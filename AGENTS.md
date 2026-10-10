@@ -62,6 +62,7 @@ La prueba de arquitectura (`tests/architecture`) hace cumplir 1, 2, 5, 6 y 9. Si
 - No se almacenan datos de tarjeta, contraseñas en claro, tokens ni enlaces firmados en logs, auditoría ni mensajes.
 - Los datos personales se tratan conforme a la Ley N.° 29733; los avisos por WhatsApp exigen consentimiento.
 - Ningún secreto, `.env` real, archivo digital ni dato personal entra al repositorio.
+- El modelo de amenazas, la lista de controles (ASVS), la privacidad y la operación segura están en `docs/05-seguridad/`; los límites de uso, los errores y el registro de seguridad, en la spec `transversal-seguridad`. Una spec o un plan que toque autenticación, datos personales, pagos, archivos digitales, límites o integraciones se revisa con `security-review`.
 
 ## 6. Interfaz de usuario
 
@@ -102,7 +103,7 @@ dotnet run --project tools/SpecCheck -- --write-matrix   # regenerar specs/TRACE
 
 ## 10. Skills y agentes del proyecto
 
-Las skills viven en `.claude/skills/` y guían cada paso del ciclo: `spec-new`, `spec-clarify`, `spec-plan`, `spec-tasks`, `spec-implement`, `spec-verify`, `progress-log`, `arch-review`, `dotnet-feature`, `ui-screen` y `ui-review`. Los agentes `spec-auditor` y `arch-reviewer` revisan en contexto aislado. Skills externas recomendadas (instalación a cargo de la persona responsable): ver `docs/07-proceso-de-desarrollo/01-flujo-sdd.md`.
+Las skills viven en `.claude/skills/` y guían cada paso del ciclo: `spec-new`, `spec-clarify`, `spec-plan`, `spec-tasks`, `spec-implement`, `spec-verify`, `progress-log`, `arch-review`, `dotnet-feature`, `security-review`, `ui-screen` y `ui-review`. Los agentes `spec-auditor`, `arch-reviewer` y `security-reviewer` revisan en contexto aislado. Skills externas recomendadas (instalación a cargo de la persona responsable): ver `docs/07-proceso-de-desarrollo/01-flujo-sdd.md`.
 
 ## 11. Ante la duda
 

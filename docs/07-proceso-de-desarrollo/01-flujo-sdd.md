@@ -30,11 +30,11 @@ InProgress --> Draft: cambia el comportamiento
 | 1 | `spec-new` | `spec.md` en Draft | Agente |
 | 2 | `spec-clarify`, agente `spec-auditor` | Spec sin ambigüedad ni preguntas abiertas | Agente y la persona (respuestas) |
 | 3 | — | Spec **Approved** (`aprobado_por`, `aprobado_en`) | **Persona** |
-| 4 | `spec-plan`, agente `arch-reviewer` | `plan.md` y `decisions.md` | Agente |
+| 4 | `spec-plan`, agentes `arch-reviewer` y `security-reviewer` | `plan.md` y `decisions.md` | Agente |
 | 5 | `spec-tasks` | `tasks.md` con cada criterio cubierto | Agente |
 | 6 | — | Plan **Planned** (`plan_aprobado_en`) | **Persona** |
 | 7 | `spec-implement`, `dotnet-feature`, `ui-screen` | Código y pruebas, una tarea y un commit a la vez | Agente |
-| 8 | `spec-verify`, `arch-review`, `ui-review` | `verificacion.md` con `Resultado: Converge` | Agente (reglas fijas) |
+| 8 | `spec-verify`, `arch-review`, `security-review`, `ui-review` | `verificacion.md` con `Resultado: Converge` | Agente (reglas fijas) |
 | 9 | `progress-log` | Bitácora y CHANGELOG | Agente |
 
 ## 3. Cómo se valida cada cosa
@@ -66,7 +66,7 @@ babelhub/
 ├── BabelHub.sln  global.json  Directory.Build.props  Directory.Packages.props
 ├── .editorconfig  .gitignore  .gitattributes  .env.example
 ├── .github/workflows/ci.yml
-├── .claude/               skills/ (11), agents/ (2), settings.json, launch.json
+├── .claude/               skills/ (12), agents/ (3), settings.json, launch.json
 ├── docs/                  7 carpetas temáticas (01-analisis-de-sistema a 07-proceso-de-desarrollo) y glossary.md
 ├── specs/                 README.md, speccheck.json, TRACEABILITY.md, _template/ y 18 features
 ├── progress/              CHANGELOG.md, blockers.md, log/
@@ -91,6 +91,7 @@ babelhub/
 | `spec-verify` | Comprobar la convergencia y escribir `verificacion.md`. |
 | `progress-log` | Registrar la sesión, el CHANGELOG y los bloqueos. |
 | `arch-review` | Revisar un cambio o un plan contra las reglas de arquitectura. |
+| `security-review` | Revisar una spec, un plan o un cambio contra el modelo de amenazas y los controles de seguridad. |
 | `dotnet-feature` | Guía para escribir casos de uso, puertos, adaptadores y pruebas. |
 | `ui-screen` | Construir una pantalla Razor desde su prototipo y el sistema de diseño. |
 | `ui-review` | Revisar una pantalla en el navegador (responsividad, temas, teclado, contraste). |
@@ -98,7 +99,8 @@ babelhub/
 | Agente | Para qué |
 | :--- | :--- |
 | `spec-auditor` | Segunda opinión independiente sobre una spec, en contexto aislado y de solo lectura. |
-| `arch-reviewer` | Revisión de arquitectura y seguridad de un cambio o plan, en contexto aislado y de solo lectura. |
+| `arch-reviewer` | Revisión de arquitectura de un cambio o plan, en contexto aislado y de solo lectura. |
+| `security-reviewer` | Revisión de seguridad y privacidad contra `docs/05-seguridad/`, en contexto aislado y de solo lectura. |
 
 ### 5.2 Externas recomendadas (instalación a cargo de la persona responsable)
 
