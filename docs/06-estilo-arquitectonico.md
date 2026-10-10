@@ -37,6 +37,7 @@ PAG["Culqi"]
 ENV["Servicio de envío"]
 LLM["Proveedor de LLM"]
 NOT["n8n + Evolution API<br/>WhatsApp"]
+ALM[("Almacén de archivos<br/>libros digitales")]
 end
 
 Nav -->|"HTTPS"| CF
@@ -67,10 +68,13 @@ ECO -->|"pagos"| PAG
 ECO -->|"envíos"| ENV
 ECO -->|"avisos"| NOT
 INV -->|"avisos"| NOT
+ECO -->|"archivos digitales"| ALM
+Nav -.->|"descarga con URL firmada"| ALM
 ASI -->|"consultas"| LLM
 
 style Nav fill:#222,stroke:#fff,color:#fff
 style NOT fill:#222,stroke:#fff,color:#fff
+style ALM fill:#222,stroke:#fff,color:#fff
 style CLIENTES fill:#222,stroke:#fff,stroke-width:2px,color:#fff
 style BORDE fill:#222,stroke:#fff,stroke-width:2px,color:#fff
 style SERVICIOS fill:#222,stroke:#fff,stroke-width:2px,color:#fff
@@ -99,12 +103,13 @@ La vista de despliegue sobre las VMs de Oracle está en `05-decisiones-arquitect
 | :--- | :--- | :--- |
 | **Aplicación Web (`BabelHub.Web`)** | Interfaz de clientes, encargados de sucursal y administración central en tres áreas; consume los servicios por REST desde el servidor y guarda el JWT en el servidor. No contiene reglas de negocio. | RC01, RC03, AD15 |
 | **Cloudflare y Nginx** | Cloudflare protege y cifra el acceso; Nginx enruta cada solicitud al servicio correspondiente. | AD13, AD14 |
-| **Servicio de E-commerce** | Catálogo, carrito, checkout, pagos y pedidos. Único servicio con el que interactúa el cliente final. | AD01, AD02 |
+| **Servicio de E-commerce** | Catálogo (impresos y digitales), carrito, checkout, pagos, pedidos y biblioteca digital (acceso y descarga). Único servicio con el que interactúa el cliente final. | AD01, AD02, AD19, AD20 |
 | **Servicio de Inventario Multi-Fuente** | Fuentes por sucursal, stock vendible (físico − reservas), reservas, selección de fuente, traslados y ajustes. | AD01, AD08 |
 | **Servicio de Identidad y Seguridad** | Autentica usuarios y emite JWT con rol y sucursal. | AD05 |
 | **Servicio de Asistente de Compra** | Recomienda libros y responde dudas con datos de las API y un LLM externo. | AD07 |
 | **BD Ventas y BD Inventario** | PostgreSQL separadas; la de Inventario se aísla por su volumen de escritura. Identidad usa el esquema propio `identidad` en la instancia de Ventas. | AD03, AD12, AD18 |
 | **Notificaciones (n8n + Evolution API)** | Reciben avisos de E-commerce e Inventario por webhook y los envían por WhatsApp; su falla no bloquea ninguna operación. | AD16 |
+| **Almacén de archivos digitales** | Guarda los EPUB y PDF en un bucket privado; el cliente los descarga con URL firmada de corta duración. | AD19, AD20 |
 | **Caché Redis** | Disponibilidad (corta duración) y catálogo (mayor duración). | AD06 |
 
 ## 4. Reglas de comunicación
@@ -120,6 +125,8 @@ La vista de despliegue sobre las VMs de Oracle está en `05-decisiones-arquitect
 | E-commerce | Culqi y servicio de envío | API externa | Cobrar y gestionar entregas. |
 | E-commerce e Inventario | n8n | Webhook (asíncrono, tolerante a fallos) | Pedir el envío de un aviso por WhatsApp. |
 | n8n | Evolution API → WhatsApp | API interna y externa | Armar y enviar el mensaje. |
+| E-commerce | Almacén de archivos | API S3 (HTTPS) | Subir archivos digitales y firmar URLs de descarga. |
+| Navegador | Almacén de archivos | HTTPS con URL firmada | Descargar el libro; la Web y el E-commerce no transportan el archivo. |
 | Asistente | Proveedor de LLM | API externa | Generar respuestas. |
 
 ## 5. Flujo principal: compra con selección de fuente
@@ -150,6 +157,37 @@ end
 E-->>C: Pedido confirmado y notificado
 end
 ```
+
+### Flujo secundario: compra y descarga de un libro digital
+
+El libro digital no pasa por el Inventario: no hay stock ni fuente que seleccionar.
+
+```mermaid
+sequenceDiagram
+autonumber
+actor C as Cliente
+participant W as Web
+participant E as E-commerce
+participant P as Culqi
+participant A as Almacén de archivos
+
+C->>W: Compra un libro digital
+W->>E: Crea el pedido, sin entrega
+E->>E: Verifica licencia vigente y territorio
+E->>P: Cobro con clave de idempotencia
+P-->>E: Pago aprobado
+E->>E: Concede acceso a la biblioteca
+E-->>W: Pedido confirmado
+C->>W: Pulsa Descargar
+W->>E: Solicita la descarga
+E->>E: Verifica titular y límite de descargas
+E->>A: Firma una URL de pocos minutos
+E-->>W: URL firmada
+W-->>C: Redirige a la URL
+C->>A: Descarga el archivo
+```
+
+En un pedido mixto, el cobro es único: las líneas impresas siguen el flujo principal y las digitales conceden acceso al aprobarse el pago.
 
 ## 6. Organización interna: Clean Architecture
 
@@ -210,8 +248,8 @@ style Ext fill:#222,stroke:#fff,color:#fff
 | :--- | :--- | :--- | :--- |
 | **Presentación** | Recibir solicitudes REST, validar la entrada, verificar token y rol, y el alcance por sucursal se comprueba también. | Controladores de disponibilidad, reservas, traslados y ajustes. | Controladores de catálogo, carrito, pedidos y pagos. |
 | **Aplicación** | Coordinar los casos de uso sin conocer detalles técnicos. | Consultar disponibilidad, reservar, seleccionar fuente, gestionar traslados y ajustes. | Buscar libros, gestionar carrito, realizar pedido, confirmar pago, consultar pedidos. |
-| **Dominio** | Entidades y reglas del negocio, sin dependencias técnicas. | Fuente, ítem de fuente, reserva, traslado y ajuste. Regla: *stock vendible = físico − reservas activas*, nunca negativo. | Libro, carrito, pedido y pago; estados del pedido. |
-| **Infraestructura** | Implementar el acceso a tecnologías externas. | Repositorios PostgreSQL, Redis y notificaciones. | Repositorios PostgreSQL, cliente REST de Inventario, pasarela de pago y servicio de envío. |
+| **Dominio** | Entidades y reglas del negocio, sin dependencias técnicas. | Fuente, ítem de fuente, reserva, traslado y ajuste. Regla: *stock vendible = físico − reservas activas*, nunca negativo. | Libro (edición impresa o digital), carrito, pedido con líneas, pago y acceso digital; estados del pedido. |
+| **Infraestructura** | Implementar el acceso a tecnologías externas. | Repositorios PostgreSQL, Redis y notificaciones. | Repositorios PostgreSQL, cliente REST de Inventario, pasarela de pago, servicio de envío y almacén de archivos. |
 
 ### 6.4 Interfaces (puertos) previstas
 
@@ -224,6 +262,7 @@ style Ext fill:#222,stroke:#fff,color:#fff
 | Notificador | Webhook de n8n, que envía por Evolution API (WhatsApp) |
 | Proveedor de LLM | API del modelo de lenguaje |
 | Caché | Redis |
+| Almacén de archivos | Almacén S3-compatible (Cloudflare R2 u Oracle Object Storage) |
 
 Gracias a ellas, cambiar de pasarela o de proveedor de LLM requiere solo una nueva implementación en Infraestructura.
 
@@ -255,6 +294,7 @@ Los nombres de proyectos son una convención sugerida, no parte de la propuesta 
 | **Arquitectura orientada a eventos** | Su complejidad operativa no se justifica con el volumen previsto; REST síncrono basta. |
 | **Interfaz dentro del servicio E-commerce** | Mezclaría la UI del personal de sucursal con la venta y rompería la independencia de los servicios. |
 | **SPA que llama a las API desde el navegador** | Expone el JWT al navegador, exige CORS y añade otro stack al proyecto. |
+| **Guardar los archivos digitales en la VM o en PostgreSQL** | El disco es escaso, los archivos pasarían por una VM de 1 OCPU y inflarían los respaldos. Ver AD19. |
 | **Capas tradicionales** | El dominio quedaría atado a la base de datos y a los proveedores externos, y sería más difícil de probar. |
 
 ## 8. Ventajas y limitaciones

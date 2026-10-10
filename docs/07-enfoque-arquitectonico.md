@@ -79,7 +79,7 @@ style Ent fill:#222,stroke:#fff,color:#fff
 | Servicio | Reglas del dominio |
 | :--- | :--- |
 | **Inventario** | *Stock vendible = stock físico − reservas activas*, y nunca negativo (RF13, RNF01). Una reserva pasa por *pendiente → confirmada* o *pendiente → liberada/expirada*. Un traslado pasa por *solicitado → aprobado → en tránsito → recibido* (o *rechazado*), y solo puede despacharse si el origen tiene stock vendible. Todo ajuste exige motivo y usuario. |
-| **E-commerce** | Un pedido solo se confirma con pago aprobado y reserva confirmada. El ISBN es único. Estados válidos del pedido y sus transiciones (RF06). Un pago se asocia a una clave de idempotencia (RF05). |
+| **E-commerce** | Un pedido agrupa líneas. Se confirma con pago aprobado y, para las líneas impresas, reserva confirmada; las líneas digitales pasan a *acceso concedido* al aprobarse el pago. El ISBN es único **por edición** (impresa o digital). Estados válidos del pedido y sus transiciones (RF06). Un pago se asocia a una clave de idempotencia (RF05). Un libro digital nunca genera reserva, selección de fuente ni traslado. Un libro digital no se vende con licencia vencida ni fuera de los territorios autorizados (RF24). El acceso digital es personal, intransferible y tiene un tope de descargas (RF23). |
 | **Identidad** | Un encargado de sucursal siempre tiene exactamente una sucursal asignada; el administrador central, ninguna restricción. Un cliente solo recibe avisos por WhatsApp si registró su número y dio su consentimiento. |
 | **Asistente** | La respuesta debe basarse en datos recibidos de las API; si no hay datos, el resultado debe indicar que no puede responder (RF08). |
 
@@ -110,6 +110,7 @@ style Ent fill:#222,stroke:#fff,color:#fff
 | Registro de auditoría | E-commerce e Inventario | Tabla de auditoría de solo inserción en la base de cada servicio |
 | Proveedor de LLM | Asistente | API del modelo de lenguaje |
 | Caché | E-commerce e Inventario | Redis |
+| Almacén de archivos (subir y firmar URLs de descarga) | E-commerce | Almacén S3-compatible (Cloudflare R2 u Oracle Object Storage); en desarrollo, MinIO o carpeta local |
 | Usuario actual | Todos | Lectura de los claims del JWT |
 | Unidad de trabajo | E-commerce e Inventario | Transacción de PostgreSQL |
 
@@ -169,10 +170,12 @@ src/
 │
 ├── BabelHub.Ecommerce/                         servicio completo (misma forma)
 │   ├── BabelHub.Ecommerce.Domain/              Catalogo, Carrito, Pedidos, Pagos,
-│   │                                           Envios, Devoluciones
+│   │                                           Envios, Devoluciones, Biblioteca
+│   │                                           (accesos digitales), Reclamaciones
 │   ├── BabelHub.Ecommerce.Application/         casos de uso y puertos
 │   ├── BabelHub.Ecommerce.Infrastructure/      PostgreSQL, cliente de Inventario,
-│   │                                           Culqi, envío, notificaciones, Redis
+│   │                                           Culqi, envío, notificaciones, Redis,
+│   │                                           almacén de archivos
 │   └── BabelHub.Ecommerce.Api/
 │
 ├── BabelHub.Identidad/                         versión reducida (ver sección 6); esquema propio `identidad`
@@ -235,12 +238,13 @@ Cada flecha es una referencia de proyecto. Al separar las capas en proyectos dis
 
 | Aspecto | Regla |
 | :--- | :--- |
-| Organización | Un solo proyecto con áreas por rol: `Tienda` (cliente), `Sucursal` (encargado y logística) y `Admin` (administración central). Sin Dominio ni Aplicación propios. |
+| Organización | Un solo proyecto con áreas por rol: `Tienda` (cliente), `Sucursal` (encargado y logística) y `Admin` (administración central). `Tienda` incluye catálogo, carrito, checkout, biblioteca digital y Libro de Reclamaciones. Sin Dominio ni Aplicación propios. |
 | Referencias | Solo a `BabelHub.Shared`. Nunca al Dominio, Aplicación o Infraestructura de un servicio. |
 | Comunicación | `HttpClient` tipados en `Clients/`, llamados **desde el servidor** por la red interna; el navegador nunca llama a los servicios. |
 | Autenticación | Inicia sesión contra Identidad, guarda el JWT en el servidor y entrega una cookie de sesión (`HttpOnly`, `Secure`, `SameSite`) más protección anti-falsificación en los formularios. Las llaves de protección de datos van en un volumen. |
 | Reglas de negocio | Ninguna. Valida la forma de la entrada para mejorar la experiencia, pero la autoridad es siempre el servicio. |
 | Pagos | El script de Culqi tokeniza la tarjeta o Yape en el navegador; la Web envía solo el token al servicio E-commerce, que realiza el cobro. |
+| Descargas digitales | La Web nunca recibe ni reenvía el archivo: pide una URL firmada al E-commerce y redirige al navegador al almacén. Las descargas fallidas se muestran con un mensaje claro (límite alcanzado, enlace vencido, licencia retirada). |
 | Errores | Traduce los códigos de los servicios (400, 403, 404, 409, 503) a pantallas con estados claros: vacío, cargando, error y con datos (RNF13). |
 | Pruebas | Pruebas E2E con Playwright y pruebas de los clientes HTTP; no se prueban las vistas de forma unitaria. |
 
@@ -328,6 +332,7 @@ Si un servicio reducido crece en lógica, se promueve a la versión completa sin
 | Infraestructura | Repositorios, migraciones, concurrencia, clientes HTTP. | `tests/integration` | xUnit + Testcontainers | Con PostgreSQL real. |
 | Contrato E-commerce ↔ Inventario | Que ambas partes respetan los DTOs de `Shared`. | `tests/integration` | xUnit | Detecta cambios que rompen la comunicación. |
 | Web | Clientes HTTP hacia los servicios y recorridos de usuario por área. | `tests/integration` y `tests/e2e` | xUnit; Playwright | Los recorridos de cada área cumplen los criterios de las specs. |
+| Biblioteca digital | Que solo el titular descargue, que un enlace vencido o ajeno se rechace y que el tope de descargas se respete. | `tests/integration` | xUnit + Testcontainers (MinIO) | AC09: 0 descargas no autorizadas. |
 | Presentación y flujo | Búsqueda → compra con recojo → cambio de estado. | `tests/e2e` | Playwright | Criterios de aceptación de las specs. |
 | Rendimiento | Disponibilidad y checkout bajo carga. | `tests/load` | k6 | p95 de RNF02. |
 
@@ -346,6 +351,7 @@ Este apartado **precisa** lo indicado en `06-estilo-arquitectonico.md` (6.3): la
 | Registrar auditoría de operaciones sensibles. | Aplicación | El caso de uso solicita el registro; la Infraestructura lo guarda sin posibilidad de modificarlo. |
 | Secretos (claves de Culqi, LLM, webhook de n8n). | Presentación | Variables de entorno; nunca en el repositorio. |
 | Sesión del usuario en la interfaz y token fuera del navegador. | `BabelHub.Web` | Cookie de sesión del servidor; el JWT nunca llega al navegador. |
+| Descarga de libros digitales solo para quien los compró. | Aplicación e Infraestructura | El caso de uso compara al usuario con el titular del acceso y revisa el tope de descargas; la Infraestructura firma una URL de 5 minutos como máximo y registra la descarga. |
 
 **Justificación:** si el alcance por sucursal se comprobara solo en los controladores, bastaría con que un controlador nuevo lo olvidara para abrir un acceso indebido (RNF05). Hacerlo en la Aplicación lo vuelve inherente a cada caso de uso y probable con pruebas unitarias.
 
@@ -365,6 +371,8 @@ Este apartado **precisa** lo indicado en `06-estilo-arquitectonico.md` (6.3): la
 8. Los secretos se leen de variables de entorno; nunca se escriben en el repositorio.
 9. BabelHub.Web solo referencia a BabelHub.Shared; no contiene reglas de negocio y llama a los servicios solo desde el servidor.
 10. Una falla del Notificador nunca interrumpe un caso de uso.
+11. Los archivos digitales nunca se guardan en el repositorio, en la base de datos ni en las VMs; viven en el almacén de objetos y se entregan solo con URL firmada de corta duración.
+12. Un libro digital no consulta al Inventario ni genera reservas.
 ```
 
 ### 9.2 Cómo se refleja en cada feature
@@ -384,19 +392,21 @@ Este apartado **precisa** lo indicado en `06-estilo-arquitectonico.md` (6.3): la
 | `inventario-seleccion-fuente` | Inventario | Dominio (estrategia de selección y reservas), Aplicación (reservar y confirmar). |
 | `inventario-ajustes` | Inventario | Dominio (ajuste con motivo y usuario; entrada por devolución), Aplicación (registrar ajuste), Infraestructura (auditoría). |
 | `inventario-traslados` | Inventario | Dominio (ciclo de vida del traslado), Aplicación (aprobar, despachar, recibir), Infraestructura (notificaciones). |
-| `ecommerce-catalogo` | E-commerce | Dominio (libro, ISBN único), Aplicación (buscar, publicar, dar de baja), Infraestructura (búsqueda y caché de catálogo). |
-| `ecommerce-carrito-checkout` | E-commerce | Dominio (carrito, pedido), Aplicación (checkout), Infraestructura (cliente de Inventario). |
+| `ecommerce-catalogo` | E-commerce | Dominio (libro, edición impresa o digital, ISBN único por edición, licencia del titular), Aplicación (buscar, publicar, dar de baja, retirar al vencer la licencia), Infraestructura (búsqueda, caché de catálogo y almacén de archivos). |
+| `ecommerce-carrito-checkout` | E-commerce | Dominio (carrito, pedido con líneas), Aplicación (checkout; la entrega solo se pide si hay impresos), Infraestructura (cliente de Inventario, solo para impresos). |
+| `ecommerce-biblioteca-digital` | E-commerce | Dominio (acceso digital, tope de descargas), Aplicación (conceder acceso, solicitar descarga), Infraestructura (almacén de archivos y URLs firmadas). |
 | `ecommerce-pagos-yape` | E-commerce | Aplicación (puerto de pasarela, idempotencia), Infraestructura (Culqi). |
 | `ecommerce-pedidos` | E-commerce | Dominio (estados y transiciones del pedido), Aplicación (consultar y avanzar estados), Infraestructura (notificaciones). |
 | `ecommerce-envios` | E-commerce | Aplicación (puerto de envío, guías y seguimiento), Infraestructura (operador logístico). |
-| `ecommerce-devoluciones` | E-commerce | Dominio (devolución y su ciclo), Aplicación (solicitar, reembolsar, reingresar stock), Infraestructura (reembolso en Culqi, cliente de Inventario). |
+| `ecommerce-devoluciones` | E-commerce | Dominio (devolución y su ciclo; política distinta para libros digitales), Aplicación (solicitar, reembolsar, reingresar stock de impresos, revocar acceso digital), Infraestructura (reembolso en Culqi, cliente de Inventario). |
+| `ecommerce-libro-reclamaciones` | E-commerce | Dominio (reclamo y su plazo de conservación), Aplicación (registrar, consultar e imprimir copia), Infraestructura (persistencia). El enlace permanente vive en `web-base`. |
 | `asistente-compra-ia` | Asistente | Aplicación (consulta fundamentada), Infraestructura (LLM y clientes REST). |
 | `identidad-seguridad` | Identidad | Dominio (usuario, rol, sucursal, consentimiento), Infraestructura (emisión de JWT, esquema `identidad`), Api. |
 | `transversal-auditoria` | E-commerce e Inventario (Identidad según se requiera) | Contrato único de registro inmutable (quién, qué, cuándo, detalle); lo implementa cada servicio en su propia base. |
 | `transversal-notificaciones` | E-commerce e Inventario | Puerto `Notificador`, plantillas de avisos, reintentos y contrato del webhook de n8n; no bloquea la operación. |
-| `web-base` | Web | Estructura de áreas, sesión por cookie, manejo de errores y estados de pantalla. Las pantallas de cada función se describen en el `plan.md` de su feature. |
+| `web-base` | Web | Estructura de áreas, sesión por cookie, manejo de errores, estados de pantalla y enlace permanente al Libro de Reclamaciones. Las pantallas de cada función se describen en el `plan.md` de su feature. |
 
-**Total: 15 especificaciones.** Los indicadores y reportes (RF21) quedan diferidos y no tienen carpeta. Las specs transversales no tienen servicio propio porque la arquitectura se limita a cuatro servicios (AD02): definen un contrato que cada servicio implementa.
+**Total: 17 especificaciones.** Los indicadores y reportes (RF21) quedan diferidos y no tienen carpeta. Las specs transversales no tienen servicio propio porque la arquitectura se limita a cuatro servicios (AD02): definen un contrato que cada servicio implementa.
 
 ## 10. Convenciones sugeridas
 
