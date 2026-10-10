@@ -64,3 +64,4 @@ style EST fill:#222,stroke:#fff,color:#fff
 | Fuga de datos personales hacia proveedores fuera del país (DA15). | Datos mínimos por proveedor, inventario de transferencias documentado (RC17) y retención definida (AD27). |
 | Dependencias o imágenes con vulnerabilidades conocidas (DA05). | Versiones fijas, escaneo en CI, SBOM y contenedores sin privilegios (RNF19). |
 | Pérdida de datos o de los respaldos por una falla de la VM de datos (DA16). | Respaldo diario cifrado fuera de la VM, prueba de restauración y objetivos RPO ≤ 24 h y RTO ≤ 4 h (AD27). |
+| El proveedor gratuito de correo limita el volumen o marca los mensajes como no deseados, y se pierde la recuperación de cuentas (DA05, DA13). | Dominio propio con SPF, DKIM y DMARC, límite de solicitudes de código (SEG-19), restablecimiento asistido para el personal y alternativa de otro proveedor detrás del puerto `EnviadorDeCorreo` (AD30). |

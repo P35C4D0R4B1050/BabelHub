@@ -59,6 +59,7 @@ Cómo se protegen las interfaces entre servicios, la que expone la Web y las que
 | **n8n y Evolution API (WhatsApp)** | Saliente: enviar mensaje. Entrante: estado de entrega. | Secreto compartido; paneles no expuestos a Internet. | Se ignoran mensajes sin firma o fuera de formato. | Reintentos con esperas crecientes; nunca interrumpe un caso de uso (NOT-04). |
 | **Almacén de archivos** | Saliente: generar URL firmada; entrante: ninguna (el navegador descarga directo). | Llave del almacén en el entorno; permisos solo de lectura para firmar. | La URL firmada caduca en 5 minutos como máximo. | Se informa el problema, no se consume una descarga (BIB-13). |
 | **Servicio de envío** | Saliente: crear guía y consultar seguimiento. | Llave en el entorno. | Formato de respuesta validado. | El envío queda pendiente y se reintenta. |
+| **Proveedor de correo** | Saliente: enviar el código de un solo uso. | Llave en el entorno; dominio con SPF, DKIM y DMARC. | Se valida el estado de entrega; el contenido solo lleva el código. | La persona reintenta; no hay cola ni almacenamiento del código fuera de Identidad (AD30). |
 | **Proveedor de LLM** | Saliente: consulta. | Llave en el entorno. | La respuesta se trata como texto no confiable (RNF22). | El asistente informa que no está disponible (ASI-07). |
 
 ## 6. Webhooks entrantes

@@ -33,7 +33,7 @@ Prioridad: **Alta**, **Media**, **Baja**.
 | **RF15** | El sistema debe seleccionar automáticamente la sucursal desde la cual atender un pedido, priorizando cercanía al cliente y disponibilidad, e identificar otras sucursales con stock cuando la más cercana no lo tenga. | Alta | NN07 |
 | **RF16** | El sistema debe generar, aprobar, despachar, recibir y dar seguimiento a traslados entre sucursales, notificando a origen y destino, y actualizando el stock de ambas. | Alta | NN07 |
 | **RF17** | El sistema debe registrar ajustes de inventario con motivo (merma, daño, corrección de conteo) y usuario responsable, por sucursal. La merma y el daño solo descuentan y nunca más que el stock vendible; la corrección de conteo se expresa como conteo físico real, que no puede ser menor que las unidades reservadas. | Alta | NN06 |
-| **RF28** | El sistema debe limitar las reservas temporales activas por cliente y por origen de red, y rechazar con un mensaje claro las que excedan el límite. Una reserva activa por cliente y hasta 5 reservas iniciadas por hora. | Alta | NN02, NN18 |
+| **RF28** | El sistema debe limitar las reservas temporales pendientes por cliente y por origen de red, y rechazar con un mensaje claro las que excedan el límite. Una reserva temporal pendiente por cliente, hasta 5 reservas iniciadas por hora por cliente y hasta 10 por origen. | Alta | NN02, NN18 |
 
 ### 1.3 Seguridad, administración y analítica
 
@@ -43,7 +43,7 @@ Prioridad: **Alta**, **Media**, **Baja**.
 | **RF19** | El sistema debe permitir registrar, actualizar y desactivar usuarios, y asignarles rol (cliente, encargado de sucursal, administrador central, logística) y sucursal. Para clientes, registrar el número de contacto y su consentimiento para recibir avisos por WhatsApp. | Alta | NN09 |
 | **RF20** | El sistema debe registrar en auditoría las operaciones sensibles: cambios de precio, anulaciones de pedido, ajustes de inventario y aprobación de traslados. | Media | NN09 |
 | **RF21** | El sistema debe ofrecer indicadores de venta, inventario y traslados por sucursal y consolidados nacionales. *(Fase posterior.)* | Baja | NN10 |
-| **RF26** | El sistema debe permitir al usuario recuperar el acceso a su cuenta mediante un código de un solo uso y vigencia corta, enviado por WhatsApp al número verificado de su cuenta, que es obligatorio al registrarse. | Alta | NN09, NN18 |
+| **RF26** | El sistema debe permitir al usuario recuperar el acceso a su cuenta mediante un código de un solo uso y vigencia corta, enviado por correo electrónico al correo verificado de su cuenta. El personal restablece su acceso mediante el administrador central. | Alta | NN09, NN18 |
 | **RF27** | El sistema debe permitir al cliente gestionar su cuenta: datos personales, consentimientos y solicitudes de acceso, rectificación, cancelación y oposición. | Alta | NN15 |
 
 ### 1.4 Libros digitales y cumplimiento legal
@@ -131,7 +131,8 @@ Las metas numéricas son **propuestas iniciales** para una red de 5 a 10 sucursa
 | **RC14** | Navegadores y dispositivos | Se soportan las dos últimas versiones estables de Chrome, Edge, Firefox y Safari, y Chrome en Android y Safari en iOS recientes. | Define el alcance de las pruebas de compatibilidad. |
 | **RC15** | Herramientas de seguridad gratuitas | Las pruebas y los escaneos usan herramientas gratuitas (CodeQL, Dependabot, ZAP, Trivy y detección de secretos). | Respeta el presupuesto (NN12). |
 | **RC16** | Estándares de referencia | OWASP Top 10:2025, API Security Top 10:2023, Top 10 para LLM 2025, ASVS 5.0 (nivel 1 completo y nivel 2 selectivo), WCAG 2.2 AA e ISO/IEC 25010:2023 como modelo de calidad; ISO/IEC 27002:2022 y NIST SSDF como referencia. Sin certificación. | Da criterios objetivos sin el costo de una certificación. |
-| **RC17** | Transferencias de datos | Los proveedores fuera del Perú (almacén de archivos, Cloudflare, WhatsApp y proveedor de LLM) se documentan con los datos que reciben y su base legal. | DS 016-2024-JUS y minimización. |
+| **RC17** | Transferencias de datos | Los proveedores fuera del Perú (almacén de archivos, Cloudflare, WhatsApp, correo y proveedor de LLM) se documentan con los datos que reciben y su base legal. | DS 016-2024-JUS y minimización. |
+| **RC18** | Correo transaccional | Los códigos de seguridad (verificación del correo y recuperación de acceso) salen por correo electrónico mediante un proveedor gratuito de envío, con el dominio del proyecto autenticado (SPF, DKIM y DMARC). No se usa para publicidad. | Respeta el presupuesto (NN12) y evita depender de un canal no oficial para la seguridad de las cuentas. |
 
 ## 4. Trazabilidad necesidad → requisitos
 
@@ -154,4 +155,4 @@ Las metas numéricas son **propuestas iniciales** para una red de 5 a 10 sucursa
 | NN15 | RF09, RF23, RF25, RF27 | RNF07, RNF23 (y [marco legal](03-marco-legal.md)) |
 | NN16 | — | RNF25, RNF26, RNF27 (y RC14) |
 | NN17 | RF29 | — |
-| NN18 | RF26, RF28 | RNF15 a RNF24 (y RC15, RC16, RC17) |
+| NN18 | RF26, RF28 | RNF15 a RNF24 (y RC15, RC16, RC17, RC18) |

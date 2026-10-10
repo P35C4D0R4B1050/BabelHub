@@ -116,7 +116,7 @@ Para Playwright (E2E) y k6 (carga) se usará su documentación oficial al implem
 
 | Fase | Contenido | Entregable verificable | Estado |
 | :---: | :--- | :--- | :--- |
-| 0 | Marco SDD: `AGENTS.md`, `CLAUDE.md`, plantillas, 18 specs en borrador, `SpecCheck`, skills y agentes, CI, glosario, bitácoras. | `SpecCheck` pasa; las skills existen. | **Hecha** |
+| 0 | Marco SDD: `AGENTS.md`, `CLAUDE.md`, plantillas, 19 specs en borrador, `SpecCheck`, skills y agentes, CI, glosario, bitácoras. | `SpecCheck` pasa; las skills existen. | **Hecha** |
 | 1 | Esqueleto técnico: solución, proyectos por servicio, prueba de arquitectura, infraestructura local. | `dotnet build -warnaserror` y `dotnet test` en verde; Compose válido. | **Hecha** |
 | 2 | Revisión y aprobación de las specs, en el orden de `specs/README.md`, con `spec-clarify` y `spec-auditor`. Resolver los bloqueos B02, B05 y B06 antes de planificar las specs que dependen de ellos. | Specs `Approved` con cero preguntas abiertas. | **Siguiente** |
 | 3 | Inventario: `transversal-auditoria`, `inventario-fuentes`, `inventario-seleccion-fuente`, `inventario-ajustes`, `inventario-traslados`. | Pruebas de concurrencia sin sobreventa (AC01). | Pendiente |

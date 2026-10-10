@@ -6,8 +6,8 @@ Aplica la Ley N.° 29733 y su reglamento (DS 016-2024-JUS) de forma **proporcion
 
 | Dato | Quién lo aporta | Finalidad | Base | Dónde vive | Quién lo ve | Retención |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| Nombre y correo | Cliente al registrarse | Identificar la cuenta y contactar | Ejecución del servicio | Identidad | El titular; la administración | Mientras la cuenta esté activa |
-| Número de WhatsApp (verificado) | Cliente al registrarse | Verificar, recuperar el acceso y, con consentimiento, avisar el estado de pedidos | Ejecución del servicio; consentimiento para avisos | Identidad | El titular; el notificador (solo el número) | Mientras la cuenta esté activa |
+| Nombre y correo (verificado) | Cliente al registrarse | Identificar la cuenta, contactar, verificar y recuperar el acceso | Ejecución del servicio | Identidad | El titular; la administración | Mientras la cuenta esté activa |
+| Número de WhatsApp (opcional) | Cliente | Avisar el estado de pedidos, solo con consentimiento | Consentimiento | Identidad | El titular; el notificador (solo el número) | Mientras la cuenta esté activa o hasta que se revoque el consentimiento |
 | Consentimientos (WhatsApp y tratamiento) | Cliente | Probar la autorización y respetar su revocación | Obligación legal | Identidad | El titular; la administración | Dos años desde su revocación *(propuesta)* |
 | Contraseña | Cliente | Autenticar | Ejecución del servicio | Identidad (solo resumen con sal) | Nadie | Mientras la cuenta esté activa |
 | Dirección de entrega | Cliente en el checkout | Despacho a domicilio | Ejecución del servicio | E-commerce (pedido) | El titular; logística | Dos años desde el pedido *(propuesta)* |
@@ -49,7 +49,8 @@ Cada proveedor recibe solo los datos mínimos necesarios (RC17).
 | **Oracle Cloud** | Todos los datos del sistema (infraestructura). | Región elegida al crear la cuenta | Se prefiere una región cercana; los respaldos se cifran. |
 | **Almacén de objetos** (R2 u Oracle) | Archivos digitales y, en los respaldos, copias cifradas de las bases. | Según el proveedor | Sin datos personales en claro en los respaldos (cifrados). |
 | **Culqi** | Datos del pago y del comprador necesarios para cobrar. | A verificar con el proveedor | La tarjeta se captura en su formulario; BabelHub recibe solo un identificador. |
-| **WhatsApp / Evolution API** | Número de teléfono y el texto del aviso. | Fuera del país | El número se usa solo para avisos y códigos; el texto no contiene datos sensibles. |
+| **WhatsApp / Evolution API** | Número de teléfono y el texto del aviso. | Fuera del país | El número se usa solo para avisos de pedidos; el texto no contiene datos sensibles. |
+| **Proveedor de correo** | Correo del destinatario y el código de un solo uso. | A verificar con el proveedor (B08) | Solo mensajes transaccionales de seguridad; sin publicidad. |
 | **Proveedor de LLM** | Texto de la consulta y datos de catálogo o del pedido del cliente que se necesiten para responder. | Fuera del país | Sin nombre, correo ni teléfono; sin historial de compra más allá del pedido consultado. |
 
 **Pendiente:** completar con la ubicación exacta cuando se elijan Oracle, el almacén (B02) y el proveedor de LLM (B06).

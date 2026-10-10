@@ -82,8 +82,8 @@ Cualquier consumidor, con o sin sesión, registra una hoja; recibe una constanci
 
 | Proceso | Pasos |
 | :--- | :--- |
-| **Registro** | La persona ingresa nombre, correo, contraseña y número de WhatsApp; recibe un código por WhatsApp y verifica el número. El consentimiento para recibir avisos se registra aparte. |
-| **Recuperación** | La persona pide recuperar el acceso; recibe un código de un solo uso en su número verificado; define una nueva contraseña y todas sus sesiones anteriores se cierran. La respuesta es la misma exista o no la cuenta. |
+| **Registro** | La persona ingresa nombre, correo y contraseña; recibe un código por correo y verifica el correo. El número de WhatsApp y el consentimiento para recibir avisos son opcionales y se registran aparte. |
+| **Recuperación** | La persona pide recuperar el acceso; recibe un código de un solo uso en su correo verificado; define una nueva contraseña y se revocan sus sesiones anteriores. El personal la recupera con el administrador central. La respuesta es la misma exista o no la cuenta. |
 | **Cancelación** | El cliente cancela su cuenta; se desactiva y se suprimen o anonimizan sus datos personales, salvo lo que una obligación legal exija. |
 
 **Spec:** `identidad-seguridad`.

@@ -25,7 +25,7 @@ El menú, el selector de sucursal y las acciones visibles dependen del rol y del
 | `ecommerce-libro-reclamaciones` | Formulario, constancia imprimible y listado de reclamos (Admin). |
 | `inventario-fuentes`, `inventario-ajustes` | Inventario de la sucursal, ajustes con motivo e historial. |
 | `inventario-seleccion-fuente`, `inventario-traslados` | Pedidos de recojo, traslados (solicitar, aprobar, despachar, recibir). |
-| `identidad-seguridad` | Inicio de sesión, registro, cuenta con consentimiento de WhatsApp, usuarios y roles. |
+| `identidad-seguridad` | Inicio de sesión, registro, verificación del correo, recuperación de acceso, cuenta con consentimiento de WhatsApp, usuarios y roles. |
 | `transversal-auditoria` | Auditoría de solo lectura con filtros. |
 | `asistente-compra-ia` | Panel de chat que no tapa precios ni acciones en pantallas pequeñas. |
 | `web-base` | Estructura, sesión, errores, estados y pie con enlaces legales. |
@@ -58,7 +58,7 @@ style F fill:#222,stroke:#fff,color:#fff
 | Solo impreso | 5 | Elección de sucursal con aviso de traslado si falta stock; reserva temporal de 15 minutos visible (AD08). |
 | Mixto | 5 | Un solo cobro; en la confirmación, las líneas impresas siguen su seguimiento y las digitales se descargan al instante. |
 
-Antes de pagar, el cliente acepta los términos y la política de reembolso de libros digitales, y da su consentimiento para los avisos por WhatsApp (Ley N.° 29733). Si el Inventario no responde, el checkout informa que no puede validar el stock y **no cobra** (AC03); los libros digitales siguen comprándose.
+Antes de pagar, el cliente acepta los términos, el tratamiento de sus datos personales (Ley N.° 29733) y, si compra libros digitales, la política de reembolso. Los avisos por WhatsApp son una opción que no se exige para pagar. Si el Inventario no responde, el checkout informa que no puede validar el stock y **no cobra** (AC03); los libros digitales siguen comprándose.
 
 ### 2.1 Tarjeta de libro
 

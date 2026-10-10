@@ -43,7 +43,7 @@ Se cruzan fronteras: (1) Internet → borde; (2) borde → aplicaciones; (3) apl
 | :--- | :--- | :---: | :--- | :---: | :--- | :---: |
 | **AM01** | Un programa o cliente acapara stock iniciando reservas sin pagar. | D | Stock | A | RF28; SEL-13, SEL-14; CAR-17; expiración de 15 minutos; SEG-05, SEG-08; AD24. | B |
 | **AM02** | Fuerza bruta o relleno de credenciales en el ingreso. | S | Cuentas | A | RNF15; IDE-03, IDE-15; SEG-06; AUD-10; SEG-09; AD22. | B |
-| **AM03** | Toma de una cuenta mediante la recuperación de contraseña (código interceptado o número reasignado). | S | Cuentas | M | IDE-16 a IDE-19; código de un solo uso y vigencia corta; respuesta uniforme; cierre de sesiones al restablecer; número verificado. | M |
+| **AM03** | Toma de una cuenta mediante la recuperación de contraseña (acceso al correo de la víctima o código adivinado). | S | Cuentas | M | IDE-16 a IDE-19; IDE-25; código de un solo uso, vigencia de 10 minutos y 5 intentos; SEG-19; respuesta uniforme; revocación de renovaciones al restablecer; correo verificado. | M |
 | **AM04** | Un encargado accede al inventario o a los pedidos de otra sucursal. | E, I | Stock, datos | A | RNF05; alcance comprobado en la Aplicación; AUD-05; FUE-08, AJU-09, PED-08; AD22. | B |
 | **AM05** | Un usuario sin permiso invoca funciones administrativas. | E | Todos | A | Roles en la credencial; política evaluada en la Aplicación; IDE-04, IDE-05; WEB-03; IDE-20 (segundo factor del administrador). | B |
 | **AM06** | Robo de la sesión mediante XSS o contenido inyectado. | S, I | Cuentas | A | SEG-02; WEB-18 (política de contenido), WEB-19 (cookie protegida); la credencial nunca llega al navegador (AGENTS 9). | B |
@@ -63,7 +63,7 @@ Se cruzan fronteras: (1) Internet → borde; (2) borde → aplicaciones; (3) apl
 | **AM20** | Abuso del Libro de Reclamaciones público (spam, scripts, datos ajenos). | D, T | Reclamaciones | M | SEG-01, SEG-02, SEG-05; REC-04; datos visibles solo a la administración y al consumidor (REC-10). | B |
 | **AM21** | Enumeración de cuentas por mensajes distintos. | I | Cuentas | M | Respuestas uniformes (IDE-03, IDE-13, IDE-17); SEG-06. | B |
 | **AM22** | Acceso a los paneles de n8n o Evolution API desde Internet. | E | Notificador | M | RNF06; sin puertos publicados; acceso solo por túnel o red interna. | B |
-| **AM23** | El canal de WhatsApp se bloquea o falla y se pierde la recuperación de contraseña. | D | Cuentas | M | Reintento (NOT-04); la falla no interrumpe otras operaciones; contingencia de recuperación asistida por la administración *(a decidir)*. | M |
+| **AM23** | El proveedor de correo falla o filtra los mensajes como no deseados y se pierde la verificación y la recuperación. | D | Cuentas | M | Dominio con SPF, DKIM y DMARC; reintento manual de la persona; la falla no interrumpe otras operaciones; el personal se restablece por el administrador (IDE-23); AD30. | B |
 | **AM24** | Un servicio interno es llamado sin credencial por otro proceso de la red. | S, E | Todos | M | SEG-15; credencial de servicio; red interna por Compose sin puertos publicados. | B |
 
 ## 4. Casos de abuso destacados
@@ -81,7 +81,7 @@ Se cruzan fronteras: (1) Internet → borde; (2) borde → aplicaciones; (3) apl
 - Se asume que Cloudflare, Oracle Cloud y los proveedores de pago y almacenamiento cumplen sus propias garantías de seguridad.
 - No se cubren ataques físicos, amenazas internas con acceso a los servidores ni adversarios con recursos de un Estado.
 - No se realizan pruebas de penetración externas (RC15, alcance del negocio); sí revisión automática (SAST, DAST básico, escaneo de dependencias y de secretos).
-- Las amenazas AM03 y AM23 dependen de un canal no oficial (Evolution API sobre WhatsApp). Se acepta el riesgo y se documenta la contingencia.
+- AM03 y AM23 dependen de un proveedor gratuito de correo (B08). Se acepta el riesgo y se documenta la contingencia en AD30.
 
 ## 6. Revisión
 

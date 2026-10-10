@@ -12,7 +12,9 @@
 | Granularidad | 14 RNF agrupados (RNF15 a RNF28). |
 | Orden | D1–D2 (mover y dividir) antes de R1 (editar el contenido). |
 | Specs | Una nueva spec transversal de seguridad y ajustes acotados en 8 specs existentes. |
-| Recuperación de contraseña (RF26) | Código de un solo uso por WhatsApp; el número de WhatsApp es obligatorio al registrarse. |
+| Recuperación de contraseña (RF26) | ~~Código por WhatsApp~~ **Revisado el 2026-10-10:** código de un solo uso por correo con proveedor gratuito (AD30, RC18, bloqueo B08); el número de WhatsApp pasa a ser opcional. El personal lo restablece el administrador central. |
+| Consentimiento de WhatsApp en el checkout | Opcional; términos y tratamiento de datos obligatorios (2026-10-10). |
+| Descarga digital | Punto de entrada propio que verifica, cuenta y redirige a un enlace firmado de 5 minutos (2026-10-10). |
 | Contraseña (RNF15) | Mínimo 8 caracteres con mayúscula, minúscula, número y símbolo; fuera de listas comunes. |
 | Reservas (RF28) | Una reserva activa por cliente y hasta 5 reservas iniciadas por hora. |
 | Otros valores *(propuesta)* | Límites de tasa, umbrales de alerta y retención de 2 años: se mantienen. |

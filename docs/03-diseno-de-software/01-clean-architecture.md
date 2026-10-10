@@ -107,7 +107,8 @@ style Ent fill:#222,stroke:#fff,color:#fff
 | Pasarela de pago | E-commerce | Culqi (Yape y tarjetas) |
 | Servicio de envío | E-commerce | Operador logístico |
 | Notificador | E-commerce e Inventario | Webhook de n8n, que envía por Evolution API (WhatsApp); si falla, deja el aviso pendiente y no interrumpe el caso de uso |
-| Registro de auditoría | E-commerce e Inventario | Tabla de auditoría de solo inserción en la base de cada servicio |
+| Enviador de correo | Identidad | Proveedor gratuito de correo (B08); envía solo códigos de seguridad, sin cola ni reintento diferido; si falla, la persona reintenta |
+| Registro de auditoría | E-commerce, Inventario e Identidad | Tabla de auditoría de solo inserción en la base de cada servicio |
 | Proveedor de LLM | Asistente | API del modelo de lenguaje |
 | Caché | E-commerce e Inventario | Redis |
 | Almacén de archivos (subir y firmar URLs de descarga) | E-commerce | Almacén S3-compatible (Cloudflare R2 u Oracle Object Storage); en desarrollo, un emulador compatible con S3 o una carpeta local |
@@ -370,7 +371,7 @@ Este apartado **precisa** lo indicado en [organización interna, sección 3 (res
 7. Toda regla de negocio nueva se escribe primero como prueba unitaria en tests/unit.
 8. Los secretos se leen de variables de entorno; nunca se escriben en el repositorio.
 9. BabelHub.Web solo referencia a BabelHub.Shared; no contiene reglas de negocio y llama a los servicios solo desde el servidor.
-10. Una falla del Notificador nunca interrumpe un caso de uso.
+10. Una falla del Notificador nunca interrumpe un caso de uso (el envío de códigos de seguridad por correo no es un aviso: usa el puerto `EnviadorDeCorreo`).
 11. Los archivos digitales nunca se guardan en el repositorio, en la base de datos ni en las VMs; viven en el almacén de objetos y se entregan solo con URL firmada de corta duración.
 12. Un libro digital no consulta al Inventario ni genera reservas.
 ```
@@ -402,7 +403,7 @@ Este apartado **precisa** lo indicado en [organización interna, sección 3 (res
 | `ecommerce-libro-reclamaciones` | E-commerce | Dominio (reclamo y su plazo de conservación), Aplicación (registrar, consultar e imprimir copia), Infraestructura (persistencia). El enlace permanente vive en `web-base`. |
 | `asistente-compra-ia` | Asistente | Aplicación (consulta fundamentada), Infraestructura (LLM y clientes REST). |
 | `identidad-seguridad` | Identidad | Dominio (usuario, rol, sucursal, consentimiento), Infraestructura (emisión de JWT, esquema `identidad`), Api. |
-| `transversal-auditoria` | E-commerce e Inventario (Identidad según se requiera) | Contrato único de registro inmutable (quién, qué, cuándo, detalle); lo implementa cada servicio en su propia base. |
+| `transversal-auditoria` | E-commerce, Inventario e Identidad | Contrato único de registro inmutable (quién, qué, cuándo, detalle); lo implementa cada servicio en su propia base. |
 | `transversal-notificaciones` | E-commerce e Inventario | Puerto `Notificador`, plantillas de avisos, reintentos y contrato del webhook de n8n; no bloquea la operación. |
 | `web-base` | Web | Estructura de áreas, sesión por cookie, manejo de errores, estados de pantalla y enlace permanente al Libro de Reclamaciones. Las pantallas de cada función se describen en el `plan.md` de su feature. |
 

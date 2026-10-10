@@ -152,7 +152,8 @@ class Usuario {
   Correo unico
   Rol
   Sucursal (solo encargado)
-  Numero de WhatsApp verificado
+  Correo verificado
+  Numero de WhatsApp opcional
   Activo
 }
 class Consentimiento {
@@ -165,7 +166,7 @@ class SolicitudARCO {
   Estado
 }
 class CodigoDeUnSoloUso {
-  Proposito: verificacion, recuperacion, segundo factor
+  Proposito: verificacion, recuperacion, segundo factor, respaldo
   Vigencia corta
   Usado
 }

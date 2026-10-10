@@ -56,8 +56,15 @@ Lenguaje común del dominio. El código, las specs y la interfaz usan estos tér
 | Término | Definición | No confundir con |
 | :--- | :--- | :--- |
 | **Rol** | Cliente, encargado de sucursal, personal de logística o administrador central. | Alcance de sucursal. |
-| **Consentimiento** | Autorización del cliente para recibir avisos por WhatsApp y tratar sus datos. Revocable. | Aceptación de términos. |
+| **Consentimiento** | Autorización opcional del cliente para recibir avisos por WhatsApp. Revocable. | Aceptación de términos y del tratamiento de datos, que es obligatoria para comprar. |
 | **Derechos ARCO** | Acceso, rectificación, cancelación y oposición sobre los datos personales (Ley N.° 29733). | — |
+| **Código de un solo uso** | Código corto enviado por correo (verificación y recuperación) o generado por una aplicación (segundo factor), que caduca y no puede reutilizarse. | Contraseña. |
+| **Segundo factor (TOTP)** | Código temporal que el administrador central presenta además de su contraseña. | Código de verificación del correo. |
+| **Límite de uso** | Tope de solicitudes u operaciones por usuario u origen en un tiempo, con una respuesta única al excederse. | Reserva que expira. |
+| **Origen** | Dirección del cliente final que realiza una solicitud, tomada del borde de confianza. | Dirección de un componente interno. |
+| **Evento de seguridad** | Registro de un ingreso fallido, bloqueo, acceso denegado, límite excedido, cambio de rol o uso de un código de respaldo. | Log técnico. |
+| **Amenaza (AM)** | Escenario de abuso identificado en el modelo de amenazas (`AM01`…). | Riesgo del proyecto. |
+| **Control (CTL)** | Verificación de seguridad de la lista basada en ASVS (`CTL-01`…). | Requisito de una spec. |
 | **Auditoría** | Registro inmutable de operaciones sensibles. | Log técnico. |
 | **Libro de Reclamaciones** | Registro de reclamos y quejas de los consumidores, con **hojas** numeradas. | Auditoría. |
 

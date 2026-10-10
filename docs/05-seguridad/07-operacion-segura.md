@@ -99,5 +99,5 @@ Contactos y responsabilidades: la persona responsable del proyecto decide; el eq
 | :--- | :--- | :--- |
 | Agregar CodeQL, Dependabot, Trivy, escáner de secretos y SBOM a CI | Infraestructura | RNF19, CTL-34 |
 | Definir cifrado y custodia de la clave de los respaldos | Infraestructura | CTL-28 |
-| Definir la contingencia de recuperación sin WhatsApp | Identidad | AM23 |
+| Elegir el proveedor de correo y configurar SPF, DKIM y DMARC | Responsable del proyecto | B08, AM23 |
 | Elegir el canal de alertas para la administración | Responsable del proyecto | SEG (pregunta abierta) |

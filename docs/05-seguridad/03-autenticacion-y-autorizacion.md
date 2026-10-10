@@ -32,10 +32,12 @@ La credencial **nunca llega al navegador** (AGENTS.md, regla 9). El navegador so
 | Contraseña | Mínimo 8 caracteres con mayúscula, minúscula, número y símbolo; fuera de listas comunes; resumen robusto con sal. | IDE-09, IDE-15, RNF15 |
 | Bloqueo | 5 fallos en 15 minutos bloquean temporalmente el ingreso; la respuesta no distingue si la cuenta existe. | IDE-03, SEG-06 |
 | Segundo factor | TOTP obligatorio para el administrador central; los demás roles no lo tienen en esta etapa. | IDE-20 |
-| Verificación del número | Código de un solo uso por WhatsApp al registrarse; el número es obligatorio. | IDE-01, IDE-16 |
-| Recuperación | Código de un solo uso y vigencia corta enviado al número verificado; al restablecer se cierran todas las sesiones. | IDE-17 a IDE-19 |
+| Verificación del correo | Código de un solo uso por correo al registrarse o cambiar el correo; el correo sin verificar no permite recuperar el acceso, pero sí comprar. | IDE-01, IDE-16, IDE-29 |
+| Recuperación del cliente | Código de un solo uso (10 minutos, 5 intentos, 3 solicitudes por hora) enviado al correo verificado; al restablecer se revocan todas las renovaciones. | IDE-17 a IDE-19, SEG-19 |
+| Recuperación del personal | La restablece el administrador central con una contraseña temporal de un solo uso, auditada. | IDE-23 |
+| Códigos de respaldo | 8 códigos de un solo uso del segundo factor del administrador. | IDE-21, IDE-22 |
 
-**Riesgo conocido:** el canal de WhatsApp (Evolution API) no es oficial y un número puede reasignarse; por eso la recuperación es la amenaza AM03 con riesgo residual medio. Contingencia pendiente de decisión: recuperación asistida por la administración con verificación de identidad.
+**Riesgo conocido:** quien controle el correo de una cuenta puede recuperarla (AM03, riesgo residual medio). Se mitiga con el código corto, el límite de intentos y solicitudes, el aviso de cambio de contraseña y el cambio de correo que exige la contraseña actual (IDE-25). El proveedor de correo es un bloqueo abierto (B08).
 
 ## 3. Identidades de servicio
 
@@ -73,5 +75,5 @@ Cerrar sesión invalida la renovación. Desactivar a un usuario impide su ingres
 ## 6. Decisiones pendientes
 
 - Mecanismo de rotación de la clave de firma y su custodia (CTL-29).
-- Contingencia de recuperación cuando el canal de WhatsApp falla (AM23).
+- Proveedor de correo y configuración de SPF, DKIM y DMARC (B08, AM23).
 - Si se extiende el segundo factor al encargado de sucursal (hoy fuera de alcance).

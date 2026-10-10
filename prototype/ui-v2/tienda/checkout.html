@@ -95,10 +95,10 @@ BH.ready(() => {
     },
     'Tus datos'() {
       return `<h2 class="font-display text-2xl mb-3">Tus datos</h2>
-        <div class="grid sm:grid-cols-2 gap-4 max-w-2xl">${campo('nombre', 'Nombre completo')}${campo('tel', 'WhatsApp', '987 654 321', 'tel', 'inputmode="tel"')}</div>
+        <div class="grid sm:grid-cols-2 gap-4 max-w-2xl">${campo('nombre', 'Nombre completo')}${campo('tel', 'WhatsApp (opcional, para avisos)', '987 654 321', 'tel', 'inputmode="tel"')}</div>
         <div class="space-y-3 mt-4 max-w-2xl">
-          <label class="flex gap-3 items-start cursor-pointer"><input id="consent" type="checkbox" class="checkbox checkbox-primary mt-0.5" ${s.consent ? 'checked' : ''}><span class="text-sm">Acepto recibir avisos de mi pedido por WhatsApp y el tratamiento de mis datos personales conforme a la Ley N.° 29733.</span></label>
-          <label class="flex gap-3 items-start cursor-pointer"><input id="terminos" type="checkbox" class="checkbox checkbox-primary mt-0.5" ${s.terminos ? 'checked' : ''}><span class="text-sm">Acepto los <a class="link" target="_blank" href="legal.html?doc=terminos">términos y condiciones</a>${hayDigital ? ' y la <a class="link" target="_blank" href="legal.html?doc=reembolso">política de reembolso de libros digitales</a>: el reembolso procede si el libro no fue descargado o si el archivo está defectuoso' : ''}.</span></label></div>
+          <label class="flex gap-3 items-start cursor-pointer"><input id="consent" type="checkbox" class="checkbox checkbox-primary mt-0.5" ${s.consent ? 'checked' : ''}><span class="text-sm">Quiero recibir avisos de mi pedido por WhatsApp (opcional; puedes cambiarlo en tu cuenta).</span></label>
+          <label class="flex gap-3 items-start cursor-pointer"><input id="terminos" type="checkbox" class="checkbox checkbox-primary mt-0.5" ${s.terminos ? 'checked' : ''}><span class="text-sm">Acepto los <a class="link" target="_blank" href="legal.html?doc=terminos">términos y condiciones</a>, el tratamiento de mis datos personales conforme a la Ley N.° 29733${hayDigital ? ' y la <a class="link" target="_blank" href="legal.html?doc=reembolso">política de reembolso de libros digitales</a>: el reembolso procede si el libro no fue descargado o si el archivo está defectuoso' : ''}.</span></label></div>
         <p id="err" class="text-error text-sm mt-2" role="alert"></p>
         <div class="mt-5 flex justify-between"><button class="btn btn-ghost" data-ir="-1">Atrás</button><button class="btn btn-primary" id="sig">Ir al pago</button></div>`;
     },
@@ -117,8 +117,8 @@ BH.ready(() => {
         <h2 class="font-display text-4xl">¡Pedido confirmado!</h2><p>Número de pedido <b>${s.creado}</b></p>
         ${hayDigital ? `<p class="max-w-md mx-auto">${BH.icon('bolt', 'size-4 inline text-success')} Tus libros digitales ya están en <b>Mi biblioteca</b>.</p>` : ''}
         ${msgImp ? `<p class="opacity-75 max-w-md mx-auto">${msgImp}</p>` : ''}
-        <div class="chat chat-start max-w-sm mx-auto text-left"><div class="chat-bubble text-sm">BabelHub: tu pedido ${s.creado} fue confirmado ✅. ${hayDigital ? 'Tus libros digitales ya están disponibles.' : 'Te avisaremos aquí cada cambio.'}</div></div>
-        <p class="text-xs opacity-60">Vista previa del WhatsApp que recibirás en ${s.tel}.</p>
+        ${s.consent ? `<div class="chat chat-start max-w-sm mx-auto text-left"><div class="chat-bubble text-sm">BabelHub: tu pedido ${s.creado} fue confirmado ✅. ${hayDigital ? 'Tus libros digitales ya están disponibles.' : 'Te avisaremos aquí cada cambio.'}</div></div>
+        <p class="text-xs opacity-60">Vista previa del WhatsApp que recibirás en ${s.tel}.</p>` : '<p class="text-xs opacity-60">No activaste los avisos por WhatsApp; puedes seguir tu pedido desde tu cuenta.</p>'}
         <div class="flex flex-wrap gap-2 justify-center">${hayDigital ? '<a href="biblioteca.html" class="btn btn-primary">Ir a mi biblioteca</a>' : ''}<a href="pedidos.html?id=${s.creado}" class="btn ${hayDigital ? 'btn-outline' : 'btn-primary'}">Seguir mi pedido</a></div></div>`;
     }
   };
@@ -143,9 +143,9 @@ BH.ready(() => {
     if (p === 'Revisar') { if (impresos.some((l) => !fuente(l).ok)) { BH.toast('Algún impreso ya no tiene stock. Vuelve al carrito.', 'error'); return; } if (lineas.some((l) => l.formato === 'digital' && !BH.digitalEstado(l.obra).ok)) { BH.toast('Un libro digital ya no está disponible. Vuelve al carrito.', 'error'); return; } reserva(); }
     if (p === 'Entrega' && s.tipo === 'domicilio' && !s.dir.trim()) { BH.toast('Escribe tu dirección de entrega', 'warning'); return; }
     if (p === 'Tus datos') {
-      if (!s.nombre.trim() || !/^\+?[\d\s]{9,}$/.test(String(s.tel).trim())) { $('err').textContent = 'Escribe tu nombre y un número de WhatsApp válido.'; return; }
-      if (!s.consent) { $('err').textContent = 'Necesitamos tu consentimiento para los avisos y el tratamiento de datos.'; return; }
-      if (!s.terminos) { $('err').textContent = 'Debes aceptar los términos' + (hayDigital ? ' y la política de reembolso de libros digitales.' : '.'); return; }
+      if (!s.nombre.trim()) { $('err').textContent = 'Escribe tu nombre.'; return; }
+      if ((s.consent || String(s.tel).trim()) && !/^\+?[\d\s]{9,}$/.test(String(s.tel).trim())) { $('err').textContent = 'Escribe un número de WhatsApp válido o quita el aviso.'; return; }
+      if (!s.terminos) { $('err').textContent = 'Debes aceptar los términos y el tratamiento de datos' + (hayDigital ? ' y la política de reembolso de libros digitales.' : '.'); return; }
     }
     i++; render();
   }

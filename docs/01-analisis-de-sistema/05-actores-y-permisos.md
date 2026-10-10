@@ -7,8 +7,8 @@ Este documento amplía los actores de la [necesidad del negocio](01-necesidad-de
 | Rol | Cómo se identifica | Alcance | Segundo factor |
 | :--- | :--- | :--- | :---: |
 | **Visitante** | Sin sesión. | Solo lectura pública y el Libro de Reclamaciones. | No |
-| **Cliente** | Cuenta propia, número de WhatsApp verificado. | Sus propios datos, carrito, pedidos y biblioteca. | No |
-| **Encargado de sucursal** | Cuenta creada por la administración, con exactamente una sucursal. | Solo su sucursal. | No |
+| **Cliente** | Cuenta propia, con correo verificado (el número de WhatsApp es opcional). | Sus propios datos, carrito, pedidos y biblioteca. | No |
+| **Encargado de sucursal** | Cuenta creada por la administración, con exactamente una sucursal; su contraseña la restablece el administrador. | Solo su sucursal. | No |
 | **Personal de logística** | Cuenta creada por la administración, sin sucursal. | Traslados y envíos de toda la red, sin ajustar stock. | No |
 | **Administrador central** | Cuenta creada por la administración. | Toda la red; gestiona catálogo, usuarios y auditoría. | **Sí (TOTP)** |
 
@@ -40,8 +40,10 @@ Soporte (ayudas del cliente) lo cubre hoy el administrador central. Un rol de so
 | Seguir traslados | — | — | ◐ | ● | ● | `inventario-traslados` |
 | Usar el asistente de compra | ◐ (solo catálogo) | ● | ● | ● | ● | `asistente-compra-ia` |
 | Gestionar usuarios, roles y sucursales | — | — | — | — | ● | `identidad-seguridad` |
-| Gestionar mi cuenta, consentimientos y solicitudes ARCO | — | ◐ | ◐ | ◐ | ◐ | `identidad-seguridad` |
+| Gestionar mi cuenta, consentimientos y solicitudes ARCO | — | ◐ | — | — | — | `identidad-seguridad` |
+| Atender solicitudes ARCO y restablecer contraseñas del personal | — | — | — | — | ● | `identidad-seguridad` |
 | Consultar la auditoría | — | — | ◐ (historial de su sucursal) | — | ● | `transversal-auditoria` |
+| Consultar la biblioteca de un cliente | — | — | — | — | ● (auditado) | `ecommerce-biblioteca-digital` |
 | Recibir alertas de seguridad | — | — | — | — | ● | `transversal-seguridad` |
 
 ## 3. Identidades que no son personas
