@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Auditoría · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-area="admin" data-page="auditoria" data-estados="normal,vacio">
+<div id="page-content" hidden>
+  <h1 class="font-display text-3xl mb-1">Auditoría</h1>
+  <p class="text-sm text-base-content/70 mb-4">Registro de solo lectura: precios, anulaciones, ajustes de inventario y traslados. Los ajustes y traslados que hagas en el prototipo aparecen aquí.</p>
+  <div class="flex flex-wrap gap-2 mb-4">
+    <select id="f-acc" class="select select-sm"><option value="">Todas las acciones</option></select>
+    <input id="f-txt" class="input input-sm" placeholder="Buscar en el detalle" aria-label="Buscar en el detalle">
+  </div>
+  <div id="tabla"></div>
+</div>
+
+<script>
+BH.ready(() => {
+  const $ = (id) => document.getElementById(id);
+  const todos = BH.estado === 'vacio' ? [] : BH.audit.list();
+  const acciones = [...new Set(todos.map((e) => e.accion))];
+  $('f-acc').innerHTML += acciones.map((a) => `<option>${a}</option>`).join('');
+  function tabla() {
+    const a = $('f-acc').value, t = $('f-txt').value.toLowerCase();
+    const l = todos.filter((e) => (!a || e.accion === a) && (!t || e.detalle.toLowerCase().includes(t)));
+    if (!l.length) { $('tabla').innerHTML = BH.emptyState('shield', 'Sin eventos', 'No hay operaciones sensibles registradas con este filtro.'); return; }
+    $('tabla').innerHTML = `<div class="overflow-x-auto card bg-base-100 border border-base-300"><table class="table">
+      <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Detalle</th></tr></thead>
+      <tbody>${l.map((e) => `<tr><td class="whitespace-nowrap text-sm tabular-nums">${e.fecha}</td>
+        <td><div class="text-sm font-medium">${e.usuario}</div><div class="text-xs text-base-content/60">${e.rol}</div></td>
+        <td><span class="badge badge-soft badge-primary">${e.accion}</span></td><td class="text-sm">${e.detalle}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  $('f-acc').onchange = tabla; $('f-txt').oninput = tabla; tabla();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Traslados · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-area="sucursal" data-page="traslados" data-estados="normal,vacio,error">
+<div id="page-content" hidden>
+  <h1 class="font-display text-3xl mb-1">Traslados</h1>
+  <p class="text-sm text-base-content/70 mb-4">Entrantes (hacia Ayacucho) y salientes (desde Ayacucho). Cada paso queda en auditoría.</p>
+  <div role="tablist" class="tabs tabs-border mb-4" id="tabs"></div>
+  <div id="lista"></div>
+</div>
+
+<script>
+BH.ready(() => {
+  const $ = (id) => document.getElementById(id);
+  const ME = 'aya';
+  let filtro = 'todos';
+  const lista = BH.traslados.map((t) => ({ ...t }));
+  const ESTADO = { solicitado: ['Solicitado', 'badge-info'], aprobado: ['Aprobado', 'badge-accent'], transito: ['En tránsito', 'badge-warning'], recibido: ['Recibido', 'badge-success'] };
+  const TABS = [['todos', 'Todos'], ['solicitado', 'Solicitados'], ['aprobado', 'Aprobados'], ['transito', 'En tránsito'], ['recibido', 'Recibidos']];
+
+  function accion(t) {
+    const saliente = t.origen === ME, entrante = t.destino === ME;
+    if (t.estado === 'solicitado' && saliente) return ['aprobado', 'Aprobar'];
+    if (t.estado === 'aprobado' && saliente) return ['transito', 'Despachar'];
+    if (t.estado === 'transito' && entrante) return ['recibido', 'Recibir'];
+    return null;
+  }
+
+  function pintar() {
+    $('tabs').innerHTML = TABS.map(([k, l]) => `<button role="tab" class="tab ${filtro === k ? 'tab-active' : ''}" data-f="${k}">${l} <span class="badge badge-sm ml-1">${k === 'todos' ? lista.length : lista.filter((t) => t.estado === k).length}</span></button>`).join('');
+    $('tabs').querySelectorAll('[data-f]').forEach((b) => (b.onclick = () => { filtro = b.dataset.f; pintar(); }));
+    if (BH.estado === 'error') { $('lista').innerHTML = BH.errorState('No pudimos cargar los traslados.'); return; }
+    const l = BH.estado === 'vacio' ? [] : lista.filter((t) => filtro === 'todos' || t.estado === filtro);
+    if (!l.length) { $('lista').innerHTML = BH.emptyState('swap', 'No hay traslados', 'Cuando una sucursal pida o envíe mercadería, aparecerá aquí.'); return; }
+    $('lista').innerHTML = `<div class="overflow-x-auto card bg-base-100 border border-base-300"><table class="table">
+      <thead><tr><th>N.°</th><th>Libro</th><th class="text-right">Cant.</th><th>Ruta</th><th>Estado</th><th></th></tr></thead>
+      <tbody>${l.map((t) => { const a = accion(t), [lab, cls] = ESTADO[t.estado], dir = t.origen === ME ? 'Saliente' : 'Entrante';
+        return `<tr><td class="font-mono text-sm">${t.id}<div class="text-xs text-base-content/50">${t.fecha}</div></td>
+        <td><div class="font-medium">${BH.libro(t.libro).titulo}</div><div class="text-xs text-base-content/60">${t.motivo}</div></td>
+        <td class="text-right">${t.cant}</td>
+        <td class="whitespace-nowrap">${BH.sucursal(t.origen).nombre} → ${BH.sucursal(t.destino).nombre}<div><span class="badge badge-ghost badge-xs">${dir}</span></div></td>
+        <td><span class="badge badge-soft ${cls}">${lab}</span></td>
+        <td class="text-right">${a ? `<button class="btn btn-sm btn-primary" data-id="${t.id}" data-to="${a[0]}">${a[1]}</button>` : '<span class="text-xs text-base-content/40">—</span>'}</td></tr>`; }).join('')}</tbody></table></div>`;
+    $('lista').querySelectorAll('[data-id]').forEach((b) => (b.onclick = () => {
+      const t = lista.find((x) => x.id === b.dataset.id), to = b.dataset.to;
+      const verbo = { aprobado: 'Aprobación de traslado', transito: 'Despacho de traslado', recibido: 'Recepción de traslado' }[to];
+      t.estado = to; BH.audit.add('enc.ayacucho', 'Encargado de sucursal', verbo, `${t.id} ${BH.sucursal(t.origen).nombre} → ${BH.sucursal(t.destino).nombre}`);
+      BH.toast(`${t.id}: ${ESTADO[to][0].toLowerCase()}. Se notificó a origen y destino por WhatsApp.`); pintar();
+    }));
+  }
+  pintar();
+});
+</script>
+</body>
+</html>

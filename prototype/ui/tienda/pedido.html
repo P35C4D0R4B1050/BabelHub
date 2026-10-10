@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Seguimiento del pedido · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-area="tienda" data-page="pedido" data-estados="transito,confirmado,preparacion,listo,entregado">
+<div id="page-content" hidden>
+  <div class="flex flex-wrap items-end justify-between gap-2 mb-6">
+    <div><p class="text-sm text-base-content/60">Pedido</p><h1 class="font-display text-3xl">BH-2026-000123</h1></div>
+    <span id="estado-badge" class="badge badge-lg"></span>
+  </div>
+  <div class="grid lg:grid-cols-[1fr_22rem] gap-8 items-start">
+    <section class="space-y-6">
+      <div class="card bg-base-100 border border-base-300"><div class="card-body">
+        <h2 class="font-semibold mb-2">Estado del pedido</h2>
+        <ul class="steps steps-vertical w-full" id="linea"></ul></div></div>
+      <div id="traslado"></div>
+    </section>
+    <aside class="space-y-4">
+      <div class="card bg-base-100 border border-base-300"><div class="card-body gap-2 p-4" id="detalle"></div></div>
+      <div class="card bg-base-100 border border-base-300"><div class="card-body gap-2 p-4">
+        <h2 class="font-semibold">Avisos enviados</h2><ul id="avisos" class="space-y-2 text-sm"></ul></div></div>
+      <button id="btn-dev" class="btn btn-outline w-full">Solicitar devolución</button>
+    </aside>
+  </div>
+
+  <dialog id="dlg-dev" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box"><h3 class="font-display text-xl mb-2">Solicitar devolución</h3>
+      <p class="text-sm text-base-content/70 mb-3">Elige qué quieres devolver. Te reembolsaremos por el mismo medio de pago cuando recibamos el libro.</p>
+      <label class="floating-label w-full mb-3"><span>Motivo</span><select class="select w-full"><option>Llegó dañado</option><option>No es el libro que pedí</option><option>Me arrepentí de la compra</option></select></label>
+      <div class="modal-action"><form method="dialog" class="flex gap-2"><button class="btn btn-ghost">Cancelar</button><button class="btn btn-primary" id="dev-ok">Enviar solicitud</button></form></div></div>
+    <form method="dialog" class="modal-backdrop"><button>cerrar</button></form>
+  </dialog>
+</div>
+
+<script>
+BH.ready(() => {
+  const $ = (id) => document.getElementById(id);
+  const e = BH.estado === 'normal' ? 'transito' : BH.estado;
+  const orden = ['confirmado', 'preparacion', 'transito', 'listo', 'entregado'];
+  const etiquetas = {
+    confirmado: ['Pedido confirmado', 'Recibimos tu pago y reservamos tu stock.'],
+    preparacion: ['En preparación', 'La sucursal está separando tus libros.'],
+    transito: ['En tránsito entre sucursales', 'Traslado de Cusco a Ayacucho para completar tu pedido.'],
+    listo: ['Listo para recojo', 'Puedes pasar por la sucursal Ayacucho con tu DNI.'],
+    entregado: ['Entregado', 'Gracias por tu compra.']
+  };
+  const i = orden.indexOf(e);
+  $('linea').innerHTML = orden.map((k, n) => `<li class="step ${n <= i ? 'step-primary' : ''}" ${n === i ? 'aria-current="step"' : ''} data-content="${n < i ? '✓' : n + 1}">
+    <div class="text-left ml-2 py-1"><div class="font-medium">${etiquetas[k][0]}</div><div class="text-sm text-base-content/70">${etiquetas[k][1]}</div></div></li>`).join('');
+
+  const tono = { confirmado: 'badge-info', preparacion: 'badge-info', transito: 'badge-warning', listo: 'badge-success', entregado: 'badge-success' }[e];
+  $('estado-badge').className = `badge badge-lg badge-soft ${tono}`; $('estado-badge').textContent = etiquetas[e][0];
+
+  if (e === 'transito') {
+    $('traslado').innerHTML = `<div class="card bg-base-100 border border-warning/50"><div class="card-body gap-3">
+      <h2 class="font-semibold flex items-center gap-2">${BH.icon('truck', 'size-5')} Traslado TR-0042</h2>
+      <div class="flex items-center gap-3 text-sm"><span class="badge badge-outline">Cusco</span><span class="flex-1 border-t border-dashed border-base-content/30"></span>${BH.icon('truck', 'size-5 text-warning')}<span class="flex-1 border-t border-dashed border-base-content/30"></span><span class="badge badge-primary">Ayacucho</span></div>
+      <p class="text-sm text-base-content/70">Despachado el 8 de octubre · llegada estimada el 12 de octubre.</p></div></div>`;
+  }
+
+  const l = BH.libro(5), l2 = BH.libro(1);
+  $('detalle').innerHTML = `<h2 class="font-semibold">Detalle</h2>
+    <p class="text-sm">1 × ${l.titulo}<br>1 × ${l2.titulo}</p>
+    <div class="divider my-1"></div>
+    <p class="text-sm"><span class="text-base-content/60">Entrega:</span> Recojo en Ayacucho</p>
+    <p class="text-sm"><span class="text-base-content/60">Total pagado:</span> <b>${BH.money(l.precio + l2.precio)}</b></p>`;
+
+  const av = [['Pedido confirmado', 'hace 3 días']];
+  if (i >= 1) av.push(['Tu pedido está en preparación', 'hace 3 días']);
+  if (i >= 2) av.push(['Tus libros viajan de Cusco a Ayacucho', 'hace 2 días']);
+  if (i >= 3) av.push(['Tu pedido está listo para recojo', 'ayer']);
+  if (i >= 4) av.push(['Pedido entregado', 'hoy']);
+  $('avisos').innerHTML = av.reverse().map(([t, c]) => `<li class="flex gap-2"><span class="text-success mt-0.5">${BH.icon('check', 'size-4')}</span><span>${t}<br><span class="text-xs text-base-content/50">WhatsApp · ${c}</span></span></li>`).join('');
+
+  const btn = $('btn-dev');
+  btn.disabled = e !== 'entregado';
+  btn.title = e !== 'entregado' ? 'Disponible cuando el pedido esté entregado' : '';
+  btn.onclick = () => $('dlg-dev').showModal();
+  $('dev-ok').onclick = () => BH.toast('Solicitud de devolución enviada');
+});
+</script>
+</body>
+</html>

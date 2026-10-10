@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Catálogo · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-area="tienda" data-page="catalogo" data-estados="normal,cargando,vacio,error">
+<div id="page-content" hidden>
+  <div class="rounded-box bg-base-200 border border-base-300 p-6 sm:p-8 mb-6 flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
+    <div>
+      <h1 class="font-display text-3xl sm:text-4xl">Libros con stock real</h1>
+      <p class="text-base-content/70 mt-1 max-w-xl">Solo mostramos lo que realmente hay en nuestras sucursales. Recoge en tienda o recíbelo en casa.</p>
+    </div>
+    <div class="stats stats-vertical sm:stats-horizontal bg-base-100 border border-base-300">
+      <div class="stat py-2 px-4"><div class="stat-title">Títulos</div><div class="stat-value text-2xl" id="st-titulos">–</div></div>
+      <div class="stat py-2 px-4"><div class="stat-title">Sucursales</div><div class="stat-value text-2xl">6</div></div>
+    </div>
+  </div>
+
+  <div class="grid lg:grid-cols-[16rem_1fr] gap-6">
+    <aside aria-label="Filtros">
+      <button class="btn btn-outline w-full lg:hidden mb-2" onclick="document.getElementById('filtros').classList.toggle('hidden')">Filtros</button>
+      <form id="filtros" class="hidden lg:block space-y-5 card bg-base-100 border border-base-300 p-4">
+        <fieldset>
+          <legend class="font-semibold mb-2">Categoría</legend>
+          <div id="f-cats" class="space-y-1"></div>
+        </fieldset>
+        <fieldset>
+          <legend class="font-semibold mb-2">Precio máximo: <span id="f-precio-v">S/ 170</span></legend>
+          <input id="f-precio" type="range" min="20" max="170" step="5" value="170" class="range range-primary range-xs" aria-label="Precio máximo">
+        </fieldset>
+        <fieldset>
+          <legend class="font-semibold mb-2">Disponibilidad</legend>
+          <select id="f-disp" class="select w-full">
+            <option value="todos">Todos los títulos</option>
+            <option value="red">Con stock en la red</option>
+            <option value="mia">Con stock en mi sucursal</option>
+          </select>
+        </fieldset>
+        <button type="button" id="f-reset" class="btn btn-ghost btn-sm w-full">Limpiar filtros</button>
+      </form>
+    </aside>
+
+    <section aria-live="polite">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <p class="text-sm text-base-content/70" id="resumen">Cargando…</p>
+        <label class="flex items-center gap-2 text-sm">Ordenar
+          <select id="orden" class="select select-sm">
+            <option value="rel">Relevancia</option><option value="pa">Precio: menor a mayor</option><option value="pd">Precio: mayor a menor</option><option value="az">Título A–Z</option>
+          </select></label>
+      </div>
+      <div id="grid" class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+BH.ready(() => {
+  const $ = (id) => document.getElementById(id);
+  const q = (BH.param('q') || '').toLowerCase();
+  const mine = BH.miSucursal();
+  $('st-titulos').textContent = BH.libros.length;
+  $('f-cats').innerHTML = BH.categorias.map((c) => `<label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" class="checkbox checkbox-sm checkbox-primary" value="${c}"> ${c}</label>`).join('');
+
+  const card = (b) => `
+    <article class="card bg-base-100 border border-base-300 hover:shadow-lg transition-shadow">
+      <a href="libro.html?id=${b.id}" class="card-body p-4 gap-2" aria-label="${b.titulo}">
+        ${BH.cover(b)}
+        <h2 class="font-display text-base leading-snug mt-1 line-clamp-2">${b.titulo}</h2>
+        <p class="text-sm text-base-content/70 -mt-1">${b.autor}</p>
+        <div>${BH.badge(b, mine)}</div>
+        <p class="text-lg font-semibold text-primary">${BH.money(b.precio)}</p>
+      </a>
+    </article>`;
+
+  function filtrar() {
+    const cats = [...document.querySelectorAll('#f-cats input:checked')].map((i) => i.value);
+    const max = Number($('f-precio').value), disp = $('f-disp').value;
+    $('f-precio-v').textContent = 'S/ ' + max;
+    let l = BH.libros.filter((b) =>
+      (!q || [b.titulo, b.autor, b.editorial].join(' ').toLowerCase().includes(q)) &&
+      (!cats.length || cats.includes(b.categoria)) && b.precio <= max &&
+      (disp === 'todos' || (disp === 'red' && BH.totalVendible(b) > 0) || (disp === 'mia' && BH.vendible(b, mine) > 0)));
+    const o = $('orden').value;
+    if (o === 'pa') l.sort((a, b) => a.precio - b.precio);
+    if (o === 'pd') l.sort((a, b) => b.precio - a.precio);
+    if (o === 'az') l.sort((a, b) => a.titulo.localeCompare(b.titulo, 'es'));
+    return l;
+  }
+
+  function pintar() {
+    if (BH.estado === 'cargando') { $('resumen').textContent = 'Cargando…'; $('grid').innerHTML = BH.skeletonCards(8); return; }
+    if (BH.estado === 'error') { $('resumen').textContent = ''; $('grid').className = ''; $('grid').innerHTML = BH.errorState(); return; }
+    const l = BH.estado === 'vacio' ? [] : filtrar();
+    $('resumen').textContent = `${l.length} ${l.length === 1 ? 'título' : 'títulos'}${q ? ` para “${q}”` : ''} · disponibilidad según ${BH.sucursal(mine).nombre}`;
+    if (!l.length) { $('grid').className = ''; $('grid').innerHTML = BH.emptyState('search', 'No encontramos libros', 'Prueba con otra búsqueda o quita algunos filtros.', '<button class="btn btn-primary btn-sm" onclick="location.href=\'index.html\'">Ver todo el catálogo</button>'); return; }
+    $('grid').className = 'grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4';
+    $('grid').innerHTML = l.map(card).join('');
+  }
+
+  ['f-precio', 'f-disp', 'orden'].forEach((id) => $(id).addEventListener('input', pintar));
+  $('f-cats').addEventListener('change', pintar);
+  $('f-reset').addEventListener('click', () => { document.querySelectorAll('#f-cats input').forEach((i) => (i.checked = false)); $('f-precio').value = 170; $('f-disp').value = 'todos'; pintar(); });
+  pintar();
+});
+</script>
+</body>
+</html>

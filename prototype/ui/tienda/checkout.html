@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Checkout · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-area="tienda" data-page="checkout" data-estados="normal,inventario-caido,pago-rechazado">
+<div id="page-content" hidden>
+  <h1 class="font-display text-3xl mb-4">Finalizar compra</h1>
+  <ul class="steps w-full mb-6 text-xs sm:text-sm" id="steps" aria-label="Progreso de la compra"></ul>
+  <div id="timer" class="mb-4"></div>
+  <div class="grid lg:grid-cols-[1fr_20rem] gap-8 items-start">
+    <section id="paso" aria-live="polite"></section>
+    <aside id="resumen" class="card bg-base-100 border border-base-300 lg:sticky lg:top-28"></aside>
+  </div>
+</div>
+
+<script>
+BH.ready(() => {
+  const $ = (id) => document.getElementById(id);
+  const PASOS = ['Revisar', 'Entrega', 'Tus datos', 'Pago', 'Listo'];
+  let paso = 1, t = null, restante = 15 * 60;
+  const s = { tipo: 'recojo', suc: BH.miSucursal(), nombre: '', tel: '', consent: false, dir: '', metodo: 'yape', cobrando: false, rechazado: false };
+
+  let cart = BH.cart.get();
+  if (!Object.keys(cart).length) cart = { 1: 1, 5: 1 };          // demo: carrito de ejemplo
+  const items = Object.keys(cart).map((id) => ({ b: BH.libro(id), q: cart[id] }));
+  const subtotal = items.reduce((a, i) => a + i.b.precio * i.q, 0);
+  const envio = () => (s.tipo === 'domicilio' ? 12 : 0);
+
+  /* Fuente asignada por ítem: sucursal elegida si alcanza; si no, otra con stock (traslado) */
+  function fuente(i) {
+    if (BH.vendible(i.b, s.suc) >= i.q) return { ok: true, traslado: false, suc: s.suc };
+    const alt = BH.sucursales.find((x) => BH.vendible(i.b, x.id) >= i.q);
+    return alt ? { ok: true, traslado: true, suc: alt.id } : { ok: false };
+  }
+  const hayTraslado = () => items.some((i) => fuente(i).traslado);
+
+  function pintarPasos() {
+    $('steps').innerHTML = PASOS.map((p, n) => `<li class="step ${n + 1 <= paso ? 'step-primary' : ''}" ${n + 1 === paso ? 'aria-current="step"' : ''}>${p}</li>`).join('');
+    $('resumen').innerHTML = `<div class="card-body gap-2 p-4">
+      <h2 class="font-semibold">Tu pedido</h2>
+      ${items.map((i) => `<div class="flex justify-between text-sm gap-2"><span class="truncate">${i.q} × ${i.b.titulo}</span><span>${BH.money(i.b.precio * i.q)}</span></div>`).join('')}
+      <div class="divider my-1"></div>
+      <div class="flex justify-between text-sm"><span>Subtotal</span><span>${BH.money(subtotal)}</span></div>
+      <div class="flex justify-between text-sm"><span>Envío</span><span>${envio() ? BH.money(envio()) : 'Gratis (recojo)'}</span></div>
+      <div class="flex justify-between font-semibold text-lg"><span>Total</span><span class="text-primary">${BH.money(subtotal + envio())}</span></div></div>`;
+  }
+
+  function iniciarReserva() {
+    if (t) return;
+    t = setInterval(() => {
+      restante--; const m = String(Math.floor(restante / 60)).padStart(2, '0'), sec = String(restante % 60).padStart(2, '0');
+      if (restante <= 0) { clearInterval(t); expirada(); return; }
+      $('timer').innerHTML = `<div role="status" class="alert alert-info alert-soft py-2">${BH.icon('clock', 'size-5')}<span>Stock reservado para ti: <b class="tabular-nums">${m}:${sec}</b></span></div>`;
+    }, 1000);
+    $('timer').innerHTML = `<div role="status" class="alert alert-info alert-soft py-2">${BH.icon('clock', 'size-5')}<span>Stock reservado para ti: <b>15:00</b></span></div>`;
+  }
+  function expirada() {
+    $('timer').innerHTML = '';
+    $('paso').innerHTML = `<div role="alert" class="alert alert-warning alert-soft">${BH.icon('warn')}<span>Tu reserva expiró y liberamos el stock. Vuelve al carrito para reservarlo otra vez.</span><a class="btn btn-sm" href="carrito.html">Volver al carrito</a></div>`;
+  }
+
+  const campo = (id, label, ph = '', type = 'text', extra = '') => `<label class="floating-label w-full"><span>${label}</span><input id="${id}" type="${type}" class="input w-full" placeholder="${ph || label}" ${extra} value="${s[id] ?? ''}"></label>`;
+
+  const vistas = {
+    1() {
+      if (BH.estado === 'inventario-caido') return `
+        <div role="alert" class="alert alert-error alert-soft">${BH.icon('warn')}<div><h3 class="font-semibold">No podemos validar el stock en este momento</h3>
+          <p class="text-sm">Por seguridad no realizaremos ningún cobro. Tu carrito sigue guardado: inténtalo de nuevo en unos minutos.</p></div>
+          <button class="btn btn-sm" onclick="location.search=''">Reintentar</button></div>`;
+      return `<h2 class="font-display text-xl mb-3">Revisa tus libros</h2>
+        <div class="space-y-3">${items.map((i) => { const f = fuente(i); return `<div class="flex gap-3 items-center card bg-base-100 border border-base-300 p-3">
+          <div class="w-12 shrink-0">${BH.cover(i.b, 'w-full aspect-[2/3] !p-1')}</div>
+          <div class="flex-1"><p class="font-medium">${i.b.titulo}</p><p class="text-sm text-base-content/70">${i.q} ud.</p></div>
+          ${!f.ok ? '<span class="badge badge-error">Sin stock</span>' : f.traslado ? '<span class="badge badge-info badge-soft">Vía traslado</span>' : '<span class="badge badge-success badge-soft">En tu sucursal</span>'}</div>`; }).join('')}</div>
+        <div class="mt-5 flex justify-end"><button class="btn btn-primary" id="sig">Validar stock y continuar</button></div>`;
+    },
+    2() {
+      const ops = BH.sucursales.map((x) => `<option value="${x.id}" ${x.id === s.suc ? 'selected' : ''}>${x.nombre}</option>`).join('');
+      const tr = hayTraslado();
+      return `<h2 class="font-display text-xl mb-3">¿Cómo quieres recibirlo?</h2>
+        <div class="grid sm:grid-cols-2 gap-3" role="radiogroup">
+          ${[['recojo', 'store', 'Recojo en sucursal', 'Gratis · te avisamos por WhatsApp'], ['domicilio', 'truck', 'Despacho a domicilio', S0(12) + ' · con guía de envío']].map(([v, ic, t1, t2]) => `
+          <label class="card border cursor-pointer ${s.tipo === v ? 'border-primary bg-primary/5' : 'border-base-300'}"><div class="card-body p-4 flex-row items-center gap-3">
+            <input type="radio" name="tipo" value="${v}" class="radio radio-primary" ${s.tipo === v ? 'checked' : ''}>${BH.icon(ic, 'size-7 text-secondary')}<div><div class="font-medium">${t1}</div><div class="text-sm text-base-content/70">${t2}</div></div></div></label>`).join('')}</div>
+        ${s.tipo === 'recojo' ? `<label class="form-control mt-4 block"><span class="label-text font-medium mb-1 block">Sucursal de recojo</span><select id="suc" class="select w-full sm:w-80">${ops}</select></label>`
+          : `<div class="mt-4 max-w-md">${campo('dir', 'Dirección de entrega')}</div>`}
+        ${tr && s.tipo === 'recojo' ? `<div role="alert" class="alert alert-info alert-soft mt-4">${BH.icon('truck')}<span>Alguno de tus libros no está en ${BH.sucursal(s.suc).nombre}. Lo traeremos con un traslado interno y te avisaremos cuando esté <b>listo para recojo (≈ 2 días hábiles)</b>.</span></div>` : ''}
+        <div class="mt-5 flex justify-between"><button class="btn btn-ghost" data-ir="1">Atrás</button><button class="btn btn-primary" id="sig">Continuar</button></div>`;
+    },
+    3() {
+      return `<h2 class="font-display text-xl mb-3">Tus datos</h2>
+        <div class="grid sm:grid-cols-2 gap-4 max-w-2xl">
+          ${campo('nombre', 'Nombre completo')}
+          ${campo('tel', 'WhatsApp (ej. 987 654 321)', '', 'tel', 'inputmode="tel"')}</div>
+        <label class="label cursor-pointer justify-start gap-3 mt-4 items-start max-w-2xl"><input id="consent" type="checkbox" class="checkbox checkbox-primary mt-1" ${s.consent ? 'checked' : ''}>
+          <span class="text-sm">Acepto recibir avisos de mi pedido por WhatsApp y el tratamiento de mis datos personales conforme a la Ley N.° 29733.</span></label>
+        <p id="err" class="text-error text-sm mt-2" role="alert"></p>
+        <div class="mt-5 flex justify-between"><button class="btn btn-ghost" data-ir="2">Atrás</button><button class="btn btn-primary" id="sig">Ir al pago</button></div>`;
+    },
+    4() {
+      return `<h2 class="font-display text-xl mb-3">Pago seguro</h2>
+        ${s.rechazado ? `<div role="alert" class="alert alert-error alert-soft mb-4">${BH.icon('warn')}<span>El pago fue rechazado. No se te cobró nada. Revisa los datos o prueba otro medio.</span></div>` : ''}
+        <div role="tablist" class="tabs tabs-box max-w-md mb-4">
+          <button role="tab" class="tab ${s.metodo === 'yape' ? 'tab-active' : ''}" data-m="yape">Yape</button>
+          <button role="tab" class="tab ${s.metodo === 'tarjeta' ? 'tab-active' : ''}" data-m="tarjeta">Tarjeta</button></div>
+        ${s.metodo === 'yape'
+          ? `<div class="grid sm:grid-cols-2 gap-4 max-w-xl">${campo('ycel', 'Celular Yape', '', 'tel')}${campo('ycod', 'Código de aprobación (6 dígitos)', '', 'text', 'inputmode="numeric" maxlength="6"')}</div>`
+          : `<div class="grid sm:grid-cols-2 gap-4 max-w-xl"><div class="sm:col-span-2">${campo('tnum', 'Número de tarjeta', '4111 1111 1111 1111', 'text', 'inputmode="numeric" autocomplete="cc-number"')}</div>${campo('tven', 'Vence (MM/AA)', '', 'text', 'autocomplete="cc-exp"')}${campo('tcvv', 'CVV', '', 'password', 'autocomplete="cc-csc" maxlength="4"')}</div>`}
+        <p class="text-xs text-base-content/60 mt-3 max-w-xl flex gap-2">${BH.icon('shield', 'size-4 shrink-0')} Tus datos se cifran en tu navegador con Culqi. BabelHub nunca ve ni guarda los datos de tu tarjeta.</p>
+        <div class="mt-5 flex justify-between"><button class="btn btn-ghost" data-ir="3">Atrás</button>
+          <button class="btn btn-primary" id="pagar" ${s.cobrando ? 'disabled' : ''}>${s.cobrando ? '<span class="loading loading-spinner"></span> Procesando…' : 'Pagar ' + BH.money(subtotal + envio())}</button></div>`;
+    },
+    5() {
+      return `<div class="text-center py-6 space-y-3">
+        <div class="mx-auto grid place-items-center size-16 rounded-full bg-success/15 text-success">${BH.icon('check', 'size-9')}</div>
+        <h2 class="font-display text-3xl">¡Pedido confirmado!</h2>
+        <p>Número de pedido <b>BH-2026-000123</b></p>
+        <p class="text-base-content/70 max-w-md mx-auto">${hayTraslado() && s.tipo === 'recojo' ? 'Tus libros viajan entre sucursales; te avisaremos cuando estén listos para recojo.' : s.tipo === 'recojo' ? `Te avisaremos cuando esté listo en ${BH.sucursal(s.suc).nombre}.` : 'Generaremos tu guía de envío y te la enviaremos.'}</p>
+        <div class="chat chat-start max-w-sm mx-auto text-left"><div class="chat-bubble chat-bubble-success text-sm">BabelHub: tu pedido BH-2026-000123 fue confirmado ✅. Te avisaremos aquí cada cambio de estado.</div></div>
+        <p class="text-xs text-base-content/50">Vista previa del WhatsApp que recibirás${s.tel ? ' en ' + s.tel : ''}.</p>
+        <a href="pedido.html?estado=${hayTraslado() ? 'transito' : 'confirmado'}" class="btn btn-primary">Seguir mi pedido</a></div>`;
+    }
+  };
+  function S0(n) { return BH.money(n); }
+
+  function render() {
+    pintarPasos(); $('paso').innerHTML = vistas[paso]();
+    const m = $('paso');
+    m.querySelectorAll('[data-ir]').forEach((b) => (b.onclick = () => ir(Number(b.dataset.ir))));
+    m.querySelectorAll('input[name=tipo]').forEach((r) => (r.onchange = () => { s.tipo = r.value; render(); }));
+    if ($('suc')) $('suc').onchange = (e) => { s.suc = e.target.value; render(); };
+    m.querySelectorAll('[data-m]').forEach((b) => (b.onclick = () => { s.metodo = b.dataset.m; render(); }));
+    ['nombre', 'tel', 'dir'].forEach((k) => { if ($(k)) $(k).oninput = (e) => (s[k] = e.target.value); });
+    if ($('consent')) $('consent').onchange = (e) => (s.consent = e.target.checked);
+    if ($('sig')) $('sig').onclick = siguiente;
+    if ($('pagar')) $('pagar').onclick = pagar;
+  }
+  function ir(n) { paso = n; render(); }
+
+  function siguiente() {
+    if (paso === 1) {
+      if (items.some((i) => !fuente(i).ok)) { BH.toast('Algún libro ya no tiene stock. Vuelve al carrito.', 'error'); return; }
+      iniciarReserva(); return ir(2);
+    }
+    if (paso === 2) { if (s.tipo === 'domicilio' && !s.dir.trim()) { BH.toast('Escribe tu dirección de entrega', 'warning'); return; } return ir(3); }
+    if (paso === 3) {
+      if (!s.nombre.trim() || !/^\+?[\d\s]{9,}$/.test(s.tel.trim())) { $('err').textContent = 'Escribe tu nombre y un número de WhatsApp válido.'; return; }
+      if (!s.consent) { $('err').textContent = 'Necesitamos tu consentimiento para continuar.'; return; }
+      return ir(4);
+    }
+  }
+  function pagar() {
+    s.cobrando = true; s.rechazado = false; render();
+    setTimeout(() => {
+      s.cobrando = false;
+      if (BH.estado === 'pago-rechazado') { s.rechazado = true; return render(); }
+      clearInterval(t); $('timer').innerHTML = ''; BH.cart.clear(); ir(5);
+    }, 1300);
+  }
+  render();
+});
+</script>
+</body>
+</html>

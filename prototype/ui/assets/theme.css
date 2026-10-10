@@ -1,0 +1,79 @@
+/* Tema BabelHub para daisyUI 5: papel cálido, tinta y burdeos. */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap');
+
+[data-theme="babelhub"] {
+  color-scheme: light;
+  --color-base-100: #fffdf8;
+  --color-base-200: #f6f1e7;
+  --color-base-300: #e6dccb;
+  --color-base-content: #2a2118;
+  --color-primary: #7a2e3b;
+  --color-primary-content: #fff7f2;
+  --color-secondary: #1f4e5f;
+  --color-secondary-content: #eefafc;
+  --color-accent: #c58a1b;
+  --color-accent-content: #2a1c00;
+  --color-neutral: #2f2a26;
+  --color-neutral-content: #f5efe6;
+  --color-info: #2b6cb0;
+  --color-info-content: #ffffff;
+  --color-success: #2f7d4f;
+  --color-success-content: #f2fff7;
+  --color-warning: #d99a1c;
+  --color-warning-content: #2a1c00;
+  --color-error: #b3261e;
+  --color-error-content: #fff5f4;
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.75rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+[data-theme="babelhub-dark"] {
+  color-scheme: dark;
+  --color-base-100: #1c1814;
+  --color-base-200: #241f1a;
+  --color-base-300: #332c25;
+  --color-base-content: #efe6d8;
+  --color-primary: #d98a98;
+  --color-primary-content: #2a0f15;
+  --color-secondary: #6fb2c4;
+  --color-secondary-content: #06242d;
+  --color-accent: #e0b24a;
+  --color-accent-content: #2a1c00;
+  --color-neutral: #3a332c;
+  --color-neutral-content: #efe6d8;
+  --color-info: #6aa8e6;
+  --color-info-content: #061a2e;
+  --color-success: #5dbb82;
+  --color-success-content: #052414;
+  --color-warning: #e8b04a;
+  --color-warning-content: #2a1c00;
+  --color-error: #ef7b72;
+  --color-error-content: #2e0a07;
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.75rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+body { font-family: 'Inter', system-ui, sans-serif; }
+.font-display { font-family: 'Fraunces', Georgia, serif; }
+
+/* Panel flotante propio del prototipo (no forma parte del diseño real) */
+.proto-bar {
+  position: fixed; left: 12px; bottom: 12px; z-index: 60;
+  display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
+  padding: .4rem .6rem; border-radius: .75rem; font-size: .75rem;
+  background: var(--color-neutral); color: var(--color-neutral-content);
+  box-shadow: 0 4px 16px rgb(0 0 0 / .25); max-width: calc(100vw - 24px);
+}
+.proto-bar select, .proto-bar a { font-size: .75rem; }
