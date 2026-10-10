@@ -32,6 +32,9 @@ BabelHub se compone de **dos sistemas independientes pero interoperables** para 
 | 07 | [Enfoque arquitectónico](docs/07-enfoque-arquitectonico.md) | Clean Architecture en detalle: capas, regla de dependencia, mapa a la estructura del repositorio, pruebas por capa y reglas para `AGENTS.md`. |
 | 08 | [Interfaz de usuario](docs/08-interfaz-de-usuario.md) | Identidad visual, sistema de diseño (AD21), mapa de pantallas por rol, recorrido de compra, estados y accesibilidad. |
 | 09 | [Convenciones técnicas](docs/09-convenciones-tecnicas.md) | Git, API REST, seguridad, configuración, persistencia, pruebas, CI y Docker. |
+| 10 | [Flujo SDD](docs/10-flujo-sdd.md) | Ciclo Spec-Driven Development, validaciones, skills y agentes, estructura del repositorio y plan de trabajo. |
+
+Además: [glosario](docs/glossary.md), [índice de specs](specs/README.md) y [matriz de trazabilidad](specs/TRACEABILITY.md).
 
 ## Trazabilidad
 
@@ -47,3 +50,15 @@ BabelHub se compone de **dos sistemas independientes pero interoperables** para 
 - Despliegue con Docker Compose en Oracle Cloud Free Tier: dos VMs ARM (Aplicaciones y Datos, de 1 OCPU y 6 GB) y una VM x86 micro opcional de apoyo.
 - Cloudflare gratuito en el borde, con Cloudflare Tunnel, para no abrir puertos en Oracle.
 - Pruebas con xUnit, Testcontainers, Playwright y k6. Desarrollo posterior bajo Spec-Driven Development.
+
+## Desarrollo
+
+| Comando | Para qué |
+| :--- | :--- |
+| `dotnet build BabelHub.sln -warnaserror` | Compilar sin advertencias. |
+| `dotnet test BabelHub.sln` | Todas las pruebas, incluida la de arquitectura. |
+| `dotnet run --project tools/SpecCheck` | Validar specs, planes, tareas y trazabilidad. |
+| `python -m http.server 8081 --directory prototype/ui-v2` | Ver el prototipo de interfaz. |
+| `docker compose -f infra/docker-compose.local.yml --env-file .env up -d` | Bases de datos y caché locales (copia antes `.env.example` a `.env`). |
+
+El trabajo sigue el ciclo de `docs/10-flujo-sdd.md`: ninguna línea de producción sin una spec aprobada y un plan aprobado. Las reglas obligatorias están en `AGENTS.md`.
