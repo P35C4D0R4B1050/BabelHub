@@ -8,6 +8,8 @@ El libro impreso sigue generando más del 91 % de los ingresos editoriales en el
 
 **Justificación del planteamiento:** BabelHub se define como **dos sistemas independientes pero interoperables** (E-commerce e Inventario Multi-Sucursal) y no como una tienda en línea con inventario embebido. El inventario tiene reglas propias (reservas, traslados, auditoría) y un patrón de uso distinto (personal interno, alta escritura), por lo que conviene diseñarlo, probarlo y escalarlo por separado. Para el inventario se adopta el patrón *Multi-Source Inventory* (MSI) de Adobe Commerce: cada sucursal es una **fuente** de stock y el **stock vendible = stock físico − reservas activas**.
 
+**Libros digitales.** La librería también vende libros digitales (EPUB y PDF). Un libro digital no tiene stock ni sucursal: se entrega de inmediato y no depende de la logística. Por eso vive en el E-commerce, no en el Inventario, y se trata como una **edición** distinta del mismo título, con su propio ISBN. A cambio, exige algo que el libro impreso no pide: una **licencia del titular de derechos** (autor o editorial) para venderlo, y medidas para que el archivo no circule fuera de quien lo compró. El marco legal se resume en `02-requisitos.md` (sección 5).
+
 ## 2. Objetivos del negocio
 
 | ID | Objetivo | Justificación |
@@ -17,6 +19,7 @@ El libro impreso sigue generando más del 91 % de los ingresos editoriales en el
 | **OB03** | Dar a cada sucursal control sobre su propio inventario, y a la administración central visibilidad nacional. | Responsabilidad local con supervisión central. |
 | **OB04** | Soportar una red inicial de 5 a 10 sucursales, con margen hasta unas 20, sin rediseñar. | MSI opera eficientemente de 1 a 20 fuentes (Adobe). |
 | **OB05** | Operar con costo mínimo de infraestructura, sin servicios administrados de pago. | El proyecto debe ser viable con recursos gratuitos o propios. |
+| **OB06** | Vender libros digitales en la misma tienda, sin inventario físico y respetando los derechos de autor. | Amplía la oferta y llega a clientes sin depender de la logística de las sucursales; exige licencia de cada titular. |
 
 ## 3. Alcance
 
@@ -26,19 +29,23 @@ El libro impreso sigue generando más del 91 % de los ingresos editoriales en el
 | Fuentes por sucursal, stock vendible, reservas, selección de fuente, traslados y ajustes (Inventario). | Costeo y licenciamiento comercial detallado. |
 | Identidad, roles y control de acceso por sucursal. | Aplicación móvil nativa (Android/iOS): extensión posterior; el alcance inicial es web responsiva. |
 | Diseño de la arquitectura y del despliegue en Oracle Cloud. | Analítica avanzada y autoservicio de reportes: fase posterior. |
+| Libros digitales (EPUB y PDF): catálogo, compra, biblioteca personal y descarga protegida. | Lector en línea con DRM comercial, audiolibros, suscripciones, préstamo digital y liquidación de regalías a editoriales. |
+| Registro de la licencia de cada libro digital (titular, territorio y vigencia) y Libro de Reclamaciones virtual. | Emisión de comprobantes electrónicos ante la SUNAT y los contratos con los titulares: se dejan previstos pero no se construyen (ver `02-requisitos.md`, sección 5). |
 
 ## 4. Actores
 
 | Actor | Rol | Qué necesita realizar |
 | :--- | :--- | :--- |
-| **Cliente** | Persona que compra libros en línea. | Buscar libros, ver disponibilidad, armar el carrito, pagar, elegir despacho o recojo y seguir su pedido. |
+| **Cliente** | Persona que compra libros en línea. | Buscar libros, ver disponibilidad, armar el carrito, pagar, elegir despacho o recojo y seguir su pedido; si compra libros digitales, leerlos y descargarlos desde su biblioteca. |
 | **Encargado de sucursal** | Personal de una tienda; solo accede a **su sucursal**. | Consultar y ajustar el stock local, preparar pedidos de recojo y gestionar traslados. |
-| **Administrador central** | Personal de administración con visión nacional. | Gestionar el catálogo, usuarios, roles y sucursales; revisar auditoría e indicadores. |
+| **Administrador central** | Personal de administración con visión nacional. | Gestionar el catálogo (incluida la licencia de cada libro digital), usuarios, roles y sucursales; revisar auditoría e indicadores. |
 | **Personal de logística** | Responsable de mover productos. | Dar seguimiento a traslados y generar guías de envío a domicilio. |
 | **Pasarela de pago** *(externo)* | Culqi. | Procesar pagos con Yape y tarjetas. |
 | **Servicio de envío** *(externo)* | Operador logístico (courier). | Gestionar la entrega y el seguimiento de los despachos a domicilio. |
 | **Proveedor de LLM** *(externo)* | Modelo de lenguaje (por ejemplo, la API de Claude). | Generar las respuestas del asistente de compra. |
 | **Servicio de notificaciones** *(propio, autoalojado)* | n8n y Evolution API, que envían los avisos por WhatsApp. | Avisar a clientes y sucursales de los cambios de estado. |
+| **Almacén de archivos digitales** *(externo)* | Cloudflare R2 u Oracle Object Storage. | Guardar los EPUB y PDF fuera de las VMs y entregarlos con enlaces firmados. |
+| **Titular de derechos** *(externo, contractual)* | Autor o editorial. | Autorizar la venta de cada título digital, con territorio y vigencia. No usa el sistema; se relaciona por contrato. |
 
 ## 5. Necesidades del negocio
 
@@ -58,6 +65,9 @@ Prioridad: **Alta** (núcleo del problema), **Media**, **Baja** (puede diferirse
 | **NN10** | Administrador central | Consultar indicadores de venta, inventario y traslados por sucursal y región. | Baja | Aporta valor de gestión, pero puede venir en una fase posterior (OB03). |
 | **NN11** | Personal de logística | Generar guías de envío y seguir los despachos a domicilio. | Media | Completa el ciclo de entrega fuera de la tienda. |
 | **NN12** | Organización | Operar la plataforma con costo mínimo y sin depender de servicios administrados de pago. | Alta | Restricción económica del proyecto (OB05); condiciona el despliegue. |
+| **NN13** | Cliente | Comprar libros digitales y acceder a ellos de inmediato desde su biblioteca personal, sin esperar despacho. | Media | Amplía la oferta y elimina la espera para quien no necesita el libro impreso (OB06). |
+| **NN14** | Administrador central | Publicar un libro digital solo con licencia vigente del titular de derechos y retirarlo de la venta cuando esa licencia termine. | Alta | Vender contenido sin licencia expone a la librería a responsabilidad por derechos de autor. |
+| **NN15** | Organización | Cumplir las obligaciones legales de una tienda en línea: Libro de Reclamaciones, datos personales, derechos de autor y política de devoluciones. | Alta | Son obligaciones, no mejoras; ver `02-requisitos.md`, sección 5. |
 
 ## 6. Diagrama de contexto
 
@@ -77,6 +87,7 @@ PAG["Pasarela de pago"]
 ENV["Servicio de envío"]
 LLM["Proveedor de LLM"]
 NOT["Notificaciones<br/>n8n + Evolution API (WhatsApp)"]
+ALM["Almacén de archivos digitales"]
 
 CLI --> ECO
 ADM --> ECO
@@ -89,6 +100,8 @@ ECO --> ENV
 ECO --> LLM
 ECO --> NOT
 INV --> NOT
+ECO --> ALM
+CLI -.->|"descarga con enlace firmado"| ALM
 
 style BH fill:#222,stroke:#fff,stroke-width:2px,color:#fff
 style CLI fill:#222,stroke:#fff,color:#fff
@@ -101,6 +114,7 @@ style PAG fill:#222,stroke:#fff,color:#fff
 style ENV fill:#222,stroke:#fff,color:#fff
 style LLM fill:#222,stroke:#fff,color:#fff
 style NOT fill:#222,stroke:#fff,color:#fff
+style ALM fill:#222,stroke:#fff,color:#fff
 ```
 
 ## 7. Referencias

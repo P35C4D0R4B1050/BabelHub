@@ -10,16 +10,16 @@ Prioridad: **Alta**, **Media**, **Baja**.
 
 | ID | Requisito funcional | Prioridad | Origen |
 | :--- | :--- | :---: | :--- |
-| **RF01** | El sistema debe permitir buscar libros por título, autor, editorial, categoría y rango de precio, y filtrar por disponibilidad. | Alta | NN01 |
-| **RF02** | El sistema debe permitir consultar la información de un libro y su disponibilidad, consolidada y por sucursal. | Alta | NN01 |
-| **RF03** | El sistema debe permitir agregar, modificar y eliminar libros del carrito, conservándolo entre sesiones y dispositivos. | Alta | NN02 |
-| **RF04** | El sistema debe permitir generar un pedido a partir del carrito, eligiendo despacho a domicilio o recojo en sucursal, y validar la disponibilidad real (stock vendible) antes de confirmar el pago. | Alta | NN02 |
+| **RF01** | El sistema debe permitir buscar libros por título, autor, editorial, categoría, formato (impreso o digital) y rango de precio, y filtrar por disponibilidad. | Alta | NN01, NN13 |
+| **RF02** | El sistema debe permitir consultar la información de un libro y su disponibilidad: consolidada y por sucursal para el impreso; inmediata para el digital mientras su licencia esté vigente. | Alta | NN01, NN13 |
+| **RF03** | El sistema debe permitir agregar, modificar y eliminar libros del carrito, que puede mezclar impresos y digitales, conservándolo entre sesiones y dispositivos. | Alta | NN02 |
+| **RF04** | El sistema debe permitir generar un pedido a partir del carrito. Si hay libros impresos, el cliente elige despacho a domicilio o recojo en sucursal y se valida su disponibilidad real (stock vendible) antes de confirmar el pago. Un carrito solo con libros digitales no pide entrega ni consulta al Inventario. | Alta | NN02, NN13 |
 | **RF05** | El sistema debe procesar el pago del pedido una sola vez mediante la pasarela de pago, sin almacenar datos de tarjeta. | Alta | NN02 |
-| **RF06** | El sistema debe permitir consultar los pedidos realizados, su detalle y su estado (confirmado, en preparación, en tránsito entre sucursales, despachado o listo para recojo, entregado, devuelto). | Alta | NN03 |
+| **RF06** | El sistema debe permitir consultar los pedidos realizados, su detalle y su estado (confirmado, en preparación, en tránsito entre sucursales, despachado o listo para recojo, entregado, devuelto). Cada libro digital pasa a «disponible en tu biblioteca» cuando se aprueba el pago. | Alta | NN03, NN13 |
 | **RF07** | El sistema debe notificar por WhatsApp al cliente y a la sucursal responsable ante cada cambio de estado del pedido, sin que una falla del envío bloquee la operación. | Alta | NN03 |
 | **RF08** | El sistema debe ofrecer un asistente de compra que recomiende libros y responda sobre disponibilidad y estado de pedidos usando datos reales del catálogo e inventario, e indique cuando no tenga información suficiente. | Media | NN04 |
-| **RF09** | El sistema debe permitir solicitar una devolución, gestionar su reembolso con trazabilidad y reingresar el stock en la sucursal receptora. | Baja | NN05 |
-| **RF10** | El sistema debe permitir registrar, actualizar y dar de baja libros en el catálogo, validando que el ISBN sea único. | Alta | NN08 |
+| **RF09** | El sistema debe permitir solicitar una devolución, gestionar su reembolso con trazabilidad y reingresar el stock en la sucursal receptora (solo libros impresos). Para libros digitales aplica la política definida en la sección 5; un reembolso revoca el acceso y no reingresa stock. | Baja | NN05, NN15 |
+| **RF10** | El sistema debe permitir registrar, actualizar y dar de baja libros en el catálogo. Cada edición (impresa o digital) tiene su propio ISBN, que debe ser único. Un libro digital incluye además formato, archivo, titular de derechos, territorios autorizados y vigencia de la licencia. | Alta | NN08, NN14 |
 | **RF11** | El sistema debe generar guías de envío y consultar el seguimiento con el servicio de envío en los despachos a domicilio. | Media | NN11 |
 
 ### 1.2 Sistema de Inventario Multi-Sucursal
@@ -42,7 +42,16 @@ Prioridad: **Alta**, **Media**, **Baja**.
 | **RF20** | El sistema debe registrar en auditoría las operaciones sensibles: cambios de precio, anulaciones de pedido, ajustes de inventario y aprobación de traslados. | Media | NN09 |
 | **RF21** | El sistema debe ofrecer indicadores de venta, inventario y traslados por sucursal y consolidados nacionales. *(Fase posterior.)* | Baja | NN10 |
 
-**Justificación:** los requisitos se agrupan por sistema porque cada uno se implementa en un servicio distinto (ver `05-decisiones-arquitectonicas.md`). RF04, RF13 y RF14 forman el camino crítico del problema: validar, calcular y reservar el stock antes de cobrar.
+### 1.4 Libros digitales y cumplimiento legal
+
+| ID | Requisito funcional | Prioridad | Origen |
+| :--- | :--- | :---: | :--- |
+| **RF22** | El sistema debe conceder acceso al libro digital a la cuenta del cliente en cuanto se apruebe el pago, sin reservar stock ni pedir entrega, y mostrarlo en su biblioteca personal. | Media | NN13 |
+| **RF23** | El sistema debe permitir descargar un libro digital solo a quien lo compró, mediante enlaces firmados de corta duración, con un límite de descargas por compra y con registro de cada descarga. | Media | NN13, NN15 |
+| **RF24** | El sistema debe impedir la venta de un libro digital cuya licencia haya vencido o no cubra el territorio del comprador. Los accesos ya concedidos se mantienen, salvo reembolso u orden legal. | Alta | NN14 |
+| **RF25** | El sistema debe exhibir de forma permanente un enlace al Libro de Reclamaciones virtual, registrar cada reclamo, permitir imprimir una copia gratuita al consumidor y conservarlo al menos dos años. | Alta | NN15 |
+
+**Justificación:** los requisitos se agrupan por sistema porque cada uno se implementa en un servicio distinto (ver `05-decisiones-arquitectonicas.md`). RF04, RF13 y RF14 forman el camino crítico del problema: validar, calcular y reservar el stock antes de cobrar. RF22 y RF23 forman el camino del libro digital, que no pasa por el Inventario y por eso no se ve afectado por sus caídas.
 
 ## 2. Requisitos no funcionales
 
@@ -63,6 +72,7 @@ Las metas numéricas son **propuestas iniciales** para una red de 5 a 10 sucursa
 | **RNF11** | Portabilidad | El sistema debe ejecutarse igual en ARM64 y x86_64. | Imágenes Docker multi-arch; despliegue con un comando por VM. | AC07 |
 | **RNF12** | Eficiencia de recursos | El sistema completo debe operar dentro del Free Tier de Oracle. | Uso sostenido de memoria < 70 % por VM; sin costo mensual. | AC07 |
 | **RNF13** | Usabilidad | La interfaz debe ser responsiva y mostrar estados claros (vacío, cargando, error, con datos). | Compra completada en no más de 5 pasos desde el catálogo. | AC08 |
+| **RNF14** | Seguridad: contenido digital | Los archivos digitales solo se entregan al titular de la compra; nunca se publican en rutas abiertas ni se guardan en el repositorio o en la base de datos. | 0 descargas no autorizadas en pruebas; enlaces válidos 5 minutos como máximo; descargas limitadas por compra. | AC09 |
 
 ## 3. Restricciones
 
@@ -80,6 +90,7 @@ Las metas numéricas son **propuestas iniciales** para una red de 5 a 10 sucursa
 | **RC10** | LLM externo | El asistente usa un modelo de lenguaje de terceros y consulta los datos solo mediante las API del sistema. | Mantiene el aislamiento de las bases de datos. |
 | **RC11** | Documentación | Se documenta con el modelo C4 e IEEE 1016, y el desarrollo posterior sigue Spec-Driven Development. | Marco de la propuesta original. |
 | **RC12** | Notificaciones | Los avisos salen por WhatsApp mediante Evolution API orquestada por n8n, ambos autoalojados en Docker. | Costo cero y control propio; Evolution API no es un canal oficial de WhatsApp, por lo que se trata como riesgo (ver `04-drivers-arquitectonicos.md`). |
+| **RC13** | Archivos digitales | Los EPUB y PDF se guardan en un almacenamiento de objetos compatible con S3 (Cloudflare R2 u Oracle Object Storage, dentro de su capa gratuita), no en las VMs, la base de datos ni el repositorio. | El disco de las VMs es escaso y los archivos no deben viajar por una VM de 1 OCPU; ver AD19. |
 
 ## 4. Trazabilidad necesidad → requisitos
 
@@ -97,3 +108,21 @@ Las metas numéricas son **propuestas iniciales** para una red de 5 a 10 sucursa
 | NN10 | RF21 | — |
 | NN11 | RF11 | — |
 | NN12 | — | RNF11, RNF12 (y RC07, RC09) |
+| NN13 | RF01, RF02, RF04, RF06, RF22, RF23 | RNF14 (y RC13) |
+| NN14 | RF10, RF24 | — |
+| NN15 | RF09, RF23, RF25 | RNF07 (y sección 5) |
+
+## 5. Marco legal y de cumplimiento
+
+> **Esto no es asesoría legal.** Resume lo que se encontró en fuentes públicas (normas, prensa especializada y análisis académicos) para saber qué diseñar. Varias entradas se marcan como **a validar** porque no se pudo confirmar su texto o su vigencia a octubre de 2026; deben revisarse con un abogado y un contador antes de operar con clientes reales.
+
+| Tema | Qué indican las fuentes consultadas | Implicancia para BabelHub | Estado |
+| :--- | :--- | :--- | :--- |
+| **Derecho de autor** | El Decreto Legislativo 822, modificado por el DL 1076 (arts. 196-A a 196-D), sanciona eludir medidas tecnológicas efectivas que controlan el acceso a una obra. No se halló una fuente clara sobre contratos de licencia de libros electrónicos. | Cada libro digital necesita contrato o autorización del titular (editorial o autor), con formato, territorio, vigencia y precio. El sistema registra titular, territorios y vigencia (RF10, RF24). Si un titular exige DRM, se evalúa con AD20. | A validar: contratos por título. |
+| **Libro de Reclamaciones** | La Ley 32495 (noviembre de 2025, según la prensa) obliga a las plataformas de comercio electrónico a exhibir un enlace visible al libro virtual. El reglamento (D.S. 011-2011-PCM) exige conservar las hojas dos años y permitir imprimir una copia gratuita; las multas llegan a 50 UIT. | RF25: enlace permanente en todas las páginas y registro de reclamos. | A validar: vigencia y texto de la Ley 32495. |
+| **IGV en libros digitales** | El D.S. 058-2024-EF (reglamento de beneficios tributarios de la Ley del Libro) exonera la importación y venta de libros electrónicos descargables. La SUNAT (Informe 013-2024) trata distinto a los libros interactivos accedidos por plataforma o suscripción. | Un EPUB o PDF descargable se vende sin IGV; los precios del catálogo no incluyen impuesto. Un lector en línea o una suscripción podría tener otro tratamiento, otra razón para dejarlos fuera del alcance. | A validar con contador: número de ley y vigencia. |
+| **Comprobantes electrónicos** | Quien vende con RUC debe emitir boleta o factura electrónica (Resolución 300-2014/SUNAT y modificatorias), mediante sistema propio, SUNAT-SOL u operador autorizado (OSE). | Fuera del alcance de la primera versión, pero imprescindible para operar. Se prevé un puerto de emisión de comprobantes y se recomienda un OSE. | Pendiente de decisión. |
+| **Devoluciones y arrepentimiento** | No se confirmó una norma vigente de derecho de arrepentimiento para compras en línea. Existen propuestas (Indecopi 2021; proyecto 415/2021-CR) con un plazo de 15 días, sin norma confirmada para contenido digital. | Política propia, informada y aceptada antes de pagar: el libro digital se reembolsa si no fue descargado o si el archivo está defectuoso; al reembolsar se revoca el acceso. Los libros impresos siguen RF09. | A validar con abogado. |
+| **Datos personales** | Ley N.° 29733 (ya aplicada en RNF07). | La biblioteca revela hábitos de lectura: se trata como dato personal, solo visible para su titular y para el personal autorizado, y no se comparte con editoriales sin base legal. | Aplicado en el diseño. |
+
+**Fuentes:** [Perú21: plataformas digitales y Libro de Reclamaciones](https://peru21.pe/peru/plataformas-digitales-estan-obligadas-tener-libro-de-reclamaciones/), [La Cámara](https://lacamara.pe/?p=66588), [Forbes Perú: IGV y libros electrónicos](https://forbes.pe/economia-y-finanzas/2024-04-24/gobierno-exonero-del-pago-de-igv-la-importacion-y-venta-de-libros-electronicos/), [SUNAT: Informe 013-2024](https://www.sunat.gob.pe/legislacion/oficios/2024/informe-oficios/i000013-2024-7T0000.pdf), [Garrigues: propuesta de Indecopi sobre arrepentimiento](https://www.garrigues.com/es_ES/noticia/peru-indecopi-publica-documento-trabajo-proteccion-consumidor-comercio-electronico-seguridad), [PUCP: medidas tecnológicas de protección](https://textos.pucp.edu.pe/textos/descargar/321), [Edicom: facturación electrónica en Perú](https://edicomgroup.com/es/blog/como-es-la-factura-electronica-peru).
