@@ -154,7 +154,7 @@ style LLM fill:#222,stroke:#fff,color:#fff
 
 **Contingencia:** si Oracle solo concede una instancia, se usa **una VM ARM de 2 OCPU y 12 GB** con las bases en contenedores sin puertos publicados, en una red interna de Docker y con volúmenes separados. Se pierde el aislamiento por VM, pero se conserva el aislamiento por red.
 
-## 7. Reglas de red
+## 4. Reglas de red
 
 | Origen | Destino | Puerto | Estado |
 | :--- | :--- | :--- | :--- |
