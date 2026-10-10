@@ -200,8 +200,8 @@ Pie de todas las páginas de la Tienda: enlace permanente al **Libro de Reclamac
 
 | Prototipo | Ubicación | Estado |
 | :--- | :--- | :--- |
-| v1: recorrido funcional básico | `prototype/ui/` | Reemplazado por v2. |
-| v2, entrega 1: sistema de diseño y área Tienda (incluye libros digitales) | `prototype/ui-v2/` | En curso. |
+| v1: recorrido funcional básico | `prototype/ui/` | Superado por v2; se conserva solo porque aún contiene las áreas Sucursal y Admin, y se retira al terminar la entrega 2. |
+| v2, entrega 1: sistema de diseño y área Tienda (incluye libros digitales) | `prototype/ui-v2/` | Lista para revisión. |
 | v2, entrega 2: áreas Sucursal, Logística y Admin | `prototype/ui-v2/` | Pendiente. |
 
 Son descartables: HTML estático con Tailwind y daisyUI por CDN y datos ficticios. Lo aprobado en ellos queda reflejado en este documento antes de escribir las vistas Razor.
