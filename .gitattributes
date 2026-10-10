@@ -1,0 +1,16 @@
+# Normaliza los saltos de línea para trabajar igual en Windows, Linux y macOS.
+* text=auto eol=lf
+
+*.sln text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.sh text eol=lf
+
+# Binarios
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.woff2 binary
+*.pdf binary

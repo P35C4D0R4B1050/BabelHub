@@ -1,0 +1,40 @@
+# --- .NET ---
+bin/
+obj/
+*.user
+*.suo
+.vs/
+TestResults/
+*.trx
+coverage/
+*.log
+*.nupkg
+
+# --- Editores y sistema operativo ---
+.idea/
+.vscode/
+*.swp
+*.kate-swp
+*~
+.DS_Store
+Thumbs.db
+
+# --- Secretos y entorno (se versiona solo .env.example) ---
+.env
+.env.*
+!.env.example
+*.pfx
+*.key
+*.pem
+secrets.json
+appsettings.*.local.json
+
+# --- Datos locales de Docker ---
+infra/data/
+
+# --- Archivos generados ---
+src/BabelHub.Web/wwwroot/css/site.css
+tools/tailwind/
+
+# --- Claude Code: configuración local (se versionan skills, agentes y settings.json) ---
+.claude/settings.local.json
