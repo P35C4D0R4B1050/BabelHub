@@ -80,7 +80,7 @@ style Ent fill:#222,stroke:#fff,color:#fff
 | :--- | :--- |
 | **Inventario** | *Stock vendible = stock físico − reservas activas*, y nunca negativo (RF13, RNF01). Una reserva pasa por *pendiente → confirmada* o *pendiente → liberada/expirada*. Un traslado pasa por *solicitado → aprobado → en tránsito → recibido* (o *rechazado*), y solo puede despacharse si el origen tiene stock vendible. Todo ajuste exige motivo y usuario. |
 | **E-commerce** | Un pedido solo se confirma con pago aprobado y reserva confirmada. El ISBN es único. Estados válidos del pedido y sus transiciones (RF06). Un pago se asocia a una clave de idempotencia (RF05). |
-| **Identidad** | Un encargado de sucursal siempre tiene exactamente una sucursal asignada; el administrador central, ninguna restricción. |
+| **Identidad** | Un encargado de sucursal siempre tiene exactamente una sucursal asignada; el administrador central, ninguna restricción. Un cliente solo recibe avisos por WhatsApp si registró su número y dio su consentimiento. |
 | **Asistente** | La respuesta debe basarse en datos recibidos de las API; si no hay datos, el resultado debe indicar que no puede responder (RF08). |
 
 **Selección de fuente como estrategia.** El criterio (cercanía y disponibilidad) se modela como una interfaz del dominio con una implementación por defecto; cambiarlo a, por ejemplo, "menor costo de traslado" implica agregar una implementación, sin tocar controladores, base de datos ni el E-commerce (AC06, RNF09).
@@ -104,9 +104,10 @@ style Ent fill:#222,stroke:#fff,color:#fff
 | Repositorio de libros, carritos, pedidos y pagos | E-commerce | PostgreSQL (BD Ventas) |
 | Cliente de inventario | E-commerce y Asistente | Llamadas REST al servicio de Inventario |
 | Cliente de catálogo y pedidos | Asistente | Llamadas REST al servicio de E-commerce |
-| Pasarela de pago | E-commerce | Niubiz o Culqi (Yape y tarjetas) |
+| Pasarela de pago | E-commerce | Culqi (Yape y tarjetas) |
 | Servicio de envío | E-commerce | Operador logístico |
-| Notificador | E-commerce e Inventario | Correo o SMS |
+| Notificador | E-commerce e Inventario | Webhook de n8n, que envía por Evolution API (WhatsApp); si falla, deja el aviso pendiente y no interrumpe el caso de uso |
+| Registro de auditoría | E-commerce e Inventario | Tabla de auditoría de solo inserción en la base de cada servicio |
 | Proveedor de LLM | Asistente | API del modelo de lenguaje |
 | Caché | E-commerce e Inventario | Redis |
 | Usuario actual | Todos | Lectura de los claims del JWT |
@@ -167,18 +168,27 @@ src/
 │       └── Dockerfile
 │
 ├── BabelHub.Ecommerce/                         servicio completo (misma forma)
-│   ├── BabelHub.Ecommerce.Domain/              Catalogo, Carrito, Pedidos, Pagos
+│   ├── BabelHub.Ecommerce.Domain/              Catalogo, Carrito, Pedidos, Pagos,
+│   │                                           Envios, Devoluciones
 │   ├── BabelHub.Ecommerce.Application/         casos de uso y puertos
 │   ├── BabelHub.Ecommerce.Infrastructure/      PostgreSQL, cliente de Inventario,
-│   │                                           pasarela, envío, notificaciones, Redis
+│   │                                           Culqi, envío, notificaciones, Redis
 │   └── BabelHub.Ecommerce.Api/
 │
-├── BabelHub.Identidad/                         versión reducida (ver sección 6)
+├── BabelHub.Identidad/                         versión reducida (ver sección 6); esquema propio `identidad`
 ├── BabelHub.AsistenteCompra/                   versión reducida (ver sección 6)
+├── BabelHub.Web/                               interfaz MVC Razor (ver sección 4.3)
+│   ├── Areas/{Tienda, Sucursal, Admin}/        Controllers, Views y ViewModels por rol
+│   ├── Clients/                                HttpClient tipados hacia cada servicio
+│   ├── Infrastructure/                         sesión por cookie, manejo del JWT, errores
+│   ├── wwwroot/
+│   └── Dockerfile
 └── BabelHub.Shared/                            solo contratos entre servicios
 ```
 
 Las subcarpetas de `Application` coinciden con las carpetas de `specs/` (`inventario-fuentes`, `inventario-seleccion-fuente`, `inventario-traslados`, `ecommerce-carrito-checkout`, etc.), de modo que **cada especificación se implementa en un lugar predecible**.
+
+La solución es un único `BabelHub.sln` en la raíz del repositorio, con una carpeta de solución por servicio y una para `tests`. No se usa el formato `.slnx`, para que Visual Studio, Rider y la CLI en Linux lo abran sin diferencias.
 
 ### 4.1 Referencias entre proyectos
 
@@ -219,7 +229,22 @@ Cada flecha es una referencia de proyecto. Al separar las capas en proyectos dis
 | Los adaptadores de Infraestructura traducen entre el contrato y el modelo interno. | Duplica algún tipo pequeño, pero a cambio protege el núcleo (anticorrupción). |
 | Ningún servicio referencia el Dominio, la Aplicación ni la Infraestructura de otro. | Los servicios se comunican solo por REST. |
 
-### 4.3 Resto de carpetas
+### 4.3 `BabelHub.Web`: la interfaz
+
+`BabelHub.Web` es una aplicación ASP.NET Core MVC con Razor. Lo que en un proyecto de cuatro capas tradicional sería la capa "Web" se reparte aquí en dos piezas: la **Api** de cada servicio (entrada HTTP/JSON del servicio) y **`BabelHub.Web`** (interfaz de usuario). No es una capa de Clean Architecture: es un cliente de los servicios, como lo sería una app móvil.
+
+| Aspecto | Regla |
+| :--- | :--- |
+| Organización | Un solo proyecto con áreas por rol: `Tienda` (cliente), `Sucursal` (encargado y logística) y `Admin` (administración central). Sin Dominio ni Aplicación propios. |
+| Referencias | Solo a `BabelHub.Shared`. Nunca al Dominio, Aplicación o Infraestructura de un servicio. |
+| Comunicación | `HttpClient` tipados en `Clients/`, llamados **desde el servidor** por la red interna; el navegador nunca llama a los servicios. |
+| Autenticación | Inicia sesión contra Identidad, guarda el JWT en el servidor y entrega una cookie de sesión (`HttpOnly`, `Secure`, `SameSite`) más protección anti-falsificación en los formularios. Las llaves de protección de datos van en un volumen. |
+| Reglas de negocio | Ninguna. Valida la forma de la entrada para mejorar la experiencia, pero la autoridad es siempre el servicio. |
+| Pagos | El script de Culqi tokeniza la tarjeta o Yape en el navegador; la Web envía solo el token al servicio E-commerce, que realiza el cobro. |
+| Errores | Traduce los códigos de los servicios (400, 403, 404, 409, 503) a pantallas con estados claros: vacío, cargando, error y con datos (RNF13). |
+| Pruebas | Pruebas E2E con Playwright y pruebas de los clientes HTTP; no se prueban las vistas de forma unitaria. |
+
+### 4.4 Resto de carpetas
 
 | Carpeta | Rol respecto a Clean Architecture |
 | :--- | :--- |
@@ -228,8 +253,8 @@ Cada flecha es una referencia de proyecto. Al separar las capas en proyectos dis
 | `tests/integration` | Pruebas de Infraestructura (PostgreSQL con Testcontainers) y del contrato REST E-commerce ↔ Inventario. |
 | `tests/e2e` | Playwright sobre la Presentación y el flujo completo. |
 | `tests/load` | k6 sobre la disponibilidad y el checkout (RNF02). |
-| `infra/` | Composición del despliegue: `docker-compose.local.yml`, `docker-compose.oracle.yml` y `nginx/`. Es la raíz de composición a nivel de sistema. |
-| `docs/` | `architecture.md` y `glossary.md` (términos: fuente, stock vendible, reserva, traslado). El glosario fija el lenguaje que usa el Dominio. |
+| `infra/` | Composición del despliegue: `docker-compose.local.yml`, `docker-compose.oracle.yml`, `nginx/` y `n8n/` (flujos exportados). Incluye n8n y Evolution API. Es la raíz de composición a nivel de sistema. |
+| `docs/` | Documentos `01` a `07` como documentación del sistema, y `glossary.md` (términos: fuente, stock vendible, reserva, traslado). El glosario fija el lenguaje que usa el Dominio. No se crea `architecture.md`: el `README.md` y el `06` ya cumplen esa función. |
 | `AGENTS.md` | Contiene la regla de dependencia como norma no negociable (sección 9). |
 
 ## 5. Ejemplo recorrido: reservar stock
@@ -290,6 +315,7 @@ style G fill:#222,stroke:#fff,color:#fff
 | **E-commerce** | Completa | 4 proyectos. | Concentra varias integraciones externas (pasarela, envío, Inventario) que conviene aislar. |
 | **Identidad** | Reducida | 1 proyecto con carpetas `Domain`, `Application`, `Infrastructure` y `Api`; puertos solo donde haya algo que sustituir. | Poca lógica de negocio; la regla de dependencia se mantiene por convención y revisión. |
 | **Asistente de Compra** | Reducida | 1 proyecto con las mismas carpetas; puertos para el LLM y los clientes de catálogo e inventario. | Su valor está en las integraciones; el dominio es mínimo (política de fundamentación). |
+| **Web** | Sin capas | 1 proyecto MVC con áreas por rol (sección 4.3). | Es un cliente de presentación; no tiene reglas de negocio que aislar. |
 
 Si un servicio reducido crece en lógica, se promueve a la versión completa sin cambiar su contrato REST.
 
@@ -301,6 +327,7 @@ Si un servicio reducido crece en lógica, se promueve a la versión completa sin
 | Aplicación | Casos de uso con puertos simulados (qué pasa si no hay stock, si el pago falla). | `tests/unit` | xUnit | Sin infraestructura real. |
 | Infraestructura | Repositorios, migraciones, concurrencia, clientes HTTP. | `tests/integration` | xUnit + Testcontainers | Con PostgreSQL real. |
 | Contrato E-commerce ↔ Inventario | Que ambas partes respetan los DTOs de `Shared`. | `tests/integration` | xUnit | Detecta cambios que rompen la comunicación. |
+| Web | Clientes HTTP hacia los servicios y recorridos de usuario por área. | `tests/integration` y `tests/e2e` | xUnit; Playwright | Los recorridos de cada área cumplen los criterios de las specs. |
 | Presentación y flujo | Búsqueda → compra con recojo → cambio de estado. | `tests/e2e` | Playwright | Criterios de aceptación de las specs. |
 | Rendimiento | Disponibilidad y checkout bajo carga. | `tests/load` | k6 | p95 de RNF02. |
 
@@ -317,7 +344,8 @@ Este apartado **precisa** lo indicado en `06-estilo-arquitectonico.md` (6.3): la
 | Obtener rol y sucursal del usuario. | Aplicación (puerto) / Presentación (implementación) | El puerto *usuario actual* se implementa leyendo los claims del token. |
 | **Impedir que un encargado opere otra sucursal.** | **Aplicación** | Cada caso de uso compara la sucursal del usuario con la del recurso. |
 | Registrar auditoría de operaciones sensibles. | Aplicación | El caso de uso solicita el registro; la Infraestructura lo guarda sin posibilidad de modificarlo. |
-| Secretos (claves de pagos, LLM). | Presentación | Variables de entorno; nunca en el repositorio. |
+| Secretos (claves de Culqi, LLM, webhook de n8n). | Presentación | Variables de entorno; nunca en el repositorio. |
+| Sesión del usuario en la interfaz y token fuera del navegador. | `BabelHub.Web` | Cookie de sesión del servidor; el JWT nunca llega al navegador. |
 
 **Justificación:** si el alcance por sucursal se comprobara solo en los controladores, bastaría con que un controlador nuevo lo olvidara para abrir un acceso indebido (RNF05). Hacerlo en la Aplicación lo vuelve inherente a cada caso de uso y probable con pruebas unitarias.
 
@@ -335,6 +363,8 @@ Este apartado **precisa** lo indicado en `06-estilo-arquitectonico.md` (6.3): la
 6. BabelHub.Shared contiene solo contratos (DTOs y constantes); no lo referencian Dominio ni Aplicación.
 7. Toda regla de negocio nueva se escribe primero como prueba unitaria en tests/unit.
 8. Los secretos se leen de variables de entorno; nunca se escriben en el repositorio.
+9. BabelHub.Web solo referencia a BabelHub.Shared; no contiene reglas de negocio y llama a los servicios solo desde el servidor.
+10. Una falla del Notificador nunca interrumpe un caso de uso.
 ```
 
 ### 9.2 Cómo se refleja en cada feature
@@ -352,13 +382,21 @@ Este apartado **precisa** lo indicado en `06-estilo-arquitectonico.md` (6.3): la
 | :--- | :--- | :--- |
 | `inventario-fuentes` | Inventario | Dominio (fuente, stock vendible), Aplicación (disponibilidad), Infraestructura (BD, caché). |
 | `inventario-seleccion-fuente` | Inventario | Dominio (estrategia de selección y reservas), Aplicación (reservar y confirmar). |
+| `inventario-ajustes` | Inventario | Dominio (ajuste con motivo y usuario; entrada por devolución), Aplicación (registrar ajuste), Infraestructura (auditoría). |
 | `inventario-traslados` | Inventario | Dominio (ciclo de vida del traslado), Aplicación (aprobar, despachar, recibir), Infraestructura (notificaciones). |
+| `ecommerce-catalogo` | E-commerce | Dominio (libro, ISBN único), Aplicación (buscar, publicar, dar de baja), Infraestructura (búsqueda y caché de catálogo). |
 | `ecommerce-carrito-checkout` | E-commerce | Dominio (carrito, pedido), Aplicación (checkout), Infraestructura (cliente de Inventario). |
-| `ecommerce-pagos-yape` | E-commerce | Aplicación (puerto de pasarela, idempotencia), Infraestructura (Niubiz o Culqi). |
+| `ecommerce-pagos-yape` | E-commerce | Aplicación (puerto de pasarela, idempotencia), Infraestructura (Culqi). |
+| `ecommerce-pedidos` | E-commerce | Dominio (estados y transiciones del pedido), Aplicación (consultar y avanzar estados), Infraestructura (notificaciones). |
+| `ecommerce-envios` | E-commerce | Aplicación (puerto de envío, guías y seguimiento), Infraestructura (operador logístico). |
+| `ecommerce-devoluciones` | E-commerce | Dominio (devolución y su ciclo), Aplicación (solicitar, reembolsar, reingresar stock), Infraestructura (reembolso en Culqi, cliente de Inventario). |
 | `asistente-compra-ia` | Asistente | Aplicación (consulta fundamentada), Infraestructura (LLM y clientes REST). |
-| `identidad-seguridad` | Identidad | Dominio (usuario, rol, sucursal), Infraestructura (emisión de JWT), Api. |
+| `identidad-seguridad` | Identidad | Dominio (usuario, rol, sucursal, consentimiento), Infraestructura (emisión de JWT, esquema `identidad`), Api. |
+| `transversal-auditoria` | E-commerce e Inventario (Identidad según se requiera) | Contrato único de registro inmutable (quién, qué, cuándo, detalle); lo implementa cada servicio en su propia base. |
+| `transversal-notificaciones` | E-commerce e Inventario | Puerto `Notificador`, plantillas de avisos, reintentos y contrato del webhook de n8n; no bloquea la operación. |
+| `web-base` | Web | Estructura de áreas, sesión por cookie, manejo de errores y estados de pantalla. Las pantallas de cada función se describen en el `plan.md` de su feature. |
 
-**Observación:** el catálogo (RF01, RF02, RF10), los pedidos y su seguimiento (RF06, RF07) y las guías de envío (RF11) no tienen una carpeta propia en `specs/`. Pueden quedar dentro de `ecommerce-carrito-checkout`, pero conviene crear `ecommerce-catalogo` y `ecommerce-pedidos`, porque son requisitos de prioridad alta.
+**Total: 15 especificaciones.** Los indicadores y reportes (RF21) quedan diferidos y no tienen carpeta. Las specs transversales no tienen servicio propio porque la arquitectura se limita a cuatro servicios (AD02): definen un contrato que cada servicio implementa.
 
 ## 10. Convenciones sugeridas
 
@@ -367,7 +405,7 @@ Este apartado **precisa** lo indicado en `06-estilo-arquitectonico.md` (6.3): la
 | Proyecto | `BabelHub.<Servicio>.<Capa>` | `BabelHub.Inventario.Domain` |
 | Caso de uso | Verbo + sustantivo | `ReservarStock`, `AprobarTraslado` |
 | Puerto | Prefijo `I` y nombre del rol | `IRepositorioDeFuentes`, `IPasarelaDePago` |
-| Adaptador | Tecnología + puerto | `RepositorioDeFuentesPostgres`, `PasarelaNiubiz` |
+| Adaptador | Tecnología + puerto | `RepositorioDeFuentesPostgres`, `PasarelaCulqi`, `NotificadorN8n` |
 | Lenguaje del dominio | Términos de `docs/glossary.md` | fuente, stock vendible, reserva, traslado |
 
 Son sugerencias propias, no vienen de la propuesta original.

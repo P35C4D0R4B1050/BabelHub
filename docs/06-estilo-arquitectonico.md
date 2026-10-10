@@ -4,7 +4,7 @@
 
 **Arquitectura basada en servicios (*Service-Based*) de granularidad gruesa**, con **Clean Architecture** como organización interna de cada servicio.
 
-- **Estructura global:** pocos servicios independientes, cada uno con una responsabilidad clara y, cuando la necesita, con su propia base de datos. Se comunican por **REST síncrono**.
+- **Estructura global:** pocos servicios independientes, cada uno con una responsabilidad clara y, cuando la necesita, con su propia base de datos. Se comunican por **REST síncrono**. La interfaz es una aplicación web (`BabelHub.Web`, MVC con Razor) que actúa como cliente de los servicios (AD15).
 - **Estructura interna:** cada servicio se divide en cuatro capas cuyas dependencias apuntan siempre hacia el dominio.
 
 **Justificación:** la red prevista es de 5 a 10 sucursales y los recursos son 2 OCPU y 12 GB en total, por lo que dividir el sistema en más servicios agregaría coordinación y consumo sin ventaja real de escalamiento (DA09). Un monolito, en cambio, mezclaría el inventario con la venta y dificultaría aislar y probar la parte más crítica (DA01). Clean Architecture compensa el tamaño reducido del sistema con límites claros dentro de cada servicio (DA08).
@@ -14,13 +14,14 @@
 ```mermaid
 flowchart TD
 subgraph CLIENTES["CLIENTES"]
-Web["Aplicación Web responsiva"]
+Nav["Navegador - cliente, sucursal, administración"]
 end
 subgraph BORDE["BORDE DE RED"]
 CF["Cloudflare - DNS, TLS, WAF y túnel"]
 NGX["Nginx - enrutamiento interno"]
 end
-subgraph SERVICIOS["SERVICIOS"]
+subgraph SERVICIOS["SERVICIOS Y APLICACIÓN WEB"]
+Web["BabelHub.Web - MVC Razor<br/>áreas Tienda, Sucursal, Admin"]
 ECO["Servicio de E-commerce"]
 INV["Servicio de Inventario Multi-Fuente"]
 IDE["Servicio de Identidad y Seguridad"]
@@ -32,18 +33,24 @@ BDI[("BD Inventario")]
 RED[("Caché Redis")]
 end
 subgraph EXTERNOS["SISTEMAS EXTERNOS"]
-PAG["Pasarela de pago"]
+PAG["Culqi"]
 ENV["Servicio de envío"]
 LLM["Proveedor de LLM"]
+NOT["n8n + Evolution API<br/>WhatsApp"]
 end
 
-Web -->|"HTTPS"| CF
+Nav -->|"HTTPS"| CF
 CF --> NGX
+NGX --> Web
 NGX --> ECO
 NGX --> INV
 NGX --> IDE
 NGX --> ASI
 
+Web -->|"REST interno"| ECO
+Web -->|"REST interno"| INV
+Web -->|"REST interno"| IDE
+Web -->|"REST interno"| ASI
 ECO -->|"REST"| INV
 ASI -->|"REST"| ECO
 ASI -->|"REST"| INV
@@ -58,8 +65,12 @@ INV --> RED
 
 ECO -->|"pagos"| PAG
 ECO -->|"envíos"| ENV
+ECO -->|"avisos"| NOT
+INV -->|"avisos"| NOT
 ASI -->|"consultas"| LLM
 
+style Nav fill:#222,stroke:#fff,color:#fff
+style NOT fill:#222,stroke:#fff,color:#fff
 style CLIENTES fill:#222,stroke:#fff,stroke-width:2px,color:#fff
 style BORDE fill:#222,stroke:#fff,stroke-width:2px,color:#fff
 style SERVICIOS fill:#222,stroke:#fff,stroke-width:2px,color:#fff
@@ -86,25 +97,29 @@ La vista de despliegue sobre las VMs de Oracle está en `05-decisiones-arquitect
 
 | Componente | Responsabilidad | Decisión |
 | :--- | :--- | :--- |
-| **Aplicación Web** | Interfaz de clientes, encargados de sucursal y administración central; consume los servicios por REST. | RC01, RC03 |
+| **Aplicación Web (`BabelHub.Web`)** | Interfaz de clientes, encargados de sucursal y administración central en tres áreas; consume los servicios por REST desde el servidor y guarda el JWT en el servidor. No contiene reglas de negocio. | RC01, RC03, AD15 |
 | **Cloudflare y Nginx** | Cloudflare protege y cifra el acceso; Nginx enruta cada solicitud al servicio correspondiente. | AD13, AD14 |
 | **Servicio de E-commerce** | Catálogo, carrito, checkout, pagos y pedidos. Único servicio con el que interactúa el cliente final. | AD01, AD02 |
 | **Servicio de Inventario Multi-Fuente** | Fuentes por sucursal, stock vendible (físico − reservas), reservas, selección de fuente, traslados y ajustes. | AD01, AD08 |
 | **Servicio de Identidad y Seguridad** | Autentica usuarios y emite JWT con rol y sucursal. | AD05 |
 | **Servicio de Asistente de Compra** | Recomienda libros y responde dudas con datos de las API y un LLM externo. | AD07 |
-| **BD Ventas y BD Inventario** | PostgreSQL separadas; la de Inventario se aísla por su volumen de escritura. | AD03, AD12 |
+| **BD Ventas y BD Inventario** | PostgreSQL separadas; la de Inventario se aísla por su volumen de escritura. Identidad usa el esquema propio `identidad` en la instancia de Ventas. | AD03, AD12, AD18 |
+| **Notificaciones (n8n + Evolution API)** | Reciben avisos de E-commerce e Inventario por webhook y los envían por WhatsApp; su falla no bloquea ninguna operación. | AD16 |
 | **Caché Redis** | Disponibilidad (corta duración) y catálogo (mayor duración). | AD06 |
 
 ## 4. Reglas de comunicación
 
 | Origen | Destino | Tipo | Propósito |
 | :--- | :--- | :--- | :--- |
-| Aplicación Web | Cloudflare → Nginx | HTTPS | Enviar todas las solicitudes. |
+| Navegador | Cloudflare → Nginx → Web | HTTPS | Enviar todas las solicitudes de la interfaz. |
+| Aplicación Web | E-commerce, Inventario, Identidad y Asistente | REST síncrono (red interna) | Obtener y modificar datos con el JWT del usuario. |
 | E-commerce | Inventario | REST síncrono | Consultar disponibilidad real y solicitar reservas. |
 | Asistente | E-commerce e Inventario | REST síncrono | Obtener datos, sin acceder a las bases. |
 | Todos los servicios | Identidad | Validación de JWT | Verificar rol y sucursal permitidos. |
 | E-commerce e Inventario | Su base y Redis | SQL y caché | Persistir y acelerar sus datos. |
-| E-commerce | Pasarela de pago y envío | API externa | Cobrar y gestionar entregas. |
+| E-commerce | Culqi y servicio de envío | API externa | Cobrar y gestionar entregas. |
+| E-commerce e Inventario | n8n | Webhook (asíncrono, tolerante a fallos) | Pedir el envío de un aviso por WhatsApp. |
+| n8n | Evolution API → WhatsApp | API interna y externa | Armar y enviar el mensaje. |
 | Asistente | Proveedor de LLM | API externa | Generar respuestas. |
 
 ## 5. Flujo principal: compra con selección de fuente
@@ -115,7 +130,7 @@ autonumber
 actor C as Cliente
 participant E as E-commerce
 participant I as Inventario
-participant P as Pasarela de pago
+participant P as Culqi
 
 C->>E: Confirma el pedido
 E->>I: Consulta disponibilidad real
@@ -146,8 +161,8 @@ end
 | **Objetivo** | Separar responsabilidades y controlar las dependencias hacia el dominio. |
 | **Problema que resuelve** | Evita que las reglas del negocio queden acopladas a la interfaz web, la base de datos, la pasarela de pago, el servicio de envío o el LLM. |
 | **Capas** | Presentación, Aplicación, Dominio e Infraestructura. |
-| **Beneficios** | Facilita el mantenimiento y las pruebas unitarias; permite cambiar una tecnología (por ejemplo, de Niubiz a Culqi) sin modificar las reglas del negocio; ordena el código. |
-| **Alcance** | Completo en E-commerce e Inventario, que concentran la lógica. Versión reducida (Presentación y Aplicación con acceso a datos simple) en Identidad y Asistente. |
+| **Beneficios** | Facilita el mantenimiento y las pruebas unitarias; permite cambiar una tecnología (por ejemplo, de Culqi a otra pasarela) sin modificar las reglas del negocio; ordena el código. |
+| **Alcance** | Completo en E-commerce e Inventario, que concentran la lógica. Versión reducida (Presentación y Aplicación con acceso a datos simple) en Identidad y Asistente. `BabelHub.Web` queda fuera de este esquema: es un cliente de presentación sin dominio propio. |
 
 ### 6.2 Dependencias
 
@@ -193,7 +208,7 @@ style Ext fill:#222,stroke:#fff,color:#fff
 
 | Capa | Responsabilidad | En Inventario | En E-commerce |
 | :--- | :--- | :--- | :--- |
-| **Presentación** | Recibir solicitudes REST, validar la entrada, verificar rol y sucursal del token y responder. | Controladores de disponibilidad, reservas, traslados y ajustes. | Controladores de catálogo, carrito, pedidos y pagos. |
+| **Presentación** | Recibir solicitudes REST, validar la entrada, verificar token y rol, y el alcance por sucursal se comprueba también. | Controladores de disponibilidad, reservas, traslados y ajustes. | Controladores de catálogo, carrito, pedidos y pagos. |
 | **Aplicación** | Coordinar los casos de uso sin conocer detalles técnicos. | Consultar disponibilidad, reservar, seleccionar fuente, gestionar traslados y ajustes. | Buscar libros, gestionar carrito, realizar pedido, confirmar pago, consultar pedidos. |
 | **Dominio** | Entidades y reglas del negocio, sin dependencias técnicas. | Fuente, ítem de fuente, reserva, traslado y ajuste. Regla: *stock vendible = físico − reservas activas*, nunca negativo. | Libro, carrito, pedido y pago; estados del pedido. |
 | **Infraestructura** | Implementar el acceso a tecnologías externas. | Repositorios PostgreSQL, Redis y notificaciones. | Repositorios PostgreSQL, cliente REST de Inventario, pasarela de pago y servicio de envío. |
@@ -204,9 +219,9 @@ style Ext fill:#222,stroke:#fff,color:#fff
 | :--- | :--- |
 | Repositorio de inventario / de ventas | Acceso a PostgreSQL |
 | Cliente de inventario | Llamadas REST del E-commerce al Inventario |
-| Pasarela de pago | Integración con Niubiz o Culqi |
+| Pasarela de pago | Integración con Culqi |
 | Servicio de envío | Integración con el operador logístico |
-| Notificador | Correo o SMS |
+| Notificador | Webhook de n8n, que envía por Evolution API (WhatsApp) |
 | Proveedor de LLM | API del modelo de lenguaje |
 | Caché | Redis |
 
@@ -238,6 +253,8 @@ Los nombres de proyectos son una convención sugerida, no parte de la propuesta 
 | **Monolito único** | Mezcla el inventario con la venta y dificulta aislarlo, probarlo y asignarle recursos. |
 | **Microservicios finos** | Añaden coordinación, comunicación y despliegue innecesarios para 5–10 sucursales, con 12 GB de RAM en total. |
 | **Arquitectura orientada a eventos** | Su complejidad operativa no se justifica con el volumen previsto; REST síncrono basta. |
+| **Interfaz dentro del servicio E-commerce** | Mezclaría la UI del personal de sucursal con la venta y rompería la independencia de los servicios. |
+| **SPA que llama a las API desde el navegador** | Expone el JWT al navegador, exige CORS y añade otro stack al proyecto. |
 | **Capas tradicionales** | El dominio quedaría atado a la base de datos y a los proveedores externos, y sería más difícil de probar. |
 
 ## 8. Ventajas y limitaciones
