@@ -27,7 +27,7 @@ BH.ready(() => {
   const todos = BH.estado === 'vacio' ? [] : BH.audit.list().filter((e) => e.accion === 'Ajuste de inventario');
   function pintar() {
     const m = $('f-motivo').value;
-    const l = todos.filter((e) => !m || e.detalle.includes('(' + m + ')'));
+    const l = todos.filter((e) => !m || e.detalle.toLowerCase().includes('(' + m));
     if (!l.length) { $('tabla').innerHTML = BH.emptyState('pencil', 'Sin ajustes', 'Aún no hay ajustes registrados con este filtro.', '<a class="btn btn-primary btn-sm" href="inventario.html">Ir al inventario</a>'); return; }
     $('tabla').innerHTML = `<div class="overflow-x-auto border border-[var(--bh-linea)] bg-base-100"><table class="table"><thead><tr><th>Fecha</th><th>Responsable</th><th>Detalle</th></tr></thead><tbody>${l.map((e) => `<tr><td class="whitespace-nowrap tabular-nums text-sm">${e.fecha}</td><td><div class="text-sm font-medium">${e.usuario}</div><div class="text-xs opacity-60">${e.rol}</div></td><td class="text-sm">${e.detalle}</td></tr>`).join('')}</tbody></table></div>`;
   }

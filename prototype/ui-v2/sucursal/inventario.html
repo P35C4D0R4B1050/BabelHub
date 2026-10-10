@@ -27,11 +27,18 @@
       <h2 class="font-display text-2xl" id="aj-t">Ajustar inventario</h2>
       <p class="text-sm opacity-75 mb-3" id="aj-info"></p>
       <div class="space-y-3">
-        <label class="floating-label w-full"><span>Motivo</span><select id="aj-motivo" class="select w-full"><option>Merma</option><option>Producto dañado</option><option>Corrección de conteo</option></select></label>
-        <label class="floating-label w-full"><span>Cantidad a sumar o restar (ej. −2)</span><input id="aj-delta" class="input w-full" inputmode="numeric" value="-1"></label>
-        <p id="aj-prev" class="text-sm" role="status"></p>
+        <fieldset><legend class="text-sm font-semibold mb-1">¿Qué pasó?</legend>
+          <div class="grid gap-2" role="radiogroup" id="aj-motivos">
+            <label class="border border-[var(--bh-linea)] p-3 flex gap-3 cursor-pointer"><input type="radio" name="aj-m" value="merma" class="radio radio-primary mt-0.5" checked><span><b>Merma</b><br><span class="text-xs opacity-75">Se perdieron unidades (robo, extravío, desgaste). Solo descuenta.</span></span></label>
+            <label class="border border-[var(--bh-linea)] p-3 flex gap-3 cursor-pointer"><input type="radio" name="aj-m" value="dañado" class="radio radio-primary mt-0.5"><span><b>Producto dañado</b><br><span class="text-xs opacity-75">Unidades que ya no se pueden vender. Solo descuenta.</span></span></label>
+            <label class="border border-[var(--bh-linea)] p-3 flex gap-3 cursor-pointer"><input type="radio" name="aj-m" value="conteo" class="radio radio-primary mt-0.5"><span><b>Corrección de conteo</b><br><span class="text-xs opacity-75">Contaste los ejemplares y el sistema no coincide. Indica cuántos hay realmente.</span></span></label>
+          </div></fieldset>
+        <div id="aj-campo"></div>
+        <label class="floating-label w-full"><span>Nota (opcional)</span><input id="aj-nota" class="input w-full" maxlength="120" placeholder="Nota (opcional)"></label>
+        <p id="aj-prev" class="text-sm min-h-10" role="status" aria-live="polite"></p>
+        <p class="text-xs opacity-60">Para recibir mercadería usa <a class="link" href="traslados.html">Traslados</a>; las devoluciones de clientes reingresan solas. No hay ajustes que sumen por merma o daño.</p>
       </div>
-      <div class="modal-action"><form method="dialog"><button class="btn btn-ghost">Cancelar</button></form><button class="btn btn-primary" id="aj-ok">Registrar ajuste</button></div>
+      <div class="modal-action"><form method="dialog"><button class="btn btn-ghost">Cancelar</button></form><button class="btn btn-primary" id="aj-ok" disabled>Registrar ajuste</button></div>
     </div>
     <form method="dialog" class="modal-backdrop"><button>cerrar</button></form>
   </dialog>
@@ -78,22 +85,57 @@ BH.ready(() => {
         ${soloLectura ? '' : `<td class="text-right"><button class="btn btn-sm btn-outline" data-aj="${x.o.id}">Ajustar</button></td>`}</tr>`; }).join('')}</tbody></table></div>`;
     $('tabla').querySelectorAll('[data-aj]').forEach((b) => (b.onclick = () => abrir(Number(b.dataset.aj))));
   }
+  /* Reglas del ajuste (RF17): merma y daño solo descuentan y nunca más que el vendible;
+     la corrección de conteo se expresa como conteo físico real, que no puede ser menor que lo reservado. */
+  const motivo = () => document.querySelector('input[name=aj-m]:checked').value;
+  const ETQ = { merma: 'merma', 'dañado': 'producto dañado', conteo: 'corrección de conteo' };
+  const num = () => { const v = $('aj-cant'); return v ? parseInt(v.value, 10) : NaN; };
+
+  function campo() {
+    const m = motivo(), vend = actual.f - actual.r;
+    if (m === 'conteo') {
+      $('aj-campo').innerHTML = `<label class="floating-label w-full"><span>Conteo físico real (ejemplares que hay)</span><input id="aj-cant" class="input w-full" type="number" min="${actual.r}" step="1" value="${actual.f}" inputmode="numeric"></label>`;
+    } else {
+      $('aj-campo').innerHTML = vend === 0
+        ? `<div role="alert" class="alert alert-warning alert-soft">${BH.icon('warn')}<span>No hay unidades vendibles para descontar: las ${actual.r} que quedan están reservadas para pedidos en curso. Si el libro realmente falta, primero resuelve esos pedidos.</span></div>`
+        : `<label class="floating-label w-full"><span>Unidades a descontar (máximo ${vend})</span><input id="aj-cant" class="input w-full" type="number" min="1" max="${vend}" step="1" value="1" inputmode="numeric"></label>`;
+    }
+    const i = $('aj-cant'); if (i) i.addEventListener('input', prev);
+    prev();
+  }
+
+  /* Devuelve el cambio de stock físico (negativo para merma y daño) o null si no es válido */
+  function prev() {
+    const m = motivo(), p = $('aj-prev'), ok = $('aj-ok'), n = num(), vend = actual.f - actual.r;
+    const fallo = (t) => { p.innerHTML = `${BH.icon('warn', 'size-4 inline text-error')} ${t}`; ok.disabled = true; ok.textContent = 'Registrar ajuste'; return null; };
+    if (m !== 'conteo' && vend === 0) return fallo('Nada que descontar.');
+    if (isNaN(n)) return fallo(m === 'conteo' ? 'Escribe el conteo real.' : 'Escribe cuántas unidades descontar.');
+    if (!Number.isInteger(Number($('aj-cant').value))) return fallo('Usa un número entero.');
+    let d;
+    if (m === 'conteo') {
+      if (n < actual.r) return fallo(`El conteo no puede ser menor que las ${actual.r} unidades reservadas.`);
+      d = n - actual.f; if (d === 0) return fallo('El conteo coincide con el sistema: no hay nada que ajustar.');
+    } else {
+      if (n < 1) return fallo('Descuenta al menos 1 unidad.');
+      if (n > vend) return fallo(`Solo puedes descontar hasta ${vend} (las demás están reservadas).`);
+      d = -n;
+    }
+    const nf = actual.f + d;
+    p.innerHTML = `${BH.icon('check', 'size-4 inline text-success')} Físico ${actual.f} → <b>${nf}</b> · vendible ${vend} → <b>${nf - actual.r}</b> (${d > 0 ? '+' : '−'}${Math.abs(d)}).`;
+    ok.disabled = false; ok.textContent = m === 'conteo' ? `Registrar conteo (${d > 0 ? '+' : '−'}${Math.abs(d)})` : `Descontar ${n} ${n === 1 ? 'unidad' : 'unidades'}`;
+    return d;
+  }
   function abrir(id) {
     actual = datos().find((x) => x.o.id === id); $('aj-t').textContent = actual.o.titulo;
-    $('aj-info').textContent = `Físico ${actual.f} · reservado ${actual.r} · vendible ${actual.f - actual.r}`; $('aj-delta').value = '-1'; prev(); $('dlg').showModal();
+    $('aj-info').textContent = `Físico ${actual.f} · reservado ${actual.r} · vendible ${actual.f - actual.r}`;
+    document.querySelector('input[name=aj-m][value=merma]').checked = true; $('aj-nota').value = ''; campo(); $('dlg').showModal();
   }
-  function prev() {
-    const d = parseInt($('aj-delta').value, 10), p = $('aj-prev');
-    if (isNaN(d) || d === 0) { p.textContent = 'Escribe una cantidad distinta de cero.'; return false; }
-    const nf = actual.f + d, nv = nf - actual.r;
-    if (nf < 0 || nv < 0) { p.innerHTML = `${BH.icon('warn', 'size-4 inline text-error')} No se puede: el vendible quedaría en ${nv}. Debe ser 0 o más (hay ${actual.r} reservadas).`; return false; }
-    p.innerHTML = `${BH.icon('check', 'size-4 inline text-success')} Resultado: físico ${nf}, vendible ${nv}.`; return true;
-  }
-  $('aj-delta').addEventListener('input', prev);
+  $('aj-motivos').addEventListener('change', campo);
   $('aj-ok').addEventListener('click', () => {
-    if (!prev()) return; const d = parseInt($('aj-delta').value, 10);
+    const d = prev(); if (d === null) return; const m = motivo(), n = $('aj-nota').value.trim();
     BH.addDelta(actual.o.id, SID, d);
-    BH.audit.add('Ajuste de inventario', `${suc.nombre} · ${actual.o.titulo} · ${d > 0 ? '+' : '−'}${Math.abs(d)} (${$('aj-motivo').value.toLowerCase()})`);
+    const det = m === 'conteo' ? `conteo ${actual.f} → ${actual.f + d}` : ETQ[m];
+    BH.audit.add('Ajuste de inventario', `${suc.nombre} · ${actual.o.titulo} · ${d > 0 ? '+' : '−'}${Math.abs(d)} (${ETQ[m]}${m === 'conteo' ? ': ' + det : ''})${n ? ' · ' + n : ''}`);
     $('dlg').close(); kpis(); tabla(); BH.toast('Ajuste registrado y auditado');
   });
   $('buscar').addEventListener('input', tabla);
