@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>BabelHub.Tools.SpecCheck</RootNamespace>
+    <AssemblyName>SpecCheck</AssemblyName>
+  </PropertyGroup>
+</Project>
