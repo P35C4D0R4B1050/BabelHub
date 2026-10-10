@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Libro · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-area="tienda" data-page="catalogo" data-estados="normal,error">
+<div id="page-content" hidden>
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    <div class="breadcrumbs text-sm mb-4"><ul><li><a href="index.html">Inicio</a></li><li><a href="catalogo.html">Catálogo</a></li><li id="bc-tit"></li></ul></div>
+    <div id="detalle"></div>
+    <section class="mt-14" id="rel-sec" hidden aria-labelledby="h-rel">
+      <h2 id="h-rel" class="font-display text-3xl mb-4">Conexiones: también te puede interesar</h2>
+      <div id="rel" class="bh-grid grid-cols-2 lg:grid-cols-4"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+BH.ready(() => {
+  const $ = (id) => document.getElementById(id);
+  if (BH.estado === 'error') { $('detalle').innerHTML = BH.errorState('No pudimos cargar este libro.'); return; }
+  const o = BH.obra(BH.param('id') || 1) || BH.obras[0];
+  const mine = BH.miSucursal();
+  document.title = o.titulo + ' · BabelHub';
+  $('bc-tit').textContent = o.titulo;
+  const dig = BH.digitalEstado(o);
+  const total = BH.totalVendible(o);
+  let ed = BH.param('ed') || (o.impreso && total > 0 ? 'impreso' : (dig.ok ? 'digital' : (o.impreso ? 'impreso' : 'digital')));
+  let qty = 1;
+
+  function panelImpreso() {
+    const i = o.impreso;
+    if (!i) return `<div role="alert" class="alert alert-soft">${BH.icon('book')}<span>Esta obra no tiene edición impresa.</span></div>`;
+    const enMia = BH.vendible(o, mine);
+    let aviso = '';
+    if (total === 0) aviso = `<div role="alert" class="alert alert-error alert-soft">${BH.icon('warn')}<span>Impreso agotado en todas las sucursales.${dig.ok ? ' Puedes comprarlo en digital.' : ''}</span></div>`;
+    else if (enMia === 0) aviso = `<div role="alert" class="alert alert-info alert-soft">${BH.icon('truck')}<span>${BH.sucursal(mine).nombre} no lo tiene. Lo traemos desde ${BH.conStock(o)[0].nombre} con un traslado: <b>≈ 2 días hábiles</b>.</span></div>`;
+    const filas = BH.sucursales.map((s) => { const v = BH.vendible(o, s.id);
+      return `<tr class="${s.id === mine ? 'bg-base-200 font-medium' : ''}"><td>${s.nombre}${s.id === mine ? ' <span class="chip">Tu sucursal</span>' : ''}</td><td class="text-right tabular-nums">${v}</td><td>${v === 0 ? `<span class="chip">${BH.icon('x', 'size-3.5 text-error')}Sin stock</span>` : v <= 2 ? `<span class="chip">${BH.icon('warn', 'size-3.5 text-warning')}Pocas</span>` : `<span class="chip">${BH.icon('check', 'size-3.5 text-success')}Disponible</span>`}</td></tr>`; }).join('');
+    return `<div class="space-y-4">
+      <div class="flex flex-wrap items-baseline gap-4"><span class="font-display text-4xl">${BH.money(i.precio)}</span>${BH.chipImpreso(o, mine)}</div>
+      <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm"><dt class="opacity-60">ISBN</dt><dd>${i.isbn}</dd><dt class="opacity-60">Editorial</dt><dd>${o.editorial}</dd><dt class="opacity-60">Stock vendible en la red</dt><dd class="font-semibold">${total} ud.</dd></dl>
+      ${aviso}
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="join" ${total === 0 ? 'hidden' : ''}><button class="btn join-item" id="q-menos" aria-label="Menos">−</button><input id="qty" class="input join-item w-16 text-center" value="${qty}" inputmode="numeric" aria-label="Cantidad"><button class="btn join-item" id="q-mas" aria-label="Más">+</button></div>
+        <button id="add" class="btn btn-primary" ${total === 0 ? 'disabled' : ''}>${BH.icon('cart')} Agregar impreso al carrito</button>
+      </div>
+      <details class="border border-[var(--bh-linea)]"><summary class="cursor-pointer p-3 font-semibold flex items-center gap-2">${BH.icon('store', 'size-5')} Disponibilidad por sucursal</summary>
+        <div class="overflow-x-auto px-3 pb-3"><table class="table table-sm"><thead><tr><th>Sucursal</th><th class="text-right">Vendible</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table>
+        <p class="text-xs opacity-70 mt-1">Vendible = stock físico − unidades reservadas por pedidos en curso.</p></div></details>
+    </div>`;
+  }
+
+  function panelDigital() {
+    const d = o.digital;
+    if (!d) return `<div role="alert" class="alert alert-soft">${BH.icon('lock')}<span>${dig.motivo}${o.impreso ? ' Puedes comprarlo en impreso.' : ''}</span></div>`;
+    const l = d.licencia;
+    return `<div class="space-y-4">
+      <div class="flex flex-wrap items-baseline gap-4"><span class="font-display text-4xl">${BH.money(d.precio)}</span>${BH.chipDigital(o)}<span class="text-xs opacity-70">Sin IGV (libro digital)</span></div>
+      <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm"><dt class="opacity-60">Formato</dt><dd>${d.formato} · ${d.paginas} páginas · ${d.tamano}</dd><dt class="opacity-60">ISBN</dt><dd>${d.isbn}</dd><dt class="opacity-60">Idioma</dt><dd>Español</dd></dl>
+      ${dig.ok ? `<ul class="text-sm space-y-1.5 border-l-2 border-primary pl-3"><li class="flex gap-2">${BH.icon('bolt', 'size-4 mt-0.5 text-success')} Disponible al instante en tu biblioteca</li><li class="flex gap-2">${BH.icon('download', 'size-4 mt-0.5')} Hasta ${BH.limiteDescargas} descargas por compra; el enlace dura 5 minutos</li><li class="flex gap-2">${BH.icon('lock', 'size-4 mt-0.5')} Para uso personal: no se puede copiar ni redistribuir</li></ul>`
+        : `<div role="alert" class="alert alert-error alert-soft">${BH.icon('lock')}<span>${dig.motivo}</span></div>`}
+      <div class="border border-[var(--bh-linea)] p-3 text-sm space-y-1">
+        <h3 class="font-semibold flex items-center gap-2">${BH.icon('doc', 'size-4')} Licencia de la edición</h3>
+        <p><span class="opacity-60">Tipo:</span> ${l.tipo} · <span class="opacity-60">Titular:</span> ${d.titular}</p>
+        <p><span class="opacity-60">Territorio:</span> ${l.territorios} · <span class="opacity-60">Vigencia:</span> ${l.vence ? 'hasta el ' + BH.fecha(l.vence) : 'sin vencimiento'}</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-3"><button id="add-d" class="btn btn-primary" ${dig.ok ? '' : 'disabled'}>${BH.icon('bolt')} Comprar digital</button>
+        <a class="link text-sm" href="legal.html?doc=reembolso">Política de reembolso de libros digitales</a></div>
+    </div>`;
+  }
+
+  function pintar() {
+    const tab = (f, label, ic) => `<button role="tab" aria-selected="${ed === f}" data-ed="${f}" class="tab flex-1 gap-2 ${ed === f ? 'tab-active' : ''}">${BH.icon(ic, 'size-4')} ${label}</button>`;
+    $('detalle').innerHTML = `<div class="grid md:grid-cols-[19rem_1fr] gap-10 aparece">
+      <div class="max-w-xs mx-auto md:mx-0 w-full">${BH.cover(o, 'w-full aspect-[2/3]', ed === 'digital')}</div>
+      <div class="space-y-5">
+        <div><p class="text-sm uppercase tracking-wider font-semibold bh-texto-coral">${o.categoria}</p>
+          <h1 class="font-display text-4xl sm:text-5xl leading-tight">${o.titulo}</h1><p class="text-lg opacity-75">${o.autor}</p></div>
+        <p class="max-w-2xl">${o.desc}</p>
+        <div role="tablist" aria-label="Edición" class="tabs tabs-box max-w-md">${tab('impreso', 'Impreso', 'book')}${tab('digital', 'Digital', 'tablet')}</div>
+        <div id="panel">${ed === 'impreso' ? panelImpreso() : panelDigital()}</div>
+      </div></div>`;
+    $('detalle').querySelectorAll('[data-ed]').forEach((b) => (b.onclick = () => { ed = b.dataset.ed; pintar(); }));
+    const mas = $('q-mas'); if (mas) { mas.onclick = () => { qty = Math.min(total, qty + 1); $('qty').value = qty; }; $('q-menos').onclick = () => { qty = Math.max(1, qty - 1); $('qty').value = qty; }; }
+    const add = $('add'); if (add) add.onclick = () => { const n = Math.max(1, Math.min(total, parseInt($('qty').value, 10) || 1)); BH.cart.add(o.id, 'impreso', n); BH.toast(`${n} × ${o.titulo} (impreso) en el carrito`); };
+    const addD = $('add-d'); if (addD) addD.onclick = () => { BH.cart.add(o.id, 'digital'); BH.toast(`${o.titulo} (digital) en el carrito`); };
+  }
+  pintar();
+
+  const rel = BH.obras.filter((x) => x.id !== o.id && (x.categoria === o.categoria || x.autor === o.autor)).slice(0, 4);
+  if (rel.length) { $('rel-sec').hidden = false; $('rel').innerHTML = rel.map((x) => BH.tarjeta(x, mine)).join(''); }
+});
+</script>
+</body>
+</html>

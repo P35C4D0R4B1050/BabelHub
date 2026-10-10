@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Libro de Reclamaciones · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-area="tienda" data-page="reclamos" data-estados="normal">
+<div id="page-content" hidden>
+  <div class="max-w-3xl mx-auto px-4 py-8" id="raiz"></div>
+</div>
+
+<script>
+BH.ready(() => {
+  const $ = (id) => document.getElementById(id);
+  const root = $('raiz');
+  const u = BH.user();
+  const c = (id, label, val = '', type = 'text', req = true) => `<label class="floating-label w-full"><span>${label}${req ? ' *' : ''}</span><input id="${id}" type="${type}" class="input w-full" placeholder="${label}" value="${val}" ${req ? 'required' : ''}></label>`;
+
+  root.innerHTML = `<div class="flex items-center gap-3">${BH.icon('book', 'size-9')}<h1 class="bh-display" style="font-size:clamp(1.8rem,5vw,3rem)">Libro de Reclamaciones</h1></div>
+    <p class="opacity-75 mt-2">Si tienes una queja o un reclamo sobre un producto o un servicio de BabelHub, regístralo aquí. Conservamos tu hoja durante al menos dos años y puedes imprimir una copia gratuita.</p>
+    <p class="text-xs opacity-60 mt-1">Prototipo: el formato real debe ajustarse a la normativa vigente de Indecopi.</p>
+    <form id="form" class="mt-6 space-y-6" novalidate>
+      <fieldset class="border border-[var(--bh-linea)] p-4 space-y-4"><legend class="px-2 font-semibold">1. Identificación del consumidor</legend>
+        <div class="grid sm:grid-cols-2 gap-4">${c('nm', 'Nombre completo', u.nombre)}${c('doc', 'DNI o documento de identidad')}${c('dom', 'Domicilio')}${c('em', 'Correo electrónico', u.email, 'email')}${c('tl', 'Teléfono', u.tel, 'tel', false)}</div></fieldset>
+      <fieldset class="border border-[var(--bh-linea)] p-4 space-y-4"><legend class="px-2 font-semibold">2. Identificación del bien contratado</legend>
+        <div class="grid sm:grid-cols-2 gap-4"><label class="floating-label"><span>Tipo *</span><select id="tipoBien" class="select w-full"><option>Producto (libro impreso)</option><option>Producto (libro digital)</option><option>Servicio (envío, recojo, atención)</option></select></label>${c('pedido', 'N.° de pedido (si lo tienes)', 'BH-2026-000123', 'text', false)}${c('monto', 'Monto reclamado (S/)', '', 'text', false)}</div>
+        <label class="floating-label w-full"><span>Descripción del producto o servicio *</span><input id="desc" class="input w-full" placeholder="Descripción" required></label></fieldset>
+      <fieldset class="border border-[var(--bh-linea)] p-4 space-y-4"><legend class="px-2 font-semibold">3. Detalle de la reclamación</legend>
+        <div class="join" role="radiogroup" aria-label="Tipo de reclamación"><input class="join-item btn btn-sm" type="radio" name="tipo" value="Reclamo" aria-label="Reclamo" checked><input class="join-item btn btn-sm" type="radio" name="tipo" value="Queja" aria-label="Queja"></div>
+        <p class="text-xs opacity-70"><b>Reclamo:</b> disconformidad con el producto o servicio. <b>Queja:</b> malestar por la atención, sin relación con el producto.</p>
+        <label class="floating-label w-full"><span>Detalle *</span><textarea id="det" class="textarea w-full h-28" placeholder="Detalle" required></textarea></label>
+        <label class="floating-label w-full"><span>Pedido del consumidor *</span><textarea id="ped" class="textarea w-full h-20" placeholder="Pedido del consumidor" required></textarea></label></fieldset>
+      <p id="err" class="text-error text-sm" role="alert"></p>
+      <button class="btn btn-primary" type="submit">Enviar hoja de reclamación</button>
+    </form>`;
+
+  $('form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const req = ['nm', 'doc', 'dom', 'em', 'desc', 'det', 'ped'];
+    if (req.some((k) => !$(k).value.trim())) { $('err').textContent = 'Completa los campos obligatorios (*).'; return; }
+    const num = 'HR-2026-' + String(Math.floor(Math.random() * 9000) + 1000);
+    const tipo = document.querySelector('input[name=tipo]:checked').value;
+    const v = { nm: $('nm').value, desc: $('desc').value, det: $('det').value, ped: $('ped').value };
+    root.innerHTML = `<div class="space-y-4 aparece"><div class="flex items-center gap-3">${BH.icon('check', 'size-9 text-success')}<h1 class="font-display text-4xl">Hoja registrada</h1></div>
+      <div class="border border-[var(--bh-linea)] p-5 space-y-2 bg-base-100 text-sm" id="hoja">
+        <div class="flex flex-wrap justify-between gap-2"><span class="font-display text-2xl">${num}</span><span>${BH.fecha(BH.hoy)}</span></div>
+        <p><b>${tipo}</b> de ${v.nm}</p><p><b>Bien o servicio:</b> ${v.desc}</p><p><b>Detalle:</b> ${v.det}</p><p><b>Pedido del consumidor:</b> ${v.ped}</p>
+        <p class="opacity-70">Responderemos por correo en un plazo máximo de 15 días calendario. Se conserva esta hoja por al menos 2 años.</p></div>
+      <div class="flex gap-2 no-print"><button class="btn btn-primary" onclick="window.print()">${BH.icon('printer')} Imprimir copia</button><a class="btn btn-ghost" href="index.html">Volver al inicio</a></div></div>`;
+  });
+});
+</script>
+</body>
+</html>

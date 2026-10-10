@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mi cuenta · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-area="tienda" data-page="cuenta" data-estados="normal">
+<div id="page-content" hidden>
+  <div class="max-w-4xl mx-auto px-4 py-8" id="raiz"></div>
+</div>
+
+<script>
+BH.ready(() => {
+  const $ = (id) => document.getElementById(id);
+  const root = $('raiz');
+  if (!BH.logueado()) { root.innerHTML = BH.gate('Inicia sesión para ver tu cuenta.'); return; }
+  const u = BH.user(); let tab = 'perfil';
+  const suc = BH.sucursales.map((s) => `<option value="${s.id}" ${s.id === BH.miSucursal() ? 'selected' : ''}>${s.nombre}</option>`).join('');
+
+  const vistas = {
+    perfil: () => `<div class="grid sm:grid-cols-2 gap-4 max-w-2xl">
+        <label class="floating-label"><span>Nombre</span><input id="nm" class="input w-full" value="${u.nombre}"></label>
+        <label class="floating-label"><span>Correo</span><input id="em" class="input w-full" value="${u.email}"></label>
+        <label class="floating-label"><span>WhatsApp</span><input id="tl" class="input w-full" value="${u.tel}"></label>
+        <label class="floating-label"><span>Sucursal preferida</span><select id="sc" class="select w-full">${suc}</select></label></div>
+        <button id="guardar" class="btn btn-primary mt-4">Guardar cambios</button>`,
+    avisos: () => `<div class="space-y-4 max-w-2xl"><label class="flex gap-4 items-start justify-between border border-[var(--bh-linea)] p-4 cursor-pointer"><span><b>Avisos por WhatsApp</b><br><span class="text-sm opacity-75">Cambios de estado de tus pedidos y disponibilidad de tus libros digitales. Solo mensajes transaccionales.</span></span><input id="cs" type="checkbox" class="toggle toggle-primary" ${u.consent ? 'checked' : ''} aria-label="Avisos por WhatsApp"></label>
+        <p class="text-sm opacity-70">Si lo desactivas, seguirás viendo todo en «Mis pedidos»; solo dejarás de recibir mensajes.</p></div>`,
+    privacidad: () => `<div class="max-w-2xl space-y-3 text-sm"><p>La Ley N.° 29733 te reconoce derechos sobre tus datos personales (acceso, rectificación, cancelación y oposición). Tu biblioteca revela tus hábitos de lectura, por eso solo tú y el personal autorizado la ven.</p>
+        <div class="grid sm:grid-cols-2 gap-2"><button class="btn btn-outline" data-a="Acceso">Descargar mis datos</button><button class="btn btn-outline" data-a="Rectificación">Solicitar rectificación</button><button class="btn btn-outline" data-a="Oposición">Oponerme a un tratamiento</button><button class="btn btn-outline text-error" data-a="Cancelación">Eliminar mi cuenta</button></div>
+        <p class="opacity-70">Prototipo: las solicitudes no se envían. <a class="link" href="legal.html?doc=privacidad">Ver la política de privacidad</a>.</p></div>`
+  };
+  function pintar() {
+    root.innerHTML = `<h1 class="bh-display" style="font-size:clamp(2rem,6vw,3.5rem)">Mi cuenta</h1>
+      <div role="tablist" class="tabs tabs-border mt-6 mb-6">${[['perfil', 'Perfil'], ['avisos', 'Avisos'], ['privacidad', 'Privacidad']].map(([k, l]) => `<button role="tab" aria-selected="${tab === k}" class="tab ${tab === k ? 'tab-active' : ''}" data-t="${k}">${l}</button>`).join('')}</div>
+      <div class="aparece">${vistas[tab]()}</div>
+      <div class="border-t border-[var(--bh-linea)] mt-10 pt-4"><button id="salir" class="btn btn-ghost btn-sm">Cerrar sesión</button></div>`;
+    root.querySelectorAll('[data-t]').forEach((b) => (b.onclick = () => { tab = b.dataset.t; pintar(); }));
+    const g = $('guardar'); if (g) g.onclick = () => { BH.store.set('bh2_user', { ...u, nombre: $('nm').value, email: $('em').value, tel: $('tl').value }); BH.store.set('bh2_sucursal', $('sc').value); BH.toast('Cambios guardados'); };
+    const c = $('cs'); if (c) c.onchange = () => { BH.store.set('bh2_user', { ...u, consent: c.checked }); BH.toast(c.checked ? 'Avisos por WhatsApp activados' : 'Avisos por WhatsApp desactivados'); };
+    root.querySelectorAll('[data-a]').forEach((b) => (b.onclick = () => BH.toast(`Solicitud de ${b.dataset.a.toLowerCase()} registrada (simulada)`)));
+    $('salir').onclick = () => { BH.store.set('bh2_logueado', false); location.href = 'index.html'; };
+  }
+  pintar();
+});
+</script>
+</body>
+</html>

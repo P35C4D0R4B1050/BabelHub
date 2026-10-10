@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mi biblioteca · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-area="tienda" data-page="biblioteca" data-estados="normal,cargando,vacio,error">
+<div id="page-content" hidden>
+  <div class="max-w-7xl mx-auto px-4 py-8">
+    <h1 class="bh-display" style="font-size:clamp(2rem,6vw,4rem)">Mi biblioteca</h1>
+    <p class="opacity-75 mt-2 max-w-2xl">Tus libros digitales. Puedes descargar cada uno hasta <b id="lim"></b> veces; cada descarga usa un enlace seguro que dura 5 minutos. Son para tu uso personal.</p>
+    <div id="lista" class="mt-8"></div>
+  </div>
+
+  <dialog id="dlg" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box">
+      <h2 class="font-display text-2xl" id="dlg-t">Descarga</h2>
+      <div id="dlg-c" class="mt-3 space-y-3"></div>
+      <div class="modal-action"><form method="dialog"><button class="btn btn-ghost" id="dlg-x">Cerrar</button></form></div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>cerrar</button></form>
+  </dialog>
+</div>
+
+<script>
+BH.ready(() => {
+  const $ = (id) => document.getElementById(id);
+  $('lim').textContent = BH.limiteDescargas;
+  if (!BH.logueado()) { $('lista').innerHTML = BH.gate('Tu biblioteca es personal: inicia sesión para ver tus libros digitales.'); return; }
+  let timer = null;
+
+  function tarjeta(it, idx) {
+    const o = BH.obra(it.obra), d = o.digital, quedan = BH.limiteDescargas - it.usadas, agotado = quedan <= 0;
+    const retirada = !BH.digitalEstado(o).ok;
+    return `<article class="bh-celda">
+      ${BH.cover(o, 'w-full aspect-[2/3]', true)}
+      <h2 class="font-display text-lg leading-tight mt-1">${o.titulo}</h2><p class="bh-sub text-sm -mt-1">${o.autor}</p>
+      <p class="bh-sub text-xs">${d.formato} · ${d.paginas} págs. · ${d.tamano} · comprado el ${BH.fecha(it.fecha)}</p>
+      ${retirada ? `<span class="chip">${BH.icon('lock', 'size-3.5 text-warning')}Retirado de la venta: tu acceso se mantiene</span>` : ''}
+      <div><div class="flex justify-between text-xs mb-1"><span>Descargas</span><span class="tabular-nums">${it.usadas} de ${BH.limiteDescargas}</span></div><progress class="progress ${agotado ? 'progress-error' : 'progress-primary'} w-full" value="${it.usadas}" max="${BH.limiteDescargas}" aria-label="Descargas usadas"></progress></div>
+      <div class="mt-auto flex flex-col gap-2 pt-1 relative z-20">
+        <button class="btn btn-primary btn-sm" data-dl="${idx}" ${agotado ? 'disabled' : ''}>${BH.icon('download', 'size-4')} ${agotado ? 'Límite alcanzado' : 'Descargar'}</button>
+        ${agotado ? '<p class="text-xs">Alcanzaste el límite. Si perdiste el archivo, <a class="link" href="reclamos.html">escríbenos</a>.</p>' : ''}
+        <button class="btn btn-ghost btn-sm" disabled title="Próximamente">Leer en línea (próximamente)</button></div>
+    </article>`;
+  }
+
+  function pintar() {
+    const b = BH.biblioteca.get();
+    if (BH.estado === 'cargando') { $('lista').innerHTML = `<div class="bh-grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4">${BH.skeletons(4)}</div>`; return; }
+    if (BH.estado === 'error') { $('lista').innerHTML = BH.errorState('No pudimos cargar tu biblioteca.'); return; }
+    if (BH.estado === 'vacio' || !b.length) { $('lista').innerHTML = BH.emptyState('book', 'Aún no tienes libros digitales', 'Cuando compres uno, aparecerá aquí al instante.', '<a class="btn btn-primary btn-sm" href="catalogo.html?formato=digital">Ver libros digitales</a>'); return; }
+    $('lista').innerHTML = `<div class="bh-grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4">${b.map(tarjeta).join('')}</div>`;
+    $('lista').querySelectorAll('[data-dl]').forEach((x) => (x.onclick = () => abrir(Number(x.dataset.dl))));
+  }
+
+  function abrir(idx) {
+    const b = BH.biblioteca.get(), it = b[idx], o = BH.obra(it.obra);
+    $('dlg-t').textContent = o.titulo; let seg = 300; clearInterval(timer);
+    const vista = () => {
+      const m = String(Math.floor(seg / 60)).padStart(2, '0'), s = String(seg % 60).padStart(2, '0');
+      $('dlg-c').innerHTML = seg > 0
+        ? `<div role="status" class="alert alert-success alert-soft">${BH.icon('shield')}<span>Enlace seguro generado. Vence en <b class="tabular-nums">${m}:${s}</b>.</span></div><p class="text-sm opacity-75">El enlace funciona solo para tu cuenta y se invalida al vencer.</p><button class="btn btn-primary w-full" id="bajar">${BH.icon('download')} Descargar ${o.digital.formato} (simulado)</button>`
+        : `<div role="alert" class="alert alert-warning alert-soft">${BH.icon('clock')}<span>El enlace venció. Genera uno nuevo; esto no cuenta como descarga.</span></div><button class="btn btn-primary w-full" id="nuevo">Generar enlace nuevo</button>`;
+      const bj = $('bajar'); if (bj) bj.onclick = () => { it.usadas++; BH.biblioteca.set(b); BH.toast(`Descarga registrada (${it.usadas} de ${BH.limiteDescargas})`); clearInterval(timer); $('dlg').close(); pintar(); };
+      const nv = $('nuevo'); if (nv) nv.onclick = () => { seg = 300; clearInterval(timer); timer = setInterval(tick, 1000); vista(); };
+    };
+    const tick = () => { seg--; vista(); if (seg <= 0) clearInterval(timer); };
+    vista(); timer = setInterval(tick, 1000); $('dlg').showModal();
+  }
+  $('dlg').addEventListener('close', () => clearInterval(timer));
+  pintar();
+});
+</script>
+</body>
+</html>

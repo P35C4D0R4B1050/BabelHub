@@ -1,0 +1,159 @@
+/* BabelHub — tokens y estilos propios (prototipo v2).
+   Dos temas daisyUI con los mismos nombres de token. Contrastes medidos en docs/08. */
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&display=swap');
+
+/* Tema claro: «Papel y tinta» */
+[data-theme="babelhub"] {
+  color-scheme: light;
+  --color-base-100: #FBF5E8;
+  --color-base-200: #F5EBD8;
+  --color-base-300: #E4D5B7;
+  --color-base-content: #172554;
+  --color-primary: #FF665A;
+  --color-primary-content: #172554;
+  --color-secondary: #172554;
+  --color-secondary-content: #F5EBD8;
+  --color-accent: #7857D9;
+  --color-accent-content: #FFFFFF;
+  --color-neutral: #172554;
+  --color-neutral-content: #F5EBD8;
+  --color-info: #1A6F80;
+  --color-info-content: #FFFFFF;
+  --color-success: #357018;
+  --color-success-content: #FFFFFF;
+  --color-warning: #F5B941;
+  --color-warning-content: #172554;
+  --color-error: #B5352A;
+  --color-error-content: #FFFFFF;
+  --radius-selector: 0.375rem;
+  --radius-field: 0.375rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+  --bh-linea: rgb(23 37 84 / .18);
+  --bh-coral-texto: #B5352A;
+  --bh-foco: #1A6F80;
+  --bh-motivo: #172554;
+}
+
+/* Tema oscuro: «Archivo nocturno» */
+[data-theme="babelhub-dark"] {
+  color-scheme: dark;
+  --color-base-100: #0F1A3D;
+  --color-base-200: #14214A;
+  --color-base-300: #1B2A57;
+  --color-base-content: #F5EBD8;
+  --color-primary: #FF665A;
+  --color-primary-content: #172554;
+  --color-secondary: #36C8D4;
+  --color-secondary-content: #0F1A3D;
+  --color-accent: #A78BFA;
+  --color-accent-content: #0F1A3D;
+  --color-neutral: #1B2A57;
+  --color-neutral-content: #F5EBD8;
+  --color-info: #36C8D4;
+  --color-info-content: #0F1A3D;
+  --color-success: #A9E85E;
+  --color-success-content: #0F1A3D;
+  --color-warning: #F5C451;
+  --color-warning-content: #0F1A3D;
+  --color-error: #FF8F86;
+  --color-error-content: #3B0A06;
+  --radius-selector: 0.375rem;
+  --radius-field: 0.375rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+  --bh-linea: rgb(245 235 216 / .2);
+  --bh-coral-texto: #FF7A6E;
+  --bh-foco: #36C8D4;
+  --bh-motivo: #F5EBD8;
+}
+
+body { font-family: 'Inter', system-ui, sans-serif; }
+.font-display { font-family: 'DM Serif Display', Georgia, serif; }
+
+/* Titular editorial: serif itálica en mayúsculas, como las referencias */
+.bh-display {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-style: italic; text-transform: uppercase;
+  line-height: .92; letter-spacing: -.01em;
+  font-size: clamp(2.4rem, 8.5vw, 6.5rem);
+}
+.bh-texto-coral { color: var(--bh-coral-texto); }
+
+/* Foco visible en todos los controles */
+:focus-visible { outline: 3px solid var(--bh-foco); outline-offset: 2px; border-radius: 4px; }
+
+/* Cuadrícula de líneas finas: cada tarjeta es una celda */
+.bh-grid { display: grid; border-top: 1px solid var(--bh-linea); border-left: 1px solid var(--bh-linea); }
+.bh-celda {
+  position: relative; border-right: 1px solid var(--bh-linea); border-bottom: 1px solid var(--bh-linea);
+  display: flex; flex-direction: column; gap: .5rem; padding: .85rem;
+  background: var(--color-base-100); color: var(--color-base-content);
+}
+.bh-celda:hover, .bh-celda:focus-within { background: var(--color-secondary); color: var(--color-secondary-content); }
+.bh-celda .bh-sub { opacity: .75; }
+
+/* Etiqueta de estado: texto + icono, legible sobre cualquier fondo */
+.chip {
+  display: inline-flex; align-items: center; gap: .3rem; padding: .1rem .5rem;
+  font-size: .72rem; font-weight: 600; line-height: 1.4;
+  border-radius: 999px; border: 1px solid var(--bh-linea);
+  background: var(--color-base-100); color: var(--color-base-content);
+}
+
+/* Motivo de laberinto, apenas perceptible y solo en áreas amplias */
+.bh-laberinto { position: relative; isolation: isolate; }
+.bh-laberinto::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; opacity: .07; pointer-events: none; color: var(--bh-motivo);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' fill='none' stroke='%23000' stroke-width='1.5'%3E%3Cpath d='M0 20H90V70H40V120H140M20 0V50M110 0V45M70 140V95M140 70H115V20'/%3E%3Ccircle cx='90' cy='20' r='4'/%3E%3Ccircle cx='40' cy='70' r='4'/%3E%3Ccircle cx='115' cy='70' r='4'/%3E%3C/svg%3E");
+  filter: none;
+}
+[data-theme="babelhub-dark"] .bh-laberinto::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' fill='none' stroke='%23fff' stroke-width='1.5'%3E%3Cpath d='M0 20H90V70H40V120H140M20 0V50M110 0V45M70 140V95M140 70H115V20'/%3E%3Ccircle cx='90' cy='20' r='4'/%3E%3Ccircle cx='40' cy='70' r='4'/%3E%3Ccircle cx='115' cy='70' r='4'/%3E%3C/svg%3E");
+}
+
+/* Portadas generadas */
+.cover { position: relative; overflow: hidden; border-radius: 3px; box-shadow: 0 6px 18px rgb(0 0 0 / .22); }
+.cover::after { content: ''; position: absolute; inset: 0 auto 0 0; width: 6%; background: rgb(0 0 0 / .22); }
+
+/* Movimiento: solo si el usuario no pidió reducirlo */
+@media (prefers-reduced-motion: no-preference) {
+  .bh-celda { transition: background-color .2s ease, color .2s ease; }
+  .bh-celda .cover { transition: transform .25s ease, box-shadow .25s ease; }
+  .bh-celda:hover .cover { transform: translateY(-4px) perspective(700px) rotateY(-3deg) scale(1.01); box-shadow: 0 12px 26px rgb(0 0 0 / .3); }
+  .bh-sube { transition: transform .2s ease, box-shadow .2s ease; }
+  .bh-sube:hover { transform: translateY(-3px); box-shadow: 0 10px 22px rgb(0 0 0 / .12); }
+  .btn { transition: background-color .15s ease, transform .15s ease, border-color .15s ease; }
+  .btn:active { transform: translateY(1px); }
+  .bump { animation: bump .45s ease; }
+  .aparece { animation: aparece .3s ease both; }
+  .pagina-sale { opacity: 0; transition: opacity .25s ease; }
+  @keyframes bump { 0%{transform:scale(1)} 35%{transform:scale(1.5)} 70%{transform:scale(.9)} 100%{transform:scale(1)} }
+  @keyframes aparece { from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none} }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* Panel flotante propio del prototipo (no forma parte del diseño real) */
+.proto-bar {
+  position: fixed; left: 12px; bottom: 12px; z-index: 60;
+  display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
+  padding: .4rem .6rem; border-radius: .5rem; font-size: .75rem;
+  background: #172554; color: #F5EBD8; border: 1px solid rgb(245 235 216 / .35);
+  box-shadow: 0 4px 16px rgb(0 0 0 / .3); max-width: calc(100vw - 24px);
+}
+.proto-bar select { font-size: .75rem; color: #172554; background: #F5EBD8; border-radius: 4px; padding: .1rem .3rem; }
+.proto-bar a { text-decoration: underline; }
+
+@media print {
+  .no-print, .proto-bar, header, footer, #fab-chat { display: none !important; }
+}

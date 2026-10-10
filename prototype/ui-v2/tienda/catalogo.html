@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Catálogo · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-area="tienda" data-page="catalogo" data-estados="normal,cargando,vacio,error">
+<div id="page-content" hidden>
+  <div class="max-w-7xl mx-auto px-4 py-8">
+    <h1 class="bh-display" style="font-size:clamp(2rem,6vw,4rem)">Catálogo</h1>
+    <p class="opacity-75 mt-2">Solo mostramos lo que realmente hay: stock por sucursal en impresos y disponibilidad inmediata en digitales.</p>
+
+    <div class="grid lg:grid-cols-[16rem_1fr] gap-8 mt-8">
+      <aside aria-label="Filtros">
+        <button class="btn btn-outline w-full lg:hidden mb-2" id="btn-filtros" aria-expanded="false">Filtros</button>
+        <form id="filtros" class="hidden lg:block space-y-6 border border-[var(--bh-linea)] p-4 bg-base-100" onsubmit="return false">
+          <fieldset><legend class="font-semibold mb-2">Formato</legend>
+            <div class="join w-full" id="f-formato">
+              <input class="join-item btn btn-sm flex-1" type="radio" name="formato" value="todos" aria-label="Todos" checked>
+              <input class="join-item btn btn-sm flex-1" type="radio" name="formato" value="impreso" aria-label="Impreso">
+              <input class="join-item btn btn-sm flex-1" type="radio" name="formato" value="digital" aria-label="Digital">
+            </div></fieldset>
+          <fieldset><legend class="font-semibold mb-2">Categoría</legend><div id="f-cats" class="space-y-1.5"></div></fieldset>
+          <fieldset><legend class="font-semibold mb-2">Precio máximo: <span id="f-precio-v">S/ 170</span></legend>
+            <input id="f-precio" type="range" min="10" max="170" step="5" value="170" class="range range-primary range-xs" aria-label="Precio máximo"></fieldset>
+          <fieldset><legend class="font-semibold mb-2">Disponibilidad</legend>
+            <select id="f-disp" class="select w-full" aria-label="Disponibilidad"><option value="todos">Todos los títulos</option><option value="red">Con stock en la red o digital</option><option value="mia">En mi sucursal o digital</option></select></fieldset>
+          <button type="button" id="f-reset" class="btn btn-ghost btn-sm w-full">Limpiar filtros</button>
+        </form>
+      </aside>
+
+      <section aria-live="polite">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <p class="text-sm opacity-75" id="resumen">Cargando…</p>
+          <label class="flex items-center gap-2 text-sm">Ordenar por
+            <select id="orden" class="select select-sm"><option value="rel">Relevancia</option><option value="pa">Precio: menor a mayor</option><option value="pd">Precio: mayor a menor</option><option value="az">Título A–Z</option></select></label>
+        </div>
+        <div id="grid"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+BH.ready(() => {
+  const $ = (id) => document.getElementById(id);
+  const mine = BH.miSucursal();
+  const q = (BH.param('q') || '').toLowerCase();
+  const catParam = BH.param('categoria');
+  const formParam = BH.param('formato');
+
+  $('f-cats').innerHTML = BH.categorias.map((c) => `<label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" class="checkbox checkbox-sm checkbox-primary" value="${c}" ${c === catParam ? 'checked' : ''}> ${c}</label>`).join('');
+  if (formParam) { const r = document.querySelector(`input[name=formato][value=${formParam}]`); if (r) r.checked = true; }
+  $('btn-filtros').onclick = () => { const f = $('filtros'); f.classList.toggle('hidden'); $('btn-filtros').setAttribute('aria-expanded', !f.classList.contains('hidden')); };
+
+  function filtrar() {
+    const cats = [...document.querySelectorAll('#f-cats input:checked')].map((i) => i.value);
+    const formato = document.querySelector('input[name=formato]:checked').value, max = Number($('f-precio').value), disp = $('f-disp').value;
+    $('f-precio-v').textContent = 'S/ ' + max;
+    let l = BH.obras.filter((o) => {
+      const dig = BH.digitalEstado(o).ok;
+      if (q && ![o.titulo, o.autor, o.editorial].join(' ').toLowerCase().includes(q)) return false;
+      if (cats.length && !cats.includes(o.categoria)) return false;
+      if (formato === 'impreso' && !o.impreso) return false;
+      if (formato === 'digital' && !dig) return false;
+      if (BH.desde(o) > max) return false;
+      if (disp === 'red' && !(BH.totalVendible(o) > 0 || dig)) return false;
+      if (disp === 'mia' && !(BH.vendible(o, mine) > 0 || dig)) return false;
+      return true;
+    });
+    const o = $('orden').value;
+    if (o === 'pa') l.sort((a, b) => BH.desde(a) - BH.desde(b));
+    if (o === 'pd') l.sort((a, b) => BH.desde(b) - BH.desde(a));
+    if (o === 'az') l.sort((a, b) => a.titulo.localeCompare(b.titulo, 'es'));
+    return l;
+  }
+
+  function pintar() {
+    const g = $('grid');
+    if (BH.estado === 'cargando') { $('resumen').textContent = 'Cargando…'; g.className = 'bh-grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4'; g.innerHTML = BH.skeletons(8); return; }
+    if (BH.estado === 'error') { $('resumen').textContent = ''; g.className = ''; g.innerHTML = BH.errorState(); return; }
+    const l = BH.estado === 'vacio' ? [] : filtrar();
+    $('resumen').textContent = `${l.length} ${l.length === 1 ? 'título' : 'títulos'}${q ? ` para “${q}”` : ''} · disponibilidad según ${BH.sucursal(mine).nombre}`;
+    if (!l.length) { g.className = ''; g.innerHTML = BH.emptyState('search', 'No encontramos libros', 'Prueba con otra búsqueda o quita algunos filtros.', '<a class="btn btn-primary btn-sm" href="catalogo.html">Ver todo el catálogo</a>'); return; }
+    g.className = 'bh-grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4';
+    g.innerHTML = l.map((o) => BH.tarjeta(o, mine)).join('');
+  }
+  ['f-precio', 'f-disp', 'orden', 'f-formato', 'f-cats'].forEach((id) => $(id).addEventListener('input', pintar));
+  $('f-reset').onclick = () => { document.querySelectorAll('#f-cats input').forEach((i) => (i.checked = false)); document.querySelector('input[name=formato][value=todos]').checked = true; $('f-precio').value = 170; $('f-disp').value = 'todos'; pintar(); };
+  pintar();
+});
+</script>
+</body>
+</html>

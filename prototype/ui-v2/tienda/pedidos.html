@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mis pedidos · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-area="tienda" data-page="pedidos" data-estados="normal,vacio,error">
+<div id="page-content" hidden>
+  <div class="max-w-7xl mx-auto px-4 py-8" id="raiz"></div>
+
+  <dialog id="dlg-dev" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box"><h2 class="font-display text-2xl mb-2">Solicitar devolución</h2>
+      <div id="dev-c" class="space-y-3"></div>
+      <div class="modal-action"><form method="dialog" class="flex gap-2"><button class="btn btn-ghost">Cancelar</button></form><button class="btn btn-primary" id="dev-ok">Enviar solicitud</button></div></div>
+    <form method="dialog" class="modal-backdrop"><button>cerrar</button></form>
+  </dialog>
+</div>
+
+<script>
+BH.ready(() => {
+  const $ = (id) => document.getElementById(id);
+  const root = $('raiz');
+  if (!BH.logueado()) { root.innerHTML = BH.gate('Inicia sesión para ver tus pedidos.'); return; }
+  const pedidos = BH.estado === 'vacio' ? [] : BH.pedidos.get();
+  const ETQ = { confirmado: 'Pedido confirmado', preparacion: 'En preparación', transito: 'En tránsito entre sucursales', listo: 'Listo para recojo', entregado: 'Entregado' };
+  const ORDEN = ['confirmado', 'preparacion', 'transito', 'listo', 'entregado'];
+  const total = (p) => p.lineas.reduce((a, l) => { const o = BH.obra(l.obra); return a + (l.formato === 'impreso' ? o.impreso.precio : o.digital.precio) * l.cant; }, 0);
+  const lineasTxt = (p) => p.lineas.map((l) => `${l.cant} × ${BH.obra(l.obra).titulo} (${l.formato})`).join(' · ');
+  const chipEstado = (p) => `<span class="chip">${BH.icon(p.estado === 'entregado' ? 'check' : 'truck', 'size-3.5 ' + (p.estado === 'entregado' ? 'text-success' : 'text-info'))}${ETQ[p.estado]}</span>`;
+
+  if (BH.estado === 'error') { root.innerHTML = BH.errorState('No pudimos cargar tus pedidos.'); return; }
+  const id = BH.param('id');
+  if (!id) return lista(); detalle(pedidos.find((p) => p.id === id) || pedidos[0]);
+
+  function lista() {
+    root.innerHTML = `<h1 class="bh-display" style="font-size:clamp(2rem,6vw,4rem)">Mis pedidos</h1><div class="mt-8" id="l"></div>`;
+    if (!pedidos.length) { $('l').innerHTML = BH.emptyState('cart', 'Aún no tienes pedidos', 'Cuando compres, podrás seguir cada paso aquí.', '<a class="btn btn-primary btn-sm" href="catalogo.html">Explorar el catálogo</a>'); return; }
+    $('l').innerHTML = `<div class="border-t border-l border-r border-[var(--bh-linea)]">${pedidos.map((p) => `<a href="pedidos.html?id=${p.id}" class="bh-sube flex flex-wrap items-center gap-x-6 gap-y-1 p-4 border-b border-[var(--bh-linea)] bg-base-100"><span class="font-display text-xl">${p.id}</span><span class="text-sm opacity-70">${BH.fecha(p.fecha)}</span>${chipEstado(p)}<span class="text-sm opacity-80 flex-1 min-w-[12rem] truncate">${lineasTxt(p)}</span><span class="font-display text-lg">${BH.money(total(p))}</span></a>`).join('')}</div>`;
+  }
+
+  function detalle(p) {
+    const imp = p.lineas.filter((l) => l.formato === 'impreso'), dig = p.lineas.filter((l) => l.formato === 'digital');
+    const est = p.estado, idx = ORDEN.indexOf(est);
+    const linea = imp.length ? `<div class="border border-[var(--bh-linea)] p-4"><h2 class="font-semibold mb-2">Libros impresos</h2><p class="text-sm opacity-75 mb-3">${imp.map((l) => `${l.cant} × ${BH.obra(l.obra).titulo}`).join(' · ')} · ${p.entrega === 'recojo' ? 'Recojo en ' + BH.sucursal(p.sucursal).nombre : 'Despacho a domicilio'}</p>
+        <ul class="steps steps-vertical w-full">${ORDEN.map((k, n) => `<li class="step ${n <= idx ? 'step-primary' : ''}" ${n === idx ? 'aria-current="step"' : ''}><span class="text-left ml-2 py-1 block"><b>${ETQ[k]}</b>${k === 'transito' && n === idx ? '<br><span class="text-sm opacity-75">Traslado TR-0042: Cusco → Ayacucho · llegada estimada 12 de octubre</span>' : ''}</span></li>`).join('')}</ul></div>` : '';
+    const digital = dig.length ? `<div class="border border-[var(--bh-linea)] p-4"><h2 class="font-semibold mb-2">Libros digitales</h2><ul class="space-y-2">${dig.map((l) => { const o = BH.obra(l.obra); return `<li class="flex flex-wrap items-center gap-3"><span class="chip">${BH.icon('bolt', 'size-3.5 text-success')}Disponible en tu biblioteca</span><span class="flex-1 min-w-[10rem]">${o.titulo}</span><a class="btn btn-sm btn-outline" href="biblioteca.html">Ir a descargar</a></li>`; }).join('')}</ul></div>` : '';
+    root.innerHTML = `<div class="breadcrumbs text-sm mb-2"><ul><li><a href="pedidos.html">Mis pedidos</a></li><li>${p.id}</li></ul></div>
+      <div class="flex flex-wrap items-end justify-between gap-3 mb-6"><div><p class="text-sm opacity-60">Pedido del ${BH.fecha(p.fecha)}</p><h1 class="font-display text-4xl">${p.id}</h1></div>${chipEstado(p)}</div>
+      <div class="grid lg:grid-cols-[1fr_21rem] gap-8 items-start aparece"><div class="space-y-4">${linea}${digital}</div>
+        <aside class="space-y-4"><div class="border border-[var(--bh-linea)] p-4 space-y-1 text-sm"><h2 class="font-semibold">Resumen</h2>${p.lineas.map((l) => `<div class="flex justify-between gap-2"><span class="truncate">${l.cant} × ${BH.obra(l.obra).titulo}</span><span>${BH.money((l.formato === 'impreso' ? BH.obra(l.obra).impreso.precio : BH.obra(l.obra).digital.precio) * l.cant)}</span></div>`).join('')}<div class="border-t border-[var(--bh-linea)] pt-2 flex justify-between font-display text-lg"><span>Total</span><span>${BH.money(total(p))}</span></div></div>
+          <div class="border border-[var(--bh-linea)] p-4 text-sm"><h2 class="font-semibold mb-2">Avisos enviados por WhatsApp</h2><ul class="space-y-1.5"><li class="flex gap-2">${BH.icon('check', 'size-4 text-success')} Pedido confirmado</li>${dig.length ? `<li class="flex gap-2">${BH.icon('check', 'size-4 text-success')} Tus libros digitales están disponibles</li>` : ''}${imp.length && idx >= 2 ? `<li class="flex gap-2">${BH.icon('check', 'size-4 text-success')} Tus libros viajan entre sucursales</li>` : ''}</ul></div>
+          <button id="btn-dev" class="btn btn-outline w-full">Solicitar devolución o reembolso</button></aside></div>`;
+    $('btn-dev').onclick = () => devolucion(p);
+  }
+
+  function devolucion(p) {
+    const b = BH.biblioteca.get();
+    $('dev-c').innerHTML = `<p class="text-sm opacity-75">Elige qué quieres devolver. Los impresos se devuelven en una sucursal; los digitales siguen una política distinta.</p>
+      ${p.lineas.map((l, n) => { const o = BH.obra(l.obra); let ok = true, nota = '';
+        if (l.formato === 'impreso') { ok = p.estado === 'entregado'; nota = ok ? 'Devolución en sucursal; el stock vuelve a la sucursal receptora.' : 'Disponible cuando el pedido esté entregado.'; }
+        else { const it = b.find((x) => x.obra === o.id); const usado = it && it.usadas > 0; ok = true; nota = usado ? 'Ya lo descargaste: el reembolso solo procede si el archivo está defectuoso.' : 'Aún no lo descargaste: tienes derecho a reembolso. Al reembolsar se revoca el acceso.'; }
+        return `<label class="flex gap-3 items-start border border-[var(--bh-linea)] p-3 ${ok ? 'cursor-pointer' : 'opacity-60'}"><input type="checkbox" class="checkbox checkbox-primary mt-0.5" ${ok ? '' : 'disabled'} data-n="${n}"><span><b>${o.titulo}</b> <span class="chip">${l.formato}</span><br><span class="text-sm opacity-75">${nota}</span></span></label>`; }).join('')}
+      <label class="floating-label w-full"><span>Motivo</span><select class="select w-full"><option>Llegó dañado o el archivo está defectuoso</option><option>No es el libro que pedí</option><option>Me arrepentí de la compra</option></select></label>`;
+    $('dlg-dev').showModal();
+  }
+  $('dev-ok').onclick = () => { if (!document.querySelector('#dev-c input:checked')) { BH.toast('Elige al menos un libro', 'warning'); return; } BH.toast('Solicitud enviada. La revisaremos y te avisaremos por WhatsApp.'); $('dlg-dev').close(); };
+});
+</script>
+</body>
+</html>

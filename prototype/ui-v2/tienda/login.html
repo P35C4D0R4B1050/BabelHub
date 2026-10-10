@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ingresar · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-area="tienda" data-page="cuenta" data-estados="normal">
+<div id="page-content" hidden>
+  <div class="bh-laberinto">
+    <div class="max-w-md mx-auto px-4 py-12">
+      <h1 class="bh-display" style="font-size:clamp(2rem,6vw,3.5rem)">Bienvenido</h1>
+      <div role="tablist" class="tabs tabs-box mt-6" id="tabs"></div>
+      <form id="form" class="mt-4 space-y-4 border border-[var(--bh-linea)] bg-base-100 p-5" novalidate></form>
+      <p class="text-xs opacity-60 mt-3">Prototipo: no hay autenticación real. En el sistema real, Identidad emite un JWT que se guarda en el servidor.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+BH.ready(() => {
+  const $ = (id) => document.getElementById(id);
+  let modo = BH.param('modo') || 'entrar';
+  const campo = (id, label, type = 'text') => `<label class="floating-label w-full"><span>${label}</span><input id="${id}" type="${type}" class="input w-full" placeholder="${label}" autocomplete="${type === 'password' ? 'current-password' : 'on'}"></label>`;
+  function pintar() {
+    $('tabs').innerHTML = [['entrar', 'Ingresar'], ['registro', 'Registrarme']].map(([k, l]) => `<button role="tab" aria-selected="${modo === k}" class="tab flex-1 ${modo === k ? 'tab-active' : ''}" data-m="${k}">${l}</button>`).join('');
+    $('tabs').querySelectorAll('[data-m]').forEach((b) => (b.onclick = () => { modo = b.dataset.m; pintar(); }));
+    $('form').innerHTML = modo === 'entrar'
+      ? `${campo('em', 'Correo electrónico', 'email')}${campo('pw', 'Contraseña', 'password')}<button class="btn btn-primary w-full" type="submit">Ingresar</button><button type="button" class="btn btn-outline w-full" id="demo">Entrar como cliente de ejemplo</button>`
+      : `${campo('nm', 'Nombre completo')}${campo('em', 'Correo electrónico', 'email')}${campo('wa', 'WhatsApp', 'tel')}${campo('pw', 'Contraseña', 'password')}
+         <label class="flex gap-3 items-start cursor-pointer"><input id="cs" type="checkbox" class="checkbox checkbox-primary mt-0.5"><span class="text-sm">Acepto recibir avisos de mis pedidos por WhatsApp y el tratamiento de mis datos personales (Ley N.° 29733). Puedes cambiarlo cuando quieras en tu cuenta.</span></label>
+         <label class="flex gap-3 items-start cursor-pointer"><input id="tc" type="checkbox" class="checkbox checkbox-primary mt-0.5"><span class="text-sm">Acepto los <a class="link" href="legal.html?doc=terminos">términos y condiciones</a>.</span></label>
+         <p id="err" class="text-error text-sm" role="alert"></p><button class="btn btn-primary w-full" type="submit">Crear mi cuenta</button>`;
+    const d = $('demo'); if (d) d.onclick = entrar;
+  }
+  function entrar() { BH.store.set('bh2_logueado', true); BH.toast('Sesión iniciada'); setTimeout(() => (location.href = 'index.html'), 500); }
+  $('form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (modo === 'registro' && (!$('cs').checked || !$('tc').checked)) { $('err').textContent = 'Para crear tu cuenta acepta el tratamiento de datos y los términos.'; return; }
+    entrar();
+  });
+  pintar();
+});
+</script>
+</body>
+</html>

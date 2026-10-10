@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Carrito · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-area="tienda" data-page="carrito" data-estados="normal,vacio">
+<div id="page-content" hidden>
+  <div class="max-w-7xl mx-auto px-4 py-8">
+    <h1 class="bh-display" style="font-size:clamp(2rem,6vw,4rem)">Tu carrito</h1>
+    <p class="opacity-75 mt-2 mb-6">Se conserva en tu cuenta: lo ves igual desde tu celular o tu computadora. Puedes mezclar libros impresos y digitales.</p>
+    <div id="cart"></div>
+  </div>
+</div>
+
+<script>
+BH.ready(() => {
+  const root = document.getElementById('cart');
+  const mine = BH.miSucursal();
+  const demo = BH.param('demo'); if (demo) { BH.demoCart(demo); history.replaceState(null, '', 'carrito.html'); BH.refreshCart(); }
+
+  function pintar() {
+    const lineas = BH.estado === 'vacio' ? [] : BH.cart.lineas();
+    if (!lineas.length) {
+      root.innerHTML = BH.emptyState('cart', 'Tu carrito está vacío', 'Agrega libros desde el catálogo para comenzar tu compra.',
+        `<div class="flex flex-wrap gap-2 justify-center"><a class="btn btn-primary btn-sm" href="catalogo.html">Explorar el catálogo</a>
+          <a class="btn btn-ghost btn-sm" href="carrito.html?demo=mixto">Cargar carrito mixto</a><a class="btn btn-ghost btn-sm" href="carrito.html?demo=digital">Solo digital</a><a class="btn btn-ghost btn-sm" href="carrito.html?demo=impreso">Solo impreso</a></div>`);
+      return;
+    }
+    let sub = 0, problema = false;
+    const hayImpreso = lineas.some((l) => l.formato === 'impreso'), hayDigital = lineas.some((l) => l.formato === 'digital');
+    const filas = lineas.map((l) => {
+      const o = l.obra, imp = l.formato === 'impreso', precio = (imp ? o.impreso.precio : o.digital.precio);
+      sub += precio * l.cant;
+      let nota;
+      if (imp) {
+        const tot = BH.totalVendible(o);
+        if (l.cant > tot) { problema = true; nota = `<span class="chip">${BH.icon('warn', 'size-3.5 text-error')}Solo quedan ${tot} en la red; ajusta la cantidad</span>`; }
+        else nota = BH.vendible(o, mine) >= l.cant ? `<span class="chip">${BH.icon('check', 'size-3.5 text-success')}En tu sucursal</span>` : `<span class="chip">${BH.icon('truck', 'size-3.5 text-info')}Se trae de otra sucursal (≈ 2 días)</span>`;
+      } else {
+        const d = BH.digitalEstado(o);
+        if (!d.ok) { problema = true; nota = `<span class="chip">${BH.icon('lock', 'size-3.5 text-error')}Ya no está disponible</span>`; }
+        else nota = `<span class="chip">${BH.icon('bolt', 'size-3.5 text-success')}Al instante · sin entrega</span>`;
+      }
+      return `<div class="flex gap-4 p-4 border-b border-[var(--bh-linea)]">
+        <a href="libro.html?id=${o.id}" class="w-20 shrink-0">${BH.cover(o, 'w-full aspect-[2/3]', !imp)}</a>
+        <div class="flex-1 min-w-0 space-y-1.5">
+          <a href="libro.html?id=${o.id}&ed=${l.formato}" class="font-display text-xl leading-tight hover:underline">${o.titulo}</a>
+          <p class="text-sm opacity-75">${o.autor} · <b>${imp ? 'Impreso' : o.digital.formato + ' digital'}</b></p>
+          <div>${nota}</div>
+          <div class="flex items-center gap-3 pt-1">
+            ${imp ? `<div class="join"><button class="btn btn-sm join-item" data-menos="${l.k}" aria-label="Menos">−</button><span class="join-item btn btn-sm btn-ghost pointer-events-none w-10">${l.cant}</span><button class="btn btn-sm join-item" data-mas="${l.k}" aria-label="Más">+</button></div>` : '<span class="text-sm opacity-60">1 licencia</span>'}
+            <button class="btn btn-ghost btn-sm" data-quitar="${l.k}">${BH.icon('trash', 'size-4')} Quitar</button></div></div>
+        <p class="font-display text-xl">${BH.money(precio * l.cant)}</p></div>`;
+    }).join('');
+    root.innerHTML = `<div class="grid lg:grid-cols-[1fr_22rem] gap-8 items-start aparece">
+      <section class="border-t border-l border-r border-[var(--bh-linea)] bg-base-100" aria-label="Libros en el carrito">${filas}</section>
+      <aside class="border border-[var(--bh-linea)] bg-base-100 p-5 space-y-3 lg:sticky lg:top-28">
+        <h2 class="font-display text-2xl">Resumen</h2>
+        <div class="flex justify-between"><span>Subtotal</span><span>${BH.money(sub)}</span></div>
+        <div class="flex justify-between text-sm opacity-75"><span>Envío</span><span>${hayImpreso ? 'Se elige en el checkout' : 'No aplica (solo digitales)'}</span></div>
+        <div class="border-t border-[var(--bh-linea)] pt-3 flex justify-between text-xl font-display"><span>Total</span><span>${BH.money(sub)}</span></div>
+        ${hayImpreso ? `<p class="text-xs opacity-75 flex gap-2">${BH.icon('clock', 'size-4 shrink-0')} Reservamos tus impresos 15 minutos cuando inicias el pago.</p>` : ''}
+        ${hayDigital ? `<p class="text-xs opacity-75 flex gap-2">${BH.icon('bolt', 'size-4 shrink-0')} Los digitales aparecen en tu biblioteca al aprobarse el pago.</p>` : ''}
+        <a href="checkout.html" class="btn btn-primary w-full ${problema ? 'btn-disabled' : ''}" ${problema ? 'aria-disabled="true"' : ''}>Continuar con la compra</a>
+        <a href="catalogo.html" class="btn btn-ghost btn-sm w-full">Seguir comprando</a>
+      </aside></div>`;
+    const c = BH.cart.get();
+    root.querySelectorAll('[data-mas]').forEach((b) => (b.onclick = () => { BH.cart.setQty(b.dataset.mas, c[b.dataset.mas] + 1); pintar(); }));
+    root.querySelectorAll('[data-menos]').forEach((b) => (b.onclick = () => { BH.cart.setQty(b.dataset.menos, c[b.dataset.menos] - 1); pintar(); }));
+    root.querySelectorAll('[data-quitar]').forEach((b) => (b.onclick = () => { BH.cart.setQty(b.dataset.quitar, 0); pintar(); }));
+  }
+  pintar();
+});
+</script>
+</body>
+</html>

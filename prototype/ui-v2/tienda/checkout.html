@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Finalizar compra · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-area="tienda" data-page="carrito" data-estados="normal,inventario-caido,pago-rechazado">
+<div id="page-content" hidden>
+  <div class="max-w-7xl mx-auto px-4 py-8">
+    <h1 class="bh-display" style="font-size:clamp(2rem,6vw,4rem)">Finalizar compra</h1>
+    <ul class="steps w-full my-6 text-xs sm:text-sm" id="steps" aria-label="Progreso de la compra"></ul>
+    <div id="timer" class="mb-4"></div>
+    <div class="grid lg:grid-cols-[1fr_21rem] gap-8 items-start">
+      <section id="paso" aria-live="polite"></section>
+      <aside id="resumen" class="border border-[var(--bh-linea)] bg-base-100 p-5 lg:sticky lg:top-28"></aside>
+    </div>
+  </div>
+</div>
+
+<script>
+BH.ready(() => {
+  const $ = (id) => document.getElementById(id);
+  const demo = BH.param('demo'); if (demo) { BH.demoCart(demo); history.replaceState(null, '', 'checkout.html'); }
+  if (!BH.logueado()) { $('paso').innerHTML = BH.gate('Necesitas una cuenta para comprar. Tu carrito se conserva.'); $('steps').remove(); $('resumen').remove(); return; }
+
+  let lineas = BH.cart.lineas();
+  if (!lineas.length) { BH.demoCart('mixto'); lineas = BH.cart.lineas(); }          // demostración
+  const hayImpreso = lineas.some((l) => l.formato === 'impreso'), hayDigital = lineas.some((l) => l.formato === 'digital');
+  const PASOS = ['Revisar', ...(hayImpreso ? ['Entrega'] : []), 'Tus datos', 'Pago', 'Listo'];
+  let i = 0, t = null, restante = 15 * 60;
+  const u = BH.user();
+  const s = { tipo: 'recojo', suc: BH.miSucursal(), nombre: u.nombre, tel: u.tel, consent: false, terminos: false, dir: '', metodo: 'yape', cobrando: false, rechazado: false, creado: null };
+  const precio = (l) => (l.formato === 'impreso' ? l.obra.impreso.precio : l.obra.digital.precio) * l.cant;
+  const subtotal = lineas.reduce((a, l) => a + precio(l), 0);
+  const envio = () => (hayImpreso && s.tipo === 'domicilio' ? 12 : 0);
+  const nombrePaso = () => PASOS[i];
+
+  const impresos = lineas.filter((l) => l.formato === 'impreso');
+  function fuente(l) {
+    if (BH.vendible(l.obra, s.suc) >= l.cant) return { ok: true, traslado: false };
+    const alt = BH.sucursales.find((x) => BH.vendible(l.obra, x.id) >= l.cant);
+    return alt ? { ok: true, traslado: true, desde: alt.nombre } : { ok: false };
+  }
+  const hayTraslado = () => impresos.some((l) => fuente(l).traslado);
+
+  function cabecera() {
+    $('steps').innerHTML = PASOS.map((p, n) => `<li class="step ${n <= i ? 'step-primary' : ''}" ${n === i ? 'aria-current="step"' : ''}>${p}</li>`).join('');
+    $('resumen').innerHTML = `<h2 class="font-display text-2xl mb-2">Tu pedido</h2>
+      <div class="space-y-1.5 text-sm">${lineas.map((l) => `<div class="flex justify-between gap-2"><span class="truncate">${l.cant} × ${l.obra.titulo} <span class="opacity-60">(${l.formato})</span></span><span>${BH.money(precio(l))}</span></div>`).join('')}</div>
+      <div class="border-t border-[var(--bh-linea)] mt-3 pt-3 space-y-1 text-sm">
+        <div class="flex justify-between"><span>Subtotal</span><span>${BH.money(subtotal)}</span></div>
+        <div class="flex justify-between"><span>Envío</span><span>${hayImpreso ? (envio() ? BH.money(envio()) : 'Gratis (recojo)') : 'No aplica'}</span></div>
+        <div class="flex justify-between font-display text-xl pt-1"><span>Total</span><span>${BH.money(subtotal + envio())}</span></div></div>
+      <p class="text-xs opacity-70 mt-3">${hayDigital && !hayImpreso ? 'Compra 100 % digital: sin entrega.' : hayDigital ? 'Un solo cobro por impresos y digitales.' : ''}</p>`;
+  }
+
+  function reserva() {
+    if (t || !hayImpreso) return;
+    const pintarT = () => { const m = String(Math.floor(restante / 60)).padStart(2, '0'), sec = String(restante % 60).padStart(2, '0'); $('timer').innerHTML = `<div role="status" class="alert alert-info alert-soft py-2">${BH.icon('clock', 'size-5')}<span>Impresos reservados para ti: <b class="tabular-nums">${m}:${sec}</b></span></div>`; };
+    pintarT();
+    t = setInterval(() => { restante--; if (restante <= 0) { clearInterval(t); $('timer').innerHTML = ''; $('paso').innerHTML = `<div role="alert" class="alert alert-warning alert-soft">${BH.icon('warn')}<span>Tu reserva expiró y liberamos el stock de los impresos. Vuelve al carrito para reservarlo otra vez.</span><a class="btn btn-sm" href="carrito.html">Volver al carrito</a></div>`; return; } pintarT(); }, 1000);
+  }
+
+  const campo = (id, label, ph = '', type = 'text', extra = '') => `<label class="floating-label w-full"><span>${label}</span><input id="${id}" type="${type}" class="input w-full" placeholder="${ph || label}" ${extra} value="${s[id] ?? ''}"></label>`;
+  const estadoChip = (l) => {
+    if (l.formato === 'digital') return `<span class="chip">${BH.icon('bolt', 'size-3.5 text-success')}Al instante</span>`;
+    const f = fuente(l);
+    return !f.ok ? `<span class="chip">${BH.icon('x', 'size-3.5 text-error')}Sin stock</span>` : f.traslado ? `<span class="chip">${BH.icon('truck', 'size-3.5 text-info')}Vía traslado</span>` : `<span class="chip">${BH.icon('check', 'size-3.5 text-success')}En tu sucursal</span>`;
+  };
+
+  const vistas = {
+    Revisar() {
+      const caida = BH.estado === 'inventario-caido' && hayImpreso;
+      const lista = `<div class="space-y-2">${lineas.map((l) => `<div class="flex gap-3 items-center border border-[var(--bh-linea)] p-3"><div class="w-12 shrink-0">${BH.cover(l.obra, 'w-full aspect-[2/3]', l.formato === 'digital')}</div><div class="flex-1"><p class="font-medium">${l.obra.titulo}</p><p class="text-sm opacity-70">${l.cant} ud. · ${l.formato === 'impreso' ? 'Impreso' : l.obra.digital.formato}</p></div>${caida && l.formato === 'impreso' ? `<span class="chip">${BH.icon('warn', 'size-3.5 text-warning')}Sin validar</span>` : estadoChip(l)}</div>`).join('')}</div>`;
+      if (caida) return `<h2 class="font-display text-2xl mb-3">Revisa tus libros</h2>${lista}
+        <div role="alert" class="alert alert-error alert-soft mt-4">${BH.icon('warn')}<div><h3 class="font-semibold">No podemos validar el stock de los impresos ahora</h3><p class="text-sm">Por seguridad no cobraremos nada hasta poder confirmarlo. Tu carrito sigue guardado.</p></div></div>
+        <div class="mt-4 flex flex-wrap gap-2 justify-end"><button class="btn btn-ghost" onclick="location.search=''">Reintentar</button>${hayDigital ? '<button class="btn btn-primary" id="solo-dig">Comprar solo los digitales</button>' : ''}</div>`;
+      return `<h2 class="font-display text-2xl mb-3">Revisa tus libros</h2>${lista}<div class="mt-5 flex justify-end"><button class="btn btn-primary" id="sig">${hayImpreso ? 'Validar stock y continuar' : 'Continuar'}</button></div>`;
+    },
+    Entrega() {
+      const ops = BH.sucursales.map((x) => `<option value="${x.id}" ${x.id === s.suc ? 'selected' : ''}>${x.nombre}</option>`).join('');
+      const tr = hayTraslado();
+      const card = (v, ic, t1, t2) => `<label class="border cursor-pointer p-4 flex items-center gap-3 ${s.tipo === v ? 'border-primary bg-base-200' : 'border-[var(--bh-linea)]'}"><input type="radio" name="tipo" value="${v}" class="radio radio-primary" ${s.tipo === v ? 'checked' : ''}>${BH.icon(ic, 'size-7')}<div><div class="font-medium">${t1}</div><div class="text-sm opacity-70">${t2}</div></div></label>`;
+      return `<h2 class="font-display text-2xl mb-1">¿Cómo quieres recibir tus impresos?</h2>${hayDigital ? '<p class="text-sm opacity-75 mb-3">Tus libros digitales no necesitan entrega: estarán en tu biblioteca.</p>' : ''}
+        <div class="grid sm:grid-cols-2 gap-3 mt-3" role="radiogroup">${card('recojo', 'store', 'Recojo en sucursal', 'Gratis · te avisamos por WhatsApp')}${card('domicilio', 'truck', 'Despacho a domicilio', BH.money(12) + ' · con guía de envío')}</div>
+        ${s.tipo === 'recojo' ? `<label class="block mt-4"><span class="font-medium mb-1 block">Sucursal de recojo</span><select id="suc" class="select w-full sm:w-80">${ops}</select></label>` : `<div class="mt-4 max-w-md">${campo('dir', 'Dirección de entrega')}</div>`}
+        ${tr && s.tipo === 'recojo' ? `<div role="alert" class="alert alert-info alert-soft mt-4">${BH.icon('truck')}<span>Algún libro no está en ${BH.sucursal(s.suc).nombre}. Lo traeremos con un traslado interno y te avisaremos cuando esté <b>listo para recojo (≈ 2 días hábiles)</b>.</span></div>` : ''}
+        <div class="mt-5 flex justify-between"><button class="btn btn-ghost" data-ir="-1">Atrás</button><button class="btn btn-primary" id="sig">Continuar</button></div>`;
+    },
+    'Tus datos'() {
+      return `<h2 class="font-display text-2xl mb-3">Tus datos</h2>
+        <div class="grid sm:grid-cols-2 gap-4 max-w-2xl">${campo('nombre', 'Nombre completo')}${campo('tel', 'WhatsApp', '987 654 321', 'tel', 'inputmode="tel"')}</div>
+        <div class="space-y-3 mt-4 max-w-2xl">
+          <label class="flex gap-3 items-start cursor-pointer"><input id="consent" type="checkbox" class="checkbox checkbox-primary mt-0.5" ${s.consent ? 'checked' : ''}><span class="text-sm">Acepto recibir avisos de mi pedido por WhatsApp y el tratamiento de mis datos personales conforme a la Ley N.° 29733.</span></label>
+          <label class="flex gap-3 items-start cursor-pointer"><input id="terminos" type="checkbox" class="checkbox checkbox-primary mt-0.5" ${s.terminos ? 'checked' : ''}><span class="text-sm">Acepto los <a class="link" target="_blank" href="legal.html?doc=terminos">términos y condiciones</a>${hayDigital ? ' y la <a class="link" target="_blank" href="legal.html?doc=reembolso">política de reembolso de libros digitales</a>: el reembolso procede si el libro no fue descargado o si el archivo está defectuoso' : ''}.</span></label></div>
+        <p id="err" class="text-error text-sm mt-2" role="alert"></p>
+        <div class="mt-5 flex justify-between"><button class="btn btn-ghost" data-ir="-1">Atrás</button><button class="btn btn-primary" id="sig">Ir al pago</button></div>`;
+    },
+    Pago() {
+      return `<h2 class="font-display text-2xl mb-3">Pago seguro</h2>
+        ${s.rechazado ? `<div role="alert" class="alert alert-error alert-soft mb-4">${BH.icon('warn')}<span>El pago fue rechazado. No se te cobró nada. Revisa los datos o prueba otro medio.</span></div>` : ''}
+        <div role="tablist" class="tabs tabs-box max-w-md mb-4"><button role="tab" aria-selected="${s.metodo === 'yape'}" class="tab flex-1 ${s.metodo === 'yape' ? 'tab-active' : ''}" data-m="yape">Yape</button><button role="tab" aria-selected="${s.metodo === 'tarjeta'}" class="tab flex-1 ${s.metodo === 'tarjeta' ? 'tab-active' : ''}" data-m="tarjeta">Tarjeta</button></div>
+        ${s.metodo === 'yape' ? `<div class="grid sm:grid-cols-2 gap-4 max-w-xl">${campo('ycel', 'Celular Yape', '', 'tel')}${campo('ycod', 'Código de aprobación (6 dígitos)', '', 'text', 'inputmode="numeric" maxlength="6"')}</div>`
+          : `<div class="grid sm:grid-cols-2 gap-4 max-w-xl"><div class="sm:col-span-2">${campo('tnum', 'Número de tarjeta', '4111 1111 1111 1111', 'text', 'inputmode="numeric" autocomplete="cc-number"')}</div>${campo('tven', 'Vence (MM/AA)', '', 'text', 'autocomplete="cc-exp"')}${campo('tcvv', 'CVV', '', 'password', 'autocomplete="cc-csc" maxlength="4"')}</div>`}
+        <p class="text-xs opacity-70 mt-3 max-w-xl flex gap-2">${BH.icon('shield', 'size-4 shrink-0')} Tus datos se cifran en tu navegador con Culqi. BabelHub nunca ve ni guarda los datos de tu tarjeta.</p>
+        <div class="mt-5 flex justify-between"><button class="btn btn-ghost" data-ir="-1">Atrás</button><button class="btn btn-primary" id="pagar" ${s.cobrando ? 'disabled' : ''}>${s.cobrando ? '<span class="loading loading-spinner"></span> Procesando…' : 'Pagar ' + BH.money(subtotal + envio())}</button></div>`;
+    },
+    Listo() {
+      const msgImp = hayImpreso ? (hayTraslado() && s.tipo === 'recojo' ? 'Tus impresos viajan entre sucursales; te avisaremos cuando estén listos para recojo.' : s.tipo === 'recojo' ? `Te avisaremos cuando tus impresos estén listos en ${BH.sucursal(s.suc).nombre}.` : 'Generaremos tu guía de envío y te la enviaremos.') : '';
+      return `<div class="text-center py-6 space-y-3 aparece"><div class="mx-auto grid place-items-center size-16 rounded-full bg-success text-success-content">${BH.icon('check', 'size-9')}</div>
+        <h2 class="font-display text-4xl">¡Pedido confirmado!</h2><p>Número de pedido <b>${s.creado}</b></p>
+        ${hayDigital ? `<p class="max-w-md mx-auto">${BH.icon('bolt', 'size-4 inline text-success')} Tus libros digitales ya están en <b>Mi biblioteca</b>.</p>` : ''}
+        ${msgImp ? `<p class="opacity-75 max-w-md mx-auto">${msgImp}</p>` : ''}
+        <div class="chat chat-start max-w-sm mx-auto text-left"><div class="chat-bubble text-sm">BabelHub: tu pedido ${s.creado} fue confirmado ✅. ${hayDigital ? 'Tus libros digitales ya están disponibles.' : 'Te avisaremos aquí cada cambio.'}</div></div>
+        <p class="text-xs opacity-60">Vista previa del WhatsApp que recibirás en ${s.tel}.</p>
+        <div class="flex flex-wrap gap-2 justify-center">${hayDigital ? '<a href="biblioteca.html" class="btn btn-primary">Ir a mi biblioteca</a>' : ''}<a href="pedidos.html?id=${s.creado}" class="btn ${hayDigital ? 'btn-outline' : 'btn-primary'}">Seguir mi pedido</a></div></div>`;
+    }
+  };
+
+  function render() {
+    cabecera(); const p = nombrePaso(); $('paso').innerHTML = vistas[p]();
+    const m = $('paso');
+    m.querySelectorAll('[data-ir]').forEach((b) => (b.onclick = () => { i += Number(b.dataset.ir); render(); }));
+    m.querySelectorAll('input[name=tipo]').forEach((r) => (r.onchange = () => { s.tipo = r.value; render(); }));
+    if ($('suc')) $('suc').onchange = (e) => { s.suc = e.target.value; render(); };
+    m.querySelectorAll('[data-m]').forEach((b) => (b.onclick = () => { s.metodo = b.dataset.m; render(); }));
+    ['nombre', 'tel', 'dir'].forEach((k) => { if ($(k)) $(k).oninput = (e) => (s[k] = e.target.value); });
+    if ($('consent')) $('consent').onchange = (e) => (s.consent = e.target.checked);
+    if ($('terminos')) $('terminos').onchange = (e) => (s.terminos = e.target.checked);
+    if ($('sig')) $('sig').onclick = siguiente;
+    if ($('pagar')) $('pagar').onclick = pagar;
+    if ($('solo-dig')) $('solo-dig').onclick = () => { impresos.forEach((l) => BH.cart.setQty(l.k, 0)); location.search = ''; };
+  }
+
+  function siguiente() {
+    const p = nombrePaso();
+    if (p === 'Revisar') { if (impresos.some((l) => !fuente(l).ok)) { BH.toast('Algún impreso ya no tiene stock. Vuelve al carrito.', 'error'); return; } if (lineas.some((l) => l.formato === 'digital' && !BH.digitalEstado(l.obra).ok)) { BH.toast('Un libro digital ya no está disponible. Vuelve al carrito.', 'error'); return; } reserva(); }
+    if (p === 'Entrega' && s.tipo === 'domicilio' && !s.dir.trim()) { BH.toast('Escribe tu dirección de entrega', 'warning'); return; }
+    if (p === 'Tus datos') {
+      if (!s.nombre.trim() || !/^\+?[\d\s]{9,}$/.test(String(s.tel).trim())) { $('err').textContent = 'Escribe tu nombre y un número de WhatsApp válido.'; return; }
+      if (!s.consent) { $('err').textContent = 'Necesitamos tu consentimiento para los avisos y el tratamiento de datos.'; return; }
+      if (!s.terminos) { $('err').textContent = 'Debes aceptar los términos' + (hayDigital ? ' y la política de reembolso de libros digitales.' : '.'); return; }
+    }
+    i++; render();
+  }
+
+  function pagar() {
+    s.cobrando = true; s.rechazado = false; render();
+    setTimeout(() => {
+      s.cobrando = false;
+      if (BH.estado === 'pago-rechazado') { s.rechazado = true; return render(); }
+      clearInterval(t); $('timer').innerHTML = '';
+      const n = BH.pedidos.get().length + 123; s.creado = 'BH-2026-' + String(n).padStart(6, '0');
+      BH.pedidos.add({ id: s.creado, fecha: BH.hoy, entrega: hayImpreso ? s.tipo : null, sucursal: hayImpreso ? s.suc : null, estado: hayImpreso ? (hayTraslado() ? 'transito' : 'confirmado') : 'entregado', lineas: lineas.map((l) => ({ obra: l.obra.id, formato: l.formato, cant: l.cant })) });
+      lineas.filter((l) => l.formato === 'digital').forEach((l) => BH.biblioteca.add(l.obra.id));
+      BH.cart.clear(); i++; render();
+    }, 1300);
+  }
+  render();
+});
+</script>
+</body>
+</html>

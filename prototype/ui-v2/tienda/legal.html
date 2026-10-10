@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Información legal · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/app.js"></script>
+</head>
+<body data-area="tienda" data-page="legal" data-estados="normal">
+<div id="page-content" hidden>
+  <div class="max-w-3xl mx-auto px-4 py-8" id="raiz"></div>
+</div>
+
+<script>
+BH.ready(() => {
+  const DOCS = {
+    terminos: ['Términos y condiciones', [
+      ['Quiénes somos', 'BabelHub es una librería con sucursales en varias regiones del Perú que vende libros impresos y digitales.'],
+      ['Compras', 'El precio, el formato y la disponibilidad se muestran antes de pagar. Los impresos se reservan 15 minutos al iniciar el pago. El cobro se hace una sola vez con Culqi; BabelHub no guarda datos de tarjeta.'],
+      ['Entrega', 'Los impresos se recogen en la sucursal elegida o se despachan a domicilio. Si el libro está en otra sucursal, se traslada y se te avisa por WhatsApp.'],
+      ['Libros digitales', 'Se entregan al instante en tu biblioteca. Ver «Cómo funcionan los libros digitales».'],
+      ['Reclamos', 'Puedes registrar un reclamo o una queja en el Libro de Reclamaciones, siempre visible al pie de la página.']]],
+    reembolso: ['Reembolsos y devoluciones', [
+      ['Libros impresos', 'Puedes devolver un impreso entregado en cualquier sucursal. El stock vuelve a la sucursal receptora y te reembolsamos por el mismo medio de pago.'],
+      ['Libros digitales', 'Tienes derecho a reembolso si todavía no descargaste el libro, o si el archivo está defectuoso. Si ya lo descargaste y el archivo está bien, no procede el reembolso, porque no se puede devolver una copia.'],
+      ['Efecto del reembolso', 'Al reembolsar un libro digital se revoca tu acceso a él.'],
+      ['Cómo pedirlo', 'Desde «Mis pedidos», en el pedido correspondiente, con el botón «Solicitar devolución o reembolso».']]],
+    digital: ['Cómo funcionan los libros digitales', [
+      ['Formato', 'Los libros se entregan en EPUB o PDF, según la edición.'],
+      ['Tu biblioteca', 'Al aprobarse el pago, el libro aparece en «Mi biblioteca», asociado a tu cuenta.'],
+      ['Descargas', `Puedes descargar cada libro hasta ${BH.limiteDescargas} veces. Cada descarga usa un enlace seguro que dura 5 minutos; si vence, generas otro sin gastar una descarga.`],
+      ['Uso personal', 'El libro es para tu uso personal. No se puede copiar, compartir ni redistribuir. En el futuro podremos incluir una marca con los datos de la compra.'],
+      ['Licencias', 'Vendemos cada libro digital con la autorización de su titular de derechos, con un territorio y una vigencia. Si una licencia termina, el libro deja de venderse, pero quienes ya lo compraron mantienen su acceso.']]],
+    privacidad: ['Privacidad y datos personales', [
+      ['Qué datos usamos', 'Nombre, correo, WhatsApp, historial de pedidos y tu biblioteca digital. Tu biblioteca revela tus hábitos de lectura, así que solo tú y el personal autorizado pueden verla.'],
+      ['Para qué', 'Para procesar tus compras, avisarte del estado de tus pedidos y atender tus reclamos. No compartimos tus datos con editoriales ni con terceros sin tu consentimiento.'],
+      ['WhatsApp', 'Solo te escribimos por WhatsApp si lo aceptaste, y solo con mensajes de tus pedidos. Puedes desactivarlo en tu cuenta cuando quieras.'],
+      ['Tus derechos', 'Conforme a la Ley N.° 29733, puedes acceder a tus datos, rectificarlos, cancelarlos y oponerte a su tratamiento desde «Mi cuenta › Privacidad».']]]
+  };
+  const d = DOCS[BH.param('doc')] || DOCS.terminos;
+  const menu = Object.entries(DOCS).map(([k, v]) => `<a class="btn btn-sm ${DOCS[k] === d ? 'btn-primary' : 'btn-ghost'}" href="legal.html?doc=${k}">${v[0]}</a>`).join('');
+  document.getElementById('raiz').innerHTML = `<div class="flex flex-wrap gap-1 mb-6" role="navigation" aria-label="Documentos legales">${menu}</div>
+    <h1 class="bh-display" style="font-size:clamp(1.8rem,5vw,3rem)">${d[0]}</h1>
+    <div class="alert alert-soft mt-4 text-sm">${BH.icon('warn')}<span>Texto de ejemplo para el prototipo. No es un documento legal definitivo.</span></div>
+    <div class="mt-6 space-y-5">${d[1].map(([t, p]) => `<section><h2 class="font-display text-2xl mb-1">${t}</h2><p class="opacity-85">${p}</p></section>`).join('')}</div>`;
+});
+</script>
+</body>
+</html>
