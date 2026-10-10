@@ -27,7 +27,7 @@ BabelHub se compone de **dos sistemas independientes pero interoperables** para 
 | 02 | [Requisitos](02-requisitos.md) | Requisitos funcionales (RF), no funcionales (RNF) y restricciones (RC). |
 | 03 | [Atributos de calidad](03-atributos-de-calidad.md) | Escenarios de calidad (AC) y su priorización. |
 | 04 | [Drivers arquitectónicos](04-drivers-arquitectonicos.md) | Requisitos que condicionan la arquitectura (DA), riesgos y compromisos. |
-| 05 | [Decisiones arquitectónicas](05-decisiones-arquitectonicas.md) | Decisiones (AD) con justificación y alternativas; despliegue en Oracle Cloud, base de datos separada y Cloudflare frente a Nginx. |
+| 05 | [Decisiones arquitectónicas](05-decisiones-arquitectonicas.md) | Decisiones (AD) con justificación y alternativas; despliegue en Oracle Cloud, base de datos separada, Cloudflare frente a Nginx, aplicación web, Culqi y notificaciones por WhatsApp (AD01–AD18). |
 | 06 | [Estilo arquitectónico](06-estilo-arquitectonico.md) | Estilo basado en servicios, diagrama de componentes y organización interna con Clean Architecture. |
 | 07 | [Enfoque arquitectónico](07-enfoque-arquitectonico.md) | Clean Architecture en detalle: capas, regla de dependencia, mapa a la estructura del repositorio, pruebas por capa y reglas para `AGENTS.md`. |
 
@@ -38,7 +38,9 @@ BabelHub se compone de **dos sistemas independientes pero interoperables** para 
 ## Resumen de la arquitectura
 
 - Cuatro servicios .NET 10 de granularidad gruesa (E-commerce, Inventario, Identidad y Asistente de Compra), con REST síncrono y Clean Architecture interna.
-- PostgreSQL por sistema, Redis como caché y Nginx como puerta de entrada interna.
+- Aplicación web `BabelHub.Web` (ASP.NET Core MVC con Razor) con áreas por rol, que consume los servicios desde el servidor.
+- PostgreSQL por sistema (Identidad con esquema propio), Redis como caché y Nginx como puerta de entrada interna.
+- Pagos con Culqi (Yape y tarjetas) y avisos por WhatsApp con n8n y Evolution API, autoalojados.
 - Despliegue con Docker Compose en Oracle Cloud Free Tier: dos VMs ARM (Aplicaciones y Datos, de 1 OCPU y 6 GB) y una VM x86 micro opcional de apoyo.
 - Cloudflare gratuito en el borde, con Cloudflare Tunnel, para no abrir puertos en Oracle.
 - Pruebas con xUnit, Testcontainers, Playwright y k6. Desarrollo posterior bajo Spec-Driven Development.
