@@ -32,9 +32,9 @@ Los plazos son los de RNF23 (auditoría y hojas de reclamación: dos años); los
 
 | Derecho | Cómo se ejerce | Spec |
 | :--- | :--- | :--- |
-| **Acceso** | Desde la cuenta del cliente o por solicitud registrada; se informa qué datos se tienen. | IDE-12, IDE-21 |
-| **Rectificación** | El cliente corrige sus datos en su cuenta. | IDE-21 |
-| **Cancelación** | El cliente cancela su cuenta; se suprimen o anonimizan sus datos personales, salvo lo que una obligación legal exija (pedidos y hojas de reclamación). | IDE-22 |
+| **Acceso** | Desde la cuenta del cliente o por solicitud registrada; se informa qué datos se tienen. | IDE-12, IDE-24 |
+| **Rectificación** | El cliente corrige sus datos en su cuenta. | IDE-24, IDE-25 |
+| **Cancelación** | El cliente cancela su cuenta; se suprimen o anonimizan sus datos personales, salvo lo que una obligación legal exija (pedidos y hojas de reclamación). | IDE-26, IDE-27, IDE-28 |
 | **Oposición** | Solicitud registrada con estado; incluye revocar el consentimiento de avisos. | IDE-11, IDE-12, NOT-08 |
 
 Las solicitudes se registran con su estado (IDE-12). El plazo de respuesta se define con la persona responsable del proyecto.
@@ -62,7 +62,7 @@ Cada proveedor recibe solo los datos mínimos necesarios (RC17).
 | Auditoría y eventos de seguridad | 2 años | Depuración periódica: se elimina o anonimiza (AUD-11). |
 | Hojas de reclamación | Al menos 2 años; no se eliminan antes | REC-06. |
 | Pedidos | 2 años *(propuesta)* | Anonimización de datos de contacto al vencer. |
-| Cuenta cancelada | Inmediato para datos de contacto | IDE-22. |
+| Cuenta cancelada | Inmediato para datos de contacto | IDE-28. |
 | Respaldos | Retención escalonada (diaria y semanal) | AD27; al cancelar una cuenta, el dato desaparece del respaldo cuando este rota. |
 
 ## 6. Incidentes de seguridad con datos personales

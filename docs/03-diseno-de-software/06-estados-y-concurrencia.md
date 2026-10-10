@@ -110,7 +110,7 @@ Un trabajo de fondo recorre las reservas pendientes vencidas y las marca como ex
 | 2 solicitudes con una descarga restante | Solo una recibe el enlace | AC-BIB-15 |
 | Repetir un cobro con la misma clave | Un solo cobro | PAG-04 |
 | Doble aprobación de un traslado | Una sola transición | TRA-04 |
-| Uso simultáneo de un código | Solo uno es aceptado | AC-IDE-17 |
+| Uso simultáneo de un código | Solo uno es aceptado | IDE-19 (a cubrir con una prueba de concurrencia en el plan) |
 
 ## 3. Fallos parciales
 

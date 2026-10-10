@@ -82,7 +82,7 @@ Traduce el **OWASP Application Security Verification Standard 5.0** a controles 
 | **CTL-30** | Las bases de datos no tienen puertos expuestos a Internet; los paneles de n8n y Evolution API tampoco. | L1 | RNF06, AM22 | Escaneo de puertos | Decisión |
 | **CTL-31** | Contenedores sin privilegios, con límites de memoria y `healthcheck`. | L2 | RNF19, convenciones | Revisión de Compose | Pendiente |
 | **CTL-32** | No se guardan datos de tarjeta ni se registran datos sensibles. | L1 | PAG-02, SEG-10, NOT-07 | Revisión y pruebas | Especificado |
-| **CTL-33** | Los datos personales tienen inventario, base legal, retención y borrado o anonimización. | L2 | RNF23, AUD-11, IDE-22 | Inspección documental | Especificado |
+| **CTL-33** | Los datos personales tienen inventario, base legal, retención y borrado o anonimización. | L2 | RNF23, AUD-11, IDE-28 | Inspección documental | Especificado |
 
 ## 10. Código seguro, registro y manejo de errores
 
