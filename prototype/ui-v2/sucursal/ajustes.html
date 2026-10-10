@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ajustes de inventario · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/data-paneles.js"></script>
+<script src="../assets/app.js"></script>
+<script src="../assets/panel.js"></script>
+</head>
+<body data-area="sucursal" data-page="ajustes" data-roles="encargado,admin" data-estados="normal,vacio">
+<div id="page-content" hidden>
+  <h1 class="bh-display" style="font-size:clamp(1.8rem,5vw,3rem)">Ajustes de inventario</h1>
+  <p class="opacity-75 mt-1 max-w-2xl">Historial de ajustes con motivo y responsable. Cada movimiento queda en la auditoría y no se puede modificar. Para registrar uno nuevo, ve al <a class="link" href="inventario.html">inventario</a>.</p>
+  <div class="mt-4 flex flex-wrap gap-2"><select id="f-motivo" class="select select-sm" aria-label="Filtrar por motivo"><option value="">Todos los motivos</option><option>merma</option><option>producto dañado</option><option>corrección de conteo</option></select></div>
+  <div id="tabla" class="mt-3"></div>
+</div>
+
+<script>
+BH.ready(() => {
+  if (BH.bloqueado) return;
+  const $ = (id) => document.getElementById(id);
+  const todos = BH.estado === 'vacio' ? [] : BH.audit.list().filter((e) => e.accion === 'Ajuste de inventario');
+  function pintar() {
+    const m = $('f-motivo').value;
+    const l = todos.filter((e) => !m || e.detalle.includes('(' + m + ')'));
+    if (!l.length) { $('tabla').innerHTML = BH.emptyState('pencil', 'Sin ajustes', 'Aún no hay ajustes registrados con este filtro.', '<a class="btn btn-primary btn-sm" href="inventario.html">Ir al inventario</a>'); return; }
+    $('tabla').innerHTML = `<div class="overflow-x-auto border border-[var(--bh-linea)] bg-base-100"><table class="table"><thead><tr><th>Fecha</th><th>Responsable</th><th>Detalle</th></tr></thead><tbody>${l.map((e) => `<tr><td class="whitespace-nowrap tabular-nums text-sm">${e.fecha}</td><td><div class="text-sm font-medium">${e.usuario}</div><div class="text-xs opacity-60">${e.rol}</div></td><td class="text-sm">${e.detalle}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  $('f-motivo').onchange = pintar; pintar();
+});
+</script>
+</body>
+</html>

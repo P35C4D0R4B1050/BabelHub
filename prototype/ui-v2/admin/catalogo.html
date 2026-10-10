@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Catálogo (admin) · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/data-paneles.js"></script>
+<script src="../assets/app.js"></script>
+<script src="../assets/panel.js"></script>
+</head>
+<body data-area="admin" data-page="catalogo" data-roles="admin" data-estados="normal,vacio,error">
+<div id="page-content" hidden>
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div><h1 class="bh-display" style="font-size:clamp(1.8rem,5vw,3rem)">Catálogo nacional</h1>
+      <p class="opacity-75 mt-1 max-w-2xl">Cada edición, impresa o digital, tiene su propio ISBN, que es único. Un libro digital solo se vende con licencia vigente del titular.</p></div>
+    <button class="btn btn-primary" id="nuevo"></button>
+  </div>
+  <div class="mt-4 flex flex-wrap gap-2">
+    <label class="input w-full sm:w-72"><span class="opacity-60" id="ic-b"></span><input id="buscar" type="search" placeholder="Buscar título, autor o ISBN" aria-label="Buscar en el catálogo"></label>
+    <select id="f-lic" class="select select-sm self-center" aria-label="Filtrar por licencia"><option value="">Todas las licencias</option><option value="porvencer">Por vencer (≤ 120 días)</option><option value="vencida">Vencidas</option></select>
+  </div>
+  <div id="tabla" class="mt-3"></div>
+
+  <dialog id="dlg" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box max-w-2xl max-h-[90vh]">
+      <h2 class="font-display text-2xl mb-3" id="dlg-t">Nueva obra</h2>
+      <div class="space-y-4">
+        <fieldset class="grid sm:grid-cols-2 gap-3"><legend class="font-semibold mb-1">Obra</legend>
+          <label class="floating-label sm:col-span-2"><span>Título *</span><input id="o-tit" class="input w-full" placeholder="Título"></label>
+          <label class="floating-label"><span>Autor *</span><input id="o-aut" class="input w-full" placeholder="Autor"></label>
+          <label class="floating-label"><span>Editorial *</span><input id="o-edi" class="input w-full" placeholder="Editorial"></label>
+          <label class="floating-label"><span>Categoría</span><select id="o-cat" class="select w-full"></select></label>
+          <label class="floating-label"><span>Imagen de portada</span><input type="file" accept="image/*" class="file-input w-full"></label></fieldset>
+
+        <fieldset class="border border-[var(--bh-linea)] p-3 space-y-3"><legend class="px-1 font-semibold">Edición impresa</legend>
+          <label class="flex items-center gap-2 cursor-pointer"><input id="i-on" type="checkbox" class="checkbox checkbox-primary checkbox-sm"> Tiene edición impresa</label>
+          <div id="i-box" class="grid sm:grid-cols-2 gap-3"><div><label class="floating-label"><span>ISBN *</span><input id="i-isbn" class="input w-full" placeholder="ISBN"></label><p id="e-ii" class="text-error text-xs mt-1" role="alert"></p></div>
+            <label class="floating-label"><span>Precio (S/) *</span><input id="i-pre" class="input w-full" inputmode="decimal" placeholder="Precio"></label></div></fieldset>
+
+        <fieldset class="border border-[var(--bh-linea)] p-3 space-y-3"><legend class="px-1 font-semibold">Edición digital y licencia</legend>
+          <label class="flex items-center gap-2 cursor-pointer"><input id="d-on" type="checkbox" class="checkbox checkbox-primary checkbox-sm"> Tiene edición digital</label>
+          <div id="d-box" class="grid sm:grid-cols-2 gap-3">
+            <div><label class="floating-label"><span>ISBN *</span><input id="d-isbn" class="input w-full" placeholder="ISBN"></label><p id="e-di" class="text-error text-xs mt-1" role="alert"></p></div>
+            <label class="floating-label"><span>Precio (S/) *</span><input id="d-pre" class="input w-full" inputmode="decimal" placeholder="Precio"></label>
+            <label class="floating-label"><span>Formato</span><select id="d-for" class="select w-full"><option>EPUB</option><option>PDF</option></select></label>
+            <label class="floating-label"><span>Archivo *</span><input id="d-file" type="file" accept=".epub,.pdf" class="file-input w-full"></label>
+            <label class="floating-label"><span>Tipo de licencia</span><select id="d-tip" class="select w-full"><option>Licencia comercial</option><option>Dominio público</option></select></label>
+            <label class="floating-label"><span>Titular de derechos *</span><input id="d-tit" class="input w-full" placeholder="Autor o editorial"></label>
+            <label class="floating-label"><span>Territorios</span><select id="d-ter" class="select w-full"><option>Mundial</option><option>Perú y Latinoamérica</option><option>Perú, Colombia y Chile</option><option>Solo Perú</option></select></label>
+            <label class="floating-label" id="d-venc-w"><span>Vigencia hasta *</span><input id="d-venc" type="date" class="input w-full"></label>
+            <p class="sm:col-span-2 text-xs opacity-70">Al vencer la licencia, el libro digital deja de venderse; quienes ya lo compraron mantienen su acceso.</p></div></fieldset>
+        <p id="e-gen" class="text-error text-sm" role="alert"></p>
+      </div>
+      <div class="modal-action"><form method="dialog"><button class="btn btn-ghost">Cancelar</button></form><button class="btn btn-primary" id="guardar">Guardar</button></div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>cerrar</button></form>
+  </dialog>
+</div>
+
+<script>
+BH.ready(() => {
+  if (BH.bloqueado) return;
+  const $ = (id) => document.getElementById(id);
+  $('ic-b').innerHTML = BH.icon('search', 'size-4'); $('nuevo').innerHTML = BH.icon('plus', 'size-5') + ' Nueva obra';
+  $('o-cat').innerHTML = BH.categorias.map((c) => `<option>${c}</option>`).join('');
+  let editando = null;
+  const isbns = (excl) => BH.obras.filter((o) => o !== excl).flatMap((o) => [o.impreso && o.impreso.isbn, o.digital && o.digital.isbn]).filter(Boolean);
+
+  function tabla() {
+    if (BH.estado === 'error') { $('tabla').innerHTML = BH.errorState('No pudimos cargar el catálogo.'); return; }
+    if (BH.estado === 'vacio') { $('tabla').innerHTML = BH.emptyState('book', 'Aún no hay obras', 'Publica la primera obra del catálogo nacional.'); return; }
+    const q = $('buscar').value.toLowerCase(), f = $('f-lic').value;
+    const l = BH.obras.filter((o) => (!q || [o.titulo, o.autor, o.impreso && o.impreso.isbn, o.digital && o.digital.isbn].join(' ').toLowerCase().includes(q)) && (!f || (o.digital && BH.licenciaEstado(o.digital) === f)));
+    if (!l.length) { $('tabla').innerHTML = BH.emptyState('search', 'Sin resultados', 'Ninguna obra coincide con el filtro.'); return; }
+    $('tabla').innerHTML = `<div class="overflow-x-auto border border-[var(--bh-linea)] bg-base-100"><table class="table"><thead><tr><th>Obra</th><th>Impreso</th><th>Digital y licencia</th><th></th></tr></thead><tbody>
+      ${l.map((o) => `<tr><td><div class="font-medium">${o.titulo}</div><div class="text-xs opacity-60">${o.autor} · ${o.categoria}</div></td>
+        <td class="text-sm">${o.impreso ? `${BH.money(o.impreso.precio)}<div class="text-xs opacity-60 font-mono">${o.impreso.isbn}</div><div class="text-xs opacity-60">Stock red: ${BH.totalVendible(o)}</div>` : '<span class="opacity-50">—</span>'}</td>
+        <td class="text-sm">${o.digital ? `${BH.money(o.digital.precio)} · ${o.digital.formato}<div class="text-xs opacity-60 font-mono">${o.digital.isbn}</div><div class="mt-1 flex flex-wrap gap-1 items-center">${BH.chipEstado(BH.licenciaEstado(o.digital))}<span class="text-xs opacity-70">${o.digital.licencia.tipo}${o.digital.licencia.vence ? ' · hasta ' + o.digital.licencia.vence : ''}</span></div><div class="text-xs opacity-60">${o.digital.titular} · ${o.digital.licencia.territorios}</div>` : '<span class="opacity-50">Sin edición digital</span>'}</td>
+        <td class="text-right whitespace-nowrap"><button class="btn btn-sm btn-ghost" data-ed="${o.id}">Editar</button>${o.digital ? ` <button class="btn btn-sm btn-ghost" data-ret="${o.id}">Retirar digital</button>` : ''} <button class="btn btn-sm btn-ghost text-error" data-baja="${o.id}">Dar de baja</button></td></tr>`).join('')}</tbody></table></div>`;
+    $('tabla').querySelectorAll('[data-ed]').forEach((b) => (b.onclick = () => abrir(BH.obra(b.dataset.ed))));
+    $('tabla').querySelectorAll('[data-ret]').forEach((b) => (b.onclick = () => { const o = BH.obra(b.dataset.ret); BH.setCambio(o.id, { sinDigital: true }); BH.audit.add('Retiro de libro digital', `${o.titulo} (digital): retirado de la venta; los accesos ya concedidos se mantienen`); BH.toast('Edición digital retirada de la venta'); tabla(); }));
+    $('tabla').querySelectorAll('[data-baja]').forEach((b) => (b.onclick = () => { const o = BH.obra(b.dataset.baja); BH.setCambio(o.id, { baja: true }); BH.audit.add('Baja de título', o.titulo); BH.toast('Título dado de baja'); tabla(); }));
+  }
+
+  const sync = () => { $('i-box').hidden = !$('i-on').checked; $('d-box').hidden = !$('d-on').checked; $('d-venc-w').hidden = $('d-tip').value === 'Dominio público'; };
+  ['i-on', 'd-on', 'd-tip'].forEach((i) => $(i).addEventListener('change', sync));
+
+  function abrir(o) {
+    editando = o || null; $('dlg-t').textContent = o ? 'Editar obra' : 'Nueva obra';
+    $('o-tit').value = o ? o.titulo : ''; $('o-aut').value = o ? o.autor : ''; $('o-edi').value = o ? o.editorial : ''; $('o-cat').value = o ? o.categoria : BH.categorias[0];
+    $('i-on').checked = o ? !!o.impreso : true; $('i-isbn').value = o && o.impreso ? o.impreso.isbn : ''; $('i-pre').value = o && o.impreso ? o.impreso.precio : '';
+    const d = o && o.digital; $('d-on').checked = !!d; $('d-isbn').value = d ? d.isbn : ''; $('d-pre').value = d ? d.precio : ''; $('d-for').value = d ? d.formato : 'EPUB';
+    $('d-tip').value = d ? d.licencia.tipo : 'Licencia comercial'; $('d-tit').value = d ? d.titular : ''; $('d-ter').value = d ? d.licencia.territorios : 'Mundial'; $('d-venc').value = d && d.licencia.vence ? d.licencia.vence : '';
+    $('e-ii').textContent = $('e-di').textContent = $('e-gen').textContent = ''; sync(); $('dlg').showModal();
+  }
+  $('nuevo').onclick = () => abrir(null);
+  const dup = () => { const usados = isbns(editando); $('e-ii').textContent = $('i-on').checked && usados.includes($('i-isbn').value.trim()) ? 'Ese ISBN ya existe. Debe ser único.' : ''; $('e-di').textContent = $('d-on').checked && ($('d-isbn').value.trim() === $('i-isbn').value.trim() && $('i-on').checked || usados.includes($('d-isbn').value.trim())) ? 'Ese ISBN ya existe. Debe ser único.' : ''; };
+  $('i-isbn').addEventListener('input', dup); $('d-isbn').addEventListener('input', dup);
+
+  $('guardar').onclick = () => {
+    const g = (id) => $(id).value.trim(); dup();
+    if (!g('o-tit') || !g('o-aut') || !g('o-edi')) { $('e-gen').textContent = 'Completa título, autor y editorial.'; return; }
+    if (!$('i-on').checked && !$('d-on').checked) { $('e-gen').textContent = 'La obra necesita al menos una edición (impresa o digital).'; return; }
+    if ($('i-on').checked && (!g('i-isbn') || !(parseFloat(g('i-pre')) > 0))) { $('e-gen').textContent = 'La edición impresa necesita ISBN y un precio mayor que cero.'; return; }
+    if ($('d-on').checked) {
+      if (!g('d-isbn') || !(parseFloat(g('d-pre')) > 0) || !g('d-tit')) { $('e-gen').textContent = 'La edición digital necesita ISBN, precio y titular de derechos.'; return; }
+      if (!editando && !$('d-file').files.length) { $('e-gen').textContent = 'Sube el archivo del libro digital (EPUB o PDF).'; return; }
+      if ($('d-tip').value !== 'Dominio público' && (!g('d-venc') || g('d-venc') <= BH.hoy)) { $('e-gen').textContent = 'La licencia comercial necesita una vigencia posterior a hoy.'; return; }
+    }
+    if ($('e-ii').textContent || $('e-di').textContent) return;
+    const impreso = $('i-on').checked ? { isbn: g('i-isbn'), precio: parseFloat(g('i-pre')), stock: editando && editando.impreso ? editando.impreso.stock : {} } : null;
+    const digital = $('d-on').checked ? { isbn: g('d-isbn'), precio: parseFloat(g('d-pre')), formato: g('d-for') || $('d-for').value, paginas: editando && editando.digital ? editando.digital.paginas : 200, tamano: editando && editando.digital ? editando.digital.tamano : '2,0 MB', titular: g('d-tit'), licencia: { tipo: $('d-tip').value, vence: $('d-tip').value === 'Dominio público' ? null : g('d-venc'), territorios: $('d-ter').value } } : null;
+    if (editando) {
+      if (editando.impreso && impreso && editando.impreso.precio !== impreso.precio) { BH.audit.add('Cambio de precio', `${editando.titulo} (impreso): ${BH.money(editando.impreso.precio)} → ${BH.money(impreso.precio)}`); BH.setCambio(editando.id, { pi: impreso.precio }); }
+      if (editando.digital && digital && editando.digital.precio !== digital.precio) { BH.audit.add('Cambio de precio', `${editando.titulo} (digital): ${BH.money(editando.digital.precio)} → ${BH.money(digital.precio)}`); BH.setCambio(editando.id, { pd: digital.precio }); }
+      Object.assign(editando, { titulo: g('o-tit'), autor: g('o-aut'), editorial: g('o-edi'), categoria: $('o-cat').value, impreso, digital });
+    } else {
+      const id = Date.now() % 100000 + 100;
+      BH.addObra({ id, titulo: g('o-tit'), autor: g('o-aut'), editorial: g('o-edi'), categoria: $('o-cat').value, motivo: ['laberinto', 'orbita', 'lineas', 'rejilla', 'ondas', 'arcos'][id % 6], paleta: id % 6, desc: '', impreso, digital });
+      BH.audit.add('Alta de título', `${g('o-tit')}${impreso ? ' (impreso)' : ''}${digital ? ' (digital, licencia ' + digital.licencia.tipo.toLowerCase() + ')' : ''}`);
+    }
+    $('dlg').close(); BH.toast('Obra guardada'); tabla();
+  };
+  $('buscar').addEventListener('input', tabla); $('f-lic').addEventListener('change', tabla);
+  tabla();
+});
+</script>
+</body>
+</html>

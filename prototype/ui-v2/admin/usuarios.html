@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Usuarios y roles · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/data-paneles.js"></script>
+<script src="../assets/app.js"></script>
+<script src="../assets/panel.js"></script>
+</head>
+<body data-area="admin" data-page="usuarios" data-roles="admin" data-estados="normal,error">
+<div id="page-content" hidden>
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div><h1 class="bh-display" style="font-size:clamp(1.8rem,5vw,3rem)">Usuarios y roles</h1>
+      <p class="opacity-75 mt-1 max-w-2xl">El rol y la sucursal viajan en el token del usuario. Un encargado de sucursal tiene siempre exactamente una sucursal.</p></div>
+    <button class="btn btn-primary" id="nuevo"></button>
+  </div>
+  <div class="mt-4"><select id="f-rol" class="select select-sm" aria-label="Filtrar por rol"><option value="">Todos los roles</option></select></div>
+  <div id="lista" class="mt-3"></div>
+
+  <dialog id="dlg" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box"><h2 class="font-display text-2xl mb-3">Nuevo usuario</h2>
+      <div class="space-y-3">
+        <label class="floating-label w-full"><span>Nombre *</span><input id="u-nom" class="input w-full" placeholder="Nombre"></label>
+        <label class="floating-label w-full"><span>Correo *</span><input id="u-em" type="email" class="input w-full" placeholder="Correo"></label>
+        <label class="floating-label w-full"><span>Rol</span><select id="u-rol" class="select w-full"></select></label>
+        <label class="floating-label w-full" id="u-suc-w"><span>Sucursal *</span><select id="u-suc" class="select w-full"></select></label>
+        <p id="u-err" class="text-error text-sm" role="alert"></p></div>
+      <div class="modal-action"><form method="dialog"><button class="btn btn-ghost">Cancelar</button></form><button class="btn btn-primary" id="u-ok">Crear usuario</button></div></div>
+    <form method="dialog" class="modal-backdrop"><button>cerrar</button></form>
+  </dialog>
+</div>
+
+<script>
+BH.ready(() => {
+  if (BH.bloqueado) return;
+  const $ = (id) => document.getElementById(id);
+  $('nuevo').innerHTML = BH.icon('plus', 'size-5') + ' Nuevo usuario';
+  const roles = Object.entries(BH.roles);
+  $('f-rol').innerHTML += roles.map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+  $('u-rol').innerHTML = roles.map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+  const sync = () => ($('u-suc-w').hidden = $('u-rol').value !== 'encargado');
+  $('u-rol').onchange = sync;
+
+  function pintar() {
+    if (BH.estado === 'error') { $('lista').innerHTML = BH.errorState('No pudimos cargar los usuarios.'); return; }
+    const f = $('f-rol').value, l = BH.usuarios.get().filter((u) => !f || u.rol === f);
+    $('lista').innerHTML = `<div class="overflow-x-auto border border-[var(--bh-linea)] bg-base-100"><table class="table"><thead><tr><th>Usuario</th><th>Rol</th><th>Sucursal</th><th>Estado</th><th></th></tr></thead><tbody>
+      ${l.map((u) => `<tr><td><div class="font-medium">${u.nombre}</div><div class="text-xs opacity-60">${u.email}</div></td><td class="text-sm">${BH.roles[u.rol]}</td><td class="text-sm">${u.sucursal ? BH.sucursal(u.sucursal).nombre : '<span class="opacity-50">Toda la red</span>'}</td><td>${BH.chipEstado(u.activo ? 'activo' : 'inactivo')}</td>
+        <td class="text-right"><button class="btn btn-sm btn-outline" data-t="${u.id}">${u.activo ? 'Desactivar' : 'Reactivar'}</button></td></tr>`).join('')}</tbody></table></div>`;
+    $('lista').querySelectorAll('[data-t]').forEach((b) => (b.onclick = () => {
+      const all = BH.usuarios.get(), u = all.find((x) => x.id === Number(b.dataset.t)); u.activo = !u.activo; BH.usuarios.set(all);
+      BH.audit.add(u.activo ? 'Reactivación de usuario' : 'Desactivación de usuario', `${u.nombre} (${BH.roles[u.rol]})`); BH.toast(`${u.nombre}: ${u.activo ? 'reactivado' : 'desactivado'}`); pintar();
+    }));
+  }
+  $('nuevo').onclick = () => {
+    $('u-suc').innerHTML = BH.sucursales.map((s) => `<option value="${s.id}">${s.nombre}</option>`).join(''); ['u-nom', 'u-em'].forEach((i) => ($(i).value = '')); $('u-rol').value = 'encargado'; $('u-err').textContent = ''; sync(); $('dlg').showModal();
+  };
+  $('u-ok').onclick = () => {
+    const nom = $('u-nom').value.trim(), em = $('u-em').value.trim(), rol = $('u-rol').value, suc = rol === 'encargado' ? $('u-suc').value : null;
+    if (!nom || !/^\S+@\S+\.\S+$/.test(em)) { $('u-err').textContent = 'Completa el nombre y un correo válido.'; return; }
+    const all = BH.usuarios.get();
+    if (all.some((u) => u.email.toLowerCase() === em.toLowerCase())) { $('u-err').textContent = 'Ya existe un usuario con ese correo.'; return; }
+    if (rol === 'encargado' && all.some((u) => u.rol === 'encargado' && u.sucursal === suc && u.activo)) { $('u-err').textContent = `${BH.sucursal(suc).nombre} ya tiene un encargado activo. Desactívalo antes de asignar otro.`; return; }
+    all.push({ id: Date.now() % 100000, nombre: nom, email: em, rol, sucursal: suc, activo: true }); BH.usuarios.set(all);
+    BH.audit.add('Alta de usuario', `${nom} · ${BH.roles[rol]}${suc ? ' · ' + BH.sucursal(suc).nombre : ''}`); $('dlg').close(); BH.toast('Usuario creado'); pintar();
+  };
+  $('f-rol').onchange = pintar; pintar();
+});
+</script>
+</body>
+</html>

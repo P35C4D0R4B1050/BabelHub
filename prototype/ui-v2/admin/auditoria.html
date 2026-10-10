@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Auditoría · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/data-paneles.js"></script>
+<script src="../assets/app.js"></script>
+<script src="../assets/panel.js"></script>
+</head>
+<body data-area="admin" data-page="auditoria" data-roles="admin" data-estados="normal,vacio">
+<div id="page-content" hidden>
+  <h1 class="bh-display" style="font-size:clamp(1.8rem,5vw,3rem)">Auditoría</h1>
+  <p class="opacity-75 mt-1 max-w-2xl">Registro de solo lectura: precios, anulaciones, ajustes, traslados, accesos denegados y cambios de usuarios. Todo lo que hagas en el prototipo aparece aquí.</p>
+  <div class="mt-4 flex flex-wrap gap-2">
+    <select id="f-acc" class="select select-sm" aria-label="Filtrar por acción"><option value="">Todas las acciones</option></select>
+    <select id="f-usr" class="select select-sm" aria-label="Filtrar por usuario"><option value="">Todos los usuarios</option></select>
+    <input id="f-txt" class="input input-sm" placeholder="Buscar en el detalle" aria-label="Buscar en el detalle">
+  </div>
+  <div id="tabla" class="mt-3"></div>
+</div>
+
+<script>
+BH.ready(() => {
+  if (BH.bloqueado) return;
+  const $ = (id) => document.getElementById(id);
+  const todos = BH.estado === 'vacio' ? [] : BH.audit.list();
+  [...new Set(todos.map((e) => e.accion))].sort().forEach((a) => ($('f-acc').innerHTML += `<option>${a}</option>`));
+  [...new Set(todos.map((e) => e.usuario))].sort().forEach((a) => ($('f-usr').innerHTML += `<option>${a}</option>`));
+  function pintar() {
+    const a = $('f-acc').value, u = $('f-usr').value, t = $('f-txt').value.toLowerCase();
+    const l = todos.filter((e) => (!a || e.accion === a) && (!u || e.usuario === u) && (!t || e.detalle.toLowerCase().includes(t)));
+    if (!l.length) { $('tabla').innerHTML = BH.emptyState('shield', 'Sin eventos', 'No hay operaciones registradas con este filtro.'); return; }
+    $('tabla').innerHTML = `<div class="overflow-x-auto border border-[var(--bh-linea)] bg-base-100"><table class="table"><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Detalle</th></tr></thead><tbody>${l.map((e) => `<tr><td class="whitespace-nowrap text-sm tabular-nums">${e.fecha}</td><td><div class="text-sm font-medium">${e.usuario}</div><div class="text-xs opacity-60">${e.rol}</div></td><td><span class="chip">${e.accion}</span></td><td class="text-sm">${e.detalle}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  ['f-acc', 'f-usr'].forEach((i) => ($(i).onchange = pintar)); $('f-txt').oninput = pintar; pintar();
+});
+</script>
+</body>
+</html>

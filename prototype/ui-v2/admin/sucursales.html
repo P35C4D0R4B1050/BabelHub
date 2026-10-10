@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sucursales · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/data-paneles.js"></script>
+<script src="../assets/app.js"></script>
+<script src="../assets/panel.js"></script>
+</head>
+<body data-area="admin" data-page="sucursales" data-roles="admin" data-estados="normal,error">
+<div id="page-content" hidden>
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div><h1 class="bh-display" style="font-size:clamp(1.8rem,5vw,3rem)">Sucursales</h1>
+      <p class="opacity-75 mt-1 max-w-2xl">Cada sucursal es una <b>fuente</b> de stock. Sumar una nueva es registrar un dato: no requiere cambios de código ni de esquema.</p></div>
+    <button class="btn btn-primary" id="nueva"></button>
+  </div>
+  <p class="mt-3 text-sm" id="cap"></p>
+  <div id="lista" class="mt-3"></div>
+
+  <dialog id="dlg" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box"><h2 class="font-display text-2xl mb-3">Nueva sucursal</h2>
+      <div class="space-y-3">
+        <label class="floating-label w-full"><span>Nombre *</span><input id="s-nom" class="input w-full" placeholder="Nombre"></label>
+        <label class="floating-label w-full"><span>Región *</span><input id="s-reg" class="input w-full" placeholder="Región"></label>
+        <label class="floating-label w-full"><span>WhatsApp de notificación *</span><input id="s-wa" class="input w-full" inputmode="tel" placeholder="WhatsApp de notificación"></label>
+        <p id="s-err" class="text-error text-sm" role="alert"></p>
+        <p class="text-xs opacity-70">La sucursal nace sin stock. Después se le asigna un encargado en «Usuarios y roles».</p></div>
+      <div class="modal-action"><form method="dialog"><button class="btn btn-ghost">Cancelar</button></form><button class="btn btn-primary" id="s-ok">Registrar</button></div></div>
+    <form method="dialog" class="modal-backdrop"><button>cerrar</button></form>
+  </dialog>
+</div>
+
+<script>
+BH.ready(() => {
+  if (BH.bloqueado) return;
+  const $ = (id) => document.getElementById(id);
+  $('nueva').innerHTML = BH.icon('plus', 'size-5') + ' Nueva sucursal';
+
+  function pintar() {
+    $('cap').innerHTML = `<span class="chip">${BH.icon('store', 'size-3.5')}${BH.sucursales.length} de 20 fuentes soportadas sin rediseño</span>`;
+    if (BH.estado === 'error') { $('lista').innerHTML = BH.errorState('No pudimos cargar las sucursales.'); return; }
+    const us = BH.usuarios.get();
+    $('lista').innerHTML = `<div class="overflow-x-auto border border-[var(--bh-linea)] bg-base-100"><table class="table"><thead><tr><th>Sucursal</th><th>Región</th><th>Encargado</th><th class="text-right">Físico</th><th class="text-right">Reservado</th><th class="text-right">Vendible</th><th></th></tr></thead><tbody>
+      ${BH.sucursales.map((s) => { const imp = BH.obras.filter((o) => o.impreso); const f = imp.reduce((a, o) => a + (o.impreso.stock[s.id] ? o.impreso.stock[s.id][0] : 0), 0), r = imp.reduce((a, o) => a + (o.impreso.stock[s.id] ? o.impreso.stock[s.id][1] : 0), 0); const enc = us.find((u) => u.rol === 'encargado' && u.sucursal === s.id && u.activo);
+        return `<tr><td class="font-medium">${s.nombre}${s.wa ? `<div class="text-xs opacity-60">WhatsApp ${s.wa}</div>` : ''}</td><td>${s.region}</td><td class="text-sm">${enc ? enc.nombre : `<span class="chip">${BH.icon('warn', 'size-3.5 text-warning')}Sin encargado</span>`}</td><td class="text-right tabular-nums">${f}</td><td class="text-right tabular-nums">${r}</td><td class="text-right tabular-nums font-semibold">${f - r}</td>
+        <td class="text-right"><a class="btn btn-sm btn-outline" href="../sucursal/inventario.html?sucursal=${s.id}&actor=admin">Ver inventario</a></td></tr>`; }).join('')}</tbody></table></div>`;
+  }
+  $('nueva').onclick = () => { ['s-nom', 's-reg', 's-wa'].forEach((i) => ($(i).value = '')); $('s-err').textContent = ''; $('dlg').showModal(); };
+  $('s-ok').onclick = () => {
+    const nom = $('s-nom').value.trim(), reg = $('s-reg').value.trim(), wa = $('s-wa').value.trim();
+    if (!nom || !reg || !/^\+?[\d\s]{9,}$/.test(wa)) { $('s-err').textContent = 'Completa nombre, región y un WhatsApp válido.'; return; }
+    if (BH.sucursales.some((s) => s.nombre.toLowerCase() === nom.toLowerCase())) { $('s-err').textContent = 'Ya existe una sucursal con ese nombre.'; return; }
+    const s = { id: 'x' + (BH.sucursales.length + 1), nombre: nom, region: reg, wa };
+    BH.store.set('bh2_sucursales_extra', [...BH.store.get('bh2_sucursales_extra', []), s]); BH.sucursales.push(s);
+    BH.audit.add('Alta de sucursal', `${nom} (${reg}) registrada como nueva fuente`); $('dlg').close(); BH.toast('Sucursal registrada como fuente de stock'); pintar();
+  };
+  pintar();
+});
+</script>
+</body>
+</html>

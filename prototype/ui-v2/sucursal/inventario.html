@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Inventario · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/data-paneles.js"></script>
+<script src="../assets/app.js"></script>
+<script src="../assets/panel.js"></script>
+</head>
+<body data-area="sucursal" data-page="inventario" data-roles="encargado,admin" data-estados="normal,cargando,vacio,error">
+<div id="page-content" hidden>
+  <div id="cab"></div>
+  <div id="kpis" class="grid grid-cols-3 gap-3 mt-4"></div>
+  <div class="mt-4 flex flex-wrap gap-3 items-center">
+    <label class="input w-full sm:w-72"><span class="opacity-60" id="ic-b"></span><input id="buscar" type="search" placeholder="Buscar título, autor o ISBN" aria-label="Buscar en el inventario"></label>
+    <p class="text-xs opacity-70 flex-1">Solo libros impresos. Los digitales no tienen stock físico: se gestionan en el catálogo.</p>
+  </div>
+  <div id="tabla" class="mt-3"></div>
+
+  <dialog id="dlg" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box">
+      <h2 class="font-display text-2xl" id="aj-t">Ajustar inventario</h2>
+      <p class="text-sm opacity-75 mb-3" id="aj-info"></p>
+      <div class="space-y-3">
+        <label class="floating-label w-full"><span>Motivo</span><select id="aj-motivo" class="select w-full"><option>Merma</option><option>Producto dañado</option><option>Corrección de conteo</option></select></label>
+        <label class="floating-label w-full"><span>Cantidad a sumar o restar (ej. −2)</span><input id="aj-delta" class="input w-full" inputmode="numeric" value="-1"></label>
+        <p id="aj-prev" class="text-sm" role="status"></p>
+      </div>
+      <div class="modal-action"><form method="dialog"><button class="btn btn-ghost">Cancelar</button></form><button class="btn btn-primary" id="aj-ok">Registrar ajuste</button></div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>cerrar</button></form>
+  </dialog>
+</div>
+
+<script>
+BH.ready(() => {
+  if (BH.bloqueado) return;
+  const $ = (id) => document.getElementById(id);
+  const actor = BH.actor(), adm = actor === 'admin';
+  const pedida = BH.param('sucursal') || BH.MI_SUC;
+  $('ic-b').innerHTML = BH.icon('search', 'size-4');
+
+  /* RNF05: un encargado solo accede a su sucursal; el intento se rechaza y se registra */
+  if (!adm && pedida !== BH.MI_SUC) {
+    BH.audit.add('Acceso denegado', `enc.ayacucho intentó ver el inventario de ${BH.sucursal(pedida) ? BH.sucursal(pedida).nombre : pedida}`);
+    $('cab').innerHTML = `<div class="max-w-lg mx-auto text-center py-16 space-y-3">${BH.icon('lock', 'size-12 mx-auto opacity-60')}<h1 class="font-display text-3xl">403 · Fuera de tu alcance</h1><p class="opacity-75">Tu cuenta solo accede a <b>Ayacucho</b>. El intento de ver otra sucursal se rechazó y quedó registrado en la auditoría.</p><a class="btn btn-primary btn-sm" href="inventario.html">Volver a mi inventario</a></div>`;
+    ['kpis', 'tabla'].forEach((i) => $(i).remove()); document.querySelector('label.input').parentElement.remove(); return;
+  }
+  const SID = pedida, suc = BH.sucursal(SID), soloLectura = adm;
+  $('cab').innerHTML = `<div class="flex flex-wrap items-end justify-between gap-3"><div><h1 class="bh-display" style="font-size:clamp(1.8rem,5vw,3rem)">Inventario · ${suc.nombre}</h1>
+      <p class="opacity-75 mt-1">${soloLectura ? 'Vista de administración: solo lectura.' : 'Solo ves y modificas el stock de tu sucursal.'}</p></div>
+      ${adm ? `<label class="flex items-center gap-2 text-sm">Sucursal <select id="sel-s" class="select select-sm">${BH.sucursales.map((s) => `<option value="${s.id}" ${s.id === SID ? 'selected' : ''}>${s.nombre}</option>`).join('')}</select></label>` : ''}</div>
+      ${soloLectura ? `<div role="status" class="alert alert-soft mt-3">${BH.icon('lock')}<span>Estás como administrador central: puedes consultar cualquier sucursal, pero los ajustes los hace el encargado.</span></div>` : ''}`;
+  if ($('sel-s')) $('sel-s').onchange = (e) => (location.search = '?sucursal=' + e.target.value);
+
+  const datos = () => BH.obras.filter((o) => o.impreso).map((o) => { const s = o.impreso.stock[SID] || [0, 0]; return { o, f: s[0], r: s[1] }; });
+  let actual = null;
+
+  function kpis() {
+    const d = datos(), f = d.reduce((a, x) => a + x.f, 0), r = d.reduce((a, x) => a + x.r, 0);
+    $('kpis').innerHTML = BH.kpi('Stock físico', f, null) + BH.kpi('Reservado', r, null) + BH.kpi('Vendible', f - r, null);
+  }
+  function tabla() {
+    if (BH.estado === 'cargando') { $('tabla').innerHTML = '<div class="space-y-2">' + Array.from({ length: 6 }, () => '<div class="skeleton h-12"></div>').join('') + '</div>'; return; }
+    if (BH.estado === 'error') { $('tabla').innerHTML = BH.errorState(`No pudimos leer el inventario de ${suc.nombre}.`); return; }
+    const q = $('buscar').value.toLowerCase();
+    const l = BH.estado === 'vacio' ? [] : datos().filter((x) => !q || (x.o.titulo + x.o.autor + x.o.impreso.isbn).toLowerCase().includes(q));
+    if (!l.length) { $('tabla').innerHTML = BH.emptyState('cube', 'Sin resultados', BH.estado === 'vacio' ? 'Esta sucursal todavía no tiene títulos registrados.' : 'Ningún título coincide con tu búsqueda.'); return; }
+    $('tabla').innerHTML = `<div class="overflow-x-auto border border-[var(--bh-linea)] bg-base-100"><table class="table"><thead><tr><th>Título</th><th class="text-right">Físico</th><th class="text-right">Reservado</th><th class="text-right">Vendible</th><th>Estado</th>${soloLectura ? '' : '<th></th>'}</tr></thead><tbody>
+      ${l.map((x) => { const v = x.f - x.r; return `<tr><td><div class="font-medium">${x.o.titulo}</div><div class="text-xs opacity-60">${x.o.autor} · ${x.o.impreso.isbn}</div></td>
+        <td class="text-right tabular-nums">${x.f}</td><td class="text-right tabular-nums">${x.r}</td><td class="text-right tabular-nums font-semibold">${v}</td>
+        <td>${v === 0 ? `<span class="chip">${BH.icon('x', 'size-3.5 text-error')}Sin vendible</span>` : v <= 2 ? `<span class="chip">${BH.icon('warn', 'size-3.5 text-warning')}Stock bajo</span>` : `<span class="chip">${BH.icon('check', 'size-3.5 text-success')}Normal</span>`}</td>
+        ${soloLectura ? '' : `<td class="text-right"><button class="btn btn-sm btn-outline" data-aj="${x.o.id}">Ajustar</button></td>`}</tr>`; }).join('')}</tbody></table></div>`;
+    $('tabla').querySelectorAll('[data-aj]').forEach((b) => (b.onclick = () => abrir(Number(b.dataset.aj))));
+  }
+  function abrir(id) {
+    actual = datos().find((x) => x.o.id === id); $('aj-t').textContent = actual.o.titulo;
+    $('aj-info').textContent = `Físico ${actual.f} · reservado ${actual.r} · vendible ${actual.f - actual.r}`; $('aj-delta').value = '-1'; prev(); $('dlg').showModal();
+  }
+  function prev() {
+    const d = parseInt($('aj-delta').value, 10), p = $('aj-prev');
+    if (isNaN(d) || d === 0) { p.textContent = 'Escribe una cantidad distinta de cero.'; return false; }
+    const nf = actual.f + d, nv = nf - actual.r;
+    if (nf < 0 || nv < 0) { p.innerHTML = `${BH.icon('warn', 'size-4 inline text-error')} No se puede: el vendible quedaría en ${nv}. Debe ser 0 o más (hay ${actual.r} reservadas).`; return false; }
+    p.innerHTML = `${BH.icon('check', 'size-4 inline text-success')} Resultado: físico ${nf}, vendible ${nv}.`; return true;
+  }
+  $('aj-delta').addEventListener('input', prev);
+  $('aj-ok').addEventListener('click', () => {
+    if (!prev()) return; const d = parseInt($('aj-delta').value, 10);
+    BH.addDelta(actual.o.id, SID, d);
+    BH.audit.add('Ajuste de inventario', `${suc.nombre} · ${actual.o.titulo} · ${d > 0 ? '+' : '−'}${Math.abs(d)} (${$('aj-motivo').value.toLowerCase()})`);
+    $('dlg').close(); kpis(); tabla(); BH.toast('Ajuste registrado y auditado');
+  });
+  $('buscar').addEventListener('input', tabla);
+  kpis(); tabla();
+});
+</script>
+</body>
+</html>

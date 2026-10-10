@@ -47,6 +47,7 @@ BH.ready(() => {
     const num = 'HR-2026-' + String(Math.floor(Math.random() * 9000) + 1000);
     const tipo = document.querySelector('input[name=tipo]:checked').value;
     const v = { nm: $('nm').value, desc: $('desc').value, det: $('det').value, ped: $('ped').value };
+    BH.reclamos.add({ id: num, fecha: BH.hoy, tipo, nombre: v.nm, desc: v.desc, det: v.det, ped: v.ped, pedido: $('pedido').value, estado: 'pendiente' });
     root.innerHTML = `<div class="space-y-4 aparece"><div class="flex items-center gap-3">${BH.icon('check', 'size-9 text-success')}<h1 class="font-display text-4xl">Hoja registrada</h1></div>
       <div class="border border-[var(--bh-linea)] p-5 space-y-2 bg-base-100 text-sm" id="hoja">
         <div class="flex flex-wrap justify-between gap-2"><span class="font-display text-2xl">${num}</span><span>${BH.fecha(BH.hoy)}</span></div>

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reclamos · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/data-paneles.js"></script>
+<script src="../assets/app.js"></script>
+<script src="../assets/panel.js"></script>
+</head>
+<body data-area="admin" data-page="reclamos" data-roles="admin" data-estados="normal,vacio,error">
+<div id="page-content" hidden>
+  <h1 class="bh-display" style="font-size:clamp(1.8rem,5vw,3rem)">Libro de Reclamaciones</h1>
+  <p class="opacity-75 mt-1 max-w-2xl">Hojas registradas por los clientes. Se conservan al menos dos años. Los reclamos que se envían desde la Tienda del prototipo aparecen aquí.</p>
+  <div role="tablist" class="tabs tabs-border mt-4" id="tabs"></div>
+  <div id="lista" class="mt-3"></div>
+
+  <dialog id="dlg" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box max-w-xl"><h2 class="font-display text-2xl" id="r-t">Hoja</h2>
+      <div id="r-c" class="mt-3 space-y-3 text-sm"></div>
+      <div class="modal-action"><form method="dialog"><button class="btn btn-ghost">Cerrar</button></form><button class="btn btn-primary" id="r-ok">Responder</button></div></div>
+    <form method="dialog" class="modal-backdrop"><button>cerrar</button></form>
+  </dialog>
+</div>
+
+<script>
+BH.ready(() => {
+  if (BH.bloqueado) return;
+  const $ = (id) => document.getElementById(id);
+  let filtro = 'todos', sel = null;
+  const TABS = [['todos', 'Todos'], ['pendiente', 'Pendientes'], ['respondido', 'Respondidos']];
+
+  function pintar() {
+    const r = BH.estado === 'vacio' ? [] : BH.reclamos.get();
+    $('tabs').innerHTML = TABS.map(([k, l]) => `<button role="tab" aria-selected="${filtro === k}" class="tab ${filtro === k ? 'tab-active' : ''}" data-f="${k}">${l} <span class="badge badge-sm ml-1">${k === 'todos' ? r.length : r.filter((x) => x.estado === k).length}</span></button>`).join('');
+    $('tabs').querySelectorAll('[data-f]').forEach((b) => (b.onclick = () => { filtro = b.dataset.f; pintar(); }));
+    if (BH.estado === 'error') { $('lista').innerHTML = BH.errorState('No pudimos cargar los reclamos.'); return; }
+    const l = r.filter((x) => filtro === 'todos' || x.estado === filtro);
+    if (!l.length) { $('lista').innerHTML = BH.emptyState('doc', 'No hay hojas aquí', 'Cuando un cliente registre un reclamo o una queja, aparecerá en esta lista.'); return; }
+    $('lista').innerHTML = `<div class="overflow-x-auto border border-[var(--bh-linea)] bg-base-100"><table class="table"><thead><tr><th>Hoja</th><th>Tipo</th><th>Cliente</th><th>Asunto</th><th>Estado</th><th></th></tr></thead><tbody>
+      ${l.map((x) => `<tr><td class="font-mono text-sm">${x.id}<div class="text-xs opacity-50">${BH.fecha(x.fecha)}</div></td><td><span class="chip">${x.tipo}</span></td><td class="text-sm">${x.nombre}</td><td class="text-sm">${x.desc}${x.pedido ? `<div class="text-xs opacity-60">Pedido ${x.pedido}</div>` : ''}</td><td>${BH.chipEstado(x.estado)}</td><td class="text-right"><button class="btn btn-sm btn-outline" data-id="${x.id}">${x.estado === 'pendiente' ? 'Atender' : 'Ver'}</button></td></tr>`).join('')}</tbody></table></div>`;
+    $('lista').querySelectorAll('[data-id]').forEach((b) => (b.onclick = () => abrir(b.dataset.id)));
+  }
+  function abrir(id) {
+    sel = BH.reclamos.get().find((x) => x.id === id); $('r-t').textContent = `${sel.tipo} ${sel.id}`;
+    const resp = sel.estado === 'respondido';
+    $('r-c').innerHTML = `<p><b>Cliente:</b> ${sel.nombre}</p><p><b>Asunto:</b> ${sel.desc}</p><p><b>Detalle:</b> ${sel.det}</p><p><b>Pedido del consumidor:</b> ${sel.ped}</p>
+      ${resp ? `<div class="border border-[var(--bh-linea)] p-3"><b>Respuesta:</b> ${sel.respuesta}</div>` : `<label class="floating-label w-full"><span>Respuesta al cliente *</span><textarea id="r-txt" class="textarea w-full h-24" placeholder="Respuesta al cliente"></textarea></label><p id="r-err" class="text-error text-sm" role="alert"></p>`}`;
+    $('r-ok').hidden = resp; $('dlg').showModal();
+  }
+  $('r-ok').onclick = () => {
+    const t = $('r-txt').value.trim(); if (!t) { $('r-err').textContent = 'Escribe una respuesta.'; return; }
+    const all = BH.reclamos.get(), x = all.find((y) => y.id === sel.id); x.estado = 'respondido'; x.respuesta = t; BH.reclamos.set(all);
+    BH.audit.add('Respuesta a reclamo', `${x.id} · ${x.nombre}`); $('dlg').close(); BH.toast('Respuesta registrada; se avisó al cliente por correo'); pintar();
+  };
+  pintar();
+});
+</script>
+</body>
+</html>

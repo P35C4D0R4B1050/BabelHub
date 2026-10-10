@@ -49,6 +49,8 @@
   BH.icon = (n, cls = 'size-5') =>
     `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" class="${cls}" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="${P[n] || ''}"/></svg>`;
 
+  BH.P = P;                      // los paneles añaden sus propios iconos
+
   /* ---------- formato y acceso a datos ---------- */
   BH.money = (n) => 'S/ ' + Number(n).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   BH.obra = (id) => BH.obras.find((o) => o.id === Number(id));
@@ -61,6 +63,37 @@
   BH.vendible = (o, sid) => { const s = o.impreso && o.impreso.stock[sid]; return s ? s[0] - s[1] : 0; };
   BH.totalVendible = (o) => (o.impreso ? BH.sucursales.reduce((a, s) => a + BH.vendible(o, s.id), 0) : 0);
   BH.conStock = (o) => BH.sucursales.filter((s) => BH.vendible(o, s.id) > 0);
+
+  /* Sucursales nuevas creadas en el prototipo: son datos, no código (RNF04) */
+  store.get('bh2_sucursales_extra', []).forEach((s) => { if (!BH.sucursal(s.id)) BH.sucursales.push(s); });
+
+  /* Ajustes de stock físico persistidos (ajustes, traslados): se reaplican al cargar cada página */
+  const aplicarDelta = (obra, suc, d) => {
+    const o = BH.obra(obra); if (!o || !o.impreso) return;
+    const s = o.impreso.stock[suc] || (o.impreso.stock[suc] = [0, 0]); s[0] = Math.max(0, s[0] + d);
+  };
+  store.get('bh2_deltas', []).forEach((x) => aplicarDelta(x.obra, x.suc, x.d));
+  BH.addDelta = (obra, suc, d) => { const l = store.get('bh2_deltas', []); l.push({ obra, suc, d }); store.set('bh2_deltas', l); aplicarDelta(obra, suc, d); };
+
+  /* Cambios de catálogo hechos desde Administración (obras nuevas, precios, bajas y retiros digitales) */
+  store.get('bh2_obras_extra', []).forEach((o) => { if (!BH.obra(o.id)) BH.obras.push(o); });
+  const aplicarCambio = (id, c) => {
+    const o = BH.obra(id); if (!o) return;
+    if (c.pi != null && o.impreso) o.impreso.precio = c.pi;
+    if (c.pd != null && o.digital) o.digital.precio = c.pd;
+    if (c.sinDigital) o.digital = null;
+    if (c.baja) BH.obras.splice(BH.obras.indexOf(o), 1);
+  };
+  Object.entries(store.get('bh2_obras_cambios', {})).forEach(([id, c]) => aplicarCambio(id, c));
+  BH.setCambio = (id, patch) => { const m = store.get('bh2_obras_cambios', {}); m[id] = { ...(m[id] || {}), ...patch }; store.set('bh2_obras_cambios', m); aplicarCambio(id, patch); };
+  BH.addObra = (o) => { store.set('bh2_obras_extra', [...store.get('bh2_obras_extra', []), o]); BH.obras.push(o); };
+
+  /* Reclamos: los crea la Tienda y los atiende Administración */
+  BH.reclamos = {
+    get() { return store.get('bh2_reclamos', BH.reclamosSemilla || []); },
+    set(v) { store.set('bh2_reclamos', v); },
+    add(r) { this.set([r, ...this.get()]); }
+  };
 
   /* Disponibilidad digital: licencia vigente (RF24). El territorio se asume Perú. */
   BH.digitalEstado = (o) => {
@@ -274,11 +307,12 @@
     const estados = (document.body.dataset.estados || '').split(',').filter(Boolean);
     const bar = document.createElement('div'); bar.className = 'proto-bar no-print';
     const opts = estados.map((e) => `<option value="${e}" ${e === BH.estado ? 'selected' : ''}>${e}</option>`).join('');
-    bar.innerHTML = `<span>Prototipo</span>${estados.length ? `<label>estado <select id="proto-estado">${opts}</select></label>` : ''}<label>sesión <select id="proto-sesion"><option value="1" ${BH.logueado() ? 'selected' : ''}>cliente</option><option value="0" ${BH.logueado() ? '' : 'selected'}>visitante</option></select></label><a href="${ROOT}index.html">Índice</a>`;
+    bar.innerHTML = `<span>Prototipo</span>${estados.length ? `<label>estado <select id="proto-estado">${opts}</select></label>` : ''}${document.body.dataset.area === 'tienda' ? `<label>sesión <select id="proto-sesion"><option value="1" ${BH.logueado() ? 'selected' : ''}>cliente</option><option value="0" ${BH.logueado() ? '' : 'selected'}>visitante</option></select></label>` : ''}<a href="${ROOT}index.html">Índice</a>`;
     document.body.append(bar);
     const s = document.getElementById('proto-estado');
     if (s) s.addEventListener('change', () => { const u = new URL(location.href); if (s.value === 'normal') u.searchParams.delete('estado'); else u.searchParams.set('estado', s.value); location.href = u; });
-    document.getElementById('proto-sesion').addEventListener('change', (e) => { store.set('bh2_logueado', e.target.value === '1'); location.reload(); });
+    const ps = document.getElementById('proto-sesion');
+    if (ps) ps.addEventListener('change', (e) => { store.set('bh2_logueado', e.target.value === '1'); location.reload(); });
   }
 
   /* «Sorpréndeme»: elige una obra disponible al azar y pasa a su ficha con una transición corta */
@@ -294,6 +328,7 @@
     const { area, page } = document.body.dataset;
     const content = document.getElementById('page-content');
     if (content && area === 'tienda') shell(content, page);
+    else if (content && BH.shellPanel && ['sucursal', 'logistica', 'admin'].includes(area)) BH.shellPanel(content, area, page);
     const tb = document.getElementById('btn-theme');
     const paint = () => { if (tb) tb.innerHTML = BH.icon(document.documentElement.dataset.theme === 'babelhub' ? 'moon' : 'sun'); };
     if (tb) tb.addEventListener('click', () => { setTheme(document.documentElement.dataset.theme === 'babelhub' ? 'babelhub-dark' : 'babelhub'); paint(); });

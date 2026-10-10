@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Resumen de sucursal · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/data-paneles.js"></script>
+<script src="../assets/app.js"></script>
+<script src="../assets/panel.js"></script>
+</head>
+<body data-area="sucursal" data-page="index" data-roles="encargado,admin" data-estados="normal,cargando,error">
+<div id="page-content" hidden>
+  <h1 class="bh-display" style="font-size:clamp(1.8rem,5vw,3rem)">Sucursal Ayacucho</h1>
+  <p class="opacity-75 mt-1">Lo que necesita tu atención hoy. Solo ves y modificas el stock de tu sucursal.</p>
+  <div id="cuerpo" class="mt-6"></div>
+</div>
+
+<script>
+BH.ready(() => {
+  if (BH.bloqueado) return;
+  const $ = (id) => document.getElementById(id);
+  const S = BH.MI_SUC;
+  if (BH.estado === 'cargando') { $('cuerpo').innerHTML = '<div class="grid grid-cols-2 lg:grid-cols-5 gap-3">' + Array.from({ length: 5 }, () => '<div class="skeleton h-24"></div>').join('') + '</div><div class="skeleton h-48 mt-6"></div>'; return; }
+  if (BH.estado === 'error') { $('cuerpo').innerHTML = BH.errorState('No pudimos cargar el resumen de Ayacucho.'); return; }
+
+  const imp = BH.obras.filter((o) => o.impreso);
+  const fis = imp.reduce((a, o) => a + (o.impreso.stock[S] ? o.impreso.stock[S][0] : 0), 0);
+  const res = imp.reduce((a, o) => a + (o.impreso.stock[S] ? o.impreso.stock[S][1] : 0), 0);
+  const tr = BH.tras.get(), rc = BH.recojos.get();
+  const porPreparar = rc.filter((r) => r.estado === 'confirmado' || r.estado === 'preparacion').length;
+  const trAtender = tr.filter((t) => BH.trasladoAcciones(t, 'encargado').length).length;
+  const bajos = imp.filter((o) => { const v = BH.vendible(o, S); return v <= 2 && (o.impreso.stock[S] && o.impreso.stock[S][0] > 0); });
+  const agotados = imp.filter((o) => BH.vendible(o, S) === 0 && o.impreso.stock[S] && o.impreso.stock[S][0] > 0);
+  const esperando = rc.filter((r) => r.espera && r.estado !== 'entregado');
+  const aprobar = tr.filter((t) => t.estado === 'solicitado' && t.origen === S), recibir = tr.filter((t) => t.estado === 'transito' && t.destino === S);
+
+  const alerta = (ic, color, texto, href, cta) => `<li class="flex flex-wrap items-center gap-3 p-3 border-b border-[var(--bh-linea)]">${BH.icon(ic, 'size-5 ' + color)}<span class="flex-1 min-w-[12rem]">${texto}</span><a class="btn btn-sm btn-outline" href="${href}">${cta}</a></li>`;
+  const alertas = [
+    ...esperando.map((r) => alerta('truck', 'text-info', `El pedido <b>${r.id}</b> espera el traslado <b>${r.espera}</b> para poder prepararse.`, 'traslados.html', 'Ver traslado')),
+    ...recibir.map((t) => alerta('swap', 'text-info', `Llegó (en tránsito) <b>${t.cant} × ${BH.obra(t.obra).titulo}</b> desde ${BH.sucursal(t.origen).nombre}: recíbelo al llegar.`, 'traslados.html', 'Recibir')),
+    ...aprobar.map((t) => alerta('clock', 'text-warning', `<b>${BH.sucursal(t.destino).nombre}</b> solicita ${t.cant} × ${BH.obra(t.obra).titulo}: pendiente de tu aprobación.`, 'traslados.html', 'Revisar')),
+    ...agotados.map((o) => alerta('warn', 'text-error', `<b>${o.titulo}</b>: todo el stock está reservado (vendible 0).`, 'inventario.html', 'Ver inventario')),
+    ...bajos.filter((o) => !agotados.includes(o)).map((o) => alerta('warn', 'text-warning', `<b>${o.titulo}</b>: quedan ${BH.vendible(o, S)} vendibles.`, 'inventario.html', 'Ver inventario'))
+  ];
+
+  $('cuerpo').innerHTML = `<div class="grid grid-cols-2 lg:grid-cols-5 gap-3 aparece">
+      ${BH.kpi('Stock físico', fis, null)}${BH.kpi('Reservado', res, null)}${BH.kpi('Vendible', fis - res, null)}${BH.kpi('Pedidos por preparar', porPreparar, null)}${BH.kpi('Traslados por atender', trAtender, null)}</div>
+    <section class="mt-8" aria-labelledby="h-al"><h2 id="h-al" class="font-display text-2xl mb-2">Alertas</h2>
+      ${alertas.length ? `<ul class="border-t border-l border-r border-[var(--bh-linea)] bg-base-100">${alertas.join('')}</ul>` : BH.emptyState('check', 'Todo en orden', 'No hay alertas de stock ni traslados pendientes.')}</section>
+    <section class="mt-8 grid sm:grid-cols-3 gap-3"><a class="bh-celda bh-sube border border-[var(--bh-linea)]" href="inventario.html"><span class="font-display text-xl">Ajustar inventario</span><span class="bh-sub text-sm">Merma, daño o corrección de conteo.</span></a>
+      <a class="bh-celda bh-sube border border-[var(--bh-linea)]" href="recojos.html"><span class="font-display text-xl">Preparar pedidos</span><span class="bh-sub text-sm">${porPreparar} por preparar.</span></a>
+      <a class="bh-celda bh-sube border border-[var(--bh-linea)]" href="traslados.html"><span class="font-display text-xl">Pedir mercadería</span><span class="bh-sub text-sm">Solicita un traslado a otra sucursal.</span></a></section>`;
+});
+</script>
+</body>
+</html>

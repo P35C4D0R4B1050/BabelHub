@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Traslados nacionales · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/data-paneles.js"></script>
+<script src="../assets/app.js"></script>
+<script src="../assets/panel.js"></script>
+</head>
+<body data-area="logistica" data-page="index" data-roles="logistica,admin" data-estados="normal,vacio,error">
+<div id="page-content" hidden>
+  <h1 class="bh-display" style="font-size:clamp(1.8rem,5vw,3rem)">Traslados nacionales</h1>
+  <p class="opacity-75 mt-1 max-w-2xl">Seguimiento de todos los traslados entre sucursales. Logística registra la guía de cada despacho; aprobar y recibir lo hacen las sucursales.</p>
+  <div id="resumen" class="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-5"></div>
+  <div class="mt-5 flex flex-wrap gap-2"><select id="f-est" class="select select-sm" aria-label="Filtrar por estado"><option value="">Todos los estados</option><option value="solicitado">Solicitado</option><option value="aprobado">Aprobado</option><option value="transito">En tránsito</option><option value="recibido">Recibido</option><option value="rechazado">Rechazado</option></select></div>
+  <div id="lista" class="mt-3"></div>
+
+  <dialog id="dlg" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box"><h2 class="font-display text-2xl" id="d-t">Guía del traslado</h2>
+      <div id="d-c" class="mt-3 space-y-3"></div>
+      <div class="modal-action"><form method="dialog"><button class="btn btn-ghost">Cerrar</button></form><button class="btn btn-primary" id="d-ok">Guardar guía</button></div></div>
+    <form method="dialog" class="modal-backdrop"><button>cerrar</button></form>
+  </dialog>
+</div>
+
+<script>
+BH.ready(() => {
+  if (BH.bloqueado) return;
+  const $ = (id) => document.getElementById(id);
+  const nom = (id) => BH.sucursal(id).nombre;
+  let sel = null;
+
+  function pintar() {
+    const todos = BH.estado === 'vacio' ? [] : BH.tras.get();
+    const c = (e) => todos.filter((t) => t.estado === e).length;
+    $('resumen').innerHTML = [['Solicitados', c('solicitado')], ['Aprobados', c('aprobado')], ['En tránsito', c('transito')], ['Recibidos', c('recibido')], ['Rechazados', c('rechazado')]].map(([l, v]) => BH.kpi(l, v, null)).join('');
+    if (BH.estado === 'error') { $('lista').innerHTML = BH.errorState('No pudimos cargar los traslados.'); return; }
+    const f = $('f-est').value, l = todos.filter((t) => !f || t.estado === f);
+    if (!l.length) { $('lista').innerHTML = BH.emptyState('swap', 'No hay traslados', 'Los traslados entre sucursales aparecerán aquí.'); return; }
+    $('lista').innerHTML = `<div class="overflow-x-auto border border-[var(--bh-linea)] bg-base-100"><table class="table"><thead><tr><th>N.°</th><th>Libro</th><th class="text-right">Cant.</th><th>Ruta</th><th>Estado</th><th>Guía</th><th></th></tr></thead><tbody>
+      ${l.map((t) => `<tr><td class="font-mono text-sm">${t.id}<div class="text-xs opacity-50">${t.fecha}</div></td><td>${BH.obra(t.obra).titulo}<div class="text-xs opacity-60">${t.motivo}</div></td><td class="text-right tabular-nums">${t.cant}</td>
+        <td class="whitespace-nowrap">${nom(t.origen)} → ${nom(t.destino)}</td><td>${BH.chipEstado(t.estado)}</td><td class="font-mono text-sm">${t.guia || '—'}</td>
+        <td class="text-right">${t.estado === 'aprobado' || t.estado === 'transito' ? `<button class="btn btn-sm btn-outline" data-g="${t.id}">${t.guia ? 'Ver guía' : 'Registrar guía'}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+    $('lista').querySelectorAll('[data-g]').forEach((b) => (b.onclick = () => abrir(b.dataset.g)));
+  }
+
+  function abrir(id) {
+    const t = BH.tras.get().find((x) => x.id === id); sel = id;
+    $('d-t').textContent = `Guía de ${t.id}`;
+    $('d-c').innerHTML = `<p class="text-sm opacity-75">${t.cant} × ${BH.obra(t.obra).titulo} · ${nom(t.origen)} → ${nom(t.destino)}</p>
+      <label class="floating-label w-full"><span>Operador</span><select id="g-op" class="select w-full"><option>Courier Andino (ejemplo)</option><option>Transporte propio</option></select></label>
+      <label class="floating-label w-full"><span>N.° de guía</span><input id="g-num" class="input w-full" value="${t.guia || ''}" placeholder="N.° de guía"></label>
+      <p class="text-xs opacity-70">Prototipo: en el sistema real la guía se genera con el operador logístico.</p>`;
+    $('dlg').showModal();
+  }
+  $('d-ok').onclick = () => {
+    const n = $('g-num').value.trim(); if (!n) { BH.toast('Escribe el número de guía', 'warning'); return; }
+    const all = BH.tras.get(), t = all.find((x) => x.id === sel); t.guia = n; BH.tras.set(all);
+    BH.audit.add('Guía de traslado', `${t.id}: guía ${n}`); $('dlg').close(); BH.toast(`Guía ${n} registrada`); pintar();
+  };
+  $('f-est').onchange = pintar; pintar();
+});
+</script>
+</body>
+</html>

@@ -37,6 +37,8 @@
   --bh-coral-texto: #B5352A;
   --bh-foco: #1A6F80;
   --bh-motivo: #172554;
+  --bh-s1: #5B3FC4;   /* serie 1: impreso (validado) */
+  --bh-s2: #E5483B;   /* serie 2: digital (validado) */
 }
 
 /* Tema oscuro: «Archivo nocturno» */
@@ -74,6 +76,8 @@
   --bh-coral-texto: #FF7A6E;
   --bh-foco: #36C8D4;
   --bh-motivo: #F5EBD8;
+  --bh-s1: #8F72F0;
+  --bh-s2: #E8584D;
 }
 
 body { font-family: 'Inter', system-ui, sans-serif; }

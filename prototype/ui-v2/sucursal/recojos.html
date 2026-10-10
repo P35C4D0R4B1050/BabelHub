@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pedidos de recojo · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/data-paneles.js"></script>
+<script src="../assets/app.js"></script>
+<script src="../assets/panel.js"></script>
+</head>
+<body data-area="sucursal" data-page="recojos" data-roles="encargado" data-estados="normal,vacio,error">
+<div id="page-content" hidden>
+  <h1 class="bh-display" style="font-size:clamp(1.8rem,5vw,3rem)">Pedidos de recojo</h1>
+  <p class="opacity-75 mt-1 max-w-2xl">Pedidos que los clientes recogerán en Ayacucho. Cada cambio de estado avisa al cliente por WhatsApp.</p>
+  <div role="tablist" class="tabs tabs-border mt-4" id="tabs"></div>
+  <div id="lista" class="mt-3"></div>
+</div>
+
+<script>
+BH.ready(() => {
+  if (BH.bloqueado) return;
+  const $ = (id) => document.getElementById(id);
+  let filtro = 'todos';
+  const TABS = [['todos', 'Todos'], ['confirmado', 'Por preparar'], ['preparacion', 'En preparación'], ['listo', 'Listos'], ['entregado', 'Entregados']];
+  const SIG = { confirmado: ['preparacion', 'Preparar'], preparacion: ['listo', 'Marcar listo'], listo: ['entregado', 'Entregar'] };
+  const AVISO = { preparacion: 'en preparación', listo: 'listo para recojo', entregado: 'entregado' };
+  const traslado = (id) => BH.tras.get().find((t) => t.id === id);
+
+  function pintar() {
+    const rc = BH.estado === 'vacio' ? [] : BH.recojos.get();
+    $('tabs').innerHTML = TABS.map(([k, l]) => `<button role="tab" aria-selected="${filtro === k}" class="tab ${filtro === k ? 'tab-active' : ''}" data-f="${k}">${l} <span class="badge badge-sm ml-1">${k === 'todos' ? rc.length : rc.filter((r) => r.estado === k).length}</span></button>`).join('');
+    $('tabs').querySelectorAll('[data-f]').forEach((b) => (b.onclick = () => { filtro = b.dataset.f; pintar(); }));
+    if (BH.estado === 'error') { $('lista').innerHTML = BH.errorState('No pudimos cargar los pedidos de recojo.'); return; }
+    const l = rc.filter((r) => filtro === 'todos' || r.estado === filtro);
+    if (!l.length) { $('lista').innerHTML = BH.emptyState('store', 'No hay pedidos aquí', 'Cuando un cliente elija recoger en Ayacucho, aparecerá en esta lista.'); return; }
+    $('lista').innerHTML = `<div class="space-y-3">${l.map((r) => {
+      const sig = SIG[r.estado], t = r.espera ? traslado(r.espera) : null, bloqueado = !!(t && t.estado !== 'recibido');
+      return `<article class="border border-[var(--bh-linea)] bg-base-100 p-4 flex flex-wrap gap-x-6 gap-y-2 items-center aparece">
+        <div class="min-w-[11rem]"><p class="font-display text-xl">${r.id}</p><p class="text-sm opacity-75">${r.cliente} · ${r.tel}</p></div>
+        <ul class="flex-1 min-w-[12rem] text-sm">${r.lineas.map((x) => `<li>${x.cant} × ${BH.obra(x.obra).titulo}</li>`).join('')}</ul>
+        <div class="space-y-1">${BH.chipEstado(r.estado)}${bloqueado ? `<div><span class="chip">${BH.icon('truck', 'size-3.5 text-info')}Espera traslado ${r.espera}</span></div>` : ''}</div>
+        <div>${sig ? `<button class="btn btn-sm btn-primary" data-id="${r.id}" ${bloqueado ? 'disabled title="Disponible cuando llegue el traslado"' : ''}>${sig[1]}</button>` : '<span class="text-xs opacity-50">Sin acciones</span>'}</div></article>`; }).join('')}</div>`;
+    $('lista').querySelectorAll('[data-id]').forEach((b) => (b.onclick = () => {
+      const all = BH.recojos.get(), r = all.find((x) => x.id === b.dataset.id), [a] = SIG[r.estado];
+      r.estado = a; BH.recojos.set(all); BH.toast(`${r.id}: ${AVISO[a]}. Se avisó a ${r.cliente} por WhatsApp.`); pintar();
+    }));
+  }
+  pintar();
+});
+</script>
+</body>
+</html>

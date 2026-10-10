@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pedidos · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/data-paneles.js"></script>
+<script src="../assets/app.js"></script>
+<script src="../assets/panel.js"></script>
+</head>
+<body data-area="admin" data-page="pedidos" data-roles="admin" data-estados="normal,vacio,error">
+<div id="page-content" hidden>
+  <h1 class="bh-display" style="font-size:clamp(1.8rem,5vw,3rem)">Pedidos</h1>
+  <p class="opacity-75 mt-1 max-w-2xl">Todos los pedidos de la red. Anular un pedido es una operación sensible: exige un motivo y queda en la auditoría.</p>
+  <div role="tablist" class="tabs tabs-border mt-4" id="tabs"></div>
+  <div id="lista" class="mt-3"></div>
+
+  <dialog id="dlg" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box"><h2 class="font-display text-2xl" id="a-t">Anular pedido</h2>
+      <div id="a-c" class="mt-3 space-y-3"></div>
+      <div class="modal-action"><form method="dialog"><button class="btn btn-ghost">Cancelar</button></form><button class="btn btn-error" id="a-ok">Anular pedido</button></div></div>
+    <form method="dialog" class="modal-backdrop"><button>cerrar</button></form>
+  </dialog>
+</div>
+
+<script>
+BH.ready(() => {
+  if (BH.bloqueado) return;
+  const $ = (id) => document.getElementById(id);
+  let filtro = 'todos', sel = null;
+  const TABS = [['todos', 'Todos'], ['confirmado', 'Confirmados'], ['preparacion', 'En preparación'], ['transito', 'En tránsito'], ['entregado', 'Entregados'], ['anulado', 'Anulados']];
+  const total = (p) => p.lineas.reduce((a, l) => { const o = BH.obra(l.obra); return a + ((l.formato === 'impreso' ? o.impreso : o.digital) || { precio: 0 }).precio * l.cant; }, 0);
+  const todos = () => {
+    const mios = BH.pedidos.get().map((p) => ({ ...p, cliente: p.cliente || 'Diego (cuenta de ejemplo)' }));
+    const ids = new Set(mios.map((p) => p.id));
+    const an = BH.anulados.get();
+    return [...mios, ...BH.adminPedidosSemilla.filter((p) => !ids.has(p.id))].map((p) => (an.includes(p.id) ? { ...p, estado: 'anulado' } : p)).sort((a, b) => (a.id < b.id ? 1 : -1));
+  };
+
+  function pintar() {
+    const p = BH.estado === 'vacio' ? [] : todos();
+    $('tabs').innerHTML = TABS.map(([k, l]) => `<button role="tab" aria-selected="${filtro === k}" class="tab ${filtro === k ? 'tab-active' : ''}" data-f="${k}">${l} <span class="badge badge-sm ml-1">${k === 'todos' ? p.length : p.filter((x) => x.estado === k).length}</span></button>`).join('');
+    $('tabs').querySelectorAll('[data-f]').forEach((b) => (b.onclick = () => { filtro = b.dataset.f; pintar(); }));
+    if (BH.estado === 'error') { $('lista').innerHTML = BH.errorState('No pudimos cargar los pedidos.'); return; }
+    const l = p.filter((x) => filtro === 'todos' || x.estado === filtro);
+    if (!l.length) { $('lista').innerHTML = BH.emptyState('list', 'No hay pedidos aquí', 'Los pedidos aparecerán cuando los clientes compren.'); return; }
+    $('lista').innerHTML = `<div class="overflow-x-auto border border-[var(--bh-linea)] bg-base-100"><table class="table"><thead><tr><th>Pedido</th><th>Cliente</th><th>Contenido</th><th class="text-right">Total</th><th>Estado</th><th></th></tr></thead><tbody>
+      ${l.map((x) => `<tr><td class="font-mono text-sm">${x.id}<div class="text-xs opacity-50">${BH.fecha(x.fecha)}</div></td><td class="text-sm">${x.cliente}</td>
+        <td class="text-sm">${x.lineas.map((y) => `${y.cant} × ${BH.obra(y.obra).titulo} <span class="chip">${y.formato}</span>`).join('<br>')}</td><td class="text-right tabular-nums">${BH.money(total(x))}</td><td>${BH.chipEstado(x.estado)}</td>
+        <td class="text-right">${x.estado === 'anulado' ? '' : `<button class="btn btn-sm btn-ghost text-error" data-a="${x.id}">Anular</button>`}</td></tr>`).join('')}</tbody></table></div>`;
+    $('lista').querySelectorAll('[data-a]').forEach((b) => (b.onclick = () => abrir(b.dataset.a)));
+  }
+  function abrir(id) {
+    sel = todos().find((x) => x.id === id);
+    const dig = sel.lineas.some((l) => l.formato === 'digital'), imp = sel.lineas.some((l) => l.formato === 'impreso');
+    $('a-t').textContent = `Anular ${sel.id}`;
+    $('a-c').innerHTML = `<p class="text-sm opacity-75">${sel.cliente} · ${BH.money(total(sel))}</p>
+      <ul class="text-sm space-y-1">${imp ? `<li class="flex gap-2">${BH.icon('cube', 'size-4 mt-0.5')} Se liberan las reservas de los impresos y se cancelan los traslados pendientes.</li>` : ''}${dig ? `<li class="flex gap-2">${BH.icon('lock', 'size-4 mt-0.5')} Se revoca el acceso a los libros digitales.</li>` : ''}<li class="flex gap-2">${BH.icon('doc', 'size-4 mt-0.5')} Se reembolsa por el mismo medio de pago.</li></ul>
+      <label class="floating-label w-full"><span>Motivo *</span><input id="a-mot" class="input w-full" placeholder="Motivo"></label><p id="a-err" class="text-error text-sm" role="alert"></p>`;
+    $('dlg').showModal();
+  }
+  $('a-ok').onclick = () => {
+    const m = $('a-mot').value.trim(); if (!m) { $('a-err').textContent = 'El motivo es obligatorio.'; return; }
+    BH.anulados.set([...BH.anulados.get(), sel.id]); BH.audit.add('Anulación de pedido', `${sel.id} · ${m}`);
+    $('dlg').close(); BH.toast(`${sel.id} anulado y registrado en la auditoría`); pintar();
+  };
+  pintar();
+});
+</script>
+</body>
+</html>

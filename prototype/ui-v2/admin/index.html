@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Indicadores · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/data-paneles.js"></script>
+<script src="../assets/app.js"></script>
+<script src="../assets/panel.js"></script>
+</head>
+<body data-area="admin" data-page="index" data-roles="admin" data-estados="normal,cargando,error">
+<div id="page-content" hidden>
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div><h1 class="bh-display" style="font-size:clamp(1.8rem,5vw,3rem)">Indicadores</h1>
+      <p class="opacity-75 mt-1 max-w-2xl">Vista de ventas, inventario y traslados de toda la red. <span class="chip">Vista previa · fase posterior (RF21)</span></p></div>
+    <div class="flex flex-wrap gap-2">
+      <select id="f-per" class="select select-sm" aria-label="Periodo"><option value="7">Últimos 7 días</option><option value="30" selected>Últimos 30 días</option><option value="90">Últimos 90 días</option></select>
+      <select id="f-reg" class="select select-sm" aria-label="Región"><option value="">Todas las regiones</option></select>
+    </div>
+  </div>
+  <div id="cuerpo" class="mt-6"></div>
+</div>
+
+<script>
+BH.ready(() => {
+  if (BH.bloqueado) return;
+  const $ = (id) => document.getElementById(id);
+  $('f-reg').innerHTML += [...new Set(BH.sucursales.map((s) => s.region))].map((r) => `<option>${r}</option>`).join('');
+
+  /* Ventas ficticias por sucursal en 30 días: [impreso, digital] en soles. Se escalan por periodo. */
+  const BASE = { lim: [18400, 7200], aqp: [9300, 3100], tru: [7200, 2400], cus: [8100, 3600], piu: [5600, 1700], aya: [6900, 2900] };
+  const TOP = [[1, 142], [12, 118], [2, 97], [15, 90], [7, 64], [6, 58]];
+
+  function pintar() {
+    if (BH.estado === 'cargando') { $('cuerpo').innerHTML = '<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">' + Array.from({ length: 4 }, () => '<div class="skeleton h-24"></div>').join('') + '</div><div class="skeleton h-64 mt-6"></div>'; return; }
+    if (BH.estado === 'error') { $('cuerpo').innerHTML = BH.errorState('No pudimos calcular los indicadores.'); return; }
+    const k = Number($('f-per').value) / 30, reg = $('f-reg').value;
+    const sucs = BH.sucursales.filter((s) => !reg || s.region === reg);
+    const filas = sucs.map((s) => ({ etiqueta: s.nombre, valores: (BASE[s.id] || [0, 0]).map((v) => Math.round(v * k)) }));
+    if (!filas.length) { $('cuerpo').innerHTML = BH.emptyState('chart', 'Sin datos', 'No hay ventas para esa selección.'); return; }
+    const impT = filas.reduce((a, f) => a + f.valores[0], 0), digT = filas.reduce((a, f) => a + f.valores[1], 0), tot = impT + digT;
+    const trActivos = BH.tras.get().filter((t) => t.estado === 'transito' || t.estado === 'aprobado' || t.estado === 'solicitado').length;
+    const pedidos = Math.round(tot / 61);
+    const topF = TOP.map(([id, u]) => ({ etiqueta: BH.obra(id).titulo, valores: [Math.round(u * k)] }));
+    $('cuerpo').innerHTML = `<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 aparece">
+        ${BH.kpi('Ventas', BH.money(tot), 8)}${BH.kpi('Pedidos', pedidos.toLocaleString('es-PE'), 5)}${BH.kpi('Ventas digitales', Math.round(digT / tot * 100) + ' %', 3)}${BH.kpi('Traslados activos', trActivos, 12, false)}</div>
+      <p class="text-xs opacity-60 mt-2">Variación frente al periodo anterior de igual duración. Datos ficticios.</p>
+      <div class="grid xl:grid-cols-2 gap-6 mt-6">
+        <section class="border border-[var(--bh-linea)] bg-base-100 p-4" id="g1" aria-label="Ventas por sucursal"></section>
+        <section class="border border-[var(--bh-linea)] bg-base-100 p-4" id="g2" aria-label="Títulos más vendidos"></section></div>`;
+    BH.barras($('g1'), { titulo: 'Ventas por sucursal y formato', filas, series: [{ nombre: 'Impreso', color: 'var(--bh-s1)' }, { nombre: 'Digital', color: 'var(--bh-s2)' }] });
+    BH.barras($('g2'), { titulo: 'Títulos más vendidos (unidades)', filas: topF, series: [{ nombre: 'Unidades', color: 'var(--bh-s1)' }], fmt: (n) => n.toLocaleString('es-PE') + ' ud.', ancho: '13rem' });
+  }
+  $('f-per').onchange = $('f-reg').onchange = pintar; pintar();
+});
+</script>
+</body>
+</html>

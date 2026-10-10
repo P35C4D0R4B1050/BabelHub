@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guías de envío · BabelHub</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/data.js"></script>
+<script src="../assets/data-paneles.js"></script>
+<script src="../assets/app.js"></script>
+<script src="../assets/panel.js"></script>
+</head>
+<body data-area="logistica" data-page="guias" data-roles="logistica,admin" data-estados="normal,vacio,error">
+<div id="page-content" hidden>
+  <h1 class="bh-display" style="font-size:clamp(1.8rem,5vw,3rem)">Guías de envío</h1>
+  <p class="opacity-75 mt-1 max-w-2xl">Despachos a domicilio. La guía se genera con el operador logístico externo y el cliente recibe el seguimiento por WhatsApp.</p>
+  <div role="tablist" class="tabs tabs-border mt-4" id="tabs"></div>
+  <div id="lista" class="mt-3"></div>
+</div>
+
+<script>
+BH.ready(() => {
+  if (BH.bloqueado) return;
+  const $ = (id) => document.getElementById(id);
+  let filtro = 'todos';
+  const TABS = [['todos', 'Todos'], ['pendiente', 'Sin guía'], ['generada', 'Con guía'], ['reparto', 'En reparto'], ['entregado', 'Entregados']];
+  const SIG = { generada: ['reparto', 'Marcar en reparto'], reparto: ['entregado', 'Marcar entregado'] };
+  const AVISO = { generada: 'Tu guía de envío está lista', reparto: 'Tu pedido salió a reparto', entregado: 'Tu pedido fue entregado' };
+
+  function pintar() {
+    const g = BH.estado === 'vacio' ? [] : BH.guias.get();
+    $('tabs').innerHTML = TABS.map(([k, l]) => `<button role="tab" aria-selected="${filtro === k}" class="tab ${filtro === k ? 'tab-active' : ''}" data-f="${k}">${l} <span class="badge badge-sm ml-1">${k === 'todos' ? g.length : g.filter((x) => x.estado === k).length}</span></button>`).join('');
+    $('tabs').querySelectorAll('[data-f]').forEach((b) => (b.onclick = () => { filtro = b.dataset.f; pintar(); }));
+    if (BH.estado === 'error') { $('lista').innerHTML = BH.errorState('No pudimos cargar los envíos.'); return; }
+    const l = g.filter((x) => filtro === 'todos' || x.estado === filtro);
+    if (!l.length) { $('lista').innerHTML = BH.emptyState('truck', 'No hay envíos aquí', 'Los pedidos con despacho a domicilio aparecerán en esta lista.'); return; }
+    $('lista').innerHTML = `<div class="overflow-x-auto border border-[var(--bh-linea)] bg-base-100"><table class="table"><thead><tr><th>Envío</th><th>Cliente y dirección</th><th>Operador</th><th>Guía</th><th>Estado</th><th></th></tr></thead><tbody>
+      ${l.map((x) => `<tr><td class="font-mono text-sm">${x.id}<div class="text-xs opacity-60">${x.pedido}</div></td><td><div class="font-medium">${x.cliente}</div><div class="text-xs opacity-60">${x.dir}</div></td><td class="text-sm">${x.operador}</td><td class="font-mono text-sm">${x.guia || '—'}</td><td>${BH.chipEstado(x.estado)}</td>
+        <td class="text-right whitespace-nowrap">${x.estado === 'pendiente' ? `<button class="btn btn-sm btn-primary" data-gen="${x.id}">Generar guía</button>` : SIG[x.estado] ? `<button class="btn btn-sm btn-outline" data-sig="${x.id}">${SIG[x.estado][1]}</button>` : '<span class="text-xs opacity-40">—</span>'}</td></tr>`).join('')}</tbody></table></div>`;
+    $('lista').querySelectorAll('[data-gen]').forEach((b) => (b.onclick = () => {
+      b.disabled = true; b.innerHTML = '<span class="loading loading-spinner loading-xs"></span> Consultando operador…';
+      setTimeout(() => { const all = BH.guias.get(), x = all.find((y) => y.id === b.dataset.gen); x.guia = 'CA-' + (883000 + Math.floor(Math.random() * 900)); x.estado = 'generada'; BH.guias.set(all); BH.audit.add('Guía de envío', `${x.pedido}: guía ${x.guia}`); BH.toast(`Guía ${x.guia} generada. ${AVISO.generada} (WhatsApp enviado).`); pintar(); }, 1200);
+    }));
+    $('lista').querySelectorAll('[data-sig]').forEach((b) => (b.onclick = () => {
+      const all = BH.guias.get(), x = all.find((y) => y.id === b.dataset.sig), [a] = SIG[x.estado]; x.estado = a; BH.guias.set(all); BH.toast(`${x.pedido}: ${AVISO[a]} (WhatsApp enviado).`); pintar();
+    }));
+  }
+  pintar();
+});
+</script>
+</body>
+</html>
