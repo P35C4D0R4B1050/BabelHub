@@ -1,0 +1,62 @@
+# Infraestructura local de BabelHub: bases de datos y caché.
+# Los servicios .NET y la Web se agregan aquí a medida que existan sus Dockerfiles.
+# El emulador de almacén S3 se elige en el bloqueo B02 (ver progress/blockers.md).
+#
+# Uso:
+#   cp .env.example .env        (y cambia las contraseñas de ejemplo)
+#   docker compose -f infra/docker-compose.local.yml --env-file .env up -d
+name: babelhub
+
+services:
+  postgres-ventas:
+    # Esquemas ventas e identidad (AD18) y base de Evolution API en producción.
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_VENTAS_USER:-babelhub}
+      POSTGRES_PASSWORD: ${POSTGRES_VENTAS_PASSWORD:?Define POSTGRES_VENTAS_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_VENTAS_DB:-ventas}
+    ports:
+      - "127.0.0.1:${POSTGRES_VENTAS_PORT:-5432}:5432"
+    volumes:
+      - postgres-ventas-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_VENTAS_USER:-babelhub} -d ${POSTGRES_VENTAS_DB:-ventas}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  postgres-inventario:
+    # Instancia propia del Inventario (AD03): aísla la escritura intensiva de reservas y traslados.
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_INVENTARIO_USER:-babelhub}
+      POSTGRES_PASSWORD: ${POSTGRES_INVENTARIO_PASSWORD:?Define POSTGRES_INVENTARIO_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_INVENTARIO_DB:-inventario}
+    ports:
+      - "127.0.0.1:${POSTGRES_INVENTARIO_PORT:-5433}:5432"
+    volumes:
+      - postgres-inventario-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_INVENTARIO_USER:-babelhub} -d ${POSTGRES_INVENTARIO_DB:-inventario}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    # Caché de disponibilidad y catálogo (AD06), con memoria acotada (RNF12).
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres-ventas-data:
+  postgres-inventario-data:
