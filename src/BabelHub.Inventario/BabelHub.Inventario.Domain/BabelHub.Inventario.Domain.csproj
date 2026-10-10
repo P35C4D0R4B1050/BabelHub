@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>BabelHub.Inventario.Domain</RootNamespace>
+  </PropertyGroup>
+</Project>

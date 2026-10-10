@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>BabelHub.Ecommerce.Api</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BabelHub.Ecommerce.Application\BabelHub.Ecommerce.Application.csproj" />
+    <ProjectReference Include="..\BabelHub.Ecommerce.Infrastructure\BabelHub.Ecommerce.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\BabelHub.Shared\BabelHub.Shared.csproj" />
+  </ItemGroup>
+</Project>

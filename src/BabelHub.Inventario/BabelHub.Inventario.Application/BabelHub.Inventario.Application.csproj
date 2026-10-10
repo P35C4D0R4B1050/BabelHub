@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>BabelHub.Inventario.Application</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BabelHub.Inventario.Domain\BabelHub.Inventario.Domain.csproj" />
+  </ItemGroup>
+</Project>
