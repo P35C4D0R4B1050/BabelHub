@@ -1,6 +1,6 @@
-# 03 — Atributos de calidad
+# Atributos de calidad
 
-Los atributos de calidad expresan **cómo** debe comportarse el sistema y se describen con escenarios (estímulo → respuesta → medida). Provienen de los requisitos no funcionales de `02-requisitos.md` y se priorizan según el problema central: *mostrar siempre stock real*.
+Los atributos de calidad expresan **cómo** debe comportarse el sistema y se describen con escenarios (estímulo → respuesta → medida). Provienen de los requisitos no funcionales de [requisitos](02-requisitos.md) y se priorizan según el problema central: *mostrar siempre stock real*.
 
 ## 1. Atributos y escenarios
 
@@ -24,4 +24,4 @@ Los atributos se ordenan por su impacto en el problema central y por el costo de
 2. **AC05 Seguridad**, **AC09 Protección de contenido digital**, **AC02 Rendimiento** y **AC03 Disponibilidad** (alta): determinan la estructura de despliegue y la separación de la base de datos.
 3. **AC04, AC06, AC07 y AC08** (media): se atienden con decisiones de bajo costo (fuentes como datos, Clean Architecture, imágenes multi-arch, interfaz responsiva).
 
-**Tensión principal:** AC03 (disponibilidad) y AC07 (eficiencia) chocan con la realidad de recursos gratuitos sin alta disponibilidad real. Se acepta un objetivo de ≥ 99 % sin redundancia, apoyado en reinicio automático y respaldos, y se documenta como riesgo en `04-drivers-arquitectonicos.md`.
+**Tensión principal:** AC03 (disponibilidad) y AC07 (eficiencia) chocan con la realidad de recursos gratuitos sin alta disponibilidad real. Se acepta un objetivo de ≥ 99 % sin redundancia, apoyado en reinicio automático y respaldos, y se documenta como riesgo en [drivers arquitectónicos](../02-arquitectura-de-software/01-drivers-arquitectonicos.md).

@@ -1,6 +1,6 @@
-# 09 — Convenciones técnicas
+# Convenciones técnicas
 
-Reglas transversales que todos los servicios y la aplicación web siguen. Complementan la regla de dependencia de `07-enfoque-arquitectonico.md`. Lo marcado como **propuesta** se confirma en la spec que lo implementa.
+Reglas transversales que todos los servicios y la aplicación web siguen. Complementan la regla de dependencia de [Clean Architecture](../03-diseno-de-software/01-clean-architecture.md). Lo marcado como **propuesta** se confirma en la spec que lo implementa.
 
 ## 1. Git
 
@@ -57,7 +57,7 @@ Los commits de un agente terminan con la línea `Co-Authored-By` correspondiente
 ## 4. Autenticación y autorización
 
 - El servicio de Identidad emite JWT con los claims `sub`, `role` y `branch_id` (vacío para clientes y administración central). Caducidad corta, con renovación desde el servidor de `BabelHub.Web` (el token nunca llega al navegador, AD15).
-- Cada servicio valida firma, vigencia y rol; el alcance por sucursal se comprueba en la Aplicación (`07`, sección 8).
+- Cada servicio valida firma, vigencia y rol; el alcance por sucursal se comprueba en la Aplicación ([Clean Architecture, sección 8](../03-diseno-de-software/01-clean-architecture.md)).
 - **Propuesta:** las llamadas entre servicios en nombre de un usuario reenvían su JWT; las tareas de fondo (liberar reservas vencidas, reintentar avisos) usan un token de servicio de Identidad. Se fija en `identidad-seguridad`.
 
 ## 5. Configuración y secretos
@@ -89,7 +89,7 @@ Los commits de un agente terminan con la línea `Co-Authored-By` correspondiente
 - Una prueba por criterio de aceptación de cada spec. Las pruebas llevan un rasgo (`Trait`) con el nombre de la spec y el criterio, para poder trazarlas.
 - Nombres descriptivos en español: `Reservar_SinStockVendible_Rechaza`.
 - Las pruebas de integración usan Testcontainers (PostgreSQL y un emulador de almacén compatible con S3) y necesitan Docker.
-- Una prueba de arquitectura (NetArchTest) verifica la regla de dependencia de `07` y que ningún servicio referencie a otro.
+- Una prueba de arquitectura (NetArchTest) verifica la regla de dependencia de [Clean Architecture](../03-diseno-de-software/01-clean-architecture.md) y que ningún servicio referencie a otro.
 
 ## 9. Integración continua
 

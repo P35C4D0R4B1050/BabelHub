@@ -1,6 +1,6 @@
-# 07 — Enfoque arquitectónico: Clean Architecture
+# Enfoque arquitectónico: Clean Architecture
 
-Este documento desarrolla el enfoque que `06-estilo-arquitectonico.md` (sección 6) resume: cómo se organizan las responsabilidades y las dependencias **dentro de cada servicio**. El estilo global (servicios de granularidad gruesa) decide *qué piezas hay*; Clean Architecture decide *cómo se ordena el código de cada pieza*. Se baja hasta la estructura de carpetas del repositorio y el flujo de trabajo con especificaciones (*Spec-Driven Development*).
+Este documento desarrolla el enfoque que resume la [organización interna](02-organizacion-interna.md) (y, a nivel de estilo, el [estilo arquitectónico](../02-arquitectura-de-software/03-estilo-arquitectonico.md)): cómo se organizan las responsabilidades y las dependencias **dentro de cada servicio**. El estilo global (servicios de granularidad gruesa) decide *qué piezas hay*; Clean Architecture decide *cómo se ordena el código de cada pieza*. Se baja hasta la estructura de carpetas del repositorio y el flujo de trabajo con especificaciones (*Spec-Driven Development*).
 
 ## 1. Resumen del enfoque
 
@@ -258,7 +258,7 @@ Cada flecha es una referencia de proyecto. Al separar las capas en proyectos dis
 | `tests/e2e` | Playwright sobre la Presentación y el flujo completo. |
 | `tests/load` | k6 sobre la disponibilidad y el checkout (RNF02). |
 | `infra/` | Composición del despliegue: `docker-compose.local.yml`, `docker-compose.oracle.yml`, `nginx/` y `n8n/` (flujos exportados). Incluye n8n y Evolution API. Es la raíz de composición a nivel de sistema. |
-| `docs/` | Documentos `01` a `07` como documentación del sistema, y `glossary.md` (términos: fuente, stock vendible, reserva, traslado). El glosario fija el lenguaje que usa el Dominio. No se crea `architecture.md`: el `README.md` y el `06` ya cumplen esa función. |
+| `docs/` | Carpetas `01-analisis-de-sistema` a `07-proceso-de-desarrollo` como documentación del sistema, y `glossary.md` (términos: fuente, stock vendible, reserva, traslado). El glosario fija el lenguaje que usa el Dominio. No se crea `architecture.md`: el `README.md` y el [estilo arquitectónico](../02-arquitectura-de-software/03-estilo-arquitectonico.md) ya cumplen esa función. |
 | `AGENTS.md` | Contiene la regla de dependencia como norma no negociable (sección 9). |
 
 ## 5. Ejemplo recorrido: reservar stock
@@ -340,7 +340,7 @@ Si un servicio reducido crece en lógica, se promueve a la versión completa sin
 
 ## 8. Seguridad por capas
 
-Este apartado **precisa** lo indicado en `06-estilo-arquitectonico.md` (6.3): la Presentación valida el token y el rol; el alcance por sucursal se aplica también en la Aplicación.
+Este apartado **precisa** lo indicado en [organización interna, sección 3 (responsabilidades por capa)](02-organizacion-interna.md): la Presentación valida el token y el rol; el alcance por sucursal se aplica también en la Aplicación.
 
 | Aspecto | Capa | Cómo |
 | :--- | :--- | :--- |
@@ -406,7 +406,7 @@ Este apartado **precisa** lo indicado en `06-estilo-arquitectonico.md` (6.3): la
 | `transversal-notificaciones` | E-commerce e Inventario | Puerto `Notificador`, plantillas de avisos, reintentos y contrato del webhook de n8n; no bloquea la operación. |
 | `web-base` | Web | Estructura de áreas, sesión por cookie, manejo de errores, estados de pantalla y enlace permanente al Libro de Reclamaciones. Las pantallas de cada función se describen en el `plan.md` de su feature. |
 
-| `web-indice-infinito` *(opcional)* | Web | Experimento aislado «El índice infinito»: generador determinista propio, sin base de datos y fuera del flujo de compra (ver `08-interfaz-de-usuario.md`, sección 8). Se escribe al final. |
+| `web-indice-infinito` *(opcional)* | Web | Experimento aislado «El índice infinito»: generador determinista propio, sin base de datos y fuera del flujo de compra (ver [El índice infinito](../06-experiencia-de-usuario/03-estados-accesibilidad-y-criterios.md)). Se escribe al final. |
 
 **Total: 18 especificaciones**, una de ellas opcional. Los indicadores y reportes (RF21) quedan diferidos y no tienen carpeta. Las specs transversales no tienen servicio propio porque la arquitectura se limita a cuatro servicios (AD02): definen un contrato que cada servicio implementa.
 

@@ -65,7 +65,7 @@ Un único catálogo nacional para toda la red. Una **obra** puede tener una edic
 - Una edición digital nunca tiene stock, reserva ni fuente.
 - Una licencia de dominio público no tiene vigencia; una licencia comercial siempre la tiene.
 - Una licencia vencida o fuera de territorio retira la oferta pero no el acceso ya concedido.
-- Los precios de los libros digitales se muestran sin IGV (referencial, ver `docs/02`, sección 5).
+- Los precios de los libros digitales se muestran sin IGV (referencial, ver `docs/01-analisis-de-sistema/03-marco-legal.md`).
 
 ## 6. Casos límite y errores
 

@@ -15,6 +15,8 @@ var idsValidos = CargarIdsDeDocs(Path.Combine(repo, "docs"));
 var specsDir = Path.Combine(repo, "specs");
 var specs = new List<Spec>();
 
+ValidarEnlacesDeDocs(Path.Combine(repo, "docs"), repo, errores);
+
 foreach (var dir in Directory.GetDirectories(specsDir).OrderBy(d => d, StringComparer.Ordinal))
 {
     var nombre = Path.GetFileName(dir);
@@ -94,10 +96,55 @@ static string ResolverRepo(string[] args)
     throw new InvalidOperationException("No se encontró la raíz del repositorio (AGENTS.md y specs/). Usa --repo <ruta>.");
 }
 
+static void ValidarEnlacesDeDocs(string docs, string repo, List<string> errores)
+{
+    if (!Directory.Exists(docs))
+    {
+        return;
+    }
+
+    foreach (var archivo in Directory.GetFiles(docs, "*.md", SearchOption.AllDirectories))
+    {
+        var lineas = File.ReadAllLines(archivo);
+        var enBloque = false;
+        for (var i = 0; i < lineas.Length; i++)
+        {
+            if (lineas[i].TrimStart().StartsWith("```", StringComparison.Ordinal))
+            {
+                enBloque = !enBloque;
+                continue;
+            }
+
+            if (enBloque)
+            {
+                continue;
+            }
+
+            foreach (Match m in Regex.Matches(lineas[i], @"\]\(([^)\s]+)\)"))
+            {
+                var destino = m.Groups[1].Value;
+                if (destino.StartsWith("http", StringComparison.OrdinalIgnoreCase) || destino.StartsWith('#') || destino.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var ruta = destino.Split('#')[0];
+                var completa = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(archivo)!, ruta));
+                if (!File.Exists(completa) && !Directory.Exists(completa))
+                {
+                    errores.Add($"{Path.GetRelativePath(repo, archivo).Replace(Path.DirectorySeparatorChar, '/')}:{i + 1}: el enlace «{destino}» no existe.");
+                }
+            }
+        }
+    }
+}
+
 static HashSet<string> CargarIdsDeDocs(string docs)
 {
     var ids = new HashSet<string>(StringComparer.Ordinal);
-    foreach (var archivo in Directory.GetFiles(docs, "*.md").Where(a => Regex.IsMatch(Path.GetFileName(a), "^0[123]-")))
+    var analisis = Path.Combine(docs, "01-analisis-de-sistema");
+    var archivos = Directory.Exists(analisis) ? Directory.GetFiles(analisis, "*.md") : [];
+    foreach (var archivo in archivos)
     {
         foreach (Match m in Regex.Matches(File.ReadAllText(archivo), @"\*\*((?:NN|RF|RNF|RC|AC)\d{2})\*\*"))
         {
@@ -372,7 +419,7 @@ internal sealed class Spec
 
         foreach (var id in s.Origen.Concat(s.Calidad).Where(id => !idsValidos.Contains(id)))
         {
-            errores.Add($"{nombre}: «{id}» no existe en docs/01, docs/02 ni docs/03.");
+            errores.Add($"{nombre}: «{id}» no existe en docs/01-analisis-de-sistema.");
         }
 
         s.LeerSecciones(lineas, nombre, cfg, idsValidos, errores, avisos);

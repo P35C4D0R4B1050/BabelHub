@@ -44,4 +44,4 @@ dotnet test BabelHub.sln --filter "Criterio=AC-FUE-01"
 
 ## Ayuda externa recomendada
 
-La skill oficial `dotnet-test` y `dotnet-data` de `dotnet/skills`, y `dotnet-aspnetcore`, complementan esta guía (instalación en `docs/10-flujo-sdd.md`). Esta skill manda en caso de diferencia.
+La skill oficial `dotnet-test` y `dotnet-data` de `dotnet/skills`, y `dotnet-aspnetcore`, complementan esta guía (instalación en `docs/07-proceso-de-desarrollo/01-flujo-sdd.md`). Esta skill manda en caso de diferencia.

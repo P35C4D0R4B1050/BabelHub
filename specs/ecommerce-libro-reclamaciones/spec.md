@@ -13,7 +13,7 @@ depende: [transversal-auditoria, transversal-notificaciones]
 
 ## 1. Propósito
 
-Que cualquier consumidor pueda registrar un reclamo o una queja desde la tienda, reciba una constancia y obtenga respuesta, y que la librería conserve las hojas (RF25, confirmado por el equipo). Se aplica con rigurosidad laxa por ser un proyecto académico (`docs/02`, sección 5).
+Que cualquier consumidor pueda registrar un reclamo o una queja desde la tienda, reciba una constancia y obtenga respuesta, y que la librería conserve las hojas (RF25, confirmado por el equipo). Se aplica con rigurosidad laxa por ser un proyecto académico (`docs/01-analisis-de-sistema/03-marco-legal.md`).
 
 ## 2. Alcance
 

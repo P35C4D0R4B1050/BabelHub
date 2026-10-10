@@ -10,7 +10,7 @@ Produce `specs/<feature>/spec.md` en estado **Draft**. Describe **qué y por qu�
 ## Antes de empezar
 
 1. Lee `AGENTS.md`, `specs/README.md` y `docs/glossary.md`.
-2. Identifica en `docs/01` a `docs/03` las necesidades (NN), requisitos (RF, RNF, RC) y atributos de calidad (AC) que la feature cubre. Usa **solo** identificadores que existan.
+2. Identifica en `docs/01-analisis-de-sistema/` las necesidades (NN), requisitos (RF, RNF, RC) y atributos de calidad (AC) que la feature cubre. Usa **solo** identificadores que existan.
 3. Si la feature tiene pantalla en `prototype/ui-v2/`, léela para entender el comportamiento esperado (estados, validaciones, textos). El prototipo informa, no manda: si contradice a `docs/`, gana `docs/` y se anota la diferencia como pregunta abierta.
 4. Mira una spec ya aprobada o escrita del repositorio para igualar el nivel de detalle.
 

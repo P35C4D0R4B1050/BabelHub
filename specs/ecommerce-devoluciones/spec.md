@@ -19,7 +19,7 @@ Que el cliente pueda devolver un impreso entregado o pedir el reembolso de un li
 
 | Dentro | Fuera |
 | :--- | :--- |
-| Solicitud, aprobación, rechazo y reembolso. | El derecho de arrepentimiento general (no hay norma confirmada, ver `docs/02`, sección 5). |
+| Solicitud, aprobación, rechazo y reembolso. | El derecho de arrepentimiento general (no hay norma confirmada, ver `docs/01-analisis-de-sistema/03-marco-legal.md`). |
 | Reingreso de stock de impresos y revocación de accesos digitales. | La mecánica del cobro y el reembolso (`ecommerce-pagos`). |
 | Política propia de reembolso de libros digitales. | Logística inversa de devoluciones a domicilio. |
 

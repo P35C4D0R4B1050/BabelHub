@@ -18,7 +18,7 @@ description: Implementa una feature de BabelHub tarea por tarea con pruebas prim
 3. **Escribe la prueba primero**, con `[Trait("Criterio", "AC-XXX-NN")]` y un nombre descriptivo (`Reservar_SinStockVendible_Rechaza`). Confirma que **falla por la razón correcta**.
 4. **Implementa lo mínimo** para que pase, en la capa que corresponde. Sin lógica de negocio en `Api` ni `Web`; sin infraestructura en `Dominio` ni `Aplicación`.
 5. **Ejecuta** `dotnet build BabelHub.sln -warnaserror`, las pruebas del proyecto afectado, las pruebas de arquitectura y `dotnet run --project tools/SpecCheck`.
-6. **Marca** la tarea (`- [x]`) y haz **un commit pequeño** (`feat:`, `test:`, `refactor:`…; ver `docs/09`).
+6. **Marca** la tarea (`- [x]`) y haz **un commit pequeño** (`feat:`, `test:`, `refactor:`…; ver `docs/07-proceso-de-desarrollo/02-convenciones-tecnicas.md`).
 7. Si hubo una decisión no trivial, anótala en `decisions.md`.
 8. Pasa a la siguiente tarea. Si algo contradice la spec o el plan, **detente** y consulta: no cambies el comportamiento por tu cuenta.
 

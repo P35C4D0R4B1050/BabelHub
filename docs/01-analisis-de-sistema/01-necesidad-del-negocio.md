@@ -1,4 +1,4 @@
-# 01 — Necesidad del negocio
+# Necesidad del negocio
 
 ## 1. Contexto y problema
 
@@ -8,7 +8,7 @@ El libro impreso sigue generando más del 91 % de los ingresos editoriales en el
 
 **Justificación del planteamiento:** BabelHub se define como **dos sistemas independientes pero interoperables** (E-commerce e Inventario Multi-Sucursal) y no como una tienda en línea con inventario embebido. El inventario tiene reglas propias (reservas, traslados, auditoría) y un patrón de uso distinto (personal interno, alta escritura), por lo que conviene diseñarlo, probarlo y escalarlo por separado. Para el inventario se adopta el patrón *Multi-Source Inventory* (MSI) de Adobe Commerce: cada sucursal es una **fuente** de stock y el **stock vendible = stock físico − reservas activas**.
 
-**Libros digitales.** La librería también vende libros digitales (EPUB y PDF). Un libro digital no tiene stock ni sucursal: se entrega de inmediato y no depende de la logística. Por eso vive en el E-commerce, no en el Inventario, y se trata como una **edición** distinta del mismo título, con su propio ISBN. A cambio, exige algo que el libro impreso no pide: una **licencia del titular de derechos** (autor o editorial) para venderlo, y medidas para que el archivo no circule fuera de quien lo compró. El marco legal se resume en `02-requisitos.md` (sección 5).
+**Libros digitales.** La librería también vende libros digitales (EPUB y PDF). Un libro digital no tiene stock ni sucursal: se entrega de inmediato y no depende de la logística. Por eso vive en el E-commerce, no en el Inventario, y se trata como una **edición** distinta del mismo título, con su propio ISBN. A cambio, exige algo que el libro impreso no pide: una **licencia del titular de derechos** (autor o editorial) para venderlo, y medidas para que el archivo no circule fuera de quien lo compró. El marco legal se resume en el [marco legal](03-marco-legal.md).
 
 ## 2. Objetivos del negocio
 
@@ -30,7 +30,7 @@ El libro impreso sigue generando más del 91 % de los ingresos editoriales en el
 | Identidad, roles y control de acceso por sucursal. | Aplicación móvil nativa (Android/iOS): extensión posterior; el alcance inicial es web responsiva. |
 | Diseño de la arquitectura y del despliegue en Oracle Cloud. | Analítica avanzada y autoservicio de reportes: fase posterior. |
 | Libros digitales (EPUB y PDF): catálogo, compra, biblioteca personal y descarga protegida. | Lector en línea con DRM comercial, audiolibros, suscripciones, préstamo digital y liquidación de regalías a editoriales. |
-| Registro de la licencia de cada libro digital (titular, territorio y vigencia) y Libro de Reclamaciones virtual. | Emisión de comprobantes electrónicos ante la SUNAT y contratos reales con los titulares: el proyecto es académico (ver `02-requisitos.md`, sección 5). |
+| Registro de la licencia de cada libro digital (titular, territorio y vigencia) y Libro de Reclamaciones virtual. | Emisión de comprobantes electrónicos ante la SUNAT y contratos reales con los titulares: el proyecto es académico (ver [marco legal](03-marco-legal.md). |
 
 ## 4. Actores
 
@@ -67,7 +67,7 @@ Prioridad: **Alta** (núcleo del problema), **Media**, **Baja** (puede diferirse
 | **NN12** | Organización | Operar la plataforma con costo mínimo y sin depender de servicios administrados de pago. | Alta | Restricción económica del proyecto (OB05); condiciona el despliegue. |
 | **NN13** | Cliente | Comprar libros digitales y acceder a ellos de inmediato desde su biblioteca personal, sin esperar despacho. | Media | Amplía la oferta y elimina la espera para quien no necesita el libro impreso (OB06). |
 | **NN14** | Administrador central | Publicar un libro digital solo con licencia vigente del titular de derechos y retirarlo de la venta cuando esa licencia termine. | Alta | Vender contenido sin licencia expone a la librería a responsabilidad por derechos de autor. |
-| **NN15** | Organización | Cumplir las obligaciones legales de una tienda en línea: Libro de Reclamaciones, datos personales, derechos de autor y política de devoluciones. | Alta | Son obligaciones, no mejoras; ver `02-requisitos.md`, sección 5. |
+| **NN15** | Organización | Cumplir las obligaciones legales de una tienda en línea: Libro de Reclamaciones, datos personales, derechos de autor y política de devoluciones. | Alta | Son obligaciones, no mejoras; ver [marco legal](03-marco-legal.md). |
 
 ## 6. Diagrama de contexto
 

@@ -1,6 +1,6 @@
 ---
 name: ui-screen
-description: Construye una pantalla de BabelHub.Web (vista Razor, ViewModel, cliente HTTP y fragmentos htmx) a partir de su prototipo, su spec y el sistema de diseño de docs/08. Úsala al implementar las tareas de Web de una feature o cuando se pida «crear la pantalla de X».
+description: Construye una pantalla de BabelHub.Web (vista Razor, ViewModel, cliente HTTP y fragmentos htmx) a partir de su prototipo, su spec y el sistema de diseño de docs/06-experiencia-de-usuario. Úsala al implementar las tareas de Web de una feature o cuando se pida «crear la pantalla de X».
 ---
 
 # ui-screen — De prototipo a vista Razor
@@ -9,7 +9,7 @@ description: Construye una pantalla de BabelHub.Web (vista Razor, ViewModel, cli
 
 1. La spec y el `plan.md` de la feature (sección «Pantallas»).
 2. El prototipo en `prototype/ui-v2/<área>/<pantalla>.html` (estructura, textos, estados).
-3. `docs/08-interfaz-de-usuario.md` (identidad, tokens, estados, accesibilidad) y `docs/glossary.md`.
+3. `docs/06-experiencia-de-usuario/` (identidad, tokens, estados, accesibilidad) y `docs/glossary.md`.
 
 ## Reglas
 

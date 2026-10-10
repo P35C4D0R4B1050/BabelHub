@@ -9,7 +9,7 @@ estado: Draft
 
 ## 1. Resumen técnico
 
-Enfoque en pocas líneas y qué decisiones tiene detrás (enlaza `decisions.md` y los AD de `docs/05`).
+Enfoque en pocas líneas y qué decisiones tiene detrás (enlaza `decisions.md` y los AD de `docs/02-arquitectura-de-software/02-decisiones-arquitectonicas.md`).
 
 ## 2. Capas afectadas
 

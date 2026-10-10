@@ -1,6 +1,6 @@
 # Prototipo v2 de BabelHub
 
-Prototipo **descartable** en HTML estático. Valida el sistema de diseño de `docs/08-interfaz-de-usuario.md` y los recorridos de todos los actores: Tienda (cliente y visitante), Sucursal (encargado), Logística y Administración. No forma parte de la solución .NET.
+Prototipo **descartable** en HTML estático. Valida el sistema de diseño de `docs/06-experiencia-de-usuario/` y los recorridos de todos los actores: Tienda (cliente y visitante), Sucursal (encargado), Logística y Administración. No forma parte de la solución .NET.
 
 - **Stack:** Tailwind CSS 4 (build del navegador) y daisyUI 5 por CDN, con fuentes de Google Fonts. Necesita Internet.
 - **Identidad:** «Babel cromático + laberinto de historias». Tokens en `assets/theme.css`, con los temas `babelhub` (claro) y `babelhub-dark` (oscuro). Por defecto sigue la preferencia del sistema.

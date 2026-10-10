@@ -1,4 +1,4 @@
-# 10 — Flujo de trabajo con Spec-Driven Development
+# Flujo de trabajo con Spec-Driven Development
 
 Cómo se construye BabelHub: el ciclo de cada feature, las validaciones que lo protegen, las skills y agentes que lo guían, la estructura final del repositorio y el plan de trabajo. Las reglas obligatorias están en `AGENTS.md`; este documento explica el porqué y el cómo.
 
@@ -67,7 +67,7 @@ babelhub/
 ├── .editorconfig  .gitignore  .gitattributes  .env.example
 ├── .github/workflows/ci.yml
 ├── .claude/               skills/ (11), agents/ (2), settings.json, launch.json
-├── docs/                  01 a 10 y glossary.md
+├── docs/                  7 carpetas temáticas (01-analisis-de-sistema a 07-proceso-de-desarrollo) y glossary.md
 ├── specs/                 README.md, speccheck.json, TRACEABILITY.md, _template/ y 18 features
 ├── progress/              CHANGELOG.md, blockers.md, log/
 ├── src/                   Inventario, Ecommerce (4 proyectos cada uno), Identidad, AsistenteCompra, Web y Shared

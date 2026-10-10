@@ -13,7 +13,7 @@ depende: [identidad-seguridad, ecommerce-libro-reclamaciones]
 
 ## 1. Propósito
 
-La base común de `BabelHub.Web`: áreas por rol, sesión, estados de pantalla estándar, accesibilidad y pie legal. Todas las pantallas de las demás specs se apoyan en ella. El diseño y los componentes están en `docs/08`.
+La base común de `BabelHub.Web`: áreas por rol, sesión, estados de pantalla estándar, accesibilidad y pie legal. Todas las pantallas de las demás specs se apoyan en ella. El diseño y los componentes están en `docs/06-experiencia-de-usuario`.
 
 ## 2. Alcance
 

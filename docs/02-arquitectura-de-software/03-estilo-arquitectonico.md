@@ -1,4 +1,4 @@
-# 06 — Estilo arquitectónico
+# Estilo arquitectónico
 
 ## 1. Estilo seleccionado
 
@@ -95,7 +95,7 @@ style ENV fill:#222,stroke:#fff,color:#fff
 style LLM fill:#222,stroke:#fff,color:#fff
 ```
 
-La vista de despliegue sobre las VMs de Oracle está en `05-decisiones-arquitectonicas.md`.
+La vista de despliegue sobre las VMs de Oracle está en [decisiones arquitectónicas](02-decisiones-arquitectonicas.md).
 
 ## 3. Componentes y responsabilidades
 
@@ -129,163 +129,7 @@ La vista de despliegue sobre las VMs de Oracle está en `05-decisiones-arquitect
 | Navegador | Almacén de archivos | HTTPS con URL firmada | Descargar el libro; la Web y el E-commerce no transportan el archivo. |
 | Asistente | Proveedor de LLM | API externa | Generar respuestas. |
 
-## 5. Flujo principal: compra con selección de fuente
-
-```mermaid
-sequenceDiagram
-autonumber
-actor C as Cliente
-participant E as E-commerce
-participant I as Inventario
-participant P as Culqi
-
-C->>E: Confirma el pedido
-E->>I: Consulta disponibilidad real
-I-->>E: Stock vendible por sucursal
-alt Sin stock vendible
-E-->>C: No disponible actualmente
-else Hay stock
-E->>I: Reserva temporal con expiración
-I->>I: Selecciona la fuente de despacho
-I-->>E: Fuente asignada
-E->>P: Cobro con clave de idempotencia
-P-->>E: Pago aprobado
-E->>I: Confirma la reserva
-opt La fuente no es la sucursal elegida
-I->>I: Genera solicitud de traslado
-end
-E-->>C: Pedido confirmado y notificado
-end
-```
-
-### Flujo secundario: compra y descarga de un libro digital
-
-El libro digital no pasa por el Inventario: no hay stock ni fuente que seleccionar.
-
-```mermaid
-sequenceDiagram
-autonumber
-actor C as Cliente
-participant W as Web
-participant E as E-commerce
-participant P as Culqi
-participant A as Almacén de archivos
-
-C->>W: Compra un libro digital
-W->>E: Crea el pedido, sin entrega
-E->>E: Verifica licencia vigente y territorio
-E->>P: Cobro con clave de idempotencia
-P-->>E: Pago aprobado
-E->>E: Concede acceso a la biblioteca
-E-->>W: Pedido confirmado
-C->>W: Pulsa Descargar
-W->>E: Solicita la descarga
-E->>E: Verifica titular y límite de descargas
-E->>A: Firma una URL de pocos minutos
-E-->>W: URL firmada
-W-->>C: Redirige a la URL
-C->>A: Descarga el archivo
-```
-
-En un pedido mixto, el cobro es único: las líneas impresas siguen el flujo principal y las digitales conceden acceso al aprobarse el pago.
-
-## 6. Organización interna: Clean Architecture
-
-### 6.1 Elementos
-
-| Elemento | Descripción aplicada a BabelHub |
-| :--- | :--- |
-| **Enfoque** | Clean Architecture (Arquitectura Limpia) en cada servicio .NET. |
-| **Objetivo** | Separar responsabilidades y controlar las dependencias hacia el dominio. |
-| **Problema que resuelve** | Evita que las reglas del negocio queden acopladas a la interfaz web, la base de datos, la pasarela de pago, el servicio de envío o el LLM. |
-| **Capas** | Presentación, Aplicación, Dominio e Infraestructura. |
-| **Beneficios** | Facilita el mantenimiento y las pruebas unitarias; permite cambiar una tecnología (por ejemplo, de Culqi a otra pasarela) sin modificar las reglas del negocio; ordena el código. |
-| **Alcance** | Completo en E-commerce e Inventario, que concentran la lógica. Versión reducida (Presentación y Aplicación con acceso a datos simple) en Identidad y Asistente. `BabelHub.Web` queda fuera de este esquema: es un cliente de presentación sin dominio propio. |
-
-### 6.2 Dependencias
-
-```mermaid
-flowchart TD
-subgraph PRES["PRESENTACIÓN"]
-Api["API REST - controladores"]
-end
-subgraph APLI["APLICACIÓN"]
-CU["Casos de uso"]
-Puertos["Interfaces - puertos"]
-end
-subgraph DOM["DOMINIO"]
-Ent["Entidades y reglas de negocio"]
-end
-subgraph INFRA["INFRAESTRUCTURA"]
-Repo["Repositorios PostgreSQL"]
-Cache["Redis"]
-Ext["Pasarela, envío y LLM"]
-end
-
-PRES -->|"usa"| APLI
-APLI -->|"usa"| DOM
-INFRA -->|"implementa"| Puertos
-INFRA -->|"depende de"| DOM
-
-style PRES fill:#222,stroke:#fff,stroke-width:2px,color:#fff
-style APLI fill:#222,stroke:#fff,stroke-width:2px,color:#fff
-style DOM fill:#222,stroke:#fff,stroke-width:2px,color:#fff
-style INFRA fill:#222,stroke:#fff,stroke-width:2px,color:#fff
-style Api fill:#222,stroke:#fff,color:#fff
-style CU fill:#222,stroke:#fff,color:#fff
-style Puertos fill:#222,stroke:#fff,color:#fff
-style Ent fill:#222,stroke:#fff,color:#fff
-style Repo fill:#222,stroke:#fff,color:#fff
-style Cache fill:#222,stroke:#fff,color:#fff
-style Ext fill:#222,stroke:#fff,color:#fff
-```
-
-**Regla de dependencia:** las dependencias apuntan hacia el dominio. El Dominio no conoce a ninguna otra capa; la Aplicación solo conoce el Dominio; la Presentación y la Infraestructura dependen de la Aplicación, nunca al revés. Cuando un caso de uso necesita algo externo (guardar, cobrar, notificar), lo pide mediante una interfaz definida en la Aplicación y la Infraestructura la implementa.
-
-### 6.3 Responsabilidades por capa
-
-| Capa | Responsabilidad | En Inventario | En E-commerce |
-| :--- | :--- | :--- | :--- |
-| **Presentación** | Recibir solicitudes REST, validar la entrada, verificar token y rol, y el alcance por sucursal se comprueba también. | Controladores de disponibilidad, reservas, traslados y ajustes. | Controladores de catálogo, carrito, pedidos y pagos. |
-| **Aplicación** | Coordinar los casos de uso sin conocer detalles técnicos. | Consultar disponibilidad, reservar, seleccionar fuente, gestionar traslados y ajustes. | Buscar libros, gestionar carrito, realizar pedido, confirmar pago, consultar pedidos. |
-| **Dominio** | Entidades y reglas del negocio, sin dependencias técnicas. | Fuente, ítem de fuente, reserva, traslado y ajuste. Regla: *stock vendible = físico − reservas activas*, nunca negativo. | Libro (edición impresa o digital), carrito, pedido con líneas, pago y acceso digital; estados del pedido. |
-| **Infraestructura** | Implementar el acceso a tecnologías externas. | Repositorios PostgreSQL, Redis y notificaciones. | Repositorios PostgreSQL, cliente REST de Inventario, pasarela de pago, servicio de envío y almacén de archivos. |
-
-### 6.4 Interfaces (puertos) previstas
-
-| Interfaz (en Aplicación) | Implementación (en Infraestructura) |
-| :--- | :--- |
-| Repositorio de inventario / de ventas | Acceso a PostgreSQL |
-| Cliente de inventario | Llamadas REST del E-commerce al Inventario |
-| Pasarela de pago | Integración con Culqi |
-| Servicio de envío | Integración con el operador logístico |
-| Notificador | Webhook de n8n, que envía por Evolution API (WhatsApp) |
-| Proveedor de LLM | API del modelo de lenguaje |
-| Caché | Redis |
-| Almacén de archivos | Almacén S3-compatible (Cloudflare R2 u Oracle Object Storage) |
-
-Gracias a ellas, cambiar de pasarela o de proveedor de LLM requiere solo una nueva implementación en Infraestructura.
-
-### 6.5 Organización del código y pruebas
-
-```
-Inventario/
-├── Inventario.Domain/          entidades y reglas de negocio
-├── Inventario.Application/     casos de uso e interfaces
-├── Inventario.Infrastructure/  PostgreSQL, Redis e integraciones
-└── Inventario.Api/             controladores REST y configuración
-```
-
-Los nombres de proyectos son una convención sugerida, no parte de la propuesta original.
-
-| Capa | Tipo de prueba | Herramienta |
-| :--- | :--- | :--- |
-| Dominio | Unitarias (por ejemplo, el cálculo de stock vendible) | xUnit |
-| Aplicación | Unitarias de casos de uso con interfaces simuladas | xUnit |
-| Infraestructura | Integración con la base real | xUnit + Testcontainers |
-| Presentación | Flujos completos de extremo a extremo; carga | Playwright; k6 |
-
-## 7. Alternativas descartadas
+## 5. Alternativas descartadas
 
 | Alternativa | Motivo del descarte |
 | :--- | :--- |
@@ -297,7 +141,7 @@ Los nombres de proyectos son una convención sugerida, no parte de la propuesta 
 | **Guardar los archivos digitales en la VM o en PostgreSQL** | El disco es escaso, los archivos pasarían por una VM de 1 OCPU y inflarían los respaldos. Ver AD19. |
 | **Capas tradicionales** | El dominio quedaría atado a la base de datos y a los proveedores externos, y sería más difícil de probar. |
 
-## 8. Ventajas y limitaciones
+## 6. Ventajas y limitaciones
 
 | Ventajas | Limitaciones |
 | :--- | :--- |

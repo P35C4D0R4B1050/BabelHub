@@ -2,12 +2,12 @@
 
 Reglas globales **no negociables** para cualquier persona o agente que trabaje en este repositorio. Si una instrucción, una spec o un plan las contradice, **gana este archivo**. Para cambiar una regla, se discute con la persona responsable del proyecto y se actualiza aquí antes de seguir.
 
-BabelHub es una plataforma de comercio electrónico y de inventario multi-sucursal para librerías (libros impresos y digitales). Es un proyecto académico, pero se construye con disciplina de producto. La documentación de diseño está en `docs/` (01 a 10); este archivo resume lo que se exige en el día a día.
+BabelHub es una plataforma de comercio electrónico y de inventario multi-sucursal para librerías (libros impresos y digitales). Es un proyecto académico, pero se construye con disciplina de producto. La documentación está en `docs/`, organizada en siete carpetas (análisis, arquitectura, diseño, modelo C4, seguridad, experiencia de usuario y proceso); este archivo resume lo que se exige en el día a día.
 
 ## 1. Fuentes de verdad y precedencia
 
 1. `AGENTS.md` (este archivo).
-2. `docs/` — necesidades, requisitos, atributos de calidad, drivers, decisiones (AD) y enfoque arquitectónico.
+2. `docs/` — necesidades, requisitos, atributos de calidad, drivers, decisiones (AD), diseño, seguridad y experiencia de usuario.
 3. `specs/<feature>/spec.md` — **qué** debe hacer el sistema (EARS).
 4. `specs/<feature>/plan.md` — **cómo** se construye.
 5. `specs/<feature>/tasks.md` — trabajo atómico y ordenado.
@@ -17,7 +17,7 @@ Nunca se inventa un requisito. Si algo no está claro, se registra como pregunta
 
 ## 2. Flujo Spec-Driven Development (obligatorio)
 
-No se escribe código de producción sin una spec **Approved** y un plan **Planned**. El ciclo y sus puertas están en `docs/10-flujo-sdd.md`:
+No se escribe código de producción sin una spec **Approved** y un plan **Planned**. El ciclo y sus puertas están en `docs/07-proceso-de-desarrollo/01-flujo-sdd.md`:
 
 `Draft → Approved → Planned → InProgress → Done`
 
@@ -65,14 +65,14 @@ La prueba de arquitectura (`tests/architecture`) hace cumplir 1, 2, 5, 6 y 9. Si
 
 ## 6. Interfaz de usuario
 
-- Sistema de diseño y reglas en `docs/08-interfaz-de-usuario.md`: Tailwind CSS + daisyUI, temas `babelhub` y `babelhub-dark` con tokens semánticos; ningún color suelto.
+- Sistema de diseño y reglas en `docs/06-experiencia-de-usuario/`: Tailwind CSS + daisyUI, temas `babelhub` y `babelhub-dark` con tokens semánticos; ningún color suelto.
 - Toda pantalla de datos implementa los estados estándar (cargando, vacío, error, sin permiso, servicio no disponible).
 - Accesibilidad: contraste AA, foco visible, teclado, `prefers-reduced-motion`, y el estado nunca depende solo del color.
 - La disponibilidad se muestra con texto e icono. No se simula stock.
 
 ## 7. Git
 
-- Commits pequeños, `tipo: descripción` en inglés, imperativo y en minúsculas (`feat`, `fix`, `chore`, `docs`, `test`, `refactor`). Detalle en `docs/09-convenciones-tecnicas.md`.
+- Commits pequeños, `tipo: descripción` en inglés, imperativo y en minúsculas (`feat`, `fix`, `chore`, `docs`, `test`, `refactor`). Detalle en `docs/07-proceso-de-desarrollo/02-convenciones-tecnicas.md`.
 - Los commits de un agente terminan con la línea `Co-Authored-By` indicada por el entorno.
 - **El agente no hace `push`, no reescribe historia ni borra ramas sin que la persona responsable lo pida de forma expresa.**
 - No se debilitan pruebas, validaciones ni hooks para que algo pase.
@@ -81,7 +81,7 @@ La prueba de arquitectura (`tests/architecture`) hace cumplir 1, 2, 5, 6 y 9. Si
 
 | Ruta | Contenido |
 | :--- | :--- |
-| `docs/` | Documentación de diseño (01 a 10) y glosario. |
+| `docs/` | Documentación en siete carpetas (`01-analisis-de-sistema` a `07-proceso-de-desarrollo`) y glosario. |
 | `specs/` | Una carpeta por feature: `spec.md`, `plan.md`, `tasks.md`, `decisions.md`, `verificacion.md`. Plantillas en `specs/_template/`. |
 | `src/` | Código: un directorio por servicio y `BabelHub.Web`, más `BabelHub.Shared`. |
 | `tests/` | `unit`, `integration`, `architecture`, `e2e` (Playwright) y `load` (k6). |
@@ -102,7 +102,7 @@ dotnet run --project tools/SpecCheck -- --write-matrix   # regenerar specs/TRACE
 
 ## 10. Skills y agentes del proyecto
 
-Las skills viven en `.claude/skills/` y guían cada paso del ciclo: `spec-new`, `spec-clarify`, `spec-plan`, `spec-tasks`, `spec-implement`, `spec-verify`, `progress-log`, `arch-review`, `dotnet-feature`, `ui-screen` y `ui-review`. Los agentes `spec-auditor` y `arch-reviewer` revisan en contexto aislado. Skills externas recomendadas (instalación a cargo de la persona responsable): ver `docs/10-flujo-sdd.md`.
+Las skills viven en `.claude/skills/` y guían cada paso del ciclo: `spec-new`, `spec-clarify`, `spec-plan`, `spec-tasks`, `spec-implement`, `spec-verify`, `progress-log`, `arch-review`, `dotnet-feature`, `ui-screen` y `ui-review`. Los agentes `spec-auditor` y `arch-reviewer` revisan en contexto aislado. Skills externas recomendadas (instalación a cargo de la persona responsable): ver `docs/07-proceso-de-desarrollo/01-flujo-sdd.md`.
 
 ## 11. Ante la duda
 

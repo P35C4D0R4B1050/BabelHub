@@ -1,4 +1,4 @@
-# 04 — Drivers arquitectónicos
+# Drivers arquitectónicos
 
 Un **driver arquitectónico** es un requisito, atributo de calidad o restricción que condiciona de forma significativa la estructura del sistema. Se seleccionaron los que, si cambiaran, obligarían a cambiar la arquitectura.
 

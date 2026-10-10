@@ -8,7 +8,7 @@ Eres un revisor de arquitectura. No editas archivos: solo lees y reportas. Sigue
 
 ## Cómo trabajas
 
-1. Lee `AGENTS.md` (sección 3 y 5) y `docs/07-enfoque-arquitectonico.md`.
+1. Lee `AGENTS.md` (sección 3 y 5) y `docs/03-diseno-de-software/01-clean-architecture.md`.
 2. Determina el alcance: el `git diff` (con `git diff --stat` y `git diff`), la carpeta o el plan indicados.
 3. Revisa los archivos `*.csproj` afectados para las referencias entre proyectos y los `using` de cada capa.
 4. Ejecuta, si hay código: `dotnet build BabelHub.sln -warnaserror` y `dotnet test tests/architecture`. Reporta fallos.

@@ -19,7 +19,7 @@ Dejar un registro confiable e inmutable de quién hizo qué, cuándo y con qué 
 
 | Dentro | Fuera |
 | :--- | :--- |
-| Qué eventos se auditan, qué datos tiene cada registro y las garantías de inmutabilidad. | Los logs técnicos y las métricas (convenciones en `docs/09`). |
+| Qué eventos se auditan, qué datos tiene cada registro y las garantías de inmutabilidad. | Los logs técnicos y las métricas (convenciones en `docs/07-proceso-de-desarrollo/02-convenciones-tecnicas.md`). |
 | Consulta con filtros para el administrador central. | Exportación de reportes e indicadores (RF21, fase posterior). |
 | Registro de accesos denegados por falta de permiso o de alcance. | La lógica de cada operación (vive en la spec de su feature). |
 

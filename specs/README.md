@@ -1,6 +1,6 @@
 # Specs de BabelHub
 
-Fuente de verdad de **qué** debe hacer el sistema. Cada carpeta es una feature. El ciclo completo, sus puertas y la verificación están en `docs/10-flujo-sdd.md`.
+Fuente de verdad de **qué** debe hacer el sistema. Cada carpeta es una feature. El ciclo completo, sus puertas y la verificación están en `docs/07-proceso-de-desarrollo/01-flujo-sdd.md`.
 
 ## Estados
 
