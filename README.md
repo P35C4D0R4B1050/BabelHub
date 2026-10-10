@@ -29,6 +29,7 @@ BabelHub se compone de **dos sistemas independientes pero interoperables** para 
 | 04 | [Drivers arquitectónicos](04-drivers-arquitectonicos.md) | Requisitos que condicionan la arquitectura (DA), riesgos y compromisos. |
 | 05 | [Decisiones arquitectónicas](05-decisiones-arquitectonicas.md) | Decisiones (AD) con justificación y alternativas; despliegue en Oracle Cloud, base de datos separada y Cloudflare frente a Nginx. |
 | 06 | [Estilo arquitectónico](06-estilo-arquitectonico.md) | Estilo basado en servicios, diagrama de componentes y organización interna con Clean Architecture. |
+| 07 | [Enfoque arquitectónico](07-enfoque-arquitectonico.md) | Clean Architecture en detalle: capas, regla de dependencia, mapa a la estructura del repositorio, pruebas por capa y reglas para `AGENTS.md`. |
 
 ## Trazabilidad
 
