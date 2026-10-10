@@ -10,7 +10,7 @@ NN["Necesidades<br/>NN01 - NN12"] --> REQ["Requisitos<br/>RF, RNF, RC"]
 REQ --> AC["Atributos de calidad<br/>AC01 - AC08"]
 AC --> DA["Drivers<br/>DA01 - DA12"]
 REQ --> DA
-DA --> AD["Decisiones<br/>AD01 - AD20"]
+DA --> AD["Decisiones<br/>AD01 - AD21"]
 AD --> EST["Estilo y estructura<br/>servicios + Clean Architecture"]
 
 style NN fill:#222,stroke:#fff,color:#fff

@@ -406,7 +406,9 @@ Este apartado **precisa** lo indicado en `06-estilo-arquitectonico.md` (6.3): la
 | `transversal-notificaciones` | E-commerce e Inventario | Puerto `Notificador`, plantillas de avisos, reintentos y contrato del webhook de n8n; no bloquea la operación. |
 | `web-base` | Web | Estructura de áreas, sesión por cookie, manejo de errores, estados de pantalla y enlace permanente al Libro de Reclamaciones. Las pantallas de cada función se describen en el `plan.md` de su feature. |
 
-**Total: 17 especificaciones.** Los indicadores y reportes (RF21) quedan diferidos y no tienen carpeta. Las specs transversales no tienen servicio propio porque la arquitectura se limita a cuatro servicios (AD02): definen un contrato que cada servicio implementa.
+| `web-indice-infinito` *(opcional)* | Web | Experimento aislado «El índice infinito»: generador determinista propio, sin base de datos y fuera del flujo de compra (ver `08-interfaz-de-usuario.md`, sección 8). Se escribe al final. |
+
+**Total: 18 especificaciones**, una de ellas opcional. Los indicadores y reportes (RF21) quedan diferidos y no tienen carpeta. Las specs transversales no tienen servicio propio porque la arquitectura se limita a cuatro servicios (AD02): definen un contrato que cada servicio implementa.
 
 ## 10. Convenciones sugeridas
 

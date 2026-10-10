@@ -23,13 +23,15 @@ BabelHub se compone de **dos sistemas independientes pero interoperables** para 
 
 | N.° | Documento | Contenido |
 | :--- | :--- | :--- |
-| 01 | [Necesidad del negocio](01-necesidad-del-negocio.md) | Problema, objetivos, alcance, actores y necesidades (NN). |
-| 02 | [Requisitos](02-requisitos.md) | Requisitos funcionales (RF), no funcionales (RNF) y restricciones (RC). |
-| 03 | [Atributos de calidad](03-atributos-de-calidad.md) | Escenarios de calidad (AC) y su priorización. |
-| 04 | [Drivers arquitectónicos](04-drivers-arquitectonicos.md) | Requisitos que condicionan la arquitectura (DA), riesgos y compromisos. |
-| 05 | [Decisiones arquitectónicas](05-decisiones-arquitectonicas.md) | Decisiones (AD) con justificación y alternativas; despliegue en Oracle Cloud, base de datos separada, Cloudflare frente a Nginx, aplicación web, Culqi y notificaciones por WhatsApp, almacén de libros digitales y su protección (AD01–AD20). |
-| 06 | [Estilo arquitectónico](06-estilo-arquitectonico.md) | Estilo basado en servicios, diagrama de componentes y organización interna con Clean Architecture. |
-| 07 | [Enfoque arquitectónico](07-enfoque-arquitectonico.md) | Clean Architecture en detalle: capas, regla de dependencia, mapa a la estructura del repositorio, pruebas por capa y reglas para `AGENTS.md`. |
+| 01 | [Necesidad del negocio](docs/01-necesidad-del-negocio.md) | Problema, objetivos, alcance, actores y necesidades (NN). |
+| 02 | [Requisitos](docs/02-requisitos.md) | Requisitos funcionales (RF), no funcionales (RNF) y restricciones (RC). |
+| 03 | [Atributos de calidad](docs/03-atributos-de-calidad.md) | Escenarios de calidad (AC) y su priorización. |
+| 04 | [Drivers arquitectónicos](docs/04-drivers-arquitectonicos.md) | Requisitos que condicionan la arquitectura (DA), riesgos y compromisos. |
+| 05 | [Decisiones arquitectónicas](docs/05-decisiones-arquitectonicas.md) | Decisiones (AD) con justificación y alternativas; despliegue en Oracle Cloud, base de datos separada, Cloudflare frente a Nginx, aplicación web, Culqi y notificaciones por WhatsApp, almacén de libros digitales y su protección (AD01–AD21). |
+| 06 | [Estilo arquitectónico](docs/06-estilo-arquitectonico.md) | Estilo basado en servicios, diagrama de componentes y organización interna con Clean Architecture. |
+| 07 | [Enfoque arquitectónico](docs/07-enfoque-arquitectonico.md) | Clean Architecture en detalle: capas, regla de dependencia, mapa a la estructura del repositorio, pruebas por capa y reglas para `AGENTS.md`. |
+| 08 | [Interfaz de usuario](docs/08-interfaz-de-usuario.md) | Identidad visual, sistema de diseño (AD21), mapa de pantallas por rol, recorrido de compra, estados y accesibilidad. |
+| 09 | [Convenciones técnicas](docs/09-convenciones-tecnicas.md) | Git, API REST, seguridad, configuración, persistencia, pruebas, CI y Docker. |
 
 ## Trazabilidad
 
