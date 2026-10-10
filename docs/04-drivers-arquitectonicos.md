@@ -8,9 +8,9 @@ Un **driver arquitectónico** es un requisito, atributo de calidad o restricció
 flowchart LR
 NN["Necesidades<br/>NN01 - NN12"] --> REQ["Requisitos<br/>RF, RNF, RC"]
 REQ --> AC["Atributos de calidad<br/>AC01 - AC08"]
-AC --> DA["Drivers<br/>DA01 - DA11"]
+AC --> DA["Drivers<br/>DA01 - DA12"]
 REQ --> DA
-DA --> AD["Decisiones<br/>AD01 - AD18"]
+DA --> AD["Decisiones<br/>AD01 - AD20"]
 AD --> EST["Estilo y estructura<br/>servicios + Clean Architecture"]
 
 style NN fill:#222,stroke:#fff,color:#fff
@@ -36,6 +36,7 @@ style EST fill:#222,stroke:#fff,color:#fff
 | **DA09** | El sistema debe ejecutarse en recursos gratuitos limitados y heterogéneos (ARM64 y x86_64). | Restricción | RC06–RC08, RNF11, RNF12, AC07 | Limita la cantidad de VMs, servicios y contenedores, y exige imágenes multi-arch. | AD02, AD10, AD11 |
 | **DA10** | La operación debe tener costo mínimo y esfuerzo técnico manejable. | Negocio | NN12, RC09 | Favorece servicios gratuitos gestionados (Cloudflare) frente a componentes propios que haya que mantener. | AD13, AD14 |
 | **DA11** | El cliente y la sucursal deben recibir avisos de estado por WhatsApp sin costo por mensaje y sin que el aviso bloquee la compra. | Negocio / Restricción | RF07, RC12, NN03, NN12 | Obliga a un puerto de notificación aislado, a un envío tolerante a fallos y a alojar n8n y Evolution API dentro del presupuesto de recursos. | AD16 |
+| **DA12** | La librería vende libros digitales con licencia de terceros, y el archivo debe llegar solo a quien lo compró. | Calidad / Restricción legal | NN13, NN14, NN15, RF22–RF24, RNF14, RC13, AC09 | Exige un almacén de archivos fuera de las VMs, entrega por enlaces firmados, un modelo de licencia por título (titular, territorio, vigencia) y que la compra digital no dependa del Inventario. | AD19, AD20 |
 
 ## 3. Riesgos y compromisos
 
@@ -44,6 +45,9 @@ style EST fill:#222,stroke:#fff,color:#fff
 | La consulta síncrona al Inventario puede volverse cuello de botella o punto único de falla (DA02, DA03). | Caché Redis, reinicio automático, pruebas de carga con k6 y un mensaje claro cuando no se pueda validar el stock. |
 | La disponibilidad en caché puede estar desactualizada (DA01, DA02). | Expiración corta y validación definitiva contra la base de datos al reservar. |
 | La reducción del Free Tier de Oracle (ahora 2 OCPU y 12 GB en ARM) deja poca holgura de CPU (DA09). | Dimensionar con 1 OCPU por VM, medir con k6 y evitar componentes pesados. |
+| Un archivo digital se filtra o se redistribuye fuera de la tienda (DA12). | Enlaces firmados de 5 minutos, límite de descargas, registro de cada descarga y auditoría; la marca de agua personalizada queda como mejora posterior. No existe protección total sin DRM, y se acepta como riesgo mientras ningún titular lo exija. |
+| La licencia de un título vence o cambia, o el titular exige DRM comercial (DA12). | El catálogo guarda vigencia y territorio por título (RF24); el puerto `AlmacenDeArchivos` y el caso de uso de descarga permiten incorporar un DRM sin tocar el dominio. |
+| Cambian las cuotas gratuitas del almacén de archivos (DA10, DA12). | El almacén va detrás de un puerto; se verifican cuotas vigentes antes de contratar y se limita el tamaño de archivo y de catálogo digital. |
 | Oracle puede no tener capacidad ARM al crear la VM, o recuperar instancias inactivas (DA03, DA09). | Reintentar la creación, mantener el mismo Compose en local como respaldo y revisar la política de instancias inactivas. |
 | El asistente depende de un LLM externo (latencia, costo, respuestas incorrectas) (DA06). | Responde solo con datos de las API, indica cuándo no sabe y su caída no bloquea la compra. |
 | Cloudflare es una dependencia de terceros en el camino de todas las solicitudes (DA10). | Aceptable para este alcance; se documenta la alternativa de exponer Nginx directamente. |

@@ -24,6 +24,8 @@ Cada decisión indica el driver que la motiva (`04-drivers-arquitectonicos.md`),
 | **AD16** | **Notificaciones por WhatsApp con Evolution API y n8n**, autoalojados en la VM-APP. Los servicios llaman a un webhook de n8n a través del puerto `Notificador`; n8n arma el mensaje y lo envía por Evolution API. | Costo cero por mensaje y control propio; n8n concentra plantillas y reintentos fuera del código. | Correo o SMS de pago; API oficial de WhatsApp Cloud (pago por conversación y trámite de verificación). | DA06, DA09, DA11 |
 | **AD17** | **Culqi** como pasarela de pago para Yape y tarjetas. El pago se tokeniza en el navegador con el script de Culqi, por lo que el sistema nunca ve datos de tarjeta; el cobro se hace desde el servicio E-commerce con clave de idempotencia propia. | API simple, soporta Yape y tarjetas, buena integración con ASP.NET Core y comisión por transacción sin costo fijo. | Niubiz. | DA06 |
 | **AD18** | **Esquema propio para Identidad** (`identidad`) en la instancia PostgreSQL de Ventas, con su propio rol de base de datos y sus propias migraciones. Ningún otro servicio tiene permiso sobre ese esquema. | Evita una tercera instancia (la RAM es escasa) y mantiene el aislamiento de datos de seguridad. | Tablas de usuarios dentro del esquema de Ventas; una tercera instancia de PostgreSQL. | DA05, DA09 |
+| **AD19** | **Archivos digitales en un almacén de objetos externo compatible con S3**, accedido por el puerto `AlmacenDeArchivos`. Candidatos: Cloudflare R2 (encaja con el Cloudflare ya usado) u Oracle Object Storage; en desarrollo, MinIO o una carpeta local. El bucket es privado. | El disco de las VMs es escaso (200 GB en total, con 47 GB de arranque por VM) y los archivos no deben ir en Git ni en PostgreSQL. Con enlaces firmados, la descarga no pasa por la VM de 1 OCPU. | Carpeta en la VM de Aplicaciones; archivos como BLOB en PostgreSQL. | DA09, DA12 |
+| **AD20** | **Entrega y protección de libros digitales sin DRM comercial**: acceso ligado a la cuenta, descarga con URL firmada de 5 minutos como máximo, límite de descargas por compra (propuesta: 5), registro de cada descarga y, como mejora posterior, marca de agua con los datos de la compra. Formatos EPUB y PDF. | Los DRM comerciales (Adobe ACS4, Readium LCP) exigen licencia o infraestructura adicional, fuera del presupuesto (NN12). Se acepta el riesgo residual y se deja el puerto para sustituirlo si un titular lo exige. *(A validar con los titulares de derechos.)* | DRM comercial; lector solo en línea; sin ningún control de descarga. | DA12 |
 
 ## 2. Decisiones de software en detalle
 
@@ -36,6 +38,8 @@ Cada decisión indica el driver que la motiva (`04-drivers-arquitectonicos.md`),
 **Sobre AD16.** El flujo es: servicio → webhook de n8n → Evolution API → WhatsApp. El adaptador del servicio no espera al envío: si n8n no responde, registra el aviso como pendiente y se reintenta, de modo que la compra nunca se bloquea. Evolution API usa la Redis existente y una base propia en la instancia de Ventas. n8n guarda sus datos en un volumen (SQLite), y sus flujos se exportan a `infra/n8n/` para versionarlos. Sus paneles se alcanzan solo por túnel SSH.
 
 **Sobre AD17.** Culqi también permite reembolsos, que usa `ecommerce-devoluciones`. Los detalles de idempotencia, Yape y modo de pruebas (llaves de sandbox) se confirman con la documentación de Culqi al escribir la spec de pagos.
+
+**Sobre AD19 y AD20.** Un libro digital es una **edición** del mismo título, con su propio ISBN, y vive solo en el E-commerce: no tiene stock, ni reserva, ni fuente, ni traslado, por lo que su compra no depende del Inventario. Un pedido agrupa **líneas**: las impresas siguen el ciclo de reserva, preparación y entrega; las digitales pasan a *acceso concedido* en cuanto se aprueba el pago. Un pedido mixto cobra una sola vez. La descarga sigue este camino: el cliente pide el archivo, el E-commerce comprueba que es el titular y que no superó el límite, genera una URL firmada de pocos minutos y el navegador descarga directamente del almacén. La Web nunca recibe el archivo. El catálogo digital guarda titular de derechos, territorios y vigencia de la licencia (RF24). El marco legal está en `02-requisitos.md` (sección 5).
 
 ## 3. Despliegue en Oracle Cloud Free Tier
 
@@ -92,6 +96,7 @@ PAG["Culqi"]
 ENV["Servicio de envío"]
 LLM["Proveedor de LLM"]
 WA["WhatsApp"]
+ALM[("Almacén de archivos<br/>R2 / Object Storage")]
 end
 
 USR -->|"HTTPS"| CFE
@@ -120,6 +125,8 @@ ECO -->|"webhook"| N8N
 INV -->|"webhook"| N8N
 N8N --> EVO
 EVO --> WA
+ECO -->|"sube y firma URLs"| ALM
+USR -.->|"descarga con URL firmada"| ALM
 ECO --> PAG
 ECO --> ENV
 ASI --> LLM
@@ -140,6 +147,7 @@ style WEB fill:#222,stroke:#fff,color:#fff
 style N8N fill:#222,stroke:#fff,color:#fff
 style EVO fill:#222,stroke:#fff,color:#fff
 style WA fill:#222,stroke:#fff,color:#fff
+style ALM fill:#222,stroke:#fff,color:#fff
 style ECO fill:#222,stroke:#fff,color:#fff
 style INV fill:#222,stroke:#fff,color:#fff
 style IDE fill:#222,stroke:#fff,color:#fff
@@ -200,6 +208,8 @@ style LLM fill:#222,stroke:#fff,color:#fff
 | Cualquier otro origen | VM-DATOS | todos | **Denegado** |
 | Internet | n8n y Evolution API | todos | **Sin publicar** (solo red interna de Docker; paneles por túnel SSH) |
 | Evolution API | WhatsApp | HTTPS saliente | Permitido |
+| VM-APP (E-commerce) | Almacén de archivos | HTTPS saliente | Permitido (subir archivos y firmar URLs) |
+| Internet | Almacén de archivos | HTTPS | Solo con URL firmada vigente; bucket privado |
 
 Complementos: firewall del sistema operativo con las mismas reglas, secretos como variables de entorno fuera del repositorio y SSH sin contraseña.
 
@@ -218,6 +228,8 @@ Se propone **Ubuntu Server LTS mínimo sin entorno gráfico** en las VMs de Orac
 - Imágenes ARM64 de n8n y de Evolution API, y consumo real de memoria de ambos.
 - Términos de uso de WhatsApp frente a Evolution API; usar un número dedicado.
 - Culqi: idempotencia, soporte de Yape, reembolsos y llaves de pruebas (sandbox).
+- Almacén de archivos: cuotas gratuitas vigentes de Cloudflare R2 y de Oracle Object Storage, costo de operaciones y límite de tamaño por archivo; elegir uno antes de implementar `ecommerce-biblioteca-digital`.
+- Contratos con los titulares de derechos y política de reembolso de libros digitales (ver `02-requisitos.md`, sección 5).
 
 ## 4. Fuentes del despliegue
 
