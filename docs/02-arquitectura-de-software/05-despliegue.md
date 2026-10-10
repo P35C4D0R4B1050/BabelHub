@@ -186,7 +186,7 @@ Se propone **Ubuntu Server LTS mínimo sin entorno gráfico** en las VMs de Orac
 - Términos de uso de WhatsApp frente a Evolution API; usar un número dedicado.
 - Culqi: idempotencia, soporte de Yape, reembolsos y llaves de pruebas (sandbox).
 - Almacén de archivos: cuotas gratuitas vigentes de Cloudflare R2 y de Oracle Object Storage, costo de operaciones y límite de tamaño por archivo; elegir uno antes de implementar `ecommerce-biblioteca-digital`.
-- Contratos con los titulares de derechos: se simulan con datos de ejemplo, al ser un proyecto académico (ver [marco legal](../01-analisis-de-sistema/03-marco-legal.md).
+- Contratos con los titulares de derechos: se simulan con datos de ejemplo, al ser un proyecto académico (ver [marco legal](../01-analisis-de-sistema/03-marco-legal.md)).
 
 ## 7. Fuentes del despliegue
 

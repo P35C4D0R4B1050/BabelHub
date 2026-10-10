@@ -20,6 +20,8 @@ El libro impreso sigue generando más del 91 % de los ingresos editoriales en el
 | **OB04** | Soportar una red inicial de 5 a 10 sucursales, con margen hasta unas 20, sin rediseñar. | MSI opera eficientemente de 1 a 20 fuentes (Adobe). |
 | **OB05** | Operar con costo mínimo de infraestructura, sin servicios administrados de pago. | El proyecto debe ser viable con recursos gratuitos o propios. |
 | **OB06** | Vender libros digitales en la misma tienda, sin inventario físico y respetando los derechos de autor. | Amplía la oferta y llega a clientes sin depender de la logística de las sucursales; exige licencia de cada titular. |
+| **OB07** | Operar de forma segura y confiable. | Las fallas de seguridad destruyen la confianza que el producto necesita (OB01). |
+| **OB08** | Ofrecer una experiencia accesible y usable para todas las personas usuarias. | Reduce el abandono y respeta el derecho de acceso. |
 
 ## 3. Alcance
 
@@ -30,7 +32,8 @@ El libro impreso sigue generando más del 91 % de los ingresos editoriales en el
 | Identidad, roles y control de acceso por sucursal. | Aplicación móvil nativa (Android/iOS): extensión posterior; el alcance inicial es web responsiva. |
 | Diseño de la arquitectura y del despliegue en Oracle Cloud. | Analítica avanzada y autoservicio de reportes: fase posterior. |
 | Libros digitales (EPUB y PDF): catálogo, compra, biblioteca personal y descarga protegida. | Lector en línea con DRM comercial, audiolibros, suscripciones, préstamo digital y liquidación de regalías a editoriales. |
-| Registro de la licencia de cada libro digital (titular, territorio y vigencia) y Libro de Reclamaciones virtual. | Emisión de comprobantes electrónicos ante la SUNAT y contratos reales con los titulares: el proyecto es académico (ver [marco legal](03-marco-legal.md). |
+| Registro de la licencia de cada libro digital (titular, territorio y vigencia) y Libro de Reclamaciones virtual. | Emisión de comprobantes electrónicos ante la SUNAT y contratos reales con los titulares: el proyecto es académico (ver [marco legal](03-marco-legal.md)). |
+| Seguridad de la aplicación (autenticación, límites de uso, protección de datos, respaldo y recuperación), accesibilidad y usabilidad medida. | Certificación ISO, auditorías de terceros y pruebas de penetración externas: se toman los estándares como referencia, sin certificar. |
 
 ## 4. Actores
 
@@ -46,6 +49,8 @@ El libro impreso sigue generando más del 91 % de los ingresos editoriales en el
 | **Servicio de notificaciones** *(propio, autoalojado)* | n8n y Evolution API, que envían los avisos por WhatsApp. | Avisar a clientes y sucursales de los cambios de estado. |
 | **Almacén de archivos digitales** *(externo)* | Cloudflare R2 u Oracle Object Storage. | Guardar los EPUB y PDF fuera de las VMs y entregarlos con enlaces firmados. |
 | **Titular de derechos** *(externo, contractual)* | Autor o editorial. | Autorizar la venta de cada título digital, con territorio y vigencia. No usa el sistema; se relaciona por contrato. |
+| **Soporte** | Atiende las ayudas del cliente (límite de descargas, accesos, solicitudes sobre sus datos). | Hoy lo cubre la administración central; se separa si la operación crece. |
+| **Actor malicioso** *(modelo, no usa el sistema de forma legítima)* | Persona o programa que abusa del sistema: acapara stock con reservas, adivina contraseñas, intenta descargar sin comprar o manipular al asistente. | Sirve para modelar casos de abuso y amenazas en la documentación de seguridad. |
 
 ## 5. Necesidades del negocio
 
@@ -68,6 +73,9 @@ Prioridad: **Alta** (núcleo del problema), **Media**, **Baja** (puede diferirse
 | **NN13** | Cliente | Comprar libros digitales y acceder a ellos de inmediato desde su biblioteca personal, sin esperar despacho. | Media | Amplía la oferta y elimina la espera para quien no necesita el libro impreso (OB06). |
 | **NN14** | Administrador central | Publicar un libro digital solo con licencia vigente del titular de derechos y retirarlo de la venta cuando esa licencia termine. | Alta | Vender contenido sin licencia expone a la librería a responsabilidad por derechos de autor. |
 | **NN15** | Organización | Cumplir las obligaciones legales de una tienda en línea: Libro de Reclamaciones, datos personales, derechos de autor y política de devoluciones. | Alta | Son obligaciones, no mejoras; ver [marco legal](03-marco-legal.md). |
+| **NN16** | Cliente | Usar la tienda con comodidad desde un celular con conexión variable y sin barreras de accesibilidad. | Alta | La demanda fuera de Lima llega desde el celular; la accesibilidad es parte de servir a todos (OB08). |
+| **NN17** | Cliente | Descubrir lecturas con orientación y sorpresa: el asistente, «Sorpréndeme» y El índice infinito. | Baja | Aporta identidad de marca y respalda NN04. |
+| **NN18** | Organización | Proteger su información y su operación frente a abusos, fallos y pérdida de datos. | Alta | Se manejan datos personales, pagos y contenido con licencia (OB07). |
 
 ## 6. Diagrama de contexto
 
