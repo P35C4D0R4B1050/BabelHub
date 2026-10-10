@@ -1,6 +1,6 @@
 # R0 — Catálogo de cambios a la línea base
 
-> **Estado: propuesta para aprobación.** Describe, con el texto exacto, qué se agregará o cambiará en `docs/` y en las specs por la incorporación de seguridad, privacidad, UX y calidad. **No se ha editado ningún documento de `docs/` ni ninguna spec.** Los identificadores existentes no se renumeran; todo lo nuevo se agrega al final de su serie.
+> **Estado: aprobado el 2026-10-10** (con los ajustes de la sección 0). Describe, con el texto exacto, qué se agregará o cambiará en `docs/` y en las specs por la incorporación de seguridad, privacidad, UX y calidad. Se aplica en D1–D2, R1 y R2. Los identificadores existentes no se renumeran; todo lo nuevo se agrega al final de su serie.
 
 ## 0. Decisiones ya tomadas
 
@@ -12,6 +12,11 @@
 | Granularidad | 14 RNF agrupados (RNF15 a RNF28). |
 | Orden | D1–D2 (mover y dividir) antes de R1 (editar el contenido). |
 | Specs | Una nueva spec transversal de seguridad y ajustes acotados en 8 specs existentes. |
+| Recuperación de contraseña (RF26) | Código de un solo uso por WhatsApp; el número de WhatsApp es obligatorio al registrarse. |
+| Contraseña (RNF15) | Mínimo 8 caracteres con mayúscula, minúscula, número y símbolo; fuera de listas comunes. |
+| Reservas (RF28) | Una reserva activa por cliente y hasta 5 reservas iniciadas por hora. |
+| Otros valores *(propuesta)* | Límites de tasa, umbrales de alerta y retención de 2 años: se mantienen. |
+| Cobertura (RNF28) | Dominio y Aplicación ≥ 85 % de líneas; sistema completo ≥ 70 %. La Infraestructura y la Web se cubren con pruebas de integración y E2E por criterio, no por porcentaje. |
 
 **Nota de nombres:** la spec nueva usa el prefijo `SEG`; por eso la lista de verificación de seguridad (basada en ASVS) usará `CTL-NN` y las amenazas `AM-NN`, para no chocar con los identificadores de la spec.
 
@@ -41,9 +46,9 @@
 
 | ID | Requisito funcional | Prioridad | Origen | Spec |
 | :--- | :--- | :---: | :--- | :--- |
-| **RF26** | El sistema debe permitir al usuario recuperar el acceso a su cuenta mediante un código o enlace de un solo uso y vigencia corta, enviado a un medio de contacto verificado. | Alta | NN09, NN18 | `identidad-seguridad` |
+| **RF26** | El sistema debe permitir al usuario recuperar el acceso a su cuenta mediante un código de un solo uso y vigencia corta, enviado por WhatsApp al número verificado de su cuenta, que es obligatorio al registrarse. | Alta | NN09, NN18 | `identidad-seguridad` |
 | **RF27** | El sistema debe permitir al cliente gestionar su cuenta: datos personales, consentimientos y solicitudes de acceso, rectificación, cancelación y oposición. | Alta | NN15 | `identidad-seguridad` |
-| **RF28** | El sistema debe limitar las reservas temporales activas por cliente y por origen de red, y rechazar con un mensaje claro las que excedan el límite. **Propuesta:** una reserva activa por cliente y hasta 5 reservas iniciadas por hora. | Alta | NN02, NN18 | `inventario-seleccion-fuente`, `ecommerce-carrito-checkout` |
+| **RF28** | El sistema debe limitar las reservas temporales activas por cliente y por origen de red, y rechazar con un mensaje claro las que excedan el límite. Una reserva activa por cliente y hasta 5 reservas iniciadas por hora. | Alta | NN02, NN18 | `inventario-seleccion-fuente`, `ecommerce-carrito-checkout` |
 | **RF29** | El sistema debe ofrecer funciones de descubrimiento separadas de la compra: elegir un libro disponible al azar y explorar páginas generadas, aclarando que no son libros reales. | Baja | NN17 | `web-base`, `web-indice-infinito` |
 
 RF28 cubre un abuso propio del negocio: reservas temporales usadas para dejar sin stock a otros clientes.
@@ -54,7 +59,7 @@ Cada uno agrega **método de verificación** y **spec**. Los valores marcados co
 
 | ID | Categoría | Requisito | Meta | Verificación | Spec | Estándar |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **RNF15** | Seguridad: autenticación y sesión | Las credenciales deben protegerse y la sesión controlarse. | Contraseña de 10 o más caracteres y fuera de listas comunes *(propuesta)*; bloqueo temporal tras 5 fallos en 15 minutos; cookie `HttpOnly`, `Secure` y `SameSite`; credencial de 15 minutos con renovación de 7 días; MFA TOTP para el administrador central. | Pruebas automatizadas e inspección | `identidad-seguridad`, `web-base` | ASVS 5.0 (autenticación, sesión), Top 10:2025 (fallas de autenticación) |
+| **RNF15** | Seguridad: autenticación y sesión | Las credenciales deben protegerse y la sesión controlarse. | Contraseña de 8 o más caracteres con mayúscula, minúscula, número y símbolo, y fuera de listas comunes; bloqueo temporal tras 5 fallos en 15 minutos; cookie `HttpOnly`, `Secure` y `SameSite`; credencial de 15 minutos con renovación de 7 días; MFA TOTP para el administrador central. | Pruebas automatizadas e inspección | `identidad-seguridad`, `web-base` | ASVS 5.0 (autenticación, sesión), Top 10:2025 (fallas de autenticación) |
 | **RNF16** | Seguridad: validación y salida | Toda entrada debe validarse y toda salida codificarse, con cabeceras de seguridad. | 0 hallazgos de inyección y XSS en las pruebas; CSP, HSTS, `X-Content-Type-Options` y `Referrer-Policy` presentes; la CSP admite el script de la pasarela. | SAST, ZAP baseline y prueba E2E de cabeceras | `transversal-seguridad`, `web-base` | ASVS, Top 10:2025 (inyección, configuración) |
 | **RNF17** | Seguridad: límites de uso | El sistema debe limitar el uso por usuario y por origen en las operaciones sensibles. | Ingreso: 5 por 15 min; API: 100 solicitudes por minuto por usuario; descargas: 10 por hora; asistente: 10 consultas por minuto; respuesta uniforme con espera sugerida *(propuesta)*. | Pruebas de integración y carga | `transversal-seguridad`, `ecommerce-biblioteca-digital`, `asistente-compra-ia` | API Top 10:2023 (consumo y flujos de negocio), LLM10 |
 | **RNF18** | Seguridad: criptografía y reposo | Los datos deben protegerse en tránsito y en reposo. | TLS 1.2 o superior hacia el exterior; volúmenes y respaldos cifrados; contraseñas con función de resumen robusta y sal. | Inspección y pruebas | `identidad-seguridad` | Top 10:2025 (fallas criptográficas) |
@@ -67,7 +72,7 @@ Cada uno agrega **método de verificación** y **spec**. Los valores marcados co
 | **RNF25** | Accesibilidad | La interfaz debe conformar WCAG 2.2 nivel AA. | 0 incumplimientos AA críticos en revisión automática; lista manual de teclado y lector de pantalla superada. | axe en E2E e inspección manual | `web-base` | WCAG 2.2 |
 | **RNF26** | Rendimiento percibido | Las pantallas clave deben cargar rápido en móvil. | LCP ≤ 2,5 s (p75) en 4G simulada, INP ≤ 200 ms, CLS ≤ 0,1 en inicio, catálogo y detalle. | Lighthouse en CI | `web-base` | Core Web Vitals |
 | **RNF27** | Usabilidad medible | La compra debe ser fácil de completar sin ayuda. | ≥ 90 % de personas de prueba completan una compra con recojo sin ayuda; SUS ≥ 68; menos de 1 error por tarea en promedio; rondas de 5 personas. | Prueba de usabilidad | `web-base` | ISO 9241-210 |
-| **RNF28** | Evolucionabilidad | Los contratos deben evolucionar sin romper clientes y el diseño mantenerse verificable. | Contratos versionados en la ruta; reglas de dependencia verificadas automáticamente; cobertura de líneas del Dominio ≥ 90 % *(propuesta)*. | Pruebas de arquitectura y cobertura | Todas | Refina RNF09 y RNF10 |
+| **RNF28** | Evolucionabilidad | Los contratos deben evolucionar sin romper clientes y el diseño mantenerse verificable. | Contratos versionados en la ruta; reglas de dependencia verificadas automáticamente; cobertura de líneas ≥ 85 % en Dominio y Aplicación y ≥ 70 % en el sistema completo. | Pruebas de arquitectura y cobertura | Todas | Refina RNF09 y RNF10 |
 
 ## 5. Restricciones nuevas
 
@@ -149,11 +154,9 @@ Se agrega una fila para el **DS 016-2024-JUS** (reglamento de la Ley N.° 29733,
 | `web-indice-infinito` | Ajuste menor | Su origen pasa a NN17 y RF29 en lugar de RC01 y NN15. |
 | Las otras 10 | Sin cambios | `inventario-fuentes`, `inventario-ajustes`, `inventario-traslados`, `ecommerce-catalogo`, `ecommerce-pagos`, `ecommerce-pedidos`, `ecommerce-envios`, `ecommerce-devoluciones`, `ecommerce-libro-reclamaciones` y `transversal-notificaciones`. |
 
-## 11. Preguntas abiertas para aprobar
+## 11. Preguntas abiertas
 
-1. **Canal de recuperación de contraseña (RF26):** hoy el único canal de avisos es WhatsApp y el número es opcional. Opciones: (a) código por WhatsApp y número obligatorio para poder recuperar; (b) correo con un proveedor gratuito de envío. **Recomendación: (a)**, porque reutiliza Evolution API y no agrega un proveedor; el número se vuelve obligatorio al registrarse.
-2. **Valores numéricos** marcados como *propuesta* (límites de tasa, reservas por hora, longitud de contraseña, umbrales de alerta, retención de 2 años): ¿te sirven como metas iniciales?
-3. **Cobertura del Dominio ≥ 90 % (RNF28):** ¿la mantienes como meta o prefieres otro umbral?
+Resueltas el 2026-10-10: ver la sección 0. No quedan preguntas abiertas en R0.
 
 ## 12. Cómo se aplica una vez aprobado
 
