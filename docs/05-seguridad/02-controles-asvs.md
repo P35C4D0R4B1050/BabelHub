@@ -46,7 +46,7 @@ Traduce el **OWASP Application Security Verification Standard 5.0** a controles 
 | :--- | :--- | :---: | :--- | :--- | :---: |
 | **CTL-15** | Política de contraseñas: mínimo 8 caracteres con mayúscula, minúscula, número y símbolo; fuera de listas comunes. | L1 | IDE-15, RNF15 | Pruebas unitarias | Especificado |
 | **CTL-16** | Las contraseñas se almacenan con función de resumen robusta y sal; nunca en claro. | L1 | IDE-09, RNF18 | Inspección y pruebas | Especificado |
-| **CTL-17** | Bloqueo temporal tras 5 fallos en 15 minutos; respuestas que no revelan si la cuenta existe. | L1 | IDE-03, SEG-06 | Pruebas de integración | Especificado |
+| **CTL-17** | Bloqueo temporal tras 5 fallos en 15 minutos; respuestas que no revelan si la cuenta existe. | L1 | SEG-06, IDE-03 | Pruebas de integración | Especificado |
 | **CTL-18** | Recuperación con código de un solo uso, vigencia corta y límite de intentos; al restablecer se cierran todas las sesiones. | L1 | IDE-17 a IDE-19 | Pruebas de integración | Especificado |
 | **CTL-19** | Segundo factor (TOTP) para el administrador central. | L2 | IDE-20, AD22 | Pruebas de integración | Especificado |
 | **CTL-20** | Las claves y los secretos de servicio salen del entorno, no del código. | L1 | SEG-11, PAG-12 | Detección de secretos en CI | Especificado |

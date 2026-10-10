@@ -30,8 +30,8 @@ Entregar al instante los libros digitales comprados y protegerlos: el archivo so
 | BIB-01 | Evento | Cuando se aprueba el pago de una línea digital, el sistema deberá conceder un acceso a la cuenta del comprador sin reservar stock ni pedir entrega. | RF22 |
 | BIB-02 | Evento | Cuando el cliente abre su biblioteca, el sistema deberá listar sus accesos con formato, fecha de compra y descargas usadas y restantes. | RF22 |
 | BIB-03 | Ubicuo | El sistema deberá permitir la descarga de un libro digital únicamente al titular de su acceso. | RF23, RNF14 |
-| BIB-04 | Evento | Cuando el titular de un acceso con descargas restantes pide descargar, el sistema deberá verificar su titularidad y su cupo, contar la descarga y entregarle un enlace firmado que expire en un máximo de cinco minutos. | RF23, AC09 |
-| BIB-05 | Ubicuo | El sistema deberá contabilizar una descarga en el momento de entregar el enlace firmado, aunque la descarga se interrumpa después. | RF23 |
+| BIB-04 | Evento | Cuando el titular de un acceso con descargas restantes pide descargar, el sistema deberá verificar su titularidad y su cupo y entregarle un enlace firmado que expire en un máximo de cinco minutos. | RF23, AC09 |
+| BIB-05 | Ubicuo | El sistema deberá contabilizar una descarga en el momento de entregar el enlace firmado, aunque la descarga se interrumpa, y permitir reutilizar el mismo enlace dentro de su vigencia sin contar otra descarga. | RF23 |
 | BIB-06 | No deseado | Si el acceso ya alcanzó el máximo de cinco descargas, entonces el sistema deberá rechazar la solicitud explicando el límite y ofreciendo pedir ayuda. | RF23, AC09 |
 | BIB-07 | No deseado | Si quien pide descargar no es el titular del acceso, entonces el sistema deberá rechazar la solicitud y registrar el intento; y si el enlace ya venció, la descarga no deberá completarse. | AC09, RNF14 |
 | BIB-08 | Evento | Cuando la administración central restituye descargas a un acceso, el sistema deberá sumarlas al cupo y registrar la acción en la auditoría con el motivo. | RF23, RNF08 |
@@ -77,7 +77,8 @@ Entregar al instante los libros digitales comprados y protegerlos: el archivo so
 
 - Dos solicitudes simultáneas con una sola descarga restante: solo una obtiene el enlace.
 - Un cliente que pierde el archivo con el límite alcanzado pide ayuda (BIB-16) y la administración decide si restituye descargas (BIB-08).
-- Una descarga interrumpida cuenta, porque el sistema no puede saber si el archivo llegó completo; la ayuda de BIB-16 cubre ese caso.
+- Una descarga interrumpida puede reintentarse con el mismo enlace mientras no venza; pasada su vigencia, pide un enlace nuevo, que cuenta, y la ayuda de BIB-16 cubre los casos restantes.
+- **Riesgo aceptado:** quien reciba un enlace de otra persona puede descargar durante sus cinco minutos de vigencia; se limita con la vigencia corta, el cupo y el registro de cada descarga.
 - Un mensaje de aviso por WhatsApp nunca incluye el enlace de descarga (`transversal-notificaciones`).
 
 ## 7. Preguntas abiertas

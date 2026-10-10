@@ -51,7 +51,7 @@ La base común de `BabelHub.Web`: áreas por rol, sesión, estados de pantalla e
 | WEB-22 | Ubicuo | El sistema deberá permitir que al menos el 90 % de las personas de una prueba de usabilidad complete una compra con recojo sin ayuda, con una puntuación SUS de al menos 68 y menos de un error por tarea en promedio, medidos en rondas de 5 personas que sumen al menos 10. | RNF27, AC08 |
 | WEB-23 | Ubicuo | El sistema deberá completar el recorrido de compra en las dos últimas versiones estables de Chrome, Edge, Firefox y Safari, y en Chrome para Android y Safari para iOS recientes. | AC14, RC14 |
 | WEB-24 | No deseado | Si una operación es rechazada por un límite de uso, entonces el sistema deberá explicar el motivo y la espera sugerida sin perder lo que la persona tenía en pantalla y sin distinguir, en el ingreso, si la cuenta existe. | RNF17, AC13 |
-| WEB-25 | Evento | Cuando la sesión vence a mitad de una acción, el sistema deberá llevar al ingreso y conservar lo que el usuario tenía en pantalla. | RNF13, RNF15 |
+| WEB-25 | Evento | Cuando la sesión vence a mitad de una acción, el sistema deberá llevar al ingreso y conservar lo que el usuario tenía en pantalla, salvo contraseñas y códigos. | RNF13, RNF15 |
 | WEB-26 | No deseado | Si la Web no logra comunicarse con los servicios, entonces el sistema deberá mostrar el estado de servicio no disponible y conservar el carrito. | RNF13, AC03 |
 
 ## 4. Criterios de aceptación
@@ -71,7 +71,7 @@ La base común de `BabelHub.Web`: áreas por rol, sesión, estados de pantalla e
 | AC-WEB-11 | WEB-15 | **Dado** un titular con descargas disponibles, **cuando** pulsa descargar, **entonces** el navegador es redirigido al enlace firmado y la capa web no recibe el archivo. |
 | AC-WEB-12 | WEB-16 | **Dado** un cliente que eligió Ayacucho, **cuando** vuelve otro día, **entonces** su sucursal sigue siendo Ayacucho. |
 | AC-WEB-13 | WEB-17 | **Dado** un catálogo con libros disponibles y agotados, **cuando** el visitante pulsa «Sorpréndeme», **entonces** se muestra la ficha de un libro disponible. |
-| AC-WEB-14 | WEB-18, WEB-19 | **Dado** cualquier página, **cuando** se inspeccionan sus respuestas, **entonces** llevan las cuatro cabeceras de seguridad y la cookie de sesión tiene los tres atributos exigidos. |
+| AC-WEB-14 | WEB-18, WEB-19 | **Dado** cualquier página, **cuando** se inspeccionan sus respuestas, **entonces** llevan las cuatro cabeceras de seguridad y la cookie de sesión tiene los tres atributos exigidos; y solo la página de pago permite el script de la pasarela. |
 | AC-WEB-15 | WEB-20 | **Dado** el recorrido de compra, **cuando** se ejecuta la revisión automática de accesibilidad y la lista manual con teclado y lector de pantalla, **entonces** hay 0 incumplimientos críticos de nivel AA. |
 | AC-WEB-16 | WEB-21 | **Dado** inicio, catálogo y detalle en 4G simulada, **cuando** se mide, **entonces** LCP, INP y CLS cumplen las metas. |
 | AC-WEB-17 | WEB-22 | **Dado** dos rondas de cinco personas de prueba, **cuando** compran un libro con recojo sin ayuda, **entonces** al menos 9 de 10 lo logran, el SUS promedio es de 68 o más y el promedio de errores por tarea es menor que uno. |

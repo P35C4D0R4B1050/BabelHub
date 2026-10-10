@@ -49,13 +49,13 @@
 | ecommerce-libro-reclamaciones | E-commerce | Draft | 10 | 8 | transversal-auditoria, transversal-notificaciones |
 | ecommerce-pagos | E-commerce | Draft | 12 | 10 | ecommerce-carrito-checkout, inventario-seleccion-fuente, transversal-auditoria |
 | ecommerce-pedidos | E-commerce | Draft | 14 | 12 | ecommerce-pagos, inventario-seleccion-fuente, transversal-notificaciones, transversal-auditoria |
-| identidad-seguridad | Identidad | Draft | 30 | 27 | transversal-auditoria, transversal-seguridad |
+| identidad-seguridad | Identidad | Draft | 31 | 28 | transversal-auditoria, transversal-seguridad |
 | inventario-ajustes | Inventario | Draft | 12 | 9 | inventario-fuentes, transversal-auditoria |
 | inventario-fuentes | Inventario | Draft | 11 | 9 | transversal-auditoria |
 | inventario-seleccion-fuente | Inventario | Draft | 19 | 19 | inventario-fuentes, transversal-auditoria, transversal-seguridad |
 | inventario-traslados | Inventario | Draft | 13 | 11 | inventario-fuentes, inventario-seleccion-fuente, transversal-auditoria, transversal-notificaciones |
-| transversal-auditoria | Transversal | Draft | 12 | 11 | — |
+| transversal-auditoria | Transversal | Draft | 13 | 12 | — |
 | transversal-notificaciones | Transversal | Draft | 12 | 11 | identidad-seguridad, transversal-seguridad |
-| transversal-seguridad | Transversal | Draft | 22 | 19 | transversal-auditoria |
+| transversal-seguridad | Transversal | Draft | 23 | 20 | transversal-auditoria |
 | web-base | Web | Draft | 26 | 21 | identidad-seguridad, ecommerce-libro-reclamaciones, ecommerce-catalogo, transversal-seguridad |
 | web-indice-infinito | Web | Draft | 9 | 7 | web-base, transversal-seguridad |

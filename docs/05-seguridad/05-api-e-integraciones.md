@@ -43,11 +43,12 @@ Cómo se protegen las interfaces entre servicios, la que expone la Web y las que
 | Operación | Límite | Nivel | Spec |
 | :--- | :--- | :--- | :--- |
 | API en general | 100 solicitudes por minuto por usuario | Borde y Aplicación | SEG-05 |
-| Ingreso | 5 intentos por 15 minutos por origen; 5 fallos por cuenta | Aplicación | SEG-06, IDE-03 |
-| Reservas | 1 activa por cliente y 5 por hora | Aplicación | SEL-13, SEL-14 |
+| Ingreso | 5 fallos en 15 minutos por combinación de cuenta y origen; bloqueo de 15 minutos | Aplicación | SEG-06 |
+| Reservas | 1 temporal pendiente y 5 por hora por cliente; 10 por hora por origen | Aplicación | SEL-13, SEL-14, SEL-19 |
 | Descargas | 10 solicitudes de enlace por hora | Aplicación | BIB-15 |
 | Asistente | 10 consultas por minuto | Aplicación | ASI-09 |
-| Recuperación de acceso | Intentos y solicitudes acotados (valores por definir: propuesta 5 intentos y 3 solicitudes por hora) | Aplicación | IDE-19 |
+| Códigos de un solo uso | 3 solicitudes por hora por correo y por origen; 5 intentos por código | Aplicación | SEG-19, IDE-19 |
+| Segundo factor | 5 códigos incorrectos en 15 minutos bloquean 15 minutos | Aplicación | SEG-20 |
 
 **Respuesta uniforme:** al exceder un límite la respuesta tiene siempre la misma forma, incluye una espera sugerida y no revela información de cuentas. Cada exceso se registra como evento de seguridad (SEG-08).
 

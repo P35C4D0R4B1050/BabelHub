@@ -20,7 +20,7 @@ Avisar al cliente y a las sucursales de cada cambio importante sin que el aviso 
 | Dentro | Fuera |
 | :--- | :--- |
 | Qué eventos generan un aviso y a quién. | El contenido de cada pantalla de estado (otras specs). |
-| Consentimiento, reintentos, deduplicación y estado de cada aviso. | Otros canales como correo o SMS (mejora posterior). |
+| Consentimiento, reintentos, deduplicación y estado de cada aviso. | Otros canales para avisos como correo o SMS (mejora posterior); los códigos de seguridad por correo son de `identidad-seguridad`. |
 | Notificador simulado para desarrollo. | Conversaciones bidireccionales con el cliente. |
 
 ## 3. Requisitos (EARS)
@@ -65,6 +65,8 @@ Avisar al cliente y a las sucursales de cada cambio importante sin que el aviso 
 
 ## 6. Casos límite y errores
 
+- Un cliente con consentimiento pero sin número registrado no recibe avisos.
+- Un número ingresado por error puede enviar avisos a un tercero; el mensaje no contiene datos sensibles y la administración puede desactivar los avisos de un número a solicitud de su titular.
 - Un número inválido marca el aviso como fallido tras agotar los reintentos y lo deja visible a la administración.
 - Si el canal cambia de proveedor, solo cambia el adaptador, no los servicios (AD16).
 - Un evento anterior al consentimiento no genera avisos retroactivos.

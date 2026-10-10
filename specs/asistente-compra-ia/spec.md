@@ -54,7 +54,7 @@ Orientar al cliente con recomendaciones y respuestas sobre disponibilidad y esta
 | AC-ASI-02 | ASI-02 | **Dado** un libro con stock en Lima y Cusco y edición digital vigente, **cuando** el cliente pregunta por su disponibilidad, **entonces** la respuesta cita Lima y Cusco con sus unidades y la edición digital. |
 | AC-ASI-03 | ASI-03 | **Dado** una pregunta sobre un libro que no existe en el catálogo, **cuando** se responde, **entonces** el asistente indica que no tiene información suficiente. |
 | AC-ASI-04 | ASI-04 | **Dado** un cliente con un pedido en tránsito, **cuando** pregunta por su estado, **entonces** el asistente responde que está en tránsito entre sucursales. |
-| AC-ASI-05 | ASI-05 | **Dado** un cliente, **cuando** pregunta por el pedido de otra persona, **entonces** el asistente se niega a responder. |
+| AC-ASI-05 | ASI-05 | **Dado** un cliente, **cuando** pregunta por el pedido de otra persona, **entonces** el asistente se niega a responder y queda un evento de seguridad. |
 | AC-ASI-06 | ASI-06 | **Dado** el asistente, **cuando** se revisa su configuración, **entonces** no tiene credenciales ni acceso a las bases de datos de los servicios y solo cuenta con una credencial de lectura hacia sus interfaces. |
 | AC-ASI-07 | ASI-07 | **Dado** que el proveedor del modelo no responde, **cuando** el cliente usa el asistente, **entonces** ve que no está disponible y puede seguir comprando con normalidad. |
 | AC-ASI-08 | ASI-08 | **Dado** una consulta que no necesita datos personales, **cuando** se envía al modelo, **entonces** no incluye nombre, correo ni teléfono del cliente. |

@@ -82,6 +82,7 @@ Se cruzan fronteras: (1) Internet → borde; (2) borde → aplicaciones; (3) apl
 - No se cubren ataques físicos, amenazas internas con acceso a los servidores ni adversarios con recursos de un Estado.
 - No se realizan pruebas de penetración externas (RC15, alcance del negocio); sí revisión automática (SAST, DAST básico, escaneo de dependencias y de secretos).
 - AM03 y AM23 dependen de un proveedor gratuito de correo (B08). Se acepta el riesgo y se documenta la contingencia en AD30.
+- Se aceptan dos riesgos residuales: el ataque distribuido de contraseñas desde muchos orígenes (acotado por la política de contraseñas, la alerta y el segundo factor del administrador) y el enlace de descarga pasado a otra persona durante sus cinco minutos de vigencia.
 
 ## 6. Revisión
 

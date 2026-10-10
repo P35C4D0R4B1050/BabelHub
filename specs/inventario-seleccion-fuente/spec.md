@@ -43,7 +43,7 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 | SEL-13 | No deseado | Si un cliente ya tiene una reserva temporal pendiente de otro pedido, entonces el sistema deberá rechazar la nueva solicitud indicando que debe completar o liberar la anterior. | RF28, AC13 |
 | SEL-14 | No deseado | Si un cliente ya inició 5 reservas temporales en una ventana deslizante de una hora, entonces el sistema deberá rechazar la nueva solicitud; las solicitudes rechazadas por falta de stock o por estos límites no cuentan como iniciadas. | RF28, AC13 |
 | SEL-15 | Evento | Cuando una solicitud de reserva es rechazada por los límites, el sistema deberá responder y registrar el evento de seguridad con el cliente y el motivo según `transversal-seguridad` (SEG-07 y SEG-08). | RF28, AC13 |
-| SEL-16 | Evento | Cuando el cliente reinicia su checkout o modifica las cantidades de un pedido que ya tiene una reserva pendiente, el sistema deberá reemplazar esa reserva sin contarla como otra reserva ni como una nueva iniciada. | RF28, AC13 |
+| SEL-16 | Evento | Cuando el cliente reinicia su checkout, modifica las cantidades o reintenta tras un pago rechazado en un pedido que ya tiene una reserva pendiente, el sistema deberá reemplazar esa reserva sin contarla como otra reserva ni como una nueva iniciada. | RF28, AC13 |
 | SEL-17 | Evento | Cuando el cliente cancela su checkout, el sistema deberá liberar de inmediato sus reservas pendientes. | RF14, RF28 |
 | SEL-18 | Ubicuo | El sistema deberá comprobar y registrar los límites de reservas de forma atómica ante solicitudes simultáneas del mismo cliente o del mismo origen. | RF28, AC01, AC13 |
 | SEL-19 | No deseado | Si un mismo origen ya inició 10 reservas temporales en una ventana deslizante de una hora, entonces el sistema deberá rechazar la nueva solicitud. | RF28, AC13 |
@@ -92,3 +92,4 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 
 - [ ] ¿Cómo se estima la «sucursal más cercana» cuando el despacho es a domicilio: por región de la dirección o por una tabla de cercanía entre sucursales? Responde: responsable del proyecto; no bloquea el comportamiento de recojo.
 - [ ] ¿El físico se descuenta al entregar (recojo) y al despachar (domicilio)? Esta spec asume que sí; confirmar con el responsable del proyecto.
+- [ ] ¿Confirmas el límite de 10 reservas por hora por origen (SEL-19)? Los orígenes compartidos pueden llegar a él; propuesta: sí, como meta inicial. Responde: responsable del proyecto.

@@ -38,3 +38,22 @@ Resultado de la revisión del agente `spec-auditor` sobre las 9 specs tocadas po
 - Decidir quién aprueba la devolución de un impreso (pregunta abierta en `ecommerce-devoluciones`).
 - Definir en el plan qué pantalla muestra la lista de alertas de seguridad.
 - Aclarar en AGENTS.md, si se desea, que la regla 10 aplica a avisos y no a los códigos de seguridad (hoy no choca porque el correo usa otro puerto).
+
+## Segunda pasada (2026-10-10)
+
+El agente revisó las correcciones y no encontró referencias rotas. Se aplicaron los hallazgos nuevos:
+
+| Hallazgo | Corrección |
+| :--- | :--- |
+| SEG-10 contra el correo con el código | SEG-10 permite el código solo en el correo a su destinatario; AC-SEG-10 ajustado. |
+| Ataque distribuido de contraseñas | Riesgo aceptado y documentado (SEG §6 y modelo de amenazas), mitigado por política de contraseñas, alerta y segundo factor. |
+| Repeticiones de avisos de integraciones | SEG-12 procesa una sola vez y responde el mismo éxito; SEG-13 ya no duplica el caso del pago. |
+| Alcance de la recuperación y del personal | IDE-17 a IDE-19 para clientes; IDE-23 también al crear usuarios del personal, con caducidad de 24 horas; caso del único administrador. |
+| Límites de códigos | Vigencia e intentos en IDE-19 (también para la verificación); SEG-19 por propósito. |
+| Enlace de descarga compartido | Riesgo aceptado (BIB §6, AC09); el mismo enlace se puede reutilizar dentro de su vigencia (BIB-05). |
+| Número de WhatsApp sin verificar | IDE-31 valida el formato; NOT §6 documenta el riesgo. |
+| Lista de alertas sin dueña | AUD-13 y AC-AUD-12. |
+| Origen no determinable | SEG-23. |
+| Referencias obsoletas en `docs/05-seguridad` y ventana fija en el modelo de datos | Corregidas. |
+
+Quedan como ajustes de redacción, a resolver spec por spec en la Fase 2: orden de algunos identificadores, requisitos compuestos (AUD-02), solapes menores BIB-03/BIB-07 y las preguntas de confirmación numérica de cada spec.

@@ -41,19 +41,20 @@ Autenticar a los usuarios y emitir credenciales que indiquen su rol y, cuando co
 | IDE-08 | Estado | Mientras un usuario esté desactivado, el sistema deberá impedir su ingreso y su renovación de sesión. | RF19 |
 | IDE-09 | Ubicuo | El sistema deberá almacenar las contraseñas con una función de resumen adaptativa y una sal única por cuenta, y nunca en texto claro. | RNF18, AC05 |
 | IDE-10 | Ubicuo | El sistema deberá permitir a los demás servicios validar la firma y la vigencia de una credencial de acceso sin consultar a Identidad en cada solicitud. | RF18 |
-| IDE-11 | Evento | Cuando el cliente registra su número de WhatsApp o cambia su consentimiento para recibir avisos, el sistema deberá guardar la decisión con su fecha y aplicarla a los avisos siguientes. | NN15, RNF07 |
+| IDE-11 | Evento | Cuando el cliente cambia su consentimiento para recibir avisos por WhatsApp, el sistema deberá guardar la decisión con su fecha y aplicarla a los avisos siguientes. | NN15, RNF07 |
+| IDE-31 | Evento | Cuando el cliente registra su número de WhatsApp, el sistema deberá validar su formato y guardarlo solo si es válido. | NN15, RNF07 |
 | IDE-12 | Evento | Cuando un cliente solicita acceder a sus datos, rectificarlos, cancelarlos u oponerse a un tratamiento, el sistema deberá registrar la solicitud con el estado recibida. | RF27, RNF07, NN15 |
 | IDE-13 | No deseado | Si se registra una cuenta con un correo que ya existe, entonces el sistema deberá rechazar el registro sin revelar datos de la cuenta existente. | RF19 |
 | IDE-14 | Evento | Cuando el usuario cierra sesión, el sistema deberá revocar su renovación. | RF18 |
 | IDE-15 | Ubicuo | El sistema deberá exigir una contraseña de al menos 8 caracteres con mayúscula, minúscula, número y símbolo, que no figure en una lista de contraseñas comunes, al registrarse, al cambiarla y al recuperarla. | RNF15, AC05 |
-| IDE-16 | Evento | Cuando una persona se registra o cambia su correo, el sistema deberá enviar a ese correo un código de un solo uso y marcar el correo como verificado al recibir el código correcto antes de que venza. | RF26, RNF15 |
-| IDE-17 | Evento | Cuando una persona solicita recuperar su acceso, el sistema deberá enviar un código de un solo uso al correo verificado de la cuenta y responder con el mismo mensaje exista o no la cuenta y esté o no verificado su correo. | RF26, RNF15, AC13 |
+| IDE-16 | Evento | Cuando una persona se registra o cambia su correo, el sistema deberá enviar a ese correo un código de un solo uso, con la misma vigencia e intentos que el de recuperación (IDE-19), y marcar el correo como verificado al recibir el código correcto antes de que venza. | RF26, RNF15 |
+| IDE-17 | Evento | Cuando un cliente solicita recuperar su acceso, el sistema deberá enviar un código de un solo uso al correo verificado de la cuenta y responder con el mismo mensaje exista o no la cuenta y esté o no verificado su correo. | RF26, RNF15, AC13 |
 | IDE-18 | Evento | Cuando el usuario ingresa el código de recuperación correcto antes de que venza, el sistema deberá permitirle definir una nueva contraseña, invalidar el código y revocar todas sus renovaciones vigentes. | RF26, RNF15 |
 | IDE-19 | No deseado | Si el código es incorrecto, venció o ya se usó, entonces el sistema deberá rechazar la operación con un mensaje genérico y registrar el evento; el código vence a los 10 minutos y admite 5 intentos. | RF26, RNF15, AC13 |
 | IDE-20 | Evento | Cuando el administrador central ingresa credenciales correctas, el sistema deberá exigir además un código TOTP y no emitir la credencial sin él. | RNF15, AC05 |
 | IDE-21 | Evento | Cuando el administrador central ingresa por primera vez, el sistema deberá exigirle configurar el segundo factor y entregarle 8 códigos de respaldo de un solo uso. | RNF15 |
 | IDE-22 | Evento | Cuando el administrador central usa un código de respaldo válido en lugar del código TOTP, el sistema deberá aceptarlo una sola vez y registrarlo como evento de seguridad. | RNF15, AC05 |
-| IDE-23 | Evento | Cuando el administrador central restablece la contraseña de un usuario del personal, el sistema deberá fijar una contraseña temporal de un solo uso, exigir cambiarla en el siguiente ingreso y registrar la acción en la auditoría. | RF19, RNF15 |
+| IDE-23 | Evento | Cuando el administrador central crea un usuario del personal o restablece su contraseña, el sistema deberá fijar una contraseña temporal de un solo uso que vence a las 24 horas, mostrarla solo al administrador, exigir cambiarla en el siguiente ingreso y registrar la acción en la auditoría. | RF19, RNF15 |
 | IDE-24 | Evento | Cuando un cliente consulta su cuenta, el sistema deberá mostrarle sus datos personales, sus consentimientos y el estado de sus solicitudes, y permitirle corregir sus datos. | RF27, NN15 |
 | IDE-25 | Evento | Cuando un cliente cambia su contraseña o su correo, el sistema deberá exigir su contraseña actual. | RF27, RNF15 |
 | IDE-26 | Evento | Cuando la administración central atiende una solicitud de acceso, rectificación, cancelación u oposición, el sistema deberá registrar su respuesta, cambiar su estado a en atención, atendida o rechazada, y registrar la acción en la auditoría. | RF27, RNF23 |
@@ -90,8 +91,9 @@ Autenticar a los usuarios y emitir credenciales que indiquen su rol y, cuando co
 | AC-IDE-22 | IDE-24, IDE-25 | **Dado** un cliente con sesión, **cuando** abre su cuenta y cambia su contraseña indicando la actual, **entonces** ve sus datos, consentimientos y solicitudes y el cambio se aplica; y sin la actual, se rechaza. |
 | AC-IDE-23 | IDE-26 | **Dado** una solicitud recibida, **cuando** el administrador la atiende y registra su respuesta, **entonces** su estado cambia y queda una entrada de auditoría. |
 | AC-IDE-24 | IDE-27 | **Dado** un cliente con un pedido sin entregar, **cuando** intenta cancelar su cuenta, **entonces** se rechaza indicando el pedido. |
-| AC-IDE-25 | IDE-28 | **Dado** un cliente sin pedidos pendientes, **cuando** confirma la cancelación, **entonces** la cuenta se desactiva, sus datos personales se anonimizan y se conservan solo los pedidos y las hojas de reclamación exigidos. |
+| AC-IDE-25 | IDE-28 | **Dado** un cliente sin pedidos pendientes, **cuando** pide cancelar su cuenta, **entonces** ve la advertencia de que perderá su biblioteca; y **cuando** confirma la cancelación, **entonces** la cuenta se desactiva, sus datos personales se anonimizan y se conservan solo los pedidos y las hojas de reclamación exigidos. |
 | AC-IDE-26 | IDE-29 | **Dado** una cuenta con el correo sin verificar, **cuando** el cliente compra, **entonces** la compra se completa; y si solicita recuperar el acceso, no se envía ningún código. |
+| AC-IDE-28 | IDE-31 | **Dado** un número de WhatsApp con formato inválido, **cuando** el cliente lo guarda, **entonces** se rechaza; y con formato válido, se guarda. |
 | AC-IDE-27 | IDE-30 | **Dado** una tarea de fondo del E-commerce, **cuando** llama al Inventario, **entonces** usa una credencial de servicio que solo permite las operaciones de esa tarea. |
 
 ## 5. Reglas e invariantes
@@ -102,7 +104,7 @@ Autenticar a los usuarios y emitir credenciales que indiquen su rol y, cuando co
 - Las contraseñas nunca se guardan ni se registran en texto claro.
 - Los códigos de un solo uso (verificación, recuperación, segundo factor y respaldo) caducan, se invalidan al usarse y no se guardan ni se registran en claro.
 - El ingreso y la recuperación no revelan si una cuenta existe. El registro sí puede indicar que el correo ya está en uso; esa enumeración se acota con los límites de `transversal-seguridad`.
-- Los límites de intentos, solicitudes y bloqueos de ingreso, de verificación, de recuperación y del segundo factor se definen en `transversal-seguridad`.
+- Los límites de ingreso, de solicitudes de códigos y del segundo factor se definen en `transversal-seguridad` (SEG-06, SEG-19, SEG-20); la vigencia y los intentos de cada código, en IDE-19.
 
 ## 6. Casos límite y errores
 
@@ -111,7 +113,7 @@ Autenticar a los usuarios y emitir credenciales que indiquen su rol y, cuando co
 - Un cliente puede comprar con el correo sin verificar; solo queda sin recuperación de acceso.
 - El número de WhatsApp es opcional; sin él o sin consentimiento, el cliente solo se queda sin avisos.
 - Si el envío del correo falla, la verificación o la recuperación no se completan y la persona puede reintentar; ninguna otra operación se interrumpe.
-- Si un administrador pierde su dispositivo y sus códigos de respaldo, la recuperación se hace con acceso a la infraestructura según un procedimiento documentado fuera del sistema.
+- Si el único administrador pierde su contraseña, o su dispositivo y sus códigos de respaldo, la recuperación se hace con acceso a la infraestructura según un procedimiento documentado fuera del sistema.
 - Cancelar la cuenta hace perder el acceso a la biblioteca digital; no hay reembolso automático por ello.
 - La identidad de un usuario cancelado en los registros de auditoría se anonimiza en la depuración (`transversal-auditoria`).
 
@@ -124,3 +126,4 @@ Autenticar a los usuarios y emitir credenciales que indiquen su rol y, cuando co
 - [ ] ¿Confirmas 10 minutos de vigencia, 5 intentos por código y 3 solicitudes por hora para los códigos? Propuesta: sí (IDE-19 y `transversal-seguridad`). Responde: responsable del proyecto.
 - [ ] ¿Cuál es el plazo para atender una solicitud de acceso, rectificación, cancelación u oposición? Propuesta: 20 días hábiles. Responde: responsable del proyecto.
 - [ ] ¿Las llamadas entre servicios reenvían la credencial del usuario o usan una credencial de servicio? Propuesta: reenviar para acciones del usuario y usar la credencial de servicio de IDE-30 para tareas de fondo. Se decide en el plan.
+- [ ] ¿Confirmas que la contraseña temporal del personal vence a las 24 horas? Propuesta: sí. Responde: responsable del proyecto.

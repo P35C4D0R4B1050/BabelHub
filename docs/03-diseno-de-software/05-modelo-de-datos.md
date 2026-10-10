@@ -34,7 +34,7 @@ RESERVAS }o--|| PEDIDOS_REF : "pertenece a"
 | `reservas` | id, pedido_id, cliente_id, origen_red, fuente_id, edicion_id, cantidad, estado, fecha_expiracion, clave_idempotencia, fecha_creacion | Estado en (pendiente, confirmada, liberada, expirada); `clave_idempotencia` única; índice parcial sobre estado pendiente por cliente (límite de una pendiente). |
 | `traslados` | id, edicion_id, origen_id, destino_id, cantidad, estado, motivo, pedido_id, fechas por estado | Origen distinto de destino; estado en el ciclo definido; cantidad positiva. |
 | `ajustes` | id, fuente_id, edicion_id, motivo, cantidad, conteo_real, usuario_id, fecha | Motivo en (merma, danado, correccion_conteo); solo inserción. |
-| `contadores_limite` | clave, ventana_inicio, cantidad | Contadores de reservas por cliente y por origen (SEL-14, SEL-19); se incrementan con la misma transacción de la reserva. |
+| `eventos_limite` | clave, instante | Un registro por reserva iniciada, por cliente y por origen (SEL-14, SEL-19); el conteo usa una ventana deslizante (SEG-21) y se inserta en la misma transacción de la reserva; los registros viejos se purgan. |
 | `auditoria` | id, fecha_utc, usuario_id, rol, accion, detalle, resultado, secuencia | Solo inserción; sin permisos de modificación para la cuenta de aplicación. |
 
 **Regla de oro:** `reservado` se actualiza en la misma transacción que la fila de `reservas`, y el `CHECK` es la última defensa contra la sobreventa (AD23). El vendible se calcula como `fisico - reservado`; no se almacena.
@@ -70,7 +70,7 @@ RESERVAS }o--|| PEDIDOS_REF : "pertenece a"
 | `codigos_respaldo` | usuario_id, huella, usado | 8 por administrador; un solo uso. |
 | `consentimientos` | usuario_id, finalidad, vigente, fecha | Historial por cambio. |
 | `solicitudes_arco` | id, usuario_id, tipo, estado, respuesta, fecha | Estados: recibida, en atención, atendida, rechazada. |
-| `contadores_ingreso` | clave (cuenta+origen), ventana_inicio, fallos | Alimenta SEG-06; cuenta también para cuentas inexistentes. |
+| `eventos_ingreso` | clave (cuenta+origen), instante | Un registro por ingreso fallido (SEG-06); cuenta también para cuentas inexistentes; ventana deslizante. |
 | `auditoria` | como en Inventario | Solo inserción. |
 
 ## 5. Índices y rendimiento
