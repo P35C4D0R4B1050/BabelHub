@@ -4,8 +4,8 @@ titulo: Reservas y selección de fuente
 estado: Draft
 servicio: Inventario
 prefijo: SEL
-origen: [RF14, RF15, NN02, NN06, NN07]
-calidad: [AC01, AC06, RNF01, RNF09]
+origen: [RF14, RF15, RF28, NN02, NN06, NN07, NN18]
+calidad: [AC01, AC06, AC13, RNF01, RNF09]
 depende: [inventario-fuentes, transversal-auditoria]
 ---
 
@@ -22,6 +22,7 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 | Reservas temporales con expiración, confirmación y liberación. | El ciclo de vida del traslado (`inventario-traslados`). |
 | Selección de la fuente de cada línea impresa. | El cobro y el pedido (`ecommerce-pagos`, `ecommerce-pedidos`). |
 | Atomicidad ante solicitudes simultáneas. | Libros digitales: nunca se reservan. |
+| Límite de reservas por cliente (una activa y 5 por hora). | Límites por origen de red y por ruta (`transversal-seguridad`). |
 
 ## 3. Requisitos (EARS)
 
@@ -39,6 +40,9 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 | SEL-10 | Opcional | Donde se defina otra regla de selección de fuente, el sistema deberá permitir sustituirla sin cambiar el contrato de reservas ni al E-commerce. | RNF09, AC06 |
 | SEL-11 | Evento | Cuando la sucursal marca como entregado un pedido de recojo, el sistema deberá descontar el stock físico de la reserva confirmada y cerrarla. | RF14 |
 | SEL-12 | Ubicuo | El sistema deberá rechazar cualquier solicitud de reserva que incluya una edición digital. | RF14 |
+| SEL-13 | No deseado | Si un cliente ya tiene una reserva pendiente de otro pedido, entonces el sistema deberá rechazar la nueva solicitud indicando que debe completar o liberar la anterior. | RF28, AC13 |
+| SEL-14 | No deseado | Si un cliente ya inició 5 reservas en la última hora, entonces el sistema deberá rechazar la nueva solicitud indicando cuándo podrá intentarlo otra vez. | RF28, AC13 |
+| SEL-15 | Evento | Cuando una solicitud de reserva es rechazada por los límites del cliente, el sistema deberá registrar el evento de seguridad con el cliente y el motivo. | RF28, AC13 |
 
 ## 4. Criterios de aceptación
 
@@ -56,6 +60,9 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 | AC-SEL-10 | SEL-10 | **Dado** una regla de selección alternativa registrada, **cuando** se activa, **entonces** las reservas la usan sin modificar el contrato ni el E-commerce. |
 | AC-SEL-11 | SEL-11 | **Dado** una reserva confirmada de 1 unidad con físico 9, **cuando** la sucursal entrega el pedido, **entonces** el físico pasa a 8 y la reserva queda cerrada. |
 | AC-SEL-12 | SEL-12 | **Dado** una solicitud de reserva con una edición digital, **cuando** se envía, **entonces** se rechaza indicando que los libros digitales no se reservan. |
+| AC-SEL-13 | SEL-13 | **Dado** un cliente con una reserva pendiente, **cuando** pide reservar otro pedido, **entonces** se rechaza con el motivo del límite y el vendible no cambia. |
+| AC-SEL-14 | SEL-14 | **Dado** un cliente que inició 5 reservas en la última hora, **cuando** intenta una sexta, **entonces** se rechaza indicando cuándo podrá reintentar. |
+| AC-SEL-15 | SEL-15 | **Dado** una solicitud rechazada por límite, **cuando** se revisa el registro de seguridad, **entonces** figura el cliente y el motivo. |
 
 ## 5. Reglas e invariantes
 
@@ -63,6 +70,7 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 - Una reserva no descuenta el stock físico; lo reduce el vendible. El físico baja al entregar.
 - El tiempo de expiración es de 15 minutos desde que se inicia el pago.
 - La reserva de un pedido es atómica: se reservan todas las líneas impresas o ninguna.
+- Una reserva expirada, liberada o confirmada deja de contar para el límite de una reserva pendiente; todas cuentan para el límite de 5 por hora.
 - La regla del dominio no basta ante la concurrencia: la atomicidad la garantiza la infraestructura y se prueba con solicitudes simultáneas.
 
 ## 6. Casos límite y errores
@@ -70,6 +78,7 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 - Un pedido con líneas de dos o más ediciones que se atienden desde fuentes distintas genera un traslado por cada fuente distinta de la sucursal de recojo.
 - Una confirmación de reserva ya expirada se rechaza y obliga a reiniciar el pago.
 - Una liberación repetida de la misma reserva no cambia el stock otra vez.
+- Repetir una solicitud con la misma clave de idempotencia no cuenta como una reserva nueva para los límites.
 
 ## 7. Preguntas abiertas
 

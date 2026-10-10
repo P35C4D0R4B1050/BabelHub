@@ -4,8 +4,8 @@ titulo: Carrito y checkout
 estado: Draft
 servicio: E-commerce
 prefijo: CAR
-origen: [RF03, RF04, NN02, NN13, NN15]
-calidad: [AC01, AC03, AC08, RNF01, RNF03, RNF13]
+origen: [RF03, RF04, RF28, NN02, NN13, NN15, NN18]
+calidad: [AC01, AC03, AC08, AC13, RNF01, RNF03, RNF13]
 depende: [ecommerce-catalogo, inventario-seleccion-fuente]
 ---
 
@@ -43,6 +43,7 @@ Que el cliente arme un carrito que se conserva entre sesiones y dispositivos, me
 | CAR-14 | No deseado | Si una edición digital deja de estar disponible por su licencia durante el checkout, entonces el sistema deberá impedir su pago e invitar a quitarla. | NN14 |
 | CAR-15 | Ubicuo | El sistema deberá completar la compra en no más de cinco pasos, y en no más de cuatro cuando el carrito es solo digital. | RNF13, AC08 |
 | CAR-16 | Ubicuo | El sistema deberá exigir que el cliente haya iniciado sesión para pagar. | RF03 |
+| CAR-17 | No deseado | Si el inventario rechaza la reserva porque el cliente superó el límite de reservas, entonces el sistema deberá explicar el motivo, indicar cuándo podrá intentarlo otra vez y conservar el carrito. | RF28, AC13 |
 
 ## 4. Criterios de aceptación
 
@@ -61,6 +62,7 @@ Que el cliente arme un carrito que se conserva entre sesiones y dispositivos, me
 | AC-CAR-11 | CAR-12, CAR-13 | **Dado** un carrito con un libro digital, **cuando** el cliente intenta pagar sin aceptar la política de reembolso digital, **entonces** no puede continuar. |
 | AC-CAR-12 | CAR-14 | **Dado** una edición digital cuya licencia vence mientras el cliente paga, **cuando** confirma, **entonces** esa línea se bloquea y se le invita a quitarla. |
 | AC-CAR-13 | CAR-16 | **Dado** un visitante sin sesión, **cuando** pulsa pagar, **entonces** se le pide iniciar sesión y su carrito se conserva. |
+| AC-CAR-14 | CAR-17 | **Dado** un cliente que ya tiene una reserva pendiente, **cuando** inicia el pago de otro carrito, **entonces** ve el motivo del límite, cuándo reintentar y su carrito intacto. |
 
 ## 5. Reglas e invariantes
 
