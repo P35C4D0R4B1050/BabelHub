@@ -6,7 +6,7 @@ servicio: Inventario
 prefijo: SEL
 origen: [RF14, RF15, RF28, NN02, NN06, NN07, NN18]
 calidad: [AC01, AC06, AC13, RNF01, RNF09]
-depende: [inventario-fuentes, transversal-auditoria]
+depende: [inventario-fuentes, transversal-auditoria, transversal-seguridad]
 ---
 
 # Spec — Reservas y selección de fuente
@@ -22,7 +22,7 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 | Reservas temporales con expiración, confirmación y liberación. | El ciclo de vida del traslado (`inventario-traslados`). |
 | Selección de la fuente de cada línea impresa. | El cobro y el pedido (`ecommerce-pagos`, `ecommerce-pedidos`). |
 | Atomicidad ante solicitudes simultáneas. | Libros digitales: nunca se reservan. |
-| Límite de reservas por cliente (una activa y 5 por hora). | Límites por origen de red y por ruta (`transversal-seguridad`). |
+| Límite de reservas temporales por cliente (una pendiente y 5 por hora) y por origen (10 por hora). | El formato de rechazo, el registro del evento y los demás límites de uso (`transversal-seguridad`). |
 
 ## 3. Requisitos (EARS)
 
@@ -40,9 +40,13 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 | SEL-10 | Opcional | Donde se defina otra regla de selección de fuente, el sistema deberá permitir sustituirla sin cambiar el contrato de reservas ni al E-commerce. | RNF09, AC06 |
 | SEL-11 | Evento | Cuando la sucursal marca como entregado un pedido de recojo, el sistema deberá descontar el stock físico de la reserva confirmada y cerrarla. | RF14 |
 | SEL-12 | Ubicuo | El sistema deberá rechazar cualquier solicitud de reserva que incluya una edición digital. | RF14 |
-| SEL-13 | No deseado | Si un cliente ya tiene una reserva pendiente de otro pedido, entonces el sistema deberá rechazar la nueva solicitud indicando que debe completar o liberar la anterior. | RF28, AC13 |
-| SEL-14 | No deseado | Si un cliente ya inició 5 reservas en la última hora, entonces el sistema deberá rechazar la nueva solicitud indicando cuándo podrá intentarlo otra vez. | RF28, AC13 |
-| SEL-15 | Evento | Cuando una solicitud de reserva es rechazada por los límites del cliente, el sistema deberá registrar el evento de seguridad con el cliente y el motivo. | RF28, AC13 |
+| SEL-13 | No deseado | Si un cliente ya tiene una reserva temporal pendiente de otro pedido, entonces el sistema deberá rechazar la nueva solicitud indicando que debe completar o liberar la anterior. | RF28, AC13 |
+| SEL-14 | No deseado | Si un cliente ya inició 5 reservas temporales en una ventana deslizante de una hora, entonces el sistema deberá rechazar la nueva solicitud; las solicitudes rechazadas por falta de stock o por estos límites no cuentan como iniciadas. | RF28, AC13 |
+| SEL-15 | Evento | Cuando una solicitud de reserva es rechazada por los límites, el sistema deberá responder y registrar el evento de seguridad con el cliente y el motivo según `transversal-seguridad` (SEG-07 y SEG-08). | RF28, AC13 |
+| SEL-16 | Evento | Cuando el cliente reinicia su checkout o modifica las cantidades de un pedido que ya tiene una reserva pendiente, el sistema deberá reemplazar esa reserva sin contarla como otra reserva ni como una nueva iniciada. | RF28, AC13 |
+| SEL-17 | Evento | Cuando el cliente cancela su checkout, el sistema deberá liberar de inmediato sus reservas pendientes. | RF14, RF28 |
+| SEL-18 | Ubicuo | El sistema deberá comprobar y registrar los límites de reservas de forma atómica ante solicitudes simultáneas del mismo cliente o del mismo origen. | RF28, AC01, AC13 |
+| SEL-19 | No deseado | Si un mismo origen ya inició 10 reservas temporales en una ventana deslizante de una hora, entonces el sistema deberá rechazar la nueva solicitud. | RF28, AC13 |
 
 ## 4. Criterios de aceptación
 
@@ -61,8 +65,12 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 | AC-SEL-11 | SEL-11 | **Dado** una reserva confirmada de 1 unidad con físico 9, **cuando** la sucursal entrega el pedido, **entonces** el físico pasa a 8 y la reserva queda cerrada. |
 | AC-SEL-12 | SEL-12 | **Dado** una solicitud de reserva con una edición digital, **cuando** se envía, **entonces** se rechaza indicando que los libros digitales no se reservan. |
 | AC-SEL-13 | SEL-13 | **Dado** un cliente con una reserva pendiente, **cuando** pide reservar otro pedido, **entonces** se rechaza con el motivo del límite y el vendible no cambia. |
-| AC-SEL-14 | SEL-14 | **Dado** un cliente que inició 5 reservas en la última hora, **cuando** intenta una sexta, **entonces** se rechaza indicando cuándo podrá reintentar. |
-| AC-SEL-15 | SEL-15 | **Dado** una solicitud rechazada por límite, **cuando** se revisa el registro de seguridad, **entonces** figura el cliente y el motivo. |
+| AC-SEL-14 | SEL-14 | **Dado** un cliente que inició 5 reservas en la última hora, **cuando** intenta una sexta, **entonces** se rechaza con el instante en que podrá reintentar; y una solicitud rechazada por falta de stock no cuenta entre las 5. |
+| AC-SEL-15 | SEL-15 | **Dado** una solicitud rechazada por límite, **cuando** se revisa el registro de seguridad, **entonces** figura el cliente y el motivo, y la respuesta tiene el formato de `transversal-seguridad`. |
+| AC-SEL-16 | SEL-16 | **Dado** un cliente con una reserva pendiente, **cuando** cambia la cantidad de su pedido, **entonces** la reserva se reemplaza, el vendible refleja la nueva cantidad y no se consume ninguna de las 5 reservas por hora. |
+| AC-SEL-17 | SEL-17 | **Dado** una reserva pendiente, **cuando** el cliente cancela su checkout, **entonces** las unidades vuelven al vendible de inmediato. |
+| AC-SEL-18 | SEL-18 | **Dado** un cliente sin reservas, **cuando** envía 10 solicitudes de reserva simultáneas de pedidos distintos, **entonces** exactamente una se acepta. |
+| AC-SEL-19 | SEL-19 | **Dado** un origen con 10 reservas iniciadas en la última hora por cuentas distintas, **cuando** otra cuenta del mismo origen intenta reservar, **entonces** se rechaza con la respuesta de límite excedido. |
 
 ## 5. Reglas e invariantes
 
@@ -70,7 +78,7 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 - Una reserva no descuenta el stock físico; lo reduce el vendible. El físico baja al entregar.
 - El tiempo de expiración es de 15 minutos desde que se inicia el pago.
 - La reserva de un pedido es atómica: se reservan todas las líneas impresas o ninguna.
-- Una reserva expirada, liberada o confirmada deja de contar para el límite de una reserva pendiente; todas cuentan para el límite de 5 por hora.
+- El límite de «una pendiente» cuenta solo las reservas temporales pendientes; una reserva expirada, liberada o confirmada deja de contar. Las reservas confirmadas de pedidos pagados no limitan nuevas compras. Todas las iniciadas con éxito cuentan para el límite de 5 por hora del cliente y de 10 por hora del origen.
 - La regla del dominio no basta ante la concurrencia: la atomicidad la garantiza la infraestructura y se prueba con solicitudes simultáneas.
 
 ## 6. Casos límite y errores

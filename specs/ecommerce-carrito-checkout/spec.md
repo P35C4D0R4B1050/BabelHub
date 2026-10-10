@@ -6,7 +6,7 @@ servicio: E-commerce
 prefijo: CAR
 origen: [RF03, RF04, RF28, NN02, NN13, NN15, NN18]
 calidad: [AC01, AC03, AC08, AC13, RNF01, RNF03, RNF13]
-depende: [ecommerce-catalogo, inventario-seleccion-fuente]
+depende: [ecommerce-catalogo, inventario-seleccion-fuente, transversal-seguridad]
 ---
 
 # Spec — Carrito y checkout
@@ -38,12 +38,15 @@ Que el cliente arme un carrito que se conserva entre sesiones y dispositivos, me
 | CAR-09 | Evento | Cuando la sucursal de recojo elegida no tiene el stock y otra fuente lo atenderá, el sistema deberá informar el traslado y su plazo estimado antes de pagar. | RF04 |
 | CAR-10 | Evento | Cuando el cliente inicia el pago de impresos, el sistema deberá reservar las unidades con expiración y mostrar el tiempo restante. | RF04, AC01 |
 | CAR-11 | No deseado | Si la reserva expira antes de completar el pago, entonces el sistema deberá impedir el cobro e invitar a reiniciar el checkout. | RF04, AC01 |
-| CAR-12 | Ubicuo | El sistema deberá exigir, antes del pago, la aceptación de los términos y el consentimiento para los avisos por WhatsApp y el tratamiento de datos. | NN15 |
+| CAR-12 | Ubicuo | El sistema deberá exigir, antes del pago, la aceptación de los términos y del tratamiento de datos personales. | NN15 |
 | CAR-13 | Estado | Mientras el carrito contiene libros digitales, el sistema deberá exigir además la aceptación de la política de reembolso de libros digitales. | NN15 |
 | CAR-14 | No deseado | Si una edición digital deja de estar disponible por su licencia durante el checkout, entonces el sistema deberá impedir su pago e invitar a quitarla. | NN14 |
 | CAR-15 | Ubicuo | El sistema deberá completar la compra en no más de cinco pasos, y en no más de cuatro cuando el carrito es solo digital. | RNF13, AC08 |
 | CAR-16 | Ubicuo | El sistema deberá exigir que el cliente haya iniciado sesión para pagar. | RF03 |
-| CAR-17 | No deseado | Si el inventario rechaza la reserva porque el cliente superó el límite de reservas, entonces el sistema deberá explicar el motivo, indicar cuándo podrá intentarlo otra vez y conservar el carrito. | RF28, AC13 |
+| CAR-17 | No deseado | Si el inventario rechaza la reserva porque el cliente superó un límite de reservas, entonces el sistema deberá explicar el motivo, mostrar el instante en que podrá intentarlo otra vez y conservar el carrito. | RF28, AC13 |
+| CAR-18 | Opcional | Donde el cliente aún no registró su consentimiento para recibir avisos por WhatsApp, el sistema deberá ofrecerlo en el checkout como opción, sin exigirlo para pagar; la decisión la guarda `identidad-seguridad`. | NN15 |
+| CAR-20 | No deseado | Si el cliente ya posee una edición digital, entonces el sistema deberá impedir agregarla de nuevo al carrito e indicar que ya está en su biblioteca. | NN13 |
+| CAR-19 | Evento | Cuando el cliente cancela el checkout o vuelve al carrito, el sistema deberá pedir al inventario la liberación de sus reservas pendientes. | RF04, RF28 |
 
 ## 4. Criterios de aceptación
 
@@ -59,10 +62,14 @@ Que el cliente arme un carrito que se conserva entre sesiones y dispositivos, me
 | AC-CAR-08 | CAR-09 | **Dado** un libro que solo está en Cusco y recojo en Ayacucho, **cuando** el cliente elige recojo, **entonces** se le avisa del traslado y del plazo estimado antes de pagar. |
 | AC-CAR-09 | CAR-10 | **Dado** un checkout con impresos, **cuando** el cliente llega al pago, **entonces** las unidades quedan reservadas y se muestra la cuenta regresiva de 15 minutos. |
 | AC-CAR-10 | CAR-11 | **Dado** una reserva de 15 minutos, **cuando** vence antes de pagar, **entonces** el pago se bloquea y se invita a reiniciar el checkout. |
-| AC-CAR-11 | CAR-12, CAR-13 | **Dado** un carrito con un libro digital, **cuando** el cliente intenta pagar sin aceptar la política de reembolso digital, **entonces** no puede continuar. |
+| AC-CAR-11 | CAR-13 | **Dado** un carrito con un libro digital, **cuando** el cliente intenta pagar sin aceptar la política de reembolso digital, **entonces** no puede continuar. |
+| AC-CAR-15 | CAR-12 | **Dado** un carrito cualquiera, **cuando** el cliente intenta pagar sin aceptar los términos y el tratamiento de datos, **entonces** no puede continuar. |
+| AC-CAR-16 | CAR-18 | **Dado** un cliente sin consentimiento de WhatsApp, **cuando** llega al pago sin marcarlo, **entonces** puede pagar y no recibe avisos por WhatsApp. |
+| AC-CAR-18 | CAR-20 | **Dado** un cliente que ya compró una edición digital, **cuando** intenta agregarla al carrito, **entonces** se rechaza indicando que ya está en su biblioteca. |
+| AC-CAR-17 | CAR-19 | **Dado** un checkout con reservas pendientes, **cuando** el cliente vuelve al carrito, **entonces** las unidades quedan libres de inmediato. |
 | AC-CAR-12 | CAR-14 | **Dado** una edición digital cuya licencia vence mientras el cliente paga, **cuando** confirma, **entonces** esa línea se bloquea y se le invita a quitarla. |
 | AC-CAR-13 | CAR-16 | **Dado** un visitante sin sesión, **cuando** pulsa pagar, **entonces** se le pide iniciar sesión y su carrito se conserva. |
-| AC-CAR-14 | CAR-17 | **Dado** un cliente que ya tiene una reserva pendiente, **cuando** inicia el pago de otro carrito, **entonces** ve el motivo del límite, cuándo reintentar y su carrito intacto. |
+| AC-CAR-14 | CAR-17 | **Dado** un cliente que ya tiene una reserva pendiente, **cuando** inicia el pago de otro carrito, **entonces** ve el motivo del límite, el instante en que puede reintentar y su carrito intacto. |
 
 ## 5. Reglas e invariantes
 
