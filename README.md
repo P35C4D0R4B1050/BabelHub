@@ -27,7 +27,7 @@ BabelHub se compone de **dos sistemas independientes pero interoperables** para 
 | [02 Arquitectura de software](docs/02-arquitectura-de-software/) | [Drivers](docs/02-arquitectura-de-software/01-drivers-arquitectonicos.md) (DA), [decisiones](docs/02-arquitectura-de-software/02-decisiones-arquitectonicas.md) (AD), [estilo](docs/02-arquitectura-de-software/03-estilo-arquitectonico.md), [escenarios y flujos](docs/02-arquitectura-de-software/04-escenarios-y-flujos.md) y [despliegue en Oracle Cloud](docs/02-arquitectura-de-software/05-despliegue.md). |
 | [03 Diseño de software](docs/03-diseno-de-software/) | [Clean Architecture](docs/03-diseno-de-software/01-clean-architecture.md) y [organización interna](docs/03-diseno-de-software/02-organizacion-interna.md). |
 | 04 Modelo C4 | Reservada; se desarrollará más adelante. |
-| 05 Seguridad | En preparación: amenazas, controles y estándares (OWASP, ISO). |
+| [05 Seguridad](docs/05-seguridad/) | Modelo de amenazas, controles ASVS, autenticación, privacidad, API e integraciones, seguridad del asistente, operación segura y mapeo a OWASP e ISO. |
 | [06 Experiencia de usuario](docs/06-experiencia-de-usuario/) | [Identidad y sistema de diseño](docs/06-experiencia-de-usuario/01-identidad-y-sistema-de-diseno.md), [pantallas y recorridos](docs/06-experiencia-de-usuario/02-pantallas-y-recorridos.md) y [estados, accesibilidad y criterios](docs/06-experiencia-de-usuario/03-estados-accesibilidad-y-criterios.md). |
 | [07 Proceso de desarrollo](docs/07-proceso-de-desarrollo/) | [Flujo SDD](docs/07-proceso-de-desarrollo/01-flujo-sdd.md) y [convenciones técnicas](docs/07-proceso-de-desarrollo/02-convenciones-tecnicas.md). |
 
