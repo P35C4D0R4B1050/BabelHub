@@ -31,7 +31,7 @@ Prioridad: **Alta**, **Media**, **Baja**.
 | **RF14** | El sistema debe crear reservas a solicitud del E-commerce, confirmarlas al aprobarse el pago y liberarlas si el pedido se cancela o expira. | Alta | NN02, NN06 |
 | **RF15** | El sistema debe seleccionar automáticamente la sucursal desde la cual atender un pedido, priorizando cercanía al cliente y disponibilidad, e identificar otras sucursales con stock cuando la más cercana no lo tenga. | Alta | NN07 |
 | **RF16** | El sistema debe generar, aprobar, despachar, recibir y dar seguimiento a traslados entre sucursales, notificando a origen y destino, y actualizando el stock de ambas. | Alta | NN07 |
-| **RF17** | El sistema debe registrar ajustes de inventario con motivo (merma, daño, corrección de conteo) y usuario responsable, por sucursal. | Alta | NN06 |
+| **RF17** | El sistema debe registrar ajustes de inventario con motivo (merma, daño, corrección de conteo) y usuario responsable, por sucursal. La merma y el daño solo descuentan y nunca más que el stock vendible; la corrección de conteo se expresa como conteo físico real, que no puede ser menor que las unidades reservadas. | Alta | NN06 |
 
 ### 1.3 Seguridad, administración y analítica
 
