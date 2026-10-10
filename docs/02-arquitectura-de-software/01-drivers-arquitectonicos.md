@@ -6,11 +6,11 @@ Un **driver arquitectónico** es un requisito, atributo de calidad o restricció
 
 ```mermaid
 flowchart LR
-NN["Necesidades<br/>NN01 - NN12"] --> REQ["Requisitos<br/>RF, RNF, RC"]
-REQ --> AC["Atributos de calidad<br/>AC01 - AC08"]
-AC --> DA["Drivers<br/>DA01 - DA12"]
+NN["Necesidades<br/>NN01 - NN18"] --> REQ["Requisitos<br/>RF, RNF, RC"]
+REQ --> AC["Atributos de calidad<br/>AC01 - AC14"]
+AC --> DA["Drivers<br/>DA01 - DA17"]
 REQ --> DA
-DA --> AD["Decisiones<br/>AD01 - AD21"]
+DA --> AD["Decisiones<br/>AD01 - AD29"]
 AD --> EST["Estilo y estructura<br/>servicios + Clean Architecture"]
 
 style NN fill:#222,stroke:#fff,color:#fff
@@ -37,6 +37,11 @@ style EST fill:#222,stroke:#fff,color:#fff
 | **DA10** | La operación debe tener costo mínimo y esfuerzo técnico manejable. | Negocio | NN12, RC09 | Favorece servicios gratuitos gestionados (Cloudflare) frente a componentes propios que haya que mantener. | AD13, AD14 |
 | **DA11** | El cliente y la sucursal deben recibir avisos de estado por WhatsApp sin costo por mensaje y sin que el aviso bloquee la compra. | Negocio / Restricción | RF07, RC12, NN03, NN12 | Obliga a un puerto de notificación aislado, a un envío tolerante a fallos y a alojar n8n y Evolution API dentro del presupuesto de recursos. | AD16 |
 | **DA12** | La librería vende libros digitales con licencia de terceros, y el archivo debe llegar solo a quien lo compró. | Calidad / Restricción legal | NN13, NN14, NN15, RF22–RF24, RNF14, RC13, AC09 | Exige un almacén de archivos fuera de las VMs, entrega por enlaces firmados, un modelo de licencia por título (titular, territorio, vigencia) y que la compra digital no dependa del Inventario. | AD19, AD20 |
+| **DA13** | Superficie pública con flujos de negocio abusables (reservas, descargas, asistente). | Calidad | RF28, RNF17, AC13 | Límites de uso en el borde y en la Aplicación; registro y alertas. | AD24, AD25 |
+| **DA14** | Experiencia móvil accesible con conexión variable. | Calidad | NN16, RNF25, RNF26, AC10 | Interfaz móvil primero, presupuesto de rendimiento y pruebas de accesibilidad. | AD26, AD29 |
+| **DA15** | Privacidad y transferencias de datos fuera del país. | Restricción legal | RNF23, RC17, AC11 | Minimización, retención y qué datos reciben los proveedores. | AD27 |
+| **DA16** | Recuperación con recursos mínimos. | Calidad | RNF24, AC12 | Respaldos fuera del dominio de falla y pruebas de restauración. | AD27 |
+| **DA17** | Contenido generado por un LLM no es confiable. | Calidad | RNF22 | Aislamiento del asistente, solo lectura y salida como texto. | AD28 |
 
 ## 3. Riesgos y compromisos
 
@@ -53,3 +58,9 @@ style EST fill:#222,stroke:#fff,color:#fff
 | Cloudflare es una dependencia de terceros en el camino de todas las solicitudes (DA10). | Aceptable para este alcance; se documenta la alternativa de exponer Nginx directamente. |
 | Evolution API no es un canal oficial de WhatsApp: el número puede ser bloqueado o el protocolo cambiar sin aviso (DA11). | Usar un número dedicado, volumen bajo y solo mensajes transaccionales con consentimiento; el puerto `Notificador` permite sustituirlo (WhatsApp Cloud API oficial o correo) sin tocar el negocio. Una falla de envío nunca bloquea la compra. |
 | n8n y Evolution API consumen RAM y CPU en una VM con 1 OCPU (DA09, DA11). | Límites de memoria por contenedor, medición con k6 y reparto de carga: Evolution API usa la Redis existente y una base propia en la VM-DATOS. |
+| Un programa acapara stock con reservas temporales o agota las consultas del asistente (DA13). | Límite de una reserva activa por cliente y 5 por hora (RF28), límites de uso en el borde y en la Aplicación (AD24), y expiración de reservas en 15 minutos. |
+| Fuerza bruta de contraseñas o robo de credenciales (DA05, DA13). | Bloqueo temporal tras 5 fallos, credenciales de 15 minutos con renovación revocable, MFA para el administrador central (AD22) y alertas de seguridad (RNF20). |
+| Inyección de instrucciones o contenido no confiable en el asistente (DA17). | Asistente de solo lectura, salida como texto, topes de consumo y sin acceso a bases de datos (AD28). |
+| Fuga de datos personales hacia proveedores fuera del país (DA15). | Datos mínimos por proveedor, inventario de transferencias documentado (RC17) y retención definida (AD27). |
+| Dependencias o imágenes con vulnerabilidades conocidas (DA05). | Versiones fijas, escaneo en CI, SBOM y contenedores sin privilegios (RNF19). |
+| Pérdida de datos o de los respaldos por una falla de la VM de datos (DA16). | Respaldo diario cifrado fuera de la VM, prueba de restauración y objetivos RPO ≤ 24 h y RTO ≤ 4 h (AD27). |
