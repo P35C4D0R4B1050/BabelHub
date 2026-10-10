@@ -38,6 +38,7 @@ dotnet run --project tools/SpecCheck -- --write-matrix  # regenera TRACEABILITY.
 | Spec | Servicio | Prefijo | Depende de |
 | :--- | :--- | :---: | :--- |
 | `transversal-auditoria` | Transversal | AUD | — |
+| `transversal-seguridad` | Transversal | SEG | auditoría |
 | `inventario-fuentes` | Inventario | FUE | auditoría |
 | `inventario-seleccion-fuente` | Inventario | SEL | fuentes, auditoría |
 | `inventario-ajustes` | Inventario | AJU | fuentes, auditoría |
@@ -60,7 +61,7 @@ dotnet run --project tools/SpecCheck -- --write-matrix  # regenera TRACEABILITY.
 
 | Orden | Specs | Motivo |
 | :---: | :--- | :--- |
-| 1 | `transversal-auditoria` | Los ajustes, traslados y precios la usan. |
+| 1 | `transversal-auditoria`, `transversal-seguridad` | Los ajustes, traslados y precios usan la auditoría; la seguridad define los errores, límites y registros que todas reutilizan. |
 | 2 | `inventario-fuentes`, `inventario-seleccion-fuente`, `inventario-ajustes`, `inventario-traslados` | Núcleo y mayor riesgo (AC01). |
 | 3 | `identidad-seguridad`, `transversal-notificaciones`, `web-base` | Activan el alcance por sucursal, los avisos y la interfaz. |
 | 4 | `ecommerce-catalogo`, `ecommerce-carrito-checkout`, `ecommerce-pagos`, `ecommerce-pedidos` | Camino crítico de la compra. |
