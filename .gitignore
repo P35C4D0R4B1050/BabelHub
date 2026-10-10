@@ -29,6 +29,58 @@ Thumbs.db
 secrets.json
 appsettings.*.local.json
 
+# --- Credenciales, claves y certificados adicionales ---
+*.p12
+*.pkcs12
+*.jks
+*.keystore
+*.ppk
+*.cer
+*.crt
+id_rsa*
+id_ed25519*
+*.secret
+*.secrets
+secrets/
+.secrets/
+credentials*.json
+service-account*.json
+.netrc
+.pgpass
+.npmrc
+.oci/
+.aws/
+.azure/
+.ssh/
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/
+docker-compose.override.yml
+.user-secrets/
+
+# --- Datos locales, respaldos y volcados (pueden contener datos personales) ---
+*.bak
+*.dump
+*.sql.gz
+*.sqlite
+*.sqlite3
+*.db
+backups/
+respaldos/
+dumps/
+infra/n8n/data/
+infra/evolution/
+.n8n/
+
+# --- Contenido digital: nunca va al repositorio (AGENTS.md, regla 11) ---
+*.epub
+*.mobi
+*.azw3
+storage/
+uploads/
+media/
+
 # --- Datos locales de Docker ---
 infra/data/
 
