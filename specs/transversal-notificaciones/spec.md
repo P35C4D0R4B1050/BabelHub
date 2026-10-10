@@ -5,8 +5,8 @@ estado: Draft
 servicio: Transversal
 prefijo: NOT
 origen: [RF07, RF16, NN03]
-calidad: [AC03, RNF03, RNF07, RNF08]
-depende: [identidad-seguridad]
+calidad: [AC03, RNF03, RNF07, RNF08, RNF21]
+depende: [identidad-seguridad, transversal-seguridad]
 ---
 
 # Spec — Avisos por WhatsApp
@@ -33,11 +33,12 @@ Avisar al cliente y a las sucursales de cada cambio importante sin que el aviso 
 | NOT-04 | No deseado | Si el envío de un aviso falla, entonces el sistema deberá dejarlo pendiente, reintentarlo con esperas crecientes y no interrumpir la operación que lo originó. | AC03, RNF03 |
 | NOT-05 | Ubicuo | El sistema deberá evitar enviar dos veces el mismo aviso para el mismo evento. | RF07 |
 | NOT-06 | Ubicuo | El sistema deberá registrar el estado de cada aviso como pendiente, enviado o fallido, con su fecha. | RNF08 |
-| NOT-07 | Ubicuo | El sistema deberá excluir de los mensajes datos de tarjeta, contraseñas y enlaces de descarga. | RNF07 |
+| NOT-07 | Ubicuo | El sistema deberá excluir de los mensajes los datos prohibidos en registros y mensajes definidos en `transversal-seguridad`. | RNF07, RNF20 |
 | NOT-08 | Evento | Cuando el cliente revoca su consentimiento, el sistema deberá cancelar los avisos pendientes que le correspondían. | RNF07 |
 | NOT-09 | Ubicuo | El sistema deberá usar el contacto de notificación registrado de cada sucursal para avisarle. | RF16 |
 | NOT-10 | Ubicuo | El sistema deberá permitir cambiar el texto de los mensajes sin modificar el código de los servicios. | RF07 |
 | NOT-11 | Estado | Mientras el entorno es de desarrollo, el sistema deberá usar un notificador simulado que registre los avisos sin enviarlos. | RF07 |
+| NOT-12 | Ubicuo | El sistema deberá autenticar las llamadas hacia el servicio de envío y las respuestas o estados que este devuelva, y descartar y registrar las que no se puedan verificar. | RNF21 |
 
 ## 4. Criterios de aceptación
 
@@ -53,6 +54,7 @@ Avisar al cliente y a las sucursales de cada cambio importante sin que el aviso 
 | AC-NOT-08 | NOT-09 | **Dado** un traslado hacia Ayacucho, **cuando** se aprueba, **entonces** se avisa al contacto registrado de Ayacucho y al de la sucursal de origen. |
 | AC-NOT-09 | NOT-10 | **Dado** una plantilla de mensaje, **cuando** se modifica su texto, **entonces** los avisos siguientes usan el nuevo texto sin cambiar el código. |
 | AC-NOT-10 | NOT-11 | **Dado** el entorno de desarrollo, **cuando** ocurre un evento notificable, **entonces** el aviso se registra sin enviarse a ningún número real. |
+| AC-NOT-11 | NOT-12 | **Dado** una respuesta del servicio de envío sin firma o con firma inválida, **cuando** llega, **entonces** se descarta y se registra, y el aviso no se marca como enviado. |
 
 ## 5. Reglas e invariantes
 
