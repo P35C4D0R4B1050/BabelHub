@@ -4,8 +4,8 @@ titulo: Biblioteca y descarga de libros digitales
 estado: Draft
 servicio: E-commerce
 prefijo: BIB
-origen: [RF22, RF23, RF24, NN13, NN15]
-calidad: [AC09, RNF14, RNF05, RNF08]
+origen: [RF22, RF23, RF24, NN13, NN15, NN18]
+calidad: [AC09, AC13, RNF14, RNF05, RNF08, RNF17]
 depende: [ecommerce-catalogo, ecommerce-pagos, transversal-auditoria]
 ---
 
@@ -41,6 +41,7 @@ Entregar al instante los libros digitales comprados y protegerlos: el archivo so
 | BIB-12 | Ubicuo | El sistema deberá mostrar la biblioteca de un cliente solo a ese cliente y al personal autorizado. | RNF05, NN15 |
 | BIB-13 | No deseado | Si el archivo de una edición no está disponible en el almacén, entonces el sistema deberá informar el problema al cliente, no consumir una descarga y ofrecer reportarlo. | RF23 |
 | BIB-14 | Ubicuo | El sistema deberá entregar el archivo directamente desde el almacén al cliente, sin que la capa web lo reciba ni lo reenvíe. | RNF14 |
+| BIB-15 | No deseado | Si un cliente solicita más de 10 enlaces de descarga en una hora, entonces el sistema deberá rechazar la solicitud con una espera sugerida, sin consumir descargas, y registrar el evento. | RNF17, AC13 |
 
 ## 4. Criterios de aceptación
 
@@ -58,6 +59,7 @@ Entregar al instante los libros digitales comprados y protegerlos: el archivo so
 | AC-BIB-10 | BIB-12 | **Dado** la biblioteca de un cliente, **cuando** otro cliente intenta verla, **entonces** se rechaza; y un administrador autorizado sí puede consultarla. |
 | AC-BIB-11 | BIB-13 | **Dado** un acceso cuyo archivo falta en el almacén, **cuando** el titular pide descargar, **entonces** se le informa del problema, no se consume una descarga y se le ofrece reportarlo. |
 | AC-BIB-12 | BIB-14 | **Dado** una descarga, **cuando** el navegador la inicia, **entonces** el archivo viene directamente del almacén y ninguna otra capa del sistema lo recibe. |
+| AC-BIB-13 | BIB-15 | **Dado** un cliente que ya pidió 10 enlaces en la última hora, **cuando** pide otro, **entonces** se rechaza con una espera sugerida, no se consume una descarga y queda un registro. |
 
 ## 5. Reglas e invariantes
 

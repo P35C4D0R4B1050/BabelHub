@@ -4,8 +4,8 @@ titulo: Auditoría de operaciones sensibles
 estado: Draft
 servicio: Transversal
 prefijo: AUD
-origen: [RF20, NN09]
-calidad: [RNF08, AC05]
+origen: [RF20, NN09, NN18]
+calidad: [RNF08, RNF20, RNF23, AC05, AC11]
 depende: []
 ---
 
@@ -21,7 +21,7 @@ Dejar un registro confiable e inmutable de quién hizo qué, cuándo y con qué 
 | :--- | :--- |
 | Qué eventos se auditan, qué datos tiene cada registro y las garantías de inmutabilidad. | Los logs técnicos y las métricas (convenciones en `docs/07-proceso-de-desarrollo/02-convenciones-tecnicas.md`). |
 | Consulta con filtros para el administrador central. | Exportación de reportes e indicadores (RF21, fase posterior). |
-| Registro de accesos denegados por falta de permiso o de alcance. | La lógica de cada operación (vive en la spec de su feature). |
+| Registro de accesos denegados por falta de permiso o de alcance y de eventos de seguridad. | La lógica de cada operación (vive en la spec de su feature). |
 
 ## 3. Requisitos (EARS)
 
@@ -36,6 +36,9 @@ Dejar un registro confiable e inmutable de quién hizo qué, cuándo y con qué 
 | AUD-07 | Evento | Cuando el administrador central consulta la auditoría, el sistema deberá permitir filtrar por acción, usuario, rango de fechas y texto del detalle. | RF20 |
 | AUD-08 | Ubicuo | El sistema deberá mostrar al encargado de sucursal únicamente el historial de ajustes y traslados de su propia sucursal. | RNF05 |
 | AUD-09 | Ubicuo | El sistema deberá presentar los registros de auditoría en orden cronológico inverso con paginación. | RF20 |
+| AUD-10 | Evento | Cuando ocurre un ingreso fallido, un bloqueo temporal, un límite de uso excedido, una recuperación de acceso, un segundo factor fallido o un cambio de rol, el sistema deberá registrarlo como evento de seguridad con su fecha, el usuario u origen y el motivo. | RNF20, AC05 |
+| AUD-11 | Ubicuo | El sistema deberá conservar los registros de auditoría y de eventos de seguridad durante dos años y eliminarlos o anonimizarlos después. | RNF23, AC11 |
+| AUD-12 | No deseado | Si no es posible registrar un evento de seguridad de una acción ya rechazada, entonces el sistema deberá mantener el rechazo y generar una alerta técnica. | RNF20 |
 
 ## 4. Criterios de aceptación
 
@@ -48,6 +51,9 @@ Dejar un registro confiable e inmutable de quién hizo qué, cuándo y con qué 
 | AC-AUD-05 | AUD-06 | **Dado** un reembolso con tarjeta o la emisión de un enlace de descarga, **cuando** se registra la operación, **entonces** el detalle no contiene número de tarjeta, token ni la dirección del enlace. |
 | AC-AUD-06 | AUD-07, AUD-09 | **Dado** cien registros de varios usuarios, **cuando** el administrador filtra por la acción «Anulación de pedido» y un rango de fechas, **entonces** ve solo los registros coincidentes, del más reciente al más antiguo, en páginas. |
 | AC-AUD-07 | AUD-08 | **Dado** ajustes realizados en Ayacucho y en Cusco, **cuando** el encargado de Ayacucho consulta el historial, **entonces** solo ve los de Ayacucho. |
+| AC-AUD-08 | AUD-10 | **Dado** cinco ingresos fallidos de un usuario, **cuando** se consulta el registro de seguridad, **entonces** figuran los intentos y el bloqueo temporal, sin contraseñas. |
+| AC-AUD-09 | AUD-11 | **Dado** un registro con más de dos años, **cuando** se ejecuta la depuración, **entonces** se elimina o se anonimiza; y uno reciente se conserva. |
+| AC-AUD-10 | AUD-12 | **Dado** que el almacén de auditoría no responde, **cuando** se rechaza un acceso, **entonces** el rechazo se mantiene y se genera una alerta técnica. |
 
 ## 5. Reglas e invariantes
 
@@ -64,5 +70,5 @@ Dejar un registro confiable e inmutable de quién hizo qué, cuándo y con qué 
 
 ## 7. Preguntas abiertas
 
-- [ ] ¿Por cuánto tiempo se conserva la auditoría? Propuesta: dos años, igual que el Libro de Reclamaciones. Responde: responsable del proyecto.
+- [x] ¿Por cuánto tiempo se conserva la auditoría? Resuelto el 2026-10-10: dos años, igual que el Libro de Reclamaciones (AUD-11).
 - [ ] ¿La consulta unificada de los tres almacenes (ventas, inventario, identidad) se compone en la capa web o se centraliza más adelante? Propuesta: capa web.

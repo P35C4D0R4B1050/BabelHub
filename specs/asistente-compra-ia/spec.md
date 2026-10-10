@@ -4,8 +4,8 @@ titulo: Asistente de compra
 estado: Draft
 servicio: Asistente
 prefijo: ASI
-origen: [RF08, NN04]
-calidad: [AC03, AC05, RNF03, RNF05, RNF07]
+origen: [RF08, NN04, NN18]
+calidad: [AC03, AC05, AC13, RNF03, RNF05, RNF07, RNF17, RNF22]
 depende: [ecommerce-catalogo, ecommerce-pedidos, identidad-seguridad]
 ---
 
@@ -35,8 +35,12 @@ Orientar al cliente con recomendaciones y respuestas sobre disponibilidad y esta
 | ASI-06 | Ubicuo | El sistema deberá obtener los datos únicamente a través de las interfaces de los servicios y nunca de sus bases de datos. | RF08, AC05 |
 | ASI-07 | No deseado | Si el proveedor del modelo de lenguaje no responde, entonces el sistema deberá informar que el asistente no está disponible sin afectar la compra. | AC03, RNF03 |
 | ASI-08 | Ubicuo | El sistema deberá excluir de la consulta al modelo los datos personales que no sean necesarios para responder. | RNF07 |
-| ASI-09 | Estado | Mientras un cliente supera el límite de consultas por minuto, el sistema deberá pedirle que espere antes de seguir consultando. | AC05 |
+| ASI-09 | Estado | Mientras un cliente supera el límite de 10 consultas por minuto, el sistema deberá pedirle que espere antes de seguir consultando y registrar el exceso. | RNF17, AC13 |
 | ASI-10 | Ubicuo | El sistema deberá excluir de las recomendaciones las ediciones digitales con licencia vencida y señalar los impresos agotados como tales. | RF08, NN14 |
+| ASI-11 | Ubicuo | El sistema deberá limitarse a consultar información y no deberá ejecutar acciones de compra, pago, cambio de datos ni administración. | RNF22, AC05 |
+| ASI-12 | Ubicuo | El sistema deberá entregar cada respuesta como texto plano sin contenido ejecutable, y la interfaz deberá mostrarla sin interpretarla como código. | RNF22, AC05 |
+| ASI-13 | No deseado | Si una consulta pide revelar las instrucciones internas del asistente o ignorar sus reglas, entonces el sistema deberá negarse y seguir su propósito original. | RNF22, AC05 |
+| ASI-14 | Ubicuo | El sistema deberá limitar la longitud de cada consulta y de cada respuesta para acotar el consumo del modelo. | RNF22, AC13 |
 
 ## 4. Criterios de aceptación
 
@@ -50,7 +54,11 @@ Orientar al cliente con recomendaciones y respuestas sobre disponibilidad y esta
 | AC-ASI-06 | ASI-06 | **Dado** el asistente, **cuando** se revisa su configuración, **entonces** no tiene credenciales ni acceso a las bases de datos de los servicios. |
 | AC-ASI-07 | ASI-07 | **Dado** que el proveedor del modelo no responde, **cuando** el cliente usa el asistente, **entonces** ve que no está disponible y puede seguir comprando con normalidad. |
 | AC-ASI-08 | ASI-08 | **Dado** una consulta que no necesita datos personales, **cuando** se envía al modelo, **entonces** no incluye nombre, correo ni teléfono del cliente. |
-| AC-ASI-09 | ASI-09 | **Dado** un cliente que envía consultas sin pausa, **cuando** supera el límite por minuto, **entonces** se le pide esperar. |
+| AC-ASI-09 | ASI-09 | **Dado** un cliente que envía consultas sin pausa, **cuando** supera 10 por minuto, **entonces** se le pide esperar y queda un registro. |
+| AC-ASI-10 | ASI-11 | **Dado** una consulta que pide «comprar este libro por mí» o cambiar un dato, **cuando** se responde, **entonces** el asistente no ejecuta la acción y enlaza a la pantalla correspondiente. |
+| AC-ASI-11 | ASI-12 | **Dado** una respuesta del modelo con etiquetas de marcado, **cuando** se muestra, **entonces** aparece como texto y no se interpreta. |
+| AC-ASI-12 | ASI-13 | **Dado** una consulta que pide mostrar las instrucciones internas, **cuando** se responde, **entonces** el asistente se niega y no las revela. |
+| AC-ASI-13 | ASI-14 | **Dado** una consulta más larga que el máximo permitido, **cuando** se envía, **entonces** se rechaza indicando el límite y no se consulta al modelo. |
 
 ## 5. Reglas e invariantes
 
