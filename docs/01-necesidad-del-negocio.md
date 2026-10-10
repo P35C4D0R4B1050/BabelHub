@@ -30,7 +30,7 @@ El libro impreso sigue generando más del 91 % de los ingresos editoriales en el
 | Identidad, roles y control de acceso por sucursal. | Aplicación móvil nativa (Android/iOS): extensión posterior; el alcance inicial es web responsiva. |
 | Diseño de la arquitectura y del despliegue en Oracle Cloud. | Analítica avanzada y autoservicio de reportes: fase posterior. |
 | Libros digitales (EPUB y PDF): catálogo, compra, biblioteca personal y descarga protegida. | Lector en línea con DRM comercial, audiolibros, suscripciones, préstamo digital y liquidación de regalías a editoriales. |
-| Registro de la licencia de cada libro digital (titular, territorio y vigencia) y Libro de Reclamaciones virtual. | Emisión de comprobantes electrónicos ante la SUNAT y los contratos con los titulares: se dejan previstos pero no se construyen (ver `02-requisitos.md`, sección 5). |
+| Registro de la licencia de cada libro digital (titular, territorio y vigencia) y Libro de Reclamaciones virtual. | Emisión de comprobantes electrónicos ante la SUNAT y contratos reales con los titulares: el proyecto es académico (ver `02-requisitos.md`, sección 5). |
 
 ## 4. Actores
 

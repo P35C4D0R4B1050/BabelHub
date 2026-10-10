@@ -41,7 +41,7 @@ BabelHub se compone de **dos sistemas independientes pero interoperables** para 
 - Aplicación web `BabelHub.Web` (ASP.NET Core MVC con Razor) con áreas por rol, que consume los servicios desde el servidor.
 - PostgreSQL por sistema (Identidad con esquema propio), Redis como caché y Nginx como puerta de entrada interna.
 - Pagos con Culqi (Yape y tarjetas) y avisos por WhatsApp con n8n y Evolution API, autoalojados.
-- Libros digitales (EPUB y PDF) en un almacén de objetos externo, con descarga por URL firmada; no pasan por el Inventario. El marco legal, con puntos a validar, está en `docs/02-requisitos.md` (sección 5).
+- Libros digitales (EPUB y PDF) en un almacén de objetos externo, con descarga por URL firmada; no pasan por el Inventario. El marco legal, aplicado con rigurosidad laxa por ser un proyecto académico, está en `docs/02-requisitos.md` (sección 5).
 - Despliegue con Docker Compose en Oracle Cloud Free Tier: dos VMs ARM (Aplicaciones y Datos, de 1 OCPU y 6 GB) y una VM x86 micro opcional de apoyo.
 - Cloudflare gratuito en el borde, con Cloudflare Tunnel, para no abrir puertos en Oracle.
 - Pruebas con xUnit, Testcontainers, Playwright y k6. Desarrollo posterior bajo Spec-Driven Development.

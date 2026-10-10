@@ -395,7 +395,7 @@ Este apartado **precisa** lo indicado en `06-estilo-arquitectonico.md` (6.3): la
 | `ecommerce-catalogo` | E-commerce | Dominio (libro, edición impresa o digital, ISBN único por edición, licencia del titular), Aplicación (buscar, publicar, dar de baja, retirar al vencer la licencia), Infraestructura (búsqueda, caché de catálogo y almacén de archivos). |
 | `ecommerce-carrito-checkout` | E-commerce | Dominio (carrito, pedido con líneas), Aplicación (checkout; la entrega solo se pide si hay impresos), Infraestructura (cliente de Inventario, solo para impresos). |
 | `ecommerce-biblioteca-digital` | E-commerce | Dominio (acceso digital, tope de descargas), Aplicación (conceder acceso, solicitar descarga), Infraestructura (almacén de archivos y URLs firmadas). |
-| `ecommerce-pagos-yape` | E-commerce | Aplicación (puerto de pasarela, idempotencia), Infraestructura (Culqi). |
+| `ecommerce-pagos` | E-commerce | Aplicación (puerto de pasarela, idempotencia, Yape y tarjetas), Infraestructura (Culqi). |
 | `ecommerce-pedidos` | E-commerce | Dominio (estados y transiciones del pedido), Aplicación (consultar y avanzar estados), Infraestructura (notificaciones). |
 | `ecommerce-envios` | E-commerce | Aplicación (puerto de envío, guías y seguimiento), Infraestructura (operador logístico). |
 | `ecommerce-devoluciones` | E-commerce | Dominio (devolución y su ciclo; política distinta para libros digitales), Aplicación (solicitar, reembolsar, reingresar stock de impresos, revocar acceso digital), Infraestructura (reembolso en Culqi, cliente de Inventario). |
