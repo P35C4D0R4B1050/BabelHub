@@ -1,0 +1,10 @@
+{
+  "estados": ["Draft", "Approved", "Planned", "InProgress", "Done"],
+  "patrones": ["Ubicuo", "Evento", "Estado", "No deseado", "Opcional"],
+  "diferidos": ["RF21"],
+  "palabrasProhibidas": [
+    "PostgreSQL", "Redis", "EF Core", "Entity Framework", "ASP.NET", "Razor", "Docker", "Nginx",
+    "n8n", "Evolution API", "Culqi", "MinIO", "S3", "JWT", "SQL", "REST", "HTTP", "Cloudflare",
+    "Oracle", "Tailwind", "daisyUI", "htmx"
+  ]
+}
