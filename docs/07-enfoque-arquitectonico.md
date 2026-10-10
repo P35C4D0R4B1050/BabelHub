@@ -110,7 +110,7 @@ style Ent fill:#222,stroke:#fff,color:#fff
 | Registro de auditoría | E-commerce e Inventario | Tabla de auditoría de solo inserción en la base de cada servicio |
 | Proveedor de LLM | Asistente | API del modelo de lenguaje |
 | Caché | E-commerce e Inventario | Redis |
-| Almacén de archivos (subir y firmar URLs de descarga) | E-commerce | Almacén S3-compatible (Cloudflare R2 u Oracle Object Storage); en desarrollo, MinIO o carpeta local |
+| Almacén de archivos (subir y firmar URLs de descarga) | E-commerce | Almacén S3-compatible (Cloudflare R2 u Oracle Object Storage); en desarrollo, un emulador compatible con S3 o una carpeta local |
 | Usuario actual | Todos | Lectura de los claims del JWT |
 | Unidad de trabajo | E-commerce e Inventario | Transacción de PostgreSQL |
 
@@ -332,7 +332,7 @@ Si un servicio reducido crece en lógica, se promueve a la versión completa sin
 | Infraestructura | Repositorios, migraciones, concurrencia, clientes HTTP. | `tests/integration` | xUnit + Testcontainers | Con PostgreSQL real. |
 | Contrato E-commerce ↔ Inventario | Que ambas partes respetan los DTOs de `Shared`. | `tests/integration` | xUnit | Detecta cambios que rompen la comunicación. |
 | Web | Clientes HTTP hacia los servicios y recorridos de usuario por área. | `tests/integration` y `tests/e2e` | xUnit; Playwright | Los recorridos de cada área cumplen los criterios de las specs. |
-| Biblioteca digital | Que solo el titular descargue, que un enlace vencido o ajeno se rechace y que el tope de descargas se respete. | `tests/integration` | xUnit + Testcontainers (MinIO) | AC09: 0 descargas no autorizadas. |
+| Biblioteca digital | Que solo el titular descargue, que un enlace vencido o ajeno se rechace y que el tope de descargas se respete. | `tests/integration` | xUnit + Testcontainers (emulador de almacén S3) | AC09: 0 descargas no autorizadas. |
 | Presentación y flujo | Búsqueda → compra con recojo → cambio de estado. | `tests/e2e` | Playwright | Criterios de aceptación de las specs. |
 | Rendimiento | Disponibilidad y checkout bajo carga. | `tests/load` | k6 | p95 de RNF02. |
 

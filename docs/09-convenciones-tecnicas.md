@@ -88,7 +88,7 @@ Los commits de un agente terminan con la línea `Co-Authored-By` correspondiente
 
 - Una prueba por criterio de aceptación de cada spec. Las pruebas llevan un rasgo (`Trait`) con el nombre de la spec y el criterio, para poder trazarlas.
 - Nombres descriptivos en español: `Reservar_SinStockVendible_Rechaza`.
-- Las pruebas de integración usan Testcontainers (PostgreSQL y MinIO) y necesitan Docker.
+- Las pruebas de integración usan Testcontainers (PostgreSQL y un emulador de almacén compatible con S3) y necesitan Docker.
 - Una prueba de arquitectura (NetArchTest) verifica la regla de dependencia de `07` y que ningún servicio referencie a otro.
 
 ## 9. Integración continua
@@ -99,7 +99,7 @@ GitHub Actions: compilar, ejecutar pruebas unitarias y de arquitectura en cada c
 
 - Un `Dockerfile` por `Api` y por `Web`, en varias etapas. En la de `Web` se compila el CSS con la CLI independiente de Tailwind.
 - Imágenes multi-arquitectura (RNF11), usuario sin privilegios, `healthcheck` y límites de memoria en Compose (AD16 y RNF12).
-- `infra/docker-compose.local.yml` levanta PostgreSQL, Redis, MinIO, un notificador simulado y los servicios. No necesita Oracle ni Cloudflare.
+- `infra/docker-compose.local.yml` levanta PostgreSQL, Redis, un emulador de almacén compatible con S3 (a elegir, bloqueo B02), un notificador simulado y los servicios. No necesita Oracle ni Cloudflare.
 
 ## 11. Datos de ejemplo
 
