@@ -8,9 +8,9 @@ Un **driver arquitectónico** es un requisito, atributo de calidad o restricció
 flowchart LR
 NN["Necesidades<br/>NN01 - NN12"] --> REQ["Requisitos<br/>RF, RNF, RC"]
 REQ --> AC["Atributos de calidad<br/>AC01 - AC08"]
-AC --> DA["Drivers<br/>DA01 - DA10"]
+AC --> DA["Drivers<br/>DA01 - DA11"]
 REQ --> DA
-DA --> AD["Decisiones<br/>AD01 - AD14"]
+DA --> AD["Decisiones<br/>AD01 - AD18"]
 AD --> EST["Estilo y estructura<br/>servicios + Clean Architecture"]
 
 style NN fill:#222,stroke:#fff,color:#fff
@@ -29,12 +29,13 @@ style EST fill:#222,stroke:#fff,color:#fff
 | **DA02** | El sistema debe mantener tiempos de respuesta adecuados al consultar disponibilidad en picos de tráfico. | Calidad | AC02, RNF02 | Influye en el uso de caché, en la comunicación entre servicios y en el reparto de recursos de las VMs. | AD04, AD06 |
 | **DA03** | El sistema debe seguir operando de forma aceptable sin SLA y con fallos parciales. | Calidad | AC03, RNF03 | Condiciona el reinicio automático, la degradación controlada ante la caída del inventario y los respaldos. | AD04, AD10, AD11 |
 | **DA04** | El sistema debe permitir sumar sucursales sin rediseñar. | Calidad | AC04, RNF04 | Obliga a modelar cada sucursal como dato (fuente) y no como código o esquema. | AD01, AD03 |
-| **DA05** | Cada encargado solo debe acceder a su sucursal, y los datos de usuarios y pagos deben protegerse. | Calidad | AC05, RNF05–RNF08, RF18 | Influye en la autenticación centralizada, el aislamiento de las bases de datos y la protección del borde de red. | AD05, AD12, AD13 |
-| **DA06** | Debe integrarse con pasarela de pago, servicio de envío y LLM externos. | Restricción | RC04, RC05, RC10 | Obliga a aislar los accesos externos para poder cambiar de proveedor sin tocar las reglas del negocio. | AD07, AD09 |
-| **DA07** | La comunicación entre componentes debe ser mediante API REST. | Restricción | RC03 | Limita las alternativas de comunicación y descarta, por ahora, un bus de eventos. | AD04 |
+| **DA05** | Cada encargado solo debe acceder a su sucursal, y los datos de usuarios y pagos deben protegerse. | Calidad | AC05, RNF05–RNF08, RF18 | Influye en la autenticación centralizada, el aislamiento de las bases de datos, la protección del borde de red y que el token no llegue al navegador. | AD05, AD12, AD13, AD15, AD18 |
+| **DA06** | Debe integrarse con pasarela de pago, servicio de envío, LLM y WhatsApp. | Restricción | RC04, RC05, RC10, RC12 | Obliga a aislar los accesos externos para poder cambiar de proveedor sin tocar las reglas del negocio. | AD07, AD09, AD16, AD17 |
+| **DA07** | La comunicación entre componentes debe ser mediante API REST, y el sistema debe tener una interfaz web responsiva para tres tipos de usuario. | Restricción | RC01, RC03, RC06, RNF13 | Limita las alternativas de comunicación, descarta un bus de eventos y exige un componente de interfaz que consuma las API sin romper la independencia de los servicios. | AD04, AD15 |
 | **DA08** | Los cambios de reglas o proveedores deben quedar aislados y ser fáciles de probar. | Calidad | AC06, RNF09, RNF10 | Influye en la organización interna de cada servicio. | AD09 |
 | **DA09** | El sistema debe ejecutarse en recursos gratuitos limitados y heterogéneos (ARM64 y x86_64). | Restricción | RC06–RC08, RNF11, RNF12, AC07 | Limita la cantidad de VMs, servicios y contenedores, y exige imágenes multi-arch. | AD02, AD10, AD11 |
 | **DA10** | La operación debe tener costo mínimo y esfuerzo técnico manejable. | Negocio | NN12, RC09 | Favorece servicios gratuitos gestionados (Cloudflare) frente a componentes propios que haya que mantener. | AD13, AD14 |
+| **DA11** | El cliente y la sucursal deben recibir avisos de estado por WhatsApp sin costo por mensaje y sin que el aviso bloquee la compra. | Negocio / Restricción | RF07, RC12, NN03, NN12 | Obliga a un puerto de notificación aislado, a un envío tolerante a fallos y a alojar n8n y Evolution API dentro del presupuesto de recursos. | AD16 |
 
 ## 3. Riesgos y compromisos
 
@@ -46,3 +47,5 @@ style EST fill:#222,stroke:#fff,color:#fff
 | Oracle puede no tener capacidad ARM al crear la VM, o recuperar instancias inactivas (DA03, DA09). | Reintentar la creación, mantener el mismo Compose en local como respaldo y revisar la política de instancias inactivas. |
 | El asistente depende de un LLM externo (latencia, costo, respuestas incorrectas) (DA06). | Responde solo con datos de las API, indica cuándo no sabe y su caída no bloquea la compra. |
 | Cloudflare es una dependencia de terceros en el camino de todas las solicitudes (DA10). | Aceptable para este alcance; se documenta la alternativa de exponer Nginx directamente. |
+| Evolution API no es un canal oficial de WhatsApp: el número puede ser bloqueado o el protocolo cambiar sin aviso (DA11). | Usar un número dedicado, volumen bajo y solo mensajes transaccionales con consentimiento; el puerto `Notificador` permite sustituirlo (WhatsApp Cloud API oficial o correo) sin tocar el negocio. Una falla de envío nunca bloquea la compra. |
+| n8n y Evolution API consumen RAM y CPU en una VM con 1 OCPU (DA09, DA11). | Límites de memoria por contenedor, medición con k6 y reparto de carga: Evolution API usa la Redis existente y una base propia en la VM-DATOS. |
