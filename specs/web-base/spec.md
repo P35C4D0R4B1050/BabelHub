@@ -6,7 +6,7 @@ servicio: Web
 prefijo: WEB
 origen: [RC01, RNF13, RF25, RF29, NN15, NN16, NN18]
 calidad: [AC05, AC08, AC10, AC13, AC14, RNF05, RNF06, RNF15, RNF16, RNF25, RNF26, RNF27]
-depende: [identidad-seguridad, ecommerce-libro-reclamaciones]
+depende: [identidad-seguridad, ecommerce-libro-reclamaciones, ecommerce-catalogo, transversal-seguridad]
 ---
 
 # Spec — Estructura base de la interfaz web
@@ -41,16 +41,18 @@ La base común de `BabelHub.Web`: áreas por rol, sesión, estados de pantalla e
 | WEB-12 | Estado | Mientras el usuario prefiere movimiento reducido, el sistema deberá eliminar las animaciones sin perder funcionalidad. | AC10 |
 | WEB-13 | Ubicuo | El sistema deberá indicar la disponibilidad y los estados con texto e icono, y nunca solo con color. | AC10 |
 | WEB-14 | Ubicuo | El sistema deberá mostrar importes en soles y fechas con formato peruano. | RNF13 |
-| WEB-15 | Evento | Cuando el cliente descarga un libro digital, el sistema deberá redirigir el navegador al enlace firmado en lugar de transmitir el archivo. | RNF14 |
+| WEB-15 | Evento | Cuando el cliente pulsa descargar un libro digital, el sistema deberá pedir la descarga al E-commerce y redirigir el navegador al enlace firmado recibido, sin transmitir el archivo. | RNF14 |
 | WEB-16 | Ubicuo | El sistema deberá recordar la sucursal preferida del cliente entre sesiones. | RNF13 |
 | WEB-17 | Evento | Cuando el visitante pulsa «Sorpréndeme», el sistema deberá elegir al azar un libro disponible y mostrar su ficha. | RF29, NN17 |
-| WEB-18 | Ubicuo | El sistema deberá enviar en cada respuesta las cabeceras de seguridad: política de contenido restrictiva, transporte seguro obligatorio, no adivinar el tipo de contenido y política de referencia limitada. | RNF16, AC05 |
+| WEB-18 | Ubicuo | El sistema deberá enviar en cada respuesta las cabeceras de seguridad: política de contenido restrictiva, transporte seguro obligatorio, no adivinar el tipo de contenido y política de referencia limitada, y permitir en la política de contenido el script de la pasarela de pago solo en la página de pago. | RNF16, AC05 |
 | WEB-19 | Ubicuo | El sistema deberá guardar la sesión en una cookie inaccesible a scripts, enviada solo por conexión segura y restringida al mismo sitio. | RNF15, AC05 |
 | WEB-20 | Ubicuo | El sistema deberá conformar las pautas WCAG 2.2 nivel AA en inicio, catálogo, detalle, carrito y checkout, verificado con revisión automática y una lista manual de teclado y lector de pantalla. | RNF25, AC10 |
 | WEB-21 | Ubicuo | El sistema deberá cargar inicio, catálogo y detalle con LCP de 2,5 s o menos (percentil 75 en 4G simulada), INP de 200 ms o menos y CLS de 0,1 o menos. | RNF26, AC02 |
-| WEB-22 | Ubicuo | El sistema deberá permitir que al menos el 90 % de las personas de una prueba de usabilidad complete una compra con recojo sin ayuda, con una puntuación SUS de al menos 68. | RNF27, AC08 |
+| WEB-22 | Ubicuo | El sistema deberá permitir que al menos el 90 % de las personas de una prueba de usabilidad complete una compra con recojo sin ayuda, con una puntuación SUS de al menos 68 y menos de un error por tarea en promedio, medidos en rondas de 5 personas que sumen al menos 10. | RNF27, AC08 |
 | WEB-23 | Ubicuo | El sistema deberá completar el recorrido de compra en las dos últimas versiones estables de Chrome, Edge, Firefox y Safari, y en Chrome para Android y Safari para iOS recientes. | AC14, RC14 |
-| WEB-24 | No deseado | Si una operación es rechazada por un límite de uso, entonces el sistema deberá explicar el motivo y la espera sugerida sin perder lo que la persona tenía en pantalla. | RNF17, AC13 |
+| WEB-24 | No deseado | Si una operación es rechazada por un límite de uso, entonces el sistema deberá explicar el motivo y la espera sugerida sin perder lo que la persona tenía en pantalla y sin distinguir, en el ingreso, si la cuenta existe. | RNF17, AC13 |
+| WEB-25 | Evento | Cuando la sesión vence a mitad de una acción, el sistema deberá llevar al ingreso y conservar lo que el usuario tenía en pantalla. | RNF13, RNF15 |
+| WEB-26 | No deseado | Si la Web no logra comunicarse con los servicios, entonces el sistema deberá mostrar el estado de servicio no disponible y conservar el carrito. | RNF13, AC03 |
 
 ## 4. Criterios de aceptación
 
@@ -60,7 +62,7 @@ La base común de `BabelHub.Web`: áreas por rol, sesión, estados de pantalla e
 | AC-WEB-02 | WEB-02, WEB-03 | **Dado** un encargado de sucursal, **cuando** entra, **entonces** su menú no muestra Administración; y si abre esa dirección, ve la pantalla de sin permiso. |
 | AC-WEB-03 | WEB-04, WEB-05 | **Dado** un usuario con sesión, **cuando** se inspecciona el navegador, **entonces** no hay credenciales en el almacenamiento accesible por scripts y los formularios llevan protección contra falsificación. |
 | AC-WEB-04 | WEB-06, WEB-07 | **Dado** un servicio que falla, **cuando** el usuario abre una pantalla de datos, **entonces** ve el estado de error con un botón de reintento y sin detalles técnicos. |
-| AC-WEB-05 | WEB-08 | **Dado** cualquier página de la tienda, **cuando** se muestra, **entonces** el pie tiene los cinco enlaces legales y el del Libro de Reclamaciones. |
+| AC-WEB-05 | WEB-08 | **Dado** cualquier página de la tienda, **cuando** se muestra, **entonces** el pie tiene el enlace al Libro de Reclamaciones y los enlaces a términos, privacidad y política de reembolso. |
 | AC-WEB-06 | WEB-09 | **Dado** un dispositivo con preferencia de tema oscuro y sin elección previa, **cuando** se abre la tienda, **entonces** se muestra el tema oscuro, y la elección posterior se recuerda. |
 | AC-WEB-07 | WEB-10, WEB-11 | **Dado** cualquier pantalla, **cuando** se navega solo con teclado, **entonces** todos los controles reciben foco visible y el texto cumple el contraste en ambos temas. |
 | AC-WEB-08 | WEB-12 | **Dado** una preferencia de movimiento reducido, **cuando** se usa la interfaz, **entonces** no hay animaciones y todo funciona. |
@@ -72,9 +74,11 @@ La base común de `BabelHub.Web`: áreas por rol, sesión, estados de pantalla e
 | AC-WEB-14 | WEB-18, WEB-19 | **Dado** cualquier página, **cuando** se inspeccionan sus respuestas, **entonces** llevan las cuatro cabeceras de seguridad y la cookie de sesión tiene los tres atributos exigidos. |
 | AC-WEB-15 | WEB-20 | **Dado** el recorrido de compra, **cuando** se ejecuta la revisión automática de accesibilidad y la lista manual con teclado y lector de pantalla, **entonces** hay 0 incumplimientos críticos de nivel AA. |
 | AC-WEB-16 | WEB-21 | **Dado** inicio, catálogo y detalle en 4G simulada, **cuando** se mide, **entonces** LCP, INP y CLS cumplen las metas. |
-| AC-WEB-17 | WEB-22 | **Dado** una ronda de cinco personas de prueba, **cuando** compran un libro con recojo sin ayuda, **entonces** al menos 90 % lo logra y el SUS promedio es de 68 o más. |
+| AC-WEB-17 | WEB-22 | **Dado** dos rondas de cinco personas de prueba, **cuando** compran un libro con recojo sin ayuda, **entonces** al menos 9 de 10 lo logran, el SUS promedio es de 68 o más y el promedio de errores por tarea es menor que uno. |
 | AC-WEB-18 | WEB-23 | **Dado** cada navegador soportado, **cuando** se recorre la compra, **entonces** se completa sin errores. |
-| AC-WEB-19 | WEB-24 | **Dado** una operación rechazada por límite, **cuando** el usuario la ve, **entonces** lee el motivo y la espera sugerida, y su formulario conserva lo escrito. |
+| AC-WEB-19 | WEB-24 | **Dado** una operación rechazada por límite, **cuando** el usuario la ve, **entonces** lee el motivo y la espera sugerida, y su formulario conserva lo escrito; y en el ingreso el mensaje es igual para cuentas existentes e inexistentes. |
+| AC-WEB-20 | WEB-25 | **Dado** un usuario con un formulario a medio llenar, **cuando** su sesión vence y envía, **entonces** es llevado al ingreso y, al volver, conserva lo escrito. |
+| AC-WEB-21 | WEB-26 | **Dado** que los servicios no responden, **cuando** el cliente abre su carrito, **entonces** ve el estado de servicio no disponible y el carrito no se pierde. |
 
 ## 5. Reglas e invariantes
 
