@@ -35,10 +35,10 @@ El libro impreso sigue generando más del 91 % de los ingresos editoriales en el
 | **Encargado de sucursal** | Personal de una tienda; solo accede a **su sucursal**. | Consultar y ajustar el stock local, preparar pedidos de recojo y gestionar traslados. |
 | **Administrador central** | Personal de administración con visión nacional. | Gestionar el catálogo, usuarios, roles y sucursales; revisar auditoría e indicadores. |
 | **Personal de logística** | Responsable de mover productos. | Dar seguimiento a traslados y generar guías de envío a domicilio. |
-| **Pasarela de pago** *(externo)* | Niubiz o Culqi. | Procesar pagos con Yape y tarjetas. |
+| **Pasarela de pago** *(externo)* | Culqi. | Procesar pagos con Yape y tarjetas. |
 | **Servicio de envío** *(externo)* | Operador logístico (courier). | Gestionar la entrega y el seguimiento de los despachos a domicilio. |
 | **Proveedor de LLM** *(externo)* | Modelo de lenguaje (por ejemplo, la API de Claude). | Generar las respuestas del asistente de compra. |
-| **Servicio de notificaciones** *(externo, por definir)* | Correo o SMS. | Avisar a clientes y sucursales de los cambios de estado. |
+| **Servicio de notificaciones** *(propio, autoalojado)* | n8n y Evolution API, que envían los avisos por WhatsApp. | Avisar a clientes y sucursales de los cambios de estado. |
 
 ## 5. Necesidades del negocio
 
@@ -76,7 +76,7 @@ end
 PAG["Pasarela de pago"]
 ENV["Servicio de envío"]
 LLM["Proveedor de LLM"]
-NOT["Servicio de notificaciones"]
+NOT["Notificaciones<br/>n8n + Evolution API (WhatsApp)"]
 
 CLI --> ECO
 ADM --> ECO

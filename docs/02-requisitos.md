@@ -16,9 +16,9 @@ Prioridad: **Alta**, **Media**, **Baja**.
 | **RF04** | El sistema debe permitir generar un pedido a partir del carrito, eligiendo despacho a domicilio o recojo en sucursal, y validar la disponibilidad real (stock vendible) antes de confirmar el pago. | Alta | NN02 |
 | **RF05** | El sistema debe procesar el pago del pedido una sola vez mediante la pasarela de pago, sin almacenar datos de tarjeta. | Alta | NN02 |
 | **RF06** | El sistema debe permitir consultar los pedidos realizados, su detalle y su estado (confirmado, en preparación, en tránsito entre sucursales, despachado o listo para recojo, entregado, devuelto). | Alta | NN03 |
-| **RF07** | El sistema debe notificar al cliente y a la sucursal responsable ante cada cambio de estado del pedido. | Alta | NN03 |
+| **RF07** | El sistema debe notificar por WhatsApp al cliente y a la sucursal responsable ante cada cambio de estado del pedido, sin que una falla del envío bloquee la operación. | Alta | NN03 |
 | **RF08** | El sistema debe ofrecer un asistente de compra que recomiende libros y responda sobre disponibilidad y estado de pedidos usando datos reales del catálogo e inventario, e indique cuando no tenga información suficiente. | Media | NN04 |
-| **RF09** | El sistema debe permitir solicitar una devolución y gestionar su reembolso con trazabilidad. | Baja | NN05 |
+| **RF09** | El sistema debe permitir solicitar una devolución, gestionar su reembolso con trazabilidad y reingresar el stock en la sucursal receptora. | Baja | NN05 |
 | **RF10** | El sistema debe permitir registrar, actualizar y dar de baja libros en el catálogo, validando que el ISBN sea único. | Alta | NN08 |
 | **RF11** | El sistema debe generar guías de envío y consultar el seguimiento con el servicio de envío en los despachos a domicilio. | Media | NN11 |
 
@@ -26,7 +26,7 @@ Prioridad: **Alta**, **Media**, **Baja**.
 
 | ID | Requisito funcional | Prioridad | Origen |
 | :--- | :--- | :---: | :--- |
-| **RF12** | El sistema debe registrar cada sucursal como una fuente independiente y permitir consultar su stock físico, reservado y vendible por título. | Alta | NN06 |
+| **RF12** | El sistema debe registrar cada sucursal como una fuente independiente, con su contacto de notificación, y permitir consultar su stock físico, reservado y vendible por título. | Alta | NN06 |
 | **RF13** | El sistema debe calcular el stock vendible como *stock físico − reservas activas* y exponerlo mediante una API REST consultable por el E-commerce y el asistente. | Alta | NN01, NN06 |
 | **RF14** | El sistema debe crear reservas a solicitud del E-commerce, confirmarlas al aprobarse el pago y liberarlas si el pedido se cancela o expira. | Alta | NN02, NN06 |
 | **RF15** | El sistema debe seleccionar automáticamente la sucursal desde la cual atender un pedido, priorizando cercanía al cliente y disponibilidad, e identificar otras sucursales con stock cuando la más cercana no lo tenga. | Alta | NN07 |
@@ -38,7 +38,7 @@ Prioridad: **Alta**, **Media**, **Baja**.
 | ID | Requisito funcional | Prioridad | Origen |
 | :--- | :--- | :---: | :--- |
 | **RF18** | El sistema debe autenticar a los usuarios y emitir tokens que incluyan su rol y la sucursal a la que pueden acceder. | Alta | NN09 |
-| **RF19** | El sistema debe permitir registrar, actualizar y desactivar usuarios, y asignarles rol (cliente, encargado de sucursal, administrador central, logística) y sucursal. | Alta | NN09 |
+| **RF19** | El sistema debe permitir registrar, actualizar y desactivar usuarios, y asignarles rol (cliente, encargado de sucursal, administrador central, logística) y sucursal. Para clientes, registrar el número de contacto y su consentimiento para recibir avisos por WhatsApp. | Alta | NN09 |
 | **RF20** | El sistema debe registrar en auditoría las operaciones sensibles: cambios de precio, anulaciones de pedido, ajustes de inventario y aprobación de traslados. | Media | NN09 |
 | **RF21** | El sistema debe ofrecer indicadores de venta, inventario y traslados por sucursal y consolidados nacionales. *(Fase posterior.)* | Baja | NN10 |
 
@@ -55,8 +55,8 @@ Las metas numéricas son **propuestas iniciales** para una red de 5 a 10 sucursa
 | **RNF03** | Disponibilidad | La instancia pública debe estar disponible a cualquier hora y recuperarse sola de fallos de contenedores. | ≥ 99 % mensual (sin SLA contratado); reinicio automático en menos de 2 minutos; catálogo consultable desde caché si Inventario no responde. | AC03 |
 | **RNF04** | Escalabilidad | Incorporar sucursales debe ser una operación de datos, no de código. | Hasta 20 fuentes sin cambios de código ni de esquema. | AC04 |
 | **RNF05** | Seguridad: acceso | Cada encargado solo puede acceder al inventario y pedidos de su propia sucursal. | 100 % de accesos fuera de alcance rechazados (HTTP 403) y registrados. | AC05 |
-| **RNF06** | Seguridad: transporte y secretos | Todo el tráfico externo debe viajar cifrado; las bases de datos no deben ser accesibles desde Internet; las claves (pagos, LLM) no deben estar en el repositorio. | TLS en el 100 % del tráfico externo; 0 puertos de BD expuestos; 0 secretos en Git. | AC05 |
-| **RNF07** | Seguridad: datos y pagos | No se almacenan datos de tarjeta, y los datos personales se tratan conforme a la normativa peruana. | Cumplimiento de la Ley N.° 29733; datos de pago solo en la pasarela. | AC05 |
+| **RNF06** | Seguridad: transporte y secretos | Todo el tráfico externo debe viajar cifrado; las bases de datos no deben ser accesibles desde Internet; las claves (pagos, LLM) no deben estar en el repositorio. | TLS en el 100 % del tráfico externo; 0 puertos de BD expuestos; paneles de n8n y Evolution API sin acceso desde Internet; 0 secretos en Git. | AC05 |
+| **RNF07** | Seguridad: datos y pagos | No se almacenan datos de tarjeta, y los datos personales se tratan conforme a la normativa peruana. | Cumplimiento de la Ley N.° 29733 (incluido el consentimiento para WhatsApp); datos de pago solo en la pasarela. | AC05 |
 | **RNF08** | Auditabilidad | Las operaciones sensibles y los movimientos de stock deben ser trazables y no modificables. | 100 % de operaciones sensibles con usuario, fecha y detalle. | AC05 |
 | **RNF09** | Mantenibilidad | Los cambios (nueva regla de selección de fuente, otra pasarela) deben quedar aislados. | Cambio localizado en una capa de un servicio, sin tocar el dominio ni otros servicios. | AC06 |
 | **RNF10** | Testabilidad | La lógica de negocio debe poder probarse sin base de datos ni servicios externos. | Cada criterio de aceptación con al menos una prueba (unitaria, de integración o E2E). | AC06 |
@@ -71,14 +71,15 @@ Las metas numéricas son **propuestas iniciales** para una red de 5 a 10 sucursa
 | **RC01** | Aplicación web | El sistema se accede desde un navegador, con diseño responsivo. | Alcance inicial; la app móvil queda como extensión. |
 | **RC02** | Control de versiones | El código se gestiona con Git en un repositorio compartido. | Requisito del curso y del trabajo en equipo. |
 | **RC03** | API REST | La comunicación entre frontend y servicios, y entre E-commerce e Inventario, es por REST. | Es simple y uniforme; no se justifica un bus de eventos para 5–10 sucursales. |
-| **RC04** | Pasarela de pago | Integración con Niubiz o Culqi para Yape y tarjetas, con comisión por transacción y sin costo fijo. | Cumple el objetivo de costo mínimo (NN12). |
+| **RC04** | Pasarela de pago | Integración con Culqi para Yape y tarjetas, con comisión por transacción y sin costo fijo. | Cumple el objetivo de costo mínimo (NN12); su API es simple de consumir desde ASP.NET Core. |
 | **RC05** | Servicio de envío | Integración con un servicio externo de envío para despachos a domicilio. | La entrega no es parte del dominio del sistema. |
-| **RC06** | Tecnologías base | Backend en .NET 10 (ASP.NET Core), PostgreSQL, Redis y Docker con Docker Compose. | Decisión del proyecto; Compose basta para 2–4 VMs (Kubernetes no se justifica). |
+| **RC06** | Tecnologías base | Backend en .NET 10 (ASP.NET Core), interfaz en ASP.NET Core MVC con Razor, PostgreSQL, Redis y Docker con Docker Compose. | Decisión del proyecto; Compose basta para 2–4 VMs (Kubernetes no se justifica). |
 | **RC07** | Infraestructura | Despliegue en Oracle Cloud Free Tier: hasta 2 VMs ARM (en total 2 OCPU y 12 GB de RAM) y 2 VMs x86 micro (1/8 OCPU y 1 GB cada una), con 200 GB de almacenamiento en bloque. | Recursos gratuitos vigentes; ver `05-decisiones-arquitectonicas.md`. |
 | **RC08** | Sistema operativo | Linux en instalación mínima, sin entorno gráfico, en todas las VMs. | Reduce el consumo de RAM, que es el recurso más escaso. |
 | **RC09** | Borde de red | Se usa el plan gratuito de Cloudflare (DNS, proxy, TLS y WAF básico); requiere un dominio propio. | Protege el origen sin costo de infraestructura. |
 | **RC10** | LLM externo | El asistente usa un modelo de lenguaje de terceros y consulta los datos solo mediante las API del sistema. | Mantiene el aislamiento de las bases de datos. |
 | **RC11** | Documentación | Se documenta con el modelo C4 e IEEE 1016, y el desarrollo posterior sigue Spec-Driven Development. | Marco de la propuesta original. |
+| **RC12** | Notificaciones | Los avisos salen por WhatsApp mediante Evolution API orquestada por n8n, ambos autoalojados en Docker. | Costo cero y control propio; Evolution API no es un canal oficial de WhatsApp, por lo que se trata como riesgo (ver `04-drivers-arquitectonicos.md`). |
 
 ## 4. Trazabilidad necesidad → requisitos
 
