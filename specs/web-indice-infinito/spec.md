@@ -4,7 +4,7 @@ titulo: El índice infinito (experimento opcional)
 estado: Draft
 servicio: Web
 prefijo: IND
-origen: [RC01, NN15]
+origen: [RF29, NN17]
 calidad: [AC08]
 depende: [web-base]
 ---
@@ -27,14 +27,14 @@ Una pieza literaria de marca, inspirada en *La biblioteca de Babel* de Borges: p
 
 | ID | Patrón | Requisito | Origen |
 | :--- | :--- | :--- | :--- |
-| IND-01 | Evento | Cuando el visitante abre una dirección, el sistema deberá mostrar una página de texto generada de forma determinista a partir de esa dirección. | RC01 |
-| IND-02 | Ubicuo | El sistema deberá generar siempre la misma página para la misma dirección. | RC01 |
-| IND-03 | Evento | Cuando el visitante pide otra página al azar, el sistema deberá elegir una dirección nueva y mostrar su página. | RC01 |
-| IND-04 | Evento | Cuando el visitante copia el enlace, el sistema deberá incluir la dirección para que otra persona vea la misma página. | RC01 |
-| IND-05 | Ubicuo | El sistema deberá indicar en la pantalla que el texto es generado, que puede carecer de sentido y que no son libros reales ni están a la venta. | NN15 |
-| IND-06 | Ubicuo | El sistema deberá generar las páginas sin almacenarlas ni consultar una base de datos. | RC01 |
+| IND-01 | Evento | Cuando el visitante abre una dirección, el sistema deberá mostrar una página de texto generada de forma determinista a partir de esa dirección. | RF29 |
+| IND-02 | Ubicuo | El sistema deberá generar siempre la misma página para la misma dirección. | RF29 |
+| IND-03 | Evento | Cuando el visitante pide otra página al azar, el sistema deberá elegir una dirección nueva y mostrar su página. | RF29 |
+| IND-04 | Evento | Cuando el visitante copia el enlace, el sistema deberá incluir la dirección para que otra persona vea la misma página. | RF29 |
+| IND-05 | Ubicuo | El sistema deberá indicar en la pantalla que el texto es generado, que puede carecer de sentido y que no son libros reales ni están a la venta. | RF29 |
+| IND-06 | Ubicuo | El sistema deberá generar las páginas sin almacenarlas ni consultar una base de datos. | RF29 |
 | IND-07 | No deseado | Si la dirección no es válida, entonces el sistema deberá mostrar un mensaje amable y ofrecer una página al azar en lugar de un error. | AC08 |
-| IND-08 | Ubicuo | El sistema deberá ofrecer un enlace de regreso al catálogo real y mantener la experiencia separada del carrito y de los resultados de búsqueda. | RC01 |
+| IND-08 | Ubicuo | El sistema deberá ofrecer un enlace de regreso al catálogo real y mantener la experiencia separada del carrito y de los resultados de búsqueda. | RF29 |
 
 ## 4. Criterios de aceptación
 

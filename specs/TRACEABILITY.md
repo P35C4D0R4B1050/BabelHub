@@ -31,26 +31,31 @@
 | RF23 | ecommerce-biblioteca-digital | BIB-03, BIB-04, BIB-05, BIB-06, BIB-08, BIB-10, BIB-11, BIB-13 | AC-BIB-03, AC-BIB-04, AC-BIB-05, AC-BIB-07, AC-BIB-09, AC-BIB-11 |
 | RF24 | ecommerce-biblioteca-digital, ecommerce-catalogo | BIB-09, CAT-06, CAT-07, CAT-08, CAT-15 | AC-BIB-08, AC-CAT-03, AC-CAT-04, AC-CAT-05 |
 | RF25 | ecommerce-libro-reclamaciones, web-base | REC-01, REC-02, REC-03, REC-04, REC-05, REC-06, REC-07, REC-09, WEB-08 | AC-REC-01, AC-REC-02, AC-REC-03, AC-REC-04, AC-REC-05, AC-REC-06, AC-REC-07, AC-WEB-05 |
+| RF26 | identidad-seguridad | IDE-01, IDE-16, IDE-17, IDE-18, IDE-19 | AC-IDE-01, AC-IDE-14, AC-IDE-15, AC-IDE-16, AC-IDE-17 |
+| RF27 | identidad-seguridad | IDE-21, IDE-22 | AC-IDE-19, AC-IDE-20 |
+| RF28 | ecommerce-carrito-checkout, inventario-seleccion-fuente | CAR-17, SEL-13, SEL-14, SEL-15 | AC-CAR-14, AC-SEL-13, AC-SEL-14, AC-SEL-15 |
+| RF29 | web-base, web-indice-infinito | IND-01, IND-02, IND-03, IND-04, IND-05, IND-06, IND-08, WEB-17 | AC-IND-01, AC-IND-02, AC-IND-03, AC-IND-04, AC-IND-05, AC-WEB-13 |
 
 ## Specs
 
 | Spec | Servicio | Estado | Requisitos | Criterios | Depende de |
 | :--- | :--- | :--- | ---: | ---: | :--- |
-| asistente-compra-ia | Asistente | Draft | 10 | 9 | ecommerce-catalogo, ecommerce-pedidos, identidad-seguridad |
-| ecommerce-biblioteca-digital | E-commerce | Draft | 14 | 12 | ecommerce-catalogo, ecommerce-pagos, transversal-auditoria |
-| ecommerce-carrito-checkout | E-commerce | Draft | 16 | 13 | ecommerce-catalogo, inventario-seleccion-fuente |
+| asistente-compra-ia | Asistente | Draft | 14 | 13 | ecommerce-catalogo, ecommerce-pedidos, identidad-seguridad |
+| ecommerce-biblioteca-digital | E-commerce | Draft | 15 | 13 | ecommerce-catalogo, ecommerce-pagos, transversal-auditoria |
+| ecommerce-carrito-checkout | E-commerce | Draft | 17 | 14 | ecommerce-catalogo, inventario-seleccion-fuente |
 | ecommerce-catalogo | E-commerce | Draft | 15 | 11 | inventario-fuentes, transversal-auditoria |
 | ecommerce-devoluciones | E-commerce | Draft | 12 | 11 | ecommerce-pedidos, ecommerce-pagos, ecommerce-biblioteca-digital, inventario-ajustes |
 | ecommerce-envios | E-commerce | Draft | 10 | 9 | ecommerce-pedidos, transversal-notificaciones |
 | ecommerce-libro-reclamaciones | E-commerce | Draft | 10 | 8 | transversal-auditoria, transversal-notificaciones |
 | ecommerce-pagos | E-commerce | Draft | 12 | 10 | ecommerce-carrito-checkout, inventario-seleccion-fuente, transversal-auditoria |
 | ecommerce-pedidos | E-commerce | Draft | 14 | 12 | ecommerce-pagos, inventario-seleccion-fuente, transversal-notificaciones, transversal-auditoria |
-| identidad-seguridad | Identidad | Draft | 14 | 12 | transversal-auditoria |
+| identidad-seguridad | Identidad | Draft | 22 | 20 | transversal-auditoria |
 | inventario-ajustes | Inventario | Draft | 12 | 9 | inventario-fuentes, transversal-auditoria |
 | inventario-fuentes | Inventario | Draft | 11 | 9 | transversal-auditoria |
-| inventario-seleccion-fuente | Inventario | Draft | 12 | 12 | inventario-fuentes, transversal-auditoria |
+| inventario-seleccion-fuente | Inventario | Draft | 15 | 15 | inventario-fuentes, transversal-auditoria |
 | inventario-traslados | Inventario | Draft | 13 | 11 | inventario-fuentes, inventario-seleccion-fuente, transversal-auditoria, transversal-notificaciones |
-| transversal-auditoria | Transversal | Draft | 9 | 7 | — |
+| transversal-auditoria | Transversal | Draft | 12 | 10 | — |
 | transversal-notificaciones | Transversal | Draft | 11 | 10 | identidad-seguridad |
-| web-base | Web | Draft | 16 | 12 | identidad-seguridad, ecommerce-libro-reclamaciones |
+| transversal-seguridad | Transversal | Draft | 15 | 13 | transversal-auditoria |
+| web-base | Web | Draft | 24 | 19 | identidad-seguridad, ecommerce-libro-reclamaciones |
 | web-indice-infinito | Web | Draft | 8 | 6 | web-base |
