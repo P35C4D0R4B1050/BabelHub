@@ -199,6 +199,22 @@ Se alinearon los documentos con todas las decisiones anteriores y se cerraron la
 
 Riesgo aceptado nuevo: los límites por origen pueden bloquear a varias personas de una red compartida (SEG §6).
 
+### 7.10 Revisión de Inventario (2026-10-16)
+
+`spec-auditor` revisó fuentes, selección, ajustes y traslados («necesita otra vuelta»). Decisiones del responsable aplicadas:
+
+| Hallazgo | Decisión | Dónde quedó |
+| :-- | :-- | :-- |
+| Stock inicial sin vía | Nuevo motivo «ingreso inicial», solo de la administración central. | AJU-02, AJU-13, AJU-14 |
+| Carrera entre anulación, entrega, reparto y despacho | Gana la primera que confirma; las demás se rechazan por estado inválido. | SEL-29, SEL-28, TRA-23 |
+| Reservas vencidas sin procesar | No cuentan como activas y se liberan al reservar la edición. | FUE-03, SEL-27 |
+| Conteo bajo lo reservado | Se rechaza y se listan los pedidos afectados. | AJU-06 |
+| Pedido no recogido | No puede entregarse después; solo se anula con reembolso. | SEL-28 |
+| Ajuste por la administración | Sí, con auditoría. | AJU-15 |
+| Traslado vinculado sin aprobar | A las 48 horas se avisa a la administración y a logística. | TRA-22 |
+
+Sin pregunta (criterio técnico): reasignación al perder la última unidad (SEL-26), atomicidad de recepción y despacho (TRA-07, TRA-08), traslado por fuente y edición (SEL-03), domicilio sin traslado y una línea en una sola fuente (SEL-24, SEL-25), alcance y validaciones de traslados (TRA-09, TRA-20), fecha estimada (TRA-21), auditoría de movimientos (SEL-32), cobertura de criterios de concurrencia, `cerrada` como estado de reserva y dependencias de identidad. **Supuesto a confirmar:** un encargado solo puede solicitar traslados hacia su propia sucursal (TRA-20).
+
 **Siguen abiertos de R3:** custodia de la clave de firma (plan) y S9 (dónde viven los contadores de límites, plan). Quedan además las preguntas abiertas de confirmación en cada spec (valores propuestos y las nuevas de esta ronda), que son las que impiden pasar a `Approved`.
 
 ## 8. Orden de resolución propuesto
