@@ -34,7 +34,7 @@ Soporte (ayudas del cliente) lo cubre hoy el administrador central. Un rol de so
 | Ver stock de una fuente | — | — | ◐ | — | ● | `inventario-fuentes` |
 | Registrar fuentes (sucursales) | — | — | — | — | ● | `inventario-fuentes` |
 | Gestionar envíos y guías | — | — | — | ● | ● | `ecommerce-envios` |
-| Ajustar inventario | — | — | ◐ | — | ● | `inventario-ajustes` |
+| Ajustar inventario | — | — | ◐ | — | ● (también el ingreso inicial) | `inventario-ajustes` |
 | Solicitar un traslado | — | — | ◐ | — | ● | `inventario-traslados` |
 | Aprobar, rechazar y despachar traslados | — | — | ◐ (solo origen) | — | ● | `inventario-traslados` |
 | Recibir traslados | — | — | ◐ (solo destino) | — | ● | `inventario-traslados` |

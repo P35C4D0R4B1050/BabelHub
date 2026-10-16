@@ -44,7 +44,7 @@ class StockPorEdicion {
   Vendible = Fisico - Reservado
 }
 class Reserva {
-  Estado: pendiente, confirmada, liberada, expirada
+  Estado: pendiente, confirmada, cerrada, liberada, expirada
   Expira en 15 min
   Clave de idempotencia
 }
@@ -60,7 +60,7 @@ class Ruta {
   Plazo en dias
 }
 class Ajuste {
-  Motivo: merma, danado, correccion de conteo
+  Motivo: merma, danado, correccion de conteo, ingreso inicial (solo administracion), devolucion
   Responsable
 }
 Fuente "1" --> "*" StockPorEdicion
@@ -78,9 +78,11 @@ StockPorEdicion "1" --> "*" Ajuste
 3. La reserva de un pedido es atómica: todas las líneas impresas o ninguna.
 4. Un cliente tiene como máximo una reserva pendiente y hasta 5 reservas iniciadas por hora (RF28).
 5. La merma y el daño solo descuentan y nunca más que el vendible; la corrección de conteo se expresa como el conteo real y no puede quedar por debajo de lo reservado.
-6. Ciclo del traslado: solicitado → aprobado → en tránsito → recibido; solicitado → rechazado (no si está vinculado a un pedido); solicitado o aprobado → cancelado (solo al anularse el pedido vinculado). El despacho descuenta del origen; la recepción suma al destino.
-8. Un traslado vinculado a un pedido mueve su reserva con las unidades: se consume en el origen al despachar y se recrea en el destino al recibir. Un pedido de recojo que supera 15 días en listo para recojo pasa a no recogido y libera sus reservas.
+6. Ciclo del traslado: solicitado → aprobado → en tránsito → recibido; solicitado → rechazado (no si está vinculado a un pedido); solicitado o aprobado → cancelado (al anularse el pedido vinculado, o por el origen o la administración si no está vinculado). El despacho descuenta del origen; la recepción suma al destino.
 7. Un libro digital nunca tiene stock, reserva ni traslado.
+8. Un traslado vinculado a un pedido mueve su reserva con las unidades: se consume en el origen al despachar y se recrea en el destino al recibir, en la misma transacción. Un pedido de recojo que supera 15 días en listo para recojo pasa a no recogido, libera sus reservas y ya no puede entregarse: solo se anula con reembolso.
+9. Una reserva pendiente vencida no cuenta como activa aunque el trabajo de fondo no la haya procesado; si dos operaciones compiten por una misma reserva, gana la primera que confirma y la otra se rechaza por estado inválido.
+10. El stock inicial entra con el motivo ingreso inicial, que solo registra la administración central.
 
 ## 3. E-commerce
 

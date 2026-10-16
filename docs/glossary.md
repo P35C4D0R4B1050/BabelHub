@@ -8,12 +8,12 @@ Lenguaje común del dominio. El código, las specs y la interfaz usan estos tér
 | :--- | :--- | :--- |
 | **Fuente** | Lugar que guarda stock de libros impresos. Cada sucursal es una fuente. Se registra como dato. | «Sucursal» como unidad comercial: la sucursal es la tienda; la fuente es su rol en el inventario. |
 | **Stock físico** | Ejemplares impresos que realmente hay en una fuente. | Stock vendible. |
-| **Reserva** | Apartado de unidades para un pedido en curso. Estados: pendiente, confirmada, liberada, expirada. | Venta: una reserva todavía no descuenta el stock físico. |
+| **Reserva** | Apartado de unidades para un pedido en curso. Estados: pendiente, confirmada, cerrada (al entregar, pasar a en reparto o despachar el traslado), liberada, expirada. Una pendiente vencida no cuenta como activa. | Venta: una reserva todavía no descuenta el stock físico. |
 | **Stock vendible** | *Stock físico − reservas activas*. Nunca es negativo. | Stock físico. |
 | **Selección de fuente** | Regla que decide desde qué fuente se atiende cada línea impresa de un pedido. | Elección de sucursal de recojo, que hace el cliente. |
 | **Traslado** | Movimiento de ejemplares de una fuente de origen a una de destino. Estados: solicitado, aprobado, en tránsito, recibido, rechazado, cancelado. Si nace de un pedido pagado está *vinculado* a él: no puede rechazarse y mueve la reserva con las unidades. | Envío a domicilio. |
 | **Ruta** | Plazo estimado, en días, del traslado de una fuente a otra. La administración la mantiene como dato; ordena las fuentes por cercanía y da el plazo que ve el cliente. | Guía de traslado. |
-| **Ajuste** | Cambio del stock físico de una fuente con motivo y responsable: merma, producto dañado o corrección de conteo. | Traslado. |
+| **Ajuste** | Cambio del stock físico de una fuente con motivo y responsable: merma, producto dañado, corrección de conteo o ingreso inicial (este solo lo registra la administración central). | Traslado. |
 | **Merma** | Pérdida de unidades (robo, extravío, desgaste). Solo descuenta. | Producto dañado. |
 | **Producto dañado** | Unidades que ya no se pueden vender. Solo descuenta. | Merma. |
 | **Corrección de conteo** | Ajuste que se expresa como el conteo físico real; el sistema calcula la diferencia. | Un ajuste con signo libre: no existe. |

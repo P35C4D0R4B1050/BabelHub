@@ -13,7 +13,8 @@ pendiente --> confirmada : pago aprobado
 pendiente --> liberada : cancelación o checkout abandonado
 pendiente --> expirada : vence el plazo
 confirmada --> liberada : pedido anulado o no recogido
-confirmada --> [*] : entrega de recojo, envío en reparto o despacho del traslado (descuenta físico)
+confirmada --> cerrada : entrega de recojo, envío en reparto o despacho del traslado (descuenta físico)
+cerrada --> [*]
 liberada --> [*]
 expirada --> [*]
 ```
@@ -27,8 +28,8 @@ stateDiagram-v2
 [*] --> solicitado
 solicitado --> aprobado : aprueba el origen
 solicitado --> rechazado : rechaza el origen (no si está vinculado a un pedido)
-solicitado --> cancelado : se anula el pedido vinculado
-aprobado --> cancelado : se anula el pedido vinculado
+solicitado --> cancelado : se anula el pedido vinculado, o lo cancela el origen o la administración si no está vinculado
+aprobado --> cancelado : se anula el pedido vinculado, o lo cancela el origen o la administración si no está vinculado
 aprobado --> en_transito : despacha el origen (baja físico del origen y consume la reserva vinculada)
 en_transito --> recibido : recibe el destino (sube físico del destino y recrea la reserva)
 rechazado --> [*]
