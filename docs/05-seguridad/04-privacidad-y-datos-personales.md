@@ -8,12 +8,14 @@ Aplica la Ley N.° 29733 y su reglamento (DS 016-2024-JUS) de forma **proporcion
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | Nombre y correo (verificado) | Cliente al registrarse | Identificar la cuenta, contactar, verificar y recuperar el acceso | Ejecución del servicio | Identidad | El titular; la administración | Mientras la cuenta esté activa |
 | Número de WhatsApp (opcional) | Cliente | Avisar el estado de pedidos, solo con consentimiento | Consentimiento | Identidad | El titular; el notificador (solo el número) | Mientras la cuenta esté activa o hasta que se revoque el consentimiento |
-| Consentimientos (WhatsApp y tratamiento) | Cliente | Probar la autorización y respetar su revocación | Obligación legal | Identidad | El titular; la administración | Dos años desde su revocación *(propuesta)* |
+| Consentimientos (WhatsApp y tratamiento) y aceptación de términos, privacidad y reembolso (versión y fecha) | Cliente | Probar la autorización y respetar su revocación | Obligación legal | Identidad y pedido | El titular; la administración | Dos años desde su revocación o desde el pedido *(propuesta)* |
+| Declaración de ser mayor de 18 años | Cliente al registrarse | Excluir a menores de edad del servicio | Ejecución del servicio | Identidad | El titular; la administración | Mientras la cuenta esté activa |
+| Dirección IP (origen de las solicitudes) | Se genera | Límites de uso, detección de abuso y seguridad | Interés legítimo | Contadores (huella no reversible, 24 horas); eventos de seguridad (dirección completa) | La administración (eventos) | Contadores 24 horas; eventos 2 años y luego se anonimiza (SEG-25, AUD-11) |
 | Contraseña | Cliente | Autenticar | Ejecución del servicio | Identidad (solo resumen con sal) | Nadie | Mientras la cuenta esté activa |
 | Dirección de entrega | Cliente en el checkout | Despacho a domicilio | Ejecución del servicio | E-commerce (pedido) | El titular; logística | Dos años desde el pedido *(propuesta)* |
 | Historial de pedidos | Se genera | Seguimiento, devoluciones y cumplimiento | Ejecución del servicio | E-commerce | El titular; la administración; el encargado de recojo (solo su sucursal) | Dos años *(propuesta)* |
 | Biblioteca digital | Se genera | Acceso a lo comprado | Ejecución del servicio | E-commerce | **Solo el titular** y el personal autorizado | Mientras la cuenta esté activa |
-| Hoja de reclamación | Consumidor | Libro de Reclamaciones | Obligación legal | E-commerce | La administración y el consumidor | Al menos dos años |
+| Hoja de reclamación (nombre, documento, domicilio, correo, monto y detalle) | Consumidor | Libro de Reclamaciones y respuesta por correo | Obligación legal | E-commerce | La administración y el consumidor | Al menos dos años; luego se anonimiza (también las descartadas) |
 | Registros de auditoría y de seguridad | Se genera | Trazabilidad y seguridad | Interés legítimo | Cada servicio | La administración | Dos años |
 | Consultas al asistente | Cliente | Responder | Ejecución del servicio | No se persisten con identidad | — | No se conservan |
 | Datos de tarjeta | Cliente a la pasarela | Cobrar | — | **Solo la pasarela** | — | No se almacenan |
@@ -22,7 +24,7 @@ Los plazos son los de RNF23 (auditoría y hojas de reclamación: dos años); los
 
 ## 2. Reglas de minimización
 
-1. Se pide solo lo necesario: no se pide documento de identidad, fecha de nacimiento ni datos de tarjeta.
+1. Se pide solo lo necesario: no se pide documento de identidad, fecha de nacimiento ni datos de tarjeta. **Excepción:** la hoja del Libro de Reclamaciones pide documento y domicilio por obligación legal (REC-03).
 2. El asistente recibe únicamente lo que necesita para responder; nunca nombre, correo ni teléfono si la consulta no lo requiere (ASI-08).
 3. Los mensajes de WhatsApp no incluyen datos de tarjeta, contraseñas ni enlaces de descarga (NOT-07).
 4. Los registros técnicos, de auditoría y de seguridad no contienen contraseñas, credenciales, datos de tarjeta ni enlaces (AUD-06, SEG-10).
@@ -37,7 +39,7 @@ Los plazos son los de RNF23 (auditoría y hojas de reclamación: dos años); los
 | **Cancelación** | El cliente cancela su cuenta; se suprimen o anonimizan sus datos personales, salvo lo que una obligación legal exija (pedidos y hojas de reclamación). | IDE-26, IDE-27, IDE-28 |
 | **Oposición** | Solicitud registrada con estado; incluye revocar el consentimiento de avisos. | IDE-11, IDE-12, NOT-08 |
 
-Las solicitudes se registran con su estado (IDE-12). El plazo de respuesta se define con la persona responsable del proyecto.
+Las solicitudes se registran con su estado y su fecha límite (IDE-12): 20 días hábiles para el acceso y 10 para rectificación, cancelación y oposición, a verificar contra el DS 016-2024-JUS. La administración las ve ordenadas por fecha límite, con las vencidas marcadas (IDE-32).
 
 ## 4. Transferencias y proveedores
 
@@ -50,7 +52,7 @@ Cada proveedor recibe solo los datos mínimos necesarios (RC17).
 | **Almacén de objetos** (R2 u Oracle) | Archivos digitales y, en los respaldos, copias cifradas de las bases. | Según el proveedor | Sin datos personales en claro en los respaldos (cifrados). |
 | **Culqi** | Datos del pago y del comprador necesarios para cobrar. | A verificar con el proveedor | La tarjeta se captura en su formulario; BabelHub recibe solo un identificador. |
 | **WhatsApp / Evolution API** | Número de teléfono y el texto del aviso. | Fuera del país | El número se usa solo para avisos de pedidos; el texto no contiene datos sensibles. |
-| **Proveedor de correo** | Correo del destinatario y el código de un solo uso. | A verificar con el proveedor (B08) | Solo mensajes transaccionales de seguridad; sin publicidad. |
+| **Proveedor de correo** | Correo del destinatario y el código de un solo uso, o la respuesta a una hoja de reclamación. | A verificar con el proveedor (B08) | Solo mensajes transaccionales (seguridad, alertas a la administración, respuesta a reclamos y estado de un pago pendiente); sin publicidad. La respuesta a un reclamo puede contener datos del caso: el texto se redacta sin documento ni domicilio. |
 | **Proveedor de LLM** | Texto de la consulta y datos de catálogo o del pedido del cliente que se necesiten para responder. | Fuera del país | Sin nombre, correo ni teléfono; sin historial de compra más allá del pedido consultado. |
 
 **Pendiente:** completar con la ubicación exacta cuando se elijan Oracle, el almacén (B02) y el proveedor de LLM (B06).
@@ -59,7 +61,7 @@ Cada proveedor recibe solo los datos mínimos necesarios (RC17).
 
 | Dato | Plazo | Mecanismo |
 | :--- | :--- | :--- |
-| Auditoría y eventos de seguridad | 2 años | Depuración periódica: se elimina o anonimiza (AUD-11). |
+| Auditoría y eventos de seguridad | 2 años | Depuración diaria: se anonimiza, incluida la dirección IP; las cuentas canceladas, desde la depuración siguiente (AUD-19). |
 | Hojas de reclamación | Al menos 2 años; no se eliminan antes | REC-06. |
 | Pedidos | 2 años *(propuesta)* | Anonimización de datos de contacto al vencer. |
 | Cuenta cancelada | Inmediato para datos de contacto | IDE-28. |
@@ -67,7 +69,7 @@ Cada proveedor recibe solo los datos mínimos necesarios (RC17).
 
 ## 6. Incidentes de seguridad con datos personales
 
-Se prevé un procedimiento sencillo (véase [operación segura](07-operacion-segura.md)): detectar, contener, evaluar si hay datos personales afectados, notificar a las personas y a la autoridad cuando corresponda, y documentar la causa y la corrección. Es un procedimiento documental; en un entorno real, lo revisaría una persona experta.
+Se prevé un procedimiento sencillo (véase [operación segura](07-operacion-segura.md)): detectar, contener, evaluar si hay datos personales afectados, notificar a las personas y a la autoridad cuando corresponda, y documentar la causa y la corrección. **Meta interna: notificar dentro de las 48 horas de conocer el incidente** (a verificar contra el plazo del DS 016-2024-JUS). Es un procedimiento documental; en un entorno real, lo revisaría una persona experta.
 
 ## 7. Banco de datos y registro
 

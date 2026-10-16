@@ -18,7 +18,7 @@ Cómo se protegen las interfaces entre servicios, la que expone la Web y las que
 | **API2 Autenticación rota** | Ingreso, recuperación, segundo factor | Bloqueo temporal, respuesta uniforme, códigos de un solo uso (IDE-03, IDE-17 a IDE-19). |
 | **API3 Autorización de propiedades** | Respuestas con datos de usuarios o de costos | DTOs específicos por rol; no se devuelven entidades de dominio; asignación masiva prohibida (CTL-11). |
 | **API4 Consumo de recursos sin límite** | Todas las rutas, búsquedas, asistente | 100 solicitudes por minuto por usuario; paginación con tope; tamaño máximo de cuerpo y de consulta (SEG-05, ASI-14). |
-| **API5 Autorización de función** | Funciones administrativas | Rol en la credencial y segundo factor del administrador (IDE-20). |
+| **API5 Autorización de función** | Funciones administrativas | Rol en la credencial y segundo factor del personal (IDE-20). |
 | **API6 Flujos de negocio sensibles sin protección** | Reservas, descargas, recuperación | Una reserva activa por cliente y 5 por hora; 10 solicitudes de descarga por hora; límites en la recuperación (SEL-13, SEL-14, BIB-15, IDE-19). |
 | **API7 Falsificación de solicitudes del servidor** | Cualquier llamada que reciba una URL | El sistema no consulta direcciones indicadas por el usuario. Si se agregara, se permite solo una lista de destinos. |
 | **API8 Configuración incorrecta** | Cabeceras, CORS, errores, puertos | Cabeceras de seguridad (WEB-18), errores uniformes (SEG-03), bases sin puertos publicados (RNF06). |
@@ -49,6 +49,10 @@ Cómo se protegen las interfaces entre servicios, la que expone la Web y las que
 | Asistente | 10 consultas por minuto | Aplicación | ASI-09 |
 | Códigos de un solo uso | 3 solicitudes por hora por correo y por origen; 5 intentos por código | Aplicación | SEG-19, IDE-19 |
 | Segundo factor | 5 códigos incorrectos en 15 minutos bloquean 15 minutos | Aplicación | SEG-20 |
+| Libro de Reclamaciones | 3 hojas por hora por origen | Aplicación | REC-11 |
+| Registro de cuentas | 3 cuentas nuevas por hora por origen | Aplicación | SEG-24 |
+| Origen no determinable | Un «origen desconocido» único con los mismos límites por origen | Aplicación | SEG-23 |
+| Caída del almacén de contadores | Ingreso, registro, códigos, reservas y descargas se rechazan; las demás operaciones usan un límite local | Aplicación | SEG-26 |
 
 **Respuesta uniforme:** al exceder un límite la respuesta tiene siempre la misma forma, incluye una espera sugerida y no revela información de cuentas. Cada exceso se registra como evento de seguridad (SEG-08).
 
@@ -60,7 +64,7 @@ Cómo se protegen las interfaces entre servicios, la que expone la Web y las que
 | **n8n y Evolution API (WhatsApp)** | Saliente: enviar mensaje. Entrante: estado de entrega. | Secreto compartido; paneles no expuestos a Internet. | Se ignoran mensajes sin firma o fuera de formato. | Reintentos con esperas crecientes; nunca interrumpe un caso de uso (NOT-04). |
 | **Almacén de archivos** | Saliente: generar URL firmada; entrante: ninguna (el navegador descarga directo). | Llave del almacén en el entorno; permisos solo de lectura para firmar. | La URL firmada caduca en 5 minutos como máximo. | Se informa el problema, no se consume una descarga (BIB-13). |
 | **Servicio de envío** | Saliente: crear guía y consultar seguimiento. | Llave en el entorno. | Formato de respuesta validado. | El envío queda pendiente y se reintenta. |
-| **Proveedor de correo** | Saliente: enviar el código de un solo uso. | Llave en el entorno; dominio con SPF, DKIM y DMARC. | Se valida el estado de entrega; el contenido solo lleva el código. | La persona reintenta; no hay cola ni almacenamiento del código fuera de Identidad (AD30). |
+| **Proveedor de correo** | Saliente: enviar el código de un solo uso o la respuesta a una hoja de reclamación. | Llave en el entorno; dominio con SPF, DKIM y DMARC. | Se valida el estado de entrega; el mensaje de seguridad solo lleva el código. | Código: la persona reintenta, sin cola ni almacenamiento fuera de Identidad (AD30). Respuesta a un reclamo: queda guardada y la administración reintenta (REC-13). |
 | **Proveedor de LLM** | Saliente: consulta. | Llave en el entorno. | La respuesta se trata como texto no confiable (RNF22). | El asistente informa que no está disponible (ASI-07). |
 
 ## 6. Webhooks entrantes

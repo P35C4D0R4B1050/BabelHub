@@ -172,7 +172,7 @@ Complementos: firewall del sistema operativo con las mismas reglas, secretos com
 
 ## 5. Sistema operativo
 
-Se propone **Ubuntu Server LTS mínimo sin entorno gráfico** en las VMs de Oracle (misma familia, mismo `apt` y mismo Docker) y Debian en local si se desea. El criterio se mantiene: instalación mínima y sin interfaz gráfica para ahorrar memoria.
+**Decisión (2026-10-16):** **Ubuntu Server LTS mínimo sin entorno gráfico** en las VMs de Oracle, por ser la imagen oficial para Ampere A1 (misma familia, mismo `apt` y mismo Docker que Debian); en local se puede usar Debian. La propuesta original indicaba Debian: el cambio se justifica por la imagen oficial y se menciona en la entrega. El criterio se mantiene: instalación mínima y sin interfaz gráfica para ahorrar memoria.
 
 ## 6. Pendientes de verificar
 

@@ -41,7 +41,7 @@ Se toman como orientación los controles más relevantes para el alcance del pro
 | 5.24–5.28 Gestión de incidentes | Procedimiento de respuesta documentado. | [operación segura](07-operacion-segura.md) |
 | 5.30 Preparación de las TIC para la continuidad | Respaldo, RPO y RTO, contingencia de despliegue. | RNF24, AD27 |
 | 5.34 Privacidad y protección de datos personales | Inventario de datos, minimización, retención, ARCO. | RNF23; [privacidad](04-privacidad-y-datos-personales.md) |
-| 8.2 Derechos de acceso privilegiado | Administrador central con segundo factor. | IDE-20 |
+| 8.2 Derechos de acceso privilegiado | Personal (incluido el administrador central) con segundo factor. | IDE-20 |
 | 8.5 Autenticación segura | Bloqueo, recuperación, segundo factor. | RNF15 |
 | 8.8 Gestión de vulnerabilidades técnicas | Escaneo de dependencias e imágenes. | RNF19 |
 | 8.9 Gestión de la configuración | Compose versionado, endurecimiento. | [operación segura](07-operacion-segura.md) |

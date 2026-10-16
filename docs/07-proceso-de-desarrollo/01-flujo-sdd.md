@@ -68,7 +68,7 @@ babelhub/
 ├── .github/workflows/ci.yml
 ├── .claude/               skills/ (12), agents/ (3), settings.json, launch.json
 ├── docs/                  7 carpetas temáticas (01-analisis-de-sistema a 07-proceso-de-desarrollo) y glossary.md
-├── specs/                 README.md, speccheck.json, TRACEABILITY.md, _template/ y 18 features
+├── specs/                 README.md, speccheck.json, TRACEABILITY.md, _template/ y 19 features
 ├── progress/              CHANGELOG.md, blockers.md, log/
 ├── src/                   Inventario, Ecommerce (4 proyectos cada uno), Identidad, AsistenteCompra, Web y Shared
 ├── tests/                 unit/, integration/, architecture/, e2e/ (Playwright) y load/ (k6)

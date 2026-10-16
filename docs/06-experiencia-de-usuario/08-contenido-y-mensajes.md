@@ -40,7 +40,12 @@ Estos mensajes **no deben revelar** si una cuenta existe, qué dato falló ni de
 | Descarga con límite | «Usaste las 5 descargas de este libro. Si perdiste el archivo, pide ayuda y lo revisamos.» | Dejar sin salida. |
 | Sin permiso | «Tu cuenta no tiene acceso a esta sección.» + salidas permitidas | Revelar que el recurso existe. |
 | Segundo factor | «Escribe el código de tu aplicación de autenticación.» | Detallar el motivo del fallo. |
-| Sesión vencida | «Tu sesión venció. Inicia sesión para continuar; guardamos lo que escribiste.» | Perder datos. |
+| Sesión vencida o inactiva | «Tu sesión venció por inactividad. Inicia sesión para continuar; guardamos lo que escribiste.» | Perder datos. |
+| Correo sin verificar al pagar | «Verifica tu correo para pagar. Te enviamos un código; tu carrito sigue guardado.» | Perder el carrito. |
+| Registros de cuentas con límite | «Se hicieron varios registros desde esta conexión. Inténtalo de nuevo a las 15:42.» | Acusar a la persona. |
+| Reclamos con límite | «Se enviaron varias hojas desde esta conexión. Podrás enviar otra a las 15:42.» | Acusar a la persona. |
+| Cancelación no permitida | «Este pedido ya está en preparación o incluye un libro digital. Si ya lo recibiste, puedes pedir una devolución.» | Dejar sin salida. |
+| Registro sin mayoría de edad | «BabelHub es solo para mayores de 18 años.» | Pedir datos innecesarios. |
 
 ## 4. Catálogo de mensajes por estado
 
@@ -53,11 +58,15 @@ Estos mensajes **no deben revelar** si una cuenta existe, qué dato falló ni de
 | Servicio no disponible | «No podemos mostrar esto ahora» | Nombra la parte afectada. | Reintentar |
 | Agotado | «Agotado» (con icono) | «Disponible en otras sucursales: …» | Ver sucursales |
 | Reserva por vencer | «Te quedan 2 minutos» | «Tus libros están apartados hasta las 15:42.» | Pagar ahora |
-| Pago pendiente | «Estamos confirmando tu pago» | «No vuelvas a pagar. Te avisaremos cuando se confirme.» | Ver mi pedido |
+| Pago pendiente | «Estamos confirmando tu pago» | «No vuelvas a pagar. Mantenemos tus libros apartados hasta las 15:42 y te avisaremos por correo (y por WhatsApp, si lo activaste) cuando se confirme.» | Ver mi pedido |
+| Pago aprobado tarde | «Tu pago llegó cuando tus libros ya no estaban apartados» | «Te devolvimos el dinero automáticamente. Puedes volver a intentar la compra.» | Volver al carrito |
+| Traslado sin plazo | «Plazo por confirmar» | «Tu libro vendrá de otra sucursal; te avisaremos la fecha.» | Continuar |
+| Pedido no recogido | «No recogiste tu pedido a tiempo» | «Liberamos tus libros. Escríbenos y revisamos tu caso.» | Ayuda |
 
 ## 5. Contenido legal y de privacidad
 
-- Los términos, la política de privacidad y la de reembolso digital usan lenguaje claro y resumen al inicio lo esencial.
+- Los términos, la política de privacidad (que informa las cookies necesarias) y la de reembolso digital usan lenguaje claro y resumen al inicio lo esencial. Cada uno muestra su versión y fecha de vigencia.
+- La constancia del Libro de Reclamaciones indica el plazo de respuesta (15 días calendario) y que la respuesta llega por correo.
 - El consentimiento de WhatsApp se explica en una frase («Te avisaremos del estado de tu pedido; no enviamos publicidad») y se ofrece como opción.
 - El Libro de Reclamaciones se enlaza siempre desde el pie y se explica qué es un reclamo y qué una queja.
 

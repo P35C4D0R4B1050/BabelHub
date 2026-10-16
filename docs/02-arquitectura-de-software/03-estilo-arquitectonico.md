@@ -105,7 +105,7 @@ La vista de despliegue sobre las VMs de Oracle está en [decisiones arquitectón
 | **Cloudflare y Nginx** | Cloudflare protege y cifra el acceso; Nginx enruta cada solicitud al servicio correspondiente. | AD13, AD14 |
 | **Servicio de E-commerce** | Catálogo (impresos y digitales), carrito, checkout, pagos, pedidos y biblioteca digital (acceso y descarga). Único servicio con el que interactúa el cliente final. | AD01, AD02, AD19, AD20 |
 | **Servicio de Inventario Multi-Fuente** | Fuentes por sucursal, stock vendible (físico − reservas), reservas, selección de fuente, traslados y ajustes. | AD01, AD08 |
-| **Servicio de Identidad y Seguridad** | Autentica usuarios y emite JWT con rol y sucursal. | AD05 |
+| **Servicio de Identidad y Seguridad** | Autentica usuarios (con segundo factor para el personal), emite JWT con rol y sucursal, firma con una clave propia que rota, y emite la credencial de lectura del asistente. | AD05, AD22 |
 | **Servicio de Asistente de Compra** | Recomienda libros y responde dudas con datos de las API y un LLM externo. | AD07 |
 | **BD Ventas y BD Inventario** | PostgreSQL separadas; la de Inventario se aísla por su volumen de escritura. Identidad usa el esquema propio `identidad` en la instancia de Ventas. | AD03, AD12, AD18 |
 | **Notificaciones (n8n + Evolution API)** | Reciben avisos de E-commerce e Inventario por webhook y los envían por WhatsApp; su falla no bloquea ninguna operación. | AD16 |
@@ -119,7 +119,8 @@ La vista de despliegue sobre las VMs de Oracle está en [decisiones arquitectón
 | Navegador | Cloudflare → Nginx → Web | HTTPS | Enviar todas las solicitudes de la interfaz. |
 | Aplicación Web | E-commerce, Inventario, Identidad y Asistente | REST síncrono (red interna) | Obtener y modificar datos con el JWT del usuario. |
 | E-commerce | Inventario | REST síncrono | Consultar disponibilidad real y solicitar reservas. |
-| Asistente | E-commerce e Inventario | REST síncrono | Obtener datos, sin acceder a las bases. |
+| Asistente | E-commerce e Inventario | REST síncrono | Obtener datos, sin acceder a las bases; los pedidos con la credencial de lectura del propio cliente. |
+| Servicios | Proveedor de correo | API externa | Códigos de seguridad, respuestas a reclamos, alertas y avisos de pago pendiente. |
 | Todos los servicios | Identidad | Validación de JWT | Verificar rol y sucursal permitidos. |
 | E-commerce e Inventario | Su base y Redis | SQL y caché | Persistir y acelerar sus datos. |
 | E-commerce | Culqi y servicio de envío | API externa | Cobrar y gestionar entregas. |

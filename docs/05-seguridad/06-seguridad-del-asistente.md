@@ -14,15 +14,15 @@ Por eso: sin herramientas de escritura, sin acceso a bases de datos, sin secreto
 flowchart LR
 U["Cliente"] --> W["Web"]
 W --> A["Servicio Asistente<br/>solo lectura"]
-A -->|"credencial de solo lectura"| C["API de Catálogo e Inventario"]
-A -->|"credencial de solo lectura"| P["API de Pedidos<br/>(solo del cliente)"]
+A -->|"credencial de servicio de solo lectura"| C["API de Catálogo e Inventario"]
+A -->|"credencial del cliente, 5 min, solo lectura"| P["API de Pedidos<br/>(filtra por el cliente)"]
 A -->|"texto mínimo"| L["Proveedor de LLM"]
 L -->|"texto"| A
 A -->|"texto plano"| W
 ```
 
 - El Asistente **no tiene cadena de conexión** a ninguna base de datos (ASI-06, AC-ASI-06).
-- Sus credenciales de servicio son de solo lectura y limitadas a los datos del catálogo, la disponibilidad y los pedidos del cliente autenticado.
+- Para el catálogo y la disponibilidad usa una credencial de servicio de solo lectura. Para los pedidos usa una credencial de 5 minutos, de solo lectura y limitada al cliente autenticado (IDE-33): el servicio de pedidos filtra por ese cliente, de modo que el asistente no puede leer pedidos ajenos aunque el modelo sea manipulado (ASI-19).
 - Si el cliente no está autenticado, solo accede a catálogo y disponibilidad.
 
 ## 3. Riesgos LLM aplicados

@@ -12,13 +12,13 @@ stateDiagram-v2
 pendiente --> confirmada : pago aprobado
 pendiente --> liberada : cancelación o checkout abandonado
 pendiente --> expirada : vence el plazo
-confirmada --> liberada : pedido anulado
-confirmada --> [*] : pedido entregado (descuenta físico)
+confirmada --> liberada : pedido anulado o no recogido
+confirmada --> [*] : entrega de recojo, envío en reparto o despacho del traslado (descuenta físico)
 liberada --> [*]
 expirada --> [*]
 ```
 
-Una reserva pendiente reduce el vendible; el físico solo baja al entregar. Confirmar una reserva expirada se rechaza.
+Una reserva pendiente reduce el vendible; el físico solo baja al entregar un pedido de recojo, al pasar a en reparto un envío a domicilio o al despachar el traslado vinculado (que recrea la reserva en el destino al recibirlo). Confirmar una reserva expirada se rechaza.
 
 ### 1.2 Traslado
 
@@ -26,10 +26,13 @@ Una reserva pendiente reduce el vendible; el físico solo baja al entregar. Conf
 stateDiagram-v2
 [*] --> solicitado
 solicitado --> aprobado : aprueba el origen
-solicitado --> rechazado : rechaza el origen
-aprobado --> en_transito : despacha el origen (baja físico del origen)
-en_transito --> recibido : recibe el destino (sube físico del destino)
+solicitado --> rechazado : rechaza el origen (no si está vinculado a un pedido)
+solicitado --> cancelado : se anula el pedido vinculado
+aprobado --> cancelado : se anula el pedido vinculado
+aprobado --> en_transito : despacha el origen (baja físico del origen y consume la reserva vinculada)
+en_transito --> recibido : recibe el destino (sube físico del destino y recrea la reserva)
 rechazado --> [*]
+cancelado --> [*]
 recibido --> [*]
 ```
 
@@ -44,6 +47,7 @@ en_transito_entre_sucursales --> listo_para_recojo
 en_preparacion --> listo_para_recojo
 en_preparacion --> despachada : domicilio
 listo_para_recojo --> entregada
+listo_para_recojo --> no_recogida : 15 días sin recoger
 despachada --> entregada
 entregada --> [*]
 ```
@@ -52,7 +56,7 @@ El estado del pedido se deriva del de sus líneas. La línea digital pasa a *dis
 
 ### 1.4 Pago
 
-`pendiente → aprobado | rechazado | pendiente de confirmación → aprobado | rechazado`. Un pedido tiene como máximo un cobro aprobado. Un pago aprobado cuya confirmación de reserva falla se reembolsa automáticamente.
+`pendiente → aprobado | rechazado | pendiente de confirmación → aprobado | rechazado | vencido`. Un pago pendiente de confirmación extiende la reserva una vez, hasta 30 minutos desde el inicio del pago, y avisa al cliente por todos sus medios; si se aprueba con la reserva vencida, se reembolsa. Un pedido tiene como máximo un cobro aprobado. Un pago aprobado cuya confirmación de reserva falla se reembolsa automáticamente.
 
 ### 1.5 Envío
 
@@ -60,7 +64,7 @@ El estado del pedido se deriva del de sus líneas. La línea digital pasa a *dis
 
 ### 1.6 Devolución
 
-`solicitada → aprobada → reembolsada → (reingreso de stock)`; también `solicitada → rechazada`. Un reembolso o reingreso fallido queda reintentable sin repetir el paso ya completado.
+Impreso: `solicitada → aprobada → recibida (reingreso de stock) → reembolsada`. Digital: `solicitada → aprobada → reembolsada`. En ambos, `solicitada → rechazada`. Un reembolso o reingreso fallido queda reintentable sin repetir el paso ya completado.
 
 ### 1.7 Solicitud ARCO
 

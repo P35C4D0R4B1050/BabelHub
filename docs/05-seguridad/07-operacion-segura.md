@@ -46,8 +46,8 @@ Se sigue una versión reducida del **NIST SSDF**, integrada al flujo de [Spec-Dr
 | :--- | :--- | :--- |
 | Eventos de seguridad (ingresos fallidos, bloqueos, accesos denegados, límites, cambios de rol, segundo factor fallido) | Registro de auditoría de cada servicio (AUD-10) | Sin contraseñas, credenciales, datos de tarjeta ni enlaces (SEG-10). |
 | Registros técnicos | Salida estándar de los contenedores, con el identificador de seguimiento | Rotación por tamaño; retención corta. |
-| Alerta | Más de 10 accesos denegados o 20 ingresos fallidos en 5 minutos | Llega a la administración central (SEG-09). |
-| Alerta técnica | Falla al registrar un evento de seguridad (AUD-12) | Revisión inmediata. |
+| Alerta | Más de 10 accesos denegados o 20 ingresos fallidos en 5 minutos, contados por servicio | Lista de la administración central y correo a los administradores activos, agrupado cada 15 minutos (SEG-09). |
+| Alerta técnica | Falla al registrar un evento de seguridad (AUD-12) | Correo a la administración central y revisión inmediata. |
 | Disponibilidad | Monitoreo ligero desde la VM auxiliar | Aviso si una puerta pública no responde. |
 
 Retención de registros de auditoría y seguridad: dos años (AUD-11).
@@ -81,7 +81,7 @@ R --> L["Aprender<br/>(causa raíz y mejora)"]
 | Detectar | Alerta de seguridad, reporte de un cliente o hallazgo de un escáner. |
 | Contener | Revocar credenciales, desactivar la cuenta o la integración afectada, bloquear el origen en Cloudflare. |
 | Evaluar | Determinar qué datos y cuántas personas se afectaron. |
-| Notificar | Informar a las personas afectadas y, cuando corresponda, a la autoridad (véase [privacidad](04-privacidad-y-datos-personales.md)). |
+| Notificar | Informar a las personas afectadas y, cuando corresponda, a la autoridad dentro de las 48 horas de conocer el incidente (meta interna, a verificar; véase [privacidad](04-privacidad-y-datos-personales.md)). |
 | Recuperar | Corregir la causa, restaurar desde respaldo si hace falta y volver a probar. |
 | Aprender | Registrar el incidente en `progress/`, actualizar el modelo de amenazas y agregar la prueba que lo habría evitado. |
 
@@ -100,4 +100,4 @@ Contactos y responsabilidades: la persona responsable del proyecto decide; el eq
 | Agregar CodeQL, Dependabot, Trivy, escáner de secretos y SBOM a CI | Infraestructura | RNF19, CTL-34 |
 | Definir cifrado y custodia de la clave de los respaldos | Infraestructura | CTL-28 |
 | Elegir el proveedor de correo y configurar SPF, DKIM y DMARC | Responsable del proyecto | B08, AM23 |
-| Elegir el canal de alertas para la administración | Responsable del proyecto | SEG (pregunta abierta) |
+| ~~Elegir el canal de alertas para la administración~~ | Resuelto el 2026-10-16: lista en el panel y correo (SEG-09) | SEG |

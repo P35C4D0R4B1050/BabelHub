@@ -41,11 +41,11 @@ Se cruzan fronteras: (1) Internet → borde; (2) borde → aplicaciones; (3) apl
 
 | ID | Amenaza | STRIDE | Activo | Riesgo | Controles | Riesgo residual |
 | :--- | :--- | :---: | :--- | :---: | :--- | :---: |
-| **AM01** | Un programa o cliente acapara stock iniciando reservas sin pagar. | D | Stock | A | RF28; SEL-13, SEL-14; CAR-17; expiración de 15 minutos; SEG-05, SEG-08; AD24. | B |
+| **AM01** | Un programa o cliente acapara stock iniciando reservas sin pagar. | D | Stock | A | RF28; SEL-13, SEL-14, SEL-19; CAR-17, CAR-21 (correo verificado para pagar); SEG-24 (3 cuentas por hora por origen); expiración de 15 minutos; SEG-05, SEG-08; AD24. | B |
 | **AM02** | Fuerza bruta o relleno de credenciales en el ingreso. | S | Cuentas | A | RNF15; IDE-03, IDE-15; SEG-06; AUD-10; SEG-09; AD22. | B |
 | **AM03** | Toma de una cuenta mediante la recuperación de contraseña (acceso al correo de la víctima o código adivinado). | S | Cuentas | M | IDE-16 a IDE-19; IDE-25; código de un solo uso, vigencia de 10 minutos y 5 intentos; SEG-19; respuesta uniforme; revocación de renovaciones al restablecer; correo verificado. | M |
 | **AM04** | Un encargado accede al inventario o a los pedidos de otra sucursal. | E, I | Stock, datos | A | RNF05; alcance comprobado en la Aplicación; AUD-05; FUE-08, AJU-09, PED-08; AD22. | B |
-| **AM05** | Un usuario sin permiso invoca funciones administrativas. | E | Todos | A | Roles en la credencial; política evaluada en la Aplicación; IDE-04, IDE-05; WEB-03; IDE-20 (segundo factor del administrador). | B |
+| **AM05** | Un usuario sin permiso invoca funciones administrativas. | E | Todos | A | Roles en la credencial; política evaluada en la Aplicación; IDE-04, IDE-05; WEB-03; IDE-20 (segundo factor del personal). | B |
 | **AM06** | Robo de la sesión mediante XSS o contenido inyectado. | S, I | Cuentas | A | SEG-02; WEB-18 (política de contenido), WEB-19 (cookie protegida); la credencial nunca llega al navegador (AGENTS 9). | B |
 | **AM07** | Un sitio externo envía formularios en nombre del usuario (CSRF). | T | Cuentas, pedidos | M | WEB-05; cookie de mismo sitio (WEB-19). | B |
 | **AM08** | Inyección (consultas, comandos) mediante campos de entrada. | T, I | Datos | A | SEG-01; acceso a datos con parámetros; privilegios mínimos de las bases. | B |
@@ -61,10 +61,12 @@ Se cruzan fronteras: (1) Internet → borde; (2) borde → aplicaciones; (3) apl
 | **AM18** | Pérdida de datos por falla de la VM de datos o borrado accidental. | D | Datos | A | RNF24; respaldo diario cifrado fuera de la VM; prueba de restauración; AD27. | M |
 | **AM19** | Alteración o borrado de registros de auditoría. | R, T | Auditoría | M | AUD-03, AUD-04; solo inserción; permisos exclusivos del esquema. | B |
 | **AM20** | Abuso del Libro de Reclamaciones público (spam, scripts, datos ajenos). | D, T | Reclamaciones | M | SEG-01, SEG-02, SEG-05; REC-04; datos visibles solo a la administración y al consumidor (REC-10). | B |
-| **AM21** | Enumeración de cuentas por mensajes distintos. | I | Cuentas | M | Respuestas uniformes (IDE-03, IDE-13, IDE-17); SEG-06. | B |
+| **AM21** | Enumeración de cuentas por mensajes distintos. | I | Cuentas | M | Respuestas uniformes en el ingreso y la recuperación (IDE-03, IDE-17); SEG-06; el registro puede revelar que un correo ya existe (IDE-13, riesgo aceptado), acotado por SEG-19 y SEG-24. | B |
 | **AM22** | Acceso a los paneles de n8n o Evolution API desde Internet. | E | Notificador | M | RNF06; sin puertos publicados; acceso solo por túnel o red interna. | B |
 | **AM23** | El proveedor de correo falla o filtra los mensajes como no deseados y se pierde la verificación y la recuperación. | D | Cuentas | M | Dominio con SPF, DKIM y DMARC; reintento manual de la persona; la falla no interrumpe otras operaciones; el personal se restablece por el administrador (IDE-23); AD30. | B |
 | **AM24** | Un servicio interno es llamado sin credencial por otro proceso de la red. | S, E | Todos | M | SEG-15; credencial de servicio; red interna por Compose sin puertos publicados. | B |
+| **AM25** | Se filtra o se roba la clave con que Identidad firma las credenciales y se emiten credenciales falsas. | S, E | Secretos, cuentas | A | IDE-35 (algoritmo fijo, identificador de clave, solo Identidad firma); IDE-36 (rotación cada 90 días y revocación en 5 minutos); SEG-11; custodia de la clave en el plan. | M |
+| **AM26** | Un atacante que conoce la contraseña bloquea al titular fallando el segundo factor, o evade los límites ocultando su origen. | D | Cuentas | M | SEG-20 por cuenta y origen; SEG-23 (origen desconocido con tope propio); SEG-17 (ignora cabeceras del cliente); IDE-38 (restablecimiento por la administración). | B |
 
 ## 4. Casos de abuso destacados
 
@@ -82,7 +84,8 @@ Se cruzan fronteras: (1) Internet → borde; (2) borde → aplicaciones; (3) apl
 - No se cubren ataques físicos, amenazas internas con acceso a los servidores ni adversarios con recursos de un Estado.
 - No se realizan pruebas de penetración externas (RC15, alcance del negocio); sí revisión automática (SAST, DAST básico, escaneo de dependencias y de secretos).
 - AM03 y AM23 dependen de un proveedor gratuito de correo (B08). Se acepta el riesgo y se documenta la contingencia en AD30.
-- Se aceptan dos riesgos residuales: el ataque distribuido de contraseñas desde muchos orígenes (acotado por la política de contraseñas, la alerta y el segundo factor del administrador) y el enlace de descarga pasado a otra persona durante sus cinco minutos de vigencia.
+- Las alertas se evalúan por servicio: un ataque repartido entre servicios por debajo de cada umbral puede no alertar (SEG §6).
+- Se aceptan dos riesgos residuales: el ataque distribuido de contraseñas desde muchos orígenes (acotado por la política de contraseñas, la alerta y el segundo factor del personal) y el enlace de descarga pasado a otra persona durante sus cinco minutos de vigencia.
 
 ## 6. Revisión
 

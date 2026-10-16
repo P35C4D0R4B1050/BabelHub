@@ -38,17 +38,17 @@ Traduce el **OWASP Application Security Verification Standard 5.0** a controles 
 | :--- | :--- | :---: | :--- | :--- | :---: |
 | **CTL-12** | Los archivos digitales viven en un almacén privado y se entregan con URL firmada de corta duración. | L1 | BIB-04, BIB-14, AD19, AD20 | Pruebas de integración | Especificado |
 | **CTL-13** | Los archivos de los usuarios (si los hubiera) no se ejecutan ni se sirven desde un origen con permisos. | L1 | Fuera de alcance hoy | — | No aplica |
-| **CTL-14** | Las portadas se validan por tipo y tamaño antes de guardarse. | L1 | `ecommerce-catalogo` (plan) | Pruebas | Pendiente |
+| **CTL-14** | Las portadas y los archivos digitales se validan por tipo (según su contenido) y tamaño, y se guarda su huella, antes de publicarse. | L1 | CAT-16 | Pruebas | Especificado |
 
 ## 5. Autenticación
 
 | ID | Control | Nivel | Dónde se especifica | Verificación | Estado |
 | :--- | :--- | :---: | :--- | :--- | :---: |
-| **CTL-15** | Política de contraseñas: mínimo 8 caracteres con mayúscula, minúscula, número y símbolo; fuera de listas comunes. | L1 | IDE-15, RNF15 | Pruebas unitarias | Especificado |
+| **CTL-15** | Política de contraseñas: mínimo 10 caracteres, fuera de listas comunes o filtradas, sin reglas de composición. | L1 | IDE-15, RNF15 | Pruebas unitarias | Especificado |
 | **CTL-16** | Las contraseñas se almacenan con función de resumen robusta y sal; nunca en claro. | L1 | IDE-09, RNF18 | Inspección y pruebas | Especificado |
 | **CTL-17** | Bloqueo temporal tras 5 fallos en 15 minutos; respuestas que no revelan si la cuenta existe. | L1 | SEG-06, IDE-03 | Pruebas de integración | Especificado |
 | **CTL-18** | Recuperación con código de un solo uso, vigencia corta y límite de intentos; al restablecer se cierran todas las sesiones. | L1 | IDE-17 a IDE-19 | Pruebas de integración | Especificado |
-| **CTL-19** | Segundo factor (TOTP) para el administrador central. | L2 | IDE-20, AD22 | Pruebas de integración | Especificado |
+| **CTL-19** | Segundo factor (TOTP) obligatorio para el personal y opcional para el cliente. | L2 | IDE-20, IDE-37, AD22 | Pruebas de integración | Especificado |
 | **CTL-20** | Las claves y los secretos de servicio salen del entorno, no del código. | L1 | SEG-11, PAG-12 | Detección de secretos en CI | Especificado |
 
 ## 6. Gestión de sesión y credenciales
@@ -56,7 +56,7 @@ Traduce el **OWASP Application Security Verification Standard 5.0** a controles 
 | ID | Control | Nivel | Dónde se especifica | Verificación | Estado |
 | :--- | :--- | :---: | :--- | :--- | :---: |
 | **CTL-21** | La cookie de sesión es `HttpOnly`, `Secure` y `SameSite`; la credencial no llega al navegador. | L1 | WEB-04, WEB-19 | Prueba E2E | Especificado |
-| **CTL-22** | La credencial de acceso dura 15 minutos y la renovación 7 días, revocable al cerrar sesión o desactivar al usuario. | L1 | IDE-02, IDE-08, IDE-14, AD22 | Pruebas de integración | Decisión |
+| **CTL-22** | La credencial de acceso dura 15 minutos y la renovación 7 días, revocable al cerrar sesión o desactivar al usuario; la sesión web vence a los 30 minutos sin uso y tiene un máximo absoluto (7 días clientes, 8 h personal). | L1 | IDE-02, IDE-08, IDE-14, WEB-27, AD22 | Pruebas de integración | Especificado |
 | **CTL-23** | Cambiar el rol invalida las credenciales vigentes en la siguiente renovación. | L2 | `identidad-seguridad` §6 | Prueba de integración | Especificado |
 
 ## 7. Autorización
@@ -73,7 +73,7 @@ Traduce el **OWASP Application Security Verification Standard 5.0** a controles 
 | :--- | :--- | :---: | :--- | :--- | :---: |
 | **CTL-27** | TLS 1.2 o superior hacia el exterior; HSTS. | L1 | RNF06, RNF18, AD13 | Escáner de configuración | Decisión |
 | **CTL-28** | Respaldos y volúmenes cifrados. | L2 | RNF18, AD27 | Inspección | Pendiente |
-| **CTL-29** | La firma de las credenciales usa una clave que rota y se guarda fuera del repositorio. | L2 | AD22 | Revisión | Pendiente |
+| **CTL-29** | La firma de las credenciales usa una clave que solo posee Identidad, rota cada 90 días y se guarda fuera del repositorio. | L2 | IDE-35, IDE-36, AD22 (custodia de la clave: plan) | Pruebas de integración y revisión | Especificado |
 
 ## 9. Configuración y protección de datos
 
@@ -98,9 +98,9 @@ Traduce el **OWASP Application Security Verification Standard 5.0** a controles 
 
 | Estado | Cantidad |
 | :--- | :---: |
-| Especificado | 25 |
-| Decisión | 4 |
-| Pendiente | 8 |
+| Especificado | 28 |
+| Decisión | 3 |
+| Pendiente | 6 |
 | No aplica | 1 |
 
 Los controles *Pendiente* se resuelven en los planes de las specs afectadas o en las tareas de infraestructura y CI. Ninguno bloquea la aprobación de una spec; sí bloquea el paso de esa spec a **Done**.

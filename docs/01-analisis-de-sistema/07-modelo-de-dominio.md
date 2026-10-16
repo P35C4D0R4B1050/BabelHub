@@ -49,9 +49,15 @@ class Reserva {
   Clave de idempotencia
 }
 class Traslado {
-  Estado: solicitado, aprobado, en transito, recibido, rechazado
+  Estado: solicitado, aprobado, en transito, recibido, rechazado, cancelado
   Cantidad
   Motivo
+  Pedido vinculado (opcional)
+}
+class Ruta {
+  Origen
+  Destino
+  Plazo en dias
 }
 class Ajuste {
   Motivo: merma, danado, correccion de conteo
@@ -61,17 +67,19 @@ Fuente "1" --> "*" StockPorEdicion
 StockPorEdicion "1" --> "*" Reserva
 Fuente "1" --> "*" Traslado : origen
 Fuente "1" --> "*" Traslado : destino
+Fuente "1" --> "*" Ruta : origen
 StockPorEdicion "1" --> "*" Ajuste
 ```
 
 **Invariantes**
 
 1. El stock vendible nunca es negativo, ni siquiera ante solicitudes simultáneas (AC01).
-2. Una reserva no descuenta el stock físico; lo reduce el vendible. El físico baja al entregar el pedido.
+2. Una reserva no descuenta el stock físico; lo reduce el vendible. El físico baja al entregar un pedido de recojo, al pasar a en reparto un envío a domicilio y, en un traslado, al despacharse en el origen.
 3. La reserva de un pedido es atómica: todas las líneas impresas o ninguna.
 4. Un cliente tiene como máximo una reserva pendiente y hasta 5 reservas iniciadas por hora (RF28).
 5. La merma y el daño solo descuentan y nunca más que el vendible; la corrección de conteo se expresa como el conteo real y no puede quedar por debajo de lo reservado.
-6. Ciclo del traslado: solicitado → aprobado → en tránsito → recibido, o solicitado → rechazado. El despacho descuenta del origen; la recepción suma al destino.
+6. Ciclo del traslado: solicitado → aprobado → en tránsito → recibido; solicitado → rechazado (no si está vinculado a un pedido); solicitado o aprobado → cancelado (solo al anularse el pedido vinculado). El despacho descuenta del origen; la recepción suma al destino.
+8. Un traslado vinculado a un pedido mueve su reserva con las unidades: se consume en el origen al despachar y se recrea en el destino al recibir. Un pedido de recojo que supera 15 días en listo para recojo pasa a no recogido y libera sus reservas.
 7. Un libro digital nunca tiene stock, reserva ni traslado.
 
 ## 3. E-commerce
@@ -138,7 +146,8 @@ Pedido "0..*" <-- "1" HojaReclamacion
 
 1. Cada edición, impresa o digital, tiene su propio ISBN, único en todo el catálogo.
 2. Un pedido se confirma solo con el pago aprobado y, para los impresos, con las reservas confirmadas; tiene como máximo un cobro aprobado.
-3. El estado del pedido se deriva del estado de sus líneas; cada línea sigue su propio ciclo.
+3. El estado del pedido se deriva del estado de sus líneas; cada línea sigue su propio ciclo. Una línea de recojo puede pasar a *no recogido* a los 15 días calendario en listo para recojo; el cliente puede cancelar un pedido solo de impresos mientras todas sus líneas estén confirmadas.
+8. Un pago *pendiente de confirmación* extiende la reserva una vez, hasta 30 minutos desde el inicio del pago; si se aprueba con la reserva vencida, se reembolsa. Un impreso devuelto se reembolsa después de confirmada su recepción.
 4. Un libro digital solo se vende con licencia vigente y que cubra el territorio del comprador; los accesos ya concedidos se mantienen salvo reembolso, anulación u orden legal.
 5. Un acceso digital es personal e intransferible, con máximo 5 descargas y enlaces de 5 minutos como máximo.
 6. No se almacenan datos de tarjeta: solo los conoce la pasarela.
@@ -154,7 +163,14 @@ class Usuario {
   Sucursal (solo encargado)
   Correo verificado
   Numero de WhatsApp opcional
+  Segundo factor: obligatorio personal, opcional cliente
+  Mayor de 18 declarado
   Activo
+}
+class Aceptacion {
+  Texto: terminos, privacidad, reembolso
+  Version
+  Fecha
 }
 class Consentimiento {
   Finalidad
@@ -173,6 +189,7 @@ class CodigoDeUnSoloUso {
 Usuario "1" --> "*" Consentimiento
 Usuario "1" --> "*" SolicitudARCO
 Usuario "1" --> "*" CodigoDeUnSoloUso
+Usuario "1" --> "*" Aceptacion
 ```
 
 **Invariantes**
@@ -180,6 +197,8 @@ Usuario "1" --> "*" CodigoDeUnSoloUso
 1. Un encargado tiene exactamente una sucursal y cada sucursal tiene como máximo un encargado activo.
 2. Las contraseñas se guardan con una función de resumen robusta y nunca en claro; los códigos de un solo uso caducan y se invalidan al usarse.
 3. Un usuario desactivado conserva su historial, pero no puede ingresar ni renovar la sesión.
+4. Las credenciales se firman con una clave que solo posee Identidad; los demás servicios solo verifican.
+5. Solo se registran mayores de 18 años y la cuenta guarda la versión y fecha de los textos aceptados.
 
 ## 5. Transversal
 

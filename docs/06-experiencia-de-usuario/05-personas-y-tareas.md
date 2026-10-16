@@ -28,6 +28,9 @@ Perfiles de uso construidos a partir de los actores y las necesidades del negoci
 | **T08** | Publicar una edición digital con su licencia. | Elena | ≥ 90 % sin ayuda | Éxito, errores |
 | **T09** | Registrar una hoja en el Libro de Reclamaciones. | Visitante | ≥ 90 % sin ayuda | Éxito |
 | **T10** | Completar T02 con solo teclado y lector de pantalla. | Persona con discapacidad | Sin bloqueos críticos | Lista de verificación |
+| **T11** | Cancelar un pedido de impresos antes de su preparación. | Rosa | ≥ 90 % sin ayuda | Éxito, errores |
+| **T12** | Configurar el segundo factor al primer ingreso y entrar con un código. | Carmen | ≥ 90 % sin ayuda | Éxito, errores |
+| **T13** | Registrar el plazo de una ruta entre dos sucursales. | Elena | ≥ 90 % sin ayuda | Éxito |
 
 Las metas globales vienen de RNF27: ≥ 90 % de éxito sin ayuda, SUS ≥ 68 y menos de un error por tarea en promedio.
 
@@ -35,7 +38,8 @@ Las metas globales vienen de RNF27: ≥ 90 % de éxito sin ayuda, SUS ≥ 68 y m
 
 | Escenario | Consecuencia de diseño |
 | :--- | :--- |
-| Conexión móvil que se corta durante el pago | El estado de pago queda pendiente de confirmación y se consulta después; no se cobra de nuevo (PAG-07). |
+| Conexión móvil que se corta durante el pago | El estado de pago queda pendiente de confirmación y se consulta después; no se cobra de nuevo (PAG-07). La reserva se extiende hasta 30 minutos y se avisa por pantalla, correo y, con consentimiento, WhatsApp (PAG-13, PAG-14). |
+| Sesión inactiva en un equipo compartido de sucursal | La sesión del personal vence a los 30 minutos sin uso y a las 8 horas como máximo (WEB-27); lo escrito se conserva (WEB-25). |
 | Mostrador con interrupciones | Los formularios de la Sucursal conservan lo escrito y confirman las acciones irreversibles. |
 | Campaña con muchas visitas | Mensajes claros ante límites de uso y ante la reserva que expira. |
 | Cliente sin WhatsApp | Se puede comprar y seguir el pedido desde la cuenta. |

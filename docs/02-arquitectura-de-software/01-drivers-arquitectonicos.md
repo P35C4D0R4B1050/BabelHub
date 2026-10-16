@@ -10,7 +10,7 @@ NN["Necesidades<br/>NN01 - NN18"] --> REQ["Requisitos<br/>RF, RNF, RC"]
 REQ --> AC["Atributos de calidad<br/>AC01 - AC14"]
 AC --> DA["Drivers<br/>DA01 - DA17"]
 REQ --> DA
-DA --> AD["Decisiones<br/>AD01 - AD29"]
+DA --> AD["Decisiones<br/>AD01 - AD30"]
 AD --> EST["Estilo y estructura<br/>servicios + Clean Architecture"]
 
 style NN fill:#222,stroke:#fff,color:#fff
@@ -56,10 +56,10 @@ style EST fill:#222,stroke:#fff,color:#fff
 | Oracle puede no tener capacidad ARM al crear la VM, o recuperar instancias inactivas (DA03, DA09). | Reintentar la creación, mantener el mismo Compose en local como respaldo y revisar la política de instancias inactivas. |
 | El asistente depende de un LLM externo (latencia, costo, respuestas incorrectas) (DA06). | Responde solo con datos de las API, indica cuándo no sabe y su caída no bloquea la compra. |
 | Cloudflare es una dependencia de terceros en el camino de todas las solicitudes (DA10). | Aceptable para este alcance; se documenta la alternativa de exponer Nginx directamente. |
-| Evolution API no es un canal oficial de WhatsApp: el número puede ser bloqueado o el protocolo cambiar sin aviso (DA11). | Usar un número dedicado, volumen bajo y solo mensajes transaccionales con consentimiento; el puerto `Notificador` permite sustituirlo (WhatsApp Cloud API oficial o correo) sin tocar el negocio. Una falla de envío nunca bloquea la compra. |
+| Evolution API no es un canal oficial de WhatsApp: el número puede ser bloqueado o el protocolo cambiar sin aviso (DA11). | Usar un número dedicado, volumen bajo y solo mensajes transaccionales con consentimiento; el puerto `Notificador` permite sustituirlo (WhatsApp Cloud API oficial o correo) sin tocar el negocio; el plan de salida está en [decisiones](02-decisiones-arquitectonicas.md) (AD16). Una falla de envío nunca bloquea la compra. |
 | n8n y Evolution API consumen RAM y CPU en una VM con 1 OCPU (DA09, DA11). | Límites de memoria por contenedor, medición con k6 y reparto de carga: Evolution API usa la Redis existente y una base propia en la VM-DATOS. |
 | Un programa acapara stock con reservas temporales o agota las consultas del asistente (DA13). | Límite de una reserva activa por cliente y 5 por hora (RF28), límites de uso en el borde y en la Aplicación (AD24), y expiración de reservas en 15 minutos. |
-| Fuerza bruta de contraseñas o robo de credenciales (DA05, DA13). | Bloqueo temporal tras 5 fallos, credenciales de 15 minutos con renovación revocable, MFA para el administrador central (AD22) y alertas de seguridad (RNF20). |
+| Fuerza bruta de contraseñas o robo de credenciales (DA05, DA13). | Bloqueo temporal tras 5 fallos, credenciales de 15 minutos con renovación revocable, MFA obligatoria para el personal y opcional para el cliente (AD22) y alertas de seguridad (RNF20). |
 | Inyección de instrucciones o contenido no confiable en el asistente (DA17). | Asistente de solo lectura, salida como texto, topes de consumo y sin acceso a bases de datos (AD28). |
 | Fuga de datos personales hacia proveedores fuera del país (DA15). | Datos mínimos por proveedor, inventario de transferencias documentado (RC17) y retención definida (AD27). |
 | Dependencias o imágenes con vulnerabilidades conocidas (DA05). | Versiones fijas, escaneo en CI, SBOM y contenedores sin privilegios (RNF19). |

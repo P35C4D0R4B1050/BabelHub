@@ -16,14 +16,16 @@ F --> G{"¿Pago aprobado?"}
 G -- No --> H["Se liberan las reservas"]
 G -- Sí --> I["Se confirman las reservas y se crea el pedido"]
 I --> J{"¿La fuente es la sucursal de recojo?"}
-J -- No --> K["Traslado entre sucursales"]
+J -- No --> K["Traslado vinculado al pedido: la reserva viaja con las unidades"]
 J -- Sí --> L["Preparación"]
 K --> L
-L --> M["Entrega o despacho"]
-M --> N["Se descuenta el stock físico"]
+L --> M{"¿Recojo o domicilio?"}
+M -- Recojo --> R["Entrega en sucursal: baja el stock físico"]
+M -- Domicilio --> S["Envío en reparto: baja el stock físico"]
+L --> T["15 días sin recoger: pedido no recogido, se liberan las reservas"]
 ```
 
-**Actores:** cliente, Inventario, pasarela de pago, encargado de sucursal, logística. **Specs:** `ecommerce-carrito-checkout`, `inventario-seleccion-fuente`, `ecommerce-pagos`, `ecommerce-pedidos`, `inventario-traslados`, `ecommerce-envios`. **Puntos de control:** límite de una reserva activa por cliente y 5 por hora (RF28); una falla del aviso por WhatsApp nunca interrumpe la compra.
+**Actores:** cliente, Inventario, pasarela de pago, encargado de sucursal, logística. **Specs:** `ecommerce-carrito-checkout`, `inventario-seleccion-fuente`, `ecommerce-pagos`, `ecommerce-pedidos`, `inventario-traslados`, `ecommerce-envios`. **Puntos de control:** el correo de la cuenta debe estar verificado para iniciar el pago; límite de una reserva activa por cliente, 5 por hora y 10 por origen (RF28); si el pago queda pendiente la reserva se extiende hasta 30 minutos y se avisa al cliente por todos sus medios; el cliente puede cancelar mientras todas las líneas estén confirmadas (se anula, se libera y se reembolsa); el traslado de un pedido pagado no se rechaza y solo se cancela al anular el pedido; una falla del aviso por WhatsApp nunca interrumpe la compra.
 
 ## 2. Compra y descarga de un libro digital
 
@@ -51,9 +53,9 @@ I --> J["El navegador descarga del almacén"]
 | 2 | Origen o administración | Aprueba o rechaza. |
 | 3 | Origen | Despacha: el stock físico del origen baja. |
 | 4 | Destino | Recibe: el stock físico del destino sube. |
-| 5 | Sistema | Notifica a origen y destino en cada cambio de estado y audita la aprobación. |
+| 5 | Sistema | Notifica a origen y destino en cada cambio de estado y audita cada cambio. |
 
-**Spec:** `inventario-traslados`.
+Si el traslado nace de un pedido pagado, el origen solo lo aprueba (no puede rechazarlo), el despacho consume la reserva del origen y la recepción la recrea en el destino; si el pedido se anula antes de despacharse, el traslado se cancela. El plazo estimado que ve el cliente sale de la ruta entre ambas sucursales. **Spec:** `inventario-traslados`.
 
 ## 4. Ajuste de inventario
 
@@ -66,23 +68,24 @@ flowchart LR
 A["Cliente solicita la devolución"] --> B["Se evalúa la solicitud"]
 B --> C{"¿Aprobada?"}
 C -- No --> X["Se rechaza con motivo"]
-C -- Sí --> D["Reembolso por la pasarela"]
-D --> E{"¿Impreso o digital?"}
-E -- Impreso --> F["Reingreso de stock en la sucursal receptora"]
-E -- Digital --> G["Se revoca el acceso; no hay stock"]
+C -- Sí --> E{"¿Impreso o digital?"}
+E -- Impreso --> F["La sucursal receptora confirma la recepción y reingresa el stock"]
+F --> D["Reembolso por la pasarela"]
+E -- Digital --> G["Reembolso por la pasarela y se revoca el acceso; no hay stock"]
 ```
 
-**Spec:** `ecommerce-devoluciones` (quién aprueba un impreso está pendiente de decisión). El libro digital ya descargado solo se reembolsa si el archivo es defectuoso.
+**Spec:** `ecommerce-devoluciones` (quién aprueba un impreso está pendiente de decisión). El impreso se reembolsa solo después de confirmada su recepción. El libro digital ya descargado solo se reembolsa si el archivo es defectuoso.
 
 ## 6. Libro de Reclamaciones
 
-Cualquier consumidor, con o sin sesión, registra una hoja; recibe una constancia imprimible y un número único; la administración la responde y avisa al consumidor; las hojas se conservan al menos dos años. **Spec:** `ecommerce-libro-reclamaciones`.
+Cualquier consumidor, con o sin sesión, registra una hoja (con nombre, documento, domicilio, correo, monto y detalle); recibe una constancia imprimible con un número único y el plazo de respuesta de 15 días; la administración la responde y la respuesta llega por correo; las hojas se conservan al menos dos años y las de spam se descartan sin borrarlas. Máximo 3 hojas por hora por origen. **Spec:** `ecommerce-libro-reclamaciones`.
 
 ## 7. Registro y recuperación de la cuenta
 
 | Proceso | Pasos |
 | :--- | :--- |
-| **Registro** | La persona ingresa nombre, correo y contraseña; recibe un código por correo y verifica el correo. El número de WhatsApp y el consentimiento para recibir avisos son opcionales y se registran aparte. |
+| **Registro** | La persona ingresa nombre, correo y contraseña (10 caracteres como mínimo), declara ser mayor de 18 años y acepta los términos y la privacidad (se guarda la versión y la fecha); recibe un código por correo y verifica el correo, necesario para pagar. Máximo 3 cuentas nuevas por hora por origen. El número de WhatsApp y el consentimiento para recibir avisos son opcionales y se registran aparte. |
+| **Segundo factor** | El personal lo configura en su primer ingreso y recibe 8 códigos de respaldo; el cliente puede activarlo en su cuenta. Si se pierde el dispositivo y los códigos, la administración lo restablece. |
 | **Recuperación** | La persona pide recuperar el acceso; recibe un código de un solo uso en su correo verificado; define una nueva contraseña y se revocan sus sesiones anteriores. El personal la recupera con el administrador central. La respuesta es la misma exista o no la cuenta. |
 | **Cancelación** | El cliente cancela su cuenta; se desactiva y se suprimen o anonimizan sus datos personales, salvo lo que una obligación legal exija. |
 

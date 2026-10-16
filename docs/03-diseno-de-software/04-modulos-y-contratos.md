@@ -6,12 +6,12 @@ Describe los módulos de cada servicio y la forma de sus contratos REST. Es un d
 
 | Servicio | Módulos (casos de uso agrupados) | Specs |
 | :--- | :--- | :--- |
-| **Inventario** | Fuentes y stock; Reservas y selección de fuente; Ajustes; Traslados | `inventario-fuentes`, `inventario-seleccion-fuente`, `inventario-ajustes`, `inventario-traslados` |
+| **Inventario** | Fuentes y stock; Rutas entre fuentes; Reservas y selección de fuente (con consulta previa); Ajustes; Traslados | `inventario-fuentes`, `inventario-seleccion-fuente`, `inventario-ajustes`, `inventario-traslados` |
 | **E-commerce** | Catálogo; Carrito y checkout; Pagos; Pedidos; Biblioteca digital; Envíos; Devoluciones; Libro de reclamaciones; Notificaciones (puerto) | `ecommerce-*`, `transversal-notificaciones` |
 | **Identidad** | Registro y verificación; Sesión y renovación; Recuperación; Segundo factor; Usuarios y roles; Cuenta y derechos ARCO | `identidad-seguridad` |
 | **Asistente** | Consulta; Recomendación; Estado de pedidos | `asistente-compra-ia` |
 | **Web** | Áreas Tienda, Sucursal y Administración; Libro de reclamaciones; Índice infinito | `web-base`, `web-indice-infinito` |
-| **Transversal** | Auditoría (contrato único); Seguridad (errores, límites, eventos) | `transversal-auditoria`, `transversal-seguridad` |
+| **Transversal** | Auditoría (contrato único, entregada por cada servicio con filtros y paginación continua); Seguridad (errores, límites, eventos y alertas por servicio) | `transversal-auditoria`, `transversal-seguridad` |
 
 Cada módulo es una carpeta dentro de las capas Aplicación y Dominio del servicio; no es un proyecto aparte.
 
@@ -55,9 +55,11 @@ Todos los servicios responden los errores con `application/problem+json`:
 
 | De → a | Operaciones principales | Autenticación | Falla |
 | :--- | :--- | :--- | :--- |
-| E-commerce → Inventario | Consultar disponibilidad; crear, confirmar, liberar reservas; descontar al entregar; ajustar al devolver | Credencial del usuario o de servicio | Si Inventario no responde, el checkout informa y no cobra (CAR-06). |
+| E-commerce → Inventario | Consultar disponibilidad; consultar la selección de fuentes sin reservar; crear, confirmar, extender (pago pendiente) y liberar reservas; descontar al entregar o al pasar a en reparto; liberar al marcar no recogido; ajustar al devolver | Credencial del usuario o de servicio | Si Inventario no responde, el checkout informa y no cobra (CAR-06); si falla el descuento al pasar a en reparto, el envío no avanza (ENV-12). |
+| Web → Identidad | Pedir una credencial de lectura de 5 minutos para el asistente en nombre del cliente | Credencial del usuario | Sin ella el asistente solo responde catálogo y disponibilidad. |
+| Web → todos los servicios | Auditoría y alertas: pedir cada servicio su página con los mismos filtros y mezclarlas por fecha | Credencial del administrador | Se muestran los demás servicios y se indica el que no respondió (AUD-18). |
 | Web → todos | Operaciones de las pantallas | Credencial del usuario (solo servidor) | Estado de error con reintento (WEB-07). |
-| Asistente → E-commerce e Inventario | Consultar catálogo, disponibilidad y pedidos | Credencial de servicio de solo lectura | El asistente informa que no tiene datos. |
+| Asistente → E-commerce e Inventario | Consultar catálogo y disponibilidad (credencial de servicio de solo lectura) y pedidos (credencial del cliente, de lectura y 5 minutos) | Ver la columna anterior | El asistente informa que no tiene datos. |
 | Servicios → Notificador | Enviar aviso | Secreto compartido | Pendiente y reintento; no interrumpe. |
 | Pasarela → E-commerce | Aviso de pago | Firma o secreto verificado | Se rechaza y registra; el estado se confirma con la pasarela. |
 | Todos → Auditoría local | Registrar operación | Interna | Si falla, la operación sensible no se aplica (AUD-04). |

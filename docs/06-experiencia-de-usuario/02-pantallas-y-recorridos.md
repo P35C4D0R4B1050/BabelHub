@@ -4,10 +4,10 @@
 
 | Área | Rol | Pantallas |
 | :--- | :--- | :--- |
-| **Tienda** | Visitante y cliente | Inicio, catálogo, detalle del libro, carrito, checkout, confirmación, mi biblioteca, mis pedidos y seguimiento, devolución, mi cuenta, inicio de sesión y registro, Libro de Reclamaciones, páginas legales y *El índice infinito* (opcional). |
-| **Sucursal** | Encargado de sucursal | Resumen con alertas, inventario, ajustes y su historial, pedidos de recojo, traslados (entrantes, salientes y nueva solicitud). |
-| **Sucursal** | Personal de logística | Traslados a nivel nacional, guías de envío y seguimiento de despachos. |
-| **Admin** | Administrador central | Resumen, catálogo (ediciones impresas y digitales con su licencia), sucursales como datos, usuarios y roles, pedidos y anulaciones, reclamos, auditoría e indicadores. |
+| **Tienda** | Visitante y cliente | Inicio, catálogo, detalle del libro, carrito, checkout (con estado de pago pendiente), confirmación, mi biblioteca, mis pedidos y seguimiento (con cancelación antes de la preparación), devolución, mi cuenta (datos, consentimientos, segundo factor opcional y solicitudes sobre datos), inicio de sesión, registro con verificación del correo y declaración de mayoría de edad, recuperación de acceso, Libro de Reclamaciones, páginas legales con versión y *El índice infinito* (opcional). |
+| **Sucursal** | Encargado de sucursal | Resumen con alertas, inventario, ajustes y su historial, pedidos de recojo (incluidos los no recogidos), traslados (entrantes, salientes y nueva solicitud), configuración del segundo factor. |
+| **Sucursal** | Personal de logística | Traslados a nivel nacional, guías de envío y seguimiento de despachos, configuración del segundo factor. |
+| **Admin** | Administrador central | Resumen, catálogo (ediciones impresas y digitales con su licencia), sucursales y rutas entre ellas como datos, usuarios y roles (con restablecimiento de contraseña y de segundo factor), pedidos, anulaciones y no recogidos, reclamos (con descarte de spam), solicitudes sobre datos personales con fechas límite, auditoría unificada y alertas de seguridad, e indicadores. |
 
 El menú, el selector de sucursal y las acciones visibles dependen del rol y del alcance del token (RNF05): quien no tiene permiso no ve la acción, y si llega por URL recibe la pantalla de «sin permiso».
 
@@ -17,16 +17,16 @@ El menú, el selector de sucursal y las acciones visibles dependen del rol y del
 | :--- | :--- |
 | `ecommerce-catalogo` | Catálogo con filtros (categoría, formato, precio, disponibilidad), detalle con selector de edición. Admin: alta, edición y baja con licencia. |
 | `ecommerce-carrito-checkout` | Carrito mixto y checkout adaptable (sección 2). |
-| `ecommerce-pagos` | Paso de pago con Yape y tarjeta; errores de pago. |
-| `ecommerce-pedidos` | Mis pedidos, seguimiento con estados por línea. Admin: pedidos y anulación. |
+| `ecommerce-pagos` | Paso de pago con Yape y tarjeta; errores de pago; estado «estamos confirmando tu pago». |
+| `ecommerce-pedidos` | Mis pedidos, seguimiento con estados por línea, cancelación antes de la preparación. Admin: pedidos, anulación y no recogidos. |
 | `ecommerce-biblioteca-digital` | Mi biblioteca, descarga y sus estados. |
 | `ecommerce-envios` | Guía de envío y seguimiento (Sucursal › Logística). |
 | `ecommerce-devoluciones` | Solicitud de devolución con política distinta para impresos y digitales. |
-| `ecommerce-libro-reclamaciones` | Formulario, constancia imprimible y listado de reclamos (Admin). |
-| `inventario-fuentes`, `inventario-ajustes` | Inventario de la sucursal, ajustes con motivo e historial. |
+| `ecommerce-libro-reclamaciones` | Formulario (con documento, domicilio y monto), constancia imprimible con el plazo y listado de reclamos con filtro por estado y descarte (Admin). |
+| `inventario-fuentes`, `inventario-ajustes` | Inventario de la sucursal, ajustes con motivo e historial. Admin: sucursales y rutas con su plazo en días. |
 | `inventario-seleccion-fuente`, `inventario-traslados` | Pedidos de recojo, traslados (solicitar, aprobar, despachar, recibir). |
-| `identidad-seguridad` | Inicio de sesión, registro, verificación del correo, recuperación de acceso, cuenta con consentimiento de WhatsApp, usuarios y roles. |
-| `transversal-auditoria` | Auditoría de solo lectura con filtros. |
+| `identidad-seguridad` | Inicio de sesión (con código del segundo factor si corresponde), registro, verificación del correo, recuperación de acceso, cuenta con consentimiento de WhatsApp y segundo factor, usuarios y roles, solicitudes sobre datos personales (Admin). |
+| `transversal-auditoria`, `transversal-seguridad` | Auditoría unificada de solo lectura con filtros y aviso si un servicio no responde; lista de alertas de seguridad con estado de revisión. |
 | `asistente-compra-ia` | Panel de chat que no tapa precios ni acciones en pantallas pequeñas. |
 | `web-base` | Estructura, sesión, errores, estados y pie con enlaces legales. |
 | `web-indice-infinito` | Experimento aislado ([El índice infinito](03-estados-accesibilidad-y-criterios.md)). |
@@ -58,7 +58,7 @@ style F fill:#222,stroke:#fff,color:#fff
 | Solo impreso | 5 | Elección de sucursal con aviso de traslado si falta stock; reserva temporal de 15 minutos visible (AD08). |
 | Mixto | 5 | Un solo cobro; en la confirmación, las líneas impresas siguen su seguimiento y las digitales se descargan al instante. |
 
-Antes de pagar, el cliente acepta los términos, el tratamiento de sus datos personales (Ley N.° 29733) y, si compra libros digitales, la política de reembolso. Los avisos por WhatsApp son una opción que no se exige para pagar. Si el Inventario no responde, el checkout informa que no puede validar el stock y **no cobra** (AC03); los libros digitales siguen comprándose.
+Para iniciar el pago, la cuenta debe tener el correo verificado (CAR-21); el costo del despacho a domicilio es fijo (CAR-23). Antes de pagar, el cliente acepta los términos, el tratamiento de sus datos personales (Ley N.° 29733) y, si compra libros digitales, la política de reembolso. Los avisos por WhatsApp son una opción que no se exige para pagar. Si el Inventario no responde, el checkout informa que no puede validar el stock y **no cobra** (AC03); los libros digitales siguen comprándose.
 
 ### 2.1 Tarjeta de libro
 

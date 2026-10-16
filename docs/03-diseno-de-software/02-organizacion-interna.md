@@ -69,7 +69,7 @@ style Ext fill:#222,stroke:#fff,color:#fff
 | Pasarela de pago | Integración con Culqi |
 | Servicio de envío | Integración con el operador logístico |
 | Notificador | Webhook de n8n, que envía por Evolution API (WhatsApp) |
-| Enviador de correo | Proveedor gratuito de correo para los códigos de seguridad (AD30) |
+| Enviador de correo | Proveedor gratuito de correo para códigos de seguridad, alertas, respuestas a reclamos y avisos de pago pendiente (AD30) |
 | Proveedor de LLM | API del modelo de lenguaje |
 | Caché | Redis |
 | Almacén de archivos | Almacén S3-compatible (Cloudflare R2 u Oracle Object Storage) |

@@ -57,3 +57,14 @@ C->>A: Descarga el archivo
 ```
 
 En un pedido mixto, el cobro es único: las líneas impresas siguen el flujo principal y las digitales conceden acceso al aprobarse el pago.
+
+## 3. Variantes del flujo principal
+
+| Situación | Qué ocurre |
+| :--- | :--- |
+| Correo sin verificar | No se inicia el pago ni se reserva; se invita a verificar el correo y el carrito se conserva (CAR-21). |
+| La fuente no es la sucursal de recojo | La consulta previa de selección informa el traslado y su plazo antes de pagar (CAR-09, SEL-20); el traslado se crea al confirmarse el pago (SEL-03) y la reserva viaja con las unidades. |
+| Pago pendiente de confirmación | La reserva se extiende hasta 30 minutos y se avisa por pantalla, correo y WhatsApp con consentimiento; si el pago llega con la reserva vencida, se reembolsa (PAG-13 a PAG-15). |
+| Entrega | En recojo, el físico baja al entregar (SEL-11); a domicilio, al pasar el envío a en reparto (SEL-21). |
+| Pedido no recogido | A los 15 días en listo para recojo se liberan las reservas y la administración decide el reembolso (PED-15, PED-16). |
+| Cancelación del cliente | Con todas las líneas impresas aún confirmadas, se anula, se libera, se cancela el traslado y se reembolsa (PED-17). |
