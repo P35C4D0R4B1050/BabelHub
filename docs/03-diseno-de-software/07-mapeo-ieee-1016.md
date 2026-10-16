@@ -1,6 +1,6 @@
 # Mapeo a IEEE 1016
 
-La propuesta original del proyecto pide documentar con el modelo C4 e IEEE 1016 (RC11). IEEE 1016 organiza un documento de diseño de software en **puntos de vista** (*viewpoints*). Este mapeo muestra dónde se cubre cada uno, para no duplicar contenido ni dejar vacíos. El modelo C4 queda reservado en `04-modelo-c4` y se desarrollará más adelante.
+La propuesta original del proyecto pide documentar con el modelo C4 e IEEE 1016 (RC11). IEEE 1016 organiza un documento de diseño de software en **puntos de vista** (*viewpoints*). Este mapeo muestra dónde se cubre cada uno, para no duplicar contenido ni dejar vacíos. El modelo C4 está en [04-modelo-c4](../04-modelo-c4/) (niveles 1 a 3).
 
 > Los nombres de los puntos de vista se tomaron de la estructura habitual de la norma IEEE 1016-2009; antes de una entrega formal, se verifican contra el texto del estándar.
 
@@ -8,8 +8,8 @@ La propuesta original del proyecto pide documentar con el modelo C4 e IEEE 1016 
 
 | Punto de vista (IEEE 1016) | Qué describe | Dónde se cubre |
 | :--- | :--- | :--- |
-| **Contexto** | Servicios, actores y límites del sistema | [Necesidad del negocio](../01-analisis-de-sistema/01-necesidad-del-negocio.md) (diagrama de contexto), [actores y permisos](../01-analisis-de-sistema/05-actores-y-permisos.md); C4 nivel 1 (reservado) |
-| **Composición** | Partes en que se descompone el sistema | [Estilo arquitectónico](../02-arquitectura-de-software/03-estilo-arquitectonico.md) (componentes), [módulos y contratos](04-modulos-y-contratos.md); C4 niveles 2 y 3 (reservado) |
+| **Contexto** | Servicios, actores y límites del sistema | [Necesidad del negocio](../01-analisis-de-sistema/01-necesidad-del-negocio.md) (diagrama de contexto), [actores y permisos](../01-analisis-de-sistema/05-actores-y-permisos.md); [C4 nivel 1](../04-modelo-c4/01-contexto-y-contenedores.md) |
+| **Composición** | Partes en que se descompone el sistema | [Estilo arquitectónico](../02-arquitectura-de-software/03-estilo-arquitectonico.md) (componentes), [módulos y contratos](04-modulos-y-contratos.md); C4 nivel 2 ([contenedores](../04-modelo-c4/01-contexto-y-contenedores.md)) y nivel 3 ([componentes](../04-modelo-c4/02-componentes.md)) |
 | **Lógico** | Clases, tipos y relaciones del dominio | [Modelo de dominio](../01-analisis-de-sistema/07-modelo-de-dominio.md), [organización interna](02-organizacion-interna.md) |
 | **Dependencia** | Relaciones y dependencias entre partes | [Clean Architecture](01-clean-architecture.md) (regla de dependencia y matriz), pruebas de arquitectura |
 | **Información** | Datos persistentes y su manejo | [Modelo de datos](05-modelo-de-datos.md), [privacidad](../05-seguridad/04-privacidad-y-datos-personales.md) |
@@ -35,6 +35,6 @@ La propuesta original del proyecto pide documentar con el modelo C4 e IEEE 1016 
 
 | Vacío | Plan |
 | :--- | :--- |
-| Modelo C4 (contexto, contenedores, componentes y código) | Carpeta `04-modelo-c4` reservada; se desarrollará cuando se indique. |
+| Modelo C4 nivel 4 (código) | No se elabora: lo cubren las specs, los planes y el código. Los niveles 1 a 3 están en `04-modelo-c4`. |
 | Algoritmos detallados | Se escriben en cada plan al aprobar la spec. |
 | Diagramas de secuencia por caso de uso | Se agregan en los planes de las features críticas (reserva, pago y descarga). |
