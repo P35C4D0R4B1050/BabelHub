@@ -34,8 +34,8 @@ Una pieza literaria de marca, inspirada en *La biblioteca de Babel* de Borges: p
 | IND-05 | Ubicuo | El sistema deberá indicar en la pantalla que el texto es generado, que puede carecer de sentido y que no son libros reales ni están a la venta. | RF29 |
 | IND-06 | Ubicuo | El sistema deberá generar las páginas sin almacenarlas ni consultar una base de datos. | RF29 |
 | IND-07 | No deseado | Si la dirección no es válida, es decir, si tiene más de 64 caracteres o caracteres fuera de las letras a-z sin tilde, los números y los guiones, entonces el sistema deberá mostrar un mensaje amable y ofrecer una página al azar en lugar de un error. | AC08 |
-| IND-09 | Estado | Mientras un mismo origen supera el límite de solicitudes para visitantes, el sistema deberá rechazar las siguientes según `transversal-seguridad` (SEG-18). | RF29 |
 | IND-08 | Ubicuo | El sistema deberá ofrecer un enlace de regreso al catálogo real y mantener la experiencia separada del carrito y de los resultados de búsqueda. | RF29 |
+| IND-09 | Estado | Mientras un mismo origen supera el límite de solicitudes para visitantes, el sistema deberá rechazar las siguientes según `transversal-seguridad` (SEG-18). | RF29 |
 
 ## 4. Criterios de aceptación
 
@@ -62,4 +62,4 @@ Una pieza literaria de marca, inspirada en *La biblioteca de Babel* de Borges: p
 
 ## 7. Preguntas abiertas
 
-- [ ] ¿Se construye en esta versión o queda para el final del proyecto? Propuesta: al final y solo con el catálogo estable. Responde: responsable del proyecto.
+- [x] ¿Se construye en esta versión o queda para el final del proyecto? Resuelto el 2026-10-16 (confirmado por el responsable): al final y solo con el catálogo estable.

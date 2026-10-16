@@ -53,6 +53,10 @@ La base común de `BabelHub.Web`: áreas por rol, sesión, estados de pantalla e
 | WEB-24 | No deseado | Si una operación es rechazada por un límite de uso, entonces el sistema deberá explicar el motivo y la espera sugerida sin perder lo que la persona tenía en pantalla y sin distinguir, en el ingreso, si la cuenta existe. | RNF17, AC13 |
 | WEB-25 | Evento | Cuando la sesión vence a mitad de una acción, el sistema deberá llevar al ingreso y conservar lo que el usuario tenía en pantalla, salvo contraseñas y códigos. | RNF13, RNF15 |
 | WEB-26 | No deseado | Si la Web no logra comunicarse con los servicios, entonces el sistema deberá mostrar el estado de servicio no disponible y conservar el carrito. | RNF13, AC03 |
+| WEB-27 | Ubicuo | El sistema deberá cerrar la sesión web tras 30 minutos sin interacción, renovando ese plazo con cada interacción, y tras un máximo absoluto de 7 días para clientes y de 8 horas para el personal, aunque haya actividad. | RNF15, AC05 |
+| WEB-28 | Evento | Cuando una persona ingresa, cierra sesión o su sesión vence, el sistema deberá emitir un identificador de sesión nuevo al ingresar e invalidar en el servidor la sesión anterior y su renovación al cerrar o vencer. | RNF15, AC05 |
+| WEB-29 | Ubicuo | El sistema deberá publicar los términos, la política de privacidad y la política de reembolso como textos con versión y fecha de vigencia visibles, incluir en la privacidad las cookies que usa el sitio, y usar la versión vigente al pedir su aceptación. | NN15, RNF23 |
+| WEB-30 | Ubicuo | El sistema deberá ofrecer a la administración central una pantalla de auditoría y eventos de seguridad con los filtros de la auditoría y otra de alertas de seguridad con su estado de revisión. | RNF20, AC05 |
 
 ## 4. Criterios de aceptación
 
@@ -79,6 +83,10 @@ La base común de `BabelHub.Web`: áreas por rol, sesión, estados de pantalla e
 | AC-WEB-19 | WEB-24 | **Dado** una operación rechazada por límite, **cuando** el usuario la ve, **entonces** lee el motivo y la espera sugerida, y su formulario conserva lo escrito; y en el ingreso el mensaje es igual para cuentas existentes e inexistentes. |
 | AC-WEB-20 | WEB-25 | **Dado** un usuario con un formulario a medio llenar, **cuando** su sesión vence y envía, **entonces** es llevado al ingreso y, al volver, conserva lo escrito. |
 | AC-WEB-21 | WEB-26 | **Dado** que los servicios no responden, **cuando** el cliente abre su carrito, **entonces** ve el estado de servicio no disponible y el carrito no se pierde. |
+| AC-WEB-22 | WEB-27 | **Dado** un cliente con sesión, **cuando** pasan 31 minutos sin interacción, **entonces** debe ingresar de nuevo; **cuando** interactúa cada 20 minutos, **entonces** la sesión sigue activa hasta los 7 días; y un encargado es llevado al ingreso a las 8 horas aunque haya actividad. |
+| AC-WEB-23 | WEB-28 | **Dado** una sesión cerrada o vencida, **cuando** alguien reutiliza su identificador, **entonces** se rechaza; y al ingresar de nuevo el identificador es distinto del anterior. |
+| AC-WEB-24 | WEB-29 | **Dado** el pie de la tienda, **cuando** el cliente abre los términos, la privacidad y el reembolso, **entonces** cada uno muestra su versión y fecha de vigencia, y la aceptación en el registro o el checkout guarda esa versión. |
+| AC-WEB-25 | WEB-30 | **Dado** un administrador central, **cuando** abre la auditoría y las alertas, **entonces** puede filtrar por acción, usuario, fechas y texto, ve las alertas con su estado y puede marcarlas como revisadas; y un encargado que abre esas pantallas ve la de sin permiso. |
 
 ## 5. Reglas e invariantes
 
@@ -90,9 +98,12 @@ La base común de `BabelHub.Web`: áreas por rol, sesión, estados de pantalla e
 ## 6. Casos límite y errores
 
 - Una sesión que vence a mitad de una acción redirige al ingreso y conserva lo que el usuario tenía.
+- La sesión vive en el servidor y la cookie solo lleva un identificador opaco; si se pierde el almacenamiento de sesiones, todas las personas deben ingresar de nuevo y el carrito se conserva (CAR-01).
+- El plazo de 30 minutos de inactividad es mayor que los 15 minutos de reserva del checkout, por lo que una reserva vigente no queda sin sesión.
 - Una pantalla sin conexión muestra el estado de servicio no disponible y no pierde el carrito.
 - El asistente de compra no tapa precios ni acciones en pantallas pequeñas.
 
 ## 7. Preguntas abiertas
 
-- [ ] ¿Las fuentes tipográficas se autoalojan desde el inicio? Propuesta: sí, para no depender de servidores externos. Se decide en el plan.
+- [x] ¿Cuánto dura la sesión web? Resuelto el 2026-10-16: 30 minutos de inactividad renovables con cada interacción y tope absoluto de 7 días (clientes) u 8 horas (personal) (WEB-27).
+- [x] ¿Las fuentes tipográficas se autoalojan desde el inicio? Resuelto el 2026-10-16 (confirmado por el responsable): sí, para no depender de servidores externos.

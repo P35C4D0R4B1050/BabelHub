@@ -69,4 +69,4 @@ Permitir que cada sucursal corrija su stock físico con un motivo y un responsab
 
 ## 7. Preguntas abiertas
 
-- [ ] ¿Se exige una nota cuando la diferencia de un conteo supera cierto porcentaje (por ejemplo, 20 %)? Propuesta: no en esta versión. Responde: responsable del proyecto.
+- [x] ¿Se exige una nota cuando la diferencia de un conteo supera cierto porcentaje? Resuelto el 2026-10-16 (confirmado por el responsable): no en esta versión.

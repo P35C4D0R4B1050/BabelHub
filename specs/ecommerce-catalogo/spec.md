@@ -42,6 +42,7 @@ Un único catálogo nacional para toda la red. Una **obra** puede tener una edic
 | CAT-13 | Evento | Cuando la administración da de baja una obra, el sistema deberá dejar de mostrarla en el catálogo y conservar sus datos en los pedidos históricos. | RF10 |
 | CAT-14 | Ubicuo | El sistema deberá permitir publicar, editar y dar de baja ediciones solo a la administración central. | NN08 |
 | CAT-15 | Evento | Cuando la administración retira una edición digital de la venta, el sistema deberá registrarlo en la auditoría. | RF24 |
+| CAT-16 | Evento | Cuando la administración sube el archivo de una edición digital o una portada, el sistema deberá verificar su tipo según su contenido (EPUB o PDF para libros; JPEG, PNG o WebP para portadas), rechazar los que superen 50 MB (libros) o 2 MB (portadas) y guardar su huella SHA-256 antes de publicarlos. | RF10, RF24 |
 
 ## 4. Criterios de aceptación
 
@@ -58,6 +59,7 @@ Un único catálogo nacional para toda la red. Una **obra** puede tener una edic
 | AC-CAT-09 | CAT-12 | **Dado** que el inventario no responde, **cuando** un cliente busca libros, **entonces** el catálogo se muestra con un aviso de disponibilidad posiblemente desactualizada. |
 | AC-CAT-10 | CAT-13 | **Dado** una obra con pedidos históricos, **cuando** se da de baja, **entonces** deja de aparecer en el catálogo y sus pedidos siguen mostrando su título. |
 | AC-CAT-11 | CAT-14 | **Dado** un encargado de sucursal, **cuando** intenta publicar o editar una edición, **entonces** se rechaza por falta de permiso. |
+| AC-CAT-12 | CAT-16 | **Dado** un administrador, **cuando** sube un ejecutable renombrado como EPUB, un libro de 60 MB y una portada de 3 MB, **entonces** los tres se rechazan con su motivo; y un EPUB válido de 10 MB se acepta y queda con su huella guardada. |
 
 ## 5. Reglas e invariantes
 
@@ -75,5 +77,5 @@ Un único catálogo nacional para toda la red. Una **obra** puede tener una edic
 
 ## 7. Preguntas abiertas
 
-- [ ] ¿Cómo se determina el territorio del comprador: por su dirección, por su país de registro o no se valida en esta versión? Propuesta: se registra en la licencia pero se asume Perú. Responde: responsable del proyecto.
-- [ ] ¿La imagen de portada se sube al almacén de objetos o se enlaza una URL externa? Propuesta: almacén de objetos. Se decide en el plan.
+- [x] ¿Cómo se determina el territorio del comprador? Resuelto el 2026-10-16 (confirmado por el responsable): el territorio se registra en la licencia y se asume Perú; no se valida el del comprador en esta versión.
+- [x] ¿La imagen de portada se sube al almacén de objetos o se enlaza una URL externa? Resuelto el 2026-10-16: se sube al almacén de objetos y se valida (CAT-16).

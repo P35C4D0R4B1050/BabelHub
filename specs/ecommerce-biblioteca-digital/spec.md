@@ -33,7 +33,7 @@ Entregar al instante los libros digitales comprados y protegerlos: el archivo so
 | BIB-04 | Evento | Cuando el titular de un acceso con descargas restantes pide descargar, el sistema deberá verificar su titularidad y su cupo y entregarle un enlace firmado que expire en un máximo de cinco minutos. | RF23, AC09 |
 | BIB-05 | Ubicuo | El sistema deberá contabilizar una descarga en el momento de entregar el enlace firmado, aunque la descarga se interrumpa, y permitir reutilizar el mismo enlace dentro de su vigencia sin contar otra descarga. | RF23 |
 | BIB-06 | No deseado | Si el acceso ya alcanzó el máximo de cinco descargas, entonces el sistema deberá rechazar la solicitud explicando el límite y ofreciendo pedir ayuda. | RF23, AC09 |
-| BIB-07 | No deseado | Si quien pide descargar no es el titular del acceso, entonces el sistema deberá rechazar la solicitud y registrar el intento; y si el enlace ya venció, la descarga no deberá completarse. | AC09, RNF14 |
+| BIB-07 | No deseado | Si quien pide descargar no es el titular del acceso, entonces el sistema deberá rechazar la solicitud y registrar el intento. | AC09, RNF14 |
 | BIB-08 | Evento | Cuando la administración central restituye descargas a un acceso, el sistema deberá sumarlas al cupo y registrar la acción en la auditoría con el motivo. | RF23, RNF08 |
 | BIB-09 | Estado | Mientras la licencia de una edición esté vencida o retirada de la venta, el sistema deberá mantener el acceso de quienes ya la compraron. | RF24 |
 | BIB-10 | Estado | Mientras un acceso esté revocado por un reembolso o una anulación, el sistema deberá impedir su descarga. | RF23 |
@@ -44,6 +44,7 @@ Entregar al instante los libros digitales comprados y protegerlos: el archivo so
 | BIB-15 | No deseado | Si un cliente solicita más de 10 enlaces de descarga en una ventana deslizante de una hora, entonces el sistema deberá rechazar la solicitud sin consumir descargas y responder y registrar el evento según `transversal-seguridad` (SEG-07 y SEG-08). | RNF17, AC13 |
 | BIB-16 | Evento | Cuando el titular pide ayuda sobre un acceso, el sistema deberá registrar la solicitud para la administración con el acceso y el motivo. | RF23 |
 | BIB-17 | Ubicuo | El sistema deberá comprobar y contar el cupo de descargas de forma atómica ante solicitudes simultáneas del mismo acceso. | RF23, AC09 |
+| BIB-18 | No deseado | Si se usa un enlace de descarga cuya vigencia ya venció, entonces el sistema deberá no completar la descarga e invitar a pedir un enlace nuevo. | AC09, RNF14 |
 
 ## 4. Criterios de aceptación
 
@@ -54,7 +55,7 @@ Entregar al instante los libros digitales comprados y protegerlos: el archivo so
 | AC-BIB-03 | BIB-03 | **Dado** un acceso del cliente A, **cuando** el cliente B pide descargarlo, **entonces** se rechaza y se registra el intento. |
 | AC-BIB-04 | BIB-04, BIB-05, BIB-11 | **Dado** un acceso con 2 descargas usadas, **cuando** el titular pide descargar, **entonces** recibe un enlace que vence en cinco minutos como máximo, las descargas pasan a 3 aunque no lo use y queda un registro. |
 | AC-BIB-05 | BIB-06 | **Dado** un acceso con 5 descargas usadas, **cuando** el titular pide descargar, **entonces** se rechaza explicando el límite. |
-| AC-BIB-06 | BIB-07 | **Dado** un enlace emitido hace diez minutos, **cuando** se usa, **entonces** la descarga no se completa; y **dado** un cliente que no es titular, **cuando** pide descargar, **entonces** se rechaza y se registra el intento. |
+| AC-BIB-06 | BIB-07, BIB-18 | **Dado** un enlace emitido hace diez minutos, **cuando** se usa, **entonces** la descarga no se completa; y **dado** un cliente que no es titular, **cuando** pide descargar, **entonces** se rechaza y se registra el intento. |
 | AC-BIB-07 | BIB-08 | **Dado** un acceso con 5 descargas usadas por una descarga fallida, **cuando** la administración restituye 1 con su motivo, **entonces** el titular puede descargar de nuevo y queda una entrada de auditoría. |
 | AC-BIB-08 | BIB-09 | **Dado** una edición cuya licencia venció después de la compra, **cuando** el cliente abre su biblioteca, **entonces** sigue pudiendo descargarla. |
 | AC-BIB-09 | BIB-10 | **Dado** un acceso revocado por un reembolso, **cuando** el cliente intenta descargar, **entonces** se rechaza. |
@@ -84,4 +85,4 @@ Entregar al instante los libros digitales comprados y protegerlos: el archivo so
 ## 7. Preguntas abiertas
 
 - [x] ¿Cómo se cuenta la descarga? Resuelto el 2026-10-10: un punto de entrada propio verifica y cuenta, y redirige al almacén con un enlace de vida muy corta (BIB-04, BIB-05); el archivo no pasa por la Web (BIB-14).
-- [ ] ¿La marca de agua con los datos de la compra entra en esta versión? Propuesta: no, queda como mejora posterior (AD20). Responde: responsable del proyecto.
+- [x] ¿La marca de agua con los datos de la compra entra en esta versión? Resuelto el 2026-10-16 (confirmado por el responsable): no, queda como mejora posterior (AD20).

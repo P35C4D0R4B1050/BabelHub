@@ -20,7 +20,7 @@ Avisar al cliente y a las sucursales de cada cambio importante sin que el aviso 
 | Dentro | Fuera |
 | :--- | :--- |
 | Qué eventos generan un aviso y a quién. | El contenido de cada pantalla de estado (otras specs). |
-| Consentimiento, reintentos, deduplicación y estado de cada aviso. | Otros canales para avisos como correo o SMS (mejora posterior); los códigos de seguridad por correo son de `identidad-seguridad`. |
+| Consentimiento, reintentos, deduplicación y estado de cada aviso. | Otros canales para avisos como correo o SMS (mejora posterior); los códigos de seguridad por correo son de `identidad-seguridad` y la respuesta a una hoja de reclamación por correo, de `ecommerce-libro-reclamaciones`. |
 | Notificador simulado para desarrollo. | Conversaciones bidireccionales con el cliente. |
 
 ## 3. Requisitos (EARS)
@@ -28,7 +28,7 @@ Avisar al cliente y a las sucursales de cada cambio importante sin que el aviso 
 | ID | Patrón | Requisito | Origen |
 | :--- | :--- | :--- | :--- |
 | NOT-01 | Evento | Cuando ocurre un evento de negocio notificable, el sistema deberá enviar un aviso por WhatsApp a quien corresponde: el cliente, la sucursal de origen o la de destino. | RF07, RF16 |
-| NOT-02 | Ubicuo | El sistema deberá considerar como eventos notificables el pedido confirmado, en preparación, en tránsito, listo para recojo, entregado, la guía de envío, el libro digital disponible, los cambios de estado de un traslado, de una devolución y la respuesta a un reclamo. | RF07, NN03 |
+| NOT-02 | Ubicuo | El sistema deberá considerar como eventos notificables el pedido confirmado, en preparación, en tránsito, listo para recojo, entregado, no recogido, el pago pendiente de confirmación y su resultado, la guía de envío, el libro digital disponible, los cambios de estado de un traslado y de una devolución. | RF07, NN03 |
 | NOT-03 | No deseado | Si el cliente no dio su consentimiento o lo revocó, entonces el sistema deberá no enviarle avisos. | RNF07 |
 | NOT-04 | No deseado | Si el envío de un aviso falla, entonces el sistema deberá dejarlo pendiente, reintentarlo con esperas crecientes y no interrumpir la operación que lo originó. | AC03, RNF03 |
 | NOT-05 | Ubicuo | El sistema deberá evitar enviar dos veces el mismo aviso para el mismo evento. | RF07 |
@@ -73,5 +73,5 @@ Avisar al cliente y a las sucursales de cada cambio importante sin que el aviso 
 
 ## 7. Preguntas abiertas
 
-- [ ] ¿Cuántos reintentos y con qué espera? Propuesta: 5 reintentos con espera creciente hasta 1 hora. Se decide en el plan.
-- [ ] ¿Se avisa también por correo cuando no hay WhatsApp? Propuesta: fuera de esta versión. Responde: responsable del proyecto.
+- Nota para el plan: reintentos de avisos (propuesta: 5, con espera creciente hasta 1 hora).
+- [x] ¿Se avisa también por correo cuando no hay WhatsApp? Resuelto el 2026-10-16 (confirmado por el responsable): fuera de esta versión para los avisos de pedidos y traslados; el correo se usa solo para seguridad, reclamos, alertas y el estado de un pago pendiente.
