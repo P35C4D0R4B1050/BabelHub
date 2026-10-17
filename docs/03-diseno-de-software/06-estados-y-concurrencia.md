@@ -63,11 +63,11 @@ El estado del pedido se deriva del de sus líneas (PED-20): anulado si todas lo 
 
 ### 1.5 Envío
 
-`pendiente de guía → guía generada → en reparto → entregado`. Un envío entregado no cambia.
+`pendiente de guía → guía generada → en reparto → entregado`, y `cancelado` desde pendiente de guía o guía generada (al anularse el pedido). Un envío entregado o cancelado no cambia.
 
 ### 1.6 Devolución
 
-Impreso: `solicitada → aprobada → recibida (reingreso de stock) → reembolsada`. Digital: `solicitada → aprobada → reembolsada`. En ambos, `solicitada → rechazada`. Un reembolso o reingreso fallido queda reintentable sin repetir el paso ya completado.
+Impreso: `solicitada → aprobada → recibida (reingreso de stock) → reembolsada`. Digital: `solicitada → aprobada → reembolsada`. En ambos, `solicitada → rechazada`; en un impreso, también `aprobada → rechazada` si vence el plazo de 10 días para la recepción. Una devolución es de un solo tipo y cada línea tiene su estado. El digital sin enlace de descarga entregado se aprueba solo (responsable «sistema»). Un reembolso o reingreso fallido queda reintentable sin repetir el paso ya completado.
 
 ### 1.7 Solicitud ARCO
 
