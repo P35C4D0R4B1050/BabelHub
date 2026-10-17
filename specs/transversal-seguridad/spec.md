@@ -58,6 +58,7 @@ Definir las protecciones que todos los servicios y la interfaz web comparten, pa
 | SEG-26 | No deseado | Si no está disponible el almacén de contadores de límites, entonces el sistema deberá rechazar el ingreso, el registro, las solicitudes de código, las reservas y las descargas con la respuesta de servicio no disponible, y aplicar a las demás operaciones un límite local por servicio. | RNF17, RNF21 |
 | SEG-27 | Evento | Cuando se repite una alerta de seguridad por el mismo motivo y servicio en 15 minutos, el sistema deberá agruparla en una sola entrada de la lista y en un solo correo. | RNF20 |
 | SEG-28 | Ubicuo | El sistema deberá enviar un código de un solo uso únicamente en el correo dirigido a su propio destinatario. | RNF20, AC05 |
+| SEG-29 | Estado | Mientras una cuenta acumula 10 códigos de segundo factor incorrectos, de aplicación o de respaldo, en una hora desde cualquier origen, el sistema deberá rechazar los siguientes durante 15 minutos. | RNF17, AC13 |
 
 ## 4. Criterios de aceptación
 
@@ -88,6 +89,7 @@ Definir las protecciones que todos los servicios y la interfaz web comparten, pa
 | AC-SEG-23 | SEG-27 | **Dado** una alerta de Inventario ya enviada, **cuando** se repite el mismo motivo dentro de 15 minutos, **entonces** la lista muestra una sola entrada con el contador y no sale otro correo; y pasados los 15 minutos, una nueva entrada y un correo. |
 | AC-SEG-24 | SEG-26 | **Dado** que el almacén de contadores no está disponible, **cuando** alguien intenta ingresar o registrarse, **entonces** recibe servicio no disponible; y consultar el catálogo sigue funcionando con el límite local. |
 | AC-SEG-25 | SEG-11 | **Dado** el repositorio y los registros, **cuando** se revisan, **entonces** no contienen ningún secreto ni clave. |
+| AC-SEG-26 | SEG-29 | **Dado** una cuenta con 10 códigos de segundo factor incorrectos en una hora desde varios orígenes, **cuando** presenta uno correcto desde cualquiera, **entonces** se rechaza durante 15 minutos. |
 
 ## 5. Reglas e invariantes
 

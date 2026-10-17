@@ -48,6 +48,7 @@ Dejar un registro confiable e inmutable de quién hizo qué, cuándo y con qué 
 | AUD-19 | Evento | Cuando corre la depuración diaria, el sistema deberá anonimizar, incluida la dirección IP, los datos personales de los registros con más de dos años y de las cuentas canceladas desde la depuración anterior, conservando la acción, la fecha y el resultado, y registrar la ejecución con el actor «sistema». | RNF23, AC11 |
 | AUD-20 | Ubicuo | El sistema deberá registrar un cambio de rol como un único registro, etiquetado como operación sensible y como evento de seguridad. | RF20, RNF20 |
 | AUD-21 | Evento | Cuando la administración consulta la biblioteca de un cliente, una hoja de reclamación o una solicitud sobre datos personales, el sistema deberá registrar la consulta en la auditoría. | RF20, RNF23 |
+| AUD-22 | Evento | Cuando se rota la clave de firma de las credenciales o la administración desactiva los avisos de un número, el sistema deberá registrarlo en la auditoría. | RF20, RNF08 |
 
 ## 4. Criterios de aceptación
 
@@ -71,6 +72,7 @@ Dejar un registro confiable e inmutable de quién hizo qué, cuándo y con qué 
 | AC-AUD-16 | AUD-18 | **Dado** que Inventario no responde, **cuando** el administrador abre la auditoría, **entonces** ve los registros de Ventas e Identidad y un aviso de que faltan los de Inventario. |
 | AC-AUD-17 | AUD-20 | **Dado** un administrador que cambia el rol de un usuario, **cuando** se revisa, **entonces** existe un único registro etiquetado como operación sensible y como evento de seguridad. |
 | AC-AUD-18 | AUD-01, AUD-14 | **Dado** el aviso de la pasarela que confirma una reserva, **cuando** se revisa la auditoría, **entonces** el registro indica el actor «integración» o «sistema» en lugar de un usuario. |
+| AC-AUD-19 | AUD-22 | **Dado** una rotación de la clave de firma y la desactivación de avisos de un número, **cuando** se revisa la auditoría, **entonces** ambas acciones tienen su registro. |
 
 ## 5. Reglas e invariantes
 
