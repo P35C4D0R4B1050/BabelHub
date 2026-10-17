@@ -46,6 +46,10 @@ confirmada --> en_preparacion : la fuente es la de recojo
 confirmada --> en_transito_entre_sucursales : la fuente no es la de recojo
 en_transito_entre_sucursales --> en_preparacion : se recibe el traslado
 confirmada --> anulada : cancelación del cliente o anulación
+en_transito_entre_sucursales --> anulada : anulación de la administración
+en_preparacion --> anulada : anulación de la administración
+listo_para_recojo --> anulada : anulación de la administración
+no_recogida --> anulada : anulación de la administración
 en_preparacion --> listo_para_recojo
 en_preparacion --> despachada : domicilio
 listo_para_recojo --> entregada
@@ -55,7 +59,7 @@ entregada --> [*]
 anulada --> [*]
 ```
 
-El estado del pedido se deriva del de sus líneas (PED-20): anulado si todas lo están, entregado si todas están entregadas, no recogido si alguna lo está y las demás están entregadas o no recogidas y, si no, el de la línea impresa menos avanzada. Si dos operaciones compiten por una línea, gana la primera que confirma (PED-21). La línea digital pasa a *disponible en biblioteca* al aprobarse el pago.
+El estado del pedido se deriva del de sus líneas (PED-20): anulado si todas lo están; si no, se ignoran las anuladas y las digitales ya disponibles: entregado si las demás están entregadas, no recogido si alguna lo está y las demás están entregadas o no recogidas y, si no, el de la línea impresa menos avanzada. Una devolución no cambia el estado de la línea. Una anulación parcial solo alcanza las líneas que no salieron. Si dos operaciones compiten por una línea, gana la primera que confirma (PED-21). La línea digital pasa a *disponible en biblioteca* al aprobarse el pago.
 
 ### 1.4 Pago
 
