@@ -90,3 +90,11 @@ tools/tailwind/
 
 # --- Claude Code: configuración local (se versionan skills, agentes y settings.json) ---
 .claude/settings.local.json
+
+# --- Material de exposición local (no forma parte del proyecto) ---
+docs/resumen-para-exposicion.md
+docs/babelhub-guion-exposicion-y-estilo.md
+.claude/serve-static.ps1
+
+# --- Archivos temporales de Office (bloqueos de Word y PowerPoint) ---
+~$*
