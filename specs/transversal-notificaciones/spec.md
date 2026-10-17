@@ -28,7 +28,7 @@ Avisar al cliente y a las sucursales de cada cambio importante sin que el aviso 
 | ID | Patrón | Requisito | Origen |
 | :--- | :--- | :--- | :--- |
 | NOT-01 | Evento | Cuando ocurre un evento de negocio notificable, el sistema deberá enviar un aviso por WhatsApp a quien corresponde: el cliente, la sucursal de origen o la de destino. | RF07, RF16 |
-| NOT-02 | Ubicuo | El sistema deberá considerar como eventos notificables el pedido confirmado, en preparación, en tránsito, listo para recojo, entregado, no recogido, el pago pendiente de confirmación y su resultado, la guía de envío, el libro digital disponible, los cambios de estado de un traslado y de una devolución. | RF07, NN03 |
+| NOT-02 | Ubicuo | El sistema deberá considerar como eventos notificables el pedido confirmado, en preparación, en tránsito, listo para recojo, entregado, no recogido, el pago pendiente de confirmación y su resultado, la anulación o cancelación de un pedido, el reembolso automático, la guía de envío, el libro digital disponible, los cambios de estado de un traslado y de una devolución. | RF07, NN03 |
 | NOT-03 | No deseado | Si el cliente no dio su consentimiento o lo revocó, entonces el sistema deberá no enviarle avisos. | RNF07 |
 | NOT-04 | No deseado | Si el envío de un aviso falla, entonces el sistema deberá dejarlo pendiente, reintentarlo hasta 5 veces con esperas crecientes de hasta 1 hora y no interrumpir la operación que lo originó. | AC03, RNF03 |
 | NOT-05 | Ubicuo | El sistema deberá evitar enviar dos veces el mismo aviso para el mismo evento, destinatario y plantilla. | RF07 |
