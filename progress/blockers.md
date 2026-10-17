@@ -14,7 +14,7 @@ Se actualiza con la skill `progress-log`. Cada ítem tiene dueño y condición d
 | B06 | Proveedor de LLM | Elegir proveedor y obtener clave para el asistente. | `asistente-compra-ia` (plan) | Responsable del proyecto |
 | B07 | Número de WhatsApp | Un número dedicado para Evolution API (no se necesita en desarrollo: hay notificador simulado). | Despliegue | Responsable del proyecto |
 | B08 | Proveedor de correo | Elegir un proveedor gratuito de envío de correo para los códigos de verificación y recuperación, las respuestas a reclamos, las alertas a la administración y los avisos de pago pendiente, y configurar el dominio remitente (SPF, DKIM y DMARC). | `identidad-seguridad` (plan), `ecommerce-libro-reclamaciones` y despliegue | Responsable del proyecto |
-| B09 | Verificación legal | Confirmar con una persona experta lo marcado «a verificar» en `docs/01-analisis-de-sistema/03-marco-legal.md`: Ley 29571, campos y plazo de la hoja de reclamación, plazos ARCO, plazo de notificación de incidentes, menores y cookies. | Aprobación de `ecommerce-libro-reclamaciones` e `identidad-seguridad` con valores definitivos; no bloquea el desarrollo académico | Responsable del proyecto |
+| B09 | Verificación legal | Confirmar con una persona experta lo marcado «a verificar» en `docs/01-analisis-de-sistema/03-marco-legal.md`: Ley 29571, campos y plazo de la hoja de reclamación, plazos ARCO, plazo de notificación de incidentes, menores y cookies. | No bloquea: riesgo aceptado el 2026-10-16 por ser un proyecto académico; las specs se aprobaron con los valores propuestos. Imprescindible antes de operar con clientes reales | Responsable del proyecto |
 
 ## Cerrados
 
