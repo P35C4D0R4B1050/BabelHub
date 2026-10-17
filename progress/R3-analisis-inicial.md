@@ -262,6 +262,8 @@ Sin pregunta (criterio técnico): reasignación al perder la última unidad (SEL
 | Consulta de hojas | El consumidor con correo verificado ve las suyas; la consulta del administrador se audita. | REC-10, REC-14, REC-15 |
 | Sin pregunta (criterio técnico) | Idempotencia del acceso (BIB-19), auditoría de entrega y alcance de logística (ENV-14, ENV-15), límite de hojas como «No deseado» (REC-11), nueva devolución tras rechazo por plazo (DEV-18). | specs |
 
+**Segunda vuelta (`spec-auditor`, «necesita otra vuelta»):** decisiones del responsable: logística ve toda la red (se elimina ENV-15) y el reembolso automático digital tiene plazo de 14 días desde el pago (DEV-04, DEV-05; a verificar con B09). Aplicado además por criterio técnico: estado derivado del pedido que ignora líneas anuladas (PED-20), anulación parcial general (PED-13, PED-27), entrega por envío que marca sus líneas (ENV-07, PED-29), preparación a domicilio (PED-28), exclusión mutua entre enlace y reembolso (DEV-20, BIB-23), revocación idempotente y auditada (BIB-24), rechazo de líneas ya reembolsadas (DEV-19), reembolso pendiente reintentable (DEV-21), reportes duplicados (DEV-22), estados, anonimización y constancia de hojas (REC-16 a REC-18), operador logístico en la privacidad y dependencias completadas.
+
 **Supuestos a confirmar:** «dispositivo reconocido» y «región habitual» del cambio de correo; el envío cancelado con guía ya generada se avisa al operador a mano.
 
 **Siguen abiertos de R3:** custodia de la clave de firma (plan) y S9 (dónde viven los contadores de límites, plan). Quedan además las preguntas abiertas de confirmación en cada spec (valores propuestos y las nuevas de esta ronda), que son las que impiden pasar a `Approved`.
