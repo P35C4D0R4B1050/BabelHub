@@ -42,9 +42,11 @@ recibido --> [*]
 ```mermaid
 stateDiagram-v2
 [*] --> confirmada
-confirmada --> en_preparacion : la fuente es la de recojo
+confirmada --> en_preparacion : sin traslado, prepara quien corresponde
 confirmada --> en_transito_entre_sucursales : la fuente no es la de recojo
-en_transito_entre_sucursales --> en_preparacion : se recibe el traslado
+en_transito_entre_sucursales --> recibida_en_sucursal : se recibe el traslado
+recibida_en_sucursal --> en_preparacion : prepara quien corresponde
+recibida_en_sucursal --> anulada : anulación de la administración
 confirmada --> anulada : cancelación del cliente o anulación
 en_transito_entre_sucursales --> anulada : anulación de la administración
 en_preparacion --> anulada : anulación de la administración
@@ -71,7 +73,7 @@ El estado del pedido se deriva del de sus líneas (PED-20): anulado si todas lo 
 
 ### 1.6 Devolución
 
-Impreso: `solicitada → aprobada → recibida (reingreso de stock) → reembolsada`. Digital: `solicitada → aprobada → reembolsada`. En ambos, `solicitada → rechazada`; en un impreso, también `aprobada → rechazada` si vence el plazo de 10 días para la recepción. Una devolución es de un solo tipo y cada línea tiene su estado. El digital sin enlace de descarga entregado se aprueba solo (responsable «sistema»). Un reembolso o reingreso fallido queda reintentable sin repetir el paso ya completado.
+Impreso: `solicitada → aprobada → recibida (reingreso de stock) → reembolsada`. Digital: `solicitada → aprobada → reembolsada`. En ambos, `solicitada → rechazada`; en un impreso, también `aprobada → rechazada` si vence el plazo de 10 días para la recepción. Una devolución es de un solo tipo y cada línea tiene su estado. El digital sin enlace de descarga entregado y dentro de 14 días desde el pago se aprueba solo (responsable «sistema»); con un archivo defectuoso reportado dentro de 30 días, las descargas se suspenden y la administración central lo aprueba o lo rechaza. Un reembolso o reingreso fallido queda reintentable sin repetir el paso ya completado.
 
 ### 1.7 Solicitud ARCO
 

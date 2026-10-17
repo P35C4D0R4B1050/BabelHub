@@ -74,7 +74,7 @@ F --> D["Reembolso por la pasarela"]
 E -- Digital --> G["Reembolso por la pasarela y se revoca el acceso; no hay stock"]
 ```
 
-**Spec:** `ecommerce-devoluciones` (quién aprueba un impreso está pendiente de decisión). El impreso se reembolsa solo después de confirmada su recepción. El libro digital ya descargado solo se reembolsa si el archivo es defectuoso.
+**Spec:** `ecommerce-devoluciones` (aprueba el encargado de la sucursal receptora o la administración). El impreso se reembolsa solo después de confirmada su recepción. El libro digital se aprueba solo si no se entregó ningún enlace de descarga y está dentro de 14 días desde el pago; con un enlace entregado solo se reembolsa si el archivo es defectuoso, y lo decide la administración central.
 
 ## 6. Libro de Reclamaciones
 

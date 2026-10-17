@@ -50,7 +50,7 @@ Estos mensajes **no deben revelar** si una cuenta existe, qué dato falló ni de
 | Cambio de correo inusual | «Por seguridad, confirma este cambio desde un dispositivo que ya usaste. Mientras tanto, no cambiamos nada.» | Alertar a quien intenta el cambio de qué canales avisamos. |
 | Nueva versión de los términos | «Actualizamos nuestros términos. Acéptalos para pagar; puedes seguir viendo tu cuenta.» | Bloquear toda la cuenta. |
 | Cancelación de cuenta aplazada | «Cancelaremos tu cuenta cuando cierres: pedido ..., reclamo ... Hasta entonces no podrás hacer compras nuevas.» | Negar el derecho. |
-| Devolución digital rechazada | «Ya descargaste este libro, por eso no podemos reembolsarlo. Si el archivo no abre, repórtalo y lo revisamos.» | Dejar sin salida. |
+| Devolución digital rechazada | «Ya te entregamos el enlace de descarga de este libro, por eso no podemos reembolsarlo. Si el archivo no abre, repórtalo y lo revisamos.» / «Pasaron más de 14 días desde tu pago. Si el archivo no abre, repórtalo y lo revisamos.» | Dejar sin salida. |
 | Registro sin mayoría de edad | «BabelHub es solo para mayores de 18 años.» | Pedir datos innecesarios. |
 
 ## 4. Catálogo de mensajes por estado
