@@ -45,6 +45,11 @@ Estos mensajes **no deben revelar** si una cuenta existe, qué dato falló ni de
 | Registros de cuentas con límite | «Se hicieron varios registros desde esta conexión. Inténtalo de nuevo a las 15:42.» | Acusar a la persona. |
 | Reclamos con límite | «Se enviaron varias hojas desde esta conexión. Podrás enviar otra a las 15:42.» | Acusar a la persona. |
 | Cancelación no permitida | «Este pedido ya está en preparación o incluye un libro digital. Si ya lo recibiste, puedes pedir una devolución.» | Dejar sin salida. |
+| Segundo factor incorrecto o bloqueado | «El código no es válido. Si perdiste tu dispositivo, usa un código de respaldo.» / «Hiciste varios intentos. Podrás volver a probar a las 15:42.» | Indicar si la contraseña era correcta. |
+| Contraseña temporal | «Define tu contraseña para continuar. La temporal vence a las 15:42.» | Mostrar la temporal. |
+| Cambio de correo inusual | «Por seguridad, confirma este cambio desde un dispositivo que ya usaste. Mientras tanto, no cambiamos nada.» | Alertar a quien intenta el cambio de qué canales avisamos. |
+| Nueva versión de los términos | «Actualizamos nuestros términos. Acéptalos para pagar; puedes seguir viendo tu cuenta.» | Bloquear toda la cuenta. |
+| Cancelación de cuenta aplazada | «Cancelaremos tu cuenta cuando cierres: pedido ..., reclamo ... Hasta entonces no podrás hacer compras nuevas.» | Negar el derecho. |
 | Registro sin mayoría de edad | «BabelHub es solo para mayores de 18 años.» | Pedir datos innecesarios. |
 
 ## 4. Catálogo de mensajes por estado

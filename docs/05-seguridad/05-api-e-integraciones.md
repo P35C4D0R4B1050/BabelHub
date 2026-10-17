@@ -48,7 +48,7 @@ Cómo se protegen las interfaces entre servicios, la que expone la Web y las que
 | Descargas | 10 solicitudes de enlace por hora | Aplicación | BIB-15 |
 | Asistente | 10 consultas por minuto | Aplicación | ASI-09 |
 | Códigos de un solo uso | 3 solicitudes por hora por correo y por origen; 5 intentos por código | Aplicación | SEG-19, IDE-19 |
-| Segundo factor | 5 códigos incorrectos en 15 minutos bloquean 15 minutos | Aplicación | SEG-20 |
+| Segundo factor | 5 códigos incorrectos en 15 minutos por cuenta y origen, y 10 por hora por cuenta desde cualquier origen, bloquean 15 minutos | Aplicación | SEG-20, SEG-29 |
 | Libro de Reclamaciones | 3 hojas por hora por origen | Aplicación | REC-11 |
 | Registro de cuentas | 3 cuentas nuevas por hora por origen | Aplicación | SEG-24 |
 | Origen no determinable | Un «origen desconocido» único con los mismos límites por origen | Aplicación | SEG-23 |
