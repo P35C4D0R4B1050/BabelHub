@@ -1,12 +1,14 @@
 ---
 id: ecommerce-pedidos
 titulo: Pedidos y seguimiento
-estado: Draft
+estado: Approved
 servicio: E-commerce
 prefijo: PED
 origen: [RF06, RF07, NN03, NN13, NN09]
 calidad: [AC01, AC03, RNF05, RNF08]
 depende: [ecommerce-pagos, ecommerce-biblioteca-digital, inventario-seleccion-fuente, transversal-notificaciones, transversal-auditoria]
+aprobado_por: Diego Amiquero
+aprobado_en: 2026-10-16
 ---
 
 # Spec — Pedidos y seguimiento

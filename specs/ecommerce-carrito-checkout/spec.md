@@ -1,12 +1,14 @@
 ---
 id: ecommerce-carrito-checkout
 titulo: Carrito y checkout
-estado: Draft
+estado: Approved
 servicio: E-commerce
 prefijo: CAR
 origen: [RF03, RF04, RF28, NN02, NN13, NN15, NN18]
 calidad: [AC01, AC03, AC08, AC13, RNF01, RNF03, RNF13]
 depende: [ecommerce-catalogo, inventario-seleccion-fuente, identidad-seguridad, transversal-seguridad]
+aprobado_por: Diego Amiquero
+aprobado_en: 2026-10-16
 ---
 
 # Spec — Carrito y checkout

@@ -1,12 +1,14 @@
 ---
 id: inventario-fuentes
 titulo: Fuentes y stock vendible
-estado: Draft
+estado: Approved
 servicio: Inventario
 prefijo: FUE
 origen: [RF12, RF13, RF15, RF02, NN06, NN07, NN01]
 calidad: [AC01, AC02, AC04, RNF01, RNF02, RNF04, RNF05]
 depende: [identidad-seguridad, transversal-auditoria]
+aprobado_por: Diego Amiquero
+aprobado_en: 2026-10-16
 ---
 
 # Spec — Fuentes y stock vendible

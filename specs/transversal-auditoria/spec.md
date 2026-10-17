@@ -1,12 +1,14 @@
 ---
 id: transversal-auditoria
 titulo: Auditoría de operaciones sensibles
-estado: Draft
+estado: Approved
 servicio: Transversal
 prefijo: AUD
 origen: [RF20, NN09, NN18]
 calidad: [RNF08, RNF20, RNF23, AC03, AC05, AC11]
 depende: []
+aprobado_por: Diego Amiquero
+aprobado_en: 2026-10-16
 ---
 
 # Spec — Auditoría de operaciones sensibles

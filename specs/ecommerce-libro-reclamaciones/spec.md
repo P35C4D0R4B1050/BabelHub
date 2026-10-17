@@ -1,12 +1,14 @@
 ---
 id: ecommerce-libro-reclamaciones
 titulo: Libro de Reclamaciones virtual
-estado: Draft
+estado: Approved
 servicio: E-commerce
 prefijo: REC
 origen: [RF25, NN15]
 calidad: [RNF07, RNF08, RNF17, AC13]
 depende: [identidad-seguridad, transversal-notificaciones, transversal-auditoria, transversal-seguridad]
+aprobado_por: Diego Amiquero
+aprobado_en: 2026-10-16
 ---
 
 # Spec — Libro de Reclamaciones virtual

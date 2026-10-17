@@ -1,12 +1,14 @@
 ---
 id: web-indice-infinito
 titulo: El índice infinito (experimento opcional)
-estado: Draft
+estado: Approved
 servicio: Web
 prefijo: IND
 origen: [RF29, NN17]
 calidad: [AC08]
 depende: [web-base, transversal-seguridad]
+aprobado_por: Diego Amiquero
+aprobado_en: 2026-10-16
 ---
 
 # Spec — El índice infinito (experimento opcional)

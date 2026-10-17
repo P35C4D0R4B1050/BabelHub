@@ -1,12 +1,14 @@
 ---
 id: ecommerce-envios
 titulo: Guías de envío a domicilio
-estado: Draft
+estado: Approved
 servicio: E-commerce
 prefijo: ENV
 origen: [RF11, RF14, NN11, NN03]
 calidad: [AC03, RNF05]
 depende: [ecommerce-pedidos, ecommerce-carrito-checkout, inventario-seleccion-fuente, identidad-seguridad, transversal-notificaciones, transversal-auditoria, transversal-seguridad]
+aprobado_por: Diego Amiquero
+aprobado_en: 2026-10-16
 ---
 
 # Spec — Guías de envío a domicilio

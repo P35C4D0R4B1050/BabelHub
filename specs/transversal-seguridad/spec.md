@@ -1,12 +1,14 @@
 ---
 id: transversal-seguridad
 titulo: Seguridad transversal de la aplicación
-estado: Draft
+estado: Approved
 servicio: Transversal
 prefijo: SEG
 origen: [RNF16, RNF17, RNF20, RNF21, NN18]
 calidad: [AC05, AC13, RNF06]
 depende: [transversal-auditoria]
+aprobado_por: Diego Amiquero
+aprobado_en: 2026-10-16
 ---
 
 # Spec — Seguridad transversal de la aplicación

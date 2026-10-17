@@ -1,12 +1,14 @@
 ---
 id: inventario-ajustes
 titulo: Ajustes de inventario
-estado: Draft
+estado: Approved
 servicio: Inventario
 prefijo: AJU
 origen: [RF17, RF09, NN06]
 calidad: [AC01, RNF01, RNF05, RNF08]
 depende: [inventario-fuentes, identidad-seguridad, transversal-auditoria]
+aprobado_por: Diego Amiquero
+aprobado_en: 2026-10-16
 ---
 
 # Spec — Ajustes de inventario

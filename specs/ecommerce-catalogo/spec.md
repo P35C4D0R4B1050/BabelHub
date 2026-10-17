@@ -1,12 +1,14 @@
 ---
 id: ecommerce-catalogo
 titulo: Catálogo de obras y ediciones
-estado: Draft
+estado: Approved
 servicio: E-commerce
 prefijo: CAT
 origen: [RF01, RF02, RF10, RF24, NN01, NN08, NN13, NN14]
 calidad: [AC02, AC03, RNF03, RNF09]
 depende: [inventario-fuentes, transversal-auditoria]
+aprobado_por: Diego Amiquero
+aprobado_en: 2026-10-16
 ---
 
 # Spec — Catálogo de obras y ediciones

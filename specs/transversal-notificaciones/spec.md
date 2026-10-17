@@ -1,12 +1,14 @@
 ---
 id: transversal-notificaciones
 titulo: Avisos por WhatsApp
-estado: Draft
+estado: Approved
 servicio: Transversal
 prefijo: NOT
 origen: [RF07, RF16, NN03]
 calidad: [AC03, RNF03, RNF07, RNF08, RNF21]
 depende: [identidad-seguridad, transversal-seguridad]
+aprobado_por: Diego Amiquero
+aprobado_en: 2026-10-16
 ---
 
 # Spec — Avisos por WhatsApp

@@ -1,12 +1,14 @@
 ---
 id: inventario-seleccion-fuente
 titulo: Reservas y selección de fuente
-estado: Draft
+estado: Approved
 servicio: Inventario
 prefijo: SEL
 origen: [RF04, RF14, RF15, RF28, NN02, NN06, NN07, NN18]
 calidad: [AC01, AC06, AC13, RNF01, RNF09]
 depende: [inventario-fuentes, identidad-seguridad, transversal-auditoria, transversal-seguridad]
+aprobado_por: Diego Amiquero
+aprobado_en: 2026-10-16
 ---
 
 # Spec — Reservas y selección de fuente

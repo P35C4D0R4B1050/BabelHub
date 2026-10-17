@@ -1,12 +1,14 @@
 ---
 id: ecommerce-pagos
 titulo: Pagos con Yape y tarjeta
-estado: Draft
+estado: Approved
 servicio: E-commerce
 prefijo: PAG
 origen: [RF05, RF07, NN02]
 calidad: [AC01, AC03, AC05, AC13, RNF06, RNF07, RNF08, RNF21]
 depende: [ecommerce-carrito-checkout, identidad-seguridad, inventario-seleccion-fuente, transversal-auditoria]
+aprobado_por: Diego Amiquero
+aprobado_en: 2026-10-16
 ---
 
 # Spec — Pagos con Yape y tarjeta

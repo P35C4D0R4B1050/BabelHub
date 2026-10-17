@@ -1,12 +1,14 @@
 ---
 id: identidad-seguridad
 titulo: Identidad, roles y control de acceso
-estado: Draft
+estado: Approved
 servicio: Identidad
 prefijo: IDE
 origen: [RF18, RF19, RF26, RF27, RF28, NN09, NN15, NN18]
 calidad: [AC05, AC11, AC13, RNF05, RNF06, RNF07, RNF08, RNF15, RNF18, RNF22, RNF23]
 depende: [transversal-auditoria, transversal-seguridad]
+aprobado_por: Diego Amiquero
+aprobado_en: 2026-10-16
 ---
 
 # Spec — Identidad, roles y control de acceso

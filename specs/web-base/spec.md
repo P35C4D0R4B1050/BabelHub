@@ -1,12 +1,14 @@
 ---
 id: web-base
 titulo: Estructura base de la interfaz web
-estado: Draft
+estado: Approved
 servicio: Web
 prefijo: WEB
 origen: [RC01, RNF13, RF25, RF29, NN15, NN16, NN18]
 calidad: [AC05, AC08, AC10, AC13, AC14, RNF05, RNF06, RNF15, RNF16, RNF25, RNF26, RNF27]
 depende: [identidad-seguridad, ecommerce-libro-reclamaciones, ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-biblioteca-digital, transversal-auditoria, transversal-seguridad]
+aprobado_por: Diego Amiquero
+aprobado_en: 2026-10-16
 ---
 
 # Spec — Estructura base de la interfaz web

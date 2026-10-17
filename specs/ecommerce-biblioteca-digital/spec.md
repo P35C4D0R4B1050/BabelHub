@@ -1,12 +1,14 @@
 ---
 id: ecommerce-biblioteca-digital
 titulo: Biblioteca y descarga de libros digitales
-estado: Draft
+estado: Approved
 servicio: E-commerce
 prefijo: BIB
 origen: [RF22, RF23, RF24, NN13, NN15, NN18]
 calidad: [AC09, AC13, RNF14, RNF05, RNF08, RNF17]
 depende: [ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-pagos, transversal-auditoria, transversal-seguridad]
+aprobado_por: Diego Amiquero
+aprobado_en: 2026-10-16
 ---
 
 # Spec — Biblioteca y descarga de libros digitales

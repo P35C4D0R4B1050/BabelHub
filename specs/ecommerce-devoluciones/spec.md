@@ -1,12 +1,14 @@
 ---
 id: ecommerce-devoluciones
 titulo: Devoluciones y reembolsos
-estado: Draft
+estado: Approved
 servicio: E-commerce
 prefijo: DEV
 origen: [RF09, NN05, NN15]
 calidad: [AC01, AC09, RNF08]
 depende: [ecommerce-pedidos, ecommerce-pagos, ecommerce-biblioteca-digital, inventario-ajustes, transversal-auditoria, transversal-notificaciones, identidad-seguridad]
+aprobado_por: Diego Amiquero
+aprobado_en: 2026-10-16
 ---
 
 # Spec — Devoluciones y reembolsos
