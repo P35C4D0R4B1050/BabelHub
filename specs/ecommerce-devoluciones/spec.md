@@ -32,7 +32,7 @@ Que el cliente pueda devolver un impreso entregado o pedir el reembolso de un li
 | DEV-03 | No deseado | Si se solicitan más unidades de las compradas, ya devueltas o ya reembolsadas por una anulación, aunque la solicitud llegue a la vez que otra, entonces el sistema deberá rechazar la solicitud. | RF09, AC01 |
 | DEV-04 | Estado | Mientras no se haya entregado ningún enlace de descarga del acceso de un libro digital desde su concesión o reactivación y no hayan pasado 14 días calendario desde la aprobación del pago, el sistema deberá aprobar automáticamente la solicitud de reembolso de esa línea, con el responsable «sistema», revocando el acceso en la misma operación. | NN15 |
 | DEV-05 | No deseado | Si ya se entregó un enlace de descarga del libro digital, o pasaron más de 14 días calendario desde el pago, y el cliente no reporta un archivo defectuoso, entonces el sistema deberá rechazar el reembolso explicando la política. | NN15 |
-| DEV-06 | Evento | Cuando el cliente reporta un archivo defectuoso de un acceso suyo vigente, el sistema deberá registrar el reporte, suspender las descargas de ese acceso y dejar la solicitud para que la administración central la apruebe o la rechace. | NN15 |
+| DEV-06 | Evento | Cuando el cliente reporta, dentro de 30 días calendario desde el pago, un archivo defectuoso de un acceso suyo vigente, el sistema deberá registrar el reporte, suspender las descargas de ese acceso y dejar la solicitud para que la administración central la apruebe o la rechace. | NN15 |
 | DEV-07 | Evento | Cuando la sucursal receptora confirma la recepción de una devolución aprobada de un impreso, el sistema deberá pedir al inventario que reingrese las unidades a esa sucursal y, solo si lo logra, pasarla a recibida. | RF09 |
 | DEV-08 | Evento | Cuando una devolución de un impreso pasa a recibida, o se aprueba el reembolso de un libro digital, el sistema deberá solicitar a la pasarela el precio unitario por la cantidad devuelta, sin el envío y sin superar lo cobrado acumulado de esa línea, y pasar la línea a reembolsada solo cuando la pasarela confirme. | RF09 |
 | DEV-09 | Evento | Cuando se aprueba el reembolso de una línea digital, el sistema deberá revocar su acceso antes de pedir el reembolso a la pasarela, mantenerlo revocado aunque el reembolso falle y no reingresar stock. | RF09, NN15 |
@@ -44,9 +44,9 @@ Que el cliente pueda devolver un impreso entregado o pedir el reembolso de un li
 | DEV-15 | No deseado | Si se solicita la devolución de un impreso cuya línea fue entregada hace más de 15 días calendario, en hora de Lima, entonces el sistema deberá rechazar la solicitud indicando el plazo. | RF09, NN05 |
 | DEV-16 | No deseado | Si la confirmación de la recepción y el vencimiento del plazo de DEV-14 ocurren a la vez, entonces el sistema deberá aplicar solo el primero que confirma y rechazar el otro por estado inválido. | RF09, AC01 |
 | DEV-17 | No deseado | Si se repite la aprobación, la recepción o el reembolso de una línea, entonces el sistema deberá no reembolsar ni reingresar dos veces, usando una clave de idempotencia por devolución y línea. | RF09, AC01 |
-| DEV-18 | Ubicuo | El sistema deberá permitir volver a solicitar una línea cuya devolución fue rechazada, por plazo o por decisión, si aún está dentro del plazo de DEV-15 (o de DEV-04 en un digital), y no contarla como devuelta para DEV-03. | RF09 |
+| DEV-18 | Ubicuo | El sistema deberá permitir volver a solicitar una línea cuya devolución fue rechazada, por plazo o por decisión, si aún está dentro del plazo de DEV-15 (o de DEV-06 en un digital, repitiendo un reporte rechazado), y no contarla como devuelta para DEV-03. | RF09 |
 | DEV-19 | No deseado | Si se solicita la devolución de una línea anulada, ya reembolsada o con el acceso digital revocado, entonces el sistema deberá rechazar la solicitud sin crear un segundo reembolso. | RF09, AC01 |
-| DEV-20 | No deseado | Si la entrega de un enlace de descarga y la aprobación automática del reembolso de DEV-04 ocurren a la vez, entonces el sistema deberá aplicar solo la primera que confirma y tratar la otra según su estado. | NN15, AC01 |
+| DEV-20 | No deseado | Si la entrega de un enlace de descarga y la aprobación automática del reembolso de DEV-04 ocurren a la vez, entonces el sistema deberá aplicar solo la primera que confirma y rechazar la otra por estado inválido. | NN15, AC01 |
 | DEV-21 | No deseado | Si falla la solicitud de reembolso a la pasarela, entonces el sistema deberá mantener la línea con el reembolso pendiente, visible para la administración, y permitir reintentarlo sin repetir los pasos ya hechos. | RF09, AC03 |
 | DEV-22 | No deseado | Si se reporta un archivo defectuoso de un acceso ya revocado, suspendido o con una solicitud abierta, entonces el sistema deberá rechazar el reporte sin crear otro. | NN15 |
 
@@ -76,7 +76,8 @@ Que el cliente pueda devolver un impreso entregado o pedir el reembolso de un li
 | AC-DEV-20 | DEV-21 | **Dado** que la pasarela no responde, **cuando** una devolución llega a recibida, **entonces** la línea queda con el reembolso pendiente, visible para la administración, y al reintentar se reembolsa una sola vez. |
 | AC-DEV-21 | DEV-22 | **Dado** un acceso suspendido con un reporte abierto, **cuando** el cliente reporta otra vez, **entonces** se rechaza sin crear otro reporte. |
 | AC-DEV-22 | DEV-04, DEV-05 | **Dado** un libro digital sin enlaces comprado hace 15 días, **cuando** el cliente pide el reembolso sin reportar defecto, **entonces** se rechaza por plazo; y con 14 días exactos se aprueba. |
-| AC-DEV-23 | DEV-06, DEV-13 | **Dado** un reporte de archivo defectuoso, **cuando** un encargado de sucursal intenta decidirlo, **entonces** se rechaza por falta de permiso; y la administración central puede aprobarlo o rechazarlo. |
+| AC-DEV-23 | DEV-06 | **Dado** un reporte de archivo defectuoso, **cuando** un encargado de sucursal intenta decidirlo, **entonces** se rechaza por falta de permiso; y la administración central puede aprobarlo o rechazarlo. |
+| AC-DEV-24 | DEV-06, DEV-18 | **Dado** un acceso pagado hace 31 días, **cuando** el cliente reporta un archivo defectuoso, **entonces** se rechaza por plazo; y con 30 días exactos se registra, y si la administración lo rechaza puede repetirse solo dentro de ese plazo. |
 
 ## 5. Reglas e invariantes
 
@@ -99,6 +100,7 @@ Que el cliente pueda devolver un impreso entregado o pedir el reembolso de un li
 
 ## 7. Preguntas abiertas
 
+- [x] ¿Hasta cuándo se puede reportar un archivo defectuoso? Resuelto el 2026-10-16: 30 días calendario desde el pago (DEV-06); a verificar con B09.
 - [x] ¿Tiene plazo el reembolso automático de un libro digital? Resuelto el 2026-10-16: 14 días calendario desde la aprobación del pago (DEV-04, DEV-05); a verificar con B09.
 - [x] ¿Quién aprueba el reembolso de un libro digital? Resuelto el 2026-10-16: automático si no se entregó ningún enlace de descarga (responsable «sistema»); un reporte de archivo defectuoso lo decide la administración (DEV-04, DEV-06).
 - [x] ¿Qué es la sucursal receptora? Resuelto el 2026-10-16: la que elige el cliente al solicitar (DEV-01, DEV-13).

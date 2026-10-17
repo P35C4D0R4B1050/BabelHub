@@ -32,7 +32,7 @@ Completar el ciclo de entrega fuera de la tienda: cuando un pedido es a domicili
 | ENV-03 | Ubicuo | El sistema deberá gestionar los estados pendiente de guía, guía generada, en reparto y entregado, y permitir solo las transiciones en ese orden, además de cancelado desde pendiente de guía o guía generada. | RF11 |
 | ENV-04 | No deseado | Si el operador no responde o rechaza la solicitud, entonces el sistema deberá mantener el envío pendiente, mostrar el error y permitir reintentar. | RF11, AC03 |
 | ENV-05 | Evento | Cuando un cliente consulta su pedido a domicilio, el sistema deberá mostrar el estado del envío y su número de guía. | RF11, NN03 |
-| ENV-06 | Evento | Cuando el envío pasa a guía generada, en reparto o entregado, el sistema deberá notificar al cliente con un solo aviso por cambio, que reemplaza al aviso genérico de cambio de línea de `ecommerce-pedidos`. | RF11, NN03 |
+| ENV-06 | Evento | Cuando el envío pasa a guía generada, en reparto o entregado, el sistema deberá notificar al cliente con un solo aviso por cambio, que reemplaza al aviso genérico de cambio de línea de `ecommerce-pedidos` (que sí se conserva para la sucursal de la fuente), y avisarle también cuando el envío pasa a cancelado. | RF11, NN03 |
 | ENV-07 | Evento | Cuando un envío pasa a entregado, el sistema deberá marcar sus líneas como entregadas, con la fecha de esa entrega, y dejar que el estado del pedido se derive según `ecommerce-pedidos`. | RF11 |
 | ENV-08 | Ubicuo | El sistema deberá permitir gestionar envíos solo a logística y a la administración central. | RNF05 |
 | ENV-09 | Ubicuo | El sistema deberá excluir de los envíos las líneas digitales. | RF11 |
@@ -59,6 +59,8 @@ Completar el ciclo de entrega fuera de la tienda: cuando un pedido es a domicili
 | AC-ENV-11 | ENV-12 | **Dado** que el inventario no responde, **cuando** logística pasa el envío a en reparto, **entonces** el envío sigue en guía generada, se muestra el error y al reintentar con el inventario disponible el descuento se aplica una sola vez. |
 | AC-ENV-12 | ENV-13, ENV-03 | **Dado** un pedido con un envío en reparto y otro pendiente de guía, **cuando** se anula el pedido, **entonces** el pendiente pasa a cancelado, el que está en reparto sigue y queda una entrada de auditoría; y un envío entregado no puede cancelarse. |
 | AC-ENV-13 | ENV-14 | **Dado** un envío en reparto, **cuando** logística lo marca entregado, **entonces** queda la fecha de entrega y una entrada de auditoría con el responsable. |
+| AC-ENV-15 | ENV-02 | **Dado** un envío pendiente, **cuando** dos solicitudes de guía llegan a la vez, **entonces** se genera una sola guía; y al operador solo se le envían el nombre, la dirección y el teléfono del destinatario. |
+| AC-ENV-16 | ENV-11, ENV-12 | **Dado** un envío con guía generada, **cuando** se pasa dos veces a en reparto, **entonces** el físico se descuenta una sola vez. |
 ## 5. Reglas e invariantes
 
 - Estados en orden: pendiente de guía → guía generada → en reparto → entregado.

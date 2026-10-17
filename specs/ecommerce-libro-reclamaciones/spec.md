@@ -43,8 +43,8 @@ Que cualquier consumidor pueda registrar un reclamo o una queja desde la tienda,
 | REC-13 | No deseado | Si falla el envío del correo de respuesta, entonces el sistema deberá mantener la hoja como respondida con la respuesta guardada, marcar el aviso como pendiente y permitir a la administración reintentarlo. | RF25 |
 | REC-14 | Evento | Cuando un consumidor con una sesión de correo verificado consulta sus hojas, el sistema deberá listar las hojas cuyo correo de contacto coincide con el suyo, con su número, fecha, estado y respuesta. | RF25, RNF07 |
 | REC-15 | Evento | Cuando la administración central consulta los datos personales de una hoja, el sistema deberá registrarlo en la auditoría. | RNF08, AC11 |
-| REC-16 | Ubicuo | El sistema deberá gestionar los estados pendiente, respondido y descartado de una hoja, y rechazar responder una hoja que ya está respondida o descartada. | RF25 |
-| REC-17 | Evento | Cuando una hoja cumple su plazo de conservación, el sistema deberá anonimizar sus datos personales y conservar el resto de la hoja. | RF25, RNF07 |
+| REC-16 | Ubicuo | El sistema deberá gestionar los estados pendiente, respondido y descartado de una hoja, permitir descartar solo una hoja pendiente y rechazar responder una hoja respondida o descartada, aunque dos respuestas lleguen a la vez. | RF25, AC01 |
+| REC-17 | Evento | Cuando una hoja cumple dos años desde su registro, el sistema deberá anonimizar sus datos personales y redactar los que haya en el detalle y la respuesta, conservar el resto de la hoja, y registrar el proceso en la auditoría. | RF25, RNF07, RNF08 |
 | REC-18 | Ubicuo | El sistema deberá permitir a quien registró una hoja sin sesión ver su constancia en el momento del registro, y no mostrarle los datos de otra hoja por su número. | RF25, RNF07 |
 
 ## 4. Criterios de aceptación
@@ -64,8 +64,8 @@ Que cualquier consumidor pueda registrar un reclamo o una queja desde la tienda,
 | AC-REC-11 | REC-13 | **Dado** que el envío de correo falla, **cuando** la administración responde una hoja, **entonces** la hoja queda respondida con su respuesta guardada, el aviso figura pendiente y al reintentar con el envío disponible el consumidor recibe el correo una sola vez. |
 | AC-REC-12 | REC-14 | **Dado** un cliente con el correo verificado que dejó dos hojas con ese correo, **cuando** consulta sus hojas, **entonces** ve esas dos con su estado y respuesta, y ninguna de otro correo. |
 | AC-REC-13 | REC-15 | **Dado** una hoja con datos personales, **cuando** un administrador central la abre, **entonces** queda una entrada de auditoría con el usuario y el número de hoja. |
-| AC-REC-14 | REC-16 | **Dado** una hoja respondida y otra descartada, **cuando** la administración intenta responderlas, **entonces** se rechaza por estado inválido; y el correo de respuesta no incluye el documento ni el domicilio. |
-| AC-REC-15 | REC-17 | **Dado** una hoja que cumplió dos años, **cuando** corre la revisión de conservación, **entonces** su nombre, documento, domicilio y correo quedan anonimizados y el número, la fecha, el tipo y el estado se conservan. |
+| AC-REC-14 | REC-07, REC-16 | **Dado** una hoja respondida y otra descartada, **cuando** la administración intenta responderlas, **entonces** se rechaza por estado inválido; y el correo de respuesta no incluye el documento ni el domicilio. |
+| AC-REC-15 | REC-17 | **Dado** una hoja que cumplió dos años, **cuando** corre la revisión de conservación, **entonces** su nombre, documento, domicilio y correo quedan anonimizados y el número, la fecha, el tipo y el estado se conservan; los datos personales escritos en el detalle y la respuesta se redactan y el proceso queda en la auditoría. |
 | AC-REC-16 | REC-18, REC-10 | **Dado** un visitante que acaba de registrar una hoja, **cuando** consulta otra por su número, **entonces** se rechaza; y un encargado de sucursal o logística tampoco puede ver los datos de ninguna hoja. |
 
 ## 5. Reglas e invariantes
