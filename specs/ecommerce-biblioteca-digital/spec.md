@@ -6,7 +6,7 @@ servicio: E-commerce
 prefijo: BIB
 origen: [RF22, RF23, RF24, NN13, NN15, NN18]
 calidad: [AC09, AC13, RNF14, RNF05, RNF08, RNF17]
-depende: [ecommerce-catalogo, ecommerce-pagos, transversal-auditoria, transversal-seguridad]
+depende: [ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-pagos, transversal-auditoria, transversal-seguridad]
 ---
 
 # Spec — Biblioteca y descarga de libros digitales
@@ -48,7 +48,9 @@ Entregar al instante los libros digitales comprados y protegerlos: el archivo so
 | BIB-19 | No deseado | Si se repite la aprobación del pago de una línea digital, entonces el sistema deberá no conceder un segundo acceso. | RF22, AC01 |
 | BIB-20 | Evento | Cuando un cliente vuelve a comprar un libro digital cuyo acceso fue revocado, el sistema deberá reactivar ese acceso y reiniciar su contador de descargas; si el acceso sigue vigente, deberá rechazar la compra repetida según `ecommerce-carrito-checkout`. | RF22 |
 | BIB-21 | Evento | Cuando la administración resuelve un reporte de archivo defectuoso, el sistema deberá reanudar el acceso si se rechaza el reporte, o dejarlo revocado si se aprueba el reembolso, y registrarlo en la auditoría. | RF23, RNF08 |
-| BIB-22 | Ubicuo | El sistema deberá informar a `ecommerce-devoluciones` si a un acceso se le entregó algún enlace de descarga, con independencia de que se haya usado. | RF23, NN15 |
+| BIB-22 | Ubicuo | El sistema deberá informar a `ecommerce-devoluciones` si a un acceso se le entregó algún enlace de descarga desde su concesión o su última reactivación, con independencia de que se haya usado. | RF23, NN15 |
+| BIB-23 | No deseado | Si la entrega de un enlace de descarga y la revocación o aprobación automática del reembolso de un mismo acceso ocurren a la vez, entonces el sistema deberá aplicar solo la primera que confirma y rechazar la otra. | RF23, AC01 |
+| BIB-24 | Evento | Cuando una anulación, un reembolso o una decisión de la administración revoca un acceso, el sistema deberá dejarlo revocado una sola vez aunque se repita la orden, y registrar quién lo revocó y el motivo en la auditoría. | RF23, RNF08 |
 
 ## 4. Criterios de aceptación
 
@@ -72,7 +74,9 @@ Entregar al instante los libros digitales comprados y protegerlos: el archivo so
 | AC-BIB-16 | BIB-10, BIB-21 | **Dado** un acceso suspendido por un reporte de archivo defectuoso, **cuando** el titular intenta descargar, **entonces** se rechaza; y si la administración rechaza el reporte, el acceso se reanuda, y si aprueba el reembolso, queda revocado, con auditoría. |
 | AC-BIB-17 | BIB-19 | **Dado** una aprobación de pago que llega dos veces, **cuando** se procesan ambas, **entonces** existe un solo acceso. |
 | AC-BIB-18 | BIB-20 | **Dado** un acceso revocado por reembolso con 4 descargas usadas, **cuando** el cliente vuelve a comprar el libro, **entonces** el acceso se reactiva con 0 descargas usadas. |
-| AC-BIB-19 | BIB-22 | **Dado** un acceso con un enlace entregado y no usado, **cuando** devoluciones pregunta, **entonces** se informa que sí se entregó un enlace; y con ninguno entregado, que no. |
+| AC-BIB-19 | BIB-22 | **Dado** un acceso con un enlace entregado y no usado, **cuando** devoluciones pregunta, **entonces** se informa que sí se entregó un enlace; con ninguno entregado, que no; y tras una reactivación por recompra, solo cuentan los enlaces posteriores. |
+| AC-BIB-20 | BIB-23 | **Dado** un acceso sin enlaces, **cuando** el titular pide descargar a la vez que se aprueba su reembolso automático, **entonces** solo uno gana: o recibe el enlace y el reembolso se rechaza, o queda revocado y la descarga se rechaza. |
+| AC-BIB-21 | BIB-24 | **Dado** un acceso revocado por una anulación, **cuando** llega otra orden de revocación, **entonces** sigue revocado una sola vez y la auditoría conserva el primer responsable y motivo. |
 
 ## 5. Reglas e invariantes
 
@@ -87,6 +91,8 @@ Entregar al instante los libros digitales comprados y protegerlos: el archivo so
 - Dos solicitudes simultáneas con una sola descarga restante: solo una obtiene el enlace.
 - Un cliente que pierde el archivo con el límite alcanzado pide ayuda (BIB-16) y la administración decide si restituye descargas (BIB-08).
 - Una descarga interrumpida puede reintentarse con el mismo enlace mientras no venza; pasada su vigencia, pide un enlace nuevo, que cuenta, y la ayuda de BIB-16 cubre los casos restantes.
+- **Riesgo aceptado:** comprar, descargar, obtener un reembolso por defecto y recomprar reinicia el contador; la aprobación de un defecto por la administración y la auditoría son el freno.
+- Si el archivo falta en el almacén (BIB-13), «reportarlo» registra una ayuda (BIB-16); como no se entregó enlace, el cliente puede además pedir el reembolso automático dentro de su plazo (`ecommerce-devoluciones`).
 - **Riesgo aceptado:** quien reciba un enlace de otra persona puede descargar durante sus cinco minutos de vigencia; se limita con la vigencia corta, el cupo y el registro de cada descarga.
 - Un mensaje de aviso por WhatsApp nunca incluye el enlace de descarga (`transversal-notificaciones`).
 
