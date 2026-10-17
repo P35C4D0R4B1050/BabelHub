@@ -247,6 +247,23 @@ Sin pregunta (criterio técnico): reasignación al perder la última unidad (SEL
 
 **Supuestos a confirmar:** carrito de visitante de 30 días y 50 líneas (CAR-29); disponibilidad en caché de hasta 10 minutos (CAT-12).
 
+### 7.13 Revisión de devoluciones, biblioteca, envíos y reclamaciones (2026-10-16)
+
+`spec-auditor` revisó las cuatro specs («necesita otra vuelta»). Decisiones del responsable aplicadas:
+
+| Hallazgo | Decisión | Dónde quedó |
+| :-- | :-- | :-- |
+| Aprobación del reembolso digital | Automática si no se entregó ningún enlace de descarga (responsable «sistema»); el reporte de archivo defectuoso suspende las descargas y lo decide la administración. | DEV-04 a DEV-06, BIB-10, BIB-21, BIB-22 |
+| Sucursal receptora y plazo | La elige el cliente; los 15 días cuentan desde la entrega de la línea, en hora de Lima. | DEV-01, DEV-13 a DEV-15 |
+| Devolución mixta | Una devolución por tipo, con estado por línea. | DEV-01, DEV-10 |
+| Reembolso | Precio unitario por las unidades devueltas, sin envío; reingreso antes de la recepción; idempotencia y carreras. | DEV-07, DEV-08, DEV-16, DEV-17 |
+| Recompra de un acceso revocado | Reactiva el acceso y reinicia las descargas. | BIB-20 |
+| Anulación con varios envíos | Se anula lo que no salió y se cancelan esos envíos. | PED-27, ENV-03, ENV-13 |
+| Consulta de hojas | El consumidor con correo verificado ve las suyas; la consulta del administrador se audita. | REC-10, REC-14, REC-15 |
+| Sin pregunta (criterio técnico) | Idempotencia del acceso (BIB-19), auditoría de entrega y alcance de logística (ENV-14, ENV-15), límite de hojas como «No deseado» (REC-11), nueva devolución tras rechazo por plazo (DEV-18). | specs |
+
+**Supuestos a confirmar:** «dispositivo reconocido» y «región habitual» del cambio de correo; el envío cancelado con guía ya generada se avisa al operador a mano.
+
 **Siguen abiertos de R3:** custodia de la clave de firma (plan) y S9 (dónde viven los contadores de límites, plan). Quedan además las preguntas abiertas de confirmación en cada spec (valores propuestos y las nuevas de esta ronda), que son las que impiden pasar a `Approved`.
 
 ## 8. Orden de resolución propuesto
