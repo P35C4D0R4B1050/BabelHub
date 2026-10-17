@@ -215,6 +215,22 @@ Riesgo aceptado nuevo: los límites por origen pueden bloquear a varias personas
 
 Sin pregunta (criterio técnico): reasignación al perder la última unidad (SEL-26), atomicidad de recepción y despacho (TRA-07, TRA-08), traslado por fuente y edición (SEL-03), domicilio sin traslado y una línea en una sola fuente (SEL-24, SEL-25), alcance y validaciones de traslados (TRA-09, TRA-20), fecha estimada (TRA-21), auditoría de movimientos (SEL-32), cobertura de criterios de concurrencia, `cerrada` como estado de reserva y dependencias de identidad. **Supuesto a confirmar:** un encargado solo puede solicitar traslados hacia su propia sucursal (TRA-20).
 
+### 7.11 Revisión de Identidad, avisos y Web (2026-10-16)
+
+`spec-auditor` revisó `identidad-seguridad`, `transversal-notificaciones` y `web-base` («necesita otra vuelta»). Decisiones del responsable aplicadas:
+
+| Hallazgo | Decisión | Dónde quedó |
+| :-- | :-- | :-- |
+| Cancelación de cuenta con pendientes | Se aplaza hasta cerrarlos (no se rechaza), exige contraseña y segundo factor, revoca renovaciones y cancela avisos. | IDE-27, IDE-28, IDE-47, IDE-48 |
+| Renovación y tope absoluto | La renovación es opaca y hereda el vencimiento absoluto; si Identidad la rechaza, la Web cierra la sesión. | IDE-02, IDE-46, WEB-31, WEB-32 |
+| Reto del segundo factor | 5 minutos entre contraseña y código; 10 fallos por hora por cuenta bloquean 15 minutos (también los códigos de respaldo). | IDE-42, SEG-29 |
+| Cambio de correo | **Según riesgo, propuesta del responsable:** desde un dispositivo reconocido y una región habitual se aplica y avisa a la cuenta y al correo nuevo, sin alertar al anterior; desde uno inusual no se aplica, se congelan los cambios sensibles del dispositivo, se alerta por todos los medios y el titular lo confirma o rechaza en 24 horas. | IDE-53 a IDE-55, AM27 |
+| Correo verificado en Ventas | Dato en la credencial de acceso (desfase máximo de 15 minutos). | IDE-02, IDE-16 |
+| Textos legales | Identidad guarda la versión vigente y valida; sin aceptar la nueva no se paga ni se hacen cambios sensibles, y se pide también al renovar la sesión. | IDE-43, IDE-57, IDE-58 |
+| Sin pregunta (criterio técnico) | Reconsentimiento de WhatsApp al cambiar de número; el administrador no opera sobre sí mismo ni sobre el último administrador; contraseña temporal; lista de contraseñas y normalización; reenviar código; regenerar respaldos; cerrar todas las sesiones; estados de aviso, reintentos y desactivación de un número; pantallas obligatorias previas y de cuenta en `web-base`; dependencias. | IDE-31, IDE-49, IDE-23, IDE-59, IDE-56, IDE-52, IDE-60, NOT-04 a NOT-13, WEB-33 a WEB-35 |
+
+**Supuestos a confirmar:** «dispositivo reconocido» es una marca emitida en un ingreso completo anterior y «región habitual» la que entrega el borde (no se guarda la ubicación exacta); la verificación de propiedad del número de WhatsApp queda como riesgo aceptado.
+
 **Siguen abiertos de R3:** custodia de la clave de firma (plan) y S9 (dónde viven los contadores de límites, plan). Quedan además las preguntas abiertas de confirmación en cada spec (valores propuestos y las nuevas de esta ronda), que son las que impiden pasar a `Approved`.
 
 ## 8. Orden de resolución propuesto
