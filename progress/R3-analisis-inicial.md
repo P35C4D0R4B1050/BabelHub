@@ -231,6 +231,22 @@ Sin pregunta (criterio técnico): reasignación al perder la última unidad (SEL
 
 **Supuestos a confirmar:** «dispositivo reconocido» es una marca emitida en un ingreso completo anterior y «región habitual» la que entrega el borde (no se guarda la ubicación exacta); la verificación de propiedad del número de WhatsApp queda como riesgo aceptado.
 
+### 7.12 Revisión de catálogo, carrito, pagos y pedidos (2026-10-16)
+
+`spec-auditor` revisó las cuatro specs («necesita otra vuelta»; bloqueantes: ciclo de la línea e idempotencia sin entidad previa). Decisiones del responsable aplicadas:
+
+| Hallazgo | Decisión | Dónde quedó |
+| :-- | :-- | :-- |
+| Ciclo de la línea con traslado | confirmado → en tránsito → en preparación → listo; PED-10 por línea. | PED-02, PED-10, PED-19 |
+| Cobro sin entidad previa | Intención de pago con un intento y clave por medio de pago y un solo cobro pendiente o aprobado. | PAG-16, PAG-17; CAR-10 |
+| Reembolso del envío | Solo al anular o cancelar todo antes de que salga. | PED-17, PED-22 |
+| Anulación de un mixto con digital descargado | La administración anula todo, revoca y reembolsa; no procede con líneas despachadas o entregadas (devolución). | PED-22, PED-23 |
+| Pago pendiente solo digital | Se consulta cada minuto y vence a los 30 minutos; si se aprueba después, se reembolsa. | PAG-18, PAG-15 |
+| Fusión de carritos | Se ajusta al máximo con aviso y se descartan los digitales poseídos o dados de baja. | CAR-24 |
+| Sin pregunta (criterio técnico) | Estado del pedido derivado (PED-20), carreras sobre una línea (PED-21), reembolso pendiente reintentable (PED-24), fallo del inventario al entregar (PED-25), compensación del pago (PAG-20), verificación de notificaciones (PAG-19), correo verificado en Pagos (PAG-21), territorio como «incluye Perú» (CAT-07), formato de ISBN y baja de ediciones (CAT-17 a CAT-19), pagos pendientes en pantalla (CAR-25, CAR-26), reserva rechazada o reasignada (CAR-27), copia de título, ISBN y precio en la línea (PED-01). | specs |
+
+**Supuestos a confirmar:** carrito de visitante de 30 días y 50 líneas (CAR-29); disponibilidad en caché de hasta 10 minutos (CAT-12).
+
 **Siguen abiertos de R3:** custodia de la clave de firma (plan) y S9 (dónde viven los contadores de límites, plan). Quedan además las preguntas abiertas de confirmación en cada spec (valores propuestos y las nuevas de esta ronda), que son las que impiden pasar a `Approved`.
 
 ## 8. Orden de resolución propuesto
