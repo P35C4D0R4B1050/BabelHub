@@ -48,11 +48,12 @@ Que el cliente vea siempre en qué estado está su compra, incluso cuando viaja 
 | PED-19 | Ubicuo | El sistema deberá llevar una línea con traslado de confirmada a en tránsito entre sucursales y, al recibirse el traslado, dejarla lista para prepararse, y una línea sin traslado de confirmada a en preparación. | RF06 |
 | PED-20 | Ubicuo | El sistema deberá derivar el estado del pedido así: anulado si todas sus líneas lo están; entregado si todas están entregadas; no recogido si alguna lo está y las demás están entregadas o no recogidas; y, en otro caso, el de su línea impresa menos avanzada, ignorando las digitales ya disponibles. | RF06 |
 | PED-21 | No deseado | Si dos operaciones compiten por una misma línea (cancelación del cliente, anulación, preparación o despacho del traslado), entonces el sistema deberá aplicar la primera que confirma y rechazar las demás por estado inválido, sin efectos parciales. | RF06, AC01 |
-| PED-22 | Evento | Cuando se anula un pedido, el sistema deberá revocar sus accesos digitales, aunque se hayan descargado, y solicitar el reembolso del total pagado, incluido el envío si ninguna línea impresa salió. | RF20, NN09 |
-| PED-23 | No deseado | Si se intenta anular un pedido con una línea impresa despachada o entregada, entonces el sistema deberá rechazar la anulación e indicar que corresponde una devolución. | RF06, NN09 |
+| PED-22 | Evento | Cuando se anula un pedido, el sistema deberá revocar los accesos digitales anulados, aunque se hayan descargado, y solicitar el reembolso de las líneas anuladas, incluido el envío si ninguna línea impresa salió. | RF20, NN09 |
+| PED-23 | No deseado | Si se intenta anular un pedido cuyas líneas impresas ya están todas despachadas o entregadas, entonces el sistema deberá rechazar la anulación e indicar que corresponde una devolución. | RF06, NN09 |
 | PED-24 | No deseado | Si falla la solicitud de reembolso de una anulación, entonces el sistema deberá mantener el pedido anulado con el reembolso pendiente, visible para la administración, y permitir reintentarlo sin repetir los pasos ya hechos. | RF06, AC03 |
 | PED-25 | No deseado | Si el inventario no responde o rechaza el descuento al entregar, entonces el sistema deberá mantener la línea como estaba, informar el error y permitir reintentar sin descontar dos veces. | RF06, AC03 |
 | PED-26 | Ubicuo | El sistema deberá mostrar a logística los pedidos a domicilio de toda la red y a la administración central todos los pedidos. | RNF05, NN09 |
+| PED-27 | Evento | Cuando se anula un pedido con envíos de varias fuentes en los que algún impreso ya salió, el sistema deberá anular solo las líneas que no salieron, mantener las que salieron y cancelar los envíos que no salieron según `ecommerce-envios`. | RF06, NN09 |
 
 ## 4. Criterios de aceptación
 
@@ -77,6 +78,7 @@ Que el cliente vea siempre en qué estado está su compra, incluso cuando viaja 
 | AC-PED-17 | PED-21 | **Dado** una línea confirmada, **cuando** el cliente la cancela a la vez que el encargado la prepara, o la administración la anula, **entonces** se aplica solo la primera que confirma, la otra se rechaza por estado inválido y una doble cancelación no reembolsa dos veces. |
 | AC-PED-18 | PED-23 | **Dado** un pedido con un impreso entregado, **cuando** la administración intenta anularlo, **entonces** se rechaza indicando que corresponde una devolución. |
 | AC-PED-19 | PED-24 | **Dado** que la pasarela no responde, **cuando** la administración anula un pedido pagado, **entonces** el pedido queda anulado con el reembolso pendiente, visible para la administración, y al reintentar se reembolsa una sola vez. |
+| AC-PED-27 | PED-27, PED-22 | **Dado** un pedido a domicilio con un impreso en reparto desde Cusco y otro confirmado en Ayacucho, **cuando** la administración lo anula, **entonces** solo se anula la línea de Ayacucho, se cancela su envío, se reembolsa esa línea y la de Cusco sigue su curso. |
 
 ## 5. Reglas e invariantes
 

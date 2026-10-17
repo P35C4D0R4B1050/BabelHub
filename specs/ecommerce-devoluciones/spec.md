@@ -6,7 +6,7 @@ servicio: E-commerce
 prefijo: DEV
 origen: [RF09, NN05, NN15]
 calidad: [AC01, AC09, RNF08]
-depende: [ecommerce-pedidos, ecommerce-pagos, ecommerce-biblioteca-digital, inventario-ajustes, transversal-auditoria]
+depende: [ecommerce-pedidos, ecommerce-pagos, ecommerce-biblioteca-digital, inventario-ajustes, transversal-auditoria, transversal-notificaciones]
 ---
 
 # Spec — Devoluciones y reembolsos
@@ -27,58 +27,72 @@ Que el cliente pueda devolver un impreso entregado o pedir el reembolso de un li
 
 | ID | Patrón | Requisito | Origen |
 | :--- | :--- | :--- | :--- |
-| DEV-01 | Evento | Cuando un cliente solicita una devolución, el sistema deberá registrar las líneas, las cantidades y el motivo en estado solicitada. | RF09 |
-| DEV-02 | No deseado | Si se solicita la devolución de una línea impresa de un pedido que aún no está entregado, entonces el sistema deberá rechazar la solicitud. | RF09 |
-| DEV-03 | No deseado | Si se solicitan más unidades de las compradas o ya devueltas, entonces el sistema deberá rechazar la solicitud. | RF09 |
-| DEV-04 | Estado | Mientras el libro digital no fue descargado, el sistema deberá aceptar la solicitud de reembolso de esa línea. | NN15 |
-| DEV-05 | No deseado | Si el libro digital ya fue descargado y el cliente no reporta un archivo defectuoso, entonces el sistema deberá rechazar el reembolso explicando la política. | NN15 |
-| DEV-06 | Evento | Cuando el cliente reporta un archivo defectuoso, el sistema deberá registrar el reporte y tratar el reembolso como aceptable. | NN15 |
-| DEV-07 | Evento | Cuando se aprueba la devolución de un impreso y la sucursal receptora confirma su recepción, el sistema deberá pedir al inventario que reingrese las unidades a esa sucursal. | RF09 |
-| DEV-08 | Evento | Cuando la sucursal confirma la recepción de un impreso devuelto y aprobado, o se aprueba el reembolso de un libro digital, el sistema deberá solicitar el monto de la línea a la pasarela de pago. | RF09 |
-| DEV-09 | Evento | Cuando se reembolsa una línea digital, el sistema deberá revocar el acceso y no reingresar stock. | RF09, NN15 |
-| DEV-10 | Ubicuo | El sistema deberá gestionar los estados solicitada, aprobada o rechazada, recibida (solo impresos) y reembolsada, con fecha y responsable en cada cambio. | RF09 |
+| DEV-01 | Evento | Cuando un cliente solicita una devolución, el sistema deberá registrar, de un solo tipo (impreso o digital), las líneas, las cantidades, el motivo y, para un impreso, la sucursal receptora que eligió, con cada línea en estado solicitada. | RF09 |
+| DEV-02 | No deseado | Si se solicita la devolución de una línea impresa que aún no está entregada, entonces el sistema deberá rechazar la solicitud. | RF09 |
+| DEV-03 | No deseado | Si se solicitan más unidades de las compradas o ya devueltas, aunque la solicitud llegue a la vez que otra, entonces el sistema deberá rechazar la solicitud. | RF09, AC01 |
+| DEV-04 | Estado | Mientras no se haya entregado ningún enlace de descarga del acceso de un libro digital, el sistema deberá aprobar automáticamente la solicitud de reembolso de esa línea, con el responsable «sistema». | NN15 |
+| DEV-05 | No deseado | Si ya se entregó un enlace de descarga del libro digital y el cliente no reporta un archivo defectuoso, entonces el sistema deberá rechazar el reembolso explicando la política. | NN15 |
+| DEV-06 | Evento | Cuando el cliente reporta un archivo defectuoso de un acceso suyo, el sistema deberá registrar el reporte, suspender las descargas de ese acceso y dejar la solicitud para que la administración la apruebe o la rechace. | NN15 |
+| DEV-07 | Evento | Cuando la sucursal receptora confirma la recepción de una devolución aprobada de un impreso, el sistema deberá pedir al inventario que reingrese las unidades a esa sucursal y, solo si lo logra, pasarla a recibida. | RF09 |
+| DEV-08 | Evento | Cuando una devolución de un impreso pasa a recibida, o se aprueba el reembolso de un libro digital, el sistema deberá solicitar a la pasarela el precio unitario por la cantidad devuelta, sin el envío y sin superar lo cobrado acumulado de esa línea. | RF09 |
+| DEV-09 | Evento | Cuando se aprueba el reembolso de una línea digital, el sistema deberá revocar su acceso antes de pedir el reembolso a la pasarela, mantenerlo revocado aunque el reembolso falle y no reingresar stock. | RF09, NN15 |
+| DEV-10 | Ubicuo | El sistema deberá gestionar, por línea, los estados solicitada, aprobada, rechazada, recibida (solo impresos) y reembolsada, con fecha y responsable, que puede ser el sistema, en cada cambio. | RF09 |
 | DEV-11 | Evento | Cuando cambia el estado de una devolución, el sistema deberá notificar al cliente. | RF09 |
-| DEV-12 | Evento | Cuando se aprueba, rechaza o reembolsa una devolución, el sistema deberá registrarlo en la auditoría. | RNF08 |
-| DEV-13 | Ubicuo | El sistema deberá permitir aprobar o rechazar la devolución de un impreso solo al encargado de la sucursal receptora o a la administración central. | RF09, RNF05 |
-| DEV-14 | No deseado | Si una devolución aprobada de un impreso lleva más de 10 días calendario sin que la sucursal confirme su recepción, entonces el sistema deberá pasarla a rechazada sin reembolso y avisar al cliente. | RF09 |
-| DEV-15 | No deseado | Si se solicita la devolución de un impreso entregado hace más de 15 días calendario, entonces el sistema deberá rechazar la solicitud indicando el plazo. | RF09, NN05 |
+| DEV-12 | Evento | Cuando se solicita, aprueba, rechaza (también por plazo), recibe, reingresa o reembolsa una devolución, el sistema deberá registrarlo en la auditoría. | RNF08 |
+| DEV-13 | Ubicuo | El sistema deberá permitir aprobar o rechazar la devolución de un impreso solo al encargado de la sucursal receptora elegida o a la administración central. | RF09, RNF05 |
+| DEV-14 | No deseado | Si una devolución aprobada de un impreso lleva más de 10 días calendario, en hora de Lima, desde su aprobación sin que la sucursal confirme su recepción, entonces el sistema deberá pasarla a rechazada sin reembolso y avisar al cliente. | RF09 |
+| DEV-15 | No deseado | Si se solicita la devolución de un impreso cuya línea fue entregada hace más de 15 días calendario, en hora de Lima, entonces el sistema deberá rechazar la solicitud indicando el plazo. | RF09, NN05 |
+| DEV-16 | No deseado | Si la confirmación de la recepción y el vencimiento del plazo de DEV-14 ocurren a la vez, entonces el sistema deberá aplicar solo el primero que confirma y rechazar el otro por estado inválido. | RF09, AC01 |
+| DEV-17 | No deseado | Si se repite la aprobación, la recepción o el reembolso de una línea, entonces el sistema deberá no reembolsar ni reingresar dos veces, usando una clave de idempotencia por devolución y línea. | RF09, AC01 |
+| DEV-18 | Ubicuo | El sistema deberá permitir volver a solicitar una línea cuya devolución fue rechazada por plazo si aún está dentro del plazo de DEV-15, y no contarla como devuelta para DEV-03. | RF09 |
 
 ## 4. Criterios de aceptación
 
 | ID | Cubre | Escenario |
 | :--- | :--- | :--- |
-| AC-DEV-01 | DEV-01, DEV-10 | **Dado** un pedido entregado, **cuando** el cliente solicita devolver un impreso con el motivo «llegó dañado», **entonces** se registra una devolución solicitada con fecha y la línea afectada. |
-| AC-DEV-02 | DEV-02 | **Dado** un pedido en tránsito, **cuando** el cliente solicita devolver su impreso, **entonces** se rechaza porque aún no fue entregado. |
-| AC-DEV-03 | DEV-03 | **Dado** una línea de 1 unidad ya devuelta, **cuando** se solicita devolverla otra vez, **entonces** se rechaza. |
-| AC-DEV-04 | DEV-04 | **Dado** un libro digital sin descargas, **cuando** el cliente pide el reembolso, **entonces** se acepta la solicitud. |
-| AC-DEV-05 | DEV-05 | **Dado** un libro digital descargado dos veces, **cuando** el cliente pide el reembolso sin reportar defecto, **entonces** se rechaza explicando la política. |
-| AC-DEV-06 | DEV-06 | **Dado** un libro digital descargado, **cuando** el cliente reporta que el archivo no abre, **entonces** el reporte queda registrado y el reembolso es aceptable. |
-| AC-DEV-07 | DEV-07 | **Dado** una devolución aprobada de un impreso, **cuando** Ayacucho confirma su recepción, **entonces** el inventario suma 1 unidad al físico de Ayacucho y la devolución pasa a recibida. |
-| AC-DEV-08 | DEV-08 | **Dado** una devolución aprobada de un impreso, **cuando** aún no se confirmó la recepción, **entonces** no se solicita ningún reembolso; y **cuando** Ayacucho confirma la recepción y el reingreso, **entonces** se solicita a la pasarela el monto de la línea; y para un libro digital, el reembolso se solicita al aprobarse. |
-| AC-DEV-09 | DEV-09 | **Dado** un reembolso aprobado de un libro digital, **cuando** se completa, **entonces** el cliente pierde el acceso y el inventario no cambia. |
+| AC-DEV-01 | DEV-01, DEV-10 | **Dado** un pedido con un impreso entregado y un libro digital, **cuando** el cliente solicita devolver el impreso con el motivo «llegó dañado» eligiendo la sucursal Ayacucho, **entonces** se registra una devolución solicitada con fecha, la línea y la sucursal receptora; y si incluye también el digital, se rechaza por mezclar tipos y debe pedir dos devoluciones. |
+| AC-DEV-02 | DEV-02 | **Dado** un pedido con una línea entregada y otra en tránsito, **cuando** el cliente solicita devolver la que está en tránsito, **entonces** se rechaza porque aún no fue entregada; y la entregada sí se acepta. |
+| AC-DEV-03 | DEV-03 | **Dado** una línea de 1 unidad ya devuelta, **cuando** se solicita devolverla otra vez, o dos solicitudes simultáneas piden devolverla, **entonces** se rechaza la repetida y solo una queda registrada. |
+| AC-DEV-04 | DEV-04 | **Dado** un libro digital sin enlaces de descarga entregados, **cuando** el cliente pide el reembolso, **entonces** se aprueba solo, con el responsable «sistema», y avanza al reembolso. |
+| AC-DEV-05 | DEV-05 | **Dado** un libro digital del que se entregó un enlace de descarga, aunque no se haya usado, **cuando** el cliente pide el reembolso sin reportar defecto, **entonces** se rechaza explicando la política. |
+| AC-DEV-06 | DEV-06 | **Dado** un libro digital descargado, **cuando** el cliente reporta que el archivo no abre, **entonces** el reporte queda registrado, las descargas del acceso se suspenden y la solicitud espera la decisión de la administración; y un reporte sobre un acceso ajeno se rechaza. |
+| AC-DEV-07 | DEV-07 | **Dado** una devolución aprobada de un impreso, **cuando** Ayacucho confirma su recepción, **entonces** el inventario suma 1 unidad al físico de Ayacucho y solo entonces la devolución pasa a recibida; y si el reingreso falla, no pasa a recibida y se puede reintentar. |
+| AC-DEV-08 | DEV-08 | **Dado** una devolución aprobada de un impreso, **cuando** aún no se confirmó la recepción, **entonces** no se solicita ningún reembolso; y **cuando** pasa a recibida, **entonces** se solicita a la pasarela el precio unitario por las unidades devueltas, sin el envío; y para un libro digital, el reembolso se solicita al aprobarse. |
+| AC-DEV-09 | DEV-09 | **Dado** un reembolso aprobado de un libro digital, **cuando** se aprueba, **entonces** el cliente pierde el acceso antes de pedirse el reembolso, lo sigue sin acceso aunque el reembolso falle y el inventario no cambia. |
 | AC-DEV-10 | DEV-11 | **Dado** una devolución, **cuando** pasa a aprobada, **entonces** el cliente recibe un aviso. |
-| AC-DEV-11 | DEV-12 | **Dado** un reembolso completado, **cuando** termina, **entonces** existe una entrada de auditoría con el usuario, el pedido y el monto. |
-| AC-DEV-12 | DEV-13 | **Dado** una devolución solicitada de un impreso, **cuando** el encargado de otra sucursal intenta aprobarla, **entonces** se rechaza; y cuando lo hace el de la sucursal receptora o la administración, se aprueba. |
-| AC-DEV-13 | DEV-14 | **Dado** una devolución aprobada hace 11 días sin recepción, **cuando** corre la revisión de plazos, **entonces** pasa a rechazada, no se reembolsa y el cliente recibe un aviso; y una de 9 días no cambia. |
-| AC-DEV-14 | DEV-15 | **Dado** un impreso entregado hace 16 días, **cuando** el cliente solicita devolverlo, **entonces** se rechaza indicando el plazo de 15 días; y uno de 14 días se registra. |
+| AC-DEV-11 | DEV-12 | **Dado** una devolución que se solicita, se aprueba, se recibe, se reingresa y se reembolsa, o se rechaza por plazo, **cuando** termina cada paso, **entonces** existe una entrada de auditoría con el usuario o el actor «sistema», el pedido y el monto. |
+| AC-DEV-12 | DEV-13 | **Dado** una devolución solicitada de un impreso con sucursal receptora Ayacucho, **cuando** el encargado de Cusco intenta aprobarla, **entonces** se rechaza; y cuando lo hace el de Ayacucho o la administración, se aprueba. |
+| AC-DEV-13 | DEV-14 | **Dado** una devolución aprobada hace 10 días y 1 hora sin recepción, **cuando** corre la revisión de plazos, **entonces** pasa a rechazada, no se reembolsa y el cliente recibe un aviso; y una de 10 días exactos no cambia. |
+| AC-DEV-14 | DEV-15 | **Dado** un impreso cuya línea se entregó hace 15 días y 1 hora, **cuando** el cliente solicita devolverlo, **entonces** se rechaza indicando el plazo de 15 días; y uno de 15 días exactos se registra. |
+| AC-DEV-15 | DEV-16 | **Dado** una devolución aprobada al límite del plazo, **cuando** la recepción y el vencimiento ocurren a la vez, **entonces** gana la primera que confirma y la otra se rechaza por estado inválido. |
+| AC-DEV-16 | DEV-17 | **Dado** una devolución recibida, **cuando** se repiten la recepción o el reembolso, o la pasarela cae y se reintenta, **entonces** el físico sube una vez y el reembolso se hace una sola vez. |
+| AC-DEV-17 | DEV-18 | **Dado** una devolución rechazada por plazo de recepción pero con la línea aún dentro de los 15 días de entrega, **cuando** el cliente la solicita otra vez, **entonces** se acepta; y si ya pasaron los 15 días, se rechaza. |
 
 ## 5. Reglas e invariantes
 
-- Una línea impresa solo se devuelve si está entregada; una línea digital solo se reembolsa si no fue descargada o si el archivo está defectuoso.
+- Una línea impresa solo se devuelve si está entregada y dentro de los 15 días desde su entrega; una línea digital solo se reembolsa si no se entregó un enlace de descarga o si el archivo está defectuoso y la administración lo aprueba.
+- Una devolución es de un solo tipo y cada línea tiene su propio estado; un pedido mixto genera dos devoluciones.
+- La «sucursal receptora» es la que el cliente elige al solicitar; ella aprueba, recibe y reingresa.
+- El envío no se reembolsa en una devolución.
 - El reingreso de stock de una devolución impresa lo hace el inventario de la sucursal que recibe, no el E-commerce.
 - Un reembolso nunca supera lo cobrado por esa línea.
 - Un impreso se reembolsa solo después de confirmada su recepción y su reingreso al stock; un libro digital, al aprobarse, porque no hay mercadería que recibir.
-- Ciclo de una devolución de impreso: solicitada → aprobada → recibida → reembolsada; de un digital: solicitada → aprobada → reembolsada; en ambos, solicitada → rechazada.
+- Ciclo de una devolución de impreso: solicitada → aprobada → recibida → reembolsada; de un digital: solicitada → aprobada → reembolsada; en ambos, solicitada → rechazada, y en un impreso aprobada → rechazada si vence el plazo de recepción.
 - Los digitales nunca reingresan stock.
 
 ## 6. Casos límite y errores
 
 - Una devolución aprobada cuyo reingreso o reembolso falla queda reintentable, sin repetir el paso que ya se completó.
-- Una solicitud sobre varias líneas se evalúa línea por línea.
+- Una solicitud sobre varias líneas del mismo tipo se evalúa línea por línea.
+- **Riesgo aceptado:** un reporte de archivo defectuoso aprobado por la administración deja al cliente con el archivo ya descargado, porque no hay marca de agua ni DRM (AD20).
 - Si el cliente reporta un archivo defectuoso, el sistema verifica que el reporte esté asociado a un acceso real del cliente.
 
 ## 7. Preguntas abiertas
 
+- [x] ¿Quién aprueba el reembolso de un libro digital? Resuelto el 2026-10-16: automático si no se entregó ningún enlace de descarga (responsable «sistema»); un reporte de archivo defectuoso lo decide la administración (DEV-04, DEV-06).
+- [x] ¿Qué es la sucursal receptora? Resuelto el 2026-10-16: la que elige el cliente al solicitar (DEV-01, DEV-13).
+- [x] ¿Desde cuándo se cuenta el plazo de 15 días? Resuelto el 2026-10-16: desde la entrega de esa línea, en hora de Lima (DEV-15).
+- [x] ¿Cómo se estructura una devolución mixta? Resuelto el 2026-10-16: una devolución por tipo, con estado por línea (DEV-01, DEV-10).
 - [x] ¿Quién aprueba la devolución de un impreso? Resuelto el 2026-10-16 (confirmado por el responsable): el encargado de la sucursal receptora o la administración (DEV-13).
 - [x] ¿Cuándo se reembolsa un impreso devuelto? Resuelto el 2026-10-16: después de confirmar la recepción y el reingreso (DEV-08); el digital, al aprobarse.
 - [x] ¿Cuántos días tiene el cliente para llevar el impreso a la sucursal tras aprobarse la devolución? Resuelto el 2026-10-16: 10 días calendario; vencida, pasa a rechazada sin reembolso (DEV-14).

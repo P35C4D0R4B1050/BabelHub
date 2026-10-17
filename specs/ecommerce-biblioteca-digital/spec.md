@@ -36,7 +36,7 @@ Entregar al instante los libros digitales comprados y protegerlos: el archivo so
 | BIB-07 | No deseado | Si quien pide descargar no es el titular del acceso, entonces el sistema deberá rechazar la solicitud y registrar el intento. | AC09, RNF14 |
 | BIB-08 | Evento | Cuando la administración central restituye descargas a un acceso, el sistema deberá sumarlas al cupo y registrar la acción en la auditoría con el motivo. | RF23, RNF08 |
 | BIB-09 | Estado | Mientras la licencia de una edición esté vencida o retirada de la venta, el sistema deberá mantener el acceso de quienes ya la compraron. | RF24 |
-| BIB-10 | Estado | Mientras un acceso esté revocado por un reembolso o una anulación, el sistema deberá impedir su descarga. | RF23 |
+| BIB-10 | Estado | Mientras un acceso esté revocado por un reembolso o una anulación, o suspendido por un reporte de archivo defectuoso, el sistema deberá impedir su descarga. | RF23 |
 | BIB-11 | Evento | Cuando se entrega un enlace de descarga, el sistema deberá registrar el usuario, la edición y la fecha. | RF23, RNF08 |
 | BIB-12 | Ubicuo | El sistema deberá mostrar la biblioteca de un cliente solo a ese cliente y al administrador central, y registrar en la auditoría cada consulta del administrador. | RNF05, NN15, AC11 |
 | BIB-13 | No deseado | Si el archivo de una edición no está disponible en el almacén, entonces el sistema deberá informar el problema al cliente, no consumir una descarga y ofrecer reportarlo. | RF23 |
@@ -45,6 +45,10 @@ Entregar al instante los libros digitales comprados y protegerlos: el archivo so
 | BIB-16 | Evento | Cuando el titular pide ayuda sobre un acceso, el sistema deberá registrar la solicitud para la administración con el acceso y el motivo. | RF23 |
 | BIB-17 | Ubicuo | El sistema deberá comprobar y contar el cupo de descargas de forma atómica ante solicitudes simultáneas del mismo acceso. | RF23, AC09 |
 | BIB-18 | No deseado | Si se usa un enlace de descarga cuya vigencia ya venció, entonces el sistema deberá no completar la descarga e invitar a pedir un enlace nuevo. | AC09, RNF14 |
+| BIB-19 | No deseado | Si se repite la aprobación del pago de una línea digital, entonces el sistema deberá no conceder un segundo acceso. | RF22, AC01 |
+| BIB-20 | Evento | Cuando un cliente vuelve a comprar un libro digital cuyo acceso fue revocado, el sistema deberá reactivar ese acceso y reiniciar su contador de descargas; si el acceso sigue vigente, deberá rechazar la compra repetida según `ecommerce-carrito-checkout`. | RF22 |
+| BIB-21 | Evento | Cuando la administración resuelve un reporte de archivo defectuoso, el sistema deberá reanudar el acceso si se rechaza el reporte, o dejarlo revocado si se aprueba el reembolso, y registrarlo en la auditoría. | RF23, RNF08 |
+| BIB-22 | Ubicuo | El sistema deberá informar a `ecommerce-devoluciones` si a un acceso se le entregó algún enlace de descarga, con independencia de que se haya usado. | RF23, NN15 |
 
 ## 4. Criterios de aceptación
 
@@ -65,6 +69,10 @@ Entregar al instante los libros digitales comprados y protegerlos: el archivo so
 | AC-BIB-13 | BIB-15 | **Dado** un cliente que ya pidió 10 enlaces en la última hora, **cuando** pide otro, **entonces** se rechaza con la respuesta de límite excedido, no se consume una descarga y queda un evento de seguridad. |
 | AC-BIB-14 | BIB-16 | **Dado** un acceso sin descargas restantes, **cuando** el titular pide ayuda, **entonces** la solicitud queda visible para la administración con el acceso y el motivo. |
 | AC-BIB-15 | BIB-17 | **Dado** un acceso con una sola descarga restante, **cuando** se envían dos solicitudes simultáneas, **entonces** solo una recibe el enlace y las descargas quedan en el máximo. |
+| AC-BIB-16 | BIB-10, BIB-21 | **Dado** un acceso suspendido por un reporte de archivo defectuoso, **cuando** el titular intenta descargar, **entonces** se rechaza; y si la administración rechaza el reporte, el acceso se reanuda, y si aprueba el reembolso, queda revocado, con auditoría. |
+| AC-BIB-17 | BIB-19 | **Dado** una aprobación de pago que llega dos veces, **cuando** se procesan ambas, **entonces** existe un solo acceso. |
+| AC-BIB-18 | BIB-20 | **Dado** un acceso revocado por reembolso con 4 descargas usadas, **cuando** el cliente vuelve a comprar el libro, **entonces** el acceso se reactiva con 0 descargas usadas. |
+| AC-BIB-19 | BIB-22 | **Dado** un acceso con un enlace entregado y no usado, **cuando** devoluciones pregunta, **entonces** se informa que sí se entregó un enlace; y con ninguno entregado, que no. |
 
 ## 5. Reglas e invariantes
 
