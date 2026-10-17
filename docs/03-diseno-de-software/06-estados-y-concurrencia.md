@@ -42,22 +42,24 @@ recibido --> [*]
 ```mermaid
 stateDiagram-v2
 [*] --> confirmada
-confirmada --> en_preparacion
-en_preparacion --> en_transito_entre_sucursales : la fuente no es la de recojo
-en_transito_entre_sucursales --> listo_para_recojo
+confirmada --> en_preparacion : la fuente es la de recojo
+confirmada --> en_transito_entre_sucursales : la fuente no es la de recojo
+en_transito_entre_sucursales --> en_preparacion : se recibe el traslado
+confirmada --> anulada : cancelación del cliente o anulación
 en_preparacion --> listo_para_recojo
 en_preparacion --> despachada : domicilio
 listo_para_recojo --> entregada
 listo_para_recojo --> no_recogida : 15 días sin recoger
 despachada --> entregada
 entregada --> [*]
+anulada --> [*]
 ```
 
-El estado del pedido se deriva del de sus líneas. La línea digital pasa a *disponible en biblioteca* al aprobarse el pago.
+El estado del pedido se deriva del de sus líneas (PED-20): anulado si todas lo están, entregado si todas están entregadas, no recogido si alguna lo está y las demás están entregadas o no recogidas y, si no, el de la línea impresa menos avanzada. Si dos operaciones compiten por una línea, gana la primera que confirma (PED-21). La línea digital pasa a *disponible en biblioteca* al aprobarse el pago.
 
 ### 1.4 Pago
 
-`pendiente → aprobado | rechazado | pendiente de confirmación → aprobado | rechazado | vencido`. Un pago pendiente de confirmación extiende la reserva una vez, hasta 30 minutos desde el inicio del pago, y avisa al cliente por todos sus medios; si se aprueba con la reserva vencida, se reembolsa. Un pedido tiene como máximo un cobro aprobado. Un pago aprobado cuya confirmación de reserva falla se reembolsa automáticamente.
+`pendiente → aprobado | rechazado | pendiente de confirmación → aprobado | rechazado | vencido`. Un pago pendiente de confirmación extiende la reserva una vez, hasta 30 minutos desde el inicio del pago, y avisa al cliente por todos sus medios; si se aprueba con la reserva vencida, se reembolsa. El pago cuelga de una *intención de pago* creada al pasar al paso de pago, con un intento y una clave de idempotencia por cada medio probado; una intención admite un solo cobro pendiente o aprobado (PAG-16, PAG-17). Un pago solo digital pendiente vence a los 30 minutos (PAG-18). Si falla la confirmación posterior a la aprobación, se compensa y se reembolsa, con el reembolso pendiente reintentable (PAG-20). Una intención tiene como máximo un cobro aprobado y el pedido nace con él. Un pago aprobado cuya confirmación de reserva falla se reembolsa automáticamente.
 
 ### 1.5 Envío
 

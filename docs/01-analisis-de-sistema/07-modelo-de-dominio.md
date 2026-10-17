@@ -112,9 +112,14 @@ class Linea {
   Cantidad
   Cumplimiento propio
 }
+class IntencionDePago {
+  Identificador unico
+  Costo de envio congelado
+  Versiones de textos aceptados
+}
 class Pago {
-  Estado
-  Clave de idempotencia
+  Estado: pendiente, aprobado, rechazado, pendiente de confirmacion, vencido
+  Clave de idempotencia por intento
 }
 class Envio {
   Guia
@@ -137,6 +142,7 @@ Edicion "0..1" --> "1" Licencia : solo digitales
 Carrito "1" --> "*" Edicion
 Pedido "1" --> "*" Linea
 Linea "*" --> "1" Edicion
+IntencionDePago "1" --> "*" Pago : intentos
 Pedido "1" --> "1" Pago
 Pedido "1" --> "0..1" Envio
 Pedido "1" --> "*" Devolucion
@@ -150,7 +156,7 @@ Pedido "0..*" <-- "1" HojaReclamacion
 2. Un pedido se confirma solo con el pago aprobado y, para los impresos, con las reservas confirmadas; tiene como máximo un cobro aprobado.
 3. El estado del pedido se deriva del estado de sus líneas; cada línea sigue su propio ciclo. Una línea de recojo puede pasar a *no recogido* a los 15 días calendario en listo para recojo; el cliente puede cancelar un pedido solo de impresos mientras todas sus líneas estén confirmadas.
 8. Un pago *pendiente de confirmación* extiende la reserva una vez, hasta 30 minutos desde el inicio del pago; si se aprueba con la reserva vencida, se reembolsa. Un impreso devuelto se reembolsa después de confirmada su recepción.
-4. Un libro digital solo se vende con licencia vigente y que cubra el territorio del comprador; los accesos ya concedidos se mantienen salvo reembolso, anulación u orden legal.
+4. Un libro digital solo se vende con licencia vigente y que incluya Perú (no se valida el territorio del comprador); los accesos ya concedidos se mantienen salvo reembolso, anulación u orden legal.
 5. Un acceso digital es personal e intransferible, con máximo 5 descargas y enlaces de 5 minutos como máximo.
 6. No se almacenan datos de tarjeta: solo los conoce la pasarela.
 7. Las hojas de reclamaciones se conservan al menos dos años.

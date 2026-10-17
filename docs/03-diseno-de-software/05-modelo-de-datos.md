@@ -49,8 +49,9 @@ RESERVAS }o--|| PEDIDOS_REF : "pertenece a"
 | `licencias` | edicion_id, titular, territorios, vigente_desde, vigente_hasta | Solo para ediciones digitales; vigencia coherente. |
 | `carritos` / `carrito_lineas` | cliente_id; carrito_id, edicion_id, cantidad | Una línea por edición; cantidad 1 para digitales. |
 | `pedidos` | id, cliente_id, tipo_entrega, estado, costo_envio, total, fecha, fecha_listo_recojo | Estado derivado de las líneas (incluye `no_recogido`); total en soles; `costo_envio` fijo y configurable. |
-| `pedido_lineas` | pedido_id, edicion_id, cantidad, precio, estado, fuente_id | Una línea por edición y pedido. |
-| `pagos` | id, pedido_id, estado (incluye `pendiente_confirmacion` y `vencido`), monto, referencia_pasarela, clave_idempotencia, fecha_inicio | **Un solo cobro aprobado por pedido** (índice único parcial); sin datos de tarjeta. |
+| `pedido_lineas` | pedido_id, edicion_id, titulo, isbn, cantidad, precio, estado, fuente_id | Una línea por edición y pedido. |
+| `intenciones_pago` | id, cliente_id, carrito_ref, costo_envio, versiones_aceptadas, estado, fecha_inicio | Un solo cobro pendiente o aprobado por intención (índice único parcial). |
+| `pagos` | id, intencion_id, pedido_id, estado (incluye `pendiente_confirmacion` y `vencido`), monto, referencia_pasarela, clave_idempotencia, fecha_inicio | **Un solo cobro aprobado por pedido** (índice único parcial); sin datos de tarjeta. |
 | `envios` | id, pedido_id, guia, estado | Estados en orden; guía única. |
 | `devoluciones` / `devolucion_lineas` | pedido_id, motivo, estado; linea_id, cantidad | Cantidad devuelta ≤ comprada. |
 | `accesos_digitales` | id, cliente_id, edicion_id, descargas_usadas, revocado | Único (cliente_id, edicion_id); `descargas_usadas` ≤ 5 por restricción. |
