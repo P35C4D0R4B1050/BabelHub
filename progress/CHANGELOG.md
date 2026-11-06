@@ -2,6 +2,21 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-06 — Auditoría del estilo basado en servicios y del despliegue
+
+### Documentación
+- Informe `progress/R4-auditoria-del-estilo-y-despliegue.md` (16 hallazgos, H1 a H16).
+- `03-estilo-arquitectonico.md` §7: alineación punto por punto con el estilo basado en servicios, desviaciones conscientes y criterios de revisión.
+- `05-despliegue.md` reescrito: cupo de Oracle por cuenta y PAYG, unidad de despliegue frente a host, **perfil objetivo de cuatro VMs ARM** (VM-BORDE, VM-VENTAS, VM-INVENTARIO y VM-DATOS) y **perfil mínimo** de dos, red entre VMs, una instancia de PostgreSQL con una base por servicio, reglas de red y matriz de fallos. Presupuesto de recursos por VM.
+- Decisiones revisadas: AD02, AD03, AD10, AD11, AD12, AD14, AD16 y AD18. Requisitos RC07 y RNF12; drivers y riesgos; tácticas; amenazas (AM24 y fronteras de confianza); operación segura; modelo de datos (bases `ecommerce`, `inventario` e `identidad`); C4 nivel 2 y 3; convenciones; README.
+- Culqi confirmada como pasarela (C05). B01 cerrado (specs aprobadas). Nuevos B10 (segunda cuenta de Oracle) y B11 (red entre VMs).
+
+### Infraestructura local
+- `docker-compose.local.yml` con una instancia PostgreSQL y `postgres/init/01-bases.sh`; `.env.example` actualizado. Solo se validó la configuración (`docker compose config`); no se levantó el contenedor.
+
+### Specs
+- Sin cambios: ninguna spec menciona máquinas ni esquemas, por lo que siguen `Approved`.
+
 ## 2026-10-16 — Análisis inicial y cierre de brechas
 
 ### Documentación

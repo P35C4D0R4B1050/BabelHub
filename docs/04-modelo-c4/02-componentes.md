@@ -27,7 +27,7 @@ PT(["Reloj y usuario actual"])
 end
 
 subgraph INF["Infraestructura"]
-DB[("PostgreSQL Inventario")]
+DB[("PostgreSQL<br/>base inventario")]
 RE[("Redis")]
 N8["n8n"]
 end
@@ -111,7 +111,7 @@ OPE["Operador logístico"]
 N8["n8n"]
 COR["Proveedor de correo"]
 ALM[("Almacén de archivos")]
-DB[("PostgreSQL Ventas")]
+DB[("PostgreSQL<br/>base ecommerce")]
 RE[("Redis")]
 end
 
@@ -202,7 +202,7 @@ PA(["Registro de auditoría"])
 PT(["Reloj"])
 end
 
-DB[("PostgreSQL Ventas<br/>esquema identidad")]
+DB[("PostgreSQL<br/>base identidad")]
 COR["Proveedor de correo"]
 
 API --> REG

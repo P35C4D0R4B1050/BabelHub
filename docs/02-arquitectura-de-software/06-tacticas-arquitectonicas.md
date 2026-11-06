@@ -19,7 +19,8 @@ Una **táctica** es una decisión de diseño que mejora un atributo de calidad c
 | **AC03 Disponibilidad** | Reinicio automático de contenedores | Todos | RNF03, AD10 |
 | | Degradación controlada: el catálogo se sirve desde caché si Inventario cae; el checkout informa en vez de cobrar a ciegas | E-commerce | CAR-06 |
 | | Aislamiento de fallas: una falla del Notificador nunca interrumpe un caso de uso | Notificaciones | AGENTS 10, NOT-04 |
-| | Tiempos de espera y corte de dependencias | Llamadas externas | SEG-14, AD25 |
+| | Aislamiento por VM: el Inventario no comparte host y el estado vive en una VM sin aplicaciones; matriz de fallos por VM | Despliegue | AD11, AD12, [despliegue](05-despliegue.md) §7 |
+| | Tiempos de espera y corte de dependencias | Llamadas externas y entre servicios | SEG-14, AD25 |
 | | Reintento con esperas crecientes | Avisos, consulta de pagos | NOT-04, PAG-07 |
 | **AC04 Escalabilidad** | Sucursales como datos, no como código | Fuentes | AD01, RNF04 |
 | **AC05 Seguridad** | Autenticar, autorizar, limitar acceso | Todos | AD22, RNF05 |
@@ -28,7 +29,8 @@ Una **táctica** es una decisión de diseño que mejora un atributo de calidad c
 | | Detectar: registro y alertas por servicio, con lista unificada y correo | Transversal | AUD-10, AUD-17, SEG-09 |
 | | Reaccionar: bloqueo temporal, rechazo con espera sugerida | Identidad y borde | IDE-03, SEG-05, SEG-06 |
 | | Recuperar: respaldo cifrado y restauración probada | Datos | AD27, RNF24 |
-| | Reducir superficie: paneles y bases sin puertos publicados | Despliegue | RNF06 |
+| | Reducir superficie: paneles y bases sin puertos publicados; servicios que escuchan solo en la red privada; malla cifrada entre VMs | Despliegue | RNF06, [despliegue](05-despliegue.md) §4 |
+| | Mínimo privilegio por VM: cada VM recibe solo los secretos de sus servicios y un rol por base | Despliegue y datos | AD03, AD11, AD18 |
 | **AC06 Mantenibilidad / testabilidad** | Aislamiento por capas con regla de dependencia | Cada servicio | AD09, RNF09 |
 | | Puertos para lo externo | Infraestructura | [organización interna](../03-diseno-de-software/02-organizacion-interna.md) |
 | | Pruebas de arquitectura que hacen cumplir las referencias | Repositorio | `tests/architecture` |
@@ -48,6 +50,8 @@ Una **táctica** es una decisión de diseño que mejora un atributo de calidad c
 | Bus de eventos o mensajería | El volumen (5–10 sucursales) no lo justifica; REST síncrono es suficiente (AD04). |
 | Bloqueos distribuidos en Redis para el stock | Agrega un punto de falla; las transacciones en la base ya garantizan la atomicidad (AD23). |
 | Réplicas y alta disponibilidad de bases | El Free Tier no ofrece recursos; se compensa con respaldo y restauración probada. |
+| Una VM por servicio | Exigiría cinco VMs ARM, más de las que caben en dos cuentas; el reparto en cuatro VMs aísla lo crítico y el estado (AD11). |
+| Una instancia de PostgreSQL por servicio | Con 1 OCPU en la VM de datos no da aislamiento de CPU y duplica la memoria de buffers; se usa una base y un rol por servicio (AD03). |
 | Sesiones de servidor en cada servicio | La credencial firmada y corta evita consultar a Identidad en cada solicitud (AD22). Solo la Web guarda una sesión del lado del servidor, con una cookie opaca (WEB-04). |
 | DRM comercial | Costo y complejidad; se mitiga con enlace firmado, límite de descargas y registro (AD20). |
 

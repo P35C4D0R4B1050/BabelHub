@@ -34,10 +34,11 @@ Se sigue una versión reducida del **NIST SSDF**, integrada al flujo de [Spec-Dr
 | Área | Regla |
 | :--- | :--- |
 | Contenedores | Imágenes multi-arquitectura con versión fija; usuario sin privilegios; sistema de archivos de solo lectura cuando se pueda; `healthcheck`; límites de memoria y CPU. |
-| Red | Bases de datos y Redis sin puertos publicados; paneles de n8n y Evolution API solo por red interna o túnel; solo Cloudflare Tunnel llega a Nginx. |
+| Red | Bases de datos y Redis sin puertos publicados a Internet y con TLS o malla cifrada entre VMs; cada servicio escucha solo en la dirección privada de su VM; paneles de n8n y Evolution API solo por túnel SSH; solo Cloudflare Tunnel llega a Nginx. Reglas por VM en [despliegue](../02-arquitectura-de-software/05-despliegue.md) §6. |
 | Sistema operativo | Linux mínimo sin entorno gráfico; actualizaciones de seguridad automáticas; acceso por clave SSH, sin contraseña. |
-| Secretos | Variables de entorno por contenedor; `.env` ignorado por Git; rotación ante cambios del equipo o sospecha. |
-| Cuentas de base de datos | Una cuenta por servicio con permisos solo sobre su esquema; Identidad aislada; la cuenta de aplicación no puede modificar la auditoría. |
+| Secretos | Variables de entorno por contenedor; `.env` ignorado por Git; rotación ante cambios del equipo o sospecha. **Cada VM recibe solo los secretos de sus servicios** (la clave de Culqi solo en VM-VENTAS, la clave de firma solo en VM-BORDE, las contraseñas de cada base solo en su servicio). |
+| Cuentas de base de datos | Un rol por servicio que solo puede conectarse a su propia base (`pg_hba` por base y origen, `REVOKE CONNECT` a los demás); Identidad en base propia; la cuenta de aplicación no puede modificar la auditoría. |
+| Hora | Sincronización con `chrony` en todas las VMs, porque las credenciales duran 15 minutos y se validan en cada servicio. |
 | Entornos | Desarrollo, pruebas y producción separados; datos de ejemplo solo en desarrollo y pruebas; nunca datos reales en pruebas. |
 
 ## 4. Registro y alertas
@@ -45,10 +46,10 @@ Se sigue una versión reducida del **NIST SSDF**, integrada al flujo de [Spec-Dr
 | Qué | Dónde | Notas |
 | :--- | :--- | :--- |
 | Eventos de seguridad (ingresos fallidos, bloqueos, accesos denegados, límites, cambios de rol, segundo factor fallido) | Registro de auditoría de cada servicio (AUD-10) | Sin contraseñas, credenciales, datos de tarjeta ni enlaces (SEG-10). |
-| Registros técnicos | Salida estándar de los contenedores, con el identificador de seguimiento | Rotación por tamaño; retención corta. |
+| Registros técnicos | Salida estándar de los contenedores, con el identificador de seguimiento | Rotación por tamaño; retención corta. Con varias VMs, el `traceId` es la clave para seguir una solicitud entre servicios; no hay agregación central (fuera de alcance) y los registros de cada VM se consultan por SSH desde la VM auxiliar. |
 | Alerta | Más de 10 accesos denegados o 20 ingresos fallidos en 5 minutos, contados por servicio | Lista de la administración central y correo a los administradores activos, agrupado cada 15 minutos (SEG-09). |
 | Alerta técnica | Falla al registrar un evento de seguridad (AUD-12) | Correo a la administración central y revisión inmediata. |
-| Disponibilidad | Monitoreo ligero desde la VM auxiliar | Aviso si una puerta pública no responde. |
+| Disponibilidad | Monitoreo ligero desde la VM auxiliar, fuera de las VMs de aplicaciones | Aviso por correo si la puerta pública o la salud de un servicio no responde. |
 
 Retención de registros de auditoría y seguridad: dos años (AUD-11).
 
@@ -57,13 +58,13 @@ Retención de registros de auditoría y seguridad: dos años (AUD-11).
 | Elemento | Decisión |
 | :--- | :--- |
 | Objetivos | **RPO ≤ 24 horas** y **RTO ≤ 4 horas**. |
-| Qué se respalda | Las dos bases PostgreSQL (incluidos los esquemas `ventas` e `identidad`), la configuración de n8n y de Evolution API, y los archivos de Compose sin secretos. Los archivos digitales ya viven en el almacén de objetos. |
+| Qué se respalda | Las bases `ecommerce`, `inventario` e `identidad` (un volcado por base, para restaurar cada una por separado), la configuración de n8n y de Evolution API, y los archivos de Compose sin secretos. Los archivos digitales ya viven en el almacén de objetos. |
 | Frecuencia | Volcado diario. |
 | Cifrado | Cifrado antes de salir de la VM de datos; la clave se guarda aparte. |
 | Destino | Almacén de objetos, fuera de la VM de datos. |
 | Retención | Escalonada: 7 diarios, 4 semanales y 3 mensuales *(propuesta)*. |
 | Prueba | Restauración en un entorno limpio **antes de cada despliegue mayor** y registro del tiempo real. |
-| Contingencia | Si Oracle no concede la VM ARM o la pierde, se levanta el mismo Compose en otra máquina desde el respaldo. |
+| Contingencia | Si Oracle no concede una VM ARM o la pierde, se levanta el mismo Compose en otra máquina desde el respaldo. Si se pierde la cuenta secundaria, se pasa al perfil mínimo en la principal ([despliegue](../02-arquitectura-de-software/05-despliegue.md) §7). |
 
 ## 6. Respuesta a incidentes
 

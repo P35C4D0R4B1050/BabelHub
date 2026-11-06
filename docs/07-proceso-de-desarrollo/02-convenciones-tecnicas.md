@@ -70,7 +70,7 @@ Los commits de un agente terminan con la línea `Co-Authored-By` correspondiente
 
 | Aspecto | Convención |
 | :--- | :--- |
-| Acceso | EF Core con Npgsql. Esquemas `ventas`, `identidad` (AD18) e `inventario`, cada uno con su propio rol de base de datos. |
+| Acceso | EF Core con Npgsql. Bases `ecommerce`, `identidad` (AD18) e `inventario` en una instancia PostgreSQL, cada una con su propio rol, que solo puede conectarse a esa base (AD03). |
 | Migraciones | Una carpeta por servicio. En producción se aplican con un comando o tarea explícita, no al arrancar la aplicación. |
 | Tiempo | `timestamptz` en UTC; se muestra en hora de Lima. El reloj es un puerto (`IReloj`) para poder probar la expiración de reservas. |
 | Concurrencia | Reservas y ajustes usan bloqueo de fila o control optimista; la estrategia concreta se decide en el `plan.md` de `inventario-seleccion-fuente`. Debe probarse con solicitudes simultáneas. |

@@ -53,30 +53,35 @@ class BH s
 
 ## 2. Nivel 2: contenedores
 
-Un contenedor es una aplicación o un almacén de datos desplegable por separado. Las VMs, los límites de memoria y la red están en el [despliegue](../02-arquitectura-de-software/05-despliegue.md).
+Un contenedor es una aplicación o un almacén de datos desplegable por separado. El diagrama muestra el **perfil objetivo** de cuatro VMs; en el perfil mínimo, VM-BORDE, VM-VENTAS y VM-INVENTARIO son una sola VM de aplicaciones. Las VMs, los límites de memoria y la red están en el [despliegue](../02-arquitectura-de-software/05-despliegue.md).
 
 ```mermaid
 flowchart TD
 NAV["Navegador<br/>cliente, sucursal, administración"]
 
-subgraph BORDE["Borde de red"]
 CF["Cloudflare<br/>DNS, TLS, WAF y túnel"]
+
+subgraph BOR["VM-BORDE - Docker Compose"]
 NGX["Nginx<br/>enrutamiento interno"]
+WEB["BabelHub.Web<br/>ASP.NET Core MVC, Razor y htmx"]
+IDE["Servicio de Identidad<br/>ASP.NET Core"]
 end
 
-subgraph APP["VM de aplicaciones - Docker Compose"]
-WEB["BabelHub.Web<br/>ASP.NET Core MVC, Razor y htmx"]
+subgraph VEN["VM-VENTAS - Docker Compose"]
 ECO["Servicio de E-commerce<br/>ASP.NET Core"]
-INV["Servicio de Inventario<br/>ASP.NET Core"]
-IDE["Servicio de Identidad<br/>ASP.NET Core"]
 ASI["Servicio de Asistente<br/>ASP.NET Core"]
-RED[("Redis<br/>caché")]
 N8N["n8n + Evolution API<br/>avisos por WhatsApp"]
 end
 
-subgraph DAT["VM de datos"]
-BDV[("PostgreSQL Ventas<br/>esquemas ventas e identidad")]
-BDI[("PostgreSQL Inventario")]
+subgraph INVM["VM-INVENTARIO - Docker Compose"]
+INV["Servicio de Inventario<br/>ASP.NET Core"]
+end
+
+subgraph DAT["VM-DATOS - sin acceso desde Internet"]
+BDV[("PostgreSQL<br/>base ecommerce")]
+BDI[("PostgreSQL<br/>base inventario")]
+BDD[("PostgreSQL<br/>base identidad")]
+RED[("Redis<br/>caché")]
 end
 
 subgraph EXT["Sistemas externos"]
@@ -102,7 +107,7 @@ ECO -.->|"valida credenciales"| IDE
 INV -.->|"valida credenciales"| IDE
 ASI -.->|"valida credenciales"| IDE
 ECO --> BDV
-IDE --> BDV
+IDE --> BDD
 INV --> BDI
 ECO --> RED
 INV --> RED
@@ -118,7 +123,7 @@ ASI --> LLM
 NAV -.->|"descarga con URL firmada"| ALM
 
 classDef n fill:#222,stroke:#fff,color:#fff
-class NAV,CF,NGX,WEB,ECO,INV,IDE,ASI,RED,N8N,BDV,BDI,PAG,ENV,LLM,COR,ALM,WA n
+class NAV,CF,NGX,WEB,ECO,INV,IDE,ASI,RED,N8N,BDV,BDI,BDD,PAG,ENV,LLM,COR,ALM,WA n
 ```
 
 | Contenedor | Tecnología | Responsabilidad | Specs principales |
@@ -130,7 +135,7 @@ class NAV,CF,NGX,WEB,ECO,INV,IDE,ASI,RED,N8N,BDV,BDI,PAG,ENV,LLM,COR,ALM,WA n
 | **Servicio de Asistente** | ASP.NET Core | Recomendaciones y consultas con datos de los servicios; solo lectura. | `asistente-compra-ia` |
 | **Redis** | Redis | Caché de disponibilidad y catálogo. | AD06 |
 | **n8n + Evolution API** | n8n, Evolution API | Plantillas y envío de avisos por WhatsApp. | AD16 |
-| **PostgreSQL Ventas / Inventario** | PostgreSQL | Datos de cada sistema; sin acceso desde Internet. | AD03, AD18 |
+| **PostgreSQL (bases `ecommerce`, `inventario` e `identidad`)** | PostgreSQL | Una instancia con una base por servicio y un rol por base; sin acceso desde Internet. | AD03, AD18 |
 | **Nginx y Cloudflare** | Nginx, Cloudflare | Entrada única, TLS, WAF y límites en el borde. | AD13, AD14 |
 
 Los tres elementos transversales (**auditoría** y **seguridad**: límites, errores y eventos) no son contenedores: se implementan en cada servicio con el mismo contrato (`transversal-auditoria`, `transversal-seguridad`).

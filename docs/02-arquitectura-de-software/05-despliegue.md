@@ -1,22 +1,50 @@
 # Despliegue en Oracle Cloud Free Tier
 
+Este documento reparte los servicios en máquinas virtuales (VMs). La **estructura** del sistema (servicios, imágenes, bases) está en el [estilo arquitectónico](03-estilo-arquitectonico.md) y no cambia con el reparto: lo que se decide aquí es **en qué host corre cada unidad de despliegue**.
+
 ## 1. Recursos disponibles
 
-Las condiciones del Free Tier cambiaron en 2026. Los datos siguientes se contrastaron con fuentes públicas y deben **verificarse en la consola de Oracle al crear la cuenta**.
+Las condiciones del Free Tier cambiaron en 2026. Las cifras se contrastaron con fuentes públicas secundarias (no con la documentación oficial de Oracle) y deben **verificarse en la consola al crear la cuenta**.
 
-| Recurso | Disponible gratis | Implicancia para BabelHub |
+| Recurso (por cuenta) | Disponible gratis | Implicancia para BabelHub |
 | :--- | :--- | :--- |
-| VMs ARM (Ampere A1) | **2 OCPU y 12 GB de RAM en total**, repartibles en **1 o 2 instancias** (antes 4 OCPU y 24 GB). | Es el único cupo con recursos útiles. La propuesta original decía "hasta 4 VMs ARM"; con el límite actual caben como máximo **2**. |
-| VMs x86 (AMD micro) | **2 instancias** de 1/8 OCPU y 1 GB de RAM. | Son muy limitadas: no sirven para .NET ni PostgreSQL, pero sí para tareas livianas. |
-| Almacenamiento en bloque | 200 GB en total; el volumen de arranque mínimo es de 47 GB. | Cuatro VMs usarían unos 188 GB solo en arranque; queda poca holgura. |
-| Total de VMs | **Máximo 4**: 2 ARM y 2 x86 micro. | Responde a la duda sobre el límite de 4: son 4 en total, de dos tipos distintos. |
+| VMs ARM (Ampere A1) | **2 OCPU y 12 GB de RAM en total**, repartibles en **1 o 2 instancias** (antes 4 OCPU y 24 GB). | Es el único cupo con recursos útiles: como máximo **2 VMs ARM de 1 OCPU y 6 GB** por cuenta. |
+| VMs x86 (AMD micro) | **2 instancias** de 1/8 OCPU y 1 GB de RAM. | No sirven para .NET ni PostgreSQL; sí para tareas livianas (salto SSH, monitoreo). |
+| Almacenamiento en bloque | 200 GB en total; el volumen de arranque mínimo es de 47 GB. | Cuatro VMs usan unos 188 GB solo en arranque; queda poca holgura. |
+| Total de VMs | **Máximo 4 por cuenta**: 2 ARM y 2 x86 micro. | La propuesta original decía «hasta 4 VMs ARM»: no es correcto. |
+
+**Cuenta de pago por uso (PAYG).** Actualizar la cuenta a PAYG **no amplía el cupo gratuito**: los recursos Always Free siguen siendo gratis y todo lo que supere el cupo se cobra. Sirve para evitar que Oracle recupere instancias con uso muy bajo (fuentes secundarias; a verificar) y reduce los fallos de capacidad al crear VMs ARM. Se activa con un **presupuesto y una alerta de costo de 1 USD** para detectar a tiempo cualquier recurso fuera del cupo.
 
 Condiciones a tener en cuenta:
-- Superar el cupo ARM puede inhabilitar las instancias o generar cargos, según el tipo de cuenta.
+- Superar el cupo ARM inhabilita las instancias o genera cargos, según el tipo de cuenta.
 - Crear instancias ARM suele fallar por falta de capacidad en regiones populares; hay que reintentar o elegir bien la región de origen al registrarse, porque no se cambia después.
-- Conviene revisar la política de Oracle sobre instancias con uso muy bajo sostenido.
+- **Segunda cuenta:** el FAQ de Oracle Cloud Free Tier permite **una cuenta gratuita por persona** y prohíbe crear varias; incumplirlo puede llevar a la suspensión o cancelación de la cuenta. Ver §3 y el riesgo en [drivers](01-drivers-arquitectonicos.md).
 
-## 2. Distribución propuesta de VMs
+## 2. Unidad de despliegue y host
+
+Un **servicio** es una unidad de despliegue independiente: tiene su propio código, imagen, versión, configuración y base de datos. Una **VM** es el host donde se ejecutan esas unidades. El estilo basado en servicios exige lo primero; no exige una VM por servicio. Lo segundo es una decisión de capacidad y de riesgo, que se toma con estos criterios:
+
+| Criterio | Regla |
+| :--- | :--- |
+| Lo crítico se aísla | El Inventario (AC01, escritura intensiva) no comparte host con nada más. |
+| El estado va aparte | Las bases de datos y Redis viven en una VM sin aplicaciones y sin acceso desde Internet (AD12). |
+| Lo expuesto va junto | El borde de red, la Web y la identidad son sin estado de negocio y se reconstruyen desde las imágenes. |
+| Lo periférico tolera fallos | El Asistente y las notificaciones pueden compartir host: su caída no bloquea la compra (AD07, AD16). |
+| Mínimo privilegio por VM | Cada VM recibe solo los secretos de los servicios que aloja (la clave de Culqi solo en VM-VENTAS; la clave de firma solo en VM-BORDE). |
+| Mover un servicio es configuración | Cambiar de VM un servicio solo cambia el Compose de esa VM y las direcciones (variables de entorno), no el código. |
+
+## 3. Perfiles de despliegue
+
+Se mantienen **dos perfiles con las mismas imágenes y el mismo código**; cambia solo el reparto y la red.
+
+| | **Perfil objetivo** | **Perfil mínimo (contingencia)** |
+| :--- | :--- | :--- |
+| Cuentas de Oracle | Dos (principal y secundaria) | Una |
+| VMs ARM (1 OCPU y 6 GB cada una) | **4**: VM-BORDE, VM-VENTAS, VM-INVENTARIO y VM-DATOS | **2**: VM-APP y VM-DATOS |
+| Red entre VMs | Malla WireGuard entre cuentas (§4) | Subred privada de la misma red virtual |
+| Cuándo se usa | Entrega y operación normal | Si no se obtiene la segunda cuenta o se pierde (§7) |
+
+Dónde corre cada cosa, con la cuenta de cada VM:
 
 ```mermaid
 flowchart TD
@@ -26,34 +54,40 @@ subgraph CF["CLOUDFLARE - plan gratuito"]
 CFE["DNS + proxy + TLS + WAF básico + mitigación DDoS"]
 end
 
-subgraph OCI["ORACLE CLOUD - Free Tier"]
-subgraph APP["VM-APP - ARM - 1 OCPU / 6 GB"]
+subgraph SEC["ORACLE - cuenta secundaria - solo cómputo sin estado"]
+subgraph BOR["VM-BORDE - ARM - 1 OCPU / 6 GB"]
 CFD["cloudflared<br/>Tunnel saliente"]
-NGX["Nginx<br/>enrutamiento interno"]
-WEB["BabelHub.Web<br/>MVC Razor"]
-ECO["Servicio de E-commerce"]
-INV["Servicio de Inventario"]
+NGX["Nginx"]
+WEB["BabelHub.Web"]
 IDE["Servicio de Identidad"]
+end
+subgraph VEN["VM-VENTAS - ARM - 1 OCPU / 6 GB"]
+ECO["Servicio de E-commerce"]
 ASI["Servicio de Asistente"]
 N8N["n8n"]
 EVO["Evolution API"]
-RED[("Redis")]
+end
+end
+
+subgraph PRI["ORACLE - cuenta principal - estado y lo crítico"]
+subgraph INVM["VM-INVENTARIO - ARM - 1 OCPU / 6 GB"]
+INV["Servicio de Inventario"]
 end
 subgraph DAT["VM-DATOS - ARM - 1 OCPU / 6 GB"]
-DBV[("PostgreSQL Ventas<br/>esquemas ventas, identidad<br/>y base de Evolution API")]
-DBI[("PostgreSQL Inventario")]
+PG[("PostgreSQL<br/>bases ecommerce, inventario,<br/>identidad y evolution")]
+RED[("Redis")]
 end
-subgraph AUX["VM-AUX - x86 micro - 1/8 OCPU / 1 GB - opcional"]
-BAS["Acceso SSH de salto<br/>monitoreo ligero"]
+subgraph AUX["VM-AUX - x86 micro - opcional"]
+BAS["Salto SSH<br/>monitoreo ligero"]
 end
 end
 
 subgraph EXT["SERVICIOS EXTERNOS"]
 PAG["Culqi"]
-ENV["Servicio de envío"]
+ENV["Operador logístico"]
 LLM["Proveedor de LLM"]
 WA["WhatsApp"]
-ALM[("Almacén de archivos<br/>R2 / Object Storage")]
+ALM[("Almacén de archivos y respaldos<br/>R2 / Object Storage")]
 end
 
 USR -->|"HTTPS"| CFE
@@ -64,35 +98,41 @@ NGX --> ECO
 NGX --> INV
 NGX --> IDE
 NGX --> ASI
-WEB -->|"REST interno"| ECO
-WEB -->|"REST interno"| INV
-WEB -->|"REST interno"| IDE
-WEB -->|"REST interno"| ASI
+WEB -->|"REST"| ECO
+WEB -->|"REST"| INV
+WEB -->|"REST"| IDE
+WEB -->|"REST"| ASI
 ECO -->|"REST"| INV
 ASI -->|"REST"| ECO
 ASI -->|"REST"| INV
+ECO -->|"5432"| PG
+INV -->|"5432"| PG
+IDE -->|"5432"| PG
+EVO -->|"5432"| PG
 ECO --> RED
 INV --> RED
 EVO --> RED
-ECO -->|"5432"| DBV
-IDE -->|"5432"| DBV
-EVO -->|"5432"| DBV
-INV -->|"5432"| DBI
 ECO -->|"webhook"| N8N
 INV -->|"webhook"| N8N
 N8N --> EVO
 EVO --> WA
 ECO -->|"sube y firma URLs"| ALM
+PG -->|"respaldo cifrado"| ALM
 USR -.->|"descarga con URL firmada"| ALM
 ECO --> PAG
 ECO --> ENV
 ASI --> LLM
-BAS -.->|"SSH"| APP
+BAS -.->|"SSH"| BOR
+BAS -.->|"SSH"| VEN
+BAS -.->|"SSH"| INVM
 BAS -.->|"SSH"| DAT
 
 style CF fill:#222,stroke:#fff,stroke-width:2px,color:#fff
-style OCI fill:#222,stroke:#fff,stroke-width:2px,color:#fff
-style APP fill:#222,stroke:#fff,stroke-width:2px,color:#fff
+style SEC fill:#222,stroke:#fff,stroke-width:2px,color:#fff
+style PRI fill:#222,stroke:#fff,stroke-width:2px,color:#fff
+style BOR fill:#222,stroke:#fff,stroke-width:2px,color:#fff
+style VEN fill:#222,stroke:#fff,stroke-width:2px,color:#fff
+style INVM fill:#222,stroke:#fff,stroke-width:2px,color:#fff
 style DAT fill:#222,stroke:#fff,stroke-width:2px,color:#fff
 style AUX fill:#222,stroke:#fff,stroke-width:2px,color:#fff
 style EXT fill:#222,stroke:#fff,stroke-width:2px,color:#fff
@@ -110,86 +150,160 @@ style INV fill:#222,stroke:#fff,color:#fff
 style IDE fill:#222,stroke:#fff,color:#fff
 style ASI fill:#222,stroke:#fff,color:#fff
 style RED fill:#222,stroke:#fff,color:#fff
-style DBV fill:#222,stroke:#fff,color:#fff
-style DBI fill:#222,stroke:#fff,color:#fff
+style PG fill:#222,stroke:#fff,color:#fff
 style BAS fill:#222,stroke:#fff,color:#fff
 style PAG fill:#222,stroke:#fff,color:#fff
 style ENV fill:#222,stroke:#fff,color:#fff
 style LLM fill:#222,stroke:#fff,color:#fff
 ```
 
-| VM | Tipo | Contenedores | Justificación |
+| VM | Cuenta | Contenedores | Justificación |
 | :--- | :--- | :--- | :--- |
-| **VM-APP** | ARM, 1 OCPU y 6 GB | cloudflared, Nginx, Web, E-commerce, Inventario, Identidad, Asistente, n8n, Evolution API y Redis. | Concentra los componentes sin estado de negocio; puede reconstruirse desde las imágenes. n8n conserva solo su volumen de flujos y la sesión de WhatsApp de Evolution API (se respalda). |
-| **VM-DATOS** | ARM, 1 OCPU y 6 GB | PostgreSQL Ventas (esquemas `ventas` e `identidad`, más la base de Evolution API) y PostgreSQL Inventario, más tareas de respaldo. | Es la VM con el estado persistente; se protege y se respalda aparte. |
-| **VM-AUX** *(opcional)* | x86 micro, 1/8 OCPU y 1 GB | Acceso SSH de salto y monitoreo ligero de disponibilidad. | Aprovecha una VM gratuita sin consumir cupo ARM. No debe alojar nada crítico: es muy pequeña y puede ser recuperada si está inactiva. |
+| **VM-BORDE** | Secundaria | cloudflared, Nginx, Web, Identidad. | Entrada pública, interfaz y emisión de credenciales: sin estado de negocio, se reconstruye desde las imágenes. La verificación de la firma es local en cada servicio; Identidad solo atiende inicios de sesión, renovaciones y la publicación de su clave pública. |
+| **VM-VENTAS** | Secundaria | E-commerce, Asistente, n8n y Evolution API. | La venta y lo periférico. El Asistente y los avisos no bloquean la compra aunque se degraden. n8n conserva sus flujos y la sesión de WhatsApp de Evolution API (se respaldan). |
+| **VM-INVENTARIO** | Principal | Inventario. | Aísla lo más crítico (AC01): su CPU no compite con la venta, el asistente ni Node. |
+| **VM-DATOS** | Principal | PostgreSQL (una instancia con las bases `ecommerce`, `inventario`, `identidad` y `evolution`), Redis y las tareas de respaldo. | Todo el estado persistente. Sin aplicaciones y sin acceso desde Internet. |
+| **VM-AUX** *(opcional)* | Principal | Salto SSH y monitoreo ligero. | Aprovecha una VM gratuita sin gastar cupo ARM. Ver §4. |
 
-**Estimación de memoria (a validar con mediciones reales):**
+**Por qué el estado y lo crítico van en la cuenta principal.** La segunda cuenta es la que Oracle podría suspender (§1). Si se pierde, se pierden VM-BORDE y VM-VENTAS, que no guardan estado de negocio y se recrean desde las imágenes: los datos, el Inventario y los respaldos siguen en la cuenta principal (§7).
+
+**Perfil mínimo.** VM-APP aloja cloudflared, Nginx, Web y los cuatro servicios más n8n y Evolution API; VM-DATOS es la misma. Es el despliegue de la versión anterior de este documento: el límite real es la CPU (5 aplicaciones .NET y 2 de Node sobre 1 OCPU) y todos los servicios comparten host y dominio de falla.
+
+### Estimación de memoria (a validar con mediciones reales)
+
+El detalle por contenedor está en el [presupuesto de recursos](07-presupuesto-de-recursos.md). Objetivo de RNF12: menos del 70 % por VM (unos 4,2 GB).
 
 | VM | Consumo estimado | Holgura |
 | :--- | :--- | :--- |
-| VM-APP (6 GB) | Sistema y Docker ~0,5 GB; cuatro servicios .NET y la web ~1,0–2,0 GB; n8n ~0,3–0,6 GB; Evolution API ~0,3–0,5 GB; Redis limitado a ~0,25 GB; Nginx y cloudflared < 0,2 GB. Total ~2,4–4,0 GB. | Suficiente en RAM, pero ya cerca del 70 % del objetivo de RNF12 en el peor caso; el límite real es la **CPU** (5 aplicaciones .NET y 2 de Node sobre 1 OCPU). Se fijan límites de memoria por contenedor y se mide con k6. |
-| VM-DATOS (6 GB) | Sistema ~0,4 GB; dos PostgreSQL con ~1 GB de buffers cada uno y conexiones, ~2,5–3,5 GB. | Buena; la memoria sobrante la usa el sistema como caché de disco. |
+| VM-BORDE | Sistema y Docker ~0,5 GB; Web y Identidad ~0,4–0,6 GB; Nginx y cloudflared < 0,2 GB. Total ~1,1–1,3 GB. | Amplia; la CPU la comparten dos aplicaciones .NET. |
+| VM-VENTAS | Sistema ~0,5 GB; E-commerce y Asistente ~0,3–0,5 GB; n8n ~0,3–0,6 GB; Evolution API ~0,3–0,5 GB. Total ~1,4–2,1 GB. | Buena; n8n y Evolution API son los mayores consumos y tienen límite. |
+| VM-INVENTARIO | Sistema ~0,5 GB; Inventario ~0,15–0,25 GB. Total ~0,7–0,8 GB. | Muy amplia; la reserva de CPU es la razón de la VM. |
+| VM-DATOS | Sistema ~0,4 GB; PostgreSQL con ~0,75 GB de buffers y conexiones, Redis ~0,25 GB y respaldos. Total ~2,0–2,8 GB. | Buena; la memoria sobrante la usa el sistema como caché de disco. |
 
-**Por qué 1 OCPU y 6 GB en cada una:** el cupo es de 2 OCPU y 12 GB, y la relación de 6 GB por OCPU lo reparte por igual. La alternativa de dar más a la VM-DATOS no ayuda, porque el cuello de botella previsto es la CPU de las aplicaciones.
+## 4. Red entre VMs
 
-## 3. ¿Conviene separar la base de datos?
+Con todos los contenedores en una VM bastaba la red interna de Docker. Con varias VMs, **la red entre ellas pasa a ser una frontera de confianza** y se trata como tal.
+
+| Tema | Regla |
+| :--- | :--- |
+| Red privada | Ningún tráfico entre servicios, hacia la base ni hacia Redis viaja por Internet sin cifrar. En el perfil objetivo, una **malla WireGuard** (`wg0`) une las cuatro VMs entre las dos cuentas; las reglas de firewall se escriben sobre esa interfaz. Alternativa a validar: peering de redes virtuales entre cuentas, si Oracle lo permite sin costo. En el perfil mínimo basta la subred privada de la cuenta. |
+| Escucha | Cada servicio publica su puerto **solo en la dirección privada de su VM**, nunca en `0.0.0.0`; Cloudflare Tunnel sigue siendo la única entrada pública. |
+| Direcciones | Las direcciones de los servicios y de la base son variables de entorno por VM (por ejemplo `BABELHUB__SERVICIOS__INVENTARIO_URL`); no hay nombres de Docker entre VMs. |
+| Autenticación | Las llamadas entre servicios llevan **credencial de servicio** (SEG-15): con varias VMs, estar en la red ya no basta para ser atendido (AM24). |
+| Base de datos | `pg_hba` por base y por dirección de origen, con `hostssl` (TLS); un rol por servicio sin permiso sobre otras bases (§5). |
+| Redis | Contraseña y usuarios con ACL por servicio, y prefijos de claves por servicio (`eco:`, `inv:`, `evo:`). |
+| Arranque | No hay orden de arranque entre VMs: cada servicio reintenta la conexión a su base y a sus dependencias con esperas crecientes y expone un `healthcheck` (vida y disponibilidad) que Docker y el monitoreo consultan. |
+| Reloj | Sincronización de hora (`chrony`) en todas las VMs: las credenciales duran 15 minutos y la validación debe tolerar una desviación pequeña (propuesta: ±60 s). |
+| Acceso administrativo | SSH solo con llave pública, desde la IP del administrador o desde **VM-AUX**, que funciona como **salto**: es el único punto de entrada administrativo a las demás VMs. VM-DATOS y VM-INVENTARIO no aceptan SSH desde Internet. |
+| Monitoreo | VM-AUX comprueba cada pocos minutos, **desde fuera de las VMs de aplicaciones**, que la puerta pública y la salud de cada servicio respondan, y avisa por correo. No reemplaza las alertas de seguridad (RNF20), que salen de los registros de cada servicio. |
+
+## 5. Base de datos
+
+### 5.1 ¿Conviene separar la VM de datos?
 
 **Veredicto: sí, con las condiciones indicadas.**
 
 | A favor | En contra |
 | :--- | :--- |
-| **Seguridad:** la VM de datos no tiene puerto abierto a Internet, y si se vulnera una aplicación el atacante no obtiene directamente los archivos de la base. | **Latencia de red:** cada consulta cruza la red interna. Es pequeña dentro de la misma red de Oracle, pero Inventario hace muchas consultas cortas; la caché Redis lo compensa. |
-| **Aislamiento de recursos:** el recolector de basura de .NET y PostgreSQL no compiten por memoria, y un fallo por falta de memoria en las aplicaciones no mata la base. | **Más piezas que operar:** dos VMs que actualizar, con reglas de red y claves SSH propias. |
-| **Mantenimiento independiente:** se puede reiniciar o actualizar las aplicaciones sin tocar la base. | **Reparto fijo:** con 6 GB cada una, la memoria libre de una VM no se puede prestar a la otra. |
-| **Respaldos más limpios:** el volumen de datos se respalda o se restaura sin tocar las aplicaciones. | **Nuevo punto de falla:** si la VM de datos cae, todo el sistema deja de funcionar. |
-| **Reglas de firewall distintas** para cada VM. | **Riesgo de capacidad:** pedir dos instancias ARM aumenta la probabilidad de recibir un error de falta de capacidad. |
+| **Seguridad:** la VM de datos no tiene puerto abierto a Internet y, si se vulnera una aplicación, el atacante no obtiene directamente los archivos de la base. | **Latencia de red:** cada consulta cruza la red privada; Inventario hace muchas consultas cortas y la caché Redis lo compensa. |
+| **Aislamiento de recursos:** el recolector de basura de .NET y PostgreSQL no compiten por memoria. | **Más piezas que operar:** reglas de red y claves propias por VM. |
+| **Mantenimiento independiente:** se reinician o actualizan las aplicaciones sin tocar la base. | **Nuevo punto de falla:** si la VM de datos cae, todo el sistema deja de funcionar. |
+| **Respaldos más limpios:** el volumen de datos se respalda o se restaura sin tocar las aplicaciones. | **Reparto fijo:** con 6 GB cada una, la memoria libre de una VM no se presta a otra. |
 
 **Condiciones para que la separación aporte seguridad real:**
-- El puerto 5432 solo acepta conexiones desde la VM-APP (regla de red de Oracle y firewall del sistema).
-- La VM-DATOS no es accesible por SSH desde Internet, solo desde la VM-AUX o desde la IP del administrador.
-- Si la red lo permite sin costo, se la ubica en una subred privada; si no, se deja en la pública pero con las reglas anteriores. **A verificar** en tu cuenta.
-- Se cifra la conexión a PostgreSQL con TLS, o se confía en la red privada de Oracle y se documenta.
+- El puerto 5432 solo acepta conexiones de las VMs de los servicios que usan cada base (regla de red de Oracle, firewall del sistema y `pg_hba`).
+- VM-DATOS no es accesible por SSH desde Internet, solo desde VM-AUX o desde la IP del administrador.
+- Si la red lo permite sin costo, se la ubica en una subred privada; si no, se deja en la pública con las reglas anteriores. **A verificar** en la cuenta.
+- La conexión usa TLS.
 - Se respaldan las bases (como mínimo con un volcado diario fuera de la VM) y se prueba la restauración.
 
-**Contingencia:** si Oracle solo concede una instancia, se usa **una VM ARM de 2 OCPU y 12 GB** con las bases en contenedores sin puertos publicados, en una red interna de Docker y con volúmenes separados. Se pierde el aislamiento por VM, pero se conserva el aislamiento por red.
+### 5.2 Una instancia, una base lógica por servicio
 
-## 4. Reglas de red
+El estilo basado en servicios, en su formulación habitual, comparte una sola base de datos entre servicios; la base por servicio es la regla de los microservicios. Este proyecto toma un punto intermedio: **cada servicio con estado tiene su propia base lógica y su propio rol, y todas comparten una instancia de PostgreSQL** en VM-DATOS.
+
+| Opción | Aislamiento de datos | Memoria | Operación | Veredicto |
+| :--- | :--- | :--- | :--- | :--- |
+| A. Una base compartida con esquemas por servicio | Débil: un rol con permisos de más cruza esquemas. | Mínima | Mínima | Descartada: la separación depende de los permisos de cada esquema. |
+| **B. Una instancia con una base por servicio y un rol por base** | **Fuerte:** PostgreSQL no permite consultas entre bases; un rol sin `CONNECT` no entra. | Una sola memoria compartida (~0,75 GB de buffers) | Un servidor, un respaldo por base | **Elegida** (AD03, AD18). |
+| C. Una instancia por servicio | Fuerte, con configuración propia | Un juego de buffers por instancia (~0,5 GB cada una) | Cuatro servidores que actualizar | Descartada: con 1 OCPU en VM-DATOS no ofrece aislamiento de CPU y consume más RAM. |
+
+| Base | Servicio dueño | Contenido |
+| :--- | :--- | :--- |
+| `ecommerce` | E-commerce | Catálogo, carritos, pedidos, pagos, envíos, devoluciones, biblioteca digital, reclamaciones, avisos y su auditoría. |
+| `inventario` | Inventario | Fuentes, stock, reservas, traslados, ajustes y su auditoría. |
+| `identidad` | Identidad | Usuarios, renovaciones, códigos, consentimientos y su auditoría. |
+| `evolution` | Evolution API | Datos propios de Evolution API (n8n guarda los suyos en un volumen). |
+
+El Asistente no tiene base: es de solo lectura y consume las API (AD07, AD28).
+
+**Reglas que sostienen el aislamiento:**
+- Un rol por base, sin ser superusuario, con `REVOKE CONNECT ... FROM PUBLIC` y sin permiso sobre otras bases; el rol de la aplicación no puede modificar la auditoría.
+- Límite de conexiones por rol (`CONNECTION LIMIT`) y `statement_timeout`, para que un servicio no agote a los demás.
+- El volcado y la restauración se hacen **por base**; la restauración de `inventario` no toca `ecommerce`.
+
+**Costo aceptado:** las bases comparten CPU, disco y memoria compartida. Una consulta pesada de un servicio puede afectar a otro. Se mitiga con los límites anteriores, con la separación de VM entre aplicaciones y datos y con la medición de carga (k6). Si Inventario necesitara su propia instancia, mover `inventario` a otra VM solo cambia su cadena de conexión.
+
+## 6. Reglas de red (perfil objetivo)
 
 | Origen | Destino | Puerto | Estado |
 | :--- | :--- | :--- | :--- |
-| Internet | VM-APP | 80 y 443 | **Cerrados** (el tráfico entra por el túnel saliente) |
-| IP del administrador | VM-APP y VM-AUX | 22 (SSH, solo con llave pública) | Permitido |
-| VM-APP | VM-DATOS | 5432 (PostgreSQL) | Permitido |
-| VM-AUX | VM-APP y VM-DATOS | 22 | Permitido |
+| Internet | Cualquier VM | 80 y 443 | **Cerrados** (el tráfico entra por el túnel saliente) |
+| IP del administrador | VM-AUX | 22 (SSH, solo con llave pública) | Permitido |
+| VM-AUX | Las demás VMs | 22 | Permitido |
+| Cualquier VM | Otra VM | 51820/UDP (WireGuard) | Solo entre las cuatro VMs |
+| VM-BORDE | VM-VENTAS | 8080 (E-commerce, Asistente) | Permitido |
+| VM-BORDE, VM-VENTAS | VM-INVENTARIO | 8080 (Inventario) | Permitido |
+| VM-VENTAS, VM-INVENTARIO | VM-BORDE | 8080 (solo Identidad: clave pública y credencial de lectura) | Permitido |
+| VM-INVENTARIO | VM-VENTAS | 5678 (webhook de n8n) | Permitido |
+| VM-BORDE, VM-VENTAS, VM-INVENTARIO | VM-DATOS | 5432 (cada una solo a su base) y 6379 (Redis) | Permitido |
 | Cualquier otro origen | VM-DATOS | todos | **Denegado** |
-| Internet | n8n y Evolution API | todos | **Sin publicar** (solo red interna de Docker; paneles por túnel SSH) |
+| Internet | n8n y Evolution API | todos | **Sin publicar** (paneles por túnel SSH) |
 | Evolution API | WhatsApp | HTTPS saliente | Permitido |
-| VM-APP (E-commerce) | Almacén de archivos | HTTPS saliente | Permitido (subir archivos y firmar URLs) |
+| VM-VENTAS | Almacén de archivos | HTTPS saliente | Permitido (subir archivos y firmar URLs) |
+| VM-DATOS | Almacén de archivos | HTTPS saliente | Permitido (respaldos cifrados) |
 | Internet | Almacén de archivos | HTTPS | Solo con URL firmada vigente; bucket privado |
 
-Complementos: firewall del sistema operativo con las mismas reglas, secretos como variables de entorno fuera del repositorio y SSH sin contraseña.
+En el perfil mínimo valen las mismas reglas con VM-APP en lugar de VM-BORDE, VM-VENTAS y VM-INVENTARIO. Complementos: firewall del sistema operativo con las mismas reglas, secretos como variables de entorno fuera del repositorio y SSH sin contraseña.
 
-## 5. Sistema operativo
+## 7. Fallos y contingencia
+
+Con más VMs en serie, **cada VM es un punto de falla más y no hay redundancia**. La arquitectura de servicios aísla el efecto de cada caída; no evita que ocurra. Esto es lo que se espera (AC03, RNF03):
+
+| Cae | Efecto | Degradación y recuperación |
+| :--- | :--- | :--- |
+| **VM-BORDE** | Sin acceso público y sin inicio de sesión. Los datos siguen intactos. | Recrear la VM con su Compose desde las imágenes (RTO ≤ 4 h). |
+| **VM-VENTAS** | Sin catálogo ni compras; la Web muestra servicio no disponible. **El personal de sucursal sigue operando el inventario.** Sin avisos ni asistente. | Recrear la VM; los avisos pendientes se reintentan al volver (NOT-04). |
+| **VM-INVENTARIO** | El catálogo se sigue consultando y el checkout informa que no puede validar el stock, sin cobrar a ciegas. | Reinicio automático; si persiste, recrear la VM. |
+| **VM-DATOS** | **Caída total** de todo lo que tiene estado. Es el mayor riesgo. | Restaurar desde el último respaldo (RPO ≤ 24 h, RTO ≤ 4 h). |
+| **VM-AUX** | Sin salto SSH ni monitoreo; el sistema sigue funcionando. | Acceder desde la IP del administrador. |
+| **La cuenta secundaria** | Se pierden VM-BORDE y VM-VENTAS. | Pasar al **perfil mínimo** en la cuenta principal: reutilizar VM-INVENTARIO como VM-APP con los contenedores de las dos VMs perdidas, desde las imágenes, los secretos custodiados y el respaldo de n8n y Evolution API. RTO ≤ 4 h. |
+| **La cuenta principal** | Se pierden el Inventario, los datos y VM-AUX. | Restaurar los respaldos cifrados del almacén de objetos en otra máquina con el mismo Compose (ver [operación segura](../05-seguridad/07-operacion-segura.md) §5). |
+
+## 8. Sistema operativo
 
 **Decisión (2026-10-16):** **Ubuntu Server LTS mínimo sin entorno gráfico** en las VMs de Oracle, por ser la imagen oficial para Ampere A1 (misma familia, mismo `apt` y mismo Docker que Debian); en local se puede usar Debian. La propuesta original indicaba Debian: el cambio se justifica por la imagen oficial y se menciona en la entrega. El criterio se mantiene: instalación mínima y sin interfaz gráfica para ahorrar memoria.
 
-## 6. Pendientes de verificar
+## 9. Pendientes de verificar
 
-- Cupo ARM, número de instancias y condiciones del Free Tier en tu cuenta.
-- Capacidad ARM en la región elegida; las más cercanas a Perú son las de Sudamérica, pero la disponibilidad varía.
+- Cupo ARM, número de instancias y condiciones del Free Tier en cada cuenta, y si la actualización a PAYG evita la recuperación por inactividad.
+- **Segunda cuenta de Oracle:** riesgo de suspensión por incumplir la regla de una cuenta gratuita por persona (B10). Alternativa sin segunda cuenta: pagar en la misma cuenta las dos VMs ARM adicionales (del orden de 14 USD al mes cada una, a verificar en la calculadora de costos de Oracle), con una sola red y sin riesgo de términos.
+- **Prueba de concepto de red entre cuentas:** WireGuard frente a peering de redes virtuales, latencia entre las VMs de la misma región y consumo de CPU (B11).
+- Capacidad ARM en la región elegida (la misma para ambas cuentas); las más cercanas a Perú son las de Sudamérica, pero la disponibilidad varía.
 - Disponibilidad de subred privada sin costo.
+- Registro de imágenes para recrear VMs sin depender de una cuenta de Oracle (por ejemplo, el registro de contenedores del repositorio).
 - Costo y registro del dominio para Cloudflare.
 - Imágenes multi-arch de todos los contenedores (PostgreSQL, Redis, Nginx, cloudflared y .NET ofrecen ARM64).
-- Comportamiento del sistema bajo carga con k6 sobre 1 OCPU por VM, con n8n y Evolution API en marcha.
+- Comportamiento del sistema bajo carga con k6 sobre cada VM de 1 OCPU, incluida la latencia añadida por las llamadas entre VMs.
 - Imágenes ARM64 de n8n y de Evolution API, y consumo real de memoria de ambos.
 - Términos de uso de WhatsApp frente a Evolution API; usar un número dedicado.
-- Culqi: idempotencia, soporte de Yape, reembolsos y llaves de pruebas (sandbox).
+- Culqi: idempotencia, soporte de Yape, reembolsos y llaves de pruebas (sandbox). **La pasarela de pago queda definida: Culqi (AD17).**
 - Almacén de archivos: cuotas gratuitas vigentes de Cloudflare R2 y de Oracle Object Storage, costo de operaciones y límite de tamaño por archivo; elegir uno antes de implementar `ecommerce-biblioteca-digital`.
 - Contratos con los titulares de derechos: se simulan con datos de ejemplo, al ser un proyecto académico (ver [marco legal](../01-analisis-de-sistema/03-marco-legal.md)).
 
-## 7. Fuentes del despliegue
+## 10. Fuentes del despliegue
 
 - Oracle Cloud Free Tier: reducción del cupo ARM a 2 OCPU y 12 GB, 2 VMs x86 micro, 200 GB de bloque (InfoQ, 2026; análisis técnicos de la comunidad).
+- Oracle Cloud Free Tier FAQ: una cuenta gratuita por persona y suspensión por incumplimiento.
 - Cloudflare: plan gratuito y Cloudflare Tunnel (documentación de Cloudflare).
 - Canonical y Oracle: imagen de Ubuntu para Ampere A1.
+- M. Richards y N. Ford, *Fundamentals of Software Architecture*: estilo basado en servicios (despliegue y datos).

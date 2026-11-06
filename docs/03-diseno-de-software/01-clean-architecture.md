@@ -100,8 +100,8 @@ style Ent fill:#222,stroke:#fff,color:#fff
 
 | Puerto | Servicio | Implementación (Infraestructura) |
 | :--- | :--- | :--- |
-| Repositorio de fuentes, reservas, traslados y ajustes | Inventario | PostgreSQL (BD Inventario) |
-| Repositorio de libros, carritos, pedidos y pagos | E-commerce | PostgreSQL (BD Ventas) |
+| Repositorio de fuentes, reservas, traslados y ajustes | Inventario | PostgreSQL (base `inventario`) |
+| Repositorio de libros, carritos, pedidos y pagos | E-commerce | PostgreSQL (base `ecommerce`) |
 | Cliente de inventario | E-commerce y Asistente | Llamadas REST al servicio de Inventario |
 | Cliente de catálogo y pedidos | Asistente | Llamadas REST al servicio de E-commerce |
 | Pasarela de pago | E-commerce | Culqi (Yape y tarjetas) |
@@ -179,7 +179,7 @@ src/
 │   │                                           almacén de archivos
 │   └── BabelHub.Ecommerce.Api/
 │
-├── BabelHub.Identidad/                         versión reducida (ver sección 6); esquema propio `identidad`
+├── BabelHub.Identidad/                         versión reducida (ver sección 6); base propia `identidad`
 ├── BabelHub.AsistenteCompra/                   versión reducida (ver sección 6)
 ├── BabelHub.Web/                               interfaz MVC Razor (ver sección 4.3)
 │   ├── Areas/{Tienda, Sucursal, Admin}/        Controllers, Views y ViewModels por rol
@@ -402,7 +402,7 @@ Este apartado **precisa** lo indicado en [organización interna, sección 3 (res
 | `ecommerce-devoluciones` | E-commerce | Dominio (devolución y su ciclo; política distinta para libros digitales), Aplicación (solicitar, reembolsar, reingresar stock de impresos, revocar acceso digital), Infraestructura (reembolso en Culqi, cliente de Inventario). |
 | `ecommerce-libro-reclamaciones` | E-commerce | Dominio (reclamo y su plazo de conservación), Aplicación (registrar, consultar e imprimir copia), Infraestructura (persistencia). El enlace permanente vive en `web-base`. |
 | `asistente-compra-ia` | Asistente | Aplicación (consulta fundamentada), Infraestructura (LLM y clientes REST). |
-| `identidad-seguridad` | Identidad | Dominio (usuario, rol, sucursal, consentimiento), Infraestructura (emisión de JWT, esquema `identidad`), Api. |
+| `identidad-seguridad` | Identidad | Dominio (usuario, rol, sucursal, consentimiento), Infraestructura (emisión de JWT, base `identidad`), Api. |
 | `transversal-auditoria` | E-commerce, Inventario e Identidad | Contrato único de registro inmutable (quién, qué, cuándo, detalle); lo implementa cada servicio en su propia base. |
 | `transversal-notificaciones` | E-commerce e Inventario | Puerto `Notificador`, plantillas de avisos, reintentos y contrato del webhook de n8n; no bloquea la operación. |
 | `web-base` | Web | Estructura de áreas, sesión por cookie, manejo de errores, estados de pantalla y enlace permanente al Libro de Reclamaciones. Las pantallas de cada función se describen en el `plan.md` de su feature. |

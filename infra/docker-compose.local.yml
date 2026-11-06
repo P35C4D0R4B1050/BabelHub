@@ -1,4 +1,4 @@
-# Infraestructura local de BabelHub: bases de datos y caché.
+# Infraestructura local de BabelHub: base de datos y caché.
 # Los servicios .NET y la Web se agregan aquí a medida que existan sus Dockerfiles.
 # El emulador de almacén S3 se elige en el bloqueo B02 (ver progress/blockers.md).
 #
@@ -8,37 +8,23 @@
 name: babelhub
 
 services:
-  postgres-ventas:
-    # Esquemas ventas e identidad (AD18) y base de Evolution API en producción.
+  postgres:
+    # Una instancia con una base y un rol por servicio: ecommerce, inventario e identidad (AD03, AD18).
+    # Igual que en VM-DATOS; `infra/postgres/init/` crea las bases la primera vez que arranca el volumen.
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_VENTAS_USER:-babelhub}
-      POSTGRES_PASSWORD: ${POSTGRES_VENTAS_PASSWORD:?Define POSTGRES_VENTAS_PASSWORD en .env}
-      POSTGRES_DB: ${POSTGRES_VENTAS_DB:-ventas}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Define POSTGRES_ADMIN_PASSWORD en .env}
+      POSTGRES_ECOMMERCE_PASSWORD: ${POSTGRES_ECOMMERCE_PASSWORD:?Define POSTGRES_ECOMMERCE_PASSWORD en .env}
+      POSTGRES_INVENTARIO_PASSWORD: ${POSTGRES_INVENTARIO_PASSWORD:?Define POSTGRES_INVENTARIO_PASSWORD en .env}
+      POSTGRES_IDENTIDAD_PASSWORD: ${POSTGRES_IDENTIDAD_PASSWORD:?Define POSTGRES_IDENTIDAD_PASSWORD en .env}
     ports:
-      - "127.0.0.1:${POSTGRES_VENTAS_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres-ventas-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_VENTAS_USER:-babelhub} -d ${POSTGRES_VENTAS_DB:-ventas}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  postgres-inventario:
-    # Instancia propia del Inventario (AD03): aísla la escritura intensiva de reservas y traslados.
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: ${POSTGRES_INVENTARIO_USER:-babelhub}
-      POSTGRES_PASSWORD: ${POSTGRES_INVENTARIO_PASSWORD:?Define POSTGRES_INVENTARIO_PASSWORD en .env}
-      POSTGRES_DB: ${POSTGRES_INVENTARIO_DB:-inventario}
-    ports:
-      - "127.0.0.1:${POSTGRES_INVENTARIO_PORT:-5433}:5432"
-    volumes:
-      - postgres-inventario-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_INVENTARIO_USER:-babelhub} -d ${POSTGRES_INVENTARIO_DB:-inventario}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_ADMIN_USER:-postgres} -d postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -58,5 +44,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres-ventas-data:
-  postgres-inventario-data:
+  postgres-data:

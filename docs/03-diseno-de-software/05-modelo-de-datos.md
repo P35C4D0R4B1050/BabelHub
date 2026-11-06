@@ -1,6 +1,6 @@
 # Modelo de datos lógico
 
-Traduce el [modelo de dominio](../01-analisis-de-sistema/07-modelo-de-dominio.md) a tablas, restricciones e índices. Es un **diseño lógico de referencia**: el plan de cada spec fija los nombres definitivos y las migraciones. Las bases siguen AD03 y AD18: una instancia PostgreSQL para Ventas (con el esquema `identidad`) y otra para Inventario, sin tablas compartidas.
+Traduce el [modelo de dominio](../01-analisis-de-sistema/07-modelo-de-dominio.md) a tablas, restricciones e índices. Es un **diseño lógico de referencia**: el plan de cada spec fija los nombres definitivos y las migraciones. Las bases siguen AD03 y AD18: una instancia PostgreSQL con una base lógica por servicio (`ecommerce`, `inventario` e `identidad`), sin tablas ni consultas compartidas entre bases.
 
 ## 1. Convenciones
 
@@ -12,10 +12,10 @@ Traduce el [modelo de dominio](../01-analisis-de-sistema/07-modelo-de-dominio.md
 | Nombres | Tablas y columnas en español, minúsculas con guion bajo (`reservas`, `fecha_expiracion`). |
 | Borrado | Baja lógica para catálogo y usuarios; auditoría y hojas de reclamación nunca se borran (solo se anonimiza lo que corresponda). |
 | Concurrencia | Columna de versión por fila (`version`) en agregados con escritura concurrente (stock). |
-| Permisos | Una cuenta de base por servicio, con permisos solo sobre su esquema; la cuenta de aplicación no puede modificar ni borrar la auditoría. |
+| Permisos | Un rol por servicio, que solo puede conectarse a su propia base (`REVOKE CONNECT` a los demás); la cuenta de aplicación no puede modificar ni borrar la auditoría. |
 | Datos personales | Marcados en el diccionario; el borrado o la anonimización se prueba (RNF23). |
 
-## 2. Inventario (instancia Inventario)
+## 2. Inventario (base `inventario`)
 
 ```mermaid
 erDiagram
@@ -40,7 +40,7 @@ RESERVAS }o--|| PEDIDOS_REF : "pertenece a"
 
 **Regla de oro:** `reservado` se actualiza en la misma transacción que la fila de `reservas`, y el `CHECK` es la última defensa contra la sobreventa (AD23). El vendible se calcula como `fisico - reservado`; no se almacena.
 
-## 3. Ventas (instancia Ventas, esquema `ventas`)
+## 3. E-commerce (base `ecommerce`)
 
 | Tabla | Columnas principales | Restricciones |
 | :--- | :--- | :--- |
@@ -61,7 +61,7 @@ RESERVAS }o--|| PEDIDOS_REF : "pertenece a"
 | `avisos` | id, evento_id, destinatario, estado, intentos, proximo_intento | Único (evento_id, destinatario) para no duplicar (NOT-05). |
 | `auditoria` | como en Inventario | Solo inserción. |
 
-## 4. Identidad (esquema `identidad`)
+## 4. Identidad (base `identidad`)
 
 | Tabla | Columnas principales | Restricciones |
 | :--- | :--- | :--- |
