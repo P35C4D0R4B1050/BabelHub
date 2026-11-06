@@ -1,12 +1,14 @@
 ---
 id: asistente-compra-ia
 titulo: Asistente de compra
-estado: Draft
+estado: Approved
 servicio: E-commerce
 prefijo: ASI
 origen: [RF08, NN04, NN18]
 calidad: [AC03, AC04, RNF03, RNF05, RNF07, RNF17, RNF22]
 depende: [ecommerce-catalogo, ecommerce-pedidos, identidad-seguridad, transversal-seguridad]
+aprobado_por: Diego Amiquero
+aprobado_en: 2026-11-06
 ---
 
 # Spec — Asistente de compra

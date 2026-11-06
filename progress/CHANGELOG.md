@@ -13,14 +13,14 @@ Informe en `progress/R5-reformulacion-a-dos-servicios.md`.
 - Reescritos: estilo (con alineación y relación con SOA y ESB), despliegue, presupuesto de recursos y tácticas. Revisados: decisiones (nueva AD31), drivers, C4 niveles 2 y 3, Clean Architecture, módulos y contratos, modelo de datos, seguridad, análisis, UX, proceso, glosario, `AGENTS.md` (regla 13), README y CLAUDE.md.
 
 ### Specs
-- Seis specs vuelven a `Draft` (B10) y se **revisaron y corrigieron el mismo día** (sin preguntas abiertas): `inventario-ajustes`, `inventario-fuentes`, `ecommerce-catalogo`, `identidad-seguridad`, `asistente-compra-ia` y `transversal-seguridad`. Nuevos requisitos: ingreso de mercadería en la fuente de recepción (AJU-19, AJU-20), fuente de recepción y unidades vendidas (FUE-19 a FUE-22), stock inicial, ingreso desde el catálogo y agotado sin baja (CAT-20 a CAT-23), límite de concurrencia del asistente (ASI-20), presupuestos del personal y verificación humana (SEG-30, SEG-31). Hallazgos en `progress/R5-reformulacion-a-dos-servicios.md` §3.1. Las demás solo cambian los identificadores de atributos.
+- **Aprobadas de nuevo por el responsable el 2026-11-06** (C09). Habían vuelto a `Draft` y se **revisaron y corrigieron el mismo día** (sin preguntas abiertas): `inventario-ajustes`, `inventario-fuentes`, `ecommerce-catalogo`, `identidad-seguridad`, `asistente-compra-ia` y `transversal-seguridad`. Nuevos requisitos: ingreso de mercadería en la fuente de recepción (AJU-19, AJU-20), fuente de recepción y unidades vendidas (FUE-19 a FUE-22), stock inicial, ingreso desde el catálogo y agotado sin baja (CAT-20 a CAT-23), límite de concurrencia del asistente (ASI-20), presupuestos del personal y verificación humana (SEG-30, SEG-31). Hallazgos en `progress/R5-reformulacion-a-dos-servicios.md` §3.1. Las demás solo cambian los identificadores de atributos.
 
 ### Código, pruebas e infraestructura
 - Se unieron al E-commerce los proyectos de Identidad, Asistente y Web (solo andamiaje); módulos como carpetas por capa; nuevas pruebas de módulos (regla 13). `dotnet build -warnaserror` y todas las pruebas correctas.
 - Compose local con dos bases; Nginx por host con límites; prototipo con stock único, ingreso en el Catálogo, Vendidos y descuento al pasar a en reparto.
 
 ### Bloqueos
-- Cerrados: segunda cuenta (C06), red entre cuentas (C07) y reformulación (C08). Nuevos B10 (reaprobación de specs) y B11 (rendimiento de la entrada).
+- Cerrados: segunda cuenta (C06), red entre cuentas (C07), reformulación (C08) y reaprobación de las seis specs (C09, aprobadas el 2026-11-06). Nuevo B11 (rendimiento de la entrada).
 
 ## 2026-11-06 — Auditoría del estilo basado en servicios y del despliegue (reemplazada por la reformulación posterior)
 

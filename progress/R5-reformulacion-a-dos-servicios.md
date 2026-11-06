@@ -32,15 +32,15 @@ Los identificadores se renumeraron en docs y specs con un cambio mecánico (la c
 
 | Spec | Cambio | Estado |
 | :--- | :--- | :--- |
-| `inventario-ajustes` | Ingreso de mercadería solo en la fuente de recepción, con referencia, límites y lista (AJU-02, AJU-13, AJU-19 y AJU-20; AC-AJU-10, 15 y 16). | **Draft** |
-| `inventario-fuentes` | Fuente de recepción, su cambio auditado, unidades vendidas y su atribución (FUE-19 a FUE-22; AC-FUE-16 a AC-FUE-18). | **Draft** |
-| `ecommerce-catalogo` | Stock inicial al dar de alta y título agotado sin baja (CAT-20 a CAT-23; AC-CAT-16 a AC-CAT-19); depende de `inventario-ajustes`. | **Draft** |
-| `identidad-seguridad` | Validación por el Inventario y los módulos, contexto de lectura en lugar de credencial para el asistente (IDE-10, 30, 33 y 35). | **Draft** |
-| `asistente-compra-ia` | Contratos de módulos y contexto de lectura (ASI-06, ASI-19) y límite de concurrencia (ASI-20, AC-ASI-19). | **Draft** |
-| `transversal-seguridad` | Credencial entre el E-commerce y el Inventario y contexto del actor entre módulos (SEG-15); presupuestos del personal y verificación humana (SEG-30 y SEG-31). | **Draft** |
+| `inventario-ajustes` | Ingreso de mercadería solo en la fuente de recepción, con referencia, límites y lista (AJU-02, AJU-13, AJU-19 y AJU-20; AC-AJU-10, 15 y 16). | **Approved** (2026-11-06) |
+| `inventario-fuentes` | Fuente de recepción, su cambio auditado, unidades vendidas y su atribución (FUE-19 a FUE-22; AC-FUE-16 a AC-FUE-18). | **Approved** (2026-11-06) |
+| `ecommerce-catalogo` | Stock inicial al dar de alta y título agotado sin baja (CAT-20 a CAT-23; AC-CAT-16 a AC-CAT-19); depende de `inventario-ajustes`. | **Approved** (2026-11-06) |
+| `identidad-seguridad` | Validación por el Inventario y los módulos, contexto de lectura en lugar de credencial para el asistente (IDE-10, 30, 33 y 35). | **Approved** (2026-11-06) |
+| `asistente-compra-ia` | Contratos de módulos y contexto de lectura (ASI-06, ASI-19) y límite de concurrencia (ASI-20, AC-ASI-19). | **Approved** (2026-11-06) |
+| `transversal-seguridad` | Credencial entre el E-commerce y el Inventario y contexto del actor entre módulos (SEG-15); presupuestos del personal y verificación humana (SEG-30 y SEG-31). | **Approved** (2026-11-06) |
 | Las otras 13 | Solo la columna de atributos de calidad; `servicio:` pasa a E-commerce en `web-base` y `web-indice-infinito`; el nombre `BabelHub.Web` en `web-base`. Sin cambio de comportamiento. | Approved |
 
-Se quitaron `aprobado_por` y `aprobado_en` de las seis specs en Draft; **no se escribió ninguna aprobación**. Ver B10.
+Se quitaron `aprobado_por` y `aprobado_en` de las seis specs mientras estuvieron en Draft y se volvieron a escribir el 2026-11-06 por indicación expresa del responsable (C09).
 
 ### 3.1 Revisión de las seis specs (misma fecha)
 
@@ -55,7 +55,7 @@ Se revisó cada spec contra la arquitectura nueva y contra las demás. Hallazgos
 | `transversal-seguridad` | Los presupuestos por rol del personal y la verificación humana (AD13, AD24) no estaban como requisitos; AC-SEG-14 y AC-SEG-15 hablaban de «servicios» y de «la Web». | SEG-30 y SEG-31 con AC-SEG-27 y AC-SEG-28; AC-SEG-14 y AC-SEG-15 reescritos. |
 | `identidad-seguridad` | La regla de pendientes al cancelar una cuenta hacía que Identidad dependiera de otros módulos (ciclo); faltaba qué pasa con la clave pública si cae el E-commerce; vocabulario de servicio y base. | Puerto de pendientes que implementan los demás módulos; nota para el plan sobre la caché de claves y la réplica de gestión; contexto de lectura y esquema `identidad`. |
 
-Resultado: sin preguntas abiertas y `SpecCheck` sin errores. Siguen en `Draft` a la espera de la persona responsable.
+Resultado: sin preguntas abiertas y `SpecCheck` sin errores. **Aprobadas por la persona responsable el 2026-11-06** (`aprobado_por: Diego Amiquero`) con su indicación expresa; antes se mantuvieron en `Draft`.
 
 ## 4. Documentación
 
@@ -79,6 +79,6 @@ Resultado: sin preguntas abiertas y `SpecCheck` sin errores. Siguen en `Draft` a
 
 ## 7. Pendiente
 
-- Reaprobación de las seis specs (B10), planes y tareas de las 19.
+- Planes y tareas de las 19 specs (`spec-plan` y `spec-tasks`).
 - Medir la VM-BORDE y la latencia entre VMs (B11).
 - Actualizar la presentación, el diseño de Canva y el resumen local, que muestran la arquitectura anterior.
