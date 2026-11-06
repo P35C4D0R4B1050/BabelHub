@@ -39,7 +39,7 @@ El estilo declarado, **basado en servicios de grano grueso**, es el correcto par
 ## 4. Respuestas a las preguntas
 
 1. **Free Tier y PAYG.** Es correcto: PAYG no amplía el cupo gratuito; lo que lo supere se cobra. Quedan 2 VMs ARM y 2 VMs micro por cuenta, máximo 4 VMs, y la idea de 4 ARM en una cuenta no es válida. Las cifras provienen de fuentes secundarias y se verifican en la consola.
-2. **Segunda cuenta.** Se adopta como perfil objetivo con las salvaguardas de H6. Es una decisión del responsable (B10).
+2. **Segunda cuenta.** El responsable la adoptó el 2026-11-06, también en PAYG, como perfil objetivo con las salvaguardas de H6; el riesgo queda aceptado (B10).
 3. **Documentación del estilo.** Ver §2.
 4. **Culqi.** Confirmada (AD17; C05).
 5. **Una instancia con varias bases.** Sí, con una base y un rol por servicio. Ver H3 y `05-despliegue.md` §5.2. Se mantiene el aislamiento de seguridad porque la VM de datos sigue sin acceso desde Internet.
@@ -47,7 +47,7 @@ El estilo declarado, **basado en servicios de grano grueso**, es el correcto par
 
 ## 5. Pendiente (no es de documentación)
 
-- Decisión del responsable sobre la segunda cuenta frente a pagar las VMs adicionales (B10).
+- Comprobar si ser PAYG cambia la regla de una cuenta gratuita por persona; la segunda cuenta ya está decidida (B10).
 - Prueba de concepto de red (B11) y medición con k6 antes de aprobar el despliegue.
 - Planes de las 19 specs (`spec-plan`) y sus tareas; hasta entonces no hay tareas que corregir.
 - La presentación (`docs/BabelHub_Exposicion.pptx`), su resumen local y el diseño de Canva siguen mostrando el despliegue anterior (diapositivas 6 y 13): actualizar si se van a presentar.

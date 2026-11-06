@@ -33,10 +33,10 @@ Cada VM ARM tiene **1 OCPU y 6 GB**. Objetivo de RNF12: uso sostenido de memoria
 
 | VM | Suma de límites | Reserva esperada (con el sistema) | Evaluación |
 | :--- | :---: | :---: | :--- |
-| VM-BORDE | ~0,8 GB + sistema | ~1,1–1,3 GB | Muy dentro del 70 % (4,2 GB). |
-| VM-VENTAS | ~1,85 GB + sistema | ~1,4–2,1 GB | Dentro del 70 %, con holgura para picos. |
-| VM-INVENTARIO | ~0,35 GB + sistema | ~0,7–0,8 GB | Muy amplia: la VM se justifica por la CPU, no por la memoria. |
-| VM-APP (perfil mínimo) | ~3,2 GB + sistema | ~1,9–3,0 GB | Dentro del 70 %; la CPU es el límite. |
+| VM-BORDE | ~0,8 GB + sistema | ~0,8–1,0 GB | Muy dentro del 70 % (4,2 GB). |
+| VM-VENTAS | ~1,85 GB + sistema | ~1,4–1,9 GB | Dentro del 70 %, con holgura para picos. |
+| VM-INVENTARIO | ~0,35 GB + sistema | ~0,6–0,7 GB | Muy amplia: la VM se justifica por la CPU, no por la memoria. |
+| VM-APP (perfil mínimo) | ~3,0 GB + sistema | ~1,8–2,6 GB | Dentro del 70 %; la CPU es el límite. |
 
 ## 3. Presupuesto de memoria por contenedor (VM-DATOS)
 

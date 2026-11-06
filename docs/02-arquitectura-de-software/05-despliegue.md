@@ -18,7 +18,7 @@ Las condiciones del Free Tier cambiaron en 2026. Las cifras se contrastaron con 
 Condiciones a tener en cuenta:
 - Superar el cupo ARM inhabilita las instancias o genera cargos, según el tipo de cuenta.
 - Crear instancias ARM suele fallar por falta de capacidad en regiones populares; hay que reintentar o elegir bien la región de origen al registrarse, porque no se cambia después.
-- **Segunda cuenta:** el FAQ de Oracle Cloud Free Tier permite **una cuenta gratuita por persona** y prohíbe crear varias; incumplirlo puede llevar a la suspensión o cancelación de la cuenta. Ver §3 y el riesgo en [drivers](01-drivers-arquitectonicos.md).
+- **Segunda cuenta (decisión del responsable, 2026-11-06):** se usará una segunda cuenta, también PAYG y con otra tarjeta. El FAQ de Oracle Cloud Free Tier permite **una cuenta gratuita por persona** y prohíbe crear varias; incumplirlo puede llevar a la suspensión o cancelación de la cuenta. No se asume que PAYG elimine ese riesgo (a verificar). Queda aceptado y mitigado: ver §3 y el riesgo en [drivers](01-drivers-arquitectonicos.md).
 
 ## 2. Unidad de despliegue y host
 
@@ -35,7 +35,7 @@ Un **servicio** es una unidad de despliegue independiente: tiene su propio códi
 
 ## 3. Perfiles de despliegue
 
-Se mantienen **dos perfiles con las mismas imágenes y el mismo código**; cambia solo el reparto y la red.
+Se mantienen **dos perfiles con las mismas imágenes y el mismo código**; cambia solo el reparto y la red. **Decisión (2026-11-06):** se adopta el perfil objetivo, con dos cuentas de Oracle, ambas en PAYG sin superar su cupo; el perfil mínimo queda como contingencia.
 
 | | **Perfil objetivo** | **Perfil mínimo (contingencia)** |
 | :--- | :--- | :--- |
@@ -175,9 +175,9 @@ El detalle por contenedor está en el [presupuesto de recursos](07-presupuesto-d
 
 | VM | Consumo estimado | Holgura |
 | :--- | :--- | :--- |
-| VM-BORDE | Sistema y Docker ~0,5 GB; Web y Identidad ~0,4–0,6 GB; Nginx y cloudflared < 0,2 GB. Total ~1,1–1,3 GB. | Amplia; la CPU la comparten dos aplicaciones .NET. |
-| VM-VENTAS | Sistema ~0,5 GB; E-commerce y Asistente ~0,3–0,5 GB; n8n ~0,3–0,6 GB; Evolution API ~0,3–0,5 GB. Total ~1,4–2,1 GB. | Buena; n8n y Evolution API son los mayores consumos y tienen límite. |
-| VM-INVENTARIO | Sistema ~0,5 GB; Inventario ~0,15–0,25 GB. Total ~0,7–0,8 GB. | Muy amplia; la reserva de CPU es la razón de la VM. |
+| VM-BORDE | Sistema y Docker ~0,5 GB; Web y Identidad ~0,25–0,4 GB; Nginx y cloudflared < 0,1 GB. Total ~0,8–1,0 GB. | Amplia; la CPU la comparten dos aplicaciones .NET. |
+| VM-VENTAS | Sistema ~0,5 GB; E-commerce y Asistente ~0,25–0,4 GB; n8n ~0,3–0,5 GB; Evolution API ~0,3–0,5 GB. Total ~1,4–1,9 GB. | Buena; n8n y Evolution API son los mayores consumos y tienen límite. |
+| VM-INVENTARIO | Sistema ~0,5 GB; Inventario ~0,12–0,2 GB. Total ~0,6–0,7 GB. | Muy amplia; la reserva de CPU es la razón de la VM. |
 | VM-DATOS | Sistema ~0,4 GB; PostgreSQL con ~0,75 GB de buffers y conexiones, Redis ~0,25 GB y respaldos. Total ~2,0–2,8 GB. | Buena; la memoria sobrante la usa el sistema como caché de disco. |
 
 ## 4. Red entre VMs
@@ -286,7 +286,7 @@ Con más VMs en serie, **cada VM es un punto de falla más y no hay redundancia*
 ## 9. Pendientes de verificar
 
 - Cupo ARM, número de instancias y condiciones del Free Tier en cada cuenta, y si la actualización a PAYG evita la recuperación por inactividad.
-- **Segunda cuenta de Oracle:** riesgo de suspensión por incumplir la regla de una cuenta gratuita por persona (B10). Alternativa sin segunda cuenta: pagar en la misma cuenta las dos VMs ARM adicionales (del orden de 14 USD al mes cada una, a verificar en la calculadora de costos de Oracle), con una sola red y sin riesgo de términos.
+- **Segunda cuenta de Oracle (adoptada; riesgo aceptado en B10):** posible suspensión por la regla de una cuenta gratuita por persona; comprobar si ser PAYG cambia la situación. Alternativa sin segunda cuenta: pagar en la misma cuenta las dos VMs ARM adicionales (del orden de 14 USD al mes cada una, a verificar en la calculadora de costos de Oracle), con una sola red y sin riesgo de términos.
 - **Prueba de concepto de red entre cuentas:** WireGuard frente a peering de redes virtuales, latencia entre las VMs de la misma región y consumo de CPU (B11).
 - Capacidad ARM en la región elegida (la misma para ambas cuentas); las más cercanas a Perú son las de Sudamérica, pero la disponibilidad varía.
 - Disponibilidad de subred privada sin costo.
