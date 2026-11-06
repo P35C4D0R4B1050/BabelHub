@@ -34,7 +34,10 @@ Soporte (ayudas del cliente) lo cubre hoy el administrador central. Un rol de so
 | Ver stock de una fuente | — | — | ◐ | — | ● | `inventario-fuentes` |
 | Registrar fuentes (sucursales) | — | — | — | — | ● | `inventario-fuentes` |
 | Gestionar envíos y guías | — | — | — | ● | ● | `ecommerce-envios` |
-| Ajustar inventario | — | — | ◐ | — | ● (también el ingreso inicial) | `inventario-ajustes` |
+| Ajustar inventario | — | — | ◐ | — | ● | `inventario-ajustes` |
+| Registrar un ingreso de mercadería (solo en la fuente de recepción) | — | — | — | — | ● | `inventario-ajustes`, `ecommerce-catalogo` |
+| Designar la fuente de recepción | — | — | — | — | ● | `inventario-fuentes` |
+| Ver las unidades vendidas | — | — | ◐ (su sucursal) | — | ● (toda la red) | `inventario-fuentes` |
 | Solicitar un traslado | — | — | ◐ | — | ● | `inventario-traslados` |
 | Aprobar, rechazar y despachar traslados | — | — | ◐ (solo origen) | — | ● | `inventario-traslados` |
 | Recibir traslados | — | — | ◐ (solo destino) | — | ● | `inventario-traslados` |
@@ -51,7 +54,7 @@ Soporte (ayudas del cliente) lo cubre hoy el administrador central. Un rol de so
 
 | Identidad | Para qué | Cómo se protege |
 | :--- | :--- | :--- |
-| **Servicio a servicio** | Llamadas del E-commerce al Inventario y del Asistente a los servicios. | Credencial de servicio verificable; mínimo privilegio (AD22). |
+| **Servicio a servicio** | Llamadas del E-commerce al Inventario y del Inventario al E-commerce (aviso de traslado recibido). | Credencial de servicio verificable; mínimo privilegio (AD22). |
 | **Integraciones entrantes** | Avisos de la pasarela de pago y del notificador. | Secreto o firma verificada (RNF21). |
 | **Asistente de compra** | Consulta datos para responder. | Solo lectura, sin acceso a las bases de datos (AD28). |
 

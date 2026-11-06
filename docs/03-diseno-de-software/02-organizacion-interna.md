@@ -9,7 +9,7 @@
 | **Problema que resuelve** | Evita que las reglas del negocio queden acopladas a la interfaz web, la base de datos, la pasarela de pago, el servicio de envío o el LLM. |
 | **Capas** | Presentación, Aplicación, Dominio e Infraestructura. |
 | **Beneficios** | Facilita el mantenimiento y las pruebas unitarias; permite cambiar una tecnología (por ejemplo, de Culqi a otra pasarela) sin modificar las reglas del negocio; ordena el código. |
-| **Alcance** | Completo en E-commerce e Inventario, que concentran la lógica. Versión reducida (Presentación y Aplicación con acceso a datos simple) en Identidad y Asistente. `BabelHub.Web` queda fuera de este esquema: es un cliente de presentación sin dominio propio. |
+| **Alcance** | Completo en E-commerce e Inventario, que concentran la lógica. Versión reducida (Presentación y Aplicación con acceso a datos simple) en los módulos Identidad y Asistente. La interfaz web es la capa de Presentación del E-commerce y no tiene dominio propio. |
 
 ## 2. Dependencias
 

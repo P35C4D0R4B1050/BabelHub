@@ -7,15 +7,17 @@
 | **Tienda** | Visitante y cliente | Inicio, catálogo, detalle del libro, carrito, checkout (con estado de pago pendiente), confirmación, mi biblioteca, mis pedidos y seguimiento (con cancelación antes de la preparación), devolución, mi cuenta (datos, consentimientos, segundo factor opcional y solicitudes sobre datos), inicio de sesión, registro con verificación del correo y declaración de mayoría de edad, recuperación de acceso, Libro de Reclamaciones, páginas legales con versión y *El índice infinito* (opcional). |
 | **Sucursal** | Encargado de sucursal | Resumen con alertas, inventario, ajustes y su historial, pedidos de recojo (incluidos los no recogidos), traslados (entrantes, salientes y nueva solicitud), configuración del segundo factor. |
 | **Sucursal** | Personal de logística | Traslados a nivel nacional, guías de envío y seguimiento de despachos, configuración del segundo factor. |
-| **Admin** | Administrador central | Resumen, catálogo (ediciones impresas y digitales con su licencia), sucursales y rutas entre ellas como datos, usuarios y roles (con restablecimiento de contraseña y de segundo factor), pedidos, anulaciones y no recogidos, reclamos (con descarte de spam), solicitudes sobre datos personales con fechas límite, auditoría unificada y alertas de seguridad, e indicadores. |
+| **Admin** | Administrador central | Resumen, catálogo (ediciones impresas y digitales con su licencia, ingreso de mercadería), sucursales y rutas entre ellas como datos, usuarios y roles (con restablecimiento de contraseña y de segundo factor), pedidos, anulaciones y no recogidos, reclamos (con descarte de spam), solicitudes sobre datos personales con fechas límite, auditoría unificada y alertas de seguridad, e indicadores. |
 
 El menú, el selector de sucursal y las acciones visibles dependen del rol y del alcance del token (RNF05): quien no tiene permiso no ve la acción, y si llega por URL recibe la pantalla de «sin permiso».
+
+**Dos hosts.** La misma interfaz se sirve en la **tienda** (dominio principal: visitante y cliente) y en la **gestión** (subdominio, por ejemplo `gestion.`: encargados, logística y administración central). La gestión usa cookies propias y está protegida por Cloudflare Access con MFA; el personal también opera funciones del E-commerce (catálogo, envíos, devoluciones, reclamos), por eso es una sola interfaz para los dos servicios.
 
 ### Pantallas por especificación
 
 | Spec | Pantallas principales |
 | :--- | :--- |
-| `ecommerce-catalogo` | Catálogo con filtros (categoría, formato, precio, disponibilidad), detalle con selector de edición. Admin: alta, edición y baja con licencia. |
+| `ecommerce-catalogo` | Catálogo con filtros (categoría, formato, precio, disponibilidad), detalle con selector de edición. Admin: alta (con stock inicial opcional en la fuente de recepción), edición y baja con licencia, **«Registrar ingreso» en cada edición impresa** (cantidad, referencia, nota), historial de ingresos y chip «Agotado en la red» (sin baja automática). |
 | `ecommerce-carrito-checkout` | Carrito mixto y checkout adaptable (sección 2). |
 | `ecommerce-pagos` | Paso de pago con Yape y tarjeta; errores de pago; estado «estamos confirmando tu pago». |
 | `ecommerce-pedidos` | Mis pedidos, seguimiento con estados por línea, cancelación antes de la preparación. Admin: pedidos, anulación y no recogidos. |
@@ -23,7 +25,7 @@ El menú, el selector de sucursal y las acciones visibles dependen del rol y del
 | `ecommerce-envios` | Guía de envío y seguimiento (Sucursal › Logística). |
 | `ecommerce-devoluciones` | Solicitud de devolución con política distinta para impresos y digitales. |
 | `ecommerce-libro-reclamaciones` | Formulario (con documento, domicilio y monto), constancia imprimible con el plazo y listado de reclamos con filtro por estado y descarte (Admin). |
-| `inventario-fuentes`, `inventario-ajustes` | Inventario de la sucursal, ajustes con motivo e historial. Admin: sucursales y rutas con su plazo en días. |
+| `inventario-fuentes`, `inventario-ajustes` | Inventario de la sucursal con físico, reservado, vendible y **vendidos de los últimos 30 días**; ajustes con motivo e historial (el administrador puede ajustar cualquier sucursal). Admin: sucursales con sus vendidos y el total de la red, fuente de recepción y rutas con su plazo en días. |
 | `inventario-seleccion-fuente`, `inventario-traslados` | Pedidos de recojo, traslados (solicitar, aprobar, despachar, recibir). |
 | `identidad-seguridad` | Inicio de sesión (con código del segundo factor si corresponde), registro, verificación del correo, recuperación de acceso, cuenta con consentimiento de WhatsApp y segundo factor, usuarios y roles, solicitudes sobre datos personales (Admin). |
 | `transversal-auditoria`, `transversal-seguridad` | Auditoría unificada de solo lectura con filtros y aviso si un servicio no responde; lista de alertas de seguridad con estado de revisión. |

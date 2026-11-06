@@ -1,6 +1,6 @@
 # Estrategia de pruebas
 
-Define qué se prueba, con qué herramienta, en qué capa y con qué umbrales. Parte de la regla del proyecto: **cada criterio de aceptación (`AC-XXX-NN`) tiene al menos una prueba que lo nombra** (RNF10), y la lógica de negocio se prueba primero (AGENTS.md, regla 7). Respalda RNF28 y AC06.
+Define qué se prueba, con qué herramienta, en qué capa y con qué umbrales. Parte de la regla del proyecto: **cada criterio de aceptación (`AC-XXX-NN`) tiene al menos una prueba que lo nombra** (RNF10), y la lógica de negocio se prueba primero (AGENTS.md, regla 7). Respalda RNF28 y AC05.
 
 ## 1. Pirámide de pruebas
 
@@ -8,9 +8,9 @@ Define qué se prueba, con qué herramienta, en qué capa y con qué umbrales. P
 | :--- | :--- | :--- | :---: | :--- |
 | **Unitarias de Dominio** | Reglas del negocio sin base ni red: stock vendible, estados, límites, invariantes | xUnit 2.9.3 | Muy rápida | `tests/unit` |
 | **Unitarias de Aplicación** | Casos de uso con puertos simulados: orquestación, alcance por sucursal, auditoría | xUnit | Rápida | `tests/unit` |
-| **De arquitectura** | Reglas de referencias y de tipos entre proyectos | NetArchTest | Rápida | `tests/architecture` |
+| **De arquitectura** | Reglas de referencias y de tipos entre proyectos y límites entre módulos (solo contratos públicos, sin ciclos) | NetArchTest | Rápida | `tests/architecture` |
 | **De integración** | Infraestructura con la base real: migraciones, restricciones, concurrencia, adaptadores | xUnit + Testcontainers | Media | `tests/integration` |
-| **De contrato** | Formato de errores, esquemas y compatibilidad entre servicios | xUnit | Media | `tests/integration` |
+| **De contrato** | Formato de errores, esquemas y compatibilidad entre el E-commerce y el Inventario | xUnit | Media | `tests/integration` |
 | **E2E** | Recorridos completos en navegador, accesibilidad y cabeceras | Playwright + axe | Lenta | `tests/e2e` |
 | **De carga** | Rendimiento y límites bajo concurrencia | k6 | Lenta | `tests/load` |
 | **De seguridad** | SAST, dependencias, imágenes, secretos y DAST básico | CodeQL, Dependabot, Trivy, escáner de secretos, ZAP baseline | Variable | CI |
@@ -81,3 +81,16 @@ La cobertura es una **señal, no el objetivo**: no se escriben pruebas vacías p
 | Dobles que divergen del servicio real | Pruebas de humo contra el modo de pruebas de Culqi y verificación de contratos. |
 | Falsa seguridad por cobertura alta | Revisión de criterios, pruebas de mutación opcionales y casos de abuso explícitos. |
 | Mantenimiento de E2E frágiles | Pocos recorridos largos, selectores estables por rol y etiqueta, y datos de ejemplo controlados. |
+
+## Pruebas de los seis atributos de calidad
+
+Cada [atributo de calidad](../01-analisis-de-sistema/04-atributos-de-calidad.md) tiene una prueba que lo verifica y una medida. Son la lista de pruebas de aceptación de calidad del proyecto:
+
+| Atributo | Prueba y medida | Herramienta |
+| :--- | :--- | :--- |
+| **AC01 Consistencia del inventario** | 100 reservas simultáneas por 1 unidad: solo una prospera y el vendible nunca es negativo. | xUnit + Testcontainers |
+| **AC02 Rendimiento y eficiencia** | p95 < 500 ms con 50 usuarios, checkout p95 < 3 s, LCP ≤ 2,5 s, memoria y CPU < 70 % por VM. | k6, Lighthouse, `docker stats` |
+| **AC03 Disponibilidad y recuperabilidad** | Apagar el contenedor de Inventario: el catálogo sigue y el checkout informa; restaurar un respaldo con RPO ≤ 24 h y RTO ≤ 4 h. | Prueba de caos manual y guion de restauración |
+| **AC04 Seguridad y privacidad** | 100 % de accesos fuera de alcance rechazados; 0 descargas ajenas; límites aplicados; 0 hallazgos críticos en ZAP, Trivy y CodeQL. | xUnit, ZAP baseline, Trivy, CodeQL |
+| **AC05 Mantenibilidad y evolucionabilidad** | Reglas de dependencia y de módulos cumplidas; cobertura ≥ 85 % en Dominio y Aplicación; una sucursal nueva sin cambiar código. | `tests/architecture`, cobertura |
+| **AC06 Usabilidad y accesibilidad** | Compra en ≤ 5 pasos, SUS ≥ 68, 0 incumplimientos AA críticos, recorrido exitoso en cuatro navegadores. | Playwright + axe, sesiones con personas |

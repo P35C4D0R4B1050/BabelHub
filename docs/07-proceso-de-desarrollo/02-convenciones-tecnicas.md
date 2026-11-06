@@ -56,9 +56,9 @@ Los commits de un agente terminan con la línea `Co-Authored-By` correspondiente
 
 ## 4. Autenticación y autorización
 
-- El servicio de Identidad emite JWT con los claims `sub`, `role` y `branch_id` (vacío para clientes y administración central). Caducidad corta, con renovación desde el servidor de `BabelHub.Web` (el token nunca llega al navegador, AD15).
-- Cada servicio valida firma, vigencia y rol; el alcance por sucursal se comprueba en la Aplicación ([Clean Architecture, sección 8](../03-diseno-de-software/01-clean-architecture.md)).
-- **Propuesta:** las llamadas entre servicios en nombre de un usuario reenvían su JWT; las tareas de fondo (liberar reservas vencidas, reintentar avisos) usan un token de servicio de Identidad. Se fija en `identidad-seguridad`.
+- El módulo Identidad del E-commerce emite JWT con los claims `sub`, `role` y `branch_id` (vacío para clientes y administración central). Caducidad corta, con renovación desde el servidor de la interfaz web (el token nunca llega al navegador, AD15).
+- El Inventario y los módulos del E-commerce validan firma, vigencia y rol; el alcance por sucursal se comprueba en la Aplicación ([Clean Architecture, sección 8](../03-diseno-de-software/01-clean-architecture.md)).
+- **Propuesta:** las llamadas del E-commerce al Inventario en nombre de un usuario reenvían su JWT; las tareas de fondo (liberar reservas vencidas, reintentar avisos) usan un token de servicio del módulo Identidad. Entre módulos del mismo servicio se pasa el contexto del actor, no un token. Se fija en `identidad-seguridad`.
 
 ## 5. Configuración y secretos
 
@@ -70,7 +70,7 @@ Los commits de un agente terminan con la línea `Co-Authored-By` correspondiente
 
 | Aspecto | Convención |
 | :--- | :--- |
-| Acceso | EF Core con Npgsql. Bases `ecommerce`, `identidad` (AD18) e `inventario` en una instancia PostgreSQL, cada una con su propio rol, que solo puede conectarse a esa base (AD03). |
+| Acceso | EF Core con Npgsql. Bases `ecommerce`, `identidad` (AD18), `inventario` y `asistente` en una instancia PostgreSQL, cada una con su propio rol, que solo puede conectarse a esa base (AD03). |
 | Migraciones | Una carpeta por servicio. En producción se aplican con un comando o tarea explícita, no al arrancar la aplicación. |
 | Tiempo | `timestamptz` en UTC; se muestra en hora de Lima. El reloj es un puerto (`IReloj`) para poder probar la expiración de reservas. |
 | Concurrencia | Reservas y ajustes usan bloqueo de fila o control optimista; la estrategia concreta se decide en el `plan.md` de `inventario-seleccion-fuente`. Debe probarse con solicitudes simultáneas. |

@@ -28,27 +28,30 @@ No se escribe código de producción sin una spec **Approved** y un plan **Plann
 - Una spec solo pasa a **Done** cuando la verificación converge (`specs/<feature>/verificacion.md` con `Resultado: Converge`).
 - Antes de cualquier commit: `dotnet run --project tools/SpecCheck` debe terminar sin errores.
 
-## 3. Arquitectura (Clean Architecture por servicio)
+## 3. Arquitectura (dos servicios, monolitos modulares con Clean Architecture)
+
+BabelHub tiene **dos servicios**: el E-commerce (con la interfaz web y los módulos Catálogo, Carrito y checkout, Pagos, Pedidos, Envíos, Devoluciones, Biblioteca digital, Libro de Reclamaciones, Identidad y Asistente) y el Inventario (módulos Fuentes, Selección y reservas, Traslados y Ajustes). Cada uno es un monolito modular en cuatro capas.
 
 1. El **Dominio** no referencia ningún otro proyecto ni paquete de infraestructura.
 2. La **Aplicación** solo referencia al Dominio y define los puertos que necesita.
 3. La **Infraestructura** implementa los puertos; es el único lugar con EF Core, Redis, `HttpClient` y SDKs de terceros.
-4. La **Api** no contiene reglas de negocio: traduce HTTP, autentica y compone dependencias.
-5. Un servicio **nunca** referencia el Dominio, la Aplicación ni la Infraestructura de otro; se comunican por REST.
+4. La **Presentación (Api)** no contiene reglas de negocio: traduce HTTP, autentica, sirve la interfaz web y compone dependencias.
+5. El E-commerce y el Inventario **nunca** referencian el Dominio, la Aplicación ni la Infraestructura del otro; se comunican por REST.
 6. `BabelHub.Shared` contiene solo contratos (DTOs y constantes); no lo referencian Dominio ni Aplicación.
 7. Toda regla de negocio nueva se escribe **primero como prueba unitaria**.
 8. Los secretos se leen de variables de entorno; nunca se escriben en el repositorio.
-9. `BabelHub.Web` solo referencia a `BabelHub.Shared`, no contiene reglas de negocio y llama a los servicios **solo desde el servidor**; el JWT nunca llega al navegador.
+9. La interfaz web es la Presentación del E-commerce: no contiene reglas de negocio, llama a los módulos por sus contratos públicos y al Inventario por REST **solo desde el servidor**; el JWT nunca llega al navegador.
 10. Una falla del Notificador **nunca** interrumpe un caso de uso.
 11. Los archivos digitales **nunca** se guardan en el repositorio, en la base de datos ni en las VMs; viven en el almacén de objetos y se entregan solo con URL firmada de corta duración.
 12. Un libro digital no consulta al Inventario ni genera reservas.
+13. Un módulo solo depende del **contrato público** de otro módulo (la raíz de su carpeta); nunca de su `Interno`, su Dominio, su Infraestructura ni su esquema de base de datos.
 
-La prueba de arquitectura (`tests/architecture`) hace cumplir 1, 2, 5, 6 y 9. Si falla, no se debilita la prueba: se corrige el código.
+La prueba de arquitectura (`tests/architecture`) hace cumplir 1, 2, 5, 6, 9 y 13. Si falla, no se debilita la prueba: se corrige el código.
 
 ## 4. Reglas de calidad
 
 - **Idioma:** documentación, interfaz y mensajes al usuario en español (es-PE). Dominio y casos de uso en español con los términos de `docs/glossary.md` (`ReservarStock`, `Fuente`). Sufijos técnicos estándar en inglés.
-- **Nombres:** proyectos `BabelHub.<Servicio>.<Capa>`; puertos `I<Rol>`; adaptadores `<Tecnología><Puerto>`.
+- **Nombres:** proyectos `BabelHub.<Servicio>.<Capa>` (módulos como carpetas y espacios de nombres); puertos `I<Rol>`; adaptadores `<Tecnología><Puerto>`.
 - **Pruebas:** xUnit; el dominio y la aplicación se prueban sin base de datos ni red; la infraestructura con Testcontainers. Nombre descriptivo: `Reservar_SinStockVendible_Rechaza`.
 - **Trazabilidad en pruebas:** cada prueba de un criterio lleva `[Trait("Criterio", "AC-XXX-NN")]`.
 - **Concurrencia:** las reglas de stock se prueban con solicitudes simultáneas (AC01). La regla del dominio no basta: la atomicidad la garantiza la infraestructura.
@@ -84,7 +87,7 @@ La prueba de arquitectura (`tests/architecture`) hace cumplir 1, 2, 5, 6 y 9. Si
 | :--- | :--- |
 | `docs/` | Documentación en siete carpetas (`01-analisis-de-sistema` a `07-proceso-de-desarrollo`) y glosario. |
 | `specs/` | Una carpeta por feature: `spec.md`, `plan.md`, `tasks.md`, `decisions.md`, `verificacion.md`. Plantillas en `specs/_template/`. |
-| `src/` | Código: un directorio por servicio y `BabelHub.Web`, más `BabelHub.Shared`. |
+| `src/` | Código: `BabelHub.Ecommerce` y `BabelHub.Inventario` (cuatro proyectos cada uno), más `BabelHub.Shared`. |
 | `tests/` | `unit`, `integration`, `architecture`, `e2e` (Playwright) y `load` (k6). |
 | `infra/` | Docker Compose, Nginx y flujos de n8n. |
 | `tools/SpecCheck/` | Validador de specs, planes, tareas y trazabilidad. |

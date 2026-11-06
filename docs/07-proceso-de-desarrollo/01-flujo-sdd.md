@@ -70,7 +70,7 @@ babelhub/
 ├── docs/                  7 carpetas temáticas (01-analisis-de-sistema a 07-proceso-de-desarrollo) y glossary.md
 ├── specs/                 README.md, speccheck.json, TRACEABILITY.md, _template/ y 19 features
 ├── progress/              CHANGELOG.md, blockers.md, log/
-├── src/                   Inventario, Ecommerce (4 proyectos cada uno), Identidad, AsistenteCompra, Web y Shared
+├── src/                   Inventario y Ecommerce (4 proyectos cada uno, monolitos modulares) y Shared
 ├── tests/                 unit/, integration/, architecture/, e2e/ (Playwright) y load/ (k6)
 ├── tools/SpecCheck/       validador de specs
 ├── infra/                 docker-compose.local.yml, nginx/, n8n/

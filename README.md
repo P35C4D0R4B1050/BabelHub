@@ -39,13 +39,13 @@ Además: [glosario](docs/glossary.md), [índice de specs](specs/README.md) y [ma
 
 ## Resumen de la arquitectura
 
-- Cuatro servicios .NET 10 de granularidad gruesa (E-commerce, Inventario, Identidad y Asistente de Compra), con REST síncrono y Clean Architecture interna.
-- Aplicación web `BabelHub.Web` (ASP.NET Core MVC con Razor) con áreas por rol, que consume los servicios desde el servidor.
-- PostgreSQL con una base lógica por servicio (`ecommerce`, `inventario` e `identidad`), Redis como caché y Nginx como puerta de entrada interna.
+- **Dos servicios** .NET 10 de granularidad gruesa, cada uno un **monolito modular** con Clean Architecture en cuatro capas: **E-commerce** (11 módulos: Catálogo, Carrito y checkout, Pagos, Pedidos, Envíos, Devoluciones, Biblioteca digital, Libro de Reclamaciones, Identidad, Asistente e interfaz web) e **Inventario** (4 módulos: Fuentes, Selección y reservas, Traslados y Ajustes), integrados por REST síncrono.
+- La interfaz web es la capa de presentación del E-commerce (ASP.NET Core MVC con Razor y htmx), con áreas por rol (Tienda, Sucursal y Admin) en dos hosts: la tienda y la gestión del personal. Llama al Inventario por REST solo desde el servidor.
+- PostgreSQL con una base por servicio (`ecommerce`, con un esquema por módulo, e `inventario`) en una instancia, un rol por esquema y seguridad por filas en Inventario; Redis como caché y Nginx como puerta de entrada.
 - Pagos con Culqi (Yape y tarjetas) y avisos por WhatsApp con n8n y Evolution API, autoalojados.
 - Libros digitales (EPUB y PDF) en un almacén de objetos externo, con descarga por URL firmada; no pasan por el Inventario. El marco legal, aplicado con rigurosidad laxa por ser un proyecto académico, está en [`docs/01-analisis-de-sistema/03-marco-legal.md`](docs/01-analisis-de-sistema/03-marco-legal.md).
-- Despliegue con Docker Compose en Oracle Cloud Free Tier, con un Compose por VM. Perfil objetivo: cuatro VMs ARM de 1 OCPU y 6 GB (borde y web, ventas, inventario y datos) en dos cuentas; perfil mínimo: dos VMs ARM (aplicaciones y datos) en una cuenta. Una VM x86 micro opcional hace de salto SSH y monitoreo.
-- Cloudflare gratuito en el borde, con Cloudflare Tunnel, para no abrir puertos en Oracle.
+- Despliegue con Docker Compose, un Compose por VM, **solo con recursos gratuitos de una cuenta de Oracle**: dos VMs AMD micro (borde de red; salto SSH y monitoreo) y dos VMs ARM de 1 OCPU y 6 GB (ventas; inventario con la base y una réplica de gestión).
+- Cloudflare gratuito en el borde (DDoS, WAF, límites, Turnstile y Access en el host de gestión), con Cloudflare Tunnel de dos conectores, para no abrir puertos en Oracle.
 - Pruebas con xUnit, Testcontainers, Playwright y k6. Desarrollo posterior bajo Spec-Driven Development.
 
 ## Desarrollo

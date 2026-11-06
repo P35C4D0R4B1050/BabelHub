@@ -2,7 +2,7 @@
 
 ## 1. Nivel 1: contexto del sistema
 
-BabelHub es un único sistema de software con dos subsistemas de negocio (E-commerce e Inventario) que usan personas de cuatro roles y que se apoya en servicios externos.
+BabelHub es un sistema de software formado por dos servicios (E-commerce e Inventario) que usan personas de cuatro roles y que se apoya en servicios externos.
 
 ```mermaid
 flowchart LR
@@ -53,35 +53,28 @@ class BH s
 
 ## 2. Nivel 2: contenedores
 
-Un contenedor es una aplicación o un almacén de datos desplegable por separado. El diagrama muestra el **perfil objetivo** de cuatro VMs; en el perfil mínimo, VM-BORDE, VM-VENTAS y VM-INVENTARIO son una sola VM de aplicaciones. Las VMs, los límites de memoria y la red están en el [despliegue](../02-arquitectura-de-software/05-despliegue.md).
+Un contenedor es una aplicación o un almacén de datos desplegable por separado. El diagrama muestra los dos servicios, sus bases y la herramienta de avisos, dentro de las cuatro VMs gratuitas. Las VMs, los límites de memoria y la red están en el [despliegue](../02-arquitectura-de-software/05-despliegue.md).
 
 ```mermaid
 flowchart TD
 NAV["Navegador<br/>cliente, sucursal, administración"]
+CF["Cloudflare<br/>DNS, TLS, WAF, límites y túnel"]
 
-CF["Cloudflare<br/>DNS, TLS, WAF y túnel"]
-
-subgraph BOR["VM-BORDE - Docker Compose"]
-NGX["Nginx<br/>enrutamiento interno"]
-WEB["BabelHub.Web<br/>ASP.NET Core MVC, Razor y htmx"]
-IDE["Servicio de Identidad<br/>ASP.NET Core"]
+subgraph BOR["VM-BORDE - AMD micro"]
+NGX["Nginx<br/>enrutamiento por host"]
 end
 
-subgraph VEN["VM-VENTAS - Docker Compose"]
-ECO["Servicio de E-commerce<br/>ASP.NET Core"]
-ASI["Servicio de Asistente<br/>ASP.NET Core"]
+subgraph VEN["VM-VENTAS - ARM"]
+ECO["Servicio E-commerce<br/>ASP.NET Core - monolito modular<br/>web, 10 módulos"]
+RED[("Redis<br/>caché y contadores")]
 N8N["n8n + Evolution API<br/>avisos por WhatsApp"]
 end
 
-subgraph INVM["VM-INVENTARIO - Docker Compose"]
-INV["Servicio de Inventario<br/>ASP.NET Core"]
-end
-
-subgraph DAT["VM-DATOS - sin acceso desde Internet"]
-BDV[("PostgreSQL<br/>base ecommerce")]
+subgraph INVM["VM-INVENTARIO - ARM"]
+INV["Servicio Inventario<br/>ASP.NET Core - monolito modular<br/>4 módulos"]
+GES["E-commerce en perfil gestión<br/>réplica de respaldo"]
+BDE[("PostgreSQL<br/>base ecommerce<br/>esquema por módulo")]
 BDI[("PostgreSQL<br/>base inventario")]
-BDD[("PostgreSQL<br/>base identidad")]
-RED[("Redis<br/>caché")]
 end
 
 subgraph EXT["Sistemas externos"]
@@ -95,51 +88,41 @@ end
 
 NAV -->|"HTTPS"| CF
 CF --> NGX
-NGX --> WEB
-WEB -->|"REST"| ECO
-WEB -->|"REST"| INV
-WEB -->|"REST"| IDE
-WEB -->|"REST"| ASI
+NGX -->|"tienda y gestión"| ECO
+NGX -.->|"gestión, respaldo"| GES
 ECO -->|"REST"| INV
-ASI -->|"REST"| ECO
-ASI -->|"REST"| INV
-ECO -.->|"valida credenciales"| IDE
-INV -.->|"valida credenciales"| IDE
-ASI -.->|"valida credenciales"| IDE
-ECO --> BDV
-IDE --> BDD
+GES -->|"REST"| INV
+INV -.->|"aviso: traslado recibido"| ECO
+ECO --> BDE
+GES --> BDE
 INV --> BDI
 ECO --> RED
-INV --> RED
 ECO -->|"webhook"| N8N
 INV -->|"webhook"| N8N
 N8N --> WA
 ECO --> PAG
 ECO --> ENV
 ECO -->|"sube y firma URLs"| ALM
-IDE -->|"códigos y alertas"| COR
-ECO -->|"respuestas a reclamos"| COR
-ASI --> LLM
+ECO -->|"códigos, reclamos y alertas"| COR
+ECO --> LLM
 NAV -.->|"descarga con URL firmada"| ALM
 
 classDef n fill:#222,stroke:#fff,color:#fff
-class NAV,CF,NGX,WEB,ECO,INV,IDE,ASI,RED,N8N,BDV,BDI,BDD,PAG,ENV,LLM,COR,ALM,WA n
+class NAV,CF,NGX,ECO,INV,GES,RED,N8N,BDE,BDI,PAG,ENV,LLM,COR,ALM,WA n
 ```
 
 | Contenedor | Tecnología | Responsabilidad | Specs principales |
 | :--- | :--- | :--- | :--- |
-| **BabelHub.Web** | ASP.NET Core MVC, Razor, htmx, Tailwind y daisyUI | Interfaz por áreas (Tienda, Sucursal, Admin); sesión del lado del servidor; mezcla de la auditoría y las alertas de los servicios. Sin reglas de negocio. | `web-base`, `web-indice-infinito` |
-| **Servicio de E-commerce** | ASP.NET Core, EF Core | Catálogo, carrito, pagos, pedidos, biblioteca digital, envíos, devoluciones y Libro de Reclamaciones. | `ecommerce-*`, `transversal-notificaciones` |
-| **Servicio de Inventario** | ASP.NET Core, EF Core | Fuentes y rutas, stock vendible, reservas y selección de fuente, traslados y ajustes. | `inventario-*` |
-| **Servicio de Identidad** | ASP.NET Core, EF Core | Usuarios, roles, credenciales y su firma, segundo factor, recuperación, consentimientos y solicitudes sobre datos personales. | `identidad-seguridad` |
-| **Servicio de Asistente** | ASP.NET Core | Recomendaciones y consultas con datos de los servicios; solo lectura. | `asistente-compra-ia` |
-| **Redis** | Redis | Caché de disponibilidad y catálogo. | AD06 |
+| **Servicio E-commerce** | ASP.NET Core, EF Core, MVC con Razor, htmx, Tailwind y daisyUI | Interfaz por áreas (Tienda, Sucursal, Admin) y los módulos Catálogo, Carrito y checkout, Pagos, Pedidos, Envíos, Devoluciones, Biblioteca digital, Libro de Reclamaciones, Identidad y Asistente. Sesión del lado del servidor en la base. | `ecommerce-*`, `identidad-seguridad`, `asistente-compra-ia`, `web-*` |
+| **Servicio Inventario** | ASP.NET Core, EF Core | Fuentes y rutas, stock vendible, unidades vendidas, reservas y selección de fuente, traslados, ajustes e ingreso de mercadería. Sin entrada pública. | `inventario-*` |
+| **Réplica de gestión** | La misma imagen del E-commerce | Áreas Sucursal y Admin, como servidor de respaldo si cae la VM de ventas. | AD11, AD15 |
+| **Redis** | Redis | Caché de disponibilidad y catálogo, y contadores de límites. | AD06 |
 | **n8n + Evolution API** | n8n, Evolution API | Plantillas y envío de avisos por WhatsApp. | AD16 |
-| **PostgreSQL (bases `ecommerce`, `inventario` e `identidad`)** | PostgreSQL | Una instancia con una base por servicio y un rol por base; sin acceso desde Internet. | AD03, AD18 |
-| **Nginx y Cloudflare** | Nginx, Cloudflare | Entrada única, TLS, WAF y límites en el borde. | AD13, AD14 |
+| **PostgreSQL** (bases `ecommerce` e `inventario`) | PostgreSQL | Una instancia con una base por servicio, un esquema por módulo y un rol por esquema; sin acceso desde Internet. | AD03, AD18 |
+| **Nginx y Cloudflare** | Nginx, Cloudflare | Entrada única, TLS, WAF, límites en el borde y enrutamiento por host (tienda y gestión). | AD13, AD14 |
 
-Los tres elementos transversales (**auditoría** y **seguridad**: límites, errores y eventos) no son contenedores: se implementan en cada servicio con el mismo contrato (`transversal-auditoria`, `transversal-seguridad`).
+Los elementos transversales (**auditoría** y **seguridad**: límites, errores y eventos) no son contenedores: se implementan en cada servicio con el mismo contrato (`transversal-auditoria`, `transversal-seguridad`).
 
 ## 3. Fronteras de confianza
 
-Se dibujan sobre este nivel en el [modelo de amenazas](../05-seguridad/01-modelo-de-amenazas.md) §2: Internet → borde, borde → aplicaciones, aplicaciones → datos y aplicaciones ↔ proveedores externos.
+Se dibujan sobre este nivel en el [modelo de amenazas](../05-seguridad/01-modelo-de-amenazas.md) §2: Internet → borde, borde → servicios, servicio → datos, entre las VMs y servicios ↔ proveedores externos.

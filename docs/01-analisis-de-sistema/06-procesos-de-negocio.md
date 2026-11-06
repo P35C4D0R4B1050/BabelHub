@@ -93,4 +93,15 @@ Cualquier consumidor, con o sin sesión, registra una hoja (con nombre, document
 
 ## 8. Asistente de compra
 
-El cliente consulta; el asistente obtiene datos de los servicios, redacta la respuesta como texto y enlaza a las pantallas. Nunca ejecuta acciones ni consulta las bases de datos. Si el proveedor del modelo no responde, la compra continúa sin él. **Spec:** `asistente-compra-ia`.
+El cliente consulta; el asistente obtiene datos de los módulos y del Inventario, redacta la respuesta como texto y enlaza a las pantallas. Nunca ejecuta acciones ni consulta las bases de datos. Si el proveedor del modelo no responde, la compra continúa sin él. **Spec:** `asistente-compra-ia`.
+
+## 9. Ingreso de mercadería
+
+La importación llega a la fuente de recepción (por defecto Lima). **Actores:** administración central. **Specs:** `inventario-ajustes`, `inventario-fuentes`, `ecommerce-catalogo`.
+
+1. La administración central recibe el lote y lo registra desde el Catálogo: edición, cantidad y referencia de la guía o factura.
+2. El Inventario suma la cantidad al stock físico de la fuente de recepción y lo audita en la misma transacción.
+3. El título deja de figurar como agotado; el lote queda en el historial de ingresos.
+4. Desde la fuente de recepción, el stock llega a las demás sucursales por traslado (proceso 3).
+
+Al dar de alta una edición impresa, la administración puede indicar un stock inicial, que se registra como el primer ingreso. Un título sin stock en toda la red se muestra como agotado y **no se da de baja**. Las unidades vendidas por sucursal se consultan en el Inventario y se atribuyen a la sucursal que despacha (domicilio) o entrega (recojo).

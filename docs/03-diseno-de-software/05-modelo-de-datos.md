@@ -1,6 +1,6 @@
 # Modelo de datos lógico
 
-Traduce el [modelo de dominio](../01-analisis-de-sistema/07-modelo-de-dominio.md) a tablas, restricciones e índices. Es un **diseño lógico de referencia**: el plan de cada spec fija los nombres definitivos y las migraciones. Las bases siguen AD03 y AD18: una instancia PostgreSQL con una base lógica por servicio (`ecommerce`, `inventario` e `identidad`), sin tablas ni consultas compartidas entre bases.
+Traduce el [modelo de dominio](../01-analisis-de-sistema/07-modelo-de-dominio.md) a tablas, restricciones e índices. Es un **diseño lógico de referencia**: el plan de cada spec fija los nombres definitivos y las migraciones. Las bases siguen AD03 y AD18: una instancia PostgreSQL con **una base por servicio** (`ecommerce` e `inventario`), un **esquema por módulo** dentro de cada base y un **rol por esquema**. No hay llaves foráneas ni consultas entre las dos bases: solo identificadores y contratos REST.
 
 ## 1. Convenciones
 
@@ -12,10 +12,10 @@ Traduce el [modelo de dominio](../01-analisis-de-sistema/07-modelo-de-dominio.md
 | Nombres | Tablas y columnas en español, minúsculas con guion bajo (`reservas`, `fecha_expiracion`). |
 | Borrado | Baja lógica para catálogo y usuarios; auditoría y hojas de reclamación nunca se borran (solo se anonimiza lo que corresponda). |
 | Concurrencia | Columna de versión por fila (`version`) en agregados con escritura concurrente (stock). |
-| Permisos | Un rol por servicio, que solo puede conectarse a su propia base (`REVOKE CONNECT` a los demás); la cuenta de aplicación no puede modificar ni borrar la auditoría. |
+| Permisos | Un rol por esquema que solo puede usar su propio esquema (`REVOKE` a los demás); el rol de la aplicación no es dueño de las tablas y no puede modificar ni borrar la auditoría. En el Inventario, además, seguridad por filas por sucursal (RLS). |
 | Datos personales | Marcados en el diccionario; el borrado o la anonimización se prueba (RNF23). |
 
-## 2. Inventario (base `inventario`)
+## 2. Inventario (base `inventario`, un esquema por módulo)
 
 ```mermaid
 erDiagram
@@ -29,18 +29,23 @@ RESERVAS }o--|| PEDIDOS_REF : "pertenece a"
 
 | Tabla | Columnas principales | Restricciones |
 | :--- | :--- | :--- |
-| `fuentes` | id, nombre, region, direccion, contacto_aviso, activa | Nombre único; `activa` por defecto verdadero. |
+| `fuentes` | id, nombre, region, direccion, contacto_aviso, activa, es_recepcion | Nombre único; `activa` por defecto verdadero; **una sola fuente con `es_recepcion`** (índice único parcial), por defecto Lima (FUE-19). |
 | `stock` | fuente_id, edicion_id, fisico, reservado, version | PK (fuente_id, edicion_id); **CHECK (fisico >= 0 AND reservado >= 0 AND reservado <= fisico)**, que impide el vendible negativo incluso ante concurrencia. |
 | `reservas` | id, pedido_id, cliente_id, huella_origen, fuente_id, edicion_id, cantidad, estado, fecha_expiracion, clave_idempotencia, fecha_creacion | Estado en (pendiente, confirmada, cerrada, liberada, expirada); `cerrada` se usa al entregar, pasar a en reparto o consumirse en el despacho de un traslado (el destino recibe una reserva nueva); `clave_idempotencia` única por cliente; índice parcial sobre estado pendiente por cliente (límite de una pendiente). |
 | `traslados` | id, edicion_id, origen_id, destino_id, cantidad, estado, motivo, pedido_id, fechas por estado | Origen distinto de destino; estado en el ciclo definido (incluye `cancelado`); cantidad positiva; un traslado con `pedido_id` no pasa a `rechazado`. |
 | `rutas` | origen_id, destino_id, plazo_dias, actualizada_en | PK (origen_id, destino_id); origen distinto de destino; **CHECK (plazo_dias > 0)**; direccional. |
 | `ajustes` | id, fuente_id, edicion_id, motivo, cantidad, conteo_real, usuario_id, fecha | Motivo en (merma, danado, correccion_conteo, ingreso_inicial, devolucion); `devolucion_id` único para no reingresar dos veces; solo inserción. |
+| `ingresos` | id, fuente_id, edicion_id, cantidad, referencia, nota, usuario_id, fecha | Solo en la fuente de recepción; **CHECK (cantidad entre 1 y 5000)**; solo inserción; el ajuste con motivo ingreso de mercadería se crea en la misma transacción (AJU-13, AJU-19). |
 | `eventos_limite` | clave, instante | Un registro por reserva iniciada, por cliente y por origen (SEL-14, SEL-19); el conteo usa una ventana deslizante (SEG-21) y se inserta en la misma transacción de la reserva; los registros viejos se purgan a las 24 horas. La clave del origen es una huella no reversible, no la IP (SEG-25). |
 | `auditoria` | id, fecha_utc, usuario_id, rol, accion, detalle, resultado, secuencia | Solo inserción; sin permisos de modificación para la cuenta de aplicación. |
 
 **Regla de oro:** `reservado` se actualiza en la misma transacción que la fila de `reservas`, y el `CHECK` es la última defensa contra la sobreventa (AD23). El vendible se calcula como `fisico - reservado`; no se almacena.
 
-## 3. E-commerce (base `ecommerce`)
+**Unidades vendidas** (FUE-21): no se guardan; se calculan por fuente y periodo a partir de las reservas confirmadas y cerradas, sin contar las liberadas, las anuladas ni el consumo por traslado, para que cada unidad cuente una sola vez para la fuente que despacha (domicilio) o entrega (recojo).
+
+## 3. E-commerce (base `ecommerce`, un esquema por módulo)
+
+Esquemas: `catalogo`, `carrito`, `pagos`, `pedidos`, `envios`, `devoluciones`, `biblioteca`, `reclamaciones`, `web` (sesiones) e `identidad` (sección 4). Cada tabla vive en el esquema de su módulo; una transacción puede abarcar varios esquemas del mismo servicio (por ejemplo, pedido, pago y auditoría).
 
 | Tabla | Columnas principales | Restricciones |
 | :--- | :--- | :--- |
@@ -59,9 +64,10 @@ RESERVAS }o--|| PEDIDOS_REF : "pertenece a"
 | `ayudas_descarga` | id, acceso_id, motivo, estado | Solicitudes de ayuda (BIB-16). |
 | `hojas_reclamacion` | id, numero, tipo, detalle, datos_consumidor (nombre, documento, domicilio, correo), monto_reclamado, pedido_id, estado, respuesta, aviso_estado | `numero` único; sin borrado; estado en (pendiente, respondido, descartada); `aviso_estado` en (pendiente, enviado). |
 | `avisos` | id, evento_id, destinatario, estado, intentos, proximo_intento | Único (evento_id, destinatario) para no duplicar (NOT-05). |
+| `sesiones_web` | id opaco, usuario_id, rol, sucursal_id, ultima_actividad, expira_absoluta, host | Esquema `web`. Sesión del servidor con cookie opaca (WEB-04, WEB-27); compartida por la réplica de gestión; se purga al vencer. |
 | `auditoria` | como en Inventario | Solo inserción. |
 
-## 4. Identidad (base `identidad`)
+## 4. Identidad (esquema `identidad` de la base `ecommerce`)
 
 | Tabla | Columnas principales | Restricciones |
 | :--- | :--- | :--- |
@@ -78,6 +84,10 @@ RESERVAS }o--|| PEDIDOS_REF : "pertenece a"
 | `solicitudes_arco` | id, usuario_id, tipo, estado, respuesta, fecha, fecha_limite | Estados: recibida, en atención, atendida, rechazada. `fecha_limite` = 20 días hábiles (acceso) o 10 (resto). |
 | `eventos_ingreso` | clave (cuenta+origen), instante | Un registro por ingreso fallido (SEG-06); cuenta también para cuentas inexistentes; ventana deslizante. |
 | `auditoria` | como en Inventario | Solo inserción. |
+
+## 4.1 Asistente (sin tablas propias)
+
+El Asistente no tiene datos de negocio (los obtiene de los contratos de otros módulos y del Inventario, ASI-06) y **no guarda el texto de las consultas ni las respuestas** (ASI-18). Sus eventos de seguridad (acceso denegado, límite excedido) se guardan en la auditoría única del E-commerce; el contador de límites de ASI-09 vive en Redis (o, si el plan lo decide, en una tabla `eventos_limite` como la de Inventario).
 
 ## 5. Índices y rendimiento
 

@@ -12,17 +12,20 @@ Por eso: sin herramientas de escritura, sin acceso a bases de datos, sin secreto
 
 ```mermaid
 flowchart LR
-U["Cliente"] --> W["Web"]
-W --> A["Servicio Asistente<br/>solo lectura"]
-A -->|"credencial de servicio de solo lectura"| C["API de Catálogo e Inventario"]
-A -->|"credencial del cliente, 5 min, solo lectura"| P["API de Pedidos<br/>(filtra por el cliente)"]
+U["Cliente"] --> W["Interfaz web"]
+subgraph ECO["Servicio E-commerce - un solo proceso"]
+W --> A["Módulo Asistente<br/>solo lectura"]
+A -->|"contexto de solo lectura"| C["Módulo Catálogo"]
+A -->|"contexto del cliente, 5 min, solo lectura"| P["Módulo Pedidos<br/>(filtra por el cliente)"]
+end
+A -->|"credencial de servicio de solo lectura"| I["API de Inventario"]
 A -->|"texto mínimo"| L["Proveedor de LLM"]
 L -->|"texto"| A
 A -->|"texto plano"| W
 ```
 
-- El Asistente **no tiene cadena de conexión** a ninguna base de datos (ASI-06, AC-ASI-06).
-- Para el catálogo y la disponibilidad usa una credencial de servicio de solo lectura. Para los pedidos usa una credencial de 5 minutos, de solo lectura y limitada al cliente autenticado (IDE-33): el servicio de pedidos filtra por ese cliente, de modo que el asistente no puede leer pedidos ajenos aunque el modelo sea manipulado (ASI-19).
+- El Asistente **no tiene cadena de conexión** a ninguna base de datos y solo usa los contratos públicos de otros módulos (ASI-06, AC-ASI-06). Como comparte proceso con la venta, sus llamadas al LLM van aisladas: cliente HTTP propio, tiempo de espera de 30 segundos (SEG-14), límite de concurrencia y cortacircuitos, para que una falla o un abuso no afecten la compra.
+- Para el catálogo usa un contexto de solo lectura y para la disponibilidad el cliente REST del Inventario con credencial de servicio de solo lectura. Para los pedidos usa un contexto de 5 minutos, de solo lectura y limitada al cliente autenticado (IDE-33): el módulo de pedidos filtra por ese cliente, de modo que el asistente no puede leer pedidos ajenos aunque el modelo sea manipulado (ASI-19).
 - Si el cliente no está autenticado, solo accede a catálogo y disponibilidad.
 
 ## 3. Riesgos LLM aplicados
@@ -37,7 +40,7 @@ A -->|"texto plano"| W
 | **LLM06 Agencia excesiva** | El modelo intenta comprar, pagar o cambiar datos. | El asistente no tiene herramientas de escritura ni de pago (ASI-11). |
 | **LLM07 Filtración de las instrucciones** | «Muestra tus instrucciones.» | Las instrucciones no contienen secretos ni reglas sensibles; el asistente se niega a revelarlas (ASI-13). |
 | **LLM08 Debilidades de vectores** | No aplica hoy: no hay almacén vectorial. | Si se agregara búsqueda semántica, se aplicaría el mismo control de acceso de los datos de origen. |
-| **LLM09 Desinformación** | Inventar títulos, precios o existencias. | El asistente solo afirma lo obtenido de los servicios en esa consulta; si no hay datos, lo dice (ASI-03); un dato que el modelo agrega y no está en la fuente se descarta. |
+| **LLM09 Desinformación** | Inventar títulos, precios o existencias. | El asistente solo afirma lo obtenido de los módulos y del Inventario en esa consulta; si no hay datos, lo dice (ASI-03); un dato que el modelo agrega y no está en la fuente se descarta. |
 | **LLM10 Consumo sin límite** | Consultas largas o repetidas que disparan el costo. | Límite de 10 consultas por minuto, longitud máxima de consulta y de respuesta (ASI-09, ASI-14). |
 
 ## 4. Datos que ve el proveedor de LLM

@@ -34,22 +34,37 @@ Se sigue una versión reducida del **NIST SSDF**, integrada al flujo de [Spec-Dr
 | Área | Regla |
 | :--- | :--- |
 | Contenedores | Imágenes multi-arquitectura con versión fija; usuario sin privilegios; sistema de archivos de solo lectura cuando se pueda; `healthcheck`; límites de memoria y CPU. |
-| Red | Bases de datos y Redis sin puertos publicados a Internet y con TLS o malla cifrada entre VMs; cada servicio escucha solo en la dirección privada de su VM; paneles de n8n y Evolution API solo por túnel SSH; solo Cloudflare Tunnel llega a Nginx. Reglas por VM en [despliegue](../02-arquitectura-de-software/05-despliegue.md) §6. |
+| Red | La base y Redis sin puertos publicados a Internet y con TLS entre VMs; cada servicio escucha solo en la dirección privada de su VM; el Inventario sin entrada pública; paneles de n8n y Evolution API solo por túnel SSH; solo Cloudflare Tunnel llega a Nginx. Reglas por VM en [despliegue](../02-arquitectura-de-software/05-despliegue.md) §7. |
 | Sistema operativo | Linux mínimo sin entorno gráfico; actualizaciones de seguridad automáticas; acceso por clave SSH, sin contraseña. |
 | Secretos | Variables de entorno por contenedor; `.env` ignorado por Git; rotación ante cambios del equipo o sospecha. **Cada VM recibe solo los secretos de sus servicios** (la clave de Culqi solo en VM-VENTAS, la clave de firma solo en VM-BORDE, las contraseñas de cada base solo en su servicio). |
-| Cuentas de base de datos | Un rol por servicio que solo puede conectarse a su propia base (`pg_hba` por base y origen, `REVOKE CONNECT` a los demás); Identidad en base propia; la cuenta de aplicación no puede modificar la auditoría. |
+| Cuentas de base de datos | Un rol por esquema que solo puede usar su propio esquema (`pg_hba` por base y origen, `REVOKE` a los demás); el esquema `identidad` solo lo usa el módulo Identidad; la cuenta de aplicación no es dueña de las tablas y no puede modificar la auditoría. |
+| Seguridad por filas | En el Inventario, política por sucursal (`FORCE ROW LEVEL SECURITY`) con la sucursal fijada por `SET LOCAL` en cada transacción. Es una segunda capa frente a un error de alcance en la Aplicación; **no protege contra el control total del servidor**. |
+| VM del Inventario | Concentra la base, el Inventario y la réplica de gestión (AD31): contenedores sin privilegios, en redes de Docker separadas y sin el socket de Docker; sistema de archivos de solo lectura cuando se pueda; SSH solo por la VM-AUX; actualizaciones automáticas; discos cifrados; alertas de ingreso por SSH, procesos y puertos nuevos; y recuperación como defensa principal (respaldo y WAL fuera de Oracle). |
 | Hora | Sincronización con `chrony` en todas las VMs, porque las credenciales duran 15 minutos y se validan en cada servicio. |
 | Entornos | Desarrollo, pruebas y producción separados; datos de ejemplo solo en desarrollo y pruebas; nunca datos reales en pruebas. |
+
+## 3.1 Límites de uso y protección contra abuso
+
+Cuatro niveles (AD24). Cada uno frena un tipo de abuso distinto y el personal también tiene presupuestos.
+
+| Nivel | Qué frena | Cómo |
+| :--- | :--- | :--- |
+| **Cloudflare** | DDoS de red y de aplicación, tráfico automatizado, rutas del personal | Protección DDoS incluida, reglas WAF, *Bot Fight Mode*, reglas de tasa y Turnstile (verificación humana) en inicio de sesión, registro, reclamos, reservas y asistente; **Cloudflare Access con MFA** en el host de gestión. |
+| **Nginx** | Ráfagas por IP | `limit_req` y `limit_conn` por la IP real (`CF-Connecting-IP`), tamaño máximo de cuerpo y tiempos de espera. |
+| **Aplicación** | Abuso por actor y por regla de negocio | Presupuestos por actor y rol (ingreso 5 por 15 min, API 100 por minuto por usuario, descargas 10 por hora, asistente 10 por minuto, una reserva activa y 5 por hora) y, para el personal, topes por hora de ajustes y solicitudes de traslado por usuario (SEG-30) y verificación humana en los flujos abiertos (SEG-31); respuesta uniforme con espera sugerida (SEG-07). |
+| **Base de datos** | Consultas que agotan al otro servicio | `CONNECTION LIMIT` por rol y `statement_timeout`. |
+
+El Inventario no tiene entrada pública: solo acepta llamadas del E-commerce, por lo que su superficie de ataque externa es mínima. La interfaz verifica que las solicitudes provengan de personas reales con Turnstile y de los orígenes del túnel con Cloudflare, y los eventos de exceso se registran por actor y origen (SEG-08).
 
 ## 4. Registro y alertas
 
 | Qué | Dónde | Notas |
 | :--- | :--- | :--- |
 | Eventos de seguridad (ingresos fallidos, bloqueos, accesos denegados, límites, cambios de rol, segundo factor fallido) | Registro de auditoría de cada servicio (AUD-10) | Sin contraseñas, credenciales, datos de tarjeta ni enlaces (SEG-10). |
-| Registros técnicos | Salida estándar de los contenedores, con el identificador de seguimiento | Rotación por tamaño; retención corta. Con varias VMs, el `traceId` es la clave para seguir una solicitud entre servicios; no hay agregación central (fuera de alcance) y los registros de cada VM se consultan por SSH desde la VM auxiliar. |
+| Registros técnicos | Salida estándar de los contenedores, con el identificador de seguimiento | Rotación por tamaño; retención corta. Con varias VMs, el `traceId` es la clave para seguir una solicitud entre servicios; no hay agregación central (fuera de alcance) y los registros de cada VM se consultan por SSH desde la VM-AUX. |
 | Alerta | Más de 10 accesos denegados o 20 ingresos fallidos en 5 minutos, contados por servicio | Lista de la administración central y correo a los administradores activos, agrupado cada 15 minutos (SEG-09). |
 | Alerta técnica | Falla al registrar un evento de seguridad (AUD-12) | Correo a la administración central y revisión inmediata. |
-| Disponibilidad | Monitoreo ligero desde la VM auxiliar, fuera de las VMs de aplicaciones | Aviso por correo si la puerta pública o la salud de un servicio no responde. |
+| Disponibilidad | Monitoreo ligero desde la VM-AUX, fuera de las VMs de aplicaciones | Aviso por correo si la puerta pública o la salud de un servicio no responde. |
 
 Retención de registros de auditoría y seguridad: dos años (AUD-11).
 
@@ -58,13 +73,13 @@ Retención de registros de auditoría y seguridad: dos años (AUD-11).
 | Elemento | Decisión |
 | :--- | :--- |
 | Objetivos | **RPO ≤ 24 horas** y **RTO ≤ 4 horas**. |
-| Qué se respalda | Las bases `ecommerce`, `inventario` e `identidad` (un volcado por base, para restaurar cada una por separado), la configuración de n8n y de Evolution API, y los archivos de Compose sin secretos. Los archivos digitales ya viven en el almacén de objetos. |
-| Frecuencia | Volcado diario. |
-| Cifrado | Cifrado antes de salir de la VM de datos; la clave se guarda aparte. |
-| Destino | Almacén de objetos, fuera de la VM de datos. |
+| Qué se respalda | Las bases `ecommerce` (con todos sus esquemas, incluido `identidad`) e `inventario` (un volcado por base, para restaurar cada una por separado), el archivado continuo de WAL, la configuración de n8n y de Evolution API, y los archivos de Compose sin secretos. Los archivos digitales ya viven en el almacén de objetos. |
+| Frecuencia | Volcado diario y archivado continuo de WAL (RPO de minutos); una réplica de PostgreSQL en caliente es una mejora opcional. |
+| Cifrado | Cifrado antes de salir de la VM del Inventario; la clave se guarda aparte. |
+| Destino | Almacén de objetos, fuera de Oracle. |
 | Retención | Escalonada: 7 diarios, 4 semanales y 3 mensuales *(propuesta)*. |
 | Prueba | Restauración en un entorno limpio **antes de cada despliegue mayor** y registro del tiempo real. |
-| Contingencia | Si Oracle no concede una VM ARM o la pierde, se levanta el mismo Compose en otra máquina desde el respaldo. Si se pierde la cuenta secundaria, se pasa al perfil mínimo en la principal ([despliegue](../02-arquitectura-de-software/05-despliegue.md) §7). |
+| Contingencia | Si Oracle no concede una VM ARM, la suspende o la pierde, se levanta el mismo Compose en otra máquina desde el respaldo y el archivado de WAL ([despliegue](../02-arquitectura-de-software/05-despliegue.md) §6). |
 
 ## 6. Respuesta a incidentes
 

@@ -1,6 +1,6 @@
 # Accesibilidad (WCAG 2.2 nivel AA)
 
-Concreta RNF25 y AC10: la interfaz conforma **WCAG 2.2 nivel AA** en inicio, catálogo, detalle, carrito y checkout, y en las pantallas de ingreso y cuenta. La conformidad se verifica con revisión automática (axe) en las pruebas E2E y con una lista manual de teclado y lector de pantalla. Los criterios de éxito se citan por su nombre; antes de una declaración formal, se verifican contra el texto de WCAG 2.2.
+Concreta RNF25 y AC06: la interfaz conforma **WCAG 2.2 nivel AA** en inicio, catálogo, detalle, carrito y checkout, y en las pantallas de ingreso y cuenta. La conformidad se verifica con revisión automática (axe) en las pruebas E2E y con una lista manual de teclado y lector de pantalla. Los criterios de éxito se citan por su nombre; antes de una declaración formal, se verifican contra el texto de WCAG 2.2.
 
 ## 1. Criterios aplicados por principio
 

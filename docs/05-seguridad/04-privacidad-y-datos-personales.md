@@ -1,6 +1,6 @@
 # Privacidad y datos personales
 
-Aplica la Ley N.° 29733 y su reglamento (DS 016-2024-JUS) de forma **proporcionada a un proyecto académico** (véase el [marco legal](../01-analisis-de-sistema/03-marco-legal.md)). Este documento no es asesoría legal: ordena qué datos se tratan, para qué, por cuánto tiempo y quién los recibe, para diseñar con criterio de minimización. Respalda RNF23, AC11 y RC17.
+Aplica la Ley N.° 29733 y su reglamento (DS 016-2024-JUS) de forma **proporcionada a un proyecto académico** (véase el [marco legal](../01-analisis-de-sistema/03-marco-legal.md)). Este documento no es asesoría legal: ordena qué datos se tratan, para qué, por cuánto tiempo y quién los recibe, para diseñar con criterio de minimización. Respalda RNF23, AC04 y RC17.
 
 ## 1. Inventario de datos personales
 

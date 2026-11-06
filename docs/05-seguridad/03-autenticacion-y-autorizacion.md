@@ -30,15 +30,15 @@ La credencial **nunca llega al navegador** (AGENTS.md, regla 9). El navegador so
 | Credencial de acceso | Firmada, de **15 minutos**, con rol y sucursal. | AD22, IDE-02 |
 | Renovación | De **7 días** para el cliente y **8 horas** para el personal, revocable; también se revoca al cambiar la contraseña o el segundo factor (IDE-44); se invalida al cerrar sesión, al desactivar al usuario y al restablecer la contraseña. | AD22, IDE-08, IDE-14, IDE-18 |
 | Contraseña | Mínimo 10 caracteres, fuera de listas comunes o filtradas, sin reglas de composición (guía NIST 800-63B); resumen robusto con sal. | IDE-09, IDE-15, RNF15 |
-| Clave de firma | Solo Identidad posee la clave de firma y publica la de verificación; la credencial lleva el identificador de la clave y el algoritmo es fijo. Rota cada 90 días o ante sospecha; la clave comprometida y sus renovaciones se dejan de aceptar en 5 minutos como máximo, con la última lista conocida si Identidad no responde. | IDE-35, IDE-36 |
+| Clave de firma | Solo el módulo Identidad posee la clave de firma y publica la de verificación; la credencial lleva el identificador de la clave y el algoritmo es fijo. Rota cada 90 días o ante sospecha; la clave comprometida y sus renovaciones se dejan de aceptar en 5 minutos como máximo, con la última lista conocida si Identidad no responde. | IDE-35, IDE-36 |
 | Protección del segundo factor | El secreto TOTP se guarda cifrado y los códigos de respaldo solo como resumen; un código ya usado en su ventana se rechaza y se acepta un desfase de una ventana; hasta presentar el segundo factor solo se puede configurarlo o presentarlo. El bloqueo por fallos es por cuenta y origen. | IDE-40 a IDE-42, SEG-20 |
 | Aviso de cambio | Al cambiar o restablecer la contraseña llega un aviso al correo, sin la contraseña. | IDE-45 |
-| Renovación | Opaca, validada en Identidad; hereda el vencimiento absoluto del ingreso (7 días cliente, 8 horas personal) y no lo extiende. Si Identidad la rechaza, la Web cierra la sesión. | IDE-46, WEB-32 |
+| Renovación | Opaca, validada en el módulo Identidad; hereda el vencimiento absoluto del ingreso (7 días cliente, 8 horas personal) y no lo extiende. Si Identidad la rechaza, la interfaz web cierra la sesión. | IDE-46, WEB-32 |
 | Reto del segundo factor | Entre la contraseña y el código hay 5 minutos; además del bloqueo por cuenta y origen, 10 códigos incorrectos por hora en la cuenta la bloquean 15 minutos. Un código TOTP no se reutiliza en su ventana y se acepta un desfase de una ventana. | IDE-41, IDE-42, IDE-51, SEG-29 |
 | Cambio de correo según riesgo | Desde un dispositivo reconocido y una región habitual se aplica y se avisa en la cuenta y al correo nuevo, sin alertar al anterior (que podría estar comprometido). Desde un dispositivo o región no reconocidos no se aplica, se congelan los cambios sensibles de ese dispositivo y se alerta por todos los medios; el titular lo confirma o rechaza en 24 horas desde un dispositivo reconocido. | IDE-53 a IDE-55 |
 | Cancelación de cuenta | Con pendientes se aplaza hasta cerrarlos; exige contraseña y segundo factor; revoca renovaciones y cancela avisos. | IDE-27, IDE-28, IDE-47 |
 | Textos legales | Identidad guarda la versión vigente y valida la aceptación; sin aceptar la nueva no se pagan ni se hacen cambios sensibles. | IDE-43, IDE-57, IDE-58 |
-| Credencial del asistente | 5 minutos, sin renovación, con el único alcance de leer los pedidos del cliente en el servicio de pedidos. | IDE-33 |
+| Contexto de lectura del asistente | 5 minutos, sin renovación, con el único alcance de leer los pedidos del cliente en el módulo de pedidos. | IDE-33 |
 | Bloqueo | 5 fallos en 15 minutos bloquean temporalmente el ingreso; la respuesta no distingue si la cuenta existe. | IDE-03, SEG-06 |
 | Segundo factor | TOTP obligatorio para el personal (encargado, logística y administrador central) y opcional para el cliente; recuperar la contraseña no lo desactiva; la administración puede restablecerlo. | IDE-20, IDE-37, IDE-38 |
 | Verificación del correo | Código de un solo uso por correo al registrarse o cambiar el correo; el correo sin verificar no permite recuperar el acceso ni iniciar un pago (frena el registro masivo para acaparar stock). | IDE-01, IDE-16, IDE-29, CAR-21 |
@@ -50,13 +50,15 @@ La credencial **nunca llega al navegador** (AGENTS.md, regla 9). El navegador so
 
 **Riesgo conocido:** quien controle el correo de una cuenta puede recuperarla (AM03, riesgo residual medio). Se mitiga con el código corto, el límite de intentos y solicitudes, el aviso de cambio de contraseña y el cambio de correo que exige la contraseña actual (IDE-25). El proveedor de correo es un bloqueo abierto (B08).
 
-## 3. Identidades de servicio
+## 3. Identidades de servicio y contextos entre módulos
 
 | Caso | Mecanismo |
 | :--- | :--- |
 | E-commerce → Inventario | Se reenvía la credencial del usuario para acciones del usuario; para tareas de fondo (expiración de reservas, reintentos) se usa una credencial de servicio de mínimo privilegio. |
-| Asistente → catálogo y disponibilidad | Credencial de servicio de solo lectura; sin acceso a las bases de datos. |
-| Asistente → pedidos | Credencial de 5 minutos, de solo lectura y limitada al propio cliente, emitida por Identidad a pedido de la capa web (IDE-33); el servicio de pedidos filtra por ese cliente, no el asistente. |
+| Inventario → E-commerce (aviso de traslado recibido) | Credencial de servicio de mínimo privilegio. |
+| Módulo → módulo (mismo proceso) | Contexto del actor que origina la llamada; no hay credenciales por la red y la autorización se vuelve a comprobar en cada módulo. |
+| Asistente → catálogo y pedidos | Contexto de solo lectura en el mismo proceso; para los pedidos, un contexto de 5 minutos limitado al propio cliente, emitido por el módulo Identidad a pedido de la capa web (IDE-33); el módulo de pedidos filtra por ese cliente, no el asistente. |
+| Asistente → disponibilidad | Cliente REST del Inventario con credencial de servicio de solo lectura; sin acceso a las bases de datos. |
 | Notificador ↔ servicios | Secreto compartido o firma verificada en ambos sentidos. |
 | Pasarela → E-commerce (aviso) | Firma o secreto del aviso; el estado se confirma además consultando a la pasarela. |
 

@@ -205,7 +205,7 @@ Usuario "1" --> "*" Aceptacion
 1. Un encargado tiene exactamente una sucursal y cada sucursal tiene como máximo un encargado activo.
 2. Las contraseñas se guardan con una función de resumen robusta y nunca en claro; los códigos de un solo uso caducan y se invalidan al usarse.
 3. Un usuario desactivado conserva su historial, pero no puede ingresar ni renovar la sesión.
-4. Las credenciales se firman con una clave que solo posee Identidad; los demás servicios solo verifican.
+4. Las credenciales se firman con una clave que solo posee el módulo Identidad; el Inventario y los demás módulos solo verifican.
 5. Solo se registran mayores de 18 años y la cuenta guarda la versión y fecha de los textos aceptados.
 
 ## 5. Transversal

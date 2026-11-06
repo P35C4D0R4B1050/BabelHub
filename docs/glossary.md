@@ -13,10 +13,13 @@ Lenguaje común del dominio. El código, las specs y la interfaz usan estos tér
 | **Selección de fuente** | Regla que decide desde qué fuente se atiende cada línea impresa de un pedido. | Elección de sucursal de recojo, que hace el cliente. |
 | **Traslado** | Movimiento de ejemplares de una fuente de origen a una de destino. Estados: solicitado, aprobado, en tránsito, recibido, rechazado, cancelado. Si nace de un pedido pagado está *vinculado* a él: no puede rechazarse y mueve la reserva con las unidades. | Envío a domicilio. |
 | **Ruta** | Plazo estimado, en días, del traslado de una fuente a otra. La administración la mantiene como dato; ordena las fuentes por cercanía y da el plazo que ve el cliente. | Guía de traslado. |
-| **Ajuste** | Cambio del stock físico de una fuente con motivo y responsable: merma, producto dañado, corrección de conteo o ingreso inicial (este solo lo registra la administración central). | Traslado. |
+| **Ajuste** | Cambio del stock físico de una fuente con motivo y responsable: merma, producto dañado, corrección de conteo o ingreso de mercadería (este solo lo registra la administración central, en la fuente de recepción). | Traslado. |
 | **Merma** | Pérdida de unidades (robo, extravío, desgaste). Solo descuenta. | Producto dañado. |
 | **Producto dañado** | Unidades que ya no se pueden vender. Solo descuenta. | Merma. |
 | **Corrección de conteo** | Ajuste que se expresa como el conteo físico real; el sistema calcula la diferencia. | Un ajuste con signo libre: no existe. |
+| **Fuente de recepción** | La única fuente que recibe la mercadería nueva de la administración central (por defecto Lima). Las demás reciben stock por traslado o devolución. | Almacén central: no es un tipo aparte, es una fuente designada. |
+| **Ingreso de mercadería** | Registro de un lote recibido (cantidad, referencia de la guía o factura, nota, usuario y fecha) que suma al físico de la fuente de recepción. El stock inicial de un título nuevo es su primer ingreso. | Ajuste por merma o conteo. |
+| **Unidades vendidas** | Unidades de impresos de pedidos pagados en los últimos 30 días, sin anulaciones ni devoluciones, atribuidas a la sucursal que despacha (domicilio) o entrega (recojo). Un traslado de reposición no es una venta. | Stock vendible. |
 | **Alcance de sucursal** | Sucursal a la que un usuario puede acceder; viaja en el token. | Rol. |
 
 ## Catálogo
@@ -85,4 +88,7 @@ Lenguaje común del dominio. El código, las specs y la interfaz usan estos tér
 | **Criterio de aceptación** | Escenario *Dado/Cuando/Entonces* que cubre uno o más requisitos. Se identifica como `AC-XXX-NN` y tiene prueba. |
 | **Puerto** | Interfaz definida en la Aplicación para algo externo (repositorio, pasarela, notificador). |
 | **Adaptador** | Implementación de un puerto en la Infraestructura. |
+| **Servicio** | Unidad de despliegue independiente con su propia base: hay dos, el E-commerce y el Inventario. Cada uno es un monolito modular. | Módulo. |
+| **Módulo** | Agrupación de casos de uso y reglas de una spec dentro de un servicio (por ejemplo Pagos o Traslados). Es una carpeta y un espacio de nombres, no un proyecto ni un proceso. | Servicio. |
+| **Contrato público (de un módulo)** | Interfaces y DTOs en la raíz del espacio de nombres del módulo; lo único que otros módulos pueden usar. El interior va en `Interno`. | Contrato REST entre servicios. |
 | **Convergencia** | Estado en que la spec, el código y las pruebas coinciden y la verificación no encuentra diferencias. |

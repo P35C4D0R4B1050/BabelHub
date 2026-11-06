@@ -53,7 +53,7 @@ Se toman como orientación los controles más relevantes para el alcance del pro
 
 ## 6. ISO/IEC 25010:2023 (modelo de calidad)
 
-Los atributos de calidad se clasifican por las características de este modelo en el documento de [atributos de calidad](../01-analisis-de-sistema/04-atributos-de-calidad.md). Seguridad se desglosa en AC05, AC09, AC11 y AC13.
+Los atributos de calidad se clasifican por las características de este modelo en el documento de [atributos de calidad](../01-analisis-de-sistema/04-atributos-de-calidad.md). Seguridad se desglosa en AC04 y AC04.
 
 ## 7. Privacidad
 

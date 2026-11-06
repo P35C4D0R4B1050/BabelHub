@@ -21,9 +21,9 @@ Identifica qué se protege, de quién y con qué controles. Sirve de insumo para
 flowchart LR
 INT["Internet<br/>(no confiable)"] -->|"TLS"| CF["Cloudflare<br/>borde"]
 CF -->|"Tunnel"| NG["Nginx"]
-subgraph APP["Zona de aplicaciones - VM-BORDE, VM-VENTAS y VM-INVENTARIO"]
+subgraph APP["Zona de aplicaciones - VM-VENTAS y VM-INVENTARIO"]
 NG --> WEB["Web"]
-WEB -->|"malla privada cifrada"| SVC["Servicios de negocio"]
+WEB -->|"red privada, credencial de servicio"| SVC["E-commerce e Inventario"]
 SVC --> AI["Asistente"]
 end
 subgraph DAT["Zona de datos"]
@@ -33,7 +33,7 @@ SVC --> DB
 SVC -->|"firma + secreto"| EXT["Pasarela, WhatsApp,<br/>proveedor de LLM,<br/>almacén de archivos"]
 ```
 
-Se cruzan fronteras: (1) Internet → borde; (2) borde → aplicaciones; (3) aplicaciones → datos; (4) aplicaciones ↔ proveedores externos; (5) **entre VMs de aplicaciones** (y entre las dos cuentas de Oracle). Cada cruce exige autenticación o validación explícita; nada dentro de la zona de aplicaciones confía en el navegador. Como las aplicaciones están en varias VMs, la red entre ellas no se da por confiable: las llamadas entre servicios llevan credencial de servicio y viajan por una malla privada cifrada (ver [despliegue](../02-arquitectura-de-software/05-despliegue.md) §4).
+Se cruzan fronteras: (1) Internet → borde; (2) borde → servicios; (3) servicios → datos; (4) servicios ↔ proveedores externos; (5) **entre VMs** (E-commerce ↔ Inventario y servicios ↔ base). Cada cruce exige autenticación o validación explícita; nada dentro de la zona de aplicaciones confía en el navegador. Como los servicios están en distintas VMs, la red entre ellas no se da por confiable: las llamadas entre el E-commerce y el Inventario llevan credencial de servicio y viajan por la red privada de la cuenta, y la base exige TLS (ver [despliegue](../02-arquitectura-de-software/05-despliegue.md) §4).
 
 ## 3. Catálogo de amenazas
 
@@ -58,13 +58,13 @@ Se cruzan fronteras: (1) Internet → borde; (2) borde → aplicaciones; (3) apl
 | **AM15** | Consumo abusivo del asistente (costo y disponibilidad). | D | Presupuesto | M | ASI-09, ASI-14; SEG-05; límite por usuario. | B |
 | **AM16** | Dependencias o imágenes con vulnerabilidades conocidas. | T, E | Todos | M | RNF19; versiones fijas; escaneo en CI; SBOM; contenedores sin privilegios. | M |
 | **AM17** | Secretos en el repositorio, los registros o los mensajes. | I | Secretos | A | SEG-10, SEG-11; PAG-12; detección de secretos en CI; `.env` ignorado por Git. | B |
-| **AM18** | Pérdida de datos por falla de la VM de datos o borrado accidental. | D | Datos | A | RNF24; respaldo diario cifrado fuera de la VM; prueba de restauración; AD27. | M |
+| **AM18** | Pérdida de datos por falla de la VM del Inventario, que aloja la base o borrado accidental. | D | Datos | A | RNF24; respaldo diario cifrado y archivado de WAL fuera de Oracle; prueba de restauración; AD27. | M |
 | **AM19** | Alteración o borrado de registros de auditoría. | R, T | Auditoría | M | AUD-03, AUD-04; solo inserción; permisos exclusivos del esquema. | B |
 | **AM20** | Abuso del Libro de Reclamaciones público (spam, scripts, datos ajenos). | D, T | Reclamaciones | M | SEG-01, SEG-02, SEG-05; REC-04; datos visibles solo a la administración y al consumidor (REC-10). | B |
 | **AM21** | Enumeración de cuentas por mensajes distintos. | I | Cuentas | M | Respuestas uniformes en el ingreso y la recuperación (IDE-03, IDE-17); SEG-06; el registro puede revelar que un correo ya existe (IDE-13, riesgo aceptado), acotado por SEG-19 y SEG-24. | B |
 | **AM22** | Acceso a los paneles de n8n o Evolution API desde Internet. | E | Notificador | M | RNF06; sin puertos publicados; acceso solo por túnel o red interna. | B |
 | **AM23** | El proveedor de correo falla o filtra los mensajes como no deseados y se pierde la verificación y la recuperación. | D | Cuentas | M | Dominio con SPF, DKIM y DMARC; reintento manual de la persona; la falla no interrumpe otras operaciones; el personal se restablece por el administrador (IDE-23); AD30. | B |
-| **AM24** | Un servicio interno es llamado sin credencial por otro proceso de la red. | S, E | Todos | M | SEG-15; credencial de servicio; cada servicio escucha solo en la dirección privada de su VM, con reglas de red por VM y malla privada cifrada entre VMs. | B |
+| **AM24** | Un servicio interno es llamado sin credencial por otro proceso de la red. | S, E | Todos | M | SEG-15; credencial de servicio; cada servicio escucha solo en la dirección privada de su VM, con reglas de red por VM, `pg_hba` y TLS hacia la base. | B |
 | **AM25** | Se filtra o se roba la clave con que Identidad firma las credenciales y se emiten credenciales falsas. | S, E | Secretos, cuentas | A | IDE-35 (algoritmo fijo, identificador de clave, solo Identidad firma); IDE-36 (rotación cada 90 días y revocación en 5 minutos); SEG-11; custodia de la clave en el plan. | M |
 | **AM27** | Un atacante que controla el correo del titular cambia el correo de la cuenta, o el titular lo cambia para huir de un correo comprometido y el aviso llega al atacante. | S, I | Cuentas | A | IDE-53 a IDE-55 (aviso según dispositivo y región, sin alertar al correo anterior si es habitual); IDE-25 (contraseña actual); IDE-44 y IDE-45 (revocación y aviso). | M |
 | **AM26** | Un atacante que conoce la contraseña bloquea al titular fallando el segundo factor, o evade los límites ocultando su origen. | D | Cuentas | M | SEG-20 por cuenta y origen; SEG-23 (origen desconocido con tope propio); SEG-17 (ignora cabeceras del cliente); IDE-38 (restablecimiento por la administración). | B |

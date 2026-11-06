@@ -2,7 +2,7 @@
 
 Cada diagrama abre un contenedor del [nivel 2](01-contexto-y-contenedores.md) y muestra sus **módulos** (casos de uso y reglas agrupados) y los **puertos** que usan, con la Infraestructura que los implementa. Son vistas de referencia a nivel de módulo: los nombres de clases y proyectos los fija el `plan.md` de cada spec. Convención: rectángulo = módulo; cilindro = almacén; óvalo = puerto.
 
-## 1. Servicio de Inventario
+## 1. Servicio de Inventario (monolito modular)
 
 ```mermaid
 flowchart TD
@@ -75,7 +75,9 @@ class API,FUE,RUT,RES,TRA,AJU,EXP,AUD,PR,PC,PN,PA,PT,DB,RE,N8 n
 | Expiración de reservas | Marca como expiradas las reservas vencidas; con credencial de servicio de mínimo privilegio. | `inventario-seleccion-fuente`, IDE-30 |
 | Auditoría y eventos de seguridad | Contrato único de auditoría en la misma transacción, accesos denegados y límites excedidos. | `transversal-auditoria`, `transversal-seguridad` |
 
-## 2. Servicio de E-commerce
+## 2. Servicio de E-commerce (monolito modular)
+
+Once módulos, cada uno con su spec: Catálogo, Carrito y checkout, Pagos, Pedidos, Envíos, Devoluciones, Biblioteca digital, Libro de Reclamaciones, Identidad, Asistente e interfaz web. Los módulos Identidad, Asistente e interfaz web tienen su propio diagrama más abajo (§3 a §5). Entre módulos solo se llaman por sus contratos públicos.
 
 ```mermaid
 flowchart TD
@@ -105,7 +107,7 @@ PC(["Caché"])
 end
 
 subgraph EXT["Infraestructura y externos"]
-INV["Servicio de Inventario"]
+INV["Servicio de Inventario<br/>(REST de solo lectura)"]
 CUL["Culqi"]
 OPE["Operador logístico"]
 N8["n8n"]
@@ -176,9 +178,9 @@ class API,CAT,CAR,PAG,PED,BIB,ENV,DEV,REC,AUD,PI,PP,PE,PN,PM,PF,PR,PC,INV,CUL,OP
 | Libro de Reclamaciones | Hojas, constancia, límite por origen, descarte sin borrado y respuesta por correo. | `ecommerce-libro-reclamaciones` |
 | Notificador | Contrato de aviso por WhatsApp, que nunca interrumpe un caso de uso. | `transversal-notificaciones` |
 
-## 3. Servicio de Identidad
+## 3. Módulo Identidad (dentro del E-commerce)
 
-Servicio de versión reducida: Presentación y Aplicación con acceso a datos simple, sin Dominio separado.
+Módulo de versión reducida: Presentación y Aplicación con acceso a datos simple, sin Dominio separado. Tiene su propio esquema `identidad` y su propio rol de base de datos; los demás módulos usan su contrato público, nunca sus tablas.
 
 ```mermaid
 flowchart TD
@@ -202,7 +204,7 @@ PA(["Registro de auditoría"])
 PT(["Reloj"])
 end
 
-DB[("PostgreSQL<br/>base identidad")]
+DB[("PostgreSQL<br/>esquema identidad<br/>de la base ecommerce")]
 COR["Proveedor de correo"]
 
 API --> REG
@@ -236,9 +238,9 @@ classDef n fill:#222,stroke:#fff,color:#fff
 class API,REG,SES,REC,MFA,USU,CTA,CLA,AUD,PR,PM,PA,PT,DB,COR n
 ```
 
-## 4. Servicio de Asistente
+## 4. Módulo Asistente (dentro del E-commerce)
 
-Servicio de versión reducida y de solo lectura (AD28).
+Módulo de versión reducida y de solo lectura (AD28). Corre en el proceso del E-commerce con un cliente HTTP propio y un límite de concurrencia, para que su falla no afecte la compra.
 
 ```mermaid
 flowchart TD
@@ -257,8 +259,8 @@ PP(["Cliente de pedidos<br/>credencial del cliente, 5 min, solo lectura"])
 PL(["Proveedor de LLM"])
 end
 
-ECO["Servicio de E-commerce"]
-INV["Servicio de Inventario"]
+ECO["Contratos públicos de Catálogo y Pedidos<br/>(mismo proceso)"]
+INV["Servicio de Inventario<br/>(REST de solo lectura)"]
 LLM["Proveedor de LLM"]
 
 API --> CON
@@ -277,11 +279,11 @@ classDef n fill:#222,stroke:#fff,color:#fff
 class API,CON,REC,PEDM,GUA,PC,PP,PL,ECO,INV,LLM n
 ```
 
-El asistente no tiene acceso a ninguna base de datos ni herramientas de escritura. El filtro de los pedidos lo aplica el servicio de pedidos con la credencial del cliente.
+El asistente no tiene acceso a ninguna base de datos ni herramientas de escritura. El filtro de los pedidos lo aplica el módulo de pedidos con el contexto de lectura del cliente.
 
-## 5. BabelHub.Web
+## 5. Interfaz web (presentación del E-commerce)
 
-`BabelHub.Web` no es una capa de Clean Architecture sino un cliente de los servicios, sin Dominio ni Aplicación (AD15).
+La interfaz web es la capa de Presentación del E-commerce (AD15): no tiene Dominio ni Aplicación propios, llama a los módulos en el mismo proceso por sus contratos públicos y al Inventario por REST, solo desde el servidor. Se sirve en dos hosts (tienda y gestión).
 
 ```mermaid
 flowchart TD
@@ -299,10 +301,10 @@ MEZ["Mezcla de auditoría y alertas<br/>AUD-09, AUD-17, AUD-18"]
 end
 
 subgraph CLI["Clients - HttpClient tipados"]
-CE["Cliente de E-commerce"]
-CI["Cliente de Inventario"]
-CD["Cliente de Identidad"]
-CA["Cliente de Asistente"]
+CE["Contratos de los módulos del E-commerce<br/>(mismo proceso)"]
+CI["Cliente REST del Inventario"]
+CD["Contrato del módulo Identidad"]
+CA["Contrato del módulo Asistente"]
 end
 
 TIE --> SESW
@@ -329,15 +331,15 @@ class TIE,SUC,ADM,SESW,SEGW,LEG,MEZ,CE,CI,CD,CA n
 
 | Aspecto | Regla |
 | :--- | :--- |
-| Referencias | Solo a `BabelHub.Shared`; nunca al Dominio, Aplicación o Infraestructura de un servicio. |
+| Referencias | Solo a los contratos públicos de los módulos y a `BabelHub.Shared`; nunca al interior de un módulo ni al Dominio, Aplicación o Infraestructura del Inventario. |
 | Llamadas | Solo desde el servidor; el navegador no ve credenciales ni llama a los servicios. |
 | Descargas | La Web redirige al enlace firmado; no transporta el archivo. |
-| Auditoría | Pide a cada servicio su página y mezcla por fecha; sin reglas de negocio. |
+| Auditoría | Pide a cada servicio (E-commerce e Inventario) su página y mezcla por fecha; sin reglas de negocio. |
 
 ## 6. Elementos compartidos
 
 | Elemento | Dónde vive | Regla |
 | :--- | :--- | :--- |
-| `BabelHub.Shared` | Referenciado por Api, Infraestructura y Web | Solo contratos (DTOs, constantes); no lo referencian Dominio ni Aplicación. |
-| Auditoría y eventos de seguridad | En cada servicio, mismo contrato | Misma transacción que el cambio; si no se puede auditar, la operación falla (AUD-04). |
+| `BabelHub.Shared` | Referenciado por Presentación e Infraestructura de ambos servicios | Solo contratos (DTOs, constantes); no lo referencian Dominio ni Aplicación. |
+| Auditoría y eventos de seguridad | En cada servicio (una tabla por base), mismo contrato | Misma transacción que el cambio; si no se puede auditar, la operación falla (AUD-04). |
 | Errores uniformes y límites | En cada Api | `problem+json` y respuesta única de límite excedido (SEG-03, SEG-07). |

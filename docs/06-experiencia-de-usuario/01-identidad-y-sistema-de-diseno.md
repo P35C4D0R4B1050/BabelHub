@@ -1,6 +1,6 @@
 # Identidad y sistema de diseño
 
-Este documento define cómo se ve y cómo se comporta `BabelHub.Web` (decisión AD15): identidad visual, sistema de diseño, mapa de pantallas por rol, recorridos clave, estados, accesibilidad y criterios de aceptación visual. No cambia la estructura funcional del análisis, la arquitectura y el diseño; la traduce a pantallas. Parte del documento de dirección visual del equipo (fuera del repositorio) y de los prototipos de `prototype/`.
+Este documento define cómo se ve y cómo se comporta la interfaz web del E-commerce (decisión AD15): identidad visual, sistema de diseño, mapa de pantallas por rol, recorridos clave, estados, accesibilidad y criterios de aceptación visual. No cambia la estructura funcional del análisis, la arquitectura y el diseño; la traduce a pantallas. Parte del documento de dirección visual del equipo (fuera del repositorio) y de los prototipos de `prototype/`.
 
 ## 1. Principios
 
@@ -11,7 +11,7 @@ Este documento define cómo se ve y cómo se comporta `BabelHub.Web` (decisión 
 | **Las portadas son las protagonistas** | La interfaz las enmarca; no compite con ellas. Sin fondos de color aleatorios por tarjeta. |
 | **Dos temas, una sola marca** | Claro («Papel y tinta») y oscuro («Archivo nocturno») comparten jerarquía, espaciado y estados; solo cambian los tokens. |
 | **Movimiento con propósito** | Cada animación comunica una respuesta del sistema. Todo funciona sin movimiento (`prefers-reduced-motion`). |
-| **Móvil primero** | La demanda en provincias llega desde celulares y conexiones variables (AC08). |
+| **Móvil primero** | La demanda en provincias llega desde celulares y conexiones variables (AC06). |
 | **Una sola app, tres áreas** | Tienda, Sucursal y Admin comparten sistema de diseño, sesión y componentes (AD15). |
 
 ## 2. Identidad: «Babel cromático + laberinto de historias»
@@ -63,7 +63,7 @@ Se respeta la preferencia de tema del sistema operativo y se recuerda la elecci�
 
 | Aspecto | Decisión (AD21) |
 | :--- | :--- |
-| **CSS** | Tailwind CSS 4 con daisyUI 5, compilado con la CLI independiente de Tailwind (sin Node) en el `Dockerfile` de `BabelHub.Web`. El CSS generado no se versiona. |
+| **CSS** | Tailwind CSS 4 con daisyUI 5, compilado con la CLI independiente de Tailwind (sin Node) en el `Dockerfile` de `BabelHub.Ecommerce.Api`. El CSS generado no se versiona. |
 | **Tokens** | Los colores viven como tokens semánticos de daisyUI (`primary`, `secondary`, `accent`, `base-100/200/300`, `base-content`, `info`, `success`, `warning`, `error`) en dos temas con los mismos nombres. Ningún componente tiene colores propios. |
 | **Componentes** | Clases de daisyUI para botones, tarjetas, formularios, insignias y modales; Tailwind para layout, espaciado y responsive. |
 | **Interactividad** | htmx para fragmentos (carrito, disponibilidad, estado de pedido y filtros); JavaScript propio mínimo. |

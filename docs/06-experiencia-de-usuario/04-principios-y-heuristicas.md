@@ -1,6 +1,6 @@
 # Principios de UX y heurísticas
 
-Define cómo se diseña la experiencia, no solo cómo se ve. Sigue el proceso de diseño centrado en las personas de **ISO 9241-210** y usa las **heurísticas de usabilidad de Nielsen** como lista de revisión. Complementa la [identidad y el sistema de diseño](01-identidad-y-sistema-de-diseno.md) y respalda NN16, OB08, AC08, AC10 y RNF27.
+Define cómo se diseña la experiencia, no solo cómo se ve. Sigue el proceso de diseño centrado en las personas de **ISO 9241-210** y usa las **heurísticas de usabilidad de Nielsen** como lista de revisión. Complementa la [identidad y el sistema de diseño](01-identidad-y-sistema-de-diseno.md) y respalda NN16, OB08, AC06 y RNF27.
 
 ## 1. Proceso centrado en las personas (ISO 9241-210)
 
