@@ -60,20 +60,17 @@
   BH.miSucursal = () => store.get('bh2_sucursal', 'aya');
   BH.fecha = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' });
 
-  BH.vendible = (o, sid) => { const s = o.impreso && o.impreso.stock[sid]; return s ? s[0] - s[1] : 0; };
+  /* Modelo de stock único (FUE-02, FUE-03): toda pantalla lee estas tres funciones.
+     vendible = físico − reservado; el reservado incluye las reservas pendientes de 15 minutos del checkout. */
+  BH.pendientes = (obraId, sid) => store.get('bh2_pend', []).filter((p) => p.obra === Number(obraId) && p.suc === sid && p.exp > Date.now()).reduce((a, p) => a + p.cant, 0);
+  BH.fisico = (o, sid) => { const s = o.impreso && o.impreso.stock[sid]; return s ? s[0] : 0; };
+  BH.reservado = (o, sid) => { const s = o.impreso && o.impreso.stock[sid]; return (s ? s[1] : 0) + BH.pendientes(o.id, sid); };
+  BH.vendible = (o, sid) => (o.impreso ? Math.max(0, BH.fisico(o, sid) - BH.reservado(o, sid)) : 0);
   BH.totalVendible = (o) => (o.impreso ? BH.sucursales.reduce((a, s) => a + BH.vendible(o, s.id), 0) : 0);
   BH.conStock = (o) => BH.sucursales.filter((s) => BH.vendible(o, s.id) > 0);
 
   /* Sucursales nuevas creadas en el prototipo: son datos, no código (RNF04) */
   store.get('bh2_sucursales_extra', []).forEach((s) => { if (!BH.sucursal(s.id)) BH.sucursales.push(s); });
-
-  /* Ajustes de stock físico persistidos (ajustes, traslados): se reaplican al cargar cada página */
-  const aplicarDelta = (obra, suc, d) => {
-    const o = BH.obra(obra); if (!o || !o.impreso) return;
-    const s = o.impreso.stock[suc] || (o.impreso.stock[suc] = [0, 0]); s[0] = Math.max(0, s[0] + d);
-  };
-  store.get('bh2_deltas', []).forEach((x) => aplicarDelta(x.obra, x.suc, x.d));
-  BH.addDelta = (obra, suc, d) => { const l = store.get('bh2_deltas', []); l.push({ obra, suc, d }); store.set('bh2_deltas', l); aplicarDelta(obra, suc, d); };
 
   /* Cambios de catálogo hechos desde Administración (obras nuevas, precios, bajas y retiros digitales) */
   store.get('bh2_obras_extra', []).forEach((o) => { if (!BH.obra(o.id)) BH.obras.push(o); });
@@ -87,6 +84,36 @@
   Object.entries(store.get('bh2_obras_cambios', {})).forEach(([id, c]) => aplicarCambio(id, c));
   BH.setCambio = (id, patch) => { const m = store.get('bh2_obras_cambios', {}); m[id] = { ...(m[id] || {}), ...patch }; store.set('bh2_obras_cambios', m); aplicarCambio(id, patch); };
   BH.addObra = (o) => { store.set('bh2_obras_extra', [...store.get('bh2_obras_extra', []), o]); BH.obras.push(o); };
+
+  /* Cambios de stock persistidos: se reaplican al cargar cada página, después del catálogo (así también valen para obras nuevas).
+     Físico: ajustes, traslados, ingresos y entregas. Reservado: reservas confirmadas de pedidos (se crean al pagar y se consumen al despachar o entregar). */
+  const aplicarDelta = (obra, suc, d) => {
+    const o = BH.obra(obra); if (!o || !o.impreso) return;
+    const s = o.impreso.stock[suc] || (o.impreso.stock[suc] = [0, 0]); s[0] = Math.max(0, s[0] + d);
+  };
+  const aplicarReserva = (obra, suc, d) => {
+    const o = BH.obra(obra); if (!o || !o.impreso) return;
+    const s = o.impreso.stock[suc] || (o.impreso.stock[suc] = [0, 0]); s[1] = Math.max(0, s[1] + d);
+  };
+  store.get('bh2_deltas', []).forEach((x) => aplicarDelta(x.obra, x.suc, x.d));
+  store.get('bh2_reservas', []).forEach((x) => aplicarReserva(x.obra, x.suc, x.d));
+  BH.addDelta = (obra, suc, d) => { const l = store.get('bh2_deltas', []); l.push({ obra, suc, d }); store.set('bh2_deltas', l); aplicarDelta(obra, suc, d); };
+  BH.addReserva = (obra, suc, d) => { const l = store.get('bh2_reservas', []); l.push({ obra, suc, d }); store.set('bh2_reservas', l); aplicarReserva(obra, suc, d); };
+
+  /* Ventas (unidades de impresos de pedidos pagados). Se cuentan al pagar y se atribuyen así:
+     domicilio → sucursal fuente (la que despacha por courier); recojo → sucursal que entrega, aunque el stock llegue por traslado.
+     Un traslado de reposición entre sucursales no es una venta. Se excluyen los pedidos anulados. */
+  BH.registrarVentas = (v) => store.set('bh2_ventas', [...store.get('bh2_ventas', []), ...v]);
+  BH.vendidos = (sid, dias = 30, obraId) => {
+    const desde = new Date(new Date(BH.hoy + 'T12:00:00').getTime() - dias * 86400000).toISOString().slice(0, 10), anul = store.get('bh2_anulados', []);
+    return [...(BH.ventasSemilla || []), ...store.get('bh2_ventas', [])]
+      .filter((v) => !anul.includes(v.pedido) && v.fecha >= desde && (!sid || v.suc === sid) && (!obraId || v.obra === Number(obraId)))
+      .reduce((a, v) => a + v.cant, 0);
+  };
+
+  /* Reserva pendiente del checkout: dura 15 minutos y caduca sola (SEL-08); al pagar pasa a reserva confirmada */
+  BH.reservarPendiente = (lineas, ms) => store.set('bh2_pend', lineas.map((l) => ({ obra: l.obra, suc: l.suc, cant: l.cant, exp: Date.now() + ms })));
+  BH.liberarPendientes = () => store.set('bh2_pend', []);
 
   /* Reclamos: los crea la Tienda y los atiende Administración */
   BH.reclamos = {

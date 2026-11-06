@@ -24,6 +24,23 @@
     <select id="f-lic" class="select select-sm self-center" aria-label="Filtrar por licencia"><option value="">Todas las licencias</option><option value="porvencer">Por vencer (≤ 120 días)</option><option value="vencida">Vencidas</option></select>
   </div>
   <div id="tabla" class="mt-3"></div>
+  <section class="mt-10" aria-labelledby="h-hist"><h2 id="h-hist" class="font-display text-2xl mb-1">Últimos ingresos de mercadería</h2><p class="text-sm opacity-70 mb-2">Cada lote suma al stock físico de <span class="lima-n"></span>; desde ahí se reparte por traslados. Queda en la auditoría.</p><div id="hist"></div></section>
+
+  <dialog id="dlg-in" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box">
+      <h2 class="font-display text-2xl" id="in-t">Registrar ingreso</h2>
+      <p class="text-sm opacity-75 mb-3" id="in-info"></p>
+      <div class="space-y-3">
+        <label class="floating-label w-full"><span>Cantidad recibida *</span><input id="in-cant" class="input w-full" type="number" min="1" max="5000" step="1" inputmode="numeric" placeholder="Cantidad recibida *"></label>
+        <label class="floating-label w-full"><span>Referencia (guía o factura de importación)</span><input id="in-ref" class="input w-full" maxlength="40" placeholder="Referencia (guía o factura de importación)"></label>
+        <label class="floating-label w-full"><span>Nota (opcional)</span><input id="in-nota" class="input w-full" maxlength="120" placeholder="Nota (opcional)"></label>
+        <p id="in-prev" class="text-sm min-h-10" role="status" aria-live="polite"></p>
+        <p class="text-xs opacity-60">Solo suma al físico de <span class="lima-n"></span>. Para corregir un conteo o descontar merma usa <a class="link" href="../sucursal/inventario.html?sucursal=lim&actor=admin">Ajustes de inventario</a>. Un título sin stock no se da de baja: se muestra como agotado.</p>
+      </div>
+      <div class="modal-action"><form method="dialog"><button class="btn btn-ghost">Cancelar</button></form><button class="btn btn-primary" id="in-ok" disabled>Registrar ingreso</button></div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>cerrar</button></form>
+  </dialog>
 
   <dialog id="dlg" class="modal modal-bottom sm:modal-middle">
     <div class="modal-box max-w-2xl max-h-[90vh]">
@@ -39,7 +56,11 @@
         <fieldset class="border border-[var(--bh-linea)] p-3 space-y-3"><legend class="px-1 font-semibold">Edición impresa</legend>
           <label class="flex items-center gap-2 cursor-pointer"><input id="i-on" type="checkbox" class="checkbox checkbox-primary checkbox-sm"> Tiene edición impresa</label>
           <div id="i-box" class="grid sm:grid-cols-2 gap-3"><div><label class="floating-label"><span>ISBN *</span><input id="i-isbn" class="input w-full" placeholder="ISBN"></label><p id="e-ii" class="text-error text-xs mt-1" role="alert"></p></div>
-            <label class="floating-label"><span>Precio (S/) *</span><input id="i-pre" class="input w-full" inputmode="decimal" placeholder="Precio"></label></div></fieldset>
+            <label class="floating-label"><span>Precio (S/) *</span><input id="i-pre" class="input w-full" inputmode="decimal" placeholder="Precio"></label>
+            <div id="i-stock-w" class="sm:col-span-2 grid sm:grid-cols-2 gap-3">
+              <label class="floating-label"><span>Stock inicial en Lima (opcional)</span><input id="i-stock" class="input w-full" type="number" min="0" max="5000" step="1" inputmode="numeric" placeholder="Stock inicial en Lima (opcional)"></label>
+              <label class="floating-label"><span>Referencia (guía o factura)</span><input id="i-ref" class="input w-full" maxlength="40" placeholder="Referencia (guía o factura)"></label>
+              <p class="sm:col-span-2 text-xs opacity-70">El stock entra solo a <span class="lima-n"></span> como un ingreso auditado. Los lotes siguientes se registran con «Registrar ingreso» en la lista; el stock no se edita aquí.</p></div></div></fieldset>
 
         <fieldset class="border border-[var(--bh-linea)] p-3 space-y-3"><legend class="px-1 font-semibold">Edición digital y licencia</legend>
           <label class="flex items-center gap-2 cursor-pointer"><input id="d-on" type="checkbox" class="checkbox checkbox-primary checkbox-sm"> Tiene edición digital</label>
@@ -67,10 +88,12 @@ BH.ready(() => {
   const $ = (id) => document.getElementById(id);
   $('ic-b').innerHTML = BH.icon('search', 'size-4'); $('nuevo').innerHTML = BH.icon('plus', 'size-5') + ' Nueva obra';
   $('o-cat').innerHTML = BH.categorias.map((c) => `<option>${c}</option>`).join('');
-  let editando = null;
+  const LIM = BH.FUENTE_CENTRAL, lima = BH.sucursal(LIM).nombre; document.querySelectorAll('.lima-n').forEach((e) => (e.textContent = lima));
+  let editando = null, actualIn = null;
   const isbns = (excl) => BH.obras.filter((o) => o !== excl).flatMap((o) => [o.impreso && o.impreso.isbn, o.digital && o.digital.isbn]).filter(Boolean);
 
   function tabla() {
+    if ($('hist')) historial();
     if (BH.estado === 'error') { $('tabla').innerHTML = BH.errorState('No pudimos cargar el catálogo.'); return; }
     if (BH.estado === 'vacio') { $('tabla').innerHTML = BH.emptyState('book', 'Aún no hay obras', 'Publica la primera obra del catálogo nacional.'); return; }
     const q = $('buscar').value.toLowerCase(), f = $('f-lic').value;
@@ -78,9 +101,10 @@ BH.ready(() => {
     if (!l.length) { $('tabla').innerHTML = BH.emptyState('search', 'Sin resultados', 'Ninguna obra coincide con el filtro.'); return; }
     $('tabla').innerHTML = `<div class="overflow-x-auto border border-[var(--bh-linea)] bg-base-100"><table class="table"><thead><tr><th>Obra</th><th>Impreso</th><th>Digital y licencia</th><th></th></tr></thead><tbody>
       ${l.map((o) => `<tr><td><div class="font-medium">${o.titulo}</div><div class="text-xs opacity-60">${o.autor} · ${o.categoria}</div></td>
-        <td class="text-sm">${o.impreso ? `${BH.money(o.impreso.precio)}<div class="text-xs opacity-60 font-mono">${o.impreso.isbn}</div><div class="text-xs opacity-60">Stock red: ${BH.totalVendible(o)}</div>` : '<span class="opacity-50">—</span>'}</td>
+        <td class="text-sm">${o.impreso ? `${BH.money(o.impreso.precio)}<div class="text-xs opacity-60 font-mono">${o.impreso.isbn}</div><div class="text-xs opacity-60">Vendible en la red: ${BH.totalVendible(o)} · Lima: ${BH.vendible(o, BH.FUENTE_CENTRAL)}</div>${BH.totalVendible(o) === 0 ? `<span class="chip mt-1">${BH.icon('warn', 'size-3.5 text-warning')}Agotado en la red</span>` : ''}` : '<span class="opacity-50">—</span>'}</td>
         <td class="text-sm">${o.digital ? `${BH.money(o.digital.precio)} · ${o.digital.formato}<div class="text-xs opacity-60 font-mono">${o.digital.isbn}</div><div class="mt-1 flex flex-wrap gap-1 items-center">${BH.chipEstado(BH.licenciaEstado(o.digital))}<span class="text-xs opacity-70">${o.digital.licencia.tipo}${o.digital.licencia.vence ? ' · hasta ' + o.digital.licencia.vence : ''}</span></div><div class="text-xs opacity-60">${o.digital.titular} · ${o.digital.licencia.territorios}</div>` : '<span class="opacity-50">Sin edición digital</span>'}</td>
-        <td class="text-right whitespace-nowrap"><button class="btn btn-sm btn-ghost" data-ed="${o.id}">Editar</button>${o.digital ? ` <button class="btn btn-sm btn-ghost" data-ret="${o.id}">Retirar digital</button>` : ''} <button class="btn btn-sm btn-ghost text-error" data-baja="${o.id}">Dar de baja</button></td></tr>`).join('')}</tbody></table></div>`;
+        <td class="text-right whitespace-nowrap">${o.impreso ? `<button class="btn btn-sm btn-primary" data-in="${o.id}">Registrar ingreso</button> ` : ""}<button class="btn btn-sm btn-ghost" data-ed="${o.id}">Editar</button>${o.digital ? ` <button class="btn btn-sm btn-ghost" data-ret="${o.id}">Retirar digital</button>` : ''} <button class="btn btn-sm btn-ghost text-error" data-baja="${o.id}">Dar de baja</button></td></tr>`).join('')}</tbody></table></div>`;
+    $('tabla').querySelectorAll('[data-in]').forEach((b) => (b.onclick = () => abrirIn(Number(b.dataset.in))));
     $('tabla').querySelectorAll('[data-ed]').forEach((b) => (b.onclick = () => abrir(BH.obra(b.dataset.ed))));
     $('tabla').querySelectorAll('[data-ret]').forEach((b) => (b.onclick = () => { const o = BH.obra(b.dataset.ret); BH.setCambio(o.id, { sinDigital: true }); BH.audit.add('Retiro de libro digital', `${o.titulo} (digital): retirado de la venta; los accesos ya concedidos se mantienen`); BH.toast('Edición digital retirada de la venta'); tabla(); }));
     $('tabla').querySelectorAll('[data-baja]').forEach((b) => (b.onclick = () => { const o = BH.obra(b.dataset.baja); BH.setCambio(o.id, { baja: true }); BH.audit.add('Baja de título', o.titulo); BH.toast('Título dado de baja'); tabla(); }));
@@ -89,12 +113,41 @@ BH.ready(() => {
   const sync = () => { $('i-box').hidden = !$('i-on').checked; $('d-box').hidden = !$('d-on').checked; $('d-venc-w').hidden = $('d-tip').value === 'Dominio público'; };
   ['i-on', 'd-on', 'd-tip'].forEach((i) => $(i).addEventListener('change', sync));
 
+  /* Ingreso de mercadería (solo administración central; entra solo a Lima): es un evento con cantidad, referencia y auditoría, no un campo editable */
+  function historial() {
+    const l = BH.ingresos.get();
+    $('hist').innerHTML = l.length ? `<div class="overflow-x-auto border border-[var(--bh-linea)] bg-base-100"><table class="table table-sm"><thead><tr><th>N.°</th><th>Fecha</th><th>Título</th><th class="text-right">Cant.</th><th>Referencia</th><th>Registró</th></tr></thead><tbody>${l.slice(0, 6).map((x) => `<tr><td class="font-mono text-sm">${x.id}</td><td>${x.fecha}</td><td>${BH.obra(x.obra) ? BH.obra(x.obra).titulo : '—'}${x.nota ? `<div class="text-xs opacity-60">${x.nota}</div>` : ''}</td><td class="text-right tabular-nums">+${x.cant}</td><td>${x.ref || '<span class="opacity-40">—</span>'}</td><td class="text-sm">${x.usuario}</td></tr>`).join('')}</tbody></table></div>` : '<p class="text-sm opacity-60">Aún no hay ingresos en esta sesión.</p>';
+  }
+  const numIn = () => { const v = $('in-cant').value.trim(); return v === '' ? NaN : Number(v); };
+  function prevIn() {
+    const p = $('in-prev'), ok = $('in-ok'), n = numIn(), f = BH.fisico(actualIn, LIM), v = BH.vendible(actualIn, LIM);
+    const fallo = (t) => { p.innerHTML = `${BH.icon('warn', 'size-4 inline text-error')} ${t}`; ok.disabled = true; ok.textContent = 'Registrar ingreso'; return null; };
+    if (isNaN(n)) return fallo('Escribe la cantidad recibida.');
+    if (!Number.isInteger(n)) return fallo('Usa un número entero.');
+    if (n < 1) return fallo('El ingreso debe ser de al menos 1 unidad.');
+    if (n > 5000) return fallo('Un solo ingreso no puede superar 5 000 unidades; divídelo por lotes.');
+    p.innerHTML = `${BH.icon('check', 'size-4 inline text-success')} Físico ${f} → <b>${f + n}</b> · vendible ${v} → <b>${v + n}</b> en ${lima}.`;
+    ok.disabled = false; ok.textContent = `Registrar ingreso (+${n})`; return n;
+  }
+  function abrirIn(id) {
+    actualIn = BH.obra(id); $('in-t').textContent = actualIn.titulo;
+    $('in-info').textContent = `${lima}: físico ${BH.fisico(actualIn, LIM)} · reservado ${BH.reservado(actualIn, LIM)} · vendible ${BH.vendible(actualIn, LIM)}`;
+    ['in-cant', 'in-ref', 'in-nota'].forEach((i) => ($(i).value = '')); prevIn(); $('dlg-in').showModal(); $('in-cant').focus();
+  }
+  $('in-cant').addEventListener('input', prevIn);
+  $('in-ok').addEventListener('click', () => {
+    const n = prevIn(); if (n === null) return;
+    const id = BH.registrarIngreso(actualIn.id, n, $('in-ref').value.trim(), $('in-nota').value.trim());
+    $('dlg-in').close(); BH.toast(`${id}: +${n} × ${actualIn.titulo} en ${lima}. Ya figura en el inventario y en la auditoría.`); tabla();
+  });
+
   function abrir(o) {
     editando = o || null; $('dlg-t').textContent = o ? 'Editar obra' : 'Nueva obra';
     $('o-tit').value = o ? o.titulo : ''; $('o-aut').value = o ? o.autor : ''; $('o-edi').value = o ? o.editorial : ''; $('o-cat').value = o ? o.categoria : BH.categorias[0];
     $('i-on').checked = o ? !!o.impreso : true; $('i-isbn').value = o && o.impreso ? o.impreso.isbn : ''; $('i-pre').value = o && o.impreso ? o.impreso.precio : '';
     const d = o && o.digital; $('d-on').checked = !!d; $('d-isbn').value = d ? d.isbn : ''; $('d-pre').value = d ? d.precio : ''; $('d-for').value = d ? d.formato : 'EPUB';
     $('d-tip').value = d ? d.licencia.tipo : 'Licencia comercial'; $('d-tit').value = d ? d.titular : ''; $('d-ter').value = d ? d.licencia.territorios : 'Mundial'; $('d-venc').value = d && d.licencia.vence ? d.licencia.vence : '';
+    $('i-stock-w').hidden = !!o; $('i-stock').value = ''; $('i-ref').value = '';
     $('e-ii').textContent = $('e-di').textContent = $('e-gen').textContent = ''; sync(); $('dlg').showModal();
   }
   $('nuevo').onclick = () => abrir(null);
@@ -111,6 +164,8 @@ BH.ready(() => {
       if (!editando && !$('d-file').files.length) { $('e-gen').textContent = 'Sube el archivo del libro digital (EPUB o PDF).'; return; }
       if ($('d-tip').value !== 'Dominio público' && (!g('d-venc') || g('d-venc') <= BH.hoy)) { $('e-gen').textContent = 'La licencia comercial necesita una vigencia posterior a hoy.'; return; }
     }
+    const st = !editando && $('i-on').checked ? g('i-stock') : '';
+    if (st !== '' && (!Number.isInteger(Number(st)) || Number(st) < 0 || Number(st) > 5000)) { $('e-gen').textContent = 'El stock inicial debe ser un entero entre 0 y 5 000.'; return; }
     if ($('e-ii').textContent || $('e-di').textContent) return;
     const impreso = $('i-on').checked ? { isbn: g('i-isbn'), precio: parseFloat(g('i-pre')), stock: editando && editando.impreso ? editando.impreso.stock : {} } : null;
     const digital = $('d-on').checked ? { isbn: g('d-isbn'), precio: parseFloat(g('d-pre')), formato: g('d-for') || $('d-for').value, paginas: editando && editando.digital ? editando.digital.paginas : 200, tamano: editando && editando.digital ? editando.digital.tamano : '2,0 MB', titular: g('d-tit'), licencia: { tipo: $('d-tip').value, vence: $('d-tip').value === 'Dominio público' ? null : g('d-venc'), territorios: $('d-ter').value } } : null;
@@ -122,6 +177,7 @@ BH.ready(() => {
       const id = Date.now() % 100000 + 100;
       BH.addObra({ id, titulo: g('o-tit'), autor: g('o-aut'), editorial: g('o-edi'), categoria: $('o-cat').value, motivo: ['laberinto', 'orbita', 'lineas', 'rejilla', 'ondas', 'arcos'][id % 6], paleta: id % 6, desc: '', impreso, digital });
       BH.audit.add('Alta de título', `${g('o-tit')}${impreso ? ' (impreso)' : ''}${digital ? ' (digital, licencia ' + digital.licencia.tipo.toLowerCase() + ')' : ''}`);
+      if (impreso && Number(st) > 0) BH.registrarIngreso(id, Number(st), g('i-ref'), 'Stock inicial');
     }
     $('dlg').close(); BH.toast('Obra guardada'); tabla();
   };

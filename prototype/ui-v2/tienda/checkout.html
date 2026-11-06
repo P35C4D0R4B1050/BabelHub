@@ -27,6 +27,7 @@
 BH.ready(() => {
   const $ = (id) => document.getElementById(id);
   const demo = BH.param('demo'); if (demo) { BH.demoCart(demo); history.replaceState(null, '', 'checkout.html'); }
+  BH.liberarPendientes();          // cada checkout empieza sin reservas pendientes propias
   if (!BH.logueado()) { $('paso').innerHTML = BH.gate('Necesitas una cuenta para comprar. Tu carrito se conserva.'); $('steps').remove(); $('resumen').remove(); return; }
 
   let lineas = BH.cart.lineas();
@@ -42,12 +43,23 @@ BH.ready(() => {
   const nombrePaso = () => PASOS[i];
 
   const impresos = lineas.filter((l) => l.formato === 'impreso');
-  function fuente(l) {
-    if (BH.vendible(l.obra, s.suc) >= l.cant) return { ok: true, traslado: false };
+  /* Selección de fuente (SEL-02): la sucursal elegida si tiene vendible; si no, otra con traslado.
+     Al reservar se guarda la fuente de cada línea (asig) para que la reserva y lo que ve el cliente coincidan. */
+  const asig = {};
+  function calcular(l) {
+    if (BH.vendible(l.obra, s.suc) >= l.cant) return { ok: true, traslado: false, id: s.suc };
     const alt = BH.sucursales.find((x) => BH.vendible(l.obra, x.id) >= l.cant);
-    return alt ? { ok: true, traslado: true, desde: alt.nombre } : { ok: false };
+    return alt ? { ok: true, traslado: true, id: alt.id, desde: alt.nombre } : { ok: false };
   }
+  const fuente = (l) => asig[l.k] || calcular(l);
   const hayTraslado = () => impresos.some((l) => fuente(l).traslado);
+  const soltar = () => { Object.keys(asig).forEach((k) => delete asig[k]); BH.liberarPendientes(); };
+  /* Reserva pendiente de los impresos: el stock baja para los demás clientes durante lo que quede de los 15 minutos */
+  function reservarImpresos() {
+    soltar();
+    impresos.forEach((l) => { asig[l.k] = calcular(l); });
+    if (impresos.every((l) => asig[l.k].ok)) BH.reservarPendiente(impresos.map((l) => ({ obra: l.obra.id, suc: asig[l.k].id, cant: l.cant })), restante * 1000);
+  }
 
   function cabecera() {
     $('steps').innerHTML = PASOS.map((p, n) => `<li class="step ${n <= i ? 'step-primary' : ''}" ${n === i ? 'aria-current="step"' : ''}>${p}</li>`).join('');
@@ -64,7 +76,7 @@ BH.ready(() => {
     if (t || !hayImpreso) return;
     const pintarT = () => { const m = String(Math.floor(restante / 60)).padStart(2, '0'), sec = String(restante % 60).padStart(2, '0'); $('timer').innerHTML = `<div role="status" class="alert alert-info alert-soft py-2">${BH.icon('clock', 'size-5')}<span>Impresos reservados para ti: <b class="tabular-nums">${m}:${sec}</b></span></div>`; };
     pintarT();
-    t = setInterval(() => { restante--; if (restante <= 0) { clearInterval(t); $('timer').innerHTML = ''; $('paso').innerHTML = `<div role="alert" class="alert alert-warning alert-soft">${BH.icon('warn')}<span>Tu reserva expiró y liberamos el stock de los impresos. Vuelve al carrito para reservarlo otra vez.</span><a class="btn btn-sm" href="carrito.html">Volver al carrito</a></div>`; return; } pintarT(); }, 1000);
+    t = setInterval(() => { restante--; if (restante <= 0) { clearInterval(t); soltar(); $('timer').innerHTML = ''; $('paso').innerHTML = `<div role="alert" class="alert alert-warning alert-soft">${BH.icon('warn')}<span>Tu reserva expiró y liberamos el stock de los impresos. Vuelve al carrito para reservarlo otra vez.</span><a class="btn btn-sm" href="carrito.html">Volver al carrito</a></div>`; return; } pintarT(); }, 1000);
   }
 
   const campo = (id, label, ph = '', type = 'text', extra = '') => `<label class="floating-label w-full"><span>${label}</span><input id="${id}" type="${type}" class="input w-full" placeholder="${ph || label}" ${extra} value="${s[id] ?? ''}"></label>`;
@@ -127,8 +139,8 @@ BH.ready(() => {
     cabecera(); const p = nombrePaso(); $('paso').innerHTML = vistas[p]();
     const m = $('paso');
     m.querySelectorAll('[data-ir]').forEach((b) => (b.onclick = () => { i += Number(b.dataset.ir); render(); }));
-    m.querySelectorAll('input[name=tipo]').forEach((r) => (r.onchange = () => { s.tipo = r.value; render(); }));
-    if ($('suc')) $('suc').onchange = (e) => { s.suc = e.target.value; render(); };
+    m.querySelectorAll('input[name=tipo]').forEach((r) => (r.onchange = () => { s.tipo = r.value; soltar(); render(); }));
+    if ($('suc')) $('suc').onchange = (e) => { s.suc = e.target.value; soltar(); render(); };
     m.querySelectorAll('[data-m]').forEach((b) => (b.onclick = () => { s.metodo = b.dataset.m; render(); }));
     ['nombre', 'tel', 'dir'].forEach((k) => { if ($(k)) $(k).oninput = (e) => (s[k] = e.target.value); });
     if ($('consent')) $('consent').onchange = (e) => (s.consent = e.target.checked);
@@ -142,6 +154,7 @@ BH.ready(() => {
     const p = nombrePaso();
     if (p === 'Revisar') { if (impresos.some((l) => !fuente(l).ok)) { BH.toast('Algún impreso ya no tiene stock. Vuelve al carrito.', 'error'); return; } if (lineas.some((l) => l.formato === 'digital' && !BH.digitalEstado(l.obra).ok)) { BH.toast('Un libro digital ya no está disponible. Vuelve al carrito.', 'error'); return; } reserva(); }
     if (p === 'Entrega' && s.tipo === 'domicilio' && !s.dir.trim()) { BH.toast('Escribe tu dirección de entrega', 'warning'); return; }
+    if (p === 'Entrega') { reservarImpresos(); if (!impresos.every((l) => fuente(l).ok)) { BH.toast('Algún impreso ya no tiene stock. Vuelve al carrito.', 'error'); return; } }
     if (p === 'Tus datos') {
       if (!s.nombre.trim()) { $('err').textContent = 'Escribe tu nombre.'; return; }
       if ((s.consent || String(s.tel).trim()) && !/^\+?[\d\s]{9,}$/.test(String(s.tel).trim())) { $('err').textContent = 'Escribe un número de WhatsApp válido o quita el aviso.'; return; }
@@ -157,8 +170,11 @@ BH.ready(() => {
       if (BH.estado === 'pago-rechazado') { s.rechazado = true; return render(); }
       clearInterval(t); $('timer').innerHTML = '';
       const n = BH.pedidos.get().length + 123; s.creado = 'BH-2026-' + String(n).padStart(6, '0');
-      BH.pedidos.add({ id: s.creado, fecha: BH.hoy, entrega: hayImpreso ? s.tipo : null, sucursal: hayImpreso ? s.suc : null, estado: hayImpreso ? (hayTraslado() ? 'transito' : 'confirmado') : 'entregado', lineas: lineas.map((l) => ({ obra: l.obra.id, formato: l.formato, cant: l.cant })) });
+      BH.pedidos.add({ id: s.creado, fecha: BH.hoy, entrega: hayImpreso ? s.tipo : null, sucursal: hayImpreso ? s.suc : null, dir: s.tipo === 'domicilio' ? s.dir : '', estado: hayImpreso ? (hayTraslado() ? 'transito' : 'confirmado') : 'entregado', lineas: lineas.map((l) => ({ obra: l.obra.id, formato: l.formato, cant: l.cant, fuente: l.formato === 'impreso' ? fuente(l).id : null })) });
+      BH.registrarVentas(impresos.map((l) => ({ pedido: s.creado, obra: l.obra.id, cant: l.cant, suc: s.tipo === 'domicilio' ? fuente(l).id : s.suc, fecha: BH.hoy, entrega: s.tipo })));   // venta: domicilio a la fuente, recojo a la sucursal que entrega
       lineas.filter((l) => l.formato === 'digital').forEach((l) => BH.biblioteca.add(l.obra.id));
+      impresos.forEach((l) => BH.addReserva(l.obra.id, fuente(l).id, l.cant));      // la reserva pendiente pasa a confirmada (baja el vendible de la red)
+      BH.liberarPendientes();
       BH.cart.clear(); i++; render();
     }, 1300);
   }

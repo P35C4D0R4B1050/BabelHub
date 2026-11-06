@@ -28,7 +28,7 @@
       <div class="space-y-3">
         <label class="floating-label w-full"><span>Libro (impreso)</span><select id="n-libro" class="select w-full"></select></label>
         <label class="floating-label w-full"><span>Sucursal de origen</span><select id="n-origen" class="select w-full"></select></label>
-        <label class="floating-label w-full"><span>Cantidad</span><input id="n-cant" class="input w-full" inputmode="numeric" value="1"></label>
+        <label class="floating-label w-full"><span id="n-cant-t">Cantidad</span><input id="n-cant" class="input w-full" type="number" min="1" step="1" inputmode="numeric" value="1"></label>
         <label class="floating-label w-full"><span>Motivo</span><input id="n-motivo" class="input w-full" value="Reposición de stock"></label>
         <p id="n-aviso" class="text-sm" role="status"></p>
       </div>
@@ -68,21 +68,38 @@ BH.ready(() => {
     }));
   }
 
-  /* Nueva solicitud: solo se ofrecen orígenes con stock vendible (RF15) */
+  /* Nueva solicitud: solo se ofrecen orígenes con stock vendible (TRA-02) y la cantidad nunca supera lo vendible del origen */
   const libros = BH.obras.filter((o) => o.impreso);
-  $('n-libro').innerHTML = libros.map((o) => `<option value="${o.id}">${o.titulo}</option>`).join('');
+  const hayOrigen = (o) => BH.sucursales.some((s) => s.id !== ME && BH.vendible(o, s.id) > 0);
+  $('n-libro').innerHTML = libros.map((o) => `<option value="${o.id}" ${hayOrigen(o) ? '' : 'disabled'}>${o.titulo}${hayOrigen(o) ? '' : ' (agotado en la red)'}</option>`).join('');
+  const maxOrigen = () => { const o = BH.obra($('n-libro').value), org = $('n-origen').value; return org ? BH.vendible(o, org) : 0; };
+  function cantidad(tocada) {
+    const max = maxOrigen(), inp = $('n-cant'), org = $('n-origen').value, ok = $('n-ok'), av = $('n-aviso');
+    inp.max = max; $('n-cant-t').textContent = max ? `Cantidad (máximo ${max})` : 'Cantidad';
+    if (!max) { inp.value = ''; inp.disabled = true; ok.disabled = true; return; }
+    inp.disabled = false;
+    if (inp.value.trim() === '') { ok.disabled = true; av.innerHTML = `${BH.icon('warn', 'size-4 inline text-warning')} Escribe cuántas unidades pides.`; return; }
+    let c = parseInt(inp.value, 10), ajustada = false;
+    if (!Number.isInteger(c) || c < 1) { c = 1; ajustada = true; }
+    if (c > max) { c = max; ajustada = true; }
+    inp.value = c; ok.disabled = false;
+    av.innerHTML = ajustada ? `${BH.icon('warn', 'size-4 inline text-warning')} Ajustamos a ${c}: ${nom(org)} solo tiene ${max} vendible${max === 1 ? '' : 's'}.` : `${BH.icon('check', 'size-4 inline text-success')} Puedes pedir hasta ${max}: es lo que ${nom(org)} tiene vendible.`;
+  }
   function origenes() {
     const o = BH.obra($('n-libro').value);
     const ops = BH.sucursales.filter((s) => s.id !== ME && BH.vendible(o, s.id) > 0);
     $('n-origen').innerHTML = ops.length ? ops.map((s) => `<option value="${s.id}">${s.nombre} (vendible ${BH.vendible(o, s.id)})</option>`).join('') : '<option value="">Ninguna sucursal tiene stock vendible</option>';
-    $('n-aviso').innerHTML = ops.length ? '' : `${BH.icon('warn', 'size-4 inline text-error')} Este libro está agotado en toda la red.`;
+    if (!ops.length) $('n-aviso').innerHTML = `${BH.icon('warn', 'size-4 inline text-error')} Este libro está agotado en toda la red.`;
+    cantidad(false);
   }
-  $('n-libro').onchange = origenes;
-  $('nueva').onclick = () => { origenes(); $('dlg').showModal(); };
+  $('n-libro').onchange = () => { $('n-cant').value = 1; origenes(); };
+  $('n-origen').onchange = () => cantidad(false);
+  $('n-cant').oninput = () => cantidad(true);
+  $('nueva').onclick = () => { const p = libros.find(hayOrigen); if (p) $('n-libro').value = p.id; $('n-cant').value = 1; origenes(); $('dlg').showModal(); };
   $('n-ok').onclick = () => {
     const o = BH.obra($('n-libro').value), org = $('n-origen').value, c = parseInt($('n-cant').value, 10);
     if (!org) { BH.toast('No hay origen con stock vendible', 'error'); return; }
-    if (!(c > 0) || c > BH.vendible(o, org)) { $('n-aviso').innerHTML = `${BH.icon('warn', 'size-4 inline text-error')} La cantidad debe estar entre 1 y ${BH.vendible(o, org)} (vendible en el origen).`; return; }
+    if (!(c > 0) || c > BH.vendible(o, org)) { cantidad(true); return; }
     const all = BH.tras.get(), id = 'TR-' + String(48 + all.length - 7).padStart(4, '0');
     all.unshift({ id, obra: o.id, cant: c, origen: org, destino: ME, estado: 'solicitado', fecha: BH.hoy, motivo: $('n-motivo').value || 'Solicitud' });
     BH.tras.set(all); BH.audit.add('Solicitud de traslado', `${id} ${nom(org)} → ${nom(ME)} · ${c} × ${o.titulo}`);

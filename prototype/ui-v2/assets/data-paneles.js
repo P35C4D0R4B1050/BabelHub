@@ -56,6 +56,31 @@ BH.adminPedidosSemilla = [
   { id: 'BH-2026-000122', cliente: 'Ana Flores', fecha: '2026-10-06', entrega: null, sucursal: null, estado: 'entregado', lineas: [{ obra: 7, formato: 'digital', cant: 1 }] }
 ];
 
+/* Ventas de ejemplo (unidades de impresos de pedidos pagados), con la sucursal a la que se atribuyen.
+   Domicilio → fuente; recojo → sucursal que entrega. La última es anterior a 30 días y no entra en «Vendidos». */
+BH.ventasSemilla = [
+  { pedido: 'BH-2026-000118', obra: 1, cant: 1, suc: 'aya', fecha: '2026-09-29', entrega: 'recojo' },
+  { pedido: 'BH-2026-000123', obra: 5, cant: 1, suc: 'aya', fecha: '2026-10-07', entrega: 'recojo' },
+  { pedido: 'BH-2026-000124', obra: 6, cant: 2, suc: 'aya', fecha: '2026-10-09', entrega: 'recojo' },
+  { pedido: 'BH-2026-000125', obra: 1, cant: 1, suc: 'aya', fecha: '2026-10-09', entrega: 'recojo' },
+  { pedido: 'BH-2026-000120', obra: 9, cant: 1, suc: 'aya', fecha: '2026-10-06', entrega: 'recojo' },
+  { pedido: 'BH-2026-000120', obra: 11, cant: 1, suc: 'aya', fecha: '2026-10-06', entrega: 'recojo' },
+  { pedido: 'BH-2026-000140', obra: 12, cant: 1, suc: 'aya', fecha: '2026-10-10', entrega: 'domicilio' },
+  { pedido: 'BH-2026-000138', obra: 2, cant: 1, suc: 'cus', fecha: '2026-10-09', entrega: 'domicilio' },
+  { pedido: 'BH-2026-000135', obra: 1, cant: 2, suc: 'aqp', fecha: '2026-10-08', entrega: 'domicilio' },
+  { pedido: 'BH-2026-000110', obra: 3, cant: 2, suc: 'lim', fecha: '2026-10-05', entrega: 'recojo' },
+  { pedido: 'BH-2026-000111', obra: 8, cant: 3, suc: 'lim', fecha: '2026-10-04', entrega: 'recojo' },
+  { pedido: 'BH-2026-000112', obra: 15, cant: 1, suc: 'lim', fecha: '2026-10-02', entrega: 'domicilio' },
+  { pedido: 'BH-2026-000113', obra: 1, cant: 2, suc: 'lim', fecha: '2026-09-28', entrega: 'recojo' },
+  { pedido: 'BH-2026-000105', obra: 6, cant: 4, suc: 'tru', fecha: '2026-10-03', entrega: 'recojo' },
+  { pedido: 'BH-2026-000106', obra: 8, cant: 2, suc: 'tru', fecha: '2026-09-30', entrega: 'recojo' },
+  { pedido: 'BH-2026-000107', obra: 9, cant: 2, suc: 'piu', fecha: '2026-10-01', entrega: 'recojo' },
+  { pedido: 'BH-2026-000108', obra: 16, cant: 1, suc: 'piu', fecha: '2026-09-25', entrega: 'domicilio' },
+  { pedido: 'BH-2026-000114', obra: 2, cant: 1, suc: 'cus', fecha: '2026-09-20', entrega: 'recojo' },
+  { pedido: 'BH-2026-000115', obra: 3, cant: 2, suc: 'cus', fecha: '2026-10-02', entrega: 'recojo' },
+  { pedido: 'BH-2026-000100', obra: 3, cant: 5, suc: 'lim', fecha: '2026-08-20', entrega: 'recojo' }
+];
+
 BH.auditSemilla = [
   { fecha: '2026-10-09 16:42', usuario: 'admin.central', rol: 'Administrador central', accion: 'Cambio de precio', detalle: 'Clean Architecture (impreso): S/ 129.00 → S/ 139.00' },
   { fecha: '2026-10-09 11:05', usuario: 'enc.cusco', rol: 'Encargado de sucursal', accion: 'Ajuste de inventario', detalle: 'Cusco · Los ríos profundos · −1 (producto dañado)' },

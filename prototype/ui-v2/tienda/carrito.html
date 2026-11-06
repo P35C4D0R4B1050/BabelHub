@@ -24,6 +24,7 @@ BH.ready(() => {
   const root = document.getElementById('cart');
   const mine = BH.miSucursal();
   const demo = BH.param('demo'); if (demo) { BH.demoCart(demo); history.replaceState(null, '', 'carrito.html'); BH.refreshCart(); }
+  BH.liberarPendientes();          // volver al carrito libera la reserva pendiente del checkout
 
   function pintar() {
     const lineas = BH.estado === 'vacio' ? [] : BH.cart.lineas();
@@ -55,7 +56,7 @@ BH.ready(() => {
           <p class="text-sm opacity-75">${o.autor} · <b>${imp ? 'Impreso' : o.digital.formato + ' digital'}</b></p>
           <div>${nota}</div>
           <div class="flex items-center gap-3 pt-1">
-            ${imp ? `<div class="join"><button class="btn btn-sm join-item" data-menos="${l.k}" aria-label="Menos">−</button><span class="join-item btn btn-sm btn-ghost pointer-events-none w-10">${l.cant}</span><button class="btn btn-sm join-item" data-mas="${l.k}" aria-label="Más">+</button></div>` : '<span class="text-sm opacity-60">1 licencia</span>'}
+            ${imp ? `<div class="join"><button class="btn btn-sm join-item" data-menos="${l.k}" aria-label="Menos">−</button><span class="join-item btn btn-sm btn-ghost pointer-events-none w-10">${l.cant}</span><button class="btn btn-sm join-item" data-mas="${l.k}" aria-label="Más" ${l.cant >= BH.totalVendible(o) ? 'disabled title="No hay más unidades vendibles en la red"' : ''}>+</button></div>` : '<span class="text-sm opacity-60">1 licencia</span>'}
             <button class="btn btn-ghost btn-sm" data-quitar="${l.k}">${BH.icon('trash', 'size-4')} Quitar</button></div></div>
         <p class="font-display text-xl">${BH.money(precio * l.cant)}</p></div>`;
     }).join('');

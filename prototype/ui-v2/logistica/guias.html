@@ -29,6 +29,19 @@ BH.ready(() => {
   const SIG = { generada: ['reparto', 'Marcar en reparto'], reparto: ['entregado', 'Marcar entregado'] };
   const AVISO = { generada: 'Tu guía de envío está lista', reparto: 'Tu pedido salió a reparto', entregado: 'Tu pedido fue entregado' };
 
+  /* Los pedidos a domicilio creados en la Tienda llegan aquí como envíos sin guía (ENV-01) */
+  (() => { const g = BH.guias.get(); let n = g.length; BH.pedidos.get().filter((p) => p.entrega === 'domicilio' && !g.some((x) => x.pedido === p.id)).forEach((p) => g.unshift({ id: 'EN-' + String(++n).padStart(3, '0'), pedido: p.id, cliente: BH.user().nombre, dir: p.dir || 'Dirección del pedido', ciudad: '', estado: 'pendiente', guia: null, operador: 'Courier Andino (ejemplo)' })); BH.guias.set(g); })();
+
+  /* Al pasar a en reparto se descuenta el físico de la fuente y se cierra la reserva (ENV-11, SEL-11) */
+  function descontar(x) {
+    const p = [...BH.adminPedidosSemilla, ...BH.pedidos.get()].find((y) => y.id === x.pedido); if (!p) return { ok: true };
+    const ls = p.lineas.filter((l) => l.formato === 'impreso').map((l) => ({ o: BH.obra(l.obra), cant: l.cant, f: l.fuente || p.sucursal }));
+    const falta = ls.find((l) => BH.fisico(l.o, l.f) < l.cant); if (falta) return { ok: false, msg: `El inventario rechazó el descuento: ${BH.sucursal(falta.f).nombre} no tiene ${falta.cant} ejemplar(es) de ${falta.o.titulo}. El envío sigue con guía generada; reintenta.` };
+    ls.forEach((l) => { BH.addDelta(l.o.id, l.f, -l.cant); BH.addReserva(l.o.id, l.f, -l.cant); });
+    BH.audit.add('Descuento de stock por envío', `${x.pedido}: ${ls.map((l) => `${l.cant} × ${l.o.titulo} (${BH.sucursal(l.f).nombre})`).join(', ')}`);
+    return { ok: true };
+  }
+
   function pintar() {
     const g = BH.estado === 'vacio' ? [] : BH.guias.get();
     $('tabs').innerHTML = TABS.map(([k, l]) => `<button role="tab" aria-selected="${filtro === k}" class="tab ${filtro === k ? 'tab-active' : ''}" data-f="${k}">${l} <span class="badge badge-sm ml-1">${k === 'todos' ? g.length : g.filter((x) => x.estado === k).length}</span></button>`).join('');
@@ -44,7 +57,9 @@ BH.ready(() => {
       setTimeout(() => { const all = BH.guias.get(), x = all.find((y) => y.id === b.dataset.gen); x.guia = 'CA-' + (883000 + Math.floor(Math.random() * 900)); x.estado = 'generada'; BH.guias.set(all); BH.audit.add('Guía de envío', `${x.pedido}: guía ${x.guia}`); BH.toast(`Guía ${x.guia} generada. ${AVISO.generada} (WhatsApp enviado).`); pintar(); }, 1200);
     }));
     $('lista').querySelectorAll('[data-sig]').forEach((b) => (b.onclick = () => {
-      const all = BH.guias.get(), x = all.find((y) => y.id === b.dataset.sig), [a] = SIG[x.estado]; x.estado = a; BH.guias.set(all); BH.toast(`${x.pedido}: ${AVISO[a]} (WhatsApp enviado).`); pintar();
+      const all = BH.guias.get(), x = all.find((y) => y.id === b.dataset.sig), [a] = SIG[x.estado];
+      if (a === 'reparto') { const r = descontar(x); if (!r.ok) { BH.toast(r.msg, 'error'); return; } }
+      x.estado = a; BH.guias.set(all); BH.toast(`${x.pedido}: ${AVISO[a]} (WhatsApp enviado).`); pintar();
     }));
   }
   pintar();

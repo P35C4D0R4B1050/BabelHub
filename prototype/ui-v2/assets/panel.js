@@ -64,19 +64,41 @@
     if (t.estado === 'transito' && (entrante || adm)) a.push(['recibido', 'Recibir']);
     return a;
   };
+  /* Un traslado vinculado a un pedido lleva su reserva (TRA-06, TRA-07, TRA-14) */
+  const vinculado = (t) => /^Pedido/.test(t.motivo);
   BH.aplicarTraslado = (t, a) => {
     const o = BH.obra(t.obra), ruta = `${t.id} ${BH.sucursal(t.origen).nombre} → ${BH.sucursal(t.destino).nombre}`;
     if (a === 'transito') {
-      if (BH.vendible(o, t.origen) < t.cant) return { ok: false, msg: `El origen (${BH.sucursal(t.origen).nombre}) no tiene stock vendible suficiente: ${BH.vendible(o, t.origen)} de ${t.cant}.` };
+      if (vinculado(t)) {
+        if (BH.reservado(o, t.origen) < t.cant) return { ok: false, msg: `El origen (${BH.sucursal(t.origen).nombre}) no tiene la reserva confirmada del pedido por ${t.cant} unidad(es).` };
+        BH.addReserva(t.obra, t.origen, -t.cant);
+      } else if (BH.vendible(o, t.origen) < t.cant) return { ok: false, msg: `El origen (${BH.sucursal(t.origen).nombre}) no tiene stock vendible suficiente: ${BH.vendible(o, t.origen)} de ${t.cant}.` };
       BH.addDelta(t.obra, t.origen, -t.cant);
     }
     if (a === 'recibido') {
       BH.addDelta(t.obra, t.destino, t.cant);
+      if (vinculado(t)) BH.addReserva(t.obra, t.destino, t.cant);
       const r = BH.recojos.get(); r.forEach((x) => { if (x.espera === t.id) delete x.espera; }); BH.recojos.set(r);
     }
     t.estado = a;
     BH.audit.add({ aprobado: 'Aprobación de traslado', rechazado: 'Rechazo de traslado', transito: 'Despacho de traslado', recibido: 'Recepción de traslado' }[a], ruta);
     return { ok: true, msg: `${t.id}: ${ET[a][0].toLowerCase()}. Se notificó a origen y destino por WhatsApp.` };
+  };
+
+  /* Entrega de un pedido de recojo: baja el físico y consume la reserva confirmada (SEL-11) */
+  BH.entregarRecojo = (r) => r.lineas.forEach((x) => { BH.addDelta(x.obra, BH.MI_SUC, -x.cant); BH.addReserva(x.obra, BH.MI_SUC, -x.cant); });
+
+  /* ---------- ingreso de mercadería: lo registra solo la administración central y entra solo a Lima ----------
+     Lima Centro es la fuente que recibe las importaciones; las demás sucursales reciben stock por traslado (o devolución). */
+  BH.FUENTE_CENTRAL = 'lim';
+  BH.ingresos = mk('bh2_ingresos', () => []);
+  BH.registrarIngreso = (obraId, cant, ref, nota) => {
+    const o = BH.obra(obraId), l = BH.ingresos.get(), id = 'IM-' + String(l.length + 1).padStart(4, '0');
+    BH.addDelta(obraId, BH.FUENTE_CENTRAL, cant);
+    l.unshift({ id, fecha: BH.hoy, obra: obraId, cant, ref: ref || '', nota: nota || '', usuario: BH.yo().user });
+    BH.ingresos.set(l);
+    BH.audit.add('Ingreso de mercadería', `${BH.sucursal(BH.FUENTE_CENTRAL).nombre} · ${o.titulo} · +${cant}${ref ? ' · ' + ref : ''}${nota ? ' · ' + nota : ''}`);
+    return id;
   };
 
   /* ---------- licencias digitales ---------- */

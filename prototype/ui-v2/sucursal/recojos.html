@@ -46,6 +46,7 @@ BH.ready(() => {
         <div>${sig ? `<button class="btn btn-sm btn-primary" data-id="${r.id}" ${bloqueado ? 'disabled title="Disponible cuando llegue el traslado"' : ''}>${sig[1]}</button>` : '<span class="text-xs opacity-50">Sin acciones</span>'}</div></article>`; }).join('')}</div>`;
     $('lista').querySelectorAll('[data-id]').forEach((b) => (b.onclick = () => {
       const all = BH.recojos.get(), r = all.find((x) => x.id === b.dataset.id), [a] = SIG[r.estado];
+      if (a === 'entregado') BH.entregarRecojo(r);        // baja el físico y consume la reserva (SEL-11)
       r.estado = a; BH.recojos.set(all); BH.toast(`${r.id}: ${AVISO[a]}. Se avisó a ${r.cliente} por WhatsApp.`); pintar();
     }));
   }

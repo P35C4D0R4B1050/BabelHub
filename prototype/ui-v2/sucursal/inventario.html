@@ -15,7 +15,7 @@
 <body data-area="sucursal" data-page="inventario" data-roles="encargado,admin" data-estados="normal,cargando,vacio,error">
 <div id="page-content" hidden>
   <div id="cab"></div>
-  <div id="kpis" class="grid grid-cols-3 gap-3 mt-4"></div>
+  <div id="kpis" class="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4"></div>
   <div class="mt-4 flex flex-wrap gap-3 items-center">
     <label class="input w-full sm:w-72"><span class="opacity-60" id="ic-b"></span><input id="buscar" type="search" placeholder="Buscar título, autor o ISBN" aria-label="Buscar en el inventario"></label>
     <p class="text-xs opacity-70 flex-1">Solo libros impresos. Los digitales no tienen stock físico: se gestionan en el catálogo.</p>
@@ -36,7 +36,7 @@
         <div id="aj-campo"></div>
         <label class="floating-label w-full"><span>Nota (opcional)</span><input id="aj-nota" class="input w-full" maxlength="120" placeholder="Nota (opcional)"></label>
         <p id="aj-prev" class="text-sm min-h-10" role="status" aria-live="polite"></p>
-        <p class="text-xs opacity-60">Para recibir mercadería usa <a class="link" href="traslados.html">Traslados</a>; las devoluciones de clientes reingresan solas. No hay ajustes que sumen por merma o daño.</p>
+        <p class="text-xs opacity-60">Para recibir mercadería usa <a class="link" href="traslados.html">Traslados</a>; las devoluciones de clientes reingresan solas, y la importación nueva la registra la administración central desde el <a class="link" href="../admin/catalogo.html">Catálogo</a> (solo entra a Lima). No hay ajustes que sumen por merma o daño.</p>
       </div>
       <div class="modal-action"><form method="dialog"><button class="btn btn-ghost">Cancelar</button></form><button class="btn btn-primary" id="aj-ok" disabled>Registrar ajuste</button></div>
     </div>
@@ -58,19 +58,19 @@ BH.ready(() => {
     $('cab').innerHTML = `<div class="max-w-lg mx-auto text-center py-16 space-y-3">${BH.icon('lock', 'size-12 mx-auto opacity-60')}<h1 class="font-display text-3xl">403 · Fuera de tu alcance</h1><p class="opacity-75">Tu cuenta solo accede a <b>Ayacucho</b>. El intento de ver otra sucursal se rechazó y quedó registrado en la auditoría.</p><a class="btn btn-primary btn-sm" href="inventario.html">Volver a mi inventario</a></div>`;
     ['kpis', 'tabla'].forEach((i) => $(i).remove()); document.querySelector('label.input').parentElement.remove(); return;
   }
-  const SID = pedida, suc = BH.sucursal(SID), soloLectura = adm;
+  const SID = pedida, suc = BH.sucursal(SID), soloLectura = false;
   $('cab').innerHTML = `<div class="flex flex-wrap items-end justify-between gap-3"><div><h1 class="bh-display" style="font-size:clamp(1.8rem,5vw,3rem)">Inventario · ${suc.nombre}</h1>
-      <p class="opacity-75 mt-1">${soloLectura ? 'Vista de administración: solo lectura.' : 'Solo ves y modificas el stock de tu sucursal.'}</p></div>
+      <p class="opacity-75 mt-1">${adm ? 'Como administración central puedes ajustar el stock de cualquier sucursal; la auditoría registra cuál.' : 'Solo ves y modificas el stock de tu sucursal.'}</p></div>
       ${adm ? `<label class="flex items-center gap-2 text-sm">Sucursal <select id="sel-s" class="select select-sm">${BH.sucursales.map((s) => `<option value="${s.id}" ${s.id === SID ? 'selected' : ''}>${s.nombre}</option>`).join('')}</select></label>` : ''}</div>
       ${soloLectura ? `<div role="status" class="alert alert-soft mt-3">${BH.icon('lock')}<span>Estás como administrador central: puedes consultar cualquier sucursal, pero los ajustes los hace el encargado.</span></div>` : ''}`;
   if ($('sel-s')) $('sel-s').onchange = (e) => (location.search = '?sucursal=' + e.target.value);
 
-  const datos = () => BH.obras.filter((o) => o.impreso).map((o) => { const s = o.impreso.stock[SID] || [0, 0]; return { o, f: s[0], r: s[1] }; });
+  const datos = () => BH.obras.filter((o) => o.impreso).map((o) => ({ o, f: BH.fisico(o, SID), r: BH.reservado(o, SID) }));
   let actual = null;
 
   function kpis() {
     const d = datos(), f = d.reduce((a, x) => a + x.f, 0), r = d.reduce((a, x) => a + x.r, 0);
-    $('kpis').innerHTML = BH.kpi('Stock físico', f, null) + BH.kpi('Reservado', r, null) + BH.kpi('Vendible', f - r, null);
+    $('kpis').innerHTML = BH.kpi('Stock físico', f, null) + BH.kpi('Reservado', r, null) + BH.kpi('Vendible', f - r, null) + BH.kpi('Vendidos (30 días)', BH.vendidos(SID), null);
   }
   function tabla() {
     if (BH.estado === 'cargando') { $('tabla').innerHTML = '<div class="space-y-2">' + Array.from({ length: 6 }, () => '<div class="skeleton h-12"></div>').join('') + '</div>'; return; }
@@ -78,9 +78,9 @@ BH.ready(() => {
     const q = $('buscar').value.toLowerCase();
     const l = BH.estado === 'vacio' ? [] : datos().filter((x) => !q || (x.o.titulo + x.o.autor + x.o.impreso.isbn).toLowerCase().includes(q));
     if (!l.length) { $('tabla').innerHTML = BH.emptyState('cube', 'Sin resultados', BH.estado === 'vacio' ? 'Esta sucursal todavía no tiene títulos registrados.' : 'Ningún título coincide con tu búsqueda.'); return; }
-    $('tabla').innerHTML = `<div class="overflow-x-auto border border-[var(--bh-linea)] bg-base-100"><table class="table"><thead><tr><th>Título</th><th class="text-right">Físico</th><th class="text-right">Reservado</th><th class="text-right">Vendible</th><th>Estado</th>${soloLectura ? '' : '<th></th>'}</tr></thead><tbody>
+    $('tabla').innerHTML = `<div class="overflow-x-auto border border-[var(--bh-linea)] bg-base-100"><table class="table"><thead><tr><th>Título</th><th class="text-right">Físico</th><th class="text-right">Reservado</th><th class="text-right">Vendible</th><th class="text-right">Vendidos (30 d)</th><th>Estado</th>${soloLectura ? '' : '<th></th>'}</tr></thead><tbody>
       ${l.map((x) => { const v = x.f - x.r; return `<tr><td><div class="font-medium">${x.o.titulo}</div><div class="text-xs opacity-60">${x.o.autor} · ${x.o.impreso.isbn}</div></td>
-        <td class="text-right tabular-nums">${x.f}</td><td class="text-right tabular-nums">${x.r}</td><td class="text-right tabular-nums font-semibold">${v}</td>
+        <td class="text-right tabular-nums">${x.f}</td><td class="text-right tabular-nums">${x.r}</td><td class="text-right tabular-nums font-semibold">${v}</td><td class="text-right tabular-nums">${BH.vendidos(SID, 30, x.o.id)}</td>
         <td>${v === 0 ? `<span class="chip">${BH.icon('x', 'size-3.5 text-error')}Sin vendible</span>` : v <= 2 ? `<span class="chip">${BH.icon('warn', 'size-3.5 text-warning')}Stock bajo</span>` : `<span class="chip">${BH.icon('check', 'size-3.5 text-success')}Normal</span>`}</td>
         ${soloLectura ? '' : `<td class="text-right"><button class="btn btn-sm btn-outline" data-aj="${x.o.id}">Ajustar</button></td>`}</tr>`; }).join('')}</tbody></table></div>`;
     $('tabla').querySelectorAll('[data-aj]').forEach((b) => (b.onclick = () => abrir(Number(b.dataset.aj))));

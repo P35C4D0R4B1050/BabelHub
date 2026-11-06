@@ -28,13 +28,13 @@ BH.ready(() => {
   if (BH.estado === 'error') { $('cuerpo').innerHTML = BH.errorState('No pudimos cargar el resumen de Ayacucho.'); return; }
 
   const imp = BH.obras.filter((o) => o.impreso);
-  const fis = imp.reduce((a, o) => a + (o.impreso.stock[S] ? o.impreso.stock[S][0] : 0), 0);
-  const res = imp.reduce((a, o) => a + (o.impreso.stock[S] ? o.impreso.stock[S][1] : 0), 0);
+  const fis = imp.reduce((a, o) => a + BH.fisico(o, S), 0);
+  const res = imp.reduce((a, o) => a + BH.reservado(o, S), 0);
   const tr = BH.tras.get(), rc = BH.recojos.get();
   const porPreparar = rc.filter((r) => r.estado === 'confirmado' || r.estado === 'preparacion').length;
   const trAtender = tr.filter((t) => BH.trasladoAcciones(t, 'encargado').length).length;
-  const bajos = imp.filter((o) => { const v = BH.vendible(o, S); return v <= 2 && (o.impreso.stock[S] && o.impreso.stock[S][0] > 0); });
-  const agotados = imp.filter((o) => BH.vendible(o, S) === 0 && o.impreso.stock[S] && o.impreso.stock[S][0] > 0);
+  const bajos = imp.filter((o) => { const v = BH.vendible(o, S); return v <= 2 && BH.fisico(o, S) > 0; });
+  const agotados = imp.filter((o) => BH.vendible(o, S) === 0 && BH.fisico(o, S) > 0);
   const esperando = rc.filter((r) => r.espera && r.estado !== 'entregado');
   const aprobar = tr.filter((t) => t.estado === 'solicitado' && t.origen === S), recibir = tr.filter((t) => t.estado === 'transito' && t.destino === S);
 
