@@ -1,14 +1,12 @@
 ---
 id: transversal-seguridad
 titulo: Seguridad transversal de la aplicación
-estado: Approved
+estado: Draft
 servicio: Transversal
 prefijo: SEG
 origen: [RNF16, RNF17, RNF20, RNF21, NN18]
-calidad: [AC05, AC13, RNF06]
+calidad: [AC04, RNF06]
 depende: [transversal-auditoria]
-aprobado_por: Diego Amiquero
-aprobado_en: 2026-10-16
 ---
 
 # Spec — Seguridad transversal de la aplicación
@@ -32,35 +30,37 @@ Definir las protecciones que todos los servicios y la interfaz web comparten, pa
 
 | ID | Patrón | Requisito | Origen |
 | :--- | :--- | :--- | :--- |
-| SEG-01 | Ubicuo | El sistema deberá validar en el servidor el tipo, la longitud, el formato y el rango de toda entrada antes de procesarla, y rechazar las que no cumplan. | RNF16, AC05 |
-| SEG-02 | Ubicuo | El sistema deberá codificar toda salida hacia la interfaz según su contexto, de modo que el contenido ingresado por una persona nunca se interprete como código. | RNF16, AC05 |
-| SEG-03 | Ubicuo | El sistema deberá responder los errores con un formato uniforme que incluya un código estable y un identificador de seguimiento, sin trazas ni datos internos. | RNF20, AC05 |
-| SEG-04 | No deseado | Si ocurre un error inesperado durante una operación, entonces el sistema deberá negar la operación y no dejar efectos parciales, salvo la falla de una dependencia no necesaria para completarla (por ejemplo, los avisos por WhatsApp, los correos de alerta y la caché), que no deberá interrumpirla. | RNF20, AC05 |
-| SEG-05 | Estado | Mientras un usuario autenticado supera 100 solicitudes en una ventana deslizante de un minuto, el sistema deberá rechazar las siguientes con la respuesta de límite excedido. | RNF17, AC13 |
-| SEG-06 | Estado | Mientras una combinación de identificador de cuenta y origen acumula 5 ingresos fallidos en 15 minutos, el sistema deberá rechazar los ingresos de esa combinación durante 15 minutos, incluso con credenciales correctas, sin extender el bloqueo por los intentos hechos durante él, y contar igual los identificadores que no existen. | RNF17, AC13 |
-| SEG-07 | Ubicuo | El sistema deberá responder todo límite excedido con una respuesta única que incluya un código estable, el motivo, la espera sugerida en segundos y el instante de nueva disponibilidad, y que nunca revele datos de cuentas. | RNF17, AC13 |
+| SEG-01 | Ubicuo | El sistema deberá validar en el servidor el tipo, la longitud, el formato y el rango de toda entrada antes de procesarla, y rechazar las que no cumplan. | RNF16, AC04 |
+| SEG-02 | Ubicuo | El sistema deberá codificar toda salida hacia la interfaz según su contexto, de modo que el contenido ingresado por una persona nunca se interprete como código. | RNF16, AC04 |
+| SEG-03 | Ubicuo | El sistema deberá responder los errores con un formato uniforme que incluya un código estable y un identificador de seguimiento, sin trazas ni datos internos. | RNF20, AC04 |
+| SEG-04 | No deseado | Si ocurre un error inesperado durante una operación, entonces el sistema deberá negar la operación y no dejar efectos parciales, salvo la falla de una dependencia no necesaria para completarla (por ejemplo, los avisos por WhatsApp, los correos de alerta y la caché), que no deberá interrumpirla. | RNF20, AC04 |
+| SEG-05 | Estado | Mientras un usuario autenticado supera 100 solicitudes en una ventana deslizante de un minuto, el sistema deberá rechazar las siguientes con la respuesta de límite excedido. | RNF17, AC04 |
+| SEG-06 | Estado | Mientras una combinación de identificador de cuenta y origen acumula 5 ingresos fallidos en 15 minutos, el sistema deberá rechazar los ingresos de esa combinación durante 15 minutos, incluso con credenciales correctas, sin extender el bloqueo por los intentos hechos durante él, y contar igual los identificadores que no existen. | RNF17, AC04 |
+| SEG-07 | Ubicuo | El sistema deberá responder todo límite excedido con una respuesta única que incluya un código estable, el motivo, la espera sugerida en segundos y el instante de nueva disponibilidad, y que nunca revele datos de cuentas. | RNF17, AC04 |
 | SEG-08 | Evento | Cuando se excede un límite de uso, el sistema deberá registrar un evento de seguridad por usuario u origen, límite y ventana de 5 minutos, con la fecha y el número de rechazos acumulados en esa ventana. | RNF17, RNF20 |
-| SEG-09 | Evento | Cuando en cinco minutos se acumulan en un servicio más de 10 accesos denegados o más de 20 ingresos fallidos, ese servicio deberá generar una alerta de seguridad con su fecha, servicio y motivo, visible en la lista de la administración central y enviada por correo a los administradores centrales activos. | RNF20, AC05 |
-| SEG-10 | Ubicuo | El sistema deberá excluir de los registros técnicos, de auditoría y de seguridad y de los avisos por WhatsApp las contraseñas (incluida la temporal del personal), las credenciales y renovaciones (incluidas las del asistente y las claves de firma), los identificadores de sesión web, los códigos de un solo uso y de respaldo, los secretos del segundo factor, los datos de tarjeta y los enlaces firmados de descarga. | RNF20, AC05 |
-| SEG-11 | Ubicuo | El sistema deberá leer sus secretos de la configuración del entorno y no incluirlos en el repositorio, los registros ni los mensajes. | RNF06, AC05 |
-| SEG-12 | Ubicuo | El sistema deberá autenticar cada llamada entrante de una integración con un secreto o una firma verificable, rechazar y registrar las que no cumplan, y procesar una sola vez las repetidas respondiendo el mismo resultado exitoso. | RNF21, AC05 |
-| SEG-13 | Ubicuo | El sistema deberá tratar como no confiable toda respuesta de un servicio externo, validar su formato antes de usarla y descartar las inválidas como si el servicio no hubiera respondido; el caso del pago se rige por `ecommerce-pagos`. | RNF21, AC05 |
-| SEG-14 | No deseado | Si una dependencia necesaria para una operación no responde en 10 segundos (30 para el proveedor del modelo de lenguaje), entonces el sistema deberá cortar la espera, informar que el servicio no está disponible y seguir atendiendo las demás operaciones; si la dependencia no es necesaria, deberá continuar sin ella. | RNF21, AC05 |
-| SEG-15 | Ubicuo | El sistema deberá exigir que cada llamada entre servicios lleve una credencial verificable, y rechazar las que no la tengan. | RNF21, AC05 |
-| SEG-16 | Ubicuo | El sistema deberá responder los errores inesperados y de seguridad con un mensaje genérico, y los errores de validación, de reglas de negocio y de límite excedido con el motivo específico, sin datos internos. | RNF20, AC05 |
-| SEG-17 | Ubicuo | El sistema deberá identificar el origen de cada solicitud como la dirección del cliente final entregada por el borde de confianza, ignorar cualquier cabecera de reenvío enviada por el cliente, y no usar la dirección de un componente interno. | RNF17, AC13 |
-| SEG-18 | Estado | Mientras un mismo origen sin sesión supera 60 solicitudes en una ventana deslizante de un minuto, el sistema deberá rechazar las siguientes con la respuesta de límite excedido. | RNF17, AC13 |
-| SEG-19 | Estado | Mientras un mismo correo destino o un mismo origen supera 3 solicitudes de código de un solo uso de un mismo propósito (verificación o recuperación) por hora, el sistema deberá rechazar las siguientes con la respuesta de límite excedido, exista o no la cuenta. | RNF17, AC13 |
-| SEG-20 | Estado | Mientras una combinación de cuenta y origen acumula 5 códigos de segundo factor incorrectos en 15 minutos, el sistema deberá rechazar los siguientes de esa combinación durante 15 minutos. | RNF17, AC13 |
-| SEG-21 | Ubicuo | El sistema deberá aplicar los límites por tiempo con una ventana deslizante. | RNF17, AC13 |
-| SEG-22 | Evento | Cuando se repite una solicitud con la misma clave de idempotencia, el sistema deberá no contarla para los límites de reservas, descargas, códigos, registros y hojas, y sí para el límite general de solicitudes. | RNF17, AC13 |
-| SEG-23 | No deseado | Si no es posible determinar el origen de una solicitud, entonces el sistema deberá registrar un evento de seguridad y contarla en un único «origen desconocido», sujeto a los mismos límites por origen, además de los límites por usuario. | RNF17, AC13 |
-| SEG-24 | Estado | Mientras un mismo origen supera 3 cuentas nuevas registradas en una ventana deslizante de una hora, el sistema deberá rechazar los registros siguientes con la respuesta de límite excedido. | RNF17, AC13 |
+| SEG-09 | Evento | Cuando en cinco minutos se acumulan en un servicio más de 10 accesos denegados o más de 20 ingresos fallidos, ese servicio deberá generar una alerta de seguridad con su fecha, servicio y motivo, visible en la lista de la administración central y enviada por correo a los administradores centrales activos. | RNF20, AC04 |
+| SEG-10 | Ubicuo | El sistema deberá excluir de los registros técnicos, de auditoría y de seguridad y de los avisos por WhatsApp las contraseñas (incluida la temporal del personal), las credenciales y renovaciones (incluidas las del asistente y las claves de firma), los identificadores de sesión web, los códigos de un solo uso y de respaldo, los secretos del segundo factor, los datos de tarjeta y los enlaces firmados de descarga. | RNF20, AC04 |
+| SEG-11 | Ubicuo | El sistema deberá leer sus secretos de la configuración del entorno y no incluirlos en el repositorio, los registros ni los mensajes. | RNF06, AC04 |
+| SEG-12 | Ubicuo | El sistema deberá autenticar cada llamada entrante de una integración con un secreto o una firma verificable, rechazar y registrar las que no cumplan, y procesar una sola vez las repetidas respondiendo el mismo resultado exitoso. | RNF21, AC04 |
+| SEG-13 | Ubicuo | El sistema deberá tratar como no confiable toda respuesta de un servicio externo, validar su formato antes de usarla y descartar las inválidas como si el servicio no hubiera respondido; el caso del pago se rige por `ecommerce-pagos`. | RNF21, AC04 |
+| SEG-14 | No deseado | Si una dependencia necesaria para una operación no responde en 10 segundos (30 para el proveedor del modelo de lenguaje), entonces el sistema deberá cortar la espera, informar que el servicio no está disponible y seguir atendiendo las demás operaciones; si la dependencia no es necesaria, deberá continuar sin ella. | RNF21, AC04 |
+| SEG-15 | Ubicuo | El sistema deberá exigir que cada llamada entre el E-commerce y el Inventario lleve una credencial verificable, y que toda llamada entre módulos conserve el contexto del actor que la origina, y rechazar las que no los tengan. | RNF21, AC04 |
+| SEG-16 | Ubicuo | El sistema deberá responder los errores inesperados y de seguridad con un mensaje genérico, y los errores de validación, de reglas de negocio y de límite excedido con el motivo específico, sin datos internos. | RNF20, AC04 |
+| SEG-17 | Ubicuo | El sistema deberá identificar el origen de cada solicitud como la dirección del cliente final entregada por el borde de confianza, ignorar cualquier cabecera de reenvío enviada por el cliente, y no usar la dirección de un componente interno. | RNF17, AC04 |
+| SEG-18 | Estado | Mientras un mismo origen sin sesión supera 60 solicitudes en una ventana deslizante de un minuto, el sistema deberá rechazar las siguientes con la respuesta de límite excedido. | RNF17, AC04 |
+| SEG-19 | Estado | Mientras un mismo correo destino o un mismo origen supera 3 solicitudes de código de un solo uso de un mismo propósito (verificación o recuperación) por hora, el sistema deberá rechazar las siguientes con la respuesta de límite excedido, exista o no la cuenta. | RNF17, AC04 |
+| SEG-20 | Estado | Mientras una combinación de cuenta y origen acumula 5 códigos de segundo factor incorrectos en 15 minutos, el sistema deberá rechazar los siguientes de esa combinación durante 15 minutos. | RNF17, AC04 |
+| SEG-21 | Ubicuo | El sistema deberá aplicar los límites por tiempo con una ventana deslizante. | RNF17, AC04 |
+| SEG-22 | Evento | Cuando se repite una solicitud con la misma clave de idempotencia, el sistema deberá no contarla para los límites de reservas, descargas, códigos, registros y hojas, y sí para el límite general de solicitudes. | RNF17, AC04 |
+| SEG-23 | No deseado | Si no es posible determinar el origen de una solicitud, entonces el sistema deberá registrar un evento de seguridad y contarla en un único «origen desconocido», sujeto a los mismos límites por origen, además de los límites por usuario. | RNF17, AC04 |
+| SEG-24 | Estado | Mientras un mismo origen supera 3 cuentas nuevas registradas en una ventana deslizante de una hora, el sistema deberá rechazar los registros siguientes con la respuesta de límite excedido. | RNF17, AC04 |
 | SEG-25 | Ubicuo | El sistema deberá guardar el origen de las solicitudes en los contadores de límites solo como una huella calculada con una clave secreta del entorno que no permita recuperar la dirección, eliminarla a las 24 horas, y conservar la dirección completa únicamente en los eventos de seguridad. | RNF17, RNF23 |
 | SEG-26 | No deseado | Si no está disponible el almacén de contadores de límites, entonces el sistema deberá rechazar el ingreso, el registro, las solicitudes de código, las reservas y las descargas con la respuesta de servicio no disponible, y aplicar a las demás operaciones un límite local por servicio. | RNF17, RNF21 |
 | SEG-27 | Evento | Cuando se repite una alerta de seguridad por el mismo motivo y servicio en 15 minutos, el sistema deberá agruparla en una sola entrada de la lista y en un solo correo. | RNF20 |
-| SEG-28 | Ubicuo | El sistema deberá enviar un código de un solo uso únicamente en el correo dirigido a su propio destinatario. | RNF20, AC05 |
-| SEG-29 | Estado | Mientras una cuenta acumula 10 códigos de segundo factor incorrectos, de aplicación o de respaldo, en una hora desde cualquier origen, el sistema deberá rechazar los siguientes durante 15 minutos. | RNF17, AC13 |
+| SEG-28 | Ubicuo | El sistema deberá enviar un código de un solo uso únicamente en el correo dirigido a su propio destinatario. | RNF20, AC04 |
+| SEG-29 | Estado | Mientras una cuenta acumula 10 códigos de segundo factor incorrectos, de aplicación o de respaldo, en una hora desde cualquier origen, el sistema deberá rechazar los siguientes durante 15 minutos. | RNF17, AC04 |
+| SEG-30 | Estado | Mientras un usuario del personal supera su presupuesto por hora de operaciones sensibles (valores iniciales: 60 ajustes de inventario y 30 solicitudes de traslado), el sistema deberá rechazar las siguientes con la respuesta uniforme de límite excedido y registrar el exceso como evento de seguridad. | RNF17, AC04 |
+| SEG-31 | Evento | Cuando una solicitud de ingreso, registro, hoja de reclamación, reserva o consulta al asistente proviene de un origen con comportamiento automatizado, el sistema deberá exigir una verificación de que es una persona antes de atenderla. | RNF17, AC04 |
 
 ## 4. Criterios de aceptación
 
@@ -75,12 +75,12 @@ Definir las protecciones que todos los servicios y la interfaz web comparten, pa
 | AC-SEG-07 | SEG-06, SEG-07 | **Dado** un correo que no existe y otro que sí, **cuando** cada uno acumula 5 ingresos fallidos, **entonces** ambos reciben exactamente la misma respuesta de límite excedido. |
 | AC-SEG-08 | SEG-07, SEG-08 | **Dado** un límite excedido en descargas, en el asistente, en reservas o en el ingreso, **cuando** se rechaza, **entonces** la respuesta tiene el mismo formato y queda un evento de seguridad; y si el mismo origen es rechazado 50 veces en 5 minutos por el mismo límite, queda un solo evento con el contador en 50. |
 | AC-SEG-09 | SEG-09 | **Dado** 11 accesos denegados en cinco minutos en Inventario, **cuando** se supera el umbral, **entonces** aparece una alerta de Inventario en la lista de la administración central y llega un correo a los administradores activos sin datos sensibles; y lo mismo ocurre con 21 ingresos fallidos en Identidad; con exactamente 10 accesos denegados o 20 ingresos fallidos no hay alerta. |
-| AC-SEG-10 | SEG-10, SEG-28 | **Dado** cualquier flujo con contraseña (incluida la temporal), código de uso único o de respaldo, identificador de sesión, credencial del asistente, tarjeta o enlace firmado, **cuando** se revisan los registros técnicos, de auditoría y de seguridad y los avisos por WhatsApp, **entonces** no aparece ninguno de esos valores; y el único mensaje que lleva un código es el correo a su destinatario. |
+| AC-SEG-10 | SEG-10, SEG-28 | **Dado** cualquier flujo con contraseña (incluida la temporal), código de uso único o de respaldo, identificador de sesión, contexto de lectura del asistente, tarjeta o enlace firmado, **cuando** se revisan los registros técnicos, de auditoría y de seguridad y los avisos por WhatsApp, **entonces** no aparece ninguno de esos valores; y el único mensaje que lleva un código es el correo a su destinatario. |
 | AC-SEG-11 | SEG-12 | **Dado** una llamada entrante de una integración sin firma o con firma inválida, **cuando** llega, **entonces** se rechaza y se registra; y con firma válida se procesa, y si se repite, no se procesa otra vez y se responde el mismo éxito. |
 | AC-SEG-12 | SEG-13 | **Dado** una respuesta externa con un formato inesperado, **cuando** se recibe, **entonces** se descarta y la operación se trata como sin respuesta. |
 | AC-SEG-13 | SEG-14 | **Dado** una dependencia necesaria que no responde, **cuando** pasan 10 segundos, **entonces** se informa servicio no disponible y las demás operaciones siguen funcionando; y si la dependencia no era necesaria, la operación continúa. |
-| AC-SEG-14 | SEG-15 | **Dado** una llamada entre servicios sin credencial, **cuando** llega, **entonces** se rechaza. |
-| AC-SEG-15 | SEG-17 | **Dado** una solicitud que llega por el borde con la dirección del cliente final, **cuando** la Web llama a un servicio, **entonces** el servicio aplica los límites con la dirección del cliente y no con la de la Web; y si el cliente envía una cabecera de reenvío con otra dirección, se ignora y se usa la que entregó el borde. |
+| AC-SEG-14 | SEG-15 | **Dado** una llamada del E-commerce al Inventario sin credencial y una llamada entre módulos sin el contexto del actor, **cuando** llegan, **entonces** ambas se rechazan. |
+| AC-SEG-15 | SEG-17 | **Dado** una solicitud que llega por el borde con la dirección del cliente final, **cuando** la interfaz web llama al Inventario, **entonces** el Inventario aplica los límites con la dirección del cliente y no con la de la Web; y si el cliente envía una cabecera de reenvío con otra dirección, se ignora y se usa la que entregó el borde. |
 | AC-SEG-16 | SEG-18 | **Dado** un visitante con 60 solicitudes en el último minuto, **cuando** envía otra, **entonces** se rechaza con la respuesta de límite excedido. |
 | AC-SEG-17 | SEG-19 | **Dado** un correo con 3 solicitudes de código en la última hora, **cuando** se pide otra, **entonces** se rechaza con la misma respuesta exista o no la cuenta. |
 | AC-SEG-18 | SEG-20 | **Dado** una cuenta con 5 códigos de segundo factor incorrectos desde un origen, **cuando** presenta uno correcto desde ese origen, **entonces** se rechaza durante 15 minutos; y desde otro origen el titular puede ingresar. |
@@ -92,6 +92,8 @@ Definir las protecciones que todos los servicios y la interfaz web comparten, pa
 | AC-SEG-24 | SEG-26 | **Dado** que el almacén de contadores no está disponible, **cuando** alguien intenta ingresar o registrarse, **entonces** recibe servicio no disponible; y consultar el catálogo sigue funcionando con el límite local. |
 | AC-SEG-25 | SEG-11 | **Dado** el repositorio y los registros, **cuando** se revisan, **entonces** no contienen ningún secreto ni clave. |
 | AC-SEG-26 | SEG-29 | **Dado** una cuenta con 10 códigos de segundo factor incorrectos en una hora desde varios orígenes, **cuando** presenta uno correcto desde cualquiera, **entonces** se rechaza durante 15 minutos. |
+| AC-SEG-27 | SEG-30 | **Dado** un encargado que registra 60 ajustes en una hora, **cuando** intenta el 61, **entonces** se rechaza con la respuesta uniforme de límite excedido, queda un evento de seguridad y otro encargado no se ve afectado. |
+| AC-SEG-28 | SEG-31 | **Dado** un origen con comportamiento automatizado que intenta registrar cuentas, **cuando** envía la solicitud, **entonces** se le exige la verificación de persona y, sin ella, no se crea la cuenta; y una persona que la supera continúa sin fricción adicional. |
 
 ## 5. Reglas e invariantes
 

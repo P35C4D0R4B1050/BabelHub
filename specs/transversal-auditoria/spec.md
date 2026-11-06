@@ -5,7 +5,7 @@ estado: Approved
 servicio: Transversal
 prefijo: AUD
 origen: [RF20, NN09, NN18]
-calidad: [RNF08, RNF20, RNF23, AC03, AC05, AC11]
+calidad: [RNF08, RNF20, RNF23, AC03, AC04]
 depende: []
 aprobado_por: Diego Amiquero
 aprobado_en: 2026-10-16
@@ -33,21 +33,21 @@ Dejar un registro confiable e inmutable de quién hizo qué, cuándo y con qué 
 | AUD-02 | Evento | Cuando ocurre un cambio de precio, una anulación de pedido, un ajuste de inventario, una aprobación, despacho, recepción o cancelación de un traslado o un reembolso, el sistema deberá registrarlo en la auditoría. | RF20, NN09 |
 | AUD-03 | Ubicuo | El sistema deberá impedir que un registro de auditoría se modifique o se elimine una vez creado, salvo la anonimización de AUD-19. | RNF08 |
 | AUD-04 | No deseado | Si no es posible registrar la auditoría de una operación sensible, entonces el sistema deberá cancelar la operación y no aplicar sus efectos. | RNF08 |
-| AUD-05 | No deseado | Si un usuario intenta una acción fuera de su rol o de su sucursal, entonces el sistema deberá rechazarla y registrar el intento como un único evento de seguridad de acceso denegado, con su usuario, rol, recurso solicitado y motivo. | RNF05, AC05 |
-| AUD-06 | Ubicuo | El sistema deberá excluir de los registros los datos que `transversal-seguridad` prohíbe en registros y mensajes (SEG-10). | RNF08, AC05 |
+| AUD-05 | No deseado | Si un usuario intenta una acción fuera de su rol o de su sucursal, entonces el sistema deberá rechazarla y registrar el intento como un único evento de seguridad de acceso denegado, con su usuario, rol, recurso solicitado y motivo. | RNF05, AC04 |
+| AUD-06 | Ubicuo | El sistema deberá excluir de los registros los datos que `transversal-seguridad` prohíbe en registros y mensajes (SEG-10). | RNF08, AC04 |
 | AUD-07 | Evento | Cuando el administrador central consulta la auditoría y los eventos de seguridad, el sistema deberá permitir filtrar por acción, usuario u origen, rango de fechas y texto del detalle. | RF20, RNF20 |
 | AUD-08 | Ubicuo | El sistema deberá mostrar al encargado de sucursal únicamente el historial de ajustes y el de los traslados en que su propia sucursal es origen o destino. | RNF05 |
 | AUD-09 | Ubicuo | El sistema deberá presentar en una sola lista los registros de auditoría y los eventos de seguridad de todos los servicios, distinguidos por tipo, en orden cronológico inverso y en páginas de 20. | RF20 |
-| AUD-10 | Evento | Cuando ocurre un ingreso fallido, un bloqueo temporal, un límite de uso excedido, un acceso denegado, una recuperación de acceso, un segundo factor fallido, el uso de un código de respaldo o un cambio de rol, el sistema deberá registrarlo como evento de seguridad con su fecha, el usuario u origen y el motivo. | RNF20, AC05 |
-| AUD-11 | Ubicuo | El sistema deberá conservar los registros de auditoría y de eventos de seguridad durante dos años. | RNF23, AC11 |
+| AUD-10 | Evento | Cuando ocurre un ingreso fallido, un bloqueo temporal, un límite de uso excedido, un acceso denegado, una recuperación de acceso, un segundo factor fallido, el uso de un código de respaldo o un cambio de rol, el sistema deberá registrarlo como evento de seguridad con su fecha, el usuario u origen y el motivo. | RNF20, AC04 |
+| AUD-11 | Ubicuo | El sistema deberá conservar los registros de auditoría y de eventos de seguridad durante dos años. | RNF23, AC04 |
 | AUD-12 | No deseado | Si no es posible registrar un evento de seguridad de una acción ya rechazada, entonces el sistema deberá mantener el rechazo y generar una alerta técnica que aparezca en la lista de alertas, llegue por correo a la administración central y, si la auditoría no responde, se conserve en el registro técnico del servicio. | RNF20 |
-| AUD-13 | Evento | Cuando el administrador central abre la lista de alertas de seguridad, el sistema deberá mostrar las de todos los servicios de la más reciente a la más antigua con su fecha, servicio, motivo y estado (pendiente o revisada), y permitir solo a la administración central marcarlas como revisadas registrándolo en la auditoría; si no se puede registrar la marca, la alerta sigue pendiente. | RNF20, AC05 |
+| AUD-13 | Evento | Cuando el administrador central abre la lista de alertas de seguridad, el sistema deberá mostrar las de todos los servicios de la más reciente a la más antigua con su fecha, servicio, motivo y estado (pendiente o revisada), y permitir solo a la administración central marcarlas como revisadas registrándolo en la auditoría; si no se puede registrar la marca, la alerta sigue pendiente. | RNF20, AC04 |
 | AUD-14 | Evento | Cuando ocurre una entrega de pedido, el paso de un envío a en reparto, la confirmación o la liberación de una reserva, el sistema deberá registrar el movimiento de stock en la auditoría. | RNF08, RF20 |
 | AUD-15 | Evento | Cuando ocurre el alta, la edición o la baja de una obra o edición, un cambio de licencia, el retiro de un libro digital, o el alta o la edición de una fuente o de una ruta entre fuentes, el sistema deberá registrarlo en la auditoría. | RF20, NN09 |
 | AUD-16 | Evento | Cuando ocurre el alta, la desactivación o la reactivación de un usuario o un cambio de rol, el restablecimiento de la contraseña o del segundo factor de un usuario, la cancelación de una cuenta, la atención de una solicitud sobre datos personales, la restitución de descargas, o la respuesta o el descarte de una hoja de reclamación, el sistema deberá registrarlo en la auditoría. | RF20, NN09, RNF23 |
 | AUD-17 | Ubicuo | El sistema deberá permitir que cada servicio entregue su auditoría y sus eventos de seguridad con los mismos filtros y paginación continua, para que la capa web los presente mezclados por fecha sin aplicar reglas de negocio. | RF20, RNF20 |
 | AUD-18 | No deseado | Si un servicio no responde a la consulta unificada en 10 segundos, entonces el sistema deberá mostrar los registros de los demás servicios e indicar cuál no respondió. | RF20, AC03 |
-| AUD-19 | Evento | Cuando corre la depuración diaria, el sistema deberá anonimizar, incluida la dirección IP, los datos personales de los registros con más de dos años y de las cuentas canceladas desde la depuración anterior, conservando la acción, la fecha y el resultado, y registrar la ejecución con el actor «sistema». | RNF23, AC11 |
+| AUD-19 | Evento | Cuando corre la depuración diaria, el sistema deberá anonimizar, incluida la dirección IP, los datos personales de los registros con más de dos años y de las cuentas canceladas desde la depuración anterior, conservando la acción, la fecha y el resultado, y registrar la ejecución con el actor «sistema». | RNF23, AC04 |
 | AUD-20 | Ubicuo | El sistema deberá registrar un cambio de rol como un único registro, etiquetado como operación sensible y como evento de seguridad. | RF20, RNF20 |
 | AUD-21 | Evento | Cuando la administración consulta la biblioteca de un cliente, una hoja de reclamación o una solicitud sobre datos personales, el sistema deberá registrar la consulta en la auditoría. | RF20, RNF23 |
 | AUD-22 | Evento | Cuando se rota la clave de firma de las credenciales o la administración desactiva los avisos de un número, el sistema deberá registrarlo en la auditoría. | RF20, RNF08 |

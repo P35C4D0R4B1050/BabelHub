@@ -5,7 +5,7 @@ estado: Approved
 servicio: E-commerce
 prefijo: PAG
 origen: [RF05, RF07, NN02]
-calidad: [AC01, AC03, AC05, AC13, RNF06, RNF07, RNF08, RNF21]
+calidad: [AC01, AC03, AC04, RNF06, RNF07, RNF08, RNF21]
 depende: [ecommerce-carrito-checkout, identidad-seguridad, inventario-seleccion-fuente, transversal-auditoria]
 aprobado_por: Diego Amiquero
 aprobado_en: 2026-10-16
@@ -30,7 +30,7 @@ Cobrar el pedido una sola vez y con seguridad, con Yape o tarjeta, sin que el si
 | ID | Patrón | Requisito | Origen |
 | :--- | :--- | :--- | :--- |
 | PAG-01 | Ubicuo | El sistema deberá cobrar cada compra una sola vez mediante una pasarela de pago externa. | RF05 |
-| PAG-02 | Ubicuo | El sistema deberá recibir de la pasarela únicamente un identificador del medio de pago, sin procesar ni guardar números de tarjeta ni códigos de seguridad. | RNF07, AC05 |
+| PAG-02 | Ubicuo | El sistema deberá recibir de la pasarela únicamente un identificador del medio de pago, sin procesar ni guardar números de tarjeta ni códigos de seguridad. | RNF07, AC04 |
 | PAG-03 | Ubicuo | El sistema deberá permitir pagar con Yape o con tarjeta. | RF05 |
 | PAG-04 | Evento | Cuando se repite una solicitud de cobro con la misma clave de idempotencia de un intento, el sistema deberá devolver el resultado original sin cobrar otra vez. | RF05 |
 | PAG-05 | Evento | Cuando la pasarela aprueba el pago, el sistema deberá crear el pedido confirmado, pedir la confirmación de las reservas de impresos y pedir la concesión de los accesos a los libros digitales. | RF05, NN02 |
@@ -49,7 +49,7 @@ Cobrar el pedido una sola vez y con seguridad, con Yape o tarjeta, sin que el si
 | PAG-18 | Estado | Mientras un pago de una compra sin impresos está pendiente de confirmación, el sistema deberá consultar su estado cada minuto hasta los 30 minutos desde su inicio y, pasado ese plazo, marcarlo como vencido. | RF05 |
 | PAG-19 | Ubicuo | El sistema deberá confirmar con la pasarela el estado de un pago informado por una notificación entrante antes de darlo por aprobado, además de verificar su firma. | RF05, RNF21 |
 | PAG-20 | No deseado | Si falla la confirmación de las reservas o la concesión de un acceso después de aprobarse el pago, entonces el sistema deberá liberar las reservas, revocar los accesos concedidos y reembolsar el total, dejando el reembolso pendiente visible a la administración y reintentable hasta completarse. | RF05, AC01 |
-| PAG-21 | No deseado | Si el correo de la cuenta no está verificado, entonces el sistema deberá negarse a cobrar. | RF05, AC13 |
+| PAG-21 | No deseado | Si el correo de la cuenta no está verificado, entonces el sistema deberá negarse a cobrar. | RF05, AC04 |
 | PAG-22 | Evento | Cuando un pago queda pendiente o se resuelve y el cliente dio su consentimiento, el sistema deberá avisarle además por WhatsApp. | RF07 |
 | PAG-23 | No deseado | Si falla un aviso del estado del pago, entonces el sistema deberá mantener el estado del cobro y no interrumpirlo. | RF07, AC03 |
 

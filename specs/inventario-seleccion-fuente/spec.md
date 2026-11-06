@@ -5,7 +5,7 @@ estado: Approved
 servicio: Inventario
 prefijo: SEL
 origen: [RF04, RF14, RF15, RF28, NN02, NN06, NN07, NN18]
-calidad: [AC01, AC06, AC13, RNF01, RNF09]
+calidad: [AC01, AC05, AC04, RNF01, RNF09]
 depende: [inventario-fuentes, identidad-seguridad, transversal-auditoria, transversal-seguridad]
 aprobado_por: Diego Amiquero
 aprobado_en: 2026-10-16
@@ -39,16 +39,16 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 | SEL-07 | Evento | Cuando un pedido se cancela, se anula o se marca como no recogido, el sistema deberá liberar sus reservas y devolver las unidades al stock vendible. | RF14 |
 | SEL-08 | Estado | Mientras una reserva está pendiente y su fecha de expiración ya pasó, el sistema deberá considerarla expirada y liberar sus unidades automáticamente. | RF14 |
 | SEL-09 | Evento | Cuando el mismo cliente repite una solicitud de reserva con la misma clave de idempotencia, el sistema deberá devolver el resultado original sin crear otra reserva. | RF14, AC01 |
-| SEL-10 | Opcional | Donde se defina otra regla de selección de fuente, el sistema deberá permitir sustituirla sin cambiar el contrato de reservas ni al E-commerce. | RNF09, AC06 |
+| SEL-10 | Opcional | Donde se defina otra regla de selección de fuente, el sistema deberá permitir sustituirla sin cambiar el contrato de reservas ni al E-commerce. | RNF09, AC05 |
 | SEL-11 | Evento | Cuando la sucursal marca como entregado un pedido de recojo, el sistema deberá descontar el stock físico de la fuente que mantiene la reserva confirmada y cerrarla. | RF14 |
 | SEL-12 | Ubicuo | El sistema deberá rechazar cualquier solicitud de reserva que incluya una edición digital. | RF14 |
-| SEL-13 | No deseado | Si un cliente ya tiene una reserva temporal pendiente de otro pedido, entonces el sistema deberá rechazar la nueva solicitud indicando que debe completar o liberar la anterior. | RF28, AC13 |
-| SEL-14 | No deseado | Si un cliente ya inició 5 reservas temporales en una ventana deslizante de una hora, entonces el sistema deberá rechazar la nueva solicitud; las solicitudes rechazadas por falta de stock o por estos límites no cuentan como iniciadas. | RF28, AC13 |
-| SEL-15 | Evento | Cuando una solicitud de reserva es rechazada por los límites, el sistema deberá responder y registrar el evento de seguridad con el cliente y el motivo según `transversal-seguridad` (SEG-07 y SEG-08). | RF28, AC13 |
-| SEL-16 | Evento | Cuando el cliente reinicia su checkout, modifica las cantidades o reintenta tras un pago rechazado en un pedido que ya tiene una reserva pendiente, el sistema deberá reemplazar esa reserva sin contarla como otra reserva ni como una nueva iniciada, y conservar la anterior si la nueva no puede crearse por falta de stock. | RF28, AC13 |
+| SEL-13 | No deseado | Si un cliente ya tiene una reserva temporal pendiente de otro pedido, entonces el sistema deberá rechazar la nueva solicitud indicando que debe completar o liberar la anterior. | RF28, AC04 |
+| SEL-14 | No deseado | Si un cliente ya inició 5 reservas temporales en una ventana deslizante de una hora, entonces el sistema deberá rechazar la nueva solicitud; las solicitudes rechazadas por falta de stock o por estos límites no cuentan como iniciadas. | RF28, AC04 |
+| SEL-15 | Evento | Cuando una solicitud de reserva es rechazada por los límites, el sistema deberá responder y registrar el evento de seguridad con el cliente y el motivo según `transversal-seguridad` (SEG-07 y SEG-08). | RF28, AC04 |
+| SEL-16 | Evento | Cuando el cliente reinicia su checkout, modifica las cantidades o reintenta tras un pago rechazado en un pedido que ya tiene una reserva pendiente, el sistema deberá reemplazar esa reserva sin contarla como otra reserva ni como una nueva iniciada, y conservar la anterior si la nueva no puede crearse por falta de stock. | RF28, AC04 |
 | SEL-17 | Evento | Cuando el cliente cancela su checkout, el sistema deberá liberar de inmediato sus reservas pendientes. | RF14, RF28 |
-| SEL-18 | Ubicuo | El sistema deberá comprobar y registrar los límites de reservas de forma atómica ante solicitudes simultáneas del mismo cliente o del mismo origen. | RF28, AC01, AC13 |
-| SEL-19 | No deseado | Si un mismo origen ya inició 10 reservas temporales en una ventana deslizante de una hora, entonces el sistema deberá rechazar la nueva solicitud. | RF28, AC13 |
+| SEL-18 | Ubicuo | El sistema deberá comprobar y registrar los límites de reservas de forma atómica ante solicitudes simultáneas del mismo cliente o del mismo origen. | RF28, AC01, AC04 |
+| SEL-19 | No deseado | Si un mismo origen ya inició 10 reservas temporales en una ventana deslizante de una hora, entonces el sistema deberá rechazar la nueva solicitud. | RF28, AC04 |
 | SEL-20 | Evento | Cuando el E-commerce consulta la selección de fuentes de un carrito, el sistema deberá responder, por cada línea impresa, la fuente que se seleccionaría, si implica un traslado y su plazo estimado, o la falta de stock, sin crear reservas ni modificar el stock vendible, ignorando las líneas digitales y sujeto al límite general de solicitudes. | RF04, RF15 |
 | SEL-21 | Evento | Cuando logística pasa a en reparto un envío a domicilio, el sistema deberá descontar el stock físico de la fuente de cada línea impresa del envío y cerrar sus reservas confirmadas. | RF14 |
 | SEL-22 | Evento | Cuando el E-commerce informa que el pago de un pedido quedó pendiente de confirmación, el sistema deberá extender una sola vez la expiración de sus reservas pendientes hasta 30 minutos desde que se inició el pago. | RF14 |

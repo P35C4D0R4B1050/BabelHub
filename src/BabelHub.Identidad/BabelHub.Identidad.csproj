@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
-  <PropertyGroup>
-    <RootNamespace>BabelHub.Identidad</RootNamespace>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\BabelHub.Shared\BabelHub.Shared.csproj" />
-  </ItemGroup>
-</Project>

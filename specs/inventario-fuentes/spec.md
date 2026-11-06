@@ -1,14 +1,12 @@
 ---
 id: inventario-fuentes
 titulo: Fuentes y stock vendible
-estado: Approved
+estado: Draft
 servicio: Inventario
 prefijo: FUE
 origen: [RF12, RF13, RF15, RF02, NN06, NN07, NN01]
-calidad: [AC01, AC02, AC04, RNF01, RNF02, RNF04, RNF05]
+calidad: [AC01, AC02, AC05, RNF01, RNF02, RNF04, RNF05]
 depende: [identidad-seguridad, transversal-auditoria]
-aprobado_por: Diego Amiquero
-aprobado_en: 2026-10-16
 ---
 
 # Spec — Fuentes y stock vendible
@@ -23,7 +21,7 @@ Cada sucursal es una **fuente** independiente de stock de libros impresos. El si
 | :--- | :--- |
 | Registro de fuentes, stock físico, reservado y vendible por edición impresa. | Crear reservas y elegir la fuente de un pedido (`inventario-seleccion-fuente`). |
 | Consulta de disponibilidad consolidada y por fuente. | Ajustes del stock (`inventario-ajustes`) y traslados (`inventario-traslados`). |
-| Consulta de stock de la sucursal para su encargado. | Libros digitales: no tienen stock ni fuente. |
+| Consulta de stock y de unidades vendidas de la sucursal para su encargado, y de toda la red para la administración. | Libros digitales: no tienen stock ni fuente. |
 | Rutas entre fuentes con su plazo estimado de traslado, como dato. | Cómo se usan las rutas para elegir la fuente de un pedido (`inventario-seleccion-fuente`). |
 
 ## 3. Requisitos (EARS)
@@ -35,7 +33,7 @@ Cada sucursal es una **fuente** independiente de stock de libros impresos. El si
 | FUE-03 | Ubicuo | El sistema deberá calcular el stock vendible de una edición en una fuente como el stock físico menos las reservas activas, es decir, las pendientes no vencidas y las confirmadas. | RF13 |
 | FUE-04 | Ubicuo | El sistema deberá garantizar que el stock vendible de una edición en una fuente nunca sea negativo. | RNF01, AC01 |
 | FUE-05 | Evento | Cuando se consulta la disponibilidad de una edición impresa, el sistema deberá responder el stock vendible consolidado de la red y el desglose por fuente. | RF13, RF02 |
-| FUE-06 | Evento | Cuando la administración central registra una nueva fuente, el sistema deberá iniciarla con stock cero y dejarla disponible sin cambios de código ni de estructura. | RNF04, AC04 |
+| FUE-06 | Evento | Cuando la administración central registra una nueva fuente, el sistema deberá iniciarla con stock cero y dejarla disponible sin cambios de código ni de estructura. | RNF04, AC05 |
 | FUE-07 | No deseado | Si se consulta la disponibilidad de una edición que no es impresa, entonces el sistema deberá rechazar la consulta indicando que no tiene stock físico. | RF13 |
 | FUE-08 | Estado | Mientras un usuario es encargado de sucursal, el sistema deberá limitar el detalle de stock físico y reservado a su propia fuente. | RNF05 |
 | FUE-09 | Evento | Cuando el encargado consulta el inventario de su sucursal, el sistema deberá permitir buscar por título, autor o ISBN y mostrar físico, reservado, vendible y un estado de stock. | RF12 |
@@ -48,6 +46,10 @@ Cada sucursal es una **fuente** independiente de stock de libros impresos. El si
 | FUE-16 | Evento | Cuando la administración central registra o edita una fuente, el sistema deberá registrarlo en la auditoría. | RF12, RNF08 |
 | FUE-17 | No deseado | Si se registra una ruta con un plazo que no es mayor que cero, o entre una fuente y ella misma, o si quien la registra no es la administración central, entonces el sistema deberá rechazarla. | RF15, RNF05 |
 | FUE-18 | Ubicuo | El sistema deberá mostrar el estado de stock de una edición en una fuente según su vendible: sin stock si es 0, bajo si es de 1 a 2 y normal si es de 3 o más. | RF12 |
+| FUE-19 | Ubicuo | El sistema deberá mantener exactamente una fuente de recepción, que es la fuente que recibe la mercadería nueva de la administración central y que por defecto es la de Lima. | RF12, NN06 |
+| FUE-20 | Evento | Cuando la administración central cambia la fuente de recepción, el sistema deberá registrarlo en la auditoría y rechazar el cambio si lo intenta otro usuario. | RF12, RNF05, RNF08 |
+| FUE-21 | Evento | Cuando se consultan las unidades vendidas, el sistema deberá mostrar para una fuente, y para la red completa a la administración central, las unidades de impresos de pedidos pagados en los últimos 30 días, sin contar las unidades de pedidos anulados ni las devueltas. | RF12, NN06 |
+| FUE-22 | Ubicuo | El sistema deberá atribuir cada unidad vendida a una sola fuente: la que despacha el pedido a domicilio o la sucursal que lo entrega en recojo, aunque la mercadería llegue por traslado; un traslado de reposición no es una venta. | RF12, RF15 |
 
 ## 4. Criterios de aceptación
 
@@ -68,6 +70,9 @@ Cada sucursal es una **fuente** independiente de stock de libros impresos. El si
 | AC-FUE-13 | FUE-16 | **Dado** la administración central, **cuando** registra la fuente «Piura» y luego edita su contacto, **entonces** cada acción queda en la auditoría. |
 | AC-FUE-14 | FUE-17 | **Dado** una ruta con plazo 0, otra de Lima a Lima y otra registrada por un encargado, **cuando** se envían, **entonces** las tres se rechazan. |
 | AC-FUE-15 | FUE-18 | **Dado** vendibles de 0, 2 y 3, **cuando** el encargado consulta su inventario, **entonces** ve sin stock, bajo y normal respectivamente. |
+| AC-FUE-16 | FUE-19, FUE-20 | **Dado** la fuente de recepción Lima, **cuando** la administración designa Arequipa, **entonces** queda un único registro de recepción en Arequipa con su auditoría; y si lo intenta un encargado, se rechaza y la recepción sigue en Arequipa. |
+| AC-FUE-17 | FUE-21 | **Dado** en Ayacucho los pedidos pagados A de 3 unidades, B de 2 unidades (anulado después) y C de 5 unidades de hace 40 días, y en Cusco uno de 4 unidades, **cuando** el encargado de Ayacucho consulta, **entonces** ve 3 vendidas (solo las de su fuente, sin la anulada ni la antigua), y la administración ve 7 en la red. |
+| AC-FUE-18 | FUE-22 | **Dado** un pedido a domicilio despachado desde Lima, y otro de recojo en Ayacucho cuyo libro llegó desde Cusco por traslado, **cuando** se consultan las vendidas, **entonces** el primero cuenta para Lima, el segundo para Ayacucho una sola vez, y el traslado de Cusco no suma. |
 
 ## 5. Reglas e invariantes
 
@@ -76,6 +81,9 @@ Cada sucursal es una **fuente** independiente de stock de libros impresos. El si
 - Una fuente nueva se crea con stock cero y se asigna a un encargado por separado.
 - El estado de stock se deriva del vendible (FUE-18).
 - Una ruta es direccional (Cusco→Ayacucho no implica Ayacucho→Cusco), tiene un plazo en días mayor que cero y es un dato que la administración mantiene; agregar una sucursal no exige código.
+- Hay **una sola fuente de recepción**; las demás reciben stock por traslado o devolución (FUE-19).
+- Las unidades vendidas no se guardan como un contador: se derivan de las reservas confirmadas o cerradas de pedidos pagados, y cada unidad cuenta una sola vez para la fuente que despacha o entrega (FUE-22).
+- Nota para el plan: una reserva cerrada por el despacho de un traslado vinculado no cuenta como venta, porque el destino crea otra reserva para el mismo pedido (TRA-14); el plan define cómo se marca para no contarla dos veces.
 
 ## 6. Casos límite y errores
 

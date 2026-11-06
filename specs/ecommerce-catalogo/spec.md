@@ -1,14 +1,12 @@
 ---
 id: ecommerce-catalogo
 titulo: Catálogo de obras y ediciones
-estado: Approved
+estado: Draft
 servicio: E-commerce
 prefijo: CAT
 origen: [RF01, RF02, RF10, RF24, NN01, NN08, NN13, NN14]
 calidad: [AC02, AC03, RNF03, RNF09]
-depende: [inventario-fuentes, transversal-auditoria]
-aprobado_por: Diego Amiquero
-aprobado_en: 2026-10-16
+depende: [inventario-fuentes, inventario-ajustes, transversal-auditoria]
 ---
 
 # Spec — Catálogo de obras y ediciones
@@ -48,6 +46,10 @@ Un único catálogo nacional para toda la red. Una **obra** puede tener una edic
 | CAT-17 | No deseado | Si el ISBN de una edición no tiene 10 o 13 dígitos con un dígito de control válido, entonces el sistema deberá rechazarla; y ante registros simultáneos con el mismo ISBN, deberá aceptar solo uno. | RF10 |
 | CAT-18 | Evento | Cuando la administración da de baja una edición, el sistema deberá quitarla de los carritos avisando a cada cliente, y conservarla en los pedidos y traslados en curso hasta que se cierren. | RF10 |
 | CAT-19 | Evento | Cuando la administración da de alta, edita o da de baja una obra o edición, el sistema deberá registrarlo en la auditoría. | RF10, RNF08 |
+| CAT-20 | Evento | Cuando la administración da de alta una edición impresa con un stock inicial mayor que cero (entero de hasta 5 000), el sistema deberá pedir al Inventario un ingreso de mercadería de esa cantidad en la fuente de recepción y, si el Inventario no responde, dejar la edición creada sin stock e indicar que el ingreso debe registrarse después. | RF10, RF17 |
+| CAT-21 | Ubicuo | El sistema deberá mostrar como agotada una edición impresa sin stock vendible en toda la red y no darla de baja ni quitarla de la venta por esa causa. | RF10, RF13 |
+| CAT-22 | Evento | Cuando la administración registra desde el catálogo un ingreso de mercadería de una edición impresa existente, el sistema deberá pedirlo al Inventario con la cantidad, la referencia y la nota, y mostrar los últimos ingresos con su fecha y usuario. | RF10, RF17 |
+| CAT-23 | No deseado | Si el stock inicial o la cantidad de un ingreso no es un entero entre 1 y 5 000, o si quien lo registra no es la administración central, entonces el sistema deberá rechazarlo sin crear ni cambiar nada. | RF17, RNF05 |
 
 ## 4. Criterios de aceptación
 
@@ -68,6 +70,10 @@ Un único catálogo nacional para toda la red. Una **obra** puede tener una edic
 | AC-CAT-13 | CAT-05 | **Dado** una edición digital sin titular, y otra de dominio público sin vigencia, **cuando** se guardan, **entonces** la primera se rechaza indicando el campo faltante y la segunda se acepta. |
 | AC-CAT-14 | CAT-17 | **Dado** un ISBN con dígito de control inválido, y dos administradores que registran a la vez el mismo ISBN válido, **cuando** se guardan, **entonces** el primero se rechaza por formato y de los otros dos solo uno se acepta. |
 | AC-CAT-15 | CAT-18, CAT-19 | **Dado** una edición impresa en el carrito de dos clientes y en un pedido en curso, **cuando** la administración la da de baja, **entonces** se quita de los carritos con aviso, el pedido en curso sigue mostrándola y queda la auditoría. |
+| AC-CAT-16 | CAT-20 | **Dado** una edición impresa nueva con un stock inicial de 12, **cuando** la administración la guarda, **entonces** la edición se crea, el Inventario registra un ingreso de 12 en la fuente de recepción y queda auditado; y si el Inventario no responde, la edición se crea con stock 0 y el aviso indica que falta registrar el ingreso. |
+| AC-CAT-17 | CAT-21 | **Dado** una edición cuyo vendible en toda la red llega a 0, **cuando** un cliente abre el catálogo, **entonces** la ve como agotada, sigue disponible en digital si lo tiene y no se quita de ningún carrito ni de la venta. |
+| AC-CAT-18 | CAT-22 | **Dado** una edición impresa agotada en toda la red, **cuando** la administración registra desde el catálogo un ingreso de 30 unidades con la referencia «GR-001», **entonces** el Inventario suma 30 en la fuente de recepción, el catálogo deja de mostrarla como agotada y el ingreso figura en la lista con su fecha y usuario. |
+| AC-CAT-19 | CAT-23 | **Dado** un stock inicial de 6 000, otro de -3, y un encargado de sucursal que intenta registrar un ingreso, **cuando** se envían, **entonces** los tres se rechazan, no se crea ni cambia nada y el tercero queda como acceso denegado. |
 
 ## 5. Reglas e invariantes
 
@@ -76,6 +82,8 @@ Un único catálogo nacional para toda la red. Una **obra** puede tener una edic
 - Una licencia de dominio público no tiene vigencia; una licencia comercial siempre la tiene.
 - Una licencia vencida o que no incluye Perú retira la oferta pero no el acceso ya concedido.
 - Los precios de los libros digitales se muestran sin IGV (referencial, ver `docs/01-analisis-de-sistema/03-marco-legal.md`).
+- Un título agotado se muestra como tal y sigue en la venta; solo la administración lo da de baja (CAT-21).
+- Nota para el plan: el ingreso pedido desde el alta o desde el catálogo lleva una clave de idempotencia para que un reintento no duplique el lote.
 
 ## 6. Casos límite y errores
 

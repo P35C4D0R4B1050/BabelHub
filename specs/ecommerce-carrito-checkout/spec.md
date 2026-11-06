@@ -5,7 +5,7 @@ estado: Approved
 servicio: E-commerce
 prefijo: CAR
 origen: [RF03, RF04, RF28, NN02, NN13, NN15, NN18]
-calidad: [AC01, AC03, AC08, AC13, RNF01, RNF03, RNF13]
+calidad: [AC01, AC03, AC06, AC04, RNF01, RNF03, RNF13]
 depende: [ecommerce-catalogo, inventario-seleccion-fuente, identidad-seguridad, transversal-seguridad]
 aprobado_por: Diego Amiquero
 aprobado_en: 2026-10-16
@@ -43,13 +43,13 @@ Que el cliente arme un carrito que se conserva entre sesiones y dispositivos, me
 | CAR-12 | Ubicuo | El sistema deberá exigir, antes del pago, la aceptación de los términos y del tratamiento de datos personales. | NN15 |
 | CAR-13 | Estado | Mientras el carrito contiene libros digitales, el sistema deberá exigir además la aceptación de la política de reembolso de libros digitales. | NN15 |
 | CAR-14 | No deseado | Si una edición digital deja de estar disponible por su licencia antes de iniciarse el pago, entonces el sistema deberá impedir su pago e invitar a quitarla; una compra ya iniciada se concede aunque la licencia venza mientras el pago está pendiente. | NN14 |
-| CAR-15 | Ubicuo | El sistema deberá completar la compra en no más de cinco pasos (revisión del carrito, entrega, datos y aceptaciones, pago, confirmación), y en no más de cuatro cuando el carrito es solo digital. | RNF13, AC08 |
+| CAR-15 | Ubicuo | El sistema deberá completar la compra en no más de cinco pasos (revisión del carrito, entrega, datos y aceptaciones, pago, confirmación), y en no más de cuatro cuando el carrito es solo digital. | RNF13, AC06 |
 | CAR-16 | Ubicuo | El sistema deberá exigir que el cliente haya iniciado sesión para pagar. | RF03 |
-| CAR-17 | No deseado | Si el inventario rechaza la reserva porque el cliente superó un límite de reservas, entonces el sistema deberá explicar el motivo, mostrar el instante en que podrá intentarlo otra vez y conservar el carrito. | RF28, AC13 |
+| CAR-17 | No deseado | Si el inventario rechaza la reserva porque el cliente superó un límite de reservas, entonces el sistema deberá explicar el motivo, mostrar el instante en que podrá intentarlo otra vez y conservar el carrito. | RF28, AC04 |
 | CAR-18 | Opcional | Donde el cliente aún no registró su consentimiento para recibir avisos por WhatsApp, el sistema deberá ofrecerlo en el checkout como opción, sin exigirlo para pagar; la decisión la guarda `identidad-seguridad`. | NN15 |
 | CAR-19 | Evento | Cuando el cliente cancela el checkout o vuelve al carrito sin un pago pendiente de confirmación, el sistema deberá pedir al inventario la liberación de sus reservas pendientes. | RF04, RF28 |
 | CAR-20 | No deseado | Si el cliente ya posee una edición digital, entonces el sistema deberá impedir agregarla de nuevo al carrito o pagarla e indicar que ya está en su biblioteca. | NN13 |
-| CAR-21 | No deseado | Si el correo de la cuenta del cliente no está verificado, entonces el sistema deberá impedir iniciar el pago, invitarlo a verificarlo y conservar su carrito. | RF28, AC13 |
+| CAR-21 | No deseado | Si el correo de la cuenta del cliente no está verificado, entonces el sistema deberá impedir iniciar el pago, invitarlo a verificarlo y conservar su carrito. | RF28, AC04 |
 | CAR-22 | Evento | Cuando el cliente acepta los términos, el tratamiento de datos o la política de reembolso digital antes de pagar, el sistema deberá guardar en la intención de pago la versión y la fecha de cada texto aceptado y pasarlas al pedido al crearse. | NN15 |
 | CAR-23 | Evento | Cuando el carrito incluye impresos con despacho a domicilio, el sistema deberá sumar al total un costo de envío fijo en soles, configurable sin modificar el código, mostrarlo antes del pago, congelarlo al crear la intención de pago y guardarlo en el pedido. | RF04 |
 | CAR-24 | Evento | Cuando un visitante arma un carrito y luego ingresa o se registra, el sistema deberá fusionarlo con el carrito de su cuenta, sumando las cantidades de una misma edición hasta el máximo disponible, limitando las digitales a una unidad, descartando las que ya posee o dejaron de venderse, y avisando cuáles ajustó; la fusión no debe aplicarse dos veces. | RF03 |
@@ -57,7 +57,7 @@ Que el cliente arme un carrito que se conserva entre sesiones y dispositivos, me
 | CAR-26 | No deseado | Si el pago está pendiente de confirmación, entonces el sistema deberá impedir volver al carrito para editarlo y cancelar el checkout hasta que se resuelva. | RF04, AC01 |
 | CAR-27 | No deseado | Si al reservar se rechaza una línea por falta de stock o la fuente asignada cambia el plazo informado, entonces el sistema deberá volver a la revisión del carrito, mostrar el cambio o el nuevo plazo y conservar el carrito. | RF04, AC01 |
 | CAR-28 | Evento | Cuando cambia la versión vigente de un texto legal durante el checkout, el sistema deberá volver a pedir su aceptación antes de pagar. | NN15 |
-| CAR-29 | Ubicuo | El sistema deberá conservar el carrito de un visitante en su navegador por 30 días, con un máximo de 50 líneas. | RF03, AC13 |
+| CAR-29 | Ubicuo | El sistema deberá conservar el carrito de un visitante en su navegador por 30 días, con un máximo de 50 líneas. | RF03, AC04 |
 
 ## 4. Criterios de aceptación
 

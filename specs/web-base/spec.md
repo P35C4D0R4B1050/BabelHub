@@ -2,10 +2,10 @@
 id: web-base
 titulo: Estructura base de la interfaz web
 estado: Approved
-servicio: Web
+servicio: E-commerce
 prefijo: WEB
 origen: [RC01, RNF13, RF25, RF29, NN15, NN16, NN18]
-calidad: [AC05, AC08, AC10, AC13, AC14, RNF05, RNF06, RNF15, RNF16, RNF25, RNF26, RNF27]
+calidad: [AC04, AC06, RNF05, RNF06, RNF15, RNF16, RNF25, RNF26, RNF27]
 depende: [identidad-seguridad, ecommerce-libro-reclamaciones, ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-biblioteca-digital, transversal-auditoria, transversal-seguridad]
 aprobado_por: Diego Amiquero
 aprobado_en: 2026-10-16
@@ -15,7 +15,7 @@ aprobado_en: 2026-10-16
 
 ## 1. Propósito
 
-La base común de `BabelHub.Web`: áreas por rol, sesión, estados de pantalla estándar, accesibilidad y pie legal. Todas las pantallas de las demás specs se apoyan en ella. El diseño y los componentes están en `docs/06-experiencia-de-usuario`.
+La base común de la interfaz web del E-commerce: áreas por rol, sesión, estados de pantalla estándar, accesibilidad y pie legal. Todas las pantallas de las demás specs se apoyan en ella. El diseño y los componentes están en `docs/06-experiencia-de-usuario`.
 
 ## 2. Alcance
 
@@ -29,39 +29,39 @@ La base común de `BabelHub.Web`: áreas por rol, sesión, estados de pantalla e
 
 | ID | Patrón | Requisito | Origen |
 | :--- | :--- | :--- | :--- |
-| WEB-01 | Ubicuo | El sistema deberá presentar una interfaz web responsiva que funcione en celulares y en computadoras. | RC01, AC08 |
+| WEB-01 | Ubicuo | El sistema deberá presentar una interfaz web responsiva que funcione en celulares y en computadoras. | RC01, AC06 |
 | WEB-02 | Ubicuo | El sistema deberá organizar la interfaz en las áreas Tienda, Sucursal y Administración, y mostrar en cada una solo las opciones permitidas al rol y al alcance del usuario. | RNF05 |
-| WEB-03 | No deseado | Si un usuario abre una pantalla que su rol no permite, entonces el sistema deberá mostrar una pantalla de sin permiso con salidas a lo que sí puede usar. | RNF05, AC05 |
-| WEB-04 | Ubicuo | El sistema deberá mantener la sesión sin exponer la credencial del usuario al navegador. | RNF06, AC05 |
-| WEB-05 | Ubicuo | El sistema deberá proteger los formularios contra solicitudes falsificadas entre sitios. | AC05 |
+| WEB-03 | No deseado | Si un usuario abre una pantalla que su rol no permite, entonces el sistema deberá mostrar una pantalla de sin permiso con salidas a lo que sí puede usar. | RNF05, AC04 |
+| WEB-04 | Ubicuo | El sistema deberá mantener la sesión sin exponer la credencial del usuario al navegador. | RNF06, AC04 |
+| WEB-05 | Ubicuo | El sistema deberá proteger los formularios contra solicitudes falsificadas entre sitios. | AC04 |
 | WEB-06 | Ubicuo | El sistema deberá mostrar en cada pantalla de datos los estados cargando, vacío, error, sin permiso y servicio no disponible, con un mismo patrón visual. | RNF13 |
 | WEB-07 | No deseado | Si un servicio devuelve un error, entonces el sistema deberá mostrar un mensaje comprensible con una acción de reintento y no mostrar detalles técnicos. | RNF13 |
 | WEB-08 | Ubicuo | El sistema deberá mostrar en el pie de todas las páginas de la tienda el enlace al Libro de Reclamaciones y los enlaces a términos, privacidad y política de reembolso. | RF25, NN15 |
 | WEB-09 | Ubicuo | El sistema deberá ofrecer un tema claro y uno oscuro, respetar la preferencia del dispositivo y recordar la elección del usuario. | RNF13 |
-| WEB-10 | Ubicuo | El sistema deberá poder usarse completamente con teclado, con foco visible y un enlace para saltar al contenido. | AC10 |
-| WEB-11 | Ubicuo | El sistema deberá cumplir un contraste de texto de al menos 4,5 a 1 en ambos temas. | AC10 |
-| WEB-12 | Estado | Mientras el usuario prefiere movimiento reducido, el sistema deberá eliminar las animaciones sin perder funcionalidad. | AC10 |
-| WEB-13 | Ubicuo | El sistema deberá indicar la disponibilidad y los estados con texto e icono, y nunca solo con color. | AC10 |
+| WEB-10 | Ubicuo | El sistema deberá poder usarse completamente con teclado, con foco visible y un enlace para saltar al contenido. | AC06 |
+| WEB-11 | Ubicuo | El sistema deberá cumplir un contraste de texto de al menos 4,5 a 1 en ambos temas. | AC06 |
+| WEB-12 | Estado | Mientras el usuario prefiere movimiento reducido, el sistema deberá eliminar las animaciones sin perder funcionalidad. | AC06 |
+| WEB-13 | Ubicuo | El sistema deberá indicar la disponibilidad y los estados con texto e icono, y nunca solo con color. | AC06 |
 | WEB-14 | Ubicuo | El sistema deberá mostrar importes en soles y fechas con formato peruano. | RNF13 |
 | WEB-15 | Evento | Cuando el cliente pulsa descargar un libro digital, el sistema deberá pedir la descarga al E-commerce y redirigir el navegador al enlace firmado recibido, sin transmitir el archivo. | RNF14 |
 | WEB-16 | Ubicuo | El sistema deberá recordar la sucursal preferida del cliente entre sesiones. | RNF13 |
 | WEB-17 | Evento | Cuando el visitante pulsa «Sorpréndeme», el sistema deberá elegir al azar un libro disponible y mostrar su ficha. | RF29, NN17 |
-| WEB-18 | Ubicuo | El sistema deberá enviar en cada respuesta las cabeceras de seguridad: política de contenido restrictiva, transporte seguro obligatorio, no adivinar el tipo de contenido y política de referencia limitada, y permitir en la política de contenido el script de la pasarela de pago solo en la página de pago. | RNF16, AC05 |
-| WEB-19 | Ubicuo | El sistema deberá guardar la sesión en una cookie inaccesible a scripts, enviada solo por conexión segura y restringida al mismo sitio con la política que permite volver de la pasarela de pago sin perder la sesión. | RNF15, AC05 |
-| WEB-20 | Ubicuo | El sistema deberá conformar las pautas WCAG 2.2 nivel AA en inicio, catálogo, detalle, carrito, checkout, registro, ingreso, segundo factor, recuperación y cuenta, permitiendo pegar contraseñas y autocompletar códigos, verificado con revisión automática y una lista manual de teclado y lector de pantalla. | RNF25, AC10 |
+| WEB-18 | Ubicuo | El sistema deberá enviar en cada respuesta las cabeceras de seguridad: política de contenido restrictiva, transporte seguro obligatorio, no adivinar el tipo de contenido y política de referencia limitada, y permitir en la política de contenido el script de la pasarela de pago solo en la página de pago. | RNF16, AC04 |
+| WEB-19 | Ubicuo | El sistema deberá guardar la sesión en una cookie inaccesible a scripts, enviada solo por conexión segura y restringida al mismo sitio con la política que permite volver de la pasarela de pago sin perder la sesión. | RNF15, AC04 |
+| WEB-20 | Ubicuo | El sistema deberá conformar las pautas WCAG 2.2 nivel AA en inicio, catálogo, detalle, carrito, checkout, registro, ingreso, segundo factor, recuperación y cuenta, permitiendo pegar contraseñas y autocompletar códigos, verificado con revisión automática y una lista manual de teclado y lector de pantalla. | RNF25, AC06 |
 | WEB-21 | Ubicuo | El sistema deberá cargar inicio, catálogo y detalle con LCP de 2,5 s o menos (percentil 75 en 4G simulada), INP de 200 ms o menos y CLS de 0,1 o menos. | RNF26, AC02 |
-| WEB-22 | Ubicuo | El sistema deberá permitir que al menos el 90 % de las personas de una prueba de usabilidad complete una compra con recojo sin ayuda, con una puntuación SUS de al menos 68 y menos de un error por tarea en promedio, medidos en rondas de 5 personas que sumen al menos 10. | RNF27, AC08 |
-| WEB-23 | Ubicuo | El sistema deberá completar el recorrido de compra en las dos últimas versiones estables de Chrome, Edge, Firefox y Safari, y en Chrome para Android y Safari para iOS recientes. | AC14, RC14 |
-| WEB-24 | No deseado | Si una operación es rechazada por un límite de uso, entonces el sistema deberá explicar el motivo y la espera sugerida sin perder lo que la persona tenía en pantalla y sin distinguir, en el ingreso, si la cuenta existe. | RNF17, AC13 |
+| WEB-22 | Ubicuo | El sistema deberá permitir que al menos el 90 % de las personas de una prueba de usabilidad complete una compra con recojo sin ayuda, con una puntuación SUS de al menos 68 y menos de un error por tarea en promedio, medidos en rondas de 5 personas que sumen al menos 10. | RNF27, AC06 |
+| WEB-23 | Ubicuo | El sistema deberá completar el recorrido de compra en las dos últimas versiones estables de Chrome, Edge, Firefox y Safari, y en Chrome para Android y Safari para iOS recientes. | AC06, RC14 |
+| WEB-24 | No deseado | Si una operación es rechazada por un límite de uso, entonces el sistema deberá explicar el motivo y la espera sugerida sin perder lo que la persona tenía en pantalla y sin distinguir, en el ingreso, si la cuenta existe. | RNF17, AC04 |
 | WEB-25 | Evento | Cuando la sesión vence a mitad de una acción, el sistema deberá llevar al ingreso y conservar en el servidor, ligado a ese usuario y por un máximo de 30 minutos, lo que tenía en pantalla, salvo contraseñas y códigos, sin mostrarlo a otra persona. | RNF13, RNF15 |
 | WEB-26 | No deseado | Si la Web no logra comunicarse con los servicios, entonces el sistema deberá mostrar el estado de servicio no disponible y conservar el carrito. | RNF13, AC03 |
-| WEB-27 | Estado | Mientras una persona no realiza ninguna acción iniciada por ella durante 30 minutos, el sistema deberá cerrar su sesión web; las consultas automáticas no renuevan ese plazo. | RNF15, AC05 |
-| WEB-28 | Evento | Cuando una persona ingresa, cierra sesión o su sesión vence, el sistema deberá emitir un identificador de sesión nuevo al ingresar e invalidar en el servidor la sesión que se cierra o vence y su renovación. | RNF15, AC05 |
+| WEB-27 | Estado | Mientras una persona no realiza ninguna acción iniciada por ella durante 30 minutos, el sistema deberá cerrar su sesión web; las consultas automáticas no renuevan ese plazo. | RNF15, AC04 |
+| WEB-28 | Evento | Cuando una persona ingresa, cierra sesión o su sesión vence, el sistema deberá emitir un identificador de sesión nuevo al ingresar e invalidar en el servidor la sesión que se cierra o vence y su renovación. | RNF15, AC04 |
 | WEB-29 | Ubicuo | El sistema deberá publicar los términos, la política de privacidad y la política de reembolso como textos con versión y fecha de vigencia visibles, incluir en la privacidad las cookies que usa el sitio, y pedir la aceptación de la versión vigente que informa Identidad. | NN15, RNF23 |
-| WEB-30 | Ubicuo | El sistema deberá ofrecer a la administración central una pantalla de auditoría y eventos de seguridad con filtros por acción, usuario u origen, fechas y texto, y el aviso del servicio que no respondió. | RNF20, AC05 |
-| WEB-31 | Estado | Mientras una sesión web lleva 7 días de un cliente o 8 horas del personal desde el ingreso, el sistema deberá cerrarla aunque haya actividad. | RNF15, AC05 |
-| WEB-32 | No deseado | Si Identidad rechaza la renovación de una sesión (usuario desactivado, renovaciones revocadas, cambio de rol o clave comprometida), entonces el sistema deberá cerrar la sesión web y llevar a la persona al ingreso conservando lo que tenía en pantalla según WEB-25. | RNF15, AC05 |
-| WEB-33 | Ubicuo | El sistema deberá ofrecer a la administración central una pantalla de alertas de seguridad con su estado de revisión y la acción de marcarlas como revisadas. | RNF20, AC05 |
+| WEB-30 | Ubicuo | El sistema deberá ofrecer a la administración central una pantalla de auditoría y eventos de seguridad con filtros por acción, usuario u origen, fechas y texto, y el aviso del servicio que no respondió. | RNF20, AC04 |
+| WEB-31 | Estado | Mientras una sesión web lleva 7 días de un cliente o 8 horas del personal desde el ingreso, el sistema deberá cerrarla aunque haya actividad. | RNF15, AC04 |
+| WEB-32 | No deseado | Si Identidad rechaza la renovación de una sesión (usuario desactivado, renovaciones revocadas, cambio de rol o clave comprometida), entonces el sistema deberá cerrar la sesión web y llevar a la persona al ingreso conservando lo que tenía en pantalla según WEB-25. | RNF15, AC04 |
+| WEB-33 | Ubicuo | El sistema deberá ofrecer a la administración central una pantalla de alertas de seguridad con su estado de revisión y la acción de marcarlas como revisadas. | RNF20, AC04 |
 | WEB-34 | Estado | Mientras una persona tiene pendiente configurar el segundo factor, cambiar una contraseña temporal, aceptar una versión nueva de los textos legales o declarar su mayoría de edad, el sistema deberá llevarla a ese paso antes de cualquier otra pantalla. | RNF15, NN15 |
 | WEB-35 | Ubicuo | El sistema deberá ofrecer las pantallas de registro, ingreso, verificación y recuperación, cuenta (datos, consentimientos, segundo factor, solicitudes y cancelación con cierre de todas las sesiones), usuarios y roles, y solicitudes sobre datos personales con sus fechas límite. | RNF13, NN15 |
 

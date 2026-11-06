@@ -5,7 +5,7 @@ estado: Approved
 servicio: E-commerce
 prefijo: BIB
 origen: [RF22, RF23, RF24, NN13, NN15, NN18]
-calidad: [AC09, AC13, RNF14, RNF05, RNF08, RNF17]
+calidad: [AC04, RNF14, RNF05, RNF08, RNF17]
 depende: [ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-pagos, transversal-auditoria, transversal-seguridad]
 aprobado_por: Diego Amiquero
 aprobado_en: 2026-10-16
@@ -15,7 +15,7 @@ aprobado_en: 2026-10-16
 
 ## 1. Propósito
 
-Entregar al instante los libros digitales comprados y protegerlos: el archivo solo le llega a quien lo compró, con enlaces de corta duración y un máximo de descargas. Sin pasar por el inventario (NN13, AC09).
+Entregar al instante los libros digitales comprados y protegerlos: el archivo solo le llega a quien lo compró, con enlaces de corta duración y un máximo de descargas. Sin pasar por el inventario (NN13, AC04).
 
 ## 2. Alcance
 
@@ -32,21 +32,21 @@ Entregar al instante los libros digitales comprados y protegerlos: el archivo so
 | BIB-01 | Evento | Cuando se aprueba el pago de una línea digital, el sistema deberá conceder un acceso a la cuenta del comprador sin reservar stock ni pedir entrega. | RF22 |
 | BIB-02 | Evento | Cuando el cliente abre su biblioteca, el sistema deberá listar sus accesos con formato, fecha de compra y descargas usadas y restantes. | RF22 |
 | BIB-03 | Ubicuo | El sistema deberá permitir la descarga de un libro digital únicamente al titular de su acceso. | RF23, RNF14 |
-| BIB-04 | Evento | Cuando el titular de un acceso con descargas restantes pide descargar, el sistema deberá verificar su titularidad y su cupo y entregarle un enlace firmado que expire en un máximo de cinco minutos. | RF23, AC09 |
+| BIB-04 | Evento | Cuando el titular de un acceso con descargas restantes pide descargar, el sistema deberá verificar su titularidad y su cupo y entregarle un enlace firmado que expire en un máximo de cinco minutos. | RF23, AC04 |
 | BIB-05 | Ubicuo | El sistema deberá contabilizar una descarga en el momento de entregar el enlace firmado, aunque la descarga se interrumpa, y permitir reutilizar el mismo enlace dentro de su vigencia sin contar otra descarga. | RF23 |
-| BIB-06 | No deseado | Si el acceso ya alcanzó el máximo de cinco descargas, entonces el sistema deberá rechazar la solicitud explicando el límite y ofreciendo pedir ayuda. | RF23, AC09 |
-| BIB-07 | No deseado | Si quien pide descargar no es el titular del acceso, entonces el sistema deberá rechazar la solicitud y registrar el intento. | AC09, RNF14 |
+| BIB-06 | No deseado | Si el acceso ya alcanzó el máximo de cinco descargas, entonces el sistema deberá rechazar la solicitud explicando el límite y ofreciendo pedir ayuda. | RF23, AC04 |
+| BIB-07 | No deseado | Si quien pide descargar no es el titular del acceso, entonces el sistema deberá rechazar la solicitud y registrar el intento. | AC04, RNF14 |
 | BIB-08 | Evento | Cuando la administración central restituye descargas a un acceso, el sistema deberá sumarlas al cupo y registrar la acción en la auditoría con el motivo. | RF23, RNF08 |
 | BIB-09 | Estado | Mientras la licencia de una edición esté vencida o retirada de la venta, el sistema deberá mantener el acceso de quienes ya la compraron. | RF24 |
 | BIB-10 | Estado | Mientras un acceso esté revocado por un reembolso o una anulación, o suspendido por un reporte de archivo defectuoso, el sistema deberá impedir su descarga. | RF23 |
 | BIB-11 | Evento | Cuando se entrega un enlace de descarga, el sistema deberá registrar el usuario, la edición y la fecha. | RF23, RNF08 |
-| BIB-12 | Ubicuo | El sistema deberá mostrar la biblioteca de un cliente solo a ese cliente y al administrador central, y registrar en la auditoría cada consulta del administrador. | RNF05, NN15, AC11 |
+| BIB-12 | Ubicuo | El sistema deberá mostrar la biblioteca de un cliente solo a ese cliente y al administrador central, y registrar en la auditoría cada consulta del administrador. | RNF05, NN15, AC04 |
 | BIB-13 | No deseado | Si el archivo de una edición no está disponible en el almacén, entonces el sistema deberá informar el problema al cliente, no consumir una descarga y ofrecer reportarlo. | RF23 |
 | BIB-14 | Ubicuo | El sistema deberá entregar el archivo directamente desde el almacén al cliente, sin que la capa web lo reciba ni lo reenvíe. | RNF14 |
-| BIB-15 | No deseado | Si un cliente solicita más de 10 enlaces de descarga en una ventana deslizante de una hora, entonces el sistema deberá rechazar la solicitud sin consumir descargas y responder y registrar el evento según `transversal-seguridad` (SEG-07 y SEG-08). | RNF17, AC13 |
+| BIB-15 | No deseado | Si un cliente solicita más de 10 enlaces de descarga en una ventana deslizante de una hora, entonces el sistema deberá rechazar la solicitud sin consumir descargas y responder y registrar el evento según `transversal-seguridad` (SEG-07 y SEG-08). | RNF17, AC04 |
 | BIB-16 | Evento | Cuando el titular pide ayuda sobre un acceso, el sistema deberá registrar la solicitud para la administración con el acceso y el motivo. | RF23 |
-| BIB-17 | Ubicuo | El sistema deberá comprobar y contar el cupo de descargas de forma atómica ante solicitudes simultáneas del mismo acceso. | RF23, AC09 |
-| BIB-18 | No deseado | Si se usa un enlace de descarga cuya vigencia ya venció, entonces el sistema deberá no completar la descarga e invitar a pedir un enlace nuevo. | AC09, RNF14 |
+| BIB-17 | Ubicuo | El sistema deberá comprobar y contar el cupo de descargas de forma atómica ante solicitudes simultáneas del mismo acceso. | RF23, AC04 |
+| BIB-18 | No deseado | Si se usa un enlace de descarga cuya vigencia ya venció, entonces el sistema deberá no completar la descarga e invitar a pedir un enlace nuevo. | AC04, RNF14 |
 | BIB-19 | No deseado | Si se repite la aprobación del pago de una línea digital, entonces el sistema deberá no conceder un segundo acceso. | RF22, AC01 |
 | BIB-20 | Evento | Cuando un cliente vuelve a comprar un libro digital cuyo acceso fue revocado, el sistema deberá reactivar ese acceso y reiniciar su contador de descargas; si el acceso sigue vigente, deberá rechazar la compra repetida según `ecommerce-carrito-checkout`. | RF22 |
 | BIB-21 | Evento | Cuando la administración resuelve un reporte de archivo defectuoso, el sistema deberá reanudar el acceso si se rechaza el reporte, o dejarlo revocado si se aprueba el reembolso, y registrarlo en la auditoría. | RF23, RNF08 |

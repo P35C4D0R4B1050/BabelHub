@@ -5,7 +5,7 @@ estado: Approved
 servicio: E-commerce
 prefijo: REC
 origen: [RF25, NN15]
-calidad: [RNF07, RNF08, RNF17, AC13]
+calidad: [RNF07, RNF08, RNF17, AC04]
 depende: [identidad-seguridad, transversal-notificaciones, transversal-auditoria, transversal-seguridad]
 aprobado_por: Diego Amiquero
 aprobado_en: 2026-10-16
@@ -40,11 +40,11 @@ Que cualquier consumidor pueda registrar un reclamo o una queja desde la tienda,
 | REC-08 | Evento | Cuando la administración responde una hoja, el sistema deberá registrarlo en la auditoría. | RNF08 |
 | REC-09 | Ubicuo | El sistema deberá permitir a la administración central listar y filtrar las hojas por estado. | RF25 |
 | REC-10 | Ubicuo | El sistema deberá proteger los datos personales de las hojas y mostrarlos solo a la administración central y al consumidor que tenga una sesión con el correo verificado igual al correo de contacto de la hoja. | RNF07 |
-| REC-11 | No deseado | Si un mismo origen intenta registrar una cuarta hoja en una ventana deslizante de una hora, entonces el sistema deberá rechazarla y responder y registrar el exceso según `transversal-seguridad` (SEG-07 y SEG-08). | RNF17, AC13 |
+| REC-11 | No deseado | Si un mismo origen intenta registrar una cuarta hoja en una ventana deslizante de una hora, entonces el sistema deberá rechazarla y responder y registrar el exceso según `transversal-seguridad` (SEG-07 y SEG-08). | RNF17, AC04 |
 | REC-12 | Evento | Cuando la administración central descarta una hoja por ser spam, el sistema deberá marcarla como descartada, ocultarla del listado por defecto, conservarla sin eliminarla y registrarlo en la auditoría. | RF25, RNF08 |
 | REC-13 | No deseado | Si falla el envío del correo de respuesta, entonces el sistema deberá mantener la hoja como respondida con la respuesta guardada, marcar el aviso como pendiente y permitir a la administración reintentarlo. | RF25 |
 | REC-14 | Evento | Cuando un consumidor con una sesión de correo verificado consulta sus hojas, el sistema deberá listar las hojas cuyo correo de contacto coincide con el suyo, con su número, fecha, estado y respuesta. | RF25, RNF07 |
-| REC-15 | Evento | Cuando la administración central consulta los datos personales de una hoja, el sistema deberá registrarlo en la auditoría. | RNF08, AC11 |
+| REC-15 | Evento | Cuando la administración central consulta los datos personales de una hoja, el sistema deberá registrarlo en la auditoría. | RNF08, AC04 |
 | REC-16 | Ubicuo | El sistema deberá gestionar los estados pendiente, respondido y descartado de una hoja, permitir descartar solo una hoja pendiente y rechazar responder una hoja respondida o descartada, aunque dos respuestas lleguen a la vez. | RF25, AC01 |
 | REC-17 | Evento | Cuando una hoja cumple dos años desde su registro, el sistema deberá anonimizar sus datos personales y redactar los que haya en el detalle y la respuesta, conservar el resto de la hoja, y registrar el proceso en la auditoría. | RF25, RNF07, RNF08 |
 | REC-18 | Ubicuo | El sistema deberá permitir a quien registró una hoja sin sesión ver su constancia en el momento del registro, y no mostrarle los datos de otra hoja por su número. | RF25, RNF07 |

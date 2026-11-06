@@ -42,7 +42,7 @@ Roles y alcance por sucursal; datos sensibles; auditoría.
 
 ## 7. Pantallas
 
-Pantallas de `BabelHub.Web` (enlaza el prototipo `prototype/ui-v2/`) y estados que cubren.
+Pantallas de la interfaz web (enlaza el prototipo `prototype/ui-v2/`) y estados que cubren.
 
 ## 8. Estrategia de pruebas
 
