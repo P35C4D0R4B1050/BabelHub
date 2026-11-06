@@ -22,8 +22,5 @@
     <ProjectReference Include="..\..\..\src\BabelHub.Ecommerce\BabelHub.Ecommerce.Application\BabelHub.Ecommerce.Application.csproj" />
     <ProjectReference Include="..\..\..\src\BabelHub.Ecommerce\BabelHub.Ecommerce.Infrastructure\BabelHub.Ecommerce.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\src\BabelHub.Ecommerce\BabelHub.Ecommerce.Api\BabelHub.Ecommerce.Api.csproj" />
-    <ProjectReference Include="..\..\..\src\BabelHub.Identidad\BabelHub.Identidad.csproj" />
-    <ProjectReference Include="..\..\..\src\BabelHub.AsistenteCompra\BabelHub.AsistenteCompra.csproj" />
-    <ProjectReference Include="..\..\..\src\BabelHub.Web\BabelHub.Web.csproj" />
   </ItemGroup>
 </Project>

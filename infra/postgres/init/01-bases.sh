@@ -1,6 +1,7 @@
 #!/bin/sh
-# Crea una base y un rol por servicio con estado (AD03, AD18). Solo para desarrollo local:
-# en las VMs de Oracle lo hace el aprovisionamiento de VM-DATOS con las mismas reglas.
+# Crea una base y un rol por servicio (AD03): ecommerce e inventario. Solo para desarrollo local:
+# en VM-INVENTARIO lo hace el aprovisionamiento con las mismas reglas. Los esquemas por módulo y los roles
+# por esquema (incluido el de `identidad`) los crean las migraciones de cada servicio.
 # Cada rol solo puede conectarse a su propia base; las demás le niegan CONNECT.
 set -eu
 
@@ -15,4 +16,3 @@ EOSQL
 
 crear_base ecommerce "$POSTGRES_ECOMMERCE_PASSWORD"
 crear_base inventario "$POSTGRES_INVENTARIO_PASSWORD"
-crear_base identidad "$POSTGRES_IDENTIDAD_PASSWORD"

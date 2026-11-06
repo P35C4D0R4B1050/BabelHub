@@ -1,23 +1,24 @@
 namespace BabelHub.ArchitectureTests;
 
 /// <summary>
-/// Hace cumplir las reglas 1, 2, 5, 6 y 9 de AGENTS.md sobre las referencias entre proyectos.
-/// Un servicio se identifica por su nombre: BabelHub.&lt;Servicio&gt;.&lt;Capa&gt; o BabelHub.&lt;Servicio&gt;.
+/// Hace cumplir las reglas 1, 2, 5 y 6 de AGENTS.md sobre las referencias entre proyectos.
+/// Hay dos servicios, cada uno con cuatro capas: BabelHub.&lt;Servicio&gt;.&lt;Capa&gt;. Los módulos son carpetas
+/// dentro de las capas y no son proyectos aparte (regla 13: ver <see cref="ReglasDeModulosTests"/>).
 /// </summary>
 public class ReglasDeReferenciasTests
 {
     private const string Shared = "BabelHub.Shared";
 
-    private static readonly string[] ServiciosCompletos = ["BabelHub.Inventario", "BabelHub.Ecommerce"];
+    private static readonly string[] Servicios = ["BabelHub.Inventario", "BabelHub.Ecommerce"];
 
-    public static TheoryData<string> Servicios => new(ServiciosCompletos);
+    public static TheoryData<string> NombresDeServicios => new(Servicios);
 
     [Fact]
     public void Existen_todos_los_proyectos_esperados()
     {
         var nombres = Proyectos.DeSrc.Select(p => p.Nombre).ToHashSet();
-        var esperados = new List<string> { Shared, "BabelHub.Web", "BabelHub.Identidad", "BabelHub.AsistenteCompra" };
-        foreach (var s in ServiciosCompletos)
+        var esperados = new List<string> { Shared };
+        foreach (var s in Servicios)
         {
             foreach (var capa in new[] { "Domain", "Application", "Infrastructure", "Api" })
             {
@@ -31,8 +32,19 @@ public class ReglasDeReferenciasTests
         }
     }
 
+    [Fact]
+    public void Solo_existen_los_dos_servicios_y_shared()
+    {
+        // Identidad, Asistente y la interfaz web son módulos del E-commerce, no proyectos aparte (AD02, AD15).
+        var ajenos = Proyectos.DeSrc
+            .Select(p => p.Nombre)
+            .Where(n => n != Shared && !Servicios.Any(s => n.StartsWith(s + ".", StringComparison.Ordinal)))
+            .ToList();
+        Assert.True(ajenos.Count == 0, $"Hay proyectos fuera de los dos servicios: {string.Join(", ", ajenos)}.");
+    }
+
     [Theory]
-    [MemberData(nameof(Servicios))]
+    [MemberData(nameof(NombresDeServicios))]
     public void El_dominio_no_referencia_ningun_proyecto_ni_paquete(string servicio)
     {
         var dominio = Obtener($"{servicio}.Domain");
@@ -41,7 +53,7 @@ public class ReglasDeReferenciasTests
     }
 
     [Theory]
-    [MemberData(nameof(Servicios))]
+    [MemberData(nameof(NombresDeServicios))]
     public void La_aplicacion_solo_referencia_al_dominio(string servicio)
     {
         var aplicacion = Obtener($"{servicio}.Application");
@@ -50,7 +62,7 @@ public class ReglasDeReferenciasTests
     }
 
     [Theory]
-    [MemberData(nameof(Servicios))]
+    [MemberData(nameof(NombresDeServicios))]
     public void La_infraestructura_solo_referencia_aplicacion_dominio_y_shared(string servicio)
     {
         var permitidas = new HashSet<string> { $"{servicio}.Application", $"{servicio}.Domain", Shared };
@@ -62,8 +74,8 @@ public class ReglasDeReferenciasTests
     }
 
     [Theory]
-    [MemberData(nameof(Servicios))]
-    public void La_api_solo_referencia_su_servicio_y_shared(string servicio)
+    [MemberData(nameof(NombresDeServicios))]
+    public void La_presentacion_solo_referencia_su_servicio_y_shared(string servicio)
     {
         var permitidas = new HashSet<string> { $"{servicio}.Application", $"{servicio}.Domain", $"{servicio}.Infrastructure", Shared };
         var api = Obtener($"{servicio}.Api");
@@ -101,24 +113,10 @@ public class ReglasDeReferenciasTests
         }
     }
 
-    [Fact]
-    public void La_web_solo_referencia_shared()
-    {
-        Assert.Equal([Shared], Obtener("BabelHub.Web").ProyectosReferenciados.ToArray());
-    }
-
-    [Theory]
-    [InlineData("BabelHub.Identidad")]
-    [InlineData("BabelHub.AsistenteCompra")]
-    public void Los_servicios_reducidos_solo_referencian_shared(string servicio)
-    {
-        Assert.Equal([Shared], Obtener(servicio).ProyectosReferenciados.ToArray());
-    }
-
     private static Proyecto Obtener(string nombre) =>
         Proyectos.DeSrc.Single(p => p.Nombre == nombre);
 
-    /// <summary>BabelHub.Inventario.Domain → BabelHub.Inventario; BabelHub.Web → BabelHub.Web.</summary>
+    /// <summary>BabelHub.Inventario.Domain → BabelHub.Inventario.</summary>
     private static string ServicioDe(string proyecto)
     {
         var partes = proyecto.Split('.');

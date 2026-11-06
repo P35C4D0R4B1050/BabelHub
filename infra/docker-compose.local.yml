@@ -9,15 +9,14 @@ name: babelhub
 
 services:
   postgres:
-    # Una instancia con una base y un rol por servicio: ecommerce, inventario e identidad (AD03, AD18).
-    # Igual que en VM-DATOS; `infra/postgres/init/` crea las bases la primera vez que arranca el volumen.
+    # Una instancia con una base y un rol por servicio: ecommerce e inventario (AD03). Identidad es un esquema de ecommerce (AD18).
+    # Igual que en VM-INVENTARIO; `infra/postgres/init/` crea las bases la primera vez que arranca el volumen.
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_ADMIN_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Define POSTGRES_ADMIN_PASSWORD en .env}
       POSTGRES_ECOMMERCE_PASSWORD: ${POSTGRES_ECOMMERCE_PASSWORD:?Define POSTGRES_ECOMMERCE_PASSWORD en .env}
       POSTGRES_INVENTARIO_PASSWORD: ${POSTGRES_INVENTARIO_PASSWORD:?Define POSTGRES_INVENTARIO_PASSWORD en .env}
-      POSTGRES_IDENTIDAD_PASSWORD: ${POSTGRES_IDENTIDAD_PASSWORD:?Define POSTGRES_IDENTIDAD_PASSWORD en .env}
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
