@@ -2,13 +2,34 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
-## 2026-11-06 — Auditoría del estilo basado en servicios y del despliegue
+## 2026-11-06 — Reformulación a dos servicios y seis atributos de calidad
+
+Informe en `progress/R5-reformulacion-a-dos-servicios.md`.
+
+### Arquitectura y documentación
+- **Dos servicios**, cada uno un monolito modular en cuatro capas: E-commerce (11 módulos, con la interfaz web, Identidad y Asistente) e Inventario (4 módulos). Una base por servicio con esquema por módulo y rol por esquema (AD01, AD02, AD03, AD15, AD18).
+- **Despliegue gratuito de cuatro VMs en una cuenta** (AD11): borde y salto en AMD micro; ventas e inventario con la base en ARM. Réplica de gestión, segundo conector de cloudflared, caché en la VM de ventas, defensa en profundidad con RLS y WAL fuera de Oracle (AD27, AD31). Límites de uso en cuatro niveles (AD24).
+- **Atributos de calidad de 14 a 6** (AC01 a AC06), con prueba y medida por atributo.
+- Reescritos: estilo (con alineación y relación con SOA y ESB), despliegue, presupuesto de recursos y tácticas. Revisados: decisiones (nueva AD31), drivers, C4 niveles 2 y 3, Clean Architecture, módulos y contratos, modelo de datos, seguridad, análisis, UX, proceso, glosario, `AGENTS.md` (regla 13), README y CLAUDE.md.
+
+### Specs
+- Seis specs vuelven a `Draft` (B10) y se **revisaron y corrigieron el mismo día** (sin preguntas abiertas): `inventario-ajustes`, `inventario-fuentes`, `ecommerce-catalogo`, `identidad-seguridad`, `asistente-compra-ia` y `transversal-seguridad`. Nuevos requisitos: ingreso de mercadería en la fuente de recepción (AJU-19, AJU-20), fuente de recepción y unidades vendidas (FUE-19 a FUE-22), stock inicial, ingreso desde el catálogo y agotado sin baja (CAT-20 a CAT-23), límite de concurrencia del asistente (ASI-20), presupuestos del personal y verificación humana (SEG-30, SEG-31). Hallazgos en `progress/R5-reformulacion-a-dos-servicios.md` §3.1. Las demás solo cambian los identificadores de atributos.
+
+### Código, pruebas e infraestructura
+- Se unieron al E-commerce los proyectos de Identidad, Asistente y Web (solo andamiaje); módulos como carpetas por capa; nuevas pruebas de módulos (regla 13). `dotnet build -warnaserror` y todas las pruebas correctas.
+- Compose local con dos bases; Nginx por host con límites; prototipo con stock único, ingreso en el Catálogo, Vendidos y descuento al pasar a en reparto.
+
+### Bloqueos
+- Cerrados: segunda cuenta (C06), red entre cuentas (C07) y reformulación (C08). Nuevos B10 (reaprobación de specs) y B11 (rendimiento de la entrada).
+
+## 2026-11-06 — Auditoría del estilo basado en servicios y del despliegue (reemplazada por la reformulación posterior)
 
 ### Documentación
-- Informe `progress/R4-auditoria-del-estilo-y-despliegue.md` (16 hallazgos, H1 a H16).
+- Informe `progress/R4-auditoria-del-estilo-y-despliegue.md` (17 hallazgos, H1 a H17).
 - `03-estilo-arquitectonico.md` §7: alineación punto por punto con el estilo basado en servicios, desviaciones conscientes y criterios de revisión.
 - `05-despliegue.md` reescrito: cupo de Oracle por cuenta y PAYG, unidad de despliegue frente a host, **perfil objetivo de cuatro VMs ARM** (VM-BORDE, VM-VENTAS, VM-INVENTARIO y VM-DATOS) y **perfil mínimo** de dos, red entre VMs, una instancia de PostgreSQL con una base por servicio, reglas de red y matriz de fallos. Presupuesto de recursos por VM.
 - Decisiones revisadas: AD02, AD03, AD10, AD11, AD12, AD14, AD16 y AD18. Requisitos RC07 y RNF12; drivers y riesgos; tácticas; amenazas (AM24 y fronteras de confianza); operación segura; modelo de datos (bases `ecommerce`, `inventario` e `identidad`); C4 nivel 2 y 3; convenciones; README.
+- Base mínima `asistente` (registro de eventos de seguridad) añadida a los documentos y al Compose local (H17). Alcance académico de los libros digitales explícito en AD19/AD20: subida directa de EPUB y PDF al almacén de objetos.
 - Culqi confirmada como pasarela (C05). B01 cerrado (specs aprobadas). Nuevos B10 (segunda cuenta de Oracle) y B11 (red entre VMs).
 
 ### Infraestructura local

@@ -1,5 +1,7 @@
 # R4. Auditoría del estilo basado en servicios y del despliegue
 
+> **Nota (2026-11-06, posterior):** las decisiones de despliegue de este informe (cuatro VMs en dos cuentas, base `asistente`) fueron reemplazadas por [R5](R5-reformulacion-a-dos-servicios.md). Se conservan los hallazgos de estilo y de red como historial.
+
 **Fecha:** 2026-11-06. **Alcance:** `docs/02-arquitectura-de-software`, `docs/04-modelo-c4`, `docs/05-seguridad` (red y datos), requisitos de infraestructura (RC07, RNF12) y archivos de `infra/`. Las specs no se tocaron: ninguna menciona máquinas, esquemas de datos ni componentes de infraestructura, por lo que siguen **Approved**.
 
 ## 1. Motivo
@@ -35,6 +37,7 @@ El estilo declarado, **basado en servicios de grano grueso**, es el correcto par
 | H14 | Secretos: cada VM debía recibir solo los suyos; antes todos vivían en una VM. | Baja | Regla de mínimo privilegio por VM (Culqi solo en VM-VENTAS; clave de firma solo en VM-BORDE). |
 | H15 | Los registros quedan repartidos en cuatro VMs. | Baja | `traceId` como clave de correlación; sin agregación central (fuera de alcance); consulta por SSH desde VM-AUX. |
 | H16 | El Compose local tenía dos instancias de PostgreSQL y no reflejaba AD03. | Baja | `infra/docker-compose.local.yml` con una instancia y `infra/postgres/init/01-bases.sh`; `.env.example` actualizado. |
+| H17 | **El Asistente no tenía dónde guardar sus eventos de seguridad.** La documentación decía que no tiene base, pero ASI-05 exige registrar el intento como evento de seguridad y AUD-10 y AUD-11 piden conservarlo dos años, como en los demás servicios. | Media | Base mínima `asistente` con la tabla `auditoria` (y, si el plan lo decide, `eventos_limite`); sin consultas ni respuestas (ASI-18). Añadida a los documentos y al Compose local. |
 
 ## 4. Respuestas a las preguntas
 
@@ -43,7 +46,7 @@ El estilo declarado, **basado en servicios de grano grueso**, es el correcto par
 3. **Documentación del estilo.** Ver §2.
 4. **Culqi.** Confirmada (AD17; C05).
 5. **Una instancia con varias bases.** Sí, con una base y un rol por servicio. Ver H3 y `05-despliegue.md` §5.2. Se mantiene el aislamiento de seguridad porque la VM de datos sigue sin acceso desde Internet.
-6. **Otras brechas.** H5 a H16.
+6. **Otras brechas.** H5 a H17.
 
 ## 5. Pendiente (no es de documentación)
 
