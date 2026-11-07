@@ -2,7 +2,7 @@
 
 Los atributos de calidad expresan **cómo** debe comportarse el sistema y se describen con escenarios (estímulo → respuesta → medida). Provienen de los requisitos no funcionales de [requisitos](02-requisitos.md) y se priorizan según el problema central: *mostrar siempre stock real*.
 
-Son **seis**. Cada uno agrupa varios requisitos no funcionales (RNF) con su medida, y cada medida se comprueba con una prueba concreta (ver §3). La versión anterior tenía catorce; se redujo para que cada atributo sea medible y verificable sin repetir pruebas (ver §5).
+Cada uno se desarrolla con escenarios completos (fuente, estímulo, entorno, artefacto, respuesta y medida) en [escenarios de calidad](08-escenarios-de-calidad.md). Son **seis**. Cada uno agrupa varios requisitos no funcionales (RNF) con su medida, y cada medida se comprueba con una prueba concreta (ver §3). La versión anterior tenía catorce; se redujo para que cada atributo sea medible y verificable sin repetir pruebas (ver §5).
 
 ## 1. Atributos y escenarios
 
