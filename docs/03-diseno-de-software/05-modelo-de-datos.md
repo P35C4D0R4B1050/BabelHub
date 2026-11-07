@@ -65,7 +65,7 @@ Esquemas: `catalogo`, `carrito`, `pagos`, `pedidos`, `envios`, `devoluciones`, `
 | `hojas_reclamacion` | id, numero, tipo, detalle, datos_consumidor (nombre, documento, domicilio, correo), monto_reclamado, pedido_id, estado, respuesta, aviso_estado | `numero` único; sin borrado; estado en (pendiente, respondido, descartada); `aviso_estado` en (pendiente, enviado). |
 | `avisos` | id, evento_id, destinatario, estado, intentos, proximo_intento | Único (evento_id, destinatario) para no duplicar (NOT-05). |
 | `sesiones_web` | id opaco, usuario_id, rol, sucursal_id, ultima_actividad, expira_absoluta, host | Esquema `web`. Sesión del servidor con cookie opaca (WEB-04, WEB-27); compartida por la réplica de gestión; se purga al vencer. |
-| `auditoria` | como en Inventario | Solo inserción. |
+| `auditoria` | como en Inventario | Solo inserción; la comparten los módulos del E-commerce salvo Identidad, que tiene la suya en su esquema aislado. |
 
 ## 4. Identidad (esquema `identidad` de la base `ecommerce`)
 
@@ -83,11 +83,11 @@ Esquemas: `catalogo`, `carrito`, `pagos`, `pedidos`, `envios`, `devoluciones`, `
 | `aceptaciones` | usuario_id o pedido_id, texto (términos, privacidad, reembolso, mayoría de edad), version, fecha | Solo inserción; una fila por texto aceptado en el registro (IDE-34) o en el checkout (CAR-22). |
 | `solicitudes_arco` | id, usuario_id, tipo, estado, respuesta, fecha, fecha_limite | Estados: recibida, en atención, atendida, rechazada. `fecha_limite` = 20 días hábiles (acceso) o 10 (resto). |
 | `eventos_ingreso` | clave (cuenta+origen), instante | Un registro por ingreso fallido (SEG-06); cuenta también para cuentas inexistentes; ventana deslizante. |
-| `auditoria` | como en Inventario | Solo inserción. |
+| `auditoria` | como en Inventario | Solo inserción; propia de Identidad por el aislamiento del esquema. La interfaz web la presenta junto con la del resto del E-commerce y la del Inventario (AUD-09). |
 
 ## 4.1 Asistente (sin tablas propias)
 
-El Asistente no tiene datos de negocio (los obtiene de los contratos de otros módulos y del Inventario, ASI-06) y **no guarda el texto de las consultas ni las respuestas** (ASI-18). Sus eventos de seguridad (acceso denegado, límite excedido) se guardan en la auditoría única del E-commerce; el contador de límites de ASI-09 vive en Redis (o, si el plan lo decide, en una tabla `eventos_limite` como la de Inventario).
+El Asistente no tiene datos de negocio (los obtiene de los contratos de otros módulos y del Inventario, ASI-06) y **no guarda el texto de las consultas ni las respuestas** (ASI-18). Sus eventos de seguridad (acceso denegado, límite excedido) se guardan en la auditoría del E-commerce; el contador de límites de ASI-09 vive en Redis (o, si el plan lo decide, en una tabla `eventos_limite` como la de Inventario).
 
 ## 5. Índices y rendimiento
 

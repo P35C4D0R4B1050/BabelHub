@@ -77,4 +77,39 @@
 
 ## 6. No verificado
 
-Docker (Compose y script de arranque), Nginx, cifras de Oracle y de proveedores, pruebas de concurrencia (aún no hay código de dominio), y lectura completa de `02-controles-asvs.md`, `08-mapeo-a-estandares.md` y de `docs/06-experiencia-de-usuario/04` a `09`.
+Cifras de Oracle y de proveedores (solo fuentes secundarias), pruebas de concurrencia (aún no hay código de dominio), y lectura completa de `02-controles-asvs.md`, `08-mapeo-a-estandares.md` y de `docs/06-experiencia-de-usuario/04` a `09`. Docker y Nginx se verificaron después (§7).
+
+## 7. Estado de cobertura (2026-11-06, misma fecha)
+
+Se abordaron los 18 hallazgos. Estado de cada uno:
+
+| ID | Estado | Qué se hizo |
+| :---: | :--- | :--- |
+| H01 | **Hecho; falta aprobación** | `transversal-auditoria` reescrita para dos servicios (AUD-09, 13, 17 y 18; AC-AUD-15 y 16; reglas y pregunta) y **devuelta a `Draft`**. Reaprobación: B12. |
+| H02 | Hecho | RF10 (stock inicial), RF12 (fuente de recepción y unidades vendidas) y RF17 (ingreso de mercadería) ampliados. |
+| H03 | Hecho | Modelo de dominio: fuente de recepción, `Ingreso`, `UnidadesVendidas` e invariantes 10 a 12; diagrama renderizado. |
+| H04 | Hecho | Fases de `01-flujo-sdd.md` y orden de `specs/README.md` rehechos (ver H19). |
+| H05 | Hecho | Skills `arch-review`, `dotnet-feature`, `ui-review`, `ui-screen`, `spec-plan`, `spec-tasks`, `spec-implement`, agente `arch-reviewer` y plantilla de spec. |
+| H06 | Hecho | Columna «Decisiones» de los drivers completada; el script ya no encuentra vínculos sin inverso. |
+| H07 | **Hecho; falta aprobación** | Nueva spec `transversal-plataforma` (PLA-01 a PLA-14, 14 criterios) en `Draft`; RNF19, RNF24 y RNF28 apuntan a ella; `SpecCheck` sin avisos. Aprobación: B12. |
+| H08 | Parcial | Recomendaciones y cifras con su fecha en B02 (R2), B06 (opciones) y B08 (Resend como opción simple). **La decisión es de la persona responsable.** |
+| H09 | Hecho | Dos bases de negocio y la técnica `evolution` (docs, presupuesto y comentario del script). |
+| H10 | Hecho | VM-INVENTARIO marcada como la más justa, con el orden de recorte. La medición sigue en B11. |
+| H11 | Hecho | `set_real_ip_from` solo para el conector local y la red privada; puerto no publicado; regla en operación segura. |
+| H12 | Hecho en lo local | Con Docker: `docker compose config`, arranque de PostgreSQL y Redis, las dos bases y roles creados, `inventario` **no puede conectarse** a `ecommerce` y `nginx -t` correcto. Falta lo que aún no existe: `n8n`, Evolution API, cloudflared e imágenes de los servicios. |
+| H13 | Parcial | Pruebas de sensibilidad (`PruebasDeSensibilidadTests`): la regla 13 detecta el uso del `Interno` de otro módulo y acepta el contrato público; la regla de capas detecta `HttpClient` en la Aplicación (26 pruebas de arquitectura). **Pendiente de la persona responsable:** la redacción de `AGENTS.md` §3 («la prueba de arquitectura hace cumplir… 9»); propuesta: «hace cumplir 1, 2, 5, 6 y 13, y la parte de la 9 que se ve en referencias; que el JWT no llegue al navegador y que el Inventario se llame solo desde el servidor se verifica con pruebas de integración y E2E». |
+| H14 | Hecho | WEB-26, AC-WEB-21 y AC-WEB-26 con «interfaz web», «Inventario» y «módulo del E-commerce» (solo redacción, sin cambio de comportamiento). |
+| H15 | Hecho | Nombres de trabajo (`<dominio>` y `gestion.<dominio>`) en el despliegue. B04 sigue abierto. |
+| H16 | Hecho | `BabelHub_Exposicion.pptx` (diapositivas 1, 4 a 10 y 13 a 15) y el resumen local actualizados en una sesión aparte; sin cifras viejas y sin desbordes en las 16 diapositivas. **Canva queda descartado** por decisión del responsable. |
+| H17 | Parcial | Fecha y cifras de R2 y Object Storage en el despliegue y en B02; la confirmación en la consola y en las páginas oficiales se hace al crear las cuentas. |
+| H18 | Hecho | Nueva sección «Limitaciones declaradas» (despliegue §6.1). |
+
+**Hallazgos nuevos al corregir:**
+
+| ID | Hallazgo | Estado |
+| :---: | :--- | :--- |
+| H19 | El orden de implementación contradecía las dependencias: el Inventario depende de Identidad (valida credenciales), `web-base` de varias features y `ecommerce-pedidos` de `ecommerce-biblioteca-digital`. | Hecho: orden calculado a partir del encabezado de cada spec (sin ciclos) en `specs/README.md` y en las fases del flujo SDD; `web-base` se construye de forma incremental. |
+| H20 | El índice de `specs/README.md` tenía servicios («Identidad», «Asistente», «Web») y dependencias distintos de los encabezados de las specs. | Hecho: tabla regenerada desde los encabezados. |
+| H21 | El modelo de datos hablaba de una «auditoría única del E-commerce» y a la vez daba a Identidad su propia tabla. | Hecho: aclarado (una tabla para los módulos del E-commerce salvo Identidad, que tiene la suya; la interfaz web las presenta juntas). |
+
+**Resultado de la verificación:** `SpecCheck` sin errores ni avisos (20 specs: 18 `Approved` y 2 `Draft`), `dotnet build -warnaserror` y las pruebas correctas, diagramas Mermaid del modelo de dominio renderizados.

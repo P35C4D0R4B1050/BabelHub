@@ -68,7 +68,7 @@ babelhub/
 ├── .github/workflows/ci.yml
 ├── .claude/               skills/ (12), agents/ (3), settings.json, launch.json
 ├── docs/                  7 carpetas temáticas (01-analisis-de-sistema a 07-proceso-de-desarrollo) y glossary.md
-├── specs/                 README.md, speccheck.json, TRACEABILITY.md, _template/ y 19 features
+├── specs/                 README.md, speccheck.json, TRACEABILITY.md, _template/ y 20 features
 ├── progress/              CHANGELOG.md, blockers.md, log/
 ├── src/                   Inventario y Ecommerce (4 proyectos cada uno, monolitos modulares) y Shared
 ├── tests/                 unit/, integration/, architecture/, e2e/ (Playwright) y load/ (k6)
@@ -118,13 +118,13 @@ Para Playwright (E2E) y k6 (carga) se usará su documentación oficial al implem
 
 | Fase | Contenido | Entregable verificable | Estado |
 | :---: | :--- | :--- | :--- |
-| 0 | Marco SDD: `AGENTS.md`, `CLAUDE.md`, plantillas, 19 specs en borrador, `SpecCheck`, skills y agentes, CI, glosario, bitácoras. | `SpecCheck` pasa; las skills existen. | **Hecha** |
+| 0 | Marco SDD: `AGENTS.md`, `CLAUDE.md`, plantillas, 20 specs (19 de negocio y la de plataforma), `SpecCheck`, skills y agentes, CI, glosario, bitácoras. | `SpecCheck` pasa; las skills existen. | **Hecha** |
 | 1 | Esqueleto técnico: solución, proyectos por servicio, prueba de arquitectura, infraestructura local. | `dotnet build -warnaserror` y `dotnet test` en verde; Compose válido. | **Hecha** |
-| 2 | Revisión y aprobación de las specs, en el orden de `specs/README.md`, con `spec-clarify` y `spec-auditor`. Resolver los bloqueos B02, B05 y B06 antes de planificar las specs que dependen de ellos. | Specs `Approved` con cero preguntas abiertas. | **Siguiente** |
-| 3 | Inventario: `transversal-auditoria`, `inventario-fuentes`, `inventario-seleccion-fuente`, `inventario-ajustes`, `inventario-traslados`. | Pruebas de concurrencia sin sobreventa (AC01). | Pendiente |
-| 4 | `identidad-seguridad`, `transversal-notificaciones`, `web-base`. | Alcance por sucursal en funcionamiento; avisos con notificador simulado; shell de la Web. | Pendiente |
-| 5 | `ecommerce-catalogo`, `ecommerce-carrito-checkout`, `ecommerce-pagos` (con pasarela de pruebas), `ecommerce-pedidos`. | Compra de punta a punta contra el Inventario. | Pendiente |
-| 6 | `ecommerce-biblioteca-digital`, `ecommerce-envios`, `ecommerce-devoluciones`, `ecommerce-libro-reclamaciones`. | Ciclo digital, de entrega, de retorno y legal. | Pendiente |
+| 2 | Revisión y aprobación de las specs (hecha el 2026-10-16 y, para seis de ellas, el 2026-11-06) y reaprobación de `transversal-auditoria` tras la auditoría R6. Después, planes y tareas (`spec-plan`, `spec-tasks`) de cada fase antes de implementarla. Resolver los bloqueos B02, B05, B06 y B08 antes de planificar las specs que dependen de ellos. | Specs `Approved` con cero preguntas abiertas; plan y tareas aprobados de la fase que empieza. | **Siguiente** |
+| 3 | `transversal-auditoria`, `transversal-seguridad`, `identidad-seguridad`, `transversal-notificaciones` y la estructura de `web-base` (diseño, sesión, estados). Identidad va antes del Inventario porque este valida sus credenciales; hasta entonces las pruebas del Inventario usan un usuario actual de prueba (puerto). | Alcance por sucursal en funcionamiento; avisos con notificador simulado; estructura de la web. | Pendiente |
+| 4 | Inventario: `inventario-fuentes`, `inventario-seleccion-fuente`, `inventario-ajustes`, `inventario-traslados`. | Pruebas de concurrencia sin sobreventa (AC01). | Pendiente |
+| 5 | `ecommerce-catalogo`, `ecommerce-carrito-checkout`, `ecommerce-pagos` (con pasarela de pruebas), `ecommerce-biblioteca-digital` y `ecommerce-pedidos` (los pedidos incluyen líneas digitales). | Compra de punta a punta contra el Inventario, impresa y digital. | Pendiente |
+| 6 | `ecommerce-envios`, `ecommerce-devoluciones`, `ecommerce-libro-reclamaciones`; cierre de las pantallas de `web-base`. | Ciclo de entrega, de retorno y legal. | Pendiente |
 | 7 | `asistente-compra-ia` y `web-indice-infinito` (opcional). | Asistente fundamentado en datos reales. | Pendiente |
 | 8 | Despliegue: Dockerfiles, `docker-compose.oracle.yml`, Nginx, Cloudflare, E2E con Playwright y carga con k6. | Criterios de aceptación y metas de rendimiento verificados. | Pendiente |
 

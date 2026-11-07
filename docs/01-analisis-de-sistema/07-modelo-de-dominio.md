@@ -1,6 +1,6 @@
 # Modelo de dominio
 
-Describe las entidades del negocio, sus relaciones y sus invariantes, con el lenguaje del [glosario](../glossary.md). No es el modelo de datos: la estructura de tablas se define en el [diseño](../03-diseno-de-software/). Se agrupa por contexto, es decir, por el servicio que es dueño de cada concepto.
+Describe las entidades del negocio, sus relaciones y sus invariantes, con el lenguaje del [glosario](../glossary.md). No es el modelo de datos: la estructura de tablas se define en el [diseño](../03-diseno-de-software/). Se agrupa por contexto, es decir, por el módulo o servicio que es dueño de cada concepto (Identidad es un módulo del E-commerce con su propio esquema aislado).
 
 ## 1. Contextos y fronteras
 
@@ -37,6 +37,7 @@ class Fuente {
   Region
   Contacto de notificacion
   Activa
+  Es fuente de recepcion (exactamente una; Lima por defecto)
 }
 class StockPorEdicion {
   Fisico
@@ -60,8 +61,18 @@ class Ruta {
   Plazo en dias
 }
 class Ajuste {
-  Motivo: merma, danado, correccion de conteo, ingreso inicial (solo administracion), devolucion
+  Motivo: merma, danado, correccion de conteo, ingreso de mercaderia (solo administracion), devolucion
   Responsable
+}
+class Ingreso {
+  Cantidad (1 a 5 000)
+  Referencia de la guia o factura (opcional)
+  Nota
+  Usuario y fecha
+}
+class UnidadesVendidas {
+  Ultimos 30 dias
+  Derivada, no almacenada como stock
 }
 Fuente "1" --> "*" StockPorEdicion
 StockPorEdicion "1" --> "*" Reserva
@@ -69,6 +80,8 @@ Fuente "1" --> "*" Traslado : origen
 Fuente "1" --> "*" Traslado : destino
 Fuente "1" --> "*" Ruta : origen
 StockPorEdicion "1" --> "*" Ajuste
+Ajuste "1" --> "0..1" Ingreso : motivo ingreso
+Fuente "1" --> "*" UnidadesVendidas : atribuida
 ```
 
 **Invariantes**
@@ -82,7 +95,9 @@ StockPorEdicion "1" --> "*" Ajuste
 7. Un libro digital nunca tiene stock, reserva ni traslado.
 8. Un traslado vinculado a un pedido mueve su reserva con las unidades: se consume en el origen al despachar y se recrea en el destino al recibir, en la misma transacción. Un pedido de recojo que supera 15 días en listo para recojo pasa a no recogido, libera sus reservas y ya no puede entregarse: solo se anula con reembolso.
 9. Una reserva pendiente vencida no cuenta como activa aunque el trabajo de fondo no la haya procesado; si dos operaciones compiten por una misma reserva, gana la primera que confirma y la otra se rechaza por estado inválido.
-10. El stock inicial entra con el motivo ingreso inicial, que solo registra la administración central.
+10. La mercadería nueva entra solo en la fuente de recepción, con el motivo ingreso de mercadería, que solo registra la administración central (AJU-19). El stock inicial de una edición nueva es su primer ingreso; las demás sucursales reciben stock por traslado o devolución. Un título sin stock en toda la red figura como agotado y no se da de baja (CAT-21).
+11. Hay exactamente una fuente de recepción y solo la administración central la cambia, con auditoría (FUE-19, FUE-20).
+12. Cada unidad vendida se atribuye a una sola fuente: la que despacha el pedido a domicilio o la sucursal que lo entrega en recojo, aunque la mercadería haya llegado por traslado; un traslado de reposición no es una venta (FUE-22). Las unidades vendidas cuentan los pedidos pagados de los últimos 30 días, sin anulaciones ni devoluciones (FUE-21).
 
 ## 3. E-commerce
 

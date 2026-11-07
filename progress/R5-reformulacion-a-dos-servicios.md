@@ -81,4 +81,4 @@ Resultado: sin preguntas abiertas y `SpecCheck` sin errores. **Aprobadas por la 
 
 - Planes y tareas de las 19 specs (`spec-plan` y `spec-tasks`).
 - Medir la VM-BORDE y la latencia entre VMs (B11).
-- Actualizar la presentación, el diseño de Canva y el resumen local, que muestran la arquitectura anterior.
+- Actualizar la presentación y el resumen local (hecho en R6, H16). El diseño de Canva se descartó por decisión del responsable.

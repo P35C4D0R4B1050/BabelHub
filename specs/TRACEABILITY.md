@@ -54,8 +54,9 @@
 | inventario-fuentes | Inventario | Approved | 22 | 18 | identidad-seguridad, transversal-auditoria |
 | inventario-seleccion-fuente | Inventario | Approved | 32 | 34 | inventario-fuentes, identidad-seguridad, transversal-auditoria, transversal-seguridad |
 | inventario-traslados | Inventario | Approved | 23 | 24 | inventario-fuentes, inventario-seleccion-fuente, identidad-seguridad, transversal-auditoria, transversal-notificaciones |
-| transversal-auditoria | Transversal | Approved | 22 | 19 | — |
+| transversal-auditoria | Transversal | Draft | 22 | 19 | — |
 | transversal-notificaciones | Transversal | Approved | 13 | 13 | identidad-seguridad, transversal-seguridad |
+| transversal-plataforma | Transversal | Draft | 14 | 14 | — |
 | transversal-seguridad | Transversal | Approved | 31 | 28 | transversal-auditoria |
 | web-base | E-commerce | Approved | 35 | 29 | identidad-seguridad, ecommerce-libro-reclamaciones, ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-biblioteca-digital, transversal-auditoria, transversal-seguridad |
 | web-indice-infinito | E-commerce | Approved | 9 | 7 | web-base, transversal-seguridad |

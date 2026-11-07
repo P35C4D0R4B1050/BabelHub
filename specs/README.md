@@ -38,32 +38,35 @@ dotnet run --project tools/SpecCheck -- --write-matrix  # regenera TRACEABILITY.
 | Spec | Servicio | Prefijo | Depende de |
 | :--- | :--- | :---: | :--- |
 | `transversal-auditoria` | Transversal | AUD | — |
-| `transversal-seguridad` | Transversal | SEG | auditoría |
-| `inventario-fuentes` | Inventario | FUE | auditoría |
-| `inventario-seleccion-fuente` | Inventario | SEL | fuentes, auditoría |
-| `inventario-ajustes` | Inventario | AJU | fuentes, auditoría |
-| `inventario-traslados` | Inventario | TRA | fuentes, selección de fuente, auditoría, notificaciones |
-| `identidad-seguridad` | Identidad | IDE | auditoría |
-| `transversal-notificaciones` | Transversal | NOT | identidad |
-| `ecommerce-catalogo` | E-commerce | CAT | fuentes, auditoría |
-| `ecommerce-carrito-checkout` | E-commerce | CAR | catálogo, selección de fuente |
-| `ecommerce-pagos` | E-commerce | PAG | carrito y checkout, selección de fuente, auditoría |
-| `ecommerce-pedidos` | E-commerce | PED | pagos, selección de fuente, notificaciones, auditoría |
-| `ecommerce-biblioteca-digital` | E-commerce | BIB | catálogo, pagos, auditoría |
-| `ecommerce-envios` | E-commerce | ENV | pedidos, notificaciones |
-| `ecommerce-devoluciones` | E-commerce | DEV | pedidos, pagos, biblioteca digital, ajustes |
-| `ecommerce-libro-reclamaciones` | E-commerce | REC | auditoría, notificaciones |
-| `asistente-compra-ia` | Asistente | ASI | catálogo, pedidos, identidad |
-| `web-base` | Web | WEB | identidad, libro de reclamaciones |
-| `web-indice-infinito` *(opcional)* | Web | IND | web base |
+| `transversal-seguridad` | Transversal | SEG | `transversal-auditoria` |
+| `transversal-plataforma` | Transversal | PLA | — |
+| `inventario-fuentes` | Inventario | FUE | `identidad-seguridad`, `transversal-auditoria` |
+| `inventario-seleccion-fuente` | Inventario | SEL | `inventario-fuentes`, `identidad-seguridad`, `transversal-auditoria`, `transversal-seguridad` |
+| `inventario-ajustes` | Inventario | AJU | `inventario-fuentes`, `identidad-seguridad`, `transversal-auditoria` |
+| `inventario-traslados` | Inventario | TRA | `inventario-fuentes`, `inventario-seleccion-fuente`, `identidad-seguridad`, `transversal-auditoria`, `transversal-notificaciones` |
+| `identidad-seguridad` | E-commerce | IDE | `transversal-auditoria`, `transversal-seguridad` |
+| `transversal-notificaciones` | Transversal | NOT | `identidad-seguridad`, `transversal-seguridad` |
+| `ecommerce-catalogo` | E-commerce | CAT | `inventario-fuentes`, `inventario-ajustes`, `transversal-auditoria` |
+| `ecommerce-carrito-checkout` | E-commerce | CAR | `ecommerce-catalogo`, `inventario-seleccion-fuente`, `identidad-seguridad`, `transversal-seguridad` |
+| `ecommerce-pagos` | E-commerce | PAG | `ecommerce-carrito-checkout`, `identidad-seguridad`, `inventario-seleccion-fuente`, `transversal-auditoria` |
+| `ecommerce-pedidos` | E-commerce | PED | `ecommerce-pagos`, `ecommerce-biblioteca-digital`, `inventario-seleccion-fuente`, `transversal-notificaciones`, `transversal-auditoria` |
+| `ecommerce-biblioteca-digital` | E-commerce | BIB | `ecommerce-catalogo`, `ecommerce-carrito-checkout`, `ecommerce-pagos`, `transversal-auditoria`, `transversal-seguridad` |
+| `ecommerce-envios` | E-commerce | ENV | `ecommerce-pedidos`, `ecommerce-carrito-checkout`, `inventario-seleccion-fuente`, `identidad-seguridad`, `transversal-notificaciones`, `transversal-auditoria`, `transversal-seguridad` |
+| `ecommerce-devoluciones` | E-commerce | DEV | `ecommerce-pedidos`, `ecommerce-pagos`, `ecommerce-biblioteca-digital`, `inventario-ajustes`, `transversal-auditoria`, `transversal-notificaciones`, `identidad-seguridad` |
+| `ecommerce-libro-reclamaciones` | E-commerce | REC | `identidad-seguridad`, `transversal-notificaciones`, `transversal-auditoria`, `transversal-seguridad` |
+| `asistente-compra-ia` | E-commerce | ASI | `ecommerce-catalogo`, `ecommerce-pedidos`, `identidad-seguridad`, `transversal-seguridad` |
+| `web-base` | E-commerce | WEB | `identidad-seguridad`, `ecommerce-libro-reclamaciones`, `ecommerce-catalogo`, `ecommerce-carrito-checkout`, `ecommerce-biblioteca-digital`, `transversal-auditoria`, `transversal-seguridad` |
+| `web-indice-infinito` *(opcional)* | E-commerce | IND | `web-base`, `transversal-seguridad` |
 
 ## Orden de aprobación e implementación sugerido
 
 | Orden | Specs | Motivo |
 | :---: | :--- | :--- |
-| 1 | `transversal-auditoria`, `transversal-seguridad` | Los ajustes, traslados y precios usan la auditoría; la seguridad define los errores, límites y registros que todas reutilizan. |
-| 2 | `inventario-fuentes`, `inventario-seleccion-fuente`, `inventario-ajustes`, `inventario-traslados` | Núcleo y mayor riesgo (AC01). |
-| 3 | `identidad-seguridad`, `transversal-notificaciones`, `web-base` | Activan el alcance por sucursal, los avisos y la interfaz. |
-| 4 | `ecommerce-catalogo`, `ecommerce-carrito-checkout`, `ecommerce-pagos`, `ecommerce-pedidos` | Camino crítico de la compra. |
-| 5 | `ecommerce-biblioteca-digital`, `ecommerce-envios`, `ecommerce-devoluciones`, `ecommerce-libro-reclamaciones` | Completan el ciclo digital, de entrega, de retorno y legal. |
+| 1 | `transversal-auditoria`, `transversal-seguridad`, `transversal-plataforma` (integración continua, respaldo y umbrales desde el inicio) | Los ajustes, traslados y precios usan la auditoría; la seguridad define los errores, límites y registros que todas reutilizan. |
+| 2 | `identidad-seguridad`, `transversal-notificaciones` y la estructura de `web-base` | Activan el alcance por sucursal, los avisos y la interfaz; el Inventario valida sus credenciales, por eso van antes. |
+| 3 | `inventario-fuentes`, `inventario-seleccion-fuente`, `inventario-ajustes`, `inventario-traslados` | Núcleo y mayor riesgo (AC01). |
+| 4 | `ecommerce-catalogo`, `ecommerce-carrito-checkout`, `ecommerce-pagos`, `ecommerce-biblioteca-digital`, `ecommerce-pedidos` | Camino crítico de la compra; los pedidos incluyen líneas digitales. |
+| 5 | `ecommerce-envios`, `ecommerce-devoluciones`, `ecommerce-libro-reclamaciones` y el cierre de `web-base` | Completan el ciclo de entrega, de retorno y legal. |
 | 6 | `asistente-compra-ia`, `web-indice-infinito` | Cierre. |
+
+El orden respeta la columna «Depende de» (se calculó a partir del encabezado de cada spec). `web-base` depende de varias features porque muestra sus pantallas: se construye de forma incremental y solo pasa a `Done` cuando todas están.

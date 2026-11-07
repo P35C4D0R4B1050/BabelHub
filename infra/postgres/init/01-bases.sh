@@ -3,6 +3,8 @@
 # en VM-INVENTARIO lo hace el aprovisionamiento con las mismas reglas. Los esquemas por módulo y los roles
 # por esquema (incluido el de `identidad`) los crean las migraciones de cada servicio.
 # Cada rol solo puede conectarse a su propia base; las demás le niegan CONNECT.
+# La base técnica `evolution` (Evolution API, solo en VM-VENTAS) no es de negocio: la crea el aprovisionamiento de VM-INVENTARIO con su propio rol
+# y sin acceso a las otras dos; no se crea en local porque Evolution API no está en el Compose local (se usa el notificador simulado).
 set -eu
 
 crear_base() {

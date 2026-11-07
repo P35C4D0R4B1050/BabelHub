@@ -17,7 +17,7 @@ Una línea por tarea (lo valida `SpecCheck`):
 
 ## Reglas
 
-1. **Orden de adentro hacia afuera:** Dominio → Aplicación → Infraestructura → Api → Web → pruebas de integración y E2E. Las dependencias entre tareas van de menor a mayor número.
+1. **Orden de adentro hacia afuera:** Dominio → Aplicación → Infraestructura → Api → interfaz web → pruebas de integración y E2E. Las dependencias entre tareas van de menor a mayor número.
 2. **Atómicas:** cada tarea cabe en un commit pequeño, deja el proyecto compilando y empieza por una prueba que falla.
 3. **Cobertura:** cada criterio `AC-XXX-NN` aparece en al menos una tarea; si no, `SpecCheck` falla.
 4. **Verbos concretos:** «Crear la regla de stock vendible no negativo», no «Trabajar en inventario».

@@ -4,7 +4,18 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 
 ## 2026-11-06 — Auditoría final de coherencia y cobertura
 
-Informe en `progress/R6-auditoria-final.md`: 18 hallazgos (5 de prioridad P1, 8 de P2 y 5 de P3) con su forma de cubrirlos y el orden propuesto. **No se corrigió nada todavía.** Lo más importante: `transversal-auditoria` conserva el vocabulario de tres servicios (necesita volver a `Draft`), RF10/RF12/RF17 no respaldan el ingreso de mercadería, el modelo de dominio y las skills siguen con la arquitectura anterior, y hay seis RNF de plataforma sin spec.
+Informe en `progress/R6-auditoria-final.md`: 18 hallazgos (5 de prioridad P1, 8 de P2 y 5 de P3) y, en §7, el estado de cada uno.
+
+### Cubierto
+- **Specs:** `transversal-auditoria` reescrita para dos servicios y **devuelta a `Draft`**; nueva spec `transversal-plataforma` (PLA-01 a PLA-14) para RNF10, 11, 12, 19, 24 y 28, en `Draft`. Ambas esperan la aprobación de la persona responsable (B12). WEB-26 y dos criterios de `web-base` con la redacción actual (sin cambio de comportamiento).
+- **Requisitos y dominio:** RF10, RF12 y RF17 respaldan el ingreso de mercadería, el stock inicial, la fuente de recepción y las unidades vendidas; el modelo de dominio los incorpora.
+- **Proceso:** fases del flujo SDD y orden de `specs/README.md` calculados a partir de las dependencias (Identidad antes que el Inventario; `web-base` incremental); índice de specs regenerado; skills, agente y plantilla actualizados a la arquitectura de dos servicios.
+- **Documentación:** vínculos drivers–decisiones completos, base técnica `evolution`, presupuesto de VM-INVENTARIO sin margen y su orden de recorte, limitaciones declaradas, nombres de trabajo de los hosts, nota de verificación de cifras.
+- **Infraestructura y pruebas:** Nginx confía en la IP del cliente solo desde el túnel; con Docker se verificaron Compose, las dos bases, el aislamiento entre roles y `nginx -t`; nuevas pruebas de sensibilidad de arquitectura (26 pruebas).
+- **Presentación (H16):** `docs/BabelHub_Exposicion.pptx` (diapositivas 1, 4 a 10 y 13 a 15) y el resumen local actualizados a dos servicios, cuatro VMs, seis atributos, 31 decisiones y 20 specs. Canva queda fuera del proyecto por decisión del responsable.
+
+### Pendiente
+- Aprobación de `transversal-auditoria` y `transversal-plataforma` (B12); decisiones B02, B06 y B08 (con recomendaciones); redacción de `AGENTS.md` §3 sobre la regla 9.
 
 ## 2026-11-06 — Reformulación a dos servicios y seis atributos de calidad
 

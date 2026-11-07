@@ -1,6 +1,6 @@
 ---
 name: dotnet-feature
-description: Guía para agregar casos de uso, entidades, puertos, adaptadores, endpoints y pruebas en BabelHub respetando Clean Architecture y las convenciones del repositorio. Úsala al escribir código de un servicio .NET (Inventario, E-commerce, Identidad, Asistente) dentro de spec-implement.
+description: Guía para agregar casos de uso, entidades, puertos, adaptadores, endpoints y pruebas en BabelHub respetando Clean Architecture y las convenciones del repositorio. Úsala al escribir código de uno de los dos servicios .NET (E-commerce o Inventario) dentro de spec-implement.
 ---
 
 # dotnet-feature — Cómo se escribe código en BabelHub
@@ -15,7 +15,7 @@ description: Guía para agregar casos de uso, entidades, puertos, adaptadores, e
 | Endpoints, autenticación, composición | `BabelHub.<Servicio>.Api` | controladores, `Program.cs` |
 | Contratos entre servicios | `BabelHub.Shared` | DTOs, constantes de roles |
 
-Identidad y Asistente son proyectos únicos con carpetas `Domain`, `Application`, `Infrastructure` y `Api` (versión reducida). Las carpetas de `Application` coinciden con las de `specs/` (`SeleccionFuente/`, `Traslados/`…).
+Cada servicio es un monolito modular: los módulos son **carpetas y espacios de nombres dentro de cada capa** (por ejemplo `BabelHub.Ecommerce.Application.Pagos`), con su contrato público en la raíz y su interior en `Interno` (regla 13). Identidad y Asistente son módulos del E-commerce con una versión reducida de las capas; la interfaz web es la Presentación (`BabelHub.Ecommerce.Api`, áreas Tienda, Sucursal y Admin). No se crean proyectos nuevos por módulo. Las carpetas de `Application` coinciden con las de `specs/` (`SeleccionFuente/`, `Traslados/`…).
 
 ## Convenciones
 
@@ -23,7 +23,7 @@ Identidad y Asistente son proyectos únicos con carpetas `Domain`, `Application`
 - Dominio y casos de uso en español con los términos de `docs/glossary.md`.
 - Los casos de uso devuelven resultados explícitos (éxito o error del dominio), no excepciones para flujos esperados. La Api los traduce a `application/problem+json`.
 - Un caso de uso: obtiene el usuario actual (puerto), **verifica alcance y rol**, carga con puertos, aplica reglas del dominio, persiste y audita dentro de una unidad de trabajo.
-- Un `HttpClient` hacia otro servicio vive en Infraestructura, con resiliencia y tiempos de espera cortos; el contrato viene de `Shared` y se traduce a un modelo interno.
+- Un módulo solo llama a otro por su contrato público, en el mismo proceso. Un `HttpClient` hacia el otro servicio vive en Infraestructura, con resiliencia y tiempos de espera cortos; el contrato viene de `Shared` y se traduce a un modelo interno.
 - Reloj, generador de identificadores y usuario actual son puertos, para poder probarlos.
 
 ## Pruebas

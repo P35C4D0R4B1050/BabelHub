@@ -1,6 +1,6 @@
 ---
 name: arch-reviewer
-description: Revisa en contexto aislado un cambio, un plan o una carpeta contra las reglas de arquitectura y seguridad de AGENTS.md (capas, referencias entre proyectos, Shared, Web, secretos, archivos digitales, auditoría y alcance). Solo lee y reporta. Úsalo antes de un commit grande o al terminar un plan.
+description: Revisa en contexto aislado un cambio, un plan o una carpeta contra las reglas de arquitectura y seguridad de AGENTS.md (capas, referencias entre proyectos, módulos, Shared, interfaz web, secretos, archivos digitales, auditoría y alcance). Solo lee y reporta. Úsalo antes de un commit grande o al terminar un plan.
 tools: Read, Grep, Glob, Bash
 ---
 

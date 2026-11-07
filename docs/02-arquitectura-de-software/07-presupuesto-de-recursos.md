@@ -25,7 +25,7 @@ Cuatro VMs de una sola cuenta: dos ARM de **1 OCPU y 6 GB** y dos AMD micro de *
 | Evolution API | 600 MB | 300–500 MB | VM-VENTAS | Proceso de Node. |
 | BabelHub.Inventario | 350 MB | 150–250 MB | VM-INVENTARIO | |
 | BabelHub.Ecommerce (gestión) | 450 MB | 200–350 MB | VM-INVENTARIO | Réplica de respaldo: mismo código, solo las áreas Sucursal y Admin. |
-| PostgreSQL | 2,0 GB | 1,2–1,8 GB | VM-INVENTARIO | Una instancia con tres bases; `shared_buffers` ~768 MB; `CONNECTION LIMIT` por rol. |
+| PostgreSQL | 2,0 GB | 1,2–1,8 GB | VM-INVENTARIO | Una instancia con dos bases de negocio (`ecommerce` e `inventario`) y la técnica de Evolution API; `shared_buffers` ~768 MB; `CONNECTION LIMIT` por rol. |
 | Tareas de respaldo | 256 MB | — | VM-INVENTARIO | Volcado y cifrado secuenciales, fuera de horas pico. |
 | Sistema y Docker | — | ~0,3–0,5 GB | Cada VM | |
 
@@ -33,7 +33,7 @@ Cuatro VMs de una sola cuenta: dos ARM de **1 OCPU y 6 GB** y dos AMD micro de *
 | :--- | :---: | :---: | :--- |
 | VM-BORDE | ~0,13 GB + sistema | ~0,5 GB | Dentro del 70 % (0,7 GB); es la más justa. |
 | VM-VENTAS | ~2,1 GB + sistema | ~1,5–2,3 GB | Dentro del 70 % (4,2 GB), con holgura para picos. |
-| VM-INVENTARIO | ~3,7 GB + sistema | ~2,1–2,9 GB | Dentro del 70 %; el resto lo usa el sistema como caché de disco. |
+| VM-INVENTARIO | ~3,7 GB + sistema | ~2,1–2,9 GB | **La más justa en memoria:** la suma de límites (3,7 GB) más el sistema (0,3–0,5 GB) llega a unos 4,0–4,2 GB, casi todo el 70 % (4,2 GB). El uso esperado sí entra, pero casi sin margen para picos. Orden de recorte si supera el 70 %: bajar `shared_buffers` de PostgreSQL (768 MB), reducir el límite de la réplica de gestión (450 MB), correr el respaldo solo fuera de horas pico y, al final, mover la réplica a otro lugar. Se mide en B11. |
 | VM-AUX | — | ~0,3 GB | Amplia. |
 
 ## 3. CPU, concurrencia y red

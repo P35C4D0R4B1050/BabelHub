@@ -42,27 +42,35 @@ public class ReglasDeModulosTests
     [MemberData(nameof(NombresDeServicios))]
     public void Un_modulo_no_depende_del_interior_de_otro(string servicio)
     {
-        var modulos = ModulosPorServicio[servicio];
         foreach (var capa in Capas)
         {
             var ensamblado = Cargar($"{servicio}.{capa}");
-            foreach (var modulo in modulos)
+            foreach (var modulo in ModulosPorServicio[servicio])
             {
-                var interioresAjenos = modulos
-                    .Where(otro => otro != modulo)
-                    .SelectMany(otro => Capas.Select(c => $"{servicio}.{c}.{otro}.Interno"))
-                    .ToArray();
-
-                var resultado = Types.InAssembly(ensamblado)
-                    .That().ResideInNamespace($"{servicio}.{capa}.{modulo}")
-                    .ShouldNot().HaveDependencyOnAny(interioresAjenos)
-                    .GetResult();
+                var resultado = ComprobarInterior(ensamblado, servicio, capa, modulo);
 
                 Assert.True(
                     resultado.IsSuccessful,
                     $"{modulo} en {servicio}.{capa} depende del interior de otro módulo: {string.Join(", ", resultado.FailingTypeNames ?? [])}.");
             }
         }
+    }
+
+    /// <summary>
+    /// La regla 13 aplicada a un módulo de una capa: sus tipos no dependen del <c>Interno</c> de ningún otro módulo del servicio.
+    /// La usan la prueba real y las de sensibilidad (<see cref="PruebasDeSensibilidadTests"/>), para que ambas apliquen exactamente la misma regla.
+    /// </summary>
+    internal static TestResult ComprobarInterior(Assembly ensamblado, string servicio, string capa, string modulo)
+    {
+        var interioresAjenos = ModulosPorServicio[servicio]
+            .Where(otro => otro != modulo)
+            .SelectMany(otro => Capas.Select(c => $"{servicio}.{c}.{otro}.Interno"))
+            .ToArray();
+
+        return Types.InAssembly(ensamblado)
+            .That().ResideInNamespace($"{servicio}.{capa}.{modulo}")
+            .ShouldNot().HaveDependencyOnAny(interioresAjenos)
+            .GetResult();
     }
 
     private static Assembly Cargar(string nombre) =>

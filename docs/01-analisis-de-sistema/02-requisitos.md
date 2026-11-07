@@ -19,7 +19,7 @@ Prioridad: **Alta**, **Media**, **Baja**.
 | **RF07** | El sistema debe notificar por WhatsApp al cliente y a la sucursal responsable ante cada cambio de estado del pedido, sin que una falla del envío bloquee la operación. | Alta | NN03 |
 | **RF08** | El sistema debe ofrecer un asistente de compra que recomiende libros y responda sobre disponibilidad y estado de pedidos usando datos reales del catálogo e inventario, e indique cuando no tenga información suficiente. | Media | NN04 |
 | **RF09** | El sistema debe permitir solicitar una devolución, gestionar su reembolso con trazabilidad y reingresar el stock en la sucursal receptora (solo libros impresos); el impreso se reembolsa después de confirmada su recepción. Para libros digitales aplica la política definida en el [marco legal](03-marco-legal.md); un reembolso revoca el acceso y no reingresa stock. | Baja | NN05, NN15 |
-| **RF10** | El sistema debe permitir registrar, actualizar y dar de baja libros en el catálogo. Cada edición (impresa o digital) tiene su propio ISBN, que debe ser único. Un libro digital incluye además formato, archivo, titular de derechos, territorios autorizados y vigencia de la licencia. | Alta | NN08, NN14 |
+| **RF10** | El sistema debe permitir registrar, actualizar y dar de baja libros en el catálogo. Cada edición (impresa o digital) tiene su propio ISBN, que debe ser único. Un libro digital incluye además formato, archivo, titular de derechos, territorios autorizados y vigencia de la licencia. Al dar de alta una edición impresa se puede indicar un stock inicial, que se registra como su primer ingreso de mercadería; un título sin stock en toda la red se muestra como agotado y no se da de baja. | Alta | NN08, NN14 |
 | **RF11** | El sistema debe generar guías de envío y consultar el seguimiento con el servicio de envío en los despachos a domicilio. El costo del despacho es fijo y configurable. | Media | NN11 |
 | **RF29** | El sistema debe ofrecer funciones de descubrimiento separadas de la compra: elegir un libro disponible al azar y explorar páginas generadas, aclarando que no son libros reales. | Baja | NN17 |
 
@@ -27,12 +27,12 @@ Prioridad: **Alta**, **Media**, **Baja**.
 
 | ID | Requisito funcional | Prioridad | Origen |
 | :--- | :--- | :---: | :--- |
-| **RF12** | El sistema debe registrar cada sucursal como una fuente independiente, con su contacto de notificación, y permitir consultar su stock físico, reservado y vendible por título. | Alta | NN06 |
+| **RF12** | El sistema debe registrar cada sucursal como una fuente independiente, con su contacto de notificación, y permitir consultar su stock físico, reservado y vendible por título. Exactamente una fuente es la fuente de recepción de la mercadería nueva (por defecto Lima), y se pueden consultar las unidades vendidas por sucursal en los últimos 30 días, atribuidas a la que despacha o entrega el pedido. | Alta | NN06 |
 | **RF13** | El sistema debe calcular el stock vendible como *stock físico − reservas activas* y exponerlo mediante una API REST consultable por el E-commerce y el asistente. | Alta | NN01, NN06 |
 | **RF14** | El sistema debe crear reservas a solicitud del E-commerce, confirmarlas al aprobarse el pago y liberarlas si el pedido se cancela o expira. | Alta | NN02, NN06 |
 | **RF15** | El sistema debe seleccionar automáticamente la sucursal desde la cual atender un pedido, priorizando cercanía al cliente y disponibilidad, e identificar otras sucursales con stock cuando la más cercana no lo tenga. | Alta | NN07 |
 | **RF16** | El sistema debe generar, aprobar, despachar, recibir y dar seguimiento a traslados entre sucursales, notificando a origen y destino, y actualizando el stock de ambas. | Alta | NN07 |
-| **RF17** | El sistema debe registrar ajustes de inventario con motivo (merma, daño, corrección de conteo) y usuario responsable, por sucursal. La merma y el daño solo descuentan y nunca más que el stock vendible; la corrección de conteo se expresa como conteo físico real, que no puede ser menor que las unidades reservadas. | Alta | NN06 |
+| **RF17** | El sistema debe registrar ajustes de inventario con motivo (merma, daño, corrección de conteo o ingreso de mercadería) y usuario responsable, por sucursal. El ingreso de mercadería solo lo registra la administración central, solo en la fuente de recepción, con una cantidad de 1 a 5 000 y la referencia opcional de la guía o factura. La merma y el daño solo descuentan y nunca más que el stock vendible; la corrección de conteo se expresa como conteo físico real, que no puede ser menor que las unidades reservadas. | Alta | NN06 |
 | **RF28** | El sistema debe limitar las reservas temporales pendientes por cliente y por origen de red, y rechazar con un mensaje claro las que excedan el límite. Una reserva temporal pendiente por cliente, hasta 5 reservas iniciadas por hora por cliente y hasta 10 por origen. | Alta | NN02, NN18 |
 
 ### 1.3 Seguridad, administración y analítica
@@ -100,16 +100,16 @@ Las metas numéricas son **propuestas iniciales** para una red de 5 a 10 sucursa
 | **RNF16** | SAST, ZAP baseline y prueba E2E de cabeceras | `transversal-seguridad`, `web-base` | ASVS, Top 10:2025 (inyección, configuración) |
 | **RNF17** | Pruebas de integración y carga | `transversal-seguridad`, `ecommerce-biblioteca-digital`, `asistente-compra-ia` | API Top 10:2023 (consumo y flujos de negocio), LLM10 |
 | **RNF18** | Inspección y pruebas | `identidad-seguridad` | Top 10:2025 (fallas criptográficas) |
-| **RNF19** | Escaneo en CI | Transversal (CI e infraestructura) | Top 10:2025 (A02, A03) |
+| **RNF19** | Escaneo en CI | `transversal-plataforma` | Top 10:2025 (A02, A03) |
 | **RNF20** | Pruebas e inspección | `transversal-seguridad`, `transversal-auditoria` | Top 10:2025 (A09, A10) |
 | **RNF21** | Pruebas de integración | `transversal-seguridad`, `transversal-notificaciones` | Top 10:2025 (A08), API10 |
 | **RNF22** | Pruebas con casos de abuso | `asistente-compra-ia` | Top 10 para LLM 2025 |
 | **RNF23** | Inspección documental | `identidad-seguridad`, `transversal-auditoria` | Ley 29733 y DS 016-2024-JUS |
-| **RNF24** | Prueba de restauración | Despliegue | ISO 27002 (continuidad) |
+| **RNF24** | Prueba de restauración | `transversal-plataforma` | ISO 27002 (continuidad) |
 | **RNF25** | axe en E2E e inspección manual | `web-base` | WCAG 2.2 |
 | **RNF26** | Lighthouse en CI | `web-base` | Core Web Vitals |
 | **RNF27** | Prueba de usabilidad | `web-base` | ISO 9241-210 |
-| **RNF28** | Pruebas de arquitectura y cobertura | Todas | Refina RNF09 y RNF10 |
+| **RNF28** | Pruebas de arquitectura y cobertura | `transversal-plataforma` y todas | Refina RNF09 y RNF10 |
 
 ## 3. Restricciones
 

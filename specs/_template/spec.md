@@ -2,7 +2,7 @@
 id: nombre-de-la-feature
 titulo: Título corto de la feature
 estado: Draft
-servicio: Inventario | E-commerce | Identidad | Asistente | Web | Transversal
+servicio: Inventario | E-commerce | Transversal
 prefijo: XXX
 origen: [RF00, NN00]
 calidad: [AC00, RNF00]

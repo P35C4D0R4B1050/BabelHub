@@ -1,6 +1,6 @@
 ---
 name: arch-review
-description: Revisa un cambio, un plan o una carpeta contra las reglas de arquitectura de AGENTS.md (capas, referencias entre proyectos, Shared, Web, secretos, archivos digitales, auditoría y alcance). Úsala antes de un commit grande, al terminar un plan o cuando se pida «revisar la arquitectura».
+description: Revisa un cambio, un plan o una carpeta contra las reglas de arquitectura de AGENTS.md (capas, referencias entre proyectos, módulos, Shared, interfaz web, secretos, archivos digitales, auditoría y alcance). Úsala antes de un commit grande, al terminar un plan o cuando se pida «revisar la arquitectura».
 ---
 
 # arch-review — Revisión de arquitectura
@@ -13,7 +13,8 @@ Lo que se revisa: `git diff` (o la carpeta o plan indicados). Lo que **no** se h
 
 ## Lista de comprobación
 
-1. **Referencias entre proyectos** (`*.csproj`): Dominio sin referencias; Aplicación solo a Dominio; Infraestructura a Aplicación, Dominio y Shared; Api a Aplicación, Infraestructura (composición) y Shared; Web solo a Shared; ningún servicio referencia a otro; ni Dominio ni Aplicación referencian Shared.
+1. **Referencias entre proyectos** (`*.csproj`): Dominio sin referencias; Aplicación solo a Dominio; Infraestructura a Aplicación, Dominio y Shared; Api a Aplicación, Infraestructura (composición) y Shared (la interfaz web es la Presentación del E-commerce y vive en `BabelHub.Ecommerce.Api`, no hay proyecto Web aparte); ningún servicio referencia a otro; ni Dominio ni Aplicación referencian Shared.
+1b. **Módulos** (regla 13): un módulo solo depende del contrato público (la raíz de su carpeta) de otro, nunca de su `Interno`, su Dominio, su Infraestructura ni su esquema; sin ciclos entre módulos (`docs/03-diseno-de-software/04-modulos-y-contratos.md` §1.1); cada módulo escribe solo en su esquema de base de datos.
 2. **Paquetes**: EF Core, Redis, `HttpClient`, SDKs de terceros solo en Infraestructura. Nada de ASP.NET en Dominio o Aplicación.
 3. **Lógica**: ¿hay reglas de negocio en controladores, vistas o adaptadores? Deben estar en Dominio o en casos de uso.
 4. **Puertos**: definidos en Aplicación, implementados en Infraestructura; sin puertos «por costumbre» con una sola implementación sin motivo.

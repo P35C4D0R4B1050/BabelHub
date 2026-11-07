@@ -16,7 +16,7 @@ Convierte una spec **Approved** en `specs/<feature>/plan.md`. El plan dice **có
 
 1. Lee `AGENTS.md`, `docs/02-arquitectura-de-software/` (AD, estilo, despliegue), `docs/03-diseno-de-software/` y `docs/07-proceso-de-desarrollo/02-convenciones-tecnicas.md`, y la spec completa.
 2. Copia `specs/_template/plan.md` y complétalo:
-   - **Capas afectadas:** entidades, objetos de valor y reglas (Dominio); casos de uso y puertos (Aplicación); adaptadores (Infraestructura); endpoints (Api); pantallas y clientes (Web); contratos (Shared).
+   - **Capas afectadas:** entidades, objetos de valor y reglas (Dominio); casos de uso y puertos (Aplicación); adaptadores (Infraestructura); endpoints (Api); pantallas y clientes (interfaz web, en `BabelHub.Ecommerce.Api`); contratos (Shared).
    - **Modelo de datos:** esquema (`ventas`, `identidad`, `inventario`), tablas, restricciones, índices, migraciones.
    - **Contratos:** operaciones, rutas `/api/<servicio>/v1/...`, errores `problem+json` con `code` estable (ver `docs/07-proceso-de-desarrollo/02-convenciones-tecnicas.md`).
    - **Concurrencia, transacciones e idempotencia:** dónde puede haber carreras y qué garantiza la infraestructura.
@@ -25,7 +25,7 @@ Convierte una spec **Approved** en `specs/<feature>/plan.md`. El plan dice **có
    - **Estrategia de pruebas:** tabla criterio → tipo de prueba → ruta.
    - **Riesgos y mitigaciones.**
 3. Resuelve las decisiones técnicas que la spec dejó al plan y regístralas en `decisions.md` con su motivo y alternativa descartada. Una decisión que afecte a varias features pide un AD en `docs/02-arquitectura-de-software/02-decisiones-arquitectonicas.md`: propónlo, no lo agregues sin confirmación.
-4. Completa la lista **Verificación contra AGENTS.md** y corrige el plan hasta que todo cumpla (dependencias entre capas, sin referencias entre servicios, `Shared` solo contratos, Web solo usa `Shared`, sin secretos ni archivos digitales fuera del almacén).
+4. Completa la lista **Verificación contra AGENTS.md** y corrige el plan hasta que todo cumpla (dependencias entre capas, sin referencias entre servicios, módulos solo por contrato público (regla 13), `Shared` solo contratos, la interfaz web solo llama a contratos de módulos y al Inventario por REST desde el servidor, sin secretos ni archivos digitales fuera del almacén).
 5. Pasa el plan por el agente `arch-reviewer` y corrige sus hallazgos.
 6. Detente: pide la revisión humana del plan. **No** escribas `plan_aprobado_en` ni cambies el estado a `Planned`.
 
