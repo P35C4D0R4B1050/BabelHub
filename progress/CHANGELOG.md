@@ -2,6 +2,10 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-06 — Auditoría final de coherencia y cobertura
+
+Informe en `progress/R6-auditoria-final.md`: 18 hallazgos (5 de prioridad P1, 8 de P2 y 5 de P3) con su forma de cubrirlos y el orden propuesto. **No se corrigió nada todavía.** Lo más importante: `transversal-auditoria` conserva el vocabulario de tres servicios (necesita volver a `Draft`), RF10/RF12/RF17 no respaldan el ingreso de mercadería, el modelo de dominio y las skills siguen con la arquitectura anterior, y hay seis RNF de plataforma sin spec.
+
 ## 2026-11-06 — Reformulación a dos servicios y seis atributos de calidad
 
 Informe en `progress/R5-reformulacion-a-dos-servicios.md`.
