@@ -1,9 +1,11 @@
 ---
 id: identidad-seguridad
 titulo: Identidad, roles y control de acceso
-estado: Approved
+estado: Planned
 aprobado_por: Claude (delegado por Diego Amiquero)
 aprobado_en: 2026-11-13
+plan_aprobado_por: Claude (delegado por Diego Amiquero)
+plan_aprobado_en: 2026-11-13
 servicio: E-commerce
 prefijo: IDE
 origen: [RF18, RF19, RF20, RF26, RF27, RF28, RC18, NN09, NN15, NN18]

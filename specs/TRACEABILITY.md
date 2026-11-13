@@ -49,14 +49,14 @@
 | ecommerce-libro-reclamaciones | E-commerce | Approved | 20 | 18 | identidad-seguridad, transversal-notificaciones, transversal-auditoria, transversal-seguridad |
 | ecommerce-pagos | E-commerce | Approved | 32 | 28 | ecommerce-carrito-checkout, identidad-seguridad, inventario-seleccion-fuente, transversal-auditoria |
 | ecommerce-pedidos | E-commerce | Approved | 41 | 35 | ecommerce-pagos, ecommerce-biblioteca-digital, inventario-seleccion-fuente, identidad-seguridad, transversal-notificaciones, transversal-auditoria |
-| identidad-seguridad | E-commerce | Approved | 89 | 66 | transversal-auditoria, transversal-plataforma, transversal-seguridad |
+| identidad-seguridad | E-commerce | Planned | 89 | 66 | transversal-auditoria, transversal-plataforma, transversal-seguridad |
 | inventario-ajustes | Inventario | Approved | 20 | 16 | inventario-fuentes, identidad-seguridad, transversal-auditoria |
 | inventario-fuentes | Inventario | Approved | 22 | 18 | identidad-seguridad, transversal-auditoria |
 | inventario-seleccion-fuente | Inventario | Approved | 35 | 36 | inventario-fuentes, identidad-seguridad, transversal-auditoria, transversal-seguridad |
 | inventario-traslados | Inventario | Approved | 23 | 24 | inventario-fuentes, inventario-seleccion-fuente, identidad-seguridad, transversal-auditoria, transversal-notificaciones |
-| transversal-auditoria | Transversal | Approved | 44 | 32 | — |
-| transversal-notificaciones | Transversal | Approved | 13 | 13 | identidad-seguridad, transversal-seguridad |
-| transversal-plataforma | Transversal | Approved | 42 | 37 | — |
-| transversal-seguridad | Transversal | Approved | 32 | 29 | transversal-auditoria |
+| transversal-auditoria | Transversal | Planned | 44 | 32 | — |
+| transversal-notificaciones | Transversal | Planned | 16 | 16 | identidad-seguridad, transversal-seguridad, transversal-auditoria |
+| transversal-plataforma | Transversal | Planned | 42 | 37 | — |
+| transversal-seguridad | Transversal | Planned | 32 | 29 | transversal-auditoria |
 | web-base | E-commerce | Approved | 40 | 33 | identidad-seguridad, ecommerce-libro-reclamaciones, ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-biblioteca-digital, transversal-auditoria, transversal-seguridad |
 | web-indice-infinito | E-commerce | Approved | 9 | 7 | web-base, transversal-seguridad |

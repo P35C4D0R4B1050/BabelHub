@@ -1,9 +1,11 @@
 ---
 id: transversal-seguridad
 titulo: Seguridad transversal de la aplicación
-estado: Approved
+estado: Planned
 aprobado_por: Claude (delegado por Diego Amiquero)
 aprobado_en: 2026-11-13
+plan_aprobado_por: Claude (delegado por Diego Amiquero)
+plan_aprobado_en: 2026-11-13
 servicio: Transversal
 prefijo: SEG
 origen: [RNF16, RNF17, RNF20, RNF21, NN18]

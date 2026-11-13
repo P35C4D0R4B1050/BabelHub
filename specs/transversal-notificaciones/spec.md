@@ -1,14 +1,16 @@
 ---
 id: transversal-notificaciones
 titulo: Avisos por WhatsApp
-estado: Approved
+estado: Planned
+aprobado_por: Claude (delegado por Diego Amiquero)
+aprobado_en: 2026-11-13
+plan_aprobado_por: Claude (delegado por Diego Amiquero)
+plan_aprobado_en: 2026-11-13
 servicio: Transversal
 prefijo: NOT
 origen: [RF07, RF16, NN03]
-calidad: [AC03, RNF03, RNF07, RNF08, RNF21]
-depende: [identidad-seguridad, transversal-seguridad]
-aprobado_por: Diego Amiquero
-aprobado_en: 2026-10-16
+calidad: [AC03, RNF03, RNF07, RNF08, RNF17, RNF21]
+depende: [identidad-seguridad, transversal-seguridad, transversal-auditoria]
 ---
 
 # Spec — Avisos por WhatsApp
@@ -34,7 +36,7 @@ Avisar al cliente y a las sucursales de cada cambio importante sin que el aviso 
 | NOT-03 | No deseado | Si el cliente no dio su consentimiento o lo revocó, entonces el sistema deberá no enviarle avisos. | RNF07 |
 | NOT-04 | No deseado | Si el envío de un aviso falla, entonces el sistema deberá dejarlo pendiente, reintentarlo hasta 5 veces con esperas crecientes de hasta 1 hora y no interrumpir la operación que lo originó. | AC03, RNF03 |
 | NOT-05 | Ubicuo | El sistema deberá evitar enviar dos veces el mismo aviso para el mismo evento, destinatario y plantilla. | RF07 |
-| NOT-06 | Ubicuo | El sistema deberá registrar el estado de cada aviso como pendiente, enviado, fallido, cancelado u omitido por falta de consentimiento, con su fecha. | RNF08 |
+| NOT-06 | Ubicuo | El sistema deberá registrar el estado de cada aviso como pendiente, enviado, fallido, cancelado, omitido por falta de consentimiento u omitido por tope de número, con su fecha. | RNF08 |
 | NOT-07 | Ubicuo | El sistema deberá excluir de los mensajes los datos prohibidos en registros y mensajes definidos en `transversal-seguridad`. | RNF07, RNF20 |
 | NOT-08 | Evento | Cuando el cliente revoca su consentimiento, cambia su número, cancela su cuenta o es desactivado, el sistema deberá cancelar los avisos pendientes que le correspondían. | RNF07 |
 | NOT-09 | Ubicuo | El sistema deberá usar el contacto de notificación registrado de cada sucursal para avisarle. | RF16 |
@@ -42,6 +44,9 @@ Avisar al cliente y a las sucursales de cada cambio importante sin que el aviso 
 | NOT-11 | Estado | Mientras el entorno es de desarrollo, el sistema deberá usar un notificador simulado que registre los avisos sin enviarlos. | RF07 |
 | NOT-12 | Ubicuo | El sistema deberá autenticar las llamadas hacia el servicio de envío y las respuestas o estados que este devuelva, y descartar y registrar las que no se puedan verificar. | RNF21 |
 | NOT-13 | Evento | Cuando la administración desactiva los avisos de un número a solicitud de su titular, el sistema deberá no enviar más avisos a ese número y registrarlo en la auditoría. | RNF07, RNF08 |
+| NOT-14 | Estado | Mientras un número de cliente destino acumula 5 avisos que pasaron la comprobación de envío en una ventana deslizante de una hora o 20 en una ventana deslizante de 24 horas, el sistema deberá omitir los avisos siguientes a ese número, marcarlos como omitidos por tope (estado final que no se reenvía) y registrar un evento de seguridad sin el número. | RNF07, RNF17 |
+| NOT-15 | No deseado | Si el servicio de límites o el Inventario no responden al enviar un aviso, entonces el sistema deberá dejar el aviso pendiente sin enviarlo, reintentarlo con espera sin contarlo dos veces contra el tope, y pasarlo a fallido con motivo de vencido si pasan 24 horas desde su creación. | RNF17, AC03 |
+| NOT-16 | Ubicuo | El sistema deberá aplicar el tope de NOT-14 por tipo de destinatario, con el contacto de una sucursal exento, y no contar contra el tope ni marcar por tope un aviso omitido por falta de consentimiento o cancelado por NOT-08 o NOT-13. | RNF07, RNF17 |
 
 ## 4. Criterios de aceptación
 
@@ -58,13 +63,16 @@ Avisar al cliente y a las sucursales de cada cambio importante sin que el aviso 
 | AC-NOT-09 | NOT-10 | **Dado** una plantilla de mensaje, **cuando** se modifica su texto, **entonces** los avisos siguientes usan el nuevo texto sin cambiar el código. |
 | AC-NOT-10 | NOT-11 | **Dado** el entorno de desarrollo, **cuando** ocurre un evento notificable, **entonces** el aviso se registra sin enviarse a ningún número real. |
 | AC-NOT-11 | NOT-12 | **Dado** una respuesta del servicio de envío sin firma o con firma inválida, **cuando** llega, **entonces** se descarta y se registra, y el aviso no se marca como enviado. |
-| AC-NOT-12 | NOT-04, NOT-05 | **Dado** un aviso que falla, **cuando** se reintenta, **entonces** se intenta hasta 5 veces con esperas crecientes de hasta 1 hora y luego queda fallido; y el mismo evento para el mismo destinatario y plantilla no genera dos avisos. |
+| AC-NOT-12 | NOT-04, NOT-05 | **Dado** un aviso que falla, **cuando** se reintenta, **entonces** se intenta una vez y se reintenta hasta 5 veces con esperas crecientes de hasta 1 hora y luego queda fallido; y el mismo evento para el mismo destinatario y plantilla no genera dos avisos. |
 | AC-NOT-13 | NOT-13 | **Dado** un número ajeno que recibió avisos por error, **cuando** la administración desactiva sus avisos a pedido de su titular, **entonces** no recibe más avisos y queda una entrada de auditoría. |
+| AC-NOT-14 | NOT-14, NOT-06 | **Dado** un número de cliente que recibió 5 avisos en la última hora y otro que recibió 20 en las últimas 24 horas, **cuando** llega el momento de enviar un aviso más a cada uno, **entonces** no se envía, queda marcado como omitido por tope con su fecha, no se reenvía después y queda un evento de seguridad sin el número; los avisos solicitados pasada la ventana se envían con normalidad; y seis avisos solicitados a la vez a un mismo número dejan cinco enviados y uno omitido. |
+| AC-NOT-15 | NOT-15 | **Dado** que el servicio de límites o el Inventario no responden, **cuando** se intenta enviar un aviso, **entonces** queda pendiente sin enviarse, se reintenta con espera sin contar dos veces contra el tope y, pasadas 24 horas desde su creación, queda fallido por vencido. |
+| AC-NOT-16 | NOT-16, NOT-14 | **Dado** el contacto de una sucursal que recibe más de 5 avisos en una hora, otro número de cliente sin avisos y un aviso omitido por falta de consentimiento, **cuando** se envían, **entonces** los de la sucursal se envían todos, el otro número no se ve afectado y el aviso sin consentimiento no cuenta contra el tope ni queda marcado por tope. |
 
 ## 5. Reglas e invariantes
 
 - Un aviso nunca bloquea ni revierte la operación que lo originó.
-- Sin consentimiento no hay avisos al cliente; las sucursales siempre se avisan por su contacto registrado.
+- Sin consentimiento no hay avisos al cliente; las sucursales siempre se avisan por su contacto registrado, sin el tope de NOT-14.
 - Los avisos son transaccionales: sin publicidad.
 - El mensaje no incluye datos sensibles; los detalles se consultan dentro de la tienda.
 
@@ -76,8 +84,9 @@ Avisar al cliente y a las sucursales de cada cambio importante sin que el aviso 
 - Un número inválido marca el aviso como fallido tras agotar los reintentos y lo deja visible a la administración.
 - Si el canal cambia de proveedor, solo cambia el adaptador, no los servicios (AD16).
 - Un evento anterior al consentimiento no genera avisos retroactivos.
+- Un número de cliente recibe como máximo 5 avisos por hora y 20 en 24 horas, en ventanas deslizantes (decisión del 2026-11-13); el tope se cuenta por número y no por cuenta, de modo que registrar el número de otra persona no permite inundarla de avisos; el contacto de una sucursal está exento del tope (decisión del 2026-11-13). Riesgo aceptado: quien registre el número de otra persona puede agotarle su cupo de avisos, porque no se verifica la propiedad del número.
 
 ## 7. Preguntas abiertas
 
-- Nota para el plan: reintentos de avisos (propuesta: 5, con espera creciente hasta 1 hora).
+- [x] Decisión del 2026-11-13 (la persona responsable): el tope de NOT-14 trata igual todos los eventos de NOT-02 y se acepta como riesgo que un cliente con varios pedidos en una hora no reciba algún aviso (por ejemplo «listo para recojo»); el estado siempre se puede consultar en la tienda y la administración ve los avisos omitidos. Las cifras (5 por hora y 20 por día), la exención de las sucursales y la retención de avisos y de números desactivados quedaron resueltas el mismo día.
 - [x] ¿Se avisa también por correo cuando no hay WhatsApp? Resuelto el 2026-10-16 (confirmado por el responsable): fuera de esta versión para los avisos de pedidos y traslados; el correo se usa solo para seguridad, reclamos, alertas y el estado de un pago pendiente.

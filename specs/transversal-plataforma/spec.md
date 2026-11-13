@@ -1,9 +1,11 @@
 ---
 id: transversal-plataforma
 titulo: Calidad de la plataforma y operación
-estado: Approved
+estado: Planned
 aprobado_por: Claude (delegado por Diego Amiquero)
 aprobado_en: 2026-11-12
+plan_aprobado_por: Claude (delegado por Diego Amiquero)
+plan_aprobado_en: 2026-11-13
 servicio: Transversal
 prefijo: PLA
 origen: [RNF10, RNF11, RNF12, RNF18, RNF19, RNF23, RNF24, RNF28]
