@@ -43,3 +43,10 @@ Seis revisores (`spec-auditor`, `arch-reviewer` y `security-reviewer`, tres sobr
 ## 4. Menores
 
 Registrados en `progress/hallazgos.md` (redundancias entre specs, glosario, trazabilidad AM/CTL, inventario de privacidad, RNF02 y RNF03 sin dueño, tareas de fondo y máquinas de estado, Redis en el Inventario, nombres de proyectos en `docs/03`, y los restos de formato de `docs/03`).
+
+## 5. Estado tras las decisiones posteriores (2026-11-12)
+
+- `identidad-seguridad` quedó **Approved** (huella `87679a1b8ebb351a`). Las 20 specs están Approved.
+- Los puntos 1 a 3 (receptores de la cancelación, teléfono de entrega, pantallas de `web-base`) **se resuelven al planificar cada fase**, reabriendo cada spec justo antes de su plan; la retención de pedidos, dirección, teléfono y descargas es de **2 años** y el teléfono se pide en el checkout (`progress/decisiones-previas-al-plan.md`). CTL-33 pasó a «Pendiente» hasta entonces.
+- El punto 4 (controles de red) va como tareas de infraestructura con prueba en el plan de plataforma.
+- Resueltos en documentos o en la prueba: 5 (réplica), 6 (transacciones), 7 y 8 (núcleo compartido y `correos_pendientes`), 9 (credenciales de servicio), 10 (sesión web), 11 (prueba de arquitectura), 12 (retención de n8n y Evolution, propuesta) y 13 (AM29).

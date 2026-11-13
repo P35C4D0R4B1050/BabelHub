@@ -32,3 +32,13 @@ Respuestas a las preguntas cortas de cierre de la fase 2. Son **entradas de los 
 ## Para el plan, sin decisión de la persona
 
 Mapa de credenciales de respaldo y retiro, herramienta de archivado de WAL (B11), tamaño del almacén frente a la cuota, cadena de hashes del registro de supresiones, caché de claves del Inventario al rotar, definición de «alerta a la administración» y de «alerta crítica de cuenta» en el glosario, y los demás Menores de `progress/hallazgos.md`.
+
+## Decisiones tras la auditoría de cierre (2026-11-12)
+
+| Decisión | Valor | Aplica en |
+| :--- | :--- | :--- |
+| Retención de pedidos, dirección y teléfono de entrega | **2 años**; luego se anonimiza el contacto y queda lo estadístico | Reaperturas de pedidos, envíos y carrito-checkout; privacidad §1 |
+| Retención del registro de descargas (BIB-11) y de las ayudas (BIB-16) | **2 años** | Reapertura de biblioteca digital |
+| Teléfono de entrega | Se pide en el checkout como dato de contacto de entrega, con finalidad y retención propias | Reaperturas de carrito-checkout y envíos |
+| Cuándo se reabren las specs aprobadas (pedidos, envíos, devoluciones, reclamaciones, pagos, biblioteca, carrito, selección de fuente, seguridad, auditoría y web-base) | **Al planificar cada fase**, justo antes de su plan y con su propia revisión de la puerta | Fase 3 en adelante |
+| Controles de red y transporte (TLS interno, puertos cerrados, Cloudflare Access con MFA en el host de gestión, sincronización de hora) | **Tareas de infraestructura con prueba** (escaneo de puertos y de TLS) en el plan de plataforma; no reabre `transversal-plataforma` | Plan de plataforma, fase 8 |
