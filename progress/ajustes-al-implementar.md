@@ -72,6 +72,7 @@ Tareas a partir:
 
 Pruebas y precisiones:
 - [ ] **T48:** añadir «canal lleno: misma respuesta, el trabajo se descarta en silencio y se publica una alerta técnica». **T37:** añadir la purga de `solicitudes_de_codigo` a los 10 minutos.
+- [ ] **Envío de códigos (T30 y las tareas que envían códigos):** el correo de un código de un solo uso se construye solo con `CorreoDeCodigo.ParaElTitular(correoDeLaCuenta, propósito, ValorSecreto)` de `Plataforma` (transversal-seguridad T12), con la dirección registrada de la cuenta y nunca la de la solicitud; el código viaja como `ValorSecreto` y los registros y avisos pasan por `RedactorDeDatosProhibidos`.
 - [ ] **T17 y T20:** repetir que la solicitud de recuperación y el rechazo o vencimiento del cambio de correo no reconocido van por `IRegistroDeSeguridad`; T15: corregir la coma doble.
 - [ ] **T27:** `IFuenteDeRegistrosAislados` incluye el conteo por acción y ventana deslizante de 5 minutos, con la prueba de los 21 ingresos fallidos.
 - [ ] **T39/T50:** la clave de entorno se rota por redespliegue y el trabajo de rotación re-cifra la privada con una versión nueva (campo de versión en `claves_de_firma`); `infra/respaldos/custodia.md` lo crea `transversal-plataforma` T28 y T50 solo añade su entrada; T50 traslada a `docs/05/03` §6 la decisión de custodia (la lista de alcances ya está allí).
