@@ -22,7 +22,8 @@ public sealed class CopiasDeAdaptadoresTests
         "Infrastructure/Plataforma/TrabajoDeUmbralesDeAlerta.cs",
         "Infrastructure/Plataforma/MotorDeLimitesLocal.cs",
         "Infrastructure/Plataforma/AlmacenDeEntradasProcesadas.cs",
-        "Infrastructure/Plataforma/VerificadorDeFirmaHmac.cs");
+        "Infrastructure/Plataforma/VerificadorDeFirmaHmac.cs",
+        "Infrastructure/Plataforma/ClientesHttpDeServicio.cs");
 
     [Theory]
     [MemberData(nameof(Archivos))]
