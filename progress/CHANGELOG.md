@@ -13,7 +13,7 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 
 ### Pendiente
 - `identidad-seguridad` quedó `Approved` el 2026-11-12 por la puerta delegada (huella `87679a1b8ebb351a`, 88 requisitos y 66 criterios) tras la auditoría de cierre.
-- Reabrir al planificar cada una (hay Importantes de diseño en `progress/R7-auditoria-de-cierre-fase-2.md`): `transversal-auditoria` (AUD-37), `inventario-seleccion-fuente`, carrito, pagos, pedidos, envíos, devoluciones y reclamaciones, `transversal-seguridad` y `web-base` (detalle en `progress/hallazgos.md`).
+- Reabrir al planificar cada una (hay Importantes de diseño en `progress/R7-auditoria-de-cierre-fase-2.md`): `inventario-seleccion-fuente`, carrito, pagos, pedidos, envíos, devoluciones, reclamaciones y biblioteca; `transversal-auditoria`, `transversal-seguridad` y `web-base` ya se reabrieron y reaprobaron el 2026-11-13 (detalle en `progress/hallazgos.md`).
 
 ## 2026-11-06 — Auditoría final de coherencia y cobertura
 

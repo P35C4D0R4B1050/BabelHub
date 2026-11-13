@@ -2,13 +2,13 @@
 id: web-base
 titulo: Estructura base de la interfaz web
 estado: Approved
+aprobado_por: Claude (delegado por Diego Amiquero)
+aprobado_en: 2026-11-13
 servicio: E-commerce
 prefijo: WEB
 origen: [RC01, RNF13, RF25, RF29, NN15, NN16, NN18]
 calidad: [AC04, AC06, RNF05, RNF06, RNF15, RNF16, RNF25, RNF26, RNF27]
 depende: [identidad-seguridad, ecommerce-libro-reclamaciones, ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-biblioteca-digital, transversal-auditoria, transversal-seguridad]
-aprobado_por: Diego Amiquero
-aprobado_en: 2026-10-16
 ---
 
 # Spec — Estructura base de la interfaz web
@@ -47,6 +47,7 @@ La base común de la interfaz web del E-commerce: áreas por rol, sesión, estad
 | WEB-16 | Ubicuo | El sistema deberá recordar la sucursal preferida del cliente entre sesiones. | RNF13 |
 | WEB-17 | Evento | Cuando el visitante pulsa «Sorpréndeme», el sistema deberá elegir al azar un libro disponible y mostrar su ficha. | RF29, NN17 |
 | WEB-18 | Ubicuo | El sistema deberá enviar en cada respuesta las cabeceras de seguridad: política de contenido restrictiva, transporte seguro obligatorio, no adivinar el tipo de contenido y política de referencia limitada, y permitir en la política de contenido el script de la pasarela de pago solo en la página de pago. | RNF16, AC04 |
+| WEB-40 | Ubicuo | El sistema deberá permitir en la política de contenido el script y el marco de la verificación de persona solo en el ingreso, el registro, la nueva hoja de reclamación, el checkout y el asistente (SEG-31). | RNF16, AC04 |
 | WEB-19 | Ubicuo | El sistema deberá guardar la sesión en una cookie inaccesible a scripts, enviada solo por conexión segura y restringida al mismo sitio con la política que permite volver de la pasarela de pago sin perder la sesión. | RNF15, AC04 |
 | WEB-20 | Ubicuo | El sistema deberá conformar las pautas WCAG 2.2 nivel AA en inicio, catálogo, detalle, carrito, checkout, registro, ingreso, segundo factor, recuperación y cuenta, permitiendo pegar contraseñas y autocompletar códigos, verificado con revisión automática y una lista manual de teclado y lector de pantalla. | RNF25, AC06 |
 | WEB-21 | Ubicuo | El sistema deberá cargar inicio, catálogo y detalle con LCP de 2,5 s o menos (percentil 75 en 4G simulada), INP de 200 ms o menos y CLS de 0,1 o menos. | RNF26, AC02 |
@@ -62,8 +63,12 @@ La base común de la interfaz web del E-commerce: áreas por rol, sesión, estad
 | WEB-31 | Estado | Mientras una sesión web lleva 7 días de un cliente o 8 horas del personal desde el ingreso, el sistema deberá cerrarla aunque haya actividad. | RNF15, AC04 |
 | WEB-32 | No deseado | Si Identidad rechaza la renovación de una sesión (usuario desactivado, renovaciones revocadas, cambio de rol o clave comprometida), entonces el sistema deberá cerrar la sesión web y llevar a la persona al ingreso conservando lo que tenía en pantalla según WEB-25. | RNF15, AC04 |
 | WEB-33 | Ubicuo | El sistema deberá ofrecer a la administración central una pantalla de alertas de seguridad con su estado de revisión y la acción de marcarlas como revisadas. | RNF20, AC04 |
-| WEB-34 | Estado | Mientras una persona tiene pendiente configurar el segundo factor, cambiar una contraseña temporal, aceptar una versión nueva de los textos legales o declarar su mayoría de edad, el sistema deberá llevarla a ese paso antes de cualquier otra pantalla. | RNF15, NN15 |
+| WEB-34 | Estado | Mientras una persona tiene pendiente configurar el segundo factor, cambiar una contraseña temporal o aceptar una versión nueva de los textos legales, el sistema deberá llevarla a ese paso antes de cualquier otra pantalla. | RNF15, NN15 |
 | WEB-35 | Ubicuo | El sistema deberá ofrecer las pantallas de registro, ingreso, verificación y recuperación, cuenta (datos, consentimientos, segundo factor, solicitudes y cancelación con cierre de todas las sesiones), usuarios y roles, y solicitudes sobre datos personales con sus fechas límite. | RNF13, NN15 |
+| WEB-36 | Ubicuo | El sistema deberá mostrar en la cuenta los avisos de seguridad que no salen por correo (IDE-53, IDE-76, IDE-79, IDE-86) y el aviso del descarte de una cancelación diferida (IDE-81), sin enlaces ni datos sensibles, hasta que el titular los marque como vistos. | RNF15, NN15 |
+| WEB-37 | Evento | Cuando un titular abre desde un dispositivo reconocido un cambio de correo pendiente, el sistema deberá mostrárselo y permitirle rechazarlo, o confirmarlo con su contraseña actual y la verificación del correo nuevo, dentro de las 24 horas (IDE-54, IDE-25, IDE-16), sin permitir ninguna de las dos desde un dispositivo no reconocido. | RNF15 |
+| WEB-38 | Estado | Mientras un cliente tiene una cancelación diferida, el sistema deberá mostrarle qué falta cerrar, su estado y sus plazos de 7 y 30 días, y permitirle reconfirmarla con su contraseña, y su segundo factor si lo tiene, o desistir (IDE-27, IDE-68, IDE-71, IDE-81). | RNF15, NN15 |
+| WEB-39 | Evento | Cuando una sesión reconocida del titular muestra un aviso de IDE-27 o de IDE-68, el sistema deberá informarlo a Identidad en ese momento, que cuenta desde allí el plazo de IDE-68 (IDE-76), y no informarlo si el aviso se muestra en una sesión no reconocida. | RNF15, NN15 |
 
 ## 4. Criterios de aceptación
 
@@ -82,7 +87,7 @@ La base común de la interfaz web del E-commerce: áreas por rol, sesión, estad
 | AC-WEB-11 | WEB-15 | **Dado** un titular con descargas disponibles, **cuando** pulsa descargar, **entonces** el navegador es redirigido al enlace firmado y la capa web no recibe el archivo. |
 | AC-WEB-12 | WEB-16 | **Dado** un cliente que eligió Ayacucho, **cuando** vuelve otro día, **entonces** su sucursal sigue siendo Ayacucho. |
 | AC-WEB-13 | WEB-17 | **Dado** un catálogo con libros disponibles y agotados, **cuando** el visitante pulsa «Sorpréndeme», **entonces** se muestra la ficha de un libro disponible. |
-| AC-WEB-14 | WEB-18, WEB-19 | **Dado** cualquier página, **cuando** se inspeccionan sus respuestas, **entonces** llevan las cuatro cabeceras de seguridad y la cookie de sesión tiene los tres atributos exigidos; solo la página de pago permite el script de la pasarela; y al volver de la pasarela de pago el cliente conserva su sesión. |
+| AC-WEB-14 | WEB-18, WEB-19, WEB-40 | **Dado** cualquier página, **cuando** se inspeccionan sus respuestas, **entonces** llevan las cuatro cabeceras de seguridad y la cookie de sesión tiene los tres atributos exigidos; solo la página de pago permite el script de la pasarela; y al volver de la pasarela de pago el cliente conserva su sesión. La política de contenido permite el script y el marco de la verificación de persona solo en el ingreso, el registro, la nueva hoja de reclamación, el checkout y el asistente, y no en el catálogo ni en las demás páginas. |
 | AC-WEB-15 | WEB-20 | **Dado** el recorrido de compra, **cuando** se ejecuta la revisión automática de accesibilidad y la lista manual con teclado y lector de pantalla, **entonces** hay 0 incumplimientos críticos de nivel AA. |
 | AC-WEB-16 | WEB-21 | **Dado** inicio, catálogo y detalle en 4G simulada, **cuando** se mide, **entonces** LCP, INP y CLS cumplen las metas. |
 | AC-WEB-17 | WEB-22 | **Dado** dos rondas de cinco personas de prueba, **cuando** compran un libro con recojo sin ayuda, **entonces** al menos 9 de 10 lo logran, el SUS promedio es de 68 o más y el promedio de errores por tarea es menor que uno. |
@@ -98,6 +103,10 @@ La base común de la interfaz web del E-commerce: áreas por rol, sesión, estad
 | AC-WEB-27 | WEB-33 | **Dado** una alerta de seguridad, **cuando** el administrador abre la pantalla de alertas, **entonces** la ve con su estado y puede marcarla como revisada. |
 | AC-WEB-28 | WEB-34 | **Dado** un encargado que no tiene el segundo factor configurado, o un cliente con una versión nueva de los términos por aceptar, **cuando** intenta abrir cualquier otra pantalla, **entonces** es llevado primero a ese paso. |
 | AC-WEB-29 | WEB-35 | **Dado** el sitio completo, **cuando** se recorren las áreas, **entonces** existen las pantallas de registro, ingreso, verificación, recuperación, cuenta, usuarios y roles, y solicitudes sobre datos personales con fechas límite. |
+| AC-WEB-30 | WEB-36 | **Dado** un aviso de seguridad que no salió por correo porque se agotó la cuota o porque el correo no está verificado, y el aviso de descarte de una cancelación diferida, **cuando** el titular ingresa, **entonces** los ve en su cuenta, sin enlaces ni datos sensibles, hasta marcarlos como vistos. |
+| AC-WEB-31 | WEB-37 | **Dado** un cambio de correo pendiente desde un dispositivo no reconocido, **cuando** el titular lo abre desde un dispositivo reconocido dentro de las 24 horas, **entonces** puede rechazarlo, o confirmarlo solo con su contraseña actual y la verificación del correo nuevo; desde un dispositivo no reconocido no puede confirmarlo ni rechazarlo; y pasadas las 24 horas la pantalla indica que se descartó. |
+| AC-WEB-32 | WEB-38 | **Dado** un cliente con una cancelación diferida con un pedido por entregar y el segundo factor activado, **cuando** abre su cuenta, **entonces** ve qué falta cerrar, su estado y los plazos de 7 y 30 días; cuando se cierran los pendientes puede reconfirmarla con su contraseña y su segundo factor, o desistir; si al reconfirmar aparece un pendiente nuevo, se le informa y la solicitud sigue diferida; y pasados los 30 días la ve como descartada. |
+| AC-WEB-33 | WEB-39 | **Dado** el aviso de una cancelación diferida, **cuando** se muestra en una sesión reconocida del titular, **entonces** Identidad recibe el momento y cuenta desde allí el plazo de 7 días; y mostrado en una sesión no reconocida no se informa y el plazo no empieza. |
 
 ## 5. Reglas e invariantes
 

@@ -60,6 +60,7 @@ La credencial **nunca llega al navegador** (AGENTS.md, regla 9). El navegador so
 | Asistente → catálogo y pedidos | Contexto de solo lectura en el mismo proceso; para los pedidos, un contexto de 5 minutos limitado al propio cliente, emitido por el módulo Identidad a pedido de la capa web (IDE-33); el módulo de pedidos filtra por ese cliente, no el asistente. |
 | Asistente → disponibilidad | Cliente REST del Inventario con credencial de servicio de solo lectura; sin acceso a las bases de datos. |
 | Credenciales de servicio | Son secretos estáticos por alcance (uno por tarea y par de servicios), guardados como secretos del entorno de cada contenedor y rotados a mano (PLA-43 las rota al restaurar); cada servicio valida el alcance de la que recibe. Identidad no las emite: IDE-30 se ajusta en el plan de identidad. |
+| Origen reenviado | La Web reenvía al Inventario la dirección del cliente final solo con una credencial de servicio de alcance «origen reenviado», además de la credencial del usuario cuando existe; sin ella el Inventario la ignora, usa la huella de la dirección directa en un cubo propio sin los límites por origen, incluido el de reservas (SEL-19), y registra un evento (SEG-17, SEG-32). La réplica de gestión, que es la misma imagen del E-commerce, usa la misma credencial. |
 | Notificador ↔ servicios | Secreto compartido o firma verificada en ambos sentidos. |
 | Pasarela → E-commerce (aviso) | Firma o secreto del aviso; el estado se confirma además consultando a la pasarela. |
 

@@ -45,3 +45,9 @@
 - **Aprobada** por delegación: huella `87679a1b8ebb351a`, fila en `progress/aprobaciones.md`. Las 20 specs están `Approved`.
 - Se ampliaron los documentos de diseño (esquema `plataforma`, mecanismo de transacciones `SET LOCAL ROLE`, almacén de la sesión web, credenciales de servicio, AM29, retención de n8n y Evolution) y la prueba de arquitectura (Dominio e Infraestructura de otro módulo y la Api frente al `Interno`; 30 pruebas).
 - Pendiente: los Importantes de `progress/R7-auditoria-de-cierre-fase-2.md` que reabren specs (receptores de la cancelación, teléfono de entrega, `web-base`) y la fase 3 de planes.
+
+## Reaperturas de la fase 3 (2026-11-13)
+
+- A petición de la persona responsable se abordaron los pendientes que pertenecían a la fase 3: `transversal-auditoria`, `transversal-seguridad` y `web-base` se reabrieron, se corrigieron y pasaron de nuevo la puerta delegada (revisores sobre el mismo texto y dependencias primero: auditoría, seguridad, `web-base`). Las tres están `Approved` con huellas en `progress/aprobaciones.md`.
+- Cambios: AUD-42 a AUD-44 (tope de 24 correos al día y eventos por aviso suprimido o dirección reenviada), SEG-32 y la credencial de alcance «origen reenviado» (fila nueva en `docs/05-seguridad/03`), SEG-27 y SEG-08 alineadas con auditoría, WEB-36 a WEB-40 (avisos, cambio de correo, cancelación diferida, «visto» en sesión reconocida y Turnstile solo en cinco páginas).
+- Pendiente: reabrir, justo antes de su plan, selección de fuente, carrito, pedidos, envíos, devoluciones, reclamaciones, pagos y biblioteca; después, planes y tareas de la fase 3.
