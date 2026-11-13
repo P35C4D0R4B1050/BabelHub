@@ -29,10 +29,34 @@ namespace BabelHub.Ecommerce.Application.Pagos
         public string Resumen(int edicionId) => catalogo.Titulo(edicionId);
     }
 
+    /// <summary>Viola la regla 13: usa el Dominio de Catálogo.</summary>
+    public sealed class UsaElDominioAjeno
+    {
+        public string Resumen() => new BabelHub.Ecommerce.Domain.Catalogo.EntidadDeEjemplo().Valor;
+    }
+
     /// <summary>Viola la regla 13: usa el interior de Catálogo.</summary>
     public sealed class UsaElInteriorAjeno
     {
         public string Resumen() => new Catalogo.Interno.DetalleOculto().Valor;
+    }
+}
+
+namespace BabelHub.Ecommerce.Domain.Catalogo
+{
+    /// <summary>Tipo del Dominio de Catálogo: ningún otro módulo puede depender de él.</summary>
+    public sealed class EntidadDeEjemplo
+    {
+        public string Valor => "dominio";
+    }
+}
+
+namespace BabelHub.Ecommerce.Api
+{
+    /// <summary>Viola la regla 9: la Api usa el interior de un módulo.</summary>
+    public sealed class UsaElInteriorDesdeLaApi
+    {
+        public string Valor() => new BabelHub.Ecommerce.Application.Catalogo.Interno.DetalleOculto().Valor;
     }
 }
 
@@ -68,6 +92,26 @@ namespace BabelHub.ArchitectureTests
 
             var tipos = resultado.FailingTypeNames ?? [];
             Assert.DoesNotContain(tipos, nombre => nombre.EndsWith("UsaElContratoPublico", StringComparison.Ordinal));
+        }
+
+        [Fact]
+        public void La_regla_de_modulos_detecta_el_uso_del_dominio_de_otro_modulo()
+        {
+            var resultado = ReglasDeModulosTests.ComprobarInterior(Pruebas, "BabelHub.Ecommerce", "Application", "Pagos");
+
+            Assert.False(resultado.IsSuccessful, "La regla 13 no detectó que Pagos usa el Dominio de Catálogo.");
+            var tipos = resultado.FailingTypeNames ?? [];
+            Assert.Contains(tipos, nombre => nombre.EndsWith("UsaElDominioAjeno", StringComparison.Ordinal));
+        }
+
+        [Fact]
+        public void La_regla_de_la_api_detecta_el_uso_del_interior_de_un_modulo()
+        {
+            var resultado = ReglasDeModulosTests.ComprobarApi(Pruebas, "BabelHub.Ecommerce");
+
+            Assert.False(resultado.IsSuccessful, "La regla 9 no detectó que la Api usa el interior de Catálogo.");
+            var tipos = resultado.FailingTypeNames ?? [];
+            Assert.Contains(tipos, nombre => nombre.EndsWith("UsaElInteriorDesdeLaApi", StringComparison.Ordinal));
         }
 
         [Fact]
