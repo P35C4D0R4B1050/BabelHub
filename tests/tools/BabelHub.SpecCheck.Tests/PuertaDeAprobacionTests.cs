@@ -27,6 +27,26 @@ public sealed class PuertaDeAprobacionTests : IDisposable
             "# Hallazgos\n\n| Fecha | Spec | Hallazgo | Gravedad | Dueño | Fase | Estado |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n",
             new UTF8Encoding(false));
 
+        // Las specs que el repositorio real ya aprobó por delegación vuelven a Draft en la copia y el registro de
+        // aprobaciones queda sin filas, para que cada prueba controle por completo qué está aprobado.
+        foreach (var spec in Directory.GetFiles(Path.Combine(_copia, "specs"), "spec.md", SearchOption.AllDirectories))
+        {
+            var texto = File.ReadAllText(spec).Replace("\r\n", "\n", StringComparison.Ordinal);
+            var revertido = System.Text.RegularExpressions.Regex.Replace(
+                texto,
+                @"\nestado: Approved\naprobado_por: Claude \(delegado[^\n]*\naprobado_en: [^\n]*",
+                "\nestado: Draft");
+            if (texto != revertido)
+            {
+                File.WriteAllText(spec, revertido, new UTF8Encoding(false));
+            }
+        }
+
+        var registro = Path.Combine(_copia, "progress", "aprobaciones.md");
+        var filas = File.ReadAllLines(registro).ToList();
+        var corte = filas.FindIndex(l => l.StartsWith("| :---", StringComparison.Ordinal));
+        File.WriteAllText(registro, string.Join("\n", filas.Take(corte + 1)) + "\n", new UTF8Encoding(false));
+
         // La spec de ejemplo pasa a Approved firmada por el agente delegado.
         var ruta = RutaSpec();
         var t = File.ReadAllText(ruta).Replace("\r\n", "\n", StringComparison.Ordinal);
