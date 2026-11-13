@@ -107,7 +107,7 @@ style Ent fill:#222,stroke:#fff,color:#fff
 | Pasarela de pago | E-commerce | Culqi (Yape y tarjetas) |
 | Servicio de envío | E-commerce | Operador logístico |
 | Notificador | E-commerce e Inventario | Webhook de n8n, que envía por Evolution API (WhatsApp); si falla, deja el aviso pendiente y no interrumpe el caso de uso |
-| Enviador de correo | Identidad y E-commerce | SMTP con MailKit y una cuenta de Gmail sencilla (B08); envía códigos de seguridad (sin cola ni reintento diferido: si falla, la persona reintenta), alertas a la administración, la respuesta a reclamos (queda pendiente y la administración reintenta) y los avisos de un pago pendiente |
+| Enviador de correo | Identidad y E-commerce | SMTP con MailKit y una cuenta de Gmail sencilla (B08); envía códigos de seguridad (sin cola ni reintento diferido: si falla, la persona reintenta), alertas a la administración, la respuesta a reclamos (queda pendiente y se reintenta sola al renovarse la cuota) y los avisos de un pago pendiente; lo que queda pendiente por cuota diaria agotada se guarda en la tabla `correos_pendientes` del E-commerce y se reintenta al renovarse la cuota (IDE-77, IDE-78, IDE-80) |
 | Registro de auditoría | E-commerce, Inventario e Identidad | Tabla de auditoría de solo inserción en la base de cada servicio (en el E-commerce, la de Identidad en su esquema aislado) |
 | Proveedor de LLM | Asistente | API del modelo de lenguaje |
 | Caché | E-commerce e Inventario | Redis |
@@ -391,7 +391,7 @@ Este apartado **precisa** lo indicado en [organización interna, sección 3 (res
 
 | `web-indice-infinito` *(opcional)* | E-commerce, interfaz web | Experimento aislado «El índice infinito»: generador determinista propio, sin base de datos y fuera del flujo de compra (ver [El índice infinito](../06-experiencia-de-usuario/03-estados-accesibilidad-y-criterios.md)). Se escribe al final. |
 
-**Total: 18 especificaciones**, una de ellas opcional. Los indicadores y reportes (RF21) quedan diferidos y no tienen carpeta. Las specs transversales no tienen servicio propio porque la arquitectura se limita a dos servicios (AD02): definen un contrato que cada servicio implementa.
+**Total: 20 especificaciones**, una de ellas opcional. Los indicadores y reportes (RF21) quedan diferidos y no tienen carpeta. Las specs transversales no tienen servicio propio porque la arquitectura se limita a dos servicios (AD02): definen un contrato que cada servicio implementa.
 
 ## 10. Convenciones sugeridas
 

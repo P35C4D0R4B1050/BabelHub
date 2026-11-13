@@ -84,6 +84,7 @@ Esquemas: `catalogo`, `carrito`, `pagos`, `pedidos`, `envios`, `devoluciones`, `
 | `aceptaciones` | usuario_id o pedido_id, texto (términos, privacidad, reembolso, mayoría de edad), version, fecha | Solo inserción; una fila por texto aceptado en el registro (IDE-34) o en el checkout (CAR-22). |
 | `solicitudes_arco` | id, usuario_id, tipo, estado, respuesta, fecha, fecha_limite | Estados: recibida, en atención, atendida, rechazada. `fecha_limite` = 20 días hábiles (acceso) o 10 (resto). |
 | `eventos_ingreso` | clave (cuenta+origen), instante | Un registro por ingreso fallido (SEG-06); cuenta también para cuentas inexistentes; ventana deslizante. |
+| `correos_pendientes` | id, tipo (alerta a la administración, alerta crítica, reclamo, pago), destinatario_ref, fecha, intentos | Cola de correos que no salieron por cuota diaria agotada (IDE-77, IDE-78, IDE-80): se reintenta al renovarse la cuota, con prioridad para las alertas a la administración; sin códigos ni enlaces firmados. |
 | `bajas_titulares` | id_opaco, fecha, estado (pendiente o entregada), intentos | Buzón de salida de Identidad para la baja al Inventario (IDE-64, AUD-32): se escribe en la misma operación que la cancelación y se reintenta; el Inventario guarda su copia por `id_opaco` para reaplicarla y no duplicar. |
 | `auditoria` | como en Inventario | Solo inserción; propia de Identidad por el aislamiento del esquema. La interfaz web la presenta junto con la del resto del E-commerce y la del Inventario (AUD-09). |
 

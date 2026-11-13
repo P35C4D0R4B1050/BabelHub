@@ -72,9 +72,9 @@ Retención de registros de auditoría y seguridad: dos años (AUD-11).
 
 | Elemento | Decisión |
 | :--- | :--- |
-| Objetivos | **RPO ≤ 24 horas** y **RTO ≤ 4 horas**. |
+| Objetivos | **RPO de 15 minutos** con el archivado de WAL (24 horas solo si el archivo de cambios está roto, PLA-15 y PLA-21) y **RTO ≤ 4 horas** (PLA-10). |
 | Qué se respalda | Las bases `ecommerce` (con todos sus esquemas, incluido `identidad`) e `inventario` (una copia consistente de las dos bases al mismo instante, PLA-09, de la que se restaura el clúster o se extrae cada base), el archivado continuo de WAL, la configuración de n8n y de Evolution API, y los archivos de Compose sin secretos. La base técnica de Evolution API entra en la copia del clúster, cifrada, pero al restaurar se descarta y se vuelve a emparejar el número de WhatsApp; el entorno de ensayo no levanta Evolution API (PLA-39). Los archivos digitales ya viven en el almacén de objetos. |
-| Frecuencia | Volcado diario y archivado continuo de WAL (RPO de minutos); una réplica de PostgreSQL en caliente es una mejora opcional. |
+| Frecuencia | Copia consistente diaria de las dos bases y archivado continuo de WAL (RPO de minutos); una réplica de PostgreSQL en caliente es una mejora opcional. |
 | Cifrado | Cifrado antes de salir de la VM del Inventario (volcado y WAL). La clave se guarda fuera de la VM de datos, del repositorio y del almacén de respaldos, con una copia fuera de línea en poder de la persona responsable (PLA-17); la restauración debe poder hacerse sin la VM original. |
 | Destino | Almacén de objetos (Oracle Object Storage), en un bucket distinto del de los libros y con una credencial de la VM que solo permite agregar objetos, no borrar ni sobrescribir (PLA-16). **Riesgo aceptado (B13):** si se pierde la cuenta de Oracle se pierden también los respaldos; la copia fuera de Oracle queda pospuesta. |
 | Retención | Escalonada: 7 diarios, 4 semanales y 3 mensuales (decidido el 2026-11-12, PLA-18). Al restaurar, se vuelven a aplicar las supresiones y anonimizaciones posteriores (PLA-19). |

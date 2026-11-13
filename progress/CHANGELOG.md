@@ -8,12 +8,12 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 - **Proceso:** puerta de aprobación por gravedad (Bloqueante, Importante, Menor) en `docs/07-proceso-de-desarrollo/04-aprobacion-delegada.md`, skill `spec-approve`, registro `progress/aprobaciones.md` con huella, registro de Menores en `progress/hallazgos.md` y validación en `tools/SpecCheck` con pruebas en `tests/tools`.
 - **Aprobadas:** `transversal-auditoria` (huella `0a3077334d725f96`) y `transversal-plataforma` (huella `0bfc0ef175eb8bf4`), cada una con los tres revisores sin Bloqueantes ni Importantes.
 - **Decisiones de la persona responsable:** Oracle Object Storage para los respaldos (riesgo B13 aceptado), MailKit con una cuenta de Gmail sencilla, Culqi y OpenCode Go como proveedores, cuatro rondas más de revisión autorizadas, cuota de correo simplificada en la spec (los tamaños y topes pasan al plan).
-- **Specs reescritas o ampliadas:** `transversal-auditoria` (AUD-01 a AUD-41), `transversal-plataforma` (PLA-01 a PLA-43), `identidad-seguridad` (IDE-01 a IDE-80, con cancelación diferida, clave comprometida y cuota de correo).
+- **Specs reescritas o ampliadas:** `transversal-auditoria` (AUD-01 a AUD-41), `transversal-plataforma` (PLA-01 a PLA-43), `identidad-seguridad` (IDE-01 a IDE-86, con cancelación diferida, clave comprometida y cuota de correo).
 - **Documentos alineados:** autenticación, operación segura, despliegue (copia consistente del clúster, restauración solo del clúster completo), modelo de datos (`fecha_confirmacion`, segundo factor del personal), privacidad y bloqueos.
 
 ### Pendiente
-- `identidad-seguridad` sigue en `Draft`: la aprueba la persona responsable. Antes de planificar, resolver con ella los valores iniciales de la cuota de correo y de la cancelación diferida (`progress/hallazgos.md`).
-- Reabrir `transversal-auditoria` (referencias a IDE-69 e IDE-73, AUD-37), `inventario-seleccion-fuente` (requisito receptor de IDE-72), carrito y pagos (estado de cuenta) y `transversal-seguridad` (SEG-25) cuando se planifique cada una.
+- `identidad-seguridad` sigue en `Draft`. Los valores de la cuota de correo y de la cancelación diferida ya están decididos (`progress/decisiones-previas-al-plan.md`); falta la aprobación final tras la auditoría de cierre.
+- Reabrir al planificar cada una: `transversal-auditoria` (AUD-37), `inventario-seleccion-fuente`, carrito, pagos, pedidos, envíos, devoluciones y reclamaciones, `transversal-seguridad` y `web-base` (detalle en `progress/hallazgos.md`).
 
 ## 2026-11-06 — Auditoría final de coherencia y cobertura
 

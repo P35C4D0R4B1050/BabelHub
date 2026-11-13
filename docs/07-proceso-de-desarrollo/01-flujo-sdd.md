@@ -15,8 +15,8 @@ stateDiagram-v2
 direction LR
 [*] --> Draft: spec-new
 Draft --> Draft: spec-clarify y spec-auditor
-Draft --> Approved: aprueba la persona
-Approved --> Planned: spec-plan, spec-tasks y aprueba la persona
+Draft --> Approved: aprueba la persona o el agente delegado (`04-aprobacion-delegada.md`)
+Approved --> Planned: spec-plan, spec-tasks y aprueba la persona o el agente delegado
 Planned --> InProgress: spec-implement
 InProgress --> InProgress: tarea, prueba y commit
 InProgress --> Done: spec-verify converge

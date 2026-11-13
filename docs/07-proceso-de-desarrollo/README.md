@@ -7,5 +7,6 @@ Cómo se construye y se verifica BabelHub: Spec-Driven Development, convenciones
 | [01 Flujo SDD](01-flujo-sdd.md) | Ciclo de una feature, puertas humanas, validaciones, skills y agentes. |
 | [02 Convenciones técnicas](02-convenciones-tecnicas.md) | Git, nombres, API, configuración, persistencia, CI y Docker. |
 | [03 Estrategia de pruebas](03-estrategia-de-pruebas.md) | Pirámide, umbrales de cobertura, dobles de prueba y puertas. |
+| [04 Aprobación delegada](04-aprobacion-delegada.md) | Cuándo y cómo el agente aprueba specs y planes por delegación: gravedad, puerta, registro y límites. |
 
 Las reglas obligatorias están en `AGENTS.md`; este directorio las desarrolla.

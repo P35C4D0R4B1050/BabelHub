@@ -79,6 +79,8 @@ Lenguaje común del dominio. El código, las specs y la interfaz usan estos tér
 | **Sesión web** | Sesión del navegador, guardada en el servidor: vence a los 30 minutos sin interacción y tiene un máximo de 7 días (clientes) u 8 horas (personal). | Credencial de acceso. |
 | **Alerta de seguridad** | Aviso que genera cada servicio al superar un umbral de accesos denegados o ingresos fallidos; se ve en la lista de la administración y llega por correo. | Alerta técnica (falla al registrar un evento). |
 | **Alerta técnica** | Aviso por correo a los administradores centrales que se genera cuando falla el registro de un evento de seguridad (AUD-12), la depuración diaria (AUD-31) o un envío de correo (IDE-65); no tiene pantalla y se agrupa en ventanas de 15 minutos (AUD-29). | Alerta de seguridad. |
+| **Alerta a la administración** | Alerta técnica (AUD-29, AUD-40) o de seguridad (SEG-09) que llega por correo a los administradores centrales activos; tiene un cupo exclusivo de la cuota diaria de correo y un tope de 24 correos al día por motivo y servicio (IDE-66, IDE-82). | Alerta crítica de cuenta. |
+| **Alerta crítica de cuenta** | Primera alerta de dispositivo no reconocido, de restablecimiento del segundo factor o de cambio de contraseña de cada tipo y cuenta en 24 horas (IDE-74); no se suprime por cuota (IDE-77). | Alerta a la administración. |
 
 ## Método
 
