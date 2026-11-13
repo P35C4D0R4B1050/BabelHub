@@ -32,8 +32,9 @@ public sealed class PostgresDeRolesFixture : IAsyncLifetime
             CREATE ROLE depuracion NOLOGIN;
             CREATE ROLE rol_identidad NOLOGIN;
             CREATE ROLE rol_pedidos NOLOGIN;
+            CREATE ROLE rol_plataforma NOLOGIN;
             CREATE ROLE acceso LOGIN NOINHERIT PASSWORD 'acceso-pruebas-0123456789';
-            GRANT rol_identidad, rol_pedidos TO acceso;
+            GRANT rol_identidad, rol_pedidos, rol_plataforma TO acceso;
 
             CREATE SCHEMA identidad AUTHORIZATION propietario;
             CREATE SCHEMA pedidos AUTHORIZATION propietario;
@@ -50,6 +51,16 @@ public sealed class PostgresDeRolesFixture : IAsyncLifetime
             """;
         await using var comando = Administracion.CreateCommand(preparacion);
         await comando.ExecuteNonQueryAsync();
+
+        // La tabla de eventos de límite del Inventario (plataforma.eventos_limite), con el permiso mínimo del rol del esquema.
+        await using var eventos = Administracion.CreateCommand(
+            BabelHub.Inventario.Infrastructure.Plataforma.DefinicionDeEventosDeLimite.Sql + """
+            ALTER SCHEMA plataforma OWNER TO propietario;
+            ALTER TABLE plataforma.eventos_limite OWNER TO propietario;
+            GRANT USAGE ON SCHEMA plataforma TO rol_plataforma;
+            GRANT SELECT, INSERT, DELETE ON plataforma.eventos_limite TO rol_plataforma;
+            """);
+        await eventos.ExecuteNonQueryAsync();
 
         var cadena = new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString())
         {

@@ -234,7 +234,7 @@ public sealed class UnidadDeTrabajoPostgresTests(PostgresDeRolesFixture bd) : IC
             "SELECT string_agg(r.rolname, ',' ORDER BY r.rolname) FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.roleid JOIN pg_roles u ON u.oid = m.member WHERE u.rolname = 'acceso'");
 
         Assert.False(hereda);
-        Assert.Equal("rol_identidad,rol_pedidos", miembros);
+        Assert.Equal("rol_identidad,rol_pedidos,rol_plataforma", miembros);
         Assert.DoesNotContain("depuracion", miembros, StringComparison.Ordinal);
         Assert.DoesNotContain("propietario", miembros, StringComparison.Ordinal);
     }
