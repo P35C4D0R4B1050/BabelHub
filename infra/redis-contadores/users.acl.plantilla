@@ -1,0 +1,2 @@
+user default off
+user limites on >__CLAVE_LIMITES__ ~lim:* ~blq:* ~idem:* ~rech:* ~rsv:* -@all +evalsha +eval +script|load +time +dbsize +pttl +exists +zadd +zremrangebyscore +zcard +zrange +zrem +set +get +pexpire +del +ping +hello +client|setinfo +client|setname +echo

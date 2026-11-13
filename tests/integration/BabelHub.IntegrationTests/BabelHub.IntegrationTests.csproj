@@ -7,11 +7,14 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="StackExchange.Redis" />
+    <PackageReference Include="Testcontainers" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\BabelHub.Shared\BabelHub.Shared.csproj" />
+    <ProjectReference Include="..\..\..\src\BabelHub.Ecommerce\BabelHub.Ecommerce.Infrastructure\BabelHub.Ecommerce.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

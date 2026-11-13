@@ -42,5 +42,19 @@ services:
       retries: 5
     restart: unless-stopped
 
+  redis-contadores:
+    # Contadores de límites de uso (transversal-seguridad): instancia dedicada, sin expulsión de claves, con AOF y un usuario ACL
+    # restringido. La contraseña (32 caracteres o más) llega por variable de entorno; en el despliegue se activa TLS (REDIS_TLS=1).
+    image: redis:7-alpine
+    entrypoint: ["sh", "/etc/redis-contadores/iniciar.sh"]
+    environment:
+      BABELHUB__Seguridad__ClaveDeRedisDeLimites: ${BABELHUB__Seguridad__ClaveDeRedisDeLimites:?define una contraseña de al menos 32 caracteres}
+      REDIS_TLS: ${REDIS_TLS:-0}
+    volumes:
+      - ./redis-contadores:/etc/redis-contadores:ro
+    ports:
+      - "127.0.0.1:${REDIS_CONTADORES_PORT:-6380}:6379"
+    restart: unless-stopped
+
 volumes:
   postgres-data:
