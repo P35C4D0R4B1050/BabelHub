@@ -62,6 +62,13 @@ public sealed class PostgresDeRolesFixture : IAsyncLifetime
             """);
         await eventos.ExecuteNonQueryAsync();
 
+        await using var entradas = Administracion.CreateCommand(
+            BabelHub.Ecommerce.Infrastructure.Plataforma.DefinicionDeEntradasProcesadas.Sql + """
+            ALTER TABLE plataforma.entradas_procesadas OWNER TO propietario;
+            GRANT SELECT, INSERT, UPDATE, DELETE ON plataforma.entradas_procesadas TO rol_plataforma;
+            """);
+        await entradas.ExecuteNonQueryAsync();
+
         var cadena = new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString())
         {
             Username = "acceso",
