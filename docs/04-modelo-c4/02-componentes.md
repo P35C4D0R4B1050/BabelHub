@@ -341,5 +341,5 @@ class TIE,SUC,ADM,SESW,SEGW,LEG,MEZ,CE,CI,CD,CA n
 | Elemento | Dónde vive | Regla |
 | :--- | :--- | :--- |
 | `BabelHub.Shared` | Referenciado por Presentación e Infraestructura de ambos servicios | Solo contratos (DTOs, constantes); no lo referencian Dominio ni Aplicación. |
-| Auditoría y eventos de seguridad | En cada servicio (una tabla por base), mismo contrato | Misma transacción que el cambio; si no se puede auditar, la operación falla (AUD-04). |
+| Auditoría y eventos de seguridad | En cada servicio (en el E-commerce, la de Identidad aparte en su esquema aislado), mismo contrato | Misma transacción que el cambio; si no se puede auditar, la operación falla (AUD-04). |
 | Errores uniformes y límites | En cada Api | `problem+json` y respuesta única de límite excedido (SEG-03, SEG-07). |

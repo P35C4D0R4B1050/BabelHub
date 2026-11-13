@@ -12,7 +12,7 @@ Traduce el [modelo de dominio](../01-analisis-de-sistema/07-modelo-de-dominio.md
 | Nombres | Tablas y columnas en español, minúsculas con guion bajo (`reservas`, `fecha_expiracion`). |
 | Borrado | Baja lógica para catálogo y usuarios; auditoría y hojas de reclamación nunca se borran (solo se anonimiza lo que corresponda). |
 | Concurrencia | Columna de versión por fila (`version`) en agregados con escritura concurrente (stock). |
-| Permisos | Un rol por esquema que solo puede usar su propio esquema (`REVOKE` a los demás); el rol de la aplicación no es dueño de las tablas y no puede modificar ni borrar la auditoría. En el Inventario, además, seguridad por filas por sucursal (RLS). |
+| Permisos | Un rol por esquema que solo puede usar su propio esquema (`REVOKE` a los demás); el rol de la aplicación no es dueño de las tablas y no puede modificar ni borrar la auditoría; solo un rol de depuración, distinto, con permiso limitado a las columnas de datos personales, anonimiza (AUD-19). En el Inventario, además, seguridad por filas por sucursal (RLS). |
 | Datos personales | Marcados en el diccionario; el borrado o la anonimización se prueba (RNF23). |
 
 ## 2. Inventario (base `inventario`, un esquema por módulo)
@@ -31,13 +31,13 @@ RESERVAS }o--|| PEDIDOS_REF : "pertenece a"
 | :--- | :--- | :--- |
 | `fuentes` | id, nombre, region, direccion, contacto_aviso, activa, es_recepcion | Nombre único; `activa` por defecto verdadero; **una sola fuente con `es_recepcion`** (índice único parcial), por defecto Lima (FUE-19). |
 | `stock` | fuente_id, edicion_id, fisico, reservado, version | PK (fuente_id, edicion_id); **CHECK (fisico >= 0 AND reservado >= 0 AND reservado <= fisico)**, que impide el vendible negativo incluso ante concurrencia. |
-| `reservas` | id, pedido_id, cliente_id, huella_origen, fuente_id, edicion_id, cantidad, estado, fecha_expiracion, clave_idempotencia, fecha_creacion | Estado en (pendiente, confirmada, cerrada, liberada, expirada); `cerrada` se usa al entregar, pasar a en reparto o consumirse en el despacho de un traslado (el destino recibe una reserva nueva); `clave_idempotencia` única por cliente; índice parcial sobre estado pendiente por cliente (límite de una pendiente). |
+| `reservas` | id, pedido_id, cliente_id, huella_origen, fuente_id, edicion_id, cantidad, estado, fecha_expiracion, fecha_confirmacion, clave_idempotencia, fecha_creacion | Estado en (pendiente, confirmada, cerrada, liberada, expirada); `cerrada` se usa al entregar, pasar a en reparto o consumirse en el despacho de un traslado (el destino recibe una reserva nueva); `clave_idempotencia` única por cliente; índice parcial sobre estado pendiente por cliente (límite de una pendiente). |
 | `traslados` | id, edicion_id, origen_id, destino_id, cantidad, estado, motivo, pedido_id, fechas por estado | Origen distinto de destino; estado en el ciclo definido (incluye `cancelado`); cantidad positiva; un traslado con `pedido_id` no pasa a `rechazado`. |
 | `rutas` | origen_id, destino_id, plazo_dias, actualizada_en | PK (origen_id, destino_id); origen distinto de destino; **CHECK (plazo_dias > 0)**; direccional. |
 | `ajustes` | id, fuente_id, edicion_id, motivo, cantidad, conteo_real, usuario_id, fecha | Motivo en (merma, danado, correccion_conteo, ingreso_inicial, devolucion); `devolucion_id` único para no reingresar dos veces; solo inserción. |
 | `ingresos` | id, fuente_id, edicion_id, cantidad, referencia, nota, usuario_id, fecha | Solo en la fuente de recepción; **CHECK (cantidad entre 1 y 5000)**; solo inserción; el ajuste con motivo ingreso de mercadería se crea en la misma transacción (AJU-13, AJU-19). |
 | `eventos_limite` | clave, instante | Un registro por reserva iniciada, por cliente y por origen (SEL-14, SEL-19); el conteo usa una ventana deslizante (SEG-21) y se inserta en la misma transacción de la reserva; los registros viejos se purgan a las 24 horas. La clave del origen es una huella no reversible, no la IP (SEG-25). |
-| `auditoria` | id, fecha_utc, usuario_id, rol, accion, detalle, resultado, secuencia | Solo inserción; sin permisos de modificación para la cuenta de aplicación. |
+| `auditoria` | id, fecha_utc, servicio, es_auditoria, es_seguridad, actor, rol, accion, objeto, sucursal_origen_id, sucursal_destino_id, origen, motivo, detalle (máx. 1000 caracteres; campos personales marcados), truncado, resultado, secuencia | Solo inserción; sin permisos de modificación para la cuenta de aplicación. Solo un rol de depuración, distinto, anonimiza los datos personales (AUD-19). Los contadores de límites y el estado de las alertas viven aparte (AUD, §5). |
 
 **Regla de oro:** `reservado` se actualiza en la misma transacción que la fila de `reservas`, y el `CHECK` es la última defensa contra la sobreventa (AD23). El vendible se calcula como `fisico - reservado`; no se almacena.
 
@@ -66,6 +66,7 @@ Esquemas: `catalogo`, `carrito`, `pagos`, `pedidos`, `envios`, `devoluciones`, `
 | `avisos` | id, evento_id, destinatario, estado, intentos, proximo_intento | Único (evento_id, destinatario) para no duplicar (NOT-05). |
 | `sesiones_web` | id opaco, usuario_id, rol, sucursal_id, ultima_actividad, expira_absoluta, host | Esquema `web`. Sesión del servidor con cookie opaca (WEB-04, WEB-27); compartida por la réplica de gestión; se purga al vencer. |
 | `auditoria` | como en Inventario | Solo inserción; la comparten los módulos del E-commerce salvo Identidad, que tiene la suya en su esquema aislado. |
+| `alertas` | id, servicio, motivo, clase (seguridad o técnica), primera_ocurrencia, ocurrencias, estado (pendiente o revisada), revisada_por, revisada_en | **No es auditoría**: se actualiza al agrupar (ventana fija de 15 minutos) y al revisar (AUD-13, AUD-34). Existe también en el Inventario. |
 
 ## 4. Identidad (esquema `identidad` de la base `ecommerce`)
 
@@ -74,8 +75,8 @@ Esquemas: `catalogo`, `carrito`, `pagos`, `pedidos`, `envios`, `devoluciones`, `
 | `usuarios` | id, nombre, correo, correo_verificado, resumen_contrasena, rol, sucursal_id, activo, whatsapp, segundo_factor_activo, mayor_de_edad_declarado_en, fecha_cancelacion | Correo único; **CHECK**: sucursal obligatoria solo para encargado; un encargado activo por sucursal (índice único parcial). |
 | `renovaciones` | id, usuario_id, huella, expira_absoluta, revocada | La huella reemplaza al valor de la renovación; nunca se guarda el valor; `expira_absoluta` se hereda en cada uso. |
 | `codigos_un_solo_uso` | id, usuario_id o correo, proposito, huella, expira, intentos, usado | Se guarda solo la huella; caduca; se borra tras vencer. |
-| `segundo_factor` | usuario_id, secreto_cifrado | Solo para administradores; cifrado en reposo. |
-| `codigos_respaldo` | usuario_id, huella, usado | 8 por administrador; un solo uso. |
+| `segundo_factor` | usuario_id, secreto_cifrado | Personal (obligatorio) y clientes que lo activaron; cifrado en reposo. |
+| `codigos_respaldo` | usuario_id, huella, usado | 8 por usuario con segundo factor; un solo uso. |
 | `consentimientos` | usuario_id, finalidad, vigente, fecha | Historial por cambio. |
 | `dispositivos` | usuario_id, huella_marca, region, primera_vez, ultima_vez | Solo la huella de la marca y la región del borde; se eliminan al cancelar la cuenta. |
 | `cambios_correo_pendientes` | id, usuario_id, correo_nuevo, dispositivo_huella, region, estado, vence_en | Estados: pendiente, confirmado, rechazado, vencido; un cambio inusual vence a las 24 horas. |
@@ -83,6 +84,7 @@ Esquemas: `catalogo`, `carrito`, `pagos`, `pedidos`, `envios`, `devoluciones`, `
 | `aceptaciones` | usuario_id o pedido_id, texto (términos, privacidad, reembolso, mayoría de edad), version, fecha | Solo inserción; una fila por texto aceptado en el registro (IDE-34) o en el checkout (CAR-22). |
 | `solicitudes_arco` | id, usuario_id, tipo, estado, respuesta, fecha, fecha_limite | Estados: recibida, en atención, atendida, rechazada. `fecha_limite` = 20 días hábiles (acceso) o 10 (resto). |
 | `eventos_ingreso` | clave (cuenta+origen), instante | Un registro por ingreso fallido (SEG-06); cuenta también para cuentas inexistentes; ventana deslizante. |
+| `bajas_titulares` | id_opaco, fecha, estado (pendiente o entregada), intentos | Buzón de salida de Identidad para la baja al Inventario (IDE-64, AUD-32): se escribe en la misma operación que la cancelación y se reintenta; el Inventario guarda su copia por `id_opaco` para reaplicarla y no duplicar. |
 | `auditoria` | como en Inventario | Solo inserción; propia de Identidad por el aislamiento del esquema. La interfaz web la presenta junto con la del resto del E-commerce y la del Inventario (AUD-09). |
 
 ## 4.1 Asistente (sin tablas propias)
@@ -98,7 +100,7 @@ El Asistente no tiene datos de negocio (los obtiene de los contratos de otros m�
 | Límite por cliente y por origen | Índices sobre `eventos_limite.clave` e `instante`. |
 | Pedidos de un cliente / de una sucursal | (cliente_id, fecha), (fuente_id, estado). |
 | Búsqueda de catálogo | Índice de texto sobre título, autor y editorial. |
-| Auditoría por fecha, usuario y acción | (fecha_utc DESC), (usuario_id), (accion). |
+| Auditoría por fecha, usuario y acción | (fecha_utc DESC), (actor), (accion). |
 
 ## 6. Datos personales y retención
 
@@ -107,7 +109,7 @@ El Asistente no tiene datos de negocio (los obtiene de los contratos de otros m�
 | `usuarios` | Nombre, correo, WhatsApp | Se anonimizan al cancelar la cuenta. |
 | `pedidos`, `envios` | Dirección, contacto | Se anonimiza el contacto a los 2 años *(propuesta)*. |
 | `hojas_reclamacion` | Datos del consumidor | Se conservan al menos 2 años. |
-| `auditoria` | Usuario, origen | Se anonimiza a los 2 años o al cancelar la cuenta (AUD-11). |
+| `auditoria` | Usuario, origen, campos personales del detalle | Se anonimiza a los 2 años o al cancelar la cuenta (AUD-11, AUD-19, AUD-32). |
 | Respaldos | Todos | Cifrados; rotan según la retención. |
 
 ## 7. Migraciones

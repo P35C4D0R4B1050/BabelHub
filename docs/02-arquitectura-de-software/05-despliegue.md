@@ -70,7 +70,7 @@ PAG["Culqi"]
 ENV["Operador logístico"]
 LLM["Proveedor de LLM"]
 WA["WhatsApp"]
-ALM[("Almacén de archivos y respaldos<br/>R2 / Object Storage")]
+ALM[("Almacén de archivos y respaldos<br/>Oracle Object Storage")]
 end
 
 USR -->|"HTTPS"| CFE
@@ -136,7 +136,7 @@ style LLM fill:#222,stroke:#fff,color:#fff
 | **VM-INVENTARIO** | ARM, 1 OCPU y 6 GB | Servicio Inventario, **réplica de gestión** del E-commerce, PostgreSQL (dos bases de negocio, `ecommerce` e `inventario`, y la base técnica `evolution`). | El sistema más crítico con su base. La base **no tiene acceso desde Internet**. La réplica de gestión es la misma imagen del E-commerce con el perfil «solo gestión» (Sucursal y Admin). |
 | **VM-AUX** | AMD micro | Salto SSH y monitoreo ligero. | Aprovecha una VM gratuita sin consumir cupo ARM. Ver §4. |
 
-**Compromiso aceptado:** la base de datos comparte VM con el Inventario, por lo que deja de ser una VM «solo de datos». Es el precio de usar solo recursos gratuitos. Se compensa con red privada, un rol por esquema, seguridad por filas, contenedores sin privilegios y respaldo fuera de Oracle (§4 y §5). Si hubiera presupuesto, mover PostgreSQL a una tercera VM ARM (≈ 7 USD al mes, a verificar) es un cambio de Compose, no de código.
+**Compromiso aceptado:** la base de datos comparte VM con el Inventario, por lo que deja de ser una VM «solo de datos». Es el precio de usar solo recursos gratuitos. Se compensa con red privada, un rol por esquema, seguridad por filas, contenedores sin privilegios y respaldo en el almacén de objetos (§4 y §5). Si hubiera presupuesto, mover PostgreSQL a una tercera VM ARM (≈ 7 USD al mes, a verificar) es un cambio de Compose, no de código.
 
 ### Estimación de memoria (a validar con mediciones reales)
 
@@ -178,7 +178,7 @@ PostgreSQL corre en VM-INVENTARIO como **una sola instancia** con dos bases de n
 
 | Base | Dueño | Contenido |
 | :--- | :--- | :--- |
-| `ecommerce` | Servicio E-commerce | Un **esquema por módulo**: `catalogo`, `carrito`, `pagos`, `pedidos`, `envios`, `devoluciones`, `biblioteca`, `reclamaciones`, `web` (sesiones) y **`identidad`** (aislado por rol). Una sola tabla de auditoría del sistema. |
+| `ecommerce` | Servicio E-commerce | Un **esquema por módulo**: `catalogo`, `carrito`, `pagos`, `pedidos`, `envios`, `devoluciones`, `biblioteca`, `reclamaciones`, `web` (sesiones) y **`identidad`** (aislado por rol). Una tabla de auditoría compartida por los módulos y otra en el esquema aislado `identidad`. |
 | `inventario` | Servicio Inventario | Fuentes, stock, reservas, traslados, ajustes, ingresos de mercadería y su auditoría. |
 | `evolution` | Evolution API | Datos propios de la herramienta de WhatsApp (n8n guarda los suyos en un volumen). No es de nuestros sistemas. |
 
@@ -194,10 +194,10 @@ PostgreSQL corre en VM-INVENTARIO como **una sola instancia** con dos bases de n
 
 ### 5.3 Reglas que sostienen el aislamiento
 
-- Un rol por esquema y por servicio, sin ser superusuario ni dueño de las tablas; `REVOKE CONNECT ... FROM PUBLIC` y sin permiso sobre otras bases. Las aplicaciones usan un rol de lectura y escritura sin permiso de `UPDATE` ni `DELETE` sobre la auditoría.
+- Un rol por esquema y por servicio, sin ser superusuario ni dueño de las tablas; `REVOKE CONNECT ... FROM PUBLIC` y sin permiso sobre otras bases. Las aplicaciones usan un rol de lectura y escritura sin permiso de `UPDATE` ni `DELETE` sobre la auditoría; la anonimización de AUD-19 la hace un rol de depuración aparte, solo sobre las columnas de datos personales.
 - **Seguridad por filas (RLS)** en el Inventario: el alcance por sucursal se repite en la base (política por sucursal con `FORCE ROW LEVEL SECURITY`; la aplicación fija la sucursal con `SET LOCAL` en cada transacción). Es una **segunda capa** frente a un error de alcance en la Aplicación; no protege contra el control total del servidor.
 - Límite de conexiones por rol y `statement_timeout`, para que un sistema no agote al otro.
-- El volcado y la restauración se hacen **por base**; la restauración de `inventario` no toca `ecommerce`.
+- El respaldo es una copia consistente del clúster con archivado de WAL (PLA-09), que permite restaurar las dos bases al mismo instante; en producción solo se restaura el clúster completo; extraer una sola base en una instancia aparte queda para ensayo o consulta.
 - Entre `ecommerce` e `inventario` no hay llaves foráneas: solo identificadores (por ejemplo, `edicion_id`) y contratos REST.
 
 **Costo aceptado:** ambas bases comparten CPU, disco y memoria con la aplicación de Inventario. Una consulta pesada de un servicio puede afectar al otro. Se mitiga con los límites anteriores y con la medición de carga (k6).
@@ -210,18 +210,19 @@ Sin redundancia, **cada VM es un punto de falla**. La arquitectura aísla el efe
 | :--- | :--- | :--- |
 | **El contenedor de Inventario** | **No cae todo.** El catálogo se sigue mostrando con la última disponibilidad conocida y el checkout informa que no puede validar el stock, sin cobrar a ciegas (CAT-12, CAR-06). | Reinicio automático y `healthcheck`. La caché de disponibilidad vive en Redis de la VM-VENTAS, no en la que cae. |
 | **VM-VENTAS** | Sin tienda, catálogo ni compras. El Inventario y su base siguen vivos, y el personal sigue operando gracias a la **réplica de gestión**. Sin avisos de WhatsApp. | Nginx pasa el host de gestión al servidor de respaldo (la réplica en VM-INVENTARIO, misma imagen del E-commerce en perfil «solo gestión»). Las sesiones están en la base, así que el cambio no cierra sesiones. Recrear la VM-VENTAS desde las imágenes (RTO ≤ 4 h); los avisos pendientes se reintentan (NOT-04). |
-| **VM-INVENTARIO** | **Cae todo**: ahí están también las bases `ecommerce` e `inventario`, así que no hay inicio de sesión, ni catálogo, ni inventario. Es el costo del compromiso. | Respaldo diario cifrado y archivado continuo de WAL **fuera de Oracle**; restaurar en la misma VM o en otra (RPO de minutos con WAL y ≤ 24 h solo con el volcado; RTO ≤ 4 h). Mejora opcional y gratuita: una **réplica de PostgreSQL en caliente en VM-VENTAS** (~1 GB) con promoción manual, que baja el RTO a minutos. |
+| **VM-INVENTARIO** | **Cae todo**: ahí están también las bases `ecommerce` e `inventario`, así que no hay inicio de sesión, ni catálogo, ni inventario. Es el costo del compromiso. | Respaldo diario cifrado y archivado continuo de WAL **en el almacén de objetos (Oracle Object Storage)**; restaurar en la misma VM o en otra (RPO de minutos con WAL y ≤ 24 h solo con el volcado; RTO ≤ 4 h). Mejora opcional y gratuita: una **réplica de PostgreSQL en caliente en VM-VENTAS** (~1 GB) con promoción manual, que baja el RTO a minutos. |
 | **VM-BORDE** | Sin entrada por Nginx. | El **segundo conector de cloudflared** en VM-VENTAS apunta directo a la aplicación; Cloudflare reparte entre ambos. Recrear la VM. |
 | **VM-AUX** | Sin salto SSH ni monitoreo; el sistema sigue funcionando. | Acceder desde la IP del administrador. |
-| **La cuenta de Oracle** | Se pierde todo. | Restaurar los respaldos cifrados del almacén de objetos en otra máquina con el mismo Compose (ver [operación segura](../05-seguridad/07-operacion-segura.md) §5). |
+| **La cuenta de Oracle** | Se pierde todo, **también los respaldos y los libros digitales** (están en el almacén de la misma cuenta). | Sin copia externa por ahora (riesgo aceptado, B13); una copia fuera de Oracle es una mejora posterior. Si la cuenta sigue activa, restaurar los respaldos cifrados del almacén de objetos en otra máquina con el mismo Compose (ver [operación segura](../05-seguridad/07-operacion-segura.md) §5). |
 
-**Compromiso de la VM-INVENTARIO.** Concentra la base, el Inventario y la réplica de gestión. Si alguien toma el control de ese servidor, la base queda comprometida y la seguridad por filas no ayuda. Por eso la defensa es en profundidad (AD31): contenedores sin privilegios y en redes separadas, `pg_hba` por base y origen, SSH solo por la VM-AUX, discos y respaldos cifrados, detección de cambios y, sobre todo, **recuperación**: respaldo y WAL fuera de Oracle.
+**Compromiso de la VM-INVENTARIO.** Concentra la base, el Inventario y la réplica de gestión. Si alguien toma el control de ese servidor, la base queda comprometida y la seguridad por filas no ayuda. Por eso la defensa es en profundidad (AD31): contenedores sin privilegios y en redes separadas, `pg_hba` por base y origen, SSH solo por la VM-AUX, discos y respaldos cifrados, detección de cambios y, sobre todo, **recuperación**: respaldo y WAL cifrados en el almacén de objetos.
 
 ### 6.1 Limitaciones declaradas
 
 Lo siguiente se acepta de forma consciente y debe figurar en el informe y en la exposición como limitación, no como omisión:
 
 - **Punto único de falla de datos:** si cae VM-INVENTARIO caen las dos bases y, con ellas, el inicio de sesión, el catálogo y el inventario (AD31); la réplica de gestión solo mantiene al personal si la base sigue viva. No hay redundancia ni SLA (DA03).
+- **Sin copia fuera de Oracle (B13):** los respaldos, el archivado de WAL y los libros digitales están en el almacén de objetos de la misma cuenta; si se pierde la cuenta, se pierde todo. Se acepta por falta de recursos y se implementará más adelante si el presupuesto lo permite.
 - **Entrada con poca CPU:** VM-BORDE tiene 1/8 de OCPU; si no rinde, cloudflared y Nginx pasan a VM-VENTAS (B11).
 - **Memoria casi al límite en VM-INVENTARIO** (ver el [presupuesto de recursos](07-presupuesto-de-recursos.md)).
 - **Aspectos legales sin consulta experta** (B09): el marco legal usa valores propuestos; imprescindible revisarlo antes de operar con clientes reales.
@@ -263,12 +264,12 @@ Complementos: firewall del sistema operativo con las mismas reglas, secretos com
 - Disponibilidad de subred privada sin costo.
 - Registro de imágenes para recrear VMs sin depender de una cuenta de Oracle (por ejemplo, el registro de contenedores del repositorio).
 - Costo y registro del dominio para Cloudflare, con el subdominio de gestión y sus reglas de Access (B04). Mientras no haya dominio se usan nombres de trabajo: la tienda en `<dominio>` y el personal en `gestion.<dominio>`; el Nginx ya enruta por ese prefijo (`gestion.*`).
-- **Verificación de cifras (fecha 2026-11-06, solo fuentes secundarias):** cupo de VMs y disco del Free Tier, condiciones de PAYG y de la recuperación por inactividad; cuotas de Cloudflare R2 (10 GB-mes, 1 millón de operaciones de escritura y 10 millones de lectura al mes) y de Oracle Object Storage (unos 20 GB; cifras antiguas de 10 GB). Confirmar todas en la consola y en las páginas oficiales al crear las cuentas y anotar la fecha.
+- **Verificación de cifras (fecha 2026-11-06, solo fuentes secundarias):** cupo de VMs y disco del Free Tier, condiciones de PAYG y de la recuperación por inactividad; cuota de Oracle Object Storage (unos 20 GB; cifras antiguas de 10 GB). Confirmar todas en la consola y en las páginas oficiales al crear las cuentas y anotar la fecha.
 - Imágenes multi-arch de todos los contenedores (PostgreSQL, Redis, Nginx, cloudflared y .NET ofrecen ARM64 y x86_64).
 - Imágenes ARM64 de n8n y de Evolution API, y consumo real de memoria de ambos.
 - Términos de uso de WhatsApp frente a Evolution API; usar un número dedicado.
 - Culqi: idempotencia, soporte de Yape, reembolsos y llaves de pruebas (sandbox). **La pasarela de pago queda definida: Culqi (AD17).**
-- Almacén de archivos: cuotas gratuitas vigentes de Cloudflare R2 y de Oracle Object Storage, costo de operaciones y límite de tamaño por archivo; elegir uno antes de implementar `ecommerce-biblioteca-digital`.
+- Almacén de archivos (Oracle Object Storage, B02 cerrado el 2026-11-12): cuota gratuita vigente, costo de operaciones y límite de tamaño por archivo; confirmarlos antes de implementar `ecommerce-biblioteca-digital`.
 - Archivado de WAL y réplica opcional de PostgreSQL: herramienta (por ejemplo, pgBackRest o WAL-G) y costo de operación.
 - Contratos con los titulares de derechos: se simulan con datos de ejemplo y los libros se suben directamente (alcance académico; ver [marco legal](../01-analisis-de-sistema/03-marco-legal.md)).
 

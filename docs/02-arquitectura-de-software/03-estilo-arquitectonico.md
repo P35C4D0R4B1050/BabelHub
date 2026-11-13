@@ -151,6 +151,38 @@ La vista de despliegue sobre las VMs de Oracle está en [despliegue](05-desplieg
 | **Almacén de archivos** | Guarda los EPUB y PDF en un bucket privado y los respaldos cifrados; el cliente descarga con URL firmada de corta duración. | AD19, AD20, AD27 |
 | **Caché Redis** | Disponibilidad (corta duración), catálogo (mayor duración) y contadores de límites; vive en la VM del E-commerce. | AD06 |
 
+### 3.1 Módulos de cada servicio
+
+Cada módulo es una carpeta dentro de las capas del servicio (no un proyecto aparte), con un contrato público en la raíz y un interior privado `Interno` (regla 13 de `AGENTS.md`). La tabla resume su responsabilidad y su spec; las dependencias completas, sin ciclos, y los contratos están en [módulos y contratos](../03-diseno-de-software/04-modulos-y-contratos.md) §1.1 y el comportamiento exacto en cada spec.
+
+**Servicio E-commerce (11 módulos)**
+
+| Módulo | Responsabilidad | Spec | Depende de |
+| :--- | :--- | :--- | :--- |
+| **Catálogo** | Obras, ediciones impresas y digitales, licencias, portadas y archivos; muestra la disponibilidad y registra el stock inicial y el ingreso de mercadería en el Inventario. Un título agotado no se da de baja. | `ecommerce-catalogo` | Cliente del Inventario |
+| **Carrito y checkout** | Carrito del cliente, validación de la compra, costo de envío y reserva previa al cobro. | `ecommerce-carrito-checkout` | Catálogo, Identidad, cliente del Inventario |
+| **Pagos** | Cobro con la pasarela (Yape y tarjeta), idempotencia, pago pendiente de confirmación y reembolsos. No guarda datos de tarjeta. | `ecommerce-pagos` | Carrito y checkout, Identidad, cliente del Inventario |
+| **Pedidos** | Ciclo de vida del pedido, sus líneas impresas y digitales, y su anulación o no recogido. | `ecommerce-pedidos` | Pagos, Biblioteca digital, cliente del Inventario |
+| **Envíos** | Despacho a domicilio con operador logístico, guía y estados; descuenta el stock al pasar a en reparto. | `ecommerce-envios` | Pedidos, Carrito y checkout, Identidad, cliente del Inventario |
+| **Devoluciones** | Solicitud, aprobación y reingreso de stock de los impresos, y reembolso. | `ecommerce-devoluciones` | Pedidos, Pagos, Biblioteca digital, cliente del Inventario |
+| **Biblioteca digital** | Acceso del titular a sus libros digitales y descargas con URL firmada de corta duración y límite por compra. Nunca consulta al Inventario. | `ecommerce-biblioteca-digital` | Catálogo, Carrito y checkout, Pagos |
+| **Libro de Reclamaciones** | Hoja de reclamación, su respuesta y su conservación. | `ecommerce-libro-reclamaciones` | Identidad |
+| **Identidad** | Registro, sesión, segundo factor, usuarios y roles, derechos ARCO y firma de las credenciales; esquema aislado por rol. | `identidad-seguridad` | Ninguno (todos usan su contexto de actor) |
+| **Asistente** | Recomendaciones y consulta del estado de pedidos con un LLM externo; solo lectura. | `asistente-compra-ia` | Catálogo, Pedidos, Identidad, cliente del Inventario |
+| **Interfaz web** | Áreas Tienda, Sucursal y Admin, sesión del servidor, estados estándar e índice infinito; sin reglas de negocio. | `web-base`, `web-indice-infinito` | Todos los módulos, cliente del Inventario |
+
+**Servicio Inventario (4 módulos)**
+
+| Módulo | Responsabilidad | Spec | Depende de |
+| :--- | :--- | :--- | :--- |
+| **Fuentes** | Sucursales como fuentes, stock físico, reservado y vendible, rutas entre fuentes, fuente de recepción y unidades vendidas. | `inventario-fuentes` | Ninguno |
+| **Selección y reservas** | Consulta previa, selección de la fuente de despacho y reservas con expiración, atómicas e idempotentes. | `inventario-seleccion-fuente` | Fuentes |
+| **Traslados** | Solicitud, aprobación, despacho y recepción de traslados entre sucursales, vinculados o no a un pedido. | `inventario-traslados` | Fuentes, Selección y reservas |
+| **Ajustes** | Merma, daño, corrección de conteo, ingreso de mercadería (solo en la fuente de recepción) y reingreso por devolución. | `inventario-ajustes` | Fuentes |
+
+**Transversales** (no son módulos propios; cada servicio los cumple con el mismo contrato): auditoría (`transversal-auditoria`), seguridad (`transversal-seguridad`), notificaciones (`transversal-notificaciones`) y calidad de la plataforma (`transversal-plataforma`).
+
+
 ## 4. Reglas de comunicación
 
 | Origen | Destino | Tipo | Propósito |

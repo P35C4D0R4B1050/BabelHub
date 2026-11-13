@@ -30,13 +30,13 @@ La credencial **nunca llega al navegador** (AGENTS.md, regla 9). El navegador so
 | Credencial de acceso | Firmada, de **15 minutos**, con rol y sucursal. | AD22, IDE-02 |
 | Renovación | De **7 días** para el cliente y **8 horas** para el personal, revocable; también se revoca al cambiar la contraseña o el segundo factor (IDE-44); se invalida al cerrar sesión, al desactivar al usuario y al restablecer la contraseña. | AD22, IDE-08, IDE-14, IDE-18 |
 | Contraseña | Mínimo 10 caracteres, fuera de listas comunes o filtradas, sin reglas de composición (guía NIST 800-63B); resumen robusto con sal. | IDE-09, IDE-15, RNF15 |
-| Clave de firma | Solo el módulo Identidad posee la clave de firma y publica la de verificación; la credencial lleva el identificador de la clave y el algoritmo es fijo. Rota cada 90 días o ante sospecha; la clave comprometida y sus renovaciones se dejan de aceptar en 5 minutos como máximo, con la última lista conocida si Identidad no responde. | IDE-35, IDE-36 |
+| Clave de firma | Solo el módulo Identidad posee la clave de firma y publica la de verificación; la credencial lleva el identificador de la clave y el algoritmo es fijo. Rota cada 90 días o ante sospecha; la clave comprometida y sus renovaciones se dejan de aceptar en 5 minutos como máximo: cada servicio renueva su caché de claves y revocaciones al menos cada 5 minutos y rechaza toda credencial si no puede renovarla. | IDE-35, IDE-36, IDE-61 |
 | Protección del segundo factor | El secreto TOTP se guarda cifrado y los códigos de respaldo solo como resumen; un código ya usado en su ventana se rechaza y se acepta un desfase de una ventana; hasta presentar el segundo factor solo se puede configurarlo o presentarlo. El bloqueo por fallos es por cuenta y origen. | IDE-40 a IDE-42, SEG-20 |
 | Aviso de cambio | Al cambiar o restablecer la contraseña llega un aviso al correo, sin la contraseña. | IDE-45 |
 | Renovación | Opaca, validada en el módulo Identidad; hereda el vencimiento absoluto del ingreso (7 días cliente, 8 horas personal) y no lo extiende. Si Identidad la rechaza, la interfaz web cierra la sesión. | IDE-46, WEB-32 |
 | Reto del segundo factor | Entre la contraseña y el código hay 5 minutos; además del bloqueo por cuenta y origen, 10 códigos incorrectos por hora en la cuenta la bloquean 15 minutos. Un código TOTP no se reutiliza en su ventana y se acepta un desfase de una ventana. | IDE-41, IDE-42, IDE-51, SEG-29 |
-| Cambio de correo según riesgo | Desde un dispositivo reconocido y una región habitual se aplica y se avisa en la cuenta y al correo nuevo, sin alertar al anterior (que podría estar comprometido). Desde un dispositivo o región no reconocidos no se aplica, se congelan los cambios sensibles de ese dispositivo y se alerta por todos los medios; el titular lo confirma o rechaza en 24 horas desde un dispositivo reconocido. | IDE-53 a IDE-55 |
-| Cancelación de cuenta | Con pendientes se aplaza hasta cerrarlos; exige contraseña y segundo factor; revoca renovaciones y cancela avisos. | IDE-27, IDE-28, IDE-47 |
+| Cambio de correo según riesgo | Desde un dispositivo reconocido y una región habitual se aplica y se avisa en la cuenta y al correo nuevo, sin alertar al anterior (que podría estar comprometido). Desde un dispositivo o región no reconocidos no se aplica, se congelan los cambios sensibles de ese dispositivo y se alerta por el correo anterior y con un aviso en la cuenta (WhatsApp no se usa); el titular lo confirma o rechaza en 24 horas desde un dispositivo reconocido. | IDE-53 a IDE-55 |
+| Cancelación de cuenta | Con pendientes se aplaza hasta cerrarlos, con aviso por correo, reconfirmación con contraseña en 7 días y posibilidad de desistir; exige contraseña y segundo factor; revoca renovaciones y cancela avisos. | IDE-27, IDE-28, IDE-47, IDE-68 |
 | Textos legales | Identidad guarda la versión vigente y valida la aceptación; sin aceptar la nueva no se pagan ni se hacen cambios sensibles. | IDE-43, IDE-57, IDE-58 |
 | Contexto de lectura del asistente | 5 minutos, sin renovación, con el único alcance de leer los pedidos del cliente en el módulo de pedidos. | IDE-33 |
 | Bloqueo | 5 fallos en 15 minutos bloquean temporalmente el ingreso; la respuesta no distingue si la cuenta existe. | IDE-03, SEG-06 |
@@ -48,7 +48,7 @@ La credencial **nunca llega al navegador** (AGENTS.md, regla 9). El navegador so
 | Recuperación del personal | La restablece el administrador central con una contraseña temporal de un solo uso, auditada. | IDE-23 |
 | Códigos de respaldo | 8 códigos de un solo uso del segundo factor, para el personal y para el cliente que lo active. | IDE-21, IDE-22, IDE-37 |
 
-**Riesgo conocido:** quien controle el correo de una cuenta puede recuperarla (AM03, riesgo residual medio). Se mitiga con el código corto, el límite de intentos y solicitudes, el aviso de cambio de contraseña y el cambio de correo que exige la contraseña actual (IDE-25). El proveedor de correo es un bloqueo abierto (B08).
+**Riesgo conocido:** quien controle el correo de una cuenta puede recuperarla (AM03, riesgo residual medio). Se mitiga con el código corto, el límite de intentos y solicitudes, el aviso de cambio de contraseña y el cambio de correo que exige la contraseña actual (IDE-25). El correo sale por una cuenta de Gmail sencilla con MailKit (B08, cerrado el 2026-11-12).
 
 ## 3. Identidades de servicio y contextos entre módulos
 
@@ -69,7 +69,7 @@ Las credenciales de servicio viven en el entorno de cada contenedor (SEG-11), nu
 1. **Rol:** viene en la credencial. Define qué funciones existen para el usuario (menús, rutas, casos de uso).
 2. **Alcance de sucursal:** viene en la credencial del encargado. Cada caso de uso de la **Aplicación** compara la sucursal del usuario con la del recurso. Los controladores solo verifican el rol, nunca el alcance.
 3. **Propiedad:** un cliente solo accede a lo propio (pedidos, biblioteca, cuenta). La comprobación usa el identificador de la credencial, no un identificador recibido en la solicitud.
-4. **Denegación:** todo acceso fuera de alcance se rechaza, se registra como evento de seguridad (AUD-10) y suma al umbral de alerta (SEG-09).
+4. **Denegación:** todo acceso fuera de alcance se rechaza, se registra como evento de seguridad (AUD-05) y suma al umbral de alerta (SEG-09).
 5. **Por defecto se niega:** una ruta o una función sin política explícita no está disponible.
 
 ### Matriz de verificación
@@ -89,5 +89,5 @@ Cerrar sesión invalida la renovación. Desactivar a un usuario impide su ingres
 ## 6. Decisiones pendientes
 
 - Custodia de la clave de firma (dónde vive la clave privada y cómo se respalda); la rotación está decidida en IDE-36 (CTL-29).
-- Proveedor de correo y configuración de SPF, DKIM y DMARC (B08, AM23).
+- Cuenta de Gmail para el correo transaccional, con su credencial de aplicación en una variable de entorno (B08, AM23).
 - ~~Si se extiende el segundo factor al encargado de sucursal~~ Resuelto el 2026-10-16: obligatorio para todo el personal y opcional para el cliente.

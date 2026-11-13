@@ -17,7 +17,7 @@ Aplica la Ley N.° 29733 y su reglamento (DS 016-2024-JUS) de forma **proporcion
 | Historial de pedidos | Se genera | Seguimiento, devoluciones y cumplimiento | Ejecución del servicio | E-commerce | El titular; la administración; el encargado de recojo (solo su sucursal); logística (solo pedidos a domicilio, de toda la red, para generar guías) | Dos años *(propuesta)* |
 | Biblioteca digital | Se genera | Acceso a lo comprado | Ejecución del servicio | E-commerce | **Solo el titular** y el personal autorizado | Mientras la cuenta esté activa |
 | Hoja de reclamación (nombre, documento, domicilio, correo, monto y detalle) | Consumidor | Libro de Reclamaciones y respuesta por correo | Obligación legal | E-commerce | La administración y el consumidor | Al menos dos años; luego se anonimiza (también las descartadas) |
-| Registros de auditoría y de seguridad | Se genera | Trazabilidad y seguridad | Interés legítimo | Cada servicio | La administración | Dos años |
+| Registros de auditoría y de seguridad | Se genera | Trazabilidad y seguridad | Interés legítimo | Cada servicio | La administración | Dos años; después, el residuo anonimizado sin plazo |
 | Consultas al asistente | Cliente | Responder | Ejecución del servicio | No se persisten con identidad | — | No se conservan |
 | Datos de tarjeta | Cliente a la pasarela | Cobrar | — | **Solo la pasarela** | — | No se almacenan |
 
@@ -50,24 +50,24 @@ Cada proveedor recibe solo los datos mínimos necesarios (RC17).
 | :--- | :--- | :--- | :--- |
 | **Cloudflare** | Tráfico de la tienda (direcciones IP, cabeceras, contenido de las solicitudes mientras viaja). | Red global | Es un intermediario de tránsito; no se guardan datos en él. |
 | **Oracle Cloud** | Todos los datos del sistema (infraestructura). | Región elegida al crear la cuenta | Se prefiere una región cercana; los respaldos se cifran. |
-| **Almacén de objetos** (R2 u Oracle) | Archivos digitales y, en los respaldos, copias cifradas de las bases. | Según el proveedor | Sin datos personales en claro en los respaldos (cifrados). |
+| **Almacén de objetos** (Oracle Object Storage) | Archivos digitales y, en los respaldos, copias cifradas de las bases. | Según el proveedor | Sin datos personales en claro en los respaldos (cifrados). |
 | **Operador logístico** | Nombre, dirección y teléfono del destinatario, solo para generar la guía de un envío a domicilio. | A verificar con el operador (no elegido aún) | Nunca recibe el documento, el correo ni datos de pago; la integración se autentica y la generación de la guía se audita. |
 | **Culqi** | Datos del pago y del comprador necesarios para cobrar. | A verificar con el proveedor | La tarjeta se captura en su formulario; BabelHub recibe solo un identificador. |
 | **WhatsApp / Evolution API** | Número de teléfono y el texto del aviso. | Fuera del país | El número se usa solo para avisos de pedidos; el texto no contiene datos sensibles. |
-| **Proveedor de correo** | Correo del destinatario y el código de un solo uso, o la respuesta a una hoja de reclamación. | A verificar con el proveedor (B08) | Solo mensajes transaccionales (seguridad, alertas a la administración, respuesta a reclamos y estado de un pago pendiente); sin publicidad. La respuesta a un reclamo puede contener datos del caso: el texto se redacta sin documento ni domicilio. |
+| **Proveedor de correo** | Correo del destinatario y el código de un solo uso, o la respuesta a una hoja de reclamación. | Google (cuenta de Gmail); condiciones a verificar. Los mensajes enviados quedan en la carpeta «Enviados» de la cuenta: se usa una cuenta dedicada al proyecto con segundo factor y se vacía esa carpeta periódicamente | Solo mensajes transaccionales (seguridad, alertas a la administración, respuesta a reclamos y estado de un pago pendiente); sin publicidad. La respuesta a un reclamo puede contener datos del caso: el texto se redacta sin documento ni domicilio. |
 | **Proveedor de LLM** | Texto de la consulta y datos de catálogo o del pedido del cliente que se necesiten para responder. | Fuera del país | Sin nombre, correo ni teléfono; sin historial de compra más allá del pedido consultado. |
 
-**Pendiente:** completar con la ubicación exacta cuando se elijan Oracle, el almacén (B02) y el proveedor de LLM (B06).
+**Pendiente:** completar con la ubicación exacta cuando se confirmen Oracle y su almacén de objetos (C10) y se elija el proveedor de LLM (B06).
 
 ## 5. Retención y borrado
 
 | Dato | Plazo | Mecanismo |
 | :--- | :--- | :--- |
-| Auditoría y eventos de seguridad | 2 años | Depuración diaria: se anonimiza, incluida la dirección IP; las cuentas canceladas, desde la depuración siguiente (AUD-19). |
+| Auditoría y eventos de seguridad | 2 años | Depuración diaria: se anonimiza el usuario, la dirección IP, los campos personales del detalle y, cuando identifican a una persona, el rol y el objeto; las cuentas canceladas, en la depuración siguiente (AUD-19, AUD-32). El residuo anonimizado (acción, fecha, tipo y resultado) se conserva sin plazo (AUD-11). |
 | Hojas de reclamación | Al menos 2 años; no se eliminan antes | REC-06. |
 | Pedidos | 2 años *(propuesta)* | Anonimización de datos de contacto al vencer. |
 | Cuenta cancelada | Inmediato para datos de contacto | IDE-28. |
-| Respaldos | Retención escalonada (diaria y semanal) | AD27; al cancelar una cuenta, el dato desaparece del respaldo cuando este rota. |
+| Respaldos | Retención escalonada: 7 diarios, 4 semanales y 3 mensuales (PLA-18) | AD27; un dato suprimido puede persistir en los respaldos hasta unos tres meses; al restaurar se vuelve a suprimir (PLA-19). El archivo de cambios se conserva mientras lo exija el respaldo más antiguo. |
 
 ## 6. Incidentes de seguridad con datos personales
 

@@ -33,7 +33,7 @@ Cuatro VMs de una sola cuenta: dos ARM de **1 OCPU y 6 GB** y dos AMD micro de *
 | :--- | :---: | :---: | :--- |
 | VM-BORDE | ~0,13 GB + sistema | ~0,5 GB | Dentro del 70 % (0,7 GB); es la más justa. |
 | VM-VENTAS | ~2,1 GB + sistema | ~1,5–2,3 GB | Dentro del 70 % (4,2 GB), con holgura para picos. |
-| VM-INVENTARIO | ~3,7 GB + sistema | ~2,1–2,9 GB | **La más justa en memoria:** la suma de límites (3,7 GB) más el sistema (0,3–0,5 GB) llega a unos 4,0–4,2 GB, casi todo el 70 % (4,2 GB). El uso esperado sí entra, pero casi sin margen para picos. Orden de recorte si supera el 70 %: bajar `shared_buffers` de PostgreSQL (768 MB), reducir el límite de la réplica de gestión (450 MB), correr el respaldo solo fuera de horas pico y, al final, mover la réplica a otro lugar. Se mide en B11. |
+| VM-INVENTARIO | ~3,1 GB + sistema | ~2,1–2,9 GB | **La VM ARM más justa en memoria:** la suma de límites (350 + 450 + 2000 + 256 MB = ~3,1 GB) más el sistema (0,3–0,5 GB) llega a unos 3,4–3,6 GB, con 0,6–0,8 GB de margen bajo el 70 % (4,2 GB); el respaldo y el archivado de WAL corren dentro de esa suma (PLA-05). Orden de recorte si supera el 70 %: bajar `shared_buffers` de PostgreSQL (768 MB), reducir el límite de la réplica de gestión (450 MB), correr el respaldo solo fuera de horas pico y, al final, mover la réplica a otro lugar. Se mide en B11. |
 | VM-AUX | — | ~0,3 GB | Amplia. |
 
 ## 3. CPU, concurrencia y red

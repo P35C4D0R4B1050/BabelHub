@@ -25,7 +25,7 @@ Una **táctica** es una decisión de diseño que mejora un atributo de calidad c
 | | Sesiones web en la base `ecommerce` (no en memoria ni en Redis): sobreviven al cambio de réplica | Web | WEB-04, AD15 |
 | | Tiempos de espera y corte de dependencias | Llamadas externas y entre sistemas | SEG-14, AD25 |
 | | Reintento con esperas crecientes | Avisos, consulta de pagos | NOT-04, PAG-07 |
-| | Respaldo diario cifrado y archivado continuo de los cambios (WAL) fuera de Oracle; restauración probada | Datos | AD27, RNF24 |
+| | Respaldo diario cifrado y archivado continuo de los cambios (WAL) en el almacén de objetos (copia externa pospuesta, B13); restauración probada | Datos | AD27, RNF24 |
 | **AC04 Seguridad y privacidad** | Autenticar, autorizar y limitar acceso por rol y sucursal, comprobado en la Aplicación y repetido en la base con seguridad por filas (RLS) en Inventario | Todos | AD22, RNF05, AD31 |
 | | Segundo factor obligatorio para el personal y opcional para el cliente; sesión web con inactividad de 30 min y tope absoluto | Identidad y Web | IDE-20, IDE-37, WEB-27 |
 | | Contexto de lectura de 5 minutos y de solo lectura para el asistente; clave de firma exclusiva del módulo Identidad con rotación | Identidad y Asistente | IDE-33, IDE-35, IDE-36 |
@@ -64,4 +64,4 @@ Una **táctica** es una decisión de diseño que mejora un atributo de calidad c
 | Credencial corta (seguridad) frente a carga sobre Identidad (eficiencia) | La verificación de la firma es local en cada sistema; solo la renovación llega al módulo Identidad. |
 | Límites estrictos (abuso) frente a clientes legítimos detrás de una red compartida | Los límites por origen son más altos que los por cuenta, y los mensajes explican el motivo sin acusar. |
 | Registro detallado (detección) frente a minimización de datos (privacidad) | Se registran eventos y no contenido; nunca contraseñas, tokens ni datos de tarjeta. |
-| Base compartida con Inventario en una VM (costo cero) frente a aislamiento de la base (seguridad) | Red privada, un rol por esquema, RLS, contenedores sin privilegios y respaldo fuera de Oracle; si hiciera falta, la base se mueve a otra VM sin cambiar código. |
+| Base compartida con Inventario en una VM (costo cero) frente a aislamiento de la base (seguridad) | Red privada, un rol por esquema, RLS, contenedores sin privilegios y respaldo en el almacén de objetos (copia externa pospuesta, B13); si hiciera falta, la base se mueve a otra VM sin cambiar código. |

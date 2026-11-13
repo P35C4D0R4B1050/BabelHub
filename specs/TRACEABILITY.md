@@ -25,14 +25,14 @@
 | RF17 | ecommerce-catalogo, inventario-ajustes | AJU-01, AJU-02, AJU-03, AJU-04, AJU-05, AJU-06, AJU-07, AJU-08, AJU-12, AJU-13, AJU-15, AJU-17, AJU-18, AJU-19, AJU-20, CAT-20, CAT-22, CAT-23 | AC-AJU-01, AC-AJU-02, AC-AJU-03, AC-AJU-04, AC-AJU-05, AC-AJU-06, AC-AJU-07, AC-AJU-10, AC-AJU-11, AC-AJU-12, AC-AJU-13, AC-AJU-14, AC-AJU-15, AC-AJU-16, AC-CAT-16, AC-CAT-18, AC-CAT-19 |
 | RF18 | identidad-seguridad | IDE-02, IDE-03, IDE-10, IDE-14, IDE-46, IDE-60 | AC-IDE-02, AC-IDE-03, AC-IDE-09, AC-IDE-12, AC-IDE-41, AC-IDE-50 |
 | RF19 | identidad-seguridad | IDE-01, IDE-04, IDE-05, IDE-06, IDE-07, IDE-08, IDE-13, IDE-23, IDE-38, IDE-49 | AC-IDE-01, AC-IDE-02, AC-IDE-04, AC-IDE-05, AC-IDE-06, AC-IDE-07, AC-IDE-21, AC-IDE-35, AC-IDE-44 |
-| RF20 | ecommerce-pedidos, inventario-traslados, transversal-auditoria | AUD-01, AUD-02, AUD-07, AUD-09, AUD-14, AUD-15, AUD-16, AUD-17, AUD-18, AUD-20, AUD-21, AUD-22, PED-13, PED-22, TRA-13 | AC-AUD-01, AC-AUD-06, AC-AUD-11, AC-AUD-13, AC-AUD-14, AC-AUD-15, AC-AUD-16, AC-AUD-17, AC-AUD-18, AC-AUD-19, AC-PED-11, AC-PED-20, AC-PED-22, AC-TRA-11 |
+| RF20 | ecommerce-pedidos, identidad-seguridad, inventario-traslados, transversal-auditoria | AUD-01, AUD-02, AUD-07, AUD-09, AUD-14, AUD-15, AUD-16, AUD-17, AUD-18, AUD-20, AUD-21, AUD-22, AUD-23, AUD-25, AUD-26, AUD-30, AUD-35, IDE-62, PED-13, PED-22, TRA-13 | AC-AUD-01, AC-AUD-06, AC-AUD-11, AC-AUD-13, AC-AUD-14, AC-AUD-15, AC-AUD-16, AC-AUD-17, AC-AUD-18, AC-AUD-19, AC-AUD-22, AC-AUD-23, AC-AUD-27, AC-IDE-51, AC-PED-11, AC-PED-20, AC-PED-22, AC-TRA-11 |
 | RF21 | *diferido* | | |
 | RF22 | ecommerce-biblioteca-digital | BIB-01, BIB-02, BIB-19, BIB-20 | AC-BIB-01, AC-BIB-02, AC-BIB-17, AC-BIB-18 |
 | RF23 | ecommerce-biblioteca-digital | BIB-03, BIB-04, BIB-05, BIB-06, BIB-08, BIB-10, BIB-11, BIB-13, BIB-16, BIB-17, BIB-21, BIB-22, BIB-23, BIB-24 | AC-BIB-03, AC-BIB-04, AC-BIB-05, AC-BIB-07, AC-BIB-09, AC-BIB-11, AC-BIB-14, AC-BIB-15, AC-BIB-16, AC-BIB-19, AC-BIB-20, AC-BIB-21 |
 | RF24 | ecommerce-biblioteca-digital, ecommerce-catalogo | BIB-09, CAT-06, CAT-07, CAT-08, CAT-15, CAT-16 | AC-BIB-08, AC-CAT-03, AC-CAT-04, AC-CAT-05, AC-CAT-12 |
 | RF25 | ecommerce-libro-reclamaciones, web-base | REC-01, REC-02, REC-03, REC-04, REC-05, REC-06, REC-07, REC-09, REC-12, REC-13, REC-14, REC-16, REC-17, REC-18, WEB-08 | AC-REC-01, AC-REC-02, AC-REC-03, AC-REC-04, AC-REC-05, AC-REC-06, AC-REC-07, AC-REC-10, AC-REC-11, AC-REC-12, AC-REC-14, AC-REC-15, AC-REC-16, AC-WEB-05 |
-| RF26 | identidad-seguridad | IDE-01, IDE-16, IDE-17, IDE-18, IDE-19, IDE-29, IDE-56 | AC-IDE-01, AC-IDE-14, AC-IDE-15, AC-IDE-16, AC-IDE-17, AC-IDE-26, AC-IDE-49 |
-| RF27 | identidad-seguridad | IDE-12, IDE-24, IDE-25, IDE-26, IDE-27, IDE-28, IDE-32, IDE-37, IDE-47, IDE-48 | AC-IDE-11, AC-IDE-22, AC-IDE-23, AC-IDE-24, AC-IDE-25, AC-IDE-29, AC-IDE-34, AC-IDE-43 |
+| RF26 | identidad-seguridad | IDE-01, IDE-16, IDE-17, IDE-18, IDE-19, IDE-29, IDE-56, IDE-65 | AC-IDE-01, AC-IDE-14, AC-IDE-15, AC-IDE-16, AC-IDE-17, AC-IDE-26, AC-IDE-49, AC-IDE-54 |
+| RF27 | identidad-seguridad | IDE-12, IDE-24, IDE-25, IDE-26, IDE-27, IDE-28, IDE-32, IDE-37, IDE-47, IDE-48, IDE-62, IDE-63, IDE-64, IDE-68, IDE-69, IDE-70, IDE-71, IDE-72, IDE-75, IDE-76 | AC-IDE-11, AC-IDE-22, AC-IDE-23, AC-IDE-24, AC-IDE-25, AC-IDE-29, AC-IDE-34, AC-IDE-43, AC-IDE-51, AC-IDE-52, AC-IDE-53, AC-IDE-57, AC-IDE-58, AC-IDE-59 |
 | RF28 | ecommerce-carrito-checkout, identidad-seguridad, inventario-seleccion-fuente | CAR-17, CAR-19, CAR-21, IDE-29, SEL-13, SEL-14, SEL-15, SEL-16, SEL-17, SEL-18, SEL-19 | AC-CAR-14, AC-CAR-17, AC-CAR-19, AC-IDE-16, AC-IDE-26, AC-SEL-13, AC-SEL-14, AC-SEL-15, AC-SEL-16, AC-SEL-17, AC-SEL-18, AC-SEL-19 |
 | RF29 | web-base, web-indice-infinito | IND-01, IND-02, IND-03, IND-04, IND-05, IND-06, IND-08, IND-09, WEB-17 | AC-IND-01, AC-IND-02, AC-IND-03, AC-IND-04, AC-IND-05, AC-IND-07, AC-WEB-13 |
 
@@ -49,14 +49,14 @@
 | ecommerce-libro-reclamaciones | E-commerce | Approved | 18 | 16 | identidad-seguridad, transversal-notificaciones, transversal-auditoria, transversal-seguridad |
 | ecommerce-pagos | E-commerce | Approved | 23 | 19 | ecommerce-carrito-checkout, identidad-seguridad, inventario-seleccion-fuente, transversal-auditoria |
 | ecommerce-pedidos | E-commerce | Approved | 30 | 25 | ecommerce-pagos, ecommerce-biblioteca-digital, inventario-seleccion-fuente, transversal-notificaciones, transversal-auditoria |
-| identidad-seguridad | E-commerce | Approved | 61 | 50 | transversal-auditoria, transversal-seguridad |
+| identidad-seguridad | E-commerce | Draft | 80 | 60 | transversal-auditoria, transversal-seguridad |
 | inventario-ajustes | Inventario | Approved | 20 | 16 | inventario-fuentes, identidad-seguridad, transversal-auditoria |
 | inventario-fuentes | Inventario | Approved | 22 | 18 | identidad-seguridad, transversal-auditoria |
 | inventario-seleccion-fuente | Inventario | Approved | 32 | 34 | inventario-fuentes, identidad-seguridad, transversal-auditoria, transversal-seguridad |
 | inventario-traslados | Inventario | Approved | 23 | 24 | inventario-fuentes, inventario-seleccion-fuente, identidad-seguridad, transversal-auditoria, transversal-notificaciones |
-| transversal-auditoria | Transversal | Draft | 22 | 19 | — |
+| transversal-auditoria | Transversal | Approved | 41 | 30 | — |
 | transversal-notificaciones | Transversal | Approved | 13 | 13 | identidad-seguridad, transversal-seguridad |
-| transversal-plataforma | Transversal | Draft | 14 | 14 | — |
+| transversal-plataforma | Transversal | Approved | 42 | 37 | — |
 | transversal-seguridad | Transversal | Approved | 31 | 28 | transversal-auditoria |
 | web-base | E-commerce | Approved | 35 | 29 | identidad-seguridad, ecommerce-libro-reclamaciones, ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-biblioteca-digital, transversal-auditoria, transversal-seguridad |
 | web-indice-infinito | E-commerce | Approved | 9 | 7 | web-base, transversal-seguridad |

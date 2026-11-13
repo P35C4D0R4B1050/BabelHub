@@ -10,7 +10,7 @@ La documentación se organiza en siete carpetas temáticas. El orden sugiere el 
 | [04-modelo-c4](04-modelo-c4/) | ¿Cómo se ve la arquitectura en distintos niveles de zoom? | Contexto (nivel 1), contenedores (nivel 2) y componentes por módulo de cada contenedor (nivel 3). |
 | [05-seguridad](05-seguridad/) | ¿Cómo se protege el sistema y sus datos? | Modelo de amenazas, controles ASVS, autenticación, privacidad, API, asistente, operación y mapeo a OWASP e ISO. |
 | [06-experiencia-de-usuario](06-experiencia-de-usuario/) | ¿Cómo se ve, se usa y se hace accesible? | Identidad y sistema de diseño, pantallas, estados, heurísticas, personas, accesibilidad WCAG, rendimiento móvil, mensajes y pruebas de usabilidad. |
-| [07-proceso-de-desarrollo](07-proceso-de-desarrollo/) | ¿Cómo se construye y se verifica? | Flujo Spec-Driven Development, convenciones técnicas y estrategia de pruebas. |
+| [07-proceso-de-desarrollo](07-proceso-de-desarrollo/) | ¿Cómo se construye y se verifica? | Flujo Spec-Driven Development, convenciones técnicas, estrategia de pruebas y aprobación delegada. |
 
 Además: [glosario](glossary.md).
 

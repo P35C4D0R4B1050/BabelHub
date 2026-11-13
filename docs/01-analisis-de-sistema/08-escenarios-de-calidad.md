@@ -71,14 +71,14 @@ No hay SLA ni redundancia real: se compensa con degradación controlada y recupe
 | **ESC-AC03-01** | El propio sistema | Un contenedor se detiene por un error o por falta de memoria. | Operación normal. | Cualquier contenedor de una VM. | Se reinicia solo y vuelve a responder su comprobación de salud. | Reinicio automático en menos de 2 minutos; ≥ 99 % de disponibilidad mensual. |
 | **ESC-AC03-02** | Cliente | Consulta el catálogo o confirma un pedido cuando el Inventario no responde. | Degradado: Inventario caído. | Catálogo y checkout del E-commerce. | El catálogo se sirve desde la caché con la última disponibilidad conocida; el checkout informa que no puede validar el stock, en lugar de cobrar a ciegas. Si falla WhatsApp, la compra se completa y el aviso queda pendiente. | 0 cobros sin reserva confirmada; catálogo consultable; 0 compras interrumpidas por el Notificador. |
 | **ESC-AC03-03** | Persona operadora | La VM-VENTAS deja de responder. | Degradado: sin tienda. | VM-INVENTARIO (réplica de gestión) y Nginx. | Nginx pasa el host de gestión al servidor de respaldo; el personal sigue operando el inventario con sus sesiones (están en la base). | El personal retoma su trabajo sin volver a iniciar sesión; la tienda vuelve al recrear la VM. |
-| **ESC-AC03-04** | Persona operadora | Se pierde la VM de datos (o la cuenta de la nube). | Desastre. | PostgreSQL (bases `ecommerce` e `inventario`) y sus respaldos fuera de Oracle. | Se restaura el último respaldo cifrado y el archivo de cambios en un entorno limpio. | RPO ≤ 24 h; RTO ≤ 4 h, con restauración probada antes de cada despliegue mayor. |
+| **ESC-AC03-04** | Persona operadora | Se pierde la VM de datos. | Desastre. | PostgreSQL (bases `ecommerce` e `inventario`) y sus respaldos en el almacén de objetos. | Se restaura el último respaldo cifrado y el archivo de cambios en un entorno limpio. | RPO ≤ 24 h; RTO ≤ 4 h, con restauración probada antes de cada despliegue mayor. |
 
 | ID | RNF | Táctica (decisión o spec) | Prueba |
 | :--- | :--- | :--- | :--- |
 | ESC-AC03-01 | RNF03 | Reinicio automático y `healthcheck` (AD10). | Prueba de caos manual: detener un contenedor y medir. |
 | ESC-AC03-02 | RNF03 | Degradación controlada (CAR-06, CAT-12); aislamiento de fallas del Notificador (AGENTS 10, NOT-04). | Apagar el Inventario y recorrer catálogo y checkout; xUnit con notificador que falla. |
 | ESC-AC03-03 | RNF03 | Réplica de gestión y servidor de respaldo de Nginx (AD11); sesiones en la base (WEB-04, AD15). | Apagar VM-VENTAS (o su contenedor) en el entorno de prueba y operar como personal. |
-| ESC-AC03-04 | RNF24 | Respaldo diario cifrado y archivado continuo fuera de Oracle (AD27). | Guion de restauración en un entorno limpio, midiendo el tiempo. |
+| ESC-AC03-04 | RNF24 | Respaldo diario cifrado y archivado continuo en el almacén de objetos (AD27). | Guion de restauración en un entorno limpio, midiendo el tiempo. |
 
 ## 6. AC04 Seguridad y privacidad
 
@@ -94,7 +94,7 @@ Se manejan datos personales, pagos y contenido con licencia de terceros; los flu
 
 | ID | RNF | Táctica (decisión o spec) | Prueba |
 | :--- | :--- | :--- | :--- |
-| ESC-AC04-01 | RNF05, RNF08, RNF20 | Alcance en la Aplicación y RLS en el Inventario (AD22, AD31); detectar y registrar (AUD-10, AUD-17, SEG-09). | xUnit de acceso fuera de alcance (403); revisión del registro de seguridad. |
+| ESC-AC04-01 | RNF05, RNF08, RNF20 | Alcance en la Aplicación y RLS en el Inventario (AD22, AD31); detectar y registrar (AUD-05, AUD-08, AUD-10, AUD-17, AUD-27, SEG-09). | xUnit de acceso fuera de alcance (403); revisión del registro de seguridad. |
 | ESC-AC04-02 | RNF14 | Entrega con URL firmada y almacén privado (AD19, AD20). | Pruebas de integración de descarga ajena y de enlace vencido. |
 | ESC-AC04-03 | RNF15, RNF17, RNF20 | Límites de uso en cuatro niveles y Turnstile (AD24, SEG-24, SEG-05, SEG-06, IDE-03). | Pruebas de integración y de carga con casos de abuso; ZAP baseline. |
 | ESC-AC04-04 | RNF07, RNF23 | Minimización, retención y anonimización (RNF23, AD27, SEG-25, IDE-34). | Pruebas de integración de la solicitud y de la depuración diaria; inspección documental. |

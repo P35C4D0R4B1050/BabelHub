@@ -78,6 +78,7 @@ Lenguaje común del dominio. El código, las specs y la interfaz usan estos tér
 | **Aceptación** | Registro de la versión y la fecha de los términos, la privacidad o el reembolso que una persona aceptó, y de su declaración de ser mayor de 18 años. | Consentimiento de WhatsApp. |
 | **Sesión web** | Sesión del navegador, guardada en el servidor: vence a los 30 minutos sin interacción y tiene un máximo de 7 días (clientes) u 8 horas (personal). | Credencial de acceso. |
 | **Alerta de seguridad** | Aviso que genera cada servicio al superar un umbral de accesos denegados o ingresos fallidos; se ve en la lista de la administración y llega por correo. | Alerta técnica (falla al registrar un evento). |
+| **Alerta técnica** | Aviso por correo a los administradores centrales que se genera cuando falla el registro de un evento de seguridad (AUD-12), la depuración diaria (AUD-31) o un envío de correo (IDE-65); no tiene pantalla y se agrupa en ventanas de 15 minutos (AUD-29). | Alerta de seguridad. |
 
 ## Método
 

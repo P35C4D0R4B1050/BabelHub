@@ -47,7 +47,7 @@ El libro impreso sigue generando más del 91 % de los ingresos editoriales en el
 | **Servicio de envío** *(externo)* | Operador logístico (courier). | Gestionar la entrega y el seguimiento de los despachos a domicilio. |
 | **Proveedor de LLM** *(externo)* | Modelo de lenguaje (por ejemplo, la API de Claude). | Generar las respuestas del asistente de compra. |
 | **Servicio de notificaciones** *(propio, autoalojado)* | n8n y Evolution API, que envían los avisos por WhatsApp. | Avisar a clientes y sucursales de los cambios de estado. |
-| **Almacén de archivos digitales** *(externo)* | Cloudflare R2 u Oracle Object Storage. | Guardar los EPUB y PDF fuera de las VMs y entregarlos con enlaces firmados. |
+| **Almacén de archivos digitales** *(externo)* | Oracle Object Storage. | Guardar los EPUB y PDF fuera de las VMs y entregarlos con enlaces firmados. |
 | **Titular de derechos** *(externo, contractual)* | Autor o editorial. | Autorizar la venta de cada título digital, con territorio y vigencia. No usa el sistema; se relaciona por contrato. |
 | **Soporte** | Atiende las ayudas del cliente (límite de descargas, accesos, solicitudes sobre sus datos). | Hoy lo cubre la administración central; se separa si la operación crece. |
 | **Actor malicioso** *(modelo, no usa el sistema de forma legítima)* | Persona o programa que abusa del sistema: acapara stock con reservas, adivina contraseñas, intenta descargar sin comprar o manipular al asistente. | Sirve para modelar casos de abuso y amenazas en la documentación de seguridad. |

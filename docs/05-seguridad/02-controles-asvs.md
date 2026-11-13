@@ -72,7 +72,7 @@ Traduce el **OWASP Application Security Verification Standard 5.0** a controles 
 | ID | Control | Nivel | Dónde se especifica | Verificación | Estado |
 | :--- | :--- | :---: | :--- | :--- | :---: |
 | **CTL-27** | TLS 1.2 o superior hacia el exterior; HSTS. | L1 | RNF06, RNF18, AD13 | Escáner de configuración | Decisión |
-| **CTL-28** | Respaldos y volúmenes cifrados. | L2 | RNF18, AD27 | Inspección | Pendiente |
+| **CTL-28** | Respaldos y volúmenes cifrados, con la clave fuera de la VM, del repositorio y del almacén de respaldos. | L2 | RNF18, AD27, PLA-09, PLA-15, PLA-16, PLA-17 | Inspección y ensayo de restauración | Especificado |
 | **CTL-29** | La firma de las credenciales usa una clave que solo posee Identidad, rota cada 90 días y se guarda fuera del repositorio. | L2 | IDE-35, IDE-36, AD22 (custodia de la clave: plan) | Pruebas de integración y revisión | Especificado |
 
 ## 9. Configuración y protección de datos
@@ -80,7 +80,7 @@ Traduce el **OWASP Application Security Verification Standard 5.0** a controles 
 | ID | Control | Nivel | Dónde se especifica | Verificación | Estado |
 | :--- | :--- | :---: | :--- | :--- | :---: |
 | **CTL-30** | Las bases de datos no tienen puertos expuestos a Internet; los paneles de n8n y Evolution API tampoco. | L1 | RNF06, AM22 | Escaneo de puertos | Decisión |
-| **CTL-31** | Contenedores sin privilegios, con límites de memoria y `healthcheck`. | L2 | RNF19, convenciones | Revisión de Compose | Pendiente |
+| **CTL-31** | Contenedores sin privilegios, con límites de memoria y `healthcheck`. | L2 | RNF19, PLA-27 | Verificación automática del lanzamiento | Especificado |
 | **CTL-32** | No se guardan datos de tarjeta ni se registran datos sensibles. | L1 | PAG-02, SEG-10, NOT-07 | Revisión y pruebas | Especificado |
 | **CTL-33** | Los datos personales tienen inventario, base legal, retención y borrado o anonimización. | L2 | RNF23, AUD-11, IDE-28 | Inspección documental | Especificado |
 
@@ -88,8 +88,8 @@ Traduce el **OWASP Application Security Verification Standard 5.0** a controles 
 
 | ID | Control | Nivel | Dónde se especifica | Verificación | Estado |
 | :--- | :--- | :---: | :--- | :--- | :---: |
-| **CTL-34** | Las dependencias tienen versión fija y se escanean; el repositorio genera un inventario de componentes (SBOM). | L1 | RNF19 | CI | Pendiente |
-| **CTL-35** | Se registran ingresos fallidos, accesos denegados, límites excedidos y cambios de rol, sin datos sensibles. | L1 | AUD-10, SEG-08, SEG-10 | Pruebas | Especificado |
+| **CTL-34** | Las dependencias tienen versión fija y se escanean; el repositorio genera un inventario de componentes (SBOM) y se detectan secretos en cada cambio. | L1 | RNF19, PLA-07, PLA-08, PLA-26, PLA-28 | CI | Especificado |
+| **CTL-35** | Se registran ingresos fallidos, accesos denegados, límites excedidos y cambios de rol, sin datos sensibles. | L1 | AUD-05, AUD-10, AUD-28, AUD-33, AUD-37, SEG-08, SEG-10 | Pruebas | Especificado |
 | **CTL-36** | Ante un error inesperado el sistema niega, no deja efectos parciales y no filtra detalles. | L1 | SEG-04, AD25 | Pruebas | Especificado |
 | **CTL-37** | Hay alertas ante umbrales de accesos denegados o ingresos fallidos. | L2 | SEG-09 | Pruebas | Especificado |
 | **CTL-38** | Las integraciones validan firma o secreto, formato de respuesta y tiempos de espera. | L1 | SEG-12 a SEG-14 | Pruebas de integración | Especificado |

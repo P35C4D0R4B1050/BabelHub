@@ -72,7 +72,7 @@ style Ext fill:#222,stroke:#fff,color:#fff
 | Enviador de correo | Proveedor gratuito de correo para códigos de seguridad, alertas, respuestas a reclamos y avisos de pago pendiente (AD30) |
 | Proveedor de LLM | API del modelo de lenguaje |
 | Caché | Redis |
-| Almacén de archivos | Almacén S3-compatible (Cloudflare R2 u Oracle Object Storage) |
+| Almacén de archivos | Almacén S3-compatible (Oracle Object Storage) |
 
 Gracias a ellas, cambiar de pasarela o de proveedor de LLM requiere solo una nueva implementación en Infraestructura.
 

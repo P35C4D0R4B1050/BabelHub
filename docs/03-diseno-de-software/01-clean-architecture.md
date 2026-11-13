@@ -107,11 +107,11 @@ style Ent fill:#222,stroke:#fff,color:#fff
 | Pasarela de pago | E-commerce | Culqi (Yape y tarjetas) |
 | Servicio de envío | E-commerce | Operador logístico |
 | Notificador | E-commerce e Inventario | Webhook de n8n, que envía por Evolution API (WhatsApp); si falla, deja el aviso pendiente y no interrumpe el caso de uso |
-| Enviador de correo | Identidad y E-commerce | Proveedor gratuito de correo (B08); envía códigos de seguridad (sin cola ni reintento diferido: si falla, la persona reintenta), alertas a la administración, la respuesta a reclamos (queda pendiente y la administración reintenta) y los avisos de un pago pendiente |
-| Registro de auditoría | E-commerce, Inventario e Identidad | Tabla de auditoría de solo inserción en la base de cada servicio |
+| Enviador de correo | Identidad y E-commerce | SMTP con MailKit y una cuenta de Gmail sencilla (B08); envía códigos de seguridad (sin cola ni reintento diferido: si falla, la persona reintenta), alertas a la administración, la respuesta a reclamos (queda pendiente y la administración reintenta) y los avisos de un pago pendiente |
+| Registro de auditoría | E-commerce, Inventario e Identidad | Tabla de auditoría de solo inserción en la base de cada servicio (en el E-commerce, la de Identidad en su esquema aislado) |
 | Proveedor de LLM | Asistente | API del modelo de lenguaje |
 | Caché | E-commerce e Inventario | Redis |
-| Almacén de archivos (subir y firmar URLs de descarga) | E-commerce | Almacén S3-compatible (Cloudflare R2 u Oracle Object Storage); en desarrollo, un emulador compatible con S3 o una carpeta local |
+| Almacén de archivos (subir y firmar URLs de descarga) | E-commerce | Almacén S3-compatible (Oracle Object Storage); en desarrollo, un emulador compatible con S3 o una carpeta local |
 | Usuario actual | Todos | Lectura de los claims del JWT |
 | Unidad de trabajo | E-commerce e Inventario | Transacción de PostgreSQL |
 
