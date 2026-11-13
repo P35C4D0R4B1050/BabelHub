@@ -37,4 +37,13 @@ public interface ICalculadorDeHuella
 {
     /// <summary>Huella de una dirección de origen, normalizada (IPv6 por /64).</summary>
     HuellaDeOrigen DeOrigen(string direccion);
+
+    /// <summary>Huella de la red /48 de una dirección IPv6, para el contador de registros por red; <see langword="null"/> si es IPv4.</summary>
+    HuellaDeOrigen? DeOrigenPorRed48(string direccion);
+
+    /// <summary>
+    /// La huella con la clave actual y, durante la rotación de la clave, también con la anterior (en ese orden), para que los
+    /// contadores ya abiertos no se reinicien (SEG-25).
+    /// </summary>
+    IReadOnlyList<HuellaDeOrigen> DeOrigenEnRotacion(string direccion);
 }

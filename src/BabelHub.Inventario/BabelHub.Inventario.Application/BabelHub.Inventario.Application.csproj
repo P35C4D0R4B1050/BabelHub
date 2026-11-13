@@ -8,5 +8,6 @@
   <ItemGroup>
     <InternalsVisibleTo Include="BabelHub.Inventario.Infrastructure" />
     <InternalsVisibleTo Include="BabelHub.Inventario.UnitTests" />
+    <InternalsVisibleTo Include="BabelHub.IntegrationTests" />
   </ItemGroup>
 </Project>

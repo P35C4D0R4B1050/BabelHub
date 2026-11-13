@@ -20,8 +20,14 @@ public sealed class AlcancesDeServicioTests
         public HuellaDeOrigen DeOrigen(string direccion) =>
             HuellaDeOrigen.Crear(Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(direccion))).TrimEnd('=').Replace('+', '-').Replace('/', '_'), "v1");
 
+        public HuellaDeOrigen? DeOrigenPorRed48(string direccion) => null;
+
+        public IReadOnlyList<HuellaDeOrigen> DeOrigenEnRotacion(string direccion) => [DeOrigen(direccion)];
+
         public HuellaDeSujeto DeSujeto(string valor, string proposito) =>
             HuellaDeSujeto.Crear(Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(proposito + valor))).TrimEnd('=').Replace('+', '-').Replace('/', '_'), "v1");
+
+        public IReadOnlyList<HuellaDeSujeto> DeSujetoEnRotacion(string valor, string proposito) => [DeSujeto(valor, proposito)];
     }
 
     private static readonly AlcanceDeServicio[] Alcances = Enum.GetValues<AlcanceDeServicio>();

@@ -172,6 +172,30 @@ public sealed class InstanciaDeContadoresTests(RedisDeContadoresFixture redis)
         Assert.Contains(await redis.TodasLasClaves(), k => k.Contains("Zq8Lw2Xv5Nc7Rb1Ty4Hu9Jk3Gf6Ds0Ae2Mp8Oi5UyW", StringComparison.Ordinal));
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-SEG-22")]
+    public async Task TodaClaveDeLosContadores_ExpiraAntesDeLas24Horas()
+    {
+        var motor = redis.Motor();
+        var politica = new PoliticaDeLimite(RedisDeContadoresFixture.Unico("ttl"), 5, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Origen, TimeSpan.FromMinutes(15), liberable: true);
+        var origen = HuellaDeOrigen.Crear("k3Jx9bQ2vT7mYw1ZpLr4NfA8sUe0dHcGiXoVtB5yMqE", "v1");
+        for (var i = 0; i < 5; i++)
+        {
+            await motor.Reservar(politica, $"o:{origen}", $"aviso-{i}", new ClaveDeIdempotencia($"clave-{i}", "/ruta", "cuerpo"), CancellationToken.None);
+        }
+
+        await motor.RegistrarRechazoDeOrigen(origen, TimeSpan.FromMinutes(5), CancellationToken.None);
+
+        var claves = (await redis.TodasLasClaves()).Where(k => k.StartsWith("lim:", StringComparison.Ordinal) || k.StartsWith("blq:", StringComparison.Ordinal)
+            || k.StartsWith("idem:", StringComparison.Ordinal) || k.StartsWith("rech:", StringComparison.Ordinal) || k.StartsWith("rsv:", StringComparison.Ordinal)).ToList();
+        Assert.NotEmpty(claves);
+        foreach (var clave in claves)
+        {
+            var ttl = await redis.Bd.KeyTimeToLiveAsync(clave);
+            Assert.True(ttl is { } t && t > TimeSpan.Zero && t <= TimeSpan.FromHours(24), $"{clave} debe expirar en 24 horas o menos (TTL: {ttl}).");
+        }
+    }
+
     private static string HuellaDelNumero() =>
         Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("avisos:" + Numero))).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
