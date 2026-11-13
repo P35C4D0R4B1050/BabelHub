@@ -16,6 +16,9 @@ public enum EstadoDeLimite
 
     /// <summary>La clave se reutilizó con otro cuerpo o ruta (409); cuenta contra el límite general.</summary>
     ClaveEnConflicto,
+
+    /// <summary>El almacén de contadores no responde y la política falla cerrada (SEG-26): se responde servicio no disponible.</summary>
+    NoDisponible,
 }
 
 /// <summary>Resultado mínimo que se guarda de una operación idempotente: nunca datos personales ni enlaces firmados.</summary>
@@ -125,4 +128,6 @@ public sealed record ResultadoDeLimite
     public static ResultadoDeLimite RepeticionEnCurso() => new(EstadoDeLimite.RepeticionEnCurso);
 
     public static ResultadoDeLimite ClaveEnConflicto() => new(EstadoDeLimite.ClaveEnConflicto);
+
+    public static ResultadoDeLimite NoDisponible() => new(EstadoDeLimite.NoDisponible);
 }
