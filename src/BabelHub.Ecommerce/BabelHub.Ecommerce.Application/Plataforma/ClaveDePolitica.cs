@@ -41,6 +41,18 @@ public static class PoliticasDeLimite
 
     public static ClaveDePolitica RegistrosPorOrigen { get; } = new("registros-por-origen");
 
+    public static ClaveDePolitica SolicitudesPreviasPorOrigen { get; } = new("solicitudes-previas-por-origen");
+
+    public static ClaveDePolitica SolicitudesDelOrigenDesconocido { get; } = new("solicitudes-del-origen-desconocido");
+
+    public static ClaveDePolitica SolicitudesSinSesionPorOrigen { get; } = new("solicitudes-sin-sesion-por-origen");
+
+    public static ClaveDePolitica SolicitudesPorUsuario { get; } = new("solicitudes-por-usuario");
+
+    /// <summary>Los límites generales de uso (con respaldo local), aparte de las políticas críticas de <see cref="Todas"/>.</summary>
+    public static IReadOnlyList<ClaveDePolitica> Generales { get; } =
+        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario];
+
     public static IReadOnlyList<ClaveDePolitica> Todas { get; } =
     [
         IngresosFallidos,

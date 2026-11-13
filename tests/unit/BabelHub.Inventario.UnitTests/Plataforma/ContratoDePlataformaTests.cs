@@ -44,6 +44,14 @@ public sealed class ContratoDePlataformaTests
             PoliticasDeLimite.Todas.Select(c => c.Valor).Order());
     }
 
+    [Fact]
+    public void LasClavesGenerales_CoincidenConLasPoliticasGeneralesDelDominio()
+    {
+        Assert.Equal(
+            PoliticasDeSeguridad.Generales.Select(p => p.Nombre).Order(),
+            PoliticasDeLimite.Generales.Select(c => c.Valor).Order());
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("Mayusculas")]

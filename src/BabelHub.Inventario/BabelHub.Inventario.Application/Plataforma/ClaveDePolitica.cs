@@ -33,5 +33,10 @@ public static class PoliticasDeLimite
 
     public static ClaveDePolitica TrasladosDelPersonal { get; } = new("traslados-del-personal");
 
+    public static ClaveDePolitica SolicitudesPorUsuario { get; } = new("solicitudes-por-usuario");
+
+    /// <summary>Los límites generales de uso (con respaldo local), aparte de las políticas críticas de <see cref="Todas"/>.</summary>
+    public static IReadOnlyList<ClaveDePolitica> Generales { get; } = [SolicitudesPorUsuario];
+
     public static IReadOnlyList<ClaveDePolitica> Todas { get; } = [AjustesDelPersonal, TrasladosDelPersonal];
 }

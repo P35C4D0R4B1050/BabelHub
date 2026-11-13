@@ -34,6 +34,26 @@ public static class PoliticasDeSeguridad
     public static PoliticaDeLimite RegistrosPorOrigen { get; } = new(
         "registros-por-origen", 3, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Origen);
 
+    /// <summary>Tope previo barato por huella de origen, antes de autenticar: 600 por minuto (el bucket del origen desconocido tiene el suyo).</summary>
+    public static PoliticaDeLimite SolicitudesPreviasPorOrigen { get; } = new(
+        "solicitudes-previas-por-origen", 600, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true);
+
+    /// <summary>Tope previo del «origen desconocido» (SEG-23): más alto, porque en él caen todos los que no se pueden identificar.</summary>
+    public static PoliticaDeLimite SolicitudesDelOrigenDesconocido { get; } = new(
+        "solicitudes-del-origen-desconocido", 3000, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true);
+
+    /// <summary>Un mismo origen sin sesión: 60 solicitudes por minuto (SEG-18).</summary>
+    public static PoliticaDeLimite SolicitudesSinSesionPorOrigen { get; } = new(
+        "solicitudes-sin-sesion-por-origen", 60, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true);
+
+    /// <summary>Un usuario autenticado: 100 solicitudes por minuto (SEG-05).</summary>
+    public static PoliticaDeLimite SolicitudesPorUsuario { get; } = new(
+        "solicitudes-por-usuario", 100, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
+
+    /// <summary>Límites generales de uso: con el almacén caído caen al límite local por instancia (SEG-26), a diferencia de los críticos de <see cref="Todas"/>.</summary>
+    public static IReadOnlyList<PoliticaDeLimite> Generales { get; } =
+        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario];
+
     public static IReadOnlyList<PoliticaDeLimite> Todas { get; } =
     [
         IngresosFallidos,

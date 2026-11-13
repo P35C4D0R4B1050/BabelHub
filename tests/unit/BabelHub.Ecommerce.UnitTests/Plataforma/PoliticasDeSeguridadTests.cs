@@ -221,4 +221,49 @@ public sealed class PoliticasDeSeguridadTests
         Assert.True(PoliticasDeSeguridad.SegundoFactorPorCuenta.Liberable);
         Assert.Equal(TipoDeSujetoDeLimite.Usuario, PoliticasDeSeguridad.SegundoFactorPorCuenta.Tipo);
     }
+
+    [Fact]
+    public void Generales_TienenClavesUnicasConRespaldoLocalYPublicanElEvento()
+    {
+        Assert.Equal(PoliticasDeSeguridad.Generales.Count, PoliticasDeSeguridad.Generales.Select(p => p.Nombre).Distinct().Count());
+        Assert.All(PoliticasDeSeguridad.Generales, p =>
+        {
+            Assert.True(p.RespaldoLocal, p.Nombre);
+            Assert.True(p.PublicarEvento, p.Nombre);
+            Assert.Null(p.DuracionDeBloqueo);
+        });
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-05")]
+    public void SolicitudesPorUsuario_ConCienEnElUltimoMinuto_RechazaLaSiguienteYVuelveAlTiempoSugerido()
+    {
+        var simulador = new SimuladorDeLimite(PoliticasDeSeguridad.SolicitudesPorUsuario);
+        var ultima = simulador.Repetir(100, Inicio, TimeSpan.FromMilliseconds(500));
+
+        var rechazo = simulador.Intentar(ultima + TimeSpan.FromSeconds(1));
+
+        Assert.False(rechazo.Permitida);
+        Assert.Equal(Inicio + TimeSpan.FromMinutes(1), rechazo.Respuesta!.DisponibleDesde);
+        Assert.True(simulador.Intentar(rechazo.Respuesta.DisponibleDesde).Permitida);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-16")]
+    public void SolicitudesSinSesionPorOrigen_ConSesentaEnElUltimoMinuto_RechazaLaSiguiente()
+    {
+        var simulador = new SimuladorDeLimite(PoliticasDeSeguridad.SolicitudesSinSesionPorOrigen);
+        var ultima = simulador.Repetir(60, Inicio, TimeSpan.FromSeconds(1));
+
+        Assert.False(simulador.Intentar(ultima + TimeSpan.FromMilliseconds(500)).Permitida);
+        Assert.Equal(TipoDeSujetoDeLimite.Origen, PoliticasDeSeguridad.SolicitudesSinSesionPorOrigen.Tipo);
+    }
+
+    [Fact]
+    public void ElTopePrevio_EsMasAltoQueElLimiteSinSesionYElDelOrigenDesconocidoMasAltoAun()
+    {
+        Assert.Equal(600, PoliticasDeSeguridad.SolicitudesPreviasPorOrigen.Maximo);
+        Assert.True(PoliticasDeSeguridad.SolicitudesDelOrigenDesconocido.Maximo > PoliticasDeSeguridad.SolicitudesPreviasPorOrigen.Maximo);
+        Assert.True(PoliticasDeSeguridad.SolicitudesPreviasPorOrigen.Maximo > PoliticasDeSeguridad.SolicitudesSinSesionPorOrigen.Maximo);
+    }
 }

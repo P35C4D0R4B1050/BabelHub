@@ -78,4 +78,29 @@ public sealed class PoliticasDeSeguridadTests
         Assert.False(traslados.Intentar(ultimo + TimeSpan.FromSeconds(1)).Permitida);
         Assert.True(ajustes.Intentar(ultimo + TimeSpan.FromSeconds(1)).Permitida);
     }
+
+    [Fact]
+    public void Generales_TienenClavesUnicasConRespaldoLocalYPublicanElEvento()
+    {
+        Assert.Equal(PoliticasDeSeguridad.Generales.Count, PoliticasDeSeguridad.Generales.Select(p => p.Nombre).Distinct().Count());
+        Assert.All(PoliticasDeSeguridad.Generales, p =>
+        {
+            Assert.True(p.RespaldoLocal, p.Nombre);
+            Assert.True(p.PublicarEvento, p.Nombre);
+        });
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-05")]
+    public void SolicitudesPorUsuario_ConCienEnElUltimoMinuto_RechazaLaSiguienteYVuelveAlTiempoSugerido()
+    {
+        var simulador = new SimuladorDeLimite(PoliticasDeSeguridad.SolicitudesPorUsuario);
+        var ultima = simulador.Repetir(100, Inicio, TimeSpan.FromMilliseconds(500));
+
+        var rechazo = simulador.Intentar(ultima + TimeSpan.FromSeconds(1));
+
+        Assert.False(rechazo.Permitida);
+        Assert.Equal(Inicio + TimeSpan.FromMinutes(1), rechazo.Respuesta!.DisponibleDesde);
+        Assert.True(simulador.Intentar(rechazo.Respuesta.DisponibleDesde).Permitida);
+    }
 }
