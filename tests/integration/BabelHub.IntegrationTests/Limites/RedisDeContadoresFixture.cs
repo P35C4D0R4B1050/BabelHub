@@ -11,12 +11,15 @@ namespace BabelHub.IntegrationTests.Limites;
 /// cada segundo, y el usuario ACL restringido de <c>infra/redis-contadores/users.acl.plantilla</c> (el valor por defecto
 /// desactivado). Las pruebas del motor usan solo ese usuario; <see cref="Administracion"/> existe para inspeccionar.
 /// </summary>
-public sealed class RedisDeContadoresFixture : IAsyncLifetime
+public class RedisDeContadoresFixture : IAsyncLifetime
 {
     public const string ClaveDelUsuarioDeLimites = "clave-de-pruebas-de-limites-con-mas-de-32-caracteres";
     private const string ClaveDeAdministracion = "clave-de-administracion-de-pruebas-0123456789";
 
     private IContainer? _contenedor;
+
+    /// <summary>Tope de memoria de la instancia; una prueba de memoria llena lo reduce.</summary>
+    protected virtual string MemoriaMaxima => "100mb";
 
     public ConnectionMultiplexer Limites { get; private set; } = null!;
 
@@ -38,7 +41,7 @@ public sealed class RedisDeContadoresFixture : IAsyncLifetime
             .WithResourceMapping(Encoding.UTF8.GetBytes(acl), "/etc/redis-pruebas/users.acl")
             .WithCommand(
                 "redis-server",
-                "--maxmemory", "100mb",
+                "--maxmemory", MemoriaMaxima,
                 "--maxmemory-policy", "noeviction",
                 "--appendonly", "yes",
                 "--appendfsync", "everysec",

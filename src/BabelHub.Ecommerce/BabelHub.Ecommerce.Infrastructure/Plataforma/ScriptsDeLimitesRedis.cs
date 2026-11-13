@@ -45,11 +45,13 @@ internal static class ScriptsDeLimitesRedis
         local restante = redis.call('PTTL', KEYS[2])
         if restante > 0 then return {2, ahora, ahora + restante} end
 
-        redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ahora - ventana)
-        local cuenta = redis.call('ZCARD', KEYS[1])
+        -- Las lecturas van primero: un rechazo no escribe nada y, con la memoria llena, el primer comando de escritura
+        -- (ZADD) es el que Redis rechaza con OOM, como corresponde a «almacén no disponible» y nunca a permitir.
+        local corte = ahora - ventana
+        local cuenta = redis.call('ZCOUNT', KEYS[1], '(' .. corte, '+inf')
         if cuenta >= maximo then
-          local masAntigua = redis.call('ZRANGE', KEYS[1], cuenta - maximo, cuenta - maximo, 'WITHSCORES')
-          return {2, ahora, tonumber(masAntigua[2]) + ventana}
+          local saliente = redis.call('ZRANGE', KEYS[1], '(' .. corte, '+inf', 'BYSCORE', 'LIMIT', cuenta - maximo, 1, 'WITHSCORES')
+          return {2, ahora, tonumber(saliente[2]) + ventana}
         end
 
         if redis.call('EXISTS', KEYS[1]) == 0 and redis.call('DBSIZE') >= tonumber(ARGV[5]) then
@@ -58,6 +60,7 @@ internal static class ScriptsDeLimitesRedis
 
         local id = ARGV[4]
         redis.call('ZADD', KEYS[1], ahora, id)
+        redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', corte)
         redis.call('PEXPIRE', KEYS[1], ventana + tonumber(ARGV[6]))
         if bloqueo > 0 and cuenta + 1 >= maximo then
           redis.call('SET', KEYS[2], id, 'PX', bloqueo)
@@ -100,14 +103,13 @@ internal static class ScriptsDeLimitesRedis
         local t = redis.call('TIME')
         local ahora = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000)
         local ventana = tonumber(ARGV[1])
-        redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ahora - ventana)
-        if ARGV[3] == '1' then
-          if redis.call('EXISTS', KEYS[1]) == 1 or redis.call('DBSIZE') < tonumber(ARGV[4]) then
-            redis.call('ZADD', KEYS[1], ahora, ARGV[2])
-            redis.call('PEXPIRE', KEYS[1], ventana + tonumber(ARGV[5]))
-          end
+        local corte = ahora - ventana
+        if ARGV[3] == '1' and (redis.call('EXISTS', KEYS[1]) == 1 or redis.call('DBSIZE') < tonumber(ARGV[4])) then
+          redis.call('ZADD', KEYS[1], ahora, ARGV[2])
+          redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', corte)
+          redis.call('PEXPIRE', KEYS[1], ventana + tonumber(ARGV[5]))
         end
-        return redis.call('ZCARD', KEYS[1])
+        return redis.call('ZCOUNT', KEYS[1], '(' .. corte, '+inf')
         """;
 
     public static string Huella(string script) =>
