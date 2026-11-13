@@ -60,6 +60,6 @@ Pantallas de la interfaz web (enlaza el prototipo `prototype/ui-v2/`) y estados 
 
 - [ ] Dominio sin dependencias externas.
 - [ ] Puertos definidos en Aplicación; adaptadores solo en Infraestructura.
-- [ ] Sin referencias entre servicios; Web solo usa Shared.
+- [ ] Sin referencias entre servicios; módulos solo por contrato público (regla 13); la interfaz web solo llama a contratos de módulos y al Inventario por REST desde el servidor.
 - [ ] Alcance por sucursal comprobado en la Aplicación.
 - [ ] Sin secretos ni archivos digitales en repositorio o base de datos.

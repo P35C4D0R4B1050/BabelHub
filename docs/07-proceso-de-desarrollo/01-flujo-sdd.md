@@ -4,7 +4,7 @@ Cómo se construye BabelHub: el ciclo de cada feature, las validaciones que lo p
 
 ## 1. Idea central
 
-**La spec manda y el código la demuestra.** Ninguna línea de producción existe sin una especificación aprobada y un plan aprobado; ningún criterio de aceptación existe sin una prueba; ninguna feature se da por terminada sin una verificación que converge. Dos decisiones las toma siempre una persona (aprobar la spec y aprobar el plan); todo lo demás se valida de forma automática o por revisión independiente.
+**La spec manda y el código la demuestra.** Ninguna línea de producción existe sin una especificación aprobada y un plan aprobado; ningún criterio de aceptación existe sin una prueba; ninguna feature se da por terminada sin una verificación que converge. Aprobar la spec y aprobar el plan lo hace la persona responsable o el agente en quien delegó, solo si la puerta de `04-aprobacion-delegada.md` no tiene ningún hallazgo; todo lo demás se valida de forma automática o por revisión independiente.
 
 El método se inspira en el flujo de GitHub Spec Kit (constitución, especificar, planificar, tareas, implementar y converger) y lo adapta a este proyecto: la constitución es `AGENTS.md`, los criterios se escriben en EARS y la convergencia se registra en `verificacion.md`.
 
@@ -29,10 +29,10 @@ InProgress --> Draft: cambia el comportamiento
 | :---: | :--- | :--- | :--- |
 | 1 | `spec-new` | `spec.md` en Draft | Agente |
 | 2 | `spec-clarify`, agente `spec-auditor` | Spec sin ambigüedad ni preguntas abiertas | Agente y la persona (respuestas) |
-| 3 | — | Spec **Approved** (`aprobado_por`, `aprobado_en`) | **Persona** |
+| 3 | `spec-approve` | Spec **Approved** (`aprobado_por`, `aprobado_en`) y fila en `progress/aprobaciones.md` | **Persona** o agente delegado (sin hallazgos) |
 | 4 | `spec-plan`, agentes `arch-reviewer` y `security-reviewer` | `plan.md` y `decisions.md` | Agente |
 | 5 | `spec-tasks` | `tasks.md` con cada criterio cubierto | Agente |
-| 6 | — | Plan **Planned** (`plan_aprobado_en`) | **Persona** |
+| 6 | `spec-approve` | Plan **Planned** (`plan_aprobado_por`, `plan_aprobado_en`) y fila en el registro | **Persona** o agente delegado (sin hallazgos) |
 | 7 | `spec-implement`, `dotnet-feature`, `ui-screen` | Código y pruebas, una tarea y un commit a la vez | Agente |
 | 8 | `spec-verify`, `arch-review`, `security-review`, `ui-review` | `verificacion.md` con `Resultado: Converge` | Agente (reglas fijas) |
 | 9 | `progress-log` | Bitácora y CHANGELOG | Agente |
@@ -47,7 +47,7 @@ La validación ocurre en capas; cada una atrapa un tipo distinto de error.
 | **Calidad EARS** | Plantilla incorrecta, ausencia de «deberá», tecnología en un requisito, requisito demasiado largo o corto. | `SpecCheck` | Igual |
 | **Cobertura** | Requisitos sin criterio; criterios que cubren requisitos inexistentes; orígenes (`RF`, `NN`, `RNF`, `AC`, `RC`) que no existen en `docs/`; RF del negocio sin spec. | `SpecCheck` y `TRACEABILITY.md` | Igual |
 | **Sustancia de la spec** | Requisitos que no se pueden probar, casos límite ausentes, contradicciones con `docs/` o con otras specs, decisiones de negocio asumidas. | Agente `spec-auditor` y la persona | Antes de aprobar |
-| **Puertas del ciclo** | Una spec sin aprobar con plan, un plan sin tareas, una spec `Done` sin verificación, aprobaciones sin firma. | `SpecCheck` | Cada edición y en CI |
+| **Puertas del ciclo** | Una spec sin aprobar con plan, un plan sin tareas, una spec `Done` sin verificación, aprobaciones sin firma, aprobaciones delegadas sin registro limpio o con el contenido cambiado después. | `SpecCheck` y `tests/tools` | Cada edición y en CI |
 | **Arquitectura del plan** | Piezas en la capa equivocada, referencias entre servicios, secretos, archivos digitales mal ubicados. | Agente `arch-reviewer` | Antes de aprobar el plan |
 | **Lógica de negocio** | Regresiones en reglas e invariantes. | xUnit, **pruebas primero** | Cada tarea |
 | **Estructura del código** | Referencias de proyecto indebidas, dependencias de infraestructura en Dominio o Aplicación. | `tests/architecture` (referencias y NetArchTest) | Cada compilación y en CI |
@@ -66,13 +66,13 @@ babelhub/
 ├── BabelHub.sln  global.json  Directory.Build.props  Directory.Packages.props
 ├── .editorconfig  .gitignore  .gitattributes  .env.example
 ├── .github/workflows/ci.yml
-├── .claude/               skills/ (12), agents/ (3), settings.json, launch.json
+├── .claude/               skills/ (13), agents/ (3), settings.json, launch.json
 ├── docs/                  7 carpetas temáticas (01-analisis-de-sistema a 07-proceso-de-desarrollo) y glossary.md
 ├── specs/                 README.md, speccheck.json, TRACEABILITY.md, _template/ y 20 features
 ├── progress/              CHANGELOG.md, blockers.md, log/
 ├── src/                   Inventario y Ecommerce (4 proyectos cada uno, monolitos modulares) y Shared
 ├── tests/                 unit/, integration/, architecture/, e2e/ (Playwright) y load/ (k6)
-├── tools/SpecCheck/       validador de specs
+├── tools/SpecCheck/       validador de specs (y de la aprobación delegada)
 ├── infra/                 docker-compose.local.yml, nginx/, n8n/
 └── prototype/ui-v2/       prototipo de interfaz (referencia)
 ```
@@ -89,6 +89,7 @@ babelhub/
 | `spec-tasks` | Dividir el plan en tareas atómicas, con cada criterio cubierto. |
 | `spec-implement` | Implementar una tarea a la vez con pruebas primero. |
 | `spec-verify` | Comprobar la convergencia y escribir `verificacion.md`. |
+| `spec-approve` | Aprobar una spec o un plan por delegación, solo con la puerta sin hallazgos y con registro. |
 | `progress-log` | Registrar la sesión, el CHANGELOG y los bloqueos. |
 | `arch-review` | Revisar un cambio o un plan contra las reglas de arquitectura. |
 | `security-review` | Revisar una spec, un plan o un cambio contra el modelo de amenazas y los controles de seguridad. |
@@ -120,7 +121,7 @@ Para Playwright (E2E) y k6 (carga) se usará su documentación oficial al implem
 | :---: | :--- | :--- | :--- |
 | 0 | Marco SDD: `AGENTS.md`, `CLAUDE.md`, plantillas, 20 specs (19 de negocio y la de plataforma), `SpecCheck`, skills y agentes, CI, glosario, bitácoras. | `SpecCheck` pasa; las skills existen. | **Hecha** |
 | 1 | Esqueleto técnico: solución, proyectos por servicio, prueba de arquitectura, infraestructura local. | `dotnet build -warnaserror` y `dotnet test` en verde; Compose válido. | **Hecha** |
-| 2 | Revisión y aprobación de las specs (hecha el 2026-10-16 y, para seis de ellas, el 2026-11-06) y reaprobación de `transversal-auditoria` tras la auditoría R6. Después, planes y tareas (`spec-plan`, `spec-tasks`) de cada fase antes de implementarla. Resolver los bloqueos B02, B05, B06 y B08 antes de planificar las specs que dependen de ellos. | Specs `Approved` con cero preguntas abiertas; plan y tareas aprobados de la fase que empieza. | **Siguiente** |
+| 2 | Revisión y aprobación de las specs (hecha el 2026-10-16 y, para seis de ellas, el 2026-11-06) y reaprobación de `transversal-auditoria` tras la auditoría R6. Después, planes y tareas (`spec-plan`, `spec-tasks`) de cada fase antes de implementarla. B02 y B08 están decididos (2026-11-12); B05 y B06 ya no bloquean los planes, solo la implementación contra Culqi y contra el proveedor de LLM. | Specs `Approved` con cero preguntas abiertas; plan y tareas aprobados de la fase que empieza. | **Siguiente** |
 | 3 | `transversal-auditoria`, `transversal-seguridad`, `identidad-seguridad`, `transversal-notificaciones` y la estructura de `web-base` (diseño, sesión, estados). Identidad va antes del Inventario porque este valida sus credenciales; hasta entonces las pruebas del Inventario usan un usuario actual de prueba (puerto). | Alcance por sucursal en funcionamiento; avisos con notificador simulado; estructura de la web. | Pendiente |
 | 4 | Inventario: `inventario-fuentes`, `inventario-seleccion-fuente`, `inventario-ajustes`, `inventario-traslados`. | Pruebas de concurrencia sin sobreventa (AC01). | Pendiente |
 | 5 | `ecommerce-catalogo`, `ecommerce-carrito-checkout`, `ecommerce-pagos` (con pasarela de pruebas), `ecommerce-biblioteca-digital` y `ecommerce-pedidos` (los pedidos incluyen líneas digitales). | Compra de punta a punta contra el Inventario, impresa y digital. | Pendiente |

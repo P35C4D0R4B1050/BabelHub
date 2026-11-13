@@ -6,6 +6,14 @@ using System.Text.RegularExpressions;
 // Uso: dotnet run --project tools/SpecCheck [-- --repo <ruta>] [--write-matrix]
 
 var repo = ResolverRepo(args);
+var ih = Array.IndexOf(args, "--huella");
+if (ih >= 0 && ih + 2 < args.Length)
+{
+    // Uso: --huella <spec> <spec|plan>: imprime la huella que va en progress/aprobaciones.md
+    Console.WriteLine(Spec.Huella(Path.Combine(repo, "specs", args[ih + 1]), args[ih + 2]));
+    return 0;
+}
+
 var escribirMatriz = args.Contains("--write-matrix");
 var errores = new List<string>();
 var avisos = new List<string>();
@@ -651,6 +659,117 @@ internal sealed class Spec
         }
     }
 
+    // --- Aprobación delegada (docs/07-proceso-de-desarrollo/04-aprobacion-delegada.md) ---------------------
+
+    private static bool EsDelegado(string firma) =>
+        firma.TrimStart().StartsWith("Claude (delegado", StringComparison.OrdinalIgnoreCase);
+
+    private static readonly string[] ClavesDeAprobacion =
+        ["estado:", "aprobado_por:", "aprobado_en:", "plan_aprobado_en:", "plan_aprobado_por:"];
+
+    private static string NormalizarTexto(string s) => s.Replace("\r\n", "\n", StringComparison.Ordinal).TrimEnd();
+
+    /// <summary>Huella del contenido aprobado: ignora solo los campos de estado y aprobación del frontmatter.</summary>
+    internal static string Huella(string dir, string tipo)
+    {
+        string contenido;
+        if (tipo == "spec")
+        {
+            var lineas = NormalizarTexto(File.ReadAllText(Path.Combine(dir, "spec.md"))).Split('\n');
+            var salida = new List<string>();
+            var dentro = false;
+            var cerrado = false;
+            for (var i = 0; i < lineas.Length; i++)
+            {
+                var l = lineas[i];
+                if (!cerrado && l.TrimEnd() == "---")
+                {
+                    if (i == 0)
+                    {
+                        dentro = true;
+                    }
+                    else
+                    {
+                        dentro = false;
+                        cerrado = true;
+                    }
+                }
+                else if (dentro && ClavesDeAprobacion.Any(k => l.StartsWith(k, StringComparison.Ordinal)))
+                {
+                    continue;
+                }
+
+                salida.Add(l);
+            }
+
+            contenido = string.Join('\n', salida);
+        }
+        else
+        {
+            var partes = new List<string>();
+            foreach (var f in new[] { "plan.md", "tasks.md", "decisions.md" })
+            {
+                var ruta = Path.Combine(dir, f);
+                partes.Add($"<<{f}>>\n" + (File.Exists(ruta) ? NormalizarTexto(File.ReadAllText(ruta)) : string.Empty));
+            }
+
+            contenido = string.Join('\n', partes);
+        }
+
+        var hash = System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(contenido));
+        return Convert.ToHexString(hash).ToLowerInvariant()[..16];
+    }
+
+    private static void ValidarAprobacionDelegada(string dir, string nombre, string tipo, string? fecha, List<string> errores)
+    {
+        var repoRaiz = Path.GetFullPath(Path.Combine(dir, "..", ".."));
+        var reg = Path.Combine(repoRaiz, "progress", "aprobaciones.md");
+        if (!File.Exists(reg))
+        {
+            errores.Add($"{nombre}: la aprobación delegada del {tipo} exige progress/aprobaciones.md.");
+            return;
+        }
+
+        // | Fecha | Tipo | Spec | Aprobó | SpecCheck | Auditor | Arquitectura | Seguridad | Graves | Menores | Huella |
+        var filas = File.ReadAllLines(reg)
+            .Where(l => l.TrimStart().StartsWith('|'))
+            .Select(l => l.Trim().Trim('|').Split('|').Select(c => c.Trim()).ToArray())
+            .Where(c => c.Length >= 11 && c[1] == tipo && c[2] == nombre)
+            .ToList();
+        if (filas.Count == 0)
+        {
+            errores.Add($"{nombre}: aprobado por delegación pero no hay fila de «{tipo}» en progress/aprobaciones.md.");
+            return;
+        }
+
+        var f = filas[^1];
+        void Exigir(bool ok, string que)
+        {
+            if (!ok)
+            {
+                errores.Add($"{nombre}: la aprobación delegada del {tipo} no cumple la puerta ({que}); revisa progress/aprobaciones.md.");
+            }
+        }
+
+        Exigir(fecha is not null && f[0] == fecha, "la fecha del registro no coincide con la del frontmatter");
+        Exigir(f[4] == "0/0", "SpecCheck debe estar en 0/0");
+        Exigir(f[5] is "Lista para aprobar" or "Con cambios menores", "el auditor debe dar «Lista para aprobar» o «Con cambios menores»");
+        Exigir(f[6] is "Cumple" or "Cumple con observaciones", "arquitectura debe dar «Cumple» o «Cumple con observaciones»");
+        Exigir(f[7] is "Cumple" or "Cumple con observaciones", "seguridad debe dar «Cumple» o «Cumple con observaciones»");
+        Exigir(f[8] == "0", "no puede haber hallazgos graves (Bloqueantes o Importantes) abiertos");
+        var menoresValidos = int.TryParse(f[9], out var menores) && menores >= 0;
+        Exigir(menoresValidos, "debe indicar cuántos hallazgos Menores se registraron");
+        if (menoresValidos && menores > 0)
+        {
+            var hall = Path.Combine(repoRaiz, "progress", "hallazgos.md");
+            Exigir(
+                File.Exists(hall) && File.ReadAllText(hall).Contains("| " + nombre + " |", StringComparison.Ordinal),
+                "los hallazgos Menores deben figurar en progress/hallazgos.md");
+        }
+
+        Exigir(f[10] == Huella(dir, tipo), "el contenido cambió después de aprobar: vuelve a Draft y reapruébalo");
+    }
+
     private void ValidarPuertas(string dir, Dictionary<string, string> fm, string nombre, Config cfg, List<string> errores, List<string> avisos)
     {
         if (IndiceEstado < 0)
@@ -674,6 +793,11 @@ internal sealed class Spec
             {
                 errores.Add($"{nombre}: {Estado} exige «aprobado_en» con formato AAAA-MM-DD.");
             }
+
+            if (por is not null && EsDelegado(por))
+            {
+                ValidarAprobacionDelegada(dir, nombre, "spec", en, errores);
+            }
         }
         else if (PreguntasAbiertas > 0)
         {
@@ -687,6 +811,15 @@ internal sealed class Spec
             if (!fm.TryGetValue("plan_aprobado_en", out var pa) || !Fecha.IsMatch(pa))
             {
                 errores.Add($"{nombre}: {Estado} exige «plan_aprobado_en» (AAAA-MM-DD).");
+            }
+
+            if (!fm.TryGetValue("plan_aprobado_por", out var ppor) || string.IsNullOrWhiteSpace(ppor))
+            {
+                errores.Add($"{nombre}: {Estado} exige «plan_aprobado_por» (la persona o «Claude (delegado por …)»).");
+            }
+            else if (EsDelegado(ppor))
+            {
+                ValidarAprobacionDelegada(dir, nombre, "plan", fm.GetValueOrDefault("plan_aprobado_en"), errores);
             }
 
             if (!File.Exists(plan))

@@ -9,8 +9,8 @@ Fuente de verdad de **qué** debe hacer el sistema. Cada carpeta es una feature.
 | Estado | Qué significa | Quién lo cambia | Exige (lo valida `SpecCheck`) |
 | :--- | :--- | :--- | :--- |
 | **Draft** | Borrador del agente, en revisión. | Agente | Estructura, EARS, criterios y trazabilidad correctos. |
-| **Approved** | Una persona aprobó el comportamiento. | **Persona** | Cero preguntas abiertas, `aprobado_por` y `aprobado_en`. |
-| **Planned** | Hay plan y tareas, y una persona aprobó el plan. | **Persona** | `plan_aprobado_en`, `plan.md`, `tasks.md` y cada criterio cubierto por una tarea. |
+| **Approved** | Se aprobó el comportamiento. | **Persona**, o el agente delegado si la puerta no tiene hallazgos (`04-aprobacion-delegada.md`) | Cero preguntas abiertas, `aprobado_por` y `aprobado_en`; si firma el agente, su fila en `progress/aprobaciones.md` y la huella del contenido. |
+| **Planned** | Hay plan y tareas y se aprobó el plan. | **Persona**, o el agente delegado con la misma puerta | `plan_aprobado_por`, `plan_aprobado_en`, `plan.md`, `tasks.md` y cada criterio cubierto por una tarea. |
 | **InProgress** | Se está implementando, tarea por tarea. | Agente | Cada criterio nombrado en una prueba de `tests/`. |
 | **Done** | La verificación converge. | Agente, tras `spec-verify` | Tareas marcadas y `verificacion.md` con `Resultado: Converge`. |
 

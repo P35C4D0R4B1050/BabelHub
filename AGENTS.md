@@ -21,7 +21,7 @@ No se escribe código de producción sin una spec **Approved** y un plan **Plann
 
 `Draft → Approved → Planned → InProgress → Done`
 
-- Solo una persona puede pasar una spec a **Approved** y un plan a **Planned**. Un agente **nunca** escribe `aprobado_en` ni `plan_aprobado_en` por su cuenta.
+- Una spec pasa a **Approved** y un plan a **Planned** solo por la persona responsable o por el agente en quien ella delegó (2026-11-12), y este último **únicamente** si cumple la puerta de `docs/07-proceso-de-desarrollo/04-aprobacion-delegada.md`: `SpecCheck` sin errores ni avisos, cero preguntas abiertas, y los tres agentes revisores (`spec-auditor`, `arch-reviewer` y `security-reviewer`) sin hallazgos **Bloqueantes ni Importantes** ni contradicciones, con la fila correspondiente en `progress/aprobaciones.md`; los hallazgos Menores y los heredados se registran en `progress/hallazgos.md` con dueño y fase. Ante un hallazgo Bloqueante o Importante, una contradicción, un vacío o una decisión de negocio pendiente, el agente **no aprueba**: lo corrige o lo reporta. Nunca firma con el nombre de la persona (firma «Claude (delegado por Diego Amiquero)»). Las decisiones de negocio, los cambios de requisitos y los cambios a este archivo siguen siendo de la persona responsable.
 - Una spec **Approved** no se modifica en silencio: un cambio de comportamiento vuelve a **Draft** y se vuelve a aprobar.
 - Se trabaja **una tarea a la vez**, de adentro hacia afuera: Dominio → Aplicación → Infraestructura → Api → Web → pruebas de integración y E2E.
 - Cada criterio de aceptación (`AC-XXX-NN`) tiene al menos una prueba que lo nombra.
@@ -46,7 +46,7 @@ BabelHub tiene **dos servicios**: el E-commerce (con la interfaz web y los módu
 12. Un libro digital no consulta al Inventario ni genera reservas.
 13. Un módulo solo depende del **contrato público** de otro módulo (la raíz de su carpeta); nunca de su `Interno`, su Dominio, su Infraestructura ni su esquema de base de datos.
 
-La prueba de arquitectura (`tests/architecture`) hace cumplir 1, 2, 5, 6, 9 y 13. Si falla, no se debilita la prueba: se corrige el código.
+La prueba de arquitectura (`tests/architecture`) hace cumplir 1, 2, 5, 6 y 13, y de la 9 la parte que se ve en las referencias de proyecto; que el JWT no llegue al navegador y que el Inventario se llame solo desde el servidor se verifican con pruebas de integración y E2E. Si falla, no se debilita la prueba: se corrige el código.
 
 ## 4. Reglas de calidad
 
@@ -106,7 +106,7 @@ dotnet run --project tools/SpecCheck -- --write-matrix   # regenerar specs/TRACE
 
 ## 10. Skills y agentes del proyecto
 
-Las skills viven en `.claude/skills/` y guían cada paso del ciclo: `spec-new`, `spec-clarify`, `spec-plan`, `spec-tasks`, `spec-implement`, `spec-verify`, `progress-log`, `arch-review`, `dotnet-feature`, `security-review`, `ui-screen` y `ui-review`. Los agentes `spec-auditor`, `arch-reviewer` y `security-reviewer` revisan en contexto aislado. Skills externas recomendadas (instalación a cargo de la persona responsable): ver `docs/07-proceso-de-desarrollo/01-flujo-sdd.md`.
+Las skills viven en `.claude/skills/` y guían cada paso del ciclo: `spec-new`, `spec-clarify`, `spec-approve`, `spec-plan`, `spec-tasks`, `spec-implement`, `spec-verify`, `progress-log`, `arch-review`, `dotnet-feature`, `security-review`, `ui-screen` y `ui-review`. Los agentes `spec-auditor`, `arch-reviewer` y `security-reviewer` revisan en contexto aislado. Skills externas recomendadas (instalación a cargo de la persona responsable): ver `docs/07-proceso-de-desarrollo/01-flujo-sdd.md`.
 
 ## 11. Ante la duda
 

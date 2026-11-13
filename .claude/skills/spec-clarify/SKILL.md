@@ -20,7 +20,7 @@ Objetivo: que la spec pueda aprobarse sin sorpresas: sin preguntas abiertas, sin
 4. Para cada pregunta abierta, usa **AskUserQuestion** con 2 a 4 opciones, tu recomendación primero y el impacto de cada una. Pregunta solo lo que cambie el comportamiento; lo técnico se decide en el plan.
 5. Con cada respuesta: actualiza los requisitos y criterios afectados, marca la pregunta como `[x]` y escribe la decisión debajo.
 6. Vuelve a ejecutar `SpecCheck` (con `--write-matrix`). Si cambió el comportamiento, revisa también las specs que dependen de esta.
-7. Entrega un resumen: qué cambió, qué quedó resuelto y qué falta. **No** marques la spec como `Approved`: pide a la persona responsable que la apruebe.
+7. Entrega un resumen: qué cambió, qué quedó resuelto y qué falta. **No** marques la spec como `Approved` aquí: la aprobación se hace con la skill `spec-approve` (puerta sin hallazgos) o la da la persona responsable.
 
 ## Reglas
 

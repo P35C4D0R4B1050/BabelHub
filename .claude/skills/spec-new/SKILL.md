@@ -30,6 +30,6 @@ Produce `specs/<feature>/spec.md` en estado **Draft**. Describe **qué y por qu�
 
 ## Reglas
 
-- Nunca escribas `aprobado_por`, `aprobado_en` ni cambies el estado a `Approved`: lo decide una persona.
+- Nunca escribas `aprobado_por`, `aprobado_en` ni cambies el estado a `Approved` desde esta skill: la aprobación se hace con `spec-approve` (puerta sin hallazgos, delegada) o la da la persona responsable.
 - Si la spec obliga a cambiar `docs/`, propón el cambio y espera confirmación.
-- Termina deteniéndote para la revisión humana: resume la spec en pocas líneas y lista las preguntas abiertas.
+- Termina deteniéndote para la revisión (`spec-clarify` y los agentes revisores): resume la spec en pocas líneas y lista las preguntas abiertas.

@@ -27,7 +27,7 @@ La base de la pirámide (Dominio y Aplicación) es la más numerosa; las lentas 
 5. **Pruebas deterministas:** el tiempo, los identificadores y el azar se inyectan; ninguna prueba depende del reloj real ni del orden.
 6. **No se debilitan pruebas ni validaciones para que algo pase.** Si falla la prueba de arquitectura, se corrige el código.
 7. **Concurrencia real:** las reglas de stock, límites y descargas se prueban con solicitudes simultáneas sobre la base real ([estados y concurrencia](../03-diseno-de-software/06-estados-y-concurrencia.md)).
-8. **Datos de prueba** de ejemplo, nunca datos reales; secretos de prueba generados y descartables.
+8. **Datos de prueba** de ejemplo, nunca datos reales (salvo el ensayo de restauración aislado, PLA-22); secretos de prueba generados y descartables.
 
 ## 3. Umbrales de cobertura (RNF28)
 
@@ -37,7 +37,7 @@ La base de la pirámide (Dominio y Aplicación) es la más numerosa; las lentas 
 | Sistema completo | **≥ 70 %** de líneas | Evita zonas ciegas sin forzar pruebas de bajo valor. |
 | Infraestructura y Web | Sin porcentaje; criterios cubiertos por pruebas de integración y E2E | La calidad se mide por criterios, no por líneas. |
 
-La cobertura es una **señal, no el objetivo**: no se escriben pruebas vacías para subir el número. Un descenso por debajo de la meta se revisa en la verificación de la spec. Opcionalmente, una pasada de pruebas de mutación sobre el Dominio (por ejemplo, con Stryker.NET) valida que las pruebas detecten errores reales.
+Los umbrales de cobertura (RNF28, PLA-14) son una **puerta**: la verificación automática falla si el Dominio y la Aplicación de un servicio bajan de 85 % o el total de un servicio baja de 70 %. Aun así, la cobertura no es el objetivo: no se escriben pruebas vacías para subir el número. Opcionalmente, una pasada de pruebas de mutación sobre el Dominio (por ejemplo, con Stryker.NET) valida que las pruebas detecten errores reales.
 
 ## 4. Qué se prueba por tipo de requisito
 
@@ -71,7 +71,7 @@ La cobertura es una **señal, no el objetivo**: no se escriben pruebas vacías p
 | Antes de cada commit | `dotnet run --project tools/SpecCheck`; compilación sin advertencias; pruebas afectadas. |
 | Integración continua | SpecCheck, compilación, todas las pruebas y arquitectura; análisis estático y escaneos cuando estén configurados. |
 | Antes de pasar una spec a `Done` | `spec-verify` con resultado *Converge*; cobertura de criterios; revisión de arquitectura y de seguridad. |
-| Antes de un despliegue mayor | Carga con k6, ZAP baseline, restauración de respaldo y lista manual de accesibilidad. |
+| Antes de cada despliegue (cada versión que se despliega en producción) | Carga con k6, ZAP baseline, restauración de respaldo y lista manual de accesibilidad. |
 
 ## 7. Riesgos de la estrategia
 

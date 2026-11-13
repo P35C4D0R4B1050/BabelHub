@@ -30,4 +30,4 @@ Una línea por tarea (lo valida `SpecCheck`):
 1. Lee el plan y la spec.
 2. Redacta las tareas por capa y numéralas `T01`, `T02`…
 3. Ejecuta `dotnet run --project tools/SpecCheck` y corrige.
-4. Detente: la persona responsable aprueba el plan y las tareas juntos y escribe `plan_aprobado_en`. Tú no cambias el estado a `Planned`.
+4. Aprueba el plan y las tareas **juntos** con la skill `spec-approve` (puerta sin hallazgos); fuera de ese procedimiento no cambies el estado a `Planned`.
