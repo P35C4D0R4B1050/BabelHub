@@ -20,7 +20,8 @@ Cuatro VMs de una sola cuenta: dos ARM de **1 OCPU y 6 GB** y dos AMD micro de *
 | Nginx | 64 MB | 20–40 MB | VM-BORDE | |
 | cloudflared | 64 MB | 20–40 MB | VM-BORDE y VM-VENTAS | Dos conectores del mismo túnel. |
 | BabelHub.Ecommerce | 600 MB | 250–450 MB | VM-VENTAS | Monolito modular con la interfaz web, Identidad y Asistente. |
-| Redis | 256 MB | 50–150 MB | VM-VENTAS | `maxmemory` con política de expulsión; caché de disponibilidad y contadores. |
+| Redis (caché y Evolution) | 128 MB | 30–80 MB | VM-VENTAS | `maxmemory` con política de expulsión `allkeys-lru`; caché de disponibilidad y del catálogo y datos de Evolution. |
+| Redis (contadores de límites) | 100 MB | 10–40 MB | VM-VENTAS | Instancia dedicada con `noeviction`, tope de claves, ACL y TLS (`transversal-seguridad` D17); alerta al 70 %. |
 | n8n | 600 MB | 300–500 MB | VM-VENTAS | Proceso de Node; el mayor consumo individual. |
 | Evolution API | 600 MB | 300–500 MB | VM-VENTAS | Proceso de Node. |
 | BabelHub.Inventario | 350 MB | 150–250 MB | VM-INVENTARIO | |

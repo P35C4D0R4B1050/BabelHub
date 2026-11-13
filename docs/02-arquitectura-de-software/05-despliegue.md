@@ -89,7 +89,6 @@ INV -->|"local - rol inventario"| PG
 EVO -->|"5432"| PG
 ECO --> RED
 ECO -->|"webhook"| N8N
-INV -->|"webhook"| N8N
 N8N --> EVO
 EVO --> WA
 ECO -->|"sube y firma URLs"| ALM
@@ -239,10 +238,10 @@ Lo siguiente se acepta de forma consciente y debe figurar en el informe y en la 
 | VM-BORDE | VM-INVENTARIO | 8081 (réplica de gestión, solo como respaldo) | Permitido |
 | VM-VENTAS, VM-INVENTARIO (réplica) | VM-INVENTARIO | 8082 (API del Inventario) | Permitido |
 | VM-INVENTARIO (Inventario) | VM-VENTAS | 8080 (aviso de traslado recibido) | Permitido |
-| VM-INVENTARIO | VM-VENTAS | 5678 (webhook de n8n) | Permitido |
+| VM-INVENTARIO | VM-VENTAS | 5678 (webhook de n8n) | Cerrado: el Inventario ya no llama a n8n (pide los avisos al E-commerce, `transversal-notificaciones` D10) |
 | VM-VENTAS | VM-INVENTARIO | 5432 (PostgreSQL, rol ecommerce) | Permitido |
 | Cualquier otro origen | VM-INVENTARIO | todos | **Denegado** |
-| VM-INVENTARIO (réplica de gestión) | VM-VENTAS | 6379 (Redis, con contraseña; si no responde, SEG-26 rechaza las acciones que dependen de un límite) | Permitido |
+| VM-INVENTARIO (réplica de gestión) | VM-VENTAS | 6380 (Redis de contadores, dedicado, con TLS y contraseña; si no responde, SEG-26 rechaza las acciones que dependen de un límite) | Permitido |
 | Internet | n8n y Evolution API | todos | **Sin publicar** (paneles por túnel SSH) |
 | Evolution API | WhatsApp | HTTPS saliente | Permitido |
 | VM-VENTAS | Almacén de archivos | HTTPS saliente | Permitido (subir archivos y firmar URLs) |

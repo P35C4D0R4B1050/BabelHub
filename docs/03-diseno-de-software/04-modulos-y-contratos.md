@@ -6,9 +6,9 @@ Describe los módulos de cada servicio y la forma de sus contratos REST. Es un d
 
 | Servicio | Módulos (casos de uso agrupados) | Specs |
 | :--- | :--- | :--- |
-| **Inventario** | **Fuentes** (fuentes, stock vendible, rutas, unidades vendidas, fuente de recepción); **Selección y reservas** (consulta previa, reservas con expiración); **Traslados**; **Ajustes** (merma, daño, conteo, ingreso de mercadería, devoluciones) | `inventario-fuentes`, `inventario-seleccion-fuente`, `inventario-traslados`, `inventario-ajustes` |
-| **E-commerce** | **Catálogo**; **Carrito y checkout**; **Pagos**; **Pedidos**; **Envíos**; **Devoluciones**; **Biblioteca digital**; **Libro de Reclamaciones**; **Identidad** (registro, sesión, segundo factor, usuarios y roles, derechos ARCO); **Asistente** (consulta, recomendación, estado de pedidos); **Interfaz web** (áreas Tienda, Sucursal y Admin, índice infinito) | `ecommerce-*`, `identidad-seguridad`, `asistente-compra-ia`, `web-base`, `web-indice-infinito` |
-| **Transversal** | **Plataforma** (núcleo compartido del E-commerce, con esquema propio `plataforma`: auditoría compartida, límites, alertas, correo con su cuota y su cola de pendientes, trabajos de fondo y puertos compartidos como reloj, usuario actual y unidad de trabajo); Auditoría (contrato único; cada servicio guarda sus registros y Identidad los suyos, aislados; con filtros y paginación estable); Seguridad (errores, límites, eventos y alertas); Notificaciones (puerto) | `transversal-auditoria`, `transversal-seguridad`, `transversal-notificaciones` |
+| **Inventario** | **Fuentes** (fuentes, stock vendible, rutas, unidades vendidas, fuente de recepción); **Selección y reservas** (consulta previa, reservas con expiración); **Traslados**; **Ajustes** (merma, daño, conteo, ingreso de mercadería, devoluciones); **Auditoría** (registros, eventos de seguridad y alertas del Inventario); **Plataforma** (límites de uso, errores, entradas de integración y puertos compartidos del Inventario) | `inventario-fuentes`, `inventario-seleccion-fuente`, `inventario-traslados`, `inventario-ajustes` |
+| **E-commerce** | **Catálogo**; **Carrito y checkout**; **Pagos**; **Pedidos**; **Envíos**; **Devoluciones**; **Biblioteca digital**; **Libro de Reclamaciones**; **Identidad** (registro, sesión, segundo factor, usuarios y roles, derechos ARCO); **Asistente** (consulta, recomendación, estado de pedidos); **Auditoría** (registros, eventos de seguridad y alertas del E-commerce, con la lista unificada); **Notificaciones** (avisos por WhatsApp, plantillas y números desactivados); **Plataforma** (núcleo compartido: límites de uso, errores, entradas de integración, registro de supresiones, correo con su cuota y su cola, trabajos de fondo, reloj, actor actual y unidad de trabajo); **Interfaz web** (áreas Tienda, Sucursal y Admin, índice infinito) | `ecommerce-*`, `identidad-seguridad`, `asistente-compra-ia`, `web-base`, `web-indice-infinito` |
+| **Transversal** | **Plataforma** (módulo de cada servicio; en el E-commerce incluye el correo con su cuota y su cola); **Auditoría** (módulo de cada servicio con su esquema `auditoria`; Identidad guarda sus registros aislados en su esquema y los entrega por un puerto que Auditoría define); Seguridad (errores, límites, eventos y alertas, sobre los módulos Plataforma y Auditoría); **Notificaciones** (módulo del E-commerce; el Inventario le pide los avisos de traslado por REST) | `transversal-auditoria`, `transversal-seguridad`, `transversal-notificaciones` |
 
 Cada módulo es una carpeta dentro de las capas Aplicación y Dominio del servicio; no es un proyecto aparte. Tiene un **contrato público** en la raíz de su carpeta y un interior privado (`Interno`).
 
@@ -18,7 +18,7 @@ Un módulo solo llama a los contratos públicos de otros. Las flechas siguen la 
 
 | Módulo | Depende de |
 | :--- | :--- |
-| Identidad | Nada: todos los módulos usan su contexto de actor; para los pendientes de una cuenta y para su cancelación (anonimizar, desvincular o eliminar los datos personales y marcar las hojas de reclamación) expone puertos que implementan los demás módulos (sin depender de ellos) y define el puerto de eliminación del carrito de una cuenta reemplazada (IDE-84), que implementa Carrito. |
+| Identidad | Plataforma y Auditoría (contratos; implementa los puertos de Auditoría y de restauración de Plataforma); todos los módulos usan su contexto de actor; para los pendientes de una cuenta y para su cancelación (anonimizar, desvincular o eliminar los datos personales y marcar las hojas de reclamación) expone puertos que implementan los demás módulos (sin depender de ellos) y define el puerto de eliminación del carrito de una cuenta reemplazada (IDE-84), que implementa Carrito. |
 | Catálogo | Cliente del Inventario (disponibilidad e ingreso de mercadería). |
 | Carrito y checkout | Catálogo, Identidad y cliente del Inventario. |
 | Pagos | Carrito y checkout, Identidad y cliente del Inventario (reserva). |
@@ -28,7 +28,9 @@ Un módulo solo llama a los contratos públicos de otros. Las flechas siguen la 
 | Devoluciones | Pedidos, Pagos, Biblioteca digital, Identidad y cliente del Inventario. |
 | Libro de Reclamaciones | Identidad. |
 | Asistente | Catálogo, Pedidos e Identidad (solo lectura) y cliente del Inventario. |
-| Plataforma (núcleo compartido) | Nada: todos los módulos usan sus puertos; es el dueño de las tablas compartidas (`auditoria`, `alertas`, `correos_pendientes`, `cuota_correo`). |
+| Plataforma (núcleo compartido) | Nada: todos los módulos usan sus puertos; es el dueño de los límites de uso (`IControlDeLimites`), el reloj, el actor actual, la unidad de trabajo, el registro de supresiones, `trabajos_de_fondo`, `correos_pendientes` y `cuota_correo`. Define puertos de salida que implementan otros módulos: los de eventos de seguridad y alertas técnicas (los implementa Auditoría) y los de restauración (`IPasoDeRestauracion`, que registran Identidad y Auditoría; `IAplicadorDeSupresion` e `IRestauracionDeIdentidad`, que implementa Identidad). Su contrato público usa modelos propios, no tipos del Dominio. |
+| Auditoría | Plataforma y cliente del Inventario (lista unificada, que fusiona su Aplicación); implementa los puertos de salida de eventos y alertas de Plataforma; define puertos que implementa Identidad (registros aislados, depuración, cuentas canceladas y destinatarios de alertas) y los de registro, alertas y denegación de acceso que usa todo módulo, con el identificador de acción en la raíz de su Aplicación. |
+| Notificaciones | Plataforma, Identidad (consentimiento y número, por su contrato) y cliente del Inventario (contacto de notificación de una sucursal); Identidad define el puerto de cancelación de avisos que Notificaciones implementa. |
 | Interfaz web | Todos los módulos y el cliente del Inventario. |
 | Inventario: Selección y reservas, Traslados y Ajustes | Fuentes; Traslados además Selección y reservas. |
 
@@ -79,9 +81,11 @@ Los dos servicios responden los errores con `application/problem+json`:
 | E-commerce → Inventario (alertas) | Consultar las alertas de seguridad y técnicas del Inventario y marcar una de seguridad como revisada (AUD-13, AUD-29, AUD-34); el E-commerce envía el correo a los administradores centrales | Credencial del administrador y de servicio | Se muestra lo del E-commerce y el aviso de AUD-18. |
 | Módulos del E-commerce entre sí | Operaciones de cada módulo por su contrato público, en el mismo proceso | Contexto del actor (no se pasa por la red) | Excepción de la capa de Aplicación traducida por la Presentación. |
 | Interfaz web → módulo Identidad | Pedir un contexto de lectura de 5 minutos para el asistente en nombre del cliente | Contexto del usuario | Sin él el asistente solo responde catálogo y disponibilidad. |
-| Interfaz web → E-commerce e Inventario | Auditoría y alertas: pedir a cada servicio su página con los mismos filtros y mezclarlas por fecha | Credencial del administrador | Se muestra el otro servicio y se indica el que no respondió (AUD-18). |
+| Módulo Auditoría del E-commerce → Inventario | Auditoría y alertas: pedir al Inventario su página con los mismos filtros; el módulo Auditoría del E-commerce las fusiona por fecha UTC, servicio, almacén de origen e identificador (AUD-09) y la interfaz web solo muestra el resultado | Credencial de servicio de alcance `consulta-de-auditoria` y token del administrador | Se muestra el otro servicio y se indica el que no respondió (AUD-18). |
 | Asistente → Catálogo, Pedidos e Inventario | Consultar catálogo y disponibilidad (contexto de solo lectura) y pedidos (contexto del cliente, de lectura y 5 minutos) | Ver la columna anterior | El asistente informa que no tiene datos. |
-| Servicios → Notificador | Enviar aviso | Secreto compartido | Pendiente y reintento; no interrumpe. |
+| Módulos del E-commerce → Notificador | Solicitar un aviso (se guarda con la operación y se envía de fondo al webhook de n8n, que arma el mensaje) | Firma HMAC con marca de tiempo | Pendiente y reintento; no interrumpe. |
+| Inventario → E-commerce (avisos) | Solicitar un aviso de traslado con evento determinista, plantilla de traslado y campos cerrados, solo con el código de sucursal (NOT-01, NOT-09, TRA-10, TRA-11); el aviso de TRA-22 sale como alerta por correo, fuera del Notificador | Credencial de servicio de alcance `solicitar-aviso` | Queda guardado en el Inventario y se reintenta; el traslado no se interrumpe. |
+| E-commerce → Inventario (contacto) | Consultar el contacto de notificación registrado de una sucursal al enviar un aviso (NOT-09, FUE-01) | Credencial de servicio de alcance `lectura-de-contacto` | El aviso queda pendiente y se reintenta. |
 | Pasarela → E-commerce | Aviso de pago | Firma o secreto verificado | Se rechaza y registra; el estado se confirma con la pasarela. |
 | Todos → Auditoría local | Registrar operación | Interna | Si falla, la operación sensible no se aplica (AUD-04). |
 
@@ -95,3 +99,13 @@ Contiene solo contratos: DTOs de solicitud y respuesta, constantes (códigos de 
 2. Un cambio incompatible crea `v2` y mantiene `v1` durante al menos 30 días (PLA-12).
 3. Los campos retirados se marcan como obsoletos antes de eliminarse.
 4. Cada contrato tiene una prueba de contrato en el servicio que lo publica y en el que lo consume.
+
+### 6.1 Versiones vigentes y fechas de retiro (PLA-12)
+
+| Contrato | Versión vigente | Versión en retiro | Fecha de retiro (≥ 30 días después de publicar la nueva) |
+| :--- | :--- | :--- | :--- |
+| Todos los de `/api/<servicio>/v1/` | `v1` | ninguna | — |
+
+Al publicar una `v2`, se añade aquí la fila con la fecha de retiro; las pruebas de contrato corren `v1` y `v2` hasta esa fecha y después ya no exigen la anterior.
+
+Todos los módulos usan además los contratos de Plataforma, Auditoría y Notificaciones; esas flechas se omiten de la tabla para no repetirlas en cada fila. Plataforma no depende de nadie y Auditoría y Notificaciones no dependen de ningún módulo de negocio salvo Identidad en el sentido indicado (Identidad implementa los puertos de Auditoría; Notificaciones consulta el contrato de Identidad).
