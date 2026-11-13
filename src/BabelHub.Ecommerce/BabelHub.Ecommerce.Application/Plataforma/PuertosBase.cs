@@ -16,6 +16,9 @@ public enum TipoDeActor
     Usuario,
     Sistema,
     Integracion,
+
+    /// <summary>Quien no tiene sesión (un visitante): es un actor con contexto, distinto de «no hay contexto» (AUD-23).</summary>
+    Anonimo,
 }
 
 /// <summary>Quién ejecuta el caso de uso: una persona con rol (y sucursal, si la tiene), el sistema o una integración.</summary>
@@ -58,13 +61,18 @@ public sealed record ActorActual
 
     public static ActorActual DelSistema() => new(TipoDeActor.Sistema, null, null, null, null);
 
+    public static ActorActual Anonimo() => new(TipoDeActor.Anonimo, null, null, null, null);
+
     public static ActorActual DeIntegracion(string nombre) =>
         string.IsNullOrWhiteSpace(nombre)
             ? throw new ArgumentException("La integración necesita un nombre.", nameof(nombre))
             : new ActorActual(TipoDeActor.Integracion, null, null, null, nombre);
 }
 
-/// <summary>Actor de la solicitud en curso; <see langword="null"/> si no hay sesión (visitante).</summary>
+/// <summary>
+/// Actor de la solicitud o tarea en curso. Un visitante es <see cref="ActorActual.Anonimo"/>; <see langword="null"/> significa que
+/// nadie estableció el contexto y toda llamada entre módulos que lo necesite se rechaza (SEG-15).
+/// </summary>
 public interface IActorActual
 {
     ActorActual? Actual { get; }
