@@ -121,6 +121,31 @@ public sealed class PuertaDeAprobacionTests : IDisposable
     }
 
     [Fact]
+    public void PlanAprobado_conUnaTareaMarcadaComoHecha_Pasa()
+    {
+        AprobarPlan();
+        var tareas = Path.Combine(_copia, "specs", Spec, "tasks.md");
+        var texto = File.ReadAllText(tareas);
+        var marcado = System.Text.RegularExpressions.Regex.Replace(texto, @"(?m)^- \[ \] T01 ", "- [x] T01 ", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5));
+        Assert.NotEqual(texto, marcado);
+        File.WriteAllText(tareas, marcado, new UTF8Encoding(false));
+        var (codigo, salida) = Ejecutar();
+        Assert.True(codigo == 0, salida);
+    }
+
+    [Fact]
+    public void PlanAprobado_conUnaTareaNuevaAgregada_Falla()
+    {
+        AprobarPlan();
+        File.AppendAllText(
+            Path.Combine(_copia, "specs", Spec, "tasks.md"),
+            "- [ ] T99 [Pruebas] Tarea agregada después de aprobar (cubre: AC-PLA-01, PLA-01)\n");
+        var (codigo, salida) = Ejecutar();
+        Assert.NotEqual(0, codigo);
+        Assert.Contains("el contenido cambi", salida, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ElRepositorioActual_PasaSpecCheck()
     {
         var p = Proceso(_raiz, "--repo", _raiz);
@@ -147,6 +172,26 @@ public sealed class PuertaDeAprobacionTests : IDisposable
     {
         var fila = $"| 2026-11-12 | spec | {Spec} | Claude (delegado) | 0/0 | {auditor} | {arq} | {seg} | {graves} | {menores} | {huella} |";
         File.AppendAllText(Path.Combine(_copia, "progress", "aprobaciones.md"), fila + "\n");
+    }
+
+    /// <summary>Deja la spec aprobada y su plan aprobado (Planned) por delegación, con las dos filas del registro.</summary>
+    private void AprobarPlan()
+    {
+        Registrar("Lista para aprobar", "Cumple", "Cumple", "0", Huella());
+        var huellaPlan = Ejecutar("--huella", Spec, "plan").salida.Trim();
+        File.AppendAllText(
+            Path.Combine(_copia, "progress", "aprobaciones.md"),
+            $"| 2026-11-12 | plan | {Spec} | Claude (delegado) | 0/0 | Lista para aprobar | Cumple | Cumple | 0 | 0 | {huellaPlan} |\n");
+
+        var ruta = RutaSpec();
+        var t = File.ReadAllText(ruta).Replace("\r\n", "\n", StringComparison.Ordinal);
+        t = t.Replace("\nestado: Approved", "\nestado: Planned", StringComparison.Ordinal)
+             .Replace(
+                 "\naprobado_en: 2026-11-12",
+                 "\naprobado_en: 2026-11-12\nplan_aprobado_por: Claude (delegado por Diego Amiquero)\nplan_aprobado_en: 2026-11-12",
+                 StringComparison.Ordinal);
+        File.WriteAllText(ruta, t, new UTF8Encoding(false));
+        Ejecutar("--write-matrix");
     }
 
     private (int codigo, string salida) Ejecutar(params string[] extra) =>

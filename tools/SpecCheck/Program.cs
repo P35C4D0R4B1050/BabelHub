@@ -669,6 +669,8 @@ internal sealed class Spec
 
     private static string NormalizarTexto(string s) => s.Replace("\r\n", "\n", StringComparison.Ordinal).TrimEnd();
 
+    private static readonly Regex CasillaMarcada = new(@"(?m)^- \[[xX]\] ", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     /// <summary>Huella del contenido aprobado: ignora solo los campos de estado y aprobación del frontmatter.</summary>
     internal static string Huella(string dir, string tipo)
     {
@@ -710,7 +712,15 @@ internal sealed class Spec
             foreach (var f in new[] { "plan.md", "tasks.md", "decisions.md" })
             {
                 var ruta = Path.Combine(dir, f);
-                partes.Add($"<<{f}>>\n" + (File.Exists(ruta) ? NormalizarTexto(File.ReadAllText(ruta)) : string.Empty));
+                var texto = File.Exists(ruta) ? NormalizarTexto(File.ReadAllText(ruta)) : string.Empty;
+                if (f == "tasks.md")
+                {
+                    // Marcar una tarea como hecha (- [x]) durante la implementación no cambia lo aprobado: solo se
+                    // ignora el estado de las casillas; cualquier otro cambio del texto sigue invalidando la huella.
+                    texto = CasillaMarcada.Replace(texto, "- [ ] ");
+                }
+
+                partes.Add($"<<{f}>>\n" + texto);
             }
 
             contenido = string.Join('\n', partes);

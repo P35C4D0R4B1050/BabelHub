@@ -72,7 +72,7 @@ Una spec o un plan firmados como «Claude (delegado …)» fallan la validación
 - no hay fila de su tipo en `progress/aprobaciones.md`, o la fecha de la fila no coincide con la del frontmatter;
 - la fila no tiene `0/0` en `SpecCheck`, un veredicto aceptable de cada revisor («Lista para aprobar» o «Con cambios menores»; «Cumple» o «Cumple con observaciones») y **0 hallazgos graves**;
 - la fila declara hallazgos Menores y la spec no figura en `progress/hallazgos.md`;
-- **el contenido cambió después de aprobar** (la huella no coincide). Una spec aprobada no se modifica en silencio: vuelve a Draft y se reaprueba.
+- **el contenido cambió después de aprobar** (la huella no coincide; la huella de un plan ignora solo el estado de las casillas `- [ ]` y `- [x]` de `tasks.md`, para poder marcar el avance durante la implementación, decisión de la persona responsable del 2026-11-13). Una spec aprobada no se modifica en silencio: vuelve a Draft y se reaprueba.
 
 Un plan en `Planned` exige además `plan_aprobado_por`. Las pruebas de esta puerta están en `tests/tools/BabelHub.SpecCheck.Tests` y fallan si alguien la debilita.
 
