@@ -21,7 +21,7 @@ La base de la pirámide (Dominio y Aplicación) es la más numerosa; las lentas 
 ## 2. Reglas
 
 1. **Prueba primero para reglas de negocio:** se escribe la prueba que falla y luego el código (TDD), de adentro hacia afuera.
-2. **Trazabilidad:** cada prueba de un criterio lleva `[Trait("Criterio", "AC-XXX-NN")]`; `SpecCheck` falla si un criterio no está nombrado en ninguna prueba cuando la spec está en `InProgress`.
+2. **Trazabilidad:** cada prueba de un criterio lleva `[Trait("Criterio", "AC-XXX-NN")]`; `SpecCheck` falla si un criterio no está nombrado en ninguna prueba: en `InProgress`, para los criterios cuyas tareas ya están todas marcadas; en `Done`, para todos.
 3. **Nombres descriptivos** en español: `Reservar_SinStockVendible_Rechaza`.
 4. **Sin red ni base** en Dominio y Aplicación; las pruebas de integración usan Testcontainers (PostgreSQL y un emulador compatible con S3) y necesitan Docker.
 5. **Pruebas deterministas:** el tiempo, los identificadores y el azar se inyectan; ninguna prueba depende del reloj real ni del orden.

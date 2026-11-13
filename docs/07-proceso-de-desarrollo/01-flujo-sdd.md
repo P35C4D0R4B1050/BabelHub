@@ -52,7 +52,7 @@ La validación ocurre en capas; cada una atrapa un tipo distinto de error.
 | **Lógica de negocio** | Regresiones en reglas e invariantes. | xUnit, **pruebas primero** | Cada tarea |
 | **Estructura del código** | Referencias de proyecto indebidas, dependencias de infraestructura en Dominio o Aplicación. | `tests/architecture` (referencias y NetArchTest) | Cada compilación y en CI |
 | **Compilación estricta** | Advertencias, estilo, nulabilidad. | `dotnet build -warnaserror` | Cada tarea y en CI |
-| **Trazabilidad hacia las pruebas** | Un criterio de una spec en ejecución que ninguna prueba nombra (`[Trait("Criterio", "AC-XXX-NN")]`). | `SpecCheck` | Desde `InProgress` |
+| **Trazabilidad hacia las pruebas** | Un criterio que ninguna prueba nombra (`[Trait("Criterio", "AC-XXX-NN")]`): en `InProgress`, los criterios cuyas tareas citadas en `tasks.md` están todas terminadas; en `Done`, todos los de la spec. | `SpecCheck` | Desde `InProgress` |
 | **Convergencia** | Diferencias entre spec, código y pruebas; funcionalidad de más. | Skill `spec-verify` | Antes de `Done` |
 | **Interfaz** | Paridad con el prototipo, responsividad, temas, teclado, contraste, estados. | Skill `ui-review` (navegador) y Playwright | Pantallas de cada feature |
 

@@ -45,3 +45,9 @@ Cuatro rondas de `arch-reviewer` y `security-reviewer` sobre cada plan (la cuart
 ## Corrección posterior: fixture de la puerta de aprobación
 
 - `tests/tools/BabelHub.SpecCheck.Tests/PuertaDeAprobacionTests.cs`: el fixture solo devolvía a Draft las specs «Approved por delegación» de su copia temporal; con los planes en `Planned` dos pruebas fallaban. Se amplió la expresión regular para revertir también `Planned` y sus campos `plan_aprobado_*` (autorizado por la persona el 2026-11-13). No se debilitó ninguna verificación de la puerta. Resultado: `dotnet test BabelHub.sln` en verde.
+
+## Implementación: T01 de transversal-seguridad y trazabilidad de SpecCheck
+
+- T01 (política de límite del Dominio, ambos servicios) implementada con pruebas primero (26 por servicio) y commiteada.
+- Con autorización de la persona («Sí, relajarla»), `SpecCheck` ya no exige desde `InProgress` que todos los criterios los nombre una prueba: en `InProgress` solo se exigen los criterios cuyas tareas citadas en `tasks.md` están todas marcadas; en `Done`, todos. Cuatro pruebas nuevas en `PuertaDeAprobacionTests` y el fixture ahora también devuelve a Draft las specs `InProgress`. Documentado en `docs/07/01-flujo-sdd.md` y `03-estrategia-de-pruebas.md`.
+- `transversal-seguridad` pasó a `InProgress` (único cambio de estado que corresponde a `spec-implement`).

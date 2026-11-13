@@ -34,7 +34,7 @@ public sealed class PuertaDeAprobacionTests : IDisposable
             var texto = File.ReadAllText(spec).Replace("\r\n", "\n", StringComparison.Ordinal);
             var revertido = System.Text.RegularExpressions.Regex.Replace(
                 texto,
-                @"\nestado: (?:Approved|Planned)\naprobado_por: Claude \(delegado[^\n]*\naprobado_en: [^\n]*(?:\nplan_aprobado_por: [^\n]*\nplan_aprobado_en: [^\n]*)?",
+                @"\nestado: (?:Approved|Planned|InProgress)\naprobado_por: Claude \(delegado[^\n]*\naprobado_en: [^\n]*(?:\nplan_aprobado_por: [^\n]*\nplan_aprobado_en: [^\n]*)?",
                 "\nestado: Draft");
             if (texto != revertido)
             {
@@ -146,6 +146,57 @@ public sealed class PuertaDeAprobacionTests : IDisposable
     }
 
     [Fact]
+    public void EnEjecucion_sinTareasTerminadas_NoExigePruebasDeCriterios()
+    {
+        PasarAEnEjecucion();
+
+        var (codigo, salida) = Ejecutar();
+
+        Assert.True(codigo == 0, salida);
+    }
+
+    [Fact]
+    public void EnEjecucion_conUnaTareaTerminadaCuyoCriterioNingunaPruebaNombra_Falla()
+    {
+        PasarAEnEjecucion();
+        MarcarTarea("T11");
+
+        var (codigo, salida) = Ejecutar();
+
+        Assert.NotEqual(0, codigo);
+        Assert.Contains("AC-PLA-01", salida, StringComparison.Ordinal);
+        Assert.Contains("ninguna prueba", salida, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EnEjecucion_conUnaTareaTerminadaCuyoCriterioUnaPruebaNombra_Pasa()
+    {
+        PasarAEnEjecucion();
+        MarcarTarea("T11");
+        var pruebas = Path.Combine(_copia, "tests", "unit");
+        Directory.CreateDirectory(pruebas);
+        File.WriteAllText(Path.Combine(pruebas, "Ejemplo.cs"), "[Trait(\"Criterio\", \"AC-PLA-01\")]\n", new UTF8Encoding(false));
+
+        var (codigo, salida) = Ejecutar();
+
+        Assert.True(codigo == 0, salida);
+    }
+
+    [Fact]
+    public void Hecha_conCriteriosSinPrueba_Falla()
+    {
+        PasarAEnEjecucion();
+        var ruta = RutaSpec();
+        var t = File.ReadAllText(ruta).Replace("\r\n", "\n", StringComparison.Ordinal);
+        File.WriteAllText(ruta, t.Replace("\nestado: InProgress", "\nestado: Done", StringComparison.Ordinal), new UTF8Encoding(false));
+
+        var (codigo, salida) = Ejecutar();
+
+        Assert.NotEqual(0, codigo);
+        Assert.Contains("ninguna prueba", salida, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ElRepositorioActual_PasaSpecCheck()
     {
         var p = Proceso(_raiz, "--repo", _raiz);
@@ -192,6 +243,25 @@ public sealed class PuertaDeAprobacionTests : IDisposable
                  StringComparison.Ordinal);
         File.WriteAllText(ruta, t, new UTF8Encoding(false));
         Ejecutar("--write-matrix");
+    }
+
+    /// <summary>Aprueba el plan y pasa la spec a InProgress (la huella ignora el estado).</summary>
+    private void PasarAEnEjecucion()
+    {
+        AprobarPlan();
+        var ruta = RutaSpec();
+        var t = File.ReadAllText(ruta).Replace("\r\n", "\n", StringComparison.Ordinal);
+        File.WriteAllText(ruta, t.Replace("\nestado: Planned", "\nestado: InProgress", StringComparison.Ordinal), new UTF8Encoding(false));
+        Ejecutar("--write-matrix");
+    }
+
+    private void MarcarTarea(string id)
+    {
+        var tareas = Path.Combine(_copia, "specs", Spec, "tasks.md");
+        var texto = File.ReadAllText(tareas);
+        var marcado = System.Text.RegularExpressions.Regex.Replace(texto, $@"(?m)^- \[ \] {id} ", $"- [x] {id} ", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5));
+        Assert.NotEqual(texto, marcado);
+        File.WriteAllText(tareas, marcado, new UTF8Encoding(false));
     }
 
     private (int codigo, string salida) Ejecutar(params string[] extra) =>

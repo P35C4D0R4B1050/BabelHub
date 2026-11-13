@@ -220,11 +220,15 @@ static void ValidarGlobal(List<Spec> specs, Config cfg, HashSet<string> idsValid
         }
     }
 
-    // Trazabilidad hacia las pruebas: toda spec en ejecución debe tener sus criterios en tests/.
+    // Trazabilidad hacia las pruebas: en ejecución, todo criterio que las tareas ya terminadas dan por construido debe tener
+    // una prueba que lo nombre; al pasar a Done (spec-verify), todos los criterios de la spec.
     var idsEnPruebas = EscanearPruebas(Path.Combine(repo, "tests"));
     foreach (var s in specs.Where(s => s.IndiceEstado >= cfg.Indice("InProgress")))
     {
-        foreach (var ac in s.Criterios.Where(c => !idsEnPruebas.Contains(c.Id)))
+        var exigidos = s.IndiceEstado >= cfg.Indice("Done")
+            ? s.Criterios.Select(c => c.Id).ToHashSet(StringComparer.Ordinal)
+            : Spec.CriteriosConstruidos(Path.Combine(repo, "specs", s.Id, "tasks.md"));
+        foreach (var ac in s.Criterios.Where(c => exigidos.Contains(c.Id) && !idsEnPruebas.Contains(c.Id)))
         {
             errores.Add($"{s.Id}: el criterio {ac.Id} no aparece en ninguna prueba de tests/ ([Trait(\"Criterio\", \"{ac.Id}\")]).");
         }
@@ -479,6 +483,39 @@ internal sealed class Spec
 
     private static List<string> Ids(string celda) =>
         celda.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+    /// <summary>Criterios cuyas tareas citadas en tasks.md están todas marcadas: ya deberían tener su prueba.</summary>
+    public static HashSet<string> CriteriosConstruidos(string rutaTareas)
+    {
+        var resultado = new HashSet<string>(StringComparer.Ordinal);
+        if (!File.Exists(rutaTareas))
+        {
+            return resultado;
+        }
+
+        var porCriterio = new Dictionary<string, bool>(StringComparer.Ordinal);
+        foreach (var l in File.ReadAllLines(rutaTareas))
+        {
+            var m = Regex.Match(l, @"^- \[( |x)\] (T\d+) \[([^\]]+)\] (.+?) \(cubre: ([^)]+)\)\s*$");
+            if (!m.Success)
+            {
+                continue;
+            }
+
+            var hecha = m.Groups[1].Value == "x";
+            foreach (var id in Ids(m.Groups[5].Value).Where(i => i.StartsWith("AC-", StringComparison.Ordinal)))
+            {
+                porCriterio[id] = porCriterio.GetValueOrDefault(id, true) && hecha;
+            }
+        }
+
+        foreach (var (id, _) in porCriterio.Where(p => p.Value))
+        {
+            resultado.Add(id);
+        }
+
+        return resultado;
+    }
 
     private static List<string[]> Filas(IEnumerable<string> lineas)
     {
