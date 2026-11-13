@@ -1,0 +1,288 @@
+using System.Reflection;
+using BabelHub.Inventario.Application.Plataforma;
+using BabelHub.Inventario.Application.Plataforma.Interno;
+using BabelHub.Inventario.Domain.Plataforma;
+
+namespace BabelHub.Inventario.UnitTests.Plataforma;
+
+public sealed class ContratoDePlataformaTests
+{
+    private static readonly DateTimeOffset Ahora = new(2026, 11, 13, 12, 0, 0, TimeSpan.Zero);
+    private static readonly ReservaDeLimite Reserva = new("ingresos-fallidos", "c:abc", "e1", Ahora);
+
+    [Fact]
+    public void ElContratoPublico_NoExponeTiposDelDominioNiDeShared()
+    {
+        // Regla 13: otro módulo no puede depender del Dominio de Plataforma; el contrato usa solo modelos propios.
+        var ensamblado = typeof(IControlDeLimites).Assembly;
+        var espacio = typeof(IControlDeLimites).Namespace!;
+        var prohibidos = new[] { "BabelHub.Inventario.Domain", "BabelHub.Shared" };
+
+        var infracciones = ensamblado.GetExportedTypes()
+            .Where(t => t.Namespace == espacio)
+            .SelectMany(t => TiposDeLaFirma(t).Select(r => (Tipo: t.Name, Usa: r)))
+            .Where(p => p.Usa.Namespace is { } n && prohibidos.Any(x => n.StartsWith(x, StringComparison.Ordinal)))
+            .Select(p => $"{p.Tipo} usa {p.Usa.FullName}")
+            .Distinct()
+            .ToList();
+
+        Assert.Empty(infracciones);
+    }
+
+    [Fact]
+    public void ElMotorDeLimites_EstaEnElInternoDelModulo()
+    {
+        Assert.Equal("BabelHub.Inventario.Application.Plataforma.Interno", typeof(IMotorDeLimites).Namespace);
+        Assert.True(typeof(IMotorDeLimites).IsPublic);
+    }
+
+    [Fact]
+    public void LasClavesDeLosModulos_CoincidenConLasPoliticasDelDominio()
+    {
+        Assert.Equal(
+            PoliticasDeSeguridad.Todas.Select(p => p.Nombre).Order(),
+            PoliticasDeLimite.Todas.Select(c => c.Valor).Order());
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("Mayusculas")]
+    [InlineData("con espacio")]
+    [InlineData("a")]
+    [InlineData("1-empieza-con-numero")]
+    public void ClaveDePolitica_ConUnValorInvalido_Lanza(string valor)
+    {
+        Assert.Throws<ArgumentException>(() => new ClaveDePolitica(valor));
+    }
+
+    [Fact]
+    public void ClaveDePolitica_ConElMismoValor_EsIgual()
+    {
+        Assert.Equal(new ClaveDePolitica("ajustes-del-personal"), PoliticasDeLimite.AjustesDelPersonal);
+    }
+
+    [Fact]
+    public void ResultadoDeLimite_Permitido_TraeLaReserva()
+    {
+        var resultado = ResultadoDeLimite.Permitido(Reserva);
+
+        Assert.True(resultado.EsPermitido);
+        Assert.Same(Reserva, resultado.Reserva);
+        Assert.Null(resultado.Motivo);
+    }
+
+    [Fact]
+    public void ResultadoDeLimite_Excedido_TraeMotivoEsperaYDisponibilidadSinReserva()
+    {
+        var resultado = ResultadoDeLimite.Excedido("ingresos-fallidos", 90, Ahora.AddSeconds(90));
+
+        Assert.False(resultado.EsPermitido);
+        Assert.Equal(EstadoDeLimite.Excedido, resultado.Estado);
+        Assert.Equal(90, resultado.EsperaEnSegundos);
+        Assert.Equal(Ahora.AddSeconds(90), resultado.DisponibleDesde);
+        Assert.Null(resultado.Reserva);
+    }
+
+    [Fact]
+    public void ResultadoDeLimite_ConDatosInvalidos_Lanza()
+    {
+        Assert.Throws<ArgumentException>(() => ResultadoDeLimite.Excedido(" ", 10, Ahora));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ResultadoDeLimite.Excedido("p", 0, Ahora));
+        Assert.Throws<ArgumentNullException>(() => ResultadoDeLimite.Permitido(null!));
+        Assert.Throws<ArgumentNullException>(() => ResultadoDeLimite.RepeticionCompletada(null!));
+    }
+
+    [Fact]
+    public void ResultadoDeLimite_ConUnaRepeticionOUnConflicto_NoPermiteNiTraeReserva()
+    {
+        var completada = ResultadoDeLimite.RepeticionCompletada(new ResultadoMinimo("creado", "pedido-9"));
+
+        Assert.False(completada.EsPermitido);
+        Assert.Equal("pedido-9", completada.ResultadoGuardado!.IdDelRecurso);
+        Assert.Equal(EstadoDeLimite.RepeticionEnCurso, ResultadoDeLimite.RepeticionEnCurso().Estado);
+        Assert.Equal(EstadoDeLimite.ClaveEnConflicto, ResultadoDeLimite.ClaveEnConflicto().Estado);
+    }
+
+    [Fact]
+    public void ResultadoMinimoYClaveDeIdempotencia_ConValoresVacios_Lanzan()
+    {
+        Assert.Throws<ArgumentException>(() => new ResultadoMinimo(" "));
+        Assert.Throws<ArgumentException>(() => new ClaveDeIdempotencia("", "/ruta", "h"));
+        Assert.Throws<ArgumentException>(() => new ClaveDeIdempotencia("k", " ", "h"));
+        Assert.Throws<ArgumentException>(() => new ClaveDeIdempotencia("k", "/ruta", ""));
+    }
+
+    [Fact]
+    public void OrigenDeSolicitud_ConocidoNecesitaDireccionYDesconocidoNoLaTrae()
+    {
+        var huella = HuellaDeOrigen.Crear("k3Jx9bQ2vT7mYw1ZpLr4NfA8sUe0dHcGiXoVtB5yMqE", "v1");
+
+        Assert.Equal("203.0.113.7", new OrigenDeSolicitud(huella, "203.0.113.7").Direccion);
+        Assert.Throws<ArgumentException>(() => new OrigenDeSolicitud(huella, null));
+        Assert.Throws<ArgumentException>(() => new OrigenDeSolicitud(HuellaDeOrigen.Desconocido, "203.0.113.7"));
+        Assert.Null(OrigenDeSolicitud.Desconocido.Direccion);
+        Assert.True(OrigenDeSolicitud.Desconocido.Huella.EsDesconocido);
+    }
+
+    [Fact]
+    public void ActorActual_DeUsuario_ConservaRolYSucursal()
+    {
+        var usuario = Guid.NewGuid();
+        var sucursal = Guid.NewGuid();
+
+        var actor = ActorActual.DeUsuario(usuario, "encargado", sucursal);
+
+        Assert.Equal(TipoDeActor.Usuario, actor.Tipo);
+        Assert.Equal(usuario, actor.UsuarioId);
+        Assert.Equal("encargado", actor.Rol);
+        Assert.Equal(sucursal, actor.SucursalId);
+    }
+
+    [Fact]
+    public void ActorActual_ConDatosInvalidos_Lanza()
+    {
+        Assert.Throws<ArgumentException>(() => ActorActual.DeUsuario(Guid.Empty, "cliente"));
+        Assert.Throws<ArgumentException>(() => ActorActual.DeUsuario(Guid.NewGuid(), " "));
+        Assert.Throws<ArgumentException>(() => ActorActual.DeIntegracion(""));
+    }
+
+    [Fact]
+    public void ActorActual_DelSistemaYDeIntegracion_NoTraenUsuario()
+    {
+        Assert.Null(ActorActual.DelSistema().UsuarioId);
+        var integracion = ActorActual.DeIntegracion("culqi");
+        Assert.Equal(TipoDeActor.Integracion, integracion.Tipo);
+        Assert.Equal("culqi", integracion.Integracion);
+        Assert.Null(integracion.Rol);
+    }
+
+    [Theory]
+    [InlineData("identidad")]
+    [InlineData("notificaciones")]
+    [InlineData("plataforma_latido")]
+    public void EsquemaDeModulo_ConUnNombreValido_LoConserva(string nombre)
+    {
+        Assert.Equal(nombre, EsquemaDeModulo.Crear(nombre).Nombre);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("Identidad")]
+    [InlineData("identidad; DROP")]
+    [InlineData("a")]
+    public void EsquemaDeModulo_ConUnNombreInvalido_Lanza(string nombre)
+    {
+        Assert.Throws<ArgumentException>(() => EsquemaDeModulo.Crear(nombre));
+    }
+
+    [Fact]
+    public void EsquemaDeModulo_NoSePuedeConstruirFueraDeLaInfraestructura()
+    {
+        Assert.Empty(typeof(EsquemaDeModulo).GetConstructors());
+        Assert.DoesNotContain(typeof(EsquemaDeModulo).GetMethods(), m => m.IsPublic && m.IsStatic && m.ReturnType == typeof(EsquemaDeModulo));
+    }
+
+    [Fact]
+    public void EventoDeSeguridad_DeLimiteExcedido_ExigePoliticaYOrigenOUsuario()
+    {
+        var huella = HuellaDeOrigen.Crear("k3Jx9bQ2vT7mYw1ZpLr4NfA8sUe0dHcGiXoVtB5yMqE", "v1");
+
+        var porOrigen = new EventoDeSeguridad(TipoDeEventoDeSeguridad.LimiteExcedido, Ahora, "ingresos-fallidos", huella, "203.0.113.7");
+        var porUsuario = new EventoDeSeguridad(TipoDeEventoDeSeguridad.LimiteExcedido, Ahora, "ajustes-del-personal", usuario: "u-1");
+
+        Assert.Equal("203.0.113.7", porOrigen.DireccionCompleta);
+        Assert.Equal("u-1", porUsuario.Usuario);
+        Assert.Throws<ArgumentException>(() => new EventoDeSeguridad(TipoDeEventoDeSeguridad.LimiteExcedido, Ahora, origen: huella));
+        Assert.Throws<ArgumentException>(() => new EventoDeSeguridad(TipoDeEventoDeSeguridad.LimiteExcedido, Ahora, "ingresos-fallidos"));
+    }
+
+    [Fact]
+    public void EventoDeSeguridad_DeOrigenReenviadoSinCredencial_NoConservaLaDireccion()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new EventoDeSeguridad(TipoDeEventoDeSeguridad.OrigenReenviadoSinCredencial, Ahora, direccionCompleta: "203.0.113.7"));
+        Assert.Null(new EventoDeSeguridad(TipoDeEventoDeSeguridad.OrigenReenviadoSinCredencial, Ahora).DireccionCompleta);
+    }
+
+    [Fact]
+    public void Alertas_ConDatosInvalidos_Lanzan()
+    {
+        Assert.Throws<ArgumentException>(() => new AlertaTecnica("", Ahora));
+        Assert.Throws<ArgumentException>(() => new AlertaDeSeguridad(" ", Ahora, 11));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new AlertaDeSeguridad("accesos-denegados", Ahora, 0));
+        Assert.Equal(11, new AlertaDeSeguridad("accesos-denegados", Ahora, 11).Total);
+    }
+
+    [Fact]
+    public void ResultadoDeValidacion_ValidoNoTraeErroresEInvalidoSi()
+    {
+        Assert.True(ResultadoDeValidacion.Valido.EsValido);
+
+        var invalido = ResultadoDeValidacion.Invalido([new ErrorDeCampo("cantidad", "fuera-de-rango")]);
+
+        Assert.False(invalido.EsValido);
+        Assert.Equal("cantidad", Assert.Single(invalido.Errores).Campo);
+        Assert.Throws<ArgumentException>(() => ResultadoDeValidacion.Invalido([]));
+    }
+
+    private static IEnumerable<Type> TiposDeLaFirma(Type tipo)
+    {
+        var encontrados = new List<Type>();
+        const BindingFlags Todos = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+        void Agregar(Type? t)
+        {
+            if (t is null)
+            {
+                return;
+            }
+
+            if (t.HasElementType)
+            {
+                Agregar(t.GetElementType());
+                return;
+            }
+
+            encontrados.Add(t);
+            foreach (var argumento in t.GenericTypeArguments)
+            {
+                Agregar(argumento);
+            }
+        }
+
+        Agregar(tipo.BaseType);
+        foreach (var i in tipo.GetInterfaces())
+        {
+            Agregar(i);
+        }
+
+        foreach (var p in tipo.GetProperties(Todos))
+        {
+            Agregar(p.PropertyType);
+        }
+
+        foreach (var f in tipo.GetFields(Todos))
+        {
+            Agregar(f.FieldType);
+        }
+
+        foreach (var m in tipo.GetMethods(Todos))
+        {
+            Agregar(m.ReturnType);
+            foreach (var p in m.GetParameters())
+            {
+                Agregar(p.ParameterType);
+            }
+        }
+
+        foreach (var c in tipo.GetConstructors(Todos))
+        {
+            foreach (var p in c.GetParameters())
+            {
+                Agregar(p.ParameterType);
+            }
+        }
+
+        return encontrados;
+    }
+}

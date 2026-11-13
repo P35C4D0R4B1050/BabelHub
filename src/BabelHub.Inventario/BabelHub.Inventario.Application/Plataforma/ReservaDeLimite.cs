@@ -1,4 +1,4 @@
-namespace BabelHub.Inventario.Domain.Plataforma;
+namespace BabelHub.Inventario.Application.Plataforma;
 
 /// <summary>
 /// Identifica un cupo concreto reservado en una política para poder devolverlo con <c>Liberar</c>: la política, la clave

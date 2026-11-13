@@ -2,8 +2,4 @@
   <PropertyGroup>
     <RootNamespace>BabelHub.Ecommerce.Domain</RootNamespace>
   </PropertyGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="BabelHub.Ecommerce.Infrastructure" />
-    <InternalsVisibleTo Include="BabelHub.Ecommerce.UnitTests" />
-  </ItemGroup>
 </Project>

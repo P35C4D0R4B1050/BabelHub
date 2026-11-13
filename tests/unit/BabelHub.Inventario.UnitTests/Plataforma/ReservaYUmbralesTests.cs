@@ -1,3 +1,4 @@
+using BabelHub.Inventario.Application.Plataforma;
 using BabelHub.Inventario.Domain.Plataforma;
 
 namespace BabelHub.Inventario.UnitTests.Plataforma;

@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace BabelHub.Ecommerce.Domain.Plataforma;
+namespace BabelHub.Inventario.Application.Plataforma;
 
 /// <summary>
 /// Reglas comunes de una huella: un resumen opaco con el identificador de versión de la clave que lo calculó. Su forma

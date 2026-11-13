@@ -1,4 +1,4 @@
-namespace BabelHub.Inventario.Domain.Plataforma;
+namespace BabelHub.Inventario.Application.Plataforma;
 
 /// <summary>
 /// Huella del origen de una solicitud (SEG-25): un resumen calculado con una clave secreta del entorno, con el

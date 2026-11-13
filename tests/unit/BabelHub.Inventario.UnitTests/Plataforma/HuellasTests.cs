@@ -1,4 +1,4 @@
-using BabelHub.Inventario.Domain.Plataforma;
+using BabelHub.Inventario.Application.Plataforma;
 
 namespace BabelHub.Inventario.UnitTests.Plataforma;
 

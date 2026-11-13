@@ -1,4 +1,4 @@
-using BabelHub.Ecommerce.Domain.Plataforma;
+using BabelHub.Ecommerce.Application.Plataforma;
 
 namespace BabelHub.Ecommerce.UnitTests.Plataforma;
 

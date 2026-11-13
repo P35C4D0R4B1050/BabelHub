@@ -1,4 +1,4 @@
-namespace BabelHub.Ecommerce.Domain.Plataforma;
+namespace BabelHub.Inventario.Application.Plataforma;
 
 /// <summary>
 /// Categoría de un error de un caso de uso (SEG-03). La Aplicación expresa sus fallos con una categoría y la Api la

@@ -1,4 +1,4 @@
-namespace BabelHub.Ecommerce.Domain.Plataforma;
+namespace BabelHub.Ecommerce.Application.Plataforma;
 
 /// <summary>
 /// Identifica un cupo concreto reservado en una política para poder devolverlo con <c>Liberar</c>: la política, la clave

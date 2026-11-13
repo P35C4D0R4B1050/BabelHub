@@ -5,4 +5,8 @@
   <ItemGroup>
     <ProjectReference Include="..\BabelHub.Inventario.Domain\BabelHub.Inventario.Domain.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BabelHub.Inventario.Infrastructure" />
+    <InternalsVisibleTo Include="BabelHub.Inventario.UnitTests" />
+  </ItemGroup>
 </Project>

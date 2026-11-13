@@ -1,4 +1,4 @@
-namespace BabelHub.Ecommerce.Domain.Plataforma;
+namespace BabelHub.Ecommerce.Application.Plataforma;
 
 /// <summary>
 /// Huella opaca del sujeto de un límite que no es un origen (por ejemplo, el número de WhatsApp de un cliente en el tope de
