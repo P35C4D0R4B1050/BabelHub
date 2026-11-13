@@ -2,24 +2,6 @@ using BabelHub.Inventario.Domain.Plataforma;
 
 namespace BabelHub.Inventario.Application.Plataforma.Interno;
 
-/// <summary>El almacén de contadores no responde; los motores lanzan esta excepción y <see cref="EvaluarLimite"/> decide qué hacer (SEG-26).</summary>
-public sealed class MotorDeLimitesNoDisponibleException : Exception
-{
-    public MotorDeLimitesNoDisponibleException()
-    {
-    }
-
-    public MotorDeLimitesNoDisponibleException(string message)
-        : base(message)
-    {
-    }
-
-    public MotorDeLimitesNoDisponibleException(string message, Exception innerException)
-        : base(message, innerException)
-    {
-    }
-}
-
 /// <summary>Políticas de límite por clave estable (D04): los valores iniciales de la spec, ajustables por configuración.</summary>
 public sealed class CatalogoDePoliticas
 {

@@ -25,7 +25,9 @@ public sealed class CopiasDeAdaptadoresTests
         "Infrastructure/Plataforma/VerificadorDeFirmaHmac.cs",
         "Infrastructure/Plataforma/ClientesHttpDeServicio.cs",
         "Infrastructure/Plataforma/ConfiguracionDeSeguridad.cs",
-        "Infrastructure/Plataforma/RegistroRedactado.cs");
+        "Infrastructure/Plataforma/RegistroRedactado.cs",
+        "Application/Plataforma/MotorDeLimitesNoDisponible.cs",
+        "Api/Plataforma/ManejoDeErrores.cs");
 
     [Theory]
     [MemberData(nameof(Archivos))]

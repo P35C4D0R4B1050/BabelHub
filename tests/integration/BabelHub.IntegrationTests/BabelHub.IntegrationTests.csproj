@@ -12,7 +12,10 @@
     <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+  </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
@@ -21,5 +24,7 @@
     <ProjectReference Include="..\..\..\src\BabelHub.Shared\BabelHub.Shared.csproj" />
     <ProjectReference Include="..\..\..\src\BabelHub.Ecommerce\BabelHub.Ecommerce.Infrastructure\BabelHub.Ecommerce.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\src\BabelHub.Inventario\BabelHub.Inventario.Infrastructure\BabelHub.Inventario.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\BabelHub.Ecommerce\BabelHub.Ecommerce.Api\BabelHub.Ecommerce.Api.csproj" />
+    <ProjectReference Include="..\..\..\src\BabelHub.Inventario\BabelHub.Inventario.Api\BabelHub.Inventario.Api.csproj" />
   </ItemGroup>
 </Project>
