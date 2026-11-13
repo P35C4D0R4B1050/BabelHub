@@ -4,6 +4,7 @@
 
 - Responde en **español** y sé conciso. Los commits van en inglés (ver `AGENTS.md`, sección 7).
 - Antes de tocar código, identifica la spec de la feature en `specs/` y su estado. Si no está **Approved** y **Planned**, usa las skills `spec-new`, `spec-clarify`, `spec-plan` o `spec-tasks` en lugar de programar.
+- Antes de implementar una tarea de un plan de la fase 3, lee también `progress/ajustes-al-implementar.md`: corrige y complementa los planes aprobados y prevalece sobre su texto.
 - Usa las skills del proyecto (`.claude/skills/`) en lugar de improvisar el flujo. Para revisar en contexto aislado, usa los agentes `spec-auditor`, `arch-reviewer` y `security-reviewer`.
 - Tras editar una spec, un plan o `tasks.md`, ejecuta `dotnet run --project tools/SpecCheck`. Si toca seguridad, privacidad o integraciones, usa también `security-review`.
 - Tras editar código, ejecuta `dotnet build BabelHub.sln -warnaserror` y las pruebas afectadas.

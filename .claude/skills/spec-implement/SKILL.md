@@ -14,7 +14,7 @@ description: Implementa una feature de BabelHub tarea por tarea con pruebas prim
 ## Ciclo por tarea
 
 1. **Elige** la primera tarea sin marcar de `tasks.md`. Si es la primera de la feature, cambia `estado: InProgress` en la spec (único cambio de estado que te corresponde aquí).
-2. **Lee** la tarea, los criterios que cubre y las reglas de la capa (ver `AGENTS.md`). Para crear casos de uso, puertos y adaptadores, sigue la skill `dotnet-feature`.
+2. **Lee** la tarea, los criterios que cubre y las reglas de la capa (ver `AGENTS.md`). **Lee también la sección de su plan en `progress/ajustes-al-implementar.md`** (correcciones, divisiones de tareas y pruebas que complementan el plan aprobado y prevalecen sobre su texto). Para crear casos de uso, puertos y adaptadores, sigue la skill `dotnet-feature`.
 3. **Escribe la prueba primero**, con `[Trait("Criterio", "AC-XXX-NN")]` y un nombre descriptivo (`Reservar_SinStockVendible_Rechaza`). Confirma que **falla por la razón correcta**.
 4. **Implementa lo mínimo** para que pase, en la capa que corresponde. Sin lógica de negocio en `Api` ni en la interfaz web; sin infraestructura en `Dominio` ni `Aplicación`.
 5. **Ejecuta** `dotnet build BabelHub.sln -warnaserror`, las pruebas del proyecto afectado, las pruebas de arquitectura y `dotnet run --project tools/SpecCheck`.
