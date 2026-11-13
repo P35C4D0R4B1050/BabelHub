@@ -17,9 +17,9 @@ public class ReglasDeModulosTests
     {
         ["BabelHub.Ecommerce"] =
         [
-            "Catalogo", "Carrito", "Pagos", "Pedidos", "Envios", "Devoluciones", "Biblioteca", "Reclamaciones", "Identidad", "Asistente", "Plataforma",
+            "Catalogo", "Carrito", "Pagos", "Pedidos", "Envios", "Devoluciones", "Biblioteca", "Reclamaciones", "Identidad", "Asistente", "Plataforma", "Auditoria", "Notificaciones",
         ],
-        ["BabelHub.Inventario"] = ["Fuentes", "Reservas", "Traslados", "Ajustes"],
+        ["BabelHub.Inventario"] = ["Fuentes", "Reservas", "Traslados", "Ajustes", "Plataforma", "Auditoria"],
     };
 
     public static TheoryData<string> NombresDeServicios => new(ModulosPorServicio.Keys.ToArray());

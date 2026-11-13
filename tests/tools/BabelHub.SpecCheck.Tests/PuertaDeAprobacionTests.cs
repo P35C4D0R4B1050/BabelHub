@@ -34,7 +34,7 @@ public sealed class PuertaDeAprobacionTests : IDisposable
             var texto = File.ReadAllText(spec).Replace("\r\n", "\n", StringComparison.Ordinal);
             var revertido = System.Text.RegularExpressions.Regex.Replace(
                 texto,
-                @"\nestado: Approved\naprobado_por: Claude \(delegado[^\n]*\naprobado_en: [^\n]*",
+                @"\nestado: (?:Approved|Planned)\naprobado_por: Claude \(delegado[^\n]*\naprobado_en: [^\n]*(?:\nplan_aprobado_por: [^\n]*\nplan_aprobado_en: [^\n]*)?",
                 "\nestado: Draft");
             if (texto != revertido)
             {
