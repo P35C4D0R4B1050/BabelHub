@@ -2,13 +2,13 @@
 id: ecommerce-carrito-checkout
 titulo: Carrito y checkout
 estado: Approved
+aprobado_por: Claude (delegado por Diego Amiquero)
+aprobado_en: 2026-11-13
 servicio: E-commerce
 prefijo: CAR
-origen: [RF03, RF04, RF28, NN02, NN13, NN15, NN18]
-calidad: [AC01, AC03, AC06, AC04, RNF01, RNF03, RNF13]
+origen: [RF03, RF04, RF18, RF27, RF28, NN02, NN13, NN15, NN18]
+calidad: [AC01, AC03, AC06, AC04, RNF01, RNF03, RNF13, RNF23]
 depende: [ecommerce-catalogo, inventario-seleccion-fuente, identidad-seguridad, transversal-seguridad]
-aprobado_por: Diego Amiquero
-aprobado_en: 2026-10-16
 ---
 
 # Spec — Carrito y checkout
@@ -58,6 +58,14 @@ Que el cliente arme un carrito que se conserva entre sesiones y dispositivos, me
 | CAR-27 | No deseado | Si al reservar se rechaza una línea por falta de stock o la fuente asignada cambia el plazo informado, entonces el sistema deberá volver a la revisión del carrito, mostrar el cambio o el nuevo plazo y conservar el carrito. | RF04, AC01 |
 | CAR-28 | Evento | Cuando cambia la versión vigente de un texto legal durante el checkout, el sistema deberá volver a pedir su aceptación antes de pagar. | NN15 |
 | CAR-29 | Ubicuo | El sistema deberá conservar el carrito de un visitante en su navegador por 30 días, con un máximo de 50 líneas. | RF03, AC04 |
+| CAR-30 | Evento | Cuando el carrito contiene impresos con despacho a domicilio, el sistema deberá exigir, además de la dirección, el nombre y un teléfono válido de contacto de la entrega, no permitir continuar sin ellos, guardarlos en el checkout y pasarlos con la intención de pago al pedido (PED-32), y no enviarlos a la pasarela, al notificador ni al asistente. | RF04, NN15 |
+| CAR-31 | Estado | Mientras la cuenta del cliente tiene una cancelación diferida (IDE-27), el sistema deberá impedir iniciar el pago, indicar el motivo y conservar el carrito. | RF04, RF27 |
+| CAR-32 | Evento | Cuando Identidad pide eliminar el carrito y los datos de entrega de una cuenta de cliente cuyo correo no está verificado y que va a reemplazar (IDE-84), el sistema deberá eliminarlos y, si no puede, informarlo para que no se reemplace la cuenta; la cuenta nueva parte sin carrito heredado. | RF04, RF18 |
+| CAR-33 | Evento | Cuando se ejecuta la cancelación de una cuenta, el sistema deberá eliminar en la misma operación (IDE-47) su carrito y los datos de entrega que tenga en el checkout y, si no puede, informarlo para que no se ejecute la cancelación (IDE-70). | RF04, RF27, RNF23 |
+| CAR-34 | Ubicuo | El sistema deberá eliminar el nombre, el teléfono y la dirección de entrega del checkout cuando Pagos informa que el pago se aprobó, cuando el cliente cancela o reinicia el checkout y a los 30 días de su última modificación. | RF04, RNF23 |
+| CAR-35 | No deseado | Si una solicitud pide un carrito o un checkout que no es de la cuenta de su credencial, entonces el sistema deberá rechazarla sin revelar si existe y registrarla como evento de seguridad. | RF04, AC04 |
+| CAR-36 | Estado | Mientras la cuenta del cliente no aceptó la versión vigente de los textos legales (IDE-58), el sistema deberá impedir iniciar el pago, invitarlo a aceptarla y conservar el carrito. | RF04, NN15 |
+| CAR-37 | Evento | Cuando el cliente inicia el pago, el sistema deberá consultar en el servidor el estado de su cuenta (IDE-27, IDE-58) por el contrato público de Identidad, antes de reservar o crear la intención de pago, y no iniciar el pago si no puede consultarlo. | RF04, RF27, AC04 |
 
 ## 4. Criterios de aceptación
 
@@ -88,6 +96,12 @@ Que el cliente arme un carrito que se conserva entre sesiones y dispositivos, me
 | AC-CAR-23 | CAR-25, CAR-26 | **Dado** un pago pendiente de confirmación, **cuando** el cliente mira su checkout y trata de volver al carrito, **entonces** ve «estamos confirmando tu pago» con el tiempo restante hasta los 30 minutos y no puede editar el carrito hasta que se resuelva. |
 | AC-CAR-24 | CAR-27 | **Dado** un checkout cuya reserva es rechazada por falta de stock, o reasignada a una fuente con otro plazo, **cuando** el cliente intenta pagar, **entonces** vuelve a la revisión con el cambio explicado y su carrito conservado. |
 | AC-CAR-25 | CAR-29 | **Dado** un visitante que lleva 31 días sin volver, o que intenta agregar la línea 51, **cuando** abre su carrito o agrega la línea, **entonces** el carrito caducó o se rechaza la línea con el motivo. |
+| AC-CAR-26 | CAR-30 | **Dado** un carrito con impresos y despacho a domicilio, **cuando** el cliente llega al paso de entrega, **entonces** se le piden la dirección, el nombre y el teléfono de contacto, no puede continuar sin alguno de ellos ni con un teléfono inválido, el pedido recibe el nombre, el teléfono y la dirección, y la pasarela, el notificador y el asistente no los reciben; y para el recojo en sucursal no se piden. |
+| AC-CAR-27 | CAR-31, CAR-36, CAR-37 | **Dado** un cliente con una cancelación diferida, otro que no aceptó la versión vigente de los términos y otro cuya cuenta cambia de estado entre la revisión del carrito y el pago, **cuando** intentan iniciar el pago, **entonces** se les impide con el motivo, no se crea ninguna reserva ni intención de pago y su carrito se conserva; y si Identidad no responde, el pago no se inicia. |
+| AC-CAR-28 | CAR-32 | **Dado** una cuenta de cliente sin verificar con un carrito y datos de entrega, **cuando** Identidad pide eliminarlos para reemplazarla, **entonces** ambos se eliminan y la cuenta nueva parte sin carrito heredado; y si no se pueden eliminar, se informa para que la cuenta no se reemplace. |
+| AC-CAR-29 | CAR-33 | **Dado** un cliente con un carrito, datos de entrega y un checkout abierto, **cuando** se ejecuta la cancelación de su cuenta, **entonces** el carrito y esos datos dejan de existir; y si no se pueden eliminar, se informa para que la cancelación no se ejecute y no queda ningún efecto parcial. |
+| AC-CAR-30 | CAR-34 | **Dado** un checkout con nombre, teléfono y dirección de entrega, **cuando** Pagos informa que el pago se aprobó, o el cliente cancela o reinicia el checkout, o pasan 30 días desde su última modificación, **entonces** esos datos dejan de existir en el checkout. |
+| AC-CAR-31 | CAR-35 | **Dado** un cliente A que pide el carrito o el checkout de un cliente B, **cuando** envía la solicitud, **entonces** se rechaza sin revelar si existe, no se devuelve ningún dato de entrega y queda un evento de seguridad. |
 
 ## 5. Reglas e invariantes
 
@@ -96,6 +110,8 @@ Que el cliente arme un carrito que se conserva entre sesiones y dispositivos, me
 - La reserva dura 15 minutos desde que se inicia el pago (cuando el cliente pasa al paso de pago) y cubre todas las líneas impresas del carrito; con un pago pendiente de confirmación se extiende hasta 30 minutos (`ecommerce-pagos`).
 - El total del carrito es la suma de las líneas más el envío cuando corresponde.
 - El costo de envío es uno por pedido a domicilio, aunque salga en más de un envío.
+- La aceptación de los textos legales tiene dos momentos: la de la cuenta, que Identidad pide al ingresar o renovar la sesión (IDE-43), y la del checkout, cuya versión se guarda en la intención de pago (CAR-22); ambas deben citar la versión vigente (IDE-57) y el bloqueo de CAR-36 se levanta cuando la cuenta acepta la versión vigente.
+- El nombre, el teléfono y la dirección de entrega viven en el checkout y en la intención de pago hasta que se crea el pedido, que guarda su propia copia (PED-32); el uso «solo para el despacho» incluye esa copia y la guía del operador (ENV-02).
 
 ## 6. Casos límite y errores
 

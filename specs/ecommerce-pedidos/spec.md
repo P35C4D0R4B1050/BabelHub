@@ -2,13 +2,13 @@
 id: ecommerce-pedidos
 titulo: Pedidos y seguimiento
 estado: Approved
+aprobado_por: Claude (delegado por Diego Amiquero)
+aprobado_en: 2026-11-13
 servicio: E-commerce
 prefijo: PED
-origen: [RF06, RF07, NN03, NN13, NN09]
-calidad: [AC01, AC03, RNF05, RNF08]
-depende: [ecommerce-pagos, ecommerce-biblioteca-digital, inventario-seleccion-fuente, transversal-notificaciones, transversal-auditoria]
-aprobado_por: Diego Amiquero
-aprobado_en: 2026-10-16
+origen: [RF04, RF06, RF07, RF27, NN03, NN13, NN09]
+calidad: [AC01, AC03, AC04, RNF05, RNF08, RNF23]
+depende: [ecommerce-pagos, ecommerce-biblioteca-digital, inventario-seleccion-fuente, identidad-seguridad, transversal-notificaciones, transversal-auditoria]
 ---
 
 # Spec — Pedidos y seguimiento
@@ -55,10 +55,21 @@ Que el cliente vea siempre en qué estado está su compra, incluso cuando viaja 
 | PED-24 | No deseado | Si falla la solicitud de reembolso de una anulación, entonces el sistema deberá mantener el pedido anulado con el reembolso pendiente, visible para la administración, y permitir reintentarlo sin repetir los pasos ya hechos. | RF06, AC03 |
 | PED-25 | No deseado | Si el inventario no responde o rechaza el descuento al entregar, entonces el sistema deberá mantener la línea como estaba, informar el error y permitir reintentar sin descontar dos veces. | RF06, AC03 |
 | PED-26 | Ubicuo | El sistema deberá mostrar a logística los pedidos a domicilio de toda la red y a la administración central todos los pedidos. | RNF05, NN09 |
-| PED-27 | Evento | Cuando se anula un pedido en el que algún impreso ya salió (despachado o entregado), el sistema deberá anular solo las líneas que no salieron, mantener las que salieron, cancelar los envíos que no salieron según `ecommerce-envios` y reembolsar solo las líneas anuladas, sin el envío. | RF06, NN09 |
-| PED-28 | Evento | Cuando logística prepara las líneas de un pedido a domicilio en su fuente, el sistema deberá pasarlas a en preparación y, al marcarlas listas (un hito sin estado propio), avisar a `ecommerce-envios` para crear su envío; y rechazar esta acción a quien no sea logística o administración central. | RF06, RF11, RNF05 |
+| PED-27 | Evento | Cuando se anula un pedido en el que algún impreso ya salió (despachado o entregado), el sistema deberá anular solo las líneas que no salieron, mantener las que salieron, cancelar, por el puerto de despacho que implementa `ecommerce-envios`, los envíos que no salieron y reembolsar solo las líneas anuladas, sin el envío. | RF06, NN09 |
+| PED-28 | Evento | Cuando logística prepara las líneas de un pedido a domicilio en su fuente, el sistema deberá pasarlas a en preparación y, al marcarlas listas (un hito sin estado propio), avisar por el puerto de despacho que implementa `ecommerce-envios` para crear su envío; y rechazar esta acción a quien no sea logística o administración central. | RF06, RF11, RNF05 |
 | PED-29 | Evento | Cuando una línea impresa pasa a entregada, el sistema deberá registrar la fecha de entrega de esa línea. | RF06 |
 | PED-30 | Ubicuo | El sistema deberá ordenar los estados de una línea impresa, para PED-20, como confirmado, en tránsito, recibido, en preparación, listo para recojo o despachado, y entregado. | RF06 |
+| PED-31 | Evento | Cuando Identidad consulta los pendientes de una cuenta, el sistema deberá informar solo dos números de esa cuenta: cuántos pedidos tienen alguna línea impresa sin entregar ni anular (incluidas las no recogidas hasta que se anulen o se entreguen) y cuántos reembolsos pendientes tiene. | RF06, RF27 |
+| PED-32 | Evento | Cuando se crea un pedido a domicilio, el sistema deberá guardar una copia del nombre, el teléfono y la dirección de entrega que le llegan con la intención de pago (CAR-30), y ser el único que los guarda: Envíos los lee del pedido. | RF04, RF06 |
+| PED-33 | Evento | Cuando se ejecuta la cancelación de una cuenta, el sistema deberá anonimizar el nombre, el teléfono y la dirección de entrega de sus pedidos y conservar el pedido, sus líneas, importes, fechas y el identificador opaco de la cuenta. | RF06, RF27, RNF23 |
+| PED-34 | Evento | Cuando un pedido a domicilio cumple dos años calendario, en hora de Lima, desde el último cambio de su estado a entregado o anulado, el sistema deberá anonimizar su nombre, teléfono y dirección de entrega y conservar el resto. | RF06, RNF23 |
+| PED-35 | Evento | Cuando guarda la copia del contacto (PED-32), el sistema deberá pedir a Pagos que elimine esos datos de la intención de pago (PAG-27) y, si Pagos no responde, reintentarlo, rigiendo el respaldo de 30 días de PAG-27. | RF04, RNF23 |
+| PED-36 | No deseado | Si no puede guardar la copia del contacto de un pedido a domicilio, o la intención de pago no la trae, entonces el sistema deberá no crear el pedido ni pedir la liberación de los datos, e informarlo para que Pagos compense el cobro (PAG-20). | RF04, RF06 |
+| PED-37 | No deseado | Si no puede anonimizar el contacto de algún pedido al cancelar una cuenta, entonces el sistema deberá informarlo para que no se ejecute la cancelación, sin dejar ningún pedido anonimizado a medias, de modo que pueda reintentarse (IDE-70). | RF27, RNF23 |
+| PED-38 | No deseado | Si se aprueba el pago de una cuenta después de que se consultaron sus pendientes para ejecutar su cancelación (IDE-70, IDE-71) y antes de que se desvincule su intención (PAG-26), entonces el sistema deberá no crear el pedido, informarlo para que Pagos reembolse el cobro (PAG-32) y liberar las reservas confirmadas, de modo que nunca quede un pedido con contacto tras la cancelación. | RF27, RNF23, AC01 |
+| PED-39 | Evento | Cuando corre la depuración de PED-34, el sistema deberá registrarla en la auditoría con actor «sistema» y conteo, sin datos personales, y reintentarla al día siguiente si no puede auditarla ni anonimizar. | RNF08, RNF23 |
+| PED-40 | Ubicuo | El sistema deberá mostrar el nombre, el teléfono y la dirección de entrega de un pedido solo a su titular, a logística y a la administración central, y no incluirlos en avisos, auditoría, registros técnicos ni consultas del asistente. | RNF05, RNF23 |
+| PED-41 | No deseado | Si un cliente o un encargado pide por su identificador un pedido que no le corresponde, entonces el sistema deberá rechazarlo con la misma respuesta exista o no el pedido y registrarlo como evento de seguridad de acceso denegado. | RNF05, AC04 |
 
 ## 4. Criterios de aceptación
 
@@ -89,6 +100,16 @@ Que el cliente vea siempre en qué estado está su compra, incluso cuando viaja 
 | AC-PED-23 | PED-28 | **Dado** un pedido a domicilio con líneas confirmadas en Cusco, **cuando** logística las prepara y las marca listas, **entonces** pasan por en preparación y se crea su envío pendiente de guía. |
 | AC-PED-24 | PED-29 | **Dado** una línea despachada, **cuando** su envío se entrega, **entonces** la línea queda entregada con su fecha de entrega. |
 | AC-PED-25 | PED-28 | **Dado** un pedido a domicilio con líneas confirmadas, **cuando** un encargado de sucursal o el cliente intenta prepararlas, **entonces** se rechaza por falta de permiso y se registra el acceso denegado. |
+| AC-PED-26 | PED-31 | **Dado** un cliente con un pedido con una línea impresa en preparación y otra línea ya entregada, otro con una línea no recogida, otro con un pedido solo digital y otro con todos sus pedidos entregados o anulados y un reembolso pendiente, y un cliente ajeno con pendientes, **cuando** Identidad consulta los pendientes de cada uno, **entonces** el primero figura con un pedido, el segundo con un pedido, el tercero con ninguno y el cuarto con ningún pedido y un reembolso, sin otros datos y sin los del cliente ajeno. |
+| AC-PED-27 | PED-32, PED-35 | **Dado** un pedido a domicilio con nombre, teléfono y dirección de entrega en su intención de pago y un pedido de recojo, **cuando** se crean, **entonces** el primero guarda esa copia aunque el checkout cambie después, el segundo no guarda contacto, Envíos lee el contacto del pedido y Pagos recibe la petición de eliminar los datos de la intención solo después de guardarse la copia; y si Pagos no responde, la petición se reintenta. |
+| AC-PED-28 | PED-33 | **Dado** un cliente con un pedido a domicilio entregado, otro de recojo y un pedido de otro cliente, **cuando** se ejecuta la cancelación de su cuenta, **entonces** el nombre, el teléfono y la dirección de entrega del primero quedan anonimizados, el de recojo termina sin error, el ajeno no cambia, y se conservan las líneas, importes, fechas y el identificador opaco de la cuenta. |
+| AC-PED-29 | PED-34 | **Dado** pedidos a domicilio entregados o anulados hace 2 años y un día, otros hace 2 años menos un día y uno aún en curso, **cuando** corre la depuración, **entonces** los primeros quedan con nombre, teléfono y dirección anonimizados, los demás no cambian y repetir la depuración no cambia nada. |
+| AC-PED-30 | PED-36 | **Dado** un pedido a domicilio cuya copia del contacto no se puede guardar, o una intención sin contacto, **cuando** se intenta crear, **entonces** no se crea el pedido, no se pide la liberación y se informa para que Pagos compense el cobro. |
+| AC-PED-31 | PED-37 | **Dado** un cliente con tres pedidos a domicilio, uno ya anonimizado por la depuración y otro que no se puede anonimizar, **cuando** se ejecuta la cancelación de su cuenta, **entonces** se informa para que no se ejecute, ningún pedido queda anonimizado a medias, el ya anonimizado no falla y la cancelación puede reintentarse. |
+| AC-PED-32 | PED-38 | **Dado** una cuenta cuya cancelación, directa o reconfirmada tras diferirse, ya consultó sus pendientes y un pago de un pedido a domicilio que se aprueba antes de que se desvincule su intención, **cuando** ambos se procesan, **entonces** no se crea el pedido, el cobro se reembolsa, las reservas confirmadas se liberan y nunca queda un pedido con nombre, teléfono ni dirección tras la cancelación. |
+| AC-PED-33 | PED-39 | **Dado** una depuración con pedidos que anonimizar y otra con ninguno, **cuando** corre, **entonces** queda una entrada de auditoría con actor «sistema» y el conteo, sin datos personales; y si no se puede auditar, no se anonimiza y se reintenta al día siguiente. |
+| AC-PED-34 | PED-40 | **Dado** un pedido a domicilio, **cuando** lo ven su titular, logística, la administración central y un encargado de sucursal, **entonces** los tres primeros ven el nombre, el teléfono y la dirección, el encargado no, y el contacto no aparece en avisos, auditoría ni registros técnicos. |
+| AC-PED-35 | PED-41 | **Dado** un pedido existente de otro cliente y un identificador inexistente, **cuando** un cliente los pide, **entonces** recibe la misma respuesta de rechazo y queda un acceso denegado. |
 
 ## 5. Reglas e invariantes
 

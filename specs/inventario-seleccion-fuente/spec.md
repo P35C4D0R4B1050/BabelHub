@@ -2,13 +2,13 @@
 id: inventario-seleccion-fuente
 titulo: Reservas y selección de fuente
 estado: Approved
+aprobado_por: Claude (delegado por Diego Amiquero)
+aprobado_en: 2026-11-13
 servicio: Inventario
 prefijo: SEL
-origen: [RF04, RF14, RF15, RF28, NN02, NN06, NN07, NN18]
-calidad: [AC01, AC05, AC04, RNF01, RNF09]
+origen: [RF04, RF14, RF15, RF27, RF28, NN02, NN06, NN07, NN18]
+calidad: [AC01, AC05, AC04, RNF01, RNF09, RNF23]
 depende: [inventario-fuentes, identidad-seguridad, transversal-auditoria, transversal-seguridad]
-aprobado_por: Diego Amiquero
-aprobado_en: 2026-10-16
 ---
 
 # Spec — Reservas y selección de fuente
@@ -62,6 +62,9 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 | SEL-30 | No deseado | Si el aviso de pago pendiente llega con la reserva ya vencida, confirmada o liberada, entonces el sistema deberá ignorarlo y mantener su estado. | RF14 |
 | SEL-31 | No deseado | Si se repite una clave de idempotencia con una carga distinta, entonces el sistema deberá rechazar la solicitud indicando el conflicto. | RF14, AC01 |
 | SEL-32 | Evento | Cuando una reserva se confirma o se libera, o se descuenta el físico por una entrega o un paso a en reparto, el sistema deberá registrarlo en la auditoría en la misma transacción. | RNF08, RF14 |
+| SEL-33 | Evento | Cuando el E-commerce consulta los pendientes de un cliente por el puerto de `identidad-seguridad` (IDE-27) con la credencial de servicio de consulta de pendientes (IDE-30), el sistema deberá informar cuántas reservas confirmadas o pendientes no vencidas (SEL-08) tiene, sin datos de las ediciones, y rechazar la consulta que llegue sin esa credencial. | RF14, RF27 |
+| SEL-34 | Evento | Cuando el E-commerce entrega la baja de un titular (IDE-72) con la credencial de servicio de baja de titular (IDE-30), el sistema deberá sustituir su identificador en las reservas y en las claves de los eventos de límite por un identificador anónimo estable, calculado con una clave secreta del entorno que no permita recuperar el original, de forma repetible y sin alterar el stock ni las unidades vendidas. | RF14, RF27, RNF23 |
+| SEL-35 | Evento | Cuando el sistema procesa la baja de un titular, deberá eliminar la huella de origen de sus reservas sin alterar el conteo del límite por origen (SEL-19), conservar la unicidad de la idempotencia y rechazar la baja que llegue sin la credencial de servicio de ese alcance. | RF14, RF27, RNF23 |
 
 ## 4. Criterios de aceptación
 
@@ -101,6 +104,8 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 | AC-SEL-32 | SEL-32 | **Dado** que la auditoría no está disponible, **cuando** se intenta confirmar una reserva o entregar un pedido, **entonces** la operación no se aplica y el stock no cambia. |
 | AC-SEL-33 | SEL-24 | **Dado** un pedido a domicilio con dirección en Cusco y sin vendible en Cusco, y vendible en Lima y en Arequipa con una ruta de 1 día de Arequipa a Cusco y de 3 días de Lima a Cusco, **cuando** se reserva, **entonces** la fuente es Arequipa y no se genera ningún traslado. |
 | AC-SEL-34 | SEL-25 | **Dado** dos fuentes con vendible suficiente, una con ruta definida de 4 días y otra sin ruta, **cuando** se reserva para recojo, **entonces** se elige la de ruta definida; y una línea de 5 unidades nunca se divide entre dos fuentes: si ninguna tiene 5, se rechaza por falta de stock. |
+| AC-SEL-35 | SEL-33 | **Dado** un cliente con una reserva confirmada, otro con solo una reserva pendiente ya vencida y otro sin reservas, **cuando** el E-commerce consulta sus pendientes con la credencial de servicio, **entonces** el primero figura con una reserva y los otros dos con ninguna, sin datos de las ediciones; y una consulta sin esa credencial, o con la de otro alcance o la de un cliente, se rechaza. |
+| AC-SEL-36 | SEL-34, SEL-35 | **Dado** la baja de un titular con reservas confirmadas y cerradas, con huella de origen, y claves de límite, **cuando** el Inventario la procesa, **entonces** esos datos llevan un identificador anónimo distinto del original y de otro titular, la huella de origen desaparece, el stock y las unidades vendidas no cambian, la unicidad de la idempotencia se conserva, el conteo por hora del origen sigue incluyendo esas reservas y repetir la baja no cambia nada; la baja de un titular sin reservas termina sin error; y una baja sin la credencial de servicio de ese alcance se rechaza. |
 
 ## 5. Reglas e invariantes
 
@@ -110,6 +115,7 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 - El tiempo de expiración es de 15 minutos desde que se inicia el pago, y de hasta 30 minutos si el pago queda pendiente de confirmación (SEL-22).
 - La reserva de un pedido es atómica: se reservan todas las líneas impresas o ninguna.
 - El límite de «una pendiente» cuenta solo las reservas temporales pendientes; una reserva expirada, liberada o confirmada deja de contar. Las reservas confirmadas de pedidos pagados no limitan nuevas compras. Todas las iniciadas con éxito cuentan para el límite de 5 por hora del cliente y de 10 por hora del origen.
+- El conteo del límite por origen (SEL-19) se lleva en los eventos de límite con la huella no reversible del origen (SEG-25), que se purgan a las 24 horas, y no en la huella de las reservas: por eso la baja de un titular (SEL-35) no libera cupo del origen.
 - La regla del dominio no basta ante la concurrencia: la atomicidad la garantiza la infraestructura y se prueba con solicitudes simultáneas.
 
 ## 6. Casos límite y errores

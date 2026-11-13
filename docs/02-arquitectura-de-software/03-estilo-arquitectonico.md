@@ -134,6 +134,8 @@ style ENV fill:#222,stroke:#fff,color:#fff
 style LLM fill:#222,stroke:#fff,color:#fff
 ```
 
+> Las flechas entre módulos del diagrama muestran el **flujo de la operación** (quién inicia el caso de uso), no la dependencia de código: la dependencia la fijan la columna `depende` de las specs y la tabla de §3.1 y de `docs/03` §1.1 (por ejemplo, Envíos y Devoluciones dependen de Pedidos aunque el diagrama dibuje el flujo inverso).
+
 La vista de despliegue sobre las VMs de Oracle está en [despliegue](05-despliegue.md). Las llamadas entre módulos del mismo servicio se dibujan solo donde importan; en el nivel 3 de C4 están completas.
 
 ## 3. Componentes y responsabilidades
@@ -162,10 +164,10 @@ Cada módulo es una carpeta dentro de las capas del servicio (no un proyecto apa
 | **Catálogo** | Obras, ediciones impresas y digitales, licencias, portadas y archivos; muestra la disponibilidad y registra el stock inicial y el ingreso de mercadería en el Inventario. Un título agotado no se da de baja. | `ecommerce-catalogo` | Cliente del Inventario |
 | **Carrito y checkout** | Carrito del cliente, validación de la compra, costo de envío y reserva previa al cobro. | `ecommerce-carrito-checkout` | Catálogo, Identidad, cliente del Inventario |
 | **Pagos** | Cobro con la pasarela (Yape y tarjeta), idempotencia, pago pendiente de confirmación y reembolsos. No guarda datos de tarjeta. | `ecommerce-pagos` | Carrito y checkout, Identidad, cliente del Inventario |
-| **Pedidos** | Ciclo de vida del pedido, sus líneas impresas y digitales, y su anulación o no recogido. | `ecommerce-pedidos` | Pagos, Biblioteca digital, cliente del Inventario |
-| **Envíos** | Despacho a domicilio con operador logístico, guía y estados; descuenta el stock al pasar a en reparto. | `ecommerce-envios` | Pedidos, Carrito y checkout, Identidad, cliente del Inventario |
-| **Devoluciones** | Solicitud, aprobación y reingreso de stock de los impresos, y reembolso. | `ecommerce-devoluciones` | Pedidos, Pagos, Biblioteca digital, cliente del Inventario |
-| **Biblioteca digital** | Acceso del titular a sus libros digitales y descargas con URL firmada de corta duración y límite por compra. Nunca consulta al Inventario. | `ecommerce-biblioteca-digital` | Catálogo, Carrito y checkout, Pagos |
+| **Pedidos** | Ciclo de vida del pedido, sus líneas impresas y digitales, y su anulación o no recogido. | `ecommerce-pedidos` | Pagos, Biblioteca digital, Identidad, cliente del Inventario; define un puerto de despacho (crear y cancelar envíos) que implementa Envíos, sin depender de él |
+| **Envíos** | Despacho a domicilio con operador logístico, guía y estados; descuenta el stock al pasar a en reparto. | `ecommerce-envios` | Pedidos (y su puerto de despacho, que Envíos implementa), Identidad, cliente del Inventario |
+| **Devoluciones** | Solicitud, aprobación y reingreso de stock de los impresos, y reembolso. | `ecommerce-devoluciones` | Pedidos, Pagos, Biblioteca digital, Identidad, cliente del Inventario |
+| **Biblioteca digital** | Acceso del titular a sus libros digitales y descargas con URL firmada de corta duración y límite por compra. Nunca consulta al Inventario. | `ecommerce-biblioteca-digital` | Catálogo, Carrito y checkout, Pagos, Identidad |
 | **Libro de Reclamaciones** | Hoja de reclamación, su respuesta y su conservación. | `ecommerce-libro-reclamaciones` | Identidad |
 | **Identidad** | Registro, sesión, segundo factor, usuarios y roles, derechos ARCO y firma de las credenciales; esquema aislado por rol. | `identidad-seguridad` | Ninguno (todos usan su contexto de actor) |
 | **Asistente** | Recomendaciones y consulta del estado de pedidos con un LLM externo; solo lectura. | `asistente-compra-ia` | Catálogo, Pedidos, Identidad, cliente del Inventario |

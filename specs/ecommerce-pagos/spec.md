@@ -2,13 +2,13 @@
 id: ecommerce-pagos
 titulo: Pagos con Yape y tarjeta
 estado: Approved
+aprobado_por: Claude (delegado por Diego Amiquero)
+aprobado_en: 2026-11-13
 servicio: E-commerce
 prefijo: PAG
 origen: [RF05, RF07, NN02]
 calidad: [AC01, AC03, AC04, RNF06, RNF07, RNF08, RNF21]
 depende: [ecommerce-carrito-checkout, identidad-seguridad, inventario-seleccion-fuente, transversal-auditoria]
-aprobado_por: Diego Amiquero
-aprobado_en: 2026-10-16
 ---
 
 # Spec — Pagos con Yape y tarjeta
@@ -48,10 +48,19 @@ Cobrar el pedido una sola vez y con seguridad, con Yape o tarjeta, sin que el si
 | PAG-17 | No deseado | Si una intención de pago ya tiene un cobro pendiente de confirmación o aprobado, entonces el sistema deberá rechazar otro cobro de esa intención, aunque llegue desde otra pestaña o dispositivo. | RF05, AC01 |
 | PAG-18 | Estado | Mientras un pago de una compra sin impresos está pendiente de confirmación, el sistema deberá consultar su estado cada minuto hasta los 30 minutos desde su inicio y, pasado ese plazo, marcarlo como vencido. | RF05 |
 | PAG-19 | Ubicuo | El sistema deberá confirmar con la pasarela el estado de un pago informado por una notificación entrante antes de darlo por aprobado, además de verificar su firma. | RF05, RNF21 |
-| PAG-20 | No deseado | Si falla la confirmación de las reservas o la concesión de un acceso después de aprobarse el pago, entonces el sistema deberá liberar las reservas, revocar los accesos concedidos y reembolsar el total, dejando el reembolso pendiente visible a la administración y reintentable hasta completarse. | RF05, AC01 |
+| PAG-20 | No deseado | Si falla la creación del pedido, la confirmación de las reservas o la concesión de un acceso después de aprobarse el pago, entonces el sistema deberá liberar las reservas, revocar los accesos concedidos y reembolsar el total, dejando el reembolso pendiente visible a la administración y reintentable hasta completarse. | RF05, AC01 |
 | PAG-21 | No deseado | Si el correo de la cuenta no está verificado, entonces el sistema deberá negarse a cobrar. | RF05, AC04 |
 | PAG-22 | Evento | Cuando un pago queda pendiente o se resuelve y el cliente dio su consentimiento, el sistema deberá avisarle además por WhatsApp. | RF07 |
 | PAG-23 | No deseado | Si falla un aviso del estado del pago, entonces el sistema deberá mantener el estado del cobro y no interrumpirlo. | RF07, AC03 |
+| PAG-24 | Evento | Cuando Identidad consulta los pendientes de una cuenta, el sistema deberá informar cuántos pagos pendientes de confirmación, intentos sin resultado final y reembolsos pendientes (incluido el de una compensación, PAG-20) tiene esa cuenta, sin datos de pago y sin revelar los de otra cuenta. | RF05, RF27 |
+| PAG-25 | No deseado | Si la cuenta del cliente tiene una cancelación diferida (IDE-27), entonces el sistema deberá negarse a iniciar un cobro nuevo e indicar el motivo, sin impedir resolver los pagos ya pendientes. | RF05, RF27 |
+| PAG-26 | Evento | Cuando se ejecuta la cancelación de una cuenta, el sistema deberá desvincular de ella los datos de sus intenciones e intentos de pago, eliminando el contacto de entrega que lleven, y conservar solo los importes, fechas, estados e identificadores de la pasarela que exige una obligación legal y, si no puede, informarlo para que no se ejecute la cancelación (IDE-70). | RF05, RF27, RNF23 |
+| PAG-27 | Evento | Cuando Pedidos pide liberarlos tras guardar su copia (PED-32), o la intención de pago se resuelve sin pedido (vencida, cancelada o rechazada sin reintento), o pasan 30 días desde su creación, el sistema deberá eliminar de la intención el nombre, el teléfono y la dirección de entrega que recibió del checkout (CAR-30). | RF05, RNF23 |
+| PAG-28 | Evento | Cuando la pasarela aprueba el pago, el sistema deberá informar a Carrito y checkout para que elimine los datos de entrega del checkout (CAR-34). | RF05, RNF23 |
+| PAG-29 | No deseado | Si un intento de pago se aprueba después de que se desvinculó su intención por la cancelación de la cuenta (PAG-26), entonces el sistema deberá reembolsarlo sin crear el pedido, sin reconstruir datos personales ni avisar al cliente, y dejar el reembolso pendiente, visible para la administración y reintentable hasta completarse (PAG-20). | RF05, RF27, AC01 |
+| PAG-30 | Ubicuo | El sistema deberá enviar a la pasarela solo el importe, la moneda, una referencia opaca de la intención y el correo del titular si la pasarela lo exige, y nunca el nombre, el teléfono ni la dirección de entrega, ni guardarlos en el registro de intentos ni en los correos. | RF05, RNF08, RNF23 |
+| PAG-31 | No deseado | Si la cuenta del cliente no aceptó la versión vigente de los textos legales (IDE-58), entonces el sistema deberá negarse a iniciar un cobro nuevo e indicar el motivo. | RF05, NN15 |
+| PAG-32 | No deseado | Si el pago se aprueba después de que se consultaron los pendientes de la cuenta para ejecutar su cancelación (IDE-70, IDE-71) y antes de que PAG-26 desvincule su intención, entonces el sistema deberá hacer prevalecer la cancelación: compensarlo como en PAG-20 sin crear el pedido, sin avisar al cliente ni leer su correo, y sin que el reembolso resultante difiera la cancelación en curso. | RF05, RF27, AC01 |
 
 ## 4. Criterios de aceptación
 
@@ -73,9 +82,18 @@ Cobrar el pedido una sola vez y con seguridad, con Yape o tarjeta, sin que el si
 | AC-PAG-14 | PAG-16, PAG-17 | **Dado** un cliente con la compra abierta en dos pestañas, **cuando** pulsa pagar en ambas a la vez, **entonces** solo se crea un cobro y el segundo se rechaza; y tras un rechazo puede reintentar con otro medio de pago. |
 | AC-PAG-15 | PAG-18 | **Dado** un pago solo digital pendiente, **cuando** pasan 30 minutos sin confirmación, **entonces** se marca como vencido y se consultó su estado cada minuto. |
 | AC-PAG-16 | PAG-19 | **Dado** una notificación entrante de pago aprobado con firma válida, **cuando** llega, **entonces** se confirma el estado con la pasarela antes de aprobar el pedido; y con firma inválida, se rechaza y se registra. |
-| AC-PAG-17 | PAG-20 | **Dado** un pago aprobado de un pedido mixto, **cuando** falla la concesión del acceso digital, **entonces** se liberan las reservas, se revoca lo concedido y se reembolsa el total; y si el reembolso también falla, queda pendiente, visible para la administración, y al reintentar se reembolsa una sola vez. |
+| AC-PAG-17 | PAG-20 | **Dado** un pago aprobado de un pedido mixto y otro cuyo pedido no se puede crear, **cuando** falla la confirmación de las reservas, la concesión del acceso digital o la creación del pedido, **entonces** se liberan las reservas, se revoca lo concedido y se reembolsa el total; y si el reembolso también falla, queda pendiente, visible para la administración, y al reintentar se reembolsa una sola vez. |
 | AC-PAG-18 | PAG-21 | **Dado** un cliente con el correo sin verificar, **cuando** se solicita el cobro de una compra solo digital, **entonces** el servicio se niega a cobrar. |
 | AC-PAG-19 | PAG-23 | **Dado** que el servicio de correo falla, **cuando** un pago se aprueba, **entonces** el cobro y el pedido se completan y el aviso queda pendiente. |
+| AC-PAG-20 | PAG-24 | **Dado** un cliente con dos pagos pendientes de confirmación y un reembolso pendiente de una compensación (PAG-20), otro con todos sus pagos resueltos y otro con un intento enviado a la pasarela sin respuesta, **cuando** Identidad consulta los pendientes de cada uno, **entonces** el primero figura con dos pagos y un reembolso, el segundo con ninguno y el tercero con un intento sin resultado, sin datos de pago y sin pendientes de otra cuenta. |
+| AC-PAG-21 | PAG-25, PAG-31 | **Dado** un cliente con una cancelación diferida y otro que no aceptó la versión vigente de los textos, **cuando** intentan iniciar un cobro, incluso repitiendo una clave de idempotencia cuyo cobro no existía, **entonces** se les niega con el motivo y no se registra ningún cobro (si el cobro ya existía, se devuelve el original sin cobrar de nuevo); y un pago ya pendiente del primero se sigue resolviendo. |
+| AC-PAG-22 | PAG-26 | **Dado** un cliente con pagos aprobados y una intención con nombre, teléfono y dirección de entrega, **cuando** se ejecuta la cancelación de su cuenta, **entonces** sus intenciones e intentos dejan de llevar su identificador de cuenta, su correo y el contacto de entrega, y se conservan los importes, fechas, estados e identificadores de la pasarela; y si Pagos no puede hacerlo, se informa para que la cancelación no se ejecute y no queda ningún efecto parcial. |
+| AC-PAG-23 | PAG-27 | **Dado** una intención de pago con el nombre, el teléfono y la dirección de entrega, **cuando** Pedidos guarda su copia y pide liberarlos, o la intención se resuelve sin pedido, o pasan 30 días desde su creación, **entonces** esos datos dejan de existir en la intención y el pedido conserva su propia copia (PED-32); y mientras no ocurra ninguno de los tres, incluso a los 29 días y 23 horas, siguen en la intención. |
+| AC-PAG-24 | PAG-28 | **Dado** un pago aprobado de una compra a domicilio, **cuando** la pasarela lo confirma, **entonces** Carrito y checkout recibe el aviso y elimina el nombre, el teléfono y la dirección del checkout. |
+| AC-PAG-25 | PAG-29 | **Dado** un intento de pago cuya intención ya se desvinculó por la cancelación de la cuenta, **cuando** la pasarela lo aprueba después, **entonces** se reembolsa, no se crea ningún pedido, no se reconstruye ningún dato personal y el reembolso queda pendiente, visible para la administración y reintentable hasta completarse, sin avisar al cliente. |
+| AC-PAG-26 | PAG-30 | **Dado** una compra a domicilio con nombre, teléfono y dirección de entrega, **cuando** se cobra, **entonces** la pasarela recibe solo importe, moneda, referencia opaca y, si lo exige, el correo; y el registro de intentos y los correos no llevan el contacto de entrega. |
+| AC-PAG-27 | PAG-24 | **Dado** un cliente con un cobro enviado a la pasarela y sin respuesta, **cuando** pide cancelar su cuenta, **entonces** el intento figura como pendiente, la cancelación queda diferida (IDE-27, IDE-71) y no se desvincula ningún dato hasta que se resuelva. |
+| AC-PAG-28 | PAG-32 | **Dado** una cancelación, directa o reconfirmada tras diferirse, cuya consulta de pendientes ya pasó sin pendientes y un pago que se aprueba antes de que PAG-26 desvincule la intención, **cuando** ambos se procesan, **entonces** prevalece la cancelación: no se crea el pedido, se liberan las reservas, se revocan los accesos concedidos, el cobro se reembolsa sin avisar al cliente, el reembolso queda pendiente y reintentable si falla, y la cancelación no se difiere. |
 
 ## 5. Reglas e invariantes
 

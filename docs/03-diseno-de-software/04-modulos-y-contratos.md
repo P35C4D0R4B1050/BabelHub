@@ -18,14 +18,14 @@ Un módulo solo llama a los contratos públicos de otros. Las flechas siguen la 
 
 | Módulo | Depende de |
 | :--- | :--- |
-| Identidad | Nada: todos los módulos usan su contexto de actor; para los pendientes de una cuenta expone un puerto que implementan los demás módulos (sin depender de ellos) y define el puerto de eliminación del carrito de una cuenta reemplazada (IDE-84), que implementa Carrito. |
+| Identidad | Nada: todos los módulos usan su contexto de actor; para los pendientes de una cuenta y para su cancelación (anonimizar, desvincular o eliminar los datos personales y marcar las hojas de reclamación) expone puertos que implementan los demás módulos (sin depender de ellos) y define el puerto de eliminación del carrito de una cuenta reemplazada (IDE-84), que implementa Carrito. |
 | Catálogo | Cliente del Inventario (disponibilidad e ingreso de mercadería). |
 | Carrito y checkout | Catálogo, Identidad y cliente del Inventario. |
 | Pagos | Carrito y checkout, Identidad y cliente del Inventario (reserva). |
-| Biblioteca digital | Catálogo, Carrito y checkout y Pagos. |
-| Pedidos | Pagos, Biblioteca digital y cliente del Inventario. |
-| Envíos | Pedidos, Carrito y checkout, Identidad y cliente del Inventario. |
-| Devoluciones | Pedidos, Pagos, Biblioteca digital y cliente del Inventario. |
+| Biblioteca digital | Catálogo, Carrito y checkout, Pagos e Identidad. |
+| Pedidos | Pagos, Biblioteca digital, Identidad y cliente del Inventario; define un puerto de despacho (crear y cancelar envíos) que implementa Envíos, sin depender de él. |
+| Envíos | Pedidos (y su puerto de despacho, que Envíos implementa), Identidad y cliente del Inventario. |
+| Devoluciones | Pedidos, Pagos, Biblioteca digital, Identidad y cliente del Inventario. |
 | Libro de Reclamaciones | Identidad. |
 | Asistente | Catálogo, Pedidos e Identidad (solo lectura) y cliente del Inventario. |
 | Plataforma (núcleo compartido) | Nada: todos los módulos usan sus puertos; es el dueño de las tablas compartidas (`auditoria`, `alertas`, `correos_pendientes`, `cuota_correo`). |
@@ -43,7 +43,7 @@ Un módulo solo llama a los contratos públicos de otros. Las flechas siguen la 
 | Identificadores | Opacos (GUID u identificador de base); el ISBN es un atributo, no el identificador de ruta. |
 | Paginación | `?pagina=1&tamano=20` con tope; respuesta con total. La auditoría usa un cursor estable (instante de apertura y último registro) para no repetir ni omitir registros (AUD-30) y un plazo de respuesta entre servicios de 10 segundos (AUD-18). |
 | Filtros y orden | `?q=`, `?orden=`, campos permitidos y documentados. |
-| Idempotencia | Cabecera `Idempotency-Key` en cobros, reservas y reembolsos. |
+| Idempotencia | Cabecera `Idempotency-Key` en cobros, reservas, reembolsos y descuentos de stock por envío (clave natural: el identificador del envío; repetir devuelve el resultado original, no el rechazo por estado de SEL-28). |
 | Trazabilidad | Cabecera de correlación (`traceId`) en todas las respuestas, incluidos los errores. |
 
 ## 3. Contrato de errores
@@ -75,6 +75,7 @@ Los dos servicios responden los errores con `application/problem+json`:
 | E-commerce → Inventario | Consultar disponibilidad; consultar la selección de fuentes sin reservar; crear, confirmar, extender (pago pendiente) y liberar reservas; descontar al entregar o al pasar a en reparto; liberar al marcar no recogido; ajustar al devolver; registrar un ingreso de mercadería; consultar unidades vendidas; gestión de sucursal (inventario, ajustes y traslados) | Credencial de servicio con la identidad del actor | Se informa «no se puede validar el stock» sin cobrar; el catálogo usa la última disponibilidad (CAR-06, CAT-12). |
 | Inventario → E-commerce | Avisar que un traslado vinculado a un pedido fue recibido | Credencial de servicio | Se reintenta; el pedido espera. |
 | E-commerce (Identidad) → Inventario | Entregar la baja del titular de una cuenta cancelada, con solo su identificador opaco; persistente, repetible sin efecto duplicado y reintentada (IDE-64, AUD-32) | Credencial de servicio | Se reintenta hasta que el Inventario la acepte; la cancelación no se deshace. |
+| E-commerce → Inventario (pendientes) | Consultar cuántas reservas confirmadas o pendientes no vencidas tiene un cliente, para el puerto de pendientes de la cuenta (IDE-27, SEL-33) | Credencial de servicio de consulta de pendientes | Se rechaza sin ella; si el Inventario no responde, la cancelación o el reemplazo no se ejecutan (IDE-70, IDE-88). |
 | E-commerce → Inventario (alertas) | Consultar las alertas de seguridad y técnicas del Inventario y marcar una de seguridad como revisada (AUD-13, AUD-29, AUD-34); el E-commerce envía el correo a los administradores centrales | Credencial del administrador y de servicio | Se muestra lo del E-commerce y el aviso de AUD-18. |
 | Módulos del E-commerce entre sí | Operaciones de cada módulo por su contrato público, en el mismo proceso | Contexto del actor (no se pasa por la red) | Excepción de la capa de Aplicación traducida por la Presentación. |
 | Interfaz web → módulo Identidad | Pedir un contexto de lectura de 5 minutos para el asistente en nombre del cliente | Contexto del usuario | Sin él el asistente solo responde catálogo y disponibilidad. |

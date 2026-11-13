@@ -2,6 +2,18 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-13 — Reaperturas de la fase 3 y requisitos receptores de la cancelación
+
+### Cubierto
+- **Reaprobadas por la puerta delegada** (tres revisores sin Bloqueantes ni Importantes sobre el mismo texto, filas en `progress/aprobaciones.md`): `transversal-auditoria`, `transversal-seguridad`, `web-base`, `identidad-seguridad` (dos reaperturas: marcado de hojas, «anonimizar, desvincular o eliminar», IDE-89 y reembolsos pendientes en IDE-27), `inventario-seleccion-fuente`, `ecommerce-libro-reclamaciones`, `ecommerce-carrito-checkout`, `ecommerce-pagos` (dos veces), `ecommerce-biblioteca-digital`, `ecommerce-pedidos`, `ecommerce-envios` y `ecommerce-devoluciones`. Las 20 specs están `Approved`.
+- **Receptores de la cancelación de cuenta y retención de 2 años:** SEL-33 a SEL-35, REC-19 y REC-20, CAR-30 a CAR-37, PAG-24 a PAG-32, BIB-25 a BIB-29, PED-31 a PED-41, ENV-15 a ENV-19, DEV-23 a DEV-31. CTL-33 vuelve a «Especificado».
+- **Decisiones de la persona responsable** (en `progress/decisiones-previas-al-plan.md`): retención de 2 años; teléfono de entrega en el checkout; contacto de entrega abandonado a 30 días; el reembolso pendiente difiere la cancelación; el pedido conserva el identificador opaco de la cuenta y el no recogido cuenta como pendiente; retención de 2 años del texto libre de Devoluciones; se aceptan ambos avisos de un envío.
+- **Documentos alineados:** privacidad (filas de entrega, intención e intentos de pago, biblioteca, descargas, ayudas, devoluciones y retención), amenazas AM30 y AM31, modelo de datos (`pedidos`, `envios`, `descargas`, `ayudas_descarga`), `docs/02` y `docs/03` (dependencias, puerto de despacho, idempotencia del descuento por envío).
+
+### Pendiente
+- Planes y tareas de la fase 3 (`spec-plan`, `spec-tasks`); los Menores y los Importantes heredados están en `progress/hallazgos.md` (CAR-20 y el ciclo latente de Biblioteca, idempotencia del reembolso en Pagos y de SEL-28 con ENV-12, PAG-05).
+- Bloqueos de credenciales y legales (B03 a B07, B09, B11, B13).
+
 ## 2026-11-12 — Aprobación delegada de la primera tanda de specs
 
 ### Cubierto

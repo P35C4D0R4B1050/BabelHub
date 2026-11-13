@@ -54,3 +54,7 @@ Registrados en `progress/hallazgos.md` (redundancias entre specs, glosario, traz
 ## 6. Reaperturas de la fase 3 aplicadas (2026-11-13)
 
 Se reabrieron y volvieron a aprobar por la puerta delegada las tres specs de la fase 3 que tenían pendientes: `transversal-auditoria` (huella `1d279d8add39ccd5`: AUD-42 a AUD-44, AUD-16 ampliado), `transversal-seguridad` (`3d9b1d3807791a53`: SEG-32 y la regla del origen reenviado, SEG-27 con el tope de 24 correos, SEG-08 y SEG-25 alineadas) y `web-base` (`75db5009af2d025b`: WEB-36 a WEB-40, avisos de seguridad, cambio de correo, cancelación diferida y Turnstile). Quedan para sus fases las reaperturas de selección de fuente, carrito, pedidos, envíos, devoluciones, reclamaciones, pagos y biblioteca (receptores de la cancelación, teléfono de entrega, retención de 2 años). Los Menores de estas revisiones están en `progress/hallazgos.md`.
+
+## 7. Receptores de la cancelación (2026-11-13)
+
+Los Importantes 1 y 2 quedan cerrados: las ocho specs receptoras (selección de fuente, reclamaciones, carrito, pagos, biblioteca, pedidos, envíos y devoluciones) tienen sus requisitos y retención, y están `Approved` por la puerta delegada, junto con las reaperturas de identidad-seguridad (marcado de hojas, «anonimizar, desvincular o eliminar», IDE-89 y reembolsos pendientes). CTL-33 vuelve a «Especificado». Lo que sigue abierto (CAR-20 y el ciclo latente con Biblioteca, la idempotencia del reembolso y del descuento por envío, PAG-05 y las Menores) está en `progress/hallazgos.md` con dueño y fase.

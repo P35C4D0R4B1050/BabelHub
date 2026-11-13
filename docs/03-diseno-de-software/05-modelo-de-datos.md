@@ -53,15 +53,15 @@ Esquemas: `catalogo`, `carrito`, `pagos`, `pedidos`, `envios`, `devoluciones`, `
 | `ediciones` | id, obra_id, isbn, formato, precio, activa | `isbn` único; formato en (impreso, digital). |
 | `licencias` | edicion_id, titular, territorios, vigente_desde, vigente_hasta | Solo para ediciones digitales; vigencia coherente. |
 | `carritos` / `carrito_lineas` | cliente_id; carrito_id, edicion_id, cantidad | Una línea por edición; cantidad 1 para digitales. |
-| `pedidos` | id, cliente_id, tipo_entrega, estado, costo_envio, total, fecha, fecha_listo_recojo | Estado derivado de las líneas (incluye `no_recogido`); total en soles; `costo_envio` fijo y configurable. |
+| `pedidos` | id, cliente_id, tipo_entrega, estado, costo_envio, total, fecha, fecha_listo_recojo, contacto_nombre, contacto_telefono, direccion_entrega, fecha_estado_final | Estado derivado de las líneas (incluye `no_recogido`); total en soles; `costo_envio` fijo y configurable. |
 | `pedido_lineas` | pedido_id, edicion_id, titulo, isbn, cantidad, precio, estado, fuente_id | Una línea por edición y pedido. |
 | `intenciones_pago` | id, cliente_id, carrito_ref, costo_envio, versiones_aceptadas, estado, fecha_inicio | Un solo cobro pendiente o aprobado por intención (índice único parcial). |
 | `pagos` | id, intencion_id, pedido_id, estado (incluye `pendiente_confirmacion` y `vencido`), monto, referencia_pasarela, clave_idempotencia, fecha_inicio | **Un solo cobro aprobado por pedido** (índice único parcial); sin datos de tarjeta. |
-| `envios` | id, pedido_id, guia, estado | Estados en orden; guía única. |
+| `envios` | id, pedido_id, fuente_id, lineas, guia, operador, clave_solicitud, estado, fechas | Estados en orden; guía única. |
 | `devoluciones` / `devolucion_lineas` | pedido_id, motivo, estado; linea_id, cantidad | Cantidad devuelta ≤ comprada. |
 | `accesos_digitales` | id, cliente_id, edicion_id, descargas_usadas, revocado | Único (cliente_id, edicion_id); `descargas_usadas` ≤ 5 por restricción. |
-| `descargas` | id, acceso_id, fecha, resultado | Solo inserción. |
-| `ayudas_descarga` | id, acceso_id, motivo, estado | Solicitudes de ayuda (BIB-16). |
+| `descargas` | id, acceso_id (anulable), edicion_id, fecha, resultado | Solo inserción, salvo la depuración y la cancelación de la cuenta; a los 2 años se quita `acceso_id` y queda la edición y el día (BIB-26); se elimina al cancelar la cuenta (BIB-25). |
+| `ayudas_descarga` | id, acceso_id, motivo, estado, fecha | Solicitudes de ayuda (BIB-16); se eliminan a los 2 años (BIB-29) y al cancelar la cuenta (BIB-25). |
 | `hojas_reclamacion` | id, numero, tipo, detalle, datos_consumidor (nombre, documento, domicilio, correo), monto_reclamado, pedido_id, estado, respuesta, aviso_estado | `numero` único; sin borrado; estado en (pendiente, respondido, descartada); `aviso_estado` en (pendiente, enviado). |
 | `avisos` | id, evento_id, destinatario, estado, intentos, proximo_intento | Único (evento_id, destinatario) para no duplicar (NOT-05). |
 | `sesiones_web` | id opaco, usuario_id, rol, sucursal_id, ultima_actividad, expira_absoluta, host, credencial_cifrada, renovacion_cifrada | Esquema `web`. Sesión del servidor con cookie opaca (WEB-04, WEB-27); compartida por la réplica de gestión; se purga al vencer. La credencial de acceso y el valor de la renovación que la sesión necesita para renovarse se guardan **cifrados en reposo** con una clave del entorno y se borran al cerrar la sesión; PLA-39 y PLA-43 las invalidan al restaurar. |
@@ -109,7 +109,7 @@ El Asistente no tiene datos de negocio (los obtiene de los contratos de otros m�
 | Tabla | Datos personales | Tratamiento |
 | :--- | :--- | :--- |
 | `usuarios` | Nombre, correo, WhatsApp | Se anonimizan al cancelar la cuenta. |
-| `pedidos`, `envios` | Dirección, contacto | Se anonimiza el contacto a los 2 años *(propuesta)*. |
+| `pedidos` | Nombre, teléfono y dirección de entrega (única copia; `envios` los lee del pedido) | Se anonimizan a los 2 años desde `fecha_estado_final` (PED-34) y al cancelar la cuenta (PED-33); el pedido conserva `cliente_id` opaco (decisión del 2026-11-13). |
 | `hojas_reclamacion` | Datos del consumidor | Se conservan al menos 2 años. |
 | `auditoria` | Usuario, origen, campos personales del detalle | Se anonimiza a los 2 años o al cancelar la cuenta (AUD-11, AUD-19, AUD-32). |
 | Respaldos | Todos | Cifrados; rotan según la retención. |

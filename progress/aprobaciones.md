@@ -11,3 +11,14 @@ Una fila por cada spec o plan que el agente aprobó por delegación de la person
 | 2026-11-13 | spec | transversal-auditoria | Claude (delegado) | 0/0 | Lista para aprobar | Cumple con observaciones | Cumple con observaciones | 0 | 11 | 1d279d8add39ccd5 |
 | 2026-11-13 | spec | transversal-seguridad | Claude (delegado) | 0/0 | Lista para aprobar | Cumple con observaciones | Cumple con observaciones | 0 | 8 | 3d9b1d3807791a53 |
 | 2026-11-13 | spec | web-base | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 9 | 75db5009af2d025b |
+| 2026-11-13 | spec | identidad-seguridad | Claude (delegado) | 0/0 | Lista para aprobar | Cumple | Cumple con observaciones | 0 | 10 | d364c1c78c253734 |
+| 2026-11-13 | spec | inventario-seleccion-fuente | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 9 | f9ccb0a940046b21 |
+| 2026-11-13 | spec | ecommerce-libro-reclamaciones | Claude (delegado) | 0/0 | Lista para aprobar | Cumple con observaciones | Cumple con observaciones | 0 | 9 | 26414d887b85e44a |
+| 2026-11-13 | spec | ecommerce-carrito-checkout | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 12 | 8ae0121a96d68cc8 |
+| 2026-11-13 | spec | identidad-seguridad | Claude (delegado) | 0/0 | Lista para aprobar | Cumple | Cumple con observaciones | 0 | 5 | 3f321e1f875e2b84 |
+| 2026-11-13 | spec | ecommerce-pagos | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 14 | f6e0810a0a60e905 |
+| 2026-11-13 | spec | ecommerce-biblioteca-digital | Claude (delegado) | 0/0 | Lista para aprobar | Cumple con observaciones | Cumple con observaciones | 0 | 12 | e56e9533679dd7f0 |
+| 2026-11-13 | spec | ecommerce-pagos | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 12 | 943275388f7f5c22 |
+| 2026-11-13 | spec | ecommerce-pedidos | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 25 | ee0e03da6b583aee |
+| 2026-11-13 | spec | ecommerce-envios | Claude (delegado) | 0/0 | Lista para aprobar | Cumple con observaciones | Cumple con observaciones | 0 | 12 | c1ba63b99c8b3807 |
+| 2026-11-13 | spec | ecommerce-devoluciones | Claude (delegado) | 0/0 | Lista para aprobar | Cumple con observaciones | Cumple con observaciones | 0 | 12 | f92b9174ca6108fd |

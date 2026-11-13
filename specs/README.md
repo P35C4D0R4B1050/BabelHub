@@ -51,7 +51,7 @@ dotnet run --project tools/SpecCheck -- --write-matrix  # regenera TRACEABILITY.
 | `ecommerce-pagos` | E-commerce | PAG | `ecommerce-carrito-checkout`, `identidad-seguridad`, `inventario-seleccion-fuente`, `transversal-auditoria` |
 | `ecommerce-pedidos` | E-commerce | PED | `ecommerce-pagos`, `ecommerce-biblioteca-digital`, `inventario-seleccion-fuente`, `transversal-notificaciones`, `transversal-auditoria` |
 | `ecommerce-biblioteca-digital` | E-commerce | BIB | `ecommerce-catalogo`, `ecommerce-carrito-checkout`, `ecommerce-pagos`, `transversal-auditoria`, `transversal-seguridad` |
-| `ecommerce-envios` | E-commerce | ENV | `ecommerce-pedidos`, `ecommerce-carrito-checkout`, `inventario-seleccion-fuente`, `identidad-seguridad`, `transversal-notificaciones`, `transversal-auditoria`, `transversal-seguridad` |
+| `ecommerce-envios` | E-commerce | ENV | `ecommerce-pedidos`, `inventario-seleccion-fuente`, `identidad-seguridad`, `transversal-notificaciones`, `transversal-auditoria`, `transversal-seguridad` |
 | `ecommerce-devoluciones` | E-commerce | DEV | `ecommerce-pedidos`, `ecommerce-pagos`, `ecommerce-biblioteca-digital`, `inventario-ajustes`, `transversal-auditoria`, `transversal-notificaciones`, `identidad-seguridad` |
 | `ecommerce-libro-reclamaciones` | E-commerce | REC | `identidad-seguridad`, `transversal-notificaciones`, `transversal-auditoria`, `transversal-seguridad` |
 | `asistente-compra-ia` | E-commerce | ASI | `ecommerce-catalogo`, `ecommerce-pedidos`, `identidad-seguridad`, `transversal-seguridad` |

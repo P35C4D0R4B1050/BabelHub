@@ -2,13 +2,13 @@
 id: ecommerce-libro-reclamaciones
 titulo: Libro de Reclamaciones virtual
 estado: Approved
+aprobado_por: Claude (delegado por Diego Amiquero)
+aprobado_en: 2026-11-13
 servicio: E-commerce
 prefijo: REC
 origen: [RF25, NN15]
 calidad: [RNF07, RNF08, RNF17, AC04]
 depende: [identidad-seguridad, transversal-notificaciones, transversal-auditoria, transversal-seguridad]
-aprobado_por: Diego Amiquero
-aprobado_en: 2026-10-16
 ---
 
 # Spec — Libro de Reclamaciones virtual
@@ -39,15 +39,17 @@ Que cualquier consumidor pueda registrar un reclamo o una queja desde la tienda,
 | REC-07 | Evento | Cuando la administración responde una hoja pendiente, el sistema deberá cambiar su estado a respondido, guardar la respuesta y enviarla por correo electrónico al correo de contacto de la hoja, sin incluir el documento ni el domicilio. | RF25 |
 | REC-08 | Evento | Cuando la administración responde una hoja, el sistema deberá registrarlo en la auditoría. | RNF08 |
 | REC-09 | Ubicuo | El sistema deberá permitir a la administración central listar y filtrar las hojas por estado. | RF25 |
-| REC-10 | Ubicuo | El sistema deberá proteger los datos personales de las hojas y mostrarlos solo a la administración central y al consumidor que tenga una sesión con el correo verificado igual al correo de contacto de la hoja. | RNF07 |
+| REC-10 | Ubicuo | El sistema deberá proteger los datos personales de las hojas y mostrarlos solo a la administración central y al consumidor que tenga una sesión con el correo verificado igual al correo de contacto de la hoja, salvo en las hojas de una cuenta cancelada (REC-20). | RNF07 |
 | REC-11 | No deseado | Si un mismo origen intenta registrar una cuarta hoja en una ventana deslizante de una hora, entonces el sistema deberá rechazarla y responder y registrar el exceso según `transversal-seguridad` (SEG-07 y SEG-08). | RNF17, AC04 |
 | REC-12 | Evento | Cuando la administración central descarta una hoja por ser spam, el sistema deberá marcarla como descartada, ocultarla del listado por defecto, conservarla sin eliminarla y registrarlo en la auditoría. | RF25, RNF08 |
 | REC-13 | No deseado | Si falla el envío del correo de respuesta, entonces el sistema deberá mantener la hoja como respondida con la respuesta guardada, marcar el aviso como pendiente y permitir a la administración reintentarlo. | RF25 |
-| REC-14 | Evento | Cuando un consumidor con una sesión de correo verificado consulta sus hojas, el sistema deberá listar las hojas cuyo correo de contacto coincide con el suyo, con su número, fecha, estado y respuesta. | RF25, RNF07 |
+| REC-14 | Evento | Cuando un consumidor con una sesión de correo verificado consulta sus hojas, el sistema deberá listar las hojas cuyo correo de contacto coincide con el suyo, con su número, fecha, estado y respuesta, salvo las de una cuenta cancelada (REC-20). | RF25, RNF07 |
 | REC-15 | Evento | Cuando la administración central consulta los datos personales de una hoja, el sistema deberá registrarlo en la auditoría. | RNF08, AC04 |
 | REC-16 | Ubicuo | El sistema deberá gestionar los estados pendiente, respondido y descartado de una hoja, permitir descartar solo una hoja pendiente y rechazar responder una hoja respondida o descartada, aunque dos respuestas lleguen a la vez. | RF25, AC01 |
 | REC-17 | Evento | Cuando una hoja cumple dos años desde su registro, el sistema deberá anonimizar sus datos personales y redactar los que haya en el detalle y la respuesta, conservar el resto de la hoja, y registrar el proceso en la auditoría. | RF25, RNF07, RNF08 |
 | REC-18 | Ubicuo | El sistema deberá permitir a quien registró una hoja sin sesión ver su constancia en el momento del registro, y no mostrarle los datos de otra hoja por su número. | RF25, RNF07 |
+| REC-19 | Evento | Cuando Identidad consulta los pendientes de una cuenta, el sistema deberá informar cuántas hojas pendientes tiene su correo de contacto, sin datos de las hojas y sin contar las descartadas. | RF25, RF27 |
+| REC-20 | Evento | Cuando se ejecuta la cancelación de una cuenta, el sistema deberá, en la misma operación, marcar sus hojas como de una cuenta cancelada, conservarlas hasta los dos años de REC-17, no mostrarlas a una cuenta nueva con el mismo correo y, si no puede marcarlas, informarlo para que no se ejecute la cancelación (IDE-70). | RF25, RF27, RNF23 |
 
 ## 4. Criterios de aceptación
 
@@ -69,6 +71,8 @@ Que cualquier consumidor pueda registrar un reclamo o una queja desde la tienda,
 | AC-REC-14 | REC-07, REC-16 | **Dado** una hoja respondida y otra descartada, **cuando** la administración intenta responderlas, **entonces** se rechaza por estado inválido; y el correo de respuesta no incluye el documento ni el domicilio. |
 | AC-REC-15 | REC-17 | **Dado** una hoja que cumplió dos años, **cuando** corre la revisión de conservación, **entonces** su nombre, documento, domicilio y correo quedan anonimizados y el número, la fecha, el tipo y el estado se conservan; los datos personales escritos en el detalle y la respuesta se redactan y el proceso queda en la auditoría. |
 | AC-REC-16 | REC-18, REC-10 | **Dado** un visitante que acaba de registrar una hoja, **cuando** consulta otra por su número, **entonces** se rechaza; y un encargado de sucursal o logística tampoco puede ver los datos de ninguna hoja. |
+| AC-REC-17 | REC-19 | **Dado** un consumidor con una hoja pendiente, otro con solo hojas respondidas y otro con una hoja descartada como spam, **cuando** Identidad consulta sus pendientes, **entonces** el primero figura con una hoja y los otros dos con ninguna, sin datos de las hojas. |
+| AC-REC-18 | REC-20, REC-14, REC-10, REC-17 | **Dado** un consumidor con una hoja respondida de hace un año que cancela su cuenta, **cuando** se ejecuta la cancelación, **entonces** la hoja queda marcada como de una cuenta cancelada y la administración central la sigue viendo con sus datos; otra persona que se registre después con el mismo correo no la ve ni en su lista ni consultándola por su número; a los dos años queda anonimizada (REC-17); y si no se pueden marcar las hojas, la cancelación no se ejecuta. |
 
 ## 5. Reglas e invariantes
 
@@ -78,6 +82,7 @@ Que cualquier consumidor pueda registrar un reclamo o una queja desde la tienda,
 - El plazo de respuesta que se informa es de 15 días calendario, dentro del máximo legal (a verificar en una operación real, ver `docs/01-analisis-de-sistema/03-marco-legal.md`).
 - Los datos de identificación de la hoja (documento y domicilio) se piden por obligación legal; son una excepción documentada a la minimización de `docs/05-seguridad/04-privacidad-y-datos-personales.md`.
 - Una hoja descartada se conserva como las demás y sus datos personales se anonimizan al cumplirse el plazo de conservación.
+- REC-19 cuenta todas las hojas pendientes del correo, aunque cualquiera pueda registrar una hoja con el correo de otra persona (REC-02): es un riesgo aceptado (decisión del 2026-11-13) que un tercero difiera una cancelación hasta el tope de 30 días de IDE-81; una hoja descartada como spam sale del conteo (REC-12).
 
 ## 6. Casos límite y errores
 
