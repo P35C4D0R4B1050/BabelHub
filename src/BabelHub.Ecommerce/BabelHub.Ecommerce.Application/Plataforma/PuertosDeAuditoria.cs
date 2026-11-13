@@ -14,6 +14,9 @@ public enum TipoDeEventoDeSeguridad
 
     /// <summary>Una dirección reenviada llegó sin la credencial de alcance «origen reenviado» (SEG-32, AUD-44).</summary>
     OrigenReenviadoSinCredencial,
+
+    /// <summary>Una llamada entrante de una integración no se pudo verificar y se rechazó (SEG-12, AUD-37).</summary>
+    EntradaDeIntegracionRechazada,
 }
 
 /// <summary>
@@ -28,8 +31,15 @@ public sealed record EventoDeSeguridad
         string? limite = null,
         HuellaDeOrigen? origen = null,
         string? direccionCompleta = null,
-        string? usuario = null)
+        string? usuario = null,
+        string? proveedor = null,
+        string? motivo = null)
     {
+        if (tipo == TipoDeEventoDeSeguridad.EntradaDeIntegracionRechazada && string.IsNullOrWhiteSpace(motivo))
+        {
+            throw new ArgumentException("El rechazo de una integración indica el motivo.", nameof(motivo));
+        }
+
         if (tipo == TipoDeEventoDeSeguridad.LimiteExcedido)
         {
             if (string.IsNullOrWhiteSpace(limite))
@@ -54,6 +64,8 @@ public sealed record EventoDeSeguridad
         Origen = origen;
         DireccionCompleta = direccionCompleta;
         Usuario = usuario;
+        Proveedor = proveedor;
+        Motivo = motivo;
     }
 
     public TipoDeEventoDeSeguridad Tipo { get; }
@@ -67,6 +79,12 @@ public sealed record EventoDeSeguridad
     public string? DireccionCompleta { get; }
 
     public string? Usuario { get; }
+
+    /// <summary>Proveedor de la integración, solo si está en la lista blanca (nunca un nombre enviado por el cliente).</summary>
+    public string? Proveedor { get; }
+
+    /// <summary>Motivo estable del rechazo (por ejemplo «firma-invalida»).</summary>
+    public string? Motivo { get; }
 }
 
 /// <summary>Alerta técnica (un trabajo de fondo que falla, una dependencia caída); el motivo viene de un catálogo cerrado.</summary>
