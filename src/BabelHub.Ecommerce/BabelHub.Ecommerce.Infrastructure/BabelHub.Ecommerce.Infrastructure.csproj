@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="StackExchange.Redis" />
+    <PackageReference Include="Npgsql" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\BabelHub.Ecommerce.Application\BabelHub.Ecommerce.Application.csproj" />

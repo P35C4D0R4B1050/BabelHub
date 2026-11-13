@@ -3,6 +3,9 @@
     <RootNamespace>BabelHub.Inventario.Infrastructure</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Npgsql" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\BabelHub.Inventario.Application\BabelHub.Inventario.Application.csproj" />
     <ProjectReference Include="..\..\BabelHub.Shared\BabelHub.Shared.csproj" />
   </ItemGroup>

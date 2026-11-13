@@ -94,3 +94,8 @@ Pruebas y precisiones:
 - [ ] Las desactivaciones de números posteriores a un respaldo no se reaplican al restaurar: incluir `numeros_desactivados` en la reaplicación de PLA-19 o registrar el residual.
 - [ ] Spec: AC-NOT-16 debe incluir un aviso cancelado por NOT-08 o NOT-13; NOT-15 mezcla dos dependencias (redactar «un aviso a un cliente nunca consume más de un cupo» con un conteo); AC-NOT-12 «se intenta y se reintenta hasta 5 veces»; `docs/05/07` y `docs/02/07` aún no mencionan NOT-14.
 - [ ] Fuera de este plan: los planes de Pedidos, Pagos, Envíos, Biblioteca y Devoluciones llaman a `INotificador`; los de Reservas y Traslados del Inventario guardan y entregan las solicitudes de aviso; `web-base` decide la pantalla de avisos desactivados y fallidos.
+
+## 7. Convenciones que dejó la implementación de `transversal-seguridad`
+
+- [ ] **Roles por esquema (migraciones de cada servicio):** el rol de cada esquema se llama `rol_<esquema>` (`rol_identidad`, `rol_pedidos`…), sin login y sin ser dueño de las tablas; la aplicación se conecta con un rol de acceso `NOINHERIT` que es miembro solo de los roles de esquema (nunca del de depuración ni del propietario). `EjecutarComo` hace `SET LOCAL ROLE "rol_<esquema>"`; si se cambia el prefijo, se cambia en `OpcionesDeUnidadDeTrabajo` y en las migraciones a la vez.
+- [ ] **Repositorios y contextos de EF Core de cada módulo:** toman la conexión y la transacción de `IConexionDeLaUnidadDeTrabajo` (contrato público de `Plataforma`) para escribir dentro de la transacción del caso de uso; no se abre otra conexión.
