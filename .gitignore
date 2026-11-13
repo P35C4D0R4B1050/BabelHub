@@ -98,3 +98,5 @@ docs/babelhub-guion-exposicion-y-estilo.md
 
 # --- Archivos temporales de Office (bloqueos de Word y PowerPoint) ---
 ~$*
+# --- Informes locales de restauración y ensayo (contienen identificadores; nunca al repositorio) ---
+progress/ensayos/local/

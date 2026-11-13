@@ -237,7 +237,7 @@ Lo siguiente se acepta de forma consciente y debe figurar en el informe y en la 
 | VM-BORDE | VM-VENTAS | 8080 (E-commerce) | Permitido |
 | VM-BORDE | VM-INVENTARIO | 8081 (réplica de gestión, solo como respaldo) | Permitido |
 | VM-VENTAS, VM-INVENTARIO (réplica) | VM-INVENTARIO | 8082 (API del Inventario) | Permitido |
-| VM-INVENTARIO (Inventario) | VM-VENTAS | 8080 (aviso de traslado recibido) | Permitido |
+| VM-INVENTARIO (Inventario) | VM-VENTAS | 8080 (aviso de traslado recibido y solicitud de avisos de traslado, alcance `solicitar-aviso`) | Permitido |
 | VM-INVENTARIO | VM-VENTAS | 5678 (webhook de n8n) | Cerrado: el Inventario ya no llama a n8n (pide los avisos al E-commerce, `transversal-notificaciones` D10) |
 | VM-VENTAS | VM-INVENTARIO | 5432 (PostgreSQL, rol ecommerce) | Permitido |
 | Cualquier otro origen | VM-INVENTARIO | todos | **Denegado** |
@@ -246,6 +246,8 @@ Lo siguiente se acepta de forma consciente y debe figurar en el informe y en la 
 | Evolution API | WhatsApp | HTTPS saliente | Permitido |
 | VM-VENTAS | Almacén de archivos | HTTPS saliente | Permitido (subir archivos y firmar URLs) |
 | VM-INVENTARIO | Almacén de archivos | HTTPS saliente | Permitido (respaldos y WAL cifrados) |
+| VM-AUX | Almacén de archivos | HTTPS saliente | Permitido (sellos del registro de supresiones, vigilancia de respaldos, copia del registro y lectura de la cuota; credenciales mínimas por tarea) |
+| VM-AUX | Servidor de correo (SMTP) | TLS saliente | Permitido (correo semanal del sello y alertas de respaldo) |
 | Internet | Almacén de archivos | HTTPS | Solo con URL firmada vigente; bucket privado |
 
 Complementos: firewall del sistema operativo con las mismas reglas, secretos como variables de entorno fuera del repositorio y SSH sin contraseña.

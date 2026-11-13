@@ -61,6 +61,7 @@ La credencial **nunca llega al navegador** (AGENTS.md, regla 9). El navegador so
 | Asistente → disponibilidad | Cliente REST del Inventario con credencial de servicio de solo lectura; sin acceso a las bases de datos. |
 | Credenciales de servicio | Son secretos estáticos por alcance (uno por tarea y par de servicios), guardados como secretos del entorno de cada contenedor y rotados a mano (PLA-43 las rota al restaurar); cada servicio valida el alcance de la que recibe. Identidad no las emite: IDE-30 se ajusta en el plan de identidad. |
 | Origen reenviado | La Web reenvía al Inventario la dirección del cliente final solo con una credencial de servicio de alcance «origen reenviado», además de la credencial del usuario cuando existe; sin ella el Inventario la ignora, usa la huella de la dirección directa en un cubo propio sin los límites por origen, incluido el de reservas (SEL-19), y registra un evento (SEG-17, SEG-32). La réplica de gestión, que es la misma imagen del E-commerce, usa la misma credencial. |
+| Alcances de la credencial de servicio | Cada credencial es un secreto estático de al menos 32 bytes, distinto por alcance, enviado en `X-Credencial-De-Servicio` (el origen reenviado, en `X-Credencial-De-Origen`), comparado en tiempo constante y con rotación en dos pasos (el anterior se acepta 24 horas y su uso se alerta). Alcances: `operacion-de-usuario`, `lectura-de-disponibilidad`, `expiracion-de-reservas`, `consulta-de-pendientes`, `baja-de-titular`, `lectura-alertas`, `consulta-de-auditoria`, `marcar-alerta`, `historial`, `solicitar-aviso`, `lectura-de-contacto` y `origen-reenviado`; rechazo por defecto y una prueba falla si un endpoint de servicio no declara su alcance (`transversal-seguridad`, D18). |
 | Notificador ↔ servicios | Secreto compartido o firma verificada en ambos sentidos. |
 | Pasarela → E-commerce (aviso) | Firma o secreto del aviso; el estado se confirma además consultando a la pasarela. |
 
@@ -90,6 +91,6 @@ Cerrar sesión invalida la renovación. Desactivar a un usuario impide su ingres
 
 ## 6. Decisiones pendientes
 
-- Custodia de la clave de firma (dónde vive la clave privada y cómo se respalda); la rotación está decidida en IDE-36 (CTL-29).
+- Custodia de la clave de firma: decidida en el plan de `identidad-seguridad` (la privada cifrada con AES-GCM con una clave de entorno que `desplegar.sh` entrega a cada VM, respaldo con `age` y custodia fuera de línea de la clave de entorno); falta trasladarla a esta sección al implementar (tarea T50 de ese plan); la rotación está decidida en IDE-36 (CTL-29).
 - Cuenta de Gmail para el correo transaccional, con su credencial de aplicación en una variable de entorno (B08, AM23).
 - ~~Si se extiende el segundo factor al encargado de sucursal~~ Resuelto el 2026-10-16: obligatorio para todo el personal y opcional para el cliente.
