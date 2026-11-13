@@ -17,7 +17,9 @@ public sealed class CopiasDeAdaptadoresTests
         "Application/Plataforma/AlcancesDeServicio.cs",
         "Application/Plataforma/EntradasDeIntegracion.cs",
         "Application/Plataforma/CasoDeUso.cs",
-        "Application/Plataforma/ConstructorDeValidacion.cs");
+        "Application/Plataforma/ConstructorDeValidacion.cs",
+        "Application/Plataforma/TrabajosDeFondo.cs",
+        "Infrastructure/Plataforma/TrabajoDeUmbralesDeAlerta.cs");
 
     [Theory]
     [MemberData(nameof(Archivos))]
