@@ -12,8 +12,8 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 - **Documentos alineados:** autenticación, operación segura, despliegue (copia consistente del clúster, restauración solo del clúster completo), modelo de datos (`fecha_confirmacion`, segundo factor del personal), privacidad y bloqueos.
 
 ### Pendiente
-- `identidad-seguridad` sigue en `Draft`. Los valores de la cuota de correo y de la cancelación diferida ya están decididos (`progress/decisiones-previas-al-plan.md`); falta la aprobación final tras la auditoría de cierre.
-- Reabrir al planificar cada una: `transversal-auditoria` (AUD-37), `inventario-seleccion-fuente`, carrito, pagos, pedidos, envíos, devoluciones y reclamaciones, `transversal-seguridad` y `web-base` (detalle en `progress/hallazgos.md`).
+- `identidad-seguridad` quedó `Approved` el 2026-11-12 por la puerta delegada (huella `87679a1b8ebb351a`, 88 requisitos y 66 criterios) tras la auditoría de cierre.
+- Reabrir al planificar cada una (hay Importantes de diseño en `progress/R7-auditoria-de-cierre-fase-2.md`): `transversal-auditoria` (AUD-37), `inventario-seleccion-fuente`, carrito, pagos, pedidos, envíos, devoluciones y reclamaciones, `transversal-seguridad` y `web-base` (detalle en `progress/hallazgos.md`).
 
 ## 2026-11-06 — Auditoría final de coherencia y cobertura
 

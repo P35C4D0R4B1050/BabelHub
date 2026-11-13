@@ -12,7 +12,7 @@ Traduce el [modelo de dominio](../01-analisis-de-sistema/07-modelo-de-dominio.md
 | Nombres | Tablas y columnas en español, minúsculas con guion bajo (`reservas`, `fecha_expiracion`). |
 | Borrado | Baja lógica para catálogo y usuarios; auditoría y hojas de reclamación nunca se borran (solo se anonimiza lo que corresponda). |
 | Concurrencia | Columna de versión por fila (`version`) en agregados con escritura concurrente (stock). |
-| Permisos | Un rol por esquema que solo puede usar su propio esquema (`REVOKE` a los demás); el rol de la aplicación no es dueño de las tablas y no puede modificar ni borrar la auditoría; solo un rol de depuración, distinto, con permiso limitado a las columnas de datos personales, anonimiza (AUD-19). En el Inventario, además, seguridad por filas por sucursal (RLS). |
+| Permisos | Un rol por esquema que solo puede usar su propio esquema (`REVOKE` a los demás); la aplicación se conecta con un rol de acceso que es miembro de los roles de esquema y, dentro de cada transacción, usa `SET LOCAL ROLE` del módulo que escribe, de modo que una operación entre módulos (cancelar una cuenta y anonimizar sus pedidos) es una sola transacción sin ampliar el permiso de ningún módulo (propuesta a confirmar en el plan de identidad); el rol de la aplicación no es dueño de las tablas y no puede modificar ni borrar la auditoría; solo un rol de depuración, distinto, con permiso limitado a las columnas de datos personales, anonimiza (AUD-19). En el Inventario, además, seguridad por filas por sucursal (RLS). |
 | Datos personales | Marcados en el diccionario; el borrado o la anonimización se prueba (RNF23). |
 
 ## 2. Inventario (base `inventario`, un esquema por módulo)
@@ -64,9 +64,11 @@ Esquemas: `catalogo`, `carrito`, `pagos`, `pedidos`, `envios`, `devoluciones`, `
 | `ayudas_descarga` | id, acceso_id, motivo, estado | Solicitudes de ayuda (BIB-16). |
 | `hojas_reclamacion` | id, numero, tipo, detalle, datos_consumidor (nombre, documento, domicilio, correo), monto_reclamado, pedido_id, estado, respuesta, aviso_estado | `numero` único; sin borrado; estado en (pendiente, respondido, descartada); `aviso_estado` en (pendiente, enviado). |
 | `avisos` | id, evento_id, destinatario, estado, intentos, proximo_intento | Único (evento_id, destinatario) para no duplicar (NOT-05). |
-| `sesiones_web` | id opaco, usuario_id, rol, sucursal_id, ultima_actividad, expira_absoluta, host | Esquema `web`. Sesión del servidor con cookie opaca (WEB-04, WEB-27); compartida por la réplica de gestión; se purga al vencer. |
+| `sesiones_web` | id opaco, usuario_id, rol, sucursal_id, ultima_actividad, expira_absoluta, host, credencial_cifrada, renovacion_cifrada | Esquema `web`. Sesión del servidor con cookie opaca (WEB-04, WEB-27); compartida por la réplica de gestión; se purga al vencer. La credencial de acceso y el valor de la renovación que la sesión necesita para renovarse se guardan **cifrados en reposo** con una clave del entorno y se borran al cerrar la sesión; PLA-39 y PLA-43 las invalidan al restaurar. |
 | `auditoria` | como en Inventario | Solo inserción; la comparten los módulos del E-commerce salvo Identidad, que tiene la suya en su esquema aislado. |
 | `alertas` | id, servicio, motivo, clase (seguridad o técnica), primera_ocurrencia, ocurrencias, estado (pendiente o revisada), revisada_por, revisada_en | **No es auditoría**: se actualiza al agrupar (ventana fija de 15 minutos) y al revisar (AUD-13, AUD-34). Existe también en el Inventario. |
+| `correos_pendientes` | id, tipo (alerta a la administración, alerta crítica, reclamo, pago), destinatario_ref, fecha, intentos | Esquema `plataforma` (núcleo compartido, no `identidad`). Cola de correos que no salieron por cuota diaria agotada (IDE-77, IDE-78, IDE-80): se reintenta al renovarse la cuota, con prioridad para las alertas a la administración; sin códigos ni enlaces firmados. |
+| `cuota_correo` | fecha, cupo (administración, críticas, códigos, resto), enviados | Esquema `plataforma`. Contador diario de la cuota de IDE-66, con el tope por origen de los códigos (IDE-83) y por motivo y servicio de las alertas a la administración (IDE-82); se purga a los 30 días. |
 
 ## 4. Identidad (esquema `identidad` de la base `ecommerce`)
 
@@ -84,7 +86,6 @@ Esquemas: `catalogo`, `carrito`, `pagos`, `pedidos`, `envios`, `devoluciones`, `
 | `aceptaciones` | usuario_id o pedido_id, texto (términos, privacidad, reembolso, mayoría de edad), version, fecha | Solo inserción; una fila por texto aceptado en el registro (IDE-34) o en el checkout (CAR-22). |
 | `solicitudes_arco` | id, usuario_id, tipo, estado, respuesta, fecha, fecha_limite | Estados: recibida, en atención, atendida, rechazada. `fecha_limite` = 20 días hábiles (acceso) o 10 (resto). |
 | `eventos_ingreso` | clave (cuenta+origen), instante | Un registro por ingreso fallido (SEG-06); cuenta también para cuentas inexistentes; ventana deslizante. |
-| `correos_pendientes` | id, tipo (alerta a la administración, alerta crítica, reclamo, pago), destinatario_ref, fecha, intentos | Cola de correos que no salieron por cuota diaria agotada (IDE-77, IDE-78, IDE-80): se reintenta al renovarse la cuota, con prioridad para las alertas a la administración; sin códigos ni enlaces firmados. |
 | `bajas_titulares` | id_opaco, fecha, estado (pendiente o entregada), intentos | Buzón de salida de Identidad para la baja al Inventario (IDE-64, AUD-32): se escribe en la misma operación que la cancelación y se reintenta; el Inventario guarda su copia por `id_opaco` para reaplicarla y no duplicar. |
 | `auditoria` | como en Inventario | Solo inserción; propia de Identidad por el aislamiento del esquema. La interfaz web la presenta junto con la del resto del E-commerce y la del Inventario (AUD-09). |
 

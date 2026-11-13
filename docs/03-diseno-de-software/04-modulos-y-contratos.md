@@ -8,7 +8,7 @@ Describe los módulos de cada servicio y la forma de sus contratos REST. Es un d
 | :--- | :--- | :--- |
 | **Inventario** | **Fuentes** (fuentes, stock vendible, rutas, unidades vendidas, fuente de recepción); **Selección y reservas** (consulta previa, reservas con expiración); **Traslados**; **Ajustes** (merma, daño, conteo, ingreso de mercadería, devoluciones) | `inventario-fuentes`, `inventario-seleccion-fuente`, `inventario-traslados`, `inventario-ajustes` |
 | **E-commerce** | **Catálogo**; **Carrito y checkout**; **Pagos**; **Pedidos**; **Envíos**; **Devoluciones**; **Biblioteca digital**; **Libro de Reclamaciones**; **Identidad** (registro, sesión, segundo factor, usuarios y roles, derechos ARCO); **Asistente** (consulta, recomendación, estado de pedidos); **Interfaz web** (áreas Tienda, Sucursal y Admin, índice infinito) | `ecommerce-*`, `identidad-seguridad`, `asistente-compra-ia`, `web-base`, `web-indice-infinito` |
-| **Transversal** | Auditoría (contrato único; cada servicio guarda sus registros y Identidad los suyos, aislados; con filtros y paginación estable); Seguridad (errores, límites, eventos y alertas); Notificaciones (puerto) | `transversal-auditoria`, `transversal-seguridad`, `transversal-notificaciones` |
+| **Transversal** | **Plataforma** (núcleo compartido del E-commerce, con esquema propio `plataforma`: auditoría compartida, límites, alertas, correo con su cuota y su cola de pendientes, trabajos de fondo y puertos compartidos como reloj, usuario actual y unidad de trabajo); Auditoría (contrato único; cada servicio guarda sus registros y Identidad los suyos, aislados; con filtros y paginación estable); Seguridad (errores, límites, eventos y alertas); Notificaciones (puerto) | `transversal-auditoria`, `transversal-seguridad`, `transversal-notificaciones` |
 
 Cada módulo es una carpeta dentro de las capas Aplicación y Dominio del servicio; no es un proyecto aparte. Tiene un **contrato público** en la raíz de su carpeta y un interior privado (`Interno`).
 
@@ -18,7 +18,7 @@ Un módulo solo llama a los contratos públicos de otros. Las flechas siguen la 
 
 | Módulo | Depende de |
 | :--- | :--- |
-| Identidad | Nada: todos los módulos usan su contexto de actor; para los pendientes de una cuenta expone un puerto que implementan los demás módulos (sin depender de ellos). |
+| Identidad | Nada: todos los módulos usan su contexto de actor; para los pendientes de una cuenta expone un puerto que implementan los demás módulos (sin depender de ellos) y define el puerto de eliminación del carrito de una cuenta reemplazada (IDE-84), que implementa Carrito. |
 | Catálogo | Cliente del Inventario (disponibilidad e ingreso de mercadería). |
 | Carrito y checkout | Catálogo, Identidad y cliente del Inventario. |
 | Pagos | Carrito y checkout, Identidad y cliente del Inventario (reserva). |
@@ -28,6 +28,7 @@ Un módulo solo llama a los contratos públicos de otros. Las flechas siguen la 
 | Devoluciones | Pedidos, Pagos, Biblioteca digital y cliente del Inventario. |
 | Libro de Reclamaciones | Identidad. |
 | Asistente | Catálogo, Pedidos e Identidad (solo lectura) y cliente del Inventario. |
+| Plataforma (núcleo compartido) | Nada: todos los módulos usan sus puertos; es el dueño de las tablas compartidas (`auditoria`, `alertas`, `correos_pendientes`, `cuota_correo`). |
 | Interfaz web | Todos los módulos y el cliente del Inventario. |
 | Inventario: Selección y reservas, Traslados y Ajustes | Fuentes; Traslados además Selección y reservas. |
 

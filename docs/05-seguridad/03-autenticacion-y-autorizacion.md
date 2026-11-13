@@ -59,6 +59,7 @@ La credencial **nunca llega al navegador** (AGENTS.md, regla 9). El navegador so
 | Módulo → módulo (mismo proceso) | Contexto del actor que origina la llamada; no hay credenciales por la red y la autorización se vuelve a comprobar en cada módulo. |
 | Asistente → catálogo y pedidos | Contexto de solo lectura en el mismo proceso; para los pedidos, un contexto de 5 minutos limitado al propio cliente, emitido por el módulo Identidad a pedido de la capa web (IDE-33); el módulo de pedidos filtra por ese cliente, no el asistente. |
 | Asistente → disponibilidad | Cliente REST del Inventario con credencial de servicio de solo lectura; sin acceso a las bases de datos. |
+| Credenciales de servicio | Son secretos estáticos por alcance (uno por tarea y par de servicios), guardados como secretos del entorno de cada contenedor y rotados a mano (PLA-43 las rota al restaurar); cada servicio valida el alcance de la que recibe. Identidad no las emite: IDE-30 se ajusta en el plan de identidad. |
 | Notificador ↔ servicios | Secreto compartido o firma verificada en ambos sentidos. |
 | Pasarela → E-commerce (aviso) | Firma o secreto del aviso; el estado se confirma además consultando a la pasarela. |
 

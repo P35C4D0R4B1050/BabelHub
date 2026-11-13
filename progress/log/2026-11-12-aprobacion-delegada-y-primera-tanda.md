@@ -38,3 +38,10 @@
 - Decisiones de la persona en esta parte: valores de la cuota de correo, réplica de gestión solo con sesiones vigentes, claves del Inventario servidas por la réplica, teléfono de entrega en el checkout y reemplazo de la cuenta sin verificar (`progress/decisiones-previas-al-plan.md`).
 - `identidad-seguridad` quedó en **Draft** con 86 requisitos y 65 criterios. Las últimas correcciones (IDE-84 limitado a clientes, IDE-86, alerta crítica por tipo) **no tuvieron una revisión final de los tres agentes**: cada verificación dejaba un hueco menor en la cuota de correo y la persona decidió aprobarla ella.
 - También se corrigió el fixture de las pruebas de la puerta, que fallaban desde las aprobaciones del día.
+
+## Aprobación de identidad-seguridad (misma fecha, tercera parte)
+
+- A petición de la persona responsable se verificó el texto final de `identidad-seguridad` con tres revisores varias veces; cada vuelta encontró huecos en las correcciones recientes (IDE-84 a IDE-88: reemplazo de la cuenta sin verificar, correo del personal, puerto de pendientes y de Carrito) hasta que los tres quedaron sin Bloqueantes ni Importantes sobre el mismo texto.
+- **Aprobada** por delegación: huella `87679a1b8ebb351a`, fila en `progress/aprobaciones.md`. Las 20 specs están `Approved`.
+- Se ampliaron los documentos de diseño (esquema `plataforma`, mecanismo de transacciones `SET LOCAL ROLE`, almacén de la sesión web, credenciales de servicio, AM29, retención de n8n y Evolution) y la prueba de arquitectura (Dominio e Infraestructura de otro módulo y la Api frente al `Interno`; 30 pruebas).
+- Pendiente: los Importantes de `progress/R7-auditoria-de-cierre-fase-2.md` que reabren specs (receptores de la cancelación, teléfono de entrega, `web-base`) y la fase 3 de planes.
