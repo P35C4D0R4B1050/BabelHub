@@ -2,4 +2,8 @@
   <PropertyGroup>
     <RootNamespace>BabelHub.Inventario.Domain</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BabelHub.Inventario.Infrastructure" />
+    <InternalsVisibleTo Include="BabelHub.Inventario.UnitTests" />
+  </ItemGroup>
 </Project>
