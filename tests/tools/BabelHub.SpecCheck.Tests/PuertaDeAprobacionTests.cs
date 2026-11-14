@@ -40,10 +40,7 @@ public sealed class PuertaDeAprobacionTests : IDisposable
         foreach (var spec in Directory.GetFiles(Path.Combine(_copia, "specs"), "spec.md", SearchOption.AllDirectories))
         {
             var texto = File.ReadAllText(spec).Replace("\r\n", "\n", StringComparison.Ordinal);
-            var revertido = System.Text.RegularExpressions.Regex.Replace(
-                texto,
-                @"\nestado: (?:Approved|Planned|InProgress)\naprobado_por: Claude \(delegado[^\n]*\naprobado_en: [^\n]*(?:\nplan_aprobado_por: [^\n]*\nplan_aprobado_en: [^\n]*)?",
-                "\nestado: Draft");
+            var revertido = RevertirAprobacionesDelegadas(texto);
             if (texto != revertido)
             {
                 File.WriteAllText(spec, revertido, new UTF8Encoding(false));
@@ -333,6 +330,46 @@ public sealed class PuertaDeAprobacionTests : IDisposable
         var salida = p.StandardOutput.ReadToEnd() + p.StandardError.ReadToEnd();
         p.WaitForExit();
         return (p.ExitCode, salida);
+    }
+
+    /// <summary>
+    /// Quita del encabezado de una spec toda aprobación firmada por el agente delegado, sin depender del orden de los campos:
+    /// la firma de la spec devuelve el estado a Draft; la firma del plan, a Approved si la spec la firmó la persona (que no
+    /// exige fila en el registro) o a Draft si también la firmó el agente.
+    /// </summary>
+    private static string RevertirAprobacionesDelegadas(string texto)
+    {
+        const string Delegado = "Claude (delegado";
+        var limite = texto.IndexOf("\n---", 4, StringComparison.Ordinal);
+        if (!texto.StartsWith("---\n", StringComparison.Ordinal) || limite < 0)
+        {
+            return texto;
+        }
+
+        var lineas = texto[..limite].Split('\n').ToList();
+        var especFirmadaPorElAgente = lineas.Any(l => l.StartsWith("aprobado_por: " + Delegado, StringComparison.Ordinal));
+        var planFirmadoPorElAgente = lineas.Any(l => l.StartsWith("plan_aprobado_por: " + Delegado, StringComparison.Ordinal));
+        if (!especFirmadaPorElAgente && !planFirmadoPorElAgente)
+        {
+            return texto;
+        }
+
+        lineas.RemoveAll(l => l.StartsWith("plan_aprobado_por:", StringComparison.Ordinal) || l.StartsWith("plan_aprobado_en:", StringComparison.Ordinal));
+        if (especFirmadaPorElAgente)
+        {
+            lineas.RemoveAll(l => l.StartsWith("aprobado_por:", StringComparison.Ordinal) || l.StartsWith("aprobado_en:", StringComparison.Ordinal));
+        }
+
+        var estado = especFirmadaPorElAgente ? "Draft" : "Approved";
+        for (var i = 0; i < lineas.Count; i++)
+        {
+            if (lineas[i].StartsWith("estado: ", StringComparison.Ordinal))
+            {
+                lineas[i] = "estado: " + estado;
+            }
+        }
+
+        return string.Join("\n", lineas) + texto[limite..];
     }
 
     private static string BuscarRaiz()

@@ -8,8 +8,8 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 
 | Bloque | Contenido | Tareas | Nivel | Depende de | Estado |
 | :--- | :--- | :--- | :---: | :--- | :---: |
-| **PLA-R1** | `transversal-plataforma`: endurecimiento de VM-AUX, espacio local reservado, custodia de la clave y ensayo de descifrado, `tools/RestauracionCheck` | T26, T27, T28, T30 | C | T25 (hecha) | ☐ |
-| **AUD-1** | `transversal-auditoria`: Dominio (detalle seguro, catálogo de acciones, actor, anonimización, alertas, acumulado de límites) | T01–T06 | C | — | ☐ |
+| **PLA-R1** | `transversal-plataforma`: endurecimiento de VM-AUX, espacio local reservado, custodia de la clave y ensayo de descifrado, `tools/RestauracionCheck` | T26, T27, T28, T30 | C | T25 (hecha) | ☑ |
+| **AUD-1** | `transversal-auditoria`: Dominio (detalle seguro, catálogo de acciones, actor, anonimización, alertas, acumulado de límites) | T01–T06 | C | — | ☑ |
 | **AUD-2** | Contratos de registro, consulta y alerta, puertos de Identidad y Reservas y los catálogos de acciones | T07, T08, T09, T11–T16 | C | AUD-1 | ☐ |
 | **AUD-3** | Implementación de los puertos de `Plataforma`, consultas unificadas, agrupar y enviar alertas, depuración y bajas del Inventario | T10, T17–T20 | C | AUD-2 | ☐ |
 | **SEG-C** | Cierre de `transversal-seguridad`: T27b y T29 (acumulador persistente) y `spec-verify` | T27b, T29 | C | AUD-3 (T10, T18) | ☐ |
@@ -36,20 +36,37 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 
 | Bloque | Contenido | Nivel | Depende de | Estado |
 | :--- | :--- | :---: | :--- | :---: |
-| **INV-0** | Planificar en lote las cuatro specs (`spec-plan`, `spec-tasks`, puerta delegada) | C | ECO-0 (contratos) | ☐ |
-| **INV-1** | `inventario-fuentes` | E | INV-0 | ☐ |
-| **INV-2** | `inventario-seleccion-fuente`: selección y reservas con pruebas de concurrencia sin sobreventa (AC01) | C | INV-1 | ☐ |
-| **INV-3** | `inventario-ajustes` (ajustes guiados por motivo, auditados) | C | INV-2 | ☐ |
-| **INV-4** | `inventario-traslados` | C | INV-3 | ☐ |
+| **INV-0** | Planificar en lote las cuatro specs (`spec-plan`, `spec-tasks`, puerta delegada): 102 tareas, las cuatro specs Approved y los cuatro planes Planned | C | ECO-0 (contratos) | ☑ |
+| **INV-1a** | `inventario-fuentes` T01–T08: piezas de Plataforma (`IBloqueosAsesores`, `ReintentoPorInterbloqueo`, alcance de datos por transacción) y Dominio | C | INV-0; ECO-0; `transversal-auditoria` T07/T08/T12 (AUD-2) | ☐ |
+| **INV-1b** | `inventario-fuentes` T09–T16: Aplicación (fuentes, rutas, existencias, `IMovimientosDeStock`, puertos) | C | INV-1a | ☐ |
+| **INV-1c** | `inventario-fuentes` T17–T25: Infraestructura (RLS, migraciones), Api y pruebas | C | INV-1b | ☐ |
+| **INV-2a** | `inventario-seleccion-fuente` T01–T10 y T19: Plataforma, Dominio, contrato, reservar, expiración compartida y primera prueba de concurrencia | C | INV-1c | ☐ |
+| **INV-2b** | `inventario-seleccion-fuente` T11–T18: idempotencia, límites, reemplazo, confirmar, extender, liberar, cerrar y consulta | C | INV-2a | ☐ |
+| **INV-2c** | `inventario-seleccion-fuente` T20–T27: puertos para otros módulos, receptores de la cancelación, trabajos de fondo y Api | C | INV-2b | ☐ |
+| **INV-2d** | `inventario-seleccion-fuente` T28–T33: pruebas de integración y documentación (T32 y T33 de nivel E) | C/E | INV-2c | ☐ |
+| **INV-3a** | `inventario-ajustes` T01–T09: Dominio y Aplicación | C | INV-1c, INV-2c | ☐ |
+| **INV-3b** | `inventario-ajustes` T10–T18: Infraestructura, depuración de 2 años, Api, concurrencia | C | INV-3a; AUD-4 (conexión de depuración) | ☐ |
+| **INV-4a** | `inventario-traslados` T01–T09: Dominio y Aplicación de las transiciones | C | INV-2c | ☐ |
+| **INV-4b** | `inventario-traslados` T10–T17: puertos de `Reservas`, infraestructura y concurrencia | C | INV-4a | ☐ |
+| **INV-4c** | `inventario-traslados` T18–T26: buzón de salida, trabajos de fondo, Api y pruebas | C | INV-4b; contrato del aviso de `transversal-notificaciones` (T20) | ☐ |
 
 ## Carril C — E-commerce y web
 
 | Bloque | Contenido | Nivel | Depende de | Estado |
 | :--- | :--- | :---: | :--- | :---: |
-| **ECO-0** | Contratos REST entre el E-commerce y el Inventario y sus DTOs en `BabelHub.Shared`; puerto de «usuario actual» de prueba | C | — | ☐ |
-| **ECO-1** | Planificar `web-base` y `ecommerce-catalogo` | E | ECO-0 | ☐ |
-| **WEB-1** | Estructura de `web-base` (diseño, sesión, estados) | E | ECO-1 | ☐ |
-| **ECO-2** | `ecommerce-catalogo` | E | WEB-1 | ☐ |
+| **ECO-0** | Contratos REST entre el E-commerce y el Inventario y sus DTOs en `BabelHub.Shared` (43 operaciones v1); doble de «usuario actual» de prueba | C | — | ☑ |
+| **ECO-1** | Planificar `web-base` (39 tareas) y `ecommerce-catalogo` (28 tareas): specs Approved y planes Planned | C | ECO-0 | ☑ |
+| **WEB-1d** | `web-base` T21–T27 (T21 antes de T01): errores, diseño (Tailwind y daisyUI), layout, componentes de estado, textos legales, «Sorpréndeme» y descarga | B/E/C | ECO-1 | ☐ |
+| **WEB-1a** | `web-base` T01–T09: módulo `Web`, Dominio (sesión, borrador, áreas) y Aplicación | C | WEB-1d (T21); dobles de Identidad, Auditoría y Catálogo | ☐ |
+| **WEB-1b** | `web-base` T10–T15: Infraestructura de sesión, cifrado por host, token del usuario y cookie | C | WEB-1a; `ITokenDelUsuarioDeLaSesion` en `Application.Plataforma` (carril A) | ☐ |
+| **WEB-1c** | `web-base` T16–T20: antiforgery, cabeceras y CSP, filtros de área y paso pendiente, pruebas de sesión y rutas | C | WEB-1b | ☐ |
+| **WEB-1e** | `web-base` T36–T39 | C | WEB-1c | ☐ |
+| **WEB-2** | `web-base` T28–T31: pantallas de ingreso, registro, recuperación, cuenta, administración, auditoría y alertas | C | IDE-3 a IDE-5, AUD-3 | ☐ |
+| **WEB-4** | `web-base` T32–T35: E2E multinavegador y móvil, axe, rendimiento y usabilidad | E/C | pantallas de catálogo y compra | ☐ |
+| **ECO-2a** | `ecommerce-catalogo` T01–T06: Dominio (ISBN, obra y ediciones, licencia, archivos), contratos y puertos | C | — | ☐ |
+| **ECO-2b** | `ecommerce-catalogo` T07–T13: casos de uso, cerrado con dobles de auditoría | C | ECO-2a | ☐ |
+| **ECO-2c** | `ecommerce-catalogo` T14–T23: Infraestructura, Api, matriz de autorización, integración con S3 e Inventario simulado, trabajos de fondo | C | AUD-4; ampliación de `IClienteDelInventario` y del almacén (carril A) | ☐ |
+| **ECO-2d** | `ecommerce-catalogo` T24–T28: pantallas del catálogo y de la administración, documentos y E2E | B/C/E | WEB-1d | ☐ |
 | **ECO-3** | Planificar `ecommerce-carrito-checkout`, `ecommerce-pagos` y `ecommerce-pedidos` | C | ECO-2 | ☐ |
 | **ECO-4** | `ecommerce-carrito-checkout` (reservas e idempotencia) | C | ECO-3, INV-2 | ☐ |
 | **ECO-5** | `ecommerce-pagos` (pasarela de pruebas de Culqi) | C | ECO-4; B05 (persona) | ☐ |
@@ -60,7 +77,7 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **ECO-10** | `ecommerce-devoluciones` | E | ECO-9 | ☐ |
 | **ECO-11** | `ecommerce-libro-reclamaciones` | E | ECO-7 | ☐ |
 | **ECO-12** | `asistente-compra-ia` | C | ECO-6; B06 (persona) | ☐ |
-| **ECO-13** | `web-indice-infinito` | B | WEB-1 | ☐ |
+| **ECO-13** | `web-indice-infinito` | B | WEB-1d | ☐ |
 
 ## Cierre (todos los carriles)
 
@@ -74,6 +91,11 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | Bloque | Tareas | Fecha de cierre | Duración | Notas (hallazgos, paradas, replanificación) |
 | :--- | :---: | :--- | :--- | :--- |
 | (antes de los bloques: `transversal-plataforma` T20–T25, una tarea por ciclo) | 6 | 2026-11-14 | ~1 jornada | Referencia: cada tarea con validación completa costaba 5 a 8 min solo de pruebas. |
+| PLA-R1 + AUD-1 (carril A) | 10 | 2026-11-14 | ~6 h en paralelo con B y C | Revisión de nivel C: PLA-R1 dio 1 Bloqueante y 4 Importantes; AUD-1, 7 Importantes de seguridad y 1 de arquitectura; todos corregidos. Integración sola: 1768 pruebas, 11 min. |
+| INV-0 (carril B) | 4 planes (102 tareas) | 2026-11-14 | ~6 h | La puerta delegada de 3 rondas no alcanzó: hicieron falta 6 (4.ª, 5.ª y 6.ª autorizadas por la persona). Reabrió las specs de selección (SEL-36/37/39) y ajustes (AJU-21/22). Pendiente de la persona: residual de reemplazos de 75 min. |
+| ECO-0 + ECO-1 (carril C) | 6 tareas + 2 planes | 2026-11-14 | ~6 h | 43 contratos congelados; planes de `web-base` y `ecommerce-catalogo` también con rondas extra; decisión WEB-34 («B, acotar» y luego «B literal»); riesgo aceptado de los alcances de reservas y traslados. |
+
+**Lectura de la primera ola (2026-11-14).** La planificación con puerta delegada es el cuello de botella real: tres de cuatro carriles-ola gastaron 4 a 6 rondas de revisión en planes. Para las specs que aún no tienen plan (biblioteca digital, envíos, devoluciones, reclamaciones, carrito, pagos, pedidos, asistente), conviene planificar en lote desde el inicio y presupuestar 2 rondas extra por spec crítica.
 
 ## Acordado y pendiente de la persona
 

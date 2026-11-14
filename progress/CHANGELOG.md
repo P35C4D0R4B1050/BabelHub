@@ -2,6 +2,17 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-14 — Primera ola de carriles en paralelo (fundida a `main`)
+
+### Cubierto
+- **Carril A:** `transversal-plataforma` T26, T27, T28 y T30 (endurecimiento de VM-AUX, espacio local reservado, custodia y descifrado de ensayo, `tools/RestauracionCheck`) y `transversal-auditoria` T01 a T06 (Dominio duplicado en los dos servicios). Revisión de seguridad y arquitectura de nivel C con todos los Bloqueantes e Importantes corregidos. La persona aprobó la credencial de correo propia `aviso.env` de la VM de datos.
+- **Carril B:** los planes de las cuatro specs de `inventario-*` (102 tareas) con spec Approved y plan Planned tras seis rondas; SEL-36/37/39 (tope de 3 reemplazos, residual de 75 minutos pendiente de confirmar) y AJU-21/22 (retención de 2 años y anonimización) reabrieron esas specs.
+- **Carril C:** ECO-0 (43 contratos v1 entre E-commerce e Inventario en `BabelHub.Shared`, documento `08-contratos-entre-servicios-v1.md`, dobles de usuario actual) y los planes aprobados de `web-base` (39 tareas) y `ecommerce-catalogo` (28 tareas). Riesgo aceptado por la persona: los alcances de `expiracion-de-reservas` y `solicitar-aviso` exceden su nombre.
+- `tools/RestauracionCheck` añadido a `BabelHub.sln`. Tareas de la fase 3 hechas: 58 (48 anteriores + 10 de esta ola); las specs recién planificadas suman 169 tareas más (ver `progress/bloques.md`).
+
+### Pendiente
+- AUD-2 en adelante (de ello depende INV-1a), WEB-1d, INV-1a y los bloques siguientes de `progress/bloques.md`; confirmar el residual de 75 minutos; decidir el desvío de la hora de Lima en `transversal-auditoria` (T07).
+
 ## 2026-11-14 — Proceso: desarrollo por bloques, carriles y rigor graduado
 
 ### Cubierto
