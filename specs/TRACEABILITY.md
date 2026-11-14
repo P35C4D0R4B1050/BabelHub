@@ -43,7 +43,7 @@
 | asistente-compra-ia | E-commerce | Approved | 20 | 19 | ecommerce-catalogo, ecommerce-pedidos, identidad-seguridad, transversal-seguridad |
 | ecommerce-biblioteca-digital | E-commerce | Approved | 29 | 26 | ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-pagos, identidad-seguridad, transversal-auditoria, transversal-seguridad |
 | ecommerce-carrito-checkout | E-commerce | Approved | 37 | 31 | ecommerce-catalogo, inventario-seleccion-fuente, identidad-seguridad, transversal-seguridad |
-| ecommerce-catalogo | E-commerce | Approved | 23 | 19 | inventario-fuentes, inventario-ajustes, transversal-auditoria |
+| ecommerce-catalogo | E-commerce | Planned | 23 | 19 | inventario-fuentes, inventario-ajustes, transversal-auditoria |
 | ecommerce-devoluciones | E-commerce | Approved | 31 | 32 | ecommerce-pedidos, ecommerce-pagos, ecommerce-biblioteca-digital, inventario-ajustes, transversal-auditoria, transversal-notificaciones, identidad-seguridad, transversal-seguridad |
 | ecommerce-envios | E-commerce | Approved | 18 | 18 | ecommerce-pedidos, inventario-seleccion-fuente, identidad-seguridad, transversal-notificaciones, transversal-auditoria, transversal-seguridad |
 | ecommerce-libro-reclamaciones | E-commerce | Approved | 20 | 18 | identidad-seguridad, transversal-notificaciones, transversal-auditoria, transversal-seguridad |
