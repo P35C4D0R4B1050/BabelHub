@@ -21,6 +21,9 @@ public static class OperacionesDelInventario
         .. DeReservas(),
         .. DeFuentes(),
         .. DeTitulares(),
+        .. DeAjustes(),
+        .. DeTraslados(),
+        .. DeAdministracion(),
     ];
 
     private static OperacionDeContrato Op(
@@ -136,5 +139,90 @@ public static class OperacionesDelInventario
         Op(
             "inventario.titulares.baja", Post, "/bajas-de-titular", AlcancesDeCredencial.BajaDeTitular, false, false, false, 204, typeof(BajaDeTitularDto), null,
             CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.ServicioNoDisponible),
+    ];
+
+    private static OperacionDeContrato[] DeAjustes() =>
+    [
+        Op(
+            "inventario.ajustes.registrar", Post, "/ajustes", Usuario, true, true, false, 201, typeof(RegistrarAjusteDto), typeof(AjusteRegistradoDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.EdicionNoImpresa, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.StockInsuficiente,
+            CodigosDeErrorDelInventario.ConteoMenorQueReservas, CodigosDeErrorDelInventario.SinCambios, CodigosDeErrorDelInventario.LimiteExcedido,
+            CodigosDeErrorDelInventario.IdempotenciaEnConflicto, CodigosDeErrorDelInventario.IdempotenciaEnCurso, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.ingresos.registrar", Post, "/ingresos-de-mercaderia", Usuario, true, true, false, 201, typeof(RegistrarIngresoDto), typeof(IngresoDeMercaderiaDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.EdicionNoImpresa, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.FuenteNoEsDeRecepcion,
+            CodigosDeErrorDelInventario.IdempotenciaEnConflicto, CodigosDeErrorDelInventario.IdempotenciaEnCurso, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.ingresos.listar", Get, "/ingresos-de-mercaderia", Usuario, true, false, true, 200, null, typeof(ListaDeIngresosDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.devoluciones.reingresar", Post, "/devoluciones/{devolucionId}/reingreso", Usuario, true, false, false, 200,
+            typeof(ReingresarDevolucionDto), typeof(ReingresoDeDevolucionDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.EdicionNoImpresa, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.ServicioNoDisponible),
+    ];
+
+    private static OperacionDeContrato[] DeTraslados() =>
+    [
+        Op(
+            "inventario.traslados.solicitar", Post, "/traslados", Usuario, true, false, false, 201, typeof(SolicitarTrasladoDto), typeof(TrasladoDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.EdicionNoImpresa, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.StockInsuficiente,
+            CodigosDeErrorDelInventario.LimiteExcedido, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.traslados.listar", Get, "/traslados", Usuario, true, false, true, 200, null, typeof(PaginaDto<TrasladoDto>),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ValidacionInvalida,
+            CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.traslados.consultar", Get, "/traslados/{trasladoId}", Usuario, true, false, true, 200, null, typeof(TrasladoDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.traslados.aprobar", Post, "/traslados/{trasladoId}/aprobar", Usuario, true, false, false, 200, null, typeof(TrasladoDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.TrasladoEstadoInvalido, CodigosDeErrorDelInventario.LimiteExcedido, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.traslados.rechazar", Post, "/traslados/{trasladoId}/rechazar", Usuario, true, false, false, 200, typeof(MotivoDeTrasladoDto), typeof(TrasladoDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.TrasladoEstadoInvalido,
+            CodigosDeErrorDelInventario.TrasladoVinculadoNoSeRechaza, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.traslados.despachar", Post, "/traslados/{trasladoId}/despachar", Usuario, true, false, false, 200, null, typeof(TrasladoDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.StockInsuficiente, CodigosDeErrorDelInventario.TrasladoEstadoInvalido, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.traslados.recibir", Post, "/traslados/{trasladoId}/recibir", Usuario, true, false, false, 200, null, typeof(TrasladoDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.TrasladoEstadoInvalido, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.traslados.cancelar", Post, "/traslados/{trasladoId}/cancelar", Usuario, true, false, false, 200, typeof(MotivoDeTrasladoDto), typeof(TrasladoDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.TrasladoEstadoInvalido, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.traslados.registrar-guia", Put, "/traslados/{trasladoId}/guia", Usuario, true, false, false, 200, typeof(RegistrarGuiaDto), typeof(TrasladoDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.TrasladoEstadoInvalido, CodigosDeErrorDelInventario.ServicioNoDisponible),
+    ];
+
+    /// <summary>
+    /// Historial de sucursal, auditoría y alertas: las rutas, los alcances y los errores están fijados por el plan de <c>transversal-auditoria</c>
+    /// (sección 4). Aquí solo se congela el historial; los cuerpos de la auditoría y de las alertas los define ese plan (carril A, AUD-2).
+    /// </summary>
+    private static OperacionDeContrato[] DeAdministracion() =>
+    [
+        Op(
+            "inventario.historial.consultar", Get, "/historial", AlcancesDeCredencial.Historial, true, false, true, 200, null, typeof(HistorialDeSucursalDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.auditoria.consultar", Get, "/auditoria", AlcancesDeCredencial.ConsultaDeAuditoria, true, false, true, 200, null, null,
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ValidacionInvalida),
+        Op(
+            "inventario.alertas.listar", Get, "/alertas", AlcancesDeCredencial.LecturaDeAlertas, false, false, true, 200, null, null,
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido),
+        Op(
+            "inventario.alertas.marcar-revisada", Post, "/alertas/{id}/revisada", AlcancesDeCredencial.MarcarAlerta, true, false, false, 204, null, null,
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ServicioNoDisponible),
     ];
 }

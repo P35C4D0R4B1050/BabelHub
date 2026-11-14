@@ -41,4 +41,19 @@ public static class CodigosDeErrorDelInventario
 
     /// <summary>422: la ruta tiene un plazo que no es mayor que cero o une una fuente consigo misma (FUE-17).</summary>
     public const string RutaInvalida = "INV-RUTA-INVALIDA";
+
+    /// <summary>422: el conteo real es menor que las unidades reservadas; el cuerpo es <c>ProblemaDeConteoDto</c> (AJU-06).</summary>
+    public const string ConteoMenorQueReservas = "INV-CONTEO-MENOR-QUE-RESERVAS";
+
+    /// <summary>422: el conteo real es igual al físico registrado; no hay nada que ajustar (AJU-07).</summary>
+    public const string SinCambios = "INV-SIN-CAMBIOS";
+
+    /// <summary>422: el ingreso de mercadería se pidió en una fuente que no es la de recepción (AJU-19).</summary>
+    public const string FuenteNoEsDeRecepcion = "INV-FUENTE-NO-ES-DE-RECEPCION";
+
+    /// <summary>409: el traslado no está en un estado que admita la operación, o la reserva de su pedido ya no la admite (TRA-03, TRA-23).</summary>
+    public const string TrasladoEstadoInvalido = "INV-TRASLADO-ESTADO-INVALIDO";
+
+    /// <summary>422: un traslado vinculado a un pedido solo se aprueba; para detenerlo se anula el pedido (TRA-16).</summary>
+    public const string TrasladoVinculadoNoSeRechaza = "INV-TRASLADO-VINCULADO-NO-SE-RECHAZA";
 }
