@@ -28,7 +28,7 @@ Van en `postgres.env`, en la carpeta de secretos de VM-INVENTARIO (`BABELHUB_SEC
 
 ## Programación
 
-El respaldo diario lo lanza el cron del anfitrión (UTC); el archivado lo lanza PostgreSQL solo:
+El respaldo diario lo lanza el cron del anfitrión (UTC), que instala `scripts/desplegar.sh inventario` (`/etc/cron.d/babelhub-respaldo`); el archivado lo lanza PostgreSQL solo. La entrada es:
 
 ```bash
 30 2 * * * docker exec babelhub-inventario-postgres-1 /opt/babelhub/respaldar.sh >> /var/log/babelhub-respaldo.log 2>&1
