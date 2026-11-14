@@ -68,7 +68,8 @@ public sealed class CopiasDeAdaptadoresTests
         "Application/Auditoria/AccionesAuditables.AlertasYDepuracion.cs",
         "Application/Auditoria/Interno/CatalogoDeAccionesDeAuditoria.AlertasYDepuracion.cs",
         "Application/Auditoria/Interno/DepurarAuditoria.cs",
-        "Application/Auditoria/IntegracionesDeAuditoria.cs");
+        "Application/Auditoria/IntegracionesDeAuditoria.cs",
+        "Infrastructure/Auditoria/DefinicionDeAuditoria.cs");
 
     [Theory]
     [MemberData(nameof(Archivos))]
