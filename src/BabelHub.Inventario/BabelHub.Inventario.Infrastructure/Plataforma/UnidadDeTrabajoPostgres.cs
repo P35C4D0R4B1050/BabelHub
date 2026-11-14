@@ -1,3 +1,4 @@
+using System.Data;
 using System.Data.Common;
 using BabelHub.Inventario.Application.Plataforma;
 using Npgsql;
@@ -18,8 +19,8 @@ public sealed record OpcionesDeUnidadDeTrabajo
 /// dure el bloque, así una operación entre módulos es una sola transacción sin ampliar el permiso de ninguno.
 /// La conexión pertenece al flujo asíncrono que abrió la transacción: no debe usarse desde tareas paralelas.
 /// </summary>
-public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeUnidadDeTrabajo? opciones = null)
-    : IUnidadDeTrabajo, IConexionDeLaUnidadDeTrabajo
+public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeUnidadDeTrabajo? opciones = null, IActorActual? actor = null)
+    : IUnidadDeTrabajo, IConexionDeLaUnidadDeTrabajo, ILecturaCoherente, IElevacionDeAlcance
 {
     private const string TransaccionAbortada = "25P02";
 
@@ -32,7 +33,14 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
 
     public DbTransaction Transaccion => (_activa.Value ?? throw SinTransaccion()).Transaccion;
 
-    public async Task<T> Ejecutar<T>(Func<CancellationToken, Task<T>> trabajo, CancellationToken cancelacion = default)
+    public Task<T> Ejecutar<T>(Func<CancellationToken, Task<T>> trabajo, CancellationToken cancelacion = default) =>
+        EjecutarEn(IsolationLevel.ReadCommitted, soloLectura: false, trabajo, cancelacion);
+
+    /// <summary>Una transacción de solo lectura con <c>REPEATABLE READ</c>: todo lo que se lee dentro ve la misma instantánea (D06). Si ya hay una transacción, se une a ella.</summary>
+    public Task<T> EjecutarLectura<T>(Func<CancellationToken, Task<T>> lectura, CancellationToken cancelacion = default) =>
+        EjecutarEn(IsolationLevel.RepeatableRead, soloLectura: true, lectura, cancelacion);
+
+    private async Task<T> EjecutarEn<T>(IsolationLevel aislamiento, bool soloLectura, Func<CancellationToken, Task<T>> trabajo, CancellationToken cancelacion)
     {
         ArgumentNullException.ThrowIfNull(trabajo);
 
@@ -43,10 +51,19 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
         }
 
         await using var conexion = await origen.OpenConnectionAsync(cancelacion).ConfigureAwait(false);
-        await using var transaccion = await conexion.BeginTransactionAsync(cancelacion).ConfigureAwait(false);
-        _activa.Value = new Activa(conexion, transaccion);
+        await using var transaccion = await conexion.BeginTransactionAsync(aislamiento, cancelacion).ConfigureAwait(false);
+        var activa = new Activa(conexion, transaccion);
+        _activa.Value = activa;
         try
         {
+            if (soloLectura)
+            {
+                await EjecutarSql(activa, "SET TRANSACTION READ ONLY", cancelacion).ConfigureAwait(false);
+            }
+
+            // Sin puerto del actor, o con el puerto pero sin actor establecido, no se fija valor y las políticas de filas deniegan (falla cerrada, SEG-15).
+            await FijarAlcance(activa, AlcanceDeDatosDelActor.Para(actor?.Actual), cancelacion).ConfigureAwait(false);
+
             var resultado = await trabajo(cancelacion).ConfigureAwait(false);
             await transaccion.CommitAsync(cancelacion).ConfigureAwait(false);
             return resultado;
@@ -79,6 +96,53 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
         {
             await RestaurarRol(activa, previo).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Implementación explícita: solo se llama por la interfaz interna <see cref="IElevacionDeAlcance"/>, de modo que la prueba de arquitectura
+    /// ve quién la usa. Con <c>red</c> las políticas de filas ven todas las filas mientras dure el bloque, y al salir vuelve el valor del actor.
+    /// </summary>
+    async Task<T> IElevacionDeAlcance.ConAlcanceDeRed<T>(Func<CancellationToken, Task<T>> bloque, CancellationToken cancelacion)
+    {
+        ArgumentNullException.ThrowIfNull(bloque);
+
+        var activa = _activa.Value ?? throw new InvalidOperationException("ConAlcanceDeRed exige una transacción activa.");
+        var previo = await Escalar(activa, $"SELECT current_setting('{AlcanceDeDatosDelActor.Parametro}', true)", cancelacion).ConfigureAwait(false) as string;
+
+        await FijarAlcance(activa, AlcanceDeDatosDelActor.Red, cancelacion).ConfigureAwait(false);
+        try
+        {
+            return await bloque(cancelacion).ConfigureAwait(false);
+        }
+        finally
+        {
+            try
+            {
+                // Si el actor no tenía valor, queda vacío (no coincide con ninguna sucursal ni con «red»): las políticas deniegan.
+                await FijarAlcance(activa, string.IsNullOrEmpty(previo) ? string.Empty : previo, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (PostgresException ex) when (ex.SqlState == TransaccionAbortada)
+            {
+                // La transacción ya falló: el valor vuelve solo al revertirla, y no se enmascara el error original del bloque.
+            }
+        }
+    }
+
+    /// <summary>
+    /// Fija el alcance de datos solo para esta transacción (<c>set_config(…, true)</c>, parametrizado): no se escapa a otra conexión del pool.
+    /// Un valor nulo no lo fija, y las políticas de filas deniegan.
+    /// </summary>
+    private static async Task FijarAlcance(Activa activa, string? valor, CancellationToken cancelacion)
+    {
+        if (valor is null)
+        {
+            return;
+        }
+
+        await using var comando = new NpgsqlCommand("SELECT set_config(@nombre, @valor, true)", activa.Conexion, activa.Transaccion);
+        comando.Parameters.AddWithValue("nombre", AlcanceDeDatosDelActor.Parametro);
+        comando.Parameters.AddWithValue("valor", valor);
+        await comando.ExecuteNonQueryAsync(cancelacion).ConfigureAwait(false);
     }
 
     private static InvalidOperationException SinTransaccion() => new("No hay una unidad de trabajo activa.");
