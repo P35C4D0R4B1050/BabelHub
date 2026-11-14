@@ -19,8 +19,8 @@ public sealed record OpcionesDeUnidadDeTrabajo
 /// dure el bloque, así una operación entre módulos es una sola transacción sin ampliar el permiso de ninguno.
 /// La conexión pertenece al flujo asíncrono que abrió la transacción: no debe usarse desde tareas paralelas.
 /// </summary>
-public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeUnidadDeTrabajo? opciones = null)
-    : IUnidadDeTrabajo, IConexionDeLaUnidadDeTrabajo, ILecturaCoherente
+public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeUnidadDeTrabajo? opciones = null, IActorActual? actor = null)
+    : IUnidadDeTrabajo, IConexionDeLaUnidadDeTrabajo, ILecturaCoherente, IElevacionDeAlcance
 {
     private const string TransaccionAbortada = "25P02";
 
@@ -61,6 +61,9 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
                 await EjecutarSql(activa, "SET TRANSACTION READ ONLY", cancelacion).ConfigureAwait(false);
             }
 
+            // Sin puerto del actor (una unidad que no sirve a casos de uso) no hay valor y las políticas de filas deniegan; con el puerto y sin actor, es la credencial de servicio.
+            await FijarAlcance(activa, actor is null ? null : AlcanceDeDatosDelActor.Para(actor.Actual), cancelacion).ConfigureAwait(false);
+
             var resultado = await trabajo(cancelacion).ConfigureAwait(false);
             await transaccion.CommitAsync(cancelacion).ConfigureAwait(false);
             return resultado;
@@ -93,6 +96,53 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
         {
             await RestaurarRol(activa, previo).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Implementación explícita: solo se llama por la interfaz interna <see cref="IElevacionDeAlcance"/>, de modo que la prueba de arquitectura
+    /// ve quién la usa. Con <c>red</c> las políticas de filas ven todas las filas mientras dure el bloque, y al salir vuelve el valor del actor.
+    /// </summary>
+    async Task<T> IElevacionDeAlcance.ConAlcanceDeRed<T>(Func<CancellationToken, Task<T>> bloque, CancellationToken cancelacion)
+    {
+        ArgumentNullException.ThrowIfNull(bloque);
+
+        var activa = _activa.Value ?? throw new InvalidOperationException("ConAlcanceDeRed exige una transacción activa.");
+        var previo = await Escalar(activa, $"SELECT current_setting('{AlcanceDeDatosDelActor.Parametro}', true)", cancelacion).ConfigureAwait(false) as string;
+
+        await FijarAlcance(activa, AlcanceDeDatosDelActor.Red, cancelacion).ConfigureAwait(false);
+        try
+        {
+            return await bloque(cancelacion).ConfigureAwait(false);
+        }
+        finally
+        {
+            try
+            {
+                // Si el actor no tenía valor, queda vacío (no coincide con ninguna sucursal ni con «red»): las políticas deniegan.
+                await FijarAlcance(activa, string.IsNullOrEmpty(previo) ? string.Empty : previo, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (PostgresException ex) when (ex.SqlState == TransaccionAbortada)
+            {
+                // La transacción ya falló: el valor vuelve solo al revertirla, y no se enmascara el error original del bloque.
+            }
+        }
+    }
+
+    /// <summary>
+    /// Fija el alcance de datos solo para esta transacción (<c>set_config(…, true)</c>, parametrizado): no se escapa a otra conexión del pool.
+    /// Un valor nulo no lo fija, y las políticas de filas deniegan.
+    /// </summary>
+    private static async Task FijarAlcance(Activa activa, string? valor, CancellationToken cancelacion)
+    {
+        if (valor is null)
+        {
+            return;
+        }
+
+        await using var comando = new NpgsqlCommand("SELECT set_config(@nombre, @valor, true)", activa.Conexion, activa.Transaccion);
+        comando.Parameters.AddWithValue("nombre", AlcanceDeDatosDelActor.Parametro);
+        comando.Parameters.AddWithValue("valor", valor);
+        await comando.ExecuteNonQueryAsync(cancelacion).ConfigureAwait(false);
     }
 
     private static InvalidOperationException SinTransaccion() => new("No hay una unidad de trabajo activa.");
