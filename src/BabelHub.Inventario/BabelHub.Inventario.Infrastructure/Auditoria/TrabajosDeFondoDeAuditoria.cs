@@ -41,7 +41,8 @@ public sealed class TrabajoDeFondoDeAuditoria(
         {
             _fallosSeguidos++;
             await Registrar(ResultadoDeTrabajo.Fallo, cancelacion).ConfigureAwait(false);
-            if (_fallosSeguidos == opciones.FallosSeguidosParaAlertar)
+            // Al llegar al umbral y después cada otro tanto (un trabajo que sigue caído vuelve a avisar; la agrupación de 15 minutos y el tope diario del correo evitan el ruido).
+            if (_fallosSeguidos >= opciones.FallosSeguidosParaAlertar && (_fallosSeguidos - opciones.FallosSeguidosParaAlertar) % opciones.FallosSeguidosParaAlertar == 0)
             {
                 await Alertar(cancelacion).ConfigureAwait(false);
             }

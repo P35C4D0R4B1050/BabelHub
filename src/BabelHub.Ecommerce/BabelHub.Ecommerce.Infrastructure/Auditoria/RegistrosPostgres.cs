@@ -232,7 +232,7 @@ public sealed class LimitadorDeEscrituras(int concurrenciaMaxima = 16, int fallo
             Interlocked.Exchange(ref _fallosSeguidos, 0);
             return resultado;
         }
-        catch (Exception)
+        catch (Exception falla) when (falla is not OperationCanceledException)
         {
             if (Interlocked.Increment(ref _fallosSeguidos) >= fallosParaAbrir)
             {

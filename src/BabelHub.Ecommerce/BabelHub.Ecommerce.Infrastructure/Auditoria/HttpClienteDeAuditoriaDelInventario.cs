@@ -213,17 +213,24 @@ public sealed class HttpClienteDeAuditoriaDelInventario(IHttpClientFactory fabri
         return [.. dtos.Select(AAlerta)];
     }
 
+    /// <summary>Un valor del contrato: solo el nombre de un miembro definido (ni un número ni un texto con otra forma).</summary>
+    private static T Analizar<T>(string texto)
+        where T : struct, Enum =>
+        texto.Length is > 0 and <= 32 && !char.IsDigit(texto[0]) && Enum.TryParse<T>(texto, ignoreCase: true, out var valor) && Enum.IsDefined(valor)
+            ? valor
+            : throw new JsonException("El valor no es un miembro del contrato.");
+
     private static RegistroAuditado ARegistro(RegistroHttp d) =>
         new(
             d.Id,
-            Enum.Parse<ServicioAuditado>(d.Servicio ?? string.Empty, ignoreCase: true),
-            Enum.Parse<TipoDeRegistroAuditado>(d.Tipo ?? string.Empty, ignoreCase: true),
-            Enum.Parse<TipoDeActor>(d.ActorTipo ?? string.Empty, ignoreCase: true),
+            Analizar<ServicioAuditado>(d.Servicio ?? string.Empty),
+            Analizar<TipoDeRegistroAuditado>(d.Tipo ?? string.Empty),
+            Analizar<TipoDeActor>(d.ActorTipo ?? string.Empty),
             d.ActorId,
             d.Rol,
             d.InstanteUtc,
             d.Accion ?? string.Empty,
-            Enum.Parse<ResultadoAuditado>(d.Resultado ?? string.Empty, ignoreCase: true))
+            Analizar<ResultadoAuditado>(d.Resultado ?? string.Empty))
         {
             ObjetoTipo = d.ObjetoTipo,
             ObjetoId = d.ObjetoId,
@@ -241,12 +248,12 @@ public sealed class HttpClienteDeAuditoriaDelInventario(IHttpClientFactory fabri
 
     private static AlertaConsultada AAlerta(AlertaHttp d)
     {
-        var servicio = Enum.Parse<ServicioAuditado>(d.Servicio ?? string.Empty, ignoreCase: true);
+        var servicio = Analizar<ServicioAuditado>(d.Servicio ?? string.Empty);
         return new AlertaConsultada(
             d.Id ?? string.Empty,
             servicio,
             new CodigoDeAlerta(d.Motivo ?? string.Empty),
-            Enum.Parse<ClaseDeAlertaConsultada>(d.Clase ?? string.Empty, ignoreCase: true),
+            Analizar<ClaseDeAlertaConsultada>(d.Clase ?? string.Empty),
             d.PrimeraOcurrencia,
             d.UltimaOcurrencia,
             d.Ocurrencias,

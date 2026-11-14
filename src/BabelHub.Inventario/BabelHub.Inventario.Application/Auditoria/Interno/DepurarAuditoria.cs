@@ -26,8 +26,8 @@ public interface IFuenteDeIdentificadoresPorAnonimizar
 }
 
 /// <summary>
-/// <c>auditoria.por_anonimizar</c> (T24 y T25): la aplicación solo <b>inserta</b> identificadores opacos (con validación de tipo y formato en la base y cada inserción auditada
-/// por el trabajo); la función de depuración los lee. Repetir un identificador no hace nada (<c>ON CONFLICT DO NOTHING</c>). Devuelve cuántos eran nuevos.
+/// <c>auditoria.por_anonimizar</c> (T24 y T25): la aplicación solo <b>inserta</b> identificadores opacos (con validación de tipo y formato en la base; el número de identificadores nuevos de cada corrida queda en el registro de su ejecución,
+/// AM34); la función de depuración los lee. Repetir un identificador no hace nada (<c>ON CONFLICT DO NOTHING</c>). Devuelve cuántos eran nuevos.
 /// </summary>
 public interface IAlmacenDePorAnonimizar
 {
@@ -164,19 +164,17 @@ public sealed class DepurarAuditoria(
                     anonimizadosEnEstaCorrida += await adicional.Depurar(cancelacion).ConfigureAwait(false);
                 }
 
-                // 3. Registrar la ejecución aunque sea cero (AUD-36), con el actor «sistema» del contexto y solo el número.
+                // 3. Registrar la ejecución aunque sea cero (AUD-36), con el actor «sistema» del contexto, el número anonimizado y los identificadores nuevos (el control de AM34: quien inserte
+                // identificadores en `por_anonimizar` deja rastro). El estado se guarda en la **misma unidad de trabajo**: o se confirman el registro y el estado, o ninguno (el pendiente no se duplica ni se pierde).
                 var total = estado.AnonimizadosSinRegistrar + anonimizadosEnEstaCorrida;
-                await unidad.Ejecutar(async ct => await RegistrarEjecucion(total, ct).ConfigureAwait(false), cancelacion).ConfigureAwait(false);
-
-                // La unidad ya confirmó: que no se pueda anotar el estado no la convierte en fallo ni la repite (otro registro, otra alerta falsa a las 24 horas).
-                try
-                {
-                    await estados.Guardar(new EstadoDeLaDepuracion(ahora, null, 0, null), cancelacion).ConfigureAwait(false);
-                }
-                catch (Exception falla) when (falla is not OperationCanceledException)
-                {
-                    // El próximo estado exitoso lo corrige.
-                }
+                await unidad.Ejecutar(
+                    async ct =>
+                    {
+                        await RegistrarEjecucion(total, nuevos, ct).ConfigureAwait(false);
+                        await estados.Guardar(new EstadoDeLaDepuracion(ahora, null, 0, null), ct).ConfigureAwait(false);
+                        return true;
+                    },
+                    cancelacion).ConfigureAwait(false);
 
                 return new ResultadoDeDepuracion(EstadoDeLaCorridaDeDepuracion.Ejecutada, total, nuevos, false);
             }
@@ -205,15 +203,18 @@ public sealed class DepurarAuditoria(
         return nuevos;
     }
 
-    private async Task<bool> RegistrarEjecucion(int anonimizados, CancellationToken cancelacion)
+    private async Task RegistrarEjecucion(int anonimizados, int nuevos, CancellationToken cancelacion)
     {
         await auditoria.Registrar(
             new SolicitudDeRegistro(AccionesAuditables.DepuracionDiariaEjecutada)
             {
-                Detalle = new Dictionary<string, string?> { ["registrosAnonimizados"] = anonimizados.ToString(System.Globalization.CultureInfo.InvariantCulture) },
+                Detalle = new Dictionary<string, string?>
+                {
+                    ["registrosAnonimizados"] = anonimizados.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ["identificadoresNuevos"] = nuevos.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                },
             },
             cancelacion).ConfigureAwait(false);
-        return true;
     }
 
     private async Task<ResultadoDeDepuracion> RegistrarFallo(EstadoDeLaDepuracion previo, DateTimeOffset ahora, CancellationToken cancelacion)

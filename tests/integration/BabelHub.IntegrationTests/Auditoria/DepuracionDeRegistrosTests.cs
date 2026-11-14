@@ -280,6 +280,32 @@ public sealed class DepuracionDeRegistrosTests(PostgresDeAuditoriaFixture bd) : 
         Assert.NotNull(await PostgresDeAuditoriaFixture.IntentarComo(bd.Administracion, "auditoria_depuracion_dueno", $"UPDATE auditoria.registros SET resultado = 'fallido' WHERE id = '{id}'"));
         Assert.NotNull(await PostgresDeAuditoriaFixture.IntentarComo(bd.Administracion, "auditoria_depuracion_dueno", $"DELETE FROM auditoria.registros WHERE id = '{id}'"));
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-09")]
+    public async Task ElGuardianSoloDejaRetirarDatos_NuncaCambiarlosPorOtroValorNiInventarUnActor()
+    {
+        var actor = Guid.NewGuid();
+        var id = await Sembrar("auditoria", "rol_auditoria", "1 hour", actor: actor, objetoId: Guid.NewGuid().ToString("D"), objetoTipo: "cliente", detalle: "{\"titular\":\"valor\",\"otra\":\"x\"}", clavesPersonales: "{titular}");
+
+        foreach (var intento in new[]
+        {
+            $"UPDATE auditoria.registros SET actor_id = '{Guid.NewGuid()}' WHERE id = '{id}'",
+            $"UPDATE auditoria.registros SET rol = 'cliente' WHERE id = '{id}'",
+            $"UPDATE auditoria.registros SET origen = 'v1:inventado1' WHERE id = '{id}'",
+            $"UPDATE auditoria.registros SET objeto_id = 'otro-objeto' WHERE id = '{id}'",
+            $"UPDATE auditoria.registros SET detalle = '{{\"titular\":\"otro-valor\",\"otra\":\"x\"}}'::jsonb WHERE id = '{id}'",
+            $"UPDATE auditoria.registros SET detalle = '{{\"titular\":\"[anonimizado]\"}}'::jsonb WHERE id = '{id}'",
+        })
+        {
+            var error = await PostgresDeAuditoriaFixture.IntentarComo(bd.Administracion, "auditoria_depuracion_dueno", intento);
+            Assert.True(error is not null, intento);
+        }
+
+        // Retirar sí se puede: NULL y la constante en la misma clave.
+        Assert.Null(await PostgresDeAuditoriaFixture.IntentarComo(bd.Administracion, "auditoria_depuracion_dueno", $"UPDATE auditoria.registros SET actor_id = NULL, objeto_id = NULL, origen = NULL, detalle = '{{\"titular\":\"[anonimizado]\",\"otra\":\"x\"}}'::jsonb, anonimizado_en = now() WHERE id = '{id}'"));
+        Assert.NotNull(await PostgresDeAuditoriaFixture.IntentarComo(bd.Administracion, "auditoria_depuracion_dueno", $"UPDATE auditoria.registros SET anonimizado_en = now() + interval '1 day' WHERE id = '{id}'"));
+    }
 }
 
 internal static class PoliticaDeAnonimizacionDeLaBase

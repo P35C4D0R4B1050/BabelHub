@@ -45,6 +45,12 @@ public sealed class PostgresAcumuladorDeLimites(NpgsqlDataSource origen, Limitad
                         await bloqueo.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                     }
 
+                    // Con el bloqueo tomado se vuelve a mirar: un cierre que confirmó mientras se esperaba no debe dejar una fila abierta con dirección en una ventana cerrada.
+                    if (await Cerrada(c, t, inicio, ct).ConfigureAwait(false))
+                    {
+                        return ResultadoDeRegistroDeRechazo.VentanaCerrada;
+                    }
+
                     if (await Sumar(c, t, huella, limite, inicio, direccion, ct).ConfigureAwait(false))
                     {
                         return ResultadoDeRegistroDeRechazo.Acumulado;
@@ -97,7 +103,7 @@ public sealed class PostgresAcumuladorDeLimites(NpgsqlDataSource origen, Limitad
             """
             INSERT INTO auditoria.acumulado_de_limites (huella, limite, ventana_inicio, rechazos, direccion_completa)
             VALUES (@huella, @limite, @inicio, 1, @direccion)
-            ON CONFLICT (huella, limite, ventana_inicio) DO UPDATE SET rechazos = LEAST(auditoria.acumulado_de_limites.rechazos + 1, 2147483646)
+            ON CONFLICT (huella, limite, ventana_inicio) DO UPDATE SET rechazos = LEAST(auditoria.acumulado_de_limites.rechazos + 1, 2147483646) WHERE auditoria.acumulado_de_limites.cerrada_en IS NULL
             """,
             c,
             t);
@@ -311,15 +317,34 @@ public sealed class PostgresAlmacenDePorAnonimizar(IUnidadDeTrabajo unidad, ICon
 
 /// <summary>
 /// <see cref="IAnonimizadorDeRegistros"/>: ejecuta <c>auditoria.anonimizar_registros()</c> con <b>otra fuente de datos</b>, la del rol de depuración (la aplicación no es miembro de ese rol, T23), en su
-/// propia conexión y transacción. La función no recibe parámetros: la aplicación no puede pedir anonimizar a nadie en particular.
+/// propia conexión y transacción, <b>un lote por llamada</b> (cada lote confirma) hasta que devuelva menos del tamaño del lote. La función no recibe parámetros: la aplicación no puede pedir anonimizar a nadie en particular.
 /// </summary>
 public sealed class PostgresAnonimizadorDeRegistros(NpgsqlDataSource depuracion) : IAnonimizadorDeRegistros
 {
+    /// <summary>El tamaño del lote de la función: mientras devuelva esto hay más; cada llamada confirma su lote (una corrida grande no depende de una sola transacción larga).</summary>
+    public const int TamanoDelLote = 5000;
+
+    /// <summary>Un tope de lotes por corrida: la siguiente continúa (un respaldo restaurado con muchos millones de filas no ocupa la base para siempre).</summary>
+    public const int MaximoDeLotesPorCorrida = 2000;
+
+    public static readonly TimeSpan EsperaPorLote = TimeSpan.FromMinutes(2);
+
     public async Task<int> Anonimizar(CancellationToken cancelacion = default)
     {
-        await using var conexion = await depuracion.OpenConnectionAsync(cancelacion).ConfigureAwait(false);
-        await using var comando = new NpgsqlCommand("SELECT auditoria.anonimizar_registros()", conexion);
-        return (int)(await comando.ExecuteScalarAsync(cancelacion).ConfigureAwait(false))!;
+        var total = 0;
+        for (var lotes = 0; lotes < MaximoDeLotesPorCorrida; lotes++)
+        {
+            await using var conexion = await depuracion.OpenConnectionAsync(cancelacion).ConfigureAwait(false);
+            await using var comando = new NpgsqlCommand("SELECT auditoria.anonimizar_registros()", conexion) { CommandTimeout = (int)EsperaPorLote.TotalSeconds };
+            var lote = (int)(await comando.ExecuteScalarAsync(cancelacion).ConfigureAwait(false))!;
+            total += lote;
+            if (lote < TamanoDelLote)
+            {
+                break;
+            }
+        }
+
+        return total;
     }
 }
 

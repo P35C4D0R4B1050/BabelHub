@@ -43,7 +43,8 @@ public sealed class PostgresDeAuditoriaFixture : IAsyncLifetime
         // Identidad: los mismos roles, disparadores y función sobre su propio esquema y su propia por_anonimizar (plan de Identidad T30).
         await Ejecutar("DO $r$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rol_identidad') THEN CREATE ROLE rol_identidad NOLOGIN; END IF; END $r$;");
         await Ejecutar(
-            DefinicionDeAuditoria.RegistrosInmutables("identidad")
+            "CREATE SCHEMA IF NOT EXISTS identidad; ALTER SCHEMA identidad OWNER TO auditoria_migraciones; "
+            + DefinicionDeAuditoria.RegistrosInmutables("identidad")
             + DefinicionDeAuditoria.PorAnonimizar("identidad")
             + DefinicionDeAuditoria.PermisosDeLaDepuracion("identidad")
             + "GRANT USAGE ON SCHEMA identidad TO rol_identidad;\nGRANT SELECT, INSERT ON identidad.registros TO rol_identidad;\nGRANT SELECT, INSERT ON identidad.por_anonimizar TO rol_identidad;\n"

@@ -167,7 +167,7 @@ public static class DefinicionDeAuditoria
         var sb = new StringBuilder();
         sb.AppendLine(CultureInfo.InvariantCulture, $$"""
             CREATE SCHEMA IF NOT EXISTS {{esquema}};
-            ALTER SCHEMA {{esquema}} OWNER TO auditoria_migraciones;
+            
             CREATE TABLE IF NOT EXISTS {{esquema}}.registros (
                 id uuid PRIMARY KEY,
                 secuencia bigint GENERATED ALWAYS AS IDENTITY,
@@ -199,6 +199,7 @@ public static class DefinicionDeAuditoria
             CREATE INDEX IF NOT EXISTS registros_por_actor ON {{esquema}}.registros (actor_id) WHERE actor_id IS NOT NULL;
             CREATE INDEX IF NOT EXISTS registros_por_objeto ON {{esquema}}.registros (objeto_id) WHERE objeto_id IS NOT NULL;
             CREATE INDEX IF NOT EXISTS registros_por_sucursal ON {{esquema}}.registros (sucursal_origen, instante_utc DESC) WHERE sucursal_origen IS NOT NULL;
+            CREATE INDEX IF NOT EXISTS registros_por_sucursal_destino ON {{esquema}}.registros (sucursal_destino, instante_utc DESC) WHERE sucursal_destino IS NOT NULL;
             CREATE INDEX IF NOT EXISTS registros_de_umbral ON {{esquema}}.registros (accion, instante_utc) WHERE accion IN ('AccesoDenegado', 'IngresoFallido');
             CREATE INDEX IF NOT EXISTS registros_por_texto ON {{esquema}}.registros USING gin ((detalle::text) gin_trgm_ops);
             ALTER TABLE {{esquema}}.registros OWNER TO auditoria_migraciones;
@@ -215,7 +216,19 @@ public static class DefinicionDeAuditoria
                        AND NEW.resultado = OLD.resultado AND NEW.motivo IS NOT DISTINCT FROM OLD.motivo AND NEW.ruta IS NOT DISTINCT FROM OLD.ruta
                        AND NEW.objeto_tipo IS NOT DISTINCT FROM OLD.objeto_tipo AND NEW.sucursal_origen IS NOT DISTINCT FROM OLD.sucursal_origen
                        AND NEW.sucursal_destino IS NOT DISTINCT FROM OLD.sucursal_destino AND NEW.truncado = OLD.truncado
-                       AND NEW.correlacion IS NOT DISTINCT FROM OLD.correlacion THEN
+                       AND NEW.correlacion IS NOT DISTINCT FROM OLD.correlacion
+                       -- Solo puede retirar datos personales: nunca cambiarlos por otro valor ni inventar un actor, un objeto o un origen.
+                       AND (NEW.actor_id IS NULL OR NEW.actor_id IS NOT DISTINCT FROM OLD.actor_id)
+                       AND (NEW.rol IS NULL OR NEW.rol IS NOT DISTINCT FROM OLD.rol)
+                       AND (NEW.objeto_id IS NULL OR NEW.objeto_id IS NOT DISTINCT FROM OLD.objeto_id)
+                       AND (NEW.origen IS NULL OR NEW.origen IS NOT DISTINCT FROM OLD.origen)
+                       AND (OLD.anonimizado_en IS NULL OR NEW.anonimizado_en IS NOT DISTINCT FROM OLD.anonimizado_en)
+                       AND NEW.claves_personales = OLD.claves_personales
+                       AND (SELECT pg_catalog.count(*) FROM pg_catalog.jsonb_object_keys(NEW.detalle)) = (SELECT pg_catalog.count(*) FROM pg_catalog.jsonb_object_keys(OLD.detalle))
+                       AND NOT EXISTS (
+                           SELECT 1 FROM pg_catalog.jsonb_each(OLD.detalle) AS o
+                           WHERE NOT (NEW.detalle ? o.key)
+                              OR ((NEW.detalle -> o.key) <> o.value AND (NEW.detalle -> o.key) <> pg_catalog.to_jsonb('[anonimizado]'::text))) THEN
                         RETURN NEW;
                     END IF;
                 END IF;
@@ -283,10 +296,8 @@ public static class DefinicionDeAuditoria
         SET search_path = pg_catalog
         AS $depurar$
         DECLARE
-            total integer := 0;
-            lote integer;
+            lote integer := 0;
         BEGIN
-            LOOP
                 WITH canceladas AS (
                     SELECT replace(p.identificador_opaco::text, '-', '') AS norm
                     FROM {{esquemaDePorAnonimizar}}.por_anonimizar p
@@ -296,7 +307,7 @@ public static class DefinicionDeAuditoria
                     SELECT r.secuencia,
                            (r.instante_utc < pg_catalog.now() - interval '2 years') AS vencido,
                            (r.actor_id IS NOT NULL AND replace(r.actor_id::text, '-', '') IN (SELECT norm FROM canceladas)) AS actor_cancelado,
-                           (r.objeto_id IS NOT NULL AND replace(pg_catalog.lower(r.objeto_id), '-', '') IN (SELECT norm FROM canceladas)) AS objeto_cancelado,
+                           (r.objeto_id IS NOT NULL AND pg_catalog.translate(pg_catalog.lower(r.objeto_id), '-{}() ', '') IN (SELECT norm FROM canceladas)) AS objeto_cancelado,
                            COALESCE(po.objeto_personal, false) AS objeto_personal,
                            COALESCE(po.rol_personal, false) AS rol_personal
                     FROM {{esquema}}.registros r
@@ -314,7 +325,7 @@ public static class DefinicionDeAuditoria
                                  AND (r.detalle ->> k) IS NOT NULL
                                  AND (r.detalle ->> k) <> '[anonimizado]'
                                  AND pg_catalog.length(r.detalle ->> k) > 0
-                                 AND (c.vencido OR replace(pg_catalog.lower(r.detalle ->> k), '-', '') IN (SELECT norm FROM canceladas))
+                                 AND (c.vencido OR pg_catalog.translate(pg_catalog.lower(r.detalle ->> k), '-{}() ', '') IN (SELECT norm FROM canceladas))
                            ) AS claves
                     FROM candidatos c
                     JOIN {{esquema}}.registros r ON r.secuencia = c.secuencia
@@ -339,13 +350,13 @@ public static class DefinicionDeAuditoria
                 WHERE r.secuencia = l.secuencia;
 
                 GET DIAGNOSTICS lote = ROW_COUNT;
-                total := total + lote;
-                EXIT WHEN lote = 0;
-            END LOOP;
 
+            -- Un solo lote por llamada (cada lote confirma): el llamador repite mientras devuelva el tamaño del lote. Solo el último lote cierra lo de `por_anonimizar`.
+            IF lote < 5000 THEN
             UPDATE {{esquemaDePorAnonimizar}}.por_anonimizar SET procesado_en = pg_catalog.now() WHERE procesado_en IS NULL;
             DELETE FROM {{esquemaDePorAnonimizar}}.por_anonimizar WHERE procesado_en < pg_catalog.now() - interval '30 days';
-            RETURN total;
+            END IF;
+            RETURN lote;
         END
         $depurar$;
         ALTER FUNCTION {{esquema}}.anonimizar_registros() OWNER TO auditoria_depuracion_dueno;

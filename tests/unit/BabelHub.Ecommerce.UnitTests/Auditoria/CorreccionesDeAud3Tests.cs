@@ -184,7 +184,7 @@ public sealed class CorreccionesDeAud3Tests
 
     [Fact]
     [Trait("Criterio", "AC-AUD-36")]
-    public async Task SiLaUnidadConfirmoYNoSePuedeAnotarElEstado_LaCorridaSigueSiendoExitosaYNoSeRepiteElRegistro()
+    public async Task SiNoSePuedeGuardarElEstadoJuntoConElRegistro_LaCorridaFalla_PorqueLaUnidadLosConfirmaOLosRevierteJuntos()
     {
         var reloj = new RelojFijo(Ahora);
         var auditoria = new AuditoriaEspia();
@@ -194,8 +194,8 @@ public sealed class CorreccionesDeAud3Tests
 
         var resultado = await depurar.Ejecutar();
 
-        Assert.Equal(EstadoDeLaCorridaDeDepuracion.Ejecutada, resultado.Estado);
-        Assert.Single(auditoria.Solicitudes);
+        Assert.Equal(EstadoDeLaCorridaDeDepuracion.Fallida, resultado.Estado);
+        Assert.Equal(0, resultado.RegistrosAnonimizados);
     }
 }
 
