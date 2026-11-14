@@ -15,5 +15,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\BabelHub.Ecommerce\BabelHub.Ecommerce.Domain\BabelHub.Ecommerce.Domain.csproj" />
     <ProjectReference Include="..\..\..\src\BabelHub.Ecommerce\BabelHub.Ecommerce.Application\BabelHub.Ecommerce.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\BabelHub.Shared\BabelHub.Shared.csproj" />
   </ItemGroup>
 </Project>
