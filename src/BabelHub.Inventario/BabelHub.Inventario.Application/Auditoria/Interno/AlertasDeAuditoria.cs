@@ -1,0 +1,103 @@
+using BabelHub.Inventario.Application.Plataforma;
+using BabelHub.Inventario.Domain.Auditoria;
+using AlertaAgrupada = BabelHub.Inventario.Domain.Auditoria.AlertaDeSeguridad;
+
+namespace BabelHub.Inventario.Application.Auditoria.Interno;
+
+/// <summary>
+/// Los motivos del catálogo cerrado de alertas (D06): un motivo que no está aquí no se guarda con su código (un texto libre de una excepción filtraría
+/// datos). Cada motivo declara su clase y si se puede enviar por correo: la alerta originada por el propio correo no se envía por correo (AUD-29).
+/// </summary>
+public static class MotivosDeAlerta
+{
+    /// <summary>Alerta de seguridad: más de 10 accesos denegados en 5 minutos (SEG-09).</summary>
+    public const string AccesosDenegados = "accesos-denegados";
+
+    /// <summary>Alerta de seguridad: más de 20 ingresos fallidos en 5 minutos (SEG-09).</summary>
+    public const string IngresosFallidos = "ingresos-fallidos";
+
+    public const string AuditoriaNoDisponible = MotivosDeAlertaDeAuditoria.AuditoriaNoDisponible;
+    public const string CredencialDeServicioAnteriorEnUso = "credencial-de-servicio-anterior-en-uso";
+    public const string DependenciaNoNecesariaFallida = "dependencia-no-necesaria-fallida";
+    public const string TrabajoDeFondoDetenido = "trabajo-de-fondo-detenido";
+    public const string MemoriaDeContadoresAlta = "memoria-de-contadores-alta";
+    public const string VerificadorDeCredencialesSinClaves = "verificador-de-credenciales-sin-claves";
+    public const string RevocacionDeSesionesPendiente = "revocacion-de-sesiones-pendiente";
+
+    /// <summary>No se pudo guardar un rechazo en el acumulado de límites (la protección sigue, AUD-28).</summary>
+    public const string AcumuladoDeLimitesNoDisponible = "acumulado-de-limites-no-disponible";
+
+    /// <summary>Identidad no respondió el conteo de ingresos fallidos: el límite sigue protegiendo con el conteo local (T10).</summary>
+    public const string ConteoDeIngresosNoDisponible = "conteo-de-ingresos-no-disponible";
+
+    /// <summary>Un motivo que ningún catálogo conoce: se conserva la alerta con este código en vez de perderla (el código original no se guarda).</summary>
+    public const string MotivoNoCatalogado = "motivo-de-alerta-no-catalogado";
+
+    /// <summary>El correo de las alertas falló: <b>no se envía por correo</b> (bucle) y se reintenta (AUD-40).</summary>
+    public const string CorreoDeAlertasNoDisponible = "correo-de-alertas-no-disponible";
+
+    /// <summary>Pasaron 24 horas sin una depuración diaria exitosa (AUD-31).</summary>
+    public const string DepuracionDiariaSinExito = "depuracion-diaria-sin-exito";
+
+    /// <summary>Pasaron 24 horas sin entregar la baja de un titular al Inventario (AUD-32, IDE-64).</summary>
+    public const string BajaDeTitularSinEntregar = "baja-de-titular-sin-entregar";
+
+    /// <summary>Un traslado vinculado sigue sin aprobar a las 48 horas (TRA-22).</summary>
+    public const string TrasladoVinculadoSinAprobar = "traslado-vinculado-sin-aprobar";
+
+    /// <summary>Las alertas del Inventario no se pudieron leer (AUD-38): el E-commerce sigue y lo reintenta.</summary>
+    public const string LecturaDeAlertasDelInventarioNoDisponible = "lectura-de-alertas-del-inventario-no-disponible";
+}
+
+/// <summary>El catálogo cerrado de motivos de alerta de los dos servicios (D06). Otros módulos publican por <see cref="IAlertas"/> con estos códigos.</summary>
+public static class CatalogoDeAlertasDeAuditoria
+{
+    public static CatalogoDeMotivosDeAlerta Crear() => new(
+    [
+        new(MotivosDeAlerta.AccesosDenegados, ClaseDeAlerta.Seguridad),
+        new(MotivosDeAlerta.IngresosFallidos, ClaseDeAlerta.Seguridad),
+        new(MotivosDeAlerta.AuditoriaNoDisponible, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.CredencialDeServicioAnteriorEnUso, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.DependenciaNoNecesariaFallida, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.TrabajoDeFondoDetenido, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.MemoriaDeContadoresAlta, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.VerificadorDeCredencialesSinClaves, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.RevocacionDeSesionesPendiente, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.AcumuladoDeLimitesNoDisponible, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.ConteoDeIngresosNoDisponible, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.MotivoNoCatalogado, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.CorreoDeAlertasNoDisponible, ClaseDeAlerta.Tecnica, enviablePorCorreo: false),
+        new(MotivosDeAlerta.DepuracionDiariaSinExito, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.BajaDeTitularSinEntregar, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.TrasladoVinculadoSinAprobar, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.LecturaDeAlertasDelInventarioNoDisponible, ClaseDeAlerta.Tecnica),
+    ]);
+}
+
+/// <summary>
+/// Almacén de las alertas del servicio (el registro técnico, <c>auditoria.alertas</c>, T22 y T25): la Infraestructura lo implementa. Las operaciones
+/// de escritura corren dentro de la transacción de <see cref="IUnidadDeTrabajo"/>; las alertas no son registros de auditoría y pueden cambiar.
+/// </summary>
+public interface IAlmacenDeAlertas
+{
+    /// <summary>La alerta más reciente del servicio y motivo, con bloqueo asesor por servicio y motivo en la transacción en curso: dos ocurrencias simultáneas no abren dos alertas.</summary>
+    Task<AlertaAgrupada?> UltimaDelMotivoParaActualizar(ServicioDeOrigen servicio, string motivo, CancellationToken cancelacion = default);
+
+    /// <summary>La alerta por su identificador (con bloqueo para actualizar si hay transacción en curso).</summary>
+    Task<AlertaAgrupada?> Obtener(string id, CancellationToken cancelacion = default);
+
+    /// <summary>Inserta la alerta o actualiza la existente (mismo identificador).</summary>
+    Task Guardar(AlertaAgrupada alerta, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Las alertas de seguridad del servicio de la más reciente a la más antigua por <c>(última ocurrencia, identificador)</c>, a partir de la posición
+    /// indicada (excluida) y hasta <paramref name="maximo"/>; las técnicas no tienen pantalla.
+    /// </summary>
+    Task<IReadOnlyList<AlertaAgrupada>> ListarDeSeguridad(PosicionDeAlerta? despuesDe, int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Las alertas (de seguridad y técnicas) con ocurrencia posterior a <paramref name="desde"/> (lectura del Inventario por el E-commerce, AUD-38), hasta <paramref name="maximo"/>.</summary>
+    Task<IReadOnlyList<AlertaAgrupada>> Desde(DateTimeOffset desde, int maximo, CancellationToken cancelacion = default);
+}
+
+/// <summary>La posición de una alerta en el orden de la lista: su última ocurrencia (UTC) y su identificador.</summary>
+public sealed record PosicionDeAlerta(DateTimeOffset UltimaOcurrencia, string Id);

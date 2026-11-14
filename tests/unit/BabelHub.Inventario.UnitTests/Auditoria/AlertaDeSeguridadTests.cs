@@ -390,3 +390,50 @@ public sealed class AlertaDeSeguridadTests
     public void LaFechaDeLaOcurrenciaDebeEstarEnUtc() =>
         Assert.Throws<ArgumentException>(() => Registrar(null, new DateTimeOffset(2026, 11, 14, 10, 0, 0, TimeSpan.FromHours(-5))));
 }
+
+/// <summary>El motivo «no enviable por correo» y la restauración desde lo persistido (T10 y T18: una alerta originada por el propio correo no se envía por correo, AUD-29).</summary>
+public sealed class MotivosDeAlertaEnviablesTests
+{
+    private static readonly DateTimeOffset T0 = new(2026, 11, 14, 15, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-26")]
+    public void UnMotivoEsEnviablePorCorreoSalvoQueSeDeclareLoContrario()
+    {
+        Assert.True(new MotivoDeAlerta("trabajo-de-fondo-detenido", ClaseDeAlerta.Tecnica).EnviablePorCorreo);
+        Assert.False(new MotivoDeAlerta("correo-de-alertas-no-disponible", ClaseDeAlerta.Tecnica, enviablePorCorreo: false).EnviablePorCorreo);
+    }
+
+    [Fact]
+    public void RestaurarReconstruyeLaAlertaPersistida_ConSusMarcas()
+    {
+        var id = AlertaDeSeguridad.NuevoId(ServicioDeOrigen.Inventario, Guid.NewGuid());
+
+        var alerta = AlertaDeSeguridad.Restaurar(id, ServicioDeOrigen.Inventario, "accesos-denegados", ClaseDeAlerta.Seguridad, T0, T0.AddMinutes(3), 4, 2, Guid.NewGuid(), T0.AddMinutes(4), enviadaPorCorreo: true);
+
+        Assert.Equal(id, alerta.Id);
+        Assert.Equal(2, alerta.OcurrenciasSinRevisar);
+        Assert.Equal(EstadoDeAlerta.Pendiente, alerta.Estado);
+        Assert.True(alerta.EnviadaPorCorreo);
+    }
+
+    [Theory]
+    [InlineData("eco:no-es-un-guid")]
+    [InlineData("inv:11111111-1111-1111-1111-111111111111")]
+    public void Restaurar_RechazaUnIdentificadorSinElPrefijoDeSuServicioOSinGuid(string id)
+    {
+        Assert.Throws<ArgumentException>(() =>
+            AlertaDeSeguridad.Restaurar(id, ServicioDeOrigen.Ecommerce, "accesos-denegados", ClaseDeAlerta.Seguridad, T0, T0, 1, 0, null, null, false));
+    }
+
+    [Fact]
+    public void Restaurar_RechazaContadoresIncoherentesOFechasQueNoEstanEnUtc()
+    {
+        var id = AlertaDeSeguridad.NuevoId(ServicioDeOrigen.Ecommerce, Guid.NewGuid());
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => AlertaDeSeguridad.Restaurar(id, ServicioDeOrigen.Ecommerce, "accesos-denegados", ClaseDeAlerta.Seguridad, T0, T0, 2, 3, null, null, false));
+        Assert.Throws<ArgumentOutOfRangeException>(() => AlertaDeSeguridad.Restaurar(id, ServicioDeOrigen.Ecommerce, "accesos-denegados", ClaseDeAlerta.Seguridad, T0, T0, 0, 0, null, null, false));
+        Assert.Throws<ArgumentException>(() => AlertaDeSeguridad.Restaurar(id, ServicioDeOrigen.Ecommerce, "accesos-denegados", ClaseDeAlerta.Seguridad, T0.ToOffset(TimeSpan.FromHours(-5)), T0, 1, 0, null, null, false));
+        Assert.Throws<ArgumentException>(() => AlertaDeSeguridad.Restaurar(id, ServicioDeOrigen.Ecommerce, "accesos-denegados", ClaseDeAlerta.Seguridad, T0, T0.AddMinutes(-1), 1, 0, null, null, false));
+    }
+}

@@ -20,7 +20,7 @@ public sealed record MotivoDeAlerta
 {
     private static readonly Regex Formato = new(@"^[a-z][a-z0-9-]{1,63}\z", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
-    public MotivoDeAlerta(string codigo, ClaseDeAlerta clase)
+    public MotivoDeAlerta(string codigo, ClaseDeAlerta clase, bool enviablePorCorreo = true)
     {
         if (string.IsNullOrEmpty(codigo) || !Formato.IsMatch(codigo))
         {
@@ -29,11 +29,18 @@ public sealed record MotivoDeAlerta
 
         Codigo = codigo;
         Clase = clase;
+        EnviablePorCorreo = enviablePorCorreo;
     }
 
     public string Codigo { get; }
 
     public ClaseDeAlerta Clase { get; }
+
+    /// <summary>
+    /// Falso para una alerta originada por el propio correo (no se envía por correo: provocaría un bucle, AUD-29); queda en el registro técnico y el
+    /// reintento del correo la atiende sin generar otra.
+    /// </summary>
+    public bool EnviablePorCorreo { get; }
 }
 
 /// <summary>El catálogo cerrado de motivos de alerta. Un motivo que no está aquí no genera alerta (un texto libre filtraría datos, D06).</summary>
@@ -144,6 +151,44 @@ public sealed class AlertaDeSeguridad
             ServicioDeOrigen.Inventario => "inv:",
             _ => throw new ArgumentOutOfRangeException(nameof(servicio)),
         } + identificador.ToString("D");
+    }
+
+    /// <summary>Reconstruye la alerta tal como la guardó el almacén (la Infraestructura la lee con esto): valida lo que el almacén no garantiza por sí solo.</summary>
+    public static AlertaDeSeguridad Restaurar(
+        string id,
+        ServicioDeOrigen servicio,
+        string motivo,
+        ClaseDeAlerta clase,
+        DateTimeOffset primeraOcurrencia,
+        DateTimeOffset ultimaOcurrencia,
+        int ocurrencias,
+        int revisadasHasta,
+        Guid? revisadaPor,
+        DateTimeOffset? revisadaEn,
+        bool enviadaPorCorreo)
+    {
+        var prefijo = servicio == ServicioDeOrigen.Ecommerce ? "eco:" : "inv:";
+        if (id is null || !id.StartsWith(prefijo, StringComparison.Ordinal) || !Guid.TryParseExact(id.AsSpan(prefijo.Length), "D", out var guid) || guid == Guid.Empty)
+        {
+            throw new ArgumentException("El identificador de la alerta lleva el prefijo de su servicio y un GUID.", nameof(id));
+        }
+
+        _ = new MotivoDeAlerta(motivo, clase);
+        ArgumentOutOfRangeException.ThrowIfLessThan(ocurrencias, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(ocurrencias, TopeDeOcurrencias);
+        ArgumentOutOfRangeException.ThrowIfNegative(revisadasHasta);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(revisadasHasta, ocurrencias);
+        if (primeraOcurrencia.Offset != TimeSpan.Zero || ultimaOcurrencia.Offset != TimeSpan.Zero || (revisadaEn is { } r && r.Offset != TimeSpan.Zero))
+        {
+            throw new ArgumentException("Las fechas de la alerta se guardan en UTC.", nameof(primeraOcurrencia));
+        }
+
+        if (ultimaOcurrencia < primeraOcurrencia)
+        {
+            throw new ArgumentException("La última ocurrencia no es anterior a la primera.", nameof(ultimaOcurrencia));
+        }
+
+        return new AlertaDeSeguridad(id, servicio, motivo, clase, primeraOcurrencia, ultimaOcurrencia, ocurrencias, revisadasHasta, revisadaPor, revisadaEn, enviadaPorCorreo);
     }
 
     /// <summary>
