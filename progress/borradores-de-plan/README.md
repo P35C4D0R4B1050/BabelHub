@@ -5,3 +5,5 @@ Planes de `web-base` y `ecommerce-catalogo` redactados en el bloque ECO-1 (2026-
 Estado de cada uno y lo que falta: `progress/log/2026-11-14-eco-1.md`.
 
 Para retomarlos: copiar `plan.md`, `decisions.md` y `tasks.md` a `specs/<feature>/`, aplicar la decisión de la persona y las correcciones pendientes del informe, repetir la revisión de los tres agentes (la persona debe autorizar la ronda adicional) y, solo con la puerta limpia, aprobar con la skill `spec-approve`. Este directorio se borra al hacerlo.
+
+> **Actualización (2026-11-14, noche):** el plan de `web-base` ya está **aprobado** (`Planned`) y vive en `specs/web-base/`; aquí solo quedan sus notas de revisión (`web-base/hallazgos-*.md`). Sigue pendiente el de `ecommerce-catalogo`.

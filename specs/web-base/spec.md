@@ -1,9 +1,11 @@
 ---
 id: web-base
 titulo: Estructura base de la interfaz web
-estado: Approved
+estado: Planned
 aprobado_por: Claude (delegado por Diego Amiquero)
 aprobado_en: 2026-11-14
+plan_aprobado_por: Claude (delegado por Diego Amiquero)
+plan_aprobado_en: 2026-11-14
 servicio: E-commerce
 prefijo: WEB
 origen: [RC01, RNF13, RF25, RF29, NN15, NN16, NN18]
