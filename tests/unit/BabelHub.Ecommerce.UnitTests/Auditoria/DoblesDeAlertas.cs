@@ -157,3 +157,93 @@ internal sealed class FuenteAisladaFalsa : IFuenteDeRegistrosAislados
         return Falla is not null ? throw Falla : IngresosFallidos;
     }
 }
+
+/// <summary>Las alertas con correo pendiente sobre el mismo almacén en memoria, con los intentos y el próximo intento de cada una.</summary>
+internal sealed class AlmacenDeCorreoEnMemoria(AlmacenDeAlertasEnMemoria alertas) : IAlmacenDeCorreoDeAlertas
+{
+    public Dictionary<string, (int Intentos, DateTimeOffset Proximo)> Intentos { get; } = [];
+
+    public Task<IReadOnlyList<AlertaConCorreoPendiente>> ConCorreoPendiente(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<AlertaConCorreoPendiente>>(
+        [
+            .. alertas.Alertas
+                .Where(a => !a.EnviadaPorCorreo && (!Intentos.TryGetValue(a.Id, out var i) || i.Proximo <= ahora))
+                .OrderBy(a => a.PrimeraOcurrencia)
+                .Take(maximo)
+                .Select(a => new AlertaConCorreoPendiente(a, Intentos.TryGetValue(a.Id, out var i) ? i.Intentos : 0)),
+        ]);
+
+    public Task RegistrarIntentoFallido(string alertaId, int intentos, DateTimeOffset proximoIntento, CancellationToken cancelacion = default)
+    {
+        Intentos[alertaId] = (intentos, proximoIntento);
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class AlertasYaEnviadasEnMemoria : IAlertasYaEnviadas
+{
+    public HashSet<string> Ids { get; } = [];
+
+    public Task<bool> Contiene(string alertaId, CancellationToken cancelacion = default) => Task.FromResult(Ids.Contains(alertaId));
+
+    public Task Marcar(string alertaId, CancellationToken cancelacion = default)
+    {
+        Ids.Add(alertaId);
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class MarcaDeLecturaEnMemoria : IMarcaDeLecturaDeAlertas
+{
+    public DateTimeOffset? Valor { get; set; }
+
+    public Task<DateTimeOffset?> Obtener(CancellationToken cancelacion = default) => Task.FromResult(Valor);
+
+    public Task Guardar(DateTimeOffset marca, CancellationToken cancelacion = default)
+    {
+        Valor = marca;
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class DestinatariosFalsos : IDestinatariosDeAlertas
+{
+    public List<DestinatarioDeAlerta> Cuentas { get; } = [new(Guid.NewGuid()), new(Guid.NewGuid())];
+
+    public Task<IReadOnlyList<DestinatarioDeAlerta>> Activos(CancellationToken cancelacion = default) => Task.FromResult<IReadOnlyList<DestinatarioDeAlerta>>([.. Cuentas]);
+}
+
+/// <summary>
+/// El puerto de correo con el tope de la fuente única (IDE-82): 24 correos al día de calendario en hora de Lima por motivo y servicio; el resto se suprime. Puede caerse.
+/// </summary>
+internal sealed class EnvioDeCorreoFalso(IReloj reloj) : IEnvioDeCorreoDeAlertas
+{
+    public const int TopeDiario = 24;
+
+    private readonly Dictionary<(DateOnly Dia, string Servicio, string Motivo), int> _porDia = [];
+
+    public List<(CorreoDeAlerta Correo, int Destinatarios)> Enviados { get; } = [];
+
+    public Exception? Falla { get; set; }
+
+    public int Intentos { get; private set; }
+
+    public Task<ResultadoDeEnvioDeAlerta> Enviar(CorreoDeAlerta correo, IReadOnlyList<DestinatarioDeAlerta> destinatarios, CancellationToken cancelacion = default)
+    {
+        Intentos++;
+        if (Falla is not null)
+        {
+            return Task.FromException<ResultadoDeEnvioDeAlerta>(Falla);
+        }
+
+        var clave = (reloj.HoyEnLima, correo.Servicio.ToString(), correo.Motivo.Valor);
+        _porDia[clave] = _porDia.GetValueOrDefault(clave) + 1;
+        if (_porDia[clave] > TopeDiario)
+        {
+            return Task.FromResult(ResultadoDeEnvioDeAlerta.Suprimido);
+        }
+
+        Enviados.Add((correo, destinatarios.Count));
+        return Task.FromResult(ResultadoDeEnvioDeAlerta.Enviado);
+    }
+}
