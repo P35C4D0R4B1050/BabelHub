@@ -259,6 +259,11 @@ public sealed class RegistroDeAuditoria : IEquatable<RegistroDeAuditoria>
             throw new ArgumentException("Un objeto sin tipo no puede tener identificador.", nameof(objetoId));
         }
 
+        if (accion.TiposDeObjeto is not null && objetoTipo is not null && !accion.TiposDeObjeto.Contains(objetoTipo, StringComparer.Ordinal))
+        {
+            throw new ArgumentException("El tipo de objeto no es de los que admite la acción.", nameof(objetoTipo));
+        }
+
         if (!Enum.IsDefined(servicio) || !Enum.IsDefined(resultado))
         {
             throw new ArgumentException("El servicio o el resultado no son válidos.", nameof(servicio));

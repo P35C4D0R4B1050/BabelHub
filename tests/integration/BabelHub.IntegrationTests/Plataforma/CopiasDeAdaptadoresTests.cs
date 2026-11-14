@@ -40,7 +40,27 @@ public sealed class CopiasDeAdaptadoresTests
         "Domain/Auditoria/RegistroDeAuditoria.cs",
         "Domain/Auditoria/PoliticaDeAnonimizacion.cs",
         "Domain/Auditoria/AlertaDeSeguridad.cs",
-        "Domain/Auditoria/AcumuladoDeLimite.cs");
+        "Domain/Auditoria/AcumuladoDeLimite.cs",
+        "Application/Auditoria/AccionAuditable.cs",
+        "Application/Auditoria/SolicitudDeRegistro.cs",
+        "Application/Auditoria/Interno/ConstructorDeRegistros.cs",
+        "Application/Auditoria/RegistroAuditado.cs",
+        "Application/Auditoria/ContratosDeAlertas.cs",
+        "Application/Auditoria/ContratosDeConsulta.cs",
+        "Application/Auditoria/AccionesAuditables.StockCatalogoYFuentes.cs",
+        "Application/Auditoria/Interno/CatalogoDeAccionesDeAuditoria.cs",
+        "Application/Auditoria/Interno/CatalogoDeAccionesDeAuditoria.StockCatalogoYFuentes.cs",
+        "Application/Auditoria/Interno/ConversionDeRegistros.cs",
+        "Application/Auditoria/AccionesAuditables.Operaciones.cs",
+        "Application/Auditoria/Interno/CatalogoDeAccionesDeAuditoria.Operaciones.cs",
+        "Application/Auditoria/AccionesAuditables.IdentidadYOtrosModulos.cs",
+        "Application/Auditoria/Interno/CatalogoDeAccionesDeAuditoria.IdentidadYOtrosModulos.cs",
+        "Application/Auditoria/AccionesAuditables.EventosDeSeguridad.cs",
+        "Application/Auditoria/Interno/CatalogoDeAccionesDeAuditoria.EventosDeSeguridad.cs",
+        "Application/Auditoria/Interno/DenegacionDeAccesoDeAplicacion.cs",
+        "Application/Auditoria/AccionesAuditables.AvisosYOrigenReenviado.cs",
+        "Application/Auditoria/Interno/CatalogoDeAccionesDeAuditoria.AvisosYOrigenReenviado.cs",
+        "Application/Auditoria/Interno/CatalogoDeAccionesDeAuditoria.TiposDeObjeto.cs");
 
     [Theory]
     [MemberData(nameof(Archivos))]
