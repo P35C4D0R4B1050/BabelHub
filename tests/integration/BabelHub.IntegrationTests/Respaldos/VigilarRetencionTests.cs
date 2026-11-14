@@ -24,7 +24,7 @@ public sealed class VigilarRetencionTests : IDisposable
             Path.Combine(_carpeta, "rclone-doble.sh"),
             """
             #!/usr/bin/env bash
-            destino="${@: -1}"; bucket="${destino#almacen:}"
+            destino="${@: -1}"; bucket="${destino#vigilante:}"
             archivo="$ALMACEN_FIXTURE/$bucket.txt"
             [[ -f "$archivo" ]] || { echo "error: no existe $bucket" >&2; exit 3; }
             cat "$archivo"

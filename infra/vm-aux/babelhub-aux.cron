@@ -1,0 +1,18 @@
+# Tareas de VM-AUX (T25; se copia a /etc/cron.d/babelhub-aux). Corren como el usuario sin privilegios `babelhub-aux`, cargan sus
+# credenciales de /etc/babelhub-aux/aux.env (0600) y avisan por correo con alertar.sh. Horas en UTC.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+AUX=/opt/babelhub/scripts/vm-aux
+
+# Respaldos al día y archivado de cambios con menos de 15 minutos de atraso, comprobados desde fuera de la VM de datos (PLA-20).
+*/5 * * * * babelhub-aux $AUX/alertar.sh respaldos $AUX/comprobar-respaldos.sh
+# Sello horario del registro de supresiones (PLA-38).
+5 * * * * babelhub-aux $AUX/alertar.sh sello-registro $AUX/sellar-registro.sh
+# Copia diaria del registro de supresiones a supresiones-copia (PLA-38).
+15 3 * * * babelhub-aux $AUX/alertar.sh copia-registro $AUX/copiar-registro.sh
+# Ancla semanal del sello por correo (los lunes).
+0 12 * * 1 babelhub-aux $AUX/alertar.sh ancla-sello $AUX/anclar-sello.sh
+# Que el almacén no retenga más de lo esperado (PLA-18).
+30 4 * * * babelhub-aux $AUX/alertar.sh retencion $AUX/vigilar-retencion.sh
+# Latido hacia un servicio externo, sin datos: si VM-AUX cae, alguien lo sabe.
+*/5 * * * * babelhub-aux $AUX/latido-externo.sh

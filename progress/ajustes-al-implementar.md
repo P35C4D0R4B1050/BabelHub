@@ -36,7 +36,7 @@ Tareas a partir (una tarea = un commit con su prueba primero):
 - [ ] **T29 (`restaurar.sh`):** (a) descifrado en el equipo, transporte por `ProxyJump` y pruebas negativas; (b) orquestación de la apertura en el orden de §5.1.
 
 Pruebas y precisiones a añadir:
-- [ ] Prueba de conformidad entre el script de sellos de VM-AUX y el verificador en C# (T12 o T25).
+- [x] Prueba de conformidad entre el script de sellos de VM-AUX y el verificador en C# (T12 o T25): hecha en T25 (`SellosDelRegistroTests`).
 - [ ] Ruta del informe local: `progress/ensayos/local/` (ya en `.gitignore`); prueba de que está excluida y de que `progress/ensayos/` solo tiene contadores (T14 o T29).
 - [x] **Marca de un solo uso de `restaurar.sh`:** HMAC con un secreto que solo conocen el script y el servicio, nonce de un solo uso y caducidad de pocos minutos; prueba negativa con una marca reutilizada o vencida (T17).
 - [ ] Quién vacía la caché de claves del Inventario tras rotar (paso 3 de §5.1): `restaurar.sh` o `IClienteDelInventario`.

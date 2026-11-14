@@ -7,7 +7,7 @@
 #   scripts/vm-aux/vigilar-retencion.sh
 #
 # Usa la credencial `respaldos-vigilante` (solo lista, sin leer ni escribir) a través de rclone, configurada en el entorno de VM-AUX:
-# RCLONE_CONFIG_ALMACEN_TYPE=s3, _ENDPOINT, _REGION, _ACCESS_KEY_ID y _SECRET_ACCESS_KEY. La definición de los plazos es la de
+# RCLONE_CONFIG_VIGILANTE_TYPE=s3, _ENDPOINT, _REGION, _ACCESS_KEY_ID y _SECRET_ACCESS_KEY (ver comun.sh). La definición de los plazos es la de
 # infra/almacen/contenedores.txt (ALMACEN_DEFINICION la cambia). RCLONE es el comando de rclone.
 #
 # Qué comprueba, por cada contenedor que tiene ciclo de vida:
@@ -21,7 +21,7 @@ set -euo pipefail
 
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEFINICION="${ALMACEN_DEFINICION:-$RAIZ/infra/almacen}"
-RCLONE="${RCLONE:-rclone}"
+. "$(dirname "${BASH_SOURCE[0]}")/comun.sh"
 MARGEN_DE_DIAS=2
 
 declare -A COPIAS_MAXIMAS=([respaldos-diarios]=8 [respaldos-semanales]=5 [respaldos-mensuales]=5)
@@ -41,7 +41,7 @@ while IFS= read -r linea || [[ -n "$linea" ]]; do
   [[ "$expira" == nunca ]] && continue
   [[ "$expira" =~ ^[0-9]+$ ]] || { echo "Error: la expiración de $nombre no es un número" >&2; exit 2; }
 
-  if ! listado="$(TZ=UTC "$RCLONE" lsf -R --files-only --format pt --separator ';' "almacen:$nombre" 2>/dev/null)"; then
+  if ! listado="$(TZ=UTC "$RCLONE" lsf -R --files-only --format pt --separator ';' "vigilante:$nombre" 2>/dev/null)"; then
     echo "ALERTA $nombre: no se pudo consultar el contenedor"
     alertas=$((alertas + 1))
     continue

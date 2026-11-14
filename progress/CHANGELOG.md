@@ -5,12 +5,12 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 ## 2026-11-14 — Implementación de `transversal-plataforma` (T06 a T24)
 
 ### Cubierto
-- **19 de 42 tareas** de `transversal-plataforma`: puertas de calidad y de cadena de suministro (cobertura, secretos, versiones fijadas, pruebas sin red), registro de supresiones y modos de arranque con salud, rotación de credenciales, imágenes multi-arquitectura, Compose endurecido por VM, definición del almacén de objetos con retención bloqueada, respaldo diario y archivado de WAL cifrados con `age` (con restauración probada), respaldo bajo demanda, `desplegar.sh` y la prueba de retención con el vigilante de VM-AUX.
+- **20 de 42 tareas** (T06 a T25) de `transversal-plataforma`: puertas de calidad y de cadena de suministro (cobertura, secretos, versiones fijadas, pruebas sin red), registro de supresiones y modos de arranque con salud, rotación de credenciales, imágenes multi-arquitectura, Compose endurecido por VM, definición del almacén de objetos con retención bloqueada, respaldo diario y archivado de WAL cifrados con `age` (con restauración probada), respaldo bajo demanda, `desplegar.sh`, la prueba de retención con el vigilante de VM-AUX y los scripts de VM-AUX (comprobación de respaldos con aviso por correo, sellos y copia del registro, ancla y latido).
 - El plazo mensual de retención pasa de 90 a 92 días (la simulación mostró que 90 no garantiza los 3 meses de AC-PLA-18).
 - Estabilidad de la suite: colección sin paralelismo para las pruebas pesadas y márgenes de tiempo mayores.
 
 ### Pendiente
-- 5 spikes (necesitan Oracle, VMs o datos reales), T25 a T42, `transversal-seguridad` T27b y T29 (esperan a Auditoría) y las demás specs de la fase 3 (126 tareas sin empezar).
+- 5 spikes (necesitan Oracle, VMs o datos reales), T26 a T42, `transversal-seguridad` T27b y T29 (esperan a Auditoría) y las demás specs de la fase 3 (126 tareas sin empezar).
 
 ## 2026-11-13 — Implementación de `transversal-seguridad` (T01 a T30)
 
