@@ -2,6 +2,17 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-14 — Segunda ola de carriles en paralelo (fundida a `main`)
+
+### Cubierto
+- **Carril A:** `transversal-auditoria` T07, T08, T09 y T11–T16 (AUD-2): contratos de registro, consulta y alerta, puertos de Identidad y Reservas, 83 acciones de auditoría por servicio, denegación de acceso y eventos de seguridad. Revisión de nivel C con 7 Importantes de seguridad y 5 de arquitectura, corregidos.
+- **Carril B:** `inventario-fuentes` T01–T08 (INV-1a): bloqueos asesores, reintento por interbloqueo, alcance de datos por transacción con elevación restringida a `Fuentes` y `Ajustes`, reglas de existencias, fuentes y rutas, contrato público y puertos, y movimientos de stock.
+- **Carril C:** `web-base` WEB-1d (T21–T27: sistema de diseño con Tailwind 4 y daisyUI 5, layout de tres áreas, estados, textos legales, «Sorpréndeme», descarga) y WEB-1a (T01–T09: módulo `Web` con sesión y borrador).
+- Validación de la fusión: unitarias 1406 y 1221, arquitectura 155, SpecCheck 23, CoverageCheck 12, integración 2284 de 2285 (una prueba de tiempo real que pasa sola), gitleaks limpio. Tareas de la fase 3 hechas: 92 (58 + 34).
+
+### Pendiente
+- Riesgo de INV-1c registrado en `progress/hallazgos.md` (el alcance falla cerrado: llamadas de servicio y trabajos de fondo necesitan un actor explícito). Tercera ola: AUD-3, INV-1b, WEB-1b; antes, `ITokenDelUsuarioDeLaSesion` y la constante `Web` del orden de restauración (carril A).
+
 ## 2026-11-14 — Primera ola de carriles en paralelo (fundida a `main`)
 
 ### Cubierto
