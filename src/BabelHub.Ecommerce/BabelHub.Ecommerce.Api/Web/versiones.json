@@ -1,0 +1,50 @@
+{
+  "descripcion": "Dependencias de la interfaz que el SBOM de .NET no ve (PLA-26, web-base D09). Versión y huella SHA-256 de cada una; una prueba de integración compara los archivos versionados con estas huellas y el Dockerfile y scripts/construir-estilos.sh verifican las descargas antes de usarlas. Quién vigila sus avisos: docs/05-seguridad/07-operacion-segura.md §3.3.",
+  "tailwindcss": {
+    "version": "4.3.3",
+    "licencia": "MIT",
+    "origen": "https://github.com/tailwindlabs/tailwindcss/releases/tag/v4.3.3",
+    "descargas": {
+      "tailwindcss-linux-x64": { "sha256": "dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a" },
+      "tailwindcss-linux-arm64": { "sha256": "55fd0b241214eff3de1e8ee4f22796662f2d2e7a49bcfca7477cfd0bac398195" },
+      "tailwindcss-windows-x64.exe": { "sha256": "e0e260ce048014e9268f6237ff18f8ccf02cef521cbd0ae04e82c2cdf7aa3955" }
+    }
+  },
+  "daisyui": {
+    "version": "5.7.50",
+    "licencia": "MIT",
+    "origen": "https://github.com/saadeghi/daisyui/releases/tag/v5.7.50",
+    "descargas": {
+      "daisyui.mjs": { "sha256": "d69de07c7463bb1f41548e2688f88ee105cdadf9779fce5b3c47b3bfaa6be472" },
+      "daisyui-theme.mjs": { "sha256": "e48a35d8326d650181ca600560e8520cf6b44cf9242bbd9d45825607e641f251" }
+    }
+  },
+  "htmx": {
+    "version": "2.0.11",
+    "licencia": "0BSD",
+    "origen": "https://cdn.jsdelivr.net/npm/htmx.org@2.0.11/dist/htmx.min.js",
+    "archivos": {
+      "wwwroot/lib/htmx/htmx.min.js": { "sha256": "d6fdc75f204e6bdefa99b69bf1e6d4ac69b8a364f77929f45c13476b4000f717" },
+      "wwwroot/lib/htmx/LICENSE.txt": { "sha256": "d3d2456f76414f2456104660ebd65aff1c04cd7966b942bdabd63f3cdb316a38" }
+    }
+  },
+  "dm-serif-display": {
+    "version": "5.3.0",
+    "licencia": "OFL-1.1",
+    "origen": "https://cdn.jsdelivr.net/npm/@fontsource/dm-serif-display@5.3.0/",
+    "archivos": {
+      "wwwroot/lib/fuentes/dm-serif-display-latin-400-normal.woff2": { "sha256": "fdf61e20fd2c0108e0ea28da4daca0035205b4b7fc031a3974b865b704de160a" },
+      "wwwroot/lib/fuentes/dm-serif-display-latin-400-italic.woff2": { "sha256": "ed8b291611e32fa2d2900488dd48fc95faf0957b2ef7ddf1527e8d21dd9cf2df" },
+      "wwwroot/lib/fuentes/LICENSE-DM-Serif-Display.txt": { "sha256": "e9d4ced9825bf03a6b634c37fe8ae974f6d1b80fbb0bd3ae9b089987e4dc541b" }
+    }
+  },
+  "inter": {
+    "version": "5.3.0",
+    "licencia": "OFL-1.1",
+    "origen": "https://cdn.jsdelivr.net/npm/@fontsource-variable/inter@5.3.0/",
+    "archivos": {
+      "wwwroot/lib/fuentes/inter-latin-wght-normal.woff2": { "sha256": "3100e775e8616cd2611beecfa23a4263d7037586789b43f035236a2e6fbd4c62" },
+      "wwwroot/lib/fuentes/LICENSE-Inter.txt": { "sha256": "3b0a5fca3d17942cde889069889dedbbbd075e9b599968c82a95f4d944e9b345" }
+    }
+  }
+}

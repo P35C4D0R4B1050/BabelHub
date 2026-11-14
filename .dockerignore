@@ -25,3 +25,5 @@ workflows/
 **/*.pfx
 **/secrets.json
 **/appsettings.*.local.json
+.herramientas/
+**/wwwroot/css/

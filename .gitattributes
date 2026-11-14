@@ -14,3 +14,6 @@
 *.ico binary
 *.woff2 binary
 *.pdf binary
+
+# Dependencias de la interfaz fijadas por huella SHA-256 (D09): se guardan byte a byte, sin normalizar saltos de línea.
+src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api/wwwroot/lib/** -text
