@@ -10,4 +10,8 @@
     <ProjectReference Include="..\BabelHub.Inventario.Application\BabelHub.Inventario.Application.csproj" />
     <ProjectReference Include="..\..\BabelHub.Shared\BabelHub.Shared.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BabelHub.IntegrationTests" />
+    <InternalsVisibleTo Include="BabelHub.Inventario.UnitTests" />
+  </ItemGroup>
 </Project>

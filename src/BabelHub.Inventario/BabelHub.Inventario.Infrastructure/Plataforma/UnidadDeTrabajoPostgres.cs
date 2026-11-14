@@ -128,6 +128,9 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
         }
     }
 
+    /// <summary>Traduce el rechazo de la política de filas (ver <see cref="IElevacionDeAlcance.TraducirRechazoDeLaPolitica{T}"/>).</summary>
+    Task<T> IElevacionDeAlcance.TraducirRechazoDeLaPolitica<T>(Func<Task<T>> operacion) => RechazoDeLaPolitica.Traducir(operacion);
+
     /// <summary>
     /// Fija el alcance de datos solo para esta transacción (<c>set_config(…, true)</c>, parametrizado): no se escapa a otra conexión del pool.
     /// Un valor nulo no lo fija, y las políticas de filas deniegan.
