@@ -77,6 +77,7 @@ public static class DefinicionDeAuditoria
             rechazos integer NOT NULL CHECK (rechazos >= 1),
             direccion_completa text CHECK (direccion_completa IS NULL OR length(direccion_completa) <= 64),
             cerrada_en timestamptz,
+            intentos_de_cierre integer NOT NULL DEFAULT 0 CHECK (intentos_de_cierre >= 0),
             PRIMARY KEY (huella, limite, ventana_inicio),
             CHECK (cerrada_en IS NULL OR direccion_completa IS NULL)
         );
@@ -104,7 +105,8 @@ public static class DefinicionDeAuditoria
             ultima_exitosa timestamptz,
             primer_fallo_sin_exito timestamptz,
             intentos_fallidos integer NOT NULL DEFAULT 0,
-            proximo_intento timestamptz
+            proximo_intento timestamptz,
+            anonimizados_sin_registrar integer NOT NULL DEFAULT 0 CHECK (anonimizados_sin_registrar >= 0)
         );
 
         CREATE TABLE IF NOT EXISTS auditoria.politica_de_anonimizacion (
