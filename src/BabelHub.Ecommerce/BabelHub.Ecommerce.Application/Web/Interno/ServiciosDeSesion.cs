@@ -55,20 +55,32 @@ internal sealed class ServiciosDeSesion(
             ? null
             : cifrador.Descifrar(fila.RenovacionCifrada, fila.VersionDeClave, PropositoDeSecreto.Renovacion, DatosAsociados(fila.Sesion.Id, PropositoDeSecreto.Renovacion, fila.Sesion.UsuarioId));
 
+
     /// <summary>
     /// Cierra o vence la sesión: <b>borra siempre la credencial cifrada</b> y la renovación <b>solo cuando Identidad confirma su revocación</b>; si no, la
-    /// fila queda con la revocación pendiente para que la purga la reintente (D05). No guarda la fila: lo hace quien llama.
+    /// fila queda con la revocación pendiente para que la purga la reintente (D05). Con <paramref name="intentarRevocar"/> en <see langword="false"/> (la purga, cuando
+    /// Identidad ya no respondió en esta corrida) no llama a Identidad y deja la revocación pendiente. No guarda la fila: lo hace quien llama.
     /// </summary>
-    public async Task CerrarYRevocar(SesionGuardada fila, MotivoDeCierre motivo, CancellationToken cancelacion)
+    public async Task CerrarYRevocar(SesionGuardada fila, MotivoDeCierre motivo, CancellationToken cancelacion, bool intentarRevocar = true)
     {
         fila.Sesion.Cerrar(motivo, reloj.Ahora);
         fila.CredencialCifrada = null;
         fila.CredencialVenceEn = null;
         fila.RetornoTrasAceptar = null;
 
+        await Revocar(fila, cancelacion, intentarRevocar).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Revoca en Identidad la renovación guardada. Devuelve <see langword="true"/> si ya no queda nada por revocar (no había renovación, se confirmó o no se podía leer) y
+    /// <see langword="false"/> si la revocación queda pendiente (Identidad no confirmó, falló o no se intentó).
+    /// </summary>
+    public async Task<bool> Revocar(SesionGuardada fila, CancellationToken cancelacion, bool intentarRevocar = true)
+    {
         if (fila.RenovacionCifrada is null)
         {
-            return;
+            fila.RevocacionPendiente = false;
+            return true;
         }
 
         string renovacion;
@@ -80,18 +92,23 @@ internal sealed class ServiciosDeSesion(
         {
             // No se puede revocar lo que no se puede leer: se descarta (la renovación vence sola) y queda el evento.
             fila.RenovacionCifrada = null;
+            fila.RevocacionPendiente = false;
+            fila.RenovacionIncierta = false;
             await seguridad.AccesoDenegado(MotivoDeDenegacionWeb.SecretoIlegible, fila.Sesion.UsuarioId, cancelacion).ConfigureAwait(false);
-            return;
+            return true;
         }
 
         var confirmada = false;
-        try
+        if (intentarRevocar)
         {
-            confirmada = await identidad.RevocarRenovacion(renovacion, cancelacion).ConfigureAwait(false);
-        }
-        catch (Exception) when (!cancelacion.IsCancellationRequested)
-        {
-            // Identidad no responde: se reintenta en la purga.
+            try
+            {
+                confirmada = await identidad.RevocarRenovacion(renovacion, cancelacion).ConfigureAwait(false);
+            }
+            catch (Exception) when (!cancelacion.IsCancellationRequested)
+            {
+                // Identidad no responde: se reintenta en la purga.
+            }
         }
 
         if (confirmada)
@@ -104,5 +121,7 @@ internal sealed class ServiciosDeSesion(
         {
             fila.RevocacionPendiente = true;
         }
+
+        return confirmada;
     }
 }

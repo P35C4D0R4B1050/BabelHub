@@ -72,6 +72,15 @@ public interface IAlmacenDeSesionesWeb
 
     /// <summary>Las sesiones abiertas de un usuario, tomadas con <c>FOR UPDATE</c> y en un orden fijo (cerrar todas, plan §5).</summary>
     Task<IReadOnlyList<SesionGuardada>> CargarAbiertasDeUnUsuario(Guid usuarioId, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Las filas que la purga debe atender, tomadas con <c>FOR UPDATE SKIP LOCKED</c> (una solicitud o una purga de otra réplica que las tiene no se espera): abiertas que ya
+    /// vencieron por inactividad o por tope sin que nadie las usara, cerradas con la revocación pendiente y cerradas hace 30 minutos o más. Exige una unidad de trabajo activa.
+    /// </summary>
+    Task<IReadOnlyList<SesionGuardada>> CargarParaPurgar(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Borra la fila (la que la purga ya atendió: cerrada hace 30 minutos o más y sin revocación pendiente).</summary>
+    Task Borrar(HashDeSesion id, CancellationToken cancelacion = default);
 }
 
 /// <summary>Puerto: la tabla de borradores (esquema <c>web</c>).</summary>
@@ -89,6 +98,9 @@ public interface IAlmacenDeBorradores
     Task Guardar(BorradorGuardado borrador, CancellationToken cancelacion = default);
 
     Task Borrar(Guid id, CancellationToken cancelacion = default);
+
+    /// <summary>Borra los borradores vencidos (hasta <paramref name="maximo"/>, con <c>SKIP LOCKED</c>) y devuelve cuántos.</summary>
+    Task<int> BorrarVencidos(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default);
 }
 
 /// <summary>Un borrador guardado: el agregado y su cuerpo cifrado.</summary>

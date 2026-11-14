@@ -97,11 +97,18 @@ internal sealed class IdentidadConRotacion(RelojDePrueba reloj) : ISesionesDeIde
         }
     }
 
-    public Task<bool> RevocarRenovacion(string renovacion, CancellationToken cancelacion = default)
+    public TimeSpan DemoraAlRevocar { get; set; } = TimeSpan.Zero;
+
+    public async Task<bool> RevocarRenovacion(string renovacion, CancellationToken cancelacion = default)
     {
         Interlocked.Increment(ref _revocaciones);
         Revocadas.Add(renovacion);
-        return Task.FromResult(ConfirmaRevocaciones);
+        if (DemoraAlRevocar > TimeSpan.Zero)
+        {
+            await Task.Delay(DemoraAlRevocar, cancelacion);
+        }
+
+        return ConfirmaRevocaciones;
     }
 
     public Task<bool> CerrarTodasLasSesiones(Guid usuarioId, CancellationToken cancelacion = default) => Task.FromResult(true);
@@ -124,6 +131,10 @@ internal sealed class AlmacenQueFallaAlGuardar(IAlmacenDeSesionesWeb interno) : 
     public Task ActualizarActividad(HashDeSesion id, DateTimeOffset ultimaActividad, CancellationToken cancelacion = default) => interno.ActualizarActividad(id, ultimaActividad, cancelacion);
 
     public Task<IReadOnlyList<SesionGuardada>> CargarAbiertasDeUnUsuario(Guid usuarioId, CancellationToken cancelacion = default) => interno.CargarAbiertasDeUnUsuario(usuarioId, cancelacion);
+
+    public Task<IReadOnlyList<SesionGuardada>> CargarParaPurgar(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) => interno.CargarParaPurgar(ahora, maximo, cancelacion);
+
+    public Task Borrar(HashDeSesion id, CancellationToken cancelacion = default) => interno.Borrar(id, cancelacion);
 }
 
 internal sealed class VerificadorPorPrefijo : IVerificadorDeCredencial

@@ -81,6 +81,22 @@ public sealed class AlmacenDeBorradoresPostgres(IUnidadDeTrabajo unidad, IConexi
             cancelacion);
     }
 
+    public Task<int> BorrarVencidos(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) =>
+        AccesoAlEsquemaWeb.Ejecutar(
+            unidad,
+            conexionDeLaUnidad,
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand(
+                    "DELETE FROM web.borradores WHERE id IN (SELECT id FROM web.borradores WHERE vence_en <= @ahora ORDER BY vence_en LIMIT @maximo FOR UPDATE SKIP LOCKED)",
+                    conexion,
+                    transaccion);
+                comando.Parameters.AddWithValue("ahora", ahora.ToUniversalTime());
+                comando.Parameters.AddWithValue("maximo", maximo);
+                return await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            },
+            cancelacion);
+
     public Task Borrar(Guid id, CancellationToken cancelacion = default) =>
         AccesoAlEsquemaWeb.Ejecutar(
             unidad,

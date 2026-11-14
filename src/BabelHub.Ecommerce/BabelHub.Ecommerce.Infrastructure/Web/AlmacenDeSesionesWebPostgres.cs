@@ -159,6 +159,53 @@ public sealed class AlmacenDeSesionesWebPostgres(IUnidadDeTrabajo unidad, IConex
             },
             cancelacion);
 
+    public Task<IReadOnlyList<SesionGuardada>> CargarParaPurgar(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) =>
+        AccesoAlEsquemaWeb.Ejecutar<IReadOnlyList<SesionGuardada>>(
+            unidad,
+            conexionDeLaUnidad,
+            async (conexion, transaccion, token) =>
+            {
+                // SKIP LOCKED: lo que una solicitud o la purga de otra réplica tiene tomado no se espera ni se atiende dos veces.
+                await using var comando = new NpgsqlCommand(
+                    $"""
+                    SELECT {Columnas} FROM web.sesiones_web
+                    WHERE (cerrada_en IS NULL AND (expira_absoluta <= @ahora OR ultima_actividad <= @inactividad))
+                       OR (cerrada_en IS NOT NULL AND (revocacion_pendiente OR cerrada_en <= @retencion))
+                    ORDER BY coalesce(cerrada_en, ultima_actividad), id_hash
+                    LIMIT @maximo
+                    FOR UPDATE SKIP LOCKED
+                    """,
+                    conexion,
+                    transaccion);
+                comando.Parameters.AddWithValue("ahora", ahora.ToUniversalTime());
+                comando.Parameters.AddWithValue("inactividad", (ahora - PoliticaDeSesion.InactividadMaxima).ToUniversalTime());
+                comando.Parameters.AddWithValue("retencion", (ahora - PoliticaDeBorradores.Vigencia).ToUniversalTime());
+                comando.Parameters.AddWithValue("maximo", maximo);
+                await using var filas = await comando.ExecuteReaderAsync(token).ConfigureAwait(false);
+                var resultado = new List<SesionGuardada>();
+                while (await filas.ReadAsync(token).ConfigureAwait(false))
+                {
+                    resultado.Add(Leer(filas));
+                }
+
+                return resultado;
+            },
+            cancelacion);
+
+    public Task Borrar(HashDeSesion id, CancellationToken cancelacion = default) =>
+        AccesoAlEsquemaWeb.Ejecutar(
+            unidad,
+            conexionDeLaUnidad,
+            async (conexion, transaccion, token) =>
+            {
+                // Solo una fila cerrada y sin revocación pendiente: una abierta o con la renovación sin revocar nunca se borra por aquí.
+                await using var comando = new NpgsqlCommand("DELETE FROM web.sesiones_web WHERE id_hash = @id AND cerrada_en IS NOT NULL AND NOT revocacion_pendiente", conexion, transaccion);
+                comando.Parameters.AddWithValue("id", Convert.FromHexString(id.Valor));
+                await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                return 0;
+            },
+            cancelacion);
+
     private static async Task Ejecutar(NpgsqlConnection conexion, NpgsqlTransaction transaccion, string sql, CancellationToken cancelacion)
     {
         await using var comando = new NpgsqlCommand(sql, conexion, transaccion);
