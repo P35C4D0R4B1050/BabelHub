@@ -11,6 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
+    <Compile Include="../../../src/BabelHub.Shared/Contratos/RolesDeUsuario.cs" Link="Soporte/RolesDeUsuario.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\BabelHub.Ecommerce\BabelHub.Ecommerce.Domain\BabelHub.Ecommerce.Domain.csproj" />
