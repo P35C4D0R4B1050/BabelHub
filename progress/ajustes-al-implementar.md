@@ -38,7 +38,7 @@ Tareas a partir (una tarea = un commit con su prueba primero):
 Pruebas y precisiones a añadir:
 - [ ] Prueba de conformidad entre el script de sellos de VM-AUX y el verificador en C# (T12 o T25).
 - [ ] Ruta del informe local: `progress/ensayos/local/` (ya en `.gitignore`); prueba de que está excluida y de que `progress/ensayos/` solo tiene contadores (T14 o T29).
-- [ ] **Marca de un solo uso de `restaurar.sh`:** HMAC con un secreto que solo conocen el script y el servicio, nonce de un solo uso y caducidad de pocos minutos; prueba negativa con una marca reutilizada o vencida (T17).
+- [x] **Marca de un solo uso de `restaurar.sh`:** HMAC con un secreto que solo conocen el script y el servicio, nonce de un solo uso y caducidad de pocos minutos; prueba negativa con una marca reutilizada o vencida (T17).
 - [ ] Quién vacía la caché de claves del Inventario tras rotar (paso 3 de §5.1): `restaurar.sh` o `IClienteDelInventario`.
 - [ ] Prueba negativa de la VM: «ni clave privada ni tar descifrado ni copia del flujo; solo el directorio de datos de PostgreSQL».
 - [ ] T33 (4 horas) se mide por el camino de `restaurar.sh` desde el equipo de la persona y registra el ancho de banda.

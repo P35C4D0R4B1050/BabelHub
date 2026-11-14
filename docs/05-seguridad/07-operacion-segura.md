@@ -68,6 +68,8 @@ Todos llegan por variables de entorno con el prefijo `BABELHUB__` (el doble guio
 | `BABELHUB__Seguridad__Turnstile__Secreto` | E-commerce | Secreto de `siteverify` de Turnstile (SEG-31). |
 | `BABELHUB__Seguridad__Turnstile__Hostnames` y `…ClaveDeSitio` | E-commerce | No son secretos: los nombres de host permitidos (separados por comas) y la clave de sitio pública del desafío. Se validan igual al arrancar. |
 | `BABELHUB__Almacen__Supresiones__Endpoint`, `…__Region`, `…__ClaveDeAcceso` y `…__ClaveSecreta` | E-commerce | La credencial `supresiones-registro` del almacén de objetos (solo crear y leer en `entradas/`) con la que Identidad escribe el registro de supresiones (PLA-37, PLA-38); el endpoint es https. |
+| `BABELHUB__Restauracion__SecretoDeLaMarca` | Ambos | El secreto del HMAC de la marca de un solo uso que `restaurar.sh` emite para arrancar `Restauracion` o `Ensayo` en producción; solo lo conocen el script y el servicio. |
+| `BABELHUB__Ensayo__ProhibidosSha256` | Ambos (solo en el ensayo) | No es un secreto: las huellas SHA-256 de las credenciales de producción, para que el ensayo se niegue a arrancar si alguna variable de secreto coincide con una. |
 | `BABELHUB__Seguridad__ClaveDeRedisDeLimites` | E-commerce y réplica de gestión | Contraseña del usuario `limites` del Redis de contadores. |
 | `BABELHUB__Auditoria__ClaveDeCursor` | Ambos, una distinta por servicio | Clave HMAC del cursor firmado de la consulta de auditoría, con versión y rotación (`transversal-auditoria`). |
 

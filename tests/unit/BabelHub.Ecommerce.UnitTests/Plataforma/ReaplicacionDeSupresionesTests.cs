@@ -443,3 +443,74 @@ internal static class ConversionesParaPruebas
 {
     public static TipoDeSupresion ATipo(ClaseDeSupresion clase) => clase == ClaseDeSupresion.Cancelacion ? TipoDeSupresion.Cancelacion : TipoDeSupresion.Anonimizacion;
 }
+
+public sealed class PasosDePlataformaDeLaRestauracionTests
+{
+    private static readonly DateTimeOffset Respaldo = new(2026, 11, 13, 12, 0, 0, TimeSpan.Zero);
+
+    private sealed class ReaplicadorFijo(InformeDeReaplicacion informe) : IReaplicadorDeSupresiones
+    {
+        public int Llamadas { get; private set; }
+
+        public Task<InformeDeReaplicacion> Reaplicar(CancellationToken cancelacion = default)
+        {
+            Llamadas++;
+            return Task.FromResult(informe);
+        }
+    }
+
+    private sealed class SellosFijos(SelloDelRegistroDto? sello) : ISellosDelRegistro
+    {
+        public Task<SelloDelRegistroDto?> ObtenerAnteriorA(DateTimeOffset instante, CancellationToken cancelacion = default) => Task.FromResult(sello);
+    }
+
+    private sealed class SinExcepciones : IExcepcionesDelRegistro
+    {
+        public Task<ExcepcionDelRegistroDto?> Obtener(DateTimeOffset instanteDelRespaldo, CancellationToken cancelacion = default) => Task.FromResult<ExcepcionDelRegistroDto?>(null);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-19")]
+    public async Task ElPasoDeVerificacion_FallaSiElRegistroNoPermiteAbrirYTienePrioridadSobreLaReaplicacion()
+    {
+        var registro = new RegistroDeSupresionesEnMemoria { NoDisponible = true };
+        var verificacion = new PasoVerificarRegistroDeSupresiones(new VerificarRegistroDeSupresiones(registro, new SellosFijos(null), new SinExcepciones()), new OpcionesDeRestauracion(Respaldo));
+        var reaplicador = new ReaplicadorFijo(new InformeDeReaplicacion(0, 0, [], [], [], false, false));
+        var reaplicacion = new PasoReaplicarSupresiones(reaplicador);
+
+        var resultado = await new EjecutorDePasosDeRestauracion([reaplicacion, verificacion]).Ejecutar();
+
+        Assert.False(resultado.PermiteAbrir);
+        Assert.Equal("verificar-registro-de-supresiones", resultado.PasoFallido);
+        Assert.Equal(0, reaplicador.Llamadas);
+        Assert.Equal(EstadoDelRegistro.RegistroAusente, verificacion.Ultimo!.Estado);
+        Assert.True(verificacion.Orden < reaplicacion.Orden);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-19")]
+    public async Task ElPasoDeVerificacion_PasaConUnRegistroVacioConSuSelloDeCero()
+    {
+        var registro = new RegistroDeSupresionesEnMemoria();
+        var sello = new SelloDelRegistroDto(Respaldo, 0, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData([])).ToLowerInvariant());
+        var paso = new PasoVerificarRegistroDeSupresiones(new VerificarRegistroDeSupresiones(registro, new SellosFijos(sello), new SinExcepciones()), new OpcionesDeRestauracion(Respaldo));
+
+        Assert.Equal(ResultadoDePaso.Correcto, await paso.Ejecutar());
+        Assert.True(paso.Ultimo!.PermiteAbrir);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-19")]
+    public async Task ElPasoDeReaplicacion_FallaConUnaCuentaQueNoPudoAplicarseOConConfirmacionPendiente_YGuardaElInforme()
+    {
+        var conFallida = new PasoReaplicarSupresiones(new ReaplicadorFijo(new InformeDeReaplicacion(1, 0, [], [], ["3f2a9c41b8d74e6a9d015c7e2b4f8a60"], false, false)));
+        var pendiente = new PasoReaplicarSupresiones(new ReaplicadorFijo(new InformeDeReaplicacion(0, 0, [], [], [], true, false)));
+        var bien = new PasoReaplicarSupresiones(new ReaplicadorFijo(new InformeDeReaplicacion(2, 1, ["9b1e7d52c4a8436fa0e3d6b7c8f12a45"], [], [], false, false)));
+
+        Assert.Equal(ResultadoDePaso.Fallido, await conFallida.Ejecutar());
+        Assert.Equal(ResultadoDePaso.Fallido, await pendiente.Ejecutar());
+        Assert.Equal(ResultadoDePaso.Correcto, await bien.Ejecutar());
+        Assert.Equal(2, bien.Informe!.Reaplicadas);
+        Assert.Equal(OrdenDePasoDeRestauracion.Plataforma + 10, bien.Orden);
+    }
+}

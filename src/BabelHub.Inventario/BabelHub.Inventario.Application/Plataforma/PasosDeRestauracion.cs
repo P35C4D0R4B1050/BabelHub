@@ -32,3 +32,39 @@ public static class OrdenDePasoDeRestauracion
     public const int Identidad = 200;
     public const int Auditoria = 300;
 }
+
+/// <summary>Lo que dejó la ejecución de los pasos: si el servicio puede abrirse, qué pasos corrieron y cuál falló (solo su nombre, nunca un mensaje).</summary>
+public sealed record ResultadoDeRestauracion(bool PermiteAbrir, IReadOnlyList<string> PasosEjecutados, string? PasoFallido);
+
+/// <summary>
+/// Ejecuta, antes de abrir el servicio restaurado, los pasos de <see cref="IPasoDeRestauracion"/> en el orden de su propiedad
+/// <see cref="IPasoDeRestauracion.Orden"/> (Plataforma, Identidad, Auditoría; a igual orden, por nombre). Se detiene en el primero que
+/// falla o que lanza una excepción: el servicio no se abre y el resultado solo nombra el paso (PLA-19, PLA-43, plan §5.1).
+/// </summary>
+public sealed class EjecutorDePasosDeRestauracion(IEnumerable<IPasoDeRestauracion> pasos)
+{
+    public async Task<ResultadoDeRestauracion> Ejecutar(CancellationToken cancelacion = default)
+    {
+        var ejecutados = new List<string>();
+        foreach (var paso in pasos.OrderBy(p => p.Orden).ThenBy(p => p.Nombre, StringComparer.Ordinal))
+        {
+            ejecutados.Add(paso.Nombre);
+            ResultadoDePaso resultado;
+            try
+            {
+                resultado = await paso.Ejecutar(cancelacion).ConfigureAwait(false);
+            }
+            catch (Exception) when (!cancelacion.IsCancellationRequested)
+            {
+                resultado = ResultadoDePaso.Fallido;
+            }
+
+            if (resultado != ResultadoDePaso.Correcto)
+            {
+                return new ResultadoDeRestauracion(false, ejecutados, paso.Nombre);
+            }
+        }
+
+        return new ResultadoDeRestauracion(true, ejecutados, null);
+    }
+}
