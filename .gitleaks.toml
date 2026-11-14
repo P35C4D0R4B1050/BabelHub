@@ -1,0 +1,15 @@
+# Configuración de gitleaks (PLA-28): las reglas por defecto más una lista de excepciones mínima.
+# Solo se permiten, por archivo, las semillas falsas que las pruebas del redactor de datos prohibidos usan a propósito
+# (ninguna es un secreto real). Un archivo nuevo aquí se discute antes de agregarlo.
+title = "BabelHub"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Semillas falsas de las pruebas del redactor de datos prohibidos y de los errores inesperados."
+paths = [
+  '''(^|/)(bin|obj|TestResults)/''',
+  '''tests/unit/BabelHub\.(Ecommerce|Inventario)\.UnitTests/Plataforma/DatosProhibidosTests\.cs''',
+  '''tests/integration/BabelHub\.IntegrationTests/Api/ManejoDeErrores(Ecommerce|Inventario)Tests\.cs''',
+]

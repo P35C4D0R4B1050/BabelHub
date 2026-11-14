@@ -23,7 +23,7 @@ Se sigue una versión reducida del **NIST SSDF**, integrada al flujo de [Spec-Dr
 | Análisis estático (SAST) | CodeQL | Cada cambio y semanal | Hay un hallazgo crítico o alto. |
 | Dependencias vulnerables | Dependabot y `dotnet list package --vulnerable` | Semanal y cada cambio | Hay una vulnerabilidad alta o crítica sin excepción registrada. |
 | Imágenes de contenedor | Trivy | Al construir imágenes | Hay una vulnerabilidad crítica o alta corregible. |
-| Detección de secretos | Escáner de secretos (por ejemplo, gitleaks) | Cada cambio | Aparece un secreto. |
+| Detección de secretos | gitleaks (árbol e historial completo, con `.gitleaks.toml`) y Trivy con análisis de secretos en las capas de cada imagen, por `scripts/escanear-secretos.sh` y el flujo `secretos.yml` | Cada cambio y cada imagen construida | Aparece un secreto; la salida nunca lo copia (gitleaks enmascara el 100 % y Trivy lo sustituye por asteriscos). |
 | Inventario de componentes | SBOM (formato CycloneDX o SPDX) | Al liberar | No se genera. |
 | Pruebas dinámicas básicas | OWASP ZAP baseline contra el entorno local | Antes de cada despliegue (cada versión que se despliega en producción) | Hay una alerta media o superior sin revisar. |
 
