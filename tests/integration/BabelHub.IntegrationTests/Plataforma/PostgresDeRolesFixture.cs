@@ -12,6 +12,9 @@ public sealed class PostgresDeRolesFixture : IAsyncLifetime
 {
     private const string ClaveDeAcceso = "acceso-pruebas-0123456789";
 
+    /// <summary>La contraseña del rol del latido, distinta en cada ejecución: nunca un secreto fijo en el repositorio.</summary>
+    private static readonly string ClaveDelLatido = "latido-" + Guid.NewGuid().ToString("N");
+
     private readonly PostgreSqlContainer _contenedor = new PostgreSqlBuilder("postgres:17-alpine")
         .WithDatabase("pruebas")
         .WithUsername("postgres")
@@ -21,6 +24,9 @@ public sealed class PostgresDeRolesFixture : IAsyncLifetime
     public NpgsqlDataSource Acceso { get; private set; } = null!;
 
     public NpgsqlDataSource Administracion { get; private set; } = null!;
+
+    /// <summary>La fuente de datos del rol <c>plataforma_latido</c>: el único que escribe el latido.</summary>
+    public NpgsqlDataSource Latido { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
@@ -77,12 +83,27 @@ public sealed class PostgresDeRolesFixture : IAsyncLifetime
             """ + BabelHub.Ecommerce.Infrastructure.Plataforma.DefinicionDeTrabajosDeFondo.Permisos);
         await trabajos.ExecuteNonQueryAsync();
 
+        // El latido de la base (plataforma.latido) y su rol mínimo plataforma_latido, con su contraseña puesta aparte, como hace el despliegue.
+        await using var latido = Administracion.CreateCommand(
+            BabelHub.Ecommerce.Infrastructure.Plataforma.DefinicionDeLatido.Sql
+            + "ALTER TABLE plataforma.latido OWNER TO propietario;\n"
+            + BabelHub.Ecommerce.Infrastructure.Plataforma.DefinicionDeLatido.Rol
+            + $"ALTER ROLE plataforma_latido PASSWORD '{ClaveDelLatido}';");
+        await latido.ExecuteNonQueryAsync();
+
         var cadena = new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString())
         {
             Username = "acceso",
             Password = ClaveDeAcceso,
         };
         Acceso = NpgsqlDataSource.Create(cadena.ConnectionString);
+
+        var cadenaDelLatido = new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString())
+        {
+            Username = "plataforma_latido",
+            Password = ClaveDelLatido,
+        };
+        Latido = NpgsqlDataSource.Create(cadenaDelLatido.ConnectionString);
     }
 
     public async Task DisposeAsync()
@@ -90,6 +111,11 @@ public sealed class PostgresDeRolesFixture : IAsyncLifetime
         if (Acceso is not null)
         {
             await Acceso.DisposeAsync();
+        }
+
+        if (Latido is not null)
+        {
+            await Latido.DisposeAsync();
         }
 
         if (Administracion is not null)
