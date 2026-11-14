@@ -132,7 +132,7 @@ internal sealed class AlmacenQueFallaAlGuardar(IAlmacenDeSesionesWeb interno) : 
 
     public Task<IReadOnlyList<SesionGuardada>> CargarAbiertasDeUnUsuario(Guid usuarioId, CancellationToken cancelacion = default) => interno.CargarAbiertasDeUnUsuario(usuarioId, cancelacion);
 
-    public Task<IReadOnlyList<SesionGuardada>> CargarParaPurgar(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) => interno.CargarParaPurgar(ahora, maximo, cancelacion);
+    public Task<IReadOnlyList<SesionGuardada>> CargarParaPurgar(HostDeSesion host, FaseDeLaPurga fase, DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) => interno.CargarParaPurgar(host, fase, ahora, maximo, cancelacion);
 
     public Task Borrar(HashDeSesion id, CancellationToken cancelacion = default) => interno.Borrar(id, cancelacion);
 }
@@ -219,9 +219,9 @@ internal sealed class EntornoDeSesiones
     public BorradoresDePantalla BorradoresDePantalla { get; }
 
     /// <summary>Abre una sesión por el camino real y devuelve el valor de su cookie.</summary>
-    public async Task<string> Abrir(HostWeb host = HostWeb.Tienda, RolWeb rol = RolWeb.Cliente, string? cookieAnterior = null)
+    public async Task<string> Abrir(HostWeb host = HostWeb.Tienda, RolWeb rol = RolWeb.Cliente, string? cookieAnterior = null, string credencial = "jwt-ok-1")
     {
-        var ingreso = new IngresoCompletado(VerificadorPorPrefijo.Usuario, rol, "jwt-ok-1", Reloj.Ahora.AddMinutes(15), Identidad.RenovacionVigente);
+        var ingreso = new IngresoCompletado(VerificadorPorPrefijo.Usuario, rol, credencial, Reloj.Ahora.AddMinutes(15), Identidad.RenovacionVigente);
         var resultado = await Web.Iniciar(new SolicitudDeInicioDeSesion(host, ingreso, cookieAnterior, true));
         return resultado.Valor.ValorDeLaCookie;
     }

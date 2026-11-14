@@ -35,9 +35,51 @@ public sealed class PurgarSesionesWebTests
         d.Fila(cookie).Sesion.RegistrarAccionDelUsuario(DoblesDeSesion.Inicio.AddHours(7).AddMinutes(50));
         d.Reloj.Ahora = DoblesDeSesion.Inicio.AddHours(8).AddMinutes(1);
 
-        await d.Purgar.Ejecutar();
+        await d.PurgarDe(HostDeSesion.Gestion).Ejecutar();
 
         Assert.Equal(MotivoDeCierre.VencidaPorTopeAbsoluto, d.Fila(cookie).Sesion.MotivoDeCierre);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-23")]
+    public async Task La_purga_de_un_host_nunca_toca_las_filas_del_otro_cuya_clave_no_tiene()
+    {
+        var d = new DoblesDeSesion();
+        var deLaTienda = await d.Abrir(HostWeb.Tienda);
+        var deLaGestion = await d.Abrir(HostWeb.Gestion, RolWeb.Encargado);
+        d.Reloj.Ahora = DoblesDeSesion.Inicio.AddMinutes(31);
+
+        var resultado = await d.PurgarDe(HostDeSesion.Gestion).Ejecutar();
+
+        Assert.Equal(1, resultado.Cerradas);
+        Assert.Equal(EstadoDeSesion.Abierta, d.Fila(deLaTienda).Sesion.Estado);
+        Assert.NotNull(d.Fila(deLaTienda).RenovacionCifrada);
+        Assert.Equal(EstadoDeSesion.Vencida, d.Fila(deLaGestion).Sesion.Estado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-23")]
+    public async Task Veinticinco_revocaciones_imposibles_no_dejan_sin_turno_a_las_sesiones_vencidas_ni_a_los_borrados()
+    {
+        var d = new DoblesDeSesion();
+        d.Identidad.ConfirmaRevocaciones = false;
+        for (var i = 0; i < 25; i++)
+        {
+            await d.Cerrar.Cerrar(await d.Abrir(), default);
+        }
+
+        d.Identidad.ConfirmaRevocaciones = true;
+        d.Identidad.LanzaAlRevocar = false;
+        var vencida = await d.Abrir();
+        d.Identidad.ConfirmaRevocaciones = false;
+        d.Reloj.Ahora = DoblesDeSesion.Inicio.AddMinutes(31);
+
+        var resultado = await d.Purgar.Ejecutar();
+
+        // Las cerradas con la revocación pendiente se reintentan al final y no impiden cerrar la vencida.
+        Assert.Equal(1, resultado.Cerradas);
+        Assert.Equal(EstadoDeSesion.Vencida, d.Fila(vencida).Sesion.Estado);
+        Assert.Equal(26, d.Almacen.Filas.Count);
     }
 
     [Fact]
@@ -105,7 +147,7 @@ public sealed class PurgarSesionesWebTests
 
     [Fact]
     [Trait("Criterio", "AC-WEB-23")]
-    public async Task Una_sesion_vencida_con_Identidad_caida_queda_con_la_revocacion_pendiente_y_no_se_vuelve_a_llamar_en_la_corrida()
+    public async Task Una_sesion_vencida_con_Identidad_caida_queda_con_la_revocacion_pendiente_y_solo_se_la_llama_una_vez_por_fase()
     {
         var d = new DoblesDeSesion();
         d.Identidad.LanzaAlRevocar = true;
@@ -115,7 +157,8 @@ public sealed class PurgarSesionesWebTests
         var resultado = await d.Purgar.Ejecutar();
 
         Assert.Equal(3, resultado.Cerradas);
-        Assert.Equal(1, d.Identidad.LlamadasARevocar);
+        // Una llamada que falla en cada fase (vencimientos y revocaciones pendientes) y ninguna más: la purga no se arrastra con una dependencia caída.
+        Assert.Equal(2, d.Identidad.LlamadasARevocar);
         Assert.All(cookies, c =>
         {
             Assert.True(d.Fila(c).RevocacionPendiente);

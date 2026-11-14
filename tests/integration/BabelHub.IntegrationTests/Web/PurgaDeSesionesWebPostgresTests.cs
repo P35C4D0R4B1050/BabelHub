@@ -4,6 +4,7 @@ using BabelHub.Ecommerce.Api.Web;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Application.Web;
 using BabelHub.Ecommerce.Application.Web.Interno;
+using BabelHub.Ecommerce.Domain.Web;
 using BabelHub.Ecommerce.Infrastructure.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -19,7 +20,7 @@ public sealed class PurgaDeSesionesWebPostgresTests(PostgresDeLaWebFixture bd) :
     public Task DisposeAsync() => Task.CompletedTask;
 
     private static PurgarSesionesWeb Purga(EntornoDeSesiones e) =>
-        new(e.Sesiones, e.Borradores, e.Cifrador, e.Identidad, e.Seguridad, e.Alertas, e.Unidad, e.Reloj);
+        new(HostDeSesion.Tienda, e.Sesiones, e.Borradores, e.Cifrador, e.Identidad, e.Seguridad, e.Alertas, e.Unidad, e.Reloj);
 
     private Task<long> Filas() => bd.Consultar<long>("SELECT count(*) FROM web.sesiones_web");
 
@@ -96,6 +97,57 @@ public sealed class PurgaDeSesionesWebPostgresTests(PostgresDeLaWebFixture bd) :
 
         Assert.Equal(10, a.Identidad.Revocaciones + b.Identidad.Revocaciones);
         Assert.Equal(10L, await bd.Consultar<long>("SELECT count(*) FROM web.sesiones_web WHERE motivo_de_cierre = 'vencida_por_inactividad' AND renovacion_cifrada IS NULL AND credencial_cifrada IS NULL"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-23")]
+    public async Task La_purga_de_la_tienda_deja_intactas_las_filas_de_la_gestion_cuya_clave_no_tiene()
+    {
+        const string ClaveTienda = "clave-de-la-tienda-0123456789-abcdefghij";
+        const string ClaveGestion = "clave-de-la-gestion-9876543210-jihgfedcba";
+        var tienda = new EntornoDeSesiones(bd, cifrador: new AesGcmCifradorDeSecretosDeSesion(ConfiguracionDeSesionesWeb.Crear(HostDeSesion.Tienda, ClaveTienda)));
+        var gestion = new EntornoDeSesiones(bd, cifrador: new AesGcmCifradorDeSecretosDeSesion(ConfiguracionDeSesionesWeb.Crear(HostDeSesion.Gestion, ClaveGestion)));
+        var deLaTienda = await tienda.Abrir();
+        var deLaGestion = await gestion.Abrir(HostWeb.Gestion, RolWeb.Encargado);
+        var cerradaDeLaGestion = await gestion.Abrir(HostWeb.Gestion, RolWeb.Encargado);
+        gestion.Identidad.ConfirmaRevocaciones = false;
+        await gestion.Web.Cerrar(cerradaDeLaGestion);
+        tienda.Reloj.Ahora = EntornoDeSesiones.Inicio.AddMinutes(31);
+
+        var purga = new PurgarSesionesWeb(HostDeSesion.Tienda, tienda.Sesiones, tienda.Borradores, tienda.Cifrador, tienda.Identidad, tienda.Seguridad, tienda.Alertas, tienda.Unidad, tienda.Reloj);
+        var resultado = await purga.Ejecutar();
+
+        Assert.Equal(1, resultado.Cerradas);
+        Assert.Equal(0, resultado.Descartadas + resultado.Revocadas);
+        Assert.Empty(tienda.Seguridad.Eventos);
+        Assert.Equal("vencida_por_inactividad", await bd.Consultar<string>($"SELECT motivo_de_cierre FROM web.sesiones_web WHERE id_hash = decode('{ValorDeCookieDeSesion.Hash(deLaTienda).Valor}', 'hex')"));
+        // Las de la gestión siguen como estaban: la abierta con su renovación y la cerrada con la revocación pendiente.
+        Assert.Equal(1L, await bd.Consultar<long>($"SELECT count(*) FROM web.sesiones_web WHERE id_hash = decode('{ValorDeCookieDeSesion.Hash(deLaGestion).Valor}', 'hex') AND cerrada_en IS NULL AND renovacion_cifrada IS NOT NULL"));
+        Assert.Equal(1L, await bd.Consultar<long>($"SELECT count(*) FROM web.sesiones_web WHERE id_hash = decode('{ValorDeCookieDeSesion.Hash(cerradaDeLaGestion).Valor}', 'hex') AND revocacion_pendiente AND renovacion_cifrada IS NOT NULL"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-23")]
+    public async Task Veinticinco_revocaciones_imposibles_no_dejan_sin_turno_a_una_vencida_ni_a_los_borrados()
+    {
+        var e = new EntornoDeSesiones(bd);
+        e.Identidad.ConfirmaRevocaciones = false;
+        for (var i = 0; i < 25; i++)
+        {
+            await e.Web.Cerrar(await e.Abrir());
+        }
+
+        var vencida = await e.Abrir();
+        e.Reloj.Ahora = EntornoDeSesiones.Inicio.AddMinutes(31);
+
+        var resultado = await Purga(e).Ejecutar();
+
+        Assert.Equal(1, resultado.Cerradas);
+        Assert.Equal("vencida_por_inactividad", await bd.Consultar<string>($"SELECT motivo_de_cierre FROM web.sesiones_web WHERE id_hash = decode('{ValorDeCookieDeSesion.Hash(vencida).Valor}', 'hex')"));
+        // Las de revocación imposible pasan al final de la cola (más reintentos): la siguiente corrida atiende otra primero.
+        Assert.Equal(1L, await bd.Consultar<long>("SELECT count(*) FROM web.sesiones_web WHERE reintentos_de_revocacion = 1"));
+        await Purga(e).Ejecutar();
+        Assert.Equal(2L, await bd.Consultar<long>("SELECT count(*) FROM web.sesiones_web WHERE reintentos_de_revocacion = 1"));
     }
 
     [Fact]
@@ -192,7 +244,7 @@ public sealed class PurgaDeSesionesWebPostgresTests(PostgresDeLaWebFixture bd) :
     {
         public bool Falla { get; set; }
 
-        public PurgarSesionesWeb Crear() => new(e.Sesiones, new BorradoresQueFallan(this, e.Borradores), e.Cifrador, e.Identidad, e.Seguridad, e.Alertas, e.Unidad, e.Reloj);
+        public PurgarSesionesWeb Crear() => new(HostDeSesion.Tienda, e.Sesiones, new BorradoresQueFallan(this, e.Borradores), e.Cifrador, e.Identidad, e.Seguridad, e.Alertas, e.Unidad, e.Reloj);
     }
 
     private sealed class BorradoresQueFallan(PurgaQueFalla purga, IAlmacenDeBorradores interno) : IAlmacenDeBorradores

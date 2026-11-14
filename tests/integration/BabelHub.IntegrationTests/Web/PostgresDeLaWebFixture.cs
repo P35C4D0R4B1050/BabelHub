@@ -11,7 +11,8 @@ namespace BabelHub.IntegrationTests.Web;
 /// </summary>
 public sealed class PostgresDeLaWebFixture : IAsyncLifetime
 {
-    private const string ClaveDeAcceso = "acceso-web-pruebas-0123456789";
+    /// <summary>La contraseña del rol de acceso, distinta en cada ejecución: nunca un secreto fijo en el repositorio.</summary>
+    private static readonly string ClaveDeAcceso = "acceso-web-" + Guid.NewGuid().ToString("N");
 
     private readonly PostgreSqlContainer _contenedor = new PostgreSqlBuilder("postgres:17-alpine")
         .WithDatabase("pruebas")

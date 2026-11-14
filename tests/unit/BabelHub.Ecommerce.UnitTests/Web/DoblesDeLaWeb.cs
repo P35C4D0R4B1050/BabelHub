@@ -54,13 +54,17 @@ internal sealed class AlmacenDeSesionesEnMemoria : IAlmacenDeSesionesWeb
         Task.FromResult<IReadOnlyList<SesionGuardada>>([.. Filas.Values.Where(f => f.Sesion.UsuarioId == usuarioId && f.Sesion.Estado == EstadoDeSesion.Abierta)]);
 
     /// <summary>Las mismas filas que elige la consulta de PostgreSQL (la integración comprueba el SQL real).</summary>
-    public Task<IReadOnlyList<SesionGuardada>> CargarParaPurgar(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) =>
+    public Task<IReadOnlyList<SesionGuardada>> CargarParaPurgar(HostDeSesion host, FaseDeLaPurga fase, DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<SesionGuardada>>(
         [
             .. Filas.Values
-                .Where(f => f.Sesion.Estado == EstadoDeSesion.Abierta
-                    ? ahora >= f.Sesion.ExpiraAbsoluta || ahora - f.Sesion.UltimaActividad >= PoliticaDeSesion.InactividadMaxima
-                    : f.RevocacionPendiente || ahora - f.Sesion.CerradaEn!.Value >= PoliticaDeBorradores.Vigencia)
+                .Where(f => f.Sesion.Host == host)
+                .Where(f => fase == FaseDeLaPurga.RevocacionesPendientes
+                    ? f.Sesion.Estado != EstadoDeSesion.Abierta && f.RevocacionPendiente
+                    : f.Sesion.Estado == EstadoDeSesion.Abierta
+                        ? ahora >= f.Sesion.ExpiraAbsoluta || ahora - f.Sesion.UltimaActividad >= PoliticaDeSesion.InactividadMaxima
+                        : !f.RevocacionPendiente && ahora - f.Sesion.CerradaEn!.Value >= PoliticaDeBorradores.Vigencia)
+                .OrderBy(f => fase == FaseDeLaPurga.RevocacionesPendientes ? f.ReintentosDeRevocacion : 0)
                 .Take(maximo),
         ]);
 

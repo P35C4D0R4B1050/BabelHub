@@ -206,6 +206,22 @@ public sealed class SesionesWebPostgresTests(PostgresDeLaWebFixture bd) : IAsync
 
     [Fact]
     [Trait("Criterio", "AC-WEB-26")]
+    public async Task Veinte_solicitudes_simultaneas_con_la_credencial_invalida_no_se_pisan_y_la_sesion_sigue_abierta()
+    {
+        var e = new EntornoDeSesiones(bd);
+        var cookie = await e.Abrir(credencial: "credencial-invalida");
+        e.Identidad.Demora = TimeSpan.FromMilliseconds(100);
+
+        var resultados = await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => Task.Run(() => e.Web.AsegurarCredencial(cookie, HostWeb.Tienda))));
+
+        Assert.All(resultados, r => Assert.Equal(EstadoDeCredencial.Asegurada, r.Estado));
+        Assert.Equal(1, e.Identidad.LlamadasARenovar);
+        Assert.Equal("abierta", await Estado(cookie));
+        Assert.False((await e.Sesiones.Cargar(e.Hash(cookie)))!.RenovacionIncierta);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-26")]
     public async Task Una_respuesta_perdida_deja_la_renovacion_incierta_y_la_solicitud_siguiente_reintenta_con_la_guardada()
     {
         var e = new EntornoDeSesiones(bd);
@@ -287,6 +303,26 @@ public sealed class SesionesWebPostgresTests(PostgresDeLaWebFixture bd) : IAsync
         Assert.Equal("voluntario", await Estado(otra));
         Assert.Empty(await e.Unidad.Ejecutar(async ct => await e.Sesiones.CargarAbiertasDeUnUsuario(VerificadorPorPrefijo.Usuario, ct)));
         Assert.False(await e.BorradoresDePantalla.Conservar(new ConservarBorrador(una, "/cuenta/datos", new Dictionary<string, string> { ["nombre"] = "Ana" }, true)));
+    }
+
+    [Theory]
+    [InlineData("host = 'gestion'")]
+    [InlineData("usuario_id = gen_random_uuid()")]
+    [InlineData("expira_absoluta = expira_absoluta + interval '30 days'")]
+    [InlineData("creada_en = now()")]
+    [Trait("Criterio", "AC-WEB-23")]
+    public async Task El_rol_del_modulo_no_puede_cambiar_lo_que_el_plan_dice_que_no_cambia(string asignacion)
+    {
+        var e = new EntornoDeSesiones(bd);
+        await e.Abrir();
+
+        await using var conexion = await bd.Administracion.OpenConnectionAsync();
+        await using var rol = new NpgsqlCommand("SET ROLE rol_web", conexion);
+        await rol.ExecuteNonQueryAsync();
+        await using var actualizar = new NpgsqlCommand($"UPDATE web.sesiones_web SET {asignacion}", conexion);
+        var error = await Assert.ThrowsAsync<PostgresException>(() => actualizar.ExecuteNonQueryAsync());
+
+        Assert.Equal("42501", error.SqlState);
     }
 
     [Fact]

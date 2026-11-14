@@ -67,13 +67,18 @@ public static class DefinicionDeLaWeb
         """;
 
     /// <summary>
-    /// Lo que <c>rol_web</c> puede hacer: leer y escribir sesiones y borradores y borrar las filas vencidas o entregadas. Sin <c>TRUNCATE</c> ni <c>DROP</c>: vaciar las
+    /// Lo que <c>rol_web</c> puede hacer: leer, insertar y borrar sesiones y borradores y actualizar <b>solo las columnas que cambian</b> (el identificador, el usuario, el host, la
+    /// creación y el tope absoluto de una sesión, y el usuario y la plantilla de un borrador, no cambian nunca: lo exige el plan §3). Sin <c>TRUNCATE</c> ni <c>DROP</c>: vaciar las
     /// tablas al restaurar lo hace el paso de restauración con el permiso de borrado, no con un permiso más amplio.
     /// </summary>
     public const string Permisos = """
         GRANT USAGE ON SCHEMA web TO rol_web;
-        GRANT SELECT, INSERT, UPDATE, DELETE ON web.sesiones_web TO rol_web;
-        GRANT SELECT, INSERT, UPDATE, DELETE ON web.borradores TO rol_web;
-        GRANT SELECT, INSERT, UPDATE ON web.claves_de_proteccion TO rol_web;
+        GRANT SELECT, INSERT, DELETE ON web.sesiones_web TO rol_web;
+        GRANT UPDATE (ultima_actividad, credencial_cifrada, credencial_vence_en, renovacion_cifrada, renovacion_incierta, retorno_tras_aceptar, revocacion_pendiente,
+                      reintentos_de_revocacion, version_de_clave, cerrada_en, motivo_de_cierre) ON web.sesiones_web TO rol_web;
+        GRANT SELECT, INSERT, DELETE ON web.borradores TO rol_web;
+        GRANT UPDATE (id, cuerpo_cifrado, version_de_clave, creado_en, vence_en) ON web.borradores TO rol_web;
+        GRANT SELECT, INSERT ON web.claves_de_proteccion TO rol_web;
+        GRANT UPDATE (xml_cifrado, version_de_clave) ON web.claves_de_proteccion TO rol_web;
         """;
 }

@@ -73,8 +73,15 @@ public sealed class AlmacenDeSesionesWebPostgres(IUnidadDeTrabajo unidad, IConex
                 {
                     await using var comando = new NpgsqlCommand($"SELECT {Columnas} FROM web.sesiones_web WHERE id_hash = @id FOR UPDATE", conexion, transaccion);
                     comando.Parameters.AddWithValue("id", Convert.FromHexString(id.Valor));
-                    await using var filas = await comando.ExecuteReaderAsync(token).ConfigureAwait(false);
-                    return await filas.ReadAsync(token).ConfigureAwait(false) ? Leer(filas) : null;
+                    SesionGuardada? fila;
+                    await using (var filas = await comando.ExecuteReaderAsync(token).ConfigureAwait(false))
+                    {
+                        fila = await filas.ReadAsync(token).ConfigureAwait(false) ? Leer(filas) : null;
+                    }
+
+                    // El plazo era solo para esperar la fila: no se arrastra a lo demás que haga la unidad de trabajo (otras tablas, otros módulos).
+                    await Ejecutar(conexion, transaccion, "SET LOCAL lock_timeout = DEFAULT", token).ConfigureAwait(false);
+                    return fila;
                 }
                 catch (PostgresException ex) when (ex.SqlState == FilaBloqueada)
                 {
@@ -159,24 +166,29 @@ public sealed class AlmacenDeSesionesWebPostgres(IUnidadDeTrabajo unidad, IConex
             },
             cancelacion);
 
-    public Task<IReadOnlyList<SesionGuardada>> CargarParaPurgar(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) =>
+    public Task<IReadOnlyList<SesionGuardada>> CargarParaPurgar(HostDeSesion host, FaseDeLaPurga fase, DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) =>
         AccesoAlEsquemaWeb.Ejecutar<IReadOnlyList<SesionGuardada>>(
             unidad,
             conexionDeLaUnidad,
             async (conexion, transaccion, token) =>
             {
                 // SKIP LOCKED: lo que una solicitud o la purga de otra réplica tiene tomado no se espera ni se atiende dos veces.
+                // Solo las del host de esta réplica: la clave de cada host solo abre sus filas.
+                const string Vencimientos = """
+                    WHERE host = @host
+                      AND ((cerrada_en IS NULL AND (expira_absoluta <= @ahora OR ultima_actividad <= @inactividad))
+                        OR (cerrada_en IS NOT NULL AND NOT revocacion_pendiente AND cerrada_en <= @retencion))
+                    ORDER BY id_hash
+                    """;
+                const string Pendientes = """
+                    WHERE host = @host AND cerrada_en IS NOT NULL AND revocacion_pendiente
+                    ORDER BY reintentos_de_revocacion, cerrada_en, id_hash
+                    """;
                 await using var comando = new NpgsqlCommand(
-                    $"""
-                    SELECT {Columnas} FROM web.sesiones_web
-                    WHERE (cerrada_en IS NULL AND (expira_absoluta <= @ahora OR ultima_actividad <= @inactividad))
-                       OR (cerrada_en IS NOT NULL AND (revocacion_pendiente OR cerrada_en <= @retencion))
-                    ORDER BY coalesce(cerrada_en, ultima_actividad), id_hash
-                    LIMIT @maximo
-                    FOR UPDATE SKIP LOCKED
-                    """,
+                    $"SELECT {Columnas} FROM web.sesiones_web {(fase == FaseDeLaPurga.Vencimientos ? Vencimientos : Pendientes)} LIMIT @maximo FOR UPDATE SKIP LOCKED",
                     conexion,
                     transaccion);
+                comando.Parameters.AddWithValue("host", host == HostDeSesion.Tienda ? "tienda" : "gestion");
                 comando.Parameters.AddWithValue("ahora", ahora.ToUniversalTime());
                 comando.Parameters.AddWithValue("inactividad", (ahora - PoliticaDeSesion.InactividadMaxima).ToUniversalTime());
                 comando.Parameters.AddWithValue("retencion", (ahora - PoliticaDeBorradores.Vigencia).ToUniversalTime());

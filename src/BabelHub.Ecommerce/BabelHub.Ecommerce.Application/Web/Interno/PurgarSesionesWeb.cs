@@ -36,11 +36,14 @@ public sealed class PurgarSesionesWeb
     public const int LotesPorCorrida = 50;
 
     private readonly ServiciosDeSesion _comun;
+    private readonly HostDeSesion _host;
     private readonly IAlmacenDeBorradores _borradores;
     private readonly IPublicadorDeAlertasTecnicas _alertas;
     private readonly IUnidadDeTrabajo _unidad;
 
+    /// <param name="host">El host de esta réplica: solo purga las filas de su host, que son las únicas que su clave puede abrir (cada host tiene su clave maestra).</param>
     public PurgarSesionesWeb(
+        HostDeSesion host,
         IAlmacenDeSesionesWeb sesiones,
         IAlmacenDeBorradores borradores,
         ICifradorDeSecretosDeSesion cifrador,
@@ -50,6 +53,7 @@ public sealed class PurgarSesionesWeb
         IUnidadDeTrabajo unidad,
         IReloj reloj)
     {
+        _host = host;
         _comun = new ServiciosDeSesion(sesiones, cifrador, identidad, seguridad, reloj);
         _borradores = borradores;
         _alertas = alertas;
@@ -61,28 +65,34 @@ public sealed class PurgarSesionesWeb
         var total = new Acumulado();
         var identidadCaida = false;
 
-        for (var lote = 0; lote < LotesPorCorrida; lote++)
+        // Primero lo que siempre avanza (vencer, cerrar y borrar), después las revocaciones pendientes: unas pocas imposibles de confirmar no dejan sin turno a lo demás.
+        foreach (var fase in new[] { FaseDeLaPurga.Vencimientos, FaseDeLaPurga.RevocacionesPendientes })
         {
-            var (atendidas, cambios) = await _unidad.Ejecutar(
-                async ct =>
-                {
-                    var ahora = _comun.Reloj.Ahora;
-                    var filas = await _comun.Sesiones.CargarParaPurgar(ahora, TamanoDelLote, ct).ConfigureAwait(false);
-                    var acumulado = new Acumulado();
-                    foreach (var fila in filas)
-                    {
-                        identidadCaida = await Atender(fila, ahora, identidadCaida, acumulado, ct).ConfigureAwait(false);
-                    }
-
-                    total.Sumar(acumulado);
-                    return (filas.Count, acumulado.Cambios);
-                },
-                cancelacion).ConfigureAwait(false);
-
-            // Sin cambios (solo quedan revocaciones pendientes que no se pueden atender ahora) o un lote incompleto: no hay más por hacer en esta corrida.
-            if (atendidas < TamanoDelLote || cambios == 0)
+            // Cada fase vuelve a intentar con Identidad: que una sesión vencida no se pudiera revocar no impide reintentar las pendientes (y la primera que falle detiene el resto).
+            identidadCaida = false;
+            for (var lote = 0; lote < LotesPorCorrida; lote++)
             {
-                break;
+                var (atendidas, cambios) = await _unidad.Ejecutar(
+                    async ct =>
+                    {
+                        var ahora = _comun.Reloj.Ahora;
+                        var filas = await _comun.Sesiones.CargarParaPurgar(_host, fase, ahora, TamanoDelLote, ct).ConfigureAwait(false);
+                        var acumulado = new Acumulado();
+                        foreach (var fila in filas)
+                        {
+                            identidadCaida = await Atender(fila, ahora, identidadCaida, acumulado, ct).ConfigureAwait(false);
+                        }
+
+                        total.Sumar(acumulado);
+                        return (filas.Count, acumulado.Cambios);
+                    },
+                    cancelacion).ConfigureAwait(false);
+
+                // Un lote incompleto, sin cambios o con Identidad caída: no hay más por hacer en esta fase (las revocaciones que fallan pasan al final de la cola y siguen en la próxima corrida).
+                if (atendidas < TamanoDelLote || cambios == 0 || (fase == FaseDeLaPurga.RevocacionesPendientes && identidadCaida))
+                {
+                    break;
+                }
             }
         }
 

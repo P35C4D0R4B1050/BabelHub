@@ -199,7 +199,7 @@ internal sealed class AsegurarCredencialDeSesion(
 
             case EstadoDeVerificacion.Vencida or EstadoDeVerificacion.Invalida when puedeReintentar:
                 // Una credencial inválida o vencida intenta una renovación; si Identidad la rechaza, la sesión se cierra.
-                var renovada = await ForzarRenovacion(id, cancelacion).ConfigureAwait(false);
+                var renovada = await ForzarRenovacion(id, fila.CredencialCifrada, cancelacion).ConfigureAwait(false);
                 if (renovada.Resultado is not null)
                 {
                     return renovada.Resultado;
@@ -223,16 +223,44 @@ internal sealed class AsegurarCredencialDeSesion(
         }
     }
 
-    private async Task<(ResultadoDeCredencial? Resultado, SesionGuardada? Fila)> ForzarRenovacion(HashDeSesion id, CancellationToken cancelacion)
+    /// <summary>
+    /// Fuerza una renovación porque la credencial observada no se pudo verificar. La lectura bajo bloqueo, el marcado y su escritura son <b>una sola transacción</b> (si no, el
+    /// bloqueo se liberaría entre la lectura y la escritura y se pisaría la credencial que otra solicitud acaba de rotar), y si otra solicitud ya renovó la credencial
+    /// (la fila ya no tiene la observada) no se marca ni se renueva otra vez.
+    /// </summary>
+    private async Task<(ResultadoDeCredencial? Resultado, SesionGuardada? Fila)> ForzarRenovacion(HashDeSesion id, byte[]? credencialObservada, CancellationToken cancelacion)
     {
-        var marcada = await comun.Sesiones.CargarParaRenovar(id, cancelacion).ConfigureAwait(false);
-        if (marcada is null || marcada.Sesion.Estado != EstadoDeSesion.Abierta)
+        var yaRenovada = false;
+        var cerrada = await unidad.Ejecutar(
+            async ct =>
+            {
+                var marcada = await comun.Sesiones.CargarParaRenovar(id, ct).ConfigureAwait(false);
+                if (marcada is null || marcada.Sesion.Estado != EstadoDeSesion.Abierta)
+                {
+                    return true;
+                }
+
+                if (credencialObservada is null || marcada.CredencialCifrada is null || !marcada.CredencialCifrada.AsSpan().SequenceEqual(credencialObservada))
+                {
+                    yaRenovada = true;
+                    return false;
+                }
+
+                marcada.RenovacionIncierta = true;
+                await comun.Sesiones.Guardar(marcada, ct).ConfigureAwait(false);
+                return false;
+            },
+            cancelacion).ConfigureAwait(false);
+        if (cerrada)
         {
             return (Sin(EstadoDeCredencial.SesionCerrada), null);
         }
 
-        marcada.RenovacionIncierta = true;
-        await comun.Sesiones.Guardar(marcada, cancelacion).ConfigureAwait(false);
+        if (yaRenovada)
+        {
+            return (null, await comun.Sesiones.Cargar(id, cancelacion).ConfigureAwait(false));
+        }
+
         var resultado = await Renovar(id, cancelacion).ConfigureAwait(false);
         if (resultado is not null)
         {

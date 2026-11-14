@@ -48,6 +48,13 @@ public sealed class BloqueoDeSesionNoDisponibleException : Exception
     }
 }
 
+/// <summary>Las dos fases de la purga de sesiones (ver <see cref="IAlmacenDeSesionesWeb.CargarParaPurgar"/>).</summary>
+public enum FaseDeLaPurga
+{
+    Vencimientos,
+    RevocacionesPendientes,
+}
+
 /// <summary>Puerto: la tabla de sesiones web (esquema <c>web</c>). <c>CargarParaRenovar</c> toma la fila con <c>SELECT … FOR UPDATE</c> y <c>lock_timeout</c>.</summary>
 public interface IAlmacenDeSesionesWeb
 {
@@ -74,10 +81,13 @@ public interface IAlmacenDeSesionesWeb
     Task<IReadOnlyList<SesionGuardada>> CargarAbiertasDeUnUsuario(Guid usuarioId, CancellationToken cancelacion = default);
 
     /// <summary>
-    /// Las filas que la purga debe atender, tomadas con <c>FOR UPDATE SKIP LOCKED</c> (una solicitud o una purga de otra réplica que las tiene no se espera): abiertas que ya
-    /// vencieron por inactividad o por tope sin que nadie las usara, cerradas con la revocación pendiente y cerradas hace 30 minutos o más. Exige una unidad de trabajo activa.
+    /// Las filas <b>del host</b> que la purga debe atender en una fase, tomadas con <c>FOR UPDATE SKIP LOCKED</c> (una solicitud o una purga de otra réplica que las tiene no se
+    /// espera). Solo las del host de la réplica: cada una descifra únicamente con la clave de su host, y una fila ajena parecería ilegible y perdería su renovación sin revocarla.
+    /// <see cref="FaseDeLaPurga.Vencimientos"/>: abiertas que ya vencieron sin que nadie las usara y cerradas hace 30 minutos o más sin revocación pendiente (siempre avanzan: se
+    /// cierran o se borran). <see cref="FaseDeLaPurga.RevocacionesPendientes"/>: cerradas con la renovación sin revocar, las de menos reintentos primero (una que falla pasa al
+    /// final, así unas pocas imposibles no dejan sin turno a las demás). Exige una unidad de trabajo activa.
     /// </summary>
-    Task<IReadOnlyList<SesionGuardada>> CargarParaPurgar(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default);
+    Task<IReadOnlyList<SesionGuardada>> CargarParaPurgar(HostDeSesion host, FaseDeLaPurga fase, DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default);
 
     /// <summary>Borra la fila (la que la purga ya atendió: cerrada hace 30 minutos o más y sin revocación pendiente).</summary>
     Task Borrar(HashDeSesion id, CancellationToken cancelacion = default);
