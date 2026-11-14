@@ -128,6 +128,7 @@ public sealed class CifradoDeDiscoTests : IDisposable
     [InlineData("DOBLE_FALLA_TODO", "1")]
     [InlineData("DOBLE_FALLA_ARRANQUE", "1")]
     [InlineData("DOBLE_FALLA_BLOQUES", "1")]
+    [Trait("Criterio", "AC-PLA-20")]
     public void UnVolumenNoDisponibleOQueNoSePuedeConsultar_NuncaSeDaPorBueno(string variable, string valor)
     {
         var (codigo, salida, _) = Ejecutar(new Dictionary<string, string> { [variable] = valor });
@@ -162,6 +163,7 @@ public sealed class CifradoDeDiscoTests : IDisposable
     [InlineData("--instancia", "no-es-un-ocid")]
     [InlineData("--compartimento", "ocid1.compartment.oc1..x; rm -rf /")]
     [InlineData("--dominio", "AD 1; echo")]
+    [Trait("Criterio", "AC-PLA-20")]
     public void UnUsoInvalidoSeRechazaConCodigo2_SinLlamarALaCli(string opcion, string valor)
     {
         var argumentos = new Dictionary<string, string> { ["--instancia"] = Instancia, ["--compartimento"] = Compartimento, ["--dominio"] = "Abcd:SA-SAOPAULO-1-AD-1" };

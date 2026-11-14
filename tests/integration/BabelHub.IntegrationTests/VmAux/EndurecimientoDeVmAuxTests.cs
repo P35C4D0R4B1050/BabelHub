@@ -22,6 +22,10 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
         allowagentforwarding no
         x11forwarding no
         permitemptypasswords no
+        usepam yes
+        allowstreamlocalforwarding no
+        gatewayports no
+        permittunnel false
         pubkeyauthentication yes
         permituserenvironment no
         maxauthtries 3
@@ -36,6 +40,8 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
         #!/usr/bin/env bash
         # stat -c <formato> <ruta>: los permisos del archivo de entorno y de los scripts de root los fija la prueba.
         formato="$2"; ruta="$3"; modo=644; dueno=root
+        [[ "$ruta" == "$DOBLE_ENV" ]] && dueno="${DOBLE_DUENO_ENV:-root}"
+        [[ "$ruta" == "$DOBLE_SCRIPTS" ]] && { modo="${DOBLE_MODO_DIR:-755}"; dueno="${DOBLE_DUENO_DIR:-root}"; }
         [[ "$ruta" == "$DOBLE_ENV" ]] && modo="${DOBLE_MODO_ENV:-600}"
         [[ "$ruta" == "$DOBLE_SCRIPTS"/* ]] && { modo="${DOBLE_MODO_SCRIPTS:-755}"; dueno="${DOBLE_DUENO_SCRIPTS:-root}"; }
         case "$formato" in '%a') echo "$modo" ;; '%U %a') echo "$dueno $modo" ;; *) exit 1 ;; esac
@@ -44,7 +50,9 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
     private const string DobleDeSshd = """
         #!/usr/bin/env bash
         [[ -n "${DOBLE_SSHD_FALLA:-}" ]] && exit 1
-        cat "$DOBLE_SSHD_CONFIG"
+        # sshd -T -C user=<usuario>,…: la configuración de otro usuario puede ser distinta (un Match User).
+        todos="$*"; usuario="${todos#*user=}"; usuario="${usuario%%,*}"
+        if [[ -f "$DOBLE_SSHD_CONFIG.$usuario" ]]; then cat "$DOBLE_SSHD_CONFIG.$usuario"; else cat "$DOBLE_SSHD_CONFIG"; fi
         """;
 
     private const string DobleDePs = """
@@ -84,6 +92,7 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
         File.WriteAllText(Path.Combine(_raiz, "sshd-doble.sh"), DobleDeSshd.ReplaceLineEndings("\n"));
         File.WriteAllText(Path.Combine(_raiz, "ps-doble.sh"), DobleDePs.ReplaceLineEndings("\n"));
         File.WriteAllText(_sshdConfig, SshdConforme.ReplaceLineEndings("\n") + "\n");
+        File.WriteAllText(Path.Combine(_raiz, "pam-sshd"), "@include common-auth\nsession optional pam_exec.so quiet /opt/babelhub/scripts/vm-aux/avisar-ingreso-ssh.sh\n");
         File.WriteAllText(_clienteSsh, "Host *\n    ForwardAgent no\n");
         File.WriteAllText(_autorizadas, "restrict,port-forwarding,permitopen=\"10.0.1.10:22\",permitopen=\"10.0.2.10:22\" ssh-ed25519 AAAAC3Nza-publica persona\n");
         File.WriteAllText(_procesos, "systemd\nsshd\ncron\nbash\nkworker/0:1\n");
@@ -117,6 +126,7 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
         ["AUX_RUTAS_CLAVES"] = EntornoDeVmAux.EnLinux(_casa),
         ["AUX_AUTORIZADAS"] = EntornoDeVmAux.EnLinux(_autorizadas),
         ["AUX_CONFIGS_SSH"] = EntornoDeVmAux.EnLinux(_clienteSsh),
+        ["AUX_PAM_SSHD"] = EntornoDeVmAux.EnLinux(Path.Combine(_raiz, "pam-sshd")),
     };
 
     private (int Codigo, string Salida, string Errores) Verificar(Action<Dictionary<string, string>>? ajustar = null)
@@ -164,9 +174,14 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
     [InlineData("permituserenvironment", "yes")]
     [InlineData("maxauthtries", "6")]
     [InlineData("permittty", "yes")]
+    [InlineData("usepam", "no")]
+    [InlineData("allowstreamlocalforwarding", "yes")]
+    [InlineData("gatewayports", "clientspecified")]
+    [InlineData("permittunnel", "yes")]
     [InlineData("allowtcpforwarding", "no")]
     [InlineData("forcecommand", null)]
     [InlineData("allowusers", null)]
+    [Trait("Criterio", "AC-PLA-20")]
     public void UnAjusteInseguroDeSshd_HaceFallarElVerificadorNombrandoLaClave(string clave, string? valor)
     {
         CambiarSshd(clave, valor);
@@ -183,6 +198,7 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
     [InlineData("10.0.1.10:22 203.0.113.9:22")]
     [InlineData("10.0.1.10:5432")]
     [InlineData("172.32.0.5:22")]
+    [Trait("Criterio", "AC-PLA-20")]
     public void SiElSaltoNoEstaAcotadoADireccionesPrivadasPuerto22_ElVerificadorFalla(string destinos)
     {
         CambiarSshd("permitopen", destinos);
@@ -208,6 +224,7 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
     [InlineData("pem")]
     [InlineData("putty")]
     [InlineData("age")]
+    [Trait("Criterio", "AC-PLA-20")]
     public void UnaLlavePrivadaEnVmAux_SeDetectaPorSuRuta_SinImprimirSuContenido(string tipo)
     {
         // Las cabeceras se arman en tiempo de ejecución: el código fuente de la prueba no lleva ninguna llave ni nada con su forma.
@@ -259,6 +276,7 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
     [Theory]
     [InlineData("ForwardAgent yes")]
     [InlineData("  forwardagent   YES")]
+    [Trait("Criterio", "AC-PLA-20")]
     public void UnForwardAgentActivoEnLaConfiguracionDeCliente_HaceFallar(string linea)
     {
         File.WriteAllText(_clienteSsh, "Host *\n" + linea + "\n");
@@ -275,6 +293,7 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
     [InlineData("restrict,port-forwarding ssh-ed25519 AAAAC3Nza-publica persona", "no acota los destinos con permitopen")]
     [InlineData("restrict,port-forwarding,permitopen=\"198.51.100.4:22\" ssh-ed25519 AAAAC3Nza-publica persona", "permitopen admite «198.51.100.4:22»")]
     [InlineData("restrict,port-forwarding,agent-forwarding,permitopen=\"10.0.1.10:22\" ssh-ed25519 AAAAC3Nza-publica persona", "agent-forwarding")]
+    [Trait("Criterio", "AC-PLA-20")]
     public void UnaLlaveDelSaltoSinAcotar_HaceFallarElVerificador(string linea, string motivo)
     {
         File.WriteAllText(_autorizadas, linea + "\n");
@@ -283,6 +302,142 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
 
         Assert.Equal(1, codigo);
         Assert.Contains(motivo, salida, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("port-forwarding,permitopen=\"10.0.1.10:22\" ssh-ed25519 AAAAC3Nza-publica restrict,persona", "no lleva «restrict»")]
+    [InlineData("restrict,port-forwarding,permitopen=\"10.0.1.10:22\",permitopen=\"203.0.113.7:22\" ssh-ed25519 AAAAC3Nza-publica persona", "permitopen admite «203.0.113.7:22»")]
+    [Trait("Criterio", "AC-PLA-20")]
+    public void ElVerificadorSoloMiraElCampoDeOpcionesDeLaLlave_NoSuComentario_NiSoloElPrimerPermitopen(string linea, string motivo)
+    {
+        File.WriteAllText(_autorizadas, linea + "\n");
+
+        var (codigo, salida, _) = Verificar();
+
+        Assert.Equal(1, codigo);
+        Assert.Contains(motivo, salida, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-20")]
+    public void UnaOpcionNoAgentForwarding_NoEsUnaLlaveConReenvioDeAgente()
+    {
+        File.WriteAllText(_autorizadas, "restrict,port-forwarding,no-agent-forwarding,permitopen=\"10.0.1.10:22\" ssh-ed25519 AAAAC3Nza-publica persona\n");
+
+        var (codigo, salida, errores) = Verificar();
+
+        Assert.True(codigo == 0, salida + errores);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-20")]
+    public void UnMatchUserDelAdministradorQueReabreElReenvioDeAgente_SeDetecta()
+    {
+        File.WriteAllText(_sshdConfig + ".admin", File.ReadAllText(_sshdConfig).Replace("allowagentforwarding no", "allowagentforwarding yes", StringComparison.Ordinal));
+
+        var (codigo, salida, _) = Verificar();
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("ALERTA sshd allowagentforwarding para «admin» es «yes» y debe ser «no»", salida, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("session optional pam_exec.so quiet /opt/babelhub/scripts/vm-aux/otro.sh\n")]
+    [InlineData("# session optional pam_exec.so quiet /opt/babelhub/scripts/vm-aux/avisar-ingreso-ssh.sh\n")]
+    [Trait("Criterio", "AC-PLA-20")]
+    public void SiLaAlertaDeIngresoSshNoEstaInstaladaEnPam_ElVerificadorFalla(string contenido)
+    {
+        File.WriteAllText(Path.Combine(_raiz, "pam-sshd"), contenido);
+
+        var (codigo, salida, _) = Verificar();
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("ALERTA la alerta de ingreso SSH no está instalada en ", salida, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("DOBLE_DUENO_ENV", "babelhub-aux", "es de babelhub-aux con permisos 600")]
+    [InlineData("DOBLE_MODO_ENV", "660", "es de root con permisos 660")]
+    [InlineData("DOBLE_MODO_ENV", "666", "es de root con permisos 666")]
+    [Trait("Criterio", "AC-PLA-20")]
+    public void ElEntornoQueLeeRootNoPuedeSerCambiadoPorElUsuarioSinPrivilegios(string variable, string valor, string esperado)
+    {
+        var (codigo, salida, _) = Verificar(e => e[variable] = valor);
+
+        Assert.Equal(1, codigo);
+        Assert.Contains(esperado, salida, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-20")]
+    public void ElEntornoDeRootConPermisos0640_Pasa()
+    {
+        var (codigo, salida, errores) = Verificar(e => e["DOBLE_MODO_ENV"] = "640");
+
+        Assert.True(codigo == 0, salida + errores);
+    }
+
+    [Theory]
+    [InlineData("DOBLE_DUENO_DIR", "babelhub-aux")]
+    [InlineData("DOBLE_MODO_DIR", "775")]
+    [Trait("Criterio", "AC-PLA-20")]
+    public void LaCarpetaDeLosScriptsDeRootTambienDebeSerDeRootYNoEscribible(string variable, string valor)
+    {
+        var (codigo, salida, _) = Verificar(e => e[variable] = valor);
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("ALERTA la carpeta ", salida, StringComparison.Ordinal);
+        Assert.Contains("debe ser de root y sin escritura para otros", salida, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-20")]
+    public void ElArchivoDeEntorno_SeLeeSinEjecutarlo_YSoloAceptaSusNombresPropios()
+    {
+        // Quien comprometa a babelhub-aux no debe ganar root a través del archivo que la tarea de root carga.
+        var marcador = Path.Combine(_raiz, "ejecutado.txt");
+        File.WriteAllText(
+            _auxEnv,
+            $"AUX_SMTP_USUARIO=$(touch {EntornoDeVmAux.EnLinux(marcador)})\n"
+            + $"AUX_SMTP_CLAVE=`touch {EntornoDeVmAux.EnLinux(marcador)}`\n"
+            + "AUX_CORREO_DE=vm-aux@ejemplo.interno\nAUX_CORREO_PARA=responsable@ejemplo.interno\nAUX_SMTP_URL=smtps://smtp.ejemplo.interno:465\n"
+            + $"PS={EntornoDeVmAux.EnLinux(marcador)}\nCURL={EntornoDeVmAux.EnLinux(marcador)}\nAUX_ESTADO={EntornoDeVmAux.EnLinux(_raiz)}/otro-estado\nSSHD_T=touch\n");
+        var comando = Path.Combine(_raiz, "imprime.sh");
+        File.WriteAllText(comando, "#!/usr/bin/env bash\necho \"PS=${PS:-vacio} ESTADO=${AUX_ESTADO}\"\nexit 1\n");
+
+        var resultado = _entorno.Ejecutar(
+            "alertar.sh",
+            ["prueba", EntornoDeVmAux.EnLinux(comando)],
+            new Dictionary<string, string> { ["AUX_ENV"] = EntornoDeVmAux.EnLinux(_auxEnv), ["AUX_SMTP_USUARIO"] = string.Empty, ["AUX_SMTP_CLAVE"] = string.Empty, ["AUX_SMTP_URL"] = string.Empty, ["AUX_CORREO_DE"] = string.Empty, ["AUX_CORREO_PARA"] = string.Empty });
+
+        Assert.Equal(1, resultado.Codigo);
+        Assert.False(File.Exists(marcador), "el contenido del archivo de entorno se ejecutó");
+        Assert.Equal(1, _entorno.CorreosEnviados);
+        // Las variables de prueba (PS, AUX_ESTADO…) no se aceptan desde el archivo: solo las pone el entorno del proceso.
+        Assert.Contains("PS=vacio ESTADO=" + EntornoDeVmAux.EnLinux(_entorno.Estado), _entorno.Cuerpo(1), StringComparison.Ordinal);
+        Assert.Contains("user = \"$(touch ", _entorno.Configuracion(1), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-20")]
+    public void UnaClaveDeCorreoConComillas_NoRompeNiInyectaElArchivoDeConfiguracionDeCurl()
+    {
+        var clave = "ab\"cd\\ef\nurl = \"http://evil.invalid\"";
+
+        var resultado = _entorno.Ejecutar("alertar.sh", ["prueba", Comando("ALERTA x", 1)], new Dictionary<string, string> { ["AUX_SMTP_CLAVE"] = clave.Replace("\n", string.Empty, StringComparison.Ordinal) });
+
+        Assert.Equal(1, resultado.Codigo);
+        var configuracion = _entorno.Configuracion(1);
+        Assert.Single(configuracion.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries));
+        Assert.Contains("ab\\\"cd\\\\ef", configuracion, StringComparison.Ordinal);
+    }
+
+    private string Comando(string texto, int codigo)
+    {
+        var ruta = Path.Combine(_raiz, $"cmd-{Guid.NewGuid():N}.sh");
+        File.WriteAllText(ruta, $"#!/usr/bin/env bash\ncat <<'FIN'\n{texto}\nFIN\nexit {codigo}\n");
+        return EntornoDeVmAux.EnLinux(ruta);
     }
 
     [Fact]
@@ -306,6 +461,7 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
     [InlineData("RCLONE_CONFIG_LECTOR_SECRET_ACCESS_KEY")]
     [InlineData("AUTHENTICATION_API_KEY")]
     [InlineData("BABELHUB_AGE_DESTINATARIO")]
+    [Trait("Criterio", "AC-PLA-20")]
     public void UnaCredencialDeMasEnElEntornoDeVmAux_SeRechazaPorSuNombre_SinImprimirSuValor(string nombre)
     {
         File.AppendAllText(_auxEnv, $"{nombre}={_valorSecreto}\n");
@@ -321,12 +477,12 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
     [Trait("Criterio", "AC-PLA-20")]
     public void ElEntornoDeVmAux_ConPermisosAbiertos_OSinSuCredencialDeCorreoPropia_OSinTls_Falla()
     {
-        File.WriteAllText(_auxEnv, "AUX_SMTP_URL=smtp://smtp.ejemplo.interno:25\nAUX_CORREO_DE=vm-aux@ejemplo.interno\n");
+        File.WriteAllText(_auxEnv, "AUX_SMTP_URL=smtp://smtp.ejemplo.interno:25\n" + "AUX_CORREO_DE=vm-aux@ejemplo.interno\n");
 
         var (codigo, salida, errores) = Verificar(e => e["DOBLE_MODO_ENV"] = "644");
 
         Assert.Equal(1, codigo);
-        Assert.Contains("tiene permisos 644: debe ser 0600", salida, StringComparison.Ordinal);
+        Assert.Contains("es de root con permisos 644: debe ser de root y 0600 o 0640", salida, StringComparison.Ordinal);
         Assert.Contains("falta AUX_SMTP_USUARIO: VM-AUX necesita su credencial de correo propia", salida, StringComparison.Ordinal);
         Assert.Contains("falta AUX_SMTP_CLAVE", salida, StringComparison.Ordinal);
         Assert.Contains("AUX_SMTP_URL usa smtp:// sin TLS implícito", salida, StringComparison.Ordinal);
@@ -350,6 +506,7 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
     [InlineData("root", "757")]
     [InlineData("root", "666")]
     [InlineData("babelhub-aux", "755")]
+    [Trait("Criterio", "AC-PLA-20")]
     public void UnScriptQueCorreComoRootYSePuedeModificar_HaceFallar(string dueno, string modo)
     {
         var (codigo, salida, _) = Verificar(e =>
@@ -427,6 +584,7 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
     [InlineData("open_session", "su")]
     [InlineData("auth", "sshd")]
     [InlineData("", "sshd")]
+    [Trait("Criterio", "AC-PLA-20")]
     public void SoloLaAperturaDeUnaSesionDeSshdAvisa(string tipo, string servicio)
     {
         var (codigo, _, _) = Ingreso(tipo, "salto", "198.51.100.23", e => e["PAM_SERVICE"] = servicio);
@@ -643,6 +801,7 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
     [InlineData("verificar-endurecimiento.sh")]
     [InlineData("avisar-ingreso-ssh.sh")]
     [InlineData("vigilar-procesos.sh")]
+    [Trait("Criterio", "AC-PLA-20")]
     public void LosScriptsNuevosDeVmAux_NoTienenCrNiLlavesNiTrazaNiCredencialesDeBorrado(string nombre)
     {
         var texto = Texto($"scripts/vm-aux/{nombre}");

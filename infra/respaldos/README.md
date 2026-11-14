@@ -66,7 +66,7 @@ La clave que **descifra** vive fuera de la VM, del repositorio y del contenedor 
 
 ```bash
 # La restauración de ensayo en otra máquina, solo con la copia fuera de línea (la clave entra por la entrada estándar):
-scripts/descifrar-respaldo.sh --entrada <respaldo>.tar.age < /dev/tty | scripts/extraer-respaldo.sh --destino <carpeta-nueva>
+scripts/descifrar-respaldo.sh --entrada <respaldo>.tar.age < /ruta/al/dispositivo/clave-respaldos.txt | scripts/extraer-respaldo.sh --destino <carpeta-nueva>
 ```
 
 `scripts/restaurar.sh` (T29) y el ensayo aislado (T31) usan estas mismas piezas; lo que ellos añaden (negativa a correr con un agente o un proceso de desarrollo con acceso, volumen cifrado efímero, apertura en orden) no está aquí.

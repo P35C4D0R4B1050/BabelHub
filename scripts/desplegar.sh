@@ -150,8 +150,9 @@ if [[ "$VM" == inventario && -n "$SECRETOS" ]]; then
   if [[ ! -s "$AVISOS" ]]; then
     anotar "falta el archivo de secretos aviso.env (la credencial de correo para avisar del espacio reservado, PLA-21)"
   else
-    permisos="$("$STAT" -c %a "$AVISOS" 2>/dev/null || echo 777)"
-    [[ "$permisos" =~ ^[0-7]*[0-7]00$ ]] || anotar "el archivo de secretos aviso.env lo pueden leer otros usuarios (permisos $permisos): debe ser 600 o 400"
+    # Lo carga alertar.sh como root desde el cron: debe ser de root y no escribible ni legible por otros (se lee sin ejecutarlo, pero no se confía).
+    lectura="$("$STAT" -c '%U %a' "$AVISOS" 2>/dev/null || echo '? 777')"
+    [[ "${lectura% *}" == root && "${lectura#* }" =~ ^[0-7]?[46]00$ ]] || anotar "el archivo de secretos aviso.env es de ${lectura% *} con permisos ${lectura#* }: debe ser de root y 600 o 400 (lo carga el cron como root); además lo pueden leer otros usuarios si los permisos no son 600 o 400"
     for clave in AUX_SMTP_URL AUX_SMTP_USUARIO AUX_SMTP_CLAVE AUX_CORREO_DE AUX_CORREO_PARA; do
       [[ -n "$(leer_valor "$AVISOS" "$clave")" ]] || anotar "falta la clave $clave en aviso.env"
     done
@@ -159,6 +160,19 @@ if [[ "$VM" == inventario && -n "$SECRETOS" ]]; then
     if grep -q 'AGE-SECRET-KEY-' "$AVISOS" 2>/dev/null; then
       anotar "el archivo aviso.env contiene una clave privada de age: no puede estar en la VM"
     fi
+  fi
+  # El cron corre alertar.sh COMO ROOT con esta credencial: esos scripts del repositorio deben ser de root y no escribibles por otros (si no,
+  # quien pueda editarlos gana root en la siguiente corrida).
+  for guion in alertar.sh comun.sh; do
+    lectura="$("$STAT" -c '%U %a' "$RAIZ/scripts/vm-aux/$guion" 2>/dev/null || echo '? ?')"
+    if [[ "${lectura% *}" != root ]] || [[ ! "${lectura#* }" =~ ^[0-7]?[0-7][0145][0145]$ ]]; then
+      anotar "scripts/vm-aux/$guion es de ${lectura% *} con permisos ${lectura#* }: debe ser de root y sin escritura para otros (lo ejecuta el cron como root)"
+    fi
+  done
+  # Y la carpeta de esos scripts (quien pueda escribir en ella puede renombrar uno por otro).
+  lectura="$("$STAT" -c '%U %a' "$RAIZ/scripts/vm-aux" 2>/dev/null || echo '? ?')"
+  if [[ "${lectura% *}" != root ]] || [[ ! "${lectura#* }" =~ ^[0-7]?[0-7][0145][0145]$ ]]; then
+    anotar "la carpeta scripts/vm-aux es de ${lectura% *} con permisos ${lectura#* }: debe ser de root y sin escritura para otros (la ejecuta el cron como root)"
   fi
   [[ "$RAIZ" =~ ^[A-Za-z0-9._:/-]+$ && "$SECRETOS" =~ ^[A-Za-z0-9._:/-]+$ ]] || anotar "las rutas del repositorio y de los secretos solo pueden tener letras, números y . _ : / - (se escriben en la tarea de cron)"
 fi

@@ -12,7 +12,7 @@ public sealed record NombresDeTablas(string Pedidos, string LineasDePedido, stri
 {
     public static NombresDeTablas PorDefecto { get; } = new("pedidos.pedidos", "pedidos.pedido_lineas", "catalogo.ediciones", "seleccion.reservas");
 
-    private static readonly Regex Identificador = new(@"^[a-z_][a-z0-9_]*(\.[a-z_][a-z0-9_]*)?$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+    private static readonly Regex Identificador = new(@"^[a-z_][a-z0-9_]*(\.[a-z_][a-z0-9_]*)?\z", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     public static bool EsValido(string nombre) => Identificador.IsMatch(nombre);
 
@@ -46,10 +46,12 @@ public sealed record Opciones(
 
         for (var i = 0; i < args.Length; i++)
         {
+            // El mensaje nunca repite un valor recibido (podría ser una cadena de conexión con su contraseña): solo el nombre de la opción.
+            var nombreDeLaOpcion = args[i].StartsWith("--", StringComparison.Ordinal) ? args[i] : "un argumento";
             string Siguiente()
             {
                 i++;
-                return i < args.Length ? args[i] : throw new ArgumentException($"falta el valor de {args[i - 1]}");
+                return i < args.Length ? args[i] : throw new ArgumentException($"falta un valor después de {nombreDeLaOpcion}");
             }
 
             try
@@ -88,7 +90,7 @@ public sealed record Opciones(
                         tablas = tablas with { Reservas = Tabla(Siguiente(), "--tabla-reservas") };
                         break;
                     default:
-                        return (null, $"opción desconocida: {args[i]}");
+                        return (null, args[i].StartsWith("--", StringComparison.Ordinal) ? $"opción desconocida: {args[i]}" : "argumento inesperado (las cadenas de conexión van en --bases o en variables de entorno)");
                 }
             }
             catch (ArgumentException ex)

@@ -61,6 +61,14 @@ public sealed class DesplegarShTests : IDisposable
 
     private const string DobleDeStat = """
         #!/usr/bin/env bash
+        if [[ "$2" == '%U %a' ]]; then
+          case "$3" in
+            *aviso.env) case "$3" in *"${STAT_ABIERTO:-__ninguno__}"*) echo "${STAT_DUENO_AVISO:-root} 644" ;; *) echo "${STAT_DUENO_AVISO:-root} 600" ;; esac ;;
+            */scripts/vm-aux) echo "${STAT_DUENO_CARPETA:-root} ${STAT_MODO_CARPETA:-755}" ;;
+            *) echo "${STAT_DUENO:-root} ${STAT_MODO_SCRIPTS:-755}" ;;
+          esac
+          exit 0
+        fi
         case "$3" in *"${STAT_ABIERTO:-__ninguno__}"*) echo 644 ;; *) echo 600 ;; esac
         """;
 
@@ -148,7 +156,7 @@ public sealed class DesplegarShTests : IDisposable
             _valoresSecretos.Add(claveDeCorreo);
             File.WriteAllText(
                 Path.Combine(_secretos, "aviso.env"),
-                $"AUX_SMTP_URL=smtps://smtp.ejemplo.interno:465\nAUX_SMTP_USUARIO=avisos-de-vm-inventario\nAUX_SMTP_CLAVE={claveDeCorreo}\nAUX_CORREO_DE=vm-inventario@ejemplo.interno\nAUX_CORREO_PARA=responsable@ejemplo.interno\n");
+                "AUX_SMTP_URL=smtps://smtp.ejemplo.interno:465\n" + $"AUX_SMTP_USUARIO=avisos-de-vm-inventario\nAUX_SMTP_CLAVE={claveDeCorreo}\n" + "AUX_CORREO_DE=vm-inventario@ejemplo.interno\nAUX_CORREO_PARA=responsable@ejemplo.interno\n");
         }
     }
 
@@ -290,19 +298,56 @@ public sealed class DesplegarShTests : IDisposable
         var ruta = Path.Combine(_secretos, "aviso.env");
         var valor = Aleatorio(30);
         _valoresSecretos.Add(valor);
-        File.WriteAllText(ruta, $"AUX_SMTP_URL=smtp://smtp.ejemplo.interno:25\nAUX_SMTP_USUARIO=avisos\nAUX_CORREO_DE=de@ejemplo.interno\nAUX_CORREO_PARA=para@ejemplo.interno\nOTRO=AGE-SECRET-" + "KEY-" + valor.ToUpperInvariant() + "\n");
+        File.WriteAllText(ruta, "AUX_SMTP_URL=smtp://smtp.ejemplo.interno:25\n" + "AUX_SMTP_USUARIO=avisos\nAUX_CORREO_DE=de@ejemplo.interno\nAUX_CORREO_PARA=para@ejemplo.interno\nOTRO=AGE-SECRET-" + "KEY-" + valor.ToUpperInvariant() + "\n");
         var entorno = EntornoDe("inventario");
         entorno["STAT_ABIERTO"] = "aviso.env";
 
         var (codigo, salida, errores) = Desplegar("inventario", entorno);
 
         Assert.Equal(1, codigo);
-        Assert.Contains("aviso.env lo pueden leer otros usuarios (permisos 644)", errores, StringComparison.Ordinal);
+        Assert.Contains("aviso.env es de root con permisos 644", errores, StringComparison.Ordinal);
         Assert.Contains("falta la clave AUX_SMTP_CLAVE en aviso.env", errores, StringComparison.Ordinal);
         Assert.Contains("AUX_SMTP_URL de aviso.env usa smtp:// sin TLS implícito", errores, StringComparison.Ordinal);
         Assert.Contains("aviso.env contiene una clave privada de age", errores, StringComparison.Ordinal);
         Assert.Empty(LlamadasADocker);
         SinSecretosEnLaSalida(salida, errores);
+    }
+
+    [Theory]
+    [InlineData("babelhub-aux", "755")]
+    [InlineData("root", "775")]
+    [InlineData("root", "666")]
+    [Trait("Criterio", "AC-PLA-21")]
+    public void SiLosScriptsQueElCronCorreComoRootLosPuedeModificarOtro_LaVmDeDatosNoSeDespliega(string dueno, string modo)
+    {
+        PrepararSecretos("inventario");
+        var entorno = EntornoDe("inventario");
+        entorno["STAT_DUENO"] = dueno;
+        entorno["STAT_MODO_SCRIPTS"] = modo;
+
+        var (codigo, _, errores) = Desplegar("inventario", entorno);
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("debe ser de root y sin escritura para otros (lo ejecuta el cron como root)", errores, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
+    }
+
+    [Theory]
+    [InlineData("STAT_DUENO_AVISO", "babelhub-aux", "aviso.env es de babelhub-aux")]
+    [InlineData("STAT_DUENO_CARPETA", "babelhub-aux", "la carpeta scripts/vm-aux es de babelhub-aux")]
+    [InlineData("STAT_MODO_CARPETA", "775", "la carpeta scripts/vm-aux es de root con permisos 775")]
+    [Trait("Criterio", "AC-PLA-21")]
+    public void SiElAvisoEnvOLaCarpetaDeLosScriptsDeRootNoSonDeRoot_LaVmDeDatosNoSeDespliega(string variable, string valor, string esperado)
+    {
+        PrepararSecretos("inventario");
+        var entorno = EntornoDe("inventario");
+        entorno[variable] = valor;
+
+        var (codigo, _, errores) = Desplegar("inventario", entorno);
+
+        Assert.Equal(1, codigo);
+        Assert.Contains(esperado, errores, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
     }
 
     [Fact]

@@ -127,8 +127,54 @@ public sealed class EspacioReservadoTests(RespaldosFixture entorno)
         var (codigo, salida) = await Vigilar(wal, espera);
 
         Assert.Equal(1, codigo);
-        Assert.Contains("al 80 %", salida, StringComparison.Ordinal);
-        Assert.Contains("8 MiB de respaldo en espera", salida, StringComparison.Ordinal);
+        Assert.Contains("al 80 % o más", salida, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-21")]
+    public async Task LaAlertaDelOchentaPorCiento_TieneUnTextoEstable_ParaQueAlertarNoMandeUnCorreoPorMinuto()
+    {
+        var (wal, espera) = await Preparar(8);
+        var primera = await Vigilar(wal, espera);
+        await entorno.Sh($"dd if=/dev/zero of={espera}/otro.tmp bs=1024 count=300 2>/dev/null");
+        var segunda = await Vigilar(wal, espera);
+
+        Assert.Equal(1, primera.Codigo);
+        Assert.Equal(primera.Salida, segunda.Salida);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-21")]
+    public async Task MientrasCorreUnRespaldoCompleto_SuCopiaCifradaTransitoriaNoCuentaContraLaReserva_PeroLoPendienteSi()
+    {
+        // Un respaldo de 9 MiB en curso (la carpeta de bloqueo existe) no declara roto el archivo de cambios ni avisa; 7 MiB por archivar, sí cuentan.
+        var (wal, espera) = await Preparar(2, 0);
+        await entorno.Sh($"mkdir {espera}/respaldo.bloqueo && dd if=/dev/zero of={espera}/base.123.tmp bs=1048576 count=9 2>/dev/null && dd if=/dev/zero of={espera}/config.123.tmp bs=1048576 count=3 2>/dev/null");
+
+        var enCurso = await Vigilar(wal, espera);
+        var marcaEnCurso = await entorno.Sh($"test -e {espera}/archivo-roto");
+        await entorno.Sh($"rmdir {espera}/respaldo.bloqueo");
+        var terminado = await Vigilar(wal, espera);
+
+        Assert.Equal(0, enCurso.Codigo);
+        Assert.Contains("ok espacio reservado al 20 %", enCurso.Salida, StringComparison.Ordinal);
+        Assert.NotEqual(0, marcaEnCurso.ExitCode);
+        Assert.Equal(1, terminado.Codigo);
+        Assert.Contains("AGOTADO", terminado.Salida, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-21")]
+    public async Task ConElArchivoRoto_LosArchivosDeHistoriaDeLineaDeTiempoSiguenArchivandose()
+    {
+        var (_, espera) = await Preparar(0);
+        var antes = await entorno.Claves(RespaldosFixture.Wal);
+        await entorno.Sh($"echo 2026-11-14T10:00:00Z > {espera}/archivo-roto; echo historia > /tmp/00000002.history");
+
+        var ejecucion = await entorno.Sh($"BABELHUB_ESPERA={espera} /opt/babelhub/archivar-wal.sh /tmp/00000002.history 00000002.history");
+
+        Assert.Equal(0, ejecucion.ExitCode);
+        Assert.Single((await entorno.Claves(RespaldosFixture.Wal)).Except(antes));
     }
 
     // ---------- La reserva: menos de 5 GB ----------

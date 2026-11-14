@@ -51,7 +51,14 @@ pendiente="$(
     echo "$PGWAL/$(basename "$_lista" .ready)"
   done | sumar_tamanos
 )"
-en_espera="$(find "$ESPERA" -type f ! -name 'archivo-roto*' 2>/dev/null | sumar_tamanos)"
+# Un respaldo completo en curso (la carpeta `respaldo.bloqueo` existe) deja su copia cifrada en espera SOLO mientras corre: tarda minutos y se
+# borra al terminar, falle o no. Contarla declararía roto el archivo de cambios en cada respaldo diario de una base de varios GiB, aunque el almacén
+# funcione. Lo que sí se vigila siempre es lo que NO es transitorio: los cambios por archivar y cualquier otro archivo en espera.
+if [ -d "$ESPERA/respaldo.bloqueo" ]; then
+  en_espera="$(find "$ESPERA" -type f ! -name 'archivo-roto*' ! -name 'base.*.tmp' ! -name 'config.*.tmp' ! -name 'resultado.*.tmp' 2>/dev/null | sumar_tamanos)"
+else
+  en_espera="$(find "$ESPERA" -type f ! -name 'archivo-roto*' 2>/dev/null | sumar_tamanos)"
+fi
 total=$((pendiente + en_espera))
 porcentaje=$((total * 100 / RESERVADO))
 detalle="$(mib "$total") MiB de $(mib "$RESERVADO") MiB reservados ($(mib "$pendiente") MiB de cambios por archivar y $(mib "$en_espera") MiB de respaldo en espera)"
@@ -65,7 +72,9 @@ if [ "$total" -ge "$RESERVADO" ]; then
 fi
 
 if [ "$porcentaje" -ge "$AVISO_PORCENTAJE" ]; then
-  echo "ALERTA espacio reservado del archivo de cambios al $porcentaje % ($detalle): el almacén de respaldos no está recibiendo lo pendiente. Si se agota se declara roto el archivo de cambios."
+  # El texto es estable (el porcentaje por tramos de 5 y sin cantidades que cambian cada minuto): alertar.sh no repite un aviso con el mismo texto
+  # y, si cambiara en cada corrida, llegaría un correo por minuto.
+  echo "ALERTA espacio reservado del archivo de cambios al $((porcentaje / 5 * 5)) % o más: el almacén de respaldos no está recibiendo lo pendiente. Si se agota se declara roto el archivo de cambios."
   exit 1
 fi
 

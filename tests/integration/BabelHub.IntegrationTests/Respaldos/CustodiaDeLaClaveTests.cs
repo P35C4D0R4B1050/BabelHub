@@ -133,6 +133,7 @@ public sealed class CustodiaDeLaClaveTests : IDisposable
     [InlineData("ultima-prueba", "Última prueba de descifrado")]
     [InlineData("periodicidad", "Periodicidad de la prueba (días)")]
     [InlineData("destinatario", "Destinatario público (age)")]
+    [Trait("Criterio", "AC-PLA-17")]
     public void UnCampoPendienteOVacio_HaceFallar_NombrandoElCampo(string etiqueta, string campo)
     {
         var ruta = Llenar();
@@ -158,6 +159,7 @@ public sealed class CustodiaDeLaClaveTests : IDisposable
     [InlineData("age1corta")]
     [InlineData("AGE1MAYUSCULAS0000000000000000000000000000000000000000000000")]
     [InlineData("no-es-un-destinatario")]
+    [Trait("Criterio", "AC-PLA-17")]
     public void UnDestinatarioConFormaInvalida_Falla(string destinatario)
     {
         var (codigo, salida, _) = ComprobarCon(Llenar(destinatario: destinatario));
@@ -171,6 +173,7 @@ public sealed class CustodiaDeLaClaveTests : IDisposable
     [InlineData("2026-12-01", "es una fecha futura")]
     [InlineData("ayer", "no es una fecha válida")]
     [InlineData("2026-13-45", "no es una fecha válida")]
+    [Trait("Criterio", "AC-PLA-17")]
     public void UnaPruebaDeDescifradoVencidaFuturaOInvalida_Falla(string prueba, string motivo)
     {
         var (codigo, salida, _) = ComprobarCon(Llenar(prueba: prueba));
@@ -281,6 +284,7 @@ public sealed class CustodiaDeLaClaveTests : IDisposable
     [InlineData("--hoy", "ayer")]
     [InlineData("--custodia")]
     [InlineData("--desconocido")]
+    [Trait("Criterio", "AC-PLA-17")]
     public void UnUsoInvalido_SeRechazaConCodigo2(params string[] argumentos)
     {
         var (codigo, _, errores) = Comprobar(argumentos);
@@ -313,6 +317,7 @@ public sealed class CustodiaDeLaClaveTests : IDisposable
     [InlineData("comprobar-custodia.sh")]
     [InlineData("descifrar-respaldo.sh")]
     [InlineData("extraer-respaldo.sh")]
+    [Trait("Criterio", "AC-PLA-17")]
     public void LosScriptsDeCustodia_NoTienenCrNiClavesNiTraza(string nombre)
     {
         var texto = File.ReadAllText(Path.Combine(Raiz, "scripts", nombre));

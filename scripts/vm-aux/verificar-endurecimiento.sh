@@ -17,7 +17,7 @@
 #   3. Ningún agente SSH corriendo ni `ForwardAgent yes` en ninguna configuración de cliente.
 #   4. authorized_keys: ninguna entrada con `agent-forwarding`; las del usuario del salto, con `restrict`, `port-forwarding` y `permitopen`
 #      a direcciones privadas.
-#   5. El archivo de entorno (AUX_ENV) es 0600 y solo tiene las variables propias de VM-AUX: su credencial de correo y las credenciales
+#   5. El archivo de entorno (AUX_ENV) es de root y 0600 o 0640 (el usuario sin privilegios lo lee pero no lo puede cambiar; los scripts lo leen sin ejecutarlo) y solo tiene las variables propias de VM-AUX: su credencial de correo y las credenciales
 #      mínimas del almacén (vigilante, sello, copia y cuota). Cualquier otra (de la base, de n8n, un escritor o un lector de respaldos, una
 #      clave de age…) es una credencial de más y se rechaza: no existe en VM-AUX ninguna credencial que borre.
 #   6. Los scripts que esta comprobación corre como root (ella misma, alertar.sh y comun.sh) son de root y no se pueden modificar: si
@@ -37,8 +37,10 @@ SSHD_T="${SSHD_T:-sshd -T}"
 PS="${PS:-ps}"
 STAT="${STAT:-stat}"
 USUARIO_SALTO="${AUX_USUARIO_SALTO:-salto}"
+USUARIO_ADMIN="${AUX_USUARIO_ADMIN:-admin}"
+PAM_SSHD="${AUX_PAM_SSHD:-/etc/pam.d/sshd}"
 SCRIPTS_DE_VM_AUX="${AUX_SCRIPTS:-/opt/babelhub/scripts/vm-aux}"
-RUTAS_CLAVES="${AUX_RUTAS_CLAVES:-/home /root /etc/babelhub-aux /var/lib/babelhub-aux /opt/babelhub /srv /var/backups}"
+RUTAS_CLAVES="${AUX_RUTAS_CLAVES:-/home /root /etc/babelhub-aux /var/lib/babelhub-aux /opt/babelhub /srv /var/backups /tmp /var/tmp /dev/shm}"
 AUTORIZADAS="${AUX_AUTORIZADAS:-/home/*/.ssh/authorized_keys /root/.ssh/authorized_keys /etc/ssh/authorized_keys/*}"
 CONFIGS_SSH="${AUX_CONFIGS_SSH:-/etc/ssh/ssh_config /etc/ssh/ssh_config.d/*.conf /home/*/.ssh/config /root/.ssh/config}"
 fallos=0
@@ -52,7 +54,10 @@ destino_privado() {
 }
 
 # ---------- 1. sshd ----------
-if ! efectivo="$(eval "$SSHD_T" -C "user=$USUARIO_SALTO,host=vm-aux,addr=127.0.0.1" 2>/dev/null)" || [[ -z "$efectivo" ]]; then
+[[ "$USUARIO_SALTO" =~ ^[a-z_][a-z0-9_-]*$ && "$USUARIO_ADMIN" =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo "ALERTA los nombres de usuario de AUX_USUARIO_SALTO y AUX_USUARIO_ADMIN no son válidos"; exit 1; }
+read -r -a COMANDO_SSHD <<<"$SSHD_T"
+sshd_de() { "${COMANDO_SSHD[@]}" -C "user=$1,host=vm-aux,addr=127.0.0.1" 2>/dev/null; }
+if ! efectivo="$(sshd_de "$USUARIO_SALTO")" || [[ -z "$efectivo" ]]; then
   alerta "no se pudo leer la configuración efectiva de sshd"
   efectivo=""
 fi
@@ -74,7 +79,12 @@ if [[ -n "$efectivo" ]]; then
   maximo="$(valor maxauthtries)"
   if [[ "$maximo" =~ ^[0-9]+$ && "$maximo" -le 3 ]]; then ok "sshd maxauthtries $maximo"; else alerta "sshd maxauthtries es «${maximo:-sin definir}» y debe ser 3 o menos"; fi
   # El usuario del salto: solo canales TCP hacia las otras VMs.
+  exigir usepam yes
   exigir permittty no
+  # El salto solo abre canales TCP: ni sockets Unix de la VM (docker.sock…), ni túneles, ni puertos abiertos al exterior.
+  for clave in allowstreamlocalforwarding gatewayports; do exigir "$clave" no; done
+  tunel="$(valor permittunnel)"
+  if [[ "$tunel" == no || "$tunel" == false ]]; then ok "sshd permittunnel no"; else alerta "sshd permittunnel es «${tunel:-sin definir}» y debe ser «no»"; fi
   forzado="$(valor forcecommand)"
   if [[ -n "$forzado" && "$forzado" != none ]]; then ok "sshd forcecommand del salto definido"; else alerta "sshd forcecommand sin definir: el usuario «$USUARIO_SALTO» tendría shell"; fi
   tcp="$(valor allowtcpforwarding)"
@@ -91,6 +101,23 @@ if [[ -n "$efectivo" ]]; then
   fi
   usuarios="$(valor allowusers)"
   if [[ -n "$usuarios" ]]; then ok "sshd allowusers definido"; else alerta "sshd allowusers sin definir: debe listar los usuarios con acceso"; fi
+
+  # Un `Match User` de otro usuario no debe reabrir el reenvío de agente ni el ingreso de root: se evalúa también el administrador y root.
+  for otro in "$USUARIO_ADMIN" root; do
+    adicional="$(sshd_de "$otro" || true)"
+    [[ -n "$adicional" ]] || { alerta "no se pudo leer la configuración efectiva de sshd para «$otro»"; continue; }
+    for clave in allowagentforwarding x11forwarding passwordauthentication; do
+      actual="$(awk -v k="$clave" 'tolower($1) == k { print $2; exit }' <<<"$adicional")"
+      [[ "$actual" == no ]] || alerta "sshd $clave para «$otro» es «${actual:-sin definir}» y debe ser «no»"
+    done
+  done
+fi
+
+# La alerta de ingreso SSH necesita PAM en sshd y su línea: si faltan, el aviso no sale y nadie lo nota.
+if [[ -f "$PAM_SSHD" ]] && grep -Eq '^[[:space:]]*session[[:space:]]+(optional|required|requisite|sufficient)[[:space:]]+pam_exec\.so[[:space:]].*avisar-ingreso-ssh\.sh' "$PAM_SSHD"; then
+  ok "la alerta de ingreso SSH está instalada en PAM"
+else
+  alerta "la alerta de ingreso SSH no está instalada en $PAM_SSHD (session optional pam_exec.so quiet …/avisar-ingreso-ssh.sh)"
 fi
 
 # ---------- 2. Ninguna llave privada ----------
@@ -140,22 +167,32 @@ for patron in $AUTORIZADAS; do
     while IFS= read -r linea || [[ -n "$linea" ]]; do
       numero=$((numero + 1))
       [[ -z "${linea// /}" || "$linea" == \#* ]] && continue
-      if [[ "$linea" == *agent-forwarding* ]]; then
+      # Solo el campo de opciones (lo que va antes del tipo de llave): un comentario de la llave no cuenta, y `no-agent-forwarding` no es `agent-forwarding`.
+      opciones=""
+      if [[ "$linea" != ssh-* && "$linea" != ecdsa-* && "$linea" != sk-* ]]; then opciones="${linea%% ssh-*}"; opciones="${opciones%% ecdsa-*}"; opciones="${opciones%% sk-*}"; fi
+      sin_comillas="$(sed 's/"[^"]*"//g' <<<"$opciones")"
+      fichas=",${sin_comillas},"
+      if [[ "$fichas" == *,agent-forwarding,* ]]; then
         alerta "$archivo línea $numero: una llave con agent-forwarding"
         claves_mal=1
       fi
       if [[ $del_salto -eq 1 ]]; then
-        if [[ "$linea" != restrict,* && "$linea" != *,restrict,* ]]; then
+        if [[ "$fichas" != *,restrict,* ]]; then
           alerta "$archivo línea $numero: la llave del salto no lleva «restrict»"
           claves_mal=1
         fi
-        if [[ "$linea" != *port-forwarding* ]]; then
+        if [[ "$fichas" != *,port-forwarding,* ]]; then
           alerta "$archivo línea $numero: la llave del salto no lleva «port-forwarding» (sin él no puede saltar)"
           claves_mal=1
         fi
-        if [[ "$linea" =~ permitopen=\"([^\"]*)\" ]]; then
-          for destino in ${BASH_REMATCH[1]//,/ }; do
-            destino_privado "$destino" || { alerta "$archivo línea $numero: permitopen admite «$destino»"; claves_mal=1; }
+        if [[ "$opciones" == *permitopen=* ]]; then
+          resto="$opciones"
+          while [[ "$resto" =~ permitopen=\"([^\"]*)\"(.*)$ ]]; do
+            grupo="${BASH_REMATCH[1]}"
+            resto="${BASH_REMATCH[2]}"
+            for destino in ${grupo//,/ }; do
+              destino_privado "$destino" || { alerta "$archivo línea $numero: permitopen admite «$destino»"; claves_mal=1; }
+            done
           done
         else
           alerta "$archivo línea $numero: la llave del salto no acota los destinos con permitopen"
@@ -171,8 +208,16 @@ done
 if [[ ! -f "$AUX_ENV" ]]; then
   alerta "falta $AUX_ENV (el archivo de entorno de VM-AUX)"
 else
-  modo="$("$STAT" -c '%a' "$AUX_ENV" 2>/dev/null || echo '?')"
-  if [[ "$modo" == 600 || "$modo" == 400 ]]; then ok "$AUX_ENV con permisos $modo"; else alerta "$AUX_ENV tiene permisos $modo: debe ser 0600"; fi
+  # Lo lee el usuario sin privilegios pero lo carga también la tarea de root: debe ser de root y no escribible por el grupo ni por otros
+  # (0600, 0640, 0400 o 0440); si `babelhub-aux` pudiera cambiarlo, podría inyectar lo que root lea.
+  lectura="$("$STAT" -c '%U %a' "$AUX_ENV" 2>/dev/null || echo '? ?')"
+  dueno="${lectura% *}"
+  modo="${lectura#* }"
+  if [[ "$dueno" == root && "$modo" =~ ^[0-7]?[46][04]0$ ]]; then
+    ok "$AUX_ENV es de root con permisos $modo"
+  else
+    alerta "$AUX_ENV es de $dueno con permisos $modo: debe ser de root y 0600 o 0640 (el usuario sin privilegios lo lee pero no lo cambia)"
+  fi
   ajenas=0
   presentes=""
   while IFS= read -r linea || [[ -n "$linea" ]]; do
@@ -213,7 +258,20 @@ for nombre in verificar-endurecimiento.sh alertar.sh comun.sh; do
     scripts_mal=1
   fi
 done
-[[ $scripts_mal -eq 0 ]] && ok "los scripts que corren como root son de root y no se pueden modificar"
+# Y también sus carpetas (y las de arriba): quien pueda escribir en la carpeta puede renombrar un script por otro.
+carpeta="$SCRIPTS_DE_VM_AUX"
+for _ in 1 2 3 4; do
+  [[ -d "$carpeta" && "$carpeta" != / ]] || break
+  lectura="$("$STAT" -c '%U %a' "$carpeta" 2>/dev/null || echo '? ?')"
+  dueno="${lectura% *}"
+  modo="${lectura#* }"
+  if [[ "$dueno" != root ]] || [[ ! "$modo" =~ ^[0-7]?[0-7][0145][0145]$ ]]; then
+    alerta "la carpeta $carpeta es de $dueno con permisos $modo: debe ser de root y sin escritura para otros"
+    scripts_mal=1
+  fi
+  carpeta="$(dirname "$carpeta")"
+done
+[[ $scripts_mal -eq 0 ]] && ok "los scripts que corren como root, y sus carpetas, son de root y no se pueden modificar"
 
 if [[ $fallos -gt 0 ]]; then
   echo "VM-AUX: $fallos comprobación(es) del endurecimiento fallaron."

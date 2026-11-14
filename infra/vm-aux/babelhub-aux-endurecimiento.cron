@@ -2,7 +2,8 @@
 # (babelhub-aux.cron, como el usuario sin privilegios), esta corre como ROOT porque necesita leer la configuración efectiva de sshd y las
 # carpetas de todos los usuarios: un usuario sin privilegios no vería las llaves ajenas y daría un «todo bien» falso. Por eso los scripts
 # que corre (verificar-endurecimiento.sh, alertar.sh y comun.sh) deben ser de root y no escribibles por otros: ella misma lo comprueba. Solo
-# lee y avisa; no cambia nada. Su estado de alertas va aparte (el de root), y el aviso sale con la misma credencial de correo de VM-AUX.
+# lee y avisa; no cambia nada. Su estado de alertas va aparte (el de root), y el aviso sale con la misma credencial de correo de VM-AUX, de un
+# `aux.env` que debe ser de root (0600 o 0640) y que los scripts leen sin ejecutarlo.
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 AUX=/opt/babelhub/scripts/vm-aux

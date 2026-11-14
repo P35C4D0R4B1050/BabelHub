@@ -50,17 +50,11 @@ public static class Ejecutor
         var inventario = await AbrirAsync(informe, "inventario", opciones.BaseInventario, cancelacion).ConfigureAwait(false);
         try
         {
-            if (ecommerce is not null)
-            {
-                await ComprobarRolAsync(informe, "ecommerce", ecommerce, cancelacion).ConfigureAwait(false);
-            }
+            var rolEcommerce = ecommerce is not null && await ComprobarRolAsync(informe, "ecommerce", ecommerce, cancelacion).ConfigureAwait(false);
+            var rolInventario = inventario is not null && await ComprobarRolAsync(informe, "inventario", inventario, cancelacion).ConfigureAwait(false);
 
-            if (inventario is not null)
-            {
-                await ComprobarRolAsync(informe, "inventario", inventario, cancelacion).ConfigureAwait(false);
-            }
-
-            if (ecommerce is not null && inventario is not null)
+            // Con un rol con permisos de más no se consulta nada más: la comprobación es de solo lectura o no es.
+            if (ecommerce is not null && inventario is not null && rolEcommerce && rolInventario)
             {
                 await ComprobarMismoInstanteAsync(informe, ecommerce, inventario, cancelacion).ConfigureAwait(false);
                 await ComprobarPedidosYReservasAsync(informe, ecommerce, inventario, opciones, cancelacion).ConfigureAwait(false);
@@ -113,7 +107,8 @@ public static class Ejecutor
         {
             var constructor = new NpgsqlConnectionStringBuilder(cadena)
             {
-                Options = "-c default_transaction_read_only=on",
+                // Sin esquema por defecto (solo pg_catalog): una tabla sin esquema no puede ser secuestrada por un esquema de la base restaurada.
+                Options = "-c default_transaction_read_only=on -c search_path=pg_catalog",
                 Timeout = 10,
                 CommandTimeout = 300,
                 Pooling = false,
@@ -154,7 +149,7 @@ public static class Ejecutor
 
     // ---------- El rol: de solo lectura y sin permisos de más ----------
 
-    private static async Task ComprobarRolAsync(Informe informe, string nombre, NpgsqlConnection conexion, CancellationToken cancelacion)
+    private static async Task<bool> ComprobarRolAsync(Informe informe, string nombre, NpgsqlConnection conexion, CancellationToken cancelacion)
     {
         try
         {
@@ -191,18 +186,27 @@ public static class Ejecutor
                 problemas.Add("el rol puede crear objetos");
             }
 
+            // Los roles predefinidos que dan acceso al servidor (ejecutar programas, leer o escribir archivos del servidor).
+            if (await EscalarAsync<bool>(conexion, transaccion, "SELECT COALESCE(bool_or(pg_has_role(current_user, r, 'MEMBER')), false) FROM unnest(ARRAY['pg_execute_server_program', 'pg_write_server_files', 'pg_read_server_files']) AS r", cancelacion).ConfigureAwait(false))
+            {
+                problemas.Add("el rol es miembro de un rol con acceso al servidor (programas o archivos)");
+            }
+
             if (problemas.Count == 0)
             {
                 await informe.OkAsync($"rol-{nombre}", "solo lectura, sin permisos de más").ConfigureAwait(false);
+                return true;
             }
             else
             {
                 await informe.FallaAsync($"rol-{nombre}", string.Join("; ", problemas)).ConfigureAwait(false);
+                return false;
             }
         }
         catch (Exception ex) when (ex is NpgsqlException or InvalidOperationException or InvalidCastException)
         {
             await informe.FallaAsync($"rol-{nombre}", $"no se pudo comprobar el rol ({ex.GetType().Name})").ConfigureAwait(false);
+            return false;
         }
     }
 

@@ -11,13 +11,13 @@
 #   - es un enlace duro, un archivo especial (dispositivo, tubería, socket) o un enlace simbólico con destino absoluto o con `..`.
 # Extrae sin propietarios (`--no-same-owner`: nunca vuelve a ser de root ni de otro usuario) y con permisos de la máscara 077. Después sanea:
 #   - vacía `postgresql.auto.conf` (un `ALTER SYSTEM` del respaldo no se hereda: podría traer un `archive_command` o un `restore_command`);
-#   - comenta en `postgresql.conf` `archive_command`, `archive_mode`, `restore_command`, `archive_cleanup_command`, `recovery_end_command`,
-#     `primary_conninfo` y las líneas `include*` (un archivo ajeno no se incluye);
+#   - REEMPLAZA `postgresql.conf` por uno generado (sin archivado, sin recuperación, sin bibliotecas precargadas y sin archivos incluidos): una lista
+#     negra de parámetros se esquiva (los nombres no distinguen mayúsculas y hay muchos que ejecutan código);
 #   - borra `postmaster.pid`, `standby.signal`, `recovery.signal` y `recovery.conf` (no se arranca como réplica de nadie ni se recupera por la
 #     configuración del respaldo: la recuperación la decide quien restaura);
 #   - **regenera `pg_hba.conf` y `pg_ident.conf`**: solo el socket local del usuario `postgres` y TCP desde 127.0.0.1 con contraseña.
-# Necesita GNU tar (el de las distros de Linux, WSL y Git Bash). El tar se guarda un momento en un archivo temporal de la misma carpeta (la
-# validación necesita leerlo dos veces) y se borra al terminar: si la carpeta es el volumen cifrado del ensayo, el claro no sale de él.
+# Necesita GNU tar (el de las distros de Linux, WSL y Git Bash). El tar se guarda un momento en un archivo temporal DENTRO de la carpeta de destino (la
+# validación necesita leerlo dos veces) y se borra al terminar: si la carpeta es el volumen cifrado del ensayo, el claro no sale de él (nunca se escribe en la carpeta de arriba, que puede estar sin cifrar).
 #
 # Códigos: 0 extraído y saneado, 1 el tar se rechazó o la extracción falló (la carpeta queda vacía), 2 uso inválido.
 set -uo pipefail
@@ -61,7 +61,7 @@ rechazar() {
   exit 1
 }
 if [[ -z "$ARCHIVO" ]]; then
-  temporal="$(mktemp "$DESTINO/../.respaldo-XXXXXX")" || rechazar "no se pudo crear el archivo temporal"
+  temporal="$(mktemp "$DESTINO/.respaldo-XXXXXX")" || rechazar "no se pudo crear el archivo temporal"
   trap '[[ -n "$temporal" ]] && rm -f "$temporal"' EXIT
   cat >"$temporal" || rechazar "no se pudo leer el tar de la entrada estándar"
   ARCHIVO="$temporal"
@@ -107,9 +107,15 @@ find "$DESTINO" -type f -exec chmod u+rw,go-rwx {} + 2>/dev/null
 # ---------- 3. Sanear ----------
 
 : >"$DESTINO/postgresql.auto.conf"
-if [[ -f "$DESTINO/postgresql.conf" ]]; then
-  sed -E -i 's/^[[:space:]]*(archive_command|archive_mode|restore_command|archive_cleanup_command|recovery_end_command|primary_conninfo|include|include_dir|include_if_exists)([[:space:]=].*)?$/# (ignorado al restaurar) &/' "$DESTINO/postgresql.conf"
-fi
+# `postgresql.conf` NO se sanea con una lista negra (los nombres de parámetros no distinguen mayúsculas y hay decenas que ejecutan código:
+# `archive_command`, `restore_command`, `ssl_passphrase_command`, `shared_preload_libraries`, `dynamic_library_path`, `include`…): se REEMPLAZA por
+# uno generado. Lo que importa (memoria, puertos, módulos) lo fija quien arranca el clúster con `-c` (restaurar.sh y el ensayo, T29 y T31).
+cat >"$DESTINO/postgresql.conf" <<'EOF'
+# Generado al restaurar (scripts/extraer-respaldo.sh): el postgresql.conf del respaldo se ignora por completo. Los parámetros los fija quien arranca
+# el clúster con -c. Sin archivado, sin recuperación por configuración, sin bibliotecas precargadas y sin archivos incluidos.
+listen_addresses = ''
+archive_mode = off
+EOF
 rm -f "$DESTINO/postmaster.pid" "$DESTINO/standby.signal" "$DESTINO/recovery.signal" "$DESTINO/recovery.conf"
 cat >"$DESTINO/pg_hba.conf" <<'EOF'
 # Regenerado al restaurar (scripts/extraer-respaldo.sh): se ignora el del respaldo.

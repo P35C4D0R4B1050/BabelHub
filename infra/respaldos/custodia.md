@@ -25,8 +25,8 @@ La persona responsable llena esta tabla al generar la clave (paso 2 del procedim
 4. **Prueba periódica de descifrado** (cada `Periodicidad` días; 90 por defecto): se baja un respaldo reciente y se descifra **solo con la copia fuera de línea**, en otra máquina:
 
    ```bash
-   # La clave privada entra por la entrada estándar y nunca se guarda en disco ni en el historial (la copia fuera de línea se conecta o se teclea).
-   scripts/descifrar-respaldo.sh --entrada <respaldo>.tar.age --probar --registrar < /dev/tty
+   # La clave privada entra por la entrada estándar, leída del dispositivo cifrado de la copia fuera de línea (montado solo para esto); nunca se copia a disco ni queda en el historial.
+   scripts/descifrar-respaldo.sh --entrada <respaldo>.tar.age --probar --registrar < /ruta/al/dispositivo/clave-respaldos.txt
    ```
 
    `--probar` descifra el respaldo completo a la nada y, si descifra, `--registrar` anota la fecha de hoy en «Última prueba de descifrado». Un cambio revisado en este archivo, como cualquier otro.

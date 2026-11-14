@@ -17,7 +17,8 @@ esac
 # Con el archivo de cambios declarado roto (espacio reservado agotado, PLA-21) se descarta el segmento para que PostgreSQL lo recicle y el disco
 # no se llene: la base sigue operando y solo un respaldo completo nuevo retira la marca. Va antes de verificar el entorno: aunque el almacén o la
 # configuración estén rotos, el espacio no debe seguir creciendo.
-if [ -f "$ARCHIVO_ROTO" ]; then
+# Los archivos de historia de línea de tiempo (`.history`) pesan unos bytes y la restauración los necesita para elegir la línea: se siguen archivando.
+if [ -f "$ARCHIVO_ROTO" ] && [ "${nombre%.history}" = "$nombre" ]; then
   echo "respaldos: el archivo de cambios está roto: se descarta el segmento $nombre hasta que haya un respaldo completo nuevo" >&2
   exit 0
 fi

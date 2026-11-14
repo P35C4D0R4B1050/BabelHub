@@ -515,12 +515,19 @@ public sealed class RestauracionCheckFixture : IAsyncLifetime
     public string Contrasena { get; }
 
     public string CadenaComo(string usuario, string contrasena, string baseDeDatos) =>
-        new NpgsqlConnectionStringBuilder(_cluster.GetConnectionString()) { Username = usuario, Password = contrasena, Database = baseDeDatos }.ConnectionString;
+        Cadena(_cluster, usuario, contrasena, baseDeDatos);
+
+    private static string Cadena(PostgreSqlContainer contenedor, string usuario, string contrasena, string baseDeDatos)
+    {
+        var constructor = new NpgsqlConnectionStringBuilder(contenedor.GetConnectionString()) { Username = usuario, Database = baseDeDatos };
+        constructor["Password"] = contrasena;
+        return constructor.ConnectionString;
+    }
 
     public string CadenaDe(string baseDeDatos) => CadenaComo("restauracion-check", Contrasena, baseDeDatos);
 
     public string CadenaDeOtroCluster() =>
-        new NpgsqlConnectionStringBuilder(_otro.GetConnectionString()) { Username = "restauracion-check", Password = Contrasena, Database = "inventario" }.ConnectionString;
+        Cadena(_otro, "restauracion-check", Contrasena, "inventario");
 
     public async Task InitializeAsync()
     {
