@@ -40,6 +40,8 @@ public static partial class CatalogoDeAccionesDeAuditoria
         [nameof(AccionesAuditables.StockDescontadoPorEntrega)] = ["pedido"],
         [nameof(AccionesAuditables.StockDescontadoPorReparto)] = ["pedido"],
         [nameof(AccionesAuditables.BajaDeTitularProcesada)] = ["titular"],
+        [nameof(AccionesAuditables.AlertaMarcadaRevisada)] = ["alerta"],
+        [nameof(AccionesAuditables.DepuracionDiariaEjecutada)] = [],
         [nameof(AccionesAuditables.ObraRegistrada)] = ["obra"],
         [nameof(AccionesAuditables.ObraEditada)] = ["obra"],
         [nameof(AccionesAuditables.ObraDadaDeBaja)] = ["obra"],

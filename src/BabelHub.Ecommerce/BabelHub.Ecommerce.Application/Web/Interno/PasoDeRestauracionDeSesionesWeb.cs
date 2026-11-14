@@ -17,8 +17,8 @@ public sealed class PasoDeRestauracionDeSesionesWeb(IVaciadoDeLaWeb vaciado) : I
 {
     public const string NombreDelPaso = "web-vaciar-sesiones";
 
-    /// <summary>Entre <see cref="OrdenDePasoDeRestauracion.Identidad"/> y <see cref="OrdenDePasoDeRestauracion.Auditoria"/>: la constante propia queda hasta que el carril A agregue la de <c>Web</c> (R12).</summary>
-    public int Orden => OrdenDePasoDeRestauracion.Identidad + 50;
+    /// <summary>Entre <see cref="OrdenDePasoDeRestauracion.Identidad"/> y <see cref="OrdenDePasoDeRestauracion.Auditoria"/>: la constante de <c>Web</c> (R12).</summary>
+    public int Orden => OrdenDePasoDeRestauracion.Web;
 
     public string Nombre => NombreDelPaso;
 

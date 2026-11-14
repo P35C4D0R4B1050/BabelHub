@@ -25,11 +25,15 @@ public interface IPasoDeRestauracion
     Task<ResultadoDePaso> Ejecutar(CancellationToken cancelacion = default);
 }
 
-/// <summary>El orden de los pasos por módulo: Plataforma, luego Identidad, luego Auditoría (plan §5.1). Dentro de un módulo se suma a la base.</summary>
+/// <summary>
+/// El orden de los pasos por módulo: Plataforma, luego Identidad, luego Web (sus sesiones restauradas se vacían después de que Identidad rote las claves de
+/// firma) y luego Auditoría (plan §5.1; <c>web-base</c> D14, hallazgo R12). Dentro de un módulo se suma a la base.
+/// </summary>
 public static class OrdenDePasoDeRestauracion
 {
     public const int Plataforma = 100;
     public const int Identidad = 200;
+    public const int Web = 250;
     public const int Auditoria = 300;
 }
 

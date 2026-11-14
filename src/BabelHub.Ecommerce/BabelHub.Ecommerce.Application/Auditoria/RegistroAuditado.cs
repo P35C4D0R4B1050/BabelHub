@@ -190,4 +190,17 @@ public sealed record PaginaDeRegistros
 
     /// <summary>Verdadero si el Inventario no respondió y la página solo trae lo del E-commerce (AUD-18).</summary>
     public bool FaltanDelInventario { get; }
+
+    /// <summary>
+    /// El cursor opaco que, pedido de nuevo, devuelve <b>esta misma página</b> sobre la misma instantánea (la primera página lo trae aunque se haya pedido sin
+    /// cursor). Lo necesita quien fusiona varias fuentes: consume parte de cada página y, en la página siguiente, vuelve a pedirla y salta lo ya consumido sin
+    /// que la fuente abra otra instantánea (AUD-30). Una fuente lo devuelve siempre que la página tenga registros.
+    /// </summary>
+    public string? CursorDeLaPagina
+    {
+        get;
+        init => field = value is { Length: > MaximoDeCaracteresDelCursor }
+            ? throw new ArgumentException("El cursor es demasiado largo.", nameof(value))
+            : value;
+    }
 }
