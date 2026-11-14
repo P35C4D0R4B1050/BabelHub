@@ -68,6 +68,10 @@ docker-compose.override.yml
 *.db
 backups/
 respaldos/
+# Excepciones: estas carpetas llevan los scripts, la documentación y las pruebas del respaldo, no respaldos (los volcados siguen excluidos por *.dump, *.bak, *.sql.gz…).
+!infra/respaldos/
+!infra/postgres/respaldos/
+!tests/integration/BabelHub.IntegrationTests/Respaldos/
 dumps/
 infra/n8n/data/
 infra/evolution/

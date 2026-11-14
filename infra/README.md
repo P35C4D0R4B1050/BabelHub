@@ -6,6 +6,7 @@
 | `postgres/init/` | Disponible | Crea las bases y los roles la primera vez que arranca el volumen (AD03). |
 | `postgres/Dockerfile` | Disponible | PostgreSQL con `age` y `rclone` (cliente S3) para el archivado de cambios y el respaldo (D06, D10), multi-arquitectura y sin privilegios. |
 | `almacen/` | Disponible | Contenedores, credenciales y retención con bloqueo del almacén de objetos de Oracle (PLA-16, PLA-35, PLA-38): `contenedores.txt`, `credenciales.txt`, `ciclo-de-vida.json` y `politicas.md`. Se aplican y se comprueban con `scripts/almacen.sh`, en el equipo de la persona responsable. |
+| `postgres/respaldos/`, `respaldos/` | Disponible | Los scripts de archivado de cambios y respaldo diario cifrado con `age` que van dentro de la imagen de PostgreSQL (`archivar-wal.sh`, `respaldar.sh`) y cómo se usan y programan (`respaldos/README.md`); el respaldo bajo demanda es `scripts/respaldar-ahora.sh`. |
 | `excepciones-de-arquitectura.json` | Disponible | Registro de las imágenes de terceros que no existen para una arquitectura en la que corren (PLA-03); hoy vacío. |
 | `nginx/nginx.conf` | Plantilla | Enrutamiento por host (tienda y gestión) con límites por IP y servidor de respaldo para la gestión (AD14). |
 | `n8n/` | Pendiente | Flujos de n8n exportados (AD16), con la spec `transversal-notificaciones`. |

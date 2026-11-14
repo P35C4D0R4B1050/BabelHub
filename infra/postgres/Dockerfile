@@ -8,4 +8,9 @@ FROM postgres:17-alpine@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717f
 
 USER root
 RUN apk add --no-cache age=1.3.2-r1 rclone=1.75.2-r0
+
+# Los scripts de archivado y respaldo (infra/postgres/respaldos, POSIX sh) y el volumen local donde espera lo cifrado antes de su subida.
+COPY respaldos/ /opt/babelhub/
+RUN chmod 0555 /opt/babelhub /opt/babelhub/*.sh && chmod 0444 /opt/babelhub/comun.sh \
+    && mkdir -p /var/respaldos && chown postgres:postgres /var/respaldos && chmod 0700 /var/respaldos
 USER postgres
