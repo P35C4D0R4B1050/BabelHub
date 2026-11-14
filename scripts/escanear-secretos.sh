@@ -5,12 +5,12 @@
 #   scripts/escanear-secretos.sh imagen <nombre[:etiqueta]>
 #
 # La salida nunca copia el secreto: gitleaks enmascara el 100 % de cada coincidencia y Trivy sustituye el valor por asteriscos.
-# Las herramientas corren en contenedores con versión fija (T10 las fija además por «digest»), sin red ni secretos del entorno.
+# Las herramientas corren en contenedores fijados por versión y por «digest» (PLA-26), sin red ni secretos del entorno.
 # Códigos de salida: 0 sin secretos, 1 con secretos, 2 error de uso o de ejecución.
 set -euo pipefail
 
-GITLEAKS_IMAGE="${GITLEAKS_IMAGE:-zricethezav/gitleaks:v8.24.3}"
-TRIVY_IMAGE="${TRIVY_IMAGE:-aquasec/trivy:0.58.1}"
+GITLEAKS_IMAGE="${GITLEAKS_IMAGE:-zricethezav/gitleaks:v8.24.3@sha256:e1b35e12a8c6fa8901f060459cfb6b2fc4c484d3afbe3b029733a3bbfab07055}"
+TRIVY_IMAGE="${TRIVY_IMAGE:-aquasec/trivy:0.58.1@sha256:ab70a02200597efa04748f210f793936eb647cbcdb0ea69cc30b226d6f5a22c7}"
 
 uso() {
   echo "Uso: $0 repositorio [carpeta] [--historial] | imagen <nombre[:etiqueta]>" >&2

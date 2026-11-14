@@ -99,6 +99,7 @@ GitHub Actions: compilar, ejecutar pruebas unitarias y de arquitectura en cada c
 
 - Un `Dockerfile` por `Api` y por `Web`, en varias etapas. En la de `Web` se compila el CSS con la CLI independiente de Tailwind.
 - Imágenes multi-arquitectura (RNF11), usuario sin privilegios, `healthcheck` y límites de memoria en Compose (AD16 y RNF12).
+- **Versiones fijadas (PLA-26):** toda imagen de un Compose, un `Dockerfile` o un script va por etiqueta y por `digest` (`postgres:17-alpine@sha256:…`, el del índice multi-arquitectura); nunca `latest` ni una etiqueta sola. Las acciones de GitHub van por el SHA de su commit con la versión en un comentario. Los paquetes NuGet tienen versión exacta en `Directory.Packages.props` y cada proyecto guarda su `packages.lock.json` (en CI el restore falla si el bloqueo cambia). Para actualizar algo, se cambia la versión y el `digest` o el SHA en un cambio revisado y se regeneran los bloqueos con `dotnet restore`. `VersionesFijadasTests` lo verifica.
 - `infra/docker-compose.local.yml` levanta PostgreSQL, Redis, un emulador de almacén compatible con S3 (a elegir, bloqueo B02), un notificador simulado y los servicios. No necesita Oracle ni Cloudflare.
 
 ## 11. Datos de ejemplo

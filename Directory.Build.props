@@ -8,4 +8,10 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <Deterministic>true</Deterministic>
   </PropertyGroup>
+  <PropertyGroup>
+    <!-- Cadena de suministro (PLA-26): cada proyecto guarda en packages.lock.json las versiones exactas de todo lo que restaura,
+         también las transitivas. En CI el restore falla si alguna cambió sin un cambio revisado del bloqueo. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+  </PropertyGroup>
 </Project>
