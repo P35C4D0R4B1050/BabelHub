@@ -44,6 +44,7 @@ internal sealed class DoblesDeSesion
 
     public CargarSesionWeb Cargar => new(Comun);
 
+    public AsegurarCredencialDeSesion Asegurar => new(Comun, Unidad, Verificador, Alertas);
 
 
     public static IngresoCompletado Ingreso(RolWeb rol = RolWeb.Cliente, string credencial = "jwt-ok-1", string renovacion = "renov-1", int vence = 15) =>
