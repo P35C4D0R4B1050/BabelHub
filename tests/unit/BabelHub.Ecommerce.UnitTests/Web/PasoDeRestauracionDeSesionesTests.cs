@@ -48,6 +48,7 @@ public sealed class PasoDeRestauracionDeSesionesTests
         var paso = new PasoDeRestauracionDeSesionesWeb(new VaciadoFalso());
 
         Assert.InRange(paso.Orden, OrdenDePasoDeRestauracion.Identidad + 1, OrdenDePasoDeRestauracion.Auditoria - 1);
+        Assert.Equal(OrdenDePasoDeRestauracion.Web, paso.Orden);
         Assert.Equal("web-vaciar-sesiones", paso.Nombre);
     }
 }

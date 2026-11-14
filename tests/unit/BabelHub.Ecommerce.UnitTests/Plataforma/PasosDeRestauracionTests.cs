@@ -46,6 +46,14 @@ public sealed class PasosDeRestauracionTests
     }
 
     [Fact]
+    public void LaConstanteWeb_QuedaEntreIdentidadYAuditoria_ConLosPasosDeIdentidadAntes()
+    {
+        Assert.True(OrdenDePasoDeRestauracion.Identidad < OrdenDePasoDeRestauracion.Web);
+        Assert.True(OrdenDePasoDeRestauracion.Web < OrdenDePasoDeRestauracion.Auditoria);
+        Assert.Equal(OrdenDePasoDeRestauracion.Identidad + 50, OrdenDePasoDeRestauracion.Web);
+    }
+
+    [Fact]
     public async Task ConElMismoOrden_SeDesempataPorNombreDeFormaDeterminista()
     {
         var bitacora = new List<string>();
