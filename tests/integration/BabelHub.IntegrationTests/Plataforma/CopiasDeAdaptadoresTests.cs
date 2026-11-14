@@ -74,7 +74,8 @@ public sealed class CopiasDeAdaptadoresTests
         "Infrastructure/Auditoria/RegistrosPostgres.cs",
         "Infrastructure/Auditoria/AlertasPostgres.cs",
         "Infrastructure/Auditoria/LimitesYDepuracionPostgres.cs",
-        "Infrastructure/Auditoria/ClavesDeCursorDelEntorno.cs");
+        "Infrastructure/Auditoria/ClavesDeCursorDelEntorno.cs",
+        "Infrastructure/Auditoria/TrabajosDeFondoDeAuditoria.cs");
 
     [Theory]
     [MemberData(nameof(Archivos))]
