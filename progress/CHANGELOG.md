@@ -2,6 +2,16 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-13 — Implementación de `transversal-seguridad` (T01 a T30)
+
+### Cubierto
+- **28 de 30 tareas** de `transversal-seguridad` en los dos servicios: límites de uso (motores de Redis, PostgreSQL y local), huellas HMAC, firma de integraciones y entradas procesadas, verificación de persona con Turnstile, cliente HTTP resiliente, secretos de entorno con arranque que falla y registros redactados, errores uniformes con `problem+json`, pipeline de límites de la Api, origen en el borde con Nginx, credencial de servicio con alcances y rotación, atributo de Turnstile por página, y revisiones automáticas del repositorio y de los registros.
+- **Documentación al día:** autenticación, modelo de datos, privacidad, lista de secretos y Redis de contadores.
+- Dos fallos de la redacción de registros descubiertos por las pruebas y corregidos.
+
+### Pendiente
+- T27b y T29 dependen de `transversal-auditoria`; después, `spec-verify` de `transversal-seguridad`. Siguiente plan: `transversal-plataforma`.
+
 ## 2026-11-13 — Reaperturas de la fase 3 y requisitos receptores de la cancelación
 
 ### Cubierto
