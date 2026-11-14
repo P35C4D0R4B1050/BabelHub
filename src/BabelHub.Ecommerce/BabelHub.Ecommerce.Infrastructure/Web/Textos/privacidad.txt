@@ -1,0 +1,21 @@
+PROVISIONAL
+TITULO: Política de privacidad
+RESUMEN: Qué datos tuyos tratamos, para qué, por cuánto tiempo y qué cookies usa el sitio, conforme a la Ley N.° 29733. Este es un texto de trabajo: la persona responsable del proyecto aún no redactó la versión legal definitiva.
+## 1. Qué datos tratamos
+Tratamos tu nombre y correo (verificado), tu contraseña (solo un resumen que nadie puede leer), tus pedidos y tu biblioteca digital, y, si lo activas, tu número de WhatsApp para avisarte del estado de tus pedidos. No guardamos datos de tarjeta.
+## 2. Para qué los usamos
+Para crear y proteger tu cuenta, procesar tus compras, entregar tus libros, avisarte del estado de tu pedido y atender tus reclamos. No usamos tus datos para publicidad ni los compartimos con editoriales.
+## 3. Cuánto tiempo los conservamos
+Mientras tu cuenta esté activa. Los registros de auditoría y las hojas de reclamación se conservan al menos dos años por obligación legal y luego se anonimizan.
+## 4. Tus derechos
+Puedes acceder, rectificar, cancelar y oponerte al tratamiento de tus datos desde «Mi cuenta». Respondemos tus solicitudes dentro de los plazos de la ley.
+## 5. Cookies que usa el sitio
+Todas las cookies llevan la marca de seguridad y ninguna contiene datos personales: son identificadores opacos o preferencias.
+- __Host-bh-tienda y __Host-bh-gestion: identifican tu sesión en la tienda o en la gestión del personal. Son necesarias. Duran lo que dure tu sesión (se cierra a los 30 minutos sin actividad).
+- __Host-bh-desafio: mantiene el paso pendiente del ingreso del personal (segundo factor o contraseña temporal). Es necesaria. Dura 5 minutos.
+- __Host-bh-dispositivo: una marca para reconocer tus dispositivos y avisarte de cambios de correo inusuales. Dura 180 días y se elimina al cancelar tu cuenta.
+- Cookie de protección de formularios (empieza con __Host-): evita solicitudes falsificadas. Es necesaria. Dura lo que dure tu sesión.
+- bh-tema: recuerda si prefieres el tema claro o el oscuro. Dura un año.
+- bh-sucursal: recuerda tu sucursal preferida. Dura un año.
+## 6. Cambios en esta política
+Si cambiamos esta política publicaremos una nueva versión con su fecha de vigencia y te pediremos aceptarla.

@@ -1,6 +1,7 @@
 using BabelHub.Ecommerce.Api.Plataforma;
 using BabelHub.Ecommerce.Api.Web;
 using BabelHub.Ecommerce.Application.Plataforma;
+using BabelHub.Ecommerce.Infrastructure.Web;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,7 @@ builder.Services.AddSingleton(typeof(ModoDeArranque), modo);
 builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("ECO"));
 builder.Services.AddSingleton<EjecutorDePasosDeRestauracion>();
 builder.Services.AgregarInterfazWeb();
+builder.Services.AgregarModuloWeb();
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();

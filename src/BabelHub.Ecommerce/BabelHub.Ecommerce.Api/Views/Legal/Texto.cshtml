@@ -1,0 +1,56 @@
+@using BabelHub.Ecommerce.Api.Controllers
+@using BabelHub.Ecommerce.Api.Web.Formato
+@model TextoLegalVista
+@{
+    var texto = Model.Texto;
+}
+<article class="mx-auto max-w-3xl" aria-labelledby="titulo-legal">
+    <h1 id="titulo-legal" class="font-display text-4xl">@texto.Titulo</h1>
+    <p class="mt-2 text-sm">
+        Versión <strong>@texto.Version</strong> · Vigente desde <time datetime="@texto.VigenteDesde.ToString("yyyy-MM-dd")">@FormatoPeruano.Fecha(texto.VigenteDesde)</time>
+    </p>
+    @if (texto.Provisional)
+    {
+        <div class="alert alert-warning mt-4" role="note">
+            <bh-icono nombre="aviso" />
+            <span><strong>Texto provisional.</strong> Es un texto de trabajo, pendiente de la revisión legal definitiva; no es la versión final.</span>
+        </div>
+    }
+    <p class="mt-6 text-lg">@texto.Resumen</p>
+    @foreach (var seccion in texto.Secciones)
+    {
+        <section class="mt-8">
+            <h2 class="text-xl font-semibold">@seccion.Titulo</h2>
+            @{
+                var enLista = false;
+            }
+            @foreach (var parrafo in seccion.Parrafos)
+            {
+                var esElemento = parrafo.StartsWith("- ", StringComparison.Ordinal);
+                if (esElemento && !enLista)
+                {
+                    enLista = true;
+                    @:<ul class="mt-2 list-disc space-y-1 pl-6">
+                }
+                else if (!esElemento && enLista)
+                {
+                    enLista = false;
+                    @:</ul>
+                }
+
+                if (esElemento)
+                {
+                    <li>@parrafo[2..]</li>
+                }
+                else
+                {
+                    <p class="mt-2">@parrafo</p>
+                }
+            }
+            @if (enLista)
+            {
+                @:</ul>
+            }
+        </section>
+    }
+</article>

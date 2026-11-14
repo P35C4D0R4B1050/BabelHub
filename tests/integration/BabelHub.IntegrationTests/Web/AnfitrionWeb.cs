@@ -1,6 +1,7 @@
 using BabelHub.Ecommerce.Api;
 using BabelHub.Ecommerce.Api.Plataforma;
 using BabelHub.Ecommerce.Api.Web;
+using BabelHub.Ecommerce.Infrastructure.Web;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
@@ -33,6 +34,7 @@ internal sealed class AnfitrionWeb : IAsyncDisposable
         builder.WebHost.UseTestServer();
         builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("ECO"));
         builder.Services.AgregarInterfazWeb();
+        builder.Services.AgregarModuloWeb();
         var mvc = builder.Services.AddControllersWithViews().AddApplicationPart(AssemblyMarker.Assembly);
         foreach (var parte in partes ?? [])
         {

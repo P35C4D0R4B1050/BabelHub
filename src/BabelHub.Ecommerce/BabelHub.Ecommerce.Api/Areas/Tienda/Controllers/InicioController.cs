@@ -11,5 +11,5 @@ public sealed class InicioVista : ModeloBaseDePagina;
 public sealed class InicioController(ContextoDePagina pagina) : Controller
 {
     [HttpGet("/")]
-    public IActionResult Index() => View(pagina.Completar(new InicioVista(), "Inicio"));
+    public async Task<IActionResult> Index(CancellationToken cancelacion) => View(await pagina.Completar(new InicioVista(), "Inicio", cancelacion: cancelacion));
 }
