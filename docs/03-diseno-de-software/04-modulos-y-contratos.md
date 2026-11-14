@@ -72,6 +72,8 @@ Los dos servicios responden los errores con `application/problem+json`:
 
 ## 4. Contratos entre servicios y entre módulos
 
+Las operaciones REST entre el E-commerce y el Inventario están congeladas en su versión v1, una por una, en [contratos entre servicios v1](08-contratos-entre-servicios-v1.md); la tabla siguiente es el resumen por flujo.
+
 | De → a | Operaciones principales | Autenticación | Falla |
 | :--- | :--- | :--- | :--- |
 | E-commerce → Inventario | Consultar disponibilidad; consultar la selección de fuentes sin reservar; crear, confirmar, extender (pago pendiente) y liberar reservas; descontar al entregar o al pasar a en reparto; liberar al marcar no recogido; ajustar al devolver; registrar un ingreso de mercadería; consultar unidades vendidas; gestión de sucursal (inventario, ajustes y traslados) | Credencial de servicio con la identidad del actor | Se informa «no se puede validar el stock» sin cobrar; el catálogo usa la última disponibilidad (CAR-06, CAT-12). |
