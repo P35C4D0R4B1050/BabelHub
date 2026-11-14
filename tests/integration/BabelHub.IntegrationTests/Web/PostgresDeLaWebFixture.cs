@@ -42,6 +42,7 @@ public sealed class PostgresDeLaWebFixture : IAsyncLifetime
             ALTER SCHEMA web OWNER TO propietario;
             ALTER TABLE web.sesiones_web OWNER TO propietario;
             ALTER TABLE web.borradores OWNER TO propietario;
+            ALTER TABLE web.claves_de_proteccion OWNER TO propietario;
             """
             + DefinicionDeLaWeb.Permisos);
         await preparacion.ExecuteNonQueryAsync();
@@ -83,7 +84,7 @@ public sealed class PostgresDeLaWebFixture : IAsyncLifetime
     }
 
     /// <summary>Vacía las tablas entre pruebas.</summary>
-    public Task Limpiar() => Ejecutar("TRUNCATE web.sesiones_web, web.borradores");
+    public Task Limpiar() => Ejecutar("TRUNCATE web.sesiones_web, web.borradores, web.claves_de_proteccion");
 }
 
 [CollectionDefinition(Nombre)]

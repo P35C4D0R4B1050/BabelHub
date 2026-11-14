@@ -9,6 +9,10 @@
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
   </ItemGroup>
   <ItemGroup>
+    <!-- El repositorio de claves de Data Protection (IXmlRepository, T12) vive en el marco compartido de ASP.NET Core, sin paquetes nuevos que fijar en packages.lock.json. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- Cuerpo de los textos legales de la web (WEB-29): recursos versionados, sin la versión ni la vigencia, que informa Identidad. -->
     <EmbeddedResource Include="Web\Textos\*.txt" />
   </ItemGroup>

@@ -53,6 +53,17 @@ public static class DefinicionDeLaWeb
             CONSTRAINT borradores_vigencia CHECK (vence_en > creado_en)
         );
         CREATE INDEX IF NOT EXISTS borradores_por_vencimiento ON web.borradores (vence_en);
+
+        -- El anillo de claves de Data Protection (antiforgery, T12): uno por host. Cada réplica lee y escribe solo las filas de su host; el XML va cifrado con la clave
+        -- maestra de ese host y nunca en claro. Las claves no se borran desde la aplicación: la restauración conserva el anillo (D14).
+        CREATE TABLE IF NOT EXISTS web.claves_de_proteccion (
+            id uuid PRIMARY KEY,
+            host text NOT NULL CHECK (host IN ('tienda', 'gestion')),
+            xml_cifrado bytea NOT NULL CHECK (octet_length(xml_cifrado) <= 65536),
+            version_de_clave smallint NOT NULL,
+            creada_en timestamptz NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS claves_de_proteccion_por_host ON web.claves_de_proteccion (host);
         """;
 
     /// <summary>
@@ -63,5 +74,6 @@ public static class DefinicionDeLaWeb
         GRANT USAGE ON SCHEMA web TO rol_web;
         GRANT SELECT, INSERT, UPDATE, DELETE ON web.sesiones_web TO rol_web;
         GRANT SELECT, INSERT, UPDATE, DELETE ON web.borradores TO rol_web;
+        GRANT SELECT, INSERT, UPDATE ON web.claves_de_proteccion TO rol_web;
         """;
 }

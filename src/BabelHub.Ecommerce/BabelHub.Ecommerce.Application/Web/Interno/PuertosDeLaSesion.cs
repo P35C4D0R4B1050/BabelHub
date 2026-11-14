@@ -99,6 +99,9 @@ public enum PropositoDeSecreto
     Credencial,
     Renovacion,
     Borrador,
+
+    /// <summary>El XML de las claves de Data Protection del anillo del host (antiforgery, T12).</summary>
+    ClavesDeProteccion,
 }
 
 public sealed record TextoCifrado(byte[] Bytes, short VersionDeClave);
