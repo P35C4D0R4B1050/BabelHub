@@ -34,7 +34,8 @@ public sealed class CopiasDeAdaptadoresTests
         "Infrastructure/Plataforma/TrabajosDeFondoPostgres.cs",
         "Infrastructure/Plataforma/LatidoDeLaBase.cs",
         "Api/Plataforma/ModoDeArranque.cs",
-        "Api/Plataforma/SaludHttp.cs");
+        "Api/Plataforma/SaludHttp.cs",
+        "Domain/Auditoria/DetalleSeguro.cs");
 
     [Theory]
     [MemberData(nameof(Archivos))]
