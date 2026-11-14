@@ -67,11 +67,19 @@ public sealed class ConstructorDeRegistros(
     }
 
     /// <summary>El registro de la solicitud ya resuelta. Falla si no hay contexto de actor o si un campo no cumple su formato.</summary>
-    public RegistroDeAuditoria Construir(SolicitudDeRegistro solicitud, AccionDelCatalogo accion)
+    public RegistroDeAuditoria Construir(
+        SolicitudDeRegistro solicitud,
+        AccionDelCatalogo accion,
+        RutaResuelta? ruta = null,
+        string? correlacion = null,
+        bool anonimoSinContexto = false)
     {
         ArgumentNullException.ThrowIfNull(solicitud);
         ArgumentNullException.ThrowIfNull(accion);
-        var actual = actores.Actual ?? throw new InvalidOperationException("Nadie estableció el contexto del actor: no se registra sin él (SEG-15).");
+        var actual = actores.Actual
+            ?? (anonimoSinContexto
+                ? ActorActual.Anonimo()
+                : throw new InvalidOperationException("Nadie estableció el contexto del actor: no se registra sin él (SEG-15)."));
         var origen = solicitud.Origen ?? (accion.Tipo == TipoDeRegistro.Auditoria ? null : origenes.Actual.Huella.ToString());
 
         return RegistroDeAuditoria.Crear(
@@ -86,7 +94,7 @@ public sealed class ConstructorDeRegistros(
             solicitud.SucursalDestino?.ToString("D"),
             solicitud.Motivo,
             origen,
-            null,
+            ruta,
             DetalleSeguro.Construir(accion.Detalle, solicitud.Detalle),
             solicitud.Resultado switch
             {
@@ -95,7 +103,7 @@ public sealed class ConstructorDeRegistros(
                 ResultadoAuditado.Fallido => ResultadoDeOperacion.Fallido,
                 _ => throw new ArgumentException("El resultado no es válido.", nameof(solicitud)),
             },
-            null);
+            correlacion);
     }
 
     private static ActorDeDominio ADominio(ActorActual actual) => actual.Tipo switch
