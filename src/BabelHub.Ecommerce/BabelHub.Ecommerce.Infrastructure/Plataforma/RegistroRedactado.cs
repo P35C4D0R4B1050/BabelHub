@@ -63,7 +63,7 @@ public sealed class RegistroRedactado(ILogger interno) : ILogger
             return;
         }
 
-        var mensaje = RedactorDeDatosProhibidos.Redactar(formatter(state, exception));
+        var mensaje = RedactorDeDatosProhibidos.Redactar(OcultarValoresSensibles(formatter(state, exception), state));
         var campos = state is IEnumerable<KeyValuePair<string, object?>> pares
             ? pares.Select(p => new KeyValuePair<string, object?>(
                 p.Key,
@@ -78,10 +78,33 @@ public sealed class RegistroRedactado(ILogger interno) : ILogger
             static (estado, _) => estado.Mensaje);
     }
 
+    /// <summary>
+    /// El mensaje ya formateado lleva el valor de los campos de la plantilla (<c>"Ingreso de {Contrasena}"</c>): el de un campo de
+    /// nombre sensible se reemplaza también dentro del texto, no solo en la lista de campos.
+    /// </summary>
+    private static string OcultarValoresSensibles<TState>(string mensaje, TState state)
+    {
+        if (state is not IEnumerable<KeyValuePair<string, object?>> pares || string.IsNullOrEmpty(mensaje))
+        {
+            return mensaje;
+        }
+
+        foreach (var par in pares)
+        {
+            if (par.Value is not null && RedactorDeDatosProhibidos.EsNombreSensible(par.Key)
+                && par.Value.ToString() is { Length: > 0 } valor)
+            {
+                mensaje = mensaje.Replace(valor, ValorSecreto.Redactado, StringComparison.Ordinal);
+            }
+        }
+
+        return mensaje;
+    }
+
     private static object RedactarAlcance<TState>(TState state) =>
         state is IEnumerable<KeyValuePair<string, object?>> pares
             ? new EstadoRedactado(
-                RedactorDeDatosProhibidos.Redactar(state.ToString()),
+                RedactorDeDatosProhibidos.Redactar(OcultarValoresSensibles(state.ToString() ?? string.Empty, state)),
                 pares.Select(p => new KeyValuePair<string, object?>(p.Key, RedactorDeDatosProhibidos.EsNombreSensible(p.Key) ? ValorSecreto.Redactado : p.Value)).ToList())
             : RedactorDeDatosProhibidos.Redactar(state?.ToString());
 

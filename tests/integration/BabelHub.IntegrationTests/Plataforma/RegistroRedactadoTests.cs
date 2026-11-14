@@ -108,6 +108,24 @@ public sealed class RegistroRedactadoTests
 
     [Fact]
     [Trait("Criterio", "AC-SEG-10")]
+    public void Registrar_ConUnCampoSensibleEnLaPlantilla_NoDejaSuValorNiEnElTextoDelMensajeNiEnElDelAlcance()
+    {
+        var (registro, capturador, _) = Armar();
+
+        registro.LogWarning("Ingreso de {Contrasena} para {Cuenta}", "valor-sin-forma-conocida", "lector-1");
+        using (registro.BeginScope("alcance {Credencial} de {Cuenta}", "otro-valor-sin-forma", "lector-1"))
+        {
+            registro.LogInformation("dentro");
+        }
+
+        var todo = string.Join("\n", capturador.Entradas.Select(e => e.Texto + " " + e.Campos).Concat(capturador.Alcances));
+        Assert.DoesNotContain("valor-sin-forma-conocida", todo, StringComparison.Ordinal);
+        Assert.DoesNotContain("otro-valor-sin-forma", todo, StringComparison.Ordinal);
+        Assert.Contains("Ingreso de [redactado] para lector-1", todo, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-10")]
     public void Registrar_ConCamposEstructuradosDeNombreSensible_OcultaSuValorYLosDemasPasan()
     {
         var (registro, capturador, _) = Armar();

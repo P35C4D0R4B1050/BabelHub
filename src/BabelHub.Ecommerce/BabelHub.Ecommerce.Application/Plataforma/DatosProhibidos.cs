@@ -118,7 +118,7 @@ public static partial class RedactorDeDatosProhibidos
 
     // «clave: valor», «clave=valor» o «"clave":"valor"» donde la clave nombra un dato prohibido (incluye parámetros de un enlace firmado).
     [GeneratedRegex(
-        """(?<clave>\b[\w-]*(?:password|passwd|contrase[ñn]a|secret|secreto|token|signature|firma|api[_-]?key|credential|credencial|cookie|session|sesion|authorization|verificacion-de-persona|origen-reenviado)[\w-]*|\b(?:pwd|sid|sig|otp|codigo|code|cvv|cvc|clave)\b)(?<sep>"?\s*[:=]\s*"?)(?:(?:Bearer|Basic)\s+)?[^\s,;&"'}\]]+""",
+        """(?<clave>\b[\w-]*(?:password|passwd|contrase[ñn]a|secret|secreto|token|signature|firma|(?:api|signing|private|encryption|hmac|access|master)[_-]?key|credential|credencial|cookie|session|sesion|authorization|verificacion-de-persona|origen-reenviado)[\w-]*|\b(?:pwd|sid|sig|otp|codigo|code|cvv|cvc|clave)\b)(?<sep>"?\s*[:=]\s*"?)(?:(?:Bearer|Basic)\s+)?[^\s,;&"'}\]]+""",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
         250)]
     private static partial Regex ParDeClaveYValor();
@@ -133,7 +133,7 @@ public static partial class RedactorDeDatosProhibidos
     private static partial Regex PosibleTarjeta();
 
     [GeneratedRegex(
-        @"^(?:[\w-]*(?:password|passwd|contrase[ñn]a|secret|secreto|token|signature|firma|api[_-]?key|credential|credencial|cookie|session|sesion|authorization)[\w-]*|pwd|sid|sig|otp|codigo|code|cvv|cvc|clave)$",
+        @"^(?:[\w-]*(?:password|passwd|contrase[ñn]a|secret|secreto|token|signature|firma|(?:api|signing|private|encryption|hmac|access|master)[_-]?key|credential|credencial|cookie|session|sesion|authorization)[\w-]*|pwd|sid|sig|otp|codigo|code|cvv|cvc|clave)$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
         250)]
     private static partial Regex NombreSensible();

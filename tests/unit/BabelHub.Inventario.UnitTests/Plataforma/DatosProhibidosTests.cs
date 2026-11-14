@@ -17,6 +17,9 @@ public sealed class DatosProhibidosTests
     [InlineData("clave=firmaDeCredenciales-v3", "firmaDeCredenciales")]
     [InlineData("cvv=123", "=123")]
     [InlineData("api_key: AKIA123456789SECRETO", "AKIA123456789")]
+    [InlineData("signing-key=Zq8Lw2Xv5Nc7", "Zq8Lw2Xv5Nc7")]
+    [InlineData("private_key: MIIEvQIBADAN", "MIIEvQIBADAN")]
+    [InlineData("hmac-key=0f1e2d3c4b5a6978", "0f1e2d3c4b5a6978")]
     public void Redactar_ConUnDatoProhibidoSembrado_NoLoConserva(string texto, string sembrado)
     {
         var redactado = RedactorDeDatosProhibidos.Redactar(texto);
