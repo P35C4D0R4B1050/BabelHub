@@ -409,7 +409,7 @@ public sealed class AlmacenShTests : IDisposable
     public void Comprobar_SiLaFechaDeBloqueoNoSeEntiende_Falla()
     {
         EstadoConforme();
-        Estado("respaldos-mensuales", retencion: "90", bloqueo: "pronto", ciclo: "90");
+        Estado("respaldos-mensuales", retencion: "92", bloqueo: "pronto", ciclo: "92");
 
         var (codigo, salida, _) = Ejecutar(null, "comprobar", "--espacio", "espacio");
 

@@ -140,7 +140,7 @@ public sealed class PoliticasDelAlmacenTests
     [Trait("Criterio", "AC-PLA-16")]
     public void LosRespaldosSeRetienenConBloqueoSegunSuClase_YElCicloDeVidaNuncaLlegaAntesQueLaRetencion()
     {
-        Assert.Equal([7, 28, 90, 100], [.. Respaldos.Select(r => Politicas.Contenedor(r).RetencionDias)]);
+        Assert.Equal([7, 28, 92, 100], [.. Respaldos.Select(r => Politicas.Contenedor(r).RetencionDias)]);
         Assert.All(Respaldos, r => Assert.True(Politicas.Contenedor(r).Bloqueada));
         Assert.All(Politicas.Contenedores.Where(c => c.ExpiraDias is not null), c => Assert.True(c.ExpiraDias >= c.RetencionDias, c.Nombre));
         Assert.False(Politicas.Contenedor("libros").Bloqueada);
