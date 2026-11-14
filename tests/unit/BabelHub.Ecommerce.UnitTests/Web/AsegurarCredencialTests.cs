@@ -104,6 +104,10 @@ public sealed class AsegurarCredencialTests
 
         public Task<IReadOnlyList<SesionGuardada>> CargarAbiertasDeUnUsuario(Guid usuarioId, CancellationToken cancelacion = default) => d.Almacen.CargarAbiertasDeUnUsuario(usuarioId, cancelacion);
 
+        public Task<IReadOnlyList<SesionGuardada>> CargarParaPurgar(HostDeSesion host, FaseDeLaPurga fase, DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) => d.Almacen.CargarParaPurgar(host, fase, ahora, maximo, cancelacion);
+
+        public Task Borrar(HashDeSesion id, CancellationToken cancelacion = default) => d.Almacen.Borrar(id, cancelacion);
+
         public async Task<SesionGuardada?> CargarParaRenovar(HashDeSesion idCargado, CancellationToken cancelacion = default)
         {
             alBloquear();
@@ -301,5 +305,58 @@ public sealed class AsegurarCredencialTests
         await Asegurar(d, cookie);
 
         Assert.Equal(["identidad (filas bloqueadas: 1)"], orden);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-03")]
+    public async Task Una_fila_cifrada_con_otra_clave_que_la_vigente_se_renueva_y_queda_cifrada_con_la_vigente_y_una_ya_vigente_no()
+    {
+        var d = new DoblesDeSesion();
+        var cookie = await d.Abrir(vence: 15);
+        d.Cifrador.VersionVigente = 2;
+        d.Identidad.Renovaciones.Enqueue(Renovada(d));
+
+        var resultado = await Asegurar(d, cookie);
+
+        Assert.Equal(EstadoDeCredencial.Asegurada, resultado.Estado);
+        Assert.Equal(1, d.Identidad.LlamadasARenovar);
+        Assert.Equal(2, d.Fila(cookie).VersionDeClave);
+
+        await Asegurar(d, cookie);
+        Assert.Equal(1, d.Identidad.LlamadasARenovar);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-26")]
+    public async Task Si_otra_solicitud_retiene_la_fila_mas_alla_del_plazo_responde_servicio_no_disponible_sin_cerrar_la_sesion()
+    {
+        var d = new DoblesDeSesion();
+        var cookie = await d.Abrir(vence: 15);
+        d.Reloj.Ahora = DoblesDeSesion.Inicio.AddMinutes(14).AddSeconds(30);
+        d.Almacen.BloqueoAgotado = true;
+
+        var resultado = await Asegurar(d, cookie);
+
+        Assert.Equal(EstadoDeCredencial.ServicioNoDisponible, resultado.Estado);
+        Assert.Equal(0, d.Identidad.LlamadasARenovar);
+        Assert.Equal(EstadoDeSesion.Abierta, d.Fila(cookie).Sesion.Estado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-26")]
+    public async Task Sin_turno_dentro_del_tope_de_renovaciones_simultaneas_responde_servicio_no_disponible()
+    {
+        var d = new DoblesDeSesion();
+        var cookie = await d.Abrir(vence: 15);
+        d.Reloj.Ahora = DoblesDeSesion.Inicio.AddMinutes(14).AddSeconds(30);
+        using var limitador = new LimitadorDeRenovaciones(maximo: 1, espera: TimeSpan.FromMilliseconds(50));
+        using var ocupado = await limitador.Entrar(default);
+        var asegurar = new AsegurarCredencialDeSesion(d.Comun, d.Unidad, d.Verificador, d.Alertas, limitador);
+
+        var resultado = await asegurar.Ejecutar(cookie, HostWeb.Tienda, default);
+
+        Assert.Equal(EstadoDeCredencial.ServicioNoDisponible, resultado.Estado);
+        Assert.Equal(0, d.Identidad.LlamadasARenovar);
+        Assert.Equal(0, d.Almacen.CargasParaRenovar);
     }
 }

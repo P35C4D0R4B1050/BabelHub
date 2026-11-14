@@ -9,11 +9,31 @@ namespace BabelHub.Ecommerce.Application.Web.Interno;
 /// (el borrador se conserva); un <b>fallo transitorio</b> responde servicio no disponible, no cierra, marca la renovación como incierta y no usa una credencial
 /// vencida; una credencial <b>inválida</b> intenta una renovación y, si se rechaza, cierra; un verificador <b>sin claves vigentes</b> no cierra ninguna sesión.
 /// </summary>
-internal sealed class AsegurarCredencialDeSesion(ServiciosDeSesion comun, IUnidadDeTrabajo unidad, IVerificadorDeCredencial verificador, IPublicadorDeAlertasTecnicas alertas)
+internal sealed class AsegurarCredencialDeSesion(
+    ServiciosDeSesion comun,
+    IUnidadDeTrabajo unidad,
+    IVerificadorDeCredencial verificador,
+    IPublicadorDeAlertasTecnicas alertas,
+    LimitadorDeRenovaciones? limitador = null)
 {
     public static readonly TimeSpan MargenDeRenovacion = TimeSpan.FromSeconds(60);
 
+    private readonly LimitadorDeRenovaciones _limitador = limitador ?? new LimitadorDeRenovaciones();
+
     public async Task<ResultadoDeCredencial> Ejecutar(string valorDeLaCookie, HostWeb host, CancellationToken cancelacion)
+    {
+        try
+        {
+            return await EjecutarInterno(valorDeLaCookie, host, cancelacion).ConfigureAwait(false);
+        }
+        catch (BloqueoDeSesionNoDisponibleException)
+        {
+            // Otra solicitud retiene la fila más allá del plazo: servicio no disponible; la sesión sigue y la solicitud siguiente lo reintenta (plan §5).
+            return Sin(EstadoDeCredencial.ServicioNoDisponible);
+        }
+    }
+
+    private async Task<ResultadoDeCredencial> EjecutarInterno(string valorDeLaCookie, HostWeb host, CancellationToken cancelacion)
     {
         if (!ValorDeCookieDeSesion.TieneFormaValida(valorDeLaCookie))
         {
@@ -51,11 +71,26 @@ internal sealed class AsegurarCredencialDeSesion(ServiciosDeSesion comun, IUnida
         return await VerificarYDevolver(fila, id, true, cancelacion).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Renueva por vencimiento próximo, por renovación incierta o porque la fila se cifró con otra clave que la vigente: la renovación guarda credencial y renovación
+    /// nuevas cifradas con la vigente (rotación de la clave de sesiones en dos pasos). Una fila ya cifrada con la vigente nunca se renueva por esto.
+    /// </summary>
     private bool NecesitaRenovarse(SesionGuardada fila) =>
-        fila.RenovacionIncierta || fila.CredencialCifrada is null || fila.CredencialVenceEn is null || fila.CredencialVenceEn.Value - comun.Reloj.Ahora < MargenDeRenovacion;
+        fila.RenovacionIncierta
+        || fila.CredencialCifrada is null
+        || fila.CredencialVenceEn is null
+        || fila.CredencialVenceEn.Value - comun.Reloj.Ahora < MargenDeRenovacion
+        || fila.VersionDeClave != comun.Cifrador.VersionVigente;
 
     /// <summary>Renueva bajo el bloqueo de la fila. Devuelve <see langword="null"/> si la credencial quedó vigente y hay que verificarla; si no, el resultado final.</summary>
-    private async Task<ResultadoDeCredencial?> Renovar(HashDeSesion id, CancellationToken cancelacion) =>
+    private async Task<ResultadoDeCredencial?> Renovar(HashDeSesion id, CancellationToken cancelacion)
+    {
+        // Un tope de renovaciones simultáneas por proceso protege el grupo de conexiones: sin turno a tiempo, servicio no disponible.
+        using var turno = await _limitador.Entrar(cancelacion).ConfigureAwait(false);
+        return turno is null ? Sin(EstadoDeCredencial.ServicioNoDisponible) : await RenovarConTurno(id, cancelacion).ConfigureAwait(false);
+    }
+
+    private async Task<ResultadoDeCredencial?> RenovarConTurno(HashDeSesion id, CancellationToken cancelacion) =>
         await unidad.Ejecutar<ResultadoDeCredencial?>(
             async ct =>
             {
@@ -164,7 +199,7 @@ internal sealed class AsegurarCredencialDeSesion(ServiciosDeSesion comun, IUnida
 
             case EstadoDeVerificacion.Vencida or EstadoDeVerificacion.Invalida when puedeReintentar:
                 // Una credencial inválida o vencida intenta una renovación; si Identidad la rechaza, la sesión se cierra.
-                var renovada = await ForzarRenovacion(id, cancelacion).ConfigureAwait(false);
+                var renovada = await ForzarRenovacion(id, fila.CredencialCifrada, cancelacion).ConfigureAwait(false);
                 if (renovada.Resultado is not null)
                 {
                     return renovada.Resultado;
@@ -188,16 +223,44 @@ internal sealed class AsegurarCredencialDeSesion(ServiciosDeSesion comun, IUnida
         }
     }
 
-    private async Task<(ResultadoDeCredencial? Resultado, SesionGuardada? Fila)> ForzarRenovacion(HashDeSesion id, CancellationToken cancelacion)
+    /// <summary>
+    /// Fuerza una renovación porque la credencial observada no se pudo verificar. La lectura bajo bloqueo, el marcado y su escritura son <b>una sola transacción</b> (si no, el
+    /// bloqueo se liberaría entre la lectura y la escritura y se pisaría la credencial que otra solicitud acaba de rotar), y si otra solicitud ya renovó la credencial
+    /// (la fila ya no tiene la observada) no se marca ni se renueva otra vez.
+    /// </summary>
+    private async Task<(ResultadoDeCredencial? Resultado, SesionGuardada? Fila)> ForzarRenovacion(HashDeSesion id, byte[]? credencialObservada, CancellationToken cancelacion)
     {
-        var marcada = await comun.Sesiones.CargarParaRenovar(id, cancelacion).ConfigureAwait(false);
-        if (marcada is null || marcada.Sesion.Estado != EstadoDeSesion.Abierta)
+        var yaRenovada = false;
+        var cerrada = await unidad.Ejecutar(
+            async ct =>
+            {
+                var marcada = await comun.Sesiones.CargarParaRenovar(id, ct).ConfigureAwait(false);
+                if (marcada is null || marcada.Sesion.Estado != EstadoDeSesion.Abierta)
+                {
+                    return true;
+                }
+
+                if (credencialObservada is null || marcada.CredencialCifrada is null || !marcada.CredencialCifrada.AsSpan().SequenceEqual(credencialObservada))
+                {
+                    yaRenovada = true;
+                    return false;
+                }
+
+                marcada.RenovacionIncierta = true;
+                await comun.Sesiones.Guardar(marcada, ct).ConfigureAwait(false);
+                return false;
+            },
+            cancelacion).ConfigureAwait(false);
+        if (cerrada)
         {
             return (Sin(EstadoDeCredencial.SesionCerrada), null);
         }
 
-        marcada.RenovacionIncierta = true;
-        await comun.Sesiones.Guardar(marcada, cancelacion).ConfigureAwait(false);
+        if (yaRenovada)
+        {
+            return (null, await comun.Sesiones.Cargar(id, cancelacion).ConfigureAwait(false));
+        }
+
         var resultado = await Renovar(id, cancelacion).ConfigureAwait(false);
         if (resultado is not null)
         {

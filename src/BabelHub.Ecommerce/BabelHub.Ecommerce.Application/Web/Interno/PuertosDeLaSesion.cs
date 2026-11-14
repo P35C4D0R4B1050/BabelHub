@@ -26,6 +26,35 @@ public sealed class SesionGuardada
     public string? RetornoTrasAceptar { get; set; }
 }
 
+/// <summary>
+/// La fila de la sesión sigue bloqueada por otra solicitud después del plazo de espera (<c>lock_timeout</c>, 5 segundos): quien la pidió responde servicio no
+/// disponible y la solicitud siguiente lo reintenta (plan §5). Nunca lleva datos de la sesión.
+/// </summary>
+public sealed class BloqueoDeSesionNoDisponibleException : Exception
+{
+    public BloqueoDeSesionNoDisponibleException()
+        : base("La sesión está ocupada por otra solicitud.")
+    {
+    }
+
+    public BloqueoDeSesionNoDisponibleException(string message)
+        : base(message)
+    {
+    }
+
+    public BloqueoDeSesionNoDisponibleException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
+/// <summary>Las dos fases de la purga de sesiones (ver <see cref="IAlmacenDeSesionesWeb.CargarParaPurgar"/>).</summary>
+public enum FaseDeLaPurga
+{
+    Vencimientos,
+    RevocacionesPendientes,
+}
+
 /// <summary>Puerto: la tabla de sesiones web (esquema <c>web</c>). <c>CargarParaRenovar</c> toma la fila con <c>SELECT … FOR UPDATE</c> y <c>lock_timeout</c>.</summary>
 public interface IAlmacenDeSesionesWeb
 {
@@ -33,8 +62,13 @@ public interface IAlmacenDeSesionesWeb
 
     Task<SesionGuardada?> Cargar(HashDeSesion id, CancellationToken cancelacion = default);
 
+    /// <summary>
+    /// Toma la fila con <c>SELECT … FOR UPDATE</c> y un <c>lock_timeout</c> de 5 segundos; exige una unidad de trabajo activa (el bloqueo dura lo que ella).
+    /// </summary>
+    /// <exception cref="BloqueoDeSesionNoDisponibleException">Si otra solicitud la retiene más allá del plazo.</exception>
     Task<SesionGuardada?> CargarParaRenovar(HashDeSesion id, CancellationToken cancelacion = default);
 
+    /// <summary>Guarda la fila que se cargó con <see cref="CargarParaRenovar"/>. Nunca reabre una fila ya cerrada (un identificador cerrado no vuelve a usarse, WEB-28).</summary>
     Task Guardar(SesionGuardada sesion, CancellationToken cancelacion = default);
 
     /// <summary>
@@ -43,7 +77,20 @@ public interface IAlmacenDeSesionesWeb
     /// </summary>
     Task ActualizarActividad(HashDeSesion id, DateTimeOffset ultimaActividad, CancellationToken cancelacion = default);
 
+    /// <summary>Las sesiones abiertas de un usuario, tomadas con <c>FOR UPDATE</c> y en un orden fijo (cerrar todas, plan §5).</summary>
     Task<IReadOnlyList<SesionGuardada>> CargarAbiertasDeUnUsuario(Guid usuarioId, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Las filas <b>del host</b> que la purga debe atender en una fase, tomadas con <c>FOR UPDATE SKIP LOCKED</c> (una solicitud o una purga de otra réplica que las tiene no se
+    /// espera). Solo las del host de la réplica: cada una descifra únicamente con la clave de su host, y una fila ajena parecería ilegible y perdería su renovación sin revocarla.
+    /// <see cref="FaseDeLaPurga.Vencimientos"/>: abiertas que ya vencieron sin que nadie las usara y cerradas hace 30 minutos o más sin revocación pendiente (siempre avanzan: se
+    /// cierran o se borran). <see cref="FaseDeLaPurga.RevocacionesPendientes"/>: cerradas con la renovación sin revocar, las de menos reintentos primero (una que falla pasa al
+    /// final, así unas pocas imposibles no dejan sin turno a las demás). Exige una unidad de trabajo activa.
+    /// </summary>
+    Task<IReadOnlyList<SesionGuardada>> CargarParaPurgar(HostDeSesion host, FaseDeLaPurga fase, DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Borra la fila (la que la purga ya atendió: cerrada hace 30 minutos o más y sin revocación pendiente).</summary>
+    Task Borrar(HashDeSesion id, CancellationToken cancelacion = default);
 }
 
 /// <summary>Puerto: la tabla de borradores (esquema <c>web</c>).</summary>
@@ -51,12 +98,19 @@ public interface IAlmacenDeBorradores
 {
     Task<int> Contar(Guid usuarioId, DateTimeOffset ahora, CancellationToken cancelacion = default);
 
+    /// <summary>
+    /// Toma el borrador con <c>FOR UPDATE</c>: dos entregas simultáneas del mismo borrador se serializan y la segunda ya no lo encuentra (entrega única). Los campos del
+    /// borrador devuelto están vacíos; el cuerpo cifrado es lo que se guardó.
+    /// </summary>
     Task<BorradorGuardado?> Cargar(Guid usuarioId, string plantillaDeRuta, CancellationToken cancelacion = default);
 
     /// <summary><c>INSERT … ON CONFLICT (usuario_id, plantilla_de_ruta) DO UPDATE</c>.</summary>
     Task Guardar(BorradorGuardado borrador, CancellationToken cancelacion = default);
 
     Task Borrar(Guid id, CancellationToken cancelacion = default);
+
+    /// <summary>Borra los borradores vencidos (hasta <paramref name="maximo"/>, con <c>SKIP LOCKED</c>) y devuelve cuántos.</summary>
+    Task<int> BorrarVencidos(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default);
 }
 
 /// <summary>Un borrador guardado: el agregado y su cuerpo cifrado.</summary>
@@ -67,6 +121,9 @@ public enum PropositoDeSecreto
     Credencial,
     Renovacion,
     Borrador,
+
+    /// <summary>El XML de las claves de Data Protection del anillo del host (antiforgery, T12).</summary>
+    ClavesDeProteccion,
 }
 
 public sealed record TextoCifrado(byte[] Bytes, short VersionDeClave);
@@ -83,6 +140,12 @@ public sealed class SecretoDeSesionIlegibleException : Exception
 /// <summary>Puerto: cifra y descifra los secretos de la sesión con una subclave por propósito y datos asociados ligados a la fila (D02).</summary>
 public interface ICifradorDeSecretosDeSesion
 {
+    /// <summary>
+    /// El identificador de la clave con la que se cifra hoy. Una fila cuya <see cref="TextoCifrado.VersionDeClave"/> difiere se re-cifra con esta (rotación en dos pasos);
+    /// una igual nunca se reescribe.
+    /// </summary>
+    short VersionVigente { get; }
+
     TextoCifrado Cifrar(string texto, PropositoDeSecreto proposito, string datosAsociados);
 
     /// <exception cref="SecretoDeSesionIlegibleException">Si no se puede descifrar.</exception>

@@ -13,6 +13,9 @@ internal sealed class AlmacenDeSesionesEnMemoria : IAlmacenDeSesionesWeb
 
     public int CargasParaRenovar { get; private set; }
 
+    /// <summary>Simula el <c>lock_timeout</c> agotado: otra solicitud retiene la fila.</summary>
+    public bool BloqueoAgotado { get; set; }
+
     public Task Insertar(SesionGuardada sesion, CancellationToken cancelacion = default)
     {
         Filas.Add(sesion.Sesion.Id.Valor, sesion);
@@ -24,6 +27,11 @@ internal sealed class AlmacenDeSesionesEnMemoria : IAlmacenDeSesionesWeb
 
     public Task<SesionGuardada?> CargarParaRenovar(HashDeSesion id, CancellationToken cancelacion = default)
     {
+        if (BloqueoAgotado)
+        {
+            throw new BloqueoDeSesionNoDisponibleException();
+        }
+
         CargasParaRenovar++;
         return Task.FromResult(Filas.GetValueOrDefault(id.Valor));
     }
@@ -44,6 +52,27 @@ internal sealed class AlmacenDeSesionesEnMemoria : IAlmacenDeSesionesWeb
 
     public Task<IReadOnlyList<SesionGuardada>> CargarAbiertasDeUnUsuario(Guid usuarioId, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<SesionGuardada>>([.. Filas.Values.Where(f => f.Sesion.UsuarioId == usuarioId && f.Sesion.Estado == EstadoDeSesion.Abierta)]);
+
+    /// <summary>Las mismas filas que elige la consulta de PostgreSQL (la integración comprueba el SQL real).</summary>
+    public Task<IReadOnlyList<SesionGuardada>> CargarParaPurgar(HostDeSesion host, FaseDeLaPurga fase, DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<SesionGuardada>>(
+        [
+            .. Filas.Values
+                .Where(f => f.Sesion.Host == host)
+                .Where(f => fase == FaseDeLaPurga.RevocacionesPendientes
+                    ? f.Sesion.Estado != EstadoDeSesion.Abierta && f.RevocacionPendiente
+                    : f.Sesion.Estado == EstadoDeSesion.Abierta
+                        ? ahora >= f.Sesion.ExpiraAbsoluta || ahora - f.Sesion.UltimaActividad >= PoliticaDeSesion.InactividadMaxima
+                        : !f.RevocacionPendiente && ahora - f.Sesion.CerradaEn!.Value >= PoliticaDeBorradores.Vigencia)
+                .OrderBy(f => fase == FaseDeLaPurga.RevocacionesPendientes ? f.ReintentosDeRevocacion : 0)
+                .Take(maximo),
+        ]);
+
+    public Task Borrar(HashDeSesion id, CancellationToken cancelacion = default)
+    {
+        Filas.Remove(id.Valor);
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class AlmacenDeBorradoresEnMemoria : IAlmacenDeBorradores
@@ -68,6 +97,9 @@ internal sealed class AlmacenDeBorradoresEnMemoria : IAlmacenDeBorradores
         Filas.RemoveAll(f => f.Borrador.Id == id);
         return Task.CompletedTask;
     }
+
+    public Task<int> BorrarVencidos(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult(Filas.RemoveAll(f => f.Borrador.VenceEn <= ahora));
 }
 
 /// <summary>Cifrado reversible de prueba que respeta lo esencial del contrato: el texto solo se descifra con el mismo propósito y los mismos datos asociados.</summary>
@@ -132,8 +164,19 @@ internal sealed class SesionesDeIdentidadFalsas : ISesionesDeIdentidad
         return Renovaciones.Count > 0 ? Renovaciones.Dequeue() : new ResultadoDeRenovacion.Transitoria();
     }
 
+    /// <summary>Identidad no responde: la revocación lanza.</summary>
+    public bool LanzaAlRevocar { get; set; }
+
+    public int LlamadasARevocar { get; private set; }
+
     public Task<bool> RevocarRenovacion(string renovacion, CancellationToken cancelacion = default)
     {
+        LlamadasARevocar++;
+        if (LanzaAlRevocar)
+        {
+            throw new HttpRequestException("Identidad no responde.");
+        }
+
         Revocadas.Add(renovacion);
         return Task.FromResult(ConfirmaRevocaciones);
     }

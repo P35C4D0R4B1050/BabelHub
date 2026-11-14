@@ -48,6 +48,12 @@ internal sealed class DoblesDeSesion
 
     public CerrarSesionWeb Cerrar => new(Comun, Unidad, Alertas);
 
+    public AlmacenDeBorradoresEnMemoria Borradores { get; } = new();
+
+    public PurgarSesionesWeb Purgar => PurgarDe(HostDeSesion.Tienda);
+
+    public PurgarSesionesWeb PurgarDe(HostDeSesion host) => new(host, Almacen, Borradores, Cifrador, Identidad, Seguridad, Alertas, Unidad, Reloj);
+
     public static IngresoCompletado Ingreso(RolWeb rol = RolWeb.Cliente, string credencial = "jwt-ok-1", string renovacion = "renov-1", int vence = 15) =>
         new(Usuario, rol, credencial, Inicio.AddMinutes(vence), renovacion);
 

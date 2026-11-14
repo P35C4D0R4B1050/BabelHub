@@ -53,6 +53,7 @@ public sealed partial class SecretosEnElRepositorioTests
         ["tests/unit/BabelHub.Ecommerce.UnitTests/Plataforma/DatosProhibidosTests.cs"] = (["clave de acceso de AWS", ContrasenaConValor], "semillas falsas para probar el redactor de datos prohibidos"),
         ["tests/unit/BabelHub.Inventario.UnitTests/Plataforma/DatosProhibidosTests.cs"] = (["clave de acceso de AWS", ContrasenaConValor], "semillas falsas para probar el redactor de datos prohibidos"),
         ["tests/integration/BabelHub.IntegrationTests/Plataforma/PostgresDeRolesFixture.cs"] = ([ContrasenaConValor], "credenciales de un contenedor PostgreSQL desechable de pruebas"),
+        ["tests/integration/BabelHub.IntegrationTests/Web/PostgresDeLaWebFixture.cs"] = ([ContrasenaConValor], "contraseña aleatoria de un contenedor PostgreSQL desechable de pruebas"),
     };
 
     /// <summary>Valores de contraseña que son un marcador y no un secreto.</summary>
