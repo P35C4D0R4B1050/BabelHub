@@ -17,6 +17,7 @@ namespace BabelHub.ArchitectureTests.Contratos;
 public sealed partial class ReglasDeContratosTests
 {
     private const string EspacioDeContratos = "BabelHub.Shared.Contratos";
+    private const string EspacioDeErrores = "BabelHub.Shared.Errores";
 
     private static readonly Type[] TiposSimples =
     [
@@ -25,7 +26,7 @@ public sealed partial class ReglasDeContratosTests
 
     private static IEnumerable<Type> TiposDeContratos() =>
         BabelHub.Shared.AssemblyMarker.Assembly.GetTypes()
-            .Where(t => t.IsPublic && t.Namespace is { } ns && ns.StartsWith(EspacioDeContratos, StringComparison.Ordinal));
+            .Where(t => t.IsPublic && t.Namespace is { } ns && (ns.StartsWith(EspacioDeContratos, StringComparison.Ordinal) || ns == EspacioDeErrores));
 
     private static bool EsRecord(Type tipo) => tipo.GetMethod("<Clone>$", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) is not null;
 
@@ -47,7 +48,7 @@ public sealed partial class ReglasDeContratosTests
     {
         foreach (var dto in Dtos())
         {
-            Assert.True(dto.IsSealed || dto.IsAbstract, $"{dto.Name} debe ser sellado (o la base abstracta de otros).");
+            Assert.True(dto.IsSealed || dto.IsAbstract || dto == typeof(ProblemaDto), $"{dto.Name} debe ser sellado (solo ProblemaDto es la base de los errores con cuerpo propio).");
         }
 
         var referencias = BabelHub.Shared.AssemblyMarker.Assembly.GetReferencedAssemblies().Select(a => a.Name!)
@@ -104,7 +105,7 @@ public sealed partial class ReglasDeContratosTests
     [Fact]
     public void Las_clases_de_constantes_solo_exponen_constantes_o_listas_de_ellas()
     {
-        foreach (var tipo in TiposDeContratos().Where(EsDeConstantes))
+        foreach (var tipo in TiposDeContratos().Where(EsDeConstantes).Where(t => t != typeof(CodigosDeError)))
         {
             var metodos = tipo.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly).Where(m => !m.IsSpecialName).Select(m => m.Name).ToList();
             Assert.True(metodos.Count == 0, $"{tipo.Name} tiene métodos públicos (los contratos no llevan reglas): {string.Join(", ", metodos)}.");
@@ -172,7 +173,8 @@ public sealed partial class ReglasDeContratosTests
             }
 
             Assert.True(operacion.Metodo != "GET" || operacion.Solicitud is null, $"{operacion.Nombre}: un GET no lleva cuerpo.");
-            Assert.True(operacion.Metodo != "GET" || !operacion.RequiereClaveDeIdempotencia, $"{operacion.Nombre}: un GET no necesita clave de idempotencia.");
+            Assert.True(operacion.Metodo != "GET" || operacion.EsLectura, $"{operacion.Nombre}: un GET es de solo lectura.");
+            Assert.True(!operacion.EsLectura || !operacion.RequiereClaveDeIdempotencia, $"{operacion.Nombre}: una lectura no necesita clave de idempotencia.");
         }
     }
 

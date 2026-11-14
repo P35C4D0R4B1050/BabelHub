@@ -12,6 +12,7 @@ namespace BabelHub.Shared.Contratos;
 /// <param name="Alcance">Alcance de la credencial de servicio (<see cref="AlcancesDeCredencial"/>).</param>
 /// <param name="RequiereTokenDeUsuario">Verdadero si, además de la credencial, lleva el token del usuario (nunca una cabecera de actor).</param>
 /// <param name="RequiereClaveDeIdempotencia">Verdadero si exige la cabecera <c>Idempotency-Key</c>.</param>
+/// <param name="EsLectura">Verdadero si no cambia nada (un <c>POST</c> de consulta con cuerpo también lo es): el cliente puede reintentarla.</param>
 /// <param name="CodigoDeExito">Código HTTP de la respuesta normal (otro código de éxito de una repetición idempotente se documenta aparte).</param>
 /// <param name="Solicitud">DTO del cuerpo de la solicitud, si lo lleva.</param>
 /// <param name="Respuesta">DTO del cuerpo de la respuesta, si lo lleva.</param>
@@ -23,6 +24,7 @@ public sealed record OperacionDeContrato(
     string Alcance,
     bool RequiereTokenDeUsuario,
     bool RequiereClaveDeIdempotencia,
+    bool EsLectura,
     int CodigoDeExito,
     Type? Solicitud,
     Type? Respuesta,
