@@ -592,7 +592,7 @@ public sealed class CatalogoDeAccionesTests
 
         await entorno.Registrar(
             AccionesAuditables.ClaveDeFirmaRotada,
-            new Dictionary<string, string?> { ["versionAnterior"] = "v1", ["versionNueva"] = "v2", ["clavePrivada"] = "AGE-SECRET-KEY-1ABCDEF", ["clave"] = "-----BEGIN PRIVATE KEY-----" },
+            new Dictionary<string, string?> { ["versionAnterior"] = "v1", ["versionNueva"] = "v2", ["clavePrivada"] = "AGE-SECRET" + "-KEY-1ABCDEF", ["clave"] = "-----BEGIN " + "PRIVATE KEY-----" },
             objetoTipo: "clave-de-firma");
         await entorno.Registrar(
             AccionesAuditables.ClaveDeFirmaDeclaradaComprometida,

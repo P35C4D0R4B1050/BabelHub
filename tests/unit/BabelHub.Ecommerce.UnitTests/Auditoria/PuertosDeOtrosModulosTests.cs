@@ -192,12 +192,12 @@ public sealed class PuertosDeOtrosModulosTests
         var bloqueo = constructor.Construir(
             new SolicitudDeRegistro(new AccionAuditable("BloqueoTemporalAplicado", aislada: true)) { Motivo = "intentos-excedidos", Resultado = ResultadoAuditado.Rechazado },
             Catalogo.Obtener("BloqueoTemporalAplicado"));
-        var contrasena = constructor.Construir(
+        var cambio = constructor.Construir(
             new SolicitudDeRegistro(new AccionAuditable("ContrasenaCambiada", aislada: true)) { Motivo = "cambio-por-el-titular" },
             Catalogo.Obtener("ContrasenaCambiada"));
 
         await eventos.Insertar(bloqueo);
-        await auditoria.Insertar(contrasena);
+        await auditoria.Insertar(cambio);
 
         Assert.Equal(["BloqueoTemporalAplicado"], aislado.AislandoElFallo);
         Assert.Equal(["ContrasenaCambiada"], aislado.EnLaTransaccion);
