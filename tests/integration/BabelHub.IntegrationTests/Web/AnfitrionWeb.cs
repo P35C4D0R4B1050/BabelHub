@@ -27,13 +27,18 @@ internal sealed class AnfitrionWeb : IAsyncDisposable
 
     public IServiceProvider Servicios => _app.Services;
 
-    public static async Task<AnfitrionWeb> Iniciar(Action<IServiceCollection>? servicios = null, Action<WebApplication>? antesDeLasRutas = null)
+    public static async Task<AnfitrionWeb> Iniciar(Action<IServiceCollection>? servicios = null, Action<WebApplication>? antesDeLasRutas = null, System.Reflection.Assembly[]? partes = null)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ContentRootPath = RaizDelRepositorio.Api, EnvironmentName = Environments.Development });
         builder.WebHost.UseTestServer();
         builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("ECO"));
         builder.Services.AgregarInterfazWeb();
-        builder.Services.AddControllersWithViews().AddApplicationPart(AssemblyMarker.Assembly);
+        var mvc = builder.Services.AddControllersWithViews().AddApplicationPart(AssemblyMarker.Assembly);
+        foreach (var parte in partes ?? [])
+        {
+            mvc.AddApplicationPart(parte);
+        }
+
         servicios?.Invoke(builder.Services);
 
         var app = builder.Build();

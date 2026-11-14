@@ -1,0 +1,94 @@
+@using BabelHub.Ecommerce.Api.Web.Estados
+@model EstadoVista
+@* El único componente de los estados estándar de una pantalla (WEB-06, D15). Los textos salen del modelo y Razor los codifica. *@
+@switch (Model.Estado)
+{
+    case EstadoDePantalla.Cargando:
+        <div class="bh-estado" role="status" aria-live="polite" aria-busy="true">
+            <span class="sr-only">@Model.Titulo</span>
+            <div class="space-y-3" aria-hidden="true">
+                <div class="bh-esqueleto h-6 w-1/3"></div>
+                <div class="bh-esqueleto h-4 w-full"></div>
+                <div class="bh-esqueleto h-4 w-5/6"></div>
+                <div class="bh-esqueleto h-4 w-2/3"></div>
+            </div>
+        </div>
+        break;
+
+    case EstadoDePantalla.Vacio:
+        <section class="bh-estado flex flex-col items-center gap-3 py-12 text-center">
+            <bh-icono nombre="bandeja" clase="size-12 opacity-70" />
+            <h2 class="font-display text-2xl">@Model.Titulo</h2>
+            @if (Model.Mensaje is not null)
+            {
+                <p class="max-w-md">@Model.Mensaje</p>
+            }
+            @if (Model.TextoDeAccion is not null && Model.RutaDeAccion is not null)
+            {
+                <a class="btn btn-primary" href="@Model.RutaDeAccion">@Model.TextoDeAccion</a>
+            }
+        </section>
+        break;
+
+    case EstadoDePantalla.SinPermiso:
+        <section class="bh-estado flex flex-col items-center gap-3 py-12 text-center">
+            <bh-icono nombre="candado" clase="size-12 opacity-70" />
+            <h2 class="font-display text-2xl">@Model.Titulo</h2>
+            <p class="max-w-md">@Model.Mensaje</p>
+            @if (Model.Salidas.Count > 0)
+            {
+                <ul class="flex flex-wrap justify-center gap-2">
+                    @foreach (var salida in Model.Salidas)
+                    {
+                        <li><a class="btn btn-outline" href="@salida.Ruta">@salida.Texto</a></li>
+                    }
+                </ul>
+            }
+        </section>
+        break;
+
+    case EstadoDePantalla.Exito:
+        <div class="bh-estado alert alert-success" role="status">
+            <bh-icono nombre="exito" />
+            <div>
+                <p class="font-semibold">@Model.Titulo</p>
+                @if (Model.Mensaje is not null)
+                {
+                    <p>@Model.Mensaje</p>
+                }
+            </div>
+        </div>
+        break;
+
+    default:
+        var esNoDisponible = Model.Estado == EstadoDePantalla.ServicioNoDisponible;
+        <div class="bh-estado alert alert-vertical sm:alert-horizontal @(esNoDisponible ? "alert-warning" : "alert-error")" role="alert">
+            <bh-icono nombre="@(esNoDisponible ? "aviso" : "error")" />
+            <div>
+                <h2 class="font-semibold">@Model.Titulo</h2>
+                @if (Model.Mensaje is not null)
+                {
+                    <p>@Model.Mensaje</p>
+                }
+                @if (Model.CodigoDeSoporte is not null || Model.IdentificadorDeSeguimiento is not null)
+                {
+                    <details class="mt-2 text-sm">
+                        <summary class="cursor-pointer">@TextosDeInterfaz.Soporte</summary>
+                        @if (Model.CodigoDeSoporte is not null)
+                        {
+                            <p>Código: <span class="font-mono">@Model.CodigoDeSoporte</span></p>
+                        }
+                        @if (Model.IdentificadorDeSeguimiento is not null)
+                        {
+                            <p>Seguimiento: <span class="font-mono">@Model.IdentificadorDeSeguimiento</span></p>
+                        }
+                    </details>
+                }
+            </div>
+            @if (Model.RutaDeReintento is not null)
+            {
+                <a class="btn btn-sm" href="@Model.RutaDeReintento" hx-get="@(Model.DestinoHtmx is null ? null : Model.RutaDeReintento)" hx-target="@Model.DestinoHtmx"><bh-icono nombre="reintentar" clase="size-4" />@TextosDeInterfaz.Reintentar</a>
+            }
+        </div>
+        break;
+}

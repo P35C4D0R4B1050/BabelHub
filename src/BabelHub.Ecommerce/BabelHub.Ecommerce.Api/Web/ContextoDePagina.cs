@@ -16,6 +16,12 @@ public static class Temas
 /// </summary>
 public sealed class ContextoDePagina(IHttpContextAccessor acceso)
 {
+    /// <summary>
+    /// Clave de <c>HttpContext.Items</c> con la que la política de textos pendientes (T37) avisa a la página de que la persona debe aceptar
+    /// los textos legales: <see cref="Completar{T}"/> la copia al modelo y los tag helpers de acciones dejan de ofrecer cambios y pagos.
+    /// </summary>
+    public const string ClaveTextosPendientes = "bh.textos-pendientes";
+
     public T Completar<T>(T modelo, string titulo, AreaDeLaPagina area = AreaDeLaPagina.Tienda)
         where T : ModeloBaseDePagina
     {
@@ -24,6 +30,7 @@ public sealed class ContextoDePagina(IHttpContextAccessor acceso)
         modelo.Area = area;
         modelo.Tema = Temas.Validar(acceso.HttpContext?.Request.Cookies[Temas.Cookie]);
         modelo.Menu = MenuProvisional(area);
+        modelo.TextosPendientes = acceso.HttpContext?.Items[ClaveTextosPendientes] is true;
         return modelo;
     }
 
