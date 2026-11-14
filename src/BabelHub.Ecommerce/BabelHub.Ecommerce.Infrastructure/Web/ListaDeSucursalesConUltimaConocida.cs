@@ -96,6 +96,8 @@ public static class ModuloWebExtensiones
         servicios.AddScoped<IPreferenciaDeSucursal, PreferenciaDeSucursal>();
         // Hasta que exista el módulo Catálogo; un registro real posterior la reemplaza.
         servicios.TryAddScoped<Application.Catalogo.IConsultaDeCatalogo, Catalogo.ConsultaDeCatalogoPendiente>();
+        // Ídem para la Biblioteca digital (ECO-8).
+        servicios.TryAddScoped<Application.Biblioteca.IDescargasDeLaBiblioteca, DescargasDeLaBibliotecaPendiente>();
         return servicios;
     }
 }

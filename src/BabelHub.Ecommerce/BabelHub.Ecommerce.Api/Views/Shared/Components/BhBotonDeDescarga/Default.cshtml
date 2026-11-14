@@ -1,0 +1,7 @@
+@using BabelHub.Ecommerce.Api.Areas.Tienda.Controllers
+@model BotonDeDescargaVista
+@* El botón de descarga: un POST con una clave de un solo uso por formulario renderizado (D18); nunca un enlace GET que un prefetch pueda gastar. *@
+<form method="post" action="/biblioteca/@Model.AccesoId.ToString("D")/descargar" asp-antiforgery="true">
+    <input type="hidden" name="clave" value="@Model.Clave" />
+    <button type="submit" class="btn btn-primary btn-sm"><bh-icono nombre="libro" clase="size-4" />Descargar</button>
+</form>

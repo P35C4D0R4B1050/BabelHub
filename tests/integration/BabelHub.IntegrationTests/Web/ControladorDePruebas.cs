@@ -80,3 +80,12 @@ public sealed class ControladorDeErroresDePruebas(CarritoDePrueba? carrito = nul
         }
     }
 }
+
+/// <summary>Renderiza el botón de descarga como lo haría la pantalla «Mi biblioteca» (T27).</summary>
+[ApiController]
+[Route("prueba")]
+public sealed class ControladorDeDescargaDePruebas : Controller
+{
+    [HttpGet("boton-de-descarga/{acceso:guid}")]
+    public IActionResult Boton(Guid acceso) => ViewComponent("BhBotonDeDescarga", new { accesoId = acceso });
+}
