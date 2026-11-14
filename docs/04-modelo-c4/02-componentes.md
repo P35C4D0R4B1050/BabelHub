@@ -283,7 +283,7 @@ El asistente no tiene acceso a ninguna base de datos ni herramientas de escritur
 
 ## 5. Interfaz web (presentación del E-commerce)
 
-La interfaz web es la capa de Presentación del E-commerce (AD15): no tiene Dominio ni Aplicación propios, llama a los módulos en el mismo proceso por sus contratos públicos y al Inventario por REST, solo desde el servidor. Se sirve en dos hosts (tienda y gestión).
+La interfaz web es la capa de Presentación del E-commerce (AD15): la Presentación no tiene reglas de negocio, llama a los módulos en el mismo proceso por sus contratos públicos y al Inventario por REST, solo desde el servidor. Las reglas de la sesión web, del borrador de pantalla y del área por rol son del módulo `Web` (Dominio, Aplicación e Infraestructura, esquema `web`), que usa los contratos públicos de Identidad, Auditoría, Catálogo y Plataforma. Se sirve en dos hosts (tienda y gestión).
 
 ```mermaid
 flowchart TD
@@ -293,8 +293,8 @@ SUC["Sucursal<br/>inventario, ajustes, pedidos de recojo, traslados, envíos"]
 ADM["Admin<br/>catálogo, usuarios, pedidos, reclamos, auditoría, alertas"]
 end
 
-subgraph INF["Infraestructura de la Web"]
-SESW["Sesión del servidor<br/>WEB-04, WEB-19, WEB-27, WEB-28"]
+subgraph INF["Módulo Web y su Presentación"]
+SESW["Sesión del servidor (módulo Web)<br/>WEB-04, WEB-19, WEB-27, WEB-28"]
 SEGW["Cabeceras, CSRF y errores<br/>WEB-05, WEB-07, WEB-18"]
 LEG["Textos legales versionados<br/>WEB-08, WEB-29"]
 MEZ["Mezcla de auditoría y alertas<br/>AUD-09, AUD-17, AUD-18"]

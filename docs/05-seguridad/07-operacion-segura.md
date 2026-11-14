@@ -72,6 +72,19 @@ Todos llegan por variables de entorno con el prefijo `BABELHUB__` (el doble guio
 | `BABELHUB__Ensayo__ProhibidosSha256` | Ambos (solo en el ensayo) | No es un secreto: las huellas SHA-256 de las credenciales de producción, para que el ensayo se niegue a arrancar si alguna variable de secreto coincide con una. |
 | `BABELHUB__Seguridad__ClaveDeRedisDeLimites` | E-commerce y réplica de gestión | Contraseña del usuario `limites` del Redis de contadores. |
 | `BABELHUB__Auditoria__ClaveDeCursor` | Ambos, una distinta por servicio | Clave HMAC del cursor firmado de la consulta de auditoría, con versión y rotación (`transversal-auditoria`). |
+| `BABELHUB__Web__ClaveDeSesionesTienda` y `…Anterior` | E-commerce, solo la VM del host `tienda` | Clave maestra (al menos 32 bytes) de la que el módulo `Web` deriva con HKDF las subclaves de cifrado de la credencial, la renovación, el borrador y el anillo de Data Protection del host `tienda` (`web-base` D02). La anterior solo existe durante una rotación en dos pasos. |
+| `BABELHUB__Web__ClaveDeSesionesGestion` y `…Anterior` | E-commerce, solo la VM del host `gestion` | Lo mismo para el host `gestion`. Debe ser distinta de la de `tienda` y de cualquier otro secreto: una `tienda` comprometida no descifra las sesiones de `gestion`. |
+| `BABELHUB__Web__Host` y `BABELHUB__Web__HostsPermitidos` | E-commerce | No son secretos. El primero es el rol del proceso (`tienda` o `gestion`) y decide qué áreas se mapean; el segundo, los hosts que acepta el servidor (`AllowedHosts`) y que usa la comprobación de `Origin`. |
+
+### 3.3 Dependencias de la interfaz que el SBOM de .NET no ve
+
+La CLI independiente de Tailwind CSS, daisyUI, htmx y las fuentes autoalojadas (DM Serif Display e Inter, licencia OFL) no pasan por NuGet, así que no aparecen en el SBOM (PLA-26). Se fijan por versión y huella SHA-256 (`src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api/Web/versiones.json`, que una prueba de integración vigila), se descargan solo con esa verificación y se listan aquí con su responsable de vigilar avisos de seguridad: la persona responsable del proyecto, revisando las publicaciones de cada proyecto al menos una vez al mes y antes de cada lanzamiento. El CSS generado no se versiona: se genera en la construcción de la imagen.
+
+| Dependencia | Dónde vive | Cómo se fija |
+| :--- | :--- | :--- |
+| Tailwind CSS (CLI independiente) y daisyUI | Solo en la construcción (`Dockerfile`); no llegan a la imagen final | Versión y SHA-256 por arquitectura en `versiones.json` y en el `Dockerfile`; la construcción falla si la huella no coincide. |
+| htmx | `wwwroot/lib/htmx/` | Versión, SHA-256 y licencia junto al archivo; sin `eval` ni etiquetas de script en las respuestas. |
+| DM Serif Display e Inter | `wwwroot/lib/fuentes/` | Versión, SHA-256 y licencia OFL junto a los archivos. |
 
 ## 4. Registro y alertas
 
