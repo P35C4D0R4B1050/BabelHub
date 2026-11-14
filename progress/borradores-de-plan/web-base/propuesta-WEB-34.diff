@@ -1,0 +1,45 @@
+diff --git a/specs/web-base/spec.md b/specs/web-base/spec.md
+index d250da7..6878d0c 100644
+--- a/specs/web-base/spec.md
++++ b/specs/web-base/spec.md
+@@ -1,14 +1,12 @@
+ ---
+ id: web-base
+ titulo: Estructura base de la interfaz web
+-estado: Approved
+-aprobado_por: Claude (delegado por Diego Amiquero)
+-aprobado_en: 2026-11-13
++estado: Draft
+ servicio: E-commerce
+ prefijo: WEB
+ origen: [RC01, RNF13, RF25, RF29, NN15, NN16, NN18]
+ calidad: [AC04, AC06, RNF05, RNF06, RNF15, RNF16, RNF25, RNF26, RNF27]
+-depende: [identidad-seguridad, ecommerce-libro-reclamaciones, ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-biblioteca-digital, transversal-auditoria, transversal-seguridad]
++depende: [identidad-seguridad, ecommerce-libro-reclamaciones, ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-pagos, ecommerce-pedidos, ecommerce-biblioteca-digital, transversal-auditoria, transversal-seguridad]
+ ---
+ 
+ # Spec — Estructura base de la interfaz web
+@@ -63,7 +61,11 @@ La base común de la interfaz web del E-commerce: áreas por rol, sesión, estad
+ | WEB-31 | Estado | Mientras una sesión web lleva 7 días de un cliente o 8 horas del personal desde el ingreso, el sistema deberá cerrarla aunque haya actividad. | RNF15, AC04 |
+ | WEB-32 | No deseado | Si Identidad rechaza la renovación de una sesión (usuario desactivado, renovaciones revocadas, cambio de rol o clave comprometida), entonces el sistema deberá cerrar la sesión web y llevar a la persona al ingreso conservando lo que tenía en pantalla según WEB-25. | RNF15, AC04 |
+ | WEB-33 | Ubicuo | El sistema deberá ofrecer a la administración central una pantalla de alertas de seguridad con su estado de revisión y la acción de marcarlas como revisadas. | RNF20, AC04 |
+-| WEB-34 | Estado | Mientras una persona tiene pendiente configurar el segundo factor, cambiar una contraseña temporal o aceptar una versión nueva de los textos legales, el sistema deberá llevarla a ese paso antes de cualquier otra pantalla. | RNF15, NN15 |
++| WEB-34 | Estado | Mientras una persona tiene pendiente configurar el segundo factor o cambiar una contraseña temporal, el sistema deberá llevarla a ese paso antes de cualquier otra pantalla, también cuando además haya textos legales por aceptar, y no mostrarle ninguna pantalla de solo lectura. | RNF15, NN15 |
++| WEB-41 | Estado | Mientras la única pendiente de una persona es aceptar la versión vigente de los textos legales, el sistema deberá llevarla a aceptarla al ingresar o renovar su sesión y cuando abra una pantalla no permitida, y negarle toda pantalla que no sea la aceptación, el cierre de sesión, los textos legales, el Libro de Reclamaciones y las que permiten WEB-42 y WEB-43. | NN15, RNF05 |
++| WEB-42 | Estado | Mientras un cliente tiene pendiente solo aceptar los textos legales, el sistema deberá permitirle ver su cuenta y sus pedidos, registrar y consultar sus solicitudes sobre datos personales (incluida la cancelación y su reconfirmación o desistimiento), revocar sus consentimientos y cambiar su contraseña, e impedirle pagar y hacer cualquier otro cambio. | NN15, RNF23 |
++| WEB-43 | Estado | Mientras un miembro del personal tiene pendiente solo aceptar los textos legales, el sistema deberá permitirle ver su cuenta y negarle las áreas Sucursal y Administración. | NN15, RNF05 |
++| WEB-44 | Ubicuo | El sistema deberá reflejar el estado de aceptación que informa Identidad, tratar como pendiente a quien no pueda consultar y dejar el bloqueo de pagos y de cambios a Identidad, Carrito y Pagos (IDE-58, CAR-36, PAG-31) aunque la pantalla se pida directamente. | AC04, RNF05 |
+ | WEB-35 | Ubicuo | El sistema deberá ofrecer las pantallas de registro, ingreso, verificación y recuperación, cuenta (datos, consentimientos, segundo factor, solicitudes y cancelación con cierre de todas las sesiones), usuarios y roles, y solicitudes sobre datos personales con sus fechas límite. | RNF13, NN15 |
+ | WEB-36 | Ubicuo | El sistema deberá mostrar en la cuenta los avisos de seguridad que no salen por correo (IDE-53, IDE-76, IDE-79, IDE-86) y el aviso del descarte de una cancelación diferida (IDE-81), sin enlaces ni datos sensibles, hasta que el titular los marque como vistos. | RNF15, NN15 |
+ | WEB-37 | Evento | Cuando un titular abre desde un dispositivo reconocido un cambio de correo pendiente, el sistema deberá mostrárselo y permitirle rechazarlo, o confirmarlo con su contraseña actual y la verificación del correo nuevo, dentro de las 24 horas (IDE-54, IDE-25, IDE-16), sin permitir ninguna de las dos desde un dispositivo no reconocido. | RNF15 |
+@@ -101,7 +103,9 @@ La base común de la interfaz web del E-commerce: áreas por rol, sesión, estad
+ | AC-WEB-25 | WEB-30 | **Dado** un administrador central, **cuando** abre la auditoría, **entonces** puede filtrar por acción, usuario u origen, fechas y texto, y si un servicio no respondió ve el aviso; y un encargado que abre esa pantalla ve la de sin permiso. |
+ | AC-WEB-26 | WEB-32 | **Dado** un encargado desactivado mientras tiene la sesión abierta, **cuando** la interfaz web intenta renovar su credencial y Identidad la rechaza, **entonces** la sesión se cierra y es llevado al ingreso. |
+ | AC-WEB-27 | WEB-33 | **Dado** una alerta de seguridad, **cuando** el administrador abre la pantalla de alertas, **entonces** la ve con su estado y puede marcarla como revisada. |
+-| AC-WEB-28 | WEB-34 | **Dado** un encargado que no tiene el segundo factor configurado, o un cliente con una versión nueva de los términos por aceptar, **cuando** intenta abrir cualquier otra pantalla, **entonces** es llevado primero a ese paso. |
++| AC-WEB-28 | WEB-34 | **Dado** un encargado que no tiene el segundo factor configurado, o que tiene una contraseña temporal, aunque haya además una versión nueva de los textos por aceptar, **cuando** intenta abrir cualquier otra pantalla, **entonces** es llevado primero a ese paso y no ve ninguna pantalla de solo lectura. |
++| AC-WEB-34 | WEB-41, WEB-42, WEB-43 | **Dado** un cliente con una versión nueva de los textos legales por aceptar como única pendiente, **cuando** ingresa o abre el catálogo o el carrito, **entonces** es llevado a aceptarla; puede abrir su cuenta, sus pedidos, sus solicitudes sobre datos personales y la cancelación, revocar un consentimiento y cambiar su contraseña, pero no pagar ni cambiar su correo; un encargado en la misma situación ve su cuenta y no las áreas Sucursal ni Administración; y al aceptar recupera todo. |
++| AC-WEB-35 | WEB-44 | **Dado** que Identidad no responde, **cuando** la persona abre una pantalla, **entonces** se la trata como pendiente de aceptar; y una solicitud directa de pago de quien tiene una versión pendiente la rechaza el servidor aunque la pantalla se pida directamente. |
+ | AC-WEB-29 | WEB-35 | **Dado** el sitio completo, **cuando** se recorren las áreas, **entonces** existen las pantallas de registro, ingreso, verificación, recuperación, cuenta, usuarios y roles, y solicitudes sobre datos personales con fechas límite. |
+ | AC-WEB-30 | WEB-36 | **Dado** un aviso de seguridad que no salió por correo porque se agotó la cuota o porque el correo no está verificado, y el aviso de descarte de una cancelación diferida, **cuando** el titular ingresa, **entonces** los ve en su cuenta, sin enlaces ni datos sensibles, hasta marcarlos como vistos. |
+ | AC-WEB-31 | WEB-37 | **Dado** un cambio de correo pendiente desde un dispositivo no reconocido, **cuando** el titular lo abre desde un dispositivo reconocido dentro de las 24 horas, **entonces** puede rechazarlo, o confirmarlo solo con su contraseña actual y la verificación del correo nuevo; desde un dispositivo no reconocido no puede confirmarlo ni rechazarlo; y pasadas las 24 horas la pantalla indica que se descartó. |
