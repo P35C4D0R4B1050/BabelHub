@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.RegularExpressions;
 
 namespace BabelHub.Ecommerce.Domain.Auditoria;
@@ -60,7 +61,9 @@ public enum ResultadoDeRegistroDeRechazo
 /// 5 minutos, con el total de rechazos y la dirección completa, que se borra al escribir el evento. Cada rechazo se persiste sin diferirlo (la
 /// infraestructura guarda cada fila al registrarlo, de modo que un reinicio no pierde rechazos: lo persistido se recupera con <see cref="Restaurar"/>
 /// y se sigue sumando) y la cardinalidad está acotada: como máximo <see cref="TopeDeFilas"/> filas por ventana; los orígenes nuevos que llegan con la
-/// ventana llena se agrupan en <see cref="HuellaDeOtros"/>, sin perder ni duplicar rechazos.
+/// ventana llena se agrupan en <see cref="HuellaDeOtros"/>, sin perder ni duplicar rechazos. No es seguro entre hilos (cada ventana se acumula bajo el
+/// bloqueo de su fila en la base). <see cref="Cerrar"/> cambia el estado en memoria: si la transacción que escribe los eventos falla, esta instancia se
+/// descarta y se vuelve a cargar con <see cref="Restaurar"/> desde lo persistido, que sigue intacto (con la dirección).
 /// </summary>
 public sealed class AcumuladoDeLimite
 {
@@ -76,9 +79,8 @@ public sealed class AcumuladoDeLimite
     public static readonly TimeSpan RetencionTrasElCierre = TimeSpan.FromHours(24);
 
     private const int TopeDeDireccion = 64;
-    private static readonly Regex FormatoDeHuella = new("^[A-Za-z0-9_-]{8,128}$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
-    private static readonly Regex FormatoDeLimite = new("^[a-z][a-z0-9-]{1,63}$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
-    private static readonly Regex FormatoDeDireccion = new(@"^\S{1,64}$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+    private static readonly Regex FormatoDeHuella = new(@"^[A-Za-z0-9_-]{8,128}\z", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+    private static readonly Regex FormatoDeLimite = new(@"^[a-z][a-z0-9-]{1,63}\z", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     private readonly Dictionary<(string Huella, string Limite), FilaDeAcumulado> _filas = new();
 
@@ -96,7 +98,7 @@ public sealed class AcumuladoDeLimite
     public IReadOnlyList<FilaDeAcumulado> Filas =>
         [.. _filas.Values.OrderBy(f => f.Huella, StringComparer.Ordinal).ThenBy(f => f.Limite, StringComparer.Ordinal)];
 
-    public int TotalDeRechazos => _filas.Values.Sum(f => f.Rechazos);
+    public long TotalDeRechazos => _filas.Values.Sum(f => (long)f.Rechazos);
 
     /// <summary>Recupera lo persistido (tras un reinicio) para seguir sumando a la misma ventana.</summary>
     public static AcumuladoDeLimite Restaurar(VentanaDeLimite ventana, IReadOnlyCollection<FilaDeAcumulado> filas, bool cerrada)
@@ -110,6 +112,22 @@ public sealed class AcumuladoDeLimite
                 throw new ArgumentException("Una fila persistida tiene al menos un rechazo.", nameof(filas));
             }
 
+            var esDeOtros = fila.Huella == HuellaDeOtros && fila.Limite == LimiteDeOtros;
+            if (!esDeOtros && (!FormatoDeHuella.IsMatch(fila.Huella) || fila.Huella == HuellaDeOtros || !FormatoDeLimite.IsMatch(fila.Limite) || fila.Limite == LimiteDeOtros))
+            {
+                throw new ArgumentException("Una fila persistida tiene una huella o un límite inválidos.", nameof(filas));
+            }
+
+            if (esDeOtros && fila.DireccionCompleta is not null)
+            {
+                throw new ArgumentException("La fila de «otros» no tiene dirección.", nameof(filas));
+            }
+
+            if (fila.DireccionCompleta is not null && Canonica(fila.DireccionCompleta) is null)
+            {
+                throw new ArgumentException("Una dirección persistida no es válida.", nameof(filas));
+            }
+
             if (cerrada && fila.DireccionCompleta is not null)
             {
                 throw new ArgumentException("Una ventana cerrada ya no conserva la dirección completa.", nameof(filas));
@@ -121,7 +139,7 @@ public sealed class AcumuladoDeLimite
             }
         }
 
-        if (acumulado._filas.Count > TopeDeFilas)
+        if (acumulado._filas.Count > TopeDeFilas || acumulado._filas.Keys.Count(k => k.Huella != HuellaDeOtros) > TopeDeFilas - 1)
         {
             throw new ArgumentException("La ventana supera el tope de filas.", nameof(filas));
         }
@@ -142,7 +160,8 @@ public sealed class AcumuladoDeLimite
             throw new ArgumentException("El límite es un código del catálogo (minúsculas, dígitos y guiones).", nameof(limite));
         }
 
-        if (direccionCompleta is not null && (direccionCompleta.Length > TopeDeDireccion || !FormatoDeDireccion.IsMatch(direccionCompleta)))
+        var direccionCanonica = Canonica(direccionCompleta);
+        if (direccionCompleta is not null && direccionCanonica is null)
         {
             throw new ArgumentException("La dirección no es válida.", nameof(direccionCompleta));
         }
@@ -161,21 +180,33 @@ public sealed class AcumuladoDeLimite
         if (_filas.TryGetValue(clave, out var existente))
         {
             // La dirección ya guardada no se cambia (es la del origen que abrió la fila); solo se completa si faltaba.
-            _filas[clave] = existente with { Rechazos = existente.Rechazos + 1, DireccionCompleta = existente.DireccionCompleta ?? direccionCompleta };
+            _filas[clave] = existente with { Rechazos = Math.Min(existente.Rechazos + 1, int.MaxValue - 1), DireccionCompleta = existente.DireccionCompleta ?? direccionCanonica };
             return ResultadoDeRegistroDeRechazo.Acumulado;
         }
 
         if (_filas.Count < TopeDeFilas - 1)
         {
-            _filas[clave] = new FilaDeAcumulado(huella, limite, 1, direccionCompleta);
+            _filas[clave] = new FilaDeAcumulado(huella, limite, 1, direccionCanonica);
             return ResultadoDeRegistroDeRechazo.Acumulado;
         }
 
         var otros = (HuellaDeOtros, LimiteDeOtros);
         _filas[otros] = _filas.TryGetValue(otros, out var fila)
-            ? fila with { Rechazos = fila.Rechazos + 1 }
+            ? fila with { Rechazos = Math.Min(fila.Rechazos + 1, int.MaxValue - 1) }
             : new FilaDeAcumulado(HuellaDeOtros, LimiteDeOtros, 1, null);
         return ResultadoDeRegistroDeRechazo.AgrupadoEnOtros;
+    }
+
+    /// <summary>La dirección en su forma canónica si es una IPv4 (cuatro grupos) o una IPv6 válidas; <c>null</c> si no lo es (un texto cualquiera no es una dirección).</summary>
+    private static string? Canonica(string? direccion)
+    {
+        if (direccion is null || direccion.Length is 0 or > TopeDeDireccion)
+        {
+            return null;
+        }
+
+        var plausible = (direccion.Count(c => c == '.') == 3 && !direccion.Contains(':', StringComparison.Ordinal)) || direccion.Count(c => c == ':') >= 2;
+        return plausible && IPAddress.TryParse(direccion, out var ip) ? ip.ToString() : null;
     }
 
     public bool PuedeCerrarse(DateTimeOffset ahora) => Ventana.PuedeCerrarse(ahora);

@@ -269,6 +269,46 @@ public sealed class PoliticaDeAnonimizacionTests
         Assert.Null(PoliticaDeAnonimizacion.Depurar(registro, Ahora, Cuentas(Ana.ToString(), Guid.NewGuid().ToString())));
     }
 
+    [Theory]
+    [InlineData("N")]
+    [InlineData("B")]
+    [InlineData("P")]
+    [InlineData("D")]
+    [Trait("Criterio", "AC-AUD-09")]
+    public void UnaCuentaCanceladaSeReconocePorSuIdentificador_AunqueLleguePorOtroFormatoDeTexto(string formato)
+    {
+        var registro = Registro(IngresoFallido, Actor.Usuario(Ana, "cliente"), Ahora.AddDays(-30), objetoId: Ana.ToString(), origen: "huella-1", detalle: [("cuenta", Ana.ToString())]);
+
+        var resultado = PoliticaDeAnonimizacion.Depurar(registro, Ahora, Cuentas(Ana.ToString(formato)))!;
+
+        Assert.Null(resultado.Actor.Id);
+        Assert.Null(resultado.ObjetoId);
+        Assert.Equal(PoliticaDeAnonimizacion.Constante, resultado.Detalle.Valores["cuenta"]);
+    }
+
+    [Fact]
+    public void ElPlazoYLasFechasSeCalculanEnUtc_UnAhoraConOtroDesfaseNoMueveElBorde()
+    {
+        var limite = Ahora.AddYears(-2);
+
+        Assert.True(PoliticaDeAnonimizacion.Vencido(limite.AddSeconds(-1), Ahora.ToOffset(TimeSpan.FromHours(-5))));
+        Assert.False(PoliticaDeAnonimizacion.Vencido(limite, Ahora.ToOffset(TimeSpan.FromHours(7))));
+        var registro = Registro(IngresoFallido, Actor.Usuario(Ana, "cliente"), Ahora.AddYears(-3), origen: "huella-1", detalle: [("nombre", "Ana")]);
+        Assert.Equal(TimeSpan.Zero, PoliticaDeAnonimizacion.Depurar(registro, Ahora.ToOffset(TimeSpan.FromHours(-5)), Cuentas())!.AnonimizadoEn!.Value.Offset);
+    }
+
+    [Fact]
+    public void UnPlanForjadoNoAnonimizaClavesQueNoSonPersonales()
+    {
+        var registro = Registro(IngresoFallido, Actor.Usuario(Ana, "cliente"), Ahora.AddDays(-1), origen: "huella-1", detalle: [("nombre", "Ana"), ("intentos", "5")]);
+        var plan = new PlanDeAnonimizacion(false, false, false, false, ["intentos", "noExiste"]);
+
+        var resultado = PoliticaDeAnonimizacion.Aplicar(registro, plan, Ahora);
+
+        Assert.Equal("5", resultado.Detalle.Valores["intentos"]);
+        Assert.Equal("Ana", resultado.Detalle.Valores["nombre"]);
+    }
+
     // ---------- Constantes o NULL ----------
 
     [Fact]
@@ -317,6 +357,10 @@ public sealed class PoliticaDeAnonimizacionTests
         Assert.Equal(string.Empty, resultado.Detalle.Valores["nombre"]);
         Assert.Equal(string.Empty, resultado.Detalle.Valores["cuenta"]);
         Assert.Equal(["cuenta", "nombre"], resultado.Detalle.ClavesPersonales.Order(StringComparer.Ordinal));
+
+        // Repetir la depuración tampoco cambia nada con los valores vacíos que dejó el límite de tamaño.
+        Assert.Null(PoliticaDeAnonimizacion.Depurar(resultado, Ahora.AddDays(1), Cuentas()));
+        Assert.Null(PoliticaDeAnonimizacion.Depurar(resultado, Ahora.AddDays(1), Cuentas(Ana.ToString())));
     }
 
     // ---------- Idempotencia y residuo ----------

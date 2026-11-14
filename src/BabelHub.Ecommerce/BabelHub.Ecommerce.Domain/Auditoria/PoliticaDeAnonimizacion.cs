@@ -31,19 +31,36 @@ public static class PoliticaDeAnonimizacion
     /// <summary>El residuo anonimizado no caduca (AUD-11): no hay plazo.</summary>
     public static readonly TimeSpan? PlazoDelResiduo = null;
 
-    /// <summary>Si el registro tiene más de dos años de calendario. Exactamente dos años todavía no vence.</summary>
-    public static bool Vencido(DateTimeOffset instante, DateTimeOffset ahora) => instante < ahora.AddYears(-AniosDeRetencion);
+    /// <summary>Si el registro tiene más de dos años de calendario. Exactamente dos años todavía no vence. Los instantes se comparan en UTC.</summary>
+    public static bool Vencido(DateTimeOffset instante, DateTimeOffset ahora) => instante.ToUniversalTime() < ahora.ToUniversalTime().AddYears(-AniosDeRetencion);
 
     public static PlanDeAnonimizacion Evaluar(RegistroDeAuditoria registro, DateTimeOffset ahora, IReadOnlyCollection<string> cuentasCanceladas)
     {
         ArgumentNullException.ThrowIfNull(registro);
         ArgumentNullException.ThrowIfNull(cuentasCanceladas);
-        var canceladas = new HashSet<string>(cuentasCanceladas, StringComparer.OrdinalIgnoreCase);
+
+        // Las cuentas se comparan como identificadores, no como texto: «N», con guiones o con llaves son la misma cuenta.
+        var guids = new HashSet<Guid>();
+        var textos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var cuenta in cuentasCanceladas)
+        {
+            if (Guid.TryParse(cuenta, out var guid))
+            {
+                guids.Add(guid);
+            }
+            else
+            {
+                textos.Add(cuenta);
+            }
+        }
+
+        bool Cancelada(string valor) => Guid.TryParse(valor, out var guid) ? guids.Contains(guid) : textos.Contains(valor);
+
         var vencido = Vencido(registro.InstanteUtc, ahora);
         var accion = registro.AccionDelCatalogo;
 
-        var actorCancelado = registro.Actor.Id is { } id && canceladas.Contains(id.ToString());
-        var objetoCancelado = registro.ObjetoId is { } objeto && canceladas.Contains(objeto);
+        var actorCancelado = registro.Actor.Id is { } id && guids.Contains(id);
+        var objetoCancelado = registro.ObjetoId is { } objeto && Cancelada(objeto);
 
         // Solo lo que todavía conserva un dato personal: así repetir la depuración no cambia nada.
         var actorId = registro.Actor.Id is not null && (vencido || actorCancelado);
@@ -52,7 +69,7 @@ public static class PoliticaDeAnonimizacion
         var origen = registro.Origen is not null && (vencido || actorCancelado);
 
         var claves = registro.Detalle.Valores
-            .Where(v => registro.Detalle.EsPersonal(v.Key) && v.Value != Constante && (vencido || canceladas.Contains(v.Value)))
+            .Where(v => registro.Detalle.EsPersonal(v.Key) && v.Value != Constante && v.Value.Length > 0 && (vencido || Cancelada(v.Value)))
             .Select(v => v.Key)
             .ToList();
 
@@ -82,7 +99,7 @@ public static class PoliticaDeAnonimizacion
             plan.Objeto ? null : registro.ObjetoId,
             plan.Origen ? null : registro.Origen,
             registro.Detalle.ConValoresAnonimizados(plan.ClavesDelDetalle, Constante),
-            registro.AnonimizadoEn ?? ahora);
+            registro.AnonimizadoEn ?? ahora.ToUniversalTime());
     }
 
     /// <summary>Evalúa y aplica: el registro anonimizado, o <c>null</c> si no había nada que anonimizar (idempotente).</summary>

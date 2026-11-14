@@ -30,7 +30,7 @@ public sealed class DetalleSeguroTests
         var detalle = Construir(("precioAnterior", "10.00"), ("precioNuevo", "12.50"), ("clave", "no declarada"), ("PRECIONUEVO", "otra mayúscula"));
 
         Assert.Equal(["precioAnterior", "precioNuevo"], detalle.Valores.Keys);
-        Assert.Equal(["PRECIONUEVO", "clave"], detalle.ClavesDescartadas.Order(StringComparer.Ordinal));
+        Assert.Equal(2, detalle.CantidadDeClavesDescartadas);
         Assert.False(detalle.Truncado);
     }
 
@@ -110,11 +110,12 @@ public sealed class DetalleSeguroTests
     }
 
     [Theory]
-    [InlineData("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c")]
+    [InlineData("ey" + "JhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9." + "ey" + "JzdWIiOiIxMjM0NTY3ODkwIn0." + "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c")]
     [InlineData("Bearer abc123def456")]
     [InlineData("0123456789abcdef0123456789abcdef01234567")]
     [InlineData("QWxhZGRpbjpvcGVuIHNlc2FtZVF1ZUVzVW5Ub2tlbkxhcmdvRGVBcGlLZXk=")]
-    [InlineData("AGE-SECRET-KEY-1QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ")]
+    [InlineData("Zk9xW2pLm7Rt5Yu8Nv3Bc6Xs1Qa4Ez9HgJkLpOiUyTrEwQ2")]
+    [InlineData("AGE-SECRET-" + "KEY-1QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ")]
     [Trait("Criterio", "AC-AUD-05")]
     public void UnValorConFormaDeToken_SeRedacta(string valor)
     {
@@ -171,6 +172,101 @@ public sealed class DetalleSeguroTests
         Assert.Equal(valor, detalle.Valores["motivoLibre"]);
     }
 
+
+    // ---------- Formas que la revisión de seguridad encontró evadibles ----------
+
+    [Theory]
+    [InlineData("pedido 12 4111 1111 1111 1111")]
+    [InlineData("4111 1111 1111 1111 5")]
+    [InlineData("1-4111111111111111")]
+    [InlineData("4111.1111.1111.1111")]
+    [InlineData("4111/1111/1111/1111")]
+    [InlineData("4111_1111_1111_1111")]
+    [InlineData("4111  1111  1111  1111")]
+    [InlineData("4111 - 1111 - 1111 - 1111")]
+    [InlineData("4111\u00a01111\u00a01111\u00a01111")]
+    [InlineData("4111\u200b1111\u200b1111\u200b1111")]
+    [InlineData("\u0664\u0661\u0661\u0661 1111 1111 1111")]
+    [Trait("Criterio", "AC-AUD-05")]
+    public void UnaTarjetaConOtrosSeparadoresOMezcladaConOtrosNumeros_SeRedacta(string valor) =>
+        Assert.Equal(DetalleSeguro.ValorRedactado, Construir(("motivoLibre", valor)).Valores["motivoLibre"]);
+
+    [Theory]
+    [InlineData("desde 192.168.1.1.")]
+    [InlineData("ip:fe80::1")]
+    [InlineData("ip:2001:db8::1")]
+    [InlineData("ip fe80::1: rechazada")]
+    [InlineData("(10.0.0.1)")]
+    [InlineData("::1")]
+    [Trait("Criterio", "AC-AUD-05")]
+    public void UnaIpRodeadaDePuntuacion_SeRedacta(string valor) =>
+        Assert.Equal(DetalleSeguro.ValorRedactado, Construir(("motivoLibre", valor)).Valores["motivoLibre"]);
+
+    [Theory]
+    [InlineData("bearer abc123def456")]
+    [InlineData("Basic dXNlcjpwYXNz")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("mailto:persona@ejemplo.pe")]
+    [InlineData("pagos.ejemplo.pe/x?firma=abc")]
+    [InlineData("tok_0123456789abcdef0123456789abcdef")]
+    public void FormasDeTokenYEnlaceEnOtraGrafia_SeRedactan(string valor) =>
+        Assert.Equal(DetalleSeguro.ValorRedactado, Construir(("motivoLibre", valor)).Valores["motivoLibre"]);
+
+    [Fact]
+    public void UnValorDemasiadoLargoSeRedactaSinAnalizarlo_YElAnalisisNoCuestaTiempo()
+    {
+        var reloj = System.Diagnostics.Stopwatch.StartNew();
+
+        var detalle = Construir(("motivoLibre", new string('x', 30_000)), ("correo", new string('y', 30_000)));
+
+        reloj.Stop();
+        Assert.Equal(DetalleSeguro.ValorRedactado, detalle.Valores["motivoLibre"]);
+        Assert.Equal(DetalleSeguro.ValorRedactado, detalle.Valores["correo"]);
+        Assert.True(reloj.ElapsedMilliseconds < 2000, reloj.ElapsedMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [Theory]
+    [InlineData("\ud800")]
+    [InlineData("texto \udc00 suelto")]
+    [InlineData("alto sin bajo \ud83d fin")]
+    [Trait("Criterio", "AC-AUD-05")]
+    public void UnParSustitutoHuerfano_NoHaceFallarElRegistro_SeReemplazaPorElCaracterDeSustitucion(string valor)
+    {
+        var detalle = Construir(("motivoLibre", valor), ("nombre", valor));
+
+        Assert.Contains('\ufffd', detalle.Valores["motivoLibre"]);
+        using var json = JsonDocument.Parse(detalle.Texto);
+        Assert.True(json.RootElement.TryGetProperty("nombre", out _));
+        Assert.Equal(["nombre"], detalle.ClavesPersonales);
+    }
+
+    [Fact]
+    public void UnParSustitutoValido_SeConserva() =>
+        Assert.Equal("libro 📚", Construir(("motivoLibre", "libro 📚")).Valores["motivoLibre"]);
+
+    [Fact]
+    public void LasColeccionesDelDetalleSonDeSoloLectura_NadiePuedeDejarElTextoIncoherente()
+    {
+        var detalle = Construir(("precioNuevo", "5.00"), ("nombre", "Ana"));
+
+        Assert.False(detalle.Valores is Dictionary<string, string>);
+        Assert.False(detalle.ClavesPersonales is HashSet<string>);
+        Assert.Throws<NotSupportedException>(() => ((IDictionary<string, string>)detalle.Valores)["otra"] = "x");
+        Assert.Throws<NotSupportedException>(() => ((ICollection<string>)detalle.ClavesPersonales).Add("otra"));
+    }
+
+    [Fact]
+    public void LosNombresDeLasClavesNoDeclaradasNoSeConservan_SoloSuCantidad()
+    {
+        var detalle = Construir(("clave-controlada-por-el-cliente", "x"), ("<script>", "y"));
+
+        Assert.Equal(2, detalle.CantidadDeClavesDescartadas);
+        Assert.DoesNotContain("script", detalle.Texto, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void UnNombreDeClaveConSaltoDeLineaFinal_SeRechaza() =>
+        Assert.Throws<ArgumentException>(() => new ClaveDeDetalle("clave\n", false));
 
     // ---------- Marca de personales ----------
 

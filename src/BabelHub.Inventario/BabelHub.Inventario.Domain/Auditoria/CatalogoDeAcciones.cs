@@ -27,8 +27,8 @@ public enum TipoDeRegistro
 /// </summary>
 public sealed record AccionDelCatalogo
 {
-    private static readonly Regex FormatoDeAccion = new("^[A-Z][A-Za-z0-9]{2,63}$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
-    private static readonly Regex FormatoDeMotivo = new("^[a-z][a-z0-9-]{1,63}$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+    private static readonly Regex FormatoDeAccion = new(@"^[A-Z][A-Za-z0-9]{2,63}\z", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+    private static readonly Regex FormatoDeMotivo = new(@"^[a-z][a-z0-9-]{1,63}\z", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     public AccionDelCatalogo(
         string identificador,
@@ -151,14 +151,17 @@ public static class PlantillaDeRuta
 
     public const int MaximoDeCaracteres = 200;
 
-    private static readonly Regex Formato = new(@"^/(?:[A-Za-z0-9._-]+|\{[A-Za-z][A-Za-z0-9]*\})(?:/(?:[A-Za-z0-9._-]+|\{[A-Za-z][A-Za-z0-9]*\}))*$|^/$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+    private static readonly Regex Formato = new(@"^/(?:[A-Za-z0-9._-]+|\{[A-Za-z][A-Za-z0-9]*\})(?:/(?:[A-Za-z0-9._-]+|\{[A-Za-z][A-Za-z0-9]*\}))*\z|^/\z", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     /// <summary>Si es una plantilla que se puede guardar: empieza con «/», no lleva «?», «;», «#», «%» ni espacios, y los parámetros son segmentos enteros como <c>{id}</c>.</summary>
     public static bool EsPlantillaValida(string? plantilla) =>
         !string.IsNullOrEmpty(plantilla) && plantilla.Length <= MaximoDeCaracteres && Formato.IsMatch(plantilla);
 
     /// <summary>La plantilla que coincide con la ruta cruda (la más específica), o <see cref="SinCoincidencia"/>.</summary>
-    public static string Resolver(string? rutaCruda, IReadOnlyCollection<string> plantillas)
+    public static string Resolver(string? rutaCruda, IReadOnlyCollection<string> plantillas) => ResolverComoRuta(rutaCruda, plantillas).Valor;
+
+    /// <summary>Como <see cref="Resolver"/>, pero devuelve el tipo que exige <c>RegistroDeAuditoria</c>: una ruta que solo puede ser una plantilla.</summary>
+    public static RutaResuelta ResolverComoRuta(string? rutaCruda, IReadOnlyCollection<string> plantillas)
     {
         ArgumentNullException.ThrowIfNull(plantillas);
         foreach (var plantilla in plantillas)
@@ -171,7 +174,7 @@ public static class PlantillaDeRuta
 
         if (string.IsNullOrWhiteSpace(rutaCruda) || rutaCruda.Length > MaximoDeCaracteres || rutaCruda[0] != '/')
         {
-            return SinCoincidencia;
+            return RutaResuelta.SinCoincidencia;
         }
 
         var sinConsulta = rutaCruda;
@@ -187,7 +190,7 @@ public static class PlantillaDeRuta
             .ToArray();
         if (segmentos.Any(string.IsNullOrEmpty))
         {
-            return SinCoincidencia;
+            return RutaResuelta.SinCoincidencia;
         }
 
         string? mejor = null;
@@ -220,6 +223,24 @@ public static class PlantillaDeRuta
             }
         }
 
-        return mejor ?? SinCoincidencia;
+        return mejor is null ? RutaResuelta.SinCoincidencia : RutaResuelta.DePlantillaValidada(mejor);
     }
+}
+
+/// <summary>
+/// La ruta que se guarda en un registro: <b>una plantilla</b> o «sin-coincidencia», nunca una ruta cruda. Solo se obtiene de
+/// <see cref="PlantillaDeRuta.ResolverComoRuta"/> (que devuelve una plantilla de la lista que se le dio) o de <see cref="SinCoincidencia"/>: no hay forma de
+/// construirla a partir de un texto de la solicitud, de modo que un identificador o un token de la ruta no llega al registro por olvido.
+/// </summary>
+public sealed class RutaResuelta
+{
+    private RutaResuelta(string valor) => Valor = valor;
+
+    public static RutaResuelta SinCoincidencia { get; } = new(PlantillaDeRuta.SinCoincidencia);
+
+    public string Valor { get; }
+
+    internal static RutaResuelta DePlantillaValidada(string plantilla) => new(plantilla);
+
+    public override string ToString() => Valor;
 }

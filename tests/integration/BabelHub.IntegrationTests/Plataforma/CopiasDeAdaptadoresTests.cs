@@ -1,7 +1,7 @@
 namespace BabelHub.IntegrationTests.Plataforma;
 
 /// <summary>
-/// Cada servicio tiene su copia de los adaptadores de la plataforma (no comparten código, regla 5). Esta prueba de contrato
+/// Cada servicio tiene su copia de los adaptadores de la plataforma y del Dominio de Auditoría (no comparten código, regla 5). Esta prueba de contrato
 /// comprueba que las copias siguen siendo la misma salvo el nombre del servicio, para que una corrección no llegue a una sola.
 /// </summary>
 public sealed class CopiasDeAdaptadoresTests

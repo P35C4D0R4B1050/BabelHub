@@ -129,6 +129,25 @@ public sealed class AcumuladoDeLimiteTests
         Assert.Throws<ArgumentException>(() => AcumuladoDeLimite.Restaurar(ventana, [new(Huella, Limite, 1, null), new(Huella, Limite, 2, null)], cerrada: false));
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-AUD-25")]
+    public void LoRestauradoRespetaElTope_ElLugarMilEsParaOtros_YValidaLasMismasReglasQueRegistrar()
+    {
+        var ventana = VentanaDeLimite.Que(Inicio);
+        var propias = Enumerable.Range(0, 1000).Select(i => new FilaDeAcumulado($"h-origen-{i:D5}", Limite, 1, null)).ToList();
+
+        Assert.Throws<ArgumentException>(() => AcumuladoDeLimite.Restaurar(ventana, propias, cerrada: false));
+        Assert.Throws<ArgumentException>(() => AcumuladoDeLimite.Restaurar(ventana, [new("corta", Limite, 1, null)], cerrada: false));
+        Assert.Throws<ArgumentException>(() => AcumuladoDeLimite.Restaurar(ventana, [new(Huella, "Con Mayuscula", 1, null)], cerrada: false));
+        Assert.Throws<ArgumentException>(() => AcumuladoDeLimite.Restaurar(ventana, [new(AcumuladoDeLimite.HuellaDeOtros, Limite, 1, null)], cerrada: false));
+        Assert.Throws<ArgumentException>(() => AcumuladoDeLimite.Restaurar(ventana, [new(AcumuladoDeLimite.HuellaDeOtros, AcumuladoDeLimite.LimiteDeOtros, 1, Direccion)], cerrada: false));
+
+        var llena = AcumuladoDeLimite.Restaurar(ventana, [.. propias.Take(999), new(AcumuladoDeLimite.HuellaDeOtros, AcumuladoDeLimite.LimiteDeOtros, 3, null)], cerrada: false);
+        Assert.Equal(1000, llena.Filas.Count);
+        Assert.Equal(ResultadoDeRegistroDeRechazo.AgrupadoEnOtros, llena.Registrar("h-nuevo-99999", Limite, Inicio.AddSeconds(5), null));
+        Assert.Equal(1000, llena.Filas.Count);
+    }
+
     // ---------- El cierre ----------
 
     [Fact]
@@ -279,6 +298,34 @@ public sealed class AcumuladoDeLimiteTests
         Assert.Null(otros.DireccionCompleta);
         Assert.Equal(1001, eventos.Sum(e => e.Rechazos));
     }
+
+    [Theory]
+    [InlineData("persona@ejemplo.pe")]
+    [InlineData("eyJhbGciOiJIUzI1NiJ9.abc.def")]
+    [InlineData("https://externo.pe")]
+    [InlineData("999.999.999.999")]
+    [InlineData("1.2.3")]
+    [InlineData("200.37.12.4\n")]
+    [InlineData("12345")]
+    public void LaDireccionCompletaDebeSerUnaIpValida_NoUnTextoCualquieraSinEspacios(string direccion) =>
+        Assert.Throws<ArgumentException>(() => Nuevo().Registrar(Huella, Limite, Inicio.AddSeconds(5), direccion));
+
+    [Theory]
+    [InlineData("200.37.12.4", "200.37.12.4")]
+    [InlineData("2001:0db8:0000:0000:0000:0000:0000:0001", "2001:db8::1")]
+    [InlineData("::1", "::1")]
+    public void LaDireccionSeGuardaEnSuFormaCanonica(string recibida, string guardada)
+    {
+        var acumulado = Nuevo();
+
+        acumulado.Registrar(Huella, Limite, Inicio.AddSeconds(5), recibida);
+
+        Assert.Equal(guardada, Assert.Single(acumulado.Filas).DireccionCompleta);
+    }
+
+    [Fact]
+    public void LoRestauradoConUnaDireccionInvalida_SeRechaza() =>
+        Assert.Throws<ArgumentException>(() => AcumuladoDeLimite.Restaurar(VentanaDeLimite.Que(Inicio), [new(Huella, Limite, 1, "persona@ejemplo.pe")], cerrada: false));
 
     // ---------- Validación y purga ----------
 

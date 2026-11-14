@@ -52,7 +52,7 @@ public sealed class RegistroDeAuditoriaTests
         DateTimeOffset? instante = null,
         string? motivo = null,
         string? origen = null,
-        string? ruta = null,
+        RutaResuelta? ruta = null,
         string? objetoTipo = "edicion",
         string? objetoId = "ed-001",
         string? sucursalOrigen = "suc-lima",
@@ -203,7 +203,7 @@ public sealed class RegistroDeAuditoriaTests
         var detalle = Detalle(AccesoDenegado);
         var anonimo = Actor.Anonimo();
 
-        var valido = Crear(AccesoDenegado, anonimo, motivo: "sin-sesion", origen: "huella-abc123", ruta: PlantillaDeRuta.SinCoincidencia, detalle: detalle, objetoTipo: null, objetoId: null, sucursalOrigen: null);
+        var valido = Crear(AccesoDenegado, anonimo, motivo: "sin-sesion", origen: "huella-abc123", ruta: RutaResuelta.SinCoincidencia, detalle: detalle, objetoTipo: null, objetoId: null, sucursalOrigen: null);
 
         Assert.Equal(TipoDeRegistro.Seguridad, valido.Tipo);
         Assert.Equal("sin-sesion", valido.Motivo);
@@ -231,19 +231,76 @@ public sealed class RegistroDeAuditoriaTests
         Assert.True(registro.Aislada);
     }
 
-    [Theory]
-    [InlineData("/api/ecommerce/v1/pedidos/{id}")]
-    [InlineData("sin-coincidencia")]
-    public void LaRutaGuardadaEsUnaPlantillaOLaConstante(string ruta) =>
-        Assert.Equal(ruta, Crear(ruta: ruta).Ruta);
+    private static readonly string[] Plantillas = ["/api/ecommerce/v1/pedidos/{id}", "/api/ecommerce/v1/pedidos"];
 
     [Theory]
-    [InlineData("/api/v1/pedidos?x=1")]
-    [InlineData("/api/v1/pedidos;jsessionid=x")]
-    [InlineData("https://externo/x")]
-    [InlineData("")]
-    public void UnaRutaCrudaONoValida_SeRechaza(string ruta) =>
-        Assert.Throws<ArgumentException>(() => Crear(ruta: ruta));
+    [InlineData("/api/ecommerce/v1/pedidos/42?token=secreto", "/api/ecommerce/v1/pedidos/{id}")]
+    [InlineData("/api/ecommerce/v1/pedidos;jsessionid=x", "/api/ecommerce/v1/pedidos")]
+    [InlineData("/descargas/AbCdEf0123456789AbCdEf0123456789", "sin-coincidencia")]
+    [InlineData("https://externo/x", "sin-coincidencia")]
+    [InlineData("", "sin-coincidencia")]
+    public void LaRutaGuardadaEsSiempreUnaPlantillaOLaConstante_PorqueSoloSeObtieneResolviendo(string cruda, string esperada) =>
+        Assert.Equal(esperada, Crear(ruta: PlantillaDeRuta.ResolverComoRuta(cruda, Plantillas)).Ruta);
+
+    [Fact]
+    public void SinRuta_ElRegistroNoLaTiene_YLaConstanteSePuedeUsarDirectamente()
+    {
+        Assert.Null(Crear(ruta: null).Ruta);
+        Assert.Equal("sin-coincidencia", Crear(ruta: RutaResuelta.SinCoincidencia).Ruta);
+    }
+
+    [Theory]
+    [InlineData("objetoId", "con espacio")]
+    [InlineData("objetoId", "ok\n")]
+    [InlineData("objetoId", "eyJhbGciOiJIUzI1NiJ9.token@correo.pe")]
+    [InlineData("objetoTipo", "Mayuscula")]
+    [InlineData("objetoTipo", "tipo\n")]
+    [InlineData("sucursalOrigen", "suc lima")]
+    [InlineData("sucursalOrigen", "suc-lima\n")]
+    [InlineData("sucursalDestino", "https://x")]
+    [InlineData("correlacion", "corta")]
+    [InlineData("correlacion", "con espacio aqui")]
+    [InlineData("origen", "persona@ejemplo.pe")]
+    [InlineData("origen", "200.37.12.4\n")]
+    [InlineData("origen", "x y")]
+    public void LosCamposDeTextoLibreTienenSuFormato_UnValorHostilNoLlegaAlRegistro(string campo, string valor)
+    {
+        var detalle = Detalle(AccesoDenegado);
+
+        Assert.Throws<ArgumentException>(() => RegistroDeAuditoria.Crear(
+            Guid.NewGuid(),
+            ServicioDeOrigen.Ecommerce,
+            AccesoDenegado,
+            Actor.Anonimo(),
+            Ahora,
+            campo == "objetoTipo" ? valor : "edicion",
+            campo == "objetoId" ? valor : "ed-1",
+            campo == "sucursalOrigen" ? valor : "suc-lima",
+            campo == "sucursalDestino" ? valor : null,
+            "sin-sesion",
+            campo == "origen" ? valor : "200.37.12.4",
+            null,
+            detalle,
+            ResultadoDeOperacion.Rechazado,
+            campo == "correlacion" ? valor : null));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-09")]
+    public void UnDetalleConLaMarcaDePersonalDistintaDeLaDeLaAccion_SeRechaza_PorqueQuedariaSinAnonimizar()
+    {
+        // La acción declara «nombre» como personal; este detalle lo construyó otra lista que no lo marca.
+        var sinMarca = DetalleSeguro.Construir([new("nombre", false), new("precioNuevo", false)], new Dictionary<string, string?> { ["nombre"] = "Ana Pérez" });
+
+        Assert.Throws<ArgumentException>(() => Crear(detalle: sinMarca));
+    }
+
+    [Fact]
+    public void ElServicioYElResultadoDebenSerValoresDefinidos()
+    {
+        Assert.Throws<ArgumentException>(() => Crear(resultado: (ResultadoDeOperacion)99));
+        Assert.Throws<ArgumentException>(() => RegistroDeAuditoria.Crear(Guid.NewGuid(), (ServicioDeOrigen)7, CambioDePrecio, Actor.Sistema(), Ahora, null, null, null, null, null, null, null, Detalle(CambioDePrecio), ResultadoDeOperacion.Exitoso, null));
+    }
 
     [Fact]
     public void ElDetalleDebeVenirDeLaListaDeClavesDeLaAccion()

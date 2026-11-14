@@ -33,7 +33,7 @@ public static class TipoDeActorExtensiones
 /// </summary>
 public sealed record Actor
 {
-    private static readonly Regex FormatoDeRol = new("^[a-z][a-z0-9-]{1,39}$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+    private static readonly Regex FormatoDeRol = new(@"^[a-z][a-z0-9-]{1,39}\z", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     private Actor(TipoDeActor tipo, Guid? id, string? rol)
     {
@@ -121,6 +121,12 @@ public static class HoraDeLima
 public sealed class RegistroDeAuditoria : IEquatable<RegistroDeAuditoria>
 {
     private const int TopeDeTexto = 64;
+    private static readonly TimeSpan Espera = TimeSpan.FromSeconds(1);
+    private static readonly Regex FormatoDeTipo = new(@"^[a-z][a-z0-9-]{0,39}\z", RegexOptions.CultureInvariant, Espera);
+    private static readonly Regex FormatoDeIdentificador = new(@"^[A-Za-z0-9:_.-]{1,64}\z", RegexOptions.CultureInvariant, Espera);
+    private static readonly Regex FormatoDeSucursal = new(@"^[A-Za-z0-9_-]{1,64}\z", RegexOptions.CultureInvariant, Espera);
+    private static readonly Regex FormatoDeOrigen = new(@"^[A-Za-z0-9:._-]{1,64}\z", RegexOptions.CultureInvariant, Espera);
+    private static readonly Regex FormatoDeCorrelacion = new(@"^[A-Za-z0-9_-]{8,64}\z", RegexOptions.CultureInvariant, Espera);
     private readonly AccionDelCatalogo _accion;
 
     private RegistroDeAuditoria(
@@ -220,7 +226,7 @@ public sealed class RegistroDeAuditoria : IEquatable<RegistroDeAuditoria>
         string? sucursalDestino,
         string? motivo,
         string? origen,
-        string? ruta,
+        RutaResuelta? ruta,
         DetalleSeguro detalle,
         ResultadoDeOperacion resultado,
         string? correlacion)
@@ -253,26 +259,41 @@ public sealed class RegistroDeAuditoria : IEquatable<RegistroDeAuditoria>
             throw new ArgumentException("Un objeto sin tipo no puede tener identificador.", nameof(objetoId));
         }
 
-        if (ruta is not null && ruta != PlantillaDeRuta.SinCoincidencia && !PlantillaDeRuta.EsPlantillaValida(ruta))
+        if (!Enum.IsDefined(servicio) || !Enum.IsDefined(resultado))
         {
-            throw new ArgumentException("La ruta se guarda como plantilla (sin parámetros, «;» ni fragmento) o como «sin-coincidencia».", nameof(ruta));
+            throw new ArgumentException("El servicio o el resultado no son válidos.", nameof(servicio));
         }
 
-        var permitidas = accion.Detalle.Select(c => c.Nombre).ToHashSet(StringComparer.Ordinal);
-        if (detalle.Valores.Keys.Any(k => !permitidas.Contains(k)))
+        // Cada clave del detalle debe llegar con la misma marca de personal que declara la acción: si no, un valor personal quedaría sin marcar y la
+        // depuración no lo anonimizaría (AUD-19).
+        foreach (var clave in detalle.Valores.Keys)
         {
-            throw new ArgumentException("El detalle trae claves que la acción no declara.", nameof(detalle));
-        }
-
-        foreach (var (nombre, valor, campo) in new[] { ("objetoTipo", objetoTipo, nameof(objetoTipo)), ("objetoId", objetoId, nameof(objetoId)), ("sucursalOrigen", sucursalOrigen, nameof(sucursalOrigen)), ("sucursalDestino", sucursalDestino, nameof(sucursalDestino)), ("origen", origen, nameof(origen)), ("correlacion", correlacion, nameof(correlacion)) })
-        {
-            if (valor is { Length: > TopeDeTexto })
+            var declarada = accion.Detalle.FirstOrDefault(c => c.Nombre == clave) ?? throw new ArgumentException("El detalle trae claves que la acción no declara.", nameof(detalle));
+            if (detalle.EsPersonal(clave) != declarada.Personal)
             {
-                throw new ArgumentException($"{nombre} no puede pasar de {TopeDeTexto} caracteres.", campo);
+                throw new ArgumentException("La marca de personal del detalle no coincide con la que declara la acción.", nameof(detalle));
             }
         }
 
-        return new RegistroDeAuditoria(id, servicio, accion, actor, instanteUtc, objetoTipo, objetoId, sucursalOrigen, sucursalDestino, motivo, origen, ruta, detalle, resultado, correlacion, anonimizadoEn: null);
+        // Los campos de texto no pasan por la redacción del detalle: cada uno tiene su formato (con \z, sin saltos de línea finales).
+        (string Nombre, string? Valor, Regex Formato)[] campos =
+        [
+            ("objetoTipo", objetoTipo, FormatoDeTipo),
+            ("objetoId", objetoId, FormatoDeIdentificador),
+            ("sucursalOrigen", sucursalOrigen, FormatoDeSucursal),
+            ("sucursalDestino", sucursalDestino, FormatoDeSucursal),
+            ("origen", origen, FormatoDeOrigen),
+            ("correlacion", correlacion, FormatoDeCorrelacion),
+        ];
+        foreach (var (nombre, valor, formato) in campos)
+        {
+            if (valor is not null && !formato.IsMatch(valor))
+            {
+                throw new ArgumentException($"{nombre} no tiene el formato permitido (y no puede pasar de {TopeDeTexto} caracteres).", nombre);
+            }
+        }
+
+        return new RegistroDeAuditoria(id, servicio, accion, actor, instanteUtc, objetoTipo, objetoId, sucursalOrigen, sucursalDestino, motivo, origen, ruta?.Valor, detalle, resultado, correlacion, anonimizadoEn: null);
     }
 
     /// <summary>El mismo registro con los datos personales retirados (los decide <c>PoliticaDeAnonimizacion</c>); conserva acción, fecha, tipo y resultado.</summary>

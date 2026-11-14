@@ -167,8 +167,8 @@ public sealed class AlertaDeSeguridadTests
     }
 
     [Fact]
-    public void UnaOcurrenciaAnteriorALaPrimera_SeRechaza_PorUnRelojAtrasado() =>
-        Assert.Throws<ArgumentException>(() => Registrar(ConOcurrencias(1), T0.AddSeconds(-1)));
+    public void UnaOcurrenciaMuyAnteriorALaPrimera_SeRechaza_PorUnRelojRoto() =>
+        Assert.Throws<ArgumentException>(() => Registrar(ConOcurrencias(1), T0.AddMinutes(-10)));
 
     [Fact]
     public void LasOcurrenciasNoDebenIrHaciaAtras_DentroDeLaVentana()
@@ -206,6 +206,57 @@ public sealed class AlertaDeSeguridadTests
         Assert.Equal("inv:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", AlertaDeSeguridad.NuevoId(ServicioDeOrigen.Inventario, id));
         Assert.Throws<ArgumentException>(() => AlertaDeSeguridad.NuevoId(ServicioDeOrigen.Ecommerce, Guid.Empty));
     }
+
+    [Fact]
+    public void UnaOcurrenciaQueLlegaEnDesordenUnPocoAntesDeLaPrimera_SeTomaComoOcurridaEnLaPrimera_SinPerderla()
+    {
+        var alerta = Registrar(null, T0).Alerta;
+
+        var temprana = Registrar(alerta, T0.AddMinutes(-4));
+
+        Assert.False(temprana.Abrio);
+        Assert.Equal(2, temprana.Alerta.Ocurrencias);
+        Assert.Equal(T0, temprana.Alerta.PrimeraOcurrencia);
+        Assert.Equal(T0, temprana.Alerta.UltimaOcurrencia);
+        Assert.Throws<ArgumentException>(() => Registrar(alerta, T0.AddMinutes(-6)));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-12")]
+    public void UnaMarcaQueNoAvanzaLoRevisado_NoCambiaQuienRevisoNiCuando()
+    {
+        var otro = Guid.Parse("44444444-4444-4444-4444-444444444444");
+        var porAdmin = ConOcurrencias(5).MarcarRevisada(3, Admin, T0.AddMinutes(6));
+
+        var igual = porAdmin.MarcarRevisada(1, otro, T0.AddMinutes(7));
+        var avanza = porAdmin.MarcarRevisada(4, otro, T0.AddMinutes(8));
+
+        Assert.Same(porAdmin, igual);
+        Assert.Equal(Admin, igual.RevisadaPor);
+        Assert.Equal(otro, avanza.RevisadaPor);
+        Assert.Equal(4, avanza.RevisadasHasta);
+    }
+
+    [Fact]
+    public void EnElTopeDelContador_UnaOcurrenciaNuevaSigueSiendoPendiente_NoQuedaOcultaTrasRevisarTodo()
+    {
+        var alerta = ConOcurrencias(1);
+        for (var i = 1; i < AlertaDeSeguridad.TopeDeOcurrencias + 1; i++)
+        {
+            alerta = Registrar(alerta, T0.AddMinutes(1)).Alerta;
+        }
+
+        var revisada = alerta.MarcarRevisada(AlertaDeSeguridad.TopeDeOcurrencias, Admin, T0.AddMinutes(2));
+        Assert.Equal(EstadoDeAlerta.Revisada, revisada.Estado);
+
+        var nueva = Registrar(revisada, T0.AddMinutes(3)).Alerta;
+
+        Assert.Equal(EstadoDeAlerta.Pendiente, nueva.Estado);
+    }
+
+    [Fact]
+    public void ElServicioDelIdentificadorDebeSerUnValorDefinido() =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => AlertaDeSeguridad.NuevoId((ServicioDeOrigen)9, Guid.NewGuid()));
 
     // ---------- Marcar como revisada (AUD-34) ----------
 

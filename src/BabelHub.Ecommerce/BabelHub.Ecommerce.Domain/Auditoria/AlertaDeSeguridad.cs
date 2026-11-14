@@ -18,7 +18,7 @@ public enum EstadoDeAlerta
 /// <summary>Un motivo de alerta: un código de un catálogo cerrado (nunca el texto de una excepción) y su clase (D06).</summary>
 public sealed record MotivoDeAlerta
 {
-    private static readonly Regex Formato = new("^[a-z][a-z0-9-]{1,63}$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+    private static readonly Regex Formato = new(@"^[a-z][a-z0-9-]{1,63}\z", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     public MotivoDeAlerta(string codigo, ClaseDeAlerta clase)
     {
@@ -122,6 +122,9 @@ public sealed class AlertaDeSeguridad
 
     public int OcurrenciasSinRevisar => Ocurrencias - RevisadasHasta;
 
+    /// <summary>Si el contador llegó al tope: una ocurrencia nueva sigue contando como sin revisar (no queda oculta tras una revisión completa).</summary>
+    private bool Saturada => Ocurrencias >= TopeDeOcurrencias;
+
     /// <summary>Pendiente mientras haya ocurrencias sin revisar; revisada cuando se revisó hasta la última.</summary>
     public EstadoDeAlerta Estado => OcurrenciasSinRevisar == 0 ? EstadoDeAlerta.Revisada : EstadoDeAlerta.Pendiente;
 
@@ -135,7 +138,12 @@ public sealed class AlertaDeSeguridad
             throw new ArgumentException("La alerta necesita su identificador.", nameof(identificador));
         }
 
-        return (servicio == ServicioDeOrigen.Ecommerce ? "eco:" : "inv:") + identificador.ToString("D");
+        return servicio switch
+        {
+            ServicioDeOrigen.Ecommerce => "eco:",
+            ServicioDeOrigen.Inventario => "inv:",
+            _ => throw new ArgumentOutOfRangeException(nameof(servicio)),
+        } + identificador.ToString("D");
     }
 
     /// <summary>
@@ -154,7 +162,13 @@ public sealed class AlertaDeSeguridad
             throw new ArgumentException("Quien revisa necesita su identificador.", nameof(por));
         }
 
-        return new AlertaDeSeguridad(Id, Servicio, Motivo, Clase, PrimeraOcurrencia, UltimaOcurrencia, Ocurrencias, Math.Max(RevisadasHasta, contadorVisto), por, cuando, EnviadaPorCorreo);
+        // Una marca que no avanza lo revisado (otra persona revisó hasta un contador mayor) no cambia quién revisó ni cuándo.
+        if (contadorVisto <= RevisadasHasta)
+        {
+            return this;
+        }
+
+        return new AlertaDeSeguridad(Id, Servicio, Motivo, Clase, PrimeraOcurrencia, UltimaOcurrencia, Ocurrencias, contadorVisto, por, cuando.ToUniversalTime(), EnviadaPorCorreo);
     }
 
     public AlertaDeSeguridad MarcarComoEnviada() =>
@@ -169,7 +183,7 @@ public sealed class AlertaDeSeguridad
             PrimeraOcurrencia,
             instante > UltimaOcurrencia ? instante : UltimaOcurrencia,
             Math.Min(Ocurrencias + 1, TopeDeOcurrencias),
-            RevisadasHasta,
+            Saturada && RevisadasHasta >= TopeDeOcurrencias ? TopeDeOcurrencias - 1 : RevisadasHasta,
             RevisadaPor,
             RevisadaEn,
             EnviadaPorCorreo);
@@ -186,6 +200,9 @@ public sealed record ResultadoDeAgrupacion(AlertaDeSeguridad Alerta, bool Abrio,
 public static class VentanaDeAgrupacion
 {
     public static readonly TimeSpan Duracion = TimeSpan.FromMinutes(15);
+
+    /// <summary>Cuánto antes de la primera ocurrencia se tolera una que llega en desorden.</summary>
+    public static readonly TimeSpan ToleranciaDeDesorden = TimeSpan.FromMinutes(5);
 
     /// <summary>Si el instante cae en la ventana que abre <paramref name="primera"/>: desde ella, incluida, hasta antes de los 15 minutos.</summary>
     public static bool Contiene(DateTimeOffset primera, DateTimeOffset instante) => instante >= primera && instante < primera + Duracion;
@@ -207,9 +224,17 @@ public static class VentanaDeAgrupacion
         var definicion = catalogo.Obtener(motivo);
         if (abierta is not null && abierta.Servicio == servicio && abierta.Motivo == motivo)
         {
+            // Con ocurrencias concurrentes que leen el reloj en desorden, una puede llegar fechada un poco antes de la primera guardada: se toma
+            // como ocurrida en la primera (perder una alerta por una excepción en una ruta que no debe interrumpir sería peor). Más de unos
+            // minutos antes ya no es desorden sino un reloj roto.
             if (instante < abierta.PrimeraOcurrencia)
             {
-                throw new ArgumentException("La ocurrencia es anterior a la primera de la alerta (reloj atrasado).", nameof(instante));
+                if (abierta.PrimeraOcurrencia - instante > ToleranciaDeDesorden)
+                {
+                    throw new ArgumentException("La ocurrencia es anterior a la primera de la alerta (reloj atrasado).", nameof(instante));
+                }
+
+                instante = abierta.PrimeraOcurrencia;
             }
 
             if (Contiene(abierta.PrimeraOcurrencia, instante))
