@@ -12,7 +12,8 @@
 #   - que cada archivo de secretos que el Compose usa exista, no esté vacío y solo lo pueda leer su dueño;
 #   - que tenga las claves de infra/secretos-requeridos.txt, con el largo mínimo de las que genera el sistema;
 #   - que ninguna clave privada de age esté en la VM (en la VM de datos solo puede haber la clave pública, PLA-17).
-# En VM-INVENTARIO instala además la tarea diaria del respaldo (el archivado de cambios ya va en el Compose) y, tras levantar, comprueba que cada
+# En VM-INVENTARIO instala además la tarea diaria del respaldo (el archivado de cambios ya va en el Compose) y la vigilancia por minuto del espacio
+# local reservado (PLA-21: exige aviso.env, la credencial de correo propia de esa VM) y, tras levantar, comprueba que cada
 # componente esté «healthy» y lo informa.
 #
 # Variables opcionales: DOCKER (comando de docker, por defecto `docker`), STAT (por defecto `stat`).
@@ -142,6 +143,26 @@ if [[ "$VM" == inventario && ! -d "$CARPETA_CRON" ]]; then
   anotar "no existe $CARPETA_CRON: la VM de datos necesita cron para el respaldo diario"
 fi
 
+# La vigilancia del espacio reservado del archivado (PLA-21) avisa por correo desde esta VM con una credencial mínima propia (aviso.env, en la
+# carpeta de secretos: solo sirve para enviar los avisos de esta VM). Sin ella el aviso del 80 % no saldría, así que no se despliega.
+if [[ "$VM" == inventario && -n "$SECRETOS" ]]; then
+  AVISOS="$SECRETOS/aviso.env"
+  if [[ ! -s "$AVISOS" ]]; then
+    anotar "falta el archivo de secretos aviso.env (la credencial de correo para avisar del espacio reservado, PLA-21)"
+  else
+    permisos="$("$STAT" -c %a "$AVISOS" 2>/dev/null || echo 777)"
+    [[ "$permisos" =~ ^[0-7]*[0-7]00$ ]] || anotar "el archivo de secretos aviso.env lo pueden leer otros usuarios (permisos $permisos): debe ser 600 o 400"
+    for clave in AUX_SMTP_URL AUX_SMTP_USUARIO AUX_SMTP_CLAVE AUX_CORREO_DE AUX_CORREO_PARA; do
+      [[ -n "$(leer_valor "$AVISOS" "$clave")" ]] || anotar "falta la clave $clave en aviso.env"
+    done
+    [[ "$(leer_valor "$AVISOS" AUX_SMTP_URL)" != smtp://* ]] || anotar "AUX_SMTP_URL de aviso.env usa smtp:// sin TLS implícito: usa smtps://"
+    if grep -q 'AGE-SECRET-KEY-' "$AVISOS" 2>/dev/null; then
+      anotar "el archivo aviso.env contiene una clave privada de age: no puede estar en la VM"
+    fi
+  fi
+  [[ "$RAIZ" =~ ^[A-Za-z0-9._:/-]+$ && "$SECRETOS" =~ ^[A-Za-z0-9._:/-]+$ ]] || anotar "las rutas del repositorio y de los secretos solo pueden tener letras, números y . _ : / - (se escriben en la tarea de cron)"
+fi
+
 if [[ ${#falta[@]} -gt 0 ]]; then
   echo "No se despliega $VM: faltan o están mal ${#falta[@]} cosas:" >&2
   printf '  - %s\n' "${falta[@]}" >&2
@@ -179,9 +200,11 @@ fi
 
 if [[ "$VM" == inventario ]]; then
   temporal="$(mktemp "$CARPETA_CRON/.babelhub-respaldo.XXXXXX")"
-  cat >"$temporal" <<'EOF'
+  cat >"$temporal" <<EOF
 # Instalado por scripts/desplegar.sh: respaldo diario cifrado de PostgreSQL hacia el almacén (PLA-09). Hora UTC.
 30 2 * * * root docker exec babelhub-inventario-postgres-1 /opt/babelhub/respaldar.sh >> /var/log/babelhub-respaldo.log 2>&1
+# Vigilancia del espacio local reservado del archivado de cambios (PLA-21), cada minuto: avisa por correo (credencial propia de aviso.env) al 80 % y al declarar roto el archivo de cambios.
+* * * * * root AUX_ENV=$SECRETOS/aviso.env AUX_ESTADO=/var/lib/babelhub-aviso $RAIZ/scripts/vm-aux/alertar.sh espacio-respaldos docker exec babelhub-inventario-postgres-1 /opt/babelhub/vigilar-espacio.sh
 EOF
   chmod 0644 "$temporal"
   mv -f "$temporal" "$TAREA_DE_RESPALDO"

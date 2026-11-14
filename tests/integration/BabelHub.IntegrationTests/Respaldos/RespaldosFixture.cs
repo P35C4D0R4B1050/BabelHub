@@ -34,6 +34,13 @@ public sealed partial class RespaldosFixture : IAsyncLifetime
 
     public IContainer Postgres { get; private set; } = null!;
 
+    /// <summary>La etiqueta de la imagen de PostgreSQL construida para las pruebas y la red del almacén, para levantar otros contenedores iguales.</summary>
+    public string Etiqueta => _etiqueta;
+
+    public INetwork Red => _red;
+
+    public string ClaveDeAccesoDelAlmacen => ClaveDeAcceso;
+
     public IAmazonS3 S3 { get; private set; } = null!;
 
     /// <summary>La clave pública de age: lo único que la VM de datos conoce.</summary>

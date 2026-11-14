@@ -60,3 +60,25 @@ clases_del_dia() {
   [ "$_dia_siguiente" = 01 ] && _clases="${_clases:+$_clases }mensual"
   echo "$_clases"
 }
+
+# ---------- Espacio local reservado y archivo de cambios roto (PLA-21, D11) ----------
+# El espacio que puede ocupar lo pendiente cuando el almacén no está disponible (cambios sin archivar y respaldo en espera) está reservado y
+# es menor de 5 GB: 4 GiB por defecto (BABELHUB_ESPACIO_RESERVADO, en bytes). `vigilar-espacio.sh` avisa al 80 % y, al agotarse, escribe la
+# marca ARCHIVO_ROTO: mientras exista, `archivar-wal.sh` descarta los segmentos (la base no se llena) y solo un respaldo completo nuevo
+# (`respaldar.sh`) la retira.
+ARCHIVO_ROTO="$ESPERA/archivo-roto"
+RESERVADO="${BABELHUB_ESPACIO_RESERVADO:-4294967296}"
+RESERVADO_MAXIMO=5000000000
+
+verificar_reserva() {
+  case "$RESERVADO" in
+    "" | *[!0-9]*)
+      echo "respaldos: BABELHUB_ESPACIO_RESERVADO debe ser un número de bytes" >&2
+      return 1
+      ;;
+  esac
+  if [ "$RESERVADO" -le 0 ] || [ "$RESERVADO" -ge "$RESERVADO_MAXIMO" ]; then
+    echo "respaldos: el espacio reservado debe ser positivo y menor de 5 GB (5000000000 bytes)" >&2
+    return 1
+  fi
+}

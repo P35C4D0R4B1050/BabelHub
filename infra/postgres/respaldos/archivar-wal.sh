@@ -14,6 +14,13 @@ nombre="$2"
 case "$nombre" in
   "" | *[!0-9A-Za-z._]*) fallo "nombre de segmento inválido" ;;
 esac
+# Con el archivo de cambios declarado roto (espacio reservado agotado, PLA-21) se descarta el segmento para que PostgreSQL lo recicle y el disco
+# no se llene: la base sigue operando y solo un respaldo completo nuevo retira la marca. Va antes de verificar el entorno: aunque el almacén o la
+# configuración estén rotos, el espacio no debe seguir creciendo.
+if [ -f "$ARCHIVO_ROTO" ]; then
+  echo "respaldos: el archivo de cambios está roto: se descarta el segmento $nombre hasta que haya un respaldo completo nuevo" >&2
+  exit 0
+fi
 verificar_entorno
 
 temporal="$ESPERA/wal.$$.tmp"
