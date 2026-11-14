@@ -63,7 +63,10 @@ public sealed class CopiasDeAdaptadoresTests
         "Application/Auditoria/Interno/CatalogoDeAccionesDeAuditoria.TiposDeObjeto.cs",
         "Application/Auditoria/Interno/AlertasDeAuditoria.cs",
         "Application/Auditoria/Interno/PublicadorDeAlertas.cs",
-        "Application/Auditoria/Interno/EventosDeSeguridadDePlataforma.cs");
+        "Application/Auditoria/Interno/EventosDeSeguridadDePlataforma.cs",
+        "Application/Auditoria/Interno/CursoresYFiltrosDeConsulta.cs",
+        "Application/Auditoria/AccionesAuditables.AlertasYDepuracion.cs",
+        "Application/Auditoria/Interno/CatalogoDeAccionesDeAuditoria.AlertasYDepuracion.cs");
 
     [Theory]
     [MemberData(nameof(Archivos))]
