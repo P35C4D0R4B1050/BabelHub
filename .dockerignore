@@ -1,0 +1,27 @@
+# El contexto de construcción de las imágenes es la raíz del repositorio; solo entra lo que hace falta para compilar los servicios.
+**/bin/
+**/obj/
+.git/
+.github/
+.claude/
+.vs/
+.idea/
+TestResults/
+coverage/
+docs/
+specs/
+progress/
+prototype/
+tests/
+infra/
+scripts/
+workflows/
+**/*.md
+.env
+.env.*
+!.env.example
+**/*.pem
+**/*.key
+**/*.pfx
+**/secrets.json
+**/appsettings.*.local.json

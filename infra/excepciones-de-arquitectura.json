@@ -1,0 +1,4 @@
+{
+  "descripcion": "Imágenes de terceros que no existen para una arquitectura en la que corren (PLA-03, AC-PLA-03). Una imagen de terceros sin versión para la arquitectura de su VM solo se admite si consta aquí, con la imagen exacta (etiqueta y digest), la arquitectura que le falta, la VM donde se usa, el motivo y la alternativa. Una excepción que ya no hace falta (la imagen sí existe para esa arquitectura) se retira. Hoy no hay ninguna: todas las imágenes de terceros existen para linux/amd64 y linux/arm64.",
+  "excepciones": []
+}
