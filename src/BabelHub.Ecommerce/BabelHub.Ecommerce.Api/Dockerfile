@@ -19,6 +19,34 @@ RUN dotnet restore src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api/BabelHub.Ecomme
 
 COPY src/BabelHub.Shared src/BabelHub.Shared
 COPY src/BabelHub.Ecommerce src/BabelHub.Ecommerce
+
+# --- inicio: estilos de la interfaz web (solo el E-commerce tiene interfaz; ImagenesDeContenedorTests ignora este bloque al comparar los Dockerfiles) ---
+# El CSS de la interfaz (Tailwind CSS 4 + daisyUI 5, AD21 y web-base D09) se genera aquí, sin Node, y no se versiona. La CLI independiente
+# y los dos archivos de daisyUI se fijan por versión y por huella SHA-256 (Web/versiones.json, que una prueba compara con estas líneas):
+# si una descarga no coincide, la construcción falla. Solo existen en esta etapa; no llegan a la imagen final.
+ARG BUILDARCH
+RUN set -eu; \
+    case "$BUILDARCH" in \
+      amd64) TW_ARCHIVO=tailwindcss-linux-x64; TW_SHA=dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a ;; \
+      arm64) TW_ARCHIVO=tailwindcss-linux-arm64; TW_SHA=55fd0b241214eff3de1e8ee4f22796662f2d2e7a49bcfca7477cfd0bac398195 ;; \
+      *) echo "arquitectura de construcción no soportada: $BUILDARCH" >&2; exit 1 ;; \
+    esac; \
+    mkdir -p .herramientas/tailwind .herramientas/daisyui; \
+    curl --proto '=https' --tlsv1.2 -fsSL -o .herramientas/tailwind/tailwindcss "https://github.com/tailwindlabs/tailwindcss/releases/download/v4.3.3/$TW_ARCHIVO"; \
+    curl --proto '=https' --tlsv1.2 -fsSL -o .herramientas/daisyui/daisyui.mjs "https://github.com/saadeghi/daisyui/releases/download/v5.7.50/daisyui.mjs"; \
+    curl --proto '=https' --tlsv1.2 -fsSL -o .herramientas/daisyui/daisyui-theme.mjs "https://github.com/saadeghi/daisyui/releases/download/v5.7.50/daisyui-theme.mjs"; \
+    printf '%s  %s\n' "$TW_SHA" .herramientas/tailwind/tailwindcss > .herramientas/sumas.txt; \
+    printf '%s  %s\n' d69de07c7463bb1f41548e2688f88ee105cdadf9779fce5b3c47b3bfaa6be472 .herramientas/daisyui/daisyui.mjs >> .herramientas/sumas.txt; \
+    printf '%s  %s\n' e48a35d8326d650181ca600560e8520cf6b44cf9242bbd9d45825607e641f251 .herramientas/daisyui/daisyui-theme.mjs >> .herramientas/sumas.txt; \
+    sha256sum -c .herramientas/sumas.txt; \
+    chmod +x .herramientas/tailwind/tailwindcss; \
+    mkdir -p src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api/wwwroot/css; \
+    .herramientas/tailwind/tailwindcss \
+      -i src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api/Web/Estilos/app.css \
+      -o src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api/wwwroot/css/app.css --minify; \
+    rm -rf .herramientas
+# --- fin: estilos de la interfaz web ---
+
 RUN dotnet publish src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api/BabelHub.Ecommerce.Api.csproj -c Release -o /app --no-restore /p:UseAppHost=false
 
 # La imagen final es de la arquitectura de destino. Corre sin privilegios (el usuario «app» de la imagen base).

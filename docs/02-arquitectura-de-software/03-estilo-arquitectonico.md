@@ -143,7 +143,7 @@ La vista de despliegue sobre las VMs de Oracle está en [despliegue](05-desplieg
 | Componente | Responsabilidad | Decisión |
 | :--- | :--- | :--- |
 | **Servicio E-commerce** | Todo lo que ve el cliente y la administración de la venta: catálogo (impresos y digitales), carrito, checkout, pagos, pedidos, envíos, devoluciones, biblioteca digital, Libro de Reclamaciones, identidad y asistente, con la interfaz web de Tienda, Sucursal y Admin. Único sistema con el que interactúa el cliente final. | AD01, AD02, AD15 |
-| **Interfaz web** | Capa de presentación del E-commerce (MVC con Razor y htmx): tres áreas por rol. No contiene reglas de negocio. Llama a los módulos en el mismo proceso y al Inventario por REST, solo desde el servidor. Se sirve en dos hosts: la tienda y la gestión del personal. | RC01, RC03, AD15 |
+| **Interfaz web** | Capa de presentación del E-commerce (MVC con Razor y htmx): tres áreas por rol. La Presentación no contiene reglas de negocio; las de la sesión web (plazos, renovación, cierre, borrador y área por rol) son del módulo `Web`. Llama a los módulos en el mismo proceso y al Inventario por REST, solo desde el servidor. Se sirve en dos hosts: la tienda y la gestión del personal. | RC01, RC03, AD15 |
 | **Módulo Identidad** | Autentica usuarios (con segundo factor para el personal), emite credenciales con rol y sucursal, firma con una clave propia que rota, y emite el contexto de lectura del asistente. Su esquema tiene un rol aparte. | AD05, AD18, AD22 |
 | **Módulo Asistente** | Recomienda libros y responde dudas con datos de los otros módulos y del Inventario y un LLM externo. Solo lectura; su caída no afecta la compra. | AD07, AD28 |
 | **Servicio Inventario** | Fuentes por sucursal, stock vendible (físico − reservas), reservas, selección de fuente, traslados, ajustes, ingreso de mercadería y unidades vendidas. Sin entrada pública. | AD01, AD08 |
@@ -171,7 +171,7 @@ Cada módulo es una carpeta dentro de las capas del servicio (no un proyecto apa
 | **Libro de Reclamaciones** | Hoja de reclamación, su respuesta y su conservación. | `ecommerce-libro-reclamaciones` | Identidad |
 | **Identidad** | Registro, sesión, segundo factor, usuarios y roles, derechos ARCO y firma de las credenciales; esquema aislado por rol. | `identidad-seguridad` | Ninguno (todos usan su contexto de actor) |
 | **Asistente** | Recomendaciones y consulta del estado de pedidos con un LLM externo; solo lectura. | `asistente-compra-ia` | Catálogo, Pedidos, Identidad, cliente del Inventario |
-| **Interfaz web** | Áreas Tienda, Sucursal y Admin, sesión del servidor, estados estándar e índice infinito; sin reglas de negocio. | `web-base`, `web-indice-infinito` | Todos los módulos, cliente del Inventario |
+| **Interfaz web** | Áreas Tienda, Sucursal y Admin, sesión del servidor (módulo `Web`), estados estándar e índice infinito; la Presentación sin reglas de negocio y el módulo `Web` solo con las de la sesión. | `web-base`, `web-indice-infinito` | Todos los módulos, cliente del Inventario |
 
 **Servicio Inventario (4 módulos)**
 

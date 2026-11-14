@@ -9,6 +9,10 @@
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Cuerpo de los textos legales de la web (WEB-29): recursos versionados, sin la versión ni la vigencia, que informa Identidad. -->
+    <EmbeddedResource Include="Web\Textos\*.txt" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\BabelHub.Ecommerce.Application\BabelHub.Ecommerce.Application.csproj" />
     <ProjectReference Include="..\..\BabelHub.Shared\BabelHub.Shared.csproj" />
   </ItemGroup>

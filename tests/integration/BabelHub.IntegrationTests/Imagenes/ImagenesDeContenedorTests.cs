@@ -79,7 +79,13 @@ public sealed partial class ImagenesDeContenedorTests
     [Trait("Criterio", "AC-PLA-03")]
     public void LosDockerfilesDeLosDosServicios_SonElMismoSalvoElNombreDelServicio()
     {
-        var ecommerce = Leer("src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api/Dockerfile");
+        // Solo el E-commerce tiene interfaz web: su Dockerfile genera el CSS en un bloque delimitado (web-base T23). Todo lo demás debe ser idéntico.
+        var ecommerce = Regex.Replace(
+            Leer("src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api/Dockerfile"),
+            "\n# --- inicio: estilos de la interfaz web.*?# --- fin: estilos de la interfaz web ---\n\n",
+            string.Empty,
+            RegexOptions.Singleline,
+            TimeSpan.FromSeconds(2));
         var inventario = Leer("src/BabelHub.Inventario/BabelHub.Inventario.Api/Dockerfile");
 
         Assert.Equal(ecommerce.Replace("Ecommerce", "Servicio", StringComparison.Ordinal), inventario.Replace("Inventario", "Servicio", StringComparison.Ordinal));

@@ -1,5 +1,9 @@
 using BabelHub.Ecommerce.Api.Plataforma;
+using BabelHub.Ecommerce.Api.Web;
 using BabelHub.Ecommerce.Application.Plataforma;
+using BabelHub.Ecommerce.Infrastructure.Biblioteca;
+using BabelHub.Ecommerce.Infrastructure.Catalogo;
+using BabelHub.Ecommerce.Infrastructure.Web;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +19,12 @@ var modo = ArranqueSeguro.Resolver(
 builder.Services.AddSingleton(typeof(ModoDeArranque), modo);
 builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("ECO"));
 builder.Services.AddSingleton<EjecutorDePasosDeRestauracion>();
+builder.Services.AgregarInterfazWeb();
+// La versión provisional de los textos legales nunca se compone en producción (hasta el contrato de Identidad, IDE-57).
+builder.Services.AgregarModuloWeb(permitirVersionesProvisionales: !builder.Environment.IsProduction());
+// Implementaciones provisionales de lo que aún no existe; un registro real anterior se respeta (TryAdd).
+builder.Services.AgregarCatalogoPendiente();
+builder.Services.AgregarBibliotecaPendiente();
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();

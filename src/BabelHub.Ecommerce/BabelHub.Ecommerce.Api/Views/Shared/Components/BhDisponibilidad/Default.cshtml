@@ -1,0 +1,7 @@
+@using BabelHub.Ecommerce.Api.Web.Estados
+@model DisponibilidadVista
+@* Disponibilidad con texto, icono y color: el estado nunca depende solo del color (WEB-13). *@
+<span class="badge @Model.ClaseDeColor h-auto gap-1 py-1 font-semibold">
+    <bh-icono nombre="@Model.Icono" clase="size-4" />
+    <span>@Model.Texto</span>
+</span>

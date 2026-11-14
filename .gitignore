@@ -104,3 +104,7 @@ docs/babelhub-guion-exposicion-y-estilo.md
 ~$*
 # --- Informes locales de restauración y ensayo (contienen identificadores; nunca al repositorio) ---
 progress/ensayos/local/
+
+# --- Interfaz web: herramientas de construcción descargadas y CSS generado (no se versionan, D09) ---
+.herramientas/
+src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api/wwwroot/css/

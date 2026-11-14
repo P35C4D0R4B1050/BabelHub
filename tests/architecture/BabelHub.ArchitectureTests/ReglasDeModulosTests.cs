@@ -17,7 +17,7 @@ public class ReglasDeModulosTests
     {
         ["BabelHub.Ecommerce"] =
         [
-            "Catalogo", "Carrito", "Pagos", "Pedidos", "Envios", "Devoluciones", "Biblioteca", "Reclamaciones", "Identidad", "Asistente", "Plataforma", "Auditoria", "Notificaciones",
+            "Catalogo", "Carrito", "Pagos", "Pedidos", "Envios", "Devoluciones", "Biblioteca", "Reclamaciones", "Identidad", "Asistente", "Plataforma", "Auditoria", "Notificaciones", "Web",
         ],
         ["BabelHub.Inventario"] = ["Fuentes", "Reservas", "Traslados", "Ajustes", "Plataforma", "Auditoria"],
     };

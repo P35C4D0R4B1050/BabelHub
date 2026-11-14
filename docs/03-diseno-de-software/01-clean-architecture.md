@@ -224,12 +224,12 @@ La interfaz web es la capa de **Presentación del E-commerce** (`BabelHub.Ecomme
 | Organización | Áreas por rol dentro de `BabelHub.Ecommerce.Api`: `Tienda` (cliente), `Sucursal` (encargado y logística) y `Admin` (administración central). Se sirve en dos hosts: la tienda y la gestión del personal. |
 | Referencias | Solo a las capas del E-commerce y a `BabelHub.Shared`; llama a los módulos por la capa de Aplicación y nunca al Dominio, Aplicación o Infraestructura del Inventario. |
 | Comunicación | Con los módulos del E-commerce, en el mismo proceso; con el Inventario, por el cliente REST de la Infraestructura, **desde el servidor**. El navegador nunca llama a los servicios. |
-| Autenticación | Inicia sesión con el módulo Identidad, guarda la credencial en el servidor y entrega una cookie de sesión (`HttpOnly`, `Secure`, `SameSite`) más protección anti-falsificación en los formularios. La sesión vive en la base `ecommerce`. |
-| Reglas de negocio | Ninguna. Valida la forma de la entrada para mejorar la experiencia, pero la autoridad es siempre la capa de Aplicación. |
+| Autenticación | Inicia sesión con el módulo Identidad por su contrato público, guarda la credencial en el servidor y entrega una cookie de sesión opaca (`HttpOnly`, `Secure`, `SameSite`) más protección anti-falsificación en los formularios. La sesión vive en la base `ecommerce`, esquema `web`. |
+| Reglas de negocio | **La Presentación no tiene ninguna.** Valida la forma de la entrada para mejorar la experiencia, pero la autoridad es siempre la capa de Aplicación. Las reglas de la **sesión web** (plazos de 30 minutos de inactividad y de 7 días o 8 horas absolutos, renovación y cierre de la credencial, borrador de lo escrito al vencer la sesión y qué área ve cada rol) **no son de la Presentación: son del módulo `Web`** (`Domain.Web` y `Application.Web`, con su contrato público en la raíz y su interior en `Interno`), que usa los contratos públicos de Identidad, Auditoría, Catálogo y Plataforma. La Api solo traduce HTTP (cookie, cabeceras, redirecciones, vistas). |
 | Pagos | El script de Culqi tokeniza la tarjeta o Yape en el navegador; la interfaz envía solo el token al módulo Pagos, que realiza el cobro. |
 | Descargas digitales | La interfaz nunca recibe ni reenvía el archivo: pide una URL firmada al módulo Biblioteca digital y redirige al navegador al almacén. |
 | Errores | Traduce los códigos de los módulos y del Inventario (400, 403, 404, 409, 503) a pantallas con estados claros: vacío, cargando, error y con datos (RNF13). |
-| Pruebas | Pruebas E2E con Playwright; no se prueban las vistas de forma unitaria. |
+| Pruebas | Las reglas del módulo `Web` se prueban de forma unitaria (Dominio y Aplicación, sin base de datos) y con PostgreSQL real (Infraestructura); **las vistas sí se prueban de forma unitaria** (HTML renderizado de los componentes de estado, de disponibilidad y del formato peruano) y los recorridos con Playwright (E2E). |
 
 ### 4.4 Resto de carpetas
 
@@ -301,7 +301,7 @@ style G fill:#222,stroke:#fff,color:#fff
 | **Inventario** | Completa | 4 proyectos (Domain, Application, Infrastructure, Api) con 4 módulos. | Concentra las reglas críticas y la concurrencia. |
 | **E-commerce** | Completa | 4 proyectos con 11 módulos. | Concentra varias integraciones externas (pasarela, envío, Inventario, LLM) que conviene aislar. |
 | Módulos **Identidad** y **Asistente** | Reducida | Carpetas `Domain`, `Application` e `Infrastructure` dentro de los proyectos del E-commerce; puertos solo donde haya algo que sustituir. | Poca lógica de negocio propia; su valor está en la seguridad y en las integraciones. |
-| **Interfaz web** | Sin capas propias | Áreas MVC en la Presentación del E-commerce (sección 4.3). | Es presentación; no tiene reglas de negocio que aislar. |
+| **Interfaz web** | Presentación sin reglas, más el módulo `Web` con las de la sesión | Áreas MVC en la Presentación del E-commerce (sección 4.3); el módulo `Web` (carpetas `Web` en Dominio, Aplicación e Infraestructura, esquema `web`) lleva las reglas de la sesión, el borrador y el área por rol. | La Presentación no tiene reglas de negocio que aislar; la sesión sí tiene reglas (plazos, renovación, cierre) y se prueban sin la web. |
 
 Si un módulo reducido crece en lógica, se promueve a la versión completa sin cambiar su contrato público.
 
