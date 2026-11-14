@@ -117,3 +117,19 @@ public sealed class TextosLegalesTests
     public void Un_nombre_desconocido_no_es_un_texto_legal(string clave) =>
         Assert.False(TiposDeTextoLegal.TryParse(clave, out _));
 }
+
+/// <summary>El enlace firmado nunca aparece en el texto de un registro (SEG-10).</summary>
+public sealed class EnlaceDeDescargaTests
+{
+    [Fact]
+    [Trait("Criterio", "AC-WEB-11")]
+    public void El_texto_del_enlace_no_incluye_la_url_firmada()
+    {
+        var enlace = new Application.Biblioteca.EnlaceDeDescarga(new Uri("https://almacen.example/a.epub?X-Signature=SECRETO"), DateTimeOffset.UnixEpoch);
+
+        var texto = $"{enlace}";
+
+        Assert.DoesNotContain("SECRETO", texto, StringComparison.Ordinal);
+        Assert.DoesNotContain("almacen.example", texto, StringComparison.Ordinal);
+    }
+}

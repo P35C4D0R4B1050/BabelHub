@@ -61,3 +61,19 @@ public sealed class ContenidoDeTextosTests
         Assert.Equal(new DateOnly(2026, 11, 14), version.VigenteDesde);
     }
 }
+
+/// <summary>Fuera de desarrollo los textos legales no usan la versión provisional (WEB-29).</summary>
+public sealed class VersionDeTextosEnProduccionTests
+{
+    [Fact]
+    [Trait("Criterio", "AC-WEB-24")]
+    public async Task Sin_versiones_provisionales_el_texto_legal_esta_no_disponible()
+    {
+        await using var anfitrion = await AnfitrionWeb.Iniciar(s =>
+            Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions.AddSingleton<BabelHub.Ecommerce.Application.Web.Interno.IVersionesDeTextosLegales, VersionesDeTextosNoDisponibles>(s));
+
+        using var respuesta = await anfitrion.Cliente.GetAsync("/legal/terminos");
+
+        Assert.Equal(System.Net.HttpStatusCode.ServiceUnavailable, respuesta.StatusCode);
+    }
+}

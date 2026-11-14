@@ -96,3 +96,10 @@ public sealed class VersionesDeTextosProvisionales : IVersionesDeTextosLegales
     public Task<VersionVigenteDeTexto?> ObtenerVigente(TipoDeTextoLegal tipo, CancellationToken cancelacion = default) =>
         Task.FromResult<VersionVigenteDeTexto?>(Version);
 }
+
+/// <summary>Sin el contrato de Identidad que informa la versión vigente, en producción los textos legales no están disponibles: no se inventa una versión.</summary>
+public sealed class VersionesDeTextosNoDisponibles : IVersionesDeTextosLegales
+{
+    public Task<VersionVigenteDeTexto?> ObtenerVigente(TipoDeTextoLegal tipo, CancellationToken cancelacion = default) =>
+        Task.FromResult<VersionVigenteDeTexto?>(null);
+}

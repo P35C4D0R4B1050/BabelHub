@@ -84,20 +84,27 @@ public sealed class ListaDeSucursalesConUltimaConocida(IFuenteDeSucursales fuent
 
 public static class ModuloWebExtensiones
 {
-    /// <summary>Registra el módulo <c>Web</c>: textos legales, preferencia de sucursal y sus adaptadores provisionales (hasta que existan los de Identidad y el Inventario).</summary>
-    public static IServiceCollection AgregarModuloWeb(this IServiceCollection servicios)
+    /// <summary>
+    /// Registra el módulo <c>Web</c>: textos legales, preferencia de sucursal y sus adaptadores provisionales (hasta que existan los de Identidad y el Inventario).
+    /// La versión provisional de los textos solo se compone si <paramref name="permitirVersionesProvisionales"/> (nunca en producción): sin ella el texto es «no disponible».
+    /// </summary>
+    public static IServiceCollection AgregarModuloWeb(this IServiceCollection servicios, bool permitirVersionesProvisionales)
     {
         ArgumentNullException.ThrowIfNull(servicios);
         servicios.AddSingleton<IContenidoDeTextosLegales, ContenidoDeTextosEmbebido>();
-        servicios.AddSingleton<IVersionesDeTextosLegales, VersionesDeTextosProvisionales>();
+        if (permitirVersionesProvisionales)
+        {
+            servicios.AddSingleton<IVersionesDeTextosLegales, VersionesDeTextosProvisionales>();
+        }
+        else
+        {
+            servicios.AddSingleton<IVersionesDeTextosLegales, VersionesDeTextosNoDisponibles>();
+        }
+
         servicios.AddScoped<ITextosLegales, ConsultarTextoLegal>();
         servicios.AddSingleton<IFuenteDeSucursales, FuenteDeSucursalesNoDisponible>();
         servicios.AddSingleton<IListaDeSucursales, ListaDeSucursalesConUltimaConocida>();
         servicios.AddScoped<IPreferenciaDeSucursal, PreferenciaDeSucursal>();
-        // Hasta que exista el módulo Catálogo; un registro real posterior la reemplaza.
-        servicios.TryAddScoped<Application.Catalogo.IConsultaDeCatalogo, Catalogo.ConsultaDeCatalogoPendiente>();
-        // Ídem para la Biblioteca digital (ECO-8).
-        servicios.TryAddScoped<Application.Biblioteca.IDescargasDeLaBiblioteca, DescargasDeLaBibliotecaPendiente>();
         return servicios;
     }
 }
