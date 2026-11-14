@@ -1,0 +1,12 @@
+# Comprobación del endurecimiento de VM-AUX (T26; se copia a /etc/cron.d/babelhub-aux-endurecimiento). A diferencia de las demás tareas
+# (babelhub-aux.cron, como el usuario sin privilegios), esta corre como ROOT porque necesita leer la configuración efectiva de sshd y las
+# carpetas de todos los usuarios: un usuario sin privilegios no vería las llaves ajenas y daría un «todo bien» falso. Por eso los scripts
+# que corre (verificar-endurecimiento.sh, alertar.sh y comun.sh) deben ser de root y no escribibles por otros: ella misma lo comprueba. Solo
+# lee y avisa; no cambia nada. Su estado de alertas va aparte (el de root), y el aviso sale con la misma credencial de correo de VM-AUX.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+AUX=/opt/babelhub/scripts/vm-aux
+AUX_ESTADO=/var/lib/babelhub-aux-root
+
+# Una vez al día y tras cada cambio a mano: sin llaves privadas, sin agente, con sshd cerrado y sin credenciales de más.
+40 4 * * * root $AUX/alertar.sh endurecimiento $AUX/verificar-endurecimiento.sh

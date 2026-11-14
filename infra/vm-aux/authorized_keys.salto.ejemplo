@@ -1,0 +1,4 @@
+# Ejemplo de /home/salto/.ssh/authorized_keys en VM-AUX (la llave PÚBLICA de la persona responsable; la privada nunca sale de su equipo).
+# `restrict` desactiva todo (terminal, reenvío de agente, X11) y `port-forwarding` más `permitopen` devuelven solo lo que el salto necesita:
+# abrir una conexión TCP a las otras VMs, puerto 22. Reemplaza las direcciones por las reales y la llave por la tuya.
+restrict,port-forwarding,permitopen="10.0.1.10:22",permitopen="10.0.2.10:22" ssh-ed25519 AAAA-REEMPLAZA-POR-TU-LLAVE-PUBLICA persona-responsable
