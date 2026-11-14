@@ -11,7 +11,7 @@ namespace BabelHub.Inventario.Application.Auditoria.Interno;
 public static partial class CatalogoDeAccionesDeAuditoria
 {
     /// <summary>El catálogo completo del servicio.</summary>
-    public static CatalogoDeAcciones Crear() => new([.. AccionesDeOperaciones(), .. AccionesDeStockCatalogoYFuentes(), .. AccionesDeIdentidadYOtrosModulos(), .. AccionesDeEventosDeSeguridad()]);
+    public static CatalogoDeAcciones Crear() => new([.. AccionesDeOperaciones(), .. AccionesDeStockCatalogoYFuentes(), .. AccionesDeIdentidadYOtrosModulos(), .. AccionesDeEventosDeSeguridad(), .. AccionesDeAvisosYOrigenReenviado()]);
 
     /// <summary>Una acción que concede o cambia algo, de auditoría pura, sin motivo: el objeto y el rol se declaran siempre (sin valor por defecto).</summary>
     private static AccionDelCatalogo Auditada(string identificador, bool objetoPersonal, bool rolPersonal, params ClaveDeDetalle[] detalle) =>
