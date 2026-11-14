@@ -3,6 +3,37 @@ using BabelHub.Ecommerce.Application.Web;
 
 namespace BabelHub.Ecommerce.Api.Web;
 
+/// <summary>Cómo quedó la sesión web en esta solicitud (lo fija <see cref="SesionWebHandler"/>); lo leen los filtros de área y de paso pendiente y las respuestas de cierre.</summary>
+public enum EstadoDeLaSesionEnLaSolicitud
+{
+    /// <summary>La solicitud no trae cookie de sesión: es una visita anónima.</summary>
+    SinCookie,
+
+    /// <summary>La sesión es válida y su credencial quedó asegurada: hay un actor verificado.</summary>
+    Asegurada,
+
+    /// <summary>La cookie no corresponde a ninguna sesión o su forma no es válida.</summary>
+    Inexistente,
+
+    /// <summary>La sesión ya estaba cerrada (un identificador cerrado nunca vuelve a usarse).</summary>
+    Cerrada,
+
+    /// <summary>La sesión venció por inactividad o por el tope absoluto en esta solicitud.</summary>
+    Vencida,
+
+    /// <summary>La cookie es de una sesión del otro host.</summary>
+    OtroHost,
+
+    /// <summary>Identidad rechazó la renovación (o la credencial no se pudo verificar): la sesión se cerró.</summary>
+    RenovacionRechazada,
+
+    /// <summary>Identidad o el verificador no responden: no se cerró nada y no hay actor verificado.</summary>
+    ServicioNoDisponible,
+
+    /// <summary>Por la ruta o el modo de arranque (<c>Ensayo</c>, <c>Restauracion</c>) no se cargó ninguna sesión.</summary>
+    NoSeCargo,
+}
+
 /// <summary>
 /// Lo que la sesión web decidió para la solicitud en curso, guardado en <see cref="HttpContext.Items"/> bajo una clave que solo este tipo conoce:
 /// el actor verificado y la credencial en memoria. Nada de esto sale del proceso ni de la solicitud (D02, regla 9 de AGENTS.md).
@@ -10,6 +41,20 @@ namespace BabelHub.Ecommerce.Api.Web;
 public static class SesionDeLaSolicitud
 {
     private static readonly object ClaveDelResultado = new();
+    private static readonly object ClaveDelEstado = new();
+
+    public static void EstablecerEstadoDeLaSesion(this HttpContext contexto, EstadoDeLaSesionEnLaSolicitud estado)
+    {
+        ArgumentNullException.ThrowIfNull(contexto);
+        contexto.Items[ClaveDelEstado] = estado;
+    }
+
+    /// <summary>Cómo quedó la sesión en esta solicitud; <see cref="EstadoDeLaSesionEnLaSolicitud.NoSeCargo"/> si el handler no corrió.</summary>
+    public static EstadoDeLaSesionEnLaSolicitud EstadoDeLaSesion(this HttpContext contexto)
+    {
+        ArgumentNullException.ThrowIfNull(contexto);
+        return contexto.Items.TryGetValue(ClaveDelEstado, out var valor) && valor is EstadoDeLaSesionEnLaSolicitud estado ? estado : EstadoDeLaSesionEnLaSolicitud.NoSeCargo;
+    }
 
     /// <summary>Guarda el resultado de asegurar la credencial (lo hace <c>SesionWebHandler</c>, una vez por solicitud).</summary>
     public static void EstablecerCredencial(this HttpContext contexto, ResultadoDeCredencial resultado)
@@ -48,6 +93,21 @@ public sealed class HttpTokenDelUsuarioDeLaSesion(IHttpContextAccessor contexto)
         return Task.FromResult(resultado is { Estado: EstadoDeCredencial.Asegurada, Credencial: { } credencial }
             ? new ValorSecreto(credencial.Valor)
             : null);
+    }
+}
+
+public static class LimpiezaDelNavegador
+{
+    /// <summary>
+    /// Pide al navegador vaciar su caché y su almacenamiento (<c>Clear-Site-Data</c>) y no guardar esta respuesta: tras cerrar la sesión, «atrás» no debe mostrar páginas de la
+    /// persona anterior y <c>localStorage</c> debe quedar vacío (WEB-28, WEB-40). La cookie de sesión se borra aparte, con sus atributos. Se usa al cerrar la sesión, en «cerrar
+    /// todas» y en toda redirección al ingreso por vencimiento o rechazo.
+    /// </summary>
+    public static void LimpiarElNavegador(this HttpResponse respuesta)
+    {
+        ArgumentNullException.ThrowIfNull(respuesta);
+        respuesta.Headers["Clear-Site-Data"] = "\"cache\", \"storage\"";
+        respuesta.Headers.CacheControl = "no-store";
     }
 }
 

@@ -20,6 +20,10 @@ builder.Services.AddSingleton(typeof(ModoDeArranque), modo);
 builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("ECO"));
 builder.Services.AddSingleton<EjecutorDePasosDeRestauracion>();
 builder.Services.AgregarInterfazWeb();
+// El host de este proceso (tienda o gestion) decide qué áreas se mapean (D03); en producción su variable y los hosts permitidos son obligatorios.
+builder.Services.AgregarHostWeb(OpcionesDelHostWeb.Leer(builder.Configuration, builder.Environment.IsProduction()));
+// El token del usuario sale de la sesión de la solicitud y solo lo consume el manejador de salida (T14, regla 9).
+builder.Services.AgregarTokenDelUsuarioDeLaSesion();
 // La versión provisional de los textos legales nunca se compone en producción (hasta el contrato de Identidad, IDE-57).
 builder.Services.AgregarModuloWeb(permitirVersionesProvisionales: !builder.Environment.IsProduction());
 // Implementaciones provisionales de lo que aún no existe; un registro real anterior se respeta (TryAdd).
@@ -49,6 +53,8 @@ app.UseStaticFiles();
 // Salud para Docker Compose y el reinicio automático (RNF03): sin datos internos, el detalle solo en la red privada.
 app.MapearSalud();
 app.MapDefaultControllerRoute();
+// Una consulta automática (hx-trigger="every …") admite solo GET: si no, el arranque falla (T15).
+ConsultasAutomaticas.Validar(((IEndpointRouteBuilder)app).DataSources.SelectMany(d => d.Endpoints));
 
 app.Run();
 return 0;
