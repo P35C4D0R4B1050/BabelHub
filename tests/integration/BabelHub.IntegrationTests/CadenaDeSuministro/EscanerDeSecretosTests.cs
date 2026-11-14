@@ -103,8 +103,10 @@ public sealed partial class EscanerDeSecretosTests : IDisposable
 
         using var proceso = Process.Start(informacion)!;
         var salida = new StringBuilder();
-        proceso.OutputDataReceived += (_, e) => salida.AppendLine(e.Data);
-        proceso.ErrorDataReceived += (_, e) => salida.AppendLine(e.Data);
+
+        // La salida y los errores llegan en hilos distintos: sin el cerrojo el StringBuilder se corrompía y tumbaba el proceso de pruebas.
+        proceso.OutputDataReceived += (_, e) => { lock (salida) { salida.AppendLine(e.Data); } };
+        proceso.ErrorDataReceived += (_, e) => { lock (salida) { salida.AppendLine(e.Data); } };
         proceso.BeginOutputReadLine();
         proceso.BeginErrorReadLine();
         if (!proceso.WaitForExit(TimeSpan.FromMinutes(4)))

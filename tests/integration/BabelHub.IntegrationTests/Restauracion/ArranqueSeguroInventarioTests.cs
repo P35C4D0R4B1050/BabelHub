@@ -539,8 +539,8 @@ public sealed class ArranqueSeguroInventarioTests : IDisposable
 
         using var proceso = Process.Start(informacion)!;
         var salida = new StringBuilder();
-        proceso.OutputDataReceived += (_, e) => salida.AppendLine(e.Data);
-        proceso.ErrorDataReceived += (_, e) => salida.AppendLine(e.Data);
+        proceso.OutputDataReceived += (_, e) => { lock (salida) { salida.AppendLine(e.Data); } };
+        proceso.ErrorDataReceived += (_, e) => { lock (salida) { salida.AppendLine(e.Data); } };
         proceso.BeginOutputReadLine();
         proceso.BeginErrorReadLine();
         if (!proceso.WaitForExit(TimeSpan.FromSeconds(60)))
