@@ -302,4 +302,38 @@ public sealed class AsegurarCredencialTests
 
         Assert.Equal(["identidad (filas bloqueadas: 1)"], orden);
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-26")]
+    public async Task Si_otra_solicitud_retiene_la_fila_mas_alla_del_plazo_responde_servicio_no_disponible_sin_cerrar_la_sesion()
+    {
+        var d = new DoblesDeSesion();
+        var cookie = await d.Abrir(vence: 15);
+        d.Reloj.Ahora = DoblesDeSesion.Inicio.AddMinutes(14).AddSeconds(30);
+        d.Almacen.BloqueoAgotado = true;
+
+        var resultado = await Asegurar(d, cookie);
+
+        Assert.Equal(EstadoDeCredencial.ServicioNoDisponible, resultado.Estado);
+        Assert.Equal(0, d.Identidad.LlamadasARenovar);
+        Assert.Equal(EstadoDeSesion.Abierta, d.Fila(cookie).Sesion.Estado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-26")]
+    public async Task Sin_turno_dentro_del_tope_de_renovaciones_simultaneas_responde_servicio_no_disponible()
+    {
+        var d = new DoblesDeSesion();
+        var cookie = await d.Abrir(vence: 15);
+        d.Reloj.Ahora = DoblesDeSesion.Inicio.AddMinutes(14).AddSeconds(30);
+        using var limitador = new LimitadorDeRenovaciones(maximo: 1, espera: TimeSpan.FromMilliseconds(50));
+        using var ocupado = await limitador.Entrar(default);
+        var asegurar = new AsegurarCredencialDeSesion(d.Comun, d.Unidad, d.Verificador, d.Alertas, limitador);
+
+        var resultado = await asegurar.Ejecutar(cookie, HostWeb.Tienda, default);
+
+        Assert.Equal(EstadoDeCredencial.ServicioNoDisponible, resultado.Estado);
+        Assert.Equal(0, d.Identidad.LlamadasARenovar);
+        Assert.Equal(0, d.Almacen.CargasParaRenovar);
+    }
 }

@@ -13,6 +13,9 @@ internal sealed class AlmacenDeSesionesEnMemoria : IAlmacenDeSesionesWeb
 
     public int CargasParaRenovar { get; private set; }
 
+    /// <summary>Simula el <c>lock_timeout</c> agotado: otra solicitud retiene la fila.</summary>
+    public bool BloqueoAgotado { get; set; }
+
     public Task Insertar(SesionGuardada sesion, CancellationToken cancelacion = default)
     {
         Filas.Add(sesion.Sesion.Id.Valor, sesion);
@@ -24,6 +27,11 @@ internal sealed class AlmacenDeSesionesEnMemoria : IAlmacenDeSesionesWeb
 
     public Task<SesionGuardada?> CargarParaRenovar(HashDeSesion id, CancellationToken cancelacion = default)
     {
+        if (BloqueoAgotado)
+        {
+            throw new BloqueoDeSesionNoDisponibleException();
+        }
+
         CargasParaRenovar++;
         return Task.FromResult(Filas.GetValueOrDefault(id.Valor));
     }

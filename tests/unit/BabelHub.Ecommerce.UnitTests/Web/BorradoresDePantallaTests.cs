@@ -50,6 +50,23 @@ public sealed class BorradoresDePantallaTests
 
     [Fact]
     [Trait("Criterio", "AC-WEB-20")]
+    public async Task Los_30_minutos_corren_desde_que_termino_la_sesion_y_no_desde_que_se_guarda()
+    {
+        var d = new DoblesDeSesion();
+        var (borradores, almacen) = Crear(d);
+        var cookie = await SesionVencida(d);
+        d.Reloj.Ahora = DoblesDeSesion.Inicio.AddMinutes(50);
+
+        Assert.True(await borradores.Conservar(Entrada(cookie)));
+
+        Assert.Equal(DoblesDeSesion.Inicio.AddMinutes(61), Assert.Single(almacen.Filas).Borrador.VenceEn);
+        d.Reloj.Ahora = DoblesDeSesion.Inicio.AddMinutes(62);
+        Assert.Null(await borradores.Recuperar(DoblesDeSesion.Usuario, Plantilla));
+        Assert.Empty(almacen.Filas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-20")]
     public async Task La_entrega_es_unica_la_segunda_recuperacion_no_devuelve_nada()
     {
         var d = new DoblesDeSesion();

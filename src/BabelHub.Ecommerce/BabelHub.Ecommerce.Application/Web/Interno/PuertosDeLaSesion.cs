@@ -26,6 +26,28 @@ public sealed class SesionGuardada
     public string? RetornoTrasAceptar { get; set; }
 }
 
+/// <summary>
+/// La fila de la sesión sigue bloqueada por otra solicitud después del plazo de espera (<c>lock_timeout</c>, 5 segundos): quien la pidió responde servicio no
+/// disponible y la solicitud siguiente lo reintenta (plan §5). Nunca lleva datos de la sesión.
+/// </summary>
+public sealed class BloqueoDeSesionNoDisponibleException : Exception
+{
+    public BloqueoDeSesionNoDisponibleException()
+        : base("La sesión está ocupada por otra solicitud.")
+    {
+    }
+
+    public BloqueoDeSesionNoDisponibleException(string message)
+        : base(message)
+    {
+    }
+
+    public BloqueoDeSesionNoDisponibleException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
 /// <summary>Puerto: la tabla de sesiones web (esquema <c>web</c>). <c>CargarParaRenovar</c> toma la fila con <c>SELECT … FOR UPDATE</c> y <c>lock_timeout</c>.</summary>
 public interface IAlmacenDeSesionesWeb
 {
@@ -33,8 +55,13 @@ public interface IAlmacenDeSesionesWeb
 
     Task<SesionGuardada?> Cargar(HashDeSesion id, CancellationToken cancelacion = default);
 
+    /// <summary>
+    /// Toma la fila con <c>SELECT … FOR UPDATE</c> y un <c>lock_timeout</c> de 5 segundos; exige una unidad de trabajo activa (el bloqueo dura lo que ella).
+    /// </summary>
+    /// <exception cref="BloqueoDeSesionNoDisponibleException">Si otra solicitud la retiene más allá del plazo.</exception>
     Task<SesionGuardada?> CargarParaRenovar(HashDeSesion id, CancellationToken cancelacion = default);
 
+    /// <summary>Guarda la fila que se cargó con <see cref="CargarParaRenovar"/>. Nunca reabre una fila ya cerrada (un identificador cerrado no vuelve a usarse, WEB-28).</summary>
     Task Guardar(SesionGuardada sesion, CancellationToken cancelacion = default);
 
     /// <summary>
@@ -43,6 +70,7 @@ public interface IAlmacenDeSesionesWeb
     /// </summary>
     Task ActualizarActividad(HashDeSesion id, DateTimeOffset ultimaActividad, CancellationToken cancelacion = default);
 
+    /// <summary>Las sesiones abiertas de un usuario, tomadas con <c>FOR UPDATE</c> y en un orden fijo (cerrar todas, plan §5).</summary>
     Task<IReadOnlyList<SesionGuardada>> CargarAbiertasDeUnUsuario(Guid usuarioId, CancellationToken cancelacion = default);
 }
 
@@ -51,6 +79,10 @@ public interface IAlmacenDeBorradores
 {
     Task<int> Contar(Guid usuarioId, DateTimeOffset ahora, CancellationToken cancelacion = default);
 
+    /// <summary>
+    /// Toma el borrador con <c>FOR UPDATE</c>: dos entregas simultáneas del mismo borrador se serializan y la segunda ya no lo encuentra (entrega única). Los campos del
+    /// borrador devuelto están vacíos; el cuerpo cifrado es lo que se guardó.
+    /// </summary>
     Task<BorradorGuardado?> Cargar(Guid usuarioId, string plantillaDeRuta, CancellationToken cancelacion = default);
 
     /// <summary><c>INSERT … ON CONFLICT (usuario_id, plantilla_de_ruta) DO UPDATE</c>.</summary>

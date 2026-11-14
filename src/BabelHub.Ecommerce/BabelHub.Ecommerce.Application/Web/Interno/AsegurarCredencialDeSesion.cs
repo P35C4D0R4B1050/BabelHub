@@ -9,11 +9,31 @@ namespace BabelHub.Ecommerce.Application.Web.Interno;
 /// (el borrador se conserva); un <b>fallo transitorio</b> responde servicio no disponible, no cierra, marca la renovación como incierta y no usa una credencial
 /// vencida; una credencial <b>inválida</b> intenta una renovación y, si se rechaza, cierra; un verificador <b>sin claves vigentes</b> no cierra ninguna sesión.
 /// </summary>
-internal sealed class AsegurarCredencialDeSesion(ServiciosDeSesion comun, IUnidadDeTrabajo unidad, IVerificadorDeCredencial verificador, IPublicadorDeAlertasTecnicas alertas)
+internal sealed class AsegurarCredencialDeSesion(
+    ServiciosDeSesion comun,
+    IUnidadDeTrabajo unidad,
+    IVerificadorDeCredencial verificador,
+    IPublicadorDeAlertasTecnicas alertas,
+    LimitadorDeRenovaciones? limitador = null)
 {
     public static readonly TimeSpan MargenDeRenovacion = TimeSpan.FromSeconds(60);
 
+    private readonly LimitadorDeRenovaciones _limitador = limitador ?? new LimitadorDeRenovaciones();
+
     public async Task<ResultadoDeCredencial> Ejecutar(string valorDeLaCookie, HostWeb host, CancellationToken cancelacion)
+    {
+        try
+        {
+            return await EjecutarInterno(valorDeLaCookie, host, cancelacion).ConfigureAwait(false);
+        }
+        catch (BloqueoDeSesionNoDisponibleException)
+        {
+            // Otra solicitud retiene la fila más allá del plazo: servicio no disponible; la sesión sigue y la solicitud siguiente lo reintenta (plan §5).
+            return Sin(EstadoDeCredencial.ServicioNoDisponible);
+        }
+    }
+
+    private async Task<ResultadoDeCredencial> EjecutarInterno(string valorDeLaCookie, HostWeb host, CancellationToken cancelacion)
     {
         if (!ValorDeCookieDeSesion.TieneFormaValida(valorDeLaCookie))
         {
@@ -55,7 +75,14 @@ internal sealed class AsegurarCredencialDeSesion(ServiciosDeSesion comun, IUnida
         fila.RenovacionIncierta || fila.CredencialCifrada is null || fila.CredencialVenceEn is null || fila.CredencialVenceEn.Value - comun.Reloj.Ahora < MargenDeRenovacion;
 
     /// <summary>Renueva bajo el bloqueo de la fila. Devuelve <see langword="null"/> si la credencial quedó vigente y hay que verificarla; si no, el resultado final.</summary>
-    private async Task<ResultadoDeCredencial?> Renovar(HashDeSesion id, CancellationToken cancelacion) =>
+    private async Task<ResultadoDeCredencial?> Renovar(HashDeSesion id, CancellationToken cancelacion)
+    {
+        // Un tope de renovaciones simultáneas por proceso protege el grupo de conexiones: sin turno a tiempo, servicio no disponible.
+        using var turno = await _limitador.Entrar(cancelacion).ConfigureAwait(false);
+        return turno is null ? Sin(EstadoDeCredencial.ServicioNoDisponible) : await RenovarConTurno(id, cancelacion).ConfigureAwait(false);
+    }
+
+    private async Task<ResultadoDeCredencial?> RenovarConTurno(HashDeSesion id, CancellationToken cancelacion) =>
         await unidad.Ejecutar<ResultadoDeCredencial?>(
             async ct =>
             {

@@ -19,12 +19,13 @@ public sealed class SesionesWeb : ISesionesWeb
         IPublicadorDeAlertasTecnicas alertas,
         IUnidadDeTrabajo unidad,
         IAleatoriosSeguros aleatorios,
-        IReloj reloj)
+        IReloj reloj,
+        LimitadorDeRenovaciones? limitador = null)
     {
         var comun = new ServiciosDeSesion(sesiones, cifrador, identidad, seguridad, reloj);
         _iniciar = new IniciarSesionWeb(comun, unidad, new AreasDeInterfaz(), aleatorios);
         _cargar = new CargarSesionWeb(comun, unidad);
-        _asegurar = new AsegurarCredencialDeSesion(comun, unidad, verificador, alertas);
+        _asegurar = new AsegurarCredencialDeSesion(comun, unidad, verificador, alertas, limitador);
         _cerrar = new CerrarSesionWeb(comun, unidad, alertas);
     }
 

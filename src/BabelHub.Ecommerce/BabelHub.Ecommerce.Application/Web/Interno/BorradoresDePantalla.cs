@@ -41,7 +41,8 @@ public sealed class BorradoresDePantalla(
         BorradorDePantalla borrador;
         try
         {
-            borrador = BorradorDePantalla.Crear(Guid.NewGuid(), sesion.UsuarioId, entrada.PlantillaDeRuta, entrada.Campos, ahora);
+            // Los 30 minutos corren desde que terminó la sesión, no desde que se guarda: lo escrito nunca vive más de 30 minutos tras el vencimiento (WEB-25).
+            borrador = BorradorDePantalla.Crear(Guid.NewGuid(), sesion.UsuarioId, entrada.PlantillaDeRuta, entrada.Campos, cerradaEn);
         }
         catch (ArgumentException)
         {
