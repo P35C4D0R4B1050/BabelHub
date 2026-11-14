@@ -28,3 +28,4 @@ Una fila por cada spec o plan que el agente aprobó por delegación de la person
 | 2026-11-13 | plan | identidad-seguridad | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 34 | 8fe773e86f811f25 |
 | 2026-11-13 | plan | transversal-notificaciones | Claude (delegado) | 0/0 | Lista para aprobar | Cumple con observaciones | Cumple | 0 | 8 | 4e0312a49dc049d8 |
 | 2026-11-13 | plan | transversal-seguridad | Claude (delegado) | 0/0 | Lista para aprobar | Cumple | Cumple | 0 | 20 | 7e95e7b771aa0902 |
+| 2026-11-14 | spec | web-base | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 13 | 601b5351205fda9e |
