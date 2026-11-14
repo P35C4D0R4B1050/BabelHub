@@ -133,15 +133,15 @@ public sealed class MotorDeLimitesPostgresTests(PostgresDeRolesFixture bd) : ICl
     public async Task Reservar_ConVentanaDeslizante_LasEntradasViejasDejanDeContar()
     {
         var motor = Motor();
-        var politica = PorCliente(2, TimeSpan.FromMilliseconds(1500));
+        var politica = PorCliente(2, TimeSpan.FromSeconds(6));
         var cliente = Contador();
 
         await Reserva(motor, politica, cliente);
-        await Task.Delay(900);
+        await Task.Delay(3500);
         await Reserva(motor, politica, cliente);
         Assert.Equal(EstadoDeLimite.Excedido, (await Reserva(motor, politica, cliente)).Estado);
 
-        await Task.Delay(700);
+        await Task.Delay(3200);
         Assert.True((await Reserva(motor, politica, cliente)).EsPermitido);
         Assert.Equal(EstadoDeLimite.Excedido, (await Reserva(motor, politica, cliente)).Estado);
     }

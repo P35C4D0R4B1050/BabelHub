@@ -64,16 +64,16 @@ public sealed class MotorDeLimitesRedisTests(RedisDeContadoresFixture redis)
     public async Task Reservar_ConVentanaDeslizante_NoPermiteUnaRafagaEnElCambioDeVentana()
     {
         var motor = redis.Motor();
-        var politica = Politica(2, 2000);
+        var politica = Politica(2, 6000);
         var contador = "u:s:b";
         var reloj = Stopwatch.StartNew();
 
         await Reservar(motor, politica, contador);
-        await Esperar(reloj, 1300);
+        await Esperar(reloj, 3000);
         await Reservar(motor, politica, contador);
 
-        // 2,3 s después de la primera: una ventana fija habría reiniciado el conteo; la deslizante aún ve la segunda entrada.
-        await Esperar(reloj, 2300);
+        // 7,5 s después de la primera: una ventana fija habría reiniciado el conteo; la deslizante aún ve la segunda entrada.
+        await Esperar(reloj, 7500);
         Assert.True((await Reservar(motor, politica, contador)).EsPermitido);
         Assert.Equal(EstadoDeLimite.Excedido, (await Reservar(motor, politica, contador)).Estado);
     }
