@@ -25,6 +25,13 @@ internal sealed class AutorizadorDeFuentes(IActorActual actores, IDenegacionDeAc
 
     public const string ClaveNoAutenticado = "no-autenticado";
 
+    /// <summary>
+    /// Cualquier actor con contexto: un usuario, el sistema o una integración (la que establece la Api para una llamada que solo trae la credencial de servicio). Lo que
+    /// <b>no</b> se admite es no tener actor o ser un visitante: una llamada que nadie identificó falla cerrada y deja su evento, en lugar de leer como si nada
+    /// (SEG-15; el alcance de datos por transacción tampoco ve nada sin actor, así que dejarla pasar daría un «sin stock» silencioso).
+    /// </summary>
+    public Task<ErrorDeAplicacion?> ExigirContexto(CancellationToken cancelacion) => Evaluar(_ => null, cancelacion);
+
     /// <summary>Solo la administración central (registrar y editar fuentes, rutas y fichas, designar la recepción, consultar una fuente).</summary>
     public Task<ErrorDeAplicacion?> ExigirAdministracionCentral(CancellationToken cancelacion) =>
         Evaluar(actor => actor.EsAdministracionCentral() ? null : MotivosDeDenegacionDeFuentes.FueraDeRol, cancelacion);
