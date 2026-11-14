@@ -1,0 +1,76 @@
+@model ModeloBaseDePagina
+@{
+    var nombreDelArea = Model.Area switch
+    {
+        AreaDeLaPagina.Sucursal => "Sucursal",
+        AreaDeLaPagina.Admin => "Administración",
+        _ => null,
+    };
+}
+<header class="border-b border-base-300 bg-base-200">
+    <div class="navbar mx-auto max-w-7xl gap-2 px-4">
+        <div class="navbar-start gap-2">
+            @if (Model.Menu.Count > 0)
+            {
+                <details class="dropdown lg:hidden">
+                    <summary class="btn btn-ghost btn-square" aria-label="Abrir el menú"><bh-icono nombre="menu" /></summary>
+                    <ul class="menu dropdown-content z-20 mt-2 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-sm">
+                        @foreach (var item in Model.Menu)
+                        {
+                            <li><a href="@item.Ruta" aria-current="@(item.Activo ? "page" : null)" class="@(item.Activo ? "menu-active" : null)"><bh-icono nombre="@item.Icono" />@item.Texto</a></li>
+                        }
+                    </ul>
+                </details>
+            }
+            <a href="/" class="btn btn-ghost px-2 font-display text-xl normal-case">BabelHub</a>
+            @if (nombreDelArea is not null)
+            {
+                <span class="badge badge-outline">@nombreDelArea</span>
+            }
+        </div>
+        <nav aria-label="Principal" class="navbar-center hidden lg:flex">
+            <ul class="menu menu-horizontal gap-1">
+                @foreach (var item in Model.Menu)
+                {
+                    <li><a href="@item.Ruta" aria-current="@(item.Activo ? "page" : null)" class="@(item.Activo ? "menu-active" : null)"><bh-icono nombre="@item.Icono" />@item.Texto</a></li>
+                }
+            </ul>
+        </nav>
+        <div class="navbar-end gap-2">
+            @if (Model.Area == AreaDeLaPagina.Tienda && Model.Sucursales.Count > 0)
+            {
+                <form method="post" action="/preferencias/sucursal" asp-antiforgery="true" class="flex items-center gap-1">
+                    <label for="bh-sucursal" class="sr-only">Sucursal preferida</label>
+                    <bh-icono nombre="sucursal" />
+                    <select id="bh-sucursal" name="sucursal" class="select select-sm w-40" data-bh-sucursal>
+                        @foreach (var sucursal in Model.Sucursales)
+                        {
+                            <option value="@sucursal.Codigo" selected="@(sucursal.Codigo == Model.SucursalPreferida)">@sucursal.Nombre</option>
+                        }
+                    </select>
+                    <noscript><button type="submit" class="btn btn-sm">Elegir</button></noscript>
+                </form>
+            }
+            <form method="post" action="/preferencias/tema" asp-antiforgery="true" class="flex items-center gap-1">
+                <label for="bh-tema" class="sr-only">Tema</label>
+                <select id="bh-tema" name="tema" class="select select-sm w-28" data-bh-tema>
+                    <option value="" selected="@(Model.Tema is null)">Dispositivo</option>
+                    <option value="babelhub" selected="@(Model.Tema == "babelhub")">Claro</option>
+                    <option value="babelhub-dark" selected="@(Model.Tema == "babelhub-dark")">Oscuro</option>
+                </select>
+                <noscript><button type="submit" class="btn btn-sm">Aplicar</button></noscript>
+            </form>
+            @if (Model.HaySesion)
+            {
+                <a href="/cuenta" class="btn btn-ghost btn-sm"><bh-icono nombre="usuario" />Mi cuenta</a>
+                <form method="post" action="/sesion/cerrar" asp-antiforgery="true">
+                    <button type="submit" class="btn btn-outline btn-sm">Cerrar sesión</button>
+                </form>
+            }
+            else
+            {
+                <a href="/ingreso" class="btn btn-primary btn-sm"><bh-icono nombre="usuario" />Ingresar</a>
+            }
+        </div>
+    </div>
+</header>

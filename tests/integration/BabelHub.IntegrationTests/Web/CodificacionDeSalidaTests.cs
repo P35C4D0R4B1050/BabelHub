@@ -13,6 +13,7 @@ public sealed partial class CodificacionDeSalidaTests
     private static readonly Dictionary<string, string> Permitidos = new(StringComparer.Ordinal)
     {
         ["BabelHub.Ecommerce/BabelHub.Ecommerce.Api/Plataforma/VerificacionDePersonaWeb.cs"] = "el script de Turnstile: marcado fijo sin ningún valor de la vista",
+        ["BabelHub.Ecommerce/BabelHub.Ecommerce.Api/Web/Layout/IconoTagHelper.cs"] = "el trazado de un icono: constantes de una lista cerrada (Iconos.Trazado lanza si el nombre no está), sin ningún valor de la vista",
     };
 
     [GeneratedRegex(@"Html\.Raw|\bHtmlString\b|\bMarkupString\b|\.AppendHtml\(|\bWriteLiteral\(|\bContent\.Raw\b|\bSetHtmlContent\(|\bHtmlContentBuilder\b|\bInnerHtml\b", RegexOptions.CultureInvariant)]

@@ -1,0 +1,29 @@
+@model ModeloBaseDePagina
+<!DOCTYPE html>
+@* Sin elección de la persona no se escribe data-theme (Razor emitiría data-theme=""): así manda la preferencia del dispositivo (WEB-09). *@
+@if (Model.Tema is { } tema)
+{
+    @:<html lang="es-PE" data-theme="@tema">
+}
+else
+{
+    @:<html lang="es-PE">
+}
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@Model.Titulo · BabelHub</title>
+    <meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"historyCacheSize":0,"selfRequestsOnly":true,"includeIndicatorStyles":false}' />
+    <link rel="stylesheet" href="/css/app.css" />
+    <script src="/lib/htmx/htmx.min.js" defer></script>
+    <script src="/js/bh.js" defer></script>
+</head>
+<body class="min-h-screen flex flex-col bg-base-100 text-base-content">
+    <a class="bh-saltar" href="#contenido">Saltar al contenido</a>
+    @await Html.PartialAsync("_Cabecera", Model)
+    <main id="contenido" tabindex="-1" class="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
+        @RenderBody()
+    </main>
+    @await Html.PartialAsync("_Pie", Model)
+</body>
+</html>
