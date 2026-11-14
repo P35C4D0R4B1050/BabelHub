@@ -56,6 +56,20 @@ Cuatro niveles (AD24). Cada uno frena un tipo de abuso distinto y el personal ta
 
 El Inventario no tiene entrada pública: solo acepta llamadas del E-commerce, por lo que su superficie de ataque externa es mínima. La interfaz verifica que las solicitudes provengan de personas reales con Turnstile y de los orígenes del túnel con Cloudflare, y los eventos de exceso se registran por actor y origen (SEG-08).
 
+## 3.2 Lista de secretos del entorno de `transversal-seguridad`
+
+Todos llegan por variables de entorno con el prefijo `BABELHUB__` (el doble guion bajo es el separador de sección de .NET) y cada VM recibe solo los de sus servicios. Al arrancar, el servicio **falla** si falta uno obligatorio o es débil, y el mensaje nombra la variable y nunca el valor. Reglas comunes a todo secreto: al menos 32 bytes, al menos 8 caracteres distintos (no un carácter repetido), **distinto de cualquier otro secreto del servicio** y la versión anterior distinta de la actual. Ninguno se registra: los registros pasan por la redacción de datos prohibidos (SEG-10) y una revisión automática vigila el repositorio y los registros (AC-SEG-25).
+
+| Variable | Servicio | Uso |
+| :--- | :--- | :--- |
+| `BABELHUB__Seguridad__ClaveDeHuella` y `…ClaveDeHuellaAnterior` | Ambos | Clave HMAC de las huellas de origen y de sujeto (SEG-25), con el formato `versión:base64`. La anterior solo existe durante una rotación. |
+| `BABELHUB__Seguridad__Credenciales__<Alcance>` y `…<Alcance>Anterior` | Ambos | Una credencial de servicio por alcance, con el nombre del alcance en PascalCase (`OperacionDeUsuario`, `LecturaDeDisponibilidad`, `OrigenReenviado`…); cada servicio exige solo los que valida o envía. |
+| `BABELHUB__Integraciones__<Proveedor>__Secreto` y `…SecretoAnterior` | El que recibe el aviso | Secreto de la firma HMAC de cada proveedor de integración (SEG-12). |
+| `BABELHUB__Seguridad__Turnstile__Secreto` | E-commerce | Secreto de `siteverify` de Turnstile (SEG-31). |
+| `BABELHUB__Seguridad__Turnstile__Hostnames` y `…ClaveDeSitio` | E-commerce | No son secretos: los nombres de host permitidos (separados por comas) y la clave de sitio pública del desafío. Se validan igual al arrancar. |
+| `BABELHUB__Seguridad__ClaveDeRedisDeLimites` | E-commerce y réplica de gestión | Contraseña del usuario `limites` del Redis de contadores. |
+| `BABELHUB__Auditoria__ClaveDeCursor` | Ambos, una distinta por servicio | Clave HMAC del cursor firmado de la consulta de auditoría, con versión y rotación (`transversal-auditoria`). |
+
 ## 4. Registro y alertas
 
 | Qué | Dónde | Notas |
