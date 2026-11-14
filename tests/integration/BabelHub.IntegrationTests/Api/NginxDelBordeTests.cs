@@ -16,6 +16,7 @@ public sealed class NginxDelBordeTests : IAsyncLifetime
         http {
             server {
                 listen 8080;
+                listen 8081;
                 location / {
                     default_type text/plain;
                     return 200 "origen=[$http_x_origen_cliente];xff=[$http_x_forwarded_for];fwd=[$http_forwarded];real=[$http_x_real_ip];servicio=[$http_x_credencial_de_servicio];reenviado=[$http_x_origen_reenviado];credorigen=[$http_x_credencial_de_origen]";

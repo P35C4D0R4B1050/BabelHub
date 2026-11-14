@@ -79,7 +79,7 @@ internal static partial class VersionesFijadas
                 imagen = ImagenDeScript().Match(lineas[i]) is { Success: true } s ? s.Groups["ref"].Value : null;
             }
 
-            if (imagen is null)
+            if (imagen is null || (ruta.EndsWith(".yml", StringComparison.OrdinalIgnoreCase) && ImagenPropiaPorVariable().IsMatch(imagen)))
             {
                 continue;
             }
@@ -168,13 +168,20 @@ internal static partial class VersionesFijadas
             .Where(p => !existe(Path.Combine(Path.GetDirectoryName(p) ?? string.Empty, "packages.lock.json")))
             .Select(p => $"{p}: no tiene su packages.lock.json.")];
 
+    /// <summary>
+    /// Una imagen propia de un Compose llega por <c>${IMAGEN_NOMBRE:?mensaje}</c>: su digest lo pone el flujo de lanzamiento con la imagen
+    /// que publicó y <c>desplegar.sh</c> rechaza un valor sin <c>@sha256:</c> (T23). La parte «:?» obliga a darla: sin ella no se levanta nada.
+    /// </summary>
+    [GeneratedRegex(@"^\$\{IMAGEN_[A-Z0-9_]+:\?[^}]+\}$", RegexOptions.None, 2000)]
+    private static partial Regex ImagenPropiaPorVariable();
+
     [GeneratedRegex(@"^\s*-?\s*uses:\s*(?<ref>\S+)", RegexOptions.None, 2000)]
     private static partial Regex UsoDeAccion();
 
     [GeneratedRegex(@"^[\w.-]+/[\w./-]+@[0-9a-f]{40}$", RegexOptions.None, 2000)]
     private static partial Regex ShaDeAccion();
 
-    [GeneratedRegex(@"^\s*image:\s*(?<ref>\S+)", RegexOptions.None, 2000)]
+    [GeneratedRegex(@"^\s*image:\s*(?<ref>[^#\r\n]+?)\s*(?:#.*)?$", RegexOptions.None, 2000)]
     private static partial Regex ImagenDeCompose();
 
     [GeneratedRegex(@"^\s*FROM\s+(?:--platform=\S+\s+)?(?<ref>\S+)(?:\s+AS\s+(?<etapa>\S+))?\s*$", RegexOptions.IgnoreCase, 2000)]

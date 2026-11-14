@@ -135,7 +135,11 @@ public sealed partial class ImagenesDeContenedorTests
         {
             foreach (Match m in ImagenDeCompose().Matches(Leer(ruta)))
             {
-                referencias.Add(m.Groups["ref"].Value);
+                // Las imágenes propias llegan por ${IMAGEN_NOMBRE:?…} y se verifican al publicarlas (T34), no aquí.
+                if (!m.Groups["ref"].Value.StartsWith("${IMAGEN_", StringComparison.Ordinal))
+                {
+                    referencias.Add(m.Groups["ref"].Value);
+                }
             }
         }
 

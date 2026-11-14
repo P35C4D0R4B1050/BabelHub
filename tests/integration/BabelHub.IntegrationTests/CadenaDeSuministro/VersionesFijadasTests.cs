@@ -69,6 +69,8 @@ public sealed class VersionesFijadasTests
     [InlineData("Dockerfile", "FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build", "digest")]
     [InlineData("Dockerfile.api", "FROM alpine:latest", "latest")]
     [InlineData("tareas.sh", "TRIVY_IMAGE=\"${TRIVY_IMAGE:-aquasec/trivy:0.58.1}\"", "digest")]
+    [InlineData("x.yml", "    image: ${IMAGEN_ECOMMERCE}", "digest")] // sin «:?» no obliga a darla
+    [InlineData("x.yml", "    image: ${OTRA_COSA:?Define OTRA_COSA}", "digest")] // solo las imágenes propias (IMAGEN_…) llegan por variable
     public void UnaImagenSinSuDigestOConEtiquetaFlotante_Falla_ySenalaLaImagen(string ruta, string linea, string motivo)
     {
         var incumplimientos = VersionesFijadas.Imagenes(ruta, "# cabecera\n" + linea + "\n");
@@ -86,6 +88,7 @@ public sealed class VersionesFijadasTests
     [InlineData("Dockerfile", "FROM scratch")]
     [InlineData("tareas.sh", $"GITLEAKS_IMAGE=\"${{GITLEAKS_IMAGE:-zricethezav/gitleaks:v8.24.3@{Digest}}}\"")]
     [InlineData("x.yml", "    build: ./api")]
+    [InlineData("x.yml", "    image: ${IMAGEN_ECOMMERCE:?Define IMAGEN_ECOMMERCE con su digest}")]
     public void UnaImagenFijadaPorDigest_Pasa(string ruta, string linea)
     {
         Assert.Empty(VersionesFijadas.Imagenes(ruta, linea + "\n"));

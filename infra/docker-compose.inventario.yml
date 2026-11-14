@@ -1,0 +1,117 @@
+# VM-INVENTARIO (ARM, 1 OCPU y 6 GB): Inventario, réplica de gestión del E-commerce y PostgreSQL (AD11, AD31).
+# Se levanta con un solo comando y sus secretos (PLA-04):
+#   BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.1.10 \
+#   IMAGEN_INVENTARIO=<imagen@sha256:…> IMAGEN_ECOMMERCE=<imagen@sha256:…> IMAGEN_POSTGRES=<imagen@sha256:…> \
+#   docker compose -f infra/docker-compose.inventario.yml up -d
+# Reglas de PLA-26 y PLA-27 (las verifica una inspección automática de este archivo):
+#   - Las imágenes propias llegan por IMAGEN_<NOMBRE>, con el digest de la imagen publicada por el flujo de lanzamiento; desplegar.sh (T23)
+#     rechaza un valor sin `@sha256:`. Las de terceros van aquí con etiqueta y digest.
+#   - Cada contenedor: usuario sin privilegios, sin modo privilegiado, sin el socket del motor, sin capacidades (todas descartadas, y no se
+#     pueden ganar otras), límite de memoria y de procesador, comprobación de salud y sistema de archivos de solo lectura (con tmpfs donde
+#     hace falta escribir). Lo que un contenedor no pueda cumplir consta en `x-excepciones` con su motivo y su mitigación.
+#   - Los puertos solo se publican en la dirección privada de la VM, nunca en 0.0.0.0. La base no tiene acceso desde Internet.
+#   - Los secretos viven fuera del repositorio, en BABELHUB_SECRETOS, y cada VM solo recibe los suyos.
+name: babelhub-inventario
+
+x-excepciones: []
+
+x-registro: &registro
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    # Una instancia con las bases ecommerce e inventario y la técnica evolution (AD03); la imagen derivada trae age y rclone (D06).
+    image: ${IMAGEN_POSTGRES:?Define IMAGEN_POSTGRES con el digest de la imagen publicada de infra/postgres}
+    user: postgres
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run/postgresql
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    env_file:
+      - "${BABELHUB_SECRETOS:?Define BABELHUB_SECRETOS con la carpeta de los secretos de esta VM}/postgres.env"
+    command: ["postgres", "-c", "shared_buffers=768MB", "-c", "max_connections=100", "-c", "archive_timeout=300"]
+    ports:
+      - "${IP_PRIVADA:?Define IP_PRIVADA con la dirección privada de esta VM}:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    mem_limit: 2g
+    cpus: 0.8
+    pids_limit: 300
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -q -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    stop_grace_period: 60s
+    logging: *registro
+    restart: unless-stopped
+
+  inventario:
+    image: ${IMAGEN_INVENTARIO:?Define IMAGEN_INVENTARIO con el digest de la imagen publicada}
+    user: "1654:1654"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+    env_file:
+      - "${BABELHUB_SECRETOS:?}/inventario.env"
+    ports:
+      - "${IP_PRIVADA:?}:8082:8080"
+    mem_limit: 350m
+    cpus: 0.3
+    pids_limit: 200
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health/live HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && head -n 1 <&3 | grep -q ' 200 '"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *registro
+    restart: unless-stopped
+
+  ecommerce-gestion:
+    # La réplica de gestión (AD31): la misma imagen del E-commerce con el perfil «solo gestión» (áreas Sucursal y Admin).
+    image: ${IMAGEN_ECOMMERCE:?Define IMAGEN_ECOMMERCE con el digest de la imagen publicada}
+    user: "1654:1654"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      BABELHUB__Perfil: Gestion
+    env_file:
+      - "${BABELHUB_SECRETOS:?}/ecommerce-gestion.env"
+    ports:
+      - "${IP_PRIVADA:?}:8081:8080"
+    mem_limit: 450m
+    cpus: 0.4
+    pids_limit: 200
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health/live HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && head -n 1 <&3 | grep -q ' 200 '"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *registro
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

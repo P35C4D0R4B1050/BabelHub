@@ -1,0 +1,206 @@
+# VM-VENTAS (ARM, 1 OCPU y 6 GB): E-commerce, Redis (caché y contadores), n8n, Evolution API y un segundo conector de cloudflared (AD11).
+# Se levanta con un solo comando y sus secretos (PLA-04):
+#   BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.10 IMAGEN_ECOMMERCE=<imagen@sha256:…> \
+#   docker compose -f infra/docker-compose.ventas.yml up -d
+# Reglas de PLA-26 y PLA-27: ver docker-compose.inventario.yml. Los paneles de n8n y Evolution API solo se alcanzan por túnel SSH
+# (se publican en 127.0.0.1); Redis no se publica salvo el de contadores, por TLS y en la dirección privada, para la réplica de gestión.
+name: babelhub-ventas
+
+x-excepciones:
+  - servicio: evolution-api
+    regla: usuario-no-administrador
+    motivo: La imagen de terceros corre como administrador dentro del contenedor y escribe en /evolution/instances y en su caché de Node; no se verificó que arranque con otro usuario.
+    mitigacion: Sin capacidades (todas descartadas) ni posibilidad de ganarlas, sin modo privilegiado ni socket del motor, sin puertos publicados fuera de 127.0.0.1, red propia solo con Redis y la base técnica, límites de memoria y procesador, y el número de WhatsApp dedicado y descartable (B07). Se revisa al implementar transversal-notificaciones.
+  - servicio: evolution-api
+    regla: sistema-de-archivos-de-solo-lectura
+    motivo: Guarda las sesiones de WhatsApp y archivos temporales en rutas del contenedor que la imagen no separa en un volumen.
+    mitigacion: Volumen propio para /evolution/instances, el resto del contenedor sin datos de negocio, y la base de Evolution se descarta al restaurar y se vuelve a emparejar el número (plan §5.1 paso 6).
+
+x-registro: &registro
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  ecommerce:
+    image: ${IMAGEN_ECOMMERCE:?Define IMAGEN_ECOMMERCE con el digest de la imagen publicada}
+    user: "1654:1654"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+    env_file:
+      - "${BABELHUB_SECRETOS:?Define BABELHUB_SECRETOS con la carpeta de los secretos de esta VM}/ecommerce.env"
+    ports:
+      - "${IP_PRIVADA:?Define IP_PRIVADA con la dirección privada de esta VM}:8080:8080"
+    mem_limit: 600m
+    cpus: 0.6
+    pids_limit: 300
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health/live HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && head -n 1 <&3 | grep -q ' 200 '"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      redis:
+        condition: service_healthy
+      redis-contadores:
+        condition: service_healthy
+    logging: *registro
+    restart: unless-stopped
+
+  redis:
+    # Caché de disponibilidad y del catálogo, y datos de Evolution API: se puede perder y se expulsa lo menos usado (AD06).
+    image: redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
+    user: redis
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    env_file:
+      - "${BABELHUB_SECRETOS:?}/redis.env"
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_CACHE_PASSWORD\" --maxmemory 100mb --maxmemory-policy allkeys-lru --save \"\" --appendonly no"]
+    mem_limit: 128m
+    cpus: 0.1
+    pids_limit: 50
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_CACHE_PASSWORD\" redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging: *registro
+    restart: unless-stopped
+
+  redis-contadores:
+    # Instancia dedicada de los contadores de límites (transversal-seguridad D17): sin expulsión, con AOF, ACL y solo TLS.
+    image: redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
+    user: redis
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    env_file:
+      - "${BABELHUB_SECRETOS:?}/redis-contadores.env"
+    environment:
+      REDIS_TLS: "1"
+    command: ["sh", "/etc/redis-contadores/iniciar.sh"]
+    ports:
+      - "${IP_PRIVADA:?}:6380:6380"
+    volumes:
+      - ./redis-contadores:/etc/redis-contadores:ro
+      - redis-contadores-datos:/data
+    secrets:
+      - redis-contadores-cert.pem
+      - redis-contadores-key.pem
+      - redis-contadores-ca.pem
+    mem_limit: 100m
+    cpus: 0.1
+    pids_limit: 50
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --tls --cacert /run/secrets/redis-contadores-ca.pem -p 6380 ping 2>&1 | grep -qE 'PONG|NOAUTH|NOPERM'"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging: *registro
+    restart: unless-stopped
+
+  n8n:
+    image: n8nio/n8n:1.121.3@sha256:4f717fcf41f5ea596757173a60ce038707e4edf2c686e9934ae75cd5f5918d73
+    user: node
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    env_file:
+      - "${BABELHUB_SECRETOS:?}/n8n.env"
+    environment:
+      N8N_PORT: "5678"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+    ports:
+      - "127.0.0.1:5678:5678"
+    volumes:
+      - n8n-datos:/home/node/.n8n
+    mem_limit: 600m
+    cpus: 0.4
+    pids_limit: 200
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:5678/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    logging: *registro
+    restart: unless-stopped
+
+  evolution-api:
+    image: evoapicloud/evolution-api:v2.3.7@sha256:1bd8afc4a6cf48822e6cf02469aeae7bd35a12a6b616eacd1291926307f4d339
+    # Corre como administrador dentro del contenedor y con sistema de archivos escribible: ver x-excepciones.
+    user: root
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    env_file:
+      - "${BABELHUB_SECRETOS:?}/evolution.env"
+    ports:
+      - "127.0.0.1:8081:8080"
+    volumes:
+      - evolution-instancias:/evolution/instances
+    depends_on:
+      redis:
+        condition: service_healthy
+    mem_limit: 600m
+    cpus: 0.4
+    pids_limit: 200
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:8080',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    logging: *registro
+    restart: unless-stopped
+
+  cloudflared:
+    # Segundo conector del mismo túnel (el primero está en VM-BORDE): si cae VM-BORDE, la entrada sigue por aquí.
+    image: cloudflare/cloudflared:2025.11.1@sha256:89ee50efb1e9cb2ae30281a8a404fed95eb8f02f0a972617526f8c5b417acae2
+    user: "65532:65532"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    env_file:
+      - "${BABELHUB_SECRETOS:?}/cloudflared.env"
+    command: ["tunnel", "--no-autoupdate", "--metrics", "127.0.0.1:2000", "run"]
+    mem_limit: 64m
+    cpus: 0.05
+    pids_limit: 50
+    healthcheck:
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:2000", "ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    depends_on:
+      ecommerce:
+        condition: service_healthy
+    logging: *registro
+    restart: unless-stopped
+
+secrets:
+  redis-contadores-cert.pem:
+    file: ${BABELHUB_SECRETOS:?}/redis-contadores-cert.pem
+  redis-contadores-key.pem:
+    file: ${BABELHUB_SECRETOS:?}/redis-contadores-key.pem
+  redis-contadores-ca.pem:
+    file: ${BABELHUB_SECRETOS:?}/redis-contadores-ca.pem
+
+volumes:
+  redis-contadores-datos:
+  n8n-datos:
+  evolution-instancias:
