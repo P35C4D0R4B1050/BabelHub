@@ -19,7 +19,7 @@ internal sealed class NpgsqlRepositorioDeExistencias(AccesoAFuentes acceso) : IR
     private const string SentenciaDeMovimiento = """
         UPDATE fuentes.stock AS s
         SET fisico = s.fisico + @df, reservado = s.reservado + @dr, version = s.version + 1
-        FROM (SELECT fuente_id, edicion_id, fisico, reservado FROM fuentes.stock WHERE fuente_id = @f AND edicion_id = @e) AS a
+        FROM (SELECT fuente_id, edicion_id, fisico, reservado FROM fuentes.stock WHERE fuente_id = @f AND edicion_id = @e FOR UPDATE) AS a
         WHERE s.fuente_id = a.fuente_id AND s.edicion_id = a.edicion_id
           AND s.fisico::bigint + @df >= s.reservado::bigint + @dr
           AND s.reservado::bigint + @dr >= 0

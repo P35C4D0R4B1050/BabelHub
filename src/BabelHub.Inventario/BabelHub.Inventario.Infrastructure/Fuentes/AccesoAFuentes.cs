@@ -68,9 +68,17 @@ internal sealed class AccesoAFuentes(
         return resultado;
     }
 
+    private async Task<bool> HayAlcanceFijado(CancellationToken cancelacion)
+    {
+        await using var comando = new NpgsqlCommand("SELECT coalesce(current_setting('babelhub.alcance', true), '') <> ''", (NpgsqlConnection)conexion.Conexion, (NpgsqlTransaction)conexion.Transaccion);
+        return (bool)(await comando.ExecuteScalarAsync(cancelacion).ConfigureAwait(false))!;
+    }
+
     private async Task ExigirActor(CancellationToken cancelacion)
     {
-        if (actores.Actual is { Tipo: not TipoDeActor.Anonimo })
+        // Un actor con contexto Y un alcance de datos que la unidad de trabajo pudo fijar para él: un encargado sin sucursal o un rol desconocido tienen actor pero no alcance, y las políticas
+        // les devolverían cero filas sin error igual que a quien no tiene actor.
+        if (actores.Actual is { Tipo: not TipoDeActor.Anonimo } && await HayAlcanceFijado(cancelacion).ConfigureAwait(false))
         {
             return;
         }
@@ -84,7 +92,7 @@ internal sealed class AccesoAFuentes(
             // La alerta no debe tapar el rechazo: si ni siquiera se puede alertar, la operación igual falla cerrada.
         }
 
-        throw new ContextoDeActorAusenteException("Se intentó acceder al stock sin un actor: una ruta de servicio debe establecer el actor de integración y un trabajo de fondo, el del sistema.");
+        throw new ContextoDeActorAusenteException("Se intentó acceder al stock sin un actor con alcance de datos: una ruta de servicio debe establecer el actor de integración y un trabajo de fondo, el del sistema.");
     }
 }
 

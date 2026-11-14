@@ -394,6 +394,14 @@ public sealed class MigracionDeFuentesTests(PostgresDeFuentesFixture bd) : IClas
         Assert.Equal(0L, (long)(await cuenta.ExecuteScalarAsync())!);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-FUE-06")]
+    public void LaPoliticaUsaElMismoParametroYElMismoValorDeRedQueLaUnidadDeTrabajo()
+    {
+        // La definición lleva literales (la Infraestructura de un módulo no depende de la de Plataforma): si la unidad de trabajo cambiara el nombre o el valor, la política dejaría de coincidir.
+        Assert.Contains($"current_setting('{BabelHub.Inventario.Infrastructure.Plataforma.AlcanceDeDatosDelActor.Parametro}', true) = '{BabelHub.Inventario.Infrastructure.Plataforma.AlcanceDeDatosDelActor.Red}'", DefinicionDeFuentes.Sql, StringComparison.Ordinal);
+    }
+
     // --- el permiso mínimo de rol_fuentes ---
 
     [Fact]

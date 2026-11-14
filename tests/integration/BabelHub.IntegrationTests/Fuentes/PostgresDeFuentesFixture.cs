@@ -54,7 +54,7 @@ public sealed class PostgresDeFuentesFixture : IAsyncLifetime
         CadenaDeAcceso = new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString())
         {
             Username = "acceso",
-            Password = ClaveDeAcceso,
+            ["Password"] = ClaveDeAcceso,
             MaxPoolSize = 60,
         }.ConnectionString;
         Acceso = NpgsqlDataSource.Create(CadenaDeAcceso);

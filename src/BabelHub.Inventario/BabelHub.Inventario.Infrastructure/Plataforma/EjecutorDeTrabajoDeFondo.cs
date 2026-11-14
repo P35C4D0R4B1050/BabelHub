@@ -8,11 +8,17 @@ namespace BabelHub.Inventario.Infrastructure.Plataforma;
 /// Todo trabajo de fondo que toque el stock debe correr dentro de <see cref="Ejecutar{T}"/>; si algo lo llama sin actor, el acceso al stock falla a la vista y deja una alerta técnica. Al terminar (o fallar)
 /// deja el flujo sin actor, así el siguiente trabajo no hereda el anterior.
 /// </summary>
-public sealed class EjecutorDeTrabajoDeFondo(IEstablecedorDeActor actor)
+public sealed class EjecutorDeTrabajoDeFondo(IEstablecedorDeActor actor, IActorActual actores)
 {
     public async Task<T> Ejecutar<T>(Func<CancellationToken, Task<T>> trabajo, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(trabajo);
+
+        // Un trabajo de fondo no corre dentro de una solicitud: si ya hay un actor, pisarlo daría a un usuario el alcance del sistema.
+        if (actores.Actual is not null)
+        {
+            throw new InvalidOperationException("Un trabajo de fondo no puede ejecutarse con un actor ya establecido.");
+        }
 
         actor.Establecer(ActorActual.DelSistema());
         try

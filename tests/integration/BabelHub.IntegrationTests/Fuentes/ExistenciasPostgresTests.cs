@@ -373,6 +373,32 @@ public sealed class ExistenciasPostgresTests(PostgresDeFuentesFixture bd) : ICla
         Assert.Equal((5, 0), await bd.StockDe(lima, edicion));
     }
 
+    [Theory]
+    [Trait("Criterio", "AC-FUE-06")]
+    [InlineData("encargado-sin-sucursal")]
+    [InlineData("encargado-con-sucursal-vacia")]
+    [InlineData("rol-desconocido")]
+    public async Task UnActorQueNoResuelveAlcance_TampocoTocaElStock_FallaALaVistaYSeDetecta(string quien)
+    {
+        var lima = await bd.AgregarFuente("lima");
+        var edicion = await bd.AgregarEdicion();
+        await bd.PonerStock(lima, edicion, 5, 0);
+        var actor = quien switch
+        {
+            "encargado-sin-sucursal" => ActorActual.DeUsuario(Guid.NewGuid(), RolesDeUsuario.EncargadoDeSucursal),
+            "encargado-con-sucursal-vacia" => ActorActual.DeUsuario(Guid.NewGuid(), RolesDeUsuario.EncargadoDeSucursal, Guid.Empty),
+            _ => ActorActual.DeUsuario(Guid.NewGuid(), "auditor-externo", lima),
+        };
+        var pila = new PilaDeFuentes(bd, actor);
+
+        await Assert.ThrowsAsync<ContextoDeActorAusenteException>(() => EnTransaccion(pila, t => pila.Existencias.LeerDeLaFuente(lima, null, t)));
+        await Assert.ThrowsAsync<ContextoDeActorAusenteException>(() => EnTransaccion(pila, t => pila.Existencias.Leer([edicion], t)));
+        await Assert.ThrowsAsync<ContextoDeActorAusenteException>(() => EnTransaccion(pila, t => pila.Existencias.Aplicar(new MovimientoDeStock(lima, edicion, 0, 1), t)));
+
+        Assert.Equal(3, pila.Alertas.Alertas.Count);
+        Assert.Equal((5, 0), await bd.StockDe(lima, edicion));
+    }
+
     [Fact]
     [Trait("Criterio", "AC-FUE-06")]
     public async Task UnVisitante_NoTocaElStockNiSiquieraConLaElevacion_YSeDetecta()

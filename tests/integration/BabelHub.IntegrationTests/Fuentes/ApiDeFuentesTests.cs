@@ -308,6 +308,54 @@ public sealed class ApiDeFuentesTests(PostgresDeFuentesFixture bd) : IClassFixtu
         Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM fuentes.fuentes"));
     }
 
+    [Theory]
+    [Trait("Criterio", "AC-FUE-06")]
+    [InlineData("cliente", "POST", "/fuentes", "{")]
+    [InlineData("logistica", "PUT", "/fuentes-de-recepcion", "[]")]
+    [InlineData("cliente", "PUT", "/rutas/cusco/lima", "{\"dias\":2,\"extra\":1}")]
+    [InlineData("cliente", "PUT", "/ediciones/00000000-0000-4000-8000-000000000001", "{\"formato\":\"pdf\"}")]
+    public async Task UnCuerpoMalFormadoDeQuienNoTieneAlcance_RecibeProhibidoConSuEvento_NoUn400(string rol, string metodo, string ruta, string cuerpo)
+    {
+        var rolDeUsuario = rol == "cliente" ? RolesDeUsuario.Cliente : RolesDeUsuario.PersonalDeLogistica;
+
+        var sinAlcance = await _api.Enviar(new HttpMethod(metodo), R(ruta), ApiDeFuentesHost.CredencialDeUsuario, rolDeUsuario, cuerpo: ApiDeFuentesHost.Json(cuerpo));
+        var conAlcance = await Admin(new HttpMethod(metodo), ruta, cuerpo);
+
+        Assert.Equal(HttpStatusCode.Forbidden, sinAlcance.StatusCode);
+        Assert.Single(_api.Denegaciones.Registros);
+        Assert.Equal(HttpStatusCode.BadRequest, conAlcance.StatusCode);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-FUE-06")]
+    public async Task UnParametroMalFormadoDeQuienNoTieneAlcance_RecibeProhibido_NoUn400()
+    {
+        await bd.AgregarFuente("cusco");
+
+        var respuesta = await _api.Enviar(HttpMethod.Get, R("/fuentes/cusco/existencias?tamano=abc"), ApiDeFuentesHost.CredencialDeUsuario, RolesDeUsuario.Cliente);
+
+        Assert.Equal(HttpStatusCode.Forbidden, respuesta.StatusCode);
+        Assert.Single(_api.Denegaciones.Registros);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-FUE-06")]
+    public async Task ElEjecutorDeTrabajosDeFondo_NoPisaUnActorExistente_YLimpiaAlTerminar()
+    {
+        await using var ambito = _api.Servicios.CreateAsyncScope();
+        var ejecutor = ambito.ServiceProvider.GetRequiredService<EjecutorDeTrabajoDeFondo>();
+        var actores = ambito.ServiceProvider.GetRequiredService<IActorActual>();
+        var establecedor = ambito.ServiceProvider.GetRequiredService<IEstablecedorDeActor>();
+
+        var visto = await ejecutor.Ejecutar(_ => Task.FromResult(actores.Actual!.Tipo));
+        Assert.Equal(BabelHub.Inventario.Application.Plataforma.TipoDeActor.Sistema, visto);
+        Assert.Null(actores.Actual);
+
+        establecedor.Establecer(ActorActual.DeUsuario(Guid.NewGuid(), RolesDeUsuario.Cliente));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => ejecutor.Ejecutar(_ => Task.FromResult(0)));
+        establecedor.Limpiar();
+    }
+
     [Fact]
     [Trait("Criterio", "AC-FUE-13")]
     public async Task LaAuditoriaCaida_NoDejaPasarLaOperacion_Responde503YNoQuedaNingunaFuente()
@@ -485,6 +533,7 @@ public sealed class ApiDeFuentesTests(PostgresDeFuentesFixture bd) : IClassFixtu
     }
 
     [Fact]
+    [Trait("Criterio", "AC-FUE-14")]
     [Trait("Criterio", "AC-FUE-11")]
     public async Task Rutas_SeDefinenSeConsultanYSeListan_ConSuPlazoOSinDefinir()
     {

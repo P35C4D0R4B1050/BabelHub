@@ -23,6 +23,9 @@ public static class EndpointsDeFuentes
         ArgumentNullException.ThrowIfNull(rutas);
         var api = rutas.MapGroup(RutasDeServicio.Inventario);
 
+        // Los cuerpos son pequeños (la consulta de varias ediciones, la más grande, no llega a 4 KB): tope propio en lugar del de 30 MB por defecto.
+        api.WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(16 * 1024));
+
         // La auditoría caída no deja pasar la operación (AUD-04, la transacción ya revirtió) y se responde «servicio no disponible» (AC-AUD-03), no un error inesperado.
         api.AddEndpointFilter(async (contexto, siguiente) =>
         {
@@ -89,7 +92,7 @@ public static class EndpointsDeFuentes
         var (cuerpo, clave) = await CuerpoEstricto.Leer<ConsultaDeDisponibilidadDto>(c).ConfigureAwait(false);
         if (cuerpo is null)
         {
-            return await ErroresDeFuentes.Validacion(c, e, "cuerpo", clave!).ConfigureAwait(false);
+            return await AutorizarAntes(caso, new ConsultarDisponibilidadEntrada([]), c, e, "cuerpo", clave!).ConfigureAwait(false);
         }
 
         var resultado = await caso.Ejecutar(new ConsultarDisponibilidadEntrada(cuerpo.EdicionIds ?? []), c.RequestAborted).ConfigureAwait(false);
@@ -147,7 +150,7 @@ public static class EndpointsDeFuentes
         {
             if (!Guid.TryParse(texto, out var id))
             {
-                return await ErroresDeFuentes.Validacion(c, e, "edicionId", "formato-invalido").ConfigureAwait(false);
+                return await AutorizarAntes(caso, new ConsultarExistenciasDeSucursalEntrada(codigo, null, null, 0, 0), c, e, "edicionId", "formato-invalido").ConfigureAwait(false);
             }
 
             ediciones.Add(id);
@@ -165,18 +168,18 @@ public static class EndpointsDeFuentes
             };
             if (estado is null)
             {
-                return await ErroresDeFuentes.Validacion(c, e, "estado", "formato-invalido").ConfigureAwait(false);
+                return await AutorizarAntes(caso, new ConsultarExistenciasDeSucursalEntrada(codigo, null, null, 0, 0), c, e, "estado", "formato-invalido").ConfigureAwait(false);
             }
         }
 
         if (!Entero(consulta["pagina"], 1, out var pagina))
         {
-            return await ErroresDeFuentes.Validacion(c, e, "pagina", "no-es-numero").ConfigureAwait(false);
+            return await AutorizarAntes(caso, new ConsultarExistenciasDeSucursalEntrada(codigo, null, null, 0, 0), c, e, "pagina", "no-es-numero").ConfigureAwait(false);
         }
 
         if (!Entero(consulta["tamano"], TamanoPorDefecto, out var tamano))
         {
-            return await ErroresDeFuentes.Validacion(c, e, "tamano", "no-es-numero").ConfigureAwait(false);
+            return await AutorizarAntes(caso, new ConsultarExistenciasDeSucursalEntrada(codigo, null, null, 0, 0), c, e, "tamano", "no-es-numero").ConfigureAwait(false);
         }
 
         var resultado = await caso.Ejecutar(new ConsultarExistenciasDeSucursalEntrada(codigo, ediciones.Count == 0 ? null : ediciones, estado, pagina, tamano), c.RequestAborted).ConfigureAwait(false);
@@ -214,7 +217,7 @@ public static class EndpointsDeFuentes
         var codigos = c.Request.Query["codigoDeFuente"];
         if (codigos.Count > 1)
         {
-            return await ErroresDeFuentes.Validacion(c, e, "codigoDeFuente", "formato-invalido").ConfigureAwait(false);
+            return await AutorizarAntes(caso, new ConsultarUnidadesVendidasEntrada(string.Empty), c, e, "codigoDeFuente", "formato-invalido").ConfigureAwait(false);
         }
 
         var resultado = await caso.Ejecutar(new ConsultarUnidadesVendidasEntrada(codigos.Count == 1 ? codigos[0] : null), c.RequestAborted).ConfigureAwait(false);
@@ -233,7 +236,7 @@ public static class EndpointsDeFuentes
         var (cuerpo, clave) = await CuerpoEstricto.Leer<RegistrarEdicionDto>(c).ConfigureAwait(false);
         if (cuerpo is null)
         {
-            return await ErroresDeFuentes.Validacion(c, e, "cuerpo", clave!).ConfigureAwait(false);
+            return await AutorizarAntes(caso, new RegistrarFichaDeEdicionEntrada(Guid.Empty, default), c, e, "cuerpo", clave!).ConfigureAwait(false);
         }
 
         FormatoDeEdicionRegistrado? formato = cuerpo.Formato switch
@@ -244,7 +247,7 @@ public static class EndpointsDeFuentes
         };
         if (formato is null)
         {
-            return await ErroresDeFuentes.Validacion(c, e, "formato", "formato-invalido").ConfigureAwait(false);
+            return await AutorizarAntes(caso, new RegistrarFichaDeEdicionEntrada(Guid.Empty, default), c, e, "formato", "formato-invalido").ConfigureAwait(false);
         }
 
         var resultado = await caso.Ejecutar(new RegistrarFichaDeEdicionEntrada(edicionId, formato.Value), c.RequestAborted).ConfigureAwait(false);
@@ -256,7 +259,7 @@ public static class EndpointsDeFuentes
         var (cuerpo, clave) = await CuerpoEstricto.Leer<RegistrarFuenteDto>(c).ConfigureAwait(false);
         if (cuerpo is null)
         {
-            return await ErroresDeFuentes.Validacion(c, e, "cuerpo", clave!).ConfigureAwait(false);
+            return await AutorizarAntes(caso, new RegistrarFuenteEntrada(string.Empty, string.Empty, string.Empty, null), c, e, "cuerpo", clave!).ConfigureAwait(false);
         }
 
         var resultado = await caso.Ejecutar(new RegistrarFuenteEntrada(cuerpo.Codigo, cuerpo.Nombre, cuerpo.Region, cuerpo.ContactoDeNotificacion), c.RequestAborted).ConfigureAwait(false);
@@ -270,7 +273,7 @@ public static class EndpointsDeFuentes
         var (cuerpo, clave) = await CuerpoEstricto.Leer<EditarFuenteDto>(c).ConfigureAwait(false);
         if (cuerpo is null)
         {
-            return await ErroresDeFuentes.Validacion(c, e, "cuerpo", clave!).ConfigureAwait(false);
+            return await AutorizarAntes(caso, new EditarFuenteEntrada(string.Empty, string.Empty, string.Empty, null), c, e, "cuerpo", clave!).ConfigureAwait(false);
         }
 
         var resultado = await caso.Ejecutar(new EditarFuenteEntrada(codigo, cuerpo.Nombre, cuerpo.Region, cuerpo.ContactoDeNotificacion), c.RequestAborted).ConfigureAwait(false);
@@ -282,7 +285,7 @@ public static class EndpointsDeFuentes
         var (cuerpo, clave) = await CuerpoEstricto.Leer<DesignarRecepcionDto>(c).ConfigureAwait(false);
         if (cuerpo is null)
         {
-            return await ErroresDeFuentes.Validacion(c, e, "cuerpo", clave!).ConfigureAwait(false);
+            return await AutorizarAntes(caso, new DesignarFuenteDeRecepcionEntrada(string.Empty), c, e, "cuerpo", clave!).ConfigureAwait(false);
         }
 
         var resultado = await caso.Ejecutar(new DesignarFuenteDeRecepcionEntrada(cuerpo.Codigo), c.RequestAborted).ConfigureAwait(false);
@@ -294,13 +297,25 @@ public static class EndpointsDeFuentes
         var (cuerpo, clave) = await CuerpoEstricto.Leer<DefinirRutaDto>(c).ConfigureAwait(false);
         if (cuerpo is null)
         {
-            return await ErroresDeFuentes.Validacion(c, e, "cuerpo", clave!).ConfigureAwait(false);
+            return await AutorizarAntes(caso, new RegistrarRutaEntrada(string.Empty, string.Empty, 0), c, e, "cuerpo", clave!).ConfigureAwait(false);
         }
 
         var resultado = await caso.Ejecutar(new RegistrarRutaEntrada(origen, destino, cuerpo.Dias), c.RequestAborted).ConfigureAwait(false);
         return resultado.EsExito
             ? Results.Json(new RutaDto(resultado.Valor.CodigoDeOrigen, resultado.Valor.CodigoDeDestino, resultado.Valor.Dias))
             : await ErroresDeFuentes.Falla(c, e, resultado.Error!).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Un cuerpo o un parámetro mal formado no se responde con 400 antes de autorizar: se pasa a la Aplicación una entrada que su validación rechaza, de modo que quien no tiene alcance recibe su 403 con el evento de acceso
+    /// denegado (alcance primero, AGENTS §5, AC-FUE-06) y solo quien sí lo tiene recibe el 400 de forma. La entrada inválida nunca llega a leer ni a escribir nada.
+    /// </summary>
+    private static async Task<IResult> AutorizarAntes<TEntrada, TSalida>(ICasoDeUso<TEntrada, TSalida> caso, TEntrada entradaInvalida, HttpContext c, OpcionesDeErrores e, string campo, string clave)
+    {
+        var resultado = await caso.Ejecutar(entradaInvalida, c.RequestAborted).ConfigureAwait(false);
+        return resultado.Error is { Categoria: CategoriaDeError.Prohibido or CategoriaDeError.NoAutenticado }
+            ? await ErroresDeFuentes.Falla(c, e, resultado.Error).ConfigureAwait(false)
+            : await ErroresDeFuentes.Validacion(c, e, campo, clave).ConfigureAwait(false);
     }
 
     // ---------- traducciones ----------

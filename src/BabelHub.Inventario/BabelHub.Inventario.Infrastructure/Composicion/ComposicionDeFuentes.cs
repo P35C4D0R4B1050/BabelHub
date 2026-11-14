@@ -40,7 +40,7 @@ public static class ComposicionDeFuentes
         servicios.TryAddSingleton<ILecturaCoherente>(sp => sp.GetRequiredService<UnidadDeTrabajoPostgres>());
         servicios.TryAddSingleton<IBloqueosAsesores>(sp => new NpgsqlBloqueosAsesores(sp.GetRequiredService<IConexionDeLaUnidadDeTrabajo>(), bloqueos));
 
-        servicios.TryAddSingleton<EjecutorDeTrabajoDeFondo>(sp => new EjecutorDeTrabajoDeFondo(sp.GetRequiredService<IEstablecedorDeActor>()));
+        servicios.TryAddSingleton<EjecutorDeTrabajoDeFondo>(sp => new EjecutorDeTrabajoDeFondo(sp.GetRequiredService<IEstablecedorDeActor>(), sp.GetRequiredService<IActorActual>()));
 
         // Repositorios y piezas del contrato público.
         servicios.AgregarAccesoAFuentes();

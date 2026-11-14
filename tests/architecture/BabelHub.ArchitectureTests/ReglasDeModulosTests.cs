@@ -69,7 +69,7 @@ public class ReglasDeModulosTests
             .ToArray();
 
         return Types.InAssembly(ensamblado)
-            .That().ResideInNamespace($"{servicio}.{capa}.{modulo}")
+            .That().ResideInNamespaceStartingWith($"{servicio}.{capa}.{modulo}")
             .ShouldNot().HaveDependencyOnAny(prohibidos)
             .GetResult();
     }

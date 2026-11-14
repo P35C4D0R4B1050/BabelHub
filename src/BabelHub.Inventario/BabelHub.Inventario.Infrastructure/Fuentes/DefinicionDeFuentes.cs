@@ -1,4 +1,3 @@
-using BabelHub.Inventario.Infrastructure.Plataforma;
 
 namespace BabelHub.Inventario.Infrastructure.Fuentes;
 
@@ -34,8 +33,11 @@ public static class DefinicionDeFuentes
         $rol$;
         """;
 
-    /// <summary>Esquema, tablas, restricciones, índices y política de filas (idempotente).</summary>
-    public const string Sql = $$"""
+    /// <summary>
+    /// Esquema, tablas, restricciones, índices y política de filas (idempotente). El parámetro <c>babelhub.alcance</c> y el valor <c>red</c> van como literales (la Infraestructura de un módulo no depende de la de
+    /// <c>Plataforma</c>, regla 13); una prueba comprueba que coinciden con <c>AlcanceDeDatosDelActor</c>.
+    /// </summary>
+    public const string Sql = """
         CREATE SCHEMA IF NOT EXISTS fuentes;
 
         CREATE TABLE IF NOT EXISTS fuentes.fuentes (
@@ -90,11 +92,11 @@ public static class DefinicionDeFuentes
         DROP POLICY IF EXISTS por_alcance ON fuentes.stock;
         CREATE POLICY por_alcance ON fuentes.stock FOR ALL
             USING (
-                current_setting('{{AlcanceDeDatosDelActor.Parametro}}', true) = '{{AlcanceDeDatosDelActor.Red}}'
-                OR current_setting('{{AlcanceDeDatosDelActor.Parametro}}', true) = fuente_id::text)
+                current_setting('babelhub.alcance', true) = 'red'
+                OR current_setting('babelhub.alcance', true) = fuente_id::text)
             WITH CHECK (
-                current_setting('{{AlcanceDeDatosDelActor.Parametro}}', true) = '{{AlcanceDeDatosDelActor.Red}}'
-                OR current_setting('{{AlcanceDeDatosDelActor.Parametro}}', true) = fuente_id::text);
+                current_setting('babelhub.alcance', true) = 'red'
+                OR current_setting('babelhub.alcance', true) = fuente_id::text);
         """;
 
     /// <summary>

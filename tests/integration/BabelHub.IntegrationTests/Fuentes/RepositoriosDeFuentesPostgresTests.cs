@@ -315,6 +315,7 @@ public sealed class RepositoriosDeFuentesPostgresTests(PostgresDeFuentesFixture 
     }
 
     [Fact]
+    [Trait("Criterio", "AC-FUE-15")]
     [Trait("Criterio", "AC-FUE-07")]
     public async Task Existencias_FiltraPorEdicionYEstado_ConLosEstadosSinStockBajoYNormal_YPagina()
     {
