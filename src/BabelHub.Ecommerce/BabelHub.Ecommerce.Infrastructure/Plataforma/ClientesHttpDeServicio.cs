@@ -94,7 +94,16 @@ public sealed class OpcionesDeCredencialesDeSalida
 /// el llamador hubiera puesto, de modo que una cabecera enviada por un cliente no llega al otro servicio (SEG-15, SEG-17). Una llamada
 /// que no declara su alcance no sale.
 /// </summary>
-public sealed class CredencialesDeSalidaHandler(OpcionesDeCredencialesDeSalida credenciales, IOrigenDeSolicitud origenes) : DelegatingHandler
+/// <remarks>
+/// <b>El token del usuario sale de la sesión</b> (<c>web-base</c> T14, D13): cuando el servicio registra un <see cref="ITokenDelUsuarioDeLaSesion"/>
+/// (el E-commerce, desde la sesión de la solicitud) este manejador es el <b>único</b> que lo consume y el token que un llamador ponga en las opciones se
+/// ignora; una operación de usuario sin sesión o sin credencial utilizable no sale. Sin ese puerto (pruebas y servicios sin sesión) vale el token de las
+/// opciones. En ningún caso se registra el token.
+/// </remarks>
+public sealed class CredencialesDeSalidaHandler(
+    OpcionesDeCredencialesDeSalida credenciales,
+    IOrigenDeSolicitud origenes,
+    ITokenDelUsuarioDeLaSesion? tokenDeLaSesion = null) : DelegatingHandler
 {
     public const string CabeceraDeCredencial = "X-Credencial-De-Servicio";
     public const string CabeceraDeCredencialDeOrigen = "X-Credencial-De-Origen";
@@ -115,7 +124,7 @@ public sealed class CredencialesDeSalidaHandler(OpcionesDeCredencialesDeSalida c
         "Authorization",
     ];
 
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -133,7 +142,8 @@ public sealed class CredencialesDeSalidaHandler(OpcionesDeCredencialesDeSalida c
 
         if (alcance == AlcanceDeServicio.OperacionDeUsuario)
         {
-            if (!request.Options.TryGetValue(OpcionesDeLaSolicitudDeServicio.TokenDeUsuario, out var token) || string.IsNullOrWhiteSpace(token))
+            var token = await TokenDelUsuario(request, cancellationToken).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(token))
             {
                 throw new InvalidOperationException("Una operación de usuario lleva el token del usuario en cuyo nombre se llama.");
             }
@@ -148,7 +158,17 @@ public sealed class CredencialesDeSalidaHandler(OpcionesDeCredencialesDeSalida c
             request.Headers.TryAddWithoutValidation(CabeceraDeCredencialDeOrigen, credenciales.Secreto(AlcanceDeServicio.OrigenReenviado));
         }
 
-        return base.SendAsync(request, cancellationToken);
+        return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<string?> TokenDelUsuario(HttpRequestMessage request, CancellationToken cancelacion)
+    {
+        if (tokenDeLaSesion is not null)
+        {
+            return (await tokenDeLaSesion.Actual(cancelacion).ConfigureAwait(false))?.Revelar();
+        }
+
+        return request.Options.TryGetValue(OpcionesDeLaSolicitudDeServicio.TokenDeUsuario, out var token) ? token : null;
     }
 }
 
