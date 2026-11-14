@@ -71,7 +71,7 @@ public sealed class ContratoDeRegistroTests
         {
             Actor = actor ?? ActorDePrueba.DeAdministradorCentral();
             Constructor = new ConstructorDeRegistros(
-                ServicioDeOrigen.Inventario,
+                ServicioDeOrigen.Ecommerce,
                 new CatalogoDeAcciones([CambioDePrecio, AccesoDenegado, CambioDeRol, IngresoFallidoAislado]),
                 Reloj,
                 Actor,
@@ -120,7 +120,7 @@ public sealed class ContratoDeRegistroTests
 
         var registro = Assert.Single(entorno.Almacen.Registros);
         Assert.Equal("CambioDePrecio", registro.Accion);
-        Assert.Equal(ServicioDeOrigen.Inventario, registro.Servicio);
+        Assert.Equal(ServicioDeOrigen.Ecommerce, registro.Servicio);
         Assert.Equal(TipoDeRegistro.Auditoria, registro.Tipo);
         Assert.Equal(Ahora, registro.InstanteUtc);
         Assert.Equal(TimeSpan.Zero, registro.InstanteUtc.Offset);
@@ -362,7 +362,10 @@ public sealed class ContratoDeRegistroTests
         var entorno = new Entorno();
         entorno.Almacen.Falla = new OperationCanceledException();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => entorno.Auditoria.Registrar(Precio()));
+        using var cancelada = new CancellationTokenSource();
+        await cancelada.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => entorno.Auditoria.Registrar(Precio(), cancelada.Token));
     }
 
     [Theory]

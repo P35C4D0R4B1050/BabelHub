@@ -67,7 +67,7 @@ public sealed class DenegacionDeAccesoTests
 
         /// <summary>Una solicitud nueva: su propio contexto, con su propia correlación y su propia bandera.</summary>
         public IDenegacionDeAcceso Solicitud() =>
-            new DenegacionDeAccesoDeAplicacion(Constructor, new ContextoDeDenegacion(), new PlantillasFijas(Plantillas), Escritor, Alertas, Reloj);
+            new DenegacionDeAccesoDeAplicacion(Constructor, new ContextoDeDenegacion(), new ResolutorDeRutas(new PlantillasFijas(Plantillas)), Escritor, Alertas, Reloj);
     }
 
     [Fact]

@@ -42,7 +42,20 @@ public sealed class PuertosDeOtrosModulosTests
     {
         public List<RegistroAuditado> Registros { get; } = [];
 
+        public List<RegistroAuditado> RegistrosAislandoElFallo { get; } = [];
+
         public Exception? Falla { get; set; }
+
+        public Task InsertarAislandoElFallo(RegistroAuditado registro, CancellationToken cancelacion = default)
+        {
+            if (Falla is not null)
+            {
+                return Task.FromException(Falla);
+            }
+
+            RegistrosAislandoElFallo.Add(registro);
+            return Task.CompletedTask;
+        }
 
         public Task Insertar(RegistroAuditado registro, CancellationToken cancelacion = default)
         {
@@ -115,7 +128,7 @@ public sealed class PuertosDeOtrosModulosTests
             reloj,
             ActorDePrueba.Anonimo(),
             new OrigenFijo(OrigenDeSolicitud.Desconocido));
-        var seguridad = new RegistroDeSeguridadDeAplicacion(constructor, new EnrutadorDeRegistros(propio, aislado), alertas, reloj);
+        var seguridad = new RegistroDeSeguridadDeAplicacion(constructor, new EnrutadorDeEventosDeSeguridad(propio, aislado), alertas, reloj);
 
         await seguridad.Registrar(new SolicitudDeRegistro(new AccionAuditable("IngresoFallido", aislada: true)) { Motivo = "credenciales-invalidas", Resultado = ResultadoAuditado.Rechazado });
 
@@ -165,5 +178,62 @@ public sealed class PuertosDeOtrosModulosTests
         Assert.Equal(cuenta, new DestinatarioDeAlerta(cuenta).CuentaId);
         Assert.Throws<ArgumentException>(() => new DestinatarioDeAlerta(Guid.Empty));
         Assert.DoesNotContain(typeof(DestinatarioDeAlerta).GetProperties(), p => p.PropertyType == typeof(string));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-03")]
+    public async Task Un_evento_de_seguridad_de_Identidad_se_escribe_aislando_el_fallo_y_uno_que_concede_en_la_transaccion()
+    {
+        var aislado = new AlmacenAisladoEspia();
+        var propio = new AlmacenDeRegistrosEnMemoria();
+        var eventos = new EnrutadorDeEventosDeSeguridad(propio, aislado);
+        var auditoria = new EnrutadorDeRegistros(propio, aislado);
+        var constructor = Constructor(ActorDePrueba.Anonimo());
+        var bloqueo = constructor.Construir(
+            new SolicitudDeRegistro(new AccionAuditable("BloqueoTemporalAplicado", aislada: true)) { Motivo = "intentos-excedidos", Resultado = ResultadoAuditado.Rechazado },
+            Catalogo.Obtener("BloqueoTemporalAplicado"));
+        var contrasena = constructor.Construir(
+            new SolicitudDeRegistro(new AccionAuditable("ContrasenaCambiada", aislada: true)) { Motivo = "cambio-por-el-titular" },
+            Catalogo.Obtener("ContrasenaCambiada"));
+
+        await eventos.Insertar(bloqueo);
+        await auditoria.Insertar(contrasena);
+
+        Assert.Equal(["BloqueoTemporalAplicado"], aislado.AislandoElFallo);
+        Assert.Equal(["ContrasenaCambiada"], aislado.EnLaTransaccion);
+    }
+
+    [Fact]
+    public void El_cliente_del_Inventario_distingue_una_respuesta_rechazada_de_un_servicio_no_disponible()
+    {
+        Assert.Equal(EstadoDeRespuestaDelInventario.Rechazada, RespuestaDelInventario<string>.Rechazada.Estado);
+        Assert.Equal(EstadoDeRespuestaDelInventario.NoDisponible, RespuestaDelInventario<string>.NoDisponible.Estado);
+        Assert.False(RespuestaDelInventario<string>.Rechazada.Disponible);
+        Assert.Throws<InvalidOperationException>(() => RespuestaDelInventario<string>.Rechazada.Valor);
+        Assert.Equal("x", RespuestaDelInventario<string>.ConValor("x").Valor);
+    }
+
+    private static readonly CatalogoDeAcciones Catalogo = CatalogoDeAccionesDeAuditoria.Crear();
+
+    private static ConstructorDeRegistros Constructor(ActorDePrueba actor) =>
+        new(ServicioDeOrigen.Ecommerce, Catalogo, new RelojFijo(Ahora), actor, new OrigenFijo(OrigenDeSolicitud.Desconocido));
+
+    private sealed class AlmacenAisladoEspia : IAlmacenDeRegistrosAislados
+    {
+        public List<string> EnLaTransaccion { get; } = [];
+
+        public List<string> AislandoElFallo { get; } = [];
+
+        public Task Insertar(RegistroAuditado registro, CancellationToken cancelacion = default)
+        {
+            EnLaTransaccion.Add(registro.Accion);
+            return Task.CompletedTask;
+        }
+
+        public Task InsertarAislandoElFallo(RegistroAuditado registro, CancellationToken cancelacion = default)
+        {
+            AislandoElFallo.Add(registro.Accion);
+            return Task.CompletedTask;
+        }
     }
 }

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using BabelHub.Inventario.Application.Plataforma;
 
 namespace BabelHub.Inventario.Application.Auditoria;
@@ -27,7 +28,24 @@ public sealed record RegistroAuditado
     /// <summary>El tope del detalle serializado (AUD-24).</summary>
     public const int MaximoDeCaracteresDelDetalle = 1000;
 
+    private static readonly TimeSpan Espera = TimeSpan.FromSeconds(1);
+    private static readonly Regex FormatoDeAccion = new(@"^[A-Z][A-Za-z0-9]{2,63}\z", RegexOptions.CultureInvariant, Espera);
+    private static readonly Regex FormatoDeCodigo = new(@"^[a-z][a-z0-9-]{1,63}\z", RegexOptions.CultureInvariant, Espera);
+    private static readonly Regex FormatoDeTipo = new(@"^[a-z][a-z0-9-]{0,39}\z", RegexOptions.CultureInvariant, Espera);
+    private static readonly Regex FormatoDeIdentificador = new(@"^[A-Za-z0-9:_.-]{1,64}\z", RegexOptions.CultureInvariant, Espera);
+    private static readonly Regex FormatoDeSucursal = new(@"^[A-Za-z0-9_-]{1,64}\z", RegexOptions.CultureInvariant, Espera);
+    private static readonly Regex FormatoDeOrigen = new(@"^[A-Za-z0-9:._-]{1,64}\z", RegexOptions.CultureInvariant, Espera);
+    private static readonly Regex FormatoDeCorrelacion = new(@"^[A-Za-z0-9_-]{8,64}\z", RegexOptions.CultureInvariant, Espera);
+    private static readonly Regex FormatoDeRuta = new(@"^(?:sin-coincidencia|/[A-Za-z0-9._{}/-]{0,198})\z", RegexOptions.CultureInvariant, Espera);
+
     private readonly IReadOnlyList<string> _clavesPersonales = [];
+
+    /// <summary>
+    /// Los campos de texto tienen su formato aunque el registro llegue de otro módulo (Identidad escribe el almacén aislado con este modelo): un valor que
+    /// no lo cumple se rechaza en vez de guardarse (AUD-06).
+    /// </summary>
+    private static string? Validar(string? valor, Regex formato, string campo) =>
+        valor is null || formato.IsMatch(valor) ? valor : throw new ArgumentException($"{campo} no tiene el formato permitido.", campo);
 
     public RegistroAuditado(
         Guid id,
@@ -45,9 +63,14 @@ public sealed record RegistroAuditado
             throw new ArgumentException("El registro necesita su identificador.", nameof(id));
         }
 
-        if (string.IsNullOrWhiteSpace(accion))
+        if (string.IsNullOrEmpty(accion) || !FormatoDeAccion.IsMatch(accion))
         {
-            throw new ArgumentException("El registro necesita su acción.", nameof(accion));
+            throw new ArgumentException("La acción es un identificador del catálogo (empieza con mayúscula, solo letras y dígitos).", nameof(accion));
+        }
+
+        if (actorRol is not null && !FormatoDeCodigo.IsMatch(actorRol))
+        {
+            throw new ArgumentException("El rol es un código (minúsculas, dígitos y guiones).", nameof(actorRol));
         }
 
         if (instanteUtc.Offset != TimeSpan.Zero)
@@ -90,21 +113,21 @@ public sealed record RegistroAuditado
 
     public ResultadoAuditado Resultado { get; }
 
-    public string? ObjetoTipo { get; init; }
+    public string? ObjetoTipo { get; init => field = Validar(value, FormatoDeTipo, nameof(ObjetoTipo)); }
 
-    public string? ObjetoId { get; init; }
+    public string? ObjetoId { get; init => field = Validar(value, FormatoDeIdentificador, nameof(ObjetoId)); }
 
-    public string? SucursalOrigen { get; init; }
+    public string? SucursalOrigen { get; init => field = Validar(value, FormatoDeSucursal, nameof(SucursalOrigen)); }
 
-    public string? SucursalDestino { get; init; }
+    public string? SucursalDestino { get; init => field = Validar(value, FormatoDeSucursal, nameof(SucursalDestino)); }
 
     /// <summary>Un código del catálogo de la acción; nunca el texto de la solicitud.</summary>
-    public string? Motivo { get; init; }
+    public string? Motivo { get; init => field = Validar(value, FormatoDeCodigo, nameof(Motivo)); }
 
-    public string? Origen { get; init; }
+    public string? Origen { get; init => field = Validar(value, FormatoDeOrigen, nameof(Origen)); }
 
     /// <summary>La plantilla de la ruta (o «sin-coincidencia»); nunca la ruta cruda.</summary>
-    public string? Ruta { get; init; }
+    public string? Ruta { get; init => field = Validar(value, FormatoDeRuta, nameof(Ruta)); }
 
     /// <summary>El detalle serializado (un objeto JSON de texto a texto), de como máximo <see cref="MaximoDeCaracteresDelDetalle"/> caracteres. Se codifica al mostrarlo.</summary>
     public string? Detalle
@@ -130,7 +153,7 @@ public sealed record RegistroAuditado
 
     public bool Truncado { get; init; }
 
-    public string? Correlacion { get; init; }
+    public string? Correlacion { get; init => field = Validar(value, FormatoDeCorrelacion, nameof(Correlacion)); }
 
     public DateTimeOffset? AnonimizadoEn { get; init; }
 }

@@ -22,7 +22,7 @@ public sealed class EventosDeAvisosYOrigenReenviadoTests
     {
         public Entorno(ActorDePrueba actor)
         {
-            var constructor = new ConstructorDeRegistros(ServicioDeOrigen.Inventario, Catalogo, new RelojFijo(Ahora), actor, new OrigenFijo(OrigenDeSolicitud.Desconocido));
+            var constructor = new ConstructorDeRegistros(ServicioDeOrigen.Ecommerce, Catalogo, new RelojFijo(Ahora), actor, new OrigenFijo(OrigenDeSolicitud.Desconocido));
             Seguridad = new RegistroDeSeguridadDeAplicacion(constructor, Almacen, Alertas, new RelojFijo(Ahora));
         }
 

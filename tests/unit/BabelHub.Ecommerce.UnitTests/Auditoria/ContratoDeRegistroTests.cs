@@ -362,7 +362,10 @@ public sealed class ContratoDeRegistroTests
         var entorno = new Entorno();
         entorno.Almacen.Falla = new OperationCanceledException();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => entorno.Auditoria.Registrar(Precio()));
+        using var cancelada = new CancellationTokenSource();
+        await cancelada.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => entorno.Auditoria.Registrar(Precio(), cancelada.Token));
     }
 
     [Theory]

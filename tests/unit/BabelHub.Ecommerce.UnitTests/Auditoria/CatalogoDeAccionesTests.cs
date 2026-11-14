@@ -65,7 +65,7 @@ public sealed class CatalogoDeAccionesTests
         }
     }
 
-    private static string ValorDePrueba(ClaveDeDetalle clave) => clave.Personal ? "Ana Perez" : "valor-" + clave.Nombre;
+    private static string ValorDePrueba(ClaveDeDetalle clave) => clave.Personal ? "Ana Perez" : clave.Valores?.First() ?? "dato";
 
     // ---------- Contrato de todo el catálogo ----------
 
@@ -110,7 +110,7 @@ public sealed class CatalogoDeAccionesTests
         var motivo = accion.ExigeMotivo ? accion.Motivos[0] : null;
         var constante = Constantes().Single(c => c.Identificador == identificador);
 
-        await entorno.Registrar(constante, detalle, motivo, "objeto", "obj-1", Guid.NewGuid(), accion.Tipo == TipoDeRegistro.Auditoria ? Guid.NewGuid() : null);
+        await entorno.Registrar(constante, detalle, motivo, accion.TiposDeObjeto!.FirstOrDefault(), accion.TiposDeObjeto!.Count > 0 ? "obj-1" : null, Guid.NewGuid(), accion.Tipo == TipoDeRegistro.Auditoria ? Guid.NewGuid() : null);
 
         var registro = Assert.Single(entorno.Almacen.Registros);
         Assert.Equal(identificador, registro.Accion);
@@ -390,7 +390,7 @@ public sealed class CatalogoDeAccionesTests
         var ayacucho = Guid.NewGuid();
 
         await entorno.Registrar(
-            AccionesAuditables.EstadoDeTrasladoCambiado,
+            AccionesAuditables.TrasladoRechazado,
             new Dictionary<string, string?> { ["estadoAnterior"] = "solicitado", ["estadoNuevo"] = "rechazado" },
             objetoTipo: "traslado",
             objetoId: "tr-9",
@@ -409,7 +409,7 @@ public sealed class CatalogoDeAccionesTests
     {
         var entorno = new Entorno(ActorDePrueba.DeEncargadoDe(Guid.NewGuid()));
 
-        await entorno.Auditoria.Registrar(new SolicitudDeRegistro(AccionesAuditables.EstadoDeTrasladoCambiado)
+        await entorno.Auditoria.Registrar(new SolicitudDeRegistro(AccionesAuditables.TrasladoRechazado)
         {
             ObjetoTipo = "traslado",
             ObjetoId = "tr-9",
@@ -432,7 +432,7 @@ public sealed class CatalogoDeAccionesTests
     [InlineData(nameof(AccionesAuditables.DevolucionSolicitada))]
     [InlineData(nameof(AccionesAuditables.EstadoDeDevolucionCambiado))]
     [InlineData(nameof(AccionesAuditables.TrasladoSolicitado))]
-    [InlineData(nameof(AccionesAuditables.EstadoDeTrasladoCambiado))]
+    [InlineData(nameof(AccionesAuditables.TrasladoRechazado))]
     [Trait("Criterio", "AC-AUD-01")]
     public async Task Las_operaciones_de_AUD_02_se_cancelan_si_no_se_puede_auditar(string nombre)
     {

@@ -22,6 +22,30 @@ public interface IAlmacenDeRegistros
 }
 
 /// <summary>
+/// Puerto interno de escritura de un evento de seguridad que <b>no concede nada</b> (AUD-12): su implementación no debe dejar abortada la transacción
+/// de quien llama si el <c>INSERT</c> falla (un punto de guardado con retroceso parcial, o una conexión y una transacción cortas propias), porque
+/// el efecto protector que acompaña al evento (un bloqueo temporal, el rechazo de una solicitud) debe mantenerse con la auditoría caída (AC-AUD-03).
+/// Un fallo se expresa con una excepción, ya sin efecto sobre la transacción del llamante.
+/// </summary>
+public interface IAlmacenDeEventosDeSeguridad
+{
+    Task Insertar(RegistroDeAuditoria registro, CancellationToken cancelacion = default);
+}
+
+/// <summary>El plazo propio con el que se escribe un evento de seguridad (separado del token de la solicitud, que un cliente puede cancelar a voluntad).</summary>
+public static class PlazoDeEscrituraDeSeguridad
+{
+    public static readonly TimeSpan Plazo = TimeSpan.FromSeconds(5);
+
+    public static async Task Ejecutar(Func<CancellationToken, Task> escribir)
+    {
+        ArgumentNullException.ThrowIfNull(escribir);
+        using var fuente = new CancellationTokenSource(Plazo);
+        await escribir(fuente.Token).ConfigureAwait(false);
+    }
+}
+
+/// <summary>
 /// Construye el <see cref="RegistroDeAuditoria"/> de una solicitud: resuelve la acción en el catálogo cerrado, impone la clase del puerto, toma el
 /// actor del contexto verificado (AUD-23), el instante del reloj y el origen de la conexión, y deja el detalle en <see cref="DetalleSeguro"/>.
 /// </summary>
@@ -61,6 +85,13 @@ public sealed class ConstructorDeRegistros(
         if (accion.Aislada != solicitud.Accion.Aislada)
         {
             throw new ArgumentException("La marca «aislada» de la acción no coincide con la del catálogo.", nameof(solicitud));
+        }
+
+        // Los dos servicios llevan el mismo catálogo, pero el almacén aislado es de Identidad (E-commerce): el Inventario no tiene dónde escribir una
+        // acción de Identidad, y guardarla en su propio almacén dejaría datos de una cuenta fuera de su depuración (D17, AUD-19).
+        if (accion.Aislada && servicio == ServicioDeOrigen.Inventario)
+        {
+            throw new ArgumentException("El Inventario no tiene almacén aislado: una acción de Identidad no se registra aquí.", nameof(solicitud));
         }
 
         return accion;
@@ -127,7 +158,7 @@ public sealed class AuditoriaDeAplicacion(ConstructorDeRegistros constructor, IA
         {
             await almacen.Insertar(registro, cancelacion).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancelacion.IsCancellationRequested)
         {
             throw;
         }
@@ -142,7 +173,7 @@ public sealed class AuditoriaDeAplicacion(ConstructorDeRegistros constructor, IA
 /// <summary>Implementa <see cref="IRegistroDeSeguridad"/>: nunca interrumpe; ante un fallo mantiene la protección y deja una alerta técnica (AUD-12).</summary>
 public sealed class RegistroDeSeguridadDeAplicacion(
     ConstructorDeRegistros constructor,
-    IAlmacenDeRegistros almacen,
+    IAlmacenDeEventosDeSeguridad almacen,
     IPublicadorDeAlertasTecnicas alertas,
     IReloj reloj) : IRegistroDeSeguridad
 {
@@ -153,7 +184,10 @@ public sealed class RegistroDeSeguridadDeAplicacion(
         try
         {
             var registro = constructor.Construir(solicitud, accion);
-            await almacen.Insertar(registro, cancelacion).ConfigureAwait(false);
+
+            // El evento de un rechazo no depende de que el cliente siga conectado: se escribe con un plazo propio y no con el token de la solicitud
+            // (si no, cerrar el socket evitaría el registro y dispararía una alerta falsa).
+            await PlazoDeEscrituraDeSeguridad.Ejecutar(token => almacen.Insertar(registro, token)).ConfigureAwait(false);
         }
         catch (Exception)
         {

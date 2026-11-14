@@ -19,7 +19,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
         yield return Seguridad(nameof(AccionesAuditables.LlamadaEntreServiciosSinCredencial), false, ["sin-credencial-de-servicio"]);
         yield return Seguridad(nameof(AccionesAuditables.OrigenIndeterminable), false, ["origen-no-determinable"]);
         yield return Seguridad(nameof(AccionesAuditables.VerificacionDePersonaFallida), false, ["verificacion-fallida"]);
-        yield return Seguridad(nameof(AccionesAuditables.EntradaDeIntegracionRechazada), false, MotivosDeIntegracionRechazada, Clave("proveedor"));
+        yield return Seguridad(nameof(AccionesAuditables.EntradaDeIntegracionRechazada), false, MotivosDeIntegracionRechazada, Clave("proveedor", 32));
 
         // Identidad (aislados). El objeto es la cuenta, un dato personal; en un ingreso fallido solo si la cuenta existe.
         yield return Seguridad(nameof(AccionesAuditables.IngresoFallido), true, ["credenciales-invalidas"], aislada: true);
@@ -55,6 +55,10 @@ public static partial class CatalogoDeAccionesDeAuditoria
         "solicitudes-por-huella-directa",
         "ajustes-del-personal",
         "traslados-del-personal",
+        "reservas-pendiente-por-cliente",
+        "reservas-por-hora-por-cliente",
+        "reservas-por-hora-por-origen",
+        "reservas-reemplazos-por-pedido",
     ];
 
     /// <summary>Los motivos por los que se rechaza una llamada de integración (SEG-12): una prueba compara esta lista con los de la plataforma.</summary>

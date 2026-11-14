@@ -57,7 +57,7 @@ public sealed class EventosDeSeguridadTests
     {
         public Entorno()
         {
-            var constructor = new ConstructorDeRegistros(ServicioDeOrigen.Inventario, Catalogo, new RelojFijo(Ahora), ActorDePrueba.Anonimo(), new OrigenFijo(OrigenDeSolicitud.Desconocido));
+            var constructor = new ConstructorDeRegistros(ServicioDeOrigen.Ecommerce, Catalogo, new RelojFijo(Ahora), ActorDePrueba.Anonimo(), new OrigenFijo(OrigenDeSolicitud.Desconocido));
             Auditoria = new AuditoriaDeAplicacion(constructor, Almacen);
             Seguridad = new RegistroDeSeguridadDeAplicacion(constructor, Almacen, Alertas, new RelojFijo(Ahora));
         }
@@ -197,7 +197,7 @@ public sealed class EventosDeSeguridadTests
         var politicas = PoliticasDeLimite.Generales.Concat(PoliticasDeLimite.Todas).Select(p => p.Valor).ToHashSet();
 
         Assert.All(politicas, p => Assert.Contains(p, CatalogoDeAccionesDeAuditoria.MotivosDeLimiteExcedido));
-        Assert.Equal(13, CatalogoDeAccionesDeAuditoria.MotivosDeLimiteExcedido.Count);
+        Assert.Equal(17, CatalogoDeAccionesDeAuditoria.MotivosDeLimiteExcedido.Count);
         Assert.Equal(CatalogoDeAccionesDeAuditoria.MotivosDeLimiteExcedido.Order(StringComparer.Ordinal), Catalogo.Obtener("LimiteExcedido").Motivos.Order(StringComparer.Ordinal));
     }
 

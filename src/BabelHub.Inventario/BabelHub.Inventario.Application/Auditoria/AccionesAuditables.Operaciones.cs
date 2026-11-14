@@ -10,10 +10,10 @@ public static partial class AccionesAuditables
     /// <summary>Se anuló un pedido (la causa figura en el detalle).</summary>
     public static readonly AccionAuditable PedidoAnulado = new(nameof(PedidoAnulado));
 
-    /// <summary>Un ajuste manual de stock (cantidad anterior y posterior, con la fuente en la sucursal de origen del registro).</summary>
+    /// <summary>Un ajuste manual de stock (cantidad anterior y posterior, con la fuente en la sucursal de origen del registro). La nota libre no se audita.</summary>
     public static readonly AccionAuditable AjusteRegistrado = new(nameof(AjusteRegistrado));
 
-    /// <summary>Un ingreso de mercadería en la fuente de recepción (una sola entrada para el ingreso y su ajuste, AJU-13).</summary>
+    /// <summary>Un ingreso de mercadería en la fuente de recepción (una sola entrada para el ingreso y su ajuste, AJU-13). La referencia libre no se audita.</summary>
     public static readonly AccionAuditable IngresoDeMercaderiaRegistrado = new(nameof(IngresoDeMercaderiaRegistrado));
 
     /// <summary>Un reingreso de stock por una devolución recibida.</summary>
@@ -31,8 +31,20 @@ public static partial class AccionesAuditables
     /// <summary>El estado de una devolución cambió (aprobada, rechazada, recibida, reembolsada…).</summary>
     public static readonly AccionAuditable EstadoDeDevolucionCambiado = new(nameof(EstadoDeDevolucionCambiado));
 
+    // ---------- Traslados (AUD-02, TRA-13): una acción por transición, con la fuente de origen y la de destino en las sucursales del registro ----------
+
     public static readonly AccionAuditable TrasladoSolicitado = new(nameof(TrasladoSolicitado));
 
-    /// <summary>El estado de un traslado cambió (aprobado, rechazado, en tránsito, recibido…), con la fuente de origen y la de destino (TRA-13).</summary>
-    public static readonly AccionAuditable EstadoDeTrasladoCambiado = new(nameof(EstadoDeTrasladoCambiado));
+    public static readonly AccionAuditable TrasladoAprobado = new(nameof(TrasladoAprobado));
+
+    public static readonly AccionAuditable TrasladoRechazado = new(nameof(TrasladoRechazado));
+
+    public static readonly AccionAuditable TrasladoCancelado = new(nameof(TrasladoCancelado));
+
+    public static readonly AccionAuditable TrasladoDespachado = new(nameof(TrasladoDespachado));
+
+    public static readonly AccionAuditable TrasladoRecibido = new(nameof(TrasladoRecibido));
+
+    /// <summary>Se registró o reemplazó la guía de un traslado: no cambia su estado (TRA-12); guarda el valor nuevo y si reemplazó a otra, no la anterior.</summary>
+    public static readonly AccionAuditable GuiaDeTrasladoRegistrada = new(nameof(GuiaDeTrasladoRegistrada));
 }

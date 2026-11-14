@@ -16,3 +16,19 @@ public sealed class EnrutadorDeRegistros(IAlmacenDeRegistros propio, IAlmacenDeR
             : propio.Insertar(registro, cancelacion);
     }
 }
+
+/// <summary>
+/// El enrutador de los eventos de seguridad que no conceden nada (AUD-12): igual que <see cref="EnrutadorDeRegistros"/>, pero los de Identidad se
+/// escriben con <see cref="IAlmacenDeRegistrosAislados.InsertarAislandoElFallo"/> y los demás con un almacén que no deja abortada la transacción de
+/// quien llama (<see cref="IAlmacenDeEventosDeSeguridad"/>).
+/// </summary>
+public sealed class EnrutadorDeEventosDeSeguridad(IAlmacenDeEventosDeSeguridad propio, IAlmacenDeRegistrosAislados aislado) : IAlmacenDeEventosDeSeguridad
+{
+    public Task Insertar(RegistroDeAuditoria registro, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(registro);
+        return registro.Aislada
+            ? aislado.InsertarAislandoElFallo(registro.AModeloDeContrato(), cancelacion)
+            : propio.Insertar(registro, cancelacion);
+    }
+}

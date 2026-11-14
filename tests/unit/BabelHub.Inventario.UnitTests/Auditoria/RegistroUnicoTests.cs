@@ -41,7 +41,7 @@ public sealed class RegistroUnicoTests
     {
         var accion = Catalogo.Obtener(identificador);
         var almacen = new AlmacenDeRegistrosEnMemoria();
-        var constructor = new ConstructorDeRegistros(ServicioDeOrigen.Inventario, Catalogo, new RelojFijo(Ahora), ActorDePrueba.DeAdministradorCentral(), new OrigenFijo(OrigenDeSolicitud.Desconocido));
+        var constructor = new ConstructorDeRegistros(ServicioDeOrigen.Ecommerce, Catalogo, new RelojFijo(Ahora), ActorDePrueba.DeAdministradorCentral(), new OrigenFijo(OrigenDeSolicitud.Desconocido));
         var auditoria = new AuditoriaDeAplicacion(constructor, almacen);
         var seguridad = new RegistroDeSeguridadDeAplicacion(constructor, almacen, new AlertasTecnicasEspia(), new RelojFijo(Ahora));
         var solicitud = new SolicitudDeRegistro(new AccionAuditable(identificador, accion.Aislada)) { Motivo = accion.Motivos[0] };
@@ -60,7 +60,7 @@ public sealed class RegistroUnicoTests
     public async Task Si_no_se_puede_registrar_el_hecho_de_ambos_tipos_no_queda_ninguna_marca_a_medias()
     {
         var almacen = new AlmacenDeRegistrosEnMemoria { Falla = new InvalidOperationException("la base no responde") };
-        var constructor = new ConstructorDeRegistros(ServicioDeOrigen.Inventario, Catalogo, new RelojFijo(Ahora), ActorDePrueba.DeAdministradorCentral(), new OrigenFijo(OrigenDeSolicitud.Desconocido));
+        var constructor = new ConstructorDeRegistros(ServicioDeOrigen.Ecommerce, Catalogo, new RelojFijo(Ahora), ActorDePrueba.DeAdministradorCentral(), new OrigenFijo(OrigenDeSolicitud.Desconocido));
         var auditoria = new AuditoriaDeAplicacion(constructor, almacen);
 
         await Assert.ThrowsAsync<AuditoriaNoDisponibleException>(

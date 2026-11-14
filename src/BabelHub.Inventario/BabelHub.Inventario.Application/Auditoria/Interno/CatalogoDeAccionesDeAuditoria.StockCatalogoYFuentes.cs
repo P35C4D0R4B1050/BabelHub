@@ -20,11 +20,11 @@ public static partial class CatalogoDeAccionesDeAuditoria
         yield return Auditada(nameof(AccionesAuditables.BajaDeTitularProcesada), true, false);
 
         // Catálogo y licencias.
-        yield return Auditada(nameof(AccionesAuditables.ObraRegistrada), false, false, Clave("titulo"));
-        yield return Auditada(nameof(AccionesAuditables.ObraEditada), false, false, Clave("titulo"), Clave("camposCambiados"));
-        yield return Auditada(nameof(AccionesAuditables.ObraDadaDeBaja), false, false, Clave("titulo"));
-        yield return Auditada(nameof(AccionesAuditables.EdicionRegistrada), false, false, Clave("isbn"), Clave("formato"));
-        yield return Auditada(nameof(AccionesAuditables.EdicionEditada), false, false, Clave("isbn"), Clave("camposCambiados"));
+        yield return Auditada(nameof(AccionesAuditables.ObraRegistrada), false, false, Clave("titulo", 200));
+        yield return Auditada(nameof(AccionesAuditables.ObraEditada), false, false, Clave("titulo", 200), Clave("camposCambiados", 200));
+        yield return Auditada(nameof(AccionesAuditables.ObraDadaDeBaja), false, false, Clave("titulo", 200));
+        yield return Auditada(nameof(AccionesAuditables.EdicionRegistrada), false, false, Clave("isbn"), new ClaveDeDetalle("formato", personal: false) { Valores = ["impresa", "digital"] });
+        yield return Auditada(nameof(AccionesAuditables.EdicionEditada), false, false, Clave("isbn"), Clave("camposCambiados", 200));
         yield return Auditada(nameof(AccionesAuditables.EdicionDadaDeBaja), false, false, Clave("isbn"));
         yield return Auditada(nameof(AccionesAuditables.EdicionDigitalRetirada), false, false, Clave("isbn"));
         yield return Auditada(
@@ -44,7 +44,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
 
         // Fuentes y rutas: sin el número de contacto, que nunca entra a la auditoría. La ruta lleva su origen y su destino en las sucursales del registro.
         yield return Auditada(nameof(AccionesAuditables.FuenteRegistrada), false, false, Clave("codigoDeFuente"));
-        yield return Auditada(nameof(AccionesAuditables.FuenteEditada), false, false, Clave("codigoDeFuente"), Clave("camposCambiados"));
+        yield return Auditada(nameof(AccionesAuditables.FuenteEditada), false, false, Clave("codigoDeFuente"), Clave("camposCambiados", 200));
         yield return Auditada(nameof(AccionesAuditables.RecepcionDesignada), false, false, Clave("fuenteAnteriorId"), Clave("fuenteNuevaId"));
         yield return Auditada(nameof(AccionesAuditables.RutaRegistrada), false, false, Clave("plazoNuevoEnDias"));
         yield return Auditada(nameof(AccionesAuditables.RutaModificada), false, false, Clave("plazoAnteriorEnDias"), Clave("plazoNuevoEnDias"));

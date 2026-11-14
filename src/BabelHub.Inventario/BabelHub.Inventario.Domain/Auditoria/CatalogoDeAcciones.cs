@@ -107,6 +107,24 @@ public sealed record AccionDelCatalogo
 
     public bool ExigeMotivo { get; }
 
+    /// <summary>
+    /// Los tipos de objeto que la acción admite (lista cerrada; vacía: la acción no lleva objeto). Nulo: sin restricción. Evita que un módulo registre,
+    /// por ejemplo, el identificador de un cliente como objeto de una acción cuyo objeto no es personal y que la anonimización no lo alcance (AUD-19).
+    /// </summary>
+    public IReadOnlyList<string>? TiposDeObjeto
+    {
+        get;
+        init
+        {
+            if (value is not null && value.Any(t => string.IsNullOrEmpty(t) || !FormatoDeMotivo.IsMatch(t)))
+            {
+                throw new ArgumentException("Un tipo de objeto es un código (minúsculas, dígitos y guiones).", nameof(value));
+            }
+
+            field = value is null ? null : Array.AsReadOnly(value.Distinct(StringComparer.Ordinal).ToArray());
+        }
+    }
+
     /// <summary>Si el motivo es válido para esta acción: del catálogo cerrado, o ausente cuando la acción no lo exige.</summary>
     public bool AdmiteMotivo(string? motivo) =>
         motivo is null ? !ExigeMotivo : Motivos.Contains(motivo, StringComparer.Ordinal);

@@ -28,6 +28,58 @@ public sealed record ClaveDeDetalle
 
     /// <summary>Si el valor identifica a una persona: la depuración lo anonimiza (AUD-19) y la lista lo trata como personal.</summary>
     public bool Personal { get; }
+
+    /// <summary>El valor sustituto cuando lo recibido no está en <see cref="Valores"/> (nunca se rechaza el registro, AUD-04).</summary>
+    public const string ValorNoPermitido = "[no-permitido]";
+
+    /// <summary>
+    /// Largo máximo del valor (nulo: sin tope propio, solo rige el del detalle completo). Un texto de una solicitud puede arrastrar nombres u otros datos
+    /// personales que la redacción por forma no ve: una clave que no es un código lleva un tope corto (AUD-06, AUD-19).
+    /// </summary>
+    public int? LargoMaximo
+    {
+        get;
+        init
+        {
+            if (value is < 1 or > DetalleSeguro.MaximoDeCaracteres)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), "El largo máximo de una clave está entre 1 y el tope del detalle.");
+            }
+
+            field = value;
+        }
+    }
+
+    /// <summary>
+    /// El conjunto cerrado de valores admitidos (nulo: cualquier texto, con el tope de largo). Un valor que no está se reemplaza por
+    /// <see cref="ValorNoPermitido"/>: el catálogo de códigos es cerrado y un texto libre no entra donde se espera un código.
+    /// </summary>
+    public IReadOnlyCollection<string>? Valores
+    {
+        get;
+        init => field = value is null ? null : Array.AsReadOnly(value.ToArray());
+    }
+
+    internal string Ajustar(string valor)
+    {
+        if (Valores is not null)
+        {
+            return Valores.Contains(valor, StringComparer.Ordinal) ? valor : ValorNoPermitido;
+        }
+
+        if (LargoMaximo is int tope && valor.Length > tope)
+        {
+            var corte = tope - 1;
+            if (corte > 0 && char.IsHighSurrogate(valor[corte - 1]))
+            {
+                corte--;
+            }
+
+            return valor[..corte] + "…";
+        }
+
+        return valor;
+    }
 }
 
 /// <summary>
@@ -110,7 +162,7 @@ public sealed partial class DetalleSeguro
             }
 
             var valor = Limpiar(recibido);
-            var seguro = Redactar(valor, clave.Personal);
+            var seguro = Redactar(clave.Ajustar(valor), clave.Personal);
             if (!string.Equals(seguro, valor, StringComparison.Ordinal))
             {
                 redactadas.Add(clave.Nombre);

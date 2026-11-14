@@ -14,16 +14,48 @@ public interface IEscritorDeDenegaciones
     Task Escribir(RegistroDeAuditoria registro, CancellationToken cancelacion = default);
 }
 
-/// <summary>Las plantillas de ruta de los endpoints del servicio, que la Api obtiene de sus rutas registradas: con ellas se reduce la ruta cruda a su plantilla (AUD-05, AUD-06).</summary>
+/// <summary>
+/// Las plantillas de ruta de los endpoints del servicio, que la Api obtiene de sus rutas registradas y <b>normaliza</b> a segmentos <c>{nombre}</c>
+/// (sin restricciones como <c>{id:guid}</c>, opcionales ni comodines): con ellas se reduce la ruta cruda a su plantilla (AUD-05, AUD-06). Una plantilla
+/// que no cumpla la forma se descarta (<see cref="ResolutorDeRutas"/>) y no impide registrar el evento.
+/// </summary>
 public interface IPlantillasDeRuta
 {
     IReadOnlyCollection<string> Todas { get; }
 }
 
 /// <summary>
+/// Reduce la ruta cruda de una solicitud a su plantilla. Valida y ordena la lista de plantillas <b>una sola vez</b> (descarta las que no cumplen la
+/// forma) y, ante cualquier problema, devuelve «sin-coincidencia»: la ruta nunca puede hacer perder el evento ni se guarda cruda. Una ruta vacía o
+/// demasiado larga se descarta sin tocar la lista.
+/// </summary>
+public sealed class ResolutorDeRutas(IPlantillasDeRuta plantillas)
+{
+    private readonly Lazy<IReadOnlyCollection<string>> _validas = new(() =>
+        Array.AsReadOnly(plantillas.Todas.Where(PlantillaDeRuta.EsPlantillaValida).Distinct(StringComparer.Ordinal).ToArray()));
+
+    public RutaResuelta Resolver(string? rutaCruda)
+    {
+        if (string.IsNullOrWhiteSpace(rutaCruda) || rutaCruda.Length > PlantillaDeRuta.MaximoDeCaracteres)
+        {
+            return RutaResuelta.SinCoincidencia;
+        }
+
+        try
+        {
+            return PlantillaDeRuta.ResolverComoRuta(rutaCruda, _validas.Value);
+        }
+        catch (Exception)
+        {
+            return RutaResuelta.SinCoincidencia;
+        }
+    }
+}
+
+/// <summary>
 /// El estado de la solicitud en curso para sus denegaciones: la correlación que <b>genera el servidor</b> (nunca la que envía el cliente) y la
 /// bandera que garantiza <b>un único evento por solicitud</b>, aunque el rechazo pase por el manejador de errores, el de autorización y los eventos de
-/// autenticación. Se registra con vida por solicitud (<c>Scoped</c>).
+/// autenticación. Se registra con vida por solicitud (<c>Scoped</c>): con otra vida se registraría un solo evento por proceso.
 /// </summary>
 public interface IContextoDeDenegacion
 {
@@ -44,13 +76,14 @@ public sealed class ContextoDeDenegacion : IContextoDeDenegacion
 
 /// <summary>
 /// Implementa <see cref="IDenegacionDeAcceso"/> (AUD-05): un único evento por solicitud, con el usuario o «anónimo» (si nadie fijó el contexto, también
-/// «anónimo»: el rechazo no se pierde), su rol, la ruta reducida a su plantilla, el motivo y el origen de la conexión. Nunca interrumpe el rechazo: si no
+/// «anónimo»: el rechazo no se pierde), su rol, la ruta reducida a su plantilla, el motivo, el código del error y el origen de la conexión. Nunca
+/// interrumpe el rechazo y <b>no depende de que el cliente siga conectado</b>: se escribe con un plazo propio y no con el token de la solicitud. Si no
 /// se puede escribir (o el motivo no está en el catálogo), deja una alerta técnica y la protección se mantiene (AUD-12).
 /// </summary>
 public sealed class DenegacionDeAccesoDeAplicacion(
     ConstructorDeRegistros constructor,
     IContextoDeDenegacion contexto,
-    IPlantillasDeRuta plantillas,
+    ResolutorDeRutas rutas,
     IEscritorDeDenegaciones escritor,
     IPublicadorDeAlertasTecnicas alertas,
     IReloj reloj) : IDenegacionDeAcceso
@@ -65,12 +98,18 @@ public sealed class DenegacionDeAccesoDeAplicacion(
 
         try
         {
-            var solicitud = new SolicitudDeRegistro(AccionesAuditables.AccesoDenegado) { Motivo = denegacion.Motivo, Resultado = ResultadoAuditado.Rechazado };
+            var solicitud = new SolicitudDeRegistro(AccionesAuditables.AccesoDenegado)
+            {
+                Motivo = denegacion.Motivo,
+                Resultado = ResultadoAuditado.Rechazado,
+                Detalle = denegacion.CodigoDeError is null
+                    ? new Dictionary<string, string?>()
+                    : new Dictionary<string, string?> { ["codigoDeError"] = denegacion.CodigoDeError },
+            };
             var accion = constructor.Resolver(solicitud, ClaseDeAccion.NoConcede);
-            var ruta = PlantillaDeRuta.ResolverComoRuta(denegacion.Ruta, plantillas.Todas);
-            var registro = constructor.Construir(solicitud, accion, ruta, contexto.Correlacion, anonimoSinContexto: true);
+            var registro = constructor.Construir(solicitud, accion, rutas.Resolver(denegacion.Ruta), contexto.Correlacion, anonimoSinContexto: true);
 
-            await escritor.Escribir(registro, cancelacion).ConfigureAwait(false);
+            await PlazoDeEscrituraDeSeguridad.Ejecutar(token => escritor.Escribir(registro, token)).ConfigureAwait(false);
         }
         catch (Exception)
         {

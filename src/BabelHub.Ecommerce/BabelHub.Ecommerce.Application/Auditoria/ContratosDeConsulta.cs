@@ -23,11 +23,32 @@ public sealed partial record DenegacionDeAcceso
 
     public string Motivo { get; }
 
+    /// <summary>
+    /// El código estable del error que se devolvió (<c>ECO-PROHIBIDO</c>, <c>INV-NO-ENCONTRADO</c>…), que el manejador de errores conoce; opcional. Un
+    /// texto que no sea un código de esa forma se rechaza.
+    /// </summary>
+    public string? CodigoDeError
+    {
+        get;
+        init
+        {
+            if (value is not null && !FormaDelCodigo().IsMatch(value))
+            {
+                throw new ArgumentException("El código de error es de la forma ECO-… o INV-… (mayúsculas, dígitos y guiones).", nameof(value));
+            }
+
+            field = value;
+        }
+    }
+
     /// <summary>La ruta cruda de la solicitud (nunca se guarda tal cual).</summary>
     public string? Ruta { get; }
 
     [GeneratedRegex(@"^[a-z][a-z0-9-]{1,63}\z", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
     private static partial Regex FormaDelMotivo();
+
+    [GeneratedRegex(@"^(ECO|INV)-[A-Z0-9][A-Z0-9-]{1,58}\z", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex FormaDelCodigo();
 }
 
 /// <summary>

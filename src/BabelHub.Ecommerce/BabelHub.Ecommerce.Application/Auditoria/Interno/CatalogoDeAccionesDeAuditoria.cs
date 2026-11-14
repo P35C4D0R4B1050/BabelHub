@@ -11,7 +11,8 @@ namespace BabelHub.Ecommerce.Application.Auditoria.Interno;
 public static partial class CatalogoDeAccionesDeAuditoria
 {
     /// <summary>El catálogo completo del servicio.</summary>
-    public static CatalogoDeAcciones Crear() => new([.. AccionesDeOperaciones(), .. AccionesDeStockCatalogoYFuentes(), .. AccionesDeIdentidadYOtrosModulos(), .. AccionesDeEventosDeSeguridad(), .. AccionesDeAvisosYOrigenReenviado()]);
+    public static CatalogoDeAcciones Crear() =>
+        new([.. ConTiposDeObjeto([.. AccionesDeOperaciones(), .. AccionesDeStockCatalogoYFuentes(), .. AccionesDeIdentidadYOtrosModulos(), .. AccionesDeEventosDeSeguridad(), .. AccionesDeAvisosYOrigenReenviado()])]);
 
     /// <summary>Una acción que concede o cambia algo, de auditoría pura, sin motivo: el objeto y el rol se declaran siempre (sin valor por defecto).</summary>
     private static AccionDelCatalogo Auditada(string identificador, bool objetoPersonal, bool rolPersonal, params ClaveDeDetalle[] detalle) =>
@@ -28,8 +29,17 @@ public static partial class CatalogoDeAccionesDeAuditoria
     private static AccionDelCatalogo AuditadaYSeguridadAislada(string identificador, bool objetoPersonal, string[] motivos, params ClaveDeDetalle[] detalle) =>
         new(identificador, ClaseDeAccion.ConcedeOCambia, TipoDeRegistro.Ambos, aislada: true, detalle, objetoPersonal, rolPersonal: false, motivos, exigeMotivo: true);
 
-    /// <summary>Una clave del detalle que no identifica a una persona.</summary>
-    private static ClaveDeDetalle Clave(string nombre) => new(nombre, personal: false);
+    /// <summary>
+    /// Una clave del detalle que no identifica a una persona, con un tope de largo corto (64 por omisión): una clave de valor libre podría arrastrar un nombre
+    /// que la redacción por forma no ve, así que lo que se espera es un código, un identificador, una cantidad o un estado (AUD-06, AUD-19).
+    /// </summary>
+    private static ClaveDeDetalle Clave(string nombre, int largoMaximo = 64) => new(nombre, personal: false) { LargoMaximo = largoMaximo };
+
+    /// <summary>La moneda, de conjunto cerrado.</summary>
+    private static ClaveDeDetalle Moneda() => new("moneda", personal: false) { Valores = ["PEN", "USD"] };
+
+    /// <summary>La modalidad de un reembolso, de conjunto cerrado.</summary>
+    private static ClaveDeDetalle Modalidad() => new("modalidad", personal: false) { Valores = ["manual", "automatico"] };
 
     /// <summary>Una clave del detalle cuyo valor identifica a una persona: la depuración la anonimiza (AUD-19).</summary>
     private static ClaveDeDetalle ClavePersonal(string nombre) => new(nombre, personal: true);

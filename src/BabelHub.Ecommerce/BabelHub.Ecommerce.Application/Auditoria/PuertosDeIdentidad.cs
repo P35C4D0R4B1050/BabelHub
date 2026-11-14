@@ -7,7 +7,15 @@ namespace BabelHub.Ecommerce.Application.Auditoria;
 /// </summary>
 public interface IAlmacenDeRegistrosAislados
 {
+    /// <summary>La auditoría de una operación que concede o cambia algo: en la transacción de la operación, y un fallo la revierte (AUD-04).</summary>
     Task Insertar(RegistroAuditado registro, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Un evento de seguridad que no concede nada (un ingreso fallido, un bloqueo): se escribe con un punto de guardado, de modo que si el
+    /// <c>INSERT</c> falla la transacción de quien llama sigue válida y el efecto protector se mantiene (AUD-12, AC-AUD-03). El fallo se lanza ya
+    /// sin efecto sobre esa transacción.
+    /// </summary>
+    Task InsertarAislandoElFallo(RegistroAuditado registro, CancellationToken cancelacion = default);
 }
 
 /// <summary>
