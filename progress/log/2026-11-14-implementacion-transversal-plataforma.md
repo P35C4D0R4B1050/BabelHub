@@ -25,3 +25,7 @@
 ## Adenda — T25 (VM-AUX)
 - Scripts de VM-AUX en `scripts/vm-aux/` y su programación en `infra/vm-aux/`: comprobación de respaldos (24 h) y del atraso del archivado (15 min) con aviso por correo desde fuera de la VM de datos, sellos horarios del registro de supresiones (conformes con `VerificadorDelRegistro` del E-commerce, con prueba), copia diaria del registro, ancla semanal por correo, `alertar.sh` y latido externo sin datos. Cada script usa solo lo que permite su credencial (la prueba aplica `credenciales.txt`).
 - Avance de la fase 3: 48 de 177 tareas. Quedan en `transversal-plataforma` 5 spikes y T26 a T42.
+
+## Adenda — Cambio de proceso (desarrollo por bloques)
+- La persona decidió llegar al producto completo con **rigor graduado por riesgo, bloques y carriles en paralelo** (`docs/07-proceso-de-desarrollo/05-desarrollo-por-bloques.md`; lista de bloques y medición en `progress/bloques.md`). Desde ahora se pide «Ejecuta el bloque X», con informe por bloque.
+- No se tocó `AGENTS.md`, `04-aprobacion-delegada.md` ni `SpecCheck`: la puerta graduada de planes y «una tarea a la vez por carril» quedaron como propuesta con texto exacto, pendientes de la persona.

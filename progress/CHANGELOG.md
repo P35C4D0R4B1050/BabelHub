@@ -2,6 +2,12 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-14 — Proceso: desarrollo por bloques, carriles y rigor graduado
+
+### Cubierto
+- Decisión de la persona responsable (producto completo en 2 a 3 semanas): rigor graduado por riesgo (crítico, estándar, bajo), trabajo por bloques con una sola validación y revisión por bloque, y hasta tres carriles en paralelo con protocolo de integración. Documento nuevo `docs/07-proceso-de-desarrollo/05-desarrollo-por-bloques.md` y lista de bloques en `progress/bloques.md`.
+- Propuestas que chocan con `AGENTS.md` y con la aprobación delegada (una tarea a la vez por carril, puerta graduada de planes) quedan redactadas como pendientes de la persona; no rigen.
+
 ## 2026-11-14 — Implementación de `transversal-plataforma` (T06 a T24)
 
 ### Cubierto
