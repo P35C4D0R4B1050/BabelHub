@@ -42,7 +42,7 @@ internal sealed class DoblesDeSesion
 
     public IniciarSesionWeb Iniciar => new(Comun, Unidad, new AreasDeInterfaz(), Aleatorios);
 
-    // CargarSesionWeb (T06), AsegurarCredencialDeSesion (T07) y CerrarSesionWeb (T08) se agregan en sus tareas.
+    public CargarSesionWeb Cargar => new(Comun);
 
 
 
