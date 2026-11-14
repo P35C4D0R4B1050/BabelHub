@@ -271,12 +271,17 @@ static HashSet<string> EscanearPruebas(string testsDir)
         return ids;
     }
 
+    // Solo cuenta el atributo [Trait("Criterio", "AC-XXX-NN")] fuera de los comentarios: nombrar el criterio en un comentario, en un
+    // texto o en un nombre de prueba no demuestra que haya una prueba que lo verifique (PLA-02, PLA-23).
     foreach (var archivo in Directory.EnumerateFiles(testsDir, "*.cs", SearchOption.AllDirectories)
-                 .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)))
+                 .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                          && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal)))
     {
-        foreach (Match m in Regex.Matches(File.ReadAllText(archivo), @"AC-[A-Z]{3}-\d{2}"))
+        var texto = Regex.Replace(File.ReadAllText(archivo), @"/\*.*?\*/", string.Empty, RegexOptions.Singleline, TimeSpan.FromSeconds(5));
+        texto = Regex.Replace(texto, @"(?m)(^|\s)//[^\n]*", "$1", RegexOptions.None, TimeSpan.FromSeconds(5));
+        foreach (Match m in Regex.Matches(texto, @"\bTrait\s*\(\s*""Criterio""\s*,\s*""(AC-[A-Z]{3}-\d{2})""\s*\)", RegexOptions.None, TimeSpan.FromSeconds(5)))
         {
-            ids.Add(m.Value);
+            ids.Add(m.Groups[1].Value);
         }
     }
 

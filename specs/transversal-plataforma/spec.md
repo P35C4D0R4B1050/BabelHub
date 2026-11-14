@@ -1,7 +1,7 @@
 ---
 id: transversal-plataforma
 titulo: Calidad de la plataforma y operación
-estado: Planned
+estado: InProgress
 aprobado_por: Claude (delegado por Diego Amiquero)
 aprobado_en: 2026-11-12
 plan_aprobado_por: Claude (delegado por Diego Amiquero)

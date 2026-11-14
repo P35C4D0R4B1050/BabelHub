@@ -1,0 +1,9 @@
+# Decisiones de implementación — transversal-plataforma
+
+Decisiones menores tomadas al implementar que el plan no fija. No cambian el comportamiento de la spec.
+
+| Tarea | Decisión | Motivo |
+| :--- | :--- | :--- |
+| T01 a T05 | Los cinco spikes (restauración ARM en emulación, credenciales y retención del almacén de Oracle, tamaño de la base y cuota gratuita, memoria de VM-INVENTARIO con respaldo y volumen cifrado efímero del ensayo) necesitan recursos que no están en este entorno (cuenta de Oracle y su almacén, VMs, una base con datos reales): quedan para la persona responsable, que registra su resultado en `progress/ensayos/`. La implementación empieza por las tareas que no dependen de ellos (T06 y siguientes de CI); lo que decidan D12 y D23 se aplicará al llegar a sus tareas. | B03 y PLA-10, PLA-16, PLA-35. |
+| T06 | `SpecCheck` solo cuenta como prueba de un criterio el atributo `[Trait("Criterio", "AC-XXX-NN")]` fuera de los comentarios (en cualquier forma: varias líneas, junto a otro atributo o varios por prueba). Nombrar el criterio en un comentario, en un texto, en un nombre de prueba o en un `Trait` de otra categoría ya no basta. Se ignoran `bin/` y `obj/`. Las pruebas de constancia de los criterios documentales (AC-PLA-05, 06, 10, 22, 29, 30, 33 y 34) las crea cada tarea que produce su evidencia y llevan el mismo `Trait`; esta tarea no las crea. | PLA-02, PLA-23. |
+| T06 | La copia temporal de `PuertaDeAprobacionTests` ahora desmarca todas las tareas (la huella del plan ignora las casillas): sin eso, el avance real de `transversal-plataforma` decidía qué criterios exigían prueba en las pruebas de la puerta. Se agregan pruebas de `SpecCheck` con el criterio solo en un comentario, en un texto, en un nombre o con otro `Trait` (falla e indica el criterio) y con el atributo en varias formas válidas (pasa). | AC-PLA-02, AC-PLA-23. |
