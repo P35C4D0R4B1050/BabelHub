@@ -37,7 +37,14 @@ La base de la pirámide (Dominio y Aplicación) es la más numerosa; las lentas 
 | Sistema completo | **≥ 70 %** de líneas | Evita zonas ciegas sin forzar pruebas de bajo valor. |
 | Infraestructura y Web | Sin porcentaje; criterios cubiertos por pruebas de integración y E2E | La calidad se mide por criterios, no por líneas. |
 
-Los umbrales de cobertura (RNF28, PLA-14) son una **puerta**: la verificación automática falla si el Dominio y la Aplicación de un servicio bajan de 85 % o el total de un servicio baja de 70 %. Aun así, la cobertura no es el objetivo: no se escriben pruebas vacías para subir el número. Opcionalmente, una pasada de pruebas de mutación sobre el Dominio (por ejemplo, con Stryker.NET) valida que las pruebas detecten errores reales.
+Los umbrales de cobertura (RNF28, PLA-14) son una **puerta**: la verificación automática falla si el Dominio y la Aplicación de un servicio bajan de 85 % o el total de un servicio baja de 70 %. Se mide con `coverlet.collector` y se verifica con `tools/CoverageCheck`, que une los informes de todas las pruebas (una línea cuenta si alguna ejecución la cubre), no cuenta migraciones ni código generado y compara sin redondear (84,99 % no es 85 %):
+
+```bash
+dotnet test BabelHub.sln --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings --results-directory TestResults
+dotnet run --project tools/CoverageCheck -- TestResults
+```
+
+Aun así, la cobertura no es el objetivo: no se escriben pruebas vacías para subir el número. Opcionalmente, una pasada de pruebas de mutación sobre el Dominio (por ejemplo, con Stryker.NET) valida que las pruebas detecten errores reales.
 
 ## 4. Qué se prueba por tipo de requisito
 

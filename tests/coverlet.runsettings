@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cobertura de líneas (PLA-14). Uso: dotnet test BabelHub.sln -collect:"XPlat Code Coverage" -settings tests/coverlet.runsettings
+     y después: dotnet run -project tools/CoverageCheck con la carpeta de resultados (TestResults) como argumento
+     Solo cuentan los ensamblados de los servicios; no cuentan las migraciones ni el código generado. -->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <Include>[BabelHub.Ecommerce.*]*,[BabelHub.Inventario.*]*</Include>
+          <Exclude>[*.UnitTests]*,[*.IntegrationTests]*,[*.ArchitectureTests]*</Exclude>
+          <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+          <ExcludeByFile>**/Migrations/**/*.cs,**/obj/**/*.cs,**/*.g.cs,**/*.Designer.cs</ExcludeByFile>
+          <SkipAutoProps>false</SkipAutoProps>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>
