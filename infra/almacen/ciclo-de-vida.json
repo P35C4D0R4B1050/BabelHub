@@ -1,0 +1,12 @@
+{
+  "contenedores": {
+    "libros": [],
+    "respaldos-diarios": [{"name": "retiro-a-los-7-dias", "action": "DELETE", "isEnabled": true, "timeAmount": 7, "timeUnit": "DAYS", "target": "objects"}],
+    "respaldos-semanales": [{"name": "retiro-a-los-28-dias", "action": "DELETE", "isEnabled": true, "timeAmount": 28, "timeUnit": "DAYS", "target": "objects"}],
+    "respaldos-mensuales": [{"name": "retiro-a-los-90-dias", "action": "DELETE", "isEnabled": true, "timeAmount": 90, "timeUnit": "DAYS", "target": "objects"}],
+    "respaldos-wal": [{"name": "retiro-a-los-100-dias", "action": "DELETE", "isEnabled": true, "timeAmount": 100, "timeUnit": "DAYS", "target": "objects"}],
+    "supresiones-entradas": [],
+    "supresiones-sellos": [],
+    "supresiones-copia": [{"name": "retiro-a-los-100-dias", "action": "DELETE", "isEnabled": true, "timeAmount": 100, "timeUnit": "DAYS", "target": "objects"}]
+  }
+}

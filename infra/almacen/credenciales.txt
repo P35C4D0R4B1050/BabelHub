@@ -1,0 +1,32 @@
+# Credenciales del almacén (mínimo privilegio, una por tarea; D08, D24) y lo que cada una puede hacer en cada contenedor.
+# Acciones: crear (OBJECT_CREATE: agrega, nunca sobrescribe), leer (OBJECT_READ), listar (OBJECT_INSPECT), uso (BUCKET_READ: tamaño del
+# contenedor), sobrescribir (OBJECT_OVERWRITE) y borrar (OBJECT_DELETE). Lo que no consta aquí está prohibido. Ninguna credencial de
+# respaldos o de supresiones puede sobrescribir o borrar: el retiro de vencidos lo hace el ciclo de vida del propio almacén (D07).
+# credencial                 contenedor             acciones
+libros                       libros                 crear,leer,listar,sobrescribir,borrar
+respaldos-escritor           respaldos-diarios      crear
+respaldos-escritor           respaldos-semanales    crear
+respaldos-escritor           respaldos-mensuales    crear
+respaldos-escritor           respaldos-wal          crear
+respaldos-lector             respaldos-diarios      leer,listar
+respaldos-lector             respaldos-semanales    leer,listar
+respaldos-lector             respaldos-mensuales    leer,listar
+respaldos-lector             respaldos-wal          leer,listar
+respaldos-lector             supresiones-copia      leer,listar
+respaldos-vigilante          respaldos-diarios      listar
+respaldos-vigilante          respaldos-semanales    listar
+respaldos-vigilante          respaldos-mensuales    listar
+respaldos-vigilante          respaldos-wal          listar
+respaldos-vigilante          supresiones-copia      listar
+supresiones-registro         supresiones-entradas   crear,leer,listar
+supresiones-sello            supresiones-sellos     crear
+supresiones-sello            supresiones-entradas   leer,listar
+respaldos-copia-registro     supresiones-copia      crear
+cuota-lectura                libros                 uso
+cuota-lectura                respaldos-diarios      uso
+cuota-lectura                respaldos-semanales    uso
+cuota-lectura                respaldos-mensuales    uso
+cuota-lectura                respaldos-wal          uso
+cuota-lectura                supresiones-entradas   uso
+cuota-lectura                supresiones-sellos     uso
+cuota-lectura                supresiones-copia      uso

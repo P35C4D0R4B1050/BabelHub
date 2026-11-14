@@ -1,0 +1,13 @@
+# Contenedores del almacén de objetos (Oracle Object Storage) y su retención. Fuente de verdad de scripts/almacen.sh y de las pruebas.
+# Una línea por contenedor: nombre, días de retención con bloqueo de tiempo, si el bloqueo es irreversible (si/no) y días tras los cuales
+# el ciclo de vida retira el objeto (o «nunca»). La retención con bloqueo de Oracle es por contenedor, no por prefijo (D23): por eso un
+# contenedor por clase. El plazo del ciclo de vida nunca es menor que el de la retención.
+# nombre                 retencion_dias  bloqueada  expira_dias
+libros                   0               no         nunca
+respaldos-diarios        7               si         7
+respaldos-semanales      28              si         28
+respaldos-mensuales      90              si         90
+respaldos-wal            100             si         100
+supresiones-entradas     100             si         nunca
+supresiones-sellos       100             si         nunca
+supresiones-copia        100             si         100
