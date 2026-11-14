@@ -8,7 +8,7 @@ public sealed class CopiasDeAdaptadoresTests
 {
     public static TheoryData<string> Archivos => new(
         "Infrastructure/Plataforma/AdaptadoresBase.cs",
-        "Infrastructure/Plataforma/UnidadDeTrabajoPostgres.cs",
+        // UnidadDeTrabajoPostgres.cs ya no es copia: la del Inventario fija el alcance de datos y ofrece la lectura coherente (inventario-fuentes T03 y T04).
         "Application/Plataforma/ConexionDeLaUnidadDeTrabajo.cs",
         "Application/Plataforma/PuertosBase.cs",
         "Application/Plataforma/FallaSegura.cs",

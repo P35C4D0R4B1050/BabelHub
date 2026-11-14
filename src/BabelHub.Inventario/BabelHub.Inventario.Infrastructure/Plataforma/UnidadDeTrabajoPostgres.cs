@@ -1,3 +1,4 @@
+using System.Data;
 using System.Data.Common;
 using BabelHub.Inventario.Application.Plataforma;
 using Npgsql;
@@ -19,7 +20,7 @@ public sealed record OpcionesDeUnidadDeTrabajo
 /// La conexión pertenece al flujo asíncrono que abrió la transacción: no debe usarse desde tareas paralelas.
 /// </summary>
 public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeUnidadDeTrabajo? opciones = null)
-    : IUnidadDeTrabajo, IConexionDeLaUnidadDeTrabajo
+    : IUnidadDeTrabajo, IConexionDeLaUnidadDeTrabajo, ILecturaCoherente
 {
     private const string TransaccionAbortada = "25P02";
 
@@ -32,7 +33,14 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
 
     public DbTransaction Transaccion => (_activa.Value ?? throw SinTransaccion()).Transaccion;
 
-    public async Task<T> Ejecutar<T>(Func<CancellationToken, Task<T>> trabajo, CancellationToken cancelacion = default)
+    public Task<T> Ejecutar<T>(Func<CancellationToken, Task<T>> trabajo, CancellationToken cancelacion = default) =>
+        EjecutarEn(IsolationLevel.ReadCommitted, soloLectura: false, trabajo, cancelacion);
+
+    /// <summary>Una transacción de solo lectura con <c>REPEATABLE READ</c>: todo lo que se lee dentro ve la misma instantánea (D06). Si ya hay una transacción, se une a ella.</summary>
+    public Task<T> EjecutarLectura<T>(Func<CancellationToken, Task<T>> lectura, CancellationToken cancelacion = default) =>
+        EjecutarEn(IsolationLevel.RepeatableRead, soloLectura: true, lectura, cancelacion);
+
+    private async Task<T> EjecutarEn<T>(IsolationLevel aislamiento, bool soloLectura, Func<CancellationToken, Task<T>> trabajo, CancellationToken cancelacion)
     {
         ArgumentNullException.ThrowIfNull(trabajo);
 
@@ -43,10 +51,16 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
         }
 
         await using var conexion = await origen.OpenConnectionAsync(cancelacion).ConfigureAwait(false);
-        await using var transaccion = await conexion.BeginTransactionAsync(cancelacion).ConfigureAwait(false);
-        _activa.Value = new Activa(conexion, transaccion);
+        await using var transaccion = await conexion.BeginTransactionAsync(aislamiento, cancelacion).ConfigureAwait(false);
+        var activa = new Activa(conexion, transaccion);
+        _activa.Value = activa;
         try
         {
+            if (soloLectura)
+            {
+                await EjecutarSql(activa, "SET TRANSACTION READ ONLY", cancelacion).ConfigureAwait(false);
+            }
+
             var resultado = await trabajo(cancelacion).ConfigureAwait(false);
             await transaccion.CommitAsync(cancelacion).ConfigureAwait(false);
             return resultado;
