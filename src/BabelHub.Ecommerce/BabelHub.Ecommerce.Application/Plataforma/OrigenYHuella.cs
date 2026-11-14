@@ -24,8 +24,8 @@ public sealed record OrigenDeSolicitud
     public string? Direccion { get; }
 
     /// <summary>
-    /// Falso cuando una direcciÃ³n reenviada se ignorÃ³ por faltar la credencial de origen (SEG-32): el origen es entonces el de la direcciÃ³n directa
-    /// y no rigen los lÃ­mites por origen, solo los de usuario y el tope general de esa direcciÃ³n.
+    /// Falso cuando una dirección reenviada se ignoró por faltar la credencial de origen (SEG-32): el origen es entonces el de la dirección directa
+    /// y no rigen los límites por origen, solo los de usuario y el tope general de esa dirección.
     /// </summary>
     public bool AplicaLimitesPorOrigen { get; init; } = true;
 
