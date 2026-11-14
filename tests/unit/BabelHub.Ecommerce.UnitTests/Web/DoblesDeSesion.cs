@@ -42,7 +42,7 @@ internal sealed class DoblesDeSesion
 
     public IniciarSesionWeb Iniciar => new(Comun, Unidad, new AreasDeInterfaz(), Aleatorios);
 
-    public CargarSesionWeb Cargar => new(Comun);
+    public CargarSesionWeb Cargar => new(Comun, Unidad);
 
     public AsegurarCredencialDeSesion Asegurar => new(Comun, Unidad, Verificador, Alertas);
 

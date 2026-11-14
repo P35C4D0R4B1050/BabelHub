@@ -56,7 +56,11 @@ public sealed record IngresoCompletado(Guid UsuarioId, RolWeb Rol, string Creden
 }
 
 /// <summary>Lo que hace falta para abrir una sesión web tras un ingreso correcto (WEB-28).</summary>
-public sealed record SolicitudDeInicioDeSesion(HostWeb Host, IngresoCompletado Ingreso, string? ValorDeLaCookieAnterior, bool TieneMarcaDeDispositivoValida);
+public sealed record SolicitudDeInicioDeSesion(HostWeb Host, IngresoCompletado Ingreso, string? ValorDeLaCookieAnterior, bool TieneMarcaDeDispositivoValida)
+{
+    /// <summary>No imprime la cookie anterior (una sesión viva) ni las credenciales (CTL-21).</summary>
+    public override string ToString() => $"SolicitudDeInicioDeSesion {{ Host = {Host} }}";
+}
 
 /// <summary>La sesión abierta: el valor de la cookie opaca (32 bytes aleatorios en base64url) y, si hay que emitirla, la marca de dispositivo nueva.</summary>
 public sealed record SesionIniciada(string ValorDeLaCookie, string? MarcaDeDispositivoNueva)

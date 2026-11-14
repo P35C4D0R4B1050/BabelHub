@@ -34,6 +34,14 @@ internal sealed class AlmacenDeSesionesEnMemoria : IAlmacenDeSesionesWeb
         return Task.CompletedTask;
     }
 
+    public Task ActualizarActividad(HashDeSesion id, DateTimeOffset ultimaActividad, CancellationToken cancelacion = default)
+    {
+        ActualizacionesDeActividad++;
+        return Task.CompletedTask;
+    }
+
+    public int ActualizacionesDeActividad { get; private set; }
+
     public Task<IReadOnlyList<SesionGuardada>> CargarAbiertasDeUnUsuario(Guid usuarioId, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<SesionGuardada>>([.. Filas.Values.Where(f => f.Sesion.UsuarioId == usuarioId && f.Sesion.Estado == EstadoDeSesion.Abierta)]);
 }

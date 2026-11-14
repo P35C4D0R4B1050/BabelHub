@@ -27,6 +27,12 @@ internal sealed class AsegurarCredencialDeSesion(ServiciosDeSesion comun, IUnida
             return Sin(EstadoDeCredencial.SinSesion);
         }
 
+        // La política de la sesión también rige aquí: una sesión vencida por inactividad o por tope no renueva ni verifica nada (CTL-22, WEB-27, WEB-31).
+        if (fila.Sesion.Evaluar(comun.Reloj.Ahora) != EvaluacionDeSesion.Vigente)
+        {
+            return await CerrarPorVencimiento(id, cancelacion).ConfigureAwait(false);
+        }
+
         if (NecesitaRenovarse(fila))
         {
             var resultado = await Renovar(id, cancelacion).ConfigureAwait(false);
@@ -56,6 +62,14 @@ internal sealed class AsegurarCredencialDeSesion(ServiciosDeSesion comun, IUnida
                 var fila = await comun.Sesiones.CargarParaRenovar(id, ct).ConfigureAwait(false);
                 if (fila is null || fila.Sesion.Estado != EstadoDeSesion.Abierta)
                 {
+                    return Sin(EstadoDeCredencial.SinSesion);
+                }
+
+                var evaluacion = fila.Sesion.Evaluar(comun.Reloj.Ahora);
+                if (evaluacion != EvaluacionDeSesion.Vigente)
+                {
+                    await comun.CerrarYRevocar(fila, evaluacion == EvaluacionDeSesion.VencidaPorTopeAbsoluto ? MotivoDeCierre.VencidaPorTopeAbsoluto : MotivoDeCierre.VencidaPorInactividad, ct).ConfigureAwait(false);
+                    await comun.Sesiones.Guardar(fila, ct).ConfigureAwait(false);
                     return Sin(EstadoDeCredencial.SinSesion);
                 }
 
@@ -132,7 +146,9 @@ internal sealed class AsegurarCredencialDeSesion(ServiciosDeSesion comun, IUnida
         }
         catch (SecretoDeSesionIlegibleException)
         {
-            return await unidad.Ejecutar(async ct => await CerrarPorSecretoIlegible(fila, ct).ConfigureAwait(false), cancelacion).ConfigureAwait(false);
+            return await unidad.Ejecutar(
+                async ct => await CerrarPorSecretoIlegible(await comun.Sesiones.CargarParaRenovar(id, ct).ConfigureAwait(false) ?? fila, ct).ConfigureAwait(false),
+                cancelacion).ConfigureAwait(false);
         }
 
         var verificacion = verificador.Verificar(texto, comun.Reloj.Ahora);
@@ -191,14 +207,31 @@ internal sealed class AsegurarCredencialDeSesion(ServiciosDeSesion comun, IUnida
         return (null, await comun.Sesiones.Cargar(id, cancelacion).ConfigureAwait(false));
     }
 
+    /// <summary>Cierra por vencimiento bajo el bloqueo de la fila (si otra solicitud ya la cerró, se respeta).</summary>
+    private async Task<ResultadoDeCredencial> CerrarPorVencimiento(HashDeSesion id, CancellationToken cancelacion) =>
+        await unidad.Ejecutar(
+            async ct =>
+            {
+                var fila = await comun.Sesiones.CargarParaRenovar(id, ct).ConfigureAwait(false);
+                if (fila is not null && fila.Sesion.Estado == EstadoDeSesion.Abierta)
+                {
+                    var evaluacion = fila.Sesion.Evaluar(comun.Reloj.Ahora);
+                    if (evaluacion != EvaluacionDeSesion.Vigente)
+                    {
+                        await comun.CerrarYRevocar(fila, evaluacion == EvaluacionDeSesion.VencidaPorTopeAbsoluto ? MotivoDeCierre.VencidaPorTopeAbsoluto : MotivoDeCierre.VencidaPorInactividad, ct).ConfigureAwait(false);
+                        await comun.Sesiones.Guardar(fila, ct).ConfigureAwait(false);
+                    }
+                }
+
+                return Sin(EstadoDeCredencial.SinSesion);
+            },
+            cancelacion).ConfigureAwait(false);
+
     private async Task<ResultadoDeCredencial> CerrarPorSecretoIlegible(SesionGuardada fila, CancellationToken cancelacion)
     {
-        // Un fallo de descifrado equivale a una sesión inválida: cierre limpio y un evento, nunca un error 500 (D02).
+        // Un fallo de descifrado equivale a una sesión inválida: cierre limpio y un evento, nunca un error 500 (D02). Se revoca lo que se pueda leer.
         await comun.Seguridad.AccesoDenegado(MotivoDeDenegacionWeb.SecretoIlegible, fila.Sesion.UsuarioId, cancelacion).ConfigureAwait(false);
-        fila.RenovacionCifrada = null;
-        fila.Sesion.Cerrar(MotivoDeCierre.CerradaPorRevocacion, comun.Reloj.Ahora);
-        fila.CredencialCifrada = null;
-        fila.CredencialVenceEn = null;
+        await comun.CerrarYRevocar(fila, MotivoDeCierre.CerradaPorRevocacion, cancelacion).ConfigureAwait(false);
         await comun.Sesiones.Guardar(fila, cancelacion).ConfigureAwait(false);
         return Sin(EstadoDeCredencial.SesionCerrada);
     }

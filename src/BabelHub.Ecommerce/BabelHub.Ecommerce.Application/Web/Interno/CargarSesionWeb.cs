@@ -1,3 +1,4 @@
+using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Web;
 
 namespace BabelHub.Ecommerce.Application.Web.Interno;
@@ -7,7 +8,7 @@ namespace BabelHub.Ecommerce.Application.Web.Interno;
 /// inactividad o por tope absoluto (cerrando, revocando la renovación y borrando los secretos), y solo una acción de la persona renueva la actividad, como máximo
 /// una vez por minuto. Una consulta automática nunca renueva ni revive una sesión.
 /// </summary>
-internal sealed class CargarSesionWeb(ServiciosDeSesion comun)
+internal sealed class CargarSesionWeb(ServiciosDeSesion comun, IUnidadDeTrabajo unidad)
 {
     public async Task<ResultadoDeCarga> Ejecutar(string? valorDeLaCookie, HostWeb host, OrigenDeLaAccion origen, CancellationToken cancelacion)
     {
@@ -41,12 +42,20 @@ internal sealed class CargarSesionWeb(ServiciosDeSesion comun)
         if (evaluacion is EvaluacionDeSesion.VencidaPorInactividad or EvaluacionDeSesion.VencidaPorTopeAbsoluto)
         {
             var tope = evaluacion == EvaluacionDeSesion.VencidaPorTopeAbsoluto;
-            var bloqueada = await comun.Sesiones.CargarParaRenovar(sesion.Id, cancelacion).ConfigureAwait(false) ?? fila;
-            if (bloqueada.Sesion.Estado == EstadoDeSesion.Abierta)
-            {
-                await comun.CerrarYRevocar(bloqueada, tope ? MotivoDeCierre.VencidaPorTopeAbsoluto : MotivoDeCierre.VencidaPorInactividad, cancelacion).ConfigureAwait(false);
-                await comun.Sesiones.Guardar(bloqueada, cancelacion).ConfigureAwait(false);
-            }
+            // Bajo la transacción y el bloqueo de la fila: si otra solicitud la cerró o renovó, se respeta.
+            await unidad.Ejecutar(
+                async ct =>
+                {
+                    var bloqueada = await comun.Sesiones.CargarParaRenovar(sesion.Id, ct).ConfigureAwait(false) ?? fila;
+                    if (bloqueada.Sesion.Estado == EstadoDeSesion.Abierta)
+                    {
+                        await comun.CerrarYRevocar(bloqueada, tope ? MotivoDeCierre.VencidaPorTopeAbsoluto : MotivoDeCierre.VencidaPorInactividad, ct).ConfigureAwait(false);
+                        await comun.Sesiones.Guardar(bloqueada, ct).ConfigureAwait(false);
+                    }
+
+                    return true;
+                },
+                cancelacion).ConfigureAwait(false);
 
             return new ResultadoDeCarga(tope ? EstadoDeCarga.VencidaPorTopeAbsoluto : EstadoDeCarga.VencidaPorInactividad, null);
         }
@@ -54,7 +63,8 @@ internal sealed class CargarSesionWeb(ServiciosDeSesion comun)
         // Solo una acción de la persona cuenta (WEB-27); la escritura se limita a una por minuto.
         if (origen == OrigenDeLaAccion.AccionDelUsuario && sesion.RegistrarAccionDelUsuario(ahora))
         {
-            await comun.Sesiones.Guardar(fila, cancelacion).ConfigureAwait(false);
+            // Solo la actividad: nunca la fila completa, que pisaría la credencial que otra solicitud acaba de rotar.
+            await comun.Sesiones.ActualizarActividad(sesion.Id, sesion.UltimaActividad, cancelacion).ConfigureAwait(false);
         }
 
         return new ResultadoDeCarga(EstadoDeCarga.Valida, sesion.UsuarioId);

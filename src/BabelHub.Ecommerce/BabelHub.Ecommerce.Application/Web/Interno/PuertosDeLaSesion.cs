@@ -37,6 +37,12 @@ public interface IAlmacenDeSesionesWeb
 
     Task Guardar(SesionGuardada sesion, CancellationToken cancelacion = default);
 
+    /// <summary>
+    /// Actualiza <b>solo</b> la última actividad (<c>UPDATE … SET ultima_actividad WHERE estado = abierta</c>): una solicitud que solo registra actividad no debe pisar la credencial ni la
+    /// renovación que otra acaba de rotar (R10).
+    /// </summary>
+    Task ActualizarActividad(HashDeSesion id, DateTimeOffset ultimaActividad, CancellationToken cancelacion = default);
+
     Task<IReadOnlyList<SesionGuardada>> CargarAbiertasDeUnUsuario(Guid usuarioId, CancellationToken cancelacion = default);
 }
 
@@ -143,7 +149,7 @@ public enum MotivoDeDenegacionWeb
     IdentificadorDeSesionCerrado,
 }
 
-/// <summary>Puerto hacia <c>Auditoría</c> (<c>IDenegacionDeAcceso</c>): un acceso denegado propio de la web, con un motivo fijo y sin datos de la sesión.</summary>
+/// <summary>Puerto hacia <c>Auditoría</c> (<c>IDenegacionDeAcceso</c>): un acceso denegado propio de la web, con un motivo fijo y sin datos de la sesión. <b>Nunca lanza</b>: un registro de seguridad no interrumpe un caso de uso (el adaptador captura sus fallos, AUD-12).</summary>
 public interface IRegistroDeSeguridadDeLaWeb
 {
     Task AccesoDenegado(MotivoDeDenegacionWeb motivo, Guid? usuarioId, CancellationToken cancelacion = default);

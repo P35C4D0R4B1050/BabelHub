@@ -100,6 +100,8 @@ public sealed class AsegurarCredencialTests
 
         public Task Guardar(SesionGuardada sesion, CancellationToken cancelacion = default) => d.Almacen.Guardar(sesion, cancelacion);
 
+        public Task ActualizarActividad(HashDeSesion id, DateTimeOffset ultimaActividad, CancellationToken cancelacion = default) => d.Almacen.ActualizarActividad(id, ultimaActividad, cancelacion);
+
         public Task<IReadOnlyList<SesionGuardada>> CargarAbiertasDeUnUsuario(Guid usuarioId, CancellationToken cancelacion = default) => d.Almacen.CargarAbiertasDeUnUsuario(usuarioId, cancelacion);
 
         public async Task<SesionGuardada?> CargarParaRenovar(HashDeSesion idCargado, CancellationToken cancelacion = default)
