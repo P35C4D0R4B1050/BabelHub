@@ -27,5 +27,7 @@
     <ProjectReference Include="..\..\..\src\BabelHub.Inventario\BabelHub.Inventario.Infrastructure\BabelHub.Inventario.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\src\BabelHub.Ecommerce\BabelHub.Ecommerce.Api\BabelHub.Ecommerce.Api.csproj" />
     <ProjectReference Include="..\..\..\src\BabelHub.Inventario\BabelHub.Inventario.Api\BabelHub.Inventario.Api.csproj" />
+    <!-- La herramienta de restauración (T30) es de solo lectura y no es un servicio: se prueba aquí, con PostgreSQL real. -->
+    <ProjectReference Include="..\..\..\tools\RestauracionCheck\RestauracionCheck.csproj" />
   </ItemGroup>
 </Project>

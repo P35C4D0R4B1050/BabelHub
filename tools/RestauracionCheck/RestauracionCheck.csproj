@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>BabelHub.Tools.RestauracionCheck</RootNamespace>
+    <AssemblyName>RestauracionCheck</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Solo lectura sobre las bases restauradas del ensayo. No referencia ningún proyecto de los servicios (PLA-13). -->
+    <PackageReference Include="Npgsql" />
+  </ItemGroup>
+</Project>
