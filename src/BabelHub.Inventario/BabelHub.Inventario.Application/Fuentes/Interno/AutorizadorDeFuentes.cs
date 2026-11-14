@@ -63,6 +63,15 @@ internal sealed class AutorizadorDeFuentes(IActorActual actores, IDenegacionDeAc
             },
             cancelacion);
 
+    /// <summary>
+    /// El alcance de <b>toda la red</b>: solo la administración central. Un encargado que lo pide (sin indicar su fuente) se rechaza como fuera de su sucursal y el resto,
+    /// como fuera de rol.
+    /// </summary>
+    public Task<ErrorDeAplicacion?> ExigirRedCompleta(CancellationToken cancelacion) =>
+        Evaluar(
+            actor => actor.EsAdministracionCentral() ? null : actor.EsEncargado() ? MotivosDeDenegacionDeFuentes.FueraDeSucursal : MotivosDeDenegacionDeFuentes.FueraDeRol,
+            cancelacion);
+
     /// <summary>El servicio de avisos (integración o sistema) o la administración central: lo que pide el contacto de notificación de una sucursal.</summary>
     public Task<ErrorDeAplicacion?> ExigirServicioDeAvisosOAdministracion(CancellationToken cancelacion) =>
         Evaluar(
