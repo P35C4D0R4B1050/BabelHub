@@ -2,6 +2,17 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-14 — Tercera ola de carriles en paralelo (fundida a `main`)
+
+### Cubierto
+- **Carril A:** `ITokenDelUsuarioDeLaSesion` en `Application.Plataforma` y `OrdenDePasoDeRestauracion.Web` (R12); `transversal-auditoria` AUD-3: puertos de `Plataforma`, consultas unificadas con cursor firmado, agrupación y envío de alertas, depuración diaria de 2 años y bajas del Inventario (T10, T17–T20).
+- **Carril B:** `inventario-fuentes` T09–T25 (INV-1b e INV-1c): Aplicación, esquema `fuentes` con seguridad por filas, repositorios con el `UPDATE` condicional único, composición con actor de integración y de sistema, endpoints de lectura y administración, pruebas de contrato contra ECO-0 y escenario k6 (no ejecutado). **`inventario-fuentes` T01–T25 completa**; el riesgo del alcance sin actor quedó cubierto con pruebas contra PostgreSQL y el rol real.
+- **Carril C:** `web-base` WEB-1b parcial (T10–T13): almacenes de sesión y borrador bajo el rol `web` con bloqueo de fila, cifrado AES-GCM por host, anillo de Data Protection por host y purga en dos fases.
+- Validación de la fusión: unitarias 1541 y 1479, arquitectura 155, SpecCheck 23, CoverageCheck 12, integración 2601 de 2601, gitleaks limpio.
+
+### Pendiente
+- AUD-4 (hecho en la rama del carril A, sin validar), `web-base` T14–T15 y WEB-1c, INV-2a en adelante; hallazgos nuevos del carril B para A (motivo `alcance-de-datos-sin-actor`, composición del Inventario) y para C (supuestos de contrato) en `progress/hallazgos.md`.
+
 ## 2026-11-14 — Segunda ola de carriles en paralelo (fundida a `main`)
 
 ### Cubierto
