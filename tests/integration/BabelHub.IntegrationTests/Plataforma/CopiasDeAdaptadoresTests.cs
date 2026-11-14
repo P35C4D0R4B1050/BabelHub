@@ -43,7 +43,10 @@ public sealed class CopiasDeAdaptadoresTests
         "Domain/Auditoria/AcumuladoDeLimite.cs",
         "Application/Auditoria/AccionAuditable.cs",
         "Application/Auditoria/SolicitudDeRegistro.cs",
-        "Application/Auditoria/Interno/ConstructorDeRegistros.cs");
+        "Application/Auditoria/Interno/ConstructorDeRegistros.cs",
+        "Application/Auditoria/RegistroAuditado.cs",
+        "Application/Auditoria/ContratosDeAlertas.cs",
+        "Application/Auditoria/ContratosDeConsulta.cs");
 
     [Theory]
     [MemberData(nameof(Archivos))]
