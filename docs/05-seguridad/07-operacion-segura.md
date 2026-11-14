@@ -67,6 +67,7 @@ Todos llegan por variables de entorno con el prefijo `BABELHUB__` (el doble guio
 | `BABELHUB__Integraciones__<Proveedor>__Secreto` y `…SecretoAnterior` | El que recibe el aviso | Secreto de la firma HMAC de cada proveedor de integración (SEG-12). |
 | `BABELHUB__Seguridad__Turnstile__Secreto` | E-commerce | Secreto de `siteverify` de Turnstile (SEG-31). |
 | `BABELHUB__Seguridad__Turnstile__Hostnames` y `…ClaveDeSitio` | E-commerce | No son secretos: los nombres de host permitidos (separados por comas) y la clave de sitio pública del desafío. Se validan igual al arrancar. |
+| `BABELHUB__Almacen__Supresiones__Endpoint`, `…__Region`, `…__ClaveDeAcceso` y `…__ClaveSecreta` | E-commerce | La credencial `supresiones-registro` del almacén de objetos (solo crear y leer en `entradas/`) con la que Identidad escribe el registro de supresiones (PLA-37, PLA-38); el endpoint es https. |
 | `BABELHUB__Seguridad__ClaveDeRedisDeLimites` | E-commerce y réplica de gestión | Contraseña del usuario `limites` del Redis de contadores. |
 | `BABELHUB__Auditoria__ClaveDeCursor` | Ambos, una distinta por servicio | Clave HMAC del cursor firmado de la consulta de auditoría, con versión y rotación (`transversal-auditoria`). |
 

@@ -69,6 +69,14 @@ public sealed class PostgresDeRolesFixture : IAsyncLifetime
             """);
         await entradas.ExecuteNonQueryAsync();
 
+        // El registro de trabajos de fondo y el estado de los umbrales (plataforma.trabajos_de_fondo y plataforma.estado_de_umbrales).
+        await using var trabajos = Administracion.CreateCommand(
+            BabelHub.Ecommerce.Infrastructure.Plataforma.DefinicionDeTrabajosDeFondo.Sql + """
+            ALTER TABLE plataforma.trabajos_de_fondo OWNER TO propietario;
+            ALTER TABLE plataforma.estado_de_umbrales OWNER TO propietario;
+            """ + BabelHub.Ecommerce.Infrastructure.Plataforma.DefinicionDeTrabajosDeFondo.Permisos);
+        await trabajos.ExecuteNonQueryAsync();
+
         var cadena = new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString())
         {
             Username = "acceso",
