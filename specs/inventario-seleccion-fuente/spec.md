@@ -1,14 +1,16 @@
 ---
 id: inventario-seleccion-fuente
 titulo: Reservas y selección de fuente
-estado: Approved
-aprobado_por: Claude (delegado por Diego Amiquero)
-aprobado_en: 2026-11-13
+estado: Planned
 servicio: Inventario
 prefijo: SEL
 origen: [RF04, RF14, RF15, RF27, RF28, NN02, NN06, NN07, NN18]
-calidad: [AC01, AC05, AC04, RNF01, RNF09, RNF23]
+calidad: [AC01, AC05, AC04, RNF01, RNF05, RNF09, RNF23]
 depende: [inventario-fuentes, identidad-seguridad, transversal-auditoria, transversal-seguridad]
+aprobado_por: Claude (delegado por Diego Amiquero)
+aprobado_en: 2026-11-14
+plan_aprobado_por: Claude (delegado por Diego Amiquero)
+plan_aprobado_en: 2026-11-14
 ---
 
 # Spec — Reservas y selección de fuente
@@ -24,7 +26,7 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 | Reservas temporales con expiración, confirmación y liberación. | El ciclo de vida del traslado (`inventario-traslados`). |
 | Selección de la fuente de cada línea impresa y su consulta previa sin reservar. | El cobro y el pedido (`ecommerce-pagos`, `ecommerce-pedidos`). |
 | Atomicidad ante solicitudes simultáneas. | Libros digitales: nunca se reservan. |
-| Límite de reservas temporales por cliente (una pendiente y 5 por hora) y por origen (10 por hora). | El formato de rechazo, el registro del evento y los demás límites de uso (`transversal-seguridad`). |
+| Límite de reservas temporales por cliente (una pendiente y 5 por hora), por origen (10 por hora) y de 3 reemplazos por reserva pendiente. | El formato de rechazo, el registro del evento y los demás límites de uso (`transversal-seguridad`). |
 
 ## 3. Requisitos (EARS)
 
@@ -50,14 +52,14 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 | SEL-18 | Ubicuo | El sistema deberá comprobar y registrar los límites de reservas de forma atómica ante solicitudes simultáneas del mismo cliente o del mismo origen. | RF28, AC01, AC04 |
 | SEL-19 | No deseado | Si un mismo origen ya inició 10 reservas temporales en una ventana deslizante de una hora, entonces el sistema deberá rechazar la nueva solicitud. | RF28, AC04 |
 | SEL-20 | Evento | Cuando el E-commerce consulta la selección de fuentes de un carrito, el sistema deberá responder, por cada línea impresa, la fuente que se seleccionaría, si implica un traslado y su plazo estimado, o la falta de stock, sin crear reservas ni modificar el stock vendible, ignorando las líneas digitales y sujeto al límite general de solicitudes. | RF04, RF15 |
-| SEL-21 | Evento | Cuando logística pasa a en reparto un envío a domicilio, el sistema deberá descontar el stock físico de la fuente de cada línea impresa del envío y cerrar sus reservas confirmadas. | RF14 |
-| SEL-22 | Evento | Cuando el E-commerce informa que el pago de un pedido quedó pendiente de confirmación, el sistema deberá extender una sola vez la expiración de sus reservas pendientes hasta 30 minutos desde que se inició el pago. | RF14 |
+| SEL-21 | Evento | Cuando logística o administración pasa a en reparto un envío a domicilio, el sistema deberá descontar el stock físico de la fuente de cada línea impresa del envío y cerrar sus reservas confirmadas; si esas líneas ya se cerraron por el mismo motivo y el mismo envío, deberá responder que ya estaban cerradas (`ya-cerrada`) sin descontar otra vez, aunque la clave de idempotencia sea nueva. | RF14 |
+| SEL-22 | Evento | Cuando el E-commerce informa que el pago de un pedido quedó pendiente de confirmación, el sistema deberá extender una sola vez la expiración de sus reservas pendientes hasta 30 minutos desde que se inició el pago, y solo una vez por pedido, incluidas las reservas que lo reemplazan. | RF14 |
 | SEL-23 | No deseado | Si la región de la dirección no tiene fuente, o dos fuentes tienen el mismo plazo de ruta, entonces el sistema deberá elegir la de mayor stock vendible y, si empatan, la de código menor. | RF15 |
 | SEL-24 | Evento | Cuando se reserva una línea impresa de un pedido a domicilio, el sistema deberá seleccionar la fuente de la región de la dirección y, si no tiene stock vendible suficiente, la de menor plazo de ruta hacia la sucursal de esa región, sin generar un traslado. | RF15 |
 | SEL-25 | Ubicuo | El sistema deberá tratar como la menos cercana a una fuente cuya ruta no está definida, y no dividir una línea entre varias fuentes. | RF15 |
 | SEL-26 | No deseado | Si una solicitud pierde la última unidad de una fuente pero otra fuente tiene stock vendible suficiente, entonces el sistema deberá reasignarla a esa fuente; y si ninguna lo tiene, rechazarla por falta de stock según SEL-05. | AC01, RF14 |
 | SEL-27 | Ubicuo | El sistema deberá excluir del stock vendible las reservas pendientes vencidas y liberar las vencidas de una edición, en la misma transacción, al reservar esa edición. | RF14, AC01 |
-| SEL-28 | No deseado | Si se intenta entregar, pasar a en reparto o despachar un pedido cuya reserva no está confirmada (liberada, expirada o ya cerrada), entonces el sistema deberá rechazar la operación por estado inválido sin cambiar el stock. | RF14, AC01 |
+| SEL-28 | No deseado | Si se intenta entregar, pasar a en reparto o despachar un pedido cuya reserva no está confirmada (liberada, expirada o cerrada por otra operación), entonces el sistema deberá rechazar la operación por estado inválido sin cambiar el stock. | RF14, AC01 |
 | SEL-29 | No deseado | Si dos operaciones compiten por la misma reserva (anulación, no recogido, entrega, reparto, despacho de traslado o expiración), entonces el sistema deberá aplicar la primera que confirma y rechazar las demás por estado inválido, sin efectos parciales. | AC01, RNF01 |
 | SEL-30 | No deseado | Si el aviso de pago pendiente llega con la reserva ya vencida, confirmada o liberada, entonces el sistema deberá ignorarlo y mantener su estado. | RF14 |
 | SEL-31 | No deseado | Si se repite una clave de idempotencia con una carga distinta, entonces el sistema deberá rechazar la solicitud indicando el conflicto. | RF14, AC01 |
@@ -65,6 +67,10 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 | SEL-33 | Evento | Cuando el E-commerce consulta los pendientes de un cliente por el puerto de `identidad-seguridad` (IDE-27) con la credencial de servicio de consulta de pendientes (IDE-30), el sistema deberá informar cuántas reservas confirmadas o pendientes no vencidas (SEL-08) tiene, sin datos de las ediciones, y rechazar la consulta que llegue sin esa credencial. | RF14, RF27 |
 | SEL-34 | Evento | Cuando el E-commerce entrega la baja de un titular (IDE-72) con la credencial de servicio de baja de titular (IDE-30), el sistema deberá sustituir su identificador en las reservas y en las claves de los eventos de límite por un identificador anónimo estable, calculado con una clave secreta del entorno que no permita recuperar el original, de forma repetible y sin alterar el stock ni las unidades vendidas. | RF14, RF27, RNF23 |
 | SEL-35 | Evento | Cuando el sistema procesa la baja de un titular, deberá eliminar la huella de origen de sus reservas sin alterar el conteo del límite por origen (SEL-19), conservar la unicidad de la idempotencia y rechazar la baja que llegue sin la credencial de servicio de ese alcance. | RF14, RF27, RNF23 |
+| SEL-36 | No deseado | Si un cliente ya reemplazó 3 veces la reserva pendiente de un mismo pedido, entonces el sistema deberá rechazar un nuevo reemplazo con el código estable del límite, los segundos de espera y el instante en que vence la reserva vigente (SEG-07), conservarla y registrar el evento de seguridad según SEL-15, contando este límite con su propio motivo en la clave de SEG-08. | RF28, AC04 |
+| SEL-37 | Ubicuo | El sistema deberá contar los reemplazos de cada pedido de forma atómica ante solicitudes simultáneas, sin contar el rechazado por falta de stock ni por el tope; la cuenta se reinicia al confirmarse, liberarse por otro motivo o expirar la reserva, y cada reemplazo reinicia la expiración a 15 minutos sin conservar la extensión de SEL-22. | RF28, AC01, AC04 |
+| SEL-38 | Evento | Cuando se repite con la misma clave el cierre de una reserva por entrega o reparto, el sistema deberá comprobar primero el alcance de quien lo repite (si no lo tiene, rechazarlo como acceso denegado sin revelar el resultado guardado); con la misma carga, devolver el resultado original sin descontar otra vez; con otra, rechazarlo como conflicto (SEL-31). La clave se acota por reserva. | RF14, AC01, RNF05 |
+| SEL-39 | Ubicuo | El sistema deberá comprobar el alcance de quien cierra, libera o extiende una reserva antes de la clave, el estado o `ya-cerrada`: la entrega con la sucursal de recojo (o administración), el paso a en reparto con el rol de logística o administración, y liberar y extender con la credencial de su alcance; un usuario sin alcance recibe 403 y una credencial de otro alcance el 401 uniforme, con evento. | RF14, RNF05 |
 
 ## 4. Criterios de aceptación
 
@@ -90,7 +96,7 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 | AC-SEL-18 | SEL-18 | **Dado** un cliente sin reservas, **cuando** envía 10 solicitudes de reserva simultáneas de pedidos distintos, **entonces** exactamente una se acepta. |
 | AC-SEL-19 | SEL-19, SEL-18 | **Dado** un origen con 10 reservas iniciadas en la última hora por cuentas distintas, **cuando** otra cuenta del mismo origen intenta reservar, **entonces** se rechaza con la respuesta de límite excedido; y si 12 cuentas del mismo origen reservan a la vez, exactamente 10 se aceptan. |
 | AC-SEL-20 | SEL-20 | **Dado** un carrito con un libro que solo está en Cusco y recojo en Ayacucho, con una ruta de 2 días, **cuando** el E-commerce consulta la selección, **entonces** responde fuente Cusco, con traslado y plazo de 2 días, y el vendible y las reservas no cambian; y con una línea sin stock en la red responde la falta de stock, y una línea digital se ignora. |
-| AC-SEL-21 | SEL-21 | **Dado** un pedido a domicilio con una reserva confirmada de 1 unidad en Cusco con físico 9, **cuando** logística pasa el envío a en reparto, **entonces** el físico de Cusco pasa a 8 y la reserva queda cerrada; y si se repite la operación, el físico no baja otra vez. |
+| AC-SEL-21 | SEL-21 | **Dado** un pedido a domicilio con una reserva confirmada de 1 unidad en Cusco con físico 9, **cuando** logística pasa el envío a en reparto, **entonces** el físico de Cusco pasa a 8 y la reserva queda cerrada; y si se repite la operación, aunque sea con otra clave de idempotencia, la respuesta indica que la línea ya estaba cerrada (`ya-cerrada`) y el físico no baja otra vez. |
 | AC-SEL-22 | SEL-07 | **Dado** una reserva confirmada de 1 unidad con físico 9 de un pedido de recojo no recogido, **cuando** el pedido se marca como no recogido, **entonces** la reserva se libera, el vendible sube en 1 y el físico sigue en 9. |
 | AC-SEL-23 | SEL-02 | **Dado** un libro con vendible en Cusco y en Lima, rutas de 2 días de Cusco a Ayacucho y de 4 días de Lima a Ayacucho, y una sucursal Ayacucho sin vendible, **cuando** se reserva para recojo en Ayacucho, **entonces** se elige Cusco; y **dado** un pedido a domicilio con dirección en la región de Cusco y vendible en Cusco, **cuando** se reserva, **entonces** la fuente es Cusco sin traslado; y con una ruta sin definir, esa fuente se trata como la menos cercana. |
 | AC-SEL-24 | SEL-22 | **Dado** una reserva pendiente que vence a los 15 minutos y un pago pendiente de confirmación, **cuando** el E-commerce lo informa, **entonces** la reserva vence a los 30 minutos desde el inicio del pago; y si se informa otra vez, no se extiende de nuevo. |
@@ -106,13 +112,17 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 | AC-SEL-34 | SEL-25 | **Dado** dos fuentes con vendible suficiente, una con ruta definida de 4 días y otra sin ruta, **cuando** se reserva para recojo, **entonces** se elige la de ruta definida; y una línea de 5 unidades nunca se divide entre dos fuentes: si ninguna tiene 5, se rechaza por falta de stock. |
 | AC-SEL-35 | SEL-33 | **Dado** un cliente con una reserva confirmada, otro con solo una reserva pendiente ya vencida y otro sin reservas, **cuando** el E-commerce consulta sus pendientes con la credencial de servicio, **entonces** el primero figura con una reserva y los otros dos con ninguna, sin datos de las ediciones; y una consulta sin esa credencial, o con la de otro alcance o la de un cliente, se rechaza. |
 | AC-SEL-36 | SEL-34, SEL-35 | **Dado** la baja de un titular con reservas confirmadas y cerradas, con huella de origen, y claves de límite, **cuando** el Inventario la procesa, **entonces** esos datos llevan un identificador anónimo distinto del original y de otro titular, la huella de origen desaparece, el stock y las unidades vendidas no cambian, la unicidad de la idempotencia se conserva, el conteo por hora del origen sigue incluyendo esas reservas y repetir la baja no cambia nada; la baja de un titular sin reservas termina sin error; y una baja sin la credencial de servicio de ese alcance se rechaza. |
+| AC-SEL-37 | SEL-36, SEL-16 | **Dado** un cliente que reemplazó 3 veces su reserva pendiente de un mismo pedido, **cuando** intenta un cuarto reemplazo, **entonces** se rechaza con el motivo del límite y el instante en que vence la reserva vigente, la vigente se conserva sin cambios y queda el evento de seguridad; los tres reemplazos aceptados no consumieron ninguna de las 5 reservas por hora. |
+| AC-SEL-38 | SEL-37 | **Dado** una reserva pendiente con 2 reemplazos, **cuando** 10 reemplazos llegan a la vez, **entonces** exactamente uno se acepta; **y dado** un reemplazo rechazado por falta de stock, **entonces** no cuenta entre los 3; **y** la liberación que produce un reemplazo no reinicia la cuenta (el cuarto reemplazo consecutivo se rechaza) mientras que un pedido nuevo, tras confirmarse, liberarse o expirar el anterior, parte de cero; **y** cada reemplazo reinicia la expiración a 15 minutos aunque la anterior se hubiera extendido. |
+| AC-SEL-39 | SEL-38, SEL-21, SEL-28 | **Dado** un envío a domicilio ya descontado con una clave, **cuando** se repite con la misma clave y carga, **entonces** se devuelve el resultado original y el físico no baja otra vez; con otra carga se rechaza como conflicto; sobre una reserva cerrada por otra operación se rechaza por estado inválido; y quien no tiene alcance sobre esa reserva recibe el rechazo de acceso denegado (403) con el evento de seguridad, y no el resultado guardado. |
+| AC-SEL-40 | SEL-39 | **Dado** una reserva confirmada para recojo en Ayacucho y un envío a domicilio de otra, **cuando** un encargado de Cusco intenta entregar la primera, o un usuario de otro rol intenta pasar a en reparto la segunda o una credencial de servicio de otro alcance intenta liberarla o extenderla, **entonces** los dos primeros se rechazan con acceso denegado (403) y el tercero con el 401 uniforme, todos con evento de seguridad antes de mirar la clave, el estado o `ya-cerrada`, y no se revela si la reserva existe, está cerrada o tiene un resultado guardado. |
 
 ## 5. Reglas e invariantes
 
 - Reserva: pendiente → confirmada, o pendiente → liberada / expirada. Una reserva confirmada pasa a cerrada al entregar un pedido de recojo o al pasar a en reparto un envío a domicilio; se libera si el pedido se anula o se marca como no recogido; y, si su fuente despacha un traslado vinculado al pedido, se consume en el origen y se vuelve a crear en el destino al recibirlo (`inventario-traslados`).
 - Una reserva no descuenta el stock físico; lo reduce el vendible. El físico baja al entregar (recojo), al pasar a en reparto (domicilio) o al despachar el traslado (origen).
 - La consulta previa de selección (SEL-20) es de solo lectura: no cuenta para los límites de reservas ni para el vendible.
-- El tiempo de expiración es de 15 minutos desde que se inicia el pago, y de hasta 30 minutos si el pago queda pendiente de confirmación (SEL-22).
+- El tiempo de expiración es de 15 minutos desde que se inicia el pago, y de hasta 30 minutos si el pago queda pendiente de confirmación, concedido una sola vez por pedido (SEL-22).
 - La reserva de un pedido es atómica: se reservan todas las líneas impresas o ninguna.
 - El límite de «una pendiente» cuenta solo las reservas temporales pendientes; una reserva expirada, liberada o confirmada deja de contar. Las reservas confirmadas de pedidos pagados no limitan nuevas compras. Todas las iniciadas con éxito cuentan para el límite de 5 por hora del cliente y de 10 por hora del origen.
 - El conteo del límite por origen (SEL-19) se lleva en los eventos de límite con la huella no reversible del origen (SEG-25), que se purgan a las 24 horas, y no en la huella de las reservas: por eso la baja de un titular (SEL-35) no libera cupo del origen.
@@ -126,6 +136,7 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 - Una confirmación de reserva ya expirada se rechaza y obliga a reiniciar el pago.
 - Una liberación repetida de la misma reserva no cambia el stock otra vez.
 - Repetir una solicitud con la misma clave de idempotencia no cuenta como una reserva nueva para los límites.
+- Un reemplazo reinicia la expiración de 15 minutos; para que reemplazar no sirva para retener stock sin pagar, cada reserva pendiente admite como máximo 3 reemplazos (SEL-36 y SEL-37, decididos por delegación de la persona responsable el 2026-11-14: «fija un tope bajo tu criterio»; la cifra 3 es del agente). Riesgo residual aceptado: una reserva puede retener unidades hasta 75 minutos (3 reservas de 15 minutos y la última de 30, porque SEL-22 extiende una sola vez por pedido hasta 30 minutos desde que se inició el pago; cifra corregida el 2026-11-14 tras la revisión: sin el límite de una extensión por pedido el máximo sería mucho mayor) y luego iniciar otra con el costo de una de las 5 por hora.
 
 ## 7. Preguntas abiertas
 

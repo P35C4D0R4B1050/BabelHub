@@ -7,6 +7,7 @@ Aplica la Ley N.° 29733 y su reglamento (DS 016-2024-JUS) de forma **proporcion
 | Dato | Quién lo aporta | Finalidad | Base | Dónde vive | Quién lo ve | Retención |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | Nombre y correo (verificado) | Cliente al registrarse | Identificar la cuenta, contactar, verificar y recuperar el acceso | Ejecución del servicio | Identidad | El titular; la administración | Mientras la cuenta esté activa |
+| Usuario responsable y nota de un ajuste o de un ingreso de mercadería | Personal de la sucursal o administración central | Dejar constancia de quién y por qué movió el stock (AUD-04, AJU-20) | Interés legítimo (control del inventario) | Inventario (`ajustes`, `ingresos`) | La administración central | Dos años; luego se anonimiza (AJU-21) |
 | Número de WhatsApp (opcional) | Cliente | Avisar el estado de pedidos, solo con consentimiento | Consentimiento | Identidad | El titular; el notificador (solo el número) | Mientras la cuenta esté activa o hasta que se revoque el consentimiento |
 | Consentimientos (WhatsApp y tratamiento) y aceptación de términos, privacidad y reembolso (versión y fecha) | Cliente | Probar la autorización y respetar su revocación | Obligación legal | Identidad y pedido | El titular; la administración | Dos años desde su revocación o desde el pedido *(propuesta)* |
 | Declaración de ser mayor de 18 años | Cliente al registrarse | Excluir a menores de edad del servicio | Ejecución del servicio | Identidad | El titular; la administración | Mientras la cuenta esté activa |
@@ -73,6 +74,7 @@ Cada proveedor recibe solo los datos mínimos necesarios (RC17).
 
 | Dato | Plazo | Mecanismo |
 | :--- | :--- | :--- |
+| Ajustes e ingresos de mercadería del Inventario (usuario responsable y nota) | 2 años (decisión del 2026-11-14) | AJU-21: depuración diaria con un rol propio, distinto de la aplicación, que anonimiza el usuario y vacía la nota y deja registro de su ejecución; el movimiento y sus cantidades se conservan. |
 | Auditoría y eventos de seguridad | 2 años | Depuración diaria: se anonimiza el usuario, la dirección IP, los campos personales del detalle y, cuando identifican a una persona, el rol y el objeto; las cuentas canceladas, en la depuración siguiente (AUD-19, AUD-32). El residuo anonimizado (acción, fecha, tipo y resultado) se conserva sin plazo (AUD-11). |
 | Hojas de reclamación | Al menos 2 años; no se eliminan antes | REC-06. |
 | Pedidos | 2 años (decisión del 2026-11-13) | PED-34 y PED-39: depuración diaria con auditoría sin datos personales; al cancelar la cuenta, PED-33. El pedido conserva el identificador opaco de la cuenta (decisión del 2026-11-13). |
