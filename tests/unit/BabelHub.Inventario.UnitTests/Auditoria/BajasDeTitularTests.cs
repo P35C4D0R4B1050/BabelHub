@@ -93,7 +93,7 @@ public sealed class BajasDeTitularTests
     public async Task CadaBajaNuevaSeAudita_ConElIdentificadorOpacoComoObjetoYSinMasDatos()
     {
         var auditoria = new AuditoriaEspia();
-        var servicio = new AuditoriaDeBajasRecibidas(auditoria, ActorDePrueba.DeIntegracion("ecommerce"));
+        var servicio = new AuditoriaDeBajasRecibidas(auditoria, ActorDePrueba.DeIntegracion("baja-de-titular"));
 
         await servicio.Registrar(Valida(), esNueva: true);
 
@@ -109,7 +109,7 @@ public sealed class BajasDeTitularTests
     public async Task LaRepeticionDeLaMismaBajaNoEscribeUnaSegundaAuditoria()
     {
         var auditoria = new AuditoriaEspia();
-        var servicio = new AuditoriaDeBajasRecibidas(auditoria, ActorDePrueba.DeIntegracion("ecommerce"));
+        var servicio = new AuditoriaDeBajasRecibidas(auditoria, ActorDePrueba.DeIntegracion("baja-de-titular"));
 
         await servicio.Registrar(Valida(), esNueva: true);
         await servicio.Registrar(Valida(), esNueva: false);
@@ -123,7 +123,7 @@ public sealed class BajasDeTitularTests
     public async Task SiNoSePuedeAuditar_LaBajaNoSeGuarda_PorqueLaExcepcionPropagaYRevierteLaTransaccionDeReservas()
     {
         var auditoria = new AuditoriaEspia { Caida = true };
-        var servicio = new AuditoriaDeBajasRecibidas(auditoria, ActorDePrueba.DeIntegracion("ecommerce"));
+        var servicio = new AuditoriaDeBajasRecibidas(auditoria, ActorDePrueba.DeIntegracion("baja-de-titular"));
 
         await Assert.ThrowsAsync<AuditoriaNoDisponibleException>(() => servicio.Registrar(Valida(), esNueva: true));
     }
@@ -149,8 +149,8 @@ public sealed class BajasDeTitularTests
     {
         var catalogo = CatalogoDeAccionesDeAuditoria.Crear();
         var almacen = new AlmacenDeRegistrosEnMemoria();
-        var constructor = new ConstructorDeRegistros(ServicioDeOrigen.Inventario, catalogo, new RelojFijo(Ahora), ActorDePrueba.DeIntegracion("ecommerce"), new OrigenFijo(OrigenDeSolicitud.Desconocido));
-        var servicio = new AuditoriaDeBajasRecibidas(new AuditoriaDeAplicacion(constructor, almacen), ActorDePrueba.DeIntegracion("ecommerce"));
+        var constructor = new ConstructorDeRegistros(ServicioDeOrigen.Inventario, catalogo, new RelojFijo(Ahora), ActorDePrueba.DeIntegracion("baja-de-titular"), new OrigenFijo(OrigenDeSolicitud.Desconocido));
+        var servicio = new AuditoriaDeBajasRecibidas(new AuditoriaDeAplicacion(constructor, almacen), ActorDePrueba.DeIntegracion("baja-de-titular"));
 
         await servicio.Registrar(Valida(), esNueva: true);
 

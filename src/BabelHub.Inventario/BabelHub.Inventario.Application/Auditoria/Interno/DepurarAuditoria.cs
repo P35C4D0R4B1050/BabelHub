@@ -148,16 +148,27 @@ public sealed class DepurarAuditoria(
                 return new ResultadoDeDepuracion(EstadoDeLaCorridaDeDepuracion.EnEspera, 0, 0, false);
             }
 
+            (int Anonimizados, int Nuevos) hecho;
             try
             {
-                var (anonimizados, nuevos) = await unidad.Ejecutar(async ct => await Depurar(ahora, ct).ConfigureAwait(false), cancelacion).ConfigureAwait(false);
-                await estados.Guardar(new EstadoDeLaDepuracion(ahora, null, 0, null), cancelacion).ConfigureAwait(false);
-                return new ResultadoDeDepuracion(EstadoDeLaCorridaDeDepuracion.Ejecutada, anonimizados, nuevos, false);
+                hecho = await unidad.Ejecutar(async ct => await Depurar(ahora, ct).ConfigureAwait(false), cancelacion).ConfigureAwait(false);
             }
             catch (Exception falla) when (falla is not OperationCanceledException)
             {
                 return await RegistrarFallo(estado, ahora, cancelacion).ConfigureAwait(false);
             }
+
+            // La unidad ya confirmó (anonimización y registro de la ejecución): que no se pueda anotar el estado no la convierte en fallo ni la repite (otro registro, otra alerta falsa a las 24 horas).
+            try
+            {
+                await estados.Guardar(new EstadoDeLaDepuracion(ahora, null, 0, null), cancelacion).ConfigureAwait(false);
+            }
+            catch (Exception falla) when (falla is not OperationCanceledException)
+            {
+                // El próximo estado exitoso lo corrige.
+            }
+
+            return new ResultadoDeDepuracion(EstadoDeLaCorridaDeDepuracion.Ejecutada, hecho.Anonimizados, hecho.Nuevos, false);
         }
     }
 

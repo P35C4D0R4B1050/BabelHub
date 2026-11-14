@@ -83,7 +83,11 @@ public interface IAlmacenDeAlertas
     /// <summary>La alerta más reciente del servicio y motivo, con bloqueo asesor por servicio y motivo en la transacción en curso: dos ocurrencias simultáneas no abren dos alertas.</summary>
     Task<AlertaAgrupada?> UltimaDelMotivoParaActualizar(ServicioDeOrigen servicio, string motivo, CancellationToken cancelacion = default);
 
-    /// <summary>La alerta por su identificador (con bloqueo para actualizar si hay transacción en curso).</summary>
+    /// <summary>
+    /// La alerta por su identificador. <b>Dentro de una unidad de trabajo toma el mismo bloqueo asesor por servicio y motivo</b> que <see cref="UltimaDelMotivoParaActualizar"/>, o <see cref="Guardar"/> actualiza
+    /// por columnas (<c>ocurrencias = ocurrencias + 1</c>, <c>revisadas_hasta = GREATEST(…)</c>): marcar como revisada y sumar una ocurrencia al mismo tiempo no pueden pisarse (AUD-34, AUD-39); la
+    /// prueba de concurrencia con PostgreSQL real es de AUD-4.
+    /// </summary>
     Task<AlertaAgrupada?> Obtener(string id, CancellationToken cancelacion = default);
 
     /// <summary>Inserta la alerta o actualiza la existente (mismo identificador).</summary>
@@ -95,7 +99,10 @@ public interface IAlmacenDeAlertas
     /// </summary>
     Task<IReadOnlyList<AlertaAgrupada>> ListarDeSeguridad(PosicionDeAlerta? despuesDe, int maximo, CancellationToken cancelacion = default);
 
-    /// <summary>Las alertas (de seguridad y técnicas) con ocurrencia posterior a <paramref name="desde"/> (lectura del Inventario por el E-commerce, AUD-38), hasta <paramref name="maximo"/>.</summary>
+    /// <summary>
+    /// Las alertas (de seguridad y técnicas) con ocurrencia posterior a <paramref name="desde"/> (lectura del Inventario por el E-commerce, AUD-38), <b>en orden ascendente por <c>(última ocurrencia, id)</c></b> y hasta
+    /// <paramref name="maximo"/>: si hay más, el lector sigue desde la última que vio (la marca avanza solo hasta ahí).
+    /// </summary>
     Task<IReadOnlyList<AlertaAgrupada>> Desde(DateTimeOffset desde, int maximo, CancellationToken cancelacion = default);
 }
 

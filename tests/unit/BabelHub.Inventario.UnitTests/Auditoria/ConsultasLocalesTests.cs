@@ -183,7 +183,7 @@ public sealed class ConsultasLocalesTests
     [Trait("Criterio", "AC-AUD-30")]
     public async Task ElServicioLeeLasAlertasNuevasSinQueSeRechace_ElEncargadoYElClienteNo()
     {
-        var e = new Entorno(ActorDePrueba.DeIntegracion("ecommerce"));
+        var e = new Entorno(ActorDePrueba.DeIntegracion("lectura-alertas"));
         e.Guardar(MotivosDeAlerta.TrabajoDeFondoDetenido, 1, Ahora.AddMinutes(-2));
         e.Guardar(MotivosDeAlerta.AccesosDenegados, 3, Ahora.AddDays(-1));
 

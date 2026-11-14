@@ -152,7 +152,7 @@ public sealed class AlertasEHistorialTests
     [Trait("Criterio", "AC-AUD-30")]
     public async Task ElIntegradorOElSistemaLeenLasAlertasNuevasConSuCredencialDeServicio()
     {
-        foreach (var actor in new[] { ActorDePrueba.DeIntegracion("ecommerce"), ActorDePrueba.DelSistema() })
+        foreach (var actor in new[] { ActorDePrueba.DeIntegracion("lectura-alertas") })
         {
             var e = new Entorno(actor);
             e.Guardar(MotivosDeAlerta.TrabajoDeFondoDetenido, 1, Ahora.AddMinutes(-3));

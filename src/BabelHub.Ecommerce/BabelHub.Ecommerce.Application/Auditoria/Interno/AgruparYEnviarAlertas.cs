@@ -137,14 +137,14 @@ public sealed class AgruparYEnviarAlertas(
             if (!catalogo.Contiene(alerta.Motivo) || !catalogo.Obtener(alerta.Motivo).EnviablePorCorreo || ahora - alerta.UltimaOcurrencia > EsperaCrecienteDeCorreo.Caducidad)
             {
                 // Una alerta originada por el propio correo, o que ya caducó, no se envía: se deja de reintentar y queda en el registro técnico.
-                await Marcar(alerta, cancelacion).ConfigureAwait(false);
+                await Anotar(() => Marcar(alerta, cancelacion)).ConfigureAwait(false);
                 continue;
             }
 
             try
             {
                 var resultado = await correo.Enviar(ADelCorreo(alerta), activos, cancelacion).ConfigureAwait(false);
-                await Marcar(alerta, cancelacion).ConfigureAwait(false);
+                await Anotar(() => Marcar(alerta, cancelacion)).ConfigureAwait(false);
                 contadores.Sumar(resultado);
             }
             catch (Exception falla) when (falla is not OperationCanceledException)
@@ -169,8 +169,10 @@ public sealed class AgruparYEnviarAlertas(
         }
 
         var todasAtendidas = true;
+        var ultimaLeida = marcaActual;
         foreach (var alerta in respuesta.Valor.Where(a => a.Servicio == ServicioAuditado.Inventario).OrderBy(a => a.PrimeraOcurrencia).ThenBy(a => a.Id, StringComparer.Ordinal))
         {
+            ultimaLeida = ultimaLeida is null || alerta.UltimaOcurrencia > ultimaLeida ? alerta.UltimaOcurrencia : ultimaLeida;
             if (await yaEnviadas.Contiene(alerta.Id, cancelacion).ConfigureAwait(false))
             {
                 continue;
@@ -178,14 +180,14 @@ public sealed class AgruparYEnviarAlertas(
 
             if (!catalogo.Contiene(alerta.Motivo.Valor) || !catalogo.Obtener(alerta.Motivo.Valor).EnviablePorCorreo)
             {
-                await yaEnviadas.Marcar(alerta.Id, cancelacion).ConfigureAwait(false);
+                await Anotar(() => yaEnviadas.Marcar(alerta.Id, cancelacion)).ConfigureAwait(false);
                 continue;
             }
 
             try
             {
                 var resultado = await correo.Enviar(new CorreoDeAlerta(alerta.Servicio, alerta.Motivo, alerta.Clase, alerta.PrimeraOcurrencia, alerta.Ocurrencias), activos, cancelacion).ConfigureAwait(false);
-                await yaEnviadas.Marcar(alerta.Id, cancelacion).ConfigureAwait(false);
+                await Anotar(() => yaEnviadas.Marcar(alerta.Id, cancelacion)).ConfigureAwait(false);
                 contadores.Sumar(resultado);
             }
             catch (Exception falla) when (falla is not OperationCanceledException)
@@ -195,13 +197,32 @@ public sealed class AgruparYEnviarAlertas(
             }
         }
 
-        // La marca solo avanza si no quedó ninguna sin atender: la siguiente lectura la vuelve a ver y, si ya se envió, el registro de enviadas la salta.
+        // La marca solo avanza si no quedó ninguna sin atender: la siguiente lectura la vuelve a ver y, si ya se envió, el registro de enviadas la salta. Si la lectura llegó al tope
+        // (el Inventario devolvió su máximo), avanza solo hasta la última ocurrencia leída, no hasta ahora: lo que no cupo se lee en la corrida siguiente y nunca se pierde (AUD-38).
         if (todasAtendidas)
         {
-            await marca.Guardar(ahora, cancelacion).ConfigureAwait(false);
+            var truncada = respuesta.Valor.Count >= HorizonteDeAlertas.MaximoPorLectura;
+            var nueva = truncada && ultimaLeida is { } leida ? leida : ahora;
+            await Anotar(() => marca.Guardar(nueva, cancelacion)).ConfigureAwait(false);
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Una anotación posterior al envío (marcar la alerta o el registro de enviadas, avanzar la marca) que falla <b>no es un fallo del correo</b>: no cuenta como intento ni publica
+    /// «correo no disponible» y no aborta la corrida; la corrida siguiente lo vuelve a intentar (a lo sumo repite un correo, nunca lo pierde).
+    /// </summary>
+    private static async Task Anotar(Func<Task> anotacion)
+    {
+        try
+        {
+            await anotacion().ConfigureAwait(false);
+        }
+        catch (Exception falla) when (falla is not OperationCanceledException)
+        {
+            // Se reintenta en la próxima corrida.
+        }
     }
 
     private static CorreoDeAlerta ADelCorreo(AlertaAgrupada alerta) =>

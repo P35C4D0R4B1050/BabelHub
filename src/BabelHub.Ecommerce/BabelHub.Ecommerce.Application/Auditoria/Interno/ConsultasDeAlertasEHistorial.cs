@@ -111,7 +111,7 @@ public sealed class ConsultaDeAlertasUnificada(
     public async Task<Resultado<IReadOnlyList<AlertaConsultada>>> LeerNuevas(DateTimeOffset desde, CancellationToken cancelacion = default)
     {
         var actor = actores.Actual;
-        if (!RolesDeConsultaDeAuditoria.EsAdministradorCentral(actor) && actor?.Tipo is not (TipoDeActor.Integracion or TipoDeActor.Sistema))
+        if (!RolesDeConsultaDeAuditoria.EsAdministradorCentral(actor) && actor is not { Tipo: TipoDeActor.Integracion, Integracion: IntegracionesDeAuditoria.LecturaDeAlertas })
         {
             return Resultado<IReadOnlyList<AlertaConsultada>>.Fallo(Prohibido("fuera-de-rol"));
         }
@@ -140,7 +140,7 @@ public sealed class ConsultaDeAlertasUnificada(
             return Resultado<AlertaConsultada>.Fallo(Invalido("alerta", "marca-invalida"));
         }
 
-        if (alertaId.StartsWith("inv:", StringComparison.Ordinal))
+        if (IdentificadorDeAlerta.EsValido(alertaId, "inv:"))
         {
             var remota = await inventario.MarcarAlertaRevisada(alertaId, contadorVisto, cancelacion).ConfigureAwait(false);
             return remota.Estado switch
@@ -151,7 +151,7 @@ public sealed class ConsultaDeAlertasUnificada(
             };
         }
 
-        if (!alertaId.StartsWith("eco:", StringComparison.Ordinal))
+        if (!IdentificadorDeAlerta.EsValido(alertaId, "eco:"))
         {
             return Resultado<AlertaConsultada>.Fallo(Invalido("alerta", "alerta-invalida"));
         }

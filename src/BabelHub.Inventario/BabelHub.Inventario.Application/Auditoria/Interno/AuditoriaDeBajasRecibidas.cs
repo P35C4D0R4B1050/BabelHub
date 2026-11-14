@@ -10,9 +10,9 @@ public sealed class AuditoriaDeBajasRecibidas(IAuditoria auditoria, IActorActual
         ArgumentNullException.ThrowIfNull(baja);
 
         // La baja solo llega con la credencial de servicio: un usuario, un anónimo o la ausencia de contexto no la pueden entregar (AUD-23, SEG-15).
-        if (actores.Actual is not { Tipo: TipoDeActor.Integracion })
+        if (actores.Actual is not { Tipo: TipoDeActor.Integracion, Integracion: IntegracionesDeAuditoria.BajaDeTitular })
         {
-            throw new InvalidOperationException("La baja de un titular llega con la credencial de servicio: el actor debe ser una integración.");
+            throw new InvalidOperationException("La baja de un titular llega con la credencial de servicio: el actor debe ser la integración de alcance baja-de-titular.");
         }
 
         if (!esNueva)

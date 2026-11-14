@@ -63,7 +63,9 @@ public sealed class ConsultasDeAuditoriaLocales(
         {
             var pagina = await local.Consultar(new ConsultaDeAuditoria(filtro, cursorDelAlmacen), cancelacion).ConfigureAwait(false);
             var siguiente = pagina.SiguienteCursor is null ? null : firmador.Firmar(usuario, huella, new CargaDeCursorLocal(pagina.SiguienteCursor));
-            return Resultado<PaginaDeRegistros>.Exito(new PaginaDeRegistros(pagina.Registros, siguiente));
+            // La página lleva también su propio cursor (el del E-commerce lo necesita para fusionar sin repetir): firmado igual, nunca el crudo del almacén.
+            var deLaPagina = pagina.CursorDeLaPagina is null ? null : firmador.Firmar(usuario, huella, new CargaDeCursorLocal(pagina.CursorDeLaPagina));
+            return Resultado<PaginaDeRegistros>.Exito(new PaginaDeRegistros(pagina.Registros, siguiente) { CursorDeLaPagina = deLaPagina });
         }
         catch (Exception falla) when (falla is not OperationCanceledException)
         {
@@ -124,7 +126,7 @@ public sealed class ConsultaDeAlertasLocales(
     public async Task<Resultado<IReadOnlyList<AlertaConsultada>>> LeerNuevas(DateTimeOffset desde, CancellationToken cancelacion = default)
     {
         var actor = actores.Actual;
-        if (!RolesDeConsultaDeAuditoria.EsAdministradorCentral(actor) && actor?.Tipo is not (TipoDeActor.Integracion or TipoDeActor.Sistema))
+        if (!RolesDeConsultaDeAuditoria.EsAdministradorCentral(actor) && actor is not { Tipo: TipoDeActor.Integracion, Integracion: IntegracionesDeAuditoria.LecturaDeAlertas })
         {
             return Resultado<IReadOnlyList<AlertaConsultada>>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Prohibido, "fuera-de-rol"));
         }
@@ -148,7 +150,7 @@ public sealed class ConsultaDeAlertasLocales(
             return Resultado<AlertaConsultada>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Prohibido, "fuera-de-rol"));
         }
 
-        if (string.IsNullOrEmpty(alertaId) || contadorVisto < 1 || !alertaId.StartsWith("inv:", StringComparison.Ordinal))
+        if (!IdentificadorDeAlerta.EsValido(alertaId, "inv:") || contadorVisto < 1)
         {
             return Resultado<AlertaConsultada>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Validacion, "marca-invalida", [new ErrorDeCampo("alerta", "marca-invalida")]));
         }
@@ -283,7 +285,9 @@ public sealed class HistorialDeSucursalLocal(IActorActual actores, IHistorialLoc
         {
             var pagina = await historial.Consultar(sucursal, cursorDelAlmacen, cancelacion).ConfigureAwait(false);
             var siguiente = pagina.SiguienteCursor is null ? null : firmador.Firmar(usuario, huella, new CargaDeCursorLocal(pagina.SiguienteCursor));
-            return Resultado<PaginaDeRegistros>.Exito(new PaginaDeRegistros(pagina.Registros, siguiente));
+            // La página lleva también su propio cursor (el del E-commerce lo necesita para fusionar sin repetir): firmado igual, nunca el crudo del almacén.
+            var deLaPagina = pagina.CursorDeLaPagina is null ? null : firmador.Firmar(usuario, huella, new CargaDeCursorLocal(pagina.CursorDeLaPagina));
+            return Resultado<PaginaDeRegistros>.Exito(new PaginaDeRegistros(pagina.Registros, siguiente) { CursorDeLaPagina = deLaPagina });
         }
         catch (Exception falla) when (falla is not OperationCanceledException)
         {

@@ -17,6 +17,9 @@ internal sealed class FuenteFusionada(Func<string?, CancellationToken, Task<Pagi
 {
     private sealed record Elemento(RegistroAuditado Registro, string? Pagina, int Indice, int Tamano, string? Siguiente);
 
+    /// <summary>Las páginas que se piden a una fuente en una solicitud: con páginas de 20 registros, 25 bastan de sobra para reunir 20 (los saltos de lo ya consumido caben en una).</summary>
+    public const int MaximoDePaginasPorSolicitud = 25;
+
     private readonly Queue<Elemento> _cola = new();
     private string? _porCargar = inicial.Pagina;
     private int _saltar = inicial.Consumidos;
@@ -28,8 +31,16 @@ internal sealed class FuenteFusionada(Func<string?, CancellationToken, Task<Pagi
 
     public async Task Llenar(int minimo, CancellationToken cancelacion)
     {
+        var paginas = 0;
         while (_cola.Count < minimo && !_agotada && !Faltan)
         {
+            // Una fuente defectuosa que devuelve páginas vacías con cursor, o el mismo cursor, no deja la solicitud en un bucle: pasado el tope, cuenta como que no respondió.
+            if (++paginas > MaximoDePaginasPorSolicitud)
+            {
+                Faltan = true;
+                return;
+            }
+
             var pagina = await pedir(_porCargar, cancelacion).ConfigureAwait(false);
             if (pagina is null)
             {
@@ -172,7 +183,15 @@ public sealed class ConsultasDeAuditoriaUnificadas(
         string? siguienteCursor = null;
         if (estados.Any(e => e.Pendiente))
         {
-            siguienteCursor = firmador.Firmar(usuario, huella, new CargaDeCursorUnificado(estados[0].Posicion, estados[1].Posicion, estados[2].Posicion));
+            try
+            {
+                siguienteCursor = firmador.Firmar(usuario, huella, new CargaDeCursorUnificado(estados[0].Posicion, estados[1].Posicion, estados[2].Posicion));
+            }
+            catch (InvalidOperationException)
+            {
+                // Los subcursores no caben en un cursor: la lista no puede continuar y se informa como servicio no disponible (503 uniforme), nunca como un 500.
+                return Resultado<PaginaDeRegistros>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "auditoria-no-disponible"));
+            }
         }
 
         return Resultado<PaginaDeRegistros>.Exito(new PaginaDeRegistros(elegidos, siguienteCursor, faltanDelInventario: remota.Faltan));
