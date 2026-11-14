@@ -30,5 +30,7 @@ jobs:
           global-json-file: global.json
       - name: Compilar sin advertencias
         run: dotnet build BabelHub.sln -warnaserror --nologo
-      - name: Probar (unitarias, integración y arquitectura)
-        run: dotnet test BabelHub.sln --no-build --nologo
+      - name: Probar con cobertura (unitarias, integración, arquitectura y herramientas)
+        run: dotnet test BabelHub.sln --no-build --nologo --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings --results-directory TestResults
+      - name: Verificar los umbrales de cobertura (Dominio y Aplicación 85 %, total 70 %)
+        run: dotnet run --project tools/CoverageCheck -- TestResults

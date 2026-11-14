@@ -144,6 +144,20 @@ public sealed class CoberturaTests : IDisposable
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PLA-14")]
+    public void LosInformesConRaicesDeFuentesDistintasUnenLasLineasDelMismoArchivo()
+    {
+        // Las pruebas unitarias dan la ruta desde el ensamblado y las de integración desde el servicio: es el mismo archivo.
+        var unitarias = Informe(Paquete("BabelHub.Inventario.Domain", "BabelHub.Inventario.Domain\\Plataforma\\D.cs", 10, 10));
+        var integracion = Informe(Paquete("BabelHub.Inventario.Domain", "BabelHub.Inventario\\BabelHub.Inventario.Domain\\Plataforma\\D.cs", 10, 0));
+
+        var servicio = Assert.Single(Cobertura.Calcular(Cobertura.Leer([unitarias, integracion])));
+
+        Assert.Equal(10, servicio.TotalTotales);
+        Assert.Equal(10, servicio.TotalCubiertas);
+    }
+
+    [Fact]
     public void LasLineasDeLosMetodosNoSeCuentanDosVeces()
     {
         var xml = Informe(Paquete("BabelHub.Ecommerce.Domain", "/src/D.cs", 10, 5, conMetodos: true));

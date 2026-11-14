@@ -47,6 +47,10 @@ public static class Cobertura
                         continue;
                     }
 
+                    // Cada informe da la ruta relativa a su propia raíz de fuentes (las pruebas unitarias dan «Ensamblado/Carpeta/A.cs» y las
+                    // de integración «Servicio/Ensamblado/Carpeta/A.cs»): se une por la parte que empieza en la carpeta del ensamblado.
+                    archivo = DesdeLaCarpetaDelEnsamblado(archivo, ensamblado);
+
                     // Solo las líneas propias de la clase: las de sus métodos son las mismas y contarían doble.
                     foreach (var linea in clase.Elements("lines").Elements("line"))
                     {
@@ -145,6 +149,14 @@ public static class Cobertura
     }
 
     private static string Normalizar(string ruta) => "/" + ruta.Replace('\\', '/').TrimStart('/');
+
+    /// <summary>La ruta desde la carpeta que se llama como el ensamblado (si no la hay, la ruta completa).</summary>
+    internal static string DesdeLaCarpetaDelEnsamblado(string rutaNormalizada, string ensamblado)
+    {
+        var marca = "/" + ensamblado + "/";
+        var indice = rutaNormalizada.IndexOf(marca, StringComparison.OrdinalIgnoreCase);
+        return indice < 0 ? rutaNormalizada : rutaNormalizada[indice..];
+    }
 
     private static bool TryServicioYCapa(string ensamblado, out string servicio, out string capa)
     {
