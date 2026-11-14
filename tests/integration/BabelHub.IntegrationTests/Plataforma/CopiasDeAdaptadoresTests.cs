@@ -38,7 +38,8 @@ public sealed class CopiasDeAdaptadoresTests
         "Domain/Auditoria/DetalleSeguro.cs",
         "Domain/Auditoria/CatalogoDeAcciones.cs",
         "Domain/Auditoria/RegistroDeAuditoria.cs",
-        "Domain/Auditoria/PoliticaDeAnonimizacion.cs");
+        "Domain/Auditoria/PoliticaDeAnonimizacion.cs",
+        "Domain/Auditoria/AlertaDeSeguridad.cs");
 
     [Theory]
     [MemberData(nameof(Archivos))]
