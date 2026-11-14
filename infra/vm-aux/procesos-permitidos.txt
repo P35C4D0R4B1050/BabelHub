@@ -1,0 +1,71 @@
+# Nombres de procesos que pueden correr en VM-AUX (los vigila scripts/vm-aux/vigilar-procesos.sh). Un nombre por línea; `*` al final = prefijo.
+# Es una lista inicial para Ubuntu Server en la VM de Oracle: la persona responsable la ajusta con `ps -eo comm= | sort -u` en una VM sana y
+# la revisa en cada cambio (un cambio revisado, no una excepción en caliente).
+# Sistema
+systemd
+systemd-*
+(sd-pam)
+init
+dbus-daemon
+rsyslogd
+cron
+agetty
+irqbalance
+networkd-dispatcher
+polkitd
+chronyd
+unattended-upgr*
+multipathd
+snapd
+udisksd
+ModemManager
+# Hilos del kernel
+kthreadd
+kworker*
+ksoftirqd*
+migration*
+rcu_*
+cpuhp*
+kdevtmpfs
+netns
+kauditd
+khungtaskd
+oom_reaper
+writeback
+kcompactd*
+khugepaged
+kintegrityd
+kblockd
+blkcg_punt_bio
+watchdogd
+kswapd*
+ecryptfs-kthread
+kthrotld
+acpi_thermal_pm
+scsi_*
+md
+jbd2*
+ext4*
+irq/*
+# Acceso
+sshd
+sshd-session
+bash
+sh
+sleep
+# Lo que corre VM-AUX (scripts/vm-aux)
+awk
+sed
+sort
+grep
+cut
+tr
+date
+cat
+sha256sum
+mktemp
+rclone
+curl
+timeout
+run-parts
+ps

@@ -1,7 +1,7 @@
 namespace BabelHub.IntegrationTests.Plataforma;
 
 /// <summary>
-/// Cada servicio tiene su copia de los adaptadores de la plataforma (no comparten código, regla 5). Esta prueba de contrato
+/// Cada servicio tiene su copia de los adaptadores de la plataforma y del Dominio de Auditoría (no comparten código, regla 5). Esta prueba de contrato
 /// comprueba que las copias siguen siendo la misma salvo el nombre del servicio, para que una corrección no llegue a una sola.
 /// </summary>
 public sealed class CopiasDeAdaptadoresTests
@@ -34,7 +34,13 @@ public sealed class CopiasDeAdaptadoresTests
         "Infrastructure/Plataforma/TrabajosDeFondoPostgres.cs",
         "Infrastructure/Plataforma/LatidoDeLaBase.cs",
         "Api/Plataforma/ModoDeArranque.cs",
-        "Api/Plataforma/SaludHttp.cs");
+        "Api/Plataforma/SaludHttp.cs",
+        "Domain/Auditoria/DetalleSeguro.cs",
+        "Domain/Auditoria/CatalogoDeAcciones.cs",
+        "Domain/Auditoria/RegistroDeAuditoria.cs",
+        "Domain/Auditoria/PoliticaDeAnonimizacion.cs",
+        "Domain/Auditoria/AlertaDeSeguridad.cs",
+        "Domain/Auditoria/AcumuladoDeLimite.cs");
 
     [Theory]
     [MemberData(nameof(Archivos))]

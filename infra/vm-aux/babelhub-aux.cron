@@ -16,3 +16,5 @@ AUX=/opt/babelhub/scripts/vm-aux
 30 4 * * * babelhub-aux $AUX/alertar.sh retencion $AUX/vigilar-retencion.sh
 # Latido hacia un servicio externo, sin datos: si VM-AUX cae, alguien lo sabe.
 */5 * * * * babelhub-aux $AUX/latido-externo.sh
+# Procesos fuera de la lista permitida (T26): un proceso desconocido en VM-AUX es una señal de compromiso.
+*/5 * * * * babelhub-aux $AUX/alertar.sh procesos $AUX/vigilar-procesos.sh

@@ -61,6 +61,14 @@ public sealed class DesplegarShTests : IDisposable
 
     private const string DobleDeStat = """
         #!/usr/bin/env bash
+        if [[ "$2" == '%U %a' ]]; then
+          case "$3" in
+            *aviso.env) case "$3" in *"${STAT_ABIERTO:-__ninguno__}"*) echo "${STAT_DUENO_AVISO:-root} 644" ;; *) echo "${STAT_DUENO_AVISO:-root} 600" ;; esac ;;
+            */scripts/vm-aux) echo "${STAT_DUENO_CARPETA:-root} ${STAT_MODO_CARPETA:-755}" ;;
+            *) echo "${STAT_DUENO:-root} ${STAT_MODO_SCRIPTS:-755}" ;;
+          esac
+          exit 0
+        fi
         case "$3" in *"${STAT_ABIERTO:-__ninguno__}"*) echo 644 ;; *) echo 600 ;; esac
         """;
 
@@ -139,6 +147,16 @@ public sealed class DesplegarShTests : IDisposable
             }
 
             File.WriteAllText(Path.Combine(_secretos, archivo), contenido.ToString().ReplaceLineEndings("\n"));
+        }
+
+        if (vm == "inventario")
+        {
+            // La credencial de correo propia de la VM de datos (PLA-21): sirve solo para avisar del espacio reservado.
+            var claveDeCorreo = Aleatorio(24);
+            _valoresSecretos.Add(claveDeCorreo);
+            File.WriteAllText(
+                Path.Combine(_secretos, "aviso.env"),
+                "AUX_SMTP_URL=smtps://smtp.ejemplo.interno:465\n" + $"AUX_SMTP_USUARIO=avisos-de-vm-inventario\nAUX_SMTP_CLAVE={claveDeCorreo}\n" + "AUX_CORREO_DE=vm-inventario@ejemplo.interno\nAUX_CORREO_PARA=responsable@ejemplo.interno\n");
         }
     }
 
@@ -224,6 +242,7 @@ public sealed class DesplegarShTests : IDisposable
         var segunda = File.Exists(tarea) ? File.ReadAllText(tarea) : null;
 
         Assert.Equal(0, segundoCodigo);
+
         if (vm == "inventario")
         {
             Assert.NotNull(primera);
@@ -236,6 +255,112 @@ public sealed class DesplegarShTests : IDisposable
         {
             Assert.Null(primera);
         }
+    }
+
+    // ---------- Vigilancia del espacio reservado de la VM de datos (PLA-21) ----------
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-21")]
+    public void LaVmDeDatos_InstalaLaVigilanciaDelEspacioCadaMinuto_ConSuCredencialDeCorreoPropia()
+    {
+        PrepararSecretos("inventario");
+
+        var (codigo, salida, errores) = Desplegar("inventario");
+
+        Assert.True(codigo == 0, salida + errores);
+        var tarea = File.ReadAllText(Path.Combine(_cron, "babelhub-respaldo"));
+        var linea = tarea.ReplaceLineEndings("\n").Split('\n').Single(l => l.Contains("vigilar-espacio.sh", StringComparison.Ordinal));
+        Assert.StartsWith("* * * * * root ", linea, StringComparison.Ordinal);
+        Assert.Contains($"AUX_ENV={EnLinux(_secretos)}/aviso.env", linea, StringComparison.Ordinal);
+        Assert.Matches(@" AUX_ESTADO=/var/lib/babelhub-aviso \S+/scripts/vm-aux/alertar\.sh espacio-respaldos docker exec babelhub-inventario-postgres-1 /opt/babelhub/vigilar-espacio\.sh$", linea);
+        SinSecretosEnLaSalida(tarea, string.Empty);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-21")]
+    public void SinLaCredencialDeCorreoDeAviso_LaVmDeDatosNoSeDespliega_PorqueElAvisoDelOchentaPorCientoNoSaldria()
+    {
+        PrepararSecretos("inventario");
+        File.Delete(Path.Combine(_secretos, "aviso.env"));
+
+        var (codigo, _, errores) = Desplegar("inventario");
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("falta el archivo de secretos aviso.env", errores, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-21")]
+    public void ElAvisoEnv_ConPermisosAbiertos_SinUnaClave_ConSmtpSinTlsOConUnaClavePrivadaDeAge_NoSeDespliega()
+    {
+        PrepararSecretos("inventario");
+        var ruta = Path.Combine(_secretos, "aviso.env");
+        var valor = Aleatorio(30);
+        _valoresSecretos.Add(valor);
+        File.WriteAllText(ruta, "AUX_SMTP_URL=smtp://smtp.ejemplo.interno:25\n" + "AUX_SMTP_USUARIO=avisos\nAUX_CORREO_DE=de@ejemplo.interno\nAUX_CORREO_PARA=para@ejemplo.interno\nOTRO=AGE-SECRET-" + "KEY-" + valor.ToUpperInvariant() + "\n");
+        var entorno = EntornoDe("inventario");
+        entorno["STAT_ABIERTO"] = "aviso.env";
+
+        var (codigo, salida, errores) = Desplegar("inventario", entorno);
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("aviso.env es de root con permisos 644", errores, StringComparison.Ordinal);
+        Assert.Contains("falta la clave AUX_SMTP_CLAVE en aviso.env", errores, StringComparison.Ordinal);
+        Assert.Contains("AUX_SMTP_URL de aviso.env usa smtp:// sin TLS implícito", errores, StringComparison.Ordinal);
+        Assert.Contains("aviso.env contiene una clave privada de age", errores, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
+        SinSecretosEnLaSalida(salida, errores);
+    }
+
+    [Theory]
+    [InlineData("babelhub-aux", "755")]
+    [InlineData("root", "775")]
+    [InlineData("root", "666")]
+    [Trait("Criterio", "AC-PLA-21")]
+    public void SiLosScriptsQueElCronCorreComoRootLosPuedeModificarOtro_LaVmDeDatosNoSeDespliega(string dueno, string modo)
+    {
+        PrepararSecretos("inventario");
+        var entorno = EntornoDe("inventario");
+        entorno["STAT_DUENO"] = dueno;
+        entorno["STAT_MODO_SCRIPTS"] = modo;
+
+        var (codigo, _, errores) = Desplegar("inventario", entorno);
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("debe ser de root y sin escritura para otros (lo ejecuta el cron como root)", errores, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
+    }
+
+    [Theory]
+    [InlineData("STAT_DUENO_AVISO", "babelhub-aux", "aviso.env es de babelhub-aux")]
+    [InlineData("STAT_DUENO_CARPETA", "babelhub-aux", "la carpeta scripts/vm-aux es de babelhub-aux")]
+    [InlineData("STAT_MODO_CARPETA", "775", "la carpeta scripts/vm-aux es de root con permisos 775")]
+    [Trait("Criterio", "AC-PLA-21")]
+    public void SiElAvisoEnvOLaCarpetaDeLosScriptsDeRootNoSonDeRoot_LaVmDeDatosNoSeDespliega(string variable, string valor, string esperado)
+    {
+        PrepararSecretos("inventario");
+        var entorno = EntornoDe("inventario");
+        entorno[variable] = valor;
+
+        var (codigo, _, errores) = Desplegar("inventario", entorno);
+
+        Assert.Equal(1, codigo);
+        Assert.Contains(esperado, errores, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-21")]
+    public void LasOtrasVms_NoPidenNiInstalanLaVigilanciaDelEspacio()
+    {
+        PrepararSecretos("ventas");
+
+        var (codigo, salida, errores) = Desplegar("ventas");
+
+        Assert.True(codigo == 0, salida + errores);
+        Assert.Empty(Directory.GetFiles(_cron));
+        Assert.DoesNotContain("aviso.env", salida + errores, StringComparison.Ordinal);
     }
 
     // ---------- Lo que impide desplegar ----------

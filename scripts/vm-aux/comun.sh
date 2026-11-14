@@ -2,7 +2,7 @@
 #
 # VM-AUX es el salto SSH y el vigilante: comprueba los respaldos desde FUERA de la VM de datos, sella el registro de supresiones y avisa por
 # correo. No guarda ninguna clave privada ni ninguna credencial de borrado. Cada script usa SU credencial del almacén, configurada como un
-# remoto de rclone en el archivo de entorno de VM-AUX (AUX_ENV, por defecto /etc/babelhub-aux/aux.env, 0600 y de su usuario):
+# remoto de rclone en el archivo de entorno de VM-AUX (AUX_ENV, por defecto /etc/babelhub-aux/aux.env, de root, grupo babelhub-aux y 0640: el usuario lo lee pero no lo puede cambiar):
 #   RCLONE_CONFIG_VIGILANTE_*   respaldos-vigilante: solo lista
 #   RCLONE_CONFIG_SELLO_*       supresiones-sello: crea sellos y lee las entradas del registro
 #   RCLONE_CONFIG_COPIA_*       respaldos-copia-registro: solo crea en supresiones-copia
@@ -13,12 +13,38 @@
 # Ningún script imprime un valor secreto. RCLONE y CURL son los comandos (las pruebas los sustituyen).
 
 AUX_ENV="${AUX_ENV:-/etc/babelhub-aux/aux.env}"
-if [[ -f "$AUX_ENV" ]]; then
-  set -a
-  # shellcheck disable=SC1090
-  . "$AUX_ENV"
-  set +a
-fi
+
+# Carga el archivo de entorno SIN EJECUTARLO (nunca `source`): algunas tareas (la comprobación del endurecimiento) corren como root y el
+# usuario sin privilegios `babelhub-aux` lee este archivo; si se ejecutara, quien comprometa a ese usuario ganaría root. Por eso, además de
+# exigir que el archivo sea de root y no escribible por otros (lo comprueba verificar-endurecimiento.sh), solo se leen líneas `NOMBRE=valor`
+# literales (el valor, opcionalmente entre comillas, no se expande: `$`, `` ` `` y `;` son texto) y solo de los nombres propios de VM-AUX.
+# Cualquier otro nombre (SSHD_T, PS, STAT, AUX_ESTADO, AUX_SCRIPTS, CURL, RCLONE…) se ignora: esos solo los pone el entorno del proceso.
+cargar_entorno() {
+  local linea nombre valor
+  [[ -f "$1" ]] || return 0
+  while IFS= read -r linea || [[ -n "$linea" ]]; do
+    linea="${linea%$'\r'}"
+    [[ -z "${linea//[[:space:]]/}" || "${linea#"${linea%%[![:space:]]*}"}" == \#* ]] && continue
+    linea="${linea#"${linea%%[![:space:]]*}"}"
+    linea="${linea#export }"
+    [[ "$linea" == *=* ]] || continue
+    nombre="${linea%%=*}"
+    valor="${linea#*=}"
+    if [[ "$valor" == \"*\" && ${#valor} -ge 2 ]] || [[ "$valor" == \'*\' && ${#valor} -ge 2 ]]; then
+      valor="${valor:1:${#valor}-2}"
+    fi
+    case "$nombre" in
+      AUX_SMTP_URL | AUX_SMTP_USUARIO | AUX_SMTP_CLAVE | AUX_CORREO_DE | AUX_CORREO_PARA | AUX_LATIDO_URL | AUX_REAVISO_HORAS | AUX_MAX_HORAS_RESPALDO | AUX_MAX_MINUTOS_ATRASO | AUX_MAX_HORAS_COPIA_REGISTRO) ;;
+      RCLONE_CONFIG_VIGILANTE_* | RCLONE_CONFIG_SELLO_* | RCLONE_CONFIG_COPIA_* | RCLONE_CONFIG_CUOTA_*) [[ "$nombre" =~ ^RCLONE_CONFIG_[A-Z]+_[A-Z0-9_]+$ ]] || continue ;;
+      *) continue ;;
+    esac
+    # El valor de un nombre ya fijado por el entorno del proceso (cron, pruebas) manda sobre el del archivo.
+    [[ -n "${!nombre:-}" ]] && continue
+    printf -v "$nombre" '%s' "$valor"
+    export "$nombre"
+  done <"$1"
+}
+cargar_entorno "$AUX_ENV"
 RCLONE="${RCLONE:-rclone}"
 CURL="${CURL:-curl}"
 AUX_ESTADO="${AUX_ESTADO:-/var/lib/babelhub-aux}"
@@ -62,7 +88,8 @@ enviar_correo() {
   config="$(mktemp)"
   mensaje="$(mktemp)"
   chmod 600 "$config" "$mensaje"
-  printf 'user = "%s:%s"\n' "$AUX_SMTP_USUARIO" "$AUX_SMTP_CLAVE" >"$config"
+  # Las comillas y las barras del usuario y la clave se escapan: una clave con `"` no debe romper ni inyectar el archivo de curl.
+  printf 'user = "%s:%s"\n' "$(printf '%s' "$AUX_SMTP_USUARIO" | sed 's/[\\"]/\\&/g')" "$(printf '%s' "$AUX_SMTP_CLAVE" | sed 's/[\\"]/\\&/g')" >"$config"
   {
     printf 'From: %s\r\nTo: %s\r\nSubject: %s\r\nDate: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n' \
       "$AUX_CORREO_DE" "$AUX_CORREO_PARA" "$asunto" "$(date -R)"

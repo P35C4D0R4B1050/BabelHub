@@ -380,6 +380,12 @@
       "babelhub.shared": {
         "type": "Project"
       },
+      "restauracioncheck": {
+        "type": "Project",
+        "dependencies": {
+          "Npgsql": "[10.0.3, )"
+        }
+      },
       "AWSSDK.S3": {
         "type": "CentralTransitive",
         "requested": "[4.1.0, )",

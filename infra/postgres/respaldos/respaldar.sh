@@ -12,6 +12,9 @@
 # cifrada en el volumen reservado. Sube dos objetos por respaldo, con el nombre «AAAA-MM-DD/<hora UTC>-<sha256 del cifrado>.tar.age»:
 # el clúster y, con «-config-» en el nombre, la configuración de la VM sin secretos (nada *.env, *.pem, *.key ni *.pfx).
 #
+# Si el archivo de cambios estaba declarado roto por falta de espacio (PLA-21, vigilar-espacio.sh), un respaldo completo que termina bien retira
+# la marca: es lo único que la retira.
+#
 # Códigos de salida: 0 hecho, 1 falló (no queda nada local), 2 uso inválido, 75 ya hay otro respaldo en curso.
 set -eu
 . /opt/babelhub/comun.sh
@@ -64,11 +67,21 @@ fi
 base="$ESPERA/base.$$.tmp"
 configuracion="$ESPERA/config.$$.tmp"
 resultado="$ESPERA/resultado.$$.tmp"
+# Si el archivo de cambios estaba roto (PLA-21), este respaldo completo lo repara: la marca se aparta antes de empezar (así lo que se genere desde
+# ahora vuelve a archivarse) y solo se borra si todo termina bien; si algo falla, vuelve a su lugar y el archivo sigue roto.
+recuperando="$ESPERA/archivo-roto.recuperando"
+terminado=0
 limpiar() {
+  if [ -f "$recuperando" ]; then
+    if [ "$terminado" = 1 ]; then rm -f "$recuperando"; else mv -f "$recuperando" "$ARCHIVO_ROTO"; fi
+  fi
   rm -f "$base" "$configuracion" "$resultado"
   rmdir "$bloqueo" 2>/dev/null || true
 }
 trap limpiar EXIT INT TERM
+if [ -f "$ARCHIVO_ROTO" ]; then
+  mv -f "$ARCHIVO_ROTO" "$recuperando"
+fi
 
 dia="$(date -u +%Y-%m-%d)"
 hora="$(date -u +%H%M%S)"
@@ -100,3 +113,7 @@ subir_con_copias() {
 
 subir_con_copias "$base" ""
 subir_con_copias "$configuracion" "config-"
+if [ -f "$recuperando" ]; then
+  echo "respaldos: el archivo de cambios estaba roto (PLA-21) y este respaldo completo lo repara"
+fi
+terminado=1
