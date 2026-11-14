@@ -31,7 +31,7 @@ public sealed class ComposicionDeFuentesTests
     {
         var servicios = new ServiceCollection();
         var actor = new ActorDelFlujo();
-        servicios.AddSingleton(NpgsqlDataSource.Create("Host=localhost;Database=no-se-conecta;Username=nadie;Password=nada-0123456789"));
+        servicios.AddSingleton(NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder { Host = "localhost", Database = "no-se-conecta", Username = "nadie", Password = Guid.NewGuid().ToString("N") }.ConnectionString));
         servicios.AddSingleton<IActorActual>(actor);
         servicios.AddSingleton<IEstablecedorDeActor>(actor);
         servicios.AddSingleton<IReloj>(new RelojDeIntegracion());
