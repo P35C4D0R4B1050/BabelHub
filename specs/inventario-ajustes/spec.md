@@ -1,14 +1,12 @@
 ---
 id: inventario-ajustes
 titulo: Ajustes de inventario
-estado: Approved
+estado: Draft
 servicio: Inventario
 prefijo: AJU
 origen: [RF17, RF09, NN06]
 calidad: [AC01, RNF01, RNF05, RNF08]
 depende: [inventario-fuentes, identidad-seguridad, transversal-auditoria]
-aprobado_por: Diego Amiquero
-aprobado_en: 2026-11-06
 ---
 
 # Spec — Ajustes de inventario
@@ -44,11 +42,13 @@ Permitir que cada sucursal corrija su stock físico con un motivo y un responsab
 | AJU-13 | Evento | Cuando la administración central registra un ingreso de mercadería, el sistema deberá sumar al stock físico de la fuente de recepción una cantidad positiva de una edición impresa y guardar la referencia opcional del documento de llegada (guía o factura). | RF17, NN06 |
 | AJU-14 | No deseado | Si un usuario que no es la administración central intenta registrar un ingreso de mercadería, entonces el sistema deberá rechazarlo y registrarlo como acceso denegado. | RNF05 |
 | AJU-15 | Estado | Mientras un usuario es administrador central, el sistema deberá permitirle ajustar el stock de cualquier sucursal con los mismos motivos y reglas, salvo que el ingreso de mercadería solo entra en la fuente de recepción (AJU-19), registrando la sucursal en la auditoría. | RF17, RNF05 |
-| AJU-16 | No deseado | Si se repite el reingreso de la misma devolución, entonces el sistema deberá no sumar las unidades otra vez. | RF09 |
+| AJU-16 | No deseado | Si se repite el reingreso de la misma devolución, entonces el sistema deberá no sumar las unidades otra vez, y si la repetición cambia la fuente, las cantidades o el pedido, deberá rechazarla como conflicto. | RF09 |
 | AJU-17 | Evento | Cuando el encargado consulta el historial de ajustes de su sucursal, el sistema deberá mostrarlos con edición, motivo, usuario, fecha y cantidades anterior y posterior. | RF17 |
 | AJU-18 | No deseado | Si se intenta ajustar o reingresar una edición digital, inexistente o en una fuente inexistente, entonces el sistema deberá rechazarlo. | RF17, RF09 |
 | AJU-19 | No deseado | Si se intenta registrar un ingreso de mercadería en una fuente que no es la de recepción, o con una cantidad que no sea un entero entre 1 y 5 000, entonces el sistema deberá rechazarlo indicando el motivo. | RF17, RNF04 |
 | AJU-20 | Evento | Cuando la administración central consulta los ingresos de mercadería, el sistema deberá mostrar los últimos con edición, cantidad, referencia, nota, usuario y fecha, y rechazar la consulta de cualquier otro usuario. | RF17, RNF05 |
+| AJU-21 | Evento | Cuando corre la depuración diaria, el sistema deberá anonimizar el usuario responsable y vaciar la nota de los ajustes e ingresos de más de 2 años, conservando el movimiento y sus cantidades; solo esa depuración, con un rol distinto del de la aplicación, puede modificar esas dos columnas, y deja registro de su ejecución. | RNF08, RNF23 |
+| AJU-22 | Evento | Cuando se repite con la misma clave un ajuste manual o un ingreso de mercadería, el sistema deberá comprobar primero el alcance de quien lo repite (si no lo tiene, rechazarlo sin revelar el resultado guardado); con la misma carga, devolver el resultado original sin aplicarlo otra vez; con otra, o con la primera en curso, rechazarlo como conflicto. La clave se acota por usuario y operación. | RF17, AC01 |
 
 ## 4. Criterios de aceptación
 
@@ -62,14 +62,16 @@ Permitir que cada sucursal corrija su stock físico con un motivo y un responsab
 | AC-AJU-06 | AJU-06 | **Dado** una edición con 5 reservadas por dos pedidos, **cuando** el conteo real indicado es 4, **entonces** se rechaza porque es menor que lo reservado y se indican los dos pedidos; y con un conteo de 5 (igual a lo reservado) se acepta y el vendible queda en 0. |
 | AC-AJU-07 | AJU-07 | **Dado** una edición con físico 9, **cuando** el conteo real indicado es 9, **entonces** se rechaza sin cambiar nada. |
 | AC-AJU-08 | AJU-09 | **Dado** un encargado de Ayacucho, **cuando** intenta ajustar el stock de Cusco, **entonces** se rechaza por falta de alcance y se registra como acceso denegado. |
-| AC-AJU-09 | AJU-11, AJU-16 | **Dado** una devolución aceptada de 1 impreso en Ayacucho, **cuando** se confirma la recepción, **entonces** el físico de Ayacucho sube en 1 con el motivo devolución y queda auditado; y si se repite el reingreso de esa devolución, el físico no sube otra vez. |
+| AC-AJU-09 | AJU-11, AJU-16 | **Dado** una devolución aceptada de 1 impreso en Ayacucho, **cuando** se confirma la recepción, **entonces** el físico de Ayacucho sube en 1 con el motivo devolución y queda auditado; y si se repite el reingreso de esa devolución, el físico no sube otra vez; y si la repetición cambia la fuente o la cantidad, se rechaza como conflicto. |
 | AC-AJU-10 | AJU-13, AJU-14 | **Dado** una edición sin stock en la fuente de recepción, **cuando** la administración registra un ingreso de mercadería de 10 unidades con la referencia «GR-001», **entonces** el físico pasa a 10, queda la referencia y la auditoría, y otro lote de 5 lo lleva a 15; y si lo intenta un encargado, se rechaza y queda un acceso denegado. |
 | AC-AJU-11 | AJU-04, AJU-08 | **Dado** una edición con vendible 5, **cuando** dos encargados registran a la vez una merma de 3, **entonces** solo una se aplica, la otra se rechaza contra el stock ya actualizado y el vendible nunca es negativo. |
 | AC-AJU-12 | AJU-15 | **Dado** un administrador central, **cuando** registra una merma en Cusco, **entonces** se aplica y la auditoría indica la sucursal Cusco. |
 | AC-AJU-13 | AJU-17 | **Dado** ajustes en Ayacucho y en Cusco, **cuando** el encargado de Ayacucho abre el historial, **entonces** ve solo los de Ayacucho con edición, motivo, usuario, fecha y cantidades. |
 | AC-AJU-14 | AJU-18 | **Dado** una edición digital, **cuando** se intenta un ajuste o un reingreso, **entonces** se rechaza. |
 | AC-AJU-15 | AJU-19 | **Dado** la fuente de recepción Lima y la sucursal Cusco, **cuando** la administración intenta un ingreso de 5 unidades en Cusco, y otro de 0 y otro de 6 000 en Lima, **entonces** los tres se rechazan con su motivo y el stock no cambia. |
-| AC-AJU-16 | AJU-20 | **Dado** tres ingresos registrados, **cuando** la administración abre la lista, **entonces** ve los tres con edición, cantidad, referencia, usuario y fecha, y un encargado no puede abrirla. |
+| AC-AJU-16 | AJU-20 | **Dado** tres ingresos registrados, **cuando** la administración abre la lista, **entonces** ve los tres con edición, cantidad, referencia, nota, usuario y fecha, y un encargado no puede abrirla. |
+| AC-AJU-17 | AJU-21 | **Dado** un ajuste con usuario y nota de hace 2 años y un día y otro de hace 1 año, **cuando** corre la depuración, **entonces** el primero queda sin usuario ni nota con su movimiento y sus cantidades intactos, el segundo no cambia, y repetir la depuración no cambia nada; y la cuenta con la que la aplicación escribe ajustes no puede modificar esas columnas. |
+| AC-AJU-18 | AJU-22 | **Dado** un ajuste de merma registrado con una clave, **cuando** se repite con la misma clave y carga, **entonces** se devuelve el resultado original y el físico no baja otra vez; con otra carga se rechaza como conflicto; con la misma clave de otro usuario o de otra sucursal no se recibe el resultado guardado ni se aplica; dos solicitudes simultáneas con la misma clave se aplican una sola vez; y lo mismo vale para la repetición y el conflicto de un ingreso de mercadería. |
 
 ## 5. Reglas e invariantes
 
@@ -78,6 +80,7 @@ Permitir que cada sucursal corrija su stock físico con un motivo y un responsab
 - Ningún ajuste manual suma por merma o daño. Las entradas son el ingreso de mercadería (solo la administración central y solo en la fuente de recepción), la corrección de conteo hacia arriba, los traslados recibidos y las devoluciones aceptadas.
 - El reingreso por devolución es un ajuste con el motivo devolución, identificado por la devolución para que no se repita.
 - Todo ajuste deja una auditoría; si no se puede auditar, no se aplica (`transversal-auditoria`).
+- Un ajuste o un ingreso nunca se modifica, salvo la anonimización del usuario y el vaciado de la nota a los 2 años (AJU-21).
 
 ## 6. Casos límite y errores
 
