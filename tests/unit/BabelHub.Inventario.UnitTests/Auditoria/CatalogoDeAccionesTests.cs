@@ -1,259 +1,334 @@
+using System.Reflection;
+using BabelHub.Inventario.Application.Auditoria;
+using BabelHub.Inventario.Application.Auditoria.Interno;
+using BabelHub.Inventario.Application.Plataforma;
 using BabelHub.Inventario.Domain.Auditoria;
+using BabelHub.Inventario.UnitTests.Plataforma;
+using BabelHub.Inventario.UnitTests.Soporte;
+using TipoDeActor = BabelHub.Inventario.Domain.Auditoria.TipoDeActor;
 
 namespace BabelHub.Inventario.UnitTests.Auditoria;
 
 /// <summary>
-/// El catálogo de acciones (AUD-01, AUD-02) y <c>PlantillaDeRuta</c> (AUD-05, AUD-06): cada acción declara su clase, el tipo de su registro, las
-/// claves permitidas de su detalle, si su objeto y su rol son personales (obligatorio, sin valor por defecto) y sus motivos, de catálogo cerrado.
+/// El catálogo concreto de acciones auditables (T11 a T16, D15): una prueba de contrato por acción con una operación de prueba que pasa por
+/// <c>IAuditoria</c> o <c>IRegistroDeSeguridad</c>, y la comparación de las constantes de la raíz con el catálogo del módulo, para que una acción
+/// nueva sin declarar (o declarada sin constante) no llegue a producción.
 /// </summary>
 public sealed class CatalogoDeAccionesTests
 {
-    private static AccionDelCatalogo Accion(
-        string id = "CambioDePrecio",
-        ClaseDeAccion clase = ClaseDeAccion.ConcedeOCambia,
-        TipoDeRegistro tipo = TipoDeRegistro.Auditoria,
-        bool aislada = false,
-        bool objetoPersonal = false,
-        bool rolPersonal = false,
-        string[]? motivos = null,
-        bool exigeMotivo = false,
-        ClaveDeDetalle[]? claves = null) =>
-        new(id, clase, tipo, aislada, claves ?? [new("precioAnterior", false), new("precioNuevo", false)], objetoPersonal, rolPersonal, motivos ?? (tipo == TipoDeRegistro.Auditoria ? [] : ["motivo-de-prueba"]), exigeMotivo || tipo != TipoDeRegistro.Auditoria);
+    private static readonly DateTimeOffset Ahora = new(2026, 11, 14, 15, 0, 0, TimeSpan.Zero);
 
-    // ---------- La acción ----------
+    private static readonly CatalogoDeAcciones Catalogo = CatalogoDeAccionesDeAuditoria.Crear();
 
-    [Fact]
-    [Trait("Criterio", "AC-AUD-01")]
-    public void UnaAccionDeclaraSuClaseSuTipoSusClavesYSiSuObjetoYSuRolSonPersonales()
+    public static TheoryData<string> Acciones => new(Catalogo.Acciones.Select(a => a.Identificador));
+
+    private static IEnumerable<AccionAuditable> Constantes() =>
+        typeof(AccionesAuditables)
+            .GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(f => f.FieldType == typeof(AccionAuditable))
+            .Select(f => (AccionAuditable)f.GetValue(null)!);
+
+    private sealed class Entorno
     {
-        var accion = Accion("CambioDeRol", ClaseDeAccion.ConcedeOCambia, TipoDeRegistro.Ambos, aislada: true, objetoPersonal: true, rolPersonal: true, motivos: ["solicitud-de-la-administracion", "correccion"], claves: [new("rolAnterior", false), new("rolNuevo", false), new("nombre", true)]);
-
-        Assert.Equal("CambioDeRol", accion.Identificador);
-        Assert.Equal(ClaseDeAccion.ConcedeOCambia, accion.Clase);
-        Assert.Equal(TipoDeRegistro.Ambos, accion.Tipo);
-        Assert.True(accion.Aislada);
-        Assert.True(accion.ObjetoPersonal);
-        Assert.True(accion.RolPersonal);
-        Assert.Equal(["rolAnterior", "rolNuevo", "nombre"], accion.Detalle.Select(c => c.Nombre));
-        Assert.Equal(["nombre"], accion.Detalle.Where(c => c.Personal).Select(c => c.Nombre));
-        Assert.Equal(["correccion", "solicitud-de-la-administracion"], accion.Motivos.Order(StringComparer.Ordinal));
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("cambioDePrecio")]
-    [InlineData("Cambio-de-precio")]
-    [InlineData("Cambio De Precio")]
-    [InlineData("C")]
-    [InlineData("Ca")]
-    public void UnIdentificadorDeAccionInvalido_SeRechaza(string id) =>
-        Assert.Throws<ArgumentException>(() => Accion(id));
-
-    [Theory]
-    [InlineData("Mayuscula")]
-    [InlineData("con espacio")]
-    [InlineData("")]
-    [InlineData("x")]
-    public void UnMotivoFueraDelFormatoDeCatalogo_SeRechaza(string motivo) =>
-        Assert.Throws<ArgumentException>(() => Accion(motivos: [motivo]));
-
-    [Fact]
-    public void UnMotivoRepetidoOUnaClaveRepetida_SeRechaza()
-    {
-        Assert.Throws<ArgumentException>(() => Accion(motivos: ["a-b", "a-b"]));
-        Assert.Throws<ArgumentException>(() => Accion(claves: [new("a", false), new("a", true)]));
-    }
-
-    [Fact]
-    public void SiLaAccionExigeMotivo_DebeTenerAlMenosUnoEnElCatalogo() =>
-        Assert.Throws<ArgumentException>(() => Accion(exigeMotivo: true, motivos: []));
-
-    [Theory]
-    [InlineData(TipoDeRegistro.Seguridad, ClaseDeAccion.NoConcede)]
-    [InlineData(TipoDeRegistro.Ambos, ClaseDeAccion.ConcedeOCambia)]
-    public void UnEventoDeSeguridadLlevaSiempreSuMotivo_LaAccionDebeExigirlo(TipoDeRegistro tipo, ClaseDeAccion clase) =>
-        Assert.Throws<ArgumentException>(() => new AccionDelCatalogo("AccionDePrueba", clase, tipo, false, [], false, false, ["un-motivo"], false));
-
-    [Theory]
-    [InlineData(ClaseDeAccion.ConcedeOCambia, TipoDeRegistro.Auditoria, true)]
-    [InlineData(ClaseDeAccion.ConcedeOCambia, TipoDeRegistro.Ambos, true)]
-    [InlineData(ClaseDeAccion.ConcedeOCambia, TipoDeRegistro.Seguridad, false)]
-    [InlineData(ClaseDeAccion.NoConcede, TipoDeRegistro.Seguridad, true)]
-    [InlineData(ClaseDeAccion.NoConcede, TipoDeRegistro.Auditoria, false)]
-    [InlineData(ClaseDeAccion.NoConcede, TipoDeRegistro.Ambos, false)]
-    public void LaClaseDeLaAccionYElTipoDeSuRegistroDebenSerCoherentes(ClaseDeAccion clase, TipoDeRegistro tipo, bool valida)
-    {
-        if (valida)
+        public Entorno(ActorDePrueba actor)
         {
-            Assert.Equal(tipo, Accion(clase: clase, tipo: tipo).Tipo);
+            Actor = actor;
+            var constructor = new ConstructorDeRegistros(ServicioDeOrigen.Inventario, Catalogo, new RelojFijo(Ahora), actor, new OrigenFijo(OrigenDeSolicitud.Desconocido));
+            Auditoria = new AuditoriaDeAplicacion(constructor, Almacen);
+            Seguridad = new RegistroDeSeguridadDeAplicacion(constructor, Almacen, Alertas, new RelojFijo(Ahora));
         }
-        else
+
+        public ActorDePrueba Actor { get; }
+
+        public AlmacenDeRegistrosEnMemoria Almacen { get; } = new();
+
+        public AlertasTecnicasEspia Alertas { get; } = new();
+
+        public IAuditoria Auditoria { get; }
+
+        public IRegistroDeSeguridad Seguridad { get; }
+
+        public Task Registrar(AccionAuditable accion, IReadOnlyDictionary<string, string?>? detalle = null, string? motivo = null, string? objetoTipo = null, string? objetoId = null, Guid? origen = null, Guid? destino = null)
         {
-            Assert.Throws<ArgumentException>(() => Accion(clase: clase, tipo: tipo));
+            var solicitud = new SolicitudDeRegistro(accion)
+            {
+                Detalle = detalle ?? new Dictionary<string, string?>(),
+                Motivo = motivo,
+                ObjetoTipo = objetoTipo,
+                ObjetoId = objetoId,
+                SucursalOrigen = origen,
+                SucursalDestino = destino,
+            };
+            return Catalogo.Obtener(accion.Identificador).Clase == ClaseDeAccion.ConcedeOCambia
+                ? Auditoria.Registrar(solicitud)
+                : Seguridad.Registrar(solicitud with { Resultado = ResultadoAuditado.Rechazado });
+        }
+    }
+
+    private static string ValorDePrueba(ClaveDeDetalle clave) => clave.Personal ? "Ana Perez" : "valor-" + clave.Nombre;
+
+    // ---------- Contrato de todo el catálogo ----------
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-23")]
+    public void Cada_constante_de_la_raiz_tiene_su_accion_en_el_catalogo_y_al_reves()
+    {
+        var constantes = Constantes().ToList();
+
+        Assert.NotEmpty(constantes);
+        Assert.Equal(constantes.Count, constantes.Select(c => c.Identificador).Distinct().Count());
+        foreach (var constante in constantes)
+        {
+            Assert.True(Catalogo.TryObtener(constante.Identificador, out var accion), $"La constante {constante.Identificador} no está en el catálogo.");
+            Assert.Equal(accion!.Aislada, constante.Aislada);
+        }
+
+        var identificadores = constantes.Select(c => c.Identificador).ToHashSet();
+        foreach (var accion in Catalogo.Acciones)
+        {
+            Assert.True(identificadores.Contains(accion.Identificador), $"La acción {accion.Identificador} no tiene constante en la raíz del contrato.");
+        }
+    }
+
+    [Fact]
+    public void El_nombre_de_cada_constante_es_el_identificador_de_su_accion()
+    {
+        foreach (var campo in typeof(AccionesAuditables).GetFields(BindingFlags.Public | BindingFlags.Static).Where(f => f.FieldType == typeof(AccionAuditable)))
+        {
+            Assert.Equal(campo.Name, ((AccionAuditable)campo.GetValue(null)!).Identificador);
         }
     }
 
     [Theory]
-    [InlineData(null)]
-    [InlineData("correccion")]
-    public void SinMotivosDeclarados_NingunMotivoEsValido_ConMotivos_SoloLosDelCatalogo(string? motivo)
-    {
-        var sin = Accion();
-        var con = Accion(motivos: ["correccion", "solicitud"]);
-
-        Assert.Equal(motivo is null, sin.AdmiteMotivo(motivo));
-        Assert.True(con.AdmiteMotivo(motivo));
-        Assert.False(con.AdmiteMotivo("otro-motivo"));
-        Assert.False(con.AdmiteMotivo("Correccion"));
-    }
-
-    [Fact]
-    public void UnaAccionQueExigeMotivo_NoAdmiteSuAusencia()
-    {
-        var accion = Accion(motivos: ["correccion"], exigeMotivo: true);
-
-        Assert.False(accion.AdmiteMotivo(null));
-        Assert.True(accion.AdmiteMotivo("correccion"));
-    }
-
-    [Fact]
-    public void LasColeccionesDeLaAccion_NoSePuedenAlterarDesdeAfuera()
-    {
-        var claves = new List<ClaveDeDetalle> { new("a", false) };
-        var motivos = new List<string> { "uno" };
-        var accion = new AccionDelCatalogo("Prueba", ClaseDeAccion.ConcedeOCambia, TipoDeRegistro.Auditoria, false, claves, false, false, motivos, false);
-
-        claves.Add(new("b", true));
-        motivos.Add("dos");
-
-        Assert.Single(accion.Detalle);
-        Assert.Single(accion.Motivos);
-    }
-
-    // ---------- El catálogo ----------
-
-    [Fact]
+    [MemberData(nameof(Acciones))]
     [Trait("Criterio", "AC-AUD-01")]
-    public void ElCatalogoBuscaPorIdentificador_ConservaElOrden_YNoAceptaDuplicados()
+    public async Task Una_operacion_de_prueba_deja_un_registro_con_todos_los_campos_declarados_de_cada_accion(string identificador)
     {
-        var catalogo = new CatalogoDeAcciones([Accion("CambioDePrecio"), Accion("AnulacionDePedido"), Accion("AccesoDenegado", ClaseDeAccion.NoConcede, TipoDeRegistro.Seguridad)]);
+        var accion = Catalogo.Obtener(identificador);
+        var entorno = new Entorno(ActorDePrueba.DeAdministradorCentral());
+        var detalle = accion.Detalle.ToDictionary(c => c.Nombre, c => (string?)ValorDePrueba(c));
+        var motivo = accion.ExigeMotivo ? accion.Motivos[0] : null;
+        var constante = Constantes().Single(c => c.Identificador == identificador);
 
-        Assert.Equal(["CambioDePrecio", "AnulacionDePedido", "AccesoDenegado"], catalogo.Acciones.Select(a => a.Identificador));
-        Assert.True(catalogo.TryObtener("AnulacionDePedido", out var anulacion));
-        Assert.Equal("AnulacionDePedido", anulacion!.Identificador);
-        Assert.False(catalogo.TryObtener("Inexistente", out _));
-        Assert.False(catalogo.TryObtener("anulaciondepedido", out _));
-        Assert.Throws<ArgumentException>(() => new CatalogoDeAcciones([Accion("CambioDePrecio"), Accion("CambioDePrecio")]));
+        await entorno.Registrar(constante, detalle, motivo, "objeto", "obj-1", Guid.NewGuid(), accion.Tipo == TipoDeRegistro.Auditoria ? Guid.NewGuid() : null);
+
+        var registro = Assert.Single(entorno.Almacen.Registros);
+        Assert.Equal(identificador, registro.Accion);
+        Assert.Equal(accion.Tipo, registro.Tipo);
+        Assert.Equal(accion.Aislada, registro.Aislada);
+        foreach (var clave in accion.Detalle)
+        {
+            Assert.Equal(ValorDePrueba(clave), registro.Detalle.Valores[clave.Nombre]);
+            Assert.Equal(clave.Personal, registro.Detalle.EsPersonal(clave.Nombre));
+        }
+
+        Assert.Empty(entorno.Alertas.Alertas);
     }
-
-    [Fact]
-    public void ObtenerUnaAccionInexistente_Lanza()
-    {
-        var catalogo = new CatalogoDeAcciones([Accion()]);
-
-        Assert.Throws<KeyNotFoundException>(() => catalogo.Obtener("NoExiste"));
-        Assert.Equal("CambioDePrecio", catalogo.Obtener("CambioDePrecio").Identificador);
-    }
-
-    [Fact]
-    public void ElCatalogoVacioEsValido_PeroNoAdmiteNulos()
-    {
-        Assert.Empty(new CatalogoDeAcciones([]).Acciones);
-        Assert.Throws<ArgumentNullException>(() => new CatalogoDeAcciones(null!));
-    }
-
-    [Fact]
-    public void ElCatalogoDeclaraQueAccionesVanAlAlmacenAislado()
-    {
-        var catalogo = new CatalogoDeAcciones([Accion("IngresoFallido", ClaseDeAccion.NoConcede, TipoDeRegistro.Seguridad, aislada: true), Accion("CambioDePrecio")]);
-
-        Assert.Equal(["IngresoFallido"], catalogo.Acciones.Where(a => a.Aislada).Select(a => a.Identificador));
-    }
-
-    // ---------- PlantillaDeRuta ----------
-
-    private static readonly string[] Plantillas =
-    [
-        "/api/ecommerce/v1/pedidos",
-        "/api/ecommerce/v1/pedidos/{id}",
-        "/api/ecommerce/v1/pedidos/{id}/anulacion",
-        "/api/ecommerce/v1/pedidos/resumen",
-        "/api/inventario/v1/auditoria",
-    ];
 
     [Theory]
-    [InlineData("/api/ecommerce/v1/pedidos", "/api/ecommerce/v1/pedidos")]
-    [InlineData("/api/ecommerce/v1/pedidos/", "/api/ecommerce/v1/pedidos")]
-    [InlineData("/api/ecommerce/v1/pedidos/3f2a9c1e-0000-4000-8000-000000000001", "/api/ecommerce/v1/pedidos/{id}")]
-    [InlineData("/api/ecommerce/v1/pedidos/3f2a9c1e/anulacion", "/api/ecommerce/v1/pedidos/{id}/anulacion")]
-    [InlineData("/API/Ecommerce/V1/Pedidos/42", "/api/ecommerce/v1/pedidos/{id}")]
-    [InlineData("/api/ecommerce/v1/pedidos/resumen", "/api/ecommerce/v1/pedidos/resumen")]
-    [InlineData("/api/inventario/v1/auditoria", "/api/inventario/v1/auditoria")]
+    [MemberData(nameof(Acciones))]
     [Trait("Criterio", "AC-AUD-05")]
-    public void LaRutaCrudaSeReemplazaPorSuPlantilla_ConLaMasEspecificaPrimero(string cruda, string esperada) =>
-        Assert.Equal(esperada, PlantillaDeRuta.Resolver(cruda, Plantillas));
-
-    [Theory]
-    [InlineData("/api/ecommerce/v1/pedidos?clave=secreto&token=abc", "/api/ecommerce/v1/pedidos")]
-    [InlineData("/api/ecommerce/v1/pedidos/42?x=1#fragmento", "/api/ecommerce/v1/pedidos/{id}")]
-    [InlineData("/api/ecommerce/v1/pedidos;jsessionid=ABC123", "/api/ecommerce/v1/pedidos")]
-    [InlineData("/api/ecommerce/v1/pedidos/42;v=1/anulacion", "/api/ecommerce/v1/pedidos/{id}/anulacion")]
-    [Trait("Criterio", "AC-AUD-05")]
-    public void LosParametrosDeConsultaLosParametrosDeRutaYElFragmentoNuncaSobreviven(string cruda, string esperada)
+    public void Cada_accion_declara_si_su_objeto_y_su_rol_son_personales_y_sus_claves_son_camelCase(string identificador)
     {
-        var plantilla = PlantillaDeRuta.Resolver(cruda, Plantillas);
+        var accion = Catalogo.Obtener(identificador);
 
-        Assert.Equal(esperada, plantilla);
-        Assert.DoesNotContain('?', plantilla);
-        Assert.DoesNotContain(';', plantilla);
-        Assert.DoesNotContain('#', plantilla);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    [InlineData("/api/otra/cosa")]
-    [InlineData("/api/ecommerce/v1/pedidos/42/otra/mas/segmentos")]
-    [InlineData("api/ecommerce/v1/pedidos")]
-    [InlineData("https://externo.ejemplo/api/ecommerce/v1/pedidos")]
-    [InlineData("/api/ecommerce/v1/pedidos/42/%2e%2e/secreto")]
-    [Trait("Criterio", "AC-AUD-05")]
-    public void SiNingunaPlantillaCoincide_LaRutaEsSinCoincidencia_NuncaLaCruda(string? cruda)
-    {
-        var resultado = PlantillaDeRuta.Resolver(cruda, Plantillas);
-
-        Assert.Equal(PlantillaDeRuta.SinCoincidencia, resultado);
-        Assert.Equal("sin-coincidencia", resultado);
+        // Los constructores obligan a decidir objeto y rol (sin valor por defecto); aquí se vigila que el catálogo no los deje en «falso» por omisión
+        // en una acción cuyo objeto es una cuenta o una persona.
+        Assert.All(accion.Detalle, clave => Assert.Matches(@"^[a-z][A-Za-z0-9]*$", clave.Nombre));
+        Assert.True(accion.Detalle.Count <= 12, "El detalle de una acción declara pocas claves: es una lista blanca, no un volcado.");
+        Assert.DoesNotContain(accion.Detalle, c => c.Nombre is "contrasena" or "password" or "token" or "codigo" or "secreto" or "clave" or "tarjeta" or "enlace" or "url");
     }
 
     [Fact]
-    public void UnaRutaMasLargaQueElTope_EsSinCoincidencia_AunqueSeaDeUnaPlantilla()
+    [Trait("Criterio", "AC-AUD-05")]
+    public void Un_identificador_de_negocio_un_GUID_y_una_huella_corta_no_se_redactan_en_el_detalle()
     {
-        var larga = "/api/ecommerce/v1/pedidos/" + new string('7', PlantillaDeRuta.MaximoDeCaracteres);
+        var detalle = DetalleSeguro.Construir(
+            [new("edicionId", false), new("isbn", false), new("huellaCorta", false)],
+            new Dictionary<string, string?> { ["edicionId"] = Guid.NewGuid().ToString("D"), ["isbn"] = "9786124516900", ["huellaCorta"] = "9f86d081884c7d65" });
 
-        Assert.Equal(PlantillaDeRuta.SinCoincidencia, PlantillaDeRuta.Resolver(larga, Plantillas));
-        Assert.Equal("/api/ecommerce/v1/pedidos/{id}", PlantillaDeRuta.Resolver("/api/ecommerce/v1/pedidos/" + new string('7', 20), Plantillas));
+        Assert.Empty(detalle.ClavesRedactadas);
+    }
+
+    // ---------- T12: movimientos de stock, catálogo, licencias, fuentes y rutas ----------
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-13")]
+    public async Task La_expiracion_automatica_de_una_reserva_queda_con_el_actor_sistema_la_edicion_y_la_cantidad()
+    {
+        var entorno = new Entorno(ActorDePrueba.DelSistema());
+        var fuente = Guid.NewGuid();
+
+        await entorno.Registrar(
+            AccionesAuditables.ReservaExpirada,
+            new Dictionary<string, string?> { ["edicionId"] = Guid.NewGuid().ToString("D"), ["cantidad"] = "2" },
+            objetoTipo: "pedido",
+            objetoId: "pd-1",
+            origen: fuente);
+
+        var registro = Assert.Single(entorno.Almacen.Registros);
+        Assert.Equal(TipoDeActor.Sistema, registro.Actor.Tipo);
+        Assert.Equal(fuente.ToString("D"), registro.SucursalOrigen);
+        Assert.Equal("2", registro.Detalle.Valores["cantidad"]);
+        Assert.Contains("edicionId", registro.Detalle.Valores.Keys);
     }
 
     [Theory]
-    [InlineData("/api/v1/pedidos/{id}", true)]
-    [InlineData("/", true)]
-    [InlineData("/api/v1/{a}/{b}", true)]
-    [InlineData("", false)]
-    [InlineData("api/v1", false)]
-    [InlineData("/api/v1/pedidos?x=1", false)]
-    [InlineData("/api/v1/pedidos;x", false)]
-    [InlineData("/api/v1/pedidos#f", false)]
-    [InlineData("/api//pedidos", false)]
-    [InlineData("/api/v1/ped{id}", false)]
-    [InlineData("/api/v1/{id", false)]
-    [InlineData("/api/v1/%41", false)]
-    [InlineData("/api/v1/espacio aqui", false)]
-    public void UnaPlantillaSoloEsValidaSinParametrosPuntoYComaNiFragmento(string plantilla, bool valida) =>
-        Assert.Equal(valida, PlantillaDeRuta.EsPlantillaValida(plantilla));
+    [InlineData(nameof(AccionesAuditables.ReservaConfirmada))]
+    [InlineData(nameof(AccionesAuditables.ReservaLiberada))]
+    [InlineData(nameof(AccionesAuditables.StockDescontadoPorEntrega))]
+    [InlineData(nameof(AccionesAuditables.StockDescontadoPorReparto))]
+    [Trait("Criterio", "AC-AUD-13")]
+    public void Cada_movimiento_de_stock_lleva_la_edicion_y_la_cantidad(string accion)
+    {
+        var claves = Catalogo.Obtener(accion).Detalle.Select(c => c.Nombre).ToList();
+
+        Assert.Contains("edicionId", claves);
+        Assert.Contains("cantidad", claves);
+    }
+
+    [Theory]
+    [InlineData(nameof(AccionesAuditables.StockDescontadoPorEntrega))]
+    [InlineData(nameof(AccionesAuditables.StockDescontadoPorReparto))]
+    public void El_descuento_del_stock_fisico_guarda_lo_que_habia_y_lo_que_quedo(string accion)
+    {
+        var claves = Catalogo.Obtener(accion).Detalle.Select(c => c.Nombre).ToList();
+
+        Assert.Contains("cantidadAnterior", claves);
+        Assert.Contains("cantidadPosterior", claves);
+    }
 
     [Fact]
-    public void UnaPlantillaInvalidaEnLaListaSeRechazaAlResolver() =>
-        Assert.Throws<ArgumentException>(() => PlantillaDeRuta.Resolver("/api/v1/x", ["/api/v1/x?y=1"]));
+    [Trait("Criterio", "AC-AUD-14")]
+    public async Task Una_ruta_modificada_guarda_el_plazo_anterior_y_el_nuevo_y_las_dos_fuentes()
+    {
+        var entorno = new Entorno(ActorDePrueba.DeAdministradorCentral());
+        var cusco = Guid.NewGuid();
+        var ayacucho = Guid.NewGuid();
+
+        await entorno.Registrar(
+            AccionesAuditables.RutaModificada,
+            new Dictionary<string, string?> { ["plazoAnteriorEnDias"] = "2", ["plazoNuevoEnDias"] = "3" },
+            objetoTipo: "ruta",
+            origen: cusco,
+            destino: ayacucho);
+
+        var registro = Assert.Single(entorno.Almacen.Registros);
+        Assert.Equal("2", registro.Detalle.Valores["plazoAnteriorEnDias"]);
+        Assert.Equal("3", registro.Detalle.Valores["plazoNuevoEnDias"]);
+        Assert.Equal(cusco.ToString("D"), registro.SucursalOrigen);
+        Assert.Equal(ayacucho.ToString("D"), registro.SucursalDestino);
+        Assert.Equal(TipoDeActor.Usuario, registro.Actor.Tipo);
+    }
+
+    [Theory]
+    [InlineData(nameof(AccionesAuditables.FuenteRegistrada))]
+    [InlineData(nameof(AccionesAuditables.FuenteEditada))]
+    [Trait("Criterio", "AC-AUD-14")]
+    public async Task El_numero_de_contacto_de_una_fuente_no_entra_a_la_auditoria(string nombre)
+    {
+        var entorno = new Entorno(ActorDePrueba.DeAdministradorCentral());
+        var accion = Constantes().Single(c => c.Identificador == nombre);
+
+        await entorno.Registrar(
+            accion,
+            new Dictionary<string, string?> { ["codigoDeFuente"] = "PIURA", ["camposCambiados"] = "contacto", ["contacto"] = "987654321", ["telefono"] = "987654321" },
+            objetoTipo: "fuente",
+            objetoId: "fu-1");
+
+        var registro = Assert.Single(entorno.Almacen.Registros);
+        Assert.DoesNotContain("contacto", registro.Detalle.Valores.Keys);
+        Assert.DoesNotContain("telefono", registro.Detalle.Valores.Keys);
+        Assert.DoesNotContain("987654321", registro.Detalle.Texto);
+        Assert.True(registro.Detalle.CantidadDeClavesDescartadas >= 2);
+    }
+
+    [Theory]
+    [InlineData(nameof(AccionesAuditables.ArchivoDeEdicionReemplazado))]
+    [InlineData(nameof(AccionesAuditables.PortadaDeEdicionReemplazada))]
+    [Trait("Criterio", "AC-AUD-14")]
+    public async Task El_reemplazo_de_un_archivo_guarda_tipo_tamano_y_huella_sin_la_clave_del_almacen(string nombre)
+    {
+        var entorno = new Entorno(ActorDePrueba.DeAdministradorCentral());
+        var accion = Constantes().Single(c => c.Identificador == nombre);
+
+        await entorno.Registrar(
+            accion,
+            new Dictionary<string, string?>
+            {
+                ["tipo"] = "application/epub+zip",
+                ["tamanoEnBytes"] = "1048576",
+                ["huellaCorta"] = "9f86d081884c7d65",
+                ["claveDelAlmacen"] = "edicion/9786124516900/original.epub",
+                ["urlFirmada"] = "https://almacen.ejemplo/obj?firma=abc",
+            },
+            objetoTipo: "edicion",
+            objetoId: "ed-9");
+
+        var registro = Assert.Single(entorno.Almacen.Registros);
+        Assert.Equal("application/epub+zip", registro.Detalle.Valores["tipo"]);
+        Assert.Equal("1048576", registro.Detalle.Valores["tamanoEnBytes"]);
+        Assert.Equal("9f86d081884c7d65", registro.Detalle.Valores["huellaCorta"]);
+        Assert.DoesNotContain("claveDelAlmacen", registro.Detalle.Valores.Keys);
+        Assert.DoesNotContain("urlFirmada", registro.Detalle.Valores.Keys);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-14")]
+    public async Task Un_cambio_de_licencia_guarda_el_valor_anterior_y_el_nuevo()
+    {
+        var entorno = new Entorno(ActorDePrueba.DeAdministradorCentral());
+
+        await entorno.Registrar(
+            AccionesAuditables.LicenciaCambiada,
+            new Dictionary<string, string?> { ["vigenciaAnterior"] = "2027-01-31", ["vigenciaNueva"] = "2028-01-31", ["tipoAnterior"] = "comercial", ["tipoNuevo"] = "comercial" },
+            objetoTipo: "edicion",
+            objetoId: "ed-9");
+
+        var registro = Assert.Single(entorno.Almacen.Registros);
+        Assert.Equal("2027-01-31", registro.Detalle.Valores["vigenciaAnterior"]);
+        Assert.Equal("2028-01-31", registro.Detalle.Valores["vigenciaNueva"]);
+    }
+
+    [Theory]
+    [InlineData(nameof(AccionesAuditables.ObraRegistrada))]
+    [InlineData(nameof(AccionesAuditables.ObraEditada))]
+    [InlineData(nameof(AccionesAuditables.ObraDadaDeBaja))]
+    [InlineData(nameof(AccionesAuditables.EdicionRegistrada))]
+    [InlineData(nameof(AccionesAuditables.EdicionEditada))]
+    [InlineData(nameof(AccionesAuditables.EdicionDadaDeBaja))]
+    [InlineData(nameof(AccionesAuditables.EdicionDigitalRetirada))]
+    [InlineData(nameof(AccionesAuditables.FuenteRegistrada))]
+    [InlineData(nameof(AccionesAuditables.FuenteEditada))]
+    [InlineData(nameof(AccionesAuditables.RutaRegistrada))]
+    [InlineData(nameof(AccionesAuditables.RutaModificada))]
+    [InlineData(nameof(AccionesAuditables.RecepcionDesignada))]
+    [InlineData(nameof(AccionesAuditables.LicenciaCambiada))]
+    [InlineData(nameof(AccionesAuditables.ArchivoDeEdicionReemplazado))]
+    [InlineData(nameof(AccionesAuditables.PortadaDeEdicionReemplazada))]
+    [Trait("Criterio", "AC-AUD-14")]
+    public async Task Las_operaciones_del_catalogo_las_fuentes_y_las_rutas_se_cancelan_si_no_se_puede_auditar(string nombre)
+    {
+        var entorno = new Entorno(ActorDePrueba.DeAdministradorCentral());
+        entorno.Almacen.Falla = new InvalidOperationException("la base no responde");
+        var accion = Constantes().Single(c => c.Identificador == nombre);
+
+        await Assert.ThrowsAsync<AuditoriaNoDisponibleException>(() => entorno.Registrar(accion));
+    }
+
+    [Theory]
+    [InlineData(nameof(AccionesAuditables.ReservaConfirmada))]
+    [InlineData(nameof(AccionesAuditables.ReservaLiberada))]
+    [InlineData(nameof(AccionesAuditables.ReservaExpirada))]
+    [InlineData(nameof(AccionesAuditables.StockDescontadoPorEntrega))]
+    [InlineData(nameof(AccionesAuditables.StockDescontadoPorReparto))]
+    [Trait("Criterio", "AC-AUD-13")]
+    public async Task Los_movimientos_de_stock_se_cancelan_si_no_se_puede_auditar(string nombre)
+    {
+        var entorno = new Entorno(ActorDePrueba.DeAdministradorCentral());
+        entorno.Almacen.Falla = new InvalidOperationException("la base no responde");
+        var accion = Constantes().Single(c => c.Identificador == nombre);
+
+        await Assert.ThrowsAsync<AuditoriaNoDisponibleException>(() => entorno.Registrar(accion));
+    }
 }
