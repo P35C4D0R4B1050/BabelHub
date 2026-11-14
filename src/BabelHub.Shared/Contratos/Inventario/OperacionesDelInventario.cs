@@ -28,7 +28,7 @@ public static class OperacionesDelInventario
         ["inventario.unidades-vendidas.consultar"] = ["codigoDeFuente:texto"],
         ["inventario.historial.consultar"] = ["pagina:int(>=1)", "tamano:int(1-100)"],
         ["inventario.alertas.listar"] = ["desde:instante"],
-        ["inventario.auditoria.consultar"] = ["filtros y cursor: los define transversal-auditoria (AUD-2)"],
+        ["inventario.auditoria.consultar"] = ["pendiente:definido por transversal-auditoria (AUD-2)"],
     };
 
     public static IReadOnlyList<OperacionDeContrato> Todas { get; } =
@@ -78,7 +78,8 @@ public static class OperacionesDelInventario
             "inventario.reservas.crear", Post, "/reservas", Usuario, true, true, false, 201, typeof(CrearReservaDto), typeof(ReservaDto),
             CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.NoEncontrado, CodigosDeErrorDelInventario.ValidacionInvalida,
             CodigosDeErrorDelInventario.StockInsuficiente, CodigosDeErrorDelInventario.EdicionNoImpresa, CodigosDeErrorDelInventario.LimiteExcedido,
-            CodigosDeErrorDelInventario.IdempotenciaEnConflicto, CodigosDeErrorDelInventario.IdempotenciaEnCurso, CodigosDeErrorDelInventario.ServicioNoDisponible),
+            CodigosDeErrorDelInventario.IdempotenciaEnConflicto, CodigosDeErrorDelInventario.IdempotenciaEnCurso, CodigosDeErrorDelInventario.ReservaEstadoInvalido,
+            CodigosDeErrorDelInventario.ServicioNoDisponible),
         Op(
             "inventario.reservas.consultar", Get, "/reservas/{pedidoId}", Usuario, true, false, true, 200, null, typeof(ReservaDto),
             CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
@@ -98,7 +99,7 @@ public static class OperacionesDelInventario
         Op(
             "inventario.reservas.cerrar", Post, "/reservas/{pedidoId}/cerrar", Usuario, true, true, false, 200, typeof(CerrarReservaDto), typeof(CierreDeReservaDto),
             CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
-            CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.ReservaEstadoInvalido, CodigosDeErrorDelInventario.IdempotenciaEnConflicto,
+            CodigosDeErrorDelInventario.ReservaEstadoInvalido, CodigosDeErrorDelInventario.IdempotenciaEnConflicto,
             CodigosDeErrorDelInventario.IdempotenciaEnCurso, CodigosDeErrorDelInventario.ServicioNoDisponible),
     ];
 

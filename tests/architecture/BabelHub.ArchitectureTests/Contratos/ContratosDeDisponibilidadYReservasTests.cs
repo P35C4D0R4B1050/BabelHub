@@ -64,6 +64,7 @@ public sealed class ContratosDeDisponibilidadYReservasTests
                 CodigosDeErrorDelInventario.LimiteExcedido,
                 CodigosDeErrorDelInventario.NoAutenticado,
                 CodigosDeErrorDelInventario.NoEncontrado,
+                CodigosDeErrorDelInventario.ReservaEstadoInvalido,
                 CodigosDeErrorDelInventario.ServicioNoDisponible,
                 CodigosDeErrorDelInventario.StockInsuficiente,
                 CodigosDeErrorDelInventario.ValidacionInvalida,

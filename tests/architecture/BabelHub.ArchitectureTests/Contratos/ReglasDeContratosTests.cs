@@ -227,6 +227,36 @@ public sealed partial class ReglasDeContratosTests
     }
 
     [Fact]
+    public void Ninguna_operacion_repite_un_codigo_de_error()
+    {
+        foreach (var operacion in CatalogoDeOperaciones.V1)
+        {
+            Assert.True(operacion.Errores.Distinct(StringComparer.Ordinal).Count() == operacion.Errores.Count, $"{operacion.Nombre} repite un código de error.");
+        }
+    }
+
+    [Fact]
+    public void Crear_una_reserva_sobre_un_pedido_cuya_reserva_ya_no_esta_pendiente_responde_estado_invalido()
+    {
+        var crear = CatalogoDeOperaciones.V1.Single(o => o.Nombre == "inventario.reservas.crear");
+
+        Assert.Contains("INV-RESERVA-ESTADO-INVALIDO", crear.Errores);
+    }
+
+    [Fact]
+    public void Los_parametros_de_consulta_solo_se_declaran_para_operaciones_del_catalogo()
+    {
+        var parametrizadas = CatalogoDeOperaciones.V1.Where(o => o.Parametros.Count > 0).Select(o => o.Nombre).Order(StringComparer.Ordinal).ToList();
+
+        Assert.Equal(
+            [
+                "inventario.alertas.listar", "inventario.auditoria.consultar", "inventario.fuentes.existencias", "inventario.historial.consultar",
+                "inventario.ingresos.listar", "inventario.traslados.listar", "inventario.unidades-vendidas.consultar",
+            ],
+            parametrizadas);
+    }
+
+    [Fact]
     public void Todo_tipo_publico_de_Shared_esta_en_los_espacios_de_contratos_o_de_errores()
     {
         var fuera = BabelHub.Shared.AssemblyMarker.Assembly.GetTypes()
@@ -239,6 +269,7 @@ public sealed partial class ReglasDeContratosTests
     }
 
     [Fact]
+    // Alcance conocido: no resuelve propiedades de MSBuild ni cubre Update/Remove ni Directory.Build.props o .targets.
     public void Los_proyectos_de_produccion_no_enlazan_codigo_de_afuera_de_su_carpeta()
     {
         var enlaces = new List<string>();
