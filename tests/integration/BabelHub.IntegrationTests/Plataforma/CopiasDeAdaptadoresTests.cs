@@ -35,7 +35,8 @@ public sealed class CopiasDeAdaptadoresTests
         "Infrastructure/Plataforma/LatidoDeLaBase.cs",
         "Api/Plataforma/ModoDeArranque.cs",
         "Api/Plataforma/SaludHttp.cs",
-        "Domain/Auditoria/DetalleSeguro.cs");
+        "Domain/Auditoria/DetalleSeguro.cs",
+        "Domain/Auditoria/CatalogoDeAcciones.cs");
 
     [Theory]
     [MemberData(nameof(Archivos))]
