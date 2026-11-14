@@ -88,12 +88,12 @@ public sealed class ConsultaDeExistencias(
             cancelacion).ConfigureAwait(false);
     }
 
-    private static Dictionary<(Guid FuenteId, Guid EdicionId), int> Sumar(IReadOnlyList<UnidadesVencidas> vencidas) =>
+    internal static Dictionary<(Guid FuenteId, Guid EdicionId), int> Sumar(IReadOnlyList<UnidadesVencidas> vencidas) =>
         vencidas
             .GroupBy(v => (v.FuenteId, v.EdicionId))
             .ToDictionary(g => g.Key, g => (int)Math.Min(int.MaxValue, g.Sum(v => (long)Math.Max(0, v.Unidades))));
 
-    private static ExistenciaEnFuente Existencia(Fuente fuente, Guid edicionId, FilaDeStock? fila, IReadOnlyDictionary<(Guid FuenteId, Guid EdicionId), int> vencidas)
+    internal static ExistenciaEnFuente Existencia(Fuente fuente, Guid edicionId, FilaDeStock? fila, IReadOnlyDictionary<(Guid FuenteId, Guid EdicionId), int> vencidas)
     {
         var stock = fila is null ? ExistenciaDeStock.Vacia : new ExistenciaDeStock(fila.Fisico, fila.Reservado);
 
@@ -112,7 +112,7 @@ public sealed class ConsultaDeExistencias(
             Convertir(EstadoDeStockExtensiones.DeVendible(vendible)));
     }
 
-    private static EstadoDeExistencia Convertir(EstadoDeStock estado) => estado switch
+    internal static EstadoDeExistencia Convertir(EstadoDeStock estado) => estado switch
     {
         EstadoDeStock.SinStock => EstadoDeExistencia.SinStock,
         EstadoDeStock.Bajo => EstadoDeExistencia.Bajo,
