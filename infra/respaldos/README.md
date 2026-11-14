@@ -54,9 +54,26 @@ Si el almacén no está disponible, la base **sigue operando** (DA03) y lo que n
 
 El tamaño de 4 GiB lo valida el spike T03 (cuota del almacén) y T04 (memoria y disco de VM-INVENTARIO); los 80 % y 100 % no cambian.
 
+## Custodia de la clave y restauración de ensayo (T28; PLA-17, AC-PLA-17)
+
+La clave que **descifra** vive fuera de la VM, del repositorio y del contenedor de respaldos; su custodia está registrada en [`custodia.md`](custodia.md) (titular, destinatario público, **segunda copia obligatoria** en otro lugar, fecha de la última prueba de descifrado y su periodicidad, y el procedimiento de rotación). Los campos están en `pendiente` hasta que la persona responsable genere la clave: así el registro sin llenar **no pasa** `scripts/comprobar-custodia.sh`.
+
+| Script (en el equipo de la persona responsable o en la máquina de ensayo, nunca en una VM) | Qué hace |
+| :--- | :--- |
+| `scripts/comprobar-custodia.sh [--entorno postgres.env \| --destinatario age1…]` | Falla si algún campo está `pendiente`, si la segunda copia está en el mismo lugar que la primera, si la prueba de descifrado venció (o es futura o inválida), si el archivo de custodia contiene una clave privada, y si **el destinatario con el que la VM de datos cifra no es el registrado** (los respaldos no se podrían descifrar con la copia registrada). Solo lee. |
+| `scripts/descifrar-respaldo.sh --entrada <respaldo>.age < clave` | Descifra con la clave por la **entrada estándar** (solo en memoria) y **solo si corresponde al destinatario registrado** (si no, sale con 3 sin descifrar nada). `--probar --registrar` descifra a la nada y anota la fecha de hoy en la custodia (la prueba periódica). |
+| `scripts/extraer-respaldo.sh --destino <carpeta-nueva>` | Recibe el `tar` y lo **valida antes de extraer**: rechaza rutas absolutas, `..`, enlaces duros, archivos especiales y enlaces simbólicos con destino absoluto o con `..`. Extrae **sin propietarios**. **Sanea** lo que trae el respaldo: vacía `postgresql.auto.conf`, comenta `archive_command`, `archive_mode`, `restore_command`, `primary_conninfo` e `include*` de `postgresql.conf`, borra `postmaster.pid` y las señales de réplica y de recuperación, y **regenera `pg_hba.conf`** (solo el socket local de `postgres` y TCP desde 127.0.0.1 con contraseña). |
+
+```bash
+# La restauración de ensayo en otra máquina, solo con la copia fuera de línea (la clave entra por la entrada estándar):
+scripts/descifrar-respaldo.sh --entrada <respaldo>.tar.age < /dev/tty | scripts/extraer-respaldo.sh --destino <carpeta-nueva>
+```
+
+`scripts/restaurar.sh` (T29) y el ensayo aislado (T31) usan estas mismas piezas; lo que ellos añaden (negativa a correr con un agente o un proceso de desarrollo con acceso, volumen cifrado efímero, apertura en orden) no está aquí.
+
 ## Lo que queda fuera de esta tarea
 
-- La clave privada de `age`, su copia fuera de línea y el registro de su custodia (`custodia.md`): los entrega T27/T28.
+- (Hecho en T28) La clave privada de `age`, su copia fuera de línea y el registro de su custodia: la genera y la guarda la persona responsable (`custodia.md`).
 - (Hecho en T27) Vigilar el espacio local reservado y declarar roto el archivado si se agota: ver la sección anterior.
 - Restaurar: `scripts/restaurar.sh` (T29) elige entre candidatos por continuidad de línea de tiempo y LSN, y extrae el `tar` sin rutas absolutas ni propietarios.
 - Compresión: el respaldo no se comprime (el nombre es `.tar.age`); si la medición de cuota (T03) la exige, se añade aquí.
