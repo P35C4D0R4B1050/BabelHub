@@ -76,6 +76,7 @@ namespace BabelHub.ArchitectureTests
         private static readonly System.Reflection.Assembly Pruebas = typeof(PruebasDeSensibilidadTests).Assembly;
 
         [Fact]
+        [Trait("Criterio", "AC-PLA-13")]
         public void La_regla_de_modulos_detecta_el_uso_del_interior_de_otro_modulo()
         {
             var resultado = ReglasDeModulosTests.ComprobarInterior(Pruebas, "BabelHub.Ecommerce", "Application", "Pagos");
@@ -95,6 +96,7 @@ namespace BabelHub.ArchitectureTests
         }
 
         [Fact]
+        [Trait("Criterio", "AC-PLA-13")]
         public void La_regla_de_modulos_detecta_el_uso_del_dominio_de_otro_modulo()
         {
             var resultado = ReglasDeModulosTests.ComprobarInterior(Pruebas, "BabelHub.Ecommerce", "Application", "Pagos");
@@ -105,6 +107,7 @@ namespace BabelHub.ArchitectureTests
         }
 
         [Fact]
+        [Trait("Criterio", "AC-PLA-13")]
         public void La_regla_de_la_api_detecta_el_uso_del_interior_de_un_modulo()
         {
             var resultado = ReglasDeModulosTests.ComprobarApi(Pruebas, "BabelHub.Ecommerce");
@@ -115,6 +118,7 @@ namespace BabelHub.ArchitectureTests
         }
 
         [Fact]
+        [Trait("Criterio", "AC-PLA-13")]
         public void La_regla_de_capas_detecta_infraestructura_en_la_aplicacion()
         {
             var resultado = Types.InAssembly(Pruebas)

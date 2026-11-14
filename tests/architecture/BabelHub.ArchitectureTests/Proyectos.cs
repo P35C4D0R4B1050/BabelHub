@@ -7,9 +7,13 @@ internal sealed record Proyecto(string Nombre, IReadOnlySet<string> ProyectosRef
 
 internal static class Proyectos
 {
-    private static readonly Lazy<IReadOnlyList<Proyecto>> Todos = new(Cargar);
+    private static readonly Lazy<IReadOnlyList<Proyecto>> Src = new(() => Cargar("src"));
+    private static readonly Lazy<IReadOnlyList<Proyecto>> Herramientas = new(() => Cargar("tools"));
 
-    public static IReadOnlyList<Proyecto> DeSrc => Todos.Value;
+    public static IReadOnlyList<Proyecto> DeSrc => Src.Value;
+
+    /// <summary>Los proyectos de <c>tools/</c>: herramientas operativas que no son parte de los servicios.</summary>
+    public static IReadOnlyList<Proyecto> DeTools => Herramientas.Value;
 
     public static string Raiz { get; } = EncontrarRaiz();
 
@@ -24,13 +28,19 @@ internal static class Proyectos
         return dir?.FullName ?? throw new InvalidOperationException("No se encontró BabelHub.sln subiendo desde el directorio de las pruebas.");
     }
 
-    private static IReadOnlyList<Proyecto> Cargar()
+    private static List<Proyecto> Cargar(string carpeta)
     {
-        var src = Path.Combine(Raiz, "src");
-        return Directory.EnumerateFiles(src, "*.csproj", SearchOption.AllDirectories)
-            .Select(ruta =>
+        var ruta = Path.Combine(Raiz, carpeta);
+        if (!Directory.Exists(ruta))
+        {
+            return [];
+        }
+
+        return Directory.EnumerateFiles(ruta, "*.csproj", SearchOption.AllDirectories)
+            .Where(r => !r.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Select(r =>
             {
-                var xml = XDocument.Load(ruta);
+                var xml = XDocument.Load(r);
                 var referencias = xml.Descendants("ProjectReference")
                     .Select(e => (string?)e.Attribute("Include") ?? string.Empty)
                     .Select(i => Path.GetFileNameWithoutExtension(i.Replace('\\', '/')))
@@ -38,7 +48,7 @@ internal static class Proyectos
                 var paquetes = xml.Descendants("PackageReference")
                     .Select(e => (string?)e.Attribute("Include") ?? string.Empty)
                     .ToHashSet(StringComparer.Ordinal);
-                return new Proyecto(Path.GetFileNameWithoutExtension(ruta), referencias, paquetes);
+                return new Proyecto(Path.GetFileNameWithoutExtension(r), referencias, paquetes);
             })
             .OrderBy(p => p.Nombre, StringComparer.Ordinal)
             .ToList();
