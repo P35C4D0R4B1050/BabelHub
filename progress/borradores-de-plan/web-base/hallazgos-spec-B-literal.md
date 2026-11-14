@@ -42,3 +42,15 @@ Contrato de Identidad: la Web como consumidora y el aceptar a mitad de sesión (
 ## Para la persona
 
 La spec ya pasó cuatro rondas (dos sobre el texto ampliado y dos sobre B). Cada ronda halla Importantes de redacción nuevos porque el texto crece; conviene una ronda final **acotada a verificar los 49 requisitos del borrador v2**, y confirmar la decisión sobre los derechos y el registro.
+
+# Ronda final sobre el borrador v2 (autorizada, 2026-11-14 noche)
+
+Veredictos: `security-reviewer` **cumple con observaciones** (0 Importantes), `spec-auditor` **con cambios menores** (0 Importantes) y `arch-reviewer` **cumple con observaciones con 2 Importantes**: (I-1) la política de textos pendientes es la única barrera real en Pedidos, Devoluciones, Biblioteca y Asistente y vive en la Presentación, y la redacción «defensa en profundidad» era engañosa; (I-2) las excepciones de aceptar, cerrar sesión, leer los textos legales y usar el Libro (con envío de hoja) siguen «por confirmar» pese a figurar como resueltas, y la puerta exige cero preguntas abiertas.
+
+Ya corregido en `spec-B-literal.md` (49 requisitos, 42 criterios, `SpecCheck` 0 avisos), sin cambiar comportamiento: I-1 (componente transversal de composición que consulta el contrato público de Identidad; única barrera para esos cuatro módulos y hallazgo para sus planes); el canal sin sesión para derechos queda «por definir» en vez de afirmarse; WEB-47 como evento propio (AUD-26) con contador por ventana de 15 minutos y WEB-48 con AUD-29; §6 sin «conservando lo escrito» ante un bloqueo; Libro acotado en WEB-43 (enlace público, envío de hoja y consulta propia).
+
+**Falta I-2, que es decisión de la persona:** confirmar las excepciones (aceptar, cerrar sesión, textos legales, Libro con envío de hoja). Con su confirmación se quitan los dos «por confirmar» (§6 y §7) y queda una verificación acotada de `arch-reviewer` sobre I-1 e I-2 antes de aprobar con `spec-approve`.
+
+## Menores a `progress/hallazgos.md` al aprobar
+
+Orden de la política frente al módulo y estado HTTP de `ECO-TEXTOS-PENDIENTES`; HEAD y OPTIONS en WEB-46 y la lista por prefijo (no por extensión) de estáticos y salud; lista permitida definida una sola vez y patrones EARS (Estado o Evento en WEB-44, 46, 47 y 49) en el plan; AC-WEB-36 y AC-WEB-28 con los casos nombrados (revocar consentimientos, cancelar cuenta, rechazar cambio de correo, marcar avisos, presentar el segundo factor, cancelar el ingreso); ruta de retorno de la pasarela en la lista cerrada; WEB-39 exento de WEB-42 y WEB-46; costo de una consulta por solicitud, ESC-AC03-03 (Identidad en la réplica de gestión) y reintento de la revocación (IDE-61, IDE-64) en el plan; contrato de Identidad con estado cerrado para cualquier persona.
