@@ -7,6 +7,7 @@ namespace BabelHub.IntegrationTests.Imagenes;
 /// de verdad con el usuario sin privilegios, el sistema de archivos de solo lectura, los límites y la comprobación de salud declarados.
 /// Los de imagen propia se prueban en <c>ImagenesDeContenedorTests</c> y se resuelven con <c>ComposePorVmTests</c>.
 /// </summary>
+[Collection(ProcesosPesadosCollection.Nombre)]
 public sealed class ComposeEnEjecucionTests : IDisposable
 {
     private readonly string _carpeta = Path.Combine(Path.GetTempPath(), "compose-ejec-" + Guid.NewGuid().ToString("N"));

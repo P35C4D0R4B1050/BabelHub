@@ -8,6 +8,7 @@ namespace BabelHub.IntegrationTests.Imagenes;
 /// con el sistema de archivos escribible o con puertos abiertos a todas las direcciones se rechaza indicando el incumplimiento, salvo
 /// una excepción registrada con su motivo y su mitigación. Las imágenes de terceros van fijadas por digest (<c>VersionesFijadasTests</c>).
 /// </summary>
+[Collection(ProcesosPesadosCollection.Nombre)]
 public sealed class ComposePorVmTests : IDisposable
 {
     private readonly string _carpeta = Path.Combine(Path.GetTempPath(), "compose-" + Guid.NewGuid().ToString("N"));

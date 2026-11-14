@@ -65,7 +65,7 @@ public sealed class ClientesHttpDeServicioTests
 
     private static OpcionesDelClienteDeServicio Rapido() => new()
     {
-        Espera = TimeSpan.FromMilliseconds(1000),
+        Espera = TimeSpan.FromSeconds(4),
         RetrasoDelReintento = TimeSpan.FromMilliseconds(10),
         DuracionDelCorte = TimeSpan.FromSeconds(5),
     };
