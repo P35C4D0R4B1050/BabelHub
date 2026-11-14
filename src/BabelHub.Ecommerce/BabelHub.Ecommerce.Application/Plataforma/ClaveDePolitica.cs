@@ -49,9 +49,11 @@ public static class PoliticasDeLimite
 
     public static ClaveDePolitica SolicitudesPorUsuario { get; } = new("solicitudes-por-usuario");
 
+    public static ClaveDePolitica SolicitudesPorHuellaDirecta { get; } = new("solicitudes-por-huella-directa");
+
     /// <summary>Los límites generales de uso (con respaldo local), aparte de las políticas críticas de <see cref="Todas"/>.</summary>
     public static IReadOnlyList<ClaveDePolitica> Generales { get; } =
-        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario];
+        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta];
 
     public static IReadOnlyList<ClaveDePolitica> Todas { get; } =
     [

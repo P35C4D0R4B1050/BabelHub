@@ -58,7 +58,16 @@ public readonly record struct OperacionDeServicio
 }
 
 /// <summary>Una llamada entre servicios tal como la ve la Aplicación: la operación y el alcance de la credencial verificada (ninguno si no trae).</summary>
-public sealed record LlamadaDeServicio(OperacionDeServicio Operacion, AlcanceDeServicio? AlcanceDeLaCredencial);
+/// <param name="ContextoDeUsuarioDiferido">Verdadero antes de autenticar: la credencial y la matriz ya se pueden comprobar, y el contexto del usuario de una operaciÃ³n de usuario se comprueba despuÃ©s de autenticar.</param>
+public sealed record LlamadaDeServicio(OperacionDeServicio Operacion, AlcanceDeServicio? AlcanceDeLaCredencial, bool ContextoDeUsuarioDiferido = false);
+
+/// <summary>Qué operaciones declaran su alcance y cuál exige cada una; la consulta pública de la matriz (la Api verifica con ella que ningún endpoint de servicio quede sin declarar).</summary>
+public interface IMatrizDeAlcancesDeServicio
+{
+    IReadOnlyCollection<OperacionDeServicio> Operaciones { get; }
+
+    AlcanceDeServicio? Exigido(OperacionDeServicio operacion);
+}
 
 public enum MotivoDeRechazoDeLlamada
 {

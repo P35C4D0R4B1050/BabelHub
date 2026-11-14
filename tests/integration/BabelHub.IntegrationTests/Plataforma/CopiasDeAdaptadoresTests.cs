@@ -28,7 +28,8 @@ public sealed class CopiasDeAdaptadoresTests
         "Infrastructure/Plataforma/RegistroRedactado.cs",
         "Application/Plataforma/MotorDeLimitesNoDisponible.cs",
         "Api/Plataforma/ManejoDeErrores.cs",
-        "Api/Plataforma/LimitesDeUsoHttp.cs");
+        "Api/Plataforma/LimitesDeUsoHttp.cs",
+        "Api/Plataforma/CredencialDeServicio.cs");
 
     [Theory]
     [MemberData(nameof(Archivos))]

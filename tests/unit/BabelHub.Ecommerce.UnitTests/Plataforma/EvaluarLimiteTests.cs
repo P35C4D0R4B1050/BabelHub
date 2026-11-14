@@ -12,6 +12,7 @@ public sealed class EvaluarLimiteTests
     private static readonly ClaveDePolitica General = new("solicitudes-generales");
     private static readonly ClaveDePolitica Avisos = new("avisos-por-numero");
     private static readonly ClaveDePolitica Reservas = new("reservas-por-usuario");
+    private static readonly ClaveDePolitica Directa = new("direccion-directa-prueba");
     private static readonly DateTimeOffset Inicio = new(2026, 11, 13, 12, 0, 0, TimeSpan.Zero);
 
     private readonly RelojFijo _reloj = new(Inicio);
@@ -32,6 +33,7 @@ public sealed class EvaluarLimiteTests
             new PoliticaDeLimite(General.Valor, 3, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true),
             new PoliticaDeLimite(Avisos.Valor, 2, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Numero, liberable: true, publicarEvento: false),
             new PoliticaDeLimite(Reservas.Valor, 2, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Usuario),
+            new PoliticaDeLimite(Directa.Valor, 2, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.OrigenDirecto),
         ]);
 
         _control = new EvaluarLimite(new CatalogoDePoliticas(politicas), _motor, _local, _origen, _eventos, _reloj);
@@ -341,6 +343,35 @@ public sealed class EvaluarLimiteTests
         await Assert.ThrowsAsync<ArgumentException>(() => _control.Reservar(PoliticasDeLimite.RegistrosPorOrigen, sujeto: "u-1"));
         await Assert.ThrowsAsync<ArgumentException>(() => _control.Reservar(Avisos, sujeto: "u-1"));
         await Assert.ThrowsAsync<ArgumentException>(() => _control.Reservar(new ClaveDePolitica("no-existe"), sujeto: "u-1"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-29")]
+    public async Task Reservar_ConLaDireccionReenviadaIgnorada_NoCuentaLosLimitesPorOrigenYSiElTopeDeLaDireccionDirecta()
+    {
+        _origen.Actual = _origen.Actual with { AplicaLimitesPorOrigen = false };
+
+        for (var i = 0; i < 5; i++)
+        {
+            var sinContar = await _control.Reservar(General);
+            Assert.True(sinContar.EsPermitido);
+            Assert.Null(sinContar.Reserva);
+        }
+
+        Assert.Empty(_motor.ContadoresUsados);
+
+        Assert.True((await _control.Reservar(Directa)).EsPermitido);
+        Assert.True((await _control.Reservar(Directa)).EsPermitido);
+        var rechazo = await _control.Reservar(Directa);
+
+        Assert.Equal(EstadoDeLimite.Excedido, rechazo.Estado);
+        Assert.All(_motor.ContadoresUsados, c => Assert.StartsWith("d:", c, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Reservar_ConLaPoliticaDeLaDireccionDirectaYSujeto_Lanza()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => _control.Reservar(Directa, sujeto: "u-1"));
     }
 
     private async Task<ResultadoDeLimite> Agotar(ClaveDePolitica politica, int cupos)

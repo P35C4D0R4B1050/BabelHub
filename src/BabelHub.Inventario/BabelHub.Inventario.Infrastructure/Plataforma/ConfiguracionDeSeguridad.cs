@@ -125,6 +125,34 @@ public sealed class OpcionesDeCredencialesDeEntrada
             p => (Encoding.UTF8.GetBytes(p.Value.Actual), p.Value.Anterior is null ? null : Encoding.UTF8.GetBytes(p.Value.Anterior)));
     }
 
+    /// <summary>
+    /// A qué alcance pertenece la credencial presentada, si a alguno, y si es la anterior de una rotación. Compara contra todas sin cortar al
+    /// primer acierto, para que el tiempo no diga qué alcance existe.
+    /// </summary>
+    public (AlcanceDeServicio? Alcance, bool EsAnterior) Identificar(string? presentada)
+    {
+        if (string.IsNullOrEmpty(presentada))
+        {
+            return (null, false);
+        }
+
+        var bytes = Encoding.UTF8.GetBytes(presentada);
+        AlcanceDeServicio? encontrado = null;
+        var esAnterior = false;
+        foreach (var (alcance, (actual, anterior)) in _credenciales)
+        {
+            var coincideActual = CryptographicOperations.FixedTimeEquals(bytes, actual);
+            var coincideAnterior = anterior is not null && CryptographicOperations.FixedTimeEquals(bytes, anterior);
+            if (coincideActual || coincideAnterior)
+            {
+                encontrado = alcance;
+                esAnterior = !coincideActual;
+            }
+        }
+
+        return (encontrado, esAnterior);
+    }
+
     public ResultadoDeCredencialDeEntrada Comprobar(AlcanceDeServicio alcance, string? presentada)
     {
         if (string.IsNullOrEmpty(presentada) || !_credenciales.TryGetValue(alcance, out var esperadas))

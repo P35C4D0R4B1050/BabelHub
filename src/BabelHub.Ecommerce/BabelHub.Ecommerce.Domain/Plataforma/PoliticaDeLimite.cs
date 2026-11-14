@@ -9,6 +9,9 @@ public enum TipoDeSujetoDeLimite
 
     /// <summary>Número de WhatsApp de un cliente (tope de avisos, NOT-14).</summary>
     Numero,
+
+    /// <summary>La huella de la dirección directa de la conexión: el tope general de una llamada con dirección reenviada sin credencial (SEG-32). Nunca se omite.</summary>
+    OrigenDirecto,
 }
 
 /// <summary>

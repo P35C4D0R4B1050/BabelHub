@@ -17,8 +17,13 @@ public static class PoliticasDeSeguridad
     public static PoliticaDeLimite SolicitudesPorUsuario { get; } = new(
         "solicitudes-por-usuario", 100, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
 
+    /// <summary>Tope general de la dirección directa de una llamada entre servicios cuya dirección reenviada se ignoró (SEG-32): 120 por minuto, configurable.</summary>
+    public static PoliticaDeLimite SolicitudesPorHuellaDirecta { get; } = new(
+        "solicitudes-por-huella-directa", 120, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.OrigenDirecto, respaldoLocal: true);
+
     /// <summary>Límites generales de uso: con el almacén caído caen al límite local por instancia (SEG-26).</summary>
-    public static IReadOnlyList<PoliticaDeLimite> Generales { get; } = [SolicitudesPorUsuario];
+    public static IReadOnlyList<PoliticaDeLimite> Generales { get; } =
+        [SolicitudesPorUsuario, SolicitudesPorHuellaDirecta];
 
     public static IReadOnlyList<PoliticaDeLimite> Todas { get; } = [AjustesDelPersonal, TrasladosDelPersonal];
 }

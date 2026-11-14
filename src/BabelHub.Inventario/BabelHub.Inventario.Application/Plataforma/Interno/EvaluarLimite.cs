@@ -44,6 +44,13 @@ public sealed class EvaluarLimite(
     {
         var definicion = catalogo.Obtener(politica);
         var origen = origenes.Actual;
+
+        // Una llamada con dirección reenviada ignorada no trae origen del cliente: los límites por origen no la cuentan (SEG-32).
+        if (!origen.AplicaLimitesPorOrigen && definicion.Tipo is TipoDeSujetoDeLimite.Origen or TipoDeSujetoDeLimite.Combinacion)
+        {
+            return ResultadoDeLimite.PermitidoSinContar();
+        }
+
         var contador = ComponerContador(definicion, sujeto, origen.Huella);
 
         ResultadoDeLimite resultado;
@@ -113,6 +120,11 @@ public sealed class EvaluarLimite(
                 return sujeto is null
                     ? throw new ArgumentException("Una política por combinación necesita el sujeto.", nameof(sujeto))
                     : $"c:s:{sujeto}|{origen}";
+
+            case TipoDeSujetoDeLimite.OrigenDirecto:
+                return sujeto is null
+                    ? $"d:{origen}"
+                    : throw new ArgumentException("Una política por dirección directa no lleva sujeto.", nameof(sujeto));
 
             default:
                 throw new ArgumentOutOfRangeException(nameof(politica), "El Inventario no tiene políticas por número.");

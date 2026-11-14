@@ -4,7 +4,7 @@ namespace BabelHub.Ecommerce.Application.Plataforma.Interno;
 /// Matriz operación → alcance de la credencial de servicio. Cada operación declara el único alcance que la autoriza; una
 /// operación sin declarar no la autoriza ninguno (rechazo por defecto).
 /// </summary>
-public sealed class MatrizDeAlcances
+public sealed class MatrizDeAlcances : IMatrizDeAlcancesDeServicio
 {
     private readonly Dictionary<OperacionDeServicio, AlcanceDeServicio> _exigidos;
 
@@ -88,7 +88,7 @@ public sealed class AutorizarLlamadaDeServicio(
         }
 
         // Una llamada que actúa por un usuario lleva su contexto; el actor «sistema» o «integración» sale del alcance.
-        if (exigido == AlcanceDeServicio.OperacionDeUsuario && actores.Actual?.Tipo != TipoDeActor.Usuario)
+        if (exigido == AlcanceDeServicio.OperacionDeUsuario && !llamada.ContextoDeUsuarioDiferido && actores.Actual?.Tipo != TipoDeActor.Usuario)
         {
             return MotivoDeRechazoDeLlamada.SinContextoDeUsuario;
         }
@@ -129,6 +129,6 @@ public sealed class ResolverOrigenDeLlamadaDeServicio(
             new EventoDeSeguridad(TipoDeEventoDeSeguridad.OrigenReenviadoSinCredencial, reloj.Ahora, origen: directo.Huella),
             cancelacion).ConfigureAwait(false);
 
-        return new OrigenResuelto(directo, AplicaLimitesPorOrigen: false, ReenvioIgnorado: true);
+        return new OrigenResuelto(directo with { AplicaLimitesPorOrigen = false }, AplicaLimitesPorOrigen: false, ReenvioIgnorado: true);
     }
 }

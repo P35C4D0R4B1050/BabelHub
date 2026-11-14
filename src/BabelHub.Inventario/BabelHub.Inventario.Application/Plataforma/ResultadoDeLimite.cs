@@ -87,7 +87,7 @@ public sealed record ResultadoDeLimite
 
     public bool EsPermitido => Estado == EstadoDeLimite.Permitido;
 
-    /// <summary>El cupo reservado (para <c>Liberar</c>, <c>Completar</c> o <c>Fallar</c>); solo existe si la solicitud puede continuar.</summary>
+    /// <summary>El cupo reservado (para <c>Liberar</c>, <c>Completar</c> o <c>Fallar</c>); solo existe si la solicitud puede continuar y se contÃ³ (es <see langword="null"/> si <see cref="PermitidoSinContar"/>).</summary>
     public ReservaDeLimite? Reserva { get; }
 
     public string? Motivo { get; }
@@ -103,6 +103,9 @@ public sealed record ResultadoDeLimite
         ArgumentNullException.ThrowIfNull(reserva);
         return new(EstadoDeLimite.Permitido, reserva);
     }
+
+    /// <summary>La solicitud pasa sin contar: la polÃ­tica es por origen y esta llamada no trae un origen del cliente (SEG-32). No hay reserva que liberar.</summary>
+    public static ResultadoDeLimite PermitidoSinContar() => new(EstadoDeLimite.Permitido);
 
     public static ResultadoDeLimite Excedido(string motivo, int esperaEnSegundos, DateTimeOffset disponibleDesde)
     {
