@@ -11,6 +11,12 @@ namespace BabelHub.Inventario.Application.Plataforma;
 internal interface IElevacionDeAlcance
 {
     Task<T> ConAlcanceDeRed<T>(Func<CancellationToken, Task<T>> bloque, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Ejecuta la operación y traduce el rechazo de la política de filas de la base (<c>42501</c> con nombre de tabla) a <see cref="AlcanceDeDatosDenegadoException"/>, sin confundirlo con «sin stock» ni con un error
+    /// inesperado. Vive aquí, y no en la Infraestructura de la plataforma, porque la Infraestructura de un módulo no puede depender de la de otro (regla 13).
+    /// </summary>
+    Task<T> TraducirRechazoDeLaPolitica<T>(Func<Task<T>> operacion);
 }
 
 /// <summary>

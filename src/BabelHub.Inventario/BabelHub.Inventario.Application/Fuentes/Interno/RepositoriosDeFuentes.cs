@@ -5,7 +5,24 @@ namespace BabelHub.Inventario.Application.Fuentes.Interno;
 /// <summary>Una fila de la tabla de stock tal como se lee: físico y reservado de una pareja (fuente, edición).</summary>
 public sealed record FilaDeStock(Guid FuenteId, Guid EdicionId, int Fisico, int Reservado);
 
-/// <summary>Repositorio de fuentes (esquema <c>fuentes</c>). Aquí solo la lectura; las escrituras llegan con los casos de uso que las necesitan.</summary>
+/// <summary>Cómo terminó la escritura de una fuente: la restricción única de código o de nombre es la última defensa frente a dos altas simultáneas.</summary>
+public enum ResultadoDeEscrituraDeFuente
+{
+    Escrita,
+    CodigoRepetido,
+    NombreRepetido,
+}
+
+/// <summary>Cómo terminó el guardado de la ficha de una edición.</summary>
+public enum ResultadoDeGuardadoDeFicha
+{
+    Guardada,
+
+    /// <summary>La edición tiene stock y la clave compuesta de formato impidió el cambio (la última defensa de «una digital nunca tiene stock»).</summary>
+    FormatoEnConflicto,
+}
+
+/// <summary>Repositorio de fuentes (esquema <c>fuentes</c>). Las escrituras corren en la transacción del caso de uso; su restricción única es la última defensa.</summary>
 public interface IRepositorioDeFuentes
 {
     Task<Fuente?> PorId(Guid fuenteId, CancellationToken cancelacion = default);
@@ -15,6 +32,24 @@ public interface IRepositorioDeFuentes
     Task<IReadOnlyList<Fuente>> Listar(CancellationToken cancelacion = default);
 
     Task<IReadOnlyList<Fuente>> DeLaRegion(string region, CancellationToken cancelacion = default);
+
+    /// <summary>Cuántas fuentes hay (para decidir si la que se registra es la primera y, por tanto, la de recepción, FUE-19).</summary>
+    Task<int> Contar(CancellationToken cancelacion = default);
+
+    /// <summary>La fuente por su código, bloqueada para actualizar (<c>SELECT … FOR UPDATE</c>): dos ediciones simultáneas no se pisan.</summary>
+    Task<Fuente?> PorCodigoParaActualizar(string codigo, CancellationToken cancelacion = default);
+
+    /// <summary>Inserta la fuente nueva; un código o un nombre repetido (también por una alta simultánea) se devuelve como resultado, no como excepción.</summary>
+    Task<ResultadoDeEscrituraDeFuente> Agregar(Fuente fuente, CancellationToken cancelacion = default);
+
+    /// <summary>Actualiza nombre, región y contacto de la fuente (el código no cambia); un nombre repetido se devuelve como resultado.</summary>
+    Task<ResultadoDeEscrituraDeFuente> Actualizar(Fuente fuente, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Pasa la marca de recepción de la fuente anterior (si la hay) a la nueva: primero la quita y luego la pone, porque el índice único parcial no admite dos a la
+    /// vez ni siquiera dentro de la misma sentencia.
+    /// </summary>
+    Task CambiarRecepcion(Guid? anteriorId, Guid nuevaId, CancellationToken cancelacion = default);
 }
 
 /// <summary>Repositorio de rutas entre fuentes.</summary>
@@ -23,12 +58,27 @@ public interface IRepositorioDeRutas
     Task<RutaEntreFuentes?> Obtener(Guid origenId, Guid destinoId, CancellationToken cancelacion = default);
 
     Task<IReadOnlyList<RutaEntreFuentes>> HaciaDestino(Guid destinoId, CancellationToken cancelacion = default);
+
+    /// <summary>Todas las rutas definidas.</summary>
+    Task<IReadOnlyList<RutaEntreFuentes>> Todas(CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Crea o cambia la ruta y devuelve el plazo que tenía antes (<see langword="null"/> si no existía), leído bajo el bloqueo de la fila: con dos administradores
+    /// simultáneos cada cambio ve el valor que de verdad reemplazó (FUE-14).
+    /// </summary>
+    Task<int?> Definir(RutaEntreFuentes ruta, CancellationToken cancelacion = default);
 }
 
 /// <summary>Repositorio de las fichas de edición (solo el formato).</summary>
 public interface IRepositorioDeFichas
 {
     Task<FichaDeEdicion?> PorId(Guid edicionId, CancellationToken cancelacion = default);
+
+    /// <summary>Las fichas que existen de esas ediciones (las que no tienen ficha no figuran).</summary>
+    Task<IReadOnlyList<FichaDeEdicion>> PorIds(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default);
+
+    /// <summary>Guarda la ficha (alta o cambio de formato). El conflicto con el stock existente se devuelve como resultado.</summary>
+    Task<ResultadoDeGuardadoDeFicha> Guardar(FichaDeEdicion ficha, CancellationToken cancelacion = default);
 
     /// <summary><see langword="true"/> si todas las ediciones tienen ficha y todas son impresas (las únicas que tienen stock).</summary>
     Task<bool> SonTodasImpresas(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default);
@@ -59,8 +109,17 @@ public interface IRepositorioDeExistencias
     /// <summary>Las filas de esas ediciones en todas las fuentes, sin bloquear (para leer en una instantánea). Con alcance de red: la Aplicación ya autorizó.</summary>
     Task<IReadOnlyList<FilaDeStock>> Leer(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default);
 
-    /// <summary>Todas las filas de una fuente, opcionalmente solo las de esas ediciones, ordenadas por edición. Con alcance de red: la Aplicación ya autorizó.</summary>
+    /// <summary>
+    /// Todas las filas de una fuente, opcionalmente solo las de esas ediciones (<see langword="null"/> = todas; una lista <b>vacía = ninguna</b>), ordenadas por edición. <b>Con el alcance del actor</b>,
+    /// no elevado: la política de filas es la segunda capa de FUE-08 (un encargado solo ve las filas de su fuente aunque falle la comprobación de la Aplicación).
+    /// </summary>
     Task<IReadOnlyList<FilaDeStock>> LeerDeLaFuente(Guid fuenteId, IReadOnlyCollection<Guid>? edicionIds, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// <see langword="true"/> si la edición tiene <b>alguna fila</b> de stock en alguna fuente, aunque sea de ceros: <c>Bloquear</c> las crea al primer movimiento y la clave compuesta de
+    /// formato impide cambiar la ficha mientras exista cualquiera. Con alcance de red: la Aplicación ya autorizó.
+    /// </summary>
+    Task<bool> HayExistencias(Guid edicionId, CancellationToken cancelacion = default);
 }
 
 /// <summary>

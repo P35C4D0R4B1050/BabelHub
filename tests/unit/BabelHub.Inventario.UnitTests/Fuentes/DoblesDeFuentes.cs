@@ -44,6 +44,64 @@ internal sealed class RepositorioDeFuentesEnMemoria : IRepositorioDeFuentes
 
     public Task<IReadOnlyList<Fuente>> DeLaRegion(string region, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<Fuente>>([.. Fuentes.Where(f => f.Region == region)]);
+
+    /// <summary>Si tiene valor, la próxima escritura responde eso (la restricción única ante una alta simultánea que la lectura previa no vio).</summary>
+    public ResultadoDeEscrituraDeFuente? RespuestaForzada { get; set; }
+
+    public List<Fuente> Escritas { get; } = [];
+
+    public Task<int> Contar(CancellationToken cancelacion = default) => Task.FromResult(Fuentes.Count);
+
+    public Task<Fuente?> PorCodigoParaActualizar(string codigo, CancellationToken cancelacion = default) => PorCodigo(codigo, cancelacion);
+
+    public Task<ResultadoDeEscrituraDeFuente> Agregar(Fuente fuente, CancellationToken cancelacion = default)
+    {
+        if (RespuestaForzada is { } forzada)
+        {
+            return Task.FromResult(forzada);
+        }
+
+        if (Fuentes.Any(f => f.Codigo == fuente.Codigo))
+        {
+            return Task.FromResult(ResultadoDeEscrituraDeFuente.CodigoRepetido);
+        }
+
+        if (Fuentes.Any(f => f.Nombre == fuente.Nombre))
+        {
+            return Task.FromResult(ResultadoDeEscrituraDeFuente.NombreRepetido);
+        }
+
+        Fuentes.Add(fuente);
+        Escritas.Add(fuente);
+        return Task.FromResult(ResultadoDeEscrituraDeFuente.Escrita);
+    }
+
+    public Task<ResultadoDeEscrituraDeFuente> Actualizar(Fuente fuente, CancellationToken cancelacion = default)
+    {
+        if (RespuestaForzada is { } forzada)
+        {
+            return Task.FromResult(forzada);
+        }
+
+        if (Fuentes.Any(f => f.Id != fuente.Id && f.Nombre == fuente.Nombre))
+        {
+            return Task.FromResult(ResultadoDeEscrituraDeFuente.NombreRepetido);
+        }
+
+        Fuentes[Fuentes.FindIndex(f => f.Id == fuente.Id)] = fuente;
+        Escritas.Add(fuente);
+        return Task.FromResult(ResultadoDeEscrituraDeFuente.Escrita);
+    }
+
+    public Task CambiarRecepcion(Guid? anteriorId, Guid nuevaId, CancellationToken cancelacion = default)
+    {
+        for (var i = 0; i < Fuentes.Count; i++)
+        {
+            Fuentes[i] = Fuentes[i].ConRecepcion(Fuentes[i].Id == nuevaId);
+        }
+
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class RepositorioDeRutasEnMemoria : IRepositorioDeRutas
@@ -55,6 +113,28 @@ internal sealed class RepositorioDeRutasEnMemoria : IRepositorioDeRutas
 
     public Task<IReadOnlyList<RutaEntreFuentes>> HaciaDestino(Guid destinoId, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<RutaEntreFuentes>>([.. Rutas.Where(r => r.DestinoId == destinoId)]);
+
+    public Task<IReadOnlyList<RutaEntreFuentes>> Todas(CancellationToken cancelacion = default) => Task.FromResult<IReadOnlyList<RutaEntreFuentes>>([.. Rutas]);
+
+    public List<RutaEntreFuentes> Definidas { get; } = [];
+
+    public Task<int?> Definir(RutaEntreFuentes ruta, CancellationToken cancelacion = default)
+    {
+        var indice = Rutas.FindIndex(r => r.OrigenId == ruta.OrigenId && r.DestinoId == ruta.DestinoId);
+        int? anterior = null;
+        if (indice >= 0)
+        {
+            anterior = Rutas[indice].PlazoEnDias;
+            Rutas[indice] = ruta;
+        }
+        else
+        {
+            Rutas.Add(ruta);
+        }
+
+        Definidas.Add(ruta);
+        return Task.FromResult(anterior);
+    }
 }
 
 internal sealed class RepositorioDeFichasEnMemoria(BitacoraDeLlamadas? bitacora = null) : IRepositorioDeFichas
@@ -69,6 +149,26 @@ internal sealed class RepositorioDeFichasEnMemoria(BitacoraDeLlamadas? bitacora 
     }
 
     public Task<FichaDeEdicion?> PorId(Guid edicionId, CancellationToken cancelacion = default) => Task.FromResult(Fichas.GetValueOrDefault(edicionId));
+
+    public Task<IReadOnlyList<FichaDeEdicion>> PorIds(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<FichaDeEdicion>>([.. edicionIds.Distinct().Where(Fichas.ContainsKey).Select(id => Fichas[id])]);
+
+    /// <summary>Si tiene valor, el próximo guardado responde eso (la clave compuesta de formato ante una carrera que la lectura previa no vio).</summary>
+    public ResultadoDeGuardadoDeFicha? RespuestaForzada { get; set; }
+
+    public List<FichaDeEdicion> Guardadas { get; } = [];
+
+    public Task<ResultadoDeGuardadoDeFicha> Guardar(FichaDeEdicion ficha, CancellationToken cancelacion = default)
+    {
+        if (RespuestaForzada is { } forzada)
+        {
+            return Task.FromResult(forzada);
+        }
+
+        Fichas[ficha.EdicionId] = ficha;
+        Guardadas.Add(ficha);
+        return Task.FromResult(ResultadoDeGuardadoDeFicha.Guardada);
+    }
 
     public Task<bool> SonTodasImpresas(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default)
     {
@@ -147,6 +247,12 @@ internal sealed class RepositorioDeExistenciasEnMemoria(RepositorioDeFuentesEnMe
                 .Where(p => p.Key.FuenteId == fuenteId && (edicionIds is null || edicionIds.Contains(p.Key.EdicionId)))
                 .Select(p => new FilaDeStock(p.Key.FuenteId, p.Key.EdicionId, p.Value.Fisico, p.Value.Reservado))
                 .OrderBy(f => f.EdicionId, OrdenDeBloqueo.DeIdentificadores)]);
+    }
+
+    public Task<bool> HayExistencias(Guid edicionId, CancellationToken cancelacion = default)
+    {
+        bitacora?.Anotar("existencias.HayExistencias");
+        return Task.FromResult(Filas.Keys.Any(p => p.EdicionId == edicionId));
     }
 
     private IReadOnlyList<FilaDeStock> Leidas(IReadOnlyCollection<Guid> edicionIds) =>

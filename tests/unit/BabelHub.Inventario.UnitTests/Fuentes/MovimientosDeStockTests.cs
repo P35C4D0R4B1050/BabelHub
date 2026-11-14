@@ -370,6 +370,10 @@ public sealed class MovimientosDeStockTests
     {
         public Task<FichaDeEdicion?> PorId(Guid edicionId, CancellationToken cancelacion = default) => interno.PorId(edicionId, cancelacion);
 
+        public Task<IReadOnlyList<FichaDeEdicion>> PorIds(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default) => interno.PorIds(edicionIds, cancelacion);
+
+        public Task<ResultadoDeGuardadoDeFicha> Guardar(FichaDeEdicion ficha, CancellationToken cancelacion = default) => interno.Guardar(ficha, cancelacion);
+
         public Task<bool> SonTodasImpresas(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default)
         {
             alConsultar(edicionIds);
