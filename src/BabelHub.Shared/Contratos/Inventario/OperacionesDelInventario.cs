@@ -19,6 +19,8 @@ public static class OperacionesDelInventario
     [
         .. DeDisponibilidad(),
         .. DeReservas(),
+        .. DeFuentes(),
+        .. DeTitulares(),
     ];
 
     private static OperacionDeContrato Op(
@@ -74,5 +76,65 @@ public static class OperacionesDelInventario
             CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
             CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.ReservaEstadoInvalido, CodigosDeErrorDelInventario.IdempotenciaEnConflicto,
             CodigosDeErrorDelInventario.IdempotenciaEnCurso, CodigosDeErrorDelInventario.ServicioNoDisponible),
+    ];
+
+    private static OperacionDeContrato[] DeFuentes() =>
+    [
+        Op(
+            "inventario.sucursales.listar", Get, "/sucursales", Lectura, false, false, true, 200, null, typeof(SucursalesDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.LimiteExcedido, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.fuentes.listar", Get, "/fuentes", Usuario, true, false, true, 200, null, typeof(ListaDeFuentesDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.fuentes.consultar", Get, "/fuentes/{codigo}", Usuario, true, false, true, 200, null, typeof(FuenteDetalleDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.fuentes.registrar", Post, "/fuentes", Usuario, true, false, false, 201, typeof(RegistrarFuenteDto), typeof(FuenteDetalleDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ValidacionInvalida,
+            CodigosDeErrorDelInventario.FuenteDuplicada, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.fuentes.editar", Put, "/fuentes/{codigo}", Usuario, true, false, false, 200, typeof(EditarFuenteDto), typeof(FuenteDetalleDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.fuentes.designar-recepcion", Put, "/fuente-de-recepcion", Usuario, true, false, false, 204, typeof(DesignarRecepcionDto), null,
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.fuentes.existencias", Get, "/fuentes/{codigo}/existencias", Usuario, true, false, true, 200, null, typeof(PaginaDto<ExistenciaDto>),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.rutas.listar", Get, "/rutas", Usuario, true, false, true, 200, null, typeof(ListaDeRutasDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.rutas.consultar", Get, "/rutas/{origen}/{destino}", Usuario, true, false, true, 200, null, typeof(RutaDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.rutas.definir", Put, "/rutas/{origen}/{destino}", Usuario, true, false, false, 200, typeof(DefinirRutaDto), typeof(RutaDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.RutaInvalida, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.unidades-vendidas.consultar", Get, "/unidades-vendidas", Usuario, true, false, true, 200, null, typeof(UnidadesVendidasDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.sucursales.contacto", Get, "/sucursales/{codigo}/contacto-de-notificacion", AlcancesDeCredencial.LecturaDeContacto, false, false, true, 200,
+            null, typeof(ContactoDeSucursalDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.NoEncontrado, CodigosDeErrorDelInventario.ServicioNoDisponible),
+    ];
+
+    private static OperacionDeContrato[] DeTitulares() =>
+    [
+        Op(
+            "inventario.titulares.consultar-pendientes", Post, "/titulares/consultas-de-pendientes", AlcancesDeCredencial.ConsultaDePendientes, false, false, true, 200,
+            typeof(ConsultaDePendientesDto), typeof(PendientesDeTitularDto),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.ServicioNoDisponible),
+        Op(
+            "inventario.titulares.baja", Post, "/bajas-de-titular", AlcancesDeCredencial.BajaDeTitular, false, false, false, 204, typeof(BajaDeTitularDto), null,
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.ServicioNoDisponible),
     ];
 }

@@ -35,4 +35,10 @@ public static class CodigosDeErrorDelInventario
 
     /// <summary>409: la misma clave de idempotencia sigue procesándose; se reintenta sin contar como solicitud nueva.</summary>
     public const string IdempotenciaEnCurso = "INV-IDEMPOTENCIA-EN-CURSO";
+
+    /// <summary>409: ya existe una fuente con ese código (AC-FUE-01).</summary>
+    public const string FuenteDuplicada = "INV-FUENTE-DUPLICADA";
+
+    /// <summary>422: la ruta tiene un plazo que no es mayor que cero o une una fuente consigo misma (FUE-17).</summary>
+    public const string RutaInvalida = "INV-RUTA-INVALIDA";
 }

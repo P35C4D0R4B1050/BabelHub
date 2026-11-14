@@ -187,7 +187,7 @@ public sealed partial class ReglasDeContratosTests
         {
             foreach (var tipo in new[] { operacion.Solicitud, operacion.Respuesta }.OfType<Type>())
             {
-                Assert.Contains(tipo, dtos);
+                Assert.Contains(tipo.IsGenericType ? tipo.GetGenericTypeDefinition() : tipo, dtos);
                 Alcanzar(tipo, dtos, alcanzables);
             }
         }
