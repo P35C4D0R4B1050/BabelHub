@@ -8,54 +8,7 @@ public sealed class SupresionDeCuentaTests
     private const string Cuenta = "3f2a9c41b8d74e6a9d015c7e2b4f8a60";
     private static readonly DateTimeOffset Inicio = new(2026, 11, 13, 12, 0, 0, TimeSpan.Zero);
 
-    /// <summary>El registro con la semántica del contrato: solo agrega, la clave es determinista y repetir no sobrescribe.</summary>
-    private sealed class RegistroEnMemoria : IRegistroDeSupresiones
-    {
-        private readonly Dictionary<string, EntradaDeSupresionDto> _entradas = [];
-
-        public bool NoDisponible { get; set; }
-
-        public List<string> Escrituras { get; } = [];
-
-        public int Consultas { get; private set; }
-
-        private static string Clave(string id, ClaseDeSupresion clase, EtapaDeSupresion etapa) => $"{id}/{clase}-{etapa}";
-
-        public Task<EntradaDeSupresionDto> Agregar(string identificadorOpaco, ClaseDeSupresion clase, EtapaDeSupresion etapa, DateTimeOffset fecha, CancellationToken cancelacion = default)
-        {
-            if (NoDisponible)
-            {
-                throw new RegistroDeSupresionesNoDisponibleException();
-            }
-
-            var clave = Clave(identificadorOpaco, clase, etapa);
-            if (_entradas.TryGetValue(clave, out var existente))
-            {
-                return Task.FromResult(existente with { YaExistia = true });
-            }
-
-            Escrituras.Add(clave);
-            var nueva = new EntradaDeSupresionDto(identificadorOpaco, clase, etapa, fecha, new string('a', 64), false);
-            _entradas[clave] = nueva;
-            return Task.FromResult(nueva);
-        }
-
-        public Task<EntradaDeSupresionDto?> Obtener(string identificadorOpaco, ClaseDeSupresion clase, EtapaDeSupresion etapa, CancellationToken cancelacion = default)
-        {
-            Consultas++;
-            if (NoDisponible)
-            {
-                throw new RegistroDeSupresionesNoDisponibleException();
-            }
-
-            return Task.FromResult(_entradas.GetValueOrDefault(Clave(identificadorOpaco, clase, etapa)));
-        }
-
-        public Task<IReadOnlyList<EntradaDeSupresionDto>> Leer(CancellationToken cancelacion = default) =>
-            Task.FromResult<IReadOnlyList<EntradaDeSupresionDto>>([.. _entradas.Values]);
-    }
-
-    private readonly RegistroEnMemoria _registro = new();
+    private readonly RegistroDeSupresionesEnMemoria _registro = new();
     private readonly RelojFijo _reloj = new(Inicio);
     private readonly AgregarIntencionDeSupresion _intencion;
     private readonly CerrarSupresion _cierre;
@@ -197,7 +150,7 @@ public sealed class SupresionDeCuentaTests
             await _cierre.Ejecutar(Cancelar());
         }
 
-        var entradas = await _registro.Leer();
+        var entradas = (await _registro.LeerConMetadatos()).Select(e => e.Entrada).ToList();
 
         Assert.Single(entradas);
         Assert.Equal(EtapaDeSupresion.Intencion, entradas[0].Etapa);

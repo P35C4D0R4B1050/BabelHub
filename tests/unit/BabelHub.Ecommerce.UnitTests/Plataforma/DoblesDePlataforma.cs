@@ -187,3 +187,64 @@ internal sealed class MotorDeMemoria(IReloj reloj) : IMotorDeLimites
         }
     }
 }
+
+/// <summary>
+/// El registro de supresiones con la semántica del contrato: solo agrega, la clave es determinista y repetir no sobrescribe. Cada
+/// entrada guarda la hora en que se escribió (o la que se siembre) como su hora de modificación en el almacén.
+/// </summary>
+internal sealed class RegistroDeSupresionesEnMemoria : IRegistroDeSupresiones
+{
+    private readonly Dictionary<string, EntradaLeidaDto> _entradas = [];
+
+    public bool NoDisponible { get; set; }
+
+    /// <summary>Las claves escritas por <see cref="Agregar"/>, en orden (no incluye lo sembrado).</summary>
+    public List<string> Escrituras { get; } = [];
+
+    public int Consultas { get; private set; }
+
+    private static string Clave(string id, ClaseDeSupresion clase, EtapaDeSupresion etapa) => $"{id}/{clase}-{etapa}";
+
+    /// <summary>Deja una entrada tal como estaba en el almacén al restaurar, con su hora de modificación.</summary>
+    public void Sembrar(EntradaLeidaDto entrada) => _entradas[Clave(entrada.Entrada.IdentificadorOpaco, entrada.Entrada.Clase, entrada.Entrada.Etapa)] = entrada;
+
+    public Task<EntradaDeSupresionDto> Agregar(string identificadorOpaco, ClaseDeSupresion clase, EtapaDeSupresion etapa, DateTimeOffset fecha, CancellationToken cancelacion = default)
+    {
+        if (NoDisponible)
+        {
+            throw new RegistroDeSupresionesNoDisponibleException();
+        }
+
+        var clave = Clave(identificadorOpaco, clase, etapa);
+        if (_entradas.TryGetValue(clave, out var existente))
+        {
+            return Task.FromResult(existente.Entrada with { YaExistia = true });
+        }
+
+        Escrituras.Add(clave);
+        var nueva = new EntradaDeSupresionDto(identificadorOpaco, clase, etapa, fecha, new string('a', 64), false);
+        _entradas[clave] = new EntradaLeidaDto(clave, nueva, fecha);
+        return Task.FromResult(nueva);
+    }
+
+    public Task<EntradaDeSupresionDto?> Obtener(string identificadorOpaco, ClaseDeSupresion clase, EtapaDeSupresion etapa, CancellationToken cancelacion = default)
+    {
+        Consultas++;
+        if (NoDisponible)
+        {
+            throw new RegistroDeSupresionesNoDisponibleException();
+        }
+
+        return Task.FromResult(_entradas.GetValueOrDefault(Clave(identificadorOpaco, clase, etapa))?.Entrada);
+    }
+
+    public Task<IReadOnlyList<EntradaLeidaDto>> LeerConMetadatos(CancellationToken cancelacion = default)
+    {
+        if (NoDisponible)
+        {
+            throw new RegistroDeSupresionesNoDisponibleException();
+        }
+
+        return Task.FromResult<IReadOnlyList<EntradaLeidaDto>>([.. _entradas.Values]);
+    }
+}

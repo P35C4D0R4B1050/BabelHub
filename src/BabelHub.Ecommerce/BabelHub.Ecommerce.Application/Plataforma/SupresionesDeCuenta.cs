@@ -57,20 +57,62 @@ public interface IRegistroDeSupresiones
     /// <summary>La entrada de una cuenta, clase y etapa, o <c>null</c> si no existe.</summary>
     Task<EntradaDeSupresionDto?> Obtener(string identificadorOpaco, ClaseDeSupresion clase, EtapaDeSupresion etapa, CancellationToken cancelacion = default);
 
-    /// <summary>Todas las entradas del registro (para reaplicarlas al restaurar).</summary>
-    Task<IReadOnlyList<EntradaDeSupresionDto>> Leer(CancellationToken cancelacion = default);
+    /// <summary>
+    /// Todas las entradas del registro tal como las devuelve el almacén (con su clave y su hora de modificación en él), para verificarlas
+    /// y reaplicarlas al restaurar. Lanza <see cref="RegistroDeSupresionesNoDisponibleException"/> si el registro no se puede leer.
+    /// </summary>
+    Task<IReadOnlyList<EntradaLeidaDto>> LeerConMetadatos(CancellationToken cancelacion = default);
 }
 
+/// <summary>Una entrada tal como la devuelve el almacén: su clave real y su hora de modificación en él (no la que diga su contenido).</summary>
+public sealed record EntradaLeidaDto(string ClaveEnElAlmacen, EntradaDeSupresionDto Entrada, DateTimeOffset ModificadaEn);
+
 /// <summary>Lo que dejó una reaplicación de supresiones al restaurar (PLA-19): solo identificadores opacos y contadores.</summary>
-/// <param name="Reaplicadas">Cuentas cuyo cierre se volvió a aplicar.</param>
+/// <param name="Reaplicadas">Cuentas cuyo cierre se volvió a aplicar y que estaban activas en el respaldo.</param>
+/// <param name="YaEstabanAplicadas">Cuentas cuyo cierre ya estaba aplicado en el respaldo: es éxito, no hubo nada que hacer.</param>
 /// <param name="IntencionesSinCierre">Cuentas con intención y sin cierre (supresión no completada): siguen activas y se informan a la persona responsable.</param>
 /// <param name="CierresSinIntencion">Cierres que no tienen intención previa: no se reaplican y se informan.</param>
-/// <param name="RequiereConfirmacion">El número de entradas supera el umbral configurable frente al conteo previo: no se reaplicó sin confirmación explícita.</param>
+/// <param name="Fallidas">Cuentas cuyo cierre no pudo aplicarse: el servicio no se abre hasta resolverlo.</param>
+/// <param name="RequiereConfirmacion">Hay más entradas nuevas que el umbral configurable respecto del conteo sellado: no se reaplicó nada sin confirmación explícita.</param>
+/// <param name="ConfirmadaPorUmbral">Se reaplicó porque la persona responsable confirmó explícitamente un conteo por encima del umbral.</param>
 public sealed record InformeDeReaplicacion(
     int Reaplicadas,
+    int YaEstabanAplicadas,
     IReadOnlyList<string> IntencionesSinCierre,
     IReadOnlyList<string> CierresSinIntencion,
-    bool RequiereConfirmacion);
+    IReadOnlyList<string> Fallidas,
+    bool RequiereConfirmacion,
+    bool ConfirmadaPorUmbral)
+{
+    /// <summary>El servicio puede abrirse: no quedó nada fallido ni pendiente de confirmar. Las intenciones sin cierre solo se informan.</summary>
+    public bool PermiteAbrir => !RequiereConfirmacion && Fallidas.Count == 0;
+
+    /// <summary>
+    /// Solo contadores, para la constancia versionada de <c>progress/ensayos/</c>: nunca un identificador (PLA-19, Ley 29733). El
+    /// detalle con identificadores sale solo por pantalla y en un archivo local fuera del repositorio (<see cref="Detalle"/>).
+    /// </summary>
+    public string Contadores() =>
+        string.Join('\n',
+            $"reaplicadas={Reaplicadas}",
+            $"ya_aplicadas={YaEstabanAplicadas}",
+            $"intenciones_sin_cierre={IntencionesSinCierre.Count}",
+            $"cierres_sin_intencion={CierresSinIntencion.Count}",
+            $"fallidas={Fallidas.Count}",
+            $"confirmaciones_por_umbral={(ConfirmadaPorUmbral || RequiereConfirmacion ? 1 : 0)}");
+
+    /// <summary>El informe para la persona responsable, con los identificadores opacos: va por pantalla y a un archivo local, nunca al repositorio.</summary>
+    public string Detalle() =>
+        string.Join('\n', new[]
+        {
+            Contadores(),
+            Lista("intenciones sin cierre (siguen activas)", IntencionesSinCierre),
+            Lista("cierres sin intención (no se reaplicaron)", CierresSinIntencion),
+            Lista("cierres que no pudieron aplicarse", Fallidas),
+        }.Where(l => l.Length > 0));
+
+    private static string Lista(string titulo, IReadOnlyList<string> identificadores) =>
+        identificadores.Count == 0 ? string.Empty : titulo + ":\n" + string.Join('\n', identificadores.Select(i => "  " + i));
+}
 
 /// <summary>Vuelve a aplicar, de forma idempotente, las supresiones con cierre antes de abrir el servicio restaurado (PLA-19).</summary>
 public interface IReaplicadorDeSupresiones
