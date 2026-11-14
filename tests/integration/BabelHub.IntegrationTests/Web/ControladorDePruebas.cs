@@ -1,3 +1,4 @@
+using BabelHub.Ecommerce.Api.Web.Errores;
 using BabelHub.Ecommerce.Api.Web.Estados;
 using Microsoft.AspNetCore.Mvc;
 
@@ -32,4 +33,50 @@ public sealed class ControladorDePruebas : Controller
         "sin-confirmar" => DisponibilidadVista.NoSePuedeConfirmar(),
         _ => throw new ArgumentException("disponibilidad desconocida", nameof(clave)),
     } });
+}
+
+/// <summary>El carrito de una prueba: cuenta líneas y detecta cualquier cambio, para comprobar que un error del Inventario no lo toca (WEB-26).</summary>
+public sealed class CarritoDePrueba
+{
+    public int Lineas { get; } = 2;
+
+    public bool SeModifico { get; private set; }
+
+    public void Vaciar() => SeModifico = true;
+}
+
+/// <summary>Rutas de prueba de la traducción de errores (T22).</summary>
+[ApiController]
+[Route("prueba")]
+public sealed class ControladorDeErroresDePruebas(CarritoDePrueba? carrito = null) : Controller
+{
+    [HttpGet("traducir/{codigo}/{estado:int}")]
+    public IActionResult Traducir(string codigo, int estado) =>
+        BabelHub.Ecommerce.Api.Web.Errores.TraductorDeErrores.Traducir(
+            new BabelHub.Shared.Errores.ProblemaDto { Code = codigo, Status = estado, TraceId = Guid.NewGuid().ToString("N") },
+            rutaDeReintento: "/prueba")
+            .ComoResultado(this);
+
+    [HttpGet("ingreso/{codigo}/{estado:int}")]
+    public IActionResult Ingreso(string codigo, int estado) =>
+        BabelHub.Ecommerce.Api.Web.Errores.TraductorDeErrores.Traducir(
+            new BabelHub.Shared.Errores.ProblemaDto { Code = codigo, Status = estado, TraceId = Guid.NewGuid().ToString("N") },
+            BabelHub.Ecommerce.Api.Web.Errores.ContextoDeTraduccion.Ingreso,
+            "/ingreso")
+            .ComoResultado(this);
+
+    /// <summary>Simula abrir el carrito con el Inventario caído: la excepción se traduce y el carrito no se toca.</summary>
+    [HttpGet("carrito")]
+    public IActionResult Carrito()
+    {
+        _ = carrito;
+        try
+        {
+            throw new HttpRequestException("Connection refused 10.0.0.9:8080");
+        }
+        catch (HttpRequestException excepcion)
+        {
+            return BabelHub.Ecommerce.Api.Web.Errores.TraductorDeErrores.Traducir(excepcion, "/carrito", "No podemos validar el stock ahora.").ComoResultado(this);
+        }
+    }
 }
