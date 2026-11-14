@@ -102,7 +102,6 @@ public class ContratoPublicoDeFuentesTests
             .ToList();
 
     [Fact]
-    [Trait("Criterio", "AC-FUE-12")]
     public void El_contrato_publico_de_Fuentes_declara_los_puertos_y_servicios_del_plan()
     {
         var nombres = TiposDelContrato().Select(t => t.Name).ToHashSet();

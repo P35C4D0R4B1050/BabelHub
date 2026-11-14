@@ -23,8 +23,8 @@ namespace BabelHub.Inventario.Infrastructure.Fuentes
 
 namespace BabelHub.Inventario.Infrastructure.Reservas
 {
-    /// <summary>Permitido: el adaptador de Reservas puede elevar.</summary>
-    public sealed class AdaptadorDeReservasQueElevaPermitido(BabelHub.Inventario.Application.Plataforma.IElevacionDeEjemplo elevacion)
+    /// <summary>Viola la regla: Reservas no eleva (pasa por IMovimientosDeStock.Bloquear, que eleva dentro de Fuentes).</summary>
+    public sealed class AdaptadorDeReservasQueEleva(BabelHub.Inventario.Application.Plataforma.IElevacionDeEjemplo elevacion)
     {
         public void Usar() => elevacion.ConAlcanceDeRed();
     }
@@ -78,7 +78,7 @@ namespace BabelHub.ArchitectureTests
 {
     /// <summary>
     /// La elevación del alcance de datos a «toda la red» (<c>ConAlcanceDeRed</c>) es de visibilidad restringida (inventario-fuentes D09 y T04):
-    /// solo la usan los adaptadores de Infraestructura de <c>Fuentes</c>, <c>Ajustes</c> y <c>Reservas</c> (y <c>UnidadDeTrabajoPostgres</c>, que la
+    /// solo la usan los adaptadores de Infraestructura de <c>Fuentes</c> y <c>Ajustes</c> (y <c>UnidadDeTrabajoPostgres</c>, que la
     /// implementa); nunca la Api, el Dominio ni la Aplicación. <c>Traslados</c> ya no la usa y por eso no está en la lista. Esta prueba hace
     /// cumplir lo que el compilador no puede (la Infraestructura ve el interior de la Aplicación).
     /// </summary>
@@ -89,7 +89,7 @@ namespace BabelHub.ArchitectureTests
         private const string InterfazDeEjemplo = "BabelHub.Inventario.Application.Plataforma.IElevacionDeEjemplo";
 
         /// <summary>Los módulos cuyos adaptadores de Infraestructura pueden elevar el alcance.</summary>
-        private static readonly string[] ModulosPermitidos = ["Fuentes", "Ajustes", "Reservas"];
+        private static readonly string[] ModulosPermitidos = ["Fuentes", "Ajustes"];
 
         private static readonly Assembly Pruebas = typeof(ReglasDeAlcanceDeDatosTests).Assembly;
 
@@ -145,7 +145,6 @@ namespace BabelHub.ArchitectureTests
         // --- el código real ---
 
         [Fact]
-        [Trait("Criterio", "AC-FUE-06")]
         public void La_elevacion_existe_y_es_interna_a_la_aplicacion()
         {
             var interfaz = Cargar($"{Servicio}.Application").GetType(InterfazReal);
@@ -155,7 +154,6 @@ namespace BabelHub.ArchitectureTests
         }
 
         [Fact]
-        [Trait("Criterio", "AC-FUE-06")]
         public void Ningun_tipo_publico_expone_un_metodo_ConAlcanceDeRed_fuera_de_la_interfaz_interna()
         {
             var publicos = new[] { "Domain", "Application", "Infrastructure", "Api" }
@@ -170,8 +168,7 @@ namespace BabelHub.ArchitectureTests
         }
 
         [Fact]
-        [Trait("Criterio", "AC-FUE-06")]
-        public void La_infraestructura_solo_eleva_en_los_adaptadores_de_Fuentes_Ajustes_y_Reservas()
+        public void La_infraestructura_solo_eleva_en_los_adaptadores_de_Fuentes_y_Ajustes()
         {
             var violaciones = ViolacionesEnInfraestructura(Cargar($"{Servicio}.Infrastructure"), InterfazReal);
 
@@ -179,7 +176,6 @@ namespace BabelHub.ArchitectureTests
         }
 
         [Theory]
-        [Trait("Criterio", "AC-FUE-06")]
         [InlineData("Domain")]
         [InlineData("Application")]
         [InlineData("Api")]
@@ -193,21 +189,19 @@ namespace BabelHub.ArchitectureTests
         // --- la regla se prueba a sí misma ---
 
         [Fact]
-        [Trait("Criterio", "AC-FUE-06")]
-        public void La_regla_detecta_a_Traslados_y_a_otro_adaptador_de_Plataforma_y_admite_los_permitidos()
+        public void La_regla_detecta_a_Reservas_a_Traslados_y_a_otro_adaptador_de_Plataforma_y_admite_los_permitidos()
         {
             var violaciones = ViolacionesEnInfraestructura(Pruebas, InterfazDeEjemplo);
 
             Assert.Contains($"{Servicio}.Infrastructure.Traslados.AdaptadorQueEleva", violaciones);
             Assert.Contains($"{Servicio}.Infrastructure.Plataforma.OtroAdaptadorDePlataforma", violaciones);
             Assert.DoesNotContain($"{Servicio}.Infrastructure.Fuentes.AdaptadorQueElevaPermitido", violaciones);
-            Assert.DoesNotContain($"{Servicio}.Infrastructure.Reservas.AdaptadorDeReservasQueElevaPermitido", violaciones);
+            Assert.Contains($"{Servicio}.Infrastructure.Reservas.AdaptadorDeReservasQueEleva", violaciones);
             Assert.DoesNotContain($"{Servicio}.Infrastructure.Plataforma.UnidadDeTrabajoPostgres", violaciones);
-            Assert.Equal(2, violaciones.Count);
+            Assert.Equal(3, violaciones.Count);
         }
 
         [Fact]
-        [Trait("Criterio", "AC-FUE-06")]
         public void La_regla_detecta_a_la_aplicacion_y_a_la_api()
         {
             Assert.Contains($"{Servicio}.Application.Ajustes.CasoDeUsoQueEleva", ViolacionesEnOtrasCapas(Pruebas, "Application", InterfazDeEjemplo));

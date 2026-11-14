@@ -79,7 +79,6 @@ public sealed class AlcanceDeDatosInventarioTests(PostgresDeRolesFixture bd) : I
         { "cliente", "red" },
         { "sistema", "red" },
         { "integracion", "red" },
-        { "sin-actor", "red" },
     };
 
     private static ActorActual? ActorDe(string nombre) => nombre switch
@@ -107,6 +106,7 @@ public sealed class AlcanceDeDatosInventarioTests(PostgresDeRolesFixture bd) : I
         Assert.Equal("aaaaaaaa-0000-4000-8000-00000000000a", AlcanceDeDatosDelActor.Para(Encargado(FuenteA)));
 
     [Theory]
+    [InlineData("sin-actor")]
     [InlineData("encargado-sin-sucursal")]
     [InlineData("encargado-con-sucursal-vacia")]
     [InlineData("rol-desconocido")]
@@ -142,6 +142,7 @@ public sealed class AlcanceDeDatosInventarioTests(PostgresDeRolesFixture bd) : I
     }
 
     [Theory]
+    [InlineData("sin-actor")]
     [InlineData("encargado-sin-sucursal")]
     [InlineData("encargado-con-sucursal-vacia")]
     [InlineData("rol-desconocido")]

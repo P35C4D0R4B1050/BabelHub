@@ -8,7 +8,7 @@ namespace BabelHub.Inventario.Infrastructure.Plataforma;
 /// <summary>
 /// El valor de alcance de datos (<c>babelhub.alcance</c>) que <see cref="UnidadDeTrabajoPostgres"/> fija en cada transacción según el actor,
 /// con una <b>lista blanca</b> (D09): la sucursal para un encargado con <c>SucursalId</c>; <c>red</c> solo para administración central,
-/// logística, cliente, sistema, integración y la credencial de servicio sin actor; cualquier otro caso (un encargado sin sucursal, un rol
+/// logística, cliente, sistema e integración (la credencial de servicio establece un actor de integración); cualquier otro caso, incluido no tener actor (un encargado sin sucursal, un rol
 /// desconocido, un visitante) no fija valor y las políticas de filas deniegan. La Aplicación decide además el alcance de cada operación.
 /// </summary>
 public static class AlcanceDeDatosDelActor
@@ -22,10 +22,11 @@ public static class AlcanceDeDatosDelActor
     /// <summary>El valor del alcance para el actor, o <see langword="null"/> si no debe fijarse (las políticas de filas deniegan).</summary>
     public static string? Para(ActorActual? actor)
     {
-        // Sin actor: una llamada solo con la credencial de servicio (la operación de usuario sin actor ya falla cerrada en la Api).
+        // Sin actor (nadie estableció el contexto): falla cerrada (SEG-15). Una llamada solo con la credencial de servicio debe establecer un actor
+        // explícito de tipo integración o sistema, que la lista blanca sí lleva a «red».
         if (actor is null)
         {
-            return Red;
+            return null;
         }
 
         return actor.Tipo switch

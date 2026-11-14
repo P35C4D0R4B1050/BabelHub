@@ -61,8 +61,8 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
                 await EjecutarSql(activa, "SET TRANSACTION READ ONLY", cancelacion).ConfigureAwait(false);
             }
 
-            // Sin puerto del actor (una unidad que no sirve a casos de uso) no hay valor y las políticas de filas deniegan; con el puerto y sin actor, es la credencial de servicio.
-            await FijarAlcance(activa, actor is null ? null : AlcanceDeDatosDelActor.Para(actor.Actual), cancelacion).ConfigureAwait(false);
+            // Sin puerto del actor, o con el puerto pero sin actor establecido, no se fija valor y las políticas de filas deniegan (falla cerrada, SEG-15).
+            await FijarAlcance(activa, AlcanceDeDatosDelActor.Para(actor?.Actual), cancelacion).ConfigureAwait(false);
 
             var resultado = await trabajo(cancelacion).ConfigureAwait(false);
             await transaccion.CommitAsync(cancelacion).ConfigureAwait(false);

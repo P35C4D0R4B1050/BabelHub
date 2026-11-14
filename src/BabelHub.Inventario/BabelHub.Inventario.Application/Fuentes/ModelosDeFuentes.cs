@@ -45,7 +45,6 @@ public sealed record ConsultaDeExistenciasDeFuente(Guid FuenteId, IReadOnlyColle
 /// <summary>Una página de existencias de una fuente y el total que cumple los filtros.</summary>
 public sealed record PaginaDeExistencias(IReadOnlyList<ExistenciaEnFuente> Elementos, int Total, int Pagina, int Tamano);
 
-
 /// <summary>Unidades físicas y reservadas de una pareja (fuente, edición).</summary>
 public sealed record CantidadesDeStock(int Fisico, int Reservado);
 
