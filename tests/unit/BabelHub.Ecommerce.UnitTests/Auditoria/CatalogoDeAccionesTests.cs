@@ -331,4 +331,146 @@ public sealed class CatalogoDeAccionesTests
 
         await Assert.ThrowsAsync<AuditoriaNoDisponibleException>(() => entorno.Registrar(accion));
     }
+
+    // ---------- T11: precios, anulaciones, ajustes, ingresos, reembolsos y estados (AUD-02) ----------
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-01")]
+    public async Task Un_cambio_de_precio_guarda_el_precio_anterior_y_el_nuevo_con_el_actor_y_su_rol()
+    {
+        var entorno = new Entorno(ActorDePrueba.DeAdministradorCentral());
+
+        await entorno.Registrar(
+            AccionesAuditables.PrecioDeEdicionCambiado,
+            new Dictionary<string, string?> { ["precioAnterior"] = "129.00", ["precioNuevo"] = "139.00", ["moneda"] = "PEN" },
+            objetoTipo: "edicion",
+            objetoId: "ed-77");
+
+        var registro = Assert.Single(entorno.Almacen.Registros);
+        Assert.Equal("129.00", registro.Detalle.Valores["precioAnterior"]);
+        Assert.Equal("139.00", registro.Detalle.Valores["precioNuevo"]);
+        Assert.Equal("administrador-central", registro.Actor.Rol);
+        Assert.Equal(ServicioDeOrigen.Ecommerce, registro.Servicio);
+        Assert.Equal(Ahora, registro.InstanteUtc);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-01")]
+    public async Task Un_reembolso_automatico_del_sistema_no_lleva_numero_de_tarjeta()
+    {
+        var entorno = new Entorno(ActorDePrueba.DelSistema());
+
+        await entorno.Registrar(
+            AccionesAuditables.ReembolsoRegistrado,
+            new Dictionary<string, string?>
+            {
+                ["monto"] = "59.90",
+                ["moneda"] = "PEN",
+                ["modalidad"] = "automatico",
+                ["medio"] = "tarjeta",
+                ["numeroDeTarjeta"] = "4111 1111 1111 1111",
+                ["titular"] = "Ana Perez",
+            },
+            objetoTipo: "pedido",
+            objetoId: "pd-5");
+
+        var registro = Assert.Single(entorno.Almacen.Registros);
+        Assert.Equal(TipoDeActor.Sistema, registro.Actor.Tipo);
+        Assert.DoesNotContain("numeroDeTarjeta", registro.Detalle.Valores.Keys);
+        Assert.DoesNotContain("titular", registro.Detalle.Valores.Keys);
+        Assert.DoesNotContain("4111", registro.Detalle.Texto);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-01")]
+    public async Task El_paso_de_una_solicitud_de_traslado_a_rechazada_guarda_el_origen_el_destino_y_los_estados()
+    {
+        var entorno = new Entorno(ActorDePrueba.DeAdministradorCentral());
+        var cusco = Guid.NewGuid();
+        var ayacucho = Guid.NewGuid();
+
+        await entorno.Registrar(
+            AccionesAuditables.EstadoDeTrasladoCambiado,
+            new Dictionary<string, string?> { ["estadoAnterior"] = "solicitado", ["estadoNuevo"] = "rechazado" },
+            objetoTipo: "traslado",
+            objetoId: "tr-9",
+            origen: cusco,
+            destino: ayacucho);
+
+        var registro = Assert.Single(entorno.Almacen.Registros);
+        Assert.Equal(cusco.ToString("D"), registro.SucursalOrigen);
+        Assert.Equal(ayacucho.ToString("D"), registro.SucursalDestino);
+        Assert.Equal("rechazado", registro.Detalle.Valores["estadoNuevo"]);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-01")]
+    public async Task El_rechazo_de_una_operacion_se_registra_con_resultado_rechazado_en_la_misma_accion()
+    {
+        var entorno = new Entorno(ActorDePrueba.DeEncargadoDe(Guid.NewGuid()));
+
+        await entorno.Auditoria.Registrar(new SolicitudDeRegistro(AccionesAuditables.EstadoDeTrasladoCambiado)
+        {
+            ObjetoTipo = "traslado",
+            ObjetoId = "tr-9",
+            Resultado = ResultadoAuditado.Rechazado,
+            Detalle = new Dictionary<string, string?> { ["estadoAnterior"] = "solicitado", ["estadoNuevo"] = "en-transito" },
+        });
+
+        Assert.Equal(ResultadoDeOperacion.Rechazado, Assert.Single(entorno.Almacen.Registros).Resultado);
+    }
+
+    [Theory]
+    [InlineData(nameof(AccionesAuditables.PrecioDeEdicionCambiado))]
+    [InlineData(nameof(AccionesAuditables.PedidoAnulado))]
+    [InlineData(nameof(AccionesAuditables.AjusteRegistrado))]
+    [InlineData(nameof(AccionesAuditables.IngresoDeMercaderiaRegistrado))]
+    [InlineData(nameof(AccionesAuditables.ReingresoPorDevolucion))]
+    [InlineData(nameof(AccionesAuditables.ReembolsoRegistrado))]
+    [InlineData(nameof(AccionesAuditables.EstadoDePedidoCambiado))]
+    [InlineData(nameof(AccionesAuditables.EstadoDeEnvioCambiado))]
+    [InlineData(nameof(AccionesAuditables.DevolucionSolicitada))]
+    [InlineData(nameof(AccionesAuditables.EstadoDeDevolucionCambiado))]
+    [InlineData(nameof(AccionesAuditables.TrasladoSolicitado))]
+    [InlineData(nameof(AccionesAuditables.EstadoDeTrasladoCambiado))]
+    [Trait("Criterio", "AC-AUD-01")]
+    public async Task Las_operaciones_de_AUD_02_se_cancelan_si_no_se_puede_auditar(string nombre)
+    {
+        var entorno = new Entorno(ActorDePrueba.DeAdministradorCentral());
+        entorno.Almacen.Falla = new InvalidOperationException("la base no responde");
+        var accion = Constantes().Single(c => c.Identificador == nombre);
+
+        await Assert.ThrowsAsync<AuditoriaNoDisponibleException>(() => entorno.Registrar(accion));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-23")]
+    public async Task Una_operacion_que_otra_spec_declara_auditable_queda_con_el_contrato_de_AUD_01_y_AUD_23_si_se_agrega_al_catalogo()
+    {
+        // El contrato de AUD-26: la acción de otra feature se agrega al catálogo con su clase y su lista blanca; sin esa declaración no se registra.
+        var propia = new AccionDelCatalogo(
+            "ReporteDeArchivoResuelto",
+            ClaseDeAccion.ConcedeOCambia,
+            TipoDeRegistro.Auditoria,
+            false,
+            [new("resolucion", false)],
+            false,
+            false,
+            [],
+            false);
+        var catalogo = new CatalogoDeAcciones([.. Catalogo.Acciones, propia]);
+        var actor = ActorDePrueba.DeIntegracion("culqi");
+        var almacen = new AlmacenDeRegistrosEnMemoria();
+        var constructor = new ConstructorDeRegistros(ServicioDeOrigen.Ecommerce, catalogo, new RelojFijo(Ahora), actor, new OrigenFijo(OrigenDeSolicitud.Desconocido));
+        var auditoria = new AuditoriaDeAplicacion(constructor, almacen);
+
+        await auditoria.Registrar(new SolicitudDeRegistro(new AccionAuditable("ReporteDeArchivoResuelto")) { Detalle = new Dictionary<string, string?> { ["resolucion"] = "archivo-corregido" } });
+        await Assert.ThrowsAsync<ArgumentException>(() => new AuditoriaDeAplicacion(new ConstructorDeRegistros(ServicioDeOrigen.Ecommerce, Catalogo, new RelojFijo(Ahora), actor, new OrigenFijo(OrigenDeSolicitud.Desconocido)), almacen)
+            .Registrar(new SolicitudDeRegistro(new AccionAuditable("ReporteDeArchivoResuelto"))));
+
+        var registro = Assert.Single(almacen.Registros);
+        Assert.Equal(TipoDeActor.Integracion, registro.Actor.Tipo);
+        Assert.Equal(Ahora, registro.InstanteUtc);
+        Assert.Equal("archivo-corregido", registro.Detalle.Valores["resolucion"]);
+    }
 }
