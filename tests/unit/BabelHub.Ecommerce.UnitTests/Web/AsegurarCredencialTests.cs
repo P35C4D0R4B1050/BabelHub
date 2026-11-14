@@ -304,6 +304,25 @@ public sealed class AsegurarCredencialTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-WEB-03")]
+    public async Task Una_fila_cifrada_con_otra_clave_que_la_vigente_se_renueva_y_queda_cifrada_con_la_vigente_y_una_ya_vigente_no()
+    {
+        var d = new DoblesDeSesion();
+        var cookie = await d.Abrir(vence: 15);
+        d.Cifrador.VersionVigente = 2;
+        d.Identidad.Renovaciones.Enqueue(Renovada(d));
+
+        var resultado = await Asegurar(d, cookie);
+
+        Assert.Equal(EstadoDeCredencial.Asegurada, resultado.Estado);
+        Assert.Equal(1, d.Identidad.LlamadasARenovar);
+        Assert.Equal(2, d.Fila(cookie).VersionDeClave);
+
+        await Asegurar(d, cookie);
+        Assert.Equal(1, d.Identidad.LlamadasARenovar);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-WEB-26")]
     public async Task Si_otra_solicitud_retiene_la_fila_mas_alla_del_plazo_responde_servicio_no_disponible_sin_cerrar_la_sesion()
     {

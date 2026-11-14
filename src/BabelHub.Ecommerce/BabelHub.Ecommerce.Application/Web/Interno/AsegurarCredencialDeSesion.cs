@@ -71,8 +71,16 @@ internal sealed class AsegurarCredencialDeSesion(
         return await VerificarYDevolver(fila, id, true, cancelacion).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Renueva por vencimiento próximo, por renovación incierta o porque la fila se cifró con otra clave que la vigente: la renovación guarda credencial y renovación
+    /// nuevas cifradas con la vigente (rotación de la clave de sesiones en dos pasos). Una fila ya cifrada con la vigente nunca se renueva por esto.
+    /// </summary>
     private bool NecesitaRenovarse(SesionGuardada fila) =>
-        fila.RenovacionIncierta || fila.CredencialCifrada is null || fila.CredencialVenceEn is null || fila.CredencialVenceEn.Value - comun.Reloj.Ahora < MargenDeRenovacion;
+        fila.RenovacionIncierta
+        || fila.CredencialCifrada is null
+        || fila.CredencialVenceEn is null
+        || fila.CredencialVenceEn.Value - comun.Reloj.Ahora < MargenDeRenovacion
+        || fila.VersionDeClave != comun.Cifrador.VersionVigente;
 
     /// <summary>Renueva bajo el bloqueo de la fila. Devuelve <see langword="null"/> si la credencial quedó vigente y hay que verificarla; si no, el resultado final.</summary>
     private async Task<ResultadoDeCredencial?> Renovar(HashDeSesion id, CancellationToken cancelacion)

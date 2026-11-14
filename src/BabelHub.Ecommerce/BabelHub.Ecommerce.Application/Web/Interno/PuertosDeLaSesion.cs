@@ -115,6 +115,12 @@ public sealed class SecretoDeSesionIlegibleException : Exception
 /// <summary>Puerto: cifra y descifra los secretos de la sesión con una subclave por propósito y datos asociados ligados a la fila (D02).</summary>
 public interface ICifradorDeSecretosDeSesion
 {
+    /// <summary>
+    /// El identificador de la clave con la que se cifra hoy. Una fila cuya <see cref="TextoCifrado.VersionDeClave"/> difiere se re-cifra con esta (rotación en dos pasos);
+    /// una igual nunca se reescribe.
+    /// </summary>
+    short VersionVigente { get; }
+
     TextoCifrado Cifrar(string texto, PropositoDeSecreto proposito, string datosAsociados);
 
     /// <exception cref="SecretoDeSesionIlegibleException">Si no se puede descifrar.</exception>
