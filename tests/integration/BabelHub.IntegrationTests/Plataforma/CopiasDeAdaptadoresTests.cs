@@ -30,7 +30,7 @@ public sealed class CopiasDeAdaptadoresTests
         "Api/Plataforma/ManejoDeErrores.cs",
         "Api/Plataforma/LimitesDeUsoHttp.cs",
         "Api/Plataforma/CredencialDeServicio.cs",
-        "Domain/Plataforma/RegistroDeSupresiones.cs");
+        "Application/Plataforma/PasosDeRestauracion.cs");
 
     [Theory]
     [MemberData(nameof(Archivos))]
