@@ -119,3 +119,9 @@ public sealed record ContactoDeNotificacion(string CodigoDeSucursal, string Nume
 {
     public override string ToString() => $"ContactoDeNotificacion {{ CodigoDeSucursal = {CodigoDeSucursal} }}";
 }
+
+/// <summary>Lo que dejó designar la fuente de recepción: si cambió o ya lo era (idempotente).</summary>
+public sealed record RecepcionDesignada(string Codigo, bool Cambio);
+
+/// <summary>Lo que dejó registrar la ficha de una edición: su formato y si se escribió algo o ya estaba así (idempotente).</summary>
+public sealed record FichaDeEdicionGuardada(Guid EdicionId, FormatoDeEdicionRegistrado Formato, bool SeEscribio);

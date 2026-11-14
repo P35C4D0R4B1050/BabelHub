@@ -153,6 +153,8 @@ internal sealed class EntornoDeFuentes
 
     public EditarFuente EditarFuente() => new(Autorizador, new ValidadorDeEditarFuente(), Fuentes, Totales, Auditoria);
 
+    public DesignarFuenteDeRecepcion DesignarRecepcion() => new(Autorizador, new ValidadorDeDesignarRecepcion(), Bloqueos, Fuentes, Auditoria);
+
     public Guid Impresa() => Fichas.Agregar().EdicionId;
 
     /// <summary>
