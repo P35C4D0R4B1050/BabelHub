@@ -1,7 +1,7 @@
 ---
 id: inventario-traslados
 titulo: Traslados entre sucursales
-estado: Approved
+estado: Planned
 servicio: Inventario
 prefijo: TRA
 origen: [RF16, RF15, RF07, RF20, NN07]
@@ -9,6 +9,8 @@ calidad: [AC01, RNF01, RNF05, RNF08]
 depende: [inventario-fuentes, inventario-seleccion-fuente, identidad-seguridad, transversal-auditoria, transversal-notificaciones]
 aprobado_por: Diego Amiquero
 aprobado_en: 2026-10-16
+plan_aprobado_por: Claude (delegado por Diego Amiquero)
+plan_aprobado_en: 2026-11-14
 ---
 
 # Spec — Traslados entre sucursales
