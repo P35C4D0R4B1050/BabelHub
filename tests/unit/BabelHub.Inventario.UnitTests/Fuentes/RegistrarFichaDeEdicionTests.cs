@@ -47,7 +47,6 @@ public sealed class RegistrarFichaDeEdicionTests
     {
         var entorno = new EntornoDeFuentes();
         var ficha = entorno.Fichas.Agregar(FormatoDeEdicion.Impreso);
-        entorno.Existencias.Poner(entorno.Lima.Id, ficha.EdicionId, 0, 0);
 
         var resultado = await Caso(entorno).Ejecutar(new RegistrarFichaDeEdicionEntrada(ficha.EdicionId, FormatoDeEdicionRegistrado.Digital));
 
@@ -57,9 +56,10 @@ public sealed class RegistrarFichaDeEdicionTests
 
     [Theory]
     [Trait("Criterio", "AC-FUE-05")]
+    [InlineData(0, 0)]
     [InlineData(3, 0)]
     [InlineData(5, 2)]
-    public async Task Registrar_PasarADigitalUnaEdicionConStock_EsConflictoYNoCambiaLaFicha(int fisico, int reservado)
+    public async Task Registrar_PasarADigitalUnaEdicionConAlgunaFilaDeStock_AunqueSeaDeCeros_EsConflictoYNoCambiaLaFicha(int fisico, int reservado)
     {
         var entorno = new EntornoDeFuentes();
         var ficha = entorno.Fichas.Agregar(FormatoDeEdicion.Impreso);

@@ -252,7 +252,7 @@ internal sealed class RepositorioDeExistenciasEnMemoria(RepositorioDeFuentesEnMe
     public Task<bool> HayExistencias(Guid edicionId, CancellationToken cancelacion = default)
     {
         bitacora?.Anotar("existencias.HayExistencias");
-        return Task.FromResult(Filas.Any(p => p.Key.EdicionId == edicionId && (p.Value.Fisico > 0 || p.Value.Reservado > 0)));
+        return Task.FromResult(Filas.Keys.Any(p => p.EdicionId == edicionId));
     }
 
     private IReadOnlyList<FilaDeStock> Leidas(IReadOnlyCollection<Guid> edicionIds) =>

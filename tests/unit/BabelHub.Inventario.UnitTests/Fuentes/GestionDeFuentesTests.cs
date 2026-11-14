@@ -324,6 +324,16 @@ public sealed class GestionDeFuentesTests
 
     [Fact]
     [Trait("Criterio", "AC-FUE-13")]
+    public async Task Editar_SiLaAuditoriaFalla_LaExcepcionSubeParaQueLaTransaccionRevierta()
+    {
+        var entorno = new EntornoDeFuentes();
+        entorno.Auditoria.Falla = true;
+
+        await Assert.ThrowsAsync<AuditoriaNoDisponibleException>(() => entorno.EditarFuente().Ejecutar(new EditarFuenteEntrada("cusco", "Cusco Centro", "cusco", null)));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-FUE-13")]
     public async Task Editar_ConDatosInvalidos_DevuelveElCampo()
     {
         var entorno = new EntornoDeFuentes();

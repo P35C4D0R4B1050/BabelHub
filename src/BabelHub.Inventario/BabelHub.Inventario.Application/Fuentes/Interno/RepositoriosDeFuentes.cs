@@ -109,10 +109,16 @@ public interface IRepositorioDeExistencias
     /// <summary>Las filas de esas ediciones en todas las fuentes, sin bloquear (para leer en una instantánea). Con alcance de red: la Aplicación ya autorizó.</summary>
     Task<IReadOnlyList<FilaDeStock>> Leer(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default);
 
-    /// <summary>Todas las filas de una fuente, opcionalmente solo las de esas ediciones, ordenadas por edición. Con alcance de red: la Aplicación ya autorizó.</summary>
+    /// <summary>
+    /// Todas las filas de una fuente, opcionalmente solo las de esas ediciones (<see langword="null"/> = todas; una lista <b>vacía = ninguna</b>), ordenadas por edición. <b>Con el alcance del actor</b>,
+    /// no elevado: la política de filas es la segunda capa de FUE-08 (un encargado solo ve las filas de su fuente aunque falle la comprobación de la Aplicación).
+    /// </summary>
     Task<IReadOnlyList<FilaDeStock>> LeerDeLaFuente(Guid fuenteId, IReadOnlyCollection<Guid>? edicionIds, CancellationToken cancelacion = default);
 
-    /// <summary><see langword="true"/> si la edición tiene físico o reservado distinto de cero en alguna fuente (una fila de ceros no cuenta). Con alcance de red: la Aplicación ya autorizó.</summary>
+    /// <summary>
+    /// <see langword="true"/> si la edición tiene <b>alguna fila</b> de stock en alguna fuente, aunque sea de ceros: <c>Bloquear</c> las crea al primer movimiento y la clave compuesta de
+    /// formato impide cambiar la ficha mientras exista cualquiera. Con alcance de red: la Aplicación ya autorizó.
+    /// </summary>
     Task<bool> HayExistencias(Guid edicionId, CancellationToken cancelacion = default);
 }
 

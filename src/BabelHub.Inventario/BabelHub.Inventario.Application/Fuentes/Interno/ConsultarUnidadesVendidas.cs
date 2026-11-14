@@ -32,10 +32,15 @@ internal sealed class ConsultarUnidadesVendidas(
         }
         else
         {
-            pedida = Fuente.EsCodigoValido(entrada.CodigoDeFuente)
-                ? await fuentes.PorCodigo(entrada.CodigoDeFuente, cancelacion).ConfigureAwait(false)
-                : null;
-            rechazo = await autorizador.ExigirFuente(pedida?.Id, cancelacion).ConfigureAwait(false);
+            // Primero el rol, sin leer nada; la fuente se resuelve solo para comparar el alcance fino.
+            rechazo = await autorizador.ExigirAdministracionOEncargado(cancelacion).ConfigureAwait(false);
+            if (rechazo is null)
+            {
+                pedida = Fuente.EsCodigoValido(entrada.CodigoDeFuente)
+                    ? await fuentes.PorCodigo(entrada.CodigoDeFuente, cancelacion).ConfigureAwait(false)
+                    : null;
+                rechazo = await autorizador.ExigirFuente(pedida?.Id, cancelacion).ConfigureAwait(false);
+            }
         }
 
         if (rechazo is not null)

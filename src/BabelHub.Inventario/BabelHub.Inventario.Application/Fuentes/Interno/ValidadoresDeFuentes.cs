@@ -29,6 +29,9 @@ internal static class LimitesDeConsulta
     public const int TamanoMinimoDePagina = 1;
 
     public const int TamanoMaximoDePagina = 100;
+
+    /// <summary>Tope de la página: con él el desplazamiento <c>(página − 1) × tamaño</c> cabe siempre en un entero.</summary>
+    public const int PaginaMaxima = 1_000_000;
 }
 
 /// <summary>Reglas de forma compartidas por los validadores del módulo: cada error lleva el campo y una clave, nunca el valor recibido (SEG-01).</summary>
@@ -212,7 +215,7 @@ internal sealed class ValidadorDeConsultarExistencias : IValidador<ConsultarExis
             errores.Add(new ErrorDeCampo("estado", ConstructorDeValidacion.FormatoInvalido));
         }
 
-        if (entrada.Pagina < 1)
+        if (entrada.Pagina is < 1 or > LimitesDeConsulta.PaginaMaxima)
         {
             errores.Add(new ErrorDeCampo("pagina", ConstructorDeValidacion.FueraDeRango));
         }

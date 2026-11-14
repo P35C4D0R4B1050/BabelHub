@@ -103,7 +103,6 @@ public sealed class ConsultarContactoDeNotificacionTests
 
         Assert.Empty(entorno.Auditoria.Solicitudes);
         Assert.DoesNotContain("966", resultado.Valor.ToString(), StringComparison.Ordinal);
-        Assert.DoesNotContain("966", entorno.Fuentes.Fuentes.Single(f => f.Codigo == "cusco").Codigo, StringComparison.Ordinal);
         Assert.DoesNotContain(entorno.Denegaciones.Eventos, e => (e.Ruta ?? string.Empty).Contains("966", StringComparison.Ordinal));
     }
 

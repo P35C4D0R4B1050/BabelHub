@@ -94,7 +94,12 @@ internal sealed class ConsultarExistenciasDeSucursal(
     {
         ArgumentNullException.ThrowIfNull(entrada);
 
-        // Se resuelve la fuente solo para comparar el alcance; nada de lo que se lea aquí sale en la respuesta de un rechazo.
+        // Primero el rol (sin leer nada: un visitante, un cliente o logística no provocan consultas); la fuente se resuelve solo para comparar el alcance fino.
+        if (await autorizador.ExigirAdministracionOEncargado(cancelacion).ConfigureAwait(false) is { } sinRol)
+        {
+            return FallosDeFuentes.Fallo<PaginaDeExistencias>(sinRol);
+        }
+
         var fuente = Fuente.EsCodigoValido(entrada.CodigoDeFuente)
             ? await fuentes.PorCodigo(entrada.CodigoDeFuente, cancelacion).ConfigureAwait(false)
             : null;

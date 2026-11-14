@@ -15,8 +15,6 @@ internal static class ClavesDeFuentes
 
     public const string RutaInvalida = "ruta-invalida";
 
-    public const string EdicionNoImpresa = "edicion-no-impresa";
-
     public const string FormatoEnConflicto = "formato-en-conflicto";
 
     public const string ContactoNoDefinido = "contacto-no-definido";

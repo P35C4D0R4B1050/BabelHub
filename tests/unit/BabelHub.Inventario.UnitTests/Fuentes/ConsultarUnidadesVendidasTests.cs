@@ -91,7 +91,7 @@ public sealed class ConsultarUnidadesVendidasTests
         var resultado = await Administracion(entorno, ventas, reingresos).Ejecutar(new ConsultarUnidadesVendidasEntrada(null));
 
         Assert.Equal(2, resultado.Valor.Total);
-        Assert.Equal([pedidoA, pedidoB], reingresos.Consultas.Single().Order());
+        Assert.Equal(new[] { pedidoA, pedidoB }.Order(), reingresos.Consultas.Single().Order());
     }
 
     [Fact]
