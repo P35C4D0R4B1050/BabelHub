@@ -306,7 +306,8 @@ public sealed class RotacionDeCredencialesTests : IAsyncLifetime
 
     private async Task<bool> PuedeIngresar(string rol, string contrasena)
     {
-        var cadena = new NpgsqlConnectionStringBuilder(_base.GetConnectionString()) { Username = rol, Password = contrasena, Pooling = false };
+        var cadena = new NpgsqlConnectionStringBuilder(_base.GetConnectionString()) { Username = rol, Pooling = false };
+        cadena.Add("Password", contrasena);
         try
         {
             await using var conexion = new NpgsqlConnection(cadena.ConnectionString);
