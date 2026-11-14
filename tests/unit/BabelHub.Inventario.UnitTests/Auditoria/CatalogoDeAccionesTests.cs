@@ -449,7 +449,7 @@ public sealed class CatalogoDeAccionesTests
     {
         // El contrato de AUD-26: la acción de otra feature se agrega al catálogo con su clase y su lista blanca; sin esa declaración no se registra.
         var propia = new AccionDelCatalogo(
-            "ReporteDeArchivoResuelto",
+            "OperacionDeOtraFeatureDePrueba",
             ClaseDeAccion.ConcedeOCambia,
             TipoDeRegistro.Auditoria,
             false,
@@ -464,13 +464,189 @@ public sealed class CatalogoDeAccionesTests
         var constructor = new ConstructorDeRegistros(ServicioDeOrigen.Inventario, catalogo, new RelojFijo(Ahora), actor, new OrigenFijo(OrigenDeSolicitud.Desconocido));
         var auditoria = new AuditoriaDeAplicacion(constructor, almacen);
 
-        await auditoria.Registrar(new SolicitudDeRegistro(new AccionAuditable("ReporteDeArchivoResuelto")) { Detalle = new Dictionary<string, string?> { ["resolucion"] = "archivo-corregido" } });
+        await auditoria.Registrar(new SolicitudDeRegistro(new AccionAuditable("OperacionDeOtraFeatureDePrueba")) { Detalle = new Dictionary<string, string?> { ["resolucion"] = "archivo-corregido" } });
         await Assert.ThrowsAsync<ArgumentException>(() => new AuditoriaDeAplicacion(new ConstructorDeRegistros(ServicioDeOrigen.Ecommerce, Catalogo, new RelojFijo(Ahora), actor, new OrigenFijo(OrigenDeSolicitud.Desconocido)), almacen)
-            .Registrar(new SolicitudDeRegistro(new AccionAuditable("ReporteDeArchivoResuelto"))));
+            .Registrar(new SolicitudDeRegistro(new AccionAuditable("OperacionDeOtraFeatureDePrueba"))));
 
         var registro = Assert.Single(almacen.Registros);
         Assert.Equal(TipoDeActor.Integracion, registro.Actor.Tipo);
         Assert.Equal(Ahora, registro.InstanteUtc);
         Assert.Equal("archivo-corregido", registro.Detalle.Valores["resolucion"]);
+    }
+
+    // ---------- T13: usuarios, roles, cancelaciones, biblioteca, reclamaciones, consultas y claves (AUD-16, AUD-21, AUD-22, AUD-35) ----------
+
+    private static readonly string[] AccionesDeIdentidad =
+    [
+        nameof(AccionesAuditables.UsuarioDadoDeAlta),
+        nameof(AccionesAuditables.UsuarioDesactivado),
+        nameof(AccionesAuditables.UsuarioReactivado),
+        nameof(AccionesAuditables.CambioDeRol),
+        nameof(AccionesAuditables.ContrasenaRestablecidaPorAdministracion),
+        nameof(AccionesAuditables.SegundoFactorRestablecidoPorAdministracion),
+        nameof(AccionesAuditables.CuentaCancelada),
+        nameof(AccionesAuditables.CuentaReemplazada),
+        nameof(AccionesAuditables.CancelacionDiferidaDescartada),
+        nameof(AccionesAuditables.SolicitudDeDatosAtendida),
+        nameof(AccionesAuditables.SolicitudDeDatosConsultada),
+        nameof(AccionesAuditables.ClaveDeFirmaRotada),
+        nameof(AccionesAuditables.ClaveDeFirmaDeclaradaComprometida),
+    ];
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-11")]
+    public void Todas_las_acciones_de_Identidad_van_al_almacen_aislado_y_las_de_otros_modulos_no()
+    {
+        foreach (var nombre in AccionesDeIdentidad)
+        {
+            Assert.True(Catalogo.Obtener(nombre).Aislada, $"{nombre} es de Identidad y debe ir al almacén aislado (D17).");
+        }
+
+        foreach (var nombre in new[]
+        {
+            nameof(AccionesAuditables.DescargasRestituidas),
+            nameof(AccionesAuditables.AccesoDigitalRevocado),
+            nameof(AccionesAuditables.ReporteDeArchivoResuelto),
+            nameof(AccionesAuditables.HojaDeReclamacionRespondida),
+            nameof(AccionesAuditables.HojaDeReclamacionDescartada),
+            nameof(AccionesAuditables.HojaDeReclamacionAnonimizada),
+            nameof(AccionesAuditables.BibliotecaDeClienteConsultada),
+            nameof(AccionesAuditables.HojaDeReclamacionConsultada),
+            nameof(AccionesAuditables.AvisosDeNumeroDesactivados),
+        })
+        {
+            Assert.False(Catalogo.Obtener(nombre).Aislada, $"{nombre} no es de Identidad.");
+        }
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-17")]
+    public async Task Un_cambio_de_rol_es_un_unico_registro_de_auditoria_y_de_seguridad_con_motivo_y_origen()
+    {
+        var entorno = new Entorno(ActorDePrueba.DeAdministradorCentral());
+
+        await entorno.Registrar(
+            AccionesAuditables.CambioDeRol,
+            new Dictionary<string, string?> { ["rolAnterior"] = "cliente", ["rolNuevo"] = "encargado-de-sucursal" },
+            motivo: Catalogo.Obtener("CambioDeRol").Motivos[0],
+            objetoTipo: "usuario",
+            objetoId: Guid.NewGuid().ToString("D"));
+
+        var registro = Assert.Single(entorno.Almacen.Registros);
+        Assert.Equal(TipoDeRegistro.Ambos, registro.Tipo);
+        Assert.True(registro.Aislada);
+        Assert.NotNull(registro.Motivo);
+        Assert.NotNull(registro.Origen);
+        Assert.True(Catalogo.Obtener("CambioDeRol").ObjetoPersonal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-05")]
+    public async Task El_restablecimiento_de_una_contrasena_temporal_no_guarda_secretos()
+    {
+        var entorno = new Entorno(ActorDePrueba.DeAdministradorCentral());
+
+        await entorno.Registrar(
+            AccionesAuditables.ContrasenaRestablecidaPorAdministracion,
+            new Dictionary<string, string?> { ["contrasenaTemporal"] = "Temp-Uno-2026", ["codigo"] = "123456", ["secreto"] = "JBSWY3DPEHPK3PXP" },
+            objetoTipo: "usuario",
+            objetoId: Guid.NewGuid().ToString("D"));
+
+        var registro = Assert.Single(entorno.Almacen.Registros);
+        Assert.Empty(registro.Detalle.Valores);
+        Assert.DoesNotContain("Temp-Uno-2026", registro.Detalle.Texto);
+        Assert.DoesNotContain("123456", registro.Detalle.Texto);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-11")]
+    public async Task El_descarte_de_una_cancelacion_diferida_se_registra_con_el_actor_sistema()
+    {
+        var entorno = new Entorno(ActorDePrueba.DelSistema());
+
+        await entorno.Registrar(AccionesAuditables.CancelacionDiferidaDescartada, objetoTipo: "cuenta", objetoId: Guid.NewGuid().ToString("D"));
+
+        Assert.Equal(TipoDeActor.Sistema, Assert.Single(entorno.Almacen.Registros).Actor.Tipo);
+    }
+
+    [Theory]
+    [InlineData(nameof(AccionesAuditables.UsuarioDadoDeAlta), true)]
+    [InlineData(nameof(AccionesAuditables.UsuarioDesactivado), true)]
+    [InlineData(nameof(AccionesAuditables.UsuarioReactivado), true)]
+    [InlineData(nameof(AccionesAuditables.CuentaCancelada), true)]
+    [InlineData(nameof(AccionesAuditables.CuentaReemplazada), true)]
+    [InlineData(nameof(AccionesAuditables.CancelacionDiferidaDescartada), true)]
+    [InlineData(nameof(AccionesAuditables.BibliotecaDeClienteConsultada), true)]
+    [InlineData(nameof(AccionesAuditables.SolicitudDeDatosAtendida), false)]
+    [InlineData(nameof(AccionesAuditables.SolicitudDeDatosConsultada), false)]
+    [InlineData(nameof(AccionesAuditables.HojaDeReclamacionConsultada), false)]
+    [Trait("Criterio", "AC-AUD-19")]
+    public void Las_cuentas_y_los_clientes_como_objeto_son_personales_y_se_anonimizan_con_la_cuenta(string nombre, bool esperado) =>
+        Assert.Equal(esperado, Catalogo.Obtener(nombre).ObjetoPersonal);
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-19")]
+    public async Task La_rotacion_y_la_declaracion_de_compromiso_de_la_clave_de_firma_no_guardan_la_clave()
+    {
+        var entorno = new Entorno(ActorDePrueba.DeAdministradorCentral());
+
+        await entorno.Registrar(
+            AccionesAuditables.ClaveDeFirmaRotada,
+            new Dictionary<string, string?> { ["versionAnterior"] = "v1", ["versionNueva"] = "v2", ["clavePrivada"] = "AGE-SECRET-KEY-1ABCDEF", ["clave"] = "-----BEGIN PRIVATE KEY-----" },
+            objetoTipo: "clave-de-firma");
+        await entorno.Registrar(
+            AccionesAuditables.ClaveDeFirmaDeclaradaComprometida,
+            new Dictionary<string, string?> { ["version"] = "v2" },
+            motivo: Catalogo.Obtener("ClaveDeFirmaDeclaradaComprometida").Motivos[0],
+            objetoTipo: "clave-de-firma");
+
+        Assert.Equal(2, entorno.Almacen.Registros.Count);
+        Assert.All(entorno.Almacen.Registros, r => Assert.DoesNotContain("AGE-SECRET", r.Detalle.Texto));
+        Assert.Equal(TipoDeRegistro.Ambos, entorno.Almacen.Registros[1].Tipo);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-19")]
+    public async Task La_desactivacion_de_avisos_de_un_numero_nunca_guarda_el_numero()
+    {
+        var entorno = new Entorno(ActorDePrueba.DeAdministradorCentral());
+
+        await entorno.Registrar(
+            AccionesAuditables.AvisosDeNumeroDesactivados,
+            new Dictionary<string, string?> { ["causa"] = "reclamo-del-titular", ["numero"] = "987654321" },
+            objetoTipo: "numero",
+            objetoId: "hn-12345678");
+
+        var registro = Assert.Single(entorno.Almacen.Registros);
+        Assert.DoesNotContain("987654321", registro.Detalle.Texto);
+        Assert.Contains("causa", registro.Detalle.Valores.Keys);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-11")]
+    public async Task Las_acciones_de_T13_se_cancelan_si_no_se_puede_auditar()
+    {
+        var nombres = AccionesDeIdentidad.Concat(
+        [
+            nameof(AccionesAuditables.DescargasRestituidas),
+            nameof(AccionesAuditables.AccesoDigitalRevocado),
+            nameof(AccionesAuditables.ReporteDeArchivoResuelto),
+            nameof(AccionesAuditables.HojaDeReclamacionRespondida),
+            nameof(AccionesAuditables.HojaDeReclamacionDescartada),
+            nameof(AccionesAuditables.HojaDeReclamacionAnonimizada),
+            nameof(AccionesAuditables.BibliotecaDeClienteConsultada),
+            nameof(AccionesAuditables.HojaDeReclamacionConsultada),
+            nameof(AccionesAuditables.AvisosDeNumeroDesactivados),
+        ]);
+
+        foreach (var nombre in nombres)
+        {
+            var entorno = new Entorno(ActorDePrueba.DeAdministradorCentral());
+            entorno.Almacen.Falla = new InvalidOperationException("la base no responde");
+            var accion = Constantes().Single(c => c.Identificador == nombre);
+            var definicion = Catalogo.Obtener(nombre);
+
+            await Assert.ThrowsAsync<AuditoriaNoDisponibleException>(() => entorno.Registrar(accion, motivo: definicion.ExigeMotivo ? definicion.Motivos[0] : null));
+        }
     }
 }

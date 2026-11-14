@@ -11,11 +11,22 @@ namespace BabelHub.Ecommerce.Application.Auditoria.Interno;
 public static partial class CatalogoDeAccionesDeAuditoria
 {
     /// <summary>El catálogo completo del servicio.</summary>
-    public static CatalogoDeAcciones Crear() => new([.. AccionesDeOperaciones(), .. AccionesDeStockCatalogoYFuentes()]);
+    public static CatalogoDeAcciones Crear() => new([.. AccionesDeOperaciones(), .. AccionesDeStockCatalogoYFuentes(), .. AccionesDeIdentidadYOtrosModulos()]);
 
     /// <summary>Una acción que concede o cambia algo, de auditoría pura, sin motivo: el objeto y el rol se declaran siempre (sin valor por defecto).</summary>
     private static AccionDelCatalogo Auditada(string identificador, bool objetoPersonal, bool rolPersonal, params ClaveDeDetalle[] detalle) =>
         new(identificador, ClaseDeAccion.ConcedeOCambia, TipoDeRegistro.Auditoria, aislada: false, detalle, objetoPersonal, rolPersonal, motivos: [], exigeMotivo: false);
+
+    /// <summary>Una acción de Identidad que concede o cambia algo: va al almacén aislado (D17); el rol del actor no es personal.</summary>
+    private static AccionDelCatalogo AuditadaAislada(string identificador, bool objetoPersonal, params ClaveDeDetalle[] detalle) =>
+        new(identificador, ClaseDeAccion.ConcedeOCambia, TipoDeRegistro.Auditoria, aislada: true, detalle, objetoPersonal, rolPersonal: false, motivos: [], exigeMotivo: false);
+
+    /// <summary>
+    /// Una acción de Identidad que es a la vez operación sensible y evento de seguridad (AUD-20): un único registro de ambos tipos, con motivo de
+    /// catálogo cerrado, en el almacén aislado.
+    /// </summary>
+    private static AccionDelCatalogo AuditadaYSeguridadAislada(string identificador, bool objetoPersonal, string[] motivos, params ClaveDeDetalle[] detalle) =>
+        new(identificador, ClaseDeAccion.ConcedeOCambia, TipoDeRegistro.Ambos, aislada: true, detalle, objetoPersonal, rolPersonal: false, motivos, exigeMotivo: true);
 
     /// <summary>Una clave del detalle que no identifica a una persona.</summary>
     private static ClaveDeDetalle Clave(string nombre) => new(nombre, personal: false);
