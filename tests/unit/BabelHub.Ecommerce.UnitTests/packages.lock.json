@@ -101,6 +101,9 @@
       },
       "babelhub.ecommerce.domain": {
         "type": "Project"
+      },
+      "babelhub.shared": {
+        "type": "Project"
       }
     }
   }

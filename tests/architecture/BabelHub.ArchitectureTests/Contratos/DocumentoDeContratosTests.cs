@@ -66,6 +66,17 @@ public sealed partial class DocumentoDeContratosTests
     }
 
     [Fact]
+    public void El_documento_lista_los_parametros_de_consulta_de_cada_operacion()
+    {
+        var lineas = File.ReadAllLines(Ruta);
+        foreach (var operacion in CatalogoDeOperaciones.V1.Where(o => o.Parametros.Count > 0))
+        {
+            var esperada = $"- `{operacion.Nombre}`: " + string.Join(", ", operacion.Parametros.Select(p => $"`{p}`"));
+            Assert.Contains(esperada, lineas);
+        }
+    }
+
+    [Fact]
     public void El_documento_declara_las_decisiones_y_lo_no_congelado()
     {
         var texto = File.ReadAllText(Ruta);

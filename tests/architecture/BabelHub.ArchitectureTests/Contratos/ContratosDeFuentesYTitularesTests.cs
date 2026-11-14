@@ -21,7 +21,7 @@ public sealed class ContratosDeFuentesYTitularesTests
         { "inventario.fuentes.consultar", "GET", "/api/inventario/v1/fuentes/{codigo}", Usuario, true, 200, null, typeof(FuenteDetalleDto), true },
         { "inventario.fuentes.registrar", "POST", "/api/inventario/v1/fuentes", Usuario, true, 201, typeof(RegistrarFuenteDto), typeof(FuenteDetalleDto), false },
         { "inventario.fuentes.editar", "PUT", "/api/inventario/v1/fuentes/{codigo}", Usuario, true, 200, typeof(EditarFuenteDto), typeof(FuenteDetalleDto), false },
-        { "inventario.fuentes.designar-recepcion", "PUT", "/api/inventario/v1/fuente-de-recepcion", Usuario, true, 204, typeof(DesignarRecepcionDto), null, false },
+        { "inventario.fuentes.designar-recepcion", "PUT", "/api/inventario/v1/fuentes-de-recepcion", Usuario, true, 204, typeof(DesignarRecepcionDto), null, false },
         { "inventario.fuentes.existencias", "GET", "/api/inventario/v1/fuentes/{codigo}/existencias", Usuario, true, 200, null, typeof(PaginaDto<ExistenciaDto>), true },
         { "inventario.rutas.listar", "GET", "/api/inventario/v1/rutas", Usuario, true, 200, null, typeof(ListaDeRutasDto), true },
         { "inventario.rutas.consultar", "GET", "/api/inventario/v1/rutas/{origen}/{destino}", Usuario, true, 200, null, typeof(RutaDto), true },
@@ -98,6 +98,19 @@ public sealed class ContratosDeFuentesYTitularesTests
         Assert.DoesNotContain("fisico", NombresJson(typeof(FuenteConVendibleDto)));
         Assert.DoesNotContain("reservado", NombresJson(typeof(FuenteConVendibleDto)));
         Assert.DoesNotContain("contactoDeNotificacion", NombresJson(typeof(SucursalPublicaDto)));
+    }
+
+    [Fact]
+    public void Los_parametros_de_consulta_de_las_lecturas_con_filtros_estan_congelados()
+    {
+        string[] De(string nombre) => [.. CatalogoDeOperaciones.V1.Single(o => o.Nombre == nombre).Parametros];
+
+        Assert.Equal(["edicionId:guid[1-50]", "estado:texto", "pagina:int(>=1)", "tamano:int(1-100)"], De("inventario.fuentes.existencias"));
+        Assert.Equal(["estado:texto", "codigoDeFuente:texto", "pagina:int(>=1)", "tamano:int(1-100)"], De("inventario.traslados.listar"));
+        Assert.Equal(["edicionId:guid", "limite:int(1-50)"], De("inventario.ingresos.listar"));
+        Assert.Equal(["codigoDeFuente:texto"], De("inventario.unidades-vendidas.consultar"));
+        Assert.Equal(["desde:instante"], De("inventario.alertas.listar"));
+        Assert.Empty(De("inventario.reservas.crear"));
     }
 
     [Fact]

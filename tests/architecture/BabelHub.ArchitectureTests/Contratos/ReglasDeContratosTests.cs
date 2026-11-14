@@ -89,6 +89,30 @@ public sealed partial class ReglasDeContratosTests
     }
 
     [Fact]
+    public void Ningun_dto_lleva_secretos_enlaces_trazas_ni_la_identidad_del_llamador()
+    {
+        var prohibidos = new[] { "token", "password", "contrasena", "url", "enlace", "tarjeta", "stack", "actor", "ip", "direccion" };
+        foreach (var dto in Dtos())
+        {
+            foreach (var propiedad in PropiedadesDe(dto))
+            {
+                var nombre = propiedad.GetCustomAttribute<JsonPropertyNameAttribute>()!.Name.ToLowerInvariant();
+                Assert.DoesNotContain(prohibidos, p => nombre == p || nombre.StartsWith(p, StringComparison.Ordinal) && char.IsUpper(propiedad.GetCustomAttribute<JsonPropertyNameAttribute>()!.Name[p.Length]));
+            }
+        }
+
+        // El titular solo viaja en los dos cuerpos de la baja y de los pendientes; la identidad del llamador sale del token o del alcance.
+        var conTitular = Dtos().Where(d => PropiedadesDe(d).Any(p => p.GetCustomAttribute<JsonPropertyNameAttribute>()!.Name == "titularId")).Select(d => d.Name).Order(StringComparer.Ordinal).ToList();
+        Assert.Equal(["BajaDeTitularDto", "ConsultaDePendientesDto"], conTitular);
+
+        var solicitudes = CatalogoDeOperaciones.V1.Select(o => o.Solicitud).OfType<Type>().Distinct();
+        foreach (var solicitud in solicitudes)
+        {
+            Assert.DoesNotContain(PropiedadesDe(solicitud), p => p.GetCustomAttribute<JsonPropertyNameAttribute>()!.Name is "usuarioId" or "clienteId");
+        }
+    }
+
+    [Fact]
     public void Los_dtos_no_tienen_metodos_propios()
     {
         foreach (var dto in Dtos())
@@ -176,6 +200,63 @@ public sealed partial class ReglasDeContratosTests
             Assert.True(operacion.Metodo != "GET" || operacion.EsLectura, $"{operacion.Nombre}: un GET es de solo lectura.");
             Assert.True(!operacion.EsLectura || !operacion.RequiereClaveDeIdempotencia, $"{operacion.Nombre}: una lectura no necesita clave de idempotencia.");
         }
+    }
+
+    [Fact]
+    public void Las_rutas_usan_segmentos_en_minusculas_con_guiones_y_cada_operacion_declara_sus_errores_basicos()
+    {
+        // Las dos consultas de administración cuyo cuerpo define transversal-auditoria (AUD-2) todavía no tienen DTO.
+        var cuerpoPendiente = new[] { "inventario.auditoria.consultar", "inventario.alertas.listar" };
+        foreach (var operacion in CatalogoDeOperaciones.V1)
+        {
+            foreach (var segmento in operacion.Ruta.Split('/', StringSplitOptions.RemoveEmptyEntries).Skip(2))
+            {
+                Assert.Matches("^([a-z0-9]+(-[a-z0-9]+)*|\\{[a-zA-Z]+\\})$", segmento);
+            }
+
+            var servicio = operacion.Nombre.StartsWith("inventario.", StringComparison.Ordinal) ? "INV" : "ECO";
+            Assert.Contains($"{servicio}-NO-AUTENTICADO", operacion.Errores);
+            Assert.True(
+                operacion.Solicitud is null && operacion.Parametros.Count == 0 || operacion.Errores.Contains($"{servicio}-VALIDACION-INVALIDA"),
+                $"{operacion.Nombre}: una operación con entrada declara VALIDACION-INVALIDA.");
+            Assert.True(
+                operacion.Respuesta is not null || operacion.CodigoDeExito is 202 or 204 || cuerpoPendiente.Contains(operacion.Nombre),
+                $"{operacion.Nombre}: sin cuerpo de respuesta solo con 202 o 204.");
+            Assert.True(operacion.Metodo != "GET" || operacion.CodigoDeExito == 200, $"{operacion.Nombre}: un GET responde 200.");
+        }
+    }
+
+    [Fact]
+    public void Todo_tipo_publico_de_Shared_esta_en_los_espacios_de_contratos_o_de_errores()
+    {
+        var fuera = BabelHub.Shared.AssemblyMarker.Assembly.GetTypes()
+            .Where(t => t.IsPublic && t != typeof(BabelHub.Shared.AssemblyMarker))
+            .Where(t => t.Namespace is not { } ns || !(ns.StartsWith(EspacioDeContratos, StringComparison.Ordinal) || ns == EspacioDeErrores))
+            .Select(t => t.FullName)
+            .ToList();
+
+        Assert.True(fuera.Count == 0, $"Tipos públicos de Shared fuera de los espacios vigilados: {string.Join(", ", fuera)}.");
+    }
+
+    [Fact]
+    public void Los_proyectos_de_produccion_no_enlazan_codigo_de_afuera_de_su_carpeta()
+    {
+        var enlaces = new List<string>();
+        foreach (var proyecto in Directory.EnumerateFiles(Path.Combine(Proyectos.Raiz, "src"), "*.csproj", SearchOption.AllDirectories)
+                     .Where(r => !r.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)))
+        {
+            var xml = System.Xml.Linq.XDocument.Load(proyecto);
+            foreach (var elemento in xml.Descendants().Where(e => e.Name.LocalName is "Compile" or "Content" or "None" or "EmbeddedResource" or "Reference" or "Import"))
+            {
+                var valor = (string?)elemento.Attribute("Include") ?? (string?)elemento.Attribute("HintPath") ?? (string?)elemento.Attribute("Project") ?? string.Empty;
+                if (valor.Contains("..", StringComparison.Ordinal))
+                {
+                    enlaces.Add($"{Path.GetFileName(proyecto)}: {elemento.Name.LocalName} {valor}");
+                }
+            }
+        }
+
+        Assert.True(enlaces.Count == 0, $"Un proyecto de producción enlaza archivos de afuera de su carpeta y evade las reglas de referencias (1, 2, 5, 6 y 13): {string.Join("; ", enlaces)}.");
     }
 
     [Fact]

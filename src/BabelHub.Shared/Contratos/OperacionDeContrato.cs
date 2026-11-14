@@ -17,6 +17,7 @@ namespace BabelHub.Shared.Contratos;
 /// <param name="Solicitud">DTO del cuerpo de la solicitud, si lo lleva.</param>
 /// <param name="Respuesta">DTO del cuerpo de la respuesta, si lo lleva.</param>
 /// <param name="Errores">Códigos de error estables de la operación (<c>INV-…</c> o <c>ECO-…</c>).</param>
+/// <remarks>Los parámetros de consulta van en <see cref="Parametros"/> y no en el constructor.</remarks>
 public sealed record OperacionDeContrato(
     string Nombre,
     string Metodo,
@@ -28,4 +29,8 @@ public sealed record OperacionDeContrato(
     int CodigoDeExito,
     Type? Solicitud,
     Type? Respuesta,
-    IReadOnlyList<string> Errores);
+    IReadOnlyList<string> Errores)
+{
+    /// <summary>Parámetros de consulta (<c>?nombre</c>) con su tipo y tope, por ejemplo <c>tamano:int(1-100)</c>; vacío si no tiene.</summary>
+    public IReadOnlyList<string> Parametros { get; init; } = [];
+}

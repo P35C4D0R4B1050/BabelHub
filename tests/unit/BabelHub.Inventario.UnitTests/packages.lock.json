@@ -101,6 +101,9 @@
       },
       "babelhub.inventario.domain": {
         "type": "Project"
+      },
+      "babelhub.shared": {
+        "type": "Project"
       }
     }
   }

@@ -75,6 +75,21 @@ public sealed class ConformidadConLosServiciosTests
         }
     }
 
+    [Theory]
+    [MemberData(nameof(NombresDeServicios))]
+    public void La_unica_implementacion_de_IActorActual_en_produccion_es_el_actor_del_flujo(string servicio)
+    {
+        var puerto = Ensamblado(servicio, "Application").GetType($"BabelHub.{servicio}.Application.Plataforma.IActorActual", throwOnError: true)!;
+
+        var implementaciones = new[] { "Domain", "Application", "Infrastructure", "Api" }
+            .SelectMany(capa => Ensamblado(servicio, capa).GetTypes())
+            .Where(t => t.IsClass && !t.IsAbstract && puerto.IsAssignableFrom(t))
+            .Select(t => t.Name)
+            .ToList();
+
+        Assert.Equal(["ActorDelFlujo"], implementaciones);
+    }
+
     private static string Constante(Type tipo, string nombre) =>
         (string)(tipo.GetField(nombre, BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)
             ?? throw new InvalidOperationException($"{tipo.FullName} no tiene la constante pública {nombre}.")).GetRawConstantValue()!;

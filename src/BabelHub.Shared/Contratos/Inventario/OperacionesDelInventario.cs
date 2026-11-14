@@ -15,7 +15,28 @@ public static class OperacionesDelInventario
     private const string Put = "PUT";
     private const string Raiz = RutasDeServicio.Inventario;
 
+    /// <summary>
+    /// Parámetros de consulta de cada operación (nombre:tipo y tope). Los de paginación siguen <c>docs/03-diseno-de-software/04-modulos-y-contratos.md</c> §2;
+    /// <c>edicionId</c> repetido filtra las existencias por las ediciones que el Catálogo resolvió (el Inventario no guarda títulos, autores ni ISBN: FUE-09 se
+    /// compone en la web con el Catálogo y esta consulta).
+    /// </summary>
+    private static readonly Dictionary<string, string[]> ParametrosDeConsulta = new(StringComparer.Ordinal)
+    {
+        ["inventario.fuentes.existencias"] = ["edicionId:guid[1-50]", "estado:texto", "pagina:int(>=1)", "tamano:int(1-100)"],
+        ["inventario.traslados.listar"] = ["estado:texto", "codigoDeFuente:texto", "pagina:int(>=1)", "tamano:int(1-100)"],
+        ["inventario.ingresos.listar"] = ["edicionId:guid", "limite:int(1-50)"],
+        ["inventario.unidades-vendidas.consultar"] = ["codigoDeFuente:texto"],
+        ["inventario.historial.consultar"] = ["pagina:int(>=1)", "tamano:int(1-100)"],
+        ["inventario.alertas.listar"] = ["desde:instante"],
+        ["inventario.auditoria.consultar"] = ["filtros y cursor: los define transversal-auditoria (AUD-2)"],
+    };
+
     public static IReadOnlyList<OperacionDeContrato> Todas { get; } =
+    [
+        .. Declaradas().Select(o => ParametrosDeConsulta.TryGetValue(o.Nombre, out var parametros) ? o with { Parametros = parametros } : o),
+    ];
+
+    private static OperacionDeContrato[] Declaradas() =>
     [
         .. DeDisponibilidad(),
         .. DeReservas(),
@@ -38,7 +59,7 @@ public static class OperacionesDelInventario
             CodigosDeErrorDelInventario.FormatoEnConflicto, CodigosDeErrorDelInventario.LimiteExcedido, CodigosDeErrorDelInventario.ServicioNoDisponible),
         Op(
             "inventario.disponibilidad.consultar", Get, "/disponibilidad/{edicionId}", Lectura, false, false, true, 200, null, typeof(DisponibilidadDeEdicionDto),
-            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.NoEncontrado, CodigosDeErrorDelInventario.EdicionNoImpresa,
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.NoEncontrado, CodigosDeErrorDelInventario.EdicionNoImpresa,
             CodigosDeErrorDelInventario.LimiteExcedido, CodigosDeErrorDelInventario.ServicioNoDisponible),
         Op(
             "inventario.disponibilidad.consultar-varias", Post, "/disponibilidad/consultas", Lectura, false, false, true, 200,
@@ -50,7 +71,7 @@ public static class OperacionesDelInventario
     private static OperacionDeContrato[] DeReservas() =>
     [
         Op(
-            "inventario.reservas.consulta-previa", Post, "/reservas/consulta-previa", Usuario, true, false, true, 200, typeof(ConsultaPreviaDto), typeof(ConsultaPreviaRespuestaDto),
+            "inventario.reservas.consulta-previa", Post, "/reservas/consulta-previa", Lectura, false, false, true, 200, typeof(ConsultaPreviaDto), typeof(ConsultaPreviaRespuestaDto),
             CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.NoEncontrado, CodigosDeErrorDelInventario.ValidacionInvalida,
             CodigosDeErrorDelInventario.LimiteExcedido, CodigosDeErrorDelInventario.ServicioNoDisponible),
         Op(
@@ -60,7 +81,7 @@ public static class OperacionesDelInventario
             CodigosDeErrorDelInventario.IdempotenciaEnConflicto, CodigosDeErrorDelInventario.IdempotenciaEnCurso, CodigosDeErrorDelInventario.ServicioNoDisponible),
         Op(
             "inventario.reservas.consultar", Get, "/reservas/{pedidoId}", Usuario, true, false, true, 200, null, typeof(ReservaDto),
-            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
             CodigosDeErrorDelInventario.ServicioNoDisponible),
         Op(
             "inventario.reservas.confirmar", Post, "/reservas/{pedidoId}/confirmar", Sistema, false, true, false, 200, null, typeof(ReservaDto),
@@ -69,14 +90,14 @@ public static class OperacionesDelInventario
             CodigosDeErrorDelInventario.ServicioNoDisponible),
         Op(
             "inventario.reservas.extender", Post, "/reservas/{pedidoId}/extender", Sistema, false, false, false, 200, null, typeof(ExtensionDeReservaDto),
-            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.NoEncontrado, CodigosDeErrorDelInventario.ServicioNoDisponible),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.NoEncontrado, CodigosDeErrorDelInventario.ServicioNoDisponible),
         Op(
             "inventario.reservas.liberar", Post, "/reservas/{pedidoId}/liberar", Sistema, false, false, false, 200, typeof(LiberarReservaDto), typeof(ReservaDto),
             CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.NoEncontrado, CodigosDeErrorDelInventario.ValidacionInvalida,
-            CodigosDeErrorDelInventario.ServicioNoDisponible),
+            CodigosDeErrorDelInventario.ReservaEstadoInvalido, CodigosDeErrorDelInventario.ServicioNoDisponible),
         Op(
             "inventario.reservas.cerrar", Post, "/reservas/{pedidoId}/cerrar", Usuario, true, true, false, 200, typeof(CerrarReservaDto), typeof(CierreDeReservaDto),
-            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
             CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.ReservaEstadoInvalido, CodigosDeErrorDelInventario.IdempotenciaEnConflicto,
             CodigosDeErrorDelInventario.IdempotenciaEnCurso, CodigosDeErrorDelInventario.ServicioNoDisponible),
     ];
@@ -102,7 +123,7 @@ public static class OperacionesDelInventario
             CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
             CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.ServicioNoDisponible),
         Op(
-            "inventario.fuentes.designar-recepcion", Put, "/fuente-de-recepcion", Usuario, true, false, false, 204, typeof(DesignarRecepcionDto), null,
+            "inventario.fuentes.designar-recepcion", Put, "/fuentes-de-recepcion", Usuario, true, false, false, 204, typeof(DesignarRecepcionDto), null,
             CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
             CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.ServicioNoDisponible),
         Op(
@@ -122,7 +143,7 @@ public static class OperacionesDelInventario
             CodigosDeErrorDelInventario.RutaInvalida, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.ServicioNoDisponible),
         Op(
             "inventario.unidades-vendidas.consultar", Get, "/unidades-vendidas", Usuario, true, false, true, 200, null, typeof(UnidadesVendidasDto),
-            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
             CodigosDeErrorDelInventario.ServicioNoDisponible),
         Op(
             "inventario.sucursales.contacto", Get, "/sucursales/{codigo}/contacto-de-notificacion", AlcancesDeCredencial.LecturaDeContacto, false, false, true, 200,
@@ -156,7 +177,7 @@ public static class OperacionesDelInventario
             CodigosDeErrorDelInventario.IdempotenciaEnConflicto, CodigosDeErrorDelInventario.IdempotenciaEnCurso, CodigosDeErrorDelInventario.ServicioNoDisponible),
         Op(
             "inventario.ingresos.listar", Get, "/ingresos-de-mercaderia", Usuario, true, false, true, 200, null, typeof(ListaDeIngresosDto),
-            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ServicioNoDisponible),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ServicioNoDisponible),
         Op(
             "inventario.devoluciones.reingresar", Post, "/devoluciones/{devolucionId}/reingreso", Usuario, true, false, false, 200,
             typeof(ReingresarDevolucionDto), typeof(ReingresoDeDevolucionDto),
@@ -214,13 +235,13 @@ public static class OperacionesDelInventario
     [
         Op(
             "inventario.historial.consultar", Get, "/historial", AlcancesDeCredencial.Historial, true, false, true, 200, null, typeof(HistorialDeSucursalDto),
-            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ServicioNoDisponible),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ServicioNoDisponible),
         Op(
             "inventario.auditoria.consultar", Get, "/auditoria", AlcancesDeCredencial.ConsultaDeAuditoria, true, false, true, 200, null, null,
             CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ValidacionInvalida),
         Op(
             "inventario.alertas.listar", Get, "/alertas", AlcancesDeCredencial.LecturaDeAlertas, false, false, true, 200, null, null,
-            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido),
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.Prohibido),
         Op(
             "inventario.alertas.marcar-revisada", Post, "/alertas/{id}/revisada", AlcancesDeCredencial.MarcarAlerta, true, false, false, 204, null, null,
             CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ServicioNoDisponible),

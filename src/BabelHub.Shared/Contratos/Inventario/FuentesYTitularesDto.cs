@@ -30,7 +30,6 @@ public sealed record FuenteDetalleDto(
     [property: JsonPropertyName("region")] string Region,
     [property: JsonPropertyName("contactoDeNotificacion")] string? ContactoDeNotificacion,
     [property: JsonPropertyName("esFuenteDeRecepcion")] bool EsFuenteDeRecepcion,
-    [property: JsonPropertyName("encargadoId")] Guid? EncargadoId,
     [property: JsonPropertyName("fisicoTotal")] int FisicoTotal,
     [property: JsonPropertyName("reservadoTotal")] int ReservadoTotal,
     [property: JsonPropertyName("vendibleTotal")] int VendibleTotal);

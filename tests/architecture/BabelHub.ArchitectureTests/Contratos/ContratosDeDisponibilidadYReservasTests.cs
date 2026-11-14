@@ -21,7 +21,7 @@ public sealed class ContratosDeDisponibilidadYReservasTests
         { "inventario.ediciones.registrar", "PUT", "/api/inventario/v1/ediciones/{edicionId}", Usuario, true, false, 204, typeof(RegistrarEdicionDto), null, false },
         { "inventario.disponibilidad.consultar", "GET", "/api/inventario/v1/disponibilidad/{edicionId}", Lectura, false, false, 200, null, typeof(DisponibilidadDeEdicionDto), true },
         { "inventario.disponibilidad.consultar-varias", "POST", "/api/inventario/v1/disponibilidad/consultas", Lectura, false, false, 200, typeof(ConsultaDeDisponibilidadDto), typeof(DisponibilidadDeEdicionesDto), true },
-        { "inventario.reservas.consulta-previa", "POST", "/api/inventario/v1/reservas/consulta-previa", Usuario, true, false, 200, typeof(ConsultaPreviaDto), typeof(ConsultaPreviaRespuestaDto), true },
+        { "inventario.reservas.consulta-previa", "POST", "/api/inventario/v1/reservas/consulta-previa", Lectura, false, false, 200, typeof(ConsultaPreviaDto), typeof(ConsultaPreviaRespuestaDto), true },
         { "inventario.reservas.crear", "POST", "/api/inventario/v1/reservas", Usuario, true, true, 201, typeof(CrearReservaDto), typeof(ReservaDto), false },
         { "inventario.reservas.consultar", "GET", "/api/inventario/v1/reservas/{pedidoId}", Usuario, true, false, 200, null, typeof(ReservaDto), true },
         { "inventario.reservas.confirmar", "POST", "/api/inventario/v1/reservas/{pedidoId}/confirmar", Reservas, false, true, 200, null, typeof(ReservaDto), false },
