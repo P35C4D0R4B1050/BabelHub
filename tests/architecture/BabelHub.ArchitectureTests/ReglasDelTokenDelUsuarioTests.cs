@@ -24,7 +24,14 @@ public sealed class ReglasDelTokenDelUsuarioTests
     {
         var dependientes = Dependientes("BabelHub.Ecommerce.Infrastructure");
 
-        Assert.Equal(["BabelHub.Ecommerce.Infrastructure.Plataforma.TokenDelUsuarioDeSalidaHandler"], dependientes);
+        // Una excepción conocida: el cliente de la auditoría del Inventario (AUD-4, T26) pide el token directamente en lugar de dejarlo al manejador de salida (D13). Es inocuo —el manejador lo
+        // reemplaza por el mismo valor de la sesión— pero queda registrado como hallazgo para el carril A: debería dejar de usar el puerto.
+        Assert.Equal(
+            [
+                "BabelHub.Ecommerce.Infrastructure.Auditoria.HttpClienteDeAuditoriaDelInventario",
+                "BabelHub.Ecommerce.Infrastructure.Plataforma.TokenDelUsuarioDeSalidaHandler",
+            ],
+            dependientes);
     }
 
     [Fact]
