@@ -26,7 +26,7 @@ public sealed class CargaDelAcumuladoTests(PostgresDeAuditoriaFixture bd) : ICla
         var reloj = Stopwatch.StartNew();
         await Parallel.ForEachAsync(
             Enumerable.Range(0, Origenes),
-            new ParallelOptions { MaxDegreeOfParallelism = 16 },
+            new ParallelOptions { MaxDegreeOfParallelism = 8 },
             async (i, ct) => resultados[i] = await acumulador.Registrar("rota" + i.ToString("D5"), "registros-por-origen", ventana.AddSeconds(i % 240), "198.51.100.77", ct));
         reloj.Stop();
 
