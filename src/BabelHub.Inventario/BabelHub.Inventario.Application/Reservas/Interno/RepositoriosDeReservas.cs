@@ -13,6 +13,12 @@ public sealed record DatosDeLaSolicitud(string ClaveDeIdempotencia, string Huell
 /// <summary>Una reserva guardada con la huella de la carga con la que se creó (D03).</summary>
 public sealed record ReservaPorClave(ReservaDePedido Reserva, string HuellaDeLaCarga);
 
+/// <summary>Una operación idempotente ya hecha: la huella de su carga y su resultado original.</summary>
+public sealed record OperacionGuardada(string HuellaDeLaCarga, string Resultado);
+
+/// <summary>Una línea confirmada que pasó a cerrada: lo necesario para descontar el físico y auditar el cierre.</summary>
+public sealed record LineaCerrada(Guid PedidoId, Guid LineaDeReservaId, Guid LineaId, Guid EdicionId, Guid FuenteId, int Cantidad);
+
 /// <summary>Una línea pendiente que pasó a confirmada: lo necesario para solicitar su traslado y auditar la confirmación.</summary>
 public sealed record LineaConfirmada(Guid PedidoId, Guid LineaDeReservaId, Guid LineaId, Guid EdicionId, Guid FuenteId, int Cantidad);
 
@@ -75,6 +81,18 @@ public interface IRepositorioDeReservas
 
     /// <summary>Marca como anulada la venta (<c>anulada_en</c>) de esas líneas cerradas por traslado si todavía no lo estaban; devuelve las que cambiaron (TRA-19). No toca el stock.</summary>
     Task<IReadOnlyList<LineaLiberada>> AnularVentas(IReadOnlyCollection<Guid> lineaDeReservaIds, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>La operación idempotente guardada con esa clave para el pedido y el tipo (<c>cerrar</c>), con la huella de su carga y su resultado original, o <see langword="null"/> si la clave no se usó (SEL-38). La clave se acota por pedido y operación.</summary>
+    Task<OperacionGuardada?> ObtenerOperacion(Guid pedidoId, string tipo, string clave, CancellationToken cancelacion = default);
+
+    /// <summary>Guarda la operación con su huella y su resultado mínimo (solo el desenlace por línea, nunca datos de clientes), en la misma transacción que el cambio.</summary>
+    Task GuardarOperacion(Guid pedidoId, string tipo, string clave, string huellaDeLaCarga, string resultado, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Pasa a <b>cerradas</b> con su causa esas líneas confirmadas, con una sola sentencia que las bloquea por id y en orden y devuelve solo las que de verdad cambiaron: la primera operación que llega gana (SEL-29).
+    /// Quien llama ya tomó el bloqueo del pedido y bloqueó las filas de stock.
+    /// </summary>
+    Task<IReadOnlyList<LineaCerrada>> CerrarLineas(IReadOnlyCollection<Guid> lineaDeReservaIds, CausaDeCierre causa, DateTimeOffset ahora, CancellationToken cancelacion = default);
 
     /// <summary>
     /// Confirma las líneas <b>pendientes no vencidas</b> del pedido con una sola sentencia condicional (las bloquea por id y en orden, repite el vencimiento con <paramref name="ahora"/>) y devuelve solo las que de verdad

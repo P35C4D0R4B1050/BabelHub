@@ -518,6 +518,92 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
         return [.. lineas.OrderBy(l => l.EdicionId, OrdenDeBloqueo.DeIdentificadores).ThenBy(l => l.FuenteId, OrdenDeBloqueo.DeIdentificadores).ThenBy(l => l.LineaDeReservaId, OrdenDeBloqueo.DeIdentificadores)];
     }
 
+    public Task<OperacionGuardada?> ObtenerOperacion(Guid pedidoId, string tipo, string clave, CancellationToken cancelacion = default) =>
+        acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand(
+                    "SELECT huella_de_carga, coalesce(resultado::text, '') FROM reservas.operaciones_idempotentes WHERE pedido_id = @p AND tipo = @t AND clave = @c",
+                    conexion,
+                    transaccion);
+                comando.Parameters.AddWithValue("p", pedidoId);
+                comando.Parameters.AddWithValue("t", tipo);
+                comando.Parameters.AddWithValue("c", clave);
+                await using var lector = await comando.ExecuteReaderAsync(token).ConfigureAwait(false);
+                return await lector.ReadAsync(token).ConfigureAwait(false) ? new OperacionGuardada(lector.GetString(0), lector.GetString(1)) : null;
+            },
+            cancelacion);
+
+    public Task GuardarOperacion(Guid pedidoId, string tipo, string clave, string huellaDeLaCarga, string resultado, CancellationToken cancelacion = default) =>
+        acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                try
+                {
+                    await using var comando = new NpgsqlCommand(
+                        "INSERT INTO reservas.operaciones_idempotentes (pedido_id, tipo, clave, huella_de_carga, resultado, creada_en) VALUES (@p, @t, @c, @h, @r::jsonb, now())",
+                        conexion,
+                        transaccion);
+                    comando.Parameters.AddWithValue("p", pedidoId);
+                    comando.Parameters.AddWithValue("t", tipo);
+                    comando.Parameters.AddWithValue("c", clave);
+                    comando.Parameters.AddWithValue("h", huellaDeLaCarga);
+                    comando.Parameters.AddWithValue("r", resultado);
+                    await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                    return 0;
+                }
+                catch (PostgresException ex) when (ex.SqlState == ViolacionDeUnicidad)
+                {
+                    // El bloqueo del pedido ya serializa las operaciones: si igual llegó otra con esta clave, es un conflicto y no un error del servidor.
+                    throw new ReservaDuplicadaException(ex);
+                }
+            },
+            cancelacion);
+
+    public Task<IReadOnlyList<LineaCerrada>> CerrarLineas(IReadOnlyCollection<Guid> lineaDeReservaIds, CausaDeCierre causa, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(lineaDeReservaIds);
+        if (lineaDeReservaIds.Count == 0)
+        {
+            return Task.FromResult<IReadOnlyList<LineaCerrada>>([]);
+        }
+
+        return acceso.Ejecutar<IReadOnlyList<LineaCerrada>>(
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand(
+                    """
+                    WITH candidatas AS (
+                        SELECT l.id
+                        FROM reservas.reserva_lineas l
+                        WHERE l.id = ANY(@ids) AND l.estado = 'confirmada'
+                        ORDER BY l.id
+                        FOR UPDATE OF l
+                    )
+                    UPDATE reservas.reserva_lineas AS u
+                    SET estado = 'cerrada', cerrada_por = @causa, estado_cambiado_en = @ahora
+                    FROM candidatas c
+                    WHERE u.id = c.id AND u.estado = 'confirmada'
+                    RETURNING u.pedido_id, u.id, u.linea_id, u.edicion_id, u.fuente_id, u.cantidad
+                    """,
+                    conexion,
+                    transaccion);
+                comando.Parameters.AddWithValue("ids", lineaDeReservaIds.ToArray());
+                comando.Parameters.AddWithValue("causa", ACausa(causa));
+                comando.Parameters.Add(new NpgsqlParameter("ahora", NpgsqlDbType.TimestampTz) { Value = ahora.ToUniversalTime() });
+
+                var lineas = new List<LineaCerrada>();
+                await using var lector = await comando.ExecuteReaderAsync(token).ConfigureAwait(false);
+                while (await lector.ReadAsync(token).ConfigureAwait(false))
+                {
+                    lineas.Add(new LineaCerrada(lector.GetGuid(0), lector.GetGuid(1), lector.GetGuid(2), lector.GetGuid(3), lector.GetGuid(4), lector.GetInt32(5)));
+                }
+
+                return [.. lineas.OrderBy(l => l.EdicionId, OrdenDeBloqueo.DeIdentificadores).ThenBy(l => l.FuenteId, OrdenDeBloqueo.DeIdentificadores).ThenBy(l => l.LineaDeReservaId, OrdenDeBloqueo.DeIdentificadores)];
+            },
+            cancelacion);
+    }
+
     public Task<PedidosQueApartanUnidades> PedidosQueApartan(Guid fuenteId, Guid edicionId, int maximo, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(maximo);

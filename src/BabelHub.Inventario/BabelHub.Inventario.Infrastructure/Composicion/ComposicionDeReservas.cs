@@ -24,7 +24,7 @@ public static class ComposicionDeReservas
     /// Los casos de uso del módulo que se pueden repetir entero ante un interbloqueo: la clave de idempotencia (reservar) o su naturaleza (expirar) los hace idempotentes, y un interbloqueo revierte la transacción
     /// completa antes de cualquier efecto (plan §5).
     /// </summary>
-    public static IReadOnlyList<Type> CasosDeUsoIdempotentes { get; } = [typeof(ReservarUnidades), typeof(ExpirarReservasVencidas), typeof(ConfirmarReservas), typeof(ExtenderReservas), typeof(LiberarReservas)];
+    public static IReadOnlyList<Type> CasosDeUsoIdempotentes { get; } = [typeof(ReservarUnidades), typeof(ExpirarReservasVencidas), typeof(ConfirmarReservas), typeof(ExtenderReservas), typeof(LiberarReservas), typeof(CerrarReservas)];
 
     /// <summary>
     /// Registra el módulo: la estrategia de selección elegida por nombre (T06), el acceso y el repositorio de reservas, <c>IReservasDeStock</c> (que reemplaza al nulo de <c>Fuentes</c>), el ejecutor «sistema» y los
@@ -67,12 +67,14 @@ public static class ComposicionDeReservas
         servicios.AddSingleton<IValidador<ConfirmarReservasEntrada>, ValidadorDeConfirmar>();
         servicios.AddSingleton<IValidador<ExtenderReservasEntrada>, ValidadorDeExtender>();
         servicios.AddSingleton<IValidador<LiberarReservasEntrada>, ValidadorDeLiberar>();
+        servicios.AddSingleton<IValidador<CerrarReservasEntrada>, ValidadorDeCerrar>();
 
         servicios.Escritura<ReservarEntrada, ReservaDelPedido, ReservarUnidades>(opcionesDeReintento);
         servicios.Escritura<ExpirarReservasEntrada, ExpiracionDelPedido, ExpirarReservasVencidas>(opcionesDeReintento);
         servicios.Escritura<ConfirmarReservasEntrada, ReservaDelPedido, ConfirmarReservas>(opcionesDeReintento);
         servicios.Escritura<ExtenderReservasEntrada, ExtensionDeReserva, ExtenderReservas>(opcionesDeReintento);
         servicios.Escritura<LiberarReservasEntrada, ReservaDelPedido, LiberarReservas>(opcionesDeReintento);
+        servicios.Escritura<CerrarReservasEntrada, CierreDeReserva, CerrarReservas>(opcionesDeReintento);
 
         return servicios;
     }

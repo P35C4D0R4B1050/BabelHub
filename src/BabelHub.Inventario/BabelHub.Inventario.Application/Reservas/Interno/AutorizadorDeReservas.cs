@@ -11,6 +11,8 @@ internal static class MotivosDeDenegacionDeReservas
     public const string SinSesion = "sin-sesion";
 
     public const string RecursoAjeno = "recurso-ajeno";
+
+    public const string FueraDeSucursal = "fuera-de-sucursal";
 }
 
 /// <summary>
@@ -44,6 +46,38 @@ internal sealed class AutorizadorDeReservas(IActorActual actores, IDenegacionDeA
     /// </summary>
     public Task<ErrorDeAplicacion?> ExigirIntegracionDeReservas(CancellationToken cancelacion) =>
         Evaluar(actor => actor.Tipo == TipoDeActor.Integracion && actor.Integracion == AlcanceDeServicio.ExpiracionDeReservas.NombreEstable() ? null : MotivosDeDenegacionDeReservas.FueraDeRol, cancelacion);
+
+    /// <summary>
+    /// El rol que cerrar exige, <b>antes de leer nada</b> (SEL-39): la entrega la hace un encargado de sucursal o la administración central; el paso a en reparto, el personal de logística o la administración central. Quien no
+    /// tiene ese rol recibe «prohibido» con su evento sin que se mire la reserva, la clave ni <c>ya-cerrada</c>.
+    /// </summary>
+    public Task<ErrorDeAplicacion?> ExigirRolParaCerrar(MotivoDeCierreDeReserva motivo, CancellationToken cancelacion) =>
+        Evaluar(
+            actor => actor.EsAdministracionCentral()
+                || (motivo == MotivoDeCierreDeReserva.Entrega && actor.EsEncargado())
+                || (motivo == MotivoDeCierreDeReserva.Reparto && actor.Tipo == TipoDeActor.Usuario && actor.Rol == RolesDelActor.PersonalDeLogistica)
+                ? null
+                : MotivosDeDenegacionDeReservas.FueraDeRol,
+            cancelacion);
+
+    /// <summary>
+    /// La entrega solo en la sucursal de recojo de la reserva (SEL-39): un encargado de otra sucursal, o que consulta una reserva que no es de recojo o que no existe, recibe «prohibido» con el evento
+    /// <c>fuera-de-sucursal</c> y no se le revela si la reserva existe. La administración central pasa siempre.
+    /// </summary>
+    public async Task<ErrorDeAplicacion?> ExigirSucursalDeRecojo(Guid? sucursalDeRecojoId, CancellationToken cancelacion)
+    {
+        var actor = Actor;
+        if (actor is not null && (actor.EsAdministracionCentral() || (sucursalDeRecojoId is { } sucursal && actor.EsEncargadoDe(sucursal))))
+        {
+            return null;
+        }
+
+        await denegaciones.Registrar(new DenegacionDeAcceso(MotivosDeDenegacionDeReservas.FueraDeSucursal, ruta: null) { CodigoDeError = "INV-PROHIBIDO" }, cancelacion).ConfigureAwait(false);
+        return new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClaveProhibido);
+    }
+
+    /// <summary>Quien puede ver que una reserva no existe: la administración y logística; un encargado recibe «prohibido» como si fuera de otra sucursal.</summary>
+    public bool PuedeSaberSiExiste => Actor is { } actor && !actor.EsEncargado();
 
     /// <summary>Cualquier actor con contexto (la consulta previa sin token la hace el E-commerce con su credencial de servicio): no un visitante ni la ausencia de actor.</summary>
     public Task<ErrorDeAplicacion?> ExigirContexto(CancellationToken cancelacion) => Evaluar(_ => null, cancelacion);

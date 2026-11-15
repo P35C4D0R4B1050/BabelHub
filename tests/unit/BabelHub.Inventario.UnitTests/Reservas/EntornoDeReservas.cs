@@ -244,6 +244,37 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
         return Task.FromResult<IReadOnlyList<LineaLiberada>>(anuladas);
     }
 
+    public Dictionary<(Guid Pedido, string Tipo, string Clave), OperacionGuardada> Operaciones { get; } = [];
+
+    public Task<OperacionGuardada?> ObtenerOperacion(Guid pedidoId, string tipo, string clave, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.ObtenerOperacion");
+        return Task.FromResult(Operaciones.GetValueOrDefault((pedidoId, tipo, clave)));
+    }
+
+    public Task GuardarOperacion(Guid pedidoId, string tipo, string clave, string huellaDeLaCarga, string resultado, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.GuardarOperacion");
+        Operaciones[(pedidoId, tipo, clave)] = new OperacionGuardada(huellaDeLaCarga, resultado);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<LineaCerrada>> CerrarLineas(IReadOnlyCollection<Guid> lineaDeReservaIds, CausaDeCierre causa, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.CerrarLineas");
+        var cerradas = new List<LineaCerrada>();
+        foreach (var reserva in Guardadas)
+        {
+            foreach (var linea in reserva.Lineas.Where(l => lineaDeReservaIds.Contains(l.Id) && l.Estado == EstadoDeLinea.Confirmada))
+            {
+                linea.Cerrar(causa, ahora);
+                cerradas.Add(new LineaCerrada(reserva.PedidoId, linea.Id, linea.LineaId, linea.EdicionId, linea.FuenteId, linea.Cantidad));
+            }
+        }
+
+        return Task.FromResult<IReadOnlyList<LineaCerrada>>(cerradas);
+    }
+
     public Task<PedidosQueApartanUnidades> PedidosQueApartan(Guid fuenteId, Guid edicionId, int maximo, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
         var pedidos = Guardadas
@@ -441,6 +472,8 @@ internal sealed class EntornoDeReservas
 
     public LiberarReservas Liberar() =>
         new(Autorizador, new ValidadorDeLiberar(), Bloqueos, Reservas, Stock, Devolucion, ConReceptores ? [new ReceptorDeCancelacionDoble(Cancelaciones, Base.Bitacora)] : [], Volumen, new ConstructorDeLaReserva(Directorio), Base.Reloj);
+
+    public CerrarReservas Cerrar() => new(Autorizador, new ValidadorDeCerrar(), Bloqueos, Reservas, Stock, Auditoria, Base.Reloj);
 
     public ExtenderReservas Extender() => new(Autorizador, new ValidadorDeExtender(), Bloqueos, Reservas, new ConstructorDeLaReserva(Directorio), Base.Reloj);
 
