@@ -226,6 +226,38 @@ public sealed class ApiDeAuditoriaTests(PostgresDeAuditoriaFixture bdEco, Audito
         Assert.Empty(cuerpo.RootElement.GetProperty("registros").EnumerateArray());
     }
 
+    // ---------- Motivos del rechazo ----------
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-04")]
+    public async Task Inventario_UnRechazoFueraDelAlcanceDeDatos_QuedaRegistradoConUnMotivoDelCatalogo_SinAlertaFalsa()
+    {
+        var antes = await Denegaciones(bdInv);
+        var alertasAntes = await bdInv.Consultar<long>($"SELECT count(*) FROM auditoria.alertas WHERE motivo = 'auditoria-no-disponible'");
+
+        var respuesta = await _inv.Enviar(HttpMethod.Get, "/servicio/prueba/alcance", InventarioDeAuditoriaHost.CredencialDeConsulta);
+
+        Assert.Equal(HttpStatusCode.Forbidden, respuesta.StatusCode);
+        Assert.Equal(antes + 1, await Denegaciones(bdInv));
+        Assert.Equal(1L, await bdInv.Consultar<long>("SELECT count(*) FROM auditoria.registros WHERE accion = 'AccesoDenegado' AND motivo = 'alcance-insuficiente' AND ruta = '/servicio/prueba/alcance'"));
+        Assert.Equal(alertasAntes, await bdInv.Consultar<long>("SELECT count(*) FROM auditoria.alertas WHERE motivo = 'auditoria-no-disponible'"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-04")]
+    public async Task Inventario_UnaClaveQueElCatalogoNoAdmite_SeRegistraConElMotivoGeneral_EnVezDePerderElEvento()
+    {
+        var antes = await Denegaciones(bdInv);
+        var alertasAntes = await bdInv.Consultar<long>($"SELECT count(*) FROM auditoria.alertas WHERE motivo = 'auditoria-no-disponible'");
+
+        var respuesta = await _inv.Enviar(HttpMethod.Get, "/servicio/prueba/clave-rara", InventarioDeAuditoriaHost.CredencialDeConsulta);
+
+        Assert.Equal(HttpStatusCode.Forbidden, respuesta.StatusCode);
+        Assert.Equal(antes + 1, await Denegaciones(bdInv));
+        Assert.Equal(1L, await bdInv.Consultar<long>("SELECT count(*) FROM auditoria.registros WHERE accion = 'AccesoDenegado' AND motivo = 'fuera-de-rol' AND ruta = '/servicio/prueba/clave-rara'"));
+        Assert.Equal(alertasAntes, await bdInv.Consultar<long>("SELECT count(*) FROM auditoria.alertas WHERE motivo = 'auditoria-no-disponible'"));
+    }
+
     // ---------- Inventario: historial, alertas y marca ----------
 
     [Fact]

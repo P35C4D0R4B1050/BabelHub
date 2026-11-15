@@ -9,7 +9,7 @@ namespace BabelHub.Ecommerce.Api.Plataforma;
 /// El punto único de la Api que registra un acceso denegado (T28; AUD-05, AC-AUD-04, AC-AUD-21): lo llaman el manejador de excepciones, los endpoints de la auditoría cuando la Aplicación responde «prohibido» o «no autenticado»,
 /// el middleware de salida (<see cref="DenegacionesMiddleware"/>: autenticación, autorización, credencial de servicio, <c>OnChallenge</c> y <c>OnForbidden</c> terminan todos en un 401 o un 403) y cualquier otro rechazo que no pasó por un caso de uso.
 /// Registra <b>un único evento por solicitud</b> (el contexto de denegación lo garantiza aunque el rechazo pase por varios puntos) con una correlación que genera el servidor, el motivo del catálogo y la ruta reducida a su plantilla.
-/// Si el host no compuso el módulo de auditoría (<see cref="IRegistradorDeDenegacionesHttp"/> ausente), no hace nada: el arranque de producción lo exige.
+/// Si el host no compuso el registrador, los puntos que lo llaman no hacen nada (los hosts que no usan la auditoría), pero <c>UsarRegistroDeDenegaciones</c> exige que esté compuesto y falla al construir el pipeline.
 /// </summary>
 public interface IRegistradorDeDenegacionesHttp
 {
@@ -111,9 +111,24 @@ public static class DenegacionesHttpExtensiones
         ArgumentNullException.ThrowIfNull(servicios);
         servicios.AddSingleton<IPlantillasDeRuta, PlantillasDeRutaDeLaApi>();
         servicios.AddScoped<IRegistradorDeDenegacionesHttp, RegistradorDeDenegacionesHttp>();
+        // El registro de petición del servidor web escribe la dirección completa con su consulta (el usuario, el origen y el texto buscado de la auditoría, AUD-06, SEG-10): solo avisos y errores.
+        servicios.AddLogging(registro => registro.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Warning));
         return servicios;
     }
 
-    /// <summary>Va después de <c>UsarManejoDeErrores</c> y antes de la credencial de servicio y de la autenticación.</summary>
-    public static IApplicationBuilder UsarRegistroDeDenegaciones(this IApplicationBuilder app) => app.UseMiddleware<DenegacionesMiddleware>();
+    /// <summary>
+    /// Va después de <c>UsarManejoDeErrores</c> y antes de la credencial de servicio y de la autenticación. <b>Falla al construir el pipeline</b> si el anfitrión no compuso el registrador ni el módulo de auditoría
+    /// (<c>IDenegacionDeAcceso</c>): un servicio que rechaza sin registrar no arranca (AGENTS §5).
+    /// </summary>
+    public static IApplicationBuilder UsarRegistroDeDenegaciones(this IApplicationBuilder app)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+        var servicios = app.ApplicationServices.GetRequiredService<IServiceProviderIsService>();
+        if (!servicios.IsService(typeof(IRegistradorDeDenegacionesHttp)) || !servicios.IsService(typeof(IDenegacionDeAcceso)))
+        {
+            throw new InvalidOperationException("El anfitrión no compuso el registro de accesos denegados: faltan AgregarRegistroDeDenegaciones y el módulo de auditoría.");
+        }
+
+        return app.UseMiddleware<DenegacionesMiddleware>();
+    }
 }

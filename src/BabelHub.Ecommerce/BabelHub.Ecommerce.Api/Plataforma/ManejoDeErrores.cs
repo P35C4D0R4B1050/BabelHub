@@ -182,7 +182,7 @@ public sealed class ManejadorDeExcepciones(OpcionesDeErrores opciones, ILogger<M
             // La auditoría caída no deja pasar la operación (AUD-04, la transacción ya revirtió): «servicio no disponible», no un error inesperado (AC-AUD-03).
             AuditoriaNoDisponibleException => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.NoDisponible),
             // La política de filas rechazó el acceso: es un acceso fuera de alcance (403 registrado), nunca «sin stock» ni un 500 (INV-1a).
-            AlcanceDeDatosDenegadoException => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.Prohibido, "fuera-de-alcance"),
+            AlcanceDeDatosDenegadoException => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.Prohibido, "alcance-insuficiente"),
             BadHttpRequestException => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.Validacion),
             _ => null,
         };
@@ -205,7 +205,7 @@ public sealed class ManejadorDeExcepciones(OpcionesDeErrores opciones, ILogger<M
             var motivo = exception switch
             {
                 ExcepcionDeNegocio negocio => negocio.ComoError().Clave,
-                AlcanceDeDatosDenegadoException => "fuera-de-alcance",
+                AlcanceDeDatosDenegadoException => "alcance-insuficiente",
                 _ => null,
             };
             await DenegacionesHttp.Registrar(httpContext, categoria, motivo, problema.Code).ConfigureAwait(false);

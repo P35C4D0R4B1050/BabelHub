@@ -146,6 +146,9 @@ public sealed class InventarioDeAuditoriaHost : IAsyncDisposable
             return Results.Json(new { ajuste });
         }).WithMetadata(new OperacionDeServicioAttribute("inventario.auditoria.consultar"));
 
+        _app.MapGet("/servicio/prueba/clave-rara", () => { throw new ExcepcionDeNegocio("una-clave-que-el-catalogo-no-admite", CategoriaDeError.Prohibido); }).WithMetadata(new OperacionDeServicioAttribute("inventario.auditoria.consultar"));
+        _app.MapGet("/servicio/prueba/alcance", () => { throw new AlcanceDeDatosDenegadoException(); }).WithMetadata(new OperacionDeServicioAttribute("inventario.auditoria.consultar"));
+
         await _app.StartAsync();
         Cliente = _app.GetTestClient();
     }

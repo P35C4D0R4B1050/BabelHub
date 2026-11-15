@@ -40,6 +40,11 @@ public sealed class DenegacionesHttpEcommerceTests
         }
     }
 
+    private sealed class DenegacionNula : IDenegacionDeAcceso
+    {
+        public Task Registrar(DenegacionDeAcceso denegacion, CancellationToken cancelacion = default) => Task.CompletedTask;
+    }
+
     private sealed class EsquemaDePrueba(IOptionsMonitor<AuthenticationSchemeOptions> opciones, ILoggerFactory registro, UrlEncoder codificador) : AuthenticationHandler<AuthenticationSchemeOptions>(opciones, registro, codificador)
     {
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -63,6 +68,7 @@ public sealed class DenegacionesHttpEcommerceTests
         builder.Logging.ClearProviders();
         builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("ECO"));
         builder.Services.AddSingleton<IRegistradorDeDenegacionesHttp>(contador);
+        builder.Services.AddSingleton<IDenegacionDeAcceso>(new DenegacionNula());
         builder.Services.AddAuthentication("prueba").AddScheme<AuthenticationSchemeOptions, EsquemaDePrueba>("prueba", _ => { });
         builder.Services.AddAuthorization(o => o.AddPolicy("solo-admin", p => p.RequireRole("administrador-central")));
         var app = builder.Build();
@@ -174,7 +180,7 @@ public sealed class DenegacionesHttpEcommerceTests
 
     [Fact]
     [Trait("Criterio", "AC-AUD-21")]
-    public async Task SinElRegistradorCompuesto_UnRechazoSeResponde_SinFallar()
+    public void SinElRegistradorNiElModuloCompuestos_ElPipelineNoSeConstruye()
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -182,13 +188,56 @@ public sealed class DenegacionesHttpEcommerceTests
         builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("ECO"));
         var app = builder.Build();
         app.UsarManejoDeErrores();
-        app.UsarRegistroDeDenegaciones();
-        app.MapGet("/rechazo", () => Results.StatusCode(StatusCodes.Status401Unauthorized));
+
+        var falla = Assert.Throws<InvalidOperationException>(() => app.UsarRegistroDeDenegaciones());
+
+        Assert.Contains("registro de accesos denegados", falla.Message, StringComparison.Ordinal);
+    }
+
+    private sealed class RegistroEnMemoria : ILoggerProvider, ILogger
+    {
+        public List<string> Mensajes { get; } = [];
+
+        public ILogger CreateLogger(string categoria) => this;
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel nivel) => true;
+
+        public void Log<TState>(LogLevel nivel, EventId evento, TState estado, Exception? excepcion, Func<TState, Exception?, string> formato)
+        {
+            lock (Mensajes)
+            {
+                Mensajes.Add(formato(estado, excepcion));
+            }
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-06")]
+    public async Task LaConsultaDeLaAuditoria_NoLlegaAlRegistroDeLaPeticionDelServidor()
+    {
+        var registro = new RegistroEnMemoria();
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseTestServer();
+        builder.Logging.ClearProviders();
+        builder.Logging.SetMinimumLevel(LogLevel.Trace);
+        builder.Logging.AddProvider(registro);
+        builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("ECO"));
+        builder.Services.AgregarRegistroDeDenegaciones();
+        var app = builder.Build();
+        app.MapGet("/api/ecommerce/v1/auditoria", () => "ok");
         await app.StartAsync();
         await using var _ = app;
 
-        var respuesta = await app.GetTestClient().GetAsync("/rechazo");
+        var respuesta = await app.GetTestClient().GetAsync("/api/ecommerce/v1/auditoria?texto=dato-buscado-secreto&usuarioId=11111111-1111-4111-8111-111111111111");
 
-        Assert.Equal(HttpStatusCode.Unauthorized, respuesta.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
+        Assert.DoesNotContain(registro.Mensajes, m => m.Contains("dato-buscado-secreto", StringComparison.Ordinal) || m.Contains("11111111-1111-4111", StringComparison.Ordinal));
     }
 }
