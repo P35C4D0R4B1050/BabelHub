@@ -842,7 +842,7 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
             async (conexion, transaccion, token) =>
             {
                 // Solo cabeceras: las líneas, el stock y lo vendido no se tocan. La unicidad (cliente, clave) se conserva porque la sustitución es inyectiva para un titular.
-                await using var comando = new NpgsqlCommand("UPDATE reservas.reservas SET cliente_id = @anonimo, huella_origen = NULL WHERE cliente_id = @t", conexion, transaccion);
+                await using var comando = new NpgsqlCommand("UPDATE reservas.reservas SET cliente_id = @anonimo, cliente_anonimizado = true, huella_origen = NULL WHERE cliente_id = @t", conexion, transaccion);
                 comando.Parameters.AddWithValue("t", titularId);
                 comando.Parameters.AddWithValue("anonimo", identificadorAnonimo);
                 return await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);
@@ -891,6 +891,78 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
                 comando.Parameters.AddWithValue("ids", titularIds.ToArray());
                 comando.Parameters.Add(new NpgsqlParameter("ahora", NpgsqlDbType.TimestampTz) { Value = ahora.ToUniversalTime() });
                 return await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            },
+            cancelacion);
+    }
+
+    public Task<int> PurgarHuellasDeOrigen(DateTimeOffset limite, CancellationToken cancelacion = default) =>
+        Escribir("UPDATE reservas.reservas SET huella_origen = NULL WHERE huella_origen IS NOT NULL AND iniciada_en < @limite", limite, cancelacion);
+
+    public Task<int> PurgarOperacionesIdempotentes(DateTimeOffset limite, CancellationToken cancelacion = default) =>
+        Escribir("DELETE FROM reservas.operaciones_idempotentes WHERE creada_en < @limite", limite, cancelacion);
+
+    public Task<int> PurgarBajasEntregadas(DateTimeOffset limite, CancellationToken cancelacion = default) =>
+        Escribir("DELETE FROM reservas.bajas_recibidas WHERE entregada_a_auditoria_en IS NOT NULL AND entregada_a_auditoria_en < @limite", limite, cancelacion);
+
+    private Task<int> Escribir(string sql, DateTimeOffset limite, CancellationToken cancelacion) =>
+        acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand(sql, conexion, transaccion);
+                comando.Parameters.Add(new NpgsqlParameter("limite", NpgsqlDbType.TimestampTz) { Value = limite.ToUniversalTime() });
+                return await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            },
+            cancelacion);
+
+    public Task<int> AnonimizarClientesAntiguos(DateTimeOffset limite, int maximo, Func<Guid, Guid> anonimo, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(anonimo);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximo);
+
+        return acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                // El pedido entero (todas sus cabeceras) debe estar quieto: sin línea viva y con la última transición anterior al límite. La cabecera ya anónima (por la baja o por una corrida anterior) no se toca.
+                var candidatas = new List<(Guid Id, Guid Cliente)>();
+                await using (var seleccion = new NpgsqlCommand(
+                    """
+                    SELECT r.id, r.cliente_id
+                    FROM reservas.reservas r
+                    WHERE NOT r.cliente_anonimizado
+                      AND NOT EXISTS (
+                          SELECT 1 FROM reservas.reserva_lineas l
+                          WHERE l.pedido_id = r.pedido_id
+                            AND (l.estado IN ('pendiente', 'confirmada')
+                                 OR (l.estado = 'cerrada' AND l.cerrada_por = 'traslado' AND l.recreada_en_destino = false AND l.anulada_en IS NULL)))
+                      AND (SELECT max(l.estado_cambiado_en) FROM reservas.reserva_lineas l WHERE l.pedido_id = r.pedido_id) < @limite
+                    ORDER BY r.id
+                    LIMIT @maximo
+                    """,
+                    conexion,
+                    transaccion))
+                {
+                    seleccion.Parameters.Add(new NpgsqlParameter("limite", NpgsqlDbType.TimestampTz) { Value = limite.ToUniversalTime() });
+                    seleccion.Parameters.AddWithValue("maximo", maximo);
+                    await using var lector = await seleccion.ExecuteReaderAsync(token).ConfigureAwait(false);
+                    while (await lector.ReadAsync(token).ConfigureAwait(false))
+                    {
+                        candidatas.Add((lector.GetGuid(0), lector.GetGuid(1)));
+                    }
+                }
+
+                var cambiadas = 0;
+                foreach (var porCliente in candidatas.GroupBy(c => c.Cliente).OrderBy(g => g.Key, OrdenDeBloqueo.DeIdentificadores))
+                {
+                    await using var actualizacion = new NpgsqlCommand(
+                        "UPDATE reservas.reservas SET cliente_id = @anonimo, cliente_anonimizado = true, huella_origen = NULL WHERE id = ANY(@ids) AND NOT cliente_anonimizado",
+                        conexion,
+                        transaccion);
+                    actualizacion.Parameters.AddWithValue("anonimo", anonimo(porCliente.Key));
+                    actualizacion.Parameters.AddWithValue("ids", porCliente.Select(c => c.Id).ToArray());
+                    cambiadas += await actualizacion.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                }
+
+                return cambiadas;
             },
             cancelacion);
     }

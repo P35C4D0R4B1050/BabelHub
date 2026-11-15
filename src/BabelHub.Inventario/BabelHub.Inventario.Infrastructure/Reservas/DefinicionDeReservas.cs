@@ -62,6 +62,9 @@ public static class DefinicionDeReservas
             CONSTRAINT ck_reservas_huella_origen CHECK (huella_origen IS NULL OR length(huella_origen) BETWEEN 16 AND 128)
         );
 
+        -- Una base ya migrada gana la marca de «el cliente ya es anónimo» (la baja y la depuración de los 2 años la ponen: así un identificador anónimo no se vuelve a calcular y sigue estable, SEL-34).
+        ALTER TABLE reservas.reservas ADD COLUMN IF NOT EXISTS cliente_anonimizado boolean NOT NULL DEFAULT false;
+
         CREATE INDEX IF NOT EXISTS ix_reservas_pedido ON reservas.reservas (pedido_id, iniciada_en DESC);
         CREATE INDEX IF NOT EXISTS ix_reservas_cliente ON reservas.reservas (cliente_id);
         CREATE INDEX IF NOT EXISTS ix_reservas_vencimiento ON reservas.reservas (fecha_expiracion) WHERE fecha_expiracion IS NOT NULL;
@@ -138,7 +141,7 @@ public static class DefinicionDeReservas
         GRANT SELECT, INSERT ON reservas.reservas, reservas.reserva_lineas TO rol_reservas;
         -- El cambio es por columna: una línea guardada no cambia su cantidad, su fuente, su edición ni su pedido, y una cabecera no cambia su pedido, su clave ni su destino.
         GRANT UPDATE (estado, cerrada_por, traslado_id, recreada_en_destino, confirmada_en, anulada_en, envio_id, estado_cambiado_en) ON reservas.reserva_lineas TO rol_reservas;
-        GRANT UPDATE (fecha_expiracion, extendida, reemplazos, cliente_id, huella_origen) ON reservas.reservas TO rol_reservas;
+        GRANT UPDATE (fecha_expiracion, extendida, reemplazos, cliente_id, huella_origen, cliente_anonimizado) ON reservas.reservas TO rol_reservas;
         GRANT SELECT, INSERT, DELETE ON reservas.operaciones_idempotentes TO rol_reservas;
         GRANT SELECT, INSERT, UPDATE, DELETE ON reservas.bajas_recibidas TO rol_reservas;
         """;

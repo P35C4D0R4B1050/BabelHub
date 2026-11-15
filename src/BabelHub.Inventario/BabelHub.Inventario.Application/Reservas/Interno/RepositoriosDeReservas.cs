@@ -150,6 +150,24 @@ public interface IRepositorioDeReservas
 
     /// <summary>Marca las bajas como entregadas a <c>Auditoria</c> en <paramref name="ahora"/> (arranca su retención de 30 días); repetirlo no cambia la fecha de las ya marcadas.</summary>
     Task MarcarBajasEntregadas(IReadOnlyCollection<Guid> titularIds, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    // ---------- Mantenimiento (trabajos de fondo con actor «sistema», T25) ----------
+
+    /// <summary>Anula la <c>huella_origen</c> de las cabeceras iniciadas antes de <paramref name="limite"/> (24 horas, el mismo plazo de los eventos de límite, SEG-25). Devuelve cuántas cambió; repetirlo cambia cero.</summary>
+    Task<int> PurgarHuellasDeOrigen(DateTimeOffset limite, CancellationToken cancelacion = default);
+
+    /// <summary>Borra las operaciones idempotentes creadas antes de <paramref name="limite"/> (30 días). Devuelve cuántas borró.</summary>
+    Task<int> PurgarOperacionesIdempotentes(DateTimeOffset limite, CancellationToken cancelacion = default);
+
+    /// <summary>Borra las bajas que <c>Auditoria</c> consumió antes de <paramref name="limite"/> (30 días después de la entrega: la retención de <c>por_anonimizar</c>). Las no entregadas no se tocan. Devuelve cuántas borró.</summary>
+    Task<int> PurgarBajasEntregadas(DateTimeOffset limite, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Anonimiza, como mucho <paramref name="maximo"/> cabeceras por corrida, el <c>cliente_id</c> de las reservas cuyo pedido ya no tiene ninguna línea viva (pendiente, confirmada o en tránsito sin recrear) y cuya última transición
+    /// de línea (<c>estado_cambiado_en</c>) fue antes de <paramref name="limite"/> (2 años, como los pedidos, PED-34). El identificador nuevo lo da <paramref name="anonimo"/> (el mismo que la baja) y la cabecera queda marcada: no se
+    /// vuelve a anonimizar. Devuelve cuántas cambió.
+    /// </summary>
+    Task<int> AnonimizarClientesAntiguos(DateTimeOffset limite, int maximo, Func<Guid, Guid> anonimo, CancellationToken cancelacion = default);
 }
 
 /// <summary>Las claves simbólicas de los fallos del módulo; la Api las traduce a los códigos <c>INV-…</c> de <c>Shared</c> (D11).</summary>

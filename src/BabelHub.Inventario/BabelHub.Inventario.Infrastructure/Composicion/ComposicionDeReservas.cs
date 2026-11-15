@@ -24,7 +24,7 @@ public static class ComposicionDeReservas
     /// Los casos de uso del módulo que se pueden repetir entero ante un interbloqueo: la clave de idempotencia (reservar y cerrar) o su naturaleza (expirar, confirmar, extender y liberar: lo ya hecho no cambia nada) los hace idempotentes, y un interbloqueo revierte la transacción
     /// completa antes de cualquier efecto (plan §5).
     /// </summary>
-    public static IReadOnlyList<Type> CasosDeUsoIdempotentes { get; } = [typeof(ReservarUnidades), typeof(ExpirarReservasVencidas), typeof(ConfirmarReservas), typeof(ExtenderReservas), typeof(LiberarReservas), typeof(CerrarReservas), typeof(ProcesarBajaDeTitular)];
+    public static IReadOnlyList<Type> CasosDeUsoIdempotentes { get; } = [typeof(ReservarUnidades), typeof(ExpirarReservasVencidas), typeof(ConfirmarReservas), typeof(ExtenderReservas), typeof(LiberarReservas), typeof(CerrarReservas), typeof(ProcesarBajaDeTitular), typeof(PurgarHuellasDeOrigen), typeof(PurgarRegistrosCaducados), typeof(DepurarReservasAntiguas)];
 
     /// <summary>
     /// Registra el módulo: la estrategia de selección elegida por nombre (T06), el acceso y el repositorio de reservas, <c>IReservasDeStock</c> (que reemplaza al nulo de <c>Fuentes</c>), el ejecutor «sistema» y los
@@ -87,11 +87,15 @@ public static class ComposicionDeReservas
         servicios.Escritura<LiberarReservasEntrada, ReservaDelPedido, LiberarReservas>(opcionesDeReintento);
         servicios.Escritura<CerrarReservasEntrada, CierreDeReserva, CerrarReservas>(opcionesDeReintento);
         servicios.Escritura<ProcesarBajaDeTitularEntrada, BajaDeTitularProcesada, ProcesarBajaDeTitular>(opcionesDeReintento);
+        servicios.Escritura<PurgarHuellasDeOrigenEntrada, ResultadoDeMantenimiento, PurgarHuellasDeOrigen>(opcionesDeReintento);
+        servicios.Escritura<PurgarRegistrosCaducadosEntrada, ResultadoDeMantenimiento, PurgarRegistrosCaducados>(opcionesDeReintento);
+        servicios.Escritura<DepurarReservasAntiguasEntrada, ResultadoDeMantenimiento, DepurarReservasAntiguas>(opcionesDeReintento);
 
         // Las consultas son de solo lectura: una instantánea coherente (REPEATABLE READ), nunca una transacción de escritura.
         servicios.Lectura<ConsultarSeleccionEntrada, SeleccionConsultada, ConsultarSeleccion>();
         servicios.Lectura<ConsultarReservaEntrada, ReservaDelPedido, ConsultarReserva>();
         servicios.Lectura<ConsultarPendientesEntrada, PendientesDeTitular, ConsultarPendientes>();
+        servicios.Lectura<BuscarPedidosConVencidasEntrada, PedidosConVencidas, BuscarPedidosConVencidas>();
 
         return servicios;
     }

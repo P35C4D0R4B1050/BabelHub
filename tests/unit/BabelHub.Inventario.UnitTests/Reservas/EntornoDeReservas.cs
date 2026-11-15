@@ -389,6 +389,7 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
 
             Guardadas[i] = ReservaDePedido.Rehidratar(
                 r.Id, r.PedidoId, identificadorAnonimo, r.TipoDeEntrega, r.SucursalDeRecojoId, r.RegionDeEntrega, r.IniciadaEn, r.FechaDeExpiracion, r.Extendida, r.Reemplazos, r.Lineas);
+            Anonimizadas.Add(r.Id);
             cambiadas++;
         }
 
@@ -406,6 +407,52 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
         }
 
         return Task.CompletedTask;
+    }
+
+    /// <summary>Cada operación de mantenimiento pedida y el límite con el que se pidió, en orden.</summary>
+    public List<(string Operacion, DateTimeOffset Limite)> Mantenimiento { get; } = [];
+
+    public int FilasDeMantenimiento { get; set; }
+
+    /// <summary>Las cabeceras ya marcadas como anónimas (por la baja o por la depuración).</summary>
+    public HashSet<Guid> Anonimizadas { get; } = [];
+
+    public Task<int> PurgarHuellasDeOrigen(DateTimeOffset limite, CancellationToken cancelacion = default) => Mantener("huellas", limite);
+
+    public Task<int> PurgarOperacionesIdempotentes(DateTimeOffset limite, CancellationToken cancelacion = default) => Mantener("operaciones", limite);
+
+    public Task<int> PurgarBajasEntregadas(DateTimeOffset limite, CancellationToken cancelacion = default) => Mantener("bajas", limite);
+
+    private Task<int> Mantener(string operacion, DateTimeOffset limite)
+    {
+        bitacora.Anotar("reservas.Mantenimiento." + operacion);
+        Mantenimiento.Add((operacion, limite));
+        return Task.FromResult(FilasDeMantenimiento);
+    }
+
+    public Task<int> AnonimizarClientesAntiguos(DateTimeOffset limite, int maximo, Func<Guid, Guid> anonimo, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.Mantenimiento.depuracion");
+        Mantenimiento.Add(("depuracion", limite));
+        var cambiadas = 0;
+        for (var i = 0; i < Guardadas.Count && cambiadas < maximo; i++)
+        {
+            var r = Guardadas[i];
+            var delPedido = Guardadas.Where(x => x.PedidoId == r.PedidoId).SelectMany(x => x.Lineas).ToList();
+            var viva = delPedido.Any(l => l.Estado is EstadoDeLinea.Pendiente or EstadoDeLinea.Confirmada
+                                          || (l is { Estado: EstadoDeLinea.Cerrada, CerradaPor: CausaDeCierre.Traslado, RecreadaEnDestino: false, AnuladaEn: null }));
+            if (Anonimizadas.Contains(r.Id) || viva || delPedido.Max(l => l.EstadoCambiadoEn) >= limite)
+            {
+                continue;
+            }
+
+            Guardadas[i] = ReservaDePedido.Rehidratar(
+                r.Id, r.PedidoId, anonimo(r.ClienteId), r.TipoDeEntrega, r.SucursalDeRecojoId, r.RegionDeEntrega, r.IniciadaEn, r.FechaDeExpiracion, r.Extendida, r.Reemplazos, r.Lineas);
+            Anonimizadas.Add(r.Id);
+            cambiadas++;
+        }
+
+        return Task.FromResult(cambiadas);
     }
 
     /// <summary>Los pedidos cuya expiración se pidió al repositorio, en orden.</summary>

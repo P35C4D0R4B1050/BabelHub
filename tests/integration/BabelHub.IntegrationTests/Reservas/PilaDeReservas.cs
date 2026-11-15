@@ -164,6 +164,7 @@ public sealed class PilaDeReservas : IDisposable
         AlertasPublicadas = new AlertasDeIntegracionEspia();
         Origen = new OrigenPorFlujo();
         Reloj = new RelojDeIntegracion();
+        Registro = new RegistroDeTrabajosEspia();
 
         var servicios = new ServiceCollection();
         servicios.AddSingleton(bd.Acceso);
@@ -186,6 +187,8 @@ public sealed class PilaDeReservas : IDisposable
             Reloj));
         servicios.AddSingleton<ISustitutorDeSujetoDeLimites>(sp => new MotorDeLimitesPostgres(sp.GetRequiredService<UnidadDeTrabajoPostgres>(), new UnidadDeTrabajoPostgres(bd.Acceso, actor: actor)));
         servicios.AddScoped<IAuditoriaDeBajasRecibidas>(sp => new BabelHub.Inventario.Application.Auditoria.Interno.AuditoriaDeBajasRecibidas(sp.GetRequiredService<IAuditoria>(), sp.GetRequiredService<IActorActual>()));
+        servicios.AddSingleton<IRegistroDeTrabajosDeFondo>(Registro);
+        servicios.AddSingleton(new BloqueoDeInstanciaUnica(bd.Acceso));
         ajustes?.Invoke(servicios);
 
         var ajustesDeConfiguracion = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { [BabelHub.Inventario.Infrastructure.Reservas.HmacGeneradorDeIdentificadorAnonimo.Ruta] = ClaveDeBajasDePrueba }).AddInMemoryCollection(configuracion ?? new Dictionary<string, string?>()).Build();
@@ -223,6 +226,8 @@ public sealed class PilaDeReservas : IDisposable
     public OrigenPorFlujo Origen { get; }
 
     public RelojDeIntegracion Reloj { get; }
+
+    public RegistroDeTrabajosEspia Registro { get; }
 
     public static ActorActual Cliente(Guid? id = null) => ActorActual.DeUsuario(id ?? Guid.NewGuid(), RolesDeUsuario.Cliente);
 
@@ -270,4 +275,22 @@ public sealed class PilaDeReservas : IDisposable
     public static LineaSolicitada Linea(Guid edicionId, int cantidad = 1) => new(Guid.NewGuid(), edicionId, cantidad);
 
     public void Dispose() => Proveedor.Dispose();
+}
+
+/// <summary>Las corridas de trabajos de fondo que se registraron (nombre, resultado e instante). Seguro entre hilos.</summary>
+public sealed class RegistroDeTrabajosEspia : IRegistroDeTrabajosDeFondo
+{
+    private readonly object _candado = new();
+
+    public List<(string Trabajo, ResultadoDeTrabajo Resultado, DateTimeOffset Instante)> Corridas { get; } = [];
+
+    public Task Registrar(string trabajo, ResultadoDeTrabajo resultado, DateTimeOffset instante, CancellationToken cancelacion = default)
+    {
+        lock (_candado)
+        {
+            Corridas.Add((trabajo, resultado, instante));
+        }
+
+        return Task.CompletedTask;
+    }
 }
