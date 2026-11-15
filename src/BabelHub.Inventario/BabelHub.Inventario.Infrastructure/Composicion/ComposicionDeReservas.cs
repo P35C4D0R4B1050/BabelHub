@@ -68,6 +68,8 @@ public static class ComposicionDeReservas
         servicios.AddSingleton<IValidador<ExtenderReservasEntrada>, ValidadorDeExtender>();
         servicios.AddSingleton<IValidador<LiberarReservasEntrada>, ValidadorDeLiberar>();
         servicios.AddSingleton<IValidador<CerrarReservasEntrada>, ValidadorDeCerrar>();
+        servicios.AddSingleton<IValidador<ConsultarSeleccionEntrada>, ValidadorDeConsultarSeleccion>();
+        servicios.AddSingleton<IValidador<ConsultarReservaEntrada>, ValidadorDeConsultarReserva>();
 
         servicios.Escritura<ReservarEntrada, ReservaDelPedido, ReservarUnidades>(opcionesDeReintento);
         servicios.Escritura<ExpirarReservasEntrada, ExpiracionDelPedido, ExpirarReservasVencidas>(opcionesDeReintento);
@@ -75,6 +77,10 @@ public static class ComposicionDeReservas
         servicios.Escritura<ExtenderReservasEntrada, ExtensionDeReserva, ExtenderReservas>(opcionesDeReintento);
         servicios.Escritura<LiberarReservasEntrada, ReservaDelPedido, LiberarReservas>(opcionesDeReintento);
         servicios.Escritura<CerrarReservasEntrada, CierreDeReserva, CerrarReservas>(opcionesDeReintento);
+
+        // Las consultas son de solo lectura: una instantánea coherente (REPEATABLE READ), nunca una transacción de escritura.
+        servicios.Lectura<ConsultarSeleccionEntrada, SeleccionConsultada, ConsultarSeleccion>();
+        servicios.Lectura<ConsultarReservaEntrada, ReservaDelPedido, ConsultarReserva>();
 
         return servicios;
     }
@@ -114,5 +120,12 @@ public static class ComposicionDeReservas
                 ? new ReintentoPorInterbloqueo<TEntrada, TSalida>(caso, sp.GetRequiredService<IConexionDeLaUnidadDeTrabajo>(), reintento, esIdempotente: true)
                 : caso;
         });
+    }
+
+    private static void Lectura<TEntrada, TSalida, TCaso>(this IServiceCollection servicios)
+        where TCaso : class, ICasoDeUso<TEntrada, TSalida>
+    {
+        servicios.AddScoped<TCaso>();
+        servicios.AddScoped<ICasoDeUso<TEntrada, TSalida>>(sp => new LecturaCoherentePorCasoDeUso<TEntrada, TSalida>(sp.GetRequiredService<TCaso>(), sp.GetRequiredService<ILecturaCoherente>()));
     }
 }

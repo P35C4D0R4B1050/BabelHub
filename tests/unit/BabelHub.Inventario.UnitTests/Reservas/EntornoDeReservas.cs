@@ -473,6 +473,10 @@ internal sealed class EntornoDeReservas
     public LiberarReservas Liberar() =>
         new(Autorizador, new ValidadorDeLiberar(), Bloqueos, Reservas, Stock, Devolucion, ConReceptores ? [new ReceptorDeCancelacionDoble(Cancelaciones, Base.Bitacora)] : [], Volumen, new ConstructorDeLaReserva(Directorio), Base.Reloj);
 
+    public ConsultarSeleccion ConsultarSeleccion() => new(Autorizador, new ValidadorDeConsultarSeleccion(), Directorio, new ConsultaDeExistencias(Base.Lectura, Base.Fuentes, Base.Existencias, ReservasDeStock), new SelectorDeFuentes(Directorio, new SeleccionPorCercania()), Base.Reloj);
+
+    public ConsultarReserva ConsultarReserva() => new(Autorizador, new ValidadorDeConsultarReserva(), Reservas, new ConstructorDeLaReserva(Directorio), Base.Reloj);
+
     public CerrarReservas Cerrar() => new(Autorizador, new ValidadorDeCerrar(), Bloqueos, Reservas, Stock, Auditoria, Base.Reloj);
 
     public ExtenderReservas Extender() => new(Autorizador, new ValidadorDeExtender(), Bloqueos, Reservas, new ConstructorDeLaReserva(Directorio), Base.Reloj);

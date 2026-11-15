@@ -47,6 +47,14 @@ internal sealed class AutorizadorDeReservas(IActorActual actores, IDenegacionDeA
     public Task<ErrorDeAplicacion?> ExigirIntegracionDeReservas(CancellationToken cancelacion) =>
         Evaluar(actor => actor.Tipo == TipoDeActor.Integracion && actor.Integracion == AlcanceDeServicio.ExpiracionDeReservas.NombreEstable() ? null : MotivosDeDenegacionDeReservas.FueraDeRol, cancelacion);
 
+    /// <summary>Consultar una reserva: el cliente (la dueña, lo comprueba el caso de uso) o la administración central; el personal de sucursal y de logística reciben «prohibido» antes de leer nada (SEL-20).</summary>
+    public Task<ErrorDeAplicacion?> ExigirClienteOAdministracion(CancellationToken cancelacion) =>
+        Evaluar(
+            actor => actor.EsAdministracionCentral() || (actor.Tipo == TipoDeActor.Usuario && actor.Rol == RolesDelActor.Cliente && actor.UsuarioId is { } id && id != Guid.Empty)
+                ? null
+                : MotivosDeDenegacionDeReservas.FueraDeRol,
+            cancelacion);
+
     /// <summary>
     /// El rol que cerrar exige, <b>antes de leer nada</b> (SEL-39): la entrega la hace un encargado de sucursal o la administración central; el paso a en reparto, el personal de logística o la administración central. Quien no
     /// tiene ese rol recibe «prohibido» con su evento sin que se mire la reserva, la clave ni <c>ya-cerrada</c>.

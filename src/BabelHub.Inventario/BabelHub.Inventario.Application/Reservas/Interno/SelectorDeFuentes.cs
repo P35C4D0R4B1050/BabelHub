@@ -143,6 +143,21 @@ internal static class ConversionesDeReservas
         _ => throw new ArgumentOutOfRangeException(nameof(estado)),
     };
 
+    /// <summary>El estado de la reserva entera a partir de los de sus líneas ya en términos del contrato (con las vencidas mostradas como expiradas).</summary>
+    public static EstadoDeReserva EstadoDeLaReserva(IEnumerable<EstadoDeReserva> estados)
+    {
+        var presentes = estados.ToHashSet();
+        foreach (var estado in new[] { EstadoDeReserva.Pendiente, EstadoDeReserva.Confirmada, EstadoDeReserva.Cerrada, EstadoDeReserva.Expirada, EstadoDeReserva.Liberada })
+        {
+            if (presentes.Contains(estado))
+            {
+                return estado;
+            }
+        }
+
+        throw new InvalidOperationException("Una reserva necesita al menos una línea.");
+    }
+
     /// <summary>
     /// El estado de la reserva entera: el de sus líneas cuando coinciden y, si difieren (una liberación parcial, un cierre por líneas), el de la línea más «viva»: pendiente, luego confirmada, cerrada, expirada y
     /// por último liberada.
@@ -168,7 +183,7 @@ internal static class ConversionesDeReservas
 /// </summary>
 internal sealed class ConstructorDeLaReserva(IDirectorioDeFuentes directorio)
 {
-    public async Task<ReservaDelPedido> Construir(ReservaDePedido reserva, bool esRepeticion, CancellationToken cancelacion, IReadOnlyList<TrasladoVinculadoAlPedido>? traslados = null)
+    public async Task<ReservaDelPedido> Construir(ReservaDePedido reserva, bool esRepeticion, CancellationToken cancelacion, IReadOnlyList<TrasladoVinculadoAlPedido>? traslados = null, DateTimeOffset? ahora = null)
     {
         ArgumentNullException.ThrowIfNull(reserva);
 
@@ -183,12 +198,14 @@ internal sealed class ConstructorDeLaReserva(IDirectorioDeFuentes directorio)
             int? plazo = requiereTraslado
                 ? await directorio.PlazoDeRuta(linea.FuenteId, reserva.SucursalDeRecojoId!.Value, cancelacion).ConfigureAwait(false)
                 : null;
-            lineas.Add(new LineaReservada(linea.LineaId, linea.EdicionId, linea.Cantidad, ConversionesDeReservas.AContrato(linea.Estado), fuente.Codigo, requiereTraslado, plazo));
+            // Una pendiente vencida que nadie barrió todavía se muestra como expirada (SEL-27): no es una reserva activa aunque la fila siga pendiente.
+            var estadoDeLaLinea = ahora is { } instante && linea.Estado == EstadoDeLinea.Pendiente && reserva.EstaVencida(instante) ? EstadoDeReserva.Expirada : ConversionesDeReservas.AContrato(linea.Estado);
+            lineas.Add(new LineaReservada(linea.LineaId, linea.EdicionId, linea.Cantidad, estadoDeLaLinea, fuente.Codigo, requiereTraslado, plazo));
         }
 
         return new ReservaDelPedido(
             reserva.PedidoId,
-            ConversionesDeReservas.EstadoDeLaReserva(reserva.Lineas),
+            ConversionesDeReservas.EstadoDeLaReserva(lineas.Select(l => l.Estado)),
             reserva.IniciadaEn,
             reserva.FechaDeExpiracion,
             lineas,
