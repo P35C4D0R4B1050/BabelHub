@@ -61,6 +61,8 @@ public static partial class RedactorDeDatosProhibidos
             var resultado = ParDeClaveYValor().Replace(texto, evaluador => $"{evaluador.Groups["clave"].Value}{evaluador.Groups["sep"].Value}{ValorSecreto.Redactado}");
             resultado = Bearer().Replace(resultado, "Bearer " + ValorSecreto.Redactado);
             resultado = Jwt().Replace(resultado, ValorSecreto.Redactado);
+            resultado = CuerpoDeBorrador().Replace(resultado, evaluador => $"{evaluador.Groups["clave"].Value}{evaluador.Groups["sep"].Value}{ValorSecreto.Redactado}");
+            resultado = HashDeSesion().Replace(resultado, ValorSecreto.Redactado);
             return PosibleTarjeta().Replace(resultado, evaluador => EsTarjeta(evaluador.Value) ? ValorSecreto.Redactado : evaluador.Value);
         }
         catch (RegexMatchTimeoutException)
@@ -125,6 +127,17 @@ public static partial class RedactorDeDatosProhibidos
 
     [GeneratedRegex(@"\bBearer\s+[A-Za-z0-9._~+/=-]{8,}", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, 250)]
     private static partial Regex Bearer();
+
+    // El hash del identificador de sesión (SHA-256 en hexadecimal, 64 caracteres): una cadena así se redacta aunque nadie la nombre; una correlación (32) o un SHA-1 (40) no.
+    [GeneratedRegex(@"(?<![0-9A-Fa-f])[0-9A-Fa-f]{64}(?![0-9A-Fa-f])", RegexOptions.CultureInvariant, 250)]
+    private static partial Regex HashDeSesion();
+
+    // El cuerpo de un borrador de pantalla (lo escrito por la persona, sin lista de claves): «borrador {…}», «"borrador":{…}» o el JSON escapado dentro de un texto. Las llaves dentro de un texto entre comillas no cierran el objeto.
+    [GeneratedRegex(
+        """(?<clave>\bborrador(?:es)?\b)(?<sep>"?\s*[:=]?\s*)(?:\{(?:[^{}"]|"(?:[^"\\]|\\.)*")*\}|"(?:[^"\\]|\\.)*")""",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+        250)]
+    private static partial Regex CuerpoDeBorrador();
 
     [GeneratedRegex(@"\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]*", RegexOptions.CultureInvariant, 250)]
     private static partial Regex Jwt();
