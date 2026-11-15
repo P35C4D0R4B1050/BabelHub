@@ -13,7 +13,7 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **AUD-2** | Contratos de registro, consulta y alerta, puertos de Identidad y Reservas y los catálogos de acciones | T07, T08, T09, T11–T16 | C | AUD-1 | ☑ |
 | **AUD-3** | Implementación de los puertos de `Plataforma`, consultas unificadas, agrupar y enviar alertas, depuración y bajas del Inventario | T10, T17–T20 | C | AUD-2 | ☑ |
 | **SEG-C** | Cierre de `transversal-seguridad`: T27b y T29 (acumulador persistente) y `spec-verify` | T27b, T29 | C | AUD-3 (T10, T18) | ☐ |
-| **AUD-4** | Migraciones, roles, función de depuración, repositorios de solo inserción, cliente del Inventario, trabajos de fondo | T21–T27 | C | AUD-3 | ☐ |
+| **AUD-4** | Migraciones, roles, función de depuración, repositorios de solo inserción, cliente del Inventario, trabajos de fondo | T21–T27 | C | AUD-3 | ▶ (T22–T27 hechas y fundidas; **T21** —DTOs de `Shared`— la hace el carril A, autorizado, junto con AUD-5) |
 | **AUD-5** | Endpoints, contrato web, integración de punta a punta y documentación | T28–T31 | E | AUD-4 | ☐ |
 | **IDE-1** | `identidad-seguridad`: Dominio (contraseñas, usuario y roles, segundo factor, desafío, códigos, textos, solicitudes, cancelación, marcas, clave de firma) | T01–T10 | C | — (puede ir en paralelo a AUD-1) | ☐ |
 | **IDE-2** | Contratos de correo y de cliente del Inventario en `Plataforma` y contrato público de Identidad | T11, T12, T13 | C | IDE-1, AUD-2 | ☐ |
@@ -58,8 +58,8 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **ECO-1** | Planificar `web-base` (39 tareas) y `ecommerce-catalogo` (28 tareas): specs Approved y planes Planned | C | ECO-0 | ☑ |
 | **WEB-1d** | `web-base` T21–T27 (T21 antes de T01): errores, diseño (Tailwind y daisyUI), layout, componentes de estado, textos legales, «Sorpréndeme» y descarga | B/E/C | ECO-1 | ☑ |
 | **WEB-1a** | `web-base` T01–T09: módulo `Web`, Dominio (sesión, borrador, áreas) y Aplicación | C | WEB-1d (T21); dobles de Identidad, Auditoría y Catálogo | ☑ |
-| **WEB-1b** | `web-base` T10–T15: Infraestructura de sesión, cifrado por host, token del usuario y cookie | C | WEB-1a; `ITokenDelUsuarioDeLaSesion` en `Application.Plataforma` (carril A, ya en main). **Parcial: T10–T13 hechas (▶); T14 y T15 en curso** | ▶ |
-| **WEB-1c** | `web-base` T16–T20: antiforgery, cabeceras y CSP, filtros de área y paso pendiente, pruebas de sesión y rutas | C | WEB-1b | ☐ |
+| **WEB-1b** | `web-base` T10–T15: Infraestructura de sesión, cifrado por host, token del usuario y cookie | C | WEB-1a; `ITokenDelUsuarioDeLaSesion` en `Application.Plataforma` (carril A, ya en main). T10–T15 hechas | ☑ |
+| **WEB-1c** | `web-base` T16–T20: antiforgery, cabeceras y CSP, filtros de área y paso pendiente, pruebas de sesión y rutas | C | WEB-1b | ☑ |
 | **WEB-1e** | `web-base` T36–T39 | C | WEB-1c | ☐ |
 | **WEB-2** | `web-base` T28–T31: pantallas de ingreso, registro, recuperación, cuenta, administración, auditoría y alertas | C | IDE-3 a IDE-5, AUD-3 | ☐ |
 | **WEB-4** | `web-base` T32–T35: E2E multinavegador y móvil, axe, rendimiento y usabilidad | E/C | pantallas de catálogo y compra | ☐ |
@@ -103,6 +103,8 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 
 Segunda ola fundida (merges de `claude/mystifying-panini-0d9826`, `claude/youthful-blackburn-db3929` y `claude/bold-kalam-0567bd`): unitarias 1406 y 1221, arquitectura 155, SpecCheck 23, CoverageCheck 12, integración 2284 de 2285 (una de tiempo real con Redis que pasa sola), gitleaks limpio. Con tres carriles a la vez las suites pesadas compiten y fallan pruebas de contenedores o de tiempo real: la integración completa se corre solo en la fusión.
 
+
+Cuarta tanda fundida (AUD-4 T22–T27 del carril A y WEB-1b/WEB-1c del carril C): unitarias 1552 y 1487, arquitectura 165 con un fallo abierto (el cliente de auditoría del E-commerce consume el token del usuario directamente; lo corrige el carril A), integración 3100 de 3102 (1 omitida y 1 fallo: el escaneo de secretos detectó valores de muestra en el worktree del carril A, no en `main`), SpecCheck 23. Dos choques de arquitectura entre carriles solo aparecieron al fundir (el fijador de actor en `ComposicionDeFuentes`, ya corregido en `a749d6f`): conviene fundir con más frecuencia.
 
 Tercera ola fundida (merges `22df391` de A, `claude/festive-feynman-2c4bef` de B y `claude/elastic-jepsen-1b3bd3` de C): unitarias 1541 y 1479, arquitectura 155, SpecCheck 23, CoverageCheck 12, **integración 2601 de 2601** (22 min, sola), gitleaks limpio. Ritmo: cada ola de carriles rinde unas 35 a 50 tareas por 1,5 a 2 horas de reloj.
 
