@@ -480,3 +480,127 @@ public sealed class ReservarUnidadesDefensasTests
         }
     }
 }
+
+/// <summary>T11: la idempotencia de reservar (SEL-09, SEL-31): la clave es única por cliente y lleva la huella de su carga canónica.</summary>
+public sealed class ReservarUnidadesIdempotenciaTests
+{
+    private static async Task<(EntornoDeReservas Entorno, Guid Libro, ReservarEntrada Entrada)> UnaReservaHecha(int cantidad = 2)
+    {
+        var entorno = new EntornoDeReservas();
+        var libro = entorno.Impresa();
+        entorno.Base.Existencias.Poner(entorno.Base.Lima.Id, libro, 10, 0);
+        var entrada = EntornoDeReservas.ARecojo("lima", [EntornoDeReservas.Linea(libro, cantidad)]);
+        Assert.True((await entorno.Reservar().Ejecutar(entrada)).EsExito);
+        return (entorno, libro, entrada);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-09")]
+    public async Task LaMismaClaveConLaMismaCarga_DevuelveLaReservaOriginalSinBajarElVendibleOtraVez()
+    {
+        var (entorno, libro, entrada) = await UnaReservaHecha();
+        var original = entorno.Reservas.Guardadas.Single();
+
+        var repetida = await entorno.Reservar().Ejecutar(entrada);
+
+        Assert.True(repetida.EsExito);
+        Assert.True(repetida.Valor.EsRepeticion);
+        Assert.Equal(original.FechaDeExpiracion, repetida.Valor.ExpiraEn);
+        Assert.Equal(original.Lineas.Single().LineaId, repetida.Valor.Lineas.Single().LineaId);
+        Assert.Equal((10, 2), entorno.FilaDe(entorno.Base.Lima, libro));
+        Assert.Single(entorno.Reservas.Guardadas);
+        Assert.Single(entorno.Base.Existencias.Movimientos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-09")]
+    public async Task LaRepeticionNoDependeDelOrdenDeLasLineas()
+    {
+        var entorno = new EntornoDeReservas();
+        var a = entorno.Impresa();
+        var b = entorno.Impresa();
+        entorno.Base.Existencias.Poner(entorno.Base.Lima.Id, a, 5, 0);
+        entorno.Base.Existencias.Poner(entorno.Base.Lima.Id, b, 5, 0);
+        var lineas = new[] { EntornoDeReservas.Linea(a, 1), EntornoDeReservas.Linea(b, 2) };
+        var entrada = EntornoDeReservas.ARecojo("lima", lineas);
+        Assert.True((await entorno.Reservar().Ejecutar(entrada)).EsExito);
+
+        var repetida = await entorno.Reservar().Ejecutar(entrada with { Lineas = [lineas[1], lineas[0]] });
+
+        Assert.True(repetida.EsExito);
+        Assert.True(repetida.Valor.EsRepeticion);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-31")]
+    public async Task LaMismaClaveConOtrasCantidades_EsConflictoYNoCambiaNada()
+    {
+        var (entorno, libro, entrada) = await UnaReservaHecha();
+
+        var otra = await entorno.Reservar().Ejecutar(entrada with { Lineas = [entrada.Lineas[0] with { Cantidad = 5 }] });
+
+        Assert.Equal((CategoriaDeError.Conflicto, "idempotencia-en-conflicto"), (otra.Error!.Categoria, otra.Error.Clave));
+        Assert.Equal((10, 2), entorno.FilaDe(entorno.Base.Lima, libro));
+        Assert.Single(entorno.Reservas.Guardadas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-31")]
+    public async Task LaMismaClaveConOtroPedido_TambienEsConflicto()
+    {
+        var (entorno, _, entrada) = await UnaReservaHecha();
+
+        var otra = await entorno.Reservar().Ejecutar(entrada with { PedidoId = Guid.NewGuid() });
+
+        Assert.Equal("idempotencia-en-conflicto", otra.Error!.Clave);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-31")]
+    public async Task OtroClientePuedeUsarLaMismaClaveSinConflicto()
+    {
+        var (primero, libro, entrada) = await UnaReservaHecha(1);
+        var segundo = new EntornoDeReservas();
+        var libro2 = segundo.Impresa();
+        segundo.Base.Existencias.Poner(segundo.Base.Lima.Id, libro2, 5, 0);
+
+        // Otro cliente (otro actor) con la misma clave en un entorno que ya conoce la del primero.
+        segundo.Reservas.Guardadas.AddRange(primero.Reservas.Guardadas);
+        segundo.Reservas.Solicitudes.AddRange(primero.Reservas.Solicitudes);
+        var resultado = await segundo.Reservar().Ejecutar(EntornoDeReservas.ARecojo("lima", [EntornoDeReservas.Linea(libro2, 1)], clave: entrada.ClaveDeIdempotencia));
+
+        Assert.True(resultado.EsExito);
+        Assert.False(resultado.Valor.EsRepeticion);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-09")]
+    public async Task LaRepeticionTomaPrimeroElBloqueoDelCliente_YNoTocaElStock()
+    {
+        var (entorno, _, entrada) = await UnaReservaHecha();
+        entorno.Base.Bitacora.Llamadas.Clear();
+
+        await entorno.Reservar().Ejecutar(entrada);
+
+        var orden = entorno.Base.Bitacora.Llamadas;
+        Assert.Equal("bloqueo.Cliente", orden[0]);
+        Assert.DoesNotContain("bloqueo.Pedido", orden);
+        Assert.DoesNotContain("existencias.BloquearFilas", orden);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-36")]
+    public async Task UnTitularDadoDeBajaNoReserva()
+    {
+        var entorno = new EntornoDeReservas();
+        var libro = entorno.Impresa();
+        entorno.Base.Existencias.Poner(entorno.Base.Lima.Id, libro, 5, 0);
+        entorno.Reservas.Bajas.Add(entorno.ClienteId);
+
+        var resultado = await entorno.Reservar().Ejecutar(EntornoDeReservas.ARecojo("lima", [EntornoDeReservas.Linea(libro)]));
+
+        Assert.Equal((CategoriaDeError.Prohibido, "titular-dado-de-baja"), (resultado.Error!.Categoria, resultado.Error.Clave));
+        Assert.Equal(["fuera-de-rol"], entorno.Base.MotivosDeDenegacion);
+        Assert.Empty(entorno.Reservas.Guardadas);
+    }
+}

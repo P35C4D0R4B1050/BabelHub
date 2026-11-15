@@ -48,6 +48,13 @@ internal sealed class AutorizadorDeReservas(IActorActual actores, IDenegacionDeA
         return new ErrorDeAplicacion(CategoriaDeError.NoEncontrado, "reserva-no-encontrada");
     }
 
+    /// <summary>Una cuenta cancelada no reserva (SEL-35): «prohibido» con el evento, sin revelar nada más.</summary>
+    public async Task<ErrorDeAplicacion> TitularDadoDeBaja(CancellationToken cancelacion)
+    {
+        await denegaciones.Registrar(new DenegacionDeAcceso(MotivosDeDenegacionDeReservas.FueraDeRol, ruta: null) { CodigoDeError = "INV-PROHIBIDO" }, cancelacion).ConfigureAwait(false);
+        return new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDeReservas.TitularDadoDeBaja);
+    }
+
     /// <summary>El resultado «denegado por alcance» de <c>Aplicar</c> (la política de filas) se traduce a «prohibido» con su evento.</summary>
     public async Task<ErrorDeAplicacion> DenegadoPorAlcance(CancellationToken cancelacion)
     {

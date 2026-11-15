@@ -10,6 +10,9 @@ public sealed record DatosDeLaSolicitud(string ClaveDeIdempotencia, string Huell
     public override string ToString() => nameof(DatosDeLaSolicitud);
 }
 
+/// <summary>Una reserva guardada con la huella de la carga con la que se creó (D03).</summary>
+public sealed record ReservaPorClave(ReservaDePedido Reserva, string HuellaDeLaCarga);
+
 /// <summary>Una línea pendiente cuya cabecera ya venció: lo necesario para devolver sus unidades y auditar su expiración (sin datos del cliente). Es lo que devuelve la lectura de vencidas y lo que devuelve su paso a expirada.</summary>
 public sealed record LineaVencida(Guid PedidoId, Guid LineaDeReservaId, Guid LineaId, Guid EdicionId, Guid FuenteId, int Cantidad);
 
@@ -21,6 +24,12 @@ public interface IRepositorioDeReservas
 {
     /// <summary>La cabecera más reciente del pedido con sus líneas, o <see langword="null"/> si el pedido nunca reservó.</summary>
     Task<ReservaDePedido?> UltimaDelPedido(Guid pedidoId, CancellationToken cancelacion = default);
+
+    /// <summary>La reserva que ese cliente creó con esa clave de idempotencia y la huella de su carga, o <see langword="null"/> si la clave no se usó (SEL-09, SEL-31). La clave es única por cliente.</summary>
+    Task<ReservaPorClave?> PorClave(Guid clienteId, string clave, CancellationToken cancelacion = default);
+
+    /// <summary><see langword="true"/> si el titular figura en las bajas recibidas: una cuenta cancelada no reserva (SEL-35).</summary>
+    Task<bool> ClienteDadoDeBaja(Guid clienteId, CancellationToken cancelacion = default);
 
     /// <summary>Inserta la cabecera y sus líneas. Una violación de unicidad por una cabecera concurrente nunca llega como error 500: la Aplicación la toma bajo el bloqueo del pedido.</summary>
     Task Insertar(ReservaDePedido reserva, DatosDeLaSolicitud solicitud, CancellationToken cancelacion = default);
@@ -61,6 +70,12 @@ internal static class ClavesDeReservas
 
     /// <summary>El pedido ya tiene una reserva: hasta que el reemplazo y la idempotencia (T11 a T13) la traten, se rechaza.</summary>
     public const string ReservaExistente = "reserva-existente";
+
+    /// <summary>La clave de idempotencia ya se usó con otra carga (SEL-31).</summary>
+    public const string IdempotenciaEnConflicto = "idempotencia-en-conflicto";
+
+    /// <summary>El titular fue dado de baja: una cuenta cancelada no reserva (SEL-35).</summary>
+    public const string TitularDadoDeBaja = "titular-dado-de-baja";
 
     public const string ReservaEstadoInvalido = "reserva-estado-invalido";
 }

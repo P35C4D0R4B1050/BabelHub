@@ -23,43 +23,76 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
     /// <summary>La condición de «línea pendiente de una cabecera vencida»: la fecha de la cabecera ya llegó a <c>@ahora</c> (en el instante exacto, también).</summary>
     private const string PendienteVencida = "l.estado = 'pendiente' AND r.fecha_expiracion IS NOT NULL AND r.fecha_expiracion <= @ahora";
 
-    public Task<ReservaDePedido?> UltimaDelPedido(Guid pedidoId, CancellationToken cancelacion = default) =>
+    public async Task<ReservaDePedido?> UltimaDelPedido(Guid pedidoId, CancellationToken cancelacion = default) =>
+        (await Una("pedido_id = @p ORDER BY iniciada_en DESC, id DESC", "p", pedidoId, cancelacion).ConfigureAwait(false))?.Reserva;
+
+    public Task<ReservaPorClave?> PorClave(Guid clienteId, string clave, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(clave);
+        return acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                await using var cabecera = new NpgsqlCommand($"SELECT {ColumnasDeCabecera}, huella_de_carga FROM reservas.reservas WHERE cliente_id = @c AND clave_idempotencia = @k", conexion, transaccion);
+                cabecera.Parameters.AddWithValue("c", clienteId);
+                cabecera.Parameters.AddWithValue("k", clave);
+                return await LeerUna(cabecera, conexion, transaccion, token).ConfigureAwait(false);
+            },
+            cancelacion);
+    }
+
+    public Task<bool> ClienteDadoDeBaja(Guid clienteId, CancellationToken cancelacion = default) =>
         acceso.Ejecutar(
             async (conexion, transaccion, token) =>
             {
-                await using var cabecera = new NpgsqlCommand($"SELECT {ColumnasDeCabecera} FROM reservas.reservas WHERE pedido_id = @p ORDER BY iniciada_en DESC, id DESC LIMIT 1", conexion, transaccion);
-                cabecera.Parameters.AddWithValue("p", pedidoId);
-
-                Guid id, clienteId;
-                string tipo;
-                Guid? sucursal;
-                string? region;
-                DateTimeOffset iniciadaEn;
-                DateTimeOffset? expiracion;
-                bool extendida;
-                int reemplazos;
-                await using (var lector = await cabecera.ExecuteReaderAsync(token).ConfigureAwait(false))
-                {
-                    if (!await lector.ReadAsync(token).ConfigureAwait(false))
-                    {
-                        return null;
-                    }
-
-                    id = lector.GetGuid(0);
-                    clienteId = lector.GetGuid(2);
-                    tipo = lector.GetString(3);
-                    sucursal = lector.IsDBNull(4) ? null : lector.GetGuid(4);
-                    region = lector.IsDBNull(5) ? null : lector.GetString(5);
-                    iniciadaEn = lector.GetFieldValue<DateTimeOffset>(6);
-                    expiracion = lector.IsDBNull(7) ? null : lector.GetFieldValue<DateTimeOffset>(7);
-                    extendida = lector.GetBoolean(8);
-                    reemplazos = lector.GetInt32(9);
-                }
-
-                var lineas = await LeerLineas(conexion, transaccion, id, token).ConfigureAwait(false);
-                return ReservaDePedido.Rehidratar(id, pedidoId, clienteId, ATipo(tipo), sucursal, region, iniciadaEn, expiracion, extendida, reemplazos, lineas);
+                await using var comando = new NpgsqlCommand("SELECT EXISTS (SELECT 1 FROM reservas.bajas_recibidas WHERE identificador_opaco = @c)", conexion, transaccion);
+                comando.Parameters.AddWithValue("c", clienteId);
+                return (bool)(await comando.ExecuteScalarAsync(token).ConfigureAwait(false))!;
             },
             cancelacion);
+
+    private Task<ReservaPorClave?> Una(string condicion, string parametro, Guid valor, CancellationToken cancelacion) =>
+        acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                await using var cabecera = new NpgsqlCommand($"SELECT {ColumnasDeCabecera}, huella_de_carga FROM reservas.reservas WHERE {condicion} LIMIT 1", conexion, transaccion);
+                cabecera.Parameters.AddWithValue(parametro, valor);
+                return await LeerUna(cabecera, conexion, transaccion, token).ConfigureAwait(false);
+            },
+            cancelacion);
+
+    private static async Task<ReservaPorClave?> LeerUna(NpgsqlCommand cabecera, NpgsqlConnection conexion, NpgsqlTransaction transaccion, CancellationToken token)
+    {
+        Guid id, pedidoId, clienteId;
+        string tipo, huella;
+        Guid? sucursal;
+        string? region;
+        DateTimeOffset iniciadaEn;
+        DateTimeOffset? expiracion;
+        bool extendida;
+        int reemplazos;
+        await using (var lector = await cabecera.ExecuteReaderAsync(token).ConfigureAwait(false))
+        {
+            if (!await lector.ReadAsync(token).ConfigureAwait(false))
+            {
+                return null;
+            }
+
+            id = lector.GetGuid(0);
+            pedidoId = lector.GetGuid(1);
+            clienteId = lector.GetGuid(2);
+            tipo = lector.GetString(3);
+            sucursal = lector.IsDBNull(4) ? null : lector.GetGuid(4);
+            region = lector.IsDBNull(5) ? null : lector.GetString(5);
+            iniciadaEn = lector.GetFieldValue<DateTimeOffset>(6);
+            expiracion = lector.IsDBNull(7) ? null : lector.GetFieldValue<DateTimeOffset>(7);
+            extendida = lector.GetBoolean(8);
+            reemplazos = lector.GetInt32(9);
+            huella = lector.GetString(10);
+        }
+
+        var lineas = await LeerLineas(conexion, transaccion, id, token).ConfigureAwait(false);
+        return new ReservaPorClave(ReservaDePedido.Rehidratar(id, pedidoId, clienteId, ATipo(tipo), sucursal, region, iniciadaEn, expiracion, extendida, reemplazos, lineas), huella);
+    }
 
     public Task Insertar(ReservaDePedido reserva, DatosDeLaSolicitud solicitud, CancellationToken cancelacion = default)
     {

@@ -250,6 +250,64 @@ public sealed class ConcurrenciaDeReservasTests(PostgresDeReservasFixture bd) : 
         Assert.Equal(0, await InterbloqueosDespuesDe(antes));
     }
 
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-09")]
+    public async Task DiezSolicitudesSimultaneasConLaMismaClave_CreanUnaSolaReservaYLasDemasLaRepiten()
+    {
+        var f = await TresFuentes();
+        var libro = await bd.AgregarEdicion();
+        await bd.PonerStock(f.Lima, libro, 50, 0);
+        using var pila = new PilaDeReservas(bd);
+        var cliente = Cliente();
+        var entrada = ARecojo("lima", [Linea(libro, 3)]);
+
+        var resultados = await Simultaneas(Enumerable.Range(0, 10).Select<int, Func<Task<Resultado<ReservaDelPedido>>>>(
+            _ => () => pila.Reservar(cliente, entrada)));
+
+        Assert.All(resultados, r => Assert.True(r.EsExito, r.Error?.Clave));
+        Assert.Equal(1, resultados.Count(r => !r.Valor.EsRepeticion));
+        Assert.Equal(9, resultados.Count(r => r.Valor.EsRepeticion));
+        Assert.Single(resultados.Select(r => r.Valor.ExpiraEn).Distinct());
+        Assert.Equal((50, 3), await bd.StockDe(f.Lima, libro));
+        Assert.Equal(1L, await bd.Consultar<long>("SELECT count(*) FROM reservas.reservas"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-31")]
+    public async Task LaMismaClaveConOtraCargaEsConflicto_YOtroClienteLaUsaSinConflicto()
+    {
+        var f = await TresFuentes();
+        var libro = await bd.AgregarEdicion();
+        await bd.PonerStock(f.Lima, libro, 50, 0);
+        using var pila = new PilaDeReservas(bd);
+        var entrada = ARecojo("lima", [Linea(libro, 3)]);
+        Assert.True((await pila.Reservar(Cliente(), entrada)).EsExito);
+        var duena = Cliente();
+        Assert.True((await pila.Reservar(duena, entrada with { PedidoId = Guid.NewGuid() })).EsExito);
+
+        var otraCarga = await pila.Reservar(duena, entrada with { Lineas = [entrada.Lineas[0] with { Cantidad = 4 }] });
+
+        Assert.Equal("idempotencia-en-conflicto", otraCarga.Error!.Clave);
+        Assert.Equal((50, 6), await bd.StockDe(f.Lima, libro));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-36")]
+    public async Task UnTitularDadoDeBajaNoReservaEnPostgres()
+    {
+        var f = await TresFuentes();
+        var libro = await bd.AgregarEdicion();
+        await bd.PonerStock(f.Lima, libro, 5, 0);
+        using var pila = new PilaDeReservas(bd);
+        var cliente = Cliente();
+        await bd.Ejecutar($"INSERT INTO reservas.bajas_recibidas (identificador_opaco, recibida_en) VALUES ('{cliente.UsuarioId}', now())");
+
+        var resultado = await pila.Reservar(cliente, ARecojo("lima", [Linea(libro)]));
+
+        Assert.Equal("titular-dado-de-baja", resultado.Error!.Clave);
+        Assert.Equal((5, 0), await bd.StockDe(f.Lima, libro));
+    }
     [Fact]
     [Trait("Criterio", "AC-SEL-04")]
     public async Task LasSolicitudesDelMismoClienteSeSerializan_YElMismoPedidoNoSeReservaDosVeces()

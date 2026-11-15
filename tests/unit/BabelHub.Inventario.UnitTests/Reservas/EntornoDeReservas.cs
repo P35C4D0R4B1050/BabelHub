@@ -68,6 +68,18 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
         return Task.FromResult(Guardadas.Where(r => r.PedidoId == pedidoId).OrderByDescending(r => r.IniciadaEn).FirstOrDefault());
     }
 
+    /// <summary>Los titulares dados de baja (SEL-35).</summary>
+    public HashSet<Guid> Bajas { get; } = [];
+
+    public Task<ReservaPorClave?> PorClave(Guid clienteId, string clave, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.PorClave");
+        var indice = Solicitudes.FindIndex(s => s.ClaveDeIdempotencia == clave && Guardadas[Solicitudes.IndexOf(s)].ClienteId == clienteId);
+        return Task.FromResult(indice < 0 ? null : new ReservaPorClave(Guardadas[indice], Solicitudes[indice].HuellaDeLaCarga));
+    }
+
+    public Task<bool> ClienteDadoDeBaja(Guid clienteId, CancellationToken cancelacion = default) => Task.FromResult(Bajas.Contains(clienteId));
+
     public Task Insertar(ReservaDePedido reserva, DatosDeLaSolicitud solicitud, CancellationToken cancelacion = default)
     {
         bitacora.Anotar("reservas.Insertar");

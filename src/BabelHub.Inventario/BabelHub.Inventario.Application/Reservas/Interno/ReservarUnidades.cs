@@ -75,6 +75,21 @@ internal sealed class ReservarUnidades(
     {
         // Jerarquía D04: cliente → pedido → filas de stock. La reserva de otro cliente sobre el mismo pedido se detecta ya con el bloqueo del pedido tomado.
         await bloqueos.Cliente(clienteId, cancelacion).ConfigureAwait(false);
+
+        // Una cuenta cancelada no reserva (SEL-35); y la clave de idempotencia ya usada por este cliente devuelve la reserva original con la misma carga o es un conflicto con otra (SEL-09, SEL-31). Bajo el
+        // bloqueo del cliente, dos solicitudes simultáneas con la misma clave se serializan: la segunda ve la primera ya confirmada y no baja el vendible otra vez.
+        if (await reservas.ClienteDadoDeBaja(clienteId, cancelacion).ConfigureAwait(false))
+        {
+            return FallosDeReservas.Fallo<ReservaDelPedido>(await autorizador.TitularDadoDeBaja(cancelacion).ConfigureAwait(false));
+        }
+
+        if (await reservas.PorClave(clienteId, entrada.ClaveDeIdempotencia, cancelacion).ConfigureAwait(false) is { } usada)
+        {
+            return usada.HuellaDeLaCarga == CargaCanonicaDeReservar.Huella(entrada)
+                ? Resultado<ReservaDelPedido>.Exito(await constructor.Construir(usada.Reserva, esRepeticion: true, cancelacion).ConfigureAwait(false))
+                : FallosDeReservas.De<ReservaDelPedido>(CategoriaDeError.Conflicto, ClavesDeReservas.IdempotenciaEnConflicto);
+        }
+
         await bloqueos.Pedido(entrada.PedidoId, cancelacion).ConfigureAwait(false);
 
         var anterior = await reservas.UltimaDelPedido(entrada.PedidoId, cancelacion).ConfigureAwait(false);
