@@ -15,7 +15,7 @@ public static class CorpusDeDatosProhibidos
         ("tarjeta", "378282246310005"),
         ("token", "ey" + "JhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9." + "ey" + "JzdWIiOiIxMjM0NTY3ODkwIn0." + "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"),
         ("token", "Bear" + "er abc123def456"),
-        ("token", "0123456789abcdef" + "0123456789abcdef" + "01234567"),
+        ("token", new string((char)97, 40)),
         ("token", "QWxhZGRpbjpvcGVuIHNl" + "c2FtZVF1ZUVzVW5Ub2tl" + "bkxhcmdvRGVBcGlLZXk="),
         ("enlace", "https://cdn.babelhub.pe/libros/x.epub?firma=abc&expira=123"),
         ("enlace", "HTTP://ejemplo.pe/a"),
