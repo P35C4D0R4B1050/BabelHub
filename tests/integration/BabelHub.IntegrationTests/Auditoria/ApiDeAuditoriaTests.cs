@@ -264,7 +264,7 @@ public sealed class ApiDeAuditoriaTests(PostgresDeAuditoriaFixture bdEco, Audito
 
         Assert.Equal(HttpStatusCode.OK, leidas.StatusCode);
         using var cuerpo = await Json(leidas);
-        Assert.Contains(cuerpo.RootElement.EnumerateArray(), a => a.GetProperty("motivo").GetString() == "accesos-denegados" && a.GetProperty("id").GetString()!.StartsWith("inv:", StringComparison.Ordinal));
+        Assert.Contains(cuerpo.RootElement.GetProperty("alertas").EnumerateArray(), a => a.GetProperty("motivo").GetString() == "accesos-denegados" && a.GetProperty("id").GetString()!.StartsWith("inv:", StringComparison.Ordinal));
         Assert.Equal(HttpStatusCode.Unauthorized, conOtraCredencial.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, sinCredencial.StatusCode);
     }
@@ -280,7 +280,7 @@ public sealed class ApiDeAuditoriaTests(PostgresDeAuditoriaFixture bdEco, Audito
 
         var lectura = await _inv.Enviar(HttpMethod.Get, $"{RutaInv}/alertas?desde={Uri.EscapeDataString(DateTimeOffset.UtcNow.AddHours(-1).ToString("O"))}", InventarioDeAuditoriaHost.CredencialDeAlertas);
         using var alertas = await Json(lectura);
-        var alerta = alertas.RootElement.EnumerateArray().First(a => a.GetProperty("motivo").GetString() == "ingresos-fallidos");
+        var alerta = alertas.RootElement.GetProperty("alertas").EnumerateArray().First(a => a.GetProperty("motivo").GetString() == "ingresos-fallidos");
         var id = alerta.GetProperty("id").GetString()!;
         var ocurrencias = alerta.GetProperty("ocurrencias").GetInt32();
         var cuerpoDeLaMarca = () => new StringContent($"{{\"contadorVisto\":{ocurrencias}}}", Encoding.UTF8, "application/json");

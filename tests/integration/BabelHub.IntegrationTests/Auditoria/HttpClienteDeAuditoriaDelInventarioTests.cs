@@ -119,7 +119,7 @@ public sealed class HttpClienteDeAuditoriaDelInventarioTests
     [Trait("Criterio", "AC-AUD-30")]
     public async Task LaLecturaDeAlertasUsaLaCredencialDeLecturaDeAlertasSinTokenDeUsuario()
     {
-        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json("[" + Alerta($"inv:{Guid.NewGuid():D}") + "]")));
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json("{\"alertas\":[" + Alerta($"inv:{Guid.NewGuid():D}") + "]}")));
         var (cliente, token) = Crear(servidor);
 
         var respuesta = await cliente.LeerAlertasNuevas(DateTimeOffset.UtcNow.AddMinutes(-20));
@@ -139,7 +139,7 @@ public sealed class HttpClienteDeAuditoriaDelInventarioTests
     public async Task MarcarRevisadaReenviaElContadorConElTokenYLaCredencialDeMarca_YDevuelveLaAlertaYaActualizada()
     {
         var id = $"inv:{Guid.NewGuid():D}";
-        var servidor = new ServidorSimulado((solicitud, _) => Task.FromResult(solicitud.Method == HttpMethod.Post ? new HttpResponseMessage(HttpStatusCode.NoContent) : Json("[" + Alerta(id) + "]")));
+        var servidor = new ServidorSimulado((solicitud, _) => Task.FromResult(solicitud.Method == HttpMethod.Post ? new HttpResponseMessage(HttpStatusCode.NoContent) : Json("{\"alertas\":[" + Alerta(id) + "]}")));
         var (cliente, _) = Crear(servidor);
 
         var respuesta = await cliente.MarcarAlertaRevisada(id, 3);
@@ -295,10 +295,10 @@ public sealed class HttpClienteDeAuditoriaDelInventarioTests
     [Trait("Criterio", "AC-AUD-16")]
     public async Task UnaAlertaInvalidaEsNoDisponible_YUnaListaVaciaEsValida()
     {
-        var invalida = new ServidorSimulado((_, _) => Task.FromResult(Json("[{\"id\":\"eco:11111111-1111-4111-8111-111111111111\",\"servicio\":\"Inventario\",\"motivo\":\"accesos-denegados\",\"clase\":\"Seguridad\",\"primeraOcurrencia\":\"2026-11-14T10:00:00Z\",\"ultimaOcurrencia\":\"2026-11-14T10:01:00Z\",\"ocurrencias\":1,\"revisadasHasta\":0}]")));
+        var invalida = new ServidorSimulado((_, _) => Task.FromResult(Json("{\"alertas\":[{\"id\":\"eco:11111111-1111-4111-8111-111111111111\",\"servicio\":\"Inventario\",\"motivo\":\"accesos-denegados\",\"clase\":\"Seguridad\",\"primeraOcurrencia\":\"2026-11-14T10:00:00Z\",\"ultimaOcurrencia\":\"2026-11-14T10:01:00Z\",\"ocurrencias\":1,\"revisadasHasta\":0}]}")));
         Assert.Equal(EstadoDeRespuestaDelInventario.NoDisponible, (await Crear(invalida).Cliente.LeerAlertasNuevas(DateTimeOffset.UtcNow)).Estado);
 
-        var vacia = new ServidorSimulado((_, _) => Task.FromResult(Json("[]")));
+        var vacia = new ServidorSimulado((_, _) => Task.FromResult(Json("{\"alertas\":[]}")));
         var respuesta = await Crear(vacia).Cliente.LeerAlertasNuevas(DateTimeOffset.UtcNow);
         Assert.True(respuesta.Disponible);
         Assert.Empty(respuesta.Valor);

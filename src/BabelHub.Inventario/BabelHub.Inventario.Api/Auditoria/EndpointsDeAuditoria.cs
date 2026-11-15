@@ -60,7 +60,7 @@ public static class EndpointsDeAuditoria
         }
 
         var resultado = await alertas.LeerNuevas(desde.Value, c.RequestAborted).ConfigureAwait(false);
-        return resultado.EsExito ? Results.Json(resultado.Valor.Select(MapeoDeAuditoria.AAlerta).ToList()) : await RespuestasDeAuditoria.Falla(c, e, resultado.Error!).ConfigureAwait(false);
+        return resultado.EsExito ? Results.Json(new PaginaDeAlertasDto([.. resultado.Valor.Select(MapeoDeAuditoria.AAlerta)], null)) : await RespuestasDeAuditoria.Falla(c, e, resultado.Error!).ConfigureAwait(false);
     }
 
     private static async Task<IResult> MarcarRevisada(string id, HttpContext c, OpcionesDeErrores e, IConsultaDeAlertas alertas)

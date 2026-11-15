@@ -205,8 +205,8 @@ public sealed partial class ReglasDeContratosTests
     [Fact]
     public void Las_rutas_usan_segmentos_en_minusculas_con_guiones_y_cada_operacion_declara_sus_errores_basicos()
     {
-        // Las dos consultas de administración cuyo cuerpo define transversal-auditoria (AUD-2) todavía no tienen DTO.
-        var cuerpoPendiente = new[] { "inventario.auditoria.consultar", "inventario.alertas.listar" };
+        // Las consultas de administración de la auditoría ya tienen su DTO (D18).
+        var cuerpoPendiente = Array.Empty<string>();
         foreach (var operacion in CatalogoDeOperaciones.V1)
         {
             foreach (var segmento in operacion.Ruta.Split('/', StringSplitOptions.RemoveEmptyEntries).Skip(2))
@@ -250,6 +250,7 @@ public sealed partial class ReglasDeContratosTests
 
         Assert.Equal(
             [
+                "ecommerce.alertas.listar", "ecommerce.auditoria.consultar", "ecommerce.historial.consultar",
                 "inventario.alertas.listar", "inventario.auditoria.consultar", "inventario.fuentes.existencias", "inventario.historial.consultar",
                 "inventario.ingresos.listar", "inventario.traslados.listar", "inventario.unidades-vendidas.consultar",
             ],

@@ -202,7 +202,8 @@ public sealed class HttpClienteDeAuditoriaDelInventario(IHttpClientFactory fabri
 
     private static IReadOnlyList<AlertaConsultada> LeerAlertas(string texto)
     {
-        var dtos = JsonSerializer.Deserialize<List<AlertaDto>>(texto, Json) ?? throw new JsonException("La respuesta no es una lista de alertas.");
+        var pagina = JsonSerializer.Deserialize<PaginaDeAlertasDto>(texto, Json) ?? throw new JsonException("La respuesta no es una lista de alertas.");
+        var dtos = pagina.Alertas ?? throw new JsonException("Faltan las alertas.");
         return [.. dtos.Select(AAlerta)];
     }
 
