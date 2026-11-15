@@ -360,6 +360,54 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
             .Count());
     }
 
+    /// <summary>Cuándo se entregó cada baja a Auditoría (nulo: todavía no).</summary>
+    public Dictionary<Guid, DateTimeOffset?> BajasEntregadas { get; } = [];
+
+    public Task<bool> RegistrarBaja(Guid titularId, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.RegistrarBaja");
+        var nueva = Bajas.Add(titularId);
+        if (nueva)
+        {
+            BajasEntregadas[titularId] = null;
+        }
+
+        return Task.FromResult(nueva);
+    }
+
+    public Task<int> AnonimizarCliente(Guid titularId, Guid identificadorAnonimo, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.AnonimizarCliente");
+        var cambiadas = 0;
+        for (var i = 0; i < Guardadas.Count; i++)
+        {
+            var r = Guardadas[i];
+            if (r.ClienteId != titularId)
+            {
+                continue;
+            }
+
+            Guardadas[i] = ReservaDePedido.Rehidratar(
+                r.Id, r.PedidoId, identificadorAnonimo, r.TipoDeEntrega, r.SucursalDeRecojoId, r.RegionDeEntrega, r.IniciadaEn, r.FechaDeExpiracion, r.Extendida, r.Reemplazos, r.Lineas);
+            cambiadas++;
+        }
+
+        return Task.FromResult(cambiadas);
+    }
+
+    public Task<IReadOnlyList<Guid>> BajasPendientesDeAuditoria(int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>([.. BajasEntregadas.Where(b => b.Value is null).Select(b => b.Key).Order().Take(maximo)]);
+
+    public Task MarcarBajasEntregadas(IReadOnlyCollection<Guid> titularIds, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        foreach (var id in titularIds.Where(i => BajasEntregadas.TryGetValue(i, out var entregada) && entregada is null))
+        {
+            BajasEntregadas[id] = ahora;
+        }
+
+        return Task.CompletedTask;
+    }
+
     /// <summary>Los pedidos cuya expiración se pidió al repositorio, en orden.</summary>
     public List<Guid> ExpiracionesPedidas { get; } = [];
 }

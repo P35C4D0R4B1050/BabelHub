@@ -69,7 +69,7 @@ public sealed class ReservasPostgresTests(PostgresDeReservasFixture bd) : IClass
 
         Assert.Equal("ReintentoPorInterbloqueo`2", reservar.Name);
         Assert.Equal("ReintentoPorInterbloqueo`2", expirar.Name);
-        Assert.Equal(["ReservarUnidades", "ExpirarReservasVencidas", "ConfirmarReservas", "ExtenderReservas", "LiberarReservas", "CerrarReservas"], ComposicionDeReservas.CasosDeUsoIdempotentes.Select(t => t.Name));
+        Assert.Equal(["ReservarUnidades", "ExpirarReservasVencidas", "ConfirmarReservas", "ExtenderReservas", "LiberarReservas", "CerrarReservas", "ProcesarBajaDeTitular"], ComposicionDeReservas.CasosDeUsoIdempotentes.Select(t => t.Name));
     }
 
     // --- reservar ---

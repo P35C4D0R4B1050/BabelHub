@@ -138,6 +138,18 @@ public interface IRepositorioDeReservas
     /// confirmada cuya línea viaja sigue siendo una reserva confirmada (SEL-33). Cada pedido cuenta una sola vez. Solo lee, sin bloquear y sin devolver datos de las ediciones.
     /// </summary>
     Task<int> PedidosActivosDelCliente(Guid clienteId, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>Registra la baja del titular en <c>bajas_recibidas</c> (<c>ON CONFLICT DO NOTHING</c>). Devuelve si la baja es nueva: falso cuando ya estaba registrada (SEL-34). Quien llama ya tomó el bloqueo del cliente.</summary>
+    Task<bool> RegistrarBaja(Guid titularId, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>Sustituye <c>cliente_id</c> de las cabeceras del titular por el identificador anónimo y anula su <c>huella_origen</c>, en una sentencia (SEL-34, SEL-35). Devuelve cuántas cabeceras cambió; no toca líneas ni stock.</summary>
+    Task<int> AnonimizarCliente(Guid titularId, Guid identificadorAnonimo, CancellationToken cancelacion = default);
+
+    /// <summary>Hasta <paramref name="maximo"/> bajas que <c>Auditoria</c> aún no consumió, de la más antigua a la más reciente.</summary>
+    Task<IReadOnlyList<Guid>> BajasPendientesDeAuditoria(int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Marca las bajas como entregadas a <c>Auditoria</c> en <paramref name="ahora"/> (arranca su retención de 30 días); repetirlo no cambia la fecha de las ya marcadas.</summary>
+    Task MarcarBajasEntregadas(IReadOnlyCollection<Guid> titularIds, DateTimeOffset ahora, CancellationToken cancelacion = default);
 }
 
 /// <summary>Las claves simbólicas de los fallos del módulo; la Api las traduce a los códigos <c>INV-…</c> de <c>Shared</c> (D11).</summary>

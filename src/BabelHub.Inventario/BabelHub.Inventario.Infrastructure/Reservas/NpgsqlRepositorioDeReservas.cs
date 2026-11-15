@@ -823,6 +823,78 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
             },
             cancelacion);
 
+    public Task<bool> RegistrarBaja(Guid titularId, DateTimeOffset ahora, CancellationToken cancelacion = default) =>
+        acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand(
+                    "INSERT INTO reservas.bajas_recibidas (identificador_opaco, recibida_en) VALUES (@t, @ahora) ON CONFLICT (identificador_opaco) DO NOTHING",
+                    conexion,
+                    transaccion);
+                comando.Parameters.AddWithValue("t", titularId);
+                comando.Parameters.Add(new NpgsqlParameter("ahora", NpgsqlDbType.TimestampTz) { Value = ahora.ToUniversalTime() });
+                return await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false) == 1;
+            },
+            cancelacion);
+
+    public Task<int> AnonimizarCliente(Guid titularId, Guid identificadorAnonimo, CancellationToken cancelacion = default) =>
+        acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                // Solo cabeceras: las líneas, el stock y lo vendido no se tocan. La unicidad (cliente, clave) se conserva porque la sustitución es inyectiva para un titular.
+                await using var comando = new NpgsqlCommand("UPDATE reservas.reservas SET cliente_id = @anonimo, huella_origen = NULL WHERE cliente_id = @t", conexion, transaccion);
+                comando.Parameters.AddWithValue("t", titularId);
+                comando.Parameters.AddWithValue("anonimo", identificadorAnonimo);
+                return await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            },
+            cancelacion);
+
+    public Task<IReadOnlyList<Guid>> BajasPendientesDeAuditoria(int maximo, CancellationToken cancelacion = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(maximo);
+
+        return acceso.Ejecutar<IReadOnlyList<Guid>>(
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand(
+                    "SELECT identificador_opaco FROM reservas.bajas_recibidas WHERE entregada_a_auditoria_en IS NULL ORDER BY recibida_en, identificador_opaco LIMIT @maximo",
+                    conexion,
+                    transaccion);
+                comando.Parameters.AddWithValue("maximo", maximo);
+                var bajas = new List<Guid>();
+                await using var lector = await comando.ExecuteReaderAsync(token).ConfigureAwait(false);
+                while (await lector.ReadAsync(token).ConfigureAwait(false))
+                {
+                    bajas.Add(lector.GetGuid(0));
+                }
+
+                return bajas;
+            },
+            cancelacion);
+    }
+
+    public Task MarcarBajasEntregadas(IReadOnlyCollection<Guid> titularIds, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(titularIds);
+        if (titularIds.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        return acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand(
+                    "UPDATE reservas.bajas_recibidas SET entregada_a_auditoria_en = @ahora WHERE identificador_opaco = ANY(@ids) AND entregada_a_auditoria_en IS NULL",
+                    conexion,
+                    transaccion);
+                comando.Parameters.AddWithValue("ids", titularIds.ToArray());
+                comando.Parameters.Add(new NpgsqlParameter("ahora", NpgsqlDbType.TimestampTz) { Value = ahora.ToUniversalTime() });
+                return await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            },
+            cancelacion);
+    }
+
     private static async Task<IReadOnlyList<LineaVencida>> LeerVencidas(NpgsqlCommand comando, CancellationToken cancelacion)
     {
         var lineas = new List<LineaVencida>();

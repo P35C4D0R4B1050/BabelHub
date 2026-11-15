@@ -24,7 +24,7 @@ public static class ComposicionDeReservas
     /// Los casos de uso del módulo que se pueden repetir entero ante un interbloqueo: la clave de idempotencia (reservar y cerrar) o su naturaleza (expirar, confirmar, extender y liberar: lo ya hecho no cambia nada) los hace idempotentes, y un interbloqueo revierte la transacción
     /// completa antes de cualquier efecto (plan §5).
     /// </summary>
-    public static IReadOnlyList<Type> CasosDeUsoIdempotentes { get; } = [typeof(ReservarUnidades), typeof(ExpirarReservasVencidas), typeof(ConfirmarReservas), typeof(ExtenderReservas), typeof(LiberarReservas), typeof(CerrarReservas)];
+    public static IReadOnlyList<Type> CasosDeUsoIdempotentes { get; } = [typeof(ReservarUnidades), typeof(ExpirarReservasVencidas), typeof(ConfirmarReservas), typeof(ExtenderReservas), typeof(LiberarReservas), typeof(CerrarReservas), typeof(ProcesarBajaDeTitular)];
 
     /// <summary>
     /// Registra el módulo: la estrategia de selección elegida por nombre (T06), el acceso y el repositorio de reservas, <c>IReservasDeStock</c> (que reemplaza al nulo de <c>Fuentes</c>), el ejecutor «sistema» y los
@@ -55,6 +55,11 @@ public static class ComposicionDeReservas
         servicios.AddScoped<ConstructorDeLaReserva>();
         servicios.AddScoped<DevolucionDeUnidades>();
         servicios.AddScoped<IReservasParaTraslados, ReservasParaTraslados>();
+        servicios.AddScoped<IBajasRecibidas, BajasRecibidasDeReservas>();
+        servicios.AddSingleton(sp => new VolumenDeBajasDeTitular(sp.GetRequiredService<IReloj>()));
+        
+        // La clave de bajas se lee al resolver el generador; el anfitrión la exige al arrancar con ExigirClaveDeBajas (un anfitrión puede registrar el suyo antes).
+        servicios.TryAddSingleton<IGeneradorDeIdentificadorAnonimo>(_ => ClaveDeBajasDelEntorno.Cargar(configuracion));
         servicios.AddSingleton(sp => new VolumenDeOperaciones(sp.GetRequiredService<IReloj>()));
         servicios.AddScoped(sp => new AlertasDeVolumenDeReservas(sp.GetRequiredService<VolumenDeOperaciones>(), sp.GetRequiredService<IAlertas>()));
         servicios.TryAddScoped<IGeneradorDeTrasladosDePedido, NuloGeneradorDeTrasladosDePedido>();
@@ -73,6 +78,7 @@ public static class ComposicionDeReservas
         servicios.AddSingleton<IValidador<ConsultarSeleccionEntrada>, ValidadorDeConsultarSeleccion>();
         servicios.AddSingleton<IValidador<ConsultarReservaEntrada>, ValidadorDeConsultarReserva>();
         servicios.AddSingleton<IValidador<ConsultarPendientesEntrada>, ValidadorDeConsultarPendientes>();
+        servicios.AddSingleton<IValidador<ProcesarBajaDeTitularEntrada>, ValidadorDeProcesarBajaDeTitular>();
 
         servicios.Escritura<ReservarEntrada, ReservaDelPedido, ReservarUnidades>(opcionesDeReintento);
         servicios.Escritura<ExpirarReservasEntrada, ExpiracionDelPedido, ExpirarReservasVencidas>(opcionesDeReintento);
@@ -80,6 +86,7 @@ public static class ComposicionDeReservas
         servicios.Escritura<ExtenderReservasEntrada, ExtensionDeReserva, ExtenderReservas>(opcionesDeReintento);
         servicios.Escritura<LiberarReservasEntrada, ReservaDelPedido, LiberarReservas>(opcionesDeReintento);
         servicios.Escritura<CerrarReservasEntrada, CierreDeReserva, CerrarReservas>(opcionesDeReintento);
+        servicios.Escritura<ProcesarBajaDeTitularEntrada, BajaDeTitularProcesada, ProcesarBajaDeTitular>(opcionesDeReintento);
 
         // Las consultas son de solo lectura: una instantánea coherente (REPEATABLE READ), nunca una transacción de escritura.
         servicios.Lectura<ConsultarSeleccionEntrada, SeleccionConsultada, ConsultarSeleccion>();
@@ -110,6 +117,13 @@ public static class ComposicionDeReservas
     {
         ArgumentNullException.ThrowIfNull(proveedor);
         return proveedor.GetRequiredService<IEstrategiaDeSeleccion>();
+    }
+
+    /// <summary>Resuelve el generador del identificador anónimo al arrancar: si <c>BABELHUB__Inventario__ClaveDeBajas</c> falta, es corta o se repite con otro secreto, el arranque falla (D09).</summary>
+    public static IGeneradorDeIdentificadorAnonimo ExigirClaveDeBajas(IServiceProvider proveedor)
+    {
+        ArgumentNullException.ThrowIfNull(proveedor);
+        return proveedor.GetRequiredService<IGeneradorDeIdentificadorAnonimo>();
     }
 
     private static void Escritura<TEntrada, TSalida, TCaso>(this IServiceCollection servicios, OpcionesDeReintentoPorInterbloqueo reintento)

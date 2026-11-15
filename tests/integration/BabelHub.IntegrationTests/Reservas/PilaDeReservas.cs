@@ -184,9 +184,11 @@ public sealed class PilaDeReservas : IDisposable
             Origen,
             Eventos,
             Reloj));
+        servicios.AddSingleton<ISustitutorDeSujetoDeLimites>(sp => new MotorDeLimitesPostgres(sp.GetRequiredService<UnidadDeTrabajoPostgres>(), new UnidadDeTrabajoPostgres(bd.Acceso, actor: actor)));
+        servicios.AddScoped<IAuditoriaDeBajasRecibidas>(sp => new BabelHub.Inventario.Application.Auditoria.Interno.AuditoriaDeBajasRecibidas(sp.GetRequiredService<IAuditoria>(), sp.GetRequiredService<IActorActual>()));
         ajustes?.Invoke(servicios);
 
-        var ajustesDeConfiguracion = new ConfigurationBuilder().AddInMemoryCollection(configuracion ?? new Dictionary<string, string?>()).Build();
+        var ajustesDeConfiguracion = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { [BabelHub.Inventario.Infrastructure.Reservas.HmacGeneradorDeIdentificadorAnonimo.Ruta] = ClaveDeBajasDePrueba }).AddInMemoryCollection(configuracion ?? new Dictionary<string, string?>()).Build();
         if (reservasPrimero)
         {
             servicios.AgregarModuloReservas(ajustesDeConfiguracion);
@@ -200,6 +202,9 @@ public sealed class PilaDeReservas : IDisposable
 
         Proveedor = servicios.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
     }
+
+    /// <summary>La clave de bajas de las pruebas (nunca una clave real: 32 bytes con variedad).</summary>
+    public const string ClaveDeBajasDePrueba = "clave-de-bajas-solo-de-pruebas-0123456789";
 
     public ServiceProvider Proveedor { get; }
 

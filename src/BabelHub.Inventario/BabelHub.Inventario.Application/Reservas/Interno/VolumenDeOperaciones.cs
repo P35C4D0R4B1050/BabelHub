@@ -24,7 +24,7 @@ internal static class VolumenDeOperacionesDeReservas
 /// Cuenta las confirmaciones y liberaciones por ventana de 5 minutos (en memoria, por instancia: un solo servicio, una instancia) para vigilar la residual de las credenciales de <c>expiracion-de-reservas</c>
 /// (plan §6): un volumen anómalo no rechaza nada, solo <b>avisa una sola vez por ventana</b> con una alerta técnica. Seguro entre hilos.
 /// </summary>
-internal sealed class VolumenDeOperaciones(IReloj reloj, int umbral = VolumenDeOperacionesDeReservas.UmbralPorDefecto)
+internal sealed class VolumenDeOperaciones(IReloj reloj, int umbral = VolumenDeOperacionesDeReservas.UmbralPorDefecto, TimeSpan? ventana = null)
 {
     private readonly object _candado = new();
     private readonly Dictionary<string, (DateTimeOffset Inicio, int Cuenta, bool Avisada)> _ventanas = [];
@@ -35,7 +35,7 @@ internal sealed class VolumenDeOperaciones(IReloj reloj, int umbral = VolumenDeO
         var ahora = reloj.Ahora;
         lock (_candado)
         {
-            var (inicio, cuenta, avisada) = _ventanas.TryGetValue(tipo, out var actual) && ahora - actual.Inicio < VolumenDeOperacionesDeReservas.Ventana
+            var (inicio, cuenta, avisada) = _ventanas.TryGetValue(tipo, out var actual) && ahora - actual.Inicio < (ventana ?? VolumenDeOperacionesDeReservas.Ventana)
                 ? actual
                 : (ahora, 0, false);
 
@@ -57,6 +57,12 @@ internal sealed class AlertasDeVolumenDeReservas(VolumenDeOperaciones volumen, I
             return;
         }
 
+        await Publicar(alertas, motivo, cancelacion).ConfigureAwait(false);
+    }
+
+    /// <summary>La alerta técnica con el motivo dado (o el de «no catalogado» si aún no consta), sin interrumpir nunca a quien llama.</summary>
+    public static async Task Publicar(IAlertas alertas, string motivo, CancellationToken cancelacion)
+    {
         try
         {
             try
