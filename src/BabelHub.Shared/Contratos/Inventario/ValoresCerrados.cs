@@ -86,5 +86,8 @@ public static class MotivosDeLimiteDeReservas
 
     public const string PorHoraPorOrigen = "reservas-por-hora-por-origen";
 
-    public static readonly IReadOnlyList<string> Todos = [PendientePorCliente, PorHoraPorCliente, PorHoraPorOrigen];
+    /// <summary>Tope de 3 reemplazos de la reserva pendiente de un mismo pedido (SEL-36): el reemplazo reinicia la expiración y sin tope retener stock sin pagar sería indefinido.</summary>
+    public const string ReemplazosPorPedido = "reservas-reemplazos-por-pedido";
+
+    public static readonly IReadOnlyList<string> Todos = [PendientePorCliente, PorHoraPorCliente, PorHoraPorOrigen, ReemplazosPorPedido];
 }

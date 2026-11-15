@@ -96,7 +96,7 @@ public sealed class ContratosDeDisponibilidadYReservasTests
         Assert.Equal(
             ["checkout-cancelado", "pedido-anulado", "cancelado-por-el-cliente", "no-recogido", "pago-vencido", "falla-posterior-al-pago"],
             MotivosDeLiberacion.Todos);
-        Assert.Equal(["reservas-pendiente-por-cliente", "reservas-por-hora-por-cliente", "reservas-por-hora-por-origen"], MotivosDeLimiteDeReservas.Todos);
+        Assert.Equal(["reservas-pendiente-por-cliente", "reservas-por-hora-por-cliente", "reservas-por-hora-por-origen", "reservas-reemplazos-por-pedido"], MotivosDeLimiteDeReservas.Todos);
         Assert.Equal(["impreso", "digital"], FormatosDeEdicion.Todos);
         Assert.Equal(["sin-stock", "bajo", "normal"], EstadosDeStock.Todos);
     }
