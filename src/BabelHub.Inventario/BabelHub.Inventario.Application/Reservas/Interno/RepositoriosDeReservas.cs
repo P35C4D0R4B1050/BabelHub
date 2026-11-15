@@ -13,6 +13,9 @@ public sealed record DatosDeLaSolicitud(string ClaveDeIdempotencia, string Huell
 /// <summary>Una reserva guardada con la huella de la carga con la que se creó (D03).</summary>
 public sealed record ReservaPorClave(ReservaDePedido Reserva, string HuellaDeLaCarga);
 
+/// <summary>Una línea pendiente que pasó a confirmada: lo necesario para solicitar su traslado y auditar la confirmación.</summary>
+public sealed record LineaConfirmada(Guid PedidoId, Guid LineaDeReservaId, Guid LineaId, Guid EdicionId, Guid FuenteId, int Cantidad);
+
 /// <summary>Una línea que pasó a liberada: lo necesario para devolver sus unidades y auditar la liberación (sin datos del cliente).</summary>
 public sealed record LineaLiberada(Guid PedidoId, Guid LineaDeReservaId, Guid LineaId, Guid EdicionId, Guid FuenteId, int Cantidad, Guid? TrasladoId, bool EstabaConfirmada);
 
@@ -64,6 +67,15 @@ public interface IRepositorioDeReservas
     /// </summary>
     Task<IReadOnlyList<LineaLiberada>> LiberarLineas(Guid pedidoId, bool incluirConfirmadas, IReadOnlyCollection<Guid>? lineaIds, DateTimeOffset ahora, CancellationToken cancelacion = default);
 
+    /// <summary>
+    /// Confirma las líneas <b>pendientes no vencidas</b> del pedido con una sola sentencia condicional (las bloquea por id y en orden, repite el vencimiento con <paramref name="ahora"/>) y devuelve solo las que de verdad
+    /// cambiaron; si cambió alguna, la cabecera deja de expirar. Quien llama ya tomó el bloqueo del pedido.
+    /// </summary>
+    Task<IReadOnlyList<LineaConfirmada>> ConfirmarLineas(Guid pedidoId, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>Fija el traslado vinculado de cada línea de reserva (por el identificador de la línea de reserva); repetirlo con el mismo traslado no cambia nada.</summary>
+    Task VincularTraslados(IReadOnlyCollection<(Guid LineaDeReservaId, Guid TrasladoId)> vinculos, CancellationToken cancelacion = default);
+
     /// <summary>Hasta <paramref name="maximo"/> pedidos que apartan unidades de la pareja (líneas pendientes no vencidas o confirmadas) y el total de pedidos, solo identificadores (AJU-06).</summary>
     Task<PedidosQueApartanUnidades> PedidosQueApartan(Guid fuenteId, Guid edicionId, int maximo, DateTimeOffset ahora, CancellationToken cancelacion = default);
 }
@@ -93,6 +105,8 @@ internal static class ClavesDeReservas
     public const string TitularDadoDeBaja = "titular-dado-de-baja";
 
     public const string ReservaEstadoInvalido = "reserva-estado-invalido";
+
+    public const string ReservaNoEncontrada = "reserva-no-encontrada";
 }
 
 /// <summary>

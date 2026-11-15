@@ -65,10 +65,17 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
     /// <summary>Si es verdadero, <c>Insertar</c> responde como la restricción única de la base ante una cabecera o una línea activa concurrentes.</summary>
     public bool InsertarChocaConUnaConcurrente { get; set; }
 
+    /// <summary>Una copia con el estado de ahora, como la que la Infraestructura rehidrata de la base: lo que el caso de uso cambie en la copia no cambia lo guardado hasta que se escribe.</summary>
+    private static ReservaDePedido Copiar(ReservaDePedido r) =>
+        ReservaDePedido.Rehidratar(
+            r.Id, r.PedidoId, r.ClienteId, r.TipoDeEntrega, r.SucursalDeRecojoId, r.RegionDeEntrega, r.IniciadaEn, r.FechaDeExpiracion, r.Extendida, r.Reemplazos,
+            r.Lineas.Select(l => LineaDeReserva.Rehidratar(l.Id, l.LineaId, l.EdicionId, l.FuenteId, l.Cantidad, l.Estado, l.CerradaPor, l.TrasladoId, l.CreadaPorTraslado, l.RecreadaEnDestino, l.ConfirmadaEn, l.AnuladaEn, l.EstadoCambiadoEn)));
+
     public Task<ReservaDePedido?> UltimaDelPedido(Guid pedidoId, CancellationToken cancelacion = default)
     {
         bitacora.Anotar("reservas.UltimaDelPedido");
-        return Task.FromResult(Guardadas.Where(r => r.PedidoId == pedidoId).OrderByDescending(r => r.Reemplazos).ThenByDescending(r => r.IniciadaEn).FirstOrDefault());
+        var ultima = Guardadas.Where(r => r.PedidoId == pedidoId).OrderByDescending(r => r.Reemplazos).ThenByDescending(r => r.IniciadaEn).FirstOrDefault();
+        return Task.FromResult(ultima is null ? null : Copiar(ultima));
     }
 
     /// <summary>Los titulares dados de baja (SEL-35).</summary>
@@ -88,7 +95,7 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
     {
         bitacora.Anotar("reservas.PorClave");
         var indice = Solicitudes.FindIndex(s => s.ClaveDeIdempotencia == clave && Guardadas[Solicitudes.IndexOf(s)].ClienteId == clienteId);
-        return Task.FromResult(indice < 0 ? null : new ReservaPorClave(Guardadas[indice], Solicitudes[indice].HuellaDeLaCarga));
+        return Task.FromResult(indice < 0 ? null : new ReservaPorClave(Copiar(Guardadas[indice]), Solicitudes[indice].HuellaDeLaCarga));
     }
 
     public Task<bool> ClienteDadoDeBaja(Guid clienteId, CancellationToken cancelacion = default) => Task.FromResult(Bajas.Contains(clienteId));
@@ -167,6 +174,40 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
         return Task.FromResult<IReadOnlyList<LineaLiberada>>(liberadas);
     }
 
+    public Task<IReadOnlyList<LineaConfirmada>> ConfirmarLineas(Guid pedidoId, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.ConfirmarLineas");
+        var confirmadas = new List<LineaConfirmada>();
+        foreach (var reserva in Guardadas.Where(r => r.PedidoId == pedidoId && !r.EstaVencida(ahora)))
+        {
+            var pendientes = reserva.Lineas.Where(l => l.Estado == EstadoDeLinea.Pendiente).ToList();
+            if (pendientes.Count == 0)
+            {
+                continue;
+            }
+
+            foreach (var linea in pendientes)
+            {
+                confirmadas.Add(new LineaConfirmada(pedidoId, linea.Id, linea.LineaId, linea.EdicionId, linea.FuenteId, linea.Cantidad));
+            }
+
+            reserva.Confirmar(ahora);
+        }
+
+        return Task.FromResult<IReadOnlyList<LineaConfirmada>>(confirmadas);
+    }
+
+    public Task VincularTraslados(IReadOnlyCollection<(Guid LineaDeReservaId, Guid TrasladoId)> vinculos, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.VincularTraslados");
+        foreach (var (lineaId, trasladoId) in vinculos)
+        {
+            Guardadas.SelectMany(r => r.Lineas).Single(l => l.Id == lineaId).VincularTraslado(trasladoId);
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task<PedidosQueApartanUnidades> PedidosQueApartan(Guid fuenteId, Guid edicionId, int maximo, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
         var pedidos = Guardadas
@@ -225,6 +266,60 @@ internal sealed class AuditoriaConActor(ActorDePrueba actor, BitacoraDeLlamadas 
     }
 }
 
+
+/// <summary>Un <c>Traslados</c> de prueba: crea un traslado por pareja (fuente, edición) del pedido y, como el real, devuelve el mismo al repetir (idempotente por pedido, fuente y edición).</summary>
+internal sealed class GeneradorDeTrasladosDoble(RepositorioDeFuentesEnMemoria fuentes, BitacoraDeLlamadas bitacora) : IGeneradorDeTrasladosDePedido
+{
+    private readonly Dictionary<(Guid Pedido, Guid Fuente, Guid Edicion), Guid> _creados = [];
+
+    public int Llamadas { get; private set; }
+
+    public List<IReadOnlyCollection<SolicitudDeTrasladoDePedido>> Solicitudes { get; } = [];
+
+    public Task<IReadOnlyList<TrasladoVinculadoAlPedido>> Generar(Guid pedidoId, Guid sucursalDeRecojoId, IReadOnlyCollection<SolicitudDeTrasladoDePedido> solicitudes, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("traslados.Generar");
+        Llamadas++;
+        Solicitudes.Add(solicitudes);
+        var destino = fuentes.Fuentes.Single(f => f.Id == sucursalDeRecojoId);
+        var resultado = new List<TrasladoVinculadoAlPedido>();
+        foreach (var s in solicitudes)
+        {
+            var clave = (pedidoId, s.FuenteDeOrigenId, s.EdicionId);
+            if (!_creados.TryGetValue(clave, out var id))
+            {
+                id = Guid.NewGuid();
+                _creados[clave] = id;
+            }
+
+            var origen = fuentes.Fuentes.Single(f => f.Id == s.FuenteDeOrigenId);
+            resultado.Add(new TrasladoVinculadoAlPedido(id, s.EdicionId, s.Cantidad, origen.Codigo, destino.Codigo, "solicitado", null));
+        }
+
+        return Task.FromResult<IReadOnlyList<TrasladoVinculadoAlPedido>>(resultado);
+    }
+}
+
+/// <summary>Las alertas que se publicaron. Como el catálogo real, rechaza con <see cref="ArgumentException"/> un motivo que no conoce.</summary>
+internal sealed class AlertasEspia : IAlertas
+{
+    public HashSet<string> Catalogados { get; } = ["motivo-de-alerta-no-catalogado"];
+
+    public List<string> Tecnicas { get; } = [];
+
+    public Task PublicarTecnica(CodigoDeAlerta motivo, CancellationToken cancelacion = default)
+    {
+        if (!Catalogados.Contains(motivo.Valor))
+        {
+            throw new ArgumentException("El motivo no consta en el catálogo.", nameof(motivo));
+        }
+
+        Tecnicas.Add(motivo.Valor);
+        return Task.CompletedTask;
+    }
+
+    public Task PublicarDeSeguridad(CodigoDeAlerta motivo, CancellationToken cancelacion = default) => throw new NotSupportedException();
+}
 /// <summary>
 /// Todo lo que los casos de uso de <c>Reservas</c> necesitan, en memoria y sobre el entorno de <c>Fuentes</c> (tres fuentes: Lima, la de recepción, Cusco y Ayacucho, cada una en su región): el cliente de prueba como actor,
 /// el stock real en memoria con sus reglas, el directorio de fuentes, los bloqueos y el reloj.
@@ -275,6 +370,32 @@ internal sealed class EntornoDeReservas
         Base.Reloj);
 
     private LimitesDeReservar? _limites;
+
+    public GeneradorDeTrasladosDoble Traslados => _traslados ??= new(Base.Fuentes, Base.Bitacora);
+
+    private GeneradorDeTrasladosDoble? _traslados;
+
+    public AlertasEspia Alertas { get; } = new();
+
+    public int UmbralDeVolumen { get; set; } = 200;
+
+    private VolumenDeOperaciones? _volumen;
+
+    public AlertasDeVolumenDeReservas Volumen => new(_volumen ??= new VolumenDeOperaciones(Base.Reloj, UmbralDeVolumen), Alertas);
+
+    public ConfirmarReservas Confirmar() =>
+        new(Autorizador, new ValidadorDeConfirmar(), Bloqueos, Reservas, Directorio, Traslados, Auditoria, Volumen, new ConstructorDeLaReserva(Directorio), Base.Reloj);
+
+    /// <summary>Una reserva pendiente ya guardada (sin pasar por reservar): una línea por edición y fuente, iniciada hace <paramref name="haceMinutos"/>.</summary>
+    public ReservaDePedido Pendiente(Guid pedidoId, IEnumerable<(Guid Edicion, Fuente Fuente, int Cantidad)> lineas, bool recojoEnLima = true, int haceMinutos = 1, Guid? clienteId = null)
+    {
+        var iniciada = Base.Reloj.Ahora.AddMinutes(-haceMinutos);
+        var reserva = ReservaDePedido.Iniciar(
+            Guid.NewGuid(), pedidoId, clienteId ?? Guid.NewGuid(), recojoEnLima ? TipoDeEntrega.Recojo : TipoDeEntrega.Domicilio, recojoEnLima ? Base.Lima.Id : null, recojoEnLima ? null : "lima", iniciada,
+            lineas.Select(l => LineaDeReserva.Pendiente(Guid.NewGuid(), Guid.NewGuid(), l.Edicion, l.Fuente.Id, l.Cantidad, iniciada)));
+        Reservas.Guardadas.Add(reserva);
+        return reserva;
+    }
 
     public ExpirarReservasVencidas ExpirarPedido() => new(Autorizador, Bloqueos, Reservas, Stock, Base.Reloj);
 

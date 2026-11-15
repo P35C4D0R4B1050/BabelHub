@@ -46,6 +46,57 @@ public sealed class AuditoriaDeIntegracionEspia(IActorActual actor) : IAuditoria
     }
 }
 
+/// <summary>Las alertas técnicas que se publicaron por <c>IAlertas</c>. Seguro entre hilos.</summary>
+public sealed class AlertasDeIntegracionEspia : BabelHub.Inventario.Application.Auditoria.IAlertas
+{
+    private readonly object _candado = new();
+
+    public List<string> Tecnicas { get; } = [];
+
+    public Task PublicarTecnica(BabelHub.Inventario.Application.Auditoria.CodigoDeAlerta motivo, CancellationToken cancelacion = default)
+    {
+        lock (_candado)
+        {
+            Tecnicas.Add(motivo.Valor);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task PublicarDeSeguridad(BabelHub.Inventario.Application.Auditoria.CodigoDeAlerta motivo, CancellationToken cancelacion = default) => Task.CompletedTask;
+}
+
+/// <summary>Un <c>Traslados</c> de prueba: un traslado por pareja (fuente, edición) del pedido, el mismo al repetir.</summary>
+public sealed class TrasladosDeIntegracionDoble(PostgresDeReservasFixture bd) : BabelHub.Inventario.Application.Reservas.IGeneradorDeTrasladosDePedido
+{
+    private readonly Dictionary<(Guid, Guid, Guid), Guid> _creados = [];
+
+    public int Llamadas { get; private set; }
+
+    public async Task<IReadOnlyList<BabelHub.Inventario.Application.Reservas.TrasladoVinculadoAlPedido>> Generar(Guid pedidoId, Guid sucursalDeRecojoId, IReadOnlyCollection<BabelHub.Inventario.Application.Reservas.SolicitudDeTrasladoDePedido> solicitudes, CancellationToken cancelacion = default)
+    {
+        Llamadas++;
+        var codigoDestino = await bd.Consultar<string>($"SELECT codigo FROM fuentes.fuentes WHERE id = '{sucursalDeRecojoId}'");
+        var resultado = new List<BabelHub.Inventario.Application.Reservas.TrasladoVinculadoAlPedido>();
+        foreach (var s in solicitudes)
+        {
+            var clave = (pedidoId, s.FuenteDeOrigenId, s.EdicionId);
+            lock (_creados)
+            {
+                if (!_creados.ContainsKey(clave))
+                {
+                    _creados[clave] = Guid.NewGuid();
+                }
+            }
+
+            var codigoOrigen = await bd.Consultar<string>($"SELECT codigo FROM fuentes.fuentes WHERE id = '{s.FuenteDeOrigenId}'");
+            resultado.Add(new BabelHub.Inventario.Application.Reservas.TrasladoVinculadoAlPedido(_creados[clave], s.EdicionId, s.Cantidad, codigoOrigen!, codigoDestino!, "solicitado", null));
+        }
+
+        return resultado;
+    }
+}
+
 public sealed class DenegacionesDeIntegracionEspia : IDenegacionDeAcceso
 {
     private readonly object _candado = new();
@@ -110,6 +161,7 @@ public sealed class PilaDeReservas : IDisposable
         Denegaciones = new DenegacionesDeIntegracionEspia();
         Alertas = new AlertasTecnicasEspia();
         Eventos = new EventosDeSeguridadEspia();
+        AlertasPublicadas = new AlertasDeIntegracionEspia();
         Origen = new OrigenPorFlujo();
         Reloj = new RelojDeIntegracion();
 
@@ -122,6 +174,7 @@ public sealed class PilaDeReservas : IDisposable
         servicios.AddSingleton<IDenegacionDeAcceso>(Denegaciones);
         servicios.AddSingleton<IAuditoria>(Auditoria);
         servicios.AddSingleton<IPublicadorDeEventosDeSeguridad>(Eventos);
+        servicios.AddSingleton<BabelHub.Inventario.Application.Auditoria.IAlertas>(AlertasPublicadas);
         servicios.AddSingleton<IOrigenDeSolicitud>(Origen);
         servicios.AddSingleton(new CatalogoDePoliticas(PoliticasDeSeguridad.Todas));
         servicios.AddSingleton<IControlDeLimites>(sp => new EvaluarLimite(
@@ -159,6 +212,8 @@ public sealed class PilaDeReservas : IDisposable
     public AlertasTecnicasEspia Alertas { get; }
 
     public EventosDeSeguridadEspia Eventos { get; }
+
+    public AlertasDeIntegracionEspia AlertasPublicadas { get; }
 
     public OrigenPorFlujo Origen { get; }
 

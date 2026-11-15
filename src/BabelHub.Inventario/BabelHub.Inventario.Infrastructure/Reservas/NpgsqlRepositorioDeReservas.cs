@@ -345,6 +345,82 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
             },
             cancelacion);
 
+    public Task<IReadOnlyList<LineaConfirmada>> ConfirmarLineas(Guid pedidoId, DateTimeOffset ahora, CancellationToken cancelacion = default) =>
+        acceso.Ejecutar<IReadOnlyList<LineaConfirmada>>(
+            async (conexion, transaccion, token) =>
+            {
+                // Una sola sentencia: bloquea por id y en orden las pendientes del pedido cuya cabecera todavía no venció y solo cambia (y devuelve) las que siguen así.
+                await using var comando = new NpgsqlCommand(
+                    """
+                    WITH candidatas AS (
+                        SELECT l.id
+                        FROM reservas.reserva_lineas l JOIN reservas.reservas r ON r.id = l.reserva_id
+                        WHERE l.pedido_id = @pedido AND l.estado = 'pendiente' AND r.fecha_expiracion IS NOT NULL AND r.fecha_expiracion > @ahora
+                        ORDER BY l.id
+                        FOR UPDATE OF l
+                    )
+                    UPDATE reservas.reserva_lineas AS u
+                    SET estado = 'confirmada', confirmada_en = @ahora, estado_cambiado_en = @ahora
+                    FROM candidatas c, reservas.reservas r
+                    WHERE u.id = c.id AND u.estado = 'pendiente' AND r.id = u.reserva_id AND r.fecha_expiracion > @ahora
+                    RETURNING u.pedido_id, u.id, u.linea_id, u.edicion_id, u.fuente_id, u.cantidad, u.reserva_id
+                    """,
+                    conexion,
+                    transaccion);
+                comando.Parameters.AddWithValue("pedido", pedidoId);
+                comando.Parameters.Add(new NpgsqlParameter("ahora", NpgsqlDbType.TimestampTz) { Value = ahora.ToUniversalTime() });
+
+                var lineas = new List<LineaConfirmada>();
+                var cabeceras = new HashSet<Guid>();
+                await using (var lector = await comando.ExecuteReaderAsync(token).ConfigureAwait(false))
+                {
+                    while (await lector.ReadAsync(token).ConfigureAwait(false))
+                    {
+                        lineas.Add(new LineaConfirmada(lector.GetGuid(0), lector.GetGuid(1), lector.GetGuid(2), lector.GetGuid(3), lector.GetGuid(4), lector.GetInt32(5)));
+                        cabeceras.Add(lector.GetGuid(6));
+                    }
+                }
+
+                if (cabeceras.Count > 0)
+                {
+                    // Confirmada, la reserva ya no expira.
+                    await using var sinExpiracion = new NpgsqlCommand("UPDATE reservas.reservas SET fecha_expiracion = NULL WHERE id = ANY(@ids)", conexion, transaccion);
+                    sinExpiracion.Parameters.AddWithValue("ids", cabeceras.ToArray());
+                    await sinExpiracion.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                }
+
+                return [.. lineas.OrderBy(l => l.EdicionId, OrdenDeBloqueo.DeIdentificadores).ThenBy(l => l.FuenteId, OrdenDeBloqueo.DeIdentificadores).ThenBy(l => l.LineaDeReservaId, OrdenDeBloqueo.DeIdentificadores)];
+            },
+            cancelacion);
+
+    public Task VincularTraslados(IReadOnlyCollection<(Guid LineaDeReservaId, Guid TrasladoId)> vinculos, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(vinculos);
+        if (vinculos.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        return acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand(
+                    """
+                    UPDATE reservas.reserva_lineas AS l
+                    SET traslado_id = v.traslado_id
+                    FROM unnest(@lineas, @traslados) AS v(linea_id, traslado_id)
+                    WHERE l.id = v.linea_id AND l.traslado_id IS DISTINCT FROM v.traslado_id
+                    """,
+                    conexion,
+                    transaccion);
+                comando.Parameters.Add(new NpgsqlParameter("lineas", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = vinculos.Select(v => v.LineaDeReservaId).ToArray() });
+                comando.Parameters.Add(new NpgsqlParameter("traslados", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = vinculos.Select(v => v.TrasladoId).ToArray() });
+                await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                return 0;
+            },
+            cancelacion);
+    }
+
     public Task<PedidosQueApartanUnidades> PedidosQueApartan(Guid fuenteId, Guid edicionId, int maximo, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(maximo);

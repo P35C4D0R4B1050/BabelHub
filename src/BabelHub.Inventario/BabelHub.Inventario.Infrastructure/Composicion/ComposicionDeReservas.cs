@@ -24,7 +24,7 @@ public static class ComposicionDeReservas
     /// Los casos de uso del módulo que se pueden repetir entero ante un interbloqueo: la clave de idempotencia (reservar) o su naturaleza (expirar) los hace idempotentes, y un interbloqueo revierte la transacción
     /// completa antes de cualquier efecto (plan §5).
     /// </summary>
-    public static IReadOnlyList<Type> CasosDeUsoIdempotentes { get; } = [typeof(ReservarUnidades), typeof(ExpirarReservasVencidas)];
+    public static IReadOnlyList<Type> CasosDeUsoIdempotentes { get; } = [typeof(ReservarUnidades), typeof(ExpirarReservasVencidas), typeof(ConfirmarReservas)];
 
     /// <summary>
     /// Registra el módulo: la estrategia de selección elegida por nombre (T06), el acceso y el repositorio de reservas, <c>IReservasDeStock</c> (que reemplaza al nulo de <c>Fuentes</c>), el ejecutor «sistema» y los
@@ -52,6 +52,9 @@ public static class ComposicionDeReservas
         servicios.AddScoped(sp => new AutorizadorDeReservas(sp.GetRequiredService<IActorActual>(), sp.GetRequiredService<IDenegacionDeAcceso>()));
         servicios.AddScoped(sp => new SelectorDeFuentes(sp.GetRequiredService<IDirectorioDeFuentes>(), sp.GetRequiredService<IEstrategiaDeSeleccion>()));
         servicios.AddScoped<ConstructorDeLaReserva>();
+        servicios.AddSingleton(sp => new VolumenDeOperaciones(sp.GetRequiredService<IReloj>()));
+        servicios.AddScoped(sp => new AlertasDeVolumenDeReservas(sp.GetRequiredService<VolumenDeOperaciones>(), sp.GetRequiredService<IAlertas>()));
+        servicios.TryAddScoped<IGeneradorDeTrasladosDePedido, NuloGeneradorDeTrasladosDePedido>();
         servicios.AddScoped(sp => new LimitesDeReservar(
             sp.GetRequiredService<IControlDeLimites>(),
             sp.GetRequiredService<IPublicadorDeEventosDeSeguridad>(),
@@ -60,9 +63,11 @@ public static class ComposicionDeReservas
             sp.GetRequiredService<IReloj>()));
 
         servicios.AddSingleton<IValidador<ReservarEntrada>, ValidadorDeReservar>();
+        servicios.AddSingleton<IValidador<ConfirmarReservasEntrada>, ValidadorDeConfirmar>();
 
         servicios.Escritura<ReservarEntrada, ReservaDelPedido, ReservarUnidades>(opcionesDeReintento);
         servicios.Escritura<ExpirarReservasEntrada, ExpiracionDelPedido, ExpirarReservasVencidas>(opcionesDeReintento);
+        servicios.Escritura<ConfirmarReservasEntrada, ReservaDelPedido, ConfirmarReservas>(opcionesDeReintento);
 
         return servicios;
     }

@@ -38,6 +38,13 @@ internal sealed class AutorizadorDeReservas(IActorActual actores, IDenegacionDeA
     public Task<ErrorDeAplicacion?> ExigirSistema(CancellationToken cancelacion) =>
         Evaluar(actor => actor.Tipo == TipoDeActor.Sistema ? null : MotivosDeDenegacionDeReservas.FueraDeRol, cancelacion);
 
+    /// <summary>
+    /// Solo la integración <c>expiracion-de-reservas</c> (sin token de usuario): confirmar, extender y liberar son llamadas de servicio del E-commerce. El alcance de la credencial lo verifica la Api; aquí se exige el actor
+    /// de integración con ese nombre. Un cliente o cualquier otra integración es «prohibido» con su evento.
+    /// </summary>
+    public Task<ErrorDeAplicacion?> ExigirIntegracionDeReservas(CancellationToken cancelacion) =>
+        Evaluar(actor => actor.Tipo == TipoDeActor.Integracion && actor.Integracion == AlcanceDeServicio.ExpiracionDeReservas.NombreEstable() ? null : MotivosDeDenegacionDeReservas.FueraDeRol, cancelacion);
+
     /// <summary>Cualquier actor con contexto (la consulta previa sin token la hace el E-commerce con su credencial de servicio): no un visitante ni la ausencia de actor.</summary>
     public Task<ErrorDeAplicacion?> ExigirContexto(CancellationToken cancelacion) => Evaluar(_ => null, cancelacion);
 

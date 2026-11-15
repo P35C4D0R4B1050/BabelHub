@@ -157,7 +157,7 @@ internal static class ConversionesDeReservas
 /// </summary>
 internal sealed class ConstructorDeLaReserva(IDirectorioDeFuentes directorio)
 {
-    public async Task<ReservaDelPedido> Construir(ReservaDePedido reserva, bool esRepeticion, CancellationToken cancelacion)
+    public async Task<ReservaDelPedido> Construir(ReservaDePedido reserva, bool esRepeticion, CancellationToken cancelacion, IReadOnlyList<TrasladoVinculadoAlPedido>? traslados = null)
     {
         ArgumentNullException.ThrowIfNull(reserva);
 
@@ -181,7 +181,7 @@ internal sealed class ConstructorDeLaReserva(IDirectorioDeFuentes directorio)
             reserva.IniciadaEn,
             reserva.FechaDeExpiracion,
             lineas,
-            [],
+            traslados ?? [],
             esRepeticion);
     }
 }
