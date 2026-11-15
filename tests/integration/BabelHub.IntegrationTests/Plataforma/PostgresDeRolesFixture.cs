@@ -63,9 +63,7 @@ public sealed class PostgresDeRolesFixture : IAsyncLifetime
             BabelHub.Inventario.Infrastructure.Plataforma.DefinicionDeEventosDeLimite.Sql + """
             ALTER SCHEMA plataforma OWNER TO propietario;
             ALTER TABLE plataforma.eventos_limite OWNER TO propietario;
-            GRANT USAGE ON SCHEMA plataforma TO rol_plataforma;
-            GRANT SELECT, INSERT, DELETE ON plataforma.eventos_limite TO rol_plataforma;
-            """);
+            """ + BabelHub.Inventario.Infrastructure.Plataforma.DefinicionDeEventosDeLimite.Permisos);
         await eventos.ExecuteNonQueryAsync();
 
         await using var entradas = Administracion.CreateCommand(

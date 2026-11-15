@@ -18,6 +18,16 @@ public static class DefinicionDeEventosDeLimite
         );
         CREATE INDEX IF NOT EXISTS ix_eventos_limite_clave_instante ON plataforma.eventos_limite (clave, instante);
         """;
+
+    /// <summary>
+    /// El permiso mínimo de <c>rol_plataforma</c> sobre la tabla: leer, insertar y borrar (la purga de 24 horas) y, solo para <b>la columna <c>clave</c></b>, actualizar: la baja de un titular sustituye el
+    /// sujeto de las claves (<c>inventario-seleccion-fuente</c> SEL-34). Sin este permiso de columna el rol no podría hacerlo y ningún otro dato de la fila es modificable.
+    /// </summary>
+    public const string Permisos = """
+        GRANT USAGE ON SCHEMA plataforma TO rol_plataforma;
+        GRANT SELECT, INSERT, DELETE ON plataforma.eventos_limite TO rol_plataforma;
+        GRANT UPDATE (clave) ON plataforma.eventos_limite TO rol_plataforma;
+        """;
 }
 
 public sealed record OpcionesDeMotorPostgres
@@ -44,7 +54,7 @@ public sealed record OpcionesDeMotorPostgres
 public sealed class MotorDeLimitesPostgres(
     UnidadDeTrabajoPostgres delLlamador,
     UnidadDeTrabajoPostgres independiente,
-    OpcionesDeMotorPostgres? opciones = null) : IMotorDeLimites
+    OpcionesDeMotorPostgres? opciones = null) : IMotorDeLimites, ISustitutorDeSujetoDeLimites
 {
     private static readonly EsquemaDeModulo Plataforma = EsquemaDeModulo.Crear("plataforma");
 
@@ -117,6 +127,39 @@ public sealed class MotorDeLimitesPostgres(
     public Task<int> RegistrarRechazoDeOrigen(HuellaDeOrigen origen, TimeSpan ventana, CancellationToken cancelacion) => Task.FromResult(0);
 
     public Task<int> ContarRechazosDeOrigen(HuellaDeOrigen origen, TimeSpan ventana, CancellationToken cancelacion) => Task.FromResult(0);
+
+    /// <summary>
+    /// Sustituye el sujeto de las claves de las políticas por usuario (<c>política|u:s:sujeto</c>): se cambia solo el sufijo exacto y en la transacción del llamador, de modo que la baja es atómica. Con la misma
+    /// sentencia repetida no cambia nada (ya no hay claves con el sujeto original).
+    /// </summary>
+    public async Task<int> Sustituir(string sujetoActual, string sujetoNuevo, CancellationToken cancelacion = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sujetoActual);
+        ArgumentException.ThrowIfNullOrWhiteSpace(sujetoNuevo);
+
+        var cambiados = 0;
+        await delLlamador.Ejecutar(
+            async token =>
+            {
+                await delLlamador.EjecutarComo(
+                    Plataforma,
+                    async interno =>
+                    {
+                        // Con LIKE habría que escapar el sujeto: se compara el sufijo por longitud y igualdad exactas.
+                        await using var comando = Comando(
+                            delLlamador,
+                            "UPDATE plataforma.eventos_limite SET clave = left(clave, length(clave) - length(@viejo)) || @nuevo WHERE length(clave) >= length(@viejo) AND right(clave, length(@viejo)) = @viejo");
+                        comando.Parameters.AddWithValue("viejo", "|u:s:" + sujetoActual);
+                        comando.Parameters.AddWithValue("nuevo", "|u:s:" + sujetoNuevo);
+                        cambiados = await comando.ExecuteNonQueryAsync(interno).ConfigureAwait(false);
+                    },
+                    token).ConfigureAwait(false);
+                return 0;
+            },
+            cancelacion).ConfigureAwait(false);
+
+        return cambiados;
+    }
 
     /// <summary>Borra los eventos más viejos que la retención (24 horas); lo invoca un trabajo de fondo. Devuelve cuántos borró.</summary>
     public async Task<int> PurgarVencidos(CancellationToken cancelacion = default)

@@ -13,7 +13,7 @@ public sealed class PoliticasDeSeguridadTests
         Assert.All(PoliticasDeSeguridad.Todas, p =>
         {
             Assert.True(p.PublicarEvento, p.Nombre);
-            Assert.Equal(TipoDeSujetoDeLimite.Usuario, p.Tipo);
+            Assert.Equal(p.Nombre == PoliticasDeSeguridad.ReservasPorHoraPorOrigen.Nombre ? TipoDeSujetoDeLimite.Origen : TipoDeSujetoDeLimite.Usuario, p.Tipo);
         });
     }
 

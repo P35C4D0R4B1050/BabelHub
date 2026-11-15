@@ -33,6 +33,12 @@ public static class PoliticasDeLimite
 
     public static ClaveDePolitica TrasladosDelPersonal { get; } = new("traslados-del-personal");
 
+    /// <summary>Reservas iniciadas por un cliente: 5 por hora (SEL-14).</summary>
+    public static ClaveDePolitica ReservasPorHoraPorCliente { get; } = new("reservas-por-hora-por-cliente");
+
+    /// <summary>Reservas iniciadas desde un mismo origen: 10 por hora (SEL-19).</summary>
+    public static ClaveDePolitica ReservasPorHoraPorOrigen { get; } = new("reservas-por-hora-por-origen");
+
     public static ClaveDePolitica SolicitudesPorUsuario { get; } = new("solicitudes-por-usuario");
 
     public static ClaveDePolitica SolicitudesPorHuellaDirecta { get; } = new("solicitudes-por-huella-directa");
@@ -41,5 +47,5 @@ public static class PoliticasDeLimite
     public static IReadOnlyList<ClaveDePolitica> Generales { get; } =
         [SolicitudesPorUsuario, SolicitudesPorHuellaDirecta];
 
-    public static IReadOnlyList<ClaveDePolitica> Todas { get; } = [AjustesDelPersonal, TrasladosDelPersonal];
+    public static IReadOnlyList<ClaveDePolitica> Todas { get; } = [AjustesDelPersonal, TrasladosDelPersonal, ReservasPorHoraPorCliente, ReservasPorHoraPorOrigen];
 }
