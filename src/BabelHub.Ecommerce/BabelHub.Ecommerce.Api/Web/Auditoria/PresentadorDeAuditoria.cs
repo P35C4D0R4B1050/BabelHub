@@ -6,7 +6,7 @@ using BabelHub.Ecommerce.Application.Plataforma;
 
 namespace BabelHub.Ecommerce.Api.Web.Auditoria;
 
-/// <summary>Un dato del detalle de un registro, ya separado de su JSON: la vista lo pinta como texto (Razor lo codifica; nunca <c>Html.Raw</c>).</summary>
+/// <summary>Un dato del detalle de un registro, ya separado de su JSON: la vista lo pinta como texto (Razor lo codifica, nunca se marca como seguro).</summary>
 public sealed record DatoDeDetalleVista(string Clave, string Valor);
 
 /// <summary>Lo que pinta una fila de la pantalla de auditoría (WEB-30; AUD-25): la hora ya está en Lima y los valores son texto sin marcar.</summary>
