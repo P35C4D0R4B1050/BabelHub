@@ -421,6 +421,21 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
             cancelacion);
     }
 
+    public async Task<bool> ExtenderExpiracion(Guid reservaId, DateTimeOffset nuevaExpiracion, DateTimeOffset ahora, CancellationToken cancelacion = default) =>
+        await acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand(
+                    "UPDATE reservas.reservas SET fecha_expiracion = @nueva, extendida = true WHERE id = @id AND NOT extendida AND fecha_expiracion IS NOT NULL AND fecha_expiracion > @ahora",
+                    conexion,
+                    transaccion);
+                comando.Parameters.AddWithValue("id", reservaId);
+                comando.Parameters.Add(new NpgsqlParameter("nueva", NpgsqlDbType.TimestampTz) { Value = nuevaExpiracion.ToUniversalTime() });
+                comando.Parameters.Add(new NpgsqlParameter("ahora", NpgsqlDbType.TimestampTz) { Value = ahora.ToUniversalTime() });
+                return await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false) == 1;
+            },
+            cancelacion).ConfigureAwait(false);
+
     public Task<PedidosQueApartanUnidades> PedidosQueApartan(Guid fuenteId, Guid edicionId, int maximo, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(maximo);

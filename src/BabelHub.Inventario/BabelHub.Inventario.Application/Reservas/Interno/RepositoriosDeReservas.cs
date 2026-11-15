@@ -73,6 +73,12 @@ public interface IRepositorioDeReservas
     /// </summary>
     Task<IReadOnlyList<LineaConfirmada>> ConfirmarLineas(Guid pedidoId, DateTimeOffset ahora, CancellationToken cancelacion = default);
 
+    /// <summary>
+    /// Extiende la expiración de la cabecera con una sola sentencia condicional: solo si todavía no se extendió, tiene una fecha y esa fecha no llegó a <paramref name="ahora"/>. Devuelve si cambió algo (SEL-22, SEL-30).
+    /// Quien llama ya tomó el bloqueo del pedido.
+    /// </summary>
+    Task<bool> ExtenderExpiracion(Guid reservaId, DateTimeOffset nuevaExpiracion, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
     /// <summary>Fija el traslado vinculado de cada línea de reserva (por el identificador de la línea de reserva); repetirlo con el mismo traslado no cambia nada.</summary>
     Task VincularTraslados(IReadOnlyCollection<(Guid LineaDeReservaId, Guid TrasladoId)> vinculos, CancellationToken cancelacion = default);
 

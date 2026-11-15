@@ -208,6 +208,13 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
         return Task.CompletedTask;
     }
 
+    public Task<bool> ExtenderExpiracion(Guid reservaId, DateTimeOffset nuevaExpiracion, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.ExtenderExpiracion");
+        var reserva = Guardadas.Single(r => r.Id == reservaId);
+        return Task.FromResult(!reserva.Extendida && reserva.FechaDeExpiracion is not null && !reserva.EstaVencida(ahora) && reserva.Extender(ahora));
+    }
+
     public Task<PedidosQueApartanUnidades> PedidosQueApartan(Guid fuenteId, Guid edicionId, int maximo, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
         var pedidos = Guardadas
@@ -396,6 +403,8 @@ internal sealed class EntornoDeReservas
         Reservas.Guardadas.Add(reserva);
         return reserva;
     }
+
+    public ExtenderReservas Extender() => new(Autorizador, new ValidadorDeExtender(), Bloqueos, Reservas, new ConstructorDeLaReserva(Directorio), Base.Reloj);
 
     public ExpirarReservasVencidas ExpirarPedido() => new(Autorizador, Bloqueos, Reservas, Stock, Base.Reloj);
 
