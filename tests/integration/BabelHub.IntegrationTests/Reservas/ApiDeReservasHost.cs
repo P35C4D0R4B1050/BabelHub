@@ -132,6 +132,8 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
 
         builder.Services.AddSingleton(bd.Acceso);
         var configuracion = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Inventario:ClaveDeBajas"] = PilaDeReservas.ClaveDeBajasDePrueba }).Build();
+        // Un Traslados de prueba: confirmar un pedido de recojo con una línea en otra sucursal genera su traslado (SEL-03); el real es de inventario-traslados.
+        builder.Services.AddSingleton<IGeneradorDeTrasladosDePedido>(new TrasladosDeIntegracionDoble(bd));
         builder.Services.AgregarModuloReservas(configuracion);
         builder.Services.AgregarModuloFuentes();
 
