@@ -1,6 +1,7 @@
 using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Auditoria.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace BabelHub.Ecommerce.Infrastructure.Auditoria;
@@ -125,6 +126,28 @@ public static class TrabajosDeAuditoria
         TimeProvider? tiempo = null) =>
         new(CierreDeVentanasDeLimite, async ct => await cierre.Ejecutar(ct).ConfigureAwait(false), registro, actor, alertas, reloj, IntervaloDelCierre, tiempo);
 
+    /// <summary>El cierre de ventanas con una corrida por alcance de servicios (la del anfitrión: los casos de uso dependen del actor y de la unidad de trabajo, que son por alcance).</summary>
+    public static TrabajoDeFondoDeAuditoria Cierre(
+        IServiceScopeFactory fabrica,
+        IRegistroDeTrabajosDeFondo registro,
+        IEstablecedorDeActor actor,
+        IAlertas alertas,
+        IReloj reloj,
+        TimeProvider? tiempo = null) =>
+        new(
+            CierreDeVentanasDeLimite,
+            async ct =>
+            {
+                using var alcance = fabrica.CreateScope();
+                await alcance.ServiceProvider.GetRequiredService<CerrarVentanasDeLimite>().Ejecutar(ct).ConfigureAwait(false);
+            },
+            registro,
+            actor,
+            alertas,
+            reloj,
+            IntervaloDelCierre,
+            tiempo);
+
     /// <summary>La depuración diaria: solo corre si pasaron 24 horas desde la última exitosa (o si nunca corrió); lo demás (la espera tras un fallo, el bloqueo, la alerta de las 24 horas) lo resuelve <see cref="DepurarAuditoria"/>.</summary>
     public static TrabajoDeFondoDeAuditoria Depuracion(
         DepurarAuditoria depurar,
@@ -134,22 +157,23 @@ public static class TrabajosDeAuditoria
         IAlertas alertas,
         IReloj reloj,
         TimeProvider? tiempo = null) =>
+        new(DepuracionDiaria, ct => CorridaDeLaDepuracion(depurar, estado, reloj, ct), registro, actor, alertas, reloj, IntervaloDeLaDepuracion, tiempo);
+
+    /// <summary>La depuración diaria con una corrida por alcance de servicios.</summary>
+    public static TrabajoDeFondoDeAuditoria Depuracion(
+        IServiceScopeFactory fabrica,
+        IRegistroDeTrabajosDeFondo registro,
+        IEstablecedorDeActor actor,
+        IAlertas alertas,
+        IReloj reloj,
+        TimeProvider? tiempo = null) =>
         new(
             DepuracionDiaria,
             async ct =>
             {
-                var actual = await estado.Obtener(ct).ConfigureAwait(false);
-                if (actual.UltimaExitosa is { } ultima && actual.IntentosFallidos == 0 && reloj.Ahora - ultima < PeriodoDeLaDepuracion)
-                {
-                    return;
-                }
-
-                var resultado = await depurar.Ejecutar(ct).ConfigureAwait(false);
-                if (resultado.Estado == EstadoDeLaCorridaDeDepuracion.Fallida)
-                {
-                    // El fallo ya quedó en el estado (espera creciente y alerta a las 24 horas): la corrida del trabajo se registra como fallo.
-                    throw new InvalidOperationException("La depuración diaria no se completó.");
-                }
+                using var alcance = fabrica.CreateScope();
+                var servicios = alcance.ServiceProvider;
+                await CorridaDeLaDepuracion(servicios.GetRequiredService<DepurarAuditoria>(), servicios.GetRequiredService<IEstadoDeLaDepuracion>(), reloj, ct).ConfigureAwait(false);
             },
             registro,
             actor,
@@ -157,6 +181,22 @@ public static class TrabajosDeAuditoria
             reloj,
             IntervaloDeLaDepuracion,
             tiempo);
+
+    private static async Task CorridaDeLaDepuracion(DepurarAuditoria depurar, IEstadoDeLaDepuracion estado, IReloj reloj, CancellationToken ct)
+    {
+        var actual = await estado.Obtener(ct).ConfigureAwait(false);
+        if (actual.UltimaExitosa is { } ultima && actual.IntentosFallidos == 0 && reloj.Ahora - ultima < PeriodoDeLaDepuracion)
+        {
+            return;
+        }
+
+        var resultado = await depurar.Ejecutar(ct).ConfigureAwait(false);
+        if (resultado.Estado == EstadoDeLaCorridaDeDepuracion.Fallida)
+        {
+            // El fallo ya quedó en el estado (espera creciente y alerta a las 24 horas): la corrida del trabajo se registra como fallo.
+            throw new InvalidOperationException("La depuración diaria no se completó.");
+        }
+    }
 }
 
 /// <summary>El servicio en segundo plano que corre los trabajos del módulo en paralelo hasta el apagado (T27).</summary>

@@ -10,26 +10,26 @@ using BabelHub.Shared.Contratos.Auditoria;
 namespace BabelHub.Ecommerce.Infrastructure.Auditoria;
 
 /// <summary>
-/// Las opciones de solicitud que <c>Plataforma</c> lee en su manejador de salida (<c>CredencialesDeSalidaHandler</c>): el módulo <c>Auditoria</c> no puede depender de la Infraestructura de otro módulo
-/// (regla 13), así que declara las mismas llaves por su <b>nombre</b> y tipo, que son parte del contrato del manejador; una prueba de integración comprueba que coinciden con las de <c>Plataforma</c>.
+/// La opción de solicitud que <c>Plataforma</c> lee en su manejador de salida (<c>CredencialesDeSalidaHandler</c>): el módulo <c>Auditoria</c> no puede depender de la Infraestructura de otro módulo
+/// (regla 13), así que declara la misma llave por su <b>nombre</b> y tipo, que son parte del contrato del manejador; una prueba de integración comprueba que coincide con la de <c>Plataforma</c>.
 /// </summary>
 internal static class OpcionesDeSolicitudDeAuditoria
 {
     public static readonly HttpRequestOptionsKey<AlcanceDeServicio> Alcance = new("babelhub.alcance");
 
-    public static readonly HttpRequestOptionsKey<string> TokenDeUsuario = new("babelhub.token-de-usuario");
 }
 
 /// <summary>
 /// <see cref="IClienteDeAuditoriaDelInventario"/> sobre HTTP (T26; AUD-17, AUD-18, AUD-38): lee la auditoría, las alertas y el historial del Inventario por el contrato congelado de ECO-0 con <b>el token verificable del
-/// usuario</b> (de <see cref="ITokenDelUsuarioDeLaSesion"/>, nunca una cabecera de actor) y la credencial de servicio del alcance de cada ruta (que adjunta el manejador de salida de <c>Plataforma</c>). La espera es de
+/// usuario</b> y la credencial de servicio del alcance de cada ruta, que adjuntan los manejadores de salida (el del token de la sesión, único consumidor de <c>ITokenDelUsuarioDeLaSesion</c>, y el de <c>Plataforma</c>; nunca una cabecera de actor). La espera es de
 /// 10 segundos y <b>una falla del Inventario nunca es una excepción</b>: un corte, un 5xx, el vencimiento del plazo, una respuesta demasiado grande, que no es JSON o con campos que el contrato rechaza son
 /// <see cref="EstadoDeRespuestaDelInventario.NoDisponible"/>; un 400, 401, 403, 404 o 409 es <see cref="EstadoDeRespuestaDelInventario.Rechazada"/> (no es una falla del servicio). Nunca se registra el cuerpo, el token ni el
 /// mensaje del error remoto, y el valor de cada filtro viaja escapado.
 /// </summary>
-public sealed class HttpClienteDeAuditoriaDelInventario(IHttpClientFactory fabrica, ITokenDelUsuarioDeLaSesion tokens, TimeProvider? reloj = null) : IClienteDeAuditoriaDelInventario
+public sealed class HttpClienteDeAuditoriaDelInventario(IHttpClientFactory fabrica, TimeProvider? reloj = null) : IClienteDeAuditoriaDelInventario
 {
-    public const string NombreDelCliente = "inventario";
+    /// <summary>El cliente con nombre propio (no el de otros módulos, que reintenta y tiene su cortacircuitos): sin reintentos, sin redirecciones y sin la consulta en sus registros (el host lo compone con <c>AgregarClienteDeAuditoriaDelInventario</c>).</summary>
+    public const string NombreDelCliente = "inventario-auditoria";
 
     public static readonly TimeSpan Espera = TimeSpan.FromSeconds(10);
 
@@ -51,14 +51,14 @@ public sealed class HttpClienteDeAuditoriaDelInventario(IHttpClientFactory fabri
         Agregar(consultaHttp, "hasta", filtro.Hasta?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
         Agregar(consultaHttp, "texto", filtro.Texto);
         Agregar(consultaHttp, "cursor", consulta.Cursor);
-        return await Pedir(HttpMethod.Get, "/api/inventario/v1/auditoria" + Unir(consultaHttp), AlcanceDeServicio.ConsultaDeAuditoria, conToken: true, cuerpo: null, LeerPagina, cancelacion).ConfigureAwait(false);
+        return await Pedir(HttpMethod.Get, "/api/inventario/v1/auditoria" + Unir(consultaHttp), AlcanceDeServicio.ConsultaDeAuditoria, cuerpo: null, LeerPagina, cancelacion).ConfigureAwait(false);
     }
 
     public async Task<RespuestaDelInventario<IReadOnlyList<AlertaConsultada>>> LeerAlertasNuevas(DateTimeOffset desde, CancellationToken cancelacion = default)
     {
         var consultaHttp = new List<string>();
         Agregar(consultaHttp, "desde", desde.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
-        return await Pedir(HttpMethod.Get, "/api/inventario/v1/alertas" + Unir(consultaHttp), AlcanceDeServicio.LecturaDeAlertas, conToken: false, cuerpo: null, LeerAlertas, cancelacion).ConfigureAwait(false);
+        return await Pedir(HttpMethod.Get, "/api/inventario/v1/alertas" + Unir(consultaHttp), AlcanceDeServicio.LecturaDeAlertas, cuerpo: null, LeerAlertas, cancelacion).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -77,7 +77,6 @@ public sealed class HttpClienteDeAuditoriaDelInventario(IHttpClientFactory fabri
             HttpMethod.Post,
             "/api/inventario/v1/alertas/" + Uri.EscapeDataString(alertaId) + "/revisada",
             AlcanceDeServicio.MarcarAlerta,
-            conToken: true,
             cuerpo,
             _ => true,
             cancelacion).ConfigureAwait(false);
@@ -96,14 +95,13 @@ public sealed class HttpClienteDeAuditoriaDelInventario(IHttpClientFactory fabri
         var consultaHttp = new List<string>();
         Agregar(consultaHttp, "sucursal", sucursalPedida.ToString("D"));
         Agregar(consultaHttp, "cursor", cursor);
-        return await Pedir(HttpMethod.Get, "/api/inventario/v1/historial" + Unir(consultaHttp), AlcanceDeServicio.Historial, conToken: true, cuerpo: null, LeerPagina, cancelacion).ConfigureAwait(false);
+        return await Pedir(HttpMethod.Get, "/api/inventario/v1/historial" + Unir(consultaHttp), AlcanceDeServicio.Historial, cuerpo: null, LeerPagina, cancelacion).ConfigureAwait(false);
     }
 
     private async Task<RespuestaDelInventario<T>> Pedir<T>(
         HttpMethod metodo,
         string ruta,
         AlcanceDeServicio alcance,
-        bool conToken,
         string? cuerpo,
         Func<string, T> leer,
         CancellationToken cancelacion)
@@ -111,17 +109,6 @@ public sealed class HttpClienteDeAuditoriaDelInventario(IHttpClientFactory fabri
     {
         using var solicitud = new HttpRequestMessage(metodo, ruta);
         solicitud.Options.Set(OpcionesDeSolicitudDeAuditoria.Alcance, alcance);
-        if (conToken)
-        {
-            var token = await tokens.Actual(cancelacion).ConfigureAwait(false);
-            if (token is null)
-            {
-                // Sin sesión no hay quien actúe: el Inventario lo rechazaría, y no se llama sin el token (nunca una cabecera de actor).
-                return RespuestaDelInventario<T>.Rechazada;
-            }
-
-            solicitud.Options.Set(OpcionesDeSolicitudDeAuditoria.TokenDeUsuario, token.Revelar());
-        }
 
         if (cuerpo is not null)
         {
@@ -156,6 +143,11 @@ public sealed class HttpClienteDeAuditoriaDelInventario(IHttpClientFactory fabri
         catch (OperationCanceledException) when (cancelacion.IsCancellationRequested)
         {
             throw;
+        }
+        catch (InvalidOperationException)
+        {
+            // Sin la sesión de la persona (el manejador del token no tiene a quién poner) no se llama: el Inventario lo rechazaría. Nunca una cabecera de actor.
+            return RespuestaDelInventario<T>.Rechazada;
         }
         catch (Exception)
         {
@@ -226,8 +218,8 @@ public sealed class HttpClienteDeAuditoriaDelInventario(IHttpClientFactory fabri
             d.Id,
             Analizar<ServicioAuditado>(d.Servicio ?? string.Empty),
             Analizar<TipoDeRegistroAuditado>(d.Tipo ?? string.Empty),
-            Analizar<TipoDeActor>(d.ActorTipo ?? string.Empty),
-            d.ActorId,
+            Analizar<TipoDeActor>(d.TipoDeActor ?? string.Empty),
+            d.UsuarioId,
             d.Rol,
             d.InstanteUtc,
             d.Accion ?? string.Empty,

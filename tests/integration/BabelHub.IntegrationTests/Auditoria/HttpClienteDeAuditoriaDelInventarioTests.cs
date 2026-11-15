@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using BabelHub.Ecommerce.Api.Auditoria;
 using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Infrastructure.Auditoria;
@@ -67,11 +68,12 @@ public sealed class HttpClienteDeAuditoriaDelInventarioTests
         servicios.AddLogging();
         servicios.AddSingleton(Credenciales());
         servicios.AddSingleton<IOrigenDeSolicitud>(new OrigenDePrueba());
-        servicios.AgregarClienteDeServicio(HttpClienteDeAuditoriaDelInventario.NombreDelCliente, new Uri("https://inventario.interno/"), opciones ?? new OpcionesDelClienteDeServicio { ReintentosMaximos = 0, DuracionDelCorte = TimeSpan.FromSeconds(30) })
-            .ConfigurePrimaryHttpMessageHandler(() => servidor);
-        var proveedor = servicios.BuildServiceProvider();
         var tokenDePrueba = new TokenDePrueba(token == "usar-el-del-usuario" ? TokenDelUsuario : token);
-        return (new HttpClienteDeAuditoriaDelInventario(proveedor.GetRequiredService<IHttpClientFactory>(), tokenDePrueba), tokenDePrueba);
+        servicios.AddSingleton<ITokenDelUsuarioDeLaSesion>(tokenDePrueba);
+        servicios.AgregarClienteDeAuditoriaDelInventario(new Uri("https://inventario.interno/"), opciones ?? new OpcionesDelClienteDeServicio { ReintentosMaximos = 0, DuracionDelCorte = TimeSpan.FromSeconds(30) });
+        servicios.AddHttpClient(HttpClienteDeAuditoriaDelInventario.NombreDelCliente).ConfigurePrimaryHttpMessageHandler(() => servidor);
+        var proveedor = servicios.BuildServiceProvider();
+        return (new HttpClienteDeAuditoriaDelInventario(proveedor.GetRequiredService<IHttpClientFactory>()), tokenDePrueba);
     }
 
     private static HttpResponseMessage Json(string cuerpo, HttpStatusCode estado = HttpStatusCode.OK) => new(estado) { Content = new StringContent(cuerpo, Encoding.UTF8, "application/json") };
@@ -80,7 +82,7 @@ public sealed class HttpClienteDeAuditoriaDelInventarioTests
         "{\"registros\":[" + string.Join(',', Enumerable.Range(0, registros).Select(i => Registro(Guid.NewGuid(), i))) + "],\"siguienteCursor\":" + (siguiente is null ? "null" : $"\"{siguiente}\"") + ",\"cursorDeLaPagina\":" + (deLaPagina is null ? "null" : $"\"{deLaPagina}\"") + "}";
 
     private static string Registro(Guid id, int segundos) =>
-        $"{{\"id\":\"{id}\",\"servicio\":\"Inventario\",\"tipo\":\"Auditoria\",\"actorTipo\":\"Usuario\",\"actorId\":\"{Guid.NewGuid()}\",\"rol\":\"administrador-central\",\"instanteUtc\":\"{DateTimeOffset.UtcNow.AddSeconds(-segundos):O}\",\"accion\":\"AjusteRegistrado\",\"resultado\":\"Exitoso\",\"objetoTipo\":\"ajuste\",\"objetoId\":\"{Guid.NewGuid():D}\",\"sucursalOrigen\":\"{Guid.NewGuid():D}\",\"detalle\":\"{{\\\"cantidadAnterior\\\":\\\"5\\\"}}\",\"clavesPersonales\":[],\"truncado\":false}}";
+        $"{{\"id\":\"{id}\",\"servicio\":\"Inventario\",\"tipo\":\"Auditoria\",\"tipoDeActor\":\"Usuario\",\"usuarioId\":\"{Guid.NewGuid()}\",\"rol\":\"administrador-central\",\"instanteUtc\":\"{DateTimeOffset.UtcNow.AddSeconds(-segundos):O}\",\"accion\":\"AjusteRegistrado\",\"resultado\":\"Exitoso\",\"objetoTipo\":\"ajuste\",\"objetoId\":\"{Guid.NewGuid():D}\",\"sucursalOrigen\":\"{Guid.NewGuid():D}\",\"detalle\":\"{{\\\"cantidadAnterior\\\":\\\"5\\\"}}\",\"clavesPersonales\":[],\"truncado\":false}}";
 
     private static string Alerta(string id, string clase = "Seguridad") =>
         $"{{\"id\":\"{id}\",\"servicio\":\"Inventario\",\"motivo\":\"accesos-denegados\",\"clase\":\"{clase}\",\"primeraOcurrencia\":\"{DateTimeOffset.UtcNow.AddMinutes(-5):O}\",\"ultimaOcurrencia\":\"{DateTimeOffset.UtcNow.AddMinutes(-1):O}\",\"ocurrencias\":3,\"revisadasHasta\":1,\"revisadaPor\":null,\"revisadaEn\":null}}";
@@ -266,9 +268,9 @@ public sealed class HttpClienteDeAuditoriaDelInventarioTests
     [InlineData("{\"registros\":null}")]
     [InlineData("[]")]
     [InlineData("{\"registros\":[{\"id\":\"no-es-un-guid\"}]}")]
-    [InlineData("{\"registros\":[{\"id\":\"11111111-1111-4111-8111-111111111111\",\"servicio\":\"Marte\",\"tipo\":\"Auditoria\",\"actorTipo\":\"Usuario\",\"instanteUtc\":\"2026-11-14T10:00:00Z\",\"accion\":\"AjusteRegistrado\",\"resultado\":\"Exitoso\"}]}")]
-    [InlineData("{\"registros\":[{\"id\":\"11111111-1111-4111-8111-111111111111\",\"servicio\":\"Inventario\",\"tipo\":\"Auditoria\",\"actorTipo\":\"Usuario\",\"instanteUtc\":\"2026-11-14T10:00:00Z\",\"accion\":\"accion en minusculas\",\"resultado\":\"Exitoso\"}]}")]
-    [InlineData("{\"registros\":[{\"id\":\"11111111-1111-4111-8111-111111111111\",\"servicio\":\"Inventario\",\"tipo\":\"Auditoria\",\"actorTipo\":\"Usuario\",\"instanteUtc\":\"2026-11-14T10:00:00-05:00\",\"accion\":\"AjusteRegistrado\",\"resultado\":\"Exitoso\"}]}")]
+    [InlineData("{\"registros\":[{\"id\":\"11111111-1111-4111-8111-111111111111\",\"servicio\":\"Marte\",\"tipo\":\"Auditoria\",\"tipoDeActor\":\"Usuario\",\"instanteUtc\":\"2026-11-14T10:00:00Z\",\"accion\":\"AjusteRegistrado\",\"resultado\":\"Exitoso\"}]}")]
+    [InlineData("{\"registros\":[{\"id\":\"11111111-1111-4111-8111-111111111111\",\"servicio\":\"Inventario\",\"tipo\":\"Auditoria\",\"tipoDeActor\":\"Usuario\",\"instanteUtc\":\"2026-11-14T10:00:00Z\",\"accion\":\"accion en minusculas\",\"resultado\":\"Exitoso\"}]}")]
+    [InlineData("{\"registros\":[{\"id\":\"11111111-1111-4111-8111-111111111111\",\"servicio\":\"Inventario\",\"tipo\":\"Auditoria\",\"tipoDeActor\":\"Usuario\",\"instanteUtc\":\"2026-11-14T10:00:00-05:00\",\"accion\":\"AjusteRegistrado\",\"resultado\":\"Exitoso\"}]}")]
     public async Task UnaRespuestaInvalidaEsNoDisponible_SinExcepcion(string cuerpo)
     {
         var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json(cuerpo)));

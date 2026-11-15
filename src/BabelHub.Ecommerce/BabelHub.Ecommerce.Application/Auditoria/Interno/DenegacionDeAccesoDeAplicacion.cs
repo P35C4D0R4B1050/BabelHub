@@ -15,16 +15,6 @@ public interface IEscritorDeDenegaciones
 }
 
 /// <summary>
-/// Las plantillas de ruta de los endpoints del servicio, que la Api obtiene de sus rutas registradas y <b>normaliza</b> a segmentos <c>{nombre}</c>
-/// (sin restricciones como <c>{id:guid}</c>, opcionales ni comodines): con ellas se reduce la ruta cruda a su plantilla (AUD-05, AUD-06). Una plantilla
-/// que no cumpla la forma se descarta (<see cref="ResolutorDeRutas"/>) y no impide registrar el evento.
-/// </summary>
-public interface IPlantillasDeRuta
-{
-    IReadOnlyCollection<string> Todas { get; }
-}
-
-/// <summary>
 /// Reduce la ruta cruda de una solicitud a su plantilla. Valida y ordena la lista de plantillas <b>una sola vez</b> (descarta las que no cumplen la
 /// forma) y, ante cualquier problema, devuelve «sin-coincidencia»: la ruta nunca puede hacer perder el evento ni se guarda cruda. Una ruta vacía o
 /// demasiado larga se descarta sin tocar la lista.

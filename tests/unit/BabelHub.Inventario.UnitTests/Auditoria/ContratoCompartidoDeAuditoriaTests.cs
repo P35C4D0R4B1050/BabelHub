@@ -130,8 +130,8 @@ public sealed class ContratoCompartidoDeAuditoriaTests
     public void ElRegistroDto_TieneUnaPropiedadPorCadaCampoDelRegistroAuditado_ConNombresEstables()
     {
         var propiedadesDelDto = typeof(Contrato.RegistroDto).GetProperties().Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
-        // El registro de la Aplicación usa «ActorRol» donde el contrato usa «Rol»; «InstanteEnLima» es solo para mostrar y la interfaz lo calcula del UTC.
-        var equivalencias = new Dictionary<string, string> { ["ActorRol"] = "Rol" };
+        // El contrato nombra al actor sin la palabra «actor» en el JSON (la regla de DTO lo prohíbe): «ActorRol» es «Rol», «ActorId» es «UsuarioId» y «ActorTipo» es «TipoDeActor»; «InstanteEnLima» es solo para mostrar y la interfaz lo calcula del UTC.
+        var equivalencias = new Dictionary<string, string> { ["ActorRol"] = "Rol", ["ActorId"] = "UsuarioId", ["ActorTipo"] = "TipoDeActor" };
         foreach (var propiedad in typeof(RegistroAuditado).GetProperties().Where(p => p.Name != nameof(RegistroAuditado.InstanteEnLima)))
         {
             var nombre = equivalencias.GetValueOrDefault(propiedad.Name, propiedad.Name);
@@ -143,7 +143,7 @@ public sealed class ContratoCompartidoDeAuditoriaTests
             "PedidoAnulado", "Exitoso", "pedido", "P-1", null, null, "motivo-x", null, "/api/x", "{}", ["correo"], false, "abc12345", null);
         using var documento = JsonDocument.Parse(JsonSerializer.Serialize(registro, Json));
         Assert.Equal(
-            ["id", "servicio", "tipo", "actorTipo", "actorId", "rol", "instanteUtc", "accion", "resultado", "objetoTipo", "objetoId", "sucursalOrigen", "sucursalDestino", "motivo", "origen", "ruta", "detalle", "clavesPersonales", "truncado", "correlacion", "anonimizadoEn"],
+            ["id", "servicio", "tipo", "tipoDeActor", "usuarioId", "rol", "instanteUtc", "accion", "resultado", "objetoTipo", "objetoId", "sucursalOrigen", "sucursalDestino", "motivo", "origen", "ruta", "detalle", "clavesPersonales", "truncado", "correlacion", "anonimizadoEn"],
             documento.RootElement.EnumerateObject().Select(p => p.Name).ToList());
     }
 

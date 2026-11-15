@@ -26,11 +26,32 @@ public sealed class ActorDeServicioMiddleware(RequestDelegate siguiente)
             && contexto.Items[CredencialDeServicioMiddleware.ClaveDelAlcance] is AlcanceDeServicio alcance
             && alcance != AlcanceDeServicio.OperacionDeUsuario)
         {
-            establecedor.Establecer(ActorActual.DeIntegracion(alcance.ToString()));
+            establecedor.Establecer(ActorActual.DeIntegracion(NombreDelAlcance(alcance)));
         }
 
         await siguiente(contexto).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// El nombre del alcance tal como lo fijan los contratos (<c>docs/03/08</c>, <see cref="AlcancesDeCredencial"/>): con él la Aplicación reconoce de qué integración viene la llamada (por ejemplo <c>lectura-alertas</c> en
+    /// <c>IntegracionesDeAuditoria</c>). El nombre del miembro del enumerado (<c>LecturaDeAlertas</c>) no es el del contrato y nunca coincidiría (hallazgo de la prueba de extremo a extremo de AUD-5, T30).
+    /// </summary>
+    public static string NombreDelAlcance(AlcanceDeServicio alcance) => alcance switch
+    {
+        AlcanceDeServicio.OperacionDeUsuario => AlcancesDeCredencial.OperacionDeUsuario,
+        AlcanceDeServicio.LecturaDeDisponibilidad => AlcancesDeCredencial.LecturaDeDisponibilidad,
+        AlcanceDeServicio.ExpiracionDeReservas => AlcancesDeCredencial.ExpiracionDeReservas,
+        AlcanceDeServicio.ConsultaDePendientes => AlcancesDeCredencial.ConsultaDePendientes,
+        AlcanceDeServicio.BajaDeTitular => AlcancesDeCredencial.BajaDeTitular,
+        AlcanceDeServicio.LecturaDeAlertas => AlcancesDeCredencial.LecturaDeAlertas,
+        AlcanceDeServicio.ConsultaDeAuditoria => AlcancesDeCredencial.ConsultaDeAuditoria,
+        AlcanceDeServicio.MarcarAlerta => AlcancesDeCredencial.MarcarAlerta,
+        AlcanceDeServicio.Historial => AlcancesDeCredencial.Historial,
+        AlcanceDeServicio.SolicitarAviso => AlcancesDeCredencial.SolicitarAviso,
+        AlcanceDeServicio.LecturaDeContacto => AlcancesDeCredencial.LecturaDeContacto,
+        AlcanceDeServicio.OrigenReenviado => AlcancesDeCredencial.OrigenReenviado,
+        _ => throw new ArgumentOutOfRangeException(nameof(alcance), alcance, "Un alcance de servicio sin nombre de contrato."),
+    };
 }
 
 /// <summary>La matriz operación → alcance de la credencial de las operaciones de <c>Fuentes</c>, tomada del catálogo de contratos v1 (una operación declara un solo alcance, rechazo por defecto).</summary>

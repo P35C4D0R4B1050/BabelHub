@@ -30,10 +30,10 @@ public class ReglasDelActorTests
 
         var infraestructura = Types.InAssembly(Cargar($"{servicio}.Infrastructure")).That().HaveDependencyOn(puerto).GetTypes()
             .Select(t => t.FullName ?? string.Empty)
-            .Where(nombre => !nombre.StartsWith($"{servicio}.Infrastructure.Plataforma.", StringComparison.Ordinal) && !nombre.StartsWith($"{servicio}.Infrastructure.Auditoria.", StringComparison.Ordinal))
+            .Where(nombre => !nombre.StartsWith($"{servicio}.Infrastructure.Plataforma.", StringComparison.Ordinal) && !nombre.StartsWith($"{servicio}.Infrastructure.Auditoria.", StringComparison.Ordinal) && !nombre.StartsWith($"{servicio}.Infrastructure.Composicion.", StringComparison.Ordinal))
             .ToList();
 
-        Assert.True(infraestructura.Count == 0, $"Solo la Infraestructura de Plataforma y de Auditoría fijan el actor: {string.Join(", ", infraestructura)}.");
+        Assert.True(infraestructura.Count == 0, $"Solo la Infraestructura de Plataforma y de Auditoría (y la raíz de composición, que registra al ejecutor de trabajos de fondo) fijan el actor: {string.Join(", ", infraestructura)}.");
     }
 
     private static Assembly Cargar(string nombre) =>
