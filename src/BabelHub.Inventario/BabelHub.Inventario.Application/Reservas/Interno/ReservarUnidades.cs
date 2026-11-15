@@ -36,6 +36,7 @@ internal sealed class ReservarUnidades(
     IMovimientosDeStock stock,
     SelectorDeFuentes selector,
     ConstructorDeLaReserva constructor,
+    LimitesDeReservar limites,
     IReloj reloj) : ICasoDeUso<ReservarEntrada, ReservaDelPedido>
 {
     public async Task<Resultado<ReservaDelPedido>> Ejecutar(ReservarEntrada entrada, CancellationToken cancelacion = default)
@@ -111,6 +112,12 @@ internal sealed class ReservarUnidades(
             return FallosDeReservas.Validacion<ReservaDelPedido>(ResultadoDeValidacion.Invalido([new ErrorDeCampo("codigoDeSucursalDeRecojo", "inexistente")]));
         }
 
+        // Los límites cuentan en esta transacción y bajo el bloqueo del cliente: un rechazo posterior (stock) los deshace con ella (SEL-14).
+        if (await limites.Evaluar(clienteId, entrada.PedidoId, cancelacion).ConfigureAwait(false) is { } rechazoPorLimite)
+        {
+            return FallosDeReservas.Fallo<ReservaDelPedido>(rechazoPorLimite);
+        }
+
         var lineas = entrada.Lineas.OrderBy(l => l.EdicionId, OrdenDeBloqueo.DeIdentificadores).ToList();
         var bloqueo = await stock.Bloquear([.. lineas.Select(l => l.EdicionId)], cancelacion).ConfigureAwait(false);
         if (!bloqueo.EstaBloqueado)
@@ -157,7 +164,7 @@ internal sealed class ReservarUnidades(
             ahora,
             seleccionadas.Select(s => LineaDeReserva.Pendiente(Guid.NewGuid(), s.Linea.LineaId, s.Linea.EdicionId, s.FuenteId, s.Linea.Cantidad, ahora)));
 
-        await reservas.Insertar(reserva, new DatosDeLaSolicitud(entrada.ClaveDeIdempotencia, CargaCanonicaDeReservar.Huella(entrada), null), cancelacion).ConfigureAwait(false);
+        await reservas.Insertar(reserva, new DatosDeLaSolicitud(entrada.ClaveDeIdempotencia, CargaCanonicaDeReservar.Huella(entrada), limites.HuellaDeOrigen), cancelacion).ConfigureAwait(false);
         return Resultado<ReservaDelPedido>.Exito(await constructor.Construir(reserva, esRepeticion: false, cancelacion).ConfigureAwait(false));
     }
 

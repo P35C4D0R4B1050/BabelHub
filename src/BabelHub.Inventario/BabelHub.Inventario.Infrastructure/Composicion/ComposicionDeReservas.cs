@@ -52,6 +52,12 @@ public static class ComposicionDeReservas
         servicios.AddScoped(sp => new AutorizadorDeReservas(sp.GetRequiredService<IActorActual>(), sp.GetRequiredService<IDenegacionDeAcceso>()));
         servicios.AddScoped(sp => new SelectorDeFuentes(sp.GetRequiredService<IDirectorioDeFuentes>(), sp.GetRequiredService<IEstrategiaDeSeleccion>()));
         servicios.AddScoped<ConstructorDeLaReserva>();
+        servicios.AddScoped(sp => new LimitesDeReservar(
+            sp.GetRequiredService<IControlDeLimites>(),
+            sp.GetRequiredService<IPublicadorDeEventosDeSeguridad>(),
+            sp.GetRequiredService<IRepositorioDeReservas>(),
+            sp.GetRequiredService<IOrigenDeSolicitud>(),
+            sp.GetRequiredService<IReloj>()));
 
         servicios.AddSingleton<IValidador<ReservarEntrada>, ValidadorDeReservar>();
 

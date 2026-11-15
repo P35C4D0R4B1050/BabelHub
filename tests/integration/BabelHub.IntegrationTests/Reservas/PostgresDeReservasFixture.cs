@@ -58,6 +58,12 @@ public sealed class PostgresDeReservasFixture : IAsyncLifetime
             """);
         await Ejecutar(DefinicionDeFuentes.Permisos);
         await Ejecutar(DefinicionDeReservas.Permisos);
+        // Los eventos del motor de límites de plataforma (plataforma.eventos_limite), con el permiso mínimo de su rol.
+        await Ejecutar("CREATE ROLE rol_plataforma NOLOGIN; GRANT rol_plataforma TO acceso;");
+        await Ejecutar(DefinicionDeEventosDeLimite.Sql + """
+            ALTER SCHEMA plataforma OWNER TO propietario;
+            ALTER TABLE plataforma.eventos_limite OWNER TO propietario;
+            """ + DefinicionDeEventosDeLimite.Permisos);
 
         Acceso = NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString())
         {
@@ -96,7 +102,7 @@ public sealed class PostgresDeReservasFixture : IAsyncLifetime
     }
 
     public Task Limpiar() => Ejecutar(
-        "TRUNCATE reservas.reserva_lineas, reservas.reservas, reservas.operaciones_idempotentes, reservas.bajas_recibidas, fuentes.stock, fuentes.rutas, fuentes.ediciones, fuentes.fuentes CASCADE");
+        "TRUNCATE reservas.reserva_lineas, reservas.reservas, reservas.operaciones_idempotentes, reservas.bajas_recibidas, plataforma.eventos_limite, fuentes.stock, fuentes.rutas, fuentes.ediciones, fuentes.fuentes CASCADE");
 
     // --- los datos de Fuentes (con la cuenta de despliegue) ---
 

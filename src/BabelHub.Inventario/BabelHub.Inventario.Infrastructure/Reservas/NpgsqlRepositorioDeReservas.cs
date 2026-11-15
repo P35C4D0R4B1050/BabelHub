@@ -50,6 +50,27 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
             },
             cancelacion);
 
+    public Task<DateTimeOffset?> ExpiracionDeLaPendienteDelCliente(Guid clienteId, Guid exceptoPedidoId, DateTimeOffset ahora, CancellationToken cancelacion = default) =>
+        acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand(
+                    """
+                    SELECT max(r.fecha_expiracion)
+                    FROM reservas.reservas r
+                    WHERE r.cliente_id = @c AND r.pedido_id <> @p AND r.fecha_expiracion IS NOT NULL AND r.fecha_expiracion > @ahora
+                      AND EXISTS (SELECT 1 FROM reservas.reserva_lineas l WHERE l.reserva_id = r.id AND l.estado = 'pendiente')
+                    """,
+                    conexion,
+                    transaccion);
+                comando.Parameters.AddWithValue("c", clienteId);
+                comando.Parameters.AddWithValue("p", exceptoPedidoId);
+                comando.Parameters.Add(new NpgsqlParameter("ahora", NpgsqlDbType.TimestampTz) { Value = ahora.ToUniversalTime() });
+                var valor = await comando.ExecuteScalarAsync(token).ConfigureAwait(false);
+                return valor is null or DBNull ? (DateTimeOffset?)null : new DateTimeOffset((DateTime)valor, TimeSpan.Zero);
+            },
+            cancelacion);
+
     private Task<ReservaPorClave?> Una(string condicion, string parametro, Guid valor, CancellationToken cancelacion) =>
         acceso.Ejecutar(
             async (conexion, transaccion, token) =>

@@ -2,6 +2,9 @@ using BabelHub.Inventario.Application.Auditoria;
 using BabelHub.Inventario.Application.Fuentes;
 using BabelHub.Inventario.Application.Fuentes.Interno;
 using BabelHub.Inventario.Application.Plataforma;
+using BabelHub.Inventario.Application.Plataforma.Interno;
+using BabelHub.Inventario.Domain.Plataforma;
+using BabelHub.Inventario.UnitTests.Plataforma;
 using BabelHub.Inventario.Application.Reservas;
 using BabelHub.Inventario.Application.Reservas.Interno;
 using BabelHub.Inventario.Domain.Fuentes;
@@ -70,6 +73,16 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
 
     /// <summary>Los titulares dados de baja (SEL-35).</summary>
     public HashSet<Guid> Bajas { get; } = [];
+
+    public Task<DateTimeOffset?> ExpiracionDeLaPendienteDelCliente(Guid clienteId, Guid exceptoPedidoId, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.PendienteDelCliente");
+        var vence = Guardadas
+            .Where(r => r.ClienteId == clienteId && r.PedidoId != exceptoPedidoId && r.TienePendienteVigente(ahora))
+            .Select(r => r.FechaDeExpiracion)
+            .Max();
+        return Task.FromResult(vence);
+    }
 
     public Task<ReservaPorClave?> PorClave(Guid clienteId, string clave, CancellationToken cancelacion = default)
     {
@@ -220,6 +233,11 @@ internal sealed class EntornoDeReservas
 
     public EjecutorComoSistemaDoble Sistema { get; }
 
+    /// <summary>Un origen conocido (la huella de una dirección): los límites por origen rigen.</summary>
+    public OrigenFijo Origen { get; } = new(new OrigenDeSolicitud(HuellaDeOrigen.Crear("k3Jx9bQ2vT7mYw1ZpLr4NfA8sUe0dHcGiXoVtB5yMqE", "v1"), "203.0.113.7"));
+
+    public PublicadorDeEventosEspia Eventos { get; } = new();
+
     public Guid ClienteId => Base.Actor.Actual!.UsuarioId!.Value;
 
     public AutorizadorDeReservas Autorizador => new(Base.Actor, Base.Denegaciones);
@@ -231,6 +249,15 @@ internal sealed class EntornoDeReservas
     public IMovimientosDeStock Stock => new MovimientosDeStock(Base.Fichas, Base.Existencias, ReservasDeStock, Aplicador);
 
     public ReservasDeStock ReservasDeStock => new(Reservas, Bloqueos, Auditoria, Sistema, Base.Reloj);
+
+    public LimitesDeReservar Limites => _limites ??= new(
+        new EvaluarLimite(new CatalogoDePoliticas(PoliticasDeSeguridad.Todas), new MotorDeMemoria(Base.Reloj), null, Origen, Eventos, Base.Reloj),
+        Eventos,
+        Reservas,
+        Origen,
+        Base.Reloj);
+
+    private LimitesDeReservar? _limites;
 
     public ExpirarReservasVencidas ExpirarPedido() => new(Autorizador, Bloqueos, Reservas, Stock, Base.Reloj);
 
@@ -248,6 +275,7 @@ internal sealed class EntornoDeReservas
             Stock,
             new SelectorDeFuentes(Directorio, estrategia ?? new SeleccionPorCercania()),
             new ConstructorDeLaReserva(Directorio),
+            Limites,
             Base.Reloj);
 
     public static LineaSolicitada Linea(Guid edicionId, int cantidad = 1, Guid? lineaId = null) => new(lineaId ?? Guid.NewGuid(), edicionId, cantidad);

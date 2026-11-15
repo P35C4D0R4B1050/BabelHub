@@ -243,3 +243,63 @@ public interface IReservasParaTraslados
 
     Task<ResultadoDeMovimientoDeReserva> RecrearEnElDestino(Guid pedidoId, Guid fuenteDeDestinoId, Guid edicionId, int cantidad, Guid trasladoId, CancellationToken cancelacion = default);
 }
+
+// ---------- El rechazo por límite de reservas (SEL-13, SEL-14, SEL-19, SEL-36) ----------
+
+/// <summary>Los motivos de un rechazo por límite de reservas: son las claves de las políticas (los de SEL-14, SEL-19 y SEL-36) y la propia de SEL-13.</summary>
+public static class MotivosDeLimiteDeReservas
+{
+    public const string PendientePorCliente = "reservas-pendiente-por-cliente";
+
+    public const string PorHoraPorCliente = "reservas-por-hora-por-cliente";
+
+    public const string PorHoraPorOrigen = "reservas-por-hora-por-origen";
+
+    public const string ReemplazosPorPedido = "reservas-reemplazos-por-pedido";
+}
+
+/// <summary>Un rechazo por límite: el motivo, cuánto esperar y desde cuándo se puede reintentar. La respuesta es la misma para todos los motivos (SEL-15): solo cambian estos tres datos.</summary>
+public sealed record RechazoPorLimite(string Motivo, int EsperaEnSegundos, DateTimeOffset DisponibleDesde);
+
+/// <summary>
+/// Cómo viaja un rechazo por límite dentro de <c>ErrorDeAplicacion.Errores</c> (con categoría <c>Limite</c> y clave <c>limite-excedido</c>): tres <c>ErrorDeCampo</c> (<c>limite</c> con el motivo,
+/// <c>esperaEnSegundos</c> y <c>disponibleDesde</c> en ISO 8601 UTC). La Api lo lee con <see cref="TryLeer"/> para armar el 429; ningún dato del cliente viaja aquí.
+/// </summary>
+public static class DetalleDeLimiteDeReservas
+{
+    public const string ClaveDeLimiteExcedido = "limite-excedido";
+
+    private const string Limite = "limite";
+
+    private const string Espera = "esperaEnSegundos";
+
+    private const string Desde = "disponibleDesde";
+
+    public static IReadOnlyList<Plataforma.ErrorDeCampo> Codificar(RechazoPorLimite rechazo)
+    {
+        ArgumentNullException.ThrowIfNull(rechazo);
+        return
+        [
+            new Plataforma.ErrorDeCampo(Limite, rechazo.Motivo),
+            new Plataforma.ErrorDeCampo(Espera, rechazo.EsperaEnSegundos.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            new Plataforma.ErrorDeCampo(Desde, rechazo.DisponibleDesde.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture)),
+        ];
+    }
+
+    public static bool TryLeer(IReadOnlyList<Plataforma.ErrorDeCampo> errores, out RechazoPorLimite? rechazo)
+    {
+        ArgumentNullException.ThrowIfNull(errores);
+        rechazo = null;
+        var motivo = errores.FirstOrDefault(e => e.Campo == Limite)?.Clave;
+        var espera = errores.FirstOrDefault(e => e.Campo == Espera)?.Clave;
+        var desde = errores.FirstOrDefault(e => e.Campo == Desde)?.Clave;
+        if (motivo is null || !int.TryParse(espera, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var segundos)
+            || !DateTimeOffset.TryParseExact(desde, "yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var instante))
+        {
+            return false;
+        }
+
+        rechazo = new RechazoPorLimite(motivo, segundos, instante);
+        return true;
+    }
+}

@@ -31,6 +31,12 @@ public interface IRepositorioDeReservas
     /// <summary><see langword="true"/> si el titular figura en las bajas recibidas: una cuenta cancelada no reserva (SEL-35).</summary>
     Task<bool> ClienteDadoDeBaja(Guid clienteId, CancellationToken cancelacion = default);
 
+    /// <summary>
+    /// El instante de expiración de la reserva <b>pendiente y no vencida</b> de ese cliente en <b>otro pedido</b> que no sea <paramref name="exceptoPedidoId"/>, o <see langword="null"/> si no tiene (SEL-13). Se lee bajo el
+    /// bloqueo del cliente, de modo que dos solicitudes simultáneas del mismo cliente se serializan.
+    /// </summary>
+    Task<DateTimeOffset?> ExpiracionDeLaPendienteDelCliente(Guid clienteId, Guid exceptoPedidoId, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
     /// <summary>Inserta la cabecera y sus líneas. Una violación de unicidad por una cabecera concurrente nunca llega como error 500: la Aplicación la toma bajo el bloqueo del pedido.</summary>
     Task Insertar(ReservaDePedido reserva, DatosDeLaSolicitud solicitud, CancellationToken cancelacion = default);
 
