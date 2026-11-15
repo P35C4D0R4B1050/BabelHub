@@ -184,7 +184,8 @@ public sealed class CookieYCierreDeSesionTests
     [Theory]
     [Trait("Criterio", "AC-WEB-02")]
     [InlineData(HostWeb.Tienda, "tienda", HttpStatusCode.OK, HttpStatusCode.NotFound, HttpStatusCode.NotFound)]
-    [InlineData(HostWeb.Gestion, "gestion", HttpStatusCode.NotFound, HttpStatusCode.OK, HttpStatusCode.OK)]
+    // En gestion las áreas existen y piden ingreso (T18): un visitante va al ingreso en lugar de recibir un 404.
+    [InlineData(HostWeb.Gestion, "gestion", HttpStatusCode.NotFound, HttpStatusCode.Found, HttpStatusCode.Found)]
     public async Task LasAreas_SeMapeanSoloEnElHostQueLasSirve(HostWeb host, string nombre, HttpStatusCode tienda, HttpStatusCode sucursal, HttpStatusCode admin)
     {
         await using var anfitrion = await AnfitrionConSesion.Iniciar(new SesionesWebDePrueba(), host);

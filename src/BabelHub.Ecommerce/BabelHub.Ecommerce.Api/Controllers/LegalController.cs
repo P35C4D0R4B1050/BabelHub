@@ -17,6 +17,7 @@ public sealed class TextoLegalVista : ModeloBaseDePagina
 /// Los términos, la privacidad y el reembolso con su versión y su fecha de vigencia visibles (WEB-29, AC-WEB-24). La versión la informa
 /// Identidad; el cuerpo, los recursos de la web. Existen en los dos hosts y los lee cualquier persona, también con sesión y textos pendientes.
 /// </summary>
+[PermitidaConPasoPendiente]
 public sealed class LegalController(ITextosLegales textos, ContextoDePagina pagina) : Controller
 {
     [HttpGet("/legal/{texto}")]

@@ -116,6 +116,7 @@ internal static class AnfitrionConSesion
                 s.AgregarTokenDelUsuarioDeLaSesion();
                 s.AgregarHostWeb(new OpcionesDelHostWeb(host, hostsPermitidos ?? []));
                 s.AgregarProteccionContraFalsificacion();
+                s.AgregarFiltroDeAccesoDeLaInterfaz();
                 servicios?.Invoke(s);
             },
             partes: [typeof(ControladorDeSesionDePrueba).Assembly],

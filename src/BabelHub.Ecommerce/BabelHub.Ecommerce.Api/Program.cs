@@ -26,6 +26,8 @@ builder.Services.AgregarHostWeb(OpcionesDelHostWeb.Leer(builder.Configuration, e
 builder.Services.AgregarTokenDelUsuarioDeLaSesion();
 // Antiforgery global, Origin y Sec-Fetch-Site y captura del borrador (T16); las claves de Data Protection las compone quien conecte la base (T12).
 builder.Services.AgregarProteccionContraFalsificacion();
+// Filtros globales de acceso: área, paso pendiente del ingreso y sesión requerida (T18).
+builder.Services.AgregarFiltroDeAccesoDeLaInterfaz();
 // Cabeceras de seguridad y política de contenido por ruta (T17); los orígenes de la pasarela y del almacén son configuración (B05).
 builder.Services.AgregarCabecerasDeSeguridad(OpcionesDeContenidoWeb.Leer(builder.Configuration));
 // La versión provisional de los textos legales nunca se compone en producción (hasta el contrato de Identidad, IDE-57).

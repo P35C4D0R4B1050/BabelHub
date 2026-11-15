@@ -9,6 +9,7 @@ namespace BabelHub.IntegrationTests.Web;
 public sealed class ControladorDeCabecerasDePrueba : Controller
 {
     [HttpGet("/ingreso")]
+    [PermitidaConPasoPendiente]
     [VerificacionDePersona(AccionProtegida.Ingreso)]
     public IActionResult Ingreso() => Content("<p>ingreso</p>", "text/html");
 
@@ -38,4 +39,15 @@ public sealed class ControladorDeCabecerasDePrueba : Controller
 
     [HttpGet("/prueba/cabeceras/prohibido")]
     public IActionResult Prohibido() => StatusCode(403);
+}
+
+/// <summary>Rutas de prueba de los filtros de acceso (T18).</summary>
+public sealed class ControladorDeAccesoDePrueba : Controller
+{
+    [HttpGet("/prueba/acceso/publica")]
+    public IActionResult Publica() => Content("<p>publica</p>", "text/html");
+
+    [HttpGet("/prueba/acceso/cuenta")]
+    [RequiereSesion]
+    public IActionResult Cuenta() => Content("<p>cuenta</p>", "text/html");
 }

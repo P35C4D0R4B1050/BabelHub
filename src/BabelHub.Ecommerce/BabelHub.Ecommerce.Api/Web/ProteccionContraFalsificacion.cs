@@ -183,23 +183,7 @@ public sealed class ProteccionContraFalsificacionFilter(
     }
 
     /// <summary>El registro de un rechazo no interrumpe nada: si Auditoría falla, la solicitud sigue rechazada y no se convierte en un error.</summary>
-    private async Task Registrar(HttpContext contexto)
-    {
-        if (denegaciones is null)
-        {
-            return;
-        }
-
-        try
-        {
-            var plantilla = PlantillaDeLaRuta(contexto);
-            await denegaciones.Registrar(new DenegacionDeAcceso(ProteccionContraFalsificacion.MotivoDelRegistro, plantilla) { CodigoDeError = "ECO-PROHIBIDO" }, contexto.RequestAborted).ConfigureAwait(false);
-        }
-        catch (Exception) when (!contexto.RequestAborted.IsCancellationRequested)
-        {
-            // Auditoría deja su propia alerta técnica (AUD-12).
-        }
-    }
+    private Task Registrar(HttpContext contexto) => RegistroDeDenegaciones.Registrar(denegaciones, contexto, ProteccionContraFalsificacion.MotivoDelRegistro, "ECO-PROHIBIDO");
 
     private async Task ConservarLoEscrito(AuthorizationFilterContext context)
     {
