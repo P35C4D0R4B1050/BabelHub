@@ -72,6 +72,7 @@ public static class ComposicionDeReservas
         servicios.AddSingleton<IValidador<CerrarReservasEntrada>, ValidadorDeCerrar>();
         servicios.AddSingleton<IValidador<ConsultarSeleccionEntrada>, ValidadorDeConsultarSeleccion>();
         servicios.AddSingleton<IValidador<ConsultarReservaEntrada>, ValidadorDeConsultarReserva>();
+        servicios.AddSingleton<IValidador<ConsultarPendientesEntrada>, ValidadorDeConsultarPendientes>();
 
         servicios.Escritura<ReservarEntrada, ReservaDelPedido, ReservarUnidades>(opcionesDeReintento);
         servicios.Escritura<ExpirarReservasEntrada, ExpiracionDelPedido, ExpirarReservasVencidas>(opcionesDeReintento);
@@ -83,6 +84,7 @@ public static class ComposicionDeReservas
         // Las consultas son de solo lectura: una instantánea coherente (REPEATABLE READ), nunca una transacción de escritura.
         servicios.Lectura<ConsultarSeleccionEntrada, SeleccionConsultada, ConsultarSeleccion>();
         servicios.Lectura<ConsultarReservaEntrada, ReservaDelPedido, ConsultarReserva>();
+        servicios.Lectura<ConsultarPendientesEntrada, PendientesDeTitular, ConsultarPendientes>();
 
         return servicios;
     }

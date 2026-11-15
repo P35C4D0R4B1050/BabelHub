@@ -801,6 +801,28 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
             },
             cancelacion);
 
+    public Task<int> PedidosActivosDelCliente(Guid clienteId, DateTimeOffset ahora, CancellationToken cancelacion = default) =>
+        acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                // Solo un conteo: nada de ediciones ni de cantidades. La pendiente vigente es la que no venció; la cerrada por traslado cuenta mientras viaja (ni recreada en el destino ni anulada).
+                await using var comando = new NpgsqlCommand(
+                    """
+                    SELECT count(DISTINCT l.pedido_id)::integer
+                    FROM reservas.reservas r JOIN reservas.reserva_lineas l ON l.reserva_id = r.id
+                    WHERE r.cliente_id = @cliente
+                      AND (l.estado = 'confirmada'
+                           OR (l.estado = 'pendiente' AND (r.fecha_expiracion IS NULL OR r.fecha_expiracion > @ahora))
+                           OR (l.estado = 'cerrada' AND l.cerrada_por = 'traslado' AND l.recreada_en_destino = false AND l.anulada_en IS NULL))
+                    """,
+                    conexion,
+                    transaccion);
+                comando.Parameters.AddWithValue("cliente", clienteId);
+                comando.Parameters.Add(new NpgsqlParameter("ahora", NpgsqlDbType.TimestampTz) { Value = ahora.ToUniversalTime() });
+                return (int)(await comando.ExecuteScalarAsync(token).ConfigureAwait(false) ?? 0);
+            },
+            cancelacion);
+
     private static async Task<IReadOnlyList<LineaVencida>> LeerVencidas(NpgsqlCommand comando, CancellationToken cancelacion)
     {
         var lineas = new List<LineaVencida>();

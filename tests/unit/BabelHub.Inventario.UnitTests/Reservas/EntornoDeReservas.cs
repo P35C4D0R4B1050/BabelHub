@@ -349,6 +349,17 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
         return Task.FromResult<IReadOnlyList<VentaAtribuida>>(ventas);
     }
 
+    public Task<int> PedidosActivosDelCliente(Guid clienteId, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.PedidosActivosDelCliente");
+        return Task.FromResult(Guardadas
+            .Where(r => r.ClienteId == clienteId && r.Lineas.Any(l => l.EstaActiva(r.FechaDeExpiracion, ahora)
+                                                                         || (l is { Estado: EstadoDeLinea.Cerrada, CerradaPor: CausaDeCierre.Traslado, RecreadaEnDestino: false, AnuladaEn: null })))
+            .Select(r => r.PedidoId)
+            .Distinct()
+            .Count());
+    }
+
     /// <summary>Los pedidos cuya expiración se pidió al repositorio, en orden.</summary>
     public List<Guid> ExpiracionesPedidas { get; } = [];
 }
@@ -539,6 +550,8 @@ internal sealed class EntornoDeReservas
     public ConsultarSeleccion ConsultarSeleccion() => new(Autorizador, new ValidadorDeConsultarSeleccion(), Directorio, new ConsultaDeExistencias(Base.Lectura, Base.Fuentes, Base.Existencias, ReservasDeStock), new SelectorDeFuentes(Directorio, new SeleccionPorCercania()), Base.Reloj);
 
     public ConsultarReserva ConsultarReserva() => new(Autorizador, new ValidadorDeConsultarReserva(), Reservas, new ConstructorDeLaReserva(Directorio), Base.Reloj);
+
+    public ConsultarPendientes ConsultarPendientes() => new(Autorizador, new ValidadorDeConsultarPendientes(), Reservas, Base.Reloj);
 
     public CerrarReservas Cerrar() => new(Autorizador, new ValidadorDeCerrar(), Bloqueos, Reservas, Stock, Auditoria, Base.Reloj);
 

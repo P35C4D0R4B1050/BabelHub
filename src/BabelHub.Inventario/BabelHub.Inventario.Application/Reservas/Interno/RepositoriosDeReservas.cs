@@ -132,6 +132,12 @@ public interface IRepositorioDeReservas
     /// no anuladas, atribuidas a la sucursal de recojo en el recojo y a la fuente de la línea a domicilio, sumadas por pedido, edición y fuente (FUE-21, FUE-22). Con <paramref name="fuenteId"/> nulo, las de toda la red. Solo lee, sin bloquear.
     /// </summary>
     Task<IReadOnlyList<VentaAtribuida>> VentasAtribuidas(Guid? fuenteId, DateTimeOffset desde, DateTimeOffset hasta, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Cuántos pedidos del cliente tienen una línea confirmada, una pendiente que no venció en <paramref name="ahora"/> o una cerrada por traslado que sigue en tránsito (sin recrear en el destino y sin anular): una reserva
+    /// confirmada cuya línea viaja sigue siendo una reserva confirmada (SEL-33). Cada pedido cuenta una sola vez. Solo lee, sin bloquear y sin devolver datos de las ediciones.
+    /// </summary>
+    Task<int> PedidosActivosDelCliente(Guid clienteId, DateTimeOffset ahora, CancellationToken cancelacion = default);
 }
 
 /// <summary>Las claves simbólicas de los fallos del módulo; la Api las traduce a los códigos <c>INV-…</c> de <c>Shared</c> (D11).</summary>

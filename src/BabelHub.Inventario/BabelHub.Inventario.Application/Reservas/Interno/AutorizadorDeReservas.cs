@@ -44,8 +44,14 @@ internal sealed class AutorizadorDeReservas(IActorActual actores, IDenegacionDeA
     /// Solo la integración <c>expiracion-de-reservas</c> (sin token de usuario): confirmar, extender y liberar son llamadas de servicio del E-commerce. El alcance de la credencial lo verifica la Api; aquí se exige el actor
     /// de integración con ese nombre. Un cliente o cualquier otra integración es «prohibido» con su evento.
     /// </summary>
-    public Task<ErrorDeAplicacion?> ExigirIntegracionDeReservas(CancellationToken cancelacion) =>
-        Evaluar(actor => actor.Tipo == TipoDeActor.Integracion && actor.Integracion == AlcanceDeServicio.ExpiracionDeReservas.NombreEstable() ? null : MotivosDeDenegacionDeReservas.FueraDeRol, cancelacion);
+    public Task<ErrorDeAplicacion?> ExigirIntegracionDeReservas(CancellationToken cancelacion) => ExigirIntegracion(AlcanceDeServicio.ExpiracionDeReservas, cancelacion);
+
+    /// <summary>
+    /// Solo la integración con el alcance dado, sin token de usuario (la consulta de pendientes y la baja del titular tienen cada una el suyo, SEL-33, SEL-34). El alcance de la credencial lo verifica la Api; aquí se exige el
+    /// actor de integración con ese nombre: un cliente, un usuario o la integración de otro alcance es «prohibido» con su evento, antes de leer nada.
+    /// </summary>
+    public Task<ErrorDeAplicacion?> ExigirIntegracion(AlcanceDeServicio alcance, CancellationToken cancelacion) =>
+        Evaluar(actor => actor.Tipo == TipoDeActor.Integracion && actor.Integracion == alcance.NombreEstable() ? null : MotivosDeDenegacionDeReservas.FueraDeRol, cancelacion);
 
     /// <summary>Consultar una reserva: el cliente (la dueña, lo comprueba el caso de uso) o la administración central; el personal de sucursal y de logística reciben «prohibido» antes de leer nada (SEL-20).</summary>
     public Task<ErrorDeAplicacion?> ExigirClienteOAdministracion(CancellationToken cancelacion) =>
