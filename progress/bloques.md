@@ -12,9 +12,9 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **AUD-1** | `transversal-auditoria`: Dominio (detalle seguro, catálogo de acciones, actor, anonimización, alertas, acumulado de límites) | T01–T06 | C | — | ☑ |
 | **AUD-2** | Contratos de registro, consulta y alerta, puertos de Identidad y Reservas y los catálogos de acciones | T07, T08, T09, T11–T16 | C | AUD-1 | ☑ |
 | **AUD-3** | Implementación de los puertos de `Plataforma`, consultas unificadas, agrupar y enviar alertas, depuración y bajas del Inventario | T10, T17–T20 | C | AUD-2 | ☑ |
-| **SEG-C** | Cierre de `transversal-seguridad`: T27b y T29 (acumulador persistente) y `spec-verify` | T27b, T29 | C | AUD-3 (T10, T18) | ☐ |
-| **AUD-4** | Migraciones, roles, función de depuración, repositorios de solo inserción, cliente del Inventario, trabajos de fondo | T21–T27 | C | AUD-3 | ▶ (T22–T27 hechas y fundidas; **T21** —DTOs de `Shared`— la hace el carril A, autorizado, junto con AUD-5) |
-| **AUD-5** | Endpoints, contrato web, integración de punta a punta y documentación | T28–T31 | E | AUD-4 | ☐ |
+| **SEG-C** | Cierre de `transversal-seguridad`: T27b y T29 (acumulador persistente) y `spec-verify` | T27b, T29 | C | AUD-3 (T10, T18) | ☐ (desbloqueado: AUD-3 ya está en `main`) |
+| **AUD-4** | Migraciones, roles, función de depuración, repositorios de solo inserción, cliente del Inventario, trabajos de fondo | T21–T27 | C | AUD-3 | ☑ (T21 hecha en AUD-5 con el catálogo de contratos ampliado, D18) |
+| **AUD-5** | Endpoints, contrato web, integración de punta a punta y documentación | T28–T31 | E | AUD-4 | ☑ (con T21; `transversal-auditoria` queda con todas las tareas marcadas, falta `spec-verify` en FIN-1 y componer la auditoría en cada `Program.cs`, hallazgo Importante abierto) |
 | **IDE-1** | `identidad-seguridad`: Dominio (contraseñas, usuario y roles, segundo factor, desafío, códigos, textos, solicitudes, cancelación, marcas, clave de firma) | T01–T10 | C | — (puede ir en paralelo a AUD-1) | ☐ |
 | **IDE-2** | Contratos de correo y de cliente del Inventario en `Plataforma` y contrato público de Identidad | T11, T12, T13 | C | IDE-1, AUD-2 | ☐ |
 | **IDE-3** | Registro, ingreso en dos pasos, sesiones y recuperación | T14–T17 | C | IDE-2 | ☐ |

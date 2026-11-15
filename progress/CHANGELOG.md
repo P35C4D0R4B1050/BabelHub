@@ -2,6 +2,13 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-15 — AUD-5 cierra `transversal-auditoria` (fundido a `main`)
+
+### Cubierto
+- **Carril A:** T21 y T28–T31: DTOs y constantes de auditoría en `Shared` (D18: el catálogo de contratos añade 4 operaciones del E-commerce y cambia los tipos de 3 del Inventario), endpoints de los dos servicios, un único punto que registra el acceso denegado, presentador de la web, prueba de punta a punta con los dos servicios y PostgreSQL real, y documentación. Redactor con el hash de sesión y el cuerpo de un borrador; el cliente de auditoría ya no consume el token del usuario directamente. **`transversal-auditoria` queda con sus 44 tareas marcadas** (falta `spec-verify` y la composición en cada `Program.cs`, hallazgo Importante abierto).
+- `transversal-seguridad` T27b y T29 quedan desbloqueadas (bloque SEG-C).
+- Validación de la fusión: unitarias 1572 y 1507, arquitectura 169, SpecCheck 23, CoverageCheck 12, integración 3195 de 3198 (los 3 fallos eran del avance de A, ya corregidos y comprobados: auditoría 280/280), gitleaks limpio.
+
 ## 2026-11-14 — Cuarta tanda de carriles (AUD-4, WEB-1b y WEB-1c, fundidas a `main`)
 
 ### Cubierto
