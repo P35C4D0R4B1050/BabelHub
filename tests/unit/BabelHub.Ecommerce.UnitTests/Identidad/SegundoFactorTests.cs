@@ -71,6 +71,7 @@ public sealed class SegundoFactorTests
         Assert.Equal(8, factor.CodigosDeRespaldoRestantes);
     }
 
+[Fact]    [Trait("Criterio", "AC-IDE-19")]    public void Un_segundo_factor_ya_activo_no_se_confirma_de_nuevo()    {        var factor = Activo();        Assert.Equal(ResultadoDeSegundoFactor.YaActivo, factor.Confirmar(Secreto, CodigoDe(Ahora, 1), Ahora, Huellas("otro")));        Assert.Equal(8, factor.CodigosDeRespaldoRestantes);    }
     [Fact]
     [Trait("Criterio", "AC-IDE-19")]
     public void Confirmar_exige_exactamente_ocho_huellas_distintas()
@@ -185,5 +186,15 @@ public sealed class SegundoFactorTests
         Assert.Equal("ABCD2345EFGH", CodigosDeRespaldo.Canonico(" abcd-2345 efgh "));
         Assert.False(CodigosDeRespaldo.TieneLaForma("ABCD-2345"));
         Assert.False(CodigosDeRespaldo.TieneLaForma("ABCD-2345-EFG0"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-45")]
+    public void Un_secreto_de_menos_de_128_bits_nunca_valida()
+    {
+        var corto = new byte[15];
+
+        Assert.Null(Totp.PasoAceptado(corto, Totp.Codigo(corto, Totp.PasoDe(Ahora)), Ahora, null));
+        Assert.Null(Totp.PasoAceptado([], "000000", Ahora, null));
     }
 }

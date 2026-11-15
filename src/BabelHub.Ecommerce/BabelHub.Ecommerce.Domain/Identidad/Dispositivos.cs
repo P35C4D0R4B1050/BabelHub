@@ -39,10 +39,15 @@ public sealed partial class Dispositivo
     public static string NormalizarRegion(string? region)
     {
         var candidato = region?.Trim().ToUpperInvariant();
-        return candidato is not null && FormatoDeRegion().IsMatch(candidato) ? candidato : RegionDesconocida;
+        return candidato is not null && candidato is not ("XX" or "T1") && FormatoDeRegion().IsMatch(candidato) ? candidato : RegionDesconocida;
     }
 
     public const string RegionDesconocida = "ZZ";
+
+    /// <summary>Un dispositivo solo sirve para reconocer (y su región para ser «habitual») una vez que tiene al menos esta antigüedad: quien acaba de ingresar desde otro país no se reconoce a sí mismo en el mismo ingreso (IDE-54, IDE-55).</summary>
+    public static readonly TimeSpan AntiguedadMinima = TimeSpan.FromHours(24);
+
+    public bool EsMaduro(DateTimeOffset ahora) => ahora - Emitido >= AntiguedadMinima;
 
     public bool EstaCongelado(DateTimeOffset ahora) => CongeladoHasta is { } hasta && ahora < hasta;
 
@@ -83,9 +88,9 @@ public static class ConfianzaDeDispositivos
     public static ConfianzaDeLaSolicitud Evaluar(string? huellaDeLaMarcaPresentada, string? regionDelBorde, IReadOnlyCollection<Dispositivo> dispositivosDelUsuario, DateTimeOffset ahora)
     {
         ArgumentNullException.ThrowIfNull(dispositivosDelUsuario);
-        var reconocido = huellaDeLaMarcaPresentada is { Length: 64 } && dispositivosDelUsuario.Any(d => d.HuellaDeLaMarca == huellaDeLaMarcaPresentada && d.PermiteCambiosSensibles(ahora));
+        var reconocido = huellaDeLaMarcaPresentada is { Length: 64 } && dispositivosDelUsuario.Any(d => d.HuellaDeLaMarca == huellaDeLaMarcaPresentada && d.PermiteCambiosSensibles(ahora) && d.EsMaduro(ahora));
         var region = Dispositivo.NormalizarRegion(regionDelBorde);
-        var habitual = region != Dispositivo.RegionDesconocida && dispositivosDelUsuario.Any(d => d.Region == region);
+        var habitual = region != Dispositivo.RegionDesconocida && dispositivosDelUsuario.Any(d => d.Region == region && d.EsMaduro(ahora));
         return new ConfianzaDeLaSolicitud(reconocido, habitual);
     }
 }
@@ -200,7 +205,7 @@ public sealed class CambioDeCorreoPendiente
         return ResultadoDelCambioDeCorreo.Hecho;
     }
 
-    /// <summary>El titular lo rechaza desde un dispositivo reconocido (IDE-54): no se aplica y se descongela el dispositivo.</summary>
+    /// <summary>El titular lo rechaza desde un dispositivo reconocido (IDE-54): no se aplica; la Aplicación descongela el dispositivo con <see cref="Dispositivo.Descongelar"/>.</summary>
     public ResultadoDelCambioDeCorreo RechazarElTitular(DateTimeOffset ahora, bool desdeDispositivoReconocido)
     {
         var previo = Antes(ahora, desdeDispositivoReconocido);

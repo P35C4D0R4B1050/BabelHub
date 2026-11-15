@@ -145,4 +145,26 @@ public sealed class DispositivosTests
         Assert.Throws<ArgumentException>(() => CambioDeCorreoPendiente.Pedir(Guid.Empty, Usuario, "a@b.pe", new ConfianzaDeLaSolicitud(true, true), Ahora));
         Assert.Throws<ArgumentException>(() => CambioDeCorreoPendiente.Pedir(Guid.NewGuid(), Guid.Empty, "a@b.pe", new ConfianzaDeLaSolicitud(true, true), Ahora));
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-48")]
+    public void Un_dispositivo_recien_emitido_no_reconoce_al_que_acaba_de_ingresar_ni_vuelve_habitual_su_region()
+    {
+        var recien = Dispositivo.Emitir(Usuario, Huella('f'), "RU", Ahora.AddHours(-1));
+
+        var confianza = ConfianzaDeDispositivos.Evaluar(Huella('f'), "RU", [Conocido(), recien], Ahora);
+        var pasadas24 = ConfianzaDeDispositivos.Evaluar(Huella('f'), "RU", [Conocido(), recien], Ahora.AddHours(24));
+
+        Assert.False(confianza.DispositivoReconocido);
+        Assert.False(confianza.RegionHabitual);
+        Assert.False(confianza.PermiteAplicarElCambio);
+        Assert.True(pasadas24.PermiteAplicarElCambio);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-IDE-48")]
+    [InlineData("XX")]
+    [InlineData("T1")]
+    public void Los_codigos_de_pais_que_el_borde_usa_para_desconocido_no_son_una_region(string codigo) =>
+        Assert.Equal("ZZ", Dispositivo.NormalizarRegion(codigo));
 }

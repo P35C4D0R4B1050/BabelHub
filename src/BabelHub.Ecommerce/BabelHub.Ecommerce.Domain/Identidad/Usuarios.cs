@@ -97,6 +97,12 @@ public sealed class Usuario
 
     public bool Activo { get; private set; }
 
+    /// <summary>Toda renovación emitida antes de este instante deja de servir (D17): cambiar el rol, la contraseña o el segundo factor, «cerrar todas» y declarar comprometida la clave lo avanzan.</summary>
+    public DateTimeOffset? SesionesValidasDesde { get; private set; }
+
+    /// <summary>Avanza el corte de sesiones (solo hacia adelante).</summary>
+    public void AvanzarElCorteDeSesiones(DateTimeOffset ahora) => SesionesValidasDesde = CorteDeSesiones.Avanzar(SesionesValidasDesde, ahora);
+
     public static string NormalizarCorreo(string correo)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(correo);
@@ -138,7 +144,7 @@ public sealed class Usuario
     /// Cambia el rol si las reglas de este usuario lo permiten: el encargado lleva exactamente una sucursal y los demás ninguna (IDE-05) y un rol de personal exige el correo verificado (IDE-87). Las reglas que dependen de
     /// otros usuarios se evalúan antes con <see cref="ReglasDeAdministracion"/>.
     /// </summary>
-    public DecisionDeAdministracion CambiarRol(RolDeUsuario nuevo, Guid? sucursal)
+    public DecisionDeAdministracion CambiarRol(RolDeUsuario nuevo, Guid? sucursal, DateTimeOffset ahora)
     {
         if (!Activo)
         {
@@ -155,6 +161,8 @@ public sealed class Usuario
             return DecisionDeAdministracion.Rechazada(MotivoDeRechazoDeUsuario.CorreoSinVerificar);
         }
 
+        // Cambiar de rol invalida las renovaciones anteriores: la vigencia, el segundo factor y los permisos del rol nuevo se exigen en un ingreso completo (IDE-21).
+        AvanzarElCorteDeSesiones(ahora);
         Rol = nuevo;
         Sucursal = sucursal;
         return DecisionDeAdministracion.Permitida;
@@ -177,6 +185,7 @@ public static class ReglasDeAdministracion
         RolDeUsuario? nuevoRol,
         Guid? sucursal,
         int administradoresActivos,
+        DateTimeOffset ahora,
         EncargadoDeSucursal? encargadoActualDeLaSucursal)
     {
         ArgumentNullException.ThrowIfNull(actor);
@@ -210,7 +219,7 @@ public static class ReglasDeAdministracion
 
             // Se evalúa sobre una copia para no modificar al usuario si la decisión es solo una consulta.
             var copia = Usuario.Restaurar(objetivo.Id, objetivo.Correo, objetivo.Rol, objetivo.Sucursal, objetivo.CorreoVerificado, objetivo.Activo);
-            return copia.CambiarRol(rol, sucursal);
+            return copia.CambiarRol(rol, sucursal, ahora);
         }
 
         return objetivo.Activo ? DecisionDeAdministracion.Permitida : DecisionDeAdministracion.Rechazada(MotivoDeRechazoDeUsuario.CuentaNoActiva);

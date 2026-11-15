@@ -107,7 +107,9 @@ public sealed class ClaveDeFirmaTests
         Assert.NotNull(resultado);
         Assert.False(juego.Acepta("kid-inicial-01", rotacion.AddMinutes(5)));
         Assert.Equal("kid-nuevo-0002", juego.Activa.Kid);
-        Assert.Null(juego.DeclararComprometida("kid-inicial-01", null, rotacion.AddMinutes(6)));
+        var repetida = juego.DeclararComprometida("kid-inicial-01", null, rotacion.AddMinutes(6));
+        Assert.NotNull(repetida);
+        Assert.True(repetida.RevocarRenovaciones);
         Assert.Null(juego.DeclararComprometida("kid-que-no-existe", null, rotacion.AddMinutes(6)));
     }
 

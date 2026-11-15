@@ -129,6 +129,7 @@ public sealed class SolicitudDeCancelacionTests
         Assert.False(solicitud.ImpideComprar);
     }
 
+[Fact]    [Trait("Criterio", "AC-IDE-61")]    public void No_se_puede_reconfirmar_antes_de_que_el_aviso_se_muestre()    {        var solicitud = Nueva();        solicitud.PendientesCerrados(Dia0.AddDays(4), avisoPorCorreo: false);        Assert.Equal(ResultadoDeReconfirmacion.NoEstaEsperando, solicitud.Reconfirmar(Dia0.AddDays(5), hayPendientes: false));        Assert.False(solicitud.EjecucionEnCurso);        solicitud.AvisoMostrado(Dia0.AddDays(5));        Assert.Equal(ResultadoDeReconfirmacion.Ejecutar, solicitud.Reconfirmar(Dia0.AddDays(6), hayPendientes: false));    }
     [Fact]
     [Trait("Criterio", "AC-IDE-61")]
     public void El_plazo_cuenta_desde_que_el_aviso_se_muestra_en_una_sesion_reconocida_con_el_tope_de_treinta_dias()
@@ -219,5 +220,23 @@ public sealed class SolicitudDeCancelacionTests
         Assert.True(restaurada.EjecucionEnCurso);
         Assert.Equal(Dia0.AddDays(30), restaurada.FechaTope);
         Assert.False(restaurada.PendientesCerrados(Dia0.AddDays(2), true));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-61")]
+    public void Una_ejecucion_en_curso_no_se_descarta_ni_por_desistir_ni_por_vencimiento_y_solo_termina_si_empezo()
+    {
+        var solicitud = Nueva();
+        solicitud.PendientesCerrados(Dia0.AddDays(2), true);
+        Assert.False(solicitud.Ejecutada(Dia0.AddDays(3)));
+        Assert.Equal(ResultadoDeReconfirmacion.Ejecutar, solicitud.Reconfirmar(Dia0.AddDays(3), false));
+
+        Assert.False(solicitud.Desistir(Dia0.AddDays(3)));
+        Assert.False(solicitud.DescartarSiVencio(Dia0.AddDays(40)));
+        Assert.Equal(EstadoDeCancelacion.EsperandoReconfirmacion, solicitud.Estado);
+
+        Assert.True(solicitud.Ejecutada(Dia0.AddDays(3)));
+        Assert.Equal(EstadoDeCancelacion.Ejecutada, solicitud.Estado);
+        Assert.False(solicitud.Ejecutada(Dia0.AddDays(4)));
     }
 }

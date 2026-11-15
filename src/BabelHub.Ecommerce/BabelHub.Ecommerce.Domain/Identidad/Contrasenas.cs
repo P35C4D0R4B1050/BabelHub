@@ -26,11 +26,22 @@ public static class PoliticaDeContrasenas
 
     public const int LongitudMaxima = 128;
 
+    /// <summary>El tope de la entrada cruda, antes de normalizar (NFKC puede alargar un carácter hasta 18).</summary>
+    public const int MaximoCrudoEnUtf16 = 2048;
+
     /// <summary>La normalización con la que se cuenta, se compara con la lista y se resume (IDE-59): NFKC.</summary>
     public static string Normalizar(string texto)
     {
         ArgumentNullException.ThrowIfNull(texto);
-        return texto.Normalize(NormalizationForm.FormKC);
+        // Un texto con sustitutos sueltos no es Unicode válido: se trata como no normalizable (el llamador lo rechaza), no como un error del servidor.
+        try
+        {
+            return texto.Normalize(NormalizationForm.FormKC);
+        }
+        catch (ArgumentException)
+        {
+            return string.Empty;
+        }
     }
 
     /// <summary>La longitud en caracteres Unicode (puntos de código) de la contraseña ya normalizada.</summary>
@@ -50,7 +61,18 @@ public static class PoliticaDeContrasenas
             return ResultadoDeContrasena.Vacia;
         }
 
+        // Se acota la entrada cruda antes de normalizar (un texto enorme no cuesta una normalización completa).
+        if (texto.Length > MaximoCrudoEnUtf16)
+        {
+            return ResultadoDeContrasena.Larga;
+        }
+
         var normalizada = Normalizar(texto);
+        if (normalizada.Length == 0)
+        {
+            return ResultadoDeContrasena.Vacia;
+        }
+
         var longitud = Longitud(normalizada);
         if (longitud < LongitudMinima)
         {
@@ -88,7 +110,8 @@ public sealed class Contrasena
     /// La contraseña que se presenta al ingresar: se normaliza como la guardada pero no se le aplica la política (una contraseña antigua o inválida debe poder compararse, y rechazarla por ser corta delataría la regla).
     /// Una cadena vacía no es una contraseña.
     /// </summary>
-    public static Contrasena? Presentada(string? texto) => string.IsNullOrEmpty(texto) ? null : new Contrasena(PoliticaDeContrasenas.Normalizar(texto));
+    public static Contrasena? Presentada(string? texto) =>
+        string.IsNullOrEmpty(texto) || texto.Length > PoliticaDeContrasenas.MaximoCrudoEnUtf16 || PoliticaDeContrasenas.Normalizar(texto) is not { Length: > 0 } normalizada ? null : new Contrasena(normalizada);
 
     public string Revelar() => _normalizada;
 
@@ -116,6 +139,17 @@ public static class ParametrosDelResumen
 public sealed class ResumenDeContrasena
 {
     private const string Prefijo = "$argon2id$";
+
+    // Base64 sin relleno: 16 bytes de sal son 22 caracteres y 32 bytes de resumen son 43 (D03).
+    private const int SalMinimaBase64 = 22;
+
+    private const int ResumenMinimoBase64 = 43;
+
+    private const int MemoriaMaximaEnKiB = 256 * 1024;
+
+    private const int IteracionesMaximas = 10;
+
+    private const int ParalelismoMaximo = 4;
 
     private ResumenDeContrasena(string valor, int memoria, int iteraciones, int paralelismo, string sal)
     {
@@ -145,7 +179,7 @@ public sealed class ResumenDeContrasena
 
         var partes = valor.Split('$');
         // ["", "argon2id", "v=19", "m=..,t=..,p=..", sal, resumen]
-        if (partes.Length != 6 || partes[2] != "v=19" || partes[4].Length < 16 || partes[5].Length < 16)
+        if (partes.Length != 6 || partes[2] != "v=19" || partes[4].Length < SalMinimaBase64 || partes[5].Length < ResumenMinimoBase64)
         {
             return null;
         }
@@ -155,6 +189,12 @@ public sealed class ResumenDeContrasena
             || !TryParametro(parametros[0], "m=", out var memoria)
             || !TryParametro(parametros[1], "t=", out var iteraciones)
             || !TryParametro(parametros[2], "p=", out var paralelismo))
+        {
+            return null;
+        }
+
+        // Topes: un resumen guardado con parámetros desmedidos agotaría la memoria de quien lo verifica (VM de 6 GB).
+        if (memoria > MemoriaMaximaEnKiB || iteraciones > IteracionesMaximas || paralelismo > ParalelismoMaximo)
         {
             return null;
         }

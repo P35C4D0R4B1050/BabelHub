@@ -57,8 +57,8 @@ public sealed class SesionesTests
     [Trait("Criterio", "AC-IDE-41")]
     public void El_encargado_queda_sin_renovacion_a_las_16_horas_aunque_la_use_y_el_cliente_a_los_siete_dias_sin_que_cada_uso_extienda_el_plazo()
     {
-        var encargado = Renovacion.Emitir(Huella(1), Guid.NewGuid(), RolDeUsuario.EncargadoDeSucursal, Lunes8);
-        var cliente = Renovacion.Emitir(Huella(2), Guid.NewGuid(), RolDeUsuario.Cliente, Lunes8);
+        var encargado = Renovacion.Emitir(Huella(1), Guid.NewGuid(), Guid.NewGuid(), RolDeUsuario.EncargadoDeSucursal, Lunes8);
+        var cliente = Renovacion.Emitir(Huella(2), Guid.NewGuid(), Guid.NewGuid(), RolDeUsuario.Cliente, Lunes8);
 
         Assert.Equal(Lunes8.AddHours(8), encargado.ExpiraAbsoluta);
         Assert.Equal(Lunes8.AddDays(7), cliente.ExpiraAbsoluta);
@@ -79,7 +79,7 @@ public sealed class SesionesTests
     [Trait("Criterio", "AC-IDE-41")]
     public void Rotar_usa_la_renovacion_y_la_siguiente_hereda_familia_y_vencimiento()
     {
-        var primera = Renovacion.Emitir(Huella(1), Guid.NewGuid(), RolDeUsuario.Cliente, Lunes8);
+        var primera = Renovacion.Emitir(Huella(1), Guid.NewGuid(), Guid.NewGuid(), RolDeUsuario.Cliente, Lunes8);
 
         var (resultado, siguiente) = primera.Rotar(Lunes8.AddDays(1), null, Huella(2));
 
@@ -96,7 +96,7 @@ public sealed class SesionesTests
     [Trait("Criterio", "AC-IDE-41")]
     public void Reutilizar_una_renovacion_ya_rotada_indica_robo_y_ordena_revocar_la_familia()
     {
-        var primera = Renovacion.Emitir(Huella(1), Guid.NewGuid(), RolDeUsuario.Cliente, Lunes8);
+        var primera = Renovacion.Emitir(Huella(1), Guid.NewGuid(), Guid.NewGuid(), RolDeUsuario.Cliente, Lunes8);
         primera.Rotar(Lunes8.AddHours(1), null, Huella(2));
 
         var (resultado, siguiente) = primera.Rotar(Lunes8.AddHours(2), null, Huella(3));
@@ -112,7 +112,7 @@ public sealed class SesionesTests
     [Trait("Criterio", "AC-IDE-12")]
     public void Cerrar_sesion_revoca_la_renovacion_y_deja_de_funcionar()
     {
-        var renovacion = Renovacion.Emitir(Huella(1), Guid.NewGuid(), RolDeUsuario.Cliente, Lunes8);
+        var renovacion = Renovacion.Emitir(Huella(1), Guid.NewGuid(), Guid.NewGuid(), RolDeUsuario.Cliente, Lunes8);
         Assert.True(renovacion.EstaVigente(Lunes8.AddHours(1)));
 
         renovacion.Revocar(Lunes8.AddHours(1));
@@ -128,14 +128,14 @@ public sealed class SesionesTests
     public void Cerrar_todas_las_sesiones_deja_sin_efecto_las_tres_renovaciones_por_el_corte_de_sesiones()
     {
         var usuario = Guid.NewGuid();
-        var renovaciones = Enumerable.Range(1, 3).Select(i => Renovacion.Emitir(Huella(i), usuario, RolDeUsuario.Cliente, Lunes8.AddHours(i))).ToList();
+        var renovaciones = Enumerable.Range(1, 3).Select(i => Renovacion.Emitir(Huella(i), usuario, Guid.NewGuid(), RolDeUsuario.Cliente, Lunes8.AddHours(i))).ToList();
         var corte = CorteDeSesiones.Avanzar(null, Lunes8.AddHours(10));
 
         Assert.All(renovaciones, r => Assert.False(r.EstaVigente(Lunes8.AddHours(11), corte)));
         Assert.All(renovaciones, r => Assert.Equal(ResultadoDeRotacion.Invalidada, r.Rotar(Lunes8.AddHours(11), corte, Huella(9)).Resultado));
 
         // Una renovación emitida después del corte (un ingreso nuevo) sí sirve.
-        var nueva = Renovacion.Emitir(Huella(8), usuario, RolDeUsuario.Cliente, Lunes8.AddHours(10).AddMinutes(1));
+        var nueva = Renovacion.Emitir(Huella(8), usuario, Guid.NewGuid(), RolDeUsuario.Cliente, Lunes8.AddHours(10).AddMinutes(1));
         Assert.True(nueva.EstaVigente(Lunes8.AddHours(11), corte));
     }
 
@@ -157,7 +157,7 @@ public sealed class SesionesTests
     [InlineData("ZZZZ000000000000000000000000000000000000000000000000000000000000")]
     public void La_huella_de_la_renovacion_es_un_sha256_en_hexadecimal(string huella)
     {
-        Assert.Throws<ArgumentException>(() => Renovacion.Emitir(huella, Guid.NewGuid(), RolDeUsuario.Cliente, Lunes8));
-        Assert.Equal("[renovación]", Renovacion.Emitir(Huella(1), Guid.NewGuid(), RolDeUsuario.Cliente, Lunes8).ToString());
+        Assert.Throws<ArgumentException>(() => Renovacion.Emitir(huella, Guid.NewGuid(), Guid.NewGuid(), RolDeUsuario.Cliente, Lunes8));
+        Assert.Equal("[renovación]", Renovacion.Emitir(Huella(1), Guid.NewGuid(), Guid.NewGuid(), RolDeUsuario.Cliente, Lunes8).ToString());
     }
 }

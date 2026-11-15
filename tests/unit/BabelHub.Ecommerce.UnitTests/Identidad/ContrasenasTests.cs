@@ -104,8 +104,8 @@ public sealed class ContrasenasTests
     [Trait("Criterio", "AC-IDE-08")]
     public void Un_resumen_de_argon2id_se_lee_con_su_sal_y_sus_parametros_y_dos_cuentas_distan()
     {
-        var uno = ResumenDeContrasena.Leer("$argon2id$v=19$m=19456,t=2,p=1$c2FsLXVuaWNhLWRlLXVuYS1jdWVudGE$cmVzdW1lbi1kZS1sYS1jb250cmFzZW5h");
-        var otro = ResumenDeContrasena.Leer("$argon2id$v=19$m=19456,t=2,p=1$c2FsLW90cmEtY3VlbnRhLWRpc3RpbnRh$cmVzdW1lbi1kZS1sYS1jb250cmFzZW5h");
+        var uno = ResumenDeContrasena.Leer("$argon2id$v=19$m=19456,t=2,p=1$c2FsLXVuaWNhLWRlLXVuYS1jdWVudGE$cmVzdW1lbi1kZS1sYS1jb250cmFzZW5hLWRlLWxhLXBydWViYQ");
+        var otro = ResumenDeContrasena.Leer("$argon2id$v=19$m=19456,t=2,p=1$c2FsLW90cmEtY3VlbnRhLWRpc3RpbnRh$cmVzdW1lbi1kZS1sYS1jb250cmFzZW5hLWRlLWxhLXBydWViYQ");
 
         Assert.NotNull(uno);
         Assert.NotNull(otro);
@@ -120,19 +120,41 @@ public sealed class ContrasenasTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("texto-claro-de-la-contraseña")]
-    [InlineData("$argon2i$v=19$m=19456,t=2,p=1$c2FsLXVuaWNhLWRlLXVuYS1jdWVudGE$cmVzdW1lbi1kZS1sYS1jb250cmFzZW5h")]
-    [InlineData("$argon2id$v=19$m=19456,t=2,p=1$corta$cmVzdW1lbi1kZS1sYS1jb250cmFzZW5h")]
-    [InlineData("$argon2id$v=19$m=0,t=2,p=1$c2FsLXVuaWNhLWRlLXVuYS1jdWVudGE$cmVzdW1lbi1kZS1sYS1jb250cmFzZW5h")]
-    [InlineData("$argon2id$v=19$m=x,t=2,p=1$c2FsLXVuaWNhLWRlLXVuYS1jdWVudGE$cmVzdW1lbi1kZS1sYS1jb250cmFzZW5h")]
+    [InlineData("$argon2i$v=19$m=19456,t=2,p=1$c2FsLXVuaWNhLWRlLXVuYS1jdWVudGE$cmVzdW1lbi1kZS1sYS1jb250cmFzZW5hLWRlLWxhLXBydWViYQ")]
+    [InlineData("$argon2id$v=19$m=19456,t=2,p=1$corta$cmVzdW1lbi1kZS1sYS1jb250cmFzZW5hLWRlLWxhLXBydWViYQ")]
+    [InlineData("$argon2id$v=19$m=0,t=2,p=1$c2FsLXVuaWNhLWRlLXVuYS1jdWVudGE$cmVzdW1lbi1kZS1sYS1jb250cmFzZW5hLWRlLWxhLXBydWViYQ")]
+    [InlineData("$argon2id$v=19$m=x,t=2,p=1$c2FsLXVuaWNhLWRlLXVuYS1jdWVudGE$cmVzdW1lbi1kZS1sYS1jb250cmFzZW5hLWRlLWxhLXBydWViYQ")]
     public void Lo_que_no_es_un_resumen_de_argon2id_valido_no_se_lee(string? valor) => Assert.Null(ResumenDeContrasena.Leer(valor));
 
     [Fact]
     [Trait("Criterio", "AC-IDE-08")]
     public void Un_resumen_con_parametros_mas_debiles_pide_actualizarse()
     {
-        var debil = ResumenDeContrasena.Leer("$argon2id$v=19$m=4096,t=1,p=1$c2FsLXVuaWNhLWRlLXVuYS1jdWVudGE$cmVzdW1lbi1kZS1sYS1jb250cmFzZW5h");
+        var debil = ResumenDeContrasena.Leer("$argon2id$v=19$m=4096,t=1,p=1$c2FsLXVuaWNhLWRlLXVuYS1jdWVudGE$cmVzdW1lbi1kZS1sYS1jb250cmFzZW5hLWRlLWxhLXBydWViYQ");
 
         Assert.True(debil!.NecesitaActualizarse());
         Assert.Equal(16, ParametrosDelResumen.BytesDeSal);
+    }
+[Theory]    [Trait("Criterio", "AC-IDE-08")]    [InlineData("$argon2id$v=19$m=19456,t=2,p=1$c2FsLWNvcnRh$cmVzdW1lbi1kZS1sYS1jb250cmFzZW5hLWRlLWxhLXBydWViYQ")]    [InlineData("$argon2id$v=19$m=19456,t=2,p=1$c2FsLXVuaWNhLWRlLXVuYS1jdWVudGE$cmVzdW1lbi1jb3J0bw")]    public void Una_sal_de_menos_de_16_bytes_o_un_resumen_de_menos_de_32_no_se_leen(string valor) => Assert.Null(ResumenDeContrasena.Leer(valor));
+
+    [Theory]
+    [Trait("Criterio", "AC-IDE-08")]
+    [InlineData("$argon2id$v=19$m=2000000000,t=2,p=1$c2FsLXVuaWNhLWRlLXVuYS1jdWVudGE$cmVzdW1lbi1kZS1sYS1jb250cmFzZW5hLWRlLWxhLXBydWViYQ")]
+    [InlineData("$argon2id$v=19$m=19456,t=500,p=1$c2FsLXVuaWNhLWRlLXVuYS1jdWVudGE$cmVzdW1lbi1kZS1sYS1jb250cmFzZW5hLWRlLWxhLXBydWViYQ")]
+    [InlineData("$argon2id$v=19$m=19456,t=2,p=64$c2FsLXVuaWNhLWRlLXVuYS1jdWVudGE$cmVzdW1lbi1kZS1sYS1jb250cmFzZW5hLWRlLWxhLXBydWViYQ")]
+    public void Un_resumen_con_parametros_desmedidos_no_se_lee(string valor) => Assert.Null(ResumenDeContrasena.Leer(valor));
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-13")]
+    public void Un_texto_enorme_o_con_sustitutos_sueltos_se_rechaza_sin_error_del_servidor()
+    {
+        var enorme = new string('x', PoliticaDeContrasenas.MaximoCrudoEnUtf16 + 1);
+        var sustitutoSuelto = "abcdefghij\uD800klmnop";
+
+        Assert.Equal(ResultadoDeContrasena.Larga, PoliticaDeContrasenas.Evaluar(enorme, EsComun));
+        Assert.Null(Contrasena.Presentada(enorme));
+        Assert.NotEqual(ResultadoDeContrasena.Aceptable, PoliticaDeContrasenas.Evaluar("\uD800", EsComun));
+        Assert.Null(Contrasena.Presentada("\uD800"));
+        _ = PoliticaDeContrasenas.Evaluar(sustitutoSuelto, EsComun);
     }
 }

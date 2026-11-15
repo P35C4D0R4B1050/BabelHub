@@ -5,6 +5,7 @@ namespace BabelHub.Ecommerce.UnitTests.Identidad;
 /// <summary>El usuario, sus roles y las reglas de administración (T02; AC-IDE-04, AC-IDE-05, AC-IDE-44, AC-IDE-66; IDE-04, IDE-05, IDE-06, IDE-49, IDE-87).</summary>
 public sealed class UsuariosTests
 {
+    private static readonly DateTimeOffset Ahora = new(2026, 11, 14, 10, 0, 0, TimeSpan.FromHours(-5));
     private static readonly Guid Sucursal = Guid.Parse("aaaaaaaa-0000-4000-8000-000000000001");
     private static readonly Guid OtraSucursal = Guid.Parse("aaaaaaaa-0000-4000-8000-000000000002");
 
@@ -34,7 +35,7 @@ public sealed class UsuariosTests
     {
         var cliente = Persona();
 
-        var decision = cliente.CambiarRol(rol, conSucursal ? Sucursal : null);
+        var decision = cliente.CambiarRol(rol, conSucursal ? Sucursal : null, Ahora);
 
         Assert.Equal(MotivoDeRechazoDeUsuario.SucursalInvalida, decision.Motivo);
         Assert.Equal(RolDeUsuario.Cliente, cliente.Rol);
@@ -46,10 +47,10 @@ public sealed class UsuariosTests
     {
         var usuario = Persona();
 
-        Assert.Equal(MotivoDeRechazoDeUsuario.SucursalInvalida, usuario.CambiarRol(RolDeUsuario.EncargadoDeSucursal, Guid.Empty).Motivo);
-        Assert.True(usuario.CambiarRol(RolDeUsuario.EncargadoDeSucursal, Sucursal).EsPermitida);
+        Assert.Equal(MotivoDeRechazoDeUsuario.SucursalInvalida, usuario.CambiarRol(RolDeUsuario.EncargadoDeSucursal, Guid.Empty, Ahora).Motivo);
+        Assert.True(usuario.CambiarRol(RolDeUsuario.EncargadoDeSucursal, Sucursal, Ahora).EsPermitida);
         Assert.Equal(Sucursal, usuario.Sucursal);
-        Assert.True(usuario.CambiarRol(RolDeUsuario.Logistica, null).EsPermitida);
+        Assert.True(usuario.CambiarRol(RolDeUsuario.Logistica, null, Ahora).EsPermitida);
         Assert.Null(usuario.Sucursal);
         Assert.Throws<ArgumentException>(() => Usuario.Restaurar(Guid.NewGuid(), "a@b.pe", RolDeUsuario.EncargadoDeSucursal, null, true, true));
     }
@@ -61,12 +62,12 @@ public sealed class UsuariosTests
         var sinVerificar = Persona(verificado: false);
         var verificado = Persona(verificado: true);
 
-        Assert.Equal(MotivoDeRechazoDeUsuario.CorreoSinVerificar, sinVerificar.CambiarRol(RolDeUsuario.Logistica, null).Motivo);
+        Assert.Equal(MotivoDeRechazoDeUsuario.CorreoSinVerificar, sinVerificar.CambiarRol(RolDeUsuario.Logistica, null, Ahora).Motivo);
         Assert.Equal(RolDeUsuario.Cliente, sinVerificar.Rol);
-        Assert.True(verificado.CambiarRol(RolDeUsuario.Logistica, null).EsPermitida);
+        Assert.True(verificado.CambiarRol(RolDeUsuario.Logistica, null, Ahora).EsPermitida);
 
         sinVerificar.VerificarCorreo();
-        Assert.True(sinVerificar.CambiarRol(RolDeUsuario.Logistica, null).EsPermitida);
+        Assert.True(sinVerificar.CambiarRol(RolDeUsuario.Logistica, null, Ahora).EsPermitida);
     }
 
     [Fact]
@@ -78,15 +79,15 @@ public sealed class UsuariosTests
         var titular = Guid.NewGuid();
         var nuevo = Persona();
 
-        var decision = ReglasDeAdministracion.CambiarRolODesactivar(admin, nuevo, RolDeUsuario.EncargadoDeSucursal, Sucursal, administradoresActivos: 2, new EncargadoDeSucursal(titular, Sucursal));
+        var decision = ReglasDeAdministracion.CambiarRolODesactivar(admin, nuevo, RolDeUsuario.EncargadoDeSucursal, Sucursal, administradoresActivos: 2, Ahora, new EncargadoDeSucursal(titular, Sucursal));
 
         Assert.Equal(MotivoDeRechazoDeUsuario.SucursalYaTieneEncargado, decision.Motivo);
         Assert.Equal(titular, decision.EncargadoActual);
         Assert.Equal(RolDeUsuario.Cliente, nuevo.Rol);
 
         // Otra sucursal, o el mismo encargado reasignado a su sucursal, sí se permite.
-        Assert.True(ReglasDeAdministracion.CambiarRolODesactivar(admin, nuevo, RolDeUsuario.EncargadoDeSucursal, OtraSucursal, 2, new EncargadoDeSucursal(titular, Sucursal)).EsPermitida);
-        Assert.True(ReglasDeAdministracion.CambiarRolODesactivar(otroAdmin, nuevo, RolDeUsuario.EncargadoDeSucursal, Sucursal, 2, new EncargadoDeSucursal(nuevo.Id, Sucursal)).EsPermitida);
+        Assert.True(ReglasDeAdministracion.CambiarRolODesactivar(admin, nuevo, RolDeUsuario.EncargadoDeSucursal, OtraSucursal, 2, Ahora, new EncargadoDeSucursal(titular, Sucursal)).EsPermitida);
+        Assert.True(ReglasDeAdministracion.CambiarRolODesactivar(otroAdmin, nuevo, RolDeUsuario.EncargadoDeSucursal, Sucursal, 2, Ahora, new EncargadoDeSucursal(nuevo.Id, Sucursal)).EsPermitida);
     }
 
     [Fact]
@@ -95,8 +96,8 @@ public sealed class UsuariosTests
     {
         var admin = Persona(RolDeUsuario.AdministradorCentral);
 
-        Assert.Equal(MotivoDeRechazoDeUsuario.SobreSiMismo, ReglasDeAdministracion.CambiarRolODesactivar(admin, admin, RolDeUsuario.Cliente, null, 2, null).Motivo);
-        Assert.Equal(MotivoDeRechazoDeUsuario.SobreSiMismo, ReglasDeAdministracion.CambiarRolODesactivar(admin, admin, null, null, 2, null).Motivo);
+        Assert.Equal(MotivoDeRechazoDeUsuario.SobreSiMismo, ReglasDeAdministracion.CambiarRolODesactivar(admin, admin, RolDeUsuario.Cliente, null, 2, Ahora, null).Motivo);
+        Assert.Equal(MotivoDeRechazoDeUsuario.SobreSiMismo, ReglasDeAdministracion.CambiarRolODesactivar(admin, admin, null, null, 2, Ahora, null).Motivo);
         Assert.Equal(MotivoDeRechazoDeUsuario.SobreSiMismo, ReglasDeAdministracion.Restablecer(admin, admin).Motivo);
         Assert.True(ReglasDeAdministracion.Restablecer(admin, Persona()).EsPermitida);
     }
@@ -108,10 +109,10 @@ public sealed class UsuariosTests
         var actor = Persona(RolDeUsuario.AdministradorCentral);
         var ultimo = Persona(RolDeUsuario.AdministradorCentral);
 
-        Assert.Equal(MotivoDeRechazoDeUsuario.UltimoAdministrador, ReglasDeAdministracion.CambiarRolODesactivar(actor, ultimo, null, null, administradoresActivos: 1, null).Motivo);
-        Assert.Equal(MotivoDeRechazoDeUsuario.UltimoAdministrador, ReglasDeAdministracion.CambiarRolODesactivar(actor, ultimo, RolDeUsuario.Logistica, null, 1, null).Motivo);
-        Assert.True(ReglasDeAdministracion.CambiarRolODesactivar(actor, ultimo, null, null, 2, null).EsPermitida);
-        Assert.True(ReglasDeAdministracion.CambiarRolODesactivar(actor, ultimo, RolDeUsuario.AdministradorCentral, null, 1, null).EsPermitida);
+        Assert.Equal(MotivoDeRechazoDeUsuario.UltimoAdministrador, ReglasDeAdministracion.CambiarRolODesactivar(actor, ultimo, null, null, administradoresActivos: 1, Ahora, null).Motivo);
+        Assert.Equal(MotivoDeRechazoDeUsuario.UltimoAdministrador, ReglasDeAdministracion.CambiarRolODesactivar(actor, ultimo, RolDeUsuario.Logistica, null, 1, Ahora, null).Motivo);
+        Assert.True(ReglasDeAdministracion.CambiarRolODesactivar(actor, ultimo, null, null, 2, Ahora, null).EsPermitida);
+        Assert.True(ReglasDeAdministracion.CambiarRolODesactivar(actor, ultimo, RolDeUsuario.AdministradorCentral, null, 1, Ahora, null).EsPermitida);
     }
 
     [Fact]
@@ -123,7 +124,7 @@ public sealed class UsuariosTests
         var adminInactivo = Persona(RolDeUsuario.AdministradorCentral, activo: false);
         var objetivo = Persona();
 
-        Assert.Equal(MotivoDeRechazoDeUsuario.NoEsAdministrador, ReglasDeAdministracion.CambiarRolODesactivar(cliente, objetivo, RolDeUsuario.Logistica, null, 2, null).Motivo);
+        Assert.Equal(MotivoDeRechazoDeUsuario.NoEsAdministrador, ReglasDeAdministracion.CambiarRolODesactivar(cliente, objetivo, RolDeUsuario.Logistica, null, 2, Ahora, null).Motivo);
         Assert.Equal(MotivoDeRechazoDeUsuario.NoEsAdministrador, ReglasDeAdministracion.Restablecer(logistica, objetivo).Motivo);
         Assert.Equal(MotivoDeRechazoDeUsuario.NoEsAdministrador, ReglasDeAdministracion.Restablecer(adminInactivo, objetivo).Motivo);
     }
@@ -135,12 +136,12 @@ public sealed class UsuariosTests
         var admin = Persona(RolDeUsuario.AdministradorCentral);
         var sinVerificar = Persona(verificado: false);
 
-        var decision = ReglasDeAdministracion.CambiarRolODesactivar(admin, sinVerificar, RolDeUsuario.Logistica, null, 2, null);
+        var decision = ReglasDeAdministracion.CambiarRolODesactivar(admin, sinVerificar, RolDeUsuario.Logistica, null, 2, Ahora, null);
 
         Assert.Equal(MotivoDeRechazoDeUsuario.CorreoSinVerificar, decision.Motivo);
         Assert.Equal(RolDeUsuario.Cliente, sinVerificar.Rol);
         var valido = Persona();
-        Assert.True(ReglasDeAdministracion.CambiarRolODesactivar(admin, valido, RolDeUsuario.Logistica, null, 2, null).EsPermitida);
+        Assert.True(ReglasDeAdministracion.CambiarRolODesactivar(admin, valido, RolDeUsuario.Logistica, null, 2, Ahora, null).EsPermitida);
         Assert.Equal(RolDeUsuario.Cliente, valido.Rol);
     }
 
@@ -150,11 +151,30 @@ public sealed class UsuariosTests
     {
         var inactivo = Persona(activo: false);
 
-        Assert.Equal(MotivoDeRechazoDeUsuario.CuentaNoActiva, inactivo.CambiarRol(RolDeUsuario.Logistica, null).Motivo);
+        Assert.Equal(MotivoDeRechazoDeUsuario.CuentaNoActiva, inactivo.CambiarRol(RolDeUsuario.Logistica, null, Ahora).Motivo);
         Assert.Equal(TimeSpan.FromDays(7), RolDeUsuario.Cliente.VigenciaDeLaRenovacion());
         Assert.Equal(TimeSpan.FromHours(8), RolDeUsuario.EncargadoDeSucursal.VigenciaDeLaRenovacion());
         Assert.Equal(TimeSpan.FromHours(8), RolDeUsuario.AdministradorCentral.VigenciaDeLaRenovacion());
         Assert.True(RolDeUsuario.Logistica.EsDePersonal());
         Assert.False(RolDeUsuario.Cliente.EsDePersonal());
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-19")]
+    public void Cambiar_el_rol_avanza_el_corte_de_sesiones_y_las_renovaciones_anteriores_dejan_de_servir()
+    {
+        var cliente = Persona();
+        var renovacion = Renovacion.Emitir(new string('a', 64), cliente.Id, Guid.NewGuid(), RolDeUsuario.Cliente, Ahora.AddHours(-2));
+        Assert.True(renovacion.EstaVigente(Ahora, cliente.SesionesValidasDesde));
+
+        Assert.True(cliente.CambiarRol(RolDeUsuario.Logistica, null, Ahora).EsPermitida);
+
+        Assert.Equal(Ahora, cliente.SesionesValidasDesde);
+        Assert.False(renovacion.EstaVigente(Ahora.AddMinutes(1), cliente.SesionesValidasDesde));
+        Assert.Equal(ResultadoDeRotacion.Invalidada, renovacion.Rotar(Ahora.AddMinutes(1), cliente.SesionesValidasDesde, new string('b', 64)).Resultado);
+
+        var rechazado = Persona(verificado: false);
+        rechazado.CambiarRol(RolDeUsuario.Logistica, null, Ahora);
+        Assert.Null(rechazado.SesionesValidasDesde);
     }
 }

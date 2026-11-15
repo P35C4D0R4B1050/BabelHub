@@ -146,8 +146,8 @@ public sealed class Renovacion
     public DateTimeOffset? RevocadaEn { get; private set; }
 
     /// <summary>La renovación de un ingreso: familia nueva y vencimiento absoluto según el rol.</summary>
-    public static Renovacion Emitir(string huella, Guid usuarioId, RolDeUsuario rol, DateTimeOffset ahora) =>
-        Crear(huella, usuarioId, Guid.NewGuid(), ahora, PoliticaDeRenovacion.VencimientoAbsoluto(rol, ahora));
+    public static Renovacion Emitir(string huella, Guid usuarioId, Guid familia, RolDeUsuario rol, DateTimeOffset ahora) =>
+        Crear(huella, usuarioId, familia, ahora, PoliticaDeRenovacion.VencimientoAbsoluto(rol, ahora));
 
     public static Renovacion Restaurar(string huella, Guid usuarioId, Guid familia, DateTimeOffset emitida, DateTimeOffset expiraAbsoluta, DateTimeOffset? usadaEn, DateTimeOffset? revocadaEn) =>
         new(Validar(huella), usuarioId, familia, emitida, expiraAbsoluta, usadaEn, revocadaEn);

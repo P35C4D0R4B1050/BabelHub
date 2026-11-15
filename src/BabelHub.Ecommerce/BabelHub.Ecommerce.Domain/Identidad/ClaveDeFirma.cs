@@ -155,12 +155,12 @@ public sealed class JuegoDeClavesDeFirma
 
     /// <summary>
     /// Declara comprometida la clave <paramref name="kid"/> (IDE-61): se rechaza de inmediato toda credencial firmada con ella; si era la activa se rota con <paramref name="claveNueva"/> (obligatoria en ese caso); se ordena revocar
-    /// las renovaciones y publicar la revocación. Devuelve nulo si el kid no existe o ya estaba comprometida.
+    /// las renovaciones y publicar la revocación. Es idempotente (repetirla tras un fallo parcial vuelve a ordenar la revocación) y devuelve nulo solo si el kid no existe.
     /// </summary>
     public ResultadoDeCompromiso? DeclararComprometida(string kid, ClaveDeFirma? claveNueva, DateTimeOffset ahora)
     {
         var comprometida = _claves.FirstOrDefault(c => c.Kid == kid);
-        if (comprometida is null || comprometida.Estado == EstadoDeClaveDeFirma.Comprometida)
+        if (comprometida is null)
         {
             return null;
         }
@@ -175,7 +175,7 @@ public sealed class JuegoDeClavesDeFirma
             comprometida.Comprometer(ahora);
             _claves.Add(claveNueva);
         }
-        else
+        else if (comprometida.Estado != EstadoDeClaveDeFirma.Comprometida)
         {
             comprometida.Comprometer(ahora);
         }

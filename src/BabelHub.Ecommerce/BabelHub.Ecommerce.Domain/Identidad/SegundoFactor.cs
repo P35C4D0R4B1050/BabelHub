@@ -16,6 +16,8 @@ public static class Totp
     /// <summary>Cuántos pasos se aceptan hacia cada lado del actual (IDE-51).</summary>
     public const int PasosDeTolerancia = 1;
 
+    public const int LongitudMinimaDelSecreto = 16;
+
     public static long PasoDe(DateTimeOffset instante) => instante.ToUnixTimeSeconds() / SegundosPorPaso;
 
     public static string Codigo(ReadOnlySpan<byte> secreto, long paso)
@@ -45,7 +47,8 @@ public static class Totp
     /// </summary>
     public static long? PasoAceptado(ReadOnlySpan<byte> secreto, string? codigo, DateTimeOffset ahora, long? ultimoPasoUsado)
     {
-        if (codigo is null || codigo.Length != Digitos || !codigo.All(char.IsAsciiDigit))
+        // RFC 4226: el secreto compartido tiene al menos 128 bits; uno más corto (o vacío) nunca valida.
+        if (secreto.Length < LongitudMinimaDelSecreto || codigo is null || codigo.Length != Digitos || !codigo.All(char.IsAsciiDigit))
         {
             return null;
         }
@@ -111,6 +114,9 @@ public enum ResultadoDeSegundoFactor
     Aceptado,
     Rechazado,
     NoEstaActivo,
+
+    /// <summary>Ya estaba activo: no se confirma de nuevo.</summary>
+    YaActivo,
 }
 
 /// <summary>El resultado de usar un código de respaldo (IDE-22): si se aceptó y cuántos quedan.</summary>
@@ -174,7 +180,7 @@ public sealed class SegundoFactor
         ArgumentNullException.ThrowIfNull(huellasDeRespaldo);
         if (EstaActivo)
         {
-            return ResultadoDeSegundoFactor.NoEstaActivo;
+            return ResultadoDeSegundoFactor.YaActivo;
         }
 
         if (huellasDeRespaldo.Count != CodigosDeRespaldo.Cantidad || huellasDeRespaldo.Distinct(StringComparer.Ordinal).Count() != CodigosDeRespaldo.Cantidad)

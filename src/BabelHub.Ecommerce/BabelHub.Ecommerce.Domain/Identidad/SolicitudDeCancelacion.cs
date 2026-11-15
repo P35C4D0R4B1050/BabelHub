@@ -150,6 +150,12 @@ public sealed class SolicitudDeCancelacion
             return ResultadoDeReconfirmacion.NoEstaEsperando;
         }
 
+        // El plazo no empezó: el aviso aún no se mostró en una sesión reconocida (IDE-76), no se puede reconfirmar.
+        if (ReconfirmarHasta is null && ahora < FechaTope)
+        {
+            return ResultadoDeReconfirmacion.NoEstaEsperando;
+        }
+
         if (ahora >= FechaTope || ReconfirmarHasta is { } hasta && ahora > hasta)
         {
             Descartar(ahora);
@@ -169,14 +175,18 @@ public sealed class SolicitudDeCancelacion
     }
 
     /// <summary>La ejecución terminó en una sola transacción (IDE-70): la solicitud queda ejecutada.</summary>
-    public void Ejecutada(DateTimeOffset ahora)
+    public bool Ejecutada(DateTimeOffset ahora)
     {
-        if (Estado == EstadoDeCancelacion.EsperandoReconfirmacion && EjecucionEnCurso)
+        // Solo termina una ejecución que empezó (devuelve falso si no: no se «ejecuta» en silencio una solicitud descartada).
+        if (Estado != EstadoDeCancelacion.EsperandoReconfirmacion || !EjecucionEnCurso)
         {
-            Estado = EstadoDeCancelacion.Ejecutada;
-            CerradaEn = ahora;
-            EjecucionEnCurso = false;
+            return false;
         }
+
+        Estado = EstadoDeCancelacion.Ejecutada;
+        CerradaEn = ahora;
+        EjecucionEnCurso = false;
+        return true;
     }
 
     /// <summary>La ejecución falló cerrada (IDE-70): no queda efecto parcial y se puede reintentar; si el reintento cruza el día 30, la solicitud se descarta (IDE-81).</summary>
@@ -192,6 +202,12 @@ public sealed class SolicitudDeCancelacion
     /// <summary>La persona desiste antes de la ejecución (IDE-68): se descarta y puede volver a comprar.</summary>
     public bool Desistir(DateTimeOffset ahora)
     {
+        if (EjecucionEnCurso)
+        {
+            // Una ejecución empezada se termina o falla cerrada: no se descarta a mitad (los datos quedarían borrados con la solicitud «descartada»).
+            return false;
+        }
+
         if (Estado is not (EstadoDeCancelacion.Diferida or EstadoDeCancelacion.EsperandoReconfirmacion))
         {
             return false;
@@ -206,7 +222,7 @@ public sealed class SolicitudDeCancelacion
     /// </summary>
     public bool DescartarSiVencio(DateTimeOffset ahora)
     {
-        if (Estado is not (EstadoDeCancelacion.Diferida or EstadoDeCancelacion.EsperandoReconfirmacion))
+        if (EjecucionEnCurso || Estado is not (EstadoDeCancelacion.Diferida or EstadoDeCancelacion.EsperandoReconfirmacion))
         {
             return false;
         }

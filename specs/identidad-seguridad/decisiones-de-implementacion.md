@@ -24,3 +24,18 @@ Decisiones tomadas al construir (no cambian la spec ni el plan aprobados). Lee t
 - La lista de contraseñas comunes (≥ 10 000, minúsculas, ya normalizadas) y el adaptador de Argon2id (con el semáforo global y el señuelo) son de la Infraestructura; la función `esComun` de T01 la entrega ese puerto.
 - La huella con clave (HMAC con pimienta) de los códigos de respaldo y de un solo uso la calcula la Aplicación; el Dominio solo compara huellas.
 - Las pruebas de atomicidad (un paso TOTP aceptado una sola vez con solicitudes simultáneas, 5 intentos con solicitudes paralelas, una rotación concurrente) son de integración con PostgreSQL en las tareas de repositorios.
+
+## Correcciones tras la revisión de IDE-1
+
+Revisión de seguridad («Cumple con observaciones», sin Bloqueantes) y de arquitectura («Cumple con observaciones»). **Corregido:**
+- (Importante) **Cambiar el rol avanza el corte de sesiones** (`Usuario.CambiarRol(…, ahora)` y `AvanzarElCorteDeSesiones`): una renovación de cliente ya no puede rotarse tras pasar a encargado sin el segundo factor. La Aplicación avanza el mismo corte al cambiar la contraseña, restablecer el segundo factor, «cerrar todas» y declarar comprometida la clave.
+- (Importante) **Un dispositivo solo reconoce (y su región solo es «habitual») con 24 horas de antigüedad** (`Dispositivo.EsMaduro`): quien ingresa desde otro país no se reconoce a sí mismo en el mismo ingreso y el cambio de correo no salta las 24 horas de IDE-54. `XX` y `T1` (desconocido y Tor en el borde) no son una región.
+- (Importante) **Una cancelación con la ejecución en curso no se descarta** (`Desistir` y `DescartarSiVencio` lo rechazan) y `Ejecutada` devuelve falso si no hubo ejecución en curso.
+- `Renovacion.Emitir` recibe la familia (no genera identificadores); el resumen PHC exige sal de 16 bytes y resumen de 32 (22 y 43 caracteres) y **topes** de memoria (256 MiB), iteraciones (10) y paralelismo (4); la contraseña cruda se acota a 2048 unidades UTF-16 antes de normalizar y un texto con sustitutos sueltos se rechaza en vez de lanzar; un secreto TOTP de menos de 128 bits nunca valida; `Confirmar` devuelve `YaActivo`; `Reconfirmar` antes de que el aviso se muestre devuelve «no está esperando» (IDE-76); `DeclararComprometida` es idempotente.
+
+**No hecho (decisión o capa siguiente):**
+- Los criterios AC-IDE-14, 17 y 38 tienen en estas tareas solo su parte de Dominio: la concurrencia («si dos se presentan a la vez, se acepta uno»), el registro del evento y la verificación del correo son de Aplicación e Infraestructura y **no están cerrados** hasta sus pruebas (que `spec-verify` no dé por cubiertos solo con el `Trait` de Dominio).
+- T01 marca el señuelo para cuentas inexistentes y la lista por puerto como Infraestructura/Aplicación; `MarcaDeDispositivo` del plan se llama `Dispositivo` aquí.
+- Estado `Cancelada` de la cuenta y regla de reactivación (`Usuario.Reactivar` sin regla): se decide con la Aplicación (`IEstadoDeCuenta`).
+- Estado «rechazada con motivo» de `SolicitudDeDatos` (IDE-26) y la consulta de «atendida tarde»; que `hoyEnLima` coincida con `ahora`: lo asegura el llamador.
+- El propósito del código de un solo uso debe ir dentro del HMAC (la Aplicación); el historial de versiones aceptadas de textos (se guarda la última); que el desafío encadenado herede `Creado`; `Emitida >= desde` frente al orden de la transacción; tipos auxiliares que sobran (`AccionConDesafio`, `PoliticaDeRenovacion`) y archivos con varios tipos.
