@@ -115,15 +115,40 @@ public static class LimpiezaDelNavegador
 
 public static class TokenDelUsuarioDeLaSesionExtensiones
 {
-    /// <summary>Registra la implementación del token de la sesión; el manejador de salida la usa para las operaciones de usuario.</summary>
-    public static IServiceCollection AgregarTokenDelUsuarioDeLaSesion(this IServiceCollection servicios)
+    /// <summary>El único cliente HTTP con nombre que acepta operaciones de usuario por omisión (el del Inventario).</summary>
+    public const string ClienteDelInventario = "inventario";
+
+    /// <summary>
+    /// Registra la implementación del token de la sesión y el manejador de salida que lo pone en las operaciones de usuario, <b>solo en los clientes HTTP con nombre que se indican</b> (por omisión <c>inventario</c>):
+    /// un cliente hacia un proveedor o a cualquier otro destino no recibe el token aunque declare el alcance, y estos clientes no siguen redirecciones (el token y la credencial de servicio no deben
+    /// viajar a un destino distinto del configurado).
+    /// </summary>
+    public static IServiceCollection AgregarTokenDelUsuarioDeLaSesion(this IServiceCollection servicios, params string[] clientesQueAceptanOperacionesDeUsuario)
     {
         ArgumentNullException.ThrowIfNull(servicios);
         servicios.AddHttpContextAccessor();
         servicios.AddSingleton<ITokenDelUsuarioDeLaSesion, HttpTokenDelUsuarioDeLaSesion>();
         // Todo cliente HTTP hacia otro servicio pone el token de la sesión en sus operaciones de usuario (el manejador va primero en la cadena).
         servicios.TryAddTransient<TokenDelUsuarioDeSalidaHandler>();
-        servicios.ConfigureHttpClientDefaults(cliente => cliente.AddHttpMessageHandler<TokenDelUsuarioDeSalidaHandler>());
+        var permitidos = clientesQueAceptanOperacionesDeUsuario is { Length: > 0 } ? clientesQueAceptanOperacionesDeUsuario : [ClienteDelInventario];
+        foreach (var nombre in permitidos)
+        {
+            // El manejador va siempre primero de la cadena (antes de la resiliencia y de las credenciales de servicio), se registre antes o después del cliente.
+            servicios.AddHttpClient(nombre)
+                .ConfigureAdditionalHttpMessageHandlers((manejadores, proveedor) => manejadores.Insert(0, proveedor.GetRequiredService<TokenDelUsuarioDeSalidaHandler>()))
+                .ConfigurePrimaryHttpMessageHandler((primario, _) =>
+                {
+                    switch (primario)
+                    {
+                        case HttpClientHandler http:
+                            http.AllowAutoRedirect = false;
+                            break;
+                        case SocketsHttpHandler sockets:
+                            sockets.AllowAutoRedirect = false;
+                            break;
+                    }
+                });
+        }
         return servicios;
     }
 }

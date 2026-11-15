@@ -133,15 +133,21 @@ public sealed class ProteccionContraFalsificacionFilter(
     {
         ArgumentNullException.ThrowIfNull(context);
         var contexto = context.HttpContext;
-        if (EsSeguro(contexto.Request.Method) || SeIgnora(context))
+        if (EsSeguro(contexto.Request.Method))
         {
             return;
         }
 
+        // Origin y Sec-Fetch-Site se comprueban siempre, también en lo que no pide token: un cliente de servidor a servidor no los trae y pasa igual.
         var origen = ComprobadorDeOrigen.Comprobar(contexto.Request, host.HostsPermitidos);
         if (origen != ResultadoDeOrigen.Valido)
         {
             await Rechazar(context, CategoriaDeError.Prohibido).ConfigureAwait(false);
+            return;
+        }
+
+        if (SeIgnora(context))
+        {
             return;
         }
 

@@ -65,7 +65,7 @@ public sealed class TokenDeSalidaDeLaSesionTests
         public OrigenDeSolicitud Actual => OrigenDeSolicitud.Desconocido;
     }
 
-    private static (HttpClient Cliente, Servidor Servidor, HttpContext Contexto, RegistroCapturado Registro) Armar()
+    private static (HttpClient Cliente, Servidor Servidor, HttpContext Contexto, RegistroCapturado Registro) Armar(string nombreDelCliente = "inventario", bool clienteAntes = false)
     {
         var servidor = new Servidor();
         var registro = new RegistroCapturado();
@@ -77,14 +77,23 @@ public sealed class TokenDeSalidaDeLaSesionTests
             new(AlcanceDeServicio.OrigenReenviado, new ValorSecreto(SecretoDeOrigen)),
         ]));
         servicios.AddSingleton<IOrigenDeSolicitud>(new OrigenDePrueba());
-        servicios.AgregarTokenDelUsuarioDeLaSesion();
-        servicios.AgregarClienteDeServicio("inventario", new Uri("https://inventario.interno/"), new OpcionesDelClienteDeServicio { ReintentosMaximos = 0 })
+        void Cliente() => servicios.AgregarClienteDeServicio(nombreDelCliente, new Uri("https://destino.interno/"), new OpcionesDelClienteDeServicio { ReintentosMaximos = 0 })
             .ConfigurePrimaryHttpMessageHandler(() => servidor);
+        if (clienteAntes)
+        {
+            Cliente();
+        }
+
+        servicios.AgregarTokenDelUsuarioDeLaSesion();
+        if (!clienteAntes)
+        {
+            Cliente();
+        }
         var proveedor = servicios.BuildServiceProvider();
 
         var contexto = new DefaultHttpContext();
         proveedor.GetRequiredService<IHttpContextAccessor>().HttpContext = contexto;
-        return (proveedor.GetRequiredService<IHttpClientFactory>().CreateClient("inventario"), servidor, contexto, registro);
+        return (proveedor.GetRequiredService<IHttpClientFactory>().CreateClient(nombreDelCliente), servidor, contexto, registro);
     }
 
     private static HttpRequestMessage OperacionDeUsuario() =>
@@ -112,6 +121,34 @@ public sealed class TokenDeSalidaDeLaSesionTests
         Assert.False(cabeceras.ContainsKey("X-Actor"));
         Assert.False(cabeceras.ContainsKey("X-Usuario"));
         Assert.False(cabeceras.ContainsKey("X-Rol"));
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-WEB-03")]
+    [InlineData("proveedor-de-pagos", false)]
+    [InlineData("proveedor-de-pagos", true)]
+    [InlineData("turnstile", false)]
+    public async Task UnClienteQueNoEsElDelInventario_NuncaRecibeElToken_AunqueDeclareLaOperacionDeUsuario(string cliente, bool clienteAntes)
+    {
+        var (http, servidor, contexto, registro) = Armar(cliente, clienteAntes);
+        contexto.EstablecerCredencial(Asegurada());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => http.SendAsync(OperacionDeUsuario()));
+
+        Assert.Empty(servidor.Solicitudes);
+        Assert.DoesNotContain(registro.Mensajes, m => m.Contains(TokenDeLaSesion, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-03")]
+    public async Task ElClienteDelInventario_RecibeElToken_ConCualquierOrdenDeRegistro()
+    {
+        var (http, servidor, contexto, _) = Armar(clienteAntes: true);
+        contexto.EstablecerCredencial(Asegurada());
+
+        await http.SendAsync(OperacionDeUsuario());
+
+        Assert.Equal("Bearer " + TokenDeLaSesion, Assert.Single(servidor.Cabeceras)["Authorization"]);
     }
 
     [Fact]

@@ -81,6 +81,21 @@ public sealed class ProteccionContraFalsificacionTests
 
     [Fact]
     [Trait("Criterio", "AC-WEB-03")]
+    public async Task LaRutaQueIgnoraElToken_AunComprueba_Origin_YSecFetchSite()
+    {
+        var (anfitrion, _, _) = await Armar();
+        await using var _ = anfitrion;
+        var ajeno = new HttpRequestMessage(HttpMethod.Post, "/prueba/sesion/ignorada");
+        ajeno.Headers.Add("Origin", "https://atacante.example");
+        var deOtroSitio = new HttpRequestMessage(HttpMethod.Post, "/prueba/sesion/ignorada");
+        deOtroSitio.Headers.Add("Sec-Fetch-Site", "cross-site");
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await anfitrion.Cliente.SendAsync(ajeno)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await anfitrion.Cliente.SendAsync(deOtroSitio)).StatusCode);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-03")]
     public async Task UnGet_NoPideToken_NiComprueba_Origin()
     {
         var (anfitrion, _, _) = await Armar();
