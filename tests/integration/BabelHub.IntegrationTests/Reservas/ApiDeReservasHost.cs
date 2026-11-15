@@ -51,6 +51,9 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
 
     public AlertasTecnicasEspia Alertas { get; } = new();
 
+    /// <summary>Los eventos de seguridad publicados (rechazos de credencial y de alcance, límites): T31 comprueba que cada rechazo deja el suyo.</summary>
+    public EventosDeSeguridadEspia Eventos { get; } = new();
+
     public AlertasDeIntegracionEspia AlertasDeAuditoria { get; } = new();
 
     public RelojDeIntegracion Reloj { get; } = new();
@@ -59,10 +62,12 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
 
     public IEnumerable<RouteEndpoint> Endpoints => _app.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>();
 
-    public static async Task<ApiDeReservasHost> Crear(PostgresDeReservasFixture bd)
+    /// <param name="bd">La base de datos de la prueba.</param>
+    /// <param name="conTopeGeneral">Aplica el tope general de la dirección directa (120 por minuto, SEG-32): el «límite general de solicitudes» al que está sujeta la consulta previa (SEL-20).</param>
+    public static async Task<ApiDeReservasHost> Crear(PostgresDeReservasFixture bd, bool conTopeGeneral = false)
     {
         var host = new ApiDeReservasHost();
-        await host.Iniciar(bd);
+        await host.Iniciar(bd, conTopeGeneral);
         return host;
     }
 
@@ -71,7 +76,7 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
         public Task AlLiberar(Guid pedidoId, MotivoDeLiberacionDeReserva motivo, IReadOnlyCollection<Guid> trasladoIds, CancellationToken cancelacion = default) => Task.CompletedTask;
     }
 
-    private async Task Iniciar(PostgresDeReservasFixture bd)
+    private async Task Iniciar(PostgresDeReservasFixture bd, bool conTopeGeneral)
     {
         var matriz = new MatrizDeAlcances([.. MatrizDeFuentes.Declaraciones(), .. MatrizDeReservas.Declaraciones()]);
         var credenciales = new OpcionesDeCredencialesDeEntrada(
@@ -91,13 +96,15 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
         builder.WebHost.UseTestServer();
         builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("INV", ErroresDeFuentes.Especificos.Concat(ErroresDeReservas.Especificos).ToDictionary(p => p.Key, p => p.Value)));
         builder.Services.AgregarLimitesHttp(new OpcionesDeLimitesHttp());
-        builder.Services.AgregarCredencialDeServicio(new OpcionesDeSuperficieDeServicio(), credenciales);
+        builder.Services.AgregarCredencialDeServicio(
+            conTopeGeneral ? new OpcionesDeSuperficieDeServicio { TopeDeLaDireccionDirecta = PoliticasDeLimite.SolicitudesPorHuellaDirecta } : new OpcionesDeSuperficieDeServicio(),
+            credenciales);
         builder.Services.AddSingleton<IMatrizDeAlcancesDeServicio>(matriz);
         builder.Services.AddSingleton<IActorActual>(actor);
         builder.Services.AddSingleton<IEstablecedorDeActor>(actor);
         builder.Services.AddSingleton<ICalculadorDeHuella>(new CalculadorDeHuellaHmac(new OpcionesDeHuella("v1:" + Convert.ToBase64String(ClaveDeHuella))));
         builder.Services.AddSingleton<IReloj>(Reloj);
-        builder.Services.AddSingleton<IPublicadorDeEventosDeSeguridad>(new EventosDeSeguridadNulos());
+        builder.Services.AddSingleton<IPublicadorDeEventosDeSeguridad>(Eventos);
         builder.Services.AddSingleton<IPublicadorDeAlertasTecnicas>(Alertas);
         builder.Services.AddSingleton<IAlertas>(AlertasDeAuditoria);
         builder.Services.AddSingleton(new CatalogoDePoliticas(PoliticasDeSeguridad.Todas.Concat(PoliticasDeSeguridad.Generales)));
