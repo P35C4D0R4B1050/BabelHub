@@ -151,12 +151,18 @@ internal sealed class ConfirmarReservas(
         var vinculos = new List<(Guid LineaDeReservaId, Guid TrasladoId)>();
         foreach (var traslado in generados)
         {
-            if (!codigos.TryGetValue(traslado.CodigoDeOrigen, out var origenId))
-            {
-                continue;
-            }
+            // Un traslado de un origen que el directorio no conoce deja la línea sin vincular: se falla a la vista (y se revierte) en lugar de confirmar un pedido cuyo traslado una anulación no podría cancelar (TRA-15).
+            var origenId = codigos.TryGetValue(traslado.CodigoDeOrigen, out var id)
+                ? id
+                : throw new InvalidOperationException("Traslados devolvió un traslado de un origen desconocido.");
 
             vinculos.AddRange(lineas.Where(l => l.FuenteId == origenId && l.EdicionId == traslado.EdicionId).Select(l => (l.Id, traslado.TrasladoId)));
+        }
+
+        // Postcondición: toda línea fuera de la sucursal de recojo debe quedar vinculada a un traslado; si el puerto devolvió una lista incompleta, se falla a la vista.
+        if (lineas.Any(l => !vinculos.Any(v => v.LineaDeReservaId == l.Id)))
+        {
+            throw new InvalidOperationException("Traslados no devolvió un traslado para cada línea que sale de otra sucursal.");
         }
 
         await reservas.VincularTraslados(vinculos, cancelacion).ConfigureAwait(false);

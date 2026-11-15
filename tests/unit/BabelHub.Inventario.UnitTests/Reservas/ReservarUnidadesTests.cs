@@ -549,8 +549,10 @@ public sealed class ReservarUnidadesIdempotenciaTests
         segundo.Base.Existencias.Poner(segundo.Base.Lima.Id, libro2, 5, 0);
 
         // Otro cliente (otro actor) con la misma clave en un entorno que ya conoce la del primero.
-        segundo.Reservas.Guardadas.AddRange(primero.Reservas.Guardadas);
-        segundo.Reservas.Solicitudes.AddRange(primero.Reservas.Solicitudes);
+        foreach (var (reserva, solicitud) in primero.Reservas.Guardadas.Zip(primero.Reservas.Solicitudes))
+        {
+            segundo.Reservas.Sembrar(reserva, solicitud);
+        }
         var resultado = await segundo.Reservar().Ejecutar(EntornoDeReservas.ARecojo("lima", [EntornoDeReservas.Linea(libro2, 1)], clave: entrada.ClaveDeIdempotencia));
 
         Assert.True(resultado.EsExito);

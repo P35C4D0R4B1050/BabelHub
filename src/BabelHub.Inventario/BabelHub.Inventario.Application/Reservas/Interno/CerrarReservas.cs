@@ -160,7 +160,7 @@ internal sealed class CerrarReservas(
                 aCerrar.Add(activa);
                 resultados.Add(new ResultadoDeCierreDeLinea(lineaId, YaCerrada: false));
             }
-            else if (delPedido.Any(l => l.Estado == EstadoDeLinea.Cerrada && l.CerradaPor == causa))
+            else if (delPedido.FirstOrDefault(l => l.Estado == EstadoDeLinea.Cerrada && l.CerradaPor == causa) is { } yaCerrada && await MismoEnvio(yaCerrada, esEntrega, entrada.EnvioId, cancelacion).ConfigureAwait(false))
             {
                 resultados.Add(new ResultadoDeCierreDeLinea(lineaId, YaCerrada: true));
             }
@@ -172,6 +172,8 @@ internal sealed class CerrarReservas(
 
         if (aCerrar.Count > 0)
         {
+            // Jerarquía D04: las líneas por id antes que las filas de stock.
+            await reservas.BloquearLineas([.. aCerrar.Select(l => l.Id)], cancelacion).ConfigureAwait(false);
             var bloqueo = await stock.Bloquear([.. aCerrar.Select(l => l.EdicionId).Distinct()], cancelacion).ConfigureAwait(false);
             if (!bloqueo.EstaBloqueado)
             {
@@ -179,7 +181,7 @@ internal sealed class CerrarReservas(
             }
 
             // La primera operación que llega gana: lo que no cambia aquí (otra operación cerró o liberó la línea) rechaza todo, sin cambios parciales (SEL-29).
-            var cerradas = await reservas.CerrarLineas([.. aCerrar.Select(l => l.Id)], causa, reloj.Ahora, cancelacion).ConfigureAwait(false);
+            var cerradas = await reservas.CerrarLineas([.. aCerrar.Select(l => l.Id)], causa, entrada.EnvioId, reloj.Ahora, cancelacion).ConfigureAwait(false);
             if (cerradas.Count != aCerrar.Count)
             {
                 return FallosDeReservas.De<CierreDeReserva>(CategoriaDeError.Conflicto, ClavesDeReservas.ReservaEstadoInvalido);
@@ -196,16 +198,24 @@ internal sealed class CerrarReservas(
         return Resultado<CierreDeReserva>.Exito(cierre);
     }
 
-    /// <summary>Descuenta el físico y lo reservado con <c>Aplicar(−c, −c)</c> agregado y ordenado por (edición, fuente), y audita cada línea cerrada con el físico anterior y posterior de su fila.</summary>
+    /// <summary>Una línea ya cerrada por esta causa solo responde <c>ya-cerrada</c> si, en el reparto, se cerró con el mismo envío (SEL-38); un envío distinto es estado inválido. La entrega no lleva envío.</summary>
+    private async Task<bool> MismoEnvio(LineaDeReserva cerrada, bool esEntrega, Guid? envioId, CancellationToken cancelacion)
+    {
+        if (esEntrega)
+        {
+            return true;
+        }
+
+        var envios = await reservas.EnviosDeCierre([cerrada.Id], cancelacion).ConfigureAwait(false);
+        return envios.GetValueOrDefault(cerrada.Id) == envioId;
+    }
+
+    /// <summary>Descuenta el físico y lo reservado con <c>Aplicar(−c, −c)</c> agregado y ordenado por (edición, fuente), y audita cada línea cerrada con el físico anterior y posterior, encadenados línea a línea dentro de cada fila.</summary>
     private async Task<ErrorDeAplicacion?> Descontar(IReadOnlyList<LineaCerrada> cerradas, bool esEntrega, CancellationToken cancelacion)
     {
-        var movimientos = cerradas
-            .GroupBy(l => (l.FuenteId, l.EdicionId))
-            .Select(g => new MovimientoDeStock(g.Key.FuenteId, g.Key.EdicionId, -checked(g.Sum(l => l.Cantidad)), -checked(g.Sum(l => l.Cantidad))))
-            .OrderBy(m => m.EdicionId, OrdenDeBloqueo.DeIdentificadores)
-            .ThenBy(m => m.FuenteId, OrdenDeBloqueo.DeIdentificadores);
+        var movimientos = MovimientosAgregados.Ordenados(cerradas.Select(l => (l.FuenteId, l.EdicionId, l.Cantidad)), -1, -1);
 
-        var fisicoPorFila = new Dictionary<(Guid FuenteId, Guid EdicionId), (int Anterior, int Posterior)>();
+        var fisicoPorFila = new Dictionary<(Guid FuenteId, Guid EdicionId), int>();
         foreach (var movimiento in movimientos)
         {
             var resultado = await stock.Aplicar(movimiento, cancelacion).ConfigureAwait(false);
@@ -220,12 +230,15 @@ internal sealed class CerrarReservas(
                 throw new InvalidOperationException("No se pudo descontar el físico de una reserva confirmada.");
             }
 
-            fisicoPorFila[(movimiento.FuenteId, movimiento.EdicionId)] = (resultado.Anterior.Fisico, resultado.Posterior.Fisico);
+            fisicoPorFila[(movimiento.FuenteId, movimiento.EdicionId)] = resultado.Anterior.Fisico;
         }
 
         foreach (var linea in cerradas)
         {
-            var (anterior, posterior) = fisicoPorFila[(linea.FuenteId, linea.EdicionId)];
+            // El físico se encadena línea a línea dentro de la misma fila: el anterior de una es el posterior de la anterior, y los números cuadran con cada cantidad.
+            var anterior = fisicoPorFila[(linea.FuenteId, linea.EdicionId)];
+            var posterior = anterior - linea.Cantidad;
+            fisicoPorFila[(linea.FuenteId, linea.EdicionId)] = posterior;
             await auditoria.Registrar(
                 new SolicitudDeRegistro(esEntrega ? AccionesAuditables.StockDescontadoPorEntrega : AccionesAuditables.StockDescontadoPorReparto)
                 {

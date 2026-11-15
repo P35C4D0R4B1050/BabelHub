@@ -181,6 +181,7 @@ public sealed class LiberarReservasTests
 
         var orden = e.Base.Bitacora.Llamadas;
         Assert.True(orden.IndexOf("traslados.AlLiberar") < orden.IndexOf("existencias.BloquearFilas"));
+        Assert.True(orden.IndexOf("reservas.BloquearLineas") < orden.IndexOf("existencias.BloquearFilas"));
         Assert.True(orden.IndexOf("existencias.BloquearFilas") < orden.IndexOf("reservas.LiberarLineasPorId"));
         Assert.True(orden.IndexOf("reservas.LiberarLineasPorId") < orden.IndexOf("existencias.Aplicar(0,-2)"));
         Assert.True(orden.IndexOf("bloqueo.Pedido") < orden.IndexOf("traslados.AlLiberar"));
@@ -234,8 +235,7 @@ public sealed class LiberarReservasTests
         e.Auditoria.Falla = true;
 
         await Assert.ThrowsAsync<AuditoriaNoDisponibleException>(() => e.Liberar().Ejecutar(Pide(pedido, CheckoutCancelado)));
-
-        // El doble no es transaccional: en producción la excepción revierte todo; aquí la auditoría fallida es lo último que se intentó.
+        // El doble no es transaccional: que la excepción revierta el stock y las líneas lo prueba LiberarReservasPostgresTests con PostgreSQL real (AC-SEL-32).
         Assert.Equal((10, 0), e.FilaDe(e.Base.Cusco, libro));
     }
 

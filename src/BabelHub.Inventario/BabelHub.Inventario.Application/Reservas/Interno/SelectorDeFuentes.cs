@@ -143,7 +143,10 @@ internal static class ConversionesDeReservas
         _ => throw new ArgumentOutOfRangeException(nameof(estado)),
     };
 
-    /// <summary>El estado de la reserva entera a partir de los de sus líneas ya en términos del contrato (con las vencidas mostradas como expiradas).</summary>
+    /// <summary>
+    /// El estado de la reserva entera a partir de los de sus líneas (con las vencidas mostradas como expiradas): el de las líneas cuando coinciden y, si difieren (una liberación parcial, un cierre por líneas), el de la línea
+    /// más «viva»: pendiente, luego confirmada, cerrada, expirada y por último liberada.
+    /// </summary>
     public static EstadoDeReserva EstadoDeLaReserva(IEnumerable<EstadoDeReserva> estados)
     {
         var presentes = estados.ToHashSet();
@@ -152,24 +155,6 @@ internal static class ConversionesDeReservas
             if (presentes.Contains(estado))
             {
                 return estado;
-            }
-        }
-
-        throw new InvalidOperationException("Una reserva necesita al menos una línea.");
-    }
-
-    /// <summary>
-    /// El estado de la reserva entera: el de sus líneas cuando coinciden y, si difieren (una liberación parcial, un cierre por líneas), el de la línea más «viva»: pendiente, luego confirmada, cerrada, expirada y
-    /// por último liberada.
-    /// </summary>
-    public static EstadoDeReserva EstadoDeLaReserva(IEnumerable<LineaDeReserva> lineas)
-    {
-        var estados = lineas.Select(l => l.Estado).ToHashSet();
-        foreach (var estado in new[] { EstadoDeLinea.Pendiente, EstadoDeLinea.Confirmada, EstadoDeLinea.Cerrada, EstadoDeLinea.Expirada, EstadoDeLinea.Liberada })
-        {
-            if (estados.Contains(estado))
-            {
-                return AContrato(estado);
             }
         }
 

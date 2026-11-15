@@ -92,7 +92,16 @@ public interface IRepositorioDeReservas
     /// Pasa a <b>cerradas</b> con su causa esas líneas confirmadas, con una sola sentencia que las bloquea por id y en orden y devuelve solo las que de verdad cambiaron: la primera operación que llega gana (SEL-29).
     /// Quien llama ya tomó el bloqueo del pedido y bloqueó las filas de stock.
     /// </summary>
-    Task<IReadOnlyList<LineaCerrada>> CerrarLineas(IReadOnlyCollection<Guid> lineaDeReservaIds, CausaDeCierre causa, DateTimeOffset ahora, CancellationToken cancelacion = default);
+    Task<IReadOnlyList<LineaCerrada>> CerrarLineas(IReadOnlyCollection<Guid> lineaDeReservaIds, CausaDeCierre causa, Guid? envioId, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>El envío con el que se cerró cada una de esas líneas (por identificador de línea de reserva), si lo tiene: solo el reparto lo lleva. Sirve para que <c>ya-cerrada</c> exija el mismo envío (SEL-38).</summary>
+    Task<IReadOnlyDictionary<Guid, Guid?>> EnviosDeCierre(IReadOnlyCollection<Guid> lineaDeReservaIds, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Bloquea por id y en orden esas líneas (<c>SELECT … FOR UPDATE</c>) <b>sin cambiarlas</b>: el escalón «líneas de reserva» de la jerarquía de bloqueos (D04), que se toma <b>antes</b> de las filas de stock. Las sentencias
+    /// condicionales que siguen las vuelven a bloquear sin costo (ya son de esta transacción).
+    /// </summary>
+    Task BloquearLineas(IReadOnlyCollection<Guid> lineaDeReservaIds, CancellationToken cancelacion = default);
 
     /// <summary>
     /// Confirma las líneas <b>pendientes no vencidas</b> del pedido con una sola sentencia condicional (las bloquea por id y en orden, repite el vencimiento con <paramref name="ahora"/>) y devuelve solo las que de verdad
@@ -128,7 +137,7 @@ internal static class ClavesDeReservas
 
     public const string StockInsuficiente = "stock-insuficiente";
 
-    /// <summary>El pedido ya tiene una reserva: hasta que el reemplazo y la idempotencia (T11 a T13) la traten, se rechaza.</summary>
+    /// <summary>Una cabecera o una línea activa concurrentes chocaron con la restricción única al insertar (nunca un error del servidor).</summary>
     public const string ReservaExistente = "reserva-existente";
 
     /// <summary>La clave de idempotencia ya se usó con otra carga (SEL-31).</summary>

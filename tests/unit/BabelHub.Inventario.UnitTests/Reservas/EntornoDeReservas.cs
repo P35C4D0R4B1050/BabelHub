@@ -62,6 +62,16 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
 
     public List<DatosDeLaSolicitud> Solicitudes { get; } = [];
 
+    private readonly Dictionary<Guid, DatosDeLaSolicitud> _porReserva = [];
+
+    /// <summary>Para las pruebas que siembran reservas ya guardadas con su solicitud (clave y huella).</summary>
+    public void Sembrar(ReservaDePedido reserva, DatosDeLaSolicitud solicitud)
+    {
+        Guardadas.Add(reserva);
+        Solicitudes.Add(solicitud);
+        _porReserva[reserva.Id] = solicitud;
+    }
+
     /// <summary>Si es verdadero, <c>Insertar</c> responde como la restricción única de la base ante una cabecera o una línea activa concurrentes.</summary>
     public bool InsertarChocaConUnaConcurrente { get; set; }
 
@@ -94,8 +104,8 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
     public Task<ReservaPorClave?> PorClave(Guid clienteId, string clave, CancellationToken cancelacion = default)
     {
         bitacora.Anotar("reservas.PorClave");
-        var indice = Solicitudes.FindIndex(s => s.ClaveDeIdempotencia == clave && Guardadas[Solicitudes.IndexOf(s)].ClienteId == clienteId);
-        return Task.FromResult(indice < 0 ? null : new ReservaPorClave(Copiar(Guardadas[indice]), Solicitudes[indice].HuellaDeLaCarga));
+        var reserva = Guardadas.FirstOrDefault(r => r.ClienteId == clienteId && _porReserva.TryGetValue(r.Id, out var s) && s.ClaveDeIdempotencia == clave);
+        return Task.FromResult(reserva is null ? null : new ReservaPorClave(Copiar(reserva), _porReserva[reserva.Id].HuellaDeLaCarga));
     }
 
     public Task<bool> ClienteDadoDeBaja(Guid clienteId, CancellationToken cancelacion = default) => Task.FromResult(Bajas.Contains(clienteId));
@@ -108,8 +118,9 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
             throw new ReservaDuplicadaException();
         }
 
-        Guardadas.Add(reserva);
+        Guardadas.Add(Copiar(reserva));
         Solicitudes.Add(solicitud);
+        _porReserva[reserva.Id] = solicitud;
         return Task.CompletedTask;
     }
 
@@ -259,7 +270,7 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyList<LineaCerrada>> CerrarLineas(IReadOnlyCollection<Guid> lineaDeReservaIds, CausaDeCierre causa, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    public Task<IReadOnlyList<LineaCerrada>> CerrarLineas(IReadOnlyCollection<Guid> lineaDeReservaIds, CausaDeCierre causa, Guid? envioId, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
         bitacora.Anotar("reservas.CerrarLineas");
         var cerradas = new List<LineaCerrada>();
@@ -268,11 +279,26 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
             foreach (var linea in reserva.Lineas.Where(l => lineaDeReservaIds.Contains(l.Id) && l.Estado == EstadoDeLinea.Confirmada))
             {
                 linea.Cerrar(causa, ahora);
+                Envios[linea.Id] = envioId;
                 cerradas.Add(new LineaCerrada(reserva.PedidoId, linea.Id, linea.LineaId, linea.EdicionId, linea.FuenteId, linea.Cantidad));
             }
         }
 
         return Task.FromResult<IReadOnlyList<LineaCerrada>>(cerradas);
+    }
+
+    public Dictionary<Guid, Guid?> Envios { get; } = [];
+
+    public Task<IReadOnlyDictionary<Guid, Guid?>> EnviosDeCierre(IReadOnlyCollection<Guid> lineaDeReservaIds, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.EnviosDeCierre");
+        return Task.FromResult<IReadOnlyDictionary<Guid, Guid?>>(lineaDeReservaIds.ToDictionary(i => i, i => Envios.GetValueOrDefault(i)));
+    }
+
+    public Task BloquearLineas(IReadOnlyCollection<Guid> lineaDeReservaIds, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.BloquearLineas");
+        return Task.CompletedTask;
     }
 
     public Task<PedidosQueApartanUnidades> PedidosQueApartan(Guid fuenteId, Guid edicionId, int maximo, DateTimeOffset ahora, CancellationToken cancelacion = default)

@@ -80,6 +80,7 @@ public static class DefinicionDeReservas
             traslado_id uuid NULL,
             creada_por_traslado boolean NOT NULL DEFAULT false,
             recreada_en_destino boolean NOT NULL DEFAULT false,
+            envio_id uuid NULL,
             confirmada_en timestamptz NULL,
             anulada_en timestamptz NULL,
             estado_cambiado_en timestamptz NOT NULL,
@@ -88,8 +89,12 @@ public static class DefinicionDeReservas
             CONSTRAINT ck_reserva_lineas_estado CHECK (estado IN ('pendiente', 'confirmada', 'cerrada', 'liberada', 'expirada')),
             CONSTRAINT ck_reserva_lineas_cerrada_por CHECK (cerrada_por IS NULL OR cerrada_por IN ('entrega', 'reparto', 'traslado')),
             CONSTRAINT ck_reserva_lineas_cierre CHECK ((estado = 'cerrada') = (cerrada_por IS NOT NULL)),
-            CONSTRAINT ck_reserva_lineas_traslado CHECK ((recreada_en_destino = false AND anulada_en IS NULL) OR cerrada_por = 'traslado')
+            CONSTRAINT ck_reserva_lineas_envio CHECK (envio_id IS NULL OR coalesce(cerrada_por, '') = 'reparto'),
+            CONSTRAINT ck_reserva_lineas_traslado CHECK ((recreada_en_destino = false AND anulada_en IS NULL) OR coalesce(cerrada_por, '') = 'traslado')
         );
+
+        -- Una base ya migrada gana la columna del envío (el reparto la usa para que «ya-cerrada» exija el mismo envío, SEL-38).
+        ALTER TABLE reservas.reserva_lineas ADD COLUMN IF NOT EXISTS envio_id uuid NULL;
 
         -- Una línea de pedido tiene una sola línea de reserva activa (pendiente o confirmada): aunque dos transacciones lleguen a la vez, la segunda no puede insertar otra (SEL-16).
         CREATE UNIQUE INDEX IF NOT EXISTS ux_reserva_lineas_activa ON reservas.reserva_lineas (pedido_id, linea_id) WHERE estado IN ('pendiente', 'confirmada');
@@ -108,6 +113,8 @@ public static class DefinicionDeReservas
             resultado jsonb NULL,
             creada_en timestamptz NOT NULL DEFAULT now(),
             CONSTRAINT pk_operaciones_idempotentes PRIMARY KEY (pedido_id, tipo, clave),
+            CONSTRAINT ck_operaciones_idempotentes_clave CHECK (length(clave) BETWEEN 16 AND 80),
+            CONSTRAINT ck_operaciones_idempotentes_huella CHECK (huella_de_carga ~ '^[0-9a-f]{64}$'),
             CONSTRAINT ck_operaciones_idempotentes_tipo CHECK (tipo IN ('confirmar', 'cerrar'))
         );
 
@@ -130,7 +137,7 @@ public static class DefinicionDeReservas
         GRANT USAGE ON SCHEMA reservas TO rol_reservas;
         GRANT SELECT, INSERT ON reservas.reservas, reservas.reserva_lineas TO rol_reservas;
         -- El cambio es por columna: una línea guardada no cambia su cantidad, su fuente, su edición ni su pedido, y una cabecera no cambia su pedido, su clave ni su destino.
-        GRANT UPDATE (estado, cerrada_por, traslado_id, recreada_en_destino, confirmada_en, anulada_en, estado_cambiado_en) ON reservas.reserva_lineas TO rol_reservas;
+        GRANT UPDATE (estado, cerrada_por, traslado_id, recreada_en_destino, confirmada_en, anulada_en, envio_id, estado_cambiado_en) ON reservas.reserva_lineas TO rol_reservas;
         GRANT UPDATE (fecha_expiracion, extendida, reemplazos, cliente_id, huella_origen) ON reservas.reservas TO rol_reservas;
         GRANT SELECT, INSERT, DELETE ON reservas.operaciones_idempotentes TO rol_reservas;
         GRANT SELECT, INSERT, UPDATE, DELETE ON reservas.bajas_recibidas TO rol_reservas;

@@ -65,11 +65,11 @@ internal sealed class LimitesDeReservar(
     public static ErrorDeAplicacion Rechazo(RechazoPorLimite rechazo) =>
         new(CategoriaDeError.Limite, DetalleDeLimiteDeReservas.ClaveDeLimiteExcedido, DetalleDeLimiteDeReservas.Codificar(rechazo));
 
-    private static ErrorDeAplicacion? Traducir(ResultadoDeLimite resultado, string motivoPorOmision) =>
+    private ErrorDeAplicacion? Traducir(ResultadoDeLimite resultado, string motivoPorOmision) =>
         resultado.Estado switch
         {
             EstadoDeLimite.Permitido => null,
-            EstadoDeLimite.Excedido => Rechazo(new RechazoPorLimite(resultado.Motivo ?? motivoPorOmision, resultado.EsperaEnSegundos ?? 1, resultado.DisponibleDesde ?? DateTimeOffset.UtcNow)),
+            EstadoDeLimite.Excedido => Rechazo(new RechazoPorLimite(resultado.Motivo ?? motivoPorOmision, resultado.EsperaEnSegundos ?? 1, resultado.DisponibleDesde ?? reloj.Ahora)),
 
             // El almacén de contadores falla cerrado (SEG-26): servicio no disponible y nada se reserva. Las demás respuestas del motor no pueden darse sin clave de idempotencia y se tratan igual.
             _ => new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClaveDeServicioNoDisponible),
@@ -81,7 +81,12 @@ internal sealed class LimitesDeReservar(
     {
         try
         {
-            await eventos.Publicar(new EventoDeSeguridad(TipoDeEventoDeSeguridad.LimiteExcedido, ahora, limite: motivo, usuario: usuario), cancelacion).ConfigureAwait(false);
+            // El evento lleva también el origen (huella y dirección, solo si es conocido y rigen los límites por origen) para poder investigar un abuso que solo dispare estos límites (SEG-25, AUD-41).
+            var origen = origenes.Actual;
+            var conocido = origen.AplicaLimitesPorOrigen && !origen.Huella.EsDesconocido;
+            await eventos.Publicar(
+                new EventoDeSeguridad(TipoDeEventoDeSeguridad.LimiteExcedido, ahora, limite: motivo, origen: conocido ? origen.Huella : null, direccionCompleta: conocido ? origen.Direccion : null, usuario: usuario),
+                cancelacion).ConfigureAwait(false);
         }
         catch (Exception) when (!cancelacion.IsCancellationRequested)
         {

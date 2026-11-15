@@ -560,7 +560,7 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
             },
             cancelacion);
 
-    public Task<IReadOnlyList<LineaCerrada>> CerrarLineas(IReadOnlyCollection<Guid> lineaDeReservaIds, CausaDeCierre causa, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    public Task<IReadOnlyList<LineaCerrada>> CerrarLineas(IReadOnlyCollection<Guid> lineaDeReservaIds, CausaDeCierre causa, Guid? envioId, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(lineaDeReservaIds);
         if (lineaDeReservaIds.Count == 0)
@@ -581,7 +581,7 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
                         FOR UPDATE OF l
                     )
                     UPDATE reservas.reserva_lineas AS u
-                    SET estado = 'cerrada', cerrada_por = @causa, estado_cambiado_en = @ahora
+                    SET estado = 'cerrada', cerrada_por = @causa, envio_id = @envio, estado_cambiado_en = @ahora
                     FROM candidatas c
                     WHERE u.id = c.id AND u.estado = 'confirmada'
                     RETURNING u.pedido_id, u.id, u.linea_id, u.edicion_id, u.fuente_id, u.cantidad
@@ -590,6 +590,7 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
                     transaccion);
                 comando.Parameters.AddWithValue("ids", lineaDeReservaIds.ToArray());
                 comando.Parameters.AddWithValue("causa", ACausa(causa));
+                comando.Parameters.Add(new NpgsqlParameter("envio", NpgsqlDbType.Uuid) { Value = (object?)envioId ?? DBNull.Value });
                 comando.Parameters.Add(new NpgsqlParameter("ahora", NpgsqlDbType.TimestampTz) { Value = ahora.ToUniversalTime() });
 
                 var lineas = new List<LineaCerrada>();
@@ -600,6 +601,54 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
                 }
 
                 return [.. lineas.OrderBy(l => l.EdicionId, OrdenDeBloqueo.DeIdentificadores).ThenBy(l => l.FuenteId, OrdenDeBloqueo.DeIdentificadores).ThenBy(l => l.LineaDeReservaId, OrdenDeBloqueo.DeIdentificadores)];
+            },
+            cancelacion);
+    }
+
+    public Task<IReadOnlyDictionary<Guid, Guid?>> EnviosDeCierre(IReadOnlyCollection<Guid> lineaDeReservaIds, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(lineaDeReservaIds);
+        if (lineaDeReservaIds.Count == 0)
+        {
+            return Task.FromResult<IReadOnlyDictionary<Guid, Guid?>>(new Dictionary<Guid, Guid?>());
+        }
+
+        return acceso.Ejecutar<IReadOnlyDictionary<Guid, Guid?>>(
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand("SELECT id, envio_id FROM reservas.reserva_lineas WHERE id = ANY(@ids)", conexion, transaccion);
+                comando.Parameters.AddWithValue("ids", lineaDeReservaIds.ToArray());
+                var envios = new Dictionary<Guid, Guid?>();
+                await using var lector = await comando.ExecuteReaderAsync(token).ConfigureAwait(false);
+                while (await lector.ReadAsync(token).ConfigureAwait(false))
+                {
+                    envios[lector.GetGuid(0)] = lector.IsDBNull(1) ? null : lector.GetGuid(1);
+                }
+
+                return envios;
+            },
+            cancelacion);
+    }
+
+    public Task BloquearLineas(IReadOnlyCollection<Guid> lineaDeReservaIds, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(lineaDeReservaIds);
+        if (lineaDeReservaIds.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        return acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand("SELECT id FROM reservas.reserva_lineas WHERE id = ANY(@ids) ORDER BY id FOR UPDATE", conexion, transaccion);
+                comando.Parameters.AddWithValue("ids", lineaDeReservaIds.ToArray());
+                await using var lector = await comando.ExecuteReaderAsync(token).ConfigureAwait(false);
+                while (await lector.ReadAsync(token).ConfigureAwait(false))
+                {
+                }
+
+                return 0;
             },
             cancelacion);
     }

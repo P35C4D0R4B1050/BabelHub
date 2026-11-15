@@ -21,11 +21,12 @@ internal static class FallosDeReservas
 }
 
 /// <summary>
-/// Reserva los impresos de un pedido: todas las líneas o ninguna (SEL-01, SEL-05). En una sola transacción y en el orden de la jerarquía de bloqueos (<c>inventario-fuentes</c> D04): bloquea al cliente y al pedido,
-/// valida que toda edición exista y sea impresa (SEL-12), pide <c>Bloquear</c> las filas de <b>todas las fuentes</b> de las ediciones (que libera las vencidas), elige la fuente de cada línea con la estrategia sobre esas
-/// filas ya confirmadas y aplica <c>Aplicar(0, +cantidad)</c> agregado y ordenado por (edición, fuente). Si alguna línea no tiene stock termina en fallo y <c>TransaccionPorCasoDeUso</c> deshace todo: ninguna otra línea
-/// queda reservada (AC-SEL-05). El cliente sale del actor verificado: nunca del cuerpo (D16). Este es el núcleo: la idempotencia, los límites y el reemplazo de una reserva pendiente los agregan T11 a T14; hasta
-/// entonces un pedido que ya tiene reserva se rechaza con <c>reserva-existente</c>.
+/// Reserva los impresos de un pedido: todas las líneas o ninguna (SEL-01, SEL-05). En una sola transacción y en el orden de la jerarquía de bloqueos (<c>inventario-fuentes</c> D04): bloquea al cliente, resuelve la
+/// idempotencia (SEL-09, SEL-31) y la baja del titular (SEL-35), bloquea el pedido, comprueba la propiedad y, si ya hay una reserva pendiente vigente del mismo cliente, la <b>reemplaza</b> (SEL-16, tope de 3, SEL-36);
+/// si no, aplica los límites (SEL-13, SEL-14, SEL-19). Valida que toda edición exista y sea impresa (SEL-12), bloquea las líneas que devuelve el reemplazo y pide <c>Bloquear</c> las filas de <b>todas las fuentes</b> de
+/// las ediciones (que libera las vencidas), elige la fuente de cada línea con la estrategia sobre esas filas ya confirmadas y aplica <c>Aplicar(0, +cantidad)</c> agregado y ordenado por (edición, fuente). Si alguna línea
+/// no tiene stock termina en fallo y <c>TransaccionPorCasoDeUso</c> deshace todo (contadores de límite y reemplazo incluidos): ninguna otra línea queda reservada (AC-SEL-05). El cliente sale del actor verificado:
+/// nunca del cuerpo (D16). Una última cabecera confirmada, expirada o liberada es <c>reserva-estado-invalido</c>.
 /// </summary>
 internal sealed class ReservarUnidades(
     AutorizadorDeReservas autorizador,
@@ -88,7 +89,7 @@ internal sealed class ReservarUnidades(
         if (await reservas.PorClave(clienteId, entrada.ClaveDeIdempotencia, cancelacion).ConfigureAwait(false) is { } usada)
         {
             return usada.HuellaDeLaCarga == CargaCanonicaDeReservar.Huella(entrada)
-                ? Resultado<ReservaDelPedido>.Exito(await constructor.Construir(usada.Reserva, esRepeticion: true, cancelacion).ConfigureAwait(false))
+                ? Resultado<ReservaDelPedido>.Exito(await constructor.Construir(usada.Reserva, esRepeticion: true, cancelacion, ahora: reloj.Ahora).ConfigureAwait(false))
                 : FallosDeReservas.De<ReservaDelPedido>(CategoriaDeError.Conflicto, ClavesDeReservas.IdempotenciaEnConflicto);
         }
 
@@ -142,6 +143,12 @@ internal sealed class ReservarUnidades(
 
         // Se bloquean las filas de stock de las ediciones nuevas y de las que devuelve la reserva reemplazada, todas en el orden único (edición, fuente).
         var edicionesAfectadas = lineas.Select(l => l.EdicionId).Concat(reemplazada?.Lineas.Where(l => l.Estado == EstadoDeLinea.Pendiente).Select(l => l.EdicionId) ?? []).Distinct().ToList();
+        // Jerarquía D04: las líneas de la reserva reemplazada por id antes que las filas de stock.
+        if (reemplazada is not null)
+        {
+            await reservas.BloquearLineas([.. reemplazada.Lineas.Where(l => l.Estado == EstadoDeLinea.Pendiente).Select(l => l.Id)], cancelacion).ConfigureAwait(false);
+        }
+
         var bloqueo = await stock.Bloquear(edicionesAfectadas, cancelacion).ConfigureAwait(false);
         if (!bloqueo.EstaBloqueado)
         {
@@ -239,11 +246,7 @@ internal sealed class ReservarUnidades(
         BloqueoDeStock bloqueo,
         CancellationToken cancelacion)
     {
-        var movimientos = seleccionadas
-            .GroupBy(s => (s.FuenteId, s.Linea.EdicionId))
-            .Select(g => new MovimientoDeStock(g.Key.FuenteId, g.Key.EdicionId, 0, checked(g.Sum(s => s.Linea.Cantidad))))
-            .OrderBy(m => m.EdicionId, OrdenDeBloqueo.DeIdentificadores)
-            .ThenBy(m => m.FuenteId, OrdenDeBloqueo.DeIdentificadores);
+        var movimientos = MovimientosAgregados.Ordenados(seleccionadas.Select(s => (s.FuenteId, s.Linea.EdicionId, s.Linea.Cantidad)), 0, 1);
 
         foreach (var movimiento in movimientos)
         {

@@ -337,7 +337,7 @@ public sealed class CerrarReservasTests
 
     [Fact]
     [Trait("Criterio", "AC-SEL-11")]
-    public async Task Cerrar_TomaElBloqueoDelPedidoAntesDeLasFilasDeStock_YNoElDelCliente()
+    public async Task Cerrar_TomaElBloqueoDelPedidoLuegoLasLineasPorIdYPorFinLasFilasDeStock_YNoElDelCliente()
     {
         var (e, _, pedido, _, linea) = Confirmada();
 
@@ -347,6 +347,7 @@ public sealed class CerrarReservasTests
         Assert.Equal([pedido], e.Bloqueos.Pedidos);
         Assert.Empty(e.Bloqueos.Clientes);
         Assert.True(orden.IndexOf("bloqueo.Pedido") < orden.IndexOf("existencias.BloquearFilas"));
+        Assert.True(orden.IndexOf("reservas.BloquearLineas") < orden.IndexOf("existencias.BloquearFilas"));
         Assert.True(orden.IndexOf("existencias.BloquearFilas") < orden.IndexOf("reservas.CerrarLineas"));
         Assert.True(orden.IndexOf("reservas.CerrarLineas") < orden.IndexOf("existencias.Aplicar(-1,-1)"));
         Assert.Equal(EntornoDeFuentes.Ahora, e.Base.Reloj.Ahora);

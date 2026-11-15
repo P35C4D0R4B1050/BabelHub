@@ -219,6 +219,7 @@ public sealed class ReservarUnidadesReemplazoTests
         var orden = entorno.Base.Bitacora.Llamadas;
         Assert.True(orden.IndexOf("bloqueo.Cliente") < orden.IndexOf("bloqueo.Pedido"));
         Assert.True(orden.IndexOf("bloqueo.Pedido") < orden.IndexOf("existencias.BloquearFilas"));
+        Assert.True(orden.IndexOf("reservas.BloquearLineas") < orden.IndexOf("existencias.BloquearFilas"));
         Assert.True(orden.IndexOf("existencias.BloquearFilas") < orden.IndexOf("reservas.LiberarLineas"));
         Assert.True(orden.IndexOf("reservas.LiberarLineas") < orden.IndexOf("existencias.Aplicar(0,-1)"));
         Assert.True(orden.IndexOf("existencias.Aplicar(0,-1)") < orden.IndexOf("reservas.Insertar"));

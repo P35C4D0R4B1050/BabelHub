@@ -14,11 +14,7 @@ internal sealed class DevolucionDeUnidades(IMovimientosDeStock stock, IAuditoria
     {
         ArgumentNullException.ThrowIfNull(liberadas);
 
-        var movimientos = liberadas
-            .GroupBy(l => (l.FuenteId, l.EdicionId))
-            .Select(g => new MovimientoDeStock(g.Key.FuenteId, g.Key.EdicionId, 0, -checked(g.Sum(l => l.Cantidad))))
-            .OrderBy(m => m.EdicionId, OrdenDeBloqueo.DeIdentificadores)
-            .ThenBy(m => m.FuenteId, OrdenDeBloqueo.DeIdentificadores);
+        var movimientos = MovimientosAgregados.Ordenados(liberadas.Select(l => (l.FuenteId, l.EdicionId, l.Cantidad)), 0, -1);
 
         foreach (var movimiento in movimientos)
         {

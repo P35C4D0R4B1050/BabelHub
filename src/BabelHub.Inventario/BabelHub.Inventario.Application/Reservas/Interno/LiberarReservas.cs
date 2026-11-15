@@ -96,7 +96,8 @@ internal sealed class LiberarReservas(
         if (entrada.LineaIds is { Count: > 0 } ids)
         {
             afectadas = [.. actual.Lineas.Where(l => ids.Contains(l.LineaId))];
-            if (afectadas.Count != ids.Count)
+            // Una línea del pedido puede tener dos filas (la cerrada por traslado en el origen y la creada en el destino): se compara por línea del pedido, no por fila.
+            if (afectadas.Select(l => l.LineaId).Distinct().Count() != ids.Count)
             {
                 return FallosDeReservas.De<ReservaDelPedido>(CategoriaDeError.NoEncontrado, ClavesDeReservas.ReservaNoEncontrada);
             }
@@ -117,6 +118,8 @@ internal sealed class LiberarReservas(
 
         if (decision.ALiberar.Count > 0)
         {
+            // Jerarquía D04: las líneas por id antes que las filas de stock.
+            await reservas.BloquearLineas([.. decision.ALiberar.Select(l => l.Id)], cancelacion).ConfigureAwait(false);
             var bloqueo = await stock.Bloquear([.. decision.ALiberar.Select(l => l.EdicionId).Distinct()], cancelacion).ConfigureAwait(false);
             if (!bloqueo.EstaBloqueado)
             {

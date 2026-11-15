@@ -407,6 +407,45 @@ public sealed class MigracionDeReservasTests(PostgresDeReservasFixture bd) : ICl
         Assert.Equal("23514", corta);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-SEL-39")]
+    public async Task ElEnvioSoloLoLlevaUnaLineaCerradaPorReparto()
+    {
+        var (pedido, reserva) = await bd.PedidoConReserva();
+        var envio = Guid.NewGuid();
+
+        var pendiente = await FallaAlEjecutar($"INSERT INTO reservas.reserva_lineas (id, linea_id, reserva_id, pedido_id, edicion_id, fuente_id, cantidad, estado, envio_id, estado_cambiado_en) VALUES ('{Guid.NewGuid()}', '{Guid.NewGuid()}', '{reserva}', '{pedido}', '{Guid.NewGuid()}', '{Guid.NewGuid()}', 1, 'pendiente', '{envio}', now())");
+        var porEntrega = await FallaAlEjecutar($"INSERT INTO reservas.reserva_lineas (id, linea_id, reserva_id, pedido_id, edicion_id, fuente_id, cantidad, estado, cerrada_por, envio_id, estado_cambiado_en) VALUES ('{Guid.NewGuid()}', '{Guid.NewGuid()}', '{reserva}', '{pedido}', '{Guid.NewGuid()}', '{Guid.NewGuid()}', 1, 'cerrada', 'entrega', '{envio}', now())");
+        await bd.Ejecutar($"INSERT INTO reservas.reserva_lineas (id, linea_id, reserva_id, pedido_id, edicion_id, fuente_id, cantidad, estado, cerrada_por, envio_id, estado_cambiado_en) VALUES ('{Guid.NewGuid()}', '{Guid.NewGuid()}', '{reserva}', '{pedido}', '{Guid.NewGuid()}', '{Guid.NewGuid()}', 1, 'cerrada', 'reparto', '{envio}', now())");
+
+        Assert.Equal("23514", pendiente);
+        Assert.Equal("23514", porEntrega);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-SEL-31")]
+    [InlineData("corta", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")]
+    [InlineData("una-clave-valida-0123456789", "no-es-un-sha256")]
+    public async Task LaClaveYLaHuellaDeUnaOperacionIdempotenteTienenFormaYLargoAcotados(string clave, string huella)
+    {
+        var estado = await FallaAlEjecutar($"INSERT INTO reservas.operaciones_idempotentes (pedido_id, tipo, clave, huella_de_carga) VALUES ('{Guid.NewGuid()}', 'cerrar', '{clave}', '{huella}')");
+
+        Assert.Equal("23514", estado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-29")]
+    public async Task UnaLineaQueNoEstaCerradaNoPuedeLlevarRecreadaNiAnulada()
+    {
+        var (pedido, reserva) = await bd.PedidoConReserva();
+
+        var recreada = await SqlStateDe(() => bd.AgregarLinea(reserva, pedido, estado: "pendiente", recreada: true));
+        var anulada = await SqlStateDe(() => bd.AgregarLinea(reserva, pedido, estado: "confirmada", anulada: true));
+
+        Assert.Equal("23514", recreada);
+        Assert.Equal("23514", anulada);
+    }
+
     /// <summary>Corre una sentencia con el rol del módulo y devuelve el <c>SqlState</c> del fallo, o <see langword="null"/> si se ejecutó.</summary>
     private async Task<string?> EjecutarComoElRolDelModulo(ActorActual actor, string sql)
     {

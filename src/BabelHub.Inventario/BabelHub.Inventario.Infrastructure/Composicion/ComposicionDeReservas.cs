@@ -21,7 +21,7 @@ namespace BabelHub.Inventario.Infrastructure.Composicion;
 public static class ComposicionDeReservas
 {
     /// <summary>
-    /// Los casos de uso del módulo que se pueden repetir entero ante un interbloqueo: la clave de idempotencia (reservar) o su naturaleza (expirar) los hace idempotentes, y un interbloqueo revierte la transacción
+    /// Los casos de uso del módulo que se pueden repetir entero ante un interbloqueo: la clave de idempotencia (reservar y cerrar) o su naturaleza (expirar, confirmar, extender y liberar: lo ya hecho no cambia nada) los hace idempotentes, y un interbloqueo revierte la transacción
     /// completa antes de cualquier efecto (plan §5).
     /// </summary>
     public static IReadOnlyList<Type> CasosDeUsoIdempotentes { get; } = [typeof(ReservarUnidades), typeof(ExpirarReservasVencidas), typeof(ConfirmarReservas), typeof(ExtenderReservas), typeof(LiberarReservas), typeof(CerrarReservas)];
