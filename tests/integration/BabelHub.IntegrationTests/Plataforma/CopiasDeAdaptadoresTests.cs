@@ -68,7 +68,14 @@ public sealed class CopiasDeAdaptadoresTests
         "Application/Auditoria/AccionesAuditables.AlertasYDepuracion.cs",
         "Application/Auditoria/Interno/CatalogoDeAccionesDeAuditoria.AlertasYDepuracion.cs",
         "Application/Auditoria/Interno/DepurarAuditoria.cs",
-        "Application/Auditoria/IntegracionesDeAuditoria.cs");
+        "Application/Auditoria/IntegracionesDeAuditoria.cs",
+        "Infrastructure/Auditoria/DefinicionDeAuditoria.cs",
+        "Application/Auditoria/Interno/CerrarVentanasDeLimite.cs",
+        "Infrastructure/Auditoria/RegistrosPostgres.cs",
+        "Infrastructure/Auditoria/AlertasPostgres.cs",
+        "Infrastructure/Auditoria/LimitesYDepuracionPostgres.cs",
+        "Infrastructure/Auditoria/ClavesDeCursorDelEntorno.cs",
+        "Infrastructure/Auditoria/TrabajosDeFondoDeAuditoria.cs");
 
     [Theory]
     [MemberData(nameof(Archivos))]

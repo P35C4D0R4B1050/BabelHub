@@ -26,8 +26,8 @@ public interface IFuenteDeIdentificadoresPorAnonimizar
 }
 
 /// <summary>
-/// <c>auditoria.por_anonimizar</c> (T24 y T25): la aplicación solo <b>inserta</b> identificadores opacos (con validación de tipo y formato en la base y cada inserción auditada
-/// por el trabajo); la función de depuración los lee. Repetir un identificador no hace nada (<c>ON CONFLICT DO NOTHING</c>). Devuelve cuántos eran nuevos.
+/// <c>auditoria.por_anonimizar</c> (T24 y T25): la aplicación solo <b>inserta</b> identificadores opacos (con validación de tipo y formato en la base; el número de identificadores nuevos de cada corrida queda en el registro de su ejecución,
+/// AM34); la función de depuración los lee. Repetir un identificador no hace nada (<c>ON CONFLICT DO NOTHING</c>). Devuelve cuántos eran nuevos.
 /// </summary>
 public interface IAlmacenDePorAnonimizar
 {
@@ -51,7 +51,7 @@ public interface IDepuradorAdicional
 }
 
 /// <summary>Cómo va la depuración: la última ejecución exitosa, el primer fallo desde entonces (la alerta cuenta 24 horas desde ahí), los intentos fallidos y el próximo intento.</summary>
-public sealed record EstadoDeLaDepuracion(DateTimeOffset? UltimaExitosa, DateTimeOffset? PrimerFalloSinExito, int IntentosFallidos, DateTimeOffset? ProximoIntento)
+public sealed record EstadoDeLaDepuracion(DateTimeOffset? UltimaExitosa, DateTimeOffset? PrimerFalloSinExito, int IntentosFallidos, DateTimeOffset? ProximoIntento, int AnonimizadosSinRegistrar = 0)
 {
     public static readonly EstadoDeLaDepuracion Inicial = new(null, null, 0, null);
 }
@@ -89,8 +89,8 @@ public sealed record ResultadoDeDepuracion(EstadoDeLaCorridaDeDepuracion Estado,
 /// <summary>
 /// La depuración diaria de la auditoría (AUD-11, AUD-19, AUD-31, AUD-36): llena <c>por_anonimizar</c> desde los puertos del servicio, anonimiza los registros de más de dos
 /// años y los de cuentas canceladas o bajas de titular con la función de la base de datos (y con la de Identidad, en el E-commerce) y <b>registra la ejecución con el actor
-/// «sistema» aunque sea cero</b>. Todo ocurre en una sola unidad de trabajo: si no se puede registrar la ejecución, se revierte la anonimización y la próxima corrida la vuelve a
-/// hacer (si no, quedaría registrada con un cero que no es el suyo). Con un bloqueo asesor; un fallo reintenta con esperas crecientes (1, 2, 4… minutos hasta una hora)
+/// «sistema» aunque sea cero</b>. La función corre con el rol de depuración, su propia conexión y su propia transacción (la aplicación no es miembro de ese rol): si no se puede registrar la ejecución, el número anonimizado queda pendiente en el estado y la próxima corrida lo registra (no se pierde ni se registra un cero que no es el suyo); la corrida vuelve a
+/// intentarlo. Con un bloqueo asesor; un fallo reintenta con esperas crecientes (1, 2, 4… minutos hasta una hora)
 /// y, si pasan 24 horas desde el primer fallo sin una ejecución exitosa, publica la alerta técnica (AUD-31). Repetir el mismo día no cambia nada y registra cero. Corre
 /// como «sistema»: sin ese actor explícito se niega (un trabajo de fondo sin actor es un defecto, no un permiso).
 /// </summary>
@@ -148,31 +148,44 @@ public sealed class DepurarAuditoria(
                 return new ResultadoDeDepuracion(EstadoDeLaCorridaDeDepuracion.EnEspera, 0, 0, false);
             }
 
-            (int Anonimizados, int Nuevos) hecho;
+            // Lo anonimizado en esta corrida que todavía no consta en un registro de ejecución: se acumula a lo que quedó pendiente de una corrida anterior (si no, un registro fallido
+            // dejaría una ejecución registrada con un cero que no es el suyo, AUD-36).
+            var anonimizadosEnEstaCorrida = 0;
+            var nuevos = 0;
             try
             {
-                hecho = await unidad.Ejecutar(async ct => await Depurar(ahora, ct).ConfigureAwait(false), cancelacion).ConfigureAwait(false);
+                // 1. Llenar `por_anonimizar` y marcar entregadas las bajas: una unidad de trabajo que confirma antes de anonimizar (la función lo lee con otra conexión).
+                nuevos = await unidad.Ejecutar(async ct => await LlenarPorAnonimizar(ahora, ct).ConfigureAwait(false), cancelacion).ConfigureAwait(false);
+
+                // 2. Anonimizar con la función de la base (rol de depuración, conexión y transacción propias) y con las depuraciones adicionales del servicio.
+                anonimizadosEnEstaCorrida = await anonimizador.Anonimizar(cancelacion).ConfigureAwait(false);
+                foreach (var adicional in adicionales)
+                {
+                    anonimizadosEnEstaCorrida += await adicional.Depurar(cancelacion).ConfigureAwait(false);
+                }
+
+                // 3. Registrar la ejecución aunque sea cero (AUD-36), con el actor «sistema» del contexto, el número anonimizado y los identificadores nuevos (el control de AM34: quien inserte
+                // identificadores en `por_anonimizar` deja rastro). El estado se guarda en la **misma unidad de trabajo**: o se confirman el registro y el estado, o ninguno (el pendiente no se duplica ni se pierde).
+                var total = estado.AnonimizadosSinRegistrar + anonimizadosEnEstaCorrida;
+                await unidad.Ejecutar(
+                    async ct =>
+                    {
+                        await RegistrarEjecucion(total, nuevos, ct).ConfigureAwait(false);
+                        await estados.Guardar(new EstadoDeLaDepuracion(ahora, null, 0, null), ct).ConfigureAwait(false);
+                        return true;
+                    },
+                    cancelacion).ConfigureAwait(false);
+
+                return new ResultadoDeDepuracion(EstadoDeLaCorridaDeDepuracion.Ejecutada, total, nuevos, false);
             }
             catch (Exception falla) when (falla is not OperationCanceledException)
             {
-                return await RegistrarFallo(estado, ahora, cancelacion).ConfigureAwait(false);
+                return await RegistrarFallo(estado with { AnonimizadosSinRegistrar = estado.AnonimizadosSinRegistrar + anonimizadosEnEstaCorrida }, ahora, cancelacion).ConfigureAwait(false);
             }
-
-            // La unidad ya confirmó (anonimización y registro de la ejecución): que no se pueda anotar el estado no la convierte en fallo ni la repite (otro registro, otra alerta falsa a las 24 horas).
-            try
-            {
-                await estados.Guardar(new EstadoDeLaDepuracion(ahora, null, 0, null), cancelacion).ConfigureAwait(false);
-            }
-            catch (Exception falla) when (falla is not OperationCanceledException)
-            {
-                // El próximo estado exitoso lo corrige.
-            }
-
-            return new ResultadoDeDepuracion(EstadoDeLaCorridaDeDepuracion.Ejecutada, hecho.Anonimizados, hecho.Nuevos, false);
         }
     }
 
-    private async Task<(int Anonimizados, int Nuevos)> Depurar(DateTimeOffset ahora, CancellationToken cancelacion)
+    private async Task<int> LlenarPorAnonimizar(DateTimeOffset ahora, CancellationToken cancelacion)
     {
         var nuevos = 0;
         foreach (var fuente in fuentes)
@@ -187,20 +200,21 @@ public sealed class DepurarAuditoria(
             await fuente.MarcarEntregados(pendientes, cancelacion).ConfigureAwait(false);
         }
 
-        var anonimizados = await anonimizador.Anonimizar(cancelacion).ConfigureAwait(false);
-        foreach (var adicional in adicionales)
-        {
-            anonimizados += await adicional.Depurar(cancelacion).ConfigureAwait(false);
-        }
+        return nuevos;
+    }
 
-        // La ejecución se registra aunque sea cero (AUD-36), con el actor «sistema» del contexto y solo el número, en la misma unidad de trabajo.
+    private async Task RegistrarEjecucion(int anonimizados, int nuevos, CancellationToken cancelacion)
+    {
         await auditoria.Registrar(
             new SolicitudDeRegistro(AccionesAuditables.DepuracionDiariaEjecutada)
             {
-                Detalle = new Dictionary<string, string?> { ["registrosAnonimizados"] = anonimizados.ToString(System.Globalization.CultureInfo.InvariantCulture) },
+                Detalle = new Dictionary<string, string?>
+                {
+                    ["registrosAnonimizados"] = anonimizados.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ["identificadoresNuevos"] = nuevos.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                },
             },
             cancelacion).ConfigureAwait(false);
-        return (anonimizados, nuevos);
     }
 
     private async Task<ResultadoDeDepuracion> RegistrarFallo(EstadoDeLaDepuracion previo, DateTimeOffset ahora, CancellationToken cancelacion)
@@ -210,7 +224,7 @@ public sealed class DepurarAuditoria(
         var alertar = ahora - primerFallo >= SinExitoHastaLaAlerta;
         try
         {
-            await estados.Guardar(new EstadoDeLaDepuracion(previo.UltimaExitosa, primerFallo, intentos, ahora + EsperaTrasFallar(intentos)), cancelacion).ConfigureAwait(false);
+            await estados.Guardar(new EstadoDeLaDepuracion(previo.UltimaExitosa, primerFallo, intentos, ahora + EsperaTrasFallar(intentos), previo.AnonimizadosSinRegistrar), cancelacion).ConfigureAwait(false);
         }
         catch (Exception falla) when (falla is not OperationCanceledException)
         {

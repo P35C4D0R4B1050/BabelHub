@@ -75,7 +75,7 @@ public sealed class DepurarAuditoriaTests
         Assert.Equal(AccionesAuditables.DepuracionDiariaEjecutada, solicitud.Accion);
         Assert.Equal("12", solicitud.Detalle["registrosAnonimizados"]);
         Assert.Equal(Ahora, e.Estados.Estado.UltimaExitosa);
-        Assert.Equal(1, e.Unidad.Ejecuciones);
+        Assert.Equal(2, e.Unidad.Ejecuciones);
     }
 
     [Fact]
@@ -233,7 +233,7 @@ public sealed class DepurarAuditoriaTests
 
     [Fact]
     [Trait("Criterio", "AC-AUD-36")]
-    public async Task SiNoSePuedeRegistrarLaEjecucion_LaCorridaFalla_YLaAnonimizacionSeHizoDentroDeLaMismaUnidadDeTrabajo()
+    public async Task SiNoSePuedeRegistrarLaEjecucion_LaCorridaFalla_PeroLoAnonimizadoQuedaPendienteYSeRegistraEnLaSiguiente()
     {
         var e = new Entorno();
         e.Auditoria.Caida = true;
@@ -242,9 +242,21 @@ public sealed class DepurarAuditoriaTests
         var resultado = await e.Depurar.Ejecutar();
 
         Assert.Equal(EstadoDeLaCorridaDeDepuracion.Fallida, resultado.Estado);
-        Assert.Equal(1, e.Unidad.Ejecuciones);
         Assert.Equal(1, e.Estados.Estado.IntentosFallidos);
         Assert.Null(e.Estados.Estado.UltimaExitosa);
+        Assert.Equal(10, e.Estados.Estado.AnonimizadosSinRegistrar);
+        Assert.Empty(e.Auditoria.Solicitudes);
+
+        // La auditoría vuelve: la siguiente corrida registra el total de lo anonimizado antes, no un cero.
+        e.Auditoria.Caida = false;
+        e.Reloj.Ahora = Ahora.AddMinutes(2);
+        e.Anonimizador.Respuestas.Enqueue(1);
+        var siguiente = await e.Depurar.Ejecutar();
+
+        Assert.Equal(EstadoDeLaCorridaDeDepuracion.Ejecutada, siguiente.Estado);
+        Assert.Equal(14, siguiente.RegistrosAnonimizados);
+        Assert.Equal("14", Assert.Single(e.Auditoria.Solicitudes).Detalle["registrosAnonimizados"]);
+        Assert.Equal(0, e.Estados.Estado.AnonimizadosSinRegistrar);
     }
 
     [Fact]

@@ -78,6 +78,15 @@ public interface IActorActual
     ActorActual? Actual { get; }
 }
 
+/// <summary>Quien establece el actor de la solicitud o de la tarea en curso (la Api desde la credencial; un trabajo de fondo como «sistema»): un puerto, para que los trabajos de cada módulo no dependan de la Infraestructura de Plataforma (regla 13).</summary>
+public interface IEstablecedorDeActor
+{
+    /// <summary>Fija el actor del flujo asíncrono actual, y de lo que este inicie.</summary>
+    void Establecer(ActorActual actor);
+
+    void Limpiar();
+}
+
 /// <summary>
 /// Esquema de base de datos de un módulo. Lo construye solo la Infraestructura de cada módulo (constructor interno), y con
 /// él <see cref="IUnidadDeTrabajo.EjecutarComo"/> corre un bloque bajo el rol de ese esquema (AD18).

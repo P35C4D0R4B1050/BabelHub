@@ -8,6 +8,6 @@ public static partial class CatalogoDeAccionesDeAuditoria
     private static IEnumerable<AccionDelCatalogo> AccionesDeAlertasYDepuracion()
     {
         yield return Auditada(nameof(AccionesAuditables.AlertaMarcadaRevisada), false, false, Clave("servicio", 16), Clave("motivo"), Clave("contadorVisto", 8));
-        yield return Auditada(nameof(AccionesAuditables.DepuracionDiariaEjecutada), false, false, Clave("registrosAnonimizados", 12));
+        yield return Auditada(nameof(AccionesAuditables.DepuracionDiariaEjecutada), false, false, Clave("registrosAnonimizados", 12), Clave("identificadoresNuevos", 12));
     }
 }

@@ -100,6 +100,18 @@ public sealed class CredencialesDeSalidaHandler(OpcionesDeCredencialesDeSalida c
     public const string CabeceraDeCredencialDeOrigen = "X-Credencial-De-Origen";
     public const string CabeceraDeOrigenReenviado = "X-Origen-Reenviado";
 
+    /// <summary>
+    /// Los alcances de las operaciones que se hacen en nombre de un usuario (<c>RequiereTokenDeUsuario</c> de <c>docs/03/08</c>): llevan su token verificable y la Aplicación del Inventario lo comprueba; sin él la
+    /// llamada no sale. La lectura de alertas nuevas (<c>lectura-alertas</c>) no lleva token.
+    /// </summary>
+    private static readonly HashSet<AlcanceDeServicio> AlcancesQueActuanPorUnUsuario =
+    [
+        AlcanceDeServicio.OperacionDeUsuario,
+        AlcanceDeServicio.ConsultaDeAuditoria,
+        AlcanceDeServicio.MarcarAlerta,
+        AlcanceDeServicio.Historial,
+    ];
+
     private static readonly string[] CabecerasQueElLlamadorNoPuedeFijar =
     [
         CabeceraDeCredencial,
@@ -131,7 +143,7 @@ public sealed class CredencialesDeSalidaHandler(OpcionesDeCredencialesDeSalida c
 
         request.Headers.TryAddWithoutValidation(CabeceraDeCredencial, credenciales.Secreto(alcance));
 
-        if (alcance == AlcanceDeServicio.OperacionDeUsuario)
+        if (AlcancesQueActuanPorUnUsuario.Contains(alcance))
         {
             if (!request.Options.TryGetValue(OpcionesDeLaSolicitudDeServicio.TokenDeUsuario, out var token) || string.IsNullOrWhiteSpace(token))
             {
@@ -239,6 +251,7 @@ public static class ClientesHttpDeServicio
             BreakDuration = opciones.DuracionDelCorte,
         });
 
-        constructor.AddTimeout(TimeSpan.FromTicks(Math.Max(opciones.Espera.Ticks / 2, TimeSpan.TicksPerMillisecond)));
+        // Con reintentos, el plazo total se reparte entre los intentos; sin reintentos, el único intento tiene todo el plazo (la consulta de auditoría acepta 9 segundos y corta a los 10, AUD-18).
+        constructor.AddTimeout(opciones.ReintentosMaximos > 0 ? TimeSpan.FromTicks(Math.Max(opciones.Espera.Ticks / 2, TimeSpan.TicksPerMillisecond)) : opciones.Espera);
     }
 }
