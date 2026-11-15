@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Plataforma;
+using BabelHub.Shared.Contratos.Auditoria;
 
 namespace BabelHub.Ecommerce.Infrastructure.Auditoria;
 
@@ -198,18 +199,18 @@ public sealed class HttpClienteDeAuditoriaDelInventario(IHttpClientFactory fabri
 
     private static string Unir(List<string> partes) => partes.Count == 0 ? string.Empty : "?" + string.Join('&', partes);
 
-    // ---------- Cuerpos del contrato (T21 los pasará a Shared) ----------
+    // ---------- Cuerpos del contrato (BabelHub.Shared, T21) ----------
 
     private static PaginaDeRegistros LeerPagina(string texto)
     {
-        var dto = JsonSerializer.Deserialize<PaginaHttp>(texto, Json) ?? throw new JsonException("La respuesta no es una página.");
+        var dto = JsonSerializer.Deserialize<PaginaDeRegistrosDto>(texto, Json) ?? throw new JsonException("La respuesta no es una página.");
         var registros = (dto.Registros ?? throw new JsonException("Faltan los registros.")).Select(ARegistro).ToList();
         return new PaginaDeRegistros(registros, dto.SiguienteCursor) { CursorDeLaPagina = dto.CursorDeLaPagina };
     }
 
     private static IReadOnlyList<AlertaConsultada> LeerAlertas(string texto)
     {
-        var dtos = JsonSerializer.Deserialize<List<AlertaHttp>>(texto, Json) ?? throw new JsonException("La respuesta no es una lista de alertas.");
+        var dtos = JsonSerializer.Deserialize<List<AlertaDto>>(texto, Json) ?? throw new JsonException("La respuesta no es una lista de alertas.");
         return [.. dtos.Select(AAlerta)];
     }
 
@@ -220,7 +221,7 @@ public sealed class HttpClienteDeAuditoriaDelInventario(IHttpClientFactory fabri
             ? valor
             : throw new JsonException("El valor no es un miembro del contrato.");
 
-    private static RegistroAuditado ARegistro(RegistroHttp d) =>
+    private static RegistroAuditado ARegistro(RegistroDto d) =>
         new(
             d.Id,
             Analizar<ServicioAuditado>(d.Servicio ?? string.Empty),
@@ -246,7 +247,7 @@ public sealed class HttpClienteDeAuditoriaDelInventario(IHttpClientFactory fabri
             AnonimizadoEn = d.AnonimizadoEn,
         };
 
-    private static AlertaConsultada AAlerta(AlertaHttp d)
+    private static AlertaConsultada AAlerta(AlertaDto d)
     {
         var servicio = Analizar<ServicioAuditado>(d.Servicio ?? string.Empty);
         return new AlertaConsultada(
@@ -263,41 +264,4 @@ public sealed class HttpClienteDeAuditoriaDelInventario(IHttpClientFactory fabri
             RevisadaEn = d.RevisadaEn,
         };
     }
-
-    private sealed record PaginaHttp(List<RegistroHttp>? Registros, string? SiguienteCursor, string? CursorDeLaPagina);
-
-    private sealed record RegistroHttp(
-        Guid Id,
-        string? Servicio,
-        string? Tipo,
-        string? ActorTipo,
-        Guid? ActorId,
-        string? Rol,
-        DateTimeOffset InstanteUtc,
-        string? Accion,
-        string? Resultado,
-        string? ObjetoTipo,
-        string? ObjetoId,
-        string? SucursalOrigen,
-        string? SucursalDestino,
-        string? Motivo,
-        string? Origen,
-        string? Ruta,
-        string? Detalle,
-        string[]? ClavesPersonales,
-        bool Truncado,
-        string? Correlacion,
-        DateTimeOffset? AnonimizadoEn);
-
-    private sealed record AlertaHttp(
-        string? Id,
-        string? Servicio,
-        string? Motivo,
-        string? Clase,
-        DateTimeOffset PrimeraOcurrencia,
-        DateTimeOffset UltimaOcurrencia,
-        int Ocurrencias,
-        int RevisadasHasta,
-        Guid? RevisadaPor,
-        DateTimeOffset? RevisadaEn);
 }
