@@ -64,6 +64,12 @@ public static class PoliticaDeTextosPendientes
             var sinConsulta = endpoint.Metadata.GetMetadata<SinConsultaDeEstadoAttribute>();
             var plantilla = PlantillasDeRuta.De(endpoint);
 
+            // Un endpoint con ShortCircuit se ejecuta justo tras el enrutado y se saltaría la sesión y esta política: no se admite.
+            if (endpoint.Metadata.Any(m => m.GetType().Name == "ShortCircuitMetadata"))
+            {
+                throw new InvalidOperationException($"«{endpoint.DisplayName}» usa ShortCircuit: se saltaría la sesión y la política de textos pendientes.");
+            }
+
             if (permitida is not null)
             {
                 var metodos = endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods;
@@ -89,6 +95,13 @@ public static class PoliticaDeTextosPendientes
                 if (plantilla is null || !RutasSinConsultaDeEstado.Contains(plantilla, StringComparer.Ordinal))
                 {
                     throw new InvalidOperationException($"«{endpoint.DisplayName}» declara [SinConsultaDeEstado] en «{plantilla}», que no está en la lista cerrada.");
+                }
+
+                // Y solo GET: un destino de redirección nunca es una acción.
+                var metodosSinConsulta = endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods;
+                if (metodosSinConsulta is null || metodosSinConsulta.Count != 1 || !string.Equals(metodosSinConsulta.Single(), HttpMethods.Get, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException($"«{endpoint.DisplayName}» es [SinConsultaDeEstado] y debe admitir únicamente GET.");
                 }
             }
 
@@ -188,7 +201,8 @@ public sealed class PoliticaDeTextosPendientesMiddleware(RequestDelegate siguien
         }
 
         var esGet = HttpMethods.IsGet(contexto.Request.Method);
-        var pantallaCompleta = esGet && !contexto.Request.EsHtmx() && !contexto.EsConsultaAutomatica();
+        // Solo una navegación real a una pantalla que existe: ni un fragmento, ni un sondeo, ni una ruta sin endpoint, ni un recurso que el navegador pide por su cuenta (imagen, favicon, prefetch).
+        var pantallaCompleta = esGet && endpoint is not null && !contexto.Request.EsHtmx() && !contexto.EsConsultaAutomatica() && EsNavegacion(contexto.Request);
         return new SolicitudDeAcceso(
             actor,
             CookieDeSesionWeb.Leer(contexto.Request, contexto.RequestServices.GetRequiredService<OpcionesDelHostWeb>().Host),
@@ -202,6 +216,10 @@ public sealed class PoliticaDeTextosPendientesMiddleware(RequestDelegate siguien
             pantallaCompleta,
             metadatos?.GetMetadata<SinRetornoAttribute>() is not null);
     }
+
+    private static bool EsNavegacion(HttpRequest solicitud) =>
+        (!solicitud.Headers.TryGetValue("Sec-Fetch-Mode", out var modo) || string.Equals(modo.ToString(), "navigate", StringComparison.Ordinal))
+        && (!solicitud.Headers.TryGetValue("Sec-Fetch-Dest", out var destino) || string.Equals(destino.ToString(), "document", StringComparison.Ordinal));
 
     private static void Ir(HttpContext contexto, string destino)
     {
@@ -225,5 +243,16 @@ public sealed class PoliticaDeTextosPendientesMiddleware(RequestDelegate siguien
 public static class PoliticaDeTextosPendientesExtensiones
 {
     /// <summary>Va <b>después de <c>UseRouting</c></b> y de la sesión web, y antes de la autorización y de los endpoints. Exige <see cref="IPoliticaDeAccesoPorTextos"/>.</summary>
-    public static IApplicationBuilder UsarPoliticaDeTextosPendientes(this IApplicationBuilder app) => app.UseMiddleware<PoliticaDeTextosPendientesMiddleware>();
+    public static IApplicationBuilder UsarPoliticaDeTextosPendientes(this IApplicationBuilder app)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+
+        // Montarla sin su política fallaría en cada solicitud: mejor que el arranque lo diga.
+        if (!(app.ApplicationServices.GetService<IServiceProviderIsService>()?.IsService(typeof(IPoliticaDeAccesoPorTextos)) ?? false))
+        {
+            throw new InvalidOperationException("La política de textos pendientes está montada pero IPoliticaDeAccesoPorTextos no está registrada (AgregarPoliticaDeTextosPendientes).");
+        }
+
+        return app.UseMiddleware<PoliticaDeTextosPendientesMiddleware>();
+    }
 }

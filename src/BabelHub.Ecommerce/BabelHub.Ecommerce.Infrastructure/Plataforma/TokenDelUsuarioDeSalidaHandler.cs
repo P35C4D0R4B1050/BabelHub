@@ -13,11 +13,20 @@ namespace BabelHub.Ecommerce.Infrastructure.Plataforma;
 /// </remarks>
 public sealed class TokenDelUsuarioDeSalidaHandler(ITokenDelUsuarioDeLaSesion token) : DelegatingHandler
 {
+    /// <summary>Los alcances que se hacen en nombre de un usuario: los mismos que <see cref="CredencialesDeSalidaHandler"/> exige con token (una prueba vigila que sigan iguales).</summary>
+    internal static readonly HashSet<AlcanceDeServicio> AlcancesQueActuanPorUnUsuario =
+    [
+        AlcanceDeServicio.OperacionDeUsuario,
+        AlcanceDeServicio.ConsultaDeAuditoria,
+        AlcanceDeServicio.MarcarAlerta,
+        AlcanceDeServicio.Historial,
+    ];
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (request.Options.TryGetValue(OpcionesDeLaSolicitudDeServicio.Alcance, out var alcance) && alcance == AlcanceDeServicio.OperacionDeUsuario)
+        if (request.Options.TryGetValue(OpcionesDeLaSolicitudDeServicio.Alcance, out var alcance) && AlcancesQueActuanPorUnUsuario.Contains(alcance))
         {
             var valor = await token.Actual(cancellationToken).ConfigureAwait(false)
                 ?? throw new InvalidOperationException("Una operación de usuario necesita la sesión de la persona en cuyo nombre se llama.");

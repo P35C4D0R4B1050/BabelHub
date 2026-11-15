@@ -53,7 +53,16 @@ public sealed class TextosController(IAceptacionDeTextos aceptacion, IPoliticaDe
         switch (await aceptacion.Aceptar(actor, version ?? string.Empty, cancelacion))
         {
             case ResultadoDeAceptacion.Aceptada:
-                var retorno = CookieDeSesionWeb.Leer(Request, host.Host) is { } cookie ? await politica.TomarRetorno(cookie, actor.Rol, cancelacion) : null;
+                string? retorno = null;
+                try
+                {
+                    retorno = CookieDeSesionWeb.Leer(Request, host.Host) is { } cookie ? await politica.TomarRetorno(cookie, actor.Rol, cancelacion) : null;
+                }
+                catch (Exception) when (!cancelacion.IsCancellationRequested)
+                {
+                    // La aceptación ya quedó registrada: perder el retorno solo lleva a la portada.
+                }
+
                 var destino = retorno ?? Portada;
                 Response.Headers.CacheControl = "no-store";
                 return Request.EsHtmx() ? new HxRedirectResult(destino) : new LocalRedirectResult(destino);

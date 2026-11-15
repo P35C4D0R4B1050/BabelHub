@@ -206,6 +206,11 @@ public sealed class ResolverAccesoConTextosPendientes(
 
     private async Task PublicarAlerta(CancellationToken cancelacion)
     {
+        if (!limitador.PuedeAlertar(reloj.Ahora))
+        {
+            return;
+        }
+
         try
         {
             await alertas.Publicar(new AlertaTecnica(MotivoDeAlertaPorIdentidadNoDisponible, reloj.Ahora), cancelacion).ConfigureAwait(false);
@@ -284,6 +289,16 @@ public sealed class ResolverAccesoConTextosPendientes(
 public sealed class LimitadorDeConsultasDeEstado(int maximo = LimitadorDeConsultasDeEstado.MaximoPorProceso) : IDisposable
 {
     public const int MaximoPorProceso = 50;
+
+    private long _ultimaAlerta;
+
+    /// <summary>Una alerta técnica como máximo por minuto y por proceso: con Identidad caída cada solicitud fallaría igual y no debe amplificarse en Auditoría.</summary>
+    public bool PuedeAlertar(DateTimeOffset ahora)
+    {
+        var marca = ahora.UtcTicks;
+        var anterior = Interlocked.Read(ref _ultimaAlerta);
+        return (anterior == 0 || marca - anterior >= TimeSpan.TicksPerMinute) && Interlocked.CompareExchange(ref _ultimaAlerta, marca, anterior) == anterior;
+    }
 
     private readonly SemaphoreSlim _turnos = new(maximo, maximo);
 

@@ -279,6 +279,22 @@ public sealed class ResolverAccesoConTextosPendientesTests
         Assert.Empty(e.Almacen.Filas);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-WEB-39")]
+    public async Task ConIdentidadCaida_LaAlertaTecnicaSePublicaComoMaximoUnaVezPorMinuto_AunqueCadaSolicitudFalleCerrada()
+    {
+        var e = new Entorno();
+        e.Estado.Estado = EstadoDeAceptacionDeTextos.Desconocido;
+        var politica = e.Resolver();
+
+        for (var i = 0; i < 20; i++)
+        {
+            Assert.Equal(TipoDeDecisionDeAcceso.NoDisponible, (await politica.Resolver(Pedir(Cliente, CapacidadWeb.Pedidos))).Tipo);
+        }
+
+        Assert.Single(e.Alertas.Alertas);
+    }
+
     [Theory]
     [Trait("Criterio", "AC-WEB-39")]
     [InlineData(CapacidadWeb.CerrarSesion, "POST", true)]

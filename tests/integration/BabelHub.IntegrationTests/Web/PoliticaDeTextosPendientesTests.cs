@@ -357,6 +357,69 @@ public sealed class PoliticaDeTextosPendientesTests
         Assert.Equal(["/error", "/sin-permiso", "/no-disponible"], PoliticaDeTextosPendientes.RutasSinConsultaDeEstado);
     }
 
+    private sealed class ShortCircuitMetadata;
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-38")]
+    public void UnEndpointConShortCircuit_OUnDestinoSinConsultaQueAdmiteUnaAccion_HaceFallarElArranque()
+    {
+        var corto = Endpoint("/x", ["GET"], new ShortCircuitMetadata());
+        var accion = Endpoint("/error", ["POST"], new SinConsultaDeEstadoAttribute());
+        var cualquiera = Endpoint("/error", null, new SinConsultaDeEstadoAttribute());
+
+        Assert.Throws<InvalidOperationException>(() => PoliticaDeTextosPendientes.Validar([corto]));
+        Assert.Throws<InvalidOperationException>(() => PoliticaDeTextosPendientes.Validar([accion]));
+        Assert.Throws<InvalidOperationException>(() => PoliticaDeTextosPendientes.Validar([cualquiera]));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-38")]
+    public async Task MontarLaPolitica_SinRegistrarSuServicio_HaceFallarElArranqueYNoCadaSolicitud()
+    {
+        var sesiones = new SesionesWebDePrueba();
+        var flujo = new BabelHub.Ecommerce.Infrastructure.Plataforma.ActorDelFlujo();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await using var _ = await AnfitrionConSesion.IniciarCon(sesiones, flujo, despuesDelHandler: app => app.UsarPoliticaDeTextosPendientes());
+        });
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-WEB-42")]
+    [InlineData("Sec-Fetch-Mode", "no-cors")]
+    [InlineData("Sec-Fetch-Mode", "cors")]
+    [InlineData("Sec-Fetch-Dest", "image")]
+    [InlineData("Sec-Fetch-Dest", "empty")]
+    public async Task UnRecursoQueElNavegadorPideSolo_NoSeGuardaComoRetorno(string cabecera, string valor)
+    {
+        var (a, _, _, _, _, almacen, _) = await AnfitrionConPolitica.Iniciar();
+        await using var _ = a;
+        var solicitud = new HttpRequestMessage(HttpMethod.Get, "/prueba/politica/catalogo");
+        solicitud.Headers.Add("Cookie", Cookie());
+        solicitud.Headers.Add(cabecera, valor);
+
+        await a.Cliente.SendAsync(solicitud);
+
+        Assert.Empty(almacen.Retornos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-42")]
+    public async Task UnaNavegacionRealOSinCabecerasFetch_SiSeGuarda()
+    {
+        var (a, _, _, _, _, almacen, _) = await AnfitrionConPolitica.Iniciar();
+        await using var _ = a;
+        var solicitud = new HttpRequestMessage(HttpMethod.Get, "/prueba/politica/catalogo");
+        solicitud.Headers.Add("Cookie", Cookie());
+        solicitud.Headers.Add("Sec-Fetch-Mode", "navigate");
+        solicitud.Headers.Add("Sec-Fetch-Dest", "document");
+
+        await a.Cliente.SendAsync(solicitud);
+
+        Assert.Single(almacen.Retornos);
+    }
+
     [Fact]
     [Trait("Criterio", "AC-WEB-38")]
     public void UnParametroDeSucursalQueLaRutaNoTiene_HaceFallarElArranque()
