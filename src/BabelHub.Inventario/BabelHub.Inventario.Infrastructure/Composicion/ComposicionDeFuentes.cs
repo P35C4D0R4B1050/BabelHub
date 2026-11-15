@@ -1,3 +1,4 @@
+using System.Reflection;
 using BabelHub.Inventario.Application.Auditoria;
 using BabelHub.Inventario.Application.Fuentes;
 using BabelHub.Inventario.Application.Fuentes.Interno;
@@ -103,17 +104,21 @@ public static class ComposicionDeFuentes
     {
         ArgumentNullException.ThrowIfNull(proveedor);
 
-        var ensamblado = typeof(ComposicionDeFuentes).Assembly;
+        // Un adaptador real puede vivir en la Infraestructura (acceso a datos) o en la Aplicación (lo que solo compone repositorios, como `ReservasDeStock`): se busca en ambos.
+        Assembly[] ensamblados = [typeof(ComposicionDeFuentes).Assembly, typeof(IReservasDeStock).Assembly];
+
+        // Los adaptadores reales de otros módulos viven por ámbito (usan la transacción en curso); los nulos, como singleton. Un ámbito propio resuelve ambos.
+        using var ambito = proveedor.CreateScope();
         object[] resueltos =
         [
-            proveedor.GetRequiredService<IReservasDeStock>(),
-            proveedor.GetRequiredService<IOrigenDeUnidadesVendidas>(),
-            proveedor.GetRequiredService<IReingresosPorDevolucion>(),
+            ambito.ServiceProvider.GetRequiredService<IReservasDeStock>(),
+            ambito.ServiceProvider.GetRequiredService<IOrigenDeUnidadesVendidas>(),
+            ambito.ServiceProvider.GetRequiredService<IReingresosPorDevolucion>(),
         ];
 
         return [.. resueltos
             .OfType<IAdaptadorNuloDeFuentes>()
-            .Where(nulo => AdaptadoresNulosDeFuentes.ExisteAdaptadorReal(nulo.Puerto, ensamblado))
+            .Where(nulo => ensamblados.Any(e => AdaptadoresNulosDeFuentes.ExisteAdaptadorReal(nulo.Puerto, e)))
             .Select(nulo => nulo.Puerto.Name)];
     }
 

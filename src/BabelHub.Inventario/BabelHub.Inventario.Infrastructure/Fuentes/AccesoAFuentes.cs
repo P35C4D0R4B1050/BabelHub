@@ -29,6 +29,8 @@ internal sealed class AccesoAFuentes(
     /// <summary>El motivo de la alerta técnica cuando se intenta tocar el stock sin actor (debe constar en el catálogo de motivos de alertas técnicas).</summary>
     public const string MotivoDeAlertaSinActor = "alcance-de-datos-sin-actor";
 
+    private const string EsperaDeBloqueoAgotada = "55P03";
+
     private static readonly EsquemaDeModulo Esquema = EsquemaDeModulo.Crear(DefinicionDeFuentes.Esquema);
 
     /// <summary>Corre el bloque con el rol del módulo y el alcance de datos del actor.</summary>
@@ -51,19 +53,27 @@ internal sealed class AccesoAFuentes(
         var transaccion = (NpgsqlTransaction)conexion.Transaccion;
         T resultado = default!;
 
-        await elevacion.TraducirRechazoDeLaPolitica(async () =>
+        try
         {
-            await unidad.EjecutarComo(
-                Esquema,
-                async token =>
-                {
-                    resultado = elevar
-                        ? await elevacion.ConAlcanceDeRed(t => bloque(conexionActiva, transaccion, t), token).ConfigureAwait(false)
-                        : await bloque(conexionActiva, transaccion, token).ConfigureAwait(false);
-                },
-                cancelacion).ConfigureAwait(false);
-            return 0;
-        }).ConfigureAwait(false);
+            await elevacion.TraducirRechazoDeLaPolitica(async () =>
+            {
+                await unidad.EjecutarComo(
+                    Esquema,
+                    async token =>
+                    {
+                        resultado = elevar
+                            ? await elevacion.ConAlcanceDeRed(t => bloque(conexionActiva, transaccion, t), token).ConfigureAwait(false)
+                            : await bloque(conexionActiva, transaccion, token).ConfigureAwait(false);
+                    },
+                    cancelacion).ConfigureAwait(false);
+                return 0;
+            }).ConfigureAwait(false);
+        }
+        catch (PostgresException ex) when (ex.SqlState == EsperaDeBloqueoAgotada)
+        {
+            // La lock_timeout de la transacción venció esperando una fila de stock: «bloqueo ocupado» y no un error del servidor.
+            throw new EsperaDeBloqueoAgotadaException(ex);
+        }
 
         return resultado;
     }

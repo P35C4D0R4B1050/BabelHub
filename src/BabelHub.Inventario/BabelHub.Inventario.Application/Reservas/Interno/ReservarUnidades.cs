@@ -1,0 +1,275 @@
+using BabelHub.Inventario.Application.Fuentes;
+using BabelHub.Inventario.Application.Plataforma;
+using BabelHub.Inventario.Domain.Reservas;
+
+namespace BabelHub.Inventario.Application.Reservas.Interno;
+
+/// <summary>Los fallos esperados del módulo como <see cref="Resultado{T}"/> (la Api los traduce a los códigos <c>INV-…</c>).</summary>
+internal static class FallosDeReservas
+{
+    public static Resultado<T> Fallo<T>(ErrorDeAplicacion error) => Resultado<T>.Fallo(error);
+
+    public static Resultado<T> Validacion<T>(ResultadoDeValidacion validacion) =>
+        Resultado<T>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Validacion, ClavesDeReservas.ValidacionFallida, validacion.Errores));
+
+    public static Resultado<T> De<T>(CategoriaDeError categoria, string clave) => Resultado<T>.Fallo(new ErrorDeAplicacion(categoria, clave));
+
+    public static Resultado<T> BloqueoOcupado<T>() => De<T>(CategoriaDeError.NoDisponible, ClavesDeReservas.BloqueoOcupado);
+
+    public static Resultado<T> StockInsuficiente<T>(IEnumerable<LineaSinStock> lineas) =>
+        Resultado<T>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDeReservas.StockInsuficiente, [.. lineas.Select(DetalleDeFaltaDeStock.Codificar)]));
+}
+
+/// <summary>
+/// Reserva los impresos de un pedido: todas las líneas o ninguna (SEL-01, SEL-05). En una sola transacción y en el orden de la jerarquía de bloqueos (<c>inventario-fuentes</c> D04): bloquea al cliente, resuelve la
+/// idempotencia (SEL-09, SEL-31) y la baja del titular (SEL-35), bloquea el pedido, comprueba la propiedad y, si ya hay una reserva pendiente vigente del mismo cliente, la <b>reemplaza</b> (SEL-16, tope de 3, SEL-36);
+/// si no, aplica los límites (SEL-13, SEL-14, SEL-19). Valida que toda edición exista y sea impresa (SEL-12), bloquea las líneas que devuelve el reemplazo y pide <c>Bloquear</c> las filas de <b>todas las fuentes</b> de
+/// las ediciones (que libera las vencidas), elige la fuente de cada línea con la estrategia sobre esas filas ya confirmadas y aplica <c>Aplicar(0, +cantidad)</c> agregado y ordenado por (edición, fuente). Si alguna línea
+/// no tiene stock termina en fallo y <c>TransaccionPorCasoDeUso</c> deshace todo (contadores de límite y reemplazo incluidos): ninguna otra línea queda reservada (AC-SEL-05). El cliente sale del actor verificado:
+/// nunca del cuerpo (D16). Una última cabecera confirmada, expirada o liberada es <c>reserva-estado-invalido</c>.
+/// </summary>
+internal sealed class ReservarUnidades(
+    AutorizadorDeReservas autorizador,
+    IValidador<ReservarEntrada> validador,
+    IBloqueosAsesores bloqueos,
+    IRepositorioDeReservas reservas,
+    IFichasDeEdiciones fichas,
+    IMovimientosDeStock stock,
+    SelectorDeFuentes selector,
+    ConstructorDeLaReserva constructor,
+    DevolucionDeUnidades devolucion,
+    LimitesDeReservar limites,
+    IReloj reloj) : ICasoDeUso<ReservarEntrada, ReservaDelPedido>
+{
+    public async Task<Resultado<ReservaDelPedido>> Ejecutar(ReservarEntrada entrada, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(entrada);
+
+        if (await autorizador.ExigirCliente(cancelacion).ConfigureAwait(false) is { } rechazo)
+        {
+            return FallosDeReservas.Fallo<ReservaDelPedido>(rechazo);
+        }
+
+        var validacion = validador.Validar(entrada);
+        if (!validacion.EsValido)
+        {
+            return FallosDeReservas.Validacion<ReservaDelPedido>(validacion);
+        }
+
+        // ExigirCliente garantizó el identificador: sale del actor, nunca de la entrada (D16).
+        var clienteId = autorizador.Actor!.UsuarioId!.Value;
+
+        try
+        {
+            return await Reservar(entrada, clienteId, cancelacion).ConfigureAwait(false);
+        }
+        catch (EsperaDeBloqueoAgotadaException)
+        {
+            return FallosDeReservas.BloqueoOcupado<ReservaDelPedido>();
+        }
+        catch (ReservaDuplicadaException)
+        {
+            // Una cabecera o una línea activa concurrente que el bloqueo del pedido ya debería impedir: conflicto, nunca un error del servidor.
+            return FallosDeReservas.De<ReservaDelPedido>(CategoriaDeError.Conflicto, ClavesDeReservas.ReservaExistente);
+        }
+    }
+
+    private async Task<Resultado<ReservaDelPedido>> Reservar(ReservarEntrada entrada, Guid clienteId, CancellationToken cancelacion)
+    {
+        // Jerarquía D04: cliente → pedido → filas de stock. La reserva de otro cliente sobre el mismo pedido se detecta ya con el bloqueo del pedido tomado.
+        await bloqueos.Cliente(clienteId, cancelacion).ConfigureAwait(false);
+
+        // Una cuenta cancelada no reserva (SEL-35); y la clave de idempotencia ya usada por este cliente devuelve la reserva original con la misma carga o es un conflicto con otra (SEL-09, SEL-31). Bajo el
+        // bloqueo del cliente, dos solicitudes simultáneas con la misma clave se serializan: la segunda ve la primera ya confirmada y no baja el vendible otra vez.
+        if (await reservas.ClienteDadoDeBaja(clienteId, cancelacion).ConfigureAwait(false))
+        {
+            return FallosDeReservas.Fallo<ReservaDelPedido>(await autorizador.TitularDadoDeBaja(cancelacion).ConfigureAwait(false));
+        }
+
+        if (await reservas.PorClave(clienteId, entrada.ClaveDeIdempotencia, cancelacion).ConfigureAwait(false) is { } usada)
+        {
+            return usada.HuellaDeLaCarga == CargaCanonicaDeReservar.Huella(entrada)
+                ? Resultado<ReservaDelPedido>.Exito(await constructor.Construir(usada.Reserva, esRepeticion: true, cancelacion, ahora: reloj.Ahora).ConfigureAwait(false))
+                : FallosDeReservas.De<ReservaDelPedido>(CategoriaDeError.Conflicto, ClavesDeReservas.IdempotenciaEnConflicto);
+        }
+
+        await bloqueos.Pedido(entrada.PedidoId, cancelacion).ConfigureAwait(false);
+
+        // La propiedad se comprueba bajo el bloqueo del pedido (dos clientes simultáneos con el mismo pedido: uno recibe «no encontrado»). Repetir el pedido con una reserva pendiente vigente la reemplaza (SEL-16);
+        // si la última cabecera ya no está pendiente (confirmada, expirada o liberada, o vencida aunque nadie la barrió) el cliente reinicia con un pedido nuevo.
+        var ahora = reloj.Ahora;
+        var anterior = await reservas.UltimaDelPedido(entrada.PedidoId, cancelacion).ConfigureAwait(false);
+        ReservaDePedido? reemplazada = null;
+        if (anterior is not null)
+        {
+            if (anterior.ClienteId != clienteId)
+            {
+                return FallosDeReservas.Fallo<ReservaDelPedido>(await autorizador.PedidoAjeno(cancelacion).ConfigureAwait(false));
+            }
+
+            if (!anterior.TienePendienteVigente(ahora))
+            {
+                return FallosDeReservas.De<ReservaDelPedido>(CategoriaDeError.Conflicto, ClavesDeReservas.ReservaEstadoInvalido);
+            }
+
+            // El tope de 3 reemplazos acota retener stock sin pagar (SEL-36): se rechaza con el instante de expiración de la vigente, que se conserva.
+            if (!ContadorDeReemplazos.Admite(anterior.Reemplazos))
+            {
+                return FallosDeReservas.Fallo<ReservaDelPedido>(await limites.RechazarPorTopeDeReemplazos(clienteId, anterior, cancelacion).ConfigureAwait(false));
+            }
+
+            reemplazada = anterior;
+        }
+
+        if (await ValidarEdiciones(entrada, cancelacion).ConfigureAwait(false) is { } falloDeEdicion)
+        {
+            return falloDeEdicion;
+        }
+
+        var destino = await selector.Resolver(entrada.TipoDeEntrega, entrada.CodigoDeSucursalDeRecojo, entrada.RegionDeEntrega, cancelacion).ConfigureAwait(false);
+        if (destino is null)
+        {
+            return FallosDeReservas.Validacion<ReservaDelPedido>(ResultadoDeValidacion.Invalido([new ErrorDeCampo("codigoDeSucursalDeRecojo", "inexistente")]));
+        }
+
+        // Los límites cuentan en esta transacción y bajo el bloqueo del cliente: un rechazo posterior (stock) los deshace con ella (SEL-14).
+        // Un reemplazo no cuenta ni consume los demás límites (SEL-16): el pedido ya contó cuando se inició.
+        if (reemplazada is null && await limites.Evaluar(clienteId, entrada.PedidoId, cancelacion).ConfigureAwait(false) is { } rechazoPorLimite)
+        {
+            return FallosDeReservas.Fallo<ReservaDelPedido>(rechazoPorLimite);
+        }
+
+        var lineas = entrada.Lineas.OrderBy(l => l.EdicionId, OrdenDeBloqueo.DeIdentificadores).ToList();
+
+        // Se bloquean las filas de stock de las ediciones nuevas y de las que devuelve la reserva reemplazada, todas en el orden único (edición, fuente).
+        var edicionesAfectadas = lineas.Select(l => l.EdicionId).Concat(reemplazada?.Lineas.Where(l => l.Estado == EstadoDeLinea.Pendiente).Select(l => l.EdicionId) ?? []).Distinct().ToList();
+        // Jerarquía D04: las líneas de la reserva reemplazada por id antes que las filas de stock.
+        if (reemplazada is not null)
+        {
+            await reservas.BloquearLineas([.. reemplazada.Lineas.Where(l => l.Estado == EstadoDeLinea.Pendiente).Select(l => l.Id)], cancelacion).ConfigureAwait(false);
+        }
+
+        var bloqueo = await stock.Bloquear(edicionesAfectadas, cancelacion).ConfigureAwait(false);
+        if (!bloqueo.EstaBloqueado)
+        {
+            // La ficha cambió entre la comprobación y el bloqueo: se trata como edición no impresa.
+            return FallosDeReservas.De<ReservaDelPedido>(CategoriaDeError.ReglaDeNegocio, ClavesDeReservas.EdicionNoImpresa);
+        }
+
+        if (reemplazada is not null)
+        {
+            // La anterior se libera ya con todas las filas bloqueadas (líneas por id, deltas agregados y ordenados) para que su stock cuente como disponible al elegir; si la nueva falla, la transacción la devuelve intacta.
+            var liberadas = await reservas.LiberarLineas(entrada.PedidoId, incluirConfirmadas: false, null, ahora, cancelacion).ConfigureAwait(false);
+            if (await devolucion.Devolver(liberadas, "reemplazo", cancelacion).ConfigureAwait(false) is { } falloAlDevolver)
+            {
+                return FallosDeReservas.Fallo<ReservaDelPedido>(falloAlDevolver);
+            }
+
+            bloqueo = ConLoDevuelto(bloqueo, liberadas);
+        }
+
+        var seleccionadas = new List<(LineaSolicitada Linea, Guid FuenteId)>(lineas.Count);
+        var sinStock = new List<LineaSinStock>();
+        var asignado = new Dictionary<(Guid FuenteId, Guid EdicionId), int>();
+        foreach (var linea in lineas)
+        {
+            var seleccion = selector.Seleccionar(destino, linea.Cantidad, bloqueo.Filas.Where(f => f.EdicionId == linea.EdicionId), asignado);
+            if (seleccion.FuenteId is not { } fuenteId)
+            {
+                sinStock.Add(new LineaSinStock(linea.LineaId, linea.EdicionId, linea.Cantidad, seleccion.DisponibleEnLaRed));
+                continue;
+            }
+
+            asignado[(fuenteId, linea.EdicionId)] = asignado.GetValueOrDefault((fuenteId, linea.EdicionId)) + linea.Cantidad;
+            seleccionadas.Add((linea, fuenteId));
+        }
+
+        if (sinStock.Count > 0)
+        {
+            // Nada se aplicó todavía: el fallo basta para que la transacción deje todo como estaba (SEL-05).
+            return FallosDeReservas.StockInsuficiente<ReservaDelPedido>(sinStock);
+        }
+
+        if (await AplicarLosMovimientos(seleccionadas, bloqueo, cancelacion).ConfigureAwait(false) is { } falloDeAplicacion)
+        {
+            return falloDeAplicacion;
+        }
+
+        // La cuenta de reemplazos y la marca de «ya se extendió» se heredan: liberar la anterior por reemplazo no las reinicia (SEL-36, SEL-22).
+        var reserva = ReservaDePedido.Iniciar(
+            Guid.NewGuid(),
+            entrada.PedidoId,
+            clienteId,
+            ConversionesDeReservas.ADominio(entrada.TipoDeEntrega),
+            destino.SucursalDeRecojo?.Id,
+            entrada.RegionDeEntrega,
+            ahora,
+            seleccionadas.Select(s => LineaDeReserva.Pendiente(Guid.NewGuid(), s.Linea.LineaId, s.Linea.EdicionId, s.FuenteId, s.Linea.Cantidad, ahora)),
+            reemplazada is null ? 0 : ContadorDeReemplazos.Siguiente(reemplazada.Reemplazos),
+            reemplazada?.Extendida ?? false);
+
+        await reservas.Insertar(reserva, new DatosDeLaSolicitud(entrada.ClaveDeIdempotencia, CargaCanonicaDeReservar.Huella(entrada), limites.HuellaDeOrigen), cancelacion).ConfigureAwait(false);
+        return Resultado<ReservaDelPedido>.Exito(await constructor.Construir(reserva, esRepeticion: false, cancelacion).ConfigureAwait(false));
+    }
+
+
+    /// <summary>Las filas bloqueadas tal como quedaron tras devolver lo liberado: lo que la reserva reemplazada apartaba cuenta como vendible para elegir la fuente de la nueva.</summary>
+    private static BloqueoDeStock ConLoDevuelto(BloqueoDeStock bloqueo, IReadOnlyList<LineaLiberada> liberadas)
+    {
+        var devuelto = liberadas.GroupBy(l => (l.FuenteId, l.EdicionId)).ToDictionary(g => g.Key, g => g.Sum(l => l.Cantidad));
+        return BloqueoDeStock.Con([.. bloqueo.Filas.Select(f => devuelto.TryGetValue((f.FuenteId, f.EdicionId), out var unidades) ? f with { Reservado = Math.Max(0, f.Reservado - unidades) } : f)]);
+    }
+
+    /// <summary>Toda edición debe existir y ser impresa (SEL-12): una desconocida es «no encontrada» y una digital se rechaza porque los libros digitales no se reservan.</summary>
+    private async Task<Resultado<ReservaDelPedido>?> ValidarEdiciones(ReservarEntrada entrada, CancellationToken cancelacion)
+    {
+        foreach (var linea in entrada.Lineas.OrderBy(l => l.EdicionId, OrdenDeBloqueo.DeIdentificadores))
+        {
+            var ficha = await fichas.PorId(linea.EdicionId, cancelacion).ConfigureAwait(false);
+            if (ficha is null)
+            {
+                return FallosDeReservas.De<ReservaDelPedido>(CategoriaDeError.NoEncontrado, ClavesDeReservas.EdicionNoEncontrada);
+            }
+
+            if (!ficha.EsImpresa)
+            {
+                return FallosDeReservas.De<ReservaDelPedido>(CategoriaDeError.ReglaDeNegocio, ClavesDeReservas.EdicionNoImpresa);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Aplica <c>Aplicar(0, +cantidad)</c> por pareja (fuente, edición), en el orden único de bloqueo: con las filas ya bloqueadas ninguna debería fallar, pero la sentencia es la última defensa.</summary>
+    private async Task<Resultado<ReservaDelPedido>?> AplicarLosMovimientos(
+        List<(LineaSolicitada Linea, Guid FuenteId)> seleccionadas,
+        BloqueoDeStock bloqueo,
+        CancellationToken cancelacion)
+    {
+        var movimientos = MovimientosAgregados.Ordenados(seleccionadas.Select(s => (s.FuenteId, s.Linea.EdicionId, s.Linea.Cantidad)), 0, 1);
+
+        foreach (var movimiento in movimientos)
+        {
+            var resultado = await stock.Aplicar(movimiento, cancelacion).ConfigureAwait(false);
+            switch (resultado.Resultado)
+            {
+                case ResultadoDeMovimiento.Aplicado:
+                    continue;
+
+                case ResultadoDeMovimiento.DeniegadoPorAlcance:
+                    return FallosDeReservas.Fallo<ReservaDelPedido>(await autorizador.DenegadoPorAlcance(cancelacion).ConfigureAwait(false));
+
+                case ResultadoDeMovimiento.EdicionInexistenteONoImpresa:
+                    return FallosDeReservas.De<ReservaDelPedido>(CategoriaDeError.ReglaDeNegocio, ClavesDeReservas.EdicionNoImpresa);
+
+                default:
+                    // Con las filas bloqueadas no debería ocurrir; si ocurre, lo disponible es el de toda la red (CAR-04), no el de una fuente.
+                    var linea = seleccionadas.First(s => s.FuenteId == movimiento.FuenteId && s.Linea.EdicionId == movimiento.EdicionId).Linea;
+                    var enLaRed = bloqueo.Filas.Where(f => f.EdicionId == movimiento.EdicionId).Sum(f => Math.Max(0, f.Fisico - f.Reservado));
+                    return FallosDeReservas.StockInsuficiente<ReservaDelPedido>([new LineaSinStock(linea.LineaId, linea.EdicionId, linea.Cantidad, enLaRed)]);
+            }
+        }
+
+        return null;
+    }
+}

@@ -10,6 +10,13 @@ public sealed record OpcionesDeUnidadDeTrabajo
 {
     /// <summary>Prefijo del rol de cada esquema: el rol del esquema <c>identidad</c> es <c>rol_identidad</c> (lo crean las migraciones, AD18).</summary>
     public string PrefijoDelRolDeEsquema { get; init; } = "rol_";
+
+    /// <summary>
+    /// Espera máxima por cualquier bloqueo de la transacción (<c>SET LOCAL lock_timeout</c>): filas de stock, líneas de reserva y esperas de unicidad. Sin tope, una transacción colgada sosteniendo la fila de una edición
+    /// popular dejaría a todas las demás esperando con su conexión hasta agotar el pool. Pasada la espera, PostgreSQL responde <c>55P03</c> y la Infraestructura del módulo lo traduce a
+    /// <c>EsperaDeBloqueoAgotadaException</c>. Los bloqueos asesores fijan su propia espera mientras se toman y la restauran a este valor.
+    /// </summary>
+    public TimeSpan EsperaMaximaDeBloqueos { get; init; } = TimeSpan.FromSeconds(10);
 }
 
 /// <summary>
@@ -63,6 +70,7 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
 
             // Sin puerto del actor, o con el puerto pero sin actor establecido, no se fija valor y las políticas de filas deniegan (falla cerrada, SEG-15).
             await FijarAlcance(activa, AlcanceDeDatosDelActor.Para(actor?.Actual), cancelacion).ConfigureAwait(false);
+            await EjecutarSql(activa, $"SET LOCAL lock_timeout = {((long)Math.Ceiling(_opciones.EsperaMaximaDeBloqueos.TotalMilliseconds)).ToString(System.Globalization.CultureInfo.InvariantCulture)}", cancelacion).ConfigureAwait(false);
 
             var resultado = await trabajo(cancelacion).ConfigureAwait(false);
             await transaccion.CommitAsync(cancelacion).ConfigureAwait(false);

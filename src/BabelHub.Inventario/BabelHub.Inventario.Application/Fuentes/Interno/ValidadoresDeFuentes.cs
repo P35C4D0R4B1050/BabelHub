@@ -3,24 +3,6 @@ using BabelHub.Inventario.Domain.Fuentes;
 
 namespace BabelHub.Inventario.Application.Fuentes.Interno;
 
-/// <summary>
-/// Las regiones que reconoce el Inventario: los códigos en minúsculas, sin tildes y con guiones de las 24 regiones del Perú y la Provincia Constitucional del
-/// Callao, los mismos que usa el E-commerce para la región de una dirección (ECO-0 D08). El plan pide que la región sea «un código de la lista conocida»; la
-/// lista misma no estaba fijada en ningún documento y es un supuesto registrado en <c>decisiones-de-implementacion.md</c>.
-/// </summary>
-internal static class RegionesConocidas
-{
-    private static readonly HashSet<string> Codigos = new(StringComparer.Ordinal)
-    {
-        "amazonas", "ancash", "apurimac", "arequipa", "ayacucho", "cajamarca", "callao", "cusco", "huancavelica", "huanuco", "ica", "junin", "la-libertad", "lambayeque",
-        "lima", "loreto", "madre-de-dios", "moquegua", "pasco", "piura", "puno", "san-martin", "tacna", "tumbes", "ucayali",
-    };
-
-    public static bool Es(string? region) => region is not null && Codigos.Contains(region);
-
-    public static IReadOnlyCollection<string> Todas => Codigos;
-}
-
 /// <summary>Los límites de las consultas de lectura que fija el plan (§6): hasta 50 ediciones por consulta y páginas de 1 a 100.</summary>
 internal static class LimitesDeConsulta
 {
@@ -64,7 +46,7 @@ internal static class ReglasDeEntrada
         {
             errores.Add(new ErrorDeCampo("region", ConstructorDeValidacion.Obligatorio));
         }
-        else if (!Fuente.EsRegionValida(region) || !RegionesConocidas.Es(region))
+        else if (!Fuente.EsRegionValida(region) || !RegionesDeEntrega.Es(region))
         {
             errores.Add(new ErrorDeCampo("region", ConstructorDeValidacion.FormatoInvalido));
         }
