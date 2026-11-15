@@ -23,6 +23,12 @@ public sealed partial class PantallasBaseTests
             Llamadas++;
             return Task.FromResult(respuesta());
         }
+
+        public Task<Resultado<PaginaDeObras>> BuscarObras(BusquedaDeObras busqueda, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<Resultado<ResumenDeObra>> ObtenerObra(Guid obraId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<Resultado<IReadOnlyList<EdicionConsultada>>> ObtenerEdiciones(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default) => throw new NotSupportedException();
     }
 
     private sealed class ListaDePrueba(ListaDeSucursales? lista) : IListaDeSucursales

@@ -11,8 +11,32 @@ namespace BabelHub.Ecommerce.Infrastructure.Catalogo;
 /// </summary>
 public sealed class ConsultaDeCatalogoPendiente : IConsultaDeCatalogo
 {
+    private static ErrorDeAplicacion NoDisponible => new(CategoriaDeError.NoDisponible, "catalogo-no-disponible");
+
     public Task<Resultado<ObraAlAzar?>> ObtenerObraAlAzar(CancellationToken cancelacion = default) =>
-        Task.FromResult(Resultado<ObraAlAzar?>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "catalogo-no-disponible")));
+        Task.FromResult(Resultado<ObraAlAzar?>.Fallo(NoDisponible));
+
+    public Task<Resultado<PaginaDeObras>> BuscarObras(BusquedaDeObras busqueda, CancellationToken cancelacion = default) =>
+        Task.FromResult(Resultado<PaginaDeObras>.Fallo(NoDisponible));
+
+    public Task<Resultado<ResumenDeObra>> ObtenerObra(Guid obraId, CancellationToken cancelacion = default) =>
+        Task.FromResult(Resultado<ResumenDeObra>.Fallo(NoDisponible));
+
+    public Task<Resultado<IReadOnlyList<EdicionConsultada>>> ObtenerEdiciones(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default) =>
+        Task.FromResult(Resultado<IReadOnlyList<EdicionConsultada>>.Fallo(NoDisponible));
+}
+
+/// <summary>
+/// El retiro de una edición de los carritos mientras el módulo <c>Carrito</c> no exista (D07): no hace nada, porque no hay carritos. <b>Una prueba de arquitectura falla en cuanto exista una
+/// implementación real</b> de <see cref="IRetiroDeEdicionDeCarritos"/>, para que esta se quite de la composición y no quede sombreando a la de <c>Carrito</c>.
+/// </summary>
+public sealed class RetiroDeEdicionDeCarritosNulo : IRetiroDeEdicionDeCarritos
+{
+    public Task Retirar(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(edicionIds);
+        return Task.CompletedTask;
+    }
 }
 
 public static class CatalogoPendienteExtensiones
@@ -22,6 +46,16 @@ public static class CatalogoPendienteExtensiones
     {
         ArgumentNullException.ThrowIfNull(servicios);
         servicios.TryAddScoped<IConsultaDeCatalogo, ConsultaDeCatalogoPendiente>();
+        return servicios;
+    }
+
+    /// <summary>
+    /// Registra el retiro nulo de carritos (D07). <c>Carrito</c>, cuando exista, registra el suyo <b>antes</b> de esta llamada (<c>TryAdd</c> lo respeta) y quita esta llamada de la composición.
+    /// </summary>
+    public static IServiceCollection AgregarRetiroNuloDeCarritos(this IServiceCollection servicios)
+    {
+        ArgumentNullException.ThrowIfNull(servicios);
+        servicios.TryAddSingleton<IRetiroDeEdicionDeCarritos, RetiroDeEdicionDeCarritosNulo>();
         return servicios;
     }
 }
