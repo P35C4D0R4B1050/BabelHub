@@ -179,7 +179,8 @@ internal sealed class EntornoDeSesiones
         TimeSpan? plazoDeBloqueo = null,
         ICifradorDeSecretosDeSesion? cifrador = null,
         LimitadorDeRenovaciones? limitador = null,
-        Func<IAlmacenDeSesionesWeb, IAlmacenDeSesionesWeb>? decorarAlmacen = null)
+        Func<IAlmacenDeSesionesWeb, IAlmacenDeSesionesWeb>? decorarAlmacen = null,
+        IVerificadorDeCredencial? verificador = null)
     {
         Reloj = new RelojDePrueba(Inicio);
         Identidad = new IdentidadConRotacion(Reloj);
@@ -190,7 +191,7 @@ internal sealed class EntornoDeSesiones
         Aleatorios = new AleatoriosSeguros();
         Limitador = limitador ?? new LimitadorDeRenovaciones();
         IAlmacenDeSesionesWeb almacen = decorarAlmacen is null ? Sesiones : decorarAlmacen(Sesiones);
-        Web = new SesionesWeb(almacen, Cifrador, Identidad, new VerificadorPorPrefijo(), Seguridad, Alertas, Unidad, Aleatorios, Reloj, Limitador);
+        Web = new SesionesWeb(almacen, Cifrador, Identidad, verificador ?? new VerificadorPorPrefijo(), Seguridad, Alertas, Unidad, Aleatorios, Reloj, Limitador);
         BorradoresDePantalla = new BorradoresDePantalla(almacen, Borradores, Cifrador, Seguridad, Unidad, Reloj);
     }
 

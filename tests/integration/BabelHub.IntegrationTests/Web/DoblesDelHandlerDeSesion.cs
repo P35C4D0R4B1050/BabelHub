@@ -105,6 +105,19 @@ internal static class AnfitrionConSesion
     {
         var flujo = new ActorDelFlujo();
         sesiones.LeerActor = () => flujo.Actual;
+        return IniciarCon(sesiones, flujo, host, modo, servicios, hostsPermitidos, antesDeLasRutas);
+    }
+
+    /// <summary>El mismo anfitrión sobre cualquier <see cref="ISesionesWeb"/> (por ejemplo, el módulo real con PostgreSQL) y el flujo de actor que se quiera observar.</summary>
+    public static Task<AnfitrionWeb> IniciarCon(
+        ISesionesWeb sesiones,
+        ActorDelFlujo flujo,
+        HostWeb host = HostWeb.Tienda,
+        ModoDeArranque modo = ModoDeArranque.Normal,
+        Action<IServiceCollection>? servicios = null,
+        IReadOnlyList<string>? hostsPermitidos = null,
+        Action<Microsoft.AspNetCore.Builder.WebApplication>? antesDeLasRutas = null)
+    {
         return AnfitrionWeb.Iniciar(
             s =>
             {
