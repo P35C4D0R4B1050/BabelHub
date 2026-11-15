@@ -117,3 +117,12 @@ public interface IAceptacionDeTextos
 
     Task<ResultadoDeAceptacion> Aceptar(ActorVerificado actor, string versionMostrada, CancellationToken cancelacion = default);
 }
+
+public static class CapacidadesWeb
+{
+    /// <summary>
+    /// Si el método HTTP es de la clase de la capacidad: las de lectura solo <c>GET</c> y las de acción solo <c>POST</c>, con comparación ordinal (<c>get</c> o un método no estándar no valen; HEAD, OPTIONS, TRACE,
+    /// PUT y DELETE nunca): negación por defecto (WEB-46). La clase de cada capacidad es del Dominio.
+    /// </summary>
+    public static bool AdmiteElMetodo(this CapacidadWeb capacidad, string? metodo) => BabelHub.Ecommerce.Domain.Web.CapacidadesDeAcceso.AdmiteElMetodo(Interno.AreasDeInterfaz.Aplicar(capacidad), metodo);
+}

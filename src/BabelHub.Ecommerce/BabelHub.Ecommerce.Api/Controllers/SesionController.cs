@@ -17,6 +17,7 @@ public sealed class SesionController(ISesionesWeb sesiones, OpcionesDelHostWeb h
 
     /// <summary>Cierre voluntario: invalida la sesión de este navegador en el servidor aunque la revocación de la renovación en Identidad quede pendiente.</summary>
     [HttpPost("/sesion/cerrar")]
+    [PermitidaConTextosPendientes(CapacidadWeb.CerrarSesion)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Cerrar(CancellationToken cancelacion)
     {

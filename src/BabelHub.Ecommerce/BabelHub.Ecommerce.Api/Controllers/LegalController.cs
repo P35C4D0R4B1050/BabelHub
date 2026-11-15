@@ -21,6 +21,7 @@ public sealed class TextoLegalVista : ModeloBaseDePagina
 public sealed class LegalController(ITextosLegales textos, ContextoDePagina pagina) : Controller
 {
     [HttpGet("/legal/{texto}")]
+    [PermitidaConTextosPendientes(CapacidadWeb.TextosLegales)]
     public async Task<IActionResult> Ver(string texto, CancellationToken cancelacion)
     {
         if (!TiposDeTextoLegal.TryParse(texto, out var tipo))

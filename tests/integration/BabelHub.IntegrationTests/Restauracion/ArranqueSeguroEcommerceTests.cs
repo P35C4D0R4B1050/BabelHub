@@ -532,6 +532,9 @@ public sealed class ArranqueSeguroEcommerceTests : IDisposable
         informacion.Environment["BABELHUB__Modo"] = modo;
         informacion.Environment["BABELHUB__Restauracion__SecretoDeLaMarca"] = _secretoDeLaMarca;
         informacion.Environment["BABELHUB__Restauracion__CarpetaDeMarcas"] = Path.Combine(_carpeta, "marcas-del-proceso");
+        // En producción el E-commerce exige el rol del proceso y los hosts que acepta (web-base, D03): sin ellos el arranque falla.
+        informacion.Environment["BABELHUB__Web__Host"] = "tienda";
+        informacion.Environment["BABELHUB__Web__HostsPermitidos"] = "www.babelhub.example";
         if (marca is not null)
         {
             informacion.Environment["BABELHUB__Restauracion__Marca"] = marca;

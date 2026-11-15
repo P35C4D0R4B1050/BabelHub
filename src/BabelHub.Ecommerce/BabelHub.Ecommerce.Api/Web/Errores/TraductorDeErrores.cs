@@ -30,6 +30,10 @@ public sealed record RespuestaDePantalla(
 public static class TraductorDeErrores
 {
     public const string RutaDelIngreso = "/ingreso";
+    public const string RutaDeAceptacion = "/textos/aceptar";
+
+    /// <summary>El código estable de una acción bloqueada por los textos legales pendientes (403). <c>Shared</c> aún no lo declara: lo agrega el cambio de contrato de R12.</summary>
+    public const string CodigoDeTextosPendientes = "ECO-TEXTOS-PENDIENTES";
     public const string MensajeDeCredencialInvalida = "El correo o la contraseña no coinciden.";
     private const string TituloDelIngreso = "No pudimos iniciar tu sesión";
 
@@ -54,6 +58,12 @@ public static class TraductorDeErrores
         IReadOnlyList<EnlaceDeSalida>? salidas = null)
     {
         ArgumentNullException.ThrowIfNull(problema);
+        // Textos legales pendientes (T38): no se muestra el problema en crudo; se invita a aceptar, sin conservar ni reenviar lo escrito en la acción bloqueada (WEB-48).
+        if (string.Equals(problema.Code, CodigoDeTextosPendientes, StringComparison.Ordinal))
+        {
+            return new RespuestaDePantalla(EstadoVista.ErrorGenerico(null), StatusCodes.Status403Forbidden, RutaDeAceptacion, false, []);
+        }
+
         var clase = Clasificar(problema);
 
         if (contexto == ContextoDeTraduccion.Ingreso)

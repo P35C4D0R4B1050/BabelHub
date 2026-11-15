@@ -116,7 +116,8 @@ internal static class AnfitrionConSesion
         ModoDeArranque modo = ModoDeArranque.Normal,
         Action<IServiceCollection>? servicios = null,
         IReadOnlyList<string>? hostsPermitidos = null,
-        Action<Microsoft.AspNetCore.Builder.WebApplication>? antesDeLasRutas = null)
+        Action<Microsoft.AspNetCore.Builder.WebApplication>? antesDeLasRutas = null,
+        Action<Microsoft.AspNetCore.Builder.WebApplication>? despuesDelHandler = null)
     {
         return AnfitrionWeb.Iniciar(
             s =>
@@ -134,7 +135,11 @@ internal static class AnfitrionConSesion
             },
             partes: [typeof(ControladorDeSesionDePrueba).Assembly],
             antesDeLasRutas: antesDeLasRutas,
-            despuesDelEnrutado: app => app.UsarSesionWeb());
+            despuesDelEnrutado: app =>
+            {
+                app.UsarSesionWeb();
+                despuesDelHandler?.Invoke(app);
+            });
     }
 
     /// <summary>La cookie de la sesión del host indicado, lista para enviarla.</summary>
@@ -198,6 +203,7 @@ public sealed class ControladorDeSesionDePrueba(IActorActual actor, ITokenDelUsu
     public IActionResult Sondeo() => Content("<p>sondeo</p>", "text/html");
 
     [HttpGet("token")]
+    [PermitidaConTextosPendientes(CapacidadWeb.TextosLegales)]
     public IActionResult Token() => Content(antiforgery.GetAndStoreTokens(HttpContext).RequestToken!);
 
     [HttpPost("accion")]

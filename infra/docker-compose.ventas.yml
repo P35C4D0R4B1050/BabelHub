@@ -33,6 +33,8 @@ services:
     security_opt: ["no-new-privileges:true"]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      # El rol del proceso (web-base, D03). BABELHUB__Web__HostsPermitidos (los hosts que acepta el servidor) va en ecommerce.env: sin él el servicio no arranca.
+      BABELHUB__Web__Host: tienda
     env_file:
       - "${BABELHUB_SECRETOS:?Define BABELHUB_SECRETOS con la carpeta de los secretos de esta VM}/ecommerce.env"
     ports:
