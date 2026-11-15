@@ -134,6 +134,18 @@ internal sealed class ExpirarReservasVencidas(
             return FallosDeReservas.Validacion<ExpiracionDelPedido>(ResultadoDeValidacion.Invalido([new ErrorDeCampo("pedidoId", ConstructorDeValidacion.Obligatorio)]));
         }
 
+        try
+        {
+            return await Expirar(entrada, cancelacion).ConfigureAwait(false);
+        }
+        catch (EsperaDeBloqueoAgotadaException)
+        {
+            return FallosDeReservas.BloqueoOcupado<ExpiracionDelPedido>();
+        }
+    }
+
+    private async Task<Resultado<ExpiracionDelPedido>> Expirar(ExpirarReservasEntrada entrada, CancellationToken cancelacion)
+    {
         if (!await bloqueos.IntentarPedido(entrada.PedidoId, cancelacion).ConfigureAwait(false))
         {
             return Resultado<ExpiracionDelPedido>.Exito(new ExpiracionDelPedido(entrada.PedidoId, Procesado: false, 0));

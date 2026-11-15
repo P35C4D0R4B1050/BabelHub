@@ -59,6 +59,9 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
 
     public List<DatosDeLaSolicitud> Solicitudes { get; } = [];
 
+    /// <summary>Si es verdadero, <c>Insertar</c> responde como la restricción única de la base ante una cabecera o una línea activa concurrentes.</summary>
+    public bool InsertarChocaConUnaConcurrente { get; set; }
+
     public Task<ReservaDePedido?> UltimaDelPedido(Guid pedidoId, CancellationToken cancelacion = default)
     {
         bitacora.Anotar("reservas.UltimaDelPedido");
@@ -68,6 +71,11 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
     public Task Insertar(ReservaDePedido reserva, DatosDeLaSolicitud solicitud, CancellationToken cancelacion = default)
     {
         bitacora.Anotar("reservas.Insertar");
+        if (InsertarChocaConUnaConcurrente)
+        {
+            throw new ReservaDuplicadaException();
+        }
+
         Guardadas.Add(reserva);
         Solicitudes.Add(solicitud);
         return Task.CompletedTask;

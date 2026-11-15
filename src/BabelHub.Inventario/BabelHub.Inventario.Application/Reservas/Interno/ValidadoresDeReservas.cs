@@ -15,10 +15,6 @@ internal static class LimitesDeReservas
 
     /// <summary>Tope de unidades por línea: la spec no lo fija, es un supuesto (registrado en las decisiones de implementación) que acota lo que se puede apartar con una solicitud.</summary>
     public const int MaximoDeCantidad = 100;
-
-    public const int MinimoDeLaClave = 16;
-
-    public const int MaximoDeLaClave = 80;
 }
 
 /// <summary>Las reglas de forma de la entrada de reservar y de la consulta previa: cada error lleva el campo y una clave, nunca el valor recibido (SEG-01).</summary>

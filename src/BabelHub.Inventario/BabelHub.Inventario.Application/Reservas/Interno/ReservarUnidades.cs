@@ -193,9 +193,10 @@ internal sealed class ReservarUnidades(
                     return FallosDeReservas.De<ReservaDelPedido>(CategoriaDeError.ReglaDeNegocio, ClavesDeReservas.EdicionNoImpresa);
 
                 default:
-                    var fila = bloqueo.Fila(movimiento.FuenteId, movimiento.EdicionId);
+                    // Con las filas bloqueadas no debería ocurrir; si ocurre, lo disponible es el de toda la red (CAR-04), no el de una fuente.
                     var linea = seleccionadas.First(s => s.FuenteId == movimiento.FuenteId && s.Linea.EdicionId == movimiento.EdicionId).Linea;
-                    return FallosDeReservas.StockInsuficiente<ReservaDelPedido>([new LineaSinStock(linea.LineaId, linea.EdicionId, linea.Cantidad, Math.Max(0, fila.Fisico - fila.Reservado))]);
+                    var enLaRed = bloqueo.Filas.Where(f => f.EdicionId == movimiento.EdicionId).Sum(f => Math.Max(0, f.Fisico - f.Reservado));
+                    return FallosDeReservas.StockInsuficiente<ReservaDelPedido>([new LineaSinStock(linea.LineaId, linea.EdicionId, linea.Cantidad, enLaRed)]);
             }
         }
 

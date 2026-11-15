@@ -448,3 +448,35 @@ public sealed class ReservarUnidadesTests
         Assert.All(resultado.Error!.Errores, e => Assert.DoesNotContain("espacios", e.Clave + e.Campo, StringComparison.Ordinal));
     }
 }
+
+/// <summary>Lo que el contrato público no debe imprimir ni dejar pasar (SEG-25, AGENTS §5) y la última defensa de unicidad.</summary>
+public sealed class ReservarUnidadesDefensasTests
+{
+    [Fact]
+    [Trait("Criterio", "AC-SEL-09")]
+    public async Task Reservar_SiLaBaseRechazaPorUnicidadUnaReservaConcurrente_EsConflictoYNuncaUnaExcepcion()
+    {
+        var entorno = new EntornoDeReservas();
+        var libro = entorno.Impresa();
+        entorno.Base.Existencias.Poner(entorno.Base.Lima.Id, libro, 5, 0);
+        entorno.Reservas.InsertarChocaConUnaConcurrente = true;
+
+        var resultado = await entorno.Reservar().Ejecutar(EntornoDeReservas.ARecojo("lima", [EntornoDeReservas.Linea(libro)]));
+
+        Assert.Equal((CategoriaDeError.Conflicto, "reserva-existente"), (resultado.Error!.Categoria, resultado.Error.Clave));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-09")]
+    public void LosModelosConClaveOHuellaNoImprimenSusDatos()
+    {
+        var entrada = EntornoDeReservas.ARecojo("lima", [EntornoDeReservas.Linea(Guid.NewGuid())], clave: "clave-secreta-de-prueba-0123");
+        var datos = new DatosDeLaSolicitud("clave-secreta-de-prueba-0123", new string('a', 64), "huella-de-origen-0123456789");
+
+        foreach (var texto in new[] { entrada.ToString(), datos.ToString(), new ConfirmarReservasEntrada(Guid.NewGuid(), "clave-secreta-de-prueba-0123").ToString(), new CerrarReservasEntrada(Guid.NewGuid(), MotivoDeCierreDeReserva.Entrega, [], null, "clave-secreta-de-prueba-0123").ToString() })
+        {
+            Assert.DoesNotContain("secreta", texto, StringComparison.Ordinal);
+            Assert.DoesNotContain("huella-de-origen", texto, StringComparison.Ordinal);
+        }
+    }
+}

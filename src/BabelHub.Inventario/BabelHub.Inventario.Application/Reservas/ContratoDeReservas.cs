@@ -52,7 +52,11 @@ public sealed record ReservarEntrada(
     string? CodigoDeSucursalDeRecojo,
     string? RegionDeEntrega,
     IReadOnlyList<LineaSolicitada> Lineas,
-    string ClaveDeIdempotencia);
+    string ClaveDeIdempotencia)
+{
+    /// <summary>La clave de idempotencia y las líneas no deben llegar a un registro por un <c>ToString</c> automático.</summary>
+    public override string ToString() => nameof(ReservarEntrada);
+}
 
 /// <summary>Una línea con su estado y la fuente asignada (nunca se divide entre fuentes, SEL-25).</summary>
 public sealed record LineaReservada(Guid LineaId, Guid EdicionId, int Cantidad, EstadoDeReserva Estado, string CodigoDeFuente, bool RequiereTraslado, int? PlazoEstimadoEnDias);
@@ -131,7 +135,10 @@ public sealed record SeleccionConsultada(IReadOnlyList<SeleccionDeLinea> Lineas,
 public sealed record ConsultarReservaEntrada(Guid PedidoId);
 
 /// <summary>Confirma las reservas de un pedido pagado (SEL-06); la clave de idempotencia se acota por pedido.</summary>
-public sealed record ConfirmarReservasEntrada(Guid PedidoId, string ClaveDeIdempotencia);
+public sealed record ConfirmarReservasEntrada(Guid PedidoId, string ClaveDeIdempotencia)
+{
+    public override string ToString() => nameof(ConfirmarReservasEntrada);
+}
 
 /// <summary>Informa que el pago quedó pendiente de confirmación: extiende la expiración una sola vez (SEL-22).</summary>
 public sealed record ExtenderReservasEntrada(Guid PedidoId);
@@ -143,7 +150,10 @@ public sealed record ExtensionDeReserva(bool Extendida, ReservaDelPedido Reserva
 public sealed record LiberarReservasEntrada(Guid PedidoId, MotivoDeLiberacionDeReserva Motivo, IReadOnlyList<Guid>? LineaIds);
 
 /// <summary>Descuenta el físico de las líneas indicadas y cierra sus reservas confirmadas (SEL-11, SEL-21); <see cref="EnvioId"/> solo en el reparto.</summary>
-public sealed record CerrarReservasEntrada(Guid PedidoId, MotivoDeCierreDeReserva Motivo, IReadOnlyList<Guid> LineaIds, Guid? EnvioId, string ClaveDeIdempotencia);
+public sealed record CerrarReservasEntrada(Guid PedidoId, MotivoDeCierreDeReserva Motivo, IReadOnlyList<Guid> LineaIds, Guid? EnvioId, string ClaveDeIdempotencia)
+{
+    public override string ToString() => nameof(CerrarReservasEntrada);
+}
 
 /// <summary>El resultado de cerrar una línea: cerrada ahora o <c>ya-cerrada</c> (el descuento ya estaba aplicado y no se repite).</summary>
 public sealed record ResultadoDeCierreDeLinea(Guid LineaId, bool YaCerrada);

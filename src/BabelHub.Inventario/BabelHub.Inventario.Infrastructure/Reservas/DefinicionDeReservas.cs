@@ -57,7 +57,9 @@ public static class DefinicionDeReservas
                 (tipo_entrega = 'recojo' AND sucursal_recojo_id IS NOT NULL AND region_entrega IS NULL)
                 OR (tipo_entrega = 'domicilio' AND region_entrega IS NOT NULL AND sucursal_recojo_id IS NULL)),
             CONSTRAINT ck_reservas_reemplazos CHECK (reemplazos BETWEEN 0 AND 3),
-            CONSTRAINT ck_reservas_huella_de_carga CHECK (huella_de_carga ~ '^[0-9a-f]{64}$')
+            CONSTRAINT ck_reservas_huella_de_carga CHECK (huella_de_carga ~ '^[0-9a-f]{64}$'),
+            CONSTRAINT ck_reservas_clave_idempotencia CHECK (length(clave_idempotencia) BETWEEN 16 AND 80),
+            CONSTRAINT ck_reservas_huella_origen CHECK (huella_origen IS NULL OR length(huella_origen) BETWEEN 16 AND 128)
         );
 
         CREATE INDEX IF NOT EXISTS ix_reservas_pedido ON reservas.reservas (pedido_id, iniciada_en DESC);
@@ -92,6 +94,8 @@ public static class DefinicionDeReservas
         -- Una línea de pedido tiene una sola línea de reserva activa (pendiente o confirmada): aunque dos transacciones lleguen a la vez, la segunda no puede insertar otra (SEL-16).
         CREATE UNIQUE INDEX IF NOT EXISTS ux_reserva_lineas_activa ON reservas.reserva_lineas (pedido_id, linea_id) WHERE estado IN ('pendiente', 'confirmada');
         CREATE INDEX IF NOT EXISTS ix_reserva_lineas_stock ON reservas.reserva_lineas (fuente_id, edicion_id, estado);
+        -- La ruta caliente de cada reserva, ajuste o traslado: las pendientes de unas ediciones (las vencidas se buscan entre ellas).
+        CREATE INDEX IF NOT EXISTS ix_reserva_lineas_pendientes ON reservas.reserva_lineas (edicion_id) WHERE estado = 'pendiente';
         CREATE INDEX IF NOT EXISTS ix_reserva_lineas_reserva ON reservas.reserva_lineas (reserva_id);
         CREATE INDEX IF NOT EXISTS ix_reserva_lineas_pedido ON reservas.reserva_lineas (pedido_id);
         CREATE INDEX IF NOT EXISTS ix_reserva_lineas_traslado ON reservas.reserva_lineas (traslado_id) WHERE traslado_id IS NOT NULL;
@@ -119,12 +123,15 @@ public static class DefinicionDeReservas
         """;
 
     /// <summary>
-    /// El permiso mínimo de <c>rol_reservas</c>: uso del esquema; lectura, alta y cambio de reservas y líneas (<b>ninguna baja</b>: las reservas se anonimizan, no se borran); y lectura, alta y baja de las operaciones
+    /// El permiso mínimo de <c>rol_reservas</c>: uso del esquema; lectura y alta de reservas y líneas, con cambio <b>solo de las columnas de estado</b> (<b>ninguna baja</b>: las reservas se anonimizan, no se borran); y lectura, alta y baja de las operaciones
     /// idempotentes y de las bajas recibidas, que se purgan. Se aplica después de que el aprovisionamiento deja las tablas a su propietario.
     /// </summary>
     public const string Permisos = """
         GRANT USAGE ON SCHEMA reservas TO rol_reservas;
-        GRANT SELECT, INSERT, UPDATE ON reservas.reservas, reservas.reserva_lineas TO rol_reservas;
+        GRANT SELECT, INSERT ON reservas.reservas, reservas.reserva_lineas TO rol_reservas;
+        -- El cambio es por columna: una línea guardada no cambia su cantidad, su fuente, su edición ni su pedido, y una cabecera no cambia su pedido, su clave ni su destino.
+        GRANT UPDATE (estado, cerrada_por, traslado_id, recreada_en_destino, confirmada_en, anulada_en, estado_cambiado_en) ON reservas.reserva_lineas TO rol_reservas;
+        GRANT UPDATE (fecha_expiracion, extendida, reemplazos, cliente_id, huella_origen) ON reservas.reservas TO rol_reservas;
         GRANT SELECT, INSERT, DELETE ON reservas.operaciones_idempotentes TO rol_reservas;
         GRANT SELECT, INSERT, UPDATE, DELETE ON reservas.bajas_recibidas TO rol_reservas;
         """;

@@ -360,6 +360,53 @@ public sealed class MigracionDeReservasTests(PostgresDeReservasFixture bd) : ICl
         Assert.True(await bd.Consultar<bool>($"SELECT extendida FROM reservas.reservas WHERE id = '{reserva}'"));
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-SEL-04")]
+    public async Task ElRolDelModulo_SoloCambiaLasColumnasDeEstado_NoLaCantidadNiLaFuenteNiElPedido()
+    {
+        var actor = ActorActual.DelSistema();
+        var (pedido, reserva) = await bd.PedidoConReserva();
+        var linea = await bd.AgregarLinea(reserva, pedido, cantidad: 2);
+
+        var estado = await EjecutarComoElRolDelModulo(actor, $"UPDATE reservas.reserva_lineas SET estado = 'confirmada', confirmada_en = now(), estado_cambiado_en = now() WHERE id = '{linea}'");
+        var cantidad = await EjecutarComoElRolDelModulo(actor, $"UPDATE reservas.reserva_lineas SET cantidad = 99 WHERE id = '{linea}'");
+        var fuente = await EjecutarComoElRolDelModulo(actor, $"UPDATE reservas.reserva_lineas SET fuente_id = '{Guid.NewGuid()}' WHERE id = '{linea}'");
+        var pedidoDeLaCabecera = await EjecutarComoElRolDelModulo(actor, $"UPDATE reservas.reservas SET pedido_id = '{Guid.NewGuid()}' WHERE id = '{reserva}'");
+        var clave = await EjecutarComoElRolDelModulo(actor, $"UPDATE reservas.reservas SET clave_idempotencia = 'otra-clave-0123456789abcdef' WHERE id = '{reserva}'");
+        var expiracion = await EjecutarComoElRolDelModulo(actor, $"UPDATE reservas.reservas SET fecha_expiracion = NULL, extendida = true WHERE id = '{reserva}'");
+        var anonimizar = await EjecutarComoElRolDelModulo(actor, $"UPDATE reservas.reservas SET cliente_id = '{Guid.NewGuid()}', huella_origen = NULL WHERE id = '{reserva}'");
+
+        Assert.Null(estado);
+        Assert.Equal("42501", cantidad);
+        Assert.Equal("42501", fuente);
+        Assert.Equal("42501", pedidoDeLaCabecera);
+        Assert.Equal("42501", clave);
+        Assert.Null(expiracion);
+        Assert.Null(anonimizar);
+        Assert.Equal(2, await bd.Consultar<int>($"SELECT cantidad FROM reservas.reserva_lineas WHERE id = '{linea}'"));
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-SEL-31")]
+    [InlineData("corta")]
+    [InlineData("una-clave-demasiado-larga-0123456789-0123456789-0123456789-0123456789-0123456789-0123456789")]
+    public async Task LaClaveDeIdempotenciaTieneUnLargoAcotado(string clave)
+    {
+        var estado = await SqlStateDe(() => bd.AgregarReserva(clave: clave));
+
+        Assert.Equal("23514", estado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-35")]
+    public async Task LaHuellaDeOrigenEsUnValorOpacoDeLargoAcotado_NoUnaDireccion()
+    {
+        var corta = await FallaAlEjecutar($"INSERT INTO reservas.reservas (id, pedido_id, cliente_id, huella_origen, clave_idempotencia, huella_de_carga, tipo_entrega, sucursal_recojo_id, iniciada_en) VALUES ('{Guid.NewGuid()}', '{Guid.NewGuid()}', '{Guid.NewGuid()}', '1.2.3.4', '{Guid.NewGuid():N}', '{new string('b', 64)}', 'recojo', '{Guid.NewGuid()}', now())");
+        await bd.Ejecutar($"INSERT INTO reservas.reservas (id, pedido_id, cliente_id, huella_origen, clave_idempotencia, huella_de_carga, tipo_entrega, sucursal_recojo_id, iniciada_en) VALUES ('{Guid.NewGuid()}', '{Guid.NewGuid()}', '{Guid.NewGuid()}', '{new string('c', 64)}', '{Guid.NewGuid():N}', '{new string('b', 64)}', 'recojo', '{Guid.NewGuid()}', now())");
+
+        Assert.Equal("23514", corta);
+    }
+
     /// <summary>Corre una sentencia con el rol del módulo y devuelve el <c>SqlState</c> del fallo, o <see langword="null"/> si se ejecutó.</summary>
     private async Task<string?> EjecutarComoElRolDelModulo(ActorActual actor, string sql)
     {

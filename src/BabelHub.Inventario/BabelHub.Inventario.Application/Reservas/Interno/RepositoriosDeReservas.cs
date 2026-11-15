@@ -4,7 +4,11 @@ using BabelHub.Inventario.Domain.Reservas;
 namespace BabelHub.Inventario.Application.Reservas.Interno;
 
 /// <summary>Lo que se guarda junto a una cabecera para la idempotencia y la investigación de abusos: la clave del cliente, la huella de su carga canónica y la huella no reversible del origen (se anula a las 24 horas, D11).</summary>
-public sealed record DatosDeLaSolicitud(string ClaveDeIdempotencia, string HuellaDeLaCarga, string? HuellaDeOrigen);
+public sealed record DatosDeLaSolicitud(string ClaveDeIdempotencia, string HuellaDeLaCarga, string? HuellaDeOrigen)
+{
+    /// <summary>La clave y la huella de origen (un dato personal derivado) no deben llegar a un registro por un <c>ToString</c> automático.</summary>
+    public override string ToString() => nameof(DatosDeLaSolicitud);
+}
 
 /// <summary>Una línea pendiente cuya cabecera ya venció: lo necesario para devolver sus unidades y auditar su expiración (sin datos del cliente). Es lo que devuelve la lectura de vencidas y lo que devuelve su paso a expirada.</summary>
 public sealed record LineaVencida(Guid PedidoId, Guid LineaDeReservaId, Guid LineaId, Guid EdicionId, Guid FuenteId, int Cantidad);

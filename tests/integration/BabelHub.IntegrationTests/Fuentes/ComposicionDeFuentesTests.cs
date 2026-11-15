@@ -131,12 +131,14 @@ public sealed class ComposicionDeFuentesTests
 
     [Fact]
     [Trait("Criterio", "AC-FUE-02")]
-    public void SinLosModulosReales_ResolverNulosEsValidoEnDesarrollo_YEnProduccionTodavia()
+    public void SinReservasRegistrado_ElNuloDeReservasSeDetectaYProduccionNoArranca_PeroDesarrolloSi()
     {
         using var proveedor = Construir();
 
-        Assert.Empty(ComposicionDeFuentes.AdaptadoresNulosConModuloReal(proveedor));
-        ComposicionDeFuentes.ExigirAdaptadoresReales(proveedor, esProduccion: true);
+        // Reservas ya existe (su adaptador real vive en la Aplicación): olvidar AgregarModuloReservas dejaría un subconteo silencioso de stock, así que producción falla al arrancar.
+        Assert.Equal(["IReservasDeStock"], ComposicionDeFuentes.AdaptadoresNulosConModuloReal(proveedor));
+        Assert.Throws<InvalidOperationException>(() => ComposicionDeFuentes.ExigirAdaptadoresReales(proveedor, esProduccion: true));
+        ComposicionDeFuentes.ExigirAdaptadoresReales(proveedor, esProduccion: false);
     }
 
     [Fact]
@@ -156,10 +158,11 @@ public sealed class ComposicionDeFuentesTests
         var nulo = typeof(ComposicionDeFuentes).Assembly.GetTypes().Single(t => t.Name == "AdaptadoresNulosDeFuentes");
         var detectar = nulo.GetMethod("ExisteAdaptadorReal")!;
 
-        // En la Infraestructura todavía no hay un Reservas ni un Ajustes reales; en el ensamblado de pruebas sí hay una implementación (el doble) y se detecta.
+        // En la Infraestructura no hay un Reservas ni un Ajustes reales (el de Reservas vive en la Aplicación, que la guarda también mira); en el ensamblado de pruebas sí hay una implementación (el doble) y se detecta.
         Assert.False((bool)detectar.Invoke(null, [typeof(IReservasDeStock), typeof(ComposicionDeFuentes).Assembly])!);
         Assert.False((bool)detectar.Invoke(null, [typeof(IOrigenDeUnidadesVendidas), typeof(ComposicionDeFuentes).Assembly])!);
         Assert.False((bool)detectar.Invoke(null, [typeof(IReingresosPorDevolucion), typeof(ComposicionDeFuentes).Assembly])!);
         Assert.True((bool)detectar.Invoke(null, [typeof(IReservasDeStock), typeof(ReservasDeStockFijo).Assembly])!);
+        Assert.True((bool)detectar.Invoke(null, [typeof(IReservasDeStock), typeof(IReservasDeStock).Assembly])!);
     }
 }

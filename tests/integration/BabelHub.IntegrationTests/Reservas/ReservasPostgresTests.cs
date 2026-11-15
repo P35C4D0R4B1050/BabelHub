@@ -472,3 +472,85 @@ public sealed class ReservasPostgresTests(PostgresDeReservasFixture bd) : IClass
         Assert.Equal(3, ninguno.TotalDePedidos);
     }
 }
+
+/// <summary>Las defensas de la revisión de INV-2a: la espera de bloqueos acotada, la unicidad como conflicto, y el acceso que falla cerrado sin actor.</summary>
+public sealed class DefensasDeReservasPostgresTests(PostgresDeReservasFixture bd) : IClassFixture<PostgresDeReservasFixture>, IAsyncLifetime
+{
+    public Task InitializeAsync() => bd.Limpiar();
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-04")]
+    public async Task UnaFilaDeStockRetenidaPorOtraTransaccion_NoDejaEsperandoParaSiempre_EsBloqueoOcupado()
+    {
+        var lima = await bd.AgregarFuente("lima", recepcion: true);
+        var libro = await bd.AgregarEdicion();
+        await bd.PonerStock(lima, libro, 5, 0);
+        using var pila = new PilaDeReservas(bd, servicios => servicios.AddSingleton(sp => new FabricaDeUnidad(sp).Crear()));
+
+        // Una transacción colgada sostiene la fila (una auditoría lenta, una conexión perdida…).
+        await using var conexion = await bd.Administracion.OpenConnectionAsync();
+        await using var retenida = await conexion.BeginTransactionAsync();
+        await using (var bloquear = new Npgsql.NpgsqlCommand($"SELECT 1 FROM fuentes.stock WHERE edicion_id = '{libro}' FOR UPDATE", conexion, retenida))
+        {
+            await bloquear.ExecuteNonQueryAsync();
+        }
+
+        var reloj = System.Diagnostics.Stopwatch.StartNew();
+        var resultado = await pila.Reservar(Cliente(), ARecojo("lima", [Linea(libro)])).WaitAsync(TimeSpan.FromSeconds(30));
+        reloj.Stop();
+
+        Assert.Equal((CategoriaDeError.NoDisponible, "bloqueo-ocupado"), (resultado.Error!.Categoria, resultado.Error.Clave));
+        Assert.True(reloj.Elapsed < TimeSpan.FromSeconds(20), $"Esperó {reloj.Elapsed}: la espera debía acotarse a la lock_timeout de la transacción.");
+        Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM reservas.reservas"));
+
+        await retenida.RollbackAsync();
+        Assert.True((await pila.Reservar(Cliente(), ARecojo("lima", [Linea(libro)]))).EsExito);
+    }
+
+    /// <summary>Una unidad de trabajo con una <c>lock_timeout</c> corta, para que la prueba no espere el valor de producción.</summary>
+    private sealed class FabricaDeUnidad(IServiceProvider sp)
+    {
+        public UnidadDeTrabajoPostgres Crear() => new(
+            sp.GetRequiredService<Npgsql.NpgsqlDataSource>(),
+            new OpcionesDeUnidadDeTrabajo { EsperaMaximaDeBloqueos = TimeSpan.FromSeconds(1) },
+            sp.GetRequiredService<IActorActual>());
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-09")]
+    public async Task InsertarUnaClaveDeIdempotenciaRepetidaDelMismoCliente_LlegaComoReservaDuplicadaNoComoErrorDelServidor()
+    {
+        var lima = await bd.AgregarFuente("lima", recepcion: true);
+        var libro = await bd.AgregarEdicion();
+        await bd.PonerStock(lima, libro, 5, 0);
+        using var pila = new PilaDeReservas(bd);
+        var cliente = Cliente();
+        var entrada = ARecojo("lima", [Linea(libro)]);
+        Assert.True((await pila.Reservar(cliente, entrada)).EsExito);
+
+        await Assert.ThrowsAsync<ReservaDuplicadaException>(() => pila.EnUnAmbito(cliente, sp =>
+            sp.GetRequiredService<IUnidadDeTrabajo>().Ejecutar(async token =>
+            {
+                var otra = ReservaDePedido.Iniciar(
+                    Guid.NewGuid(), Guid.NewGuid(), cliente.UsuarioId!.Value, TipoDeEntrega.Recojo, lima, null, pila.Reloj.Ahora,
+                    [LineaDeReserva.Pendiente(Guid.NewGuid(), Guid.NewGuid(), libro, lima, 1, pila.Reloj.Ahora)]);
+                await sp.GetRequiredService<IRepositorioDeReservas>().Insertar(otra, new DatosDeLaSolicitud(entrada.ClaveDeIdempotencia, CargaCanonicaDeReservar.Huella(entrada), null), token);
+                return 0;
+            })));
+        Assert.Equal(1L, await bd.Consultar<long>("SELECT count(*) FROM reservas.reservas"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-27")]
+    public async Task ElAccesoAReservasSinActorFallaCerrado_NoPasaEnSilencio()
+    {
+        using var pila = new PilaDeReservas(bd);
+
+        await Assert.ThrowsAsync<ContextoDeActorAusenteException>(() => pila.EnUnAmbito(null, sp =>
+            sp.GetRequiredService<IUnidadDeTrabajo>().Ejecutar(async token => await sp.GetRequiredService<IRepositorioDeReservas>().UltimaDelPedido(Guid.NewGuid(), token))));
+        await Assert.ThrowsAsync<ContextoDeActorAusenteException>(() => pila.EnUnAmbito(ActorActual.Anonimo(), sp =>
+            sp.GetRequiredService<IUnidadDeTrabajo>().Ejecutar(async token => await sp.GetRequiredService<IRepositorioDeReservas>().UltimaDelPedido(Guid.NewGuid(), token))));
+    }
+}

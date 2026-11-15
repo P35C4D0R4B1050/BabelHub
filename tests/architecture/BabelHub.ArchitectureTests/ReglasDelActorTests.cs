@@ -36,6 +36,39 @@ public class ReglasDelActorTests
         Assert.True(infraestructura.Count == 0, $"Solo la Infraestructura de Plataforma y de Auditoría fijan el actor: {string.Join(", ", infraestructura)}.");
     }
 
+    /// <summary>
+    /// <c>IEjecutorComoSistema</c> pone «sistema» como actor mientras dura un trabajo dentro del flujo de otro actor (la liberación de vencidas se audita como sistema aunque la transacción sea de un cliente). Es un puerto
+    /// estrecho a propósito: dentro del bloque una autorización vería a «sistema» y concedería, así que <b>solo la lista blanca</b> lo usa y ampliarla es una decisión explícita (aquí). Hoy: el expirador de <c>Reservas</c>
+    /// y quien lo compone. Solo la Infraestructura de <c>Plataforma</c> lo implementa.
+    /// </summary>
+    [Fact]
+    public void Solo_la_lista_blanca_depende_de_ejecutar_como_sistema_y_solo_plataforma_lo_implementa()
+    {
+        const string servicio = "BabelHub.Inventario";
+        const string puerto = $"{servicio}.Application.Plataforma.IEjecutorComoSistema";
+        string[] permitidos =
+        [
+            $"{servicio}.Application.Reservas.Interno.ExpiradorDeReservas",
+            $"{servicio}.Application.Reservas.Interno.ReservasDeStock",
+        ];
+
+        var dependientes = new[] { "Domain", "Application" }
+            .SelectMany(capa => Types.InAssembly(Cargar($"{servicio}.{capa}")).That().HaveDependencyOn(puerto).GetTypes())
+            .Select(t => t.FullName ?? string.Empty)
+            .Where(nombre => nombre != puerto && !permitidos.Any(p => nombre == p || nombre.StartsWith(p + "+", StringComparison.Ordinal) || nombre.StartsWith(p + "<", StringComparison.Ordinal)))
+            .Where(nombre => !nombre.Contains("<>c", StringComparison.Ordinal) && !nombre.Contains("DisplayClass", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.True(dependientes.Count == 0, $"Solo la lista blanca puede cambiar el actor a «sistema»; ampliarla es una decisión explícita: {string.Join(", ", dependientes)}.");
+
+        var implementaciones = Types.InAssembly(Cargar($"{servicio}.Infrastructure")).That().ImplementInterface(Cargar($"{servicio}.Application").GetType(puerto)!).GetTypes()
+            .Select(t => t.FullName ?? string.Empty)
+            .Where(nombre => !nombre.StartsWith($"{servicio}.Infrastructure.Plataforma.", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.True(implementaciones.Count == 0, $"Solo la Infraestructura de Plataforma implementa el ejecutor «sistema»: {string.Join(", ", implementaciones)}.");
+    }
+
     private static Assembly Cargar(string nombre) =>
         AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == nombre)
         ?? Assembly.Load(nombre);
