@@ -73,6 +73,51 @@ public sealed record ReservaDelPedido(
     IReadOnlyList<TrasladoVinculadoAlPedido> Traslados,
     bool EsRepeticion = false);
 
+/// <summary>Una línea que no tiene stock vendible suficiente en ninguna fuente y lo máximo que hay en la red (CAR-04, CAR-27).</summary>
+public sealed record LineaSinStock(Guid LineaId, Guid EdicionId, int Solicitada, int DisponibleEnLaRed);
+
+/// <summary>
+/// Cómo viaja el detalle de una falta de stock dentro de <c>ErrorDeAplicacion.Errores</c> (el contrato de error solo conoce campo y clave): un <c>ErrorDeCampo</c> por línea, con el campo
+/// <c>lineas.{lineaId}</c> y una clave <c>sin-stock:{edicionId}:{solicitada}:{disponibleEnLaRed}</c>. La Api lo lee con <see cref="TryLeer"/> para armar el cuerpo del 409; ningún valor del cliente viaja aquí.
+/// </summary>
+public static class DetalleDeFaltaDeStock
+{
+    public const string ClaveDeStockInsuficiente = "stock-insuficiente";
+
+    private const string Prefijo = "lineas.";
+
+    private const string PrefijoDeClave = "sin-stock:";
+
+    public static Plataforma.ErrorDeCampo Codificar(LineaSinStock linea)
+    {
+        ArgumentNullException.ThrowIfNull(linea);
+        return new Plataforma.ErrorDeCampo($"{Prefijo}{linea.LineaId:D}", $"{PrefijoDeClave}{linea.EdicionId:D}:{linea.Solicitada}:{linea.DisponibleEnLaRed}");
+    }
+
+    public static bool TryLeer(Plataforma.ErrorDeCampo campo, out LineaSinStock? linea)
+    {
+        ArgumentNullException.ThrowIfNull(campo);
+        linea = null;
+
+        if (!campo.Campo.StartsWith(Prefijo, StringComparison.Ordinal) || !campo.Clave.StartsWith(PrefijoDeClave, StringComparison.Ordinal)
+            || !Guid.TryParseExact(campo.Campo[Prefijo.Length..], "D", out var lineaId))
+        {
+            return false;
+        }
+
+        var partes = campo.Clave[PrefijoDeClave.Length..].Split(':');
+        if (partes.Length != 3 || !Guid.TryParseExact(partes[0], "D", out var edicionId)
+            || !int.TryParse(partes[1], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var solicitada)
+            || !int.TryParse(partes[2], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var disponible))
+        {
+            return false;
+        }
+
+        linea = new LineaSinStock(lineaId, edicionId, solicitada, disponible);
+        return true;
+    }
+}
+
 /// <summary>Consulta previa de la selección de fuentes de un carrito, sin reservar (SEL-20).</summary>
 public sealed record ConsultarSeleccionEntrada(TipoDeEntregaDeReserva TipoDeEntrega, string? CodigoDeSucursalDeRecojo, string? RegionDeEntrega, IReadOnlyList<LineaSolicitada> Lineas);
 
