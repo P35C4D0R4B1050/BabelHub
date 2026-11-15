@@ -26,6 +26,8 @@ builder.Services.AgregarHostWeb(OpcionesDelHostWeb.Leer(builder.Configuration, b
 builder.Services.AgregarTokenDelUsuarioDeLaSesion();
 // Antiforgery global, Origin y Sec-Fetch-Site y captura del borrador (T16); las claves de Data Protection las compone quien conecte la base (T12).
 builder.Services.AgregarProteccionContraFalsificacion();
+// Cabeceras de seguridad y política de contenido por ruta (T17); los orígenes de la pasarela y del almacén son configuración (B05).
+builder.Services.AgregarCabecerasDeSeguridad(OpcionesDeContenidoWeb.Leer(builder.Configuration));
 // La versión provisional de los textos legales nunca se compone en producción (hasta el contrato de Identidad, IDE-57).
 builder.Services.AgregarModuloWeb(permitirVersionesProvisionales: !builder.Environment.IsProduction());
 // Implementaciones provisionales de lo que aún no existe; un registro real anterior se respeta (TryAdd).
@@ -50,6 +52,7 @@ if (modo == ModoDeArranque.Restauracion)
     return resultado.PermiteAbrir ? 0 : 1;
 }
 
+app.UsarCabecerasDeSeguridad();
 app.UsarManejoDeErrores();
 app.UseStaticFiles();
 // Salud para Docker Compose y el reinicio automático (RNF03): sin datos internos, el detalle solo en la red privada.
@@ -57,6 +60,8 @@ app.MapearSalud();
 app.MapDefaultControllerRoute();
 // Una consulta automática (hx-trigger="every …") admite solo GET: si no, el arranque falla (T15).
 ConsultasAutomaticas.Validar(((IEndpointRouteBuilder)app).DataSources.SelectMany(d => d.Endpoints));
+// El contenido de terceros solo se abre en las rutas exactas que le corresponden (T17).
+RutasConContenidoDeTerceros.Validar(((IEndpointRouteBuilder)app).DataSources.SelectMany(d => d.Endpoints));
 
 app.Run();
 return 0;

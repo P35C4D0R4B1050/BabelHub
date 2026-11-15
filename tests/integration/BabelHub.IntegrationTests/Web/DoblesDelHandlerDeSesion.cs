@@ -100,7 +100,8 @@ internal static class AnfitrionConSesion
         HostWeb host = HostWeb.Tienda,
         ModoDeArranque modo = ModoDeArranque.Normal,
         Action<IServiceCollection>? servicios = null,
-        IReadOnlyList<string>? hostsPermitidos = null)
+        IReadOnlyList<string>? hostsPermitidos = null,
+        Action<Microsoft.AspNetCore.Builder.WebApplication>? antesDeLasRutas = null)
     {
         var flujo = new ActorDelFlujo();
         sesiones.LeerActor = () => flujo.Actual;
@@ -118,6 +119,7 @@ internal static class AnfitrionConSesion
                 servicios?.Invoke(s);
             },
             partes: [typeof(ControladorDeSesionDePrueba).Assembly],
+            antesDeLasRutas: antesDeLasRutas,
             despuesDelEnrutado: app => app.UsarSesionWeb());
     }
 

@@ -164,7 +164,7 @@ public sealed class ProteccionContraFalsificacionFilter(
 
     /// <summary>La plantilla de la ruta del endpoint (nunca la dirección con sus valores), siempre con «/» inicial: es lo que el módulo compara con su lista cerrada.</summary>
     internal static string? PlantillaDeLaRuta(HttpContext contexto) =>
-        (contexto.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText is { Length: > 0 } texto ? "/" + texto.TrimStart('/') : null;
+        PlantillasDeRuta.De(contexto.GetEndpoint());
 
     /// <summary>Una ruta declarada <c>[IgnoreAntiforgeryToken]</c> (por ejemplo, el destino de las propias redirecciones de error) no pide token.</summary>
     private static bool SeIgnora(AuthorizationFilterContext context) =>
