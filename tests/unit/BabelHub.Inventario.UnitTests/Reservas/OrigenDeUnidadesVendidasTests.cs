@@ -16,7 +16,7 @@ public sealed class OrigenDeUnidadesVendidasTests
         Origen(e).Ventas(fuente, e.Base.Reloj.Ahora.AddDays(-30), e.Base.Reloj.Ahora);
 
     [Fact]
-    [Trait("Criterio", "AC-FUE-21")]
+    [Trait("Criterio", "AC-FUE-17")]
     public async Task UnaLineaConfirmada_EnElRecojo_SeAtribuyeALaSucursalDeRecojo_AunqueElLibroEsteEnElOrigen()
     {
         var e = Entorno();
@@ -31,7 +31,7 @@ public sealed class OrigenDeUnidadesVendidasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-FUE-21")]
+    [Trait("Criterio", "AC-FUE-17")]
     public async Task UnPedidoADomicilio_SeAtribuyeALaFuenteDeLaLinea()
     {
         var e = Entorno();
@@ -46,7 +46,7 @@ public sealed class OrigenDeUnidadesVendidasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-FUE-22")]
+    [Trait("Criterio", "AC-FUE-18")]
     public async Task UnaLineaCerradaPorEntrega_SigueSiendoUnaVenta()
     {
         var e = Entorno();
@@ -61,7 +61,7 @@ public sealed class OrigenDeUnidadesVendidasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-FUE-22")]
+    [Trait("Criterio", "AC-FUE-18")]
     public async Task ElTrasladoCuentaUnaSolaVez_LaLineaRecreadaEnElDestinoNoEsOtraVenta()
     {
         var e = Entorno();
@@ -84,7 +84,7 @@ public sealed class OrigenDeUnidadesVendidasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-FUE-22")]
+    [Trait("Criterio", "AC-FUE-18")]
     public async Task UnPedidoAnulado_NoEsUnaVenta_NiLaLiberadaNiLaPendienteNiLaExpirada()
     {
         var e = Entorno();
@@ -104,7 +104,7 @@ public sealed class OrigenDeUnidadesVendidasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-FUE-21")]
+    [Trait("Criterio", "AC-FUE-17")]
     public async Task SoloCuentaLaVentanaDeTreintaDias_ConLosDosExtremosIncluidos()
     {
         var e = Entorno();
@@ -125,7 +125,7 @@ public sealed class OrigenDeUnidadesVendidasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-FUE-21")]
+    [Trait("Criterio", "AC-FUE-17")]
     public async Task ConUnaFuente_SoloLasVentasDeEsaFuente()
     {
         var e = Entorno();
@@ -141,7 +141,7 @@ public sealed class OrigenDeUnidadesVendidasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-FUE-21")]
+    [Trait("Criterio", "AC-FUE-17")]
     public async Task DosLineasDeLaMismaEdicionEnUnPedido_SeSumanEnUnaSolaVentaAtribuida()
     {
         var e = Entorno();
@@ -156,7 +156,7 @@ public sealed class OrigenDeUnidadesVendidasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-FUE-21")]
+    [Trait("Criterio", "AC-FUE-17")]
     public async Task UnaVentanaInvertida_SeRechaza()
     {
         var e = Entorno();

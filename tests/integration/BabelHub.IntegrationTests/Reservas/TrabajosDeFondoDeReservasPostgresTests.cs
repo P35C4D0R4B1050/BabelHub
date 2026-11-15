@@ -191,7 +191,7 @@ public sealed class TrabajosDeFondoDeReservasPostgresTests(PostgresDeReservasFix
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEL-35")]
+    [Trait("Criterio", "AC-SEL-08")]
     public async Task LaPurgaDeHuellas_AnulaLaHuellaDeOrigenAPartirDeLas24Horas_SinTocarLoDemas()
     {
         var (lima, libro) = await Escenario();
@@ -214,7 +214,7 @@ public sealed class TrabajosDeFondoDeReservasPostgresTests(PostgresDeReservasFix
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEL-35")]
+    [Trait("Criterio", "AC-SEL-08")]
     public async Task LaPurgaDeRegistros_BorraLasOperacionesIdempotentesA30Dias_YLasBajasConsumidasA30DiasDeLaEntrega_PeroNuncaLasNoConsumidas()
     {
         var (lima, libro) = await Escenario();
@@ -259,7 +259,7 @@ public sealed class TrabajosDeFondoDeReservasPostgresTests(PostgresDeReservasFix
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEL-36")]
+    [Trait("Criterio", "AC-SEL-08")]
     public async Task LaDepuracionDiaria_AnonimizaElClienteA2AñosDeLaUltimaTransicion_ConElMismoIdentificadorDeLaBaja_YNoVuelveACalcularlo()
     {
         var (_, libro) = await Escenario(fisico: 50);
@@ -302,7 +302,7 @@ public sealed class TrabajosDeFondoDeReservasPostgresTests(PostgresDeReservasFix
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEL-36")]
+    [Trait("Criterio", "AC-SEL-08")]
     public async Task LaBajaMarcaLasCabecerasComoAnonimas_YLaDepuracionNoLasVuelveACalcular()
     {
         var (_, libro) = await Escenario();

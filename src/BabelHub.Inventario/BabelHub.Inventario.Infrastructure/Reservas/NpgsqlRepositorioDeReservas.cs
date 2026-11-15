@@ -842,7 +842,7 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
             async (conexion, transaccion, token) =>
             {
                 // Solo cabeceras: las líneas, el stock y lo vendido no se tocan. La unicidad (cliente, clave) se conserva porque la sustitución es inyectiva para un titular.
-                await using var comando = new NpgsqlCommand("UPDATE reservas.reservas SET cliente_id = @anonimo, cliente_anonimizado = true, huella_origen = NULL WHERE cliente_id = @t", conexion, transaccion);
+                await using var comando = new NpgsqlCommand("UPDATE reservas.reservas SET cliente_id = @anonimo, cliente_anonimizado = true, huella_origen = NULL WHERE cliente_id = @t AND NOT cliente_anonimizado", conexion, transaccion);
                 comando.Parameters.AddWithValue("t", titularId);
                 comando.Parameters.AddWithValue("anonimo", identificadorAnonimo);
                 return await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);

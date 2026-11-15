@@ -41,7 +41,7 @@ public static class ClaveDeBajasDelEntorno
         if (generador is not null)
         {
             var clave = configuracion[HmacGeneradorDeIdentificadorAnonimo.Ruta]!;
-            foreach (var seccion in new[] { "Seguridad", "Integraciones", "Auditoria" })
+            foreach (var seccion in new[] { "Seguridad", "Integraciones", "Auditoria", "Restauracion" })
             {
                 foreach (var (ruta, valor) in configuracion.GetSection(seccion).AsEnumerable().Where(p => !string.IsNullOrEmpty(p.Value)))
                 {

@@ -143,6 +143,8 @@ public static class DefinicionDeReservas
         GRANT UPDATE (estado, cerrada_por, traslado_id, recreada_en_destino, confirmada_en, anulada_en, envio_id, estado_cambiado_en) ON reservas.reserva_lineas TO rol_reservas;
         GRANT UPDATE (fecha_expiracion, extendida, reemplazos, cliente_id, huella_origen, cliente_anonimizado) ON reservas.reservas TO rol_reservas;
         GRANT SELECT, INSERT, DELETE ON reservas.operaciones_idempotentes TO rol_reservas;
-        GRANT SELECT, INSERT, UPDATE, DELETE ON reservas.bajas_recibidas TO rol_reservas;
+        GRANT SELECT, INSERT, DELETE ON reservas.bajas_recibidas TO rol_reservas;
+        -- Solo la marca de entrega cambia: el identificador original de la baja no se reescribe.
+        GRANT UPDATE (entregada_a_auditoria_en) ON reservas.bajas_recibidas TO rol_reservas;
         """;
 }

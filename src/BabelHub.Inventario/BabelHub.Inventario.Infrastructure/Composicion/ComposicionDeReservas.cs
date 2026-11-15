@@ -57,7 +57,7 @@ public static class ComposicionDeReservas
         servicios.AddScoped<IReservasParaTraslados, ReservasParaTraslados>();
         servicios.AddScoped<IBajasRecibidas, BajasRecibidasDeReservas>();
         servicios.AddSingleton(sp => new VolumenDeBajasDeTitular(sp.GetRequiredService<IReloj>()));
-        
+
         // La clave de bajas se lee al resolver el generador; el anfitrión la exige al arrancar con ExigirClaveDeBajas (un anfitrión puede registrar el suyo antes).
         servicios.TryAddSingleton<IGeneradorDeIdentificadorAnonimo>(_ => ClaveDeBajasDelEntorno.Cargar(configuracion));
         servicios.AddSingleton(sp => new VolumenDeOperaciones(sp.GetRequiredService<IReloj>()));

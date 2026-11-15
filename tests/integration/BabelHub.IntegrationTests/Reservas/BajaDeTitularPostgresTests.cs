@@ -215,6 +215,25 @@ public sealed class BajaDeTitularPostgresTests(PostgresDeReservasFixture bd) : I
 
     [Fact]
     [Trait("Criterio", "AC-SEL-36")]
+    public async Task UnaBajaConUnIdentificadorYaAnonimo_NoLoVuelveAAnonimizar()
+    {
+        var lima = await bd.AgregarFuente("lima", recepcion: true);
+        var libro = await bd.AgregarEdicion();
+        await bd.PonerStock(lima, libro, 5, 0);
+        using var pila = new PilaDeReservas(bd);
+        var titular = Guid.NewGuid();
+        Assert.True((await pila.Reservar(Cliente(titular), ARecojo("lima", [Linea(libro, 1)]))).EsExito);
+        Assert.True((await Baja(pila, titular)).EsExito);
+        var anonimo = Anonimo(pila, titular);
+
+        // Una baja que llega con el identificador anónimo (un error de quien llama) no cambia lo ya anónimo.
+        Assert.True((await Baja(pila, anonimo)).EsExito);
+
+        Assert.Equal(1L, await bd.Consultar<long>($"SELECT count(*) FROM reservas.reservas WHERE cliente_id = '{anonimo}' AND cliente_anonimizado"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-36")]
     public async Task LasBajasPendientesSeEntreganAAuditoriaYSeMarcan_ConElRolRealDelModulo()
     {
         using var pila = new PilaDeReservas(bd);

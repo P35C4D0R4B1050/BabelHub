@@ -30,7 +30,7 @@ public sealed class OrigenDeUnidadesVendidasPostgresTests(PostgresDeReservasFixt
         pila.Ejecutar<ConfirmarReservasEntrada, ReservaDelPedido>(Servicio, new ConfirmarReservasEntrada(pedido, Guid.NewGuid().ToString("N")));
 
     [Fact]
-    [Trait("Criterio", "AC-FUE-21")]
+    [Trait("Criterio", "AC-FUE-17")]
     public async Task ElAdaptadorRealReemplazaAlNuloDeFuentes()
     {
         using var pila = new PilaDeReservas(bd);
@@ -41,7 +41,7 @@ public sealed class OrigenDeUnidadesVendidasPostgresTests(PostgresDeReservasFixt
     }
 
     [Fact]
-    [Trait("Criterio", "AC-FUE-21")]
+    [Trait("Criterio", "AC-FUE-17")]
     public async Task ElRecojoSeAtribuyeALaSucursal_ADomicilioALaFuente_ConLaVentanaYElFiltro()
     {
         var lima = await bd.AgregarFuente("lima", recepcion: true);
@@ -72,7 +72,7 @@ public sealed class OrigenDeUnidadesVendidasPostgresTests(PostgresDeReservasFixt
     }
 
     [Fact]
-    [Trait("Criterio", "AC-FUE-22")]
+    [Trait("Criterio", "AC-FUE-18")]
     public async Task ElTrasladoDeReposicionNoEsUnaVenta_ElPedidoCuentaUnaSolaVezEnLaSucursalDeRecojo()
     {
         var lima = await bd.AgregarFuente("lima", recepcion: true);

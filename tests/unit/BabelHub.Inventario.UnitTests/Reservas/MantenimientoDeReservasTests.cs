@@ -65,7 +65,7 @@ public sealed class MantenimientoDeReservasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEL-36")]
+    [Trait("Criterio", "AC-SEL-08")]
     public async Task LaDepuracion_AnonimizaConElMismoIdentificadorDeLaBaja_SoloLoQueLleva2AñosQuieto()
     {
         var e = Entorno();
@@ -88,7 +88,7 @@ public sealed class MantenimientoDeReservasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEL-36")]
+    [Trait("Criterio", "AC-SEL-08")]
     public async Task LaDepuracion_EsRepetible_EsAcotada_YNoVuelveACalcularLoYaAnonimo()
     {
         var e = Entorno();
@@ -110,7 +110,7 @@ public sealed class MantenimientoDeReservasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEL-36")]
+    [Trait("Criterio", "AC-SEL-08")]
     public async Task LaDepuracionConUnMaximoInvalido_EsValidacion()
     {
         var e = Entorno();
