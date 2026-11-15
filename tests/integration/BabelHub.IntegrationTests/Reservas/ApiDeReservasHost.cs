@@ -186,7 +186,8 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
         Guid? sucursal = null,
         Guid? usuario = null,
         string? json = null,
-        string? clave = null)
+        string? clave = null,
+        string? origenReenviado = null)
     {
         var solicitud = new HttpRequestMessage(metodo, Raiz + ruta) { Content = json is null ? null : Json(json) };
         if (credencial is not null)
@@ -207,6 +208,11 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
         if (usuario is { } u)
         {
             solicitud.Headers.TryAddWithoutValidation(CabeceraDeUsuario, u.ToString());
+        }
+
+        if (origenReenviado is not null)
+        {
+            solicitud.Headers.TryAddWithoutValidation("X-Origen-Reenviado", origenReenviado);
         }
 
         if (clave is not null)
