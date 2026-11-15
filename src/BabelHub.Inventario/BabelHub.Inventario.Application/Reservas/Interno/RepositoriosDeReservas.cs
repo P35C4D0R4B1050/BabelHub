@@ -68,6 +68,15 @@ public interface IRepositorioDeReservas
     Task<IReadOnlyList<LineaLiberada>> LiberarLineas(Guid pedidoId, bool incluirConfirmadas, IReadOnlyCollection<Guid>? lineaIds, DateTimeOffset ahora, CancellationToken cancelacion = default);
 
     /// <summary>
+    /// Pasa a <b>liberadas</b> exactamente esas líneas de reserva (por su identificador) si siguen pendientes o confirmadas, con una sola sentencia que las bloquea por id y en orden y devuelve solo las que de
+    /// verdad cambiaron. Quien llama ya tomó el bloqueo del pedido y bloqueó las filas de stock.
+    /// </summary>
+    Task<IReadOnlyList<LineaLiberada>> LiberarLineasPorId(IReadOnlyCollection<Guid> lineaDeReservaIds, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>Marca como anulada la venta (<c>anulada_en</c>) de esas líneas cerradas por traslado si todavía no lo estaban; devuelve las que cambiaron (TRA-19). No toca el stock.</summary>
+    Task<IReadOnlyList<LineaLiberada>> AnularVentas(IReadOnlyCollection<Guid> lineaDeReservaIds, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>
     /// Confirma las líneas <b>pendientes no vencidas</b> del pedido con una sola sentencia condicional (las bloquea por id y en orden, repite el vencimiento con <paramref name="ahora"/>) y devuelve solo las que de verdad
     /// cambiaron; si cambió alguna, la cabecera deja de expirar. Quien llama ya tomó el bloqueo del pedido.
     /// </summary>

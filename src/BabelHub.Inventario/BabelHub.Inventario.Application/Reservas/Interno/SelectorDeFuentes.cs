@@ -122,6 +122,17 @@ internal static class ConversionesDeReservas
 {
     public static TipoDeEntrega ADominio(TipoDeEntregaDeReserva tipo) => tipo == TipoDeEntregaDeReserva.Recojo ? TipoDeEntrega.Recojo : TipoDeEntrega.Domicilio;
 
+    public static MotivoDeLiberacion ADominio(MotivoDeLiberacionDeReserva motivo) => motivo switch
+    {
+        MotivoDeLiberacionDeReserva.CheckoutCancelado => MotivoDeLiberacion.CheckoutCancelado,
+        MotivoDeLiberacionDeReserva.PagoVencido => MotivoDeLiberacion.PagoVencido,
+        MotivoDeLiberacionDeReserva.PedidoAnulado => MotivoDeLiberacion.PedidoAnulado,
+        MotivoDeLiberacionDeReserva.CanceladoPorElCliente => MotivoDeLiberacion.CanceladoPorElCliente,
+        MotivoDeLiberacionDeReserva.FallaPosteriorAlPago => MotivoDeLiberacion.FallaPosteriorAlPago,
+        MotivoDeLiberacionDeReserva.NoRecogido => MotivoDeLiberacion.NoRecogido,
+        _ => throw new ArgumentOutOfRangeException(nameof(motivo)),
+    };
+
     public static EstadoDeReserva AContrato(EstadoDeLinea estado) => estado switch
     {
         EstadoDeLinea.Pendiente => EstadoDeReserva.Pendiente,

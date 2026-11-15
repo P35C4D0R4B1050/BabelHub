@@ -215,6 +215,35 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
         return Task.FromResult(!reserva.Extendida && reserva.FechaDeExpiracion is not null && !reserva.EstaVencida(ahora) && reserva.Extender(ahora));
     }
 
+    public Task<IReadOnlyList<LineaLiberada>> LiberarLineasPorId(IReadOnlyCollection<Guid> lineaDeReservaIds, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.LiberarLineasPorId");
+        var liberadas = new List<LineaLiberada>();
+        foreach (var linea in Guardadas.SelectMany(r => r.Lineas).Where(l => lineaDeReservaIds.Contains(l.Id) && l.Estado is EstadoDeLinea.Pendiente or EstadoDeLinea.Confirmada))
+        {
+            var estabaConfirmada = linea.Estado == EstadoDeLinea.Confirmada;
+            var pedido = Guardadas.Single(r => r.Lineas.Contains(linea)).PedidoId;
+            linea.Liberar(ahora);
+            liberadas.Add(new LineaLiberada(pedido, linea.Id, linea.LineaId, linea.EdicionId, linea.FuenteId, linea.Cantidad, linea.TrasladoId, estabaConfirmada));
+        }
+
+        return Task.FromResult<IReadOnlyList<LineaLiberada>>(liberadas);
+    }
+
+    public Task<IReadOnlyList<LineaLiberada>> AnularVentas(IReadOnlyCollection<Guid> lineaDeReservaIds, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.AnularVentas");
+        var anuladas = new List<LineaLiberada>();
+        foreach (var linea in Guardadas.SelectMany(r => r.Lineas).Where(l => lineaDeReservaIds.Contains(l.Id) && l.Estado == EstadoDeLinea.Cerrada && l.CerradaPor == CausaDeCierre.Traslado && l.AnuladaEn is null))
+        {
+            var pedido = Guardadas.Single(r => r.Lineas.Contains(linea)).PedidoId;
+            linea.Anular(ahora);
+            anuladas.Add(new LineaLiberada(pedido, linea.Id, linea.LineaId, linea.EdicionId, linea.FuenteId, linea.Cantidad, linea.TrasladoId, false));
+        }
+
+        return Task.FromResult<IReadOnlyList<LineaLiberada>>(anuladas);
+    }
+
     public Task<PedidosQueApartanUnidades> PedidosQueApartan(Guid fuenteId, Guid edicionId, int maximo, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
         var pedidos = Guardadas
@@ -369,6 +398,8 @@ internal sealed class EntornoDeReservas
 
     public ReservasDeStock ReservasDeStock => new(Reservas, Bloqueos, Auditoria, Sistema, Base.Reloj);
 
+    public DevolucionDeUnidades Devolucion => new(Stock, Auditoria, Autorizador);
+
     public LimitesDeReservar Limites => _limites ??= new(
         new EvaluarLimite(new CatalogoDePoliticas(PoliticasDeSeguridad.Todas), new MotorDeMemoria(Base.Reloj), null, Origen, Eventos, Base.Reloj),
         Eventos,
@@ -404,6 +435,13 @@ internal sealed class EntornoDeReservas
         return reserva;
     }
 
+    public List<(Guid Pedido, MotivoDeLiberacionDeReserva Motivo, IReadOnlyCollection<Guid> Traslados)> Cancelaciones { get; } = [];
+
+    public bool ConReceptores { get; set; } = true;
+
+    public LiberarReservas Liberar() =>
+        new(Autorizador, new ValidadorDeLiberar(), Bloqueos, Reservas, Stock, Devolucion, ConReceptores ? [new ReceptorDeCancelacionDoble(Cancelaciones, Base.Bitacora)] : [], Volumen, new ConstructorDeLaReserva(Directorio), Base.Reloj);
+
     public ExtenderReservas Extender() => new(Autorizador, new ValidadorDeExtender(), Bloqueos, Reservas, new ConstructorDeLaReserva(Directorio), Base.Reloj);
 
     public ExpirarReservasVencidas ExpirarPedido() => new(Autorizador, Bloqueos, Reservas, Stock, Base.Reloj);
@@ -422,7 +460,7 @@ internal sealed class EntornoDeReservas
             Stock,
             new SelectorDeFuentes(Directorio, estrategia ?? new SeleccionPorCercania()),
             new ConstructorDeLaReserva(Directorio),
-            Auditoria,
+            Devolucion,
             Limites,
             Base.Reloj);
 
@@ -438,4 +476,15 @@ internal sealed class EntornoDeReservas
 
     /// <summary>El físico y lo reservado de una pareja, tal como está en la tabla en memoria.</summary>
     public (int Fisico, int Reservado) FilaDe(Fuente fuente, Guid edicionId) => Base.Existencias.Filas[(fuente.Id, edicionId)];
+}
+
+/// <summary>Un receptor de la cancelación de prueba (<c>Traslados</c>): anota lo que recibe y cuándo, para comprobar que se invoca antes de tocar líneas y stock.</summary>
+internal sealed class ReceptorDeCancelacionDoble(List<(Guid Pedido, MotivoDeLiberacionDeReserva Motivo, IReadOnlyCollection<Guid> Traslados)> cancelaciones, BitacoraDeLlamadas bitacora) : IAlLiberarPedido
+{
+    public Task AlLiberar(Guid pedidoId, MotivoDeLiberacionDeReserva motivo, IReadOnlyCollection<Guid> trasladoIds, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("traslados.AlLiberar");
+        cancelaciones.Add((pedidoId, motivo, trasladoIds));
+        return Task.CompletedTask;
+    }
 }

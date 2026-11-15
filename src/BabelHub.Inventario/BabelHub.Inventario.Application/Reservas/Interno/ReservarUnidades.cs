@@ -1,4 +1,3 @@
-using BabelHub.Inventario.Application.Auditoria;
 using BabelHub.Inventario.Application.Fuentes;
 using BabelHub.Inventario.Application.Plataforma;
 using BabelHub.Inventario.Domain.Reservas;
@@ -37,7 +36,7 @@ internal sealed class ReservarUnidades(
     IMovimientosDeStock stock,
     SelectorDeFuentes selector,
     ConstructorDeLaReserva constructor,
-    IAuditoria auditoria,
+    DevolucionDeUnidades devolucion,
     LimitesDeReservar limites,
     IReloj reloj) : ICasoDeUso<ReservarEntrada, ReservaDelPedido>
 {
@@ -154,9 +153,9 @@ internal sealed class ReservarUnidades(
         {
             // La anterior se libera ya con todas las filas bloqueadas (líneas por id, deltas agregados y ordenados) para que su stock cuente como disponible al elegir; si la nueva falla, la transacción la devuelve intacta.
             var liberadas = await reservas.LiberarLineas(entrada.PedidoId, incluirConfirmadas: false, null, ahora, cancelacion).ConfigureAwait(false);
-            if (await DevolverLoLiberado(liberadas, cancelacion).ConfigureAwait(false) is { } falloAlDevolver)
+            if (await devolucion.Devolver(liberadas, "reemplazo", cancelacion).ConfigureAwait(false) is { } falloAlDevolver)
             {
-                return falloAlDevolver;
+                return FallosDeReservas.Fallo<ReservaDelPedido>(falloAlDevolver);
             }
 
             bloqueo = ConLoDevuelto(bloqueo, liberadas);
@@ -206,53 +205,6 @@ internal sealed class ReservarUnidades(
         return Resultado<ReservaDelPedido>.Exito(await constructor.Construir(reserva, esRepeticion: false, cancelacion).ConfigureAwait(false));
     }
 
-    /// <summary>
-    /// Devuelve al vendible las unidades de la reserva reemplazada con <c>Aplicar(0, −c)</c> agregado y ordenado por (edición, fuente), y audita cada línea liberada (<c>ReservaLiberada</c>, causa «reemplazo») en la misma
-    /// transacción: si no se puede auditar, la excepción revierte todo y la anterior sigue intacta (AUD-04).
-    /// </summary>
-    private async Task<Resultado<ReservaDelPedido>?> DevolverLoLiberado(IReadOnlyList<LineaLiberada> liberadas, CancellationToken cancelacion)
-    {
-        var movimientos = liberadas
-            .GroupBy(l => (l.FuenteId, l.EdicionId))
-            .Select(g => new MovimientoDeStock(g.Key.FuenteId, g.Key.EdicionId, 0, -checked(g.Sum(l => l.Cantidad))))
-            .OrderBy(m => m.EdicionId, OrdenDeBloqueo.DeIdentificadores)
-            .ThenBy(m => m.FuenteId, OrdenDeBloqueo.DeIdentificadores);
-
-        foreach (var movimiento in movimientos)
-        {
-            var resultado = await stock.Aplicar(movimiento, cancelacion).ConfigureAwait(false);
-            if (resultado.Resultado == ResultadoDeMovimiento.DeniegadoPorAlcance)
-            {
-                return FallosDeReservas.Fallo<ReservaDelPedido>(await autorizador.DenegadoPorAlcance(cancelacion).ConfigureAwait(false));
-            }
-
-            if (!resultado.Aplicado)
-            {
-                // Devolver lo que esta misma transacción tenía reservado nunca debería fallar: un estado imposible aborta (la transacción se revierte).
-                throw new InvalidOperationException("No se pudo devolver al vendible la reserva reemplazada.");
-            }
-        }
-
-        foreach (var linea in liberadas)
-        {
-            await auditoria.Registrar(
-                new SolicitudDeRegistro(AccionesAuditables.ReservaLiberada)
-                {
-                    ObjetoTipo = "pedido",
-                    ObjetoId = linea.PedidoId.ToString("D"),
-                    SucursalOrigen = linea.FuenteId,
-                    Detalle = new Dictionary<string, string?>
-                    {
-                        ["edicionId"] = linea.EdicionId.ToString("D"),
-                        ["cantidad"] = linea.Cantidad.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                        ["causa"] = "reemplazo",
-                    },
-                },
-                cancelacion).ConfigureAwait(false);
-        }
-
-        return null;
-    }
 
     /// <summary>Las filas bloqueadas tal como quedaron tras devolver lo liberado: lo que la reserva reemplazada apartaba cuenta como vendible para elegir la fuente de la nueva.</summary>
     private static BloqueoDeStock ConLoDevuelto(BloqueoDeStock bloqueo, IReadOnlyList<LineaLiberada> liberadas)

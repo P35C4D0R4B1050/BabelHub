@@ -436,6 +436,88 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
             },
             cancelacion).ConfigureAwait(false);
 
+    public Task<IReadOnlyList<LineaLiberada>> LiberarLineasPorId(IReadOnlyCollection<Guid> lineaDeReservaIds, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(lineaDeReservaIds);
+        if (lineaDeReservaIds.Count == 0)
+        {
+            return Task.FromResult<IReadOnlyList<LineaLiberada>>([]);
+        }
+
+        return acceso.Ejecutar<IReadOnlyList<LineaLiberada>>(
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand(
+                    """
+                    WITH candidatas AS (
+                        SELECT l.id, l.estado AS estado_previo
+                        FROM reservas.reserva_lineas l
+                        WHERE l.id = ANY(@ids) AND l.estado IN ('pendiente', 'confirmada')
+                        ORDER BY l.id
+                        FOR UPDATE OF l
+                    )
+                    UPDATE reservas.reserva_lineas AS u
+                    SET estado = 'liberada', estado_cambiado_en = @ahora
+                    FROM candidatas c
+                    WHERE u.id = c.id AND u.estado = c.estado_previo
+                    RETURNING u.pedido_id, u.id, u.linea_id, u.edicion_id, u.fuente_id, u.cantidad, u.traslado_id, c.estado_previo = 'confirmada'
+                    """,
+                    conexion,
+                    transaccion);
+                comando.Parameters.AddWithValue("ids", lineaDeReservaIds.ToArray());
+                comando.Parameters.Add(new NpgsqlParameter("ahora", NpgsqlDbType.TimestampTz) { Value = ahora.ToUniversalTime() });
+                return await LeerLiberadas(comando, token).ConfigureAwait(false);
+            },
+            cancelacion);
+    }
+
+    public Task<IReadOnlyList<LineaLiberada>> AnularVentas(IReadOnlyCollection<Guid> lineaDeReservaIds, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(lineaDeReservaIds);
+        if (lineaDeReservaIds.Count == 0)
+        {
+            return Task.FromResult<IReadOnlyList<LineaLiberada>>([]);
+        }
+
+        return acceso.Ejecutar<IReadOnlyList<LineaLiberada>>(
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand(
+                    """
+                    WITH candidatas AS (
+                        SELECT l.id
+                        FROM reservas.reserva_lineas l
+                        WHERE l.id = ANY(@ids) AND l.estado = 'cerrada' AND l.cerrada_por = 'traslado' AND l.anulada_en IS NULL
+                        ORDER BY l.id
+                        FOR UPDATE OF l
+                    )
+                    UPDATE reservas.reserva_lineas AS u
+                    SET anulada_en = @ahora
+                    FROM candidatas c
+                    WHERE u.id = c.id AND u.anulada_en IS NULL
+                    RETURNING u.pedido_id, u.id, u.linea_id, u.edicion_id, u.fuente_id, u.cantidad, u.traslado_id, false
+                    """,
+                    conexion,
+                    transaccion);
+                comando.Parameters.AddWithValue("ids", lineaDeReservaIds.ToArray());
+                comando.Parameters.Add(new NpgsqlParameter("ahora", NpgsqlDbType.TimestampTz) { Value = ahora.ToUniversalTime() });
+                return await LeerLiberadas(comando, token).ConfigureAwait(false);
+            },
+            cancelacion);
+    }
+
+    private static async Task<IReadOnlyList<LineaLiberada>> LeerLiberadas(NpgsqlCommand comando, CancellationToken cancelacion)
+    {
+        var lineas = new List<LineaLiberada>();
+        await using var lector = await comando.ExecuteReaderAsync(cancelacion).ConfigureAwait(false);
+        while (await lector.ReadAsync(cancelacion).ConfigureAwait(false))
+        {
+            lineas.Add(new LineaLiberada(lector.GetGuid(0), lector.GetGuid(1), lector.GetGuid(2), lector.GetGuid(3), lector.GetGuid(4), lector.GetInt32(5), lector.IsDBNull(6) ? null : lector.GetGuid(6), lector.GetBoolean(7)));
+        }
+
+        return [.. lineas.OrderBy(l => l.EdicionId, OrdenDeBloqueo.DeIdentificadores).ThenBy(l => l.FuenteId, OrdenDeBloqueo.DeIdentificadores).ThenBy(l => l.LineaDeReservaId, OrdenDeBloqueo.DeIdentificadores)];
+    }
+
     public Task<PedidosQueApartanUnidades> PedidosQueApartan(Guid fuenteId, Guid edicionId, int maximo, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(maximo);
