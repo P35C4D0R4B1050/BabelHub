@@ -1,5 +1,7 @@
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Application.Web;
+using BabelHub.Ecommerce.Infrastructure.Plataforma;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BabelHub.Ecommerce.Api.Web;
 
@@ -119,6 +121,9 @@ public static class TokenDelUsuarioDeLaSesionExtensiones
         ArgumentNullException.ThrowIfNull(servicios);
         servicios.AddHttpContextAccessor();
         servicios.AddSingleton<ITokenDelUsuarioDeLaSesion, HttpTokenDelUsuarioDeLaSesion>();
+        // Todo cliente HTTP hacia otro servicio pone el token de la sesión en sus operaciones de usuario (el manejador va primero en la cadena).
+        servicios.TryAddTransient<TokenDelUsuarioDeSalidaHandler>();
+        servicios.ConfigureHttpClientDefaults(cliente => cliente.AddHttpMessageHandler<TokenDelUsuarioDeSalidaHandler>());
         return servicios;
     }
 }

@@ -20,8 +20,8 @@ builder.Services.AddSingleton(typeof(ModoDeArranque), modo);
 builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("ECO"));
 builder.Services.AddSingleton<EjecutorDePasosDeRestauracion>();
 builder.Services.AgregarInterfazWeb();
-// El host de este proceso (tienda o gestion) decide qué áreas se mapean (D03); en producción su variable y los hosts permitidos son obligatorios.
-builder.Services.AgregarHostWeb(OpcionesDelHostWeb.Leer(builder.Configuration, builder.Environment.IsProduction()));
+// El host de este proceso (tienda o gestion) decide qué áreas se mapean (D03). TODO de composición: pasar esProduccion cuando los Compose entreguen BABELHUB__Web__Host y HostsPermitidos (hoy el servicio real aún no sirve sesiones).
+builder.Services.AgregarHostWeb(OpcionesDelHostWeb.Leer(builder.Configuration, esProduccion: false));
 // El token del usuario sale de la sesión de la solicitud y solo lo consume el manejador de salida (T14, regla 9).
 builder.Services.AgregarTokenDelUsuarioDeLaSesion();
 // Antiforgery global, Origin y Sec-Fetch-Site y captura del borrador (T16); las claves de Data Protection las compone quien conecte la base (T12).
@@ -34,6 +34,13 @@ builder.Services.AgregarModuloWeb(permitirVersionesProvisionales: !builder.Envir
 builder.Services.AgregarCatalogoPendiente();
 builder.Services.AgregarBibliotecaPendiente();
 builder.Services.AddControllersWithViews();
+// Detrás del borde la aplicación recibe HTTP: solo se toma el esquema (X-Forwarded-Proto) para que las cookies __Host- y el antiforgery vean HTTPS. El Api solo es alcanzable desde la red del borde (SEG-17); la lista de proxies conocidos queda para la composición.
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
+    o.KnownIPNetworks.Clear();
+    o.KnownProxies.Clear();
+});
 
 var app = builder.Build();
 ArranqueSeguro.ExigirCoherencia(modo, builder.Environment.IsProduction(), app.Services.GetServices<IAdaptadorSaliente>());
@@ -52,6 +59,7 @@ if (modo == ModoDeArranque.Restauracion)
     return resultado.PermiteAbrir ? 0 : 1;
 }
 
+app.UseForwardedHeaders();
 app.UsarCabecerasDeSeguridad();
 app.UsarManejoDeErrores();
 app.UseStaticFiles();

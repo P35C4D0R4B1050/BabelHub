@@ -20,11 +20,11 @@ public sealed class ReglasDelTokenDelUsuarioTests
 
     [Fact]
     [Trait("Criterio", "AC-WEB-03")]
-    public void En_la_Infraestructura_solo_lo_consume_el_manejador_de_salida_de_Plataforma()
+    public void En_la_Infraestructura_solo_lo_consume_el_manejador_del_token_de_salida_de_Plataforma()
     {
         var dependientes = Dependientes("BabelHub.Ecommerce.Infrastructure");
 
-        Assert.Equal(["BabelHub.Ecommerce.Infrastructure.Plataforma.CredencialesDeSalidaHandler"], dependientes);
+        Assert.Equal(["BabelHub.Ecommerce.Infrastructure.Plataforma.TokenDelUsuarioDeSalidaHandler"], dependientes);
     }
 
     [Fact]
