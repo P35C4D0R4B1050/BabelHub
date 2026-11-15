@@ -301,6 +301,28 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
         return Task.CompletedTask;
     }
 
+    public Task<bool> MarcarRecreadaEnDestino(Guid lineaDeReservaId, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.MarcarRecreadaEnDestino");
+        var linea = Guardadas.SelectMany(r => r.Lineas).SingleOrDefault(l => l.Id == lineaDeReservaId);
+        if (linea is not { Estado: EstadoDeLinea.Cerrada, CerradaPor: CausaDeCierre.Traslado, RecreadaEnDestino: false, AnuladaEn: null })
+        {
+            return Task.FromResult(false);
+        }
+
+        linea.MarcarRecreadaEnDestino();
+        return Task.FromResult(true);
+    }
+
+    public Task InsertarLineaDeTraslado(Guid reservaId, Guid pedidoId, LineaDeReserva linea, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.InsertarLineaDeTraslado");
+        var reserva = Guardadas.Single(r => r.Id == reservaId);
+        Guardadas[Guardadas.IndexOf(reserva)] = ReservaDePedido.Rehidratar(
+            reserva.Id, reserva.PedidoId, reserva.ClienteId, reserva.TipoDeEntrega, reserva.SucursalDeRecojoId, reserva.RegionDeEntrega, reserva.IniciadaEn, reserva.FechaDeExpiracion, reserva.Extendida, reserva.Reemplazos, [.. reserva.Lineas, linea]);
+        return Task.CompletedTask;
+    }
+
     public Task<PedidosQueApartanUnidades> PedidosQueApartan(Guid fuenteId, Guid edicionId, int maximo, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
         var pedidos = Guardadas
@@ -504,6 +526,8 @@ internal sealed class EntornoDeReservas
     public ConsultarReserva ConsultarReserva() => new(Autorizador, new ValidadorDeConsultarReserva(), Reservas, new ConstructorDeLaReserva(Directorio), Base.Reloj);
 
     public CerrarReservas Cerrar() => new(Autorizador, new ValidadorDeCerrar(), Bloqueos, Reservas, Stock, Auditoria, Base.Reloj);
+
+    public ReservasParaTraslados ParaTraslados() => new(Bloqueos, Reservas, Stock, Base.Reloj);
 
     public ExtenderReservas Extender() => new(Autorizador, new ValidadorDeExtender(), Bloqueos, Reservas, new ConstructorDeLaReserva(Directorio), Base.Reloj);
 

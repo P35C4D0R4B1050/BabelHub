@@ -103,6 +103,12 @@ public interface IRepositorioDeReservas
     /// </summary>
     Task BloquearLineas(IReadOnlyCollection<Guid> lineaDeReservaIds, CancellationToken cancelacion = default);
 
+    /// <summary>Marca como recreada en el destino la línea cerrada por traslado (con una sentencia condicional: solo si lo está, no estaba recreada y su venta no se anuló). Devuelve si cambió algo.</summary>
+    Task<bool> MarcarRecreadaEnDestino(Guid lineaDeReservaId, CancellationToken cancelacion = default);
+
+    /// <summary>Inserta la línea que un traslado crea ya confirmada en el destino (misma línea del pedido, otra fuente) en la cabecera dada.</summary>
+    Task InsertarLineaDeTraslado(Guid reservaId, Guid pedidoId, LineaDeReserva linea, CancellationToken cancelacion = default);
+
     /// <summary>
     /// Confirma las líneas <b>pendientes no vencidas</b> del pedido con una sola sentencia condicional (las bloquea por id y en orden, repite el vencimiento con <paramref name="ahora"/>) y devuelve solo las que de verdad
     /// cambiaron; si cambió alguna, la cabecera deja de expirar. Quien llama ya tomó el bloqueo del pedido.

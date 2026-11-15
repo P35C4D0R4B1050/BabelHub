@@ -653,6 +653,57 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
             cancelacion);
     }
 
+    public Task<bool> MarcarRecreadaEnDestino(Guid lineaDeReservaId, CancellationToken cancelacion = default) =>
+        acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand(
+                    "UPDATE reservas.reserva_lineas SET recreada_en_destino = true WHERE id = @id AND estado = 'cerrada' AND cerrada_por = 'traslado' AND NOT recreada_en_destino AND anulada_en IS NULL",
+                    conexion,
+                    transaccion);
+                comando.Parameters.AddWithValue("id", lineaDeReservaId);
+                return await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false) == 1;
+            },
+            cancelacion);
+
+    public Task InsertarLineaDeTraslado(Guid reservaId, Guid pedidoId, LineaDeReserva linea, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(linea);
+
+        return acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                try
+                {
+                    await using var comando = new NpgsqlCommand(
+                        """
+                        INSERT INTO reservas.reserva_lineas
+                            (id, linea_id, reserva_id, pedido_id, edicion_id, fuente_id, cantidad, estado, traslado_id, creada_por_traslado, recreada_en_destino, confirmada_en, estado_cambiado_en)
+                        VALUES (@id, @linea, @reserva, @pedido, @edicion, @fuente, @cantidad, 'confirmada', @traslado, true, false, @confirmada, @cambiada)
+                        """,
+                        conexion,
+                        transaccion);
+                    comando.Parameters.AddWithValue("id", linea.Id);
+                    comando.Parameters.AddWithValue("linea", linea.LineaId);
+                    comando.Parameters.AddWithValue("reserva", reservaId);
+                    comando.Parameters.AddWithValue("pedido", pedidoId);
+                    comando.Parameters.AddWithValue("edicion", linea.EdicionId);
+                    comando.Parameters.AddWithValue("fuente", linea.FuenteId);
+                    comando.Parameters.AddWithValue("cantidad", linea.Cantidad);
+                    comando.Parameters.Add(new NpgsqlParameter("traslado", NpgsqlDbType.Uuid) { Value = (object?)linea.TrasladoId ?? DBNull.Value });
+                    comando.Parameters.Add(new NpgsqlParameter("confirmada", NpgsqlDbType.TimestampTz) { Value = linea.ConfirmadaEn is { } c ? c.ToUniversalTime() : DBNull.Value });
+                    comando.Parameters.Add(new NpgsqlParameter("cambiada", NpgsqlDbType.TimestampTz) { Value = linea.EstadoCambiadoEn.ToUniversalTime() });
+                    await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                    return 0;
+                }
+                catch (PostgresException ex) when (ex.SqlState == ViolacionDeUnicidad)
+                {
+                    throw new ReservaDuplicadaException(ex);
+                }
+            },
+            cancelacion);
+    }
+
     public Task<PedidosQueApartanUnidades> PedidosQueApartan(Guid fuenteId, Guid edicionId, int maximo, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(maximo);

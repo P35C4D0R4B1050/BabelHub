@@ -53,6 +53,7 @@ public static class ComposicionDeReservas
         servicios.AddScoped(sp => new SelectorDeFuentes(sp.GetRequiredService<IDirectorioDeFuentes>(), sp.GetRequiredService<IEstrategiaDeSeleccion>()));
         servicios.AddScoped<ConstructorDeLaReserva>();
         servicios.AddScoped<DevolucionDeUnidades>();
+        servicios.AddScoped<IReservasParaTraslados, ReservasParaTraslados>();
         servicios.AddSingleton(sp => new VolumenDeOperaciones(sp.GetRequiredService<IReloj>()));
         servicios.AddScoped(sp => new AlertasDeVolumenDeReservas(sp.GetRequiredService<VolumenDeOperaciones>(), sp.GetRequiredService<IAlertas>()));
         servicios.TryAddScoped<IGeneradorDeTrasladosDePedido, NuloGeneradorDeTrasladosDePedido>();
