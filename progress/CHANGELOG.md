@@ -2,10 +2,22 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-15 — SEG-C, IDE-1, INV-2a/2b/2c y WEB-1e (fundidos a `main`)
+
+### Cubierto
+- **Carril A:** SEG-C (T27b y T29): `transversal-seguridad` queda con sus 30 tareas, pendiente de `spec-verify`; IDE-1 (T01–T10 de `identidad-seguridad`): Dominio de contraseñas con Argon2id, usuario y cuatro roles, TOTP y códigos de respaldo, desafío y renovación opaca, código de un solo uso, aceptación de textos y consentimiento de WhatsApp, solicitudes sobre datos y calendario hábil, cancelación diferida, dispositivos y cambio de correo, ciclo de vida de la clave de firma.
+- **Carril B:** `inventario-seleccion-fuente` T01–T27 (INV-2a, 2b y 2c): estrategia de selección de la fuente más cercana, reserva atómica sobre stock bloqueado, esquema con restricciones, repositorios PostgreSQL, prueba de concurrencia sin sobreventa ni interbloqueos, idempotencia, límites dentro de la transacción, reemplazo con tope de tres, confirmar, extender, liberar, cerrar, consulta previa, puertos para traslados y cancelación de cuenta, bajas de titular con identificador anónimo, trabajos de fondo con actor de sistema y endpoints. Faltan INV-2d (T28–T33).
+- **Carril C:** `web-base` WEB-1e (T36–T39): política de acceso con textos pendientes, middleware con validación de arranque, pantalla mínima de aceptación e integración con la sesión real.
+- Integración: dos choques de arquitectura entre carriles resueltos en `main` sin debilitar reglas (el manejador del token de salida y el fijador de actor); se quitó una excepción provisoria a `ReglasDelTokenDelUsuarioTests`.
+- Validación de la fusión: unitarias 1812 y 1917, arquitectura 173, SpecCheck 23, CoverageCheck 12, **integración 3645 de 3645**, gitleaks limpio. Tareas hechas de las specs planificadas: 178 de 347.
+
+### Pendiente
+- Decisión de negocio sobre el tope de unidades por reserva (100 por línea, 50 líneas); un bloque de composición de los `Program.cs`; motivos de alerta que faltan; las nueve specs sin plan (carrito y checkout, pagos, pedidos, biblioteca digital, envíos, devoluciones, reclamaciones, asistente e índice infinito).
+
 ## 2026-11-15 — AUD-5 cierra `transversal-auditoria` (fundido a `main`)
 
 ### Cubierto
-- **Carril A:** T21 y T28–T31: DTOs y constantes de auditoría en `Shared` (D18: el catálogo de contratos añade 4 operaciones del E-commerce y cambia los tipos de 3 del Inventario), endpoints de los dos servicios, un único punto que registra el acceso denegado, presentador de la web, prueba de punta a punta con los dos servicios y PostgreSQL real, y documentación. Redactor con el hash de sesión y el cuerpo de un borrador; el cliente de auditoría ya no consume el token del usuario directamente. **`transversal-auditoria` queda con sus 44 tareas marcadas** (falta `spec-verify` y la composición en cada `Program.cs`, hallazgo Importante abierto).
+- **Carril A:** T21 y T28–T31: DTOs y constantes de auditoría en `Shared` (D18: el catálogo de contratos añade 4 operaciones del E-commerce y cambia los tipos de 3 del Inventario), endpoints de los dos servicios, un único punto que registra el acceso denegado, presentador de la web, prueba de punta a punta con los dos servicios y PostgreSQL real, y documentación. Redactor con el hash de sesión y el cuerpo de un borrador; el cliente de auditoría ya no consume el token del usuario directamente. **`transversal-auditoria` queda con sus 31 tareas marcadas** (falta `spec-verify` y la composición en cada `Program.cs`, hallazgo Importante abierto).
 - `transversal-seguridad` T27b y T29 quedan desbloqueadas (bloque SEG-C).
 - Validación de la fusión: unitarias 1572 y 1507, arquitectura 169, SpecCheck 23, CoverageCheck 12, integración 3195 de 3198 (los 3 fallos eran del avance de A, ya corregidos y comprobados: auditoría 280/280), gitleaks limpio.
 

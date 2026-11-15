@@ -12,10 +12,10 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **AUD-1** | `transversal-auditoria`: Dominio (detalle seguro, catálogo de acciones, actor, anonimización, alertas, acumulado de límites) | T01–T06 | C | — | ☑ |
 | **AUD-2** | Contratos de registro, consulta y alerta, puertos de Identidad y Reservas y los catálogos de acciones | T07, T08, T09, T11–T16 | C | AUD-1 | ☑ |
 | **AUD-3** | Implementación de los puertos de `Plataforma`, consultas unificadas, agrupar y enviar alertas, depuración y bajas del Inventario | T10, T17–T20 | C | AUD-2 | ☑ |
-| **SEG-C** | Cierre de `transversal-seguridad`: T27b y T29 (acumulador persistente) y `spec-verify` | T27b, T29 | C | AUD-3 (T10, T18) | ☐ (desbloqueado: AUD-3 ya está en `main`) |
+| **SEG-C** | Cierre de `transversal-seguridad`: T27b y T29 (acumulador persistente) y `spec-verify` | T27b, T29 | C | AUD-3 (T10, T18) | ☑ (30/30 tareas; falta `spec-verify` en FIN-1, que debe comprobar el tope de 24 correos con el adaptador de Identidad) |
 | **AUD-4** | Migraciones, roles, función de depuración, repositorios de solo inserción, cliente del Inventario, trabajos de fondo | T21–T27 | C | AUD-3 | ☑ (T21 hecha en AUD-5 con el catálogo de contratos ampliado, D18) |
 | **AUD-5** | Endpoints, contrato web, integración de punta a punta y documentación | T28–T31 | E | AUD-4 | ☑ (con T21; `transversal-auditoria` queda con todas las tareas marcadas, falta `spec-verify` en FIN-1 y componer la auditoría en cada `Program.cs`, hallazgo Importante abierto) |
-| **IDE-1** | `identidad-seguridad`: Dominio (contraseñas, usuario y roles, segundo factor, desafío, códigos, textos, solicitudes, cancelación, marcas, clave de firma) | T01–T10 | C | — (puede ir en paralelo a AUD-1) | ☐ |
+| **IDE-1** | `identidad-seguridad`: Dominio (contraseñas, usuario y roles, segundo factor, desafío, códigos, textos, solicitudes, cancelación, marcas, clave de firma) | T01–T10 | C | — (puede ir en paralelo a AUD-1) | ☑ (AC-IDE-14, 17 y 38 solo con su parte de Dominio; hallazgo Importante) |
 | **IDE-2** | Contratos de correo y de cliente del Inventario en `Plataforma` y contrato público de Identidad | T11, T12, T13 | C | IDE-1, AUD-2 | ☐ |
 | **IDE-3** | Registro, ingreso en dos pasos, sesiones y recuperación | T14–T17 | C | IDE-2 | ☐ |
 | **IDE-4** | Cuenta del cliente, administración de usuarios, cambio de correo, solicitudes de datos, cancelación (solicitud) | T18–T22 | C | IDE-3 | ☐ |
@@ -40,9 +40,9 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **INV-1a** | `inventario-fuentes` T01–T08: piezas de Plataforma (`IBloqueosAsesores`, `ReintentoPorInterbloqueo`, alcance de datos por transacción) y Dominio | C | INV-0; ECO-0; `transversal-auditoria` T07/T08/T12 (AUD-2) | ☑ |
 | **INV-1b** | `inventario-fuentes` T09–T16: Aplicación (fuentes, rutas, existencias, `IMovimientosDeStock`, puertos) | C | INV-1a | ☑ |
 | **INV-1c** | `inventario-fuentes` T17–T25: Infraestructura (RLS, migraciones), Api y pruebas. **Riesgo a cubrir (hallazgo del 2026-11-14 en `progress/hallazgos.md`):** el alcance de datos por transacción falla cerrado, así que sin actor (llamadas de servicio, trabajos de fondo, migraciones) las políticas de `stock` deniegan y devuelven 0 filas sin error; la Api y los trabajos deben fijar un actor explícito (integración o sistema), con pruebas contra PostgreSQL con el rol real | C | INV-1b | ☑ |
-| **INV-2a** | `inventario-seleccion-fuente` T01–T10 y T19: Plataforma, Dominio, contrato, reservar, expiración compartida y primera prueba de concurrencia | C | INV-1c | ☐ |
-| **INV-2b** | `inventario-seleccion-fuente` T11–T18: idempotencia, límites, reemplazo, confirmar, extender, liberar, cerrar y consulta | C | INV-2a | ☐ |
-| **INV-2c** | `inventario-seleccion-fuente` T20–T27: puertos para otros módulos, receptores de la cancelación, trabajos de fondo y Api | C | INV-2b | ☐ |
+| **INV-2a** | `inventario-seleccion-fuente` T01–T10 y T19: Plataforma, Dominio, contrato, reservar, expiración compartida y primera prueba de concurrencia | C | INV-1c | ☑ |
+| **INV-2b** | `inventario-seleccion-fuente` T11–T18: idempotencia, límites, reemplazo, confirmar, extender, liberar, cerrar y consulta | C | INV-2a | ☑ |
+| **INV-2c** | `inventario-seleccion-fuente` T20–T27: puertos para otros módulos, receptores de la cancelación, trabajos de fondo y Api | C | INV-2b | ☑ |
 | **INV-2d** | `inventario-seleccion-fuente` T28–T33: pruebas de integración y documentación (T32 y T33 de nivel E) | C/E | INV-2c | ☐ |
 | **INV-3a** | `inventario-ajustes` T01–T09: Dominio y Aplicación | C | INV-1c, INV-2c | ☐ |
 | **INV-3b** | `inventario-ajustes` T10–T18: Infraestructura, depuración de 2 años, Api, concurrencia | C | INV-3a; AUD-4 (conexión de depuración) | ☐ |
@@ -60,7 +60,7 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **WEB-1a** | `web-base` T01–T09: módulo `Web`, Dominio (sesión, borrador, áreas) y Aplicación | C | WEB-1d (T21); dobles de Identidad, Auditoría y Catálogo | ☑ |
 | **WEB-1b** | `web-base` T10–T15: Infraestructura de sesión, cifrado por host, token del usuario y cookie | C | WEB-1a; `ITokenDelUsuarioDeLaSesion` en `Application.Plataforma` (carril A, ya en main). T10–T15 hechas | ☑ |
 | **WEB-1c** | `web-base` T16–T20: antiforgery, cabeceras y CSP, filtros de área y paso pendiente, pruebas de sesión y rutas | C | WEB-1b | ☑ |
-| **WEB-1e** | `web-base` T36–T39 | C | WEB-1c | ☐ |
+| **WEB-1e** | `web-base` T36–T39 | C | WEB-1c | ☑ |
 | **WEB-2** | `web-base` T28–T31: pantallas de ingreso, registro, recuperación, cuenta, administración, auditoría y alertas | C | IDE-3 a IDE-5, AUD-3 | ☐ |
 | **WEB-4** | `web-base` T32–T35: E2E multinavegador y móvil, axe, rendimiento y usabilidad | E/C | pantallas de catálogo y compra | ☐ |
 | **ECO-2a** | `ecommerce-catalogo` T01–T06: Dominio (ISBN, obra y ediciones, licencia, archivos), contratos y puertos | C | — | ☐ |
