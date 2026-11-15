@@ -188,14 +188,15 @@ public sealed class DenegacionDeAccesoTests
 
     [Fact]
     [Trait("Criterio", "AC-AUD-10")]
-    public async Task Un_motivo_fuera_del_catalogo_no_interrumpe_el_rechazo_y_deja_una_alerta()
+    public async Task Un_motivo_fuera_del_catalogo_no_pierde_el_evento_ni_deja_una_alerta_falsa_y_se_registra_con_el_motivo_general()
     {
         var entorno = new Entorno();
 
         await entorno.Solicitud().Registrar(new DenegacionDeAcceso("motivo-inventado-por-un-modulo", "/api/ecommerce/v1/biblioteca"));
 
-        Assert.Empty(entorno.Escritor.Registros);
-        Assert.Single(entorno.Alertas.Alertas);
+        var registro = Assert.Single(entorno.Escritor.Registros);
+        Assert.Equal(DenegacionDeAccesoDeAplicacion.MotivoPorOmision, registro.Motivo);
+        Assert.Empty(entorno.Alertas.Alertas);
     }
 
     [Fact]
