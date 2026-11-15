@@ -126,6 +126,12 @@ public interface IRepositorioDeReservas
 
     /// <summary>Hasta <paramref name="maximo"/> pedidos que apartan unidades de la pareja (líneas pendientes no vencidas o confirmadas) y el total de pedidos, solo identificadores (AJU-06).</summary>
     Task<PedidosQueApartanUnidades> PedidosQueApartan(Guid fuenteId, Guid edicionId, int maximo, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Las unidades vendidas con la confirmación entre <paramref name="desde"/> y <paramref name="hasta"/> (los dos extremos incluidos): líneas confirmadas o cerradas por cualquier causa, creadas por la venta (no por un traslado) y
+    /// no anuladas, atribuidas a la sucursal de recojo en el recojo y a la fuente de la línea a domicilio, sumadas por pedido, edición y fuente (FUE-21, FUE-22). Con <paramref name="fuenteId"/> nulo, las de toda la red. Solo lee, sin bloquear.
+    /// </summary>
+    Task<IReadOnlyList<VentaAtribuida>> VentasAtribuidas(Guid? fuenteId, DateTimeOffset desde, DateTimeOffset hasta, CancellationToken cancelacion = default);
 }
 
 /// <summary>Las claves simbólicas de los fallos del módulo; la Api las traduce a los códigos <c>INV-…</c> de <c>Shared</c> (D11).</summary>

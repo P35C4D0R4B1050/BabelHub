@@ -135,8 +135,8 @@ public sealed class ComposicionDeFuentesTests
     {
         using var proveedor = Construir();
 
-        // Reservas ya existe (su adaptador real vive en la Aplicación): olvidar AgregarModuloReservas dejaría un subconteo silencioso de stock, así que producción falla al arrancar.
-        Assert.Equal(["IReservasDeStock"], ComposicionDeFuentes.AdaptadoresNulosConModuloReal(proveedor));
+        // Reservas ya existe (sus adaptadores reales viven en la Aplicación: el de stock y, desde T21, el de unidades vendidas): olvidar AgregarModuloReservas dejaría un subconteo silencioso, así que producción falla al arrancar.
+        Assert.Equal(["IReservasDeStock", "IOrigenDeUnidadesVendidas"], ComposicionDeFuentes.AdaptadoresNulosConModuloReal(proveedor));
         Assert.Throws<InvalidOperationException>(() => ComposicionDeFuentes.ExigirAdaptadoresReales(proveedor, esProduccion: true));
         ComposicionDeFuentes.ExigirAdaptadoresReales(proveedor, esProduccion: false);
     }

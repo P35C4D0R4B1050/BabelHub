@@ -48,6 +48,7 @@ public static class ComposicionDeReservas
 
         // El adaptador real reemplaza al nulo de Fuentes, venga antes o después en el registro.
         servicios.Replace(ServiceDescriptor.Scoped<IReservasDeStock, ReservasDeStock>());
+        servicios.Replace(ServiceDescriptor.Scoped<IOrigenDeUnidadesVendidas, OrigenDeUnidadesVendidas>());
 
         servicios.AddScoped(sp => new AutorizadorDeReservas(sp.GetRequiredService<IActorActual>(), sp.GetRequiredService<IDenegacionDeAcceso>()));
         servicios.AddScoped(sp => new SelectorDeFuentes(sp.GetRequiredService<IDirectorioDeFuentes>(), sp.GetRequiredService<IEstrategiaDeSeleccion>()));

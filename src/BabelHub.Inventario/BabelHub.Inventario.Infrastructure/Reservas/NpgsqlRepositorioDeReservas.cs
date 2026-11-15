@@ -765,6 +765,42 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
             cancelacion);
     }
 
+    public Task<IReadOnlyList<VentaAtribuida>> VentasAtribuidas(Guid? fuenteId, DateTimeOffset desde, DateTimeOffset hasta, CancellationToken cancelacion = default) =>
+        acceso.Ejecutar<IReadOnlyList<VentaAtribuida>>(
+            async (conexion, transaccion, token) =>
+            {
+                // La sucursal de recojo recibe la venta aunque la línea siga en el origen o en tránsito; a domicilio, la fuente de la línea. Una línea creada por un traslado o anulada no es una venta.
+                await using var comando = new NpgsqlCommand(
+                    """
+                    SELECT pedido_id, edicion_id, fuente_atribuida, sum(cantidad)::integer
+                    FROM (
+                        SELECT l.pedido_id, l.edicion_id, l.cantidad,
+                               CASE WHEN r.tipo_entrega = 'recojo' THEN r.sucursal_recojo_id ELSE l.fuente_id END AS fuente_atribuida
+                        FROM reservas.reserva_lineas l JOIN reservas.reservas r ON r.id = l.reserva_id
+                        WHERE l.estado IN ('confirmada', 'cerrada') AND l.creada_por_traslado = false AND l.anulada_en IS NULL
+                          AND l.confirmada_en >= @desde AND l.confirmada_en <= @hasta
+                    ) v
+                    WHERE @fuente::uuid IS NULL OR fuente_atribuida = @fuente
+                    GROUP BY pedido_id, edicion_id, fuente_atribuida
+                    ORDER BY pedido_id, edicion_id, fuente_atribuida
+                    """,
+                    conexion,
+                    transaccion);
+                comando.Parameters.Add(new NpgsqlParameter("desde", NpgsqlDbType.TimestampTz) { Value = desde.ToUniversalTime() });
+                comando.Parameters.Add(new NpgsqlParameter("hasta", NpgsqlDbType.TimestampTz) { Value = hasta.ToUniversalTime() });
+                comando.Parameters.Add(new NpgsqlParameter("fuente", NpgsqlDbType.Uuid) { Value = fuenteId.HasValue ? fuenteId.Value : DBNull.Value });
+
+                var ventas = new List<VentaAtribuida>();
+                await using var lector = await comando.ExecuteReaderAsync(token).ConfigureAwait(false);
+                while (await lector.ReadAsync(token).ConfigureAwait(false))
+                {
+                    ventas.Add(new VentaAtribuida(lector.GetGuid(0), lector.GetGuid(1), lector.GetGuid(2), lector.GetInt32(3)));
+                }
+
+                return ventas;
+            },
+            cancelacion);
+
     private static async Task<IReadOnlyList<LineaVencida>> LeerVencidas(NpgsqlCommand comando, CancellationToken cancelacion)
     {
         var lineas = new List<LineaVencida>();

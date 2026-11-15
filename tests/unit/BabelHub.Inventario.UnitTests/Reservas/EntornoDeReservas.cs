@@ -334,6 +334,21 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
         return Task.FromResult(new PedidosQueApartanUnidades([.. pedidos.Take(maximo)], pedidos.Count));
     }
 
+    public Task<IReadOnlyList<VentaAtribuida>> VentasAtribuidas(Guid? fuenteId, DateTimeOffset desde, DateTimeOffset hasta, CancellationToken cancelacion = default)
+    {
+        var ventas = Guardadas
+            .SelectMany(r => r.Lineas.Select(l => (Reserva: r, Linea: l)))
+            .Where(x => (x.Linea.Estado is EstadoDeLinea.Confirmada or EstadoDeLinea.Cerrada) && !x.Linea.CreadaPorTraslado && x.Linea.AnuladaEn is null
+                        && x.Linea.ConfirmadaEn >= desde && x.Linea.ConfirmadaEn <= hasta)
+            .Select(x => (x.Reserva.PedidoId, x.Linea.EdicionId, Fuente: x.Reserva.TipoDeEntrega == TipoDeEntrega.Recojo ? x.Reserva.SucursalDeRecojoId!.Value : x.Linea.FuenteId, x.Linea.Cantidad))
+            .Where(x => fuenteId is null || x.Fuente == fuenteId)
+            .GroupBy(x => (x.PedidoId, x.EdicionId, x.Fuente))
+            .Select(g => new VentaAtribuida(g.Key.PedidoId, g.Key.EdicionId, g.Key.Fuente, g.Sum(x => x.Cantidad)))
+            .OrderBy(v => v.PedidoId).ThenBy(v => v.EdicionId).ThenBy(v => v.FuenteId)
+            .ToList();
+        return Task.FromResult<IReadOnlyList<VentaAtribuida>>(ventas);
+    }
+
     /// <summary>Los pedidos cuya expiración se pidió al repositorio, en orden.</summary>
     public List<Guid> ExpiracionesPedidas { get; } = [];
 }
