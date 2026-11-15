@@ -195,4 +195,54 @@ public sealed class DatosProhibidosTests
         Assert.DoesNotContain(typeof(CorreoDeCodigo).GetProperties(), p => p.CanWrite && p.SetMethod!.IsPublic);
         Assert.Throws<ArgumentNullException>(() => CorreoDeCodigo.ParaElTitular("a@b.pe", PropositoDeCodigo.VerificacionDeCuenta, null!));
     }
+
+    // ---------- Hash del identificador de sesión y cuerpo de un borrador (web-base T19, hallazgo R12) ----------
+
+    [Theory]
+    [Trait("Criterio", "AC-SEG-28")]
+    [InlineData("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08")]
+    [InlineData("9F86D081884C7D659A2FEAA0C55AD015A3BF4F1B2B0B822CD15D6C15B0F00A08")]
+    public void ElHashDelIdentificadorDeSesion_SeRedacta_ConOSinContexto(string hash)
+    {
+        Assert.DoesNotContain(hash, RedactorDeDatosProhibidos.Redactar($"sesion {hash}"), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(hash, RedactorDeDatosProhibidos.Redactar(hash), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(hash, RedactorDeDatosProhibidos.Redactar($"id_hash={hash}; otro=1"), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(hash, RedactorDeDatosProhibidos.Redactar($"fila {{\"id\":\"{hash}\"}}"), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-28")]
+    public void UnaCadenaHexadecimalQueNoMide64_NoSeRedacta()
+    {
+        const string Correlacion = "3f2b8c1d4e5a6978b0c1d2e3f4a5b6c7";
+        const string Sha1 = "da39a3ee5e6b4b0d3255bfef95601890afd80709";
+
+        Assert.Equal($"traza {Correlacion}", RedactorDeDatosProhibidos.Redactar($"traza {Correlacion}"));
+        Assert.Equal($"commit {Sha1}", RedactorDeDatosProhibidos.Redactar($"commit {Sha1}"));
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-SEG-28")]
+    [InlineData("borrador {\"nombre\":\"Ana Pérez\",\"direccion\":\"Av. Siempre Viva 742\"}")]
+    [InlineData("{\"borrador\":{\"nombre\":\"Ana Pérez\",\"direccion\":\"Av. Siempre Viva 742\"},\"plantilla\":\"/cuenta/datos\"}")]
+    [InlineData("borrador: {\"nombre\":\"Ana Pérez\",\"direccion\":\"Av. }Siempre{ Viva 742\"}")]
+    [InlineData("el borrador={\"nombre\":\"Ana Pérez\",\"direccion\":\"Av. Siempre Viva 742\"} se guardó")]
+    [InlineData("{\"borrador\":\"{\\\"nombre\\\":\\\"Ana Pérez\\\",\\\"direccion\\\":\\\"Av. Siempre Viva 742\\\"}\"}")]
+    public void ElCuerpoDeUnBorrador_SeRedactaCompleto(string texto)
+    {
+        var redactado = RedactorDeDatosProhibidos.Redactar(texto);
+
+        Assert.DoesNotContain("Ana", redactado, StringComparison.Ordinal);
+        Assert.DoesNotContain("Siempre", redactado, StringComparison.Ordinal);
+        Assert.DoesNotContain("742", redactado, StringComparison.Ordinal);
+        Assert.Contains("[redactado]", redactado, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-28")]
+    public void UnTextoSobreBorradoresSinCuerpo_ConservaSuSentido()
+    {
+        Assert.Equal("se purgaron 3 borradores vencidos", RedactorDeDatosProhibidos.Redactar("se purgaron 3 borradores vencidos"));
+        Assert.Equal("borrador descartado por vencimiento", RedactorDeDatosProhibidos.Redactar("borrador descartado por vencimiento"));
+    }
 }

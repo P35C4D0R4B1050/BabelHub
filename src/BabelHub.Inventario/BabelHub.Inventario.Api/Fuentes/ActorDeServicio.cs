@@ -26,7 +26,7 @@ public sealed class ActorDeServicioMiddleware(RequestDelegate siguiente)
             && contexto.Items[CredencialDeServicioMiddleware.ClaveDelAlcance] is AlcanceDeServicio alcance
             && alcance != AlcanceDeServicio.OperacionDeUsuario)
         {
-            establecedor.Establecer(ActorActual.DeIntegracion(alcance.ToString()));
+            establecedor.Establecer(ActorActual.DeIntegracion(alcance.NombreEstable()));
         }
 
         await siguiente(contexto).ConfigureAwait(false);

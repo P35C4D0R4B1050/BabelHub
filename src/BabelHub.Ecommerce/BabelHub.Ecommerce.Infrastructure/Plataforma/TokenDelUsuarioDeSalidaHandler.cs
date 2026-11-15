@@ -9,7 +9,7 @@ namespace BabelHub.Ecommerce.Infrastructure.Plataforma;
 /// </summary>
 /// <remarks>
 /// Es un archivo propio (no parte de <c>ClientesHttpDeServicio.cs</c>, que es una copia idéntica en los dos servicios, <c>CopiasDeAdaptadoresTests</c>) y se registra con
-/// <c>ConfigureHttpClientDefaults</c>, de modo que va primero en la cadena de todo cliente HTTP; solo actúa sobre las llamadas que declaran el alcance de operación de usuario.
+/// <c>ConfigureHttpClientDefaults</c>, de modo que va primero en la cadena de todo cliente HTTP; solo actúa sobre las llamadas cuyo alcance se hace en nombre de un usuario: la operación de usuario y, desde la auditoría (T28), la consulta de auditoría, la marca de alerta y el historial (<c>CredencialesDeSalidaHandler.AlcancesQueActuanPorUnUsuario</c>).
 /// </remarks>
 public sealed class TokenDelUsuarioDeSalidaHandler(ITokenDelUsuarioDeLaSesion token) : DelegatingHandler
 {
@@ -17,7 +17,7 @@ public sealed class TokenDelUsuarioDeSalidaHandler(ITokenDelUsuarioDeLaSesion to
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (request.Options.TryGetValue(OpcionesDeLaSolicitudDeServicio.Alcance, out var alcance) && alcance == AlcanceDeServicio.OperacionDeUsuario)
+        if (request.Options.TryGetValue(OpcionesDeLaSolicitudDeServicio.Alcance, out var alcance) && CredencialesDeSalidaHandler.AlcancesQueActuanPorUnUsuario.Contains(alcance))
         {
             var valor = await token.Actual(cancellationToken).ConfigureAwait(false)
                 ?? throw new InvalidOperationException("Una operación de usuario necesita la sesión de la persona en cuyo nombre se llama.");

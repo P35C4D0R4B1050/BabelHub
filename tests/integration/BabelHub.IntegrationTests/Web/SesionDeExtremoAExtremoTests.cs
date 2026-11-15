@@ -408,7 +408,7 @@ public sealed class SesionDeExtremoAExtremoTests(PostgresDeLaWebFixture bd) : IA
 
     private static string Base64Url(string texto) => Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(texto)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
-    [Fact(Skip = "Hallazgo R12 del carril A (RedactorDeDatosProhibidos): aún no reconoce el hash del identificador de sesión ni el cuerpo de un borrador; ver progress/log/2026-11-14-WEB-1c.md")]
+    [Fact]
     [Trait("Criterio", "AC-WEB-03")]
     public void ElRedactor_DebeReconocerElHashDelIdentificadorYElCuerpoDeUnBorrador()
     {

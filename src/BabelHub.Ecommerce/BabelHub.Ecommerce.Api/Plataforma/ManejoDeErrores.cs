@@ -1,4 +1,5 @@
 using System.Text.Json;
+using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Shared.Errores;
 using Microsoft.AspNetCore.Diagnostics;
@@ -178,6 +179,10 @@ public sealed class ManejadorDeExcepciones(OpcionesDeErrores opciones, ILogger<M
             ExcepcionDeNegocio negocio => ProblemasHttp.Crear(httpContext, opciones, negocio.ComoError()),
             MotorDeLimitesNoDisponibleException => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.NoDisponible),
             ContextoDeActorAusenteException => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.NoAutenticado),
+            // La auditoría caída no deja pasar la operación (AUD-04, la transacción ya revirtió): «servicio no disponible», no un error inesperado (AC-AUD-03).
+            AuditoriaNoDisponibleException => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.NoDisponible),
+            // La política de filas rechazó el acceso: es un acceso fuera de alcance (403 registrado), nunca «sin stock» ni un 500 (INV-1a).
+            AlcanceDeDatosDenegadoException => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.Prohibido, "alcance-insuficiente"),
             BadHttpRequestException => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.Validacion),
             _ => null,
         };
@@ -186,6 +191,24 @@ public sealed class ManejadorDeExcepciones(OpcionesDeErrores opciones, ILogger<M
         {
             registro.LogError(exception, "Error inesperado en {Metodo} {Ruta}", httpContext.Request.Method, httpContext.Request.Path.Value);
             problema = ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.Inesperado);
+        }
+
+        // Un 401 o un 403 que sale de una excepción no pasó por el middleware de salida (el manejador responde fuera de él): se registra aquí, antes de responder y sin depender de que el cliente siga conectado (T28, AUD-05).
+        var denegada = problema.Status switch
+        {
+            StatusCodes.Status401Unauthorized => (CategoriaDeError?)CategoriaDeError.NoAutenticado,
+            StatusCodes.Status403Forbidden => CategoriaDeError.Prohibido,
+            _ => null,
+        };
+        if (denegada is { } categoria)
+        {
+            var motivo = exception switch
+            {
+                ExcepcionDeNegocio negocio => negocio.ComoError().Clave,
+                AlcanceDeDatosDenegadoException => "alcance-insuficiente",
+                _ => null,
+            };
+            await DenegacionesHttp.Registrar(httpContext, categoria, motivo, problema.Code).ConfigureAwait(false);
         }
 
         await ProblemasHttp.Escribir(httpContext, problema).ConfigureAwait(false);

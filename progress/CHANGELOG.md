@@ -2,6 +2,16 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-14 — Cuarta tanda de carriles (AUD-4, WEB-1b y WEB-1c, fundidas a `main`)
+
+### Cubierto
+- **Carril A:** `transversal-auditoria` T22–T27 (AUD-4 sin T21): migraciones, roles y disparadores de solo inserción, función de depuración por lotes de 5000, repositorios de registros, alertas, límites y `por_anonimizar`, cliente HTTP de la auditoría del Inventario y trabajos de fondo de cierre, correo y depuración con actor de sistema explícito; `IEstablecedorDeActor` pasa a ser un puerto de `Application.Plataforma`, con regla de arquitectura sobre quién puede usarlo.
+- **Carril C:** `web-base` WEB-1b (T10–T15: almacén de sesiones y borradores, cifrado AES-GCM por host, anillo de Data Protection, purga en dos fases, token del usuario y cookie) y WEB-1c (T16–T20: antiforgery, cabeceras y CSP por ruta, filtros de área, pruebas de sesión y rutas).
+- Corrección de integración: el registro del ejecutor de trabajos de fondo del Inventario pasa a `Infrastructure.Plataforma` (`a749d6f`).
+
+### Pendiente
+- El cliente de auditoría del E-commerce debe dejar de consumir directamente el token del usuario (lo corrige el carril A; una prueba de arquitectura sigue en rojo en `main` hasta entonces); T21 y AUD-5; WEB-1e; INV-2a en curso en el carril B.
+
 ## 2026-11-14 — Tercera ola de carriles en paralelo (fundida a `main`)
 
 ### Cubierto

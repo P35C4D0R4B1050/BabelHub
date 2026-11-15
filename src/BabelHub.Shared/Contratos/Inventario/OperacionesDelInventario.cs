@@ -28,7 +28,7 @@ public static class OperacionesDelInventario
         ["inventario.unidades-vendidas.consultar"] = ["codigoDeFuente:texto"],
         ["inventario.historial.consultar"] = ["pagina:int(>=1)", "tamano:int(1-100)"],
         ["inventario.alertas.listar"] = ["desde:instante"],
-        ["inventario.auditoria.consultar"] = ["pendiente:definido por transversal-auditoria (AUD-2)"],
+        ["inventario.auditoria.consultar"] = ["accion:texto", "usuarioId:guid", "origen:texto", "desde:instante", "hasta:instante", "texto:texto(3-100)", "cursor:texto"],
     };
 
     public static IReadOnlyList<OperacionDeContrato> Todas { get; } =
@@ -230,7 +230,7 @@ public static class OperacionesDelInventario
 
     /// <summary>
     /// Historial de sucursal, auditoría y alertas: las rutas, los alcances y los errores están fijados por el plan de <c>transversal-auditoria</c>
-    /// (sección 4). Aquí solo se congela el historial; los cuerpos de la auditoría y de las alertas los define ese plan (carril A, AUD-2).
+    /// (sección 4). El historial es el de ECO-0; los cuerpos de la auditoría y de las alertas son los de <c>BabelHub.Shared.Contratos.Auditoria</c> (D18).
     /// </summary>
     private static OperacionDeContrato[] DeAdministracion() =>
     [
@@ -238,13 +238,13 @@ public static class OperacionesDelInventario
             "inventario.historial.consultar", Get, "/historial", AlcancesDeCredencial.Historial, true, false, true, 200, null, typeof(HistorialDeSucursalDto),
             CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ServicioNoDisponible),
         Op(
-            "inventario.auditoria.consultar", Get, "/auditoria", AlcancesDeCredencial.ConsultaDeAuditoria, true, false, true, 200, null, null,
+            "inventario.auditoria.consultar", Get, "/auditoria", AlcancesDeCredencial.ConsultaDeAuditoria, true, false, true, 200, null, typeof(Auditoria.PaginaDeRegistrosDto),
             CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ValidacionInvalida),
         Op(
-            "inventario.alertas.listar", Get, "/alertas", AlcancesDeCredencial.LecturaDeAlertas, false, false, true, 200, null, null,
+            "inventario.alertas.listar", Get, "/alertas", AlcancesDeCredencial.LecturaDeAlertas, false, false, true, 200, null, typeof(Auditoria.PaginaDeAlertasDto),
             CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.Prohibido),
         Op(
-            "inventario.alertas.marcar-revisada", Post, "/alertas/{id}/revisada", AlcancesDeCredencial.MarcarAlerta, true, false, false, 204, null, null,
-            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ServicioNoDisponible),
+            "inventario.alertas.marcar-revisada", Post, "/alertas/{id}/revisada", AlcancesDeCredencial.MarcarAlerta, true, false, false, 204, typeof(Auditoria.MarcarAlertaRevisadaDto), null,
+            CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.ServicioNoDisponible),
     ];
 }
