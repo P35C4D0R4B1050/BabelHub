@@ -1,6 +1,7 @@
 using System.Reflection;
 using BabelHub.Shared.Contratos;
 using BabelHub.Shared.Contratos.Ecommerce;
+using BabelHub.Shared.Contratos.Auditoria;
 using BabelHub.Shared.Contratos.Inventario;
 
 namespace BabelHub.ArchitectureTests.Contratos;
@@ -30,9 +31,13 @@ public sealed class ContratosDeAjustesTrasladosYEventosTests
         { "inventario.traslados.cancelar", "POST", "/api/inventario/v1/traslados/{trasladoId}/cancelar", Usuario, true, false, 200, typeof(MotivoDeTrasladoDto), typeof(TrasladoDto), false },
         { "inventario.traslados.registrar-guia", "PUT", "/api/inventario/v1/traslados/{trasladoId}/guia", Usuario, true, false, 200, typeof(RegistrarGuiaDto), typeof(TrasladoDto), false },
         { "inventario.historial.consultar", "GET", "/api/inventario/v1/historial", AlcancesDeCredencial.Historial, true, false, 200, null, typeof(HistorialDeSucursalDto), true },
-        { "inventario.auditoria.consultar", "GET", "/api/inventario/v1/auditoria", AlcancesDeCredencial.ConsultaDeAuditoria, true, false, 200, null, null, true },
-        { "inventario.alertas.listar", "GET", "/api/inventario/v1/alertas", AlcancesDeCredencial.LecturaDeAlertas, false, false, 200, null, null, true },
-        { "inventario.alertas.marcar-revisada", "POST", "/api/inventario/v1/alertas/{id}/revisada", AlcancesDeCredencial.MarcarAlerta, true, false, 204, null, null, false },
+        { "inventario.auditoria.consultar", "GET", "/api/inventario/v1/auditoria", AlcancesDeCredencial.ConsultaDeAuditoria, true, false, 200, null, typeof(PaginaDeRegistrosDto), true },
+        { "inventario.alertas.listar", "GET", "/api/inventario/v1/alertas", AlcancesDeCredencial.LecturaDeAlertas, false, false, 200, null, typeof(PaginaDeAlertasDto), true },
+        { "inventario.alertas.marcar-revisada", "POST", "/api/inventario/v1/alertas/{id}/revisada", AlcancesDeCredencial.MarcarAlerta, true, false, 204, typeof(MarcarAlertaRevisadaDto), null, false },
+        { "ecommerce.auditoria.consultar", "GET", "/api/ecommerce/v1/auditoria", AlcancesDeCredencial.OperacionDeUsuario, true, false, 200, null, typeof(PaginaDeRegistrosDto), true },
+        { "ecommerce.alertas.listar", "GET", "/api/ecommerce/v1/alertas", AlcancesDeCredencial.OperacionDeUsuario, true, false, 200, null, typeof(PaginaDeAlertasDto), true },
+        { "ecommerce.alertas.marcar-revisada", "POST", "/api/ecommerce/v1/alertas/{id}/revisada", AlcancesDeCredencial.OperacionDeUsuario, true, false, 204, typeof(MarcarAlertaRevisadaDto), null, false },
+        { "ecommerce.historial.consultar", "GET", "/api/ecommerce/v1/historial", AlcancesDeCredencial.OperacionDeUsuario, true, false, 200, null, typeof(PaginaDeRegistrosDto), true },
         { "ecommerce.avisos.solicitar-del-inventario", "POST", "/api/ecommerce/v1/integraciones/inventario/avisos", AlcancesDeCredencial.SolicitarAviso, false, false, 202, typeof(SolicitudDeAvisoDeInventarioDto), null, false },
         { "ecommerce.traslados.informar-estado", "POST", "/api/ecommerce/v1/integraciones/inventario/traslados", AlcancesDeCredencial.SolicitarAviso, false, false, 204, typeof(EstadoDeTrasladoDePedidoDto), null, false },
     };

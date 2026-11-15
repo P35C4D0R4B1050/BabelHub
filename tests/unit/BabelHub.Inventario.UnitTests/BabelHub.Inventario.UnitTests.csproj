@@ -11,6 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
+    <Compile Include="../Compartido/*.cs" LinkBase="Compartido" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\BabelHub.Inventario\BabelHub.Inventario.Domain\BabelHub.Inventario.Domain.csproj" />

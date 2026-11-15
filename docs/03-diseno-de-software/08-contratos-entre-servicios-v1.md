@@ -102,14 +102,20 @@ El ciclo de vida es el de TRA-03; cada transición es atómica y, si dos operaci
 
 ## 8. Historial, auditoría y alertas
 
-Las rutas, los alcances y los errores los fijó el plan de `transversal-auditoria` (§4); aquí solo se congela el cuerpo del historial. Los cuerpos de la auditoría y de las alertas (y su cursor firmado) los define ese plan en el bloque AUD-2.
+Las rutas, los alcances y los errores los fijó el plan de `transversal-auditoria` (§4). El cuerpo del historial es el de ECO-0; los de la auditoría y las alertas son los de `BabelHub.Shared.Contratos.Auditoria` (D18): `PaginaDeRegistrosDto`, `PaginaDeAlertasDto` (con `faltanDelInventario`), `AlertaDto`, `RegistroDto` y `MarcarAlertaRevisadaDto`. El cursor es opaco y firmado; un cursor inválido, de otro usuario o de otros filtros es siempre el mismo `400`.
 
 | Operación | Método y ruta | Alcance | Token | Clave | Éxito | Solicitud | Respuesta | Errores |
 | :--- | :--- | :--- | :---: | :---: | :---: | :--- | :--- | :--- |
 | `inventario.historial.consultar` | `GET /historial` | `historial` | Sí | No | 200 | — | `HistorialDeSucursalDto` | `INV-NO-AUTENTICADO`, `INV-VALIDACION-INVALIDA`, `INV-PROHIBIDO`, `INV-SERVICIO-NO-DISPONIBLE` |
-| `inventario.auditoria.consultar` | `GET /auditoria` | `consulta-de-auditoria` | Sí | No | 200 | — | — | `INV-NO-AUTENTICADO`, `INV-PROHIBIDO`, `INV-VALIDACION-INVALIDA` |
-| `inventario.alertas.listar` | `GET /alertas` | `lectura-alertas` | No | No | 200 | — | — | `INV-NO-AUTENTICADO`, `INV-VALIDACION-INVALIDA`, `INV-PROHIBIDO` |
-| `inventario.alertas.marcar-revisada` | `POST /alertas/{id}/revisada` | `marcar-alerta` | Sí | No | 204 | — | — | `INV-NO-AUTENTICADO`, `INV-PROHIBIDO`, `INV-SERVICIO-NO-DISPONIBLE` |
+| `inventario.auditoria.consultar` | `GET /auditoria` | `consulta-de-auditoria` | Sí | No | 200 | — | `PaginaDeRegistrosDto` | `INV-NO-AUTENTICADO`, `INV-PROHIBIDO`, `INV-VALIDACION-INVALIDA` |
+| `inventario.alertas.listar` | `GET /alertas` | `lectura-alertas` | No | No | 200 | — | `PaginaDeAlertasDto` | `INV-NO-AUTENTICADO`, `INV-VALIDACION-INVALIDA`, `INV-PROHIBIDO` |
+| `inventario.alertas.marcar-revisada` | `POST /alertas/{id}/revisada` | `marcar-alerta` | Sí | No | 204 | `MarcarAlertaRevisadaDto` | — | `INV-NO-AUTENTICADO`, `INV-PROHIBIDO`, `INV-VALIDACION-INVALIDA`, `INV-SERVICIO-NO-DISPONIBLE` |
+| `ecommerce.auditoria.consultar` | `GET /auditoria` | `operacion-de-usuario` | Sí | No | 200 | — | `PaginaDeRegistrosDto` | `ECO-NO-AUTENTICADO`, `ECO-PROHIBIDO`, `ECO-VALIDACION-INVALIDA`, `ECO-SERVICIO-NO-DISPONIBLE` |
+| `ecommerce.alertas.listar` | `GET /alertas` | `operacion-de-usuario` | Sí | No | 200 | — | `PaginaDeAlertasDto` | `ECO-NO-AUTENTICADO`, `ECO-PROHIBIDO`, `ECO-VALIDACION-INVALIDA`, `ECO-SERVICIO-NO-DISPONIBLE` |
+| `ecommerce.alertas.marcar-revisada` | `POST /alertas/{id}/revisada` | `operacion-de-usuario` | Sí | No | 204 | `MarcarAlertaRevisadaDto` | — | `ECO-NO-AUTENTICADO`, `ECO-PROHIBIDO`, `ECO-VALIDACION-INVALIDA`, `ECO-SERVICIO-NO-DISPONIBLE` |
+| `ecommerce.historial.consultar` | `GET /historial` | `operacion-de-usuario` | Sí | No | 200 | — | `PaginaDeRegistrosDto` | `ECO-NO-AUTENTICADO`, `ECO-PROHIBIDO`, `ECO-VALIDACION-INVALIDA`, `ECO-SERVICIO-NO-DISPONIBLE` |
+
+Las cuatro operaciones `ecommerce.*` son de usuario (token verificable, sin credencial entre servicios): las atiende la Api del E-commerce y las consume la interfaz web desde el servidor, que además puede llamar a los contratos de la Aplicación directamente (regla 9).
 
 ## 9. Del Inventario al E-commerce
 
@@ -143,12 +149,13 @@ Cada una resuelve un vacío que ninguna spec cerraba. Los carriles que planifica
 | D15 | **Sucursal del token.** Los contratos identifican una fuente o sucursal por su `codigo`; la sucursal de un encargado en el token es ese mismo código y el alcance por sucursal es la igualdad entre el código de la credencial y el de la fuente (AJU-09, TRA-09, FUE-08, historial, unidades vendidas). `sucursales.listar` es la fuente de los valores válidos. **Propuesta a confirmar** en INV-0 y en el plan de Identidad (carril A): hoy `ActorActual.SucursalId` es un `Guid`, y habrá que alinear el tipo o definir la equivalencia código ↔ identificador. | Sin esta equivalencia no se puede comprobar el alcance por sucursal en el Inventario. Registrar «sucursal = fuente» en el glosario. |
 | D16 | El Inventario no guarda títulos, autores ni ISBN: la búsqueda de FUE-09 la resuelve la web con el Catálogo y filtra las existencias con `edicionId` repetido (hasta 50). El encargado de una fuente (FUE-11) no viaja en `FuenteDetalleDto`: lo asigna Identidad y la web lo compone desde ella. | Evita que el Inventario invente tablas de catálogo o de usuarios. |
 | D17 | Notas para los planes: Pagos y Carrito reutilizan el mismo `pedidoId` al reintentar un pago (SEL-16, PAG-16); la liberación por `pedido-anulado` con credencial de sistema pierde la identidad del administrador en la auditoría del Inventario (la guarda Pedidos, PED-13); el aviso de TRA-22 a logística no pasa por estos contratos (es una alerta por correo de `transversal-auditoria`); `reservas.consultar` se justifica por PAG-08 y CAR-11 (comprobar que la reserva sigue vigente). Registrar una edición **digital** en el Inventario guarda solo su formato: ninguna operación de compra la consulta ni genera reservas (regla 12). | Dejan por escrito lo que los planes siguientes deben respetar. |
+| D18 | **Cuerpos de la auditoría y de las alertas (AUD-5, autorizado por el coordinador el 2026-11-14).** Las operaciones de auditoría no tenían DTOs en el catálogo (los dejó pendientes AUD-2) y una prueba de arquitectura exige que todo DTO de `Shared` lo use una operación. Se conservan los identificadores y las rutas: `inventario.auditoria.consultar` responde `PaginaDeRegistrosDto`; `inventario.alertas.marcar-revisada` recibe `MarcarAlertaRevisadaDto`; **`inventario.alertas.listar` responde `PaginaDeAlertasDto` (`{alertas:[…]}`) en vez de un arreglo** (el E-commerce es el único consumidor y el único implementador, AUD-5); y se añaden las cuatro operaciones `ecommerce.*` de auditoría, alertas e historial. El nombre JSON del actor de un registro es `usuarioId` y `tipoDeActor` (una regla de DTO prohíbe nombres que empiezan con «actor»). `inventario.historial.consultar` conserva `HistorialDeSucursalDto` (ECO-0); reconciliarlo con la página de registros sigue abierto. | Ninguna otra spec o plan depende de la forma anterior (comprobado con búsqueda en `specs/` y `docs/`). |
 **Riesgo aceptado (2026-11-14).** La persona responsable decidió mantener, en D03 y D04, los alcances `expiracion-de-reservas` (confirmar, extender y liberar sin token) y `solicitar-aviso` (estados de traslado) más allá de su nombre, en lugar de crear alcances propios y reabrir `transversal-seguridad`, con las tres reglas de mitigación de D03 (el actor sale solo del alcance, la auditoría guarda operación, `pedidoId` y motivo, y el Inventario valida existencia y máquina de estados). Si más adelante hiciera falta separarlos, sería un cambio incompatible (`v2`) del contrato.
 
 
 ## 11. Lo que no se congela
 
-- Los cuerpos de la auditoría y de las alertas y su cursor (`transversal-auditoria`, AUD-2).
+- El contenido de los cursores (opacos y firmados; los cuerpos de la auditoría y de las alertas se congelaron en D18).
 - Los nombres de las plantillas de aviso y sus campos (`transversal-notificaciones`): el contrato solo fija el sobre.
 - Los endpoints de Identidad y la forma del token (`identidad-seguridad`): el contrato solo exige que el Inventario reciba el del usuario y lo valide.
 - Los esquemas de base de datos y las reglas de selección de fuente (SEL-10). Los valores de `LimitesDeContrato` (50 ediciones o líneas, 500, 80, 300 y 60 caracteres) son **valores iniciales asumidos** que cada plan confirma o ajusta con su validación; los de las specs son 5 000 (ingreso), 30 días y la paginación.
@@ -170,4 +177,7 @@ Se declaran en `OperacionDeContrato.Parametros`; una prueba compara esta lista c
 - `inventario.unidades-vendidas.consultar`: `codigoDeFuente:texto`
 - `inventario.historial.consultar`: `pagina:int(>=1)`, `tamano:int(1-100)`
 - `inventario.alertas.listar`: `desde:instante`
-- `inventario.auditoria.consultar`: `pendiente:definido por transversal-auditoria (AUD-2)`
+- `inventario.auditoria.consultar`: `accion:texto`, `usuarioId:guid`, `origen:texto`, `desde:instante`, `hasta:instante`, `texto:texto(3-100)`, `cursor:texto`
+- `ecommerce.auditoria.consultar`: `accion:texto`, `usuarioId:guid`, `origen:texto`, `desde:instante`, `hasta:instante`, `texto:texto(3-100)`, `cursor:texto`
+- `ecommerce.alertas.listar`: `cursor:texto`
+- `ecommerce.historial.consultar`: `sucursal:guid`, `cursor:texto`

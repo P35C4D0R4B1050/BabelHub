@@ -15,16 +15,6 @@ public interface IEscritorDeDenegaciones
 }
 
 /// <summary>
-/// Las plantillas de ruta de los endpoints del servicio, que la Api obtiene de sus rutas registradas y <b>normaliza</b> a segmentos <c>{nombre}</c>
-/// (sin restricciones como <c>{id:guid}</c>, opcionales ni comodines): con ellas se reduce la ruta cruda a su plantilla (AUD-05, AUD-06). Una plantilla
-/// que no cumpla la forma se descarta (<see cref="ResolutorDeRutas"/>) y no impide registrar el evento.
-/// </summary>
-public interface IPlantillasDeRuta
-{
-    IReadOnlyCollection<string> Todas { get; }
-}
-
-/// <summary>
 /// Reduce la ruta cruda de una solicitud a su plantilla. Valida y ordena la lista de plantillas <b>una sola vez</b> (descarta las que no cumplen la
 /// forma) y, ante cualquier problema, devuelve «sin-coincidencia»: la ruta nunca puede hacer perder el evento ni se guarda cruda. Una ruta vacía o
 /// demasiado larga se descarta sin tocar la lista.
@@ -88,6 +78,9 @@ public sealed class DenegacionDeAccesoDeAplicacion(
     IPublicadorDeAlertasTecnicas alertas,
     IReloj reloj) : IDenegacionDeAcceso
 {
+    /// <summary>El motivo con el que se registra un rechazo cuyo motivo el catálogo no admite.</summary>
+    public const string MotivoPorOmision = "fuera-de-rol";
+
     public async Task Registrar(DenegacionDeAcceso denegacion, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(denegacion);
@@ -98,9 +91,12 @@ public sealed class DenegacionDeAccesoDeAplicacion(
 
         try
         {
-            var solicitud = new SolicitudDeRegistro(AccionesAuditables.AccesoDenegado)
+            // Un motivo que el catálogo de la acción no admite (una clave simbólica de un caso de uso) no puede hacer perder el evento ni disparar una alerta falsa de «auditoría no disponible»: se registra con el motivo general.
+            var sinMotivo = new SolicitudDeRegistro(AccionesAuditables.AccesoDenegado);
+            var motivo = constructor.Resolver(sinMotivo, ClaseDeAccion.NoConcede).AdmiteMotivo(denegacion.Motivo) ? denegacion.Motivo : MotivoPorOmision;
+            var solicitud = sinMotivo with
             {
-                Motivo = denegacion.Motivo,
+                Motivo = motivo,
                 Resultado = ResultadoAuditado.Rechazado,
                 Detalle = denegacion.CodigoDeError is null
                     ? new Dictionary<string, string?>()

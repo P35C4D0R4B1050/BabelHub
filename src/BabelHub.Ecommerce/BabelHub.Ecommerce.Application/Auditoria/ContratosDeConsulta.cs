@@ -103,3 +103,13 @@ public interface IHistorialDeSucursal
 {
     Task<Resultado<PaginaDeRegistros>> Consultar(Guid? sucursalPedida, string? cursor, CancellationToken cancelacion = default);
 }
+
+/// <summary>
+/// Las plantillas de ruta de los endpoints del servicio, que la Api obtiene de sus rutas registradas y <b>normaliza</b> a segmentos <c>{nombre}</c>
+/// (sin restricciones como <c>{id:guid}</c>, opcionales ni comodines): con ellas se reduce la ruta cruda a su plantilla (AUD-05, AUD-06). Una plantilla
+/// que no cumpla la forma se descarta (<c>ResolutorDeRutas</c>) y no impide registrar el evento.
+/// </summary>
+public interface IPlantillasDeRuta
+{
+    IReadOnlyCollection<string> Todas { get; }
+}

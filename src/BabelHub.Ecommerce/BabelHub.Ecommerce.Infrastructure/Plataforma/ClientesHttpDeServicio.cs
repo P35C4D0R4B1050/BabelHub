@@ -104,7 +104,7 @@ public sealed class CredencialesDeSalidaHandler(OpcionesDeCredencialesDeSalida c
     /// Los alcances de las operaciones que se hacen en nombre de un usuario (<c>RequiereTokenDeUsuario</c> de <c>docs/03/08</c>): llevan su token verificable y la Aplicación del Inventario lo comprueba; sin él la
     /// llamada no sale. La lectura de alertas nuevas (<c>lectura-alertas</c>) no lleva token.
     /// </summary>
-    private static readonly HashSet<AlcanceDeServicio> AlcancesQueActuanPorUnUsuario =
+    internal static readonly HashSet<AlcanceDeServicio> AlcancesQueActuanPorUnUsuario =
     [
         AlcanceDeServicio.OperacionDeUsuario,
         AlcanceDeServicio.ConsultaDeAuditoria,

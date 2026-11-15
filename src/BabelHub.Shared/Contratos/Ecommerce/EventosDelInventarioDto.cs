@@ -46,6 +46,9 @@ public static class CodigosDeErrorDelEcommerce
 
     public const string ValidacionInvalida = "ECO-VALIDACION-INVALIDA";
 
+    /// <summary>El usuario autenticado no puede consultar (no es administrador central, o pide la sucursal de otro); queda como acceso denegado (AUD-05).</summary>
+    public const string Prohibido = "ECO-PROHIBIDO";
+
     public const string LimiteExcedido = "ECO-LIMITE-EXCEDIDO";
 
     /// <summary>El pedido del estado de traslado no existe en el E-commerce: error permanente, no se reintenta.</summary>

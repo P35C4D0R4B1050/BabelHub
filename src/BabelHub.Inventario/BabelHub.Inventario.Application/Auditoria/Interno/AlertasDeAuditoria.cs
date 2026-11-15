@@ -47,6 +47,9 @@ public static class MotivosDeAlerta
 
     /// <summary>Las alertas del Inventario no se pudieron leer (AUD-38): el E-commerce sigue y lo reintenta.</summary>
     public const string LecturaDeAlertasDelInventarioNoDisponible = "lectura-de-alertas-del-inventario-no-disponible";
+
+    /// <summary>Una lectura de datos del Inventario llegó sin actor (un defecto de composición: el alcance por sucursal devolvería cero filas sin error, INV-1a).</summary>
+    public const string AlcanceDeDatosSinActor = "alcance-de-datos-sin-actor";
 }
 
 /// <summary>El catálogo cerrado de motivos de alerta de los dos servicios (D06). Otros módulos publican por <see cref="IAlertas"/> con estos códigos.</summary>
@@ -71,6 +74,7 @@ public static class CatalogoDeAlertasDeAuditoria
         new(MotivosDeAlerta.BajaDeTitularSinEntregar, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.TrasladoVinculadoSinAprobar, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.LecturaDeAlertasDelInventarioNoDisponible, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.AlcanceDeDatosSinActor, ClaseDeAlerta.Tecnica),
     ]);
 }
 
