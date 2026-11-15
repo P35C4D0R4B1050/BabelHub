@@ -148,12 +148,12 @@ public sealed class CifradoDeSesionesTests
         }
 
         var espia = new DenegacionesEspia();
-        await new RegistroDeSeguridadDeLaWebEnAuditoria(espia).AccesoDenegado(MotivoDeDenegacionWeb.SesionDeOtroHost, Guid.NewGuid());
+        await new RegistroDeSeguridadDeLaWebEnAuditoria(espia, RegistroDeBloqueosPorTextosPendientesTests.SinBloqueos()).AccesoDenegado(MotivoDeDenegacionWeb.SesionDeOtroHost, Guid.NewGuid());
         Assert.Equal("sin-sesion", Assert.Single(espia.Registradas).Motivo);
         Assert.Null(espia.Registradas[0].Ruta);
 
         espia.Falla = true;
-        await new RegistroDeSeguridadDeLaWebEnAuditoria(espia).AccesoDenegado(MotivoDeDenegacionWeb.SecretoIlegible, null);
+        await new RegistroDeSeguridadDeLaWebEnAuditoria(espia, RegistroDeBloqueosPorTextosPendientesTests.SinBloqueos()).AccesoDenegado(MotivoDeDenegacionWeb.SecretoIlegible, null);
     }
 
     private sealed class DenegacionesEspia : IDenegacionDeAcceso

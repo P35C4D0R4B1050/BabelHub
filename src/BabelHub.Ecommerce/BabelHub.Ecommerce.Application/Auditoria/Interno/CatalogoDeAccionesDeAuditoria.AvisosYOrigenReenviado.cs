@@ -17,5 +17,6 @@ public static partial class CatalogoDeAccionesDeAuditoria
             ["cuota-de-correo", "tope-por-cuenta", "tope-por-origen", "correo-sin-verificar"],
             aislada: true);
         yield return Seguridad(nameof(AccionesAuditables.OrigenReenviadoSinCredencial), false, ["origen-reenviado-sin-credencial"]);
+        yield return Seguridad(nameof(AccionesAuditables.AccesoBloqueadoPorTextosPendientes), true, ["accion-no-permitida", "ruta-no-declarada", "metodo-no-declarado", "metodo-no-estandar"], Clave("metodo", 16), Clave("plantilla", 100));
     }
 }
