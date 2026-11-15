@@ -18,4 +18,12 @@ public static class RegistroDelEjecutorDeTrabajoDeFondo
         servicios.TryAddSingleton<EjecutorDeTrabajoDeFondo>(sp => new EjecutorDeTrabajoDeFondo(sp.GetRequiredService<IEstablecedorDeActor>(), sp.GetRequiredService<IActorActual>()));
         return servicios;
     }
+
+    /// <summary>Registra <see cref="IEjecutorComoSistema"/>: lo que el sistema hace por su cuenta dentro del flujo de otro actor (la liberación de vencidas al reservar) se audita con actor «sistema».</summary>
+    public static IServiceCollection AgregarEjecutorComoSistema(this IServiceCollection servicios)
+    {
+        ArgumentNullException.ThrowIfNull(servicios);
+        servicios.TryAddScoped<IEjecutorComoSistema>(sp => new EjecutorComoSistema(sp.GetRequiredService<IEstablecedorDeActor>(), sp.GetRequiredService<IActorActual>()));
+        return servicios;
+    }
 }

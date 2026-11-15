@@ -31,28 +31,3 @@ public sealed class EjecutorDeTrabajoDeFondo(IEstablecedorDeActor actor, IActorA
         }
     }
 }
-
-public static class RegistroDelEjecutorDeTrabajoDeFondo
-{
-    /// <summary>Registra el ejecutor aquí, en la Infraestructura de <c>Plataforma</c>, que es la única que puede fijar el actor (junto con la de <c>Auditoria</c> y la Api).</summary>
-    public static Microsoft.Extensions.DependencyInjection.IServiceCollection AgregarEjecutorDeTrabajoDeFondo(this Microsoft.Extensions.DependencyInjection.IServiceCollection servicios)
-    {
-        Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.TryAddSingleton(
-            servicios,
-            sp => new EjecutorDeTrabajoDeFondo(
-                Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<IEstablecedorDeActor>(sp),
-                Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<IActorActual>(sp)));
-        return servicios;
-    }
-
-    /// <summary>Registra <see cref="IEjecutorComoSistema"/>: lo que el sistema hace por su cuenta dentro del flujo de otro actor (la liberación de vencidas al reservar) se audita con actor «sistema».</summary>
-    public static Microsoft.Extensions.DependencyInjection.IServiceCollection AgregarEjecutorComoSistema(this Microsoft.Extensions.DependencyInjection.IServiceCollection servicios)
-    {
-        Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.TryAddScoped<IEjecutorComoSistema>(
-            servicios,
-            sp => new EjecutorComoSistema(
-                Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<IEstablecedorDeActor>(sp),
-                Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<IActorActual>(sp)));
-        return servicios;
-    }
-}
