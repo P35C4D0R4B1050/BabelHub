@@ -25,7 +25,7 @@ public sealed class BorradoresPostgresTests(PostgresDeLaWebFixture bd) : IAsyncL
         return cookie;
     }
 
-    private static ConservarBorrador Entrada(string cookie, string plantilla = Plantilla) => new(cookie, plantilla, Campos, true);
+    private static ConservarBorrador Entrada(string cookie, string plantilla = Plantilla) => new(cookie, plantilla, Campos, (_, _) => Task.FromResult(true));
 
     [Fact]
     [Trait("Criterio", "AC-WEB-20")]
@@ -116,8 +116,8 @@ public sealed class BorradoresPostgresTests(PostgresDeLaWebFixture bd) : IAsyncL
         var cookie = await SesionVencida(e);
 
         Assert.True(await e.BorradoresDePantalla.Conservar(Entrada(cookie)));
-        Assert.True(await e.BorradoresDePantalla.Conservar(new ConservarBorrador(cookie, Plantilla, new Dictionary<string, string> { ["detalle"] = "Corregido" }, true)));
-        Assert.True(await e.BorradoresDePantalla.Conservar(new ConservarBorrador(cookie, "/cuenta/datos", new Dictionary<string, string> { ["nombre"] = "Ana" }, true)));
+        Assert.True(await e.BorradoresDePantalla.Conservar(new ConservarBorrador(cookie, Plantilla, new Dictionary<string, string> { ["detalle"] = "Corregido" }, (_, _) => Task.FromResult(true))));
+        Assert.True(await e.BorradoresDePantalla.Conservar(new ConservarBorrador(cookie, "/cuenta/datos", new Dictionary<string, string> { ["nombre"] = "Ana" }, (_, _) => Task.FromResult(true))));
 
         Assert.Equal(2L, await bd.Consultar<long>("SELECT count(*) FROM web.borradores"));
         Assert.Equal("Corregido", (await e.BorradoresDePantalla.Recuperar(VerificadorPorPrefijo.Usuario, Plantilla))!["detalle"]);

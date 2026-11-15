@@ -14,6 +14,7 @@ public sealed class PantallaDeEstadoVista : ModeloBaseDePagina
 /// Las pantallas de error, sin permiso y servicio no disponible (WEB-03, WEB-07, WEB-26, T26): <b>único dueño</b> de esos tres estados. Existen en los
 /// dos hosts. Son los destinos de las redirecciones de la web: solo se leen y no tienen efectos.
 /// </summary>
+[PermitidaConPasoPendiente]
 public sealed class EstadosController(ContextoDePagina pagina) : Controller
 {
     /// <summary>Un fallo inesperado: mensaje simple y reintento a la página de inicio, sin detalles técnicos.</summary>

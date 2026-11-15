@@ -14,6 +14,14 @@
     document.cookie = nombre + '=; path=/; max-age=0; samesite=lax; secure';
   }
 
+  // Antiforgery (WEB-05): htmx envía el token del <meta> en la cabecera de cada solicitud que cambia algo; los formularios normales llevan su campo oculto.
+  document.addEventListener('htmx:configRequest', function (evento) {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta && meta.content) {
+      evento.detail.headers['RequestVerificationToken'] = meta.content;
+    }
+  });
+
   // Tema (WEB-09): se aplica al instante y se recuerda; sin elección manda la preferencia del dispositivo.
   var selectorDeTema = document.querySelector('[data-bh-tema]');
   if (selectorDeTema) {

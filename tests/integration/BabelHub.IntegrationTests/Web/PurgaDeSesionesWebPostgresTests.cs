@@ -158,7 +158,7 @@ public sealed class PurgaDeSesionesWebPostgresTests(PostgresDeLaWebFixture bd) :
         var cookie = await e.Abrir();
         e.Reloj.Ahora = EntornoDeSesiones.Inicio.AddMinutes(31);
         await e.Web.Cargar(cookie, HostWeb.Tienda, OrigenDeLaAccion.AccionDelUsuario);
-        Assert.True(await e.BorradoresDePantalla.Conservar(new ConservarBorrador(cookie, "/cuenta/datos", new Dictionary<string, string> { ["nombre"] = "Ana" }, true)));
+        Assert.True(await e.BorradoresDePantalla.Conservar(new ConservarBorrador(cookie, "/cuenta/datos", new Dictionary<string, string> { ["nombre"] = "Ana" }, (_, _) => Task.FromResult(true))));
         e.Reloj.Ahora = EntornoDeSesiones.Inicio.AddMinutes(60);
         var resultado = await Purga(e).Ejecutar();
         Assert.Equal(0, resultado.BorradoresBorrados);
@@ -179,7 +179,7 @@ public sealed class PurgaDeSesionesWebPostgresTests(PostgresDeLaWebFixture bd) :
         var cookie = await e.Abrir();
         e.Reloj.Ahora = EntornoDeSesiones.Inicio.AddMinutes(31);
         await e.Web.Cargar(cookie, HostWeb.Tienda, OrigenDeLaAccion.AccionDelUsuario);
-        await e.BorradoresDePantalla.Conservar(new ConservarBorrador(cookie, "/cuenta/datos", new Dictionary<string, string> { ["nombre"] = "Ana" }, true));
+        await e.BorradoresDePantalla.Conservar(new ConservarBorrador(cookie, "/cuenta/datos", new Dictionary<string, string> { ["nombre"] = "Ana" }, (_, _) => Task.FromResult(true)));
         await bd.Ejecutar("INSERT INTO web.claves_de_proteccion VALUES (gen_random_uuid(), 'tienda', '\\x00', 1, now())");
         var paso = new PasoDeRestauracionDeSesionesWeb(new VaciadoDeLaWebPostgres(e.Unidad, e.Unidad));
 

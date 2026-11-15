@@ -32,7 +32,7 @@ public sealed record ActorVerificado(Guid UsuarioId, RolWeb Rol, Guid? SucursalI
 
 /// <summary>
 /// Una credencial en memoria: el texto del JWT solo existe durante la solicitud (D02). No se serializa ni se imprime: <see cref="ToString"/> no la
-/// devuelve y <see cref="Valor"/> solo lo lee el manejador de salida hacia el Inventario.
+/// devuelve y <see cref="Revelar"/> solo lo llama la implementación del token de la sesión, que lo entrega al manejador de salida hacia el Inventario.
 /// </summary>
 public sealed class CredencialEnMemoria
 {
@@ -44,7 +44,8 @@ public sealed class CredencialEnMemoria
         _valor = valor;
     }
 
-    public string Valor => _valor;
+    /// <summary>El texto del JWT: solo lo lee <c>HttpTokenDelUsuarioDeLaSesion</c> (Api) para entregarlo como <see cref="ValorSecreto"/>. Es un método y no una propiedad para que ningún serializador lo emita.</summary>
+    public string Revelar() => _valor;
 
     public override string ToString() => "[credencial]";
 }
@@ -158,8 +159,12 @@ public interface IBorradoresDePantalla
     Task<IReadOnlyDictionary<string, string>?> Recuperar(Guid usuarioId, string plantillaDeRuta, CancellationToken cancelacion = default);
 }
 
-/// <summary>Lo que se conserva: la cookie de la sesión vencida, la plantilla de la ruta (nunca la dirección), los campos marcados y si el token antifalsificación era válido.</summary>
-public sealed record ConservarBorrador(string ValorDeLaCookie, string PlantillaDeRuta, IReadOnlyDictionary<string, string> Campos, bool TokenAntifalsificacionValido)
+/// <summary>
+/// Lo que se conserva: la cookie de la sesión vencida, la plantilla de la ruta (nunca la dirección), los campos marcados y <b>cómo se comprueba el token antifalsificación</b>.
+/// El token solo puede validarse contra el usuario de la fila retenida (el módulo la carga por el identificador de la cookie): <paramref name="ValidarElToken"/> recibe ese
+/// usuario y devuelve si el token de la solicitud es válido para él y para esa sesión. No se guarda nada si no se invoca o si devuelve <see langword="false"/> (D06).
+/// </summary>
+public sealed record ConservarBorrador(string ValorDeLaCookie, string PlantillaDeRuta, IReadOnlyDictionary<string, string> Campos, Func<Guid, CancellationToken, Task<bool>> ValidarElToken)
 {
     public override string ToString() => $"ConservarBorrador {{ PlantillaDeRuta = {PlantillaDeRuta} }}";
 }

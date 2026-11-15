@@ -30,7 +30,7 @@ internal sealed class AnfitrionWeb : IAsyncDisposable
 
     public IServiceProvider Servicios => _app.Services;
 
-    public static async Task<AnfitrionWeb> Iniciar(Action<IServiceCollection>? servicios = null, Action<WebApplication>? antesDeLasRutas = null, System.Reflection.Assembly[]? partes = null)
+    public static async Task<AnfitrionWeb> Iniciar(Action<IServiceCollection>? servicios = null, Action<WebApplication>? antesDeLasRutas = null, System.Reflection.Assembly[]? partes = null, Action<WebApplication>? despuesDelEnrutado = null)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ContentRootPath = RaizDelRepositorio.Api, EnvironmentName = Environments.Development });
         builder.WebHost.UseTestServer();
@@ -50,10 +50,14 @@ internal sealed class AnfitrionWeb : IAsyncDisposable
         var app = builder.Build();
         antesDeLasRutas?.Invoke(app);
         app.UseRouting();
+        despuesDelEnrutado?.Invoke(app);
         app.UseAuthorization();
         app.MapControllers();
         await app.StartAsync();
-        return new AnfitrionWeb(app, app.GetTestClient());
+        // Detrás del proxy la aplicación ve HTTPS (ForwardedHeaders con proxies conocidos): las cookies __Host- y el antiforgery exigen Secure y fallan cerrado si no.
+        var cliente = app.GetTestClient();
+        cliente.BaseAddress = new Uri("https://localhost/");
+        return new AnfitrionWeb(app, cliente);
     }
 
     public async ValueTask DisposeAsync()

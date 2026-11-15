@@ -24,7 +24,7 @@ public sealed class AsegurarCredencialTests
 
         Assert.Equal(EstadoDeCredencial.Asegurada, resultado.Estado);
         Assert.Equal(DoblesDeSesion.ActorCliente, resultado.Actor);
-        Assert.Equal("jwt-ok-1", resultado.Credencial!.Valor);
+        Assert.Equal("jwt-ok-1", resultado.Credencial!.Revelar());
         Assert.DoesNotContain("jwt-ok", $"{resultado.Credencial}", StringComparison.Ordinal);
         Assert.Equal(0, d.Identidad.LlamadasARenovar);
         Assert.Equal(0, d.Almacen.CargasParaRenovar);
@@ -42,7 +42,7 @@ public sealed class AsegurarCredencialTests
         var resultado = await Asegurar(d, cookie);
 
         Assert.Equal(EstadoDeCredencial.Asegurada, resultado.Estado);
-        Assert.Equal("jwt-ok-2", resultado.Credencial!.Valor);
+        Assert.Equal("jwt-ok-2", resultado.Credencial!.Revelar());
         Assert.Equal(1, d.Identidad.LlamadasARenovar);
         Assert.Equal(1, d.Almacen.CargasParaRenovar);
         var fila = d.Fila(cookie);
@@ -88,7 +88,7 @@ public sealed class AsegurarCredencialTests
 
         Assert.Equal(EstadoDeCredencial.Asegurada, resultado.Estado);
         Assert.Equal(0, d.Identidad.LlamadasARenovar);
-        Assert.Equal("jwt-ok-otra", resultado.Credencial!.Valor);
+        Assert.Equal("jwt-ok-otra", resultado.Credencial!.Revelar());
         Assert.Equal(1, cargas);
     }
 
@@ -223,7 +223,7 @@ public sealed class AsegurarCredencialTests
         var resultado = await Asegurar(d, cookie);
 
         Assert.Equal(EstadoDeCredencial.Asegurada, resultado.Estado);
-        Assert.Equal("jwt-ok-2", resultado.Credencial!.Valor);
+        Assert.Equal("jwt-ok-2", resultado.Credencial!.Revelar());
     }
 
     [Fact]

@@ -102,6 +102,8 @@ public static class ModuloWebExtensiones
         }
 
         servicios.AddScoped<ITextosLegales, ConsultarTextoLegal>();
+        servicios.AddSingleton<IAreasDeInterfaz, AreasDeInterfaz>();
+        servicios.TryAddSingleton<IDesafioDelIngreso, DesafioDelIngresoSinIdentidad>();
         servicios.AddSingleton<IFuenteDeSucursales, FuenteDeSucursalesNoDisponible>();
         servicios.AddSingleton<IListaDeSucursales, ListaDeSucursalesConUltimaConocida>();
         servicios.AddScoped<IPreferenciaDeSucursal, PreferenciaDeSucursal>();

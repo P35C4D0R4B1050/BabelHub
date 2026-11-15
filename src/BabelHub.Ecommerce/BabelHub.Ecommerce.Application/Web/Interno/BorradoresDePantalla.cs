@@ -20,7 +20,7 @@ public sealed class BorradoresDePantalla(
     public async Task<bool> Conservar(ConservarBorrador entrada, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(entrada);
-        if (!entrada.TokenAntifalsificacionValido || !ValorDeCookieDeSesion.TieneFormaValida(entrada.ValorDeLaCookie))
+        if (entrada.ValidarElToken is null || !ValorDeCookieDeSesion.TieneFormaValida(entrada.ValorDeLaCookie))
         {
             return false;
         }
@@ -34,6 +34,12 @@ public sealed class BorradoresDePantalla(
             || !motivo.ConservaElBorrador()
             || sesion.CerradaEn is not { } cerradaEn
             || ahora - cerradaEn >= PoliticaDeBorradores.Vigencia)
+        {
+            return false;
+        }
+
+        // El token se comprueba contra el usuario de la fila retenida y no contra quien presenta la solicitud (que ya no tiene sesión): sin un token válido para esa sesión nada se guarda.
+        if (!await entrada.ValidarElToken(sesion.UsuarioId, cancelacion).ConfigureAwait(false))
         {
             return false;
         }

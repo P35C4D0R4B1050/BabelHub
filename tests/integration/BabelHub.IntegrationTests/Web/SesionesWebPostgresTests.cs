@@ -198,7 +198,7 @@ public sealed class SesionesWebPostgresTests(PostgresDeLaWebFixture bd) : IAsync
 
         Assert.All(resultados, r => Assert.Equal(EstadoDeCredencial.Asegurada, r.Estado));
         Assert.Equal(1, e.Identidad.LlamadasARenovar);
-        Assert.All(resultados, r => Assert.Equal("jwt-ok-2", r.Credencial!.Valor));
+        Assert.All(resultados, r => Assert.Equal("jwt-ok-2", r.Credencial!.Revelar()));
         var fila = (await e.Sesiones.Cargar(e.Hash(cookie)))!;
         Assert.Equal(e.Reloj.Ahora.AddMinutes(15), fila.CredencialVenceEn);
         Assert.False(fila.RenovacionIncierta);
@@ -261,7 +261,7 @@ public sealed class SesionesWebPostgresTests(PostgresDeLaWebFixture bd) : IAsync
         Assert.Equal(EstadoDeCredencial.SesionCerrada, segunda.Estado);
         Assert.Equal("renovacion_rechazada", await Estado(cookie));
         var campos = new Dictionary<string, string> { ["detalle"] = "Mi reclamo" };
-        Assert.True(await e.BorradoresDePantalla.Conservar(new ConservarBorrador(cookie, "/reclamaciones/nueva", campos, true)));
+        Assert.True(await e.BorradoresDePantalla.Conservar(new ConservarBorrador(cookie, "/reclamaciones/nueva", campos, (_, _) => Task.FromResult(true))));
     }
 
     [Fact]
@@ -302,7 +302,7 @@ public sealed class SesionesWebPostgresTests(PostgresDeLaWebFixture bd) : IAsync
         Assert.Equal("voluntario", await Estado(una));
         Assert.Equal("voluntario", await Estado(otra));
         Assert.Empty(await e.Unidad.Ejecutar(async ct => await e.Sesiones.CargarAbiertasDeUnUsuario(VerificadorPorPrefijo.Usuario, ct)));
-        Assert.False(await e.BorradoresDePantalla.Conservar(new ConservarBorrador(una, "/cuenta/datos", new Dictionary<string, string> { ["nombre"] = "Ana" }, true)));
+        Assert.False(await e.BorradoresDePantalla.Conservar(new ConservarBorrador(una, "/cuenta/datos", new Dictionary<string, string> { ["nombre"] = "Ana" }, (_, _) => Task.FromResult(true))));
     }
 
     [Theory]

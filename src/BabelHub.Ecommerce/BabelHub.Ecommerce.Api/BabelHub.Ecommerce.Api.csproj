@@ -7,4 +7,7 @@
     <ProjectReference Include="..\BabelHub.Ecommerce.Infrastructure\BabelHub.Ecommerce.Infrastructure.csproj" />
     <ProjectReference Include="..\..\BabelHub.Shared\BabelHub.Shared.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BabelHub.IntegrationTests" />
+  </ItemGroup>
 </Project>
