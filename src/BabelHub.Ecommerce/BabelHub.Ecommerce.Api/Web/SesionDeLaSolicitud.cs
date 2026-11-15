@@ -57,7 +57,7 @@ public static class SesionDeLaSolicitud
     }
 
     /// <summary>Guarda el resultado de asegurar la credencial (lo hace <c>SesionWebHandler</c>, una vez por solicitud).</summary>
-    public static void EstablecerCredencial(this HttpContext contexto, ResultadoDeCredencial resultado)
+    internal static void EstablecerCredencial(this HttpContext contexto, ResultadoDeCredencial resultado)
     {
         ArgumentNullException.ThrowIfNull(contexto);
         ArgumentNullException.ThrowIfNull(resultado);
@@ -65,7 +65,7 @@ public static class SesionDeLaSolicitud
     }
 
     /// <summary>El resultado de asegurar la credencial en esta solicitud, o <see langword="null"/> si no se llegó a asegurar (sin cookie o fuera del handler).</summary>
-    public static ResultadoDeCredencial? CredencialDeLaSesion(this HttpContext contexto)
+    internal static ResultadoDeCredencial? CredencialDeLaSesion(this HttpContext contexto)
     {
         ArgumentNullException.ThrowIfNull(contexto);
         return contexto.Items.TryGetValue(ClaveDelResultado, out var valor) ? valor as ResultadoDeCredencial : null;
@@ -91,7 +91,7 @@ public sealed class HttpTokenDelUsuarioDeLaSesion(IHttpContextAccessor contexto)
     {
         var resultado = contexto.HttpContext?.CredencialDeLaSesion();
         return Task.FromResult(resultado is { Estado: EstadoDeCredencial.Asegurada, Credencial: { } credencial }
-            ? new ValorSecreto(credencial.Valor)
+            ? new ValorSecreto(credencial.Revelar())
             : null);
     }
 }

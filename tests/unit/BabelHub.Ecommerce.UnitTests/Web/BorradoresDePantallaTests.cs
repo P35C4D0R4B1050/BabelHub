@@ -26,7 +26,7 @@ public sealed class BorradoresDePantallaTests
     }
 
     private static ConservarBorrador Entrada(string cookie, bool token = true, string plantilla = Plantilla, IReadOnlyDictionary<string, string>? campos = null) =>
-        new(cookie, plantilla, campos ?? Campos, token);
+        new(cookie, plantilla, campos ?? Campos, (_, _) => Task.FromResult(token));
 
     [Fact]
     [Trait("Criterio", "AC-WEB-20")]
@@ -131,6 +131,56 @@ public sealed class BorradoresDePantallaTests
 
         Assert.True(await borradores.Conservar(Entrada(cookie)));
         Assert.Single(almacen.Filas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-20")]
+    public async Task El_token_se_valida_contra_el_usuario_de_la_fila_retenida_y_solo_si_la_sesion_lo_permite()
+    {
+        var d = new DoblesDeSesion();
+        var (borradores, almacen) = Crear(d);
+        var cookie = await SesionVencida(d);
+        var consultas = new List<Guid>();
+
+        var guardado = await borradores.Conservar(new ConservarBorrador(cookie, Plantilla, Campos, (usuario, _) =>
+        {
+            consultas.Add(usuario);
+            return Task.FromResult(true);
+        }));
+
+        Assert.True(guardado);
+        Assert.Equal([DoblesDeSesion.Usuario], consultas);
+        Assert.Single(almacen.Filas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-20")]
+    public async Task Si_se_omite_la_comprobacion_del_token_no_se_conserva_nada()
+    {
+        var d = new DoblesDeSesion();
+        var (borradores, almacen) = Crear(d);
+        var cookie = await SesionVencida(d);
+
+        Assert.False(await borradores.Conservar(new ConservarBorrador(cookie, Plantilla, Campos, null!)));
+        Assert.Empty(almacen.Filas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-20")]
+    public async Task El_token_no_se_consulta_si_la_sesion_no_admite_borrador_aunque_sea_valido()
+    {
+        var d = new DoblesDeSesion();
+        var (borradores, almacen) = Crear(d);
+        var abierta = await d.Abrir();
+        var consultas = 0;
+
+        Assert.False(await borradores.Conservar(new ConservarBorrador(abierta, Plantilla, Campos, (_, _) =>
+        {
+            consultas++;
+            return Task.FromResult(true);
+        })));
+        Assert.Equal(0, consultas);
+        Assert.Empty(almacen.Filas);
     }
 
     [Fact]

@@ -121,6 +121,10 @@ public sealed class CredencialesDeSalidaHandler(
         "X-Actor",
         "X-Usuario",
         "X-Rol",
+        "Cookie",
+        "X-Sucursal",
+        "X-User-Id",
+        "X-Actor-Id",
         "Authorization",
     ];
 

@@ -1,6 +1,7 @@
 using System.Net;
 using BabelHub.Ecommerce.Api.Plataforma;
 using BabelHub.Ecommerce.Api.Web;
+using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Application.Web;
 
 namespace BabelHub.IntegrationTests.Web;
@@ -228,6 +229,19 @@ public sealed class SesionWebHandlerTests
         Assert.False(yo.GetProperty("autenticada").GetBoolean());
         Assert.Equal("NoSeCargo", yo.GetProperty("estado").GetString());
         Assert.Empty(sesiones.Cargas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-03")]
+    public async Task LasLlamadasAlModulo_SeHacenComoVisitanteAnonimo_NuncaSinContexto()
+    {
+        var sesiones = new SesionesWebDePrueba().ConSesionValida();
+        await using var anfitrion = await AnfitrionConSesion.Iniciar(sesiones);
+
+        await Get(anfitrion, "/prueba/sesion/yo", AnfitrionConSesion.Cookie());
+
+        Assert.Equal(2, sesiones.ActoresVistos.Count);
+        Assert.All(sesiones.ActoresVistos, a => Assert.Equal(TipoDeActor.Anonimo, a?.Tipo));
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 @model ModeloBaseDePagina
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 <!DOCTYPE html>
 @* Sin elección de la persona no se escribe data-theme (Razor emitiría data-theme=""): así manda la preferencia del dispositivo (WEB-09). *@
 @if (Model.Tema is { } tema)
@@ -14,6 +15,8 @@ else
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@Model.Titulo · BabelHub</title>
     <meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"historyCacheSize":0,"selfRequestsOnly":true,"includeIndicatorStyles":false}' />
+    @* El token antifalsificación para htmx (WEB-05): bh.js lo envía en la cabecera de cada solicitud, sin scripts en línea. *@
+    <meta name="csrf-token" content="@Antiforgery.GetAndStoreTokens(Context).RequestToken" />
     <link rel="stylesheet" href="/css/app.css" />
     <script src="/lib/htmx/htmx.min.js" defer></script>
     <script src="/js/bh.js" defer></script>

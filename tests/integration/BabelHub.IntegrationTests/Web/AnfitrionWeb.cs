@@ -54,7 +54,10 @@ internal sealed class AnfitrionWeb : IAsyncDisposable
         app.UseAuthorization();
         app.MapControllers();
         await app.StartAsync();
-        return new AnfitrionWeb(app, app.GetTestClient());
+        // Detrás del proxy la aplicación ve HTTPS (ForwardedHeaders con proxies conocidos): las cookies __Host- y el antiforgery exigen Secure y fallan cerrado si no.
+        var cliente = app.GetTestClient();
+        cliente.BaseAddress = new Uri("https://localhost/");
+        return new AnfitrionWeb(app, cliente);
     }
 
     public async ValueTask DisposeAsync()

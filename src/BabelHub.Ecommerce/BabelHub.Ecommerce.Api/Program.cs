@@ -24,6 +24,8 @@ builder.Services.AgregarInterfazWeb();
 builder.Services.AgregarHostWeb(OpcionesDelHostWeb.Leer(builder.Configuration, builder.Environment.IsProduction()));
 // El token del usuario sale de la sesión de la solicitud y solo lo consume el manejador de salida (T14, regla 9).
 builder.Services.AgregarTokenDelUsuarioDeLaSesion();
+// Antiforgery global, Origin y Sec-Fetch-Site y captura del borrador (T16); las claves de Data Protection las compone quien conecte la base (T12).
+builder.Services.AgregarProteccionContraFalsificacion();
 // La versión provisional de los textos legales nunca se compone en producción (hasta el contrato de Identidad, IDE-57).
 builder.Services.AgregarModuloWeb(permitirVersionesProvisionales: !builder.Environment.IsProduction());
 // Implementaciones provisionales de lo que aún no existe; un registro real anterior se respeta (TryAdd).

@@ -27,6 +27,11 @@ internal sealed class SesionesWebDePrueba : ISesionesWeb
 
     public Guid UsuarioId { get; } = Guid.NewGuid();
 
+    /// <summary>De dónde se lee el actor del flujo en el momento en que el handler llama al módulo (debe ser un visitante anónimo, nunca nulo).</summary>
+    public Func<ActorActual?>? LeerActor { get; set; }
+
+    public List<ActorActual?> ActoresVistos { get; } = [];
+
     public const string ValorDeLaCookie = "Aq3ZfK9wLm2XvB7nRt4YcP8sJd6HgE1uTo5WiN0xCyU";
 
     /// <summary>Una sesión válida de un cliente con la credencial asegurada.</summary>
@@ -57,6 +62,7 @@ internal sealed class SesionesWebDePrueba : ISesionesWeb
         lock (Cargas)
         {
             Cargas.Add((valorDeLaCookie, host, origen));
+            ActoresVistos.Add(LeerActor?.Invoke());
         }
 
         return Task.FromResult(Carga(valorDeLaCookie, host, origen));
@@ -67,6 +73,7 @@ internal sealed class SesionesWebDePrueba : ISesionesWeb
         lock (Aseguradas)
         {
             Aseguradas.Add((valorDeLaCookie, host));
+            ActoresVistos.Add(LeerActor?.Invoke());
         }
 
         return Task.FromResult(Credencial(valorDeLaCookie, host));
@@ -92,18 +99,22 @@ internal static class AnfitrionConSesion
         SesionesWebDePrueba sesiones,
         HostWeb host = HostWeb.Tienda,
         ModoDeArranque modo = ModoDeArranque.Normal,
-        Action<IServiceCollection>? servicios = null)
+        Action<IServiceCollection>? servicios = null,
+        IReadOnlyList<string>? hostsPermitidos = null)
     {
+        var flujo = new ActorDelFlujo();
+        sesiones.LeerActor = () => flujo.Actual;
         return AnfitrionWeb.Iniciar(
             s =>
             {
                 s.AddSingleton<ISesionesWeb>(sesiones);
                 s.AddSingleton(typeof(ModoDeArranque), modo);
-                s.AddSingleton<ActorDelFlujo>();
+                s.AddSingleton(flujo);
                 s.AddSingleton<IActorActual>(p => p.GetRequiredService<ActorDelFlujo>());
                 s.AddSingleton<IEstablecedorDeActor>(p => p.GetRequiredService<ActorDelFlujo>());
                 s.AgregarTokenDelUsuarioDeLaSesion();
-                s.AgregarHostWeb(new OpcionesDelHostWeb(host, []));
+                s.AgregarHostWeb(new OpcionesDelHostWeb(host, hostsPermitidos ?? []));
+                s.AgregarProteccionContraFalsificacion();
                 servicios?.Invoke(s);
             },
             partes: [typeof(ControladorDeSesionDePrueba).Assembly],
@@ -134,7 +145,7 @@ internal static class AnfitrionConSesion
             var respuesta = await anfitrion.Cliente.SendAsync(pedido);
             respuesta.EnsureSuccessStatusCode();
             var token = await respuesta.Content.ReadAsStringAsync();
-            var antiforgery = respuesta.Headers.GetValues("Set-Cookie").Select(c => c.Split(';')[0]).Single(c => c.StartsWith(".AspNetCore.Antiforgery", StringComparison.Ordinal));
+            var antiforgery = respuesta.Headers.GetValues("Set-Cookie").Select(c => c.Split(';')[0]).Single(c => c.StartsWith("__Host-bh-antiforgery", StringComparison.Ordinal));
             cookies.Add(antiforgery);
             solicitud.Headers.Add("RequestVerificationToken", token);
         }
@@ -176,6 +187,74 @@ public sealed class ControladorDeSesionDePrueba(IActorActual actor, ITokenDelUsu
     [HttpPost("accion")]
     [ValidateAntiForgeryToken]
     public IActionResult Accion() => Ok();
+
+    /// <summary>Sin ningún atributo: la protección global es la que la cubre.</summary>
+    [HttpPost("sin-atributo")]
+    public IActionResult SinAtributo() => Ok();
+
+    [HttpPost("ignorada")]
+    [IgnoreAntiforgeryToken]
+    public IActionResult Ignorada() => Ok();
+
+    /// <summary>Un formulario de la lista cerrada de plantillas con borrador: solo <c>Nombre</c> es conservable.</summary>
+    [HttpPost("/cuenta/datos")]
+    public IActionResult Datos([FromForm] FormularioDePrueba formulario) => Ok(formulario.Nombre);
+
+    /// <summary>Un formulario sin ningún campo conservable.</summary>
+    [HttpPost("/reclamaciones/nueva")]
+    public IActionResult SinConservables([FromForm] FormularioSinConservables formulario) => Ok(formulario.Texto);
+}
+
+public sealed class FormularioDePrueba
+{
+    [Conservar]
+    public string? Nombre { get; set; }
+
+    public string? Otro { get; set; }
+}
+
+public sealed class FormularioSinConservables
+{
+    public string? Texto { get; set; }
+}
+
+/// <summary>Un <see cref="IDenegacionDeAcceso"/> que anota lo que se le registra (y puede fallar a pedido).</summary>
+internal sealed class DenegacionesDePrueba : BabelHub.Ecommerce.Application.Auditoria.IDenegacionDeAcceso
+{
+    public List<BabelHub.Ecommerce.Application.Auditoria.DenegacionDeAcceso> Registradas { get; } = [];
+
+    public bool Falla { get; set; }
+
+    public Task Registrar(BabelHub.Ecommerce.Application.Auditoria.DenegacionDeAcceso denegacion, CancellationToken cancelacion = default)
+    {
+        Registradas.Add(denegacion);
+        return Falla ? throw new InvalidOperationException("auditoría caída") : Task.CompletedTask;
+    }
+}
+
+/// <summary>Un módulo de borradores que, como el real, valida el token contra el usuario de la fila retenida.</summary>
+internal sealed class BorradoresDePrueba(Guid usuarioRetenido) : IBorradoresDePantalla
+{
+    public List<(string Plantilla, IReadOnlyDictionary<string, string> Campos)> Guardados { get; } = [];
+
+    public int Intentos { get; private set; }
+
+    public Guid UsuarioRetenido { get; set; } = usuarioRetenido;
+
+    public async Task<bool> Conservar(ConservarBorrador entrada, CancellationToken cancelacion = default)
+    {
+        Intentos++;
+        if (!await entrada.ValidarElToken(UsuarioRetenido, cancelacion))
+        {
+            return false;
+        }
+
+        Guardados.Add((entrada.PlantillaDeRuta, entrada.Campos));
+        return true;
+    }
+
+    public Task<IReadOnlyDictionary<string, string>?> Recuperar(Guid usuarioId, string plantillaDeRuta, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyDictionary<string, string>?>(null);
 }
 
 [Area("Sucursal")]

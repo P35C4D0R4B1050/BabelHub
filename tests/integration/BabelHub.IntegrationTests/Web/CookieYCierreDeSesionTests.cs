@@ -124,11 +124,11 @@ public sealed class CookieYCierreDeSesionTests
     [Trait("Criterio", "AC-WEB-26")]
     public async Task CerrarLaSesion_ConIdentidadCaida_SigueFuncionando()
     {
-        var sesiones = new SesionesWebDePrueba().ConCredencial(EstadoDeCredencial.ServicioNoDisponible);
+        // La página se emitió con la sesión sana (el token va ligado a la persona y a su sesión) y después Identidad cae: salir sigue funcionando.
+        var sesiones = new SesionesWebDePrueba().ConSesionValida();
         await using var anfitrion = await AnfitrionConSesion.Iniciar(sesiones);
-        // Con Identidad caída el token antifalsificación no está ligado a una sesión verificada: se pide sin la cookie de sesión.
-        var solicitud = await AnfitrionConSesion.Post(anfitrion, "/sesion/cerrar");
-        solicitud.Headers.Add("Cookie", string.Join("; ", solicitud.Headers.GetValues("Cookie").Append(AnfitrionConSesion.Cookie())));
+        var solicitud = await AnfitrionConSesion.Post(anfitrion, "/sesion/cerrar", AnfitrionConSesion.Cookie());
+        sesiones.ConCredencial(EstadoDeCredencial.ServicioNoDisponible);
 
         var respuesta = await anfitrion.Cliente.SendAsync(solicitud);
 

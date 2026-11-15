@@ -3,7 +3,7 @@ using BabelHub.Ecommerce.Domain.Web;
 namespace BabelHub.Ecommerce.Application.Web.Interno;
 
 /// <summary>Implementa <see cref="IAreasDeInterfaz"/> sobre los permisos del Dominio, con los tipos propios del contrato.</summary>
-public sealed class AreasDeInterfaz : IAreasDeInterfaz
+internal sealed class AreasDeInterfaz : IAreasDeInterfaz
 {
     public IReadOnlyList<AreaWeb> AreasDe(RolWeb rol) => [.. PermisosDeArea.Areas(Aplicar(rol)).Select(Aplicar)];
 

@@ -197,6 +197,10 @@ public sealed class TokenDeSalidaDeLaSesionTests
 
         Assert.Equal(ValorSecreto.Redactado, token.ToString());
         Assert.DoesNotContain(TokenDeLaSesion, System.Text.Json.JsonSerializer.Serialize(token), StringComparison.Ordinal);
-        Assert.DoesNotContain(TokenDeLaSesion, contexto.CredencialDeLaSesion()!.Credencial!.ToString(), StringComparison.Ordinal);
+        var resultado = contexto.CredencialDeLaSesion()!;
+        Assert.DoesNotContain(TokenDeLaSesion, resultado.Credencial!.ToString(), StringComparison.Ordinal);
+        // Ni la credencial ni el resultado completo se serializan con el token (regla 9: nada del JWT sale del proceso).
+        Assert.DoesNotContain(TokenDeLaSesion, System.Text.Json.JsonSerializer.Serialize(resultado.Credencial), StringComparison.Ordinal);
+        Assert.DoesNotContain(TokenDeLaSesion, System.Text.Json.JsonSerializer.Serialize(resultado), StringComparison.Ordinal);
     }
 }

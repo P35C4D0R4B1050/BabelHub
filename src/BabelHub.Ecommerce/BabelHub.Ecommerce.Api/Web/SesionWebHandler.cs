@@ -41,6 +41,8 @@ public sealed class SesionWebHandler(RequestDelegate siguiente, OpcionesDelHostW
 
         try
         {
+            // Mientras no hay actor verificado, las llamadas al módulo (y de él a Identidad y Auditoría) se hacen como visitante anónimo, nunca sin contexto (SEG-15, plan §1).
+            actor.Establecer(ActorActual.Anonimo());
             var decision = await Resolver(contexto, sesiones).ConfigureAwait(false);
             if (!decision.Continuar)
             {
@@ -92,7 +94,7 @@ public sealed class SesionWebHandler(RequestDelegate siguiente, OpcionesDelHostW
         return credencial.Estado switch
         {
             EstadoDeCredencial.Asegurada when credencial.Actor is { } verificado => Autenticar(contexto, verificado),
-            EstadoDeCredencial.ServicioNoDisponible => await NoDisponible(contexto).ConfigureAwait(false),
+            EstadoDeCredencial.ServicioNoDisponible => await NoDisponible(contexto, carga.UsuarioId).ConfigureAwait(false),
             EstadoDeCredencial.SesionCerrada => NoValida(contexto, EstadoDeLaSesionEnLaSolicitud.RenovacionRechazada),
             _ => NoValida(contexto, EstadoDeLaSesionEnLaSolicitud.Inexistente),
         };
@@ -113,29 +115,43 @@ public sealed class SesionWebHandler(RequestDelegate siguiente, OpcionesDelHostW
         return Anonimo(contexto, estado);
     }
 
-    private static Decision Autenticar(HttpContext contexto, ActorVerificado verificado)
+    /// <summary>La identidad de la solicitud para una persona con sesión: lo que leen los límites por usuario y el antiforgery (que liga el token a <c>NameIdentifier</c>).</summary>
+    internal static ClaimsPrincipal PrincipalDe(Guid usuarioId, string? rol, Guid? sucursalId)
     {
-        var rol = RolComoTexto(verificado.Rol);
-        var reclamos = new List<Claim>
+        var reclamos = new List<Claim> { new(ClaimTypes.NameIdentifier, usuarioId.ToString("D")) };
+        if (rol is not null)
         {
-            new(ClaimTypes.NameIdentifier, verificado.UsuarioId.ToString("D")),
-            new(ClaimTypes.Role, rol),
-        };
-        if (verificado.SucursalId is { } sucursal)
+            reclamos.Add(new Claim(ClaimTypes.Role, rol));
+        }
+
+        if (sucursalId is { } sucursal)
         {
             reclamos.Add(new Claim("bh:sucursal", sucursal.ToString("D")));
         }
 
-        contexto.User = new ClaimsPrincipal(new ClaimsIdentity(reclamos, "SesionWeb"));
+        return new ClaimsPrincipal(new ClaimsIdentity(reclamos, "SesionWeb"));
+    }
+
+    private static Decision Autenticar(HttpContext contexto, ActorVerificado verificado)
+    {
+        var rol = RolComoTexto(verificado.Rol);
+        contexto.User = PrincipalDe(verificado.UsuarioId, rol, verificado.SucursalId);
         contexto.EstablecerEstadoDeLaSesion(EstadoDeLaSesionEnLaSolicitud.Asegurada);
         return new Decision(true, ActorActual.DeUsuario(verificado.UsuarioId, rol, verificado.SucursalId));
     }
 
-    private async Task<Decision> NoDisponible(HttpContext contexto)
+    private async Task<Decision> NoDisponible(HttpContext contexto, Guid? usuarioDeLaSesion = null)
     {
         var anonimo = Anonimo(contexto, EstadoDeLaSesionEnLaSolicitud.ServicioNoDisponible);
         if (contexto.Request.Path.StartsWithSegments(RutaDeCierre, StringComparison.OrdinalIgnoreCase))
         {
+            // Para poder salir con Identidad caída: el token antifalsificación de la página va ligado a la persona, así que el cierre se valida con una identidad que solo lleva su
+            // identificador (dato de la sesión opaca ya cargada). No es el actor de la Aplicación (sigue anónimo) ni sirve para autorizar nada.
+            if (usuarioDeLaSesion is { } usuario)
+            {
+                contexto.User = PrincipalDe(usuario, rol: null, sucursalId: null);
+            }
+
             return anonimo;
         }
 

@@ -59,6 +59,34 @@ public sealed class ReglasDelTokenDelUsuarioTests
 
     [Fact]
     [Trait("Criterio", "AC-WEB-03")]
+    public void El_texto_del_JWT_solo_lo_tocan_el_modulo_y_la_implementacion_del_token()
+    {
+        const string Credencial = "BabelHub.Ecommerce.Application.Web.CredencialEnMemoria";
+        var enLaApi = Types.InAssembly(Cargar("BabelHub.Ecommerce.Api")).That().HaveDependencyOn(Credencial).GetTypes().Select(t => t.FullName!).Order(StringComparer.Ordinal).ToList();
+        var enLaInfraestructura = Types.InAssembly(Cargar("BabelHub.Ecommerce.Infrastructure")).That().HaveDependencyOn(Credencial).GetTypes().Select(t => t.FullName!).ToList();
+
+        Assert.Equal(["BabelHub.Ecommerce.Api.Web.HttpTokenDelUsuarioDeLaSesion"], enLaApi);
+        Assert.Empty(enLaInfraestructura);
+    }
+
+    [Fact]
+    public void Todo_controlador_de_una_carpeta_de_area_declara_su_area_para_que_el_mapeo_por_host_no_falle_abierto()
+    {
+        var controladores = Cargar("BabelHub.Ecommerce.Api").GetTypes()
+            .Where(t => t.IsClass && typeof(Microsoft.AspNetCore.Mvc.ControllerBase).IsAssignableFrom(t) && t.Namespace is not null && t.Namespace.Contains(".Areas.", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.NotEmpty(controladores);
+        foreach (var tipo in controladores)
+        {
+            var carpeta = tipo.Namespace!.Split(".Areas.")[1].Split('.')[0];
+            var area = tipo.GetCustomAttributes(typeof(Microsoft.AspNetCore.Mvc.AreaAttribute), inherit: true).Cast<Microsoft.AspNetCore.Mvc.AreaAttribute>().SingleOrDefault();
+            Assert.True(area is not null && area.RouteValue == carpeta, $"{tipo.FullName} debe declarar [Area(\"{carpeta}\")].");
+        }
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-03")]
     public void La_unica_implementacion_en_produccion_es_la_de_la_sesion_de_la_Api()
     {
         var implementaciones = new[] { "BabelHub.Ecommerce.Api", "BabelHub.Ecommerce.Infrastructure", "BabelHub.Ecommerce.Application", "BabelHub.Ecommerce.Domain" }
