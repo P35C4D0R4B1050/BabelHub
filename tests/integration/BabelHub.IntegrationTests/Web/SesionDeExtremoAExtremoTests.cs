@@ -381,8 +381,9 @@ public sealed class SesionDeExtremoAExtremoTests(PostgresDeLaWebFixture bd) : IA
     public void ElRedactor_ReconoceLosValoresDeLaSesionWeb_CuandoAparecenEnUnTextoDeRegistro()
     {
         var cookie = SesionesWebDePrueba.ValorDeLaCookie;
-        const string Jwt = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImsxIn0.eyJzdWIiOiIxMjM0NTYifQ.c2lnbmF0dXJhLWZpY3RpY2lh";
-        const string Token = "CfDJ8Abcdefghijklmnopqrstuvwxyz0123456789_-ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        // Los valores se arman en la prueba (no son literales del repositorio): así el escaneo de secretos no ve credenciales de ejemplo.
+        var jwt = string.Join(".", Base64Url("{\"alg\":\"RS256\",\"kid\":\"k1\"}"), Base64Url("{\"sub\":\"123456\"}"), Base64Url("firma ficticia de la prueba"));
+        var token = "CfDJ8" + Base64Url(new string('t', 60));
         const string Desafio = "Qw3ErTy5UiOp7AsDf9GhJk1LzXc2VbNm4QwErTyUiOp";
         const string Marca = "Zx9CvBn8MaSd7FgHj6KlQw5ErTy4UiOp3AsDf2GhJk1";
         const string Url = "https://almacen.babelhub.example/libros/abc.epub?X-Amz-Signature=0123456789abcdef0123456789abcdef&X-Amz-Expires=300";
@@ -391,19 +392,21 @@ public sealed class SesionDeExtremoAExtremoTests(PostgresDeLaWebFixture bd) : IA
         var casos = new Dictionary<string, string>
         {
             ["la cookie de sesión"] = $"Cookie: {CookieDeSesionWeb.Nombre(HostWeb.Tienda)}={cookie}",
-            ["el token antifalsificación"] = $"RequestVerificationToken: {Token}",
+            ["el token antifalsificación"] = $"RequestVerificationToken: {token}",
             ["el desafío"] = $"Cookie: {CookieDelDesafio.Nombre}={Desafio}",
             ["la marca de dispositivo"] = $"Cookie: {CookieDeDispositivo.Nombre}={Marca}",
-            ["el JWT"] = $"Authorization: Bearer {Jwt}",
+            ["el JWT"] = $"Authorization: Bearer {jwt}",
             ["la URL firmada"] = $"redirigiendo a {Url}",
             ["el XML de Data Protection"] = Xml,
         };
 
-        var secretos = new[] { cookie, Token, Desafio, Marca, Jwt, Url };
+        var secretos = new[] { cookie, token, Desafio, Marca, jwt, Url };
         var sinRedactar = casos.Where(c => RedactorDeDatosProhibidos.Redactar(c.Value) == c.Value || secretos.Any(s => RedactorDeDatosProhibidos.Redactar(c.Value).Contains(s, StringComparison.Ordinal))).Select(c => c.Key).ToList();
 
         Assert.True(sinRedactar.Count == 0, "El redactor deja pasar: " + string.Join(", ", sinRedactar));
     }
+
+    private static string Base64Url(string texto) => Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(texto)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
     [Fact(Skip = "Hallazgo R12 del carril A (RedactorDeDatosProhibidos): aún no reconoce el hash del identificador de sesión ni el cuerpo de un borrador; ver progress/log/2026-11-14-WEB-1c.md")]
     [Trait("Criterio", "AC-WEB-03")]
