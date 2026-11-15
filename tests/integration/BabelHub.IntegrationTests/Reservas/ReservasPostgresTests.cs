@@ -173,7 +173,7 @@ public sealed class ReservasPostgresTests(PostgresDeReservasFixture bd) : IClass
 
     [Fact]
     [Trait("Criterio", "AC-SEL-16")]
-    public async Task Reservar_UnPedidoDeOtroCliente_EsNoEncontradoYElDeSuDuenoSeRechazaPorAhora()
+    public async Task Reservar_UnPedidoDeOtroCliente_EsNoEncontrado_YElDeSuDuenoLoReemplaza()
     {
         var f = await TresFuentes();
         var libro = await bd.AgregarEdicion();
@@ -187,7 +187,7 @@ public sealed class ReservasPostgresTests(PostgresDeReservasFixture bd) : IClass
         var mismoCliente = await pila.Reservar(duena, ARecojo("lima", [Linea(libro)], pedido));
 
         Assert.Equal((CategoriaDeError.NoEncontrado, "reserva-no-encontrada"), (ajeno.Error!.Categoria, ajeno.Error.Clave));
-        Assert.Equal("reserva-existente", mismoCliente.Error!.Clave);
+        Assert.True(mismoCliente.EsExito, mismoCliente.Error?.Clave);
         Assert.Equal(["recurso-ajeno"], pila.Denegaciones.Motivos);
         Assert.Equal((5, 1), await bd.StockDe(f.Lima, libro));
     }

@@ -24,7 +24,7 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
     private const string PendienteVencida = "l.estado = 'pendiente' AND r.fecha_expiracion IS NOT NULL AND r.fecha_expiracion <= @ahora";
 
     public async Task<ReservaDePedido?> UltimaDelPedido(Guid pedidoId, CancellationToken cancelacion = default) =>
-        (await Una("pedido_id = @p ORDER BY iniciada_en DESC, id DESC", "p", pedidoId, cancelacion).ConfigureAwait(false))?.Reserva;
+        (await Una("pedido_id = @p ORDER BY reemplazos DESC, iniciada_en DESC, id DESC", "p", pedidoId, cancelacion).ConfigureAwait(false))?.Reserva;
 
     public Task<ReservaPorClave?> PorClave(Guid clienteId, string clave, CancellationToken cancelacion = default)
     {
@@ -300,6 +300,48 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
 
                 comando.Parameters.Add(new NpgsqlParameter("ahora", NpgsqlDbType.TimestampTz) { Value = ahora.ToUniversalTime() });
                 return await LeerVencidas(comando, token).ConfigureAwait(false);
+            },
+            cancelacion);
+
+    public Task<IReadOnlyList<LineaLiberada>> LiberarLineas(Guid pedidoId, bool incluirConfirmadas, IReadOnlyCollection<Guid>? lineaIds, DateTimeOffset ahora, CancellationToken cancelacion = default) =>
+        acceso.Ejecutar<IReadOnlyList<LineaLiberada>>(
+            async (conexion, transaccion, token) =>
+            {
+                // Una sola sentencia: bloquea por id y en orden las líneas activas del pedido y solo cambia (y devuelve) las que seguían en ese estado.
+                var estados = incluirConfirmadas ? "('pendiente', 'confirmada')" : "('pendiente')";
+                await using var comando = new NpgsqlCommand(
+                    $"""
+                    WITH candidatas AS (
+                        SELECT l.id, l.estado AS estado_previo
+                        FROM reservas.reserva_lineas l
+                        WHERE l.pedido_id = @pedido AND l.estado IN {estados}{(lineaIds is null ? string.Empty : " AND l.linea_id = ANY(@lineas)")}
+                        ORDER BY l.id
+                        FOR UPDATE OF l
+                    )
+                    UPDATE reservas.reserva_lineas AS u
+                    SET estado = 'liberada', estado_cambiado_en = @ahora
+                    FROM candidatas c
+                    WHERE u.id = c.id AND u.estado = c.estado_previo
+                    RETURNING u.pedido_id, u.id, u.linea_id, u.edicion_id, u.fuente_id, u.cantidad, u.traslado_id, c.estado_previo = 'confirmada'
+                    """,
+                    conexion,
+                    transaccion);
+                comando.Parameters.AddWithValue("pedido", pedidoId);
+                if (lineaIds is not null)
+                {
+                    comando.Parameters.AddWithValue("lineas", lineaIds.ToArray());
+                }
+
+                comando.Parameters.Add(new NpgsqlParameter("ahora", NpgsqlDbType.TimestampTz) { Value = ahora.ToUniversalTime() });
+
+                var lineas = new List<LineaLiberada>();
+                await using var lector = await comando.ExecuteReaderAsync(token).ConfigureAwait(false);
+                while (await lector.ReadAsync(token).ConfigureAwait(false))
+                {
+                    lineas.Add(new LineaLiberada(lector.GetGuid(0), lector.GetGuid(1), lector.GetGuid(2), lector.GetGuid(3), lector.GetGuid(4), lector.GetInt32(5), lector.IsDBNull(6) ? null : lector.GetGuid(6), lector.GetBoolean(7)));
+                }
+
+                return [.. lineas.OrderBy(l => l.EdicionId, OrdenDeBloqueo.DeIdentificadores).ThenBy(l => l.FuenteId, OrdenDeBloqueo.DeIdentificadores).ThenBy(l => l.LineaDeReservaId, OrdenDeBloqueo.DeIdentificadores)];
             },
             cancelacion);
 

@@ -50,6 +50,17 @@ internal sealed class LimitesDeReservar(
         return Traducir(porOrigen, MotivosDeLimiteDeReservas.PorHoraPorOrigen);
     }
 
+    /// <summary>
+    /// El rechazo por el tope de reemplazos (SEL-36): con el instante de expiración de la reserva vigente, que se conserva, y el evento de seguridad una sola vez. Es la misma respuesta de límite que los demás motivos.
+    /// </summary>
+    public async Task<ErrorDeAplicacion> RechazarPorTopeDeReemplazos(Guid clienteId, Domain.Reservas.ReservaDePedido vigente, CancellationToken cancelacion)
+    {
+        var ahora = reloj.Ahora;
+        var vence = vigente.FechaDeExpiracion ?? ahora.AddMinutes(1);
+        await PublicarEventoPropio(MotivosDeLimiteDeReservas.ReemplazosPorPedido, clienteId.ToString("D"), ahora, cancelacion).ConfigureAwait(false);
+        return Rechazo(new RechazoPorLimite(MotivosDeLimiteDeReservas.ReemplazosPorPedido, Segundos(vence - ahora), vence));
+    }
+
     /// <summary>El rechazo uniforme de un límite: categoría <c>Limite</c>, clave estable y los tres datos del reintento.</summary>
     public static ErrorDeAplicacion Rechazo(RechazoPorLimite rechazo) =>
         new(CategoriaDeError.Limite, DetalleDeLimiteDeReservas.ClaveDeLimiteExcedido, DetalleDeLimiteDeReservas.Codificar(rechazo));

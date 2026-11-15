@@ -13,6 +13,9 @@ public sealed record DatosDeLaSolicitud(string ClaveDeIdempotencia, string Huell
 /// <summary>Una reserva guardada con la huella de la carga con la que se creó (D03).</summary>
 public sealed record ReservaPorClave(ReservaDePedido Reserva, string HuellaDeLaCarga);
 
+/// <summary>Una línea que pasó a liberada: lo necesario para devolver sus unidades y auditar la liberación (sin datos del cliente).</summary>
+public sealed record LineaLiberada(Guid PedidoId, Guid LineaDeReservaId, Guid LineaId, Guid EdicionId, Guid FuenteId, int Cantidad, Guid? TrasladoId, bool EstabaConfirmada);
+
 /// <summary>Una línea pendiente cuya cabecera ya venció: lo necesario para devolver sus unidades y auditar su expiración (sin datos del cliente). Es lo que devuelve la lectura de vencidas y lo que devuelve su paso a expirada.</summary>
 public sealed record LineaVencida(Guid PedidoId, Guid LineaDeReservaId, Guid LineaId, Guid EdicionId, Guid FuenteId, int Cantidad);
 
@@ -54,6 +57,12 @@ public interface IRepositorioDeReservas
     /// con una sola sentencia condicional; devuelve solo las que de verdad cambiaron. Quien llama ya tomó el bloqueo asesor del pedido.
     /// </summary>
     Task<IReadOnlyList<LineaVencida>> ExpirarLineasVencidas(Guid pedidoId, IReadOnlyCollection<Guid>? edicionIds, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Pasa a <b>liberadas</b> las líneas activas del pedido (pendientes, y confirmadas si <paramref name="incluirConfirmadas"/>), opcionalmente solo las de esas líneas del pedido (<paramref name="lineaIds"/>), con una
+    /// sola sentencia condicional que las bloquea por id y en orden y devuelve <b>solo las que de verdad cambiaron</b>. Quien llama ya tomó el bloqueo del pedido y bloqueó las filas de stock.
+    /// </summary>
+    Task<IReadOnlyList<LineaLiberada>> LiberarLineas(Guid pedidoId, bool incluirConfirmadas, IReadOnlyCollection<Guid>? lineaIds, DateTimeOffset ahora, CancellationToken cancelacion = default);
 
     /// <summary>Hasta <paramref name="maximo"/> pedidos que apartan unidades de la pareja (líneas pendientes no vencidas o confirmadas) y el total de pedidos, solo identificadores (AJU-06).</summary>
     Task<PedidosQueApartanUnidades> PedidosQueApartan(Guid fuenteId, Guid edicionId, int maximo, DateTimeOffset ahora, CancellationToken cancelacion = default);

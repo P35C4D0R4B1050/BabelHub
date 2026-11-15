@@ -300,22 +300,6 @@ public sealed class ReservarUnidadesTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEL-16")]
-    public async Task Reservar_UnPedidoQueYaTieneReservaDelMismoCliente_SeRechazaHastaQueElReemplazoLoTrate()
-    {
-        var entorno = new EntornoDeReservas();
-        var libro = entorno.Impresa();
-        entorno.Base.Existencias.Poner(entorno.Base.Lima.Id, libro, 5, 0);
-        var pedido = Guid.NewGuid();
-        Assert.True((await entorno.Reservar().Ejecutar(ARecojo("lima", [Linea(libro)], pedido))).EsExito);
-
-        var otra = await entorno.Reservar().Ejecutar(ARecojo("lima", [Linea(libro)], pedido));
-
-        Assert.Equal((CategoriaDeError.Conflicto, "reserva-existente"), (otra.Error!.Categoria, otra.Error.Clave));
-        Assert.Equal((5, 1), entorno.FilaDe(entorno.Base.Lima, libro));
-    }
-
-    [Fact]
     [Trait("Criterio", "AC-SEL-01")]
     public async Task Reservar_ConLaSucursalDeRecojoInexistente_EsUnaValidacionDelCampo()
     {

@@ -309,8 +309,8 @@ public sealed class ConcurrenciaDeReservasTests(PostgresDeReservasFixture bd) : 
         Assert.Equal((5, 0), await bd.StockDe(f.Lima, libro));
     }
     [Fact]
-    [Trait("Criterio", "AC-SEL-04")]
-    public async Task LasSolicitudesDelMismoClienteSeSerializan_YElMismoPedidoNoSeReservaDosVeces()
+    [Trait("Criterio", "AC-SEL-37")]
+    public async Task LasSolicitudesDelMismoClienteSobreElMismoPedidoSeSerializan_UnaCreaTresReemplazanYElRestoPasaElTope()
     {
         var f = await TresFuentes();
         var libro = await bd.AgregarEdicion();
@@ -319,13 +319,85 @@ public sealed class ConcurrenciaDeReservasTests(PostgresDeReservasFixture bd) : 
         var cliente = Cliente();
         var pedido = Guid.NewGuid();
 
-        // Diez intentos simultáneos del mismo cliente sobre el mismo pedido: solo uno crea la reserva, los demás ven «reserva-existente» (hasta que T11 los trate como repetición idempotente).
+        // Diez intentos simultáneos del mismo cliente sobre el mismo pedido: el bloqueo del cliente los serializa; el primero crea, tres reemplazan y los demás topan con SEL-36.
         var resultados = await Simultaneas(Enumerable.Range(0, 10).Select<int, Func<Task<Resultado<ReservaDelPedido>>>>(
             _ => () => pila.Reservar(cliente, ARecojo("lima", [Linea(libro)], pedido))));
 
-        Assert.Equal(1, resultados.Count(r => r.EsExito));
-        Assert.All(resultados.Where(r => !r.EsExito), r => Assert.Equal("reserva-existente", r.Error!.Clave));
+        Assert.Equal(4, resultados.Count(r => r.EsExito));
+        Assert.All(resultados.Where(r => !r.EsExito), r => Assert.Equal(MotivosDeLimiteDeReservas.ReemplazosPorPedido, Rechazo(r)));
         Assert.Equal((50, 1), await bd.StockDe(f.Lima, libro));
-        Assert.Equal(1L, await bd.Consultar<long>($"SELECT count(*) FROM reservas.reserva_lineas WHERE pedido_id = '{pedido}'"));
+        Assert.Equal(1L, await bd.Consultar<long>($"SELECT count(*) FROM reservas.reserva_lineas WHERE pedido_id = '{pedido}' AND estado = 'pendiente'"));
+        Assert.Equal(3L, await bd.Consultar<long>($"SELECT count(*) FROM reservas.reserva_lineas WHERE pedido_id = '{pedido}' AND estado = 'liberada'"));
+        Assert.Equal(3, await bd.Consultar<int>($"SELECT max(reemplazos) FROM reservas.reservas WHERE pedido_id = '{pedido}'"));
+        Assert.Equal(await bd.ReservadoDeLaRed(libro), await bd.UnidadesDeLineasActivas(libro));
+    }
+
+    private static string Rechazo(Resultado<ReservaDelPedido> resultado)
+    {
+        Assert.Equal((CategoriaDeError.Limite, "limite-excedido"), (resultado.Error!.Categoria, resultado.Error.Clave));
+        Assert.True(DetalleDeLimiteDeReservas.TryLeer(resultado.Error.Errores, out var rechazo));
+        return rechazo!.Motivo;
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-16")]
+    public async Task DosClientesSimultaneosConElMismoPedido_UnoGanaYElOtroEsNoEncontrado_NuncaUn500()
+    {
+        var f = await TresFuentes();
+        var libro = await bd.AgregarEdicion();
+        await bd.PonerStock(f.Lima, libro, 50, 0);
+        using var pila = new PilaDeReservas(bd);
+        var pedido = Guid.NewGuid();
+
+        var resultados = await Simultaneas(Enumerable.Range(0, 2).Select<int, Func<Task<Resultado<ReservaDelPedido>>>>(
+            _ => () => pila.Reservar(Cliente(), ARecojo("lima", [Linea(libro)], pedido))));
+
+        Assert.Equal(1, resultados.Count(r => r.EsExito));
+        var perdedor = Assert.Single(resultados, r => !r.EsExito);
+        Assert.Equal((CategoriaDeError.NoEncontrado, "reserva-no-encontrada"), (perdedor.Error!.Categoria, perdedor.Error.Clave));
+        Assert.Equal((50, 1), await bd.StockDe(f.Lima, libro));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-16")]
+    public async Task UnReemplazoYUnasVencidasConEdicionesCruzadasEnOrdenContrario_NoSeInterbloquean_YTodoQuedaCoherente()
+    {
+        var f = await TresFuentes();
+        var a = await bd.AgregarEdicion();
+        var b = await bd.AgregarEdicion();
+        await bd.PonerStock(f.Lima, a, 1000, 0);
+        await bd.PonerStock(f.Lima, b, 1000, 0);
+        using var pila = new PilaDeReservas(bd);
+        for (var i = 0; i < 6; i++)
+        {
+            Assert.True((await pila.Reservar(Cliente(), ARecojo("lima", i % 2 == 0 ? [Linea(a, 2), Linea(b, 3)] : [Linea(b, 2), Linea(a, 3)]))).EsExito);
+        }
+
+        pila.Reloj.Ahora = pila.Reloj.Ahora.AddMinutes(16);
+        var duena = Cliente();
+        var pedido = Guid.NewGuid();
+        Assert.True((await pila.Reservar(duena, ARecojo("lima", [Linea(a, 1), Linea(b, 1)], pedido))).EsExito);
+        var antes = await Interbloqueos();
+
+        var trabajos = new List<Func<Task<bool>>>
+        {
+            // El reemplazo toma las ediciones en el orden contrario al de la reserva que sustituye.
+            async () => (await pila.Reservar(duena, ARecojo("lima", [Linea(b, 4), Linea(a, 5)], pedido))).EsExito,
+        };
+        for (var i = 0; i < 12; i++)
+        {
+            var cruzada = i % 2 == 0;
+            trabajos.Add(async () => (await pila.Reservar(Cliente(), ARecojo("lima", cruzada ? [Linea(a), Linea(b)] : [Linea(b), Linea(a)]))).EsExito);
+        }
+
+        var resultados = await Simultaneas(trabajos);
+
+        Assert.All(resultados, ok => Assert.True(ok));
+        Assert.True((await pila.Reservar(Cliente(), ARecojo("lima", [Linea(a), Linea(b)]))).EsExito);
+        Assert.Equal(12L, await bd.Consultar<long>("SELECT count(*) FROM reservas.reserva_lineas WHERE estado = 'expirada'"));
+        Assert.Equal(12, pila.Auditoria.Contar("ReservaExpirada"));
+        Assert.Equal(2, pila.Auditoria.Contar("ReservaLiberada"));
+        await AfirmarCoherencia(a, b);
+        Assert.Equal(0, await InterbloqueosDespuesDe(antes));
     }
 }

@@ -68,7 +68,7 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
     public Task<ReservaDePedido?> UltimaDelPedido(Guid pedidoId, CancellationToken cancelacion = default)
     {
         bitacora.Anotar("reservas.UltimaDelPedido");
-        return Task.FromResult(Guardadas.Where(r => r.PedidoId == pedidoId).OrderByDescending(r => r.IniciadaEn).FirstOrDefault());
+        return Task.FromResult(Guardadas.Where(r => r.PedidoId == pedidoId).OrderByDescending(r => r.Reemplazos).ThenByDescending(r => r.IniciadaEn).FirstOrDefault());
     }
 
     /// <summary>Los titulares dados de baja (SEL-35).</summary>
@@ -148,6 +148,23 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
         }
 
         return Task.FromResult<IReadOnlyList<LineaVencida>>(cambiadas);
+    }
+
+    public Task<IReadOnlyList<LineaLiberada>> LiberarLineas(Guid pedidoId, bool incluirConfirmadas, IReadOnlyCollection<Guid>? lineaIds, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.LiberarLineas");
+        var liberadas = new List<LineaLiberada>();
+        foreach (var reserva in Guardadas.Where(r => r.PedidoId == pedidoId))
+        {
+            foreach (var linea in reserva.Lineas.Where(l => (l.Estado == EstadoDeLinea.Pendiente || (incluirConfirmadas && l.Estado == EstadoDeLinea.Confirmada)) && (lineaIds is null || lineaIds.Contains(l.LineaId))))
+            {
+                var estabaConfirmada = linea.Estado == EstadoDeLinea.Confirmada;
+                linea.Liberar(ahora);
+                liberadas.Add(new LineaLiberada(pedidoId, linea.Id, linea.LineaId, linea.EdicionId, linea.FuenteId, linea.Cantidad, linea.TrasladoId, estabaConfirmada));
+            }
+        }
+
+        return Task.FromResult<IReadOnlyList<LineaLiberada>>(liberadas);
     }
 
     public Task<PedidosQueApartanUnidades> PedidosQueApartan(Guid fuenteId, Guid edicionId, int maximo, DateTimeOffset ahora, CancellationToken cancelacion = default)
@@ -275,6 +292,7 @@ internal sealed class EntornoDeReservas
             Stock,
             new SelectorDeFuentes(Directorio, estrategia ?? new SeleccionPorCercania()),
             new ConstructorDeLaReserva(Directorio),
+            Auditoria,
             Limites,
             Base.Reloj);
 

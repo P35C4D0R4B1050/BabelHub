@@ -1,3 +1,4 @@
+using BabelHub.Inventario.Application.Auditoria;
 using BabelHub.Inventario.Application.Fuentes;
 using BabelHub.Inventario.Application.Plataforma;
 using BabelHub.Inventario.Domain.Reservas;
@@ -36,6 +37,7 @@ internal sealed class ReservarUnidades(
     IMovimientosDeStock stock,
     SelectorDeFuentes selector,
     ConstructorDeLaReserva constructor,
+    IAuditoria auditoria,
     LimitesDeReservar limites,
     IReloj reloj) : ICasoDeUso<ReservarEntrada, ReservaDelPedido>
 {
@@ -93,12 +95,30 @@ internal sealed class ReservarUnidades(
 
         await bloqueos.Pedido(entrada.PedidoId, cancelacion).ConfigureAwait(false);
 
+        // La propiedad se comprueba bajo el bloqueo del pedido (dos clientes simultáneos con el mismo pedido: uno recibe «no encontrado»). Repetir el pedido con una reserva pendiente vigente la reemplaza (SEL-16);
+        // si la última cabecera ya no está pendiente (confirmada, expirada o liberada, o vencida aunque nadie la barrió) el cliente reinicia con un pedido nuevo.
+        var ahora = reloj.Ahora;
         var anterior = await reservas.UltimaDelPedido(entrada.PedidoId, cancelacion).ConfigureAwait(false);
+        ReservaDePedido? reemplazada = null;
         if (anterior is not null)
         {
-            return anterior.ClienteId != clienteId
-                ? FallosDeReservas.Fallo<ReservaDelPedido>(await autorizador.PedidoAjeno(cancelacion).ConfigureAwait(false))
-                : FallosDeReservas.De<ReservaDelPedido>(CategoriaDeError.Conflicto, ClavesDeReservas.ReservaExistente);
+            if (anterior.ClienteId != clienteId)
+            {
+                return FallosDeReservas.Fallo<ReservaDelPedido>(await autorizador.PedidoAjeno(cancelacion).ConfigureAwait(false));
+            }
+
+            if (!anterior.TienePendienteVigente(ahora))
+            {
+                return FallosDeReservas.De<ReservaDelPedido>(CategoriaDeError.Conflicto, ClavesDeReservas.ReservaEstadoInvalido);
+            }
+
+            // El tope de 3 reemplazos acota retener stock sin pagar (SEL-36): se rechaza con el instante de expiración de la vigente, que se conserva.
+            if (!ContadorDeReemplazos.Admite(anterior.Reemplazos))
+            {
+                return FallosDeReservas.Fallo<ReservaDelPedido>(await limites.RechazarPorTopeDeReemplazos(clienteId, anterior, cancelacion).ConfigureAwait(false));
+            }
+
+            reemplazada = anterior;
         }
 
         if (await ValidarEdiciones(entrada, cancelacion).ConfigureAwait(false) is { } falloDeEdicion)
@@ -113,17 +133,33 @@ internal sealed class ReservarUnidades(
         }
 
         // Los límites cuentan en esta transacción y bajo el bloqueo del cliente: un rechazo posterior (stock) los deshace con ella (SEL-14).
-        if (await limites.Evaluar(clienteId, entrada.PedidoId, cancelacion).ConfigureAwait(false) is { } rechazoPorLimite)
+        // Un reemplazo no cuenta ni consume los demás límites (SEL-16): el pedido ya contó cuando se inició.
+        if (reemplazada is null && await limites.Evaluar(clienteId, entrada.PedidoId, cancelacion).ConfigureAwait(false) is { } rechazoPorLimite)
         {
             return FallosDeReservas.Fallo<ReservaDelPedido>(rechazoPorLimite);
         }
 
         var lineas = entrada.Lineas.OrderBy(l => l.EdicionId, OrdenDeBloqueo.DeIdentificadores).ToList();
-        var bloqueo = await stock.Bloquear([.. lineas.Select(l => l.EdicionId)], cancelacion).ConfigureAwait(false);
+
+        // Se bloquean las filas de stock de las ediciones nuevas y de las que devuelve la reserva reemplazada, todas en el orden único (edición, fuente).
+        var edicionesAfectadas = lineas.Select(l => l.EdicionId).Concat(reemplazada?.Lineas.Where(l => l.Estado == EstadoDeLinea.Pendiente).Select(l => l.EdicionId) ?? []).Distinct().ToList();
+        var bloqueo = await stock.Bloquear(edicionesAfectadas, cancelacion).ConfigureAwait(false);
         if (!bloqueo.EstaBloqueado)
         {
             // La ficha cambió entre la comprobación y el bloqueo: se trata como edición no impresa.
             return FallosDeReservas.De<ReservaDelPedido>(CategoriaDeError.ReglaDeNegocio, ClavesDeReservas.EdicionNoImpresa);
+        }
+
+        if (reemplazada is not null)
+        {
+            // La anterior se libera ya con todas las filas bloqueadas (líneas por id, deltas agregados y ordenados) para que su stock cuente como disponible al elegir; si la nueva falla, la transacción la devuelve intacta.
+            var liberadas = await reservas.LiberarLineas(entrada.PedidoId, incluirConfirmadas: false, null, ahora, cancelacion).ConfigureAwait(false);
+            if (await DevolverLoLiberado(liberadas, cancelacion).ConfigureAwait(false) is { } falloAlDevolver)
+            {
+                return falloAlDevolver;
+            }
+
+            bloqueo = ConLoDevuelto(bloqueo, liberadas);
         }
 
         var seleccionadas = new List<(LineaSolicitada Linea, Guid FuenteId)>(lineas.Count);
@@ -153,7 +189,7 @@ internal sealed class ReservarUnidades(
             return falloDeAplicacion;
         }
 
-        var ahora = reloj.Ahora;
+        // La cuenta de reemplazos y la marca de «ya se extendió» se heredan: liberar la anterior por reemplazo no las reinicia (SEL-36, SEL-22).
         var reserva = ReservaDePedido.Iniciar(
             Guid.NewGuid(),
             entrada.PedidoId,
@@ -162,10 +198,67 @@ internal sealed class ReservarUnidades(
             destino.SucursalDeRecojo?.Id,
             entrada.RegionDeEntrega,
             ahora,
-            seleccionadas.Select(s => LineaDeReserva.Pendiente(Guid.NewGuid(), s.Linea.LineaId, s.Linea.EdicionId, s.FuenteId, s.Linea.Cantidad, ahora)));
+            seleccionadas.Select(s => LineaDeReserva.Pendiente(Guid.NewGuid(), s.Linea.LineaId, s.Linea.EdicionId, s.FuenteId, s.Linea.Cantidad, ahora)),
+            reemplazada is null ? 0 : ContadorDeReemplazos.Siguiente(reemplazada.Reemplazos),
+            reemplazada?.Extendida ?? false);
 
         await reservas.Insertar(reserva, new DatosDeLaSolicitud(entrada.ClaveDeIdempotencia, CargaCanonicaDeReservar.Huella(entrada), limites.HuellaDeOrigen), cancelacion).ConfigureAwait(false);
         return Resultado<ReservaDelPedido>.Exito(await constructor.Construir(reserva, esRepeticion: false, cancelacion).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Devuelve al vendible las unidades de la reserva reemplazada con <c>Aplicar(0, −c)</c> agregado y ordenado por (edición, fuente), y audita cada línea liberada (<c>ReservaLiberada</c>, causa «reemplazo») en la misma
+    /// transacción: si no se puede auditar, la excepción revierte todo y la anterior sigue intacta (AUD-04).
+    /// </summary>
+    private async Task<Resultado<ReservaDelPedido>?> DevolverLoLiberado(IReadOnlyList<LineaLiberada> liberadas, CancellationToken cancelacion)
+    {
+        var movimientos = liberadas
+            .GroupBy(l => (l.FuenteId, l.EdicionId))
+            .Select(g => new MovimientoDeStock(g.Key.FuenteId, g.Key.EdicionId, 0, -checked(g.Sum(l => l.Cantidad))))
+            .OrderBy(m => m.EdicionId, OrdenDeBloqueo.DeIdentificadores)
+            .ThenBy(m => m.FuenteId, OrdenDeBloqueo.DeIdentificadores);
+
+        foreach (var movimiento in movimientos)
+        {
+            var resultado = await stock.Aplicar(movimiento, cancelacion).ConfigureAwait(false);
+            if (resultado.Resultado == ResultadoDeMovimiento.DeniegadoPorAlcance)
+            {
+                return FallosDeReservas.Fallo<ReservaDelPedido>(await autorizador.DenegadoPorAlcance(cancelacion).ConfigureAwait(false));
+            }
+
+            if (!resultado.Aplicado)
+            {
+                // Devolver lo que esta misma transacción tenía reservado nunca debería fallar: un estado imposible aborta (la transacción se revierte).
+                throw new InvalidOperationException("No se pudo devolver al vendible la reserva reemplazada.");
+            }
+        }
+
+        foreach (var linea in liberadas)
+        {
+            await auditoria.Registrar(
+                new SolicitudDeRegistro(AccionesAuditables.ReservaLiberada)
+                {
+                    ObjetoTipo = "pedido",
+                    ObjetoId = linea.PedidoId.ToString("D"),
+                    SucursalOrigen = linea.FuenteId,
+                    Detalle = new Dictionary<string, string?>
+                    {
+                        ["edicionId"] = linea.EdicionId.ToString("D"),
+                        ["cantidad"] = linea.Cantidad.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        ["causa"] = "reemplazo",
+                    },
+                },
+                cancelacion).ConfigureAwait(false);
+        }
+
+        return null;
+    }
+
+    /// <summary>Las filas bloqueadas tal como quedaron tras devolver lo liberado: lo que la reserva reemplazada apartaba cuenta como vendible para elegir la fuente de la nueva.</summary>
+    private static BloqueoDeStock ConLoDevuelto(BloqueoDeStock bloqueo, IReadOnlyList<LineaLiberada> liberadas)
+    {
+        var devuelto = liberadas.GroupBy(l => (l.FuenteId, l.EdicionId)).ToDictionary(g => g.Key, g => g.Sum(l => l.Cantidad));
+        return BloqueoDeStock.Con([.. bloqueo.Filas.Select(f => devuelto.TryGetValue((f.FuenteId, f.EdicionId), out var unidades) ? f with { Reservado = Math.Max(0, f.Reservado - unidades) } : f)]);
     }
 
     /// <summary>Toda edición debe existir y ser impresa (SEL-12): una desconocida es «no encontrada» y una digital se rechaza porque los libros digitales no se reservan.</summary>
