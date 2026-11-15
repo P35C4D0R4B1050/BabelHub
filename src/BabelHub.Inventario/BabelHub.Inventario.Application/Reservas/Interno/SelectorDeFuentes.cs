@@ -162,8 +162,9 @@ internal sealed class ConstructorDeLaReserva(IDirectorioDeFuentes directorio)
         ArgumentNullException.ThrowIfNull(reserva);
 
         var fuentes = (await directorio.Listar(cancelacion).ConfigureAwait(false)).ToDictionary(f => f.Id);
+        // Un orden estable (edición y línea del pedido): la respuesta de una repetición, leída de la base, es la misma que la original.
         var lineas = new List<LineaReservada>(reserva.Lineas.Count);
-        foreach (var linea in reserva.Lineas)
+        foreach (var linea in reserva.Lineas.OrderBy(l => l.EdicionId, OrdenDeBloqueo.DeIdentificadores).ThenBy(l => l.LineaId, OrdenDeBloqueo.DeIdentificadores))
         {
             var fuente = fuentes.GetValueOrDefault(linea.FuenteId)
                 ?? throw new InvalidOperationException("La línea de la reserva nombra una fuente que no existe.");

@@ -1,4 +1,5 @@
 using BabelHub.Inventario.Application.Plataforma;
+using BabelHub.Inventario.Infrastructure.Fuentes;
 using BabelHub.Inventario.Infrastructure.Plataforma;
 using BabelHub.Inventario.Infrastructure.Reservas;
 using BabelHub.IntegrationTests.Fuentes;
@@ -31,12 +32,15 @@ public sealed class PostgresDeReservasFixture : IAsyncLifetime
         await _contenedor.StartAsync();
         Administracion = NpgsqlDataSource.Create(_contenedor.GetConnectionString());
 
+        await Ejecutar(DefinicionDeFuentes.Rol);
         await Ejecutar(DefinicionDeReservas.Rol);
         await Ejecutar($"""
             CREATE ROLE propietario NOLOGIN;
             CREATE ROLE acceso LOGIN NOINHERIT PASSWORD '{ClaveDeAcceso}';
             GRANT rol_reservas TO acceso;
+            GRANT rol_fuentes TO acceso;
             """);
+        await Ejecutar(DefinicionDeFuentes.Sql);
         await Ejecutar(DefinicionDeReservas.Sql);
         await Ejecutar("""
             ALTER SCHEMA reservas OWNER TO propietario;
@@ -45,6 +49,14 @@ public sealed class PostgresDeReservasFixture : IAsyncLifetime
             ALTER TABLE reservas.operaciones_idempotentes OWNER TO propietario;
             ALTER TABLE reservas.bajas_recibidas OWNER TO propietario;
             """);
+        await Ejecutar("""
+            ALTER SCHEMA fuentes OWNER TO propietario;
+            ALTER TABLE fuentes.fuentes OWNER TO propietario;
+            ALTER TABLE fuentes.ediciones OWNER TO propietario;
+            ALTER TABLE fuentes.stock OWNER TO propietario;
+            ALTER TABLE fuentes.rutas OWNER TO propietario;
+            """);
+        await Ejecutar(DefinicionDeFuentes.Permisos);
         await Ejecutar(DefinicionDeReservas.Permisos);
 
         Acceso = NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString())
@@ -83,7 +95,69 @@ public sealed class PostgresDeReservasFixture : IAsyncLifetime
         return valor is null or DBNull ? default : (T)valor;
     }
 
-    public Task Limpiar() => Ejecutar("TRUNCATE reservas.reserva_lineas, reservas.reservas, reservas.operaciones_idempotentes, reservas.bajas_recibidas");
+    public Task Limpiar() => Ejecutar(
+        "TRUNCATE reservas.reserva_lineas, reservas.reservas, reservas.operaciones_idempotentes, reservas.bajas_recibidas, fuentes.stock, fuentes.rutas, fuentes.ediciones, fuentes.fuentes CASCADE");
+
+    // --- los datos de Fuentes (con la cuenta de despliegue) ---
+
+    public async Task<Guid> AgregarFuente(string codigo, string? region = null, bool recepcion = false)
+    {
+        var id = Guid.NewGuid();
+        await using var comando = Administracion.CreateCommand(
+            "INSERT INTO fuentes.fuentes (id, codigo, nombre, region, es_recepcion) VALUES (@id, @codigo, @nombre, @region, @recepcion)");
+        comando.Parameters.AddWithValue("id", id);
+        comando.Parameters.AddWithValue("codigo", codigo);
+        comando.Parameters.AddWithValue("nombre", char.ToUpperInvariant(codigo[0]) + codigo[1..]);
+        comando.Parameters.AddWithValue("region", region ?? codigo);
+        comando.Parameters.AddWithValue("recepcion", recepcion);
+        await comando.ExecuteNonQueryAsync();
+        return id;
+    }
+
+    public async Task<Guid> AgregarEdicion(string formato = "impreso")
+    {
+        var id = Guid.NewGuid();
+        await using var comando = Administracion.CreateCommand("INSERT INTO fuentes.ediciones (edicion_id, formato) VALUES (@id, @formato)");
+        comando.Parameters.AddWithValue("id", id);
+        comando.Parameters.AddWithValue("formato", formato);
+        await comando.ExecuteNonQueryAsync();
+        return id;
+    }
+
+    public async Task PonerStock(Guid fuenteId, Guid edicionId, int fisico, int reservado)
+    {
+        await using var comando = Administracion.CreateCommand(
+            """
+            INSERT INTO fuentes.stock (fuente_id, edicion_id, formato, fisico, reservado) VALUES (@f, @e, 'impreso', @fi, @re)
+            ON CONFLICT (fuente_id, edicion_id) DO UPDATE SET fisico = @fi, reservado = @re
+            """);
+        comando.Parameters.AddWithValue("f", fuenteId);
+        comando.Parameters.AddWithValue("e", edicionId);
+        comando.Parameters.AddWithValue("fi", fisico);
+        comando.Parameters.AddWithValue("re", reservado);
+        await comando.ExecuteNonQueryAsync();
+    }
+
+    public async Task DefinirRuta(Guid origenId, Guid destinoId, int dias) =>
+        await Ejecutar($"INSERT INTO fuentes.rutas (origen_id, destino_id, plazo_dias) VALUES ('{origenId}', '{destinoId}', {dias}) ON CONFLICT (origen_id, destino_id) DO UPDATE SET plazo_dias = {dias}");
+
+    /// <summary>El stock actual de una pareja leído con la cuenta de despliegue (se salta la política), o <see langword="null"/> si no hay fila.</summary>
+    public async Task<(int Fisico, int Reservado)?> StockDe(Guid fuenteId, Guid edicionId)
+    {
+        await using var comando = Administracion.CreateCommand("SELECT fisico, reservado FROM fuentes.stock WHERE fuente_id = @f AND edicion_id = @e");
+        comando.Parameters.AddWithValue("f", fuenteId);
+        comando.Parameters.AddWithValue("e", edicionId);
+        await using var lector = await comando.ExecuteReaderAsync();
+        return await lector.ReadAsync() ? (lector.GetInt32(0), lector.GetInt32(1)) : null;
+    }
+
+    /// <summary>Las unidades reservadas de la red para una edición.</summary>
+    public async Task<long> ReservadoDeLaRed(Guid edicionId) =>
+        await Consultar<long>($"SELECT coalesce(sum(reservado), 0) FROM fuentes.stock WHERE edicion_id = '{edicionId}'");
+
+    /// <summary>La suma de las cantidades de las líneas activas (pendientes o confirmadas) de la red para una edición: debe coincidir con lo reservado.</summary>
+    public async Task<long> UnidadesDeLineasActivas(Guid edicionId) =>
+        await Consultar<long>($"SELECT coalesce(sum(cantidad), 0) FROM reservas.reserva_lineas WHERE edicion_id = '{edicionId}' AND estado IN ('pendiente', 'confirmada')");
 
     /// <summary>Una unidad de trabajo con el rol real de la aplicación y el actor dado (<see langword="null"/> = nadie estableció el contexto).</summary>
     public UnidadDeTrabajoPostgres Unidad(ActorActual? actor) => new(Acceso, actor: new ActorFijo(actor));

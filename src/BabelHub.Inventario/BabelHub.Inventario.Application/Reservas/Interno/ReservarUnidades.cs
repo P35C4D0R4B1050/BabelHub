@@ -64,6 +64,11 @@ internal sealed class ReservarUnidades(
         {
             return FallosDeReservas.BloqueoOcupado<ReservaDelPedido>();
         }
+        catch (ReservaDuplicadaException)
+        {
+            // Una cabecera o una línea activa concurrente que el bloqueo del pedido ya debería impedir: conflicto, nunca un error del servidor.
+            return FallosDeReservas.De<ReservaDelPedido>(CategoriaDeError.Conflicto, ClavesDeReservas.ReservaExistente);
+        }
     }
 
     private async Task<Resultado<ReservaDelPedido>> Reservar(ReservarEntrada entrada, Guid clienteId, CancellationToken cancelacion)

@@ -104,11 +104,14 @@ public static class ComposicionDeFuentes
         ArgumentNullException.ThrowIfNull(proveedor);
 
         var ensamblado = typeof(ComposicionDeFuentes).Assembly;
+
+        // Los adaptadores reales de otros módulos viven por ámbito (usan la transacción en curso); los nulos, como singleton. Un ámbito propio resuelve ambos.
+        using var ambito = proveedor.CreateScope();
         object[] resueltos =
         [
-            proveedor.GetRequiredService<IReservasDeStock>(),
-            proveedor.GetRequiredService<IOrigenDeUnidadesVendidas>(),
-            proveedor.GetRequiredService<IReingresosPorDevolucion>(),
+            ambito.ServiceProvider.GetRequiredService<IReservasDeStock>(),
+            ambito.ServiceProvider.GetRequiredService<IOrigenDeUnidadesVendidas>(),
+            ambito.ServiceProvider.GetRequiredService<IReingresosPorDevolucion>(),
         ];
 
         return [.. resueltos

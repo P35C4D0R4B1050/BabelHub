@@ -60,3 +60,25 @@ internal static class ClavesDeReservas
 
     public const string ReservaEstadoInvalido = "reserva-estado-invalido";
 }
+
+/// <summary>
+/// Una cabecera o una línea activa de otra transacción chocó con la que se insertaba (la restricción única es la última defensa de la clave de idempotencia y de «una línea activa por línea de pedido»). El bloqueo del
+/// pedido y el del cliente ya lo impiden; si ocurre igual, el caso de uso lo traduce a un conflicto y nunca a un error del servidor.
+/// </summary>
+public sealed class ReservaDuplicadaException : Exception
+{
+    public ReservaDuplicadaException()
+        : base("Otra reserva del mismo pedido o con la misma clave de idempotencia ya existe.")
+    {
+    }
+
+    public ReservaDuplicadaException(Exception interna)
+        : base("Otra reserva del mismo pedido o con la misma clave de idempotencia ya existe.", interna)
+    {
+    }
+
+    public ReservaDuplicadaException(string message, Exception interna)
+        : base(message, interna)
+    {
+    }
+}
