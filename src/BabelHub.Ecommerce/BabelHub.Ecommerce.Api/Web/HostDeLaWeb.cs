@@ -114,7 +114,8 @@ public static class HostDeLaWebExtensiones
         {
             servicios.PostConfigure<HostFilteringOptions>(o =>
             {
-                o.AllowedHosts = [.. opciones.HostsPermitidos];
+                // Los hosts configurados y, solo para el filtro, los de la comprobación de salud local del contenedor (Docker llama a 127.0.0.1 o localhost). La comprobación de Origin usa únicamente los configurados.
+                o.AllowedHosts = [.. opciones.HostsPermitidos, "localhost", "127.0.0.1", "[::1]"];
                 o.AllowEmptyHosts = false;
             });
         }

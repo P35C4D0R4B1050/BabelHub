@@ -134,6 +134,10 @@ internal sealed class AlmacenQueFallaAlGuardar(IAlmacenDeSesionesWeb interno) : 
 
     public Task<IReadOnlyList<SesionGuardada>> CargarParaPurgar(HostDeSesion host, FaseDeLaPurga fase, DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) => interno.CargarParaPurgar(host, fase, ahora, maximo, cancelacion);
 
+    public Task GuardarRetorno(HashDeSesion id, string ruta, CancellationToken cancelacion = default) => interno.GuardarRetorno(id, ruta, cancelacion);
+
+    public Task<string?> TomarRetorno(HashDeSesion id, CancellationToken cancelacion = default) => interno.TomarRetorno(id, cancelacion);
+
     public Task Borrar(HashDeSesion id, CancellationToken cancelacion = default) => interno.Borrar(id, cancelacion);
 }
 
@@ -154,6 +158,14 @@ internal sealed class RegistroDeSeguridadEspiaSeguro : IRegistroDeSeguridadDeLaW
     public Task AccesoDenegado(MotivoDeDenegacionWeb motivo, Guid? usuarioId, CancellationToken cancelacion = default)
     {
         Eventos.Add(motivo);
+        return Task.CompletedTask;
+    }
+
+    public ConcurrentBag<ClaveDeBloqueoPorTextos> Bloqueos { get; } = [];
+
+    public Task TextosPendientesBloqueado(ClaveDeBloqueoPorTextos clave, CancellationToken cancelacion = default)
+    {
+        Bloqueos.Add(clave);
         return Task.CompletedTask;
     }
 }

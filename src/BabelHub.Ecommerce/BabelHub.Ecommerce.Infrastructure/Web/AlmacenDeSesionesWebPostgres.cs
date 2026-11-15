@@ -204,6 +204,39 @@ public sealed class AlmacenDeSesionesWebPostgres(IUnidadDeTrabajo unidad, IConex
             },
             cancelacion);
 
+    public Task GuardarRetorno(HashDeSesion id, string ruta, CancellationToken cancelacion = default) =>
+        AccesoAlEsquemaWeb.Ejecutar(
+            unidad,
+            conexionDeLaUnidad,
+            async (conexion, transaccion, token) =>
+            {
+                // Solo una sesión abierta: una cerrada o vencida no conserva ningún retorno (D05).
+                await using var comando = new NpgsqlCommand("UPDATE web.sesiones_web SET retorno_tras_aceptar = @ruta WHERE id_hash = @id AND cerrada_en IS NULL", conexion, transaccion);
+                comando.Parameters.AddWithValue("id", Convert.FromHexString(id.Valor));
+                comando.Parameters.AddWithValue("ruta", ruta);
+                await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                return 0;
+            },
+            cancelacion);
+
+    public Task<string?> TomarRetorno(HashDeSesion id, CancellationToken cancelacion = default) =>
+        AccesoAlEsquemaWeb.Ejecutar<string?>(
+            unidad,
+            conexionDeLaUnidad,
+            async (conexion, transaccion, token) =>
+            {
+                // De un solo uso y atómico: lee la ruta bajo el bloqueo de la fila y la borra en la misma sentencia; dos solicitudes simultáneas no obtienen la misma.
+                await using var comando = new NpgsqlCommand(
+                    "WITH previa AS (SELECT retorno_tras_aceptar AS ruta FROM web.sesiones_web WHERE id_hash = @id AND cerrada_en IS NULL FOR UPDATE) " +
+                    "UPDATE web.sesiones_web s SET retorno_tras_aceptar = NULL FROM previa WHERE s.id_hash = @id RETURNING previa.ruta",
+                    conexion,
+                    transaccion);
+                comando.Parameters.AddWithValue("id", Convert.FromHexString(id.Valor));
+                var valor = await comando.ExecuteScalarAsync(token).ConfigureAwait(false);
+                return valor as string;
+            },
+            cancelacion);
+
     public Task Borrar(HashDeSesion id, CancellationToken cancelacion = default) =>
         AccesoAlEsquemaWeb.Ejecutar(
             unidad,

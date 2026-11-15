@@ -20,8 +20,8 @@ builder.Services.AddSingleton(typeof(ModoDeArranque), modo);
 builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("ECO"));
 builder.Services.AddSingleton<EjecutorDePasosDeRestauracion>();
 builder.Services.AgregarInterfazWeb();
-// El host de este proceso (tienda o gestion) decide qué áreas se mapean (D03). TODO de composición: pasar esProduccion cuando los Compose entreguen BABELHUB__Web__Host y HostsPermitidos (hoy el servicio real aún no sirve sesiones).
-builder.Services.AgregarHostWeb(OpcionesDelHostWeb.Leer(builder.Configuration, esProduccion: false));
+// El host de este proceso (tienda o gestion) decide qué áreas se mapean (D03). En producción BABELHUB__Web__Host y BABELHUB__Web__HostsPermitidos son obligatorios: sin ellos el arranque falla nombrando la variable.
+builder.Services.AgregarHostWeb(OpcionesDelHostWeb.Leer(builder.Configuration, builder.Environment.IsProduction()));
 // El token del usuario sale de la sesión de la solicitud y solo lo consume el manejador de salida (T14, regla 9).
 builder.Services.AgregarTokenDelUsuarioDeLaSesion();
 // Antiforgery global, Origin y Sec-Fetch-Site y captura del borrador (T16); las claves de Data Protection las compone quien conecte la base (T12).
@@ -70,6 +70,8 @@ app.MapearSalud();
 app.MapDefaultControllerRoute();
 // Una consulta automática (hx-trigger="every …") admite solo GET: si no, el arranque falla (T15).
 ConsultasAutomaticas.Validar(((IEndpointRouteBuilder)app).DataSources.SelectMany(d => d.Endpoints));
+// La política de textos pendientes (T37): todo endpoint atribuido declara métodos de la clase de su capacidad y SinConsultaDeEstado solo en su lista cerrada.
+PoliticaDeTextosPendientes.Validar(((IEndpointRouteBuilder)app).DataSources.SelectMany(d => d.Endpoints));
 // El contenido de terceros solo se abre en las rutas exactas que le corresponden (T17).
 RutasConContenidoDeTerceros.Validar(((IEndpointRouteBuilder)app).DataSources.SelectMany(d => d.Endpoints));
 

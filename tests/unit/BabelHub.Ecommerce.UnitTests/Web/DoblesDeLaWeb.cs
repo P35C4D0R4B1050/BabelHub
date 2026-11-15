@@ -50,6 +50,24 @@ internal sealed class AlmacenDeSesionesEnMemoria : IAlmacenDeSesionesWeb
 
     public int ActualizacionesDeActividad { get; private set; }
 
+    public Dictionary<string, string> Retornos { get; } = [];
+
+    public Task GuardarRetorno(HashDeSesion id, string ruta, CancellationToken cancelacion = default)
+    {
+        if (Filas.TryGetValue(id.Valor, out var fila) && fila.Sesion.Estado == EstadoDeSesion.Abierta)
+        {
+            Retornos[id.Valor] = ruta;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task<string?> TomarRetorno(HashDeSesion id, CancellationToken cancelacion = default)
+    {
+        var hay = Retornos.Remove(id.Valor, out var ruta) && Filas.TryGetValue(id.Valor, out var fila) && fila.Sesion.Estado == EstadoDeSesion.Abierta;
+        return Task.FromResult(hay ? ruta : null);
+    }
+
     public Task<IReadOnlyList<SesionGuardada>> CargarAbiertasDeUnUsuario(Guid usuarioId, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<SesionGuardada>>([.. Filas.Values.Where(f => f.Sesion.UsuarioId == usuarioId && f.Sesion.Estado == EstadoDeSesion.Abierta)]);
 
@@ -209,6 +227,16 @@ internal sealed class RegistroDeSeguridadEspia : IRegistroDeSeguridadDeLaWeb
     {
         Eventos.Add((motivo, usuarioId));
         return Task.CompletedTask;
+    }
+
+    public List<ClaveDeBloqueoPorTextos> Bloqueos { get; } = [];
+
+    public bool FallaAlRegistrar { get; set; }
+
+    public Task TextosPendientesBloqueado(ClaveDeBloqueoPorTextos clave, CancellationToken cancelacion = default)
+    {
+        Bloqueos.Add(clave);
+        return FallaAlRegistrar ? throw new InvalidOperationException("auditoría caída") : Task.CompletedTask;
     }
 }
 

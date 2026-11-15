@@ -104,9 +104,25 @@ public static class ModuloWebExtensiones
         servicios.AddScoped<ITextosLegales, ConsultarTextoLegal>();
         servicios.AddSingleton<IAreasDeInterfaz, AreasDeInterfaz>();
         servicios.TryAddSingleton<IDesafioDelIngreso, DesafioDelIngresoSinIdentidad>();
+        // La política de textos pendientes (T36): el estado y la aceptación los informa Identidad (provisionales y fallando cerrado hasta entonces); el tope de consultas es uno por proceso.
+        servicios.TryAddSingleton<IEstadoDeCuentaDeLaWeb, EstadoDeCuentaSinIdentidad>();
+        servicios.TryAddSingleton<IAceptacionDeTextosEnIdentidad, AceptacionDeTextosSinIdentidad>();
         servicios.AddSingleton<IFuenteDeSucursales, FuenteDeSucursalesNoDisponible>();
         servicios.AddSingleton<IListaDeSucursales, ListaDeSucursalesConUltimaConocida>();
         servicios.AddScoped<IPreferenciaDeSucursal, PreferenciaDeSucursal>();
+        return servicios;
+    }
+
+    /// <summary>
+    /// Registra la política de textos pendientes (T36) y la aceptación (T38). Se llama <b>junto con la composición de la sesión</b> (almacén de sesiones, Identidad y Auditoría reales): la política usa el almacén
+    /// para el retorno tras aceptar y el registro de seguridad para el evento del bloqueo, que no se registran en <see cref="AgregarModuloWeb"/>.
+    /// </summary>
+    public static IServiceCollection AgregarPoliticaDeTextosPendientes(this IServiceCollection servicios)
+    {
+        ArgumentNullException.ThrowIfNull(servicios);
+        servicios.TryAddSingleton<LimitadorDeConsultasDeEstado>();
+        servicios.TryAddScoped<IPoliticaDeAccesoPorTextos, ResolverAccesoConTextosPendientes>();
+        servicios.TryAddScoped<IAceptacionDeTextos, AceptarTextosLegales>();
         return servicios;
     }
 }

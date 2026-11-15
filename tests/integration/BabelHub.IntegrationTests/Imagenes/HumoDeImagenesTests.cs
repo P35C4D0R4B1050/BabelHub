@@ -134,7 +134,7 @@ public sealed class HumoDeImagenesTests : IDisposable
         foreach (var arquitectura in Arquitecturas)
         {
             var imagen = Construir(".", $"src/BabelHub.{servicio}/BabelHub.{servicio}.Api/Dockerfile", arquitectura, servicio.ToLowerInvariant());
-            var contenedor = Arrancar(imagen, arquitectura, "--publish", "127.0.0.1::8080");
+            var contenedor = Arrancar(imagen, arquitectura, "--publish", "127.0.0.1::8080", "--env", "BABELHUB__Web__Host=tienda", "--env", "BABELHUB__Web__HostsPermitidos=www.babelhub.example");
             resultados[arquitectura] = await EsperarSalud(contenedor);
 
             // La arquitectura del contenedor es la pedida y no corre como root.

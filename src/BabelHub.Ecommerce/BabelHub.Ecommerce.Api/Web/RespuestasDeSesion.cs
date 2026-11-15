@@ -29,4 +29,30 @@ public static class RespuestasDeSesion
 
         return contexto.Request.EsHtmx() ? new HxRedirectResult(RutaDelIngreso) : new LocalRedirectResult(RutaDelIngreso);
     }
+
+    /// <summary>Lo mismo que <see cref="RedirigirAlIngreso"/> pero escribiendo la respuesta directamente: para el middleware, que no ejecuta resultados de MVC.</summary>
+    public static void IrAlIngreso(this HttpContext contexto)
+    {
+        ArgumentNullException.ThrowIfNull(contexto);
+        var limpiar = contexto.EstadoDeLaSesion() is EstadoDeLaSesionEnLaSolicitud.Vencida or EstadoDeLaSesionEnLaSolicitud.RenovacionRechazada or EstadoDeLaSesionEnLaSolicitud.Cerrada;
+        if (limpiar)
+        {
+            contexto.Response.LimpiarElNavegador();
+        }
+        else
+        {
+            contexto.Response.Headers.CacheControl = "no-store";
+        }
+
+        if (contexto.Request.EsHtmx())
+        {
+            contexto.Response.StatusCode = StatusCodes.Status200OK;
+            contexto.Response.Headers["HX-Redirect"] = RutaDelIngreso;
+        }
+        else
+        {
+            contexto.Response.StatusCode = StatusCodes.Status302Found;
+            contexto.Response.Headers.Location = RutaDelIngreso;
+        }
+    }
 }

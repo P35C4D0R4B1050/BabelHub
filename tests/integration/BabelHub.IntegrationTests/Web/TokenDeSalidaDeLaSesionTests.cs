@@ -75,6 +75,9 @@ public sealed class TokenDeSalidaDeLaSesionTests
         [
             new(AlcanceDeServicio.OperacionDeUsuario, new ValorSecreto(SecretoDeUsuario)),
             new(AlcanceDeServicio.OrigenReenviado, new ValorSecreto(SecretoDeOrigen)),
+            new(AlcanceDeServicio.ConsultaDeAuditoria, new ValorSecreto("secreto-del-alcance-consulta-de-auditoria-0004")),
+            new(AlcanceDeServicio.MarcarAlerta, new ValorSecreto("secreto-del-alcance-marcar-alerta-de-prueba-0005")),
+            new(AlcanceDeServicio.Historial, new ValorSecreto("secreto-del-alcance-historial-de-prueba-0006x")),
         ]));
         servicios.AddSingleton<IOrigenDeSolicitud>(new OrigenDePrueba());
         void Cliente() => servicios.AgregarClienteDeServicio(nombreDelCliente, new Uri("https://destino.interno/"), new OpcionesDelClienteDeServicio { ReintentosMaximos = 0 })
@@ -137,6 +140,34 @@ public sealed class TokenDeSalidaDeLaSesionTests
 
         Assert.Empty(servidor.Solicitudes);
         Assert.DoesNotContain(registro.Mensajes, m => m.Contains(TokenDeLaSesion, StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-WEB-03")]
+    [InlineData(AlcanceDeServicio.ConsultaDeAuditoria)]
+    [InlineData(AlcanceDeServicio.MarcarAlerta)]
+    [InlineData(AlcanceDeServicio.Historial)]
+    public async Task EnLosAlcancesDeAuditoria_ElTokenTambienEsElDeLaSesion_NuncaElQueElClienteElija(AlcanceDeServicio alcance)
+    {
+        var (http, servidor, contexto, _) = Armar();
+        contexto.EstablecerCredencial(Asegurada());
+        var solicitud = new HttpRequestMessage(HttpMethod.Get, "auditoria").ConAlcance(alcance).ConTokenDeUsuario("token-que-eligio-el-cliente");
+
+        await http.SendAsync(solicitud);
+
+        Assert.Equal("Bearer " + TokenDeLaSesion, Assert.Single(servidor.Cabeceras)["Authorization"]);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-03")]
+    public void LosAlcancesQueActuanPorUnUsuario_SonLosMismosEnElManejadorDelTokenYEnElDeLasCredenciales()
+    {
+        var campo = typeof(CredencialesDeSalidaHandler).GetField("AlcancesQueActuanPorUnUsuario", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        var enLasCredenciales = ((IEnumerable<AlcanceDeServicio>)campo.GetValue(null)!).Order().ToList();
+        var propios = typeof(TokenDelUsuarioDeSalidaHandler)
+            .GetField("AlcancesQueActuanPorUnUsuario", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+
+        Assert.Equal(enLasCredenciales, ((IEnumerable<AlcanceDeServicio>)propios.GetValue(null)!).Order().ToList());
     }
 
     [Fact]

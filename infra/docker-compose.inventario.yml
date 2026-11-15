@@ -99,6 +99,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       BABELHUB__Perfil: Gestion
+      # El rol del proceso (web-base, D03); BABELHUB__Web__HostsPermitidos va en ecommerce-gestion.env: sin él el servicio no arranca.
+      BABELHUB__Web__Host: gestion
     env_file:
       - "${BABELHUB_SECRETOS:?}/ecommerce-gestion.env"
     ports:
