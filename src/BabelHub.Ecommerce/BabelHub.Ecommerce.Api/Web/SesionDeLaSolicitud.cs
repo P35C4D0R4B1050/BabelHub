@@ -81,7 +81,7 @@ public static class SesionDeLaSolicitud
 /// <summary>
 /// Implementa <see cref="ITokenDelUsuarioDeLaSesion"/> desde la sesión de la solicitud en curso (T14, D13): entrega el token solo si la credencial quedó
 /// <b>asegurada</b> (verificada y con más de 60 segundos de vida, ya renovada si hacía falta) y nunca lo pone en un campo, cabecera ni registro. Solo
-/// la consume el manejador de salida de <c>Infrastructure.Plataforma</c>, que es quien lo coloca en <c>Authorization</c>.
+/// la consume <c>TokenDelUsuarioDeSalidaHandler</c> (<c>Infrastructure.Plataforma</c>), que lo deja en las opciones de la solicitud para que <c>CredencialesDeSalidaHandler</c> lo coloque en <c>Authorization</c>.
 /// </summary>
 /// <remarks>
 /// Es un singleton que lee el contexto HTTP del flujo asíncrono (<see cref="IHttpContextAccessor"/>): los manejadores de <c>IHttpClientFactory</c> viven

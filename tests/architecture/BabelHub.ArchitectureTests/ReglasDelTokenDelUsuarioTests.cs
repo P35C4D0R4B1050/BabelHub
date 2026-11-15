@@ -87,6 +87,15 @@ public sealed class ReglasDelTokenDelUsuarioTests
 
     [Fact]
     [Trait("Criterio", "AC-WEB-03")]
+    public void La_Api_no_usa_el_Dominio_solo_los_contratos_de_la_Aplicacion()
+    {
+        var resultado = Types.InAssembly(Cargar("BabelHub.Ecommerce.Api")).ShouldNot().HaveDependencyOn("BabelHub.Ecommerce.Domain").GetResult();
+
+        Assert.True(resultado.IsSuccessful, "La Api usa el Dominio: " + string.Join(", ", resultado.FailingTypeNames ?? []));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-03")]
     public void La_unica_implementacion_en_produccion_es_la_de_la_sesion_de_la_Api()
     {
         var implementaciones = new[] { "BabelHub.Ecommerce.Api", "BabelHub.Ecommerce.Infrastructure", "BabelHub.Ecommerce.Application", "BabelHub.Ecommerce.Domain" }

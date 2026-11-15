@@ -426,7 +426,10 @@ public sealed class AccesoDeLaInterfazTests
 
         // Una por servidor (tienda y gestión); el valor sale solo de la cabecera de Cloudflare, nunca de la del cliente con ese nombre.
         Assert.Equal(2, directivas.Count);
-        Assert.All(directivas, d => Assert.Equal("$http_cf_ipcountry", d.Groups[1].Value));
+        Assert.All(directivas, d => Assert.Equal("$region_del_borde", d.Groups[1].Value));
+        // La región solo vale si la conexión viene del túnel de confianza (como el origen del cliente) y con forma de código de país.
+        Assert.Contains("map \"$viene_del_tunel:$http_cf_ipcountry\" $region_del_borde", configuracion, StringComparison.Ordinal);
+        Assert.Contains("\"~^1:([A-Z]{2})$\" $1;", configuracion, StringComparison.Ordinal);
         Assert.Equal(2, Regex.Matches(configuracion, @"server\s*\{").Count);
     }
 }
