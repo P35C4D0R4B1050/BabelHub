@@ -139,7 +139,7 @@ public sealed class ReservarUnidadesTests
             "bloqueo.Cliente",
             "bloqueo.Pedido",
             "existencias.GarantizarFilas",
-            "reservas.LiberarVencidas",
+            "reservas.PedidosConVencidas",
             "existencias.BloquearFilas",
             "existencias.Aplicar(0,1)",
             "reservas.Insertar",

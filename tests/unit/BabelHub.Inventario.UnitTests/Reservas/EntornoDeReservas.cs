@@ -1,3 +1,4 @@
+using BabelHub.Inventario.Application.Auditoria;
 using BabelHub.Inventario.Application.Fuentes;
 using BabelHub.Inventario.Application.Fuentes.Interno;
 using BabelHub.Inventario.Application.Plataforma;
@@ -22,6 +23,9 @@ internal sealed class BloqueosDeReservasEspia(BitacoraDeLlamadas bitacora) : IBl
 
     public List<Guid> Pedidos { get; } = [];
 
+    /// <summary>Los pedidos que se intentó bloquear sin esperar, en el orden en que se intentó.</summary>
+    public List<Guid> Intentados { get; } = [];
+
     public Task Cliente(Guid clienteId, CancellationToken cancelacion = default)
     {
         bitacora.Anotar("bloqueo.Cliente");
@@ -39,6 +43,7 @@ internal sealed class BloqueosDeReservasEspia(BitacoraDeLlamadas bitacora) : IBl
     public Task<bool> IntentarPedido(Guid pedidoId, CancellationToken cancelacion = default)
     {
         bitacora.Anotar("bloqueo.IntentarPedido");
+        Intentados.Add(pedidoId);
         return Task.FromResult(!PedidosOcupados.Contains(pedidoId));
     }
 
@@ -68,17 +73,106 @@ internal sealed class RepositorioDeReservasEnMemoria(BitacoraDeLlamadas bitacora
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyList<UnidadesVencidas>> VencidasPorEdicion(IReadOnlyCollection<Guid> edicionIds, DateTimeOffset ahora, CancellationToken cancelacion = default) =>
-        throw new NotSupportedException();
+    /// <summary>Las líneas pendientes de cabeceras ya vencidas, de esas ediciones (todas si es nulo).</summary>
+    private IEnumerable<(ReservaDePedido Reserva, LineaDeReserva Linea)> Vencidas(IReadOnlyCollection<Guid>? edicionIds, DateTimeOffset ahora) =>
+        Guardadas
+            .Where(r => r.EstaVencida(ahora))
+            .SelectMany(r => r.Lineas.Where(l => l.Estado == EstadoDeLinea.Pendiente && (edicionIds is null || edicionIds.Contains(l.EdicionId))).Select(l => (r, l)));
 
-    public Task<IReadOnlyList<Guid>> PedidosConVencidas(IReadOnlyCollection<Guid>? edicionIds, DateTimeOffset ahora, CancellationToken cancelacion = default) =>
-        throw new NotSupportedException();
+    public Task<IReadOnlyList<UnidadesVencidas>> VencidasPorEdicion(IReadOnlyCollection<Guid> edicionIds, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.VencidasPorEdicion");
+        return Task.FromResult<IReadOnlyList<UnidadesVencidas>>(
+            [.. Vencidas(edicionIds, ahora)
+                .GroupBy(v => (v.Linea.FuenteId, v.Linea.EdicionId))
+                .Select(g => new UnidadesVencidas(g.Key.FuenteId, g.Key.EdicionId, g.Sum(v => v.Linea.Cantidad)))]);
+    }
 
-    public Task<IReadOnlyList<LineaExpirada>> ExpirarLineasVencidas(Guid pedidoId, IReadOnlyCollection<Guid>? edicionIds, DateTimeOffset ahora, CancellationToken cancelacion = default) =>
-        throw new NotSupportedException();
+    public Task<IReadOnlyList<Guid>> PedidosConVencidas(IReadOnlyCollection<Guid>? edicionIds, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.PedidosConVencidas");
+        return Task.FromResult<IReadOnlyList<Guid>>([.. Vencidas(edicionIds, ahora).Select(v => v.Reserva.PedidoId).Distinct().Order()]);
+    }
 
-    public Task<PedidosQueApartanUnidades> PedidosQueApartan(Guid fuenteId, Guid edicionId, int maximo, DateTimeOffset ahora, CancellationToken cancelacion = default) =>
-        throw new NotSupportedException();
+    public Task<IReadOnlyList<LineaVencida>> VencidasDelPedido(Guid pedidoId, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.VencidasDelPedido");
+        return Task.FromResult<IReadOnlyList<LineaVencida>>(
+            [.. Vencidas(null, ahora).Where(v => v.Reserva.PedidoId == pedidoId).Select(v => new LineaVencida(pedidoId, v.Linea.Id, v.Linea.LineaId, v.Linea.EdicionId, v.Linea.FuenteId, v.Linea.Cantidad))]);
+    }
+
+    public Task<IReadOnlyList<LineaVencida>> ExpirarLineasVencidas(Guid pedidoId, IReadOnlyCollection<Guid>? edicionIds, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar("reservas.ExpirarLineasVencidas");
+        ExpiracionesPedidas.Add(pedidoId);
+
+        // La comprobación de vencimiento se repite con «ahora» al expirar (la sentencia condicional del repositorio real).
+        var cambiadas = new List<LineaVencida>();
+        foreach (var (reserva, linea) in Vencidas(edicionIds, ahora).Where(v => v.Reserva.PedidoId == pedidoId).ToList())
+        {
+            linea.Expirar(ahora);
+            cambiadas.Add(new LineaVencida(pedidoId, linea.Id, linea.LineaId, linea.EdicionId, linea.FuenteId, linea.Cantidad));
+        }
+
+        return Task.FromResult<IReadOnlyList<LineaVencida>>(cambiadas);
+    }
+
+    public Task<PedidosQueApartanUnidades> PedidosQueApartan(Guid fuenteId, Guid edicionId, int maximo, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        var pedidos = Guardadas
+            .Where(r => r.Lineas.Any(l => l.FuenteId == fuenteId && l.EdicionId == edicionId && l.EstaActiva(r.FechaDeExpiracion, ahora)))
+            .Select(r => r.PedidoId)
+            .Distinct()
+            .Order()
+            .ToList();
+        return Task.FromResult(new PedidosQueApartanUnidades([.. pedidos.Take(maximo)], pedidos.Count));
+    }
+
+    /// <summary>Los pedidos cuya expiración se pidió al repositorio, en orden.</summary>
+    public List<Guid> ExpiracionesPedidas { get; } = [];
+}
+
+/// <summary>
+/// El ejecutor «sistema» de prueba: mientras dura el trabajo el actor del contexto es el sistema y al terminar se restaura el anterior (también si falla), como el de la Infraestructura.
+/// </summary>
+internal sealed class EjecutorComoSistemaDoble(ActorDePrueba actor) : IEjecutorComoSistema
+{
+    public int Llamadas { get; private set; }
+
+    public async Task<T> Ejecutar<T>(Func<CancellationToken, Task<T>> trabajo, CancellationToken cancelacion = default)
+    {
+        Llamadas++;
+        var anterior = actor.Actual;
+        actor.Establecer(ActorActual.DelSistema());
+        try
+        {
+            return await trabajo(cancelacion);
+        }
+        finally
+        {
+            actor.Establecer(anterior);
+        }
+    }
+}
+
+/// <summary>La auditoría que anota, junto a cada solicitud, el tipo del actor del contexto en ese instante: así se comprueba que lo expirado se audita con actor «sistema» aunque la transacción sea de un cliente.</summary>
+internal sealed class AuditoriaConActor(ActorDePrueba actor, BitacoraDeLlamadas bitacora) : IAuditoria
+{
+    public List<(SolicitudDeRegistro Solicitud, TipoDeActor? Actor)> Registros { get; } = [];
+
+    public bool Falla { get; set; }
+
+    public Task Registrar(SolicitudDeRegistro solicitud, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar($"auditoria.{solicitud.Accion}");
+        if (Falla)
+        {
+            return Task.FromException(new AuditoriaNoDisponibleException("La auditoría no responde."));
+        }
+
+        Registros.Add((solicitud, actor.Actual?.Tipo));
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>
@@ -92,6 +186,8 @@ internal sealed class EntornoDeReservas
         Base = new EntornoDeFuentes(actor ?? ActorDePrueba.DeCliente());
         Reservas = new RepositorioDeReservasEnMemoria(Base.Bitacora);
         Bloqueos = new BloqueosDeReservasEspia(Base.Bitacora);
+        Auditoria = new AuditoriaConActor(Base.Actor, Base.Bitacora);
+        Sistema = new EjecutorComoSistemaDoble(Base.Actor);
     }
 
     public EntornoDeFuentes Base { get; }
@@ -99,6 +195,10 @@ internal sealed class EntornoDeReservas
     public RepositorioDeReservasEnMemoria Reservas { get; }
 
     public BloqueosDeReservasEspia Bloqueos { get; }
+
+    public AuditoriaConActor Auditoria { get; }
+
+    public EjecutorComoSistemaDoble Sistema { get; }
 
     public Guid ClienteId => Base.Actor.Actual!.UsuarioId!.Value;
 
@@ -108,7 +208,11 @@ internal sealed class EntornoDeReservas
 
     public IAplicadorDeMovimientos Aplicador => new AplicadorDeMovimientos(Base.Existencias);
 
-    public IMovimientosDeStock Stock => new MovimientosDeStock(Base.Fichas, Base.Existencias, Base.Reservas, Aplicador);
+    public IMovimientosDeStock Stock => new MovimientosDeStock(Base.Fichas, Base.Existencias, ReservasDeStock, Aplicador);
+
+    public ReservasDeStock ReservasDeStock => new(Reservas, Bloqueos, Auditoria, Sistema, Base.Reloj);
+
+    public ExpirarReservasVencidas ExpirarPedido() => new(Autorizador, Bloqueos, Reservas, Stock, Base.Reloj);
 
     public Guid Impresa() => Base.Impresa();
 

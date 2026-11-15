@@ -31,6 +31,13 @@ internal sealed class AutorizadorDeReservas(IActorActual actores, IDenegacionDeA
     public Task<ErrorDeAplicacion?> ExigirCliente(CancellationToken cancelacion) =>
         Evaluar(actor => actor.Tipo == TipoDeActor.Usuario && actor.Rol == RolesDelActor.Cliente && actor.UsuarioId is { } id && id != Guid.Empty ? null : MotivosDeDenegacionDeReservas.FueraDeRol, cancelacion);
 
+    /// <summary>
+    /// Solo el actor «sistema»: la expiración la hace el propio Inventario por su cuenta, con el actor explícito del ejecutor de trabajos de fondo (D08). Un trabajo que corre sin actor responde «no autenticado» y no
+    /// toca nada: el alcance de datos sin actor devolvería cero filas y la expiración pasaría por «nada que expirar» sin error (hallazgo del 2026-11-14).
+    /// </summary>
+    public Task<ErrorDeAplicacion?> ExigirSistema(CancellationToken cancelacion) =>
+        Evaluar(actor => actor.Tipo == TipoDeActor.Sistema ? null : MotivosDeDenegacionDeReservas.FueraDeRol, cancelacion);
+
     /// <summary>Cualquier actor con contexto (la consulta previa sin token la hace el E-commerce con su credencial de servicio): no un visitante ni la ausencia de actor.</summary>
     public Task<ErrorDeAplicacion?> ExigirContexto(CancellationToken cancelacion) => Evaluar(_ => null, cancelacion);
 
