@@ -39,6 +39,18 @@ internal sealed class AreasDeInterfaz : IAreasDeInterfaz
         _ => throw new ArgumentOutOfRangeException(nameof(area)),
     };
 
+    internal static CapacidadDeAcceso Aplicar(CapacidadWeb capacidad) => capacidad switch
+    {
+        CapacidadWeb.Cuenta => CapacidadDeAcceso.Cuenta,
+        CapacidadWeb.Pedidos => CapacidadDeAcceso.Pedidos,
+        CapacidadWeb.Aceptar => CapacidadDeAcceso.Aceptar,
+        CapacidadWeb.CerrarSesion => CapacidadDeAcceso.CerrarSesion,
+        CapacidadWeb.TextosLegales => CapacidadDeAcceso.TextosLegales,
+        CapacidadWeb.LibroDeReclamaciones => CapacidadDeAcceso.LibroDeReclamaciones,
+        CapacidadWeb.EnviarHoja => CapacidadDeAcceso.EnviarHoja,
+        _ => throw new ArgumentOutOfRangeException(nameof(capacidad)),
+    };
+
     internal static HostDeSesion Aplicar(HostWeb host) => host == HostWeb.Tienda ? HostDeSesion.Tienda : HostDeSesion.Gestion;
 
     internal static HostWeb Aplicar(HostDeSesion host) => host == HostDeSesion.Tienda ? HostWeb.Tienda : HostWeb.Gestion;

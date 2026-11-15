@@ -26,6 +26,12 @@ public sealed class RegistroDeSeguridadDeLaWebEnAuditoria(IDenegacionDeAcceso de
         }
     }
 
+    /// <summary>
+    /// El bloqueo por textos legales pendientes es un evento <b>propio</b> (WEB-47): su acción y su alerta técnica (AUD-13, AUD-29) las agrega el carril A al catálogo de Auditoría (R12). Registrarlo hoy como
+    /// <c>acceso_denegado</c> lo contaría para SEG-09, que el requisito prohíbe; hasta que exista la acción este adaptador no escribe nada y el bloqueo sigue vigente en la web.
+    /// </summary>
+    public Task TextosPendientesBloqueado(ClaveDeBloqueoPorTextos clave, CancellationToken cancelacion = default) => Task.CompletedTask;
+
     /// <summary>El motivo del catálogo de <c>acceso_denegado</c> que corresponde a cada situación (R12 pide motivos propios; hasta entonces, el más cercano).</summary>
     public static string MotivoDelCatalogo(MotivoDeDenegacionWeb motivo) => motivo switch
     {

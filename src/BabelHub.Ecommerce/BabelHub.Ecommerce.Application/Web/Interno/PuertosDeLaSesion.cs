@@ -89,6 +89,12 @@ public interface IAlmacenDeSesionesWeb
     /// </summary>
     Task<IReadOnlyList<SesionGuardada>> CargarParaPurgar(HostDeSesion host, FaseDeLaPurga fase, DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default);
 
+    /// <summary>Guarda la ruta a la que volver tras aceptar los textos (solo en una sesión abierta; reemplaza la anterior).</summary>
+    Task GuardarRetorno(HashDeSesion id, string ruta, CancellationToken cancelacion = default);
+
+    /// <summary>Entrega la ruta guardada y la borra en la misma operación (un solo uso), o <see langword="null"/> si no hay o la sesión no está abierta.</summary>
+    Task<string?> TomarRetorno(HashDeSesion id, CancellationToken cancelacion = default);
+
     /// <summary>Borra la fila (la que la purga ya atendió: cerrada hace 30 minutos o más y sin revocación pendiente).</summary>
     Task Borrar(HashDeSesion id, CancellationToken cancelacion = default);
 }
@@ -216,4 +222,7 @@ public enum MotivoDeDenegacionWeb
 public interface IRegistroDeSeguridadDeLaWeb
 {
     Task AccesoDenegado(MotivoDeDenegacionWeb motivo, Guid? usuarioId, CancellationToken cancelacion = default);
+
+    /// <summary>Un bloqueo por textos legales pendientes (WEB-47): un evento propio con la clave normalizada, que no cuenta para SEG-09. Nunca lanza.</summary>
+    Task TextosPendientesBloqueado(ClaveDeBloqueoPorTextos clave, CancellationToken cancelacion = default);
 }
