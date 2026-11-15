@@ -35,7 +35,7 @@ fallo_de_uso() {
 # ---------- Lectura de la definición ----------
 
 NOMBRES=()
-declare -A RETENCION=() BLOQUEADA=() EXPIRA=()
+declare -A RETENCION=() BLOQUEADA=() EXPIRA=() MULTIPART=()
 CRED_CONTENEDOR=()
 CRED_NOMBRE=()
 CRED_ACCIONES=()
@@ -47,13 +47,14 @@ limpiar() {
 }
 
 leer_definicion() {
-  local archivo linea nombre dias bloqueo expira resto credencial contenedor acciones
+  local archivo linea nombre dias bloqueo expira multipart resto credencial contenedor acciones
   archivo="$DEFINICION/contenedores.txt"
   [[ -f "$archivo" ]] || fallo_de_uso "no existe $archivo"
   while IFS= read -r linea || [[ -n "$linea" ]]; do
     linea="$(limpiar "$linea")"
     [[ -z "${linea//[[:space:]]/}" ]] && continue
-    read -r nombre dias bloqueo expira resto <<<"$linea"
+    read -r nombre dias bloqueo expira multipart resto <<<"$linea"
+    multipart="${multipart:-nunca}"
     [[ -z "$resto" ]] || fallo_de_uso "contenedores.txt: sobran columnas en «$nombre»"
     [[ "$nombre" =~ ^[a-z][a-z0-9-]*$ ]] || fallo_de_uso "contenedores.txt: el nombre «$nombre» no es válido"
     [[ -z "${RETENCION[$nombre]:-}" ]] || fallo_de_uso "contenedores.txt: «$nombre» está repetido"
@@ -61,6 +62,7 @@ leer_definicion() {
     [[ "$bloqueo" == si || "$bloqueo" == no ]] || fallo_de_uso "contenedores.txt: el bloqueo de «$nombre» debe ser si o no"
     [[ "$expira" == nunca || "$expira" =~ ^[0-9]+$ ]] || fallo_de_uso "contenedores.txt: la expiración de «$nombre» debe ser un número o «nunca»"
     [[ "$bloqueo" == no || "$dias" -gt 0 ]] || fallo_de_uso "contenedores.txt: «$nombre» tiene bloqueo sin días de retención"
+    [[ "$multipart" == nunca || ( "$multipart" =~ ^[0-9]+$ && "$multipart" -gt 0 ) ]] || fallo_de_uso "contenedores.txt: las subidas incompletas de «$nombre» deben abortarse en un número de días mayor que cero o «nunca»"
     if [[ "$expira" != nunca && "$expira" -lt "$dias" ]]; then
       fallo_de_uso "contenedores.txt: «$nombre» retira los objetos antes de que venza su retención"
     fi
@@ -68,6 +70,7 @@ leer_definicion() {
     RETENCION[$nombre]="$dias"
     BLOQUEADA[$nombre]="$bloqueo"
     EXPIRA[$nombre]="$expira"
+    MULTIPART[$nombre]="$multipart"
   done <"$archivo"
   [[ ${#NOMBRES[@]} -gt 0 ]] || fallo_de_uso "contenedores.txt no define contenedores"
 
@@ -98,6 +101,23 @@ elemento_de_ciclo() {
   printf '{"name": "retiro-a-los-%s-dias", "action": "DELETE", "isEnabled": true, "timeAmount": %s, "timeUnit": "DAYS", "target": "objects"}' "$1" "$1"
 }
 
+elemento_de_subidas() {
+  printf '{"name": "abortar-subidas-a-los-%s-dias", "action": "ABORT", "isEnabled": true, "timeAmount": %s, "timeUnit": "DAYS", "target": "multipart-uploads"}' "$1" "$1"
+}
+
+# Las reglas de un contenedor, separadas por comas: primero el retiro de objetos (si expira) y después el aborto de las subidas
+# multipart incompletas (si se pide). El orden lo usa `comprobar`.
+reglas_de_ciclo() {
+  local nombre="$1" reglas=""
+  if [[ "${EXPIRA[$nombre]}" != nunca ]]; then
+    reglas="$(elemento_de_ciclo "${EXPIRA[$nombre]}")"
+  fi
+  if [[ "${MULTIPART[$nombre]}" != nunca ]]; then
+    reglas+="${reglas:+, }$(elemento_de_subidas "${MULTIPART[$nombre]}")"
+  fi
+  echo "$reglas"
+}
+
 ciclo_de_vida() {
   local i nombre coma=""
   echo '{'
@@ -105,11 +125,7 @@ ciclo_de_vida() {
   for i in "${!NOMBRES[@]}"; do
     nombre="${NOMBRES[$i]}"
     [[ $i -lt $((${#NOMBRES[@]} - 1)) ]] && coma="," || coma=""
-    if [[ "${EXPIRA[$nombre]}" == nunca ]]; then
-      printf '    "%s": []%s\n' "$nombre" "$coma"
-    else
-      printf '    "%s": [%s]%s\n' "$nombre" "$(elemento_de_ciclo "${EXPIRA[$nombre]}")" "$coma"
-    fi
+    printf '    "%s": [%s]%s\n' "$nombre" "$(reglas_de_ciclo "$nombre")" "$coma"
   done
   echo '  }'
   echo '}'
@@ -195,9 +211,9 @@ aplicar() {
       fi
     fi
 
-    if [[ "${EXPIRA[$nombre]}" != nunca ]]; then
+    if [[ -n "$(reglas_de_ciclo "$nombre")" ]]; then
       archivo="$(mktemp)"
-      echo "[$(elemento_de_ciclo "${EXPIRA[$nombre]}")]" >"$archivo"
+      echo "[$(reglas_de_ciclo "$nombre")]" >"$archivo"
       if [[ "$MODO" == plan ]]; then
         printf '%q ' "$OCI" os object-lifecycle-policy put --namespace-name "$ESPACIO" --bucket-name "$nombre" --items "$(cat "$archivo")"
         echo
@@ -219,7 +235,7 @@ epoch() {
 }
 
 comprobar() {
-  local nombre dias valor unidad bloqueo ahora fallos=0 pendientes=0
+  local nombre dias valor unidad bloqueo ahora fallos=0 pendientes=0 accion habilitada objetivo
   ahora="$(date -u +%s)"
   for nombre in "${NOMBRES[@]}"; do
     local fallos_antes=$fallos
@@ -260,7 +276,13 @@ comprobar() {
 
     if [[ "${EXPIRA[$nombre]}" == nunca ]]; then
       valor="$(consulta os object-lifecycle-policy get --namespace-name "$ESPACIO" --bucket-name "$nombre" --query 'data.items[0]."time-amount"' || true)"
-      [[ -z "$valor" ]] || { echo "x $nombre: tiene un ciclo de vida de $valor días y no debe expirar"; fallos=$((fallos + 1)); }
+      if [[ "${MULTIPART[$nombre]}" == nunca ]]; then
+        [[ -z "$valor" ]] || { echo "x $nombre: tiene un ciclo de vida de $valor días y no debe expirar"; fallos=$((fallos + 1)); }
+      else
+        # La única regla permitida es la de las subidas incompletas (la primera regla no puede ser un retiro de objetos).
+        accion="$(consulta os object-lifecycle-policy get --namespace-name "$ESPACIO" --bucket-name "$nombre" --query 'data.items[0].action' || true)"
+        [[ "${accion^^}" != DELETE ]] || { echo "x $nombre: tiene un ciclo de vida que retira objetos y no debe expirar"; fallos=$((fallos + 1)); }
+      fi
     else
       valor="$(consulta os object-lifecycle-policy get --namespace-name "$ESPACIO" --bucket-name "$nombre" --query 'data.items[0]."time-amount"' || true)"
       local accion habilitada
@@ -268,6 +290,18 @@ comprobar() {
       habilitada="$(consulta os object-lifecycle-policy get --namespace-name "$ESPACIO" --bucket-name "$nombre" --query 'data.items[0]."is-enabled"' || true)"
       if [[ "$valor" != "${EXPIRA[$nombre]}" || "${accion^^}" != DELETE || "${habilitada,,}" != true ]]; then
         echo "x $nombre: el ciclo de vida debe retirar a los ${EXPIRA[$nombre]} días y está en «${valor:-sin política}» (${accion:-sin acción}, habilitada: ${habilitada:-?})"
+        fallos=$((fallos + 1))
+      fi
+    fi
+
+    if [[ "${MULTIPART[$nombre]}" != nunca ]]; then
+      # La regla de las subidas multipart incompletas es la última de la política.
+      valor="$(consulta os object-lifecycle-policy get --namespace-name "$ESPACIO" --bucket-name "$nombre" --query 'data.items[-1]."time-amount"' || true)"
+      accion="$(consulta os object-lifecycle-policy get --namespace-name "$ESPACIO" --bucket-name "$nombre" --query 'data.items[-1].action' || true)"
+      objetivo="$(consulta os object-lifecycle-policy get --namespace-name "$ESPACIO" --bucket-name "$nombre" --query 'data.items[-1].target' || true)"
+      habilitada="$(consulta os object-lifecycle-policy get --namespace-name "$ESPACIO" --bucket-name "$nombre" --query 'data.items[-1]."is-enabled"' || true)"
+      if [[ "$valor" != "${MULTIPART[$nombre]}" || "${accion^^}" != ABORT || "${objetivo,,}" != multipart-uploads || "${habilitada,,}" != true ]]; then
+        echo "x $nombre: el ciclo de vida debe abortar las subidas incompletas a los ${MULTIPART[$nombre]} días y está en «${valor:-sin política}» (${accion:-sin acción}, ${objetivo:-sin objetivo}, habilitada: ${habilitada:-?})"
         fallos=$((fallos + 1))
       fi
     fi
