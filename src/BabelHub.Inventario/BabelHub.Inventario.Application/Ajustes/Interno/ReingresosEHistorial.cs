@@ -253,7 +253,7 @@ internal sealed class ConsultarHistorialDeAjustes(
         }
 
         var pagina = await ajustes.Historial(fuente.Id, entrada.Pagina, entrada.Tamano, cancelacion).ConfigureAwait(false);
-        return Resultado<PaginaDeAjustes>.Exito(new PaginaDeAjustes([.. pagina.Elementos.Select(a => ConversionDeAjustes.ARespuesta(a, fuente.Codigo))], pagina.Total, entrada.Pagina, entrada.Tamano));
+        return Resultado<PaginaDeAjustes>.Exito(new PaginaDeAjustes([.. pagina.Elementos.Select(a => ConversionDeAjustes.ARespuesta(a, fuente.Codigo) with { Nota = null })], pagina.Total, entrada.Pagina, entrada.Tamano));
     }
 }
 

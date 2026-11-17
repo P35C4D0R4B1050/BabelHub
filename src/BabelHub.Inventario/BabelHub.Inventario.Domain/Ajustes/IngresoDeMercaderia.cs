@@ -72,6 +72,9 @@ public sealed record IngresoDeMercaderia
         AjusteId = ajusteId;
     }
 
+    /// <summary>Sin la nota ni la referencia: un registro de diagnóstico nunca debe volcar el texto libre de un empleado (AUD-06).</summary>
+    public override string ToString() => $"{nameof(IngresoDeMercaderia)} {{ Id = {Id} }}";
+
     public Guid Id { get; }
 
     public Guid FuenteId { get; }

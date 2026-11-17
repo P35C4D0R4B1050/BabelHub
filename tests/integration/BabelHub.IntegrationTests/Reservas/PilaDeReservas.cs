@@ -203,6 +203,9 @@ public sealed class PilaDeReservas : IDisposable
             servicios.AgregarModuloReservas(ajustesDeConfiguracion);
         }
 
+        // Ajustes reemplaza al nulo de IReingresosPorDevolucion (la guarda de arranque lo exige una vez que el módulo existe).
+        servicios.AgregarModuloAjustes(new OpcionesDelModuloDeAjustes(bd.Acceso));
+
         Proveedor = servicios.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
     }
 

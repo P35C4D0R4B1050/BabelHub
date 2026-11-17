@@ -292,7 +292,6 @@ public sealed class AjusteManualTests
     // ---------- presupuesto (SEG-30) ----------
 
     [Fact]
-    [Trait("Criterio", "AC-AJU-08")]
     public async Task ElAjusteConsumeElPresupuestoDelUsuario_AunSiSeRechazaPorUnaReglaDeNegocio()
     {
         var libro = _e.Impresa();
@@ -306,7 +305,6 @@ public sealed class AjusteManualTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-AJU-08")]
     public async Task SuperarElPresupuestoDaLaRespuestaUniformeDeLimite_YNoAplicaNada()
     {
         var libro = _e.Impresa();
@@ -322,7 +320,6 @@ public sealed class AjusteManualTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-AJU-08")]
     public async Task ConElAlmacenDeContadoresCaido_FallaCerrado()
     {
         _e.Limites.Forzado = ResultadoDeLimite.NoDisponible();

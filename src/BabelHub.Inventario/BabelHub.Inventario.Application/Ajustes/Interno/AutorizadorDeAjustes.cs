@@ -34,6 +34,10 @@ internal sealed class AutorizadorDeAjustes(IActorActual actores, IDenegacionDeAc
     public Task<ErrorDeAplicacion?> ExigirAdministracionOEncargado(CancellationToken cancelacion) =>
         Evaluar(actor => EsUsuario(actor) && (actor.EsAdministracionCentral() || actor.EsEncargado()) ? null : MotivosDeDenegacionDeAjustes.FueraDeRol, cancelacion);
 
+    /// <summary>Solo el actor «sistema»: la depuración diaria la hace el propio Inventario con el actor explícito del ejecutor de trabajos de fondo; sin actor es «no autenticado» y no toca nada.</summary>
+    public Task<ErrorDeAplicacion?> ExigirSistema(CancellationToken cancelacion) =>
+        Evaluar(actor => actor.Tipo == TipoDeActor.Sistema ? null : MotivosDeDenegacionDeAjustes.FueraDeRol, cancelacion);
+
     /// <summary>Solo la administración central (ingreso de mercadería y su lista, AJU-14, AJU-20).</summary>
     public Task<ErrorDeAplicacion?> ExigirAdministracionCentral(CancellationToken cancelacion) =>
         Evaluar(actor => EsUsuario(actor) && actor.EsAdministracionCentral() ? null : MotivosDeDenegacionDeAjustes.FueraDeRol, cancelacion);

@@ -37,7 +37,7 @@ public sealed class IngresosReingresosEHistorialTests
 
     [Fact]
     [Trait("Criterio", "AC-AJU-10")]
-    public async Task LaReferenciaYLaNotaNoVanALaAuditoria_NiAlAjusteDelIngreso()
+    public async Task LaReferenciaYLaNotaNoVanALaAuditoria()
     {
         var libro = _e.Impresa();
 
@@ -354,6 +354,8 @@ public sealed class IngresosReingresosEHistorialTests
         Assert.Equal(2, historial.Valor.Total);
         Assert.All(historial.Valor.Elementos, a => Assert.Equal(("ayacucho", libro), (a.CodigoDeFuente, a.EdicionId)));
         Assert.All(historial.Valor.Elementos, a => Assert.NotNull(a.UsuarioId));
+        // AJU-17 no incluye la nota: es texto libre y el encargado no debe ver la de otro usuario.
+        Assert.All(historial.Valor.Elementos, a => Assert.Null(a.Nota));
         Assert.Equal(["merma", "danio"], historial.Valor.Elementos.Select(a => a.Motivo).Order(StringComparer.Ordinal).Reverse());
     }
 

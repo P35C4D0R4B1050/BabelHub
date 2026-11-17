@@ -188,7 +188,6 @@ public sealed class ReglasDeAjusteTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-AJU-17")]
     public void UnAjusteDepuradoPuedeRehidratarseSinUsuarioNiNota_PeroUnoNuevoExigeUsuario()
     {
         var depurado = Ajuste.Rehidratar(Guid.NewGuid(), Fuente, Edicion, MotivoDeAjuste.Merma, 9, 7, null, null, null, Ahora, null, null);
@@ -248,12 +247,34 @@ public sealed class ReglasDeAjusteTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-AJU-17")]
     public void UnIngresoDepuradoSeRehidrataSinUsuarioYSuReferenciaSeConserva()
     {
         var ingreso = IngresoDeMercaderia.Rehidratar(Guid.NewGuid(), Fuente, Edicion, 10, "GR-001", null, null, Ahora, Guid.NewGuid());
 
         Assert.Null(ingreso.UsuarioId);
         Assert.Equal("GR-001", ingreso.Referencia);
+    }
+}
+
+public sealed class TextoLibreDeAjustesTests
+{
+    [Fact]
+    [Trait("Criterio", "AC-AJU-01")]
+    public void NingunTipoConNotaOReferenciaLaImprimeEnSuToString()
+    {
+        var decision = BabelHub.Inventario.Domain.Ajustes.ReglasDeAjuste.Restar(9, 0, 2);
+        var ajuste = BabelHub.Inventario.Domain.Ajustes.Ajuste.Restado(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), BabelHub.Inventario.Domain.Ajustes.MotivoDeAjuste.Merma, decision, "NOTA-CENTINELA", Guid.NewGuid(), DateTimeOffset.UtcNow);
+        var ingreso = BabelHub.Inventario.Domain.Ajustes.IngresoDeMercaderia.Nuevo(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 5, "REF-CENTINELA", "NOTA-CENTINELA", Guid.NewGuid(), DateTimeOffset.UtcNow, Guid.NewGuid());
+        var entradas = new object[]
+        {
+            ajuste,
+            ingreso,
+            new BabelHub.Inventario.Application.Ajustes.RegistrarAjusteManualEntrada("lima", Guid.NewGuid(), "merma", 1, null, "NOTA-CENTINELA", "clave-clave-clave-1"),
+            new BabelHub.Inventario.Application.Ajustes.RegistrarIngresoDeMercaderiaEntrada(Guid.NewGuid(), null, 5, "REF-CENTINELA", "NOTA-CENTINELA", "clave-clave-clave-1"),
+            new BabelHub.Inventario.Application.Ajustes.AjusteRegistrado(ajuste.Id, "lima", ajuste.EdicionId, "merma", ajuste.UsuarioId, ajuste.Fecha, 9, 7, "NOTA-CENTINELA", "REF-CENTINELA"),
+            new BabelHub.Inventario.Application.Ajustes.IngresoListado(ingreso.Id, ingreso.EdicionId, "lima", 5, "REF-CENTINELA", "NOTA-CENTINELA", ingreso.UsuarioId, ingreso.Fecha),
+        };
+
+        Assert.All(entradas, e => Assert.DoesNotContain("CENTINELA", e.ToString(), StringComparison.Ordinal));
     }
 }
