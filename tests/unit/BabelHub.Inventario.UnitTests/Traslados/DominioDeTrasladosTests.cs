@@ -281,6 +281,21 @@ public sealed class DominioDeTrasladosTests
         }
     }
 
+    [Theory]
+    [Trait("Criterio", "AC-TRA-03")]
+    [InlineData(RolDeTraslado.AdministracionCentral, OperacionDeTraslado.Solicitar, true)]
+    [InlineData(RolDeTraslado.AdministracionCentral, OperacionDeTraslado.RegistrarGuia, true)]
+    [InlineData(RolDeTraslado.EncargadoDeSucursal, OperacionDeTraslado.Despachar, true)]
+    [InlineData(RolDeTraslado.EncargadoDeSucursal, OperacionDeTraslado.RegistrarGuia, false)]
+    [InlineData(RolDeTraslado.Logistica, OperacionDeTraslado.RegistrarGuia, true)]
+    [InlineData(RolDeTraslado.Logistica, OperacionDeTraslado.Consultar, true)]
+    [InlineData(RolDeTraslado.Logistica, OperacionDeTraslado.Aprobar, false)]
+    [InlineData(RolDeTraslado.Logistica, OperacionDeTraslado.Solicitar, false)]
+    [InlineData(RolDeTraslado.Cliente, OperacionDeTraslado.Consultar, false)]
+    [InlineData(RolDeTraslado.Otro, OperacionDeTraslado.Consultar, false)]
+    public void ElRolSinNingunPermisoSeRechazaAntesDeLeerElTraslado(RolDeTraslado rol, OperacionDeTraslado operacion, bool puede) =>
+        Assert.Equal(puede, PermisosDeTraslado.RolPuedeIntentar(operacion, rol));
+
     // ---------- T03: reglas de solicitud y estimación ----------
 
     [Fact]

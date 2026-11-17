@@ -72,6 +72,19 @@ public static class PermisosDeTraslado
         }
     }
 
+    /// <summary>
+    /// Si el rol puede intentar la operación en alguna sucursal: es lo primero que se comprueba, antes de leer el traslado, para que un rol sin ningún permiso (cliente, logística fuera de la guía y la consulta, cualquier otro) reciba su rechazo
+    /// sin saber si el traslado existe. La sucursal se decide después con <see cref="Evaluar"/>.
+    /// </summary>
+    public static bool RolPuedeIntentar(OperacionDeTraslado operacion, RolDeTraslado rol) =>
+        rol switch
+        {
+            RolDeTraslado.AdministracionCentral => true,
+            RolDeTraslado.EncargadoDeSucursal => operacion != OperacionDeTraslado.RegistrarGuia,
+            RolDeTraslado.Logistica => operacion is OperacionDeTraslado.RegistrarGuia or OperacionDeTraslado.Consultar,
+            _ => false,
+        };
+
     private static DecisionDePermiso Encargado(OperacionDeTraslado operacion, Guid? sucursal, Guid origenId, Guid destinoId)
     {
         // La guía es de logística: el encargado no la registra, sea cual sea su sucursal.
