@@ -1,4 +1,5 @@
 using System.Net;
+using BabelHub.Inventario.Api.Ajustes;
 using BabelHub.Inventario.Api.Fuentes;
 using BabelHub.Inventario.Api.Plataforma;
 using BabelHub.Inventario.Api.Reservas;
@@ -78,7 +79,7 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
 
     private async Task Iniciar(PostgresDeReservasFixture bd, bool conTopeGeneral)
     {
-        var matriz = new MatrizDeAlcances([.. MatrizDeFuentes.Declaraciones(), .. MatrizDeReservas.Declaraciones()]);
+        var matriz = new MatrizDeAlcances([.. MatrizDeFuentes.Declaraciones(), .. MatrizDeReservas.Declaraciones(), .. MatrizDeAjustes.Declaraciones()]);
         var credenciales = new OpcionesDeCredencialesDeEntrada(
         [
             new(AlcanceDeServicio.LecturaDeDisponibilidad, (CredencialDeDisponibilidad, null)),
@@ -94,7 +95,7 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
         var local = new MotorDeLimitesLocal();
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
-        builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("INV", ErroresDeFuentes.Especificos.Concat(ErroresDeReservas.Especificos).ToDictionary(p => p.Key, p => p.Value)));
+        builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("INV", ErroresDeFuentes.Especificos.Concat(ErroresDeReservas.Especificos).Concat(ErroresDeAjustes.Especificos).ToDictionary(p => p.Key, p => p.Value)));
         builder.Services.AgregarLimitesHttp(new OpcionesDeLimitesHttp());
         builder.Services.AgregarCredencialDeServicio(
             conTopeGeneral ? new OpcionesDeSuperficieDeServicio { TopeDeLaDireccionDirecta = PoliticasDeLimite.SolicitudesPorHuellaDirecta } : new OpcionesDeSuperficieDeServicio(),
@@ -136,6 +137,7 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
         builder.Services.AddSingleton<IGeneradorDeTrasladosDePedido>(new TrasladosDeIntegracionDoble(bd));
         builder.Services.AgregarModuloReservas(configuracion);
         builder.Services.AgregarModuloFuentes();
+        builder.Services.AgregarModuloAjustes(new OpcionesDelModuloDeAjustes(bd.Depuracion));
 
         _app = builder.Build();
         _app.UsarManejoDeErrores();
@@ -165,6 +167,7 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
 
         _app.MapearFuentes();
         _app.MapearReservas();
+        _app.MapearAjustes();
 
         await _app.StartAsync();
         Cliente = _app.GetTestClient();
