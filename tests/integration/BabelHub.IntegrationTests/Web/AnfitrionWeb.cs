@@ -38,6 +38,7 @@ internal sealed class AnfitrionWeb : IAsyncDisposable
         builder.Services.AgregarInterfazWeb();
         builder.Services.AgregarModuloWeb(permitirVersionesProvisionales: true);
         builder.Services.AgregarCatalogoPendiente();
+        builder.Services.AgregarRetiroNuloDeCarritos();
         builder.Services.AgregarBibliotecaPendiente();
         var mvc = builder.Services.AddControllersWithViews().AddApplicationPart(AssemblyMarker.Assembly);
         foreach (var parte in partes ?? [])

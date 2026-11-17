@@ -34,6 +34,7 @@ builder.Services.AgregarCabecerasDeSeguridad(OpcionesDeContenidoWeb.Leer(builder
 builder.Services.AgregarModuloWeb(permitirVersionesProvisionales: !builder.Environment.IsProduction());
 // Implementaciones provisionales de lo que aún no existe; un registro real anterior se respeta (TryAdd).
 builder.Services.AgregarCatalogoPendiente();
+builder.Services.AgregarRetiroNuloDeCarritos();
 builder.Services.AgregarBibliotecaPendiente();
 builder.Services.AddControllersWithViews();
 // Detrás del borde la aplicación recibe HTTP: solo se toma el esquema (X-Forwarded-Proto) para que las cookies __Host- y el antiforgery vean HTTPS. El Api solo es alcanzable desde la red del borde (SEG-17); la lista de proxies conocidos queda para la composición.
