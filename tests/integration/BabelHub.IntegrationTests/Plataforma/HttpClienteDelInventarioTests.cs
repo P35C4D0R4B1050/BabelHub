@@ -17,6 +17,8 @@ public sealed class HttpClienteDelInventarioTests
     private static readonly string SecretoDeUsuario = "usuario-" + Guid.NewGuid().ToString("N");
     private static readonly string SecretoDeLectura = "lectura-" + Guid.NewGuid().ToString("N");
     private static readonly string SecretoDeOrigen = "origen-" + Guid.NewGuid().ToString("N");
+    private static readonly string SecretoDePendientes = "pendientes-" + Guid.NewGuid().ToString("N");
+    private static readonly string SecretoDeBaja = "baja-" + Guid.NewGuid().ToString("N");
     private static readonly string TokenDelUsuario = "jwt." + Guid.NewGuid().ToString("N");
     private static readonly string Clave = "ingreso-" + Guid.NewGuid().ToString("N");
 
@@ -65,6 +67,8 @@ public sealed class HttpClienteDelInventarioTests
             new(AlcanceDeServicio.OperacionDeUsuario, new ValorSecreto(SecretoDeUsuario)),
             new(AlcanceDeServicio.LecturaDeDisponibilidad, new ValorSecreto(SecretoDeLectura)),
             new(AlcanceDeServicio.OrigenReenviado, new ValorSecreto(SecretoDeOrigen)),
+            new(AlcanceDeServicio.ConsultaDePendientes, new ValorSecreto(SecretoDePendientes)),
+            new(AlcanceDeServicio.BajaDeTitular, new ValorSecreto(SecretoDeBaja)),
         ]));
         servicios.AddSingleton<IOrigenDeSolicitud>(new OrigenDePrueba(origen ?? OrigenDeSolicitud.Desconocido));
         var tokenDePrueba = new TokenDePrueba(token == "usar-el-del-usuario" ? TokenDelUsuario : token);
@@ -347,6 +351,93 @@ public sealed class HttpClienteDelInventarioTests
 
         Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, (await cliente.ListarIngresos(edicion, 10)).Estado);
         Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, (await cliente.ListarIngresos(edicion, 1)).Estado);
+    }
+
+    // ---------- Pendientes y bajas de un titular (T12) ----------
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-27")]
+    public async Task ConsultarPendientes_LlevaElTitularEnElCuerpo_ConSuCredencialYSinToken()
+    {
+        var titular = Guid.NewGuid();
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json("{\"reservasActivas\":2}")));
+        var (cliente, token) = Crear(servidor);
+
+        var resultado = await cliente.ConsultarPendientes(titular);
+
+        Assert.True(resultado.Exitosa);
+        Assert.Equal(2, resultado.Valor.ReservasActivas);
+        Assert.Equal(HttpMethod.Post, Assert.Single(servidor.Metodos));
+        var ruta = Assert.Single(servidor.Rutas);
+        Assert.Equal("/api/inventario/v1/titulares/consultas-de-pendientes", ruta);
+        Assert.DoesNotContain(titular.ToString("D"), ruta, StringComparison.Ordinal);
+        Assert.Contains(titular.ToString("D"), Assert.Single(servidor.Cuerpos), StringComparison.Ordinal);
+        var cabeceras = Assert.Single(servidor.Cabeceras);
+        Assert.Equal(SecretoDePendientes, cabeceras[CredencialesDeSalidaHandler.CabeceraDeCredencial]);
+        Assert.False(cabeceras.ContainsKey("Authorization"));
+        SinCabecerasDeActor(cabeceras);
+        Assert.Equal(0, token.Pedidos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-27")]
+    public async Task ConsultarPendientes_ConUnConteoNegativoOInvalido_EsNoDisponible_YUnaFallaNoEsUnaExcepcion()
+    {
+        var respuestas = new Queue<string>(["{\"reservasActivas\":-1}", "no es json"]);
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json(respuestas.Dequeue())));
+        var (cliente, _) = Crear(servidor);
+
+        Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, (await cliente.ConsultarPendientes(Guid.NewGuid())).Estado);
+        Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, (await cliente.ConsultarPendientes(Guid.NewGuid())).Estado);
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.ConsultarPendientes(Guid.Empty));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-53")]
+    public async Task DarDeBajaAlTitular_SaleConLaCredencialDeBaja_SinTokenYSinElTitularEnLaRuta()
+    {
+        var titular = Guid.NewGuid();
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent)));
+        var (cliente, token) = Crear(servidor);
+
+        var resultado = await cliente.DarDeBajaAlTitular(titular);
+
+        Assert.True(resultado.Exitosa);
+        Assert.Equal("/api/inventario/v1/bajas-de-titular", Assert.Single(servidor.Rutas));
+        Assert.Contains(titular.ToString("D"), Assert.Single(servidor.Cuerpos), StringComparison.Ordinal);
+        var cabeceras = Assert.Single(servidor.Cabeceras);
+        Assert.Equal(SecretoDeBaja, cabeceras[CredencialesDeSalidaHandler.CabeceraDeCredencial]);
+        Assert.False(cabeceras.ContainsKey("Authorization"));
+        Assert.Equal(0, token.Pedidos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-53")]
+    public async Task DarDeBajaAlTitular_SeReintentaAnteUnaFallaTransitoria_PorqueRepetirlaNoTieneEfectoDuplicado()
+    {
+        var servidor = new ServidorSimulado((_, n) => Task.FromResult(new HttpResponseMessage(n == 1 ? HttpStatusCode.BadGateway : HttpStatusCode.NoContent)));
+        var (cliente, _) = Crear(servidor, opciones: new OpcionesDelClienteDeServicio { ReintentosMaximos = 2, RetrasoDelReintento = TimeSpan.FromMilliseconds(1) });
+
+        var resultado = await cliente.DarDeBajaAlTitular(Guid.NewGuid());
+
+        Assert.True(resultado.Exitosa);
+        Assert.Equal(2, servidor.Rutas.Count);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-IDE-53")]
+    [InlineData(HttpStatusCode.Unauthorized, "INV-NO-AUTENTICADO", EstadoDeLlamadaAlInventario.Rechazada)]
+    [InlineData(HttpStatusCode.BadRequest, "INV-VALIDACION-INVALIDA", EstadoDeLlamadaAlInventario.Rechazada)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, "INV-SERVICIO-NO-DISPONIBLE", EstadoDeLlamadaAlInventario.NoDisponible)]
+    public async Task LaBajaRechazadaOCaida_DevuelveUnEstado_ParaQueIdentidadLaReintente(HttpStatusCode http, string codigo, EstadoDeLlamadaAlInventario esperado)
+    {
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Problema(http, codigo)));
+        var (cliente, _) = Crear(servidor);
+
+        var resultado = await cliente.DarDeBajaAlTitular(Guid.NewGuid());
+
+        Assert.False(resultado.Exitosa);
+        Assert.Equal(esperado, resultado.Estado);
     }
 
     // ---------- Sucursales ----------
