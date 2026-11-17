@@ -13,4 +13,10 @@ public static partial class AccionesAuditables
     /// solo la dirección directa del llamante: la dirección reenviada, completa o en parte, nunca se guarda.
     /// </summary>
     public static readonly AccionAuditable OrigenReenviadoSinCredencial = new(nameof(OrigenReenviadoSinCredencial));
+
+    /// <summary>
+    /// Una acción directa de la interfaz web bloqueada porque la persona tiene textos legales pendientes (WEB-47): un evento de seguridad propio, no un acceso denegado, de modo que no cuenta para el
+    /// umbral de SEG-09. Lleva el motivo del bloqueo, la plantilla de la ruta sin consulta, el método y la cuenta por su identificador opaco; nunca contraseñas ni el identificador de la sesión.
+    /// </summary>
+    public static readonly AccionAuditable AccesoBloqueadoPorTextosPendientes = new(nameof(AccesoBloqueadoPorTextosPendientes));
 }

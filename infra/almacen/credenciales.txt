@@ -1,9 +1,12 @@
 # Credenciales del almacén (mínimo privilegio, una por tarea; D08, D24) y lo que cada una puede hacer en cada contenedor.
 # Acciones: crear (OBJECT_CREATE: agrega, nunca sobrescribe), leer (OBJECT_READ), listar (OBJECT_INSPECT), uso (BUCKET_READ: tamaño del
 # contenedor), sobrescribir (OBJECT_OVERWRITE) y borrar (OBJECT_DELETE). Lo que no consta aquí está prohibido. Ninguna credencial de
-# respaldos o de supresiones puede sobrescribir o borrar: el retiro de vencidos lo hace el ciclo de vida del propio almacén (D07).
+# respaldos o de supresiones puede sobrescribir o borrar: el retiro de vencidos lo hace el ciclo de vida del propio almacén (D07). Solo el catálogo
+# borra (sus archivos y portadas, de claves aleatorias que nunca se sobrescriben: sin sobrescribir) y la biblioteca solo lee los libros.
 # credencial                 contenedor             acciones
-libros                       libros                 crear,leer,listar,sobrescribir,borrar
+catalogo-archivos             libros                 crear,leer,borrar
+catalogo-archivos             portadas               crear,leer,borrar
+biblioteca-lector             libros                 leer
 respaldos-escritor           respaldos-diarios      crear
 respaldos-escritor           respaldos-semanales    crear
 respaldos-escritor           respaldos-mensuales    crear
@@ -23,6 +26,7 @@ supresiones-sello            supresiones-sellos     crear
 supresiones-sello            supresiones-entradas   leer,listar
 respaldos-copia-registro     supresiones-copia      crear
 cuota-lectura                libros                 uso
+cuota-lectura                portadas               uso
 cuota-lectura                respaldos-diarios      uso
 cuota-lectura                respaldos-semanales    uso
 cuota-lectura                respaldos-mensuales    uso
