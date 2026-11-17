@@ -219,6 +219,8 @@ public sealed class TrabajosDeFondoDeReservasPostgresTests(PostgresDeReservasFix
     {
         var (lima, libro) = await Escenario();
         using var pila = new PilaDeReservas(bd);
+        // `creada_en` la pone la base con su hora real: el reloj de la prueba parte de la hora real para que los 30 días se midan desde ahí (no desde una fecha fija que se vuelve vieja).
+        pila.Reloj.Ahora = DateTimeOffset.UtcNow;
         var entrada = ARecojo("lima", [Linea(libro, 1)]);
         Assert.True((await pila.Reservar(Cliente(), entrada)).EsExito);
         Assert.True((await Confirmar(pila, entrada.PedidoId)).EsExito);
