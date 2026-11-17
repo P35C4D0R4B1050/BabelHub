@@ -9,6 +9,8 @@ public static class AccionesDeAuditoria
 {
     public const string AccesoBloqueadoPorTextosPendientes = "AccesoBloqueadoPorTextosPendientes";
 
+    public const string RenovacionReutilizada = "RenovacionReutilizada";
+
     public const string AccesoDenegado = "AccesoDenegado";
 
     public const string AccesoDigitalRevocado = "AccesoDigitalRevocado";
@@ -44,6 +46,8 @@ public static class AccionesDeAuditoria
     public const string ClaveDeFirmaRotada = "ClaveDeFirmaRotada";
 
     public const string CodigoDeRespaldoUsado = "CodigoDeRespaldoUsado";
+
+    public const string CodigoDeUnSoloUsoRechazado = "CodigoDeUnSoloUsoRechazado";
 
     public const string ContrasenaCambiada = "ContrasenaCambiada";
 
@@ -233,6 +237,8 @@ public static class AccionesDeAuditoria
         OrigenIndeterminable,
         OrigenReenviadoSinCredencial,
         AccesoBloqueadoPorTextosPendientes,
+        CodigoDeUnSoloUsoRechazado,
+        RenovacionReutilizada,
         PedidoAnulado,
         PortadaDeEdicionReemplazada,
         PrecioDeEdicionCambiado,

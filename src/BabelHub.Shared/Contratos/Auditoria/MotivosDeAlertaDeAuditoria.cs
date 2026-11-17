@@ -60,6 +60,9 @@ public static class MotivosDeAlertaDeAuditoria
     /// <summary>El cupo de códigos de verificación y de recuperación llegó al 80 % (IDE-73).</summary>
     public const string CupoDeCodigosAlto = "cupo-de-codigos-alto";
 
+    /// <summary>Se reutilizó una renovación ya rotada y se revocó su familia (D02, IDE-14).</summary>
+    public const string RenovacionReutilizada = "renovacion-reutilizada";
+
     public static readonly IReadOnlyList<string> Todos =
     [
         AccesosDenegados,
@@ -86,5 +89,6 @@ public static class MotivosDeAlertaDeAuditoria
         BloqueosPorTextosPendientes,
         CuotaDeCorreoAlta,
         CupoDeCodigosAlto,
+        RenovacionReutilizada,
     ];
 }
