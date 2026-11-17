@@ -1,4 +1,5 @@
 using BabelHub.Inventario.Application.Plataforma;
+using BabelHub.Inventario.Infrastructure.Ajustes;
 using BabelHub.Inventario.Infrastructure.Fuentes;
 using BabelHub.Inventario.Infrastructure.Plataforma;
 using BabelHub.Inventario.Infrastructure.Reservas;
@@ -26,6 +27,9 @@ public sealed class PostgresDeReservasFixture : IAsyncLifetime
     public NpgsqlDataSource Acceso { get; private set; } = null!;
 
     public NpgsqlDataSource Administracion { get; private set; } = null!;
+
+    /// <summary>La cuenta de depuración de Ajustes (miembro de <c>ajustes_depuracion</c>, que solo ejecuta las dos funciones): distinta de la de la aplicación.</summary>
+    public NpgsqlDataSource Depuracion { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
@@ -65,6 +69,16 @@ public sealed class PostgresDeReservasFixture : IAsyncLifetime
             ALTER TABLE plataforma.eventos_limite OWNER TO propietario;
             """ + DefinicionDeEventosDeLimite.Permisos);
 
+        // El esquema de Ajustes: roles, tablas con sus disparadores, tablas del propietario, funciones de depuración y permisos; y la cuenta de depuración, aparte de la de la aplicación.
+        await Ejecutar(DefinicionDeAjustes.Roles);
+        await Ejecutar($"CREATE ROLE depurador LOGIN PASSWORD '{ClaveDeAcceso}'; GRANT ajustes_depuracion TO depurador; GRANT rol_ajustes TO acceso;");
+        await Ejecutar(DefinicionDeAjustes.Sql);
+        await Ejecutar("ALTER SCHEMA ajustes OWNER TO propietario; ALTER TABLE ajustes.ajustes OWNER TO propietario; ALTER TABLE ajustes.ingresos OWNER TO propietario; ALTER TABLE ajustes.operaciones_idempotentes OWNER TO propietario;");
+        await Ejecutar(DefinicionDeAjustes.FuncionesDeDepuracion);
+        await Ejecutar(DefinicionDeAjustes.Permisos);
+
+        Depuracion = NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString()) { Username = "depurador", ["Password"] = ClaveDeAcceso }.ConnectionString);
+
         Acceso = NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString())
         {
             Username = "acceso",
@@ -75,6 +89,11 @@ public sealed class PostgresDeReservasFixture : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
+        if (Depuracion is not null)
+        {
+            await Depuracion.DisposeAsync();
+        }
+
         if (Acceso is not null)
         {
             await Acceso.DisposeAsync();
@@ -102,7 +121,13 @@ public sealed class PostgresDeReservasFixture : IAsyncLifetime
     }
 
     public Task Limpiar() => Ejecutar(
-        "TRUNCATE reservas.reserva_lineas, reservas.reservas, reservas.operaciones_idempotentes, reservas.bajas_recibidas, plataforma.eventos_limite, fuentes.stock, fuentes.rutas, fuentes.ediciones, fuentes.fuentes CASCADE");
+        """
+        ALTER TABLE ajustes.ajustes DISABLE TRIGGER ajustes_solo_insercion_por_sentencia;
+        ALTER TABLE ajustes.ingresos DISABLE TRIGGER ingresos_solo_insercion_por_sentencia;
+        TRUNCATE ajustes.ajustes, ajustes.ingresos, ajustes.operaciones_idempotentes, reservas.reserva_lineas, reservas.reservas, reservas.operaciones_idempotentes, reservas.bajas_recibidas, plataforma.eventos_limite, fuentes.stock, fuentes.rutas, fuentes.ediciones, fuentes.fuentes CASCADE;
+        ALTER TABLE ajustes.ajustes ENABLE ALWAYS TRIGGER ajustes_solo_insercion_por_sentencia;
+        ALTER TABLE ajustes.ingresos ENABLE ALWAYS TRIGGER ingresos_solo_insercion_por_sentencia;
+        """);
 
     // --- los datos de Fuentes (con la cuenta de despliegue) ---
 
