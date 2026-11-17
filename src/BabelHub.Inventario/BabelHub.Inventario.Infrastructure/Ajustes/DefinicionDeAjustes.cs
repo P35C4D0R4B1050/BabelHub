@@ -123,7 +123,7 @@ public static class DefinicionDeAjustes
         -- Los disparadores guardianes: ningún UPDATE, DELETE ni TRUNCATE, salvo el UPDATE de la función de depuración (current_user = su propietario), que solo puede retirar el usuario y la nota de filas de más de 2 años.
         CREATE OR REPLACE FUNCTION ajustes.rechazar_modificacion_de_ajustes() RETURNS trigger
         LANGUAGE plpgsql
-        SET search_path = pg_catalog
+        SET search_path = pg_catalog, pg_temp
         AS $guardian$
         BEGIN
             IF TG_OP = 'UPDATE' AND current_user = 'ajustes_depuracion_dueno' THEN
@@ -143,7 +143,7 @@ public static class DefinicionDeAjustes
 
         CREATE OR REPLACE FUNCTION ajustes.rechazar_modificacion_de_ingresos() RETURNS trigger
         LANGUAGE plpgsql
-        SET search_path = pg_catalog
+        SET search_path = pg_catalog, pg_temp
         AS $guardian$
         BEGIN
             IF TG_OP = 'UPDATE' AND current_user = 'ajustes_depuracion_dueno' THEN
@@ -161,7 +161,7 @@ public static class DefinicionDeAjustes
 
         CREATE OR REPLACE FUNCTION ajustes.rechazar_vaciado() RETURNS trigger
         LANGUAGE plpgsql
-        SET search_path = pg_catalog
+        SET search_path = pg_catalog, pg_temp
         AS $guardian$
         BEGIN
             RAISE EXCEPTION 'Los ajustes son de solo inserción (%).', TG_OP USING ERRCODE = 'insufficient_privilege';
@@ -186,20 +186,19 @@ public static class DefinicionDeAjustes
     /// <summary>
     /// Las funciones de depuración (T13): <c>ajustes.anonimizar_registros()</c> (AJU-21: a los 2 años <c>usuario_id</c> a nulo y <c>nota</c> a nulo, en lotes de 5 000 por tabla; devuelve cuántas filas cambió y repetirla no
     /// cambia nada) y <c>ajustes.purgar_operaciones()</c> (las operaciones idempotentes de más de 30 días). <c>SECURITY DEFINER</c>, <b>sin parámetros</b>, con <c>search_path</c> fijo y propietario propio; como la política de
-    /// filas también alcanza al propietario, la función fija <c>babelhub.alcance = 'red'</c> dentro de su transacción. Solo el rol de depuración tiene <c>EXECUTE</c>.
+    /// filas también alcanza al propietario, la función declara <c>SET babelhub.alcance = 'red'</c> (vale mientras dura la función y se restaura al salir). Solo el rol de depuración tiene <c>EXECUTE</c>.
     /// </summary>
     public const string FuncionesDeDepuracion = """
         CREATE OR REPLACE FUNCTION ajustes.anonimizar_registros() RETURNS integer
         LANGUAGE plpgsql
         SECURITY DEFINER
-        SET search_path = pg_catalog
+        SET search_path = pg_catalog, pg_temp
+        SET babelhub.alcance = 'red'
         AS $depurar$
         DECLARE
             cambiados integer := 0;
             n integer;
         BEGIN
-            PERFORM pg_catalog.set_config('babelhub.alcance', 'red', true);
-
             UPDATE ajustes.ajustes a SET usuario_id = NULL, nota = NULL
             WHERE a.id IN (
                 SELECT id FROM ajustes.ajustes
@@ -223,7 +222,7 @@ public static class DefinicionDeAjustes
         CREATE OR REPLACE FUNCTION ajustes.purgar_operaciones() RETURNS integer
         LANGUAGE plpgsql
         SECURITY DEFINER
-        SET search_path = pg_catalog
+        SET search_path = pg_catalog, pg_temp
         AS $purgar$
         DECLARE
             n integer;
@@ -241,6 +240,8 @@ public static class DefinicionDeAjustes
     /// </summary>
     public const string Permisos = """
         GRANT USAGE ON SCHEMA ajustes TO rol_ajustes, ajustes_depuracion_dueno, ajustes_depuracion;
+        -- Para cambiar el propietario de una función, PostgreSQL exige que el nuevo propietario tenga CREATE sobre el esquema (salvo superusuario): se concede solo mientras dura el cambio. Quien migra debe ser miembro del rol propietario.
+        GRANT CREATE ON SCHEMA ajustes TO ajustes_depuracion_dueno;
         REVOKE ALL ON ajustes.ajustes, ajustes.ingresos, ajustes.operaciones_idempotentes FROM PUBLIC;
         GRANT SELECT, INSERT ON ajustes.ajustes, ajustes.ingresos, ajustes.operaciones_idempotentes TO rol_ajustes;
         GRANT SELECT ON ajustes.ajustes, ajustes.ingresos TO ajustes_depuracion_dueno;
@@ -248,6 +249,7 @@ public static class DefinicionDeAjustes
         GRANT SELECT, DELETE ON ajustes.operaciones_idempotentes TO ajustes_depuracion_dueno;
         ALTER FUNCTION ajustes.anonimizar_registros() OWNER TO ajustes_depuracion_dueno;
         ALTER FUNCTION ajustes.purgar_operaciones() OWNER TO ajustes_depuracion_dueno;
+        REVOKE CREATE ON SCHEMA ajustes FROM ajustes_depuracion_dueno;
         REVOKE EXECUTE ON FUNCTION ajustes.anonimizar_registros(), ajustes.purgar_operaciones() FROM PUBLIC;
         GRANT EXECUTE ON FUNCTION ajustes.anonimizar_registros(), ajustes.purgar_operaciones() TO ajustes_depuracion;
         """;

@@ -266,13 +266,110 @@ public sealed class ApiDeAjustesTests(PostgresDeReservasFixture bd) : IClassFixt
         }
     }
 
+    // ---------- reingreso por devolución (T14, T16, T17) ----------
+
+    private static string Reingreso(Guid pedido, string fuente, params (Guid Edicion, int Cantidad)[] lineas) =>
+        $$"""{"pedidoId":"{{pedido}}","codigoDeFuente":"{{fuente}}","lineas":[{{string.Join(",", lineas.Select(l => $$"""{"edicionId":"{{l.Edicion}}","cantidad":{{l.Cantidad}}}"""))}}]}""";
+
+    [Fact]
+    [Trait("Criterio", "AC-AJU-09")]
+    public async Task ElReingreso_Responde200ConElDtoDeEco0_RepetirloEsYaAplicado_YOtroPedidoOCantidadEsConflicto()
+    {
+        var (_, _, ayacucho, libro) = await Escenario(3);
+        var devolucion = Guid.NewGuid();
+        var pedido = Guid.NewGuid();
+        Task<HttpResponseMessage> Reingresar(string json) =>
+            Enviar(HttpMethod.Post, $"/devoluciones/{devolucion}/reingreso", RolesDeUsuario.EncargadoDeSucursal, ayacucho, null, json);
+
+        var primero = await Reingresar(Reingreso(pedido, "ayacucho", (libro, 1)));
+        var repetido = await Reingresar(Reingreso(pedido, "ayacucho", (libro, 1)));
+        var otroPedido = await Reingresar(Reingreso(Guid.NewGuid(), "ayacucho", (libro, 1)));
+        var otraCantidad = await Reingresar(Reingreso(pedido, "ayacucho", (libro, 2)));
+
+        Assert.Equal(HttpStatusCode.OK, primero.StatusCode);
+        var dto = JsonSerializer.Deserialize<ReingresoDeDevolucionDto>(await primero.Content.ReadAsStringAsync(), Estricto)!;
+        Assert.Equal((devolucion, false, "devolucion", 3, 4), (dto.DevolucionId, dto.YaAplicado, dto.Ajustes[0].Motivo, dto.Ajustes[0].FisicoAnterior, dto.Ajustes[0].FisicoPosterior));
+        Assert.True(JsonSerializer.Deserialize<ReingresoDeDevolucionDto>(await repetido.Content.ReadAsStringAsync(), Estricto)!.YaAplicado);
+        Assert.All(new[] { otroPedido, otraCantidad }, r => Assert.Equal(HttpStatusCode.Conflict, r.StatusCode));
+        Assert.Equal(CodigosDeErrorDelInventario.IdempotenciaEnConflicto, (await Cuerpo(otroPedido)).GetProperty("code").GetString());
+        Assert.Equal((4, 0), await bd.StockDe(ayacucho, libro));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AJU-14")]
+    public async Task ElReingreso_EncargadoAjenoLogisticaYClienteSon403_UnaDigitalEs422_SinPedidoOCon21LineasEs400()
+    {
+        var (_, cusco, ayacucho, libro) = await Escenario();
+        var digital = await bd.AgregarEdicion("digital");
+        string Ruta() => $"/devoluciones/{Guid.NewGuid()}/reingreso";
+
+        var ajeno = await Enviar(HttpMethod.Post, Ruta(), RolesDeUsuario.EncargadoDeSucursal, cusco, null, Reingreso(Guid.NewGuid(), "ayacucho", (libro, 1)));
+        var logistica = await Enviar(HttpMethod.Post, Ruta(), RolesDeUsuario.PersonalDeLogistica, null, null, Reingreso(Guid.NewGuid(), "ayacucho", (libro, 1)));
+        var cliente = await Enviar(HttpMethod.Post, Ruta(), RolesDeUsuario.Cliente, null, null, Reingreso(Guid.NewGuid(), "ayacucho", (libro, 1)));
+        var deDigital = await Enviar(HttpMethod.Post, Ruta(), RolesDeUsuario.EncargadoDeSucursal, ayacucho, null, Reingreso(Guid.NewGuid(), "ayacucho", (digital, 1)));
+        var sinPedido = await Enviar(HttpMethod.Post, Ruta(), RolesDeUsuario.EncargadoDeSucursal, ayacucho, null, Reingreso(Guid.Empty, "ayacucho", (libro, 1)));
+        var veintiuna = await Enviar(HttpMethod.Post, Ruta(), RolesDeUsuario.EncargadoDeSucursal, ayacucho, null, Reingreso(Guid.NewGuid(), "ayacucho", [.. Enumerable.Range(0, 21).Select(_ => (Guid.NewGuid(), 1))]));
+        var campoDeMas = await Enviar(HttpMethod.Post, Ruta(), RolesDeUsuario.EncargadoDeSucursal, ayacucho, null, Reingreso(Guid.NewGuid(), "ayacucho", (libro, 1)).Replace("}]}", "}],\"usuarioId\":\"x\"}", StringComparison.Ordinal));
+
+        Assert.All(new[] { ajeno, logistica, cliente }, r => Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, deDigital.StatusCode);
+        Assert.Equal(CodigosDeErrorDelInventario.EdicionNoImpresa, (await Cuerpo(deDigital)).GetProperty("code").GetString());
+        Assert.All(new[] { sinPedido, veintiuna, campoDeMas }, r => Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode));
+        Assert.Equal((9, 0), await bd.StockDe(ayacucho, libro));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AJU-10")]
+    public async Task ElEcommerceSimulado_CadaFalloDeAjustesTraeUnCodigoDeLosQueSuOperacionDeclara()
+    {
+        var (_, cusco, ayacucho, libro) = await Escenario();
+        var digital = await bd.AgregarEdicion("digital");
+        var casos = new (string Operacion, HttpResponseMessage Respuesta)[]
+        {
+            ("inventario.ajustes.registrar", await Enviar(HttpMethod.Post, "/ajustes", RolesDeUsuario.EncargadoDeSucursal, ayacucho, null, Ajuste("ayacucho", libro, 99), Clave())),
+            ("inventario.ajustes.registrar", await Enviar(HttpMethod.Post, "/ajustes", RolesDeUsuario.EncargadoDeSucursal, ayacucho, null, Ajuste("ayacucho", digital, 1), Clave())),
+            ("inventario.ajustes.registrar", await Enviar(HttpMethod.Post, "/ajustes", RolesDeUsuario.EncargadoDeSucursal, ayacucho, null, Ajuste("ayacucho", libro, 1, null, "regalo"), Clave())),
+            ("inventario.ajustes.registrar", await Enviar(HttpMethod.Post, "/ajustes", RolesDeUsuario.EncargadoDeSucursal, cusco, null, Ajuste("ayacucho", libro, 1), Clave())),
+            ("inventario.ingresos.registrar", await Enviar(HttpMethod.Post, "/ingresos-de-mercaderia", RolesDeUsuario.AdministradorCentral, null, null, IngresoJson(libro, 5, "cusco"), Clave())),
+            ("inventario.ingresos.registrar", await Enviar(HttpMethod.Post, "/ingresos-de-mercaderia", RolesDeUsuario.AdministradorCentral, null, null, IngresoJson(digital, 5), Clave())),
+            ("inventario.ingresos.listar", await Enviar(HttpMethod.Get, "/ingresos-de-mercaderia?limite=0", RolesDeUsuario.AdministradorCentral)),
+            ("inventario.devoluciones.reingresar", await Enviar(HttpMethod.Post, $"/devoluciones/{Guid.NewGuid()}/reingreso", RolesDeUsuario.EncargadoDeSucursal, cusco, null, Reingreso(Guid.NewGuid(), "ayacucho", (libro, 1)))),
+        };
+
+        foreach (var (operacion, respuesta) in casos)
+        {
+            var contrato = OperacionesDelInventario.Todas.Single(o => o.Nombre == operacion);
+            Assert.NotEqual((int)respuesta.StatusCode, contrato.CodigoDeExito);
+            var problema = JsonSerializer.Deserialize<ProblemaDto>(await respuesta.Content.ReadAsStringAsync(), new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+            Assert.Contains(problema.Code, contrato.Errores);
+            Assert.Equal((int)respuesta.StatusCode, problema.Status);
+        }
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AJU-08")]
+    public async Task ElAlcancePrimero_UnCuerpoMalFormadoDeQuienNoTienePermisoRecibe403_YElDeQuienSiLoTieneRecibe400()
+    {
+        var (_, _, ayacucho, _) = await Escenario();
+        const string Malformado = """{"campoDesconocido":1}""";
+
+        var logistica = await Enviar(HttpMethod.Post, "/ajustes", RolesDeUsuario.PersonalDeLogistica, null, null, Malformado, Clave());
+        var cliente = await Enviar(HttpMethod.Post, "/ingresos-de-mercaderia", RolesDeUsuario.Cliente, null, null, Malformado, Clave());
+        var encargadoEnIngreso = await Enviar(HttpMethod.Post, "/ingresos-de-mercaderia", RolesDeUsuario.EncargadoDeSucursal, ayacucho, null, Malformado, Clave());
+        var encargado = await Enviar(HttpMethod.Post, "/ajustes", RolesDeUsuario.EncargadoDeSucursal, ayacucho, null, Malformado, Clave());
+        var administracion = await Enviar(HttpMethod.Post, "/ingresos-de-mercaderia", RolesDeUsuario.AdministradorCentral, null, null, Malformado, Clave());
+
+        Assert.All(new[] { logistica, cliente, encargadoEnIngreso }, r => Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode));
+        Assert.All(new[] { encargado, administracion }, r => Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode));
+    }
+
     // ---------- la matriz ----------
 
     [Fact]
     [Trait("Criterio", "AC-AJU-08")]
     public void CadaOperacionDeAjustesEstaDeclaradaEnLaMatrizConUnSoloAlcance()
     {
-        var endpoints = _api.Endpoints.Where(e => (e.RoutePattern.RawText ?? string.Empty).Contains("/ajustes", StringComparison.Ordinal) || (e.RoutePattern.RawText ?? string.Empty).Contains("/ingresos-de-mercaderia", StringComparison.Ordinal)).ToList();
+        var endpoints = _api.Endpoints.Where(e => (e.RoutePattern.RawText ?? string.Empty).Contains("/ajustes", StringComparison.Ordinal) || (e.RoutePattern.RawText ?? string.Empty).Contains("/ingresos-de-mercaderia", StringComparison.Ordinal) || (e.RoutePattern.RawText ?? string.Empty).Contains("/devoluciones", StringComparison.Ordinal)).ToList();
 
         Assert.Equal(MatrizDeAjustes.Operaciones.Count, endpoints.Count);
         Assert.All(endpoints, e => Assert.Contains(e.Metadata.GetMetadata<BabelHub.Inventario.Api.Plataforma.OperacionDeServicioAttribute>()!.Operacion.Valor, MatrizDeAjustes.Operaciones));

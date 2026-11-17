@@ -16,10 +16,9 @@ namespace BabelHub.Inventario.Api.Ajustes;
 /// </summary>
 public static class ErroresDeAjustes
 {
-    /// <summary>Los códigos específicos de las reglas de negocio de Ajustes, para <see cref="OpcionesDeErrores"/> (422).</summary>
+    /// <summary>Los códigos específicos de las reglas de negocio de Ajustes, para <see cref="OpcionesDeErrores"/> (422). <c>edicion-no-impresa</c> ya lo declara <c>Reservas</c>: la colisión de claves rompería la composición.</summary>
     public static IReadOnlyDictionary<string, MensajeEspecifico> Especificos { get; } = new Dictionary<string, MensajeEspecifico>
     {
-        ["edicion-no-impresa"] = new(CodigosDeErrorDelInventario.EdicionNoImpresa, "La edición no es impresa: no tiene stock físico."),
         ["sin-cambios"] = new(CodigosDeErrorDelInventario.SinCambios, "El conteo es igual al físico registrado: no hay nada que ajustar."),
         ["fuente-no-es-de-recepcion"] = new(CodigosDeErrorDelInventario.FuenteNoEsDeRecepcion, "El ingreso de mercadería solo entra en la fuente de recepción."),
         ["conteo-menor-que-reservas"] = new(CodigosDeErrorDelInventario.ConteoMenorQueReservas, "El conteo es menor que las unidades reservadas."),
@@ -111,7 +110,7 @@ public static class MatrizDeAjustes
     public const string OperacionDelHistorial = "inventario.ajustes.historial";
 
     public static IReadOnlyList<string> Operaciones { get; } =
-        ["inventario.ajustes.registrar", "inventario.ingresos.registrar", "inventario.ingresos.listar", OperacionDelHistorial];
+        ["inventario.ajustes.registrar", "inventario.ingresos.registrar", "inventario.ingresos.listar", OperacionDelHistorial, "inventario.devoluciones.reingresar"];
 
     public static IEnumerable<(OperacionDeServicio Operacion, AlcanceDeServicio Alcance)> Declaraciones() =>
         Operaciones.Select(nombre => (new OperacionDeServicio(nombre), AlcanceDeServicio.OperacionDeUsuario));
@@ -155,6 +154,7 @@ public static class EndpointsDeAjustes
         api.MapPost("/ingresos-de-mercaderia", RegistrarIngreso).Operacion("inventario.ingresos.registrar");
         api.MapGet("/ingresos-de-mercaderia", ListarIngresos).Operacion("inventario.ingresos.listar");
         api.MapGet("/ajustes", Historial).Operacion(MatrizDeAjustes.OperacionDelHistorial);
+        api.MapPost("/devoluciones/{devolucionId:guid}/reingreso", Reingresar).Operacion("inventario.devoluciones.reingresar");
         return rutas;
     }
 
@@ -237,6 +237,21 @@ public static class EndpointsDeAjustes
         var resultado = await caso.Ejecutar(new ConsultarHistorialDeAjustesEntrada(codigos[0]!, pagina, tamano), c.RequestAborted).ConfigureAwait(false);
         return resultado.EsExito
             ? Results.Json(new PaginaDto<AjusteRegistradoDto>([.. resultado.Valor.Elementos.Select(AAjuste)], resultado.Valor.Pagina, resultado.Valor.Tamano, resultado.Valor.Total))
+            : await ErroresDeAjustes.Falla(c, e, resultado.Error!).ConfigureAwait(false);
+    }
+
+    private static async Task<IResult> Reingresar(Guid devolucionId, HttpContext c, OpcionesDeErrores e, ICasoDeUso<ReingresarPorDevolucionEntrada, ReingresoRegistrado> caso)
+    {
+        var (cuerpo, clave) = await CuerpoEstricto.Leer<ReingresarDevolucionDto>(c).ConfigureAwait(false);
+        if (cuerpo is null)
+        {
+            return await AutorizarAntes(caso, new ReingresarPorDevolucionEntrada(Guid.Empty, Guid.Empty, string.Empty, []), c, e, "cuerpo", clave!).ConfigureAwait(false);
+        }
+
+        var entrada = new ReingresarPorDevolucionEntrada(devolucionId, cuerpo.PedidoId, cuerpo.CodigoDeFuente, [.. (cuerpo.Lineas ?? []).Select(l => new LineaDeReingreso(l.EdicionId, l.Cantidad))]);
+        var resultado = await caso.Ejecutar(entrada, c.RequestAborted).ConfigureAwait(false);
+        return resultado.EsExito
+            ? Results.Json(new ReingresoDeDevolucionDto(resultado.Valor.DevolucionId, resultado.Valor.YaAplicado, [.. resultado.Valor.Ajustes.Select(AAjuste)]))
             : await ErroresDeAjustes.Falla(c, e, resultado.Error!).ConfigureAwait(false);
     }
 

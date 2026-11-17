@@ -112,7 +112,8 @@ internal sealed class NpgsqlRepositorioDeAjustes(AccesoAAjustes acceso) : IRepos
             async (conexion, transaccion, token) =>
             {
                 // La comprobación de que ya existe es de toda la red: el alcance de la sucursal que reingresa no debe ocultar el de otra (se compara la fuente después y es conflicto).
-                await using var comando = new NpgsqlCommand($"SELECT {Columnas} FROM ajustes.ajustes WHERE motivo = 'devolucion' AND devolucion_id = @d AND edicion_id = @e", conexion, transaccion);
+                // Solo lo que se compara (fuente, cantidad y pedido): sin la nota ni el usuario de otra sucursal.
+                await using var comando = new NpgsqlCommand("SELECT id, fuente_id, edicion_id, motivo, cantidad_anterior, cantidad_posterior, conteo_real, NULL::text, NULL::uuid, fecha, devolucion_id, pedido_id FROM ajustes.ajustes WHERE motivo = 'devolucion' AND devolucion_id = @d AND edicion_id = @e", conexion, transaccion);
                 comando.Parameters.AddWithValue("d", devolucionId);
                 comando.Parameters.AddWithValue("e", edicionId);
                 await using var lector = await comando.ExecuteReaderAsync(token).ConfigureAwait(false);

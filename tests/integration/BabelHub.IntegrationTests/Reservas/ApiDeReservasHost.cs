@@ -95,7 +95,7 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
         var local = new MotorDeLimitesLocal();
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
-        builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("INV", ErroresDeFuentes.Especificos.Concat(ErroresDeReservas.Especificos).Concat(ErroresDeAjustes.Especificos).GroupBy(p => p.Key).ToDictionary(g => g.Key, g => g.First().Value)));
+        builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("INV", ErroresDeFuentes.Especificos.Concat(ErroresDeReservas.Especificos).Concat(ErroresDeAjustes.Especificos).ToDictionary(p => p.Key, p => p.Value)));
         builder.Services.AgregarLimitesHttp(new OpcionesDeLimitesHttp());
         builder.Services.AgregarCredencialDeServicio(
             conTopeGeneral ? new OpcionesDeSuperficieDeServicio { TopeDeLaDireccionDirecta = PoliticasDeLimite.SolicitudesPorHuellaDirecta } : new OpcionesDeSuperficieDeServicio(),
