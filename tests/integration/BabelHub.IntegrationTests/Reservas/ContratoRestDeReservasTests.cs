@@ -209,7 +209,6 @@ public sealed class ContratoRestDeReservasTests(PostgresDeReservasFixture bd) : 
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEL-20")]
     public async Task LosFallos_RespondenConUnCodigoDeLosQueLaOperacionDeclara_ConElDetalleQueElContratoPromete()
     {
         var (_, _, libro, enLima) = await Escenario();
@@ -273,7 +272,6 @@ public sealed class ContratoRestDeReservasTests(PostgresDeReservasFixture bd) : 
 
     [Fact]
     [Trait("Criterio", "AC-SEL-11")]
-    [Trait("Criterio", "AC-SEL-21")]
     public async Task LasUnidadesVendidas_CuentanUnaSolaVezEnLaSucursalDeRecojo_EnCadaFaseDelTrasladoSimulado()
     {
         var lima = await bd.AgregarFuente("lima", recepcion: true);

@@ -66,7 +66,7 @@ public sealed class CarrerasYLimitesDeReservasPostgresTests(PostgresDeReservasFi
 
     private static async Task<T[]> Simultaneas<T>(params Func<Task<T>>[] trabajos)
     {
-        var compuerta = new TaskCompletionSource();
+        var compuerta = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var tareas = trabajos.Select(trabajo => Task.Run(async () =>
         {
             await compuerta.Task;
@@ -146,7 +146,6 @@ public sealed class CarrerasYLimitesDeReservasPostgresTests(PostgresDeReservasFi
     // ---------- T29: carreras sobre una misma reserva ----------
 
     [Fact]
-    [Trait("Criterio", "AC-SEL-29")]
     [Trait("Criterio", "AC-SEL-16")]
     public async Task UnReemplazoYUnaConfirmacionALaVez_AplicanLaPrimera_SinEfectosParcialesNiInterbloqueos()
     {
@@ -179,7 +178,6 @@ public sealed class CarrerasYLimitesDeReservasPostgresTests(PostgresDeReservasFi
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEL-29")]
     [Trait("Criterio", "AC-SEL-07")]
     public async Task UnReemplazoYUnaLiberacionALaVez_NoDejanNadaReservadoSeaCualSeaElOrden()
     {
@@ -234,7 +232,6 @@ public sealed class CarrerasYLimitesDeReservasPostgresTests(PostgresDeReservasFi
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEL-29")]
     [Trait("Criterio", "AC-SEL-08")]
     public async Task LaExpiracionYLaEntregaALaVez_UnaConfirmadaNoExpira_LaEntregaBajaElFisicoUnaVez()
     {
@@ -257,7 +254,6 @@ public sealed class CarrerasYLimitesDeReservasPostgresTests(PostgresDeReservasFi
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEL-29")]
     [Trait("Criterio", "AC-SEL-28")]
     public async Task LaEntregaDeUnaReservaPendienteVencida_SeRechazaPorEstadoInvalido_YLaExpiracionLaLibera()
     {
@@ -279,7 +275,6 @@ public sealed class CarrerasYLimitesDeReservasPostgresTests(PostgresDeReservasFi
 
     [Fact]
     [Trait("Criterio", "AC-SEL-07")]
-    [Trait("Criterio", "AC-SEL-28")]
     public async Task AnularConUnTrasladoEnTransito_EsExito_ElStockNoCambia_LaVentaQuedaAnuladaYElReceptorRecibeElTraslado()
     {
         var lima = await bd.AgregarFuente("lima", recepcion: true);
