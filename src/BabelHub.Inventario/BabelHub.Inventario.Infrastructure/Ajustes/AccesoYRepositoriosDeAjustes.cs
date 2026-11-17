@@ -313,3 +313,16 @@ internal sealed class NpgsqlRepositorioDeOperacionesIdempotentes(AccesoAAjustes 
             },
             cancelacion);
 }
+
+/// <summary>El registro del acceso al esquema: aquí vive el de la elevación porque solo la Infraestructura de <c>Fuentes</c> y de <c>Ajustes</c> puede depender de ella (D09).</summary>
+internal static class RegistroDeAccesoAAjustes
+{
+    public static Microsoft.Extensions.DependencyInjection.IServiceCollection AgregarAccesoAAjustes(this Microsoft.Extensions.DependencyInjection.IServiceCollection servicios)
+    {
+        Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.TryAddSingleton<IElevacionDeAlcance>(
+            servicios,
+            sp => (IElevacionDeAlcance)Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<IUnidadDeTrabajo>(sp));
+        Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions.AddScoped<AccesoAAjustes>(servicios);
+        return servicios;
+    }
+}

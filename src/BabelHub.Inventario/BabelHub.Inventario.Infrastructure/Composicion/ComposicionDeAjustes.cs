@@ -34,8 +34,7 @@ public static class ComposicionDeAjustes
         ArgumentNullException.ThrowIfNull(opciones);
         var opcionesDeReintento = reintento ?? new OpcionesDeReintentoPorInterbloqueo();
 
-        servicios.TryAddSingleton<IElevacionDeAlcance>(sp => (IElevacionDeAlcance)sp.GetRequiredService<IUnidadDeTrabajo>());
-        servicios.AddScoped<AccesoAAjustes>();
+        servicios.AgregarAccesoAAjustes();
         servicios.AddScoped<IRepositorioDeAjustes, NpgsqlRepositorioDeAjustes>();
         servicios.AddScoped<IRepositorioDeIngresos, NpgsqlRepositorioDeIngresos>();
         servicios.AddScoped<IRepositorioDeOperacionesIdempotentes, NpgsqlRepositorioDeOperacionesIdempotentes>();
