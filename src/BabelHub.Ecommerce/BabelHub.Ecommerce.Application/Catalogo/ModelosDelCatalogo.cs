@@ -73,8 +73,8 @@ public enum FrescuraDeLaDisponibilidad
 public sealed record DisponibilidadPorFuente(string CodigoDeFuente, string NombreDeFuente, int Vendible);
 
 /// <summary>
-/// La disponibilidad de una edición. <see cref="VendibleEnLaRed"/> y <see cref="PorFuente"/> solo existen para una impresa con dato; <see cref="RegistroPendiente"/> (el
-/// Inventario aún no conoce la edición: «registro o ingreso pendiente») solo la ve la administración central, el público ve «agotada».
+/// La disponibilidad de una edición. <see cref="VendibleEnLaRed"/> y <see cref="PorFuente"/> solo existen para una impresa con dato. El aviso «registro o ingreso pendiente» (el
+/// Inventario aún no conoce la edición) <b>no está aquí</b>: lo ve solo la administración central y por eso vive en los modelos de administración; el público ve «agotada».
 /// </summary>
 public sealed record DisponibilidadDeEdicion(
     Guid EdicionId,
@@ -83,8 +83,7 @@ public sealed record DisponibilidadDeEdicion(
     IReadOnlyList<DisponibilidadPorFuente> PorFuente,
     FrescuraDeLaDisponibilidad Frescura,
     DateTimeOffset? ConsultadaEn,
-    MotivoDeNoDisponibleDeEdicion? Motivo,
-    bool RegistroPendiente);
+    MotivoDeNoDisponibleDeEdicion? Motivo);
 
 // ---------- Consulta pública ----------
 
@@ -258,7 +257,11 @@ public enum FinalidadDeLaSubida
 public sealed record SubirArchivoEntrada(FinalidadDeLaSubida Finalidad, Stream Contenido);
 
 /// <summary>La referencia que se usa después al registrar la obra o la edición: la huella SHA-256 (64 hexadecimales), el tipo y el tamaño; nunca la clave del almacén.</summary>
-public sealed record ArchivoSubido(Guid ReferenciaId, FinalidadDeLaSubida Finalidad, string Tipo, long TamanoEnBytes, string HuellaSha256, DateTimeOffset VenceEn);
+public sealed record ArchivoSubido(Guid ReferenciaId, FinalidadDeLaSubida Finalidad, string Tipo, long TamanoEnBytes, string HuellaSha256, DateTimeOffset VenceEn)
+{
+    /// <summary>La referencia es una capacidad de un solo uso ligada al usuario: no se imprime (SEG-10).</summary>
+    public override string ToString() => $"ArchivoSubido {{ Finalidad = {Finalidad}, Tipo = {Tipo}, TamanoEnBytes = {TamanoEnBytes} }}";
+}
 
 /// <summary>Una portada lista para servir: su tipo de medio y su flujo (que quien llama cierra).</summary>
 public sealed record PortadaServida(string TipoDeMedio, Stream Contenido);
@@ -307,7 +310,11 @@ public sealed record IngresoDeLaLista(
     string? Referencia,
     Guid? UsuarioId,
     DateTimeOffset Instante,
-    EstadoDeIngresoSolicitado? Estado);
+    EstadoDeIngresoSolicitado? Estado)
+{
+    /// <summary>La referencia (texto libre) y el usuario no se imprimen (SEG-10).</summary>
+    public override string ToString() => $"IngresoDeLaLista {{ Cantidad = {Cantidad}, Instante = {Instante:O}, Estado = {Estado} }}";
+}
 
 /// <summary>Los últimos ingresos de una edición con su fecha y su usuario. <see cref="InventarioNoRespondio"/> indica que la parte del Inventario falta.</summary>
 public sealed record HistorialDeIngresos(Guid EdicionId, IReadOnlyList<IngresoDeLaLista> Ingresos, bool InventarioNoRespondio);

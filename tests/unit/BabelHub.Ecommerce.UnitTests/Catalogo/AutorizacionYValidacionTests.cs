@@ -188,7 +188,6 @@ public sealed class AutorizacionYValidacionTests
     }
 
     [Theory]
-    [Trait("Criterio", "AC-CAT-16")]
     [InlineData(1)]
     [InlineData(12)]
     [InlineData(5000)]
@@ -252,7 +251,6 @@ public sealed class AutorizacionYValidacionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-15")]
     public void Las_bajas_exigen_identificadores_y_version()
     {
         Assert.Equal(["obraId", "version"], Campos(new ValidadorDeDarDeBajaObra().Validar(new DarDeBajaObraEntrada(Guid.Empty, 0))));
@@ -287,7 +285,6 @@ public sealed class AutorizacionYValidacionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-18")]
     public void Un_ingreso_de_30_con_la_referencia_GR_001_se_acepta_y_sus_textos_tienen_tope()
     {
         var edicion = Guid.NewGuid();
@@ -298,7 +295,6 @@ public sealed class AutorizacionYValidacionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-18")]
     public void La_nota_de_un_ingreso_no_lleva_una_tarjeta_y_la_referencia_no_admite_saltos_de_linea()
     {
         var edicion = Guid.NewGuid();
@@ -311,7 +307,6 @@ public sealed class AutorizacionYValidacionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-18")]
     public void Reintentar_conciliar_emitir_y_listar_exigen_sus_identificadores_y_una_resolucion_conocida()
     {
         Assert.Equal(["ingresoId"], Campos(new ValidadorDeReintentarIngreso().Validar(new ReintentarIngresoEntrada(Guid.Empty))));
@@ -330,7 +325,6 @@ public sealed class AutorizacionYValidacionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-06")]
     public void La_busqueda_valida_el_texto_de_2_a_100_el_rango_de_precio_y_la_pagina()
     {
         var invalida = new BusquedaDeObras("a", new string('x', 201), null, null, (FormatoDeEdicion)5, -1m, 0m, false, 0, 51);
@@ -345,7 +339,6 @@ public sealed class AutorizacionYValidacionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-06")]
     public void La_lista_de_administracion_valida_el_texto_y_la_pagina()
     {
         Assert.Equal(["q", "tamano"], Campos(new ValidadorDeListarObrasDeAdministracion().Validar(new ListarObrasDeAdministracionEntrada(new string('q', 101), false, 1, 0))));
@@ -353,7 +346,6 @@ public sealed class AutorizacionYValidacionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-17")]
     public void Las_ediciones_por_identificador_son_hasta_50_sin_vacios()
     {
         var cincuenta = Enumerable.Range(0, 50).Select(_ => Guid.NewGuid()).ToList();

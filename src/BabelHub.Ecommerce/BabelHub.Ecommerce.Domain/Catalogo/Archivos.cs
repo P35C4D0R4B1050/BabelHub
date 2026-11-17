@@ -173,11 +173,11 @@ public sealed class HuellaDeArchivo : IEquatable<HuellaDeArchivo>
             ? new HuellaDeArchivo(bytes.ToArray())
             : throw new ArgumentException("La huella SHA-256 tiene 32 bytes.", nameof(bytes));
 
-    /// <summary>Exactamente 64 caracteres hexadecimales (cualquier otra longitud o carácter se rechaza); es la forma de <c>/portadas/{huella}</c>.</summary>
+    /// <summary>Exactamente 64 caracteres hexadecimales <b>en minúsculas</b> (cualquier otra longitud o carácter, incluidas las mayúsculas, se rechaza); es la forma de <c>/portadas/{huella}</c>: una sola URL por portada, para poder purgarla del borde (R06).</summary>
     public static bool TryDesdeHexadecimal(string? texto, out HuellaDeArchivo? huella)
     {
         huella = null;
-        if (texto is null || texto.Length != LongitudEnBytes * 2 || !texto.All(char.IsAsciiHexDigit))
+        if (texto is null || texto.Length != LongitudEnBytes * 2 || !texto.All(c => char.IsAsciiDigit(c) || char.IsAsciiHexDigitLower(c)))
         {
             return false;
         }
@@ -251,6 +251,14 @@ public sealed record ArchivoDeEdicion
 
     /// <summary>El formato digital al que corresponde el archivo.</summary>
     public FormatoDigital Formato => TipoDetectado == TipoDeArchivo.Epub ? FormatoDigital.Epub : FormatoDigital.Pdf;
+
+    /// <summary>La clave del almacén y quien subió el archivo nunca se imprimen (un registro de diagnóstico no debe volcarlos, SEG-10).</summary>
+    private bool PrintMembers(System.Text.StringBuilder constructor)
+    {
+        ArgumentNullException.ThrowIfNull(constructor);
+        constructor.Append("TipoDetectado = ").Append(TipoDetectado).Append(", TamanoEnBytes = ").Append(TamanoEnBytes);
+        return true;
+    }
 }
 
 /// <summary>La portada de una obra: su objeto en el almacén, su tipo y su huella (la ruta pública es <c>/portadas/{huella}</c>, D06).</summary>
@@ -279,6 +287,14 @@ public sealed record PortadaDeObra
     public TipoDeArchivo TipoDetectado { get; }
 
     public HuellaDeArchivo Huella { get; }
+
+    /// <summary>La clave del almacén nunca se imprime (SEG-10).</summary>
+    private bool PrintMembers(System.Text.StringBuilder constructor)
+    {
+        ArgumentNullException.ThrowIfNull(constructor);
+        constructor.Append("TipoDetectado = ").Append(TipoDetectado);
+        return true;
+    }
 }
 
 public enum EstadoDeReferencia
@@ -387,10 +403,28 @@ public sealed class ReferenciaDeArchivo
         HuellaDeArchivo? huella,
         DateTimeOffset creadoEn,
         DateTimeOffset venceEn,
-        DateTimeOffset? consumidoEn) =>
-        ClaveEnAlmacen.EsValida(claveEnAlmacen)
-            ? new ReferenciaDeArchivo(id, usuarioId, finalidad, claveEnAlmacen, estado, tipoDetectado, tamanoEnBytes, huella, creadoEn, venceEn, consumidoEn)
-            : throw new ArgumentException("La clave del almacén guardada no tiene la forma esperada.", nameof(claveEnAlmacen));
+        DateTimeOffset? consumidoEn)
+    {
+        if (!ClaveEnAlmacen.EsValida(claveEnAlmacen))
+        {
+            throw new ArgumentException("La clave del almacén guardada no tiene la forma esperada.", nameof(claveEnAlmacen));
+        }
+
+        // Una fila guardada es coherente con su estado: lista o consumida tiene tipo, tamaño y huella (y el tipo corresponde a la finalidad); consumida tiene su instante.
+        var completa = tipoDetectado is not null && tamanoEnBytes is > 0 && huella is not null && TiposDeArchivo.EsAcordeALaFinalidad(tipoDetectado.Value, finalidad);
+        if (estado is EstadoDeReferencia.Lista or EstadoDeReferencia.Consumida && !completa)
+        {
+            throw new ArgumentException("Una referencia lista o consumida guarda su tipo, su tamaño y su huella.", nameof(estado));
+        }
+
+        // Una fila en descarte puede venir de una consumida (conserva su instante) o de una que nunca se consumió.
+        if ((estado == EstadoDeReferencia.Consumida && consumidoEn is null) || (estado is EstadoDeReferencia.Subiendo or EstadoDeReferencia.Lista && consumidoEn is not null))
+        {
+            throw new ArgumentException("El instante de consumo corresponde solo a una referencia consumida (o a una descartada que lo fue).", nameof(consumidoEn));
+        }
+
+        return new ReferenciaDeArchivo(id, usuarioId, finalidad, claveEnAlmacen, estado, tipoDetectado, tamanoEnBytes, huella, creadoEn, venceEn, consumidoEn);
+    }
 
     /// <summary>El objeto ya está escrito y verificado: pasa a <c>lista</c> con su tipo, su tamaño real y su huella.</summary>
     public void MarcarLista(TipoDeArchivo tipo, long tamanoEnBytes, HuellaDeArchivo huella)

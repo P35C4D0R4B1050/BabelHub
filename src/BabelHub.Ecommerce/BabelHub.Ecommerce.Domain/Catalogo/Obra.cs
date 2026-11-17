@@ -87,6 +87,15 @@ public sealed record CambiosDeEdicion(
     public bool CambioLaLicencia => LicenciaAnterior is not null;
 
     public bool ReemplazoElArchivo => ArchivoAnterior is not null;
+
+    /// <summary>La licencia anterior y el archivo (con su clave del almacén) no se imprimen: un registro de diagnóstico no debe volcarlos (SEG-10).</summary>
+    private bool PrintMembers(System.Text.StringBuilder constructor)
+    {
+        ArgumentNullException.ThrowIfNull(constructor);
+        constructor.Append("EdicionId = ").Append(Edicion.Id).Append(", CambioElPrecio = ").Append(CambioElPrecio)
+            .Append(", CambioLaLicencia = ").Append(CambioLaLicencia).Append(", ReemplazoElArchivo = ").Append(ReemplazoElArchivo);
+        return true;
+    }
 }
 
 /// <summary>Las ediciones que quedaron dadas de baja con la obra (para quitarlas de los carritos y auditarlas).</summary>

@@ -146,6 +146,10 @@ internal static class ReglasDeEntradaDelCatalogo
         {
             errores.Add(new ErrorDeCampo(prefijo + "titular", ConstructorDeValidacion.DemasiadoLargo));
         }
+        else if (licencia.Titular is not null && TieneCaracteresDeControl(licencia.Titular, permiteSaltos: false))
+        {
+            errores.Add(new ErrorDeCampo(prefijo + "titular", ConstructorDeValidacion.FormatoInvalido));
+        }
 
         if (licencia.Territorios is { Count: > LimitesDelCatalogo.MaximoDeTerritorios })
         {
@@ -226,7 +230,7 @@ internal static class ReglasDeEntradaDelCatalogo
         }
     }
 
-    private static bool TieneCaracteresDeControl(string valor, bool permiteSaltos) =>
+    internal static bool TieneCaracteresDeControl(string valor, bool permiteSaltos) =>
         valor.Any(c => char.IsControl(c) && !(permiteSaltos && c is '\n' or '\r' or '\t'));
 }
 
@@ -463,6 +467,11 @@ internal sealed class ValidadorDeBusquedaDeObras : IValidador<BusquedaDeObras>
             {
                 errores.Add(new ErrorDeCampo("q", ConstructorDeValidacion.DemasiadoLargo));
             }
+            else if (ReglasDeEntradaDelCatalogo.TieneCaracteresDeControl(entrada.Texto, permiteSaltos: false))
+            {
+                // Un carácter NUL o de control llegaría al parámetro de PostgreSQL y daría un 500 en lugar de un 400 (SEG-01, SEG-03).
+                errores.Add(new ErrorDeCampo("q", ConstructorDeValidacion.FormatoInvalido));
+            }
         }
 
         ReglasDeEntradaDelCatalogo.Texto(errores, "autor", entrada.Autor, LimitesDelCatalogo.LargoMaximoDeTexto, obligatorio: false);
@@ -506,7 +515,7 @@ internal sealed class ValidadorDeListarObrasDeAdministracion : IValidador<Listar
     }
 }
 
-/// <summary>Los identificadores de varias ediciones (hasta 50, sin vacíos ni repetidos): lo comparten <c>ConsultarDisponibilidad</c> y <c>ObtenerEdiciones</c>.</summary>
+/// <summary>Los identificadores de varias ediciones (hasta 50, sin vacíos ni repetidos: un lote con el mismo identificador dos veces se rechaza): lo comparten <c>ConsultarDisponibilidad</c> y <c>ObtenerEdiciones</c>.</summary>
 internal static class ValidadorDeEdicionesPorIdentificador
 {
     public const int Maximo = 50;
@@ -522,7 +531,7 @@ internal static class ValidadorDeEdicionesPorIdentificador
         {
             errores.Add(new ErrorDeCampo("edicionIds", ConstructorDeValidacion.DemasiadoLargo));
         }
-        else if (ids.Any(i => i == Guid.Empty))
+        else if (ids.Any(i => i == Guid.Empty) || ids.Distinct().Count() != ids.Count)
         {
             errores.Add(new ErrorDeCampo("edicionIds", ConstructorDeValidacion.FormatoInvalido));
         }

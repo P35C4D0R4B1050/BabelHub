@@ -25,7 +25,7 @@ public class ReglasDelCatalogoTests
     /// <summary>Los campos que un cliente nunca ve: titular, territorios, vigencia, claves y huellas del almacén, versión, motivo de retiro, licencia, ISBN tal como se ingresó y datos de quién subió.</summary>
     private static readonly string[] FragmentosInternos =
     [
-        "Titular", "Territorio", "Vigente", "Licencia", "Clave", "Version", "MotivoDeRetiro", "IsbnIngresado", "SubidoPor", "UsuarioId", "Archivo",
+        "Titular", "Territorio", "Vigente", "Licencia", "Clave", "Version", "MotivoDeRetiro", "IsbnIngresado", "SubidoPor", "UsuarioId", "Archivo", "RegistroPendiente",
     ];
 
     /// <summary>Los tipos del contrato que, por diseño, llevan datos internos: las entradas de la administración, sus salidas «DeAdministracion» y los dos de archivos para la Biblioteca y la subida.</summary>
@@ -40,12 +40,7 @@ public class ReglasDelCatalogoTests
     [Fact]
     public void Los_modelos_publicos_de_consulta_no_llevan_ningun_campo_interno()
     {
-        var infractores = Aplicacion.GetTypes()
-            .Where(EsPublico)
-            .SelectMany(t => t.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-                .Where(p => FragmentosInternos.Any(f => p.Name.Contains(f, StringComparison.Ordinal)))
-                .Select(p => $"{t.Name}.{p.Name}"))
-            .ToList();
+        var infractores = Infractores(Aplicacion.GetTypes().Where(EsPublico));
 
         Assert.True(infractores.Count == 0, $"Estos modelos públicos del catálogo exponen un campo interno: {string.Join(", ", infractores)}.");
     }
@@ -65,10 +60,18 @@ public class ReglasDelCatalogoTests
     [Fact]
     public void La_regla_de_campos_internos_detecta_un_modelo_publico_que_los_expone()
     {
-        var campos = typeof(ModeloQueFiltraElTitular).GetProperties().Where(p => FragmentosInternos.Any(f => p.Name.Contains(f, StringComparison.Ordinal))).ToList();
+        var campos = Infractores([typeof(ModeloQueFiltraElTitular), typeof(ModeloQueFiltraElRegistroPendiente)]);
 
-        Assert.Single(campos);
+        Assert.Equal(2, campos.Count);
     }
 
     private sealed record ModeloQueFiltraElTitular(string Titulo, string TitularDeDerechos);
+
+    private sealed record ModeloQueFiltraElRegistroPendiente(Guid EdicionId, bool RegistroPendiente);
+
+    /// <summary>La regla misma, compartida por la prueba real y la que comprueba que detecta: las propiedades públicas de los tipos dados con un fragmento interno.</summary>
+    private static List<string> Infractores(IEnumerable<Type> tipos) =>
+        tipos.SelectMany(t => t.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Where(p => FragmentosInternos.Any(f => p.Name.Contains(f, StringComparison.Ordinal)))
+            .Select(p => $"{t.Name}.{p.Name}")).ToList();
 }

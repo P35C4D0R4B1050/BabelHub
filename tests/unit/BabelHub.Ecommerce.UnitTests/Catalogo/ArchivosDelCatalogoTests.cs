@@ -101,7 +101,8 @@ public sealed class ArchivosDelCatalogoTests
         Assert.Equal(16, huella.Corta.Length);
         Assert.StartsWith(huella.Corta, huella.Hex, StringComparison.Ordinal);
         Assert.Throws<ArgumentException>(() => HuellaDeArchivo.Desde(new byte[31]));
-        Assert.True(HuellaDeArchivo.TryDesdeHexadecimal(huella.Hex.ToUpperInvariant(), out var igual));
+        Assert.True(HuellaDeArchivo.TryDesdeHexadecimal(huella.Hex, out var igual));
+        Assert.False(HuellaDeArchivo.TryDesdeHexadecimal(huella.Hex.ToUpperInvariant(), out _));
         Assert.Equal(huella, igual);
     }
 

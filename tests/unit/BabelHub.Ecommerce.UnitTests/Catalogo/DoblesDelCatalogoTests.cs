@@ -15,7 +15,6 @@ public sealed class DoblesDelCatalogoTests
     private static readonly Guid Beto = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000002");
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-16")]
     public async Task El_inventario_doble_aplica_una_vez_la_misma_clave_con_la_misma_carga_y_rechaza_otra_carga()
     {
         var inventario = new InventarioDelCatalogoDoble();
@@ -34,7 +33,6 @@ public sealed class DoblesDelCatalogoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-16")]
     public async Task El_inventario_doble_puede_aplicar_el_ingreso_y_no_responder_o_estar_caido()
     {
         var inventario = new InventarioDelCatalogoDoble { AplicaYNoResponde = true };
@@ -53,7 +51,6 @@ public sealed class DoblesDelCatalogoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-17")]
     public async Task El_inventario_doble_separa_las_ediciones_registradas_de_las_no_registradas()
     {
         var inventario = new InventarioDelCatalogoDoble();
@@ -71,7 +68,6 @@ public sealed class DoblesDelCatalogoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-09")]
     public void La_memoria_invalida_para_la_cache_pero_conserva_el_dato_como_respaldo()
     {
         var memoria = new MemoriaDeDisponibilidadDoble();
@@ -89,7 +85,6 @@ public sealed class DoblesDelCatalogoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-18")]
     public void El_emisor_de_claves_emite_un_token_valido_solo_para_su_usuario_y_edicion_y_hasta_los_30_minutos()
     {
         var emisor = new EmisorDeClavesDeIngresoDoble();
@@ -107,7 +102,6 @@ public sealed class DoblesDelCatalogoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task El_almacen_doble_rechaza_un_ejecutable_renombrado_y_acepta_un_pdf_con_su_huella_y_tamano_reales()
     {
         var almacen = new AlmacenDeArchivosDoble();
@@ -126,7 +120,6 @@ public sealed class DoblesDelCatalogoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task El_almacen_doble_cuenta_los_bytes_leidos_acepta_el_tope_exacto_y_falla_si_no_responde()
     {
         var almacen = new AlmacenDeArchivosDoble();
@@ -146,7 +139,6 @@ public sealed class DoblesDelCatalogoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task El_almacen_doble_lee_por_rango_abre_portadas_y_borra()
     {
         var almacen = new AlmacenDeArchivosDoble();

@@ -77,9 +77,12 @@ public class ContratoPublicoDeCatalogoTests
         {
             var ensamblado = Cargar($"BabelHub.Ecommerce.{capa}");
 
-            var resultado = Types.InAssembly(ensamblado)
-                .That().DoNotResideInNamespaceStartingWith($"BabelHub.Ecommerce.{capa}.Biblioteca")
-                .And().DoNotResideInNamespaceStartingWith($"BabelHub.Ecommerce.{capa}.Catalogo")
+            // La web (Api) no tiene exenciones: la clave del archivo de una digital nunca llega a la interfaz (D13, D17), tampoco a una vista o controlador de Biblioteca o Catálogo.
+            var tipos = capa == "Api"
+                ? Types.InAssembly(ensamblado).That().ResideInNamespaceStartingWith($"BabelHub.Ecommerce.{capa}")
+                : Types.InAssembly(ensamblado).That().DoNotResideInNamespaceStartingWith($"BabelHub.Ecommerce.{capa}.Biblioteca").And().DoNotResideInNamespaceStartingWith($"BabelHub.Ecommerce.{capa}.Catalogo");
+
+            var resultado = tipos
                 .ShouldNot().HaveDependencyOn($"{Raiz}.{nameof(IReferenciaDeArchivosDelCatalogo)}")
                 .GetResult();
 
@@ -90,6 +93,7 @@ public class ContratoPublicoDeCatalogoTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-CAT-15")]
     public void Mientras_Carrito_no_exista_el_retiro_de_carritos_es_el_nulo_y_la_composicion_lo_registra_sin_pisar_a_otro()
     {
         var infraestructura = Cargar("BabelHub.Ecommerce.Infrastructure");

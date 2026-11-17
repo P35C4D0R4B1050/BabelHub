@@ -14,7 +14,11 @@ public sealed record DisponibilidadDelInventario(Guid EdicionId, int VendibleEnL
 public sealed record RespuestaDeDisponibilidad(IReadOnlyList<DisponibilidadDelInventario> Ediciones, IReadOnlyList<Guid> NoRegistradas);
 
 /// <summary>Lo que se pide al Inventario para un ingreso: la clave de idempotencia es el nonce del token firmado (formato del contrato) y la carga es la que se guardó.</summary>
-public sealed record SolicitudDeIngresoAlInventario(Guid EdicionId, Guid ClaveDeIdempotencia, int Cantidad, string? Referencia, string? Nota);
+public sealed record SolicitudDeIngresoAlInventario(Guid EdicionId, Guid ClaveDeIdempotencia, int Cantidad, string? Referencia, string? Nota)
+{
+    /// <summary>La referencia y la nota son texto libre y la clave de idempotencia es una capacidad: nada de eso se imprime (SEG-10).</summary>
+    public override string ToString() => $"SolicitudDeIngresoAlInventario {{ EdicionId = {EdicionId}, Cantidad = {Cantidad} }}";
+}
 
 public enum TipoDeRespuestaDeIngreso
 {
@@ -38,7 +42,11 @@ public sealed record RespuestaDeIngreso(TipoDeRespuestaDeIngreso Tipo, Guid? Ing
 }
 
 /// <summary>Un ingreso de mercadería que el Inventario conserva (con su fecha y su usuario).</summary>
-public sealed record IngresoDelInventario(Guid IngresoId, Guid EdicionId, string CodigoDeFuente, int Cantidad, string? Referencia, string? Nota, Guid? UsuarioId, DateTimeOffset Instante);
+public sealed record IngresoDelInventario(Guid IngresoId, Guid EdicionId, string CodigoDeFuente, int Cantidad, string? Referencia, string? Nota, Guid? UsuarioId, DateTimeOffset Instante)
+{
+    /// <summary>La referencia, la nota y el usuario no se imprimen (SEG-10).</summary>
+    public override string ToString() => $"IngresoDelInventario {{ IngresoId = {IngresoId}, EdicionId = {EdicionId}, Cantidad = {Cantidad} }}";
+}
 
 /// <summary>
 /// El Inventario visto por el Catálogo (D01): solo lo que necesita. Nunca lanza por una falla del Inventario: los resultados «sin respuesta» se expresan en el valor devuelto (un 429, un
