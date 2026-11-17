@@ -119,6 +119,15 @@ internal static class ClavesDelCatalogo
     public const string AlmacenNoDisponible = "almacen-no-disponible";
 
     public const string InventarioNoDisponible = "inventario-no-disponible";
+
+    public const string ObraDadaDeBaja = "obra-dada-de-baja";
+
+    public const string EdicionDadaDeBaja = "edicion-dada-de-baja";
+
+    /// <summary>La operación (licencia, archivo, retiro) es solo de una edición digital (validación, plan §4).</summary>
+    public const string SoloEdicionDigital = "solo-edicion-digital";
+
+    public const string EdicionYaRetirada = "edicion-ya-retirada";
 }
 
 internal static class FallosDelCatalogo
