@@ -4,7 +4,6 @@ using BabelHub.Inventario.Application.Auditoria;
 using BabelHub.Inventario.Application.Fuentes;
 using BabelHub.Inventario.Application.Plataforma;
 using BabelHub.Inventario.Domain.Ajustes;
-using BabelHub.Inventario.Domain.Fuentes;
 
 namespace BabelHub.Inventario.Application.Ajustes.Interno;
 
@@ -173,13 +172,12 @@ internal sealed class RegistrarAjusteManual(
         }
 
         var fila = bloqueo.Fila(fuente.Id, entrada.EdicionId);
-        var existencia = new ExistenciaDeStock(fila.Fisico, fila.Reservado);
         var decision = motivo == MotivoDeAjuste.CorreccionDeConteo
-            ? ReglasDeAjuste.Corregir(existencia, entrada.ConteoReal!.Value)
-            : ReglasDeAjuste.Restar(existencia, entrada.Cantidad!.Value);
+            ? ReglasDeAjuste.Corregir(fila.Fisico, fila.Reservado, entrada.ConteoReal!.Value)
+            : ReglasDeAjuste.Restar(fila.Fisico, fila.Reservado, entrada.Cantidad!.Value);
         if (!decision.Aceptado)
         {
-            return await Rechazar(decision.Rechazo!.Value, existencia, fuente.Id, entrada.EdicionId, cancelacion).ConfigureAwait(false);
+            return await Rechazar(decision.Rechazo!.Value, fila.Fisico, fila.Reservado, fuente.Id, entrada.EdicionId, cancelacion).ConfigureAwait(false);
         }
 
         var resultado = await stock.Aplicar(new MovimientoDeStock(fuente.Id, entrada.EdicionId, decision.DeltaFisico, 0), cancelacion).ConfigureAwait(false);
@@ -222,13 +220,13 @@ internal sealed class RegistrarAjusteManual(
             : Resultado<AjusteRegistrado>.Exito(ConversionDeAjustes.ARespuesta(original, fuente.Codigo));
     }
 
-    private async Task<Resultado<AjusteRegistrado>> Rechazar(MotivoDeRechazoDeAjuste motivo, ExistenciaDeStock existencia, Guid fuenteId, Guid edicionId, CancellationToken cancelacion)
+    private async Task<Resultado<AjusteRegistrado>> Rechazar(MotivoDeRechazoDeAjuste motivo, int fisico, int reservado, Guid fuenteId, Guid edicionId, CancellationToken cancelacion)
     {
         switch (motivo)
         {
             case MotivoDeRechazoDeAjuste.CantidadSuperaAlVendible:
                 return Resultado<AjusteRegistrado>.Fallo(new ErrorDeAplicacion(
-                    CategoriaDeError.Conflicto, ClavesDeAjustes.StockInsuficiente, DetalleDeStockInsuficienteDeAjuste.Codificar(existencia.Fisico, existencia.Reservado, existencia.Vendible())));
+                    CategoriaDeError.Conflicto, ClavesDeAjustes.StockInsuficiente, DetalleDeStockInsuficienteDeAjuste.Codificar(fisico, reservado, Math.Max(0, fisico - reservado))));
 
             case MotivoDeRechazoDeAjuste.ConteoMenorQueLoReservado:
                 var pedidos = await reservas.PedidosQueApartan(fuenteId, edicionId, LimitesDeEntradaDeAjustes.MaximoDePedidosEnElRechazo, cancelacion).ConfigureAwait(false);

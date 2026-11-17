@@ -2,7 +2,6 @@ using BabelHub.Inventario.Application.Auditoria;
 using BabelHub.Inventario.Application.Fuentes;
 using BabelHub.Inventario.Application.Plataforma;
 using BabelHub.Inventario.Domain.Ajustes;
-using BabelHub.Inventario.Domain.Fuentes;
 
 namespace BabelHub.Inventario.Application.Ajustes.Interno;
 
@@ -165,7 +164,7 @@ internal sealed class ReingresarPorDevolucion(
             foreach (var linea in nuevas)
             {
                 var fila = bloqueo.Fila(fuente.Id, linea.EdicionId);
-                var decision = ReglasDeAjuste.Sumar(new ExistenciaDeStock(fila.Fisico, fila.Reservado), linea.Cantidad);
+                var decision = ReglasDeAjuste.Sumar(fila.Fisico, linea.Cantidad);
                 if (!decision.Aceptado)
                 {
                     return FallosDeAjustes.De<ReingresoRegistrado>(CategoriaDeError.ReglaDeNegocio, ClavesDeAjustes.CantidadFueraDeRango);

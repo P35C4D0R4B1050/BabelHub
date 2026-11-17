@@ -4,7 +4,6 @@ using BabelHub.Inventario.Application.Auditoria;
 using BabelHub.Inventario.Application.Fuentes;
 using BabelHub.Inventario.Application.Plataforma;
 using BabelHub.Inventario.Domain.Ajustes;
-using BabelHub.Inventario.Domain.Fuentes;
 
 namespace BabelHub.Inventario.Application.Ajustes.Interno;
 
@@ -143,7 +142,7 @@ internal sealed class RegistrarIngresoDeMercaderia(
         }
 
         var fila = bloqueo.Fila(recepcion.Id, entrada.EdicionId);
-        var decision = ReglasDeAjuste.Sumar(new ExistenciaDeStock(fila.Fisico, fila.Reservado), entrada.Cantidad);
+        var decision = ReglasDeAjuste.Sumar(fila.Fisico, entrada.Cantidad);
         if (!decision.Aceptado)
         {
             return FallosDeAjustes.De<IngresoRegistrado>(CategoriaDeError.ReglaDeNegocio, ClavesDeAjustes.CantidadFueraDeRango);

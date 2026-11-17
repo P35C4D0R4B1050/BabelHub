@@ -1,5 +1,4 @@
 using BabelHub.Inventario.Domain.Ajustes;
-using BabelHub.Inventario.Domain.Fuentes;
 
 namespace BabelHub.Inventario.UnitTests.Ajustes;
 
@@ -37,7 +36,7 @@ public sealed class ReglasDeAjusteTests
     [Trait("Criterio", "AC-AJU-01")]
     public void UnaMermaDeDosConFisicoNueveBajaElFisicoASiete()
     {
-        var decision = ReglasDeAjuste.Restar(new ExistenciaDeStock(9, 0), 2);
+        var decision = ReglasDeAjuste.Restar(9, 0, 2);
 
         Assert.True(decision.Aceptado);
         Assert.Equal((9, 7, -2), (decision.CantidadAnterior, decision.CantidadPosterior, decision.DeltaFisico));
@@ -50,7 +49,7 @@ public sealed class ReglasDeAjusteTests
     [InlineData(int.MinValue)]
     public void LaMermaYElDanioConCeroONegativoSeRechazanYNoCambianNada(int cantidad)
     {
-        var decision = ReglasDeAjuste.Restar(new ExistenciaDeStock(9, 1), cantidad);
+        var decision = ReglasDeAjuste.Restar(9, 1, cantidad);
 
         Assert.False(decision.Aceptado);
         Assert.Equal(MotivoDeRechazoDeAjuste.CantidadNoPositiva, decision.Rechazo);
@@ -62,10 +61,9 @@ public sealed class ReglasDeAjusteTests
     public void UnDanioQueSuperaElVendibleSeRechaza_AunqueNoSupereElFisico()
     {
         // Físico 9, reservado 1 y vendible 8: descontar 9 se rechaza porque supera el vendible; 8 se acepta y deja el físico en 1 (igual a lo reservado).
-        var existencia = new ExistenciaDeStock(9, 1);
 
-        var rechazado = ReglasDeAjuste.Restar(existencia, 9);
-        var aceptado = ReglasDeAjuste.Restar(existencia, 8);
+        var rechazado = ReglasDeAjuste.Restar(9, 1, 9);
+        var aceptado = ReglasDeAjuste.Restar(9, 1, 8);
 
         Assert.Equal(MotivoDeRechazoDeAjuste.CantidadSuperaAlVendible, rechazado.Rechazo);
         Assert.True(aceptado.Aceptado);
@@ -76,14 +74,14 @@ public sealed class ReglasDeAjusteTests
     [Trait("Criterio", "AC-AJU-04")]
     public void ConVendibleCeroNoSePuedeRegistrarMerma()
     {
-        Assert.Equal(MotivoDeRechazoDeAjuste.CantidadSuperaAlVendible, ReglasDeAjuste.Restar(new ExistenciaDeStock(5, 5), 1).Rechazo);
+        Assert.Equal(MotivoDeRechazoDeAjuste.CantidadSuperaAlVendible, ReglasDeAjuste.Restar(5, 5, 1).Rechazo);
     }
 
     [Fact]
     [Trait("Criterio", "AC-AJU-05")]
     public void UnConteoDeSieteConFisicoCincoYReservadoCincoSubeElFisicoYDejaElVendibleEnDos()
     {
-        var decision = ReglasDeAjuste.Corregir(new ExistenciaDeStock(5, 5), 7);
+        var decision = ReglasDeAjuste.Corregir(5, 5, 7);
 
         Assert.True(decision.Aceptado);
         Assert.Equal((5, 7, 2), (decision.CantidadAnterior, decision.CantidadPosterior, decision.DeltaFisico));
@@ -93,21 +91,20 @@ public sealed class ReglasDeAjusteTests
     [Trait("Criterio", "AC-AJU-06")]
     public void UnConteoMenorQueLoReservadoSeRechaza_YUnoIgualSeAceptaYDejaElVendibleEnCero()
     {
-        var existencia = new ExistenciaDeStock(8, 5);
 
-        var menor = ReglasDeAjuste.Corregir(existencia, 4);
-        var igual = ReglasDeAjuste.Corregir(existencia, 5);
+        var menor = ReglasDeAjuste.Corregir(8, 5, 4);
+        var igual = ReglasDeAjuste.Corregir(8, 5, 5);
 
         Assert.Equal(MotivoDeRechazoDeAjuste.ConteoMenorQueLoReservado, menor.Rechazo);
         Assert.True(igual.Aceptado);
-        Assert.Equal(0, new ExistenciaDeStock(igual.CantidadPosterior, 5).Vendible());
+        Assert.Equal(0, igual.CantidadPosterior - 5);
     }
 
     [Fact]
     [Trait("Criterio", "AC-AJU-07")]
     public void UnConteoIgualAlFisicoSeRechazaSinNadaQueAjustar()
     {
-        var decision = ReglasDeAjuste.Corregir(new ExistenciaDeStock(9, 0), 9);
+        var decision = ReglasDeAjuste.Corregir(9, 0, 9);
 
         Assert.Equal(MotivoDeRechazoDeAjuste.SinCambios, decision.Rechazo);
     }
@@ -118,13 +115,13 @@ public sealed class ReglasDeAjusteTests
     [InlineData(1_000_001)]
     [InlineData(int.MaxValue)]
     public void UnConteoNegativoOPasadoDelTopeTecnicoSeRechaza(int conteo) =>
-        Assert.Equal(MotivoDeRechazoDeAjuste.ConteoFueraDeRango, ReglasDeAjuste.Corregir(new ExistenciaDeStock(9, 0), conteo).Rechazo);
+        Assert.Equal(MotivoDeRechazoDeAjuste.ConteoFueraDeRango, ReglasDeAjuste.Corregir(9, 0, conteo).Rechazo);
 
     [Fact]
     [Trait("Criterio", "AC-AJU-05")]
     public void UnConteoDeCeroSinReservasEsValidoYDejaElFisicoEnCero()
     {
-        var decision = ReglasDeAjuste.Corregir(new ExistenciaDeStock(9, 0), 0);
+        var decision = ReglasDeAjuste.Corregir(9, 0, 0);
 
         Assert.True(decision.Aceptado);
         Assert.Equal(-9, decision.DeltaFisico);
@@ -134,10 +131,10 @@ public sealed class ReglasDeAjusteTests
     [Trait("Criterio", "AC-AJU-10")]
     public void SumarRespetaElTopeTecnico_YUnaCantidadNoPositivaSeRechaza()
     {
-        Assert.True(ReglasDeAjuste.Sumar(new ExistenciaDeStock(0, 0), 10).Aceptado);
-        Assert.Equal(MotivoDeRechazoDeAjuste.CantidadNoPositiva, ReglasDeAjuste.Sumar(new ExistenciaDeStock(0, 0), 0).Rechazo);
-        Assert.Equal(MotivoDeRechazoDeAjuste.ConteoFueraDeRango, ReglasDeAjuste.Sumar(new ExistenciaDeStock(999_999, 0), 2).Rechazo);
-        Assert.True(ReglasDeAjuste.Sumar(new ExistenciaDeStock(999_999, 0), 1).Aceptado);
+        Assert.True(ReglasDeAjuste.Sumar(0, 10).Aceptado);
+        Assert.Equal(MotivoDeRechazoDeAjuste.CantidadNoPositiva, ReglasDeAjuste.Sumar(0, 0).Rechazo);
+        Assert.Equal(MotivoDeRechazoDeAjuste.ConteoFueraDeRango, ReglasDeAjuste.Sumar(999_999, 2).Rechazo);
+        Assert.True(ReglasDeAjuste.Sumar(999_999, 1).Aceptado);
     }
 
     // ---------- La entidad ----------
@@ -146,7 +143,7 @@ public sealed class ReglasDeAjusteTests
     [Trait("Criterio", "AC-AJU-01")]
     public void UnAjusteDeMermaGuardaMotivoEdicionFuenteUsuarioCantidadesYNota()
     {
-        var decision = ReglasDeAjuste.Restar(new ExistenciaDeStock(9, 0), 2);
+        var decision = ReglasDeAjuste.Restar(9, 0, 2);
 
         var ajuste = Ajuste.Restado(Guid.NewGuid(), Fuente, Edicion, MotivoDeAjuste.Merma, decision, "caja mojada", Usuario, Ahora);
 
@@ -159,15 +156,15 @@ public sealed class ReglasDeAjusteTests
     {
         Assert.Throws<ArgumentException>(() => Ajuste.Rehidratar(Guid.NewGuid(), Fuente, Edicion, MotivoDeAjuste.Merma, 5, 7, null, null, Usuario, Ahora, null, null));
         Assert.Throws<ArgumentException>(() => Ajuste.Rehidratar(Guid.NewGuid(), Fuente, Edicion, MotivoDeAjuste.Danio, 5, 5, null, null, Usuario, Ahora, null, null));
-        Assert.Throws<InvalidOperationException>(() => Ajuste.Restado(Guid.NewGuid(), Fuente, Edicion, MotivoDeAjuste.Merma, ReglasDeAjuste.Restar(new ExistenciaDeStock(5, 5), 1), null, Usuario, Ahora));
-        Assert.Throws<ArgumentException>(() => Ajuste.Restado(Guid.NewGuid(), Fuente, Edicion, MotivoDeAjuste.CorreccionDeConteo, ReglasDeAjuste.Restar(new ExistenciaDeStock(5, 0), 1), null, Usuario, Ahora));
+        Assert.Throws<InvalidOperationException>(() => Ajuste.Restado(Guid.NewGuid(), Fuente, Edicion, MotivoDeAjuste.Merma, ReglasDeAjuste.Restar(5, 5, 1), null, Usuario, Ahora));
+        Assert.Throws<ArgumentException>(() => Ajuste.Restado(Guid.NewGuid(), Fuente, Edicion, MotivoDeAjuste.CorreccionDeConteo, ReglasDeAjuste.Restar(5, 0, 1), null, Usuario, Ahora));
     }
 
     [Fact]
     [Trait("Criterio", "AC-AJU-05")]
     public void LaCorreccionGuardaElConteoRealYUnaDiferenciaConSigno()
     {
-        var decision = ReglasDeAjuste.Corregir(new ExistenciaDeStock(5, 5), 7);
+        var decision = ReglasDeAjuste.Corregir(5, 5, 7);
 
         var ajuste = Ajuste.Corregido(Guid.NewGuid(), Fuente, Edicion, decision, 7, null, Usuario, Ahora);
 
@@ -179,7 +176,7 @@ public sealed class ReglasDeAjusteTests
     [Trait("Criterio", "AC-AJU-09")]
     public void ElAjusteDeUnaDevolucionExigeLaDevolucionYElPedido_ElDeOtroMotivoNoLosLleva()
     {
-        var decision = ReglasDeAjuste.Sumar(new ExistenciaDeStock(3, 0), 1);
+        var decision = ReglasDeAjuste.Sumar(3, 1);
         var devolucion = Guid.NewGuid();
         var pedido = Guid.NewGuid();
 
@@ -197,14 +194,14 @@ public sealed class ReglasDeAjusteTests
         var depurado = Ajuste.Rehidratar(Guid.NewGuid(), Fuente, Edicion, MotivoDeAjuste.Merma, 9, 7, null, null, null, Ahora, null, null);
 
         Assert.Null(depurado.UsuarioId);
-        Assert.Throws<ArgumentException>(() => Ajuste.Restado(Guid.NewGuid(), Fuente, Edicion, MotivoDeAjuste.Merma, ReglasDeAjuste.Restar(new ExistenciaDeStock(9, 0), 2), null, Guid.Empty, Ahora));
+        Assert.Throws<ArgumentException>(() => Ajuste.Restado(Guid.NewGuid(), Fuente, Edicion, MotivoDeAjuste.Merma, ReglasDeAjuste.Restar(9, 0, 2), null, Guid.Empty, Ahora));
     }
 
     [Fact]
     [Trait("Criterio", "AC-AJU-01")]
     public void LaNotaNoPasaDe200Caracteres()
     {
-        var decision = ReglasDeAjuste.Restar(new ExistenciaDeStock(9, 0), 2);
+        var decision = ReglasDeAjuste.Restar(9, 0, 2);
 
         Ajuste.Restado(Guid.NewGuid(), Fuente, Edicion, MotivoDeAjuste.Merma, decision, new string('a', 200), Usuario, Ahora);
 

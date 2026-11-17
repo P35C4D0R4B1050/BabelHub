@@ -1,4 +1,3 @@
-using BabelHub.Inventario.Domain.Fuentes;
 
 namespace BabelHub.Inventario.Domain.Ajustes;
 
@@ -108,57 +107,57 @@ public static class ReglasDeAjuste
     public const int TopeTecnico = 1_000_000;
 
     /// <summary>Merma o daño: resta <paramref name="cantidad"/> del físico si es positiva y no supera el vendible (AJU-03, AJU-04, AJU-12).</summary>
-    public static DecisionDeAjuste Restar(ExistenciaDeStock existencia, int cantidad)
+    public static DecisionDeAjuste Restar(int fisico, int reservado, int cantidad)
     {
         if (cantidad <= 0)
         {
-            return DecisionDeAjuste.Rechazado(existencia.Fisico, MotivoDeRechazoDeAjuste.CantidadNoPositiva);
+            return DecisionDeAjuste.Rechazado(fisico, MotivoDeRechazoDeAjuste.CantidadNoPositiva);
         }
 
         // El vendible ya devolvió las vencidas (Bloquear las liberó): físico menos reservado.
-        if (cantidad > existencia.Vendible())
+        if (cantidad > Math.Max(0, fisico - reservado))
         {
-            return DecisionDeAjuste.Rechazado(existencia.Fisico, MotivoDeRechazoDeAjuste.CantidadSuperaAlVendible);
+            return DecisionDeAjuste.Rechazado(fisico, MotivoDeRechazoDeAjuste.CantidadSuperaAlVendible);
         }
 
-        return DecisionDeAjuste.Con(existencia.Fisico, existencia.Fisico - cantidad);
+        return DecisionDeAjuste.Con(fisico, fisico - cantidad);
     }
 
     /// <summary>Corrección de conteo: el físico pasa a ser el conteo real, que no puede ser negativo ni pasar el tope, igual al físico ni menor que lo reservado (AJU-05, AJU-06, AJU-07).</summary>
-    public static DecisionDeAjuste Corregir(ExistenciaDeStock existencia, int conteoReal)
+    public static DecisionDeAjuste Corregir(int fisico, int reservado, int conteoReal)
     {
         if (conteoReal < 0 || conteoReal > TopeTecnico)
         {
-            return DecisionDeAjuste.Rechazado(existencia.Fisico, MotivoDeRechazoDeAjuste.ConteoFueraDeRango);
+            return DecisionDeAjuste.Rechazado(fisico, MotivoDeRechazoDeAjuste.ConteoFueraDeRango);
         }
 
-        if (conteoReal == existencia.Fisico)
+        if (conteoReal == fisico)
         {
-            return DecisionDeAjuste.Rechazado(existencia.Fisico, MotivoDeRechazoDeAjuste.SinCambios);
+            return DecisionDeAjuste.Rechazado(fisico, MotivoDeRechazoDeAjuste.SinCambios);
         }
 
         // Con el conteo igual a lo reservado se acepta y el vendible queda en 0 (AC-AJU-06).
-        if (conteoReal < existencia.Reservado)
+        if (conteoReal < reservado)
         {
-            return DecisionDeAjuste.Rechazado(existencia.Fisico, MotivoDeRechazoDeAjuste.ConteoMenorQueLoReservado);
+            return DecisionDeAjuste.Rechazado(fisico, MotivoDeRechazoDeAjuste.ConteoMenorQueLoReservado);
         }
 
-        return DecisionDeAjuste.Con(existencia.Fisico, conteoReal);
+        return DecisionDeAjuste.Con(fisico, conteoReal);
     }
 
     /// <summary>Un ingreso o un reingreso suma <paramref name="cantidad"/> al físico: positiva y sin pasar el tope técnico tras sumar. El rango propio de cada operación lo decide su regla.</summary>
-    public static DecisionDeAjuste Sumar(ExistenciaDeStock existencia, int cantidad)
+    public static DecisionDeAjuste Sumar(int fisico, int cantidad)
     {
         if (cantidad <= 0)
         {
-            return DecisionDeAjuste.Rechazado(existencia.Fisico, MotivoDeRechazoDeAjuste.CantidadNoPositiva);
+            return DecisionDeAjuste.Rechazado(fisico, MotivoDeRechazoDeAjuste.CantidadNoPositiva);
         }
 
-        if ((long)existencia.Fisico + cantidad > TopeTecnico)
+        if ((long)fisico + cantidad > TopeTecnico)
         {
-            return DecisionDeAjuste.Rechazado(existencia.Fisico, MotivoDeRechazoDeAjuste.ConteoFueraDeRango);
+            return DecisionDeAjuste.Rechazado(fisico, MotivoDeRechazoDeAjuste.ConteoFueraDeRango);
         }
 
-        return DecisionDeAjuste.Con(existencia.Fisico, existencia.Fisico + cantidad);
+        return DecisionDeAjuste.Con(fisico, fisico + cantidad);
     }
 }
