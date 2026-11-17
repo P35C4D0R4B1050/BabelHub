@@ -9,7 +9,7 @@ namespace BabelHub.Ecommerce.Application.Identidad;
 public interface IRegistroDeCuentas
 {
     /// <summary>
-    /// Crea una cuenta de cliente con el correo sin verificar y envía el código de verificación. Si el correo ya existe, responde lo mismo: salvo el reemplazo de una cuenta de cliente sin verificar y sin pedidos ni
+    /// Crea una cuenta de cliente con el correo sin verificar y envía el código de verificación (en segundo plano). Si el correo ya existe, lo rechaza con el mismo fallo <c>correo-en-uso</c> sin datos de la cuenta (IDE-13), salvo el reemplazo de una cuenta de cliente sin verificar y sin pedidos ni
     /// reservas (IDE-84), que se hace en una transacción y, si cualquiera de sus puertos falla, se rechaza de forma indistinguible de IDE-13 (IDE-88).
     /// </summary>
     Task<Resultado<RespuestaUniforme>> Registrar(SolicitudDeAltaDeCuenta solicitud, CancellationToken cancelacion = default);
