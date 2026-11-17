@@ -54,6 +54,12 @@ public static class MotivosDeAlertaDeAuditoria
     /// <summary>El acceso a pantallas bloqueado por textos legales pendientes superó el umbral en una ventana de 15 minutos (WEB-47): no cuenta para SEG-09.</summary>
     public const string BloqueosPorTextosPendientes = "bloqueos-por-textos-pendientes";
 
+    /// <summary>La cuota diaria de correo llegó al 80 % (IDE-73).</summary>
+    public const string CuotaDeCorreoAlta = "cuota-de-correo-alta";
+
+    /// <summary>El cupo de códigos de verificación y de recuperación llegó al 80 % (IDE-73).</summary>
+    public const string CupoDeCodigosAlto = "cupo-de-codigos-alto";
+
     public static readonly IReadOnlyList<string> Todos =
     [
         AccesosDenegados,
@@ -78,5 +84,7 @@ public static class MotivosDeAlertaDeAuditoria
         LiberacionesDeReservasAnomalas,
         BajasDeTitularAnomalas,
         BloqueosPorTextosPendientes,
+        CuotaDeCorreoAlta,
+        CupoDeCodigosAlto,
     ];
 }
