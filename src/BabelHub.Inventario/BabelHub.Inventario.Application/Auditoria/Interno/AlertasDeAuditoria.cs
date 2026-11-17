@@ -68,6 +68,9 @@ public static class MotivosDeAlerta
 
     /// <summary>El cupo de códigos de verificación y de recuperación llegó al 80 % (IDE-73).</summary>
     public const string CupoDeCodigosAlto = "cupo-de-codigos-alto";
+
+    /// <summary>Alerta de seguridad: se reutilizó una renovación ya rotada y se revocó su familia (D02, IDE-14).</summary>
+    public const string RenovacionReutilizada = "renovacion-reutilizada";
 }
 
 /// <summary>El catálogo cerrado de motivos de alerta de los dos servicios (D06). Otros módulos publican por <see cref="IAlertas"/> con estos códigos.</summary>
@@ -99,6 +102,7 @@ public static class CatalogoDeAlertasDeAuditoria
         new(MotivosDeAlerta.BloqueosPorTextosPendientes, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.CuotaDeCorreoAlta, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.CupoDeCodigosAlto, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.RenovacionReutilizada, ClaseDeAlerta.Seguridad),
     ]);
 }
 

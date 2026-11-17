@@ -92,6 +92,7 @@ public static class PresentadorDeAuditoria
         ["bloqueos-por-textos-pendientes"] = "Muchas acciones bloqueadas por textos legales pendientes",
         ["cuota-de-correo-alta"] = "La cuota diaria de correo llegó al 80 %",
         ["cupo-de-codigos-alto"] = "El cupo de códigos por correo llegó al 80 %",
+        ["renovacion-reutilizada"] = "Se reutilizó una renovación de sesión y se cerró su familia",
     };
 
     public static PaginaDeAuditoriaVista Presentar(PaginaDeRegistros pagina)

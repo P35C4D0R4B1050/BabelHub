@@ -41,6 +41,12 @@ public static partial class AccionesAuditables
 
     public static readonly AccionAuditable SegundoFactorFallido = new(nameof(SegundoFactorFallido), aislada: true);
 
+    /// <summary>Un código de un solo uso (de verificación o de recuperación) se rechazó por incorrecto, vencido, ya usado o con los intentos agotados (IDE-19): el motivo exacto solo va al registro, nunca a la respuesta.</summary>
+    public static readonly AccionAuditable CodigoDeUnSoloUsoRechazado = new(nameof(CodigoDeUnSoloUsoRechazado), aislada: true);
+
+    /// <summary>Se reutilizó una renovación ya rotada, señal de robo: se revoca toda la familia (D02).</summary>
+    public static readonly AccionAuditable RenovacionReutilizada = new(nameof(RenovacionReutilizada), aislada: true);
+
     /// <summary>Se usó un código de respaldo (sin el código en el registro).</summary>
     public static readonly AccionAuditable CodigoDeRespaldoUsado = new(nameof(CodigoDeRespaldoUsado), aislada: true);
 
