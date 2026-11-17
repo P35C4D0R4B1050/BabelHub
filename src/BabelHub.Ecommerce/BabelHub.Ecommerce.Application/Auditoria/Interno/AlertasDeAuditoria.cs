@@ -62,6 +62,12 @@ public static class MotivosDeAlerta
 
     /// <summary>Muchas acciones bloqueadas por textos legales pendientes en una ventana de 15 minutos (WEB-47): no cuenta para SEG-09.</summary>
     public const string BloqueosPorTextosPendientes = "bloqueos-por-textos-pendientes";
+
+    /// <summary>La cuota diaria de correo llegó al 80 % (IDE-73).</summary>
+    public const string CuotaDeCorreoAlta = "cuota-de-correo-alta";
+
+    /// <summary>El cupo de códigos de verificación y de recuperación llegó al 80 % (IDE-73).</summary>
+    public const string CupoDeCodigosAlto = "cupo-de-codigos-alto";
 }
 
 /// <summary>El catálogo cerrado de motivos de alerta de los dos servicios (D06). Otros módulos publican por <see cref="IAlertas"/> con estos códigos.</summary>
@@ -91,6 +97,8 @@ public static class CatalogoDeAlertasDeAuditoria
         new(MotivosDeAlerta.LiberacionesDeReservasAnomalas, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.BajasDeTitularAnomalas, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.BloqueosPorTextosPendientes, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.CuotaDeCorreoAlta, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.CupoDeCodigosAlto, ClaseDeAlerta.Tecnica),
     ]);
 }
 
