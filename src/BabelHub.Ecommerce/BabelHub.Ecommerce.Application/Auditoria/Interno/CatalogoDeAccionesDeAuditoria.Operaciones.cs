@@ -14,6 +14,8 @@ public static partial class CatalogoDeAccionesDeAuditoria
     {
         yield return Auditada(nameof(AccionesAuditables.PrecioDeEdicionCambiado), false, false, Clave("precioAnterior", 16), Clave("precioNuevo", 16), Moneda());
         yield return Auditada(nameof(AccionesAuditables.PedidoAnulado), false, false, Clave("estadoAnterior", 32), Clave("causa", 40));
+        yield return Auditada(nameof(AccionesAuditables.IngresoPendienteConciliado), false, false, Clave("edicionId", 40), Clave("cantidad", 12), Clave("intentos", 12), new ClaveDeDetalle("resolucion", personal: false) { Valores = ["registrado", "fallido", "discrepancia"] });
+        yield return Auditada(nameof(AccionesAuditables.IngresosSolicitadosAnonimizados), false, false, Clave("cantidad", 12));
         yield return Auditada(nameof(AccionesAuditables.AjusteRegistrado), false, false, Clave("ajusteId", 40), Clave("edicionId", 40), Clave("cantidadAnterior", 12), Clave("cantidadPosterior", 12), Clave("motivo", 40));
         yield return Auditada(nameof(AccionesAuditables.IngresoDeMercaderiaRegistrado), false, false, Clave("ajusteId", 40), Clave("ingresoId", 40), Clave("edicionId", 40), Clave("cantidadAnterior", 12), Clave("cantidadPosterior", 12));
         yield return Auditada(nameof(AccionesAuditables.ReingresoPorDevolucion), false, false, Clave("ajusteId", 40), Clave("devolucionId", 40), Clave("edicionId", 40), Clave("cantidadAnterior", 12), Clave("cantidadPosterior", 12));
