@@ -520,3 +520,29 @@ internal sealed class SegundoFactorEnMemoria : ISegundoFactorAlmacen
     public void Sembrar(Guid usuarioId, byte[] secretoEnClaro, IEnumerable<string> huellasDeRespaldo, CifradorDePrueba cifrador) =>
         _factores[usuarioId] = (SegundoFactor.Restaurar(usuarioId, EstadoDelSegundoFactor.Activo, null, huellasDeRespaldo), cifrador.Cifrar(secretoEnClaro, usuarioId));
 }
+
+internal sealed class AlertasDeAuditoriaDePrueba : IAlertas
+{
+    public List<string> Tecnicas { get; } = [];
+
+    public List<string> DeSeguridad { get; } = [];
+
+    public bool Falla { get; set; }
+
+    public Task PublicarTecnica(CodigoDeAlerta motivo, CancellationToken cancelacion = default)
+    {
+        Tecnicas.Add(motivo.Valor);
+        return Task.CompletedTask;
+    }
+
+    public Task PublicarDeSeguridad(CodigoDeAlerta motivo, CancellationToken cancelacion = default)
+    {
+        if (Falla)
+        {
+            throw new InvalidOperationException("Sin registro técnico.");
+        }
+
+        DeSeguridad.Add(motivo.Valor);
+        return Task.CompletedTask;
+    }
+}
