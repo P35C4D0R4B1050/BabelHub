@@ -142,9 +142,10 @@ Las portadas se sirven en `/portadas/{huella}` con una URL por portada (la huell
 
 | Paso | Qué se hace |
 | :--- | :--- |
-| 1 | La administración central reemplaza o da de baja la obra en la interfaz del Catálogo; la portada nueva tiene otra huella y otra URL. |
-| 2 | En Cloudflare, *Caching → Configuration → Purge Cache → Custom purge*, se pega la URL completa `https://<host-de-la-tienda>/portadas/<huella-anterior>` (la huella está en la auditoría de la obra) y se purga. |
-| 3 | Si el objeto ya no debe existir, se borra del contenedor `portadas` con la credencial de administración del almacén (no la `catalogo-archivos`, que solo lo hace por el caso de uso) y se deja el hallazgo en `progress/`. |
+| 1 | **Antes de cambiar nada**, se copia la URL de la portada ilícita (la de la imagen en la ficha pública de la obra: `https://<host-de-la-tienda>/portadas/<huella de 64 hexadecimales>`). La auditoría guarda solo los primeros 16 caracteres de la huella, así que después de reemplazar la portada la URL completa ya no se ve en la interfaz. |
+| 2 | La administración central reemplaza la portada (o da de baja la obra) en la interfaz del Catálogo; la portada nueva tiene otra huella y otra URL. |
+| 3 | En Cloudflare, *Caching → Configuration → Purge Cache → Custom purge*, se pega la URL completa copiada en el paso 1 y se purga. |
+| 4 | Si el objeto ya no debe existir, se borra del contenedor `portadas` con la credencial de administración del almacén (no la `catalogo-archivos`, que solo lo hace por el caso de uso) y se deja el hallazgo en `progress/`. |
 
 Reglas del contenedor: el ciclo de vida (`infra/almacen/ciclo-de-vida.json`) aborta las subidas multipart incompletas; los libros y las portadas nunca son públicos, y los libros solo se entregan con URL firmada de corta duración.
 

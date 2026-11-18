@@ -53,6 +53,8 @@
     if (cuerpo !== undefined) { cabeceras['Content-Type'] = 'application/json'; opciones.body = JSON.stringify(cuerpo); }
     var respuesta;
     try { respuesta = await fetch(url, opciones); } catch (e) { return { ok: false, estado: 0, problema: null }; }
+    // La sesión vencida llega como una redirección al ingreso (HTML), no como JSON.
+    if (respuesta.redirected) { return { ok: false, estado: 401, datos: null, problema: { code: 'ECO-NO-AUTENTICADO' } }; }
     var datos = null;
     try { datos = await respuesta.json(); } catch (e) { datos = null; }
     return { ok: respuesta.ok, estado: respuesta.status, datos: datos, problema: respuesta.ok ? null : datos };
@@ -63,6 +65,7 @@
     try {
       respuesta = await fetch('/administracion/archivos?finalidad=' + finalidad, { method: 'POST', headers: { 'RequestVerificationToken': TOKEN, 'Content-Type': 'application/octet-stream' }, credentials: 'same-origin', body: archivo });
     } catch (e) { return { ok: false, problema: null }; }
+    if (respuesta.redirected) { return { ok: false, problema: { code: 'ECO-NO-AUTENTICADO' } }; }
     var datos = null;
     try { datos = await respuesta.json(); } catch (e) { datos = null; }
     return respuesta.ok && datos && datos.referenciaId ? { ok: true, ref: datos.referenciaId } : { ok: false, problema: datos };

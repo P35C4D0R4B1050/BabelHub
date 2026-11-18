@@ -9,7 +9,8 @@ const sesionDeAdministracion = process.env.E2E_ADMIN_STORAGE_STATE;
 
 test.describe('Administración del catálogo', () => {
   test.skip(!sesionDeAdministracion, 'Falta E2E_ADMIN_STORAGE_STATE');
-  test.use({ storageState: sesionDeAdministracion });
+  // La administración vive en el host de gestión (D03), distinto del de la tienda.
+  test.use({ storageState: sesionDeAdministracion, baseURL: process.env.E2E_ADMIN_URL ?? 'http://localhost:8081' });
 
   test('la lista de obras sale en la ruta del catálogo nacional con sus estados', async ({ page }) => {
     await page.goto('/administracion/obras');
@@ -71,7 +72,7 @@ test.describe('Administración del catálogo', () => {
   test('un Encargado de sucursal no entra a la administración del catálogo', async ({ browser }) => {
     const sesionDeEncargado = process.env.E2E_ENCARGADO_STORAGE_STATE;
     test.skip(!sesionDeEncargado, 'Falta E2E_ENCARGADO_STORAGE_STATE');
-    const contexto = await browser.newContext({ storageState: sesionDeEncargado });
+    const contexto = await browser.newContext({ storageState: sesionDeEncargado, baseURL: process.env.E2E_ADMIN_URL ?? 'http://localhost:8081' });
     const pagina = await contexto.newPage();
     const respuesta = await pagina.goto('/administracion/obras');
     expect(respuesta?.status()).toBe(403);

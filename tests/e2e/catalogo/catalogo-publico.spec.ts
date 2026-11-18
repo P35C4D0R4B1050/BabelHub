@@ -46,7 +46,7 @@ test.describe('Catálogo público', () => {
     await expect(page.getByRole('link', { name: 'Digital' })).toBeVisible();
   });
 
-  test('AC-CAT-07: el filtro con un valor inválido avisa y no rompe la pantalla', async ({ page }) => {
+  test('filtro inválido: el filtro con un valor inválido avisa y no rompe la pantalla', async ({ page }) => {
     const respuesta = await page.goto('/catalogo?precioMin=abc');
     expect(respuesta?.status()).toBe(400);
     await expect(page.getByRole('heading', { level: 1, name: 'Catálogo' })).toBeVisible();
