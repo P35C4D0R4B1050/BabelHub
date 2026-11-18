@@ -31,16 +31,48 @@ internal sealed class BdIdentidad
 
     public List<Guid> CarritosEliminados { get; private set; } = [];
 
-    public (Dictionary<Guid, CuentaDeIdentidad>, List<RenovacionGuardada>, List<(DesafioDeIngreso, string)>, List<Guid>, List<Guid>) Instantanea() =>
-        (new Dictionary<Guid, CuentaDeIdentidad>(Cuentas), [.. Renovaciones], [.. Desafios], [.. AccionesAuditadas], [.. CarritosEliminados]);
+    /// <summary>La instantánea guarda una copia del estado de cada cuenta para restaurarlo <b>en el mismo objeto</b>: las pruebas conservan su referencia y ven la reversión como la vería una base de datos.</summary>
+    public (Dictionary<Guid, CuentaDeIdentidad>, List<RenovacionGuardada>, List<(DesafioDeIngreso, string)>, List<Guid>, List<Guid>, List<(CuentaDeIdentidad Cuenta, CuentaDeIdentidad Copia)>) Instantanea() =>
+        (new Dictionary<Guid, CuentaDeIdentidad>(Cuentas), [.. Renovaciones], [.. Desafios], [.. AccionesAuditadas], [.. CarritosEliminados], [.. Cuentas.Values.Select(c => (c, Copiar(c)))]);
 
-    public void Restaurar((Dictionary<Guid, CuentaDeIdentidad>, List<RenovacionGuardada>, List<(DesafioDeIngreso, string)>, List<Guid>, List<Guid>) estado)
+    public void Restaurar((Dictionary<Guid, CuentaDeIdentidad>, List<RenovacionGuardada>, List<(DesafioDeIngreso, string)>, List<Guid>, List<Guid>, List<(CuentaDeIdentidad Cuenta, CuentaDeIdentidad Copia)>) estado)
     {
         Cuentas = estado.Item1;
         Renovaciones = estado.Item2;
         Desafios = estado.Item3;
         AccionesAuditadas = estado.Item4;
         CarritosEliminados = estado.Item5;
+        foreach (var (cuenta, copia) in estado.Item6)
+        {
+            cuenta.Usuario = Copiar(copia).Usuario;
+            cuenta.Nombre = copia.Nombre;
+            cuenta.ResumenDeContrasena = copia.ResumenDeContrasena;
+            cuenta.ContrasenaTemporalHasta = copia.ContrasenaTemporalHasta;
+            cuenta.DebeCambiarLaContrasena = copia.DebeCambiarLaContrasena;
+            cuenta.Aceptacion = copia.Aceptacion;
+            cuenta.CanceladaEn = copia.CanceladaEn;
+        }
+    }
+
+    private static CuentaDeIdentidad Copiar(CuentaDeIdentidad c)
+    {
+        var usuario = Usuario.Restaurar(c.Usuario.Id, c.Usuario.Correo, c.Usuario.Rol, c.Usuario.Sucursal, c.Usuario.CorreoVerificado, c.Usuario.Activo);
+        if (c.Usuario.SesionesValidasDesde is { } desde)
+        {
+            usuario.AvanzarElCorteDeSesiones(desde);
+        }
+
+        return new CuentaDeIdentidad
+        {
+            Usuario = usuario,
+            Nombre = c.Nombre,
+            ResumenDeContrasena = c.ResumenDeContrasena,
+            ContrasenaTemporalHasta = c.ContrasenaTemporalHasta,
+            DebeCambiarLaContrasena = c.DebeCambiarLaContrasena,
+            Aceptacion = c.Aceptacion,
+            CreadaEn = c.CreadaEn,
+            CanceladaEn = c.CanceladaEn,
+        };
     }
 }
 
@@ -232,6 +264,9 @@ internal sealed class CalculadorDeHuellaDePrueba : ICalculadorDeHuella
 /// <summary>Los límites en memoria con los máximos de las políticas del Dominio (sin ventana de tiempo): lo suficiente para probar que cada caso de uso reserva, rechaza y libera.</summary>
 internal sealed class LimitesEnMemoria : IControlDeLimites
 {
+    /// <summary>Sustituye el máximo de una política (por ejemplo, para una prueba que pide códigos desde un mismo origen para muchos correos).</summary>
+    public Dictionary<string, int> Maximos { get; } = [];
+
     private readonly Dictionary<(string Politica, string Sujeto), int> _cuentas = [];
 
     public bool Caido { get; set; }
@@ -254,7 +289,7 @@ internal sealed class LimitesEnMemoria : IControlDeLimites
         }
 
         var clave = huellaDelLlamador?.Valor ?? sujeto ?? "origen";
-        var maximo = PoliticasDeSeguridad.Todas.Single(p => p.Nombre == politica.Valor).Maximo;
+        var maximo = Maximos.TryGetValue(politica.Valor, out var propio) ? propio : PoliticasDeSeguridad.Todas.Single(p => p.Nombre == politica.Valor).Maximo;
         var cuenta = _cuentas.GetValueOrDefault((politica.Valor, clave)) + 1;
         _cuentas[(politica.Valor, clave)] = cuenta;
         Reservas.Add((politica.Valor, clave));

@@ -91,7 +91,7 @@ internal sealed class EntornoDeIdentidad
         Eventos = new EventosDeSeguridadDeIdentidad(Seguridad);
         Avisos = new AvisosDeCuenta(Correo);
         Revocacion = new RevocacionDeSesiones(Cuentas, Renovaciones, Reloj);
-        SegundoPlano = new ProcesarSolicitudDeCodigo(Cuentas, EmisionDeCodigos);
+        SegundoPlano = new ProcesarSolicitudDeCodigo(Cuentas, EmisionDeCodigos, Eventos);
     }
 
     public RegistroDeCuentas Registro() => new(
@@ -140,6 +140,8 @@ internal sealed class EntornoDeIdentidad
 internal static class EntornoDeIdentidadExtensiones
 {
     public static Application.Identidad.Interno.Sesiones Gestor(this EntornoDeIdentidad e) => new(e.Cuentas, e.Renovaciones, e.HuellasDeIdentidad, e.Secretos, e.Sesiones, e.Revocacion, e.Unidad, e.Eventos, e.AlertasDeSeguridad, e.Reloj);
+
+    public static RecuperacionDeAcceso Recuperacion(this EntornoDeIdentidad e) => new(e.Cuentas, e.Hasher, new ListaDeContrasenasDePrueba(), e.Limites, e.Huellas, e.Solicitudes, e.Cola, e.Codigos, e.HuellasDeIdentidad, e.Revocacion, e.Unidad, e.Auditoria, e.Eventos, e.Avisos, e.Alertas, e.Reloj);
 
     public static Ingreso Ingreso(this EntornoDeIdentidad e) => new(
         e.Cuentas, e.Hasher, new ListaDeContrasenasDePrueba(), e.Limites, e.Huellas, e.Desafios, e.HuellasDeIdentidad, e.Secretos, e.SegundoFactor, e.Cifrador, e.Sesiones, e.Renovaciones, e.Unidad, e.Auditoria, e.Eventos, e.Avisos, e.Reloj);

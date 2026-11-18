@@ -38,12 +38,18 @@ public static class EntradasDeIdentidad
 /// de la solicitud es idéntico exista o no la cuenta. El código de verificación sale solo a un cliente activo con el correo sin verificar; el de recuperación, solo a un cliente activo con el correo verificado
 /// (IDE-17, IDE-29); nunca al personal ni a una cuenta cancelada.
 /// </summary>
-public sealed class ProcesarSolicitudDeCodigo(IRepositorioDeCuentas cuentas, EmisionDeCodigos emision)
+public sealed class ProcesarSolicitudDeCodigo(IRepositorioDeCuentas cuentas, EmisionDeCodigos emision, EventosDeSeguridadDeIdentidad eventos)
 {
     public async Task Ejecutar(SolicitudDeCodigoEnSegundoPlano solicitud, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(solicitud);
         var cuenta = await cuentas.PorCorreo(solicitud.CorreoNormalizado, cancelacion).ConfigureAwait(false);
+        if (solicitud.Proposito == PropositoDeCodigo.RecuperacionDeAcceso)
+        {
+            // Toda solicitud de recuperación deja su evento (IDE-19, AUD-10); el identificador de la cuenta solo se guarda si existe.
+            await eventos.RecuperacionSolicitada(cuenta?.Usuario.Id, cancelacion).ConfigureAwait(false);
+        }
+
         if (cuenta is null || !LeToca(cuenta, solicitud.Proposito))
         {
             return;

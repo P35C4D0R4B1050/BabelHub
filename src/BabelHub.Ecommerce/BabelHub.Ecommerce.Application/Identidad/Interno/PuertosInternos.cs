@@ -8,7 +8,7 @@ namespace BabelHub.Ecommerce.Application.Identidad.Interno;
 /// </summary>
 public sealed class CuentaDeIdentidad
 {
-    public required Usuario Usuario { get; init; }
+    public required Usuario Usuario { get; set; }
 
     public required string Nombre { get; set; }
 
