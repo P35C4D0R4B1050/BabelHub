@@ -22,7 +22,6 @@ public sealed class ConcurrenciaDeTrasladosTests(PostgresDeReservasFixture bd) :
     [Trait("Criterio", "AC-TRA-22")]
     public async Task ElDespachoFrenteALaAnulacionDelPedido_SeAplicaSoloUna_YLaAnulacionNuncaFalla()
     {
-        var (despachosQueGanaron, anulacionesQueGanaron) = (0, 0);
         for (var ronda = 0; ronda < 8; ronda++)
         {
             await bd.Limpiar();
@@ -41,13 +40,11 @@ public sealed class ConcurrenciaDeTrasladosTests(PostgresDeReservasFixture bd) :
             Assert.Equal(antes, await escenario.Interbloqueos());
             if (despacho.EsExito)
             {
-                despachosQueGanaron++;
                 Assert.Equal(("en-transito", true), (await escenario.EstadoDe(traslado), await escenario.PedidoAnuladoDe(traslado)));
                 Assert.Equal((0, 0), await bd.StockDe(escenario.Cusco, escenario.Libro));
             }
             else
             {
-                anulacionesQueGanaron++;
                 Assert.Equal(ClavesDeTraslados.TrasladoEstadoInvalido, despacho.Error!.Clave);
                 Assert.Equal(("cancelado", false), (await escenario.EstadoDe(traslado), await escenario.PedidoAnuladoDe(traslado)));
                 Assert.Equal("pedido-anulado", await bd.Consultar<string>($"SELECT motivo_de_cierre FROM traslados.traslados WHERE id = '{traslado}'"));
@@ -57,7 +54,6 @@ public sealed class ConcurrenciaDeTrasladosTests(PostgresDeReservasFixture bd) :
             Assert.Equal(await bd.ReservadoDeLaRed(escenario.Libro), await bd.UnidadesDeLineasActivas(escenario.Libro));
         }
 
-        Assert.Equal(8, despachosQueGanaron + anulacionesQueGanaron);
     }
 
     [Fact]

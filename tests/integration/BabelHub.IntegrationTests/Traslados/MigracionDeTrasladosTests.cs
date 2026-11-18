@@ -96,7 +96,6 @@ public sealed class MigracionDeTrasladosTests(PostgresDeReservasFixture bd) : IC
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-02")]
     public async Task ElEstadoEsDeLaListaCerrada()
     {
         Assert.Equal("23514", await SqlStateDe(() => bd.Ejecutar(Traslado(estado: "perdido"))));
@@ -137,7 +136,6 @@ public sealed class MigracionDeTrasladosTests(PostgresDeReservasFixture bd) : IC
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-11")]
     public async Task LosTextosTienenTope_200ElMotivoY40LaGuia()
     {
         Assert.Equal("23514", await SqlStateDe(() => bd.Ejecutar(Traslado(motivo: new string('m', 201)))));
@@ -159,7 +157,6 @@ public sealed class MigracionDeTrasladosTests(PostgresDeReservasFixture bd) : IC
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-20")]
     public async Task ElNumeroLoGeneraLaBase_Creciente_YUnico()
     {
         await bd.Ejecutar(Traslado());
@@ -322,5 +319,21 @@ public sealed class MigracionDeTrasladosTests(PostgresDeReservasFixture bd) : IC
         var inicia = await bd.Consultar<bool>("SELECT rolcanlogin FROM pg_roles WHERE rolname = 'rol_traslados'");
 
         Assert.Equal(("INSERT,SELECT", "propietario", false), (privilegios, propietario, inicia));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-TRA-08")]
+    public async Task ElRolDeLaAplicacionSoloActualizaLasColumnasDeEntregaDelBuzon_NuncaLaCargaLaClaveElTipoNiLaSucursal()
+    {
+        await bd.Ejecutar(Mensaje(Clave()));
+
+        var carga = await ComoLaAplicacion("UPDATE traslados.mensajes_salientes SET carga = '{\"estado\":\"otro\"}'::jsonb");
+        var clave = await ComoLaAplicacion($"UPDATE traslados.mensajes_salientes SET clave_de_evento = 'traslado:{Guid.NewGuid():D}:recibido'");
+        var sucursal = await ComoLaAplicacion("UPDATE traslados.mensajes_salientes SET sucursal_codigo = 'lima'");
+        var entrega = await ComoLaAplicacion("UPDATE traslados.mensajes_salientes SET estado = 'enviado', intentos = intentos + 1, enviado_en = now()");
+
+        Assert.All(new[] { carga, clave, sucursal }, e => Assert.True(e is PostgresException { SqlState: "42501" }, e?.Message));
+        Assert.Null(entrega);
+        Assert.Equal("enviado", await bd.Consultar<string>("SELECT estado FROM traslados.mensajes_salientes"));
     }
 }

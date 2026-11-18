@@ -36,10 +36,11 @@ internal sealed class GenerarTrasladosDePedido(
 
         var destino = await fuentes.PorId(sucursalDeRecojoId, cancelacion).ConfigureAwait(false)
             ?? throw new InvalidOperationException("La sucursal de recojo del pedido no existe.");
-        var solicitadoPor = actores.Actual is { Tipo: TipoDeActor.Usuario, UsuarioId: { } id } && id != Guid.Empty ? id : (Guid?)null;
+        // Solo una persona del personal queda como solicitante (el plan §3 dice «identificador de personal»): el id de un cliente nunca se guarda aquí.
+        var solicitadoPor = actores.Actual is { Tipo: TipoDeActor.Usuario, UsuarioId: { } id, Rol: RolesDelActor.AdministradorCentral or RolesDelActor.EncargadoDeSucursal or RolesDelActor.PersonalDeLogistica } && id != Guid.Empty ? id : (Guid?)null;
         var resultado = new List<TrasladoVinculadoAlPedido>();
 
-        // Un orden determinista (fuente y edición) evita interbloqueos entre dos confirmaciones que insertan sobre los mismos índices.
+        // Un orden determinista (fuente y edición) hace reproducible la respuesta; el bloqueo del pedido de la confirmación ya serializa a quien inserta sobre estos índices.
         foreach (var solicitud in solicitudes.OrderBy(s => s.FuenteDeOrigenId).ThenBy(s => s.EdicionId))
         {
             var origen = await fuentes.PorId(solicitud.FuenteDeOrigenId, cancelacion).ConfigureAwait(false)

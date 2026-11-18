@@ -30,7 +30,17 @@ internal sealed class CancelarTrasladosDePedido(
         }
 
         var ahora = reloj.Ahora;
-        foreach (var traslado in await traslados.PorIdsBloqueados([.. trasladoIds.Distinct()], cancelacion).ConfigureAwait(false))
+        var pedidos = trasladoIds.Distinct().ToList();
+        var bloqueados = await traslados.PorIdsBloqueados(pedidos, cancelacion).ConfigureAwait(false);
+
+        // Los traslados nunca se borran: un identificador que no vuelve es uno que la política de filas ocultó porque el actor no tiene alcance sobre él. Anular un pedido con reembolso dejando un traslado activo
+        // sería peor que fallar: la operación falla cerrada (lo hace un actor de servicio con alcance «red», que nunca llega aquí).
+        if (bloqueados.Count < pedidos.Count)
+        {
+            throw new AlcanceDeDatosDenegadoException();
+        }
+
+        foreach (var traslado in bloqueados)
         {
             if (traslado.PedidoId != pedidoId)
             {

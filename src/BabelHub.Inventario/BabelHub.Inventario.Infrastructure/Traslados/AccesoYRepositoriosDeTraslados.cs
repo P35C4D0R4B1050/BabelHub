@@ -10,12 +10,17 @@ namespace BabelHub.Inventario.Infrastructure.Traslados;
 /// Cómo entra la Infraestructura de <c>Traslados</c> a su esquema: cada operación corre <b>dentro de la transacción de la unidad de trabajo</b> y con <c>SET LOCAL ROLE rol_traslados</c> (<c>EjecutarComo</c>), con el <b>alcance de
 /// datos del actor</b> que fijó la unidad de trabajo: la política de filas de <c>traslados</c> (origen o destino igual al alcance) es la segunda capa del alcance por sucursal. <b>No usa la elevación a la red</b> (solo <c>Fuentes</c> y
 /// <c>Ajustes</c> pueden, D09): los puertos de <c>Reservas</c> y los trabajos de fondo corren con el alcance <c>red</c> que la lista blanca da al actor sistema, integración o credencial de servicio, de modo que un encargado que
-/// llegara a ellos solo vería y escribiría lo de su sucursal y la política le rechazaría el resto. Sin actor con contexto <b>falla cerrado</b>, como <c>AccesoAFuentes</c>: la política devolvería cero filas sin error. Una espera
-/// de bloqueo agotada (<c>55P03</c>) es <see cref="EsperaDeBloqueoAgotadaException"/>, no un error del servidor, y el rechazo de la política (<c>42501</c> con la tabla) es <see cref="AlcanceDeDatosDenegadoException"/>.
-/// <c>PostgresException.Detail</c> (que trae la fila, con el motivo y la guía) nunca se registra ni se propaga.
+/// llegara a ellos solo vería y escribiría lo de su sucursal y la política le rechazaría el resto. <b>Falla cerrado</b>, como <c>AccesoAFuentes</c>, sin un actor con contexto <b>y</b> con un alcance de datos que la unidad de
+/// trabajo pudo fijar para él (un encargado sin sucursal o un rol desconocido tienen actor pero no alcance, y la política les devolvería cero filas sin error) y deja una alerta técnica. Una espera de bloqueo agotada
+/// (<c>55P03</c>) es <see cref="EsperaDeBloqueoAgotadaException"/>, no un error del servidor, y el rechazo de la política (<c>42501</c> con la tabla) es <see cref="AlcanceDeDatosDenegadoException"/>. Los errores de integridad
+/// y de datos (<c>23xxx</c> y <c>22xxx</c>) se reenvían <b>sin</b> la excepción original: su <c>Detail</c> trae la fila, con el motivo y la guía, y nunca debe registrarse ni propagarse. Un interbloqueo o un fallo de serialización
+/// pasan tal cual para que el decorador de reintento los reconozca.
 /// </summary>
-internal sealed class AccesoATraslados(IUnidadDeTrabajo unidad, IConexionDeLaUnidadDeTrabajo conexion, IActorActual actores)
+internal sealed class AccesoATraslados(IUnidadDeTrabajo unidad, IConexionDeLaUnidadDeTrabajo conexion, IActorActual actores, IPublicadorDeAlertasTecnicas alertas, IReloj reloj)
 {
+    /// <summary>El motivo de la alerta técnica cuando se intenta tocar los traslados sin actor o sin alcance de datos (consta en el catálogo de motivos de alertas técnicas).</summary>
+    public const string MotivoDeAlertaSinActor = "alcance-de-datos-sin-actor";
+
     private const string EsperaAgotada = "55P03";
 
     private const string Privilegios = "42501";
@@ -26,11 +31,7 @@ internal sealed class AccesoATraslados(IUnidadDeTrabajo unidad, IConexionDeLaUni
     public async Task<T> Ejecutar<T>(Func<NpgsqlConnection, NpgsqlTransaction, CancellationToken, Task<T>> bloque, CancellationToken cancelacion)
     {
         ArgumentNullException.ThrowIfNull(bloque);
-
-        if (actores.Actual is not { Tipo: not TipoDeActor.Anonimo })
-        {
-            throw new ContextoDeActorAusenteException("Se intentó acceder a los traslados sin un actor con contexto: cada caso de uso autoriza antes y un trabajo de fondo corre como sistema.");
-        }
+        await ExigirActorConAlcance(cancelacion).ConfigureAwait(false);
 
         var conexionActiva = (NpgsqlConnection)conexion.Conexion;
         var transaccion = (NpgsqlTransaction)conexion.Transaccion;
@@ -52,8 +53,38 @@ internal sealed class AccesoATraslados(IUnidadDeTrabajo unidad, IConexionDeLaUni
             // La política de filas rechazó la escritura (un permiso de tabla que falta no trae el nombre de la tabla). Sin el Detail de la excepción: trae la fila.
             throw new AlcanceDeDatosDenegadoException();
         }
+        catch (PostgresException ex) when (ex.SqlState is { } estado && (estado.StartsWith("23", StringComparison.Ordinal) || estado.StartsWith("22", StringComparison.Ordinal)))
+        {
+            // Sin la excepción original ni su Detail: trae la fila (motivo, guía). Solo el código de estado, que no lleva datos.
+            throw new InvalidOperationException($"La base de datos de traslados rechazó la operación (SQLSTATE {estado}).");
+        }
 
         return resultado;
+    }
+
+    private async Task ExigirActorConAlcance(CancellationToken cancelacion)
+    {
+        if (actores.Actual is { Tipo: not TipoDeActor.Anonimo } && await HayAlcanceFijado(cancelacion).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        try
+        {
+            await alertas.Publicar(new AlertaTecnica(MotivoDeAlertaSinActor, reloj.Ahora), cancelacion).ConfigureAwait(false);
+        }
+        catch (Exception) when (!cancelacion.IsCancellationRequested)
+        {
+            // La alerta no debe tapar el rechazo: si ni siquiera se puede alertar, la operación igual falla cerrada.
+        }
+
+        throw new ContextoDeActorAusenteException("Se intentó acceder a los traslados sin un actor con alcance de datos: cada caso de uso autoriza antes, una ruta de servicio establece el actor de integración y un trabajo de fondo, el del sistema.");
+    }
+
+    private async Task<bool> HayAlcanceFijado(CancellationToken cancelacion)
+    {
+        await using var comando = new NpgsqlCommand("SELECT coalesce(current_setting('babelhub.alcance', true), '') <> ''", (NpgsqlConnection)conexion.Conexion, (NpgsqlTransaction)conexion.Transaccion);
+        return (bool)(await comando.ExecuteScalarAsync(cancelacion).ConfigureAwait(false))!;
     }
 }
 
@@ -179,7 +210,7 @@ internal sealed class NpgsqlRepositorioDeTraslados(AccesoATraslados acceso) : IR
                 await using var comandoPagina = new NpgsqlCommand($"SELECT {Columnas} FROM traslados.traslados {Condicion} ORDER BY solicitado_en DESC, id DESC LIMIT @limite OFFSET @desde", conexion, transaccion);
                 Filtros(comandoPagina);
                 comandoPagina.Parameters.AddWithValue("limite", tamano);
-                comandoPagina.Parameters.AddWithValue("desde", (pagina - 1) * tamano);
+                comandoPagina.Parameters.AddWithValue("desde", (long)(pagina - 1) * tamano);
                 var elementos = new List<Traslado>();
                 await using var lector = await comandoPagina.ExecuteReaderAsync(token).ConfigureAwait(false);
                 while (await lector.ReadAsync(token).ConfigureAwait(false))

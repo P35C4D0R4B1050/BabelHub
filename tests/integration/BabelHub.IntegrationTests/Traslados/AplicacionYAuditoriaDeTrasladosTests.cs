@@ -278,7 +278,6 @@ public sealed class AplicacionYAuditoriaDeTrasladosTests(PostgresDeReservasFixtu
     // ---------- Presupuesto ----------
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-11")]
     public async Task ElIntento31DeTrasladosDelPersonalSeRechazaConLaRespuestaUniforme_OtroEncargadoNoSeAfecta()
     {
         var escenario = await new EscenarioDeTraslados(bd).Preparar();
@@ -304,7 +303,6 @@ public sealed class AplicacionYAuditoriaDeTrasladosTests(PostgresDeReservasFixtu
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-11")]
     public async Task LasTransicionesYLasConsultasNoConsumenElPresupuesto()
     {
         var escenario = await new EscenarioDeTraslados(bd).Preparar();

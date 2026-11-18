@@ -194,7 +194,6 @@ public sealed class ConsultarTrasladosTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-20")]
     public async Task LosFiltrosPorEstadoVinculadoYDemoraMinima()
     {
         var (entorno, edicion) = Preparar();
@@ -219,7 +218,6 @@ public sealed class ConsultarTrasladosTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-20")]
     public async Task LaListaVaDelMasRecienteAlMasAntiguo_ConPaginacion()
     {
         var (entorno, edicion) = Preparar();
@@ -246,6 +244,7 @@ public sealed class ConsultarTrasladosTests
     [InlineData(null, null, 0, 20, "pagina")]
     [InlineData(null, null, 1, 0, "tamano")]
     [InlineData(null, null, 1, 101, "tamano")]
+    [InlineData(null, null, 10_001, 20, "pagina")]
     public async Task LaListaValidaSusFiltrosAntesDeLeer(string? estado, string? fuente, int pagina, int tamano, string campo)
     {
         var (entorno, _) = Preparar();
@@ -257,7 +256,6 @@ public sealed class ConsultarTrasladosTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-20")]
     public async Task LaDemoraMinimaTieneRango()
     {
         var (entorno, _) = Preparar();
@@ -308,7 +306,6 @@ public sealed class ConsultarTrasladosTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-20")]
     public async Task ElPedidoVacioSeRechazaComoValidacion()
     {
         var (entorno, _) = Preparar();

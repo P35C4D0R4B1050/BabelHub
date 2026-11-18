@@ -129,14 +129,15 @@ public static class DefinicionDeTraslados
 
     /// <summary>
     /// Los permisos mínimos de <c>rol_traslados</c> (se aplican después de que el aprovisionamiento deja las tablas a su propietario): lee e inserta los traslados y actualiza <b>solo las columnas que cambian</b> (nunca el
-    /// origen, el destino, la cantidad, el pedido ni la estimación) y <b>no puede borrar</b> un traslado; el buzón lo lee, inserta, actualiza y purga.
+    /// origen, el destino, la cantidad, el pedido ni la estimación) y <b>no puede borrar</b> un traslado; el buzón lo lee, inserta y purga y actualiza solo sus columnas de entrega (nunca la carga, la clave, el tipo ni la sucursal).
     /// </summary>
     public const string Permisos = """
         GRANT USAGE ON SCHEMA traslados TO rol_traslados;
         REVOKE ALL ON traslados.traslados, traslados.mensajes_salientes FROM PUBLIC;
         GRANT SELECT, INSERT ON traslados.traslados TO rol_traslados;
         GRANT UPDATE (estado, motivo, motivo_de_cierre, pedido_anulado, guia, solicitado_por, aprobado_en, despachado_en, recibido_en, cerrado_en, alerta_de_demora_en, version) ON traslados.traslados TO rol_traslados;
-        GRANT SELECT, INSERT, UPDATE, DELETE ON traslados.mensajes_salientes TO rol_traslados;
+        GRANT SELECT, INSERT, DELETE ON traslados.mensajes_salientes TO rol_traslados;
+        GRANT UPDATE (estado, intentos, proxima_fecha, arrendado_hasta, motivo_de_fallo, enviado_en) ON traslados.mensajes_salientes TO rol_traslados;
         """;
 
     /// <summary>La migración completa del módulo, en el orden que exige (rol, tablas y permisos).</summary>

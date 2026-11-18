@@ -5,6 +5,7 @@ using BabelHub.Inventario.Application.Traslados.Interno;
 using BabelHub.Inventario.Domain.Fuentes;
 using BabelHub.Inventario.Domain.Traslados;
 using BabelHub.Inventario.UnitTests.Soporte;
+using BabelHub.Shared.Contratos;
 
 namespace BabelHub.Inventario.UnitTests.Traslados;
 
@@ -95,7 +96,6 @@ public sealed class TrasladosDeUnPedidoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-20")]
     public async Task ElActorDeUnUsuarioQuedaComoSolicitante_YSinSolicitudesNoHayNada()
     {
         var (entorno, edicion, pedido) = Preparar(ActorDePrueba.DeAdministradorCentral());
@@ -108,7 +108,6 @@ public sealed class TrasladosDeUnPedidoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-20")]
     public async Task UnaFuenteInexistenteOUnPedidoVacioSonUnError_NoUnTrasladoPerdido()
     {
         var (entorno, edicion, pedido) = Preparar();
@@ -239,7 +238,7 @@ public sealed class TrasladosDeUnPedidoTests
         var sinPedido = entorno.Reposicion(edicion, entorno.Cusco, entorno.Ayacucho, 1, EstadoDeTraslado.Aprobado);
         var noRecibido = entorno.Vinculado(edicion, entorno.Lima, entorno.Ayacucho, 1, pedido, EstadoDeTraslado.Aprobado);
 
-        await entorno.CancelacionPorPedido().AlLiberar(pedido, MotivoDeLiberacionDeReserva.PedidoAnulado, [propio.Id, deOtroPedido.Id, sinPedido.Id, Guid.NewGuid()]);
+        await entorno.CancelacionPorPedido().AlLiberar(pedido, MotivoDeLiberacionDeReserva.PedidoAnulado, [propio.Id, deOtroPedido.Id, sinPedido.Id]);
 
         Assert.Equal(EstadoDeTraslado.Cancelado, entorno.Traslados.Almacenado(propio.Id).Estado);
         Assert.All([deOtroPedido, sinPedido, noRecibido], t => Assert.Equal(EstadoDeTraslado.Aprobado, entorno.Traslados.Almacenado(t.Id).Estado));
@@ -268,10 +267,39 @@ public sealed class TrasladosDeUnPedidoTests
         Assert.Empty(entorno.Buzon.Mensajes);
     }
 
+
+    [Fact]
+    [Trait("Criterio", "AC-TRA-15")]
+    public async Task SiElRepositorioNoDevuelveUnTrasladoPedido_PorqueLaPoliticaDeFilasLoOculto_LaAnulacionFallaCerrado()
+    {
+        var (entorno, _, pedido, traslado) = await Vinculado(EstadoDeTraslado.Aprobado);
+
+        await Assert.ThrowsAsync<AlcanceDeDatosDenegadoException>(() => entorno.CancelacionPorPedido().AlLiberar(pedido, MotivoDeLiberacionDeReserva.PedidoAnulado, [traslado.Id, Guid.NewGuid()]));
+
+        Assert.Equal(EstadoDeTraslado.Aprobado, entorno.Traslados.Almacenado(traslado.Id).Estado);
+        Assert.Empty(entorno.Buzon.Mensajes);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-TRA-20")]
+    [InlineData(RolesDeUsuario.AdministradorCentral, true)]
+    [InlineData(RolesDeUsuario.EncargadoDeSucursal, true)]
+    [InlineData(RolesDeUsuario.PersonalDeLogistica, true)]
+    [InlineData(RolesDeUsuario.Cliente, false)]
+    public async Task ElSolicitanteDeUnVinculadoEsSoloPersonal_ElIdDeUnClienteNuncaSeGuarda(string rol, bool quedaGuardado)
+    {
+        var (entorno, edicion, pedido) = Preparar(ActorDePrueba.DeAdministradorCentral());
+        entorno.Como(rol, entorno.Ayacucho);
+
+        var generados = await entorno.Generador().Generar(pedido, entorno.Ayacucho, [new SolicitudDeTrasladoDePedido(entorno.Cusco, edicion, 1)]);
+
+        var solicitante = entorno.Traslados.Almacenado(generados.Single().TrasladoId).SolicitadoPor;
+        Assert.Equal(quedaGuardado, solicitante is not null);
+    }
+
     // ---------- Ningún endpoint los alcanza ----------
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-22")]
     public void LosDosCasosDeUsoSonPuertosDeReservas_NoCasosDeUsoExpuestosNiDependenDelStockNiDeLasReservas()
     {
         Assert.Contains(typeof(IGeneradorDeTrasladosDePedido), typeof(GenerarTrasladosDePedido).GetInterfaces());

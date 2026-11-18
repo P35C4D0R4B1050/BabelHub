@@ -134,6 +134,7 @@ public sealed class TrasladosConReservasRealesTests(PostgresDeReservasFixture bd
 
     [Fact]
     [Trait("Criterio", "AC-TRA-18")]
+    [Trait("Criterio", "AC-TRA-16")]
     public async Task AnularElPedidoConElTrasladoEnTransito_LoMarca_ElPedidoSeAnulaSinFallar_YAlRecibirseLasUnidadesQuedanLibres()
     {
         using var escenario = await new EscenarioDeTraslados(bd).Preparar(stockDeLima: 0, stockDeCusco: 1);

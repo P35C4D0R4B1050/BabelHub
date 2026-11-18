@@ -150,6 +150,9 @@ internal sealed class ValidadorDeListarTraslados : IValidador<ListarTrasladosEnt
 
     public const int DemoraMaximaEnHoras = 24 * 365;
 
+    /// <summary>Una página más allá de este tope no es una consulta legítima: evita un desplazamiento enorme (y un desbordamiento) en la base.</summary>
+    public const int PaginaMaxima = 10_000;
+
     public ResultadoDeValidacion Validar(ListarTrasladosEntrada entrada)
     {
         ArgumentNullException.ThrowIfNull(entrada);
@@ -169,7 +172,7 @@ internal sealed class ValidadorDeListarTraslados : IValidador<ListarTrasladosEnt
             errores.Add(new ErrorDeCampo("demoraMinimaHoras", ConstructorDeValidacion.FueraDeRango));
         }
 
-        if (entrada.Pagina < 1)
+        if (entrada.Pagina is < 1 or > PaginaMaxima)
         {
             errores.Add(new ErrorDeCampo("pagina", ConstructorDeValidacion.FueraDeRango));
         }

@@ -43,7 +43,6 @@ public sealed class RepositoriosDeTrasladosPostgresTests(PostgresDeReservasFixtu
         pila.EnUnAmbito(actor, sp => sp.GetRequiredService<IUnidadDeTrabajo>().Ejecutar(_ => operacion(sp)));
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-22")]
     public async Task UnTrasladoSeGuardaConSuNumeroYSeLeeIgual_ConTodosSusCampos()
     {
         var (_, cusco, ayacucho, libro) = await Escenario();
@@ -291,5 +290,61 @@ public sealed class RepositoriosDeTrasladosPostgresTests(PostgresDeReservasFixtu
         Assert.Equal(2L, await bd.Consultar<long>("SELECT count(*) FROM traslados.traslados WHERE estado = 'cancelado' AND motivo_de_cierre = 'pedido-anulado'"));
         Assert.Equal(2, pila.Auditoria.Contar("TrasladoCancelado"));
         Assert.Equal(6L, await bd.Consultar<long>("SELECT count(*) FROM traslados.mensajes_salientes"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-TRA-15")]
+    public async Task LaAnulacionDeUnPedidoConUnActorSinAlcanceSobreElTraslado_FallaCerradoYNoDejaElTrasladoActivoEnSilencio()
+    {
+        var (lima, cusco, ayacucho, libro) = await Escenario();
+        using var pila = new PilaDeReservas(bd, conTraslados: true);
+        var pedido = Guid.NewGuid();
+        var traslado = Vinculado(libro, cusco, ayacucho, pedido);
+        await EnUnaTransaccion(pila, Sistema, async sp => { await sp.GetRequiredService<IRepositorioDeTraslados>().InsertarVinculado(traslado); return 0; });
+
+        await Assert.ThrowsAsync<AlcanceDeDatosDenegadoException>(() => EnUnaTransaccion(pila, Encargado(lima), async sp =>
+        {
+            await sp.GetRequiredService<IEnumerable<IAlLiberarPedido>>().OfType<CancelarTrasladosDePedido>().Single().AlLiberar(pedido, MotivoDeLiberacionDeReserva.PedidoAnulado, [traslado.Id]);
+            return 0;
+        }));
+
+        Assert.Equal("solicitado", await bd.Consultar<string>($"SELECT estado FROM traslados.traslados WHERE id = '{traslado.Id}'"));
+        Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM traslados.mensajes_salientes"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-TRA-03")]
+    public async Task UnEncargadoSinSucursalTieneActorPeroNoAlcance_ElAccesoFallaCerradoEnLugarDeDevolverCeroFilas()
+    {
+        var (_, cusco, ayacucho, libro) = await Escenario();
+        using var pila = new PilaDeReservas(bd, conTraslados: true);
+        var traslado = Reposicion(libro, cusco, ayacucho);
+        await EnUnaTransaccion(pila, Sistema, async sp => { await sp.GetRequiredService<IRepositorioDeTraslados>().Insertar(traslado); return 0; });
+        var sinSucursal = ActorActual.DeUsuario(Guid.NewGuid(), RolesDeUsuario.EncargadoDeSucursal);
+
+        await Assert.ThrowsAsync<ContextoDeActorAusenteException>(() => EnUnaTransaccion(pila, sinSucursal, sp => sp.GetRequiredService<IRepositorioDeTraslados>().PorId(traslado.Id)));
+
+        Assert.Contains(pila.Alertas.Alertas, a => a.Motivo == "alcance-de-datos-sin-actor");
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-TRA-11")]
+    public async Task UnErrorDeIntegridadSePropagaSinElDetailDeLaFila_ElTextoLibreNuncaSale()
+    {
+        var (_, cusco, ayacucho, libro) = await Escenario();
+        using var pila = new PilaDeReservas(bd, conTraslados: true);
+        var traslado = Traslado.SolicitarReposicion(Guid.NewGuid(), libro, cusco, ayacucho, 1, "MOTIVO-CENTINELA-77", Guid.NewGuid(), Ahora);
+        await EnUnaTransaccion(pila, Sistema, async sp => { await sp.GetRequiredService<IRepositorioDeTraslados>().Insertar(traslado); return 0; });
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => EnUnaTransaccion(pila, Sistema, async sp =>
+        {
+            // La misma clave primaria: la base responde 23505 con el Detail de la fila.
+            await sp.GetRequiredService<IRepositorioDeTraslados>().Insertar(traslado);
+            return 0;
+        }));
+
+        Assert.Contains("23505", error.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("CENTINELA", error.ToString(), StringComparison.Ordinal);
+        Assert.Null(error.InnerException);
     }
 }
