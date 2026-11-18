@@ -197,8 +197,8 @@ public enum EstadoDeIngresoSolicitado
 /// <summary>El ingreso de mercadería que pidió el alta o la edición (de la edición impresa) y cómo quedó; si quedó <c>Pendiente</c>, la ficha lo avisa (CAT-20).</summary>
 public sealed record IngresoDeAlta(Guid IngresoSolicitadoId, Guid EdicionId, int Cantidad, EstadoDeIngresoSolicitado Estado);
 
-/// <summary>El resultado de un alta: la obra, su versión y las ediciones creadas, con el ingreso inicial si se pidió. Un Inventario que no responde no revierte el alta (CAT-20): el aviso va en <see cref="Ingresos"/>.</summary>
-public sealed record ResultadoDeAlta(Guid ObraId, long Version, IReadOnlyList<Guid> EdicionIds, IReadOnlyList<IngresoDeAlta> Ingresos);
+/// <summary>El resultado de un alta: la obra, su versión y las ediciones creadas, con el ingreso inicial si se pidió y las ediciones impresas cuya ficha el Inventario no confirmó (<see cref="FichasSinConfirmar"/>, para el aviso «registro pendiente» de la administración). Un Inventario que no responde no revierte el alta (CAT-20): el aviso va en <see cref="Ingresos"/>.</summary>
+public sealed record ResultadoDeAlta(Guid ObraId, long Version, IReadOnlyList<Guid> EdicionIds, IReadOnlyList<IngresoDeAlta> Ingresos, IReadOnlyList<Guid>? FichasSinConfirmar = null);
 
 /// <summary>La versión nueva de la obra tras una operación que la cambia.</summary>
 public sealed record ResultadoDeEscritura(Guid ObraId, long Version);
@@ -214,7 +214,8 @@ public sealed record EdicionDeAdministracion(
     string? MotivoDeRetiro,
     MotivoDeNoDisponibleDeEdicion? MotivoDeNoDisponible,
     LicenciaDeEdicionDeAdministracion? Licencia,
-    ArchivoDeEdicionDeAdministracion? Archivo);
+    ArchivoDeEdicionDeAdministracion? Archivo,
+    bool? RegistroPendienteEnElInventario = null);
 
 public sealed record LicenciaDeEdicionDeAdministracion(
     TipoDeLicenciaDeEdicion Tipo,
@@ -286,7 +287,8 @@ public sealed record RegistrarIngresoEntrada(Guid EdicionId, int Cantidad, strin
 /// <summary>El resultado de pedir, reintentar o conciliar un ingreso: su identificador, el estado y, si <c>Pendiente</c>, el aviso «reintentar» con su misma clave.</summary>
 public sealed record ResultadoDeIngreso(Guid IngresoSolicitadoId, Guid EdicionId, EstadoDeIngresoSolicitado Estado);
 
-public sealed record ReintentarIngresoEntrada(Guid IngresoSolicitadoId);
+/// <summary>Reintenta el ingreso pendiente. <paramref name="EdicionId"/> (la de la ruta) es opcional: si viene y la fila es de otra edición, responde «no encontrado».</summary>
+public sealed record ReintentarIngresoEntrada(Guid IngresoSolicitadoId, Guid? EdicionId = null);
 
 public enum ResolucionDeIngreso
 {
@@ -298,7 +300,7 @@ public enum ResolucionDeIngreso
 /// Concilia un ingreso pendiente (solo administración central): <c>Registrado</c> exige una coincidencia única en los últimos ingresos del Inventario; <c>Fallido</c> exige la
 /// confirmación explícita de que habilita una clave nueva y puede duplicar el stock.
 /// </summary>
-public sealed record ConciliarIngresoEntrada(Guid IngresoSolicitadoId, ResolucionDeIngreso Resolucion, bool ConfirmaFallido);
+public sealed record ConciliarIngresoEntrada(Guid IngresoSolicitadoId, ResolucionDeIngreso Resolucion, bool ConfirmaFallido, Guid? EdicionId = null);
 
 public sealed record ListarIngresosEntrada(Guid EdicionId);
 
@@ -318,3 +320,14 @@ public sealed record IngresoDeLaLista(
 
 /// <summary>Los últimos ingresos de una edición con su fecha y su usuario. <see cref="InventarioNoRespondio"/> indica que la parte del Inventario falta.</summary>
 public sealed record HistorialDeIngresos(Guid EdicionId, IReadOnlyList<IngresoDeLaLista> Ingresos, bool InventarioNoRespondio);
+
+// ---------- Mantenimiento (trabajos de fondo) ----------
+
+/// <summary>Lo que depuró una corrida: los objetos borrados, las filas quitadas y las que no se pudieron depurar (se reintentan en la corrida siguiente).</summary>
+public sealed record DepuracionDeArchivos(int ObjetosBorrados, int FilasQuitadas, int Fallidas);
+
+/// <summary>Cuántas filas anonimizó una corrida, por tabla: los ingresos solicitados, los libros de las ediciones y las subidas pendientes. Solo cantidades: nunca datos de personas.</summary>
+public sealed record AnonimizacionDelCatalogoRealizada(int IngresosSolicitados, int LibrosDeEdiciones, int SubidasPendientes)
+{
+    public int Total => IngresosSolicitados + LibrosDeEdiciones + SubidasPendientes;
+}

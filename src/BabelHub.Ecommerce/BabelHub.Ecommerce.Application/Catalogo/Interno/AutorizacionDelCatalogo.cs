@@ -105,6 +105,9 @@ internal static class ClavesDelCatalogo
 
     public const string ArchivoDemasiadoGrande = "archivo-demasiado-grande";
 
+    /// <summary>Hay demasiadas subidas en curso (4 en el proceso o 2 del usuario) o una subida duró más de 15 minutos (429 con <c>Retry-After</c>).</summary>
+    public const string LimiteDeSubidas = "limite-de-subidas";
+
     public const string ClaveDeIngresoInvalida = "clave-de-ingreso-invalida";
 
     public const string IngresoPendiente = "ingreso-pendiente";
@@ -119,6 +122,15 @@ internal static class ClavesDelCatalogo
     public const string AlmacenNoDisponible = "almacen-no-disponible";
 
     public const string InventarioNoDisponible = "inventario-no-disponible";
+
+    public const string ObraDadaDeBaja = "obra-dada-de-baja";
+
+    public const string EdicionDadaDeBaja = "edicion-dada-de-baja";
+
+    /// <summary>La operación (licencia, archivo, retiro) es solo de una edición digital (validación, plan §4).</summary>
+    public const string SoloEdicionDigital = "solo-edicion-digital";
+
+    public const string EdicionYaRetirada = "edicion-ya-retirada";
 }
 
 internal static class FallosDelCatalogo

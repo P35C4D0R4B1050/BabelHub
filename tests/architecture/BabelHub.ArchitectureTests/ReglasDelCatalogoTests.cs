@@ -65,6 +65,61 @@ public class ReglasDelCatalogoTests
         Assert.Equal(2, campos.Count);
     }
 
+    /// <summary>
+    /// Los casos de uso de la administración del catálogo (CAT-14, CAT-23, AGENTS.md §5): publicar, editar, dar de baja, subir archivos, ingresar mercadería y leer la administración son solo de la administración central y la
+    /// Aplicación lo comprueba en <b>cada</b> caso de uso con el <c>AutorizadorDelCatalogo</c>. Si uno nuevo no lo usa, esta prueba falla.
+    /// </summary>
+    private static readonly string[] CasosDeUsoDeAdministracion =
+    [
+        "RegistrarObra", "RegistrarEdicion", "EditarObra", "EditarEdicion", "DarDeBajaObra", "DarDeBajaEdicion", "RetirarEdicionDigital", "SubirArchivo",
+        "EmitirClaveDeIngreso", "RegistrarIngresoDeMercaderia", "ReintentarIngresoPendiente", "ConciliarIngresoPendiente", "ListarIngresos", "LecturasDeAdministracion",
+    ];
+
+    [Fact]
+    public void Cada_caso_de_uso_de_administracion_del_catalogo_depende_del_autorizador()
+    {
+        var interno = Aplicacion.GetTypes().Where(t => t.Namespace == "BabelHub.Ecommerce.Application.Catalogo.Interno").ToList();
+
+        foreach (var nombre in CasosDeUsoDeAdministracion)
+        {
+            var tipo = interno.SingleOrDefault(t => t.Name == nombre);
+            Assert.True(tipo is not null, $"Falta el caso de uso {nombre} del catálogo.");
+            Assert.True(
+                DependeDelAutorizador(tipo),
+                $"El caso de uso de administración {nombre} no depende de AutorizadorDelCatalogo: toda operación de administración comprueba el rol en la Aplicación.");
+        }
+    }
+
+
+    /// <summary>Los únicos casos de uso de Interno que no comprueban el rol: pasos internos que solo llama otro caso de uso ya autorizado.</summary>
+    private static readonly string[] SinAutorizadorPorDiseno = ["MarcarResultadoDeIngreso"];
+
+    [Fact]
+    public void Todo_caso_de_uso_nuevo_de_Interno_comprueba_el_rol_salvo_los_pasos_internos_de_la_lista()
+    {
+        var casos = Aplicacion.GetTypes()
+            .Where(t => t.Namespace == "BabelHub.Ecommerce.Application.Catalogo.Interno" && t is { IsClass: true, IsAbstract: false }
+                && t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition().Name.StartsWith("ICasoDeUso", StringComparison.Ordinal)))
+            .ToList();
+
+        Assert.NotEmpty(casos);
+        var sinRol = casos.Where(t => !DependeDelAutorizador(t) && !SinAutorizadorPorDiseno.Contains(t.Name)).Select(t => t.Name).ToList();
+        Assert.True(sinRol.Count == 0, $"Estos casos de uso del catálogo no comprueban el rol de administración central: {string.Join(", ", sinRol)}.");
+    }
+    [Fact]
+    public void La_regla_del_autorizador_detecta_un_caso_de_uso_que_no_lo_usa()
+    {
+        Assert.False(DependeDelAutorizador(typeof(CasoDeUsoSinAutorizador)));
+    }
+
+    private static bool DependeDelAutorizador(Type tipo) =>
+        tipo.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).SelectMany(c => c.GetParameters()).Any(p => p.ParameterType.Name == "AutorizadorDelCatalogo");
+
+    private sealed class CasoDeUsoSinAutorizador(IDisposable otro)
+    {
+        public IDisposable Otro { get; } = otro;
+    }
+
     private sealed record ModeloQueFiltraElTitular(string Titulo, string TitularDeDerechos);
 
     private sealed record ModeloQueFiltraElRegistroPendiente(Guid EdicionId, bool RegistroPendiente);

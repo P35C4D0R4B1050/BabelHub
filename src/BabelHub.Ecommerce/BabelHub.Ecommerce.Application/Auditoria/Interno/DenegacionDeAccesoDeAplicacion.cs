@@ -76,7 +76,8 @@ public sealed class DenegacionDeAccesoDeAplicacion(
     ResolutorDeRutas rutas,
     IEscritorDeDenegaciones escritor,
     IPublicadorDeAlertasTecnicas alertas,
-    IReloj reloj) : IDenegacionDeAcceso
+    IReloj reloj,
+    IRutaDeLaSolicitud? rutaDeLaSolicitud = null) : IDenegacionDeAcceso
 {
     /// <summary>El motivo con el que se registra un rechazo cuyo motivo el catálogo no admite.</summary>
     public const string MotivoPorOmision = "fuera-de-rol";
@@ -103,7 +104,7 @@ public sealed class DenegacionDeAccesoDeAplicacion(
                     : new Dictionary<string, string?> { ["codigoDeError"] = denegacion.CodigoDeError },
             };
             var accion = constructor.Resolver(solicitud, ClaseDeAccion.NoConcede);
-            var registro = constructor.Construir(solicitud, accion, rutas.Resolver(denegacion.Ruta), contexto.Correlacion, anonimoSinContexto: true);
+            var registro = constructor.Construir(solicitud, accion, rutas.Resolver(denegacion.Ruta ?? rutaDeLaSolicitud?.Actual), contexto.Correlacion, anonimoSinContexto: true);
 
             await PlazoDeEscrituraDeSeguridad.Ejecutar(token => escritor.Escribir(registro, token)).ConfigureAwait(false);
         }

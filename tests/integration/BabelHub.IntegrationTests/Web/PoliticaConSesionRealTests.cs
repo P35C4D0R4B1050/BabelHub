@@ -143,7 +143,10 @@ public sealed class PoliticaConSesionRealTests(PostgresDeLaWebFixture bd) : IAsy
                 recorridas++;
                 var respuesta = await Pedir(m, url, metodo);
                 var cuerpo = await respuesta.Content.ReadAsStringAsync();
+                // Una ruta de la administración que el rol no ve la niega primero el filtro de área (403 ECO-PROHIBIDO, antes de la acción): también es una negación, no una ejecución.
+                var delAreaDeAdministracion = rol == RolWeb.Encargado && endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Mvc.AreaAttribute>()?.RouteValue == "Admin";
                 var negada = (respuesta.StatusCode == HttpStatusCode.Found && respuesta.Headers.Location!.OriginalString is "/textos/aceptar" or "/sin-permiso")
+                             || (delAreaDeAdministracion && respuesta.StatusCode == HttpStatusCode.Forbidden && cuerpo.Contains("ECO-PROHIBIDO", StringComparison.Ordinal))
                              || (respuesta.StatusCode == HttpStatusCode.Forbidden && (cuerpo.Contains("ECO-TEXTOS-PENDIENTES", StringComparison.Ordinal) || cuerpo.Length == 0));
                 Assert.True(negada, $"{host} {metodo} {url} → {(int)respuesta.StatusCode} {cuerpo}");
             }

@@ -67,7 +67,7 @@ public static class ComposicionDeAuditoria
         servicios.TryAddScoped<IAuditoriaDeBajasRecibidas, AuditoriaDeBajasRecibidas>();
         servicios.TryAddScoped<IDenegacionDeAcceso>(sp => new DenegacionDeAccesoDeAplicacion(
             sp.GetRequiredService<ConstructorDeRegistros>(), sp.GetRequiredService<IContextoDeDenegacion>(), sp.GetRequiredService<ResolutorDeRutas>(), sp.GetRequiredService<IEscritorDeDenegaciones>(),
-            sp.GetRequiredService<IPublicadorDeAlertasTecnicas>(), sp.GetRequiredService<IReloj>()));
+            sp.GetRequiredService<IPublicadorDeAlertasTecnicas>(), sp.GetRequiredService<IReloj>(), sp.GetService<IRutaDeLaSolicitud>()));
 
         // Las alertas: una sola implementación para los tres puertos.
         servicios.TryAddScoped(sp => new PublicadorDeAlertas(

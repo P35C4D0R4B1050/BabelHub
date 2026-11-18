@@ -16,6 +16,12 @@ public static partial class AccionesAuditables
     /// <summary>Un ingreso de mercadería en la fuente de recepción (una sola entrada para el ingreso y su ajuste, AJU-13). La referencia libre no se audita.</summary>
     public static readonly AccionAuditable IngresoDeMercaderiaRegistrado = new(nameof(IngresoDeMercaderiaRegistrado));
 
+    /// <summary>El Catálogo concilió un ingreso de mercadería pendiente con los ingresos del Inventario (registrado, fallido o discrepancia; sin la nota ni la referencia, CAT-22).</summary>
+    public static readonly AccionAuditable IngresoPendienteConciliado = new(nameof(IngresoPendienteConciliado));
+
+    /// <summary>El trabajo de fondo anonimizó los ingresos solicitados de más de 2 años (cantidad, sin datos personales).</summary>
+    public static readonly AccionAuditable IngresosSolicitadosAnonimizados = new(nameof(IngresosSolicitadosAnonimizados));
+
     /// <summary>Un reingreso de stock por una devolución recibida.</summary>
     public static readonly AccionAuditable ReingresoPorDevolucion = new(nameof(ReingresoPorDevolucion));
 

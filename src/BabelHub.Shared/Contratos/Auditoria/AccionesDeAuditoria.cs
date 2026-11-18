@@ -95,6 +95,10 @@ public static class AccionesDeAuditoria
 
     public const string IngresoDeMercaderiaRegistrado = "IngresoDeMercaderiaRegistrado";
 
+    public const string IngresoPendienteConciliado = "IngresoPendienteConciliado";
+
+    public const string IngresosSolicitadosAnonimizados = "IngresosSolicitadosAnonimizados";
+
     public const string IngresoFallido = "IngresoFallido";
 
     public const string LicenciaCambiada = "LicenciaCambiada";
@@ -228,6 +232,8 @@ public static class AccionesDeAuditoria
         HojaDeReclamacionRespondida,
         IngresoDeMercaderiaRegistrado,
         IngresoFallido,
+        IngresoPendienteConciliado,
+        IngresosSolicitadosAnonimizados,
         LicenciaCambiada,
         LimiteExcedido,
         LlamadaEntreServiciosSinCredencial,

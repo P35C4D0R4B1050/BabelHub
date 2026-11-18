@@ -111,3 +111,13 @@ Pruebas y precisiones:
 - [ ] **Guía y auditoría:** el plan §3 lista la guía entre los textos que no se auditan, pero §2, §4, §8, T04, T17 y el catálogo la auditan como valor nuevo (`guiaNueva`). Se implementó lo segundo; pendiente de confirmar con la persona responsable y de inventariar en `docs/05-seguridad/04` (T26).
 - [ ] **Para T11 y T16:** si el pedido se libera sin que `IAlLiberarPedido` marque el traslado (cualquier motivo de anulación), la recepción de un vinculado falla con 409 y queda en tránsito: `CancelarTrasladosDePedido` debe marcar para todos los motivos de anulación y se prueba con `Reservas` real. `IReservasParaTraslados.ConsultarConfirmada` no filtra `CreadaPorTraslado == false` (sí lo hace `ConsumirEnElOrigen`): probar un traslado encadenado en T16 y corregir en `Reservas` si hace falta.
 - [ ] **Para T14 y T23:** decidir qué DTO ve cada rol (`TrasladoRegistrado` lleva motivo, motivo de cierre y solicitante).
+## 9. `ecommerce-catalogo` (ECO-2a y ECO-2b)
+
+Los planes no se pueden editar sin perder la aprobación: lo que cambió al implementar T01 a T13 vive en `specs/ecommerce-catalogo/decisiones-de-implementacion.md` y aquí se resume lo que contradice el texto del plan (vale lo de aquí).
+
+- [x] **Conciliación (plan §1 y T12):** la ventana de coincidencia va de **5 minutos antes** de `solicitado_en` a 60 minutos después de `ultimo_intento_en` (el hallazgo del plan pedía margen por abajo); `fallido` se rechaza si el último intento tiene menos de 2 minutos (un reintento en vuelo aún puede aplicarse); una fila anonimizada no coincide con ningún ingreso.
+- [x] **`Shared` (plan §2, «sin cambios», y §10):** dos acciones de auditoría nuevas, `IngresoPendienteConciliado` e `IngresosSolicitadosAnonimizados`, en `Shared` y en los catálogos de ambos servicios (commit propio).
+- [x] **Reintento y conciliación:** `ReintentarIngresoEntrada` y `ConciliarIngresoEntrada` llevan un `EdicionId` opcional (el de la ruta): una fila de otra edición responde `ECO-NO-ENCONTRADO`.
+- [x] **Aviso «registro o ingreso pendiente»:** vive en el modelo de administración (`EdicionDeAdministracion.RegistroPendienteEnElInventario`, nulo si el Inventario no respondió) y en `ResultadoDeAlta.FichasSinConfirmar`; el modelo público no lo lleva.
+- [x] **Auditoría de ediciones:** el detalle de `EdicionRegistrada` solo lleva el formato, y el de `EdicionEditada`, `EdicionDadaDeBaja` y `EdicionDigitalRetirada` no lleva el ISBN (el objeto es la edición): `DetalleSeguro` redacta un ISBN-13 que pasa Luhn.
+- [ ] **ECO-2c:** ver la fila de `progress/hallazgos.md` del 2026-11-18 sobre la revisión de ECO-2b (composición transaccional, validación del 201 del Inventario, escape de comodines, inventario de privacidad y cobertura real de AC-CAT-12).

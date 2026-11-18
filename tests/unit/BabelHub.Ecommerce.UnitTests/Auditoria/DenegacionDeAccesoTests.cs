@@ -91,6 +91,28 @@ public sealed class DenegacionDeAccesoTests
         Assert.Equal(Ahora, registro.InstanteUtc);
     }
 
+    private sealed class RutaFija(string? ruta) : IRutaDeLaSolicitud
+    {
+        public string? Actual { get; } = ruta;
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-04")]
+    public async Task Con_una_ruta_nula_del_caso_de_uso_el_evento_usa_la_ruta_de_la_solicitud_en_curso_y_una_ruta_propia_manda()
+    {
+        var entorno = new Entorno(ActorDePrueba.DeCliente());
+        IDenegacionDeAcceso Con(string? solicitud) =>
+            new DenegacionDeAccesoDeAplicacion(entorno.Constructor, new ContextoDeDenegacion(), new ResolutorDeRutas(new PlantillasFijas(Plantillas)), entorno.Escritor, entorno.Alertas, entorno.Reloj, new RutaFija(solicitud));
+
+        await Con("/api/ecommerce/v1/pedidos/9f3c2a10-aaaa-bbbb-cccc-000000000001").Registrar(new DenegacionDeAcceso("fuera-de-rol", null));
+        await Con("/api/ecommerce/v1/pedidos/9f3c2a10-aaaa-bbbb-cccc-000000000001").Registrar(new DenegacionDeAcceso("fuera-de-rol", "/api/ecommerce/v1/biblioteca"));
+        await Con(null).Registrar(new DenegacionDeAcceso("fuera-de-rol", null));
+
+        Assert.Equal("/api/ecommerce/v1/pedidos/{id}", entorno.Escritor.Registros[0].Ruta);
+        Assert.Equal("/api/ecommerce/v1/biblioteca", entorno.Escritor.Registros[1].Ruta);
+        Assert.Equal(PlantillaDeRuta.SinCoincidencia, entorno.Escritor.Registros[2].Ruta);
+    }
+
     [Fact]
     [Trait("Criterio", "AC-AUD-21")]
     public async Task Quien_no_tiene_sesion_queda_como_anonimo()

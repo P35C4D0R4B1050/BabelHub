@@ -111,6 +111,8 @@ public static class DenegacionesHttpExtensiones
         ArgumentNullException.ThrowIfNull(servicios);
         servicios.AddSingleton<IPlantillasDeRuta, PlantillasDeRutaDeLaApi>();
         servicios.AddScoped<IRegistradorDeDenegacionesHttp, RegistradorDeDenegacionesHttp>();
+        servicios.AddHttpContextAccessor();
+        servicios.AddScoped<IRutaDeLaSolicitud, RutaDeLaSolicitudHttp>();
         // El registro de petición del servidor web escribe la dirección completa con su consulta (el usuario, el origen y el texto buscado de la auditoría, AUD-06, SEG-10): solo avisos y errores.
         servicios.AddLogging(registro => registro.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Warning));
         return servicios;
@@ -131,4 +133,10 @@ public static class DenegacionesHttpExtensiones
 
         return app.UseMiddleware<DenegacionesMiddleware>();
     }
+}
+
+/// <summary>La ruta de la solicitud en curso (sin la consulta) para los accesos denegados que registra la Aplicación con una ruta nula (T19): el módulo de auditoría la reduce a su plantilla.</summary>
+public sealed class RutaDeLaSolicitudHttp(IHttpContextAccessor acceso) : IRutaDeLaSolicitud
+{
+    public string? Actual => acceso.HttpContext?.Request.Path.Value;
 }

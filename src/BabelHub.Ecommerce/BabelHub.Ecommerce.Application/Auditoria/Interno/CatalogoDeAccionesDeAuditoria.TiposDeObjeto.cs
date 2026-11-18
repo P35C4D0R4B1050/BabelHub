@@ -19,6 +19,8 @@ public static partial class CatalogoDeAccionesDeAuditoria
         [nameof(AccionesAuditables.PedidoAnulado)] = ["pedido"],
         [nameof(AccionesAuditables.AjusteRegistrado)] = ["ajuste"],
         [nameof(AccionesAuditables.IngresoDeMercaderiaRegistrado)] = ["ingreso"],
+        [nameof(AccionesAuditables.IngresoPendienteConciliado)] = ["ingreso"],
+        [nameof(AccionesAuditables.IngresosSolicitadosAnonimizados)] = [],
         [nameof(AccionesAuditables.ReingresoPorDevolucion)] = ["ajuste", "devolucion"],
         [nameof(AccionesAuditables.ReembolsoRegistrado)] = ["pedido"],
         [nameof(AccionesAuditables.EstadoDePedidoCambiado)] = ["pedido"],
