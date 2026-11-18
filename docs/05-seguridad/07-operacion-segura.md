@@ -68,6 +68,8 @@ Todos llegan por variables de entorno con el prefijo `BABELHUB__` (el doble guio
 | `BABELHUB__Seguridad__Turnstile__Secreto` | E-commerce | Secreto de `siteverify` de Turnstile (SEG-31). |
 | `BABELHUB__Seguridad__Turnstile__Hostnames` y `…ClaveDeSitio` | E-commerce | No son secretos: los nombres de host permitidos (separados por comas) y la clave de sitio pública del desafío. Se validan igual al arrancar. |
 | `BABELHUB__Almacen__Supresiones__Endpoint`, `…__Region`, `…__ClaveDeAcceso` y `…__ClaveSecreta` | E-commerce | La credencial `supresiones-registro` del almacén de objetos (solo crear y leer en `entradas/`) con la que Identidad escribe el registro de supresiones (PLA-37, PLA-38); el endpoint es https. |
+| `BABELHUB__Almacen__Catalogo__Endpoint`, `…__Region`, `…__ClaveDeAcceso` y `…__ClaveSecreta` | E-commerce | La credencial `catalogo-archivos` del almacén de objetos (crear, leer por rango y borrar en los contenedores `libros` y `portadas`; sin listar ni administrar el almacén) con la que el Catálogo guarda y sirve portadas y libros; es distinta de la de lectura de la Biblioteca y de la de supresiones; el endpoint es https. Se compone cuando se une el Catálogo a `Program.cs`. |
+| `BABELHUB__Catalogo__ClaveDeIngresos` y `…ClaveDeIngresosAnterior` | E-commerce | Clave HMAC-SHA256 (al menos 32 bytes, distinta de toda otra) con la que el Catálogo firma el token de 30 minutos del formulario de ingreso de mercadería (es la clave de idempotencia del ingreso); la `Anterior` permite rotarla sin invalidar formularios abiertos. |
 | `BABELHUB__Restauracion__SecretoDeLaMarca` | Ambos | El secreto del HMAC de la marca de un solo uso que `restaurar.sh` emite para arrancar `Restauracion` o `Ensayo` en producción; solo lo conocen el script y el servicio. |
 | `BABELHUB__Ensayo__ProhibidosSha256` | Ambos (solo en el ensayo) | No es un secreto: las huellas SHA-256 de las credenciales de producción, para que el ensayo se niegue a arrancar si alguna variable de secreto coincide con una. |
 | `BABELHUB__Seguridad__ClaveDeRedisDeLimites` | E-commerce y réplica de gestión | Contraseña del usuario `limites` del Redis de contadores. |
@@ -133,6 +135,18 @@ R --> L["Aprender<br/>(causa raíz y mejora)"]
 | Aprender | Registrar el incidente en `progress/`, actualizar el modelo de amenazas y agregar la prueba que lo habría evitado. |
 
 Contactos y responsabilidades: la persona responsable del proyecto decide; el equipo documenta cada incidente aunque sea menor.
+
+### 6.1 Purgar una portada ilícita del borde (Catálogo)
+
+Las portadas se sirven en `/portadas/{huella}` con una URL por portada (la huella va en minúsculas y la llave de caché de Cloudflare ignora la cadena de consulta), así que una portada ilícita ya cacheada se purga por su URL exacta.
+
+| Paso | Qué se hace |
+| :--- | :--- |
+| 1 | La administración central reemplaza o da de baja la obra en la interfaz del Catálogo; la portada nueva tiene otra huella y otra URL. |
+| 2 | En Cloudflare, *Caching → Configuration → Purge Cache → Custom purge*, se pega la URL completa `https://<host-de-la-tienda>/portadas/<huella-anterior>` (la huella está en la auditoría de la obra) y se purga. |
+| 3 | Si el objeto ya no debe existir, se borra del contenedor `portadas` con la credencial de administración del almacén (no la `catalogo-archivos`, que solo lo hace por el caso de uso) y se deja el hallazgo en `progress/`. |
+
+Reglas del contenedor: el ciclo de vida (`infra/almacen/ciclo-de-vida.json`) aborta las subidas multipart incompletas; los libros y las portadas nunca son públicos, y los libros solo se entregan con URL firmada de corta duración.
 
 ## 7. Gestión de cambios y vulnerabilidades
 
