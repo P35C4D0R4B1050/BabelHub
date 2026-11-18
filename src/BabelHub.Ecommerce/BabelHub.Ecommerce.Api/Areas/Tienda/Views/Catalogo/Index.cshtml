@@ -1,0 +1,74 @@
+@model BabelHub.Ecommerce.Api.Areas.Tienda.Controllers.CatalogoVista
+@{
+    var f = Model.Filtros;
+}
+<h1 class="bh-display">Catálogo</h1>
+<p class="mt-2 max-w-2xl opacity-80">Solo mostramos lo que realmente hay: stock por sucursal en los impresos y disponibilidad inmediata en los digitales.</p>
+
+<div class="mt-8 grid gap-8 lg:grid-cols-[16rem_1fr]">
+    <aside aria-label="Filtros del catálogo">
+        <form method="get" action="/catalogo" class="space-y-5 rounded-box border border-base-300 bg-base-100 p-4"
+              hx-get="/catalogo" hx-target="#resultados" hx-push-url="true" hx-indicator="#cargando">
+            <div>
+                <label class="font-semibold" for="f-q">Buscar por título</label>
+                <input id="f-q" name="q" type="search" class="input mt-1 w-full" maxlength="100" value="@f.Texto" autocomplete="off" />
+            </div>
+            <fieldset>
+                <legend class="mb-1 font-semibold">Formato</legend>
+                <div class="join w-full">
+                    <input class="join-item btn btn-sm flex-1" type="radio" name="formato" value="" aria-label="Todos" checked="@(f.Formato is null)" />
+                    <input class="join-item btn btn-sm flex-1" type="radio" name="formato" value="impresa" aria-label="Impreso" checked="@(f.Formato == "impresa")" />
+                    <input class="join-item btn btn-sm flex-1" type="radio" name="formato" value="digital" aria-label="Digital" checked="@(f.Formato == "digital")" />
+                </div>
+            </fieldset>
+            <div>
+                <label class="font-semibold" for="f-categoria">Categoría</label>
+                <input id="f-categoria" name="categoria" type="text" class="input mt-1 w-full" maxlength="60" value="@f.Categoria" />
+            </div>
+            <div>
+                <label class="font-semibold" for="f-autor">Autor</label>
+                <input id="f-autor" name="autor" type="text" class="input mt-1 w-full" maxlength="100" value="@f.Autor" />
+            </div>
+            <div>
+                <label class="font-semibold" for="f-editorial">Editorial</label>
+                <input id="f-editorial" name="editorial" type="text" class="input mt-1 w-full" maxlength="100" value="@f.Editorial" />
+            </div>
+            <fieldset>
+                <legend class="mb-1 font-semibold">Precio (S/)</legend>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="text-sm" for="f-min">Desde</label>
+                        <input id="f-min" name="precioMin" type="text" inputmode="decimal" class="input input-sm w-full" value="@f.PrecioMinimo" />
+                    </div>
+                    <div>
+                        <label class="text-sm" for="f-max">Hasta</label>
+                        <input id="f-max" name="precioMax" type="text" inputmode="decimal" class="input input-sm w-full" value="@f.PrecioMaximo" />
+                    </div>
+                </div>
+            </fieldset>
+            <label class="flex cursor-pointer items-start gap-2 text-sm">
+                <input type="checkbox" name="disponible" value="1" class="checkbox checkbox-sm checkbox-primary mt-0.5" checked="@f.SoloDisponibles" />
+                <span>Solo con stock en la red o digitales vigentes</span>
+            </label>
+            <div class="flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-primary btn-sm"><bh-icono nombre="libro" clase="size-4" />Buscar</button>
+                <a class="btn btn-ghost btn-sm" href="/catalogo">Limpiar filtros</a>
+            </div>
+        </form>
+    </aside>
+
+    <section aria-label="Resultados">
+        <div id="cargando" class="htmx-indicator" role="status" aria-live="polite" aria-busy="true">
+            <span class="sr-only">Cargando…</span>
+            <div class="bh-grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4" aria-hidden="true">
+                @for (var i = 0; i < 4; i++)
+                {
+                    <div class="bh-celda"><div class="bh-esqueleto aspect-[2/3] w-full"></div><div class="bh-esqueleto h-4 w-3/4"></div><div class="bh-esqueleto h-4 w-1/2"></div></div>
+                }
+            </div>
+        </div>
+        <div id="resultados" aria-live="polite">
+            @await Html.PartialAsync("_Resultados", Model)
+        </div>
+    </section>
+</div>
