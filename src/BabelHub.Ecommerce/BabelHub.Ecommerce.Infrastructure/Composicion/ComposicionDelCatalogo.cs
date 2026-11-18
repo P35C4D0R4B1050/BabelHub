@@ -146,6 +146,10 @@ public static class ComposicionDelCatalogo
             sp.GetRequiredService<ICasoDeUso<ConciliarIngresoEntrada, ResultadoDeIngreso>>(),
             sp.GetRequiredService<ICasoDeUso<ListarIngresosEntrada, HistorialDeIngresos>>()));
 
+        servicios.TryAddScoped<IAnonimizadorDelCatalogo, AnonimizadorDelCatalogoPostgres>();
+        servicios.TryAddScoped<IMantenimientoDelCatalogo>(sp => new MantenimientoDelCatalogoDeLaAplicacion(sp.GetRequiredService<DepurarArchivosSinUso>(), sp.GetRequiredService<AnonimizarIngresosSolicitados>()));
+        servicios.TryAddScoped(sp => new AnonimizarIngresosSolicitados(
+            sp.GetRequiredService<IActorActual>(), sp.GetRequiredService<IAnonimizadorDelCatalogo>(), sp.GetRequiredService<IUnidadDeTrabajo>(), sp.GetRequiredService<IAuditoria>(), sp.GetRequiredService<IReloj>()));
         servicios.TryAddScoped(sp => new DepurarArchivosSinUso(
             sp.GetRequiredService<IActorActual>(), sp.GetRequiredService<IRepositorioDeReferenciasDeArchivo>(), sp.GetRequiredService<IAlmacenDeArchivos>(), sp.GetRequiredService<IUnidadDeTrabajo>(), sp.GetRequiredService<IReloj>()));
 

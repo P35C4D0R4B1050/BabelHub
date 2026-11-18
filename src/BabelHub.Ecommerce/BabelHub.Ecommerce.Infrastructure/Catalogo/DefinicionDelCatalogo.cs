@@ -182,7 +182,7 @@ public static class DefinicionDelCatalogo
         GRANT SELECT, INSERT ON catalogo.archivos_digitales TO rol_catalogo;
         GRANT UPDATE (clave_en_almacen, tipo_detectado, tamano, huella_sha256, subido_en, subido_por) ON catalogo.archivos_digitales TO rol_catalogo;
         GRANT SELECT, INSERT, DELETE ON catalogo.archivos_pendientes TO rol_catalogo;
-        GRANT UPDATE (estado, tipo_detectado, tamano, huella_sha256, vence_en, consumido_en) ON catalogo.archivos_pendientes TO rol_catalogo;
+        GRANT UPDATE (usuario_id, estado, tipo_detectado, tamano, huella_sha256, vence_en, consumido_en) ON catalogo.archivos_pendientes TO rol_catalogo;
         GRANT SELECT, INSERT ON catalogo.ingresos_solicitados TO rol_catalogo;
         GRANT UPDATE (usuario_id, estado, ingreso_id, referencia, nota, intentos, ultimo_intento_en, resultado_en) ON catalogo.ingresos_solicitados TO rol_catalogo;
         """;

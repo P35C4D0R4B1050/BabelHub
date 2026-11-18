@@ -87,3 +87,14 @@ public interface IIngresosDeMercaderia
 
     Task<Resultado<HistorialDeIngresos>> Listar(ListarIngresosEntrada entrada, CancellationToken cancelacion = default);
 }
+
+/// <summary>
+/// El mantenimiento del catálogo que corre como trabajo de fondo (plan §3, D05, T23): solo el sistema, comprobado en cada operación. La depuración parte de las filas de <c>archivos_pendientes</c> (borra el objeto y luego la fila) y la anonimización
+/// quita a los 2 años los datos de personal de los ingresos solicitados y de los archivos, con su auditoría sin datos personales en la misma transacción. Fallan cerrado: lo que no se pudo hacer se reintenta en la corrida siguiente.
+/// </summary>
+public interface IMantenimientoDelCatalogo
+{
+    Task<Resultado<DepuracionDeArchivos>> DepurarArchivosSinUso(CancellationToken cancelacion = default);
+
+    Task<Resultado<AnonimizacionDelCatalogoRealizada>> AnonimizarIngresosSolicitados(CancellationToken cancelacion = default);
+}

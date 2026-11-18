@@ -7,6 +7,7 @@ using System.Text.Json.Serialization;
 using Amazon.S3;
 using BabelHub.Ecommerce.Api.Areas.Admin.Controllers;
 using BabelHub.Ecommerce.Api.Areas.Tienda.Controllers;
+using BabelHub.Ecommerce.Api.Catalogo;
 using BabelHub.Ecommerce.Api.Plataforma;
 using BabelHub.Ecommerce.Api.Web;
 using BabelHub.Ecommerce.Application.Auditoria;
@@ -70,6 +71,8 @@ public sealed class CatalogoApiHost : IAsyncDisposable
 
     public IAmazonS3 Almacen { get; private set; } = null!;
 
+    public RegistroDeTrabajosEspia RegistroDeTrabajos { get; } = new();
+
     /// <summary>La auditoría no responde: toda escritura de un registro falla (AUD-04).</summary>
     public volatile bool AuditoriaCaida;
 
@@ -113,7 +116,7 @@ public sealed class CatalogoApiHost : IAsyncDisposable
         builder.Services.AddSingleton<IActorActual>(actor);
         builder.Services.AddSingleton<IEstablecedorDeActor>(actor);
         builder.Services.AddSingleton<IReloj>(Reloj);
-        builder.Services.AddSingleton<IRegistroDeTrabajosDeFondo, RegistroDeTrabajosNulo>();
+        builder.Services.AddSingleton<IRegistroDeTrabajosDeFondo>(RegistroDeTrabajos);
 
         builder.Services.AddSingleton(bd.Acceso);
         builder.Services.AddSingleton(sp => new UnidadDeTrabajoPostgres(sp.GetRequiredService<NpgsqlDataSource>()));
@@ -132,6 +135,7 @@ public sealed class CatalogoApiHost : IAsyncDisposable
         // El Catálogo real: PostgreSQL, el almacén S3 real y el Inventario simulado.
         builder.Services.AddSingleton<IClienteDelInventario>(Inventario);
         builder.Services.AgregarCatalogo(new OpcionesDelCatalogo(almacen, ClaveDeIngresos, ClaveDeIngresosAnterior, Libros, Portadas));
+        builder.Services.AgregarTrabajosDelCatalogo(soloEnModoNormal: false);
 
         // Antifalsificación global del E-commerce y MVC con solo los controladores del catálogo.
         builder.Services.AddSingleton(new OpcionesDelHostWeb(HostWeb.Gestion, []));
@@ -301,8 +305,29 @@ public sealed class CatalogoApiHost : IAsyncDisposable
         public Task<ResultadoDeEnvioDeAlerta> Enviar(CorreoDeAlerta correo, IReadOnlyList<DestinatarioDeAlerta> destinatarios, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeEnvioDeAlerta.Enviado);
     }
 
-    private sealed class RegistroDeTrabajosNulo : IRegistroDeTrabajosDeFondo
+    public sealed class RegistroDeTrabajosEspia : IRegistroDeTrabajosDeFondo
     {
-        public Task Registrar(string trabajo, ResultadoDeTrabajo resultado, DateTimeOffset instante, CancellationToken cancelacion = default) => Task.CompletedTask;
+        private readonly List<(string Trabajo, ResultadoDeTrabajo Resultado)> _corridas = [];
+
+        public IReadOnlyList<(string Trabajo, ResultadoDeTrabajo Resultado)> Corridas
+        {
+            get
+            {
+                lock (_corridas)
+                {
+                    return [.. _corridas];
+                }
+            }
+        }
+
+        public Task Registrar(string trabajo, ResultadoDeTrabajo resultado, DateTimeOffset instante, CancellationToken cancelacion = default)
+        {
+            lock (_corridas)
+            {
+                _corridas.Add((trabajo, resultado));
+            }
+
+            return Task.CompletedTask;
+        }
     }
 }

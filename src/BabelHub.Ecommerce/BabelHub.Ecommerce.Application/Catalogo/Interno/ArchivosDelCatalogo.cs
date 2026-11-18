@@ -199,8 +199,6 @@ internal sealed class ArchivosDelCatalogoDeLaAplicacion(ICasoDeUso<SubirArchivoE
     public Task<Resultado<PortadaServida>> ObtenerPortada(string huella, CancellationToken cancelacion = default) => portada.Ejecutar(huella, cancelacion);
 }
 
-/// <summary>Lo que depuró una corrida: los objetos borrados, las filas quitadas y las que no se pudieron depurar (se reintentan en la corrida siguiente).</summary>
-internal sealed record DepuracionDeArchivos(int ObjetosBorrados, int FilasQuitadas, int Fallidas);
 
 /// <summary>
 /// <c>DepurarArchivosSinUso</c> (D05, trabajo de fondo diario): <b>parte de las filas</b> de <c>archivos_pendientes</c>, no de los objetos del almacén. Para una <c>subiendo</c> más vieja que un margen mayor que la duración máxima de una

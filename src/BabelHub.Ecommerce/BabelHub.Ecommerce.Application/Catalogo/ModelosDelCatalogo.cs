@@ -320,3 +320,14 @@ public sealed record IngresoDeLaLista(
 
 /// <summary>Los últimos ingresos de una edición con su fecha y su usuario. <see cref="InventarioNoRespondio"/> indica que la parte del Inventario falta.</summary>
 public sealed record HistorialDeIngresos(Guid EdicionId, IReadOnlyList<IngresoDeLaLista> Ingresos, bool InventarioNoRespondio);
+
+// ---------- Mantenimiento (trabajos de fondo) ----------
+
+/// <summary>Lo que depuró una corrida: los objetos borrados, las filas quitadas y las que no se pudieron depurar (se reintentan en la corrida siguiente).</summary>
+public sealed record DepuracionDeArchivos(int ObjetosBorrados, int FilasQuitadas, int Fallidas);
+
+/// <summary>Cuántas filas anonimizó una corrida, por tabla: los ingresos solicitados, los libros de las ediciones y las subidas pendientes. Solo cantidades: nunca datos de personas.</summary>
+public sealed record AnonimizacionDelCatalogoRealizada(int IngresosSolicitados, int LibrosDeEdiciones, int SubidasPendientes)
+{
+    public int Total => IngresosSolicitados + LibrosDeEdiciones + SubidasPendientes;
+}
