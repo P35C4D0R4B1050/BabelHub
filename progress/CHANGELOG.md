@@ -2,6 +2,18 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-18 — Quinta ola, segunda parte y planes de comercio (fundidos a `main`)
+
+### Cubierto
+- **Carril B:** `inventario-ajustes` completo (T01–T18: Dominio, Aplicación, esquema, depuración de 2 años, Api de ajustes, ingresos y reingreso con `pedidoId` obligatorio, D19) e `inventario-traslados` completo (T01–T26: transiciones, generación y cancelación de traslados por pedido, repositorios, buzón de salida, trabajos de fondo y Api). El Inventario queda sin tareas pendientes salvo `spec-verify` y la composición de los `Program.cs`.
+- **Carril A:** IDE-2 e IDE-3 (T11–T17 de `identidad-seguridad`): cuota de correo, cliente del Inventario ampliado (pendientes y baja del titular), contrato público de Identidad, registro con verificación y reenvío de código, ingreso en dos pasos, sesiones y recuperación; umbral de 50 bloqueos por 15 minutos confirmado por la persona.
+- **Carril C:** ECO-2b y ECO-2c de `ecommerce-catalogo` (T07–T23: casos de uso, conciliación de ingresos, adaptador del Inventario, almacén S3 con verificador por rangos, Api, trabajos de fondo); ECO-2d (T24–T28) commiteada en su rama, con revisiones sin Bloqueantes ni Importantes.
+- **Planes aprobados (`Planned`) por delegación:** `ecommerce-carrito-checkout` (37 tareas), `ecommerce-pagos` (38), `ecommerce-pedidos` (42), `ecommerce-biblioteca-digital` (26), `ecommerce-envios` (25), `ecommerce-devoluciones` (34) y `ecommerce-libro-reclamaciones` (23). Solo faltan por planificar `asistente-compra-ia` y `web-indice-infinito`. ECO-3 necesitó 5 rondas y ECO-7, 4, autorizadas por la persona.
+- Un choque semántico al fundir (los dobles de `IClienteDelInventario` del catálogo no tenían las operaciones del titular de identidad) se corrigió en `723a071`.
+
+### Pendiente
+- Validar `main` con la integración completa (se cortó dos veces con los carriles corriendo a la vez); ECO-4a de carrito (T01–T06) en curso; ECO-2d por fundir; IDE-4 sin empezar (carril A pausado a petición de la persona).
+
 ## 2026-11-17 — Quinta ola, primera parte (fundida a `main`)
 
 ### Cubierto
