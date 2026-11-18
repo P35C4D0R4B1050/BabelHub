@@ -12,7 +12,7 @@ namespace BabelHub.Ecommerce.UnitTests.Identidad;
 /// </summary>
 public sealed class IngresoTests
 {
-    private static SolicitudDeIngreso Solicitud(string correo = "ana@example.com", string contrasena = EntornoDeIdentidad.ContrasenaSegura) => new(correo, new ValorSecreto(contrasena));
+    private static SolicitudDeIngreso Solicitud(string correo = "ana@example.com", string frase = EntornoDeIdentidad.ContrasenaSegura) => new(correo, new ValorSecreto(frase));
 
     // ---------- Credenciales ----------
 
@@ -87,7 +87,7 @@ public sealed class IngresoTests
         var cuenta = e.Cuenta();
         var ingreso = e.Ingreso();
 
-        await ingreso.Ingresar(Solicitud(contrasena: "contraseña-equivocada-123"));
+        await ingreso.Ingresar(Solicitud(frase: "contraseña-equivocada-123"));
         await ingreso.Ingresar(Solicitud("nadie@example.com", "contraseña-equivocada-123"));
 
         Assert.Equal(cuenta.Usuario.Id.ToString("D"), e.Seguridad.Eventos[0].ObjetoId);
@@ -104,7 +104,7 @@ public sealed class IngresoTests
         var ingreso = e.Ingreso();
         for (var i = 0; i < 5; i++)
         {
-            await ingreso.Ingresar(Solicitud(contrasena: "contraseña-equivocada-123"));
+            await ingreso.Ingresar(Solicitud(frase: "contraseña-equivocada-123"));
         }
 
         var sexto = await ingreso.Ingresar(Solicitud());
@@ -125,7 +125,7 @@ public sealed class IngresoTests
         var ingreso = e.Ingreso();
         for (var i = 0; i < 5; i++)
         {
-            var fallo = await ingreso.Ingresar(Solicitud(contrasena: "contraseña-equivocada-123"));
+            var fallo = await ingreso.Ingresar(Solicitud(frase: "contraseña-equivocada-123"));
             Assert.Equal(FallosDeIdentidad.CredencialesInvalidas, fallo.Error);
         }
 
@@ -143,7 +143,7 @@ public sealed class IngresoTests
         var ingreso = e.Ingreso();
         for (var i = 0; i < 4; i++)
         {
-            await ingreso.Ingresar(Solicitud(contrasena: "contraseña-equivocada-123"));
+            await ingreso.Ingresar(Solicitud(frase: "contraseña-equivocada-123"));
         }
 
         Assert.True((await ingreso.Ingresar(Solicitud())).EsExito);
@@ -414,8 +414,8 @@ public sealed class IngresoTests
 
     private static CuentaDeIdentidad ConTemporal(EntornoDeIdentidad e, RolDeUsuario rol, string correo = "nuevo@example.com")
     {
-        var cuenta = e.Cuenta(correo, rol, contrasena: "Temporal-de-prueba-0001");
-        cuenta.DebeCambiarLaContrasena = true;
+        var cuenta = e.Cuenta(correo, rol, frase: "Temporal-de-prueba-0001");
+        cuenta.DebeCambiarLaTemporal = true;
         cuenta.ContrasenaTemporalHasta = EntornoDeIdentidad.Inicio.AddHours(24);
         return cuenta;
     }
@@ -466,9 +466,9 @@ public sealed class IngresoTests
         Assert.Equal("demasiado-comun", comun.Error!.Errores[0].Clave);
         Assert.Equal(PasoPendienteDelIngreso.ConfigurarSegundoFactor, cambiado.Valor.Desafio!.Paso);
         Assert.Equal(EntornoDeIdentidad.Inicio.AddMinutes(5), cambiado.Valor.Desafio.VenceEn);
-        Assert.False(cuenta.DebeCambiarLaContrasena);
+        Assert.False(cuenta.DebeCambiarLaTemporal);
         Assert.Null(cuenta.ContrasenaTemporalHasta);
-        Assert.Equal(HasherDePrueba.ResumenDe("una frase nueva y segura"), cuenta.ResumenDeContrasena);
+        Assert.Equal(HasherDePrueba.ResumenDe("una frase nueva y segura"), cuenta.ResumenDeAcceso);
         Assert.NotNull(cuenta.Usuario.SesionesValidasDesde);
         Assert.All(e.Bd.Renovaciones, r => Assert.NotNull(r.RevocadaEn));
         Assert.Contains(e.Auditoria.Registradas, r => r.Accion == AccionesAuditables.ContrasenaCambiada);

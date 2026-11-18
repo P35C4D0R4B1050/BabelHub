@@ -110,9 +110,9 @@ public sealed class RecuperacionDeAcceso(
                     return false;
                 }
 
-                actual.ResumenDeContrasena = resumen;
+                actual.ResumenDeAcceso = resumen;
                 actual.ContrasenaTemporalHasta = null;
-                actual.DebeCambiarLaContrasena = false;
+                actual.DebeCambiarLaTemporal = false;
 
                 // Todas las renovaciones dejan de servir (IDE-18, IDE-44); el segundo factor no se toca.
                 await revocacion.Todas(actual, ct).ConfigureAwait(false);

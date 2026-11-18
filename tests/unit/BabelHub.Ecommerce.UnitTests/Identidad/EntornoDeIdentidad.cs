@@ -101,8 +101,8 @@ internal sealed class EntornoDeIdentidad
     public RegistroDeCuentas Registro() => new(
         Cuentas, Hasher, new ListaDeContrasenasDePrueba(), Versiones, Limites, Huellas, Unidad, Pendientes, Carrito, Renovaciones, SegundoFactor, Auditoria, Codigos, HuellasDeIdentidad, Solicitudes, Cola, Sesiones, Eventos, Alertas, Secretos, Reloj);
 
-    public SolicitudDeAltaDeCuenta Alta(string correo = "ana@example.com", string nombre = "Ana", string contrasena = ContrasenaSegura, string? terminos = "t1", string? privacidad = "p1", bool mayor = true) =>
-        new(nombre, correo, new ValorSecreto(contrasena), terminos, privacidad, mayor);
+    public SolicitudDeAltaDeCuenta Alta(string correo = "ana@example.com", string nombre = "Ana", string frase = ContrasenaSegura, string? terminos = "t1", string? privacidad = "p1", bool mayor = true) =>
+        new(nombre, correo, new ValorSecreto(frase), terminos, privacidad, mayor);
 
     /// <summary>Siembra una cuenta ya guardada con la contraseña dada (su resumen), para probar ingreso, renovación y recuperación.</summary>
     public CuentaDeIdentidad Cuenta(
@@ -110,7 +110,7 @@ internal sealed class EntornoDeIdentidad
         RolDeUsuario rol = RolDeUsuario.Cliente,
         bool verificada = true,
         bool activa = true,
-        string contrasena = ContrasenaSegura,
+        string frase = ContrasenaSegura,
         Guid? sucursal = null)
     {
         var usuario = Usuario.Restaurar(Guid.NewGuid(), correo, rol, rol == RolDeUsuario.EncargadoDeSucursal ? sucursal ?? Guid.NewGuid() : null, verificada, activa);
@@ -118,7 +118,7 @@ internal sealed class EntornoDeIdentidad
         {
             Usuario = usuario,
             Nombre = "Persona",
-            ResumenDeContrasena = HasherDePrueba.ResumenDe(PoliticaDeContrasenas.Normalizar(contrasena)),
+            ResumenDeAcceso = HasherDePrueba.ResumenDe(PoliticaDeContrasenas.Normalizar(frase)),
             Aceptacion = AceptacionDeTextos.EnElRegistro(Versiones.Vigentes, "t1", "p1", mayorDeEdad: true, Inicio).Aceptacion!,
             CreadaEn = Inicio.AddDays(-30),
         };

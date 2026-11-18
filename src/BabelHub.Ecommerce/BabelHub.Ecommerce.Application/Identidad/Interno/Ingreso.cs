@@ -112,9 +112,9 @@ public sealed class Ingreso(
         }
 
         var cuenta = correoValido ? await cuentas.PorCorreo(correo, cancelacion).ConfigureAwait(false) : null;
-        var coincide = presentada is not null && await hasher.Verificar(cuenta?.ResumenDeContrasena, presentada, cancelacion).ConfigureAwait(false);
+        var coincide = presentada is not null && await hasher.Verificar(cuenta?.ResumenDeAcceso, presentada, cancelacion).ConfigureAwait(false);
         var ahora = reloj.Ahora;
-        var temporalVencida = cuenta is { DebeCambiarLaContrasena: true, ContrasenaTemporalHasta: { } hasta } && ahora >= hasta;
+        var temporalVencida = cuenta is { DebeCambiarLaTemporal: true, ContrasenaTemporalHasta: { } hasta } && ahora >= hasta;
         if (cuenta is null || !coincide || !cuenta.Usuario.Activo || cuenta.CanceladaEn is not null || temporalVencida)
         {
             await eventos.IngresoFallido(cuenta?.Usuario.Id, cancelacion).ConfigureAwait(false);
@@ -326,7 +326,7 @@ public sealed class Ingreso(
         var vigente = await DesafioVigente(desafio, AccionConDesafio.CambiarContrasenaTemporal, cancelacion).ConfigureAwait(false);
         var cuenta = vigente is null ? null : await cuentas.PorId(vigente.UsuarioId, cancelacion: cancelacion).ConfigureAwait(false);
         var ahora = reloj.Ahora;
-        if (cuenta is not { CanceladaEn: null, Usuario.Activo: true, DebeCambiarLaContrasena: true } || (cuenta.ContrasenaTemporalHasta is { } hasta && ahora >= hasta))
+        if (cuenta is not { CanceladaEn: null, Usuario.Activo: true, DebeCambiarLaTemporal: true } || (cuenta.ContrasenaTemporalHasta is { } hasta && ahora >= hasta))
         {
             return Resultado<ResultadoDelIngreso>.Fallo(FallosDeIdentidad.DesafioInvalido);
         }
@@ -357,14 +357,14 @@ public sealed class Ingreso(
     
                     // Se relee bajo el bloqueo de la fila: un cambio de la administración (desactivar, restablecer) entre la lectura y ahora no se pisa (IDE-08, IDE-44).
                     var actual = await cuentas.PorId(cuenta.Usuario.Id, paraActualizar: true, ct).ConfigureAwait(false);
-                    if (actual is not { CanceladaEn: null, Usuario.Activo: true, DebeCambiarLaContrasena: true })
+                    if (actual is not { CanceladaEn: null, Usuario.Activo: true, DebeCambiarLaTemporal: true })
                     {
                         throw new DesafioYaConsumidoException();
                     }
     
-                    actual.ResumenDeContrasena = resumen;
+                    actual.ResumenDeAcceso = resumen;
                     actual.ContrasenaTemporalHasta = null;
-                    actual.DebeCambiarLaContrasena = false;
+                    actual.DebeCambiarLaTemporal = false;
                     actual.Usuario.AvanzarElCorteDeSesiones(ahora);
                     await cuentas.Guardar(actual, ct).ConfigureAwait(false);
                     await renovaciones.RevocarTodas(actual.Usuario.Id, ahora, ct).ConfigureAwait(false);
@@ -395,7 +395,7 @@ public sealed class Ingreso(
     private async Task<ResultadoDelIngreso> SiguientePaso(CuentaDeIdentidad cuenta, DateTimeOffset? creado, CancellationToken cancelacion)
     {
         var ahora = reloj.Ahora;
-        if (cuenta.DebeCambiarLaContrasena)
+        if (cuenta.DebeCambiarLaTemporal)
         {
             return await NuevoDesafio(cuenta.Usuario.Id, ModoDelDesafio.CambiarContrasenaTemporal, PasoPendienteDelIngreso.CambiarContrasenaTemporal, creado, cancelacion).ConfigureAwait(false);
         }

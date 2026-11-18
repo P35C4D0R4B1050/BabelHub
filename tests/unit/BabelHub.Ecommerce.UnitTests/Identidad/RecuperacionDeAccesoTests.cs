@@ -168,9 +168,9 @@ public sealed class RecuperacionDeAccesoTests
         var repetido = await recuperacion.Confirmar("ana@example.com", new ValorSecreto(codigo), new ValorSecreto("otra frase nueva y segura"));
 
         Assert.True(resultado.EsExito);
-        Assert.Equal(HasherDePrueba.ResumenDe(Nueva), cuenta.ResumenDeContrasena);
+        Assert.Equal(HasherDePrueba.ResumenDe(Nueva), cuenta.ResumenDeAcceso);
         Assert.Equal(FallosDeIdentidad.CodigoInvalido, repetido.Error);
-        Assert.Equal(HasherDePrueba.ResumenDe(Nueva), cuenta.ResumenDeContrasena);
+        Assert.Equal(HasherDePrueba.ResumenDe(Nueva), cuenta.ResumenDeAcceso);
         Assert.All(e.Bd.Renovaciones, r => Assert.NotNull(r.RevocadaEn));
         Assert.NotNull(cuenta.Usuario.SesionesValidasDesde);
         Assert.Equal(AccionesAuditables.RecuperacionDeAccesoCompletada, Assert.Single(e.Auditoria.Registradas).Accion);
@@ -213,7 +213,7 @@ public sealed class RecuperacionDeAccesoTests
         Assert.Equal(FallosDeIdentidad.CodigoInvalido, mal.Error);
         Assert.Equal(FallosDeIdentidad.CodigoInvalido, vencido.Error);
         Assert.Equal(["incorrecto", "vencido"], e.Seguridad.Eventos.Where(ev => ev.Accion == AccionesAuditables.CodigoDeUnSoloUsoRechazado).Select(ev => ev.Motivo));
-        Assert.Equal(HasherDePrueba.ResumenDe(EntornoDeIdentidad.ContrasenaSegura), cuenta.ResumenDeContrasena);
+        Assert.Equal(HasherDePrueba.ResumenDe(EntornoDeIdentidad.ContrasenaSegura), cuenta.ResumenDeAcceso);
     }
 
     [Fact]
@@ -304,7 +304,7 @@ public sealed class RecuperacionDeAccesoTests
 
         await Assert.ThrowsAsync<AuditoriaNoDisponibleException>(() => recuperacion.Confirmar("ana@example.com", new ValorSecreto(codigo), new ValorSecreto(Nueva)));
 
-        Assert.Equal(HasherDePrueba.ResumenDe(EntornoDeIdentidad.ContrasenaSegura), cuenta.ResumenDeContrasena);
+        Assert.Equal(HasherDePrueba.ResumenDe(EntornoDeIdentidad.ContrasenaSegura), cuenta.ResumenDeAcceso);
         Assert.All(e.Bd.Renovaciones, r => Assert.Null(r.RevocadaEn));
         Assert.Empty(e.Correo.Correos);
     }

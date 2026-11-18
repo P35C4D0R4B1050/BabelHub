@@ -13,12 +13,12 @@ public sealed class CuentaDeIdentidad
     public required string Nombre { get; set; }
 
     /// <summary>El resumen Argon2id (PHC) de la contraseña; <see langword="null"/> si no hay (nunca la contraseña).</summary>
-    public string? ResumenDeContrasena { get; set; }
+    public string? ResumenDeAcceso { get; set; }
 
     /// <summary>Si la contraseña es una temporal (IDE-23): hasta cuándo sirve; solo permite el desafío de cambio.</summary>
     public DateTimeOffset? ContrasenaTemporalHasta { get; set; }
 
-    public bool DebeCambiarLaContrasena { get; set; }
+    public bool DebeCambiarLaTemporal { get; set; }
 
     public required AceptacionDeTextos Aceptacion { get; set; }
 

@@ -30,8 +30,8 @@ public sealed class RegistroDeCuentasTests
         Assert.False(cuenta.Usuario.CorreoVerificado);
         Assert.True(cuenta.Usuario.Activo);
         Assert.Equal("Ana", cuenta.Nombre);
-        Assert.Equal(HasherDePrueba.ResumenDe(EntornoDeIdentidad.ContrasenaSegura), cuenta.ResumenDeContrasena);
-        Assert.DoesNotContain(EntornoDeIdentidad.ContrasenaSegura, cuenta.ResumenDeContrasena!, StringComparison.Ordinal);
+        Assert.Equal(HasherDePrueba.ResumenDe(EntornoDeIdentidad.ContrasenaSegura), cuenta.ResumenDeAcceso);
+        Assert.DoesNotContain(EntornoDeIdentidad.ContrasenaSegura, cuenta.ResumenDeAcceso!, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -73,18 +73,17 @@ public sealed class RegistroDeCuentasTests
     [Trait("Criterio", "AC-IDE-01")]
     [InlineData("corta", "demasiado-corta")]
     [InlineData("contrasena123", "demasiado-comun")]
-    [InlineData("", "obligatoria")]
-    public async Task Registrar_ConUnaContrasenaQueLaPoliticaRechaza_NoCreaLaCuenta(string contrasena, string clave)
+    [InlineData("", "demasiado-corta")]
+    public async Task Registrar_ConUnaContrasenaQueLaPoliticaRechaza_NoCreaLaCuenta(string entrada, string clave)
     {
         var e = new EntornoDeIdentidad();
 
-        var resultado = await e.Registro().Registrar(e.Alta(contrasena: contrasena.Length == 0 ? "x" : contrasena) with { Contrasena = contrasena.Length == 0 ? new ValorSecreto(" ") : new ValorSecreto(contrasena) });
+        var resultado = await e.Registro().Registrar(e.Alta() with { Contrasena = new ValorSecreto(entrada.Length == 0 ? " " : entrada) });
 
         Assert.False(resultado.EsExito);
         Assert.Equal("contrasena", resultado.Error!.Errores[0].Campo);
-        Assert.NotEmpty(resultado.Error.Errores[0].Clave);
+        Assert.Equal(clave, resultado.Error.Errores[0].Clave);
         Assert.Empty(e.Bd.Cuentas);
-        _ = clave;
     }
 
     [Theory]

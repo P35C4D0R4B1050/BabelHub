@@ -46,9 +46,9 @@ internal sealed class BdIdentidad
         {
             cuenta.Usuario = Copiar(copia).Usuario;
             cuenta.Nombre = copia.Nombre;
-            cuenta.ResumenDeContrasena = copia.ResumenDeContrasena;
+            cuenta.ResumenDeAcceso = copia.ResumenDeAcceso;
             cuenta.ContrasenaTemporalHasta = copia.ContrasenaTemporalHasta;
-            cuenta.DebeCambiarLaContrasena = copia.DebeCambiarLaContrasena;
+            cuenta.DebeCambiarLaTemporal = copia.DebeCambiarLaTemporal;
             cuenta.Aceptacion = copia.Aceptacion;
             cuenta.CanceladaEn = copia.CanceladaEn;
         }
@@ -66,9 +66,9 @@ internal sealed class BdIdentidad
         {
             Usuario = usuario,
             Nombre = c.Nombre,
-            ResumenDeContrasena = c.ResumenDeContrasena,
+            ResumenDeAcceso = c.ResumenDeAcceso,
             ContrasenaTemporalHasta = c.ContrasenaTemporalHasta,
-            DebeCambiarLaContrasena = c.DebeCambiarLaContrasena,
+            DebeCambiarLaTemporal = c.DebeCambiarLaTemporal,
             Aceptacion = c.Aceptacion,
             CreadaEn = c.CreadaEn,
             CanceladaEn = c.CanceladaEn,

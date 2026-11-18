@@ -150,7 +150,7 @@ public sealed class RegistroDeCuentas(
         {
             Usuario = Usuario.NuevoCliente(secretos.NuevoIdentificador(), correo),
             Nombre = solicitud.Nombre.Trim(),
-            ResumenDeContrasena = resumen,
+            ResumenDeAcceso = resumen,
             Aceptacion = aceptacion,
             CreadaEn = ahora,
         };
