@@ -66,8 +66,12 @@ public sealed record LineaDeReingresoDto(
     [property: JsonPropertyName("edicionId")] Guid EdicionId,
     [property: JsonPropertyName("cantidad")] int Cantidad);
 
-/// <summary>Reingreso de los impresos de una devolución aceptada a la sucursal receptora (AJU-11, DEV-07); la devolución de la ruta identifica el reingreso y repetirlo no suma otra vez (AJU-16).</summary>
+/// <summary>
+/// Reingreso de los impresos de una devolución aceptada a la sucursal receptora (AJU-11, DEV-07); la devolución de la ruta identifica el reingreso y repetirlo no suma otra vez (AJU-16). <c>pedidoId</c> es obligatorio (D19):
+/// el pedido devuelto, para que las unidades vendidas resten lo devuelto (<c>inventario-seleccion-fuente</c> D13); repetir el reingreso con otro pedido es un conflicto.
+/// </summary>
 public sealed record ReingresarDevolucionDto(
+    [property: JsonPropertyName("pedidoId")] Guid PedidoId,
     [property: JsonPropertyName("codigoDeFuente")] string CodigoDeFuente,
     [property: JsonPropertyName("lineas")] IReadOnlyList<LineaDeReingresoDto> Lineas);
 

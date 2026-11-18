@@ -1,4 +1,5 @@
 using System.Net;
+using BabelHub.Inventario.Api.Ajustes;
 using BabelHub.Inventario.Api.Fuentes;
 using BabelHub.Inventario.Api.Plataforma;
 using BabelHub.Inventario.Api.Reservas;
@@ -51,6 +52,9 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
 
     public AlertasTecnicasEspia Alertas { get; } = new();
 
+    /// <summary>Los eventos de seguridad publicados (rechazos de credencial y de alcance, límites): T31 comprueba que cada rechazo deja el suyo.</summary>
+    public EventosDeSeguridadEspia Eventos { get; } = new();
+
     public AlertasDeIntegracionEspia AlertasDeAuditoria { get; } = new();
 
     public RelojDeIntegracion Reloj { get; } = new();
@@ -59,10 +63,12 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
 
     public IEnumerable<RouteEndpoint> Endpoints => _app.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>();
 
-    public static async Task<ApiDeReservasHost> Crear(PostgresDeReservasFixture bd)
+    /// <param name="bd">La base de datos de la prueba.</param>
+    /// <param name="conTopeGeneral">Aplica el tope general de la dirección directa (120 por minuto, SEG-32): el «límite general de solicitudes» al que está sujeta la consulta previa (SEL-20).</param>
+    public static async Task<ApiDeReservasHost> Crear(PostgresDeReservasFixture bd, bool conTopeGeneral = false)
     {
         var host = new ApiDeReservasHost();
-        await host.Iniciar(bd);
+        await host.Iniciar(bd, conTopeGeneral);
         return host;
     }
 
@@ -71,9 +77,9 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
         public Task AlLiberar(Guid pedidoId, MotivoDeLiberacionDeReserva motivo, IReadOnlyCollection<Guid> trasladoIds, CancellationToken cancelacion = default) => Task.CompletedTask;
     }
 
-    private async Task Iniciar(PostgresDeReservasFixture bd)
+    private async Task Iniciar(PostgresDeReservasFixture bd, bool conTopeGeneral)
     {
-        var matriz = new MatrizDeAlcances([.. MatrizDeFuentes.Declaraciones(), .. MatrizDeReservas.Declaraciones()]);
+        var matriz = new MatrizDeAlcances([.. MatrizDeFuentes.Declaraciones(), .. MatrizDeReservas.Declaraciones(), .. MatrizDeAjustes.Declaraciones()]);
         var credenciales = new OpcionesDeCredencialesDeEntrada(
         [
             new(AlcanceDeServicio.LecturaDeDisponibilidad, (CredencialDeDisponibilidad, null)),
@@ -89,15 +95,17 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
         var local = new MotorDeLimitesLocal();
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
-        builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("INV", ErroresDeFuentes.Especificos.Concat(ErroresDeReservas.Especificos).ToDictionary(p => p.Key, p => p.Value)));
+        builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("INV", ErroresDeFuentes.Especificos.Concat(ErroresDeReservas.Especificos).Concat(ErroresDeAjustes.Especificos).ToDictionary(p => p.Key, p => p.Value)));
         builder.Services.AgregarLimitesHttp(new OpcionesDeLimitesHttp());
-        builder.Services.AgregarCredencialDeServicio(new OpcionesDeSuperficieDeServicio(), credenciales);
+        builder.Services.AgregarCredencialDeServicio(
+            conTopeGeneral ? new OpcionesDeSuperficieDeServicio { TopeDeLaDireccionDirecta = PoliticasDeLimite.SolicitudesPorHuellaDirecta } : new OpcionesDeSuperficieDeServicio(),
+            credenciales);
         builder.Services.AddSingleton<IMatrizDeAlcancesDeServicio>(matriz);
         builder.Services.AddSingleton<IActorActual>(actor);
         builder.Services.AddSingleton<IEstablecedorDeActor>(actor);
         builder.Services.AddSingleton<ICalculadorDeHuella>(new CalculadorDeHuellaHmac(new OpcionesDeHuella("v1:" + Convert.ToBase64String(ClaveDeHuella))));
         builder.Services.AddSingleton<IReloj>(Reloj);
-        builder.Services.AddSingleton<IPublicadorDeEventosDeSeguridad>(new EventosDeSeguridadNulos());
+        builder.Services.AddSingleton<IPublicadorDeEventosDeSeguridad>(Eventos);
         builder.Services.AddSingleton<IPublicadorDeAlertasTecnicas>(Alertas);
         builder.Services.AddSingleton<IAlertas>(AlertasDeAuditoria);
         builder.Services.AddSingleton(new CatalogoDePoliticas(PoliticasDeSeguridad.Todas.Concat(PoliticasDeSeguridad.Generales)));
@@ -125,8 +133,11 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
 
         builder.Services.AddSingleton(bd.Acceso);
         var configuracion = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Inventario:ClaveDeBajas"] = PilaDeReservas.ClaveDeBajasDePrueba }).Build();
+        // Un Traslados de prueba: confirmar un pedido de recojo con una línea en otra sucursal genera su traslado (SEL-03); el real es de inventario-traslados.
+        builder.Services.AddSingleton<IGeneradorDeTrasladosDePedido>(new TrasladosDeIntegracionDoble(bd));
         builder.Services.AgregarModuloReservas(configuracion);
         builder.Services.AgregarModuloFuentes();
+        builder.Services.AgregarModuloAjustes(new OpcionesDelModuloDeAjustes(bd.Depuracion));
 
         _app = builder.Build();
         _app.UsarManejoDeErrores();
@@ -156,6 +167,7 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
 
         _app.MapearFuentes();
         _app.MapearReservas();
+        _app.MapearAjustes();
 
         await _app.StartAsync();
         Cliente = _app.GetTestClient();
@@ -179,7 +191,8 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
         Guid? sucursal = null,
         Guid? usuario = null,
         string? json = null,
-        string? clave = null)
+        string? clave = null,
+        string? origenReenviado = null)
     {
         var solicitud = new HttpRequestMessage(metodo, Raiz + ruta) { Content = json is null ? null : Json(json) };
         if (credencial is not null)
@@ -200,6 +213,11 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
         if (usuario is { } u)
         {
             solicitud.Headers.TryAddWithoutValidation(CabeceraDeUsuario, u.ToString());
+        }
+
+        if (origenReenviado is not null)
+        {
+            solicitud.Headers.TryAddWithoutValidation("X-Origen-Reenviado", origenReenviado);
         }
 
         if (clave is not null)

@@ -175,7 +175,7 @@ public static class OperacionesDelInventario
             "inventario.ingresos.registrar", Post, "/ingresos-de-mercaderia", Usuario, true, true, false, 201, typeof(RegistrarIngresoDto), typeof(IngresoDeMercaderiaDto),
             CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
             CodigosDeErrorDelInventario.EdicionNoImpresa, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.FuenteNoEsDeRecepcion,
-            CodigosDeErrorDelInventario.IdempotenciaEnConflicto, CodigosDeErrorDelInventario.IdempotenciaEnCurso, CodigosDeErrorDelInventario.ServicioNoDisponible),
+            CodigosDeErrorDelInventario.LimiteExcedido, CodigosDeErrorDelInventario.IdempotenciaEnConflicto, CodigosDeErrorDelInventario.IdempotenciaEnCurso, CodigosDeErrorDelInventario.ServicioNoDisponible),
         Op(
             "inventario.ingresos.listar", Get, "/ingresos-de-mercaderia", Usuario, true, false, true, 200, null, typeof(ListaDeIngresosDto),
             CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.ServicioNoDisponible),
@@ -183,7 +183,8 @@ public static class OperacionesDelInventario
             "inventario.devoluciones.reingresar", Post, "/devoluciones/{devolucionId}/reingreso", Usuario, true, false, false, 200,
             typeof(ReingresarDevolucionDto), typeof(ReingresoDeDevolucionDto),
             CodigosDeErrorDelInventario.NoAutenticado, CodigosDeErrorDelInventario.Prohibido, CodigosDeErrorDelInventario.NoEncontrado,
-            CodigosDeErrorDelInventario.EdicionNoImpresa, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.ServicioNoDisponible),
+            CodigosDeErrorDelInventario.EdicionNoImpresa, CodigosDeErrorDelInventario.ValidacionInvalida, CodigosDeErrorDelInventario.IdempotenciaEnConflicto,
+            CodigosDeErrorDelInventario.IdempotenciaEnCurso, CodigosDeErrorDelInventario.ServicioNoDisponible),
     ];
 
     private static OperacionDeContrato[] DeTraslados() =>

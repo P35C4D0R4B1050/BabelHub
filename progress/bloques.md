@@ -43,7 +43,7 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **INV-2a** | `inventario-seleccion-fuente` T01–T10 y T19: Plataforma, Dominio, contrato, reservar, expiración compartida y primera prueba de concurrencia | C | INV-1c | ☑ |
 | **INV-2b** | `inventario-seleccion-fuente` T11–T18: idempotencia, límites, reemplazo, confirmar, extender, liberar, cerrar y consulta | C | INV-2a | ☑ |
 | **INV-2c** | `inventario-seleccion-fuente` T20–T27: puertos para otros módulos, receptores de la cancelación, trabajos de fondo y Api | C | INV-2b | ☑ |
-| **INV-2d** | `inventario-seleccion-fuente` T28–T33: pruebas de integración y documentación (T32 y T33 de nivel E) | C/E | INV-2c | ☐ |
+| **INV-2d** | `inventario-seleccion-fuente` T28–T33: pruebas de integración y documentación (T32 y T33 de nivel E) | C/E | INV-2c | ☑ (`inventario-seleccion-fuente` 33/33; falta `spec-verify`) |
 | **INV-3a** | `inventario-ajustes` T01–T09: Dominio y Aplicación | C | INV-1c, INV-2c | ☐ |
 | **INV-3b** | `inventario-ajustes` T10–T18: Infraestructura, depuración de 2 años, Api, concurrencia | C | INV-3a; AUD-4 (conexión de depuración) | ☐ |
 | **INV-4a** | `inventario-traslados` T01–T09: Dominio y Aplicación de las transiciones | C | INV-2c | ☐ |
@@ -63,7 +63,7 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **WEB-1e** | `web-base` T36–T39 | C | WEB-1c | ☑ |
 | **WEB-2** | `web-base` T28–T31: pantallas de ingreso, registro, recuperación, cuenta, administración, auditoría y alertas | C | IDE-3 a IDE-5, AUD-3 | ☐ |
 | **WEB-4** | `web-base` T32–T35: E2E multinavegador y móvil, axe, rendimiento y usabilidad | E/C | pantallas de catálogo y compra | ☐ |
-| **ECO-2a** | `ecommerce-catalogo` T01–T06: Dominio (ISBN, obra y ediciones, licencia, archivos), contratos y puertos | C | — | ☐ |
+| **ECO-2a** | `ecommerce-catalogo` T01–T06: Dominio (ISBN, obra y ediciones, licencia, archivos), contratos y puertos | C | — | ☑ |
 | **ECO-2b** | `ecommerce-catalogo` T07–T13: casos de uso, cerrado con dobles de auditoría | C | ECO-2a | ☐ |
 | **ECO-2c** | `ecommerce-catalogo` T14–T23: Infraestructura, Api, matriz de autorización, integración con S3 e Inventario simulado, trabajos de fondo | C | AUD-4; ampliación de `IClienteDelInventario` y del almacén (carril A) | ☐ |
 | **ECO-2d** | `ecommerce-catalogo` T24–T28: pantallas del catálogo y de la administración, documentos y E2E | B/C/E | WEB-1d | ☐ |
@@ -103,6 +103,8 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 
 Segunda ola fundida (merges de `claude/mystifying-panini-0d9826`, `claude/youthful-blackburn-db3929` y `claude/bold-kalam-0567bd`): unitarias 1406 y 1221, arquitectura 155, SpecCheck 23, CoverageCheck 12, integración 2284 de 2285 (una de tiempo real con Redis que pasa sola), gitleaks limpio. Con tres carriles a la vez las suites pesadas compiten y fallan pruebas de contenedores o de tiempo real: la integración completa se corre solo en la fusión.
 
+
+Quinta ola, primera parte (2026-11-17; piezas de plataforma del carril A hasta `47dda76`, INV-2d completo y ECO-2a): unitarias 1985 y 1923, arquitectura 183, SpecCheck 23, CoverageCheck 12, integración 3744 de 3746 (dos pruebas de tiempo real o de carrera que pasan sueltas, con los otros carriles corriendo suites a la vez), gitleaks limpio. Las sesiones de esta ola se pausaron varias veces a media tarea: cada una deja trabajo sin commitear que hay que retomar.
 
 Cuarta tanda fundida (AUD-4 T22–T27 del carril A y WEB-1b/WEB-1c del carril C): unitarias 1552 y 1487, arquitectura 165 con un fallo abierto (el cliente de auditoría del E-commerce consume el token del usuario directamente; lo corrige el carril A), integración 3100 de 3102 (1 omitida y 1 fallo: el escaneo de secretos detectó valores de muestra en el worktree del carril A, no en `main`), SpecCheck 23. Dos choques de arquitectura entre carriles solo aparecieron al fundir (el fijador de actor en `ComposicionDeFuentes`, ya corregido en `a749d6f`): conviene fundir con más frecuencia.
 
