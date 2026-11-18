@@ -45,6 +45,8 @@ public sealed class Sesiones(
     IUnidadDeTrabajo unidad,
     EventosDeSeguridadDeIdentidad eventos,
     IAlertas alertas,
+    IActorActual actor,
+    IDenegacionDeAcceso denegaciones,
     IReloj reloj) : ISesiones
 {
     /// <summary>El motivo de la alerta de seguridad por reutilizar una renovación (catálogo cerrado de alertas).</summary>
@@ -89,6 +91,13 @@ public sealed class Sesiones(
 
     public async Task<Resultado<RespuestaUniforme>> CerrarTodas(Guid usuarioId, CancellationToken cancelacion = default)
     {
+        // El alcance se comprueba en la Aplicación (AGENTS.md §5): solo la propia persona cierra todas sus sesiones; la administración revoca por `RevocacionDeSesiones` en sus casos de uso (IDE-44).
+        if (actor.Actual is not { Tipo: TipoDeActor.Usuario, UsuarioId: { } propio } || propio != usuarioId)
+        {
+            await RegistrarLaDenegacion(cancelacion).ConfigureAwait(false);
+            return Resultado<RespuestaUniforme>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Prohibido, "acceso-denegado"));
+        }
+
         var existe = await unidad.Ejecutar(
             async ct =>
             {
@@ -144,6 +153,18 @@ public sealed class Sesiones(
 
             default:
                 return rechazo;
+        }
+    }
+
+    private async Task RegistrarLaDenegacion(CancellationToken cancelacion)
+    {
+        try
+        {
+            await denegaciones.Registrar(new DenegacionDeAcceso("recurso-ajeno", ruta: null), cancelacion).ConfigureAwait(false);
+        }
+        catch (Exception) when (!cancelacion.IsCancellationRequested)
+        {
+            // IDenegacionDeAcceso nunca interrumpe y deja su alerta técnica si falla.
         }
     }
 

@@ -581,3 +581,19 @@ internal sealed class AlertasDeAuditoriaDePrueba : IAlertas
         return Task.CompletedTask;
     }
 }
+
+internal sealed class ActorDePrueba : IActorActual
+{
+    public ActorActual? Actual { get; set; }
+}
+
+internal sealed class DenegacionesDePrueba : IDenegacionDeAcceso
+{
+    public List<DenegacionDeAcceso> Registradas { get; } = [];
+
+    public Task Registrar(DenegacionDeAcceso denegacion, CancellationToken cancelacion = default)
+    {
+        Registradas.Add(denegacion);
+        return Task.CompletedTask;
+    }
+}

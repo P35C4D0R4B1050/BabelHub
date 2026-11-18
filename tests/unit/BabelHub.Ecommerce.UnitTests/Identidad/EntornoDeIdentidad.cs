@@ -68,6 +68,10 @@ internal sealed class EntornoDeIdentidad
 
     public EmisionDeCodigos EmisionDeCodigos { get; }
 
+    public ActorDePrueba Actor { get; } = new();
+
+    public DenegacionesDePrueba Denegaciones { get; } = new();
+
     public AvisosDeCuenta Avisos { get; }
 
     public RevocacionDeSesiones Revocacion { get; }
@@ -139,7 +143,7 @@ internal sealed class EntornoDeIdentidad
 
 internal static class EntornoDeIdentidadExtensiones
 {
-    public static Application.Identidad.Interno.Sesiones Gestor(this EntornoDeIdentidad e) => new(e.Cuentas, e.Renovaciones, e.HuellasDeIdentidad, e.Secretos, e.Sesiones, e.Revocacion, e.Unidad, e.Eventos, e.AlertasDeSeguridad, e.Reloj);
+    public static Application.Identidad.Interno.Sesiones Gestor(this EntornoDeIdentidad e) => new(e.Cuentas, e.Renovaciones, e.HuellasDeIdentidad, e.Secretos, e.Sesiones, e.Revocacion, e.Unidad, e.Eventos, e.AlertasDeSeguridad, e.Actor, e.Denegaciones, e.Reloj);
 
     public static RecuperacionDeAcceso Recuperacion(this EntornoDeIdentidad e) => new(e.Cuentas, e.Hasher, new ListaDeContrasenasDePrueba(), e.Limites, e.Huellas, e.Solicitudes, e.Cola, e.Codigos, e.HuellasDeIdentidad, e.Revocacion, e.Unidad, e.Auditoria, e.Eventos, e.Avisos, e.Alertas, e.Reloj);
 

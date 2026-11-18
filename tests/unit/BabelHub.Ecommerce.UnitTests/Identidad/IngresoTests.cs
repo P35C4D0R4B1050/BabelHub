@@ -176,6 +176,7 @@ public sealed class IngresoTests
 
     [Fact]
     [Trait("Criterio", "AC-IDE-20")]
+    [Trait("Criterio", "AC-IDE-38")]
     public async Task UnTotpCorrecto_EmiteLaCredencial_YUnDesafioNoSirveDosVeces()
     {
         var e = new EntornoDeIdentidad();
@@ -274,6 +275,7 @@ public sealed class IngresoTests
 
     [Fact]
     [Trait("Criterio", "AC-IDE-42")]
+    [Trait("Criterio", "AC-IDE-41")]
     public async Task UnDesafioVencidoOInexistente_NoSirve_YElIngresoSeReinicia()
     {
         var e = new EntornoDeIdentidad();

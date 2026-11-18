@@ -173,7 +173,11 @@ public interface IVersionesDeTextosVigentes
 }
 
 /// <summary>La credencial de acceso emitida: el JWT y su vencimiento.</summary>
-public sealed record CredencialEmitida(string Jwt, DateTimeOffset ExpiraEn);
+public sealed record CredencialEmitida(string Jwt, DateTimeOffset ExpiraEn)
+{
+    /// <summary>No imprime el JWT (AGENTS.md §5): un token no aparece en ningún registro.</summary>
+    public override string ToString() => "[credencial]";
+}
 
 /// <summary>Lo que lleva la credencial de acceso (IDE-02): el usuario, su rol, su sucursal si es encargado y si su correo está verificado.</summary>
 public sealed record DatosDeLaCredencial(Guid UsuarioId, RolDeUsuario Rol, Guid? Sucursal, bool CorreoVerificado);

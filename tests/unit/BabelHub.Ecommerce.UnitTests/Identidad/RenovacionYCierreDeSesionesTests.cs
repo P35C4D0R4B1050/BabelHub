@@ -10,7 +10,7 @@ namespace BabelHub.Ecommerce.UnitTests.Identidad;
 /// Renovar, cerrar y cerrar todas las sesiones (identidad-seguridad T16; AC-IDE-07, AC-IDE-12, AC-IDE-39, AC-IDE-40, AC-IDE-50; IDE-08, IDE-14, IDE-43, IDE-44, IDE-46, IDE-60): rotación única con vencimiento absoluto
 /// heredado, datos actuales del usuario, reutilización que revoca la familia con evento y alerta, y revocación de las demás o de todas.
 /// </summary>
-public sealed class SesionesTests
+public sealed class RenovacionYCierreDeSesionesTests
 {
     private static async Task<(CredencialDeSesion Sesion, CuentaDeIdentidad Cuenta)> Ingresar(EntornoDeIdentidad e, RolDeUsuario rol = RolDeUsuario.Cliente)
     {
@@ -40,6 +40,7 @@ public sealed class SesionesTests
 
     [Fact]
     [Trait("Criterio", "AC-IDE-07")]
+    [Trait("Criterio", "AC-IDE-41")]
     public async Task UsarLaRenovacionNuncaExtiendeSuVencimiento_YPasadoElNoSeRenueva()
     {
         var e = new EntornoDeIdentidad();
@@ -61,6 +62,7 @@ public sealed class SesionesTests
 
     [Fact]
     [Trait("Criterio", "AC-IDE-07")]
+    [Trait("Criterio", "AC-IDE-41")]
     public async Task LaRenovacionDelPersonalVenceALas8Horas()
     {
         var e = new EntornoDeIdentidad();
@@ -208,6 +210,7 @@ public sealed class SesionesTests
         var ajena = await e.Sesiones.Nueva(otra.Usuario, e.Reloj.Ahora, default);
         e.Reloj.Ahora = EntornoDeIdentidad.Inicio.AddMinutes(5);
         var gestor = e.Gestor();
+        e.Actor.Actual = ActorActual.DeUsuario(cuenta.Usuario.Id, "cliente");
 
         var cierre = await gestor.CerrarTodas(cuenta.Usuario.Id);
 
@@ -242,10 +245,35 @@ public sealed class SesionesTests
     public async Task CerrarTodasDeUnaCuentaInexistente_EsNoEncontrada()
     {
         var e = new EntornoDeIdentidad();
+        var id = Guid.NewGuid();
+        e.Actor.Actual = ActorActual.DeUsuario(id, "cliente");
 
-        var resultado = await e.Gestor().CerrarTodas(Guid.NewGuid());
+        var resultado = await e.Gestor().CerrarTodas(id);
 
         Assert.Equal(CategoriaDeError.NoEncontrado, resultado.Error!.Categoria);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-50")]
+    public async Task CerrarTodas_SoloLoHaceLaPropiaPersona_ElActorAjenoOAnonimoSeRechazaYSeRegistra()
+    {
+        var e = new EntornoDeIdentidad();
+        var cuenta = e.Cuenta("ana@example.com");
+        var sesion = await e.Sesiones.Nueva(cuenta.Usuario, e.Reloj.Ahora, default);
+        var gestor = e.Gestor();
+
+        e.Actor.Actual = ActorActual.DeUsuario(Guid.NewGuid(), "administrador-central");
+        var ajeno = await gestor.CerrarTodas(cuenta.Usuario.Id);
+        e.Actor.Actual = ActorActual.Anonimo();
+        var anonimo = await gestor.CerrarTodas(cuenta.Usuario.Id);
+        e.Actor.Actual = null;
+        var sinContexto = await gestor.CerrarTodas(cuenta.Usuario.Id);
+
+        Assert.All(new[] { ajeno, anonimo, sinContexto }, r => Assert.Equal(CategoriaDeError.Prohibido, r.Error!.Categoria));
+        Assert.Equal(3, e.Denegaciones.Registradas.Count);
+        Assert.All(e.Denegaciones.Registradas, d => Assert.Equal("recurso-ajeno", d.Motivo));
+        Assert.Null(e.Bd.Renovaciones.Single().RevocadaEn);
+        Assert.NotNull(sesion);
     }
 
     [Fact]

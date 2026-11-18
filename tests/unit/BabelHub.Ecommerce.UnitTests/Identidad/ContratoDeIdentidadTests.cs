@@ -93,6 +93,35 @@ public sealed class ContratoDeIdentidadTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-IDE-30")]
+    public void LosMotivosDeAlertaQueUsaLaAplicacion_ConstanEnElCatalogoCerradoDeAuditoria()
+    {
+        var catalogo = BabelHub.Ecommerce.Application.Auditoria.Interno.CatalogoDeAlertasDeAuditoria.Crear();
+
+        foreach (var motivo in new[]
+        {
+            Application.Identidad.Interno.Sesiones.MotivoDeRenovacionReutilizada,
+            Application.Identidad.Interno.EmisionDeCodigos.MotivoDeFallaDelCorreo,
+            Application.Plataforma.Interno.CuotaDeCorreo.MotivoDeCuotaAlta,
+            Application.Plataforma.Interno.CuotaDeCorreo.MotivoDeCupoDeCodigosAlto,
+        })
+        {
+            Assert.True(catalogo.Contiene(motivo), motivo);
+        }
+
+        Assert.Equal(BabelHub.Ecommerce.Domain.Auditoria.ClaseDeAlerta.Seguridad, catalogo.Obtener(Application.Identidad.Interno.Sesiones.MotivoDeRenovacionReutilizada).Clase);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-30")]
+    public void LaCredencialEmitida_NoImprimeElJwt()
+    {
+        var jwt = "eyJ.secreto." + Guid.NewGuid().ToString("N");
+
+        Assert.DoesNotContain(jwt, new Application.Identidad.Interno.CredencialEmitida(jwt, DateTimeOffset.UtcNow).ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-IDE-26")]
     public void ElEstadoDeCuenta_NoLlevaDatosPersonales()
     {
