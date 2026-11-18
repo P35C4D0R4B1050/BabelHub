@@ -93,7 +93,22 @@ internal interface IRepositorioDeTraslados
 
     /// <summary>Los traslados por identificador, bloqueados <c>FOR UPDATE</c> y ordenados por identificador (la anulación de un pedido los toma después del pedido y antes de las líneas).</summary>
     Task<IReadOnlyList<Traslado>> PorIdsBloqueados(IReadOnlyCollection<Guid> trasladoIds, CancellationToken cancelacion = default);
+
+    /// <summary>Una página de traslados que cumplen el filtro, del más reciente al más antiguo (fecha de solicitud e identificador descendentes), con el total.</summary>
+    Task<PaginaDeTrasladosGuardados> Listar(FiltroDeTraslados filtro, int pagina, int tamano, CancellationToken cancelacion = default);
+
+    /// <summary>Los traslados vinculados a un pedido (cualquier estado), del más reciente al más antiguo.</summary>
+    Task<IReadOnlyList<Traslado>> DelPedido(Guid pedidoId, CancellationToken cancelacion = default);
 }
+
+/// <summary>
+/// Los filtros de la lista de traslados: por estado, por fuente (origen <b>o</b> destino), vinculados o no, y los <c>solicitado</c> con fecha de solicitud no posterior a <see cref="SolicitadoAntesDe"/> (la demora mínima ya
+/// convertida en un instante por quien llama).
+/// </summary>
+internal sealed record FiltroDeTraslados(EstadoDeTraslado? Estado, Guid? FuenteId, bool? Vinculado, DateTimeOffset? SolicitadoAntesDe);
+
+/// <summary>Una página de traslados leída del repositorio.</summary>
+internal sealed record PaginaDeTrasladosGuardados(IReadOnlyList<Traslado> Elementos, int Total);
 
 /// <summary>
 /// El buzón de salida: los mensajes del cambio de estado se insertan <b>en la misma transacción</b> con <c>INSERT … ON CONFLICT DO NOTHING</c>, de modo que un duplicado no aborta la transacción de quien confirma (plan §5). Los

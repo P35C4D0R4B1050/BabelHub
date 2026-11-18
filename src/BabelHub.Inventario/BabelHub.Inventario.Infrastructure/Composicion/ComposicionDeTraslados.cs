@@ -47,6 +47,9 @@ public static class ComposicionDeTraslados
         servicios.AddSingleton<IValidador<RechazarTrasladoEntrada>, ValidadorDeRechazarTraslado>();
         servicios.AddSingleton<IValidador<CancelarTrasladoEntrada>, ValidadorDeCancelarTraslado>();
         servicios.AddSingleton<IValidador<RegistrarGuiaDeTrasladoEntrada>, ValidadorDeRegistrarGuiaDeTraslado>();
+        servicios.AddSingleton<IValidador<ConsultarTrasladoEntrada>>(new ValidadorDeTrasladoPorId<ConsultarTrasladoEntrada>(e => e.TrasladoId));
+        servicios.AddSingleton<IValidador<ListarTrasladosEntrada>, ValidadorDeListarTraslados>();
+        servicios.AddSingleton<IValidador<ConsultarTrasladosDeUnPedidoEntrada>, ValidadorDeConsultarTrasladosDeUnPedido>();
 
         servicios.Escritura<SolicitarTrasladoEntrada, TrasladoRegistrado, SolicitarTraslado>(opcionesDeReintento);
         servicios.Escritura<AprobarTrasladoEntrada, TrasladoRegistrado, AprobarTraslado>(opcionesDeReintento);
@@ -58,6 +61,9 @@ public static class ComposicionDeTraslados
 
         // Una consulta es de solo lectura: una instantánea coherente (REPEATABLE READ), nunca una transacción de escritura.
         servicios.Lectura<ConsultarOrigenesPosiblesEntrada, OrigenesPosibles, ConsultarOrigenesPosibles>();
+        servicios.Lectura<ConsultarTrasladoEntrada, TrasladoRegistrado, ConsultarTraslado>();
+        servicios.Lectura<ListarTrasladosEntrada, PaginaDeTraslados, ListarTraslados>();
+        servicios.Lectura<ConsultarTrasladosDeUnPedidoEntrada, TrasladosDeUnPedido, ConsultarTrasladosDeUnPedido>();
 
         // Los puertos de Reservas: el adaptador real reemplaza al que falla a la vista, y el receptor de anulaciones se suma a los demás. No son casos de uso expuestos.
         servicios.Replace(ServiceDescriptor.Scoped<IGeneradorDeTrasladosDePedido, GenerarTrasladosDePedido>());

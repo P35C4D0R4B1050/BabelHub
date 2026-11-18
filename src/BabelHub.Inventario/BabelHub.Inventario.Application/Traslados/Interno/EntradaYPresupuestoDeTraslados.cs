@@ -144,6 +144,56 @@ internal sealed class ValidadorDeCancelarTraslado : IValidador<CancelarTrasladoE
     }
 }
 
+internal sealed class ValidadorDeListarTraslados : IValidador<ListarTrasladosEntrada>
+{
+    public const int TamanoMaximoDePagina = 100;
+
+    public const int DemoraMaximaEnHoras = 24 * 365;
+
+    public ResultadoDeValidacion Validar(ListarTrasladosEntrada entrada)
+    {
+        ArgumentNullException.ThrowIfNull(entrada);
+        var errores = new List<ErrorDeCampo>();
+        if (entrada.Estado is not null && EstadosDeTraslado.DeIdentificador(entrada.Estado) is null)
+        {
+            errores.Add(new ErrorDeCampo("estado", ConstructorDeValidacion.FormatoInvalido));
+        }
+
+        if (entrada.CodigoDeFuente is not null)
+        {
+            ReglasDeEntradaDeTraslados.Codigo(errores, "codigoDeFuente", entrada.CodigoDeFuente);
+        }
+
+        if (entrada.DemoraMinimaEnHoras is < 1 or > DemoraMaximaEnHoras)
+        {
+            errores.Add(new ErrorDeCampo("demoraMinimaHoras", ConstructorDeValidacion.FueraDeRango));
+        }
+
+        if (entrada.Pagina < 1)
+        {
+            errores.Add(new ErrorDeCampo("pagina", ConstructorDeValidacion.FueraDeRango));
+        }
+
+        if (entrada.Tamano is < 1 or > TamanoMaximoDePagina)
+        {
+            errores.Add(new ErrorDeCampo("tamano", ConstructorDeValidacion.FueraDeRango));
+        }
+
+        return ReglasDeEntradaDeTraslados.Resultado(errores);
+    }
+}
+
+internal sealed class ValidadorDeConsultarTrasladosDeUnPedido : IValidador<ConsultarTrasladosDeUnPedidoEntrada>
+{
+    public ResultadoDeValidacion Validar(ConsultarTrasladosDeUnPedidoEntrada entrada)
+    {
+        ArgumentNullException.ThrowIfNull(entrada);
+        var errores = new List<ErrorDeCampo>();
+        ReglasDeEntradaDeTraslados.Identificador(errores, "pedidoId", entrada.PedidoId);
+        return ReglasDeEntradaDeTraslados.Resultado(errores);
+    }
+}
+
 internal sealed class ValidadorDeRegistrarGuiaDeTraslado : IValidador<RegistrarGuiaDeTrasladoEntrada>
 {
     public ResultadoDeValidacion Validar(RegistrarGuiaDeTrasladoEntrada entrada)

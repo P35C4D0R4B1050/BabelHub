@@ -110,6 +110,22 @@ internal sealed class RepositorioDeTrasladosEnMemoria : IRepositorioDeTraslados
     }
 
 
+    public Task<PaginaDeTrasladosGuardados> Listar(FiltroDeTraslados filtro, int pagina, int tamano, CancellationToken cancelacion = default)
+    {
+        var todos = _guardados.Values
+            .Where(t => filtro.Estado is null || t.Estado == filtro.Estado)
+            .Where(t => filtro.FuenteId is null || t.OrigenId == filtro.FuenteId || t.DestinoId == filtro.FuenteId)
+            .Where(t => filtro.Vinculado is null || t.EsVinculado == filtro.Vinculado)
+            .Where(t => filtro.SolicitadoAntesDe is null || (t.Estado == EstadoDeTraslado.Solicitado && t.SolicitadoEn <= filtro.SolicitadoAntesDe))
+            .OrderByDescending(t => t.SolicitadoEn).ThenByDescending(t => t.Id)
+            .ToList();
+        return Task.FromResult(new PaginaDeTrasladosGuardados([.. todos.Skip((pagina - 1) * tamano).Take(tamano).Select(Copiar)], todos.Count));
+    }
+
+    public Task<IReadOnlyList<Traslado>> DelPedido(Guid pedidoId, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Traslado>>([.. _guardados.Values.Where(t => t.PedidoId == pedidoId).OrderByDescending(t => t.SolicitadoEn).ThenByDescending(t => t.Id).Select(Copiar)]);
+
+
     public static Traslado Copiar(Traslado t) =>
         Traslado.Rehidratar(
             t.Id, t.Numero, t.EdicionId, t.OrigenId, t.DestinoId, t.Cantidad, t.Estado, t.Motivo, t.MotivoDeCierre, t.PedidoId, t.PedidoAnulado, t.FechaEstimada, t.EstimadaPorConfirmar, t.Guia, t.SolicitadoPor, t.SolicitadoEn,

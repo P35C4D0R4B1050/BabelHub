@@ -150,6 +150,66 @@ internal sealed class NpgsqlRepositorioDeTraslados(AccesoATraslados acceso) : IR
             cancelacion);
     }
 
+    public Task<PaginaDeTrasladosGuardados> Listar(FiltroDeTraslados filtro, int pagina, int tamano, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(filtro);
+        return acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                const string Condicion =
+                    """
+                    WHERE (@estado::text IS NULL OR estado = @estado)
+                      AND (@fuente::uuid IS NULL OR origen_id = @fuente OR destino_id = @fuente)
+                      AND (@vinculado::boolean IS NULL OR (pedido_id IS NOT NULL) = @vinculado)
+                      AND (@antes::timestamptz IS NULL OR (estado = 'solicitado' AND solicitado_en <= @antes))
+                    """;
+
+                void Filtros(NpgsqlCommand comando)
+                {
+                    comando.Parameters.Add(new NpgsqlParameter("estado", NpgsqlDbType.Text) { Value = filtro.Estado is { } e ? e.Identificador() : DBNull.Value });
+                    comando.Parameters.Add(new NpgsqlParameter("fuente", NpgsqlDbType.Uuid) { Value = filtro.FuenteId is { } f ? f : DBNull.Value });
+                    comando.Parameters.Add(new NpgsqlParameter("vinculado", NpgsqlDbType.Boolean) { Value = filtro.Vinculado is { } v ? v : DBNull.Value });
+                    comando.Parameters.Add(new NpgsqlParameter("antes", NpgsqlDbType.TimestampTz) { Value = filtro.SolicitadoAntesDe is { } a ? a.ToUniversalTime() : DBNull.Value });
+                }
+
+                await using var total = new NpgsqlCommand($"SELECT count(*) FROM traslados.traslados {Condicion}", conexion, transaccion);
+                Filtros(total);
+                var cuenta = (long)(await total.ExecuteScalarAsync(token).ConfigureAwait(false))!;
+
+                await using var comandoPagina = new NpgsqlCommand($"SELECT {Columnas} FROM traslados.traslados {Condicion} ORDER BY solicitado_en DESC, id DESC LIMIT @limite OFFSET @desde", conexion, transaccion);
+                Filtros(comandoPagina);
+                comandoPagina.Parameters.AddWithValue("limite", tamano);
+                comandoPagina.Parameters.AddWithValue("desde", (pagina - 1) * tamano);
+                var elementos = new List<Traslado>();
+                await using var lector = await comandoPagina.ExecuteReaderAsync(token).ConfigureAwait(false);
+                while (await lector.ReadAsync(token).ConfigureAwait(false))
+                {
+                    elementos.Add(Leer(lector));
+                }
+
+                return new PaginaDeTrasladosGuardados(elementos, (int)Math.Min(cuenta, int.MaxValue));
+            },
+            cancelacion);
+    }
+
+    public Task<IReadOnlyList<Traslado>> DelPedido(Guid pedidoId, CancellationToken cancelacion = default) =>
+        acceso.Ejecutar<IReadOnlyList<Traslado>>(
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand($"SELECT {Columnas} FROM traslados.traslados WHERE pedido_id = @pedido ORDER BY solicitado_en DESC, id DESC", conexion, transaccion);
+                comando.Parameters.AddWithValue("pedido", pedidoId);
+                var resultado = new List<Traslado>();
+                await using var lector = await comando.ExecuteReaderAsync(token).ConfigureAwait(false);
+                while (await lector.ReadAsync(token).ConfigureAwait(false))
+                {
+                    resultado.Add(Leer(lector));
+                }
+
+                return resultado;
+            },
+            cancelacion);
+
+
     public Task<bool> Guardar(Traslado traslado, long versionAnterior, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(traslado);

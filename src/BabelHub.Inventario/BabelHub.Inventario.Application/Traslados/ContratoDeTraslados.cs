@@ -75,6 +75,24 @@ public sealed record OrigenPosible(string Codigo, string Nombre);
 /// <summary>Los orígenes posibles de una solicitud, los de ruta más corta primero y luego por código.</summary>
 public sealed record OrigenesPosibles(IReadOnlyList<OrigenPosible> Origenes);
 
+/// <summary>Pide el detalle de un traslado (TRA-12, TRA-21): el encargado solo si su sucursal es el origen o el destino; logística y administración, cualquiera.</summary>
+public sealed record ConsultarTrasladoEntrada(Guid TrasladoId);
+
+/// <summary>
+/// Pide la lista de traslados (del más reciente al más antiguo), con página de 1 a 100: por <see cref="Estado"/> (<c>solicitado</c>…), por fuente (origen o destino), solo vinculados a un pedido o no, y los solicitados desde hace al menos
+/// <see cref="DemoraMinimaEnHoras"/> horas (TRA-22). El encargado solo ve los de su sucursal como origen o destino: sin <see cref="CodigoDeFuente"/> se filtra a la suya y con el de otra sucursal se rechaza con acceso denegado (AUD-08).
+/// </summary>
+public sealed record ListarTrasladosEntrada(string? Estado, string? CodigoDeFuente, bool? Vinculado, int? DemoraMinimaEnHoras, int Pagina, int Tamano);
+
+/// <summary>Una página de traslados y el total que cumple los filtros.</summary>
+public sealed record PaginaDeTraslados(IReadOnlyList<TrasladoRegistrado> Elementos, int Total, int Pagina, int Tamano);
+
+/// <summary>Pide los traslados vinculados a un pedido (TRA-11): el personal con el mismo alcance; la consulta del cliente la hace Pedidos con una credencial de servicio de solo lectura.</summary>
+public sealed record ConsultarTrasladosDeUnPedidoEntrada(Guid PedidoId);
+
+/// <summary>Los traslados de un pedido, del más reciente al más antiguo (ninguno si el pedido no tiene).</summary>
+public sealed record TrasladosDeUnPedido(IReadOnlyList<TrasladoRegistrado> Traslados);
+
 // ---------- Cómo viajan los rechazos con datos dentro de ErrorDeAplicacion.Errores ----------
 
 /// <summary>Cuánto esperar tras superar el presupuesto del personal (SEG-30) y desde cuándo reintentar: la misma respuesta uniforme de los demás límites.</summary>
