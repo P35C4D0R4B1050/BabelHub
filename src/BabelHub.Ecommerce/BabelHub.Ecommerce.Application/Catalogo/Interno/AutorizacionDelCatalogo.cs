@@ -105,6 +105,9 @@ internal static class ClavesDelCatalogo
 
     public const string ArchivoDemasiadoGrande = "archivo-demasiado-grande";
 
+    /// <summary>Hay demasiadas subidas en curso (4 en el proceso o 2 del usuario) o una subida duró más de 15 minutos (429 con <c>Retry-After</c>).</summary>
+    public const string LimiteDeSubidas = "limite-de-subidas";
+
     public const string ClaveDeIngresoInvalida = "clave-de-ingreso-invalida";
 
     public const string IngresoPendiente = "ingreso-pendiente";

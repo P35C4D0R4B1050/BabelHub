@@ -15,7 +15,8 @@ internal sealed class SubirArchivo(
     IRepositorioDeReferenciasDeArchivo referencias,
     IAlmacenDeArchivos almacen,
     IUnidadDeTrabajo unidad,
-    IReloj reloj) : ICasoDeUso<SubirArchivoEntrada, ArchivoSubido>
+    IReloj reloj,
+    LimitadorDeSubidas limitador) : ICasoDeUso<SubirArchivoEntrada, ArchivoSubido>
 {
     public async Task<Resultado<ArchivoSubido>> Ejecutar(SubirArchivoEntrada entrada, CancellationToken cancelacion = default)
     {
@@ -31,21 +32,36 @@ internal sealed class SubirArchivo(
             return FallosDelCatalogo.Validacion<ArchivoSubido>(validacion);
         }
 
+        // El cupo se toma después de autorizar (quien no es de la administración central no consume cupos) y antes de leer el cuerpo.
+        using var permiso = limitador.Intentar(autorizador.UsuarioId!.Value);
+        if (permiso is null)
+        {
+            return FallosDelCatalogo.De<ArchivoSubido>(CategoriaDeError.Limite, ClavesDelCatalogo.LimiteDeSubidas);
+        }
+
         var finalidad = entrada.Finalidad == FinalidadDeLaSubida.Portada ? FinalidadDeArchivo.Portada : FinalidadDeArchivo.Libro;
         var referencia = ReferenciaDeArchivo.Iniciar(Guid.NewGuid(), autorizador.UsuarioId!.Value, finalidad, reloj.Ahora);
 
         // Transacción 1: la fila nace antes de escribir el objeto (si el proceso cae, el trabajo de fondo parte de ella).
         await unidad.Ejecutar(async token => { await referencias.Agregar(referencia, token).ConfigureAwait(false); return true; }, cancelacion).ConfigureAwait(false);
 
+        // La escritura se corta al cumplirse la duración máxima de la subida o si el llamador cancela.
+        using var corte = CancellationTokenSource.CreateLinkedTokenSource(cancelacion, permiso.Cancelacion);
         ResultadoDeEscrituraEnAlmacen escrito;
         try
         {
-            escrito = await almacen.Escribir(referencia.ClaveDelAlmacen, finalidad, entrada.Contenido, cancelacion).ConfigureAwait(false);
+            escrito = await almacen.Escribir(referencia.ClaveDelAlmacen, finalidad, entrada.Contenido, corte.Token).ConfigureAwait(false);
         }
         catch (AlmacenNoDisponibleException)
         {
             // La subida se rechaza; la fila subiendo la depura el trabajo de fondo (borra el objeto, si llegó a escribirse, y luego la fila).
             return FallosDelCatalogo.De<ArchivoSubido>(CategoriaDeError.NoDisponible, ClavesDelCatalogo.AlmacenNoDisponible);
+        }
+        catch (OperationCanceledException) when (permiso.Cancelacion.IsCancellationRequested && !cancelacion.IsCancellationRequested)
+        {
+            // La subida duró más que lo permitido: se descarta lo escrito y se rechaza como un límite de uso.
+            await DescartarLaSubida(referencia, cancelacion).ConfigureAwait(false);
+            return FallosDelCatalogo.De<ArchivoSubido>(CategoriaDeError.Limite, ClavesDelCatalogo.LimiteDeSubidas);
         }
 
         if (!escrito.Escrito)

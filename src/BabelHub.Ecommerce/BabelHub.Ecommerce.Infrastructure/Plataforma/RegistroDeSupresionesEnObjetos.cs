@@ -26,14 +26,13 @@ public sealed record OpcionesDelAlmacenDeObjetos(
     /// <summary>
     /// Lee <c>BABELHUB__Almacen__Supresiones__Endpoint</c> (una URL https; http solo para un almacén local de desarrollo),
     /// <c>…__Region</c>, <c>…__ClaveDeAcceso</c> y <c>…__ClaveSecreta</c>, todas obligatorias. Las claves siguen las reglas de los demás
-    /// secretos (largo, variedad); si algo falta o es débil falla al arrancar nombrando la variable, nunca el valor.
+    /// secretos (largo, variedad); si algo falta o es débil falla al arrancar nombrando la variable, nunca el valor. Otro uso del mismo almacén (el catálogo, <c>Almacen:Catalogo:</c>) lo pide con su <paramref name="raiz"/>.
     /// </summary>
-    public static OpcionesDelAlmacenDeObjetos Cargar(IConfiguration configuracion, bool permitirHttp = false)
+    public static OpcionesDelAlmacenDeObjetos Cargar(IConfiguration configuracion, bool permitirHttp = false, string raiz = "Almacen:Supresiones:")
     {
         ArgumentNullException.ThrowIfNull(configuracion);
         var lector = new LectorDeSecretos(configuracion);
 
-        const string raiz = "Almacen:Supresiones:";
         var endpoint = lector.Obligatorio(raiz + "Endpoint");
         var region = lector.Obligatorio(raiz + "Region");
         var acceso = lector.Obligatorio(raiz + "ClaveDeAcceso");

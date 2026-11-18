@@ -142,7 +142,7 @@ public sealed class ArchivosDelCatalogoUsoTests
         var e = new EntornoDelCatalogo();
         Guid? filaAlEscribir = null;
         var almacen = new AlmacenQueMiraLasFilas(e, id => filaAlEscribir = id);
-        var subir = new SubirArchivo(e.Autorizador, new ValidadorDeSubirArchivo(), e.Referencias, almacen, e.Unidad, e.Reloj);
+        var subir = new SubirArchivo(e.Autorizador, new ValidadorDeSubirArchivo(), e.Referencias, almacen, e.Unidad, e.Reloj, e.Limitador);
 
         var resultado = await subir.Ejecutar(Subida(FinalidadDeLaSubida.Libro, Epub()));
 
