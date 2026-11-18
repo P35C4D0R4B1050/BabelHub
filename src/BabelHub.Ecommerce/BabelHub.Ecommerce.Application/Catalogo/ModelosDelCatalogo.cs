@@ -286,7 +286,8 @@ public sealed record RegistrarIngresoEntrada(Guid EdicionId, int Cantidad, strin
 /// <summary>El resultado de pedir, reintentar o conciliar un ingreso: su identificador, el estado y, si <c>Pendiente</c>, el aviso «reintentar» con su misma clave.</summary>
 public sealed record ResultadoDeIngreso(Guid IngresoSolicitadoId, Guid EdicionId, EstadoDeIngresoSolicitado Estado);
 
-public sealed record ReintentarIngresoEntrada(Guid IngresoSolicitadoId);
+/// <summary>Reintenta el ingreso pendiente. <paramref name="EdicionId"/> (la de la ruta) es opcional: si viene y la fila es de otra edición, responde «no encontrado».</summary>
+public sealed record ReintentarIngresoEntrada(Guid IngresoSolicitadoId, Guid? EdicionId = null);
 
 public enum ResolucionDeIngreso
 {
@@ -298,7 +299,7 @@ public enum ResolucionDeIngreso
 /// Concilia un ingreso pendiente (solo administración central): <c>Registrado</c> exige una coincidencia única en los últimos ingresos del Inventario; <c>Fallido</c> exige la
 /// confirmación explícita de que habilita una clave nueva y puede duplicar el stock.
 /// </summary>
-public sealed record ConciliarIngresoEntrada(Guid IngresoSolicitadoId, ResolucionDeIngreso Resolucion, bool ConfirmaFallido);
+public sealed record ConciliarIngresoEntrada(Guid IngresoSolicitadoId, ResolucionDeIngreso Resolucion, bool ConfirmaFallido, Guid? EdicionId = null);
 
 public sealed record ListarIngresosEntrada(Guid EdicionId);
 

@@ -325,6 +325,50 @@ internal sealed class EntornoDelCatalogo
     public ICasoDeUso<RetirarEdicionDigitalEntrada, ResultadoDeEscritura> RetirarEdicionDigital() =>
         Transaccional(new RetirarEdicionDigital(Autorizador, new ValidadorDeRetirarEdicionDigital(), Obras, Auditoria, Reloj));
 
+    public ICasoDeUso<MarcarResultadoDeIngresoEntrada, EstadoDeIngresoSolicitado> Marcar() => Transaccional(new MarcarResultadoDeIngreso(Ingresos, Memoria, Reloj));
+
+    public OrquestadorDeIngresos Orquestador() => new(Inventario, Marcar());
+
+    public ICasoDeUso<RegistrarIngresoEntrada, IngresoPedido> PedirIngreso() =>
+        Transaccional(new RegistrarIngresoDeMercaderia(Autorizador, new ValidadorDeRegistrarIngreso(), Obras, Ingresos, Emisor, Reloj));
+
+    public ICasoDeUso<ConciliarIngresoEntrada, ResultadoDeIngreso> Conciliar() =>
+        new ConciliarIngresoPendiente(Autorizador, new ValidadorDeConciliarIngreso(), Ingresos, Inventario, Unidad, Auditoria, Memoria, Reloj);
+
+    public IAdministracionDelCatalogo Administracion() =>
+        new AdministracionDelCatalogoDeLaAplicacion(
+            RegistrarObra(),
+            EditarObra(),
+            DarDeBajaObra(),
+            RegistrarEdicion(),
+            EditarEdicion(),
+            DarDeBajaEdicion(),
+            RetirarEdicionDigital(),
+            new LecturasDeAdministracion(Autorizador, new ValidadorDeListarObrasDeAdministracion(), Lecturas, Reloj),
+            Orquestador(),
+            Ingresos);
+
+    public IIngresosDeMercaderia IngresosDeMercaderia() =>
+        new IngresosDeMercaderiaDeLaAplicacion(
+            Transaccional(new EmitirClaveDeIngreso(Autorizador, new ValidadorDeEmitirClaveDeIngreso(), Obras, Emisor, Reloj)),
+            PedirIngreso(),
+            Orquestador(),
+            new ReintentarIngresoPendiente(Autorizador, new ValidadorDeReintentarIngreso(), Ingresos, Unidad, Orquestador(), Reloj),
+            Conciliar(),
+            Transaccional(new ListarIngresos(Autorizador, new ValidadorDeListarIngresos(), Obras, Ingresos, Inventario)));
+
+    /// <summary>Una obra con una impresa ya guardada (sin pasar por el alta) para probar ingresos sueltos.</summary>
+    public Guid ImpresaSembrada(string isbn = "978-0-00-000001-9")
+    {
+        var edicion = Edicion.Impresa(Guid.NewGuid(), Isbn.Crear(isbn), Precio.Crear(50m));
+        var obra = Domain.Catalogo.Obra.Registrar(Guid.NewGuid(), new DatosDeObra("Con ingresos", "A", "E", "C"), new PortadaDeObra(ClaveEnAlmacen.Nueva(), TipoDeArchivo.Jpeg, HuellaDeArchivo.Desde(SHA256.HashData(Guid.NewGuid().ToByteArray()))), [edicion], Reloj.Ahora).Valor;
+        Obras.Sembrar(obra);
+        return edicion.Id;
+    }
+
+    /// <summary>El token del formulario de la edición para el usuario actual.</summary>
+    public string Token(Guid edicionId, Guid? usuario = null) => Emisor.Emitir(usuario ?? UsuarioId, edicionId, Reloj.Ahora).Token;
+
     // ---------- Datos de prueba ----------
 
     public Guid PortadaLista(Guid? usuario = null) => Referencias.SembrarLista(usuario ?? UsuarioId, FinalidadDeArchivo.Portada, TipoDeArchivo.Jpeg, Reloj.Ahora);
@@ -392,6 +436,17 @@ internal sealed class LecturasDelCatalogoEnMemoria(RepositorioDeObrasEnMemoria o
         return Task.FromResult((cumplen.Count, cumplen.Sum(o => o.Ediciones.Count(e => Candidata(e, filtros)))));
     }
 
+
+    public Task<PaginaDeObrasDeLaBase> BuscarParaAdministracion(string? texto, bool incluirDadasDeBaja, int pagina, int tamano, CancellationToken cancelacion = default)
+    {
+        var todas = obras.Todas
+            .Where(o => (incluirDadasDeBaja || !o.EstaDadaDeBaja)
+                && (string.IsNullOrEmpty(texto) || Normalizar(o.Titulo + " " + o.Autor + " " + o.Editorial).Contains(Normalizar(texto), StringComparison.Ordinal)))
+            .OrderBy(o => o.Titulo, StringComparer.Ordinal)
+            .ThenBy(o => o.Id)
+            .ToList();
+        return Task.FromResult(new PaginaDeObrasDeLaBase(todas.Skip((pagina - 1) * tamano).Take(tamano).Select(RepositorioDeObrasEnMemoria.Clonar).ToList(), todas.Count));
+    }
     public Task<IReadOnlyList<Obra>> TodasLasQueCumplen(FiltrosDeObras filtros, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<Obra>>(Cumplen(filtros).Select(RepositorioDeObrasEnMemoria.Clonar).ToList());
 

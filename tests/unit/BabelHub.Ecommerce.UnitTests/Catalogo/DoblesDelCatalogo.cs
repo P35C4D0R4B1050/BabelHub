@@ -114,11 +114,15 @@ internal sealed class InventarioDelCatalogoDoble : IInventarioDelCatalogo
 
     public bool ListarIngresosCaido { get; set; }
 
+    /// <summary>Algo que ocurre justo cuando se pide la lista de ingresos (por ejemplo, otra conciliación que resuelve la fila antes de que esta termine).</summary>
+    public Action? AlListarIngresos { get; set; }
+
     public Task<IReadOnlyList<IngresoDelInventario>?> ListarIngresos(Guid edicionId, int limite, CancellationToken cancelacion = default)
     {
         lock (_bloqueo)
         {
             LlamadasAListarIngresos++;
+            AlListarIngresos?.Invoke();
             if (Caido || ListarIngresosCaido)
             {
                 return Task.FromResult<IReadOnlyList<IngresoDelInventario>?>(null);
