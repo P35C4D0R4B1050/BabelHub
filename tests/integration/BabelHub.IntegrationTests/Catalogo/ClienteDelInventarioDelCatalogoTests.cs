@@ -31,6 +31,12 @@ public sealed class ClienteDelInventarioDelCatalogoTests
             return Task.FromResult(Registro);
         }
 
+        public Task<ResultadoDelInventario<PendientesDeTitular>> ConsultarPendientes(Guid titularId, CancellationToken cancelacion = default) =>
+            Task.FromResult(ResultadoDelInventario<PendientesDeTitular>.SinRespuesta);
+
+        public Task<ResultadoDelInventario> DarDeBajaAlTitular(Guid titularId, CancellationToken cancelacion = default) =>
+            Task.FromResult(ResultadoDelInventario.SinRespuesta);
+
         public Task<ResultadoDelInventario<DisponibilidadDeVariasEdiciones>> ConsultarDisponibilidad(IReadOnlyList<Guid> edicionIds, CancellationToken cancelacion = default) => Task.FromResult(Disponibilidad);
 
         public Task<ResultadoDelInventario<IngresoRegistrado>> RegistrarIngreso(IngresoARegistrar ingreso, string claveDeIdempotencia, CancellationToken cancelacion = default)

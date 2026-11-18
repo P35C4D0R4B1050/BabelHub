@@ -101,6 +101,13 @@ public sealed class InventarioSimulado(IActorActual actores) : IClienteDelInvent
         return Task.FromResult(ResultadoDelInventario.Correcta);
     }
 
+    // Operaciones de la cuenta del titular (identidad-seguridad): el catálogo no las usa, el simulado no las atiende.
+    public Task<ResultadoDelInventario<PendientesDeTitular>> ConsultarPendientes(Guid titularId, CancellationToken cancelacion = default) =>
+        Task.FromResult(ResultadoDelInventario<PendientesDeTitular>.SinRespuesta);
+
+    public Task<ResultadoDelInventario> DarDeBajaAlTitular(Guid titularId, CancellationToken cancelacion = default) =>
+        Task.FromResult(ResultadoDelInventario.SinRespuesta);
+
     public Task<ResultadoDelInventario<DisponibilidadDeVariasEdiciones>> ConsultarDisponibilidad(IReadOnlyList<Guid> edicionIds, CancellationToken cancelacion = default)
     {
         Interlocked.Increment(ref LlamadasDeDisponibilidad);
