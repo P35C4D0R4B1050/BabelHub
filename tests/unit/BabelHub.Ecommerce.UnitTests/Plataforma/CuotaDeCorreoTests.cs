@@ -43,6 +43,14 @@ public sealed class CuotaDeCorreoTests
             return Task.CompletedTask;
         }
 
+        public Task DevolverAlertaDeAdministracion(DateOnly dia, string motivo, string servicio, CancellationToken cancelacion = default)
+        {
+            _alertas[(dia, motivo, servicio)] = Math.Max(0, _alertas.GetValueOrDefault((dia, motivo, servicio)) - 1);
+            return Task.CompletedTask;
+        }
+
+        public int AlertasContadas(DateOnly dia, string motivo, string servicio) => _alertas.GetValueOrDefault((dia, motivo, servicio));
+
         public Task<bool> ReservarAlertaDeAdministracion(DateOnly dia, string motivo, string servicio, int tope, CancellationToken cancelacion = default)
         {
             var enviadas = _alertas.GetValueOrDefault((dia, motivo, servicio));
@@ -356,5 +364,57 @@ public sealed class CuotaDeCorreoTests
         {
             _ = CuotaDeCorreo.Clase(categoria);
         }
+    }
+
+    // ---------- Correcciones de la revisión de seguridad ----------
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-62")]
+    public async Task UnaAlertaQueSeEncolaPorFaltaDeCupo_NoGastaElTopeDelMotivo()
+    {
+        var e = new Entorno(
+            new CuotaDeCorreo(new PoliticaDeCuotaDeCorreo(ConfiguracionDeCuotaDeCorreo.Predeterminada), new AlmacenEnMemoria(), new BabelHub.Ecommerce.UnitTests.Web.AlertasTecnicasEspia(), new RelojFijo(Ahora)),
+            new AlmacenEnMemoria(),
+            new BabelHub.Ecommerce.UnitTests.Web.AlertasTecnicasEspia(),
+            new RelojFijo(Ahora));
+        e = Crear();
+        await Agotar(e, CategoriaDeCorreo.Pago, 135);
+        await Agotar(e, CategoriaDeCorreo.AlertaALaAdministracion, 45, motivo: null);
+
+        var encolada = await e.Cuota.Decidir(Correo(CategoriaDeCorreo.AlertaALaAdministracion, "nuevo-motivo", "ecommerce"));
+
+        Assert.Equal(ResultadoDeEnvio.Encolado, encolada.Resultado);
+        Assert.Equal(0, e.Almacen.AlertasContadas(e.Reloj.HoyEnLima, "nuevo-motivo", "ecommerce"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-62")]
+    public async Task SiElEnvioDeUnaAlertaFalla_SeDevuelveElCupoYElTopeDelMotivo()
+    {
+        var e = Crear();
+        var decision = await e.Cuota.Decidir(Correo(CategoriaDeCorreo.AlertaALaAdministracion, "ingresos-fallidos", "ecommerce"));
+        Assert.Equal(1, e.Almacen.AlertasContadas(e.Reloj.HoyEnLima, "ingresos-fallidos", "ecommerce"));
+
+        await e.Cuota.Devolver(decision.Reserva!);
+
+        Assert.Equal(0, e.Almacen.AlertasContadas(e.Reloj.HoyEnLima, "ingresos-fallidos", "ecommerce"));
+        Assert.Equal(0, e.Almacen.Usados(e.Reloj.HoyEnLima, CupoDeCorreo.Administracion));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-62")]
+    public async Task AlLlegarAlTopeDelMotivo_ElCupoReservadoSeDevuelve_YLaAlertaQuedaSinCorreo()
+    {
+        var e = Crear();
+        for (var i = 0; i < 24; i++)
+        {
+            Assert.Equal(ResultadoDeEnvio.Enviado, (await e.Cuota.Decidir(Correo(CategoriaDeCorreo.AlertaALaAdministracion, "accesos-denegados", "ecommerce"))).Resultado);
+        }
+
+        var usadosAntes = e.Almacen.Usados(e.Reloj.HoyEnLima, CupoDeCorreo.Administracion);
+        var vigesimoquinta = await e.Cuota.Decidir(Correo(CategoriaDeCorreo.AlertaALaAdministracion, "accesos-denegados", "ecommerce"));
+
+        Assert.Equal(ResultadoDeEnvio.Suprimido, vigesimoquinta.Resultado);
+        Assert.Equal(usadosAntes, e.Almacen.Usados(e.Reloj.HoyEnLima, CupoDeCorreo.Administracion));
     }
 }

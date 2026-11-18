@@ -489,4 +489,63 @@ public sealed class IngresoTests
 
         Assert.True(cambiado.Valor.Completo);
     }
+
+    // ---------- Correcciones de la revisión de seguridad ----------
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-18")]
+    public async Task UnSegundoFactorAcertado_DevuelveLosCuposDelSegundoFactor_PorqueSoloCuentanLosIncorrectos()
+    {
+        var e = new EntornoDeIdentidad();
+        var cuenta = e.Cuenta("jefe@example.com", RolDeUsuario.Logistica);
+        var (secreto, respaldo) = e.ConSegundoFactor(cuenta);
+        var ingreso = e.Ingreso();
+        var sujeto = cuenta.Usuario.Id.ToString("N");
+        for (var i = 0; i < 6; i++)
+        {
+            var desafio = (await ingreso.Ingresar(Solicitud("jefe@example.com"))).Valor.Desafio!;
+            var codigo = i % 2 == 0 ? e.Totp(secreto, i) : respaldo[i];
+            e.Reloj.Ahora = EntornoDeIdentidad.Inicio.AddSeconds(31 * i);
+            var resultado = await ingreso.PresentarSegundoFactor(desafio.Identificador, new ValorSecreto(i % 2 == 0 ? e.Totp(secreto) : codigo));
+            Assert.True(resultado.EsExito, $"el ingreso legítimo {i} debe pasar");
+        }
+
+        Assert.Equal(0, e.Limites.Cuenta("segundo-factor-por-origen", sujeto));
+        Assert.Equal(0, e.Limites.Cuenta("segundo-factor-por-cuenta", sujeto));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-21")]
+    public async Task UnDesafioDeConfiguracionRezagado_NoPuedeReemplazarElSecretoDeUnSegundoFactorYaActivo()
+    {
+        var e = new EntornoDeIdentidad();
+        var cuenta = e.Cuenta("jefe@example.com", RolDeUsuario.AdministradorCentral);
+        var ingreso = e.Ingreso();
+        var uno = (await ingreso.Ingresar(Solicitud("jefe@example.com"))).Valor.Desafio!;
+        var dos = (await ingreso.Ingresar(Solicitud("jefe@example.com"))).Valor.Desafio!;
+        await ingreso.IniciarConfiguracionDelSegundoFactor(uno.Identificador);
+        var secreto = e.Secretos.SecretoDelSegundoFactor();
+        Assert.True((await ingreso.ConfirmarElSegundoFactor(uno.Identificador, new ValorSecreto(e.Totp(secreto)))).EsExito);
+        var antes = (await e.SegundoFactor.Obtener(cuenta.Usuario.Id))!.SecretoCifrado;
+
+        var rezagado = await ingreso.IniciarConfiguracionDelSegundoFactor(dos.Identificador);
+
+        Assert.Equal(FallosDeIdentidad.DesafioInvalido, rezagado.Error);
+        Assert.Equal(antes, (await e.SegundoFactor.Obtener(cuenta.Usuario.Id))!.SecretoCifrado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-21")]
+    public async Task CambiarLaContrasenaTemporal_ReleeLaCuentaBajoElBloqueoDeSuFila()
+    {
+        var e = new EntornoDeIdentidad();
+        ConTemporal(e, RolDeUsuario.Cliente);
+        var ingreso = e.Ingreso();
+        var desafio = (await ingreso.Ingresar(Solicitud("nuevo@example.com", "Temporal-de-prueba-0001"))).Valor.Desafio!;
+        var antes = e.Cuentas.Bloqueos;
+
+        await ingreso.CambiarLaContrasenaTemporal(desafio.Identificador, new ValorSecreto("una frase nueva y segura"));
+
+        Assert.True(e.Cuentas.Bloqueos > antes);
+    }
 }

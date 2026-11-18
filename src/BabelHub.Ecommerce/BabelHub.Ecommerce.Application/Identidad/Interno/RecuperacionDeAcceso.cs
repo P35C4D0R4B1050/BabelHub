@@ -80,6 +80,8 @@ public sealed class RecuperacionDeAcceso(
         var cuenta = await cuentas.PorCorreo(normalizado, cancelacion).ConfigureAwait(false);
         if (cuenta is null || !PuedeRecuperar(cuenta))
         {
+            // El mismo costo que la rama elegible (un resumen de contraseña descartado): el tiempo no delata qué cuentas existen ni cuáles pueden recuperar (IDE-17, IDE-65).
+            _ = await hasher.Resumir(nueva, cancelacion).ConfigureAwait(false);
             await eventos.CodigoRechazado(cuenta?.Usuario.Id, ResultadoDelCodigo.NoVigente, cancelacion).ConfigureAwait(false);
             return Resultado<RespuestaUniforme>.Fallo(FallosDeIdentidad.CodigoInvalido);
         }
@@ -100,7 +102,14 @@ public sealed class RecuperacionDeAcceso(
                     return false;
                 }
 
-                var actual = await cuentas.PorId(usuarioId, paraActualizar: true, ct).ConfigureAwait(false) ?? throw new InvalidOperationException("La cuenta desapareció al recuperar el acceso.");
+                var actual = await cuentas.PorId(usuarioId, paraActualizar: true, ct).ConfigureAwait(false);
+                if (actual is null || !PuedeRecuperar(actual))
+                {
+                    // Se desactivó, se canceló o cambió de rol entre la lectura y el bloqueo: no se le define una contraseña nueva.
+                    rechazado = ResultadoDelCodigo.NoVigente;
+                    return false;
+                }
+
                 actual.ResumenDeContrasena = resumen;
                 actual.ContrasenaTemporalHasta = null;
                 actual.DebeCambiarLaContrasena = false;

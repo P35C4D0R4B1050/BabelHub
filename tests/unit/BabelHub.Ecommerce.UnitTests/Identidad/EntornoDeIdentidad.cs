@@ -99,7 +99,7 @@ internal sealed class EntornoDeIdentidad
     }
 
     public RegistroDeCuentas Registro() => new(
-        Cuentas, Hasher, new ListaDeContrasenasDePrueba(), Versiones, Limites, Huellas, Unidad, Pendientes, Carrito, Renovaciones, Auditoria, Codigos, HuellasDeIdentidad, Solicitudes, Cola, Sesiones, Eventos, Alertas, Secretos, Reloj);
+        Cuentas, Hasher, new ListaDeContrasenasDePrueba(), Versiones, Limites, Huellas, Unidad, Pendientes, Carrito, Renovaciones, SegundoFactor, Auditoria, Codigos, HuellasDeIdentidad, Solicitudes, Cola, Sesiones, Eventos, Alertas, Secretos, Reloj);
 
     public SolicitudDeAltaDeCuenta Alta(string correo = "ana@example.com", string nombre = "Ana", string contrasena = ContrasenaSegura, string? terminos = "t1", string? privacidad = "p1", bool mayor = true) =>
         new(nombre, correo, new ValorSecreto(contrasena), terminos, privacidad, mayor);

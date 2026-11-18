@@ -79,6 +79,8 @@ public sealed class Sesiones(
             {
                 if (await renovaciones.PorHuella(huella, ct).ConfigureAwait(false) is { } actual)
                 {
+                    // Bajo el bloqueo de la fila del usuario, como rotar: un cierre no puede correr entre la lectura y la inserción de una rotación y dejar viva la sucesora (D17).
+                    await cuentas.PorId(actual.UsuarioId, paraActualizar: true, ct).ConfigureAwait(false);
                     // Cierra la sesión entera (su familia): la renovación y las que nacieron de sus rotaciones dejan de servir (IDE-14). Repetirlo no cambia nada y no revela si existía.
                     await renovaciones.RevocarFamilia(actual.UsuarioId, actual.Familia, reloj.Ahora, ct).ConfigureAwait(false);
                 }

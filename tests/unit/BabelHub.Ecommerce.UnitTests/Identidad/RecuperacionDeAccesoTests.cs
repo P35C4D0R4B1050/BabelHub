@@ -349,4 +349,30 @@ public sealed class RecuperacionDeAccesoTests
         var ingreso = await e.Ingreso().Ingresar(new SolicitudDeIngreso("ana@example.com", new ValorSecreto(Nueva)));
         Assert.Equal(PasoPendienteDelIngreso.PresentarSegundoFactor, ingreso.Valor.Desafio!.Paso);
     }
+
+    // ---------- Correcciones de la revisión de seguridad ----------
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-16")]
+    public async Task ConfirmarCuestaLoMismoSeaLaCuentaElegibleONo_ElTiempoNoDelataQueCuentasExisten()
+    {
+        var elegible = new EntornoDeIdentidad();
+        elegible.Cuenta("ana@example.com");
+        var recuperacion = elegible.Recuperacion();
+        var codigo = await PedirElCodigo(elegible, recuperacion);
+        var antes = elegible.Hasher.Resumenes;
+        await recuperacion.Confirmar("ana@example.com", new ValorSecreto(codigo), new ValorSecreto(Nueva));
+        var costoElegible = elegible.Hasher.Resumenes - antes;
+
+        var otro = new EntornoDeIdentidad();
+        otro.Cuenta("sin-verificar@example.com", verificada: false);
+        otro.Cuenta("jefe@example.com", RolDeUsuario.Logistica);
+        var r = otro.Recuperacion();
+        foreach (var correo in new[] { "sin-verificar@example.com", "jefe@example.com", "nadie@example.com" })
+        {
+            var inicio = otro.Hasher.Resumenes;
+            await r.Confirmar(correo, new ValorSecreto("123456"), new ValorSecreto(Nueva));
+            Assert.Equal(costoElegible, otro.Hasher.Resumenes - inicio);
+        }
+    }
 }

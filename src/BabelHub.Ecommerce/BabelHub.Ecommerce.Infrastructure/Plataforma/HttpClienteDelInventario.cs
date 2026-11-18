@@ -56,7 +56,8 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
             claveDeIdempotencia: null,
             conOrigen: false,
             _ => true,
-            cancelacion).ConfigureAwait(false);
+            cancelacion,
+            HttpStatusCode.NoContent).ConfigureAwait(false);
         return resultado.Exitosa ? ResultadoDelInventario.Correcta : ComoSinValor(resultado);
     }
 
@@ -110,7 +111,8 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
                     ? registrado
                     : throw new JsonException("El ingreso devuelto no es el pedido.");
             },
-            cancelacion);
+            cancelacion,
+            HttpStatusCode.Created);
     }
 
     public Task<ResultadoDelInventario<IReadOnlyList<IngresoRegistrado>>> ListarIngresos(Guid edicionId, int limite, CancellationToken cancelacion = default)
@@ -155,6 +157,13 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
             conOrigen: false,
             texto =>
             {
+                // Un cuerpo sin la propiedad no es «cero reservas»: una respuesta mal formada (un proxy, otra ruta, otra versión) falla cerrada, no abierta (IDE-27, IDE-70, IDE-84, IDE-88).
+                using var documento = JsonDocument.Parse(texto);
+                if (documento.RootElement.ValueKind != JsonValueKind.Object || !documento.RootElement.TryGetProperty("reservasActivas", out var propiedad) || propiedad.ValueKind != JsonValueKind.Number)
+                {
+                    throw new JsonException("Falta el conteo de reservas activas.");
+                }
+
                 var dto = JsonSerializer.Deserialize<PendientesDeTitularDto>(texto, Json) ?? throw new JsonException("La respuesta no es un conteo de pendientes.");
                 return dto.ReservasActivas >= 0 ? new PendientesDeTitular(dto.ReservasActivas) : throw new JsonException("El conteo no puede ser negativo.");
             },
@@ -177,7 +186,8 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
             claveDeIdempotencia: null,
             conOrigen: false,
             _ => true,
-            cancelacion).ConfigureAwait(false);
+            cancelacion,
+            HttpStatusCode.NoContent).ConfigureAwait(false);
         return resultado.Exitosa ? ResultadoDelInventario.Correcta : ComoSinValor(resultado);
     }
 
@@ -215,7 +225,8 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
         string? claveDeIdempotencia,
         bool conOrigen,
         Func<string, T> leer,
-        CancellationToken cancelacion)
+        CancellationToken cancelacion,
+        HttpStatusCode? exitoDelContrato = null)
         where T : notnull
     {
         using var solicitud = new HttpRequestMessage(metodo, ruta).ConAlcance(alcance);
@@ -248,6 +259,12 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
 
             if (respuesta.IsSuccessStatusCode)
             {
+                // El contrato fija el código de éxito de cada operación (204, 201…): otro 2xx (un proxy, otra ruta) no se da por bueno.
+                if (exitoDelContrato is { } esperado && respuesta.StatusCode != esperado)
+                {
+                    return ResultadoDelInventario<T>.SinRespuesta;
+                }
+
                 if (typeof(T) == typeof(bool))
                 {
                     return (ResultadoDelInventario<T>)(object)ResultadoDelInventario<bool>.ConValor(true);

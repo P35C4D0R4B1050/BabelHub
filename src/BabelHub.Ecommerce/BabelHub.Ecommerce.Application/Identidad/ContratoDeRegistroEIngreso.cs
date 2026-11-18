@@ -14,8 +14,11 @@ public interface IRegistroDeCuentas
     /// </summary>
     Task<Resultado<RespuestaUniforme>> Registrar(SolicitudDeAltaDeCuenta solicitud, CancellationToken cancelacion = default);
 
-    /// <summary>Marca el correo como verificado si el código es el correcto y vigente, y emite la credencial con ese dato (IDE-16). Cualquier fallo es genérico (IDE-19).</summary>
-    Task<Resultado<CredencialDeSesion>> VerificarCorreo(string correo, ValorSecreto codigo, CancellationToken cancelacion = default);
+    /// <summary>
+    /// Marca el correo como verificado si el código es el correcto y vigente y emite la credencial con ese dato (IDE-16). <b>Si la cuenta tiene el segundo factor activo</b> (IDE-37 no exige el correo verificado) verifica el correo pero
+    /// <b>no emite sesión</b>: el resultado no trae credencial y la persona debe ingresar con su contraseña y su segundo factor (IDE-50). Cualquier fallo es genérico (IDE-19).
+    /// </summary>
+    Task<Resultado<ResultadoDelIngreso>> VerificarCorreo(string correo, ValorSecreto codigo, CancellationToken cancelacion = default);
 
     /// <summary>Envía un código nuevo al correo de una cuenta sin verificar, con el límite de SEG-19; responde lo mismo exista o no la cuenta (IDE-56, IDE-65).</summary>
     Task<Resultado<RespuestaUniforme>> ReenviarCodigo(string correo, CancellationToken cancelacion = default);

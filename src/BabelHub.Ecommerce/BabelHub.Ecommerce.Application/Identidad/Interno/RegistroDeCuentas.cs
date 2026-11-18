@@ -26,6 +26,16 @@ public static class EntradasDeIdentidad
             return false;
         }
 
+        // La misma regla que el correo de un código (SEG-28): una cuenta cuyo correo no admite un código sería imposible de verificar y generaría alertas en cada intento.
+        try
+        {
+            _ = CorreoDeCodigo.ParaElTitular(texto, Plataforma.PropositoDeCodigo.VerificacionDeCuenta, new ValorSecreto("000000"));
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+
         normalizado = texto;
         return true;
     }
@@ -86,6 +96,7 @@ public sealed class RegistroDeCuentas(
     IPendientesDeCuenta pendientes,
     ICarritoDeCuentaReemplazada carrito,
     IRepositorioDeRenovaciones renovaciones,
+    ISegundoFactorAlmacen segundoFactor,
     IAuditoria auditoria,
     ICodigosDeUnSoloUso codigos,
     IHuellasDeIdentidad huellasDeIdentidad,
@@ -163,40 +174,66 @@ public sealed class RegistroDeCuentas(
         return Resultado<RespuestaUniforme>.Exito(new RespuestaUniforme());
     }
 
-    public async Task<Resultado<CredencialDeSesion>> VerificarCorreo(string correo, ValorSecreto codigo, CancellationToken cancelacion = default)
+    public async Task<Resultado<ResultadoDelIngreso>> VerificarCorreo(string correo, ValorSecreto codigo, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(codigo);
         if (!EntradasDeIdentidad.TryNormalizarElCorreo(correo, out var normalizado) || !CodigoDeUnSoloUso.TieneLaForma(codigo.Revelar()))
         {
-            return Resultado<CredencialDeSesion>.Fallo(FallosDeIdentidad.CodigoInvalido);
+            return Resultado<ResultadoDelIngreso>.Fallo(FallosDeIdentidad.CodigoInvalido);
         }
 
         var cuenta = await cuentas.PorCorreo(normalizado, cancelacion).ConfigureAwait(false);
-        if (cuenta is null || cuenta.Usuario.CorreoVerificado || !cuenta.Usuario.Activo || cuenta.CanceladaEn is not null)
+        if (cuenta is null || !PuedeVerificar(cuenta))
         {
             await eventos.CodigoRechazado(cuenta?.Usuario.Id, ResultadoDelCodigo.NoVigente, cancelacion).ConfigureAwait(false);
-            return Resultado<CredencialDeSesion>.Fallo(FallosDeIdentidad.CodigoInvalido);
+            return Resultado<ResultadoDelIngreso>.Fallo(FallosDeIdentidad.CodigoInvalido);
         }
 
-        var huella = huellasDeIdentidad.DeCodigo(cuenta.Usuario.Id, PropositoDeCodigo.VerificacionDeCorreo, codigo.Revelar());
-        var resultado = await codigos.Verificar(cuenta.Usuario.Id, PropositoDeCodigo.VerificacionDeCorreo, huella, reloj.Ahora, cancelacion).ConfigureAwait(false);
-        if (resultado != ResultadoDelCodigo.Correcto)
-        {
-            await eventos.CodigoRechazado(cuenta.Usuario.Id, resultado, cancelacion).ConfigureAwait(false);
-            return Resultado<CredencialDeSesion>.Fallo(FallosDeIdentidad.CodigoInvalido);
-        }
+        var usuarioId = cuenta.Usuario.Id;
+        var huella = huellasDeIdentidad.DeCodigo(usuarioId, PropositoDeCodigo.VerificacionDeCorreo, codigo.Revelar());
+        ResultadoDelCodigo? rechazado = null;
 
-        var sesion = await unidad.Ejecutar(
+        // El intento y el consumo del código, marcar el correo y emitir la sesión son UNA transacción (como en la recuperación): si algo falla después de consumir el código, se revierte entera.
+        var resultado = await unidad.Ejecutar(
             async ct =>
             {
-                var actual = await cuentas.PorId(cuenta.Usuario.Id, paraActualizar: true, ct).ConfigureAwait(false) ?? throw new InvalidOperationException("La cuenta desapareció al verificar.");
+                var verificacion = await codigos.Verificar(usuarioId, PropositoDeCodigo.VerificacionDeCorreo, huella, reloj.Ahora, ct).ConfigureAwait(false);
+                if (verificacion != ResultadoDelCodigo.Correcto)
+                {
+                    rechazado = verificacion;
+                    return null;
+                }
+
+                var actual = await cuentas.PorId(usuarioId, paraActualizar: true, ct).ConfigureAwait(false);
+                if (actual is null || !PuedeVerificar(actual))
+                {
+                    rechazado = ResultadoDelCodigo.NoVigente;
+                    return null;
+                }
+
                 actual.Usuario.VerificarCorreo();
                 await cuentas.Guardar(actual, ct).ConfigureAwait(false);
-                return await sesiones.Nueva(actual.Usuario, reloj.Ahora, ct).ConfigureAwait(false);
+
+                // Con el segundo factor activo el correo queda verificado pero NO se emite sesión: solo ingresando con contraseña y segundo factor (IDE-50).
+                if (await segundoFactor.Obtener(usuarioId, ct).ConfigureAwait(false) is { Factor.EstaActivo: true })
+                {
+                    return new ResultadoDelIngreso();
+                }
+
+                return new ResultadoDelIngreso { Credencial = await sesiones.Nueva(actual.Usuario, reloj.Ahora, ct).ConfigureAwait(false) };
             },
             cancelacion).ConfigureAwait(false);
-        return Resultado<CredencialDeSesion>.Exito(sesion);
+
+        if (resultado is null)
+        {
+            await eventos.CodigoRechazado(usuarioId, rechazado!.Value, cancelacion).ConfigureAwait(false);
+            return Resultado<ResultadoDelIngreso>.Fallo(FallosDeIdentidad.CodigoInvalido);
+        }
+
+        return Resultado<ResultadoDelIngreso>.Exito(resultado);
     }
+
+    private static bool PuedeVerificar(CuentaDeIdentidad cuenta) => cuenta is { CanceladaEn: null, Usuario: { CorreoVerificado: false, Activo: true } };
 
     public async Task<Resultado<RespuestaUniforme>> ReenviarCodigo(string correo, CancellationToken cancelacion = default)
     {
@@ -233,6 +270,12 @@ public sealed class RegistroDeCuentas(
 
         try
         {
+            // Se relee bajo el bloqueo de la fila y se repiten las condiciones: si el titular verificó su correo entre la lectura y ahora, no se elimina una cuenta ya verificada (IDE-84).
+            if (await cuentas.PorId(existente.Usuario.Id, paraActualizar: true, cancelacion).ConfigureAwait(false) is not { CanceladaEn: null, Usuario: { Rol: RolDeUsuario.Cliente, CorreoVerificado: false, Activo: true } })
+            {
+                return false;
+            }
+
             if (await pendientes.Contar(existente.Usuario.Id, cancelacion).ConfigureAwait(false) != 0)
             {
                 return false;
@@ -248,7 +291,8 @@ public sealed class RegistroDeCuentas(
         }
         catch (Exception ex) when (ex is not ReemplazoNoRealizableException && !cancelacion.IsCancellationRequested)
         {
-            // Un puerto que no responde, el carrito que no se puede eliminar o la auditoría caída: no se reemplaza nada y el rechazo es el mismo de IDE-13 (IDE-88).
+            // Un puerto que no responde, el carrito que no se puede eliminar o la auditoría caída: no se reemplaza nada y el rechazo es el mismo de IDE-13 (IDE-88); la causa no se pierde: queda una alerta técnica.
+            await AlertarCanalLleno().ConfigureAwait(false);
             throw new ReemplazoNoRealizableException();
         }
     }

@@ -67,27 +67,39 @@ public sealed class CuotaDeCorreo(PoliticaDeCuotaDeCorreo politica, IAlmacenDeCu
         Decidir(ClaseDeCorreoParaCuota.Codigo, motivo: null, servicio: null, cancelacion);
 
     /// <summary>Devuelve el lugar de un envío que falló: la cuota solo cuenta lo que salió (IDE-66).</summary>
-    public Task Devolver(ReservaDeCupoDeCorreo reserva, CancellationToken cancelacion = default)
+    public async Task Devolver(ReservaDeCupoDeCorreo reserva, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(reserva);
-        return almacen.Devolver(reloj.HoyEnLima, reserva.Cupo, cancelacion);
+        var dia = reloj.HoyEnLima;
+        await almacen.Devolver(dia, reserva.Cupo, cancelacion).ConfigureAwait(false);
+        if (reserva.MotivoDelTope is { } motivo && reserva.ServicioDelTope is { } servicio)
+        {
+            await almacen.DevolverAlertaDeAdministracion(dia, motivo, servicio, cancelacion).ConfigureAwait(false);
+        }
     }
 
     private async Task<DecisionDeSalidaDeCorreo> Decidir(ClaseDeCorreoParaCuota clase, string? motivo, string? servicio, CancellationToken cancelacion)
     {
         var dia = reloj.HoyEnLima;
-        if (clase == ClaseDeCorreoParaCuota.AlertaALaAdministracion
-            && !await almacen.ReservarAlertaDeAdministracion(dia, motivo!, servicio!, politica.Configuracion.TopeDeAlertasPorMotivoYServicio, cancelacion).ConfigureAwait(false))
-        {
-            return DecisionDeSalidaDeCorreo.Suprime();
-        }
-
         var reserva = await almacen.Reservar(dia, politica.Candidatos(clase), cancelacion).ConfigureAwait(false);
         if (reserva is null)
         {
+            // Sin cupo no se gasta el tope: lo que se encola lo cuenta cuando sale (IDE-80, IDE-82).
             return PoliticaDeCuotaDeCorreo.SinCupo(clase) == SinCupoDeCorreo.Encolar
                 ? DecisionDeSalidaDeCorreo.Encola(PoliticaDeCuotaDeCorreo.Prioridad(clase))
                 : DecisionDeSalidaDeCorreo.Suprime();
+        }
+
+        if (clase == ClaseDeCorreoParaCuota.AlertaALaAdministracion)
+        {
+            // El tope por motivo y servicio se cuenta solo después de tener cupo; si ya se llegó al tope, se devuelve el cupo y la alerta queda en la lista sin salir por correo (IDE-82).
+            if (!await almacen.ReservarAlertaDeAdministracion(dia, motivo!, servicio!, politica.Configuracion.TopeDeAlertasPorMotivoYServicio, cancelacion).ConfigureAwait(false))
+            {
+                await almacen.Devolver(dia, reserva.Cupo, cancelacion).ConfigureAwait(false);
+                return DecisionDeSalidaDeCorreo.Suprime();
+            }
+
+            reserva = reserva with { MotivoDelTope = motivo, ServicioDelTope = servicio };
         }
 
         await AlertarSiCruzaElUmbral(reserva).ConfigureAwait(false);

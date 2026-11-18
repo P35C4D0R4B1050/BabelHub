@@ -100,11 +100,21 @@ internal sealed class UnidadDeTrabajoEnMemoria(BdIdentidad bd) : IUnidadDeTrabaj
 
 internal sealed class RepositorioDeCuentasEnMemoria(BdIdentidad bd) : IRepositorioDeCuentas
 {
+    /// <summary>Cuántas veces se leyó una cuenta tomando el bloqueo de su fila (<c>FOR UPDATE</c>).</summary>
+    public int Bloqueos { get; private set; }
+
     public Task<CuentaDeIdentidad?> PorCorreo(string correoNormalizado, CancellationToken cancelacion = default) =>
         Task.FromResult(bd.Cuentas.Values.FirstOrDefault(c => c.Usuario.Correo == correoNormalizado));
 
-    public Task<CuentaDeIdentidad?> PorId(Guid usuarioId, bool paraActualizar = false, CancellationToken cancelacion = default) =>
-        Task.FromResult(bd.Cuentas.GetValueOrDefault(usuarioId));
+    public Task<CuentaDeIdentidad?> PorId(Guid usuarioId, bool paraActualizar = false, CancellationToken cancelacion = default)
+    {
+        if (paraActualizar)
+        {
+            Bloqueos++;
+        }
+
+        return Task.FromResult(bd.Cuentas.GetValueOrDefault(usuarioId));
+    }
 
     public Task<bool> Insertar(CuentaDeIdentidad cuenta, CancellationToken cancelacion = default)
     {

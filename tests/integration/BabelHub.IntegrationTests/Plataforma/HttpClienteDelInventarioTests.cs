@@ -531,6 +531,40 @@ public sealed class HttpClienteDelInventarioTests
         Assert.True(servidor.Rutas.Count < 6, "Con el cortacircuitos abierto las llamadas ya no salen.");
     }
 
+    // ---------- Falla cerrada ante una respuesta que no es la del contrato (revisión de seguridad) ----------
+
+    [Theory]
+    [Trait("Criterio", "AC-IDE-57")]
+    [InlineData("{}")]
+    [InlineData("{\"otro\":1}")]
+    [InlineData("{\"reservasActivas\":\"2\"}")]
+    [InlineData("[]")]
+    public async Task ConsultarPendientes_ConUnCuerpoSinElConteo_EsNoDisponible_NuncaCeroReservas(string cuerpo)
+    {
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json(cuerpo)));
+        var (cliente, _) = Crear(servidor);
+
+        var resultado = await cliente.ConsultarPendientes(Guid.NewGuid());
+
+        Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, resultado.Estado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-53")]
+    public async Task UnCodigoDeExitoQueNoEsElDelContrato_NoSeDaPorBueno()
+    {
+        var edicion = Guid.NewGuid();
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(Ingreso(edicion), Encoding.UTF8, "application/json") }));
+        var (cliente, _) = Crear(servidor);
+
+        var baja = await cliente.DarDeBajaAlTitular(Guid.NewGuid());
+        var edicionRegistrada = await cliente.RegistrarEdicion(new EdicionARegistrar(Guid.NewGuid(), "impreso"));
+        var ingreso = await cliente.RegistrarIngreso(new IngresoARegistrar(edicion, null, 5, null, null), Clave);
+
+        Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, baja.Estado);
+        Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, edicionRegistrada.Estado);
+        Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, ingreso.Estado);
+    }
     [Fact]
     public void ElNombreDelClienteEsElQueRecibeElTokenDeLaSesion() =>
         Assert.Equal(TokenDelUsuarioDeLaSesionExtensiones.ClienteDelInventario, HttpClienteDelInventario.NombreDelCliente);

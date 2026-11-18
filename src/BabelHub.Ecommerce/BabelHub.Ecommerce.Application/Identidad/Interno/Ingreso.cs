@@ -143,7 +143,7 @@ public sealed class Ingreso(
         }
 
         var usuarioId = cuenta.Usuario.Id;
-        var rechazo = await ReservarLosLimitesDelSegundoFactor(usuarioId, cancelacion).ConfigureAwait(false);
+        var (rechazo, reservas) = await ReservarLosLimitesDelSegundoFactor(usuarioId, cancelacion).ConfigureAwait(false);
         if (rechazo is not null)
         {
             return Resultado<ResultadoDelIngreso>.Fallo(rechazo);
@@ -231,6 +231,11 @@ public sealed class Ingreso(
             await eventos.SegundoFactorFallido(usuarioId, cancelacion).ConfigureAwait(false);
         }
 
+        if (resultado.EsExito)
+        {
+            await DevolverLosCupos(reservas, cancelacion).ConfigureAwait(false);
+        }
+
         return resultado;
     }
 
@@ -240,6 +245,12 @@ public sealed class Ingreso(
         var vigente = await DesafioVigente(desafio, AccionConDesafio.ConfigurarSegundoFactor, cancelacion).ConfigureAwait(false);
         var cuenta = vigente is null ? null : await cuentas.PorId(vigente.UsuarioId, cancelacion: cancelacion).ConfigureAwait(false);
         if (cuenta is not { CanceladaEn: null, Usuario.Activo: true })
+        {
+            return Resultado<SecretoDelSegundoFactor>.Fallo(FallosDeIdentidad.DesafioInvalido);
+        }
+
+        // Un desafío de configuración rezagado no puede reemplazar el secreto de un segundo factor que otro ingreso ya activó (IDE-21).
+        if (await segundoFactor.Obtener(cuenta.Usuario.Id, cancelacion).ConfigureAwait(false) is { Factor.EstaActivo: true })
         {
             return Resultado<SecretoDelSegundoFactor>.Fallo(FallosDeIdentidad.DesafioInvalido);
         }
@@ -261,7 +272,7 @@ public sealed class Ingreso(
         }
 
         var usuarioId = cuenta.Usuario.Id;
-        var rechazo = await ReservarLosLimitesDelSegundoFactor(usuarioId, cancelacion).ConfigureAwait(false);
+        var (rechazo, reservas) = await ReservarLosLimitesDelSegundoFactor(usuarioId, cancelacion).ConfigureAwait(false);
         if (rechazo is not null)
         {
             return Resultado<ResultadoDelIngreso>.Fallo(rechazo);
@@ -283,7 +294,7 @@ public sealed class Ingreso(
             return Resultado<ResultadoDelIngreso>.Fallo(confirmacion == ResultadoDeSegundoFactor.YaActivo ? FallosDeIdentidad.DesafioInvalido : FallosDeIdentidad.CodigoInvalido);
         }
 
-        return await unidad.Ejecutar(
+        var confirmada = await unidad.Ejecutar(
             async ct =>
             {
                 if (!vigente!.Consumir(ahora, AccionConDesafio.ConfigurarSegundoFactor) || !await desafios.MarcarUsado(vigente.Id, ct).ConfigureAwait(false))
@@ -299,6 +310,13 @@ public sealed class Ingreso(
                 return Resultado<ResultadoDelIngreso>.Exito(new ResultadoDelIngreso { Credencial = credencial, CodigosDeRespaldo = [.. respaldo.Select(c => new ValorSecreto(c))] });
             },
             cancelacion).ConfigureAwait(false);
+
+        if (confirmada.EsExito)
+        {
+            await DevolverLosCupos(reservas, cancelacion).ConfigureAwait(false);
+        }
+
+        return confirmada;
     }
 
     public async Task<Resultado<ResultadoDelIngreso>> CambiarLaContrasenaTemporal(ValorSecreto desafio, ValorSecreto contrasenaNueva, CancellationToken cancelacion = default)
@@ -326,26 +344,41 @@ public sealed class Ingreso(
         }
 
         var resumen = await hasher.Resumir(nueva, cancelacion).ConfigureAwait(false);
-        var resultado = await unidad.Ejecutar(
-            async ct =>
-            {
-                if (!vigente!.Consumir(ahora, AccionConDesafio.CambiarContrasenaTemporal) || !await desafios.MarcarUsado(vigente.Id, ct).ConfigureAwait(false))
+        Resultado<ResultadoDelIngreso> resultado;
+        try
+        {
+            resultado = await unidad.Ejecutar(
+                async ct =>
                 {
-                    return Resultado<ResultadoDelIngreso>.Fallo(FallosDeIdentidad.DesafioInvalido);
-                }
-
-                cuenta.ResumenDeContrasena = resumen;
-                cuenta.ContrasenaTemporalHasta = null;
-                cuenta.DebeCambiarLaContrasena = false;
-                cuenta.Usuario.AvanzarElCorteDeSesiones(ahora);
-                await cuentas.Guardar(cuenta, ct).ConfigureAwait(false);
-                await renovaciones.RevocarTodas(cuenta.Usuario.Id, ahora, ct).ConfigureAwait(false);
-                await auditoria.Registrar(
-                    new SolicitudDeRegistro(AccionesAuditables.ContrasenaCambiada) { ObjetoTipo = "cuenta", ObjetoId = cuenta.Usuario.Id.ToString("D"), Motivo = "cambio-por-el-titular" },
-                    ct).ConfigureAwait(false);
-                return Resultado<ResultadoDelIngreso>.Exito(await SiguientePaso(cuenta, vigente.Creado, ct).ConfigureAwait(false));
-            },
-            cancelacion).ConfigureAwait(false);
+                    if (!vigente!.Consumir(ahora, AccionConDesafio.CambiarContrasenaTemporal) || !await desafios.MarcarUsado(vigente.Id, ct).ConfigureAwait(false))
+                    {
+                        return Resultado<ResultadoDelIngreso>.Fallo(FallosDeIdentidad.DesafioInvalido);
+                    }
+    
+                    // Se relee bajo el bloqueo de la fila: un cambio de la administración (desactivar, restablecer) entre la lectura y ahora no se pisa (IDE-08, IDE-44).
+                    var actual = await cuentas.PorId(cuenta.Usuario.Id, paraActualizar: true, ct).ConfigureAwait(false);
+                    if (actual is not { CanceladaEn: null, Usuario.Activo: true, DebeCambiarLaContrasena: true })
+                    {
+                        throw new DesafioYaConsumidoException();
+                    }
+    
+                    actual.ResumenDeContrasena = resumen;
+                    actual.ContrasenaTemporalHasta = null;
+                    actual.DebeCambiarLaContrasena = false;
+                    actual.Usuario.AvanzarElCorteDeSesiones(ahora);
+                    await cuentas.Guardar(actual, ct).ConfigureAwait(false);
+                    await renovaciones.RevocarTodas(actual.Usuario.Id, ahora, ct).ConfigureAwait(false);
+                    await auditoria.Registrar(
+                        new SolicitudDeRegistro(AccionesAuditables.ContrasenaCambiada) { ObjetoTipo = "cuenta", ObjetoId = actual.Usuario.Id.ToString("D"), Motivo = "cambio-por-el-titular" },
+                        ct).ConfigureAwait(false);
+                    return Resultado<ResultadoDelIngreso>.Exito(await SiguientePaso(actual, vigente.Creado, ct).ConfigureAwait(false));
+                },
+                cancelacion).ConfigureAwait(false);
+        }
+        catch (DesafioYaConsumidoException)
+        {
+            return Resultado<ResultadoDelIngreso>.Fallo(FallosDeIdentidad.DesafioInvalido);
+        }
 
         if (resultado.EsExito)
         {
@@ -401,16 +434,36 @@ public sealed class Ingreso(
         return desafio is not null && desafio.Evaluar(reloj.Ahora) == EstadoDelDesafio.Vigente && desafio.Permite(accion) ? desafio : null;
     }
 
-    private async Task<ErrorDeAplicacion?> ReservarLosLimitesDelSegundoFactor(Guid usuarioId, CancellationToken cancelacion)
+    /// <summary>Reserva los dos cupos del segundo factor (SEG-20, SEG-29) y devuelve los reservados: se devuelven al acertar, porque los límites cuentan los códigos <b>incorrectos</b>.</summary>
+    private async Task<(ErrorDeAplicacion? Error, List<ReservaDeLimite> Reservas)> ReservarLosLimitesDelSegundoFactor(Guid usuarioId, CancellationToken cancelacion)
     {
+        var reservas = new List<ReservaDeLimite>();
         var sujeto = usuarioId.ToString("N");
         var porOrigen = await limites.Reservar(PoliticasDeLimite.SegundoFactorPorOrigen, sujeto, cancelacion: cancelacion).ConfigureAwait(false);
         if (LimitesDeIdentidad.Rechazo(porOrigen) is { } rechazoPorOrigen)
         {
-            return rechazoPorOrigen;
+            return (rechazoPorOrigen, reservas);
+        }
+
+        if (porOrigen.Reserva is { } reservaPorOrigen)
+        {
+            reservas.Add(reservaPorOrigen);
         }
 
         var porCuenta = await limites.Reservar(PoliticasDeLimite.SegundoFactorPorCuenta, sujeto, cancelacion: cancelacion).ConfigureAwait(false);
-        return LimitesDeIdentidad.Rechazo(porCuenta);
+        if (porCuenta.Reserva is { } reservaPorCuenta)
+        {
+            reservas.Add(reservaPorCuenta);
+        }
+
+        return (LimitesDeIdentidad.Rechazo(porCuenta), reservas);
+    }
+
+    private async Task DevolverLosCupos(IEnumerable<ReservaDeLimite> reservas, CancellationToken cancelacion)
+    {
+        foreach (var reserva in reservas)
+        {
+            await limites.Liberar(reserva, cancelacion).ConfigureAwait(false);
+        }
     }
 }

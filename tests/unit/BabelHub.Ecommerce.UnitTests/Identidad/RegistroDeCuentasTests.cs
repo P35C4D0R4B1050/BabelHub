@@ -273,8 +273,8 @@ public sealed class RegistroDeCuentasTests
         var resultado = await registro.VerificarCorreo("ana@example.com", new ValorSecreto(e.UltimoCodigoEnviado()));
 
         Assert.True(resultado.EsExito);
-        Assert.True(resultado.Valor.CorreoVerificado);
-        Assert.Equal(RolDeCuenta.Cliente, resultado.Valor.Rol);
+        Assert.True(resultado.Valor.Credencial!.CorreoVerificado);
+        Assert.Equal(RolDeCuenta.Cliente, resultado.Valor.Credencial.Rol);
         Assert.True(Assert.Single(e.Bd.Cuentas.Values).Usuario.CorreoVerificado);
         var datos = Assert.Single(e.Emisor.Emitidas);
         Assert.True(datos.CorreoVerificado);
@@ -492,5 +492,57 @@ public sealed class RegistroDeCuentasTests
 
         Assert.Equal(FallosDeIdentidad.CodigoInvalido, viejo.Error);
         Assert.All(e.Correo.Codigos, c => Assert.Equal("ana@example.com", c.Destinatario));
+    }
+
+    // ---------- Correcciones de la revisión de seguridad ----------
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-14")]
+    public async Task ConElSegundoFactorActivo_ElCorreoSeVerificaPeroNoSeEmiteSesion()
+    {
+        var e = new EntornoDeIdentidad();
+        var cuenta = e.Cuenta("ana@example.com", verificada: false);
+        e.ConSegundoFactor(cuenta);
+        var registro = e.Registro();
+        await registro.ReenviarCodigo("ana@example.com");
+        await e.ProcesarLaCola();
+
+        var resultado = await registro.VerificarCorreo("ana@example.com", new ValorSecreto(e.UltimoCodigoEnviado()));
+
+        Assert.True(resultado.EsExito);
+        Assert.Null(resultado.Valor.Credencial);
+        Assert.Null(resultado.Valor.Desafio);
+        Assert.True(cuenta.Usuario.CorreoVerificado);
+        Assert.Empty(e.Emisor.Emitidas);
+        Assert.Empty(e.Bd.Renovaciones);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-IDE-01")]
+    [InlineData("a@b")]
+    [InlineData("a@b.")]
+    public async Task UnCorreoQueNoAdmiteUnCodigo_SeRechazaAlRegistrar_PorqueNuncaSePodriaVerificar(string correo)
+    {
+        var e = new EntornoDeIdentidad();
+
+        var resultado = await e.Registro().Registrar(e.Alta(correo));
+
+        Assert.Equal("correo", resultado.Error!.Errores[0].Campo);
+        Assert.True(EntradasDeIdentidad.TryNormalizarElCorreo("ana@example.com", out _));
+        Assert.Empty(e.Bd.Cuentas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-63")]
+    public async Task UnaFallaDeUnPuertoDelReemplazo_DejaUnaAlertaTecnica_ElRechazoSigueSiendoElMismo()
+    {
+        var e = new EntornoDeIdentidad();
+        e.Cuenta("ana@example.com", verificada: false);
+        e.Pendientes.Falla = true;
+
+        var resultado = await e.Registro().Registrar(e.Alta("ana@example.com"));
+
+        Assert.Equal("correo-en-uso", resultado.Error!.Clave);
+        Assert.Contains(e.Alertas.Alertas, a => a.Motivo == EmisionDeCodigos.MotivoDeFallaDelCorreo);
     }
 }

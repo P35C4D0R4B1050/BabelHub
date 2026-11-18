@@ -296,4 +296,17 @@ public sealed class RenovacionYCierreDeSesionesTests
         Assert.All(e.Bd.Renovaciones, r => Assert.NotNull(r.RevocadaEn));
         Assert.Equal(EntornoDeIdentidad.Inicio, cuenta.Usuario.SesionesValidasDesde);
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-12")]
+    public async Task CerrarSesion_TomaElBloqueoDeLaFilaDelUsuario_ComoRotar_ParaQueNoCorraEntreLaLecturaYLaInsercionDeUnaRotacion()
+    {
+        var e = new EntornoDeIdentidad();
+        var (sesion, _) = await Ingresar(e);
+        var antes = e.Cuentas.Bloqueos;
+
+        await e.Gestor().Cerrar(sesion.Renovacion);
+
+        Assert.True(e.Cuentas.Bloqueos > antes);
+    }
 }
