@@ -3,6 +3,7 @@ using BabelHub.Inventario.Infrastructure.Ajustes;
 using BabelHub.Inventario.Infrastructure.Fuentes;
 using BabelHub.Inventario.Infrastructure.Plataforma;
 using BabelHub.Inventario.Infrastructure.Reservas;
+using BabelHub.Inventario.Infrastructure.Traslados;
 using BabelHub.IntegrationTests.Fuentes;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -77,6 +78,13 @@ public sealed class PostgresDeReservasFixture : IAsyncLifetime
         await Ejecutar(DefinicionDeAjustes.FuncionesDeDepuracion);
         await Ejecutar(DefinicionDeAjustes.Permisos);
 
+        // El esquema de Traslados: rol, tablas con su política de filas, tablas del propietario y permisos mínimos.
+        await Ejecutar(DefinicionDeTraslados.Rol);
+        await Ejecutar("GRANT rol_traslados TO acceso;");
+        await Ejecutar(DefinicionDeTraslados.Sql);
+        await Ejecutar("ALTER SCHEMA traslados OWNER TO propietario; ALTER TABLE traslados.traslados OWNER TO propietario; ALTER TABLE traslados.mensajes_salientes OWNER TO propietario;");
+        await Ejecutar(DefinicionDeTraslados.Permisos);
+
         Depuracion = NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString()) { Username = "depurador", ["Password"] = ClaveDeAcceso }.ConnectionString);
 
         Acceso = NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString())
@@ -124,7 +132,7 @@ public sealed class PostgresDeReservasFixture : IAsyncLifetime
         """
         ALTER TABLE ajustes.ajustes DISABLE TRIGGER ajustes_solo_insercion_por_sentencia;
         ALTER TABLE ajustes.ingresos DISABLE TRIGGER ingresos_solo_insercion_por_sentencia;
-        TRUNCATE ajustes.ajustes, ajustes.ingresos, ajustes.operaciones_idempotentes, reservas.reserva_lineas, reservas.reservas, reservas.operaciones_idempotentes, reservas.bajas_recibidas, plataforma.eventos_limite, fuentes.stock, fuentes.rutas, fuentes.ediciones, fuentes.fuentes CASCADE;
+        TRUNCATE traslados.traslados, traslados.mensajes_salientes, ajustes.ajustes, ajustes.ingresos, ajustes.operaciones_idempotentes, reservas.reserva_lineas, reservas.reservas, reservas.operaciones_idempotentes, reservas.bajas_recibidas, plataforma.eventos_limite, fuentes.stock, fuentes.rutas, fuentes.ediciones, fuentes.fuentes CASCADE;
         ALTER TABLE ajustes.ajustes ENABLE ALWAYS TRIGGER ajustes_solo_insercion_por_sentencia;
         ALTER TABLE ajustes.ingresos ENABLE ALWAYS TRIGGER ingresos_solo_insercion_por_sentencia;
         """);
