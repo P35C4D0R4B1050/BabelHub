@@ -126,6 +126,42 @@ internal sealed class RepositorioDeTrasladosEnMemoria : IRepositorioDeTraslados
         Task.FromResult<IReadOnlyList<Traslado>>([.. _guardados.Values.Where(t => t.PedidoId == pedidoId).OrderByDescending(t => t.SolicitadoEn).ThenByDescending(t => t.Id).Select(Copiar)]);
 
 
+    public int Anonimizaciones { get; private set; }
+
+    public Task<IReadOnlyList<Guid>> VinculadosSinAprobarVencidos(DateTimeOffset solicitadosAntesDe, int maximo, CancellationToken cancelacion = default)
+    {
+        LecturasBloqueadas++;
+        return Task.FromResult<IReadOnlyList<Guid>>([.. _guardados.Values
+            .Where(t => t.EsVinculado && t.Estado == EstadoDeTraslado.Solicitado && t.SolicitadoEn < solicitadosAntesDe && t.AlertaDeDemoraEn is null)
+            .OrderBy(t => t.Id).Take(maximo).Select(t => t.Id)]);
+    }
+
+    public Task<bool> MarcarAlertaDeDemora(Guid trasladoId, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        if (!_guardados.TryGetValue(trasladoId, out var t) || t.Estado != EstadoDeTraslado.Solicitado || t.AlertaDeDemoraEn is not null)
+        {
+            return Task.FromResult(false);
+        }
+
+        _guardados[trasladoId] = Traslado.Rehidratar(t.Id, t.Numero, t.EdicionId, t.OrigenId, t.DestinoId, t.Cantidad, t.Estado, t.Motivo, t.MotivoDeCierre, t.PedidoId, t.PedidoAnulado, t.FechaEstimada, t.EstimadaPorConfirmar, t.Guia, t.SolicitadoPor, t.SolicitadoEn, t.AprobadoEn, t.DespachadoEn, t.RecibidoEn, t.CerradoEn, ahora, t.Version);
+        return Task.FromResult(true);
+    }
+
+    public Task<int> AnonimizarCerrados(DateTimeOffset cerradosAntesDe, int lote, CancellationToken cancelacion = default)
+    {
+        var cambiar = _guardados.Values
+            .Where(t => t.CerradoEn < cerradosAntesDe && (t.SolicitadoPor is not null || t.Motivo is not null || t.MotivoDeCierre is not null || t.Guia is not null))
+            .OrderBy(t => t.CerradoEn).Take(lote).ToList();
+        foreach (var t in cambiar)
+        {
+            _guardados[t.Id] = Traslado.Rehidratar(t.Id, t.Numero, t.EdicionId, t.OrigenId, t.DestinoId, t.Cantidad, t.Estado, null, null, t.PedidoId, t.PedidoAnulado, t.FechaEstimada, t.EstimadaPorConfirmar, null, null, t.SolicitadoEn, t.AprobadoEn, t.DespachadoEn, t.RecibidoEn, t.CerradoEn, t.AlertaDeDemoraEn, t.Version);
+        }
+
+        Anonimizaciones += cambiar.Count;
+        return Task.FromResult(cambiar.Count);
+    }
+
+
     public static Traslado Copiar(Traslado t) =>
         Traslado.Rehidratar(
             t.Id, t.Numero, t.EdicionId, t.OrigenId, t.DestinoId, t.Cantidad, t.Estado, t.Motivo, t.MotivoDeCierre, t.PedidoId, t.PedidoAnulado, t.FechaEstimada, t.EstimadaPorConfirmar, t.Guia, t.SolicitadoPor, t.SolicitadoEn,

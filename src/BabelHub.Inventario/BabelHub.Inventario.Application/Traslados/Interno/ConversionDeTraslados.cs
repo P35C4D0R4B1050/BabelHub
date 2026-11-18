@@ -139,6 +139,8 @@ internal static class ConversionDeTraslados
         new(Guid.NewGuid(), TiposDeMensaje.EstadoDePedido, clave, codigoDeDestino, Serializar(
             ("pedidoId", traslado.PedidoId!.Value.ToString("D")),
             ("trasladoId", traslado.Id.ToString("D")),
+            ("edicionId", traslado.EdicionId.ToString("D")),
+            ("cantidad", traslado.Cantidad),
             ("estado", estado),
             ("fechaEstimadaDeLlegada", traslado.FechaEstimada?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
             ("estimadaPorConfirmar", traslado.EstimadaPorConfirmar),

@@ -100,6 +100,7 @@ public static class DefinicionDeTraslados
             proxima_fecha timestamptz NOT NULL,
             arrendado_hasta timestamptz NULL,
             motivo_de_fallo text NULL,
+            alertado_en timestamptz NULL,
             creado_en timestamptz NOT NULL,
             enviado_en timestamptz NULL,
             CONSTRAINT uq_mensajes_salientes_evento UNIQUE (clave_de_evento, sucursal_codigo, tipo),
@@ -113,6 +114,11 @@ public static class DefinicionDeTraslados
                 (estado = 'enviado') = (enviado_en IS NOT NULL)
                 AND (estado = 'fallido' OR motivo_de_fallo IS NULL))
         );
+
+        ALTER TABLE traslados.mensajes_salientes ADD COLUMN IF NOT EXISTS alertado_en timestamptz NULL;
+
+        -- El orden de entrega por traslado es el de la secuencia: la operación que cambia el estado toma antes el bloqueo del traslado, así que sus mensajes siempre se insertan después de los del cambio anterior (un reloj no distingue dos cambios en el mismo instante).
+        ALTER TABLE traslados.mensajes_salientes ADD COLUMN IF NOT EXISTS secuencia bigint GENERATED ALWAYS AS IDENTITY;
 
         -- La entrega toma los pendientes cuya fecha llegó, del más antiguo al más nuevo.
         CREATE INDEX IF NOT EXISTS ix_mensajes_salientes_pendientes ON traslados.mensajes_salientes (proxima_fecha, creado_en) WHERE estado = 'pendiente';
@@ -137,7 +143,7 @@ public static class DefinicionDeTraslados
         GRANT SELECT, INSERT ON traslados.traslados TO rol_traslados;
         GRANT UPDATE (estado, motivo, motivo_de_cierre, pedido_anulado, guia, solicitado_por, aprobado_en, despachado_en, recibido_en, cerrado_en, alerta_de_demora_en, version) ON traslados.traslados TO rol_traslados;
         GRANT SELECT, INSERT, DELETE ON traslados.mensajes_salientes TO rol_traslados;
-        GRANT UPDATE (estado, intentos, proxima_fecha, arrendado_hasta, motivo_de_fallo, enviado_en) ON traslados.mensajes_salientes TO rol_traslados;
+        GRANT UPDATE (estado, intentos, proxima_fecha, arrendado_hasta, motivo_de_fallo, alertado_en, enviado_en) ON traslados.mensajes_salientes TO rol_traslados;
         """;
 
     /// <summary>La migración completa del módulo, en el orden que exige (rol, tablas y permisos).</summary>

@@ -99,6 +99,21 @@ internal interface IRepositorioDeTraslados
 
     /// <summary>Los traslados vinculados a un pedido (cualquier estado), del más reciente al más antiguo.</summary>
     Task<IReadOnlyList<Traslado>> DelPedido(Guid pedidoId, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Los identificadores de los vinculados <c>solicitado</c> solicitados antes de <paramref name="solicitadosAntesDe"/> y sin alerta de demora previa (TRA-22), <b>bloqueados</b> con <c>FOR UPDATE SKIP LOCKED</c> y por
+    /// <c>ORDER BY id</c>: dos instancias del trabajo no toman el mismo traslado.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> VinculadosSinAprobarVencidos(DateTimeOffset solicitadosAntesDe, int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Marca la alerta de demora con una sola sentencia condicional (<c>WHERE estado = 'solicitado' AND alerta_de_demora_en IS NULL</c>): falso si el traslado se aprobó o ya tenía alerta (no se avisa de uno aprobado en paralelo).</summary>
+    Task<bool> MarcarAlertaDeDemora(Guid trasladoId, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// La depuración de los 2 años (plan §3, D07): quita <c>solicitado_por</c> y vacía el motivo, el motivo de cierre y la guía de los traslados cerrados antes de <paramref name="cerradosAntesDe"/>, en un lote de hasta
+    /// <paramref name="lote"/> filas. Devuelve cuántas cambió: repetirla no cambia nada.
+    /// </summary>
+    Task<int> AnonimizarCerrados(DateTimeOffset cerradosAntesDe, int lote, CancellationToken cancelacion = default);
 }
 
 /// <summary>
@@ -139,7 +154,7 @@ internal enum ResultadoDeEnvio
 internal sealed record AvisoDeTrasladoParaEnviar(string EventoId, string CodigoDeSucursal, long NumeroDeTraslado, string Estado, string RolDeLaSucursal, int Cantidad, DateTimeOffset OcurridoEn);
 
 /// <summary>El estado del traslado de un pedido (<c>en-transito</c>, <c>recibido</c> o <c>cancelado</c>) que se informa al E-commerce, con su fecha estimada de llegada o «por confirmar».</summary>
-internal sealed record EstadoDeTrasladoDePedidoParaEnviar(string EventoId, Guid PedidoId, Guid TrasladoId, string Estado, DateOnly? FechaEstimadaDeLlegada, bool EstimadaPorConfirmar, DateTimeOffset OcurridoEn);
+internal sealed record EstadoDeTrasladoDePedidoParaEnviar(string EventoId, Guid PedidoId, Guid TrasladoId, Guid EdicionId, int Cantidad, string Estado, DateOnly? FechaEstimadaDeLlegada, bool EstimadaPorConfirmar, DateTimeOffset OcurridoEn);
 
 /// <summary>
 /// La salida hacia el E-commerce (TRA-10, TRA-11): <b>modelos propios</b>, sin los DTOs de <c>Shared</c>, y nunca lanza (un E-commerce caído deja el mensaje pendiente, no interrumpe una transición, regla 10). Quien la implementa

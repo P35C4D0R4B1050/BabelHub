@@ -63,6 +63,13 @@ internal sealed class AutorizadorDeTraslados(IActorActual actores, IDenegacionDe
     public Task<ErrorDeAplicacion?> ExigirRol(OperacionDeTraslado operacion, CancellationToken cancelacion) =>
         Evaluar(() => PermisosDeTraslado.RolPuedeIntentar(operacion, Rol) ? null : MotivosDeDenegacionDeTraslados.FueraDeRol, cancelacion);
 
+    /// <summary>
+    /// Solo el actor «sistema»: la entrega de mensajes, la revisión de plazos y la depuración las hace el propio Inventario con el actor explícito del ejecutor de trabajos de fondo; sin actor es «no autenticado» y no toca nada
+    /// (el trabajo lo convierte en un fallo a la vista).
+    /// </summary>
+    public Task<ErrorDeAplicacion?> ExigirSistema(CancellationToken cancelacion) =>
+        Evaluar(() => Actor is { Tipo: TipoDeActor.Sistema } ? null : MotivosDeDenegacionDeTraslados.FueraDeRol, cancelacion);
+
     /// <summary>La operación sobre un traslado de <paramref name="origenId"/> a <paramref name="destinoId"/> según rol y sucursal (un único evento si se deniega).</summary>
     public Task<ErrorDeAplicacion?> Exigir(OperacionDeTraslado operacion, Guid origenId, Guid destinoId, CancellationToken cancelacion) =>
         Evaluar(

@@ -8,6 +8,7 @@ using BabelHub.Inventario.Infrastructure.Plataforma;
 using BabelHub.Inventario.Infrastructure.Traslados;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Npgsql;
 
 namespace BabelHub.Inventario.Infrastructure.Composicion;
 
@@ -24,7 +25,7 @@ public static class ComposicionDeTraslados
     /// La solicitud <b>no</b>: consume el presupuesto del personal en una transacción independiente y repetirla lo contaría dos veces.
     /// </summary>
     public static IReadOnlyList<Type> CasosDeUsoIdempotentes { get; } =
-        [typeof(AprobarTraslado), typeof(RechazarTraslado), typeof(CancelarTraslado), typeof(DespacharTraslado), typeof(RecibirTraslado), typeof(RegistrarGuiaDeTraslado)];
+        [typeof(AprobarTraslado), typeof(RechazarTraslado), typeof(CancelarTraslado), typeof(DespacharTraslado), typeof(RecibirTraslado), typeof(RegistrarGuiaDeTraslado), typeof(RevisarTrasladosSinAprobar), typeof(DepurarTraslados)];
 
     public static IServiceCollection AgregarModuloTraslados(this IServiceCollection servicios, OpcionesDeReintentoPorInterbloqueo? reintento = null)
     {
@@ -34,6 +35,10 @@ public static class ComposicionDeTraslados
         servicios.AddScoped<AccesoATraslados>();
         servicios.AddScoped<IRepositorioDeTraslados, NpgsqlRepositorioDeTraslados>();
         servicios.AddScoped<IBuzonDeSalida, NpgsqlBuzonDeSalida>();
+        servicios.AddScoped<IColaDeMensajesSalientes, NpgsqlColaDeMensajesSalientes>();
+
+        // Sin la salida real configurada, un mensaje queda pendiente (nunca se pierde) hasta que se agregue con AgregarSalidaAlEcommerce.
+        servicios.TryAddScoped<IEnvioAlEcommerce, EnvioAlEcommerceNoConfigurado>();
 
         servicios.AddScoped(sp => new AutorizadorDeTraslados(sp.GetRequiredService<IActorActual>(), sp.GetRequiredService<IDenegacionDeAcceso>()));
         servicios.AddScoped(sp => new PresupuestoDeTraslados(sp.GetRequiredService<IControlDeLimites>(), sp.GetRequiredService<IReloj>()));
@@ -65,6 +70,12 @@ public static class ComposicionDeTraslados
         servicios.Lectura<ListarTrasladosEntrada, PaginaDeTraslados, ListarTraslados>();
         servicios.Lectura<ConsultarTrasladosDeUnPedidoEntrada, TrasladosDeUnPedido, ConsultarTrasladosDeUnPedido>();
 
+        // Los casos de uso del sistema: la entrega del buzón maneja sus propias transacciones cortas (reclamar y registrar) y envía fuera de toda transacción, así que no lleva el decorador; la revisión de plazos y la depuración sí.
+        servicios.AddScoped<EntregarMensajesSalientes>();
+        servicios.AddScoped<ICasoDeUso<EntregarMensajesSalientesEntrada, ResultadoDeLaEntrega>>(sp => sp.GetRequiredService<EntregarMensajesSalientes>());
+        servicios.Escritura<RevisarTrasladosSinAprobarEntrada, ResultadoDeLaRevision, RevisarTrasladosSinAprobar>(opcionesDeReintento);
+        servicios.Escritura<DepurarTrasladosEntrada, ResultadoDeLaDepuracionDeTraslados, DepurarTraslados>(opcionesDeReintento);
+
         // Los puertos de Reservas: el adaptador real reemplaza al que falla a la vista, y el receptor de anulaciones se suma a los demás. No son casos de uso expuestos.
         servicios.Replace(ServiceDescriptor.Scoped<IGeneradorDeTrasladosDePedido, GenerarTrasladosDePedido>());
         servicios.AddScoped<IAlLiberarPedido, CancelarTrasladosDePedido>();
@@ -91,5 +102,91 @@ public static class ComposicionDeTraslados
     {
         servicios.AddScoped<TCaso>();
         servicios.AddScoped<ICasoDeUso<TEntrada, TSalida>>(sp => new LecturaCoherentePorCasoDeUso<TEntrada, TSalida>(sp.GetRequiredService<TCaso>(), sp.GetRequiredService<ILecturaCoherente>()));
+    }
+}
+
+/// <summary>La salida al E-commerce mientras no está configurada: <b>nunca pierde un mensaje</b> (lo deja pendiente y reintenta) y a las 24 horas la entrega alerta; el anfitrión de producción registra el adaptador real.</summary>
+internal sealed class EnvioAlEcommerceNoConfigurado : IEnvioAlEcommerce
+{
+    public Task<ResultadoDeEnvio> EnviarAviso(AvisoDeTrasladoParaEnviar aviso, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeEnvio.Reintentable);
+
+    public Task<ResultadoDeEnvio> InformarEstadoDelPedido(EstadoDeTrasladoDePedidoParaEnviar estado, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeEnvio.Reintentable);
+}
+
+/// <summary>Registro de la salida real al E-commerce (T19): el cliente de servicio con la credencial <c>solicitar-aviso</c>, el plazo de 10 segundos y la resiliencia. El anfitrión pone, además, <see cref="OpcionesDeCredencialesDeSalida"/>.</summary>
+public static class ComposicionDeLaSalidaAlEcommerce
+{
+    public static IServiceCollection AgregarSalidaAlEcommerce(this IServiceCollection servicios, Uri direccion, OpcionesDelClienteDeServicio? opciones = null)
+    {
+        ArgumentNullException.ThrowIfNull(servicios);
+        ArgumentNullException.ThrowIfNull(direccion);
+        servicios.AgregarClienteDeServicio(HttpEnvioAlEcommerce.NombreDelCliente, direccion, opciones).AddTypedClient<IEnvioAlEcommerce, HttpEnvioAlEcommerce>();
+        return servicios;
+    }
+}
+
+/// <summary>Los trabajos de fondo de <c>Traslados</c> con sus nombres estables e intervalos (plan §5): la entrega del buzón cada 30 segundos, la revisión de plazos cada hora y la depuración diaria.</summary>
+public static class TrabajosDeTraslados
+{
+    public const string EntregaDeMensajes = "traslados-entrega-de-mensajes";
+
+    public const string RevisionDePlazos = "traslados-revision-de-plazos";
+
+    public const string DepuracionDiaria = "traslados-depuracion-diaria";
+
+    public static readonly TimeSpan IntervaloDeLaEntrega = TimeSpan.FromSeconds(30);
+
+    public static readonly TimeSpan IntervaloDeLaRevision = TimeSpan.FromHours(1);
+
+    public static readonly TimeSpan IntervaloDeLaDepuracion = TimeSpan.FromHours(24);
+
+    public static TrabajoDeFondoDeReservas Entregar(IServiceProvider sp, TimeProvider? tiempo = null) =>
+        Crear(sp, EntregaDeMensajes, IntervaloDeLaEntrega, tiempo, proveedor => proveedor.GetRequiredService<ICasoDeUso<EntregarMensajesSalientesEntrada, ResultadoDeLaEntrega>>().Ejecutar(new EntregarMensajesSalientesEntrada(), default));
+
+    public static TrabajoDeFondoDeReservas Revisar(IServiceProvider sp, TimeProvider? tiempo = null) =>
+        Crear(sp, RevisionDePlazos, IntervaloDeLaRevision, tiempo, proveedor => proveedor.GetRequiredService<ICasoDeUso<RevisarTrasladosSinAprobarEntrada, ResultadoDeLaRevision>>().Ejecutar(new RevisarTrasladosSinAprobarEntrada(), default));
+
+    public static TrabajoDeFondoDeReservas Depurar(IServiceProvider sp, TimeProvider? tiempo = null) =>
+        Crear(sp, DepuracionDiaria, IntervaloDeLaDepuracion, tiempo, proveedor => proveedor.GetRequiredService<ICasoDeUso<DepurarTrasladosEntrada, ResultadoDeLaDepuracionDeTraslados>>().Ejecutar(new DepurarTrasladosEntrada(), default));
+
+    private static TrabajoDeFondoDeReservas Crear<T>(IServiceProvider sp, string nombre, TimeSpan intervalo, TimeProvider? tiempo, Func<IServiceProvider, Task<Resultado<T>>> caso) =>
+        new(
+            nombre,
+            intervalo,
+            async (fabrica, cancelacion) =>
+            {
+                using var alcance = fabrica.CreateScope();
+                var resultado = await caso(alcance.ServiceProvider).WaitAsync(cancelacion).ConfigureAwait(false);
+                if (!resultado.EsExito)
+                {
+                    // Sin el actor «sistema» (no autenticado o prohibido) la corrida falla a la vista: nunca pasa por «nada que hacer».
+                    throw resultado.Error!.Categoria is CategoriaDeError.NoAutenticado or CategoriaDeError.Prohibido
+                        ? new ActorDeTrabajoDeFondoAusenteException()
+                        : new InvalidOperationException($"El trabajo {nombre} falló ({resultado.Error.Clave}).");
+                }
+            },
+            sp.GetRequiredService<IServiceScopeFactory>(),
+            sp.GetRequiredService<EjecutorDeTrabajoDeFondo>(),
+            sp.GetRequiredService<BloqueoDeInstanciaUnica>(),
+            sp.GetRequiredService<IRegistroDeTrabajosDeFondo>(),
+            sp.GetRequiredService<IReloj>(),
+            tiempo);
+}
+
+/// <summary>Registro de los trabajos de fondo de <c>Traslados</c> (entrega del buzón, revisión de plazos y depuración). Solo en el modo normal (PLA-19).</summary>
+public static class ComposicionDeTrabajosDeTraslados
+{
+    public static IServiceCollection AgregarTrabajosDeTraslados(this IServiceCollection servicios, bool soloEnModoNormal)
+    {
+        ArgumentNullException.ThrowIfNull(servicios);
+        if (!soloEnModoNormal)
+        {
+            return servicios;
+        }
+
+        servicios.AgregarEjecutorDeTrabajoDeFondo();
+        servicios.TryAddSingleton(sp => new BloqueoDeInstanciaUnica(sp.GetRequiredService<NpgsqlDataSource>()));
+        servicios.AddHostedService(sp => new ServicioDeTrabajosDeReservas([TrabajosDeTraslados.Entregar(sp), TrabajosDeTraslados.Revisar(sp), TrabajosDeTraslados.Depurar(sp)]));
+        return servicios;
     }
 }

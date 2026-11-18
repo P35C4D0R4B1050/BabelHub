@@ -3,6 +3,7 @@ using BabelHub.Inventario.Application.Plataforma;
 using BabelHub.Inventario.Application.Reservas;
 using BabelHub.Inventario.Application.Traslados;
 using BabelHub.Shared.Contratos;
+using Microsoft.Extensions.DependencyInjection;
 using static BabelHub.IntegrationTests.Reservas.PilaDeReservas;
 
 namespace BabelHub.IntegrationTests.Traslados;
@@ -34,7 +35,7 @@ public sealed class EscenarioDeTraslados(PostgresDeReservasFixture bd) : IDispos
     public static ActorActual Logistica() => ActorActual.DeUsuario(Guid.NewGuid(), RolesDeUsuario.PersonalDeLogistica);
 
     /// <summary>Crea las tres fuentes y una edición impresa, con las rutas de Cusco y Ayacucho hacia Lima y de Cusco hacia Ayacucho, y levanta la pila con <c>Traslados</c>.</summary>
-    public async Task<EscenarioDeTraslados> Preparar(int stockDeLima = 0, int stockDeCusco = 10, int stockDeAyacucho = 0)
+    public async Task<EscenarioDeTraslados> Preparar(int stockDeLima = 0, int stockDeCusco = 10, int stockDeAyacucho = 0, Action<IServiceCollection>? pila = null)
     {
         Lima = await bd.AgregarFuente("lima", recepcion: true);
         Cusco = await bd.AgregarFuente("cusco");
@@ -45,7 +46,7 @@ public sealed class EscenarioDeTraslados(PostgresDeReservasFixture bd) : IDispos
         await bd.PonerStock(Ayacucho, Libro, stockDeAyacucho, 0);
         await bd.DefinirRuta(Cusco, Lima, 2);
         await bd.DefinirRuta(Cusco, Ayacucho, 3);
-        Pila = new PilaDeReservas(bd, conTraslados: true);
+        Pila = new PilaDeReservas(bd, pila, conTraslados: true);
         return this;
     }
 

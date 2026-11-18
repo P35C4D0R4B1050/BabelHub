@@ -241,6 +241,67 @@ internal sealed class NpgsqlRepositorioDeTraslados(AccesoATraslados acceso) : IR
             cancelacion);
 
 
+    public Task<IReadOnlyList<Guid>> VinculadosSinAprobarVencidos(DateTimeOffset solicitadosAntesDe, int maximo, CancellationToken cancelacion = default) =>
+        acceso.Ejecutar<IReadOnlyList<Guid>>(
+            async (conexion, transaccion, token) =>
+            {
+                // SKIP LOCKED y ORDER BY id: dos instancias del trabajo no toman el mismo traslado y el orden es único.
+                await using var comando = new NpgsqlCommand(
+                    """
+                    SELECT id FROM traslados.traslados
+                    WHERE pedido_id IS NOT NULL AND estado = 'solicitado' AND solicitado_en < @antes AND alerta_de_demora_en IS NULL
+                    ORDER BY id LIMIT @maximo FOR UPDATE SKIP LOCKED
+                    """,
+                    conexion,
+                    transaccion);
+                comando.Parameters.Add(new NpgsqlParameter("antes", NpgsqlDbType.TimestampTz) { Value = solicitadosAntesDe.ToUniversalTime() });
+                comando.Parameters.AddWithValue("maximo", maximo);
+                var ids = new List<Guid>();
+                await using var lector = await comando.ExecuteReaderAsync(token).ConfigureAwait(false);
+                while (await lector.ReadAsync(token).ConfigureAwait(false))
+                {
+                    ids.Add(lector.GetGuid(0));
+                }
+
+                return ids;
+            },
+            cancelacion);
+
+    public Task<bool> MarcarAlertaDeDemora(Guid trasladoId, DateTimeOffset ahora, CancellationToken cancelacion = default) =>
+        acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand(
+                    "UPDATE traslados.traslados SET alerta_de_demora_en = @ahora WHERE id = @id AND estado = 'solicitado' AND alerta_de_demora_en IS NULL",
+                    conexion,
+                    transaccion);
+                comando.Parameters.AddWithValue("id", trasladoId);
+                comando.Parameters.Add(Fecha("ahora", ahora));
+                return await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false) == 1;
+            },
+            cancelacion);
+
+    public Task<int> AnonimizarCerrados(DateTimeOffset cerradosAntesDe, int lote, CancellationToken cancelacion = default) =>
+        acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand(
+                    """
+                    UPDATE traslados.traslados
+                    SET solicitado_por = NULL, motivo = NULL, motivo_de_cierre = NULL, guia = NULL
+                    WHERE id IN (
+                        SELECT id FROM traslados.traslados
+                        WHERE cerrado_en < @antes AND (solicitado_por IS NOT NULL OR motivo IS NOT NULL OR motivo_de_cierre IS NOT NULL OR guia IS NOT NULL)
+                        ORDER BY cerrado_en, id LIMIT @lote)
+                    """,
+                    conexion,
+                    transaccion);
+                comando.Parameters.Add(Fecha("antes", cerradosAntesDe));
+                comando.Parameters.AddWithValue("lote", lote);
+                return await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            },
+            cancelacion);
+
     public Task<bool> Guardar(Traslado traslado, long versionAnterior, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(traslado);
