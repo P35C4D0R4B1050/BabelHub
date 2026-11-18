@@ -91,6 +91,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
         [nameof(AccionesAuditables.VerificacionDePersonaFallida)] = [],
         [nameof(AccionesAuditables.EntradaDeIntegracionRechazada)] = [],
         [nameof(AccionesAuditables.OrigenReenviadoSinCredencial)] = [],
+        [nameof(AccionesAuditables.AccesoBloqueadoPorTextosPendientes)] = ["usuario"],
         [nameof(AccionesAuditables.IngresoFallido)] = ["cuenta"],
         [nameof(AccionesAuditables.BloqueoTemporalAplicado)] = ["cuenta"],
         [nameof(AccionesAuditables.RecuperacionDeAccesoSolicitada)] = ["cuenta"],

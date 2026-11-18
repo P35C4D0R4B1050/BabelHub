@@ -1,6 +1,7 @@
 {
   "contenedores": {
-    "libros": [],
+    "libros": [{"name": "abortar-subidas-a-los-1-dias", "action": "ABORT", "isEnabled": true, "timeAmount": 1, "timeUnit": "DAYS", "target": "multipart-uploads"}],
+    "portadas": [{"name": "abortar-subidas-a-los-1-dias", "action": "ABORT", "isEnabled": true, "timeAmount": 1, "timeUnit": "DAYS", "target": "multipart-uploads"}],
     "respaldos-diarios": [{"name": "retiro-a-los-7-dias", "action": "DELETE", "isEnabled": true, "timeAmount": 7, "timeUnit": "DAYS", "target": "objects"}],
     "respaldos-semanales": [{"name": "retiro-a-los-28-dias", "action": "DELETE", "isEnabled": true, "timeAmount": 28, "timeUnit": "DAYS", "target": "objects"}],
     "respaldos-mensuales": [{"name": "retiro-a-los-92-dias", "action": "DELETE", "isEnabled": true, "timeAmount": 92, "timeUnit": "DAYS", "target": "objects"}],

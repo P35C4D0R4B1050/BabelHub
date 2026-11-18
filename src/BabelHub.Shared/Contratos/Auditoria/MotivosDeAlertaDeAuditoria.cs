@@ -42,6 +42,18 @@ public static class MotivosDeAlertaDeAuditoria
 
     public const string AlcanceDeDatosSinActor = "alcance-de-datos-sin-actor";
 
+    /// <summary>Más de 200 confirmaciones de reservas en 5 minutos: la residual de la credencial de <c>expiracion-de-reservas</c> (INV-2b).</summary>
+    public const string ConfirmacionesDeReservasAnomalas = "confirmaciones-de-reservas-anomalas";
+
+    /// <summary>Más de 200 liberaciones de reservas en 5 minutos (INV-2b).</summary>
+    public const string LiberacionesDeReservasAnomalas = "liberaciones-de-reservas-anomalas";
+
+    /// <summary>Más de 20 bajas de titular en un minuto (SEL-34, AM31): solo avisa, la baja es una obligación legal y nunca se rechaza.</summary>
+    public const string BajasDeTitularAnomalas = "bajas-de-titular-anomalas";
+
+    /// <summary>El acceso a pantallas bloqueado por textos legales pendientes superó el umbral en una ventana de 15 minutos (WEB-47): no cuenta para SEG-09.</summary>
+    public const string BloqueosPorTextosPendientes = "bloqueos-por-textos-pendientes";
+
     public static readonly IReadOnlyList<string> Todos =
     [
         AccesosDenegados,
@@ -62,5 +74,9 @@ public static class MotivosDeAlertaDeAuditoria
         TrasladoVinculadoSinAprobar,
         LecturaDeAlertasDelInventarioNoDisponible,
         AlcanceDeDatosSinActor,
+        ConfirmacionesDeReservasAnomalas,
+        LiberacionesDeReservasAnomalas,
+        BajasDeTitularAnomalas,
+        BloqueosPorTextosPendientes,
     ];
 }

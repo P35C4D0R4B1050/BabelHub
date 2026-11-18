@@ -86,6 +86,10 @@ public static class PresentadorDeAuditoria
         ["traslado-vinculado-sin-aprobar"] = "Un traslado vinculado sigue sin aprobar a las 48 horas",
         ["lectura-de-alertas-del-inventario-no-disponible"] = "No se pudieron leer las alertas del Inventario",
         ["alcance-de-datos-sin-actor"] = "Una lectura de datos llegó sin actor",
+        ["confirmaciones-de-reservas-anomalas"] = "Más de 200 confirmaciones de reservas en 5 minutos",
+        ["liberaciones-de-reservas-anomalas"] = "Más de 200 liberaciones de reservas en 5 minutos",
+        ["bajas-de-titular-anomalas"] = "Más de 20 bajas de titular en un minuto",
+        ["bloqueos-por-textos-pendientes"] = "Muchas acciones bloqueadas por textos legales pendientes",
     };
 
     public static PaginaDeAuditoriaVista Presentar(PaginaDeRegistros pagina)

@@ -50,6 +50,18 @@ public static class MotivosDeAlerta
 
     /// <summary>Una lectura de datos del Inventario llegó sin actor (un defecto de composición: el alcance por sucursal devolvería cero filas sin error, INV-1a).</summary>
     public const string AlcanceDeDatosSinActor = "alcance-de-datos-sin-actor";
+
+    /// <summary>Más de 200 confirmaciones de reservas en 5 minutos (INV-2b): solo avisa.</summary>
+    public const string ConfirmacionesDeReservasAnomalas = "confirmaciones-de-reservas-anomalas";
+
+    /// <summary>Más de 200 liberaciones de reservas en 5 minutos (INV-2b): solo avisa.</summary>
+    public const string LiberacionesDeReservasAnomalas = "liberaciones-de-reservas-anomalas";
+
+    /// <summary>Más de 20 bajas de titular en un minuto (SEL-34, AM31): solo avisa, la baja nunca se rechaza.</summary>
+    public const string BajasDeTitularAnomalas = "bajas-de-titular-anomalas";
+
+    /// <summary>Muchas acciones bloqueadas por textos legales pendientes en una ventana de 15 minutos (WEB-47): no cuenta para SEG-09.</summary>
+    public const string BloqueosPorTextosPendientes = "bloqueos-por-textos-pendientes";
 }
 
 /// <summary>El catálogo cerrado de motivos de alerta de los dos servicios (D06). Otros módulos publican por <see cref="IAlertas"/> con estos códigos.</summary>
@@ -75,6 +87,10 @@ public static class CatalogoDeAlertasDeAuditoria
         new(MotivosDeAlerta.TrasladoVinculadoSinAprobar, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.LecturaDeAlertasDelInventarioNoDisponible, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.AlcanceDeDatosSinActor, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.ConfirmacionesDeReservasAnomalas, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.LiberacionesDeReservasAnomalas, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.BajasDeTitularAnomalas, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.BloqueosPorTextosPendientes, ClaseDeAlerta.Tecnica),
     ]);
 }
 

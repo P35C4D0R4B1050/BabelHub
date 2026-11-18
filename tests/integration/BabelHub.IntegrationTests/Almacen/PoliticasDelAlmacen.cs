@@ -1,7 +1,7 @@
 namespace BabelHub.IntegrationTests.Almacen;
 
-/// <summary>Un contenedor del almacén: su retención con bloqueo y cuándo lo vacía el ciclo de vida (<c>null</c> si nunca).</summary>
-internal sealed record ContenedorDelAlmacen(string Nombre, int RetencionDias, bool Bloqueada, int? ExpiraDias);
+/// <summary>Un contenedor del almacén: su retención con bloqueo y cuándo lo vacía el ciclo de vida (<c>null</c> si nunca) y a los cuántos días aborta las subidas multipart incompletas (<c>null</c> si no lo hace).</summary>
+internal sealed record ContenedorDelAlmacen(string Nombre, int RetencionDias, bool Bloqueada, int? ExpiraDias, int? SubidasIncompletasDias = null);
 
 /// <summary>Lo que una credencial puede hacer en un contenedor (<c>crear</c>, <c>leer</c>, <c>listar</c>, <c>uso</c>, <c>sobrescribir</c>, <c>borrar</c>).</summary>
 internal sealed record ConcesionDelAlmacen(string Credencial, string Contenedor, IReadOnlySet<string> Acciones);
@@ -42,7 +42,7 @@ internal sealed class PoliticasDelAlmacen
     public static PoliticasDelAlmacen Cargar(string carpeta)
     {
         var contenedores = Lineas(Path.Combine(carpeta, "contenedores.txt"))
-            .Select(c => new ContenedorDelAlmacen(c[0], int.Parse(c[1], System.Globalization.CultureInfo.InvariantCulture), c[2] == "si", c[3] == "nunca" ? null : int.Parse(c[3], System.Globalization.CultureInfo.InvariantCulture)))
+            .Select(c => new ContenedorDelAlmacen(c[0], int.Parse(c[1], System.Globalization.CultureInfo.InvariantCulture), c[2] == "si", c[3] == "nunca" ? null : int.Parse(c[3], System.Globalization.CultureInfo.InvariantCulture), c.Length > 4 && c[4] != "nunca" ? int.Parse(c[4], System.Globalization.CultureInfo.InvariantCulture) : null))
             .ToList();
         var concesiones = Lineas(Path.Combine(carpeta, "credenciales.txt"))
             .Select(c => new ConcesionDelAlmacen(c[0], c[1], c[2].Split(',').ToHashSet(StringComparer.Ordinal)))

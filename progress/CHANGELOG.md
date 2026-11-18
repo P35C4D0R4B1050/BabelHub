@@ -2,6 +2,17 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-17 — Quinta ola, primera parte (fundida a `main`)
+
+### Cubierto
+- **Carril A (piezas de plataforma):** puerto y cliente REST del Inventario ampliado (registrar edición, disponibilidad por lotes, ingresos), contenedor `portadas` y credenciales del almacén del catálogo, motivos de alerta nuevos en `Shared` y evento propio del bloqueo por textos pendientes (solo aditivo). T11–T14 de identidad siguen en su rama, sin revisión.
+- **Carril B:** INV-2d (T28–T33): `inventario-seleccion-fuente` queda con sus 33 tareas (falta `spec-verify`): pruebas de reversión de límites, carreras y ciclo de vida con reloj controlado, abuso de credencial y de entrada, contrato REST de reservas con un E-commerce simulado e inventario de privacidad con la clave de bajas fuera de la rotación.
+- **Carril C:** ECO-2a (T01–T06 de `ecommerce-catalogo`): ISBN, precio, tipos y límites de archivo, licencia digital, agregado obra-edición, contratos y puertos, autorización y validadores.
+- Validación de la fusión: unitarias 1985 y 1923, arquitectura 183, SpecCheck 23, CoverageCheck 12, integración 3744 de 3746 (las 2 pasan sueltas), gitleaks limpio.
+
+### Pendiente
+- En curso: IDE-2/IDE-3 (A), INV-3 (B), ECO-2b/2c (C) y la planificación de carrito, pagos y pedidos en su ronda 3.
+
 ## 2026-11-15 — SEG-C, IDE-1, INV-2a/2b/2c y WEB-1e (fundidos a `main`)
 
 ### Cubierto

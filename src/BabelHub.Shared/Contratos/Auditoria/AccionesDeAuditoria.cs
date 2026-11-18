@@ -7,6 +7,8 @@ namespace BabelHub.Shared.Contratos.Auditoria;
 /// </summary>
 public static class AccionesDeAuditoria
 {
+    public const string AccesoBloqueadoPorTextosPendientes = "AccesoBloqueadoPorTextosPendientes";
+
     public const string AccesoDenegado = "AccesoDenegado";
 
     public const string AccesoDigitalRevocado = "AccesoDigitalRevocado";
@@ -230,6 +232,7 @@ public static class AccionesDeAuditoria
         ObraRegistrada,
         OrigenIndeterminable,
         OrigenReenviadoSinCredencial,
+        AccesoBloqueadoPorTextosPendientes,
         PedidoAnulado,
         PortadaDeEdicionReemplazada,
         PrecioDeEdicionCambiado,

@@ -68,6 +68,10 @@ public sealed class AlmacenShTests : IDisposable
             esac ;;
           "os object-lifecycle-policy get")
             case "$consulta" in
+              *'[-1]'*time-amount*) echo "${SUBIDAS_MONTO:-null}" ;;
+              *'[-1]'*action*) echo "${SUBIDAS_ACCION:-null}" ;;
+              *'[-1]'*target*) echo "${SUBIDAS_OBJETIVO:-null}" ;;
+              *'[-1]'*is-enabled*) echo "${SUBIDAS_HABILITADA:-null}" ;;
               *time-amount*) echo "${CICLO_MONTO:-null}" ;;
               *action*) echo "${CICLO_ACCION:-null}" ;;
               *is-enabled*) echo "${CICLO_HABILITADA:-null}" ;;
@@ -128,7 +132,7 @@ public sealed class AlmacenShTests : IDisposable
         return carpeta;
     }
 
-    private void Estado(string bucket, string acceso = "NoPublicAccess", string? retencion = null, string unidad = "DAYS", string? bloqueo = null, string? ciclo = null, string accion = "DELETE", string habilitada = "true")
+    private void Estado(string bucket, string acceso = "NoPublicAccess", string? retencion = null, string unidad = "DAYS", string? bloqueo = null, string? ciclo = null, string accion = "DELETE", string habilitada = "true", string? subidas = null, string accionDeSubidas = "ABORT", string objetivoDeSubidas = "multipart-uploads", string habilitadaSubidas = "true")
     {
         var texto = new StringBuilder();
         texto.AppendLine(CultureInfo(acceso, "ACCESO"));
@@ -147,6 +151,11 @@ public sealed class AlmacenShTests : IDisposable
             texto.AppendLine(CultureInfo(ciclo, "CICLO_MONTO")).AppendLine(CultureInfo(accion, "CICLO_ACCION")).AppendLine(CultureInfo(habilitada, "CICLO_HABILITADA"));
         }
 
+        if (subidas is not null)
+        {
+            texto.AppendLine(CultureInfo(subidas, "SUBIDAS_MONTO")).AppendLine(CultureInfo(accionDeSubidas, "SUBIDAS_ACCION")).AppendLine(CultureInfo(objetivoDeSubidas, "SUBIDAS_OBJETIVO")).AppendLine(CultureInfo(habilitadaSubidas, "SUBIDAS_HABILITADA"));
+        }
+
         File.WriteAllText(Path.Combine(_estado, bucket + ".env"), texto.ToString());
     }
 
@@ -161,7 +170,8 @@ public sealed class AlmacenShTests : IDisposable
                 c.Nombre,
                 retencion: c.RetencionDias > 0 ? c.RetencionDias.ToString(System.Globalization.CultureInfo.InvariantCulture) : null,
                 bloqueo: c.Bloqueada ? bloqueo : null,
-                ciclo: c.ExpiraDias?.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                ciclo: c.ExpiraDias?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                subidas: c.SubidasIncompletasDias?.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
     }
 
@@ -180,7 +190,7 @@ public sealed class AlmacenShTests : IDisposable
 
     [Fact]
     [Trait("Criterio", "AC-PLA-16")]
-    public void LasSentenciasDePolitica_DanASoloCrearALaCredencialDeRespaldo_YNuncaBorrarFueraDeLosLibros()
+    public void LasSentenciasDePolitica_DanASoloCrearALaCredencialDeRespaldo_YNuncaBorrarFueraDelCatalogo()
     {
         var (codigo, salida, errores) = Ejecutar(null, "politicas-iam", "--compartimento-nombre", "babelhub");
 
@@ -195,13 +205,19 @@ public sealed class AlmacenShTests : IDisposable
             Assert.DoesNotContain("OBJECT_OVERWRITE", s, StringComparison.Ordinal);
         });
         Assert.All(
-            sentencias.Where(s => !s.StartsWith("Allow group libros ", StringComparison.Ordinal)),
+            sentencias.Where(s => !s.StartsWith("Allow group catalogo-archivos ", StringComparison.Ordinal)),
             s =>
             {
                 Assert.DoesNotContain("OBJECT_DELETE", s, StringComparison.Ordinal);
                 Assert.DoesNotContain("OBJECT_OVERWRITE", s, StringComparison.Ordinal);
             });
-        Assert.All(sentencias.Where(s => s.StartsWith("Allow group libros ", StringComparison.Ordinal)), s => Assert.Contains("target.bucket.name='libros'", s, StringComparison.Ordinal));
+        Assert.All(sentencias.Where(s => s.StartsWith("Allow group catalogo-archivos ", StringComparison.Ordinal)), s => Assert.True(s.Contains("target.bucket.name='libros'", StringComparison.Ordinal) || s.Contains("target.bucket.name='portadas'", StringComparison.Ordinal)));
+        Assert.All(sentencias.Where(s => s.StartsWith("Allow group biblioteca-lector ", StringComparison.Ordinal)), s =>
+        {
+            Assert.Contains("target.bucket.name='libros'", s, StringComparison.Ordinal);
+            Assert.Contains("request.permission='OBJECT_READ'", s, StringComparison.Ordinal);
+            Assert.DoesNotContain("OBJECT_CREATE", s, StringComparison.Ordinal);
+        });
         Assert.All(sentencias.Where(s => s.StartsWith("Allow group supresiones-registro ", StringComparison.Ordinal)), s => Assert.Contains("target.bucket.name='supresiones-entradas'", s, StringComparison.Ordinal));
         Assert.DoesNotContain(sentencias, s => s.Contains("*", StringComparison.Ordinal));
     }
@@ -213,10 +229,10 @@ public sealed class AlmacenShTests : IDisposable
 
         Assert.True(codigo == 0, errores);
         Assert.False(File.Exists(Path.Combine(_estado, "cambios.log")), "plan no debe ejecutar nada");
-        Assert.Equal(8, salida.Split('\n').Count(l => l.Contains(" os bucket create ", StringComparison.Ordinal)));
+        Assert.Equal(9, salida.Split('\n').Count(l => l.Contains(" os bucket create ", StringComparison.Ordinal)));
         Assert.Equal(7, salida.Split('\n').Count(l => l.Contains(" os retention-rule create ", StringComparison.Ordinal)));
         Assert.Equal(7, salida.Split('\n').Count(l => l.Contains("--time-rule-locked", StringComparison.Ordinal)));
-        Assert.Equal(5, salida.Split('\n').Count(l => l.Contains(" os object-lifecycle-policy put ", StringComparison.Ordinal)));
+        Assert.Equal(7, salida.Split('\n').Count(l => l.Contains(" os object-lifecycle-policy put ", StringComparison.Ordinal)));
         Assert.All(salida.Split('\n').Where(l => l.Contains(" os bucket create ", StringComparison.Ordinal)), l => Assert.Contains("--public-access-type NoPublicAccess", l, StringComparison.Ordinal));
         Assert.Matches(@"--time-rule-locked 20\d\d-\d\d-\d\dT\d\d:\d\d:\d\dZ", salida);
     }
@@ -228,9 +244,9 @@ public sealed class AlmacenShTests : IDisposable
 
         Assert.True(codigo == 0, errores);
         var cambios = File.ReadAllLines(Path.Combine(_estado, "cambios.log"));
-        Assert.Equal(8, cambios.Count(c => c.StartsWith("os bucket create", StringComparison.Ordinal)));
+        Assert.Equal(9, cambios.Count(c => c.StartsWith("os bucket create", StringComparison.Ordinal)));
         Assert.Equal(7, cambios.Count(c => c.StartsWith("os retention-rule create", StringComparison.Ordinal)));
-        Assert.Equal(5, cambios.Count(c => c.StartsWith("os object-lifecycle-policy put", StringComparison.Ordinal)));
+        Assert.Equal(7, cambios.Count(c => c.StartsWith("os object-lifecycle-policy put", StringComparison.Ordinal)));
         Assert.Contains("Allow group respaldos-escritor", salida, StringComparison.Ordinal);
         Assert.Contains("queda efectivo el", salida, StringComparison.Ordinal);
     }
@@ -259,7 +275,9 @@ public sealed class AlmacenShTests : IDisposable
     [InlineData("uno 7 si pronto", "número o «nunca»")]
     [InlineData("UNO 7 si nunca", "no es válido")]
     [InlineData("uno 7 si nunca\nuno 7 si nunca", "repetido")]
-    [InlineData("uno 7 si nunca extra", "sobran columnas")]
+    [InlineData("uno 7 si nunca 1 extra", "sobran columnas")]
+    [InlineData("uno 0 no nunca cero", "subidas incompletas")]
+    [InlineData("uno 0 no nunca 0", "subidas incompletas")]
     public void UnaDefinicionDeContenedoresInvalida_SeRechazaConCodigo2(string contenedores, string mensaje)
     {
         var (codigo, _, errores) = Ejecutar(DefinicionCon(contenedores), "ciclo-de-vida");
@@ -304,7 +322,7 @@ public sealed class AlmacenShTests : IDisposable
         var (codigo, salida, errores) = Ejecutar(null, "comprobar", "--espacio", "espacio");
 
         Assert.True(codigo == 0, salida + errores);
-        Assert.Equal(8, salida.Split('\n').Count(l => l.StartsWith("ok ", StringComparison.Ordinal)));
+        Assert.Equal(9, salida.Split('\n').Count(l => l.StartsWith("ok ", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -390,6 +408,66 @@ public sealed class AlmacenShTests : IDisposable
 
         Assert.Equal(1, codigo);
         Assert.Contains("x respaldos-diarios: el ciclo de vida debe retirar a los 7 días", salida, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAT-12")]
+    public void ElCicloDeVidaDelCatalogo_AbortaLasSubidasMultipartIncompletas_SinRetirarObjetos()
+    {
+        var (codigo, salida, errores) = Ejecutar(null, "ciclo-de-vida");
+
+        Assert.True(codigo == 0, errores);
+        foreach (var contenedor in new[] { "libros", "portadas" })
+        {
+            Assert.Contains($"\"{contenedor}\": [{{\"name\": \"abortar-subidas-a-los-1-dias\", \"action\": \"ABORT\", \"isEnabled\": true, \"timeAmount\": 1, \"timeUnit\": \"DAYS\", \"target\": \"multipart-uploads\"}}]", salida, StringComparison.Ordinal);
+        }
+
+        Assert.DoesNotContain("\"libros\": [{\"name\": \"retiro", salida, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ElRetiroDeObjetosYElAbortoDeSubidas_ConviveEnUnMismoContenedor_ConElRetiroPrimero()
+    {
+        var definicion = DefinicionCon("uno 0 no 30 2");
+
+        var (codigo, salida, errores) = Ejecutar(definicion, "ciclo-de-vida");
+
+        Assert.True(codigo == 0, errores);
+        var retiro = salida.IndexOf("\"action\": \"DELETE\"", StringComparison.Ordinal);
+        var aborto = salida.IndexOf("\"action\": \"ABORT\"", StringComparison.Ordinal);
+        Assert.True(retiro >= 0 && aborto > retiro, "El retiro de objetos va antes que el aborto de subidas.");
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-CAT-12")]
+    [InlineData("3", "ABORT", "multipart-uploads", "true")]
+    [InlineData("1", "DELETE", "multipart-uploads", "true")]
+    [InlineData("1", "ABORT", "objects", "true")]
+    [InlineData("1", "ABORT", "multipart-uploads", "false")]
+    public void Comprobar_SiElCatalogoNoAbortaLasSubidasIncompletasComoDebe_Falla(string dias, string accion, string objetivo, string habilitada)
+    {
+        EstadoConforme();
+        Estado("portadas", subidas: dias, accionDeSubidas: accion, objetivoDeSubidas: objetivo, habilitadaSubidas: habilitada);
+
+        var (codigo, salida, _) = Ejecutar(null, "comprobar", "--espacio", "espacio");
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("x portadas: el ciclo de vida debe abortar las subidas incompletas a los 1 días", salida, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAT-12")]
+    public void Comprobar_SiElCatalogoNoTienePoliticaDeSubidas_Falla_YSiRetiraObjetosTambien()
+    {
+        EstadoConforme();
+        Estado("libros");
+        Estado("portadas", ciclo: "30", subidas: "1");
+
+        var (codigo, salida, _) = Ejecutar(null, "comprobar", "--espacio", "espacio");
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("x libros: el ciclo de vida debe abortar las subidas incompletas", salida, StringComparison.Ordinal);
+        Assert.Contains("x portadas: tiene un ciclo de vida que retira objetos y no debe expirar", salida, StringComparison.Ordinal);
     }
 
     [Fact]

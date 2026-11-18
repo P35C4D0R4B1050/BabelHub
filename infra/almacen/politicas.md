@@ -6,7 +6,8 @@ Define qué contenedores existen en el almacén de Oracle, quién puede hacer qu
 
 | Contenedor | Contiene | Retención con bloqueo | Ciclo de vida |
 | :--- | :--- | :--- | :--- |
-| `libros` | Archivos digitales (AD19) | ninguna | no expira |
+| `libros` | Archivos digitales (AD19) | ninguna | no expira; aborta las subidas multipart incompletas al día |
+| `portadas` | Portadas de las obras del catálogo (imágenes que la web sirve por huella, D06 de `ecommerce-catalogo`) | ninguna | no expira; aborta las subidas multipart incompletas al día |
 | `respaldos-diarios` | Copia consistente diaria del clúster, cifrada con `age` | 7 días, bloqueada | retira a los 7 días |
 | `respaldos-semanales` | Copia dominical | 28 días, bloqueada | retira a los 28 días |
 | `respaldos-mensuales` | Copia del último día del mes | 92 días, bloqueada | retira a los 92 días |
@@ -34,9 +35,10 @@ Las acciones son `crear` (`OBJECT_CREATE`: agrega y no sobrescribe), `leer`, `li
 | `supresiones-sello` | VM-AUX | `crear` solo en `supresiones-sellos`; `leer` y `listar` en `supresiones-entradas`. |
 | `respaldos-copia-registro` | VM-AUX | `crear` solo en `supresiones-copia`. |
 | `cuota-lectura` | VM-AUX | `uso` de cada contenedor. |
-| `libros` | E-commerce | `crear`, `leer`, `listar`, `sobrescribir` y `borrar` solo en `libros`. |
+| `catalogo-archivos` | E-commerce (módulo Catálogo) | `crear`, `leer` y `borrar` en `libros` y en `portadas`. No sobrescribe (las claves son aleatorias y un reemplazo crea un objeto nuevo y borra el anterior) y no lista (el Catálogo conoce sus claves por su esquema y verifica con lecturas por rango). |
+| `biblioteca-lector` | E-commerce (módulo Biblioteca) | Solo `leer` en `libros`: firma las URL de descarga de corta duración (D13 de `ecommerce-catalogo`). No toca `portadas`. |
 
-**Ninguna credencial de respaldos o de supresiones puede borrar o sobrescribir.** El retiro de lo vencido lo hace el ciclo de vida del propio almacén, que no es una credencial que esté en una VM (D07): así se lee AC-PLA-16 («una credencial distinta que retira»), anotado en `progress/hallazgos.md` para reformularla.
+**Solo `catalogo-archivos` borra (sus archivos y portadas) y ninguna sobrescribe; ninguna credencial de respaldos o de supresiones puede borrar o sobrescribir.** El retiro de lo vencido lo hace el ciclo de vida del propio almacén, que no es una credencial que esté en una VM (D07): así se lee AC-PLA-16 («una credencial distinta que retira»), anotado en `progress/hallazgos.md` para reformularla.
 
 ## Retención con bloqueo efectivo
 
@@ -62,3 +64,13 @@ scripts/almacen.sh comprobar --espacio <espacio-de-nombres>
 
 - **Comprobado con pruebas:** la definición cumple las reglas (cada credencial solo hace lo que consta y se rechaza lo ajeno, incluidos los libros y los respaldos, el registro frente a los sellos y todo intento de borrar o sobrescribir; la retención y el bloqueo de cada contenedor; el ciclo de vida nunca antes que la retención), el script genera los comandos y las sentencias esperados, rechaza definiciones inválidas y `comprobar` detecta cada diferencia con un doble del CLI.
 - **No comprobado aquí (spike T02):** que el almacén de Oracle acepte la sintaxis de las sentencias IAM tal como se emiten, que la retención sea por contenedor, que `crear` rechace una clave repetida y cuándo ejecuta el almacén el ciclo de vida. La forma de las respuestas del CLI que usa `comprobar` (`time-amount`, `time-unit`, `time-rule-locked`, `is-enabled`) se contrastará con el compartimento de prueba del spike.
+
+## Almacén del catálogo (portadas y libros)
+
+Lo pidió `ecommerce-catalogo` (R05, T17) y se agregó sin tarea propia de `transversal-plataforma` (fila «R05 del catálogo» de su `decisiones-de-implementacion.md`):
+
+- **Contenedores.** `libros` (los archivos digitales) y `portadas`, ambos privados, sin retención con bloqueo y sin expiración: el Catálogo borra lo que ya no sirve (reemplazos y descartes) con su propia credencial y la web sirve las portadas por huella, nunca por el almacén.
+- **Subidas incompletas.** `contenedores.txt` admite una quinta columna opcional (`subidas_dias`): los días tras los cuales el ciclo de vida aborta una subida multipart incompleta (`action: ABORT`, `target: multipart-uploads`). `libros` y `portadas` la fijan en 1 día. `scripts/almacen.sh` la genera en `ciclo-de-vida.json`, la aplica y `comprobar` verifica que sea la **última** regla de la política y que ninguna regla retire objetos en esos contenedores.
+- **Credenciales.** `catalogo-archivos` (crear, leer y borrar, sin sobrescribir ni listar) y `biblioteca-lector` (solo leer `libros`); `cuota-lectura` mide también `portadas`. Reemplazan a la credencial genérica `libros`, que nadie usaba todavía.
+- **Variables de entorno (convención, aún sin consumidor).** `BABELHUB__Almacen__Catalogo__Endpoint`, `…__Region`, `…__ClaveDeAcceso` y `…__ClaveSecreta` para `catalogo-archivos`, y `BABELHUB__Almacen__Biblioteca__…` para `biblioteca-lector`, en el archivo de secretos de VM-VENTAS. Se añaden a `infra/secretos-requeridos.txt` junto con el código que las lee (ECO-2c T17 y el bloque de la biblioteca), para no exigir en el despliegue claves que nada usa.
+- **Por confirmar en el spike T02** (como el resto): que el permiso `OBJECT_READ` baste para las lecturas por rango y para las URL firmadas de la biblioteca, que abortar subidas multipart incompletas no exija otro permiso y que el almacén acepte `target: multipart-uploads` con `ABORT` en la política tal como se emite.
