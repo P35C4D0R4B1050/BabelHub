@@ -248,6 +248,9 @@ internal sealed class EntornoDelCatalogo
         ConsumirReferencia = new ConsumirReferenciaDeArchivo(Referencias, Reloj);
         Constructor = new ConstructorDeEdiciones(ConsumirReferencia, Reloj);
         IngresosIniciales = new SolicitudDeIngresosIniciales(Ingresos, Emisor, Reloj);
+        Lecturas = new LecturasDelCatalogoEnMemoria(Obras);
+        Resolutor = new ResolutorDeDisponibilidad(Inventario, Memoria, Reloj);
+        Consulta = new ConsultaDeCatalogoDeLaAplicacion(Lecturas, Resolutor, Reloj, Lecturas);
     }
 
     public ActorDePrueba Actor { get; }
@@ -283,6 +286,12 @@ internal sealed class EntornoDelCatalogo
     public ConstructorDeEdiciones Constructor { get; }
 
     public SolicitudDeIngresosIniciales IngresosIniciales { get; }
+
+    public LecturasDelCatalogoEnMemoria Lecturas { get; }
+
+    public ResolutorDeDisponibilidad Resolutor { get; }
+
+    public ConsultaDeCatalogoDeLaAplicacion Consulta { get; }
 
     private readonly Guid _usuarioPorOmision = Guid.NewGuid();
 
@@ -341,4 +350,61 @@ internal sealed class EntornoDelCatalogo
         Assert.True(resultado.EsExito, resultado.Error?.Clave);
         return (await Obras.Obtener(resultado.Valor.ObraId, false))!;
     }
+}
+
+/// <summary>La lectura del catálogo sobre el repositorio en memoria: texto con subcadena sin distinguir mayúsculas ni tildes, filtros por formato y precio, orden por título e identificador, y azar controlado.</summary>
+internal sealed class LecturasDelCatalogoEnMemoria(RepositorioDeObrasEnMemoria obras) : ILecturasDelCatalogo, IAzarDelCatalogo
+{
+    public int ContarCandidatasLlamadas { get; private set; }
+
+    /// <summary>La posición que elegirá <see cref="Siguiente"/> (módulo la cantidad).</summary>
+    public int Eleccion { get; set; }
+
+    private static string Normalizar(string? texto) =>
+        new string((texto ?? string.Empty).Normalize(System.Text.NormalizationForm.FormD).Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark).ToArray()).ToUpperInvariant();
+
+    private IEnumerable<Obra> Activas() => obras.Todas.Where(o => !o.EstaDadaDeBaja).OrderBy(o => o.Titulo, StringComparer.Ordinal).ThenBy(o => o.Id);
+
+    private static bool Candidata(Edicion e, FiltrosDeObras f) =>
+        !e.EstaDadaDeBaja
+        && (f.Formato is null || (f.Formato == FormatoDeEdicion.Digital) == e.EsDigital)
+        && (f.PrecioMinimo is null || e.Precio.Valor >= f.PrecioMinimo)
+        && (f.PrecioMaximo is null || e.Precio.Valor <= f.PrecioMaximo);
+
+    private IEnumerable<Obra> Cumplen(FiltrosDeObras f) =>
+        Activas().Where(o =>
+            (string.IsNullOrEmpty(f.Texto) || Normalizar(o.Titulo).Contains(Normalizar(f.Texto), StringComparison.Ordinal))
+            && (string.IsNullOrEmpty(f.Autor) || Normalizar(o.Autor).Contains(Normalizar(f.Autor), StringComparison.Ordinal))
+            && (string.IsNullOrEmpty(f.Editorial) || Normalizar(o.Editorial).Contains(Normalizar(f.Editorial), StringComparison.Ordinal))
+            && (string.IsNullOrEmpty(f.Categoria) || Normalizar(o.Categoria) == Normalizar(f.Categoria))
+            && o.Ediciones.Any(e => Candidata(e, f)));
+
+    public Task<PaginaDeObrasDeLaBase> Buscar(FiltrosDeObras filtros, int pagina, int tamano, CancellationToken cancelacion = default)
+    {
+        var todas = Cumplen(filtros).ToList();
+        return Task.FromResult(new PaginaDeObrasDeLaBase(todas.Skip((pagina - 1) * tamano).Take(tamano).Select(RepositorioDeObrasEnMemoria.Clonar).ToList(), todas.Count));
+    }
+
+    public Task<(int Obras, int Ediciones)> ContarCandidatas(FiltrosDeObras filtros, CancellationToken cancelacion = default)
+    {
+        ContarCandidatasLlamadas++;
+        var cumplen = Cumplen(filtros).ToList();
+        return Task.FromResult((cumplen.Count, cumplen.Sum(o => o.Ediciones.Count(e => Candidata(e, filtros)))));
+    }
+
+    public Task<IReadOnlyList<Obra>> TodasLasQueCumplen(FiltrosDeObras filtros, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Obra>>(Cumplen(filtros).Select(RepositorioDeObrasEnMemoria.Clonar).ToList());
+
+    public Task<Obra?> ObraPorId(Guid obraId, CancellationToken cancelacion = default) =>
+        Task.FromResult(obras.Todas.FirstOrDefault(o => o.Id == obraId) is { } o ? RepositorioDeObrasEnMemoria.Clonar(o) : null);
+
+    public Task<IReadOnlyList<EdicionConObra>> EdicionesPorId(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<EdicionConObra>>(
+            edicionIds.Distinct().Select(id => obras.Todas.FirstOrDefault(o => o.BuscarEdicion(id) is not null)).OfType<Obra>().DistinctBy(o => o.Id).Select(RepositorioDeObrasEnMemoria.Clonar)
+                .SelectMany(o => o.Ediciones.Where(e => edicionIds.Contains(e.Id)).Select(e => new EdicionConObra(o, e))).ToList());
+
+    public Task<IReadOnlyList<Obra>> ObrasAlAzar(int cantidad, IReadOnlyCollection<Guid> excluidas, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Obra>>(Activas().Where(o => !excluidas.Contains(o.Id)).Take(cantidad).Select(RepositorioDeObrasEnMemoria.Clonar).ToList());
+
+    public int Siguiente(int maximoExclusivo) => Eleccion % maximoExclusivo;
 }
