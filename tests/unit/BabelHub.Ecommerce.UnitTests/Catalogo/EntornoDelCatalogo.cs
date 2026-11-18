@@ -313,6 +313,9 @@ internal sealed class EntornoDelCatalogo
     public ICasoDeUso<DarDeBajaEdicionEntrada, ResultadoDeEscritura> DarDeBajaEdicion() =>
         Transaccional(new DarDeBajaEdicion(Autorizador, new ValidadorDeDarDeBajaEdicion(), Obras, Carritos, Auditoria, Reloj));
 
+    public ICasoDeUso<RetirarEdicionDigitalEntrada, ResultadoDeEscritura> RetirarEdicionDigital() =>
+        Transaccional(new RetirarEdicionDigital(Autorizador, new ValidadorDeRetirarEdicionDigital(), Obras, Auditoria, Reloj));
+
     // ---------- Datos de prueba ----------
 
     public Guid PortadaLista(Guid? usuario = null) => Referencias.SembrarLista(usuario ?? UsuarioId, FinalidadDeArchivo.Portada, TipoDeArchivo.Jpeg, Reloj.Ahora);
