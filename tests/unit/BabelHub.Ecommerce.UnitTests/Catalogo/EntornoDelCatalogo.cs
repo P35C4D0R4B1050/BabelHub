@@ -307,6 +307,12 @@ internal sealed class EntornoDelCatalogo
     public ICasoDeUso<EditarEdicionEntrada, ResultadoDeEscritura> EditarEdicion() =>
         Transaccional(new EditarEdicion(Autorizador, new ValidadorDeEditarEdicion(), ConsumirReferencia, Constructor, Obras, Referencias, Auditoria, Reloj));
 
+    public ICasoDeUso<DarDeBajaObraEntrada, ResultadoDeEscritura> DarDeBajaObra() =>
+        Transaccional(new DarDeBajaObra(Autorizador, new ValidadorDeDarDeBajaObra(), Obras, Carritos, Auditoria, Reloj));
+
+    public ICasoDeUso<DarDeBajaEdicionEntrada, ResultadoDeEscritura> DarDeBajaEdicion() =>
+        Transaccional(new DarDeBajaEdicion(Autorizador, new ValidadorDeDarDeBajaEdicion(), Obras, Carritos, Auditoria, Reloj));
+
     // ---------- Datos de prueba ----------
 
     public Guid PortadaLista(Guid? usuario = null) => Referencias.SembrarLista(usuario ?? UsuarioId, FinalidadDeArchivo.Portada, TipoDeArchivo.Jpeg, Reloj.Ahora);
