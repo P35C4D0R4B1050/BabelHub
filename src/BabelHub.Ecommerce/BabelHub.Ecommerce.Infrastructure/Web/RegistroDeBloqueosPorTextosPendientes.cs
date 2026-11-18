@@ -16,7 +16,7 @@ namespace BabelHub.Ecommerce.Infrastructure.Web;
 /// </summary>
 public sealed class RegistroDeBloqueosPorTextosPendientes(IRegistroDeSeguridad registro, IAlertas alertas, IReloj reloj)
 {
-    /// <summary>Cuántos bloqueos en una ventana de 15 minutos se consideran anómalos. Valor inicial a confirmar con la persona responsable (<c>progress/hallazgos.md</c>).</summary>
+    /// <summary>Cuántos bloqueos en una ventana de 15 minutos se consideran anómalos. Valor confirmado por la persona responsable el 2026-11-18 (<c>progress/hallazgos.md</c>).</summary>
     public const int UmbralPorVentana = 50;
 
     public static readonly TimeSpan Ventana = TimeSpan.FromMinutes(15);
