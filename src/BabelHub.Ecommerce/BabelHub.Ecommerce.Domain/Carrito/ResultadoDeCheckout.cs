@@ -111,3 +111,19 @@ public enum MotivoDePagoResuelto
     Rechazado,
     Compensado,
 }
+
+/// <summary>Por qué se elimina el contacto de entrega de un checkout (CAR-34): lista cerrada, para el conteo de la auditoría (sin datos personales).</summary>
+public enum MotivoDeEliminacionDeContacto
+{
+    PagoAprobado,
+    Cancelar,
+    Reiniciar,
+    CambioARecojo,
+    CambioASoloDigital,
+
+    /// <summary>Pasaron 30 días desde la última modificación hecha por la persona (D08).</summary>
+    Vencido,
+
+    CuentaCancelada,
+    CuentaReemplazada,
+}

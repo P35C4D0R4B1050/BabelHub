@@ -14,6 +14,9 @@ public sealed class Checkout
     /// <summary>Un checkout <c>reservando</c> de más de dos minutos lo devuelve a <c>en_edicion</c> el trabajo de recuperación (D20).</summary>
     public static readonly TimeSpan DuracionMaximaDeReservando = TimeSpan.FromMinutes(2);
 
+    /// <summary>El contacto se elimina a los 30 días de la última modificación hecha por la persona (CAR-34, D08).</summary>
+    public static readonly TimeSpan RetencionDelContacto = TimeSpan.FromDays(30);
+
     private readonly List<LineaDelCheckout> _lineas;
     private PasoDelCheckout _pasoDeEdicion = PasoDelCheckout.Revision;
 
@@ -516,6 +519,43 @@ public sealed class Checkout
     /// <summary>Un <c>reservando</c> de dos minutos o más está atascado (un corte entre los pasos): lo recupera el trabajo de fondo (D20).</summary>
     public bool ReservandoVencido(DateTimeOffset ahora) => Estado == EstadoDelCheckout.Reservando && ReservandoDesde is { } desde && ahora - desde >= DuracionMaximaDeReservando;
 
+    /// <summary>
+    /// El contacto solo existe con el checkout vivo y a domicilio (el <c>CHECK</c> de la tabla, CAR-34): un checkout terminado, a recojo o solo digital nunca lo conserva. Toda transición mantiene esta regla.
+    /// </summary>
+    public bool CumpleLaRetencionDelContacto => Contacto is null || (EsVivo && TipoDeEntrega == Tipo.Domicilio);
+
+    /// <summary>
+    /// Pasaron 30 días desde la última modificación hecha por la persona (CAR-34, D08, AC-CAR-30): a los 30 días exactos vence y a 29 días y 23 horas no. Sin contacto no hay nada que vencer.
+    /// </summary>
+    public bool ContactoVencido(DateTimeOffset ahora) => Contacto is not null && ahora - ModificadoPorLaPersonaEn >= RetencionDelContacto;
+
+    /// <summary>
+    /// Elimina el contacto de entrega y anula la huella de instantánea (CAR-34): por vencimiento (solo en <c>en_edicion</c> y si ya venció; deja la entrega por elegir) o por cancelar o reemplazar la cuenta (en cualquier estado; el
+    /// checkout se elimina después). Sin contacto no cambia nada. No mueve la retención de la persona. Los demás motivos los aplican por sí solas las transiciones (aprobar el pago, cancelar, reiniciar, cambiar a recojo o a solo digital).
+    /// </summary>
+    public ResultadoDeCheckout EliminarContacto(MotivoDeEliminacionDeContacto motivo, DateTimeOffset ahora)
+    {
+        if (Contacto is null)
+        {
+            return ResultadoDeCheckout.SinCambios();
+        }
+
+        if (motivo == MotivoDeEliminacionDeContacto.Vencido && (Estado != EstadoDelCheckout.EnEdicion || !ContactoVencido(ahora)))
+        {
+            return ResultadoDeCheckout.De(EfectoDeTransicion.NoAplica);
+        }
+
+        QuitarContacto();
+        if (Estado == EstadoDelCheckout.EnEdicion && TipoDeEntrega == Tipo.Domicilio)
+        {
+            TipoDeEntrega = null;
+            RegionDeEntrega = null;
+        }
+
+        Cambiar(porLaPersona: false, ahora);
+        return ResultadoDeCheckout.Aplicada();
+    }
+
     /// <summary>La reserva se liberó en el Inventario (o ya no existía): quita la anotación.</summary>
     public void LiberacionConfirmada()
     {
@@ -567,6 +607,7 @@ public sealed class Checkout
                 return ResultadoDeCheckout.SinCambios();
             case EstadoDelCheckout.PagoPendiente or EstadoDelCheckout.EnPago:
                 Estado = EstadoDelCheckout.Pagado;
+                QuitarContacto();
                 LimitePendienteEn = null;
                 PagoPendienteDesde = null;
                 var retiradas = carrito.AplicarRetirosPendientes(ahora);
@@ -668,6 +709,7 @@ public sealed class Checkout
         }
 
         Estado = destino;
+        QuitarContacto();
         LimitePendienteEn = null;
         PagoPendienteDesde = null;
         ReservaALiberarDesde = PedidoId is not null && RequiereReserva ? ahora : ReservaALiberarDesde;
@@ -710,11 +752,26 @@ public sealed class Checkout
         }
     }
 
+    /// <summary>
+    /// Quita el contacto y anula la huella de instantánea junto con él (T06): la huella se calculó con el teléfono y no debe sobrevivirle. Es lo que hace toda salida a un estado terminal, el cambio a recojo o a solo digital y
+    /// <see cref="EliminarContacto"/>.
+    /// </summary>
+    private void QuitarContacto()
+    {
+        if (Contacto is null)
+        {
+            return;
+        }
+
+        Contacto = null;
+        HuellaDeInstantanea = null;
+    }
+
     private void LimpiarEntrega()
     {
         CodigoDeSucursalDeRecojo = null;
         RegionDeEntrega = null;
-        Contacto = null;
+        QuitarContacto();
     }
 
     private void Cambiar(bool porLaPersona, DateTimeOffset? ahora = null)
