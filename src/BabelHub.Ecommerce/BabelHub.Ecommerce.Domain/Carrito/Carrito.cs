@@ -216,6 +216,30 @@ public sealed class Carrito
         return ResultadoDeLinea.Exito(0);
     }
 
+    /// <summary>
+    /// Deja en el carrito de la cuenta las líneas que resultan de <see cref="Fusion.Fusionar"/> (CAR-24): las que ya estaban conservan su fecha y su orden y las nuevas llevan la de ahora. Un carrito fusionado no la admite.
+    /// </summary>
+    public bool AplicarFusion(ResultadoDeFusion resultado, DateTimeOffset ahora)
+    {
+        ArgumentNullException.ThrowIfNull(resultado);
+        if (Estado == EstadoDeCarrito.Fusionado)
+        {
+            return false;
+        }
+
+        var anteriores = _lineas.ToDictionary(l => l.EdicionId);
+        _lineas.Clear();
+        foreach (var fusionada in resultado.Lineas)
+        {
+            _lineas.Add(anteriores.TryGetValue(fusionada.EdicionId, out var anterior)
+                ? anterior.ConCantidad(fusionada.Cantidad)
+                : LineaDeCarrito.Crear(fusionada.EdicionId, fusionada.EsDigital, fusionada.Cantidad, ahora));
+        }
+
+        Tocar(ahora);
+        return true;
+    }
+
     /// <summary>El carrito se sumó al de una cuenta (CAR-24): queda <c>fusionado</c> y sin líneas.</summary>
     public void MarcarFusionado(DateTimeOffset ahora)
     {
