@@ -168,6 +168,21 @@ public sealed class CorreccionesDeLaRevisionDeEco2bTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-CAT-16")]
+    public async Task El_alta_con_stock_inicial_y_el_inventario_caido_avisa_la_ficha_sin_confirmar_y_deja_el_ingreso_fallido()
+    {
+        var e = new EntornoDelCatalogo();
+        e.Inventario.Caido = true;
+
+        var alta = await e.Administracion().RegistrarObra(e.Obra("Con stock sin ficha", e.EdicionImpresa(stock: 12)));
+
+        var impresa = e.Obras.Todas.Single().Ediciones.Single();
+        Assert.True(alta.EsExito);
+        Assert.Equal([impresa.Id], alta.Valor.FichasSinConfirmar);
+        Assert.Equal(EstadoDeIngresoSolicitado.Fallido, Assert.Single(alta.Valor.Ingresos).Estado);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-CAT-17")]
     public async Task La_administracion_ve_el_registro_pendiente_de_una_impresa_que_el_inventario_no_conoce_y_el_publico_la_ve_agotada()
     {

@@ -191,6 +191,12 @@ internal sealed class AdministracionDelCatalogoDeLaAplicacion(
             {
                 var estado = await orquestador.Enviar(fila, esReintento: false, cancelacion).ConfigureAwait(false);
                 resultado[pedido] = resultado[pedido] with { Estado = estado };
+
+                // Un primer envío fallido puede ser porque la ficha no se pudo confirmar (nada se envió) o porque el Inventario rechazó el ingreso: se comprueba la ficha para el aviso «registro pendiente» de la administración.
+                if (estado == EstadoDeIngresoSolicitado.Fallido && !await orquestador.RegistrarFicha(edicionId, cancelacion).ConfigureAwait(false))
+                {
+                    sinFicha.Add(edicionId);
+                }
             }
         }
 
