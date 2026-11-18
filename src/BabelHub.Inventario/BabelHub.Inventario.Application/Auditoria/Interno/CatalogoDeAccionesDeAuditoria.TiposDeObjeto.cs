@@ -97,6 +97,8 @@ public static partial class CatalogoDeAccionesDeAuditoria
         [nameof(AccionesAuditables.RecuperacionDeAccesoSolicitada)] = ["cuenta"],
         [nameof(AccionesAuditables.RecuperacionDeAccesoCompletada)] = ["cuenta"],
         [nameof(AccionesAuditables.SegundoFactorFallido)] = ["cuenta"],
+        [nameof(AccionesAuditables.CodigoDeUnSoloUsoRechazado)] = ["cuenta"],
+        [nameof(AccionesAuditables.RenovacionReutilizada)] = ["cuenta"],
         [nameof(AccionesAuditables.CodigoDeRespaldoUsado)] = ["cuenta"],
         [nameof(AccionesAuditables.ContrasenaCambiada)] = ["cuenta"],
         [nameof(AccionesAuditables.CorreoCambiado)] = ["cuenta"],

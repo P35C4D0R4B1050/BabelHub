@@ -26,6 +26,8 @@ public static partial class CatalogoDeAccionesDeAuditoria
         yield return Seguridad(nameof(AccionesAuditables.BloqueoTemporalAplicado), true, ["intentos-excedidos"], aislada: true);
         yield return Seguridad(nameof(AccionesAuditables.RecuperacionDeAccesoSolicitada), true, ["solicitud-de-recuperacion"], aislada: true);
         yield return Seguridad(nameof(AccionesAuditables.SegundoFactorFallido), true, ["codigo-invalido"], aislada: true);
+        yield return Seguridad(nameof(AccionesAuditables.CodigoDeUnSoloUsoRechazado), true, ["incorrecto", "vencido", "no-vigente", "intentos-agotados"], aislada: true);
+        yield return Seguridad(nameof(AccionesAuditables.RenovacionReutilizada), true, ["reutilizacion-de-renovacion"], aislada: true);
         yield return Seguridad(nameof(AccionesAuditables.CambioDeCorreoNoReconocidoRechazado), true, ["rechazado-por-el-titular"], aislada: true);
         yield return Seguridad(nameof(AccionesAuditables.CambioDeCorreoNoReconocidoVencido), true, ["vencido-sin-confirmar"], aislada: true);
 

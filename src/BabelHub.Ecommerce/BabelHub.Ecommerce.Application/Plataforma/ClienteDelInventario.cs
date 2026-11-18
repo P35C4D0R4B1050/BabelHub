@@ -92,6 +92,9 @@ public sealed record IngresoARegistrar(Guid EdicionId, string? CodigoDeFuente, i
 /// <summary>Un ingreso de mercadería registrado, con su fecha y el usuario que lo hizo.</summary>
 public sealed record IngresoRegistrado(Guid IngresoId, Guid EdicionId, string CodigoDeFuente, int Cantidad, string? Referencia, string? Nota, Guid? UsuarioId, DateTimeOffset Instante);
 
+/// <summary>Las reservas activas (pendientes no vencidas o confirmadas) de un titular, sin datos de las ediciones (IDE-27, SEL-33).</summary>
+public sealed record PendientesDeTitular(int ReservasActivas);
+
 /// <summary>Una sucursal tal como la ve quien elige un recojo o una sucursal preferida.</summary>
 public sealed record SucursalPublica(string Codigo, string Nombre, string Region);
 
@@ -124,6 +127,18 @@ public interface IClienteDelInventario
 
     /// <summary><c>inventario.ingresos.listar</c>: los últimos ingresos de una edición, del más reciente al más antiguo (hasta <paramref name="limite"/>, de 1 a 50; token del usuario, no es una lectura de servicio).</summary>
     Task<ResultadoDelInventario<IReadOnlyList<IngresoRegistrado>>> ListarIngresos(Guid edicionId, int limite, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// <c>inventario.titulares.consultar-pendientes</c>: cuántas reservas activas tiene el titular de una cuenta (alcance <c>consulta-de-pendientes</c>, sin token; IDE-27, SEL-33). El identificador viaja en el cuerpo, nunca en la ruta.
+    /// Es una lectura: se puede reintentar.
+    /// </summary>
+    Task<ResultadoDelInventario<PendientesDeTitular>> ConsultarPendientes(Guid titularId, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// <c>inventario.titulares.baja</c>: da de baja al titular de una cuenta cancelada (alcance <c>baja-de-titular</c>, sin token; IDE-64, SEL-34): el Inventario sustituye su identificador por uno anónimo estable. Repetirla no tiene efecto duplicado
+    /// (204 también al repetirla), así que se puede reintentar; Identidad la reintenta hasta que se acepta.
+    /// </summary>
+    Task<ResultadoDelInventario> DarDeBajaAlTitular(Guid titularId, CancellationToken cancelacion = default);
 
     /// <summary><c>inventario.sucursales.listar</c>: las sucursales para elegir recojo o sucursal preferida (alcance de lectura, sin token).</summary>
     Task<ResultadoDelInventario<IReadOnlyList<SucursalPublica>>> ListarSucursales(CancellationToken cancelacion = default);

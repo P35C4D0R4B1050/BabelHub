@@ -90,6 +90,9 @@ public static class PresentadorDeAuditoria
         ["liberaciones-de-reservas-anomalas"] = "Más de 200 liberaciones de reservas en 5 minutos",
         ["bajas-de-titular-anomalas"] = "Más de 20 bajas de titular en un minuto",
         ["bloqueos-por-textos-pendientes"] = "Muchas acciones bloqueadas por textos legales pendientes",
+        ["cuota-de-correo-alta"] = "La cuota diaria de correo llegó al 80 %",
+        ["cupo-de-codigos-alto"] = "El cupo de códigos por correo llegó al 80 %",
+        ["renovacion-reutilizada"] = "Se reutilizó una renovación de sesión y se cerró su familia",
     };
 
     public static PaginaDeAuditoriaVista Presentar(PaginaDeRegistros pagina)
