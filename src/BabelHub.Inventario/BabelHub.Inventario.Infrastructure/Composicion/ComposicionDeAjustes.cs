@@ -8,6 +8,7 @@ using BabelHub.Inventario.Infrastructure.Ajustes;
 using BabelHub.Inventario.Infrastructure.Plataforma;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Npgsql;
 
 namespace BabelHub.Inventario.Infrastructure.Composicion;
@@ -130,7 +131,7 @@ public static class ComposicionDeTrabajosDeAjustes
 
         servicios.AgregarEjecutorDeTrabajoDeFondo();
         servicios.TryAddSingleton(sp => new BloqueoDeInstanciaUnica(sp.GetRequiredService<NpgsqlDataSource>()));
-        servicios.AddHostedService(sp => new ServicioDeTrabajosDeReservas([TrabajosDeAjustes.Depurar(sp)]));
+        servicios.AddSingleton<IHostedService>(sp => new ServicioDeTrabajosDeReservas([TrabajosDeAjustes.Depurar(sp)]));
         return servicios;
     }
 }

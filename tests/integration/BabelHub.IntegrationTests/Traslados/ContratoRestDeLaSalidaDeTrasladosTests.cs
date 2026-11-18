@@ -273,7 +273,6 @@ public sealed class ContratoRestDeLaSalidaDeTrasladosTests(PostgresDeReservasFix
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-08")]
     public async Task LaCredencialSolicitarAvisoSoloValeEnLasDosRutasDeIntegracion_EnOtraSeRechaza()
     {
         await using var ecommerce = await EcommerceDeContrato.Iniciar();
@@ -288,7 +287,6 @@ public sealed class ContratoRestDeLaSalidaDeTrasladosTests(PostgresDeReservasFix
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-08")]
     public async Task UnaLlamadaSinAlcanceDeclaradoNoSale()
     {
         await using var ecommerce = await EcommerceDeContrato.Iniciar();

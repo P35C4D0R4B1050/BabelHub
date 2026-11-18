@@ -66,13 +66,14 @@ internal sealed class NpgsqlColaDeMensajesSalientes(AccesoATraslados acceso) : I
             },
             cancelacion);
 
-    public Task MarcarFallido(Guid mensajeId, MotivoDeFalloDeMensaje motivo, int intentos, CancellationToken cancelacion = default) =>
+    public Task MarcarFallido(Guid mensajeId, MotivoDeFalloDeMensaje motivo, int intentos, DateTimeOffset ahora, CancellationToken cancelacion = default) =>
         Actualizar(
-            "UPDATE traslados.mensajes_salientes SET estado = 'fallido', intentos = @intentos, motivo_de_fallo = @motivo, arrendado_hasta = NULL WHERE id = @id AND estado = 'pendiente'",
+            "UPDATE traslados.mensajes_salientes SET estado = 'fallido', intentos = @intentos, motivo_de_fallo = @motivo, fallido_en = @ahora, arrendado_hasta = NULL WHERE id = @id AND estado = 'pendiente'",
             mensajeId,
             comando =>
             {
                 comando.Parameters.AddWithValue("intentos", intentos);
+                comando.Parameters.Add(new NpgsqlParameter("ahora", NpgsqlDbType.TimestampTz) { Value = ahora.ToUniversalTime() });
                 comando.Parameters.AddWithValue("motivo", motivo switch { MotivoDeFalloDeMensaje.Credencial => "credencial", MotivoDeFalloDeMensaje.Vencido => "vencido", _ => "permanente" });
             },
             cancelacion);
@@ -81,7 +82,7 @@ internal sealed class NpgsqlColaDeMensajesSalientes(AccesoATraslados acceso) : I
         acceso.Ejecutar(
             async (conexion, transaccion, token) =>
             {
-                await using var comando = new NpgsqlCommand("DELETE FROM traslados.mensajes_salientes WHERE estado <> 'pendiente' AND coalesce(enviado_en, creado_en) < @antes", conexion, transaccion);
+                await using var comando = new NpgsqlCommand("DELETE FROM traslados.mensajes_salientes WHERE estado <> 'pendiente' AND coalesce(enviado_en, fallido_en, creado_en) < @antes", conexion, transaccion);
                 comando.Parameters.Add(new NpgsqlParameter("antes", NpgsqlDbType.TimestampTz) { Value = antesDe.ToUniversalTime() });
                 return await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);
             },

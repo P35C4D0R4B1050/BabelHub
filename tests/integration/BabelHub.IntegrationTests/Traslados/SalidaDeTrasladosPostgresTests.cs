@@ -178,9 +178,12 @@ public sealed class SalidaDeTrasladosPostgresTests(PostgresDeReservasFixture bd)
         Avanzar(escenario, TimeSpan.FromHours(3));
         var despues = await Entregar(escenario);
 
-        Assert.Equal(4L, await bd.Consultar<long>($"SELECT count(*) FROM traslados.mensajes_salientes WHERE estado = 'fallido' AND motivo_de_fallo = '{motivo}'"));
-        Assert.Equal(0, despues.Valor.Reclamados);
-        Assert.Equal(4, escenario.Pila.AlertasPublicadas.Tecnicas.Count(t => t == "dependencia-no-necesaria-fallida"));
+        // Una credencial rechazada corta cada corrida tras el primer mensaje (dos corridas, dos fallidos); un error permanente falla cada mensaje.
+        var fallidos = motivo == "credencial" ? 2 : 4;
+        Assert.Equal(fallidos, await bd.Consultar<long>($"SELECT count(*) FROM traslados.mensajes_salientes WHERE estado = 'fallido' AND motivo_de_fallo = '{motivo}' AND fallido_en IS NOT NULL"));
+        Assert.Equal(motivo == "credencial" ? 2L : 0L, await bd.Consultar<long>("SELECT count(*) FROM traslados.mensajes_salientes WHERE estado = 'pendiente'"));
+        Assert.Equal(motivo == "credencial" ? 3 : 0, despues.Valor.Reclamados);
+        Assert.Equal(fallidos, escenario.Pila.AlertasPublicadas.Tecnicas.Count(t => t == "dependencia-no-necesaria-fallida"));
     }
 
     [Fact]
@@ -320,7 +323,6 @@ public sealed class SalidaDeTrasladosPostgresTests(PostgresDeReservasFixture bd)
     // ---------- Depuración y trabajos de fondo ----------
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-21")]
     public async Task ALos2AnosSeAnonimizaElSolicitanteYLosTextos_ConElRelojControlado_ConservandoElMovimiento()
     {
         var ecommerce = new EcommerceSimulado();
@@ -345,7 +347,6 @@ public sealed class SalidaDeTrasladosPostgresTests(PostgresDeReservasFixture bd)
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-21")]
     public async Task ALos30DiasSePurganLosMensajesEnviadosOFallidos_NuncaLosPendientes()
     {
         var ecommerce = new EcommerceSimulado();

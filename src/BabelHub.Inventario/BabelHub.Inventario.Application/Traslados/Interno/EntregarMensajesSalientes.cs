@@ -34,9 +34,9 @@ internal interface IColaDeMensajesSalientes
 
     Task Reprogramar(Guid mensajeId, int intentos, DateTimeOffset proximaFecha, bool alertado, CancellationToken cancelacion = default);
 
-    Task MarcarFallido(Guid mensajeId, MotivoDeFalloDeMensaje motivo, int intentos, CancellationToken cancelacion = default);
+    Task MarcarFallido(Guid mensajeId, MotivoDeFalloDeMensaje motivo, int intentos, DateTimeOffset ahora, CancellationToken cancelacion = default);
 
-    /// <summary>Borra los mensajes enviados o fallidos de más de 30 días (plan §3): devuelve cuántos.</summary>
+    /// <summary>Borra los mensajes enviados o fallidos hace más de 30 días, contados desde el envío o desde el fallo (plan §3): devuelve cuántos.</summary>
     Task<int> PurgarTerminados(DateTimeOffset antesDe, CancellationToken cancelacion = default);
 }
 
@@ -105,6 +105,17 @@ internal sealed class EntregarMensajesSalientes(
                 default: fallidos++; break;
             }
 
+            // Una credencial rechazada vale para todo lo que sigue: se corta la corrida y el resto queda pendiente (su arrendamiento vence solo), en vez de dejar fallido todo el lote.
+            if (resultado == ResultadoDeEnvio.CredencialRechazada)
+            {
+                if (alertar)
+                {
+                    await Alertar(cancelacion).ConfigureAwait(false);
+                }
+
+                break;
+            }
+
             if (alertar)
             {
                 await Alertar(cancelacion).ConfigureAwait(false);
@@ -131,18 +142,18 @@ internal sealed class EntregarMensajesSalientes(
                 return (EstadoDeLaEntrega.Enviado, false);
 
             case ResultadoDeEnvio.Permanente:
-                await cola.MarcarFallido(mensaje.Id, MotivoDeFalloDeMensaje.Permanente, intentos, cancelacion).ConfigureAwait(false);
+                await cola.MarcarFallido(mensaje.Id, MotivoDeFalloDeMensaje.Permanente, intentos, ahora, cancelacion).ConfigureAwait(false);
                 return (EstadoDeLaEntrega.Fallido, true);
 
             case ResultadoDeEnvio.CredencialRechazada:
-                await cola.MarcarFallido(mensaje.Id, MotivoDeFalloDeMensaje.Credencial, intentos, cancelacion).ConfigureAwait(false);
+                await cola.MarcarFallido(mensaje.Id, MotivoDeFalloDeMensaje.Credencial, intentos, ahora, cancelacion).ConfigureAwait(false);
                 return (EstadoDeLaEntrega.Fallido, true);
 
             default:
                 var edad = ahora - mensaje.CreadoEn;
                 if (mensaje.Tipo == TiposDeMensaje.Aviso && edad >= PlanDeEntrega.EdadMaxima)
                 {
-                    await cola.MarcarFallido(mensaje.Id, MotivoDeFalloDeMensaje.Vencido, intentos, cancelacion).ConfigureAwait(false);
+                    await cola.MarcarFallido(mensaje.Id, MotivoDeFalloDeMensaje.Vencido, intentos, ahora, cancelacion).ConfigureAwait(false);
                     return (EstadoDeLaEntrega.Fallido, true);
                 }
 

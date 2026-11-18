@@ -234,7 +234,6 @@ public sealed class ApiDeTrasladosTests(PostgresDeReservasFixture bd) : IClassFi
     }
 
     [Theory]
-    [Trait("Criterio", "AC-TRA-19")]
     [InlineData("{\"edicionId\":\"00000000-0000-0000-0000-000000000001\",\"cantidad\":1,\"codigoDeOrigen\":\"cusco\",\"codigoDeDestino\":\"ayacucho\",\"motivo\":\"x\",\"actor\":\"yo\"}")]
     [InlineData("{\"cantidad\":1}")]
     [InlineData("no es json")]
@@ -251,7 +250,6 @@ public sealed class ApiDeTrasladosTests(PostgresDeReservasFixture bd) : IClassFi
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-19")]
     public async Task LaListaValidaSusParametros_ConElAlcancePrimero()
     {
         var (lima, _, ayacucho, _) = await Escenario();
@@ -269,7 +267,6 @@ public sealed class ApiDeTrasladosTests(PostgresDeReservasFixture bd) : IClassFi
     // ---------- Presupuesto y textos libres ----------
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-11")]
     public async Task ElIntento31DeTrasladosDelPersonalEsUn429UniformeConRetryAfter_OtroEncargadoNoSeAfecta()
     {
         var (_, _, ayacucho, libro) = await Escenario();
@@ -334,7 +331,6 @@ public sealed class ApiDeTrasladosTests(PostgresDeReservasFixture bd) : IClassFi
     // ---------- Superficie ----------
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-15")]
     public void NingunEndpointAlcanzaLosPuertosDeReservasNiLosTrabajosDeFondo()
     {
         var rutas = _api.Endpoints.Where(e => e.Metadata.GetMetadata<OperacionDeServicioAttribute>()?.Operacion.Valor.StartsWith("inventario.traslados.", StringComparison.Ordinal) == true).ToList();
@@ -346,7 +342,6 @@ public sealed class ApiDeTrasladosTests(PostgresDeReservasFixture bd) : IClassFi
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-15")]
     public void CadaOperacionDeTrasladosDeEco0TieneSuEndpoint_ConElAlcanceOperacionDeUsuario()
     {
         var deEco0 = OperacionesDelInventario.Todas.Where(o => o.Nombre.StartsWith("inventario.traslados.", StringComparison.Ordinal)).Select(o => o.Nombre).ToList();

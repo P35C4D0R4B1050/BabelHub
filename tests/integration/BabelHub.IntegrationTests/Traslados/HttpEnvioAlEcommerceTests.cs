@@ -126,7 +126,6 @@ public sealed class HttpEnvioAlEcommerceTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-08")]
     public async Task ElAvisoNoLlevaTextoLibre_SoloCamposTipados()
     {
         var manejador = new ManejadorFijo(_ => new HttpResponseMessage(HttpStatusCode.Accepted));

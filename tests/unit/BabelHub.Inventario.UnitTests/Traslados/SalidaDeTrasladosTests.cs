@@ -222,10 +222,13 @@ public sealed class SalidaDeTrasladosTests
         entorno.Base.Reloj.Ahora = EntornoDeTraslados.Ahora.AddHours(3);
         var despues = await entorno.Entrega().Ejecutar(new EntregarMensajesSalientesEntrada());
 
-        Assert.Equal(2, resultado.Valor.Fallidos);
-        Assert.All(entorno.Buzon.Mensajes, m => Assert.Equal(("fallido", motivo), (entorno.Cola.De(m).Valor, entorno.Cola.De(m).MotivoDeFallo)));
-        Assert.Equal(["dependencia-no-necesaria-fallida", "dependencia-no-necesaria-fallida"], entorno.Alertas.Tecnicas.ToArray());
-        Assert.Equal(0, despues.Valor.Reclamados);
+        // Una credencial rechazada corta la corrida: solo el primero queda fallido y el resto sigue pendiente; un error permanente falla cada mensaje.
+        var fallidos = motivo == "credencial" ? 1 : 2;
+        Assert.Equal(fallidos, resultado.Valor.Fallidos);
+        Assert.All(entorno.Buzon.Mensajes.Where(m => entorno.Cola.De(m).Valor == "fallido"), m => Assert.Equal(motivo, entorno.Cola.De(m).MotivoDeFallo));
+        Assert.Equal(2, entorno.Buzon.Mensajes.Count(m => entorno.Cola.De(m).Valor == "fallido"));
+        Assert.Equal(2, entorno.Alertas.Tecnicas.Count);
+        Assert.Equal(motivo == "credencial" ? 1 : 0, despues.Valor.Reclamados);
     }
 
     [Fact]
@@ -300,7 +303,6 @@ public sealed class SalidaDeTrasladosTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-08")]
     public void LasAlertasDeLaSalidaUsanSoloMotivosDelCatalogoCerrado()
     {
         var catalogo = BabelHub.Inventario.Application.Auditoria.Interno.CatalogoDeAlertasDeAuditoria.Crear();
@@ -380,7 +382,6 @@ public sealed class SalidaDeTrasladosTests
     // ---------- T21: depuración ----------
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-21")]
     public async Task ALos2AnosSeAnonimizaElSolicitanteYSeVacianLosTextos_ConservandoElMovimiento_YRepetirNoCambiaNada()
     {
         var (entorno, edicion) = Preparar();
@@ -400,7 +401,6 @@ public sealed class SalidaDeTrasladosTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-21")]
     public async Task ALos30DiasSePurganLosMensajesEnviadosOFallidos_NuncaLosPendientes()
     {
         var (entorno, edicion) = Preparar();
@@ -412,7 +412,7 @@ public sealed class SalidaDeTrasladosTests
         var recienteEnviado = new MensajeSaliente(Guid.NewGuid(), "aviso", $"traslado:{traslado.Id:D}:recibido", "cusco", "{}", ahora.AddDays(-5));
         await entorno.Buzon.Insertar([pendienteViejo, recienteEnviado]);
         await entorno.Cola.MarcarEnviado(viejos.First().Id, ahora.AddDays(-31));
-        await entorno.Cola.MarcarFallido(viejos.Last().Id, MotivoDeFalloDeMensaje.Permanente, 1);
+        await entorno.Cola.MarcarFallido(viejos.Last().Id, MotivoDeFalloDeMensaje.Permanente, 1, ahora.AddDays(-31));
         await entorno.Cola.MarcarEnviado(recienteEnviado.Id, ahora.AddDays(-5));
 
         var resultado = await entorno.Depuracion().Ejecutar(new DepurarTrasladosEntrada());
@@ -422,8 +422,7 @@ public sealed class SalidaDeTrasladosTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-21")]
-    public async Task SoloElActorSistemaDepura_YUnLoteLlenoSigueHastaVaciarse()
+    public async Task SoloElActorSistemaDepura()
     {
         var (entorno, _) = Preparar();
         entorno.Como(RolesDeUsuario.PersonalDeLogistica);

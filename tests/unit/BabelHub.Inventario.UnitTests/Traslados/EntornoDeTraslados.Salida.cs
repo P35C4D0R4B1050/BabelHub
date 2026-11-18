@@ -27,6 +27,8 @@ internal sealed class ColaDeMensajesEnMemoria(BuzonDeSalidaEnMemoria buzon) : IC
         public string? MotivoDeFallo { get; set; }
 
         public DateTimeOffset? EnviadoEn { get; set; }
+
+        public DateTimeOffset? FallidoEn { get; set; }
     }
 
     public Dictionary<Guid, Estado> Estados { get; } = [];
@@ -83,16 +85,16 @@ internal sealed class ColaDeMensajesEnMemoria(BuzonDeSalidaEnMemoria buzon) : IC
         return Task.CompletedTask;
     }
 
-    public Task MarcarFallido(Guid mensajeId, MotivoDeFalloDeMensaje motivo, int intentos, CancellationToken cancelacion = default)
+    public Task MarcarFallido(Guid mensajeId, MotivoDeFalloDeMensaje motivo, int intentos, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
         var e = De(mensajeId);
-        (e.Valor, e.Intentos, e.ArrendadoHasta, e.MotivoDeFallo) = ("fallido", intentos, null, motivo.ToString().ToLowerInvariant());
+        (e.Valor, e.Intentos, e.ArrendadoHasta, e.MotivoDeFallo, e.FallidoEn) = ("fallido", intentos, null, motivo.ToString().ToLowerInvariant(), ahora);
         return Task.CompletedTask;
     }
 
     public Task<int> PurgarTerminados(DateTimeOffset antesDe, CancellationToken cancelacion = default)
     {
-        var purgables = buzon.Mensajes.Where(m => De(m).Valor != "pendiente" && (De(m).EnviadoEn ?? m.CreadoEn) < antesDe).ToList();
+        var purgables = buzon.Mensajes.Where(m => De(m).Valor != "pendiente" && (De(m).EnviadoEn ?? De(m).FallidoEn ?? m.CreadoEn) < antesDe).ToList();
         foreach (var m in purgables)
         {
             buzon.Mensajes.Remove(m);

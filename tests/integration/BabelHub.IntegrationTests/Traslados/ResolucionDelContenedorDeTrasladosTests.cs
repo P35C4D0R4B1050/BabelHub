@@ -20,7 +20,6 @@ public sealed class ResolucionDelContenedorDeTrasladosTests(PostgresDeReservasFi
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Theory]
-    [Trait("Criterio", "AC-TRA-15")]
     [InlineData(false)]
     [InlineData(true)]
     public async Task ElContenedorResuelveTodasLasPiezasDeTrasladosSinCiclos_EnCualquierOrdenDeRegistro(bool reservasPrimero)
@@ -52,7 +51,6 @@ public sealed class ResolucionDelContenedorDeTrasladosTests(PostgresDeReservasFi
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-15")]
     public async Task LosPuertosDeReservasNoSonCasosDeUsoExpuestos_NiLaGeneracionNiLaCancelacionPorPedido()
     {
         await bd.AgregarFuente("lima", recepcion: true);

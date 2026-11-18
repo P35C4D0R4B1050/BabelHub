@@ -8,6 +8,7 @@ using BabelHub.Inventario.Infrastructure.Plataforma;
 using BabelHub.Inventario.Infrastructure.Traslados;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Npgsql;
 
 namespace BabelHub.Inventario.Infrastructure.Composicion;
@@ -116,11 +117,23 @@ internal sealed class EnvioAlEcommerceNoConfigurado : IEnvioAlEcommerce
 /// <summary>Registro de la salida real al E-commerce (T19): el cliente de servicio con la credencial <c>solicitar-aviso</c>, el plazo de 10 segundos y la resiliencia. El anfitrión pone, además, <see cref="OpcionesDeCredencialesDeSalida"/>.</summary>
 public static class ComposicionDeLaSalidaAlEcommerce
 {
-    public static IServiceCollection AgregarSalidaAlEcommerce(this IServiceCollection servicios, Uri direccion, OpcionesDelClienteDeServicio? opciones = null)
+    /// <param name="servicios">El registro de dependencias.</param>
+    /// <param name="direccion">La dirección del E-commerce: <b>siempre HTTPS</b>, porque la credencial viaja en una cabecera (docs/05/03, plan §6).</param>
+    /// <param name="opciones">Plazos y resiliencia del cliente.</param>
+    /// <param name="permitirHttp">Solo para pruebas con un servidor en el bucle local: admite <c>http</c>. Nunca en producción.</param>
+    public static IServiceCollection AgregarSalidaAlEcommerce(this IServiceCollection servicios, Uri direccion, OpcionesDelClienteDeServicio? opciones = null, bool permitirHttp = false)
     {
         ArgumentNullException.ThrowIfNull(servicios);
         ArgumentNullException.ThrowIfNull(direccion);
-        servicios.AgregarClienteDeServicio(HttpEnvioAlEcommerce.NombreDelCliente, direccion, opciones).AddTypedClient<IEnvioAlEcommerce, HttpEnvioAlEcommerce>();
+        if (!direccion.IsAbsoluteUri || (direccion.Scheme != Uri.UriSchemeHttps && !(permitirHttp && direccion.Scheme == Uri.UriSchemeHttp)))
+        {
+            throw new ArgumentException("La salida al E-commerce va por HTTPS: la credencial de servicio viaja en una cabecera.", nameof(direccion));
+        }
+
+        // Sin seguir redirecciones: .NET solo retira «Authorization» al redirigir, así que la cabecera de la credencial de servicio llegaría al destino del «Location». Un 3xx es un error permanente.
+        servicios.AgregarClienteDeServicio(HttpEnvioAlEcommerce.NombreDelCliente, direccion, opciones)
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false })
+            .AddTypedClient<IEnvioAlEcommerce, HttpEnvioAlEcommerce>();
         return servicios;
     }
 }
@@ -186,7 +199,7 @@ public static class ComposicionDeTrabajosDeTraslados
 
         servicios.AgregarEjecutorDeTrabajoDeFondo();
         servicios.TryAddSingleton(sp => new BloqueoDeInstanciaUnica(sp.GetRequiredService<NpgsqlDataSource>()));
-        servicios.AddHostedService(sp => new ServicioDeTrabajosDeReservas([TrabajosDeTraslados.Entregar(sp), TrabajosDeTraslados.Revisar(sp), TrabajosDeTraslados.Depurar(sp)]));
+        servicios.AddSingleton<IHostedService>(sp => new ServicioDeTrabajosDeReservas([TrabajosDeTraslados.Entregar(sp), TrabajosDeTraslados.Revisar(sp), TrabajosDeTraslados.Depurar(sp)]));
         return servicios;
     }
 }
