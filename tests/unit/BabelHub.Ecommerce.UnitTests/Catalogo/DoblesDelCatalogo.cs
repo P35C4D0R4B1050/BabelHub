@@ -25,6 +25,52 @@ internal sealed class InventarioDelCatalogoDoble : IInventarioDelCatalogo
     /// <summary>Si es verdadero, el Inventario no responde a nada (caído).</summary>
     public bool Caido { get; set; }
 
+    /// <summary>Dice si hay una transacción abierta (el entorno la fija): llamar al Inventario dentro de una transacción es un error de diseño (D15).</summary>
+    public Func<bool>? EnTransaccion { get; set; }
+
+    /// <summary>Si es verdadero, toda llamada espera su token de cancelación (un Inventario colgado) y lanza al cancelarse, como un cliente HTTP.</summary>
+    public bool EsperaElToken { get; set; }
+
+    /// <summary>Como <see cref="EsperaElToken"/> pero solo para el ingreso (la ficha responde bien y el ingreso se cuelga).</summary>
+    public bool EsperaElTokenEnIngresos { get; set; }
+
+    public async Task<bool> RegistrarEdicionImpresa(Guid edicionId, CancellationToken cancelacion = default)
+    {
+        await Comprobar(cancelacion).ConfigureAwait(false);
+        return await RegistrarEdicionImpresaInterno(edicionId).ConfigureAwait(false);
+    }
+
+    public async Task<RespuestaDeDisponibilidad?> ConsultarDisponibilidad(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default)
+    {
+        await Comprobar(cancelacion).ConfigureAwait(false);
+        return await ConsultarDisponibilidadInterno(edicionIds).ConfigureAwait(false);
+    }
+
+    public async Task<RespuestaDeIngreso> RegistrarIngreso(SolicitudDeIngresoAlInventario solicitud, CancellationToken cancelacion = default)
+    {
+        await Comprobar(cancelacion, esIngreso: true).ConfigureAwait(false);
+        return await RegistrarIngresoInterno(solicitud).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<IngresoDelInventario>?> ListarIngresos(Guid edicionId, int limite, CancellationToken cancelacion = default)
+    {
+        await Comprobar(cancelacion).ConfigureAwait(false);
+        return await ListarIngresosInterno(edicionId, limite).ConfigureAwait(false);
+    }
+
+    private async Task Comprobar(CancellationToken cancelacion, bool esIngreso = false)
+    {
+        if (EnTransaccion?.Invoke() == true)
+        {
+            throw new InvalidOperationException("Se llamó al Inventario dentro de una transacción.");
+        }
+
+        if (EsperaElToken || (esIngreso && EsperaElTokenEnIngresos))
+        {
+            await Task.Delay(Timeout.Infinite, cancelacion).ConfigureAwait(false);
+        }
+    }
+
     public bool NoConfirmaLaFicha { get; set; }
 
     /// <summary>Si se fija, la siguiente respuesta de ingreso que se devuelve (por ejemplo, un rechazo conocido); se consume en cada llamada.</summary>
@@ -43,7 +89,7 @@ internal sealed class InventarioDelCatalogoDoble : IInventarioDelCatalogo
 
     public DateTimeOffset Ahora { get; set; } = new(2026, 11, 14, 10, 0, 0, TimeSpan.FromHours(-5));
 
-    public Task<bool> RegistrarEdicionImpresa(Guid edicionId, CancellationToken cancelacion = default)
+    private Task<bool> RegistrarEdicionImpresaInterno(Guid edicionId)
     {
         if (Caido || NoConfirmaLaFicha)
         {
@@ -59,7 +105,7 @@ internal sealed class InventarioDelCatalogoDoble : IInventarioDelCatalogo
         return Task.FromResult(true);
     }
 
-    public Task<RespuestaDeDisponibilidad?> ConsultarDisponibilidad(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default)
+    private Task<RespuestaDeDisponibilidad?> ConsultarDisponibilidadInterno(IReadOnlyCollection<Guid> edicionIds)
     {
         lock (_bloqueo)
         {
@@ -76,7 +122,7 @@ internal sealed class InventarioDelCatalogoDoble : IInventarioDelCatalogo
         }
     }
 
-    public Task<RespuestaDeIngreso> RegistrarIngreso(SolicitudDeIngresoAlInventario solicitud, CancellationToken cancelacion = default)
+    private Task<RespuestaDeIngreso> RegistrarIngresoInterno(SolicitudDeIngresoAlInventario solicitud)
     {
         lock (_bloqueo)
         {
@@ -117,7 +163,7 @@ internal sealed class InventarioDelCatalogoDoble : IInventarioDelCatalogo
     /// <summary>Algo que ocurre justo cuando se pide la lista de ingresos (por ejemplo, otra conciliación que resuelve la fila antes de que esta termine).</summary>
     public Action? AlListarIngresos { get; set; }
 
-    public Task<IReadOnlyList<IngresoDelInventario>?> ListarIngresos(Guid edicionId, int limite, CancellationToken cancelacion = default)
+    private Task<IReadOnlyList<IngresoDelInventario>?> ListarIngresosInterno(Guid edicionId, int limite)
     {
         lock (_bloqueo)
         {
@@ -230,6 +276,12 @@ internal sealed class AlmacenDeArchivosDoble : IAlmacenDeArchivos
 
     public bool NoResponde { get; set; }
 
+    /// <summary>Dice si hay una transacción abierta: el streaming de un archivo nunca corre con una conexión abierta (D14).</summary>
+    public Func<bool>? EnTransaccion { get; set; }
+
+    /// <summary>Si es verdadero, <see cref="Borrar"/> falla como un almacén que no responde (la escritura sí funciona).</summary>
+    public bool BorrarFalla { get; set; }
+
     public bool EstructuraInvalidaEnLaProxima { get; set; }
 
     public (int Ancho, int Alto)? DimensionesDeLaProxima { get; set; }
@@ -244,6 +296,11 @@ internal sealed class AlmacenDeArchivosDoble : IAlmacenDeArchivos
     public async Task<ResultadoDeEscrituraEnAlmacen> Escribir(string claveEnAlmacen, FinalidadDeArchivo finalidad, Stream contenido, CancellationToken cancelacion = default)
     {
         Escrituras++;
+        if (EnTransaccion?.Invoke() == true)
+        {
+            throw new InvalidOperationException("Se escribió en el almacén con una transacción abierta.");
+        }
+
         if (NoResponde)
         {
             throw new AlmacenNoDisponibleException();
@@ -308,22 +365,6 @@ internal sealed class AlmacenDeArchivosDoble : IAlmacenDeArchivos
         return ResultadoDeEscrituraEnAlmacen.Correcto(new ArchivoEscrito(detectado, total, HuellaDeArchivo.Desde(sha.GetHashAndReset())));
     }
 
-    public Task<int> LeerRango(string claveEnAlmacen, long desde, Memory<byte> destino, CancellationToken cancelacion = default)
-    {
-        if (NoResponde)
-        {
-            throw new AlmacenNoDisponibleException();
-        }
-
-        if (!_objetos.TryGetValue(claveEnAlmacen, out var datos) || desde >= datos.Length)
-        {
-            return Task.FromResult(0);
-        }
-
-        var n = (int)Math.Min(destino.Length, datos.Length - desde);
-        datos.AsMemory((int)desde, n).CopyTo(destino);
-        return Task.FromResult(n);
-    }
 
     public Task<Stream?> AbrirPortada(string claveEnAlmacen, CancellationToken cancelacion = default)
     {
@@ -337,7 +378,7 @@ internal sealed class AlmacenDeArchivosDoble : IAlmacenDeArchivos
 
     public Task Borrar(string claveEnAlmacen, CancellationToken cancelacion = default)
     {
-        if (NoResponde)
+        if (NoResponde || BorrarFalla)
         {
             throw new AlmacenNoDisponibleException();
         }

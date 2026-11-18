@@ -18,6 +18,8 @@ public sealed class ConciliacionDeIngresosTests
         var edicion = e.ImpresaSembrada();
         e.Inventario.RespuestasDeIngreso.Enqueue(RespuestaDeIngreso.SinRespuesta);
         await e.IngresosDeMercaderia().Registrar(new RegistrarIngresoEntrada(edicion, 30, referencia, "nota privada", e.Token(edicion)));
+        // Pasados unos minutos: un reintento en vuelo reciente impediría marcar fallido (M-2).
+        e.Reloj.Ahora = e.Reloj.Ahora.AddMinutes(3);
         return new Escenario(e, edicion, e.Ingresos.Todos.Single());
     }
 

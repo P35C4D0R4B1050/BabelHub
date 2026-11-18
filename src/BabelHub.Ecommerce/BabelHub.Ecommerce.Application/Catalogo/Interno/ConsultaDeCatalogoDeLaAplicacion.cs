@@ -8,11 +8,12 @@ namespace BabelHub.Ecommerce.Application.Catalogo.Interno;
 /// sesión y sus modelos excluyen todo campo interno. Primero se filtra por la base y el Inventario solo se consulta por lotes de 50 ediciones impresas y sobre a lo más 500 ediciones candidatas
 /// (<c>busqueda-demasiado-amplia</c> si hay más), con un presupuesto de 10 llamadas y 3 segundos por solicitud; el Inventario caído nunca hace fallar la lectura (CAT-12).
 /// </summary>
-public sealed class ConsultaDeCatalogoDeLaAplicacion(
+internal sealed class ConsultaDeCatalogoDeLaAplicacion(
     ILecturasDelCatalogo lecturas,
     ResolutorDeDisponibilidad resolutor,
     IReloj reloj,
-    IAzarDelCatalogo azar) : IConsultaDeCatalogo, IDisponibilidadDeEdiciones
+    IAzarDelCatalogo azar,
+    TimeSpan? plazoDeLaSolicitud = null) : IConsultaDeCatalogo, IDisponibilidadDeEdiciones
 {
     /// <summary>El tope de ediciones candidatas del filtro de disponibilidad (D08).</summary>
     public const int MaximoDeEdicionesCandidatas = 500;
@@ -21,7 +22,9 @@ public sealed class ConsultaDeCatalogoDeLaAplicacion(
 
     public const int TamanoDelLoteDeMuestreo = 50;
 
-    public static readonly TimeSpan PlazoDeLaSolicitud = TimeSpan.FromSeconds(3);
+    public static readonly TimeSpan PlazoPorOmision = TimeSpan.FromSeconds(3);
+
+    private readonly TimeSpan _plazo = plazoDeLaSolicitud ?? PlazoPorOmision;
 
     private readonly ValidadorDeBusquedaDeObras _validadorDeBusqueda = new();
 
@@ -36,13 +39,13 @@ public sealed class ConsultaDeCatalogoDeLaAplicacion(
 
         var filtros = new FiltrosDeObras(busqueda.Texto?.Trim(), busqueda.Autor?.Trim(), busqueda.Editorial?.Trim(), busqueda.Categoria?.Trim(), busqueda.Formato, busqueda.PrecioMinimo, busqueda.PrecioMaximo);
         using var plazo = CancellationTokenSource.CreateLinkedTokenSource(cancelacion);
-        plazo.CancelAfter(PlazoDeLaSolicitud);
+        plazo.CancelAfter(_plazo);
         var presupuesto = new PresupuestoDeLlamadas();
 
         if (!busqueda.SoloDisponibles)
         {
             var pagina = await lecturas.Buscar(filtros, busqueda.Pagina, busqueda.Tamano, cancelacion).ConfigureAwait(false);
-            var disponibles = await resolutor.Resolver(pagina.Obras.SelectMany(Vigentes).ToList(), presupuesto, plazo.Token).ConfigureAwait(false);
+            var disponibles = await resolutor.Resolver(pagina.Obras.SelectMany(Vigentes).ToList(), presupuesto, plazo.Token, cancelacion).ConfigureAwait(false);
             return Resultado<PaginaDeObras>.Exito(new PaginaDeObras(pagina.Obras.Select(o => Resumir(o, disponibles)).ToList(), busqueda.Pagina, busqueda.Tamano, pagina.Total));
         }
 
@@ -54,7 +57,7 @@ public sealed class ConsultaDeCatalogoDeLaAplicacion(
 
         var obras = await lecturas.TodasLasQueCumplen(filtros, cancelacion).ConfigureAwait(false);
         var ediciones = obras.SelectMany(o => Vigentes(o).Where(e => CumpleFormatoYPrecio(e, filtros))).ToList();
-        var datos = await resolutor.Resolver(ediciones, presupuesto, plazo.Token).ConfigureAwait(false);
+        var datos = await resolutor.Resolver(ediciones, presupuesto, plazo.Token, cancelacion).ConfigureAwait(false);
 
         // Una obra cumple si alguna edición cumple a la vez formato, precio y disponibilidad; una edición sin dato o «no se puede confirmar» no cumple.
         var cumplen = obras
@@ -62,7 +65,7 @@ public sealed class ConsultaDeCatalogoDeLaAplicacion(
             .ToList();
         var pagina2 = cumplen.Skip((busqueda.Pagina - 1) * busqueda.Tamano).Take(busqueda.Tamano).ToList();
         var restantes = pagina2.SelectMany(Vigentes).Where(e => !datos.ContainsKey(e.Id)).ToList();
-        var resto = await resolutor.Resolver(restantes, presupuesto, plazo.Token).ConfigureAwait(false);
+        var resto = await resolutor.Resolver(restantes, presupuesto, plazo.Token, cancelacion).ConfigureAwait(false);
         var todos = datos.Concat(resto).ToDictionary(p => p.Key, p => p.Value);
         return Resultado<PaginaDeObras>.Exito(new PaginaDeObras(pagina2.Select(o => Resumir(o, todos)).ToList(), busqueda.Pagina, busqueda.Tamano, cumplen.Count));
     }
@@ -83,8 +86,8 @@ public sealed class ConsultaDeCatalogoDeLaAplicacion(
         }
 
         using var plazo = CancellationTokenSource.CreateLinkedTokenSource(cancelacion);
-        plazo.CancelAfter(PlazoDeLaSolicitud);
-        var datos = await resolutor.Resolver(Vigentes(obra).ToList(), new PresupuestoDeLlamadas(), plazo.Token).ConfigureAwait(false);
+        plazo.CancelAfter(_plazo);
+        var datos = await resolutor.Resolver(Vigentes(obra).ToList(), new PresupuestoDeLlamadas(), plazo.Token, cancelacion).ConfigureAwait(false);
         return Resultado<ResumenDeObra>.Exito(Resumir(obra, datos));
     }
 
@@ -122,8 +125,8 @@ public sealed class ConsultaDeCatalogoDeLaAplicacion(
 
         var encontradas = await lecturas.EdicionesPorId(edicionIds, cancelacion).ConfigureAwait(false);
         using var plazo = CancellationTokenSource.CreateLinkedTokenSource(cancelacion);
-        plazo.CancelAfter(PlazoDeLaSolicitud);
-        var datos = await resolutor.Resolver(encontradas.Select(c => c.Edicion).ToList(), new PresupuestoDeLlamadas(), plazo.Token).ConfigureAwait(false);
+        plazo.CancelAfter(_plazo);
+        var datos = await resolutor.Resolver(encontradas.Select(c => c.Edicion).ToList(), new PresupuestoDeLlamadas(), plazo.Token, cancelacion).ConfigureAwait(false);
         IReadOnlyList<DisponibilidadDeEdicion> resultado = edicionIds.Where(datos.ContainsKey).Select(id => datos[id]).ToList();
         return Resultado<IReadOnlyList<DisponibilidadDeEdicion>>.Exito(resultado);
     }
@@ -131,7 +134,7 @@ public sealed class ConsultaDeCatalogoDeLaAplicacion(
     public async Task<Resultado<ObraAlAzar?>> ObtenerObraAlAzar(CancellationToken cancelacion = default)
     {
         using var plazo = CancellationTokenSource.CreateLinkedTokenSource(cancelacion);
-        plazo.CancelAfter(PlazoDeLaSolicitud);
+        plazo.CancelAfter(_plazo);
         var presupuesto = new PresupuestoDeLlamadas(LotesDeMuestreo);
         var vistas = new HashSet<Guid>();
 
@@ -144,7 +147,7 @@ public sealed class ConsultaDeCatalogoDeLaAplicacion(
             }
 
             vistas.UnionWith(muestra.Select(o => o.Id));
-            var datos = await resolutor.Resolver(muestra.SelectMany(Vigentes).ToList(), presupuesto, plazo.Token).ConfigureAwait(false);
+            var datos = await resolutor.Resolver(muestra.SelectMany(Vigentes).ToList(), presupuesto, plazo.Token, cancelacion).ConfigureAwait(false);
 
             // Una digital vigente cuenta como disponible sin consultar al Inventario; una impresa solo si el Inventario respondió ahora (con el Inventario caído solo se ofrecen digitales o ninguna).
             var disponibles = muestra

@@ -162,7 +162,7 @@ public sealed record ResultadoDeEscrituraEnAlmacen(ArchivoEscrito? Archivo, Moti
 }
 
 /// <summary>
-/// El almacén de objetos privado (S3): no es un contrato público; la biblioteca define su propio puerto de entrega con URL firmada (D13). <b>Nada pasa por el disco local ni se carga completo en
+/// El almacén de objetos privado (S3): no es un contrato público; la biblioteca define su propio puerto de entrega con URL firmada (D13). Las lecturas por rango de la verificación de estructura son del adaptador (T17). <b>Nada pasa por el disco local ni se carga completo en
 /// memoria</b> (regla 11, D14): se escribe en streaming y se verifica por lecturas por rango.
 /// </summary>
 public interface IAlmacenDeArchivos
@@ -172,9 +172,6 @@ public interface IAlmacenDeArchivos
     /// verifica después la estructura por lecturas por rango. Si rechaza, borra lo escrito. Lanza <see cref="AlmacenNoDisponibleException"/> si el almacén no responde.
     /// </summary>
     Task<ResultadoDeEscrituraEnAlmacen> Escribir(string claveEnAlmacen, FinalidadDeArchivo finalidad, Stream contenido, CancellationToken cancelacion = default);
-
-    /// <summary>Lee hasta <paramref name="destino"/>.Length bytes desde <paramref name="desde"/> (lectura por rango); devuelve cuántos leyó.</summary>
-    Task<int> LeerRango(string claveEnAlmacen, long desde, Memory<byte> destino, CancellationToken cancelacion = default);
 
     /// <summary>Abre una portada para servirla; <see langword="null"/> si el objeto no existe.</summary>
     Task<Stream?> AbrirPortada(string claveEnAlmacen, CancellationToken cancelacion = default);

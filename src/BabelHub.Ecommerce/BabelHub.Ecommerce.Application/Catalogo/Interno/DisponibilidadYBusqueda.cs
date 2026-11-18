@@ -52,7 +52,7 @@ public interface IAzarDelCatalogo
 }
 
 /// <summary>El presupuesto de llamadas al Inventario de una solicitud pública (plan §6): a lo más 10 llamadas; lo que no entra se trata como «sin respuesta».</summary>
-public sealed class PresupuestoDeLlamadas(int llamadas = ResolutorDeDisponibilidad.MaximoDeLlamadas)
+internal sealed class PresupuestoDeLlamadas(int llamadas = ResolutorDeDisponibilidad.MaximoDeLlamadas)
 {
     public int Restantes { get; private set; } = llamadas;
 
@@ -74,7 +74,7 @@ public sealed class PresupuestoDeLlamadas(int llamadas = ResolutorDeDisponibilid
 /// dato de menos de 10 minutos («puede estar desactualizada»; exactamente 10 minutos ya es «más antigua») o, si no hay, «no se puede confirmar». Una impresa que el Inventario no conoce se muestra
 /// agotada. El instante guardado es el de esta solicitud (el del Catálogo), nunca el que informa el Inventario.
 /// </summary>
-public sealed class ResolutorDeDisponibilidad(IInventarioDelCatalogo inventario, IMemoriaDeDisponibilidad memoria, IReloj reloj)
+internal sealed class ResolutorDeDisponibilidad(IInventarioDelCatalogo inventario, IMemoriaDeDisponibilidad memoria, IReloj reloj)
 {
     public const int MaximoDeLlamadas = 10;
 
@@ -84,7 +84,7 @@ public sealed class ResolutorDeDisponibilidad(IInventarioDelCatalogo inventario,
 
     public static readonly TimeSpan RespaldoMaximo = TimeSpan.FromMinutes(10);
 
-    public async Task<IReadOnlyDictionary<Guid, DisponibilidadDeEdicion>> Resolver(IReadOnlyCollection<Edicion> ediciones, PresupuestoDeLlamadas presupuesto, CancellationToken cancelacion)
+    public async Task<IReadOnlyDictionary<Guid, DisponibilidadDeEdicion>> Resolver(IReadOnlyCollection<Edicion> ediciones, PresupuestoDeLlamadas presupuesto, CancellationToken cancelacion, CancellationToken llamador = default)
     {
         ArgumentNullException.ThrowIfNull(ediciones);
         ArgumentNullException.ThrowIfNull(presupuesto);
@@ -117,7 +117,7 @@ public sealed class ResolutorDeDisponibilidad(IInventarioDelCatalogo inventario,
         foreach (var lote in porConsultar.Chunk(TamanoDeLote))
         {
             var ids = lote.Select(e => e.Id).ToList();
-            var respuesta = presupuesto.Tomar() ? Validar(await inventario.ConsultarDisponibilidad(ids, cancelacion).ConfigureAwait(false), ids) : null;
+            var respuesta = presupuesto.Tomar() ? Validar(await Consultar(ids, cancelacion, llamador).ConfigureAwait(false), ids) : null;
 
             foreach (var edicion in lote)
             {
@@ -126,6 +126,19 @@ public sealed class ResolutorDeDisponibilidad(IInventarioDelCatalogo inventario,
         }
 
         return resultado;
+    }
+
+    /// <summary>El plazo de la solicitud agotado cuenta como «sin respuesta» (se usa el respaldo): un Inventario lento nunca tumba el catálogo (CAT-12). Una cancelación del llamador sí se propaga.</summary>
+    private async Task<RespuestaDeDisponibilidad?> Consultar(IReadOnlyCollection<Guid> ids, CancellationToken plazo, CancellationToken llamador)
+    {
+        try
+        {
+            return await inventario.ConsultarDisponibilidad(ids, plazo).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!llamador.IsCancellationRequested)
+        {
+            return null;
+        }
     }
 
     private DisponibilidadDeEdicion Aplicar(Guid edicionId, RespuestaDeDisponibilidad respuesta, DateTimeOffset ahora)
@@ -169,7 +182,7 @@ public sealed class ResolutorDeDisponibilidad(IInventarioDelCatalogo inventario,
         var ids = respuesta.Ediciones.Select(e => e.EdicionId).Concat(respuesta.NoRegistradas).ToList();
         var valida = ids.All(pedidas.Contains)
             && ids.Distinct().Count() == ids.Count
-            && respuesta.Ediciones.All(e => e.VendibleEnLaRed >= 0 && e.PorFuente.All(f => f.Vendible >= 0 && !string.IsNullOrWhiteSpace(f.CodigoDeFuente)));
+            && respuesta.Ediciones.All(e => e.VendibleEnLaRed >= 0 && e.PorFuente.Count <= 100 && e.PorFuente.All(f => f.Vendible >= 0 && !string.IsNullOrWhiteSpace(f.CodigoDeFuente) && f.CodigoDeFuente.Length <= 40 && f.NombreDeFuente is { Length: <= 200 }));
         return valida ? respuesta : null;
     }
 

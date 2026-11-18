@@ -32,7 +32,6 @@ public sealed class ArchivosDelCatalogoUsoTests
     // ---------- Subir ----------
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Un_epub_valido_se_acepta_queda_lista_con_su_huella_y_tamano_reales_ligada_al_usuario_con_vencimiento_a_24_horas()
     {
         var e = new EntornoDelCatalogo();
@@ -55,7 +54,6 @@ public sealed class ArchivosDelCatalogoUsoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Un_pdf_de_exactamente_50_mib_se_acepta_con_su_huella_guardada()
     {
         var e = new EntornoDelCatalogo();
@@ -70,7 +68,6 @@ public sealed class ArchivosDelCatalogoUsoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Las_portadas_jpeg_png_y_webp_validas_se_aceptan_y_una_de_3_mb_se_rechaza_con_su_motivo()
     {
         var e = new EntornoDelCatalogo();
@@ -89,7 +86,6 @@ public sealed class ArchivosDelCatalogoUsoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Un_ejecutable_renombrado_como_epub_y_un_libro_de_60_mb_se_rechazan_sin_dejar_fila_ni_objeto()
     {
         var e = new EntornoDelCatalogo();
@@ -108,7 +104,6 @@ public sealed class ArchivosDelCatalogoUsoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Una_portada_que_es_un_pdf_o_un_libro_que_es_una_imagen_se_rechazan_por_su_finalidad_y_la_estructura_invalida_tambien()
     {
         var e = new EntornoDelCatalogo();
@@ -142,7 +137,6 @@ public sealed class ArchivosDelCatalogoUsoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task La_fila_subiendo_nace_antes_de_escribir_el_objeto_y_la_subida_son_dos_transacciones_cortas()
     {
         var e = new EntornoDelCatalogo();
@@ -167,8 +161,6 @@ public sealed class ArchivosDelCatalogoUsoTests
             alEscribir(fila.Id);
             return entorno.Almacen.Escribir(claveEnAlmacen, finalidad, contenido, cancelacion);
         }
-
-        public Task<int> LeerRango(string claveEnAlmacen, long desde, Memory<byte> destino, CancellationToken cancelacion = default) => entorno.Almacen.LeerRango(claveEnAlmacen, desde, destino, cancelacion);
 
         public Task<Stream?> AbrirPortada(string claveEnAlmacen, CancellationToken cancelacion = default) => entorno.Almacen.AbrirPortada(claveEnAlmacen, cancelacion);
 
@@ -217,7 +209,6 @@ public sealed class ArchivosDelCatalogoUsoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task La_referencia_subida_se_puede_consumir_al_registrar_una_obra()
     {
         var e = new EntornoDelCatalogo();
@@ -233,7 +224,6 @@ public sealed class ArchivosDelCatalogoUsoTests
     // ---------- Portada ----------
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Una_portada_se_sirve_por_su_huella_con_el_tipo_detectado_tambien_la_de_una_obra_dada_de_baja()
     {
         var e = new EntornoDelCatalogo();
@@ -250,7 +240,6 @@ public sealed class ArchivosDelCatalogoUsoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task La_huella_de_un_libro_da_404_en_portadas_y_tambien_una_huella_mal_formada_inexistente_o_con_el_almacen_sin_objeto()
     {
         var e = new EntornoDelCatalogo();
@@ -271,7 +260,6 @@ public sealed class ArchivosDelCatalogoUsoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Con_el_almacen_caido_la_portada_responde_no_disponible_y_si_falta_el_objeto_no_encontrada()
     {
         var e = new EntornoDelCatalogo();
@@ -314,7 +302,6 @@ public sealed class ArchivosDelCatalogoUsoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task La_depuracion_parte_de_las_filas_borra_el_objeto_y_luego_la_fila_de_una_subiendo_vieja_una_lista_vencida_y_una_descarte()
     {
         var e = new EntornoDelCatalogo();
@@ -337,7 +324,6 @@ public sealed class ArchivosDelCatalogoUsoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Purgar_una_fila_consumida_nunca_borra_el_objeto_que_ya_vive_en_la_edicion_o_la_obra()
     {
         var e = new EntornoDelCatalogo();
@@ -354,7 +340,6 @@ public sealed class ArchivosDelCatalogoUsoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Un_libro_reemplazado_a_los_30_dias_deja_su_objeto_borrado_aunque_su_fila_consumida_ya_se_purgo()
     {
         var e = new EntornoDelCatalogo();
@@ -376,7 +361,6 @@ public sealed class ArchivosDelCatalogoUsoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Un_objeto_que_no_se_pudo_borrar_deja_su_fila_para_la_corrida_siguiente_y_solo_el_sistema_depura()
     {
         var e = new EntornoDelCatalogo();

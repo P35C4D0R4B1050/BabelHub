@@ -4,7 +4,7 @@ using BabelHub.Ecommerce.Domain.Catalogo;
 namespace BabelHub.Ecommerce.Application.Catalogo.Interno;
 
 /// <summary>Qué significa la respuesta del Inventario a un ingreso para la fila local.</summary>
-public enum ClasificacionDeIngreso
+internal enum ClasificacionDeIngreso
 {
     /// <summary>201 bien formado: el ingreso se aplicó.</summary>
     Registrado,
@@ -22,7 +22,7 @@ public enum ClasificacionDeIngreso
 /// coherente con él: un 401, 403 o 404 de forma inesperada deja <c>Pendiente</c>, SEG-13). Los dos 409 de idempotencia, un tiempo agotado, un 5xx, un corte y un 429 dejan <c>Pendiente</c> <b>en el primer envío</b>; en
 /// un reintento todo resultado distinto de 201 deja <c>Pendiente</c> (un token vencido o un rol revocado entre intentos no prueba que el primero no se aplicó).
 /// </summary>
-public static class ClasificadorDeIngreso
+internal static class ClasificadorDeIngreso
 {
     private static readonly IReadOnlyDictionary<string, int[]> ListaCerrada = new Dictionary<string, int[]>(StringComparer.Ordinal)
     {
@@ -54,14 +54,14 @@ public static class ClasificadorDeIngreso
 }
 
 /// <summary>Lo que se anota de la llamada al Inventario: la clasificación y, si se aplicó, el identificador del ingreso.</summary>
-public sealed record MarcarResultadoDeIngresoEntrada(Guid IngresoSolicitadoId, ClasificacionDeIngreso Clasificacion, Guid? IngresoId);
+internal sealed record MarcarResultadoDeIngresoEntrada(Guid IngresoSolicitadoId, ClasificacionDeIngreso Clasificacion, Guid? IngresoId);
 
 /// <summary>
 /// <c>MarcarResultadoDeIngreso</c> (transaccional, en su propia transacción corta tras la llamada al Inventario, D15): pasa la fila a <c>Registrado</c> (con el identificador opaco del ingreso) o a <c>Fallido</c>; con
 /// <c>Pendiente</c> no cambia nada. La transición es <b>condicional</b> (<c>WHERE estado = pendiente</c>): si otro la resolvió antes (una conciliación), no se pisa y se devuelve el estado actual. Al registrarse
 /// invalida la disponibilidad guardada de la edición (CAT-22). El Catálogo no audita el ingreso: lo hace el Inventario con el actor correcto.
 /// </summary>
-public sealed class MarcarResultadoDeIngreso(IRepositorioDeIngresos ingresos, IMemoriaDeDisponibilidad memoria, IReloj reloj) : ICasoDeUso<MarcarResultadoDeIngresoEntrada, EstadoDeIngresoSolicitado>
+internal sealed class MarcarResultadoDeIngreso(IRepositorioDeIngresos ingresos, IMemoriaDeDisponibilidad memoria, IReloj reloj) : ICasoDeUso<MarcarResultadoDeIngresoEntrada, EstadoDeIngresoSolicitado>
 {
     public async Task<Resultado<EstadoDeIngresoSolicitado>> Ejecutar(MarcarResultadoDeIngresoEntrada entrada, CancellationToken cancelacion = default)
     {

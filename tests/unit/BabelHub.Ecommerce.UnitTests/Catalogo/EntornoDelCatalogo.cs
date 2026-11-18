@@ -22,10 +22,15 @@ internal sealed class UnidadDeTrabajoReversible(params IInstantanea[] repositori
 {
     public int Ejecuciones { get; private set; }
 
+    /// <summary>Si hay una transacción abierta ahora: ni el Inventario ni el almacén se llaman dentro de una (D15, D14).</summary>
+    public bool EnCurso { get; private set; }
+
     public async Task<T> Ejecutar<T>(Func<CancellationToken, Task<T>> trabajo, CancellationToken cancelacion = default)
     {
         Ejecuciones++;
         var capturas = repositorios.Select(r => r.Capturar()).ToArray();
+        var anterior = EnCurso;
+        EnCurso = true;
         try
         {
             return await trabajo(cancelacion).ConfigureAwait(false);
@@ -38,6 +43,10 @@ internal sealed class UnidadDeTrabajoReversible(params IInstantanea[] repositori
             }
 
             throw;
+        }
+        finally
+        {
+            EnCurso = anterior;
         }
     }
 
@@ -146,7 +155,7 @@ internal sealed class RepositorioDeReferenciasEnMemoria : IRepositorioDeReferenc
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyList<ReferenciaDeArchivo>> Depurables(DateTimeOffset ahora, TimeSpan margenDeSubida, int maximo, CancellationToken cancelacion = default) =>
+    private Task<IReadOnlyList<ReferenciaDeArchivo>> DepurablesInterno(DateTimeOffset ahora, TimeSpan margenDeSubida, int maximo) =>
         Task.FromResult<IReadOnlyList<ReferenciaDeArchivo>>(_referencias.Values
             .Where(r => r.Estado switch
             {
@@ -158,6 +167,16 @@ internal sealed class RepositorioDeReferenciasEnMemoria : IRepositorioDeReferenc
             .Take(maximo)
             .Select(Clonar)
             .ToList());
+
+    /// <summary>Algo que ocurre justo después de leer las candidatas de la depuración (por ejemplo, un reemplazo que cambia una fila entre la lectura y el bloqueo).</summary>
+    public Action? AlLeerDepurables { get; set; }
+
+    public Task<IReadOnlyList<ReferenciaDeArchivo>> Depurables(DateTimeOffset ahora, TimeSpan margenDeSubida, int maximo, CancellationToken cancelacion = default)
+    {
+        var candidatas = DepurablesInterno(ahora, margenDeSubida, maximo);
+        AlLeerDepurables?.Invoke();
+        return candidatas;
+    }
 
     public Task Eliminar(Guid id, CancellationToken cancelacion = default)
     {
@@ -251,6 +270,8 @@ internal sealed class EntornoDelCatalogo
         Lecturas = new LecturasDelCatalogoEnMemoria(Obras);
         Resolutor = new ResolutorDeDisponibilidad(Inventario, Memoria, Reloj);
         Consulta = new ConsultaDeCatalogoDeLaAplicacion(Lecturas, Resolutor, Reloj, Lecturas);
+        Inventario.EnTransaccion = () => Unidad.EnCurso;
+        Almacen.EnTransaccion = () => Unidad.EnCurso;
     }
 
     public ActorDePrueba Actor { get; }
@@ -334,7 +355,9 @@ internal sealed class EntornoDelCatalogo
 
     public ICasoDeUso<MarcarResultadoDeIngresoEntrada, EstadoDeIngresoSolicitado> Marcar() => Transaccional(new MarcarResultadoDeIngreso(Ingresos, Memoria, Reloj));
 
-    public OrquestadorDeIngresos Orquestador() => new(Inventario, Marcar());
+    public OrquestadorDeIngresos Orquestador(TimeSpan? presupuesto = null) => new(Inventario, Marcar(), presupuesto);
+
+    public ConsultaDeCatalogoDeLaAplicacion ConsultaConPlazo(TimeSpan plazo) => new(Lecturas, Resolutor, Reloj, Lecturas, plazo);
 
     public ICasoDeUso<RegistrarIngresoEntrada, IngresoPedido> PedirIngreso() =>
         Transaccional(new RegistrarIngresoDeMercaderia(Autorizador, new ValidadorDeRegistrarIngreso(), Obras, Ingresos, Emisor, Reloj));
@@ -342,7 +365,7 @@ internal sealed class EntornoDelCatalogo
     public ICasoDeUso<ConciliarIngresoEntrada, ResultadoDeIngreso> Conciliar() =>
         new ConciliarIngresoPendiente(Autorizador, new ValidadorDeConciliarIngreso(), Ingresos, Inventario, Unidad, Auditoria, Memoria, Reloj);
 
-    public IAdministracionDelCatalogo Administracion() =>
+    public IAdministracionDelCatalogo Administracion(TimeSpan? presupuesto = null) =>
         new AdministracionDelCatalogoDeLaAplicacion(
             RegistrarObra(),
             EditarObra(),
@@ -351,8 +374,8 @@ internal sealed class EntornoDelCatalogo
             EditarEdicion(),
             DarDeBajaEdicion(),
             RetirarEdicionDigital(),
-            new LecturasDeAdministracion(Autorizador, new ValidadorDeListarObrasDeAdministracion(), Lecturas, Reloj),
-            Orquestador(),
+            new LecturasDeAdministracion(Autorizador, new ValidadorDeListarObrasDeAdministracion(), Lecturas, Inventario, Reloj),
+            Orquestador(presupuesto),
             Ingresos);
 
     public IIngresosDeMercaderia IngresosDeMercaderia() =>
@@ -362,7 +385,7 @@ internal sealed class EntornoDelCatalogo
             Orquestador(),
             new ReintentarIngresoPendiente(Autorizador, new ValidadorDeReintentarIngreso(), Ingresos, Unidad, Orquestador(), Reloj),
             Conciliar(),
-            Transaccional(new ListarIngresos(Autorizador, new ValidadorDeListarIngresos(), Obras, Ingresos, Inventario)));
+            new ListarIngresos(Autorizador, new ValidadorDeListarIngresos(), Obras, Ingresos, Inventario, Unidad));
 
     /// <summary>Una obra con una impresa ya guardada (sin pasar por el alta) para probar ingresos sueltos.</summary>
     public Guid ImpresaSembrada(string isbn = "978-0-00-000001-9")

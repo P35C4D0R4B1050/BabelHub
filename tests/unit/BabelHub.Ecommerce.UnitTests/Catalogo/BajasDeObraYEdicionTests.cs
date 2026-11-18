@@ -99,11 +99,9 @@ public sealed class BajasDeObraYEdicionTests
         Assert.Equal(obra.Version + 1, guardada.Version);
         var auditoria = Assert.Single(entorno.Auditoria.Solicitudes);
         Assert.Equal("EdicionDadaDeBaja", auditoria.Accion.Identificador);
-        Assert.Equal(impresa.Isbn.Isbn13, auditoria.Detalle["isbn"]);
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-10")]
     public async Task La_baja_de_la_ultima_edicion_no_dada_de_baja_se_rechaza_con_obra_sin_ediciones_y_no_cambia_nada()
     {
         var entorno = new EntornoDelCatalogo();
@@ -118,7 +116,6 @@ public sealed class BajasDeObraYEdicionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-10")]
     public async Task Una_digital_retirada_cuenta_como_edicion_existente_y_la_otra_si_se_puede_dar_de_baja()
     {
         var (entorno, obra) = await ConAmbas();

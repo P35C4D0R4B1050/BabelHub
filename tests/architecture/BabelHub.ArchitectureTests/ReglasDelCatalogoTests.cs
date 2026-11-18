@@ -90,6 +90,22 @@ public class ReglasDelCatalogoTests
         }
     }
 
+
+    /// <summary>Los únicos casos de uso de Interno que no comprueban el rol: pasos internos que solo llama otro caso de uso ya autorizado.</summary>
+    private static readonly string[] SinAutorizadorPorDiseno = ["MarcarResultadoDeIngreso"];
+
+    [Fact]
+    public void Todo_caso_de_uso_nuevo_de_Interno_comprueba_el_rol_salvo_los_pasos_internos_de_la_lista()
+    {
+        var casos = Aplicacion.GetTypes()
+            .Where(t => t.Namespace == "BabelHub.Ecommerce.Application.Catalogo.Interno" && t is { IsClass: true, IsAbstract: false }
+                && t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition().Name.StartsWith("ICasoDeUso", StringComparison.Ordinal)))
+            .ToList();
+
+        Assert.NotEmpty(casos);
+        var sinRol = casos.Where(t => !DependeDelAutorizador(t) && !SinAutorizadorPorDiseno.Contains(t.Name)).Select(t => t.Name).ToList();
+        Assert.True(sinRol.Count == 0, $"Estos casos de uso del catálogo no comprueban el rol de administración central: {string.Join(", ", sinRol)}.");
+    }
     [Fact]
     public void La_regla_del_autorizador_detecta_un_caso_de_uso_que_no_lo_usa()
     {

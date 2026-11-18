@@ -7,36 +7,56 @@ namespace BabelHub.Ecommerce.Application.Catalogo.Interno;
 /// El <b>orquestador sin transacción</b> (D15): encadena, <b>fuera</b> de toda transacción, el registro de la edición impresa en el Inventario, el ingreso y el marcado de su resultado en una transacción corta aparte. «El
 /// Inventario no responde» es un resultado de éxito con aviso, nunca un fallo: el alta o el ingreso ya confirmados no se revierten por él (CAT-20). Todo con un presupuesto total de 15 segundos.
 /// </summary>
-internal sealed class OrquestadorDeIngresos(IInventarioDelCatalogo inventario, ICasoDeUso<MarcarResultadoDeIngresoEntrada, EstadoDeIngresoSolicitado> marcar)
+internal sealed class OrquestadorDeIngresos(IInventarioDelCatalogo inventario, ICasoDeUso<MarcarResultadoDeIngresoEntrada, EstadoDeIngresoSolicitado> marcar, TimeSpan? presupuesto = null)
 {
-    public static readonly TimeSpan Presupuesto = TimeSpan.FromSeconds(15);
+    public static readonly TimeSpan PresupuestoPorOmision = TimeSpan.FromSeconds(15);
+
+    private readonly TimeSpan _presupuesto = presupuesto ?? PresupuestoPorOmision;
 
     /// <summary>
     /// Pide al Inventario el ingreso de la fila: primero registra la ficha de la edición impresa (D11: también antes de cada ingreso); si no se pudo confirmar, <b>nada se envió</b> y en el primer envío la fila pasa a
     /// <c>Fallido</c> (en un reintento, como un intento anterior pudo aplicarse, sigue <c>Pendiente</c>). Después envía el ingreso con la clave y la carga de la fila y marca el resultado según
-    /// <see cref="ClasificadorDeIngreso"/>.
+    /// <see cref="ClasificadorDeIngreso"/>. Un plazo agotado cuenta como «sin respuesta» (nunca como una excepción): la obra o el ingreso ya confirmados no se revierten.
     /// </summary>
     public async Task<EstadoDeIngresoSolicitado> Enviar(IngresoSolicitado fila, bool esReintento, CancellationToken cancelacion)
     {
         ArgumentNullException.ThrowIfNull(fila);
         using var plazo = CancellationTokenSource.CreateLinkedTokenSource(cancelacion);
-        plazo.CancelAfter(Presupuesto);
+        plazo.CancelAfter(_presupuesto);
 
-        if (!await inventario.RegistrarEdicionImpresa(fila.EdicionId, plazo.Token).ConfigureAwait(false))
+        var ficha = await ConPlazo(() => inventario.RegistrarEdicionImpresa(fila.EdicionId, plazo.Token), false, plazo, cancelacion).ConfigureAwait(false);
+        if (!ficha)
         {
             return await Marcar(fila.Id, esReintento ? ClasificacionDeIngreso.Pendiente : ClasificacionDeIngreso.Fallido, null, cancelacion).ConfigureAwait(false);
         }
 
-        var respuesta = await inventario.RegistrarIngreso(new SolicitudDeIngresoAlInventario(fila.EdicionId, fila.ClaveDeIdempotencia, fila.Cantidad, fila.Referencia, fila.Nota), plazo.Token).ConfigureAwait(false);
+        var respuesta = await ConPlazo(
+            () => inventario.RegistrarIngreso(new SolicitudDeIngresoAlInventario(fila.EdicionId, fila.ClaveDeIdempotencia, fila.Cantidad, fila.Referencia, fila.Nota), plazo.Token),
+            RespuestaDeIngreso.SinRespuesta,
+            plazo,
+            cancelacion).ConfigureAwait(false);
         return await Marcar(fila.Id, ClasificadorDeIngreso.Clasificar(respuesta, esReintento), respuesta.IngresoId, cancelacion).ConfigureAwait(false);
     }
 
-    /// <summary>Registra la ficha de una edición impresa tras el commit del alta, con o sin stock inicial y sin hacer fallar el alta (D11); <see langword="false"/> si el Inventario no la confirmó.</summary>
+    /// <summary>Registra la ficha de una edición impresa tras el commit del alta, con o sin stock inicial y sin hacer fallar el alta (D11); <see langword="false"/> si el Inventario no la confirmó a tiempo.</summary>
     public async Task<bool> RegistrarFicha(Guid edicionId, CancellationToken cancelacion)
     {
         using var plazo = CancellationTokenSource.CreateLinkedTokenSource(cancelacion);
-        plazo.CancelAfter(Presupuesto);
-        return await inventario.RegistrarEdicionImpresa(edicionId, plazo.Token).ConfigureAwait(false);
+        plazo.CancelAfter(_presupuesto);
+        return await ConPlazo(() => inventario.RegistrarEdicionImpresa(edicionId, plazo.Token), false, plazo, cancelacion).ConfigureAwait(false);
+    }
+
+    /// <summary>Un plazo propio agotado (no una cancelación del llamador) es «sin respuesta»: el valor de reemplazo, no una excepción.</summary>
+    private static async Task<T> ConPlazo<T>(Func<Task<T>> llamada, T sinRespuesta, CancellationTokenSource plazo, CancellationToken cancelacion)
+    {
+        try
+        {
+            return await llamada().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (plazo.IsCancellationRequested && !cancelacion.IsCancellationRequested)
+        {
+            return sinRespuesta;
+        }
     }
 
     private async Task<EstadoDeIngresoSolicitado> Marcar(Guid ingresoSolicitadoId, ClasificacionDeIngreso clasificacion, Guid? ingresoId, CancellationToken cancelacion)
@@ -93,7 +113,8 @@ internal sealed class ListarIngresos(
     IValidador<ListarIngresosEntrada> validador,
     IRepositorioDeObras obras,
     IRepositorioDeIngresos ingresos,
-    IInventarioDelCatalogo inventario) : ICasoDeUso<ListarIngresosEntrada, HistorialDeIngresos>
+    IInventarioDelCatalogo inventario,
+    IUnidadDeTrabajo unidad) : ICasoDeUso<ListarIngresosEntrada, HistorialDeIngresos>
 {
     public const int Maximo = 50;
 
@@ -111,7 +132,8 @@ internal sealed class ListarIngresos(
             return FallosDelCatalogo.Validacion<HistorialDeIngresos>(validacion);
         }
 
-        if ((await obras.ObtenerPorEdicion(entrada.EdicionId, paraActualizar: false, cancelacion).ConfigureAwait(false))?.BuscarEdicion(entrada.EdicionId) is null)
+        // Las lecturas locales abren su propia transacción corta y la llamada al Inventario va fuera de toda transacción (D15).
+        if (await unidad.Ejecutar(async token => (await obras.ObtenerPorEdicion(entrada.EdicionId, paraActualizar: false, token).ConfigureAwait(false))?.BuscarEdicion(entrada.EdicionId), cancelacion).ConfigureAwait(false) is null)
         {
             return FallosDelCatalogo.Fallo<HistorialDeIngresos>(TraductorDeRechazos.De(new RechazoDeObra(RechazoDeCatalogo.EdicionNoEncontrada)));
         }
@@ -122,7 +144,7 @@ internal sealed class ListarIngresos(
             remotos = null;
         }
 
-        var locales = await ingresos.DeLaEdicion(entrada.EdicionId, Maximo, cancelacion).ConfigureAwait(false);
+        var locales = await unidad.Ejecutar(token => ingresos.DeLaEdicion(entrada.EdicionId, Maximo, token), cancelacion).ConfigureAwait(false);
         var lista = new List<IngresoDeLaLista>();
         if (remotos is not null)
         {

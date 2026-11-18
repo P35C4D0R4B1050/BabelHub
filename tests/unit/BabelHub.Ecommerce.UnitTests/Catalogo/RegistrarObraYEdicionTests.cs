@@ -159,7 +159,6 @@ public sealed class RegistrarObraYEdicionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task El_archivo_de_la_digital_debe_ser_del_formato_de_la_licencia_y_el_rechazo_no_deja_nada_consumido()
     {
         var entorno = new EntornoDelCatalogo();
@@ -173,7 +172,6 @@ public sealed class RegistrarObraYEdicionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Una_referencia_ajena_vencida_usada_de_otra_finalidad_o_inexistente_responde_lo_mismo()
     {
         var entorno = new EntornoDelCatalogo();
@@ -220,7 +218,6 @@ public sealed class RegistrarObraYEdicionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-16")]
     public async Task Un_stock_inicial_de_12_deja_una_fila_pendiente_con_la_clave_del_emisor_y_no_llama_al_inventario()
     {
         var entorno = new EntornoDelCatalogo();
@@ -242,7 +239,6 @@ public sealed class RegistrarObraYEdicionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-16")]
     public async Task Sin_stock_inicial_no_hay_fila_de_ingreso()
     {
         var entorno = new EntornoDelCatalogo();
@@ -278,7 +274,6 @@ public sealed class RegistrarObraYEdicionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-19")]
     public async Task Con_la_auditoria_caida_no_se_crea_nada_y_la_portada_sigue_sin_consumir()
     {
         var entorno = new EntornoDelCatalogo();
@@ -292,7 +287,6 @@ public sealed class RegistrarObraYEdicionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-19")]
     public async Task Una_obra_con_una_impresa_y_una_digital_audita_la_obra_y_cada_edicion()
     {
         var entorno = new EntornoDelCatalogo();
@@ -328,7 +322,6 @@ public sealed class RegistrarObraYEdicionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-16")]
     public async Task Agregar_una_edicion_impresa_con_stock_inicial_deja_su_fila_pendiente()
     {
         var entorno = new EntornoDelCatalogo();
@@ -360,7 +353,6 @@ public sealed class RegistrarObraYEdicionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-08")]
     public async Task Con_una_version_vieja_responde_conflicto_y_con_una_obra_inexistente_no_encontrada()
     {
         var entorno = new EntornoDelCatalogo();
@@ -402,7 +394,6 @@ public sealed class RegistrarObraYEdicionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-19")]
     public async Task Con_la_auditoria_caida_no_se_agrega_la_edicion_ni_su_ingreso_ni_se_consume_el_archivo()
     {
         var entorno = new EntornoDelCatalogo();

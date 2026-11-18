@@ -104,7 +104,6 @@ public sealed class EditarObraYEdicionTests
     // ---------- Archivo y portada ----------
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Reemplazar_el_libro_consume_la_referencia_encola_el_objeto_anterior_y_audita_tipo_tamano_y_huellas_cortas()
     {
         var (entorno, obra) = await ConImpresaYDigital();
@@ -128,7 +127,6 @@ public sealed class EditarObraYEdicionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Un_libro_del_formato_equivocado_o_una_referencia_ajena_se_rechaza_y_el_archivo_anterior_sigue()
     {
         var (entorno, obra) = await ConImpresaYDigital();
@@ -146,7 +144,6 @@ public sealed class EditarObraYEdicionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Cambiar_la_licencia_a_pdf_exige_reemplazar_tambien_el_libro()
     {
         var (entorno, obra) = await ConImpresaYDigital();
@@ -161,7 +158,6 @@ public sealed class EditarObraYEdicionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Una_impresa_no_acepta_licencia_ni_libro()
     {
         var (entorno, obra) = await ConImpresaYDigital();
@@ -174,7 +170,6 @@ public sealed class EditarObraYEdicionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Reemplazar_la_portada_consume_la_referencia_encola_la_anterior_y_audita_con_la_obra_como_objeto()
     {
         var (entorno, obra) = await ConImpresaYDigital();
@@ -195,7 +190,6 @@ public sealed class EditarObraYEdicionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-12")]
     public async Task Una_portada_ajena_o_de_otra_finalidad_no_reemplaza_la_de_la_obra()
     {
         var (entorno, obra) = await ConImpresaYDigital();
@@ -229,7 +223,6 @@ public sealed class EditarObraYEdicionTests
     // ---------- Concurrencia, no encontrado, rol, auditoría ----------
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-08")]
     public async Task La_segunda_de_dos_ediciones_con_la_misma_version_recibe_conflicto()
     {
         var (entorno, obra) = await ConImpresaYDigital();
@@ -247,7 +240,6 @@ public sealed class EditarObraYEdicionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-08")]
     public async Task Una_obra_o_una_edicion_inexistente_o_dada_de_baja_se_rechazan()
     {
         var (entorno, obra) = await ConImpresaYDigital();
@@ -299,7 +291,6 @@ public sealed class EditarObraYEdicionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-08")]
     public async Task Con_la_auditoria_caida_no_se_aplica_ni_el_precio_ni_el_reemplazo_del_libro()
     {
         var (entorno, obra) = await ConImpresaYDigital();

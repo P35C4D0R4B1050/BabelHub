@@ -2,8 +2,8 @@ using BabelHub.Ecommerce.Domain.Catalogo;
 
 namespace BabelHub.Ecommerce.Application.Catalogo.Interno;
 
-// Los repositorios del módulo (puertos de la Aplicación que implementa la Infraestructura del Catálogo sobre el esquema `catalogo`, con EjecutarComo(catalogo), dentro de la
-// transacción del caso de uso). «ParaActualizar» es un bloqueo de fila (FOR UPDATE) que el adaptador toma; los dobles de prueba lo ignoran.
+// Los repositorios del módulo (puertos de la Aplicación que implementa la Infraestructura del Catálogo sobre el esquema `catalogo`, con EjecutarComo(catalogo)). Todo acceso va dentro de una transacción:
+// la del caso de uso o, en una lectura sin transacción (la consulta pública, la portada, la lista de ingresos), una transacción corta propia del adaptador o del llamador (`IUnidadDeTrabajo`). «ParaActualizar» es un bloqueo de fila (FOR UPDATE) que el adaptador toma; los dobles de prueba lo ignoran.
 
 public enum ResultadoDeEscrituraDeObra
 {

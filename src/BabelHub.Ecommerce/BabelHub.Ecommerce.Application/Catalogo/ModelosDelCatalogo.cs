@@ -197,8 +197,8 @@ public enum EstadoDeIngresoSolicitado
 /// <summary>El ingreso de mercadería que pidió el alta o la edición (de la edición impresa) y cómo quedó; si quedó <c>Pendiente</c>, la ficha lo avisa (CAT-20).</summary>
 public sealed record IngresoDeAlta(Guid IngresoSolicitadoId, Guid EdicionId, int Cantidad, EstadoDeIngresoSolicitado Estado);
 
-/// <summary>El resultado de un alta: la obra, su versión y las ediciones creadas, con el ingreso inicial si se pidió. Un Inventario que no responde no revierte el alta (CAT-20): el aviso va en <see cref="Ingresos"/>.</summary>
-public sealed record ResultadoDeAlta(Guid ObraId, long Version, IReadOnlyList<Guid> EdicionIds, IReadOnlyList<IngresoDeAlta> Ingresos);
+/// <summary>El resultado de un alta: la obra, su versión y las ediciones creadas, con el ingreso inicial si se pidió y las ediciones impresas cuya ficha el Inventario no confirmó (<see cref="FichasSinConfirmar"/>, para el aviso «registro pendiente» de la administración). Un Inventario que no responde no revierte el alta (CAT-20): el aviso va en <see cref="Ingresos"/>.</summary>
+public sealed record ResultadoDeAlta(Guid ObraId, long Version, IReadOnlyList<Guid> EdicionIds, IReadOnlyList<IngresoDeAlta> Ingresos, IReadOnlyList<Guid>? FichasSinConfirmar = null);
 
 /// <summary>La versión nueva de la obra tras una operación que la cambia.</summary>
 public sealed record ResultadoDeEscritura(Guid ObraId, long Version);
@@ -214,7 +214,8 @@ public sealed record EdicionDeAdministracion(
     string? MotivoDeRetiro,
     MotivoDeNoDisponibleDeEdicion? MotivoDeNoDisponible,
     LicenciaDeEdicionDeAdministracion? Licencia,
-    ArchivoDeEdicionDeAdministracion? Archivo);
+    ArchivoDeEdicionDeAdministracion? Archivo,
+    bool? RegistroPendienteEnElInventario = null);
 
 public sealed record LicenciaDeEdicionDeAdministracion(
     TipoDeLicenciaDeEdicion Tipo,

@@ -29,6 +29,9 @@ internal sealed class ConciliarIngresoPendiente(
 
     public const int IngresosRevisados = 50;
 
+    /// <summary>Un reintento en vuelo (hasta 15 s de presupuesto más un margen) puede aplicarse aún: marcar <c>Fallido</c> habilitaría una clave nueva y duplicaría el lote.</summary>
+    public static readonly TimeSpan IntentoReciente = TimeSpan.FromMinutes(2);
+
     public async Task<Resultado<ResultadoDeIngreso>> Ejecutar(ConciliarIngresoEntrada entrada, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(entrada);
@@ -43,7 +46,7 @@ internal sealed class ConciliarIngresoPendiente(
             return FallosDelCatalogo.Validacion<ResultadoDeIngreso>(validacion);
         }
 
-        var fila = await ingresos.Obtener(entrada.IngresoSolicitadoId, paraActualizar: false, cancelacion).ConfigureAwait(false);
+        var fila = await unidad.Ejecutar(token => ingresos.Obtener(entrada.IngresoSolicitadoId, paraActualizar: false, token), cancelacion).ConfigureAwait(false);
         if (fila is null || (entrada.EdicionId is { } edicion && fila.EdicionId != edicion))
         {
             return FallosDelCatalogo.De<ResultadoDeIngreso>(CategoriaDeError.NoEncontrado, ClavesDelCatalogo.IngresoNoEncontrado);
@@ -54,6 +57,7 @@ internal sealed class ConciliarIngresoPendiente(
             return FallosDelCatalogo.De<ResultadoDeIngreso>(CategoriaDeError.Conflicto, ClavesDelCatalogo.IngresoYaResuelto);
         }
 
+if (entrada.Resolucion == ResolucionDeIngreso.Fallido && reloj.Ahora - fila.UltimoIntentoEn < IntentoReciente)        {            return FallosDelCatalogo.De<ResultadoDeIngreso>(CategoriaDeError.ReglaDeNegocio, ClavesDelCatalogo.ReglaDeNegocio, [new ErrorDeCampo("resolucion", "intento-reciente")]);        }
         // Fuera de la transacción: la llamada al Inventario nunca queda dentro de una.
         var remotos = await inventario.ListarIngresos(fila.EdicionId, IngresosRevisados, cancelacion).ConfigureAwait(false);
         if (remotos is null || remotos.Any(i => i.EdicionId != fila.EdicionId))
@@ -61,7 +65,7 @@ internal sealed class ConciliarIngresoPendiente(
             return FallosDelCatalogo.De<ResultadoDeIngreso>(CategoriaDeError.NoDisponible, ClavesDelCatalogo.InventarioNoDisponible);
         }
 
-        var constatados = await ingresos.IngresosYaConstatados(remotos.Select(i => i.IngresoId).ToList(), cancelacion).ConfigureAwait(false);
+        var constatados = await unidad.Ejecutar(token => ingresos.IngresosYaConstatados(remotos.Select(i => i.IngresoId).ToList(), token), cancelacion).ConfigureAwait(false);
         var coincidencias = remotos.Where(i => !constatados.Contains(i.IngresoId) && Coincide(fila, i)).ToList();
 
         if (entrada.Resolucion == ResolucionDeIngreso.Registrado && coincidencias.Count != 1)

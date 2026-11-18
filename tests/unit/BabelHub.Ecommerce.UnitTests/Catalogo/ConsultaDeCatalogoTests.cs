@@ -429,7 +429,6 @@ public sealed class ConsultaDeCatalogoTests
     // ---------- Disponibilidad ----------
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-17")]
     public async Task Consultar_la_disponibilidad_devuelve_cada_edicion_en_el_orden_pedido_y_valida_el_tope_de_50()
     {
         var e = new EntornoDelCatalogo();
@@ -447,7 +446,6 @@ public sealed class ConsultaDeCatalogoTests
     // ---------- Sorpréndeme ----------
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-07")]
     public async Task Sorprendeme_cuenta_una_digital_vigente_sin_consultar_al_inventario()
     {
         var e = new EntornoDelCatalogo();
@@ -460,7 +458,6 @@ public sealed class ConsultaDeCatalogoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-07")]
     public async Task Con_el_inventario_caido_sorprendeme_solo_ofrece_digitales_o_ninguna()
     {
         var e = new EntornoDelCatalogo();
@@ -480,7 +477,6 @@ public sealed class ConsultaDeCatalogoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-07")]
     public async Task Sorprendeme_con_una_impresa_con_stock_la_ofrece_y_sin_obras_disponibles_responde_ninguna()
     {
         var e = new EntornoDelCatalogo();
@@ -499,7 +495,6 @@ public sealed class ConsultaDeCatalogoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-07")]
     public async Task Sorprendeme_muestrea_hasta_3_lotes_de_50_y_se_detiene_al_encontrar_una_disponible()
     {
         var e = new EntornoDelCatalogo();

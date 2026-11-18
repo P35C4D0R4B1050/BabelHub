@@ -11,6 +11,7 @@ internal sealed class LecturasDeAdministracion(
     AutorizadorDelCatalogo autorizador,
     IValidador<ListarObrasDeAdministracionEntrada> validador,
     ILecturasDelCatalogo lecturas,
+    IInventarioDelCatalogo inventario,
     IReloj reloj)
 {
     public async Task<Resultado<PaginaDeObrasDeAdministracion>> Listar(ListarObrasDeAdministracionEntrada entrada, CancellationToken cancelacion)
@@ -28,7 +29,7 @@ internal sealed class LecturasDeAdministracion(
         }
 
         var pagina = await lecturas.BuscarParaAdministracion(entrada.Texto?.Trim(), entrada.IncluirDadasDeBaja, entrada.Pagina, entrada.Tamano, cancelacion).ConfigureAwait(false);
-        return Resultado<PaginaDeObrasDeAdministracion>.Exito(new PaginaDeObrasDeAdministracion(pagina.Obras.Select(Mapear).ToList(), entrada.Pagina, entrada.Tamano, pagina.Total));
+        return Resultado<PaginaDeObrasDeAdministracion>.Exito(new PaginaDeObrasDeAdministracion(pagina.Obras.Select(o => Mapear(o)).ToList(), entrada.Pagina, entrada.Tamano, pagina.Total));
     }
 
     public async Task<Resultado<ObraDeAdministracion>> Obtener(Guid obraId, CancellationToken cancelacion)
@@ -44,10 +45,39 @@ internal sealed class LecturasDeAdministracion(
         }
 
         var obra = await lecturas.ObraPorId(obraId, cancelacion).ConfigureAwait(false);
-        return obra is null ? FallosDelCatalogo.Fallo<ObraDeAdministracion>(TraductorDeRechazos.ObraNoEncontrada()) : Resultado<ObraDeAdministracion>.Exito(Mapear(obra));
+        if (obra is null)
+        {
+            return FallosDelCatalogo.Fallo<ObraDeAdministracion>(TraductorDeRechazos.ObraNoEncontrada());
+        }
+
+        var registro = await RegistroPendiente(obra, cancelacion).ConfigureAwait(false);
+        return Resultado<ObraDeAdministracion>.Exito(Mapear(obra, registro));
     }
 
-    private ObraDeAdministracion Mapear(Obra obra) =>
+    /// <summary>
+    /// El aviso «registro o ingreso pendiente» (el Inventario aún no conoce la edición impresa): <b>solo lo ve la administración central</b> (esta lectura ya comprobó el rol) y el público ve «agotada». <see langword="null"/> si el
+    /// Inventario no respondió (no se sabe); un fallo del Inventario nunca hace fallar la lectura.
+    /// </summary>
+    private async Task<IReadOnlySet<Guid>?> RegistroPendiente(Obra obra, CancellationToken cancelacion)
+    {
+        var impresas = obra.Ediciones.Where(e => !e.EsDigital && !e.EstaDadaDeBaja).Select(e => e.Id).ToList();
+        if (impresas.Count == 0)
+        {
+            return new HashSet<Guid>();
+        }
+
+        try
+        {
+            var respuesta = await inventario.ConsultarDisponibilidad(impresas, cancelacion).ConfigureAwait(false);
+            return respuesta is null ? null : respuesta.NoRegistradas.ToHashSet();
+        }
+        catch (OperationCanceledException) when (!cancelacion.IsCancellationRequested)
+        {
+            return null;
+        }
+    }
+
+    private ObraDeAdministracion Mapear(Obra obra, IReadOnlySet<Guid>? sinRegistrar = null) =>
         new(
             obra.Id,
             obra.Titulo,
@@ -57,9 +87,9 @@ internal sealed class LecturasDeAdministracion(
             obra.Portada.Huella.Hex,
             obra.Version,
             obra.EstaDadaDeBaja,
-            obra.Ediciones.Select(Mapear).ToList());
+            obra.Ediciones.Select(e => Mapear(e, sinRegistrar)).ToList());
 
-    private EdicionDeAdministracion Mapear(Edicion edicion) =>
+    private EdicionDeAdministracion Mapear(Edicion edicion, IReadOnlySet<Guid>? sinRegistrar) =>
         new(
             edicion.Id,
             edicion.EsDigital ? FormatoDeEdicion.Digital : FormatoDeEdicion.Impresa,
@@ -82,7 +112,8 @@ internal sealed class LecturasDeAdministracion(
                     licencia.VigenteHasta,
                     licencia.Formato == FormatoDigital.Epub ? FormatoDeArchivoDigital.Epub : FormatoDeArchivoDigital.Pdf)
                 : null,
-            edicion.Archivo is { } archivo ? new ArchivoDeEdicionDeAdministracion(TiposDeArchivo.Nombre(archivo.TipoDetectado), archivo.TamanoEnBytes, archivo.Huella.Corta, archivo.SubidoEn) : null);
+            edicion.Archivo is { } archivo ? new ArchivoDeEdicionDeAdministracion(TiposDeArchivo.Nombre(archivo.TipoDetectado), archivo.TamanoEnBytes, archivo.Huella.Corta, archivo.SubidoEn) : null,
+            edicion.EsDigital || edicion.EstaDadaDeBaja || sinRegistrar is null ? null : sinRegistrar.Contains(edicion.Id));
 }
 
 /// <summary>
@@ -135,6 +166,7 @@ internal sealed class AdministracionDelCatalogoDeLaAplicacion(
     private async Task<ResultadoDeAlta> ContinuarAlta(ResultadoDeAlta alta, IReadOnlyList<NuevaEdicionEntrada> entradas, CancellationToken cancelacion)
     {
         var resultado = alta.Ingresos.ToList();
+        var sinFicha = new List<Guid>();
         for (var i = 0; i < entradas.Count && i < alta.EdicionIds.Count; i++)
         {
             if (entradas[i].Formato != FormatoDeEdicion.Impresa)
@@ -146,7 +178,11 @@ internal sealed class AdministracionDelCatalogoDeLaAplicacion(
             var pedido = resultado.FindIndex(x => x.EdicionId == edicionId);
             if (pedido < 0)
             {
-                await orquestador.RegistrarFicha(edicionId, cancelacion).ConfigureAwait(false);
+                if (!await orquestador.RegistrarFicha(edicionId, cancelacion).ConfigureAwait(false))
+                {
+                    sinFicha.Add(edicionId);
+                }
+
                 continue;
             }
 
@@ -158,6 +194,6 @@ internal sealed class AdministracionDelCatalogoDeLaAplicacion(
             }
         }
 
-        return alta with { Ingresos = resultado };
+        return alta with { Ingresos = resultado, FichasSinConfirmar = sinFicha };
     }
 }

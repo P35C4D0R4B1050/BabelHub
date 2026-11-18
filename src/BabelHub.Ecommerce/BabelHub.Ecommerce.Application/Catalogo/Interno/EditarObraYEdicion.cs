@@ -147,7 +147,7 @@ internal sealed class EditarEdicion(
         LicenciaDigital? licenciaNueva = null;
         if (entrada.Licencia is not null)
         {
-            var licencia = constructor.Licencia(entrada.Licencia, "licencia.");
+            var licencia = constructor.Licencia(entrada.Licencia);
             if (!licencia.EsExito)
             {
                 return FallosDelCatalogo.Fallo<ResultadoDeEscritura>(TraductorDeRechazos.LicenciaInvalida(licencia.Errores, "licencia."));

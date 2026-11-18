@@ -75,7 +75,7 @@ internal sealed class SubirArchivo(
         if (lista is null)
         {
             // La fila ya no estaba (la depuró el trabajo de fondo): el objeto no sirve.
-            await IntentarBorrar(referencia.ClaveDelAlmacen, cancelacion).ConfigureAwait(false);
+            await DescartarLaSubida(referencia, cancelacion).ConfigureAwait(false);
             return FallosDelCatalogo.De<ArchivoSubido>(CategoriaDeError.NoDisponible, ClavesDelCatalogo.AlmacenNoDisponible);
         }
 
@@ -83,28 +83,48 @@ internal sealed class SubirArchivo(
             new ArchivoSubido(lista.Id, entrada.Finalidad, TiposDeArchivo.Nombre(archivo.Tipo), archivo.TamanoEnBytes, archivo.Huella.Hex, lista.VenceEn));
     }
 
+    /// <summary>
+    /// El archivo no sirve: se borra el objeto y, <b>solo si se borró</b>, la fila. Si el almacén no pudo borrarlo, la fila pasa a <c>descarte</c> y el trabajo de fondo —que parte de las filas— lo borra después: quitar la fila
+    /// dejaría un objeto sin validar y sin seguimiento para siempre.
+    /// </summary>
     private async Task DescartarLaSubida(ReferenciaDeArchivo referencia, CancellationToken cancelacion)
     {
-        await IntentarBorrar(referencia.ClaveDelAlmacen, cancelacion).ConfigureAwait(false);
+        var borrado = await IntentarBorrar(referencia.ClaveDelAlmacen, cancelacion).ConfigureAwait(false);
         try
         {
-            await unidad.Ejecutar(async token => { await referencias.Eliminar(referencia.Id, token).ConfigureAwait(false); return true; }, cancelacion).ConfigureAwait(false);
+            await unidad.Ejecutar(
+                async token =>
+                {
+                    if (borrado)
+                    {
+                        await referencias.Eliminar(referencia.Id, token).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        referencia.PasarADescarte();
+                        await referencias.Guardar(referencia, token).ConfigureAwait(false);
+                    }
+
+                    return true;
+                },
+                cancelacion).ConfigureAwait(false);
         }
         catch (Exception) when (!cancelacion.IsCancellationRequested)
         {
-            // Si no se pudo quitar la fila, el trabajo de fondo la depura (parte de las filas).
+            // Si no se pudo anotar, la fila subiendo queda y el trabajo de fondo la depura (parte de las filas).
         }
     }
 
-    private async Task IntentarBorrar(string clave, CancellationToken cancelacion)
+    private async Task<bool> IntentarBorrar(string clave, CancellationToken cancelacion)
     {
         try
         {
             await almacen.Borrar(clave, cancelacion).ConfigureAwait(false);
+            return true;
         }
         catch (Exception) when (!cancelacion.IsCancellationRequested)
         {
-            // El objeto huérfano lo borra el trabajo de fondo desde la fila.
+            return false;
         }
     }
 
@@ -164,7 +184,7 @@ internal sealed class ArchivosDelCatalogoDeLaAplicacion(ICasoDeUso<SubirArchivoE
 }
 
 /// <summary>Lo que depuró una corrida: los objetos borrados, las filas quitadas y las que no se pudieron depurar (se reintentan en la corrida siguiente).</summary>
-public sealed record DepuracionDeArchivos(int ObjetosBorrados, int FilasQuitadas, int Fallidas);
+internal sealed record DepuracionDeArchivos(int ObjetosBorrados, int FilasQuitadas, int Fallidas);
 
 /// <summary>
 /// <c>DepurarArchivosSinUso</c> (D05, trabajo de fondo diario): <b>parte de las filas</b> de <c>archivos_pendientes</c>, no de los objetos del almacén. Para una <c>subiendo</c> más vieja que un margen mayor que la duración máxima de una
@@ -191,19 +211,15 @@ internal sealed class DepurarArchivosSinUso(
         }
 
         int objetos = 0, filas = 0, fallidas = 0;
-        var pendientes = await unidad.Ejecutar(token => referencias.Depurables(reloj.Ahora, MargenDeSubida, MaximoPorCorrida, token), cancelacion).ConfigureAwait(false);
-        foreach (var fila in pendientes)
+        var candidatas = await unidad.Ejecutar(token => referencias.Depurables(reloj.Ahora, MargenDeSubida, MaximoPorCorrida, token), cancelacion).ConfigureAwait(false);
+        foreach (var candidata in candidatas)
         {
             try
             {
-                if (fila.Estado != EstadoDeReferencia.Consumida)
-                {
-                    await almacen.Borrar(fila.ClaveDelAlmacen, cancelacion).ConfigureAwait(false);
-                    objetos++;
-                }
-
-                await unidad.Ejecutar(async token => { await referencias.Eliminar(fila.Id, token).ConfigureAwait(false); return true; }, cancelacion).ConfigureAwait(false);
-                filas++;
+                // Cada fila en su propia transacción: se toma con bloqueo, se revalida que siga como se leyó (un reemplazo pudo pasarla a descarte o un consumo, a consumida) y se borra el objeto y luego la fila.
+                var resultado = await unidad.Ejecutar(token => Depurar(candidata, token), cancelacion).ConfigureAwait(false);
+                objetos += resultado.Objeto ? 1 : 0;
+                filas += resultado.Fila ? 1 : 0;
             }
             catch (Exception) when (!cancelacion.IsCancellationRequested)
             {
@@ -212,5 +228,24 @@ internal sealed class DepurarArchivosSinUso(
         }
 
         return Resultado<DepuracionDeArchivos>.Exito(new DepuracionDeArchivos(objetos, filas, fallidas));
+    }
+
+    private async Task<(bool Objeto, bool Fila)> Depurar(ReferenciaDeArchivo candidata, CancellationToken cancelacion)
+    {
+        var fila = await referencias.Obtener(candidata.Id, paraActualizar: true, cancelacion).ConfigureAwait(false);
+        if (fila is null || fila.Estado != candidata.Estado)
+        {
+            // Otra operación la cambió o la quitó entre la lectura y el bloqueo: no se toca (se revisa en la corrida siguiente).
+            return (false, false);
+        }
+
+        var borrarObjeto = fila.Estado != EstadoDeReferencia.Consumida;
+        if (borrarObjeto)
+        {
+            await almacen.Borrar(fila.ClaveDelAlmacen, cancelacion).ConfigureAwait(false);
+        }
+
+        await referencias.Eliminar(fila.Id, cancelacion).ConfigureAwait(false);
+        return (borrarObjeto, true);
     }
 }

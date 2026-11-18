@@ -8,7 +8,6 @@ namespace BabelHub.Ecommerce.UnitTests.Catalogo;
 public sealed class LecturasDeAdministracionTests
 {
     [Fact]
-    [Trait("Criterio", "AC-CAT-11")]
     public async Task La_administracion_central_ve_las_ediciones_con_su_licencia_estado_y_version_pero_sin_la_clave_del_almacen()
     {
         var e = new EntornoDelCatalogo();
@@ -29,7 +28,6 @@ public sealed class LecturasDeAdministracionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-11")]
     public async Task La_lista_oculta_las_dadas_de_baja_salvo_que_se_pidan_y_busca_por_texto()
     {
         var e = new EntornoDelCatalogo();

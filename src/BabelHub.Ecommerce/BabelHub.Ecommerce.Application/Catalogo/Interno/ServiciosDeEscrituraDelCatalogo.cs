@@ -95,7 +95,7 @@ internal sealed class ConstructorDeEdiciones(ConsumirReferenciaDeArchivo referen
             return Resultado<EdicionConstruida>.Exito(new EdicionConstruida(Edicion.Impresa(Guid.NewGuid(), isbn, precio), entrada.StockInicial));
         }
 
-        var licencia = Licencia(entrada.Licencia!, prefijo);
+        var licencia = Licencia(entrada.Licencia!);
         if (!licencia.EsExito)
         {
             return Resultado<EdicionConstruida>.Fallo(TraductorDeRechazos.LicenciaInvalida(licencia.Errores, prefijo + "licencia."));
@@ -112,10 +112,9 @@ internal sealed class ConstructorDeEdiciones(ConsumirReferenciaDeArchivo referen
     }
 
     /// <summary>La licencia de la entrada, validada por el Dominio con el día de Lima (solo al registrar o cambiar).</summary>
-    public ResultadoDeLicencia Licencia(LicenciaDeEdicionEntrada entrada, string prefijo)
+    public ResultadoDeLicencia Licencia(LicenciaDeEdicionEntrada entrada)
     {
         ArgumentNullException.ThrowIfNull(entrada);
-        _ = prefijo;
         return LicenciaDigital.Crear(
             entrada.Tipo == TipoDeLicenciaDeEdicion.Comercial ? TipoDeLicencia.Comercial : TipoDeLicencia.DominioPublico,
             entrada.Titular,
@@ -148,7 +147,7 @@ internal static class AuditoriaDelCatalogo
         {
             ObjetoTipo = "edicion",
             ObjetoId = Id(edicion.Id),
-            Detalle = new Dictionary<string, string?> { ["isbn"] = edicion.Isbn.Isbn13, ["formato"] = edicion.EsDigital ? "digital" : "impresa" },
+            Detalle = new Dictionary<string, string?> { ["formato"] = edicion.EsDigital ? "digital" : "impresa" },
         };
 
     public static SolicitudDeRegistro EdicionEditada(Edicion edicion, IReadOnlyList<string> campos) =>
@@ -156,14 +155,14 @@ internal static class AuditoriaDelCatalogo
         {
             ObjetoTipo = "edicion",
             ObjetoId = Id(edicion.Id),
-            Detalle = new Dictionary<string, string?> { ["isbn"] = edicion.Isbn.Isbn13, ["camposCambiados"] = string.Join(',', campos) },
+            Detalle = new Dictionary<string, string?> { ["camposCambiados"] = string.Join(',', campos) },
         };
 
     public static SolicitudDeRegistro EdicionDadaDeBaja(Edicion edicion) =>
-        new(AccionesAuditables.EdicionDadaDeBaja) { ObjetoTipo = "edicion", ObjetoId = Id(edicion.Id), Detalle = new Dictionary<string, string?> { ["isbn"] = edicion.Isbn.Isbn13 } };
+        new(AccionesAuditables.EdicionDadaDeBaja) { ObjetoTipo = "edicion", ObjetoId = Id(edicion.Id), Detalle = new Dictionary<string, string?>() };
 
     public static SolicitudDeRegistro EdicionDigitalRetirada(Edicion edicion) =>
-        new(AccionesAuditables.EdicionDigitalRetirada) { ObjetoTipo = "edicion", ObjetoId = Id(edicion.Id), Detalle = new Dictionary<string, string?> { ["isbn"] = edicion.Isbn.Isbn13 } };
+        new(AccionesAuditables.EdicionDigitalRetirada) { ObjetoTipo = "edicion", ObjetoId = Id(edicion.Id), Detalle = new Dictionary<string, string?>() };
 
     /// <summary>El cambio de precio con ambos valores (CAT-11, AC-CAT-08).</summary>
     public static SolicitudDeRegistro PrecioCambiado(Edicion edicion, Precio anterior) =>

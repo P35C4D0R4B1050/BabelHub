@@ -294,7 +294,6 @@ public sealed class IngresosDeMercaderiaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-19")]
     public async Task Una_edicion_digital_dada_de_baja_o_inexistente_no_recibe_ingresos_ni_clave()
     {
         var e = new EntornoDelCatalogo();
@@ -461,7 +460,6 @@ public sealed class IngresosDeMercaderiaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAT-19")]
     public async Task Reintentar_una_fila_de_otra_edicion_o_inexistente_responde_no_encontrado_y_una_ya_resuelta_conflicto()
     {
         var e = new EntornoDelCatalogo();

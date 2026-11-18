@@ -139,20 +139,15 @@ public sealed class DoblesDelCatalogoTests
     }
 
     [Fact]
-    public async Task El_almacen_doble_lee_por_rango_abre_portadas_y_borra()
+    public async Task El_almacen_doble_abre_portadas_y_borra()
     {
         var almacen = new AlmacenDeArchivosDoble();
         var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3, 4 };
         var clave = ClaveEnAlmacen.Nueva();
         await almacen.Escribir(clave, FinalidadDeArchivo.Portada, new MemoryStream(png));
-
-        var cola = new byte[4];
-        var leidos = await almacen.LeerRango(clave, 8, cola);
         await using var portada = (await almacen.AbrirPortada(clave))!;
         await almacen.Borrar(clave);
 
-        Assert.Equal(4, leidos);
-        Assert.Equal(new byte[] { 1, 2, 3, 4 }, cola);
         Assert.Equal(png.Length, portada.Length);
         Assert.Null(await almacen.AbrirPortada(clave));
         Assert.Equal([clave], almacen.Borrados);
