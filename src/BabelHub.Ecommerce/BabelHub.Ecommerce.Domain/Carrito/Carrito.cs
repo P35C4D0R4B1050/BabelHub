@@ -25,6 +25,22 @@ public enum RechazoDeCarrito
     CarritoFusionado,
 }
 
+/// <summary>Qué hizo el retiro de una edición (CAT-18) sobre un carrito.</summary>
+public enum ResultadoDeRetiro
+{
+    /// <summary>La edición no estaba en el carrito.</summary>
+    NoEstaba,
+
+    /// <summary>La línea se quitó; queda el aviso para la persona.</summary>
+    Quitada,
+
+    /// <summary>El checkout está en un estado vivo que no admite editar: la línea sigue, marcada, hasta que salga de él.</summary>
+    Anotada,
+}
+
+/// <summary>Una edición cuya línea se quitó por un retiro del catálogo: para dejar el aviso <c>edicion_retirada</c> (D15).</summary>
+public sealed record EdicionRetirada(Guid EdicionId, bool EsDigital);
+
 /// <summary>El resultado de agregar, cambiar o quitar una línea: el rechazo del Dominio o la cantidad con que quedó la línea (0 si se quitó).</summary>
 public sealed class ResultadoDeLinea
 {
@@ -268,11 +284,67 @@ public sealed class Carrito
         return total;
     }
 
-    private void Tocar(DateTimeOffset ahora)
+    /// <summary>Hay una edición retirada del catálogo que espera a que el checkout salga de su estado vivo (D21).</summary>
+    public bool TieneRetirosPendientes => _lineas.Exists(l => l.RetiroPendiente);
+
+    /// <summary>
+    /// Catálogo retiró una edición (CAT-18, <c>IRetiroDeEdicionDeCarritos</c>): con <paramref name="diferir"/> falso (no hay checkout vivo que lo impida) quita la línea y devuelve <see cref="ResultadoDeRetiro.Quitada"/>; con
+    /// <paramref name="diferir"/> verdadero (el checkout está <c>reservando</c>, <c>en_pago</c> o <c>pago_pendiente</c>) solo la marca para quitarla después (<see cref="ResultadoDeRetiro.Anotada"/>, idempotente). Nunca falla ni mueve
+    /// la caducidad del visitante: no es una acción de la persona.
+    /// </summary>
+    public ResultadoDeRetiro RetirarEdicion(Guid edicionId, bool diferir, DateTimeOffset ahora)
+    {
+        var indice = _lineas.FindIndex(l => l.EdicionId == edicionId);
+        if (indice < 0)
+        {
+            return ResultadoDeRetiro.NoEstaba;
+        }
+
+        if (!diferir)
+        {
+            _lineas.RemoveAt(indice);
+            Tocar(ahora, porLaPersona: false);
+            return ResultadoDeRetiro.Quitada;
+        }
+
+        if (!_lineas[indice].RetiroPendiente)
+        {
+            _lineas[indice] = _lineas[indice].ConRetiroPendiente();
+            Tocar(ahora, porLaPersona: false);
+        }
+
+        return ResultadoDeRetiro.Anotada;
+    }
+
+    /// <summary>
+    /// Quita las líneas con retiro pendiente (<c>AplicarRetirosPendientes</c>, D21) y devuelve cuáles eran para dejar su aviso. Es lo que hace toda salida del checkout de un estado vivo hacia <c>en_edicion</c>, <c>cancelado</c>,
+    /// <c>reiniciado</c> o <c>pagado</c>. Sin retiros pendientes no cambia nada.
+    /// </summary>
+    public IReadOnlyList<EdicionRetirada> AplicarRetirosPendientes(DateTimeOffset ahora)
+    {
+        var retiradas = _lineas.Where(l => l.RetiroPendiente).Select(l => new EdicionRetirada(l.EdicionId, l.EsDigital)).ToList();
+        if (retiradas.Count == 0)
+        {
+            return retiradas;
+        }
+
+        _lineas.RemoveAll(l => l.RetiroPendiente);
+        Tocar(ahora, porLaPersona: false);
+        return retiradas;
+    }
+
+    /// <summary>
+    /// Una anotación <b>huérfana</b> (sin checkout vivo, o con el checkout ya <c>en_edicion</c> o terminado porque la transición se confirmó entre la lectura del retiro y su bloqueo del carrito) la quita la primera lectura con bloqueo del
+    /// carrito: la misma regla que <see cref="AplicarRetirosPendientes"/>, solo si el checkout no la sostiene. Con el checkout <c>reservando</c>, <c>en_pago</c> o <c>pago_pendiente</c> no hace nada.
+    /// </summary>
+    public IReadOnlyList<EdicionRetirada> QuitarRetirosHuerfanos(EstadoDelCheckout? estadoDelCheckout, DateTimeOffset ahora) =>
+        estadoDelCheckout is { } e && Checkout.SostieneRetirosPendientes(e) ? [] : AplicarRetirosPendientes(ahora);
+
+    private void Tocar(DateTimeOffset ahora, bool porLaPersona = true)
     {
         Version++;
         ModificadoEn = ahora;
-        if (Propietario.EsDeVisitante)
+        if (porLaPersona && Propietario.EsDeVisitante)
         {
             VenceEn = ahora + DuracionDelVisitante;
         }

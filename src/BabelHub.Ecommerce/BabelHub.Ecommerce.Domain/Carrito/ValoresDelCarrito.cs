@@ -57,15 +57,19 @@ public sealed class PropietarioDelCarrito
     }
 }
 
-/// <summary>Una línea del carrito: una edición con su cantidad (una por edición, CAR-02).</summary>
+/// <summary>
+/// Una línea del carrito: una edición con su cantidad (una por edición, CAR-02). <see cref="RetiroPendiente"/> la marca cuando Catálogo retiró la edición mientras había un checkout <c>reservando</c>, <c>en_pago</c> o <c>pago_pendiente</c>:
+/// para la persona ya está retirada (no se puede modificar ni pagar) y el retiro se aplica al salir de ese estado (D21).
+/// </summary>
 public sealed class LineaDeCarrito
 {
-    private LineaDeCarrito(Guid edicionId, bool esDigital, Cantidad cantidad, DateTimeOffset agregadaEn)
+    private LineaDeCarrito(Guid edicionId, bool esDigital, Cantidad cantidad, DateTimeOffset agregadaEn, bool retiroPendiente)
     {
         EdicionId = edicionId;
         EsDigital = esDigital;
         Cantidad = cantidad;
         AgregadaEn = agregadaEn;
+        RetiroPendiente = retiroPendiente;
     }
 
     public Guid EdicionId { get; }
@@ -76,7 +80,9 @@ public sealed class LineaDeCarrito
 
     public DateTimeOffset AgregadaEn { get; }
 
-    public static LineaDeCarrito Crear(Guid edicionId, bool esDigital, Cantidad cantidad, DateTimeOffset agregadaEn)
+    public bool RetiroPendiente { get; }
+
+    public static LineaDeCarrito Crear(Guid edicionId, bool esDigital, Cantidad cantidad, DateTimeOffset agregadaEn, bool retiroPendiente = false)
     {
         ArgumentNullException.ThrowIfNull(cantidad);
         if (edicionId == Guid.Empty)
@@ -86,10 +92,12 @@ public sealed class LineaDeCarrito
 
         return esDigital && cantidad.Valor != 1
             ? throw new ArgumentException("Una edición digital lleva siempre una unidad.", nameof(cantidad))
-            : new LineaDeCarrito(edicionId, esDigital, cantidad, agregadaEn);
+            : new LineaDeCarrito(edicionId, esDigital, cantidad, agregadaEn, retiroPendiente);
     }
 
-    internal LineaDeCarrito ConCantidad(Cantidad cantidad) => new(EdicionId, EsDigital, cantidad, AgregadaEn);
+    internal LineaDeCarrito ConCantidad(Cantidad cantidad) => new(EdicionId, EsDigital, cantidad, AgregadaEn, RetiroPendiente);
+
+    internal LineaDeCarrito ConRetiroPendiente() => new(EdicionId, EsDigital, Cantidad, AgregadaEn, retiroPendiente: true);
 }
 
 /// <summary>Los importes en soles (CAR-23, D17): <c>decimal</c> con dos decimales, redondeando <b>alejándose de cero</b> (el 5 siempre sube).</summary>
