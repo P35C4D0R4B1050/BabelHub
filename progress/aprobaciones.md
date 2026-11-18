@@ -37,3 +37,6 @@ Una fila por cada spec o plan que el agente aprobó por delegación de la person
 | 2026-11-14 | spec | inventario-seleccion-fuente | Claude (delegado) | 0/0 | Con cambios menores | Cumple | Cumple | 0 | 12 | 8be6d72e44743be8 |
 | 2026-11-14 | plan | inventario-seleccion-fuente | Claude (delegado) | 0/0 | Lista para aprobar | Cumple | Cumple con observaciones | 0 | 22 | ca4732df20e5b95c |
 | 2026-11-14 | plan | inventario-traslados | Claude (delegado) | 0/0 | Lista para aprobar | Cumple con observaciones | Cumple con observaciones | 0 | 12 | 8ff01f3b1ac8364b |
+| 2026-11-18 | plan | ecommerce-carrito-checkout | Claude (delegado) | 0/0 | Lista para aprobar | Cumple | Cumple con observaciones | 0 | 12 | 2e93d34b768bab55 |
+| 2026-11-18 | plan | ecommerce-pagos | Claude (delegado) | 0/0 | Lista para aprobar | Cumple | Cumple con observaciones | 0 | 12 | 5d0ce131706f5bff |
+| 2026-11-18 | plan | ecommerce-pedidos | Claude (delegado) | 0/0 | Con cambios menores | Cumple | Cumple con observaciones | 0 | 14 | 4c523fa3cb72bc6c |
