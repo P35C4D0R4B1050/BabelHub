@@ -1,0 +1,126 @@
+@using BabelHub.Ecommerce.Api.Areas.Admin.Controllers
+@model IngresosDeLaEdicionVista
+@{
+    var aviso = Context.Request.Query["aviso"].ToString();
+}
+<nav aria-label="Ruta de navegación" class="mb-4 text-sm">
+    <a class="link" href="/administracion/obras">Catálogo nacional</a> <span aria-hidden="true">/</span>
+    <a class="link" href="/administracion/obras/@Model.ObraId">@Model.TituloDeLaObra</a> <span aria-hidden="true">/</span> <span>Ingresos</span>
+</nav>
+
+<div class="flex flex-wrap items-center gap-3">
+    <h1 class="font-display text-3xl sm:text-4xl">Ingresos de mercadería</h1>
+    @if (Model.AgotadaEnLaRed)
+    {
+        <span class="bh-chip"><bh-icono nombre="agotado" clase="size-3.5" />Agotado en la red</span>
+    }
+</div>
+<p class="mt-1 opacity-80">@Model.TituloDeLaObra · ISBN <span class="font-mono">@Model.Isbn</span>@(Model.VendibleEnLaRed is { } v ? $" · vendible en la red: {v}" : string.Empty)</p>
+<p class="mt-1 max-w-2xl text-sm opacity-80">Cada lote suma al stock de la fuente de recepción; desde ahí se reparte por traslados. Queda en la auditoría del Inventario.</p>
+
+@if (aviso == "registrado")
+{
+    <div class="alert alert-success mt-4" role="status"><bh-icono nombre="exito" /><span>Ingreso registrado.</span></div>
+}
+else if (aviso == "pendiente")
+{
+    <div class="alert alert-warning mt-4" role="status"><bh-icono nombre="aviso" /><span>El Inventario no respondió y no sabemos si aplicó el ingreso. Quedó pendiente: reinténtalo o concílialo más abajo.</span></div>
+}
+
+@if (Model.HayPendiente)
+{
+    <div class="alert alert-warning mt-4" role="status">
+        <bh-icono nombre="aviso" />
+        <span>Hay un ingreso pendiente de esta edición. Resuélvelo antes de registrar otro: así evitas duplicar el stock.</span>
+    </div>
+}
+else
+{
+    <section class="mt-6 max-w-xl" aria-labelledby="h-registrar">
+        <h2 id="h-registrar" class="text-xl font-semibold">Registrar ingreso</h2>
+        <form class="mt-3 space-y-3" data-bh-formulario="registrar-ingreso" data-url="/administracion/ediciones/@Model.EdicionId/ingresos" data-token="@Model.Token" novalidate>
+            <div data-bh-errores class="alert alert-error" role="alert" tabindex="-1" hidden></div>
+            <div>
+                <label class="block text-sm font-semibold" for="in-cantidad">Cantidad recibida (de 1 a 5 000) *</label>
+                <input id="in-cantidad" name="cantidad" class="input w-full sm:w-56" type="number" min="1" max="5000" step="1" inputmode="numeric" />
+            </div>
+            <div>
+                <label class="block text-sm font-semibold" for="in-referencia">Referencia (guía o factura, hasta 80 caracteres)</label>
+                <input id="in-referencia" name="referencia" class="input w-full" maxlength="80" />
+            </div>
+            <div>
+                <label class="block text-sm font-semibold" for="in-nota">Nota (opcional, hasta 500 caracteres)</label>
+                <textarea id="in-nota" name="nota" class="textarea w-full" maxlength="500" rows="2" aria-describedby="in-nota-ayuda"></textarea>
+                <p id="in-nota-ayuda" class="mt-1 text-xs opacity-70">No escribas datos personales: la nota se conserva por 2 años y luego se borra.</p>
+            </div>
+            <p class="text-xs opacity-70">Este formulario es válido hasta las @Model.TokenVenceEn (hora de Lima) y sirve para un solo ingreso: si lo envías dos veces, el Inventario aplica uno solo.</p>
+            <button type="submit" class="btn btn-primary">Registrar ingreso</button>
+        </form>
+    </section>
+}
+
+<section class="mt-10" aria-labelledby="h-historial">
+    <h2 id="h-historial" class="text-xl font-semibold">Últimos ingresos</h2>
+    @if (Model.InventarioNoRespondio)
+    {
+        <div class="alert alert-warning mt-2" role="status"><bh-icono nombre="aviso" /><span>El Inventario no respondió: solo vemos los ingresos pedidos desde aquí. Intenta de nuevo en unos minutos.</span></div>
+    }
+    @if (Model.Ingresos.Count == 0)
+    {
+        <p class="mt-2 opacity-80">Aún no hay ingresos de esta edición.</p>
+    }
+    else
+    {
+        <div class="mt-2 overflow-x-auto rounded-box border border-base-300 bg-base-100">
+            <table class="table table-sm">
+                <caption class="sr-only">Ingresos de la edición con su fecha, cantidad, referencia, usuario y estado</caption>
+                <thead><tr><th scope="col">Fecha</th><th scope="col" class="text-right">Cantidad</th><th scope="col">Referencia</th><th scope="col">Registró</th><th scope="col">Estado</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead>
+                <tbody>
+                    @foreach (var fila in Model.Ingresos)
+                    {
+                        <tr>
+                            <td class="whitespace-nowrap">@fila.Fecha</td>
+                            <td class="text-right tabular-nums">@fila.Cantidad</td>
+                            <td>@(fila.Referencia ?? "—")</td>
+                            <td>@fila.Usuario</td>
+                            <td><span class="bh-chip"><bh-icono nombre="@fila.EstadoIcono" clase="size-3.5" />@fila.Estado</span></td>
+                            <td>
+                                @if (fila.EsPendiente && fila.IngresoSolicitadoId is { } id)
+                                {
+                                    <details class="dropdown dropdown-end">
+                                        <summary class="btn btn-xs">Resolver</summary>
+                                        <div class="dropdown-content z-10 mt-1 w-80 max-w-[90vw] space-y-3 rounded-box border border-base-300 bg-base-100 p-3 shadow-sm">
+                                            <form data-bh-formulario="reintentar-ingreso" data-url="/administracion/ediciones/@Model.EdicionId/ingresos/@id/reintentar" novalidate>
+                                                <div data-bh-errores class="alert alert-error mb-2" role="alert" tabindex="-1" hidden></div>
+                                                <button type="submit" class="btn btn-sm btn-primary w-full">Reintentar ingreso pendiente</button>
+                                                <p class="mt-1 text-xs opacity-70">Reenvía el mismo ingreso con su misma clave: no duplica el stock. Solo lo puede reintentar quien lo pidió.</p>
+                                            </form>
+                                            <form data-bh-formulario="conciliar-ingreso" data-url="/administracion/ediciones/@Model.EdicionId/ingresos/@id/conciliar" novalidate>
+                                                <div data-bh-errores class="alert alert-error mb-2" role="alert" tabindex="-1" hidden></div>
+                                                <fieldset class="space-y-1">
+                                                    <legend class="text-sm font-semibold">Conciliar ingreso pendiente</legend>
+                                                    <label class="flex cursor-pointer items-start gap-2 text-sm"><input type="radio" name="resultado" value="registrado" class="radio radio-sm mt-0.5" /> <span>Sí se aplicó (consta en el Inventario)</span></label>
+                                                    <label class="flex cursor-pointer items-start gap-2 text-sm"><input type="radio" name="resultado" value="fallido" class="radio radio-sm mt-0.5" /> <span>No se aplicó</span></label>
+                                                </fieldset>
+                                                <div class="alert alert-warning mt-2 text-sm" role="note">
+                                                    <bh-icono nombre="aviso" />
+                                                    <span>Marcarlo como fallido habilita una clave nueva y <strong>puede duplicar el stock</strong> si el Inventario sí lo aplicó@(fila.Viejo ? ". Este ingreso lleva más de 24 horas pendiente: revisa los ingresos del Inventario antes de confirmar" : string.Empty).</span>
+                                                </div>
+                                                <label class="mt-2 flex cursor-pointer items-start gap-2 text-sm"><input type="checkbox" name="confirma" class="checkbox checkbox-sm mt-0.5" /> <span>Entiendo el riesgo y confirmo que no se aplicó.</span></label>
+                                                <button type="submit" class="btn btn-sm mt-2 w-full">Conciliar</button>
+                                            </form>
+                                        </div>
+                                    </details>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@section Scripts {
+    <script src="/js/admin-catalogo.js" defer></script>
+}
