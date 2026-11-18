@@ -11,6 +11,7 @@ public sealed class AceptacionesTests
 {
     private static readonly DateTimeOffset Ahora = new(2026, 11, 18, 15, 0, 0, TimeSpan.Zero);
     private static readonly Guid Cuenta = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private static readonly Guid CarritoId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
     private static readonly Guid LineaFija = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
     private static readonly Func<string, string> Identidad = s => s;
     private static readonly CostoDeEnvio Envio = CostoDeEnvio.Crear(12.00m);
@@ -23,7 +24,7 @@ public sealed class AceptacionesTests
 
     private static Checkout Nuevo(params LineaParaCheckout[] lineas)
     {
-        var checkout = Checkout.Iniciar(Guid.NewGuid(), Cuenta, Guid.NewGuid(), lineas, () => LineaFija, Ahora);
+        var checkout = Checkout.Iniciar(Guid.NewGuid(), Cuenta, CarritoId, lineas, () => LineaFija, Ahora);
         if (checkout.RequiereEntrega)
         {
             checkout.ElegirRecojo("lima", Ahora);
@@ -34,7 +35,7 @@ public sealed class AceptacionesTests
 
     private static CarritoDeDominio CarritoCon(params LineaParaCheckout[] lineas)
     {
-        var carrito = CarritoDeDominio.Crear(Guid.NewGuid(), PropietarioDelCarrito.DeCuenta(Cuenta), Ahora);
+        var carrito = CarritoDeDominio.Crear(CarritoId, PropietarioDelCarrito.DeCuenta(Cuenta), Ahora);
         foreach (var l in lineas)
         {
             carrito.Agregar(l.EdicionId, l.EsDigital, l.Cantidad, Ahora);

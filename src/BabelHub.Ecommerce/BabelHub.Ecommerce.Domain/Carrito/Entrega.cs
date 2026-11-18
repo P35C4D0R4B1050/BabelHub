@@ -34,7 +34,7 @@ internal static class TextoDeEntrega
 
         foreach (var c in recortado)
         {
-            if (char.IsControl(c) || (int)c is 0x2028 or 0x2029)
+            if (EsCaracterNoPermitido(c))
             {
                 return false;
             }
@@ -43,6 +43,13 @@ internal static class TextoDeEntrega
         normalizado = recortado;
         return true;
     }
+
+    /// <summary>
+    /// Los caracteres de control, los separadores de línea y de párrafo (U+2028, U+2029), los de formato (cero ancho, controles bidireccionales, BOM: sirven para suplantar visualmente un texto en la guía del operador) y todo espacio que no
+    /// sea el U+0020 (el espacio duro, por ejemplo).
+    /// </summary>
+    private static bool EsCaracterNoPermitido(char c) =>
+        char.IsControl(c) || (int)c is 0x2028 or 0x2029 || (c != ' ' && char.GetUnicodeCategory(c) is System.Globalization.UnicodeCategory.Format or System.Globalization.UnicodeCategory.SpaceSeparator);
 }
 
 /// <summary>
@@ -111,6 +118,11 @@ public sealed class TelefonoDeContacto : IEquatable<TelefonoDeContacto>
     {
         telefono = null;
         if (texto is null)
+        {
+            return false;
+        }
+
+        if (texto.Length > 40)
         {
             return false;
         }

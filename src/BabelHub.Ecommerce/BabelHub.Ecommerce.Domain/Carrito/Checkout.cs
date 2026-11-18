@@ -17,6 +17,9 @@ public sealed class Checkout
     /// <summary>El contacto se elimina a los 30 días de la última modificación hecha por la persona (CAR-34, D08).</summary>
     public static readonly TimeSpan RetencionDelContacto = TimeSpan.FromDays(30);
 
+    /// <summary>El tope del código de una sucursal (el de <c>sucursales.listar</c> es corto): se valida antes de que entre al texto canónico.</summary>
+    public const int LongitudMaximaDelCodigoDeSucursal = 40;
+
     private readonly List<LineaDelCheckout> _lineas;
     private PasoDelCheckout _pasoDeEdicion = PasoDelCheckout.Revision;
 
@@ -260,9 +263,9 @@ public sealed class Checkout
     /// <summary>Recojo en una sucursal (CAR-08): quita el contacto y la región si antes era a domicilio. Un carrito solo digital no tiene entrega. Elegir lo mismo no cambia nada.</summary>
     public ResultadoDeCheckout ElegirRecojo(string codigoDeSucursal, DateTimeOffset ahora)
     {
-        if (string.IsNullOrWhiteSpace(codigoDeSucursal))
+        if (!TextoDeEntrega.TryNormalizar(codigoDeSucursal, LongitudMaximaDelCodigoDeSucursal, out var codigo))
         {
-            throw new ArgumentException("La sucursal de recojo necesita su código.", nameof(codigoDeSucursal));
+            throw new ArgumentException("El código de la sucursal de recojo es obligatorio, de hasta 40 caracteres y sin caracteres de control.", nameof(codigoDeSucursal));
         }
 
         if (RechazarEntrega() is { } rechazo)
@@ -270,7 +273,6 @@ public sealed class Checkout
             return rechazo;
         }
 
-        var codigo = codigoDeSucursal.Trim();
         if (TipoDeEntrega == Tipo.Recojo && CodigoDeSucursalDeRecojo == codigo)
         {
             return ResultadoDeCheckout.SinCambios();
@@ -351,7 +353,7 @@ public sealed class Checkout
         ArgumentNullException.ThrowIfNull(costoConfigurado);
         ArgumentNullException.ThrowIfNull(calcularHuellaDeReserva);
         ArgumentNullException.ThrowIfNull(calcularHuellaDeInstantanea);
-        ArgumentNullException.ThrowIfNull(carrito);
+        ExigirCarritoPropio(carrito);
         if (pedidoIdNuevo == Guid.Empty)
         {
             throw new ArgumentException("El pedido necesita su identificador.", nameof(pedidoIdNuevo));
@@ -422,7 +424,7 @@ public sealed class Checkout
     public ResultadoDeCheckout ConfirmarEnPago(Guid pedidoId, int generacionDeReserva, string huellaDeInstantanea, DateTimeOffset reservaExpiraEn, Carrito carrito)
     {
         ArgumentNullException.ThrowIfNull(huellaDeInstantanea);
-        ArgumentNullException.ThrowIfNull(carrito);
+        ExigirCarritoPropio(carrito);
         var coincide = PedidoId == pedidoId && GeneracionDeReserva == generacionDeReserva && HuellaDeInstantanea == huellaDeInstantanea;
         if (Estado == EstadoDelCheckout.EnPago && coincide)
         {
@@ -454,7 +456,7 @@ public sealed class Checkout
     /// </summary>
     public ResultadoDeCheckout Editar(Carrito carrito, DateTimeOffset ahora)
     {
-        ArgumentNullException.ThrowIfNull(carrito);
+        ExigirCarritoPropio(carrito);
         return Estado switch
         {
             EstadoDelCheckout.EnEdicion => ResultadoDeCheckout.SinCambios(),
@@ -469,7 +471,7 @@ public sealed class Checkout
     /// </summary>
     public ResultadoDeCheckout VolverAEnEdicionTrasReabrir(Carrito carrito, DateTimeOffset ahora)
     {
-        ArgumentNullException.ThrowIfNull(carrito);
+        ExigirCarritoPropio(carrito);
         return Estado switch
         {
             EstadoDelCheckout.EnEdicion => ResultadoDeCheckout.SinCambios(),
@@ -493,7 +495,7 @@ public sealed class Checkout
     /// </summary>
     public ResultadoDeCheckout AbortarPasoAlPago(EstadoDelCheckout desde, Guid pedidoId, int generacionDeReserva, Carrito carrito, DateTimeOffset ahora)
     {
-        ArgumentNullException.ThrowIfNull(carrito);
+        ExigirCarritoPropio(carrito);
         if (desde is not (EstadoDelCheckout.Reservando or EstadoDelCheckout.EnPago))
         {
             throw new ArgumentException("Solo se aborta desde reservando o en_pago.", nameof(desde));
@@ -535,12 +537,17 @@ public sealed class Checkout
     /// </summary>
     public ResultadoDeCheckout EliminarContacto(MotivoDeEliminacionDeContacto motivo, DateTimeOffset ahora)
     {
+        if (motivo is not (MotivoDeEliminacionDeContacto.Vencido or MotivoDeEliminacionDeContacto.CuentaCancelada or MotivoDeEliminacionDeContacto.CuentaReemplazada))
+        {
+            throw new ArgumentException("Ese motivo lo aplica la propia transición del checkout; aquí solo valen el vencimiento y la cuenta cancelada o reemplazada.", nameof(motivo));
+        }
+
         if (Contacto is null)
         {
             return ResultadoDeCheckout.SinCambios();
         }
 
-        if (motivo == MotivoDeEliminacionDeContacto.Vencido && (Estado != EstadoDelCheckout.EnEdicion || !ContactoVencido(ahora)))
+        if (motivo == MotivoDeEliminacionDeContacto.Vencido && (Estado is not (EstadoDelCheckout.EnEdicion or EstadoDelCheckout.PagoPendiente) || !ContactoVencido(ahora)))
         {
             return ResultadoDeCheckout.De(EfectoDeTransicion.NoAplica);
         }
@@ -556,6 +563,21 @@ public sealed class Checkout
         return ResultadoDeCheckout.Aplicada();
     }
 
+    /// <summary>
+    /// Un checkout abandonado con el cobro sin empezar (<c>reservando</c> o <c>en_pago</c>) que lleva 30 días sin que la persona lo toque se termina: pasa a <c>cancelado</c>, quita el contacto, anota la reserva que liberar y aplica los
+    /// retiros pendientes (CAR-34, AC-CAR-30). Lo invoca el trabajo de fondo, que antes cancela la intención de pago. Con <c>en_edicion</c> el contacto se quita con <see cref="EliminarContacto"/>; un <c>pago_pendiente</c> lo resuelve Pagos.
+    /// </summary>
+    public ResultadoDeCheckout CancelarPorVencimiento(Carrito carrito, DateTimeOffset ahora)
+    {
+        ExigirCarritoPropio(carrito);
+        if (Estado is not (EstadoDelCheckout.Reservando or EstadoDelCheckout.EnPago) || ahora - ModificadoPorLaPersonaEn < RetencionDelContacto)
+        {
+            return ResultadoDeCheckout.De(EfectoDeTransicion.NoAplica);
+        }
+
+        return Terminar(EstadoDelCheckout.Cancelado, carrito, ahora, porLaPersona: false, desdeReservando: true);
+    }
+
     /// <summary>La reserva se liberó en el Inventario (o ya no existía): quita la anotación.</summary>
     public void LiberacionConfirmada()
     {
@@ -569,11 +591,16 @@ public sealed class Checkout
     // ------------------------------------------------------------------ lo que informa Pagos
 
     /// <summary>
-    /// <c>PagoPendiente</c> (D13): de <c>en_pago</c> a <c>pago_pendiente</c> con los instantes que fija Pagos (el límite de 30 minutos y la expiración de la reserva). Mientras el checkout está <c>reservando</c> responde
+    /// <c>PagoPendiente</c> (D13), condicional al <c>pedidoId</c>: de <c>en_pago</c> a <c>pago_pendiente</c> con los instantes que fija Pagos (el límite de 30 minutos y la expiración de la reserva). Mientras el checkout está <c>reservando</c> responde
     /// <see cref="EfectoDeTransicion.AunNo"/> y Pagos reintenta; si ya está pendiente o pagado, es idempotente.
     /// </summary>
-    public ResultadoDeCheckout PagoPendiente(DateTimeOffset limiteEn, DateTimeOffset reservaExpiraEn, DateTimeOffset ahora)
+    public ResultadoDeCheckout PagoPendiente(Guid pedidoId, DateTimeOffset limiteEn, DateTimeOffset reservaExpiraEn, DateTimeOffset ahora)
     {
+        if (DeOtroPedido(pedidoId) is { } ajeno)
+        {
+            return ajeno;
+        }
+
         switch (Estado)
         {
             case EstadoDelCheckout.Reservando:
@@ -593,12 +620,17 @@ public sealed class Checkout
     }
 
     /// <summary>
-    /// <c>PagoAprobado</c> (D13, D16): de <c>pago_pendiente</c> o <c>en_pago</c> a <c>pagado</c>, quitando los retiros pendientes. Quitar del carrito lo comprado lo hace la Aplicación con las líneas del checkout. Mientras reserva responde
+    /// <c>PagoAprobado</c> (D13, D16), condicional al <c>pedidoId</c>: de <c>pago_pendiente</c> o <c>en_pago</c> a <c>pagado</c>, quitando los retiros pendientes. Quitar del carrito lo comprado lo hace la Aplicación con las líneas del checkout. Mientras reserva responde
     /// <see cref="EfectoDeTransicion.AunNo"/>; ya pagado, es idempotente.
     /// </summary>
-    public ResultadoDeCheckout PagoAprobado(Carrito carrito, DateTimeOffset ahora)
+    public ResultadoDeCheckout PagoAprobado(Guid pedidoId, Carrito carrito, DateTimeOffset ahora)
     {
-        ArgumentNullException.ThrowIfNull(carrito);
+        ExigirCarritoPropio(carrito);
+        if (DeOtroPedido(pedidoId) is { } ajeno)
+        {
+            return ajeno;
+        }
+
         switch (Estado)
         {
             case EstadoDelCheckout.Reservando:
@@ -619,13 +651,18 @@ public sealed class Checkout
     }
 
     /// <summary>
-    /// <c>PagoResuelto</c> (D13, D21): un pago <c>vencido</c> o <c>rechazado</c> vuelve a <c>en_pago</c> si la reserva sigue vigente, o a <c>cancelado</c> (anotando la liberación) si expiró; con un retiro pendiente no cambia el estado
+    /// <c>PagoResuelto</c> (D13, D21), condicional al <c>pedidoId</c>: un pago <c>vencido</c> o <c>rechazado</c> vuelve a <c>en_pago</c> si la reserva sigue vigente, o a <c>cancelado</c> (anotando la liberación) si expiró; con un retiro pendiente no cambia el estado
     /// (<see cref="EfectoDeTransicion.ConRetiroPendiente"/>: quien llama reabre la intención y vuelve a <c>en_edicion</c>). <c>Compensado</c> cancela el checkout desde <c>pago_pendiente</c> o <c>en_pago</c>. Mientras reserva
     /// responde <see cref="EfectoDeTransicion.AunNo"/>; si el checkout ya resolvió, es idempotente.
     /// </summary>
-    public ResultadoDeCheckout PagoResuelto(MotivoDePagoResuelto motivo, Carrito carrito, DateTimeOffset ahora)
+    public ResultadoDeCheckout PagoResuelto(Guid pedidoId, MotivoDePagoResuelto motivo, Carrito carrito, DateTimeOffset ahora)
     {
-        ArgumentNullException.ThrowIfNull(carrito);
+        ExigirCarritoPropio(carrito);
+        if (DeOtroPedido(pedidoId) is { } ajeno)
+        {
+            return ajeno;
+        }
+
         if (Estado == EstadoDelCheckout.Reservando)
         {
             return ResultadoDeCheckout.De(EfectoDeTransicion.AunNo);
@@ -666,6 +703,55 @@ public sealed class Checkout
         }
     }
 
+    /// <summary>
+    /// <c>PagoResuelto</c> con un retiro pendiente y <c>Reabrir</c> respondió <c>NoCancelable</c> (hay un intento activo, D21): el pago pendiente vuelve a <c>en_pago</c> <b>conservando el retiro pendiente</b> (no hay estado atascado: un cobro
+    /// nuevo exige <c>en_pago</c> sin retiro). Condicional al <c>pedidoId</c>; ya en <c>en_pago</c> es idempotente; mientras reserva, <see cref="EfectoDeTransicion.AunNo"/>.
+    /// </summary>
+    public ResultadoDeCheckout VolverAEnPagoConservandoElRetiro(Guid pedidoId, DateTimeOffset ahora)
+    {
+        if (DeOtroPedido(pedidoId) is { } ajeno)
+        {
+            return ajeno;
+        }
+
+        switch (Estado)
+        {
+            case EstadoDelCheckout.Reservando:
+                return ResultadoDeCheckout.De(EfectoDeTransicion.AunNo);
+            case EstadoDelCheckout.EnPago:
+                return ResultadoDeCheckout.SinCambios();
+            case EstadoDelCheckout.PagoPendiente:
+                Estado = EstadoDelCheckout.EnPago;
+                LimitePendienteEn = null;
+                PagoPendienteDesde = null;
+                Cambiar(porLaPersona: false, ahora);
+                return ResultadoDeCheckout.Aplicada();
+            default:
+                return ResultadoDeCheckout.De(EfectoDeTransicion.NoAplica);
+        }
+    }
+
+    /// <summary>
+    /// <c>Reabrir</c> respondió <c>Cerrada</c> o <c>NoExiste</c> (la intención ya no admite cobro, D21): cancela el checkout desde <c>en_pago</c> o <c>pago_pendiente</c> sin que lo pida la persona, anotando la reserva que liberar, quitando el
+    /// contacto y aplicando los retiros pendientes. Condicional al <c>pedidoId</c>; ya cancelado es idempotente; mientras reserva, <see cref="EfectoDeTransicion.AunNo"/>.
+    /// </summary>
+    public ResultadoDeCheckout CancelarPorIntencionCerrada(Guid pedidoId, Carrito carrito, DateTimeOffset ahora)
+    {
+        ExigirCarritoPropio(carrito);
+        if (DeOtroPedido(pedidoId) is { } ajeno)
+        {
+            return ajeno;
+        }
+
+        return Estado switch
+        {
+            EstadoDelCheckout.Reservando => ResultadoDeCheckout.De(EfectoDeTransicion.AunNo),
+            EstadoDelCheckout.Cancelado => ResultadoDeCheckout.SinCambios(),
+            EstadoDelCheckout.PagoPendiente or EstadoDelCheckout.EnPago => Terminar(EstadoDelCheckout.Cancelado, carrito, ahora, porLaPersona: false),
+            _ => ResultadoDeCheckout.De(EfectoDeTransicion.NoAplica),
+        };
+    }
+
     // ------------------------------------------------------------------ tiempo
 
     /// <summary>
@@ -700,10 +786,11 @@ public sealed class Checkout
         return ResultadoDeCheckout.Aplicada(retiradas);
     }
 
-    private ResultadoDeCheckout Terminar(EstadoDelCheckout destino, Carrito carrito, DateTimeOffset ahora, bool porLaPersona)
+    private ResultadoDeCheckout Terminar(EstadoDelCheckout destino, Carrito carrito, DateTimeOffset ahora, bool porLaPersona, bool desdeReservando = false)
     {
-        ArgumentNullException.ThrowIfNull(carrito);
-        if (Estado is not (EstadoDelCheckout.EnEdicion or EstadoDelCheckout.EnPago or EstadoDelCheckout.PagoPendiente) || (porLaPersona && Estado == EstadoDelCheckout.PagoPendiente))
+        ExigirCarritoPropio(carrito);
+        var admitido = Estado is EstadoDelCheckout.EnEdicion or EstadoDelCheckout.EnPago or EstadoDelCheckout.PagoPendiente || (desdeReservando && Estado == EstadoDelCheckout.Reservando);
+        if (!admitido || (porLaPersona && Estado == EstadoDelCheckout.PagoPendiente))
         {
             return ResultadoDeCheckout.Rechazar(RechazoPorEstado() ?? RechazoDeCheckout.EstadoNoPermite);
         }
@@ -716,6 +803,22 @@ public sealed class Checkout
         var retiradas = carrito.AplicarRetirosPendientes(ahora);
         Cambiar(porLaPersona, ahora);
         return ResultadoDeCheckout.Aplicada(retiradas);
+    }
+
+    /// <summary>
+    /// Un aviso de Pagos de otro <c>pedidoId</c> (por ejemplo el de un pedido ya descartado, que llega tarde) no debe tocar este checkout: si es el último descartado es un éxito idempotente y si no, no aplica. Es nulo cuando el aviso es de este pedido.
+    /// </summary>
+    private ResultadoDeCheckout? DeOtroPedido(Guid pedidoId) =>
+        PedidoId is { } actual && actual == pedidoId ? null : PedidoDescartado == pedidoId ? ResultadoDeCheckout.SinCambios() : ResultadoDeCheckout.De(EfectoDeTransicion.NoAplica);
+
+    /// <summary>Defensa en profundidad: el carrito que se pasa debe ser el de este checkout y de su cuenta (el alcance real lo comprueba la Aplicación); si no, se lanzaría sobre un carrito ajeno.</summary>
+    private void ExigirCarritoPropio(Carrito carrito)
+    {
+        ArgumentNullException.ThrowIfNull(carrito);
+        if (carrito.Id != CarritoId || carrito.Propietario.CuentaId != CuentaId)
+        {
+            throw new ArgumentException("El carrito no es el de este checkout.", nameof(carrito));
+        }
     }
 
     private RechazoDeCheckout? RechazoPorEstado() => Estado switch

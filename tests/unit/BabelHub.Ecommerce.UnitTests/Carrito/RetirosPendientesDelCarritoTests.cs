@@ -114,15 +114,18 @@ public sealed class RetirosPendientesDelCarritoTests
     }
 
     [Fact]
-    public void Una_linea_con_retiro_pendiente_se_conserva_al_cambiar_su_cantidad_o_aplicar_una_fusion()
+    public void Una_linea_con_retiro_pendiente_no_se_puede_agregar_ni_modificar_pero_si_quitar()
     {
         var carrito = ConDosLineas();
         carrito.RetirarEdicion(Libro, diferir: true, Ahora);
+        var version = carrito.Version;
 
-        carrito.Modificar(Libro, cantidad: 5, Ahora.AddMinutes(1));
+        Assert.Equal(RechazoDeCarrito.EdicionRetirada, carrito.Modificar(Libro, cantidad: 5, Ahora.AddMinutes(1)).Rechazo);
+        Assert.Equal(RechazoDeCarrito.EdicionRetirada, carrito.Agregar(Libro, esDigital: false, cantidad: 1, Ahora.AddMinutes(1)).Rechazo);
+        Assert.Equal(version, carrito.Version);
+        Assert.Equal(2, carrito.Lineas.Single(l => l.EdicionId == Libro).Cantidad.Valor);
 
-        var linea = carrito.Lineas.Single(l => l.EdicionId == Libro);
-        Assert.True(linea.RetiroPendiente);
-        Assert.Equal(5, linea.Cantidad.Valor);
+        Assert.True(carrito.Eliminar(Libro, Ahora.AddMinutes(2)).EsExito);
+        Assert.False(carrito.TieneRetirosPendientes);
     }
 }

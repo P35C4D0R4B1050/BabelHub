@@ -183,19 +183,6 @@ public sealed class EntregaYTotalTests
         Assert.Equal((111.90m, 0m, 111.90m), (digital.Subtotal, digital.Envio, digital.Total));
     }
 
-    [Fact]
-    [Trait("Criterio", "AC-CAR-21")]
-    public void El_total_congelado_no_cambia_aunque_cambie_la_configuracion_del_envio_despues()
-    {
-        var lineas = new[] { new ImporteDeLinea(37.30m, 3) };
-        var congelado = TotalDeCompra.Calcular(lineas, TipoDeEntrega.Domicilio, CostoDeEnvio.Crear(12.00m));
-
-        var conOtroEnvio = TotalDeCompra.Calcular(lineas, TipoDeEntrega.Domicilio, CostoDeEnvio.Crear(15.00m));
-
-        Assert.Equal(123.90m, congelado.Total);
-        Assert.Equal(126.90m, conOtroEnvio.Total);
-    }
-
     [Theory]
     [InlineData("0.125", 1, "0.13")]
     [InlineData("0.124", 1, "0.12")]

@@ -11,6 +11,7 @@ public sealed class RetencionDelContactoTests
 {
     private static readonly DateTimeOffset Ahora = new(2026, 11, 18, 15, 0, 0, TimeSpan.Zero);
     private static readonly Guid Cuenta = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private static readonly Guid CarritoId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
     private static readonly Func<string, string> Identidad = s => s;
     private static readonly CostoDeEnvio Envio = CostoDeEnvio.Crear(12.00m);
 
@@ -25,7 +26,7 @@ public sealed class RetencionDelContactoTests
 
     private static CarritoDeDominio CarritoCon(params LineaParaCheckout[] lineas)
     {
-        var carrito = CarritoDeDominio.Crear(Guid.NewGuid(), PropietarioDelCarrito.DeCuenta(Cuenta), Ahora);
+        var carrito = CarritoDeDominio.Crear(CarritoId, PropietarioDelCarrito.DeCuenta(Cuenta), Ahora);
         foreach (var l in lineas)
         {
             carrito.Agregar(l.EdicionId, l.EsDigital, l.Cantidad, Ahora);
@@ -37,7 +38,7 @@ public sealed class RetencionDelContactoTests
     /// <summary>Un checkout mixto a domicilio con el contacto cargado, en edición.</summary>
     private static (Checkout Checkout, CarritoDeDominio Carrito) ADomicilio()
     {
-        var checkout = Checkout.Iniciar(Guid.NewGuid(), Cuenta, Guid.NewGuid(), [Impreso(1), Digital(2)], Guid.NewGuid, Ahora);
+        var checkout = Checkout.Iniciar(Guid.NewGuid(), Cuenta, CarritoId, [Impreso(1), Digital(2)], Guid.NewGuid, Ahora);
         checkout.Aceptar(TextoLegal.Terminos, "t-1", Ahora);
         checkout.Aceptar(TextoLegal.Privacidad, "p-1", Ahora);
         checkout.Aceptar(TextoLegal.ReembolsoDigital, "r-1", Ahora);
@@ -76,13 +77,13 @@ public sealed class RetencionDelContactoTests
     public void Cuando_pagos_informa_que_el_pago_se_aprobo_el_contacto_deja_de_existir_desde_en_pago_y_desde_pago_pendiente()
     {
         var (desdeEnPago, carritoE) = EnPago();
-        Assert.Equal(EfectoDeTransicion.Aplicada, desdeEnPago.PagoAprobado(carritoE, Ahora.AddMinutes(5)).Efecto);
+        Assert.Equal(EfectoDeTransicion.Aplicada, desdeEnPago.PagoAprobado(desdeEnPago.PedidoId!.Value, carritoE, Ahora.AddMinutes(5)).Efecto);
         ExigirSinContacto(desdeEnPago);
 
         var (desdePendiente, carritoP) = EnPago();
-        desdePendiente.PagoPendiente(Ahora.AddMinutes(31), Ahora.AddMinutes(30), Ahora.AddMinutes(1));
+        desdePendiente.PagoPendiente(desdePendiente.PedidoId!.Value, Ahora.AddMinutes(31), Ahora.AddMinutes(30), Ahora.AddMinutes(1));
         Assert.NotNull(desdePendiente.Contacto);
-        desdePendiente.PagoAprobado(carritoP, Ahora.AddMinutes(5));
+        desdePendiente.PagoAprobado(desdePendiente.PedidoId!.Value, carritoP, Ahora.AddMinutes(5));
         ExigirSinContacto(desdePendiente);
     }
 
@@ -108,12 +109,12 @@ public sealed class RetencionDelContactoTests
     public void Un_pago_compensado_o_resuelto_con_la_reserva_expirada_cancela_el_checkout_sin_contacto()
     {
         var (compensado, carritoC) = EnPago();
-        compensado.PagoResuelto(MotivoDePagoResuelto.Compensado, carritoC, Ahora.AddMinutes(1));
+        compensado.PagoResuelto(compensado.PedidoId!.Value, MotivoDePagoResuelto.Compensado, carritoC, Ahora.AddMinutes(1));
         ExigirSinContacto(compensado);
 
         var (expirado, carritoX) = EnPago();
-        expirado.PagoPendiente(Ahora.AddMinutes(31), Ahora.AddMinutes(30), Ahora.AddMinutes(1));
-        expirado.PagoResuelto(MotivoDePagoResuelto.Vencido, carritoX, Ahora.AddMinutes(31));
+        expirado.PagoPendiente(expirado.PedidoId!.Value, Ahora.AddMinutes(31), Ahora.AddMinutes(30), Ahora.AddMinutes(1));
+        expirado.PagoResuelto(expirado.PedidoId!.Value, MotivoDePagoResuelto.Vencido, carritoX, Ahora.AddMinutes(31));
         Assert.Equal(EstadoDelCheckout.Cancelado, expirado.Estado);
         ExigirSinContacto(expirado);
     }
@@ -147,7 +148,7 @@ public sealed class RetencionDelContactoTests
         var (enEdicion, _) = ADomicilio();
         var (enPago, carritoE) = EnPago();
         var (pendiente, _) = EnPago();
-        pendiente.PagoPendiente(Ahora.AddMinutes(31), Ahora.AddMinutes(30), Ahora.AddMinutes(1));
+        pendiente.PagoPendiente(pendiente.PedidoId!.Value, Ahora.AddMinutes(31), Ahora.AddMinutes(30), Ahora.AddMinutes(1));
         var (reservando, _) = ADomicilio();
         reservando.PrepararPasoAlPago(Guid.NewGuid(), Envio, Identidad, Identidad, carritoE, Ahora);
         Assert.Equal(EstadoDelCheckout.Reservando, reservando.Estado);
@@ -244,11 +245,11 @@ public sealed class RetencionDelContactoTests
         var (checkout, carrito) = EnPago();
         var estados = new List<EstadoDelCheckout> { checkout.Estado };
 
-        checkout.PagoPendiente(Ahora.AddMinutes(31), Ahora.AddMinutes(30), Ahora.AddMinutes(1));
+        checkout.PagoPendiente(checkout.PedidoId!.Value, Ahora.AddMinutes(31), Ahora.AddMinutes(30), Ahora.AddMinutes(1));
         estados.Add(checkout.Estado);
         Assert.True(checkout.CumpleLaRetencionDelContacto);
 
-        checkout.PagoResuelto(MotivoDePagoResuelto.Rechazado, carrito, Ahora.AddMinutes(10));
+        checkout.PagoResuelto(checkout.PedidoId!.Value, MotivoDePagoResuelto.Rechazado, carrito, Ahora.AddMinutes(10));
         estados.Add(checkout.Estado);
         Assert.True(checkout.CumpleLaRetencionDelContacto);
 

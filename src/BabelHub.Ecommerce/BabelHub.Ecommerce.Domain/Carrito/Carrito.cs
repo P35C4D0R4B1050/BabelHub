@@ -21,6 +21,9 @@ public enum RechazoDeCarrito
 
     EdicionNoEstaEnElCarrito,
 
+    /// <summary>La edición se retiró del catálogo y la línea espera a que el checkout salga de su estado vivo: no se puede cambiar (solo quitar).</summary>
+    EdicionRetirada,
+
     /// <summary>El carrito ya se fusionó con el de una cuenta: no admite líneas.</summary>
     CarritoFusionado,
 }
@@ -174,6 +177,11 @@ public sealed class Carrito
         }
 
         var existente = _lineas[indice];
+        if (existente.RetiroPendiente)
+        {
+            return ResultadoDeLinea.Rechazar(RechazoDeCarrito.EdicionRetirada);
+        }
+
         if (existente.EsDigital)
         {
             Tocar(ahora);
@@ -207,6 +215,11 @@ public sealed class Carrito
         if (indice < 0)
         {
             return ResultadoDeLinea.Rechazar(RechazoDeCarrito.EdicionNoEstaEnElCarrito);
+        }
+
+        if (_lineas[indice].RetiroPendiente)
+        {
+            return ResultadoDeLinea.Rechazar(RechazoDeCarrito.EdicionRetirada);
         }
 
         var linea = _lineas[indice];

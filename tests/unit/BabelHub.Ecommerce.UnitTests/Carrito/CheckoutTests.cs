@@ -11,6 +11,7 @@ public sealed class CheckoutTests
 {
     private static readonly DateTimeOffset Ahora = new(2026, 11, 18, 15, 0, 0, TimeSpan.Zero);
     private static readonly Guid Cuenta = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private static readonly Guid CarritoId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
     private static readonly Func<string, string> Identidad = s => s;
     private static readonly CostoDeEnvio Envio = CostoDeEnvio.Crear(12.00m);
 
@@ -22,7 +23,7 @@ public sealed class CheckoutTests
 
     private static readonly Guid LineaFija = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
-    private static Checkout Nuevo(params LineaParaCheckout[] lineas) => ConAceptaciones(Checkout.Iniciar(Guid.NewGuid(), Cuenta, Guid.NewGuid(), lineas, Guid.NewGuid, Ahora));
+    private static Checkout Nuevo(params LineaParaCheckout[] lineas) => ConAceptaciones(Checkout.Iniciar(Guid.NewGuid(), Cuenta, CarritoId, lineas, Guid.NewGuid, Ahora));
 
     /// <summary>Los tres textos aceptados (el del reembolso digital solo cuenta si hay digitales): lo que T05 exige antes de pasar al pago.</summary>
     private static Checkout ConAceptaciones(Checkout checkout)
@@ -34,11 +35,11 @@ public sealed class CheckoutTests
     }
 
     /// <summary>Un checkout de una sola línea con un <c>lineaId</c> fijo: sirve para comparar huellas entre dos checkouts distintos.</summary>
-    private static Checkout Determinista(LineaParaCheckout linea) => ConAceptaciones(Checkout.Iniciar(Guid.NewGuid(), Cuenta, Guid.NewGuid(), [linea], () => LineaFija, Ahora));
+    private static Checkout Determinista(LineaParaCheckout linea) => ConAceptaciones(Checkout.Iniciar(Guid.NewGuid(), Cuenta, CarritoId, [linea], () => LineaFija, Ahora));
 
     private static CarritoDeDominio CarritoCon(params LineaParaCheckout[] lineas)
     {
-        var carrito = CarritoDeDominio.Crear(Guid.NewGuid(), PropietarioDelCarrito.DeCuenta(Cuenta), Ahora);
+        var carrito = CarritoDeDominio.Crear(CarritoId, PropietarioDelCarrito.DeCuenta(Cuenta), Ahora);
         foreach (var l in lineas)
         {
             carrito.Agregar(l.EdicionId, l.EsDigital, l.Cantidad, Ahora);
@@ -76,7 +77,7 @@ public sealed class CheckoutTests
     private static (Checkout Checkout, CarritoDeDominio Carrito) PagoPendiente()
     {
         var (checkout, carrito) = EnPago();
-        Assert.Equal(EfectoDeTransicion.Aplicada, checkout.PagoPendiente(Ahora.AddMinutes(31), Ahora.AddMinutes(30), Ahora.AddMinutes(1)).Efecto);
+        Assert.Equal(EfectoDeTransicion.Aplicada, checkout.PagoPendiente(checkout.PedidoId!.Value, Ahora.AddMinutes(31), Ahora.AddMinutes(30), Ahora.AddMinutes(1)).Efecto);
         return (checkout, carrito);
     }
 
@@ -313,7 +314,7 @@ public sealed class CheckoutTests
         Assert.Equal(RechazoDeCheckout.PagoPendiente, Preparar(pendiente, carritoP).Rechazo);
 
         var (pagado, carritoG) = PagoPendiente();
-        pagado.PagoAprobado(carritoG, Ahora);
+        pagado.PagoAprobado(pagado.PedidoId!.Value, carritoG, Ahora);
         Assert.Equal(RechazoDeCheckout.YaTerminado, Preparar(pagado, carritoG).Rechazo);
     }
 
@@ -604,8 +605,7 @@ public sealed class CheckoutTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAR-10")]
-    public void Un_checkout_reservando_de_mas_de_dos_minutos_esta_vencido_y_uno_mas_reciente_no()
+    public void Un_checkout_reservando_desde_hace_dos_minutos_o_mas_esta_vencido_y_uno_mas_reciente_no()
     {
         var (checkout, _) = Reservando();
 
@@ -677,7 +677,7 @@ public sealed class CheckoutTests
     {
         var (checkout, _) = EnPago();
 
-        var resultado = checkout.PagoPendiente(limiteEn: Ahora.AddMinutes(31), reservaExpiraEn: Ahora.AddMinutes(30), Ahora.AddMinutes(1));
+        var resultado = checkout.PagoPendiente(checkout.PedidoId!.Value, limiteEn: Ahora.AddMinutes(31), reservaExpiraEn: Ahora.AddMinutes(30), Ahora.AddMinutes(1));
 
         Assert.Equal(EfectoDeTransicion.Aplicada, resultado.Efecto);
         Assert.Equal(EstadoDelCheckout.PagoPendiente, checkout.Estado);
@@ -688,8 +688,7 @@ public sealed class CheckoutTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAR-10")]
-    public void La_reserva_de_15_minutos_se_cuenta_hacia_atras_y_al_vencer_el_pago_se_bloquea()
+    public void La_cuenta_regresiva_llega_a_cero_y_la_reserva_deja_de_estar_vigente_al_llegar_a_su_expiracion()
     {
         var (checkout, _) = EnPago();
 
@@ -710,14 +709,14 @@ public sealed class CheckoutTests
     public void Pago_pendiente_mientras_el_checkout_reserva_responde_aun_no_y_repetido_o_ya_pagado_es_idempotente()
     {
         var (reservando, _) = Reservando();
-        Assert.Equal(EfectoDeTransicion.AunNo, reservando.PagoPendiente(Ahora.AddMinutes(30), Ahora.AddMinutes(30), Ahora).Efecto);
+        Assert.Equal(EfectoDeTransicion.AunNo, reservando.PagoPendiente(reservando.PedidoId!.Value, Ahora.AddMinutes(30), Ahora.AddMinutes(30), Ahora).Efecto);
         Assert.Equal(EstadoDelCheckout.Reservando, reservando.Estado);
 
         var (pendiente, carrito) = PagoPendiente();
-        Assert.Equal(EfectoDeTransicion.SinCambios, pendiente.PagoPendiente(Ahora.AddMinutes(40), Ahora.AddMinutes(40), Ahora.AddMinutes(5)).Efecto);
+        Assert.Equal(EfectoDeTransicion.SinCambios, pendiente.PagoPendiente(pendiente.PedidoId!.Value, Ahora.AddMinutes(40), Ahora.AddMinutes(40), Ahora.AddMinutes(5)).Efecto);
         Assert.Equal(Ahora.AddMinutes(31), pendiente.LimitePendienteEn);
-        pendiente.PagoAprobado(carrito, Ahora.AddMinutes(6));
-        Assert.Equal(EfectoDeTransicion.SinCambios, pendiente.PagoPendiente(Ahora.AddMinutes(40), Ahora.AddMinutes(40), Ahora.AddMinutes(7)).Efecto);
+        pendiente.PagoAprobado(pendiente.PedidoId!.Value, carrito, Ahora.AddMinutes(6));
+        Assert.Equal(EfectoDeTransicion.SinCambios, pendiente.PagoPendiente(pendiente.PedidoId!.Value, Ahora.AddMinutes(40), Ahora.AddMinutes(40), Ahora.AddMinutes(7)).Efecto);
         Assert.Equal(EstadoDelCheckout.Pagado, pendiente.Estado);
     }
 
@@ -725,13 +724,13 @@ public sealed class CheckoutTests
     public void Pago_aprobado_desde_pago_pendiente_o_desde_en_pago_deja_el_checkout_pagado_y_es_idempotente()
     {
         var (pendiente, carritoP) = PagoPendiente();
-        Assert.Equal(EfectoDeTransicion.Aplicada, pendiente.PagoAprobado(carritoP, Ahora.AddMinutes(5)).Efecto);
+        Assert.Equal(EfectoDeTransicion.Aplicada, pendiente.PagoAprobado(pendiente.PedidoId!.Value, carritoP, Ahora.AddMinutes(5)).Efecto);
         Assert.Equal(EstadoDelCheckout.Pagado, pendiente.Estado);
         Assert.Equal(PasoDelCheckout.Confirmacion, pendiente.Paso);
-        Assert.Equal(EfectoDeTransicion.SinCambios, pendiente.PagoAprobado(carritoP, Ahora.AddMinutes(6)).Efecto);
+        Assert.Equal(EfectoDeTransicion.SinCambios, pendiente.PagoAprobado(pendiente.PedidoId!.Value, carritoP, Ahora.AddMinutes(6)).Efecto);
 
         var (enPago, carritoE) = EnPago();
-        Assert.Equal(EfectoDeTransicion.Aplicada, enPago.PagoAprobado(carritoE, Ahora.AddMinutes(5)).Efecto);
+        Assert.Equal(EfectoDeTransicion.Aplicada, enPago.PagoAprobado(enPago.PedidoId!.Value, carritoE, Ahora.AddMinutes(5)).Efecto);
         Assert.Equal(EstadoDelCheckout.Pagado, enPago.Estado);
     }
 
@@ -739,11 +738,11 @@ public sealed class CheckoutTests
     public void Pago_aprobado_mientras_reserva_responde_aun_no_y_en_un_checkout_cancelado_no_aplica()
     {
         var (reservando, carritoR) = Reservando();
-        Assert.Equal(EfectoDeTransicion.AunNo, reservando.PagoAprobado(carritoR, Ahora).Efecto);
+        Assert.Equal(EfectoDeTransicion.AunNo, reservando.PagoAprobado(reservando.PedidoId!.Value, carritoR, Ahora).Efecto);
 
         var (cancelado, carritoC) = EnPago();
         cancelado.Volver(carritoC, Ahora);
-        Assert.Equal(EfectoDeTransicion.NoAplica, cancelado.PagoAprobado(carritoC, Ahora).Efecto);
+        Assert.Equal(EfectoDeTransicion.NoAplica, cancelado.PagoAprobado(cancelado.PedidoId!.Value, carritoC, Ahora).Efecto);
     }
 
     [Theory]
@@ -753,7 +752,7 @@ public sealed class CheckoutTests
     {
         var (checkout, carrito) = PagoPendiente();
 
-        var resultado = checkout.PagoResuelto(motivo, carrito, Ahora.AddMinutes(10));
+        var resultado = checkout.PagoResuelto(checkout.PedidoId!.Value, motivo, carrito, Ahora.AddMinutes(10));
 
         Assert.Equal(EfectoDeTransicion.Aplicada, resultado.Efecto);
         Assert.Equal(EstadoDelCheckout.EnPago, checkout.Estado);
@@ -768,7 +767,7 @@ public sealed class CheckoutTests
     {
         var (checkout, carrito) = PagoPendiente();
 
-        var resultado = checkout.PagoResuelto(motivo, carrito, Ahora.AddMinutes(31));
+        var resultado = checkout.PagoResuelto(checkout.PedidoId!.Value, motivo, carrito, Ahora.AddMinutes(31));
 
         Assert.Equal(EfectoDeTransicion.Aplicada, resultado.Efecto);
         Assert.Equal(EstadoDelCheckout.Cancelado, checkout.Estado);
@@ -779,12 +778,12 @@ public sealed class CheckoutTests
     public void Un_pago_compensado_cancela_el_checkout_desde_pago_pendiente_o_en_pago_y_repetirlo_es_idempotente()
     {
         var (pendiente, carritoP) = PagoPendiente();
-        Assert.Equal(EfectoDeTransicion.Aplicada, pendiente.PagoResuelto(MotivoDePagoResuelto.Compensado, carritoP, Ahora.AddMinutes(5)).Efecto);
+        Assert.Equal(EfectoDeTransicion.Aplicada, pendiente.PagoResuelto(pendiente.PedidoId!.Value, MotivoDePagoResuelto.Compensado, carritoP, Ahora.AddMinutes(5)).Efecto);
         Assert.Equal(EstadoDelCheckout.Cancelado, pendiente.Estado);
-        Assert.Equal(EfectoDeTransicion.SinCambios, pendiente.PagoResuelto(MotivoDePagoResuelto.Compensado, carritoP, Ahora.AddMinutes(6)).Efecto);
+        Assert.Equal(EfectoDeTransicion.SinCambios, pendiente.PagoResuelto(pendiente.PedidoId!.Value, MotivoDePagoResuelto.Compensado, carritoP, Ahora.AddMinutes(6)).Efecto);
 
         var (enPago, carritoE) = EnPago();
-        Assert.Equal(EfectoDeTransicion.Aplicada, enPago.PagoResuelto(MotivoDePagoResuelto.Compensado, carritoE, Ahora.AddMinutes(5)).Efecto);
+        Assert.Equal(EfectoDeTransicion.Aplicada, enPago.PagoResuelto(enPago.PedidoId!.Value, MotivoDePagoResuelto.Compensado, carritoE, Ahora.AddMinutes(5)).Efecto);
         Assert.Equal(EstadoDelCheckout.Cancelado, enPago.Estado);
     }
 
@@ -792,10 +791,10 @@ public sealed class CheckoutTests
     public void Resolver_un_pago_mientras_el_checkout_reserva_responde_aun_no_y_si_ya_esta_en_pago_es_idempotente()
     {
         var (reservando, carritoR) = Reservando();
-        Assert.Equal(EfectoDeTransicion.AunNo, reservando.PagoResuelto(MotivoDePagoResuelto.Vencido, carritoR, Ahora).Efecto);
+        Assert.Equal(EfectoDeTransicion.AunNo, reservando.PagoResuelto(reservando.PedidoId!.Value, MotivoDePagoResuelto.Vencido, carritoR, Ahora).Efecto);
 
         var (enPago, carritoE) = EnPago();
-        Assert.Equal(EfectoDeTransicion.SinCambios, enPago.PagoResuelto(MotivoDePagoResuelto.Rechazado, carritoE, Ahora).Efecto);
+        Assert.Equal(EfectoDeTransicion.SinCambios, enPago.PagoResuelto(enPago.PedidoId!.Value, MotivoDePagoResuelto.Rechazado, carritoE, Ahora).Efecto);
         Assert.Equal(EstadoDelCheckout.EnPago, enPago.Estado);
     }
 
@@ -805,7 +804,7 @@ public sealed class CheckoutTests
         var (checkout, carrito) = PagoPendiente();
         carrito.RetirarEdicion(Edicion(2), diferir: true, Ahora);
 
-        var resultado = checkout.PagoResuelto(MotivoDePagoResuelto.Rechazado, carrito, Ahora.AddMinutes(10));
+        var resultado = checkout.PagoResuelto(checkout.PedidoId!.Value, MotivoDePagoResuelto.Rechazado, carrito, Ahora.AddMinutes(10));
 
         Assert.Equal(EfectoDeTransicion.ConRetiroPendiente, resultado.Efecto);
         Assert.Equal(EstadoDelCheckout.PagoPendiente, checkout.Estado);
@@ -831,7 +830,7 @@ public sealed class CheckoutTests
     // ---------------------------------------------------------------- retiros pendientes
 
     [Fact]
-    public void Entrar_a_en_pago_no_aplica_los_retiros_pero_toda_salida_del_estado_vivo_si()
+    public void Una_salida_del_estado_vivo_aplica_los_retiros_pendientes_y_los_quita_del_carrito()
     {
         // Entrar: con el retiro anotado antes de pasar a en_pago, 3b no cambia el estado (cubierto arriba); anotado después, la línea sigue.
         var (checkout, carrito) = EnPago();
@@ -853,7 +852,7 @@ public sealed class CheckoutTests
             (c, k) => c.Volver(k, Ahora.AddMinutes(1)),
             (c, k) => c.Reiniciar(k, Ahora.AddMinutes(1)),
             (c, k) => c.AbortarPasoAlPago(EstadoDelCheckout.EnPago, c.PedidoId!.Value, c.GeneracionDeReserva, k, Ahora.AddMinutes(1)),
-            (c, k) => c.PagoAprobado(k, Ahora.AddMinutes(1)),
+            (c, k) => c.PagoAprobado(c.PedidoId!.Value, k, Ahora.AddMinutes(1)),
         })
         {
             var (checkout, carrito) = EnPago();
@@ -883,5 +882,60 @@ public sealed class CheckoutTests
         Assert.Equal(
             [EstadoDelCheckout.Reservando, EstadoDelCheckout.EnPago, EstadoDelCheckout.PagoPendiente],
             Enum.GetValues<EstadoDelCheckout>().Where(Checkout.SostieneRetirosPendientes));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-21")]
+    public void El_envio_y_el_total_quedan_congelados_al_pasar_al_pago_aunque_cambie_la_configuracion_despues()
+    {
+        var checkout = Nuevo(Impreso(1, 3, 37.30m));
+        checkout.ElegirDomicilio(Contacto(), Ahora);
+        var carrito = CarritoCon(Impreso(1, 3));
+        checkout.PrepararPasoAlPago(Guid.NewGuid(), CostoDeEnvio.Crear(12.00m), Identidad, Identidad, carrito, Ahora);
+        Assert.Equal((12.00m, 123.90m), (checkout.EnvioCongelado, checkout.TotalCongelado));
+
+        var otraVez = checkout.PrepararPasoAlPago(Guid.NewGuid(), CostoDeEnvio.Crear(15.00m), Identidad, Identidad, carrito, Ahora.AddMinutes(1));
+
+        Assert.Equal(EfectoDeTransicion.SinCambios, otraVez.Efecto);
+        Assert.Equal((12.00m, 123.90m), (checkout.EnvioCongelado, checkout.TotalCongelado));
+        ConfirmarEnPago(checkout, carrito);
+        Assert.Equal(EfectoDeTransicion.SinCambios, checkout.PrepararPasoAlPago(Guid.NewGuid(), CostoDeEnvio.Crear(15.00m), Identidad, Identidad, carrito, Ahora.AddMinutes(2)).Efecto);
+        Assert.Equal(123.90m, checkout.TotalCongelado);
+    }
+
+    [Fact]
+    public void Con_un_retiro_pendiente_y_un_intento_activo_el_pago_pendiente_vuelve_a_en_pago_conservando_el_retiro()
+    {
+        var (checkout, carrito) = PagoPendiente();
+        carrito.RetirarEdicion(Edicion(2), diferir: true, Ahora);
+
+        var resultado = checkout.VolverAEnPagoConservandoElRetiro(checkout.PedidoId!.Value, Ahora.AddMinutes(10));
+
+        Assert.Equal(EfectoDeTransicion.Aplicada, resultado.Efecto);
+        Assert.Equal(EstadoDelCheckout.EnPago, checkout.Estado);
+        Assert.Null(checkout.LimitePendienteEn);
+        Assert.True(carrito.TieneRetirosPendientes);
+        Assert.Equal(EfectoDeTransicion.SinCambios, checkout.VolverAEnPagoConservandoElRetiro(checkout.PedidoId!.Value, Ahora.AddMinutes(11)).Efecto);
+        Assert.Equal(EfectoDeTransicion.NoAplica, checkout.VolverAEnPagoConservandoElRetiro(Guid.NewGuid(), Ahora).Efecto);
+    }
+
+    [Fact]
+    public void Si_reabrir_responde_cerrada_o_no_existe_el_checkout_se_cancela_anota_la_liberacion_y_aplica_el_retiro()
+    {
+        var (checkout, carrito) = PagoPendiente();
+        carrito.RetirarEdicion(Edicion(2), diferir: true, Ahora);
+
+        var resultado = checkout.CancelarPorIntencionCerrada(checkout.PedidoId!.Value, carrito, Ahora.AddMinutes(10));
+
+        Assert.Equal(EfectoDeTransicion.Aplicada, resultado.Efecto);
+        Assert.Equal(EstadoDelCheckout.Cancelado, checkout.Estado);
+        Assert.Equal(Ahora.AddMinutes(10), checkout.ReservaALiberarDesde);
+        Assert.Equal([new EdicionRetirada(Edicion(2), true)], resultado.Retiradas);
+        Assert.Equal(EfectoDeTransicion.SinCambios, checkout.CancelarPorIntencionCerrada(checkout.PedidoId!.Value, carrito, Ahora.AddMinutes(11)).Efecto);
+
+        var (enPago, carritoE) = EnPago();
+        Assert.Equal(EfectoDeTransicion.Aplicada, enPago.CancelarPorIntencionCerrada(enPago.PedidoId!.Value, carritoE, Ahora.AddMinutes(1)).Efecto);
+        var (reservando, carritoR) = Reservando();
+        Assert.Equal(EfectoDeTransicion.AunNo, reservando.CancelarPorIntencionCerrada(reservando.PedidoId!.Value, carritoR, Ahora).Efecto);
     }
 }
