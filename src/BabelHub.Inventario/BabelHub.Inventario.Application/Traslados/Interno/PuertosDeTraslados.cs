@@ -81,6 +81,18 @@ internal interface IRepositorioDeTraslados
     /// no puede pasar; un falso es un estado imposible que revierte la transacción.
     /// </summary>
     Task<bool> Guardar(Traslado traslado, long versionAnterior, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Inserta un traslado vinculado con <c>INSERT … ON CONFLICT DO NOTHING</c> sobre el índice único parcial <c>(pedido, edición, origen)</c> de los no cancelados: devuelve verdadero si lo creó (y le asigna su número) y falso si
+    /// ya existía uno, sin abortar la transacción de la confirmación (plan §5).
+    /// </summary>
+    Task<bool> InsertarVinculado(Traslado traslado, CancellationToken cancelacion = default);
+
+    /// <summary>El traslado vinculado no cancelado de esa pareja de pedido, edición y origen, o <see langword="null"/>: lo que una confirmación repetida devuelve en lugar de crear otro.</summary>
+    Task<Traslado?> VinculadoActivo(Guid pedidoId, Guid edicionId, Guid origenId, CancellationToken cancelacion = default);
+
+    /// <summary>Los traslados por identificador, bloqueados <c>FOR UPDATE</c> y ordenados por identificador (la anulación de un pedido los toma después del pedido y antes de las líneas).</summary>
+    Task<IReadOnlyList<Traslado>> PorIdsBloqueados(IReadOnlyCollection<Guid> trasladoIds, CancellationToken cancelacion = default);
 }
 
 /// <summary>

@@ -73,6 +73,43 @@ internal sealed class RepositorioDeTrasladosEnMemoria : IRepositorioDeTraslados
         return Task.FromResult(true);
     }
 
+    /// <summary>Simula que otra confirmación del mismo pedido creó el traslado entre la lectura y la inserción: la inserción choca con el índice único.</summary>
+    public bool ChocaConUnoConcurrente { get; set; }
+
+    public Task<bool> InsertarVinculado(Traslado traslado, CancellationToken cancelacion = default)
+    {
+        if (ChocaConUnoConcurrente)
+        {
+            var otro = Traslado.VincularAUnPedido(Guid.NewGuid(), traslado.EdicionId, traslado.OrigenId, traslado.DestinoId, traslado.Cantidad, traslado.PedidoId!.Value, new EstimacionDeLlegada(traslado.FechaEstimada, traslado.EstimadaPorConfirmar), null, traslado.SolicitadoEn);
+            Sembrar(otro);
+            ChocaConUnoConcurrente = false;
+            return Task.FromResult(false);
+        }
+
+        if (_guardados.Values.Any(t => t.PedidoId == traslado.PedidoId && t.EdicionId == traslado.EdicionId && t.OrigenId == traslado.OrigenId && t.Estado != EstadoDeTraslado.Cancelado))
+        {
+            return Task.FromResult(false);
+        }
+
+        traslado.AsignarNumero(_siguienteNumero++);
+        _guardados[traslado.Id] = Copiar(traslado);
+        Escrituras++;
+        return Task.FromResult(true);
+    }
+
+    public Task<Traslado?> VinculadoActivo(Guid pedidoId, Guid edicionId, Guid origenId, CancellationToken cancelacion = default)
+    {
+        var t = _guardados.Values.FirstOrDefault(x => x.PedidoId == pedidoId && x.EdicionId == edicionId && x.OrigenId == origenId && x.Estado != EstadoDeTraslado.Cancelado);
+        return Task.FromResult(t is null ? null : Copiar(t));
+    }
+
+    public Task<IReadOnlyList<Traslado>> PorIdsBloqueados(IReadOnlyCollection<Guid> trasladoIds, CancellationToken cancelacion = default)
+    {
+        LecturasBloqueadas++;
+        return Task.FromResult<IReadOnlyList<Traslado>>([.. _guardados.Values.Where(t => trasladoIds.Contains(t.Id)).OrderBy(t => t.Id).Select(Copiar)]);
+    }
+
+
     public static Traslado Copiar(Traslado t) =>
         Traslado.Rehidratar(
             t.Id, t.Numero, t.EdicionId, t.OrigenId, t.DestinoId, t.Cantidad, t.Estado, t.Motivo, t.MotivoDeCierre, t.PedidoId, t.PedidoAnulado, t.FechaEstimada, t.EstimadaPorConfirmar, t.Guia, t.SolicitadoPor, t.SolicitadoEn,
@@ -252,7 +289,14 @@ internal sealed partial class EntornoDeTraslados
     public Traslado Vinculado(Guid edicion, Guid origen, Guid destino, int cantidad, Guid pedido, EstadoDeTraslado estado = EstadoDeTraslado.Solicitado)
     {
         var t = Traslado.VincularAUnPedido(Guid.NewGuid(), edicion, origen, destino, cantidad, pedido, EstimacionDeLlegada.Calcular(DateOnly.FromDateTime(Ahora.UtcDateTime), 2), null, Ahora.AddDays(-1));
-        Avanzar(t, estado);
+        if (estado == EstadoDeTraslado.Cancelado)
+        {
+            t.AnularPorPedido(Ahora.AddHours(-12));
+        }
+        else
+        {
+            Avanzar(t, estado);
+        }
         return Traslados.Sembrar(t);
     }
 
