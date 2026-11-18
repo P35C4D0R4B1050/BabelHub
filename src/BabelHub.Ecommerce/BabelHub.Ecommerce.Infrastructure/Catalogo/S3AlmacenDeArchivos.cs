@@ -23,6 +23,14 @@ public sealed record OpcionesDelAlmacenDelCatalogo(
     string ContenedorDePortadas = "portadas",
     bool RutaEnLaUrl = true)
 {
+    /// <summary>Lo que se imprime no lleva la clave de acceso ni la secreta (SEG-10).</summary>
+    private bool PrintMembers(System.Text.StringBuilder constructor)
+    {
+        ArgumentNullException.ThrowIfNull(constructor);
+        constructor.Append("Endpoint = ").Append(Endpoint).Append(", ContenedorDeLibros = ").Append(ContenedorDeLibros).Append(", ContenedorDePortadas = ").Append(ContenedorDePortadas);
+        return true;
+    }
+
     /// <summary>El cliente S3: plazo por solicitud de un minuto (una parte de 5 MiB), dos reintentos y la suma de verificación solo cuando el almacén la exige.</summary>
     public IAmazonS3 CrearCliente() =>
         new AmazonS3Client(

@@ -16,7 +16,9 @@ internal sealed class SubirArchivo(
     IAlmacenDeArchivos almacen,
     IUnidadDeTrabajo unidad,
     IReloj reloj,
-    LimitadorDeSubidas limitador) : ICasoDeUso<SubirArchivoEntrada, ArchivoSubido>
+    LimitadorDeSubidas limitador,
+    IPublicadorDeEventosDeSeguridad eventos,
+    IOrigenDeSolicitud origenes) : ICasoDeUso<SubirArchivoEntrada, ArchivoSubido>
 {
     public async Task<Resultado<ArchivoSubido>> Ejecutar(SubirArchivoEntrada entrada, CancellationToken cancelacion = default)
     {
@@ -36,6 +38,7 @@ internal sealed class SubirArchivo(
         using var permiso = limitador.Intentar(autorizador.UsuarioId!.Value);
         if (permiso is null)
         {
+            await PublicarElLimite(autorizador.UsuarioId!.Value).ConfigureAwait(false);
             return FallosDelCatalogo.De<ArchivoSubido>(CategoriaDeError.Limite, ClavesDelCatalogo.LimiteDeSubidas);
         }
 
@@ -61,6 +64,7 @@ internal sealed class SubirArchivo(
         {
             // La subida duró más que lo permitido: se descarta lo escrito y se rechaza como un límite de uso.
             await DescartarLaSubida(referencia, cancelacion).ConfigureAwait(false);
+            await PublicarElLimite(autorizador.UsuarioId!.Value).ConfigureAwait(false);
             return FallosDelCatalogo.De<ArchivoSubido>(CategoriaDeError.Limite, ClavesDelCatalogo.LimiteDeSubidas);
         }
 
@@ -97,6 +101,22 @@ internal sealed class SubirArchivo(
 
         return Resultado<ArchivoSubido>.Exito(
             new ArchivoSubido(lista.Id, entrada.Finalidad, TiposDeArchivo.Nombre(archivo.Tipo), archivo.TamanoEnBytes, archivo.Huella.Hex, lista.VenceEn));
+    }
+
+    /// <summary>
+    /// Deja el evento de seguridad «límite excedido» (SEG-08, AC-SEG-08) con el usuario y el origen, para que Auditoría lo agrupe y las alertas lo vean (cuatro subidas lentas pueden bloquear la subida de toda la administración). Nunca interrumpe la respuesta del límite.
+    /// </summary>
+    private async Task PublicarElLimite(Guid usuarioId)
+    {
+        try
+        {
+            var origen = origenes.Actual;
+            await eventos.Publicar(new EventoDeSeguridad(TipoDeEventoDeSeguridad.LimiteExcedido, reloj.Ahora, LimitadorDeSubidas.Politica, origen.Huella, origen.Direccion, usuarioId.ToString("D")), CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // El evento es informativo: si Auditoría no responde, el límite se mantiene y la solicitud se rechaza igual.
+        }
     }
 
     /// <summary>

@@ -14,6 +14,7 @@ namespace BabelHub.Ecommerce.Api.Areas.Admin.Controllers;
 /// reintento solo su autor), nunca una cabecera ni el área; el token antifalsificación lo valida el filtro global antes de la acción. No hay una API JSON pública: las pantallas de lectura (lista de obras, ficha) llegan con sus vistas.
 /// </summary>
 [Area("Admin")]
+[RequestSizeLimit(AdministracionDelCatalogoController.TopeDelCuerpoJson)]
 public sealed class AdministracionDelCatalogoController(
     IAdministracionDelCatalogo catalogo,
     IArchivosDelCatalogo archivos,
@@ -22,6 +23,9 @@ public sealed class AdministracionDelCatalogoController(
 {
     /// <summary>El tope del cuerpo de una subida: el de un libro más un margen de 64 KiB; el tope real por finalidad lo cuenta la Aplicación con los bytes leídos (una portada pasa de 2 MiB y se rechaza).</summary>
     public const long TopeDelCuerpoDeUnaSubida = 52_428_800 + 65_536;
+
+    /// <summary>El tope del cuerpo de las acciones JSON (obras, ediciones, ingresos): 64 KiB, mucho más que cualquier alta legítima; el rechazo por rol de la Aplicación nunca espera a parsear megabytes.</summary>
+    public const long TopeDelCuerpoJson = 64 * 1024;
 
     /// <summary>La velocidad mínima del cuerpo de una subida: 240 bytes por segundo tras 30 segundos de espera de datos (un cliente lento no retiene un cupo).</summary>
     private const double BytesPorSegundoMinimos = 240;

@@ -167,6 +167,12 @@ internal sealed class RegistrarIngresoDeMercaderia(
 
         if (await ingresos.PendienteDeLaEdicion(entrada.EdicionId, cancelacion).ConfigureAwait(false) is not null)
         {
+            // El pendiente pudo ser este mismo envío, adelantado por otro simultáneo con la misma clave entre la lectura por clave y esta: se relee por la clave (ya confirmada) y se repite su resultado.
+            if (await ingresos.PorClave(nonce, cancelacion).ConfigureAwait(false) is { } mismo)
+            {
+                return Repeticion(mismo, entrada, usuarioId);
+            }
+
             return FallosDelCatalogo.De<IngresoPedido>(CategoriaDeError.Conflicto, ClavesDelCatalogo.IngresoPendiente);
         }
 

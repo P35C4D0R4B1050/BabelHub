@@ -298,6 +298,10 @@ internal sealed class EntornoDelCatalogo
 
     public LimitadorDeSubidas Limitador { get; set; } = new();
 
+    public EventosDeSeguridadEspia Eventos { get; } = new();
+
+    public IOrigenDeSolicitud Origen { get; } = new OrigenDelCatalogoDoble();
+
     public RetiroDeCarritosEspia Carritos { get; } = new();
 
     public UnidadDeTrabajoReversible Unidad { get; }
@@ -349,7 +353,7 @@ internal sealed class EntornoDelCatalogo
         Transaccional(new RetirarEdicionDigital(Autorizador, new ValidadorDeRetirarEdicionDigital(), Obras, Auditoria, Reloj));
 
     public ICasoDeUso<SubirArchivoEntrada, ArchivoSubido> SubirArchivo() =>
-        new SubirArchivo(Autorizador, new ValidadorDeSubirArchivo(), Referencias, Almacen, Unidad, Reloj, Limitador);
+        new SubirArchivo(Autorizador, new ValidadorDeSubirArchivo(), Referencias, Almacen, Unidad, Reloj, Limitador, Eventos, Origen);
 
     public IArchivosDelCatalogo Archivos() => new ArchivosDelCatalogoDeLaAplicacion(SubirArchivo(), new ObtenerPortada(Lecturas, Almacen));
 

@@ -438,3 +438,28 @@ internal sealed class AuditoriaDelCatalogoEspia : IAuditoria
         return Task.CompletedTask;
     }
 }
+
+/// <summary>Un publicador de eventos de seguridad que guarda lo publicado (y puede fallar) para probar que el límite deja su evento sin interrumpir la respuesta.</summary>
+internal sealed class EventosDeSeguridadEspia : IPublicadorDeEventosDeSeguridad
+{
+    public List<EventoDeSeguridad> Publicados { get; } = [];
+
+    public bool Falla { get; set; }
+
+    public Task Publicar(EventoDeSeguridad evento, CancellationToken cancelacion = default)
+    {
+        if (Falla)
+        {
+            return Task.FromException(new InvalidOperationException("Auditoría no responde."));
+        }
+
+        Publicados.Add(evento);
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>Un origen conocido y fijo para las pruebas.</summary>
+internal sealed class OrigenDelCatalogoDoble : IOrigenDeSolicitud
+{
+    public OrigenDeSolicitud Actual { get; } = new(HuellaDeOrigen.Crear("k3Jx9bQ2vT7mYw1ZpLr4NfA8sUe0dHcGiXoVtB5yMqE", "v1"), "2800:200:1234:5678::1");
+}

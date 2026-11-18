@@ -18,7 +18,7 @@ public sealed class PostgresDelCatalogoFixture : IAsyncLifetime
     private readonly PostgreSqlContainer _contenedor = new PostgreSqlBuilder("postgres:17-alpine")
         .WithDatabase("pruebas")
         .WithUsername("postgres")
-        .WithPassword("postgres-pruebas")
+        .WithPassword("admin-" + Guid.NewGuid().ToString("N"))
         .Build();
 
     public NpgsqlDataSource Acceso { get; private set; } = null!;
@@ -62,7 +62,8 @@ public sealed class PostgresDelCatalogoFixture : IAsyncLifetime
             + DefinicionDelCatalogo.Permisos);
         await preparacion.ExecuteNonQueryAsync();
 
-        var cadena = new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString()) { Username = "acceso", Password = ClaveDeAcceso };
+        var clave = ClaveDeAcceso;
+        var cadena = new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString()) { Username = "acceso", Password = clave };
         Acceso = NpgsqlDataSource.Create(cadena.ConnectionString);
         Unidad = new UnidadDeTrabajoPostgres(Acceso);
         AccesoAlEsquema = new AccesoAlEsquemaDelCatalogo(Unidad, Unidad);

@@ -41,8 +41,9 @@ internal sealed class LimitadorDeSubidas(int maximoGlobal = LimitadorDeSubidas.M
 
     public static readonly TimeSpan DuracionMaximaPorDefecto = TimeSpan.FromMinutes(15);
 
-    /// <summary>Lo que se sugiere esperar (<c>Retry-After</c>) cuando no hay cupo.</summary>
-    public static readonly TimeSpan EsperaSugerida = TimeSpan.FromSeconds(30);
+    /// <summary>El nombre de esta política de límite en el evento de seguridad y en la respuesta (SEG-07, SEG-08).</summary>
+    public const string Politica = "subidas-del-catalogo";
+
 
     private readonly object _candado = new();
     private readonly Dictionary<Guid, int> _porUsuario = [];

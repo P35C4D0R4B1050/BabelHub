@@ -19,6 +19,10 @@ public sealed class ClienteDelInventarioDelCatalogo(IClienteDelInventario client
 
     private const int LargoMaximoDelNombreDeFuente = 200;
 
+    private const int LargoMaximoDeLaReferencia = 80;
+
+    private const int LargoMaximoDeLaNota = 500;
+
     public async Task<bool> RegistrarEdicionImpresa(Guid edicionId, CancellationToken cancelacion = default)
     {
         var resultado = await cliente.RegistrarEdicion(new EdicionARegistrar(edicionId, "impreso"), cancelacion).ConfigureAwait(false);
@@ -84,7 +88,9 @@ public sealed class ClienteDelInventarioDelCatalogo(IClienteDelInventario client
 
         // Solo ingresos de la edición pedida, con cantidades válidas y sin repetir (la conciliación depende de ello).
         var ingresos = resultado.Valor;
-        if (ingresos.Any(i => i.EdicionId != edicionId || i.Cantidad < 1 || i.IngresoId == Guid.Empty) || ingresos.Select(i => i.IngresoId).Distinct().Count() != ingresos.Count)
+        if (ingresos.Count > Math.Clamp(limite, 1, 50)
+            || ingresos.Any(i => i.EdicionId != edicionId || i.Cantidad < 1 || i.IngresoId == Guid.Empty || i.Referencia is { Length: > LargoMaximoDeLaReferencia } || i.Nota is { Length: > LargoMaximoDeLaNota } || string.IsNullOrWhiteSpace(i.CodigoDeFuente) || i.CodigoDeFuente.Length > LargoMaximoDelCodigoDeFuente)
+            || ingresos.Select(i => i.IngresoId).Distinct().Count() != ingresos.Count)
         {
             return null;
         }

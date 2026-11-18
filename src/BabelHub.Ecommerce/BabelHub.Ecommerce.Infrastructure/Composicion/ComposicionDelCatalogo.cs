@@ -21,7 +21,16 @@ public sealed record OpcionesDelCatalogo(
     string ContenedorDeLibros = "libros",
     string ContenedorDePortadas = "portadas",
     TimeSpan? PlazoDeLaSolicitud = null,
-    TimeSpan? PresupuestoDeIngresos = null);
+    TimeSpan? PresupuestoDeIngresos = null)
+{
+    /// <summary>Lo que se imprime no lleva las claves de firma ni el cliente del almacén (SEG-10).</summary>
+    private bool PrintMembers(System.Text.StringBuilder constructor)
+    {
+        ArgumentNullException.ThrowIfNull(constructor);
+        constructor.Append("ContenedorDeLibros = ").Append(ContenedorDeLibros).Append(", ContenedorDePortadas = ").Append(ContenedorDePortadas);
+        return true;
+    }
+}
 
 public static class ComposicionDelCatalogo
 {
@@ -109,7 +118,8 @@ public static class ComposicionDelCatalogo
         // Los que no son transaccionales por diseño (plan §5): cada uno abre sus propias transacciones cortas y nunca mantiene una abierta durante una llamada externa.
         servicios.TryAddScoped<ICasoDeUso<SubirArchivoEntrada, ArchivoSubido>>(sp => new SubirArchivo(
             sp.GetRequiredService<AutorizadorDelCatalogo>(), sp.GetRequiredService<IValidador<SubirArchivoEntrada>>(), sp.GetRequiredService<IRepositorioDeReferenciasDeArchivo>(), sp.GetRequiredService<IAlmacenDeArchivos>(),
-            sp.GetRequiredService<IUnidadDeTrabajo>(), sp.GetRequiredService<IReloj>(), sp.GetRequiredService<LimitadorDeSubidas>()));
+            sp.GetRequiredService<IUnidadDeTrabajo>(), sp.GetRequiredService<IReloj>(), sp.GetRequiredService<LimitadorDeSubidas>(),
+            sp.GetRequiredService<IPublicadorDeEventosDeSeguridad>(), sp.GetRequiredService<IOrigenDeSolicitud>()));
         servicios.TryAddScoped(sp => new ObtenerPortada(sp.GetRequiredService<ILecturasDelCatalogo>(), sp.GetRequiredService<IAlmacenDeArchivos>()));
         servicios.TryAddScoped<IArchivosDelCatalogo>(sp => new ArchivosDelCatalogoDeLaAplicacion(sp.GetRequiredService<ICasoDeUso<SubirArchivoEntrada, ArchivoSubido>>(), sp.GetRequiredService<ObtenerPortada>()));
 

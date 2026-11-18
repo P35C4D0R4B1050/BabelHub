@@ -272,6 +272,80 @@ public sealed class AdministracionDelCatalogoApiTests(PostgresDelCatalogoYAudito
         Assert.Equal(HttpStatusCode.Created, despues.StatusCode);
     }
 
+    private sealed class EventosEspia : BabelHub.Ecommerce.Application.Plataforma.IPublicadorDeEventosDeSeguridad
+    {
+        public List<BabelHub.Ecommerce.Application.Plataforma.EventoDeSeguridad> Publicados { get; } = [];
+
+        public Task Publicar(BabelHub.Ecommerce.Application.Plataforma.EventoDeSeguridad evento, CancellationToken cancelacion = default)
+        {
+            lock (Publicados)
+            {
+                Publicados.Add(evento);
+            }
+
+            return Task.CompletedTask;
+        }
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAT-12")]
+    public async Task El_rechazo_por_limite_de_subidas_deja_un_evento_de_seguridad_y_responde_con_la_forma_uniforme_de_SEG_07()
+    {
+        var eventos = new EventosEspia();
+        await using var host = await CatalogoApiHost.Crear(bd, almacen.Cliente, servicios => servicios.AddSingleton<BabelHub.Ecommerce.Application.Plataforma.IPublicadorDeEventosDeSeguridad>(eventos));
+        var limitador = host.Servicios.GetRequiredService<LimitadorDeSubidas>();
+        using var uno = limitador.Intentar(CatalogoApiHost.UsuarioPorOmision);
+        using var dos = limitador.Intentar(CatalogoApiHost.UsuarioPorOmision);
+
+        using var respuesta = await host.Subir("libro", Epub());
+        var cuerpo = await CatalogoApiHost.Leer(respuesta);
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, respuesta.StatusCode);
+        Assert.Equal("ECO-LIMITE-EXCEDIDO", Codigo(cuerpo));
+        Assert.Equal("subidas-del-catalogo", cuerpo.GetProperty("motivo").GetString());
+        Assert.Equal(30, cuerpo.GetProperty("retryAfterSeconds").GetInt32());
+        Assert.True(cuerpo.TryGetProperty("disponibleDesde", out _));
+        Assert.Equal("30", respuesta.Headers.GetValues("Retry-After").Single());
+        var evento = Assert.Single(eventos.Publicados);
+        Assert.Equal(BabelHub.Ecommerce.Application.Plataforma.TipoDeEventoDeSeguridad.LimiteExcedido, evento.Tipo);
+        Assert.Equal("subidas-del-catalogo", evento.Limite);
+        Assert.Equal(CatalogoApiHost.UsuarioPorOmision.ToString("D"), evento.Usuario);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAT-11")]
+    public async Task Ninguna_respuesta_de_error_de_la_administracion_ni_el_404_de_una_portada_se_puede_cachear()
+    {
+        var obra = await ObraConImpresa();
+
+        using var prohibido = await _host.Json(HttpMethod.Post, $"/administracion/obras/{obra.ObraId}/baja", new { version = obra.Version }, rol: RolesDeUsuario.Cliente);
+        using var conflicto = await _host.Json(HttpMethod.Put, $"/administracion/obras/{obra.ObraId}", new { version = obra.Version + 50, titulo = "X", autor = "A", editorial = "E", categoria = "C" });
+        using var validacion = await _host.Json(HttpMethod.Post, "/administracion/obras", "{}");
+        using var sinPortada = await _host.Cliente.GetAsync($"/portadas/{new string('a', 64)}");
+
+        foreach (var respuesta in new[] { prohibido, conflicto, validacion, sinPortada })
+        {
+            Assert.Equal("no-store", respuesta.Headers.CacheControl?.ToString());
+        }
+
+        Assert.Equal(HttpStatusCode.Forbidden, prohibido.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, conflicto.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, validacion.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, sinPortada.StatusCode);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAT-12")]
+    public async Task Un_cuerpo_json_de_mas_de_64_KiB_se_rechaza_sin_parsearlo_entero()
+    {
+        var enorme = "{\"titulo\":\"" + new string('x', 200_000) + "\"}";
+
+        using var respuesta = await _host.Json(HttpMethod.Post, "/administracion/obras", enorme);
+
+        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
+        Assert.Equal(0, await bd.Consultar<long>("SELECT count(*) FROM catalogo.obras"));
+    }
+
     // ---------- Portadas ----------
 
     [Fact]

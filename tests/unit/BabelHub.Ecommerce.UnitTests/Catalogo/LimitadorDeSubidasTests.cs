@@ -99,6 +99,28 @@ public sealed class LimitadorDeSubidasTests
 
     [Fact]
     [Trait("Criterio", "AC-CAT-12")]
+    public async Task Cada_rechazo_por_limite_deja_un_evento_de_seguridad_con_el_usuario_y_el_origen_y_un_fallo_de_auditoria_no_interrumpe()
+    {
+        var e = new EntornoDelCatalogo();
+        var usuario = e.Actor.Actual!.UsuarioId!.Value;
+        using var uno = e.Limitador.Intentar(usuario);
+        using var dos = e.Limitador.Intentar(usuario);
+
+        var primero = await e.Archivos().SubirArchivo(new SubirArchivoEntrada(FinalidadDeLaSubida.Libro, new MemoryStream(Epub())));
+        e.Eventos.Falla = true;
+        var segundo = await e.Archivos().SubirArchivo(new SubirArchivoEntrada(FinalidadDeLaSubida.Libro, new MemoryStream(Epub())));
+
+        var evento = Assert.Single(e.Eventos.Publicados);
+        Assert.Equal(TipoDeEventoDeSeguridad.LimiteExcedido, evento.Tipo);
+        Assert.Equal(LimitadorDeSubidas.Politica, evento.Limite);
+        Assert.Equal(usuario.ToString("D"), evento.Usuario);
+        Assert.NotNull(evento.Origen);
+        Assert.Equal(CategoriaDeError.Limite, primero.Error!.Categoria);
+        Assert.Equal(CategoriaDeError.Limite, segundo.Error!.Categoria);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAT-12")]
     public async Task Quien_no_es_de_la_administracion_central_se_rechaza_sin_consumir_cupo()
     {
         var e = new EntornoDelCatalogo(ActorDePrueba.DeCliente());
@@ -133,7 +155,7 @@ public sealed class LimitadorDeSubidasTests
     {
         var e = new EntornoDelCatalogo { Limitador = new LimitadorDeSubidas(duracionMaxima: TimeSpan.FromMilliseconds(30)) };
         var almacen = new AlmacenQueNuncaTermina();
-        var subir = new SubirArchivo(e.Autorizador, new ValidadorDeSubirArchivo(), e.Referencias, almacen, e.Unidad, e.Reloj, e.Limitador);
+        var subir = new SubirArchivo(e.Autorizador, new ValidadorDeSubirArchivo(), e.Referencias, almacen, e.Unidad, e.Reloj, e.Limitador, e.Eventos, e.Origen);
 
         var resultado = await subir.Ejecutar(new SubirArchivoEntrada(FinalidadDeLaSubida.Libro, new MemoryStream(Epub())));
 
@@ -151,7 +173,7 @@ public sealed class LimitadorDeSubidasTests
     {
         var e = new EntornoDelCatalogo();
         var almacen = new AlmacenQueNuncaTermina();
-        var subir = new SubirArchivo(e.Autorizador, new ValidadorDeSubirArchivo(), e.Referencias, almacen, e.Unidad, e.Reloj, e.Limitador);
+        var subir = new SubirArchivo(e.Autorizador, new ValidadorDeSubirArchivo(), e.Referencias, almacen, e.Unidad, e.Reloj, e.Limitador, e.Eventos, e.Origen);
         using var cancelacion = new CancellationTokenSource(TimeSpan.FromMilliseconds(30));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => subir.Ejecutar(new SubirArchivoEntrada(FinalidadDeLaSubida.Libro, new MemoryStream(Epub())), cancelacion.Token));

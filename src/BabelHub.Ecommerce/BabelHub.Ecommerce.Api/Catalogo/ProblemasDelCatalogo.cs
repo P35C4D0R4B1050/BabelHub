@@ -38,6 +38,9 @@ public static class ProblemasDelCatalogo
     /// <summary>Lo que se sugiere esperar (<c>Retry-After</c>, en segundos) cuando una subida no tiene cupo.</summary>
     public const int EsperaDeSubidasEnSegundos = 30;
 
+    /// <summary>El motivo del límite de subidas en la respuesta uniforme (el mismo nombre de la política del evento de seguridad).</summary>
+    public const string MotivoDeSubidas = "subidas-del-catalogo";
+
     public static ProblemaDto Crear(HttpContext contexto, OpcionesDeErrores opciones, ErrorDeAplicacion error)
     {
         ArgumentNullException.ThrowIfNull(contexto);
@@ -62,14 +65,26 @@ public static class ProblemasDelCatalogo
         };
     }
 
-    /// <summary>Escribe el fallo: el problema uniforme y, si es una subida sin cupo, <c>Retry-After</c>. El acceso denegado ya lo registró la Aplicación (un evento por solicitud).</summary>
+    /// <summary>
+    /// Escribe el fallo: el problema uniforme, nunca cacheable (<c>no-store</c>, fijado al empezar la respuesta porque escribir el problema la limpia) y, si es un límite de subidas, la respuesta uniforme de SEG-07 (motivo, espera e instante de nueva disponibilidad) con <c>Retry-After</c>.
+    /// El acceso denegado ya lo registró la Aplicación (un evento por solicitud) y el evento de límite excedido también.
+    /// </summary>
     public static async Task Escribir(HttpContext contexto, OpcionesDeErrores opciones, ErrorDeAplicacion error)
     {
+        contexto.Response.OnStarting(() =>
+        {
+            contexto.Response.Headers.CacheControl = "no-store";
+            return Task.CompletedTask;
+        });
+
+        if (error.Categoria == CategoriaDeError.Limite)
+        {
+            await ProblemasHttp.EscribirLimite(contexto, opciones, ResultadoDeLimite.Excedido(MotivoDeSubidas, EsperaDeSubidasEnSegundos, DateTimeOffset.UtcNow.AddSeconds(EsperaDeSubidasEnSegundos))).ConfigureAwait(false);
+            return;
+        }
+
         var problema = Crear(contexto, opciones, error);
-        var cabeceras = error.Categoria == CategoriaDeError.Limite
-            ? new Dictionary<string, string> { ["Retry-After"] = EsperaDeSubidasEnSegundos.ToString(System.Globalization.CultureInfo.InvariantCulture) }
-            : null;
         await DenegacionesHttp.Registrar(contexto, error.Categoria, error.Clave, problema.Code).ConfigureAwait(false);
-        await ProblemasHttp.Escribir(contexto, problema, cabeceras).ConfigureAwait(false);
+        await ProblemasHttp.Escribir(contexto, problema).ConfigureAwait(false);
     }
 }

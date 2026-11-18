@@ -59,6 +59,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
         "reservas-por-hora-por-cliente",
         "reservas-por-hora-por-origen",
         "reservas-reemplazos-por-pedido",
+        "subidas-del-catalogo",
     ];
 
     /// <summary>Los motivos por los que se rechaza una llamada de integración (SEG-12): una prueba compara esta lista con los de la plataforma.</summary>
