@@ -9,8 +9,6 @@ public static class AccionesDeAuditoria
 {
     public const string AccesoBloqueadoPorTextosPendientes = "AccesoBloqueadoPorTextosPendientes";
 
-    public const string RenovacionReutilizada = "RenovacionReutilizada";
-
     public const string AccesoDenegado = "AccesoDenegado";
 
     public const string AccesoDigitalRevocado = "AccesoDigitalRevocado";
@@ -132,6 +130,8 @@ public static class AccionesDeAuditoria
     public const string ReembolsoRegistrado = "ReembolsoRegistrado";
 
     public const string ReingresoPorDevolucion = "ReingresoPorDevolucion";
+
+    public const string RenovacionReutilizada = "RenovacionReutilizada";
 
     public const string ReporteDeArchivoResuelto = "ReporteDeArchivoResuelto";
 
