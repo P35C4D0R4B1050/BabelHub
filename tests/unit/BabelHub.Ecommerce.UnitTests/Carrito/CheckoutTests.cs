@@ -22,10 +22,19 @@ public sealed class CheckoutTests
 
     private static readonly Guid LineaFija = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
-    private static Checkout Nuevo(params LineaParaCheckout[] lineas) => Checkout.Iniciar(Guid.NewGuid(), Cuenta, Guid.NewGuid(), lineas, Guid.NewGuid, Ahora);
+    private static Checkout Nuevo(params LineaParaCheckout[] lineas) => ConAceptaciones(Checkout.Iniciar(Guid.NewGuid(), Cuenta, Guid.NewGuid(), lineas, Guid.NewGuid, Ahora));
+
+    /// <summary>Los tres textos aceptados (el del reembolso digital solo cuenta si hay digitales): lo que T05 exige antes de pasar al pago.</summary>
+    private static Checkout ConAceptaciones(Checkout checkout)
+    {
+        checkout.Aceptar(TextoLegal.Terminos, "t-1", Ahora);
+        checkout.Aceptar(TextoLegal.Privacidad, "p-1", Ahora);
+        checkout.Aceptar(TextoLegal.ReembolsoDigital, "r-1", Ahora);
+        return checkout;
+    }
 
     /// <summary>Un checkout de una sola línea con un <c>lineaId</c> fijo: sirve para comparar huellas entre dos checkouts distintos.</summary>
-    private static Checkout Determinista(LineaParaCheckout linea) => Checkout.Iniciar(Guid.NewGuid(), Cuenta, Guid.NewGuid(), [linea], () => LineaFija, Ahora);
+    private static Checkout Determinista(LineaParaCheckout linea) => ConAceptaciones(Checkout.Iniciar(Guid.NewGuid(), Cuenta, Guid.NewGuid(), [linea], () => LineaFija, Ahora));
 
     private static CarritoDeDominio CarritoCon(params LineaParaCheckout[] lineas)
     {

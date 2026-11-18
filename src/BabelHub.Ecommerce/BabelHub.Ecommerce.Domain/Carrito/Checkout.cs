@@ -47,6 +47,9 @@ public sealed class Checkout
 
     public IReadOnlyList<LineaDelCheckout> Lineas => _lineas;
 
+    /// <summary>Las aceptaciones de los textos legales con su versión y su fecha (CAR-22); solo se cambian por <see cref="Aceptar"/> y <see cref="RevalidarTextos"/>.</summary>
+    public AceptacionesDelCheckout Aceptaciones { get; } = new();
+
     public TipoDeEntrega? TipoDeEntrega { get; private set; }
 
     public string? CodigoDeSucursalDeRecojo { get; private set; }
@@ -181,6 +184,55 @@ public sealed class Checkout
 
         Cambiar(porLaPersona: true, ahora);
         return ResultadoDeCheckout.Aplicada();
+    }
+
+    /// <summary>Los textos requeridos que la persona aún no aceptó (o cuya aceptación se invalidó): términos y privacidad, y el reembolso digital si hay digitales (CAR-12, CAR-13).</summary>
+    public IReadOnlyList<TextoLegal> TextosPorAceptar() => Aceptaciones.PorAceptar(_lineas.Exists(l => l.EsDigital));
+
+    /// <summary>
+    /// La persona acepta un texto con su versión (CAR-12, CAR-13, CAR-22): se guarda la versión y la fecha, y aceptar de nuevo la misma versión no cambia nada (conserva la primera fecha). Solo en <c>en_edicion</c>: con <c>en_pago</c> hay
+    /// que reabrir la intención antes (<see cref="Editar"/>). Aceptar el reembolso digital sin digitales no hace nada: no se exige.
+    /// </summary>
+    public ResultadoDeCheckout Aceptar(TextoLegal texto, string version, DateTimeOffset ahora)
+    {
+        if (RechazoPorNoEstarEnEdicion() is { } rechazo)
+        {
+            return ResultadoDeCheckout.Rechazar(rechazo);
+        }
+
+        if (texto == TextoLegal.ReembolsoDigital && !_lineas.Exists(l => l.EsDigital))
+        {
+            return ResultadoDeCheckout.SinCambios();
+        }
+
+        if (!Aceptaciones.Aceptar(texto, version, ahora))
+        {
+            return ResultadoDeCheckout.SinCambios();
+        }
+
+        Cambiar(porLaPersona: true, ahora);
+        return ResultadoDeCheckout.Aplicada();
+    }
+
+    /// <summary>
+    /// Compara las aceptaciones con las versiones vigentes de los textos (CAR-28): las que ya no coinciden se invalidan y se vuelven a pedir antes de pagar. Solo en <c>en_edicion</c>; no es una acción de la persona (no mueve su
+    /// retención). Sin cambios no toca la versión del checkout.
+    /// </summary>
+    public ResultadoDeRevalidacion RevalidarTextos(IReadOnlyDictionary<TextoLegal, string> vigentes, DateTimeOffset ahora)
+    {
+        ArgumentNullException.ThrowIfNull(vigentes);
+        if (RechazoPorNoEstarEnEdicion() is { } rechazo)
+        {
+            return new ResultadoDeRevalidacion([], rechazo);
+        }
+
+        var invalidadas = Aceptaciones.InvalidarLasQueCambiaron(vigentes, _lineas.Exists(l => l.EsDigital));
+        if (invalidadas.Count > 0)
+        {
+            Cambiar(porLaPersona: false, ahora);
+        }
+
+        return new ResultadoDeRevalidacion(invalidadas, null);
     }
 
     /// <summary>La persona confirmó la revisión del carrito: pasa a la entrega, o directo a los datos si el carrito es solo digital (CAR-07, CAR-15).</summary>
@@ -323,6 +375,11 @@ public sealed class Checkout
         if (carrito.TieneRetirosPendientes)
         {
             return ResultadoDeCheckout.Rechazar(RechazoDeCheckout.HayRetiroPendiente);
+        }
+
+        if (TextosPorAceptar().Count > 0)
+        {
+            return ResultadoDeCheckout.Rechazar(RechazoDeCheckout.AceptacionRequerida);
         }
 
         if (RequiereEntrega && TipoDeEntrega is null)
@@ -698,6 +755,12 @@ public sealed class Checkout
         Campo(texto, Contacto?.Nombre.Valor);
         Campo(texto, Contacto?.Telefono.Valor);
         Campo(texto, Contacto?.Direccion.Texto);
+        foreach (var requerida in AceptacionesDelCheckout.Requeridas(_lineas.Exists(l => l.EsDigital)))
+        {
+            // Solo la versión de cada texto: la fecha de aceptación conserva la primera y no entra, para que un doble clic no cambie la huella.
+            Campo(texto, Aceptaciones.Aceptadas.FirstOrDefault(a => a.Texto == requerida)?.Version);
+        }
+
         Campo(texto, envio.ToString("0.00", CultureInfo.InvariantCulture));
         Campo(texto, total.ToString("0.00", CultureInfo.InvariantCulture));
         foreach (var l in _lineas.OrderBy(l => l.EdicionId))

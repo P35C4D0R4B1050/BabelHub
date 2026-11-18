@@ -72,6 +72,9 @@ public enum RechazoDeCheckout
 
     /// <summary>Una línea del carrito tiene un retiro pendiente: el checkout la rechaza (D21).</summary>
     HayRetiroPendiente,
+
+    /// <summary>Falta aceptar un texto legal requerido, o su versión cambió (CAR-12, CAR-13, CAR-28).</summary>
+    AceptacionRequerida,
 }
 
 /// <summary>El resultado de una transición del checkout: su efecto, el rechazo si lo hubo y las ediciones que se quitaron del carrito por retiros pendientes (para dejar su aviso).</summary>
