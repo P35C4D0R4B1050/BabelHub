@@ -117,7 +117,7 @@ public sealed class RecibirTrasladoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-24")]
+    [Trait("Criterio", "AC-TRA-13")]
     public async Task SiLaReservaYaNoSePuedeRecrear_LaRecepcionFallaPorEstadoInvalido_NoPorFaltaDeStock_YNadaSeGuarda()
     {
         var (entorno, edicion) = Preparar();

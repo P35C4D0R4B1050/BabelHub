@@ -178,7 +178,6 @@ public sealed class AprobarRechazarYCancelarTrasladoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-14")]
     public async Task UnTrasladoVinculadoSiSeApruebaYSeBloqueaPrimeroElPedido_ConLaFilaDespues()
     {
         var (entorno, edicion) = Preparar();
@@ -195,7 +194,6 @@ public sealed class AprobarRechazarYCancelarTrasladoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-22")]
     public async Task UnLockTimeoutDelPedidoEsServicioNoDisponible_SinCambiarElTraslado()
     {
         var (entorno, edicion) = Preparar();

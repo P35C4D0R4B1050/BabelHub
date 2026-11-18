@@ -123,7 +123,6 @@ public sealed class CatalogoYMensajesDeTrasladosTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-08")]
     public async Task ElBuzonNoAbortaPorUnDuplicado_YElMensajeNoSeGuardaDosVeces()
     {
         var entorno = new EntornoDeTraslados();
@@ -136,7 +135,7 @@ public sealed class CatalogoYMensajesDeTrasladosTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-TRA-12")]
+    [Trait("Criterio", "AC-TRA-09")]
     public void ElPuertoDelEnvioAlEcommerceUsaModelosPropios_YNoReferenciaShared()
     {
         var tiposDelPuerto = typeof(IEnvioAlEcommerce).GetMethods().SelectMany(m => m.GetParameters().Select(p => p.ParameterType).Append(m.ReturnType)).ToList();
