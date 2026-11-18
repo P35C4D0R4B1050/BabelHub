@@ -326,8 +326,15 @@ internal sealed class SeguridadDePrueba : IRegistroDeSeguridad
 {
     public List<SolicitudDeRegistro> Eventos { get; } = [];
 
+    public bool Falla { get; set; }
+
     public Task Registrar(SolicitudDeRegistro solicitud, CancellationToken cancelacion = default)
     {
+        if (Falla)
+        {
+            throw new InvalidOperationException("Auditoría de seguridad caída.");
+        }
+
         Eventos.Add(solicitud);
         return Task.CompletedTask;
     }
@@ -383,6 +390,8 @@ internal sealed class GeneradorDeSecretosDePrueba : IGeneradorDeSecretos
     public string ValorOpaco() => $"opaco-{++_n:D6}-" + new string('x', 30);
 
     public string ContrasenaTemporal() => "Temporal-" + Guid.NewGuid().ToString("N");
+
+    public byte[] SecretoDelSegundoFactor() => [.. Enumerable.Range(1, 20).Select(i => (byte)(i * 7))];
 }
 
 internal sealed class SolicitudesDeCodigoDePrueba : IRegistroDeSolicitudesDeCodigo
@@ -468,7 +477,7 @@ internal sealed class SegundoFactorEnMemoria : ISegundoFactorAlmacen
     private readonly Dictionary<Guid, (SegundoFactor Factor, byte[] Secreto)> _factores = [];
 
     public Task<SegundoFactorGuardado?> Obtener(Guid usuarioId, CancellationToken cancelacion = default) =>
-        Task.FromResult(_factores.TryGetValue(usuarioId, out var f) ? new SegundoFactorGuardado(f.Factor, f.Secreto) : null);
+        Task.FromResult(_factores.TryGetValue(usuarioId, out var f) ? new SegundoFactorGuardado(SegundoFactor.Restaurar(usuarioId, f.Factor.Estado, f.Factor.UltimoPasoUsado, f.Factor.HuellasDisponibles), f.Secreto) : null);
 
     public Task GuardarSinConfirmar(Guid usuarioId, byte[] secretoCifrado, CancellationToken cancelacion = default)
     {

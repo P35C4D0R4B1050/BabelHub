@@ -85,6 +85,9 @@ public interface IGeneradorDeSecretos
     /// <summary>Un valor opaco de 256 bits (base64url sin relleno): la renovación y el desafío.</summary>
     string ValorOpaco();
 
+    /// <summary>El secreto de un segundo factor nuevo: 20 bytes (160 bits) de un CSPRNG, más que los 128 bits que exige el Dominio.</summary>
+    byte[] SecretoDelSegundoFactor();
+
     /// <summary>La contraseña temporal del personal (IDE-23): de al menos 20 caracteres, generada con un CSPRNG.</summary>
     string ContrasenaTemporal();
 }

@@ -2,6 +2,7 @@ using BabelHub.Ecommerce.Application.Identidad;
 using BabelHub.Ecommerce.Application.Identidad.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Identidad;
+using Domain = BabelHub.Ecommerce.Domain;
 using BabelHub.Ecommerce.UnitTests.Plataforma;
 using BabelHub.Ecommerce.UnitTests.Web;
 using PropositoDeCodigo = BabelHub.Ecommerce.Domain.Identidad.PropositoDeCodigo;
@@ -67,6 +68,8 @@ internal sealed class EntornoDeIdentidad
 
     public EmisionDeCodigos EmisionDeCodigos { get; }
 
+    public AvisosDeCuenta Avisos { get; }
+
     public EventosDeSeguridadDeIdentidad Eventos { get; }
 
     public ProcesarSolicitudDeCodigo SegundoPlano { get; }
@@ -82,6 +85,7 @@ internal sealed class EntornoDeIdentidad
         Sesiones = new EmisionDeSesion(Renovaciones, Emisor, Secretos, HuellasDeIdentidad);
         EmisionDeCodigos = new EmisionDeCodigos(Codigos, HuellasDeIdentidad, Correo, Alertas, Reloj);
         Eventos = new EventosDeSeguridadDeIdentidad(Seguridad);
+        Avisos = new AvisosDeCuenta(Correo);
         SegundoPlano = new ProcesarSolicitudDeCodigo(Cuentas, EmisionDeCodigos);
     }
 
@@ -126,4 +130,23 @@ internal sealed class EntornoDeIdentidad
 
     /// <summary>El último código enviado por correo (el que la persona escribiría).</summary>
     public string UltimoCodigoEnviado() => Correo.Codigos[^1].Codigo.Revelar();
+}
+
+internal static class EntornoDeIdentidadExtensiones
+{
+    public static Ingreso Ingreso(this EntornoDeIdentidad e) => new(
+        e.Cuentas, e.Hasher, new ListaDeContrasenasDePrueba(), e.Limites, e.Huellas, e.Desafios, e.HuellasDeIdentidad, e.Secretos, e.SegundoFactor, e.Cifrador, e.Sesiones, e.Renovaciones, e.Unidad, e.Auditoria, e.Eventos, e.Avisos, e.Reloj);
+
+    /// <summary>Deja activo el segundo factor de una cuenta con un secreto conocido y 8 códigos de respaldo; devuelve el secreto y los códigos en claro.</summary>
+    public static (byte[] Secreto, IReadOnlyList<string> Respaldo) ConSegundoFactor(this EntornoDeIdentidad e, CuentaDeIdentidad cuenta)
+    {
+        var secreto = e.Secretos.SecretoDelSegundoFactor();
+        var respaldo = CodigosDeRespaldo.Generar();
+        e.SegundoFactor.Sembrar(cuenta.Usuario.Id, secreto, respaldo.Select(c => e.HuellasDeIdentidad.DeCodigoDeRespaldo(cuenta.Usuario.Id, CodigosDeRespaldo.Canonico(c))), e.Cifrador);
+        return (secreto, respaldo);
+    }
+
+    /// <summary>El código TOTP que mostraría la aplicación de autenticación en el instante del reloj del entorno (con un desplazamiento opcional de pasos).</summary>
+    public static string Totp(this EntornoDeIdentidad e, byte[] secreto, int pasos = 0) =>
+        Domain.Identidad.Totp.Codigo(secreto, Domain.Identidad.Totp.PasoDe(e.Reloj.Ahora) + pasos);
 }
