@@ -153,7 +153,7 @@ public sealed class EventosDeSeguridadEspia : IPublicadorDeEventosDeSeguridad
 /// </summary>
 public sealed class PilaDeReservas : IDisposable
 {
-    public PilaDeReservas(PostgresDeReservasFixture bd, Action<IServiceCollection>? ajustes = null, IReadOnlyDictionary<string, string?>? configuracion = null, bool reservasPrimero = false)
+    public PilaDeReservas(PostgresDeReservasFixture bd, Action<IServiceCollection>? ajustes = null, IReadOnlyDictionary<string, string?>? configuracion = null, bool reservasPrimero = false, bool conTraslados = false)
     {
         var actor = new ActorDelFlujo();
         Establecedor = actor;
@@ -205,6 +205,12 @@ public sealed class PilaDeReservas : IDisposable
 
         // Ajustes reemplaza al nulo de IReingresosPorDevolucion (la guarda de arranque lo exige una vez que el módulo existe).
         servicios.AgregarModuloAjustes(new OpcionesDelModuloDeAjustes(bd.Depuracion));
+
+        // Traslados (opcional: las pruebas de Reservas y Ajustes usan su propio doble de los puertos): reemplaza al generador que falla a la vista y se suma a los receptores de anulaciones.
+        if (conTraslados)
+        {
+            servicios.AgregarModuloTraslados();
+        }
 
         Proveedor = servicios.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
     }

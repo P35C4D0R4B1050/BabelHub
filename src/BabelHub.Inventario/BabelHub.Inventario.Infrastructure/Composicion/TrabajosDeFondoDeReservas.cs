@@ -375,7 +375,7 @@ public static class ComposicionDeTrabajosDeReservas
 
         servicios.AgregarEjecutorDeTrabajoDeFondo();
         servicios.TryAddSingleton(sp => new BloqueoDeInstanciaUnica(sp.GetRequiredService<NpgsqlDataSource>()));
-        servicios.AddHostedService(sp => new ServicioDeTrabajosDeReservas(
+        servicios.AddSingleton<IHostedService>(sp => new ServicioDeTrabajosDeReservas(
         [
             TrabajosDeReservas.Expirar(sp),
             TrabajosDeReservas.PurgarHuellas(sp),
