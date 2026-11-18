@@ -325,6 +325,13 @@ internal sealed class EntornoDelCatalogo
     public ICasoDeUso<RetirarEdicionDigitalEntrada, ResultadoDeEscritura> RetirarEdicionDigital() =>
         Transaccional(new RetirarEdicionDigital(Autorizador, new ValidadorDeRetirarEdicionDigital(), Obras, Auditoria, Reloj));
 
+    public ICasoDeUso<SubirArchivoEntrada, ArchivoSubido> SubirArchivo() =>
+        new SubirArchivo(Autorizador, new ValidadorDeSubirArchivo(), Referencias, Almacen, Unidad, Reloj);
+
+    public IArchivosDelCatalogo Archivos() => new ArchivosDelCatalogoDeLaAplicacion(SubirArchivo(), new ObtenerPortada(Lecturas, Almacen));
+
+    public DepurarArchivosSinUso Depurador(ActorDePrueba? actor = null) => new(actor ?? ActorDePrueba.DelSistema(), Referencias, Almacen, Unidad, Reloj);
+
     public ICasoDeUso<MarcarResultadoDeIngresoEntrada, EstadoDeIngresoSolicitado> Marcar() => Transaccional(new MarcarResultadoDeIngreso(Ingresos, Memoria, Reloj));
 
     public OrquestadorDeIngresos Orquestador() => new(Inventario, Marcar());
@@ -436,6 +443,9 @@ internal sealed class LecturasDelCatalogoEnMemoria(RepositorioDeObrasEnMemoria o
         return Task.FromResult((cumplen.Count, cumplen.Sum(o => o.Ediciones.Count(e => Candidata(e, filtros)))));
     }
 
+
+    public Task<PortadaDeObra?> PortadaPorHuella(HuellaDeArchivo huella, CancellationToken cancelacion = default) =>
+        Task.FromResult(obras.Todas.Select(o => o.Portada).FirstOrDefault(p => p.Huella.Equals(huella)));
 
     public Task<PaginaDeObrasDeLaBase> BuscarParaAdministracion(string? texto, bool incluirDadasDeBaja, int pagina, int tamano, CancellationToken cancelacion = default)
     {

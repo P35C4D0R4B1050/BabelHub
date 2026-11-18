@@ -28,6 +28,9 @@ public interface ILecturasDelCatalogo
     /// <summary>Todas las obras que cumplen (con orden fijo); solo se pide con el filtro de disponibilidad y tras comprobar el tope de 500 ediciones candidatas.</summary>
     Task<IReadOnlyList<Obra>> TodasLasQueCumplen(FiltrosDeObras filtros, CancellationToken cancelacion = default);
 
+    /// <summary>La portada de una obra por su huella: solo se busca entre las portadas de obras (también la de una obra dada de baja), nunca entre las huellas de los libros.</summary>
+    Task<PortadaDeObra?> PortadaPorHuella(HuellaDeArchivo huella, CancellationToken cancelacion = default);
+
     /// <summary>La lista de la administración: obras con todas sus ediciones (también las dadas de baja si <paramref name="incluirDadasDeBaja"/>), por título e identificador y con el texto opcional sobre título, autor y editorial.</summary>
     Task<PaginaDeObrasDeLaBase> BuscarParaAdministracion(string? texto, bool incluirDadasDeBaja, int pagina, int tamano, CancellationToken cancelacion = default);
 
