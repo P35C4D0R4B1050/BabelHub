@@ -149,34 +149,39 @@ public sealed class RepositorioDeObrasPostgres(AccesoAlEsquemaDelCatalogo acceso
             }
         }
 
-        var resultado = new List<Obra>();
-        foreach (var cabecera in cabeceras)
+        // Todas las ediciones de las obras leídas en una sola consulta (también las dadas de baja), agrupadas por obra.
+        var porObra = new Dictionary<Guid, List<Edicion>>();
+        if (cabeceras.Count > 0)
         {
-            var ediciones = new List<Edicion>();
-            await using (var comando = new NpgsqlCommand(
+            await using var comando = new NpgsqlCommand(
                 $"""
-                SELECT {ColumnasDeEdicion}
+                SELECT {ColumnasDeEdicion}, e.obra_id
                 FROM catalogo.ediciones e
                 LEFT JOIN catalogo.licencias l ON l.edicion_id = e.id
                 LEFT JOIN catalogo.archivos_digitales a ON a.edicion_id = e.id
-                WHERE e.obra_id = @obra
+                WHERE e.obra_id = ANY(@obras)
                 ORDER BY e.tipo, e.id
                 """,
                 conexion,
-                transaccion))
+                transaccion);
+            comando.Parameters.AddWithValue("obras", cabeceras.Select(c => c.Id).ToArray());
+            await using var filas = await comando.ExecuteReaderAsync(cancelacion).ConfigureAwait(false);
+            while (await filas.ReadAsync(cancelacion).ConfigureAwait(false))
             {
-                comando.Parameters.AddWithValue("obra", cabecera.Id);
-                await using var filas = await comando.ExecuteReaderAsync(cancelacion).ConfigureAwait(false);
-                while (await filas.ReadAsync(cancelacion).ConfigureAwait(false))
+                var obraId = filas.GetGuid(19);
+                if (!porObra.TryGetValue(obraId, out var lista))
                 {
-                    ediciones.Add(LeerEdicion(filas));
+                    lista = [];
+                    porObra[obraId] = lista;
                 }
-            }
 
-            resultado.Add(Obra.Rehidratar(cabecera.Id, cabecera.Datos, cabecera.Portada, cabecera.Version, cabecera.Estado, cabecera.Baja, cabecera.Creada, ediciones));
+                lista.Add(LeerEdicion(filas));
+            }
         }
 
-        return resultado;
+        return cabeceras
+            .Select(c => Obra.Rehidratar(c.Id, c.Datos, c.Portada, c.Version, c.Estado, c.Baja, c.Creada, porObra.GetValueOrDefault(c.Id) ?? []))
+            .ToList();
     }
 
     private static NpgsqlParameter Clonar(NpgsqlParameter p) => new(p.ParameterName, p.Value);
