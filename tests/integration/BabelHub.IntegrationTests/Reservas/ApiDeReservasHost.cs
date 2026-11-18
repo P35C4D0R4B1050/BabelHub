@@ -3,6 +3,7 @@ using BabelHub.Inventario.Api.Ajustes;
 using BabelHub.Inventario.Api.Fuentes;
 using BabelHub.Inventario.Api.Plataforma;
 using BabelHub.Inventario.Api.Reservas;
+using BabelHub.Inventario.Api.Traslados;
 using BabelHub.Inventario.Application.Auditoria;
 using BabelHub.Inventario.Application.Auditoria.Interno;
 using BabelHub.Inventario.Application.Plataforma;
@@ -65,10 +66,10 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
 
     /// <param name="bd">La base de datos de la prueba.</param>
     /// <param name="conTopeGeneral">Aplica el tope general de la dirección directa (120 por minuto, SEG-32): el «límite general de solicitudes» al que está sujeta la consulta previa (SEL-20).</param>
-    public static async Task<ApiDeReservasHost> Crear(PostgresDeReservasFixture bd, bool conTopeGeneral = false)
+    public static async Task<ApiDeReservasHost> Crear(PostgresDeReservasFixture bd, bool conTopeGeneral = false, bool conTraslados = false)
     {
         var host = new ApiDeReservasHost();
-        await host.Iniciar(bd, conTopeGeneral);
+        await host.Iniciar(bd, conTopeGeneral, conTraslados);
         return host;
     }
 
@@ -77,9 +78,9 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
         public Task AlLiberar(Guid pedidoId, MotivoDeLiberacionDeReserva motivo, IReadOnlyCollection<Guid> trasladoIds, CancellationToken cancelacion = default) => Task.CompletedTask;
     }
 
-    private async Task Iniciar(PostgresDeReservasFixture bd, bool conTopeGeneral)
+    private async Task Iniciar(PostgresDeReservasFixture bd, bool conTopeGeneral, bool conTraslados)
     {
-        var matriz = new MatrizDeAlcances([.. MatrizDeFuentes.Declaraciones(), .. MatrizDeReservas.Declaraciones(), .. MatrizDeAjustes.Declaraciones()]);
+        var matriz = new MatrizDeAlcances([.. MatrizDeFuentes.Declaraciones(), .. MatrizDeReservas.Declaraciones(), .. MatrizDeAjustes.Declaraciones(), .. (conTraslados ? MatrizDeTraslados.Declaraciones() : [])]);
         var credenciales = new OpcionesDeCredencialesDeEntrada(
         [
             new(AlcanceDeServicio.LecturaDeDisponibilidad, (CredencialDeDisponibilidad, null)),
@@ -95,7 +96,7 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
         var local = new MotorDeLimitesLocal();
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
-        builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("INV", ErroresDeFuentes.Especificos.Concat(ErroresDeReservas.Especificos).Concat(ErroresDeAjustes.Especificos).ToDictionary(p => p.Key, p => p.Value)));
+        builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("INV", ErroresDeFuentes.Especificos.Concat(ErroresDeReservas.Especificos).Concat(ErroresDeAjustes.Especificos).Concat(conTraslados ? ErroresDeTraslados.Especificos : new Dictionary<string, MensajeEspecifico>()).ToDictionary(p => p.Key, p => p.Value)));
         builder.Services.AgregarLimitesHttp(new OpcionesDeLimitesHttp());
         builder.Services.AgregarCredencialDeServicio(
             conTopeGeneral ? new OpcionesDeSuperficieDeServicio { TopeDeLaDireccionDirecta = PoliticasDeLimite.SolicitudesPorHuellaDirecta } : new OpcionesDeSuperficieDeServicio(),
@@ -129,15 +130,25 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
         builder.Services.AddSingleton(p => new ResolutorDeRutas(p.GetRequiredService<IPlantillasDeRuta>()));
         builder.Services.AddScoped<IDenegacionDeAcceso>(p => new DenegacionDeAccesoDeAplicacion(
             p.GetRequiredService<ConstructorDeRegistros>(), p.GetRequiredService<IContextoDeDenegacion>(), p.GetRequiredService<ResolutorDeRutas>(), Denegaciones, Alertas, p.GetRequiredService<IReloj>()));
-        builder.Services.AddSingleton<IAlLiberarPedido>(new ReceptorSinEfecto());
+        if (!conTraslados)
+        {
+            builder.Services.AddSingleton<IAlLiberarPedido>(new ReceptorSinEfecto());
+        }
 
         builder.Services.AddSingleton(bd.Acceso);
         var configuracion = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Inventario:ClaveDeBajas"] = PilaDeReservas.ClaveDeBajasDePrueba }).Build();
         // Un Traslados de prueba: confirmar un pedido de recojo con una línea en otra sucursal genera su traslado (SEL-03); el real es de inventario-traslados.
-        builder.Services.AddSingleton<IGeneradorDeTrasladosDePedido>(new TrasladosDeIntegracionDoble(bd));
+        if (!conTraslados)
+        {
+            builder.Services.AddSingleton<IGeneradorDeTrasladosDePedido>(new TrasladosDeIntegracionDoble(bd));
+        }
         builder.Services.AgregarModuloReservas(configuracion);
         builder.Services.AgregarModuloFuentes();
         builder.Services.AgregarModuloAjustes(new OpcionesDelModuloDeAjustes(bd.Depuracion));
+        if (conTraslados)
+        {
+            builder.Services.AgregarModuloTraslados();
+        }
 
         _app = builder.Build();
         _app.UsarManejoDeErrores();
@@ -168,6 +179,10 @@ public sealed class ApiDeReservasHost : IAsyncDisposable
         _app.MapearFuentes();
         _app.MapearReservas();
         _app.MapearAjustes();
+        if (conTraslados)
+        {
+            _app.MapearTraslados();
+        }
 
         await _app.StartAsync();
         Cliente = _app.GetTestClient();
