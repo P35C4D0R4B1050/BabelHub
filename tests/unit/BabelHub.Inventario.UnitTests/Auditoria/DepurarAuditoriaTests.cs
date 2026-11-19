@@ -104,7 +104,7 @@ public sealed class DepurarAuditoriaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-AUD-36")]
+    [Trait("Criterio", "AC-AUD-09")]
     public async Task SinElActorSistemaLaDepuracionSeNiega()
     {
         foreach (var actor in new[] { ActorDePrueba.SinContexto(), ActorDePrueba.Anonimo(), ActorDePrueba.DeAdministradorCentral(), ActorDePrueba.DeIntegracion("ecommerce") })
@@ -137,7 +137,7 @@ public sealed class DepurarAuditoriaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-AUD-36")]
+    [Trait("Criterio", "AC-AUD-09")]
     public async Task SiNoSePuedeRegistrarLaEjecucionLaCorridaFallaYSeReintenta()
     {
         var e = new Entorno();

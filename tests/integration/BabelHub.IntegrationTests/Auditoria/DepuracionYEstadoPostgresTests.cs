@@ -157,7 +157,7 @@ public sealed class DepuracionYEstadoPostgresTests(PostgresDeAuditoriaFixture bd
     }
 
     [Fact]
-    [Trait("Criterio", "AC-AUD-36")]
+    [Trait("Criterio", "AC-AUD-09")]
     public async Task ElEstadoDeLaDepuracionSeGuardaYSeLeeConTodosSusCampos()
     {
         var unidad = new UnidadDeTrabajoPostgres(bd.Acceso);

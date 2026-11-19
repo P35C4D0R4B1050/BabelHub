@@ -183,7 +183,7 @@ public sealed class CorreccionesDeAud3Tests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-AUD-36")]
+    [Trait("Criterio", "AC-AUD-09")]
     public async Task SiNoSePuedeGuardarElEstadoJuntoConElRegistro_LaCorridaFalla_PorqueLaUnidadLosConfirmaOLosRevierteJuntos()
     {
         var reloj = new RelojFijo(Ahora);
