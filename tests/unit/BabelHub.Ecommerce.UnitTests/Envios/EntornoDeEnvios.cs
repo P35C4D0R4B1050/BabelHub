@@ -27,6 +27,9 @@ internal sealed class EntornoDeEnvios
         Alertas = new AlertasTecnicasEspia();
         var autorizador = new AutorizadorDeEnvios(Actor, Denegaciones);
         SolicitarGuia = new SolicitarGuia(autorizador, Envios, Contactos, Operador, Unidad, Auditoria, Alertas, Reloj);
+        Reservas = new ReservasDelEnvioDoble(Unidad);
+        Progreso = new ProgresoDeEnviosDoble(Unidad, Envios);
+        PasarAEnReparto = new PasarAEnReparto(autorizador, Envios, Reservas, Progreso, Unidad, Auditoria, Alertas, Reloj);
         Crear = new CrearEnvio(Pedidos, Envios, Reloj);
         Cancelar = new CancelarEnviosDelPedido(Envios, Auditoria, Reloj);
         Despacho = new DespachoDeEnviosDeLaAplicacion(Crear, Cancelar);
@@ -53,6 +56,12 @@ internal sealed class EntornoDeEnvios
     public AlertasTecnicasEspia Alertas { get; }
 
     public SolicitarGuia SolicitarGuia { get; }
+
+    public ReservasDelEnvioDoble Reservas { get; }
+
+    public ProgresoDeEnviosDoble Progreso { get; }
+
+    public PasarAEnReparto PasarAEnReparto { get; }
 
     public CrearEnvio Crear { get; }
 

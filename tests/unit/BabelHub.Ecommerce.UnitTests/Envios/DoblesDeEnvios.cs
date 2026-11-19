@@ -305,3 +305,77 @@ internal sealed class OperadorLogisticoDoble(UnidadDeTrabajoReversible unidad) :
         return Task.FromResult<ResultadoDelOperador>(new ResultadoDelOperador.GuiaCreada(numero));
     }
 }
+
+/// <summary>
+/// El cierre de reservas con motivo reparto del Inventario (T07): idempotente por <c>envioId</c> (una segunda llamada del mismo envío no descuenta otra vez), con una cola de resultados forzados por llamada y registro de las
+/// llamadas y de si ocurrieron dentro de una transacción.
+/// </summary>
+internal sealed class ReservasDelEnvioDoble(UnidadDeTrabajoReversible unidad) : IReservasDelEnvio
+{
+    /// <summary>Se ejecuta durante la llamada al Inventario: simula lo que pasa mientras el Inventario trabaja (por ejemplo, una cancelación).</summary>
+    public Action? AlCerrar { get; set; }
+
+    private readonly Queue<ResultadoDeCierreDeReservas> _forzados = new();
+    private readonly HashSet<Guid> _descontados = [];
+
+    public List<(Guid EnvioId, IReadOnlyCollection<Guid> Lineas)> Llamadas { get; } = [];
+
+    public int LlamadasDentroDeLaTransaccion { get; private set; }
+
+    /// <summary>Cuántos envíos tienen el físico descontado (una sola vez cada uno).</summary>
+    public int EnviosDescontados => _descontados.Count;
+
+    /// <summary>Un resultado para la próxima llamada; si el resultado es <c>Cerrado</c> el descuento se aplica.</summary>
+    public void Encolar(ResultadoDeCierreDeReservas resultado) => _forzados.Enqueue(resultado);
+
+    public Task<ResultadoDeCierreDeReservas> Cerrar(Guid envioId, IReadOnlyCollection<Guid> lineaIds, CancellationToken cancelacion = default)
+    {
+        if (unidad.EnCurso)
+        {
+            LlamadasDentroDeLaTransaccion++;
+        }
+
+        Llamadas.Add((envioId, lineaIds));
+        AlCerrar?.Invoke();
+        var resultado = _forzados.Count > 0 ? _forzados.Dequeue() : new ResultadoDeCierreDeReservas.Cerrado();
+        if (resultado is ResultadoDeCierreDeReservas.Cerrado)
+        {
+            _descontados.Add(envioId);
+        }
+
+        return Task.FromResult(resultado);
+    }
+}
+
+/// <summary>
+/// El progreso de los envíos hacia Pedidos (contrato de Pedidos): guarda las llamadas, el estado que tenía el envío guardado en ese momento (para comprobar que se llama <b>después de confirmar</b>) y si ocurrieron dentro de una
+/// transacción; puede fallar.
+/// </summary>
+internal sealed class ProgresoDeEnviosDoble(UnidadDeTrabajoReversible unidad, RepositorioDeEnviosEnMemoria envios) : IProgresoDeEnvios
+{
+    public bool Falla { get; set; }
+
+    public List<(EnvioEnRepartoEntrada? EnReparto, EnvioEntregadoEntrada? Entregado, EstadoDeEnvio EstadoGuardado)> Llamadas { get; } = [];
+
+    public int LlamadasDentroDeLaTransaccion { get; private set; }
+
+    public Task<Resultado<ProgresoDeEnvioAplicado>> EnvioEnReparto(EnvioEnRepartoEntrada entrada, CancellationToken cancelacion = default) =>
+        Registrar(entrada, null, entrada.EnvioId);
+
+    public Task<Resultado<ProgresoDeEnvioAplicado>> EnvioEntregado(EnvioEntregadoEntrada entrada, CancellationToken cancelacion = default) =>
+        Registrar(null, entrada, entrada.EnvioId);
+
+    private Task<Resultado<ProgresoDeEnvioAplicado>> Registrar(EnvioEnRepartoEntrada? enReparto, EnvioEntregadoEntrada? entregado, Guid envioId)
+    {
+        if (unidad.EnCurso)
+        {
+            LlamadasDentroDeLaTransaccion++;
+        }
+
+        Llamadas.Add((enReparto, entregado, envios.Todos.Single(e => e.Id == envioId).Estado));
+        return Task.FromResult(
+            Falla
+                ? Resultado<ProgresoDeEnvioAplicado>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible"))
+                : Resultado<ProgresoDeEnvioAplicado>.Exito(new ProgresoDeEnvioAplicado(false)));
+    }
+}
