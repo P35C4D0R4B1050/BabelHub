@@ -92,6 +92,7 @@ public sealed class RestReservasDelEnvioTests
             var adaptador = Crear(respuesta);
 
             Assert.IsType<ResultadoDeCierreDeReservas.Incierto>(await adaptador.Cerrar(Pedido, Envio, [a, b]));
+            Assert.Single(ClienteDelInventarioEspia.Llamadas);
         }
     }
 
@@ -110,7 +111,7 @@ public sealed class RestReservasDelEnvioTests
     [Theory]
     [Trait("Criterio", "AC-ENV-11")]
     [InlineData(409, "INV-IDEMPOTENCIA-EN-CURSO")]
-    [InlineData(409, "INV-IDEMPOTENCIA-CONFLICTO")]
+    [InlineData(409, "INV-IDEMPOTENCIA-EN-CONFLICTO")]
     [InlineData(401, "INV-NO-AUTENTICADO")]
     [InlineData(403, "INV-PROHIBIDO")]
     [InlineData(408, null)]
@@ -123,6 +124,7 @@ public sealed class RestReservasDelEnvioTests
         var adaptador = Crear(() => ResultadoDelInventario<CierreDeLaReserva>.Rechazo(estado, codigo));
 
         Assert.IsType<ResultadoDeCierreDeReservas.Incierto>(await adaptador.Cerrar(Pedido, Envio, [Guid.NewGuid()]));
+        Assert.Single(ClienteDelInventarioEspia.Llamadas);
     }
 
     [Fact]
@@ -144,7 +146,7 @@ public sealed class RestReservasDelEnvioTests
         var adaptador = Crear(() => throw new InvalidOperationException("no debe llamarse"));
         var linea = Guid.NewGuid();
 
-        foreach (var (pedido, envio, lineas) in new (Guid, Guid, Guid[])[] { (Guid.Empty, Envio, [linea]), (Pedido, Guid.Empty, [linea]), (Pedido, Envio, []), (Pedido, Envio, [linea, linea]), (Pedido, Envio, [Guid.Empty]) })
+        foreach (var (pedido, envio, lineas) in new (Guid, Guid, Guid[])[] { (Guid.Empty, Envio, [linea]), (Pedido, Guid.Empty, [linea]), (Pedido, Envio, []), (Pedido, Envio, [linea, linea]), (Pedido, Envio, [Guid.Empty]), (Pedido, Envio, [.. Enumerable.Range(0, 51).Select(_ => Guid.NewGuid())]) })
         {
             Assert.IsType<ResultadoDeCierreDeReservas.RechazoDeNegocio>(await adaptador.Cerrar(pedido, envio, lineas));
         }

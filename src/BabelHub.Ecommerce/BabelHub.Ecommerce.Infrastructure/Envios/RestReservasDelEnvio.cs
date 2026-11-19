@@ -19,6 +19,9 @@ internal sealed class RestReservasDelEnvio(IClienteDelInventario cliente) : IRes
 {
     public const string MotivoReparto = "reparto";
 
+    /// <summary>El tope del contrato de reservas (50 líneas por llamada): una entrada mayor no se envía y no deja el marcador de despacho sin salida.</summary>
+    public const int MaximoDeLineas = 50;
+
     private static readonly string[] RechazosDeNegocio = ["INV-RESERVA-ESTADO-INVALIDO", "INV-VALIDACION-INVALIDA", "INV-NO-ENCONTRADO"];
 
     private static readonly string[] ResultadosAceptados = ["cerrada", "ya-cerrada"];
@@ -27,7 +30,7 @@ internal sealed class RestReservasDelEnvio(IClienteDelInventario cliente) : IRes
     {
         ArgumentNullException.ThrowIfNull(lineaIds);
         var pedidas = lineaIds.Distinct().ToList();
-        if (pedidoId == Guid.Empty || envioId == Guid.Empty || pedidas.Count == 0 || pedidas.Count != lineaIds.Count || pedidas.Contains(Guid.Empty))
+        if (pedidoId == Guid.Empty || envioId == Guid.Empty || pedidas.Count == 0 || pedidas.Count > MaximoDeLineas || pedidas.Count != lineaIds.Count || pedidas.Contains(Guid.Empty))
         {
             // Una llamada que el contrato no admite ni se envía: no cambió nada y no hay nada que reintentar.
             return new ResultadoDeCierreDeReservas.RechazoDeNegocio();
