@@ -77,6 +77,8 @@ internal sealed class ReclamacionesApiHost : IAsyncDisposable
 
     public HojasDelConsumidorFalso Consumidor { get; } = new();
 
+    public AdministracionDeReclamacionesFalso Administracion { get; } = new();
+
     public static async Task<ReclamacionesApiHost> Crear()
     {
         var host = new ReclamacionesApiHost();
@@ -99,6 +101,7 @@ internal sealed class ReclamacionesApiHost : IAsyncDisposable
                 servicios.AddSingleton<IEstablecedorDeActor>(actor);
                 servicios.AddSingleton<IReclamaciones>(Reclamaciones);
                 servicios.AddSingleton<IHojasDelConsumidor>(Consumidor);
+                servicios.AddSingleton<IAdministracionDeReclamaciones>(Administracion);
                 servicios.AddSingleton<IRegistradorDeDenegacionesHttp>(new DenegacionesEspia());
                 servicios.AddSingleton<IListaDeSucursales>(new ListaVacia());
                 servicios.AddSingleton(new OpcionesDeVerificacionWeb("clave-de-sitio-de-prueba"));
@@ -128,9 +131,9 @@ internal sealed class ReclamacionesApiHost : IAsyncDisposable
         return solicitud;
     }
 
-    public async Task<HttpResponseMessage> Enviar(IEnumerable<KeyValuePair<string, string>> campos, bool html = true, bool conToken = true)
+    public async Task<HttpResponseMessage> Enviar(IEnumerable<KeyValuePair<string, string>> campos, bool html = true, bool conToken = true, string ruta = "/reclamaciones/nueva")
     {
-        using var solicitud = new HttpRequestMessage(HttpMethod.Post, "/reclamaciones/nueva");
+        using var solicitud = new HttpRequestMessage(HttpMethod.Post, ruta);
         if (conToken)
         {
             if (_token is null)
@@ -154,4 +157,68 @@ internal sealed class ReclamacionesApiHost : IAsyncDisposable
     }
 
     public static async Task<JsonElement> Leer(HttpResponseMessage respuesta) => (await respuesta.Content.ReadFromJsonAsync<JsonElement>()).Clone();
+}
+
+/// <summary>Un <c>IAdministracionDeReclamaciones</c> que anota la llamada y responde lo que la prueba le pida.</summary>
+public sealed class AdministracionDeReclamacionesFalso : IAdministracionDeReclamaciones
+{
+    public List<string> Llamadas { get; } = [];
+
+    public List<ResponderHojaEntrada> Respuestas { get; } = [];
+
+    public Resultado<PaginaDeHojas> Pagina { get; set; } = Resultado<PaginaDeHojas>.Exito(new PaginaDeHojas([new ResumenDeHoja(Guid.Parse("a0000000-0000-0000-0000-000000000001"), "2026-000001", new DateTimeOffset(2026, 11, 19, 15, 0, 0, TimeSpan.Zero), "reclamo", EstadoDeLaHoja.Pendiente, null)], 1, 20, 1));
+
+    public Resultado<DetalleDeHoja> Detalle { get; set; } = Resultado<DetalleDeHoja>.Exito(new DetalleDeHoja(
+        Guid.Parse("a0000000-0000-0000-0000-000000000001"),
+        "2026-000001",
+        new DateTimeOffset(2026, 11, 19, 15, 0, 0, TimeSpan.Zero),
+        "reclamo",
+        EstadoDeLaHoja.Pendiente,
+        "Ana Pérez",
+        "12345678",
+        "Jr. Lima 123",
+        "ana@example.com",
+        "Libro",
+        59.90m,
+        "<script>alert('x')</script> Llegó dañado",
+        null,
+        null,
+        null,
+        null,
+        false,
+        false,
+        new DateOnly(2026, 12, 4)));
+
+    public Resultado<ResultadoDeLaHoja> Operacion { get; set; } = Resultado<ResultadoDeLaHoja>.Exito(new ResultadoDeLaHoja("2026-000001", EstadoDeLaHoja.Respondido, AvisoDeLaRespuesta.Pendiente));
+
+    public Task<Resultado<PaginaDeHojas>> Listar(ListarHojasEntrada entrada, CancellationToken cancelacion = default)
+    {
+        Llamadas.Add($"listar:{entrada.Estado}:{entrada.Pagina}:{entrada.Tamano}");
+        return Task.FromResult(Pagina);
+    }
+
+    public Task<Resultado<DetalleDeHoja>> Obtener(Guid hojaId, CancellationToken cancelacion = default)
+    {
+        Llamadas.Add($"obtener:{hojaId:D}");
+        return Task.FromResult(Detalle);
+    }
+
+    public Task<Resultado<ResultadoDeLaHoja>> Responder(ResponderHojaEntrada entrada, CancellationToken cancelacion = default)
+    {
+        Llamadas.Add($"responder:{entrada.HojaId:D}");
+        Respuestas.Add(entrada);
+        return Task.FromResult(Operacion);
+    }
+
+    public Task<Resultado<ResultadoDeLaHoja>> Descartar(Guid hojaId, CancellationToken cancelacion = default)
+    {
+        Llamadas.Add($"descartar:{hojaId:D}");
+        return Task.FromResult(Operacion);
+    }
+
+    public Task<Resultado<ResultadoDeLaHoja>> ReintentarAviso(Guid hojaId, CancellationToken cancelacion = default)
+    {
+        Llamadas.Add($"reintentar:{hojaId:D}");
+        return Task.FromResult(Operacion);
+    }
 }
