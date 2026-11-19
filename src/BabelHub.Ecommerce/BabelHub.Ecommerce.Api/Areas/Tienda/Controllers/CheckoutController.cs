@@ -11,12 +11,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BabelHub.Ecommerce.Api.Areas.Tienda.Controllers;
 
-/// <summary>La pantalla del checkout (revisión, entrega, datos y aceptaciones): lo que la persona ve de su compra en curso. Los precios, el envío y el total salen del servidor; la pantalla solo los pinta y devuelve el total visto para compararlo.</summary>
-public sealed class CheckoutVista : ModeloBaseDePagina
-{
-    public VistaDelCheckout Checkout { get; set; } = null!;
-}
-
 /// <summary>
 /// El checkout (plan §4, CAR-05 a CAR-18, CAR-26 a CAR-35): <c>POST /checkout/iniciar</c>, <c>GET /checkout</c> (sin efectos), <c>POST /checkout/entrega</c>, <c>POST /checkout</c> (pasar al pago, con la verificación de persona de Turnstile), <c>POST /checkout/volver</c> y
 /// <c>POST /checkout/reiniciar</c>. Las rutas <c>/checkout</c> y <c>/checkout/pago</c> son de coincidencia <b>exacta</b>. <b>Presentación pura</b>: lee el cuerpo con esquema estricto (un campo desconocido o repetido es validación; <c>carritoId</c>, <c>checkoutId</c> o <c>cuentaId</c> se
@@ -87,7 +81,7 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
         }
 
         // Con un retiro pendiente la Aplicación no entrega el pedidoId: se muestra la revisión con su aviso, sin redirigir al pago (CAR-26).
-        var vista = await pagina.Completar(new CheckoutVista { Checkout = resultado.Valor }, "Tu compra", cancelacion: cancelacion);
+        var vista = await Armar(resultado.Valor, cancelacion);
         Response.Headers.CacheControl = "no-store";
         return View("Index", vista);
     }
@@ -140,7 +134,8 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
         var contacto = tipo == TipoDeEntregaDeCompra.Domicilio
             ? new ContactoDeCompra(campos.GetValueOrDefault("nombre"), campos.GetValueOrDefault("telefono"), campos.GetValueOrDefault("direccion"), campos.GetValueOrDefault("region"))
             : null;
-        return await Terminar(await checkout.ElegirEntrega(new ElegirEntregaEntrada(tipo.Value, campos.GetValueOrDefault("sucursal"), contacto, pedidoId), cancelacion), "/checkout", cancelacion);
+        var elegida = await checkout.ElegirEntrega(new ElegirEntregaEntrada(tipo.Value, campos.GetValueOrDefault("sucursal"), contacto, pedidoId), cancelacion);
+        return elegida.EsExito ? Redirigir("/checkout") : await FallaEnLaPagina(elegida.Error!, campos, cancelacion);
     }
 
     // ---------- Pasar al pago ----------
@@ -326,6 +321,39 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
         Response.StatusCode = StatusCodes.Status303SeeOther;
         Response.Headers.Location = destino;
         return new EmptyResult();
+    }
+
+    private async Task<CheckoutVista> Armar(VistaDelCheckout vista, CancellationToken cancelacion)
+    {
+        var modelo = await pagina.Completar(new CheckoutVista(), "Tu compra", cancelacion: cancelacion);
+        ConstructorDeLaVistaDelCheckout.Armar(modelo, vista);
+        modelo.SucursalesDeRecojo = modelo.Sucursales;
+        return modelo;
+    }
+
+    /// <summary>
+    /// El fallo de un formulario del checkout: un navegador vuelve a ver la pantalla con el aviso del bloqueo, <b>los errores junto a cada campo</b> y lo que escribió (solo en esta respuesta, nunca en un borrador); quien no pide HTML recibe el problema en JSON.
+    /// </summary>
+    private async Task<IActionResult> FallaEnLaPagina(ErrorDeAplicacion error, IReadOnlyDictionary<string, string> campos, CancellationToken cancelacion)
+    {
+        if (!PantallasDelCarrito.PrefiereHtml(Request))
+        {
+            return await Falla(error, cancelacion);
+        }
+
+        var actual = await checkout.Obtener(cancelacion);
+        if (!actual.EsExito)
+        {
+            return await Falla(error, cancelacion);
+        }
+
+        var problema = ProblemasDelCarrito.Crear(HttpContext, errores, error);
+        await DenegacionesHttp.Registrar(HttpContext, error.Categoria, error.Clave, problema.Code);
+        var modelo = await Armar(actual.Valor, cancelacion);
+        PantallasDelCarrito.AplicarElFallo(modelo, problema, error, campos);
+        Response.StatusCode = Request.EsHtmx() ? StatusCodes.Status200OK : problema.Status;
+        Response.Headers.CacheControl = "no-store";
+        return View("Index", modelo);
     }
 
     private async Task<IActionResult> FallaDeVerificacion(string sufijo, CategoriaDeError categoria)

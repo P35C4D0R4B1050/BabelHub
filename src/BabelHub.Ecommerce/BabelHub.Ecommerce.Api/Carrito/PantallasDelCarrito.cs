@@ -44,6 +44,64 @@ public static class PantallasDelCarrito
         ["ECO-VERIFICACION-FALLIDA"] = new("No pudimos verificarte", "Completa la verificación de nuevo e inténtalo otra vez."),
     };
 
+    private static readonly Dictionary<string, string> CampoDelFormulario = new(StringComparer.Ordinal)
+    {
+        ["codigoDeSucursalDeRecojo"] = "sucursal",
+        ["terminos"] = "terminosVersion",
+        ["privacidad"] = "privacidadVersion",
+        ["reembolsoDigital"] = "reembolsoDigitalVersion",
+    };
+
+    private static string TextoDelCampo(string campo, string clave) => (campo, clave) switch
+    {
+        ("telefono", _) => "Escribe un celular de 9 dígitos que empiece con 9.",
+        ("nombre", "obligatorio") => "Escribe tu nombre completo.",
+        ("direccion", "obligatorio") => "Escribe tu dirección de entrega.",
+        ("region", "obligatorio") => "Escribe la región de entrega.",
+        ("region", _) => "Esa región no está en nuestra lista de despacho.",
+        ("sucursal", _) => "Elige una sucursal de la lista.",
+        (_, "obligatorio") => "Completa este dato.",
+        (_, "demasiado-largo") => "Es demasiado largo.",
+        (_, "fuera-de-rango") => "Está fuera del rango permitido.",
+        _ => "Revisa este dato.",
+    };
+
+    /// <summary>
+    /// Aplica un fallo a la pantalla del checkout: el aviso del bloqueo con el texto de su código (o «Revisa los datos» en una validación), los errores junto a cada campo con el nombre del formulario y lo que la persona escribió (sin el token ni la verificación de persona).
+    /// </summary>
+    public static void AplicarElFallo(Areas.Tienda.Controllers.CheckoutVista modelo, ProblemaDto problema, ErrorDeAplicacion error, IReadOnlyDictionary<string, string> campos)
+    {
+        ArgumentNullException.ThrowIfNull(modelo);
+        ArgumentNullException.ThrowIfNull(problema);
+        ArgumentNullException.ThrowIfNull(error);
+        ArgumentNullException.ThrowIfNull(campos);
+        if (PorCodigo.TryGetValue(problema.Code, out var texto))
+        {
+            modelo.AlertaTitulo = texto.Titulo;
+            modelo.AlertaMensaje = texto.Mensaje;
+        }
+        else
+        {
+            modelo.AlertaTitulo = error.Categoria == CategoriaDeError.Validacion ? "Revisa los datos" : "No pudimos continuar con tu compra";
+            modelo.AlertaMensaje = error.Categoria == CategoriaDeError.Validacion ? "Corrige los campos marcados e inténtalo de nuevo." : "No se hizo ningún cobro y tu carrito se conservó.";
+        }
+
+        var porCampo = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (error.Categoria == CategoriaDeError.Validacion)
+        {
+            foreach (var e in error.Errores)
+            {
+                var nombre = CampoDelFormulario.GetValueOrDefault(e.Campo, e.Campo);
+                porCampo.TryAdd(nombre, TextoDelCampo(nombre, e.Clave));
+            }
+        }
+
+        modelo.Errores = porCampo;
+        modelo.Valores = campos
+            .Where(c => c.Key is not (VerificacionDePersonaWeb.CampoDelToken or "huellaDelNumero"))
+            .ToDictionary(c => c.Key, c => c.Value, StringComparer.Ordinal);
+    }
+
     /// <summary>Un navegador pide una página: <c>Accept</c> incluye <c>text/html</c>. Una prueba o una integración (sin ese tipo) recibe el problema en JSON.</summary>
     public static bool PrefiereHtml(HttpRequest solicitud)
     {
