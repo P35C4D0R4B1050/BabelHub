@@ -16,6 +16,10 @@ const digital = process.env.E2E_CLIENTE_DIGITAL_STORAGE_STATE;
 const visitante = process.env.E2E_VISITANTE_STORAGE_STATE;
 const trasFusion = process.env.E2E_CLIENTE_TRAS_FUSION_STORAGE_STATE;
 
+// Los recorridos comparten la sesión y el carrito sembrados y cambian su estado (pagar, descartar avisos): se corren en serie
+// (`--workers=1`) y se vuelve a sembrar el estado antes de cada corrida.
+test.describe.configure({ mode: 'serial' });
+
 const pasos = (page: Page) => page.getByRole('list', { name: 'Progreso de la compra' }).getByRole('listitem');
 
 async function aceptarYPagar(page: Page) {
@@ -144,13 +148,18 @@ for (const [nombre, ruta, estado] of [
     test('teclado: el foco es visible y se llega a la acción principal sin ratón', async ({ page }) => {
       test.skip(!estado, 'Falta E2E_CLIENTE_MIXTO_STORAGE_STATE');
       await page.goto(ruta);
-      for (let i = 0; i < 6; i += 1) {
+      // Se tabula hasta la acción principal (con un máximo de pasos) y el foco debe verse en cada parada.
+      const principal = page.getByRole('button', { name: /Continuar con la compra|Elegir recojo|Ir al pago/ }).first();
+      let llegado = false;
+      for (let i = 0; i < 60 && !llegado; i += 1) {
         await page.keyboard.press('Tab');
+        const enfocado = page.locator(':focus');
+        await expect(enfocado).toBeVisible();
+        const contorno = await enfocado.evaluate((el) => getComputedStyle(el).outlineStyle);
+        expect(contorno).not.toBe('none');
+        llegado = await principal.evaluate((el) => el === document.activeElement);
       }
-      const enfocado = page.locator(':focus');
-      await expect(enfocado).toBeVisible();
-      const contorno = await enfocado.evaluate((el) => getComputedStyle(el).outlineStyle);
-      expect(contorno).not.toBe('none');
+      expect(llegado).toBe(true);
     });
 
     test('teléfono: sin desplazamiento horizontal', async ({ page }) => {

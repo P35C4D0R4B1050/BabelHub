@@ -454,6 +454,7 @@ public sealed class PantallasDelCheckoutTests
 
         Assert.Equal(HttpStatusCode.TooManyRequests, respuesta.StatusCode);
         Assert.Contains("Podrás intentarlo de nuevo a las 15:42 (hora de Lima)", html, StringComparison.Ordinal);
+        Assert.True(respuesta.Headers.Contains("Retry-After"));
     }
 
     [Fact]

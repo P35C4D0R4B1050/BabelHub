@@ -386,6 +386,12 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
         PantallasDelCarrito.AplicarElFallo(modelo, problema, error, campos);
         Response.StatusCode = Request.EsHtmx() ? StatusCodes.Status200OK : problema.Status;
         Response.Headers.CacheControl = "no-store";
+        if (error.Categoria == CategoriaDeError.Limite)
+        {
+            var espera = ProblemasDelCarrito.ReintentarEn(error) is { } hasta ? Math.Max(1, (int)Math.Ceiling((hasta - DateTimeOffset.UtcNow).TotalSeconds)) : 60;
+            Response.Headers["Retry-After"] = espera.ToString(CultureInfo.InvariantCulture);
+        }
+
         return View("Index", modelo);
     }
 

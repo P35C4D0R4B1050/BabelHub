@@ -105,8 +105,9 @@ public static class PantallasDelCarrito
         }
 
         modelo.Errores = porCampo;
+        // Lista blanca de lo que la pantalla repinta: nada más de lo recibido vuelve a salir.
         modelo.Valores = campos
-            .Where(c => c.Key is not (VerificacionDePersonaWeb.CampoDelToken or "huellaDelNumero"))
+            .Where(c => c.Key is "nombre" or "telefono" or "direccion" or "region" or "sucursal" or "consentimientoDeWhatsApp" or "terminosVersion" or "privacidadVersion" or "reembolsoDigitalVersion")
             .ToDictionary(c => c.Key, c => c.Value, StringComparer.Ordinal);
     }
 
