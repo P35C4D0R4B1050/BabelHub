@@ -159,7 +159,7 @@ internal sealed class PasarAEnReparto(
                 },
                 CancellationToken.None).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is EnviosNoDisponiblesException or HttpRequestException or TimeoutException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // Queda sin informar: el trabajo de fondo lo reintenta.
         }
