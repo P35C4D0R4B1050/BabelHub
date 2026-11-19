@@ -730,7 +730,6 @@ public sealed class HttpClienteDelInventarioTests
     // ---------- Consultar, extender y confirmar una reserva (PLA-Y; SEL-03, SEL-04, SEL-22, SEL-30) ----------
 
     [Fact]
-    [Trait("Criterio", "AC-SEL-04")]
     public async Task ConsultarReserva_LlevaElTokenYLaCredencialDeUsuario_SinClave_YDevuelveLaReservaValidada()
     {
         var pedido = Guid.NewGuid();
@@ -753,7 +752,6 @@ public sealed class HttpClienteDelInventarioTests
     [Theory]
     [InlineData(404, "INV-NO-ENCONTRADO")]
     [InlineData(403, "INV-PROHIBIDO")]
-    [Trait("Criterio", "AC-SEL-04")]
     public async Task ConsultarReserva_ConUnRechazoDelInventario_TraeElCodigo_SinExcepcion(int estado, string codigo)
     {
         var servidor = new ServidorSimulado((_, _) => Task.FromResult(Problema((HttpStatusCode)estado, codigo)));
@@ -766,7 +764,6 @@ public sealed class HttpClienteDelInventarioTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEL-04")]
     public async Task ConsultarReserva_ConUnaReservaDeOtroPedido_EsNoDisponible_YSinPedidoNoSale()
     {
         var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json(Reserva(Guid.NewGuid()))));
@@ -782,7 +779,7 @@ public sealed class HttpClienteDelInventarioTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    [Trait("Criterio", "AC-SEL-22")]
+    [Trait("Criterio", "AC-SEL-24")]
     public async Task ExtenderReserva_UsaLaCredencialDeExpiracionSinTokenNiCuerpo_SeReintenta_YDevuelveSiSeExtendio(bool extendida)
     {
         var pedido = Guid.NewGuid();
@@ -805,7 +802,7 @@ public sealed class HttpClienteDelInventarioTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEL-22")]
+    [Trait("Criterio", "AC-SEL-24")]
     public async Task ExtenderReserva_ConUnaRespuestaQueNoEsLaDelPedido_OSinReserva_EsNoDisponible()
     {
         var pedido = Guid.NewGuid();
