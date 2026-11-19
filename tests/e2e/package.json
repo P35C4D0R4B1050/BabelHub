@@ -1,0 +1,13 @@
+{
+  "name": "babelhub-e2e",
+  "private": true,
+  "description": "Recorridos E2E de BabelHub con Playwright. No se instalan paquetes sin que la persona responsable lo pida: ejecutar `npm install` y `npx playwright install chromium` a mano.",
+  "scripts": {
+    "test": "playwright test",
+    "test:catalogo": "playwright test catalogo"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
+    "@playwright/test": "1.49.1"
+  }
+}

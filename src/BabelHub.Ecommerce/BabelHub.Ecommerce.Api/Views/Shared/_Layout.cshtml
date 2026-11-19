@@ -36,5 +36,6 @@ else
         @RenderBody()
     </main>
     @await Html.PartialAsync("_Pie", Model)
+    @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

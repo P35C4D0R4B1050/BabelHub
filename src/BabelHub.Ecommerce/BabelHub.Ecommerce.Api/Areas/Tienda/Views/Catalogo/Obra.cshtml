@@ -1,0 +1,123 @@
+@using BabelHub.Ecommerce.Api.Web.Estados
+@model BabelHub.Ecommerce.Api.Areas.Tienda.Controllers.FichaVista
+@{
+    var activa = Model.EdicionActiva == "digital" ? Model.Digital : Model.Impresa;
+}
+<nav aria-label="Ruta de navegación" class="mb-4 text-sm">
+    <a class="link" href="/catalogo">Catálogo</a> <span aria-hidden="true">/</span> <span>@Model.ObraTitulo</span>
+</nav>
+
+<div class="grid gap-10 md:grid-cols-[19rem_1fr]">
+    <div class="mx-auto w-full max-w-xs md:mx-0">
+        <div class="bh-portada bg-base-300">
+            <img src="/portadas/@Model.PortadaHuella" alt="Portada de @Model.ObraTitulo" class="size-full object-cover" width="300" height="450" />
+        </div>
+    </div>
+    <div class="space-y-5">
+        <div>
+            <p class="bh-texto-coral text-sm font-semibold uppercase tracking-wider">@Model.Categoria</p>
+            <h1 class="font-display text-4xl leading-tight sm:text-5xl">@Model.ObraTitulo</h1>
+            <p class="text-lg opacity-80">@Model.Autor · @Model.Editorial</p>
+        </div>
+
+        @if (Model.DisponibilidadDudosa)
+        {
+            <div class="alert alert-warning" role="status">
+                <bh-icono nombre="aviso" />
+                <span>La disponibilidad puede estar desactualizada porque no pudimos consultar el inventario en este momento.</span>
+            </div>
+        }
+
+        <nav aria-label="Edición" class="join w-full max-w-md">
+            @if (Model.Impresa is not null)
+            {
+                <a class="join-item btn flex-1 @(Model.EdicionActiva == "impresa" ? "btn-primary" : "btn-outline")" href="?edicion=impresa" aria-current="@(Model.EdicionActiva == "impresa" ? "page" : null)">Impreso</a>
+            }
+            @if (Model.Digital is not null)
+            {
+                <a class="join-item btn flex-1 @(Model.EdicionActiva == "digital" ? "btn-primary" : "btn-outline")" href="?edicion=digital" aria-current="@(Model.EdicionActiva == "digital" ? "page" : null)">Digital</a>
+            }
+        </nav>
+
+        @if (activa is { EsDigital: false } impresa)
+        {
+            <section aria-labelledby="h-impresa" class="space-y-4">
+                <h2 id="h-impresa" class="sr-only">Edición impresa</h2>
+                <div class="flex flex-wrap items-baseline gap-4">
+                    <span class="font-display text-4xl">@impresa.PrecioTexto</span>
+                    <vc:bh-disponibilidad modelo="@impresa.Disponibilidad" />
+                </div>
+                <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
+                    <dt class="opacity-70">ISBN</dt><dd>@impresa.Isbn</dd>
+                    <dt class="opacity-70">Editorial</dt><dd>@Model.Editorial</dd>
+                </dl>
+                @if (impresa.Aviso is not null)
+                {
+                    <div class="alert alert-warning" role="status"><bh-icono nombre="aviso" /><span>@impresa.Aviso</span></div>
+                }
+                else if (impresa.Disponibilidad.Estado == EstadoDeDisponibilidad.Agotado)
+                {
+                    <div class="alert alert-error" role="status">
+                        <bh-icono nombre="agotado" />
+                        <span>Impreso agotado en todas las sucursales.@(Model.Digital?.Disponibilidad.Estado == EstadoDeDisponibilidad.DisponibleAlInstante ? " Puedes verlo en digital." : string.Empty)</span>
+                    </div>
+                }
+                @if (impresa.Sucursales.Count > 0)
+                {
+                    <details class="rounded-box border border-base-300" open>
+                        <summary class="flex cursor-pointer items-center gap-2 p-3 font-semibold"><bh-icono nombre="sucursal" clase="size-5" />Disponibilidad por sucursal</summary>
+                        <div class="overflow-x-auto px-3 pb-3">
+                            <table class="table table-sm">
+                                <caption class="sr-only">Stock vendible por sucursal</caption>
+                                <thead><tr><th scope="col">Sucursal</th><th scope="col" class="text-right">Vendible</th><th scope="col">Estado</th></tr></thead>
+                                <tbody>
+                                    @foreach (var fila in impresa.Sucursales)
+                                    {
+                                        <tr class="@(fila.EsLaTuya ? "bg-base-200 font-medium" : null)">
+                                            <th scope="row" class="font-normal">
+                                                @fila.Nombre
+                                                @if (fila.EsLaTuya)
+                                                {
+                                                    <span class="bh-chip ml-2">Tu sucursal</span>
+                                                }
+                                            </th>
+                                            <td class="text-right tabular-nums">@fila.Vendible</td>
+                                            <td><span class="bh-chip"><bh-icono nombre="@fila.Icono" clase="size-3.5" />@fila.Estado</span></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                            <p class="mt-1 text-xs opacity-70">Vendible = stock físico − unidades reservadas por pedidos en curso.</p>
+                        </div>
+                    </details>
+                }
+            </section>
+        }
+        else if (activa is { EsDigital: true } digital)
+        {
+            <section aria-labelledby="h-digital" class="space-y-4">
+                <h2 id="h-digital" class="sr-only">Edición digital</h2>
+                <div class="flex flex-wrap items-baseline gap-4">
+                    <span class="font-display text-4xl">@digital.PrecioTexto</span>
+                    <vc:bh-disponibilidad modelo="@digital.Disponibilidad" />
+                    <span class="text-xs opacity-80">Sin IGV: los libros digitales descargables están exonerados (precio referencial).</span>
+                </div>
+                <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
+                    <dt class="opacity-70">ISBN</dt><dd>@digital.Isbn</dd>
+                    <dt class="opacity-70">Idioma</dt><dd>Español</dd>
+                </dl>
+                @if (digital.Aviso is not null)
+                {
+                    <div class="alert alert-info" role="status"><bh-icono nombre="candado" /><span>@digital.Aviso@(Model.Impresa is not null ? " Puedes verlo en impreso." : string.Empty)</span></div>
+                }
+                else
+                {
+                    <ul class="space-y-1.5 border-l-2 border-primary pl-3 text-sm">
+                        <li class="flex gap-2"><bh-icono nombre="exito" clase="mt-0.5 size-4" />Disponible al instante en tu biblioteca</li>
+                        <li class="flex gap-2"><bh-icono nombre="candado" clase="mt-0.5 size-4" />Para uso personal: no se puede copiar ni redistribuir</li>
+                    </ul>
+                }
+            </section>
+        }
+    </div>
+</div>
