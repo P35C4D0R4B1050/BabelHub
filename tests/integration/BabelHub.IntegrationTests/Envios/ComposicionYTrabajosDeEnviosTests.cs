@@ -2,6 +2,7 @@ using System.Reflection;
 using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Envios;
 using BabelHub.Ecommerce.Application.Envios.Interno;
+using BabelHub.Ecommerce.Application.Identidad;
 using BabelHub.Ecommerce.Application.Notificaciones;
 using BabelHub.Ecommerce.Application.Pedidos;
 using BabelHub.Ecommerce.Application.Plataforma;
@@ -81,6 +82,18 @@ public sealed class ComposicionYTrabajosDeEnviosTests
             using var alcance = proveedor.CreateScope();
             Assert.IsType<DespachoDeEnviosDeLaAplicacion>(alcance.ServiceProvider.GetRequiredService<IDespachoDeEnvios>());
         }
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-17")]
+    public void Envios_no_registra_ningun_aplicador_de_cancelacion_de_cuenta_porque_no_guarda_datos_personales()
+    {
+        var servicios = ConDependencias();
+        servicios.AgregarEnvios(esProduccion: false);
+        using var proveedor = servicios.BuildServiceProvider();
+        using var alcance = proveedor.CreateScope();
+
+        Assert.Empty(alcance.ServiceProvider.GetServices<IAplicadorDeCancelacion>());
     }
 
     [Fact]
