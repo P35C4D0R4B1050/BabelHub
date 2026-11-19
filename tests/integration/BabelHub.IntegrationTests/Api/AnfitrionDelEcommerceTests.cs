@@ -4,6 +4,7 @@ using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Infrastructure.Plataforma;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -77,6 +78,12 @@ public sealed class AnfitrionDelEcommerceTests
         ["Correo:Smtp:Cuenta"] = "avisos@example.org",
         ["Correo:Smtp:Credencial"] = Secreto(),
         ["Correo:Smtp:Remitente"] = "avisos@example.org",
+        // Notificaciones: en producción el envío es n8n (el simulado no vale), con su webhook interno, la clave del sentido saliente, la clave de la huella de los números y la del sentido entrante (Integraciones).
+        ["Notificaciones:Envio"] = "n8n",
+        ["Notificaciones:N8n:Webhook"] = "http://n8n:5678/webhook/babelhub-avisos",
+        ["Notificaciones:N8n:ClaveSaliente"] = Secreto(),
+        ["Notificaciones:ClaveDeHuellaDeNumero"] = "1:" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+        ["Integraciones:n8n:Secreto"] = Secreto(),
     };
 
     private static WebApplicationBuilder Constructor(Dictionary<string, string?> configuracion, string entorno)
@@ -199,10 +206,12 @@ public sealed class AnfitrionDelEcommerceTests
         }
 
         var normal = Constructor(configuracion, "Production");
-        var falla = Assert.Throws<InvalidOperationException>(() => normal.AgregarEcommerce(ModoDeArranque.Normal));
+        // Notificaciones ya es real (no hay doble provisional que la guarda deba nombrar): lo primero que rechaza producción es el simulador de Pagos, que sigue esperando el adaptador de la pasarela.
+        var falla = Assert.Throws<BabelHub.Ecommerce.Infrastructure.Pagos.ConfiguracionDePagosInvalidaException>(() => normal.AgregarEcommerce(ModoDeArranque.Normal));
         var restauracion = Constructor(configuracion, "Production");
 
-        Assert.Contains("ICancelacionDeAvisos", falla.Message, StringComparison.Ordinal);
+        Assert.Contains("simulador", falla.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("ICancelacionDeAvisos", falla.Message, StringComparison.Ordinal);
         restauracion.AgregarEcommerce(ModoDeArranque.Restauracion);
     }
 
@@ -446,5 +455,180 @@ public sealed class AnfitrionDelEcommerceTests
         var opciones = OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(ConfiguracionCompleta()).Build(), esProduccion: false);
 
         Assert.Equal("[configuración del anfitrión del E-commerce]", opciones.ToString());
+    }
+
+    // ---------------------------------------------------------------- Notificaciones (T14, T15; NOT-11, NOT-12)
+
+    private static Dictionary<string, string?> ConN8n(Dictionary<string, string?> c)
+    {
+        c["Notificaciones:Envio"] = "n8n";
+        c["Notificaciones:N8n:Webhook"] = "http://n8n:5678/webhook/babelhub-avisos";
+        c["Notificaciones:N8n:ClaveSaliente"] = Secreto();
+        c["Integraciones:n8n:Secreto"] = Secreto();
+        return c;
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-10")]
+    public async Task Notificaciones_EnDesarrolloElEnvioEsElSimulado_ConN8nElReal_YEnElEnsayoYAlRestaurarElNuloSinTrabajos()
+    {
+        await using var simulado = Con(ConfiguracionCompleta(), ModoDeArranque.Normal);
+        await using var n8n = Con(ConN8n(ConfiguracionCompleta()), ModoDeArranque.Normal);
+        await using var ensayo = Con(ConN8n(ConfiguracionCompleta()), ModoDeArranque.Ensayo);
+        await using var restauracion = Con(ConN8n(ConfiguracionCompleta()), ModoDeArranque.Restauracion);
+
+        static T Resolver<T>(WebApplication a)
+            where T : notnull
+        {
+            using var alcance = a.Services.CreateScope();
+            return alcance.ServiceProvider.GetRequiredService<T>();
+        }
+
+        Assert.IsType<BabelHub.Ecommerce.Infrastructure.Notificaciones.SimuladoEnvioDeWhatsApp>(Resolver<BabelHub.Ecommerce.Application.Notificaciones.Interno.IEnvioDeWhatsApp>(simulado));
+        Assert.IsType<BabelHub.Ecommerce.Infrastructure.Notificaciones.N8nEnvioDeWhatsApp>(Resolver<BabelHub.Ecommerce.Application.Notificaciones.Interno.IEnvioDeWhatsApp>(n8n));
+        Assert.IsType<BabelHub.Ecommerce.Infrastructure.Notificaciones.NuloEnvioDeWhatsApp>(Resolver<BabelHub.Ecommerce.Application.Notificaciones.Interno.IEnvioDeWhatsApp>(ensayo));
+        Assert.IsType<BabelHub.Ecommerce.Infrastructure.Notificaciones.NuloEnvioDeWhatsApp>(Resolver<BabelHub.Ecommerce.Application.Notificaciones.Interno.IEnvioDeWhatsApp>(restauracion));
+
+        // Los dobles provisionales ya no existen: el contrato público es el real.
+        Assert.IsType<BabelHub.Ecommerce.Application.Notificaciones.Interno.SolicitarAviso>(Resolver<BabelHub.Ecommerce.Application.Notificaciones.INotificador>(n8n));
+        Assert.IsType<BabelHub.Ecommerce.Application.Notificaciones.Interno.CancelarAvisosPendientes>(Resolver<BabelHub.Ecommerce.Application.Identidad.ICancelacionDeAvisos>(n8n));
+
+        // El trabajo de fondo corre solo en el modo normal (PLA-19): los avisos restaurados traen números reales.
+        static bool TieneElTrabajo(WebApplication a) => a.Services.GetServices<IHostedService>().Any(h => h is BabelHub.Ecommerce.Infrastructure.Notificaciones.ServicioDeTrabajosDeNotificaciones);
+        Assert.True(TieneElTrabajo(n8n));
+        Assert.False(TieneElTrabajo(ensayo));
+        Assert.False(TieneElTrabajo(restauracion));
+
+        // El adaptador declara su estado real: ExigirCoherencia lo comprueba en el ensayo y al restaurar.
+        static bool NotificadorNulo(WebApplication a) => a.Services.GetServices<IAdaptadorSaliente>().Single(x => x.Nombre == "notificador").EsNulo;
+        Assert.False(NotificadorNulo(n8n));
+        Assert.True(NotificadorNulo(ensayo));
+        Assert.True(NotificadorNulo(restauracion));
+
+        // La firma de los estados de entrega de n8n entra a la lista blanca de entradas de integración.
+        Assert.Contains("n8n", n8n.Services.GetRequiredService<BabelHub.Ecommerce.Application.Plataforma.Interno.OpcionesDeEntradasDeIntegracion>().ProveedoresPermitidos);
+        Assert.DoesNotContain("n8n", simulado.Services.GetRequiredService<BabelHub.Ecommerce.Application.Plataforma.Interno.OpcionesDeEntradasDeIntegracion>().ProveedoresPermitidos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-01")]
+    public async Task LaSolicitudDeAvisoDelInventario_SinLaCredencialDeAlcanceOConUnaAjena_Es401Uniforme_ConLaCorrectaLlegaALaValidacion()
+    {
+        var configuracion = ConfiguracionCompleta();
+        var builder = Constructor(configuracion, "Development");
+        builder.WebHost.UseTestServer();
+        builder.Services.AddSingleton(typeof(ModoDeArranque), ModoDeArranque.Ensayo);
+        builder.AgregarEcommerce(ModoDeArranque.Ensayo);
+        await using var app = builder.Build();
+        app.UsarEcommerce();
+        await app.StartAsync();
+        using var cliente = app.GetTestClient();
+        cliente.BaseAddress = new Uri("https://localhost");
+
+        async Task<System.Net.HttpStatusCode> Llamar(string? credencial)
+        {
+            using var peticion = new HttpRequestMessage(HttpMethod.Post, BabelHub.Ecommerce.Api.Notificaciones.EndpointsDeNotificaciones.RutaDeLasSolicitudesDelInventario) { Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json") };
+            if (credencial is not null)
+            {
+                peticion.Headers.TryAddWithoutValidation(CredencialDeServicioMiddleware.CabeceraDeCredencial, credencial);
+            }
+
+            using var respuesta = await cliente.SendAsync(peticion);
+            return respuesta.StatusCode;
+        }
+
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, await Llamar(null));
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, await Llamar("una-credencial-que-no-existe-0123456789abcdef"));
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, await Llamar(configuracion["Seguridad:Credenciales:LecturaDeDisponibilidad"]));
+        // Con la credencial de alcance «solicitar-aviso» pasa la autenticación y llega a la validación del cuerpo vacío.
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, await Llamar(configuracion["Seguridad:Credenciales:SolicitarAviso"]));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-11")]
+    public async Task LaEntradaDeEstadosDeN8n_SoloExisteSiElEnvioEsPorN8n()
+    {
+        await using var simulado = Con(ConfiguracionCompleta(), ModoDeArranque.Normal);
+        await using var n8n = Con(ConN8n(ConfiguracionCompleta()), ModoDeArranque.Normal);
+
+        static bool Mapea(WebApplication a)
+        {
+            a.UsarEcommerce();
+            return ((Microsoft.AspNetCore.Routing.IEndpointRouteBuilder)a).DataSources.SelectMany(d => d.Endpoints).OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>()
+                .Any(e => e.RoutePattern.RawText == BabelHub.Ecommerce.Api.Notificaciones.EstadosDeEntregaDeN8nEnLaApi.Ruta);
+        }
+
+        Assert.False(Mapea(simulado));
+        Assert.True(Mapea(n8n));
+        n8n.ExigirComposicionDeProduccion();
+    }
+
+    private static string Falla(Dictionary<string, string?> c, bool esProduccion = true, bool soloEnModoNormal = true) =>
+        Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => BabelHub.Ecommerce.Infrastructure.Composicion.OpcionesDeNotificaciones.Leer(new ConfigurationBuilder().AddInMemoryCollection(c).Build(), esProduccion, soloEnModoNormal)).Message;
+
+    private static Dictionary<string, string?> NotificacionesDeProduccion() => new()
+    {
+        ["Notificaciones:Envio"] = "n8n",
+        ["Notificaciones:N8n:Webhook"] = "http://n8n:5678/webhook/babelhub-avisos",
+        ["Notificaciones:N8n:ClaveSaliente"] = Secreto(),
+        ["Notificaciones:ClaveDeHuellaDeNumero"] = "1:" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+    };
+
+    private static BabelHub.Ecommerce.Infrastructure.Composicion.ModoDelEnvioDeAvisos ModoDelEnvioDeAvisosDe(Dictionary<string, string?> c, bool soloEnModoNormal = true) =>
+        BabelHub.Ecommerce.Infrastructure.Composicion.OpcionesDeNotificaciones.Leer(new ConfigurationBuilder().AddInMemoryCollection(c).Build(), esProduccion: true, soloEnModoNormal).Envio;
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-10")]
+    public void Notificaciones_EnProduccion_ElEnvioSimuladoOSinElegirFalla_NombrandoLaVariable()
+    {
+        var simulado = NotificacionesDeProduccion();
+        simulado["Notificaciones:Envio"] = "simulado";
+        var sinElegir = NotificacionesDeProduccion();
+        sinElegir.Remove("Notificaciones:Envio");
+        var desconocido = NotificacionesDeProduccion();
+        desconocido["Notificaciones:Envio"] = "whatsapp-directo";
+
+        Assert.Contains("BABELHUB__Notificaciones__Envio: el envío simulado no vale en producción", Falla(simulado), StringComparison.Ordinal);
+        Assert.Contains("BABELHUB__Notificaciones__Envio: falta", Falla(sinElegir), StringComparison.Ordinal);
+        Assert.Contains("BABELHUB__Notificaciones__Envio: no es un valor conocido", Falla(desconocido), StringComparison.Ordinal);
+        Assert.Equal(BabelHub.Ecommerce.Infrastructure.Composicion.ModoDelEnvioDeAvisos.N8n, ModoDelEnvioDeAvisosDe(NotificacionesDeProduccion()));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-12")]
+    public void Notificaciones_ConN8n_ExigeElWebhookLaClaveSalienteYLaClaveDeLaHuella_SinImprimirSusValores()
+    {
+        var clave = Secreto();
+        var sinWebhook = NotificacionesDeProduccion();
+        sinWebhook.Remove("Notificaciones:N8n:Webhook");
+        var webhookExterno = NotificacionesDeProduccion();
+        webhookExterno["Notificaciones:N8n:Webhook"] = "http://n8n.example.org/webhook/x";
+        var claveDebil = NotificacionesDeProduccion();
+        claveDebil["Notificaciones:N8n:ClaveSaliente"] = "corta";
+        var sinHuella = NotificacionesDeProduccion();
+        sinHuella.Remove("Notificaciones:ClaveDeHuellaDeNumero");
+        var huellaMalFormada = NotificacionesDeProduccion();
+        huellaMalFormada["Notificaciones:ClaveDeHuellaDeNumero"] = clave;
+        var anteriorIgualVersion = NotificacionesDeProduccion();
+        anteriorIgualVersion["Notificaciones:ClaveDeHuellaDeNumeroAnterior"] = "1:" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+
+        Assert.Contains("BABELHUB__Notificaciones__N8n__Webhook: falta", Falla(sinWebhook), StringComparison.Ordinal);
+        Assert.Contains("BABELHUB__Notificaciones__N8n__Webhook", Falla(webhookExterno), StringComparison.Ordinal);
+        Assert.Contains("BABELHUB__Notificaciones__N8n__ClaveSaliente: es débil", Falla(claveDebil), StringComparison.Ordinal);
+        Assert.Contains("BABELHUB__Notificaciones__ClaveDeHuellaDeNumero: falta", Falla(sinHuella), StringComparison.Ordinal);
+        Assert.Contains("BABELHUB__Notificaciones__ClaveDeHuellaDeNumero: debe tener la forma", Falla(huellaMalFormada), StringComparison.Ordinal);
+        Assert.Contains("BABELHUB__Notificaciones__ClaveDeHuellaDeNumeroAnterior", Falla(anteriorIgualVersion), StringComparison.Ordinal);
+        Assert.DoesNotContain(clave, Falla(huellaMalFormada), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-10")]
+    public void Notificaciones_EnElEnsayoYAlRestaurar_ElEnvioEsSiempreElNulo_AunqueLaConfiguracionDigaN8n()
+    {
+        var configuracion = NotificacionesDeProduccion();
+
+        Assert.Equal(BabelHub.Ecommerce.Infrastructure.Composicion.ModoDelEnvioDeAvisos.Nulo, ModoDelEnvioDeAvisosDe(configuracion, soloEnModoNormal: false));
+        Assert.Equal(["n8n"], BabelHub.Ecommerce.Infrastructure.Composicion.OpcionesDeNotificaciones.ProveedoresDeFirma(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), soloEnModoNormal: true));
+        Assert.Empty(BabelHub.Ecommerce.Infrastructure.Composicion.OpcionesDeNotificaciones.ProveedoresDeFirma(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), soloEnModoNormal: false));
     }
 }

@@ -13,8 +13,30 @@ public sealed class PoliticasDeSeguridadTests
         Assert.All(PoliticasDeSeguridad.Todas, p =>
         {
             Assert.False(p.RespaldoLocal, p.Nombre);
-            Assert.True(p.PublicarEvento, p.Nombre);
+            // Las políticas por número (el tope de avisos de WhatsApp, NOT-14) no publican el evento solas: lo publica Notificaciones, agrupado por cuenta, para que no haya dos eventos por el mismo rechazo.
+            Assert.Equal(p.Tipo != TipoDeSujetoDeLimite.Numero, p.PublicarEvento);
         });
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-14")]
+    public void ElTopeDeAvisosPorNumero_Es5PorHoraY20En24Horas_PorNumero_FallaCerrado_YLiberable()
+    {
+        var hora = PoliticasDeSeguridad.AvisosPorNumeroPorHora;
+        var dia = PoliticasDeSeguridad.AvisosPorNumeroEn24Horas;
+
+        Assert.Equal((5, TimeSpan.FromHours(1)), (hora.Maximo, hora.Ventana));
+        Assert.Equal((20, TimeSpan.FromHours(24)), (dia.Maximo, dia.Ventana));
+        Assert.All(new[] { hora, dia }, p =>
+        {
+            Assert.Equal(TipoDeSujetoDeLimite.Numero, p.Tipo);
+            Assert.False(p.RespaldoLocal);
+            Assert.False(p.PublicarEvento);
+            Assert.True(p.Liberable);
+            Assert.Contains(p, PoliticasDeSeguridad.Todas);
+        });
+        Assert.Equal(hora.Nombre, BabelHub.Ecommerce.Application.Plataforma.PoliticasDeLimite.AvisosPorNumeroPorHora.Valor);
+        Assert.Equal(dia.Nombre, BabelHub.Ecommerce.Application.Plataforma.PoliticasDeLimite.AvisosPorNumeroEn24Horas.Valor);
     }
 
     [Fact]

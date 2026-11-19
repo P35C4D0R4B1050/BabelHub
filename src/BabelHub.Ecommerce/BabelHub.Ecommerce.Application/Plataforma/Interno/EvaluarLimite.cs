@@ -146,7 +146,11 @@ public sealed class EvaluarLimite(
 
     private async Task RegistrarRechazo(PoliticaDeLimite politica, string? sujeto, OrigenDeSolicitud origen, CancellationToken cancelacion)
     {
-        await Tolerando(() => motor.RegistrarRechazoDeOrigen(origen.Huella, VentanaDeRechazosDelOrigen, cancelacion)).ConfigureAwait(false);
+        // El rechazo de un tope por número (los avisos de WhatsApp, NOT-14) lo provoca un trabajo de fondo, sin origen del cliente: no cuenta contra ningún origen.
+        if (politica.Tipo != TipoDeSujetoDeLimite.Numero)
+        {
+            await Tolerando(() => motor.RegistrarRechazoDeOrigen(origen.Huella, VentanaDeRechazosDelOrigen, cancelacion)).ConfigureAwait(false);
+        }
 
         if (politica.PublicarEvento)
         {

@@ -5,7 +5,9 @@ using BabelHub.Ecommerce.Application.Identidad;
 using BabelHub.Ecommerce.Application.Notificaciones;
 using BabelHub.Ecommerce.Application.Notificaciones.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
+using BabelHub.Ecommerce.Application.Plataforma.Interno;
 using BabelHub.Ecommerce.Domain.Notificaciones;
+using BabelHub.Ecommerce.Domain.Plataforma;
 using BabelHub.Ecommerce.UnitTests.Identidad;
 using BabelHub.Ecommerce.UnitTests.Plataforma;
 
@@ -21,7 +23,7 @@ public sealed class SolicitudesDeAvisosTests
 
     // ---------------------------------------------------------------- dobles
 
-    private sealed class AvisosEnMemoria : IRepositorioDeAvisos
+    internal sealed class AvisosEnMemoria : IRepositorioDeAvisos
     {
         private readonly object _candado = new();
 
@@ -62,9 +64,37 @@ public sealed class SolicitudesDeAvisosTests
         }
 
         public Task Guardar(Aviso aviso, CancellationToken cancelacion = default) => Task.CompletedTask;
+
+        /// <summary>Avisos que «otro» (la cancelación de Identidad) terminó en la base mientras el trabajo los atendía: la escritura condicional no los toca.</summary>
+        public HashSet<Guid> TerminadosPorOtro { get; } = [];
+
+        public int EscriturasCondicionales { get; private set; }
+
+        public Task<bool> GuardarSiNoEsFinal(Aviso aviso, CancellationToken cancelacion = default)
+        {
+            EscriturasCondicionales++;
+            return Task.FromResult(!TerminadosPorOtro.Contains(aviso.Id));
+        }
+
+        public Task<Aviso?> PorId(Guid id, bool paraActualizar, CancellationToken cancelacion = default) => Task.FromResult(Guardados.FirstOrDefault(a => a.Id == id));
+
+        public Task<IReadOnlyList<Aviso>> TomarParaEnviar(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) =>
+            Task.FromResult<IReadOnlyList<Aviso>>([.. Guardados
+                .Where(a => !a.EsFinal && (ahora >= a.VenceEn || (a.Estado == EstadoDelAviso.Pendiente && ahora >= a.ProximaFecha) || (a.Estado == EstadoDelAviso.Enviando && a.ArrendadoHasta is { } hasta && ahora >= hasta)))
+                .OrderBy(a => a.Creado)
+                .Take(maximo)]);
+
+        public Task<PaginaDeAvisosAlmacenados> Listar(EstadoDelAviso? estado, int pagina, int tamano, CancellationToken cancelacion = default)
+        {
+            var filtrados = Guardados.Where(a => estado is null || a.Estado == estado).OrderByDescending(a => a.Creado).ToList();
+            return Task.FromResult(new PaginaDeAvisosAlmacenados([.. filtrados.Skip((pagina - 1) * tamano).Take(tamano)], filtrados.Count));
+        }
+
+        public Task<int> PurgarFinalesAnterioresA(DateTimeOffset limite, CancellationToken cancelacion = default) =>
+            Task.FromResult(Guardados.RemoveAll(a => a.EsFinal && a.FechaFinal < limite));
     }
 
-    private sealed class EstadoDeCuentaFalso : IEstadoDeCuenta
+    internal sealed class EstadoDeCuentaFalso : IEstadoDeCuenta
     {
         public Dictionary<Guid, EstadoDeCuenta> Cuentas { get; } = [];
 
@@ -88,7 +118,7 @@ public sealed class SolicitudesDeAvisosTests
         }
     }
 
-    private sealed class HuellasDePrueba : IHuellasDeNumeros
+    internal sealed class HuellasDePrueba : IHuellasDeNumeros
     {
         public int VersionActual { get; set; } = 2;
 
@@ -97,9 +127,11 @@ public sealed class SolicitudesDeAvisosTests
         public HuellaDeNumero Actual(NumeroDeDestino numero) => De(VersionActual, numero);
 
         public IReadOnlyList<HuellaDeNumero> Vigentes(NumeroDeDestino numero) => [.. Enumerable.Range(1, VersionActual).Select(v => De(v, numero))];
+
+        public HuellaDeSujeto ParaElTope(NumeroDeDestino numero) => HuellaDeSujeto.Crear(Actual(numero).Valor[..32], "v1");
     }
 
-    private sealed class DesactivadosEnMemoria : IRepositorioDeNumerosDesactivados
+    internal sealed class DesactivadosEnMemoria : IRepositorioDeNumerosDesactivados
     {
         public List<NumeroDesactivado> Guardados { get; private set; } = [];
 
@@ -124,7 +156,7 @@ public sealed class SolicitudesDeAvisosTests
     }
 
     /// <summary>Una unidad de trabajo que revierte el almacén de números si el trabajo lanza (como una transacción).</summary>
-    private sealed class UnidadReversible(DesactivadosEnMemoria desactivados) : IUnidadDeTrabajo
+    internal sealed class UnidadReversible(DesactivadosEnMemoria desactivados) : IUnidadDeTrabajo
     {
         public async Task<T> Ejecutar<T>(Func<CancellationToken, Task<T>> trabajo, CancellationToken cancelacion = default)
         {
@@ -143,16 +175,24 @@ public sealed class SolicitudesDeAvisosTests
         public Task EjecutarComo(EsquemaDeModulo esquema, Func<CancellationToken, Task> bloque, CancellationToken cancelacion = default) => bloque(cancelacion);
     }
 
-    private sealed class Entorno
+    internal sealed class Entorno
     {
         public Entorno()
         {
+            Motor = new MotorDeMemoria(Reloj);
+            Limites = new EvaluarLimite(new CatalogoDePoliticas(PoliticasDeSeguridad.Todas), Motor, null, new OrigenFijo(OrigenDeSolicitud.Desconocido), EventosAutomaticos, Reloj);
             Solicitar = new SolicitarAviso(Avisos, Cuentas, Alertas, Reloj);
-            Cancelar = new CancelarAvisosPendientes(Avisos, Reloj);
+            Cancelar = new CancelarAvisosPendientes(Avisos, Reloj, new TopeDeAvisosPorNumero(Limites, Huellas));
             Desactivar = new DesactivarAvisosDeUnNumero(Actor, Denegaciones, Huellas, Desactivados, new UnidadReversible(Desactivados), Auditoria, Reloj);
         }
 
         public RelojFijo Reloj { get; } = new(Inicio);
+
+        public MotorDeMemoria Motor { get; }
+
+        public PublicadorDeEventosEspia EventosAutomaticos { get; } = new();
+
+        public EvaluarLimite Limites { get; }
 
         public AvisosEnMemoria Avisos { get; } = new();
 
@@ -181,7 +221,7 @@ public sealed class SolicitudesDeAvisosTests
         new(evento, DestinatarioDelAviso.Cliente, cuenta.ToString("D"), "pedido-listo-para-recojo", new Dictionary<string, string> { ["numeroDePedido"] = pedido, ["nombre"] = "María" });
 
     private static SolicitudDeAviso Traslado(string sucursal, string evento = "traslado:7:aprobado") =>
-        new(evento, DestinatarioDelAviso.Sucursal, sucursal, "traslado-estado", new Dictionary<string, string> { ["trasladoId"] = "tr-7", ["estado"] = "aprobado" });
+        new(evento, DestinatarioDelAviso.Sucursal, sucursal, "traslado-cambio-de-estado", new Dictionary<string, string> { ["numeroDeTraslado"] = "7", ["rolDeLaSucursal"] = "destino", ["cantidad"] = "3", ["estado"] = "aprobado" });
 
     // ---------------------------------------------------------------- solicitar (T04)
 
@@ -251,7 +291,7 @@ public sealed class SolicitudesDeAvisosTests
 
     [Theory]
     [InlineData("plantilla-que-no-existe")]
-    [InlineData("traslado-estado")]
+    [InlineData("traslado-cambio-de-estado")]
     [Trait("Criterio", "AC-NOT-06")]
     public async Task UnaPlantillaInexistenteOParaOtroTipoDeDestinatario_SeRechaza_SinTocarLaBaseNiIdentidad(string plantilla)
     {
@@ -465,7 +505,7 @@ public sealed class SolicitudesDeAvisosTests
     }
 
     [Theory]
-    [InlineData("trasladoId", "3f2c9a8e-0000-4000-8000-123456789012")]
+    [InlineData("numeroDeTraslado", "TR3f2c9a8e0000123456")]
     [Trait("Criterio", "AC-NOT-06")]
     public async Task UnIdentificadorMixtoConMuchosDigitos_NoSeRechazaPorParecerUnaTarjeta(string campo, string valor)
     {
@@ -486,7 +526,7 @@ public sealed class SolicitudesDeAvisosTests
         var e = new Entorno();
         var solicitud = Traslado("AYACUCHO");
 
-        var resultado = await e.Solicitar.Solicitar(solicitud with { Campos = new Dictionary<string, string>(solicitud.Campos) { ["trasladoId"] = valor } });
+        var resultado = await e.Solicitar.Solicitar(solicitud with { Campos = new Dictionary<string, string>(solicitud.Campos) { ["numeroDeTraslado"] = valor } });
 
         Assert.Equal(ResultadoDeLaSolicitudDeAviso.Rechazado, resultado);
     }

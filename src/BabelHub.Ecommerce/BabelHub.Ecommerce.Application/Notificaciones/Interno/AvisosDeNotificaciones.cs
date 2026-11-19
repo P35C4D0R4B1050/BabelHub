@@ -18,6 +18,27 @@ public interface IRepositorioDeAvisos
     Task<IReadOnlyList<Aviso>> NoFinalesDe(TipoDeDestinatario tipo, string destinatarioRef, CancellationToken cancelacion = default);
 
     Task Guardar(Aviso aviso, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Guarda el aviso <b>solo si en la base sigue sin terminar</b> (pendiente o en envío): <see langword="false"/> si lo cancelaron o terminó mientras el trabajo lo atendía, y entonces no se toca. Así un envío en curso
+    /// nunca revierte una cancelación de Identidad (NOT-08).
+    /// </summary>
+    Task<bool> GuardarSiNoEsFinal(Aviso aviso, CancellationToken cancelacion = default);
+
+    /// <summary>Un aviso por su identificador, con bloqueo si se va a modificar; <see langword="null"/> si no existe.</summary>
+    Task<Aviso?> PorId(Guid id, bool paraActualizar, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Hasta <paramref name="maximo"/> avisos para enviar, con <c>FOR UPDATE SKIP LOCKED</c> dentro de la transacción en curso (dos trabajos nunca toman el mismo): los pendientes cuya fecha llegó, los que están en envío con el
+    /// arrendamiento vencido y los que vencieron por edad (24 horas), del más antiguo al más nuevo.
+    /// </summary>
+    Task<IReadOnlyList<Aviso>> TomarParaEnviar(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Una página de avisos, del más reciente al más antiguo, con el total que cumple el filtro.</summary>
+    Task<PaginaDeAvisosAlmacenados> Listar(EstadoDelAviso? estado, int pagina, int tamano, CancellationToken cancelacion = default);
+
+    /// <summary>Elimina los avisos <b>terminados</b> (enviado, fallido, cancelado u omitido) cuyo estado final es anterior a <paramref name="limite"/>; devuelve cuántos.</summary>
+    Task<int> PurgarFinalesAnterioresA(DateTimeOffset limite, CancellationToken cancelacion = default);
 }
 
 /// <summary>La huella de un número con la versión de la clave que la calculó (NOT-13, NOT-14): el número no se conserva, solo su huella.</summary>
@@ -38,6 +59,9 @@ public interface IHuellasDeNumeros
 
     /// <summary>Las huellas con <b>todas las versiones vigentes</b> de la clave: un número desactivado con una versión anterior se reconoce igual.</summary>
     IReadOnlyList<HuellaDeNumero> Vigentes(NumeroDeDestino numero);
+
+    /// <summary>La huella que sujeta el tope por número en el motor de límites (NOT-14): con el calculador de huellas de Plataforma y un propósito propio; <b>nunca el número</b>.</summary>
+    HuellaDeSujeto ParaElTope(NumeroDeDestino numero);
 }
 
 /// <summary>Un número cuyos avisos se desactivaron a pedido de su titular (<c>notificaciones.numeros_desactivados</c>, NOT-13): su huella, la fecha y el motivo.</summary>
@@ -148,7 +172,7 @@ public sealed class SolicitarAviso(IRepositorioDeAvisos avisos, IEstadoDeCuenta 
 /// administración la desactiva; los avisos pendientes o en envío pasan a <b>cancelados</b> con su motivo y un aviso que ya era final no cambia. Si llega durante un envío, la comprobación del estado vigente de cada intento
 /// (T08) lo detiene. Si no se puede cancelar, lanza: Identidad no cambia nada a medias.
 /// </summary>
-public sealed class CancelarAvisosPendientes(IRepositorioDeAvisos avisos, IReloj reloj) : ICancelacionDeAvisos
+public sealed class CancelarAvisosPendientes(IRepositorioDeAvisos avisos, IReloj reloj, TopeDeAvisosPorNumero tope) : ICancelacionDeAvisos
 {
     public const string MotivoDeCancelacion = "destinatario-cambiado";
 
@@ -158,10 +182,13 @@ public sealed class CancelarAvisosPendientes(IRepositorioDeAvisos avisos, IReloj
         var pendientes = await avisos.NoFinalesDe(TipoDeDestinatario.Cliente, usuarioId.ToString("D"), cancelacion).ConfigureAwait(false);
         foreach (var aviso in pendientes)
         {
+            var cupos = aviso.Cupos;
             if (aviso.Cancelar(MotivoDeCancelacion, ahora))
             {
-                // El cupo del tope por número, si se había reservado, se devuelve al cancelar (T09); aquí solo se deja constancia en el aviso.
                 await avisos.Guardar(aviso, cancelacion).ConfigureAwait(false);
+
+                // El cupo del tope por número se devuelve al cancelar (NOT-15): el aviso no salió.
+                await tope.Devolver(aviso.Id, cupos, cancelacion).ConfigureAwait(false);
             }
         }
     }
@@ -181,7 +208,7 @@ public sealed class DesactivarAvisosDeUnNumero(
     IAuditoria auditoria,
     IReloj reloj) : IDesactivacionDeNumeros
 {
-    public const string RolDeAdministracionCentral = "administrador-central";
+    public const string RolDeAdministracionCentral = AdministracionCentral.Rol;
 
     public const string CausaDeLaDesactivacion = "desactivado-a-pedido-del-titular";
 
@@ -251,24 +278,7 @@ public sealed class DesactivarAvisosDeUnNumero(
     public async Task<bool> EstaDesactivado(NumeroDeDestino numero, CancellationToken cancelacion = default) =>
         await desactivados.ExisteAlguna(huellas.Vigentes(numero), cancelacion).ConfigureAwait(false);
 
-    private async Task<ErrorDeAplicacion?> ComprobarAdministracion(CancellationToken cancelacion)
-    {
-        if (actor.Actual is { Tipo: TipoDeActor.Usuario, UsuarioId: not null, Rol: RolDeAdministracionCentral })
-        {
-            return null;
-        }
-
-        try
-        {
-            await denegaciones.Registrar(new DenegacionDeAcceso("fuera-de-rol", ruta: null), cancelacion).ConfigureAwait(false);
-        }
-        catch (Exception) when (!cancelacion.IsCancellationRequested)
-        {
-            // IDenegacionDeAcceso nunca interrumpe y deja su alerta técnica si falla.
-        }
-
-        return new ErrorDeAplicacion(CategoriaDeError.Prohibido, "acceso-denegado");
-    }
+    private Task<ErrorDeAplicacion?> ComprobarAdministracion(CancellationToken cancelacion) => AdministracionCentral.Comprobar(actor, denegaciones, cancelacion);
 
     private Task Auditar(HuellaDeNumero huella, string causa, CancellationToken cancelacion) =>
         auditoria.Registrar(

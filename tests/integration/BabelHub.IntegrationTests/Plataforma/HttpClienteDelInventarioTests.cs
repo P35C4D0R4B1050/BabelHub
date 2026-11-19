@@ -1,7 +1,9 @@
 using System.Net;
 using System.Text;
 using BabelHub.Ecommerce.Api.Web;
+using BabelHub.Ecommerce.Application.Notificaciones.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
+using BabelHub.Ecommerce.Infrastructure.Notificaciones;
 using BabelHub.Ecommerce.Infrastructure.Plataforma;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -20,6 +22,7 @@ public sealed class HttpClienteDelInventarioTests
     private static readonly string SecretoDePendientes = "pendientes-" + Guid.NewGuid().ToString("N");
     private static readonly string SecretoDeBaja = "baja-" + Guid.NewGuid().ToString("N");
     private static readonly string SecretoDeExpiracion = "expiracion-" + Guid.NewGuid().ToString("N");
+    private static readonly string SecretoDeContacto = "contacto-" + Guid.NewGuid().ToString("N");
     private static readonly string TokenDelUsuario = "jwt." + Guid.NewGuid().ToString("N");
     private static readonly string Clave = "ingreso-" + Guid.NewGuid().ToString("N");
 
@@ -71,6 +74,7 @@ public sealed class HttpClienteDelInventarioTests
             new(AlcanceDeServicio.ConsultaDePendientes, new ValorSecreto(SecretoDePendientes)),
             new(AlcanceDeServicio.BajaDeTitular, new ValorSecreto(SecretoDeBaja)),
             new(AlcanceDeServicio.ExpiracionDeReservas, new ValorSecreto(SecretoDeExpiracion)),
+            new(AlcanceDeServicio.LecturaDeContacto, new ValorSecreto(SecretoDeContacto)),
         ]));
         servicios.AddSingleton<IOrigenDeSolicitud>(new OrigenDePrueba(origen ?? OrigenDeSolicitud.Desconocido));
         var tokenDePrueba = new TokenDePrueba(token == "usar-el-del-usuario" ? TokenDelUsuario : token);
@@ -474,6 +478,66 @@ public sealed class HttpClienteDelInventarioTests
 
         Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, (await cliente.ListarSucursales()).Estado);
         Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, (await cliente.ListarSucursales()).Estado);
+    }
+
+    // ---------- El contacto de una sucursal (NOT-09, T16, T25) ----------
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-08")]
+    public async Task ConsultarContactoDeSucursal_UsaLaCredencialDeContactoSinToken_ConElCodigoEnLaRuta_YDevuelveElNumero()
+    {
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json("{\"codigo\":\"AYACUCHO\",\"numero\":\"+51912345678\"}")));
+        var (cliente, token) = Crear(servidor);
+
+        var resultado = await cliente.ConsultarContactoDeSucursal("AYACUCHO");
+
+        Assert.True(resultado.Exitosa);
+        Assert.Equal("+51912345678", resultado.Valor.Numero);
+        Assert.DoesNotContain("912345678", resultado.Valor.ToString(), StringComparison.Ordinal);
+        Assert.Equal(HttpMethod.Get, Assert.Single(servidor.Metodos));
+        Assert.Equal("/api/inventario/v1/sucursales/AYACUCHO/contacto-de-notificacion", Assert.Single(servidor.Rutas));
+        var cabeceras = Assert.Single(servidor.Cabeceras);
+        Assert.Equal(SecretoDeContacto, cabeceras[CredencialesDeSalidaHandler.CabeceraDeCredencial]);
+        Assert.False(cabeceras.ContainsKey("Authorization"));
+        SinCabecerasDeActor(cabeceras);
+        Assert.Equal(0, token.Pedidos);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound, "INV-NO-ENCONTRADO", EstadoDelContactoDeSucursal.NoEncontrada)]
+    [InlineData(HttpStatusCode.Unauthorized, "INV-NO-AUTENTICADO", EstadoDelContactoDeSucursal.NoAutenticado)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, "INV-SERVICIO-NO-DISPONIBLE", EstadoDelContactoDeSucursal.NoDisponible)]
+    [InlineData(HttpStatusCode.TooManyRequests, "INV-LIMITE-EXCEDIDO", EstadoDelContactoDeSucursal.NoDisponible)]
+    [Trait("Criterio", "AC-NOT-08")]
+    public async Task ElContactoDeSucursal_TraduceLosErroresDelInventario_ALoQueElEnvioNecesita(HttpStatusCode estado, string codigo, EstadoDelContactoDeSucursal esperado)
+    {
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Problema(estado, codigo)));
+        var (cliente, _) = Crear(servidor);
+
+        var contacto = await new ClienteDeContactoDelInventario(cliente).Resolver("AYACUCHO");
+
+        Assert.Equal(esperado, contacto.Estado);
+        Assert.Null(contacto.Numero);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-08")]
+    public async Task ElContactoDeSucursal_ConUnaRespuestaQueElContratoNoAdmite_OUnCodigoInvalido_NoEsUnaExcepcion()
+    {
+        var respuestas = new Queue<string>(["no es json", "{\"codigo\":\"OTRA\",\"numero\":\"+51912345678\"}", "{\"codigo\":\"AYACUCHO\",\"numero\":\"\"}"]);
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json(respuestas.Dequeue())));
+        var (cliente, _) = Crear(servidor);
+        var contactos = new ClienteDeContactoDelInventario(cliente);
+
+        Assert.Equal(EstadoDelContactoDeSucursal.NoDisponible, (await contactos.Resolver("AYACUCHO")).Estado);
+        Assert.Equal(EstadoDelContactoDeSucursal.NoDisponible, (await contactos.Resolver("AYACUCHO")).Estado);
+        Assert.Equal(EstadoDelContactoDeSucursal.NoDisponible, (await contactos.Resolver("AYACUCHO")).Estado);
+
+        // Un código que no tiene la forma de una sucursal ni siquiera se pregunta.
+        var antes = servidor.Rutas.Count;
+        Assert.Equal(EstadoDelContactoDeSucursal.NoEncontrada, (await contactos.Resolver("../../etc?x=1")).Estado);
+        Assert.Equal(antes, servidor.Rutas.Count);
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.ConsultarContactoDeSucursal("../x"));
     }
 
     // ---------- Fallas: siempre un estado, nunca una excepción ----------

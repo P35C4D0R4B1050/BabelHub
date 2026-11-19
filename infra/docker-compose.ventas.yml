@@ -126,6 +126,12 @@ services:
     environment:
       N8N_PORT: "5678"
       N8N_DIAGNOSTICS_ENABLED: "false"
+      # Notificaciones (T17, T18): el flujo verifica la firma con las claves de n8n.env (BABELHUB_FIRMA_DE_AVISOS y BABELHUB_FIRMA_DE_ESTADOS) y arma el mensaje con crypto; el historial de ejecuciones, que trae números, se purga a las 168 horas y las ejecuciones correctas no se guardan.
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      NODE_FUNCTION_ALLOW_BUILTIN: "crypto"
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: "168"
+      EXECUTIONS_DATA_SAVE_ON_SUCCESS: "none"
     ports:
       - "127.0.0.1:5678:5678"
     volumes:
@@ -150,6 +156,14 @@ services:
     security_opt: ["no-new-privileges:true"]
     env_file:
       - "${BABELHUB_SECRETOS:?}/evolution.env"
+    environment:
+      # Evolution no guarda mensajes, contactos ni chats (T18; NOT-06, NOT-07): solo la sesión de WhatsApp. El historial de n8n se purga a las 168 horas.
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      DATABASE_SAVE_DATA_CONTACTS: "false"
+      DATABASE_SAVE_DATA_CHATS: "false"
+      DATABASE_SAVE_DATA_LABELS: "false"
+      DATABASE_SAVE_DATA_HISTORIC: "false"
     ports:
       - "127.0.0.1:8081:8080"
     volumes:

@@ -62,6 +62,8 @@ public sealed class AdaptadoresRealesDePedidosTests
         public Task<ResultadoDelInventario<ReservaDelInventario>> ConfirmarReserva(Guid pedidoId, string claveDeIdempotencia, CancellationToken cancelacion = default) => throw new NotSupportedException();
 
         public Task<ResultadoDelInventario<IReadOnlyList<SucursalPublica>>> ListarSucursales(CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<ResultadoDelInventario<ContactoDeSucursalDelInventario>> ConsultarContactoDeSucursal(string codigoDeSucursal, CancellationToken cancelacion = default) => throw new NotSupportedException();
     }
 
     private static ResultadoDelInventario<CierreDeLaReserva> Cerrada(string resultado, Guid? pedido = null, Guid? linea = null) =>
