@@ -16,6 +16,13 @@ public static class ComposicionDePedidos
     public static IServiceCollection AgregarPedidos(this IServiceCollection servicios, bool esProduccion)
     {
         ArgumentNullException.ThrowIfNull(servicios);
+        if (Hay<IUnidadDeTrabajo>(servicios) && Hay<IConexionDeLaUnidadDeTrabajo>(servicios))
+        {
+            // El repositorio real (T28) sobre el esquema `pedidos` bajo `EjecutarComo(pedidos)`.
+            servicios.TryAddScoped<AccesoAlEsquemaDePedidos>();
+            servicios.TryAddScoped<IRepositorioDePedidos, RepositorioDePedidosPostgres>();
+        }
+
         if (Hay<IClienteDelInventario>(servicios))
         {
             servicios.TryAddScoped<IReservasDelPedido, RestReservasDelPedido>();
