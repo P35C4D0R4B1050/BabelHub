@@ -2,6 +2,15 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-18 — ECO-4b fundido (casos de uso del carrito)
+
+### Cubierto
+- **Carril B:** `ecommerce-carrito-checkout` T07–T13 (ECO-4b): contratos públicos y dobles provisionales con guarda de producción, alcance y posesión, casos de uso del carrito para visitante y cuenta, edición con checkout vivo con reapertura de la intención de pago, fusión idempotente del carrito de visitante y retiro de ediciones dadas de baja; revisiones sin Bloqueantes. Integración 4402 de 4404 (las 2 pasan solas).
+- **Decisiones delegadas:** la persona delegó en el carril B la coordinación de los hallazgos de `ecommerce-carrito-checkout` (mensaje del 2026-11-18); sus 15 decisiones están en `progress/decisiones-delegadas.md` y no modifican ninguna spec ni plan aprobados. Ratifican, entre otras, los topes técnicos del carrito (50 líneas, 99 unidades por línea), la lectura de `retiro_pendiente` de CAT-18 y los nombres del contrato público de Carrito.
+
+### Pendiente
+- ECO-4c (T14–T23); la T26b de B necesita del carril A políticas de límite y acciones de auditoría de Carrito, la lectura de la marca de cancelación y el consentimiento de WhatsApp en Identidad, y el cliente del Inventario con consulta previa, reservar y liberar (carril A pausado).
+
 ## 2026-11-18 — ECO-2d, ECO-5a y ECO-4a fundidos, Docker reubicado
 
 ### Cubierto

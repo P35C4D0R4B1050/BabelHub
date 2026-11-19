@@ -58,13 +58,14 @@ public sealed class ContratosPublicosDeCarritoTests
         Assert.NotEqual(Contacto(), new ContactoDeCompra("Ana Pérez", "911222333", "Jr. Lima 123", "Ayacucho"));
     }
 
-    [Theory]
-    [InlineData("", "987654321", "Jr. Lima 123", "Ayacucho")]
-    [InlineData("Ana", " ", "Jr. Lima 123", "Ayacucho")]
-    [InlineData("Ana", "987654321", "", "Ayacucho")]
-    [InlineData("Ana", "987654321", "Jr. Lima 123", "  ")]
-    public void El_contacto_de_compra_exige_sus_cuatro_datos(string nombre, string telefono, string direccion, string region) =>
-        Assert.ThrowsAny<ArgumentException>(() => new ContactoDeCompra(nombre, telefono, direccion, region));
+    [Fact]
+    public void El_contacto_de_compra_acepta_datos_ausentes_para_que_el_caso_de_uso_responda_por_campo_y_sigue_redactado()
+    {
+        var vacio = new ContactoDeCompra(null, "  ", null, "");
+
+        Assert.Equal(["", "  ", "", ""], [vacio.Nombre, vacio.Telefono, vacio.Direccion, vacio.Region]);
+        Assert.Equal("[redactado]", vacio.ToString());
+    }
 
     [Fact]
     public void La_posesion_sin_ninguna_edicion_poseida_es_no_posee_y_sin_poseidas()

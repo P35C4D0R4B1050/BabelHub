@@ -197,7 +197,31 @@ public interface IRepositorioDeCarritos
     Task AgregarAvisos(Guid cuentaId, IReadOnlyList<AvisoDelCarrito> avisos, CancellationToken cancelacion = default);
 
     Task MarcarAvisosComoVistos(Guid cuentaId, IReadOnlyCollection<Guid> avisoIds, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>La constancia de una fusión aplicada (<c>fusiones_aplicadas</c>, única por huella de cookie): hace idempotente la fusión de un segundo dispositivo. Se purga a los 30 días.</summary>
+    Task RegistrarFusion(byte[] huellaDeLaCookie, Guid carritoDeCuentaId, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>Elimina los carritos de visitante que vencieron (30 días desde su última acción de la persona, CAR-29) y devuelve cuántos: como mucho <paramref name="maximo"/> por corrida.</summary>
+    Task<int> EliminarDeVisitantesVencidos(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Elimina las constancias de fusión anteriores a <paramref name="antesDe"/> (30 días) y devuelve cuántas.</summary>
+    Task<int> EliminarFusionesAnterioresA(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Elimina los avisos vistos antes de <paramref name="vistosAntesDe"/> (30 días después de vistos) o creados antes de <paramref name="creadosAntesDe"/> (90 días) y devuelve cuántos.</summary>
+    Task<int> EliminarAvisosVencidos(DateTimeOffset vistosAntesDe, DateTimeOffset creadosAntesDe, CancellationToken cancelacion = default);
+
+    /// <summary>Las cuentas con un carrito o un checkout sin movimiento desde antes de <paramref name="antesDe"/>, para comprobar si siguen activas (la purga de las que no lo están).</summary>
+    Task<IReadOnlyList<Guid>> CuentasSinMovimientoDesde(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Elimina el carrito de la cuenta con sus líneas y sus avisos (CAR-32, CAR-33): idempotente ante filas ausentes y siempre <b>después</b> de eliminar el checkout (D10). No toca el carrito de un visitante.</summary>
+    Task EliminarDeCuenta(Guid cuentaId, CancellationToken cancelacion = default);
+
+    /// <summary>Los carritos (de cuenta o de visitante) que tienen alguna de las ediciones, <b>sin bloqueo</b>: lo que necesita el retiro de ediciones para saber qué bloquear después, en orden (D10).</summary>
+    Task<IReadOnlyList<CarritoConEdicion>> BuscarConEdiciones(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default);
 }
+
+/// <summary>Un carrito que tiene alguna de las ediciones buscadas: su <c>id</c> y su cuenta (nulo si es de un visitante).</summary>
+public sealed record CarritoConEdicion(Guid CarritoId, Guid? CuentaId);
 
 /// <summary>Los checkouts del módulo: a lo más uno vivo por cuenta (índice único parcial). Las lecturas con bloqueo siguen el orden global (D10): checkout antes que carrito.</summary>
 public interface IRepositorioDeCheckouts
@@ -205,13 +229,34 @@ public interface IRepositorioDeCheckouts
     /// <summary>El checkout vivo de la cuenta (<c>en_edicion</c>, <c>reservando</c>, <c>en_pago</c> o <c>pago_pendiente</c>); <see langword="null"/> si no hay.</summary>
     Task<Checkout?> ObtenerVivoDeCuenta(Guid cuentaId, bool conBloqueo, CancellationToken cancelacion = default);
 
-    /// <summary>El checkout cuyo <c>pedido_id</c> o <c>pedido_descartado</c> es el dado (vivo o terminado).</summary>
+    /// <summary>El checkout cuyo <c>pedido_id</c>, <c>pedido_descartado</c> o <c>pedido_a_liberar</c> es el dado (vivo o terminado).</summary>
     Task<Checkout?> ObtenerPorPedido(Guid pedidoId, bool conBloqueo, CancellationToken cancelacion = default);
+
+    /// <summary>Los checkouts vivos que la persona no modifica desde <paramref name="antesDe"/> o antes (30 días, inclusive: «a los 30 días»): su cuenta y su estado, sin bloqueo, para aplicarles el vencimiento condicional (CAR-34).</summary>
+    Task<IReadOnlyList<Guid>> CuentasConCheckoutVivoSinMovimientoDesde(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Elimina los checkouts terminados (<c>pagado</c>, <c>cancelado</c>, <c>reiniciado</c>) modificados por la persona hasta <paramref name="antesDe"/> (30 días, inclusive) y <b>sin una reserva por liberar</b> (si no, se perdería la anotación que reintenta <c>LiberarReservasPendientes</c>), y devuelve cuántos: solo guardan cuenta, pedido y fechas.</summary>
+    Task<int> EliminarTerminadosAnterioresA(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Cuántos checkouts están <c>pago_pendiente</c> desde antes de <paramref name="antesDe"/> (45 minutos): lo que Pagos debía resolver (AUD-31).</summary>
+    Task<int> ContarConElPagoPendienteDesdeAntesDe(DateTimeOffset antesDe, CancellationToken cancelacion = default);
+
+    /// <summary>Elimina <b>todos</b> los checkouts de la cuenta (vivos y terminados, con su contacto y sus líneas): idempotente ante filas ausentes y siempre <b>antes</b> que el carrito (D10).</summary>
+    Task EliminarDeCuenta(Guid cuentaId, CancellationToken cancelacion = default);
+
+    /// <summary>Los checkouts vivos de esas cuentas, <b>con bloqueo y por <c>id</c> ascendente</b> (D10): lo que usa el retiro de ediciones, que bloquea todos los checkouts antes que los carritos.</summary>
+    Task<IReadOnlyList<Checkout>> ObtenerVivosDeCuentasConBloqueo(IReadOnlyCollection<Guid> cuentaIds, CancellationToken cancelacion = default);
 
     /// <summary>El estado del checkout vivo de la cuenta <b>sin bloqueo</b>: para decidir si hay que llamar a <c>Reabrir</c> antes de bloquear (D10).</summary>
     Task<EstadoDelCheckout?> LeerEstadoSinBloqueo(Guid cuentaId, CancellationToken cancelacion = default);
 
     Task Agregar(Checkout checkout, CancellationToken cancelacion = default);
+
+    /// <summary>Los checkouts con una reserva por liberar (<c>reserva_a_liberar_desde</c> con valor), sin bloqueo y como mucho <paramref name="maximo"/>: lo que reintenta <c>LiberarReservasPendientes</c>.</summary>
+    Task<IReadOnlyList<PedidoPorLiberar>> ConLiberacionPendiente(int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Los checkouts <c>reservando</c> desde <paramref name="antesDe"/> o antes (2 minutos, inclusive; atascados por un corte entre los pasos), sin bloqueo: lo que recoge <c>RecuperarCheckoutsReservando</c>.</summary>
+    Task<IReadOnlyList<CheckoutPorRecuperar>> ReservandoDesdeAntesDe(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default);
 
     /// <summary>Guarda el checkout con su versión (concurrencia optimista) y reconstruye sus líneas conservando el <c>lineaId</c> de las que siguen.</summary>
     Task Guardar(Checkout checkout, CancellationToken cancelacion = default);
@@ -225,3 +270,186 @@ public interface IGeneradorDeIdentificadores
     /// <summary>El valor en claro de la cookie del visitante: 32 bytes aleatorios en base64url sin relleno. Solo la Presentación lo escribe; el servidor guarda su SHA-256.</summary>
     string NuevaCookieDeVisitante();
 }
+
+// ---------- Límites de uso ----------
+
+public enum DecisionDeLimiteDelCarrito
+{
+    Permitido,
+
+    /// <summary>Se pasó del límite: <see cref="ResultadoDeLimiteDelCarrito.ReintentarEn"/> dice desde cuándo.</summary>
+    Excedido,
+
+    /// <summary>El almacén de contadores no responde y la política falla cerrada (SEG-26): se responde «servicio no disponible».</summary>
+    NoDisponible,
+}
+
+public sealed record ResultadoDeLimiteDelCarrito(DecisionDeLimiteDelCarrito Decision, DateTimeOffset? ReintentarEn = null)
+{
+    public static ResultadoDeLimiteDelCarrito Permitido { get; } = new(DecisionDeLimiteDelCarrito.Permitido);
+
+    public static ResultadoDeLimiteDelCarrito NoDisponible { get; } = new(DecisionDeLimiteDelCarrito.NoDisponible);
+}
+
+/// <summary>
+/// Los límites de uso de Carrito (plan §6, SEG-05, SEG-07, SEG-26), valores iniciales y configurables: <b>crear carritos de visitante</b>, 10 por origen y hora; <b>agregar o cambiar líneas</b>, 60 por cuenta o por origen y
+/// minuto; <b>pasar al pago</b>, 10 por cuenta y hora y <b>falla cerrado</b>; volver y reiniciar, 20 por cuenta y hora; revisión y entrega, 30 por cuenta y minuto. Un puerto propio hasta que <c>Plataforma</c> defina las
+/// políticas (hallazgo para el carril de plataforma): la Infraestructura lo implementa sobre <c>IControlDeLimites</c> y, mientras tanto, con un doble que falla cerrado en lo que reserva stock.
+/// </summary>
+public interface ILimitadorDelCarrito
+{
+    Task<ResultadoDeLimiteDelCarrito> CrearCarritoDeVisitante(CancellationToken cancelacion = default);
+
+    /// <summary>Agregar, cambiar o quitar una línea: por la cuenta si la hay y, si no, por el origen.</summary>
+    Task<ResultadoDeLimiteDelCarrito> EditarLineas(Guid? cuentaId, CancellationToken cancelacion = default);
+
+    /// <summary>Revisar el checkout y elegir la entrega: consultan el Inventario sin memoria, 30 por cuenta y minuto.</summary>
+    Task<ResultadoDeLimiteDelCarrito> RevisarCheckout(Guid cuentaId, CancellationToken cancelacion = default);
+
+    /// <summary>Pasar al pago reserva stock: 10 por cuenta y hora y <b>falla cerrado</b>. <paramref name="claveDeRepeticion"/> identifica el pedido en curso: repetir el mismo (un doble clic, otra pestaña) no cuenta otra vez (DD-12).</summary>
+    Task<ResultadoDeLimiteDelCarrito> PasarAlPago(Guid cuentaId, string claveDeRepeticion, CancellationToken cancelacion = default);
+
+    /// <summary>Volver al carrito y reiniciar el checkout: 20 por cuenta y hora.</summary>
+    Task<ResultadoDeLimiteDelCarrito> VolverOReiniciar(Guid cuentaId, CancellationToken cancelacion = default);
+}
+
+// ---------- Auditoría ----------
+
+/// <summary>
+/// La auditoría de Carrito (plan §6): en la <b>misma transacción</b> del caso de uso, y si no se puede auditar la operación falla. Sin datos personales, sin la cookie del visitante ni su huella. Es un puerto propio hasta que
+/// el catálogo de acciones de auditoría (<c>AccionesAuditables</c>, del carril de auditoría) tenga las de Carrito: la Infraestructura lo implementa sobre <c>IAuditoria</c> (T26b). Cada tarea agrega el método de su evento.
+/// </summary>
+public interface IAuditoriaDelCarrito
+{
+    /// <summary>Una fusión aplicada: cuántas líneas aportó el visitante y los motivos de los ajustes (sin identificar al visitante).</summary>
+    Task FusionAplicada(Guid cuentaId, int lineasDelVisitante, IReadOnlyList<MotivoDeAjusteDeAviso> ajustes, CancellationToken cancelacion = default);
+
+    /// <summary>La baja de ediciones aplicada a los carritos: cuántas ediciones, cuántos carritos afectados y cuántas líneas se quitaron o quedaron anotadas con retiro pendiente (sin identificar a nadie).</summary>
+    Task EdicionesRetiradas(int ediciones, int carritosAfectados, int lineasQuitadas, int lineasAnotadas, CancellationToken cancelacion = default);
+
+    /// <summary>El checkout terminó por voluntad de la persona (<c>volver</c> o <c>reiniciar</c>); sin datos personales.</summary>
+    Task CheckoutTerminado(string motivo, CancellationToken cancelacion = default);
+
+    /// <summary>Identidad pidió eliminar el carrito y los datos de entrega de una cuenta (reemplazo de una cuenta sin verificar o cancelación): sin datos personales; el motivo es <c>reemplazo</c>, <c>cancelacion</c> o <c>cuenta-inactiva</c> (la purga de una cuenta que Identidad ya no tiene activa) o <c>cancelacion</c>.</summary>
+    Task CarritoEliminadoPorIdentidad(string motivo, CancellationToken cancelacion = default);
+
+    /// <summary>Una corrida de purga: cuántos registros eliminó o venció de cada tipo (solo conteos, sin datos personales; D09).</summary>
+    Task PurgaRealizada(string trabajo, int cantidad, CancellationToken cancelacion = default);
+
+    /// <summary>Se abortó el paso al pago (o lo recuperó el trabajo de fondo) con un motivo cerrado (por ejemplo <c>reserva-expirada</c>, <c>plazo-cambiado</c>, <c>recuperacion</c>): sin datos personales ni identificadores (DD-11).</summary>
+    Task PasoAlPagoAbortado(string motivo, CancellationToken cancelacion = default);
+
+    /// <summary>Se pasó al pago (la intención creada y el checkout en <c>en_pago</c>): con o sin impresos y el tipo de entrega; sin contacto, sin cuenta ni pedido en el detalle (D13).</summary>
+    Task PasoAlPagoIniciado(bool conImpresos, bool aDomicilio, CancellationToken cancelacion = default);
+}
+
+/// <summary>
+/// <c>IRepositorioDeCarritos.Agregar</c> la lanza cuando el carrito de esa cuenta (o de esa cookie) ya existe (índice único): otro dispositivo lo creó a la vez. La Aplicación <b>rehace la transacción</b> una vez, y esta vez lo
+/// encuentra y lo bloquea (AC-CAR-01, AC-CAR-02). Con PostgreSQL una violación de unicidad aborta la transacción, así que no se puede seguir dentro de ella.
+/// </summary>
+public sealed class CarritoYaExisteException() : Exception("El carrito ya existe: otro dispositivo lo creó a la vez.");
+
+// ---------- Opciones ----------
+
+/// <summary>
+/// El costo de envío fijo configurado (<c>Carrito:CostoDeEnvio</c>, CAR-23): soles con dos decimales y no negativo, validado al arrancar. Se lee al elegir el domicilio y se <b>congela</b> al pasar al pago; uno por pedido a
+/// domicilio. No es un puerto de un tercero sino una opción tipada: la Infraestructura lee la configuración y la Aplicación solo ve este valor.
+/// </summary>
+public interface ICostoDeEnvioConfigurado
+{
+    CostoDeEnvio Valor { get; }
+}
+
+/// <summary>
+/// <c>IRepositorioDeCheckouts.Agregar</c> la lanza cuando la cuenta ya tiene un checkout vivo (índice único parcial): otra solicitud lo creó a la vez. La Aplicación rehace la lectura y devuelve ese checkout (<c>POST
+/// /checkout/iniciar</c> con un checkout vivo devuelve ese checkout).
+/// </summary>
+public sealed class CheckoutYaExisteException() : Exception("La cuenta ya tiene un checkout vivo: otra solicitud lo creó a la vez.");
+
+// ---------- Consentimiento de avisos por WhatsApp ----------
+
+public enum EstadoDeLaOfertaDeConsentimiento
+{
+    /// <summary>La cuenta no tiene un número guardado, o Identidad no responde: no se ofrece (se ofrece solo si ya hay un número, CAR-18).</summary>
+    NoSeOfrece,
+
+    /// <summary>La cuenta tiene un número y aún no consiente: se ofrece, mostrando la huella enmascarada.</summary>
+    SeOfrece,
+
+    /// <summary>La cuenta ya consiente: no se vuelve a ofrecer.</summary>
+    YaConsiente,
+}
+
+/// <summary>Lo que se ofrece en el checkout: el estado y, si se ofrece, la huella enmascarada del número (nunca el número, que no llega a Carrito).</summary>
+public sealed record OfertaDeConsentimiento(EstadoDeLaOfertaDeConsentimiento Estado, string? HuellaEnmascarada)
+{
+    public static OfertaDeConsentimiento NoSeOfrece { get; } = new(EstadoDeLaOfertaDeConsentimiento.NoSeOfrece, null);
+}
+
+/// <summary>
+/// El consentimiento de avisos por WhatsApp (CAR-18, IDE-31, IDE-32): lo guarda <c>identidad-seguridad</c> y <b>no se exige</b> para pagar. Un puerto propio de Carrito mientras el contrato de Identidad no tenga una operación que reciba la
+/// huella enmascarada en vez del número (el número nunca llega a Carrito, a sus registros ni a su auditoría): Identidad compara la huella con el número vigente al guardar. Una falla no bloquea el pago ni dice «guardado».
+/// </summary>
+public interface IConsentimientoDeAvisos
+{
+    /// <summary>Si se ofrece el consentimiento y la huella enmascarada del número de la cuenta; ante cualquier falla, <see cref="OfertaDeConsentimiento.NoSeOfrece"/>.</summary>
+    Task<OfertaDeConsentimiento> Consultar(Guid cuentaId, CancellationToken cancelacion = default);
+
+    /// <summary><see langword="true"/> solo si Identidad confirmó que guardó el consentimiento para el número al que se refiere la huella; <see langword="false"/> ante cualquier falla, cambio de número o respuesta no entendida.</summary>
+    Task<bool> Guardar(Guid cuentaId, string huellaEnmascaradaDelNumero, CancellationToken cancelacion = default);
+}
+
+// ---------- Marca de cancelación de la cuenta ----------
+
+public enum EstadoDeLaMarcaDeCancelacion
+{
+    /// <summary>La cuenta está activa y sin cancelación en marcha.</summary>
+    Libre,
+
+    /// <summary>Tiene una cancelación diferida (IDE-27, CAR-31).</summary>
+    Diferida,
+
+    /// <summary>La cancelación está en ejecución (IDE-71): no se inicia el pago.</summary>
+    EnEjecucion,
+
+    /// <summary>La cuenta ya se canceló o no existe.</summary>
+    Ejecutada,
+}
+
+/// <summary>
+/// La marca de cancelación de la cuenta leída <b>con bloqueo</b> dentro de la transacción de pasar al pago (D10: es lo primero que se bloquea): la cancelación de una cuenta y el paso a <c>reservando</c> se serializan, de modo que
+/// una cancelación que empezó entre la revisión y el pago impide iniciarlo (AC-CAR-27). La implementa Identidad (T26b); mientras tanto, un doble que falla cerrado. Si no se puede leer, lanza: nunca se asume libre.
+/// </summary>
+public interface IMarcaDeCancelacion
+{
+    Task<EstadoDeLaMarcaDeCancelacion> LeerConBloqueo(Guid cuentaId, CancellationToken cancelacion = default);
+}
+
+// ---------- Alertas técnicas ----------
+
+public enum TipoDeAlertaDelCarrito
+{
+    /// <summary><c>liberar</c> respondió <c>INV-RESERVA-ESTADO-INVALIDO</c> con un pedido que ya está confirmado: no se reintenta y se limpia la anotación.</summary>
+    LiberacionDeUnPedidoConfirmado,
+
+    /// <summary>El Inventario respondió <c>INV-IDEMPOTENCIA-EN-CONFLICTO</c>: la clave de reserva está mal derivada (un defecto).</summary>
+    ClaveDeReservaEnConflicto,
+
+    /// <summary>Hay checkouts con el pago pendiente más de 45 minutos (AUD-31): Pagos no los resolvió.</summary>
+    CheckoutsConElPagoPendienteDemasiado,
+
+    /// <summary>Un trabajo de fondo de Carrito no corre desde hace más de 24 horas (AUD-31).</summary>
+    TrabajoSinCorrer,
+}
+
+/// <summary>Las alertas técnicas de Carrito (<c>AUD-31</c>): sin datos personales, solo el tipo y un conteo. La Infraestructura (T26b) las publica por el canal de alertas de Auditoría.</summary>
+public interface IAlertasDelCarrito
+{
+    Task Publicar(TipoDeAlertaDelCarrito tipo, int cantidad, CancellationToken cancelacion = default);
+}
+
+/// <summary>Un pedido cuya reserva falta por liberar: el <c>pedido_a_liberar</c> del checkout, que no es necesariamente su <c>pedido_id</c> vivo.</summary>
+public sealed record PedidoPorLiberar(Guid CheckoutId, Guid PedidoId);
+
+/// <summary>Un checkout <c>reservando</c> atascado: la cuenta, el pedido y la generación leídos, de modo que el aborto sea condicional a ellos (no toca uno que ya pasó a <c>en_pago</c>).</summary>
+public sealed record CheckoutPorRecuperar(Guid CuentaId, Guid PedidoId, int Generacion, bool IntencionPudoCrearse);

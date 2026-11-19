@@ -69,29 +69,65 @@ public sealed record LineaDelCarritoVista(
     DisponibilidadDeEdicion? Disponibilidad,
     bool Retirada);
 
-/// <summary>El carrito de la cuenta o del visitante: sus líneas, el subtotal (sin envío) y los avisos sin ver. Una lectura no tiene efectos (CAR-25).</summary>
-public sealed record VistaDelCarrito(IReadOnlyList<LineaDelCarritoVista> Lineas, decimal Subtotal, IReadOnlyList<AvisoDelCarrito> Avisos, bool HayUnaCompraEnCurso);
+/// <summary>El carrito de la cuenta o del visitante: sus líneas, el subtotal (sin envío) y los avisos sin ver. <see cref="PreciosNoConfirmados"/> es verdadero cuando el Catálogo no respondió: los precios y el subtotal no se pueden mostrar y ninguna línea se marca como retirada por ese motivo. Una lectura no tiene efectos (CAR-25).</summary>
+public sealed record VistaDelCarrito(IReadOnlyList<LineaDelCarritoVista> Lineas, decimal Subtotal, IReadOnlyList<AvisoDelCarrito> Avisos, bool HayUnaCompraEnCurso, bool PreciosNoConfirmados = false);
 
 /// <summary>
 /// Quién pide sobre el carrito: con sesión, la cuenta sale del actor y <see cref="CookieDelVisitante"/> es <see langword="null"/>; sin sesión, la cookie opaca <c>__Host-bh-carrito</c> (256 bits) identifica el carrito del
 /// visitante. Un identificador de carrito, checkout o cuenta nunca llega de afuera (CAR-35).
 /// </summary>
-public sealed record SolicitudSobreElCarrito(string? CookieDelVisitante = null);
+public sealed record SolicitudSobreElCarrito(string? CookieDelVisitante = null)
+{
+    private bool PrintMembers(System.Text.StringBuilder constructor)
+    {
+        constructor.Append("ConCookie = ").Append(CookieDelVisitante is not null);
+        return true;
+    }
+}
 
-public sealed record AgregarLineaEntrada(Guid EdicionId, int Cantidad, string? CookieDelVisitante = null);
+public sealed record AgregarLineaEntrada(Guid EdicionId, int Cantidad, string? CookieDelVisitante = null)
+{
+    /// <summary>La cookie del visitante es una capacidad: no se imprime.</summary>
+    private bool PrintMembers(System.Text.StringBuilder constructor)
+    {
+        constructor.Append("EdicionId = ").Append(EdicionId).Append(", Cantidad = ").Append(Cantidad);
+        return true;
+    }
+}
 
-public sealed record ModificarLineaEntrada(Guid EdicionId, int Cantidad, string? CookieDelVisitante = null);
+public sealed record ModificarLineaEntrada(Guid EdicionId, int Cantidad, string? CookieDelVisitante = null)
+{
+    private bool PrintMembers(System.Text.StringBuilder constructor)
+    {
+        constructor.Append("EdicionId = ").Append(EdicionId).Append(", Cantidad = ").Append(Cantidad);
+        return true;
+    }
+}
 
-public sealed record EliminarLineaEntrada(Guid EdicionId, string? CookieDelVisitante = null);
+public sealed record EliminarLineaEntrada(Guid EdicionId, string? CookieDelVisitante = null)
+{
+    private bool PrintMembers(System.Text.StringBuilder constructor)
+    {
+        constructor.Append("EdicionId = ").Append(EdicionId);
+        return true;
+    }
+}
 
 /// <summary>
 /// El carrito después de una operación y, si se creó el de un visitante o se rotó la cookie al fusionar, el valor <b>en claro</b> de la cookie nueva (que solo la Presentación escribe) o <see langword="null"/>
 /// para borrarla cuando <see cref="BorrarLaCookie"/> es verdadero. El servidor guarda solo su SHA-256.
 /// </summary>
-public sealed record ResultadoDeCarrito(VistaDelCarrito Carrito, string? CookieNueva, bool BorrarLaCookie);
+public sealed record ResultadoDeCarrito(VistaDelCarrito Carrito, string? CookieNueva, bool BorrarLaCookie)
+{
+    private bool PrintMembers(System.Text.StringBuilder constructor)
+    {
+        constructor.Append("Lineas = ").Append(Carrito.Lineas.Count).Append(", CookieNueva = ").Append(CookieNueva is not null).Append(", BorrarLaCookie = ").Append(BorrarLaCookie);
+        return true;
+    }
+}
 
-/// <summary>Resultado de la fusión al ingresar (CAR-24): el carrito de la cuenta, los ajustes hechos y si se aplazó por una compra en curso (se reintenta en el siguiente <c>POST</c> de la misma sesión).</summary>
-public sealed record ResultadoDeFusionDeCarrito(VistaDelCarrito Carrito, IReadOnlyList<AvisoDelCarrito> Ajustes, bool Aplazada);
+/// <summary>Resultado de la fusión al ingresar (CAR-24): el carrito de la cuenta, los ajustes hechos, si se aplazó por una compra en curso (se reintenta en el siguiente <c>POST</c> de la misma sesión y la cookie <b>sigue</b>) y si la Presentación debe borrar la cookie (la fusión se aplicó o ya estaba aplicada, o no había nada que fusionar).</summary>
+public sealed record ResultadoDeFusionDeCarrito(VistaDelCarrito Carrito, IReadOnlyList<AvisoDelCarrito> Ajustes, bool Aplazada, bool BorrarLaCookie);
 
 /// <summary>
 /// El contacto de la entrega a domicilio (CAR-08, CAR-30): nombre, teléfono móvil peruano, dirección y región. Es dato personal: <c>ToString</c> y la serialización devuelven <c>[redactado]</c> y no se interpola en
@@ -100,16 +136,13 @@ public sealed record ResultadoDeFusionDeCarrito(VistaDelCarrito Carrito, IReadOn
 [JsonConverter(typeof(ConversorDeContactoDeCompra))]
 public sealed class ContactoDeCompra : IEquatable<ContactoDeCompra>
 {
-    public ContactoDeCompra(string nombre, string telefono, string direccion, string region)
+    /// <summary>Los cuatro datos tal como llegan: la validación (obligatorio, formato, largo, región de la lista) es del caso de uso, que responde por campo sin repetir el valor; un dato ausente se guarda como texto vacío.</summary>
+    public ContactoDeCompra(string? nombre, string? telefono, string? direccion, string? region)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(nombre);
-        ArgumentException.ThrowIfNullOrWhiteSpace(telefono);
-        ArgumentException.ThrowIfNullOrWhiteSpace(direccion);
-        ArgumentException.ThrowIfNullOrWhiteSpace(region);
-        Nombre = nombre;
-        Telefono = telefono;
-        Direccion = direccion;
-        Region = region;
+        Nombre = nombre ?? string.Empty;
+        Telefono = telefono ?? string.Empty;
+        Direccion = direccion ?? string.Empty;
+        Region = region ?? string.Empty;
     }
 
     public string Nombre { get; }
@@ -185,6 +218,9 @@ public sealed record IniciarCheckoutEntrada(string? CodigoDeSucursalPreferida = 
 
 public enum DisponibilidadDeLineaDeCheckout
 {
+    /// <summary>Hay stock vendible en la red y todavía no se eligió la entrega: no se sabe de qué fuente saldrá.</summary>
+    Disponible,
+
     EnSuSucursal,
     PorTraslado,
     Agotada,
@@ -222,7 +258,8 @@ public sealed record VistaDelCheckout(
     IReadOnlyList<TextoLegalDeCompra> TextosPorAceptar,
     DateTimeOffset? ReservaExpiraEn,
     Guid? PedidoId,
-    bool CarritoCambio);
+    bool CarritoCambio,
+    ConsentimientoDeWhatsAppDeCompra? ConsentimientoDeWhatsApp = null);
 
 /// <summary>La entrega elegida: recojo con el código de una sucursal, domicilio con el contacto (dirección y región incluidas) o solo digital (CAR-07 a CAR-09, CAR-30).</summary>
 public sealed record ElegirEntregaEntrada(TipoDeEntregaDeCompra Tipo, string? CodigoDeSucursalDeRecojo, ContactoDeCompra? Contacto, Guid? PedidoId = null);
@@ -246,8 +283,11 @@ public sealed record PasarAlPagoEntrada(decimal TotalVisto, IReadOnlyList<TextoV
 /// <summary>Volver al carrito o reiniciar: el <c>pedidoId</c> oculto cuando el checkout ya lo tiene; si no, se usa el checkout vivo de quien pide.</summary>
 public sealed record SalirDelCheckoutEntrada(Guid? PedidoId = null);
 
-/// <summary>Cómo quedó el checkout tras pasar al pago: el <c>pedidoId</c> y el estado (<c>en_pago</c> o <c>pago_pendiente</c>); la Presentación redirige a la pantalla de Pagos.</summary>
-public sealed record ResultadoDePasarAlPago(Guid PedidoId, EstadoVisibleDelCheckout Estado);
+/// <summary>
+/// Cómo quedó el checkout tras pasar al pago: el <c>pedidoId</c> y el estado (<c>en_pago</c>) y la Presentación redirige a la pantalla de Pagos; con <see cref="PagoEnCurso"/> la intención ya estaba aprobada o completada y se redirige a su estado;
+/// con <see cref="Revision"/> (un retiro pendiente o un conflicto con un intento activo) no se paga: se muestra esa revisión con el aviso «tu carrito cambió», sin <c>pedidoId</c>.
+/// </summary>
+public sealed record ResultadoDePasarAlPago(Guid? PedidoId, EstadoVisibleDelCheckout Estado, VistaDelCheckout? Revision = null, bool PagoEnCurso = false);
 
 /// <summary>El checkout vivo de la cuenta cuando Pagos necesita su <c>pedidoId</c>: solo en <c>en_pago</c> y <c>pago_pendiente</c>, y en <c>en_pago</c> no con una línea retirada (D13).</summary>
 public sealed record CheckoutVivoParaPagar(Guid PedidoId, EstadoVisibleDelCheckout Estado);
@@ -392,3 +432,24 @@ public interface IProgresoDelCheckout
     /// <summary>El pago pendiente se resolvió sin aprobar: <c>vencido</c> o <c>rechazado</c> con la reserva vigente vuelven a <c>en_pago</c>; con la reserva expirada o <c>compensado</c> pasa a <c>cancelado</c>.</summary>
     Task<ResultadoDelAvisoDePago> PagoResuelto(Guid pedidoId, MotivoDePagoResueltoDeCompra motivo, CancellationToken cancelacion = default);
 }
+
+public enum EstadoDelConsentimientoDeCompra
+{
+    /// <summary>No se ofrece (la cuenta no tiene número o Identidad no respondió).</summary>
+    NoSeOfrece,
+
+    /// <summary>Se ofrece, sin marcar, con la huella enmascarada del número.</summary>
+    SeOfrece,
+
+    /// <summary>La cuenta ya consiente.</summary>
+    YaConsiente,
+
+    /// <summary>Se marcó y Identidad confirmó el guardado.</summary>
+    Guardado,
+
+    /// <summary>Se marcó pero no se pudo guardar: el pago sigue y se informa que no se guardó (nunca se dice «guardado»).</summary>
+    NoGuardado,
+}
+
+/// <summary>El estado del consentimiento de WhatsApp para la pantalla de datos y aceptaciones, con la huella enmascarada del número solo si se ofrece (CAR-18, AC-CAR-16).</summary>
+public sealed record ConsentimientoDeWhatsAppDeCompra(EstadoDelConsentimientoDeCompra Estado, string? HuellaEnmascarada = null);
