@@ -129,7 +129,8 @@ public static class ComposicionDeLosTrabajosDelCarrito
             sp.GetRequiredService<IServiceScopeFactory>(),
             sp.GetRequiredService<IRegistroDeTrabajosDeFondo>(),
             alcanceDeSistema(sp),
-            sp.GetRequiredService<IAlertasDelCarrito>(),
+            // Los trabajos viven más que una solicitud: cada alerta se publica en su propio alcance (el publicador de alertas es de alcance de solicitud).
+            new AlertasDelCarritoSobrePublicador(new AlertasTecnicasPorCorrida(sp.GetRequiredService<IServiceScopeFactory>()), sp.GetRequiredService<IReloj>()),
             sp.GetRequiredService<IReloj>()));
         servicios.TryAddSingleton(sp => new ServicioDeTrabajosDelCarrito(sp.GetRequiredService<IReadOnlyList<TrabajoDeFondoDeCarrito>>()));
         return servicios;

@@ -155,7 +155,7 @@ public static class ArranqueSeguro
     public const string VariableDelSecretoDeLaMarca = "BABELHUB__Restauracion__SecretoDeLaMarca";
     public const string VariableDeLosProhibidos = "BABELHUB__Ensayo__ProhibidosSha256";
 
-    private static readonly string[] NombresDeSecretos = ["secreto", "clave", "credencial", "contrasena", "password", "token", "marca"];
+    private static readonly string[] NombresDeSecretos = ["secreto", "clave", "credencial", "contrasena", "password", "token", "marca", "base", "pimienta"];
 
     /// <summary>Lee y valida el modo. Lanza <see cref="ArranqueRechazadoException"/> si el modo es inválido o si en producción falta la marca.</summary>
     public static ModoDeArranque Resolver(IConfiguration configuracion, bool esProduccion, DateTimeOffset ahora, IAlmacenDeNoncesDeMarcas almacen)

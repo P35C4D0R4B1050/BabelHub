@@ -289,6 +289,25 @@ public sealed class ArranqueSeguroEcommerceTests : IDisposable
         Assert.DoesNotContain(deProduccion, error.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("Ecommerce:Base:Aplicacion")]
+    [InlineData("Ecommerce:Base:DepuracionDeAuditoria")]
+    [InlineData("Identidad:Pimienta")]
+    [Trait("Criterio", "AC-PLA-22")]
+    public void ElEnsayoNoArrancaConLaBaseOLaPimientaDeProduccion_YNombraLaVariableSinElValor(string ruta)
+    {
+        var deProduccion = "Host=bd-de-produccion;Database=ecommerce;Username=acceso;Pass" + "word=" + Guid.NewGuid().ToString("N");
+        var configuracion = Configuracion(
+            ("Modo", "Ensayo"),
+            ("Ensayo:ProhibidosSha256", Huella(deProduccion)),
+            (ruta, deProduccion));
+
+        var error = Assert.Throws<ArranqueRechazadoException>(() => ArranqueSeguro.Resolver(configuracion, esProduccion: false, Ahora, new AlmacenEnMemoria()));
+
+        Assert.Contains("BABELHUB__" + ruta.Replace(":", "__", StringComparison.Ordinal), error.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(deProduccion, error.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     [Trait("Criterio", "AC-PLA-22")]
     public void ElEnsayoConSecretosPropiosArranca()
@@ -529,6 +548,21 @@ public sealed class ArranqueSeguroEcommerceTests : IDisposable
         };
         informacion.ArgumentList.Add(dll);
         informacion.Environment["ASPNETCORE_ENVIRONMENT"] = entorno;
+
+        // La composición real (COMP-1) exige todos sus secretos: el proceso arranca con una configuración completa y desechable.
+        foreach (var (ruta, valor) in BabelHub.IntegrationTests.Api.AnfitrionDelEcommerceTests.ConfiguracionCompleta())
+        {
+            informacion.Environment["BABELHUB__" + ruta.Replace(":", "__", StringComparison.Ordinal)] = valor;
+        }
+
+        if (entorno == "Production")
+        {
+            foreach (var (ruta, valor) in BabelHub.IntegrationTests.Api.AnfitrionDelEcommerceTests.ConfiguracionDeProduccion())
+            {
+                informacion.Environment["BABELHUB__" + ruta.Replace(":", "__", StringComparison.Ordinal)] = valor;
+            }
+        }
+
         informacion.Environment["BABELHUB__Modo"] = modo;
         informacion.Environment["BABELHUB__Restauracion__SecretoDeLaMarca"] = _secretoDeLaMarca;
         informacion.Environment["BABELHUB__Restauracion__CarpetaDeMarcas"] = Path.Combine(_carpeta, "marcas-del-proceso");
@@ -576,8 +610,9 @@ public sealed class ArranqueSeguroEcommerceTests : IDisposable
         var primera = Arrancar("Production", "Restauracion", marca);
         var segunda = Arrancar("Production", "Restauracion", marca);
 
-        Assert.True(primera.Codigo == 0, primera.Salida);
-        Assert.Contains("restauracion: puede abrirse", primera.Salida, StringComparison.Ordinal);
+        // Con la composición real los pasos hablan con la base: sin ella la restauración no se abre, pero la marca válida sí se aceptó (llegó a los pasos) y se consumió.
+        Assert.Contains("paso: identidad-rotar-claves-e-invalidar-sesiones", primera.Salida, StringComparison.Ordinal);
+        Assert.DoesNotContain("Reutilizada", primera.Salida, StringComparison.Ordinal);
         Assert.NotEqual(0, segunda.Codigo);
         Assert.Contains("Reutilizada", segunda.Salida, StringComparison.Ordinal);
         Assert.DoesNotContain(marca, segunda.Salida, StringComparison.Ordinal);
@@ -596,12 +631,14 @@ public sealed class ArranqueSeguroEcommerceTests : IDisposable
     }
 
     [Fact]
-    public void FueraDeProduccion_LaRestauracionSinPasosPuedeAbrirYUnModoInvalidoNoArranca()
+    public void FueraDeProduccion_LaRestauracionCorreSusPasosReales_YUnModoInvalidoNoArranca()
     {
-        var sinPasos = Arrancar("Development", "Restauracion", marca: null);
+        // Con la composición real los pasos de Identidad y de la web hablan con su base: sin base de datos el primero falla y la restauración no se abre, nombrando el paso.
+        var sinBase = Arrancar("Development", "Restauracion", marca: null);
         var invalido = Arrancar("Development", "Cualquiera", marca: null);
 
-        Assert.True(sinPasos.Codigo == 0, sinPasos.Salida);
+        Assert.NotEqual(0, sinBase.Codigo);
+        Assert.Contains("restauracion: no se abre, falló el paso identidad-rotar-claves-e-invalidar-sesiones", sinBase.Salida, StringComparison.Ordinal);
         Assert.NotEqual(0, invalido.Codigo);
         Assert.Contains("BABELHUB__Modo", invalido.Salida, StringComparison.Ordinal);
     }

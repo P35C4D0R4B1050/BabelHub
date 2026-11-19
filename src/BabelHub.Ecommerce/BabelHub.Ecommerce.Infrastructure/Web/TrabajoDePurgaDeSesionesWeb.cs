@@ -1,5 +1,6 @@
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Application.Web.Interno;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace BabelHub.Ecommerce.Infrastructure.Web;
 
@@ -18,18 +19,70 @@ public sealed record OpcionesDelTrabajoDePurgaDeSesiones
 /// por una alerta técnica. La Api lo ejecuta como servicio hospedado y <b>solo en el modo normal</b>: en <c>Ensayo</c> y <c>Restauracion</c> está apagado (PLA-19, PLA-43), porque
 /// el ensayo no debe revocar renovaciones de producción y al restaurar el paso de restauración vacía las tablas.
 /// </summary>
-public sealed class TrabajoDePurgaDeSesionesWeb(
-    PurgarSesionesWeb purga,
-    IRegistroDeTrabajosDeFondo registro,
-    IPublicadorDeAlertasTecnicas alertas,
-    IReloj reloj,
-    OpcionesDelTrabajoDePurgaDeSesiones? opciones = null,
-    TimeProvider? tiempo = null)
+public sealed class TrabajoDePurgaDeSesionesWeb
 {
+    private readonly Func<CancellationToken, Task<ResultadoDePurga>> _purga;
+    private readonly IRegistroDeTrabajosDeFondo registro;
+    private readonly IPublicadorDeAlertasTecnicas alertas;
+    private readonly IReloj reloj;
+    private readonly TimeProvider? tiempo;
+
+    public TrabajoDePurgaDeSesionesWeb(
+        PurgarSesionesWeb purga,
+        IRegistroDeTrabajosDeFondo registro,
+        IPublicadorDeAlertasTecnicas alertas,
+        IReloj reloj,
+        OpcionesDelTrabajoDePurgaDeSesiones? opciones = null,
+        TimeProvider? tiempo = null)
+        : this(purga is null ? throw new ArgumentNullException(nameof(purga)) : purga.Ejecutar, registro, alertas, reloj, opciones, tiempo)
+    {
+    }
+
+    /// <summary>
+    /// Con un <b>alcance por corrida</b> (lo que usa la Api, donde el trabajo vive más que una solicitud): <see cref="PurgarSesionesWeb"/> depende de Identidad y de Auditoría, que son de alcance de solicitud, así que cada corrida
+    /// crea su alcance y lo libera al terminar.
+    /// </summary>
+    public TrabajoDePurgaDeSesionesWeb(
+        IServiceScopeFactory fabrica,
+        IRegistroDeTrabajosDeFondo registro,
+        IPublicadorDeAlertasTecnicas alertas,
+        IReloj reloj,
+        OpcionesDelTrabajoDePurgaDeSesiones? opciones = null,
+        TimeProvider? tiempo = null)
+        : this(
+            async cancelacion =>
+            {
+                await using var alcance = fabrica.CreateAsyncScope();
+                return await alcance.ServiceProvider.GetRequiredService<PurgarSesionesWeb>().Ejecutar(cancelacion).ConfigureAwait(false);
+            },
+            registro,
+            alertas,
+            reloj,
+            opciones,
+            tiempo)
+    {
+    }
+
+    private TrabajoDePurgaDeSesionesWeb(
+        Func<CancellationToken, Task<ResultadoDePurga>> purga,
+        IRegistroDeTrabajosDeFondo registro,
+        IPublicadorDeAlertasTecnicas alertas,
+        IReloj reloj,
+        OpcionesDelTrabajoDePurgaDeSesiones? opciones,
+        TimeProvider? tiempo)
+    {
+        _purga = purga;
+        this.registro = registro;
+        this.alertas = alertas;
+        this.reloj = reloj;
+        this.tiempo = tiempo;
+        _opciones = opciones ?? new OpcionesDelTrabajoDePurgaDeSesiones();
+    }
+
     public const string Nombre = "purgar-sesiones-web";
     public const string MotivoDeAlerta = "purga-de-sesiones-web-detenida";
 
-    private readonly OpcionesDelTrabajoDePurgaDeSesiones _opciones = opciones ?? new OpcionesDelTrabajoDePurgaDeSesiones();
+    private readonly OpcionesDelTrabajoDePurgaDeSesiones _opciones;
     private int _fallosSeguidos;
 
     /// <summary>Una corrida ahora. Solo la cancelación de quien la ejecuta se propaga; devuelve lo que hizo o <see langword="null"/> si falló.</summary>
@@ -37,7 +90,7 @@ public sealed class TrabajoDePurgaDeSesionesWeb(
     {
         try
         {
-            var resultado = await purga.Ejecutar(cancelacion).ConfigureAwait(false);
+            var resultado = await _purga(cancelacion).ConfigureAwait(false);
             _fallosSeguidos = 0;
             await Registrar(ResultadoDeTrabajo.Exito, cancelacion).ConfigureAwait(false);
             return resultado;
