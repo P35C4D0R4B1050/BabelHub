@@ -32,9 +32,13 @@ internal static class ComprasDePrueba
         var intencion = IntencionDePago.Crear(id, Mixta(cuenta ?? Cuenta, ahora), ahora + PlazosDelPago.VigenciaConImpresos, ahora);
         await entorno.Bd.Unidad.Ejecutar(async token => { await entorno.Bd.Pagos.AgregarIntencion(intencion, token); return 0; });
         entorno.Reservas.Sembrar(id, ahora + PlazosDelPago.VigenciaConImpresos, [new LineaConfirmadaDeReserva(LineaImpresa, "AYA-01", false, null, null)]);
-        entorno.Checkout.Con(nameof(BabelHub.Ecommerce.Application.Carrito.ICheckoutDelCliente.ObtenerParaPagar), _ => Task.FromResult(Resultado<BabelHub.Ecommerce.Application.Carrito.CheckoutVivoParaPagar>.Exito(new(id, BabelHub.Ecommerce.Application.Carrito.EstadoVisibleDelCheckout.EnPago))));
+        VivoEnPago(entorno, id);
         return id;
     }
+
+    /// <summary>Carrito dice que este es el checkout vivo y está en pago (el último sembrado lo es por omisión).</summary>
+    public static void VivoEnPago(EntornoDePagosConPostgres entorno, Guid pedido) =>
+        entorno.Checkout.Con(nameof(BabelHub.Ecommerce.Application.Carrito.ICheckoutDelCliente.ObtenerParaPagar), _ => Task.FromResult(Resultado<BabelHub.Ecommerce.Application.Carrito.CheckoutVivoParaPagar>.Exito(new(pedido, BabelHub.Ecommerce.Application.Carrito.EstadoVisibleDelCheckout.EnPago))));
 }
 
 /// <summary>
