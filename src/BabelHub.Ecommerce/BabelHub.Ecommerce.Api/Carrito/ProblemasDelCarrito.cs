@@ -43,6 +43,8 @@ public static class ProblemasDelCarrito
         ["checkout-textos-pendientes"] = new("CHECKOUT-TEXTOS-PENDIENTES", StatusCodes.Status403Forbidden),
         ["checkout-reserva-rechazada"] = new("CHECKOUT-RESERVA-RECHAZADA", StatusCodes.Status409Conflict, ExponeCampos: true),
         ["servicio-no-disponible"] = new("SERVICIO-NO-DISPONIBLE", StatusCodes.Status503ServiceUnavailable),
+        ["verificacion-requerida"] = new("VERIFICACION-REQUERIDA", StatusCodes.Status403Forbidden),
+        ["verificacion-fallida"] = new("VERIFICACION-FALLIDA", StatusCodes.Status403Forbidden),
     };
 
     public static ProblemaDto Crear(HttpContext contexto, OpcionesDeErrores opciones, ErrorDeAplicacion error)

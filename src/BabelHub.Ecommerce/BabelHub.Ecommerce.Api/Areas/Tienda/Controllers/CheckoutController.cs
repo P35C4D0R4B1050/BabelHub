@@ -6,6 +6,7 @@ using BabelHub.Ecommerce.Api.Web;
 using BabelHub.Ecommerce.Api.Web.Errores;
 using BabelHub.Ecommerce.Application.Carrito;
 using BabelHub.Ecommerce.Application.Plataforma;
+using BabelHub.Ecommerce.Application.Web;
 using BabelHub.Shared.Errores;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,7 +22,7 @@ namespace BabelHub.Ecommerce.Api.Areas.Tienda.Controllers;
 [Area("Tienda")]
 [RequestSizeLimit(EntradasHttpDelCarrito.TopeDelCuerpo)]
 [RequiereSesion]
-public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IExigenciaDeVerificacionDePersona verificacion, ContextoDePagina pagina, OpcionesDeErrores errores) : Controller
+public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IExigenciaDeVerificacionDePersona verificacion, ITextosLegales textos, ContextoDePagina pagina, OpcionesDeErrores errores) : Controller
 {
     public const string RutaDelPago = "/checkout/pago";
 
@@ -158,9 +159,9 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
         switch (await verificacion.Exigir(AccionProtegida.Reserva, token, cancelacion))
         {
             case ResultadoDeExigencia.Requerida:
-                return await FallaDeVerificacion("VERIFICACION-REQUERIDA", CategoriaDeError.Prohibido);
+                return await FallaEnLaPagina(new ErrorDeAplicacion(CategoriaDeError.Prohibido, "verificacion-requerida"), campos, cancelacion);
             case ResultadoDeExigencia.Fallida:
-                return await FallaDeVerificacion("VERIFICACION-FALLIDA", CategoriaDeError.Prohibido);
+                return await FallaEnLaPagina(new ErrorDeAplicacion(CategoriaDeError.Prohibido, "verificacion-fallida"), campos, cancelacion);
             case ResultadoDeExigencia.NoDisponible:
                 return await Falla(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible"), cancelacion);
         }
@@ -175,7 +176,7 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
             return await Falla(campos.ContainsKey("totalVisto") ? EntradasHttpDelCarrito.Invalido("totalVisto") : EntradasHttpDelCarrito.Falta("totalVisto"), cancelacion);
         }
 
-        var textos = new List<TextoVistoDeCompra>();
+        var vistos = new List<TextoVistoDeCompra>();
         foreach (var (campo, texto) in new[] { ("terminosVersion", TextoLegalDeCompra.Terminos), ("privacidadVersion", TextoLegalDeCompra.Privacidad), ("reembolsoDigitalVersion", TextoLegalDeCompra.ReembolsoDigital) })
         {
             if (!campos.TryGetValue(campo, out var version))
@@ -188,7 +189,7 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
                 return await Falla(EntradasHttpDelCarrito.Invalido(campo), cancelacion);
             }
 
-            textos.Add(new TextoVistoDeCompra(texto, version));
+            vistos.Add(new TextoVistoDeCompra(texto, version));
         }
 
         bool? whatsapp = null;
@@ -212,16 +213,16 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
             return await Falla(EntradasHttpDelCarrito.Invalido("huellaDelNumero"), cancelacion);
         }
 
-        var aceptaciones = await checkout.RegistrarAceptaciones(new RegistrarAceptacionesEntrada(textos, whatsapp, huella, pedidoId), cancelacion);
+        var aceptaciones = await checkout.RegistrarAceptaciones(new RegistrarAceptacionesEntrada(vistos, whatsapp, huella, pedidoId), cancelacion);
         if (!aceptaciones.EsExito)
         {
-            return await Falla(aceptaciones.Error!, cancelacion);
+            return await FallaEnLaPagina(aceptaciones.Error!, campos, cancelacion);
         }
 
-        var resultado = await checkout.PasarAlPago(new PasarAlPagoEntrada(total, textos, pedidoId), cancelacion);
+        var resultado = await checkout.PasarAlPago(new PasarAlPagoEntrada(total, vistos, pedidoId), cancelacion);
         if (!resultado.EsExito)
         {
-            return await Falla(resultado.Error!, cancelacion);
+            return await FallaEnLaPagina(resultado.Error!, campos, cancelacion);
         }
 
         var pago = resultado.Valor;
@@ -328,7 +329,39 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
         var modelo = await pagina.Completar(new CheckoutVista(), "Tu compra", cancelacion: cancelacion);
         ConstructorDeLaVistaDelCheckout.Armar(modelo, vista);
         modelo.SucursalesDeRecojo = modelo.Sucursales;
+        modelo.Textos = await TextosParaAceptar(vista, modelo.HayDigitales, cancelacion);
         return modelo;
+    }
+
+    /// <summary>
+    /// Los textos que la persona debe aceptar con la <b>versión vigente</b> que informa Identidad (la que se manda para compararla, CAR-28): términos y privacidad siempre y el reembolso si hay digitales. Si Identidad no informa una versión no se inventa: la lista queda vacía y no se ofrece pagar.
+    /// </summary>
+    private async Task<IReadOnlyList<TextoParaAceptar>> TextosParaAceptar(VistaDelCheckout vista, bool hayDigitales, CancellationToken cancelacion)
+    {
+        var pedidos = new List<(TipoDeTextoLegal Tipo, TextoLegalDeCompra Texto, string Campo, string Titulo, string Ruta)>
+        {
+            (TipoDeTextoLegal.Terminos, TextoLegalDeCompra.Terminos, "terminosVersion", "los términos y condiciones", "/legal/terminos"),
+            (TipoDeTextoLegal.Privacidad, TextoLegalDeCompra.Privacidad, "privacidadVersion", "la política de privacidad y el tratamiento de mis datos personales", "/legal/privacidad"),
+        };
+        if (hayDigitales)
+        {
+            pedidos.Add((TipoDeTextoLegal.Reembolso, TextoLegalDeCompra.ReembolsoDigital, "reembolsoDigitalVersion", "la política de reembolso de libros digitales", "/legal/reembolso"));
+        }
+
+        var lista = new List<TextoParaAceptar>();
+        foreach (var (tipo, texto, campo, titulo, ruta) in pedidos)
+        {
+            var obtenido = await textos.Obtener(tipo, cancelacion);
+            if (!obtenido.EsExito)
+            {
+                return [];
+            }
+
+            var version = obtenido.Valor.Version;
+            lista.Add(new TextoParaAceptar(campo, titulo, ruta, version, vista.Aceptaciones.Any(a => a.Texto == texto && a.Version == version)));
+        }
+
+        return lista;
     }
 
     /// <summary>
@@ -354,19 +387,6 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
         Response.StatusCode = Request.EsHtmx() ? StatusCodes.Status200OK : problema.Status;
         Response.Headers.CacheControl = "no-store";
         return View("Index", modelo);
-    }
-
-    private async Task<IActionResult> FallaDeVerificacion(string sufijo, CategoriaDeError categoria)
-    {
-        var problema = ProblemasHttp.Crear(HttpContext, errores, categoria, sufijo.ToLowerInvariant(), []) with { Code = CodigosDeError.De(errores.Servicio, sufijo) };
-        Response.OnStarting(() =>
-        {
-            Response.Headers.CacheControl = "no-store";
-            return Task.CompletedTask;
-        });
-        await DenegacionesHttp.Registrar(HttpContext, categoria, sufijo.ToLowerInvariant(), problema.Code);
-        await ProblemasHttp.Escribir(HttpContext, problema);
-        return new EmptyResult();
     }
 
     private async Task<IActionResult> Falla(ErrorDeAplicacion error, CancellationToken cancelacion)

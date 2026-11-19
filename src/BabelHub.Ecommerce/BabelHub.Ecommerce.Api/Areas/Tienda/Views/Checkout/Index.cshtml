@@ -161,6 +161,87 @@
             <p class="flex gap-2 text-sm opacity-80"><bh-icono nombre="candado" clase="size-5 shrink-0" />Compra 100 % digital: sin entrega. Tus libros aparecen en tu biblioteca cuando se aprueba el pago.</p>
         }
 
+        @if (enEdicion && (tipo is not null || !Model.RequiereEntrega))
+        {
+            var bloqueado = Model.HayProblema || Model.StockNoValidable || Model.Textos.Count == 0;
+            var consentimiento = checkout.ConsentimientoDeWhatsApp;
+            <section aria-labelledby="titulo-datos">
+                <h2 id="titulo-datos" class="font-display text-2xl">Tus datos y aceptaciones</h2>
+                @if (tipo == TipoDeEntregaDeCompra.Recojo)
+                {
+                    <p class="mt-1 text-sm opacity-80">Recogerás tus impresos en la sucursal que elegiste. Te avisamos cuando estén listos.</p>
+                }
+                else if (tipo == TipoDeEntregaDeCompra.Domicilio)
+                {
+                    <p class="mt-1 text-sm opacity-80">Despacharemos tus impresos a la dirección que indicaste.</p>
+                }
+
+                @if (Model.Textos.Count == 0)
+                {
+                    <div class="alert alert-warning mt-3" role="status">
+                        <bh-icono nombre="aviso" />
+                        <span>No podemos mostrar los textos legales ahora, así que todavía no se puede pagar. Tu carrito sigue guardado.</span>
+                        <a class="btn btn-sm" href="/checkout"><bh-icono nombre="reintentar" clase="size-4" />Reintentar</a>
+                    </div>
+                }
+
+                <form method="post" action="/checkout" class="mt-3 space-y-4" novalidate>
+                    <partial name="_TokenAntifalsificacion" />
+                    <input type="hidden" name="totalVisto" value="@Model.TotalVisto" />
+                    @if (pedido is not null) { <input type="hidden" name="pedidoId" value="@pedido" /> }
+
+                    <fieldset class="space-y-3">
+                        <legend class="font-semibold">Para continuar, acepta:</legend>
+                        @foreach (var texto in Model.Textos)
+                        {
+                            var error = Model.Error(texto.Campo);
+                            <div>
+                                <label class="flex cursor-pointer items-start gap-3">
+                                    <input type="checkbox" class="checkbox checkbox-primary mt-0.5" name="@texto.Campo" value="@texto.Version" checked="@(texto.Aceptado || Model.Valores.ContainsKey(texto.Campo))" aria-invalid="@(error is null ? "false" : "true")" aria-describedby="@(error is null ? null : "error-" + texto.Campo)" />
+                                    <span class="text-sm">Acepto @texto.Titulo. <a class="link" href="@texto.Ruta" target="_blank" rel="noopener">Leer (se abre en otra pestaña)</a></span>
+                                </label>
+                                @if (error is not null)
+                                {
+                                    <p id="error-@texto.Campo" class="ml-8 mt-1 text-sm text-error">Para pagar necesitas aceptar este texto.</p>
+                                }
+                            </div>
+                        }
+                    </fieldset>
+
+                    @if (consentimiento is { Estado: EstadoDelConsentimientoDeCompra.SeOfrece })
+                    {
+                        <div>
+                            <label class="flex cursor-pointer items-start gap-3">
+                                <input type="checkbox" class="checkbox checkbox-primary mt-0.5" name="consentimientoDeWhatsApp" value="true" checked="@(Model.Valor("consentimientoDeWhatsApp") == "true")" />
+                                <span class="text-sm">Quiero recibir avisos de mi pedido por WhatsApp al número @consentimiento.HuellaEnmascarada (opcional; puedes cambiarlo en tu cuenta).</span>
+                            </label>
+                            <input type="hidden" name="huellaDelNumero" value="@consentimiento.HuellaEnmascarada" />
+                        </div>
+                    }
+                    else if (consentimiento is { Estado: EstadoDelConsentimientoDeCompra.YaConsiente })
+                    {
+                        <p class="flex gap-2 text-sm"><bh-icono nombre="exito" clase="size-5 shrink-0" />Ya recibes avisos de tus pedidos por WhatsApp.</p>
+                    }
+                    else if (consentimiento is { Estado: EstadoDelConsentimientoDeCompra.NoGuardado })
+                    {
+                        <p class="flex gap-2 text-sm" role="status"><bh-icono nombre="aviso" clase="size-5 shrink-0" />No pudimos guardar tu preferencia de WhatsApp. Tu compra sigue: puedes cambiarla en tu cuenta.</p>
+                    }
+
+                    <verificacion-de-persona />
+
+                    @if (bloqueado)
+                    {
+                        <p class="flex gap-2 text-sm" role="status"><bh-icono nombre="aviso" clase="size-5 shrink-0" />@(Model.Textos.Count == 0 ? "Hasta poder mostrar los textos legales no se puede pagar." : "Resuelve los avisos de arriba para pasar al pago.")</p>
+                    }
+
+                    <bh-accion-de-cambio>
+                        <button type="submit" class="btn btn-primary" disabled="@bloqueado" aria-disabled="@(bloqueado ? "true" : null)">Ir al pago · @Model.TotalTexto</button>
+                    </bh-accion-de-cambio>
+                    <p class="text-xs opacity-80">Reservamos tus impresos durante 15 minutos cuando pasas al pago. No se cobra nada hasta que confirmes el pago.</p>
+                </form>
+            </section>
+        }
+
         @if (!enEdicion)
         {
             <section class="rounded-box border border-base-300 bg-base-100 p-4" role="status" aria-label="Estado de tu compra">

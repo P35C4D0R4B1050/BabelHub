@@ -55,13 +55,14 @@ public sealed class PantallasDelCheckoutTests
         Linea("Cien años de soledad", FormatoDeEdicion.Digital, 1, 20m, DisponibilidadDeLineaDeCheckout.DisponibleAlInstante),
     ];
 
-    private static async Task<AnfitrionWeb> Iniciar(CheckoutDelClienteFalso falso)
+    private static async Task<AnfitrionWeb> Iniciar(CheckoutDelClienteFalso falso, ExigenciaDeVerificacionFalsa? exigencia = null, ITextosLegales? textos = null)
     {
         var actor = new ActorFijo(ActorActual.DeUsuario(Guid.NewGuid(), "cliente", null));
         return await AnfitrionWeb.Iniciar(servicios =>
         {
             servicios.AddSingleton<ICheckoutDelCliente>(falso);
-            servicios.AddSingleton<IExigenciaDeVerificacionDePersona>(new ExigenciaDeVerificacionFalsa());
+            servicios.AddSingleton<IExigenciaDeVerificacionDePersona>(exigencia ?? new ExigenciaDeVerificacionFalsa());
+            servicios.AddSingleton<ITextosLegales>(textos ?? new TextosDelCarrito());
             servicios.AddSingleton<IActorActual>(actor);
             servicios.AddSingleton<IListaDeSucursales>(new ListaDePrueba());
             servicios.AddSingleton(new OpcionesDeVerificacionWeb("clave-de-sitio-de-prueba"));
@@ -296,5 +297,196 @@ public sealed class PantallasDelCheckoutTests
 
         Assert.Contains("Tu carrito cambió", crudo, StringComparison.Ordinal);
         Assert.DoesNotContain("<script>alert(1)</script>", crudo, StringComparison.Ordinal);
+    }
+
+    // ---------- Datos y aceptaciones (T35) ----------
+
+    private sealed class TextosCaidos : ITextosLegales
+    {
+        public Task<Resultado<TextoLegal>> Obtener(TipoDeTextoLegal tipo, CancellationToken cancelacion = default) =>
+            Task.FromResult(Resultado<TextoLegal>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "texto-no-disponible")));
+    }
+
+    private static VistaDelCheckout ConEntrega(IReadOnlyList<LineaDeRevision> lineas, IReadOnlyList<AceptacionDeCompra>? aceptaciones = null, ConsentimientoDeWhatsAppDeCompra? consentimiento = null)
+    {
+        var subtotal = lineas.Sum(l => l.Importe);
+        return new VistaDelCheckout(EstadoVisibleDelCheckout.EnEdicion, 3, 5, lineas, TipoDeEntregaDeCompra.Recojo, "LIM", null, subtotal, 0m, subtotal, null, aceptaciones ?? [], [], null, null, false, consentimiento);
+    }
+
+    private static KeyValuePair<string, string>[] CamposDePago(params KeyValuePair<string, string>[] extra) =>
+        [new("terminosVersion", "t-1"), new("privacidadVersion", "p-1"), new("reembolsoDigitalVersion", "r-1"), new("totalVisto", "140.00"), .. extra];
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-11")]
+    public async Task Despues_de_elegir_la_entrega_se_ofrecen_los_textos_con_su_version_vigente_el_total_visto_y_el_desafio_de_persona()
+    {
+        await using var anfitrion = await Iniciar(Con(ConEntrega(Mixto)));
+
+        var (html, _) = await Pedir(anfitrion);
+
+        Assert.Contains("action=\"/checkout\"", html, StringComparison.Ordinal);
+        Assert.Contains("name=\"terminosVersion\" value=\"t-1\"", html, StringComparison.Ordinal);
+        Assert.Contains("name=\"privacidadVersion\" value=\"p-1\"", html, StringComparison.Ordinal);
+        Assert.Contains("name=\"reembolsoDigitalVersion\" value=\"r-1\"", html, StringComparison.Ordinal);
+        Assert.Contains("Acepto los términos y condiciones.", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/legal/terminos\" target=\"_blank\" rel=\"noopener\"", html, StringComparison.Ordinal);
+        Assert.Contains("name=\"totalVisto\" value=\"140.00\"", html, StringComparison.Ordinal);
+        Assert.Contains("cf-turnstile", html, StringComparison.Ordinal);
+        Assert.Contains("clave-de-sitio-de-prueba", html, StringComparison.Ordinal);
+        Assert.Contains("Ir al pago · " + FormatoPeruano.Soles(140m), html, StringComparison.Ordinal);
+        Assert.Contains("15 minutos", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Sin_entrega_elegida_no_se_ofrece_pagar_y_una_compra_solo_digital_si_con_su_politica_de_reembolso()
+    {
+        await using var sinEntrega = await Iniciar(Con(Vista(Mixto)));
+        var digital = new[] { Linea("Digital", FormatoDeEdicion.Digital, 1, 20m, DisponibilidadDeLineaDeCheckout.DisponibleAlInstante) };
+        await using var soloDigital = await Iniciar(Con(Vista(digital, paso: 2, total: 4)));
+
+        var (antes, _) = await Pedir(sinEntrega);
+        var (conDigital, _) = await Pedir(soloDigital);
+
+        Assert.DoesNotContain("Tus datos y aceptaciones", antes, StringComparison.Ordinal);
+        Assert.Contains("Tus datos y aceptaciones", conDigital, StringComparison.Ordinal);
+        Assert.Contains("la política de reembolso de libros digitales", conDigital, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Un_texto_ya_aceptado_en_su_version_vigente_sale_marcado_y_uno_de_otra_version_no()
+    {
+        var aceptadas = new[]
+        {
+            new AceptacionDeCompra(TextoLegalDeCompra.Terminos, "t-1", DateTimeOffset.UtcNow),
+            new AceptacionDeCompra(TextoLegalDeCompra.Privacidad, "p-0", DateTimeOffset.UtcNow),
+        };
+        await using var anfitrion = await Iniciar(Con(ConEntrega(Mixto, aceptadas)));
+
+        var (html, _) = await Pedir(anfitrion);
+
+        Assert.Matches("name=\"terminosVersion\" value=\"t-1\" checked", html);
+        Assert.DoesNotMatch("name=\"privacidadVersion\" value=\"p-1\" checked", html);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-16")]
+    public async Task El_consentimiento_de_WhatsApp_es_opcional_sin_marcar_con_la_huella_y_solo_si_se_ofrece()
+    {
+        await using var seOfrece = await Iniciar(Con(ConEntrega(Mixto, consentimiento: new ConsentimientoDeWhatsAppDeCompra(EstadoDelConsentimientoDeCompra.SeOfrece, "***321"))));
+        await using var noSeOfrece = await Iniciar(Con(ConEntrega(Mixto, consentimiento: new ConsentimientoDeWhatsAppDeCompra(EstadoDelConsentimientoDeCompra.NoSeOfrece))));
+        await using var yaConsiente = await Iniciar(Con(ConEntrega(Mixto, consentimiento: new ConsentimientoDeWhatsAppDeCompra(EstadoDelConsentimientoDeCompra.YaConsiente))));
+
+        var (ofrecido, _) = await Pedir(seOfrece);
+        var (ausente, _) = await Pedir(noSeOfrece);
+        var (existente, _) = await Pedir(yaConsiente);
+
+        Assert.Contains("name=\"consentimientoDeWhatsApp\" value=\"true\"", ofrecido, StringComparison.Ordinal);
+        Assert.DoesNotMatch("name=\"consentimientoDeWhatsApp\" value=\"true\" checked", ofrecido);
+        Assert.Contains("name=\"huellaDelNumero\" value=\"***321\"", ofrecido, StringComparison.Ordinal);
+        Assert.Contains("al número ***321 (opcional", ofrecido, StringComparison.Ordinal);
+        Assert.DoesNotContain("consentimientoDeWhatsApp", ausente, StringComparison.Ordinal);
+        Assert.Contains("Ya recibes avisos de tus pedidos por WhatsApp.", existente, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Con_un_problema_en_las_lineas_o_sin_los_textos_el_boton_de_pagar_queda_inactivo_y_se_explica()
+    {
+        var agotada = new[] { Linea("Libro", FormatoDeEdicion.Impresa, 1, 10m, DisponibilidadDeLineaDeCheckout.Agotada) };
+        await using var conProblema = await Iniciar(Con(ConEntrega(agotada)));
+        await using var sinTextos = await Iniciar(Con(ConEntrega(Mixto)), textos: new TextosCaidos());
+
+        var (problema, _) = await Pedir(conProblema);
+        var (caidos, _) = await Pedir(sinTextos);
+
+        Assert.Matches("<button type=\"submit\" class=\"btn btn-primary\" disabled", problema);
+        Assert.Contains("Resuelve los avisos de arriba para pasar al pago.", problema, StringComparison.Ordinal);
+        Assert.Matches("<button type=\"submit\" class=\"btn btn-primary\" disabled", caidos);
+        Assert.Contains("No podemos mostrar los textos legales ahora", caidos, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-27")]
+    public async Task Pasar_al_pago_con_exito_redirige_a_la_pantalla_de_Pagos_con_un_303()
+    {
+        await using var anfitrion = await Iniciar(Con(ConEntrega(Mixto)));
+
+        var (_, respuesta, _) = await Enviar(anfitrion, "/checkout", CamposDePago());
+
+        Assert.Equal(HttpStatusCode.SeeOther, respuesta.StatusCode);
+        Assert.Equal("/checkout/pago", respuesta.Headers.Location?.OriginalString);
+    }
+
+    [Theory]
+    [InlineData("checkout-total-cambio", CategoriaDeError.Conflicto, 409, "El total cambió")]
+    [InlineData("checkout-reserva-rechazada", CategoriaDeError.Conflicto, 409, "No pudimos reservar tus libros")]
+    [InlineData("checkout-en-curso", CategoriaDeError.Conflicto, 409, "Estamos preparando tu compra")]
+    [InlineData("checkout-stock-no-validable", CategoriaDeError.NoDisponible, 503, "No podemos validar el stock ahora")]
+    [InlineData("checkout-correo-sin-verificar", CategoriaDeError.Prohibido, 403, "Verifica tu correo para pagar")]
+    [InlineData("checkout-textos-pendientes", CategoriaDeError.Prohibido, 403, "Acepta los textos legales vigentes")]
+    [InlineData("checkout-cuenta-no-puede-comprar", CategoriaDeError.Prohibido, 403, "Tu cuenta no puede comprar ahora")]
+    [InlineData("checkout-licencia-no-vigente", CategoriaDeError.Conflicto, 409, "Un libro digital ya no se puede vender")]
+    [InlineData("checkout-texto-cambio", CategoriaDeError.Conflicto, 409, "Actualizamos nuestros textos")]
+    public async Task Cada_bloqueo_del_paso_de_reserva_se_dice_en_la_misma_pantalla_con_su_texto_y_el_carrito_conservado(string clave, CategoriaDeError categoria, int estado, string titulo)
+    {
+        var falso = Con(ConEntrega(Mixto));
+        falso.RespuestaDePago = Resultado<ResultadoDePasarAlPago>.Fallo(new ErrorDeAplicacion(categoria, clave));
+        await using var anfitrion = await Iniciar(falso);
+
+        var (html, respuesta, _) = await Enviar(anfitrion, "/checkout", CamposDePago());
+
+        Assert.Equal(estado, (int)respuesta.StatusCode);
+        Assert.Contains(titulo, html, StringComparison.Ordinal);
+        Assert.Contains("role=\"alert\"", html, StringComparison.Ordinal);
+        Assert.Contains("Estructuras de datos", html, StringComparison.Ordinal);
+        Assert.Contains("Ir al pago · ", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-14")]
+    public async Task El_limite_de_reservas_dice_a_que_hora_de_Lima_se_puede_reintentar()
+    {
+        var hasta = new DateTimeOffset(2030, 5, 1, 20, 42, 0, TimeSpan.Zero);
+        var falso = Con(ConEntrega(Mixto));
+        falso.RespuestaDePago = Resultado<ResultadoDePasarAlPago>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Limite, "limite-excedido", [new ErrorDeCampo("disponibleDesde", hasta.ToString("O", System.Globalization.CultureInfo.InvariantCulture))]));
+        await using var anfitrion = await Iniciar(falso);
+
+        var (html, respuesta, _) = await Enviar(anfitrion, "/checkout", CamposDePago());
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, respuesta.StatusCode);
+        Assert.Contains("Podrás intentarlo de nuevo a las 15:42 (hora de Lima)", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Falta_aceptar_un_texto_se_dice_junto_a_su_casilla_y_lo_marcado_se_conserva()
+    {
+        var falso = Con(ConEntrega(Mixto));
+        falso.RespuestaDeVistaPorLlamada = llamada => llamada == "aceptaciones"
+            ? Resultado<VistaDelCheckout>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Validacion, "checkout-aceptacion-requerida", [new ErrorDeCampo("privacidad", "obligatorio")]))
+            : null;
+        await using var anfitrion = await Iniciar(falso);
+
+        var (html, respuesta, _) = await Enviar(anfitrion, "/checkout", new KeyValuePair<string, string>("terminosVersion", "t-1"), new("totalVisto", "140.00"));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, respuesta.StatusCode);
+        Assert.Contains("Falta aceptar los textos", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"error-privacidadVersion\"", html, StringComparison.Ordinal);
+        Assert.Matches("name=\"terminosVersion\" value=\"t-1\" checked", html);
+        Assert.DoesNotContain("pagar", falso.Llamadas);
+    }
+
+    [Theory]
+    [InlineData(ResultadoDeExigencia.Requerida, "Confirma que eres una persona")]
+    [InlineData(ResultadoDeExigencia.Fallida, "No pudimos verificarte")]
+    public async Task Sin_la_verificacion_de_persona_se_dice_en_la_pantalla_y_no_se_llama_a_la_Aplicacion(ResultadoDeExigencia resultado, string titulo)
+    {
+        var falso = Con(ConEntrega(Mixto));
+        await using var anfitrion = await Iniciar(falso, new ExigenciaDeVerificacionFalsa { Resultado = resultado });
+
+        var (html, respuesta, _) = await Enviar(anfitrion, "/checkout", CamposDePago());
+
+        Assert.Equal(HttpStatusCode.Forbidden, respuesta.StatusCode);
+        Assert.Contains(titulo, html, StringComparison.Ordinal);
+        Assert.DoesNotContain("pagar", falso.Llamadas);
+        Assert.DoesNotContain("aceptaciones", falso.Llamadas);
     }
 }

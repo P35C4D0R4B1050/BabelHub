@@ -86,6 +86,14 @@ public static class PantallasDelCarrito
             modelo.AlertaMensaje = error.Categoria == CategoriaDeError.Validacion ? "Corrige los campos marcados e inténtalo de nuevo." : "No se hizo ningún cobro y tu carrito se conservó.";
         }
 
+        if (error.Categoria == CategoriaDeError.Limite)
+        {
+            modelo.AlertaTitulo = "Demasiados intentos";
+            modelo.AlertaMensaje = ProblemasDelCarrito.ReintentarEn(error) is { } hasta
+                ? $"Podrás intentarlo de nuevo a las {Web.Formato.FormatoPeruano.Hora(hasta)} (hora de Lima). Tu carrito se conservó y no se hizo ningún cobro."
+                : "Espera unos minutos e inténtalo de nuevo. Tu carrito se conservó y no se hizo ningún cobro.";
+        }
+
         var porCampo = new Dictionary<string, string>(StringComparer.Ordinal);
         if (error.Categoria == CategoriaDeError.Validacion)
         {

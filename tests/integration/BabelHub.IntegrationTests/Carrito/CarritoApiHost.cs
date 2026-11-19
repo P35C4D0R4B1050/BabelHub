@@ -108,6 +108,7 @@ public sealed class CarritoApiHost : IAsyncDisposable
         builder.Services.AddSingleton<ICarritoDelCliente>(Carrito);
         builder.Services.AddSingleton<ICheckoutDelCliente>(Checkout);
         builder.Services.AddSingleton<IExigenciaDeVerificacionDePersona>(Verificacion);
+        builder.Services.AddSingleton<ITextosLegales>(new TextosDelCarrito());
         builder.Services.AddSingleton<IRegistradorDeDenegacionesHttp>(Denegaciones);
         builder.Services.AddSingleton(new OpcionesDelHostWeb(HostWeb.Tienda, []));
         builder.Services.AgregarProteccionContraFalsificacion();
