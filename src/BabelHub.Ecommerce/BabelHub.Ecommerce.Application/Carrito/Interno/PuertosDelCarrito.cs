@@ -205,7 +205,7 @@ public interface IRepositorioDeCarritos
     Task<int> EliminarDeVisitantesVencidos(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default);
 
     /// <summary>Elimina las constancias de fusión anteriores a <paramref name="antesDe"/> (30 días) y devuelve cuántas.</summary>
-    Task<int> EliminarFusionesAnterioresA(DateTimeOffset antesDe, CancellationToken cancelacion = default);
+    Task<int> EliminarFusionesAnterioresA(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default);
 
     /// <summary>Elimina los avisos vistos antes de <paramref name="vistosAntesDe"/> (30 días después de vistos) o creados antes de <paramref name="creadosAntesDe"/> (90 días) y devuelve cuántos.</summary>
     Task<int> EliminarAvisosVencidos(DateTimeOffset vistosAntesDe, DateTimeOffset creadosAntesDe, CancellationToken cancelacion = default);
@@ -229,14 +229,14 @@ public interface IRepositorioDeCheckouts
     /// <summary>El checkout vivo de la cuenta (<c>en_edicion</c>, <c>reservando</c>, <c>en_pago</c> o <c>pago_pendiente</c>); <see langword="null"/> si no hay.</summary>
     Task<Checkout?> ObtenerVivoDeCuenta(Guid cuentaId, bool conBloqueo, CancellationToken cancelacion = default);
 
-    /// <summary>El checkout cuyo <c>pedido_id</c> o <c>pedido_descartado</c> es el dado (vivo o terminado).</summary>
+    /// <summary>El checkout cuyo <c>pedido_id</c>, <c>pedido_descartado</c> o <c>pedido_a_liberar</c> es el dado (vivo o terminado).</summary>
     Task<Checkout?> ObtenerPorPedido(Guid pedidoId, bool conBloqueo, CancellationToken cancelacion = default);
 
     /// <summary>Los checkouts vivos que la persona no modifica desde <paramref name="antesDe"/> o antes (30 días, inclusive: «a los 30 días»): su cuenta y su estado, sin bloqueo, para aplicarles el vencimiento condicional (CAR-34).</summary>
     Task<IReadOnlyList<Guid>> CuentasConCheckoutVivoSinMovimientoDesde(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default);
 
     /// <summary>Elimina los checkouts terminados (<c>pagado</c>, <c>cancelado</c>, <c>reiniciado</c>) modificados por la persona hasta <paramref name="antesDe"/> (30 días, inclusive) y <b>sin una reserva por liberar</b> (si no, se perdería la anotación que reintenta <c>LiberarReservasPendientes</c>), y devuelve cuántos: solo guardan cuenta, pedido y fechas.</summary>
-    Task<int> EliminarTerminadosAnterioresA(DateTimeOffset antesDe, CancellationToken cancelacion = default);
+    Task<int> EliminarTerminadosAnterioresA(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default);
 
     /// <summary>Cuántos checkouts están <c>pago_pendiente</c> desde antes de <paramref name="antesDe"/> (45 minutos): lo que Pagos debía resolver (AUD-31).</summary>
     Task<int> ContarConElPagoPendienteDesdeAntesDe(DateTimeOffset antesDe, CancellationToken cancelacion = default);
@@ -317,7 +317,7 @@ public interface ILimitadorDelCarrito
 
 /// <summary>
 /// La auditoría de Carrito (plan §6): en la <b>misma transacción</b> del caso de uso, y si no se puede auditar la operación falla. Sin datos personales, sin la cookie del visitante ni su huella. Es un puerto propio hasta que
-/// el catálogo de acciones de auditoría (<c>AccionesAuditables</c>, del carril de auditoría) tenga las de Carrito: la Infraestructura lo implementa sobre <c>IAuditoria</c> (T25). Cada tarea agrega el método de su evento.
+/// el catálogo de acciones de auditoría (<c>AccionesAuditables</c>, del carril de auditoría) tenga las de Carrito: la Infraestructura lo implementa sobre <c>IAuditoria</c> (T26b). Cada tarea agrega el método de su evento.
 /// </summary>
 public interface IAuditoriaDelCarrito
 {
@@ -330,11 +330,14 @@ public interface IAuditoriaDelCarrito
     /// <summary>El checkout terminó por voluntad de la persona (<c>volver</c> o <c>reiniciar</c>); sin datos personales.</summary>
     Task CheckoutTerminado(string motivo, CancellationToken cancelacion = default);
 
-    /// <summary>Identidad pidió eliminar el carrito y los datos de entrega de una cuenta (reemplazo de una cuenta sin verificar o cancelación): sin datos personales; el motivo es <c>reemplazo</c> o <c>cancelacion</c>.</summary>
+    /// <summary>Identidad pidió eliminar el carrito y los datos de entrega de una cuenta (reemplazo de una cuenta sin verificar o cancelación): sin datos personales; el motivo es <c>reemplazo</c>, <c>cancelacion</c> o <c>cuenta-inactiva</c> (la purga de una cuenta que Identidad ya no tiene activa) o <c>cancelacion</c>.</summary>
     Task CarritoEliminadoPorIdentidad(string motivo, CancellationToken cancelacion = default);
 
     /// <summary>Una corrida de purga: cuántos registros eliminó o venció de cada tipo (solo conteos, sin datos personales; D09).</summary>
     Task PurgaRealizada(string trabajo, int cantidad, CancellationToken cancelacion = default);
+
+    /// <summary>Se abortó el paso al pago (o lo recuperó el trabajo de fondo) con un motivo cerrado (por ejemplo <c>reserva-expirada</c>, <c>plazo-cambiado</c>, <c>recuperacion</c>): sin datos personales ni identificadores (DD-11).</summary>
+    Task PasoAlPagoAbortado(string motivo, CancellationToken cancelacion = default);
 
     /// <summary>Se pasó al pago (la intención creada y el checkout en <c>en_pago</c>): con o sin impresos y el tipo de entrega; sin contacto, sin cuenta ni pedido en el detalle (D13).</summary>
     Task PasoAlPagoIniciado(bool conImpresos, bool aDomicilio, CancellationToken cancelacion = default);
@@ -445,7 +448,7 @@ public interface IAlertasDelCarrito
     Task Publicar(TipoDeAlertaDelCarrito tipo, int cantidad, CancellationToken cancelacion = default);
 }
 
-/// <summary>Un pedido cuya reserva falta por liberar (el <c>pedido_descartado</c> o el <c>pedido_id</c> del checkout).</summary>
+/// <summary>Un pedido cuya reserva falta por liberar: el <c>pedido_a_liberar</c> del checkout, que no es necesariamente su <c>pedido_id</c> vivo.</summary>
 public sealed record PedidoPorLiberar(Guid CheckoutId, Guid PedidoId);
 
 /// <summary>Un checkout <c>reservando</c> atascado: la cuenta, el pedido y la generación leídos, de modo que el aborto sea condicional a ellos (no toca uno que ya pasó a <c>en_pago</c>).</summary>

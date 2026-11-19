@@ -41,7 +41,7 @@ internal sealed class PurgarCarritosDeVisitante(ServiciosDelCarrito servicios) :
             async token =>
             {
                 var carritos = await servicios.Carritos.EliminarDeVisitantesVencidos(ahora, TrabajosDelCarrito.MaximoPorCorrida, token).ConfigureAwait(false);
-                var fusiones = await servicios.Carritos.EliminarFusionesAnterioresA(ahora - TrabajosDelCarrito.Retencion, token).ConfigureAwait(false);
+                var fusiones = await servicios.Carritos.EliminarFusionesAnterioresA(ahora - TrabajosDelCarrito.Retencion, TrabajosDelCarrito.MaximoPorCorrida, token).ConfigureAwait(false);
                 await servicios.Auditoria.PurgaRealizada("carritos-de-visitante", carritos + fusiones, token).ConfigureAwait(false);
                 return carritos + fusiones;
             },
@@ -93,7 +93,7 @@ internal sealed class PurgarContactoYCheckoutsVencidos(ServiciosDelCheckout serv
         var tocados = 0;
 
         // 1. Los terminados de 30 días o más (solo guardan cuenta, pedido y fechas; el repositorio no borra los que aún tienen una reserva por liberar). Va primero para que un checkout que esta misma corrida cancela por vencimiento se borre en la siguiente, no en esta.
-        tocados += await carrito.Unidad.Ejecutar(token => carrito.Checkouts.EliminarTerminadosAnterioresA(antes, token), cancelacion).ConfigureAwait(false);
+        tocados += await carrito.Unidad.Ejecutar(token => carrito.Checkouts.EliminarTerminadosAnterioresA(antes, TrabajosDelCarrito.MaximoPorCorrida, token), cancelacion).ConfigureAwait(false);
 
         // 2. Los checkouts vivos que la persona no toca desde hace 30 días.
         foreach (var cuenta in await carrito.Checkouts.CuentasConCheckoutVivoSinMovimientoDesde(antes, TrabajosDelCarrito.MaximoPorCorrida, cancelacion).ConfigureAwait(false))
@@ -165,7 +165,7 @@ internal sealed class PurgarContactoYCheckoutsVencidos(ServiciosDelCheckout serv
                     await carrito.Carritos.AgregarAvisos(cuenta, carrito.AvisosDeRetiro(efecto.Retiradas, new Dictionary<Guid, EdicionConsultada>(), ahora), token).ConfigureAwait(false);
                 }
 
-                return checkout.ReservaALiberarDesde is null ? Guid.Empty : checkout.PedidoId ?? checkout.PedidoDescartado;
+                return checkout.PedidoALiberar is { } aLiberar && checkout.ReservaALiberarDesde is not null ? aLiberar : Guid.Empty;
             },
             cancelacion).ConfigureAwait(false);
 

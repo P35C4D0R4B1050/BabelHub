@@ -75,16 +75,25 @@ internal sealed class ReservarImpresos(ServiciosDelCheckout servicios)
         }
     }
 
+    /// <summary>La clave de la reserva está mal derivada (defecto, no estado de la compra): alerta técnica y aborto; la alerta no interrumpe el caso de uso.</summary>
+    private async Task<ResultadoDelPasoDeReserva> AbortarPorClaveEnConflicto(CancellationToken cancelacion)
+    {
+        try
+        {
+            await servicios.Alertas.Publicar(TipoDeAlertaDelCarrito.ClaveDeReservaEnConflicto, 1, cancelacion).ConfigureAwait(false);
+        }
+        catch (Exception excepcion) when (excepcion is not OperationCanceledException)
+        {
+            // Una falla del canal de alertas nunca interrumpe el caso de uso.
+        }
+
+        return Abortar("clave-de-reserva-en-conflicto", new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDelCarrito.ServicioNoDisponible));
+    }
+
     /// <summary>
     /// Lo que devolvió <c>Reservar</c>: si ya expiró (repetir la clave la devuelve aunque haya vencido, DD-03) se aborta con un pedido nuevo; si la fuente, el traslado o el plazo difieren de lo que se le informó a la persona (CAR-27), se aborta
     /// con el plazo nuevo para que lo acepte viéndolo, y lo devuelto pasa a ser lo informado.
     /// </summary>
-    private async Task<ResultadoDelPasoDeReserva> AbortarPorClaveEnConflicto(CancellationToken cancelacion)
-    {
-        await servicios.Alertas.Publicar(TipoDeAlertaDelCarrito.ClaveDeReservaEnConflicto, 1, cancelacion).ConfigureAwait(false);
-        return Abortar("clave-de-reserva-en-conflicto", new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDelCarrito.ServicioNoDisponible));
-    }
-
     private static ResultadoDelPasoDeReserva Revisar(ReservaObtenida reserva, PasoAlPagoPreparado preparado, DateTimeOffset ahora)
     {
         if (reserva.ExpiraEn <= ahora)
@@ -165,6 +174,13 @@ internal sealed class AbortarElPasoAlPago(ServiciosDelCheckout servicios)
         // Desde en_pago: primero Cancelar; el cambio local solo con una respuesta final (D21). Sin respuesta no hay cambio local.
         if (solicitud.Desde == EstadoDelCheckout.EnPago)
         {
+            // Antes de tocar a Pagos: si otra solicitud ya cambió el checkout (estado, pedido o generación), la intención vigente es la suya y no se cancela (D21).
+            var vigente = await carrito.Checkouts.ObtenerVivoDeCuenta(solicitud.CuentaId, conBloqueo: false, cancelacion).ConfigureAwait(false);
+            if (vigente is null || vigente.Estado != EstadoDelCheckout.EnPago || vigente.PedidoId != solicitud.PedidoId || vigente.GeneracionDeReserva != solicitud.Generacion)
+            {
+                return DesenlaceDelAborto.NoAplica;
+            }
+
             ResultadoDeCancelarIntencion cancelada;
             try
             {
@@ -235,6 +251,8 @@ internal sealed class AbortarElPasoAlPago(ServiciosDelCheckout servicios)
             await carrito.Carritos.AgregarAvisos(solicitud.CuentaId, carrito.AvisosDeRetiro(efecto.Retiradas, new Dictionary<Guid, EdicionConsultada>(), ahora), cancelacion).ConfigureAwait(false);
         }
 
+        // La auditoría va en la misma transacción (DD-11): el motivo es un valor cerrado, sin datos personales.
+        await carrito.Auditoria.PasoAlPagoAbortado(solicitud.Motivo, cancelacion).ConfigureAwait(false);
         return true;
     }
 

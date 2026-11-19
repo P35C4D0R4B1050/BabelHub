@@ -53,8 +53,11 @@ internal sealed class PasarAlPago(ServiciosDelCheckout servicios) : ICasoDeUso<P
                 return Resultado<ResultadoDePasarAlPago>.Fallo(paso.Error!);
         }
 
+        // La expiración se calcula una sola vez (con solo digitales no hay reserva que la fije): la intención y el checkout comparten el mismo instante.
+        var expiraEn = paso.ExpiraEn ?? servicios.Carrito.Reloj.Ahora.AddMinutes(15);
+
         // 3a. La intención de pago.
-        var intencion = await new SolicitarIntencionDePago(servicios).Ejecutar(preparado, paso.ExpiraEn, cancelacion).ConfigureAwait(false);
+        var intencion = await new SolicitarIntencionDePago(servicios).Ejecutar(preparado, expiraEn, cancelacion).ConfigureAwait(false);
         switch (intencion.Desenlace)
         {
             case DesenlaceDeLaIntencion.Abortar:
@@ -69,8 +72,18 @@ internal sealed class PasarAlPago(ServiciosDelCheckout servicios) : ICasoDeUso<P
                 return await EstadoActual(preparado, cancelacion).ConfigureAwait(false);
         }
 
-        // 3b. Confirmar en pago.
-        var confirmacion = await new ConfirmarEnPago(servicios).Ejecutar(preparado, paso.ExpiraEn, cancelacion).ConfigureAwait(false);
+        // 3b. Confirmar en pago. Si lanza (la auditoría o la base de datos fallan), la intención ya se creó en 3a: se aborta para cancelarla y liberar la reserva, y no se deja al checkout en reservando.
+        ResultadoDeLaConfirmacion confirmacion;
+        try
+        {
+            confirmacion = await new ConfirmarEnPago(servicios).Ejecutar(preparado, expiraEn, cancelacion).ConfigureAwait(false);
+        }
+        catch (Exception excepcion) when (excepcion is not OperationCanceledException)
+        {
+            await Abortar(preparado, EstadoDelCheckout.Reservando, true, "falla-en-confirmacion", null, cancelacion).ConfigureAwait(false);
+            return Resultado<ResultadoDePasarAlPago>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDelCarrito.ServicioNoDisponible));
+        }
+
         switch (confirmacion.Desenlace)
         {
             case DesenlaceDeLaConfirmacion.EnPago:

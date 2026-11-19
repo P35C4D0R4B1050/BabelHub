@@ -31,14 +31,21 @@ internal sealed class LiberadorDeReservas(ServiciosDelCheckout servicios)
 
         if (liberada == ResultadoDeLiberar.PedidoConfirmado)
         {
-            await servicios.Alertas.Publicar(TipoDeAlertaDelCarrito.LiberacionDeUnPedidoConfirmado, 1, cancelacion).ConfigureAwait(false);
+            try
+            {
+                await servicios.Alertas.Publicar(TipoDeAlertaDelCarrito.LiberacionDeUnPedidoConfirmado, 1, cancelacion).ConfigureAwait(false);
+            }
+            catch (Exception excepcion) when (excepcion is not OperationCanceledException)
+            {
+                // Una falla del canal de alertas nunca interrumpe el caso de uso ni deja la anotación sin limpiar.
+            }
         }
 
         await carrito.Unidad.Ejecutar(
             async token =>
             {
                 var checkout = await carrito.Checkouts.ObtenerPorPedido(pedidoId, conBloqueo: true, token).ConfigureAwait(false);
-                if (checkout is { ReservaALiberarDesde: not null } c && (c.PedidoDescartado == pedidoId || c.PedidoId == pedidoId))
+                if (checkout is { ReservaALiberarDesde: not null } c && c.PedidoALiberar == pedidoId)
                 {
                     c.LiberacionConfirmada();
                     await carrito.Checkouts.Guardar(c, token).ConfigureAwait(false);
@@ -161,13 +168,13 @@ internal sealed class SalirDelCheckout(ServiciosDelCheckout servicios, bool rein
         }
 
         await carrito.Auditoria.CheckoutTerminado(reiniciar ? "reiniciar" : "volver", cancelacion).ConfigureAwait(false);
-        return Resultado<Terminado>.Exito(new Terminado(delCarrito, checkout.ReservaALiberarDesde is null ? null : checkout.PedidoId ?? checkout.PedidoDescartado));
+        return Resultado<Terminado>.Exito(new Terminado(delCarrito, checkout.ReservaALiberarDesde is null ? null : checkout.PedidoALiberar));
     }
 }
 
 /// <summary>
 /// <c>LiberarReservasPendientes</c> (T20; trabajo de fondo como «sistema»): reintenta <c>liberar</c> de las reservas anotadas por <c>volver</c>, <c>reiniciar</c>, un aborto o una cancelación cuyo Inventario no respondió, direccionando por el
-/// <c>pedidoId</c> o el <c>pedido_descartado</c>. Cada una sigue las reglas de <see cref="LiberadorDeReservas"/>: la liberada, ya liberada o inexistente se limpia; la de un pedido ya confirmado se limpia <b>sin reintento</b> y se alerta, de modo que no
+/// <c>pedido_a_liberar</c> (explícito, nunca el pedido vivo del checkout). Cada una sigue las reglas de <see cref="LiberadorDeReservas"/>: la liberada, ya liberada o inexistente se limpia; la de un pedido ya confirmado se limpia <b>sin reintento</b> y se alerta, de modo que no
 /// reintenta sin fin; una falla queda para la corrida siguiente. Solo corre con el actor «sistema».
 /// </summary>
 internal sealed class LiberarReservasPendientes(ServiciosDelCheckout servicios) : ICasoDeUso<LiberarReservasPendientesEntrada, ResumenDeLiberaciones>

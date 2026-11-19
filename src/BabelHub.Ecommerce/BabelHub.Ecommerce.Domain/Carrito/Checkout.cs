@@ -87,8 +87,14 @@ public sealed class Checkout
 
     public DateTimeOffset? ReservaExpiraEn { get; private set; }
 
-    /// <summary>Desde cuándo falta liberar la reserva tras volver, reiniciar o abortar; se direcciona por <see cref="PedidoId"/> o <see cref="PedidoDescartado"/>.</summary>
+    /// <summary>Desde cuándo falta liberar la reserva tras volver, reiniciar o abortar; se direcciona por <see cref="PedidoALiberar"/>.</summary>
     public DateTimeOffset? ReservaALiberarDesde { get; private set; }
+
+    /// <summary>
+    /// El pedido cuya reserva falta por liberar, <b>guardado de forma explícita</b> (columna <c>pedido_a_liberar</c>): nunca se deduce de <see cref="PedidoId"/>, porque tras un aborto el checkout puede tener ya un pedido nuevo con una reserva viva que no debe liberarse.
+    /// Una anotación pendiente que otra salida sobrescribe antes de liberarse se acota por la expiración de la reserva (15 minutos).
+    /// </summary>
+    public Guid? PedidoALiberar { get; private set; }
 
     /// <summary>El límite de 30 minutos del pago pendiente, que fija Pagos (D13).</summary>
     public DateTimeOffset? LimitePendienteEn { get; private set; }
@@ -507,9 +513,9 @@ public sealed class Checkout
         }
 
         PedidoDescartado = PedidoId;
-        PedidoId = null;
         GeneracionDeReserva++;
-        ReservaALiberarDesde = RequiereReserva ? ahora : null;
+        AnotarReservaALiberar(pedidoId, ahora);
+        PedidoId = null;
         ReservaExpiraEn = null;
         ReservandoDesde = null;
         Estado = EstadoDelCheckout.EnEdicion;
@@ -622,6 +628,7 @@ public sealed class Checkout
         if (ReservaALiberarDesde is not null)
         {
             ReservaALiberarDesde = null;
+            PedidoALiberar = null;
             Version++;
         }
     }
@@ -837,7 +844,11 @@ public sealed class Checkout
         QuitarContacto();
         LimitePendienteEn = null;
         PagoPendienteDesde = null;
-        ReservaALiberarDesde = PedidoId is not null && RequiereReserva ? ahora : ReservaALiberarDesde;
+        if (PedidoId is { } aLiberar)
+        {
+            AnotarReservaALiberar(aLiberar, ahora);
+        }
+
         var retiradas = carrito.AplicarRetirosPendientes(ahora);
         Cambiar(porLaPersona, ahora);
         return ResultadoDeCheckout.Aplicada(retiradas);
@@ -913,6 +924,16 @@ public sealed class Checkout
         CodigoDeSucursalDeRecojo = null;
         RegionDeEntrega = null;
         QuitarContacto();
+    }
+
+    /// <summary>Anota la reserva de un pedido que falta liberar (solo si hay impresos que reservar); sin impresos conserva la anotación que hubiera.</summary>
+    private void AnotarReservaALiberar(Guid pedido, DateTimeOffset ahora)
+    {
+        if (RequiereReserva)
+        {
+            PedidoALiberar = pedido;
+            ReservaALiberarDesde = ahora;
+        }
     }
 
     private void Cambiar(bool porLaPersona, DateTimeOffset? ahora = null)
