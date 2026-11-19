@@ -225,3 +225,36 @@ public interface IGeneradorDeIdentificadores
     /// <summary>El valor en claro de la cookie del visitante: 32 bytes aleatorios en base64url sin relleno. Solo la Presentación lo escribe; el servidor guarda su SHA-256.</summary>
     string NuevaCookieDeVisitante();
 }
+
+// ---------- Límites de uso ----------
+
+public enum DecisionDeLimiteDelCarrito
+{
+    Permitido,
+
+    /// <summary>Se pasó del límite: <see cref="ResultadoDeLimiteDelCarrito.ReintentarEn"/> dice desde cuándo.</summary>
+    Excedido,
+
+    /// <summary>El almacén de contadores no responde y la política falla cerrada (SEG-26): se responde «servicio no disponible».</summary>
+    NoDisponible,
+}
+
+public sealed record ResultadoDeLimiteDelCarrito(DecisionDeLimiteDelCarrito Decision, DateTimeOffset? ReintentarEn = null)
+{
+    public static ResultadoDeLimiteDelCarrito Permitido { get; } = new(DecisionDeLimiteDelCarrito.Permitido);
+
+    public static ResultadoDeLimiteDelCarrito NoDisponible { get; } = new(DecisionDeLimiteDelCarrito.NoDisponible);
+}
+
+/// <summary>
+/// Los límites de uso de Carrito (plan §6, SEG-05, SEG-07, SEG-26), valores iniciales y configurables: <b>crear carritos de visitante</b>, 10 por origen y hora; <b>agregar o cambiar líneas</b>, 60 por cuenta o por origen y
+/// minuto; <b>pasar al pago</b>, 10 por cuenta y hora y <b>falla cerrado</b>; volver y reiniciar, 20 por cuenta y hora; revisión y entrega, 30 por cuenta y minuto. Un puerto propio hasta que <c>Plataforma</c> defina las
+/// políticas (hallazgo para el carril de plataforma): la Infraestructura lo implementa sobre <c>IControlDeLimites</c> y, mientras tanto, con un doble que falla cerrado en lo que reserva stock.
+/// </summary>
+public interface ILimitadorDelCarrito
+{
+    Task<ResultadoDeLimiteDelCarrito> CrearCarritoDeVisitante(CancellationToken cancelacion = default);
+
+    /// <summary>Agregar, cambiar o quitar una línea: por la cuenta si la hay y, si no, por el origen.</summary>
+    Task<ResultadoDeLimiteDelCarrito> EditarLineas(Guid? cuentaId, CancellationToken cancelacion = default);
+}

@@ -25,6 +25,33 @@ internal static class ClavesDelCarrito
 
     /// <summary>El <c>pedidoId</c> oculto es el propio pero ya terminado o descartado (una pestaña obsoleta): error amable y sin evento de seguridad.</summary>
     public const string PedidoObsoleto = "pedido-obsoleto";
+
+    public const string ValidacionFallida = "validacion-fallida";
+
+    /// <summary>Más unidades de un impreso que el stock vendible de la red (409): el campo <c>maximo</c> lleva el máximo disponible (CAR-04).</summary>
+    public const string SinStock = "carrito-sin-stock";
+
+    public const string LimiteDeLineas = "carrito-limite-de-lineas";
+
+    public const string LimiteDeUnidades = "carrito-limite-de-unidades";
+
+    /// <summary>La cuenta ya posee la edición digital (409, CAR-20): solo con sesión.</summary>
+    public const string DigitalYaPoseida = "digital-ya-poseida";
+
+    public const string EdicionNoDisponible = "edicion-no-disponible";
+
+    public const string LineaNoEncontrada = "linea-no-encontrada";
+
+    public const string PagoPendiente = "checkout-pago-pendiente";
+
+    public const string EnCurso = "checkout-en-curso";
+
+    /// <summary>La cuenta está cancelada, desactivada o no existe: no opera sobre el carrito (el token vive hasta 15 minutos).</summary>
+    public const string CuentaNoPuedeOperar = "cuenta-no-puede-comprar";
+
+    public const string ServicioNoDisponible = "servicio-no-disponible";
+
+    public const string LimiteExcedido = "limite-excedido";
 }
 
 /// <summary>Los motivos de <c>AccesoDenegado</c> que usa el módulo (AUD-05).</summary>
