@@ -13,11 +13,11 @@ Carril A: Plataforma, Auditoría, Notificaciones, Identidad (y su composición e
 - **Sembrador de sesiones** (`d35d2fc0`): `POST /desarrollo/sesion`, solo Debug + Development, loopback, clave `BABELHUB__Sembrador__Clave`. Uso en `tests/e2e/README.md`.
 - **D20 en Identidad** (`7fc74b69`): sucursal del encargado por código, validada contra `sucursales.listar` (`ICatalogoDeSucursales`).
 - **Lista de usuarios y sesión reconocida** (`cf856c3b`): `IAdministracionDeUsuarios.Listar`, `IDispositivosDeLaCuenta.Reconoce`, pantalla de usuarios.
-- **D20 opción (b) en el Inventario** (ver §3 si aún no está commiteado): `Fuente.IdentificadorDe(codigo)` es el `Id` de toda fuente.
+- **D20 opción (b) en el Inventario** (`41cc7a6b`): `Fuente.IdentificadorDe(codigo)` es el `Id` de toda fuente; revisado por seguridad y arquitectura sin Bloqueantes ni Importantes de código.
 
 ## 3. En curso
 
-- Cambio del Inventario (opción b): código, pruebas y documentación listos y verdes; **faltaba cerrar los revisores de seguridad y arquitectura y commitear**. Revisa `git status`: si hay cambios en `src/BabelHub.Inventario/.../Fuentes`, `tests/.../Fuentes`, `docs/03/08` (fila D20) y `specs/inventario-fuentes/decisiones-de-implementacion.md`, son esos; corre las pruebas de Fuentes/Reservas/VerificadorDelInventario y commitea.
+- Nada a medias: todo lo anterior está commiteado (suma el relevo). Aviso de datos anteriores a D20 en `progress/hallazgos.md` (recrear bases de desarrollo antes de desplegar con datos).
 - **No tomar ECO-8 (biblioteca digital)**: va a un carril nuevo (decisión del coordinador, plan del sprint 2).
 
 ## 4. Decisiones vigentes
