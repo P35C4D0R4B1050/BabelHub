@@ -50,7 +50,8 @@ public sealed class PostgresDePedidosFixture : IAsyncLifetime
             + DefinicionDePedidos.Permisos);
         await preparacion.ExecuteNonQueryAsync();
 
-        var cadena = new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString()) { Username = "acceso", Password = ClaveDeAcceso };
+        var clave = ClaveDeAcceso;
+        var cadena = new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString()) { Username = "acceso", Password = clave };
         Acceso = NpgsqlDataSource.Create(cadena.ConnectionString);
         Unidad = new UnidadDeTrabajoPostgres(Acceso);
         Pedidos = new RepositorioDePedidosPostgres(new AccesoAlEsquemaDePedidos(Unidad, Unidad));
