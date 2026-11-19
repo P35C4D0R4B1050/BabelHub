@@ -102,18 +102,25 @@ public sealed class EmisionDeCodigos(ICodigosDeUnSoloUso codigos, IHuellasDeIden
     /// <summary>El motivo del catálogo cerrado para una dependencia no necesaria que falló (el correo de un código): la alerta técnica de IDE-65.</summary>
     public const string MotivoDeFallaDelCorreo = "dependencia-no-necesaria-fallida";
 
-    public Task Emitir(Usuario usuario, DominioProposito proposito, CancellationToken cancelacion)
+    public Task Emitir(Usuario usuario, DominioProposito proposito, CancellationToken cancelacion, bool cupoYaReservado = false)
     {
         ArgumentNullException.ThrowIfNull(usuario);
-        return EmitirA(usuario, usuario.Correo, proposito, cancelacion);
+        return EmitirA(usuario, usuario.Correo, proposito, cancelacion, cupoYaReservado);
     }
 
     /// <summary>
     /// Emite el código y lo envía a <paramref name="correoDestino"/>: la dirección registrada del titular, o la <b>del correo nuevo guardado en el cambio de correo en curso</b> (nunca la de la solicitud en vuelo, SEG-28).
     /// </summary>
-    public async Task EmitirA(Usuario usuario, string correoDestino, DominioProposito proposito, CancellationToken cancelacion)
+    public async Task EmitirA(Usuario usuario, string correoDestino, DominioProposito proposito, CancellationToken cancelacion, bool cupoYaReservado = false)
     {
         ArgumentNullException.ThrowIfNull(usuario);
+        // El tope de 10 al día por origen del consumo del cupo de códigos (IDE-83) se reserva **antes** de invalidar el código vigente, para no dejar a la persona sin código si el tope lo impide. Lo reserva el camino
+        // síncrono de la solicitud (<see cref="SolicitudDeCodigos.Reservar"/>), donde existe el origen; el trabajo en segundo plano no tiene origen y llega con <paramref name="cupoYaReservado"/>.
+        if (!cupoYaReservado && !await ReservarElCupoDelOrigen(cancelacion).ConfigureAwait(false))
+        {
+            return;
+        }
+
         var ahora = reloj.Ahora;
         var codigo = CodigoDeUnSoloUso.Generar();
         var emitido = CodigoDeUnSoloUso.Emitir(usuario.Id, proposito, huellas.DeCodigo(usuario.Id, proposito, codigo), ahora);
@@ -121,19 +128,26 @@ public sealed class EmisionDeCodigos(ICodigosDeUnSoloUso codigos, IHuellasDeIden
 
         try
         {
-            // El tope de 10 al día por origen del consumo del cupo de códigos (IDE-83): superado, o sin el almacén de contadores, el código no sale (falla cerrada) y la respuesta es la misma. El código ya emitido vence solo.
-            var cupo = await limites.Reservar(PoliticasDeLimite.CupoDeCodigosPorOrigen, cancelacion: cancelacion).ConfigureAwait(false);
-            if (!cupo.EsPermitido)
-            {
-                return;
-            }
-
             var mensaje = CorreoDeCodigo.ParaElTitular(correoDestino, PropositoDelCorreoDe(proposito), new ValorSecreto(codigo));
             await correo.EnviarCodigo(mensaje, cancelacion).ConfigureAwait(false);
         }
         catch (Exception) when (!cancelacion.IsCancellationRequested)
         {
             await AlertarSinInterrumpir().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Superado el tope, o sin el almacén de contadores (falla cerrada), el código no sale y la respuesta a la persona es la misma.</summary>
+    private async Task<bool> ReservarElCupoDelOrigen(CancellationToken cancelacion)
+    {
+        try
+        {
+            return (await limites.Reservar(PoliticasDeLimite.CupoDeCodigosPorOrigen, cancelacion: cancelacion).ConfigureAwait(false)).EsPermitido;
+        }
+        catch (Exception) when (!cancelacion.IsCancellationRequested)
+        {
+            await AlertarSinInterrumpir().ConfigureAwait(false);
+            return false;
         }
     }
 

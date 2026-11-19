@@ -351,6 +351,53 @@ public sealed class CredencialesEs256Tests
         Assert.Equal(EstadoDeLaCredencial.Invalida, e.Verificador.Verificar(Armar(Cabecera(e.Kid), carga, e.Clave), Ahora).Estado);
     }
 
+    [Theory]
+    [InlineData(15 * 60 + 30, true)]
+    [InlineData(15 * 60 + 31, false)]
+    [InlineData(24 * 60 * 60, false)]
+    [InlineData(0, false)]
+    [Trait("Criterio", "AC-IDE-09")]
+    public void UnaCredencialConMasVidaQueLaDeIdentidadONinguna_SeRechaza_AunqueEstePorBienFirmada(int vidaEnSegundos, bool valida)
+    {
+        var e = new Escenario();
+        var jwt = Armar(Cabecera(e.Kid), Reclamos(Ahora, TimeSpan.FromSeconds(vidaEnSegundos)), e.Clave);
+
+        Assert.Equal(valida ? EstadoDeLaCredencial.Valida : EstadoDeLaCredencial.Invalida, e.Verificador.Verificar(jwt, Ahora).Estado);
+    }
+
+    [Fact]
+    public async Task UnContextoDeOtroEmisor_NoSeLee()
+    {
+        var e = new Escenario();
+        var firma = new Es256FirmaDeContextosDeLectura(new ClaveEnMemoria(e.Kid, e.Clave), e.Fuente, new RelojManual(Ahora));
+        var otro = Armar(
+            Cabecera(e.Kid),
+            new Dictionary<string, object?>
+            {
+                ["iss"] = "otro-emisor",
+                ["sub"] = Guid.NewGuid().ToString("D"),
+                ["aud"] = "pedidos",
+                ["typ"] = "lectura-asistente",
+                ["alcance"] = "leer-pedidos",
+                ["iat"] = Ahora.ToUnixTimeSeconds(),
+                ["exp"] = Ahora.AddMinutes(5).ToUnixTimeSeconds(),
+                ["jti"] = "id",
+            },
+            e.Clave);
+
+        Assert.Null(await firma.Verificar(otro));
+    }
+
+    [Fact]
+    public async Task UnaFotoEstampadaPorUnRelojUnPocoAdelantado_NoRechazaTodoPorUnInstante()
+    {
+        var e = new Escenario();
+        var jwt = await e.Credencial();
+        e.Fuente.Actual = new FotoDeClavesDeVerificacion(e.Foto.Claves, e.Foto.Revocadas, Ahora.AddSeconds(10));
+
+        Assert.Equal(EstadoDeLaCredencial.Valida, e.Verificador.Verificar(jwt, Ahora).Estado);
+    }
+
     // ---------------------------------------------------------------- claves, revocaciones y caché (IDE-61, IDE-85)
 
     [Fact]

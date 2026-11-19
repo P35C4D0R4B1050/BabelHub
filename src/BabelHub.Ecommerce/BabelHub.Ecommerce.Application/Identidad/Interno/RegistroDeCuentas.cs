@@ -74,7 +74,8 @@ public sealed class ProcesarSolicitudDeCodigo(IRepositorioDeCuentas cuentas, Emi
             return;
         }
 
-        await emision.Emitir(cuenta.Usuario, solicitud.Proposito, cancelacion).ConfigureAwait(false);
+        // Sin origen en segundo plano: el cupo del origen (IDE-83) ya lo reservó el camino síncrono de la solicitud.
+        await emision.Emitir(cuenta.Usuario, solicitud.Proposito, cancelacion, cupoYaReservado: true).ConfigureAwait(false);
     }
 
     private static bool LeToca(CuentaDeIdentidad cuenta, PropositoDeCodigo proposito) =>
@@ -351,6 +352,13 @@ public static class SolicitudDeCodigos
         }
 
         var porOrigen = await limites.Reservar(PoliticasDeLimite.CodigosPorOrigen, cancelacion: cancelacion).ConfigureAwait(false);
-        return LimitesDeIdentidad.Rechazo(porOrigen);
+        if (LimitesDeIdentidad.Rechazo(porOrigen) is { } rechazoPorOrigen)
+        {
+            return rechazoPorOrigen;
+        }
+
+        // El cupo de códigos de 10 al día por origen (IDE-83): aquí existe el origen; en el trabajo en segundo plano no.
+        var cupoDelOrigen = await limites.Reservar(PoliticasDeLimite.CupoDeCodigosPorOrigen, cancelacion: cancelacion).ConfigureAwait(false);
+        return LimitesDeIdentidad.Rechazo(cupoDelOrigen);
     }
 }

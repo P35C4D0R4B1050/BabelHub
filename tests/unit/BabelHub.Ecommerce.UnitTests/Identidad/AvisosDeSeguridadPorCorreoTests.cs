@@ -272,7 +272,48 @@ public sealed class AvisosDeSeguridadPorCorreoTests
         }
 
         Assert.Equal(10, e.Correo.Codigos.Count);
-        Assert.Equal(12, e.Codigos.Codigos.Count);
+        Assert.Equal(10, e.Codigos.Codigos.Count);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-62")]
+    public async Task ElCupoDelOrigen_SeReservaEnElCaminoSincrono_YElTrabajoEnSegundoPlanoNoLoGastaOtraVez()
+    {
+        var e = new EntornoDeIdentidad();
+        var cuenta = e.Cuenta("ana@example.com");
+        e.Limites.Maximos["codigos-por-correo"] = 100;
+        e.Limites.Maximos["codigos-por-origen"] = 100;
+
+        for (var i = 0; i < 10; i++)
+        {
+            Assert.Null(await SolicitudDeCodigos.Reservar(e.Limites, e.Huellas, "ana@example.com", "recuperacion", CancellationToken.None));
+        }
+
+        var rechazo = await SolicitudDeCodigos.Reservar(e.Limites, e.Huellas, "ana@example.com", "recuperacion", CancellationToken.None);
+        e.Limites.Maximos["cupo-de-codigos-por-origen"] = 10;
+        var reservasAntes = e.Limites.Cuenta("cupo-de-codigos-por-origen", "origen");
+        await e.SegundoPlano.Ejecutar(new SolicitudDeCodigoEnSegundoPlano("ana@example.com", DominioProposito.RecuperacionDeAcceso));
+
+        Assert.NotNull(rechazo);
+        Assert.Equal(reservasAntes, e.Limites.Cuenta("cupo-de-codigos-por-origen", "origen"));
+        Assert.Single(e.Correo.Codigos);
+        _ = cuenta;
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-56")]
+    public async Task SiElTopeImpideElEnvio_ElCodigoVigenteNoSeInvalida()
+    {
+        var e = new EntornoDeIdentidad();
+        var usuario = Cliente(e);
+        await e.EmisionDeCodigos.Emitir(usuario, DominioProposito.RecuperacionDeAcceso, CancellationToken.None);
+        var vigentes = e.Codigos.Codigos.Count;
+        e.Limites.Maximos["cupo-de-codigos-por-origen"] = 1;
+
+        await e.EmisionDeCodigos.Emitir(usuario, DominioProposito.RecuperacionDeAcceso, CancellationToken.None);
+
+        Assert.Equal(vigentes, e.Codigos.Codigos.Count);
+        Assert.Single(e.Correo.Codigos);
     }
 
     [Fact]

@@ -183,7 +183,7 @@ public sealed class FotoDeClavesDeVerificacion(IReadOnlyDictionary<string, ECDsa
     public DateTimeOffset ObtenidaEn { get; } = obtenidaEn;
 
     /// <summary>Una foto vale hasta 5 minutos: pasado ese plazo (el JWKS no respondió) el verificador rechaza toda credencial (IDE-61).</summary>
-    public bool EstaVigente(DateTimeOffset ahora) => ahora >= ObtenidaEn && ahora - ObtenidaEn <= TimeSpan.FromMinutes(CredencialDeAcceso.RenovacionDeClavesEnMinutos);
+    public bool EstaVigente(DateTimeOffset ahora) => ahora + TimeSpan.FromSeconds(CredencialDeAcceso.DesfaseTolerado) >= ObtenidaEn && ahora - ObtenidaEn <= TimeSpan.FromMinutes(CredencialDeAcceso.RenovacionDeClavesEnMinutos);
 }
 
 /// <summary>De dónde saca el verificador la foto vigente: en el E-commerce, la caché en proceso de <see cref="CacheDeClavesDeVerificacion"/>; en el Inventario, la que renueva de la URL interna configurada.</summary>
@@ -252,6 +252,11 @@ public sealed class Es256VerificadorDeCredenciales(IFuenteDeClavesDeVerificacion
         }
 
         var desfase = TimeSpan.FromSeconds(CredencialDeAcceso.DesfaseTolerado);
+        if (vence <= desde || vence - desde > TimeSpan.FromMinutes(CredencialDeAcceso.VigenciaDeLaCredencialEnMinutos) + desfase)
+        {
+            return Invalida;
+        }
+
         if (ahora + desfase < desde)
         {
             return Invalida;
@@ -345,7 +350,8 @@ public sealed class Es256FirmaDeContextosDeLectura(IClavePrivadaDeFirma claves, 
         }
 
         var c = leido.Carga;
-        if (!TryTexto(c, "sub", out var sujeto) || !Guid.TryParse(sujeto, out var cliente)
+        if (!TryTexto(c, "iss", out var emisor) || !string.Equals(emisor, CredencialDeAcceso.Emisor, StringComparison.Ordinal)
+            || !TryTexto(c, "sub", out var sujeto) || !Guid.TryParse(sujeto, out var cliente)
             || !TryTexto(c, "aud", out var audiencia) || !TryTexto(c, CredencialDeAcceso.ReclamoTipo, out var tipo) || !TryTexto(c, CredencialDeAcceso.ReclamoAlcance, out var alcance)
             || !TryTexto(c, "jti", out var identificador) || !TryInstante(c, "iat", out var emitido) || !TryInstante(c, "exp", out var vence))
         {

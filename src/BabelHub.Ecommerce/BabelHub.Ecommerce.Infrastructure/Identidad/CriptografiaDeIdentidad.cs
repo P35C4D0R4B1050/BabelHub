@@ -364,7 +364,7 @@ public sealed class CsprngGeneradorDeSecretos : IGeneradorDeSecretos
 
     public Guid NuevoIdentificador() => Guid.NewGuid();
 
-    public string ValorOpaco() => Base64Url(RandomNumberGenerator.GetBytes(32));
+    public string ValorOpaco() => Base64Url.Codificar(RandomNumberGenerator.GetBytes(32));
 
     public byte[] SecretoDelSegundoFactor() => RandomNumberGenerator.GetBytes(20);
 
@@ -378,6 +378,4 @@ public sealed class CsprngGeneradorDeSecretos : IGeneradorDeSecretos
 
         return new string(caracteres);
     }
-
-    private static string Base64Url(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 }

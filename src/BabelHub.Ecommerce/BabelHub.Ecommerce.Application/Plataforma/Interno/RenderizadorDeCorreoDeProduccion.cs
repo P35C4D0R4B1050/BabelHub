@@ -10,7 +10,7 @@ public sealed record PlantillaDeCorreo(string Asunto, string Cuerpo);
 /// </summary>
 public static class PlantillasDeCorreoDeSeguridad
 {
-    public const string Firma = "BabelHub nunca te pedirá tu contraseña ni un código por correo, teléfono ni mensajes. Si no reconoces esta actividad, entra a tu cuenta desde la dirección de BabelHub que ya conoces.";
+    public const string Firma = "BabelHub nunca te pedirá tu contraseña ni un código por teléfono, por mensajes ni respondiendo a este correo. Si no reconoces esta actividad, entra a tu cuenta desde la dirección de BabelHub que ya conoces.";
 
     private static string Cuerpo(string cuerpo) => $"Hola, te escribe BabelHub.\n\n{cuerpo}\n\n{Firma}";
 
