@@ -141,6 +141,26 @@ public sealed class CatalogoDeAccionesTests
 
     [Fact]
     [Trait("Criterio", "AC-AUD-13")]
+    public void Las_acciones_de_Devoluciones_declaran_el_pedido_la_devolucion_y_el_monto_y_nunca_el_motivo_ni_el_texto()
+    {
+        var esperado = new Dictionary<string, string[]>
+        {
+            [nameof(AccionesAuditables.DevolucionSolicitada)] = ["pedidoId", "cantidadDeLineas", "monto", "moneda"],
+            [nameof(AccionesAuditables.EstadoDeDevolucionCambiado)] = ["estadoAnterior", "estadoNuevo", "pedidoId", "devolucionId", "monto", "moneda"],
+            [nameof(AccionesAuditables.ReingresoPorDevolucion)] = ["ajusteId", "devolucionId", "edicionId", "cantidadAnterior", "cantidadPosterior", "pedidoId", "monto", "moneda"],
+        };
+
+        foreach (var (nombre, claves) in esperado)
+        {
+            var accion = Catalogo.Obtener(nombre);
+            Assert.Equal(claves, accion.Detalle.Select(c => c.Nombre));
+            Assert.DoesNotContain(accion.Detalle, c => c.Nombre is "motivo" or "texto" or "descripcion" or "comentario");
+            Assert.All(accion.Detalle, c => Assert.False(c.Personal, c.Nombre));
+        }
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-13")]
     public void Las_acciones_de_Pedidos_declaran_sus_claves_el_iniciador_como_campo_personal_y_nunca_el_contacto()
     {
         var esperado = new Dictionary<string, string[]>

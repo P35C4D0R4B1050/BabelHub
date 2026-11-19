@@ -7,13 +7,14 @@ namespace BabelHub.Ecommerce.Application.Devoluciones.Interno;
 /// <summary>
 /// <c>RechazarDevolucionesVencidas</c> (T12; DEV-12, DEV-14, DEV-16; plan §1 y §5): la revisión horaria, como «sistema». Cada devolución se revisa <b>en su propia transacción, bajo su bloqueo con <c>SKIP LOCKED</c> y revalidando</b>: pasa a rechazada, sin reembolso y con el cupo devuelto, la que está
 /// aprobada hace <b>más de 10 días</b> (10 exactos no) <b>sin el marcador de reingreso</b> (si la confirmación lo fijó, se respeta: DEV-16); la auditoría va en la misma transacción y falla cerrada. Una devolución bloqueada por otra transacción, ya cambiada o que falla no detiene a las demás: se reintenta
-/// en la próxima hora. El aviso del cambio llega con T14.
+/// en la próxima hora.
 /// </summary>
 internal sealed class RechazarDevolucionesVencidas(
     AutorizadorDeDevoluciones autorizador,
     IRepositorioDeDevoluciones repositorio,
     IUnidadDeTrabajo unidad,
     IAuditoria auditoria,
+    AvisosDeDevoluciones avisos,
     IReloj reloj)
 {
     public async Task<Resultado<int>> Ejecutar(int maximo, CancellationToken cancelacion = default)
@@ -54,8 +55,16 @@ internal sealed class RechazarDevolucionesVencidas(
         return Resultado<int>.Exito(rechazadas);
     }
 
-    private Task<bool> Revisar(Guid devolucionId, DateTimeOffset ahora, CancellationToken cancelacion) =>
-        unidad.Ejecutar(
+    private async Task<bool> Revisar(Guid devolucionId, DateTimeOffset ahora, CancellationToken cancelacion)
+    {
+        // La cuenta del aviso sale de Pedidos antes de abrir la transacción: si no responde, no se rechaza hoy y la próxima hora lo reintenta (el aviso no se pierde).
+        var previa = await repositorio.Obtener(devolucionId, paraActualizar: false, cancelacion).ConfigureAwait(false);
+        if (previa is null || await avisos.Destinatario(previa.PedidoId, cancelacion).ConfigureAwait(false) is not { } cuentaId)
+        {
+            return false;
+        }
+
+        return await unidad.Ejecutar(
             async token =>
             {
                 // SKIP LOCKED: una recepción en curso tiene la fila y se respeta; null también si ya no existe.
@@ -69,9 +78,11 @@ internal sealed class RechazarDevolucionesVencidas(
                 await repositorio.DevolverCupos([.. devolucion.Lineas.Select(l => (l.LineaDePedidoId, l.Cantidad))], token).ConfigureAwait(false);
                 await repositorio.Guardar(devolucion, token).ConfigureAwait(false);
                 await auditoria.Registrar(AuditoriaDeDevoluciones.Cambio(devolucion, EstadoDeLineaDeDevolucion.Aprobada, EstadoDeLineaDeDevolucion.Rechazada), token).ConfigureAwait(false);
+                await avisos.Solicitar(devolucion, cuentaId, EstadoDeLineaDeDevolucion.Rechazada, token).ConfigureAwait(false);
                 return true;
             },
             cancelacion);
+    }
 }
 
 /// <summary>

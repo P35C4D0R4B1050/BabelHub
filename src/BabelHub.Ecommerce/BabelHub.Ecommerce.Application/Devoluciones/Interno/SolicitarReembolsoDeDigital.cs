@@ -9,9 +9,13 @@ using BabelHub.Ecommerce.Domain.Devoluciones;
 
 namespace BabelHub.Ecommerce.Application.Devoluciones.Interno;
 
-/// <summary>Las entradas de auditoría de los cambios de una devolución (DEV-12): sin el motivo ni el texto, con el monto cuando lo hay.</summary>
+/// <summary>
+/// Las entradas de auditoría de los cambios de una devolución (DEV-12, AC-DEV-11): el pedido, la devolución y el monto (en soles, con dos decimales) en cada paso, <b>nunca el motivo ni el texto</b>. El usuario o el actor «sistema» los pone la Auditoría desde el actor.
+/// </summary>
 internal static class AuditoriaDeDevoluciones
 {
+    public const string Moneda = "PEN";
+
     public static SolicitudDeRegistro Solicitada(Devolucion d) =>
         new(AccionesAuditables.DevolucionSolicitada)
         {
@@ -21,11 +25,15 @@ internal static class AuditoriaDeDevoluciones
             {
                 ["pedidoId"] = d.PedidoId.ToString(),
                 ["cantidadDeLineas"] = d.Lineas.Count.ToString(CultureInfo.InvariantCulture),
+                ["monto"] = Monto(d.Lineas.Sum(l => l.Monto)),
+                ["moneda"] = Moneda,
             },
         };
 
-    /// <summary>El cambio de estado: el anterior y el nuevo y, cuando el catálogo de Auditoría los admita (hallazgo para el carril A), el pedido, la devolución y el monto.</summary>
-    public static SolicitudDeRegistro Cambio(Devolucion d, EstadoDeLineaDeDevolucion anterior, EstadoDeLineaDeDevolucion nuevo, string? estadoNuevoPropio = null) =>
+    /// <summary>
+    /// El cambio de estado: el anterior y el nuevo, el pedido, la devolución y el monto. Con <paramref name="lineaDePedidoId"/> el monto es el de esa línea (el reembolso es por línea); sin ella, el de toda la devolución.
+    /// </summary>
+    public static SolicitudDeRegistro Cambio(Devolucion d, EstadoDeLineaDeDevolucion anterior, EstadoDeLineaDeDevolucion nuevo, string? estadoNuevoPropio = null, Guid? lineaDePedidoId = null) =>
         new(AccionesAuditables.EstadoDeDevolucionCambiado)
         {
             ObjetoTipo = "devolucion",
@@ -34,8 +42,29 @@ internal static class AuditoriaDeDevoluciones
             {
                 ["estadoAnterior"] = anterior.Codigo(),
                 ["estadoNuevo"] = estadoNuevoPropio ?? nuevo.Codigo(),
+                ["pedidoId"] = d.PedidoId.ToString(),
+                ["devolucionId"] = d.Id.ToString(),
+                ["monto"] = Monto(lineaDePedidoId is { } id ? d.Lineas.Single(l => l.LineaDePedidoId == id).Monto : d.Lineas.Sum(l => l.Monto)),
+                ["moneda"] = Moneda,
             },
         };
+
+    /// <summary>El reingreso al Inventario confirmado: el pedido, la devolución y el valor de lo reingresado.</summary>
+    public static SolicitudDeRegistro Reingreso(Devolucion d) =>
+        new(AccionesAuditables.ReingresoPorDevolucion)
+        {
+            ObjetoTipo = "devolucion",
+            ObjetoId = d.Id.ToString(),
+            Detalle = new Dictionary<string, string?>
+            {
+                ["devolucionId"] = d.Id.ToString(),
+                ["pedidoId"] = d.PedidoId.ToString(),
+                ["monto"] = Monto(d.Lineas.Sum(l => l.Monto)),
+                ["moneda"] = Moneda,
+            },
+        };
+
+    private static string Monto(decimal monto) => monto.ToString("0.00", CultureInfo.InvariantCulture);
 }
 
 /// <summary>
@@ -53,6 +82,7 @@ internal sealed class SolicitarReembolsoDeDigital(
     IRepositorioDeDevoluciones repositorio,
     IUnidadDeTrabajo unidad,
     IAuditoria auditoria,
+    AvisosDeDevoluciones avisos,
     ProcesarReembolsoDeLinea procesador,
     IReloj reloj) : ICasoDeUso<PedirReembolsoDeDigitalEntrada, DevolucionVista>
 {
@@ -214,6 +244,7 @@ internal sealed class SolicitarReembolsoDeDigital(
         await repositorio.Guardar(devolucion, token).ConfigureAwait(false);
         await auditoria.Registrar(AuditoriaDeDevoluciones.Solicitada(devolucion), token).ConfigureAwait(false);
         await auditoria.Registrar(AuditoriaDeDevoluciones.Cambio(devolucion, EstadoDeLineaDeDevolucion.Solicitada, EstadoDeLineaDeDevolucion.Aprobada), token).ConfigureAwait(false);
+        await avisos.Solicitar(devolucion, pedido.CuentaId, EstadoDeLineaDeDevolucion.Aprobada, token).ConfigureAwait(false);
         return registrado.Valor.ReembolsoId;
     }
 

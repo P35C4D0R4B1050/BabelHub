@@ -345,8 +345,10 @@ internal sealed class EntornoDeDevoluciones
         Auditoria = new AuditoriaDeDevolucionesEspia();
         Reembolsos = new ReembolsosDoble();
         Accesos = new AccesosParaDevolucionesDoble();
-        Unidad = new UnidadDeTrabajoReversible(Repositorio, Auditoria, Reembolsos, Accesos);
+        Notificador = new NotificadorDeDevolucionesEspia();
+        Unidad = new UnidadDeTrabajoReversible(Repositorio, Auditoria, Reembolsos, Accesos, Notificador);
         Reembolsos.Unidad = Unidad;
+        Notificador.Unidad = Unidad;
         Denegaciones = new DenegacionesDelCatalogoEspia();
         Cuentas = new EstadoDeCuentaFalso();
         Sucursales = new ResolucionDeSucursalDoble();
@@ -371,6 +373,7 @@ internal sealed class EntornoDeDevoluciones
         Auditoria = compartido.Auditoria;
         Reembolsos = compartido.Reembolsos;
         Unidad = compartido.Unidad;
+        Notificador = compartido.Notificador;
         Accesos = compartido.Accesos;
         Denegaciones = compartido.Denegaciones;
         Cuentas = compartido.Cuentas;
@@ -388,20 +391,25 @@ internal sealed class EntornoDeDevoluciones
     {
         Autorizador = new AutorizadorDeDevoluciones(Actor, Denegaciones, Cuentas, Sucursales);
         LimitesDeUso = new LimitesDeDevoluciones(Limites, Actor);
-        Procesador = new ProcesarReembolsoDeLinea(Reembolsos, Repositorio, Unidad, Auditoria, Reloj);
+        Avisos = new AvisosDeDevoluciones(Notificador, Pedidos, Alertas, Reloj);
+        Procesador = new ProcesarReembolsoDeLinea(Reembolsos, Repositorio, Unidad, Auditoria, Avisos, Reloj);
         SolicitarImpreso = new SolicitarDevolucionDeImpreso(Autorizador, LimitesDeUso, Pedidos, Inventario, Marca, Repositorio, Unidad, Auditoria, Reloj);
-        SolicitarDigital = new SolicitarReembolsoDeDigital(Autorizador, LimitesDeUso, Pedidos, Accesos, Reembolsos, Marca, Repositorio, Unidad, Auditoria, Procesador, Reloj);
+        SolicitarDigital = new SolicitarReembolsoDeDigital(Autorizador, LimitesDeUso, Pedidos, Accesos, Reembolsos, Marca, Repositorio, Unidad, Auditoria, Avisos, Procesador, Reloj);
         Reportar = new ReportarArchivoDefectuoso(Autorizador, LimitesDeUso, Pedidos, Accesos, Marca, Repositorio, Unidad, Auditoria, Reloj);
-        Decidir = new DecidirReporte(Autorizador, LimitesDeUso, Pedidos, Accesos, Biblioteca, Reembolsos, Repositorio, Unidad, Auditoria, Procesador, Reloj);
-        Gestion = new AprobarYRechazarDevolucion(Autorizador, LimitesDeUso, Repositorio, Unidad, Auditoria, Reloj);
-        Recepcion = new ConfirmarRecepcion(Autorizador, LimitesDeUso, Inventario, Reembolsos, Repositorio, Unidad, Auditoria, Alertas, Procesador, Reloj);
+        Decidir = new DecidirReporte(Autorizador, LimitesDeUso, Pedidos, Accesos, Biblioteca, Reembolsos, Repositorio, Unidad, Auditoria, Avisos, Procesador, Reloj);
+        Gestion = new AprobarYRechazarDevolucion(Autorizador, LimitesDeUso, Repositorio, Unidad, Auditoria, Avisos, Reloj);
+        Recepcion = new ConfirmarRecepcion(Autorizador, LimitesDeUso, Inventario, Reembolsos, Repositorio, Unidad, Auditoria, Avisos, Alertas, Procesador, Reloj);
         Conciliacion = new ConciliarReembolsosDeDevoluciones(Autorizador, Repositorio, Reembolsos, Unidad, Procesador, Reloj);
         Consultas = new ConsultasDeDevoluciones(Autorizador, LimitesDeUso, Pedidos, Repositorio);
-        Vencidas = new RechazarDevolucionesVencidas(Autorizador, Repositorio, Unidad, Auditoria, Reloj);
+        Vencidas = new RechazarDevolucionesVencidas(Autorizador, Repositorio, Unidad, Auditoria, Avisos, Reloj);
         Estancadas = new RevisarDevolucionesEstancadas(Autorizador, Repositorio, Alertas, Reloj);
     }
 
     public ConsultasDeDevoluciones Consultas { get; private set; } = null!;
+
+    public NotificadorDeDevolucionesEspia Notificador { get; private set; }
+
+    public AvisosDeDevoluciones Avisos { get; private set; } = null!;
 
     public RechazarDevolucionesVencidas Vencidas { get; private set; } = null!;
 
@@ -471,4 +479,40 @@ internal sealed class EntornoDeDevoluciones
         new(Guid.NewGuid(), Guid.NewGuid(), false, cantidad, precio, cantidad * precio, estado, estado == EstadoVisibleDeLaLinea.Entregado ? entregadaEn : null);
 
     public static LineaDePedidoParaDevoluciones Digital() => new(Guid.NewGuid(), Guid.NewGuid(), true, 1, 30m, 30m, EstadoVisibleDeLaLinea.DisponibleEnLaBiblioteca, null);
+}
+
+/// <summary>El Notificador de las pruebas de Devoluciones: guarda las solicitudes, se revierte con la transacción y puede devolver «no se guardó», rechazar o lanzar (el contrato dice que nunca lanza, pero Devoluciones no debe depender de ello).</summary>
+internal sealed class NotificadorDeDevolucionesEspia : BabelHub.Ecommerce.Application.Notificaciones.INotificador, IInstantanea
+{
+    private List<BabelHub.Ecommerce.Application.Notificaciones.SolicitudDeAviso> _solicitudes = [];
+
+    public UnidadDeTrabajoReversible? Unidad { get; set; }
+
+    public IReadOnlyList<BabelHub.Ecommerce.Application.Notificaciones.SolicitudDeAviso> Solicitudes => _solicitudes;
+
+    public int DentroDeLaTransaccion { get; private set; }
+
+    public BabelHub.Ecommerce.Application.Notificaciones.ResultadoDeLaSolicitudDeAviso Resultado { get; set; } = BabelHub.Ecommerce.Application.Notificaciones.ResultadoDeLaSolicitudDeAviso.Creado;
+
+    public bool Lanza { get; set; }
+
+    public Task<BabelHub.Ecommerce.Application.Notificaciones.ResultadoDeLaSolicitudDeAviso> Solicitar(BabelHub.Ecommerce.Application.Notificaciones.SolicitudDeAviso solicitud, CancellationToken cancelacion = default)
+    {
+        if (Lanza)
+        {
+            throw new InvalidOperationException("El notificador falló.");
+        }
+
+        if (Unidad?.EnCurso == true)
+        {
+            DentroDeLaTransaccion++;
+        }
+
+        _solicitudes.Add(solicitud);
+        return Task.FromResult(Resultado);
+    }
+
+    public object Capturar() => _solicitudes.ToList();
+
+    public void Restaurar(object instantanea) => _solicitudes = (List<BabelHub.Ecommerce.Application.Notificaciones.SolicitudDeAviso>)instantanea;
 }

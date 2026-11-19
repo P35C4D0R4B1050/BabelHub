@@ -25,7 +25,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
         yield return Auditada(nameof(AccionesAuditables.AvisoDeLaPasarelaRecibido), false, false, new ClaveDeDetalle("resultado", personal: false) { Valores = ["consulta-adelantada"] });
         yield return Auditada(nameof(AccionesAuditables.AjusteRegistrado), false, false, Clave("ajusteId", 40), Clave("edicionId", 40), Clave("cantidadAnterior", 12), Clave("cantidadPosterior", 12), Clave("motivo", 40));
         yield return Auditada(nameof(AccionesAuditables.IngresoDeMercaderiaRegistrado), false, false, Clave("ajusteId", 40), Clave("ingresoId", 40), Clave("edicionId", 40), Clave("cantidadAnterior", 12), Clave("cantidadPosterior", 12));
-        yield return Auditada(nameof(AccionesAuditables.ReingresoPorDevolucion), false, false, Clave("ajusteId", 40), Clave("devolucionId", 40), Clave("edicionId", 40), Clave("cantidadAnterior", 12), Clave("cantidadPosterior", 12));
+        yield return Auditada(nameof(AccionesAuditables.ReingresoPorDevolucion), false, false, Clave("ajusteId", 40), Clave("devolucionId", 40), Clave("edicionId", 40), Clave("cantidadAnterior", 12), Clave("cantidadPosterior", 12), Clave("pedidoId", 40), Clave("monto", 16), Moneda());
         yield return Auditada(nameof(AccionesAuditables.ReembolsoRegistrado), false, false, Clave("monto", 16), Moneda(), Modalidad(), Clave("medio", 32));
         yield return Auditada(nameof(AccionesAuditables.EstadoDePedidoCambiado), false, false, Clave("estadoAnterior", 32), Clave("estadoNuevo", 32), ClavePersonal("iniciadaPor"));
         yield return Auditada(nameof(AccionesAuditables.ContactoDePedidoConsultado), false, false, Clave("rol", 32));
@@ -36,8 +36,8 @@ public static partial class CatalogoDeAccionesDeAuditoria
         yield return Auditada(nameof(AccionesAuditables.ContactoDePedidoAnonimizado), false, false, Clave("causa"), Clave("cantidad", 12));
         yield return Auditada(nameof(AccionesAuditables.PedidosDepurados), false, false, Clave("cantidad", 12));
         yield return Auditada(nameof(AccionesAuditables.EstadoDeEnvioCambiado), false, false, Clave("estadoAnterior", 32), Clave("estadoNuevo", 32), Clave("pedidoId", 40), Clave("numeroDeGuia", 40), Clave("operador", 32), Clave("fuente", 40), Clave("fecha", 32));
-        yield return Auditada(nameof(AccionesAuditables.DevolucionSolicitada), false, false, Clave("pedidoId", 40), Clave("cantidadDeLineas", 8));
-        yield return Auditada(nameof(AccionesAuditables.EstadoDeDevolucionCambiado), false, false, Clave("estadoAnterior", 32), Clave("estadoNuevo", 32));
+        yield return Auditada(nameof(AccionesAuditables.DevolucionSolicitada), false, false, Clave("pedidoId", 40), Clave("cantidadDeLineas", 8), Clave("monto", 16), Moneda());
+        yield return Auditada(nameof(AccionesAuditables.EstadoDeDevolucionCambiado), false, false, Clave("estadoAnterior", 32), Clave("estadoNuevo", 32), Clave("pedidoId", 40), Clave("devolucionId", 40), Clave("monto", 16), Moneda());
 
         // Traslados: lo que pide el plan de Traslados (número, edición, cantidad, estados anterior y nuevo, si es vinculado y el pedido opaco), nunca el motivo.
         yield return Auditada(nameof(AccionesAuditables.TrasladoSolicitado), false, false, Clave("numero", 24), Clave("edicionId", 40), Clave("cantidad", 12), Clave("vinculado", 8), Clave("pedidoId", 40));

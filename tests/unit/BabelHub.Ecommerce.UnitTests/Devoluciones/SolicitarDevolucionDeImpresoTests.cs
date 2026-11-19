@@ -46,7 +46,7 @@ public sealed class SolicitarDevolucionDeImpresoTests
         Assert.Equal(ResponsableDelCambio.Cliente(entorno.Actor.Actual!.UsuarioId!.Value), guardada.Lineas[0].Cambios[0].Responsable);
         var auditoria = Assert.Single(entorno.Auditoria.Solicitudes);
         Assert.Equal(AccionesAuditables.DevolucionSolicitada, auditoria.Accion);
-        Assert.Equal(["cantidadDeLineas", "pedidoId"], auditoria.Detalle.Keys.Order());
+        Assert.Equal(["cantidadDeLineas", "moneda", "monto", "pedidoId"], auditoria.Detalle.Keys.Order());
         Assert.DoesNotContain("hojas", JsonSerializer.Serialize(auditoria.Detalle), StringComparison.Ordinal);
         Assert.Equal(2, entorno.Repositorio.Cupos[linea.LineaId].CantidadComprometida);
     }
