@@ -316,6 +316,22 @@ public sealed class RegistrarIntentoTests
 
     [Fact]
     [Trait("Criterio", "AC-PAG-21")]
+    public async Task Una_clave_que_es_de_un_intento_de_otra_intencion_no_se_devuelve_y_sigue_siendo_un_conflicto()
+    {
+        var e = await ConIntencionLista();
+        await e.RegistrarIntento.Registrar(e.Entrada(Guid.NewGuid()));
+        var ajena = Guid.NewGuid();
+        await e.Repositorio.AgregarIntento(IntentoDeCobro.Iniciar(ajena, Guid.NewGuid(), MedioDePago.Yape, Importe.De(140m), e.Reloj.Ahora));
+
+        var resultado = await e.RegistrarIntento.Registrar(e.Entrada(ajena));
+
+        Assert.False(resultado.EsExito);
+        Assert.Equal("pago-en-curso", resultado.Error!.Clave);
+        Assert.Equal(2, e.Repositorio.Intentos.Count);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-21")]
     public async Task El_pedido_de_otra_cuenta_o_inexistente_responde_no_encontrado_con_un_acceso_denegado_y_sin_tocar_nada()
     {
         var e = await ConIntencionLista();
