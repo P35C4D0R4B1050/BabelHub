@@ -248,6 +248,16 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
         return Task.CompletedTask;
     }
 
+    public Task<int> PurgarAvisosAnterioresA(DateTimeOffset corte, int limite, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        var viejosDePago = _avisosDePago.Where(a => a.CreadoEn < corte).OrderBy(a => a.CreadoEn).Take(limite).ToList();
+        var viejosACarrito = _avisosACarrito.Where(a => a.CreadoEn < corte).OrderBy(a => a.CreadoEn).Take(limite).ToList();
+        _avisosDePago.RemoveAll(viejosDePago.Contains);
+        _avisosACarrito.RemoveAll(viejosACarrito.Contains);
+        return Task.FromResult(viejosDePago.Count + viejosACarrito.Count);
+    }
+
     public object Capturar() => (
         _intenciones.ToDictionary(p => p.Key, p => p.Value.Copiar()),
         _intentos.ToDictionary(p => p.Key, p => p.Value.Copiar()),

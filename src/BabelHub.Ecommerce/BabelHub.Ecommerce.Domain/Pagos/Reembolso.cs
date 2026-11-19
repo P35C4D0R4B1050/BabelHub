@@ -244,6 +244,33 @@ public sealed class Reembolso
 
     public bool EsHuerfano(DateTimeOffset ahora) => Estado == EstadoDeReembolso.Solicitado && UltimoIntentoEn is { } ultimo && ahora - ultimo >= PlazoDeHuerfano;
 
+    /// <summary>La reconstruye desde el almacén (la infraestructura): no valida ni cambia nada.</summary>
+    public static Reembolso Rehidratar(
+        Guid id,
+        OrigenDeReembolso origen,
+        string claveNatural,
+        Guid intencionId,
+        Guid intentoId,
+        Importe monto,
+        IReadOnlyList<LineaDeReembolso> lineas,
+        Importe envio,
+        DateTimeOffset creadoEn,
+        EstadoDeReembolso estado,
+        string? referenciaDePasarela,
+        int intentos,
+        DateTimeOffset? ultimoIntentoEn,
+        MotivoPendienteDeReembolso? motivoPendiente,
+        DateTimeOffset? resueltoEn) =>
+        new(id, origen, claveNatural, intencionId, intentoId, monto, lineas.ToArray(), envio, creadoEn)
+        {
+            Estado = estado,
+            ReferenciaDePasarela = referenciaDePasarela,
+            Intentos = intentos,
+            UltimoIntentoEn = ultimoIntentoEn,
+            MotivoPendiente = motivoPendiente,
+            ResueltoEn = resueltoEn,
+        };
+
     internal Reembolso Copiar() => (Reembolso)MemberwiseClone();
 
     /// <summary>Sin la referencia de la pasarela ni la clave.</summary>

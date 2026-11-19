@@ -199,6 +199,9 @@ internal interface IRepositorioDePagos
     Task<IReadOnlyList<AvisoDePago>> ListarAvisosDePagoListos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default);
 
     Task GuardarAvisoDePago(AvisoDePago aviso, CancellationToken cancelacion = default);
+
+    /// <summary>Borra los avisos de pago y los avisos a Carrito creados antes de <paramref name="corte"/> (hasta <paramref name="limite"/> de cada tabla); devuelve cuántos borró en total.</summary>
+    Task<int> PurgarAvisosAnterioresA(DateTimeOffset corte, int limite, CancellationToken cancelacion = default);
 }
 
 /// <summary>Los reembolsos de toda la plataforma (D08): clave natural única por origen.</summary>

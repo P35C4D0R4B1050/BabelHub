@@ -97,6 +97,33 @@ public sealed class IntentoDeCobro
         return new IntentoDeCobro(id, intencionId, medio, importe, ahora);
     }
 
+    /// <summary>La reconstruye desde el almacén (la infraestructura): no valida ni cambia nada.</summary>
+    public static IntentoDeCobro Rehidratar(
+        Guid id,
+        Guid intencionId,
+        MedioDePago medio,
+        Importe importe,
+        DateTimeOffset iniciadoEn,
+        EstadoDeIntento estado,
+        string? referenciaDePasarela,
+        bool consultaInmediata,
+        MotivoDeRechazo? motivoDeRechazo,
+        DateTimeOffset? enviadoEn,
+        DateTimeOffset? resueltoEn,
+        int consultas,
+        DateTimeOffset? ultimaConsultaEn) =>
+        new(id, intencionId, medio, importe, iniciadoEn)
+        {
+            Estado = estado,
+            ReferenciaDePasarela = referenciaDePasarela,
+            ConsultaInmediata = consultaInmediata,
+            MotivoDeRechazo = motivoDeRechazo,
+            EnviadoEn = enviadoEn,
+            ResueltoEn = resueltoEn,
+            Consultas = consultas,
+            UltimaConsultaEn = ultimaConsultaEn,
+        };
+
     internal IntentoDeCobro Copiar() => (IntentoDeCobro)MemberwiseClone();
 
     /// <summary>Anota el instante en que se llamó a la pasarela (una sola vez).</summary>

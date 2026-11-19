@@ -328,5 +328,7 @@ public sealed class AvisarACarritoTests
         public Task GuardarAvisoACarrito(AvisoACarrito aviso, CancellationToken cancelacion = default) => interno.GuardarAvisoACarrito(aviso, cancelacion);
 
         public Task GuardarAvisoDePago(AvisoDePago aviso, CancellationToken cancelacion = default) => interno.GuardarAvisoDePago(aviso, cancelacion);
+
+        public Task<int> PurgarAvisosAnterioresA(DateTimeOffset corte, int limite, CancellationToken cancelacion = default) => interno.PurgarAvisosAnterioresA(corte, limite, cancelacion);
     }
 }
