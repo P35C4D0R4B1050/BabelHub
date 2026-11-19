@@ -19,7 +19,7 @@ Un módulo solo llama a los contratos públicos de otros. Las flechas siguen la 
 | Módulo | Depende de |
 | :--- | :--- |
 | Identidad | Plataforma y Auditoría (contratos; implementa los puertos de Auditoría y de restauración de Plataforma); todos los módulos usan su contexto de actor; para los pendientes de una cuenta y para su cancelación (anonimizar, desvincular o eliminar los datos personales y marcar las hojas de reclamación) expone puertos que implementan los demás módulos (sin depender de ellos) y define el puerto de eliminación del carrito de una cuenta reemplazada (IDE-84), que implementa Carrito. |
-| Catálogo | Cliente del Inventario (disponibilidad e ingreso de mercadería). |
+| Catálogo | Cliente del Inventario (disponibilidad e ingreso de mercadería) y el almacén de objetos (portadas y libros, con su credencial propia `catalogo-archivos`); Plataforma y Auditoría (contratos). Expone `IConsultaDeCatalogo`, `IDisponibilidadDeEdiciones`, `IAdministracionDelCatalogo`, `IArchivosDelCatalogo`, `IIngresosDeMercaderia` e `IMantenimientoDelCatalogo`; el archivo de una edición digital lo expone **solo** a Biblioteca digital por `IReferenciaDeArchivosDelCatalogo` (ningún otro contrato lo muestra), y declara `IRetiroDeEdicionDeCarritos`, que implementa Carrito y checkout (quita la edición dada de baja de los carritos en la misma transacción). |
 | Carrito y checkout | Catálogo, Identidad y cliente del Inventario. |
 | Pagos | Carrito y checkout, Identidad y cliente del Inventario (reserva). |
 | Biblioteca digital | Catálogo, Carrito y checkout, Pagos e Identidad. |
@@ -66,7 +66,7 @@ Los dos servicios responden los errores con `application/problem+json`:
 | :--- | :--- |
 | `code` | Estable, en mayúsculas con guiones, con prefijo del servicio; la interfaz y las pruebas dependen de él, no del texto. |
 | `title` y mensaje | Genéricos y en español; sin trazas, rutas internas ni nombres de tablas. |
-| `status` | Códigos estándar: 400 validación, 401 sin credencial, 403 sin permiso, 404 no existe, 409 conflicto de estado, 422 regla de negocio, 429 límite de uso, 503 dependencia no disponible. |
+| `status` | Códigos estándar: 400 validación, 401 sin credencial, 403 sin permiso, 404 no existe, 409 conflicto de estado, 413 cuerpo demasiado grande (solo la subida de archivos del Catálogo), 422 regla de negocio, 429 límite de uso, 503 dependencia no disponible. El Catálogo agrega códigos propios: `ECO-ISBN-DUPLICADO` (409, con `tituloExistente` solo para la administración central), `ECO-EDICION-DUPLICADA-POR-TIPO` y `ECO-INGRESO-PENDIENTE` (409), `ECO-ARCHIVO-DEMASIADO-GRANDE` (413), `ECO-ARCHIVO-INVALIDO`, `ECO-LICENCIA-INVALIDA`, `ECO-OBRA-SIN-EDICIONES`, `ECO-REFERENCIA-DE-ARCHIVO-INVALIDA`, `ECO-CLAVE-INVALIDA` y `ECO-BUSQUEDA-DEMASIADO-AMPLIA` (422). |
 | Límites de uso | 429 con `Retry-After` y el mismo cuerpo siempre (SEG-05, SEG-07). |
 | Validación | Lista de campos inválidos con su motivo, sin eco del valor sensible. |
 

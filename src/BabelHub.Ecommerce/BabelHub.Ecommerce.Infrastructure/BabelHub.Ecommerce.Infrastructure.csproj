@@ -20,4 +20,8 @@
     <ProjectReference Include="..\BabelHub.Ecommerce.Application\BabelHub.Ecommerce.Application.csproj" />
     <ProjectReference Include="..\..\BabelHub.Shared\BabelHub.Shared.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BabelHub.IntegrationTests" />
+    <InternalsVisibleTo Include="BabelHub.ArchitectureTests" />
+  </ItemGroup>
 </Project>

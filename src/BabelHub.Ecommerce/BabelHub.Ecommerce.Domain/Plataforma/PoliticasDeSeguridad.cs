@@ -34,6 +34,19 @@ public static class PoliticasDeSeguridad
     public static PoliticaDeLimite RegistrosPorOrigen { get; } = new(
         "registros-por-origen", 3, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Origen);
 
+    /// <summary>3 hojas de reclamación por hora y por origen, con una ventana deslizante (REC-11). No falla cerrada: con el almacén de contadores caído cae al límite local por instancia (SEG-26).</summary>
+    public static PoliticaDeLimite HojasPorOrigen { get; } = new(
+        "hojas-por-origen", 3, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true);
+
+    /// <summary>5 intentos de cobro por intención y hora (PAG-17, D18). Falla cerrada: una operación de dinero no cae a un contador local (SEG-26).</summary>
+    public static PoliticaDeLimite CobrosPorIntencion { get; } = new("cobros-por-intencion", 5, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Usuario);
+
+    /// <summary>10 intentos de cobro por cuenta y hora (D18, AM38). Falla cerrada.</summary>
+    public static PoliticaDeLimite CobrosPorCuenta { get; } = new("cobros-por-cuenta", 10, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Usuario);
+
+    /// <summary>20 intentos de cobro por origen y hora (D18, AM38). Falla cerrada.</summary>
+    public static PoliticaDeLimite CobrosPorOrigen { get; } = new("cobros-por-origen", 20, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Origen);
+
     /// <summary>Tope previo barato por huella de origen, antes de autenticar: 600 por minuto (el bucket del origen desconocido tiene el suyo).</summary>
     public static PoliticaDeLimite SolicitudesPreviasPorOrigen { get; } = new(
         "solicitudes-previas-por-origen", 600, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true);
@@ -56,7 +69,7 @@ public static class PoliticasDeSeguridad
 
     /// <summary>Límites generales de uso: con el almacén caído caen al límite local por instancia (SEG-26), a diferencia de los críticos de <see cref="Todas"/>.</summary>
     public static IReadOnlyList<PoliticaDeLimite> Generales { get; } =
-        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta];
+        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen];
 
     public static IReadOnlyList<PoliticaDeLimite> Todas { get; } =
     [
@@ -66,5 +79,8 @@ public static class PoliticasDeSeguridad
         SegundoFactorPorOrigen,
         SegundoFactorPorCuenta,
         RegistrosPorOrigen,
+        CobrosPorIntencion,
+        CobrosPorCuenta,
+        CobrosPorOrigen,
     ];
 }

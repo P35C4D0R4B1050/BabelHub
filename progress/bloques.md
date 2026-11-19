@@ -66,10 +66,10 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **ECO-2a** | `ecommerce-catalogo` T01–T06: Dominio (ISBN, obra y ediciones, licencia, archivos), contratos y puertos | C | — | ☑ |
 | **ECO-2b** | `ecommerce-catalogo` T07–T13: casos de uso, cerrado con dobles de auditoría | C | ECO-2a | ☑ |
 | **ECO-2c** | `ecommerce-catalogo` T14–T23: Infraestructura, Api, matriz de autorización, integración con S3 e Inventario simulado, trabajos de fondo | C | AUD-4; ampliación de `IClienteDelInventario` y del almacén (carril A) | ☑ |
-| **ECO-2d** | `ecommerce-catalogo` T24–T28: pantallas del catálogo y de la administración, documentos y E2E | B/C/E | WEB-1d | ☐ |
+| **ECO-2d** | `ecommerce-catalogo` T24–T28: pantallas del catálogo y de la administración, documentos y E2E | B/C/E | WEB-1d | ☑ (T24–T28; Playwright escrito y sin ejecutar, CSS sin compilar y composición del Catálogo pendientes antes de `spec-verify`) |
 | **ECO-3** | Planificar `ecommerce-carrito-checkout`, `ecommerce-pagos` y `ecommerce-pedidos` | C | ECO-2 | ☑ (planes aprobados el 2026-11-18) |
-| **ECO-4** | `ecommerce-carrito-checkout` (reservas e idempotencia) | C | ECO-3, INV-2 | ▶ (subbloques ECO-4a a 4e, T01–T37; ECO-4a en curso) |
-| **ECO-5** | `ecommerce-pagos` (pasarela de pruebas de Culqi) | C | ECO-4; B05 (persona) | ☐ (subbloques ECO-5a a 5f, T01–T38; 5f condicionado a B05) |
+| **ECO-4** | `ecommerce-carrito-checkout` (reservas e idempotencia) | C | ECO-3, INV-2 | ▶ (subbloques ECO-4a a 4e, T01–T37; ECO-4a y ECO-4b hechos y fundidos, T01–T13; ECO-4c (T14–T23) en curso; la T26b necesita piezas del carril A) |
+| **ECO-5** | `ecommerce-pagos` (pasarela de pruebas de Culqi) | C | ECO-4; B05 (persona) | ▶ (ECO-5a hecho y fundido; subbloques ECO-5a a 5f, T01–T38; 5f condicionado a B05) |
 | **ECO-6** | `ecommerce-pedidos` | E | ECO-5 | ☐ (subbloques ECO-6a a 6f, T01–T42) |
 | **ECO-7** | Planificar biblioteca digital, envíos, devoluciones y libro de reclamaciones | C | ECO-6 | ☑ (planes aprobados el 2026-11-18) |
 | **ECO-8** | `ecommerce-biblioteca-digital` (archivos y URLs firmadas) | C | ECO-7 | ☐ (ECO-8a a 8e, T01–T26) |

@@ -2,6 +2,26 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-18 — ECO-4b fundido (casos de uso del carrito)
+
+### Cubierto
+- **Carril B:** `ecommerce-carrito-checkout` T07–T13 (ECO-4b): contratos públicos y dobles provisionales con guarda de producción, alcance y posesión, casos de uso del carrito para visitante y cuenta, edición con checkout vivo con reapertura de la intención de pago, fusión idempotente del carrito de visitante y retiro de ediciones dadas de baja; revisiones sin Bloqueantes. Integración 4402 de 4404 (las 2 pasan solas).
+- **Decisiones delegadas:** la persona delegó en el carril B la coordinación de los hallazgos de `ecommerce-carrito-checkout` (mensaje del 2026-11-18); sus 15 decisiones están en `progress/decisiones-delegadas.md` y no modifican ninguna spec ni plan aprobados. Ratifican, entre otras, los topes técnicos del carrito (50 líneas, 99 unidades por línea), la lectura de `retiro_pendiente` de CAT-18 y los nombres del contrato público de Carrito.
+
+### Pendiente
+- ECO-4c (T14–T23); la T26b de B necesita del carril A políticas de límite y acciones de auditoría de Carrito, la lectura de la marca de cancelación y el consentimiento de WhatsApp en Identidad, y el cliente del Inventario con consulta previa, reservar y liberar (carril A pausado).
+
+## 2026-11-18 — ECO-2d, ECO-5a y ECO-4a fundidos, Docker reubicado
+
+### Cubierto
+- **Carril C:** ECO-2d (T24–T28 de `ecommerce-catalogo`): pantallas públicas y de administración del catálogo, pantalla de ingresos, documentos y E2E de Playwright (escritos, sin ejecutar); ECO-5a (T01–T06 de `ecommerce-pagos`): Dominio de importe, intención, intento, compensación, reembolso, resultado y token.
+- **Carril B:** ECO-4a (T01–T06 de `ecommerce-carrito-checkout`): carrito, fusión de visitante, checkout con estados, aceptaciones por texto y retención del contacto; contratos públicos del carrito y puertos (T07) y dobles provisionales con guarda de producción (T08). T09–T13 escritos en su rama (integración y revisiones de ECO-4b en curso).
+- **Entorno:** el disco de Docker (106,7 GB) se movió de `C:` a `D:\Docker\wsl\disk` con un enlace en la ruta original; `C:` pasó de 0,1 a 106,8 GB libres y Docker conserva sus 32 imágenes y 195 volúmenes. Identidad de git configurada solo en el repositorio.
+- Validación de `main` (antes del último merge): unitarias 2484 y 2295, arquitectura 193, SpecCheck 23, CoverageCheck 12, integración 4449 de 4453 (las 4 pasan sueltas) y gitleaks limpio. Tras el merge de ECO-4a: unitarias del E-commerce 2735 y arquitectura 211.
+
+### Pendiente
+- ECO-4b a ECO-4e y ECO-5b en adelante, ECO-11 en curso (reclamaciones, T01–T02 hechos), IDE-4 sin empezar (carril A pausado), `spec-verify` y los pendientes de la persona.
+
 ## 2026-11-18 — Quinta ola, segunda parte y planes de comercio (fundidos a `main`)
 
 ### Cubierto

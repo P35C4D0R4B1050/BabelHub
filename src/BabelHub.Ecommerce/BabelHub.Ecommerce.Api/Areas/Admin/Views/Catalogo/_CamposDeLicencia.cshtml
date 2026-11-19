@@ -1,0 +1,32 @@
+@* Los campos de la licencia de una edición digital: el prefijo distingue los nombres de campo del formulario (alta, edición). El texto de ayuda no promete nada que la Aplicación no haga. *@
+@model BabelHub.Ecommerce.Api.Areas.Admin.Controllers.CamposDeLicenciaVista
+<div class="grid gap-3 sm:grid-cols-2">
+    <div>
+        <label class="block text-sm font-semibold" for="@(Model.Prefijo)tipo">Tipo de licencia</label>
+        <select id="@(Model.Prefijo)tipo" name="@(Model.Prefijo)tipo" class="select w-full">
+            <option value="comercial" selected="@(Model.Tipo != "dominioPublico")">Licencia comercial</option>
+            <option value="dominioPublico" selected="@(Model.Tipo == "dominioPublico")">Dominio público</option>
+        </select>
+    </div>
+    <div>
+        <label class="block text-sm font-semibold" for="@(Model.Prefijo)formato">Formato del libro</label>
+        <select id="@(Model.Prefijo)formato" name="@(Model.Prefijo)formato" class="select w-full">
+            <option value="epub" selected="@(Model.Formato != "pdf")">EPUB</option>
+            <option value="pdf" selected="@(Model.Formato == "pdf")">PDF</option>
+        </select>
+    </div>
+    <div>
+        <label class="block text-sm font-semibold" for="@(Model.Prefijo)titular">Titular de derechos *</label>
+        <input id="@(Model.Prefijo)titular" name="@(Model.Prefijo)titular" class="input w-full" maxlength="200" value="@Model.Titular" />
+    </div>
+    <div>
+        <label class="block text-sm font-semibold" for="@(Model.Prefijo)territorios">Territorios (códigos de país) *</label>
+        <input id="@(Model.Prefijo)territorios" name="@(Model.Prefijo)territorios" class="input w-full" maxlength="100" placeholder="PE, CO, CL" value="@Model.Territorios" aria-describedby="@(Model.Prefijo)territorios-ayuda" />
+        <p id="@(Model.Prefijo)territorios-ayuda" class="mt-1 text-xs opacity-70">La edición solo se vende si la licencia incluye Perú (PE).</p>
+    </div>
+    <div data-bh-vigencia="@Model.Prefijo">
+        <label class="block text-sm font-semibold" for="@(Model.Prefijo)vigencia">Vigencia hasta *</label>
+        <input id="@(Model.Prefijo)vigencia" name="@(Model.Prefijo)vigencia" type="date" class="input w-full" value="@Model.Vigencia" />
+        <p class="mt-1 text-xs opacity-70">Al vencer la licencia el libro deja de venderse; quienes ya lo compraron mantienen su acceso.</p>
+    </div>
+</div>

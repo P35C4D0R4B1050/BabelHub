@@ -1,0 +1,133 @@
+@model BabelHub.Ecommerce.Api.Areas.Admin.Controllers.ListaDeObrasVista
+<div class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+        <h1 class="bh-display">Catálogo nacional</h1>
+        <p class="mt-2 max-w-2xl opacity-80">Cada edición, impresa o digital, tiene su propio ISBN, que es único. Un libro digital solo se vende con licencia vigente del titular.</p>
+    </div>
+    <a class="btn btn-primary" href="/administracion/obras/nueva"><bh-icono nombre="libro" />Nueva obra</a>
+</div>
+
+<form method="get" action="/administracion/obras" class="mt-6 flex flex-wrap items-end gap-3" role="search" aria-label="Buscar en el catálogo">
+    <div>
+        <label class="block text-sm font-semibold" for="b-q">Título, autor, editorial o ISBN</label>
+        <input id="b-q" name="q" type="search" class="input w-full sm:w-80" maxlength="100" value="@Model.Texto" />
+    </div>
+    <label class="flex cursor-pointer items-center gap-2 pb-2 text-sm">
+        <input type="checkbox" name="bajas" value="1" class="checkbox checkbox-sm" checked="@Model.IncluirDadasDeBaja" />
+        <span>Incluir las dadas de baja</span>
+    </label>
+    <button type="submit" class="btn btn-sm btn-primary">Buscar</button>
+    <a class="btn btn-sm btn-ghost" href="/administracion/obras">Limpiar</a>
+</form>
+
+@if (Model.Aviso is not null)
+{
+    <div class="alert alert-warning mt-4" role="alert"><bh-icono nombre="aviso" /><span>@Model.Aviso</span></div>
+}
+
+<div class="mt-4" aria-live="polite">
+    @if (Model.Estado is not null)
+    {
+        <vc:bh-estado modelo="@Model.Estado" />
+    }
+    else
+    {
+        <p class="mb-2 text-sm opacity-80">@Model.Total @(Model.Total == 1 ? "obra" : "obras")</p>
+        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+            <table class="table">
+                <caption class="sr-only">Obras del catálogo con su edición impresa, su edición digital y su licencia</caption>
+                <thead>
+                    <tr><th scope="col">Obra</th><th scope="col">Impreso</th><th scope="col">Digital y licencia</th><th scope="col"><span class="sr-only">Acciones</span></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var obra in Model.Obras)
+                    {
+                        <tr>
+                            <th scope="row" class="align-top font-normal">
+                                <div class="font-medium">@obra.Titulo</div>
+                                <div class="text-xs opacity-70">@obra.Autor · @obra.Categoria</div>
+                                @if (obra.DadaDeBaja)
+                                {
+                                    <span class="bh-chip mt-1"><bh-icono nombre="candado" clase="size-3.5" />Dada de baja</span>
+                                }
+                            </th>
+                            <td class="align-top text-sm">
+                                @if (obra.Impresa is { } impresa)
+                                {
+                                    <div>@impresa.PrecioTexto</div>
+                                    <div class="font-mono text-xs opacity-70">@impresa.Isbn</div>
+                                    <div class="mt-1 flex flex-wrap gap-1">
+                                        <span class="bh-chip">@impresa.Estado</span>
+                                        @if (impresa.AgotadaEnLaRed)
+                                        {
+                                            <span class="bh-chip"><bh-icono nombre="agotado" clase="size-3.5" />Agotado en la red</span>
+                                        }
+                                        @if (impresa.RegistroPendienteEnElInventario)
+                                        {
+                                            <span class="bh-chip"><bh-icono nombre="aviso" clase="size-3.5" />Registro pendiente en el Inventario</span>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="opacity-60">Sin edición impresa</span>
+                                }
+                            </td>
+                            <td class="align-top text-sm">
+                                @if (obra.Digital is { } digital)
+                                {
+                                    <div>@digital.PrecioTexto</div>
+                                    <div class="font-mono text-xs opacity-70">@digital.Isbn</div>
+                                    <div class="mt-1 flex flex-wrap items-center gap-1">
+                                        <span class="bh-chip">@digital.Estado</span>
+                                        @if (digital.MotivoDeNoDisponible is not null)
+                                        {
+                                            <span class="bh-chip"><bh-icono nombre="aviso" clase="size-3.5" />@digital.MotivoDeNoDisponible</span>
+                                        }
+                                    </div>
+                                    @if (digital.LicenciaTexto is not null)
+                                    {
+                                        <div class="text-xs opacity-80">@digital.LicenciaTexto@(digital.VigenteHasta is not null ? $" · hasta {digital.VigenteHasta}" : " · sin vencimiento")</div>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="opacity-60">Sin edición digital</span>
+                                }
+                            </td>
+                            <td class="whitespace-nowrap text-right align-top">
+                                @if (obra.Impresa is { Activa: true } activa)
+                                {
+                                    <a class="btn btn-sm btn-primary" href="/administracion/ediciones/@activa.EdicionId/ingreso">Registrar ingreso</a>
+                                }
+                                <a class="btn btn-sm btn-ghost" href="/administracion/obras/@obra.ObraId">@(obra.DadaDeBaja ? "Ver" : "Editar")</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (Model.TotalDePaginas > 1)
+        {
+            <nav class="mt-4 flex items-center justify-between gap-3" aria-label="Paginación">
+                @if (Model.Pagina > 1)
+                {
+                    <a class="btn btn-sm" rel="prev" href="@Model.RutaDeLaPagina(Model.Pagina - 1)">Anterior</a>
+                }
+                else
+                {
+                    <span></span>
+                }
+                <span class="text-sm">Página @Model.Pagina de @Model.TotalDePaginas</span>
+                @if (Model.Pagina < Model.TotalDePaginas)
+                {
+                    <a class="btn btn-sm" rel="next" href="@Model.RutaDeLaPagina(Model.Pagina + 1)">Siguiente</a>
+                }
+                else
+                {
+                    <span></span>
+                }
+            </nav>
+        }
+    }
+</div>
