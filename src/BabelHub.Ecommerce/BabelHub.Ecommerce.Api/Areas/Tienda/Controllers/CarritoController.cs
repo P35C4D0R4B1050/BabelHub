@@ -21,6 +21,7 @@ public sealed class CarritoVista : ModeloBaseDePagina
 /// filtro global antes de la acción. Con una cuenta y una cookie de visitante todavía presente (una fusión aplazada por una compra en curso), cada <c>POST</c> reintenta la fusión primero y nunca la deja fallar la acción.
 /// </summary>
 [Area("Tienda")]
+[RequestSizeLimit(EntradasHttpDelCarrito.TopeDelCuerpo)]
 public sealed class CarritoController(ICarritoDelCliente carrito, IActorActual actor, ContextoDePagina pagina, OpcionesDeErrores errores) : Controller
 {
     private static readonly string[] CamposDeAgregar = ["edicionId", "cantidad"];
@@ -32,9 +33,9 @@ public sealed class CarritoController(ICarritoDelCliente carrito, IActorActual a
     [HttpGet("/carrito")]
     public async Task<IActionResult> Index(CancellationToken cancelacion)
     {
-        if (Request.Query.Count > 0)
+        if (await EntradasHttpDelCarrito.RechazarConsulta(HttpContext) is { } consulta)
         {
-            return await Falla(EntradasHttpDelCarrito.CuerpoInvalido);
+            return await Falla(consulta);
         }
 
         var vista = await pagina.Completar(new CarritoVista(), "Tu carrito", cancelacion: cancelacion);

@@ -95,6 +95,8 @@ public sealed class CuentasDelCarrito : IEstadoDeCuenta
 {
     private readonly HashSet<Guid> _canceladas = [];
 
+    public bool CorreoSinVerificar { get; set; }
+
     public bool NoResponde { get; set; }
 
     public void Cancelar(Guid cuenta) => _canceladas.Add(cuenta);
@@ -107,7 +109,7 @@ public sealed class CuentasDelCarrito : IEstadoDeCuenta
         }
 
         var cancelada = _canceladas.Contains(usuarioId);
-        return Task.FromResult<EstadoDeCuenta?>(new EstadoDeCuenta(usuarioId, !cancelada, EstadoDeAceptacionDeLosTextos.AlDia, true, cancelada, false));
+        return Task.FromResult<EstadoDeCuenta?>(new EstadoDeCuenta(usuarioId, !cancelada && !CorreoSinVerificar, EstadoDeAceptacionDeLosTextos.AlDia, !CorreoSinVerificar, cancelada, false));
     }
 
     public Task<ResultadoDeLaAceptacion> AceptarLosTextos(Guid usuarioId, string versionMostrada, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLaAceptacion.Aceptada);

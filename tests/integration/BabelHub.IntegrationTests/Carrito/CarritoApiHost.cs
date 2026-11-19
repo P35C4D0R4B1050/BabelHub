@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json;
 using BabelHub.Ecommerce.Api.Areas.Tienda.Controllers;
+using BabelHub.Ecommerce.Api.Carrito;
 using BabelHub.Ecommerce.Api.Plataforma;
 using BabelHub.Ecommerce.Api.Web;
 using BabelHub.Ecommerce.Application.Carrito;
@@ -122,6 +123,7 @@ public sealed class CarritoApiHost : IAsyncDisposable
 
         _app = builder.Build();
         _app.UsarManejoDeErrores();
+        _app.UsarLimiteDeCuerpoDelCarrito();
         _app.Use(async (contexto, siguiente) =>
         {
             if (Guid.TryParse(contexto.Request.Headers["X-Prueba-Usuario"], out var usuario))

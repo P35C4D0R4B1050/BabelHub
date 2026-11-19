@@ -25,6 +25,7 @@ public sealed class CheckoutVista : ModeloBaseDePagina
 /// el filtro global antes de la acción.
 /// </summary>
 [Area("Tienda")]
+[RequestSizeLimit(EntradasHttpDelCarrito.TopeDelCuerpo)]
 [RequiereSesion]
 public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IExigenciaDeVerificacionDePersona verificacion, ContextoDePagina pagina, OpcionesDeErrores errores) : Controller
 {
@@ -71,11 +72,12 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
     }
 
     [HttpGet("/checkout")]
+    [VerificacionDePersona(AccionProtegida.Reserva)]
     public async Task<IActionResult> Index(CancellationToken cancelacion)
     {
-        if (Request.Query.Count > 0)
+        if (await EntradasHttpDelCarrito.RechazarConsulta(HttpContext) is { } consulta)
         {
-            return await Falla(EntradasHttpDelCarrito.CuerpoInvalido);
+            return await Falla(consulta);
         }
 
         var resultado = await checkout.Obtener(cancelacion);

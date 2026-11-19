@@ -62,7 +62,7 @@ public sealed class RestInventarioDelCarrito(IClienteDelInventario cliente, IRel
 
             ediciones.AddRange(resultado.Valor.Ediciones.Select(e => new StockDeEdicion(e.EdicionId, e.VendibleEnLaRed)));
             noRegistradas.AddRange(resultado.Valor.NoRegistradas);
-            consultadaEn = resultado.Valor.Ediciones.Select(e => e.ConsultadaEn).Append(consultadaEn).Min();
+            consultadaEn = resultado.Valor.Ediciones.Select(e => e.ConsultadaEn > reloj.Ahora ? reloj.Ahora : e.ConsultadaEn).Append(consultadaEn).Min();
         }
 
         // Sin ninguna edición registrada no hay instante de consulta: la frescura es la de esta llamada.

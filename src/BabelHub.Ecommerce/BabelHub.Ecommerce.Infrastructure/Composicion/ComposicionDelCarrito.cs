@@ -34,7 +34,7 @@ public static class ComposicionDelCarrito
         servicios.TryAddScoped<AccesoAlEsquemaDelCarrito>();
         servicios.TryAddScoped<IRepositorioDeCarritos, RepositorioDeCarritosPostgres>();
         servicios.TryAddScoped<IRepositorioDeCheckouts, RepositorioDeCheckoutsPostgres>();
-        servicios.TryAddScoped<IInventarioDelCarrito>(sp => new RestInventarioDelCarrito(sp.GetRequiredService<IClienteDelInventario>(), sp.GetRequiredService<IReloj>(), sp.GetRequiredService<MemoriaDeSucursalesDelCarrito>()));
+        servicios.TryAddScoped<IInventarioDelCarrito, RestInventarioDelCarrito>();
 
         // ---------- Aplicación ----------
         servicios.TryAddScoped(sp => new AutorizadorDelCarrito(sp.GetRequiredService<IActorActual>(), sp.GetRequiredService<IDenegacionDeAcceso>()));

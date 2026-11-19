@@ -324,10 +324,10 @@ public sealed class RepositorioDeCarritosPostgres(AccesoAlEsquemaDelCarrito acce
             [new NpgsqlParameter("limite", antesDe.ToUniversalTime()), new NpgsqlParameter("maximo", maximo)],
             cancelacion);
 
-    public Task<int> EliminarAvisosVencidos(DateTimeOffset vistosAntesDe, DateTimeOffset creadosAntesDe, CancellationToken cancelacion = default) =>
+    public Task<int> EliminarAvisosVencidos(DateTimeOffset vistosAntesDe, DateTimeOffset creadosAntesDe, int maximo, CancellationToken cancelacion = default) =>
         Borrar(
-            "DELETE FROM carrito.avisos_de_carrito WHERE (visto_en IS NOT NULL AND visto_en <= @vistos) OR creado_en <= @creados",
-            [new NpgsqlParameter("vistos", vistosAntesDe.ToUniversalTime()), new NpgsqlParameter("creados", creadosAntesDe.ToUniversalTime())],
+            "DELETE FROM carrito.avisos_de_carrito WHERE id IN (SELECT id FROM carrito.avisos_de_carrito WHERE (visto_en IS NOT NULL AND visto_en <= @vistos) OR creado_en <= @creados ORDER BY creado_en, id LIMIT @maximo)",
+            [new NpgsqlParameter("vistos", vistosAntesDe.ToUniversalTime()), new NpgsqlParameter("creados", creadosAntesDe.ToUniversalTime()), new NpgsqlParameter("maximo", maximo)],
             cancelacion);
 
     private Task<int> Borrar(string sql, NpgsqlParameter[] parametros, CancellationToken cancelacion) =>

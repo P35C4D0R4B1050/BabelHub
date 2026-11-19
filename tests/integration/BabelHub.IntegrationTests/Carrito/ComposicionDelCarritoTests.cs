@@ -101,8 +101,8 @@ public sealed class ComposicionDelCarritoTests
             Assert.Contains(puerto, error.Message, StringComparison.Ordinal);
         }
 
-        // El Inventario ya no es provisional: es el adaptador real (que falla cerrado en lo que aún no existe en Plataforma).
-        Assert.DoesNotContain(nameof(IInventarioDelCarrito), error.Message, StringComparison.Ordinal);
+        // El adaptador real del Inventario aún no tiene consulta previa, reservar ni liberar (T25b): la guarda impide publicarlo hasta entonces.
+        Assert.Contains(nameof(IInventarioDelCarrito), error.Message, StringComparison.Ordinal);
     }
 
     [Fact]

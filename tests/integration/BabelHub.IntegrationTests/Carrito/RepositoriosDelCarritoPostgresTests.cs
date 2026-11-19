@@ -226,7 +226,7 @@ public sealed class RepositoriosDelCarritoPostgresTests(PostgresDelCarritoFixtur
             });
 
         var sinVer = await bd.Unidad.Ejecutar(token => bd.Carritos.AvisosSinVer(cuenta, token));
-        var eliminados = await bd.Unidad.Ejecutar(token => bd.Carritos.EliminarAvisosVencidos(Inicio.AddDays(-30), Inicio.AddDays(-90), token));
+        var eliminados = await bd.Unidad.Ejecutar(token => bd.Carritos.EliminarAvisosVencidos(Inicio.AddDays(-30), Inicio.AddDays(-90), 100, token));
 
         Assert.Equal([avisoNuevo.Id, avisoViejo.Id], sinVer.Select(a => a.Id));
         Assert.Equal(2, eliminados);

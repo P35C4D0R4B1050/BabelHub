@@ -114,6 +114,24 @@ public sealed class CarritoConPostgresTests(PostgresDelCarritoFixture bd) : IAsy
         Assert.Equal("pago_pendiente", await EstadoDelCheckout(cuenta));
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-CAR-19")]
+    public async Task Con_el_correo_sin_verificar_pasar_al_pago_no_crea_reserva_ni_intencion_y_el_carrito_sigue_intacto()
+    {
+        var (cuenta, impreso) = (EntornoDelCarritoConPostgres.NuevaCuenta(), Impreso());
+        await _e.Agregar(cuenta, impreso, 3);
+        await _e.PrepararCheckout(cuenta);
+        _e.Cuentas.CorreoSinVerificar = true;
+
+        var pago = await _e.Pagar(cuenta, 120m);
+
+        Assert.False(pago.EsExito);
+        Assert.Equal(0, _e.Inventario.Reservado(impreso));
+        Assert.Equal(0, _e.Pagos.Creaciones);
+        Assert.NotEqual("en_pago", await EstadoDelCheckout(cuenta));
+        Assert.Equal(3, (await Carrito(cuenta)).Vista.Lineas[0].Cantidad);
+    }
+
     // ---------- Pasar al pago ----------
 
     [Fact]

@@ -21,6 +21,18 @@ public static partial class EntradasHttpDelCarrito
 
     public const int TopeDelCuerpo = 16 * 1024;
 
+    /// <summary>Un <c>GET</c> no admite consulta: cualquier parámetro es validación, y uno que es un identificador prohibido además registra el acceso denegado. <see langword="null"/> si no hay consulta.</summary>
+    public static async Task<ErrorDeAplicacion?> RechazarConsulta(HttpContext contexto)
+    {
+        ArgumentNullException.ThrowIfNull(contexto);
+        foreach (var clave in contexto.Request.Query.Keys)
+        {
+            return await Rechazar(contexto, clave).ConfigureAwait(false) ?? Invalido(Nombre(clave));
+        }
+
+        return null;
+    }
+
     public static readonly ErrorDeAplicacion CuerpoInvalido = new(CategoriaDeError.Validacion, "validacion-fallida", [new ErrorDeCampo("cuerpo", "formato-invalido")]);
 
     public static ErrorDeAplicacion Falta(string campo) => new(CategoriaDeError.Validacion, "validacion-fallida", [new ErrorDeCampo(campo, "obligatorio")]);

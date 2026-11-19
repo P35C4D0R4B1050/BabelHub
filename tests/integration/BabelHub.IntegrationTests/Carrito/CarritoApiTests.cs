@@ -270,6 +270,43 @@ public sealed class CarritoApiTests : IAsyncLifetime
         Assert.Contains("maximo", texto, StringComparison.Ordinal);
     }
 
+    // ---------- Tope y tipo del cuerpo, y la consulta de un GET ----------
+
+    [Fact]
+    public async Task Un_cuerpo_de_mas_de_16_KiB_se_rechaza_con_413_antes_de_leerlo_y_nunca_llega_a_la_Aplicacion()
+    {
+        using var respuesta = await _host.Enviar("/carrito/lineas", [C("edicionId", Edicion.ToString("D")), C("cantidad", "1"), C("relleno", new string('x', 20_000))]);
+
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, respuesta.StatusCode);
+        Assert.Empty(_host.Carrito.Llamadas);
+    }
+
+    [Fact]
+    public async Task Solo_se_admite_formulario_urlencoded_o_JSON_y_un_multipart_o_texto_plano_es_415()
+    {
+        using var multipart = await _host.Enviar("/carrito/lineas", cuerpo: new MultipartFormDataContent { { new StringContent("1"), "cantidad" } });
+        using var texto = await _host.Enviar("/carrito/lineas", cuerpo: new StringContent("cantidad=1", System.Text.Encoding.UTF8, "text/plain"));
+
+        Assert.Equal([HttpStatusCode.UnsupportedMediaType, HttpStatusCode.UnsupportedMediaType], [multipart.StatusCode, texto.StatusCode]);
+        Assert.Empty(_host.Carrito.Llamadas);
+    }
+
+    [Theory]
+    [InlineData("carritoId")]
+    [InlineData("checkoutId")]
+    [InlineData("cuentaId")]
+    [Trait("Criterio", "AC-CAR-31")]
+    public async Task Un_GET_con_un_identificador_prohibido_en_la_consulta_se_rechaza_y_registra_el_acceso_denegado(string campo)
+    {
+        using var solicitud = new HttpRequestMessage(HttpMethod.Get, $"/carrito?{campo}={Guid.NewGuid():D}");
+
+        using var respuesta = await _host.Cliente.SendAsync(solicitud);
+
+        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
+        Assert.Equal([(CategoriaDeError.Prohibido, "recurso-ajeno")], _host.Denegaciones.Registradas);
+        Assert.Empty(_host.Carrito.Llamadas);
+    }
+
     // ---------- Fusión aplazada ----------
 
     [Fact]

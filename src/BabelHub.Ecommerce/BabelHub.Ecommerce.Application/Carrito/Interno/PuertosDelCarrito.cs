@@ -208,7 +208,7 @@ public interface IRepositorioDeCarritos
     Task<int> EliminarFusionesAnterioresA(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default);
 
     /// <summary>Elimina los avisos vistos antes de <paramref name="vistosAntesDe"/> (30 días después de vistos) o creados antes de <paramref name="creadosAntesDe"/> (90 días) y devuelve cuántos.</summary>
-    Task<int> EliminarAvisosVencidos(DateTimeOffset vistosAntesDe, DateTimeOffset creadosAntesDe, CancellationToken cancelacion = default);
+    Task<int> EliminarAvisosVencidos(DateTimeOffset vistosAntesDe, DateTimeOffset creadosAntesDe, int maximo, CancellationToken cancelacion = default);
 
     /// <summary>Las cuentas con un carrito o un checkout sin movimiento desde antes de <paramref name="antesDe"/>, para comprobar si siguen activas (la purga de las que no lo están).</summary>
     Task<IReadOnlyList<Guid>> CuentasSinMovimientoDesde(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default);
