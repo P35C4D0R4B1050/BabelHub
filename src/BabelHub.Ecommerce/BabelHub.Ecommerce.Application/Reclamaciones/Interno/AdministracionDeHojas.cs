@@ -324,11 +324,14 @@ internal sealed class ReclamacionesDeLaAplicacion(ICasoDeUso<RegistrarHojaEntrad
 
 internal sealed class AdministracionDeReclamacionesDeLaAplicacion(
     ICasoDeUso<ListarHojasEntrada, PaginaDeHojas> listar,
+    ICasoDeUso<ObtenerHojaEntrada, DetalleDeHoja> obtener,
     ICasoDeUso<ResponderHojaEntrada, ResultadoDeLaHoja> responder,
     ICasoDeUso<DescartarHojaEntrada, ResultadoDeLaHoja> descartar,
     ICasoDeUso<ReintentarAvisoEntrada, ResultadoDeLaHoja> reintentar) : IAdministracionDeReclamaciones
 {
     public Task<Resultado<PaginaDeHojas>> Listar(ListarHojasEntrada entrada, CancellationToken cancelacion = default) => listar.Ejecutar(entrada, cancelacion);
+
+    public Task<Resultado<DetalleDeHoja>> Obtener(Guid hojaId, CancellationToken cancelacion = default) => obtener.Ejecutar(new ObtenerHojaEntrada(hojaId), cancelacion);
 
     public Task<Resultado<ResultadoDeLaHoja>> Responder(ResponderHojaEntrada entrada, CancellationToken cancelacion = default) => responder.Ejecutar(entrada, cancelacion);
 

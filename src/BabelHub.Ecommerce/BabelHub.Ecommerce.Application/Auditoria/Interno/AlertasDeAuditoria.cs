@@ -45,6 +45,48 @@ public static class MotivosDeAlerta
     /// <summary>Un traslado vinculado sigue sin aprobar a las 48 horas (TRA-22).</summary>
     public const string TrasladoVinculadoSinAprobar = "traslado-vinculado-sin-aprobar";
 
+    public const string RetomaDePagosFallida = "retoma-de-pagos-fallida";
+
+    public const string ReservasConfirmadasInconsistentes = "reservas-confirmadas-inconsistentes";
+
+    public const string ReservaConfirmadaInexistente = "reserva-confirmada-inexistente";
+
+    public const string ReservaConfirmadaSinLiberar = "reserva-confirmada-sin-liberar";
+
+    public const string ReintentoDeReembolsosFallido = "reintento-de-reembolsos-fallido";
+
+    public const string RegistroDelCobroFallido = "registro-del-cobro-fallido";
+
+    public const string ReembolsoPedidoSinRegistrar = "reembolso-pedido-sin-registrar";
+
+    public const string PurgaDeContactoFallida = "purga-de-contacto-fallida";
+
+    public const string ConsultaDePagoFallida = "consulta-de-pago-fallida";
+
+    public const string ConfirmacionDeCompraFallida = "confirmacion-de-compra-fallida";
+
+    public const string CompraAprobadaSinReferencia = "compra-aprobada-sin-referencia";
+
+    public const string CompraAprobadaSinCompletar = "compra-aprobada-sin-completar";
+
+    public const string CompensacionNoAplicable = "compensacion-no-aplicable";
+
+    public const string CompensacionDeCompraFallida = "compensacion-fallida";
+
+    public const string CobroDudosoParaConciliar = "cobro-dudoso-para-conciliar";
+
+    public const string CierreDeIntencionesFallido = "cierre-de-intenciones-fallido";
+
+    public const string CargoDuplicadoParaConciliar = "cargo-duplicado-para-conciliar";
+
+    public const string AvisoDePagoFallido = "aviso-de-pago-fallido";
+
+    public const string AvisoACarritoFallido = "aviso-a-carrito-fallido";
+
+    public const string CompraAprobadaSinPedidoALos30Dias = "compra-aprobada-sin-pedido-a-los-30-dias";
+
+    public const string AnonimizacionDeHojasSinCorrer = "anonimizacion-de-hojas-sin-correr";
+
     /// <summary>Las alertas del Inventario no se pudieron leer (AUD-38): el E-commerce sigue y lo reintenta.</summary>
     public const string LecturaDeAlertasDelInventarioNoDisponible = "lectura-de-alertas-del-inventario-no-disponible";
 
@@ -94,6 +136,27 @@ public static class CatalogoDeAlertasDeAuditoria
         new(MotivosDeAlerta.DepuracionDiariaSinExito, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.BajaDeTitularSinEntregar, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.TrasladoVinculadoSinAprobar, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.RetomaDePagosFallida, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.ReservasConfirmadasInconsistentes, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.ReservaConfirmadaInexistente, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.ReservaConfirmadaSinLiberar, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.ReintentoDeReembolsosFallido, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.RegistroDelCobroFallido, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.ReembolsoPedidoSinRegistrar, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.PurgaDeContactoFallida, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.ConsultaDePagoFallida, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.ConfirmacionDeCompraFallida, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.CompraAprobadaSinReferencia, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.CompraAprobadaSinCompletar, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.CompensacionNoAplicable, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.CompensacionDeCompraFallida, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.CobroDudosoParaConciliar, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.CierreDeIntencionesFallido, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.CargoDuplicadoParaConciliar, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.AvisoDePagoFallido, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.AvisoACarritoFallido, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.CompraAprobadaSinPedidoALos30Dias, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.AnonimizacionDeHojasSinCorrer, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.LecturaDeAlertasDelInventarioNoDisponible, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.AlcanceDeDatosSinActor, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.ConfirmacionesDeReservasAnomalas, ClaseDeAlerta.Tecnica),

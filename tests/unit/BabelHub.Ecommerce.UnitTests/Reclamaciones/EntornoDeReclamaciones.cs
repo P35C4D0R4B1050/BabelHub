@@ -136,6 +136,52 @@ internal sealed class RepositorioDeHojasEnMemoria : IRepositorioDeHojas, IInstan
         return Task.FromResult(new ListadoDeHojas(filtradas.Skip((pagina - 1) * tamano).Take(tamano).Select(Clonar).ToList(), filtradas.Count));
     }
 
+    /// <summary>El marcado de las hojas de una cuenta cancelada falla a mitad (para probar que Identidad lo revierte todo).</summary>
+    public bool FallaAlMarcar { get; set; }
+
+    public Task<HojaDeReclamacion?> ObtenerPorNumero(NumeroDeHoja numero, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        return Task.FromResult(_hojas.Values.FirstOrDefault(h => h.Numero == numero) is { } h ? Clonar(h) : null);
+    }
+
+    public Task<ListadoDeHojas> ListarDelCorreo(string correoNormalizado, int pagina, int tamano, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        var filtradas = _hojas.Values
+            .Where(h => h.Datos.CorreoNormalizado == correoNormalizado && !h.DeCuentaCancelada)
+            .OrderByDescending(h => h.FechaRegistro)
+            .ThenByDescending(h => h.Numero.Secuencia)
+            .ToList();
+        return Task.FromResult(new ListadoDeHojas(filtradas.Skip((pagina - 1) * tamano).Take(tamano).Select(Clonar).ToList(), filtradas.Count));
+    }
+
+    public Task<int> ContarPendientesDelCorreo(string correoNormalizado, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        return Task.FromResult(_hojas.Values.Count(h => h.Datos.CorreoNormalizado == correoNormalizado && h.Estado == EstadoDeHoja.Pendiente && !h.DeCuentaCancelada));
+    }
+
+    public Task<int> MarcarDeCuentaCancelada(string correoNormalizado, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        var cambiadas = 0;
+        foreach (var hoja in _hojas.Values.Where(h => h.Datos.CorreoNormalizado == correoNormalizado).ToList())
+        {
+            if (FallaAlMarcar && cambiadas >= 1)
+            {
+                throw new InvalidOperationException("La base falló a mitad del marcado.");
+            }
+
+            if (hoja.MarcarDeCuentaCancelada())
+            {
+                cambiadas++;
+            }
+        }
+
+        return Task.FromResult(cambiadas);
+    }
+
     public object Capturar() => (_hojas.ToDictionary(p => p.Key, p => Clonar(p.Value)), new Dictionary<int, int>(_secuencias));
 
     public void Restaurar(object instantanea)
@@ -157,6 +203,11 @@ internal sealed class LimitesDeHojasDoble : IControlDeLimites
     public int Maximo { get; set; } = 3;
 
     public int Usadas { get; set; }
+
+    /// <summary>El tope de las consultas del consumidor por minuto (política aparte de la de registrar hojas).</summary>
+    public int MaximoDeConsultas { get; set; } = 60;
+
+    public int Consultas { get; private set; }
 
     public bool Caido { get; set; }
 
@@ -180,6 +231,22 @@ internal sealed class LimitesDeHojasDoble : IControlDeLimites
         ClaveDeIdempotencia? idempotencia = null,
         CancellationToken cancelacion = default)
     {
+        if (politica == PoliticasDeLimite.ConsultasDeHojasPorUsuario)
+        {
+            if (Caido)
+            {
+                return Task.FromResult(ResultadoDeLimite.NoDisponible());
+            }
+
+            if (Consultas >= MaximoDeConsultas)
+            {
+                return Task.FromResult(ResultadoDeLimite.Excedido(politica.Valor, 30, DateTimeOffset.UtcNow.AddSeconds(30)));
+            }
+
+            Consultas++;
+            return Task.FromResult(ResultadoDeLimite.Permitido(new ReservaDeLimite(politica.Valor, "usuario", Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow)));
+        }
+
         if (Forzado is not null)
         {
             return Task.FromResult(Forzado);
@@ -310,6 +377,7 @@ internal sealed class EntornoDeReclamaciones
         Reclamaciones = new ReclamacionesDeLaAplicacion(new RegistrarHoja(Verificacion, new CalculadorDeHuellaNormalizante(), Limites, Hojas, Unidad, Reloj));
         Administracion = new AdministracionDeReclamacionesDeLaAplicacion(
             new ListarHojas(autorizador, Hojas, Unidad),
+            new ObtenerHojaParaAdministracion(autorizador, Hojas, Unidad, Auditoria),
             new ResponderHoja(autorizador, Hojas, Unidad, Reloj, Auditoria, envio),
             new DescartarHoja(autorizador, Hojas, Unidad, Reloj, Auditoria),
             new ReintentarAvisoDeRespuesta(autorizador, Hojas, Unidad, Reloj, envio));

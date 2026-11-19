@@ -51,6 +51,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
         "segundo-factor-por-cuenta",
         "registros-por-origen",
         "hojas-por-origen",
+        "consultas-de-hojas-por-usuario",
         "cobros-por-intencion",
         "cobros-por-cuenta",
         "cobros-por-origen",
