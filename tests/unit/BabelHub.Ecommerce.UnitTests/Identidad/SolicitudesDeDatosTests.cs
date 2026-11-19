@@ -145,4 +145,19 @@ public sealed class SolicitudesDeDatosTests
         Assert.False(solicitud.Atender(InstanteViernes.AddDays(2)));
         Assert.Throws<ArgumentException>(() => SolicitudDeDatos.Recibir(Guid.NewGuid(), Guid.NewGuid(), TipoDeSolicitudDeDatos.Oposicion, InstanteViernes, Viernes).Rechazar(InstanteViernes, " "));
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-43")]
+    public void Borrar_el_contenido_deja_solo_identificador_tipo_estado_y_fechas()
+    {
+        var solicitud = SolicitudDeDatos.Recibir(Guid.NewGuid(), Guid.NewGuid(), TipoDeSolicitudDeDatos.Acceso, InstanteViernes, Viernes);
+        solicitud.Atender(InstanteViernes.AddDays(1), "respuesta");
+
+        solicitud.BorrarElContenido();
+
+        Assert.Null(solicitud.Respuesta);
+        Assert.Null(solicitud.Motivo);
+        Assert.Equal(EstadoDeSolicitudDeDatos.Atendida, solicitud.Estado);
+        Assert.Equal(TipoDeSolicitudDeDatos.Acceso, solicitud.Tipo);
+    }
 }

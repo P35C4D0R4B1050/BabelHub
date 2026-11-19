@@ -84,6 +84,16 @@ internal sealed class EntornoDeIdentidad
 
     public CancelacionesEnMemoria CancelacionesGuardadas { get; }
 
+    public BajasEnMemoria BajasGuardadas { get; }
+
+    public PurgaDeIdentidadDePrueba Purga { get; }
+
+    public EntregaDeBajasDePrueba EntregaDeBajas { get; } = new();
+
+    public Plataforma.RegistroDeSupresionesEnMemoria Supresiones { get; } = new();
+
+    public List<AplicadorDePrueba> Aplicadores { get; } = [new("pedidos"), new("pagos"), new("devoluciones"), new("biblioteca"), new("reclamaciones"), new("carrito")];
+
     public EjecutorDeCancelacionDePrueba Ejecutor { get; }
 
     public AvisosDeCuenta Avisos { get; }
@@ -106,6 +116,8 @@ internal sealed class EntornoDeIdentidad
         Cambios = new CambiosDeCorreoEnMemoria(Bd);
         SolicitudesGuardadas = new SolicitudesDeDatosEnMemoria(Bd);
         CancelacionesGuardadas = new CancelacionesEnMemoria(Bd);
+        BajasGuardadas = new BajasEnMemoria(Bd);
+        Purga = new PurgaDeIdentidadDePrueba(Bd);
         Ejecutor = new EjecutorDeCancelacionDePrueba(Reloj);
         Renovaciones = new RenovacionesEnMemoria(Bd);
         Desafios = new DesafiosEnMemoria(Bd);
@@ -315,4 +327,37 @@ internal static class EntornoDeLaCancelacionExtensiones
         e.Unidad,
         e.Auditoria,
         e.Reloj);
+}
+
+internal static class EntornoDeLaEjecucionExtensiones
+{
+    public static EjecutorDeLaCancelacion EjecutorReal(this EntornoDeIdentidad e) => new(
+        e.Supresiones,
+        e.Aplicadores,
+        e.Purga,
+        e.CancelacionDeAvisos,
+        e.Cuentas,
+        e.Revocacion,
+        e.CancelacionesGuardadas,
+        e.BajasGuardadas,
+        e.Secretos,
+        e.Auditoria,
+        e.Reloj);
+
+    /// <summary>La cancelación con el ejecutor <b>real</b> (el de las pruebas anteriores es un doble).</summary>
+    public static CancelacionDeCuenta CancelacionReal(this EntornoDeIdentidad e) => new(
+        e.Cuentas,
+        new AlcanceDeLaCuenta(e.Actor, e.Denegaciones),
+        e.Reautenticacion(),
+        e.CancelacionesGuardadas,
+        e.Pendientes,
+        e.EjecutorReal(),
+        e.AvisosGuardados,
+        e.Avisos,
+        e.Secretos,
+        e.Unidad,
+        e.Auditoria,
+        e.Reloj);
+
+    public static ReintentoDeBajas Reintento(this EntornoDeIdentidad e) => new(e.BajasGuardadas, e.Supresiones, e.EntregaDeBajas, e.AlertasDeSeguridad, e.Reloj);
 }

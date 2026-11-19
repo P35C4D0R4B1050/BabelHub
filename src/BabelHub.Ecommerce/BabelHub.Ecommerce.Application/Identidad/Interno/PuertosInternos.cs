@@ -239,6 +239,42 @@ public interface IEjecutorDeLaCancelacion
     Task Ejecutar(CuentaDeIdentidad cuenta, CancellationToken cancelacion = default);
 }
 
+/// <summary>
+/// La parte de la matriz de cancelación (IDE-47, IDE-69, IDE-89) que es del propio esquema <c>identidad</c>, aplicada bajo <c>SET LOCAL ROLE</c> de ese esquema y <b>dentro de la transacción de la cancelación</b>: elimina
+/// el segundo factor y sus códigos de respaldo, los códigos de un solo uso, los desafíos, las renovaciones, los dispositivos y la región, los cambios de correo pendientes (con el correo nuevo), los avisos de la cuenta,
+/// y deja en las solicitudes sobre datos personales (y en las de cancelación) solo identificador, tipo, estado y fechas. No toca el registro de la cuenta: eso lo anonimiza el caso de uso.
+/// </summary>
+public interface IPurgaDeIdentidad
+{
+    Task EliminarLosDatosDe(Guid usuarioId, CancellationToken cancelacion = default);
+}
+
+/// <summary>La baja de un titular que se entrega al Inventario y cuyo cierre se agrega al registro de supresiones (<c>identidad.bajas_titulares</c> y <c>cierres_pendientes</c>, IDE-64, IDE-75): solo el identificador opaco y fechas.</summary>
+public sealed class BajaDeTitular(Guid usuarioId, DateTimeOffset creada, DateTimeOffset? entregadaEn = null, DateTimeOffset? cerradaEn = null)
+{
+    /// <summary>El identificador opaco: el identificador interno aleatorio de la cuenta, nunca derivado del correo.</summary>
+    public Guid IdentificadorOpaco { get; } = usuarioId;
+
+    public DateTimeOffset Creada { get; } = creada;
+
+    public DateTimeOffset? EntregadaEn { get; set; } = entregadaEn;
+
+    public DateTimeOffset? CerradaEn { get; set; } = cerradaEn;
+
+    public bool Pendiente => EntregadaEn is null || CerradaEn is null;
+}
+
+/// <summary>Las bajas pendientes: se agregan en la misma transacción que la cancelación y se reintentan hasta completarse, sin deshacer nada.</summary>
+public interface IRepositorioDeBajas
+{
+    Task Agregar(BajaDeTitular baja, CancellationToken cancelacion = default);
+
+    /// <summary>Las que aún no se entregaron o no se cerraron, con <c>FOR UPDATE SKIP LOCKED</c> en la base: dos reintentos simultáneos no procesan la misma.</summary>
+    Task<IReadOnlyList<BajaDeTitular>> Pendientes(int limite, CancellationToken cancelacion = default);
+
+    Task Guardar(BajaDeTitular baja, CancellationToken cancelacion = default);
+}
+
 /// <summary>El cambio de correo en curso de un usuario (<c>identidad.cambios_de_correo_pendientes</c>, IDE-53, IDE-54): como máximo uno por usuario; <see cref="Guardar"/> reemplaza el anterior.</summary>
 public interface IRepositorioDeCambiosDeCorreo
 {

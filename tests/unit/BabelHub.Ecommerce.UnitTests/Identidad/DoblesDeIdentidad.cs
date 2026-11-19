@@ -39,6 +39,8 @@ internal sealed class BdIdentidad
 
     public List<SolicitudDeCancelacion> Cancelaciones { get; private set; } = [];
 
+    public List<BajaDeTitular> Bajas { get; private set; } = [];
+
     public List<(Guid UsuarioId, AvisoDeCuenta Aviso)> Avisos { get; private set; } = [];
 
     internal sealed record EstadoDeLaBd(
@@ -52,6 +54,7 @@ internal sealed class BdIdentidad
         List<CambioDeCorreoPendiente> Cambios,
         List<SolicitudDeDatos> Solicitudes,
         List<SolicitudDeCancelacion> Cancelaciones,
+        List<BajaDeTitular> Bajas,
         List<(Guid UsuarioId, AvisoDeCuenta Aviso)> Avisos);
 
     /// <summary>La instantánea guarda una copia del estado de cada cuenta para restaurarlo <b>en el mismo objeto</b>: las pruebas conservan su referencia y ven la reversión como la vería una base de datos.</summary>
@@ -66,6 +69,7 @@ internal sealed class BdIdentidad
         [.. Cambios.Select(c => CambioDeCorreoPendiente.Restaurar(c.Id, c.UsuarioId, c.CorreoNuevo, c.Creado, c.Estado))],
         [.. Solicitudes.Select(s => SolicitudDeDatos.Restaurar(s.Id, s.UsuarioId, s.Tipo, s.Estado, s.RecibidaEn, s.FechaLimite, s.AtendidaEn, s.Respuesta, s.Motivo))],
         [.. Cancelaciones.Select(c => SolicitudDeCancelacion.Restaurar(c.Id, c.UsuarioId, c.Estado, c.SolicitadaEn, c.ReconfirmarHasta, c.AvisoVistoEn, c.CerradaEn, c.EjecucionEnCurso))],
+        [.. Bajas.Select(b => new BajaDeTitular(b.IdentificadorOpaco, b.Creada, b.EntregadaEn, b.CerradaEn))],
         [.. Avisos]);
 
     public void Restaurar(EstadoDeLaBd estado)
@@ -79,6 +83,7 @@ internal sealed class BdIdentidad
         Cambios = estado.Cambios;
         Solicitudes = estado.Solicitudes;
         Cancelaciones = estado.Cancelaciones;
+        Bajas = estado.Bajas;
         Avisos = estado.Avisos;
         foreach (var (cuenta, copia) in estado.CopiasDeCuentas)
         {
@@ -819,5 +824,85 @@ internal sealed class EjecutorDeCancelacionDePrueba(BabelHub.Ecommerce.UnitTests
         cuenta.Usuario.Desactivar();
         Ejecutadas.Add(cuenta.Usuario.Id);
         return Task.CompletedTask;
+    }
+}
+
+internal sealed class BajasEnMemoria(BdIdentidad bd) : IRepositorioDeBajas
+{
+    public Task Agregar(BajaDeTitular baja, CancellationToken cancelacion = default)
+    {
+        bd.Bajas.Add(baja);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<BajaDeTitular>> Pendientes(int limite, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<BajaDeTitular>>([.. bd.Bajas.Where(b => b.Pendiente).Take(limite)]);
+
+    public Task Guardar(BajaDeTitular baja, CancellationToken cancelacion = default) => Task.CompletedTask;
+}
+
+/// <summary>Un módulo receptor de la cancelación de prueba: anota lo que se le pidió o falla.</summary>
+internal sealed class AplicadorDePrueba(string modulo) : IAplicadorDeCancelacion
+{
+    public string Modulo => modulo;
+
+    public List<(Guid UsuarioId, Guid Opaco)> Aplicados { get; } = [];
+
+    public bool Falla { get; set; }
+
+    public Task Aplicar(Guid usuarioId, Guid identificadorOpaco, CancellationToken cancelacion = default)
+    {
+        if (Falla)
+        {
+            throw new InvalidOperationException($"El módulo {modulo} no pudo aplicar la cancelación.");
+        }
+
+        Aplicados.Add((usuarioId, identificadorOpaco));
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>La parte de la matriz del esquema <c>identidad</c>, simulada sobre la base en memoria (la real es T33).</summary>
+internal sealed class PurgaDeIdentidadDePrueba(BdIdentidad bd) : IPurgaDeIdentidad
+{
+    public bool Falla { get; set; }
+
+    public int Llamadas { get; private set; }
+
+    public Task EliminarLosDatosDe(Guid usuarioId, CancellationToken cancelacion = default)
+    {
+        Llamadas++;
+        if (Falla)
+        {
+            throw new InvalidOperationException("La purga del esquema identidad falló.");
+        }
+
+        bd.Dispositivos.RemoveAll(d => d.UsuarioId == usuarioId);
+        bd.Cambios.RemoveAll(c => c.UsuarioId == usuarioId);
+        bd.Avisos.RemoveAll(a => a.UsuarioId == usuarioId);
+        foreach (var solicitud in bd.Solicitudes.Where(s => s.UsuarioId == usuarioId))
+        {
+            solicitud.BorrarElContenido();
+        }
+
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class EntregaDeBajasDePrueba : IEntregaDeBajas
+{
+    public List<Guid> Entregadas { get; } = [];
+
+    public bool Falla { get; set; }
+
+    public Task<bool> Entregar(Guid identificadorOpaco, CancellationToken cancelacion = default)
+    {
+        if (Falla)
+        {
+            throw new InvalidOperationException("El Inventario no responde.");
+        }
+
+        Entregadas.Add(identificadorOpaco);
+        return Task.FromResult(true);
     }
 }

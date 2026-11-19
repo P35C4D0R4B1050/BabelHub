@@ -136,6 +136,14 @@ public sealed class Usuario
 
     public void VerificarCorreo() => CorreoVerificado = true;
 
+    /// <summary>La cancelación de la cuenta (IDE-47, IDE-48): el correo se reemplaza por uno anónimo aleatorio (no derivado del original, para que el original pueda registrarse como una cuenta nueva), queda sin verificar y desactivada.</summary>
+    public void Anonimizar(string correoAnonimo)
+    {
+        Correo = NormalizarCorreo(correoAnonimo);
+        CorreoVerificado = false;
+        Activo = false;
+    }
+
     /// <summary>Aplica un cambio de correo ya verificado por su código (IDE-53): el correo nuevo queda normalizado y verificado.</summary>
     public void CambiarElCorreo(string correoNuevo)
     {

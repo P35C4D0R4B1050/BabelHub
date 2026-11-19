@@ -104,6 +104,13 @@ public sealed class SolicitudDeDatos
     /// <summary>El motivo del rechazo (IDE-26); nulo si no se rechazó.</summary>
     public string? Motivo { get; private set; }
 
+    /// <summary>La cancelación de la cuenta del titular (IDE-69): deja solo identificador, tipo, estado y fechas; la respuesta y el motivo se borran.</summary>
+    public void BorrarElContenido()
+    {
+        Respuesta = null;
+        Motivo = null;
+    }
+
     /// <summary>Cerrada: atendida o rechazada; ya no cambia (IDE-26).</summary>
     public bool EstaCerrada => Estado is EstadoDeSolicitudDeDatos.Atendida or EstadoDeSolicitudDeDatos.Rechazada;
 
