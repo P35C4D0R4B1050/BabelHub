@@ -25,6 +25,7 @@ public sealed class TextoRedactado
     }
 
     /// <summary>El texto tal como lo escribió la persona, o el valor fijo si ya se redactó.</summary>
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)]
     public string Valor { get; }
 
     public bool EstaRedactado { get; }
@@ -33,7 +34,7 @@ public sealed class TextoRedactado
     public static TextoRedactado? Crear(string? valor, int maximo)
     {
         var texto = valor?.Trim(' ');
-        return string.IsNullOrEmpty(texto) || texto.Length > maximo || texto.Any(char.IsControl) ? null : new TextoRedactado(texto, redactado: false);
+        return string.IsNullOrEmpty(texto) || texto.Length > maximo || texto.Any(c => char.IsControl(c) || char.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.Format) ? null : new TextoRedactado(texto, redactado: false);
     }
 
     /// <summary>Lo que lee el repositorio: un texto guardado o el valor fijo de uno ya redactado.</summary>

@@ -88,7 +88,10 @@ internal static class MotivosDeDenegacionDeDevoluciones
 
     public const string RecursoAjeno = "recurso-ajeno";
 
-    public const string SucursalNoResoluble = "sucursal-no-resoluble";
+    /// <summary>Los motivos del catálogo de <c>AccesoDenegado</c>: la devolución es de otra sucursal receptora o la sucursal del actor no se puede resolver (<c>fuera-de-sucursal</c>), o el alcance no alcanza (un reporte o un digital visto por un encargado).</summary>
+    public const string FueraDeSucursal = "fuera-de-sucursal";
+
+    public const string AlcanceInsuficiente = "alcance-insuficiente";
 }
 
 /// <summary>
@@ -104,6 +107,18 @@ internal sealed class AutorizadorDeDevoluciones(IActorActual actores, IDenegacio
 
     /// <summary>El encargado de sucursal o la administración central: aprueban, rechazan y reciben un impreso (DEV-13).</summary>
     public Task<ErrorDeAplicacion?> ExigirPersonal(CancellationToken cancelacion) => Exigir(a => RolesDeDevoluciones.EsEncargado(a) || RolesDeDevoluciones.EsAdministracion(a), cancelacion);
+
+    /// <summary>El actor «sistema» de los trabajos de fondo (conciliación, revisión de plazos, depuración): una persona o una integración no lo es. Sin sesión de persona, no hay textos legales que comprobar.</summary>
+    public async Task<ErrorDeAplicacion?> ExigirSistema(CancellationToken cancelacion)
+    {
+        if (actores.Actual is { Tipo: TipoDeActor.Sistema })
+        {
+            return null;
+        }
+
+        await Denegar(MotivosDeDenegacionDeDevoluciones.FueraDeRol, "ECO-PROHIBIDO", cancelacion).ConfigureAwait(false);
+        return new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDeDevoluciones.Prohibido);
+    }
 
     /// <summary>Solo la administración central: ver todas y decidir un reporte (DEV-28).</summary>
     public Task<ErrorDeAplicacion?> ExigirAdministracion(CancellationToken cancelacion) => Exigir(RolesDeDevoluciones.EsAdministracion, cancelacion);
@@ -170,12 +185,12 @@ internal sealed class AutorizadorDeDevoluciones(IActorActual actores, IDenegacio
 
         if (!RolesDeDevoluciones.EsEncargado(actor) || actor!.SucursalId is not { } sucursalId)
         {
-            return await NoEncontrado(MotivosDeDenegacionDeDevoluciones.SucursalNoResoluble, cancelacion).ConfigureAwait(false);
+            return await NoEncontrado(MotivosDeDenegacionDeDevoluciones.FueraDeSucursal, cancelacion).ConfigureAwait(false);
         }
 
         if (devolucion.Tipo != TipoDeDevolucion.Impreso || devolucion.Origen != OrigenDeDevolucion.Solicitud)
         {
-            return await NoEncontrado(MotivosDeDenegacionDeDevoluciones.RecursoAjeno, cancelacion).ConfigureAwait(false);
+            return await NoEncontrado(MotivosDeDenegacionDeDevoluciones.AlcanceInsuficiente, cancelacion).ConfigureAwait(false);
         }
 
         string? codigo;
@@ -190,12 +205,12 @@ internal sealed class AutorizadorDeDevoluciones(IActorActual actores, IDenegacio
 
         if (codigo is null)
         {
-            return await NoEncontrado(MotivosDeDenegacionDeDevoluciones.SucursalNoResoluble, cancelacion).ConfigureAwait(false);
+            return await NoEncontrado(MotivosDeDenegacionDeDevoluciones.FueraDeSucursal, cancelacion).ConfigureAwait(false);
         }
 
         return string.Equals(codigo, devolucion.CodigoDeSucursalReceptora, StringComparison.Ordinal)
             ? null
-            : await NoEncontrado(MotivosDeDenegacionDeDevoluciones.RecursoAjeno, cancelacion).ConfigureAwait(false);
+            : await NoEncontrado(MotivosDeDenegacionDeDevoluciones.FueraDeSucursal, cancelacion).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -208,6 +223,12 @@ internal sealed class AutorizadorDeDevoluciones(IActorActual actores, IDenegacio
         if (RolesDeDevoluciones.EsAdministracion(actor))
         {
             return null;
+        }
+
+        if (!RolesDeDevoluciones.EsEncargado(actor))
+        {
+            await Denegar(MotivosDeDenegacionDeDevoluciones.FueraDeRol, "ECO-PROHIBIDO", cancelacion).ConfigureAwait(false);
+            return new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDeDevoluciones.Prohibido);
         }
 
         string? codigo = null;
@@ -228,7 +249,7 @@ internal sealed class AutorizadorDeDevoluciones(IActorActual actores, IDenegacio
             return null;
         }
 
-        await Denegar(codigo is null ? MotivosDeDenegacionDeDevoluciones.SucursalNoResoluble : MotivosDeDenegacionDeDevoluciones.RecursoAjeno, "ECO-PROHIBIDO", cancelacion).ConfigureAwait(false);
+        await Denegar(MotivosDeDenegacionDeDevoluciones.FueraDeSucursal, "ECO-PROHIBIDO", cancelacion).ConfigureAwait(false);
         return new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDeDevoluciones.Prohibido);
     }
 

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BabelHub.Ecommerce.Application.Plataforma;
@@ -8,12 +9,14 @@ namespace BabelHub.Ecommerce.Application.Devoluciones;
 // Modelos propios: ningún tipo del Dominio ni de `Interno`. El motivo y el texto libre viajan como `TextoLibre`, que no se vuelca en `ToString` ni en la serialización (DEV-29, DEV-31).
 
 /// <summary>Un texto libre de la persona (motivo o texto de un reporte): su <c>ToString</c> y su serialización están redactados para que no llegue a un registro, un error ni un aviso (DEV-31). Solo la pantalla lo lee y siempre codificado.</summary>
+[DebuggerDisplay("[redactado]")]
 [JsonConverter(typeof(ConvertidorDeTextoLibre))]
 public sealed class TextoLibre(string? valor)
 {
     public const string Redactado = "[redactado]";
 
     /// <summary>El texto tal como lo escribió la persona, sin validar (la Aplicación lo valida y rechaza sin repetirlo).</summary>
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)]
     public string? Valor { get; } = valor;
 
     public override string ToString() => Redactado;

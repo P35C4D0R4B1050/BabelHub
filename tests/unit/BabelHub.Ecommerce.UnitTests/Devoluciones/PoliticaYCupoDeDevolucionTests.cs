@@ -144,7 +144,6 @@ public sealed class PoliticaYCupoDeDevolucionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-03")]
     public void Dos_solicitudes_simultaneas_sobre_la_misma_unidad_solo_comprometen_a_una_con_el_cupo_protegido_por_un_candado()
     {
         var cupo = CupoDeLinea.Crear(Guid.NewGuid(), 1);

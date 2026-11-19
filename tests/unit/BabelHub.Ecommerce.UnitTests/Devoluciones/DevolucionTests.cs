@@ -89,7 +89,7 @@ public sealed class DevolucionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-17")]
+    [Trait("Criterio", "AC-DEV-16")]
     public void Un_reporte_es_de_una_sola_linea_digital_con_su_acceso_y_una_solicitud_no_lleva_acceso()
     {
         var yo = ResponsableDelCambio.Cliente(Cliente);
@@ -103,7 +103,7 @@ public sealed class DevolucionTests
     // ---------- Aprobar y rechazar la devolución completa ----------
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-17")]
+    [Trait("Criterio", "AC-DEV-10")]
     public void Aprobar_pasa_todas_las_lineas_con_la_fecha_y_el_responsable_y_repetirlo_es_estado_invalido_sin_efectos()
     {
         var devolucion = Impreso();
@@ -274,7 +274,7 @@ public sealed class DevolucionTests
     // ---------- Reembolso por línea ----------
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-17")]
+    [Trait("Criterio", "AC-DEV-16")]
     public void Un_impreso_se_reembolsa_linea_a_linea_solo_desde_recibida_y_repetirlo_es_estado_invalido()
     {
         var devolucion = Aprobada();
@@ -296,18 +296,21 @@ public sealed class DevolucionTests
         Assert.Equal(Ahora.AddMinutes(5), devolucion.Lineas[0].ReembolsadaEn);
         Assert.Null(devolucion.Lineas[1].ReembolsadaEn);
         Assert.False(devolucion.TodasFinales);
-        Assert.Equal(ResultadoDeTransicionDeDevolucion.Aplicada, devolucion.Reembolsar(segunda, Ahora.AddMinutes(7), ResponsableDelCambio.Sistema));
+        Assert.Equal(ResultadoDeTransicionDeDevolucion.EstadoInvalido, devolucion.Reembolsar(segunda, Ahora.AddMinutes(7), ResponsableDelCambio.Sistema));
+        devolucion.RegistrarReembolsoDeLinea(segunda, Ahora);
+        Assert.Equal(ResultadoDeTransicionDeDevolucion.Aplicada, devolucion.Reembolsar(segunda, Ahora.AddMinutes(8), ResponsableDelCambio.Sistema));
         Assert.True(devolucion.TodasFinales);
     }
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-17")]
+    [Trait("Criterio", "AC-DEV-08")]
     public void Un_digital_aprobado_por_el_sistema_se_reembolsa_sin_pasar_por_recibida()
     {
         var devolucion = Digital();
         var linea = devolucion.Lineas[0].LineaDePedidoId;
 
         Assert.Equal(ResultadoDeTransicionDeDevolucion.Aplicada, devolucion.Aprobar(Ahora, ResponsableDelCambio.Sistema));
+        devolucion.RegistrarReembolsoDeLinea(linea, Ahora);
         Assert.Equal(ResultadoDeTransicionDeDevolucion.Aplicada, devolucion.Reembolsar(linea, Ahora.AddMinutes(1), ResponsableDelCambio.Sistema));
 
         Assert.DoesNotContain(devolucion.Lineas[0].Cambios, c => c.Estado == EstadoDeLineaDeDevolucion.Recibida);
@@ -315,7 +318,7 @@ public sealed class DevolucionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-17")]
+    [Trait("Criterio", "AC-DEV-07")]
     public void El_responsable_sistema_no_tiene_identificador_y_cliente_y_personal_si()
     {
         Assert.Null(ResponsableDelCambio.Sistema.Id);
@@ -329,7 +332,7 @@ public sealed class DevolucionTests
     // ---------- Rehidratar ----------
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-17")]
+    [Trait("Criterio", "AC-DEV-16")]
     public void Rehidratar_devuelve_lo_guardado_y_rechaza_lo_incoherente()
     {
         var original = Aprobada();

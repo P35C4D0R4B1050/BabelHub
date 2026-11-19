@@ -486,6 +486,12 @@ public sealed class Devolucion
     public ResultadoDeTransicionDeDevolucion Reembolsar(Guid lineaDePedidoId, DateTimeOffset ahora, ResponsableDelCambio responsable)
     {
         var linea = Linea(lineaDePedidoId);
+        // Solo cuando la pasarela confirma, y con el reembolso ya registrado en Pagos (DEV-08, D07).
+        if (linea.ReembolsoRegistradoEn is null)
+        {
+            return ResultadoDeTransicionDeDevolucion.EstadoInvalido;
+        }
+
         var origenValido = Tipo == TipoDeDevolucion.Impreso ? linea.Estado == EstadoDeLineaDeDevolucion.Recibida : linea.Estado == EstadoDeLineaDeDevolucion.Aprobada;
         if (!origenValido)
         {

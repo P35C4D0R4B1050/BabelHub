@@ -53,11 +53,12 @@ public static class EstadosDeLineaDeDevolucion
     public static bool ComprometeCupo(this EstadoDeLineaDeDevolucion estado) => estado != EstadoDeLineaDeDevolucion.Rechazada;
 }
 
+/// <summary>El valor cero es el sistema: un <c>default</c> nunca se hace pasar por un cliente.</summary>
 public enum TipoDeResponsable
 {
+    Sistema,
     Cliente,
     Personal,
-    Sistema,
 }
 
 /// <summary>
@@ -74,6 +75,9 @@ public readonly record struct ResponsableDelCambio
     public TipoDeResponsable Tipo { get; }
 
     public Guid? Id { get; }
+
+    /// <summary>Solo el tipo: el identificador del cliente (la cuenta opaca) no sale en un texto ni en un registro.</summary>
+    public override string ToString() => Tipo.ToString();
 
     public static ResponsableDelCambio Cliente(Guid id) => id == Guid.Empty ? throw new ArgumentException("El cliente necesita un identificador.", nameof(id)) : new(TipoDeResponsable.Cliente, id);
 

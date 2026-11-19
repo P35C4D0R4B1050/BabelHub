@@ -77,6 +77,13 @@ public sealed class AutorizacionYAlcanceDeDevolucionesTests
                 : Domain.Devoluciones.Devolucion.Solicitar(Guid.NewGuid(), tipo, origen, null, motivo, null, [new NuevaLineaDeDevolucion(Guid.NewGuid(), Guid.NewGuid(), 1, 30m)], EntornoDeDevoluciones.AhoraInicial, cliente);
     }
 
+    private static ActorDePrueba EncargadoSinSucursal()
+    {
+        var actor = ActorDePrueba.DeCliente();
+        actor.Establecer(ActorActual.DeUsuario(Guid.NewGuid(), BabelHub.Shared.Contratos.RolesDeUsuario.EncargadoDeSucursal));
+        return actor;
+    }
+
     // ---------- Roles ----------
 
     [Fact]
@@ -211,7 +218,7 @@ public sealed class AutorizacionYAlcanceDeDevolucionesTests
         var otra = await entorno.Autorizador.ExigirAlcanceDeGestion(Devolucion(sucursal: "arequipa"), default);
 
         Assert.Equal(CategoriaDeError.NoEncontrado, otra!.Categoria);
-        Assert.Equal("recurso-ajeno", Assert.Single(entorno.Denegaciones.Eventos).Motivo);
+        Assert.Equal("fuera-de-sucursal", Assert.Single(entorno.Denegaciones.Eventos).Motivo);
     }
 
     [Fact]
@@ -227,6 +234,7 @@ public sealed class AutorizacionYAlcanceDeDevolucionesTests
 
         Assert.Equal(ajena, reporte);
         Assert.Equal(ajena, digital);
+        Assert.Equal(["alcance-insuficiente", "alcance-insuficiente", "fuera-de-sucursal"], entorno.Denegaciones.Eventos.Select(e => e.Motivo));
         Assert.Equal(3, entorno.Denegaciones.Eventos.Count);
     }
 
@@ -250,18 +258,16 @@ public sealed class AutorizacionYAlcanceDeDevolucionesTests
     [InlineData("sin-sucursal-en-el-actor")]
     public async Task Una_sucursal_que_no_se_puede_resolver_se_niega_y_se_registra(string falla)
     {
-        var entorno = falla == "sin-sucursal-en-el-actor" ? new EntornoDeDevoluciones(ActorDePrueba.DeCliente()) : new EntornoDeDevoluciones(ActorDePrueba.DeEncargadoDe(Sucursal));
+        var entorno = falla == "sin-sucursal-en-el-actor" ? new EntornoDeDevoluciones(EncargadoSinSucursal()) : new EntornoDeDevoluciones(ActorDePrueba.DeEncargadoDe(Sucursal));
         if (falla == "no-responde")
         {
             entorno.Sucursales.NoResponde = true;
         }
 
-        var error = falla == "sin-sucursal-en-el-actor"
-            ? await entorno.Autorizador.ExigirAlcanceDeGestion(Devolucion(), default)
-            : await entorno.Autorizador.ExigirAlcanceDeGestion(Devolucion(), default);
+        var error = await entorno.Autorizador.ExigirAlcanceDeGestion(Devolucion(), default);
 
         Assert.Equal(CategoriaDeError.NoEncontrado, error!.Categoria);
-        Assert.Equal("sucursal-no-resoluble", Assert.Single(entorno.Denegaciones.Eventos).Motivo);
+        Assert.Equal("fuera-de-sucursal", Assert.Single(entorno.Denegaciones.Eventos).Motivo);
     }
 
     [Fact]
@@ -276,7 +282,7 @@ public sealed class AutorizacionYAlcanceDeDevolucionesTests
 
         Assert.Equal(CategoriaDeError.Prohibido, otra!.Categoria);
         var evento = Assert.Single(entorno.Denegaciones.Eventos);
-        Assert.Equal("recurso-ajeno", evento.Motivo);
+        Assert.Equal("fuera-de-sucursal", evento.Motivo);
         Assert.Equal("ECO-PROHIBIDO", evento.CodigoDeError);
     }
 
@@ -311,5 +317,31 @@ public sealed class AutorizacionYAlcanceDeDevolucionesTests
 
         Assert.Equal(CategoriaDeError.NoDisponible, error!.Categoria);
         Assert.Equal("servicio-no-disponible", error.Clave);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-30")]
+    public async Task Un_encargado_sin_sucursal_en_el_actor_es_prohibido_en_la_ruta_con_un_evento()
+    {
+        var entorno = new EntornoDeDevoluciones(EncargadoSinSucursal());
+
+        var error = await entorno.Autorizador.ExigirSucursalDeLaRuta("lima-central", default);
+
+        Assert.Equal(CategoriaDeError.Prohibido, error!.Categoria);
+        Assert.Equal("fuera-de-sucursal", Assert.Single(entorno.Denegaciones.Eventos).Motivo);
+        Assert.Equal(0, entorno.Sucursales.Consultas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-30")]
+    public async Task El_codigo_de_la_ruta_solo_lo_ve_un_encargado_o_la_administracion_y_logistica_con_sucursal_es_prohibido()
+    {
+        var entorno = new EntornoDeDevoluciones(ActorDePrueba.DePersonalDeLogistica());
+
+        var error = await entorno.Autorizador.ExigirSucursalDeLaRuta("lima-central", default);
+
+        Assert.Equal(CategoriaDeError.Prohibido, error!.Categoria);
+        Assert.Equal("fuera-de-rol", Assert.Single(entorno.Denegaciones.Eventos).Motivo);
+        Assert.Equal(0, entorno.Sucursales.Consultas);
     }
 }
