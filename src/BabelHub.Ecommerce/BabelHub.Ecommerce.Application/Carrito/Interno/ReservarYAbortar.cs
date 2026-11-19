@@ -61,7 +61,7 @@ internal sealed class ReservarImpresos(ServiciosDelCheckout servicios)
                 return new ResultadoDelPasoDeReserva(TipoDeResultadoDelPaso.NoAbortar, Error: new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.EnCurso));
             case TipoDeResultadoDeReservar.ConflictoDeIdempotencia:
                 // La clave está mal derivada: es un defecto, no un estado de la compra (alerta técnica en T26b); se aborta y se informa como servicio no disponible.
-                return Abortar("clave-de-reserva-en-conflicto", new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDelCarrito.ServicioNoDisponible));
+                return await AbortarPorClaveEnConflicto(cancelacion).ConfigureAwait(false);
             case TipoDeResultadoDeReservar.EstadoInvalido:
                 return Abortar("reserva-expirada", Rechazo([new ErrorDeCampo("motivo", "reserva-expirada")]));
             case TipoDeResultadoDeReservar.LimiteExcedido:
@@ -79,6 +79,12 @@ internal sealed class ReservarImpresos(ServiciosDelCheckout servicios)
     /// Lo que devolvió <c>Reservar</c>: si ya expiró (repetir la clave la devuelve aunque haya vencido, DD-03) se aborta con un pedido nuevo; si la fuente, el traslado o el plazo difieren de lo que se le informó a la persona (CAR-27), se aborta
     /// con el plazo nuevo para que lo acepte viéndolo, y lo devuelto pasa a ser lo informado.
     /// </summary>
+    private async Task<ResultadoDelPasoDeReserva> AbortarPorClaveEnConflicto(CancellationToken cancelacion)
+    {
+        await servicios.Alertas.Publicar(TipoDeAlertaDelCarrito.ClaveDeReservaEnConflicto, 1, cancelacion).ConfigureAwait(false);
+        return Abortar("clave-de-reserva-en-conflicto", new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDelCarrito.ServicioNoDisponible));
+    }
+
     private static ResultadoDelPasoDeReserva Revisar(ReservaObtenida reserva, PasoAlPagoPreparado preparado, DateTimeOffset ahora)
     {
         if (reserva.ExpiraEn <= ahora)
@@ -195,7 +201,7 @@ internal sealed class AbortarElPasoAlPago(ServiciosDelCheckout servicios)
             }
         }
 
-        await LiberarLaReserva(solicitud, cancelacion).ConfigureAwait(false);
+        await new LiberadorDeReservas(servicios).Liberar(solicitud.PedidoId, cancelacion).ConfigureAwait(false);
         return DesenlaceDelAborto.Abortado;
     }
 
@@ -232,40 +238,4 @@ internal sealed class AbortarElPasoAlPago(ServiciosDelCheckout servicios)
         return true;
     }
 
-    /// <summary>
-    /// <c>liberar</c> direccionando por el <c>pedidoId</c> descartado, después de confirmar: liberada, ya liberada o inexistente limpia la anotación; un pedido ya confirmado la limpia sin reintento (alerta técnica en T26b); sin respuesta
-    /// la deja anotada y la reserva expira sola a los 15 minutos (<c>LiberarReservasPendientes</c>, T20, la reintenta).
-    /// </summary>
-    private async Task LiberarLaReserva(SolicitudDeAborto solicitud, CancellationToken cancelacion)
-    {
-        var carrito = servicios.Carrito;
-        ResultadoDeLiberar liberada;
-        try
-        {
-            liberada = await servicios.Inventario.Liberar(solicitud.PedidoId, "checkout-cancelado", cancelacion).ConfigureAwait(false);
-        }
-        catch (Exception excepcion) when (excepcion is not OperationCanceledException)
-        {
-            return;
-        }
-
-        if (liberada == ResultadoDeLiberar.NoSePudo)
-        {
-            return;
-        }
-
-        await carrito.Unidad.Ejecutar(
-            async token =>
-            {
-                var checkout = await carrito.Checkouts.ObtenerPorPedido(solicitud.PedidoId, conBloqueo: true, token).ConfigureAwait(false);
-                if (checkout is { } c && c.PedidoDescartado == solicitud.PedidoId && c.ReservaALiberarDesde is not null)
-                {
-                    c.LiberacionConfirmada();
-                    await carrito.Checkouts.Guardar(c, token).ConfigureAwait(false);
-                }
-
-                return true;
-            },
-            cancelacion).ConfigureAwait(false);
-    }
 }

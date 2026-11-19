@@ -178,6 +178,19 @@ internal sealed class AutorizadorDelCarrito(IActorActual actores, IDenegacionDeA
         return Resultado<SolicitanteDelCarrito>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDelCarrito.Prohibido));
     }
 
+    /// <summary>Solo el sistema (un trabajo de fondo): cualquier otro actor, incluido el personal y los clientes, se rechaza con su evento.</summary>
+    public async Task<ErrorDeAplicacion?> ExigirSistema(CancellationToken cancelacion)
+    {
+        if (actores.Actual is { Tipo: TipoDeActor.Sistema })
+        {
+            return null;
+        }
+
+        var sinContexto = actores.Actual is null;
+        await Denegar(sinContexto ? MotivosDeDenegacionDelCarrito.SinSesion : MotivosDeDenegacionDelCarrito.FueraDeRol, sinContexto ? "ECO-NO-AUTENTICADO" : "ECO-PROHIBIDO", cancelacion).ConfigureAwait(false);
+        return sinContexto ? new ErrorDeAplicacion(CategoriaDeError.NoAutenticado, ClavesDelCarrito.NoAutenticado) : new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDelCarrito.Prohibido);
+    }
+
     /// <summary>El «no encontrado» uniforme: el mismo para un recurso ajeno, inexistente o mal formado.</summary>
     public ErrorDeAplicacion NoEncontrado() => new(CategoriaDeError.NoEncontrado, ClavesDelCarrito.NoEncontrado);
 

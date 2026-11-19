@@ -24,8 +24,11 @@ internal sealed partial class ServiciosDelCheckout(
     ITextosLegales textosLegales,
     IConsentimientoDeAvisos consentimiento,
     IMarcaDeCancelacion marcaDeCancelacion,
-    ICalculadorDeHuella calculadorDeHuella)
+    ICalculadorDeHuella calculadorDeHuella,
+    IAlertasDelCarrito alertas)
 {
+    public IAlertasDelCarrito Alertas => alertas;
+
     public IMarcaDeCancelacion Marca => marcaDeCancelacion;
 
     /// <summary>La huella de instantánea (D19): un digest <b>con clave</b> y propósito propio, de modo que el teléfono que lleva su texto canónico no se pueda recuperar por fuerza bruta. Se guarda con la versión de la clave.</summary>
@@ -163,20 +166,34 @@ internal sealed partial class ServiciosDelCheckout(
     /// </summary>
     public async Task<Resultado<CheckoutDeQuienPide>> EntrarAlCheckout(Guid? pedidoOculto, CancellationToken cancelacion)
     {
+        var entro = await EntrarSinExigirCheckout(pedidoOculto, cancelacion).ConfigureAwait(false);
+        if (!entro.EsExito)
+        {
+            return Resultado<CheckoutDeQuienPide>.Fallo(entro.Error!);
+        }
+
+        return entro.Valor.Checkout is { } vivo
+            ? Resultado<CheckoutDeQuienPide>.Exito(new CheckoutDeQuienPide(entro.Valor.Cuenta, vivo, entro.Valor.Carrito))
+            : Resultado<CheckoutDeQuienPide>.Fallo(carrito.Autorizador.NoEncontrado());
+    }
+
+    /// <summary>Igual que <see cref="EntrarAlCheckout"/> pero sin checkout vivo no es un error (volver y reiniciar son idempotentes).</summary>
+    public async Task<Resultado<CheckoutOpcionalDeQuienPide>> EntrarSinExigirCheckout(Guid? pedidoOculto, CancellationToken cancelacion)
+    {
         var cuenta = await carrito.Autorizador.ExigirCuenta(cancelacion).ConfigureAwait(false);
         if (!cuenta.EsExito)
         {
-            return Resultado<CheckoutDeQuienPide>.Fallo(cuenta.Error!);
+            return Resultado<CheckoutOpcionalDeQuienPide>.Fallo(cuenta.Error!);
         }
 
         if (await carrito.ExigirCuentaActiva(cuenta.Valor, cancelacion).ConfigureAwait(false) is { } cuentaRechazada)
         {
-            return Resultado<CheckoutDeQuienPide>.Fallo(cuentaRechazada);
+            return Resultado<CheckoutOpcionalDeQuienPide>.Fallo(cuentaRechazada);
         }
 
         if (ServiciosDelCarrito.ErrorDeLimite(await carrito.Limites.RevisarCheckout(cuenta.Valor, cancelacion).ConfigureAwait(false)) is { } limite)
         {
-            return Resultado<CheckoutDeQuienPide>.Fallo(limite);
+            return Resultado<CheckoutOpcionalDeQuienPide>.Fallo(limite);
         }
 
         if (pedidoOculto is { } pedido)
@@ -185,18 +202,13 @@ internal sealed partial class ServiciosDelCheckout(
             var visto = dueno is null ? null : new PedidoVisto(dueno.CuentaId, dueno.EsVivo && dueno.PedidoId == pedido);
             if (await carrito.Autorizador.ComprobarPedidoOculto(pedido, cuenta.Valor, visto, cancelacion).ConfigureAwait(false) is { } rechazo)
             {
-                return Resultado<CheckoutDeQuienPide>.Fallo(rechazo);
+                return Resultado<CheckoutOpcionalDeQuienPide>.Fallo(rechazo);
             }
         }
 
         var vivo = await carrito.Checkouts.ObtenerVivoDeCuenta(cuenta.Valor, conBloqueo: false, cancelacion).ConfigureAwait(false);
-        if (vivo is null)
-        {
-            return Resultado<CheckoutDeQuienPide>.Fallo(carrito.Autorizador.NoEncontrado());
-        }
-
         var delCarrito = await carrito.Carritos.ObtenerDeCuenta(cuenta.Valor, conBloqueo: false, cancelacion).ConfigureAwait(false);
-        return Resultado<CheckoutDeQuienPide>.Exito(new CheckoutDeQuienPide(cuenta.Valor, vivo, delCarrito));
+        return Resultado<CheckoutOpcionalDeQuienPide>.Exito(new CheckoutOpcionalDeQuienPide(cuenta.Valor, vivo, delCarrito));
     }
 
     public static InformacionDeLinea DeSeleccion(SeleccionDeLinea s) =>

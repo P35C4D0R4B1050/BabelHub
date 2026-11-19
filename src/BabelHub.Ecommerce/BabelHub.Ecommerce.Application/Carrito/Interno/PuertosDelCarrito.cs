@@ -225,6 +225,12 @@ public interface IRepositorioDeCheckouts
 
     Task Agregar(Checkout checkout, CancellationToken cancelacion = default);
 
+    /// <summary>Los checkouts con una reserva por liberar (<c>reserva_a_liberar_desde</c> con valor), sin bloqueo y como mucho <paramref name="maximo"/>: lo que reintenta <c>LiberarReservasPendientes</c>.</summary>
+    Task<IReadOnlyList<PedidoPorLiberar>> ConLiberacionPendiente(int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Los checkouts <c>reservando</c> desde antes de <paramref name="antesDe"/> (atascados por un corte entre los pasos), sin bloqueo: lo que recoge <c>RecuperarCheckoutsReservando</c>.</summary>
+    Task<IReadOnlyList<CheckoutPorRecuperar>> ReservandoDesdeAntesDe(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default);
+
     /// <summary>Guarda el checkout con su versión (concurrencia optimista) y reconstruye sus líneas conservando el <c>lineaId</c> de las que siguen.</summary>
     Task Guardar(Checkout checkout, CancellationToken cancelacion = default);
 }
@@ -275,6 +281,9 @@ public interface ILimitadorDelCarrito
 
     /// <summary>Pasar al pago reserva stock: 10 por cuenta y hora y <b>falla cerrado</b>. <paramref name="claveDeRepeticion"/> identifica el pedido en curso: repetir el mismo (un doble clic, otra pestaña) no cuenta otra vez (DD-12).</summary>
     Task<ResultadoDeLimiteDelCarrito> PasarAlPago(Guid cuentaId, string claveDeRepeticion, CancellationToken cancelacion = default);
+
+    /// <summary>Volver al carrito y reiniciar el checkout: 20 por cuenta y hora.</summary>
+    Task<ResultadoDeLimiteDelCarrito> VolverOReiniciar(Guid cuentaId, CancellationToken cancelacion = default);
 }
 
 // ---------- Auditoría ----------
@@ -290,6 +299,9 @@ public interface IAuditoriaDelCarrito
 
     /// <summary>La baja de ediciones aplicada a los carritos: cuántas ediciones, cuántos carritos afectados y cuántas líneas se quitaron o quedaron anotadas con retiro pendiente (sin identificar a nadie).</summary>
     Task EdicionesRetiradas(int ediciones, int carritosAfectados, int lineasQuitadas, int lineasAnotadas, CancellationToken cancelacion = default);
+
+    /// <summary>El checkout terminó por voluntad de la persona (<c>volver</c> o <c>reiniciar</c>); sin datos personales.</summary>
+    Task CheckoutTerminado(string motivo, CancellationToken cancelacion = default);
 
     /// <summary>Se pasó al pago (la intención creada y el checkout en <c>en_pago</c>): con o sin impresos y el tipo de entrega; sin contacto, sin cuenta ni pedido en el detalle (D13).</summary>
     Task PasoAlPagoIniciado(bool conImpresos, bool aDomicilio, CancellationToken cancelacion = default);
@@ -376,3 +388,32 @@ public interface IMarcaDeCancelacion
 {
     Task<EstadoDeLaMarcaDeCancelacion> LeerConBloqueo(Guid cuentaId, CancellationToken cancelacion = default);
 }
+
+// ---------- Alertas técnicas ----------
+
+public enum TipoDeAlertaDelCarrito
+{
+    /// <summary><c>liberar</c> respondió <c>INV-RESERVA-ESTADO-INVALIDO</c> con un pedido que ya está confirmado: no se reintenta y se limpia la anotación.</summary>
+    LiberacionDeUnPedidoConfirmado,
+
+    /// <summary>El Inventario respondió <c>INV-IDEMPOTENCIA-EN-CONFLICTO</c>: la clave de reserva está mal derivada (un defecto).</summary>
+    ClaveDeReservaEnConflicto,
+
+    /// <summary>Hay checkouts con el pago pendiente más de 45 minutos (AUD-31): Pagos no los resolvió.</summary>
+    CheckoutsConElPagoPendienteDemasiado,
+
+    /// <summary>Un trabajo de fondo de Carrito no corre desde hace más de 24 horas (AUD-31).</summary>
+    TrabajoSinCorrer,
+}
+
+/// <summary>Las alertas técnicas de Carrito (<c>AUD-31</c>): sin datos personales, solo el tipo y un conteo. La Infraestructura (T26b) las publica por el canal de alertas de Auditoría.</summary>
+public interface IAlertasDelCarrito
+{
+    Task Publicar(TipoDeAlertaDelCarrito tipo, int cantidad, CancellationToken cancelacion = default);
+}
+
+/// <summary>Un pedido cuya reserva falta por liberar (el <c>pedido_descartado</c> o el <c>pedido_id</c> del checkout).</summary>
+public sealed record PedidoPorLiberar(Guid CheckoutId, Guid PedidoId);
+
+/// <summary>Un checkout <c>reservando</c> atascado: la cuenta, el pedido y la generación leídos, de modo que el aborto sea condicional a ellos (no toca uno que ya pasó a <c>en_pago</c>).</summary>
+public sealed record CheckoutPorRecuperar(Guid CuentaId, Guid PedidoId, int Generacion, bool IntencionPudoCrearse);

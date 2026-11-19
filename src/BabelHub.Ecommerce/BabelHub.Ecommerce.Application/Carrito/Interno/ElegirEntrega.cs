@@ -9,6 +9,9 @@ namespace BabelHub.Ecommerce.Application.Carrito.Interno;
 /// <summary>Lo que se sabe del checkout vivo de quien pide después de comprobar el alcance: su cuenta y lo leído sin bloqueo (el checkout y el carrito).</summary>
 internal sealed record CheckoutDeQuienPide(Guid Cuenta, Checkout Checkout, CarritoDeDominio? Carrito);
 
+/// <summary>Lo mismo pero con el checkout opcional: <c>volver</c> y <c>reiniciar</c> repetidos (un doble envío) sobre un checkout ya terminado son un éxito idempotente.</summary>
+internal sealed record CheckoutOpcionalDeQuienPide(Guid Cuenta, Checkout? Checkout, CarritoDeDominio? Carrito);
+
 /// <summary>
 /// <c>ElegirEntrega</c> (CAR-08, CAR-09, CAR-23, CAR-30; AC-CAR-07, AC-CAR-08, AC-CAR-21, AC-CAR-26): recojo en una sucursal o domicilio con su contacto. Valida la forma antes de cualquier red (errores por campo que no repiten
 /// el valor), comprueba la sucursal o la región contra la lista del Inventario, hace la <b>consulta previa fuera de la transacción</b> (fuente, traslado y plazo por línea; «a confirmar» si no hay plazo) y guarda lo informado por
