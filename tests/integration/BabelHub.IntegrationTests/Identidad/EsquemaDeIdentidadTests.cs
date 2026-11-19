@@ -1,5 +1,6 @@
 using BabelHub.Ecommerce.Infrastructure.Auditoria;
 using BabelHub.Ecommerce.Infrastructure.Composicion;
+using BabelHub.Ecommerce.Infrastructure.Plataforma;
 using BabelHub.Ecommerce.Infrastructure.Identidad;
 using BabelHub.IntegrationTests.Auditoria;
 using Npgsql;
@@ -26,6 +27,11 @@ public sealed class PostgresDeIdentidadFixture : IAsyncLifetime
     /// <summary>La aplicación: un rol <c>NOINHERIT</c> miembro solo de los roles de esquema.</summary>
     public NpgsqlDataSource Acceso { get; private set; } = null!;
 
+    /// <summary>La unidad de trabajo real de la aplicación (rol de acceso <c>NOINHERIT</c> y <c>EjecutarComo</c>).</summary>
+    public UnidadDeTrabajoPostgres Unidad { get; private set; } = null!;
+
+    public AccesoAlEsquemaDeIdentidad AccesoAlEsquema { get; private set; } = null!;
+
     public async Task InitializeAsync()
     {
         await _contenedor.StartAsync();
@@ -33,7 +39,10 @@ public sealed class PostgresDeIdentidadFixture : IAsyncLifetime
         await Ejecutar(DefinicionDeAuditoria.MigracionCompleta(PostgresDeAuditoriaFixture.Catalogo));
         await Ejecutar(MigracionDelEsquemaDeIdentidad.Completa());
         await Ejecutar($"CREATE ROLE acceso LOGIN NOINHERIT PASSWORD '{ClaveDeAcceso}'; GRANT rol_auditoria, rol_identidad TO acceso;");
-        Acceso = NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString()) { Username = "acceso", Password = ClaveDeAcceso }.ConnectionString);
+        var clave = ClaveDeAcceso;
+        Acceso = NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString()) { Username = "acceso", Password = clave }.ConnectionString);
+        Unidad = new UnidadDeTrabajoPostgres(Acceso);
+        AccesoAlEsquema = new AccesoAlEsquemaDeIdentidad(Unidad, Unidad);
     }
 
     public async Task DisposeAsync()

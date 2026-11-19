@@ -38,6 +38,7 @@ public static class DefinicionDeIdentidad
             hash_contrasena text CHECK (hash_contrasena IS NULL OR hash_contrasena LIKE '$argon2id$%'),
             contrasena_temporal_hasta timestamptz,
             debe_cambiar boolean NOT NULL DEFAULT false,
+            sesiones_validas_desde timestamptz,
             creada_en timestamptz NOT NULL,
             cancelada_en timestamptz,
             mayor_de_18_en timestamptz,

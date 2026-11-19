@@ -512,7 +512,7 @@ public static class DocumentosDeClavesPublicadas
 /// <summary>Donde se guarda la clave privada de firma cifrada (T33): la escritura ocurre dentro de la transacción de la rotación, junto con el juego de claves.</summary>
 public interface IAlmacenDeClavesPrivadas
 {
-    Task Guardar(string kid, byte[] privadaCifrada, CancellationToken cancelacion = default);
+    Task Guardar(string kid, byte[] privadaCifrada, string jwkPublico, DateTimeOffset creada, CancellationToken cancelacion = default);
 }
 
 /// <summary>
@@ -529,7 +529,7 @@ public sealed class Es256GeneradorDeClavesDeFirma(AesGcmCifradorDeSecretos cifra
         try
         {
             var cifrada = cifrador.Cifrar(AesGcmCifradorDeSecretos.PropositoDeLaClaveDeFirma, kid, privada);
-            await almacen.Guardar(kid, cifrada, cancelacion).ConfigureAwait(false);
+            await almacen.Guardar(kid, cifrada, JwkEs256.Publico(par, kid), ahora, cancelacion).ConfigureAwait(false);
         }
         finally
         {

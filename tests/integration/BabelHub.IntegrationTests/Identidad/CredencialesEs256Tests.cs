@@ -607,7 +607,7 @@ public sealed class CredencialesEs256Tests
     {
         public Dictionary<string, byte[]> Guardadas { get; } = [];
 
-        public Task Guardar(string kid, byte[] privadaCifrada, CancellationToken cancelacion = default)
+        public Task Guardar(string kid, byte[] privadaCifrada, string jwkPublico, DateTimeOffset creada, CancellationToken cancelacion = default)
         {
             Guardadas[kid] = privadaCifrada;
             return Task.CompletedTask;
