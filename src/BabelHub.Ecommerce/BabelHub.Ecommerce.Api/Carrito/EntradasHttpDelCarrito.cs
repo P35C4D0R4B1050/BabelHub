@@ -33,6 +33,19 @@ public static partial class EntradasHttpDelCarrito
         return null;
     }
 
+    /// <summary>Como <see cref="RechazarConsulta(HttpContext)"/> pero admite los parámetros de consulta de <paramref name="permitidos"/> (el pago acepta el <c>pedidoId</c>): cualquier otro es validación, y uno prohibido además registra el acceso denegado.</summary>
+    public static async Task<ErrorDeAplicacion?> RechazarConsulta(HttpContext contexto, IReadOnlyCollection<string> permitidos)
+    {
+        ArgumentNullException.ThrowIfNull(contexto);
+        ArgumentNullException.ThrowIfNull(permitidos);
+        foreach (var clave in contexto.Request.Query.Keys.Where(k => !permitidos.Contains(k, StringComparer.Ordinal)))
+        {
+            return await Rechazar(contexto, clave).ConfigureAwait(false) ?? Invalido(Nombre(clave));
+        }
+
+        return null;
+    }
+
     public static readonly ErrorDeAplicacion CuerpoInvalido = new(CategoriaDeError.Validacion, "validacion-fallida", [new ErrorDeCampo("cuerpo", "formato-invalido")]);
 
     public static ErrorDeAplicacion Falta(string campo) => new(CategoriaDeError.Validacion, "validacion-fallida", [new ErrorDeCampo(campo, "obligatorio")]);

@@ -223,3 +223,46 @@ public sealed class ApiDePagosAvisosReembolsosYTrabajosTests
         Assert.Equal(hospedados, servicios.Count(s => s.ServiceType == typeof(IHostedService)));
     }
 }
+
+/// <summary>T29 (revisión): la paginación del listado de reembolsos y la consulta de los GET del pago son estrictas.</summary>
+public sealed class ConsultasEstrictasDelPagoTests
+{
+    [Theory]
+    [InlineData("/administracion/reembolsos?pagina=abc")]
+    [InlineData("/administracion/reembolsos?tamano=-1")]
+    [InlineData("/administracion/reembolsos?pagina=1&otro=2")]
+    [InlineData("/administracion/reembolsos?cuentaId=1")]
+    public async Task Una_paginacion_o_una_consulta_invalida_es_validacion_sin_llamar_a_Pagos(string ruta)
+    {
+        await using var host = await PagosApiHost.Crear();
+
+        using var respuesta = await host.Cliente.SendAsync(host.Pedir(ruta));
+
+        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
+        Assert.Empty(host.Reembolsos.Llamadas);
+    }
+
+    [Fact]
+    public async Task La_paginacion_valida_llega_a_Pagos_y_la_ausente_usa_los_valores_por_omision()
+    {
+        await using var host = await PagosApiHost.Crear();
+
+        using var conValores = await host.Cliente.SendAsync(host.Pedir("/administracion/reembolsos?pagina=2&tamano=5", html: true));
+        using var sinValores = await host.Cliente.SendAsync(host.Pedir("/administracion/reembolsos", html: true));
+
+        Assert.Equal(["listar:2:5", "listar:1:20"], host.Reembolsos.Llamadas);
+    }
+
+    [Theory]
+    [InlineData("/checkout/pago?cuentaId=1")]
+    [InlineData("/checkout/pago/estado?x=1")]
+    public async Task Los_GET_del_pago_solo_admiten_el_pedidoId_en_la_consulta(string ruta)
+    {
+        await using var host = await PagosApiHost.Crear();
+
+        using var respuesta = await host.Cliente.SendAsync(host.Pedir(ruta));
+
+        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
+        Assert.Empty(host.Pagos.Llamadas);
+    }
+}

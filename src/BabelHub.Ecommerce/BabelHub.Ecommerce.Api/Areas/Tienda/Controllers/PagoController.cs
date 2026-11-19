@@ -32,6 +32,11 @@ public sealed class PagoController(IPagos pagos, ICheckoutDelCliente checkout, C
     [HttpGet("/checkout/pago")]
     public async Task<IActionResult> Index([FromQuery] string? pedidoId, CancellationToken cancelacion)
     {
+        if (await EntradasHttpDelCarrito.RechazarConsulta(HttpContext, ["pedidoId"]) is { } consulta)
+        {
+            return await Falla(consulta, cancelacion);
+        }
+
         Guid pedido;
         if (pedidoId is null)
         {
@@ -143,6 +148,11 @@ public sealed class PagoController(IPagos pagos, ICheckoutDelCliente checkout, C
     [HttpGet("/checkout/pago/estado")]
     public async Task<IActionResult> Estado([FromQuery] string? pedidoId, CancellationToken cancelacion)
     {
+        if (await EntradasHttpDelCarrito.RechazarConsulta(HttpContext, ["pedidoId"]) is { } consulta)
+        {
+            return await Falla(consulta, cancelacion);
+        }
+
         Guid pedido;
         if (pedidoId is null)
         {

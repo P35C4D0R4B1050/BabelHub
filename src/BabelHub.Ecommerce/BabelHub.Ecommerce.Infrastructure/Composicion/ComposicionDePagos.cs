@@ -103,7 +103,7 @@ public static class ComposicionDeLosTrabajosDePagos
 {
     /// <summary>
     /// Registra los nueve trabajos de fondo de Pagos y el servicio que los corre (T27). <paramref name="alcanceDeSistema"/> lo construye el anfitrión —la Api— con sus servicios y fija el actor «sistema» alrededor de cada corrida: la Infraestructura de Pagos no fija el actor.
-    /// Se llama <b>solo en modo normal</b> (en <c>Restauracion</c> y <c>Ensayo</c> no corre ningún trabajo) y después de <c>AgregarPagos</c>; quien la llame añade también <c>AddHostedService&lt;ServicioDeTrabajosDePagos&gt;()</c>.
+    /// Se registra siempre (el singleton es perezoso), pero el servicio que los corre solo en modo normal (en <c>Restauracion</c> y <c>Ensayo</c> no corre ningún trabajo), y después de <c>AgregarPagos</c>; quien la llame añade también <c>AddHostedService&lt;ServicioDeTrabajosDePagos&gt;()</c>.
     /// </summary>
     public static IServiceCollection AgregarTrabajosDeFondoDePagos(this IServiceCollection servicios, Func<IServiceProvider, AlcanceDeSistemaDePagos> alcanceDeSistema)
     {
