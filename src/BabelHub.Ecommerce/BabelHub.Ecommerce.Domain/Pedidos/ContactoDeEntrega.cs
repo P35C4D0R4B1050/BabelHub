@@ -37,13 +37,16 @@ public sealed class ContactoDeEntrega
         var n = nombre?.Trim(' ');
         var t = telefono?.Trim(' ');
         var d = direccion?.Trim(' ');
-        if (!Valido(n, LongitudMaximaDelNombre) || !Valido(t, LongitudMaximaDelTelefono) || !Valido(d, LongitudMaximaDeLaDireccion))
+        if (!Valido(n, LongitudMaximaDelNombre) || !TelefonoValido(t) || !Valido(d, LongitudMaximaDeLaDireccion))
         {
             return null;
         }
 
         return new ContactoDeEntrega(n!, t!, d!);
     }
+
+    /// <summary>El teléfono admite solo dígitos, «+», espacios, guiones y paréntesis y al menos un dígito (la regla de Envíos para la guía).</summary>
+    private static bool TelefonoValido(string? valor) => Valido(valor, LongitudMaximaDelTelefono) && valor is not null && valor.All(c => char.IsAsciiDigit(c) || c is '+' or ' ' or '-' or '(' or ')') && valor.Any(char.IsAsciiDigit);
 
     private static bool Valido(string? valor, int maximo) => !string.IsNullOrEmpty(valor) && valor.Length <= maximo && !valor.Any(char.IsControl);
 

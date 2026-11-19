@@ -49,6 +49,9 @@ public sealed record DatosDePedidoNuevo(
 public enum RechazoDeCrearPedido
 {
     SinLineas,
+
+    /// <summary>El pedido o la cuenta vienen vacíos.</summary>
+    PedidoInvalido,
     NumeroInvalido,
     AceptacionFaltante,
     LineaInvalida,
@@ -184,7 +187,7 @@ public sealed class LineaDePedido
     /// Pasa una línea impresa a <paramref name="hacia"/> si la máquina lo permite (PED-02, PED-19): devuelve <see langword="false"/> y no cambia nada si no. Fija la fecha del estado (entregada, no recogida, anulada o lista) y, al pasar a listo para recojo,
     /// el instante de listo que usa la política de no recogidos (PED-15).
     /// </summary>
-    public bool PasarA(EstadoDeLineaImpresa hacia, DateTimeOffset ahora)
+    internal bool PasarA(EstadoDeLineaImpresa hacia, DateTimeOffset ahora)
     {
         if (EstadoImpreso is not { } actual || !MaquinaDeEstadosDeLinea.Permite(actual, hacia, Contexto))
         {
@@ -231,8 +234,12 @@ public sealed class LineaDePedido
         return true;
     }
 
+    internal void FijarFechaEstimada(DateOnly? fecha) => FechaEstimadaDeLlegada = fecha;
+
+    internal void AsignarEnvio(Guid envioId) => EnvioId = envioId;
+
     /// <summary>Anula una línea digital disponible (la biblioteca ya revocó el acceso); una ya anulada o una impresa no cambia.</summary>
-    public bool AnularDigital(DateTimeOffset ahora)
+    internal bool AnularDigital(DateTimeOffset ahora)
     {
         if (EstadoDigital is not { } actual || !MaquinaDeEstadosDeLinea.PermiteDigital(actual, EstadoDeLineaDigital.Anulado))
         {
@@ -309,7 +316,7 @@ public sealed partial class Pedido
 
     public AceptacionDeTexto? ReembolsoDigital { get; }
 
-    public IReadOnlyList<LineaDePedido> Lineas => _lineas;
+    public IReadOnlyList<LineaDePedido> Lineas => _lineas.AsReadOnly();
 
     /// <summary>
     /// Crea el pedido desde una compra aprobada si es coherente; si no, indica por qué sin repetir ningún dato personal (PED-36). Las comprobaciones van de lo más general a lo más particular: líneas, número, aceptaciones, cada línea, la entrega, el contacto y el total.
@@ -327,8 +334,13 @@ public sealed partial class Pedido
             return ResultadoDeCrearPedido.Rechazado(RechazoDeCrearPedido.NumeroInvalido);
         }
 
+        if (datos.PedidoId == Guid.Empty || datos.CuentaId == Guid.Empty)
+        {
+            return ResultadoDeCrearPedido.Rechazado(RechazoDeCrearPedido.PedidoInvalido);
+        }
+
         var hayDigitales = datos.Lineas.Any(l => l.EsDigital);
-        if (datos.Terminos is null || datos.Privacidad is null || (hayDigitales && datos.ReembolsoDigital is null))
+        if (datos.Terminos is null || datos.Privacidad is null || string.IsNullOrWhiteSpace(datos.Terminos.Version) || string.IsNullOrWhiteSpace(datos.Privacidad.Version) || (hayDigitales && (datos.ReembolsoDigital is null || string.IsNullOrWhiteSpace(datos.ReembolsoDigital.Version))))
         {
             return ResultadoDeCrearPedido.Rechazado(RechazoDeCrearPedido.AceptacionFaltante);
         }
@@ -451,6 +463,63 @@ public sealed partial class Pedido
         return marcadas;
     }
 
+    /// <summary>
+    /// Registra el estado de un traslado en una línea con traslado (PED-19): «en tránsito» o «recibido» (un recibido sin tránsito previo recorre ambos) y la fecha estimada de llegada, y recalcula el pedido. Una línea sin traslado, ya más avanzada o que no es del pedido
+    /// no cambia.
+    /// </summary>
+    public ResultadoDeOperacionDeLinea RegistrarTraslado(Guid lineaId, EstadoDeLineaImpresa estado, DateOnly? fechaEstimada, DateTimeOffset ahora)
+    {
+        if (estado is not (EstadoDeLineaImpresa.EnTransito or EstadoDeLineaImpresa.Recibido))
+        {
+            throw new ArgumentOutOfRangeException(nameof(estado), "Un traslado solo lleva la línea a en tránsito o recibida.");
+        }
+
+        var linea = _lineas.FirstOrDefault(l => l.Id == lineaId);
+        if (linea is null)
+        {
+            return ResultadoDeOperacionDeLinea.NoEncontrada;
+        }
+
+        if (linea.EsDigital || !linea.RequiereTraslado)
+        {
+            return ResultadoDeOperacionDeLinea.EstadoInvalido;
+        }
+
+        var aplicada = false;
+        if (estado == EstadoDeLineaImpresa.Recibido && linea.EstadoImpreso == EstadoDeLineaImpresa.Confirmado)
+        {
+            aplicada = linea.PasarA(EstadoDeLineaImpresa.EnTransito, ahora);
+        }
+
+        aplicada = linea.PasarA(estado, ahora) || aplicada;
+        if (aplicada)
+        {
+            linea.FijarFechaEstimada(fechaEstimada ?? linea.FechaEstimadaDeLlegada);
+            RecalcularEstado(ahora);
+        }
+
+        return Resultado(aplicada);
+    }
+
+    /// <summary>Asigna el envío a las líneas impresas de un pedido a domicilio al crearse (PED-28); devuelve cuántas líneas cambiaron.</summary>
+    public int AsignarEnvio(IReadOnlyCollection<Guid> lineaIds, Guid envioId)
+    {
+        ArgumentNullException.ThrowIfNull(lineaIds);
+        if (envioId == Guid.Empty)
+        {
+            throw new ArgumentException("El envío no puede ser vacío.", nameof(envioId));
+        }
+
+        var cambiadas = 0;
+        foreach (var linea in _lineas.Where(l => !l.EsDigital && lineaIds.Contains(l.Id) && l.EnvioId != envioId))
+        {
+            linea.AsignarEnvio(envioId);
+            cambiadas++;
+        }
+
+        return cambiadas;
+    }
+
     private IReadOnlyList<ResultadoPorLinea> Aplicar(IReadOnlyCollection<Guid> lineaIds, DateTimeOffset ahora, Func<LineaDePedido, DateTimeOffset, ResultadoDeOperacionDeLinea> operacion)
     {
         ArgumentNullException.ThrowIfNull(lineaIds);
@@ -473,7 +542,7 @@ public sealed partial class Pedido
 
     private static RechazoDeCrearPedido? RechazoDeLinea(DatosDeLineaNueva linea)
     {
-        if (linea.LineaId == Guid.Empty || linea.EdicionId == Guid.Empty || string.IsNullOrWhiteSpace(linea.Titulo) || linea.Cantidad < 1 || linea.PrecioUnitario < 0m || linea.Importe != linea.PrecioUnitario * linea.Cantidad)
+        if (linea.LineaId == Guid.Empty || linea.EdicionId == Guid.Empty || string.IsNullOrWhiteSpace(linea.Titulo) || linea.Cantidad < 1 || linea.PrecioUnitario <= 0m || linea.Importe != linea.PrecioUnitario * linea.Cantidad)
         {
             return RechazoDeCrearPedido.LineaInvalida;
         }

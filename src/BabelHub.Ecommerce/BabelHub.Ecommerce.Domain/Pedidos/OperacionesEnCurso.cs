@@ -111,7 +111,7 @@ public sealed class Anulacion
 
     public bool HayDigitales { get; private set; }
 
-    public IReadOnlyList<Guid> LineaIds => _lineaIds;
+    public IReadOnlyList<Guid> LineaIds => _lineaIds.AsReadOnly();
 
     public EstadoDeOperacion Estado { get; private set; } = EstadoDeOperacion.EnCurso;
 
@@ -250,6 +250,11 @@ public sealed class Anulacion
             return;
         }
 
+        if (plan.Origen != Origen || plan.Motivo != Motivo)
+        {
+            throw new ArgumentException("El plan nuevo debe tener el mismo origen y motivo que la anulación.", nameof(plan));
+        }
+
         _lineaIds.Clear();
         Aplicar(plan);
         IncluyeEnvio = plan.IncluyeEnvio;
@@ -323,7 +328,7 @@ public sealed class Entrega
 
     public DateTimeOffset? ProximoIntentoEn { get; private set; }
 
-    public IReadOnlyList<LineaDeEntrega> Lineas => _lineas;
+    public IReadOnlyList<LineaDeEntrega> Lineas => _lineas.AsReadOnly();
 
     public bool BloqueaLasLineas => Estado == EstadoDeOperacion.EnCurso;
 

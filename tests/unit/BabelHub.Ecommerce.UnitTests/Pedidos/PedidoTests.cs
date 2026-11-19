@@ -112,6 +112,8 @@ public sealed class PedidoTests
     [Theory]
     [InlineData(null, "987654321", "Jr. Lima 123")]
     [InlineData("Ana", null, "Jr. Lima 123")]
+    [InlineData("Ana", "abc-defg", "Jr. Lima 123")]
+    [InlineData("Ana", "()", "Jr. Lima 123")]
     [InlineData("Ana", "987654321", " ")]
     [InlineData("Ana\n", "987654321", "Jr. Lima 123")]
     public void Un_contacto_incompleto_o_con_caracteres_de_control_no_se_crea(string? nombre, string? telefono, string? direccion)
@@ -150,6 +152,17 @@ public sealed class PedidoTests
         var datos = Datos(TipoDeEntregaDelPedido.Recojo, [Impresa()], sucursal: "LIM") with { Numero = "mal" };
 
         Assert.Equal(RechazoDeCrearPedido.NumeroInvalido, Pedido.Crear(datos).Rechazo);
+    }
+
+    [Fact]
+    public void Un_pedido_con_identificadores_vacios_precio_cero_o_version_vacia_no_se_crea()
+    {
+        var valida = Datos(TipoDeEntregaDelPedido.Recojo, [Impresa()], sucursal: "LIM");
+
+        Assert.Equal(RechazoDeCrearPedido.PedidoInvalido, Pedido.Crear(valida with { PedidoId = Guid.Empty }).Rechazo);
+        Assert.Equal(RechazoDeCrearPedido.PedidoInvalido, Pedido.Crear(valida with { CuentaId = Guid.Empty }).Rechazo);
+        Assert.Equal(RechazoDeCrearPedido.AceptacionFaltante, Pedido.Crear(valida with { Terminos = new AceptacionDeTexto(" ", Ahora) }).Rechazo);
+        Assert.Equal(RechazoDeCrearPedido.LineaInvalida, Pedido.Crear(Datos(TipoDeEntregaDelPedido.Recojo, [Impresa(precio: 0m)], sucursal: "LIM", total: 1m)).Rechazo);
     }
 
     [Fact]

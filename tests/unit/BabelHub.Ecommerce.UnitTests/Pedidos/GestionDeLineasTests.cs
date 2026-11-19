@@ -60,6 +60,46 @@ public sealed class GestionDeLineasTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PED-03")]
+    public void Los_estados_de_traslado_llevan_la_linea_a_en_transito_y_recibida_con_su_fecha_y_recalculan_el_pedido()
+    {
+        var pedido = Crear(TipoDeEntregaDelPedido.Recojo, Impresa("Uno", traslado: true), Impresa("Dos", traslado: true), Impresa("Tres"));
+        var uno = De(pedido, "Uno");
+        var dos = De(pedido, "Dos");
+        var llegada = new DateOnly(2026, 11, 25);
+
+        var transito = pedido.RegistrarTraslado(uno.Id, EstadoDeLineaImpresa.EnTransito, llegada, Inicio);
+        var recibidoSinTransito = pedido.RegistrarTraslado(dos.Id, EstadoDeLineaImpresa.Recibido, null, Inicio);
+        var sinTraslado = pedido.RegistrarTraslado(De(pedido, "Tres").Id, EstadoDeLineaImpresa.EnTransito, null, Inicio);
+        var repetido = pedido.RegistrarTraslado(uno.Id, EstadoDeLineaImpresa.EnTransito, llegada, Inicio);
+
+        Assert.Equal(ResultadoDeOperacionDeLinea.Aplicada, transito);
+        Assert.Equal((EstadoDeLineaImpresa.EnTransito, llegada), (uno.EstadoImpreso!.Value, uno.FechaEstimadaDeLlegada!.Value));
+        Assert.Equal(ResultadoDeOperacionDeLinea.Aplicada, recibidoSinTransito);
+        Assert.Equal(EstadoDeLineaImpresa.Recibido, dos.EstadoImpreso);
+        Assert.Equal(ResultadoDeOperacionDeLinea.EstadoInvalido, sinTraslado);
+        Assert.Equal(ResultadoDeOperacionDeLinea.EstadoInvalido, repetido);
+        Assert.Equal(ResultadoDeOperacionDeLinea.NoEncontrada, pedido.RegistrarTraslado(Guid.NewGuid(), EstadoDeLineaImpresa.EnTransito, null, Inicio));
+        Assert.Equal(EstadoDePedido.Confirmado, pedido.Estado);
+    }
+
+    [Fact]
+    public void Asignar_el_envio_marca_solo_las_lineas_impresas_pedidas_una_vez()
+    {
+        var pedido = Crear(TipoDeEntregaDelPedido.Domicilio, Impresa("Uno"), Impresa("Dos"));
+        var envio = Guid.NewGuid();
+
+        var primera = pedido.AsignarEnvio([De(pedido, "Uno").Id], envio);
+        var repetida = pedido.AsignarEnvio([De(pedido, "Uno").Id], envio);
+
+        Assert.Equal(1, primera);
+        Assert.Equal(0, repetida);
+        Assert.Equal(envio, De(pedido, "Uno").EnvioId);
+        Assert.Null(De(pedido, "Dos").EnvioId);
+        Assert.Throws<ArgumentException>(() => pedido.AsignarEnvio([], Guid.Empty));
+    }
+
+    [Fact]
     public void Una_linea_con_traslado_en_transito_espera_y_una_recibida_se_prepara()
     {
         var pedido = Crear(TipoDeEntregaDelPedido.Recojo, Impresa("Uno", traslado: true));

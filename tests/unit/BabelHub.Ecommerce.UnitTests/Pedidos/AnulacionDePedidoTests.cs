@@ -219,6 +219,23 @@ public sealed class AnulacionDePedidoTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PED-17")]
+    public void Tras_cancelar_la_linea_ya_no_se_prepara_y_una_doble_cancelacion_no_cambia_nada()
+    {
+        var pedido = Crear(TipoDeEntregaDelPedido.Recojo, Impresa("Uno"));
+        var linea = De(pedido, "Uno");
+        var plan = pedido.PlanearCancelacionDelCliente().Plan!;
+        Assert.Equal(1, pedido.AplicarAnulacion(plan, Inicio));
+
+        var preparar = pedido.PrepararLineas([linea.Id], Inicio.AddMinutes(1));
+        var doble = pedido.AplicarAnulacion(plan, Inicio.AddMinutes(2));
+
+        Assert.Equal(ResultadoDeOperacionDeLinea.EstadoInvalido, Assert.Single(preparar).Resultado);
+        Assert.Equal(0, doble);
+        Assert.Equal(RechazoDeAnulacion.PedidoYaAnulado, pedido.PlanearCancelacionDelCliente().Rechazo);
+    }
+
+    [Fact]
     public void Aplicar_la_anulacion_anula_las_digitales_y_recalcula_el_pedido_y_repetirla_no_cambia_nada()
     {
         var pedido = Crear(TipoDeEntregaDelPedido.Recojo, Impresa("Uno"), Digital());

@@ -127,7 +127,6 @@ public sealed class OperacionesEnCursoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PED-09")]
     public void Una_entrega_lleva_una_clave_de_cierre_por_linea_y_marca_cada_cierre_confirmado()
     {
         var otra = Guid.NewGuid();
@@ -145,7 +144,6 @@ public sealed class OperacionesEnCursoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PED-17")]
     public void Un_cierre_que_ya_salio_por_Envios_deja_la_linea_fuera_de_la_entrega()
     {
         var entrega = Entrega.Iniciar(Guid.NewGuid(), Pedido, [Linea], Admin, Inicio);
