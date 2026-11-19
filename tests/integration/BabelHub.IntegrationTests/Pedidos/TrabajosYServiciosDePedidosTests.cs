@@ -82,6 +82,11 @@ public sealed class TrabajosYServiciosDePedidosTests
         Assert.False(TrabajosDePedidos.TocaHoy(reloj, ayer, TrabajosDePedidos.HoraDeLimaDeLaRevision));
         reloj.Ahora = Ahora.AddHours(-2);
         Assert.False(TrabajosDePedidos.TocaHoy(reloj, ayer, TrabajosDePedidos.HoraDeLimaDeLaDepuracion));
+
+        // Un corte a las 03:xx se recupera el mismo día: a las 10:00 de Lima sigue tocando si no corrió hoy.
+        reloj.Ahora = Ahora.AddHours(7);
+        Assert.True(TrabajosDePedidos.TocaHoy(reloj, ayer, TrabajosDePedidos.HoraDeLimaDeLaDepuracion));
+        Assert.False(TrabajosDePedidos.TocaHoy(reloj, Ahora.AddHours(1), TrabajosDePedidos.HoraDeLimaDeLaDepuracion));
     }
 
     [Fact]
@@ -92,7 +97,7 @@ public sealed class TrabajosYServiciosDePedidosTests
         var fallar = true;
         var trabajo = new TrabajoDeFondoDePedidos(
             "pedidos-prueba",
-            _ => fallar ? throw new InvalidOperationException("sin base") : Task.CompletedTask,
+            _ => fallar ? throw new InvalidOperationException("sin base") : Task.FromResult(true),
             registro,
             SinActor,
             alertas,
@@ -111,12 +116,47 @@ public sealed class TrabajosYServiciosDePedidosTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PED-13")]
+    public async Task Un_tick_sin_trabajo_debido_no_se_registra_como_exito_ni_reinicia_los_fallos_y_los_cinco_trabajos_tienen_nombre_estable()
+    {
+        var registro = new RegistroEspia();
+        var alertas = new AlertasEspia();
+        var modo = 0;
+        var trabajo = new TrabajoDeFondoDePedidos(
+            "pedidos-diario",
+            _ => modo == 0 ? throw new InvalidOperationException("sin base") : Task.FromResult(false),
+            registro,
+            SinActor,
+            alertas,
+            new Reloj(Ahora),
+            new OpcionesDelTrabajoDePedidos(TimeSpan.FromMinutes(1)));
+
+        await trabajo.EjecutarUnaVez();
+        await trabajo.EjecutarUnaVez();
+        modo = 1;
+        await trabajo.EjecutarUnaVez();
+        modo = 0;
+        await trabajo.EjecutarUnaVez();
+
+        // El tick intermedio que no tocaba no registró nada ni reinició la cuenta: el tercer fallo alerta.
+        Assert.Equal([ResultadoDeTrabajo.Fallo, ResultadoDeTrabajo.Fallo, ResultadoDeTrabajo.Fallo], registro.Corridas.Select(c => c.Resultado));
+        Assert.Single(alertas.Motivos);
+        Assert.Equal(
+            ["pedidos-revision-de-plazos", "pedidos-depuracion-diaria", "pedidos-liberacion-del-contacto", "pedidos-reanudacion-de-operaciones", "pedidos-revision-sin-estado-final"],
+            new[] { TrabajosDePedidos.RevisionDePlazos, TrabajosDePedidos.DepuracionDiaria, TrabajosDePedidos.LiberacionDelContacto, TrabajosDePedidos.ReanudacionDeOperaciones, TrabajosDePedidos.RevisionSinEstadoFinal });
+    }
+
+    [Fact]
     public async Task Una_corrida_que_se_cuelga_se_cancela_por_su_plazo_y_cuenta_como_fallo_y_solo_el_apagado_se_propaga()
     {
         var registro = new RegistroEspia();
         var trabajo = new TrabajoDeFondoDePedidos(
             "pedidos-colgado",
-            async ct => await Task.Delay(TimeSpan.FromMinutes(10), ct),
+            async ct =>
+            {
+                await Task.Delay(TimeSpan.FromMinutes(10), ct);
+                return true;
+            },
             registro,
             SinActor,
             new AlertasEspia(),

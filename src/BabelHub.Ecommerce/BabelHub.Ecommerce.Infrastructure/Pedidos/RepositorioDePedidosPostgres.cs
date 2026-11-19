@@ -241,7 +241,8 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
                 " ORDER BY id LIMIT @maximo",
                 conBloqueo: true,
                 conContacto: true,
-                token),
+                token,
+                omitirBloqueados: true),
             cancelacion);
 
     public Task<IReadOnlyList<Guid>> PedidosConRecojoVencido(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) =>
@@ -574,7 +575,8 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
         string orden,
         bool conBloqueo,
         bool conContacto,
-        CancellationToken cancelacion)
+        CancellationToken cancelacion,
+        bool omitirBloqueados = false)
     {
         if (conBloqueo)
         {
@@ -583,7 +585,7 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
 
         var filas = new List<(DatosBasicosDelPedido Datos, string? Nombre, string? Telefono, string? Direccion)>();
         await using (var comando = new NpgsqlCommand(
-            $"SELECT {string.Format(System.Globalization.CultureInfo.InvariantCulture, ColumnasDelPedido, conContacto ? ConContacto : SinContacto)} FROM pedidos.pedidos WHERE {filtro}{orden}{(conBloqueo ? " FOR UPDATE" : string.Empty)}",
+            $"SELECT {string.Format(System.Globalization.CultureInfo.InvariantCulture, ColumnasDelPedido, conContacto ? ConContacto : SinContacto)} FROM pedidos.pedidos WHERE {filtro}{orden}{(conBloqueo ? (omitirBloqueados ? " FOR UPDATE SKIP LOCKED" : " FOR UPDATE") : string.Empty)}",
             conexion,
             transaccion))
         {

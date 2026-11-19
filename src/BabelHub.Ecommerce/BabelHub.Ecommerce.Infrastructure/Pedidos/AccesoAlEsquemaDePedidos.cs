@@ -18,9 +18,6 @@ public sealed class FallaDeLaBaseDePedidosException(string? codigoDeEstado, stri
     public string? Restriccion { get; } = restriccion;
 }
 
-/// <summary>La base no respondió a tiempo (conexión caída, interbloqueo, serialización o consulta cancelada): el caso de uso responde «servicio no disponible» y es reintentable.</summary>
-public sealed class PedidosNoDisponiblesException(string motivo) : Exception($"La base de pedidos no está disponible ({motivo}).");
-
 /// <summary>
 /// Acceso común a las tablas del esquema <c>pedidos</c>: cada operación corre en la unidad de trabajo en curso bajo el rol <c>rol_pedidos</c> (<c>EjecutarComo</c>, AD18). Un <c>lock_timeout</c> (55P03) sale como <see cref="EsperaDeBloqueoDeUnPedidoAgotadaException"/> (el caso de uso responde <c>conflicto</c>); un interbloqueo, una
 /// serialización, una consulta cancelada o una conexión caída salen como <see cref="PedidosNoDisponiblesException"/>; cualquier otro rechazo, como <see cref="FallaDeLaBaseDePedidosException"/> sin el detalle de la fila.

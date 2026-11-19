@@ -23,7 +23,7 @@ public sealed record OpcionesDelTrabajoDePedidos(TimeSpan Intervalo, int FallosS
 /// </summary>
 public sealed class TrabajoDeFondoDePedidos(
     string nombre,
-    Func<CancellationToken, Task> corrida,
+    Func<CancellationToken, Task<bool>> corrida,
     IRegistroDeTrabajosDeFondo registro,
     AlcanceDeSistemaDePedidos alcanceDeSistema,
     IPublicadorDeAlertasTecnicas alertas,
@@ -43,9 +43,15 @@ public sealed class TrabajoDeFondoDePedidos(
         {
             using var plazo = CancellationTokenSource.CreateLinkedTokenSource(cancelacion);
             plazo.CancelAfter(opciones.PlazoDeLaCorrida);
-            await alcanceDeSistema(corrida, plazo.Token).ConfigureAwait(false);
-            _fallosSeguidos = 0;
-            await Registrar(ResultadoDeTrabajo.Exito, cancelacion).ConfigureAwait(false);
+            var hizoAlgo = true;
+            await alcanceDeSistema(async ct => { hizoAlgo = await corrida(ct).ConfigureAwait(false); }, plazo.Token).ConfigureAwait(false);
+
+            // Un tick en el que no tocaba trabajar (un trabajo diario fuera de su hora) no es un éxito: ni se registra ni reinicia la cuenta de fallos.
+            if (hizoAlgo)
+            {
+                _fallosSeguidos = 0;
+                await Registrar(ResultadoDeTrabajo.Exito, cancelacion).ConfigureAwait(false);
+            }
         }
         catch (Exception) when (!cancelacion.IsCancellationRequested)
         {
@@ -118,24 +124,27 @@ public static class TrabajosDePedidos
     public const int HoraDeLimaDeLaDepuracion = 3;
     public const int HoraDeLimaDeLaRevision = 4;
 
+    /// <summary>Pasado este tiempo desde la última depuración con éxito, cada tick publica la alerta técnica (PED-39).</summary>
+    public static readonly TimeSpan SinDepuracionDurante = TimeSpan.FromHours(25);
+
     public static readonly OpcionesDelTrabajoDePedidos CadaMinuto = new(TimeSpan.FromMinutes(1), FallosSeguidosParaAlertar: 3, PlazoMaximoDeLaCorrida: TimeSpan.FromMinutes(2));
 
     public static readonly OpcionesDelTrabajoDePedidos PorHora = new(TimeSpan.FromHours(1));
 
-    /// <summary>Un trabajo diario corre cuando es su hora de Lima y aún no corrió hoy: se mira cada hora y repite al día siguiente si falla (PED-39).</summary>
+    /// <summary>Un trabajo diario corre desde su hora de Lima y mientras no haya corrido con éxito hoy: se mira cada hora, así que recupera el mismo día un corte (si falla, sigue intentando cada hora y los fallos seguidos alertan, PED-39).</summary>
     public static bool TocaHoy(IReloj reloj, DateTimeOffset? ultimaCorridaExitosa, int horaDeLima) =>
-        reloj.Ahora.ToOffset(PoliticaDeRetencion.DesfaseDeLima).Hour == horaDeLima && (ultimaCorridaExitosa is null || PoliticaDeRetencion.FechaEnLima(ultimaCorridaExitosa.Value) < reloj.HoyEnLima);
+        reloj.Ahora.ToOffset(PoliticaDeRetencion.DesfaseDeLima).Hour >= horaDeLima && (ultimaCorridaExitosa is null || PoliticaDeRetencion.FechaEnLima(ultimaCorridaExitosa.Value) < reloj.HoyEnLima);
 
     /// <summary>Los cinco trabajos; cada corrida abre su propio alcance de servicios (los casos de uso dependen del actor, de la unidad de trabajo y de los repositorios, que son por alcance).</summary>
     public static IReadOnlyList<TrabajoDeFondoDePedidos> Todos(IServiceScopeFactory fabrica, IRegistroDeTrabajosDeFondo registro, AlcanceDeSistemaDePedidos alcance, IPublicadorDeAlertasTecnicas alertas, IReloj reloj, TimeProvider? tiempo = null)
     {
-        TrabajoDeFondoDePedidos Crear(string nombre, OpcionesDelTrabajoDePedidos opciones, Func<IServiceProvider, CancellationToken, Task> ejecutar) =>
+        TrabajoDeFondoDePedidos Crear(string nombre, OpcionesDelTrabajoDePedidos opciones, Func<IServiceProvider, CancellationToken, Task<bool>> ejecutar) =>
             new(
                 nombre,
                 async ct =>
                 {
                     using var ambito = fabrica.CreateScope();
-                    await ejecutar(ambito.ServiceProvider, ct).ConfigureAwait(false);
+                    return await ejecutar(ambito.ServiceProvider, ct).ConfigureAwait(false);
                 },
                 registro,
                 alcance,
@@ -157,29 +166,36 @@ public static class TrabajosDePedidos
                     var ultima = await p.GetRequiredService<IRepositorioDePedidos>().UltimaDepuracionExitosaEn(ct).ConfigureAwait(false);
                     if (TocaHoy(reloj, ultima, HoraDeLimaDeLaDepuracion))
                     {
-                        ExigirExito(await p.GetRequiredService<AnonimizarContactosVencidos>().Depurar(ct).ConfigureAwait(false));
+                        return ExigirExito(await p.GetRequiredService<AnonimizarContactosVencidos>().Depurar(ct).ConfigureAwait(false));
                     }
+
+                    // Aunque hoy no toque (o el trabajo no haya podido correr), una depuración sin éxito desde hace más de un día alerta en cada tick: nunca queda en silencio (PED-39).
+                    if (ultima is { } ultimaVez && reloj.Ahora - ultimaVez >= SinDepuracionDurante)
+                    {
+                        await alertas.Publicar(new AlertaTecnica(TrabajoDeFondoDePedidos.MotivoDelTrabajoDetenido, reloj.Ahora), ct).ConfigureAwait(false);
+                    }
+
+                    return false;
                 }),
             Crear(
                 RevisionSinEstadoFinal,
                 PorHora,
                 async (p, ct) =>
-                {
-                    if (reloj.Ahora.ToOffset(PoliticaDeRetencion.DesfaseDeLima).Hour == HoraDeLimaDeLaRevision)
-                    {
-                        ExigirExito(await p.GetRequiredService<RevisarPedidosSinEstadoFinal>().Revisar(ct).ConfigureAwait(false));
-                    }
-                }),
+                    TocaHoy(reloj, null, HoraDeLimaDeLaRevision) && reloj.Ahora.ToOffset(PoliticaDeRetencion.DesfaseDeLima).Hour == HoraDeLimaDeLaRevision
+                        ? ExigirExito(await p.GetRequiredService<RevisarPedidosSinEstadoFinal>().Revisar(ct).ConfigureAwait(false))
+                        : false),
         ];
     }
 
-    /// <summary>Un caso de uso que rechaza (por ejemplo, porque el actor no es «sistema») es una corrida fallida, nunca un éxito silencioso: falla cerrada.</summary>
-    private static void ExigirExito<T>(Resultado<T> resultado)
+    /// <summary>Un caso de uso que rechaza (por ejemplo, porque el actor no es «sistema») es una corrida fallida, nunca un éxito silencioso: falla cerrada. Devuelve <see langword="true"/> (hizo su trabajo).</summary>
+    private static bool ExigirExito<T>(Resultado<T> resultado)
     {
         if (!resultado.EsExito)
         {
             throw new InvalidOperationException("El trabajo de fondo de Pedidos fue rechazado.");
         }
+
+        return true;
     }
 }
 

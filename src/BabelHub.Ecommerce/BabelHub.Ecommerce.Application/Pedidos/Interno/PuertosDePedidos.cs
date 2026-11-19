@@ -13,6 +13,9 @@ public sealed record EstadoDeTrasladoRegistrado(string EventoId, Guid TrasladoId
 /// <summary>El bloqueo de un pedido no se obtuvo a tiempo (<c>lock_timeout</c> de 5 s): el caso de uso responde <c>conflicto</c>, reintentable.</summary>
 public sealed class EsperaDeBloqueoDeUnPedidoAgotadaException() : Exception("No se obtuvo el bloqueo del pedido a tiempo.");
 
+/// <summary>La base de pedidos no respondió a tiempo (conexión caída, interbloqueo, serialización o consulta cancelada): la Api la traduce a «servicio no disponible» (503) y es reintentable. Vive en la Aplicación para que los casos de uso y la Api la vean sin depender de la Infraestructura.</summary>
+public sealed class PedidosNoDisponiblesException(string motivo) : Exception($"La base de pedidos no está disponible ({motivo}).");
+
 /// <summary>Una línea marcada no recogida a la que aún falta liberar la reserva en el Inventario (<c>liberaciones_de_reserva</c>, PED-15): se borra al lograrlo o al saber que la reserva ya se cerró.</summary>
 public sealed record LiberacionDeReservaPendiente(Guid PedidoId, Guid LineaId, string Motivo, DateTimeOffset PendienteDesde, int Intentos);
 
@@ -45,7 +48,7 @@ public interface IRepositorioDePedidos
     /// <summary>Inserta el pedido con sus líneas; <see langword="false"/> si ya existía por <c>id</c> o por <c>numero</c>.</summary>
     Task<bool> Agregar(Pedido pedido, CancellationToken cancelacion = default);
 
-    /// <summary>Guarda los cambios de estado del pedido y de sus líneas con comprobación de versión.</summary>
+    /// <summary>Guarda los cambios de estado del pedido y de sus líneas (suma la versión). Se llama siempre sobre un pedido leído <b>con bloqueo</b> en la misma transacción: el bloqueo, no una comparación de versión, impide que dos operaciones pisen el estado (PED-21).</summary>
     Task Actualizar(Pedido pedido, CancellationToken cancelacion = default);
 
     /// <summary>Anota que falta pedir a Pagos que elimine el contacto de la intención de este pedido (<c>liberaciones_de_contacto</c>, PED-35): se registra en la misma transacción de la creación; idempotente.</summary>

@@ -49,6 +49,22 @@ public static class DefinicionDePedidos
         CREATE INDEX IF NOT EXISTS pedidos_por_tipo_y_estado ON pedidos.pedidos (tipo_de_entrega, estado);
         CREATE INDEX IF NOT EXISTS pedidos_por_estado ON pedidos.pedidos (estado, creado_en);
 
+        -- El contacto se escribe una sola vez, al crear el pedido: después solo puede pasar a nulo (anonimizarse), nunca cambiar a otro valor.
+        CREATE OR REPLACE FUNCTION pedidos.proteger_el_contacto() RETURNS trigger
+            LANGUAGE plpgsql SET search_path = pg_catalog, pedidos
+            AS $$
+        BEGIN
+            IF (NEW.contacto_nombre IS DISTINCT FROM OLD.contacto_nombre OR NEW.contacto_telefono IS DISTINCT FROM OLD.contacto_telefono OR NEW.contacto_direccion IS DISTINCT FROM OLD.contacto_direccion)
+               AND (NEW.contacto_nombre IS NOT NULL OR NEW.contacto_telefono IS NOT NULL OR NEW.contacto_direccion IS NOT NULL) THEN
+                RAISE EXCEPTION 'El contacto de entrega solo se anonimiza.' USING ERRCODE = '23514';
+            END IF;
+            RETURN NEW;
+        END
+        $$;
+        DROP TRIGGER IF EXISTS pedidos_proteger_el_contacto ON pedidos.pedidos;
+        CREATE TRIGGER pedidos_proteger_el_contacto BEFORE UPDATE ON pedidos.pedidos
+            FOR EACH ROW EXECUTE FUNCTION pedidos.proteger_el_contacto();
+
         CREATE TABLE IF NOT EXISTS pedidos.lineas_de_pedido (
             id uuid PRIMARY KEY,
             pedido_id uuid NOT NULL REFERENCES pedidos.pedidos (id),
@@ -107,7 +123,8 @@ public static class DefinicionDePedidos
             creada_en timestamptz NOT NULL,
             completada_en timestamptz,
             CONSTRAINT anulaciones_reembolso_con_su_paso CHECK ((reembolso_id IS NULL) = (reembolso_registrado_en IS NULL)),
-            CONSTRAINT anulaciones_completada_con_fecha CHECK (estado NOT IN ('completada') OR completada_en IS NOT NULL)
+            CONSTRAINT anulaciones_completada_con_fecha CHECK (estado NOT IN ('completada') OR completada_en IS NOT NULL),
+            CONSTRAINT anulaciones_en_curso_con_proximo_intento CHECK (estado <> 'en_curso' OR proximo_intento_en IS NOT NULL)
         );
         CREATE UNIQUE INDEX IF NOT EXISTS anulaciones_una_en_curso_por_pedido ON pedidos.anulaciones (pedido_id) WHERE estado = 'en_curso';
         CREATE INDEX IF NOT EXISTS anulaciones_por_pedido ON pedidos.anulaciones (pedido_id, creada_en);
@@ -189,6 +206,7 @@ public static class DefinicionDePedidos
     public const string Permisos = """
         GRANT USAGE ON SCHEMA pedidos TO rol_pedidos;
         GRANT SELECT, INSERT ON pedidos.pedidos TO rol_pedidos;
+        GRANT EXECUTE ON FUNCTION pedidos.proteger_el_contacto() TO rol_pedidos;
         GRANT UPDATE (estado, fecha_estado_final, contacto_nombre, contacto_telefono, contacto_direccion, contacto_anonimizado_en, version) ON pedidos.pedidos TO rol_pedidos;
         GRANT SELECT, INSERT ON pedidos.lineas_de_pedido TO rol_pedidos;
         GRANT UPDATE (estado, fecha_estimada_de_llegada, listo_en, entregada_en, no_recogida_en, anulada_en, envio_id, version) ON pedidos.lineas_de_pedido TO rol_pedidos;
@@ -197,7 +215,7 @@ public static class DefinicionDePedidos
             incluye_envio, hay_digitales, monto, estado, reembolso_id, envios_cancelados_en, reservas_liberadas_en, reembolso_registrado_en, accesos_revocados_en, iniciada_por, rol_del_iniciador,
             sucursal_del_iniciador, proximo_intento_en, intentos, completada_en
         ) ON pedidos.anulaciones TO rol_pedidos;
-        GRANT SELECT, INSERT, UPDATE (en_curso), DELETE ON pedidos.anulacion_lineas TO rol_pedidos;
+        GRANT SELECT, INSERT, DELETE ON pedidos.anulacion_lineas TO rol_pedidos;
         GRANT SELECT, INSERT ON pedidos.entregas TO rol_pedidos;
         GRANT UPDATE (estado, iniciada_por, rol_del_iniciador, sucursal_del_iniciador, proximo_intento_en, intentos) ON pedidos.entregas TO rol_pedidos;
         GRANT SELECT, INSERT, UPDATE (cierre_confirmado_en, resultado_del_cierre, en_curso) ON pedidos.entrega_lineas TO rol_pedidos;

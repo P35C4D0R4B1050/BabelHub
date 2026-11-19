@@ -306,7 +306,25 @@ public sealed class RepositorioDePedidosPostgresTests(PostgresDePedidosFixture b
             await cambiar.ExecuteNonQueryAsync();
         });
         var ex = await Assert.ThrowsAsync<PostgresException>(() => bd.Ejecutar($"UPDATE pedidos.pedidos SET contacto_nombre = 'x', contacto_telefono = '1', contacto_direccion = 'y' WHERE id = '{pedido.Id}'"));
-        Assert.Equal("pedidos_contacto_solo_a_domicilio", ex.ConstraintName);
+        // El disparador del contacto (solo se anonimiza) o el CHECK de «solo a domicilio»: ambos rechazan con 23514.
+        Assert.Equal("23514", ex.SqlState);
+    }
+
+    [Fact]
+    public async Task El_contacto_guardado_no_puede_cambiar_a_otro_valor_solo_anonimizarse_y_una_anulacion_en_curso_exige_su_proximo_intento()
+    {
+        var pedido = Domicilio();
+        await bd.Pedidos.Agregar(pedido);
+
+        var cambio = await Assert.ThrowsAsync<PostgresException>(() => bd.Ejecutar($"UPDATE pedidos.pedidos SET contacto_nombre = 'Otra persona' WHERE id = '{pedido.Id}'"));
+        await bd.Ejecutar($"UPDATE pedidos.pedidos SET contacto_nombre = NULL, contacto_telefono = NULL, contacto_direccion = NULL, contacto_anonimizado_en = now() WHERE id = '{pedido.Id}'");
+
+        Assert.Equal("23514", cambio.SqlState);
+        Assert.Null(await bd.Consultar<string>("SELECT contacto_nombre FROM pedidos.pedidos"));
+
+        var sinProximo = await Assert.ThrowsAsync<PostgresException>(() => bd.Ejecutar(
+            $"INSERT INTO pedidos.anulaciones (id, pedido_id, origen, motivo, incluye_envio, hay_digitales, monto, estado, iniciada_por, intentos, creada_en) VALUES (gen_random_uuid(), '{pedido.Id}', 'administracion', 'otro', false, false, 1, 'en_curso', gen_random_uuid(), 0, now())"));
+        Assert.Equal("anulaciones_en_curso_con_proximo_intento", sinProximo.ConstraintName);
     }
 
     [Fact]
