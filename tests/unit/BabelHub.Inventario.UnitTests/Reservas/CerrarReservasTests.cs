@@ -134,6 +134,44 @@ public sealed class CerrarReservasTests
         Assert.Equal((9, 1), e.FilaDe(e.Base.Lima, libro));
     }
 
+    [Theory]
+    [Trait("Criterio", "AC-SEL-40")]
+    [InlineData("clave-ausente")]
+    [InlineData("clave-mal-formada")]
+    [InlineData("sin-lineas")]
+    [InlineData("pedido-vacio")]
+    public async Task UnEncargadoDeOtraSucursal_ConUnaEntradaMalFormada_RecibeElMismo403ConEvento_Y_NoUn400(string defecto)
+    {
+        var (e, _, pedido, libro, linea) = Confirmada();
+        ComoEncargadoDe(e, e.Base.Cusco.Id);
+        var entrada = defecto switch
+        {
+            "clave-ausente" => Entrega(pedido, [linea], string.Empty),
+            "clave-mal-formada" => Entrega(pedido, [linea], "x"),
+            "sin-lineas" => Entrega(pedido, []),
+            _ => Entrega(Guid.Empty, [linea]),
+        };
+
+        var resultado = await e.Cerrar().Ejecutar(entrada);
+
+        Assert.Equal((CategoriaDeError.Prohibido, "prohibido"), (resultado.Error!.Categoria, resultado.Error.Clave));
+        Assert.Equal(["fuera-de-sucursal"], e.Base.MotivosDeDenegacion);
+        Assert.Equal((9, 1), e.FilaDe(e.Base.Lima, libro));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-40")]
+    public async Task UnEncargadoDeLaSucursalDeRecojo_ConUnaClaveMalFormada_RecibeLaValidacion_SinEventoDeAlcance()
+    {
+        var (e, _, pedido, _, linea) = Confirmada();
+        ComoEncargadoDe(e, e.Base.Lima.Id);
+
+        var resultado = await e.Cerrar().Ejecutar(Entrega(pedido, [linea], "x"));
+
+        Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
+        Assert.Empty(e.Base.MotivosDeDenegacion);
+    }
+
     [Fact]
     [Trait("Criterio", "AC-SEL-40")]
     public async Task UnEncargadoQueConsultaUnPedidoInexistente_RecibeElMismo403Que_UnoAjeno_SinPistas()

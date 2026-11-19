@@ -416,7 +416,7 @@ public sealed class ApiDeReservasTests(PostgresDeReservasFixture bd) : IClassFix
         var deOtraSucursal = await _api.Enviar(HttpMethod.Post, $"/reservas/{pedido}/cerrar", ApiDeReservasHost.CredencialDeUsuario, RolesDeUsuario.EncargadoDeSucursal, cusco, json: json, clave: Clave());
         var cliente = await _api.Enviar(HttpMethod.Post, $"/reservas/{pedido}/cerrar", ApiDeReservasHost.CredencialDeUsuario, RolesDeUsuario.Cliente, usuario: usuario, json: json, clave: Clave());
         var conOtraCredencial = await _api.Enviar(HttpMethod.Post, $"/reservas/{pedido}/cerrar", ApiDeReservasHost.CredencialDeExpiracion, json: json, clave: Clave());
-        // El rol se comprueba antes de mirar el cuerpo; la sucursal solo puede compararse con una reserva, que un cuerpo mal formado no nombra: ese 400 no lee nada.
+        // El rol se comprueba antes de mirar el cuerpo y, en la entrega, el alcance de sucursal antes de la forma (SEL-39): un cuerpo mal formado de otra sucursal recibe el mismo 403 con su evento.
         var malFormadoDeUnCliente = await _api.Enviar(HttpMethod.Post, $"/reservas/{pedido}/cerrar", ApiDeReservasHost.CredencialDeUsuario, RolesDeUsuario.Cliente, usuario: usuario, json: """{"motivo":"x"}""", clave: Clave());
         var malFormadoDeOtraSucursal = await _api.Enviar(HttpMethod.Post, $"/reservas/{pedido}/cerrar", ApiDeReservasHost.CredencialDeUsuario, RolesDeUsuario.EncargadoDeSucursal, cusco, json: """{"motivo":"x"}""", clave: Clave());
         var sinClave = await _api.Enviar(HttpMethod.Post, $"/reservas/{pedido}/cerrar", ApiDeReservasHost.CredencialDeUsuario, RolesDeUsuario.EncargadoDeSucursal, lima, json: json);
@@ -425,7 +425,7 @@ public sealed class ApiDeReservasTests(PostgresDeReservasFixture bd) : IClassFix
         Assert.Equal(HttpStatusCode.Forbidden, cliente.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, conOtraCredencial.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, malFormadoDeUnCliente.StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, malFormadoDeOtraSucursal.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, malFormadoDeOtraSucursal.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, sinClave.StatusCode);
         Assert.Equal((50, 2), await bd.StockDe(lima, libro));
         Assert.Contains(_api.Denegaciones.Registros, r => r.Motivo == "fuera-de-sucursal" || r.Motivo == "fuera-de-rol");
