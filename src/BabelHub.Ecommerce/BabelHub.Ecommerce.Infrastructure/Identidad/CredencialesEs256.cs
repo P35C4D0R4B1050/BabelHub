@@ -183,7 +183,7 @@ public sealed class FotoDeClavesDeVerificacion(IReadOnlyDictionary<string, ECDsa
     public DateTimeOffset ObtenidaEn { get; } = obtenidaEn;
 
     /// <summary>Una foto vale hasta 5 minutos: pasado ese plazo (el JWKS no respondió) el verificador rechaza toda credencial (IDE-61).</summary>
-    public bool EstaVigente(DateTimeOffset ahora) => ahora + TimeSpan.FromSeconds(CredencialDeAcceso.DesfaseTolerado) >= ObtenidaEn && ahora - ObtenidaEn <= TimeSpan.FromMinutes(CredencialDeAcceso.RenovacionDeClavesEnMinutos);
+    public bool EstaVigente(DateTimeOffset ahora) => ahora + TimeSpan.FromSeconds(CredencialDeAcceso.DesfaseToleradoEnSegundos) >= ObtenidaEn && ahora - ObtenidaEn <= TimeSpan.FromMinutes(CredencialDeAcceso.RenovacionDeClavesEnMinutos);
 }
 
 /// <summary>De dónde saca el verificador la foto vigente: en el E-commerce, la caché en proceso de <see cref="CacheDeClavesDeVerificacion"/>; en el Inventario, la que renueva de la URL interna configurada.</summary>
@@ -251,7 +251,7 @@ public sealed class Es256VerificadorDeCredenciales(IFuenteDeClavesDeVerificacion
             sucursal = id;
         }
 
-        var desfase = TimeSpan.FromSeconds(CredencialDeAcceso.DesfaseTolerado);
+        var desfase = TimeSpan.FromSeconds(CredencialDeAcceso.DesfaseToleradoEnSegundos);
         if (vence <= desde || vence - desde > TimeSpan.FromMinutes(CredencialDeAcceso.VigenciaDeLaCredencialEnMinutos) + desfase)
         {
             return Invalida;
