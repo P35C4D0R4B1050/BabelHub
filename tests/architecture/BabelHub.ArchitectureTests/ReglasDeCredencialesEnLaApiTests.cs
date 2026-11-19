@@ -42,6 +42,20 @@ public class ReglasDeCredencialesEnLaApiTests
         AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == nombre) ?? Assembly.Load(nombre);
 
     [Fact]
+    public void Ningun_tipo_de_la_Api_depende_del_firmador_ni_del_verificador_del_contexto_de_lectura()
+    {
+        // El contexto del asistente (aud=pedidos) solo lo verifica Pedidos por el contrato de Identidad; ningún endpoint de la Api (escritura, biblioteca, cuenta, descarga) puede autenticar con él.
+        var resultado = Types.InAssembly(Cargar("BabelHub.Ecommerce.Api"))
+            .ShouldNot().HaveDependencyOnAny(
+                "BabelHub.Ecommerce.Application.Identidad.IContextoDeLectura",
+                "BabelHub.Ecommerce.Application.Identidad.Interno.IFirmaDeContextosDeLectura",
+                "BabelHub.Ecommerce.Infrastructure.Identidad.Es256FirmaDeContextosDeLectura")
+            .GetResult();
+
+        Assert.True(resultado.IsSuccessful, $"Un tipo de la Api usa el contexto de lectura: {string.Join(", ", resultado.FailingTypeNames ?? [])}.");
+    }
+
+    [Fact]
     public void Los_endpoints_de_Identidad_en_la_Api_no_dependen_de_ningun_contrato_que_emita_o_maneje_credenciales()
     {
         var resultado = Types.InAssembly(Cargar("BabelHub.Ecommerce.Api"))

@@ -22,7 +22,8 @@ public sealed class DestinatarioParaGuia
 {
     public const int LongitudMaximaDelNombre = 120;
 
-    public const int LongitudMaximaDeLaDireccion = 200;
+    /// <summary>200 de la dirección de Carrito, ", " y 60 de la región: la región se entrega dentro de la dirección (ENV-17).</summary>
+    public const int LongitudMaximaDeLaDireccion = 200 + 2 + 60;
 
     public const int LongitudMaximaDelTelefono = 20;
 
@@ -66,7 +67,7 @@ public sealed class DestinatarioParaGuia
         return ResultadoDeValidacionDelDestinatario.Completo(new DestinatarioParaGuia(n, d, t));
     }
 
-    private static bool TieneControl(string texto) => texto.Any(char.IsControl);
+    private static bool TieneControl(string texto) => texto.Any(c => char.IsControl(c) || (c != ' ' && char.GetUnicodeCategory(c) is System.Globalization.UnicodeCategory.Format or System.Globalization.UnicodeCategory.LineSeparator or System.Globalization.UnicodeCategory.ParagraphSeparator or System.Globalization.UnicodeCategory.SpaceSeparator));
 
     public override string ToString() => "[redactado]";
 }
