@@ -25,6 +25,12 @@ Variables de datos (los recorridos que las necesitan se omiten si faltan; nunca 
 | `E2E_ADMIN_URL` | URL del host de gestión (la administración no existe en el host de la tienda). |
 | `E2E_ADMIN_STORAGE_STATE` | `storageState` de Playwright con la sesión de un administrador central (las pantallas de acceso son de `web-identidad`). |
 | `E2E_ENCARGADO_STORAGE_STATE` | Ídem, de un Encargado de sucursal (debe recibir 403 en `/administracion/obras`). |
+| `E2E_CLIENTE_MIXTO_STORAGE_STATE` | `storageState` de un cliente con un impreso con stock y un digital que no posee en el carrito (carrito y checkout, CAR-15). |
+| `E2E_CLIENTE_DIGITAL_STORAGE_STATE` | Ídem, con solo libros digitales (AC-CAR-06). |
+| `E2E_VISITANTE_STORAGE_STATE` | Visitante con un libro en su carrito (cookie `__Host-bh-carrito`; AC-CAR-13). |
+| `E2E_CLIENTE_TRAS_FUSION_STORAGE_STATE` | Cliente recién ingresado con avisos de ajuste sin ver (AC-CAR-22). |
+
+Requisitos previos de los recorridos del carrito: la composición del Carrito en `Program.cs` (`AgregarCarrito`, `AgregarTrabajosDelCarritoEnLaApi`, `UsarLimiteDeCuerpoDelCarrito`), el Inventario y Pagos reales o sus pantallas, y el carrito sembrado en cada `storageState` (la ficha aún no agrega al carrito).
 
 Requisitos previos de los recorridos del catálogo: el CSS compilado (`scripts/construir-estilos.sh`) y la composición del Catálogo en `Program.cs`.
 
