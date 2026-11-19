@@ -44,6 +44,9 @@ public static class PoliticasDeLimite
     /// <summary>3 hojas de reclamación por hora y por origen (REC-11).</summary>
     public static ClaveDePolitica HojasPorOrigen { get; } = new("hojas-por-origen");
 
+    /// <summary>60 consultas de hojas por usuario y minuto.</summary>
+    public static ClaveDePolitica ConsultasDeHojasPorUsuario { get; } = new("consultas-de-hojas-por-usuario");
+
     /// <summary>5 intentos de cobro por intención y hora.</summary>
     public static ClaveDePolitica CobrosPorIntencion { get; } = new("cobros-por-intencion");
 
@@ -65,7 +68,7 @@ public static class PoliticasDeLimite
 
     /// <summary>Los límites generales de uso (con respaldo local), aparte de las políticas críticas de <see cref="Todas"/>.</summary>
     public static IReadOnlyList<ClaveDePolitica> Generales { get; } =
-        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen];
+        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen, ConsultasDeHojasPorUsuario];
 
     public static IReadOnlyList<ClaveDePolitica> Todas { get; } =
     [

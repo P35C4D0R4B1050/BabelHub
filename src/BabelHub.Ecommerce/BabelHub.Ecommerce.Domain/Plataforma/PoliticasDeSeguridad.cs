@@ -38,6 +38,10 @@ public static class PoliticasDeSeguridad
     public static PoliticaDeLimite HojasPorOrigen { get; } = new(
         "hojas-por-origen", 3, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true);
 
+    /// <summary>Un consumidor con sesión consultando sus hojas de reclamación: 60 por minuto (plan de reclamaciones, REC-10), valor inicial configurable.</summary>
+    public static PoliticaDeLimite ConsultasDeHojasPorUsuario { get; } = new(
+        "consultas-de-hojas-por-usuario", 60, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
+
     /// <summary>5 intentos de cobro por intención y hora (PAG-17, D18). Falla cerrada: una operación de dinero no cae a un contador local (SEG-26).</summary>
     public static PoliticaDeLimite CobrosPorIntencion { get; } = new("cobros-por-intencion", 5, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Usuario);
 
@@ -69,7 +73,7 @@ public static class PoliticasDeSeguridad
 
     /// <summary>Límites generales de uso: con el almacén caído caen al límite local por instancia (SEG-26), a diferencia de los críticos de <see cref="Todas"/>.</summary>
     public static IReadOnlyList<PoliticaDeLimite> Generales { get; } =
-        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen];
+        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen, ConsultasDeHojasPorUsuario];
 
     public static IReadOnlyList<PoliticaDeLimite> Todas { get; } =
     [
