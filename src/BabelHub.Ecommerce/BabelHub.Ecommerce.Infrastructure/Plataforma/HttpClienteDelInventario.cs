@@ -431,6 +431,34 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
         return new ReservaDelInventario(dto.PedidoId, dto.Estado, dto.CreadaEn, dto.ExpiraEn, lineas, traslados);
     }
 
+    public Task<ResultadoDelInventario<ReingresoDeDevolucion>> ReingresarDevolucion(Guid devolucionId, Guid pedidoId, string codigoDeFuente, IReadOnlyList<LineaAReingresar> lineas, CancellationToken cancelacion = default)
+    {
+        if (devolucionId == Guid.Empty || pedidoId == Guid.Empty || string.IsNullOrWhiteSpace(codigoDeFuente)
+            || lineas is null || lineas.Count is 0 or > MaximoDeLineasDeUnReingreso || lineas.Any(l => l is null || l.EdicionId == Guid.Empty || l.Cantidad < 1) || lineas.Select(l => l.EdicionId).Distinct().Count() != lineas.Count)
+        {
+            throw new ArgumentException("El reingreso necesita la devolución, el pedido, la fuente y de 1 a 20 líneas de ediciones distintas con cantidad positiva.");
+        }
+
+        var cuerpo = JsonSerializer.Serialize(new ReingresarDevolucionDto(pedidoId, codigoDeFuente, [.. lineas.Select(l => new LineaDeReingresoDto(l.EdicionId, l.Cantidad))]), Json);
+        return Pedir(
+            HttpMethod.Post,
+            $"{RutasDeServicio.Inventario}/devoluciones/{devolucionId:D}/reingreso",
+            AlcanceDeServicio.OperacionDeUsuario,
+            cuerpo,
+            claveDeIdempotencia: null,
+            conOrigen: false,
+            texto =>
+            {
+                // SEG-13: solo se acepta el reingreso de la devolución pedida.
+                var dto = JsonSerializer.Deserialize<ReingresoDeDevolucionDto>(texto, Json) ?? throw new JsonException("La respuesta no es un reingreso.");
+                return dto.DevolucionId == devolucionId ? new ReingresoDeDevolucion(dto.DevolucionId, dto.YaAplicado) : throw new JsonException("El reingreso devuelto no es el de la devolución pedida.");
+            },
+            cancelacion,
+            HttpStatusCode.OK);
+    }
+
+    private const int MaximoDeLineasDeUnReingreso = 20;
+
     public Task<ResultadoDelInventario<IReadOnlyList<SucursalPublica>>> ListarSucursales(CancellationToken cancelacion = default) =>
         Pedir<IReadOnlyList<SucursalPublica>>(
             HttpMethod.Get,
