@@ -251,6 +251,37 @@ internal sealed class RepositorioDeDevolucionesEnMemoria : IRepositorioDeDevoluc
         return Task.FromResult(pendientes);
     }
 
+    /// <summary>Las devoluciones que otra transacción tiene bloqueadas: <c>SKIP LOCKED</c> las salta.</summary>
+    public HashSet<Guid> Bloqueadas { get; } = [];
+
+    public Task<Devolucion?> ObtenerParaActualizarSinEsperar(Guid devolucionId, CancellationToken cancelacion = default)
+    {
+        Comprobar();
+        return Task.FromResult(!Bloqueadas.Contains(devolucionId) && _devoluciones.TryGetValue(devolucionId, out var guardada) ? Clonar(guardada) : null);
+    }
+
+    public Task<IReadOnlyList<Guid>> ObtenerConRecepcionVencida(DateTimeOffset aprobadasAntesDe, int maximo, CancellationToken cancelacion = default)
+    {
+        Comprobar();
+        IReadOnlyList<Guid> ids = [.. _devoluciones.Values
+            .Where(d => d.Tipo == TipoDeDevolucion.Impreso && d.ReingresoIniciadoEn is null && d.Lineas.All(l => l.Estado == EstadoDeLineaDeDevolucion.Aprobada) && d.Lineas.Min(l => l.AprobadaEn)!.Value < aprobadasAntesDe)
+            .OrderBy(d => d.Lineas.Min(l => l.AprobadaEn))
+            .Select(d => d.Id)
+            .Take(maximo)];
+        return Task.FromResult(ids);
+    }
+
+    public Task<IReadOnlyList<Guid>> ObtenerConReingresoEstancado(DateTimeOffset iniciadoAntesDe, int maximo, CancellationToken cancelacion = default)
+    {
+        Comprobar();
+        IReadOnlyList<Guid> ids = [.. _devoluciones.Values
+            .Where(d => d.ReingresoIniciadoEn is { } iniciado && iniciado < iniciadoAntesDe && d.Lineas.All(l => l.Estado == EstadoDeLineaDeDevolucion.Aprobada))
+            .OrderBy(d => d.ReingresoIniciadoEn)
+            .Select(d => d.Id)
+            .Take(maximo)];
+        return Task.FromResult(ids);
+    }
+
     public Task<PaginaDeDevolucionesDelDominio> ListarDeLaAdministracion(FiltroDeLaAdministracion filtro, int pagina, int tamano, CancellationToken cancelacion = default)
     {
         var todas = _devoluciones.Values.Where(d => (filtro.Tipo is null || d.Tipo == filtro.Tipo) && (!filtro.SoloReportes || d.Origen == OrigenDeDevolucion.Reporte)).OrderByDescending(d => d.CreadaEn).ToList();
@@ -356,7 +387,13 @@ internal sealed class EntornoDeDevoluciones
         Gestion = new AprobarYRechazarDevolucion(Autorizador, LimitesDeUso, Repositorio, Unidad, Auditoria, Reloj);
         Recepcion = new ConfirmarRecepcion(Autorizador, LimitesDeUso, Inventario, Reembolsos, Repositorio, Unidad, Auditoria, Alertas, Procesador, Reloj);
         Conciliacion = new ConciliarReembolsosDeDevoluciones(Autorizador, Repositorio, Reembolsos, Unidad, Procesador, Reloj);
+        Vencidas = new RechazarDevolucionesVencidas(Autorizador, Repositorio, Unidad, Auditoria, Reloj);
+        Estancadas = new RevisarDevolucionesEstancadas(Autorizador, Repositorio, Alertas, Reloj);
     }
+
+    public RechazarDevolucionesVencidas Vencidas { get; private set; } = null!;
+
+    public RevisarDevolucionesEstancadas Estancadas { get; private set; } = null!;
 
     public ActorDePrueba Actor { get; private set; }
 
