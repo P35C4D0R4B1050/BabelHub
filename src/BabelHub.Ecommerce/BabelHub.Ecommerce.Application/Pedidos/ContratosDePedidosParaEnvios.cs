@@ -37,7 +37,7 @@ public sealed record ResultadoDeCancelarEnvio(Guid EnvioId, DestinoDelEnvioAlCan
 
 /// <summary>
 /// El puerto que Pedidos declara y Envíos implementa (D01 de Envíos, D19 de Pedidos). Ambas operaciones corren <b>dentro de la unidad de trabajo del llamador</b> y con el pedido ya bloqueado (orden de bloqueo pedido → envío): no abren
-/// su propia transacción ni toman el bloqueo del pedido. Solo llevan identificadores; para saber si una línea es digital o de qué fuente es, Envíos lee <see cref="IPedidosParaEnvios"/>. Los fallos son <see cref="ErrorDeAplicacion"/> (nunca excepciones de negocio).
+/// su propia transacción ni toman el bloqueo del pedido. Solo llevan identificadores; para saber si una línea es digital o de qué fuente es, Envíos lee <see cref="IPedidosParaEnvios"/>. Los fallos son <see cref="ErrorDeAplicacion"/> (nunca excepciones de negocio): un <c>Fallo</c> no deja efectos y una excepción posterior al primer efecto se propaga, así que el llamador **revierte toda su transacción** ante cualquiera de los dos. Un envío ya cancelado se informa como <c>Mantenido</c>.
 /// </summary>
 public interface IDespachoDeEnvios
 {
