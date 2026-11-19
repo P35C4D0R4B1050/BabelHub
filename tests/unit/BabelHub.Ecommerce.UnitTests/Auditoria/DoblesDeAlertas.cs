@@ -211,6 +211,13 @@ internal sealed class DestinatariosFalsos : IDestinatariosDeAlertas
     public List<DestinatarioDeAlerta> Cuentas { get; } = [new(Guid.NewGuid()), new(Guid.NewGuid())];
 
     public Task<IReadOnlyList<DestinatarioDeAlerta>> Activos(CancellationToken cancelacion = default) => Task.FromResult<IReadOnlyList<DestinatarioDeAlerta>>([.. Cuentas]);
+
+    public List<DestinatarioDeAlerta> Logistica { get; } = [];
+
+    public bool LogisticaFalla { get; set; }
+
+    public Task<IReadOnlyList<DestinatarioDeAlerta>> DeLogistica(CancellationToken cancelacion = default) =>
+        LogisticaFalla ? throw new InvalidOperationException("No se pudo leer a logística.") : Task.FromResult<IReadOnlyList<DestinatarioDeAlerta>>([.. Logistica]);
 }
 
 /// <summary>

@@ -175,6 +175,12 @@ public sealed class AtencionDeSolicitudesDeDatos(
                     return Resultado<SolicitudSobreDatos>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoEncontrado, "solicitud-no-encontrada"));
                 }
 
+                // Tras cancelar, la solicitud no se puede responder: nada vuelve a escribirse en ella ni en la cuenta anonimizada (IDE-47, IDE-69).
+                if (await cuentas.PorId(solicitud.UsuarioId, paraActualizar: false, ct).ConfigureAwait(false) is not { CanceladaEn: null })
+                {
+                    return Resultado<SolicitudSobreDatos>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Conflicto, "cuenta-cancelada"));
+                }
+
                 var ahora = reloj.Ahora;
                 var cambio = resolucion switch
                 {

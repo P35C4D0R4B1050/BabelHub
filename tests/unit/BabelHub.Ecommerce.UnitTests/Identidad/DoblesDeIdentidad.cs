@@ -39,6 +39,12 @@ internal sealed class BdIdentidad
 
     public List<SolicitudDeCancelacion> Cancelaciones { get; private set; } = [];
 
+    public List<BajaDeTitular> Bajas { get; private set; } = [];
+
+    public List<ClaveDeFirma> Claves { get; private set; } = [];
+
+    public List<Guid> PorAnonimizar { get; private set; } = [];
+
     public List<(Guid UsuarioId, AvisoDeCuenta Aviso)> Avisos { get; private set; } = [];
 
     internal sealed record EstadoDeLaBd(
@@ -52,6 +58,9 @@ internal sealed class BdIdentidad
         List<CambioDeCorreoPendiente> Cambios,
         List<SolicitudDeDatos> Solicitudes,
         List<SolicitudDeCancelacion> Cancelaciones,
+        List<BajaDeTitular> Bajas,
+        List<ClaveDeFirma> Claves,
+        List<Guid> PorAnonimizar,
         List<(Guid UsuarioId, AvisoDeCuenta Aviso)> Avisos);
 
     /// <summary>La instantánea guarda una copia del estado de cada cuenta para restaurarlo <b>en el mismo objeto</b>: las pruebas conservan su referencia y ven la reversión como la vería una base de datos.</summary>
@@ -66,6 +75,9 @@ internal sealed class BdIdentidad
         [.. Cambios.Select(c => CambioDeCorreoPendiente.Restaurar(c.Id, c.UsuarioId, c.CorreoNuevo, c.Creado, c.Estado))],
         [.. Solicitudes.Select(s => SolicitudDeDatos.Restaurar(s.Id, s.UsuarioId, s.Tipo, s.Estado, s.RecibidaEn, s.FechaLimite, s.AtendidaEn, s.Respuesta, s.Motivo))],
         [.. Cancelaciones.Select(c => SolicitudDeCancelacion.Restaurar(c.Id, c.UsuarioId, c.Estado, c.SolicitadaEn, c.ReconfirmarHasta, c.AvisoVistoEn, c.CerradaEn, c.EjecucionEnCurso))],
+        [.. Bajas.Select(b => new BajaDeTitular(b.IdentificadorOpaco, b.Creada, b.EntregadaEn, b.CerradaEn))],
+        [.. Claves.Select(c => ClaveDeFirma.Restaurar(c.Kid, c.Creada, c.Estado, c.DejoDeFirmarEn, c.ComprometidaEn))],
+        [.. PorAnonimizar],
         [.. Avisos]);
 
     public void Restaurar(EstadoDeLaBd estado)
@@ -79,6 +91,9 @@ internal sealed class BdIdentidad
         Cambios = estado.Cambios;
         Solicitudes = estado.Solicitudes;
         Cancelaciones = estado.Cancelaciones;
+        Bajas = estado.Bajas;
+        Claves = estado.Claves;
+        PorAnonimizar = estado.PorAnonimizar;
         Avisos = estado.Avisos;
         foreach (var (cuenta, copia) in estado.CopiasDeCuentas)
         {
@@ -182,6 +197,9 @@ internal sealed class RepositorioDeCuentasEnMemoria(BdIdentidad bd) : IRepositor
     /// <summary>Si se fija, simula que la lectura bajo bloqueo ve ese número de administradores activos (una desactivación simultánea ya ocurrió).</summary>
     public int? ForzarAdministradoresActivos { get; set; }
 
+    public Task<IReadOnlyList<Guid>> IdsActivosConRol(IReadOnlyCollection<RolDeUsuario> roles, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>([.. bd.Cuentas.Values.Where(c => c is { CanceladaEn: null, Usuario.Activo: true } && roles.Contains(c.Usuario.Rol)).Select(c => c.Usuario.Id)]);
+
     public Task<int> ContarAdministradoresActivos(CancellationToken cancelacion = default) =>
         Task.FromResult(ForzarAdministradoresActivos ?? bd.Cuentas.Values.Count(c => c is { CanceladaEn: null, Usuario: { Rol: RolDeUsuario.AdministradorCentral, Activo: true } }));
 
@@ -220,6 +238,8 @@ internal sealed class RenovacionesEnMemoria(BdIdentidad bd) : IRepositorioDeReno
         Revocar(r => r.UsuarioId == usuarioId && r.Familia == familia, ahora);
 
     public Task RevocarTodas(Guid usuarioId, DateTimeOffset ahora, CancellationToken cancelacion = default) => Revocar(r => r.UsuarioId == usuarioId, ahora);
+
+    public Task RevocarLasDeTodos(DateTimeOffset ahora, CancellationToken cancelacion = default) => Revocar(_ => true, ahora);
 
     public Task RevocarLasDemas(Guid usuarioId, Guid familiaQueSeConserva, DateTimeOffset ahora, CancellationToken cancelacion = default) =>
         Revocar(r => r.UsuarioId == usuarioId && r.Familia != familiaQueSeConserva, ahora);
@@ -820,4 +840,142 @@ internal sealed class EjecutorDeCancelacionDePrueba(BabelHub.Ecommerce.UnitTests
         Ejecutadas.Add(cuenta.Usuario.Id);
         return Task.CompletedTask;
     }
+}
+
+internal sealed class BajasEnMemoria(BdIdentidad bd) : IRepositorioDeBajas
+{
+    public Task Agregar(BajaDeTitular baja, CancellationToken cancelacion = default)
+    {
+        bd.Bajas.Add(baja);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<BajaDeTitular>> Pendientes(int limite, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<BajaDeTitular>>([.. bd.Bajas.Where(b => b.Pendiente).Take(limite)]);
+
+    public Task Guardar(BajaDeTitular baja, CancellationToken cancelacion = default) => Task.CompletedTask;
+}
+
+/// <summary>Un módulo receptor de la cancelación de prueba: anota lo que se le pidió o falla.</summary>
+internal sealed class AplicadorDePrueba(string modulo) : IAplicadorDeCancelacion
+{
+    public string Modulo => modulo;
+
+    public List<(Guid UsuarioId, Guid Opaco)> Aplicados { get; } = [];
+
+    public bool Falla { get; set; }
+
+    public Task Aplicar(Guid usuarioId, Guid identificadorOpaco, CancellationToken cancelacion = default)
+    {
+        if (Falla)
+        {
+            throw new InvalidOperationException($"El módulo {modulo} no pudo aplicar la cancelación.");
+        }
+
+        Aplicados.Add((usuarioId, identificadorOpaco));
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>La parte de la matriz del esquema <c>identidad</c>, simulada sobre la base en memoria (la real es T33).</summary>
+internal sealed class PurgaDeIdentidadDePrueba(BdIdentidad bd) : IPurgaDeIdentidad
+{
+    public bool Falla { get; set; }
+
+    public int Llamadas { get; private set; }
+
+    public Task EliminarLosDatosDe(Guid usuarioId, CancellationToken cancelacion = default)
+    {
+        Llamadas++;
+        if (Falla)
+        {
+            throw new InvalidOperationException("La purga del esquema identidad falló.");
+        }
+
+        bd.Dispositivos.RemoveAll(d => d.UsuarioId == usuarioId);
+        bd.Cambios.RemoveAll(c => c.UsuarioId == usuarioId);
+        bd.Avisos.RemoveAll(a => a.UsuarioId == usuarioId);
+        foreach (var solicitud in bd.Solicitudes.Where(s => s.UsuarioId == usuarioId))
+        {
+            solicitud.BorrarElContenido();
+        }
+
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class EntregaDeBajasDePrueba : IEntregaDeBajas
+{
+    public List<Guid> Entregadas { get; } = [];
+
+    public bool Falla { get; set; }
+
+    public Task<bool> Entregar(Guid identificadorOpaco, CancellationToken cancelacion = default)
+    {
+        if (Falla)
+        {
+            throw new InvalidOperationException("El Inventario no responde.");
+        }
+
+        Entregadas.Add(identificadorOpaco);
+        return Task.FromResult(true);
+    }
+}
+
+internal sealed class AlmacenDeClavesEnMemoria(BdIdentidad bd) : IAlmacenDeClavesDeFirma
+{
+    public Dictionary<string, string> Parametros { get; } = [];
+
+    public int Bloqueos { get; private set; }
+
+    public Task<JuegoDeClavesDeFirma> Cargar(bool paraActualizar, CancellationToken cancelacion = default)
+    {
+        if (paraActualizar)
+        {
+            Bloqueos++;
+        }
+
+        return Task.FromResult(JuegoDeClavesDeFirma.Restaurar(bd.Claves.Select(c => ClaveDeFirma.Restaurar(c.Kid, c.Creada, c.Estado, c.DejoDeFirmarEn, c.ComprometidaEn))));
+    }
+
+    public Task Guardar(JuegoDeClavesDeFirma juego, CancellationToken cancelacion = default)
+    {
+        bd.Claves.Clear();
+        bd.Claves.AddRange(juego.Claves.Select(c => ClaveDeFirma.Restaurar(c.Kid, c.Creada, c.Estado, c.DejoDeFirmarEn, c.ComprometidaEn)));
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyDictionary<string, string>> ParametrosPublicos(IReadOnlyCollection<string> kids, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyDictionary<string, string>>(kids.Where(Parametros.ContainsKey).ToDictionary(k => k, k => Parametros[k]));
+}
+
+internal sealed class GeneradorDeClavesDePrueba(AlmacenDeClavesEnMemoria almacen) : IGeneradorDeClavesDeFirma
+{
+    private int _n;
+
+    public int Generadas => _n;
+
+    public Task<(ClaveDeFirma Clave, string ParametrosPublicos)> Generar(DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        var kid = $"kid-generada-{++_n:D4}";
+        var publico = $"jwk-publico-de-{kid}";
+        almacen.Parametros[kid] = publico;
+        return Task.FromResult((ClaveDeFirma.Nueva(kid, ahora), publico));
+    }
+}
+
+internal sealed class PorAnonimizarEnMemoria(BdIdentidad bd) : IPorAnonimizar
+{
+    public Task Agregar(Guid usuarioId, CancellationToken cancelacion = default)
+    {
+        if (!bd.PorAnonimizar.Contains(usuarioId))
+        {
+            bd.PorAnonimizar.Add(usuarioId);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<Guid>> Listar(int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>([.. bd.PorAnonimizar.Take(maximo)]);
 }

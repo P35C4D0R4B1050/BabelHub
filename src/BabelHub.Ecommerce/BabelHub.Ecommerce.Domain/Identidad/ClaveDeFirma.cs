@@ -137,6 +137,23 @@ public sealed class JuegoDeClavesDeFirma
     public bool DebeRotar(DateTimeOffset ahora) => ahora - Activa.Creada >= ClaveDeFirma.PeriodoDeRotacion;
 
     /// <summary>
+    /// Tras restaurar un respaldo (PLA-43): la clave restaurada <b>deja de aceptarse de inmediato</b>, sin el periodo de gracia de una rotación normal (una credencial firmada antes de la restauración se rechaza), y queda
+    /// en las revocaciones publicadas; la nueva firma desde ahora.
+    /// </summary>
+    public void RotarRevocandoLaAnterior(ClaveDeFirma nueva, DateTimeOffset ahora)
+    {
+        ArgumentNullException.ThrowIfNull(nueva);
+        if (nueva.Estado != EstadoDeClaveDeFirma.Activa || _claves.Any(c => c.Kid == nueva.Kid))
+        {
+            throw new ArgumentException("La clave nueva es activa y con un kid que no existe.", nameof(nueva));
+        }
+
+        Activa.Comprometer(ahora);
+        _claves.Add(nueva);
+        RetirarVencidas(ahora);
+    }
+
+    /// <summary>
     /// Rota la clave de firma (IDE-36): la activa pasa a anterior (sus credenciales valen hasta que venzan) y <paramref name="nueva"/> firma desde ahora. Retira las anteriores cuyas credenciales ya vencieron. La rotación se
     /// registra en la auditoría (lo hace la Aplicación).
     /// </summary>

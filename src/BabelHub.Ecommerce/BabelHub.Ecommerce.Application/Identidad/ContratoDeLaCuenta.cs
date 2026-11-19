@@ -238,6 +238,9 @@ public interface IClavesDeFirma
     Task<Resultado<ClavePublicaDeFirma>> DeclararComprometida(Guid administradorId, string kid, CancellationToken cancelacion = default);
 
     Task<IReadOnlyList<ClavePublicaDeFirma>> Publicadas(CancellationToken cancelacion = default);
+
+    /// <summary>Los <c>kid</c> de las claves declaradas comprometidas: la lista de revocaciones que cada servicio renueva al menos cada 5 minutos (IDE-61, IDE-85).</summary>
+    Task<IReadOnlyList<string>> Revocadas(CancellationToken cancelacion = default);
 }
 
 /// <summary>

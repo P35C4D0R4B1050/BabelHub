@@ -84,6 +84,22 @@ internal sealed class EntornoDeIdentidad
 
     public CancelacionesEnMemoria CancelacionesGuardadas { get; }
 
+    public BajasEnMemoria BajasGuardadas { get; }
+
+    public PorAnonimizarEnMemoria PorAnonimizarGuardadas { get; }
+
+    public AlmacenDeClavesEnMemoria AlmacenDeClaves { get; }
+
+    public GeneradorDeClavesDePrueba GeneradorDeClaves { get; }
+
+    public PurgaDeIdentidadDePrueba Purga { get; }
+
+    public EntregaDeBajasDePrueba EntregaDeBajas { get; } = new();
+
+    public Plataforma.RegistroDeSupresionesEnMemoria Supresiones { get; } = new();
+
+    public List<AplicadorDePrueba> Aplicadores { get; } = [new("pedidos"), new("pagos"), new("devoluciones"), new("biblioteca"), new("reclamaciones"), new("carrito")];
+
     public EjecutorDeCancelacionDePrueba Ejecutor { get; }
 
     public AvisosDeCuenta Avisos { get; }
@@ -106,6 +122,11 @@ internal sealed class EntornoDeIdentidad
         Cambios = new CambiosDeCorreoEnMemoria(Bd);
         SolicitudesGuardadas = new SolicitudesDeDatosEnMemoria(Bd);
         CancelacionesGuardadas = new CancelacionesEnMemoria(Bd);
+        BajasGuardadas = new BajasEnMemoria(Bd);
+        PorAnonimizarGuardadas = new PorAnonimizarEnMemoria(Bd);
+        AlmacenDeClaves = new AlmacenDeClavesEnMemoria(Bd);
+        GeneradorDeClaves = new GeneradorDeClavesDePrueba(AlmacenDeClaves);
+        Purga = new PurgaDeIdentidadDePrueba(Bd);
         Ejecutor = new EjecutorDeCancelacionDePrueba(Reloj);
         Renovaciones = new RenovacionesEnMemoria(Bd);
         Desafios = new DesafiosEnMemoria(Bd);
@@ -315,4 +336,68 @@ internal static class EntornoDeLaCancelacionExtensiones
         e.Unidad,
         e.Auditoria,
         e.Reloj);
+}
+
+internal static class EntornoDeLaEjecucionExtensiones
+{
+    public static EjecutorDeLaCancelacion EjecutorReal(this EntornoDeIdentidad e) => new(
+        e.Supresiones,
+        e.Aplicadores,
+        e.Purga,
+        e.CancelacionDeAvisos,
+        e.Cuentas,
+        e.Revocacion,
+        e.CancelacionesGuardadas,
+        e.BajasGuardadas,
+        e.PorAnonimizarGuardadas,
+        e.Secretos,
+        e.Auditoria,
+        e.Reloj);
+
+    /// <summary>La cancelación con el ejecutor <b>real</b> (el de las pruebas anteriores es un doble).</summary>
+    public static CancelacionDeCuenta CancelacionReal(this EntornoDeIdentidad e) => new(
+        e.Cuentas,
+        new AlcanceDeLaCuenta(e.Actor, e.Denegaciones),
+        e.Reautenticacion(),
+        e.CancelacionesGuardadas,
+        e.Pendientes,
+        e.EjecutorReal(),
+        e.AvisosGuardados,
+        e.Avisos,
+        e.Secretos,
+        e.Unidad,
+        e.Auditoria,
+        e.Reloj);
+
+    public static ReintentoDeBajas Reintento(this EntornoDeIdentidad e) => new(e.BajasGuardadas, e.Supresiones, e.EntregaDeBajas, e.AlertasDeSeguridad, e.Reloj);
+}
+
+internal static class EntornoDeLasClavesExtensiones
+{
+    public static ClavesDeFirma Claves(this EntornoDeIdentidad e) => new(
+        new AlcanceDeLaAdministracion(new AlcanceDeLaCuenta(e.Actor, e.Denegaciones), e.Cuentas),
+        e.AlmacenDeClaves,
+        e.GeneradorDeClaves,
+        e.Renovaciones,
+        e.Unidad,
+        e.Auditoria,
+        e.Reloj);
+
+    /// <summary>Deja una clave activa creada hace los días indicados, con sus parámetros públicos.</summary>
+    public static ClaveDeFirma ConClaveActiva(this EntornoDeIdentidad e, int diasDeAntiguedad = 10, string kid = "kid-inicial-0001")
+    {
+        var clave = ClaveDeFirma.Nueva(kid, e.Reloj.Ahora.AddDays(-diasDeAntiguedad));
+        e.Bd.Claves.Add(clave);
+        e.AlmacenDeClaves.Parametros[kid] = $"jwk-publico-de-{kid}";
+        return clave;
+    }
+}
+
+internal static class EntornoDeLosPuertosExtensiones
+{
+    public static AplicadorDeSupresionDeIdentidad AplicadorDeSupresion(this EntornoDeIdentidad e) => new(e.Cuentas, e.EjecutorReal(), e.Unidad);
+
+    public static DestinatariosDeAlertasDeIdentidad Destinatarios(this EntornoDeIdentidad e) => new(e.Cuentas);
+
+    public static RestauracionDeIdentidad Restauracion(this EntornoDeIdentidad e) => new(e.Claves(), e.Renovaciones, e.Unidad, e.Reloj);
 }

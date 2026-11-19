@@ -53,6 +53,9 @@ public interface IRepositorioDeCuentas
     /// </summary>
     Task<int> ContarAdministradoresActivos(CancellationToken cancelacion = default);
 
+    /// <summary>Los identificadores de los usuarios activos con alguno de esos roles y no cancelados: los destinatarios de las alertas (administración central y, para algunos motivos, logística). Solo identificadores, nunca direcciones.</summary>
+    Task<IReadOnlyList<Guid>> IdsActivosConRol(IReadOnlyCollection<RolDeUsuario> roles, CancellationToken cancelacion = default);
+
     /// <summary>El encargado activo de la sucursal, si lo hay (IDE-06); el índice único parcial de la base respalda la regla ante dos asignaciones simultáneas.</summary>
     Task<Domain.Identidad.EncargadoDeSucursal?> EncargadoActivoDe(Guid sucursal, CancellationToken cancelacion = default);
 }
@@ -133,6 +136,9 @@ public interface IRepositorioDeRenovaciones
 
     /// <summary>Revoca todas las renovaciones vigentes del usuario (cerrar todas, recuperación, cambio de contraseña).</summary>
     Task RevocarTodas(Guid usuarioId, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>Revoca TODAS las renovaciones vigentes de todos los usuarios: la clave de firma se declaró comprometida (IDE-61).</summary>
+    Task RevocarLasDeTodos(DateTimeOffset ahora, CancellationToken cancelacion = default);
 
     /// <summary>Revoca las renovaciones vigentes salvo una familia (cambio de contraseña o del segundo factor: «las demás», IDE-44).</summary>
     Task RevocarLasDemas(Guid usuarioId, Guid familiaQueSeConserva, DateTimeOffset ahora, CancellationToken cancelacion = default);
@@ -239,6 +245,65 @@ public interface IEjecutorDeLaCancelacion
     Task Ejecutar(CuentaDeIdentidad cuenta, CancellationToken cancelacion = default);
 }
 
+/// <summary>
+/// La parte de la matriz de cancelación (IDE-47, IDE-69, IDE-89) que es del propio esquema <c>identidad</c>, aplicada bajo <c>SET LOCAL ROLE</c> de ese esquema y <b>dentro de la transacción de la cancelación</b>: elimina
+/// el segundo factor y sus códigos de respaldo, los códigos de un solo uso, los desafíos, las renovaciones, los dispositivos y la región, los cambios de correo pendientes (con el correo nuevo), los avisos de la cuenta,
+/// y deja en las solicitudes sobre datos personales (y en las de cancelación) solo identificador, tipo, estado y fechas. No toca el registro de la cuenta: eso lo anonimiza el caso de uso.
+/// </summary>
+public interface IPurgaDeIdentidad
+{
+    Task EliminarLosDatosDe(Guid usuarioId, CancellationToken cancelacion = default);
+}
+
+/// <summary>La baja de un titular que se entrega al Inventario y cuyo cierre se agrega al registro de supresiones (<c>identidad.bajas_titulares</c> y <c>cierres_pendientes</c>, IDE-64, IDE-75): solo el identificador opaco y fechas.</summary>
+public sealed class BajaDeTitular(Guid usuarioId, DateTimeOffset creada, DateTimeOffset? entregadaEn = null, DateTimeOffset? cerradaEn = null)
+{
+    /// <summary>El identificador opaco: el identificador interno aleatorio de la cuenta, nunca derivado del correo.</summary>
+    public Guid IdentificadorOpaco { get; } = usuarioId;
+
+    public DateTimeOffset Creada { get; } = creada;
+
+    public DateTimeOffset? EntregadaEn { get; set; } = entregadaEn;
+
+    public DateTimeOffset? CerradaEn { get; set; } = cerradaEn;
+
+    public bool Pendiente => EntregadaEn is null || CerradaEn is null;
+}
+
+/// <summary>Las bajas pendientes: se agregan en la misma transacción que la cancelación y se reintentan hasta completarse, sin deshacer nada.</summary>
+public interface IRepositorioDeBajas
+{
+    Task Agregar(BajaDeTitular baja, CancellationToken cancelacion = default);
+
+    /// <summary>Las que aún no se entregaron o no se cerraron. Entregar y cerrar son idempotentes, así que dos reintentos simultáneos (dos instancias, o el paso de restauración y el trabajo) a lo sumo repiten un paso sin efecto; el trabajo de fondo (T40) puede tomar cada baja con <c>FOR UPDATE SKIP LOCKED</c> en una transacción por baja.</summary>
+    Task<IReadOnlyList<BajaDeTitular>> Pendientes(int limite, CancellationToken cancelacion = default);
+
+    Task Guardar(BajaDeTitular baja, CancellationToken cancelacion = default);
+}
+
+/// <summary>
+/// El juego de claves de firma (<c>identidad.claves_de_firma</c>, IDE-35, IDE-36, IDE-61): <see cref="Cargar"/> con <c>paraActualizar</c> toma el bloqueo del juego completo, de modo que dos rotaciones o declaraciones
+/// simultáneas se serializan; el índice único parcial de «una sola clave activa» impide que una doble rotación deje a una clave fuera del JWKS. Guardar es una operación de la misma transacción.
+/// </summary>
+public interface IAlmacenDeClavesDeFirma
+{
+    Task<JuegoDeClavesDeFirma> Cargar(bool paraActualizar, CancellationToken cancelacion = default);
+
+    Task Guardar(JuegoDeClavesDeFirma juego, CancellationToken cancelacion = default);
+
+    /// <summary>Los parámetros públicos (JWK sin la privada) de cada <c>kid</c> pedido: lo que se publica para verificar.</summary>
+    Task<IReadOnlyDictionary<string, string>> ParametrosPublicos(IReadOnlyCollection<string> kids, CancellationToken cancelacion = default);
+}
+
+/// <summary>
+/// Genera un par de claves ES256 nuevo: guarda la <b>privada cifrada</b> con la clave del entorno (nunca sale de Identidad) y devuelve la clave del Dominio (con su <c>kid</c> aleatorio) y los parámetros públicos. Se llama
+/// dentro de la transacción de la rotación: si esta se revierte, la privada generada queda sin uso.
+/// </summary>
+public interface IGeneradorDeClavesDeFirma
+{
+    Task<(ClaveDeFirma Clave, string ParametrosPublicos)> Generar(DateTimeOffset ahora, CancellationToken cancelacion = default);
+}
+
 /// <summary>El cambio de correo en curso de un usuario (<c>identidad.cambios_de_correo_pendientes</c>, IDE-53, IDE-54): como máximo uno por usuario; <see cref="Guardar"/> reemplaza el anterior.</summary>
 public interface IRepositorioDeCambiosDeCorreo
 {
@@ -293,4 +358,16 @@ public interface IColaDeCodigos
 public interface IRegistroDeSolicitudesDeCodigo
 {
     Task Registrar(string huellaDelCorreo, PropositoDeCodigo proposito, DateTimeOffset ahora, CancellationToken cancelacion = default);
+}
+
+/// <summary>
+/// Los identificadores opacos de las cuentas canceladas cuyos registros aislados aún no se anonimizaron (<c>identidad.por_anonimizar</c>, AUD-19, AUD-31): se llena al ejecutar la cancelación, en la misma transacción, y
+/// la depuración los consume; tras restaurar un respaldo se vuelve a poblar desde las cuentas canceladas.
+/// </summary>
+public interface IPorAnonimizar
+{
+    /// <summary>Idempotente: agregar un identificador que ya está no cambia nada (la reaplicación tras restaurar lo repite).</summary>
+    Task Agregar(Guid usuarioId, CancellationToken cancelacion = default);
+
+    Task<IReadOnlyList<Guid>> Listar(int maximo, CancellationToken cancelacion = default);
 }

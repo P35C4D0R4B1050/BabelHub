@@ -189,4 +189,17 @@ public sealed class UsuariosTests
         Assert.Equal("nuevo.correo@correo.pe", usuario.Correo);
         Assert.True(usuario.CorreoVerificado);
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-43")]
+    public void Anonimizar_reemplaza_el_correo_desactiva_la_cuenta_y_la_deja_sin_verificar()
+    {
+        var usuario = Persona();
+
+        usuario.Anonimizar("cancelada-0123456789abcdef@anonimo.invalid");
+
+        Assert.Equal("cancelada-0123456789abcdef@anonimo.invalid", usuario.Correo);
+        Assert.False(usuario.Activo);
+        Assert.False(usuario.CorreoVerificado);
+    }
 }

@@ -65,6 +65,8 @@ public sealed class UmbralesDeAlertaConAuditoriaRealTests(PostgresDeAuditoriaFix
 
         public Task<IReadOnlyList<DestinatarioDeAlerta>> Activos(CancellationToken cancelacion = default) =>
             Task.FromResult<IReadOnlyList<DestinatarioDeAlerta>>([new DestinatarioDeAlerta(Guid.NewGuid()), new DestinatarioDeAlerta(Guid.NewGuid())]);
+
+        public Task<IReadOnlyList<DestinatarioDeAlerta>> DeLogistica(CancellationToken cancelacion = default) => Task.FromResult<IReadOnlyList<DestinatarioDeAlerta>>([]);
     }
 
     private sealed class OrigenEco : IOrigenDeSolicitud
