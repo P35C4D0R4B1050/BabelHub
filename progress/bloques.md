@@ -19,7 +19,7 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **IDE-2** | Contratos de correo y de cliente del Inventario en `Plataforma` y contrato público de Identidad | T11, T12, T13 | C | IDE-1, AUD-2 | ☑ (T11–T13) |
 | **IDE-3** | Registro, ingreso en dos pasos, sesiones y recuperación | T14–T17 | C | IDE-2 | ☐ |
 | **IDE-4** | Cuenta del cliente, administración de usuarios, cambio de correo, solicitudes de datos, cancelación (solicitud) | T18–T22 | C | IDE-3 | ☑ (T18–T22; integración pendiente de la corrida del coordinador) |
-| **IDE-5** | Cancelación (ejecución), cierre y baja, rotación de la clave, puertos de Auditoría y de restauración | T23–T25, T27 | C | IDE-4, AUD-3 | ☐ |
+| **IDE-5** | Cancelación (ejecución), cierre y baja, rotación de la clave, puertos de Auditoría y de restauración | T23–T25, T27 | C | IDE-4, AUD-3 | ▶ (T23–T25 hechas; T27 y T34 parciales: falta Infraestructura de correo —SMTP, tablas, plantillas— y los adaptadores de registros aislados) |
 | **IDE-6** | Credenciales de servicio, topes, clasificación de correos y la infraestructura de seguridad (roles de acceso, Argon2id, emisor ES256, repositorios) | T26, T28, T29, T30–T33 | C | IDE-5 | ☐ |
 | **IDE-7** | Adaptadores de correo e Inventario, trabajos de fondo (vencimiento, descarte, rotación, bajas) | T34–T40 | C | IDE-6 | ☐ |
 | **IDE-8** | Verificador del Inventario, endpoints y la cookie de sesión de la web | T41–T45 | C | IDE-7 | ☐ |
@@ -76,8 +76,8 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **ECO-9** | `ecommerce-envios` | E | ECO-7 | ☐ (ECO-9a a 9e, T01–T25) |
 | **ECO-10** | `ecommerce-devoluciones` | E | ECO-9 | ☐ (ECO-10a a 10f, T01–T34) |
 | **ECO-11** | `ecommerce-libro-reclamaciones` | E | ECO-7 | ▶ (ECO-11a y ECO-11b hechos, T01–T12; faltan 11c y 11d) |
-| **ECO-12** | `asistente-compra-ia` | C | ECO-6; B06 (persona) | ☐ |
-| **ECO-13** | `web-indice-infinito` | B | WEB-1d | ☐ |
+| **ECO-12** | `asistente-compra-ia` | C | ECO-6; B06 (persona) | ☐ (plan redactado, spec `Approved` sin plan aprobado: falta la ronda 4 acotada de arch-reviewer, que la persona debe autorizar; 24 tareas; valores ratificados el 2026-11-19) |
+| **ECO-13** | `web-indice-infinito` | B | WEB-1d | ☐ (plan aprobado el 2026-11-19: ECO-13a T01–T06, 13b T07–T11, 13c T12–T15) |
 
 ## Cierre (todos los carriles)
 

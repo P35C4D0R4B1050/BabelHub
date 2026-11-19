@@ -2,6 +2,16 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-19 — IDE-5 y los planes de `web-indice-infinito` y del asistente
+
+### Cubierto
+- **Carril A:** IDE-5 (T23–T25 de `identidad-seguridad`; T27 y T34 parciales en la capa de Aplicación): cancelación de cuenta (ejecución), cierre y baja, rotación de la clave de firma; alertas de traslados con logística como destinataria (cierra TRA-22); reaplicación y restauración; enviador de correo con cuota y tope de 24 al día. Falta la Infraestructura de correo (SMTP, tablas, plantillas) y los adaptadores de registros aislados.
+- **Carril V:** plan de `web-indice-infinito` aprobado (`Planned`, 15 tareas, ECO-13a a 13c) y plan de `asistente-compra-ia` redactado (24 tareas) con los cinco valores ratificados por la persona el 2026-11-19; falta una ronda 4 acotada de `arch-reviewer` para aprobarlo.
+- Validación de `main` (sin IDE-5): unitarias 3744 y 2320, arquitectura 217, integración 4975 de 4976. Con IDE-5 apareció un fallo real de la guarda de secretos en `ServiciosDeLaCuenta.cs`, a cargo del carril A.
+
+### Pendiente
+- Fallo de secretos de A; IDE-6 y NOT-1; ECO-6 de pedidos, ECO-5d, ECO-11c y 11d; infraestructura de correo; la autorización de la ronda 4 del asistente.
+
 ## 2026-11-19 — IDE-4, SEL-39, ECO-11b y las pruebas de verificación fundidos
 
 ### Cubierto
