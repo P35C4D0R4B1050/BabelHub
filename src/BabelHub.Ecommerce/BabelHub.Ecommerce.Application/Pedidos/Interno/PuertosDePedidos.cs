@@ -20,6 +20,9 @@ public interface IRepositorioDePedidos
     /// <summary>Guarda los cambios de estado del pedido y de sus líneas con comprobación de versión.</summary>
     Task Actualizar(Pedido pedido, CancellationToken cancelacion = default);
 
+    /// <summary>Anota que falta pedir a Pagos que elimine el contacto de la intención de este pedido (<c>liberaciones_de_contacto</c>, PED-35): se registra en la misma transacción de la creación; idempotente.</summary>
+    Task RegistrarLiberacionDeContacto(Guid pedidoId, DateTimeOffset desde, CancellationToken cancelacion = default);
+
     Task<IReadOnlyList<Anulacion>> AnulacionesEnCurso(Guid pedidoId, CancellationToken cancelacion = default);
 
     Task<IReadOnlyList<Entrega>> EntregasEnCurso(Guid pedidoId, CancellationToken cancelacion = default);

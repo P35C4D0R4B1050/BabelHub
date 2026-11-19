@@ -45,30 +45,11 @@ public sealed class ControlesDeGestionTests
         public Task<ResultadoDeLaAceptacion> AceptarLosTextos(Guid usuarioId, string versionMostrada, CancellationToken cancelacion = default) => throw new NotSupportedException();
     }
 
-    private sealed class RepositorioFalso : IRepositorioDePedidos
-    {
-        public List<Anulacion> Anulaciones { get; } = [];
-
-        public List<Entrega> Entregas { get; } = [];
-
-        public Task<IReadOnlyList<Anulacion>> AnulacionesEnCurso(Guid pedidoId, CancellationToken cancelacion = default) => Task.FromResult<IReadOnlyList<Anulacion>>(Anulaciones);
-
-        public Task<IReadOnlyList<Entrega>> EntregasEnCurso(Guid pedidoId, CancellationToken cancelacion = default) => Task.FromResult<IReadOnlyList<Entrega>>(Entregas);
-
-        public Task<Domain.Pedidos.Pedido?> Obtener(Guid pedidoId, bool conBloqueo, CancellationToken cancelacion = default) => throw new NotSupportedException();
-
-        public Task<bool> Existe(Guid pedidoId, CancellationToken cancelacion = default) => throw new NotSupportedException();
-
-        public Task<bool> Agregar(Domain.Pedidos.Pedido pedido, CancellationToken cancelacion = default) => throw new NotSupportedException();
-
-        public Task Actualizar(Domain.Pedidos.Pedido pedido, CancellationToken cancelacion = default) => throw new NotSupportedException();
-    }
-
-    private static (ControlesDeGestionDePedidos Controles, LimitadorFalso Limites, CuentasFalsas Cuentas, RepositorioFalso Repositorio) Crear()
+    private static (ControlesDeGestionDePedidos Controles, LimitadorFalso Limites, CuentasFalsas Cuentas, RepositorioDePedidosFalso Repositorio) Crear()
     {
         var limites = new LimitadorFalso();
         var cuentas = new CuentasFalsas();
-        var repositorio = new RepositorioFalso();
+        var repositorio = new RepositorioDePedidosFalso();
         return (new ControlesDeGestionDePedidos(limites, cuentas, repositorio), limites, cuentas, repositorio);
     }
 
