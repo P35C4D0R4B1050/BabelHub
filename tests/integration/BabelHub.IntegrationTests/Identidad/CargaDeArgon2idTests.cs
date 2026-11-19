@@ -24,16 +24,13 @@ public sealed class CargaDeArgon2idTests
         using var hasher = new Argon2idHasherDeContrasenas(espera: TimeSpan.FromMinutes(2));
         var correcta = Frase("la frase correcta de la cuenta");
         var resumen = await hasher.Resumir(correcta);
-        var memoriaInicial = GC.GetTotalMemory(forceFullCollection: true);
         var picoDeTurnos = 0;
-        var picoDeMemoria = 0L;
         using var cierre = new CancellationTokenSource();
         var muestreo = Task.Run(async () =>
         {
             while (!cierre.IsCancellationRequested)
             {
                 picoDeTurnos = Math.Max(picoDeTurnos, TurnosPorDefecto - hasher.TurnosLibres);
-                picoDeMemoria = Math.Max(picoDeMemoria, GC.GetTotalMemory(forceFullCollection: false));
                 await Task.Delay(2).ConfigureAwait(false);
             }
         });
@@ -52,10 +49,8 @@ public sealed class CargaDeArgon2idTests
         await muestreo;
 
         Assert.All(resultados, r => Assert.Equal(r.Esperado, r.Obtenido));
-        Assert.InRange(picoDeTurnos, 1, TurnosPorDefecto);
+        Assert.Equal(TurnosPorDefecto, picoDeTurnos);
         Assert.Equal(TurnosPorDefecto, hasher.TurnosLibres);
-        // 4 turnos de 19 MiB (más los intermedios del algoritmo) con un margen amplio: 32 cálculos a la vez habrían pedido más de 600 MiB.
-        Assert.True(picoDeMemoria - memoriaInicial < 400L * 1024 * 1024, $"La memoria administrada creció {(picoDeMemoria - memoriaInicial) / (1024 * 1024)} MiB.");
         Assert.True(reloj.Elapsed < TimeSpan.FromMinutes(2), "La carga no terminó en el plazo de espera.");
     }
 

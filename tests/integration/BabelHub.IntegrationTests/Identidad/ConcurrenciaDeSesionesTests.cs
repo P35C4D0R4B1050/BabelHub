@@ -11,7 +11,7 @@ namespace BabelHub.IntegrationTests.Identidad;
 
 /// <summary>
 /// Renovaciones y revocaciones simultáneas con el caso de uso real de sesiones sobre PostgreSQL (identidad-seguridad T49; AC-IDE-38, AC-IDE-40, AC-IDE-50; IDE-14, IDE-46, IDE-60): rotar y revocar corren en una transacción
-/// que bloquea la fila del usuario, así que <b>dos renovaciones simultáneas del mismo valor nunca dejan dos filas vigentes</b> y <b>una renovación concurrente con «cerrar todas» no deja ninguna vigente</b>, sea cual sea el
+/// que bloquea la fila del usuario, así que <b>dos renovaciones simultáneas del mismo valor tienen un solo éxito y la reutilización revoca la familia, de modo que no queda ninguna fila vigente</b> y <b>una renovación concurrente con «cerrar todas» no deja ninguna vigente</b>, sea cual sea el
 /// orden en que lleguen. (Los códigos TOTP, de respaldo, de recuperación y los intentos simultáneos los prueban los repositorios en <c>RepositoriosDeIdentidadTests</c>.)
 /// </summary>
 public sealed class ConcurrenciaDeSesionesTests(PostgresDeIdentidadFixture bd) : IClassFixture<PostgresDeIdentidadFixture>
@@ -108,8 +108,9 @@ public sealed class ConcurrenciaDeSesionesTests(PostgresDeIdentidadFixture bd) :
 
             var resultados = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => Task.Run(() => e.Sesiones.Renovar(new ValorSecreto(valor)))));
 
-            Assert.True(resultados.Count(r => r.EsExito) <= 1, "Dos renovaciones del mismo valor tuvieron éxito.");
-            Assert.True(await e.Vigentes(usuario) <= 1, "Quedó más de una renovación vigente.");
+            // Exactamente una gana; las demás ven un valor ya usado, lo tratan como reutilización y revocan la familia: no queda ninguna fila vigente.
+            Assert.Equal(1, resultados.Count(r => r.EsExito));
+            Assert.Equal(0, await e.Vigentes(usuario));
         }
     }
 
