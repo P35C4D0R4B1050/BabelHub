@@ -907,6 +907,9 @@ public sealed class HttpClienteDelInventarioTests
     [InlineData(409, "INV-IDEMPOTENCIA-EN-CONFLICTO")]
     [InlineData(403, "INV-PROHIBIDO")]
     [InlineData(404, "INV-NO-ENCONTRADO")]
+    [InlineData(409, "INV-IDEMPOTENCIA-EN-CURSO")]
+    [InlineData(401, "INV-NO-AUTENTICADO")]
+    [InlineData(422, "INV-VALIDACION-INVALIDA")]
     [Trait("Criterio", "AC-SEL-29")]
     public async Task CerrarReserva_ConUnRechazoDelInventario_TraeElCodigoEstable_SinExcepcion(int estado, string codigo)
     {
@@ -919,11 +922,49 @@ public sealed class HttpClienteDelInventarioTests
         Assert.Equal(codigo, resultado.Codigo);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-SEL-21")]
+    public async Task CerrarReserva_Con429_EsLimiteExcedido_YConUnaFallaTransitoriaSeReintentaConLaMismaClave()
+    {
+        var pedido = Guid.NewGuid();
+        var linea = Guid.NewGuid();
+        var limitado = new ServidorSimulado((_, _) => Task.FromResult(Problema((HttpStatusCode)429, "INV-LIMITE-EXCEDIDO")));
+        var (clienteLimitado, _) = Crear(limitado);
+        var reintentado = new ServidorSimulado((_, n) => Task.FromResult(n == 1 ? new HttpResponseMessage(HttpStatusCode.BadGateway) : RespuestaDeCierre(pedido, (linea, "cerrada"))));
+        var (clienteQueReintenta, _) = Crear(reintentado, opciones: new OpcionesDelClienteDeServicio { ReintentosMaximos = 2, RetrasoDelReintento = TimeSpan.FromMilliseconds(1) });
+
+        var excedido = await clienteLimitado.CerrarReserva(pedido, "entrega", [linea], envioId: null, Clave);
+        var resultado = await clienteQueReintenta.CerrarReserva(pedido, "entrega", [linea], envioId: null, Clave);
+
+        Assert.Equal(EstadoDeLlamadaAlInventario.LimiteExcedido, excedido.Estado);
+        Assert.True(resultado.Exitosa);
+        Assert.Equal(2, reintentado.Rutas.Count);
+        Assert.All(reintentado.Cabeceras, c => Assert.Equal(Clave, c["Idempotency-Key"]));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-21")]
+    public async Task CerrarReserva_AdmiteLasClavesQueDerivanPedidosYEnvios_YRechazaLasDeMasDeOchentaCaracteres()
+    {
+        var pedido = Guid.NewGuid();
+        var linea = Guid.NewGuid();
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(RespuestaDeCierre(pedido, (linea, "cerrada"))));
+        var (cliente, _) = Crear(servidor);
+        var deLaLinea = ("cierre-" + pedido.ToString("N") + "-" + linea.ToString("N"));
+        var deEnvios = Guid.NewGuid().ToString("D");
+
+        Assert.True((await cliente.CerrarReserva(pedido, "entrega", [linea], null, deLaLinea)).Exitosa);
+        Assert.True((await cliente.CerrarReserva(pedido, "reparto", [linea], Guid.Parse(deEnvios), deEnvios)).Exitosa);
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.CerrarReserva(pedido, "entrega", [linea], null, new string('a', 81)));
+        Assert.Equal(2, servidor.Rutas.Count);
+    }
+
     [Theory]
     [InlineData("otro-pedido")]
     [InlineData("otra-linea")]
     [InlineData("falta-una-linea")]
     [InlineData("resultado-desconocido")]
+    [Trait("Criterio", "AC-SEL-21")]
     public async Task CerrarReserva_ConUnaRespuestaFueraDelContrato_EsNoDisponible_YNuncaUnExito(string caso)
     {
         var pedido = Guid.NewGuid();
@@ -943,6 +984,7 @@ public sealed class HttpClienteDelInventarioTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-SEL-21")]
     public async Task CerrarReserva_ConArgumentosQueNoCumplenElContrato_NoSale()
     {
         var servidor = new ServidorSimulado((_, _) => Task.FromResult(RespuestaDeCierre(Guid.NewGuid())));

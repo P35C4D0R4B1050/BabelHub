@@ -232,7 +232,7 @@ public sealed record TrasladoDeLaReserva(Guid TrasladoId, Guid EdicionId, int Ca
 /// <summary>El resultado de cerrar las líneas de una reserva: por cada una, <c>cerrada</c> ahora o <c>ya-cerrada</c> (el descuento ya estaba aplicado).</summary>
 public sealed record CierreDeLaReserva(Guid PedidoId, IReadOnlyList<ResultadoDeCierreDeLinea> Lineas);
 
-/// <summary>El resultado de cerrar una línea (<see cref="BabelHub.Shared.Contratos.ResultadosDeCierre"/>).</summary>
+/// <summary>El resultado de cerrar una línea: <c>cerrada</c> o <c>ya-cerrada</c>.</summary>
 public sealed record ResultadoDeCierreDeLinea(Guid LineaId, string Resultado);
 
 /// <summary>El resultado de extender una reserva (SEL-22, SEL-30): si se extendió y cómo quedó la reserva.</summary>

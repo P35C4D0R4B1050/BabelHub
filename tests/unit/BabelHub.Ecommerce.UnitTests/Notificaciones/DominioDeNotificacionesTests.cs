@@ -250,7 +250,7 @@ public sealed class DominioDeNotificacionesTests
     [Theory]
     [InlineData("pedido-estado", TipoDeDestinatario.Cliente)]
     [InlineData("pedido-estado-sucursal", TipoDeDestinatario.Sucursal)]
-    [Trait("Criterio", "AC-NOT-06")]
+    [Trait("Criterio", "AC-NOT-01")]
     public void LasPlantillasDeEstadoDePedido_TienenUnSoloTipoDeDestinatario_YAceptanSoloElNumeroYUnEstadoDeLaListaCerrada(string clave, TipoDeDestinatario destinatario)
     {
         var plantilla = CatalogoDePlantillas.Obtener(clave)!;

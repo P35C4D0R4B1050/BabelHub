@@ -140,7 +140,7 @@ public sealed class CatalogoDeAccionesTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-AUD-05")]
+    [Trait("Criterio", "AC-AUD-13")]
     public void Las_acciones_de_Pedidos_declaran_sus_claves_el_iniciador_como_campo_personal_y_nunca_el_contacto()
     {
         var esperado = new Dictionary<string, string[]>
