@@ -115,6 +115,7 @@ public sealed class ComposicionDeIdentidadTests
         Assert.IsType<AdministracionDeUsuarios>(s.GetRequiredService<IAdministracionDeUsuarios>());
         Assert.IsType<ClavesDeFirma>(s.GetRequiredService<IClavesDeFirma>());
         Assert.IsType<ContextoDeLecturaDelAsistente>(s.GetRequiredService<IContextoDeLectura>());
+        Assert.IsType<ContextoDelAsistenteDeLaWeb>(s.GetRequiredService<IContextoDelAsistente>());
         Assert.IsType<DestinatariosDeAlertasDeIdentidad>(s.GetRequiredService<IDestinatariosDeAlertas>());
         Assert.NotNull(s.GetRequiredService<IAplicadorDeSupresion>());
         Assert.NotNull(s.GetRequiredService<IRestauracionDeIdentidad>());
