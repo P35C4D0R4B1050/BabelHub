@@ -290,6 +290,17 @@ internal sealed class RepositorioDeDevolucionesEnMemoria : IRepositorioDeDevoluc
         return Task.FromResult(ids);
     }
 
+    public Task<IReadOnlyList<Guid>> ObtenerVencidasParaDepurar(DateTimeOffset ultimoCambioAntesDe, int maximo, CancellationToken cancelacion = default)
+    {
+        Comprobar();
+        IReadOnlyList<Guid> ids = [.. _devoluciones.Values
+            .Where(d => d.RedactadaEn is null && d.TodasFinales && d.UltimoCambioEn < ultimoCambioAntesDe)
+            .OrderBy(d => d.UltimoCambioEn)
+            .Select(d => d.Id)
+            .Take(maximo)];
+        return Task.FromResult(ids);
+    }
+
     public Task<PaginaDeDevolucionesDelDominio> ListarDeLaAdministracion(FiltroDeLaAdministracion filtro, int pagina, int tamano, CancellationToken cancelacion = default)
     {
         Comprobar();
@@ -404,11 +415,20 @@ internal sealed class EntornoDeDevoluciones
         Localizador = new LocalizadorDeDevolucionesDeUnaCuenta(Pedidos, Repositorio);
         Pendientes = new ContarPendientesDeCuenta(Localizador);
         Redaccion = new RedactarDevolucionesDeUnaCuenta(Localizador, Repositorio, Auditoria, Reloj);
+        ControlDeDepuracion = new ControlDeLaDepuracionDeDevoluciones(Reloj);
+        Depuracion = new RedactarDevolucionesVencidas(Autorizador, Repositorio, Unidad, Auditoria, ControlDeDepuracion, Reloj);
+        RevisionDeLaDepuracion = new RevisarDepuracionDeDevoluciones(Autorizador, ControlDeDepuracion, Alertas, Reloj);
         Vencidas = new RechazarDevolucionesVencidas(Autorizador, Repositorio, Unidad, Auditoria, Avisos, Reloj);
         Estancadas = new RevisarDevolucionesEstancadas(Autorizador, Repositorio, Alertas, Reloj);
     }
 
     public ConsultasDeDevoluciones Consultas { get; private set; } = null!;
+
+    public ControlDeLaDepuracionDeDevoluciones ControlDeDepuracion { get; private set; } = null!;
+
+    public RedactarDevolucionesVencidas Depuracion { get; private set; } = null!;
+
+    public RevisarDepuracionDeDevoluciones RevisionDeLaDepuracion { get; private set; } = null!;
 
     public LocalizadorDeDevolucionesDeUnaCuenta Localizador { get; private set; } = null!;
 

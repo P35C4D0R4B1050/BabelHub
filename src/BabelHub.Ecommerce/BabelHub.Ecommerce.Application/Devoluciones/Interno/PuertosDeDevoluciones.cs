@@ -74,6 +74,9 @@ internal interface IRepositorioDeDevoluciones
 
     /// <summary>Las devoluciones con el marcador de reingreso fijado antes de <paramref name="iniciadoAntesDe"/> y todas sus líneas todavía aprobadas (la recepción no se completó), hasta <paramref name="maximo"/>: la revisión de estancadas.</summary>
     Task<IReadOnlyList<Guid>> ObtenerConReingresoEstancado(DateTimeOffset iniciadoAntesDe, int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Las devoluciones sin redactar con todas sus líneas finales (reembolsada o rechazada) y el último cambio antes de <paramref name="ultimoCambioAntesDe"/> (candidatas a la depuración de los dos años, DEV-27), de las más antiguas a las más recientes, hasta <paramref name="maximo"/>. Solo candidatas: el llamador revalida bajo el bloqueo.</summary>
+    Task<IReadOnlyList<Guid>> ObtenerVencidasParaDepurar(DateTimeOffset ultimoCambioAntesDe, int maximo, CancellationToken cancelacion = default);
 }
 
 /// <summary>El resultado de pedir el reingreso de una devolución al Inventario, reducido a la lista cerrada que el orquestador necesita (D07).</summary>
