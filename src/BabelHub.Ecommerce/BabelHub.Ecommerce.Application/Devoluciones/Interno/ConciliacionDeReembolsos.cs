@@ -9,7 +9,7 @@ namespace BabelHub.Ecommerce.Application.Devoluciones.Interno;
 /// <c>ProcesarReembolsoDeLinea</c> (T11; DEV-08, DEV-17, DEV-21): pide la pasarela <b>fuera de transacción</b> y pasa la línea a reembolsada <b>solo cuando la pasarela confirma</b>, con el responsable «sistema» y su auditoría; una falla o la falta de confirmación dejan la
 /// línea como estaba (recibida de un impreso o aprobada de un digital) con el reembolso pendiente, reintentable sin repetir pasos. Nunca lanza.
 /// </summary>
-internal sealed class ProcesarReembolsoDeLinea(IReembolsos reembolsos, IRepositorioDeDevoluciones repositorio, IUnidadDeTrabajo unidad, IAuditoria auditoria, IReloj reloj)
+internal sealed class ProcesarReembolsoDeLinea(IReembolsos reembolsos, IRepositorioDeDevoluciones repositorio, IUnidadDeTrabajo unidad, IAuditoria auditoria, AvisosDeDevoluciones avisos, IReloj reloj)
 {
     public async Task Ejecutar(Guid devolucionId, Guid lineaDePedidoId, Guid reembolsoId, CancellationToken cancelacion)
     {
@@ -29,11 +29,17 @@ internal sealed class ProcesarReembolsoDeLinea(IReembolsos reembolsos, IReposito
         }
     }
 
-    /// <summary>La transacción corta que pasa la línea a reembolsada: bajo el bloqueo de la devolución, idempotente (una línea ya reembolsada no cambia) y con la auditoría que falla cerrada. Si falla, la conciliación la repite.</summary>
+    /// <summary>La transacción corta que pasa la línea a reembolsada: bajo el bloqueo de la devolución, idempotente (una línea ya reembolsada no cambia) y con la auditoría que falla cerrada. El aviso se pide en la misma transacción; la cuenta que lo recibe se lee de Pedidos antes de abrirla (si Pedidos no responde, no se completa el paso y la conciliación lo repite, sin perder el aviso).</summary>
     public async Task<bool> PasarAReembolsada(Guid devolucionId, Guid lineaDePedidoId, CancellationToken cancelacion)
     {
         try
         {
+            var previa = await repositorio.Obtener(devolucionId, paraActualizar: false, cancelacion).ConfigureAwait(false);
+            if (previa is null || await avisos.Destinatario(previa.PedidoId, cancelacion).ConfigureAwait(false) is not { } cuentaId)
+            {
+                return false;
+            }
+
             return await unidad.Ejecutar(
                 async token =>
                 {
@@ -51,7 +57,8 @@ internal sealed class ProcesarReembolsoDeLinea(IReembolsos reembolsos, IReposito
                     }
 
                     await repositorio.Guardar(devolucion, token).ConfigureAwait(false);
-                    await auditoria.Registrar(AuditoriaDeDevoluciones.Cambio(devolucion, anterior, EstadoDeLineaDeDevolucion.Reembolsada), token).ConfigureAwait(false);
+                    await auditoria.Registrar(AuditoriaDeDevoluciones.Cambio(devolucion, anterior, EstadoDeLineaDeDevolucion.Reembolsada, lineaDePedidoId: lineaDePedidoId), token).ConfigureAwait(false);
+                    await avisos.Solicitar(devolucion, cuentaId, EstadoDeLineaDeDevolucion.Reembolsada, token).ConfigureAwait(false);
                     return true;
                 },
                 cancelacion).ConfigureAwait(false);

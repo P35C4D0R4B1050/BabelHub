@@ -62,6 +62,12 @@ internal sealed class PedidosParaDevolucionesDoble : IPedidosParaDevoluciones
 
     public Task<Resultado<PaginaDePedidosDeUnaCuenta>> ListarDeUnaCuenta(Guid cuentaId, int pagina, int tamano, CancellationToken cancelacion = default)
     {
+        Lecturas++;
+        if (NoResponde)
+        {
+            return Task.FromResult(Resultado<PaginaDePedidosDeUnaCuenta>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible")));
+        }
+
         var ids = _pedidos.Values.Where(p => p.CuentaId == cuentaId).Select(p => p.PedidoId).ToList();
         return Task.FromResult(Resultado<PaginaDePedidosDeUnaCuenta>.Exito(new PaginaDePedidosDeUnaCuenta([.. ids.Skip((pagina - 1) * tamano).Take(tamano)], pagina, tamano, ids.Count)));
     }
@@ -234,13 +240,15 @@ internal sealed class RepositorioDeDevolucionesEnMemoria : IRepositorioDeDevoluc
 
     public Task<PaginaDeDevolucionesDelDominio> ListarDePedidos(IReadOnlyCollection<Guid> pedidoIds, int pagina, int tamano, CancellationToken cancelacion = default)
     {
-        var todas = _devoluciones.Values.Where(d => pedidoIds.Contains(d.PedidoId)).OrderByDescending(d => d.CreadaEn).ToList();
+        Comprobar();
+        var todas = _devoluciones.Values.Where(d => pedidoIds.Contains(d.PedidoId)).OrderByDescending(d => d.CreadaEn).ThenBy(d => d.Id).ToList();
         return Task.FromResult(new PaginaDeDevolucionesDelDominio([.. todas.Skip((pagina - 1) * tamano).Take(tamano)], todas.Count));
     }
 
     public Task<PaginaDeDevolucionesDelDominio> ListarDeLaSucursal(string codigoDeSucursal, int pagina, int tamano, CancellationToken cancelacion = default)
     {
-        var todas = _devoluciones.Values.Where(d => d.Tipo == TipoDeDevolucion.Impreso && d.Origen == OrigenDeDevolucion.Solicitud && d.CodigoDeSucursalReceptora == codigoDeSucursal).OrderByDescending(d => d.CreadaEn).ToList();
+        Comprobar();
+        var todas = _devoluciones.Values.Where(d => d.Tipo == TipoDeDevolucion.Impreso && d.Origen == OrigenDeDevolucion.Solicitud && d.CodigoDeSucursalReceptora == codigoDeSucursal).OrderByDescending(d => d.CreadaEn).ThenBy(d => d.Id).ToList();
         return Task.FromResult(new PaginaDeDevolucionesDelDominio([.. todas.Skip((pagina - 1) * tamano).Take(tamano)], todas.Count));
     }
 
@@ -251,9 +259,60 @@ internal sealed class RepositorioDeDevolucionesEnMemoria : IRepositorioDeDevoluc
         return Task.FromResult(pendientes);
     }
 
+    /// <summary>Las devoluciones que otra transacción tiene bloqueadas: <c>SKIP LOCKED</c> las salta.</summary>
+    public HashSet<Guid> Bloqueadas { get; } = [];
+
+    /// <summary>Las devoluciones cuya lectura bloqueada falla (un bloqueo agotado o el almacén): la revisión sigue con las demás.</summary>
+    public HashSet<Guid> FallanAlBloquear { get; } = [];
+
+    public Task<Devolucion?> ObtenerParaActualizarSinEsperar(Guid devolucionId, CancellationToken cancelacion = default)
+    {
+        Comprobar();
+        if (FallanAlBloquear.Contains(devolucionId))
+        {
+            throw new DevolucionesNoDisponiblesException("El bloqueo agotó su espera.");
+        }
+
+        return Task.FromResult(!Bloqueadas.Contains(devolucionId) && _devoluciones.TryGetValue(devolucionId, out var guardada) ? Clonar(guardada) : null);
+    }
+
+    public Task<IReadOnlyList<Guid>> ObtenerConRecepcionVencida(DateTimeOffset aprobadasAntesDe, int maximo, CancellationToken cancelacion = default)
+    {
+        Comprobar();
+        IReadOnlyList<Guid> ids = [.. _devoluciones.Values
+            .Where(d => d.Tipo == TipoDeDevolucion.Impreso && d.ReingresoIniciadoEn is null && d.Lineas.All(l => l.Estado == EstadoDeLineaDeDevolucion.Aprobada) && d.Lineas.Min(l => l.AprobadaEn)!.Value < aprobadasAntesDe)
+            .OrderBy(d => d.Lineas.Min(l => l.AprobadaEn))
+            .Select(d => d.Id)
+            .Take(maximo)];
+        return Task.FromResult(ids);
+    }
+
+    public Task<IReadOnlyList<Guid>> ObtenerConReingresoEstancado(DateTimeOffset iniciadoAntesDe, int maximo, CancellationToken cancelacion = default)
+    {
+        Comprobar();
+        IReadOnlyList<Guid> ids = [.. _devoluciones.Values
+            .Where(d => d.ReingresoIniciadoEn is { } iniciado && iniciado < iniciadoAntesDe && d.Lineas.All(l => l.Estado == EstadoDeLineaDeDevolucion.Aprobada))
+            .OrderBy(d => d.ReingresoIniciadoEn)
+            .Select(d => d.Id)
+            .Take(maximo)];
+        return Task.FromResult(ids);
+    }
+
+    public Task<IReadOnlyList<Guid>> ObtenerVencidasParaDepurar(DateTimeOffset ultimoCambioAntesDe, int maximo, CancellationToken cancelacion = default)
+    {
+        Comprobar();
+        IReadOnlyList<Guid> ids = [.. _devoluciones.Values
+            .Where(d => d.RedactadaEn is null && d.TodasFinales && d.UltimoCambioEn < ultimoCambioAntesDe)
+            .OrderBy(d => d.UltimoCambioEn)
+            .Select(d => d.Id)
+            .Take(maximo)];
+        return Task.FromResult(ids);
+    }
+
     public Task<PaginaDeDevolucionesDelDominio> ListarDeLaAdministracion(FiltroDeLaAdministracion filtro, int pagina, int tamano, CancellationToken cancelacion = default)
     {
-        var todas = _devoluciones.Values.Where(d => (filtro.Tipo is null || d.Tipo == filtro.Tipo) && (!filtro.SoloReportes || d.Origen == OrigenDeDevolucion.Reporte)).OrderByDescending(d => d.CreadaEn).ToList();
+        Comprobar();
+        var todas = _devoluciones.Values.Where(d => (filtro.Tipo is null || d.Tipo == filtro.Tipo) && (!filtro.SoloReportes || d.Origen == OrigenDeDevolucion.Reporte)).OrderByDescending(d => d.CreadaEn).ThenBy(d => d.Id).ToList();
         return Task.FromResult(new PaginaDeDevolucionesDelDominio([.. todas.Skip((pagina - 1) * tamano).Take(tamano)], todas.Count));
     }
 
@@ -305,8 +364,10 @@ internal sealed class EntornoDeDevoluciones
         Auditoria = new AuditoriaDeDevolucionesEspia();
         Reembolsos = new ReembolsosDoble();
         Accesos = new AccesosParaDevolucionesDoble();
-        Unidad = new UnidadDeTrabajoReversible(Repositorio, Auditoria, Reembolsos, Accesos);
+        Notificador = new NotificadorDeDevolucionesEspia();
+        Unidad = new UnidadDeTrabajoReversible(Repositorio, Auditoria, Reembolsos, Accesos, Notificador);
         Reembolsos.Unidad = Unidad;
+        Notificador.Unidad = Unidad;
         Denegaciones = new DenegacionesDelCatalogoEspia();
         Cuentas = new EstadoDeCuentaFalso();
         Sucursales = new ResolucionDeSucursalDoble();
@@ -331,6 +392,7 @@ internal sealed class EntornoDeDevoluciones
         Auditoria = compartido.Auditoria;
         Reembolsos = compartido.Reembolsos;
         Unidad = compartido.Unidad;
+        Notificador = compartido.Notificador;
         Accesos = compartido.Accesos;
         Denegaciones = compartido.Denegaciones;
         Cuentas = compartido.Cuentas;
@@ -348,15 +410,47 @@ internal sealed class EntornoDeDevoluciones
     {
         Autorizador = new AutorizadorDeDevoluciones(Actor, Denegaciones, Cuentas, Sucursales);
         LimitesDeUso = new LimitesDeDevoluciones(Limites, Actor);
-        Procesador = new ProcesarReembolsoDeLinea(Reembolsos, Repositorio, Unidad, Auditoria, Reloj);
+        Avisos = new AvisosDeDevoluciones(Notificador, Pedidos, Alertas, Reloj);
+        Procesador = new ProcesarReembolsoDeLinea(Reembolsos, Repositorio, Unidad, Auditoria, Avisos, Reloj);
         SolicitarImpreso = new SolicitarDevolucionDeImpreso(Autorizador, LimitesDeUso, Pedidos, Inventario, Marca, Repositorio, Unidad, Auditoria, Reloj);
-        SolicitarDigital = new SolicitarReembolsoDeDigital(Autorizador, LimitesDeUso, Pedidos, Accesos, Reembolsos, Marca, Repositorio, Unidad, Auditoria, Procesador, Reloj);
+        SolicitarDigital = new SolicitarReembolsoDeDigital(Autorizador, LimitesDeUso, Pedidos, Accesos, Reembolsos, Marca, Repositorio, Unidad, Auditoria, Avisos, Procesador, Reloj);
         Reportar = new ReportarArchivoDefectuoso(Autorizador, LimitesDeUso, Pedidos, Accesos, Marca, Repositorio, Unidad, Auditoria, Reloj);
-        Decidir = new DecidirReporte(Autorizador, LimitesDeUso, Pedidos, Accesos, Biblioteca, Reembolsos, Repositorio, Unidad, Auditoria, Procesador, Reloj);
-        Gestion = new AprobarYRechazarDevolucion(Autorizador, LimitesDeUso, Repositorio, Unidad, Auditoria, Reloj);
-        Recepcion = new ConfirmarRecepcion(Autorizador, LimitesDeUso, Inventario, Reembolsos, Repositorio, Unidad, Auditoria, Alertas, Procesador, Reloj);
+        Decidir = new DecidirReporte(Autorizador, LimitesDeUso, Pedidos, Accesos, Biblioteca, Reembolsos, Repositorio, Unidad, Auditoria, Avisos, Procesador, Reloj);
+        Gestion = new AprobarYRechazarDevolucion(Autorizador, LimitesDeUso, Repositorio, Unidad, Auditoria, Avisos, Reloj);
+        Recepcion = new ConfirmarRecepcion(Autorizador, LimitesDeUso, Inventario, Reembolsos, Repositorio, Unidad, Auditoria, Avisos, Alertas, Procesador, Reloj);
         Conciliacion = new ConciliarReembolsosDeDevoluciones(Autorizador, Repositorio, Reembolsos, Unidad, Procesador, Reloj);
+        Localizador = new LocalizadorDeDevolucionesDeUnaCuenta(Pedidos, Repositorio);
+        Consultas = new ConsultasDeDevoluciones(Autorizador, LimitesDeUso, Pedidos, Localizador, Repositorio);
+        Pendientes = new ContarPendientesDeCuenta(Localizador);
+        Redaccion = new RedactarDevolucionesDeUnaCuenta(Localizador, Repositorio, Auditoria, Reloj);
+        ControlDeDepuracion = new ControlDeLaDepuracionDeDevoluciones(Reloj);
+        Depuracion = new RedactarDevolucionesVencidas(Autorizador, Repositorio, Unidad, Auditoria, ControlDeDepuracion, Reloj);
+        RevisionDeLaDepuracion = new RevisarDepuracionDeDevoluciones(Autorizador, ControlDeDepuracion, Alertas, Reloj);
+        Vencidas = new RechazarDevolucionesVencidas(Autorizador, Repositorio, Unidad, Auditoria, Avisos, Reloj);
+        Estancadas = new RevisarDevolucionesEstancadas(Autorizador, Repositorio, Alertas, Reloj);
     }
+
+    public ConsultasDeDevoluciones Consultas { get; private set; } = null!;
+
+    public ControlDeLaDepuracionDeDevoluciones ControlDeDepuracion { get; private set; } = null!;
+
+    public RedactarDevolucionesVencidas Depuracion { get; private set; } = null!;
+
+    public RevisarDepuracionDeDevoluciones RevisionDeLaDepuracion { get; private set; } = null!;
+
+    public LocalizadorDeDevolucionesDeUnaCuenta Localizador { get; private set; } = null!;
+
+    public ContarPendientesDeCuenta Pendientes { get; private set; } = null!;
+
+    public RedactarDevolucionesDeUnaCuenta Redaccion { get; private set; } = null!;
+
+    public NotificadorDeDevolucionesEspia Notificador { get; private set; }
+
+    public AvisosDeDevoluciones Avisos { get; private set; } = null!;
+
+    public RechazarDevolucionesVencidas Vencidas { get; private set; } = null!;
+
+    public RevisarDevolucionesEstancadas Estancadas { get; private set; } = null!;
 
     public ActorDePrueba Actor { get; private set; }
 
@@ -422,4 +516,40 @@ internal sealed class EntornoDeDevoluciones
         new(Guid.NewGuid(), Guid.NewGuid(), false, cantidad, precio, cantidad * precio, estado, estado == EstadoVisibleDeLaLinea.Entregado ? entregadaEn : null);
 
     public static LineaDePedidoParaDevoluciones Digital() => new(Guid.NewGuid(), Guid.NewGuid(), true, 1, 30m, 30m, EstadoVisibleDeLaLinea.DisponibleEnLaBiblioteca, null);
+}
+
+/// <summary>El Notificador de las pruebas de Devoluciones: guarda las solicitudes, se revierte con la transacción y puede devolver «no se guardó», rechazar o lanzar (el contrato dice que nunca lanza, pero Devoluciones no debe depender de ello).</summary>
+internal sealed class NotificadorDeDevolucionesEspia : BabelHub.Ecommerce.Application.Notificaciones.INotificador, IInstantanea
+{
+    private List<BabelHub.Ecommerce.Application.Notificaciones.SolicitudDeAviso> _solicitudes = [];
+
+    public UnidadDeTrabajoReversible? Unidad { get; set; }
+
+    public IReadOnlyList<BabelHub.Ecommerce.Application.Notificaciones.SolicitudDeAviso> Solicitudes => _solicitudes;
+
+    public int DentroDeLaTransaccion { get; private set; }
+
+    public BabelHub.Ecommerce.Application.Notificaciones.ResultadoDeLaSolicitudDeAviso Resultado { get; set; } = BabelHub.Ecommerce.Application.Notificaciones.ResultadoDeLaSolicitudDeAviso.Creado;
+
+    public bool Lanza { get; set; }
+
+    public Task<BabelHub.Ecommerce.Application.Notificaciones.ResultadoDeLaSolicitudDeAviso> Solicitar(BabelHub.Ecommerce.Application.Notificaciones.SolicitudDeAviso solicitud, CancellationToken cancelacion = default)
+    {
+        if (Lanza)
+        {
+            throw new InvalidOperationException("El notificador falló.");
+        }
+
+        if (Unidad?.EnCurso == true)
+        {
+            DentroDeLaTransaccion++;
+        }
+
+        _solicitudes.Add(solicitud);
+        return Task.FromResult(Resultado);
+    }
+
+    public object Capturar() => _solicitudes.ToList();
+
+    public void Restaurar(object instantanea) => _solicitudes = (List<BabelHub.Ecommerce.Application.Notificaciones.SolicitudDeAviso>)instantanea;
 }

@@ -53,7 +53,7 @@ internal interface IRepositorioDeDevoluciones
     /// <summary>Devuelve las unidades de líneas rechazadas, también en orden de <c>linea_id</c> (DEV-18).</summary>
     Task DevolverCupos(IReadOnlyList<(Guid LineaId, int Unidades)> cupos, CancellationToken cancelacion = default);
 
-    /// <summary>Las devoluciones de los pedidos dados, de la más reciente a la más antigua (las de una cuenta: sus pedidos salen del contrato de lectura de Pedidos).</summary>
+    /// <summary>Las devoluciones de los pedidos dados, de la más reciente a la más antigua <b>con un orden total estable (desempate por identificador)</b>, porque se lee por páginas sin bloqueo (las de una cuenta: sus pedidos salen del contrato de lectura de Pedidos).</summary>
     Task<PaginaDeDevolucionesDelDominio> ListarDePedidos(IReadOnlyCollection<Guid> pedidoIds, int pagina, int tamano, CancellationToken cancelacion = default);
 
     /// <summary>Solo las de <b>impresos</b> con esa sucursal receptora (un encargado nunca ve un reporte ni un digital, DEV-28).</summary>
@@ -63,6 +63,20 @@ internal interface IRepositorioDeDevoluciones
 
     /// <summary>Las líneas con el reembolso pendiente (recibida de un impreso o aprobada de un digital), de las más antiguas a las más recientes, hasta <paramref name="maximo"/>: la conciliación de reembolsos (T11).</summary>
     Task<IReadOnlyList<(Guid DevolucionId, Guid LineaDePedidoId)>> ObtenerConReembolsoPendiente(int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Como <see cref="Obtener"/> con bloqueo pero <b>saltando</b> la fila que otra transacción tenga bloqueada (<c>FOR UPDATE SKIP LOCKED</c>): <see langword="null"/> si no existe o está bloqueada. La revisión de plazos de cada hora la usa para no esperar a una recepción en curso (DEV-16).
+    /// </summary>
+    Task<Devolucion?> ObtenerParaActualizarSinEsperar(Guid devolucionId, CancellationToken cancelacion = default);
+
+    /// <summary>Las devoluciones de <b>impresos</b> con todas sus líneas aprobadas desde antes de <paramref name="aprobadasAntesDe"/> y <b>sin</b> el marcador de reingreso (candidatas a vencer por el plazo de recepción, DEV-14), de las más antiguas a las más recientes, hasta <paramref name="maximo"/>. Solo candidatas: el llamador revalida bajo el bloqueo.</summary>
+    Task<IReadOnlyList<Guid>> ObtenerConRecepcionVencida(DateTimeOffset aprobadasAntesDe, int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Las devoluciones con el marcador de reingreso fijado antes de <paramref name="iniciadoAntesDe"/> y todas sus líneas todavía aprobadas (la recepción no se completó), hasta <paramref name="maximo"/>: la revisión de estancadas.</summary>
+    Task<IReadOnlyList<Guid>> ObtenerConReingresoEstancado(DateTimeOffset iniciadoAntesDe, int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Las devoluciones sin redactar con todas sus líneas finales (reembolsada o rechazada) y el último cambio antes de <paramref name="ultimoCambioAntesDe"/> (candidatas a la depuración de los dos años, DEV-27), de las más antiguas a las más recientes, hasta <paramref name="maximo"/>. Solo candidatas: el llamador revalida bajo el bloqueo.</summary>
+    Task<IReadOnlyList<Guid>> ObtenerVencidasParaDepurar(DateTimeOffset ultimoCambioAntesDe, int maximo, CancellationToken cancelacion = default);
 }
 
 /// <summary>El resultado de pedir el reingreso de una devolución al Inventario, reducido a la lista cerrada que el orquestador necesita (D07).</summary>

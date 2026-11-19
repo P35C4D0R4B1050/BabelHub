@@ -6,7 +6,7 @@ namespace BabelHub.Ecommerce.Application.Devoluciones.Interno;
 
 /// <summary>
 /// <c>AprobarDevolucion</c> y <c>RechazarDevolucion</c> de un impreso (T09; DEV-10, DEV-11, DEV-12, DEV-13, DEV-17): solo el encargado de la sucursal receptora o la administración central, sobre <b>la devolución completa</b>. Rechazar devuelve el cupo de cada
-/// línea (DEV-18). Repetir la operación es estado inválido sin efectos. La auditoría de cada cambio va en la misma transacción y falla cerrada (el aviso del cambio llega con T14).
+/// línea (DEV-18). Repetir la operación es estado inválido sin efectos. La auditoría y el aviso de cada cambio van en la misma transacción (la auditoría falla cerrada; el Notificador nunca interrumpe).
 /// </summary>
 internal sealed class AprobarYRechazarDevolucion(
     AutorizadorDeDevoluciones autorizador,
@@ -14,6 +14,7 @@ internal sealed class AprobarYRechazarDevolucion(
     IRepositorioDeDevoluciones repositorio,
     IUnidadDeTrabajo unidad,
     IAuditoria auditoria,
+    AvisosDeDevoluciones avisos,
     IReloj reloj)
 {
     public Task<Resultado<DevolucionVista>> Aprobar(Guid devolucionId, CancellationToken cancelacion = default) => Decidir(devolucionId, aprobar: true, cancelacion);
@@ -52,6 +53,12 @@ internal sealed class AprobarYRechazarDevolucion(
                 return FallosDeDevoluciones.De<DevolucionVista>(CategoriaDeError.Conflicto, ClavesDeDevoluciones.EstadoInvalido);
             }
 
+            // La cuenta del aviso sale de Pedidos antes de abrir la transacción: si no responde, no se cambia nada y se reintenta.
+            if (await avisos.Destinatario(inicial.PedidoId, cancelacion).ConfigureAwait(false) is not { } cuentaId)
+            {
+                return FallosDeDevoluciones.NoDisponible<DevolucionVista>();
+            }
+
             var responsable = ResponsableDelCambio.Personal(autorizador.Actor!.UsuarioId!.Value);
             var ahora = reloj.Ahora;
             Devolucion? decidida = null;
@@ -75,6 +82,7 @@ internal sealed class AprobarYRechazarDevolucion(
                     await auditoria.Registrar(
                         AuditoriaDeDevoluciones.Cambio(devolucion, EstadoDeLineaDeDevolucion.Solicitada, aprobar ? EstadoDeLineaDeDevolucion.Aprobada : EstadoDeLineaDeDevolucion.Rechazada),
                         token).ConfigureAwait(false);
+                    await avisos.Solicitar(devolucion, cuentaId, aprobar ? EstadoDeLineaDeDevolucion.Aprobada : EstadoDeLineaDeDevolucion.Rechazada, token).ConfigureAwait(false);
                     decidida = devolucion;
                     return true;
                 },

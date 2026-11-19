@@ -47,6 +47,8 @@ public static partial class CatalogoDeAccionesDeAuditoria
         [nameof(AccionesAuditables.LineaDePedidoMarcadaNoRecogida)] = ["pedido"],
         [nameof(AccionesAuditables.ContactoDePedidoAnonimizado)] = [],
         [nameof(AccionesAuditables.PedidosDepurados)] = [],
+        [nameof(AccionesAuditables.DevolucionesDepuradas)] = [],
+        [nameof(AccionesAuditables.DevolucionesDeCuentaRedactadas)] = [],
         [nameof(AccionesAuditables.EstadoDeEnvioCambiado)] = ["envio", "pedido"],
         [nameof(AccionesAuditables.DevolucionSolicitada)] = ["devolucion"],
         [nameof(AccionesAuditables.EstadoDeDevolucionCambiado)] = ["devolucion"],

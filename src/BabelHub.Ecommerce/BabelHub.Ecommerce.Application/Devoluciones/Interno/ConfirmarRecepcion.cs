@@ -19,6 +19,7 @@ internal sealed class ConfirmarRecepcion(
     IRepositorioDeDevoluciones repositorio,
     IUnidadDeTrabajo unidad,
     IAuditoria auditoria,
+    AvisosDeDevoluciones avisos,
     IPublicadorDeAlertasTecnicas alertas,
     ProcesarReembolsoDeLinea procesador,
     IReloj reloj)
@@ -49,6 +50,12 @@ internal sealed class ConfirmarRecepcion(
             }
 
             var responsable = ResponsableDelCambio.Personal(autorizador.Actor!.UsuarioId!.Value);
+
+            // La cuenta del aviso de recibida sale de Pedidos antes de tocar nada: si no responde, no se fija el marcador ni se llama al Inventario.
+            if (await avisos.Destinatario(inicial.PedidoId, cancelacion).ConfigureAwait(false) is not { } cuentaId)
+            {
+                return FallosDeDevoluciones.NoDisponible<DevolucionVista>();
+            }
 
             // (1) El marcador, bajo el bloqueo de la devolución, con su auditoría (si no se puede auditar, no hay marcador ni llamada).
             var reingresoYaConfirmado = false;
@@ -114,6 +121,7 @@ internal sealed class ConfirmarRecepcion(
 
                     await repositorio.Guardar(devolucion, token).ConfigureAwait(false);
                     await auditoria.Registrar(AuditoriaDeDevoluciones.Cambio(devolucion, EstadoDeLineaDeDevolucion.Aprobada, EstadoDeLineaDeDevolucion.Recibida), token).ConfigureAwait(false);
+                    await avisos.Solicitar(devolucion, cuentaId, EstadoDeLineaDeDevolucion.Recibida, token).ConfigureAwait(false);
                     return true;
                 },
                 cancelacion).ConfigureAwait(false);
@@ -171,14 +179,7 @@ internal sealed class ConfirmarRecepcion(
                         }
 
                         await repositorio.Guardar(devolucion, token).ConfigureAwait(false);
-                        await auditoria.Registrar(
-                            new SolicitudDeRegistro(AccionesAuditables.ReingresoPorDevolucion)
-                            {
-                                ObjetoTipo = "devolucion",
-                                ObjetoId = devolucion.Id.ToString(),
-                                Detalle = new Dictionary<string, string?> { ["devolucionId"] = devolucion.Id.ToString() },
-                            },
-                            token).ConfigureAwait(false);
+                        await auditoria.Registrar(AuditoriaDeDevoluciones.Reingreso(devolucion), token).ConfigureAwait(false);
                         return true;
                     },
                     cancelacion).ConfigureAwait(false);

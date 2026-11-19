@@ -178,4 +178,22 @@ public sealed class TextoRedactadoYRetencionTests
 
         Assert.False(devolucion.EstaVencidaParaDepurar(DateOnly.FromDateTime(Ahora.UtcDateTime).AddYears(10)));
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-29")]
+    public void La_cota_de_candidatas_nunca_deja_fuera_a_una_devolucion_vencida_incluido_el_29_de_febrero()
+    {
+        // Un último cambio cada seis horas durante tres años y un día de hoy cada día durante cuatro: toda devolución vencida está antes de la cota.
+        var inicio = new DateTimeOffset(2023, 12, 25, 0, 0, 0, TimeSpan.Zero);
+        for (var cambio = inicio; cambio < inicio.AddDays(3 * 366); cambio = cambio.AddHours(6))
+        {
+            for (var hoy = new DateOnly(2025, 12, 20); hoy < new DateOnly(2026, 3, 10); hoy = hoy.AddDays(1))
+            {
+                if (PoliticaDeRetencion.EstaVencida(cambio, hoy))
+                {
+                    Assert.True(cambio < PoliticaDeRetencion.CotaDeCandidatas(hoy), $"{cambio:O} {hoy}");
+                }
+            }
+        }
+    }
 }
