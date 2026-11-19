@@ -1,7 +1,7 @@
 ---
 id: ecommerce-envios
 titulo: Guías de envío a domicilio
-estado: Planned
+estado: InProgress
 aprobado_por: Claude (delegado por Diego Amiquero)
 aprobado_en: 2026-11-13
 plan_aprobado_por: Claude (delegado por Diego Amiquero)
