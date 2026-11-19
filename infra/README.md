@@ -12,9 +12,18 @@
 | `excepciones-de-arquitectura.json` | Disponible | Registro de las imágenes de terceros que no existen para una arquitectura en la que corren (PLA-03); hoy vacío. |
 | `nginx/nginx.conf` | Plantilla | Enrutamiento por host (tienda y gestión) con límites por IP y servidor de respaldo para la gestión (AD14). |
 | `n8n/` | Pendiente | Flujos de n8n exportados (AD16), con la spec `transversal-notificaciones`. |
+| `scripts/desplegar.sh` (migración) | Disponible | En VM-INVENTARIO, antes de levantar los servicios, levanta PostgreSQL y ejecuta `migrar` en la imagen de cada servicio (`inventario` y `ecommerce-gestion`): crea los roles de esquema, aplica los esquemas de los módulos y crea o rota las cuentas de conexión (COMP-2). La cuenta propietaria viene de `migrador.env` (`BABELHUB__Migrador__Inventario__Propietaria` y `BABELHUB__Migrador__Ecommerce__Propietaria`), que solo existe en esa VM y nunca en los archivos de los servicios. VM-VENTAS no migra: usa la base de la VM de datos. |
 | `docker-compose.borde.yml`, `docker-compose.ventas.yml`, `docker-compose.inventario.yml` | Disponible | Un Compose por VM de Oracle (PLA-26, PLA-27): versiones y `digest` fijos, usuario sin privilegios, capacidades descartadas, límites, `healthcheck`, `read_only` (con las excepciones de Evolution API registradas en `x-excepciones`) y solo los secretos de esa VM, desde `BABELHUB_SECRETOS`. Las imágenes propias llegan por `IMAGEN_<SERVICIO>` con su `digest` (las fija el flujo de lanzamiento). VM-AUX no usa Compose: sus scripts llegan con T24. |
 
 Reglas (ver `docs/02-arquitectura-de-software/02-decisiones-arquitectonicas.md` y `docs/07-proceso-de-desarrollo/02-convenciones-tecnicas.md`): imágenes multi-arquitectura, usuario sin privilegios, `healthcheck`, límites de memoria y puertos de bases de datos solo en `127.0.0.1` en local. Los secretos viven en `.env` (ignorado por Git); se versiona `.env.example`.
+
+**Migrar las bases en local** (COMP-2): con el Compose local arriba, las cuentas del servicio (`BABELHUB__<Servicio>__Base__…`) y la cuenta propietaria en el entorno:
+
+```bash
+BABELHUB__Migrador__Ecommerce__Propietaria="Host=localhost;Database=ecommerce;Username=postgres;Password=<administradora>" \n  dotnet run --project src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api -- migrar   # y lo mismo con Inventario y su variable
+```
+
+Es idempotente (repetirlo es seguro y solo rota las contraseñas), falla cerrado nombrando la variable o el rol que falta y no imprime ninguna clave. La cuenta propietaria debe ser de administración (crea roles y extensiones) y distinta de las del servicio.
 
 ```bash
 cp .env.example .env

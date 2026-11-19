@@ -10,6 +10,7 @@
 #   - que las imágenes propias (IMAGEN_*) sean ya publicadas: con su digest `@sha256:…` (este script solo despliega lo publicado; la puerta
 #     del ensayo de restauración, PLA-11, la ejecuta el flujo de lanzamiento antes de publicar);
 #   - que cada archivo de secretos que el Compose usa exista, no esté vacío y solo lo pueda leer su dueño;
+#   - en la VM de datos, que migrador.env (las cuentas propietarias de las bases, COMP-2) exista con sus permisos y sus dos claves;
 #   - que tenga las claves de infra/secretos-requeridos.txt, con el largo mínimo de las que genera el sistema;
 #   - que ninguna clave privada de age esté en la VM (en la VM de datos solo puede haber la clave pública, PLA-17).
 # En VM-INVENTARIO instala además la tarea diaria del respaldo (el archivado de cambios ya va en el Compose) y la vigilancia por minuto del espacio
@@ -177,6 +178,24 @@ if [[ "$VM" == inventario && -n "$SECRETOS" ]]; then
   [[ "$RAIZ" =~ ^[A-Za-z0-9._:/-]+$ && "$SECRETOS" =~ ^[A-Za-z0-9._:/-]+$ ]] || anotar "las rutas del repositorio y de los secretos solo pueden tener letras, números y . _ : / - (se escriben en la tarea de cron)"
 fi
 
+# La migración de las bases (COMP-2): la VM de datos aloja PostgreSQL de los dos servicios y es la única que migra, con las cuentas propietarias de
+# migrador.env (administración de cada base, solo para migrar: nunca están en los archivos de los servicios, que solo llevan sus cuentas de conexión).
+if [[ "$VM" == inventario && -n "$SECRETOS" ]]; then
+  MIGRADOR="$SECRETOS/migrador.env"
+  if [[ ! -s "$MIGRADOR" ]]; then
+    anotar "falta el archivo de secretos migrador.env (las cuentas propietarias de las bases para migrar sus esquemas y roles, COMP-2)"
+  else
+    permisos="$("$STAT" -c %a "$MIGRADOR" 2>/dev/null || echo 777)"
+    [[ "$permisos" =~ ^[0-7]*[0-7]00$ ]] || anotar "el archivo de secretos migrador.env lo pueden leer otros usuarios (permisos $permisos): debe ser 600 o 400"
+    for clave in BABELHUB__Migrador__Inventario__Propietaria BABELHUB__Migrador__Ecommerce__Propietaria; do
+      [[ -n "$(leer_valor "$MIGRADOR" "$clave")" ]] || anotar "falta la clave $clave en migrador.env"
+    done
+    if grep -q 'AGE-SECRET-KEY-' "$MIGRADOR" 2>/dev/null; then
+      anotar "el archivo migrador.env contiene una clave privada de age: no puede estar en la VM"
+    fi
+  fi
+fi
+
 if [[ ${#falta[@]} -gt 0 ]]; then
   echo "No se despliega $VM: faltan o están mal ${#falta[@]} cosas:" >&2
   printf '  - %s\n' "${falta[@]}" >&2
@@ -189,6 +208,25 @@ compose() { "$DOCKER" compose --project-directory "$INFRA" -f "$COMPOSE" "$@"; }
 
 echo "Desplegando $VM..."
 compose config --quiet || { echo "El Compose de $VM no es válido." >&2; exit 1; }
+# La migración de las bases antes de levantar los servicios (COMP-2): primero PostgreSQL sano, después los esquemas y roles de cada servicio con la
+# cuenta propietaria de migrador.env, que solo vive en el entorno de ese proceso (nunca en un argumento ni en un archivo de los servicios). Es idempotente.
+if [[ "$VM" == inventario ]]; then
+  echo "Migrando las bases (esquemas y roles)..."
+  if ! compose up -d --wait --wait-timeout "$ESPERA" postgres; then
+    echo "PostgreSQL de $VM no quedó sano en $ESPERA segundos: no se migra." >&2
+    exit 1
+  fi
+  migrar() { # servicio variable-de-la-cuenta-propietaria
+    local servicio="$1" variable="$2"
+    (
+      export "$variable=$(leer_valor "$MIGRADOR" "$variable")"
+      compose run --rm --no-deps -e "$variable" "$servicio" migrar
+    ) || { echo "La migración de la base de $servicio falló: no se despliega $VM." >&2; exit 1; }
+  }
+  migrar inventario BABELHUB__Migrador__Inventario__Propietaria
+  migrar ecommerce-gestion BABELHUB__Migrador__Ecommerce__Propietaria
+fi
+
 if ! compose up -d --wait --wait-timeout "$ESPERA"; then
   echo "Algún componente de $VM no quedó sano en $ESPERA segundos." >&2
   compose ps >&2 || true
