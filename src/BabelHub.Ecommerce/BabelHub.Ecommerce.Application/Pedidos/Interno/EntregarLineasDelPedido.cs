@@ -137,7 +137,7 @@ internal sealed class EntregarLineasDelPedido(
             {
                 ObjetoTipo = "pedido",
                 ObjetoId = pedido.Id.ToString("D"),
-                Detalle = new Dictionary<string, string?> { ["operacion"] = "entrega", ["iniciadaPor"] = solicitante.UsuarioId.ToString("D") },
+                Detalle = new Dictionary<string, string?> { ["operacion"] = "entrega", ["iniciadaPor"] = solicitante.UsuarioId.ToString("D"), ["rolDelIniciador"] = solicitante.Rol, ["sucursalDelIniciador"] = solicitante.SucursalId?.ToString("D") },
             },
             cancelacion).ConfigureAwait(false);
 
@@ -230,7 +230,7 @@ internal sealed class EntregarLineasDelPedido(
                 {
                     ObjetoTipo = "pedido",
                     ObjetoId = pedido.Id.ToString("D"),
-                    Detalle = new Dictionary<string, string?> { ["lineaId"] = lineaId.ToString("D"), ["iniciadaPor"] = entrega.Iniciador.EstaAnonimizado ? null : entrega.Iniciador.UsuarioId.ToString("D") },
+                    Detalle = new Dictionary<string, string?> { ["lineaId"] = lineaId.ToString("D"), ["iniciadaPor"] = entrega.Iniciador.EstaAnonimizado ? null : entrega.Iniciador.UsuarioId.ToString("D"), ["rolDelIniciador"] = entrega.Iniciador.Rol, ["sucursalDelIniciador"] = entrega.Iniciador.SucursalId?.ToString("D") },
                 },
                 cancelacion).ConfigureAwait(false);
         }
