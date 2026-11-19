@@ -14,6 +14,8 @@ export default defineConfig({
     locale: 'es-PE',
     timezoneId: 'America/Lima',
     trace: 'retain-on-failure',
+    // El host local escucha en HTTP; detrás del borde recibe X-Forwarded-Proto: https (las cookies __Host- y el antiforgery lo exigen).
+    extraHTTPHeaders: process.env.E2E_FORWARDED_PROTO ? { 'X-Forwarded-Proto': process.env.E2E_FORWARDED_PROTO } : undefined,
   },
   projects: [
     // Escritorio y teléfono (375 px): el catálogo debe verse bien en ambos.
