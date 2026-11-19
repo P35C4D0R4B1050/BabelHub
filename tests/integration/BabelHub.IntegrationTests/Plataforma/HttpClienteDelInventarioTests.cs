@@ -726,6 +726,135 @@ public sealed class HttpClienteDelInventarioTests
         Assert.Equal(SecretoDeExpiracion, servidor.Cabeceras[0][CredencialesDeSalidaHandler.CabeceraDeCredencial]);
         Assert.Equal(0, token.Pedidos);
     }
+
+    // ---------- Consultar, extender y confirmar una reserva (PLA-Y; SEL-03, SEL-04, SEL-22, SEL-30) ----------
+
+    [Fact]
+    public async Task ConsultarReserva_LlevaElTokenYLaCredencialDeUsuario_SinClave_YDevuelveLaReservaValidada()
+    {
+        var pedido = Guid.NewGuid();
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json(Reserva(pedido, LineaReserva(Guid.NewGuid(), Edicion1, 2)))));
+        var (cliente, _) = Crear(servidor);
+
+        var resultado = await cliente.ConsultarReserva(pedido);
+
+        Assert.True(resultado.Exitosa);
+        Assert.Equal(pedido, resultado.Valor.PedidoId);
+        Assert.Equal(HttpMethod.Get, Assert.Single(servidor.Metodos));
+        Assert.Equal($"/api/inventario/v1/reservas/{pedido:D}", Assert.Single(servidor.Rutas));
+        var cabeceras = Assert.Single(servidor.Cabeceras);
+        Assert.False(cabeceras.ContainsKey("Idempotency-Key"));
+        Assert.Equal(SecretoDeUsuario, cabeceras[CredencialesDeSalidaHandler.CabeceraDeCredencial]);
+        Assert.Equal("Bearer " + TokenDelUsuario, cabeceras["Authorization"]);
+        SinCabecerasDeActor(cabeceras);
+    }
+
+    [Theory]
+    [InlineData(404, "INV-NO-ENCONTRADO")]
+    [InlineData(403, "INV-PROHIBIDO")]
+    public async Task ConsultarReserva_ConUnRechazoDelInventario_TraeElCodigo_SinExcepcion(int estado, string codigo)
+    {
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Problema((HttpStatusCode)estado, codigo)));
+        var (cliente, _) = Crear(servidor);
+
+        var resultado = await cliente.ConsultarReserva(Guid.NewGuid());
+
+        Assert.Equal(EstadoDeLlamadaAlInventario.Rechazada, resultado.Estado);
+        Assert.Equal(codigo, resultado.Codigo);
+    }
+
+    [Fact]
+    public async Task ConsultarReserva_ConUnaReservaDeOtroPedido_EsNoDisponible_YSinPedidoNoSale()
+    {
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json(Reserva(Guid.NewGuid()))));
+        var (cliente, _) = Crear(servidor);
+
+        var resultado = await cliente.ConsultarReserva(Guid.NewGuid());
+
+        Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, resultado.Estado);
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.ConsultarReserva(Guid.Empty));
+        Assert.Single(servidor.Rutas);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    [Trait("Criterio", "AC-SEL-24")]
+    public async Task ExtenderReserva_UsaLaCredencialDeExpiracionSinTokenNiCuerpo_SeReintenta_YDevuelveSiSeExtendio(bool extendida)
+    {
+        var pedido = Guid.NewGuid();
+        var cuerpo = $"{{\"extendida\":{(extendida ? "true" : "false")},\"reserva\":{Reserva(pedido, LineaReserva(Guid.NewGuid(), Edicion1, 1))}}}";
+        var servidor = new ServidorSimulado((_, n) => Task.FromResult(n == 1 ? new HttpResponseMessage(HttpStatusCode.BadGateway) : Json(cuerpo)));
+        var (cliente, token) = Crear(servidor, opciones: new OpcionesDelClienteDeServicio { ReintentosMaximos = 2, RetrasoDelReintento = TimeSpan.FromMilliseconds(1) });
+
+        var resultado = await cliente.ExtenderReserva(pedido);
+
+        Assert.True(resultado.Exitosa);
+        Assert.Equal(extendida, resultado.Valor.Extendida);
+        Assert.Equal(pedido, resultado.Valor.Reserva.PedidoId);
+        Assert.Equal(2, servidor.Rutas.Count);
+        Assert.All(servidor.Rutas, r => Assert.Equal($"/api/inventario/v1/reservas/{pedido:D}/extender", r));
+        Assert.All(servidor.Metodos, m => Assert.Equal(HttpMethod.Post, m));
+        Assert.All(servidor.Cabeceras, c => Assert.False(c.ContainsKey("Authorization")));
+        Assert.Equal(SecretoDeExpiracion, servidor.Cabeceras[0][CredencialesDeSalidaHandler.CabeceraDeCredencial]);
+        Assert.All(servidor.Cuerpos, c => Assert.True(string.IsNullOrEmpty(c)));
+        Assert.Equal(0, token.Pedidos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-24")]
+    public async Task ExtenderReserva_ConUnaRespuestaQueNoEsLaDelPedido_OSinReserva_EsNoDisponible()
+    {
+        var pedido = Guid.NewGuid();
+        var respuestas = new Queue<string>([$"{{\"extendida\":true,\"reserva\":{Reserva(Guid.NewGuid())}}}", "{\"extendida\":true}", "no es json"]);
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json(respuestas.Dequeue())));
+        var (cliente, _) = Crear(servidor);
+
+        for (var i = 0; i < 3; i++)
+        {
+            Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, (await cliente.ExtenderReserva(pedido)).Estado);
+        }
+
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.ExtenderReserva(Guid.Empty));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-03")]
+    public async Task ConfirmarReserva_LlevaLaClaveYLaCredencialDeExpiracion_SinToken_YDevuelveLaReserva()
+    {
+        var pedido = Guid.NewGuid();
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json(Reserva(pedido, LineaReserva(Guid.NewGuid(), Edicion1, 1)).Replace("\"pendiente\"", "\"confirmada\"", StringComparison.Ordinal))));
+        var (cliente, token) = Crear(servidor);
+
+        var resultado = await cliente.ConfirmarReserva(pedido, Clave);
+
+        Assert.True(resultado.Exitosa);
+        Assert.Equal("confirmada", resultado.Valor.Estado);
+        Assert.Equal(HttpMethod.Post, Assert.Single(servidor.Metodos));
+        Assert.Equal($"/api/inventario/v1/reservas/{pedido:D}/confirmar", Assert.Single(servidor.Rutas));
+        var cabeceras = Assert.Single(servidor.Cabeceras);
+        Assert.Equal(Clave, cabeceras["Idempotency-Key"]);
+        Assert.Equal(SecretoDeExpiracion, cabeceras[CredencialesDeSalidaHandler.CabeceraDeCredencial]);
+        Assert.False(cabeceras.ContainsKey("Authorization"));
+        Assert.Equal(0, token.Pedidos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-03")]
+    public async Task ConfirmarReserva_ConUnEstadoInvalido_TraeElCodigo_YSinClaveValidaNoSale()
+    {
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Problema(HttpStatusCode.Conflict, "INV-RESERVA-ESTADO-INVALIDO")));
+        var (cliente, _) = Crear(servidor);
+
+        var resultado = await cliente.ConfirmarReserva(Guid.NewGuid(), Clave);
+
+        Assert.Equal(EstadoDeLlamadaAlInventario.Rechazada, resultado.Estado);
+        Assert.Equal("INV-RESERVA-ESTADO-INVALIDO", resultado.Codigo);
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.ConfirmarReserva(Guid.NewGuid(), "corta"));
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.ConfirmarReserva(Guid.Empty, Clave));
+        Assert.Single(servidor.Rutas);
+    }
+
     [Fact]
     public void ElNombreDelClienteEsElQueRecibeElTokenDeLaSesion() =>
         Assert.Equal(TokenDelUsuarioDeLaSesionExtensiones.ClienteDelInventario, HttpClienteDelInventario.NombreDelCliente);

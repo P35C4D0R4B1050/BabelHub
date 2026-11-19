@@ -1,4 +1,6 @@
+using BabelHub.Ecommerce.Application.Biblioteca;
 using BabelHub.Ecommerce.Application.Pedidos;
+using BabelHub.Ecommerce.Application.Pedidos.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Infrastructure.Pedidos;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,6 +33,16 @@ public class DoblesProvisionalesDePedidosTests
         });
         Assert.Equal(EstadoDeLecturaDelContacto.NoDisponible, contacto.Estado);
         Assert.Null(contacto.Contacto);
+
+        var acceso = await new AccesosDeBibliotecaProvisional().Conceder(new ConcederAccesoEntrada(Guid.NewGuid(), pedido, Guid.NewGuid()));
+        Assert.Equal(CategoriaDeError.NoDisponible, acceso.Error!.Categoria);
+        Assert.Equal(ResultadoDeCerrarReserva.Incierto, await new ReservasDelPedidoProvisional().Cerrar(pedido, lineas[0], "cierre-x"));
+        Assert.Equal(ResultadoDeLiberarReserva.NoSePudo, await new ReservasDelPedidoProvisional().Liberar(pedido, "pedido-anulado", lineas));
+        Assert.Null(await new ResolucionDeSucursalProvisional().IdentificadorDe("LIM"));
+        var limitador = new LimitadorDePedidosProvisional();
+        Assert.Equal(DecisionDeLimiteDePedidos.NoDisponible, (await limitador.Consultar(Guid.NewGuid())).Decision);
+        Assert.Equal(DecisionDeLimiteDePedidos.NoDisponible, (await limitador.Gestionar(Guid.NewGuid())).Decision);
+        Assert.Equal(DecisionDeLimiteDePedidos.NoDisponible, (await limitador.LeerContacto(Guid.NewGuid())).Decision);
     }
 
     [Fact]
@@ -61,6 +73,11 @@ public class DoblesProvisionalesDePedidosTests
         Assert.IsType<DespachoDeEnviosProvisional>(proveedor.GetRequiredService<IDespachoDeEnvios>());
         Assert.IsType<ContactoDeEntregaProvisional>(proveedor.GetRequiredService<IContactoDeEntregaDelPedido>());
         Assert.IsType<PedidosParaEnviosProvisional>(proveedor.GetRequiredService<IPedidosParaEnvios>());
+        Assert.IsType<AccesosDeBibliotecaProvisional>(proveedor.GetRequiredService<IAccesosDeBiblioteca>());
+        Assert.IsType<ReservasDelPedidoProvisional>(proveedor.GetRequiredService<IReservasDelPedido>());
+        Assert.IsType<ResolucionDeSucursalProvisional>(proveedor.GetRequiredService<IResolucionDeSucursal>());
+        Assert.IsType<LimitadorDePedidosProvisional>(proveedor.GetRequiredService<ILimitadorDePedidos>());
+        Assert.IsType<AuditoriaDeContactoProvisional>(proveedor.GetRequiredService<IAuditoriaDeContacto>());
     }
 
     [Fact]
@@ -74,6 +91,11 @@ public class DoblesProvisionalesDePedidosTests
         Assert.Contains(nameof(IDespachoDeEnvios), error.Message, StringComparison.Ordinal);
         Assert.Contains(nameof(IContactoDeEntregaDelPedido), error.Message, StringComparison.Ordinal);
         Assert.Contains(nameof(IPedidosParaEnvios), error.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IAccesosDeBiblioteca), error.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IReservasDelPedido), error.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IResolucionDeSucursal), error.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(ILimitadorDePedidos), error.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IAuditoriaDeContacto), error.Message, StringComparison.Ordinal);
         Assert.DoesNotContain(nameof(IProgresoDeEnvios), error.Message, StringComparison.Ordinal);
     }
 
@@ -85,6 +107,11 @@ public class DoblesProvisionalesDePedidosTests
         servicios.AddSingleton<IProgresoDeEnvios, ProgresoReal>();
         servicios.AddSingleton<IContactoDeEntregaDelPedido, ContactoReal>();
         servicios.AddSingleton<IPedidosParaEnvios, LecturaReal>();
+        servicios.AddSingleton<IAccesosDeBiblioteca, AccesosReales>();
+        servicios.AddSingleton<IReservasDelPedido, ReservasReales>();
+        servicios.AddSingleton<IResolucionDeSucursal, ResolucionReal>();
+        servicios.AddSingleton<ILimitadorDePedidos, LimitadorReal>();
+        servicios.AddSingleton<IAuditoriaDeContacto, AuditoriaDeContactoReal>();
 
         var resultado = servicios.AgregarDoblesProvisionalesDePedidos(esProduccion: true);
 
@@ -108,6 +135,39 @@ public class DoblesProvisionalesDePedidosTests
     private sealed class ContactoReal : IContactoDeEntregaDelPedido
     {
         public Task<LecturaDelContactoDeEntrega> Leer(Guid pedidoId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    }
+
+    private sealed class AccesosReales : IAccesosDeBiblioteca
+    {
+        public Task<Resultado<ResultadoDeConcederAcceso>> Conceder(ConcederAccesoEntrada entrada, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<Resultado<ResultadoDeRevocarAcceso>> Revocar(RevocarAccesoEntrada entrada, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    }
+
+    private sealed class ReservasReales : IReservasDelPedido
+    {
+        public Task<ResultadoDeCerrarReserva> Cerrar(Guid pedidoId, Guid lineaId, string claveDeCierre, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<ResultadoDeLiberarReserva> Liberar(Guid pedidoId, string motivo, IReadOnlyList<Guid> lineaIds, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    }
+
+    private sealed class AuditoriaDeContactoReal : IAuditoriaDeContacto
+    {
+        public Task ContactoConsultado(Guid pedidoId, string rol, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    }
+
+    private sealed class LimitadorReal : ILimitadorDePedidos
+    {
+        public Task<ResultadoDeLimiteDePedidos> Consultar(Guid usuarioId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<ResultadoDeLimiteDePedidos> Gestionar(Guid usuarioId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<ResultadoDeLimiteDePedidos> LeerContacto(Guid usuarioId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    }
+
+    private sealed class ResolucionReal : IResolucionDeSucursal
+    {
+        public Task<Guid?> IdentificadorDe(string codigoDeSucursal, CancellationToken cancelacion = default) => throw new NotSupportedException();
     }
 
     private sealed class LecturaReal : IPedidosParaEnvios

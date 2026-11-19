@@ -45,16 +45,7 @@ internal sealed class CancelarEnviosDelPedido(IRepositorioDeEnvios envios, IAudi
                 case ResultadoDeCancelacion.Cancelado:
                     aGuardar.Add(envio);
                     auditorias.Add(
-                        new SolicitudDeRegistro(AccionesAuditables.EstadoDeEnvioCambiado)
-                        {
-                            ObjetoTipo = "envio",
-                            ObjetoId = envio.Id.ToString(),
-                            Detalle = new Dictionary<string, string?>
-                            {
-                                ["estadoAnterior"] = anterior.Codigo(),
-                                ["estadoNuevo"] = EstadoDeEnvio.Cancelado.Codigo(),
-                            },
-                        });
+                        AuditoriaDeEnvios.Cambio(envio, anterior, EstadoDeEnvio.Cancelado));
                     resultados.Add(new ResultadoDeCancelarEnvio(envio.Id, DestinoDelEnvioAlCancelar.Cancelado, lineas));
                     break;
                 default:

@@ -212,4 +212,20 @@ public sealed class ConsultasDeEnviosTests
         Assert.Equal(CategoriaDeError.NoDisponible, baseCaida.Error!.Categoria);
         Assert.Empty(entorno.Denegaciones.Eventos);
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-08")]
+    public async Task Un_estado_fuera_de_rango_se_rechaza_como_validacion_y_una_pagina_enorme_se_topa_sin_desbordar()
+    {
+        var entorno = new EntornoDeEnvios();
+        Sembrar(entorno, Guid.NewGuid());
+
+        var invalido = await entorno.Listar.Ejecutar(new ListarEnviosEntrada((EstadoDelEnvio)99));
+        var enorme = await entorno.Listar.Ejecutar(new ListarEnviosEntrada(null, int.MaxValue, int.MaxValue));
+
+        Assert.Equal(CategoriaDeError.Validacion, invalido.Error!.Categoria);
+        Assert.True(enorme.EsExito);
+        Assert.Equal(ListarEnvios.PaginaMaxima, enorme.Valor.Pagina);
+        Assert.Equal(ListarEnvios.TamanoMaximo, enorme.Valor.Tamano);
+    }
 }

@@ -42,6 +42,11 @@ public sealed class SolicitarGuiaTests
         Assert.Equal(AccionesAuditables.EstadoDeEnvioCambiado, auditoria.Accion);
         Assert.Equal("pendiente_de_guia", auditoria.Detalle["estadoAnterior"]);
         Assert.Equal("guia_generada", auditoria.Detalle["estadoNuevo"]);
+        Assert.Equal(envio.PedidoId.ToString(), auditoria.Detalle["pedidoId"]);
+        Assert.Equal("GUIA-000001", auditoria.Detalle["numeroDeGuia"]);
+        Assert.Equal("operador-a", auditoria.Detalle["operador"]);
+        Assert.Equal("lima-central", auditoria.Detalle["fuente"]);
+        Assert.Equal(["estadoAnterior", "estadoNuevo", "fuente", "numeroDeGuia", "operador", "pedidoId"], auditoria.Detalle.Keys.Order().ToArray());
         Assert.Empty(entorno.Alertas.Alertas);
     }
 
@@ -245,7 +250,7 @@ public sealed class SolicitarGuiaTests
         Assert.Equal(EstadoDeEnvio.Cancelado, entorno.Envios.Todos.Single().Estado);
         Assert.Null(entorno.Envios.Todos.Single().NumeroDeGuia);
         var alerta = Assert.Single(entorno.Alertas.Alertas);
-        Assert.Equal("dependencia-no-necesaria-fallida", alerta.Motivo);
+        Assert.Equal("envio-guia-sin-uso", alerta.Motivo);
         Assert.Empty(entorno.Auditoria.Solicitudes);
     }
 

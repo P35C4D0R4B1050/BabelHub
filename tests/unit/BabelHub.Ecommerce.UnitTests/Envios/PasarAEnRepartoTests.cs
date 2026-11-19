@@ -50,6 +50,9 @@ public sealed class PasarAEnRepartoTests
         var auditoria = Assert.Single(entorno.Auditoria.Solicitudes);
         Assert.Equal("guia_generada", auditoria.Detalle["estadoAnterior"]);
         Assert.Equal("en_reparto", auditoria.Detalle["estadoNuevo"]);
+        Assert.Equal("GUIA-000123", auditoria.Detalle["numeroDeGuia"]);
+        Assert.Equal("operador-a", auditoria.Detalle["operador"]);
+        Assert.Equal("lima-central", auditoria.Detalle["fuente"]);
     }
 
     [Fact]

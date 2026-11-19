@@ -281,6 +281,19 @@ public sealed class PoliticasDeSeguridadTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PAG-16")]
+    public void LaRafagaDeAvisosDeLaPasarela_EsPorOrigen_ConRespaldoLocal_YEstaEnElCatalogoDeLimites()
+    {
+        var politica = PoliticasDeSeguridad.AvisosDeLaPasarelaPorOrigen;
+
+        Assert.Equal(("avisos-de-la-pasarela-por-origen", 120, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Origen), (politica.Nombre, politica.Maximo, politica.Ventana, politica.Tipo));
+        Assert.True(politica.RespaldoLocal);
+        Assert.Contains(politica, PoliticasDeSeguridad.Generales);
+        Assert.Contains(politica.Nombre, BabelHub.Ecommerce.Application.Auditoria.Interno.CatalogoDeAccionesDeAuditoria.MotivosDeLimiteExcedido);
+        Assert.Equal(politica.Nombre, BabelHub.Ecommerce.Application.Plataforma.PoliticasDeLimite.AvisosDeLaPasarelaPorOrigen.Valor);
+    }
+
+    [Fact]
     public void LasPoliticasDeCarrito_TienenLosValoresDelPlan_YSoloPasarAlPagoFallaCerrada()
     {
         Assert.Equal(("carritos-de-visitante-por-origen", 10, TimeSpan.FromHours(1)), (PoliticasDeSeguridad.CarritosDeVisitantePorOrigen.Nombre, PoliticasDeSeguridad.CarritosDeVisitantePorOrigen.Maximo, PoliticasDeSeguridad.CarritosDeVisitantePorOrigen.Ventana));

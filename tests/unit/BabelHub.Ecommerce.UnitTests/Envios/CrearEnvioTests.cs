@@ -273,13 +273,13 @@ public sealed class CrearEnvioTests
 
     [Fact]
     [Trait("Criterio", "AC-ENV-01")]
-    public async Task Una_fuente_de_mas_de_64_caracteres_es_una_validacion_fallida_y_no_una_excepcion()
+    public async Task Una_fuente_de_mas_de_40_caracteres_es_una_validacion_fallida_y_no_una_excepcion()
     {
         var entorno = new EntornoDeEnvios();
         var linea = EntornoDeEnvios.Impresa();
         var pedido = entorno.SembrarPedido(true, linea);
 
-        var resultado = await entorno.Crear.Ejecutar(new CrearEnvioEntrada(pedido.PedidoId, new string('f', 65), [linea.LineaId]));
+        var resultado = await entorno.Crear.Ejecutar(new CrearEnvioEntrada(pedido.PedidoId, new string('f', 41), [linea.LineaId]));
 
         Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
     }

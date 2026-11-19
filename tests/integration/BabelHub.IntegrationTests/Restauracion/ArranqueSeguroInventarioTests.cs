@@ -529,6 +529,13 @@ public sealed class ArranqueSeguroInventarioTests : IDisposable
         };
         informacion.ArgumentList.Add(dll);
         informacion.Environment["ASPNETCORE_ENVIRONMENT"] = entorno;
+
+        // La composición real (COMP-1) exige todos sus secretos: el proceso arranca con una configuración completa y desechable.
+        foreach (var (ruta, valor) in BabelHub.IntegrationTests.Api.AnfitrionDelInventarioTests.ConfiguracionCompleta())
+        {
+            informacion.Environment["BABELHUB__" + ruta.Replace(":", "__", StringComparison.Ordinal)] = valor;
+        }
+
         informacion.Environment["BABELHUB__Modo"] = modo;
         informacion.Environment["BABELHUB__Restauracion__SecretoDeLaMarca"] = _secretoDeLaMarca;
         informacion.Environment["BABELHUB__Restauracion__CarpetaDeMarcas"] = Path.Combine(_carpeta, "marcas-del-proceso");

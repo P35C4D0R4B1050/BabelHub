@@ -77,6 +77,7 @@ internal sealed class InformadorDeProgreso(IRepositorioDeEnvios envios, IProgres
 /// </summary>
 internal sealed class MarcarEntregado(
     AutorizadorDeEnvios autorizador,
+    LimitesDeEnvios limites,
     IRepositorioDeEnvios envios,
     IUnidadDeTrabajo unidad,
     IAuditoria auditoria,
@@ -88,6 +89,11 @@ internal sealed class MarcarEntregado(
         if (await autorizador.ExigirLogisticaOAdministracion(cancelacion).ConfigureAwait(false) is { } rechazo)
         {
             return FallosDeEnvios.Fallo<DetalleDeEnvio>(rechazo);
+        }
+
+        if (await limites.Operacion(cancelacion).ConfigureAwait(false) is { } excedido)
+        {
+            return FallosDeEnvios.Fallo<DetalleDeEnvio>(excedido);
         }
 
         Resultado<DetalleDeEnvio> resultado;
@@ -109,16 +115,7 @@ internal sealed class MarcarEntregado(
                     }
 
                     await auditoria.Registrar(
-                        new SolicitudDeRegistro(AccionesAuditables.EstadoDeEnvioCambiado)
-                        {
-                            ObjetoTipo = "envio",
-                            ObjetoId = envio.Id.ToString(),
-                            Detalle = new Dictionary<string, string?>
-                            {
-                                ["estadoAnterior"] = anterior.Codigo(),
-                                ["estadoNuevo"] = EstadoDeEnvio.Entregado.Codigo(),
-                            },
-                        },
+                        AuditoriaDeEnvios.Cambio(envio, anterior, EstadoDeEnvio.Entregado, envio.EntregadoEn),
                         token).ConfigureAwait(false);
                     await envios.Guardar(envio, token).ConfigureAwait(false);
                     return Resultado<DetalleDeEnvio>.Exito(MapeoDeEnvios.Detalle(envio));
@@ -186,7 +183,7 @@ internal sealed class InformarProgresoAPedidos(IActorActual actores, IRepositori
     {
         try
         {
-            await alertas.Publicar(new AlertaTecnica(ClavesDeEnvios.MotivoDeAlertaDeDependencia, reloj.Ahora)).ConfigureAwait(false);
+            await alertas.Publicar(new AlertaTecnica(ClavesDeEnvios.AlertaProgresoSinInformar, reloj.Ahora)).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

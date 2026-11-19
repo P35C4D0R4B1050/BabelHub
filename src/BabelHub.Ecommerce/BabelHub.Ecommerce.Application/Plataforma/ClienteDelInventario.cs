@@ -164,6 +164,24 @@ public interface IClienteDelInventario
     /// </summary>
     Task<ResultadoDelInventario<ReservaDelInventario>> Liberar(Guid pedidoId, string motivo, IReadOnlyList<Guid>? lineaIds = null, CancellationToken cancelacion = default);
 
+    /// <summary>
+    /// <c>inventario.reservas.consultar</c>: la reserva de un pedido (alcance de usuario: lleva el token de la persona, sin clave de idempotencia; SEL-04). Una lectura: se puede reintentar. Un <c>404</c> es <c>INV-NO-ENCONTRADO</c> y
+    /// un <c>403</c>, que la reserva no es de esa persona.
+    /// </summary>
+    Task<ResultadoDelInventario<ReservaDelInventario>> ConsultarReserva(Guid pedidoId, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// <c>inventario.reservas.extender</c>: alarga la reserva de un pedido con un pago pendiente (alcance <c>expiracion-de-reservas</c>, sin token y sin cuerpo; SEL-22, SEL-30). <see cref="ExtensionDeLaReserva.Extendida"/> es falso si ya se extendió o la
+    /// reserva ya no está pendiente. Repetirla no extiende dos veces, así que se puede reintentar.
+    /// </summary>
+    Task<ResultadoDelInventario<ExtensionDeLaReserva>> ExtenderReserva(Guid pedidoId, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// <c>inventario.reservas.confirmar</c>: confirma la reserva de un pedido ya pagado y genera sus traslados (alcance <c>expiracion-de-reservas</c>, sin token y con clave de idempotencia obligatoria; SEL-03). Repetir la clave devuelve la reserva ya confirmada;
+    /// <c>INV-RESERVA-ESTADO-INVALIDO</c> si ya no puede confirmarse.
+    /// </summary>
+    Task<ResultadoDelInventario<ReservaDelInventario>> ConfirmarReserva(Guid pedidoId, string claveDeIdempotencia, CancellationToken cancelacion = default);
+
     /// <summary><c>inventario.sucursales.listar</c>: las sucursales para elegir recojo o sucursal preferida (alcance de lectura, sin token).</summary>
     Task<ResultadoDelInventario<IReadOnlyList<SucursalPublica>>> ListarSucursales(CancellationToken cancelacion = default);
 }
@@ -203,6 +221,9 @@ public sealed record LineaReservada(Guid LineaId, Guid EdicionId, int Cantidad, 
 
 /// <summary>Un traslado vinculado a un pedido; la fecha estimada es <see langword="null"/> si la ruta no está definida (TRA-21).</summary>
 public sealed record TrasladoDeLaReserva(Guid TrasladoId, Guid EdicionId, int Cantidad, string CodigoDeOrigen, string CodigoDeDestino, string Estado, DateOnly? FechaEstimadaDeLlegada);
+
+/// <summary>El resultado de extender una reserva (SEL-22, SEL-30): si se extendió y cómo quedó la reserva.</summary>
+public sealed record ExtensionDeLaReserva(bool Extendida, ReservaDelInventario Reserva);
 
 /// <summary>La reserva de un pedido tal como la devuelve el Inventario; los traslados solo traen contenido después de confirmarla (SEL-03).</summary>
 public sealed record ReservaDelInventario(Guid PedidoId, string Estado, DateTimeOffset CreadaEn, DateTimeOffset? ExpiraEn, IReadOnlyList<LineaReservada> Lineas, IReadOnlyList<TrasladoDeLaReserva> Traslados);
