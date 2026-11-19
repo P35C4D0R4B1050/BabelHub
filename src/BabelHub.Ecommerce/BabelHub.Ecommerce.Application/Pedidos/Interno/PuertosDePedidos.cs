@@ -47,6 +47,16 @@ public interface IRepositorioDePedidos
 
     Task GuardarEstadoDeTraslado(EstadoDeTrasladoRegistrado estado, CancellationToken cancelacion = default);
 
+    /// <summary>Inserta la fila de una entrega (tiempo 1) y guarda sus cambios (el cierre confirmado de cada línea y su estado).</summary>
+    Task AgregarEntrega(Entrega entrega, CancellationToken cancelacion = default);
+
+    Task ActualizarEntrega(Entrega entrega, CancellationToken cancelacion = default);
+
+    /// <summary>Inserta la fila de una anulación (tiempo 1) y guarda sus cambios (pasos, reembolso y estado).</summary>
+    Task AgregarAnulacion(Anulacion anulacion, CancellationToken cancelacion = default);
+
+    Task ActualizarAnulacion(Anulacion anulacion, CancellationToken cancelacion = default);
+
     Task<IReadOnlyList<Anulacion>> AnulacionesEnCurso(Guid pedidoId, CancellationToken cancelacion = default);
 
     Task<IReadOnlyList<Entrega>> EntregasEnCurso(Guid pedidoId, CancellationToken cancelacion = default);

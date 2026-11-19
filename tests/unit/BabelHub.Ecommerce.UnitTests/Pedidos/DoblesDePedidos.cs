@@ -89,6 +89,32 @@ internal sealed class RepositorioDePedidosFalso : IRepositorioDePedidos
         return Task.CompletedTask;
     }
 
+    public Task AgregarEntrega(Entrega entrega, CancellationToken cancelacion = default)
+    {
+        Llamadas.Add("agregar-entrega");
+        Entregas.Add(entrega);
+        return Task.CompletedTask;
+    }
+
+    public Task ActualizarEntrega(Entrega entrega, CancellationToken cancelacion = default)
+    {
+        Llamadas.Add("actualizar-entrega");
+        return Task.CompletedTask;
+    }
+
+    public Task AgregarAnulacion(Anulacion anulacion, CancellationToken cancelacion = default)
+    {
+        Llamadas.Add("agregar-anulacion");
+        Anulaciones.Add(anulacion);
+        return Task.CompletedTask;
+    }
+
+    public Task ActualizarAnulacion(Anulacion anulacion, CancellationToken cancelacion = default)
+    {
+        Llamadas.Add("actualizar-anulacion");
+        return Task.CompletedTask;
+    }
+
     public Task RegistrarLiberacionDeContacto(Guid pedidoId, DateTimeOffset desde, CancellationToken cancelacion = default)
     {
         Llamadas.Add("liberacion-de-contacto");
@@ -304,4 +330,54 @@ internal sealed class UnidadDeTrabajoEspia : IUnidadDeTrabajo
     }
 
     public Task EjecutarComo(EsquemaDeModulo esquema, Func<CancellationToken, Task> bloque, CancellationToken cancelacion = default) => bloque(cancelacion);
+}
+
+internal sealed class ReservasFalsas : IReservasDelPedido
+{
+    public List<(Guid Pedido, Guid Linea, string Clave)> Cierres { get; } = [];
+
+    public List<(Guid Pedido, string Motivo, IReadOnlyList<Guid> Lineas)> Liberaciones { get; } = [];
+
+    public Func<Guid, ResultadoDeCerrarReserva> Respuesta { get; set; } = _ => ResultadoDeCerrarReserva.Cerrada;
+
+    public Func<ResultadoDeLiberarReserva> RespuestaDeLiberar { get; set; } = () => ResultadoDeLiberarReserva.Liberada;
+
+    public Task<ResultadoDeCerrarReserva> Cerrar(Guid pedidoId, Guid lineaId, string claveDeCierre, CancellationToken cancelacion = default)
+    {
+        Cierres.Add((pedidoId, lineaId, claveDeCierre));
+        return Task.FromResult(Respuesta(lineaId));
+    }
+
+    public Task<ResultadoDeLiberarReserva> Liberar(Guid pedidoId, string motivo, IReadOnlyList<Guid> lineaIds, CancellationToken cancelacion = default)
+    {
+        Liberaciones.Add((pedidoId, motivo, lineaIds));
+        return Task.FromResult(RespuestaDeLiberar());
+    }
+}
+
+internal sealed class GeneradorDeIdentificadoresFalso : IGeneradorDeIdentificadoresDePedidos
+{
+    public Guid Nuevo() => Guid.NewGuid();
+}
+
+/// <summary>Una auditoría que guarda lo registrado y puede caer desde el principio o a partir de la N-ésima llamada (probar el tiempo 3 de una operación).</summary>
+internal sealed class AuditoriaDePedidosEspia : BabelHub.Ecommerce.Application.Auditoria.IAuditoria
+{
+    public List<BabelHub.Ecommerce.Application.Auditoria.SolicitudDeRegistro> Solicitudes { get; } = [];
+
+    public bool Caida { get; set; }
+
+    /// <summary>Si se fija, las llamadas posteriores a esa cantidad de registros fallan.</summary>
+    public int? CaeDespuesDe { get; set; }
+
+    public Task Registrar(BabelHub.Ecommerce.Application.Auditoria.SolicitudDeRegistro solicitud, CancellationToken cancelacion = default)
+    {
+        if (Caida || (CaeDespuesDe is { } limite && Solicitudes.Count >= limite))
+        {
+            return Task.FromException(new BabelHub.Ecommerce.Application.Auditoria.AuditoriaNoDisponibleException("sin auditoría"));
+        }
+
+        Solicitudes.Add(solicitud);
+        return Task.CompletedTask;
+    }
 }
