@@ -148,6 +148,23 @@ public sealed class AnulacionDePedidoTests
     }
 
     [Fact]
+    public void Un_motivo_fuera_de_la_lista_cerrada_se_rechaza_y_las_digitales_no_se_anulan_si_un_impreso_ya_salio_aunque_el_plan_las_traiga()
+    {
+        var pedido = Crear(TipoDeEntregaDelPedido.Domicilio, Impresa("Cusco"), Impresa("Ayacucho"), Digital());
+        var cusco = De(pedido, "Cusco");
+        pedido.PrepararLineas([cusco.Id], Inicio);
+        pedido.MarcarListas([cusco.Id], Inicio);
+        pedido.DespacharLineas([cusco.Id], Inicio);
+        var digital = De(pedido, "Digital");
+        var plan = new PlanDeAnulacion(OrigenDeLaAnulacion.Administracion, MotivoDeAnulacion.Otro, [De(pedido, "Ayacucho").Id], [digital.Id], false, 70m, []);
+
+        pedido.AplicarAnulacion(plan, Inicio);
+
+        Assert.Equal(RechazoDeAnulacion.MotivoNoCorresponde, pedido.PlanearAnulacionDeLaAdministracion((MotivoDeAnulacion)99).Rechazo);
+        Assert.Equal(EstadoDeLineaDigital.Disponible, digital.EstadoDigital);
+    }
+
+    [Fact]
     public void La_administracion_no_usa_el_motivo_del_cliente_y_un_pedido_ya_anulado_no_se_anula_de_nuevo()
     {
         var pedido = Crear(TipoDeEntregaDelPedido.Recojo, Impresa("Uno"));

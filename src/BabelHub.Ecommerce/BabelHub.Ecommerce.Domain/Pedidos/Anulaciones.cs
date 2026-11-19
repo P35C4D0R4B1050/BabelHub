@@ -108,7 +108,7 @@ public sealed partial class Pedido
     /// </summary>
     public ResultadoDePlanDeAnulacion PlanearAnulacionDeLaAdministracion(MotivoDeAnulacion motivo, IReadOnlySet<Guid>? lineasQueSalieron = null)
     {
-        if (!MotivosDeAnulacion.EsDeLaAdministracion(motivo))
+        if (!Enum.IsDefined(motivo) || !MotivosDeAnulacion.EsDeLaAdministracion(motivo))
         {
             return ResultadoDePlanDeAnulacion.Rechazado(RechazoDeAnulacion.MotivoNoCorresponde);
         }
@@ -172,13 +172,15 @@ public sealed partial class Pedido
     {
         ArgumentNullException.ThrowIfNull(plan);
         var cambiadas = 0;
+        // Las digitales solo se anulan si ninguna impresa salió (D10), aunque el plan las traiga.
+        var algunaSalio = _lineas.Any(l => l.EstadoImpreso is { } e && e.Salio());
         foreach (var linea in _lineas)
         {
             if (plan.LineasImpresas.Contains(linea.Id) && linea.PasarA(EstadoDeLineaImpresa.Anulado, ahora))
             {
                 cambiadas++;
             }
-            else if (plan.LineasDigitales.Contains(linea.Id) && linea.AnularDigital(ahora))
+            else if (!algunaSalio && plan.LineasDigitales.Contains(linea.Id) && linea.AnularDigital(ahora))
             {
                 cambiadas++;
             }

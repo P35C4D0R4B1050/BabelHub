@@ -188,6 +188,22 @@ public sealed class OperacionesEnCursoTests
     }
 
     [Fact]
+    public void El_iniciador_no_se_imprime_y_una_operacion_nueva_no_nace_con_un_iniciador_sin_identificador_ni_con_claves_repetidas()
+    {
+        var encargado = new IniciadorDeOperacion(Guid.NewGuid(), "encargado-de-sucursal", Guid.NewGuid());
+        var sinId = new IniciadorDeOperacion(Guid.Empty, "encargado-de-sucursal", Guid.NewGuid());
+        var entrega = Entrega.Iniciar(Guid.NewGuid(), Pedido, [Linea], encargado, Inicio);
+
+        Assert.DoesNotContain("encargado", encargado.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(encargado.UsuarioId.ToString(), encargado.ToString() + entrega.Iniciador, StringComparison.Ordinal);
+        Assert.False(sinId.EstaAnonimizado);
+        Assert.Throws<ArgumentException>(() => Entrega.Iniciar(Guid.NewGuid(), Pedido, [Linea], sinId, Inicio));
+        Assert.Throws<ArgumentException>(() => Anulacion.Iniciar(Guid.NewGuid(), Pedido, Plan(), sinId, Inicio));
+        var mismaClave = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-ffffffffffff");
+        Assert.Throws<ArgumentException>(() => Entrega.Iniciar(Guid.NewGuid(), Pedido, [Linea, mismaClave], encargado, Inicio));
+    }
+
+    [Fact]
     public void El_iniciador_lleva_identificador_rol_y_sucursal_y_se_anonimiza_una_vez()
     {
         var sucursal = Guid.NewGuid();

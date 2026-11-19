@@ -63,8 +63,10 @@ public sealed class AnonimizacionTests
         var pedido = Domicilio();
         pedido.AnonimizarContacto(Inicio);
 
-        var texto = pedido.ToString() + JsonSerializer.Serialize(pedido.Contacto);
+        var texto = pedido.ToString() + JsonSerializer.Serialize(pedido.Lineas.Select(l => l.ToString()));
 
+        Assert.Null(pedido.Contacto);
+        Assert.NotNull(pedido.ContactoAnonimizadoEn);
         Assert.DoesNotContain("Ana", texto, StringComparison.Ordinal);
         Assert.DoesNotContain("987654321", texto, StringComparison.Ordinal);
     }

@@ -21,7 +21,10 @@ public enum EstadoDeOperacion
 /// </summary>
 public sealed record IniciadorDeOperacion(Guid UsuarioId, string? Rol, Guid? SucursalId)
 {
-    public bool EstaAnonimizado => UsuarioId == Guid.Empty;
+    public bool EstaAnonimizado => UsuarioId == Guid.Empty && Rol is null && SucursalId is null;
+
+    /// <summary>Sin el identificador, el rol ni la sucursal: son datos personales del personal y no deben salir en ningún texto.</summary>
+    public override string ToString() => $"IniciadorDeOperacion {{ Anonimizado = {EstaAnonimizado} }}";
 
     public IniciadorDeOperacion Anonimizar() => new(Guid.Empty, null, null);
 }
@@ -131,6 +134,11 @@ public sealed class Anulacion
     {
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(iniciador);
+        if (iniciador.UsuarioId == Guid.Empty)
+        {
+            throw new ArgumentException("El iniciador de una operación nueva tiene identificador.", nameof(iniciador));
+        }
+
         if (id == Guid.Empty || pedidoId == Guid.Empty)
         {
             throw new ArgumentException("La anulación y el pedido no pueden ser vacíos.");
@@ -336,7 +344,18 @@ public sealed class Entrega
             throw new ArgumentException("Una entrega lleva un pedido y al menos una línea, sin repetir.");
         }
 
-        return new Entrega(id, pedidoId, lineaIds, iniciador, ahora);
+        if (iniciador.UsuarioId == Guid.Empty)
+        {
+            throw new ArgumentException("El iniciador de una operación nueva tiene identificador.", nameof(iniciador));
+        }
+
+        var entrega = new Entrega(id, pedidoId, lineaIds, iniciador, ahora);
+        if (entrega._lineas.Select(l => l.ClaveDeCierre).Distinct(StringComparer.Ordinal).Count() != entrega._lineas.Count)
+        {
+            throw new ArgumentException("Las claves de cierre de dos líneas coinciden.", nameof(lineaIds));
+        }
+
+        return entrega;
     }
 
     /// <summary>Marca el cierre de una línea justo tras la respuesta del Inventario: una sola vez y solo mientras la entrega está en curso.</summary>
