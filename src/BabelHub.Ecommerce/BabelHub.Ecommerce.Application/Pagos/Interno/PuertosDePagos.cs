@@ -150,6 +150,14 @@ internal interface IRepositorioDePagos
 
     /// <summary>Inserta el aviso del estado del pago al cliente; <c>false</c> si ya existe el de esa clave <c>(intención, intento, evento)</c>.</summary>
     Task<bool> AgregarAvisoDePago(AvisoDePago aviso, CancellationToken cancelacion = default);
+
+    Task<IReadOnlyList<AvisoACarrito>> ListarAvisosACarritoDeLaIntencion(Guid intencionId, CancellationToken cancelacion = default);
+
+    Task<IReadOnlyList<AvisoDePago>> ListarAvisosDePagoDeLaIntencion(Guid intencionId, CancellationToken cancelacion = default);
+
+    Task GuardarAvisoACarrito(AvisoACarrito aviso, CancellationToken cancelacion = default);
+
+    Task GuardarAvisoDePago(AvisoDePago aviso, CancellationToken cancelacion = default);
 }
 
 /// <summary>Los reembolsos de toda la plataforma (D08): clave natural única por origen.</summary>

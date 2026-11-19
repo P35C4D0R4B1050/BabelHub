@@ -164,6 +164,28 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
         return Task.FromResult(true);
     }
 
+    public Task<IReadOnlyList<AvisoACarrito>> ListarAvisosACarritoDeLaIntencion(Guid intencionId, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<AvisoACarrito>>(_avisosACarrito.Where(a => a.IntencionId == intencionId).Select(a => a.Copiar()).ToArray());
+
+    public Task<IReadOnlyList<AvisoDePago>> ListarAvisosDePagoDeLaIntencion(Guid intencionId, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<AvisoDePago>>(_avisosDePago.Where(a => a.IntencionId == intencionId).Select(a => a.Copiar()).ToArray());
+
+    public Task GuardarAvisoACarrito(AvisoACarrito aviso, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        var indice = _avisosACarrito.FindIndex(a => a.Id == aviso.Id);
+        _avisosACarrito[indice] = aviso.Copiar();
+        return Task.CompletedTask;
+    }
+
+    public Task GuardarAvisoDePago(AvisoDePago aviso, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        var indice = _avisosDePago.FindIndex(a => a.Id == aviso.Id);
+        _avisosDePago[indice] = aviso.Copiar();
+        return Task.CompletedTask;
+    }
+
     public object Capturar() => (
         _intenciones.ToDictionary(p => p.Key, p => p.Value.Copiar()),
         _intentos.ToDictionary(p => p.Key, p => p.Value.Copiar()),

@@ -74,6 +74,18 @@ public sealed class AvisoACarrito
         return new AvisoACarrito(Guid.NewGuid(), intencionId, intentoId, transicion, retenido ? EstadoDeAvisoACarrito.Retenido : EstadoDeAvisoACarrito.Pendiente, ahora);
     }
 
+
+    /// <summary>Ya no tiene sentido enviarlo (su intento ya se resolvió o la intención se cerró): no se envía. Devuelve si cambió.</summary>
+    public bool Omitir()
+    {
+        if (Estado is EstadoDeAvisoACarrito.Enviado or EstadoDeAvisoACarrito.Omitido)
+        {
+            return false;
+        }
+
+        Estado = EstadoDeAvisoACarrito.Omitido;
+        return true;
+    }
     internal AvisoACarrito Copiar() => (AvisoACarrito)MemberwiseClone();
 }
 
@@ -141,5 +153,17 @@ public sealed class AvisoDePago
         return new AvisoDePago(Guid.NewGuid(), intencionId, intentoId, evento, ahora);
     }
 
+
+    /// <summary>Ya no tiene sentido enviarlo (lo supera otro aviso del mismo intento): no se envía. Devuelve si cambió.</summary>
+    public bool Omitir()
+    {
+        if (Estado != EstadoDeAvisoDePago.Pendiente)
+        {
+            return false;
+        }
+
+        Estado = EstadoDeAvisoDePago.Omitido;
+        return true;
+    }
     internal AvisoDePago Copiar() => (AvisoDePago)MemberwiseClone();
 }
