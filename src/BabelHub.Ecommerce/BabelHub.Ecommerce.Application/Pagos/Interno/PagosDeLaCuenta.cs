@@ -67,7 +67,7 @@ internal sealed class DesvincularPagosDeUnaCuenta(IRepositorioDePagos repositori
 /// Que Pedidos pida eliminar el contacto de la intención tras guardar su copia (T22, PED-35, PAG-27): <b>idempotente</b>. Solo libera el de una compra <c>completada</c> (con pedido); en cualquier otro estado el contacto aún lo
 /// necesita la compra, o ya se eliminó al resolverse sin pedido, y no hace nada. Una intención desconocida no falla.
 /// </summary>
-internal sealed class LiberarContactoDeLaIntencion(IRepositorioDePagos repositorio, IUnidadDeTrabajo unidad, BloqueoDeIntenciones bloqueo, IAuditoria auditoria, IReloj reloj) : ILiberacionDeContactoDePago
+internal sealed class LiberarContactoDeLaIntencion(IRepositorioDePagos repositorio, IUnidadDeTrabajo unidad, IAuditoria auditoria, IReloj reloj) : ILiberacionDeContactoDePago
 {
     public Task Liberar(Guid pedidoId, CancellationToken cancelacion = default)
     {
@@ -79,7 +79,8 @@ internal sealed class LiberarContactoDeLaIntencion(IRepositorioDePagos repositor
         return unidad.Ejecutar(
             async token =>
             {
-                var (intencion, _) = await bloqueo.Bloquear(pedidoId, token).ConfigureAwait(false);
+                // La llamada la hace Pedidos dentro de su transacción: solo se bloquea la intención (cuenta → pedido → intención), sin tomar la marca de la cuenta.
+                var intencion = await repositorio.ObtenerIntencion(pedidoId, paraActualizar: true, token).ConfigureAwait(false);
                 if (intencion is { Estado: EstadoDeIntencion.Completada } && intencion.LiberarContacto(reloj.Ahora))
                 {
                     await repositorio.GuardarIntencion(intencion, token).ConfigureAwait(false);

@@ -93,7 +93,7 @@ public sealed class AuditoriaDePagosTests
     public async Task Liberar_el_contacto_a_pedido_de_Pedidos_se_audita_una_vez_y_sin_datos_personales()
     {
         var e = await EntornoDeReembolsos.ConCompraCompletada();
-        var liberar = new LiberarContactoDeLaIntencion(e.Pagos.Repositorio, e.Pagos.Unidad, new BloqueoDeIntenciones(e.Pagos.Repositorio, e.Pagos.Cuenta), e.Pagos.Auditoria, e.Pagos.Reloj);
+        var liberar = new LiberarContactoDeLaIntencion(e.Pagos.Repositorio, e.Pagos.Unidad, e.Pagos.Auditoria, e.Pagos.Reloj);
 
         await liberar.Liberar(Pedido);
         await liberar.Liberar(Pedido);

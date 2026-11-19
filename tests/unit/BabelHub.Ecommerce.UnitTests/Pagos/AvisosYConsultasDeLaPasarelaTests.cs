@@ -476,7 +476,7 @@ public sealed class CobrosAprobadosTardeTests
         p.Pasarela.Interprete = _ => new AvisoDeLaPasarela("evt_1", b.IntentoId);
         var bloqueo = new BloqueoDeIntenciones(p.Repositorio, p.Cuenta);
         var consultar = new ConsultarPagosPendientes(p.Repositorio, p.Unidad, bloqueo, p.Pasarela, p.Confirmador, new ExtenderReservaDelPago(p.Repositorio, p.Unidad, p.Cuenta, p.Reservas), p.Avisador, p.Auditoria, p.Alertas, p.Reloj, new OpcionesDelCobro(TimeSpan.FromMilliseconds(300)));
-        var aviso = new RegistrarAvisoDeLaPasarela(p.Procesador, p.Pasarela, p.Repositorio, p.Unidad, bloqueo, p.Auditoria, p.Reloj);
+        var aviso = new RegistrarAvisoDeLaPasarela(p.Procesador, p.Pasarela, p.Repositorio, p.Unidad, new BloqueoDeIntenciones(p.Repositorio, p.Cuenta), p.Auditoria, p.Reloj);
         // El trabajo vence el intento a los 30 minutos.
         p.Reloj.Ahora = IntencionesDePrueba.Inicio.AddMinutes(31);
         await consultar.Ejecutar(10);

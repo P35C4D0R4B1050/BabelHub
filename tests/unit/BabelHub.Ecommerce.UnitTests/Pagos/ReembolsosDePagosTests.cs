@@ -16,7 +16,7 @@ internal sealed class EntornoDeReembolsos
         Base = b;
         var p = b.Entorno;
         var bloqueo = new BloqueoDeIntenciones(p.Repositorio, p.Cuenta);
-        Registrar = new RegistrarReembolso(p.Repositorio, p.Reembolsos, p.Unidad, bloqueo, p.Auditoria, p.Reloj);
+        Registrar = new RegistrarReembolso(p.Repositorio, p.Reembolsos, p.Unidad, p.Auditoria, p.Reloj);
         Procesar = new ProcesarReembolso(p.Repositorio, p.Reembolsos, p.Unidad, p.Pasarela, p.Auditoria, p.Alertas, p.Reloj, new OpcionesDelCobro(TimeSpan.FromMilliseconds(300)));
         Reintentar = new ReintentarReembolso(p.Autorizador, p.Reembolsos, p.Unidad, Procesar, p.Reloj);
         Listar = new ListarReembolsosPendientes(p.Autorizador, p.Reembolsos, p.Unidad);
@@ -94,14 +94,14 @@ public sealed class ReembolsosDePagosTests
 
     [Fact]
     [Trait("Criterio", "AC-PAG-08")]
-    public async Task Registrar_bloquea_la_intencion_despues_de_leer_la_marca_de_la_cuenta()
+    public async Task Registrar_solo_bloquea_la_intencion_sin_tomar_la_marca_porque_quien_llama_ya_tiene_su_orden()
     {
         var e = await EntornoDeReembolsos.ConCompraCompletada();
         e.Pagos.Orden.Clear();
 
         await e.Pedir(AppOrigen.Anulacion, EntornoDeReembolsos.ClaveDeAnulacion);
 
-        Assert.Equal(["marca-con-bloqueo", "intencion-con-bloqueo"], e.Pagos.Orden.Take(2).ToArray());
+        Assert.Equal(["intencion-con-bloqueo"], e.Pagos.Orden.ToArray());
     }
 
     [Fact]
@@ -199,7 +199,7 @@ public sealed class ReembolsosDePagosTests
     {
         var b = await EntornoDeConfirmacion.ConIntentoIniciado();
         var p = b.Entorno;
-        var registrar = new RegistrarReembolso(p.Repositorio, p.Reembolsos, p.Unidad, new BloqueoDeIntenciones(p.Repositorio, p.Cuenta), p.Auditoria, p.Reloj);
+        var registrar = new RegistrarReembolso(p.Repositorio, p.Reembolsos, p.Unidad, p.Auditoria, p.Reloj);
 
         var resultado = await registrar.Ejecutar(new RegistrarReembolsoEntrada(InstantaneasDeCompraDePrueba.Pedido, AppOrigen.Anulacion, EntornoDeReembolsos.ClaveDeAnulacion, [new LineaAReembolsar(IntencionesDePrueba.LineaImpresa, 10m)], 0m));
 

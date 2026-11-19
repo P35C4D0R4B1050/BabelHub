@@ -25,7 +25,6 @@ internal sealed class RegistrarReembolso(
     IRepositorioDePagos pagos,
     IRepositorioDeReembolsos reembolsos,
     IUnidadDeTrabajo unidad,
-    BloqueoDeIntenciones bloqueo,
     IAuditoria auditoria,
     IReloj reloj) : ICasoDeUso<RegistrarReembolsoEntrada, ReembolsoRegistrado>
 {
@@ -57,7 +56,8 @@ internal sealed class RegistrarReembolso(
 
     private async Task<Resultado<ReembolsoRegistrado>> RegistrarEnLaTransaccion(RegistrarReembolsoEntrada entrada, CancellationToken token)
     {
-        var (intencion, _) = await bloqueo.Bloquear(entrada.PedidoId, token).ConfigureAwait(false);
+        // Quien registra ya tiene su propia transacción (Pedidos, Devoluciones, Carrito) y su orden de bloqueo: aquí solo se bloquea la intención, sin tomar la marca de la cuenta (cuenta → pedido → intención).
+        var intencion = await pagos.ObtenerIntencion(entrada.PedidoId, paraActualizar: true, token).ConfigureAwait(false);
         if (intencion is null)
         {
             return FallosDePagos.De<ReembolsoRegistrado>(CategoriaDeError.NoEncontrado, ClavesDePagos.NoEncontrado);
