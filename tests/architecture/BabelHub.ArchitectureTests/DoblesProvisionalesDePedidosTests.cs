@@ -39,6 +39,10 @@ public class DoblesProvisionalesDePedidosTests
         Assert.Equal(ResultadoDeCerrarReserva.Incierto, await new ReservasDelPedidoProvisional().Cerrar(pedido, lineas[0], "cierre-x"));
         Assert.Equal(ResultadoDeLiberarReserva.NoSePudo, await new ReservasDelPedidoProvisional().Liberar(pedido, "pedido-anulado", lineas));
         Assert.Null(await new ResolucionDeSucursalProvisional().IdentificadorDe("LIM"));
+        var limitador = new LimitadorDePedidosProvisional();
+        Assert.Equal(DecisionDeLimiteDePedidos.Permitido, (await limitador.Consultar(Guid.NewGuid())).Decision);
+        Assert.Equal(DecisionDeLimiteDePedidos.NoDisponible, (await limitador.Gestionar(Guid.NewGuid())).Decision);
+        Assert.Equal(DecisionDeLimiteDePedidos.NoDisponible, (await limitador.LeerContacto(Guid.NewGuid())).Decision);
     }
 
     [Fact]
@@ -72,6 +76,7 @@ public class DoblesProvisionalesDePedidosTests
         Assert.IsType<AccesosDeBibliotecaProvisional>(proveedor.GetRequiredService<IAccesosDeBiblioteca>());
         Assert.IsType<ReservasDelPedidoProvisional>(proveedor.GetRequiredService<IReservasDelPedido>());
         Assert.IsType<ResolucionDeSucursalProvisional>(proveedor.GetRequiredService<IResolucionDeSucursal>());
+        Assert.IsType<LimitadorDePedidosProvisional>(proveedor.GetRequiredService<ILimitadorDePedidos>());
     }
 
     [Fact]
@@ -88,6 +93,7 @@ public class DoblesProvisionalesDePedidosTests
         Assert.Contains(nameof(IAccesosDeBiblioteca), error.Message, StringComparison.Ordinal);
         Assert.Contains(nameof(IReservasDelPedido), error.Message, StringComparison.Ordinal);
         Assert.Contains(nameof(IResolucionDeSucursal), error.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(ILimitadorDePedidos), error.Message, StringComparison.Ordinal);
         Assert.DoesNotContain(nameof(IProgresoDeEnvios), error.Message, StringComparison.Ordinal);
     }
 
@@ -102,6 +108,7 @@ public class DoblesProvisionalesDePedidosTests
         servicios.AddSingleton<IAccesosDeBiblioteca, AccesosReales>();
         servicios.AddSingleton<IReservasDelPedido, ReservasReales>();
         servicios.AddSingleton<IResolucionDeSucursal, ResolucionReal>();
+        servicios.AddSingleton<ILimitadorDePedidos, LimitadorReal>();
 
         var resultado = servicios.AgregarDoblesProvisionalesDePedidos(esProduccion: true);
 
@@ -139,6 +146,15 @@ public class DoblesProvisionalesDePedidosTests
         public Task<ResultadoDeCerrarReserva> Cerrar(Guid pedidoId, Guid lineaId, string claveDeCierre, CancellationToken cancelacion = default) => throw new NotSupportedException();
 
         public Task<ResultadoDeLiberarReserva> Liberar(Guid pedidoId, string motivo, IReadOnlyList<Guid> lineaIds, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    }
+
+    private sealed class LimitadorReal : ILimitadorDePedidos
+    {
+        public Task<ResultadoDeLimiteDePedidos> Consultar(Guid usuarioId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<ResultadoDeLimiteDePedidos> Gestionar(Guid usuarioId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<ResultadoDeLimiteDePedidos> LeerContacto(Guid usuarioId, CancellationToken cancelacion = default) => throw new NotSupportedException();
     }
 
     private sealed class ResolucionReal : IResolucionDeSucursal

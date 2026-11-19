@@ -73,6 +73,16 @@ internal sealed class ResolucionDeSucursalProvisional : IResolucionDeSucursal
     public Task<Guid?> IdentificadorDe(string codigoDeSucursal, CancellationToken cancelacion = default) => Task.FromResult<Guid?>(null);
 }
 
+/// <summary>Los límites de Pedidos sin las políticas de Plataforma: las consultas pasan (solo leen) pero la gestión (que toca stock y reembolsos) y la lectura del contacto fallan cerrado.</summary>
+internal sealed class LimitadorDePedidosProvisional : ILimitadorDePedidos
+{
+    public Task<ResultadoDeLimiteDePedidos> Consultar(Guid usuarioId, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLimiteDePedidos.Permitido);
+
+    public Task<ResultadoDeLimiteDePedidos> Gestionar(Guid usuarioId, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLimiteDePedidos.NoDisponible);
+
+    public Task<ResultadoDeLimiteDePedidos> LeerContacto(Guid usuarioId, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLimiteDePedidos.NoDisponible);
+}
+
 public static class ComposicionProvisionalDePedidos
 {
     private static readonly (Type Puerto, Type Doble)[] Dobles =
@@ -84,6 +94,7 @@ public static class ComposicionProvisionalDePedidos
         (typeof(IAccesosDeBiblioteca), typeof(AccesosDeBibliotecaProvisional)),
         (typeof(IReservasDelPedido), typeof(ReservasDelPedidoProvisional)),
         (typeof(IResolucionDeSucursal), typeof(ResolucionDeSucursalProvisional)),
+        (typeof(ILimitadorDePedidos), typeof(LimitadorDePedidosProvisional)),
     ];
 
     /// <summary>
@@ -100,6 +111,7 @@ public static class ComposicionProvisionalDePedidos
         servicios.TryAddSingleton<IAccesosDeBiblioteca, AccesosDeBibliotecaProvisional>();
         servicios.TryAddSingleton<IReservasDelPedido, ReservasDelPedidoProvisional>();
         servicios.TryAddSingleton<IResolucionDeSucursal, ResolucionDeSucursalProvisional>();
+        servicios.TryAddSingleton<ILimitadorDePedidos, LimitadorDePedidosProvisional>();
 
         if (esProduccion)
         {
