@@ -1,9 +1,11 @@
 ---
 id: ecommerce-devoluciones
 titulo: Devoluciones y reembolsos
-estado: Approved
+estado: Planned
 aprobado_por: Claude (delegado por Diego Amiquero)
 aprobado_en: 2026-11-13
+plan_aprobado_por: Claude (delegado por Diego Amiquero)
+plan_aprobado_en: 2026-11-18
 servicio: E-commerce
 prefijo: DEV
 origen: [RF09, RF27, NN05, NN15]

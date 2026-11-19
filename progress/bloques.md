@@ -16,7 +16,7 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **AUD-4** | Migraciones, roles, función de depuración, repositorios de solo inserción, cliente del Inventario, trabajos de fondo | T21–T27 | C | AUD-3 | ☑ (T21 hecha en AUD-5 con el catálogo de contratos ampliado, D18) |
 | **AUD-5** | Endpoints, contrato web, integración de punta a punta y documentación | T28–T31 | E | AUD-4 | ☑ (con T21; `transversal-auditoria` queda con todas las tareas marcadas, falta `spec-verify` en FIN-1 y componer la auditoría en cada `Program.cs`, hallazgo Importante abierto) |
 | **IDE-1** | `identidad-seguridad`: Dominio (contraseñas, usuario y roles, segundo factor, desafío, códigos, textos, solicitudes, cancelación, marcas, clave de firma) | T01–T10 | C | — (puede ir en paralelo a AUD-1) | ☑ (AC-IDE-14, 17 y 38 solo con su parte de Dominio; hallazgo Importante) |
-| **IDE-2** | Contratos de correo y de cliente del Inventario en `Plataforma` y contrato público de Identidad | T11, T12, T13 | C | IDE-1, AUD-2 | ☐ |
+| **IDE-2** | Contratos de correo y de cliente del Inventario en `Plataforma` y contrato público de Identidad | T11, T12, T13 | C | IDE-1, AUD-2 | ☑ (T11–T13) |
 | **IDE-3** | Registro, ingreso en dos pasos, sesiones y recuperación | T14–T17 | C | IDE-2 | ☐ |
 | **IDE-4** | Cuenta del cliente, administración de usuarios, cambio de correo, solicitudes de datos, cancelación (solicitud) | T18–T22 | C | IDE-3 | ☐ |
 | **IDE-5** | Cancelación (ejecución), cierre y baja, rotación de la clave, puertos de Auditoría y de restauración | T23–T25, T27 | C | IDE-4, AUD-3 | ☐ |
@@ -44,11 +44,11 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **INV-2b** | `inventario-seleccion-fuente` T11–T18: idempotencia, límites, reemplazo, confirmar, extender, liberar, cerrar y consulta | C | INV-2a | ☑ |
 | **INV-2c** | `inventario-seleccion-fuente` T20–T27: puertos para otros módulos, receptores de la cancelación, trabajos de fondo y Api | C | INV-2b | ☑ |
 | **INV-2d** | `inventario-seleccion-fuente` T28–T33: pruebas de integración y documentación (T32 y T33 de nivel E) | C/E | INV-2c | ☑ (`inventario-seleccion-fuente` 33/33; falta `spec-verify`) |
-| **INV-3a** | `inventario-ajustes` T01–T09: Dominio y Aplicación | C | INV-1c, INV-2c | ☐ |
-| **INV-3b** | `inventario-ajustes` T10–T18: Infraestructura, depuración de 2 años, Api, concurrencia | C | INV-3a; AUD-4 (conexión de depuración) | ☐ |
-| **INV-4a** | `inventario-traslados` T01–T09: Dominio y Aplicación de las transiciones | C | INV-2c | ☐ |
-| **INV-4b** | `inventario-traslados` T10–T17: puertos de `Reservas`, infraestructura y concurrencia | C | INV-4a | ☐ |
-| **INV-4c** | `inventario-traslados` T18–T26: buzón de salida, trabajos de fondo, Api y pruebas | C | INV-4b; contrato del aviso de `transversal-notificaciones` (T20) | ☐ |
+| **INV-3a** | `inventario-ajustes` T01–T09: Dominio y Aplicación | C | INV-1c, INV-2c | ☑ |
+| **INV-3b** | `inventario-ajustes` T10–T18: Infraestructura, depuración de 2 años, Api, concurrencia | C | INV-3a; AUD-4 (conexión de depuración) | ☑ (`inventario-ajustes` 18/18; falta `spec-verify`) |
+| **INV-4a** | `inventario-traslados` T01–T09: Dominio y Aplicación de las transiciones | C | INV-2c | ☑ |
+| **INV-4b** | `inventario-traslados` T10–T17: puertos de `Reservas`, infraestructura y concurrencia | C | INV-4a | ☑ |
+| **INV-4c** | `inventario-traslados` T18–T26: buzón de salida, trabajos de fondo, Api y pruebas | C | INV-4b; contrato del aviso de `transversal-notificaciones` (T20) | ☑ (`inventario-traslados` 26/26; falta `spec-verify`) |
 
 ## Carril C — E-commerce y web
 
@@ -64,18 +64,18 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **WEB-2** | `web-base` T28–T31: pantallas de ingreso, registro, recuperación, cuenta, administración, auditoría y alertas | C | IDE-3 a IDE-5, AUD-3 | ☐ |
 | **WEB-4** | `web-base` T32–T35: E2E multinavegador y móvil, axe, rendimiento y usabilidad | E/C | pantallas de catálogo y compra | ☐ |
 | **ECO-2a** | `ecommerce-catalogo` T01–T06: Dominio (ISBN, obra y ediciones, licencia, archivos), contratos y puertos | C | — | ☑ |
-| **ECO-2b** | `ecommerce-catalogo` T07–T13: casos de uso, cerrado con dobles de auditoría | C | ECO-2a | ☐ |
-| **ECO-2c** | `ecommerce-catalogo` T14–T23: Infraestructura, Api, matriz de autorización, integración con S3 e Inventario simulado, trabajos de fondo | C | AUD-4; ampliación de `IClienteDelInventario` y del almacén (carril A) | ☐ |
+| **ECO-2b** | `ecommerce-catalogo` T07–T13: casos de uso, cerrado con dobles de auditoría | C | ECO-2a | ☑ |
+| **ECO-2c** | `ecommerce-catalogo` T14–T23: Infraestructura, Api, matriz de autorización, integración con S3 e Inventario simulado, trabajos de fondo | C | AUD-4; ampliación de `IClienteDelInventario` y del almacén (carril A) | ☑ |
 | **ECO-2d** | `ecommerce-catalogo` T24–T28: pantallas del catálogo y de la administración, documentos y E2E | B/C/E | WEB-1d | ☐ |
-| **ECO-3** | Planificar `ecommerce-carrito-checkout`, `ecommerce-pagos` y `ecommerce-pedidos` | C | ECO-2 | ☐ |
-| **ECO-4** | `ecommerce-carrito-checkout` (reservas e idempotencia) | C | ECO-3, INV-2 | ☐ |
-| **ECO-5** | `ecommerce-pagos` (pasarela de pruebas de Culqi) | C | ECO-4; B05 (persona) | ☐ |
-| **ECO-6** | `ecommerce-pedidos` | E | ECO-5 | ☐ |
-| **ECO-7** | Planificar biblioteca digital, envíos, devoluciones y libro de reclamaciones | C | ECO-6 | ☐ |
-| **ECO-8** | `ecommerce-biblioteca-digital` (archivos y URLs firmadas) | C | ECO-7 | ☐ |
-| **ECO-9** | `ecommerce-envios` | E | ECO-7 | ☐ |
-| **ECO-10** | `ecommerce-devoluciones` | E | ECO-9 | ☐ |
-| **ECO-11** | `ecommerce-libro-reclamaciones` | E | ECO-7 | ☐ |
+| **ECO-3** | Planificar `ecommerce-carrito-checkout`, `ecommerce-pagos` y `ecommerce-pedidos` | C | ECO-2 | ☑ (planes aprobados el 2026-11-18) |
+| **ECO-4** | `ecommerce-carrito-checkout` (reservas e idempotencia) | C | ECO-3, INV-2 | ▶ (subbloques ECO-4a a 4e, T01–T37; ECO-4a en curso) |
+| **ECO-5** | `ecommerce-pagos` (pasarela de pruebas de Culqi) | C | ECO-4; B05 (persona) | ☐ (subbloques ECO-5a a 5f, T01–T38; 5f condicionado a B05) |
+| **ECO-6** | `ecommerce-pedidos` | E | ECO-5 | ☐ (subbloques ECO-6a a 6f, T01–T42) |
+| **ECO-7** | Planificar biblioteca digital, envíos, devoluciones y libro de reclamaciones | C | ECO-6 | ☑ (planes aprobados el 2026-11-18) |
+| **ECO-8** | `ecommerce-biblioteca-digital` (archivos y URLs firmadas) | C | ECO-7 | ☐ (ECO-8a a 8e, T01–T26) |
+| **ECO-9** | `ecommerce-envios` | E | ECO-7 | ☐ (ECO-9a a 9e, T01–T25) |
+| **ECO-10** | `ecommerce-devoluciones` | E | ECO-9 | ☐ (ECO-10a a 10f, T01–T34) |
+| **ECO-11** | `ecommerce-libro-reclamaciones` | E | ECO-7 | ☐ (ECO-11a a 11d, T01–T23) |
 | **ECO-12** | `asistente-compra-ia` | C | ECO-6; B06 (persona) | ☐ |
 | **ECO-13** | `web-indice-infinito` | B | WEB-1d | ☐ |
 
