@@ -147,6 +147,9 @@ public sealed class IntencionDePago
 
     public DateTimeOffset? ReservasConfirmadasEn { get; private set; }
 
+    /// <summary>Lo que devolvió <c>reservas.confirmar</c> por cada línea impresa (la fuente y el traslado, D02): se guarda para que Pedidos cree el pedido con ello, aun si la compra se retoma.</summary>
+    public IReadOnlyList<ReservaConfirmadaDeLinea> LineasConfirmadas { get; private set; } = Array.Empty<ReservaConfirmadaDeLinea>();
+
     public DateTimeOffset? ReclamadaHasta { get; private set; }
 
     public DateTimeOffset? CerradaEn { get; private set; }
@@ -405,10 +408,17 @@ public sealed class IntencionDePago
         return true;
     }
 
-    public void MarcarReservasConfirmadas(DateTimeOffset ahora)
+    /// <summary>Anota que las reservas de los impresos se confirmaron y guarda la fuente y los traslados de cada línea. Idempotente: la primera confirmación es la que vale.</summary>
+    public void MarcarReservasConfirmadas(DateTimeOffset ahora, IReadOnlyList<ReservaConfirmadaDeLinea>? lineas = null)
     {
         ExigirEstado(EstadoDeIntencion.Aprobada);
-        ReservasConfirmadasEn ??= ahora;
+        if (ReservasConfirmadasEn is not null)
+        {
+            return;
+        }
+
+        ReservasConfirmadasEn = ahora;
+        LineasConfirmadas = lineas is null ? Array.Empty<ReservaConfirmadaDeLinea>() : lineas.ToArray();
     }
 
     /// <summary>Reclama la compra aprobada durante dos minutos para completarla; devuelve <c>false</c> si otro ejecutor la tiene reclamada.</summary>

@@ -136,6 +136,14 @@ internal interface IRepositorioDePagos
     Task<ResultadoDeAgregarIntento> AgregarIntento(IntentoDeCobro intento, CancellationToken cancelacion = default);
 
     Task GuardarIntento(IntentoDeCobro intento, CancellationToken cancelacion = default);
+
+    /// <summary>La compensación de un cobro (una por cobro, clave <c>(intención, intento)</c>).</summary>
+    Task<Compensacion?> ObtenerCompensacion(Guid intentoId, CancellationToken cancelacion = default);
+
+    /// <summary>Inserta la compensación; <c>false</c> si ya existe la del intento (la clave única).</summary>
+    Task<bool> AgregarCompensacion(Compensacion compensacion, CancellationToken cancelacion = default);
+
+    Task GuardarCompensacion(Compensacion compensacion, CancellationToken cancelacion = default);
 }
 
 /// <summary>Los reembolsos de toda la plataforma (D08): clave natural única por origen.</summary>

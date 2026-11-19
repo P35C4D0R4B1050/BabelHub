@@ -108,6 +108,9 @@ public sealed class Compensacion
 
     public bool EstaTerminada => CompletadaEn is not null;
 
+    /// <summary>Una copia (para que las pruebas simulen la reversión de una transacción).</summary>
+    internal Compensacion Copiar() => (Compensacion)MemberwiseClone();
+
     /// <summary>La clave natural del reembolso de esta compensación: <c>comp:&lt;intentoId&gt;</c>.</summary>
     public string ClaveDelReembolso => ClaveDeReembolso.Compensacion(IntentoId);
 

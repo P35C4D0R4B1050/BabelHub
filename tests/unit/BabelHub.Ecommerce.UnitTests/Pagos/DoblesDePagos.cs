@@ -37,9 +37,13 @@ internal sealed class CuentaDelPagadorDoble(UnidadDeTrabajoReversible unidad, Li
         return Falla ? throw new InvalidOperationException("Identidad no responde.") : Task.FromResult(Estado);
     }
 
+    /// <summary>Lo que ocurre justo al leer la marca (por ejemplo, que otra solicitud desvincule la intención entre las dos lecturas).</summary>
+    public Action? AlLeerLaMarca { get; set; }
+
     public Task<bool> CancelacionEnEjecucion(Guid cuentaId, bool bloquear, CancellationToken cancelacion = default)
     {
         orden.Add(bloquear ? "marca-con-bloqueo" : "marca");
+        AlLeerLaMarca?.Invoke();
         if (bloquear)
         {
             MarcasLeidasConBloqueo++;
@@ -122,10 +126,14 @@ internal sealed class ReservasDelPagoDoble(UnidadDeTrabajoReversible unidad, Rel
         return Task.FromResult(respuesta);
     }
 
+    /// <summary>Lo que ocurre justo al llamar a <c>reservas.confirmar</c> (por ejemplo, anotar el estado de la intención en ese momento).</summary>
+    public Action? AlConfirmar { get; set; }
+
     public Task<RespuestaDeReserva<IReadOnlyList<LineaConfirmadaDeReserva>>> Confirmar(Guid pedidoId, string claveDeIdempotencia, CancellationToken cancelacion = default)
     {
         Anotar();
         Confirmaciones.Add(claveDeIdempotencia);
+        AlConfirmar?.Invoke();
         return Task.FromResult(Confirmacion ?? new RespuestaDeReserva<IReadOnlyList<LineaConfirmadaDeReserva>>(ResultadoDeLaLlamadaDeReserva.Correcto, []));
     }
 
@@ -223,6 +231,46 @@ internal sealed class ConfirmadorDeCompraDoble(UnidadDeTrabajoReversible unidad)
         }
 
         return Task.FromResult(new ResultadoDelCobroDelCliente(Application.Pagos.EstadoDelCobro.Aprobado, null, intentoId));
+    }
+}
+
+/// <summary>El paso (c) de la confirmación (T15): devuelve lo que la prueba fije y anota si lo llamaron dentro de una transacción.</summary>
+internal sealed class CompletadorDeCompraDoble(UnidadDeTrabajoReversible unidad) : ICompletadorDeCompra
+{
+    public ResultadoDeCompletarCompra Resultado { get; set; } = new(TipoDeCompletar.Completada);
+
+    public List<(Guid PedidoId, Guid IntentoId)> Llamadas { get; } = [];
+
+    public int LlamadasDentroDeUnaTransaccion { get; private set; }
+
+    public Task<ResultadoDeCompletarCompra> Completar(Guid pedidoId, Guid intentoId, CancellationToken cancelacion = default)
+    {
+        Llamadas.Add((pedidoId, intentoId));
+        if (unidad.EnCurso)
+        {
+            LlamadasDentroDeUnaTransaccion++;
+        }
+
+        return Task.FromResult(Resultado);
+    }
+}
+
+/// <summary>El orquestador de la compensación (T16): anota con qué motivo y variante lo llamaron.</summary>
+internal sealed class CompensadorDeCompraDoble(UnidadDeTrabajoReversible unidad) : ICompensadorDeCompra
+{
+    public List<(Guid PedidoId, Guid IntentoId, MotivoDeCompensacion Motivo, VarianteDeCompensacion Variante)> Llamadas { get; } = [];
+
+    public int LlamadasDentroDeUnaTransaccion { get; private set; }
+
+    public Task Compensar(Guid pedidoId, Guid intentoId, MotivoDeCompensacion motivo, VarianteDeCompensacion variante, CancellationToken cancelacion = default)
+    {
+        Llamadas.Add((pedidoId, intentoId, motivo, variante));
+        if (unidad.EnCurso)
+        {
+            LlamadasDentroDeUnaTransaccion++;
+        }
+
+        return Task.CompletedTask;
     }
 }
 

@@ -73,17 +73,17 @@ internal sealed class IniciarCobro(
         }
 
         // Paso 0: la clave ya existe: el resultado original, sin consultas ni cupo.
-        var (existente, ajeno) = await unidad.Ejecutar(
+        var (existente, ajeno, completada) = await unidad.Ejecutar(
             async token =>
             {
                 var intento = await repositorio.ObtenerIntento(clave.IntentoId, token).ConfigureAwait(false);
                 if (intento is null)
                 {
-                    return ((IntentoDeCobro?)null, false);
+                    return ((IntentoDeCobro?)null, false, false);
                 }
 
                 var intencion = await repositorio.ObtenerIntencion(intento.IntencionId, paraActualizar: false, token).ConfigureAwait(false);
-                return (intento, intento.IntencionId != entrada.PedidoId || intencion is null || !intencion.EsDeLaCuenta(cuentaId));
+                return (intento, intento.IntencionId != entrada.PedidoId || intencion is null || !intencion.EsDeLaCuenta(cuentaId), intencion?.Estado == EstadoDeIntencion.Completada);
             },
             cancelacion).ConfigureAwait(false);
         if (existente is not null)
@@ -94,7 +94,7 @@ internal sealed class IniciarCobro(
                 return FallosDePagos.De<ResultadoDelCobroDelCliente>(CategoriaDeError.Conflicto, ClavesDePagos.ClaveInvalida);
             }
 
-            return Resultado<ResultadoDelCobroDelCliente>.Exito(ResultadoOriginal(existente));
+            return Resultado<ResultadoDelCobroDelCliente>.Exito(ResultadoOriginal(existente, completada));
         }
 
         var medio = entrada.Medio.ADominio();
@@ -121,7 +121,8 @@ internal sealed class IniciarCobro(
         if (registrado.Valor.EraRepetido)
         {
             // Otra solicitud simultánea con la misma clave ya hizo el cobro: este es el resultado original.
-            return Resultado<ResultadoDelCobroDelCliente>.Exito(ResultadoOriginal(intentoRegistrado));
+            var intencionDelCobro = await unidad.Ejecutar(token => repositorio.ObtenerIntencion(entrada.PedidoId, paraActualizar: false, token), cancelacion).ConfigureAwait(false);
+            return Resultado<ResultadoDelCobroDelCliente>.Exito(ResultadoOriginal(intentoRegistrado, intencionDelCobro?.Estado == EstadoDeIntencion.Completada));
         }
 
         // Desde aquí el intento existe y la pasarela puede haber cobrado: nada de lo que sigue depende de que el cliente siga conectado (cerrar la pestaña no deja un cobro sin rastro).
@@ -148,9 +149,13 @@ internal sealed class IniciarCobro(
         }
     }
 
-    private static ResultadoDelCobroDelCliente ResultadoOriginal(IntentoDeCobro intento) => intento.Estado switch
+    /// <summary>
+    /// El resultado de un intento que ya existe. Un cobro aprobado solo es «aprobado» para el cliente si la compra quedó completada; si no (se está confirmando, se compensó o fue un cobro sobrante que se reembolsa) el cliente
+    /// ve «estamos confirmando tu pago» y la pantalla de estado dice la verdad.
+    /// </summary>
+    private static ResultadoDelCobroDelCliente ResultadoOriginal(IntentoDeCobro intento, bool intencionCompletada) => intento.Estado switch
     {
-        EstadoDeIntento.Aprobado or EstadoDeIntento.AprobadoSobrante => new ResultadoDelCobroDelCliente(EstadoDelCobro.Aprobado, null, intento.Id),
+        EstadoDeIntento.Aprobado when intencionCompletada => new ResultadoDelCobroDelCliente(EstadoDelCobro.Aprobado, null, intento.Id),
         EstadoDeIntento.Rechazado => new ResultadoDelCobroDelCliente(EstadoDelCobro.Rechazado, MapeoDeMotivos.APublico(intento.MotivoDeRechazo), intento.Id),
         EstadoDeIntento.Vencido => new ResultadoDelCobroDelCliente(EstadoDelCobro.Rechazado, MotivoDeRechazoDePago.Otro, intento.Id),
         _ => new ResultadoDelCobroDelCliente(EstadoDelCobro.PendienteDeConfirmacion, null, intento.Id),

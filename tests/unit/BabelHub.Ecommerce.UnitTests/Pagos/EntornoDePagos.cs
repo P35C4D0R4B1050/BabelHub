@@ -15,6 +15,7 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
 {
     private Dictionary<Guid, IntencionDePago> _intenciones = [];
     private Dictionary<Guid, IntentoDeCobro> _intentos = [];
+    private Dictionary<Guid, Compensacion> _compensaciones = [];
 
     public IReadOnlyCollection<IntencionDePago> Intenciones => _intenciones.Values;
 
@@ -99,13 +100,35 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
         return Task.CompletedTask;
     }
 
-    public object Capturar() => (_intenciones.ToDictionary(p => p.Key, p => p.Value.Copiar()), _intentos.ToDictionary(p => p.Key, p => p.Value.Copiar()));
+    public IReadOnlyCollection<Compensacion> Compensaciones => _compensaciones.Values;
+
+    public Task<Compensacion?> ObtenerCompensacion(Guid intentoId, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        return Task.FromResult(_compensaciones.TryGetValue(intentoId, out var c) ? c.Copiar() : null);
+    }
+
+    public Task<bool> AgregarCompensacion(Compensacion compensacion, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        return Task.FromResult(_compensaciones.TryAdd(compensacion.IntentoId, compensacion.Copiar()));
+    }
+
+    public Task GuardarCompensacion(Compensacion compensacion, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        _compensaciones[compensacion.IntentoId] = compensacion.Copiar();
+        return Task.CompletedTask;
+    }
+
+    public object Capturar() => (_intenciones.ToDictionary(p => p.Key, p => p.Value.Copiar()), _intentos.ToDictionary(p => p.Key, p => p.Value.Copiar()), _compensaciones.ToDictionary(p => p.Key, p => p.Value.Copiar()));
 
     public void Restaurar(object instantanea)
     {
-        var (intenciones, intentos) = ((Dictionary<Guid, IntencionDePago>, Dictionary<Guid, IntentoDeCobro>))instantanea;
+        var (intenciones, intentos, compensaciones) = ((Dictionary<Guid, IntencionDePago>, Dictionary<Guid, IntentoDeCobro>, Dictionary<Guid, Compensacion>))instantanea;
         _intenciones = intenciones;
         _intentos = intentos;
+        _compensaciones = compensaciones;
     }
 }
 
