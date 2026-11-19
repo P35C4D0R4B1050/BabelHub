@@ -22,6 +22,8 @@ internal sealed class EntornoDeEnvios
         Denegaciones = new DenegacionesDelCatalogoEspia();
 
         Crear = new CrearEnvio(Pedidos, Envios, Reloj);
+        Cancelar = new CancelarEnviosDelPedido(Envios, Auditoria, Reloj);
+        Despacho = new DespachoDeEnviosDeLaAplicacion(Crear, Cancelar);
     }
 
     public ActorDePrueba Actor { get; }
@@ -39,6 +41,10 @@ internal sealed class EntornoDeEnvios
     public DenegacionesDelCatalogoEspia Denegaciones { get; }
 
     public CrearEnvio Crear { get; }
+
+    public CancelarEnviosDelPedido Cancelar { get; }
+
+    public DespachoDeEnviosDeLaAplicacion Despacho { get; }
 
     /// <summary>Siembra un pedido a domicilio con las líneas dadas y lo devuelve.</summary>
     public PedidoParaEnvios SembrarPedido(bool aDomicilio = true, params LineaDePedidoParaEnvios[] lineas)
