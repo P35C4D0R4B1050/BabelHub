@@ -276,9 +276,13 @@ internal sealed class HasherDePrueba : IHasherDeContrasenas
         return $"$argon2id$v=19$m=19456,t=2,p=1${new string('s', 22)}${huella}";
     }
 
+    /// <summary>Un gancho para simular que otra operación cambia la cuenta mientras se calcula el resumen (Argon2id tarda).</summary>
+    public Action? AlResumir { get; set; }
+
     public Task<string> Resumir(Contrasena contrasena, CancellationToken cancelacion = default)
     {
         Resumenes++;
+        AlResumir?.Invoke();
         return Task.FromResult(ResumenDe(contrasena.Revelar()));
     }
 

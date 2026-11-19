@@ -562,4 +562,31 @@ public sealed class AdministracionDeUsuariosTests
         Assert.True(resultado.EsExito);
         Assert.Null(await e.SegundoFactor.Obtener(encargado.Usuario.Id));
     }
+
+    [Fact]
+    public async Task UnRolFueraDelCatalogo_SeRechazaComoValidacion_SinLanzar()
+    {
+        var (e, admin, administracion) = Escenario();
+        var objetivo = e.Cuenta("persona@example.com", RolDeUsuario.Logistica);
+
+        var crear = await administracion.Crear(admin.Usuario.Id, "Persona", "otra@example.com", (RolDeCuenta)99, null);
+        var cambiar = await administracion.CambiarElRol(admin.Usuario.Id, objetivo.Usuario.Id, (RolDeCuenta)99, null);
+
+        Assert.Equal(CategoriaDeError.Validacion, crear.Error!.Categoria);
+        Assert.Equal(CategoriaDeError.Validacion, cambiar.Error!.Categoria);
+    }
+
+    [Fact]
+    public async Task QuienNoEsAdministrador_QuedaRegistradoComoFueraDeRol()
+    {
+        var e = new EntornoDeIdentidad();
+        var encargado = e.Cuenta("encargado@example.com", RolDeUsuario.EncargadoDeSucursal);
+        e.Actor.Actual = ActorActual.DeUsuario(encargado.Usuario.Id, "encargado-de-sucursal");
+
+        await e.Administracion().Desactivar(encargado.Usuario.Id, Guid.NewGuid());
+        await e.Solicitudes().Listar(encargado.Usuario.Id);
+
+        Assert.All(e.Denegaciones.Registradas, d => Assert.Equal("fuera-de-rol", d.Motivo));
+        Assert.Equal(2, e.Denegaciones.Registradas.Count);
+    }
 }

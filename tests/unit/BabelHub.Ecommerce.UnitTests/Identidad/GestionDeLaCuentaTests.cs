@@ -520,7 +520,7 @@ public sealed class GestionDeLaCuentaTests
     }
 
     [Fact]
-    public async Task ConfirmarElSegundoFactor_SiLaAuditoriaFalla_NoQuedaActivo()
+    public async Task ConfirmarElSegundoFactor_SiLaAuditoriaFalla_LanzaYNoEntregaCodigos()
     {
         var (e, cuenta, gestion) = Titular();
         await gestion.IniciarElSegundoFactor(cuenta.Usuario.Id, S(EntornoDeIdentidad.ContrasenaSegura));
@@ -697,5 +697,41 @@ public sealed class GestionDeLaCuentaTests
         var resultado = await gestion.MarcarElAvisoComoVisto(cuenta.Usuario.Id, ajeno, desdeUnaSesionReconocida: true);
 
         Assert.Equal(CategoriaDeError.NoEncontrado, resultado.Error!.Categoria);
+    }
+
+    [Fact]
+    public async Task UnaCuentaDesactivada_NoLeeSusAvisosAunqueSuCredencialSigaVigente()
+    {
+        var (e, cuenta, gestion) = Titular();
+        e.AvisosGuardados.Sembrar(cuenta.Usuario.Id, "contrasena-cambiada", EntornoDeIdentidad.Inicio);
+        cuenta.Usuario.Desactivar();
+
+        var resultado = await gestion.ListarLosAvisos(cuenta.Usuario.Id);
+
+        Assert.Equal(AlcanceDeLaCuenta.CuentaNoEncontrada, resultado.Error);
+    }
+
+    [Fact]
+    public async Task ActivarElSegundoFactor_SinHaberloIniciado_NoConsumeLosCuposDeIntentos()
+    {
+        var (e, cuenta, gestion) = Titular();
+
+        for (var i = 0; i < 8; i++)
+        {
+            Assert.Equal("segundo-factor-no-iniciado", (await gestion.ConfirmarElSegundoFactor(cuenta.Usuario.Id, S("123456"))).Error!.Clave);
+        }
+    }
+
+    [Fact]
+    public async Task CambiarLaContrasena_SiOtroCambioLaPisoMientrasSeVerificaba_NoSeSobrescribe()
+    {
+        var (e, cuenta, gestion) = Titular();
+        e.Hasher.AlResumir = () => cuenta.ResumenDeAcceso = "resumen-de-una-recuperacion-concurrente";
+
+        var resultado = await gestion.CambiarLaContrasena(cuenta.Usuario.Id, S(EntornoDeIdentidad.ContrasenaSegura), S(Nueva));
+
+        Assert.Equal(Reautenticacion.ContrasenaActualIncorrecta, resultado.Error);
+        Assert.Equal("resumen-de-una-recuperacion-concurrente", cuenta.ResumenDeAcceso);
+        Assert.Empty(e.Auditoria.Registradas);
     }
 }

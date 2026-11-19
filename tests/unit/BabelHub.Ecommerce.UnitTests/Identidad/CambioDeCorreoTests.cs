@@ -26,8 +26,8 @@ public sealed class CambioDeCorreoTests
         return (e, cuenta, e.CambioDeCorreo(), marca);
     }
 
-    private static Task<Resultado<RespuestaUniforme>> Pedir(CambioDeCorreo cambio, CuentaDeIdentidad cuenta, ValorSecreto? marca, string? region = "PE", string correo = Nuevo, string frase = EntornoDeIdentidad.ContrasenaSegura) =>
-        cambio.Solicitar(cuenta.Usuario.Id, correo, S(frase), marca, region);
+    private static Task<Resultado<RespuestaUniforme>> Pedir(CambioDeCorreo cambio, CuentaDeIdentidad cuenta, ValorSecreto? marca = null, string? region = "PE", string correo = Nuevo, string frase = EntornoDeIdentidad.ContrasenaSegura, bool marcaNula = false) =>
+        cambio.Solicitar(cuenta.Usuario.Id, correo, S(frase), marcaNula ? null : marca, region);
 
     // ---------------------------------------------------------------- reconocido y habitual (AC-IDE-47)
 
@@ -543,5 +543,88 @@ public sealed class CambioDeCorreoTests
 
         Assert.Equal(AlcanceDeLaCuenta.Prohibido, resultado.Error);
         Assert.Single(e.Bd.Dispositivos);
+    }
+
+    // ---------------------------------------------------------------- correcciones de la revisión de IDE-4
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-47")]
+    public async Task ElLimiteDeCodigos_SeConsumeIgualParaUnCorreoLibreQueParaUnoOcupado_SinOraculoDeEnumeracion()
+    {
+        var (e, cuenta, cambio, marca) = Escenario();
+        e.Cuenta("ocupado@example.com");
+
+        ErrorDeAplicacion? libre = null;
+        ErrorDeAplicacion? ocupado = null;
+        for (var i = 0; i < 4; i++)
+        {
+            libre = (await Pedir(cambio, cuenta, marca, correo: "libre@example.com")).Error;
+            ocupado = (await Pedir(cambio, cuenta, marca, correo: "ocupado@example.com")).Error;
+        }
+
+        Assert.Equal(FallosDeIdentidad.LimiteExcedido, libre);
+        Assert.Equal(FallosDeIdentidad.LimiteExcedido, ocupado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-48")]
+    public async Task MientrasHayUnCambioNoReconocidoPendiente_SinMarcaOConUnaInmadura_NoSeHacenCambiosSensibles()
+    {
+        var (e, cuenta, cambio, marca) = Escenario();
+        // Una sesión robada, sin la cookie, pide el cambio: nada se congela en el dispositivo, pero la cuenta sí.
+        await Pedir(cambio, cuenta, marcaNula: true);
+        var gestion = e.Gestion();
+        var id = cuenta.Usuario.Id;
+        var nueva = S("otra frase larga y distinta");
+        var inmadura = (await e.DispositivosDeLaCuenta().RegistrarElIngresoCompleto(id, null, "PE")).Valor.MarcaNueva!;
+
+        Assert.Equal(ConfianzaDelDispositivo.DispositivoCongelado, (await gestion.CambiarLaContrasena(id, S(EntornoDeIdentidad.ContrasenaSegura), nueva)).Error);
+        Assert.Equal(ConfianzaDelDispositivo.DispositivoCongelado, (await gestion.IniciarElSegundoFactor(id, S(EntornoDeIdentidad.ContrasenaSegura))).Error);
+        Assert.Equal(ConfianzaDelDispositivo.DispositivoCongelado, (await gestion.CambiarLaContrasena(id, S(EntornoDeIdentidad.ContrasenaSegura), nueva, marcaDeDispositivo: inmadura)).Error);
+        Assert.Equal(ConfianzaDelDispositivo.DispositivoCongelado, (await gestion.CambiarLaContrasena(id, S(EntornoDeIdentidad.ContrasenaSegura), nueva, marcaDeDispositivo: S("marca-desconocida"))).Error);
+
+        // Quien sí trae un dispositivo reconocido sigue pudiendo, y sin cambio pendiente nadie queda bloqueado por no traer marca.
+        Assert.True((await gestion.CambiarLaContrasena(id, S(EntornoDeIdentidad.ContrasenaSegura), nueva, marcaDeDispositivo: marca)).EsExito);
+    }
+
+    [Fact]
+    public async Task SinCambioPendiente_UnaSolicitudSinMarca_SigueHaciendoCambiosSensibles()
+    {
+        var (e, cuenta, _, _) = Escenario();
+
+        var resultado = await e.Gestion().CambiarLaContrasena(cuenta.Usuario.Id, S(EntornoDeIdentidad.ContrasenaSegura), S("otra frase larga y distinta"));
+
+        Assert.True(resultado.EsExito);
+    }
+
+    [Fact]
+    public async Task UnNuevoCambio_InvalidaElCodigoDelAnterior_YElCodigoViejoNoAplicaElCorreoNuevo()
+    {
+        var (e, cuenta, cambio, marca) = Escenario();
+        await Pedir(cambio, cuenta, marca, correo: "primero@example.com");
+        var codigoDelPrimero = e.UltimoCodigoEnviado();
+        // Si el segundo cambio se guarda pero el envío del código falla, el código viejo no puede aplicar el segundo correo.
+        e.Correo.Falla = true;
+        await Pedir(cambio, cuenta, marca, correo: "segundo@example.com");
+        e.Correo.Falla = false;
+
+        var resultado = await cambio.VerificarElCorreoNuevo(cuenta.Usuario.Id, S(codigoDelPrimero));
+
+        Assert.Equal(FallosDeIdentidad.CodigoInvalido, resultado.Error);
+        Assert.Equal(Antiguo, cuenta.Usuario.Correo);
+    }
+
+    [Fact]
+    public async Task ElLimiteDeCodigos_SeReservaAntesDeConfirmar_YSiSeExcedeElCambioSigueSinConfirmar()
+    {
+        var (e, cuenta, cambio, marca) = Escenario();
+        await Pedir(cambio, cuenta, marca, region: "BR");
+        var otraMarca = e.DispositivoReconocido(cuenta, "PE");
+        e.Limites.Maximos["codigos-por-correo"] = 0;
+
+        var resultado = await cambio.ConfirmarElCambioPendiente(cuenta.Usuario.Id, S(EntornoDeIdentidad.ContrasenaSegura), otraMarca, "PE");
+
+        Assert.Equal(FallosDeIdentidad.LimiteExcedido, resultado.Error);
+        Assert.Equal(EstadoDelCambioDeCorreo.PendienteDeConfirmacion, e.Bd.Cambios.Single().Estado);
     }
 }

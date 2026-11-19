@@ -26,11 +26,11 @@ public sealed class AlcanceDeLaCuenta(IActorActual actor, IDenegacionDeAcceso de
     }
 
     /// <summary>Registra la denegación (sin interrumpir) y devuelve el rechazo: también la usa quien llama con identidad propia pero sin el rol que la operación exige.</summary>
-    public async Task<ErrorDeAplicacion> Denegar(CancellationToken cancelacion)
+    public async Task<ErrorDeAplicacion> Denegar(CancellationToken cancelacion, string motivo = "recurso-ajeno")
     {
         try
         {
-            await denegaciones.Registrar(new DenegacionDeAcceso("recurso-ajeno", ruta: null), cancelacion).ConfigureAwait(false);
+            await denegaciones.Registrar(new DenegacionDeAcceso(motivo, ruta: null), cancelacion).ConfigureAwait(false);
         }
         catch (Exception) when (!cancelacion.IsCancellationRequested)
         {
@@ -75,7 +75,14 @@ public static class LimitesDelSegundoFactor
         ArgumentNullException.ThrowIfNull(reservas);
         foreach (var reserva in reservas)
         {
-            await limites.Liberar(reserva, cancelacion).ConfigureAwait(false);
+            try
+            {
+                await limites.Liberar(reserva, cancelacion).ConfigureAwait(false);
+            }
+            catch (Exception) when (!cancelacion.IsCancellationRequested)
+            {
+                // Devolver el cupo es una cortesía tras acertar: si no se puede, la operación ya hecha no se deshace (el cupo vence solo).
+            }
         }
     }
 }

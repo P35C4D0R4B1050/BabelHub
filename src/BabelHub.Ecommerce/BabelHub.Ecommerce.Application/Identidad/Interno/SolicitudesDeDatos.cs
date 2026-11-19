@@ -23,7 +23,7 @@ public sealed class AlcanceDeLaAdministracion(AlcanceDeLaCuenta alcance, IReposi
         var cuenta = await cuentas.PorId(administradorId, paraActualizar: false, cancelacion).ConfigureAwait(false);
         return cuenta is { CanceladaEn: null, Usuario: { Rol: RolDeUsuario.AdministradorCentral, Activo: true } }
             ? (null, cuenta)
-            : (await alcance.Denegar(cancelacion).ConfigureAwait(false), null);
+            : (await alcance.Denegar(cancelacion, "fuera-de-rol").ConfigureAwait(false), null);
     }
 }
 
@@ -99,6 +99,11 @@ public sealed class AtencionDeSolicitudesDeDatos(
         if (await alcance.Comprobar(usuarioId, cancelacion).ConfigureAwait(false) is { } prohibido)
         {
             return Resultado<IReadOnlyList<SolicitudDelCliente>>.Fallo(prohibido);
+        }
+
+        if (await cuentas.PorId(usuarioId, paraActualizar: false, cancelacion).ConfigureAwait(false) is not { CanceladaEn: null, Usuario.Activo: true })
+        {
+            return Resultado<IReadOnlyList<SolicitudDelCliente>>.Fallo(AlcanceDeLaCuenta.CuentaNoEncontrada);
         }
 
         var hoy = reloj.HoyEnLima;
@@ -202,7 +207,7 @@ public sealed class AtencionDeSolicitudesDeDatos(
             cancelacion).ConfigureAwait(false);
 
         // El aviso por correo sale con la respuesta ya guardada y nunca interrumpe; no lleva el contenido (IDE-26).
-        if (resultado.EsExito && titular is { } usuarioId && await cuentas.PorId(usuarioId, paraActualizar: false, cancelacion).ConfigureAwait(false) is { CanceladaEn: null } cuenta)
+        if (resultado.EsExito && titular is { } usuarioId && await cuentas.PorId(usuarioId, paraActualizar: false, cancelacion).ConfigureAwait(false) is { CanceladaEn: null, Usuario.Activo: true } cuenta)
         {
             await avisos.SolicitudDeDatosRespondida(cuenta.Usuario, cancelacion).ConfigureAwait(false);
         }

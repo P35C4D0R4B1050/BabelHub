@@ -241,7 +241,7 @@ internal static class EntornoDeLaAdministracionExtensiones
 
 internal static class EntornoDelCambioDeCorreoExtensiones
 {
-    public static ConfianzaDelDispositivo Confianza(this EntornoDeIdentidad e) => new(e.Dispositivos, e.HuellasDeIdentidad, e.Reloj);
+    public static ConfianzaDelDispositivo Confianza(this EntornoDeIdentidad e) => new(e.Dispositivos, e.Cambios, e.HuellasDeIdentidad, e.Reloj);
 
     public static CambioDeCorreo CambioDeCorreo(this EntornoDeIdentidad e) => new(
         e.Cuentas,

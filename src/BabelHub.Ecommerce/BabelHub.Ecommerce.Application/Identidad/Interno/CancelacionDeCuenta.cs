@@ -80,15 +80,15 @@ public sealed class CancelacionDeCuenta(
                     return Resultado<EstadoDeLaCancelacionDeCuenta>.Fallo(AlcanceDeLaCuenta.CuentaNoEncontrada);
                 }
 
+                if (await cancelaciones.AbiertaDe(usuarioId, paraActualizar: true, ct).ConfigureAwait(false) is not null)
+                {
+                    return Resultado<EstadoDeLaCancelacionDeCuenta>.Fallo(CancelacionEnCurso);
+                }
+
                 if (verificacion.Codigo is not null && !await reautenticacion.Aceptar(usuarioId, verificacion.Codigo, ct).ConfigureAwait(false))
                 {
                     perdioLaCarrera = true;
                     return Resultado<EstadoDeLaCancelacionDeCuenta>.Fallo(FallosDeIdentidad.CodigoInvalido);
-                }
-
-                if (await cancelaciones.AbiertaDe(usuarioId, paraActualizar: true, ct).ConfigureAwait(false) is not null)
-                {
-                    return Resultado<EstadoDeLaCancelacionDeCuenta>.Fallo(CancelacionEnCurso);
                 }
 
                 var abiertos = await pendientes.Contar(usuarioId, ct).ConfigureAwait(false);
@@ -437,7 +437,7 @@ public sealed class RevisionDeLasCancelaciones(
     private async Task<(bool PendientesCerrados, bool Descartada)> Procesar(Guid usuarioId, CancellationToken cancelacion)
     {
         var cuenta = await cuentas.PorId(usuarioId, paraActualizar: false, cancelacion).ConfigureAwait(false);
-        if (cuenta is not { CanceladaEn: null })
+        if (cuenta is not { CanceladaEn: null, Usuario.Activo: true })
         {
             return (false, false);
         }

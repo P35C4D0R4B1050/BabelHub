@@ -7,23 +7,35 @@ namespace BabelHub.Ecommerce.Application.Identidad.Interno;
 
 /// <summary>
 /// La confianza en el dispositivo y la región de quien pide algo sensible (IDE-54, IDE-55): se reconoce por la huella de su marca (solo se guarda el SHA-256) y por la región que entregó el borde, y solo cuenta un
-/// dispositivo con 24 horas de antigüedad y que no esté congelado. Un dispositivo <b>congelado</b> no puede hacer cambios sensibles (correo, contraseña, segundo factor) hasta que venza el congelamiento.
+/// dispositivo con 24 horas de antigüedad y que no esté congelado. Un dispositivo <b>congelado</b> no puede hacer cambios sensibles (correo, contraseña, segundo factor) hasta que venza el congelamiento, y
+/// <b>mientras hay un cambio de correo no reconocido pendiente</b> los cambios sensibles exigen un dispositivo reconocido: el congelamiento es de la cuenta y no depende de que quien lo pidió traiga una marca.
 /// </summary>
-public sealed class ConfianzaDelDispositivo(IRepositorioDeDispositivos dispositivos, IHuellasDeIdentidad huellas, IReloj reloj)
+public sealed class ConfianzaDelDispositivo(IRepositorioDeDispositivos dispositivos, IRepositorioDeCambiosDeCorreo cambios, IHuellasDeIdentidad huellas, IReloj reloj)
 {
     public static ErrorDeAplicacion DispositivoCongelado { get; } = new(CategoriaDeError.Prohibido, "dispositivo-congelado");
 
-    /// <summary>El dispositivo congelado no hace cambios sensibles (IDE-54). Sin marca no se sabe cuál es y no se bloquea: el cambio de correo no reconocido se decide por su confianza.</summary>
+    /// <summary>
+    /// El dispositivo congelado no hace cambios sensibles (IDE-54). Mientras hay un cambio de correo pendiente de confirmación, quien no presenta la marca de un dispositivo reconocido (sin marca, desconocido o con menos de
+    /// 24 horas) tampoco: así una sesión robada que pidió el cambio sin cookie no puede cambiar la contraseña ni el segundo factor para atrincherarse. Sin cambio pendiente, solo se bloquea al dispositivo congelado.
+    /// </summary>
     public async Task<ErrorDeAplicacion?> ComprobarQueNoEsteCongelado(Guid usuarioId, ValorSecreto? marca, CancellationToken cancelacion)
     {
+        var ahora = reloj.Ahora;
+        var pendiente = await cambios.Obtener(usuarioId, cancelacion).ConfigureAwait(false) is { Estado: EstadoDelCambioDeCorreo.PendienteDeConfirmacion } cambio && ahora < cambio.Vence;
         if (marca is null)
         {
-            return null;
+            return pendiente ? DispositivoCongelado : null;
         }
 
         var lista = await dispositivos.Listar(usuarioId, cancelacion).ConfigureAwait(false);
         var huella = huellas.DeValorOpaco(marca.Revelar());
-        return lista.Any(d => d.HuellaDeLaMarca == huella && d.EstaCongelado(reloj.Ahora)) ? DispositivoCongelado : null;
+        var presentado = lista.FirstOrDefault(d => d.HuellaDeLaMarca == huella);
+        if (presentado is not null && presentado.EstaCongelado(ahora))
+        {
+            return DispositivoCongelado;
+        }
+
+        return pendiente && (presentado is null || !presentado.EsMaduro(ahora)) ? DispositivoCongelado : null;
     }
 
     /// <summary>La confianza de la solicitud y el dispositivo que presentó, si lo guardado lo reconoce por su marca.</summary>
@@ -163,30 +175,43 @@ public sealed class CambioDeCorreo(
         }
 
         var ahora = reloj.Ahora;
-        var existente = await cambios.Obtener(usuarioId, cancelacion).ConfigureAwait(false);
-        if (existente is { Estado: EstadoDelCambioDeCorreo.PendienteDeConfirmacion } && ahora < existente.Vence)
-        {
-            // Mientras el titular no confirme ni rechace el cambio no reconocido, no se pide otro (IDE-54).
-            return Resultado<RespuestaUniforme>.Fallo(CambioPendiente);
-        }
 
-        // Un correo que ya es de otra cuenta responde igual y no manda nada: quien lo prueba no aprende qué correos existen.
-        if (await cuentas.PorCorreo(nuevo, cancelacion).ConfigureAwait(false) is not null)
-        {
-            return Resultado<RespuestaUniforme>.Exito(new RespuestaUniforme());
-        }
-
-        var (evaluada, presentado) = await confianza.Evaluar(usuarioId, marcaDeDispositivo, region, cancelacion).ConfigureAwait(false);
-        var cambio = CambioDeCorreoPendiente.Pedir(secretos.NuevoIdentificador(), usuarioId, nuevo, evaluada, ahora);
-        var seEnviaElCodigo = cambio.Estado == EstadoDelCambioDeCorreo.EsperandoVerificacion;
-        if (seEnviaElCodigo && await SolicitudDeCodigos.Reservar(limites, huellas, nuevo, PropositoDeLosLimites, cancelacion).ConfigureAwait(false) is { } limite)
+        // Los límites de SEG-19 se reservan ANTES de saber si el correo ya es de otra cuenta y en todas las ramas: exista o no, cuesta lo mismo y responde lo mismo (sin oráculo de enumeración).
+        if (await SolicitudDeCodigos.Reservar(limites, huellas, nuevo, PropositoDeLosLimites, cancelacion).ConfigureAwait(false) is { } limite)
         {
             return Resultado<RespuestaUniforme>.Fallo(limite);
         }
 
-        await unidad.Ejecutar(
+        var yaEsDeOtraCuenta = await cuentas.PorCorreo(nuevo, cancelacion).ConfigureAwait(false) is not null;
+        var (evaluada, presentado) = await confianza.Evaluar(usuarioId, marcaDeDispositivo, region, cancelacion).ConfigureAwait(false);
+        var cambio = CambioDeCorreoPendiente.Pedir(secretos.NuevoIdentificador(), usuarioId, nuevo, evaluada, ahora);
+        var seEnviaElCodigo = cambio.Estado == EstadoDelCambioDeCorreo.EsperandoVerificacion;
+        var guardado = false;
+
+        var resultado = await unidad.Ejecutar(
             async ct =>
             {
+                // Bajo el bloqueo de la fila del usuario se relee el cambio en curso: dos solicitudes simultáneas no sustituyen el pendiente que IDE-54 protege.
+                if (await Cargar(usuarioId, true, ct).ConfigureAwait(false) is null)
+                {
+                    return Resultado<RespuestaUniforme>.Fallo(AlcanceDeLaCuenta.CuentaNoEncontrada);
+                }
+
+                var existente = await cambios.Obtener(usuarioId, ct).ConfigureAwait(false);
+                if (existente is { Estado: EstadoDelCambioDeCorreo.PendienteDeConfirmacion } && ahora < existente.Vence)
+                {
+                    // Mientras el titular no confirme ni rechace el cambio no reconocido, no se pide otro (IDE-54).
+                    return Resultado<RespuestaUniforme>.Fallo(CambioPendiente);
+                }
+
+                // Un correo que ya es de otra cuenta responde igual y no manda nada: quien lo prueba no aprende qué correos existen.
+                if (yaEsDeOtraCuenta)
+                {
+                    return Resultado<RespuestaUniforme>.Exito(new RespuestaUniforme());
+                }
+
+                // Un código anterior (de otro correo nuevo) no puede aplicar este cambio: el código no va ligado a la dirección, así que se invalida con el cambio que reemplaza (SEG-28).
+                await codigos.Invalidar(usuarioId, DominioProposito.VerificacionDeCorreo, ct).ConfigureAwait(false);
                 await cambios.Guardar(cambio, ct).ConfigureAwait(false);
                 if (cambio.CongelaAlDispositivo)
                 {
@@ -199,9 +224,15 @@ public sealed class CambioDeCorreo(
                     await avisosDeCuenta.Agregar(usuarioId, AvisoDeCambioNoReconocido, ahora, ct).ConfigureAwait(false);
                 }
 
-                return true;
+                guardado = true;
+                return Resultado<RespuestaUniforme>.Exito(new RespuestaUniforme());
             },
             cancelacion).ConfigureAwait(false);
+
+        if (!resultado.EsExito || !guardado)
+        {
+            return resultado;
+        }
 
         if (seEnviaElCodigo)
         {
@@ -328,13 +359,25 @@ public sealed class CambioDeCorreo(
             return Resultado<RespuestaUniforme>.Fallo(rechazo);
         }
 
+        // Los límites de SEG-19 se reservan ANTES de confirmar: si se exceden, el cambio sigue pendiente y no queda esperando un código que nunca saldrá.
+        if (await SolicitudDeCodigos.Reservar(limites, huellas, cambio.CorreoNuevo, PropositoDeLosLimites, cancelacion).ConfigureAwait(false) is { } limite)
+        {
+            return Resultado<RespuestaUniforme>.Fallo(limite);
+        }
+
         var ahora = reloj.Ahora;
         var vencido = false;
         var confirmado = await unidad.Ejecutar(
             async ct =>
             {
+                // Bajo el bloqueo de la fila del usuario: si otra solicitud sustituyó el cambio mientras tanto, no se confirma ni se envía nada al correo anterior (SEG-28).
+                if (await Cargar(usuarioId, true, ct).ConfigureAwait(false) is null)
+                {
+                    return false;
+                }
+
                 var actual = await cambios.Obtener(usuarioId, ct).ConfigureAwait(false);
-                if (actual is null)
+                if (actual is null || actual.CorreoNuevo != cambio.CorreoNuevo)
                 {
                     return false;
                 }
@@ -365,12 +408,7 @@ public sealed class CambioDeCorreo(
             return Resultado<RespuestaUniforme>.Fallo(vencido ? CambioVencido : SinCambioPendiente);
         }
 
-        // Confirmado, falta verificar el correo nuevo: el código sale al correo guardado en el cambio, con los límites de SEG-19.
-        if (await SolicitudDeCodigos.Reservar(limites, huellas, cambio.CorreoNuevo, PropositoDeLosLimites, cancelacion).ConfigureAwait(false) is { } limite)
-        {
-            return Resultado<RespuestaUniforme>.Fallo(limite);
-        }
-
+        // Confirmado, falta verificar el correo nuevo: el código sale al correo guardado en el cambio (el mismo que se comprobó bajo el bloqueo).
         await emisionDeCodigos.EmitirA(cuenta.Usuario, cambio.CorreoNuevo, DominioProposito.VerificacionDeCorreo, cancelacion).ConfigureAwait(false);
         return Resultado<RespuestaUniforme>.Exito(new RespuestaUniforme());
     }

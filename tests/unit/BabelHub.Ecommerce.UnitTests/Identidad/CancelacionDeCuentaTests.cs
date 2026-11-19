@@ -644,4 +644,38 @@ public sealed class CancelacionDeCuentaTests
 
         Assert.Equal(EstadoDeLaMarca.Ejecutada, await e.Cancelacion().LeerConBloqueo(cliente.Usuario.Id));
     }
+
+    [Fact]
+    public async Task SiYaHayUnaCancelacionEnCurso_ElCodigoDelSegundoFactorNoSeConsume()
+    {
+        var (e, cliente, cancelacion) = Escenario();
+        var (secreto, _) = e.ConSegundoFactor(cliente);
+        e.Pendientes.Cantidad = 1;
+        await cancelacion.Solicitar(cliente.Usuario.Id, Contrasena, S(e.Totp(secreto)));
+        var codigo = e.Totp(secreto, 1);
+
+        var otra = await cancelacion.Solicitar(cliente.Usuario.Id, Contrasena, S(codigo));
+        var desiste = await cancelacion.Desistir(cliente.Usuario.Id);
+        var denuevo = await cancelacion.Solicitar(cliente.Usuario.Id, Contrasena, S(codigo));
+
+        Assert.Equal("cancelacion-en-curso", otra.Error!.Clave);
+        Assert.True(desiste.EsExito);
+        Assert.True(denuevo.EsExito);
+    }
+
+    [Fact]
+    public async Task LaRevision_NoEnviaCorreoALasCuentasDesactivadas()
+    {
+        var (e, cliente, cancelacion) = Escenario();
+        e.Pendientes.Cantidad = 1;
+        await cancelacion.Solicitar(cliente.Usuario.Id, Contrasena, null);
+        cliente.Usuario.Desactivar();
+        e.Correo.Correos.Clear();
+        e.Pendientes.Cantidad = 0;
+        e.Actor.Actual = ActorActual.DelSistema();
+
+        await e.Revision().Revisar();
+
+        Assert.Empty(e.Correo.Correos);
+    }
 }

@@ -81,7 +81,11 @@ public sealed class GestionDeLaCuenta(
         {
             return Resultado<RespuestaUniforme>.Fallo(prohibido);
         }
-if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)        {            return Resultado<RespuestaUniforme>.Fallo(congelado);        }
+
+        if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)
+        {
+            return Resultado<RespuestaUniforme>.Fallo(congelado);
+        }
 
         var cuenta = await Cargar(usuarioId, false, cancelacion).ConfigureAwait(false);
         if (cuenta is null)
@@ -89,6 +93,7 @@ if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, c
             return Resultado<RespuestaUniforme>.Fallo(AlcanceDeLaCuenta.CuentaNoEncontrada);
         }
 
+        var resumenVerificado = cuenta.ResumenDeAcceso;
         if (await reautenticacion.ContrasenaActual(cuenta, actual, cancelacion).ConfigureAwait(false) is { } rechazo)
         {
             return Resultado<RespuestaUniforme>.Fallo(rechazo);
@@ -102,12 +107,20 @@ if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, c
 
         var resumen = await hasher.Resumir(contrasena, cancelacion).ConfigureAwait(false);
         var familia = await FamiliaDeLaSesion(usuarioId, renovacionDeLaSesion, cancelacion).ConfigureAwait(false);
+        var cambioConcurrente = false;
         var hecho = await unidad.Ejecutar(
             async ct =>
             {
                 var bloqueada = await Cargar(usuarioId, true, ct).ConfigureAwait(false);
                 if (bloqueada is null)
                 {
+                    return false;
+                }
+
+                // La contraseña actual se verificó contra el resumen leído sin bloqueo: si una recuperación o un restablecimiento lo cambió mientras tanto, no se pisa con una verificación vieja.
+                if (!string.Equals(bloqueada.ResumenDeAcceso, resumenVerificado, StringComparison.Ordinal))
+                {
+                    cambioConcurrente = true;
                     return false;
                 }
 
@@ -123,7 +136,7 @@ if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, c
 
         if (!hecho)
         {
-            return Resultado<RespuestaUniforme>.Fallo(AlcanceDeLaCuenta.CuentaNoEncontrada);
+            return Resultado<RespuestaUniforme>.Fallo(cambioConcurrente ? Reautenticacion.ContrasenaActualIncorrecta : AlcanceDeLaCuenta.CuentaNoEncontrada);
         }
 
         await avisos.ContrasenaCambiada(cuenta.Usuario, cancelacion).ConfigureAwait(false);
@@ -265,7 +278,11 @@ if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, c
         {
             return Resultado<SecretoDelSegundoFactor>.Fallo(prohibido);
         }
-if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)        {            return Resultado<SecretoDelSegundoFactor>.Fallo(congelado);        }
+
+        if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)
+        {
+            return Resultado<SecretoDelSegundoFactor>.Fallo(congelado);
+        }
 
         var cuenta = await Cargar(usuarioId, false, cancelacion).ConfigureAwait(false);
         if (cuenta is null)
@@ -295,7 +312,11 @@ if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, c
         {
             return Resultado<IReadOnlyList<ValorSecreto>>.Fallo(prohibido);
         }
-if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)        {            return Resultado<IReadOnlyList<ValorSecreto>>.Fallo(congelado);        }
+
+        if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)
+        {
+            return Resultado<IReadOnlyList<ValorSecreto>>.Fallo(congelado);
+        }
 
         if (await Cargar(usuarioId, false, cancelacion).ConfigureAwait(false) is null)
         {
@@ -311,6 +332,8 @@ if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, c
         var guardado = await segundoFactor.Obtener(usuarioId, cancelacion).ConfigureAwait(false);
         if (guardado is null)
         {
+            // Sin haber probado ningún código no cuenta como intento: se devuelven los cupos (no se autobloquea quien se equivoca de paso).
+            await LimitesDelSegundoFactor.Devolver(limites, reservas, cancelacion).ConfigureAwait(false);
             return Resultado<IReadOnlyList<ValorSecreto>>.Fallo(NoIniciado);
         }
 
@@ -319,6 +342,7 @@ if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, c
         var confirmacion = guardado.Factor.Confirmar(cifrador.Descifrar(guardado.SecretoCifrado, usuarioId), codigo.Revelar(), reloj.Ahora, huellasDeRespaldo);
         if (confirmacion == ResultadoDeSegundoFactor.YaActivo)
         {
+            await LimitesDelSegundoFactor.Devolver(limites, reservas, cancelacion).ConfigureAwait(false);
             return Resultado<IReadOnlyList<ValorSecreto>>.Fallo(YaActivo);
         }
 
@@ -336,6 +360,12 @@ if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, c
                 if (cuenta is null)
                 {
                     return Resultado<IReadOnlyList<ValorSecreto>>.Fallo(AlcanceDeLaCuenta.CuentaNoEncontrada);
+                }
+
+                // Bajo el bloqueo se relee: dos confirmaciones simultáneas no activan dos veces ni pisan los códigos de respaldo que ya se entregaron.
+                if (await segundoFactor.Obtener(usuarioId, ct).ConfigureAwait(false) is { Factor.EstaActivo: true })
+                {
+                    return Resultado<IReadOnlyList<ValorSecreto>>.Fallo(YaActivo);
                 }
 
                 await segundoFactor.Activar(usuarioId, guardado.Factor.UltimoPasoUsado!.Value, huellasDeRespaldo, ct).ConfigureAwait(false);
@@ -361,7 +391,11 @@ if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, c
         {
             return Resultado<RespuestaUniforme>.Fallo(prohibido);
         }
-if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)        {            return Resultado<RespuestaUniforme>.Fallo(congelado);        }
+
+        if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)
+        {
+            return Resultado<RespuestaUniforme>.Fallo(congelado);
+        }
 
         var cuenta = await Cargar(usuarioId, false, cancelacion).ConfigureAwait(false);
         if (cuenta is null)
@@ -410,7 +444,11 @@ if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, c
         {
             return Resultado<IReadOnlyList<ValorSecreto>>.Fallo(prohibido);
         }
-if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)        {            return Resultado<IReadOnlyList<ValorSecreto>>.Fallo(congelado);        }
+
+        if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)
+        {
+            return Resultado<IReadOnlyList<ValorSecreto>>.Fallo(congelado);
+        }
 
         var cuenta = await Cargar(usuarioId, false, cancelacion).ConfigureAwait(false);
         if (cuenta is null)
@@ -451,6 +489,11 @@ if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, c
         if (await alcance.Comprobar(usuarioId, cancelacion).ConfigureAwait(false) is { } prohibido)
         {
             return Resultado<IReadOnlyList<AvisoDeCuenta>>.Fallo(prohibido);
+        }
+
+        if (await Cargar(usuarioId, false, cancelacion).ConfigureAwait(false) is null)
+        {
+            return Resultado<IReadOnlyList<AvisoDeCuenta>>.Fallo(AlcanceDeLaCuenta.CuentaNoEncontrada);
         }
 
         return Resultado<IReadOnlyList<AvisoDeCuenta>>.Exito(await avisosDeCuenta.Listar(usuarioId, cancelacion).ConfigureAwait(false));
@@ -546,7 +589,8 @@ if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, c
         var guardado = await segundoFactor.Obtener(usuarioId, cancelacion).ConfigureAwait(false);
         if (guardado is not { Factor.EstaActivo: true })
         {
-            return new Verificacion(NoActivo, null, reservas);
+            await LimitesDelSegundoFactor.Devolver(limites, reservas, cancelacion).ConfigureAwait(false);
+            return new Verificacion(NoActivo, null, []);
         }
 
         var presentado = reautenticacion.Evaluar(usuarioId, guardado, codigo.Revelar(), permiteRespaldo);

@@ -34,6 +34,11 @@ public sealed class AdministracionDeUsuarios(
             return Resultado<ContrasenaTemporalEntregada>.Fallo(error);
         }
 
+        if (!Enum.IsDefined(rol))
+        {
+            return Resultado<ContrasenaTemporalEntregada>.Fallo(FallosDeIdentidad.Validacion("rol", "invalido"));
+        }
+
         var rolDeUsuario = RolDeUsuarioDe(rol);
         if (!EntradasDeIdentidad.NombreValido(nombre))
         {
@@ -97,6 +102,11 @@ public sealed class AdministracionDeUsuarios(
         if (error is not null)
         {
             return Resultado<UsuarioAdministrado>.Fallo(error);
+        }
+
+        if (!Enum.IsDefined(rol))
+        {
+            return Resultado<UsuarioAdministrado>.Fallo(FallosDeIdentidad.Validacion("rol", "invalido"));
         }
 
         var nuevoRol = RolDeUsuarioDe(rol);
@@ -360,7 +370,7 @@ public sealed class AdministracionDeUsuarios(
 
     private async Task<ErrorDeAplicacion> Rechazo(DecisionDeAdministracion decision, CancellationToken cancelacion) => decision.Motivo switch
     {
-        MotivoDeRechazoDeUsuario.NoEsAdministrador => await alcance.Denegar(cancelacion).ConfigureAwait(false),
+        MotivoDeRechazoDeUsuario.NoEsAdministrador => await alcance.Denegar(cancelacion, "fuera-de-rol").ConfigureAwait(false),
         MotivoDeRechazoDeUsuario.SobreSiMismo => new ErrorDeAplicacion(CategoriaDeError.Conflicto, "sobre-si-mismo"),
         MotivoDeRechazoDeUsuario.UltimoAdministrador => new ErrorDeAplicacion(CategoriaDeError.Conflicto, "ultimo-administrador"),
         MotivoDeRechazoDeUsuario.SucursalYaTieneEncargado => SucursalConEncargado(decision.EncargadoActual!.Value),
