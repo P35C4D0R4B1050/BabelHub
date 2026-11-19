@@ -23,6 +23,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
         [nameof(AccionesAuditables.IngresosSolicitadosAnonimizados)] = [],
         [nameof(AccionesAuditables.CobroIniciado)] = ["intento-de-cobro"],
         [nameof(AccionesAuditables.CobroResuelto)] = ["intento-de-cobro"],
+        [nameof(AccionesAuditables.AvisoDeLaPasarelaRecibido)] = ["intento-de-cobro"],
         [nameof(AccionesAuditables.ReingresoPorDevolucion)] = ["ajuste", "devolucion"],
         [nameof(AccionesAuditables.ReembolsoRegistrado)] = ["pedido"],
         [nameof(AccionesAuditables.EstadoDePedidoCambiado)] = ["pedido"],

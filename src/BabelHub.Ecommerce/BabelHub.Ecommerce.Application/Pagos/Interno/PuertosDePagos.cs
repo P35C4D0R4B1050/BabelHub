@@ -40,6 +40,9 @@ internal sealed record ResultadoDeReembolsoEnPasarela(TipoDeResultadoDeReembolso
     public override string ToString() => $"ResultadoDeReembolsoEnPasarela {{ Tipo = {Tipo} }}";
 }
 
+/// <summary>Lo que se entiende de un aviso entrante: el identificador del evento (para no repetirlo) y la referencia opaca del cargo, que es la clave del intento. Sin datos de pago ni del cliente.</summary>
+internal sealed record AvisoDeLaPasarela(string IdDeEntrada, Guid ReferenciaOpaca);
+
 /// <summary>Un reembolso que la pasarela dice haber aplicado a un cargo: su <c>reembolsos.id</c> viaja en los metadatos para reconocerlo (D08).</summary>
 internal sealed record ReembolsoEnPasarela(Guid? ReembolsoId, string Referencia, Importe Monto);
 
@@ -59,6 +62,11 @@ internal interface IPasarelaDePago
 
     /// <summary>Los reembolsos que la pasarela tiene de un cargo, para no pedir otro a ciegas; <c>null</c> si no se pudo consultar.</summary>
     Task<IReadOnlyList<ReembolsoEnPasarela>?> ConsultarReembolsos(string referenciaDelCargo, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Lee el aviso entrante sin red y sin confiar en él (su firma la verifica <c>Plataforma</c>): el identificador del evento y la referencia opaca del cargo (los metadatos); <c>null</c> si no se entiende. El aviso solo adelanta la consulta.
+    /// </summary>
+    AvisoDeLaPasarela? InterpretarAviso(ReadOnlyMemory<byte> cuerpo);
 }
 
 // ---------- Las reservas en el Inventario ----------
@@ -136,6 +144,9 @@ internal interface IRepositorioDePagos
     Task<ResultadoDeAgregarIntento> AgregarIntento(IntentoDeCobro intento, CancellationToken cancelacion = default);
 
     Task GuardarIntento(IntentoDeCobro intento, CancellationToken cancelacion = default);
+
+    /// <summary>Los intentos <c>iniciado</c> o <c>pendiente_de_confirmacion</c>, los más antiguos primero: los que el trabajo de consulta revisa.</summary>
+    Task<IReadOnlyList<Guid>> ListarIntentosSinResolver(int limite, CancellationToken cancelacion = default);
 
     /// <summary>La compensación de un cobro (una por cobro, clave <c>(intención, intento)</c>).</summary>
     Task<Compensacion?> ObtenerCompensacion(Guid intentoId, CancellationToken cancelacion = default);

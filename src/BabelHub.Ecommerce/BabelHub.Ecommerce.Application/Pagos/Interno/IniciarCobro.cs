@@ -33,7 +33,7 @@ internal sealed class IniciarCobro(
     RegistrarIntento registrar,
     IPasarelaDePago pasarela,
     ICuentaDelPagador cuentas,
-    IReservasDelPago reservas,
+    ExtenderReservaDelPago extender,
     IConfirmadorDeCompraAprobada confirmador,
     IAvisadorACarrito avisador,
     IAuditoria auditoria,
@@ -146,7 +146,7 @@ internal sealed class IniciarCobro(
                 if (cierre.PasoAPendiente)
                 {
                     // El aviso de «pendiente» con impresos nace retenido: sale con los instantes definitivos cuando termina reservas.extender (si falla, lo libera la consulta del trabajo).
-                    if (await ExtenderLaReservaSiHaceFalta(entrada.PedidoId).ConfigureAwait(false))
+                    if (await extender.Extender(entrada.PedidoId).ConfigureAwait(false))
                     {
                         await avisador.LiberarElPendienteRetenido(entrada.PedidoId, intentoRegistrado.Id, CancellationToken.None).ConfigureAwait(false);
                     }
@@ -292,34 +292,8 @@ internal sealed class IniciarCobro(
         }
     }
 
-    private Task Auditar(IntentoDeCobro intento, string resultado, string? motivo, MotivoDeDuda? duda, CancellationToken token)
-    {
-        var detalle = new Dictionary<string, string?> { ["resultado"] = resultado };
-        if (motivo is not null)
-        {
-            detalle["motivo"] = motivo;
-        }
-
-        if (duda is { } d)
-        {
-            // El aprobado dudoso queda identificable en la auditoría (AM11): referencia, moneda o importe distintos del intento.
-            detalle["duda"] = d switch
-            {
-                MotivoDeDuda.ReferenciaDistinta => "referencia",
-                MotivoDeDuda.MonedaDistinta => "moneda",
-                _ => "importe",
-            };
-        }
-
-        return auditoria.Registrar(
-            new SolicitudDeRegistro(AccionesAuditables.CobroResuelto)
-            {
-                ObjetoTipo = "intento-de-cobro",
-                ObjetoId = intento.Id.ToString("D"),
-                Detalle = detalle,
-            },
-            token);
-    }
+    private Task Auditar(IntentoDeCobro intento, string resultado, string? motivo, MotivoDeDuda? duda, CancellationToken token) =>
+        ResolucionesDeCobros.Auditar(auditoria, intento, resultado, motivo, duda, token);
 
     private async Task Alertar(string motivo)
     {
@@ -333,57 +307,9 @@ internal sealed class IniciarCobro(
         }
     }
 
-    /// <summary>Con impresos, el pago pendiente prolonga la reserva una sola vez hasta los 30 minutos desde el inicio (PAG-13), <b>fuera de toda transacción</b>; si falla, la retoma el trabajo de consulta.</summary>
-    private async Task<bool> ExtenderLaReservaSiHaceFalta(Guid pedidoId)
-    {
-        try
-        {
-            var intencion = await unidad.Ejecutar(token => repositorio.ObtenerIntencion(pedidoId, paraActualizar: false, token), CancellationToken.None).ConfigureAwait(false);
-            if (intencion is not { TieneImpresos: true, ReservaExtendida: false })
-            {
-                return true;
-            }
-
-            var extension = await reservas.Extender(pedidoId, CancellationToken.None).ConfigureAwait(false);
-            if (!extension.EsCorrecta || extension.Valor is null)
-            {
-                return false;
-            }
-
-            await unidad.Ejecutar(
-                async token =>
-                {
-                    // El mismo orden de bloqueo (D24): la marca de cancelación de la cuenta y después la intención.
-                    if (intencion.CuentaId is { } cuentaId)
-                    {
-                        await cuentas.CancelacionEnEjecucion(cuentaId, bloquear: true, token).ConfigureAwait(false);
-                    }
-
-                    var actual = await repositorio.ObtenerIntencion(pedidoId, paraActualizar: true, token).ConfigureAwait(false);
-                    if (actual is not null && actual.ExtenderReserva(extension.Valor.ExpiraEn))
-                    {
-                        await repositorio.GuardarIntencion(actual, token).ConfigureAwait(false);
-                    }
-
-                    return true;
-                },
-                CancellationToken.None).ConfigureAwait(false);
-            return true;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            // El inventario o la base no respondieron: la reserva se extiende en la siguiente consulta del trabajo.
-            return false;
-        }
-    }
-
     /// <summary>Anota, en la misma transacción de la transición, el aviso a Carrito y el aviso del estado del pago al cliente (idempotentes por su clave).</summary>
-    private async Task AnotarLosAvisos(Guid intencionId, Guid intentoId, TransicionDeAviso transicion, EventoDeAvisoDePago evento, bool retenido, CancellationToken token)
-    {
-        var ahora = reloj.Ahora;
-        await repositorio.AgregarAvisoACarrito(AvisoACarrito.Crear(intencionId, intentoId, transicion, retenido, ahora), token).ConfigureAwait(false);
-        await repositorio.AgregarAvisoDePago(AvisoDePago.Crear(intencionId, intentoId, evento, ahora), token).ConfigureAwait(false);
-    }
+    private Task AnotarLosAvisos(Guid intencionId, Guid intentoId, TransicionDeAviso transicion, EventoDeAvisoDePago evento, bool retenido, CancellationToken token) =>
+        ResolucionesDeCobros.AnotarLosAvisos(repositorio, intencionId, intentoId, transicion, evento, retenido, reloj.Ahora, token);
 }
 
 /// <summary>Traduce el motivo de rechazo del Dominio al público (mismos nombres, lo comprueba una prueba).</summary>

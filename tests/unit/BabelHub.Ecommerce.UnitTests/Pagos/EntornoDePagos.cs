@@ -170,6 +170,9 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
     public Task<IReadOnlyList<AvisoDePago>> ListarAvisosDePagoDeLaIntencion(Guid intencionId, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<AvisoDePago>>(_avisosDePago.Where(a => a.IntencionId == intencionId).Select(a => a.Copiar()).ToArray());
 
+    public Task<IReadOnlyList<Guid>> ListarIntentosSinResolver(int limite, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(_intentos.Values.Where(i => i.Estado is EstadoDeIntento.Iniciado or EstadoDeIntento.PendienteDeConfirmacion).OrderBy(i => i.IniciadoEn).Select(i => i.Id).Take(limite).ToArray());
+
     public Task<IReadOnlyList<Guid>> ListarIntencionesConAvisosACarritoListos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<Guid>>(_avisosACarrito.Where(a => a.EstaListo(ahora)).OrderBy(a => a.CreadoEn).Select(a => a.IntencionId).Distinct().Take(limite).ToArray());
 
@@ -268,7 +271,8 @@ internal sealed class EntornoDePagos
         Reloj = new RelojFijo(ahora ?? IntencionesDePrueba.Inicio);
         Repositorio = new RepositorioDePagosEnMemoria();
         Reembolsos = new RepositorioDeReembolsosEnMemoria(Repositorio);
-        Unidad = new UnidadDeTrabajoReversible(Repositorio, Reembolsos);
+        Procesador = new ProcesadorDeEntradasDoble();
+        Unidad = new UnidadDeTrabajoReversible(Repositorio, Reembolsos, Procesador);
         Denegaciones = new DenegacionesDelCatalogoEspia();
         Creador = new IntencionesDePagoDeLaAplicacion(Repositorio, Unidad, Reloj, Denegaciones);
         Actor = ActorDePrueba.DeCliente(InstantaneasDeCompraDePrueba.Cuenta);
@@ -317,7 +321,7 @@ internal sealed class EntornoDePagos
 
     /// <summary>El orquestador con otras opciones (por ejemplo, la pasarela que exige el correo del titular).</summary>
     public IniciarCobro CrearIniciarCobro(OpcionesDelCobro opciones) =>
-        new(Autorizador, Firmador, Repositorio, Unidad, RegistrarIntento, Pasarela, Cuenta, Reservas, Confirmador, Avisador, Auditoria, Alertas, Reloj, opciones);
+        new(Autorizador, Firmador, Repositorio, Unidad, RegistrarIntento, Pasarela, Cuenta, new ExtenderReservaDelPago(Repositorio, Unidad, Cuenta, Reservas), Confirmador, Avisador, Auditoria, Alertas, Reloj, opciones);
 
     public ActorDePrueba Actor { get; }
 
@@ -334,6 +338,8 @@ internal sealed class EntornoDePagos
     public RepositorioDePagosEnMemoria Repositorio { get; }
 
     public RepositorioDeReembolsosEnMemoria Reembolsos { get; }
+
+    public ProcesadorDeEntradasDoble Procesador { get; }
 
     public UnidadDeTrabajoReversible Unidad { get; }
 

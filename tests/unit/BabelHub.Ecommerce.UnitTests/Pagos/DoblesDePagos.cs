@@ -208,7 +208,35 @@ internal sealed class PasarelaDePagoDoble(UnidadDeTrabajoReversible unidad) : IP
         return Respuesta is { } f ? f(solicitud) : ResultadoDeCobro.Aprobado("ch_1", solicitud.Importe, "PEN", solicitud.ReferenciaOpaca);
     }
 
-    public Task<ResultadoDeCobro> ConsultarEstado(Guid referenciaOpaca, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    /// <summary>Lo que responde la pasarela al consultar un cargo (por defecto, que no lo conoce).</summary>
+    public Func<Guid, ResultadoDeCobro>? RespuestaDeConsulta { get; set; }
+
+    public bool ConsultaLanza { get; set; }
+
+    public List<Guid> Consultas { get; } = [];
+
+    public int ConsultasDentroDeUnaTransaccion { get; private set; }
+
+    /// <summary>Cómo se lee un aviso entrante (por defecto, no se entiende).</summary>
+    public Func<ReadOnlyMemory<byte>, AvisoDeLaPasarela?>? Interprete { get; set; }
+
+    public AvisoDeLaPasarela? InterpretarAviso(ReadOnlyMemory<byte> cuerpo) => Interprete?.Invoke(cuerpo);
+
+    public Task<ResultadoDeCobro> ConsultarEstado(Guid referenciaOpaca, CancellationToken cancelacion = default)
+    {
+        Consultas.Add(referenciaOpaca);
+        if (unidad.EnCurso)
+        {
+            ConsultasDentroDeUnaTransaccion++;
+        }
+
+        if (ConsultaLanza)
+        {
+            throw new HttpRequestException("La pasarela falló.");
+        }
+
+        return Task.FromResult(RespuestaDeConsulta is { } f ? f(referenciaOpaca) : ResultadoDeCobro.SinRespuesta());
+    }
 
     /// <summary>Lo que responde la pasarela a un pedido de reembolso (por defecto, lo aplica).</summary>
     public Func<Guid, ResultadoDeReembolsoEnPasarela>? RespuestaDeReembolso { get; set; }
@@ -468,5 +496,57 @@ internal sealed class ProgresoDelCheckoutDoble(UnidadDeTrabajoReversible unidad)
         }
 
         return Falla ? throw new HttpRequestException("Carrito no responde.") : Task.FromResult(Respuesta);
+    }
+}
+
+/// <summary>El procesador de entradas de integración de Plataforma doblado: verifica «la firma» (un interruptor), deduplica por identificador y libera el reclamo si la transacción se revierte.</summary>
+internal sealed class ProcesadorDeEntradasDoble : IProcesadorDeEntradasDeIntegracion, IInstantanea
+{
+    private HashSet<string> _reclamadas = [];
+    private HashSet<string> _completadas = [];
+
+    public bool FirmaValida { get; set; } = true;
+
+    /// <summary>Fuerza que otra llamada con el mismo identificador siga en curso.</summary>
+    public bool EnCurso { get; set; }
+
+    public List<EntradaDeIntegracion> Recibidas { get; } = [];
+
+    public IReadOnlyCollection<string> Completadas => _completadas;
+
+    public Task<ResultadoDeEntradaDeIntegracion> Recibir(EntradaDeIntegracion entrada, CancellationToken cancelacion = default)
+    {
+        Recibidas.Add(entrada);
+        if (!FirmaValida || string.IsNullOrEmpty(entrada.IdDeEntrada))
+        {
+            return Task.FromResult(new ResultadoDeEntradaDeIntegracion(EstadoDeEntradaDeIntegracion.Rechazada));
+        }
+
+        if (_completadas.Contains(entrada.IdDeEntrada))
+        {
+            return Task.FromResult(new ResultadoDeEntradaDeIntegracion(EstadoDeEntradaDeIntegracion.Repetida));
+        }
+
+        if (EnCurso || !_reclamadas.Add(entrada.IdDeEntrada))
+        {
+            return Task.FromResult(new ResultadoDeEntradaDeIntegracion(EstadoDeEntradaDeIntegracion.EnCurso));
+        }
+
+        return Task.FromResult(new ResultadoDeEntradaDeIntegracion(EstadoDeEntradaDeIntegracion.Aceptada));
+    }
+
+    public Task Completar(string proveedor, string idDeEntrada, ResultadoMinimo resultado, CancellationToken cancelacion = default)
+    {
+        _completadas.Add(idDeEntrada);
+        return Task.CompletedTask;
+    }
+
+    public object Capturar() => (new HashSet<string>(_reclamadas), new HashSet<string>(_completadas));
+
+    public void Restaurar(object instantanea)
+    {
+        var (reclamadas, completadas) = ((HashSet<string>, HashSet<string>))instantanea;
+        _reclamadas = reclamadas;
+        _completadas = completadas;
     }
 }

@@ -22,6 +22,9 @@ public static partial class AccionesAuditables
     /// <summary>Se resolvió un cobro: aprobado, rechazado (con su motivo de la lista cerrada) o pendiente de confirmación (PAG-11).</summary>
     public static readonly AccionAuditable CobroResuelto = new(nameof(CobroResuelto));
 
+    /// <summary>El aviso firmado de la pasarela adelantó la consulta de un intento sin resolver (PAG-19): sin el cuerpo del aviso ni datos de pago.</summary>
+    public static readonly AccionAuditable AvisoDeLaPasarelaRecibido = new(nameof(AvisoDeLaPasarelaRecibido));
+
     /// <summary>El Catálogo concilió un ingreso de mercadería pendiente con los ingresos del Inventario (registrado, fallido o discrepancia; sin la nota ni la referencia, CAT-22).</summary>
     public static readonly AccionAuditable IngresoPendienteConciliado = new(nameof(IngresoPendienteConciliado));
 
