@@ -255,6 +255,20 @@ public sealed class AnfitrionDelInventarioTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-SEG-25")]
+    public void UnServicioConLaCuentaPropietariaEnSuEntorno_NoArranca_NombrandoLaVariableSinElValor()
+    {
+        var configuracion = ConfiguracionCompleta();
+        var cuenta = Cuenta("postgres");
+        configuracion["Migrador:Inventario:Propietaria"] = cuenta;
+
+        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => OpcionesDelAnfitrionDelInventario.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: true));
+
+        Assert.Contains("BABELHUB__Migrador", falla.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(cuenta, falla.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LasOpciones_NoImprimenNingunValor()
     {
         var opciones = OpcionesDelAnfitrionDelInventario.Leer(new ConfigurationBuilder().AddInMemoryCollection(ConfiguracionCompleta()).Build(), esProduccion: true);

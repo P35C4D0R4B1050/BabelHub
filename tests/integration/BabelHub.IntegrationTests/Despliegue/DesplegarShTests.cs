@@ -50,6 +50,7 @@ public sealed class DesplegarShTests : IDisposable
           *" config --quiet"*) exit 0 ;;
           *" config --services"*) printf '%s\n' $DOBLE_SERVICIOS; exit 0 ;;
           *" up -d --wait"*) [[ "${DOBLE_UP_FALLA:-0}" == 1 ]] && exit 1; exit 0 ;;
+          *" run --rm "*) [[ "${DOBLE_RUN_FALLA:-0}" == 1 ]] && exit 1; exit 0 ;;
           *" ps -q "*) echo "id-${@: -1}"; exit 0 ;;
           inspect*)
             id="${@: -1}"; servicio="${id#id-}"
@@ -151,6 +152,15 @@ public sealed class DesplegarShTests : IDisposable
 
         if (vm == "inventario")
         {
+            // Las cuentas propietarias de las bases (COMP-2): solo la VM de datos las tiene, aparte de los archivos de los servicios.
+            var claveInventario = Aleatorio(60);
+            var claveEcommerce = Aleatorio(60);
+            _valoresSecretos.Add(claveInventario);
+            _valoresSecretos.Add(claveEcommerce);
+            File.WriteAllText(
+                Path.Combine(_secretos, "migrador.env"),
+                $"BABELHUB__Migrador__Inventario__Propietaria=Host=postgres;Username=postgres;Pass{"word"}={claveInventario}\nBABELHUB__Migrador__Ecommerce__Propietaria=Host=postgres;Username=postgres;Pass{"word"}={claveEcommerce}\n");
+
             // La credencial de correo propia de la VM de datos (PLA-21): sirve solo para avisar del espacio reservado.
             var claveDeCorreo = Aleatorio(24);
             _valoresSecretos.Add(claveDeCorreo);
@@ -361,6 +371,96 @@ public sealed class DesplegarShTests : IDisposable
         Assert.True(codigo == 0, salida + errores);
         Assert.Empty(Directory.GetFiles(_cron));
         Assert.DoesNotContain("aviso.env", salida + errores, StringComparison.Ordinal);
+    }
+
+    // ---------- La migración de las bases (COMP-2) ----------
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void LaVmDeDatos_LevantaPostgresMigraLasDosBasesYDespuesLevantaTodo_EnEseOrden()
+    {
+        PrepararSecretos("inventario");
+
+        var (codigo, salida, errores) = Desplegar("inventario");
+
+        Assert.True(codigo == 0, salida + errores);
+        var llamadas = LlamadasADocker.ToList();
+        var postgres = llamadas.FindIndex(l => l.Contains("up -d --wait --wait-timeout 300 postgres", StringComparison.Ordinal));
+        var inventario = llamadas.FindIndex(l => l.Contains("run --rm --no-deps -e BABELHUB__Migrador__Inventario__Propietaria inventario migrar", StringComparison.Ordinal));
+        var ecommerce = llamadas.FindIndex(l => l.Contains("run --rm --no-deps -e BABELHUB__Migrador__Ecommerce__Propietaria ecommerce-gestion migrar", StringComparison.Ordinal));
+        var todo = llamadas.FindLastIndex(l => l.EndsWith("up -d --wait --wait-timeout 300", StringComparison.Ordinal));
+        Assert.True(postgres >= 0 && postgres < inventario && inventario < ecommerce && ecommerce < todo, string.Join("\n", llamadas));
+        SinSecretosEnLaSalida(salida, errores);
+        Assert.DoesNotContain(llamadas, l => l.Contains("Propietaria=", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("borde")]
+    [InlineData("ventas")]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void LasOtrasVms_NoMigran_NiPidenMigradorEnv(string vm)
+    {
+        PrepararSecretos(vm);
+
+        var (codigo, salida, errores) = Desplegar(vm);
+
+        Assert.True(codigo == 0, salida + errores);
+        Assert.DoesNotContain(LlamadasADocker, l => l.Contains(" run --rm ", StringComparison.Ordinal));
+        Assert.False(File.Exists(Path.Combine(_secretos, "migrador.env")));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void SinMigradorEnvOSinUnaDeSusClaves_LaVmDeDatosNoSeDespliega_SinLlamarADocker()
+    {
+        PrepararSecretos("inventario");
+        File.Delete(Path.Combine(_secretos, "migrador.env"));
+        var (sinArchivo, _, erroresSinArchivo) = Desplegar("inventario");
+        PrepararSecretos("inventario");
+        File.WriteAllText(Path.Combine(_secretos, "migrador.env"), "BABELHUB__Migrador__Inventario__Propietaria=algo\n");
+
+        var (sinClave, _, erroresSinClave) = Desplegar("inventario");
+
+        Assert.Equal(1, sinArchivo);
+        Assert.Contains("migrador.env", erroresSinArchivo, StringComparison.Ordinal);
+        Assert.Equal(1, sinClave);
+        Assert.Contains("falta la clave BABELHUB__Migrador__Ecommerce__Propietaria en migrador.env", erroresSinClave, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-25")]
+    public void LaCuentaPropietariaEnElArchivoDeUnServicio_OMigradorEnEnUnaVmQueNoMigra_NoSeDespliega()
+    {
+        PrepararSecretos("inventario");
+        File.AppendAllText(Path.Combine(_secretos, "inventario.env"), "BABELHUB__Migrador__Inventario__Propietaria=algo\n");
+        var (enServicio, _, erroresEnServicio) = Desplegar("inventario");
+        PrepararSecretos("ventas");
+        File.WriteAllText(Path.Combine(_secretos, "migrador.env"), "BABELHUB__Migrador__Ecommerce__Propietaria=algo\n");
+
+        var (enVentas, _, erroresEnVentas) = Desplegar("ventas");
+
+        Assert.Equal(1, enServicio);
+        Assert.Contains("inventario.env lleva claves BABELHUB__Migrador__*", erroresEnServicio, StringComparison.Ordinal);
+        Assert.Equal(1, enVentas);
+        Assert.Contains("existe migrador.env en la VM ventas", erroresEnVentas, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void SiLaMigracionFalla_NoSeLevantanLosServicios()
+    {
+        PrepararSecretos("inventario");
+        var entorno = EntornoDe("inventario");
+        entorno["DOBLE_RUN_FALLA"] = "1";
+
+        var (codigo, salida, errores) = Desplegar("inventario", entorno);
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("La migración de la base de inventario falló", errores, StringComparison.Ordinal);
+        Assert.DoesNotContain(LlamadasADocker, l => l.EndsWith("up -d --wait --wait-timeout 300", StringComparison.Ordinal));
+        SinSecretosEnLaSalida(salida, errores);
     }
 
     // ---------- Lo que impide desplegar ----------

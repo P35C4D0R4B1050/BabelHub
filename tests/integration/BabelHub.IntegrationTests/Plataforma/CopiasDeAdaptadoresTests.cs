@@ -36,6 +36,7 @@ public sealed class CopiasDeAdaptadoresTests
         "Infrastructure/Plataforma/TrabajosDeFondoPostgres.cs",
         "Infrastructure/Plataforma/LatidoDeLaBase.cs",
         "Api/Plataforma/ModoDeArranque.cs",
+        "Infrastructure/Migracion/MigradorDeLaBase.cs",
         "Api/Plataforma/SaludHttp.cs",
         "Domain/Auditoria/DetalleSeguro.cs",
         "Domain/Auditoria/CatalogoDeAcciones.cs",

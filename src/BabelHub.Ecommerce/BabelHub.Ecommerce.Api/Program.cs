@@ -1,6 +1,12 @@
 using BabelHub.Ecommerce.Api.Plataforma;
 using BabelHub.Ecommerce.Application.Plataforma;
 
+// El modo migrar (COMP-2): aplica los esquemas y los roles de la base con la cuenta propietaria y termina; no arranca el servidor.
+if (args.Length > 0 && args[0] == ModoMigrar.Argumento)
+{
+    return await ModoMigrar.Ejecutar(new ConfigurationBuilder().AddEnvironmentVariables(prefix: "BABELHUB__").Build(), Console.Out, Console.Error);
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Las variables BABELHUB__… son la configuración del servicio (SEG-11): BABELHUB__Modo se lee como «Modo».
