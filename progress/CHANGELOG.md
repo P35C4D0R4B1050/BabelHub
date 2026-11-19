@@ -2,6 +2,19 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-19 — IDE-4, SEL-39, ECO-11b y las pruebas de verificación fundidos
+
+### Cubierto
+- **Carril A:** IDE-4 (T18–T22 de `identidad-seguridad`): cuenta del cliente, administración de usuarios, cambio de correo con congelamiento, solicitudes sobre datos personales y solicitud de cancelación; incluye lo que esperaba el carrito (cliente del Inventario con consulta previa, reservar y liberar; políticas de límite y 7 acciones de auditoría de Carrito; marca de cancelación con bloqueo y consentimiento de WhatsApp por huella).
+- **Carril B:** SEL-39 corregido en el código (alcance antes que la forma de la clave, con su evento).
+- **Carril C:** ECO-11b (T07–T12 de reclamaciones) y 21 motivos de alerta de Pagos y Reclamaciones registrados en el catálogo cerrado.
+- **Carril V (verificación FIN-1):** `verificacion.md` de seis specs (una converge, cinco no por huecos con dueño; ver `progress/coordinacion.md`) y las pruebas que cerraban SEL-03, SEL-24, AC-AUD-09, AC-AUD-25 y AC-SEG-23.
+- Integración de `main` antes del último merge: 4942 de 4945; dos fallos reales (texto en español de los 21 motivos nuevos en `PresentadorDeAuditoria`, a cargo de C, y una cadena de conexión con contraseña literal en `PostgresDelCarritoFixture`, a cargo de B) y el escáner de secretos por contención.
+- Un conflicto semántico al fundir IDE-4 (listas de políticas de límite de A y de C) se resolvió a mano en una lista unión: el recuento de motivos de límite pasa a 29.
+
+### Pendiente
+- Correcciones de B y C; IDE-5 (A); la corrida de integración de `main` con IDE-4; ECO-6 de pedidos, ECO-11c y 11d, ECO-5d; planes de `asistente-compra-ia` y `web-indice-infinito` (ratificación de cinco valores por la persona).
+
 ## 2026-11-19 — ECO-4c, ECO-4d y ECO-5c fundidos; tablero de coordinación
 
 ### Cubierto
