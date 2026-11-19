@@ -216,6 +216,67 @@ internal sealed class ProcesarReembolso(
         }
     }
 
+    /// <summary>
+    /// Reanuda un reembolso <c>solicitado</c> huérfano (el proceso cayó tras pedirlo): <b>consulta a la pasarela</b> qué aplicó de ese cargo. Si ya lo aplicó, lo marca reembolsado sin pedir otro; si no, vuelve a pendiente para que el
+    /// reintento lo pida (consultando antes, sin pedir a ciegas); y si no se puede consultar, lo deja como está. Fuera de toda transacción la consulta.
+    /// </summary>
+    public async Task<Resultado<EstadoDelReembolso>> Reanudar(Guid reembolsoId, CancellationToken cancelacion = default)
+    {
+        var (reembolso, referencia) = await unidad.Ejecutar(
+            async token =>
+            {
+                var r = await reembolsos.Obtener(reembolsoId, paraActualizar: false, token).ConfigureAwait(false);
+                var cargo = r is null ? null : await pagos.ObtenerIntento(r.IntentoId, token).ConfigureAwait(false);
+                return (r, cargo?.ReferenciaDePasarela);
+            },
+            cancelacion).ConfigureAwait(false);
+        if (reembolso is null)
+        {
+            return FallosDePagos.De<EstadoDelReembolso>(CategoriaDeError.NoEncontrado, ClavesDePagos.NoEncontrado);
+        }
+
+        if (!reembolso.EsHuerfano(reloj.Ahora) || referencia is null)
+        {
+            return Resultado<EstadoDelReembolso>.Exito(reembolso.Estado.APublico());
+        }
+
+        IReadOnlyList<ReembolsoEnPasarela>? existentes;
+        using (var plazo = new CancellationTokenSource(opciones.TiempoDeRespuesta))
+        {
+            try
+            {
+                existentes = await pasarela.ConsultarReembolsos(referencia, plazo.Token).ConfigureAwait(false);
+            }
+            catch (Exception) when (!cancelacion.IsCancellationRequested)
+            {
+                existentes = null;
+            }
+        }
+
+        if (existentes is null)
+        {
+            return Resultado<EstadoDelReembolso>.Exito(EstadoDelReembolso.Solicitado);
+        }
+
+        return await unidad.Ejecutar(
+            async token =>
+            {
+                var actual = (await reembolsos.Obtener(reembolsoId, paraActualizar: true, token).ConfigureAwait(false))!;
+                if (existentes.FirstOrDefault(e => e.ReembolsoId == reembolsoId) is { } aplicado)
+                {
+                    actual.MarcarReembolsado(aplicado.Referencia, reloj.Ahora);
+                }
+                else
+                {
+                    actual.DejarPendiente(MotivoPendienteDeReembolso.SinRespuesta, reloj.Ahora);
+                }
+
+                await reembolsos.Guardar(actual, token).ConfigureAwait(false);
+                return Resultado<EstadoDelReembolso>.Exito(actual.Estado.APublico());
+            },
+            cancelacion).ConfigureAwait(false);
+    }
+
     private sealed record Reclamo(Reembolso? Reembolso, bool Reclamado, string? ReferenciaDelCargo);
 
     private async Task<Reclamo> Reclamar(Guid reembolsoId, CancellationToken token)

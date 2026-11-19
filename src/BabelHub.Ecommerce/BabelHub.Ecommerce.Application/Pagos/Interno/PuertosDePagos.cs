@@ -148,6 +148,12 @@ internal interface IRepositorioDePagos
     /// <summary>Los intentos <c>iniciado</c> o <c>pendiente_de_confirmacion</c>, los más antiguos primero: los que el trabajo de consulta revisa.</summary>
     Task<IReadOnlyList<Guid>> ListarIntentosSinResolver(int limite, CancellationToken cancelacion = default);
 
+    /// <summary>Las intenciones <c>aprobada</c> sin completar, las más antiguas primero: las que la retoma completa o compensa.</summary>
+    Task<IReadOnlyList<Guid>> ListarIntencionesAprobadas(int limite, CancellationToken cancelacion = default);
+
+    /// <summary>Las compensaciones ya iniciadas que no terminaron, las más antiguas primero.</summary>
+    Task<IReadOnlyList<Compensacion>> ListarCompensacionesSinTerminar(int limite, CancellationToken cancelacion = default);
+
     /// <summary>La compensación de un cobro (una por cobro, clave <c>(intención, intento)</c>).</summary>
     Task<Compensacion?> ObtenerCompensacion(Guid intentoId, CancellationToken cancelacion = default);
 
@@ -192,6 +198,12 @@ internal interface IRepositorioDeReembolsos
     Task<int> ContarPendientesDeLaCuenta(Guid cuentaId, OrigenDeReembolso origen, CancellationToken cancelacion = default);
 
     Task<(IReadOnlyList<Reembolso> Reembolsos, int Total)> ListarPendientes(int pagina, int tamano, CancellationToken cancelacion = default);
+
+    /// <summary>Los reembolsos <c>solicitado</c> sin resolver desde hace tiempo (huérfanos): el proceso cayó tras pedirlos.</summary>
+    Task<IReadOnlyList<Guid>> ListarHuerfanos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default);
+
+    /// <summary>Los reembolsos <c>pendiente</c> que se pueden pedir ahora, los más antiguos primero.</summary>
+    Task<IReadOnlyList<Guid>> ListarReintentables(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default);
 }
 
 // ---------- La cuenta del pagador (Identidad) ----------

@@ -305,6 +305,10 @@ public sealed class AvisarACarritoTests
 
         public Task<IReadOnlyList<Guid>> ListarIntentosSinResolver(int limite, CancellationToken cancelacion = default) => interno.ListarIntentosSinResolver(limite, cancelacion);
 
+        public Task<IReadOnlyList<Guid>> ListarIntencionesAprobadas(int limite, CancellationToken cancelacion = default) => interno.ListarIntencionesAprobadas(limite, cancelacion);
+
+        public Task<IReadOnlyList<Compensacion>> ListarCompensacionesSinTerminar(int limite, CancellationToken cancelacion = default) => interno.ListarCompensacionesSinTerminar(limite, cancelacion);
+
         public Task<IReadOnlyList<Guid>> ListarIntencionesConAvisosACarritoListos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) => interno.ListarIntencionesConAvisosACarritoListos(ahora, limite, cancelacion);
 
         public Task GuardarAvisoACarrito(AvisoACarrito aviso, CancellationToken cancelacion = default) => interno.GuardarAvisoACarrito(aviso, cancelacion);

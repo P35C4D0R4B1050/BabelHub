@@ -339,6 +339,12 @@ internal sealed class RepositorioDeReembolsosEnMemoria(RepositorioDePagosEnMemor
         return Task.FromResult(((IReadOnlyList<Reembolso>)pendientes.Skip((pagina - 1) * tamano).Take(tamano).Select(r => r.Copiar()).ToArray(), pendientes.Length));
     }
 
+    public Task<IReadOnlyList<Guid>> ListarHuerfanos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(_reembolsos.Values.Where(r => r.EsHuerfano(ahora)).OrderBy(r => r.CreadoEn).Select(r => r.Id).Take(limite).ToArray());
+
+    public Task<IReadOnlyList<Guid>> ListarReintentables(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(_reembolsos.Values.Where(r => r.PuedeReintentarse(ahora)).OrderBy(r => r.CreadoEn).Select(r => r.Id).Take(limite).ToArray());
+
     public object Capturar() => _reembolsos.ToDictionary(p => p.Key, p => p.Value.Copiar());
 
     public void Restaurar(object instantanea) => _reembolsos = (Dictionary<Guid, Reembolso>)instantanea;
@@ -414,6 +420,8 @@ internal sealed class CompensadorDeCompraDoble(UnidadDeTrabajoReversible unidad)
 
     public int LlamadasDentroDeUnaTransaccion { get; private set; }
 
+    public bool Lanza { get; set; }
+
     public Task Compensar(Guid pedidoId, Guid intentoId, MotivoDeCompensacion motivo, VarianteDeCompensacion variante, CancellationToken cancelacion = default)
     {
         Llamadas.Add((pedidoId, intentoId, motivo, variante));
@@ -422,7 +430,7 @@ internal sealed class CompensadorDeCompraDoble(UnidadDeTrabajoReversible unidad)
             LlamadasDentroDeUnaTransaccion++;
         }
 
-        return Task.CompletedTask;
+        return Lanza ? throw new InvalidOperationException("La compensación cayó.") : Task.CompletedTask;
     }
 }
 
