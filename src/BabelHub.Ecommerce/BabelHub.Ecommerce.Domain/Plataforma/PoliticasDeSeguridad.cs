@@ -47,6 +47,29 @@ public static class PoliticasDeSeguridad
     /// <summary>20 intentos de cobro por origen y hora (D18, AM38). Falla cerrada.</summary>
     public static PoliticaDeLimite CobrosPorOrigen { get; } = new("cobros-por-origen", 20, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Origen);
 
+    /// <summary>Crear carritos de visitante: 10 por origen y hora (plan de carrito-checkout §6, SEG-05). No falla cerrada: con el almacén caído cae al límite local (SEG-26).</summary>
+    public static PoliticaDeLimite CarritosDeVisitantePorOrigen { get; } = new(
+        "carritos-de-visitante-por-origen", 10, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true);
+
+    /// <summary>Agregar, cambiar o quitar líneas del carrito: 60 por cuenta y minuto (la cuenta si la hay).</summary>
+    public static PoliticaDeLimite EdicionDeLineasPorCuenta { get; } = new(
+        "edicion-de-lineas-por-cuenta", 60, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
+
+    /// <summary>Agregar, cambiar o quitar líneas del carrito de un visitante: 60 por origen y minuto.</summary>
+    public static PoliticaDeLimite EdicionDeLineasPorOrigen { get; } = new(
+        "edicion-de-lineas-por-origen", 60, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true);
+
+    /// <summary>Revisar el checkout y elegir la entrega consultan el Inventario sin memoria: 30 por cuenta y minuto.</summary>
+    public static PoliticaDeLimite RevisionDelCheckoutPorCuenta { get; } = new(
+        "revision-del-checkout-por-cuenta", 30, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
+
+    /// <summary>Pasar al pago reserva stock: 10 por cuenta y hora. <b>Falla cerrada</b> (SEG-26): una operación que reserva stock no cae a un contador local; repetir el mismo pedido no cuenta otra vez (DD-12).</summary>
+    public static PoliticaDeLimite PasosAlPagoPorCuenta { get; } = new("pasos-al-pago-por-cuenta", 10, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Usuario);
+
+    /// <summary>Volver al carrito y reiniciar el checkout: 20 por cuenta y hora.</summary>
+    public static PoliticaDeLimite VolverOReiniciarPorCuenta { get; } = new(
+        "volver-o-reiniciar-por-cuenta", 20, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
+
     /// <summary>Tope previo barato por huella de origen, antes de autenticar: 600 por minuto (el bucket del origen desconocido tiene el suyo).</summary>
     public static PoliticaDeLimite SolicitudesPreviasPorOrigen { get; } = new(
         "solicitudes-previas-por-origen", 600, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true);
@@ -69,7 +92,8 @@ public static class PoliticasDeSeguridad
 
     /// <summary>Límites generales de uso: con el almacén caído caen al límite local por instancia (SEG-26), a diferencia de los críticos de <see cref="Todas"/>.</summary>
     public static IReadOnlyList<PoliticaDeLimite> Generales { get; } =
-        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen];
+        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen,
+         CarritosDeVisitantePorOrigen, EdicionDeLineasPorCuenta, EdicionDeLineasPorOrigen, RevisionDelCheckoutPorCuenta, VolverOReiniciarPorCuenta];
 
     public static IReadOnlyList<PoliticaDeLimite> Todas { get; } =
     [
@@ -82,5 +106,6 @@ public static class PoliticasDeSeguridad
         CobrosPorIntencion,
         CobrosPorCuenta,
         CobrosPorOrigen,
+        PasosAlPagoPorCuenta,
     ];
 }
