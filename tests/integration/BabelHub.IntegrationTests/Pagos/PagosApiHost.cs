@@ -97,6 +97,8 @@ internal sealed class PagosApiHost : IAsyncDisposable
 
     public CheckoutVivoFalso Checkout { get; } = new();
 
+    public ReembolsosFalso Reembolsos { get; } = new();
+
     public DenegacionesEspia Denegaciones { get; } = new();
 
     public static async Task<PagosApiHost> Crear()
@@ -117,6 +119,7 @@ internal sealed class PagosApiHost : IAsyncDisposable
                 servicios.AddSingleton<IActorActual>(actor);
                 servicios.AddSingleton<IEstablecedorDeActor>(actor);
                 servicios.AddSingleton<IPagos>(Pagos);
+                servicios.AddSingleton<IReembolsos>(Reembolsos);
                 servicios.AddSingleton<ICheckoutDelCliente>(Checkout);
                 servicios.AddSingleton<IRegistradorDeDenegacionesHttp>(Denegaciones);
                 servicios.AddSingleton<IListaDeSucursales>(new ListaVacia());
@@ -207,4 +210,34 @@ internal sealed class PagosApiHost : IAsyncDisposable
 
         public IEnumerable<TypeInfo> Types => tipos.Select(t => t.GetTypeInfo());
     }
+}
+
+/// <summary>Un <c>IReembolsos</c> que anota la llamada y responde lo que la prueba le pida.</summary>
+public sealed class ReembolsosFalso : IReembolsos
+{
+    public List<string> Llamadas { get; } = [];
+
+    public Resultado<PaginaDeReembolsos> Pagina { get; set; } = Resultado<PaginaDeReembolsos>.Exito(new PaginaDeReembolsos([], 1, 20, 0));
+
+    public Resultado<EstadoDelReembolso> Reintento { get; set; } = Resultado<EstadoDelReembolso>.Exito(EstadoDelReembolso.Reembolsado);
+
+    public Task<Resultado<PaginaDeReembolsos>> ListarPendientes(int pagina, int tamano, CancellationToken cancelacion = default)
+    {
+        Llamadas.Add($"listar:{pagina}:{tamano}");
+        return Task.FromResult(Pagina);
+    }
+
+    public Task<Resultado<EstadoDelReembolso>> Reintentar(Guid reembolsoId, CancellationToken cancelacion = default)
+    {
+        Llamadas.Add($"reintentar:{reembolsoId:D}");
+        return Task.FromResult(Reintento);
+    }
+
+    public Task<Resultado<ReembolsoRegistrado>> Registrar(RegistrarReembolsoEntrada entrada, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+    public Task<Resultado<EstadoDelReembolso>> Procesar(Guid reembolsoId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+    public Task<int> ContarPendientes(Guid cuentaId, OrigenDelReembolso origen, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+    public Task<Resultado<ReembolsoPendienteVista?>> ConsultarPorOrigen(OrigenDelReembolso origen, string claveNatural, CancellationToken cancelacion = default) => throw new NotSupportedException();
 }
