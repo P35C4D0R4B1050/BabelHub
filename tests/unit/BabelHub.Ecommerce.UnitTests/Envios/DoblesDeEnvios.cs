@@ -31,6 +31,9 @@ internal sealed class RepositorioDeEnviosEnMemoria : IRepositorioDeEnvios, IInst
     /// <summary>El próximo guardado falla como un error inesperado de la base (y se rearma solo).</summary>
     public bool FallaAlGuardarElSiguiente { get; set; }
 
+    /// <summary>El próximo guardado de un envío con guía falla como el único (operador, numero_de_guia) de la base.</summary>
+    public bool GuiaRepetidaAlGuardar { get; set; }
+
     public int Operaciones { get; private set; }
 
     public int LecturasConBloqueo { get; private set; }
@@ -135,6 +138,12 @@ internal sealed class RepositorioDeEnviosEnMemoria : IRepositorioDeEnvios, IInst
     {
         Comprobar();
         _guardados++;
+        if (GuiaRepetidaAlGuardar && envio.NumeroDeGuia is not null)
+        {
+            GuiaRepetidaAlGuardar = false;
+            throw new GuiaRepetidaException("guia-repetida");
+        }
+
         if (FallaAlGuardarElSiguiente)
         {
             FallaAlGuardarElSiguiente = false;

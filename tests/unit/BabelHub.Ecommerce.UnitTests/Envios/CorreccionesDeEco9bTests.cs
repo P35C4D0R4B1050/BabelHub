@@ -176,4 +176,24 @@ public sealed class CorreccionesDeEco9bTests
         Assert.Empty(entorno.Alertas.Alertas); // la entrega lleva 5 minutos, no 3 días
         _ = envio;
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-15")]
+    public async Task Un_operador_que_repite_el_numero_de_otro_envio_deja_el_envio_pendiente_con_una_alerta_y_no_un_error_500()
+    {
+        var entorno = new EntornoDeEnvios();
+        var envio = SembrarPendiente(entorno);
+        entorno.Envios.GuiaRepetidaAlGuardar = true;
+
+        var resultado = await entorno.SolicitarGuia.Ejecutar(envio.Id);
+
+        Assert.Equal(CategoriaDeError.NoDisponible, resultado.Error!.Categoria);
+        Assert.Equal("operador-no-disponible", resultado.Error.Clave);
+        var guardado = Assert.Single(entorno.Envios.Todos);
+        Assert.Equal(EstadoDeEnvio.PendienteDeGuia, guardado.Estado);
+        Assert.Null(guardado.NumeroDeGuia);
+        Assert.Null(guardado.GuiaEnCursoHasta);
+        Assert.Equal("envio-guia-repetida", Assert.Single(entorno.Alertas.Alertas).Motivo);
+        Assert.Empty(entorno.Auditoria.Solicitudes);
+    }
 }

@@ -109,3 +109,21 @@ internal abstract record ResultadoDeCierreDeReservas
     /// <summary>Sin respuesta, plazo agotado, 5xx, 401, 408, 429, <c>EN-CURSO</c>, conflicto de idempotencia, sin permiso o una respuesta inválida: el primer cierre puede haberse aplicado.</summary>
     public sealed record Incierto : ResultadoDeCierreDeReservas;
 }
+
+/// <summary>El operador devolvió un número de guía que ya pertenece a otro envío (el único <c>(operador, numero_de_guia)</c>): se trata como ENV-04 con una alerta técnica y nunca como un error 500.</summary>
+internal sealed class GuiaRepetidaException : Exception
+{
+    public GuiaRepetidaException()
+    {
+    }
+
+    public GuiaRepetidaException(string message)
+        : base(message)
+    {
+    }
+
+    public GuiaRepetidaException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}

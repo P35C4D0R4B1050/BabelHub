@@ -159,6 +159,21 @@ internal sealed class SolicitarGuia(
                     },
                     cancelacion).ConfigureAwait(false);
             }
+            catch (GuiaRepetidaException)
+            {
+                // El operador devolvió el número de otro envío (ENV-04): alerta técnica sin el número y reintento; nunca se ve la guía de otro pedido.
+                await LiberarElArrendamiento(envioId).ConfigureAwait(false);
+                try
+                {
+                    await alertas.Publicar(new AlertaTecnica(ClavesDeEnvios.AlertaGuiaRepetida, reloj.Ahora), CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // Una alerta que no se publica nunca interrumpe la operación.
+                }
+
+                return FallosDeEnvios.De<DetalleDeEnvio>(CategoriaDeError.NoDisponible, ClavesDeEnvios.OperadorNoDisponible);
+            }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 // La guía ya existe en el operador: se libera el arrendamiento (la clave se conserva) para recuperarla al reintentar.
