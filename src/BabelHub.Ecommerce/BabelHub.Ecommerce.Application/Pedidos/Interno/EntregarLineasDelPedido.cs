@@ -80,12 +80,30 @@ internal sealed class EntregarLineasDelPedido(
         // Tiempo 3.
         try
         {
-            return await unidad.Ejecutar(token => CompletarLaEntrega(entrega, quien.Valor, token), cancelacion).ConfigureAwait(false);
+            return await unidad.Ejecutar(token => CompletarLaEntrega(entrega, token), cancelacion).ConfigureAwait(false);
         }
         catch (Exception excepcion) when (excepcion is AuditoriaNoDisponibleException or EsperaDeBloqueoDeUnPedidoAgotadaException)
         {
             // El tiempo 3 se revirtió: la fila sigue en curso con el cierre confirmado y la reanudación repite solo lo local.
             return Resultado<LineasOperadas>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDePedidos.ServicioNoDisponible));
+        }
+    }
+
+    /// <summary>
+    /// La reanudación (T22): repite <b>solo el tiempo 3</b> de una entrega en curso (nunca <c>cerrar</c>) para las líneas con el cierre ya confirmado. La ejecuta el trabajo de «sistema», así que la auditoría la registra el sistema con el iniciador guardado en la fila en <c>iniciadaPor</c> (nunca se reconstruye un actor de persona).
+    /// Devuelve <see langword="false"/> si no se pudo (auditoría o bloqueo): la fila sigue en curso y se reintenta.
+    /// </summary>
+    public async Task<bool> Reanudar(Entrega entrega, CancellationToken cancelacion)
+    {
+        ArgumentNullException.ThrowIfNull(entrega);
+        try
+        {
+            var resultado = await unidad.Ejecutar(token => CompletarLaEntrega(entrega, token), cancelacion).ConfigureAwait(false);
+            return resultado.EsExito;
+        }
+        catch (Exception excepcion) when (excepcion is AuditoriaNoDisponibleException or EsperaDeBloqueoDeUnPedidoAgotadaException)
+        {
+            return false;
         }
     }
 
@@ -176,7 +194,7 @@ internal sealed class EntregarLineasDelPedido(
         return null;
     }
 
-    private async Task<Resultado<LineasOperadas>> CompletarLaEntrega(Entrega entrega, SolicitanteDePedidos solicitante, CancellationToken cancelacion)
+    private async Task<Resultado<LineasOperadas>> CompletarLaEntrega(Entrega entrega, CancellationToken cancelacion)
     {
         var pedido = await pedidos.Obtener(entrega.PedidoId, conBloqueo: true, cancelacion).ConfigureAwait(false)
             ?? throw new InvalidOperationException("El pedido de una entrega en curso no existe.");
@@ -192,7 +210,7 @@ internal sealed class EntregarLineasDelPedido(
                 {
                     ObjetoTipo = "pedido",
                     ObjetoId = pedido.Id.ToString("D"),
-                    Detalle = new Dictionary<string, string?> { ["lineaId"] = lineaId.ToString("D"), ["iniciadaPor"] = solicitante.UsuarioId.ToString("D") },
+                    Detalle = new Dictionary<string, string?> { ["lineaId"] = lineaId.ToString("D"), ["iniciadaPor"] = entrega.Iniciador.EstaAnonimizado ? null : entrega.Iniciador.UsuarioId.ToString("D") },
                 },
                 cancelacion).ConfigureAwait(false);
         }

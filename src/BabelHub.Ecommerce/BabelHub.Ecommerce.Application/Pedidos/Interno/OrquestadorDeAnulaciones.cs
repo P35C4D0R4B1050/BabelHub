@@ -175,7 +175,7 @@ internal sealed class OrquestadorDeAnulaciones(
     /// </summary>
     public async Task<Resultado<AnulacionAplicada>> Continuar(Anulacion anulacion, bool reanudacion, CancellationToken cancelacion)
     {
-        var liberadas = await LiberarLasReservas(anulacion, cancelacion).ConfigureAwait(false);
+        var liberadas = await LiberarLasReservas(anulacion, reanudacion, cancelacion).ConfigureAwait(false);
         if (liberadas is not null)
         {
             return Resultado<AnulacionAplicada>.Fallo(liberadas);
@@ -207,7 +207,7 @@ internal sealed class OrquestadorDeAnulaciones(
     }
 
     /// <summary>El tiempo 2: <c>liberar</c> una línea por llamada con el motivo de la operación, solo las impresas que no salieron; el paso se marca al terminar.</summary>
-    private async Task<ErrorDeAplicacion?> LiberarLasReservas(Anulacion anulacion, CancellationToken cancelacion)
+    private async Task<ErrorDeAplicacion?> LiberarLasReservas(Anulacion anulacion, bool reanudacion, CancellationToken cancelacion)
     {
         if (anulacion.PasoConfirmadoEn(PasoDeAnulacion.ReservasLiberadas) is not null)
         {
@@ -239,14 +239,19 @@ internal sealed class OrquestadorDeAnulaciones(
 
         if (sinRespuesta)
         {
-            await unidad.Ejecutar(
-                async token =>
-                {
-                    anulacion.RegistrarIntento(reloj.Ahora);
-                    await pedidos.ActualizarAnulacion(anulacion, token).ConfigureAwait(false);
-                    return true;
-                },
-                cancelacion).ConfigureAwait(false);
+            // La reanudación anota ella misma el intento (una vez por pasada); la solicitud original lo anota aquí.
+            if (!reanudacion)
+            {
+                await unidad.Ejecutar(
+                    async token =>
+                    {
+                        anulacion.RegistrarIntento(reloj.Ahora);
+                        await pedidos.ActualizarAnulacion(anulacion, token).ConfigureAwait(false);
+                        return true;
+                    },
+                    cancelacion).ConfigureAwait(false);
+            }
+
             return new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDePedidos.ServicioNoDisponible);
         }
 
@@ -254,7 +259,7 @@ internal sealed class OrquestadorDeAnulaciones(
         {
             // Con el plan ajustado se vuelve a liberar solo lo que queda (cada pasada deja fuera al menos una línea: termina).
             return await AjustarPorLasQueSalieron(anulacion, salieron, cancelacion).ConfigureAwait(false)
-                ?? await LiberarLasReservas(anulacion, cancelacion).ConfigureAwait(false);
+                ?? await LiberarLasReservas(anulacion, reanudacion, cancelacion).ConfigureAwait(false);
         }
 
         // 2b: el paso se marca justo tras la última respuesta del Inventario.

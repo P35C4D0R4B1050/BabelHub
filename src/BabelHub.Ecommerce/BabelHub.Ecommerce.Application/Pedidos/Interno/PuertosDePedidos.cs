@@ -16,6 +16,9 @@ public sealed class EsperaDeBloqueoDeUnPedidoAgotadaException() : Exception("No 
 /// <summary>Una línea marcada no recogida a la que aún falta liberar la reserva en el Inventario (<c>liberaciones_de_reserva</c>, PED-15): se borra al lograrlo o al saber que la reserva ya se cerró.</summary>
 public sealed record LiberacionDeReservaPendiente(Guid PedidoId, Guid LineaId, string Motivo, DateTimeOffset PendienteDesde, int Intentos);
 
+/// <summary>Lo que la reanudación debe retomar: las anulaciones y las entregas en curso que ya cumplieron su espera.</summary>
+public sealed record OperacionesPorReanudar(IReadOnlyList<Anulacion> Anulaciones, IReadOnlyList<Entrega> Entregas);
+
 public sealed record PaginaDeDominio(IReadOnlyList<Pedido> Pedidos, int Total);
 
 /// <summary>La auditoría de la lectura del contacto por el personal (PED-40, D09): si no se puede auditar lanza y el detalle se muestra sin contacto. Una acción propia del catálogo de auditoría llega con el carril de auditoría.</summary>
@@ -63,6 +66,9 @@ public interface IRepositorioDePedidos
     Task<IReadOnlyList<Anulacion>> AnulacionesEnCurso(Guid pedidoId, CancellationToken cancelacion = default);
 
     Task<IReadOnlyList<Entrega>> EntregasEnCurso(Guid pedidoId, CancellationToken cancelacion = default);
+
+    /// <summary>Las anulaciones y entregas <c>en_curso</c> cuyo <c>proximo_intento_en</c> ya llegó (la reanudación de T22), las más antiguas primero y hasta <paramref name="maximo"/> en total; el adaptador las lee con <c>FOR UPDATE SKIP LOCKED</c> para que dos instancias no tomen la misma.</summary>
+    Task<OperacionesPorReanudar> OperacionesEnCursoParaReanudar(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default);
 
     /// <summary>Los pedidos de recojo con alguna línea que lleva más de 360 horas en listo para recojo (candidatos de la revisión de plazos, PED-15), hasta <paramref name="maximo"/>; sin bloqueo: cada uno se revisa luego bajo el suyo.</summary>
     Task<IReadOnlyList<Guid>> PedidosConRecojoVencido(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default);

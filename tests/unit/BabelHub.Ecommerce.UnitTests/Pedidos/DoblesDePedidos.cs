@@ -133,6 +133,11 @@ internal sealed class RepositorioDePedidosFalso : IRepositorioDePedidos
     public Task<IReadOnlyList<Entrega>> EntregasEnCurso(Guid pedidoId, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<Entrega>>([.. Entregas.Where(e => e.PedidoId == pedidoId && e.BloqueaLasLineas)]);
 
+    public Task<OperacionesPorReanudar> OperacionesEnCursoParaReanudar(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult(new OperacionesPorReanudar(
+            [.. Anulaciones.Where(a => a.Estado == EstadoDeOperacion.EnCurso && a.ProximoIntentoEn is { } p && p <= ahora).OrderBy(a => a.CreadaEn).Take(maximo)],
+            [.. Entregas.Where(e => e.Estado == EstadoDeOperacion.EnCurso && e.ProximoIntentoEn is { } p && p <= ahora).OrderBy(e => e.CreadaEn).Take(maximo)]));
+
     public List<LiberacionDeReservaPendiente> LiberacionesDeReserva { get; } = [];
 
     public Task<IReadOnlyList<Guid>> PedidosConRecojoVencido(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) =>
