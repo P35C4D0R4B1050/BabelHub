@@ -174,6 +174,9 @@ public sealed class IntencionDePago
         return new IntencionDePago(pedidoId, instantanea, reservaExpiraEn, ahora);
     }
 
+    /// <summary>Una copia de la intención (para que las pruebas simulen la reversión de una transacción).</summary>
+    internal IntencionDePago Copiar() => (IntencionDePago)MemberwiseClone();
+
     public bool EsDeLaCuenta(Guid cuentaId) => cuentaId != Guid.Empty && CuentaId == cuentaId;
 
     /// <summary>
