@@ -185,6 +185,10 @@ internal sealed class EntornoDePagos
         LimitesDeCobro = new LimitesDeCobroDoble();
         Auditoria = new AuditoriaDelCatalogoEspia();
         RegistrarIntento = new RegistrarIntento(Autorizador, Repositorio, Unidad, Cuenta, Posesion, Reservas, Checkout, new LimitadorDeCobros(LimitesDeCobro), Auditoria, Reloj);
+        Pasarela = new PasarelaDePagoDoble(Unidad);
+        Confirmador = new ConfirmadorDeCompraDoble(Unidad);
+        Alertas = new AlertasTecnicasEspia();
+        Cobrar = CrearIniciarCobro(new OpcionesDelCobro(TimeSpan.FromMilliseconds(300)));
     }
 
     public List<string> Orden { get; }
@@ -200,6 +204,18 @@ internal sealed class EntornoDePagos
     public AuditoriaDelCatalogoEspia Auditoria { get; }
 
     public RegistrarIntento RegistrarIntento { get; }
+
+    public PasarelaDePagoDoble Pasarela { get; }
+
+    public ConfirmadorDeCompraDoble Confirmador { get; }
+
+    public AlertasTecnicasEspia Alertas { get; }
+
+    public ICasoDeUso<CobrarEntrada, ResultadoDelCobroDelCliente> Cobrar { get; private set; }
+
+    /// <summary>El orquestador con otras opciones (por ejemplo, la pasarela que exige el correo del titular).</summary>
+    public IniciarCobro CrearIniciarCobro(OpcionesDelCobro opciones) =>
+        new(Autorizador, Firmador, Repositorio, Unidad, RegistrarIntento, Pasarela, Cuenta, Reservas, Confirmador, Auditoria, Alertas, Reloj, opciones);
 
     public ActorDePrueba Actor { get; }
 

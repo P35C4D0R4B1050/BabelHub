@@ -1,6 +1,7 @@
 using BabelHub.Ecommerce.Application.Carrito;
 using BabelHub.Ecommerce.Application.Pagos.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
+using BabelHub.Ecommerce.Application.Pagos;
 using BabelHub.Ecommerce.Domain.Pagos;
 using BabelHub.Ecommerce.UnitTests.Catalogo;
 using BabelHub.Ecommerce.UnitTests.Plataforma;
@@ -157,4 +158,75 @@ internal sealed class LimitesDeCobroDoble : IControlDeLimites
     public Task Completar(ReservaDeLimite reserva, ResultadoMinimo resultado, CancellationToken cancelacion = default) => Task.CompletedTask;
 
     public Task Fallar(ReservaDeLimite reserva, CancellationToken cancelacion = default) => Task.CompletedTask;
+}
+
+/// <summary>La pasarela: responde lo que la prueba fije, puede tardar más que el plazo o fallar, y anota lo que recibió y si la llamaron dentro de una transacción.</summary>
+internal sealed class PasarelaDePagoDoble(UnidadDeTrabajoReversible unidad) : IPasarelaDePago
+{
+    public Func<SolicitudDeCobroEnPasarela, ResultadoDeCobro>? Respuesta { get; set; }
+
+    public bool NoResponde { get; set; }
+
+    public bool Lanza { get; set; }
+
+    public List<SolicitudDeCobroEnPasarela> Solicitudes { get; } = [];
+
+    public int LlamadasDentroDeUnaTransaccion { get; private set; }
+
+    public async Task<ResultadoDeCobro> Cobrar(SolicitudDeCobroEnPasarela solicitud, CancellationToken cancelacion = default)
+    {
+        Solicitudes.Add(solicitud);
+        if (unidad.EnCurso)
+        {
+            LlamadasDentroDeUnaTransaccion++;
+        }
+
+        if (Lanza)
+        {
+            throw new HttpRequestException("La pasarela falló.");
+        }
+
+        if (NoResponde)
+        {
+            await Task.Delay(Timeout.Infinite, cancelacion);
+        }
+
+        return Respuesta is { } f ? f(solicitud) : ResultadoDeCobro.Aprobado("ch_1", solicitud.Importe, "PEN", solicitud.ReferenciaOpaca);
+    }
+
+    public Task<ResultadoDeCobro> ConsultarEstado(Guid referenciaOpaca, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+    public Task<ResultadoDeReembolsoEnPasarela> Reembolsar(Guid reembolsoId, string referenciaDelCargo, Importe monto, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+    public Task<IReadOnlyList<ReembolsoEnPasarela>?> ConsultarReembolsos(string referenciaDelCargo, CancellationToken cancelacion = default) => throw new NotSupportedException();
+}
+
+/// <summary>La confirmación de la compra aprobada (T14): anota la llamada y si ocurrió dentro de una transacción.</summary>
+internal sealed class ConfirmadorDeCompraDoble(UnidadDeTrabajoReversible unidad) : IConfirmadorDeCompraAprobada
+{
+    public List<(Guid PedidoId, Guid IntentoId, string Referencia)> Llamadas { get; } = [];
+
+    public int LlamadasDentroDeUnaTransaccion { get; private set; }
+
+    public Task<ResultadoDelCobroDelCliente> Confirmar(Guid pedidoId, Guid intentoId, string referenciaDePasarela, CancellationToken cancelacion = default)
+    {
+        Llamadas.Add((pedidoId, intentoId, referenciaDePasarela));
+        if (unidad.EnCurso)
+        {
+            LlamadasDentroDeUnaTransaccion++;
+        }
+
+        return Task.FromResult(new ResultadoDelCobroDelCliente(Application.Pagos.EstadoDelCobro.Aprobado, null, intentoId));
+    }
+}
+
+internal sealed class AlertasTecnicasEspia : IPublicadorDeAlertasTecnicas
+{
+    public List<AlertaTecnica> Publicadas { get; } = [];
+
+    public Task Publicar(AlertaTecnica alerta, CancellationToken cancelacion = default)
+    {
+        Publicadas.Add(alerta);
+        return Task.CompletedTask;
+    }
 }
