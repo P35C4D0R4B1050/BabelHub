@@ -105,6 +105,18 @@ public static class PoliticasDeSeguridad
     public static PoliticaDeLimite GuiasAlOperador { get; } = new(
         "guias-al-operador", 30, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
 
+    /// <summary>Las consultas de pedidos (el cliente por su cuenta, el personal por la lista y el detalle): 60 por usuario y minuto (plan de pedidos, SEG-05).</summary>
+    public static PoliticaDeLimite ConsultasDePedidosPorUsuario { get; } = new(
+        "consultas-de-pedidos-por-usuario", 60, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
+
+    /// <summary>La gestión de pedidos (anular, entregar, reintentar el reembolso, cancelar): 30 por usuario y minuto (SEG-07).</summary>
+    public static PoliticaDeLimite GestionDePedidosPorUsuario { get; } = new(
+        "gestion-de-pedidos-por-usuario", 30, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
+
+    /// <summary>Las lecturas del detalle de un pedido con el contacto del cliente: 200 por persona y hora. <b>Crítica y falla cerrada</b> (SEG-26): un dato personal no se sirve sin contador; sin el almacén, la lectura con contacto no se sirve.</summary>
+    public static PoliticaDeLimite LecturasDelContactoDePedidosPorPersona { get; } = new(
+        "lecturas-del-contacto-de-pedidos-por-persona", 200, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Usuario);
+
     /// <summary>La ráfaga de avisos de la pasarela de pagos (PAG-05, SEG-05): 120 por origen y minuto, antes de verificar la firma, para que una entrada pública no pueda agotar el cómputo. Con el almacén caído cae al límite local (SEG-26); el aviso legítimo se reintenta.</summary>
     public static PoliticaDeLimite AvisosDeLaPasarelaPorOrigen { get; } = new(
         "avisos-de-la-pasarela-por-origen", 120, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true);
@@ -133,7 +145,7 @@ public static class PoliticasDeSeguridad
     public static IReadOnlyList<PoliticaDeLimite> Generales { get; } =
         [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen, ConsultasDeHojasPorUsuario,
          CarritosDeVisitantePorOrigen, EdicionDeLineasPorCuenta, EdicionDeLineasPorOrigen, RevisionDelCheckoutPorCuenta, VolverOReiniciarPorCuenta,
-         ConsultasDeEnviosPorUsuario, OperacionesDeEnviosPorUsuario, GuiasAlOperador, AvisosDeLaPasarelaPorOrigen];
+         ConsultasDeEnviosPorUsuario, OperacionesDeEnviosPorUsuario, GuiasAlOperador, AvisosDeLaPasarelaPorOrigen, ConsultasDePedidosPorUsuario, GestionDePedidosPorUsuario];
 
     public static IReadOnlyList<PoliticaDeLimite> Todas { get; } =
     [
@@ -151,5 +163,6 @@ public static class PoliticasDeSeguridad
         CobrosPorCuenta,
         CobrosPorOrigen,
         PasosAlPagoPorCuenta,
+        LecturasDelContactoDePedidosPorPersona,
     ];
 }
