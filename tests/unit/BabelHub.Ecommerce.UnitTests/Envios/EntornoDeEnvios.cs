@@ -26,15 +26,18 @@ internal sealed class EntornoDeEnvios
         Operador = new OperadorLogisticoDoble(Unidad);
         Alertas = new AlertasTecnicasEspia();
         var autorizador = new AutorizadorDeEnvios(Actor, Denegaciones);
-        SolicitarGuia = new SolicitarGuia(autorizador, Envios, Contactos, Operador, Unidad, Auditoria, Alertas, Reloj);
+        Notificador = new NotificadorDeEnviosEspia(Unidad);
+        Avisos = new AvisosDeEnvios(Notificador, Pedidos);
+        SolicitarGuia = new SolicitarGuia(autorizador, Envios, Contactos, Operador, Unidad, Auditoria, Alertas, Avisos, Reloj);
         Reservas = new ReservasDelEnvioDoble(Unidad);
         Progreso = new ProgresoDeEnviosDoble(Unidad, Envios);
         Informador = new InformadorDeProgreso(Envios, Progreso, Unidad, Reloj);
-        PasarAEnReparto = new PasarAEnReparto(autorizador, Envios, Reservas, Informador, Unidad, Auditoria, Alertas, Reloj);
+        PasarAEnReparto = new PasarAEnReparto(autorizador, Envios, Reservas, Informador, Unidad, Auditoria, Alertas, Avisos, Reloj);
         MarcarEntregado = new MarcarEntregado(autorizador, Envios, Unidad, Auditoria, Informador, Reloj);
         Listar = new ListarEnvios(autorizador, Envios);
         Obtener = new ObtenerEnvio(autorizador, Envios);
         EnviosDelPedido = new ObtenerEnviosDeUnPedido(Actor, Denegaciones, Pedidos, Envios);
+        RevisarEstancados = new RevisarEnviosEstancados(ActorDePrueba.DelSistema(), Envios, Alertas, Reloj);
         InformarProgreso = new InformarProgresoAPedidos(ActorDePrueba.DelSistema(), Envios, Informador, Alertas, Reloj);
         Crear = new CrearEnvio(Pedidos, Envios, Reloj);
         Cancelar = new CancelarEnviosDelPedido(Envios, Auditoria, Reloj);
@@ -55,6 +58,10 @@ internal sealed class EntornoDeEnvios
 
     public DenegacionesDelCatalogoEspia Denegaciones { get; }
 
+    public NotificadorDeEnviosEspia Notificador { get; }
+
+    public AvisosDeEnvios Avisos { get; }
+
     public ContactoDeEntregaDoble Contactos { get; }
 
     public OperadorLogisticoDoble Operador { get; }
@@ -66,6 +73,8 @@ internal sealed class EntornoDeEnvios
     public ReservasDelEnvioDoble Reservas { get; }
 
     public ProgresoDeEnviosDoble Progreso { get; }
+
+    public RevisarEnviosEstancados RevisarEstancados { get; }
 
     public ListarEnvios Listar { get; }
 
@@ -86,6 +95,9 @@ internal sealed class EntornoDeEnvios
     public CancelarEnviosDelPedido Cancelar { get; }
 
     public DespachoDeEnviosDeLaAplicacion Despacho { get; }
+
+    /// <summary>Siembra el pedido de un envío ya sembrado (lo que Envíos lee para armar el aviso).</summary>
+    public void SembrarPedidoDelEnvio(Guid pedidoId) => Pedidos.Sembrar(new PedidoParaEnvios(pedidoId, "PED-2026-0001", Guid.NewGuid(), true, []));
 
     /// <summary>Siembra un pedido a domicilio con las líneas dadas y lo devuelve.</summary>
     public PedidoParaEnvios SembrarPedido(bool aDomicilio = true, params LineaDePedidoParaEnvios[] lineas)

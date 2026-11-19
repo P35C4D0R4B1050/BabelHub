@@ -150,6 +150,20 @@ internal sealed class RepositorioDeEnviosEnMemoria : IRepositorioDeEnvios, IInst
         return Task.FromResult<IReadOnlyList<Envio>>(pendientes);
     }
 
+    public Task<IReadOnlyList<Envio>> ObtenerConDespachoIniciadoAntesDe(DateTimeOffset limite, int maximo, CancellationToken cancelacion = default)
+    {
+        Comprobar();
+        var lista = _envios.Values.Where(e => e.Estado == EstadoDeEnvio.GuiaGenerada && e.DespachoIniciadoEn is { } d && d < limite).OrderBy(e => e.DespachoIniciadoEn).Take(maximo).Select(Clonar).ToList();
+        return Task.FromResult<IReadOnlyList<Envio>>(lista);
+    }
+
+    public Task<IReadOnlyList<Envio>> ObtenerCanceladosConGuiaEntre(DateTimeOffset desde, DateTimeOffset hasta, int maximo, CancellationToken cancelacion = default)
+    {
+        Comprobar();
+        var lista = _envios.Values.Where(e => e.Estado == EstadoDeEnvio.Cancelado && e.NumeroDeGuia is not null && e.CanceladoEn is { } c && c > desde && c <= hasta).OrderBy(e => e.CanceladoEn).Take(maximo).Select(Clonar).ToList();
+        return Task.FromResult<IReadOnlyList<Envio>>(lista);
+    }
+
     public Task<ListadoDeEnvios> Listar(EstadoDeEnvio? estado, int pagina, int tamano, CancellationToken cancelacion = default)
     {
         Comprobar();
@@ -386,5 +400,33 @@ internal sealed class ProgresoDeEnviosDoble(UnidadDeTrabajoReversible unidad, Re
             Falla
                 ? Resultado<ProgresoDeEnvioAplicado>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible"))
                 : Resultado<ProgresoDeEnvioAplicado>.Exito(new ProgresoDeEnvioAplicado(false)));
+    }
+}
+
+/// <summary>El Notificador de las pruebas: guarda las solicitudes y si se pidieron dentro de una transacción; puede devolver «no se guardó», rechazar o lanzar (el contrato dice que nunca lanza, pero Envíos no debe depender de ello).</summary>
+internal sealed class NotificadorDeEnviosEspia(UnidadDeTrabajoReversible unidad) : BabelHub.Ecommerce.Application.Notificaciones.INotificador
+{
+    public List<BabelHub.Ecommerce.Application.Notificaciones.SolicitudDeAviso> Solicitudes { get; } = [];
+
+    public int DentroDeLaTransaccion { get; private set; }
+
+    public BabelHub.Ecommerce.Application.Notificaciones.ResultadoDeLaSolicitudDeAviso Resultado { get; set; } = BabelHub.Ecommerce.Application.Notificaciones.ResultadoDeLaSolicitudDeAviso.Creado;
+
+    public bool Lanza { get; set; }
+
+    public Task<BabelHub.Ecommerce.Application.Notificaciones.ResultadoDeLaSolicitudDeAviso> Solicitar(BabelHub.Ecommerce.Application.Notificaciones.SolicitudDeAviso solicitud, CancellationToken cancelacion = default)
+    {
+        if (Lanza)
+        {
+            throw new InvalidOperationException("El notificador falló.");
+        }
+
+        if (unidad.EnCurso)
+        {
+            DentroDeLaTransaccion++;
+        }
+
+        Solicitudes.Add(solicitud);
+        return Task.FromResult(Resultado);
     }
 }

@@ -53,6 +53,12 @@ internal interface IRepositorioDeEnvios
     /// <summary>Los envíos en reparto o entregados cuyo progreso todavía no se informó a Pedidos, del más antiguo al más reciente (para que el reparto se informe antes que la entrega).</summary>
     Task<IReadOnlyList<Envio>> ObtenerConProgresoPendiente(int maximo, CancellationToken cancelacion = default);
 
+    /// <summary>Los envíos en guía generada con el marcador de despacho iniciado antes de <paramref name="limite"/> (más de 24 horas sin pasar a en reparto).</summary>
+    Task<IReadOnlyList<Envio>> ObtenerConDespachoIniciadoAntesDe(DateTimeOffset limite, int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Los envíos cancelados que tenían guía y se cancelaron en la ventana dada (una guía sin uso en el operador que logística debe avisar fuera del sistema).</summary>
+    Task<IReadOnlyList<Envio>> ObtenerCanceladosConGuiaEntre(DateTimeOffset desde, DateTimeOffset hasta, int maximo, CancellationToken cancelacion = default);
+
     /// <summary>Lista por fecha de creación descendente, con el estado opcional.</summary>
     Task<ListadoDeEnvios> Listar(EstadoDeEnvio? estado, int pagina, int tamano, CancellationToken cancelacion = default);
 }

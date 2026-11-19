@@ -17,6 +17,7 @@ public sealed class SolicitarGuiaTests
         preparar?.Invoke(envio);
         entorno.Envios.Sembrar(envio);
         entorno.Contactos.SembrarDisponible(pedidoId);
+        entorno.SembrarPedidoDelEnvio(pedidoId);
         return envio;
     }
 

@@ -19,6 +19,7 @@ internal sealed class PasarAEnReparto(
     IUnidadDeTrabajo unidad,
     IAuditoria auditoria,
     IPublicadorDeAlertasTecnicas alertas,
+    AvisosDeEnvios avisos,
     IReloj reloj) : ICasoDeUso<Guid, DetalleDeEnvio>
 {
     public async Task<Resultado<DetalleDeEnvio>> Ejecutar(Guid envioId, CancellationToken cancelacion = default)
@@ -30,6 +31,24 @@ internal sealed class PasarAEnReparto(
 
         try
         {
+            // Sin lo que el aviso necesita no se cambia nada y se reintenta.
+            var inicial = await envios.Obtener(envioId, paraActualizar: false, cancelacion).ConfigureAwait(false);
+            if (inicial is null)
+            {
+                return FallosDeEnvios.De<DetalleDeEnvio>(CategoriaDeError.NoEncontrado, ClavesDeEnvios.EnvioNoEncontrado);
+            }
+
+            if (inicial.Estado != EstadoDeEnvio.GuiaGenerada)
+            {
+                return FallosDeEnvios.De<DetalleDeEnvio>(CategoriaDeError.Conflicto, ClavesDeEnvios.EstadoInvalido);
+            }
+
+            var datosDelAviso = await avisos.Preparar(inicial.PedidoId, cancelacion).ConfigureAwait(false);
+            if (!datosDelAviso.EsExito)
+            {
+                return FallosDeEnvios.Fallo<DetalleDeEnvio>(datosDelAviso.Error!);
+            }
+
             // (1) Transacción corta: el marcador de despacho y su arrendamiento.
             var inicio = await unidad.Ejecutar(
                 async token =>
@@ -102,6 +121,7 @@ internal sealed class PasarAEnReparto(
                                         },
                                     },
                                     token).ConfigureAwait(false);
+                                await avisos.Solicitar(envio, datosDelAviso.Valor, AvisosDeEnvios.EstadoEnReparto, token).ConfigureAwait(false);
                                 await envios.Guardar(envio, token).ConfigureAwait(false);
                                 return Resultado<DetalleDeEnvio>.Exito(MapeoDeEnvios.Detalle(envio));
 

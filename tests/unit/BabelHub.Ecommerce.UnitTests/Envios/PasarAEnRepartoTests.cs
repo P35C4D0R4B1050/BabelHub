@@ -17,6 +17,7 @@ public sealed class PasarAEnRepartoTests
         envio.RegistrarGuia(NumeroDeGuia.Crear("GUIA-000123"), "operador-a", EntornoDeEnvios.AhoraInicial);
         preparar?.Invoke(envio);
         entorno.Envios.Sembrar(envio);
+        entorno.SembrarPedidoDelEnvio(envio.PedidoId);
         return envio;
     }
 
