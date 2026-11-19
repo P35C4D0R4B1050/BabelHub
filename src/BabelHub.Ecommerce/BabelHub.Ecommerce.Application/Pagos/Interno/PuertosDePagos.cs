@@ -157,6 +157,15 @@ internal interface IRepositorioDePagos
     /// <summary>Cuántas intenciones de la cuenta están en curso: con un cobro sin resolver (<c>con_cobro</c>) o aprobadas sin pedido (PAG-24).</summary>
     Task<int> ContarIntencionesEnCursoDeLaCuenta(Guid cuentaId, CancellationToken cancelacion = default);
 
+    /// <summary>Las intenciones <c>abierta</c> cuya vigencia ya venció, las más antiguas primero: las que el trabajo cierra sin cobro.</summary>
+    Task<IReadOnlyList<Guid>> ListarIntencionesAbiertasVencidas(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default);
+
+    /// <summary>Las intenciones que aún guardan el contacto de entrega y cumplieron sus 30 días de retención (PAG-27).</summary>
+    Task<IReadOnlyList<Guid>> ListarIntencionesConContactoVencido(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default);
+
+    /// <summary>Las intenciones cerradas antes de <paramref name="corte"/> que siguen vinculadas a una cuenta, con <c>FOR UPDATE</c> (PAG-26).</summary>
+    Task<IReadOnlyList<IntencionDePago>> ListarIntencionesCerradasParaDepurar(DateTimeOffset corte, int limite, CancellationToken cancelacion = default);
+
     /// <summary>Las compensaciones ya iniciadas que no terminaron, las más antiguas primero.</summary>
     Task<IReadOnlyList<Compensacion>> ListarCompensacionesSinTerminar(int limite, CancellationToken cancelacion = default);
 

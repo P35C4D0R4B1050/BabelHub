@@ -201,6 +201,22 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
     public Task<int> ContarIntencionesEnCursoDeLaCuenta(Guid cuentaId, CancellationToken cancelacion = default) =>
         Task.FromResult(_intenciones.Values.Count(i => i.CuentaId == cuentaId && i.Estado is EstadoDeIntencion.ConCobro or EstadoDeIntencion.Aprobada));
 
+    public Task<IReadOnlyList<Guid>> ListarIntencionesAbiertasVencidas(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(_intenciones.Values
+            .Where(i => i.Estado == EstadoDeIntencion.Abierta && (ahora >= i.VenceEn || (i.TieneImpresos && PlazosDelPago.ReservaExpirada(i.ReservaExpiraEn, ahora))))
+            .OrderBy(i => i.VenceEn).Select(i => i.Id).Take(limite).ToArray());
+
+    public Task<IReadOnlyList<Guid>> ListarIntencionesConContactoVencido(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(_intenciones.Values.Where(i => i.ContactoVencido(ahora)).OrderBy(i => i.CreadaEn).Select(i => i.Id).Take(limite).ToArray());
+
+    public Task<IReadOnlyList<IntencionDePago>> ListarIntencionesCerradasParaDepurar(DateTimeOffset corte, int limite, CancellationToken cancelacion = default)
+    {
+        LecturasConBloqueo++;
+        return Task.FromResult<IReadOnlyList<IntencionDePago>>(_intenciones.Values
+            .Where(i => i.CuentaId is not null && i.Estado is EstadoDeIntencion.Completada or EstadoDeIntencion.Compensada or EstadoDeIntencion.CerradaSinCobro && i.CerradaEn <= corte)
+            .OrderBy(i => i.CerradaEn).Select(i => i.Copiar()).Take(limite).ToArray());
+    }
+
     public Task<IReadOnlyList<Compensacion>> ListarCompensacionesSinTerminar(int limite, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<Compensacion>>(_compensaciones.Values.Where(c => !c.EstaTerminada).OrderBy(c => c.IniciadaEn).Select(c => c.Copiar()).Take(limite).ToArray());
 

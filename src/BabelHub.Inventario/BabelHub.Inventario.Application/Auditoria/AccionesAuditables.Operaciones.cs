@@ -31,6 +31,9 @@ public static partial class AccionesAuditables
     /// <summary>El trabajo de fondo anonimizó los ingresos solicitados de más de 2 años (cantidad, sin datos personales).</summary>
     public static readonly AccionAuditable IngresosSolicitadosAnonimizados = new(nameof(IngresosSolicitadosAnonimizados));
 
+    /// <summary>El trabajo de fondo desvinculó las intenciones de pago cerradas hace más de 2 años (cantidad, sin datos personales, PAG-26).</summary>
+    public static readonly AccionAuditable IntencionesDePagoDesvinculadas = new(nameof(IntencionesDePagoDesvinculadas));
+
     /// <summary>Un reingreso de stock por una devolución recibida.</summary>
     public static readonly AccionAuditable ReingresoPorDevolucion = new(nameof(ReingresoPorDevolucion));
 

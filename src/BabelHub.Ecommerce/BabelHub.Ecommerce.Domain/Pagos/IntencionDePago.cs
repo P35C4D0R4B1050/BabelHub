@@ -453,6 +453,7 @@ public sealed class IntencionDePago
         }
 
         Estado = EstadoDeIntencion.Completada;
+        CerradaEn ??= ahora;
         ReclamadaHasta = null;
         return ResultadoDeCompletar.Completada;
     }

@@ -21,6 +21,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
         [nameof(AccionesAuditables.IngresoDeMercaderiaRegistrado)] = ["ingreso"],
         [nameof(AccionesAuditables.IngresoPendienteConciliado)] = ["ingreso"],
         [nameof(AccionesAuditables.IngresosSolicitadosAnonimizados)] = [],
+        [nameof(AccionesAuditables.IntencionesDePagoDesvinculadas)] = [],
         [nameof(AccionesAuditables.CobroIniciado)] = ["intento-de-cobro"],
         [nameof(AccionesAuditables.CobroResuelto)] = ["intento-de-cobro"],
         [nameof(AccionesAuditables.AvisoDeLaPasarelaRecibido)] = ["intento-de-cobro"],
