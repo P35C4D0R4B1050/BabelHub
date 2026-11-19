@@ -34,6 +34,15 @@ public static partial class AccionesAuditables
     /// <summary>El trabajo de fondo desvinculó las intenciones de pago cerradas hace más de 2 años (cantidad, sin datos personales, PAG-26).</summary>
     public static readonly AccionAuditable IntencionesDePagoDesvinculadas = new(nameof(IntencionesDePagoDesvinculadas));
 
+    /// <summary>Un reembolso de Pagos se concluyó o quedó pendiente (con su motivo de lista cerrada); el actor es el administrador central o el sistema. Sin datos de pago.</summary>
+    public static readonly AccionAuditable ReembolsoResuelto = new(nameof(ReembolsoResuelto));
+
+    /// <summary>Un paso de la compensación de un cobro se hizo (abrir, liberar reservas, registrar el reembolso o cerrar el checkout), con su motivo de lista cerrada.</summary>
+    public static readonly AccionAuditable PasoDeCompensacionHecho = new(nameof(PasoDeCompensacionHecho));
+
+    /// <summary>Pagos eliminó el contacto de entrega de una o varias intenciones (cantidad, sin datos personales, PAG-27).</summary>
+    public static readonly AccionAuditable ContactoDeEntregaLiberado = new(nameof(ContactoDeEntregaLiberado));
+
     /// <summary>Un reingreso de stock por una devolución recibida.</summary>
     public static readonly AccionAuditable ReingresoPorDevolucion = new(nameof(ReingresoPorDevolucion));
 

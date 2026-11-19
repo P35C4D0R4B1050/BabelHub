@@ -72,7 +72,7 @@ public sealed class Compensacion
         Motivo = motivo;
         Variante = variante;
         IniciadaEn = ahora;
-        Avisar = variante == VarianteDeCompensacion.SoloReembolso || motivo is MotivoDeCompensacion.PagoTardio or MotivoDeCompensacion.FallaPosteriorAlPago;
+        Avisar = motivo is MotivoDeCompensacion.PagoTardio or MotivoDeCompensacion.FallaPosteriorAlPago;
 
         // Una compra solo digital no tiene reservas que liberar: el paso ya está hecho.
         if (variante == VarianteDeCompensacion.Completa && !tieneReservas)
@@ -89,7 +89,7 @@ public sealed class Compensacion
 
     public VarianteDeCompensacion Variante { get; }
 
-    /// <summary>PAG-29 y PAG-32 no avisan ni leen el correo (PAG-26); los demás avisan «reembolso automático».</summary>
+    /// <summary>PAG-29 y PAG-32 no avisan ni leen el correo (PAG-26), tampoco en un cobro sobrante; los demás avisan «reembolso automático».</summary>
     public bool Avisar { get; }
 
     public DateTimeOffset IniciadaEn { get; }

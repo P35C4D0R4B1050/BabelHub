@@ -15,7 +15,7 @@ internal sealed class EntornoDeCompensacion
         var bloqueo = new BloqueoDeIntenciones(p.Repositorio, p.Cuenta);
         var registrar = new RegistrarReembolso(p.Repositorio, p.Reembolsos, p.Unidad, bloqueo, p.Auditoria, p.Reloj);
         var procesar = new ProcesarReembolso(p.Repositorio, p.Reembolsos, p.Unidad, p.Pasarela, p.Alertas, p.Reloj, new OpcionesDelCobro(TimeSpan.FromMilliseconds(300)));
-        Compensar = new CompensarCompra(p.Repositorio, p.Unidad, bloqueo, p.Reservas, registrar, procesar, p.Avisador, p.Alertas, p.Reloj);
+        Compensar = new CompensarCompra(p.Repositorio, p.Unidad, bloqueo, p.Reservas, registrar, procesar, p.Avisador, p.Auditoria, p.Alertas, p.Reloj);
     }
 
     public EntornoDeConfirmacion Base { get; }
@@ -364,6 +364,63 @@ public sealed class CompensarCompraTests
         await e.Ejecutar();
 
         Assert.Contains(e.Pagos.Alertas.Publicadas, a => a.Motivo == CompensarCompra.MotivoDeAlertaCompensacionFallida);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-28")]
+    [InlineData(MotivoDeCompensacion.CancelacionDeCuentaEnCurso)]
+    [InlineData(MotivoDeCompensacion.IntencionDesvinculada)]
+    public async Task Un_cobro_sobrante_con_la_cuenta_en_cancelacion_o_desvinculada_no_avisa_ni_deja_avisos_que_lean_el_correo(MotivoDeCompensacion motivo)
+    {
+        var e = await EntornoDeCompensacion.ConSobrante();
+        await e.Pagos.Repositorio.AgregarAvisoDePago(AvisoDePago.Crear(InstantaneasDeCompraDePrueba.Pedido, e.IntentoId, EventoDeAvisoDePago.Rechazado, e.Pagos.Reloj.Ahora));
+        await e.Pagos.Repositorio.AgregarAvisoACarrito(AvisoACarrito.Crear(InstantaneasDeCompraDePrueba.Pedido, e.IntentoId, TransicionDeAviso.Rechazado, false, e.Pagos.Reloj.Ahora));
+
+        await e.Ejecutar(motivo, VarianteDeCompensacion.SoloReembolso);
+
+        Assert.False(e.Compensacion.Avisar);
+        Assert.All(e.Pagos.Repositorio.AvisosDePago, a => Assert.Equal(EstadoDeAvisoDePago.Omitido, a.Estado));
+        Assert.DoesNotContain(e.Pagos.Repositorio.AvisosDePago, a => a.Evento == EventoDeAvisoDePago.ReembolsoAutomatico);
+        Assert.All(e.Pagos.Repositorio.AvisosACarrito, a => Assert.Equal(EstadoDeAvisoACarrito.Omitido, a.Estado));
+        Assert.Single(e.Pagos.Reembolsos.Todos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-17")]
+    public async Task Cada_paso_de_la_compensacion_se_audita_con_su_motivo_y_sin_datos_de_pago()
+    {
+        var e = await EntornoDeCompensacion.Aprobada();
+
+        await e.Ejecutar(MotivoDeCompensacion.PagoTardio);
+
+        var pasos = e.Pagos.Auditoria.Solicitudes.Where(s => s.Accion.Identificador == "PasoDeCompensacionHecho").Select(s => s.Detalle["paso"]!).ToArray();
+        Assert.Equal(["abrir", "liberar-reservas", "registrar-reembolso", "cerrar-checkout"], pasos);
+        Assert.All(e.Pagos.Auditoria.Solicitudes.Where(s => s.Accion.Identificador == "PasoDeCompensacionHecho"), s =>
+        {
+            Assert.Equal("pago-tardio", s.Detalle["motivo"]);
+            Assert.Equal("pedido", s.ObjetoTipo);
+            Assert.DoesNotContain("ch_", string.Join(' ', s.Detalle.Values));
+        });
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-17")]
+    public async Task Si_la_auditoria_cae_el_paso_se_revierte_y_la_retoma_lo_repite_sin_duplicar()
+    {
+        var e = await EntornoDeCompensacion.Aprobada();
+        e.Pagos.Auditoria.Caida = true;
+
+        await e.Ejecutar();
+
+        Assert.Empty(e.Pagos.Repositorio.Compensaciones);
+        Assert.Equal(EstadoDeIntencion.Aprobada, e.Intencion.Estado);
+        Assert.Contains(e.Pagos.Alertas.Publicadas, a => a.Motivo == CompensarCompra.MotivoDeAlertaCompensacionFallida);
+
+        e.Pagos.Auditoria.Caida = false;
+        await e.Ejecutar();
+
+        Assert.True(e.Compensacion.EstaTerminada);
+        Assert.Single(e.Pagos.Reembolsos.Todos);
     }
 
     [Fact]

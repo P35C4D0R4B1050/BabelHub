@@ -1,3 +1,4 @@
+using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Pagos;
 
@@ -17,6 +18,7 @@ internal sealed class CompensarCompra(
     RegistrarReembolso registrarReembolso,
     ProcesarReembolso procesarReembolso,
     IAvisadorACarrito avisador,
+    IAuditoria auditoria,
     IPublicadorDeAlertasTecnicas alertas,
     IReloj reloj) : ICompensadorDeCompra
 {
@@ -110,25 +112,29 @@ internal sealed class CompensarCompra(
             return (await repositorio.ObtenerCompensacion(intentoId, token).ConfigureAwait(false), false);
         }
 
-        if (variante == VarianteDeCompensacion.Completa)
+        // Sin aviso al cliente (PAG-29 y PAG-32, también en un cobro sobrante) no queda ningún aviso sin enviar que lea su correo; y una compensación completa supera los avisos de «pendiente».
+        if (variante == VarianteDeCompensacion.Completa || !compensacion.Avisar)
         {
-            await OmitirLosAvisosQueYaNoTienenSentido(pedidoId, token).ConfigureAwait(false);
-            if (intencion.Estado == EstadoDeIntencion.Aprobada)
-            {
-                intencion.Compensar(ahora);
-                await repositorio.GuardarIntencion(intencion, token).ConfigureAwait(false);
-            }
+            await OmitirLosAvisosQueYaNoTienenSentido(pedidoId, todos: !compensacion.Avisar, token).ConfigureAwait(false);
         }
+
+        if (variante == VarianteDeCompensacion.Completa && intencion.Estado == EstadoDeIntencion.Aprobada)
+        {
+            intencion.Compensar(ahora);
+            await repositorio.GuardarIntencion(intencion, token).ConfigureAwait(false);
+        }
+
+        await Auditar(pedidoId, "abrir", motivo, token).ConfigureAwait(false);
 
         return (compensacion, false);
     }
 
-    /// <summary>Los avisos de «pendiente» (a Carrito y al cliente) de esta intención quedan superados por la compensación: pasan a <c>omitido</c>.</summary>
-    private async Task OmitirLosAvisosQueYaNoTienenSentido(Guid pedidoId, CancellationToken token)
+    /// <summary>Los avisos de «pendiente» (a Carrito y al cliente) de esta intención quedan superados por la compensación: pasan a <c>omitido</c>; si la compensación no avisa (PAG-29 y PAG-32), <b>todo</b> aviso sin enviar pasa a omitido para no leer el correo.</summary>
+    private async Task OmitirLosAvisosQueYaNoTienenSentido(Guid pedidoId, bool todos, CancellationToken token)
     {
         foreach (var aviso in await repositorio.ListarAvisosACarritoDeLaIntencion(pedidoId, token).ConfigureAwait(false))
         {
-            if (aviso.Transicion == TransicionDeAviso.Pendiente && aviso.Omitir())
+            if ((todos || aviso.Transicion == TransicionDeAviso.Pendiente) && aviso.Omitir())
             {
                 await repositorio.GuardarAvisoACarrito(aviso, token).ConfigureAwait(false);
             }
@@ -136,7 +142,7 @@ internal sealed class CompensarCompra(
 
         foreach (var aviso in await repositorio.ListarAvisosDePagoDeLaIntencion(pedidoId, token).ConfigureAwait(false))
         {
-            if (aviso.Evento == EventoDeAvisoDePago.Pendiente && aviso.Omitir())
+            if ((todos || aviso.Evento == EventoDeAvisoDePago.Pendiente) && aviso.Omitir())
             {
                 await repositorio.GuardarAvisoDePago(aviso, token).ConfigureAwait(false);
             }
@@ -185,6 +191,7 @@ internal sealed class CompensarCompra(
                 if (compensacion.MarcarReservasLiberadas(motivo, reloj.Ahora))
                 {
                     await repositorio.GuardarCompensacion(compensacion, token).ConfigureAwait(false);
+                    await Auditar(pedidoId, "liberar-reservas", compensacion.Motivo, token).ConfigureAwait(false);
                 }
 
                 return true;
@@ -215,6 +222,7 @@ internal sealed class CompensarCompra(
         }
 
         await repositorio.GuardarCompensacion(compensacion, token).ConfigureAwait(false);
+        await Auditar(pedidoId, "registrar-reembolso", compensacion.Motivo, token).ConfigureAwait(false);
         return reembolso.Id;
     }
 
@@ -232,9 +240,11 @@ internal sealed class CompensarCompra(
         await repositorio.AgregarAvisoACarrito(AvisoACarrito.Crear(pedidoId, intentoId, TransicionDeAviso.Compensado, retenido: false, ahora), token).ConfigureAwait(false);
         compensacion.MarcarCheckoutCerrado(ahora);
         await repositorio.GuardarCompensacion(compensacion, token).ConfigureAwait(false);
+        await Auditar(pedidoId, "cerrar-checkout", compensacion.Motivo, token).ConfigureAwait(false);
         return true;
     }
 
+/// <summary>Audita un paso de la compensación en la misma transacción, con su motivo de lista cerrada y sin datos de pago ni de la persona.</summary>    private Task Auditar(Guid pedidoId, string paso, MotivoDeCompensacion motivo, CancellationToken token) =>        auditoria.Registrar(            new SolicitudDeRegistro(AccionesAuditables.PasoDeCompensacionHecho)            {                ObjetoTipo = "pedido",                ObjetoId = pedidoId.ToString("D"),                Detalle = new Dictionary<string, string?>                {                    ["paso"] = paso,                    ["motivo"] = motivo switch                    {                        MotivoDeCompensacion.PagoTardio => "pago-tardio",                        MotivoDeCompensacion.FallaPosteriorAlPago => "falla-posterior-al-pago",                        MotivoDeCompensacion.IntencionDesvinculada => "intencion-desvinculada",                        _ => "cancelacion-de-cuenta-en-curso",                    },                },            },            token);
     private Task<Compensacion> Leer(Guid intentoId, CancellationToken cancelacion) =>
         unidad.Ejecutar(async token => (await repositorio.ObtenerCompensacion(intentoId, token).ConfigureAwait(false))!, cancelacion);
 
@@ -250,6 +260,27 @@ internal sealed class CompensarCompra(
             // El reembolso quedó registrado y pendiente: lo reintenta el trabajo.
         }
     }
+
+    /// <summary>Audita un paso de la compensación en la misma transacción, con su motivo de lista cerrada y sin datos de pago ni de la persona.</summary>
+    private Task Auditar(Guid pedidoId, string paso, MotivoDeCompensacion motivo, CancellationToken token) =>
+        auditoria.Registrar(
+            new SolicitudDeRegistro(AccionesAuditables.PasoDeCompensacionHecho)
+            {
+                ObjetoTipo = "pedido",
+                ObjetoId = pedidoId.ToString("D"),
+                Detalle = new Dictionary<string, string?>
+                {
+                    ["paso"] = paso,
+                    ["motivo"] = motivo switch
+                    {
+                        MotivoDeCompensacion.PagoTardio => "pago-tardio",
+                        MotivoDeCompensacion.FallaPosteriorAlPago => "falla-posterior-al-pago",
+                        MotivoDeCompensacion.IntencionDesvinculada => "intencion-desvinculada",
+                        _ => "cancelacion-de-cuenta-en-curso",
+                    },
+                },
+            },
+            token);
 
     private async Task Alertar(string motivo)
     {
