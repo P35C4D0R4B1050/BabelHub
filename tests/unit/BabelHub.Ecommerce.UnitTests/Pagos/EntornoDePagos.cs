@@ -84,6 +84,12 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
         return Task.FromResult(_intentos.TryGetValue(intentoId, out var i) ? i.Copiar() : null);
     }
 
+    public Task<IntentoDeCobro?> ObtenerUltimoIntento(Guid intencionId, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        return Task.FromResult(_intentos.Values.Where(i => i.IntencionId == intencionId).OrderByDescending(i => i.IniciadoEn).FirstOrDefault() is { } u ? u.Copiar() : null);
+    }
+
     public Task<IntentoDeCobro?> ObtenerIntentoActivo(Guid intencionId, CancellationToken cancelacion = default)
     {
         Operaciones++;

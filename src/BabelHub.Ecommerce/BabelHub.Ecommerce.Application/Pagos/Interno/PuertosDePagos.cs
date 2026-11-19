@@ -141,6 +141,9 @@ internal interface IRepositorioDePagos
 
     Task<IntentoDeCobro?> ObtenerIntentoActivo(Guid intencionId, CancellationToken cancelacion = default);
 
+    /// <summary>El intento más reciente de la intención (por su inicio), activo o no: lo que la pantalla de estado usa para el último motivo de rechazo.</summary>
+    Task<IntentoDeCobro?> ObtenerUltimoIntento(Guid intencionId, CancellationToken cancelacion = default);
+
     Task<ResultadoDeAgregarIntento> AgregarIntento(IntentoDeCobro intento, CancellationToken cancelacion = default);
 
     Task GuardarIntento(IntentoDeCobro intento, CancellationToken cancelacion = default);

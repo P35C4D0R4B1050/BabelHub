@@ -287,6 +287,8 @@ public sealed class AvisarACarritoTests
 
         public Task<IntentoDeCobro?> ObtenerIntentoActivo(Guid intencionId, CancellationToken cancelacion = default) => interno.ObtenerIntentoActivo(intencionId, cancelacion);
 
+        public Task<IntentoDeCobro?> ObtenerUltimoIntento(Guid intencionId, CancellationToken cancelacion = default) => interno.ObtenerUltimoIntento(intencionId, cancelacion);
+
         public Task<ResultadoDeAgregarIntento> AgregarIntento(IntentoDeCobro intento, CancellationToken cancelacion = default) => interno.AgregarIntento(intento, cancelacion);
 
         public Task GuardarIntento(IntentoDeCobro intento, CancellationToken cancelacion = default) => interno.GuardarIntento(intento, cancelacion);
