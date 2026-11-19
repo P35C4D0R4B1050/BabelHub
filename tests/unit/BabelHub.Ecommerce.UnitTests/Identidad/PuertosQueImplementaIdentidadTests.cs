@@ -3,6 +3,7 @@ using BabelHub.Ecommerce.Application.Identidad;
 using BabelHub.Ecommerce.Application.Identidad.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Identidad;
+using TipoDeSolicitudDeDatos = BabelHub.Ecommerce.Domain.Identidad.TipoDeSolicitudDeDatos;
 
 namespace BabelHub.Ecommerce.UnitTests.Identidad;
 
@@ -265,5 +266,82 @@ public sealed class PuertosQueImplementaIdentidadTests
         Assert.Null(await direcciones.DeLaCuenta(inactiva.Usuario.Id));
         Assert.Null(await direcciones.DeLaCuenta(cancelada.Usuario.Id));
         Assert.Null(await direcciones.DeLaCuenta(Guid.NewGuid()));
+    }
+
+    // ---------------------------------------------------------------- correcciones de la revisión de IDE-5
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-43")]
+    public async Task LaRestauracion_RechazaDeInmediatoLaClaveRestaurada_SinPeriodoDeGracia_YLaDejaEnLasRevocaciones()
+    {
+        var e = new EntornoDeIdentidad();
+        e.ConClaveActiva(kid: "kid-restaurada-01");
+        e.Actor.Actual = ActorActual.DelSistema();
+
+        await e.Restauracion().RotarClavesEInvalidarSesiones();
+
+        var juego = await e.AlmacenDeClaves.Cargar(false);
+        Assert.False(juego.Acepta("kid-restaurada-01", e.Reloj.Ahora));
+        Assert.False(juego.Acepta("kid-restaurada-01", e.Reloj.Ahora.AddMinutes(1)));
+        Assert.Contains("kid-restaurada-01", juego.Revocadas);
+        Assert.True(juego.Acepta(juego.Activa.Kid, e.Reloj.Ahora));
+        Assert.DoesNotContain(juego.Publicables(e.Reloj.Ahora), c => c.Kid == "kid-restaurada-01");
+    }
+
+    [Theory]
+    [InlineData(RolDeUsuario.AdministradorCentral)]
+    [InlineData(RolDeUsuario.Logistica)]
+    [InlineData(RolDeUsuario.EncargadoDeSucursal)]
+    public async Task LaReaplicacion_NoCancelaNuncaAlPersonal_AunqueElRegistroTengaUnaEntradaDeEsaCuenta(RolDeUsuario rol)
+    {
+        var e = new EntornoDeIdentidad();
+        var persona = e.Cuenta("persona@example.com", rol);
+
+        var resultado = await e.AplicadorDeSupresion().Aplicar(persona.Usuario.Id.ToString("D"), ClaseDeSupresion.Cancelacion);
+
+        Assert.Equal(ResultadoDeAplicacionDeSupresion.Fallida, resultado);
+        Assert.Null(persona.CanceladaEn);
+        Assert.True(persona.Usuario.Activo);
+        Assert.Equal("persona@example.com", persona.Usuario.Correo);
+    }
+
+    [Fact]
+    public async Task UnaAnonimizacion_NoMarcaLaCuentaComoCancelada()
+    {
+        var e = new EntornoDeIdentidad();
+        var cliente = e.Cuenta("ana@example.com");
+
+        await e.AplicadorDeSupresion().Aplicar(cliente.Usuario.Id.ToString("D"), ClaseDeSupresion.Anonimizacion);
+
+        Assert.Null(cliente.CanceladaEn);
+        Assert.EndsWith("@anonimo.invalid", cliente.Usuario.Correo, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LaDireccionDeUnaAlerta_ExigeElCorreoVerificado()
+    {
+        var e = new EntornoDeIdentidad();
+        var sinVerificar = e.Cuenta("sin-verificar@example.com", RolDeUsuario.AdministradorCentral, verificada: false);
+
+        Assert.Null(await new DireccionesDeCuentasDeIdentidad(e.Cuentas).DeLaCuenta(sinVerificar.Usuario.Id));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-43")]
+    public async Task TrasCancelar_LaAdministracionNoPuedeResponderLaSolicitudDelTitular_NiDejarUnAvisoEnLaCuentaAnonimizada()
+    {
+        var e = new EntornoDeIdentidad();
+        var cliente = e.Cuenta("ana@example.com");
+        var solicitud = SolicitudDeDatos.Recibir(Guid.NewGuid(), cliente.Usuario.Id, TipoDeSolicitudDeDatos.Acceso, e.Reloj.Ahora, e.Reloj.HoyEnLima);
+        e.Bd.Solicitudes.Add(solicitud);
+        e.ActuarComo(cliente);
+        await e.CancelacionReal().Solicitar(cliente.Usuario.Id, new ValorSecreto(EntornoDeIdentidad.ContrasenaSegura), null);
+        e.ActuarComoAdministrador();
+
+        var resultado = await e.Solicitudes().Responder(e.Bd.Cuentas.Values.Single(c => c.Usuario.Rol == RolDeUsuario.AdministradorCentral).Usuario.Id, solicitud.Id, ResolucionDeSolicitud.Atendida, "datos del titular", null);
+
+        Assert.Equal("cuenta-cancelada", resultado.Error!.Clave);
+        Assert.Null(e.Bd.Solicitudes.Single().Respuesta);
+        Assert.Empty(e.Bd.Avisos);
     }
 }

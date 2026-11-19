@@ -45,6 +45,12 @@ public sealed class AplicadorDeSupresionDeIdentidad(IRepositorioDeCuentas cuenta
                 async ct =>
                 {
                     var cuenta = await cuentas.PorId(usuarioId, paraActualizar: true, ct).ConfigureAwait(false);
+                    // Solo se reaplica sobre la cuenta de un cliente: una entrada falsa en el registro no puede cancelar a un administrador ni al personal (IDE-49).
+                    if (cuenta is { Usuario.Rol: not RolDeUsuario.Cliente })
+                    {
+                        return ResultadoDeAplicacionDeSupresion.Fallida;
+                    }
+
                     if (cuenta is null || YaAplicada(cuenta, clase))
                     {
                         return ResultadoDeAplicacionDeSupresion.YaEstabaAplicada;
@@ -133,5 +139,5 @@ public sealed class PasoDeRestauracionReenviarBajas(ReintentoDeBajas reintento) 
 public sealed class DireccionesDeCuentasDeIdentidad(IRepositorioDeCuentas cuentas) : IDireccionesDeCuentas
 {
     public async Task<string?> DeLaCuenta(Guid cuentaId, CancellationToken cancelacion = default) =>
-        await cuentas.PorId(cuentaId, paraActualizar: false, cancelacion).ConfigureAwait(false) is { CanceladaEn: null, Usuario: { Activo: true } usuario } ? usuario.Correo : null;
+        await cuentas.PorId(cuentaId, paraActualizar: false, cancelacion).ConfigureAwait(false) is { CanceladaEn: null, Usuario: { Activo: true, CorreoVerificado: true } usuario } ? usuario.Correo : null;
 }

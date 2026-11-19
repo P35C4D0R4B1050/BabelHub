@@ -275,7 +275,7 @@ public interface IRepositorioDeBajas
 {
     Task Agregar(BajaDeTitular baja, CancellationToken cancelacion = default);
 
-    /// <summary>Las que aún no se entregaron o no se cerraron, con <c>FOR UPDATE SKIP LOCKED</c> en la base: dos reintentos simultáneos no procesan la misma.</summary>
+    /// <summary>Las que aún no se entregaron o no se cerraron. Entregar y cerrar son idempotentes, así que dos reintentos simultáneos (dos instancias, o el paso de restauración y el trabajo) a lo sumo repiten un paso sin efecto; el trabajo de fondo (T40) puede tomar cada baja con <c>FOR UPDATE SKIP LOCKED</c> en una transacción por baja.</summary>
     Task<IReadOnlyList<BajaDeTitular>> Pendientes(int limite, CancellationToken cancelacion = default);
 
     Task Guardar(BajaDeTitular baja, CancellationToken cancelacion = default);
@@ -366,6 +366,7 @@ public interface IRegistroDeSolicitudesDeCodigo
 /// </summary>
 public interface IPorAnonimizar
 {
+    /// <summary>Idempotente: agregar un identificador que ya está no cambia nada (la reaplicación tras restaurar lo repite).</summary>
     Task Agregar(Guid usuarioId, CancellationToken cancelacion = default);
 
     Task<IReadOnlyList<Guid>> Listar(int maximo, CancellationToken cancelacion = default);

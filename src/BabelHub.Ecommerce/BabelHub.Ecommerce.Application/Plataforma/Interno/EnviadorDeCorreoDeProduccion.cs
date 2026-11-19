@@ -96,7 +96,7 @@ public sealed class EnviadorDeCorreoDeProduccion(
             await transporte.Enviar(plantillas.De(correo), cancelacion).ConfigureAwait(false);
             return ResultadoDeEnvio.Enviado;
         }
-        catch (Exception) when (!cancelacion.IsCancellationRequested)
+        catch (Exception)
         {
             await DevolverSinInterrumpir(decision.Reserva!, cancelacion).ConfigureAwait(false);
             await AlertarSinInterrumpir(cancelacion).ConfigureAwait(false);
@@ -128,7 +128,7 @@ public sealed class EnviadorDeCorreoDeProduccion(
             await transporte.Enviar(plantillas.DeCodigo(correo), cancelacion).ConfigureAwait(false);
             return ResultadoDeEnvio.Enviado;
         }
-        catch (Exception) when (!cancelacion.IsCancellationRequested)
+        catch (Exception)
         {
             // Sin reintento: el código vence a los 10 minutos y la persona pide otro (IDE-65). El cupo se devuelve y queda la alerta técnica.
             await DevolverSinInterrumpir(decision.Reserva!, cancelacion).ConfigureAwait(false);
@@ -161,7 +161,8 @@ public sealed class EnviadorDeCorreoDeProduccion(
     {
         try
         {
-            await cuota.Devolver(reserva, cancelacion).ConfigureAwait(false);
+            // Con CancellationToken.None: si quien llama canceló, el cupo y el tope igual se devuelven (no se gasta una alerta del día sin que saliera correo).
+            await cuota.Devolver(reserva, CancellationToken.None).ConfigureAwait(false);
         }
         catch (Exception) when (!cancelacion.IsCancellationRequested)
         {
@@ -226,15 +227,26 @@ public sealed class ReintentoDeCorreosPendientes(
                 }
                 catch (Exception) when (!cancelacion.IsCancellationRequested)
                 {
-                    await cuota.Devolver(decision.Reserva!, cancelacion).ConfigureAwait(false);
+                    // Devolver el cupo es una cortesía: si falla, igual se reprograma con la espera creciente (no se reintenta sin espera).
+                    try
+                    {
+                        await cuota.Devolver(decision.Reserva!, cancelacion).ConfigureAwait(false);
+                    }
+                    catch (Exception) when (!cancelacion.IsCancellationRequested)
+                    {
+                        // El cupo se renueva a la medianoche de Lima.
+                    }
+
                     var intentos = pendiente.Intentos + 1;
                     await cola.Reprogramar(pendiente.Id, intentos, ahora + EsperaDelReintentoDeCorreo.Para(intentos), cancelacion).ConfigureAwait(false);
                     fallidos++;
                     continue;
                 }
 
-                await cola.Eliminar(pendiente.Id, cancelacion).ConfigureAwait(false);
                 enviados++;
+
+                // Entrega «al menos una vez»: si purgarlo falla tras un envío correcto, la siguiente pasada lo reenvía (preferible a perder un pago o un reclamo); se cuenta como enviado y la falla de la cola no lo contradice.
+                await cola.Eliminar(pendiente.Id, cancelacion).ConfigureAwait(false);
             }
             catch (Exception) when (!cancelacion.IsCancellationRequested)
             {

@@ -483,4 +483,19 @@ public sealed class EnviadorDeCorreoDeProduccionTests
         Assert.Equal(1, resultado.Fallidos);
         Assert.Single(e.Cola.Items);
     }
+
+    [Fact]
+    public async Task SiQuienLlamaCancelaYElTransporteFalla_ElCupoYElTopeSeDevuelvenIgual_YNadaLanza()
+    {
+        var e = Crear();
+        e.Transporte.Falla = true;
+        using var cancelacion = new CancellationTokenSource();
+        await cancelacion.CancelAsync();
+
+        var resultado = await e.Enviador.Enviar(Alerta(), cancelacion.Token);
+
+        Assert.True(resultado is ResultadoDeEnvio.Encolado or ResultadoDeEnvio.Suprimido);
+        Assert.Equal(0, e.Almacen.Total(Hoy(e)));
+        Assert.Equal(0, e.Almacen.AlertasContadas(Hoy(e), "motivo-a", "Ecommerce"));
+    }
 }

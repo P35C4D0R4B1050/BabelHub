@@ -331,4 +331,47 @@ public sealed class EjecucionDeLaCancelacionTests
         Assert.Equal(0, resultado.Cerradas);
         Assert.DoesNotContain(e.Supresiones.Escrituras, c => c.EndsWith("Cierre", StringComparison.Ordinal));
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-53")]
+    public async Task UnaBajaSinCerrarEn24Horas_PorElRegistroCaido_PublicaLaMismaAlertaTecnica_AunqueSeHayaEntregado()
+    {
+        var (e, cliente, cancelacion) = Escenario();
+        await cancelacion.Solicitar(cliente.Usuario.Id, Contrasena, null);
+        e.Actor.Actual = ActorActual.DelSistema();
+        e.Supresiones.NoDisponible = true;
+
+        e.Reloj.Ahora = EntornoDeIdentidad.Inicio.AddHours(23);
+        await e.Reintento().Procesar();
+        Assert.Empty(e.AlertasDeSeguridad.Tecnicas);
+
+        e.Reloj.Ahora = EntornoDeIdentidad.Inicio.AddHours(25);
+        var resultado = await e.Reintento().Procesar();
+
+        Assert.Equal(1, resultado.SinEntregarPasadoElPlazo);
+        Assert.Equal(ReintentoDeBajas.MotivoDeBajaSinEntregar, Assert.Single(e.AlertasDeSeguridad.Tecnicas));
+        Assert.NotNull(e.Bd.Bajas.Single().EntregadaEn);
+        Assert.Null(e.Bd.Bajas.Single().CerradaEn);
+    }
+
+    [Fact]
+    public async Task UnaBajaSinIntencionPrevia_QueLlevaMasDe24Horas_TambienAlerta()
+    {
+        var (e, _, _) = Escenario();
+        e.Bd.Bajas.Add(new BajaDeTitular(Guid.NewGuid(), e.Reloj.Ahora));
+        e.Actor.Actual = ActorActual.DelSistema();
+        e.Reloj.Ahora = e.Reloj.Ahora.AddHours(25);
+
+        await e.Reintento().Procesar();
+
+        Assert.Single(e.AlertasDeSeguridad.Tecnicas);
+    }
+
+    [Fact]
+    public void ElMotivoDeLaAlertaDeBajas_EstaEnElCatalogoCerradoDeAlertas()
+    {
+        var catalogo = BabelHub.Ecommerce.Application.Auditoria.Interno.CatalogoDeAlertasDeAuditoria.Crear();
+
+        Assert.True(catalogo.Contiene(ReintentoDeBajas.MotivoDeBajaSinEntregar));
+    }
 }

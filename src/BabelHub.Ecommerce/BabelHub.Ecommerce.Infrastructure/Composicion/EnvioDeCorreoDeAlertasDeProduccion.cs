@@ -56,12 +56,12 @@ public sealed class EnvioDeCorreoDeAlertasDeProduccion(
             await transporte.Enviar(plantillas.DeAlerta(correo.Servicio.ToString(), correo.Motivo.Valor, correo.PrimeraOcurrencia, correo.Ocurrencias, lista), cancelacion).ConfigureAwait(false);
             return ResultadoDeEnvioDeAlerta.Enviado;
         }
-        catch (Exception) when (!cancelacion.IsCancellationRequested)
+        catch (Exception)
         {
             // La cuota solo cuenta lo que salió; Auditoría reintenta con esperas crecientes (AUD-40).
             try
             {
-                await cuota.Devolver(decision.Reserva!, cancelacion).ConfigureAwait(false);
+                await cuota.Devolver(decision.Reserva!, CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception) when (!cancelacion.IsCancellationRequested)
             {

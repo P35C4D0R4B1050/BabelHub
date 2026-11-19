@@ -89,7 +89,11 @@ public sealed class EjecutorDeLaCancelacion(
         cuenta.DebeCambiarLaTemporal = false;
         cuenta.Whatsapp.Eliminar();
         cuenta.Aceptacion = AceptacionDeTextos.Vacia();
-        cuenta.CanceladaEn ??= ahora;
+        if (conBaja)
+        {
+            cuenta.CanceladaEn ??= ahora;
+        }
+
         await cuentas.Guardar(cuenta, cancelacion).ConfigureAwait(false);
 
         // (5) La baja del titular y el cierre pendiente, en la misma transacción.
@@ -119,7 +123,7 @@ public sealed class ReintentoDeBajas(
 
     public static readonly TimeSpan PlazoParaLaAlerta = TimeSpan.FromHours(24);
 
-    /// <summary>El motivo del catálogo cerrado de alertas técnicas: una baja lleva más de 24 horas sin entregarse (AUD-32).</summary>
+    /// <summary>El motivo del catálogo cerrado de alertas técnicas: una baja lleva más de 24 horas sin entregarse o sin cerrarse en el registro de supresiones (AUD-32, PLA-41).</summary>
     public const string MotivoDeBajaSinEntregar = "baja-de-titular-sin-entregar";
 
     public async Task<ResultadoDelReintentoDeBajas> Procesar(CancellationToken cancelacion = default)
@@ -141,7 +145,8 @@ public sealed class ReintentoDeBajas(
                 entregadas++;
             }
 
-            if (baja.EntregadaEn is null && ahora - baja.Creada >= PlazoParaLaAlerta)
+            // Sin entregar al Inventario o sin cerrar en el registro de supresiones pasadas 24 horas: la misma alerta técnica (AUD-32, PLA-41).
+            if (baja.Pendiente && ahora - baja.Creada >= PlazoParaLaAlerta)
             {
                 sinEntregarMuchoTiempo++;
             }

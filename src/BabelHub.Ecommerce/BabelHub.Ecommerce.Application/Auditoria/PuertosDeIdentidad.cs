@@ -113,8 +113,7 @@ public interface IDestinatariosDeAlertas
     Task<IReadOnlyList<DestinatarioDeAlerta>> Activos(CancellationToken cancelacion = default);
 
     /// <summary>
-    /// Los usuarios de <b>logística</b> activos: reciben además las alertas cuyo motivo lo indica (TRA-22: un traslado vinculado a un pedido lleva más de 48 horas sin aprobarse). Por omisión nadie, de modo que
-    /// una implementación que no distingue roles sigue siendo válida; quien tiene el esquema de usuarios la sobrescribe.
+    /// Los usuarios de <b>logística</b> activos: reciben además las alertas cuyo motivo lo indica (TRA-22: un traslado vinculado a un pedido lleva más de 48 horas sin aprobarse). Es obligatorio: un adaptador que lo olvide no compila (y no pierde en silencio los avisos de TRA-22).
     /// </summary>
-    Task<IReadOnlyList<DestinatarioDeAlerta>> DeLogistica(CancellationToken cancelacion = default) => Task.FromResult<IReadOnlyList<DestinatarioDeAlerta>>([]);
+    Task<IReadOnlyList<DestinatarioDeAlerta>> DeLogistica(CancellationToken cancelacion = default);
 }
