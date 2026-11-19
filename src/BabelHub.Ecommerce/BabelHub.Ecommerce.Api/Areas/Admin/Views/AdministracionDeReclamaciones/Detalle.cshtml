@@ -41,10 +41,12 @@
 @if (h.Estado == EstadoDeLaHoja.Pendiente && !h.Anonimizada)
 {
     <form method="post" action="/administracion/reclamaciones/@id/responder" class="my-6 flex max-w-xl flex-col gap-3">
+        <partial name="_TokenAntifalsificacion" />
         <label class="form-control"><span class="label-text">Respuesta al consumidor (hasta 3000 caracteres)</span><textarea name="respuesta" class="textarea textarea-bordered" rows="6" required maxlength="3000"></textarea></label>
         <button type="submit" class="btn btn-primary">Responder</button>
     </form>
     <form method="post" action="/administracion/reclamaciones/@id/descartar" class="my-6">
+        <partial name="_TokenAntifalsificacion" />
         <button type="submit" class="btn btn-outline btn-error">Descartar por spam</button>
     </form>
 }
@@ -52,6 +54,7 @@
 @if (h.Estado == EstadoDeLaHoja.Respondido && h.Aviso == AvisoDeLaRespuesta.Pendiente && !h.Anonimizada)
 {
     <form method="post" action="/administracion/reclamaciones/@id/reintentar-aviso" class="my-6">
+        <partial name="_TokenAntifalsificacion" />
         <button type="submit" class="btn btn-primary">Reintentar el aviso por correo</button>
     </form>
 }

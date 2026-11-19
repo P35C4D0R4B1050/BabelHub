@@ -53,8 +53,8 @@ public sealed class ReclamacionesApiTests : IAsyncLifetime
         using var segunda = await _host.Cliente.SendAsync(_host.Pedir("/reclamaciones/nueva"));
 
         var html = await primera.Content.ReadAsStringAsync();
-        var claveA = Regex.Match(html, "name=\"claveDelFormulario\" value=\"([0-9a-f]{32})\"").Groups[1].Value;
-        var claveB = Regex.Match(await segunda.Content.ReadAsStringAsync(), "name=\"claveDelFormulario\" value=\"([0-9a-f]{32})\"").Groups[1].Value;
+        var claveA = Regex.Match(html, "name=\"claveDelFormulario\" value=\"([A-Za-z0-9_-]{22})\"").Groups[1].Value;
+        var claveB = Regex.Match(await segunda.Content.ReadAsStringAsync(), "name=\"claveDelFormulario\" value=\"([A-Za-z0-9_-]{22})\"").Groups[1].Value;
         Assert.Equal(HttpStatusCode.OK, primera.StatusCode);
         Assert.NotEmpty(claveA);
         Assert.NotEqual(claveA, claveB);
@@ -139,7 +139,7 @@ public sealed class ReclamacionesApiTests : IAsyncLifetime
     [Theory]
     [InlineData(CategoriaDeError.Prohibido, "verificacion-requerida", HttpStatusCode.Forbidden, "ECO-VERIFICACION-REQUERIDA")]
     [InlineData(CategoriaDeError.Prohibido, "verificacion-fallida", HttpStatusCode.Forbidden, "ECO-VERIFICACION-FALLIDA")]
-    [InlineData(CategoriaDeError.Conflicto, "conflicto", HttpStatusCode.Conflict, "ECO-CONFLICTO")]
+    [InlineData(CategoriaDeError.Conflicto, "rec-conflicto", HttpStatusCode.Conflict, "ECO-CONFLICTO")]
     [InlineData(CategoriaDeError.NoDisponible, "servicio-no-disponible", HttpStatusCode.ServiceUnavailable, "ECO-SERVICIO-NO-DISPONIBLE")]
     [Trait("Criterio", "AC-REC-12")]
     public async Task Los_errores_del_registro_se_traducen_a_su_codigo_estable(CategoriaDeError categoria, string clave, HttpStatusCode estado, string codigo)
@@ -272,8 +272,8 @@ public sealed class PantallasDeErrorDeReclamacionesTests : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData("estado-invalido", "Esta hoja ya no admite esa acción")]
-    [InlineData("conflicto", "No pudimos completar la solicitud")]
+    [InlineData("rec-estado-invalido", "Esta hoja ya no admite esa acción")]
+    [InlineData("rec-conflicto", "No pudimos completar la solicitud")]
     public async Task Un_estado_invalido_o_un_conflicto_de_la_administracion_se_explican_en_su_pantalla(string clave, string titulo)
     {
         _host.Administracion.Operacion = Resultado<ResultadoDeLaHoja>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Conflicto, clave));
@@ -315,5 +315,54 @@ public sealed class EnlaceDelPieDelLibroTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.SeeOther, enlace.StatusCode);
         Assert.Equal("/reclamaciones/nueva", enlace.Headers.Location?.OriginalString);
         Assert.Contains("href=\"/reclamaciones\"", await formulario.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+}
+
+/// <summary>Revisión de seguridad: los formularios llevan su propio token antifalsificación (un navegador sin JavaScript no lo manda en la cabecera) y la ruta del número se valida dentro de la acción.</summary>
+public sealed class FormulariosConTokenTests : IAsyncLifetime
+{
+    private ReclamacionesApiHost _host = null!;
+
+    public async Task InitializeAsync() => _host = await ReclamacionesApiHost.Crear();
+
+    public async Task DisposeAsync() => await _host.DisposeAsync();
+
+    [Fact]
+    [Trait("Criterio", "AC-REC-02")]
+    public async Task El_formulario_publico_renderizado_se_envia_tal_cual_con_su_campo_de_token_y_sin_la_cabecera()
+    {
+        using var pagina = await _host.Cliente.SendAsync(_host.Pedir("/reclamaciones/nueva"));
+        var html = await pagina.Content.ReadAsStringAsync();
+        var cookie = pagina.Headers.GetValues("Set-Cookie").Select(c => c.Split(';')[0]).Single(c => c.StartsWith(BabelHub.Ecommerce.Api.Web.ProteccionContraFalsificacion.NombreDeLaCookie + "=", StringComparison.Ordinal));
+        var token = Regex.Match(html, "name=\"" + Regex.Escape(BabelHub.Ecommerce.Api.Web.ProteccionContraFalsificacion.NombreDelCampo) + "\" value=\"([^\"]+)\"").Groups[1].Value;
+        var clave = Regex.Match(html, "name=\"claveDelFormulario\" value=\"([^\"]+)\"").Groups[1].Value;
+        Assert.NotEmpty(token);
+
+        using var envio = new HttpRequestMessage(HttpMethod.Post, "/reclamaciones/nueva");
+        envio.Headers.TryAddWithoutValidation("Cookie", cookie);
+        envio.Headers.TryAddWithoutValidation("Accept", "text/html");
+        envio.Content = new FormUrlEncodedContent(
+        [
+            new(BabelHub.Ecommerce.Api.Web.ProteccionContraFalsificacion.NombreDelCampo, token),
+            new("claveDelFormulario", clave),
+            new("tipo", "reclamo"), new("nombre", "Ana Pérez"), new("documento", "12345678"), new("domicilio", "Jr. Lima 123"), new("correo", "ana@example.com"),
+            new("bienContratado", "Libro"), new("montoReclamado", "10.50"), new("detalle", "Llegó dañado"),
+        ]);
+        using var respuesta = await _host.Cliente.SendAsync(envio);
+
+        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
+        Assert.Single(_host.Reclamaciones.Entradas);
+    }
+
+    [Theory]
+    [InlineData("/reclamaciones/2026-000001%0A")]
+    [InlineData("/reclamaciones/2026-00001")]
+    [InlineData("/reclamaciones/abc")]
+    public async Task Un_numero_mal_escrito_responde_no_encontrado_uniforme_sin_llegar_al_modulo(string ruta)
+    {
+        using var respuesta = await _host.Cliente.SendAsync(_host.Pedir(ruta, html: false));
+
+        Assert.Equal(HttpStatusCode.NotFound, respuesta.StatusCode);
+        Assert.Empty(_host.Consumidor.Llamadas);
     }
 }

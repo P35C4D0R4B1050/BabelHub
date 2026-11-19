@@ -56,8 +56,8 @@ public static class ProblemasDelCarrito
         ["reembolso-supera-el-tope"] = new("REEMBOLSO-SUPERA-EL-TOPE", StatusCodes.Status422UnprocessableEntity),
         ["reembolso-no-reintentable"] = new("REEMBOLSO-NO-REINTENTABLE", StatusCodes.Status409Conflict),
         ["correo-no-verificado"] = new("REC-CORREO-NO-VERIFICADO", StatusCodes.Status403Forbidden),
-        ["estado-invalido"] = new("REC-ESTADO-INVALIDO", StatusCodes.Status409Conflict),
-        ["conflicto"] = new("CONFLICTO", StatusCodes.Status409Conflict),
+        ["rec-estado-invalido"] = new("REC-ESTADO-INVALIDO", StatusCodes.Status409Conflict),
+        ["rec-conflicto"] = new("CONFLICTO", StatusCodes.Status409Conflict),
         ["hoja-no-encontrada"] = new("NO-ENCONTRADO"),
     };
 

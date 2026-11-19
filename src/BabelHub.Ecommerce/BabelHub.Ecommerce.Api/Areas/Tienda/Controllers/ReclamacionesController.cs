@@ -143,6 +143,12 @@ public sealed partial class ReclamacionesController(IReclamaciones reclamaciones
     [PermitidaConTextosPendientes(CapacidadWeb.LibroDeReclamaciones)]
     public async Task<IActionResult> MiHoja(string numero, CancellationToken cancelacion)
     {
+        // El formato AAAA-NNNNNN se comprueba aquí (con \z y dígitos ASCII, no con una restricción de ruta que rompe la plantilla de la auditoría): un número mal escrito responde igual que una hoja ajena o inexistente.
+        if (!FormaDelNumero().IsMatch(numero))
+        {
+            return await Falla(new ErrorDeAplicacion(CategoriaDeError.NoEncontrado, "hoja-no-encontrada"), cancelacion);
+        }
+
         if (await EntradasHttpDelCarrito.RechazarConsulta(HttpContext) is { } consulta)
         {
             return await Falla(consulta, cancelacion);
@@ -161,6 +167,9 @@ public sealed partial class ReclamacionesController(IReclamaciones reclamaciones
 
     // ---------- Piezas ----------
 
+    [GeneratedRegex(@"^[0-9]{4}-[0-9]{6}\z", RegexOptions.CultureInvariant)]
+    private static partial Regex FormaDelNumero();
+
     [GeneratedRegex(@"^\d{1,10}(\.\d{1,2})?$", RegexOptions.CultureInvariant)]
     private static partial Regex FormaDelMonto();
 
@@ -175,7 +184,7 @@ public sealed partial class ReclamacionesController(IReclamaciones reclamaciones
     private async Task<IActionResult> Formulario(IReadOnlyList<string> camposConProblema, int estado, CancellationToken cancelacion)
     {
         var vista = await pantalla.Completar(
-            new ReclamacionNuevaVista { ClaveDelFormulario = Guid.NewGuid().ToString("N"), CamposConProblema = camposConProblema },
+            new ReclamacionNuevaVista { ClaveDelFormulario = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlEncode(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)), CamposConProblema = camposConProblema },
             "Libro de Reclamaciones",
             cancelacion: cancelacion);
         Response.Headers.CacheControl = "no-store";

@@ -111,7 +111,7 @@ public sealed class HojasConPostgresTests(PostgresDeReclamacionesFixture bd) : I
         }));
 
         Assert.Equal(20, resultados.Count(r => r.EsExito));
-        Assert.All(resultados.Where(r => !r.EsExito), r => Assert.Equal("estado-invalido", r.Error!.Clave));
+        Assert.All(resultados.Where(r => !r.EsExito), r => Assert.Equal("rec-estado-invalido", r.Error!.Clave));
         Assert.Equal(20L, await bd.Consultar<long>("SELECT count(*) FROM reclamaciones.hojas_reclamacion WHERE estado <> 'pendiente'"));
         Assert.Equal(20L, await bd.Consultar<long>("SELECT count(DISTINCT id) FROM reclamaciones.hojas_reclamacion WHERE estado <> 'pendiente'"));
     }

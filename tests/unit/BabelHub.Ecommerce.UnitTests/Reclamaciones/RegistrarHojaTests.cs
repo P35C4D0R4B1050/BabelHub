@@ -244,7 +244,7 @@ public sealed class RegistrarHojaTests
         var repetida = await e.Reclamaciones.Registrar(e.Entrada());
 
         Assert.Equal(CategoriaDeError.Conflicto, repetida.Error!.Categoria);
-        Assert.Equal("conflicto", repetida.Error.Clave);
+        Assert.Equal("rec-conflicto", repetida.Error.Clave);
         Assert.Empty(e.Hojas.Todas);
         Assert.Equal(0, e.Hojas.Operaciones);
     }

@@ -38,14 +38,14 @@ internal static class ClavesDeReclamaciones
     public const string EsperaEnSegundos = "espera-en-segundos";
 
     /// <summary>La misma clave del formulario con otro contenido, o con el primer envío todavía en curso (409).</summary>
-    public const string Conflicto = "conflicto";
+    public const string Conflicto = "rec-conflicto";
 
     public const string ServicioNoDisponible = "servicio-no-disponible";
 
     public const string HojaNoEncontrada = "hoja-no-encontrada";
 
     /// <summary><c>ECO-REC-ESTADO-INVALIDO</c> (409): la hoja no está pendiente o ya se anonimizó (REC-16).</summary>
-    public const string EstadoInvalido = "estado-invalido";
+    public const string EstadoInvalido = "rec-estado-invalido";
 
     public const string Prohibido = "prohibido";
 

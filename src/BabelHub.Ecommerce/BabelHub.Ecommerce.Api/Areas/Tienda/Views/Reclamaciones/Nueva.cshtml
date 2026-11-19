@@ -20,6 +20,7 @@
 }
 
 <form method="post" action="/reclamaciones/nueva" class="flex max-w-xl flex-col gap-4" id="formulario-de-reclamacion">
+        <partial name="_TokenAntifalsificacion" />
     <input type="hidden" name="claveDelFormulario" value="@Model.ClaveDelFormulario" />
     <fieldset class="flex flex-col gap-2">
         <legend class="font-semibold">Tipo</legend>
