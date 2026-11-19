@@ -30,8 +30,25 @@ Variables de datos (los recorridos que las necesitan se omiten si faltan; nunca 
 | `E2E_VISITANTE_STORAGE_STATE` | Visitante con un libro en su carrito (cookie `__Host-bh-carrito`; AC-CAR-13). |
 | `E2E_CLIENTE_TRAS_FUSION_STORAGE_STATE` | Cliente recién ingresado con avisos de ajuste sin ver (AC-CAR-22). |
 
-Versiones: `@playwright/test` y `playwright-core` fijados en **1.64.0**, la que usa los navegadores de la caché local (`chromium-1248`, `firefox-1555`); con otra versión Playwright pide otros navegadores y falla al lanzarlos. Node en `C:Program Files
-odejs` (si el shell no lo ve: `export PATH="$PATH:/c/Program Files/nodejs"`); `npm install` y `npx playwright test carrito` (sin las variables `E2E_*` los recorridos se omiten).
+Versiones: `@playwright/test` y `playwright-core` fijados en **1.64.0**, la que usa los navegadores de la caché local (`chromium-1248`, `firefox-1555`); con otra versión Playwright pide otros navegadores y falla al lanzarlos. Node está en `C:\Program Files\nodejs` (si el shell no lo ve: `export PATH="$PATH:/c/Program Files/nodejs"`); `npm install` y `npx playwright test carrito` (sin las variables `E2E_*` los recorridos con datos se omiten).
+
+## Entorno local de punta a punta (T36 de `ecommerce-carrito-checkout`)
+
+Todo en `tests/e2e/entorno/`, solo para desarrollo y sin datos reales (`.env.e2e` lo ignora Git y se genera con secretos aleatorios):
+
+```bash
+bash tests/e2e/entorno/preparar-entorno.sh                # PostgreSQL y Redis aislados (proyecto `bhe2e`, puertos 55432 y 56379) y las dos bases migradas (COMP-2)
+bash tests/e2e/entorno/arrancar-host.sh inventario &      # http://localhost:8082
+bash tests/e2e/entorno/arrancar-host.sh ecommerce &       # http://localhost:8080 (el borde real recibe HTTPS)
+cd tests/e2e && E2E_FORWARDED_PROTO=https npx playwright test carrito/humo-del-entorno --project=escritorio --project=telefono --workers=1
+```
+
+- `E2E_FORWARDED_PROTO=https` hace que Playwright envíe `X-Forwarded-Proto: https`: el host local escucha en HTTP y sin esa cabecera las cookies `__Host-` y el antiforgery fallan (el borde real termina el TLS).
+- Cada servicio usa **cuentas de base de datos con nombres distintos** (`acceso_inv`, `depurador_ajustes_inv`, `depurador_auditoria_inv` en el Inventario): los roles de PostgreSQL son del clúster y, en una sola instancia, los nombres iguales de los dos servicios (`acceso`, `depurador_auditoria`) se pisan las contraseñas al migrar.
+- El host se niega a arrancar con las variables `BABELHUB__Migrador__*` en su entorno (COMP-2); `arrancar-host.sh` las quita.
+- Para apagar: `docker compose -p bhe2e -f infra/docker-compose.local.yml --env-file .env.e2e down` (el volumen conserva las bases).
+
+**Estado:** el humo del visitante (carrito vacío, catálogo, cabeceras de seguridad y axe AA) corre en Chromium de escritorio y de teléfono. Los recorridos con compra (`carrito-checkout.spec.ts`) siguen omitidos por faltar: (1) sembrado de catálogo (obras y ediciones) y de inventario (sucursales, fuentes y stock); (2) sesiones de clientes (no hay pantalla de ingreso: es de `web-identidad`) y su `storageState`; (3) el esquema `pedidos` (T28) para confirmar la compra; y (4) Firefox no se puede lanzar en este equipo (`firefox.exe` responde «Permission denied» y Playwright «spawn UNKNOWN», también sin sandbox).
 
 Navegadores: `escritorio` y `telefono` (Chromium) y `firefox`; los tres usan los navegadores de la caché de Playwright (`%LOCALAPPDATA%ms-playwright`) y solo hace falta Node para ejecutarlos.
 
