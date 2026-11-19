@@ -75,6 +75,7 @@ public static class PresentadorDeAuditoria
         ["credencial-de-servicio-anterior-en-uso"] = "Se usó la credencial de servicio anterior",
         ["dependencia-no-necesaria-fallida"] = "Falló una dependencia no necesaria",
         ["trabajo-de-fondo-detenido"] = "Un trabajo de fondo se detuvo",
+        ["trabajo-de-pagos-sin-correr"] = "Un trabajo de fondo de Pagos falló varias veces seguidas o lleva un día sin correr bien",
         ["memoria-de-contadores-alta"] = "La memoria de los contadores de límites es alta",
         ["verificador-de-credenciales-sin-claves"] = "El verificador de credenciales no tiene claves",
         ["revocacion-de-sesiones-pendiente"] = "Hay sesiones por revocar",
