@@ -8,8 +8,22 @@ namespace BabelHub.Ecommerce.Application.Pedidos.Interno;
 /// Los pedidos y sus operaciones (esquema <c>pedidos</c>). Cada lectura <c>conBloqueo</c> es <c>SELECT … FOR UPDATE</c> con <c>lock_timeout</c> dentro de la transacción activa, en el orden global de bloqueo (cuenta → pedido → envío → intención → reembolso → …); sin transacción
 /// no se bloquea. <see cref="Agregar"/> inserta con <c>ON CONFLICT DO NOTHING</c> sin objetivo (una colisión de <c>numero</c> tampoco aborta la transacción) y dice si insertó.
 /// </summary>
+/// <summary>Los criterios de un listado: la cuenta (el cliente), la sucursal de recojo (el encargado), solo pedidos que no son de recojo (logística), el estado derivado y la página; el tamaño ya viene acotado a 50.</summary>
+public sealed record CriterioDeListado(Guid? CuentaId, string? CodigoDeSucursalDeRecojo, bool SoloQueNoSonDeRecojo, EstadoDePedido? Estado, int Pagina, int Tamano);
+
+public sealed record PaginaDeDominio(IReadOnlyList<Pedido> Pedidos, int Total);
+
+/// <summary>La auditoría de la lectura del contacto por el personal (PED-40, D09): si no se puede auditar lanza y el detalle se muestra sin contacto. Una acción propia del catálogo de auditoría llega con el carril de auditoría.</summary>
+public interface IAuditoriaDeContacto
+{
+    Task ContactoConsultado(Guid pedidoId, string rol, CancellationToken cancelacion = default);
+}
+
 public interface IRepositorioDePedidos
 {
+    /// <summary>Un listado paginado, del más reciente al más antiguo, con el total; nunca carga el contacto en un listado que no lo necesita.</summary>
+    Task<PaginaDeDominio> Listar(CriterioDeListado criterio, CancellationToken cancelacion = default);
+
     Task<Pedido?> Obtener(Guid pedidoId, bool conBloqueo, CancellationToken cancelacion = default);
 
     Task<bool> Existe(Guid pedidoId, CancellationToken cancelacion = default);

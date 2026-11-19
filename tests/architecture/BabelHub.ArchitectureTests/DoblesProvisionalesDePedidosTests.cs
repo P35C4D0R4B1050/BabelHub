@@ -77,6 +77,7 @@ public class DoblesProvisionalesDePedidosTests
         Assert.IsType<ReservasDelPedidoProvisional>(proveedor.GetRequiredService<IReservasDelPedido>());
         Assert.IsType<ResolucionDeSucursalProvisional>(proveedor.GetRequiredService<IResolucionDeSucursal>());
         Assert.IsType<LimitadorDePedidosProvisional>(proveedor.GetRequiredService<ILimitadorDePedidos>());
+        Assert.IsType<AuditoriaDeContactoProvisional>(proveedor.GetRequiredService<IAuditoriaDeContacto>());
     }
 
     [Fact]
@@ -94,6 +95,7 @@ public class DoblesProvisionalesDePedidosTests
         Assert.Contains(nameof(IReservasDelPedido), error.Message, StringComparison.Ordinal);
         Assert.Contains(nameof(IResolucionDeSucursal), error.Message, StringComparison.Ordinal);
         Assert.Contains(nameof(ILimitadorDePedidos), error.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IAuditoriaDeContacto), error.Message, StringComparison.Ordinal);
         Assert.DoesNotContain(nameof(IProgresoDeEnvios), error.Message, StringComparison.Ordinal);
     }
 
@@ -109,6 +111,7 @@ public class DoblesProvisionalesDePedidosTests
         servicios.AddSingleton<IReservasDelPedido, ReservasReales>();
         servicios.AddSingleton<IResolucionDeSucursal, ResolucionReal>();
         servicios.AddSingleton<ILimitadorDePedidos, LimitadorReal>();
+        servicios.AddSingleton<IAuditoriaDeContacto, AuditoriaDeContactoReal>();
 
         var resultado = servicios.AgregarDoblesProvisionalesDePedidos(esProduccion: true);
 
@@ -146,6 +149,11 @@ public class DoblesProvisionalesDePedidosTests
         public Task<ResultadoDeCerrarReserva> Cerrar(Guid pedidoId, Guid lineaId, string claveDeCierre, CancellationToken cancelacion = default) => throw new NotSupportedException();
 
         public Task<ResultadoDeLiberarReserva> Liberar(Guid pedidoId, string motivo, IReadOnlyList<Guid> lineaIds, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    }
+
+    private sealed class AuditoriaDeContactoReal : IAuditoriaDeContacto
+    {
+        public Task ContactoConsultado(Guid pedidoId, string rol, CancellationToken cancelacion = default) => throw new NotSupportedException();
     }
 
     private sealed class LimitadorReal : ILimitadorDePedidos

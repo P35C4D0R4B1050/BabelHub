@@ -1,5 +1,6 @@
 using BabelHub.Ecommerce.Application.Biblioteca;
 using BabelHub.Ecommerce.Application.Identidad;
+using BabelHub.Ecommerce.Application.Pagos;
 using BabelHub.Ecommerce.Application.Pedidos.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Pedidos;
@@ -61,6 +62,19 @@ internal sealed class RepositorioDePedidosFalso : IRepositorioDePedidos
         Llamadas.Add("actualizar");
         _pedidos[pedido.Id] = pedido;
         return Task.CompletedTask;
+    }
+
+    public Task<PaginaDeDominio> Listar(CriterioDeListado criterio, CancellationToken cancelacion = default)
+    {
+        Llamadas.Add("listar");
+        var filtrados = _pedidos.Values
+            .Where(p => criterio.CuentaId is null || p.CuentaId == criterio.CuentaId)
+            .Where(p => criterio.CodigoDeSucursalDeRecojo is null || (p.Tipo == TipoDeEntregaDelPedido.Recojo && p.CodigoDeSucursalDeRecojo == criterio.CodigoDeSucursalDeRecojo))
+            .Where(p => !criterio.SoloQueNoSonDeRecojo || p.Tipo != TipoDeEntregaDelPedido.Recojo)
+            .Where(p => criterio.Estado is null || p.Estado == criterio.Estado)
+            .OrderByDescending(p => p.CreadoEn)
+            .ToList();
+        return Task.FromResult(new PaginaDeDominio([.. filtrados.Skip((criterio.Pagina - 1) * criterio.Tamano).Take(criterio.Tamano)], filtrados.Count));
     }
 
     public Task RegistrarLiberacionDeContacto(Guid pedidoId, DateTimeOffset desde, CancellationToken cancelacion = default)
@@ -151,4 +165,89 @@ internal sealed class GeneradorDeNumerosFalso : IGeneradorDeNumerosDePedido
         Entregados.Add(texto);
         return NumeroDePedido.Crear(texto) ?? numero;
     }
+}
+
+internal sealed class ResolucionDeSucursalFalsa : IResolucionDeSucursal
+{
+    public static readonly Guid Lima = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
+    public static readonly Guid Ayacucho = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000002");
+
+    public Task<Guid?> IdentificadorDe(string codigoDeSucursal, CancellationToken cancelacion = default) =>
+        Task.FromResult<Guid?>(codigoDeSucursal switch { "LIM" => Lima, "AYA" => Ayacucho, _ => null });
+}
+
+/// <summary>Límites que dejan pasar todo y pueden negar el contacto o la gestión.</summary>
+internal sealed class LimitesPermisivosDePedidos : ILimitadorDePedidos
+{
+    public ResultadoDeLimiteDePedidos Contacto { get; set; } = ResultadoDeLimiteDePedidos.Permitido;
+
+    public ResultadoDeLimiteDePedidos Gestion { get; set; } = ResultadoDeLimiteDePedidos.Permitido;
+
+    public Task<ResultadoDeLimiteDePedidos> Consultar(Guid usuarioId, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLimiteDePedidos.Permitido);
+
+    public Task<ResultadoDeLimiteDePedidos> Gestionar(Guid usuarioId, CancellationToken cancelacion = default) => Task.FromResult(Gestion);
+
+    public Task<ResultadoDeLimiteDePedidos> LeerContacto(Guid usuarioId, CancellationToken cancelacion = default) => Task.FromResult(Contacto);
+}
+
+internal sealed class EstadoDeCuentaFalso : IEstadoDeCuenta
+{
+    public EstadoDeCuenta? Estado { get; set; }
+
+    public Task<EstadoDeCuenta?> Consultar(Guid usuarioId, CancellationToken cancelacion = default) =>
+        Task.FromResult<EstadoDeCuenta?>(Estado ?? new EstadoDeCuenta(usuarioId, true, EstadoDeAceptacionDeLosTextos.AlDia, true, false, false));
+
+    public Task<ResultadoDeLaAceptacion> AceptarLosTextos(Guid usuarioId, string versionMostrada, CancellationToken cancelacion = default) => throw new NotSupportedException();
+}
+
+internal sealed class AuditoriaDeContactoFalsa : IAuditoriaDeContacto
+{
+    public List<(Guid PedidoId, string Rol)> Lecturas { get; } = [];
+
+    public bool Caida { get; set; }
+
+    public Task ContactoConsultado(Guid pedidoId, string rol, CancellationToken cancelacion = default)
+    {
+        if (Caida)
+        {
+            throw new InvalidOperationException("auditoría caída");
+        }
+
+        Lecturas.Add((pedidoId, rol));
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class ReembolsosFalsos : IReembolsos
+{
+    public Dictionary<string, ReembolsoPendienteVista> Pendientes { get; } = [];
+
+    public List<RegistrarReembolsoEntrada> Registrados { get; } = [];
+
+    public bool Falla { get; set; }
+
+    public Task<Resultado<ReembolsoRegistrado>> Registrar(RegistrarReembolsoEntrada entrada, CancellationToken cancelacion = default)
+    {
+        Registrados.Add(entrada);
+        var monto = entrada.Lineas.Sum(l => l.Monto) + entrada.Envio;
+        return Task.FromResult(Resultado<ReembolsoRegistrado>.Exito(new ReembolsoRegistrado(Guid.NewGuid(), monto, EstadoDelReembolso.Pendiente, false)));
+    }
+
+    public Task<Resultado<EstadoDelReembolso>> Procesar(Guid reembolsoId, CancellationToken cancelacion = default) => Task.FromResult(Resultado<EstadoDelReembolso>.Exito(EstadoDelReembolso.Reembolsado));
+
+    public Task<int> ContarPendientes(Guid cuentaId, OrigenDelReembolso origen, CancellationToken cancelacion = default) => Task.FromResult(0);
+
+    public Task<Resultado<ReembolsoPendienteVista?>> ConsultarPorOrigen(OrigenDelReembolso origen, string claveNatural, CancellationToken cancelacion = default)
+    {
+        if (Falla)
+        {
+            throw new InvalidOperationException("Pagos caído");
+        }
+
+        return Task.FromResult(Resultado<ReembolsoPendienteVista?>.Exito(Pendientes.GetValueOrDefault(claveNatural)));
+    }
+
+    public Task<Resultado<PaginaDeReembolsos>> ListarPendientes(int pagina, int tamano, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+    public Task<Resultado<EstadoDelReembolso>> Reintentar(Guid reembolsoId, CancellationToken cancelacion = default) => Task.FromResult(Resultado<EstadoDelReembolso>.Exito(EstadoDelReembolso.Reembolsado));
 }

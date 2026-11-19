@@ -83,6 +83,13 @@ internal sealed class LimitadorDePedidosProvisional : ILimitadorDePedidos
     public Task<ResultadoDeLimiteDePedidos> LeerContacto(Guid usuarioId, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLimiteDePedidos.NoDisponible);
 }
 
+/// <summary>La auditoría de la lectura del contacto sin la acción del catálogo de Auditoría: lanza, así que el personal ve el detalle sin contacto (falla cerrado, D09).</summary>
+internal sealed class AuditoriaDeContactoProvisional : IAuditoriaDeContacto
+{
+    public Task ContactoConsultado(Guid pedidoId, string rol, CancellationToken cancelacion = default) =>
+        throw new InvalidOperationException("La acción de auditoría de la lectura del contacto de un pedido aún no existe en el catálogo.");
+}
+
 public static class ComposicionProvisionalDePedidos
 {
     private static readonly (Type Puerto, Type Doble)[] Dobles =
@@ -95,6 +102,7 @@ public static class ComposicionProvisionalDePedidos
         (typeof(IReservasDelPedido), typeof(ReservasDelPedidoProvisional)),
         (typeof(IResolucionDeSucursal), typeof(ResolucionDeSucursalProvisional)),
         (typeof(ILimitadorDePedidos), typeof(LimitadorDePedidosProvisional)),
+        (typeof(IAuditoriaDeContacto), typeof(AuditoriaDeContactoProvisional)),
     ];
 
     /// <summary>
@@ -112,6 +120,7 @@ public static class ComposicionProvisionalDePedidos
         servicios.TryAddSingleton<IReservasDelPedido, ReservasDelPedidoProvisional>();
         servicios.TryAddSingleton<IResolucionDeSucursal, ResolucionDeSucursalProvisional>();
         servicios.TryAddSingleton<ILimitadorDePedidos, LimitadorDePedidosProvisional>();
+        servicios.TryAddSingleton<IAuditoriaDeContacto, AuditoriaDeContactoProvisional>();
 
         if (esProduccion)
         {
