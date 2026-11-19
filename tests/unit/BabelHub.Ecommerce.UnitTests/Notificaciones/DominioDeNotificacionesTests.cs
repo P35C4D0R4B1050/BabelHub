@@ -237,7 +237,7 @@ public sealed class DominioDeNotificacionesTests
         Assert.Equivalent(
             new[]
             {
-                "pedido-confirmado", "pedido-en-preparacion", "pedido-en-transito", "pedido-listo-para-recojo", "pedido-entregado", "pedido-no-recogido", "pago-pendiente", "pago-resultado", "pedido-anulado",
+                "pedido-confirmado", "pedido-estado", "pedido-estado-sucursal", "pedido-en-preparacion", "pedido-en-transito", "pedido-listo-para-recojo", "pedido-entregado", "pedido-no-recogido", "pago-pendiente", "pago-resultado", "pedido-anulado",
                 "reembolso-automatico", "envio-guia", "libro-digital-disponible", "devolucion-estado", "traslado-estado",
             },
             claves);
@@ -245,6 +245,25 @@ public sealed class DominioDeNotificacionesTests
         Assert.True(CatalogoDePlantillas.EsDeTraslado("traslado-estado"));
         Assert.False(CatalogoDePlantillas.EsDeTraslado("pedido-confirmado"));
         Assert.Equal(TipoDeDestinatario.Sucursal, CatalogoDePlantillas.Obtener("traslado-estado")!.Destinatario);
+    }
+
+    [Theory]
+    [InlineData("pedido-estado", TipoDeDestinatario.Cliente)]
+    [InlineData("pedido-estado-sucursal", TipoDeDestinatario.Sucursal)]
+    [Trait("Criterio", "AC-NOT-06")]
+    public void LasPlantillasDeEstadoDePedido_TienenUnSoloTipoDeDestinatario_YAceptanSoloElNumeroYUnEstadoDeLaListaCerrada(string clave, TipoDeDestinatario destinatario)
+    {
+        var plantilla = CatalogoDePlantillas.Obtener(clave)!;
+        var valido = new Dictionary<string, string> { ["numeroDePedido"] = "BH-000123", ["estado"] = "listo-para-recojo" };
+
+        Assert.Equal(destinatario, plantilla.Destinatario);
+        Assert.Equal(["numeroDePedido", "estado"], plantilla.Campos.Select(c => c.Nombre));
+        Assert.All(new[] { "confirmado", "en-transito", "recibido", "en-preparacion", "listo-para-recojo", "despachado", "entregado", "no-recogido", "anulado" }, estado =>
+            Assert.True(plantilla.Validar(new Dictionary<string, string>(valido) { ["estado"] = estado }).EsValido, estado));
+        Assert.Equal("valor-fuera-de-la-lista", plantilla.Validar(new Dictionary<string, string>(valido) { ["estado"] = "devuelto" }).Motivo);
+        Assert.Equal("campo-fuera-del-catalogo", plantilla.Validar(new Dictionary<string, string>(valido) { ["nombre"] = "Ana" }).Motivo);
+        Assert.Equal("obligatorio", plantilla.Validar(new Dictionary<string, string> { ["numeroDePedido"] = "BH-000123" }).Motivo);
+        Assert.Equal("valor-prohibido", plantilla.Validar(new Dictionary<string, string>(valido) { ["numeroDePedido"] = "https://malo.example" }).Motivo);
     }
 
     [Theory]

@@ -203,9 +203,18 @@ public static class CatalogoDePlantillas
 
     private static IReadOnlySet<string> Lista(params string[] valores) => new HashSet<string>(valores, StringComparer.Ordinal);
 
+    /// <summary>Los estados de un pedido que Pedidos avisa (PED-05, PED-06): la lista cerrada de su máquina de estados.</summary>
+    private static readonly CampoDePlantilla EstadoDelPedido = new(
+        "estado",
+        TipoDeCampo.Enumeracion,
+        20,
+        new HashSet<string>(["confirmado", "en-transito", "recibido", "en-preparacion", "listo-para-recojo", "despachado", "entregado", "no-recogido", "anulado"], StringComparer.Ordinal));
+
     public static IReadOnlyList<PlantillaDeAviso> Todas { get; } =
     [
         PlantillaDeAviso.Crear("pedido-confirmado", TipoDeDestinatario.Cliente, 1, Pedido, Nombre),
+        PlantillaDeAviso.Crear("pedido-estado", TipoDeDestinatario.Cliente, 1, Pedido, EstadoDelPedido),
+        PlantillaDeAviso.Crear("pedido-estado-sucursal", TipoDeDestinatario.Sucursal, 1, Pedido, EstadoDelPedido),
         PlantillaDeAviso.Crear("pedido-en-preparacion", TipoDeDestinatario.Cliente, 1, Pedido, Nombre),
         PlantillaDeAviso.Crear("pedido-en-transito", TipoDeDestinatario.Cliente, 1, Pedido, Nombre),
         PlantillaDeAviso.Crear("pedido-listo-para-recojo", TipoDeDestinatario.Cliente, 1, Pedido, Nombre, new CampoDePlantilla("sucursal", TipoDeCampo.CodigoDeSucursal, 16, Obligatorio: false)),
