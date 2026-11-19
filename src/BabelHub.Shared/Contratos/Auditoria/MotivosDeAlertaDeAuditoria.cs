@@ -70,6 +70,8 @@ public static class MotivosDeAlertaDeAuditoria
 
     public const string CierreDeIntencionesFallido = "cierre-de-intenciones-fallido";
 
+    public const string TrabajoDePagosSinCorrer = "trabajo-de-pagos-sin-correr";
+
     public const string CargoDuplicadoParaConciliar = "cargo-duplicado-para-conciliar";
 
     public const string AvisoDePagoFallido = "aviso-de-pago-fallido";
@@ -139,6 +141,7 @@ public static class MotivosDeAlertaDeAuditoria
         CompensacionDeCompraFallida,
         CobroDudosoParaConciliar,
         CierreDeIntencionesFallido,
+        TrabajoDePagosSinCorrer,
         CargoDuplicadoParaConciliar,
         AvisoDePagoFallido,
         AvisoACarritoFallido,
