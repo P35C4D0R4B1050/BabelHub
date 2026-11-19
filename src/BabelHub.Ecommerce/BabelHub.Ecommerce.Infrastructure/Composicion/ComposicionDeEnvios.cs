@@ -12,7 +12,7 @@ namespace BabelHub.Ecommerce.Infrastructure.Composicion;
 /// <summary>
 /// La composición del módulo Envíos (T15; <c>ecommerce-envios</c>): el repositorio de PostgreSQL bajo <c>EjecutarComo(envios)</c>, los casos de uso por alcance de solicitud, las implementaciones públicas
 /// <see cref="IEnviosDeLogistica"/>, <see cref="IEnviosDelCliente"/> e <see cref="IDespachoDeEnvios"/> y, al final, lo que otros módulos aún no entregan. <b>Envíos es la implementación real de <see cref="IDespachoDeEnvios"/></b>:
-/// reemplaza al doble provisional de Pedidos esté o no ya registrado (sin referenciar el tipo del doble). <b>Orden en producción:</b> <c>AgregarEnvios</c> va <b>antes</b> de <c>AgregarDoblesProvisionalesDePedidos(esProduccion: true)</c> (su guarda exige que las implementaciones reales ya estén) y, cuando exista, el adaptador real de reservas (T13) se registra <b>antes</b> de <c>AgregarEnvios</c>, cuya guarda lo comprueba al llamarse. El operador logístico lo registra aparte
+/// reemplaza al doble provisional de Pedidos esté o no ya registrado (sin referenciar el tipo del doble). <b>Orden en producción:</b> <c>AgregarEnvios</c> va <b>antes</b> de <c>AgregarDoblesProvisionalesDePedidos(esProduccion: true)</c> (su guarda exige que las implementaciones reales ya estén) y, cuando exista, el cliente del Inventario (<see cref="IClienteDelInventario"/>) se registra <b>antes</b> de <c>AgregarEnvios</c>: si está, el cierre de reservas es <c>RestReservasDelEnvio</c> (T13); si no, el doble provisional y la guarda de producción lo rechaza. El operador logístico lo registra aparte
 /// <see cref="ComposicionDelOperadorLogistico.AgregarOperadorLogisticoDeEnvios"/> (el nulo por defecto). Necesita ya registrados: <see cref="IUnidadDeTrabajo"/>, <see cref="IConexionDeLaUnidadDeTrabajo"/>, <see cref="IActorActual"/>,
 /// <see cref="IDenegacionDeAcceso"/>, <see cref="IReloj"/>, <see cref="IControlDeLimites"/>, <see cref="BabelHub.Ecommerce.Application.Auditoria.IAuditoria"/>, <see cref="IPublicadorDeAlertasTecnicas"/> y
 /// <see cref="BabelHub.Ecommerce.Application.Notificaciones.INotificador"/>, más los contratos de lectura de Pedidos (reales o provisionales).
@@ -53,6 +53,12 @@ public static class ComposicionDeEnvios
 
         // Sin un operador elegido por el anfitrión (guarda de arranque), el nulo: falla cerrado con «no disponible» en vez de un error de resolución.
         servicios.TryAddSingleton<IOperadorLogistico, NuloOperadorLogistico>();
+
+        // El cierre de reservas del envío sobre el cliente del Inventario de Plataforma, si ya está registrado (T13); si no, queda el doble provisional que falla cerrado y la guarda de producción lo nombra.
+        if (servicios.Any(d => d.ServiceType == typeof(IClienteDelInventario)))
+        {
+            servicios.TryAddScoped<IReservasDelEnvio, RestReservasDelEnvio>();
+        }
 
         // ---------- Lo que aún no existe, con su guarda de producción ----------
         servicios.TryAddScoped<IReservasDelEnvio, ReservasDelEnvioProvisional>();
