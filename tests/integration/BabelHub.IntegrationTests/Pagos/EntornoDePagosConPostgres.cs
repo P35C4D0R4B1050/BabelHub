@@ -262,7 +262,19 @@ internal sealed class EntornoDePagosConPostgres : IAsyncDisposable
         servicios.AddSingleton<ReservasSimuladasDelPago>();
         servicios.AddScoped<IReservasDelPago>(sp => sp.GetRequiredService<ReservasSimuladasDelPago>());
 
-        entradas.Con(nameof(IProcesadorDeEntradasDeIntegracion.Recibir), _ => Task.FromResult(new ResultadoDeEntradaDeIntegracion(EstadoDeEntradaDeIntegracion.Aceptada)));
+        var vistos = new HashSet<string>();
+        entradas.Con(
+            nameof(IProcesadorDeEntradasDeIntegracion.Recibir),
+            argumentos =>
+            {
+                // Como el procesador real: una entrada sin identificador o con la firma forjada se rechaza; la misma entrada dos veces es repetida.
+                var entrada = (EntradaDeIntegracion)argumentos[0]!;
+                lock (vistos)
+                {
+                    var estado = entrada.IdDeEntrada.Length == 0 || entrada.Firma == "forjada" ? EstadoDeEntradaDeIntegracion.Rechazada : vistos.Add(entrada.IdDeEntrada) ? EstadoDeEntradaDeIntegracion.Aceptada : EstadoDeEntradaDeIntegracion.Repetida;
+                    return Task.FromResult(new ResultadoDeEntradaDeIntegracion(estado));
+                }
+            });
         entradas.Con(nameof(IProcesadorDeEntradasDeIntegracion.Completar), _ => Task.CompletedTask);
         alertas.Con(nameof(IPublicadorDeAlertasTecnicas.Publicar), argumentos => { lock (_alertas) { _alertas.Add(((AlertaTecnica)argumentos[0]!).Motivo); } return Task.CompletedTask; });
         trabajos.Con(nameof(IRegistroDeTrabajosDeFondo.Registrar), _ => Task.CompletedTask);
