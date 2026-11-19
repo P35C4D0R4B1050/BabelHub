@@ -244,6 +244,13 @@ internal sealed class RepositorioDeDevolucionesEnMemoria : IRepositorioDeDevoluc
         return Task.FromResult(new PaginaDeDevolucionesDelDominio([.. todas.Skip((pagina - 1) * tamano).Take(tamano)], todas.Count));
     }
 
+    public Task<IReadOnlyList<(Guid DevolucionId, Guid LineaDePedidoId)>> ObtenerConReembolsoPendiente(int maximo, CancellationToken cancelacion = default)
+    {
+        Comprobar();
+        IReadOnlyList<(Guid, Guid)> pendientes = [.. _devoluciones.Values.OrderBy(d => d.CreadaEn).SelectMany(d => d.Lineas.Where(l => d.Tipo == TipoDeDevolucion.Impreso ? l.Estado == EstadoDeLineaDeDevolucion.Recibida : l.Estado == EstadoDeLineaDeDevolucion.Aprobada).Select(l => (d.Id, l.LineaDePedidoId))).Take(maximo)];
+        return Task.FromResult(pendientes);
+    }
+
     public Task<PaginaDeDevolucionesDelDominio> ListarDeLaAdministracion(FiltroDeLaAdministracion filtro, int pagina, int tamano, CancellationToken cancelacion = default)
     {
         var todas = _devoluciones.Values.Where(d => (filtro.Tipo is null || d.Tipo == filtro.Tipo) && (!filtro.SoloReportes || d.Origen == OrigenDeDevolucion.Reporte)).OrderByDescending(d => d.CreadaEn).ToList();
@@ -341,12 +348,14 @@ internal sealed class EntornoDeDevoluciones
     {
         Autorizador = new AutorizadorDeDevoluciones(Actor, Denegaciones, Cuentas, Sucursales);
         LimitesDeUso = new LimitesDeDevoluciones(Limites, Actor);
+        Procesador = new ProcesarReembolsoDeLinea(Reembolsos, Repositorio, Unidad, Auditoria, Reloj);
         SolicitarImpreso = new SolicitarDevolucionDeImpreso(Autorizador, LimitesDeUso, Pedidos, Inventario, Marca, Repositorio, Unidad, Auditoria, Reloj);
-        SolicitarDigital = new SolicitarReembolsoDeDigital(Autorizador, LimitesDeUso, Pedidos, Accesos, Reembolsos, Marca, Repositorio, Unidad, Auditoria, Reloj);
+        SolicitarDigital = new SolicitarReembolsoDeDigital(Autorizador, LimitesDeUso, Pedidos, Accesos, Reembolsos, Marca, Repositorio, Unidad, Auditoria, Procesador, Reloj);
         Reportar = new ReportarArchivoDefectuoso(Autorizador, LimitesDeUso, Pedidos, Accesos, Marca, Repositorio, Unidad, Auditoria, Reloj);
-        Decidir = new DecidirReporte(Autorizador, LimitesDeUso, Pedidos, Accesos, Biblioteca, Reembolsos, Repositorio, Unidad, Auditoria, Reloj);
+        Decidir = new DecidirReporte(Autorizador, LimitesDeUso, Pedidos, Accesos, Biblioteca, Reembolsos, Repositorio, Unidad, Auditoria, Procesador, Reloj);
         Gestion = new AprobarYRechazarDevolucion(Autorizador, LimitesDeUso, Repositorio, Unidad, Auditoria, Reloj);
-        Recepcion = new ConfirmarRecepcion(Autorizador, LimitesDeUso, Inventario, Reembolsos, Repositorio, Unidad, Auditoria, Alertas, Reloj);
+        Recepcion = new ConfirmarRecepcion(Autorizador, LimitesDeUso, Inventario, Reembolsos, Repositorio, Unidad, Auditoria, Alertas, Procesador, Reloj);
+        Conciliacion = new ConciliarReembolsosDeDevoluciones(Autorizador, Repositorio, Reembolsos, Unidad, Procesador, Reloj);
     }
 
     public ActorDePrueba Actor { get; private set; }
@@ -390,6 +399,10 @@ internal sealed class EntornoDeDevoluciones
     public AprobarYRechazarDevolucion Gestion { get; private set; } = null!;
 
     public ConfirmarRecepcion Recepcion { get; private set; } = null!;
+
+    public ProcesarReembolsoDeLinea Procesador { get; private set; } = null!;
+
+    public ConciliarReembolsosDeDevoluciones Conciliacion { get; private set; } = null!;
 
     public BabelHub.Ecommerce.UnitTests.Auditoria.AlertasTecnicasEspia Alertas { get; private set; } = null!;
 

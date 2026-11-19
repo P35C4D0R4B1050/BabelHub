@@ -20,6 +20,7 @@ internal sealed class ConfirmarRecepcion(
     IUnidadDeTrabajo unidad,
     IAuditoria auditoria,
     IPublicadorDeAlertasTecnicas alertas,
+    ProcesarReembolsoDeLinea procesador,
     IReloj reloj)
 {
     public async Task<Resultado<DevolucionVista>> Ejecutar(Guid devolucionId, CancellationToken cancelacion = default)
@@ -119,7 +120,7 @@ internal sealed class ConfirmarRecepcion(
 
             foreach (var (lineaDePedidoId, reembolsoId) in ids)
             {
-                await ProcesarElReembolso(devolucionId, lineaDePedidoId, reembolsoId, cancelacion).ConfigureAwait(false);
+                await procesador.Ejecutar(devolucionId, lineaDePedidoId, reembolsoId, cancelacion).ConfigureAwait(false);
             }
 
             var final = await repositorio.Obtener(devolucionId, paraActualizar: false, cancelacion).ConfigureAwait(false);
@@ -225,42 +226,4 @@ internal sealed class ConfirmarRecepcion(
         }
     }
 
-    private async Task ProcesarElReembolso(Guid devolucionId, Guid lineaDePedidoId, Guid reembolsoId, CancellationToken cancelacion)
-    {
-        Resultado<EstadoDelReembolso> procesado;
-        try
-        {
-            procesado = await reembolsos.Procesar(reembolsoId, cancelacion).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return;
-        }
-
-        if (!procesado.EsExito || procesado.Valor != EstadoDelReembolso.Reembolsado)
-        {
-            return;
-        }
-
-        try
-        {
-            await unidad.Ejecutar(
-                async token =>
-                {
-                    var devolucion = await repositorio.Obtener(devolucionId, paraActualizar: true, token).ConfigureAwait(false);
-                    if (devolucion is not null && devolucion.Reembolsar(lineaDePedidoId, reloj.Ahora, ResponsableDelCambio.Sistema) == ResultadoDeTransicionDeDevolucion.Aplicada)
-                    {
-                        await repositorio.Guardar(devolucion, token).ConfigureAwait(false);
-                        await auditoria.Registrar(AuditoriaDeDevoluciones.Cambio(devolucion, EstadoDeLineaDeDevolucion.Recibida, EstadoDeLineaDeDevolucion.Reembolsada), token).ConfigureAwait(false);
-                    }
-
-                    return true;
-                },
-                cancelacion).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            // La pasarela ya confirmó: la conciliación (T11) pasa la línea a reembolsada sin repetir el reembolso.
-        }
-    }
 }

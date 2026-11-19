@@ -60,6 +60,9 @@ internal interface IRepositorioDeDevoluciones
     Task<PaginaDeDevolucionesDelDominio> ListarDeLaSucursal(string codigoDeSucursal, int pagina, int tamano, CancellationToken cancelacion = default);
 
     Task<PaginaDeDevolucionesDelDominio> ListarDeLaAdministracion(FiltroDeLaAdministracion filtro, int pagina, int tamano, CancellationToken cancelacion = default);
+
+    /// <summary>Las líneas con el reembolso pendiente (recibida de un impreso o aprobada de un digital), de las más antiguas a las más recientes, hasta <paramref name="maximo"/>: la conciliación de reembolsos (T11).</summary>
+    Task<IReadOnlyList<(Guid DevolucionId, Guid LineaDePedidoId)>> ObtenerConReembolsoPendiente(int maximo, CancellationToken cancelacion = default);
 }
 
 /// <summary>El resultado de pedir el reingreso de una devolución al Inventario, reducido a la lista cerrada que el orquestador necesita (D07).</summary>

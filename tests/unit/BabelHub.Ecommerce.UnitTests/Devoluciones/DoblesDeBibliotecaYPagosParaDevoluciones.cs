@@ -134,8 +134,22 @@ internal sealed class ReembolsosDoble : IReembolsos, IInstantanea
 
     public Task<int> ContarPendientes(Guid cuentaId, OrigenDelReembolso origen, CancellationToken cancelacion = default) => Task.FromResult(0);
 
-    public Task<Resultado<ReembolsoPendienteVista?>> ConsultarPorOrigen(OrigenDelReembolso origen, string claveNatural, CancellationToken cancelacion = default) =>
-        Task.FromResult(Resultado<ReembolsoPendienteVista?>.Exito(null));
+    /// <summary>El estado que Pagos informa por clave natural (el reintento de la administración lo deja reembolsado); sin entrada, Pagos no conoce el reembolso.</summary>
+    public Dictionary<string, EstadoDelReembolso> PorClaveNatural { get; } = [];
+
+    public bool ConsultaFalla { get; set; }
+
+    public Task<Resultado<ReembolsoPendienteVista?>> ConsultarPorOrigen(OrigenDelReembolso origen, string claveNatural, CancellationToken cancelacion = default)
+    {
+        if (ConsultaFalla)
+        {
+            return Task.FromResult(Resultado<ReembolsoPendienteVista?>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible")));
+        }
+
+        return Task.FromResult(Resultado<ReembolsoPendienteVista?>.Exito(PorClaveNatural.TryGetValue(claveNatural, out var estado)
+            ? new ReembolsoPendienteVista(Guid.NewGuid(), origen, 10m, estado, null, DateTimeOffset.UtcNow, 1)
+            : null));
+    }
 
     public Task<Resultado<PaginaDeReembolsos>> ListarPendientes(int pagina, int tamano, CancellationToken cancelacion = default) =>
         Task.FromResult(Resultado<PaginaDeReembolsos>.Exito(new PaginaDeReembolsos([], pagina, tamano, 0)));
