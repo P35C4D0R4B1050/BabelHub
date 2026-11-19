@@ -36,6 +36,32 @@ public static class ComposicionDelCarrito
         servicios.TryAddScoped<IRepositorioDeCheckouts, RepositorioDeCheckoutsPostgres>();
         servicios.TryAddScoped<IInventarioDelCarrito, RestInventarioDelCarrito>();
 
+        // T26c: los adaptadores reales de lo que entregaron Plataforma, Auditoría e Identidad, solo si ya está registrado lo que necesitan; si no, queda el doble provisional (que falla cerrado) y la guarda de producción lo nombra.
+        if (Hay<IControlDeLimites>(servicios))
+        {
+            servicios.TryAddScoped<ILimitadorDelCarrito, LimitadorDelCarritoSobreLimites>();
+        }
+
+        if (Hay<IAuditoria>(servicios))
+        {
+            servicios.TryAddScoped<IAuditoriaDelCarrito, AuditoriaDelCarritoSobreAuditoria>();
+        }
+
+        if (Hay<IMarcaDeCancelacionDeCuenta>(servicios))
+        {
+            servicios.TryAddScoped<IMarcaDeCancelacion, MarcaDeCancelacionSobreIdentidad>();
+        }
+
+        if (Hay<ICuentaDelCliente>(servicios))
+        {
+            servicios.TryAddScoped<IConsentimientoDeAvisos, ConsentimientoDeAvisosSobreIdentidad>();
+        }
+
+        if (Hay<IPublicadorDeAlertasTecnicas>(servicios))
+        {
+            servicios.TryAddScoped<IAlertasDelCarrito, AlertasDelCarritoSobrePublicador>();
+        }
+
         // ---------- Aplicación ----------
         servicios.TryAddScoped(sp => new AutorizadorDelCarrito(sp.GetRequiredService<IActorActual>(), sp.GetRequiredService<IDenegacionDeAcceso>()));
         servicios.TryAddScoped(sp => new EdicionConCheckoutVivo(sp.GetRequiredService<ICreadorDeIntencionesDePago>(), sp.GetRequiredService<IRepositorioDeCheckouts>()));
@@ -85,6 +111,8 @@ public static class ComposicionDelCarrito
         // ---------- Lo que otros módulos aún no entregan, con su guarda de producción ----------
         return servicios.AgregarDoblesProvisionalesDelCarrito(esProduccion);
     }
+
+    private static bool Hay<T>(IServiceCollection servicios) => servicios.Any(d => d.ServiceType == typeof(T));
 }
 
 public static class ComposicionDeLosTrabajosDelCarrito

@@ -10,6 +10,8 @@ internal static class RolesDeEnvios
 
     public const string AdministradorCentral = "administrador-central";
 
+    public const string Cliente = "cliente";
+
     /// <summary>Ver los envíos, pedir la guía, pasar a en reparto y marcar entregado son solo de logística y de la administración central (ENV-08).</summary>
     public static bool PuedeOperarEnvios(ActorActual? actor) =>
         actor is { Tipo: TipoDeActor.Usuario, UsuarioId: not null } && (actor.Rol == PersonalDeLogistica || actor.Rol == AdministradorCentral);

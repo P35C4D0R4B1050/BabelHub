@@ -19,6 +19,7 @@ internal sealed class SolicitarGuia(
     IUnidadDeTrabajo unidad,
     IAuditoria auditoria,
     IPublicadorDeAlertasTecnicas alertas,
+    AvisosDeEnvios avisos,
     IReloj reloj) : ICasoDeUso<Guid, DetalleDeEnvio>
 {
     public async Task<Resultado<DetalleDeEnvio>> Ejecutar(Guid envioId, CancellationToken cancelacion = default)
@@ -58,6 +59,13 @@ internal sealed class SolicitarGuia(
             if (!destinatario.EsValido)
             {
                 return ContactoIncompleto(NombreDelCampo(destinatario.CampoFaltante!.Value));
+            }
+
+            // Lo que el aviso necesita, antes de fijar nada: sin Pedidos no se cambia el estado y se reintenta.
+            var datosDelAviso = await avisos.Preparar(inicial.PedidoId, cancelacion).ConfigureAwait(false);
+            if (!datosDelAviso.EsExito)
+            {
+                return FallosDeEnvios.Fallo<DetalleDeEnvio>(datosDelAviso.Error!);
             }
 
             // (2b) Transacción corta: la clave y el arrendamiento.
@@ -100,6 +108,11 @@ internal sealed class SolicitarGuia(
                 await LiberarElArrendamiento(envioId).ConfigureAwait(false);
                 throw;
             }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Una excepción inesperada del adaptador es un operador no disponible: el texto nunca se propaga (ENV-04, ENV-17).
+                respuesta = new ResultadoDelOperador.NoDisponible();
+            }
 
             if (respuesta is not ResultadoDelOperador.GuiaCreada creada)
             {
@@ -135,6 +148,7 @@ internal sealed class SolicitarGuia(
                                         },
                                     },
                                     token).ConfigureAwait(false);
+                                await avisos.Solicitar(envio, datosDelAviso.Valor, AvisosDeEnvios.EstadoGuiaGenerada, token).ConfigureAwait(false);
                                 await envios.Guardar(envio, token).ConfigureAwait(false);
                                 return Resultado<DetalleDeEnvio>.Exito(MapeoDeEnvios.Detalle(envio));
 
@@ -153,7 +167,7 @@ internal sealed class SolicitarGuia(
                     },
                     cancelacion).ConfigureAwait(false);
             }
-            catch (Exception ex) when (ex is AuditoriaNoDisponibleException or EnviosNoDisponiblesException)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 // La guía ya existe en el operador: se libera el arrendamiento (la clave se conserva) para recuperarla al reintentar.
                 await LiberarElArrendamiento(envioId).ConfigureAwait(false);
