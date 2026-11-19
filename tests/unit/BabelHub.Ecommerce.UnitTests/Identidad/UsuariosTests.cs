@@ -177,4 +177,16 @@ public sealed class UsuariosTests
         rechazado.CambiarRol(RolDeUsuario.Logistica, null, Ahora);
         Assert.Null(rechazado.SesionesValidasDesde);
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-47")]
+    public void Cambiar_el_correo_lo_normaliza_y_lo_deja_verificado()
+    {
+        var usuario = Usuario.NuevoCliente(Guid.NewGuid(), "ana@correo.pe");
+
+        usuario.CambiarElCorreo("  Nuevo.Correo@Correo.PE ");
+
+        Assert.Equal("nuevo.correo@correo.pe", usuario.Correo);
+        Assert.True(usuario.CorreoVerificado);
+    }
 }

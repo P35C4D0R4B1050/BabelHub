@@ -14,6 +14,7 @@ namespace BabelHub.Ecommerce.Application.Identidad.Interno;
 public sealed class GestionDeLaCuenta(
     IRepositorioDeCuentas cuentas,
     AlcanceDeLaCuenta alcance,
+    ConfianzaDelDispositivo confianza,
     Reautenticacion reautenticacion,
     IControlDeLimites limites,
     IListaDeContrasenasComunes comunes,
@@ -72,7 +73,7 @@ public sealed class GestionDeLaCuenta(
             cancelacion).ConfigureAwait(false);
     }
 
-    public async Task<Resultado<RespuestaUniforme>> CambiarLaContrasena(Guid usuarioId, ValorSecreto actual, ValorSecreto nueva, ValorSecreto? renovacionDeLaSesion = null, CancellationToken cancelacion = default)
+    public async Task<Resultado<RespuestaUniforme>> CambiarLaContrasena(Guid usuarioId, ValorSecreto actual, ValorSecreto nueva, ValorSecreto? renovacionDeLaSesion = null, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(actual);
         ArgumentNullException.ThrowIfNull(nueva);
@@ -80,6 +81,7 @@ public sealed class GestionDeLaCuenta(
         {
             return Resultado<RespuestaUniforme>.Fallo(prohibido);
         }
+if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)        {            return Resultado<RespuestaUniforme>.Fallo(congelado);        }
 
         var cuenta = await Cargar(usuarioId, false, cancelacion).ConfigureAwait(false);
         if (cuenta is null)
@@ -256,13 +258,14 @@ public sealed class GestionDeLaCuenta(
             cancelacion).ConfigureAwait(false);
     }
 
-    public async Task<Resultado<SecretoDelSegundoFactor>> IniciarElSegundoFactor(Guid usuarioId, ValorSecreto contrasenaActual, CancellationToken cancelacion = default)
+    public async Task<Resultado<SecretoDelSegundoFactor>> IniciarElSegundoFactor(Guid usuarioId, ValorSecreto contrasenaActual, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(contrasenaActual);
         if (await alcance.Comprobar(usuarioId, cancelacion).ConfigureAwait(false) is { } prohibido)
         {
             return Resultado<SecretoDelSegundoFactor>.Fallo(prohibido);
         }
+if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)        {            return Resultado<SecretoDelSegundoFactor>.Fallo(congelado);        }
 
         var cuenta = await Cargar(usuarioId, false, cancelacion).ConfigureAwait(false);
         if (cuenta is null)
@@ -285,13 +288,14 @@ public sealed class GestionDeLaCuenta(
         return Resultado<SecretoDelSegundoFactor>.Exito(new SecretoDelSegundoFactor(new ValorSecreto(Base32.Codificar(secreto)), Ingreso.Emisor, cuenta.Usuario.Correo));
     }
 
-    public async Task<Resultado<IReadOnlyList<ValorSecreto>>> ConfirmarElSegundoFactor(Guid usuarioId, ValorSecreto codigo, ValorSecreto? renovacionDeLaSesion = null, CancellationToken cancelacion = default)
+    public async Task<Resultado<IReadOnlyList<ValorSecreto>>> ConfirmarElSegundoFactor(Guid usuarioId, ValorSecreto codigo, ValorSecreto? renovacionDeLaSesion = null, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(codigo);
         if (await alcance.Comprobar(usuarioId, cancelacion).ConfigureAwait(false) is { } prohibido)
         {
             return Resultado<IReadOnlyList<ValorSecreto>>.Fallo(prohibido);
         }
+if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)        {            return Resultado<IReadOnlyList<ValorSecreto>>.Fallo(congelado);        }
 
         if (await Cargar(usuarioId, false, cancelacion).ConfigureAwait(false) is null)
         {
@@ -349,7 +353,7 @@ public sealed class GestionDeLaCuenta(
         return resultado;
     }
 
-    public async Task<Resultado<RespuestaUniforme>> DesactivarElSegundoFactor(Guid usuarioId, ValorSecreto contrasenaActual, ValorSecreto codigo, ValorSecreto? renovacionDeLaSesion = null, CancellationToken cancelacion = default)
+    public async Task<Resultado<RespuestaUniforme>> DesactivarElSegundoFactor(Guid usuarioId, ValorSecreto contrasenaActual, ValorSecreto codigo, ValorSecreto? renovacionDeLaSesion = null, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(contrasenaActual);
         ArgumentNullException.ThrowIfNull(codigo);
@@ -357,6 +361,7 @@ public sealed class GestionDeLaCuenta(
         {
             return Resultado<RespuestaUniforme>.Fallo(prohibido);
         }
+if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)        {            return Resultado<RespuestaUniforme>.Fallo(congelado);        }
 
         var cuenta = await Cargar(usuarioId, false, cancelacion).ConfigureAwait(false);
         if (cuenta is null)
@@ -397,7 +402,7 @@ public sealed class GestionDeLaCuenta(
         return resultado;
     }
 
-    public async Task<Resultado<IReadOnlyList<ValorSecreto>>> RegenerarLosCodigosDeRespaldo(Guid usuarioId, ValorSecreto contrasenaActual, ValorSecreto codigo, CancellationToken cancelacion = default)
+    public async Task<Resultado<IReadOnlyList<ValorSecreto>>> RegenerarLosCodigosDeRespaldo(Guid usuarioId, ValorSecreto contrasenaActual, ValorSecreto codigo, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(contrasenaActual);
         ArgumentNullException.ThrowIfNull(codigo);
@@ -405,6 +410,7 @@ public sealed class GestionDeLaCuenta(
         {
             return Resultado<IReadOnlyList<ValorSecreto>>.Fallo(prohibido);
         }
+if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)        {            return Resultado<IReadOnlyList<ValorSecreto>>.Fallo(congelado);        }
 
         var cuenta = await Cargar(usuarioId, false, cancelacion).ConfigureAwait(false);
         if (cuenta is null)

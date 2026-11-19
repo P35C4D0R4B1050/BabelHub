@@ -35,7 +35,7 @@ public interface ICuentaDelCliente
     /// Cambia la contraseña con la actual (IDE-25): revoca las demás renovaciones y conserva la de la sesión desde la que se hace (<paramref name="renovacionDeLaSesion"/>; sin ella, todas), audita el cambio y avisa al correo
     /// (IDE-44, IDE-45). La contraseña actual equivocada cuenta contra el límite de ingresos fallidos.
     /// </summary>
-    Task<Resultado<RespuestaUniforme>> CambiarLaContrasena(Guid usuarioId, ValorSecreto actual, ValorSecreto nueva, ValorSecreto? renovacionDeLaSesion = null, CancellationToken cancelacion = default);
+    Task<Resultado<RespuestaUniforme>> CambiarLaContrasena(Guid usuarioId, ValorSecreto actual, ValorSecreto nueva, ValorSecreto? renovacionDeLaSesion = null, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default);
 
     /// <summary>Guarda el número de WhatsApp (E.164) o lo quita con <see langword="null"/>: deja sin efecto el consentimiento hasta confirmarlo para ese número y cancela los avisos pendientes (IDE-31).</summary>
     Task<Resultado<CuentaDelCliente>> GuardarElNumeroDeWhatsApp(Guid usuarioId, string? numero, CancellationToken cancelacion = default);
@@ -50,16 +50,16 @@ public interface ICuentaDelCliente
     Task<Resultado<RespuestaUniforme>> GuardarElConsentimientoPorHuella(Guid usuarioId, string huellaEnmascaradaDelNumero, CancellationToken cancelacion = default);
 
     /// <summary>Empieza a activar el segundo factor (IDE-37): pide la contraseña actual y entrega el secreto una sola vez; no se activa hasta confirmarlo con un código.</summary>
-    Task<Resultado<SecretoDelSegundoFactor>> IniciarElSegundoFactor(Guid usuarioId, ValorSecreto contrasenaActual, CancellationToken cancelacion = default);
+    Task<Resultado<SecretoDelSegundoFactor>> IniciarElSegundoFactor(Guid usuarioId, ValorSecreto contrasenaActual, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default);
 
     /// <summary>Activa el segundo factor con un código válido, entrega los 8 códigos de respaldo una sola vez y revoca las demás renovaciones (IDE-37, IDE-44).</summary>
-    Task<Resultado<IReadOnlyList<ValorSecreto>>> ConfirmarElSegundoFactor(Guid usuarioId, ValorSecreto codigo, ValorSecreto? renovacionDeLaSesion = null, CancellationToken cancelacion = default);
+    Task<Resultado<IReadOnlyList<ValorSecreto>>> ConfirmarElSegundoFactor(Guid usuarioId, ValorSecreto codigo, ValorSecreto? renovacionDeLaSesion = null, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default);
 
     /// <summary>Desactiva el segundo factor con la contraseña y un código vigente (IDE-37); revoca las demás renovaciones.</summary>
-    Task<Resultado<RespuestaUniforme>> DesactivarElSegundoFactor(Guid usuarioId, ValorSecreto contrasenaActual, ValorSecreto codigo, ValorSecreto? renovacionDeLaSesion = null, CancellationToken cancelacion = default);
+    Task<Resultado<RespuestaUniforme>> DesactivarElSegundoFactor(Guid usuarioId, ValorSecreto contrasenaActual, ValorSecreto codigo, ValorSecreto? renovacionDeLaSesion = null, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default);
 
     /// <summary>Regenera los 8 códigos de respaldo con la contraseña y un código vigente; invalida los anteriores (IDE-52).</summary>
-    Task<Resultado<IReadOnlyList<ValorSecreto>>> RegenerarLosCodigosDeRespaldo(Guid usuarioId, ValorSecreto contrasenaActual, ValorSecreto codigo, CancellationToken cancelacion = default);
+    Task<Resultado<IReadOnlyList<ValorSecreto>>> RegenerarLosCodigosDeRespaldo(Guid usuarioId, ValorSecreto contrasenaActual, ValorSecreto codigo, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default);
 
     Task<Resultado<IReadOnlyList<AvisoDeCuenta>>> ListarLosAvisos(Guid usuarioId, CancellationToken cancelacion = default);
 
@@ -82,8 +82,20 @@ public interface ICambioDeCorreo
     /// <summary>El titular confirma un cambio pendiente desde un dispositivo reconocido, con su contraseña (IDE-54).</summary>
     Task<Resultado<RespuestaUniforme>> ConfirmarElCambioPendiente(Guid usuarioId, ValorSecreto contrasenaActual, ValorSecreto? marcaDeDispositivo, string? region, CancellationToken cancelacion = default);
 
-    /// <summary>El titular rechaza un cambio pendiente desde un dispositivo reconocido (IDE-54).</summary>
-    Task<Resultado<RespuestaUniforme>> RechazarElCambioPendiente(Guid usuarioId, ValorSecreto? marcaDeDispositivo, string? region, CancellationToken cancelacion = default);
+    /// <summary>El titular rechaza un cambio pendiente desde un dispositivo reconocido y con su contraseña (IDE-54, WEB-37).</summary>
+    Task<Resultado<RespuestaUniforme>> RechazarElCambioPendiente(Guid usuarioId, ValorSecreto contrasenaActual, ValorSecreto? marcaDeDispositivo, string? region, CancellationToken cancelacion = default);
+}
+
+/// <summary>El resultado de registrar el dispositivo tras un ingreso completo: la marca nueva si hubo que emitir una (la capa servidor la guarda en una cookie), o nada si el dispositivo ya era conocido (IDE-55).</summary>
+public sealed record MarcaDeDispositivoEmitida(ValorSecreto? MarcaNueva);
+
+/// <summary>
+/// Los dispositivos reconocidos (IDE-55, D11): tras <b>cada ingreso completo</b> la capa servidor registra el dispositivo con la marca que traía (si traía una) y la región que entregó el borde. Solo el propio usuario
+/// autenticado lo registra (el actor se compara con el identificador): una credencial solo existe tras un ingreso completo. Un dispositivo solo cuenta como reconocido pasadas 24 horas de su emisión.
+/// </summary>
+public interface IDispositivosDeLaCuenta
+{
+    Task<Resultado<MarcaDeDispositivoEmitida>> RegistrarElIngresoCompleto(Guid usuarioId, ValorSecreto? marcaPresentada, string? region, CancellationToken cancelacion = default);
 }
 
 public enum TipoDeSolicitudDeDatos

@@ -86,7 +86,7 @@ public sealed class Usuario
     public Guid Id { get; }
 
     /// <summary>El correo normalizado (minúsculas, sin espacios en los extremos).</summary>
-    public string Correo { get; }
+    public string Correo { get; private set; }
 
     public RolDeUsuario Rol { get; private set; }
 
@@ -135,6 +135,13 @@ public sealed class Usuario
         rol.LlevaSucursal() ? sucursal is { } s && s != Guid.Empty : sucursal is null;
 
     public void VerificarCorreo() => CorreoVerificado = true;
+
+    /// <summary>Aplica un cambio de correo ya verificado por su código (IDE-53): el correo nuevo queda normalizado y verificado.</summary>
+    public void CambiarElCorreo(string correoNuevo)
+    {
+        Correo = NormalizarCorreo(correoNuevo);
+        CorreoVerificado = true;
+    }
 
     public void Desactivar() => Activo = false;
 

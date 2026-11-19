@@ -74,7 +74,11 @@ internal sealed class EntornoDeIdentidad
 
     public CancelacionDeAvisosDePrueba CancelacionDeAvisos { get; } = new();
 
-    public AvisosDeCuentaEnMemoria AvisosGuardados { get; } = new();
+    public AvisosDeCuentaEnMemoria AvisosGuardados { get; }
+
+    public DispositivosEnMemoria Dispositivos { get; }
+
+    public CambiosDeCorreoEnMemoria Cambios { get; }
 
     public AvisosDeCuenta Avisos { get; }
 
@@ -91,6 +95,9 @@ internal sealed class EntornoDeIdentidad
         Unidad = new UnidadDeTrabajoEnMemoria(Bd);
         Carrito = new CarritoDePrueba(Bd);
         Cuentas = new RepositorioDeCuentasEnMemoria(Bd);
+        AvisosGuardados = new AvisosDeCuentaEnMemoria(Bd);
+        Dispositivos = new DispositivosEnMemoria(Bd);
+        Cambios = new CambiosDeCorreoEnMemoria(Bd);
         Renovaciones = new RenovacionesEnMemoria(Bd);
         Desafios = new DesafiosEnMemoria(Bd);
         Auditoria = new AuditoriaDePrueba(Bd);
@@ -176,6 +183,7 @@ internal static class EntornoDeLaCuentaExtensiones
     public static GestionDeLaCuenta Gestion(this EntornoDeIdentidad e) => new(
         e.Cuentas,
         new AlcanceDeLaCuenta(e.Actor, e.Denegaciones),
+        e.Confianza(),
         e.Reautenticacion(),
         e.Limites,
         new ListaDeContrasenasDePrueba(),
@@ -219,5 +227,41 @@ internal static class EntornoDeLaAdministracionExtensiones
         var admin = e.Cuenta(correo, RolDeUsuario.AdministradorCentral);
         e.Actor.Actual = ActorActual.DeUsuario(admin.Usuario.Id, "administrador-central");
         return admin;
+    }
+}
+
+internal static class EntornoDelCambioDeCorreoExtensiones
+{
+    public static ConfianzaDelDispositivo Confianza(this EntornoDeIdentidad e) => new(e.Dispositivos, e.HuellasDeIdentidad, e.Reloj);
+
+    public static CambioDeCorreo CambioDeCorreo(this EntornoDeIdentidad e) => new(
+        e.Cuentas,
+        new AlcanceDeLaCuenta(e.Actor, e.Denegaciones),
+        e.Reautenticacion(),
+        e.Confianza(),
+        e.Dispositivos,
+        e.Cambios,
+        e.EmisionDeCodigos,
+        e.Codigos,
+        e.HuellasDeIdentidad,
+        e.Secretos,
+        e.Limites,
+        e.Huellas,
+        e.AvisosGuardados,
+        e.Avisos,
+        e.Eventos,
+        e.Unidad,
+        e.Auditoria,
+        e.Reloj);
+
+    public static DispositivosDeLaCuenta DispositivosDeLaCuenta(this EntornoDeIdentidad e) =>
+        new(new AlcanceDeLaCuenta(e.Actor, e.Denegaciones), e.Dispositivos, e.HuellasDeIdentidad, e.Secretos, e.Unidad, e.Reloj);
+
+    /// <summary>Siembra un dispositivo ya reconocido (con la antigüedad que exige el Dominio) y devuelve su marca en claro.</summary>
+    public static ValorSecreto DispositivoReconocido(this EntornoDeIdentidad e, CuentaDeIdentidad cuenta, string region = "PE", int diasDeAntiguedad = 5)
+    {
+        var marca = e.Secretos.ValorOpaco();
+        e.Bd.Dispositivos.Add(Dispositivo.Emitir(cuenta.Usuario.Id, e.HuellasDeIdentidad.DeValorOpaco(marca), region, e.Reloj.Ahora.AddDays(-diasDeAntiguedad)));
+        return new ValorSecreto(marca);
     }
 }

@@ -183,6 +183,30 @@ public interface IAvisosDeCuentaAlmacen
 
     /// <summary>Marca el aviso del usuario como visto con un <c>UPDATE</c> condicional: <see langword="false"/> si no existe o es de otro usuario.</summary>
     Task<bool> MarcarVisto(Guid usuarioId, Guid avisoId, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>Deja un aviso en la cuenta (sin datos sensibles: solo el tipo del catálogo y la fecha); se llama dentro de la transacción del hecho que lo causa.</summary>
+    Task Agregar(Guid usuarioId, string tipo, DateTimeOffset ahora, CancellationToken cancelacion = default);
+}
+
+/// <summary>
+/// Los dispositivos reconocidos de un usuario (<c>identidad.dispositivos</c>, IDE-55, D11): solo la huella SHA-256 de la marca y la región. <see cref="Guardar"/> inserta o actualiza por (usuario, huella) y
+/// conserva como máximo <see cref="Maximo"/> por usuario, eliminando los más antiguos: iniciar sesión muchas veces sin la marca no hace crecer la tabla sin límite.
+/// </summary>
+public interface IRepositorioDeDispositivos
+{
+    public const int Maximo = 10;
+
+    Task<IReadOnlyList<Dispositivo>> Listar(Guid usuarioId, CancellationToken cancelacion = default);
+
+    Task Guardar(Dispositivo dispositivo, CancellationToken cancelacion = default);
+}
+
+/// <summary>El cambio de correo en curso de un usuario (<c>identidad.cambios_de_correo_pendientes</c>, IDE-53, IDE-54): como máximo uno por usuario; <see cref="Guardar"/> reemplaza el anterior.</summary>
+public interface IRepositorioDeCambiosDeCorreo
+{
+    Task<CambioDeCorreoPendiente?> Obtener(Guid usuarioId, CancellationToken cancelacion = default);
+
+    Task Guardar(CambioDeCorreoPendiente cambio, CancellationToken cancelacion = default);
 }
 
 /// <summary>El cifrado de los secretos del segundo factor (AES-GCM, nonce aleatorio, clave versionada por propósito, AAD ligado al usuario, D04).</summary>

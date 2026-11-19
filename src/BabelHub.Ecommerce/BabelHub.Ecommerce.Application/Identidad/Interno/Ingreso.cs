@@ -45,12 +45,22 @@ public sealed class AvisosDeCuenta(IEnviadorDeCorreo correo)
 
     public const string PlantillaDeSegundoFactorRestablecido = "segundo-factor-restablecido";
 
-    public Task ContrasenaCambiada(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeContrasenaCambiada, cancelacion);
+    public const string PlantillaDeCambioDeCorreoNoReconocido = "cambio-de-correo-no-reconocido";
+
+    public const string PlantillaDeCorreoCambiado = "correo-cambiado";
+
+    public Task ContrasenaCambiada(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeContrasenaCambiada, CategoriaDeCorreo.AlertaCriticaDeCuenta, cancelacion);
+
+    /// <summary>La alerta al correo <b>anterior</b> por un cambio de correo desde un dispositivo o una región no reconocidos (IDE-54): crítica, sin enlaces ni el correo nuevo.</summary>
+    public Task CambioDeCorreoNoReconocido(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeCambioDeCorreoNoReconocido, CategoriaDeCorreo.AlertaCriticaDeCuenta, cancelacion);
+
+    /// <summary>El aviso al correo <b>nuevo</b> ya aplicado el cambio (IDE-53); nada sale al correo anterior.</summary>
+    public Task CorreoCambiado(Usuario usuarioConElCorreoNuevo, CancellationToken cancelacion) => Avisar(usuarioConElCorreoNuevo, PlantillaDeCorreoCambiado, CategoriaDeCorreo.AvisoDeSeguridad, cancelacion);
 
     /// <summary>El aviso al titular cuando la administración restablece su segundo factor (IDE-38): sin enlaces ni códigos.</summary>
-    public Task SegundoFactorRestablecido(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeSegundoFactorRestablecido, cancelacion);
+    public Task SegundoFactorRestablecido(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeSegundoFactorRestablecido, CategoriaDeCorreo.AlertaCriticaDeCuenta, cancelacion);
 
-    private async Task Avisar(Usuario usuario, string plantilla, CancellationToken cancelacion)
+    private async Task Avisar(Usuario usuario, string plantilla, CategoriaDeCorreo categoria, CancellationToken cancelacion)
     {
         ArgumentNullException.ThrowIfNull(usuario);
         if (!usuario.CorreoVerificado)
@@ -61,7 +71,7 @@ public sealed class AvisosDeCuenta(IEnviadorDeCorreo correo)
 
         try
         {
-            await correo.Enviar(new CorreoSaliente(CategoriaDeCorreo.AlertaCriticaDeCuenta, usuario.Correo, plantilla), cancelacion).ConfigureAwait(false);
+            await correo.Enviar(new CorreoSaliente(categoria, usuario.Correo, plantilla), cancelacion).ConfigureAwait(false);
         }
         catch (Exception) when (!cancelacion.IsCancellationRequested)
         {

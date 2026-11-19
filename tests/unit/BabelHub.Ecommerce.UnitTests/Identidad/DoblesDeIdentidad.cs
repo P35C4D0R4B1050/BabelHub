@@ -31,18 +31,46 @@ internal sealed class BdIdentidad
 
     public List<Guid> CarritosEliminados { get; private set; } = [];
 
-    /// <summary>La instantánea guarda una copia del estado de cada cuenta para restaurarlo <b>en el mismo objeto</b>: las pruebas conservan su referencia y ven la reversión como la vería una base de datos.</summary>
-    public (Dictionary<Guid, CuentaDeIdentidad>, List<RenovacionGuardada>, List<(DesafioDeIngreso, string)>, List<Guid>, List<Guid>, List<(CuentaDeIdentidad Cuenta, CuentaDeIdentidad Copia)>) Instantanea() =>
-        (new Dictionary<Guid, CuentaDeIdentidad>(Cuentas), [.. Renovaciones], [.. Desafios], [.. AccionesAuditadas], [.. CarritosEliminados], [.. Cuentas.Values.Select(c => (c, Copiar(c)))]);
+    public List<Dispositivo> Dispositivos { get; private set; } = [];
 
-    public void Restaurar((Dictionary<Guid, CuentaDeIdentidad>, List<RenovacionGuardada>, List<(DesafioDeIngreso, string)>, List<Guid>, List<Guid>, List<(CuentaDeIdentidad Cuenta, CuentaDeIdentidad Copia)>) estado)
+    public List<CambioDeCorreoPendiente> Cambios { get; private set; } = [];
+
+    public List<(Guid UsuarioId, AvisoDeCuenta Aviso)> Avisos { get; private set; } = [];
+
+    internal sealed record EstadoDeLaBd(
+        Dictionary<Guid, CuentaDeIdentidad> Cuentas,
+        List<RenovacionGuardada> Renovaciones,
+        List<(DesafioDeIngreso, string)> Desafios,
+        List<Guid> AccionesAuditadas,
+        List<Guid> CarritosEliminados,
+        List<(CuentaDeIdentidad Cuenta, CuentaDeIdentidad Copia)> CopiasDeCuentas,
+        List<Dispositivo> Dispositivos,
+        List<CambioDeCorreoPendiente> Cambios,
+        List<(Guid UsuarioId, AvisoDeCuenta Aviso)> Avisos);
+
+    /// <summary>La instantánea guarda una copia del estado de cada cuenta para restaurarlo <b>en el mismo objeto</b>: las pruebas conservan su referencia y ven la reversión como la vería una base de datos.</summary>
+    public EstadoDeLaBd Instantanea() => new(
+        new Dictionary<Guid, CuentaDeIdentidad>(Cuentas),
+        [.. Renovaciones],
+        [.. Desafios],
+        [.. AccionesAuditadas],
+        [.. CarritosEliminados],
+        [.. Cuentas.Values.Select(c => (c, Copiar(c)))],
+        [.. Dispositivos.Select(d => Dispositivo.Restaurar(d.UsuarioId, d.HuellaDeLaMarca, d.Region, d.Emitido, d.CongeladoHasta))],
+        [.. Cambios.Select(c => CambioDeCorreoPendiente.Restaurar(c.Id, c.UsuarioId, c.CorreoNuevo, c.Creado, c.Estado))],
+        [.. Avisos]);
+
+    public void Restaurar(EstadoDeLaBd estado)
     {
-        Cuentas = estado.Item1;
-        Renovaciones = estado.Item2;
-        Desafios = estado.Item3;
-        AccionesAuditadas = estado.Item4;
-        CarritosEliminados = estado.Item5;
-        foreach (var (cuenta, copia) in estado.Item6)
+        Cuentas = estado.Cuentas;
+        Renovaciones = estado.Renovaciones;
+        Desafios = estado.Desafios;
+        AccionesAuditadas = estado.AccionesAuditadas;
+        CarritosEliminados = estado.CarritosEliminados;
+        Dispositivos = estado.Dispositivos;
+        Cambios = estado.Cambios;
+        Avisos = estado.Avisos;
+        foreach (var (cuenta, copia) in estado.CopiasDeCuentas)
         {
             cuenta.Usuario = Copiar(copia).Usuario;
             cuenta.Nombre = copia.Nombre;
@@ -653,9 +681,9 @@ internal sealed class CancelacionDeAvisosDePrueba : ICancelacionDeAvisos
     }
 }
 
-internal sealed class AvisosDeCuentaEnMemoria : IAvisosDeCuentaAlmacen
+internal sealed class AvisosDeCuentaEnMemoria(BdIdentidad bd) : IAvisosDeCuentaAlmacen
 {
-    public List<(Guid UsuarioId, AvisoDeCuenta Aviso)> Avisos { get; } = [];
+    public List<(Guid UsuarioId, AvisoDeCuenta Aviso)> Avisos => bd.Avisos;
 
     public Guid Sembrar(Guid usuarioId, string tipo, DateTimeOffset fecha)
     {
@@ -667,6 +695,12 @@ internal sealed class AvisosDeCuentaEnMemoria : IAvisosDeCuentaAlmacen
     public Task<IReadOnlyList<AvisoDeCuenta>> Listar(Guid usuarioId, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<AvisoDeCuenta>>([.. Avisos.Where(a => a.UsuarioId == usuarioId).Select(a => a.Aviso)]);
 
+    public Task Agregar(Guid usuarioId, string tipo, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        Avisos.Add((usuarioId, new AvisoDeCuenta(Guid.NewGuid(), tipo, ahora, false)));
+        return Task.CompletedTask;
+    }
+
     public Task<bool> MarcarVisto(Guid usuarioId, Guid avisoId, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
         var indice = Avisos.FindIndex(a => a.UsuarioId == usuarioId && a.Aviso.Id == avisoId);
@@ -677,5 +711,37 @@ internal sealed class AvisosDeCuentaEnMemoria : IAvisosDeCuentaAlmacen
 
         Avisos[indice] = (usuarioId, Avisos[indice].Aviso with { Visto = true });
         return Task.FromResult(true);
+    }
+}
+
+internal sealed class DispositivosEnMemoria(BdIdentidad bd) : IRepositorioDeDispositivos
+{
+    public Task<IReadOnlyList<Dispositivo>> Listar(Guid usuarioId, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Dispositivo>>([.. bd.Dispositivos.Where(d => d.UsuarioId == usuarioId)]);
+
+    public Task Guardar(Dispositivo dispositivo, CancellationToken cancelacion = default)
+    {
+        bd.Dispositivos.RemoveAll(d => d.UsuarioId == dispositivo.UsuarioId && d.HuellaDeLaMarca == dispositivo.HuellaDeLaMarca);
+        bd.Dispositivos.Add(dispositivo);
+        var propios = bd.Dispositivos.Where(d => d.UsuarioId == dispositivo.UsuarioId).OrderBy(d => d.Emitido).ToList();
+        foreach (var sobrante in propios.Take(Math.Max(0, propios.Count - IRepositorioDeDispositivos.Maximo)))
+        {
+            bd.Dispositivos.Remove(sobrante);
+        }
+
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class CambiosDeCorreoEnMemoria(BdIdentidad bd) : IRepositorioDeCambiosDeCorreo
+{
+    public Task<CambioDeCorreoPendiente?> Obtener(Guid usuarioId, CancellationToken cancelacion = default) =>
+        Task.FromResult(bd.Cambios.FirstOrDefault(c => c.UsuarioId == usuarioId));
+
+    public Task Guardar(CambioDeCorreoPendiente cambio, CancellationToken cancelacion = default)
+    {
+        bd.Cambios.RemoveAll(c => c.UsuarioId == cambio.UsuarioId);
+        bd.Cambios.Add(cambio);
+        return Task.CompletedTask;
     }
 }
