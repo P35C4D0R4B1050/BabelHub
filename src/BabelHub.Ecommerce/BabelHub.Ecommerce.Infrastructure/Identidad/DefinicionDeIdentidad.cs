@@ -254,17 +254,4 @@ public static class DefinicionDeIdentidad
         GRANT SELECT, INSERT ON identidad.registros TO rol_identidad;
         GRANT SELECT, INSERT ON identidad.por_anonimizar TO rol_identidad;
         """;
-
-    /// <summary>
-    /// La migración completa del módulo: roles, tablas, registros aislados con la plantilla de inmutabilidad y la función de depuración, y los permisos mínimos. Presupone la migración de <c>Auditoria</c> (que
-    /// crea <c>auditoria_migraciones</c>, el propietario de la función de depuración y la política).
-    /// </summary>
-    public static string MigracionCompleta() =>
-        Roles
-        + Tablas
-        + Auditoria.DefinicionDeAuditoria.RegistrosInmutables(Esquema)
-        + Auditoria.DefinicionDeAuditoria.PorAnonimizar(Esquema)
-        + Auditoria.DefinicionDeAuditoria.PermisosDeLaDepuracion(Esquema)
-        + Permisos
-        + Auditoria.DefinicionDeAuditoria.FuncionDeDepuracion(Esquema, Esquema);
 }

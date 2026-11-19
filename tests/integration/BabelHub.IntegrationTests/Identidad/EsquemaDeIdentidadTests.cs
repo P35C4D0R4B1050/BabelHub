@@ -1,4 +1,5 @@
 using BabelHub.Ecommerce.Infrastructure.Auditoria;
+using BabelHub.Ecommerce.Infrastructure.Composicion;
 using BabelHub.Ecommerce.Infrastructure.Identidad;
 using BabelHub.IntegrationTests.Auditoria;
 using Npgsql;
@@ -7,7 +8,7 @@ using Testcontainers.PostgreSql;
 namespace BabelHub.IntegrationTests.Identidad;
 
 /// <summary>
-/// PostgreSQL real con la migración de <c>Auditoria</c> y la del esquema <c>identidad</c> (<see cref="DefinicionDeIdentidad.MigracionCompleta"/>): el rol de acceso de la aplicación es <c>NOINHERIT</c> y solo
+/// PostgreSQL real con la migración de <c>Auditoria</c> y la del esquema <c>identidad</c> (<see cref="MigracionDelEsquemaDeIdentidad.Completa"/>): el rol de acceso de la aplicación es <c>NOINHERIT</c> y solo
 /// opera el esquema con <c>SET LOCAL ROLE rol_identidad</c> dentro de una transacción. Las credenciales se generan distintas en cada ejecución.
 /// </summary>
 public sealed class PostgresDeIdentidadFixture : IAsyncLifetime
@@ -30,7 +31,7 @@ public sealed class PostgresDeIdentidadFixture : IAsyncLifetime
         await _contenedor.StartAsync();
         Administracion = NpgsqlDataSource.Create(_contenedor.GetConnectionString());
         await Ejecutar(DefinicionDeAuditoria.MigracionCompleta(PostgresDeAuditoriaFixture.Catalogo));
-        await Ejecutar(DefinicionDeIdentidad.MigracionCompleta());
+        await Ejecutar(MigracionDelEsquemaDeIdentidad.Completa());
         await Ejecutar($"CREATE ROLE acceso LOGIN NOINHERIT PASSWORD '{ClaveDeAcceso}'; GRANT rol_auditoria, rol_identidad TO acceso;");
         Acceso = NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString()) { Username = "acceso", Password = ClaveDeAcceso }.ConnectionString);
     }
@@ -113,7 +114,7 @@ public sealed class EsquemaDeIdentidadTests(PostgresDeIdentidadFixture bd) : ICl
     [Trait("Criterio", "AC-IDE-05")]
     public async Task LaMigracionEsIdempotente_YLasTablasTienenSuPropietario()
     {
-        await bd.Ejecutar(DefinicionDeIdentidad.MigracionCompleta());
+        await bd.Ejecutar(MigracionDelEsquemaDeIdentidad.Completa());
 
         foreach (var tabla in new[] { "usuarios", "segundo_factor", "renovaciones", "claves_de_firma", "bajas_titulares", "registros", "por_anonimizar" })
         {
