@@ -88,9 +88,59 @@ public interface IAdministracionDeReclamaciones
 {
     Task<Resultado<PaginaDeHojas>> Listar(ListarHojasEntrada entrada, CancellationToken cancelacion = default);
 
+    /// <summary>Abre una hoja con sus datos personales y <b>audita la consulta en la misma transacción</b>: si no se puede auditar, no se muestra (REC-15).</summary>
+    Task<Resultado<DetalleDeHoja>> Obtener(Guid hojaId, CancellationToken cancelacion = default);
+
     Task<Resultado<ResultadoDeLaHoja>> Responder(ResponderHojaEntrada entrada, CancellationToken cancelacion = default);
 
     Task<Resultado<ResultadoDeLaHoja>> Descartar(Guid hojaId, CancellationToken cancelacion = default);
 
     Task<Resultado<ResultadoDeLaHoja>> ReintentarAviso(Guid hojaId, CancellationToken cancelacion = default);
+}
+
+/// <summary>
+/// La hoja completa para la administración central (REC-15): <b>con los datos personales</b>. Por eso su texto y su serialización no los repiten (ningún registro, error ni auditoría los lleva, RNF07, RNF23); solo
+/// la vista de la administración los lee de sus propiedades.
+/// </summary>
+public sealed record DetalleDeHoja(
+    Guid Id,
+    string Numero,
+    DateTimeOffset FechaDeRegistro,
+    string Tipo,
+    EstadoDeLaHoja Estado,
+    [property: JsonIgnore] string Nombre,
+    [property: JsonIgnore] string Documento,
+    [property: JsonIgnore] string Domicilio,
+    [property: JsonIgnore] string Correo,
+    [property: JsonIgnore] string BienContratado,
+    decimal MontoReclamado,
+    [property: JsonIgnore] string Detalle,
+    string? PedidoReferencia,
+    [property: JsonIgnore] string? Respuesta,
+    DateTimeOffset? RespondidaEn,
+    AvisoDeLaRespuesta? Aviso,
+    bool DeCuentaCancelada,
+    bool Anonimizada,
+    DateOnly FechaLimiteDeRespuesta)
+{
+    public override string ToString() => $"DetalleDeHoja {{ Numero = {Numero}, Estado = {Estado} }}";
+}
+
+/// <summary>Una hoja de quien la escribió (REC-14): número, fecha, tipo, estado y respuesta, también las descartadas; sin documento ni domicilio. El texto de la respuesta no se repite al imprimirla.</summary>
+public sealed record MiHoja(string Numero, DateTimeOffset FechaDeRegistro, string Tipo, EstadoDeLaHoja Estado, [property: JsonIgnore] string? Respuesta, DateTimeOffset? RespondidaEn)
+{
+    public override string ToString() => $"MiHoja {{ Numero = {Numero}, Estado = {Estado} }}";
+}
+
+public sealed record PaginaDeMisHojas(IReadOnlyList<MiHoja> Hojas, int Pagina, int Tamano, int Total);
+
+public sealed record ListarMisHojasEntrada(int Pagina = 1, int Tamano = 20);
+
+/// <summary>Las hojas del consumidor con una sesión de <b>correo verificado</b> igual al de contacto de la hoja, y solo si la hoja no es de una cuenta cancelada (REC-10, REC-14, REC-20). Cualquier otro caso es «no encontrada».</summary>
+public interface IHojasDelConsumidor
+{
+    Task<Resultado<PaginaDeMisHojas>> Listar(ListarMisHojasEntrada entrada, CancellationToken cancelacion = default);
+
+    /// <summary>Por el número con formato <c>AAAA-NNNNNN</c>.</summary>
+    Task<Resultado<MiHoja>> Obtener(string? numero, CancellationToken cancelacion = default);
 }

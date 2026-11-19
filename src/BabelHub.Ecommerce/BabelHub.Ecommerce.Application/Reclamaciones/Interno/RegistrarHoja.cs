@@ -51,6 +51,30 @@ internal static class MapeoDeHojas
         new(hoja.Id, hoja.Numero.ToString(), hoja.FechaRegistro, hoja.Tipo.ATexto(), EstadoDe(hoja.Estado), AvisoDe(hoja.AvisoDeRespuesta));
 
     public static ResultadoDeLaHoja ResultadoDe(HojaDeReclamacion hoja) => new(hoja.Numero.ToString(), EstadoDe(hoja.Estado), AvisoDe(hoja.AvisoDeRespuesta));
+
+    public static DetalleDeHoja DetalleDe(HojaDeReclamacion hoja) =>
+        new(
+            hoja.Id,
+            hoja.Numero.ToString(),
+            hoja.FechaRegistro,
+            hoja.Tipo.ATexto(),
+            EstadoDe(hoja.Estado),
+            hoja.Datos.Nombre,
+            hoja.Datos.Documento,
+            hoja.Datos.Domicilio,
+            hoja.Datos.Correo,
+            hoja.BienContratado,
+            hoja.MontoReclamado,
+            hoja.Detalle,
+            hoja.PedidoReferencia,
+            hoja.Respuesta,
+            hoja.RespondidaEn,
+            AvisoDe(hoja.AvisoDeRespuesta),
+            hoja.DeCuentaCancelada,
+            hoja.EstaAnonimizada,
+            hoja.FechaLimiteDeRespuesta);
+
+    public static MiHoja MiHojaDe(HojaDeReclamacion hoja) => new(hoja.Numero.ToString(), hoja.FechaRegistro, hoja.Tipo.ATexto(), EstadoDe(hoja.Estado), hoja.Respuesta, hoja.RespondidaEn);
 }
 
 /// <summary>

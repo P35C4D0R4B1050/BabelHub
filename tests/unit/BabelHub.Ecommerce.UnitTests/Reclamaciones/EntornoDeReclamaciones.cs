@@ -310,6 +310,7 @@ internal sealed class EntornoDeReclamaciones
         Reclamaciones = new ReclamacionesDeLaAplicacion(new RegistrarHoja(Verificacion, new CalculadorDeHuellaNormalizante(), Limites, Hojas, Unidad, Reloj));
         Administracion = new AdministracionDeReclamacionesDeLaAplicacion(
             new ListarHojas(autorizador, Hojas, Unidad),
+            new ObtenerHojaParaAdministracion(autorizador, Hojas, Unidad, Auditoria),
             new ResponderHoja(autorizador, Hojas, Unidad, Reloj, Auditoria, envio),
             new DescartarHoja(autorizador, Hojas, Unidad, Reloj, Auditoria),
             new ReintentarAvisoDeRespuesta(autorizador, Hojas, Unidad, Reloj, envio));

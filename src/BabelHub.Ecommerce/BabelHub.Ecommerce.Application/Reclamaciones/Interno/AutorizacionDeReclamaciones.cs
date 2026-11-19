@@ -44,6 +44,9 @@ internal static class ClavesDeReclamaciones
     public const string Prohibido = "prohibido";
 
     public const string NoAutenticado = "no-autenticado";
+
+    /// <summary><c>ECO-REC-CORREO-NO-VERIFICADO</c> (403): la sesión no tiene un correo verificado.</summary>
+    public const string CorreoNoVerificado = "correo-no-verificado";
 }
 
 internal static class FallosDeReclamaciones
