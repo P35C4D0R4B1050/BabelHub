@@ -1,0 +1,39 @@
+@using BabelHub.Ecommerce.Api.Areas.Tienda.Controllers
+@using BabelHub.Ecommerce.Api.Web.Formato
+@model MisHojasVista
+<h1 class="font-display text-4xl leading-tight sm:text-5xl">Mis hojas de reclamación</h1>
+
+@if (Model.Pagina.Hojas.Count == 0)
+{
+    <p class="my-6">No tienes hojas registradas con tu correo verificado.</p>
+}
+else
+{
+    <div class="my-6 overflow-x-auto">
+        <table class="table">
+            <caption class="sr-only">Hojas de reclamación de tu correo verificado</caption>
+            <thead><tr><th scope="col">Número</th><th scope="col">Fecha</th><th scope="col">Tipo</th><th scope="col">Estado</th></tr></thead>
+            <tbody>
+                @foreach (var hoja in Model.Pagina.Hojas)
+                {
+                    <tr>
+                        <td><a class="link" href="/reclamaciones/@hoja.Numero">@hoja.Numero</a></td>
+                        <td>@FormatoPeruano.Fecha(DateOnly.FromDateTime(hoja.FechaDeRegistro.ToOffset(TimeSpan.FromHours(-5)).DateTime))</td>
+                        <td>@TextosDeReclamaciones.Tipo(hoja.Tipo)</td>
+                        <td>@TextosDeReclamaciones.Estado(hoja.Estado)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <nav class="join" aria-label="Páginas de hojas">
+        @if (Model.HayAnterior)
+        {
+            <a class="btn join-item" href="/reclamaciones/mis-hojas?pagina=@(Model.Pagina.Pagina - 1)&tamano=@Model.Pagina.Tamano">Anterior</a>
+        }
+        @if (Model.HaySiguiente)
+        {
+            <a class="btn join-item" href="/reclamaciones/mis-hojas?pagina=@(Model.Pagina.Pagina + 1)&tamano=@Model.Pagina.Tamano">Siguiente</a>
+        }
+    </nav>
+}

@@ -1,0 +1,62 @@
+@using BabelHub.Ecommerce.Api.Areas.Tienda.Controllers
+@using BabelHub.Ecommerce.Api.Web.Formato
+@using BabelHub.Ecommerce.Application.Reclamaciones
+@model BabelHub.Ecommerce.Api.Areas.Admin.Controllers.DetalleDeHojaVista
+@{
+    var h = Model.Hoja;
+    var id = h.Id.ToString("D");
+}
+<h1 class="font-display text-4xl leading-tight sm:text-5xl">Hoja @h.Numero</h1>
+
+<div class="alert alert-info my-6" role="note">
+    <bh-icono nombre="info" />
+    <span>Esta consulta queda registrada en la auditoría. Los datos personales de la hoja no se copian a ningún otro lugar.</span>
+</div>
+
+<dl class="my-6 grid grid-cols-1 gap-2 sm:grid-cols-[12rem_1fr]">
+    <dt class="font-semibold">Registrada</dt><dd>@FormatoPeruano.FechaYHora(h.FechaDeRegistro) (plazo: @FormatoPeruano.Fecha(h.FechaLimiteDeRespuesta))</dd>
+    <dt class="font-semibold">Tipo</dt><dd>@TextosDeReclamaciones.Tipo(h.Tipo)</dd>
+    <dt class="font-semibold">Estado</dt><dd>@TextosDeReclamaciones.Estado(h.Estado)@(h.Anonimizada ? " (anonimizada)" : string.Empty)@(h.DeCuentaCancelada ? " (cuenta cancelada)" : string.Empty)</dd>
+    <dt class="font-semibold">Nombre</dt><dd>@h.Nombre</dd>
+    <dt class="font-semibold">Documento</dt><dd>@h.Documento</dd>
+    <dt class="font-semibold">Domicilio</dt><dd>@h.Domicilio</dd>
+    <dt class="font-semibold">Correo</dt><dd>@h.Correo</dd>
+    <dt class="font-semibold">Bien contratado</dt><dd>@h.BienContratado</dd>
+    <dt class="font-semibold">Monto reclamado</dt><dd>@FormatoPeruano.Soles(h.MontoReclamado)</dd>
+    @if (h.PedidoReferencia is not null)
+    {
+        <dt class="font-semibold">Pedido</dt><dd>@h.PedidoReferencia</dd>
+    }
+    <dt class="font-semibold">Detalle</dt><dd class="whitespace-pre-line">@h.Detalle</dd>
+    @if (h.Respuesta is not null)
+    {
+        <dt class="font-semibold">Respuesta</dt><dd class="whitespace-pre-line">@h.Respuesta</dd>
+    }
+    @if (h.Aviso is { } aviso)
+    {
+        <dt class="font-semibold">Aviso por correo</dt><dd>@(aviso == AvisoDeLaRespuesta.Enviado ? "Enviado" : "Pendiente de enviar")</dd>
+    }
+</dl>
+
+@if (h.Estado == EstadoDeLaHoja.Pendiente && !h.Anonimizada)
+{
+    <form method="post" action="/administracion/reclamaciones/@id/responder" class="my-6 flex max-w-xl flex-col gap-3">
+        <partial name="_TokenAntifalsificacion" />
+        <label class="form-control"><span class="label-text">Respuesta al consumidor (hasta 3000 caracteres)</span><textarea name="respuesta" class="textarea textarea-bordered" rows="6" required maxlength="3000"></textarea></label>
+        <button type="submit" class="btn btn-primary">Responder</button>
+    </form>
+    <form method="post" action="/administracion/reclamaciones/@id/descartar" class="my-6">
+        <partial name="_TokenAntifalsificacion" />
+        <button type="submit" class="btn btn-outline btn-error">Descartar por spam</button>
+    </form>
+}
+
+@if (h.Estado == EstadoDeLaHoja.Respondido && h.Aviso == AvisoDeLaRespuesta.Pendiente && !h.Anonimizada)
+{
+    <form method="post" action="/administracion/reclamaciones/@id/reintentar-aviso" class="my-6">
+        <partial name="_TokenAntifalsificacion" />
+        <button type="submit" class="btn btn-primary">Reintentar el aviso por correo</button>
+    </form>
+}
+
+<a class="btn btn-ghost" href="/administracion/reclamaciones">Volver al listado</a>

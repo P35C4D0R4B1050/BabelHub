@@ -42,6 +42,9 @@ public static class PantallasDelCarrito
         ["ECO-CHECKOUT-PEDIDO-OBSOLETO"] = new("Esta pantalla quedó desactualizada", "Tu compra cambió en otra pestaña. Vuelve a revisarla."),
         ["ECO-VERIFICACION-REQUERIDA"] = new("Confirma que eres una persona", "Completa la verificación e inténtalo de nuevo."),
         ["ECO-VERIFICACION-FALLIDA"] = new("No pudimos verificarte", "Completa la verificación de nuevo e inténtalo otra vez."),
+        ["ECO-REC-CORREO-NO-VERIFICADO"] = new("Verifica tu correo para ver tus hojas", "Tus hojas se muestran solo con un correo verificado: confirma tu correo con el enlace que te enviamos y vuelve a esta página. Tus hojas siguen registradas."),
+        ["ECO-REC-ESTADO-INVALIDO"] = new("Esta hoja ya no admite esa acción", "Otra persona la respondió o la descartó, o ya pasó su plazo de conservación. Vuelve al listado para ver su estado."),
+        ["ECO-CONFLICTO"] = new("No pudimos completar la solicitud", "Otra solicitud igual sigue en curso o la información cambió. Espera unos segundos y revisa el estado antes de repetirla."),
     };
 
     private static readonly Dictionary<string, string> CampoDelFormulario = new(StringComparer.Ordinal)

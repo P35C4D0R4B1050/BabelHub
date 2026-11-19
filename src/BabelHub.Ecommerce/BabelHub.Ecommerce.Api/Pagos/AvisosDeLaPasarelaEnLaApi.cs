@@ -12,7 +12,7 @@ namespace BabelHub.Ecommerce.Api.Pagos;
 /// La entrada de avisos de la pasarela (T29; PAG-19, AC-PAG-16): <c>POST /api/ecommerce/v1/integraciones/pasarela/avisos</c>, <b>firma de proveedor y no credencial de servicio</b>. Presentación pura: lee el cuerpo con un <b>tope de tamaño</b> (se rechaza antes de leerlo si
 /// declara más, y se corta si lo supera), toma la marca de tiempo y la firma de sus cabeceras y llama a <see cref="IAvisosDeLaPasarela"/>, que verifica, deduplica y solo adelanta la consulta. <b>Está deshabilitada</b> (no se mapea y responde 404) mientras no haya un
 /// esquema de firma verificable (<c>habilitada</c>): sin él un aviso no se puede autenticar. Un duplicado responde 200; una firma o marca inválida, un 401 uniforme sin decir por qué (la Aplicación deja el evento de seguridad); un fallo al aplicar, un 503 para que la
-/// pasarela reintente. El actor es la integración <c>culqi</c>. La ráfaga la acota el límite general de origen sin sesión del pipeline. Nunca repite el cuerpo, la firma ni la marca en una respuesta.
+/// pasarela reintente. El actor es la integración <c>culqi</c>. La ráfaga (política <c>avisos-de-la-pasarela-por-origen</c>, antes de verificar la firma) y la exención de SEG-18 las cablea la composición del anfitrión (COMP-1, carril A); esta entrada no las reimplementa. Nunca repite el cuerpo, la firma ni la marca en una respuesta.
 /// </summary>
 public static class AvisosDeLaPasarelaEnLaApi
 {

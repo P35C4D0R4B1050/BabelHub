@@ -33,6 +33,14 @@
     }
   });
 
+  // Imprimir (la constancia de una hoja de reclamación): un manejador por atributo, porque la política de contenido no admite scripts en línea.
+  document.addEventListener('click', function (evento) {
+    var boton = evento.target instanceof Element ? evento.target.closest('[data-bh-imprimir]') : null;
+    if (boton) {
+      window.print();
+    }
+  });
+
   // El foco pasa al mensaje de error de una pantalla repintada por el servidor (docs/06 §8): el aviso marcado con data-bh-foco-inicial.
   var avisoInicial = document.querySelector('[data-bh-foco-inicial]');
   if (avisoInicial) {

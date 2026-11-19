@@ -1,0 +1,21 @@
+@using BabelHub.Ecommerce.Api.Areas.Tienda.Controllers
+@using BabelHub.Ecommerce.Api.Web.Formato
+@model MiHojaVista
+@{
+    var hoja = Model.Hoja;
+}
+<h1 class="font-display text-4xl leading-tight sm:text-5xl">Hoja @hoja.Numero</h1>
+<dl class="my-6 grid grid-cols-1 gap-2 sm:grid-cols-[12rem_1fr]">
+    <dt class="font-semibold">Registrada</dt><dd>@FormatoPeruano.FechaYHora(hoja.FechaDeRegistro)</dd>
+    <dt class="font-semibold">Tipo</dt><dd>@TextosDeReclamaciones.Tipo(hoja.Tipo)</dd>
+    <dt class="font-semibold">Estado</dt><dd>@TextosDeReclamaciones.Estado(hoja.Estado)</dd>
+    @if (hoja.RespondidaEn is { } respondidaEn)
+    {
+        <dt class="font-semibold">Respondida</dt><dd>@FormatoPeruano.FechaYHora(respondidaEn)</dd>
+    }
+    @if (hoja.Respuesta is not null)
+    {
+        <dt class="font-semibold">Respuesta</dt><dd class="whitespace-pre-line">@hoja.Respuesta</dd>
+    }
+</dl>
+<a class="btn btn-ghost" href="/reclamaciones/mis-hojas">Volver a mis hojas</a>

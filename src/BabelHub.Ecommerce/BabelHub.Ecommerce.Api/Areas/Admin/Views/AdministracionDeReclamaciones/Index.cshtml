@@ -1,0 +1,49 @@
+@using BabelHub.Ecommerce.Api.Areas.Admin.Controllers
+@using BabelHub.Ecommerce.Api.Areas.Tienda.Controllers
+@using BabelHub.Ecommerce.Api.Web.Formato
+@model HojasAdministradasVista
+<h1 class="font-display text-4xl leading-tight sm:text-5xl">Hojas de reclamación</h1>
+
+<nav class="tabs tabs-boxed my-4 w-fit" aria-label="Filtrar por estado">
+    <a class="tab @(Model.Estado is null ? "tab-active" : string.Empty)" href="/administracion/reclamaciones" aria-current="@(Model.Estado is null ? "page" : null)">Pendientes y respondidas</a>
+    <a class="tab @(Model.Estado == BabelHub.Ecommerce.Application.Reclamaciones.EstadoDeLaHoja.Descartado ? "tab-active" : string.Empty)" href="/administracion/reclamaciones?estado=descartado" aria-current="@(Model.Estado == BabelHub.Ecommerce.Application.Reclamaciones.EstadoDeLaHoja.Descartado ? "page" : null)">Descartadas</a>
+</nav>
+
+@if (Model.Pagina.Hojas.Count == 0)
+{
+    <p class="my-6">No hay hojas con este filtro.</p>
+}
+else
+{
+    <div class="my-6 overflow-x-auto">
+        <table class="table">
+            <caption class="sr-only">Hojas de reclamación, sin datos personales</caption>
+            <thead><tr><th scope="col">Número</th><th scope="col">Fecha</th><th scope="col">Tipo</th><th scope="col">Estado</th><th scope="col">Aviso</th></tr></thead>
+            <tbody>
+                @foreach (var hoja in Model.Pagina.Hojas)
+                {
+                    <tr>
+                        <td><a class="link" href="/administracion/reclamaciones/@hoja.Id.ToString("D")">@hoja.Numero</a></td>
+                        <td>@FormatoPeruano.FechaYHora(hoja.FechaDeRegistro)</td>
+                        <td>@TextosDeReclamaciones.Tipo(hoja.Tipo)</td>
+                        <td>@TextosDeReclamaciones.Estado(hoja.Estado)</td>
+                        <td>@HojasAdministradasVista.Aviso(hoja.Aviso)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <nav class="join" aria-label="Páginas de hojas">
+        @{
+            var filtro = Model.Estado == BabelHub.Ecommerce.Application.Reclamaciones.EstadoDeLaHoja.Descartado ? "&estado=descartado" : string.Empty;
+        }
+        @if (Model.HayAnterior)
+        {
+            <a class="btn join-item" href="/administracion/reclamaciones?pagina=@(Model.Pagina.Pagina - 1)&tamano=@Model.Pagina.Tamano@filtro">Anterior</a>
+        }
+        @if (Model.HaySiguiente)
+        {
+            <a class="btn join-item" href="/administracion/reclamaciones?pagina=@(Model.Pagina.Pagina + 1)&tamano=@Model.Pagina.Tamano@filtro">Siguiente</a>
+        }
+    </nav>
+}

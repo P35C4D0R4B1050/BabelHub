@@ -382,7 +382,7 @@ Este apartado **precisa** lo indicado en [organización interna, sección 3 (res
 | `ecommerce-pedidos` | E-commerce | Dominio (estados y transiciones del pedido), Aplicación (consultar y avanzar estados), Infraestructura (notificaciones). |
 | `ecommerce-envios` | E-commerce | Aplicación (puerto de envío, guías y seguimiento), Infraestructura (operador logístico). |
 | `ecommerce-devoluciones` | E-commerce | Dominio (devolución y su ciclo; política distinta para libros digitales), Aplicación (solicitar, reembolsar, reingresar stock de impresos, revocar acceso digital), Infraestructura (reembolso en Culqi, cliente de Inventario). |
-| `ecommerce-libro-reclamaciones` | E-commerce | Dominio (reclamo y su plazo de conservación), Aplicación (registrar, consultar e imprimir copia), Infraestructura (persistencia). El enlace permanente vive en `web-base`. |
+| `ecommerce-libro-reclamaciones` | E-commerce | Dominio (la hoja inmutable, su plazo de respuesta y su conservación), Aplicación (registrar con constancia, consultar las hojas propias, administrar, responder y anonimizar), Infraestructura (persistencia con disparadores de inmutabilidad y la función de anonimización). El enlace permanente vive en `web-base`. |
 | `asistente-compra-ia` | E-commerce, módulo Asistente | Aplicación (consulta fundamentada), Infraestructura (LLM y contratos de otros módulos y cliente REST del Inventario). |
 | `identidad-seguridad` | E-commerce, módulo Identidad | Dominio (usuario, rol, sucursal, consentimiento), Infraestructura (emisión de JWT, esquema `identidad`), Presentación. |
 | `transversal-auditoria` | E-commerce e Inventario | Contrato único de registro inmutable (quién, qué, cuándo, detalle); lo implementa cada servicio en su propia base. |

@@ -51,6 +51,7 @@ Cómo se protegen las interfaces entre servicios, la que expone la Web y las que
 | Segundo factor | 5 códigos incorrectos en 15 minutos por cuenta y origen, y 10 por hora por cuenta desde cualquier origen, bloquean 15 minutos | Aplicación | SEG-20, SEG-29 |
 | Libro de Reclamaciones | 3 hojas por hora por origen | Aplicación | REC-11 |
 | Envíos | 60 consultas y 30 operaciones por usuario y minuto; 30 solicitudes de guía por minuto al operador en total (compartido) | Aplicación | SEG-05, SEG-07 |
+| Libro de Reclamaciones | 3 hojas por hora por origen (la clave del formulario es la idempotencia: repetirla no cuenta); 60 consultas de hojas por usuario y minuto | Aplicación | REC-11, REC-14 |
 | Registro de cuentas | 3 cuentas nuevas por hora por origen | Aplicación | SEG-24 |
 | Origen no determinable | Un «origen desconocido» único con los mismos límites por origen | Aplicación | SEG-23 |
 | Caída del almacén de contadores | Ingreso, registro, códigos, reservas y descargas se rechazan; las demás operaciones usan un límite local | Aplicación | SEG-26 (los límites de Envíos tienen respaldo local: con el almacén caído caen al límite local y solo fallan cerrado con «no disponible» si tampoco responde) |

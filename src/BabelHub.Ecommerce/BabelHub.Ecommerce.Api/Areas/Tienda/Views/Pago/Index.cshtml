@@ -18,6 +18,7 @@
     <p class="my-4 text-lg">Total a pagar: <strong>@FormatoPeruano.Soles(clave.Total)</strong></p>
     <p class="mb-6 text-sm">Tienes hasta las @FormatoPeruano.Hora(clave.VenceEn) para pagar.</p>
     <form method="post" action="/checkout/pago" class="flex max-w-lg flex-col gap-4" id="formulario-de-pago">
+        <partial name="_TokenAntifalsificacion" />
         <input type="hidden" name="pedidoId" value="@Model.PedidoId.ToString("D")" />
         <input type="hidden" name="claveDeIntento" value="@clave.Token" />
         <fieldset class="flex flex-col gap-2">

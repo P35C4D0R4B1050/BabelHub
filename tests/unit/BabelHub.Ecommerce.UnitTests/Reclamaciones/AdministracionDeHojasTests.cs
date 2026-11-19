@@ -124,7 +124,7 @@ public sealed class AdministracionDeHojasTests
         Assert.Equal(AvisoDeLaRespuesta.Enviado, reintento.Valor.Aviso);
         Assert.Single(e.Correo.Correos);
         Assert.Equal(CategoriaDeError.Conflicto, segundo.Error!.Categoria);
-        Assert.Equal("estado-invalido", segundo.Error.Clave);
+        Assert.Equal("rec-estado-invalido", segundo.Error.Clave);
     }
 
     [Fact]
@@ -141,7 +141,7 @@ public sealed class AdministracionDeHojasTests
         var reintento = await e.Administracion.ReintentarAviso(id);
 
         Assert.Equal(CategoriaDeError.Conflicto, reintento.Error!.Categoria);
-        Assert.Equal("conflicto", reintento.Error.Clave);
+        Assert.Equal("rec-conflicto", reintento.Error.Clave);
         Assert.Empty(e.Correo.Correos);
 
         e.Reloj.Ahora = e.Reloj.Ahora.AddSeconds(61);
@@ -161,8 +161,8 @@ public sealed class AdministracionDeHojasTests
             e.Reloj.Ahora.AddYears(-2), "clave-vieja", EstadoDeHoja.Respondido, HojaDeReclamacion.TextoRedactado, e.Reloj.Ahora.AddYears(-2), Admin, AvisoDeRespuesta.Pendiente, null, null, null, false, e.Reloj.Ahora);
         e.Hojas.Sembrar(anonimizada);
 
-        Assert.Equal("estado-invalido", (await e.Administracion.ReintentarAviso(pendiente)).Error!.Clave);
-        Assert.Equal("estado-invalido", (await e.Administracion.ReintentarAviso(anonimizada.Id)).Error!.Clave);
+        Assert.Equal("rec-estado-invalido", (await e.Administracion.ReintentarAviso(pendiente)).Error!.Clave);
+        Assert.Equal("rec-estado-invalido", (await e.Administracion.ReintentarAviso(anonimizada.Id)).Error!.Clave);
         Assert.Empty(e.Correo.Correos);
     }
 
@@ -180,8 +180,8 @@ public sealed class AdministracionDeHojasTests
         var segunda = await e.Administracion.Responder(new ResponderHojaEntrada(respondida, "Segunda."));
         var sobreDescartada = await e.Administracion.Responder(new ResponderHojaEntrada(descartada, "Respuesta."));
 
-        Assert.Equal("estado-invalido", segunda.Error!.Clave);
-        Assert.Equal("estado-invalido", sobreDescartada.Error!.Clave);
+        Assert.Equal("rec-estado-invalido", segunda.Error!.Clave);
+        Assert.Equal("rec-estado-invalido", sobreDescartada.Error!.Clave);
         Assert.Equal(CategoriaDeError.Conflicto, segunda.Error.Categoria);
         Assert.Equal("Primera.", e.Hojas.Todas.Single(h => h.Id == respondida).Respuesta);
         Assert.Single(e.Correo.Correos);
@@ -200,7 +200,7 @@ public sealed class AdministracionDeHojasTests
 
         var resultado = await e.Administracion.Responder(new ResponderHojaEntrada(anonimizada.Id, "Tarde."));
 
-        Assert.Equal("estado-invalido", resultado.Error!.Clave);
+        Assert.Equal("rec-estado-invalido", resultado.Error!.Clave);
         Assert.Empty(e.Correo.Correos);
     }
 
@@ -318,8 +318,8 @@ public sealed class AdministracionDeHojasTests
         var a = await e.Administracion.Descartar(respondida);
         var b = await e.Administracion.Descartar(descartada);
 
-        Assert.Equal("estado-invalido", a.Error!.Clave);
-        Assert.Equal("estado-invalido", b.Error!.Clave);
+        Assert.Equal("rec-estado-invalido", a.Error!.Clave);
+        Assert.Equal("rec-estado-invalido", b.Error!.Clave);
         Assert.Equal(2, e.Auditoria.Solicitudes.Count);
     }
 
