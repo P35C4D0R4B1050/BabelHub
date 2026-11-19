@@ -283,8 +283,11 @@ public sealed record PasarAlPagoEntrada(decimal TotalVisto, IReadOnlyList<TextoV
 /// <summary>Volver al carrito o reiniciar: el <c>pedidoId</c> oculto cuando el checkout ya lo tiene; si no, se usa el checkout vivo de quien pide.</summary>
 public sealed record SalirDelCheckoutEntrada(Guid? PedidoId = null);
 
-/// <summary>Cómo quedó el checkout tras pasar al pago: el <c>pedidoId</c> y el estado (<c>en_pago</c> o <c>pago_pendiente</c>); la Presentación redirige a la pantalla de Pagos.</summary>
-public sealed record ResultadoDePasarAlPago(Guid PedidoId, EstadoVisibleDelCheckout Estado);
+/// <summary>
+/// Cómo quedó el checkout tras pasar al pago: el <c>pedidoId</c> y el estado (<c>en_pago</c>) y la Presentación redirige a la pantalla de Pagos; con <see cref="PagoEnCurso"/> la intención ya estaba aprobada o completada y se redirige a su estado;
+/// con <see cref="Revision"/> (un retiro pendiente o un conflicto con un intento activo) no se paga: se muestra esa revisión con el aviso «tu carrito cambió», sin <c>pedidoId</c>.
+/// </summary>
+public sealed record ResultadoDePasarAlPago(Guid? PedidoId, EstadoVisibleDelCheckout Estado, VistaDelCheckout? Revision = null, bool PagoEnCurso = false);
 
 /// <summary>El checkout vivo de la cuenta cuando Pagos necesita su <c>pedidoId</c>: solo en <c>en_pago</c> y <c>pago_pendiente</c>, y en <c>en_pago</c> no con una línea retirada (D13).</summary>
 public sealed record CheckoutVivoParaPagar(Guid PedidoId, EstadoVisibleDelCheckout Estado);

@@ -118,8 +118,10 @@ internal sealed class PrepararPasoAlPago(ServiciosDelCheckout servicios) : ICaso
             return Resultado<PasoAlPagoPreparado>.Fallo(entrega);
         }
 
+        // Con un retiro pendiente con el checkout en pago, el resultado es la revisión (aunque no quede ninguna línea): no se exige una línea vigente.
+        var conRetiro = delCarrito.TieneRetirosPendientes && vivo.Estado == EstadoDelCheckout.EnPago;
         var lineasVigentes = ServiciosDelCheckout.LineasParaElCheckout(delCarrito, ediciones);
-        if (lineasVigentes.Count == 0)
+        if (lineasVigentes.Count == 0 && !conRetiro)
         {
             return Resultado<PasoAlPagoPreparado>.Fallo(ServiciosDelCheckout.CheckoutVacio());
         }
@@ -131,7 +133,6 @@ internal sealed class PrepararPasoAlPago(ServiciosDelCheckout servicios) : ICaso
 
         // 3. Con un retiro pendiente: Reabrir fuera de la transacción y antes de bloquear; el resultado es la revisión, no el pago.
         var puerta = PuertaDeEdicion.Libre;
-        var conRetiro = delCarrito.TieneRetirosPendientes && vivo.Estado == EstadoDelCheckout.EnPago;
         if (conRetiro)
         {
             var decidida = await carrito.Edicion.PrepararAntesDeBloquear(cuenta, cancelacion).ConfigureAwait(false);

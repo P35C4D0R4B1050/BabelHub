@@ -386,6 +386,9 @@ internal sealed class PagosFalso(BitacoraDeBloqueos bitacora) : ICreadorDeIntenc
     /// <summary>Se ejecuta justo después de que Pagos responde a <c>Reabrir</c>: simula otra solicitud que cambia el checkout mientras tanto.</summary>
     public Action? EnLaCarreraDeReabrir { get; set; }
 
+    /// <summary>Se ejecuta una sola vez justo antes de responder a <c>Crear</c>: simula otra solicitud que cambia el carrito entre 3a y 3b.</summary>
+    public Action? AlCrearAccion { get; set; }
+
     public int Reaperturas { get; private set; }
 
     public int Cancelaciones { get; private set; }
@@ -395,6 +398,12 @@ internal sealed class PagosFalso(BitacoraDeBloqueos bitacora) : ICreadorDeIntenc
     public Task<ResultadoDeCrearIntencion> Crear(Guid cuentaId, InstantaneaDeCompra instantanea, string huellaDeInstantanea, DateTimeOffset reservaExpiraEn, CancellationToken cancelacion = default)
     {
         Creaciones++;
+        if (AlCrearAccion is { } accion)
+        {
+            AlCrearAccion = null;
+            accion();
+        }
+
         return NoResponde ? throw new InvalidOperationException("Pagos no responde.") : Task.FromResult(AlCrear);
     }
 
@@ -696,6 +705,13 @@ internal sealed class MarcaDeCancelacionFalsa(BitacoraDeBloqueos bitacora) : IMa
 
     public bool Falla { get; set; }
 
+    /// <summary>Después de esta cantidad de lecturas la marca pasa a <see cref="EstadoTrasLasLecturas"/>: simula una cancelación que empieza entre los pasos.</summary>
+    public int? LecturasHastaCambiar { get; set; }
+
+    public EstadoDeLaMarcaDeCancelacion EstadoTrasLasLecturas { get; set; } = EstadoDeLaMarcaDeCancelacion.EnEjecucion;
+
+    public int Lecturas { get; private set; }
+
     /// <summary>Se ejecuta justo antes de leer la marca: simula que la cancelación empieza entre la revisión y el pago.</summary>
     public Action? AntesDeLeer { get; set; }
 
@@ -708,6 +724,12 @@ internal sealed class MarcaDeCancelacionFalsa(BitacoraDeBloqueos bitacora) : IMa
         }
 
         bitacora.Anotar(true, "marca");
+        Lecturas++;
+        if (LecturasHastaCambiar is { } hasta && Lecturas > hasta)
+        {
+            Estado = EstadoTrasLasLecturas;
+        }
+
         return Falla ? throw new InvalidOperationException("Identidad no responde.") : Task.FromResult(Estado);
     }
 }
