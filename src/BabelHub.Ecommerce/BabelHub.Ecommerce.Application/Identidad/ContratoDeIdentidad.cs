@@ -101,3 +101,22 @@ public sealed record EstadoDeCuenta(
     bool CorreoVerificado,
     bool CuentaCanceladaODesactivada,
     bool TieneWhatsAppConConsentimiento);
+
+/// <summary>
+/// El contacto de avisos de un cliente tal como lo necesita <b>solo</b> Notificaciones al enviar (NOT-03, NOT-08): si consiente, si la cuenta sigue vigente y el número en formato E.164. El número sale de Identidad únicamente
+/// por este puerto, hacia el envío; ninguna pantalla ni otro módulo lo recibe, y nunca se imprime.
+/// </summary>
+public sealed record ContactoDeAvisosDelCliente(bool CuentaCanceladaODesactivada, bool Consiente, string? NumeroE164)
+{
+    /// <summary>No imprime el número.</summary>
+    public override string ToString() => "[contacto de avisos]";
+}
+
+/// <summary>
+/// Lo que Notificaciones lee de Identidad justo antes de enviar un aviso a un cliente (NOT-03, NOT-08): su consentimiento y su número vigentes, <b>sin caché</b>. <see langword="null"/> si la cuenta no existe. Si Identidad no
+/// responde, la excepción sube y el envío se aplaza sin consumir un intento (falla cerrada: nunca se envía sin conocer el consentimiento).
+/// </summary>
+public interface IContactoDeAvisosDelCliente
+{
+    Task<ContactoDeAvisosDelCliente?> Consultar(Guid usuarioId, CancellationToken cancelacion = default);
+}

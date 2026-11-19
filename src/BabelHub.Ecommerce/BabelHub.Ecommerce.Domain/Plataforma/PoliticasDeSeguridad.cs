@@ -137,6 +137,17 @@ public static class PoliticasDeSeguridad
     public static PoliticaDeLimite SolicitudesPorUsuario { get; } = new(
         "solicitudes-por-usuario", 100, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
 
+    /// <summary>
+    /// Tope de avisos por WhatsApp a un número de cliente: 5 por hora deslizante (NOT-14). El sujeto es la huella del número E.164, <b>falla cerrada</b> (sin respaldo local, NOT-15) y la omisión la publica Notificaciones
+    /// con su propio evento (sin publicación automática, para que no haya dos eventos por el mismo rechazo). Liberable: un aviso cancelado u omitido devuelve su cupo.
+    /// </summary>
+    public static PoliticaDeLimite AvisosPorNumeroPorHora { get; } = new(
+        "avisos-por-numero-por-hora", 5, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Numero, liberable: true, publicarEvento: false);
+
+    /// <summary>Tope de avisos por WhatsApp a un número de cliente: 20 en 24 horas deslizantes (NOT-14); mismas reglas que <see cref="AvisosPorNumeroPorHora"/>.</summary>
+    public static PoliticaDeLimite AvisosPorNumeroEn24Horas { get; } = new(
+        "avisos-por-numero-en-24-horas", 20, TimeSpan.FromHours(24), TipoDeSujetoDeLimite.Numero, liberable: true, publicarEvento: false);
+
     /// <summary>Tope general de la dirección directa de una llamada entre servicios cuya dirección reenviada se ignoró (SEG-32): 120 por minuto, configurable.</summary>
     public static PoliticaDeLimite SolicitudesPorHuellaDirecta { get; } = new(
         "solicitudes-por-huella-directa", 120, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.OrigenDirecto, respaldoLocal: true);
@@ -164,5 +175,7 @@ public static class PoliticasDeSeguridad
         CobrosPorOrigen,
         PasosAlPagoPorCuenta,
         LecturasDelContactoDePedidosPorPersona,
+        AvisosPorNumeroPorHora,
+        AvisosPorNumeroEn24Horas,
     ];
 }

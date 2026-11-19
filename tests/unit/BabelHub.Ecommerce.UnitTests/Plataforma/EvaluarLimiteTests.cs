@@ -223,6 +223,21 @@ public sealed class EvaluarLimiteTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-NOT-14")]
+    public async Task UnRechazoDelTopePorNumero_NoCuentaContraNingunOrigen_NiPublicaElEventoAutomatico()
+    {
+        var huella = HuellaDeSujeto.Crear(Resumen, "v1");
+        await _control.Reservar(Avisos, claveDelLlamador: "aviso-1", huellaDelLlamador: huella);
+        await _control.Reservar(Avisos, claveDelLlamador: "aviso-2", huellaDelLlamador: huella);
+
+        var rechazado = await _control.Reservar(Avisos, claveDelLlamador: "aviso-3", huellaDelLlamador: huella);
+
+        Assert.Equal(EstadoDeLimite.Excedido, rechazado.Estado);
+        Assert.Equal(0, await _motor.ContarRechazosDeOrigen(_origen.Actual.Huella, EvaluarLimite.VentanaDeRechazosDelOrigen, CancellationToken.None));
+        Assert.Empty(_eventos.Eventos);
+    }
+
+    [Fact]
     public async Task Reservar_ConLaMismaClaveDelLlamador_DevuelveLaMismaReservaYNoCuentaDeNuevo()
     {
         var huella = HuellaDeSujeto.Crear(Resumen, "v1");

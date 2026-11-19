@@ -23,6 +23,16 @@ public enum EstadoDelAviso
 }
 
 /// <summary>
+/// Un cupo del tope por número ya reservado para un aviso (NOT-14, NOT-15): la política, la clave <b>opaca</b> del contador (una huella, nunca el número), el identificador de la entrada y su instante. Sirve para
+/// <b>devolverlo</b> si el aviso termina cancelado u omitido, aunque se desconozca el número; se vacía al llegar a un estado final.
+/// </summary>
+public sealed record CupoDelTope(string Politica, string Sujeto, string Identificador, DateTimeOffset ReservadoEn)
+{
+    /// <summary>No imprime la clave del contador.</summary>
+    public override string ToString() => $"[cupo {Politica}]";
+}
+
+/// <summary>
 /// Los reintentos y las esperas de un aviso (NOT-04, AC-NOT-12, AC-NOT-15): el intento inicial y <b>hasta 5 reintentos</b> con esperas de 1, 5, 15, 30 y 60 minutos; los aplazamientos que no consumen un intento (motor de
 /// límites o Inventario sin responder) esperan 5 minutos; esperar el estado de entrega devuelve el aviso a pendiente como máximo 3 veces seguidas y la cuarta cuenta como un intento; y todo aviso vive <b>24 horas</b> como máximo
 /// desde su creación (un aviso de traslado no debe llegar días tarde).
@@ -69,7 +79,7 @@ public sealed class Aviso
         int intentos,
         DateTimeOffset proximaFecha,
         DateTimeOffset? arrendadoHasta,
-        bool cupoReservado,
+        IReadOnlyList<CupoDelTope> cupos,
         int repeticionesDeDuplicado,
         string? motivoDeCierre,
         DateTimeOffset creado,
@@ -86,7 +96,7 @@ public sealed class Aviso
         Intentos = intentos;
         ProximaFecha = proximaFecha;
         ArrendadoHasta = arrendadoHasta;
-        CupoReservado = cupoReservado;
+        Cupos = cupos;
         RepeticionesDeDuplicado = repeticionesDeDuplicado;
         MotivoDeCierre = motivoDeCierre;
         Creado = creado;
@@ -119,8 +129,11 @@ public sealed class Aviso
 
     public DateTimeOffset? ArrendadoHasta { get; private set; }
 
-    /// <summary>Si ya se reservó el cupo del tope por número (solo clientes): se reserva <b>una vez</b> por aviso aunque se reintente.</summary>
-    public bool CupoReservado { get; private set; }
+    /// <summary>Los cupos del tope por número ya reservados (solo clientes): se reservan <b>una vez</b> por aviso aunque se reintente; vacío al terminar.</summary>
+    public IReadOnlyList<CupoDelTope> Cupos { get; private set; }
+
+    /// <summary>Si ya se reservó el cupo del tope por número.</summary>
+    public bool CupoReservado => Cupos.Count > 0;
 
     /// <summary>Cuántas veces seguidas el servicio de envío respondió «duplicado» sin dar el estado de entrega.</summary>
     public int RepeticionesDeDuplicado { get; private set; }
@@ -141,7 +154,7 @@ public sealed class Aviso
     public static Aviso Crear(Guid id, string eventoId, string destinatarioRef, TipoDeDestinatario tipo, string plantilla, int versionDeLaPlantilla, IReadOnlyDictionary<string, string> campos, DateTimeOffset ahora)
     {
         Validar(id, eventoId, destinatarioRef, plantilla, campos);
-        return new Aviso(id, eventoId, destinatarioRef, tipo, plantilla, versionDeLaPlantilla, new Dictionary<string, string>(campos), EstadoDelAviso.Pendiente, 0, ahora, null, false, 0, null, ahora, null);
+        return new Aviso(id, eventoId, destinatarioRef, tipo, plantilla, versionDeLaPlantilla, new Dictionary<string, string>(campos), EstadoDelAviso.Pendiente, 0, ahora, null, [], 0, null, ahora, null);
     }
 
     /// <summary>Un aviso que nace omitido (NOT-03, NOT-06): el cliente no consiente o no hay número; queda registrado con su estado y su fecha, sin campos y sin enviarse.</summary>
@@ -149,7 +162,7 @@ public sealed class Aviso
     {
         Validar(id, eventoId, destinatarioRef, plantilla, new Dictionary<string, string>());
         ArgumentException.ThrowIfNullOrWhiteSpace(motivo);
-        return new Aviso(id, eventoId, destinatarioRef, tipo, plantilla, versionDeLaPlantilla, new Dictionary<string, string>(), EstadoDelAviso.OmitidoSinConsentimiento, 0, ahora, null, false, 0, motivo, ahora, ahora);
+        return new Aviso(id, eventoId, destinatarioRef, tipo, plantilla, versionDeLaPlantilla, new Dictionary<string, string>(), EstadoDelAviso.OmitidoSinConsentimiento, 0, ahora, null, [], 0, motivo, ahora, ahora);
     }
 
     public static Aviso Restaurar(
@@ -164,17 +177,22 @@ public sealed class Aviso
         int intentos,
         DateTimeOffset proximaFecha,
         DateTimeOffset? arrendadoHasta,
-        bool cupoReservado,
+        IReadOnlyList<CupoDelTope> cupos,
         int repeticionesDeDuplicado,
         string? motivoDeCierre,
         DateTimeOffset creado,
         DateTimeOffset? fechaFinal) =>
-        new(id, eventoId, destinatarioRef, tipo, plantilla, versionDeLaPlantilla, campos, estado, intentos, proximaFecha, arrendadoHasta, cupoReservado, repeticionesDeDuplicado, motivoDeCierre, creado, fechaFinal);
+        new(id, eventoId, destinatarioRef, tipo, plantilla, versionDeLaPlantilla, campos, estado, intentos, proximaFecha, arrendadoHasta, cupos, repeticionesDeDuplicado, motivoDeCierre, creado, fechaFinal);
 
-    /// <summary>Toma el aviso para enviarlo, con un arrendamiento corto: solo uno pendiente cuya fecha llegó y que no venció (si venció, se vence).</summary>
+    /// <summary>
+    /// Toma el aviso para enviarlo, con un arrendamiento corto: uno pendiente cuya fecha llegó o uno en envío <b>cuyo arrendamiento venció</b> (el trabajo que lo tenía cayó o el estado de entrega no llegó) y que no venció por
+    /// edad (si venció, se vence).
+    /// </summary>
     public bool IniciarEnvio(DateTimeOffset ahora, DateTimeOffset arrendadoHasta)
     {
-        if (Estado != EstadoDelAviso.Pendiente || ahora < ProximaFecha)
+        var tomable = (Estado == EstadoDelAviso.Pendiente && ahora >= ProximaFecha)
+            || (Estado == EstadoDelAviso.Enviando && ArrendadoHasta is { } vence && ahora >= vence);
+        if (!tomable)
         {
             return false;
         }
@@ -186,6 +204,21 @@ public sealed class Aviso
 
         Estado = EstadoDelAviso.Enviando;
         ArrendadoHasta = arrendadoHasta;
+        return true;
+    }
+
+    /// <summary>
+    /// El servicio de envío <b>aceptó</b> el mensaje (200 «aceptado», no entregado): el aviso sigue en envío esperando el estado de entrega firmado; si no llega en 10 minutos, el arrendamiento vence y el siguiente
+    /// intento lo recoge (NOT-06, NOT-12).
+    /// </summary>
+    public bool EsperarLaEntrega(DateTimeOffset ahora)
+    {
+        if (Estado != EstadoDelAviso.Enviando)
+        {
+            return false;
+        }
+
+        ArrendadoHasta = ahora + PoliticaDeReintento.EsperaDelEstadoDeEntrega;
         return true;
     }
 
@@ -316,11 +349,17 @@ public sealed class Aviso
         return true;
     }
 
-    /// <summary>El cupo del tope por número ya se reservó para este aviso (una sola vez, NOT-15).</summary>
-    public void MarcarElCupoReservado() => CupoReservado = true;
+    /// <summary>Los cupos del tope por número ya se reservaron para este aviso (una sola vez, NOT-15); no se reservan dos veces.</summary>
+    public void ReservarLosCupos(IReadOnlyList<CupoDelTope> cupos)
+    {
+        ArgumentNullException.ThrowIfNull(cupos);
+        if (EsFinal || CupoReservado)
+        {
+            return;
+        }
 
-    /// <summary>El cupo se devolvió porque el aviso terminó cancelado u omitido.</summary>
-    public void MarcarElCupoDevuelto() => CupoReservado = false;
+        Cupos = [.. cupos];
+    }
 
     private void Terminar(EstadoDelAviso estado, string? motivo, DateTimeOffset ahora)
     {
@@ -329,6 +368,7 @@ public sealed class Aviso
         FechaFinal = ahora;
         ArrendadoHasta = null;
         Campos = new Dictionary<string, string>();
+        Cupos = [];
     }
 
     private static void Validar(Guid id, string eventoId, string destinatarioRef, string plantilla, IReadOnlyDictionary<string, string> campos)

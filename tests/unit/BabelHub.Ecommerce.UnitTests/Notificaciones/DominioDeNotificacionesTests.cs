@@ -213,16 +213,58 @@ public sealed class DominioDeNotificacionesTests
         Assert.False(aviso.IniciarEnvio(Ahora, Ahora.AddMinutes(2)));
     }
 
+    private static readonly CupoDelTope[] DosCupos =
+    [
+        new("avisos-por-numero-por-hora", "n:v1:aaaa", "e1", Ahora),
+        new("avisos-por-numero-en-24-horas", "n:v1:aaaa", "e2", Ahora),
+    ];
+
     [Fact]
-    public void ElCupoSeMarcaUnaVez_YSeDevuelveSiElAvisoTerminaCancelado()
+    [Trait("Criterio", "AC-NOT-15")]
+    public void LosCuposSeReservanUnaVez_YSeVacianAlTerminar()
     {
         var aviso = Nuevo();
 
-        aviso.MarcarElCupoReservado();
+        aviso.ReservarLosCupos(DosCupos);
+        aviso.ReservarLosCupos([new("otra", "x", "y", Ahora)]);
+
         Assert.True(aviso.CupoReservado);
-        aviso.MarcarElCupoDevuelto();
+        Assert.Equal(2, aviso.Cupos.Count);
+        Assert.True(aviso.Cancelar("destinatario-cambiado", Ahora));
+        Assert.False(aviso.CupoReservado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-15")]
+    public void UnAvisoFinal_NoReservaCupos()
+    {
+        var aviso = Nuevo();
+        aviso.Cancelar("x", Ahora);
+
+        aviso.ReservarLosCupos(DosCupos);
 
         Assert.False(aviso.CupoReservado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-12")]
+    public void UnEnvioAceptado_EsperaLaEntrega10Minutos_YSuArrendamientoVencidoPermiteRecogerlo()
+    {
+        var aviso = Nuevo();
+        Assert.True(aviso.IniciarEnvio(Ahora, Ahora.AddMinutes(2)));
+
+        Assert.True(aviso.EsperarLaEntrega(Ahora));
+
+        Assert.Equal(EstadoDelAviso.Enviando, aviso.Estado);
+        Assert.Equal(Ahora.AddMinutes(10), aviso.ArrendadoHasta);
+        Assert.False(aviso.IniciarEnvio(Ahora.AddMinutes(9), Ahora.AddMinutes(11)));
+        Assert.True(aviso.IniciarEnvio(Ahora.AddMinutes(10), Ahora.AddMinutes(12)));
+    }
+
+    [Fact]
+    public void EsperarLaEntrega_SoloSirveEnEnvio()
+    {
+        Assert.False(Nuevo().EsperarLaEntrega(Ahora));
     }
 
     // ---------------------------------------------------------------- las plantillas (T02)

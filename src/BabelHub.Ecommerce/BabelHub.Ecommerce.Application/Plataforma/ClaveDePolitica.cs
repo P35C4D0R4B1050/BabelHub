@@ -94,6 +94,12 @@ public static class PoliticasDeLimite
 
     public static ClaveDePolitica LecturasDelContactoDePedidosPorPersona { get; } = new("lecturas-del-contacto-de-pedidos-por-persona");
 
+    /// <summary>El tope de avisos por WhatsApp a un número de cliente: 5 por hora (NOT-14).</summary>
+    public static ClaveDePolitica AvisosPorNumeroPorHora { get; } = new("avisos-por-numero-por-hora");
+
+    /// <summary>El tope de avisos por WhatsApp a un número de cliente: 20 en 24 horas (NOT-14).</summary>
+    public static ClaveDePolitica AvisosPorNumeroEn24Horas { get; } = new("avisos-por-numero-en-24-horas");
+
     /// <summary>La ráfaga de avisos de la pasarela de pagos: 120 por origen y minuto, antes de verificar la firma (PAG-05).</summary>
     public static ClaveDePolitica AvisosDeLaPasarelaPorOrigen { get; } = new("avisos-de-la-pasarela-por-origen");
 
@@ -130,5 +136,7 @@ public static class PoliticasDeLimite
         CobrosPorOrigen,
         PasosAlPagoPorCuenta,
         LecturasDelContactoDePedidosPorPersona,
+        AvisosPorNumeroPorHora,
+        AvisosPorNumeroEn24Horas,
     ];
 }
