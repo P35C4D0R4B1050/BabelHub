@@ -16,6 +16,9 @@ public sealed class EsperaDeBloqueoDeUnPedidoAgotadaException() : Exception("No 
 /// <summary>Una línea marcada no recogida a la que aún falta liberar la reserva en el Inventario (<c>liberaciones_de_reserva</c>, PED-15): se borra al lograrlo o al saber que la reserva ya se cerró.</summary>
 public sealed record LiberacionDeReservaPendiente(Guid PedidoId, Guid LineaId, string Motivo, DateTimeOffset PendienteDesde, int Intentos);
 
+/// <summary>Una liberación del contacto de la intención de pago que aún falta pedir a Pagos (PED-35): desde cuándo y cuántos intentos lleva.</summary>
+public sealed record LiberacionDeContactoPendiente(Guid PedidoId, DateTimeOffset Desde, int Intentos);
+
 /// <summary>Lo que la reanudación debe retomar: las anulaciones y las entregas en curso que ya cumplieron su espera.</summary>
 public sealed record OperacionesPorReanudar(IReadOnlyList<Anulacion> Anulaciones, IReadOnlyList<Entrega> Entregas);
 
@@ -66,6 +69,27 @@ public interface IRepositorioDePedidos
     Task<IReadOnlyList<Anulacion>> AnulacionesEnCurso(Guid pedidoId, CancellationToken cancelacion = default);
 
     Task<IReadOnlyList<Entrega>> EntregasEnCurso(Guid pedidoId, CancellationToken cancelacion = default);
+
+    /// <summary>Todos los pedidos de la cuenta, <b>con bloqueo</b> y en orden de identificador (orden global de bloqueo: la marca de la cuenta es de Identidad y va antes): los que anonimiza la cancelación de la cuenta (T24). Corre dentro de la transacción de Identidad y bajo el rol del esquema.</summary>
+    Task<IReadOnlyList<Pedido>> ListarDeLaCuentaConBloqueo(Guid cuentaId, CancellationToken cancelacion = default);
+
+    /// <summary>Los pedidos vencidos para depurar (dos años por fecha de Lima desde su último cambio a entregado o anulado, PED-34) a los que aún queda algo por anonimizar (el contacto o la identidad de quien inició sus operaciones), <b>con bloqueo</b> y en orden de identificador, hasta <paramref name="maximo"/> (T25).</summary>
+    Task<IReadOnlyList<Pedido>> ListarVencidosParaDepurar(DateOnly hoyEnLima, int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Anonimiza el iniciador (identificador, rol y sucursal) de todas las anulaciones y entregas del pedido (PED-34); devuelve cuántas filas cambió y repetirlo no cambia nada.</summary>
+    Task<int> AnonimizarIniciadoresDeOperaciones(Guid pedidoId, CancellationToken cancelacion = default);
+
+    /// <summary>Cuándo terminó con éxito la última depuración (<see langword="null"/> si nunca): la alerta de «sin corrida en 24 horas» (PED-39) se mide contra ella.</summary>
+    Task<DateTimeOffset?> UltimaDepuracionExitosaEn(CancellationToken cancelacion = default);
+
+    Task RegistrarDepuracionExitosa(DateTimeOffset cuando, CancellationToken cancelacion = default);
+
+    /// <summary>Las liberaciones del contacto de la intención que faltan (<c>liberaciones_de_contacto</c>, PED-35), las más antiguas primero.</summary>
+    Task<IReadOnlyList<LiberacionDeContactoPendiente>> LiberacionesDeContactoPendientes(int maximo, CancellationToken cancelacion = default);
+
+    Task QuitarLiberacionDeContacto(Guid pedidoId, CancellationToken cancelacion = default);
+
+    Task AnotarIntentoDeLiberacionDeContacto(Guid pedidoId, DateTimeOffset cuando, CancellationToken cancelacion = default);
 
     /// <summary>Cuántos pedidos de la cuenta tienen alguna línea impresa sin entregar ni anular, incluidas las no recogidas (PED-31, AC-PED-26): un pedido solo digital no cuenta.</summary>
     Task<int> ContarPedidosConImpresaSinCerrar(Guid cuentaId, CancellationToken cancelacion = default);
