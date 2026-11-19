@@ -122,3 +122,43 @@ internal static class AuditoriaDeEnvios
         };
     }
 }
+
+/// <summary>
+/// Los límites de uso de Envíos (plan §6; SEG-05, SEG-07): consultas (60 por usuario y minuto), operaciones (30 por usuario y minuto) y las solicitudes de guía al operador (30 por minuto en total, con un sujeto
+/// constante interno que protege al operador de una ráfaga). Un límite excedido es la respuesta uniforme con el tiempo de espera; el almacén de contadores caído falla cerrado (SEG-26).
+/// </summary>
+internal sealed class LimitesDeEnvios(IControlDeLimites limites, IActorActual actores)
+{
+    public const string SujetoDelOperador = "operador-logistico";
+
+    public Task<ErrorDeAplicacion?> Consulta(CancellationToken cancelacion) => Reservar(PoliticasDeLimite.ConsultasDeEnviosPorUsuario, SujetoDelUsuario(), cancelacion);
+
+    public Task<ErrorDeAplicacion?> Operacion(CancellationToken cancelacion) => Reservar(PoliticasDeLimite.OperacionesDeEnviosPorUsuario, SujetoDelUsuario(), cancelacion);
+
+    public Task<ErrorDeAplicacion?> GuiaAlOperador(CancellationToken cancelacion) => Reservar(PoliticasDeLimite.GuiasAlOperador, SujetoDelOperador, cancelacion);
+
+    private string SujetoDelUsuario() => actores.Actual?.UsuarioId?.ToString("N") ?? "sin-usuario";
+
+    private async Task<ErrorDeAplicacion?> Reservar(ClaveDePolitica politica, string sujeto, CancellationToken cancelacion)
+    {
+        ResultadoDeLimite resultado;
+        try
+        {
+            resultado = await limites.Reservar(politica, sujeto, cancelacion: cancelacion).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDeEnvios.ServicioNoDisponible);
+        }
+
+        return resultado.Estado switch
+        {
+            EstadoDeLimite.Permitido => null,
+            EstadoDeLimite.Excedido => new ErrorDeAplicacion(
+                CategoriaDeError.Limite,
+                ClavesDeEnvios.LimiteExcedido,
+                [new ErrorDeCampo(ClavesDeEnvios.EsperaEnSegundos, (resultado.EsperaEnSegundos ?? 1).ToString(System.Globalization.CultureInfo.InvariantCulture))]),
+            _ => new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDeEnvios.ServicioNoDisponible),
+        };
+    }
+}

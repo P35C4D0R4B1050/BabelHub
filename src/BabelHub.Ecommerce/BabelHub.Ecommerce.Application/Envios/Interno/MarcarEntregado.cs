@@ -77,6 +77,7 @@ internal sealed class InformadorDeProgreso(IRepositorioDeEnvios envios, IProgres
 /// </summary>
 internal sealed class MarcarEntregado(
     AutorizadorDeEnvios autorizador,
+    LimitesDeEnvios limites,
     IRepositorioDeEnvios envios,
     IUnidadDeTrabajo unidad,
     IAuditoria auditoria,
@@ -88,6 +89,11 @@ internal sealed class MarcarEntregado(
         if (await autorizador.ExigirLogisticaOAdministracion(cancelacion).ConfigureAwait(false) is { } rechazo)
         {
             return FallosDeEnvios.Fallo<DetalleDeEnvio>(rechazo);
+        }
+
+        if (await limites.Operacion(cancelacion).ConfigureAwait(false) is { } excedido)
+        {
+            return FallosDeEnvios.Fallo<DetalleDeEnvio>(excedido);
         }
 
         Resultado<DetalleDeEnvio> resultado;

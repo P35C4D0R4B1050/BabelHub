@@ -13,6 +13,7 @@ namespace BabelHub.Ecommerce.Application.Envios.Interno;
 /// </summary>
 internal sealed class PasarAEnReparto(
     AutorizadorDeEnvios autorizador,
+    LimitesDeEnvios limites,
     IRepositorioDeEnvios envios,
     IReservasDelEnvio reservas,
     InformadorDeProgreso informador,
@@ -27,6 +28,11 @@ internal sealed class PasarAEnReparto(
         if (await autorizador.ExigirLogisticaOAdministracion(cancelacion).ConfigureAwait(false) is { } rechazo)
         {
             return FallosDeEnvios.Fallo<DetalleDeEnvio>(rechazo);
+        }
+
+        if (await limites.Operacion(cancelacion).ConfigureAwait(false) is { } excedido)
+        {
+            return FallosDeEnvios.Fallo<DetalleDeEnvio>(excedido);
         }
 
         try

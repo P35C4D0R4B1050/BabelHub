@@ -6,7 +6,7 @@ using BabelHub.Ecommerce.Domain.Envios;
 namespace BabelHub.Ecommerce.Application.Envios.Interno;
 
 /// <summary>El listado de logística (T09; ENV-08): solo logística y la administración central, por fecha de creación descendente, con el tamaño de página topado en 50 y <b>sin ningún dato de contacto</b>.</summary>
-internal sealed class ListarEnvios(AutorizadorDeEnvios autorizador, IRepositorioDeEnvios envios) : ICasoDeUso<ListarEnviosEntrada, PaginaDeEnvios>
+internal sealed class ListarEnvios(AutorizadorDeEnvios autorizador, LimitesDeEnvios limites, IRepositorioDeEnvios envios) : ICasoDeUso<ListarEnviosEntrada, PaginaDeEnvios>
 {
     public const int TamanoMaximo = 50;
 
@@ -16,6 +16,11 @@ internal sealed class ListarEnvios(AutorizadorDeEnvios autorizador, IRepositorio
         if (await autorizador.ExigirLogisticaOAdministracion(cancelacion).ConfigureAwait(false) is { } rechazo)
         {
             return FallosDeEnvios.Fallo<PaginaDeEnvios>(rechazo);
+        }
+
+        if (await limites.Consulta(cancelacion).ConfigureAwait(false) is { } excedido)
+        {
+            return FallosDeEnvios.Fallo<PaginaDeEnvios>(excedido);
         }
 
         var pagina = Math.Max(1, entrada.Pagina);
@@ -37,13 +42,18 @@ internal sealed class ListarEnvios(AutorizadorDeEnvios autorizador, IRepositorio
 }
 
 /// <summary>Un envío para logística (T09; ENV-08): en el orden rol → envío. Para logística y la administración central un identificador inexistente solo es «no encontrado», sin evento (alcance global).</summary>
-internal sealed class ObtenerEnvio(AutorizadorDeEnvios autorizador, IRepositorioDeEnvios envios) : ICasoDeUso<Guid, DetalleDeEnvio>
+internal sealed class ObtenerEnvio(AutorizadorDeEnvios autorizador, LimitesDeEnvios limites, IRepositorioDeEnvios envios) : ICasoDeUso<Guid, DetalleDeEnvio>
 {
     public async Task<Resultado<DetalleDeEnvio>> Ejecutar(Guid envioId, CancellationToken cancelacion = default)
     {
         if (await autorizador.ExigirLogisticaOAdministracion(cancelacion).ConfigureAwait(false) is { } rechazo)
         {
             return FallosDeEnvios.Fallo<DetalleDeEnvio>(rechazo);
+        }
+
+        if (await limites.Consulta(cancelacion).ConfigureAwait(false) is { } excedido)
+        {
+            return FallosDeEnvios.Fallo<DetalleDeEnvio>(excedido);
         }
 
         try
@@ -65,7 +75,7 @@ internal sealed class ObtenerEnvio(AutorizadorDeEnvios autorizador, IRepositorio
 /// de Pedidos; un pedido <b>ajeno o inexistente responde igual</b> (<c>ECO-NO-ENCONTRADO</c>, PED-41) con un acceso denegado por cada intento. Logística y la administración central también pueden consultarlo (alcance
 /// global: un pedido inexistente solo es «no encontrado»); cualquier otro rol recibe «prohibido» con un acceso denegado.
 /// </summary>
-internal sealed class ObtenerEnviosDeUnPedido(IActorActual actores, IDenegacionDeAcceso denegaciones, IPedidosParaEnvios pedidos, IRepositorioDeEnvios envios) : ICasoDeUso<Guid, EnviosDeMiPedido>
+internal sealed class ObtenerEnviosDeUnPedido(IActorActual actores, IDenegacionDeAcceso denegaciones, LimitesDeEnvios limites, IPedidosParaEnvios pedidos, IRepositorioDeEnvios envios) : ICasoDeUso<Guid, EnviosDeMiPedido>
 {
     public async Task<Resultado<EnviosDeMiPedido>> Ejecutar(Guid pedidoId, CancellationToken cancelacion = default)
     {
@@ -82,6 +92,11 @@ internal sealed class ObtenerEnviosDeUnPedido(IActorActual actores, IDenegacionD
         {
             await Denegar(MotivosDeDenegacionDeEnvios.FueraDeRol, "ECO-PROHIBIDO", cancelacion).ConfigureAwait(false);
             return FallosDeEnvios.De<EnviosDeMiPedido>(CategoriaDeError.Prohibido, ClavesDeEnvios.Prohibido);
+        }
+
+        if (await limites.Consulta(cancelacion).ConfigureAwait(false) is { } excedido)
+        {
+            return FallosDeEnvios.Fallo<EnviosDeMiPedido>(excedido);
         }
 
         var lectura = await pedidos.Obtener(pedidoId, cancelacion).ConfigureAwait(false);

@@ -59,6 +59,11 @@ internal static class ClavesDeEnvios
 
     /// <summary><c>ECO-ENV-INVENTARIO-RECHAZO</c> (409): el Inventario rechazó el descuento con un rechazo de negocio; el envío sigue en guía generada y no se descontó ninguna línea (ENV-12).</summary>
     public const string InventarioRechazo = "inventario-rechazo";
+
+    /// <summary><c>ECO-LIMITE-EXCEDIDO</c> (429): el campo <c>espera-en-segundos</c> lleva el tiempo sugerido para el <c>Retry-After</c>.</summary>
+    public const string LimiteExcedido = "limite-excedido";
+
+    public const string EsperaEnSegundos = "espera-en-segundos";
 }
 
 internal static class FallosDeEnvios

@@ -13,6 +13,7 @@ namespace BabelHub.Ecommerce.Application.Envios.Interno;
 /// </summary>
 internal sealed class SolicitarGuia(
     AutorizadorDeEnvios autorizador,
+    LimitesDeEnvios limites,
     IRepositorioDeEnvios envios,
     IContactoDeEntregaDelPedido contactos,
     IOperadorLogistico operador,
@@ -27,6 +28,11 @@ internal sealed class SolicitarGuia(
         if (await autorizador.ExigirLogisticaOAdministracion(cancelacion).ConfigureAwait(false) is { } rechazo)
         {
             return FallosDeEnvios.Fallo<DetalleDeEnvio>(rechazo);
+        }
+
+        if (await limites.Operacion(cancelacion).ConfigureAwait(false) is { } excedido)
+        {
+            return FallosDeEnvios.Fallo<DetalleDeEnvio>(excedido);
         }
 
         try
@@ -66,6 +72,12 @@ internal sealed class SolicitarGuia(
             if (!datosDelAviso.EsExito)
             {
                 return FallosDeEnvios.Fallo<DetalleDeEnvio>(datosDelAviso.Error!);
+            }
+
+            // El tope de solicitudes de guía al operador (30 por minuto en total): se reserva antes de fijar nada.
+            if (await limites.GuiaAlOperador(cancelacion).ConfigureAwait(false) is { } sobreCarga)
+            {
+                return FallosDeEnvios.Fallo<DetalleDeEnvio>(sobreCarga);
             }
 
             // (2b) Transacción corta: la clave y el arrendamiento.
