@@ -308,10 +308,69 @@ public sealed class InventarioSimuladoDelCarrito(IReloj reloj) : IInventarioDelC
     }
 }
 
+/// <summary>
+/// <see cref="ILimitadorDelCarrito"/> hasta que <c>Plataforma</c> tenga las políticas de Carrito (carril de plataforma): <b>falla cerrado en lo que reserva stock</b> (pasar al pago) y permite el resto, que solo edita el carrito; la guarda de arranque
+/// impide publicarlo (nunca hay carritos sin límite de uso en producción, SEG-05).
+/// </summary>
+public sealed class LimitadorDelCarritoProvisional : ILimitadorDelCarrito
+{
+    public Task<ResultadoDeLimiteDelCarrito> CrearCarritoDeVisitante(CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLimiteDelCarrito.Permitido);
+
+    public Task<ResultadoDeLimiteDelCarrito> EditarLineas(Guid? cuentaId, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLimiteDelCarrito.Permitido);
+
+    public Task<ResultadoDeLimiteDelCarrito> RevisarCheckout(Guid cuentaId, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLimiteDelCarrito.Permitido);
+
+    public Task<ResultadoDeLimiteDelCarrito> PasarAlPago(Guid cuentaId, string claveDeRepeticion, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLimiteDelCarrito.NoDisponible);
+
+    public Task<ResultadoDeLimiteDelCarrito> VolverOReiniciar(Guid cuentaId, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLimiteDelCarrito.Permitido);
+}
+
+/// <summary>
+/// <see cref="IAuditoriaDelCarrito"/> hasta que <c>AccionesAuditables</c> tenga las acciones de Carrito (carril de auditoría): <b>no audita nada</b>. Solo sirve para desarrollo y pruebas; la guarda de arranque impide publicarlo, porque en producción
+/// una operación sensible sin auditoría debe fallar (AGENTS §4).
+/// </summary>
+public sealed class AuditoriaDelCarritoProvisional : IAuditoriaDelCarrito
+{
+    public Task FusionAplicada(Guid cuentaId, int lineasDelVisitante, IReadOnlyList<MotivoDeAjusteDeAviso> ajustes, CancellationToken cancelacion = default) => Task.CompletedTask;
+
+    public Task EdicionesRetiradas(int ediciones, int carritosAfectados, int lineasQuitadas, int lineasAnotadas, CancellationToken cancelacion = default) => Task.CompletedTask;
+
+    public Task CheckoutTerminado(string motivo, CancellationToken cancelacion = default) => Task.CompletedTask;
+
+    public Task CarritoEliminadoPorIdentidad(string motivo, CancellationToken cancelacion = default) => Task.CompletedTask;
+
+    public Task PurgaRealizada(string trabajo, int cantidad, CancellationToken cancelacion = default) => Task.CompletedTask;
+
+    public Task PasoAlPagoIniciado(bool conImpresos, bool aDomicilio, CancellationToken cancelacion = default) => Task.CompletedTask;
+
+    public Task PasoAlPagoAbortado(string motivo, CancellationToken cancelacion = default) => Task.CompletedTask;
+}
+
+/// <summary><see cref="IMarcaDeCancelacion"/> hasta que Identidad la exponga: <b>falla cerrado</b> (lanza), de modo que nadie pasa al pago sin saber si la cuenta se está cancelando (AC-CAR-27).</summary>
+public sealed class MarcaDeCancelacionProvisional : IMarcaDeCancelacion
+{
+    public Task<EstadoDeLaMarcaDeCancelacion> LeerConBloqueo(Guid cuentaId, CancellationToken cancelacion = default) =>
+        throw new IntegracionProvisionalNoDisponibleException("Identidad");
+}
+
+/// <summary><see cref="IConsentimientoDeAvisos"/> hasta que Identidad lo exponga: no se ofrece el consentimiento y no se guarda (el pago nunca depende de él).</summary>
+public sealed class ConsentimientoDeAvisosProvisional : IConsentimientoDeAvisos
+{
+    public Task<OfertaDeConsentimiento> Consultar(Guid cuentaId, CancellationToken cancelacion = default) => Task.FromResult(OfertaDeConsentimiento.NoSeOfrece);
+
+    public Task<bool> Guardar(Guid cuentaId, string huellaEnmascaradaDelNumero, CancellationToken cancelacion = default) => Task.FromResult(false);
+}
+
+/// <summary><see cref="IAlertasDelCarrito"/> hasta que Auditoría exponga el canal de alertas técnicas de Carrito: no publica nada. La guarda de arranque impide publicarlo.</summary>
+public sealed class AlertasDelCarritoProvisional : IAlertasDelCarrito
+{
+    public Task Publicar(TipoDeAlertaDelCarrito tipo, int cantidad, CancellationToken cancelacion = default) => Task.CompletedTask;
+}
+
 public static class ComposicionProvisionalDelCarrito
 {
     /// <summary>
-    /// Registra los dobles provisionales de lo que aún no existe (Biblioteca, Pagos, Identidad y el cliente real del Inventario) con <c>TryAdd</c>: <b>un registro real anterior se respeta</b>. Con
+    /// Registra los dobles provisionales de lo que aún no existe (Biblioteca, Pagos, Identidad, el cliente real del Inventario y lo que espera al carril de plataforma y auditoría: límites, auditoría y alertas) con <c>TryAdd</c>: <b>un registro real anterior se respeta</b>. Con
     /// <paramref name="esProduccion"/>, si cualquiera de los puertos que declara Carrito termina resuelto por un doble provisional, el arranque falla nombrando cuál (D07, R02): nunca se publica con un cobro
     /// simulado, un Inventario simulado ni una posesión de ediciones «abierta». Se llama <b>después</b> de registrar las implementaciones reales.
     /// </summary>
@@ -322,6 +381,11 @@ public static class ComposicionProvisionalDelCarrito
         servicios.TryAddSingleton<ICreadorDeIntencionesDePago, CreadorDeIntencionesSinPagos>();
         servicios.TryAddSingleton<IInventarioDelCarrito, InventarioSimuladoDelCarrito>();
         servicios.TryAddSingleton<IEstadoDeCuenta, EstadoDeCuentaDelCarritoSinIdentidad>();
+        servicios.TryAddSingleton<ILimitadorDelCarrito, LimitadorDelCarritoProvisional>();
+        servicios.TryAddSingleton<IAuditoriaDelCarrito, AuditoriaDelCarritoProvisional>();
+        servicios.TryAddSingleton<IMarcaDeCancelacion, MarcaDeCancelacionProvisional>();
+        servicios.TryAddSingleton<IConsentimientoDeAvisos, ConsentimientoDeAvisosProvisional>();
+        servicios.TryAddSingleton<IAlertasDelCarrito, AlertasDelCarritoProvisional>();
 
         if (esProduccion)
         {
@@ -337,6 +401,11 @@ public static class ComposicionProvisionalDelCarrito
         (typeof(ICreadorDeIntencionesDePago), typeof(CreadorDeIntencionesSinPagos)),
         (typeof(IInventarioDelCarrito), typeof(InventarioSimuladoDelCarrito)),
         (typeof(IEstadoDeCuenta), typeof(EstadoDeCuentaDelCarritoSinIdentidad)),
+        (typeof(ILimitadorDelCarrito), typeof(LimitadorDelCarritoProvisional)),
+        (typeof(IAuditoriaDelCarrito), typeof(AuditoriaDelCarritoProvisional)),
+        (typeof(IMarcaDeCancelacion), typeof(MarcaDeCancelacionProvisional)),
+        (typeof(IConsentimientoDeAvisos), typeof(ConsentimientoDeAvisosProvisional)),
+        (typeof(IAlertasDelCarrito), typeof(AlertasDelCarritoProvisional)),
     ];
 
     private static void ExigirQueNingunoSeaProvisional(IServiceCollection servicios)

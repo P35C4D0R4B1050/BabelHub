@@ -7,18 +7,16 @@ namespace BabelHub.Ecommerce.Infrastructure.Carrito;
 /// El Inventario visto por Carrito sobre <see cref="IClienteDelInventario"/> de <c>Plataforma</c> (T25; CAR-05, CAR-06): ese cliente pone el plazo de 10 segundos, las credenciales de cada alcance y el token del usuario, y <b>este adaptador no toca
 /// el token ni abre un <c>HttpClient</c></b> (regla 9 y decisión D01). Hoy implementa de verdad <b>la disponibilidad por lotes de a lo más 50</b> (con la validación de la respuesta, SEG-13: nada fuera de lo pedido, sin repetidos, sin cantidades negativas
 /// y sin edición omitida) y <b>la lista de sucursales con su última lista conocida</b> (hasta 10 minutos, R05). La <b>consulta previa, <c>reservas.crear</c> y <c>reservas.liberar</c> aún no existen en <see cref="IClienteDelInventario"/></b> (los agrega el carril de
-/// plataforma): hasta entonces fallan cerrado —«sin respuesta» y «no se pudo»— y el checkout no pasa al pago, nunca simula stock; el hallazgo está en <c>progress/hallazgos.md</c>. Una falla del Inventario nunca es una excepción. Se registra como singleton:
-/// guarda la última lista de sucursales.
+/// plataforma): hasta entonces fallan cerrado —«sin respuesta» y «no se pudo»— y el checkout no pasa al pago, nunca simula stock; el hallazgo está en <c>progress/hallazgos.md</c>. Una falla del Inventario nunca es una excepción. Se registra por alcance de solicitud:
+/// la última lista de sucursales vive en el singleton <see cref="MemoriaDeSucursalesDelCarrito"/>.
 /// </summary>
-public sealed class RestInventarioDelCarrito(IClienteDelInventario cliente, IReloj reloj) : IInventarioDelCarrito
+public sealed class RestInventarioDelCarrito(IClienteDelInventario cliente, IReloj reloj, MemoriaDeSucursalesDelCarrito? memoria = null) : IInventarioDelCarrito
 {
     public const int MaximoDeEdicionesPorLote = 50;
 
     public static readonly TimeSpan VigenciaDeLaUltimaLista = TimeSpan.FromMinutes(10);
 
-    private readonly Lock _candado = new();
-    private IReadOnlyList<SucursalDeEntrega>? _ultimaLista;
-    private DateTimeOffset _obtenidaEn;
+    private readonly MemoriaDeSucursalesDelCarrito _memoria = memoria ?? new MemoriaDeSucursalesDelCarrito();
 
     public async Task<RespuestaDelInventarioDelCarrito<StockDeVariasEdiciones>> ConsultarDisponibilidad(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default)
     {
@@ -116,11 +114,7 @@ public sealed class RestInventarioDelCarrito(IClienteDelInventario cliente, IRel
         {
             var ahora = reloj.Ahora;
             var lista = sucursales.Select(s => new SucursalDeEntrega(s.Codigo, s.Nombre, s.Region)).ToList();
-            lock (_candado)
-            {
-                _ultimaLista = lista;
-                _obtenidaEn = ahora;
-            }
+            _memoria.Guardar(lista, ahora);
 
             return new ListaDeSucursales(lista, ahora, EsDeRespaldo: false);
         }
@@ -131,10 +125,7 @@ public sealed class RestInventarioDelCarrito(IClienteDelInventario cliente, IRel
     /// <summary>La última lista conocida si tiene a lo más 10 minutos; si no, <see langword="null"/> (no hay lista ni respaldo).</summary>
     private ListaDeSucursales? DeRespaldo()
     {
-        lock (_candado)
-        {
-            return _ultimaLista is { } lista && reloj.Ahora - _obtenidaEn <= VigenciaDeLaUltimaLista ? new ListaDeSucursales(lista, _obtenidaEn, EsDeRespaldo: true) : null;
-        }
+        return _memoria.Leer() is { } ultima && reloj.Ahora - ultima.ObtenidaEn <= VigenciaDeLaUltimaLista ? new ListaDeSucursales(ultima.Lista, ultima.ObtenidaEn, EsDeRespaldo: true) : null;
     }
 
     // La consulta previa, reservas.crear y reservas.liberar faltan en IClienteDelInventario (carril de plataforma): fallan cerrado.

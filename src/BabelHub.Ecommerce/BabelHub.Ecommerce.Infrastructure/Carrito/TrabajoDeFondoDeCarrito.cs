@@ -5,6 +5,11 @@ using Microsoft.Extensions.Hosting;
 
 namespace BabelHub.Ecommerce.Infrastructure.Carrito;
 
+/// <summary>
+/// Corre una corrida de un trabajo como el actor «sistema»: lo aporta el anfitrión (la Api, T29), que es de los pocos lugares que fijan el actor (regla de arquitectura): fija «sistema», ejecuta la corrida con su cancelación y limpia el actor al terminar, aunque falle.
+/// </summary>
+public delegate Task AlcanceDeSistema(Func<CancellationToken, Task> corrida, CancellationToken cancelacion);
+
 /// <summary>Los trabajos de fondo de Carrito: sus nombres estables en <c>plataforma.trabajos_de_fondo</c> y cada cuánto corren.</summary>
 public static class TrabajosDeFondoDelCarrito
 {
@@ -36,7 +41,7 @@ public static class TrabajosDeFondoDelCarrito
     /// Los seis trabajos del módulo con una corrida por alcance de servicios (los casos de uso dependen del actor, de la unidad de trabajo y de los repositorios, que son por alcance): purga de carritos de visitante, de avisos, del contacto y los checkouts
     /// vencidos, recuperación de <c>reservando</c>, reintento de liberaciones y revisión de pagos pendientes.
     /// </summary>
-    public static IReadOnlyList<TrabajoDeFondoDeCarrito> Todos(IServiceScopeFactory fabrica, IRegistroDeTrabajosDeFondo registro, IEstablecedorDeActor actor, IAlertasDelCarrito alertas, IReloj reloj, TimeProvider? tiempo = null)
+    public static IReadOnlyList<TrabajoDeFondoDeCarrito> Todos(IServiceScopeFactory fabrica, IRegistroDeTrabajosDeFondo registro, AlcanceDeSistema alcanceDeSistema, IAlertasDelCarrito alertas, IReloj reloj, TimeProvider? tiempo = null)
     {
         TrabajoDeFondoDeCarrito Crear<TCaso>(string nombre, OpcionesDelTrabajoDelCarrito opciones, Func<TCaso, CancellationToken, Task> ejecutar)
             where TCaso : notnull =>
@@ -48,7 +53,7 @@ public static class TrabajosDeFondoDelCarrito
                     await ejecutar(alcance.ServiceProvider.GetRequiredService<TCaso>(), ct).ConfigureAwait(false);
                 },
                 registro,
-                actor,
+                alcanceDeSistema,
                 alertas,
                 reloj,
                 opciones,
@@ -79,7 +84,7 @@ public static class TrabajosDeFondoDelCarrito
 public sealed record OpcionesDelTrabajoDelCarrito(TimeSpan Intervalo, int FallosSeguidosParaAlertar = 3);
 
 /// <summary>
-/// Un trabajo de fondo de Carrito (T26a; CAR-29, CAR-34): corre su corrida cada intervalo <b>como «sistema» fijado explícitamente</b> (sin ese contexto los casos de uso lo rechazan: es un defecto, no un permiso), registra el resultado enumerado de
+/// Un trabajo de fondo de Carrito (T26a; CAR-29, CAR-34): corre su corrida cada intervalo <b>dentro del <see cref="AlcanceDeSistema"/> que le da el anfitrión</b>, que fija el actor «sistema» (sin ese contexto los casos de uso lo rechazan: es un defecto, no un permiso), registra el resultado enumerado de
 /// cada corrida en <c>plataforma.trabajos_de_fondo</c> y publica una alerta técnica tras varios fallos seguidos y cuando <b>no hay una corrida exitosa en 24 horas</b> (AUD-31). Nunca deja caer el servicio: solo se propaga la cancelación del apagado ordenado.
 /// La alerta no lleva datos personales: solo el tipo y un conteo.
 /// </summary>
@@ -87,7 +92,7 @@ public sealed class TrabajoDeFondoDeCarrito(
     string nombre,
     Func<CancellationToken, Task> corrida,
     IRegistroDeTrabajosDeFondo registro,
-    IEstablecedorDeActor actor,
+    AlcanceDeSistema alcanceDeSistema,
     IAlertasDelCarrito alertas,
     IReloj reloj,
     OpcionesDelTrabajoDelCarrito opciones,
@@ -103,10 +108,9 @@ public sealed class TrabajoDeFondoDeCarrito(
     public async Task EjecutarUnaVez(CancellationToken cancelacion = default)
     {
         _ultimaExitosa ??= reloj.Ahora;
-        actor.Establecer(ActorActual.DelSistema());
         try
         {
-            await corrida(cancelacion).ConfigureAwait(false);
+            await alcanceDeSistema(corrida, cancelacion).ConfigureAwait(false);
             _fallosSeguidos = 0;
             _ultimaExitosa = reloj.Ahora;
             _ultimaAlertaDeInactividad = null;
@@ -128,10 +132,6 @@ public sealed class TrabajoDeFondoDeCarrito(
             {
                 await Alertar(cancelacion).ConfigureAwait(false);
             }
-        }
-        finally
-        {
-            actor.Limpiar();
         }
     }
 

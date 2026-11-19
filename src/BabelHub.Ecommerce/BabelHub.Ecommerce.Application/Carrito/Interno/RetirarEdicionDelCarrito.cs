@@ -11,9 +11,9 @@ namespace BabelHub.Ecommerce.Application.Carrito.Interno;
 /// Audita en la misma transacción y, si no se puede auditar, falla (la baja no se aplica). Idempotente.
 /// </summary>
 /// <remarks>
-/// Es el cuerpo de <c>IRetiroDeEdicionDeCarritos</c> de Catálogo: la clase que lo implementa y su registro en la composición son de T25, junto con la prueba de arquitectura del Catálogo que hoy exige el retiro nulo.
+/// Es la implementación real de <c>IRetiroDeEdicionDeCarritos</c> de Catálogo (T26b): la composición de Carrito la registra reemplazando al retiro nulo de Catálogo, que queda solo como respaldo mientras Catálogo se compone sin Carrito.
 /// </remarks>
-internal sealed class RetirarEdicionDelCarrito(ServiciosDelCarrito servicios)
+internal sealed class RetirarEdicionDelCarrito(ServiciosDelCarrito servicios) : IRetiroDeEdicionDeCarritos
 {
     private const string TituloGenerico = "Edición retirada";
 

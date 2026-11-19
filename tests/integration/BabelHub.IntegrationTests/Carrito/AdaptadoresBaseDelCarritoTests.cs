@@ -78,7 +78,7 @@ public sealed class AdaptadoresBaseDelCarritoTests
         });
     }
 
-    // ---------- Ejecutor de trabajos de fondo ----------
+    // ---------- Ejecutor de trabajos de fondo (el actor «sistema» lo fija el anfitrión) ----------
 
     private sealed class RelojMovil : IReloj
     {
@@ -87,15 +87,26 @@ public sealed class AdaptadoresBaseDelCarritoTests
         public DateOnly HoyEnLima => DateOnly.FromDateTime(Ahora.ToOffset(TimeSpan.FromHours(-5)).DateTime);
     }
 
-    private sealed class ActorEspia : IEstablecedorDeActor
+    private sealed class AlcanceEspia
     {
-        public List<TipoDeActor> Fijados { get; } = [];
+        public int Entradas { get; private set; }
 
-        public int Limpiezas { get; private set; }
+        public int Salidas { get; private set; }
 
-        public void Establecer(ActorActual actor) => Fijados.Add(actor.Tipo);
+        public bool DentroDelAlcance => Entradas > Salidas;
 
-        public void Limpiar() => Limpiezas++;
+        public AlcanceDeSistema Delegado => async (corrida, cancelacion) =>
+        {
+            Entradas++;
+            try
+            {
+                await corrida(cancelacion);
+            }
+            finally
+            {
+                Salidas++;
+            }
+        };
     }
 
     private sealed class RegistroEspia : IRegistroDeTrabajosDeFondo
@@ -124,21 +135,24 @@ public sealed class AdaptadoresBaseDelCarritoTests
         }
     }
 
-    private static (TrabajoDeFondoDeCarrito Trabajo, ActorEspia Actor, RegistroEspia Registro, AlertasEspia Alertas, RelojMovil Reloj) Crear(Func<CancellationToken, Task> corrida)
+    private static (TrabajoDeFondoDeCarrito Trabajo, AlcanceEspia Alcance, RegistroEspia Registro, AlertasEspia Alertas, RelojMovil Reloj) Crear(Func<CancellationToken, Task> corrida)
     {
-        var (actor, registro, alertas, reloj) = (new ActorEspia(), new RegistroEspia(), new AlertasEspia(), new RelojMovil());
-        return (new TrabajoDeFondoDeCarrito("carrito-prueba", corrida, registro, actor, alertas, reloj, new OpcionesDelTrabajoDelCarrito(TimeSpan.FromMinutes(1))), actor, registro, alertas, reloj);
+        var (alcance, registro, alertas, reloj) = (new AlcanceEspia(), new RegistroEspia(), new AlertasEspia(), new RelojMovil());
+        return (new TrabajoDeFondoDeCarrito("carrito-prueba", corrida, registro, alcance.Delegado, alertas, reloj, new OpcionesDelTrabajoDelCarrito(TimeSpan.FromMinutes(1))), alcance, registro, alertas, reloj);
     }
 
     [Fact]
-    public async Task La_corrida_se_ejecuta_como_sistema_se_registra_como_exito_y_el_actor_se_limpia()
+    public async Task La_corrida_se_ejecuta_dentro_del_alcance_de_sistema_del_anfitrion_y_se_registra_como_exito()
     {
-        var (trabajo, actor, registro, alertas, _) = Crear(_ => Task.CompletedTask);
+        AlcanceEspia? alcance = null;
+        var dentro = false;
+        var (trabajo, alcanceCreado, registro, alertas, _) = Crear(_ => { dentro = alcance!.DentroDelAlcance; return Task.CompletedTask; });
+        alcance = alcanceCreado;
 
         await trabajo.EjecutarUnaVez();
 
-        Assert.Equal([TipoDeActor.Sistema], actor.Fijados);
-        Assert.Equal(1, actor.Limpiezas);
+        Assert.True(dentro);
+        Assert.Equal((1, 1), (alcance.Entradas, alcance.Salidas));
         Assert.Equal([("carrito-prueba", ResultadoDeTrabajo.Exito)], registro.Corridas);
         Assert.Empty(alertas.Publicadas);
     }
