@@ -25,7 +25,7 @@ public sealed class RegistrarAvisoDeLaPasarelaTests
         var b = await EntornoDeConfirmacion.ConIntentoIniciado();
         var p = b.Entorno;
         p.Pasarela.Interprete = _ => new AvisoDeLaPasarela(idDeEntrada, b.IntentoId);
-        var registrar = new RegistrarAvisoDeLaPasarela(p.Procesador, p.Pasarela, p.Repositorio, p.Unidad, new BloqueoDeIntenciones(p.Repositorio, p.Cuenta), p.Auditoria);
+        var registrar = new RegistrarAvisoDeLaPasarela(p.Procesador, p.Pasarela, p.Repositorio, p.Unidad, new BloqueoDeIntenciones(p.Repositorio, p.Cuenta), p.Auditoria, p.Reloj);
         return new Entorno { Base = b, Registrar = registrar };
     }
 
@@ -118,12 +118,13 @@ public sealed class RegistrarAvisoDeLaPasarelaTests
 
     [Fact]
     [Trait("Criterio", "AC-PAG-16")]
-    public async Task Un_intento_ya_resuelto_no_se_marca()
+    public async Task Un_intento_resuelto_hace_mas_de_24_horas_ya_no_se_marca()
     {
         var e = await Nuevo();
         var intento = e.Intento;
         intento.MarcarRechazado(MotivoDeRechazo.Otro, e.Pagos.Reloj.Ahora);
         await e.Pagos.Repositorio.GuardarIntento(intento);
+        e.Pagos.Reloj.Ahora = e.Pagos.Reloj.Ahora.AddHours(25);
 
         var resultado = await e.Registrar.Recibir(e.Aviso());
 
@@ -432,7 +433,7 @@ public sealed class ConsultarPagosPendientesTests
 
     [Fact]
     [Trait("Criterio", "AC-PAG-15")]
-    public async Task Los_intentos_ya_resueltos_no_se_consultan()
+    public async Task Un_intento_rechazado_sin_aviso_no_se_consulta()
     {
         var e = await Nuevo(pendiente: true);
         var intento = e.Intento;
@@ -441,7 +442,7 @@ public sealed class ConsultarPagosPendientesTests
 
         var revisados = await e.Correr();
 
-        Assert.Equal(0, revisados);
+        Assert.Equal(1, revisados);
         Assert.Empty(e.Pagos.Pasarela.Consultas);
     }
 
@@ -458,5 +459,96 @@ public sealed class ConsultarPagosPendientesTests
         Assert.Equal(1, revisados);
         Assert.Contains(e.Pagos.Alertas.Publicadas, a => a.Motivo == ConsultarPagosPendientes.MotivoDeAlertaConsultaFallida);
         Assert.Equal(EstadoDeIntento.PendienteDeConfirmacion, e.Intento.Estado);
+    }
+}
+
+public sealed class CobrosAprobadosTardeTests
+{
+    private static async Task<(EntornoDeConfirmacion B, ConsultarPagosPendientes Consultar, RegistrarAvisoDeLaPasarela Aviso)> VencidoSoloDigital()
+    {
+        var b = await EntornoDeConfirmacion.ConIntentoIniciado(soloDigital: true);
+        var p = b.Entorno;
+        var intento = b.Intento;
+        intento.MarcarPendiente(p.Reloj.Ahora);
+        b.Intencion.PasarAPendiente();
+        await p.Repositorio.GuardarIntento(intento);
+        await p.Repositorio.GuardarIntencion(b.Intencion);
+        p.Pasarela.Interprete = _ => new AvisoDeLaPasarela("evt_1", b.IntentoId);
+        var bloqueo = new BloqueoDeIntenciones(p.Repositorio, p.Cuenta);
+        var consultar = new ConsultarPagosPendientes(p.Repositorio, p.Unidad, bloqueo, p.Pasarela, p.Confirmador, new ExtenderReservaDelPago(p.Repositorio, p.Unidad, p.Cuenta, p.Reservas), p.Avisador, p.Auditoria, p.Alertas, p.Reloj, new OpcionesDelCobro(TimeSpan.FromMilliseconds(300)));
+        var aviso = new RegistrarAvisoDeLaPasarela(p.Procesador, p.Pasarela, p.Repositorio, p.Unidad, bloqueo, p.Auditoria, p.Reloj);
+        // El trabajo vence el intento a los 30 minutos.
+        p.Reloj.Ahora = IntencionesDePrueba.Inicio.AddMinutes(31);
+        await consultar.Ejecutar(10);
+        Assert.Equal(EstadoDeIntento.Vencido, b.Intento.Estado);
+        return (b, consultar, aviso);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-13")]
+    public async Task Un_cobro_que_la_pasarela_aprueba_tras_vencer_el_intento_entra_como_sobrante_por_el_unico_punto_de_entrada()
+    {
+        var (b, consultar, aviso) = await VencidoSoloDigital();
+        var p = b.Entorno;
+        p.Reloj.Ahora = p.Reloj.Ahora.AddMinutes(2);
+        p.Pasarela.RespuestaDeConsulta = _ => ResultadoDeCobro.Aprobado("ch_tarde", b.Intento.Importe, "PEN", b.Intento.ReferenciaOpaca);
+        p.Confirmador.Llamadas.Clear();
+
+        await aviso.Recibir(new AvisoDeLaPasarelaEntrada(System.Text.Encoding.UTF8.GetBytes("evento"), "1763460000", "firma"));
+        await consultar.Ejecutar(10);
+
+        Assert.Equal((InstantaneasDeCompraDePrueba.Pedido, b.IntentoId, "ch_tarde"), Assert.Single(p.Confirmador.Llamadas));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-13")]
+    public async Task Tras_vencer_el_trabajo_sigue_consultando_cada_minuto_15_minutos_y_despues_solo_si_el_aviso_lo_adelanta()
+    {
+        var (b, consultar, _) = await VencidoSoloDigital();
+        var p = b.Entorno;
+        var consultasAlVencer = p.Pasarela.Consultas.Count;
+
+        p.Reloj.Ahora = p.Reloj.Ahora.AddMinutes(2);
+        await consultar.Ejecutar(10);
+        Assert.Equal(consultasAlVencer + 1, p.Pasarela.Consultas.Count);
+
+        p.Reloj.Ahora = p.Reloj.Ahora.AddMinutes(20);
+        await consultar.Ejecutar(10);
+        Assert.Equal(consultasAlVencer + 1, p.Pasarela.Consultas.Count);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-13")]
+    public async Task El_aviso_adelanta_la_consulta_de_un_intento_vencido_dentro_de_las_24_horas_y_no_despues()
+    {
+        var (b, consultar, aviso) = await VencidoSoloDigital();
+        var p = b.Entorno;
+        p.Reloj.Ahora = p.Reloj.Ahora.AddHours(3);
+
+        await aviso.Recibir(new AvisoDeLaPasarelaEntrada(System.Text.Encoding.UTF8.GetBytes("evento"), "1763460000", "firma"));
+        Assert.True(b.Intento.ConsultaInmediata);
+        var antes = p.Pasarela.Consultas.Count;
+        await consultar.Ejecutar(10);
+        Assert.Equal(antes + 1, p.Pasarela.Consultas.Count);
+
+        p.Reloj.Ahora = p.Reloj.Ahora.AddHours(25);
+        p.Pasarela.Interprete = _ => new AvisoDeLaPasarela("evt_2", b.IntentoId);
+        await aviso.Recibir(new AvisoDeLaPasarelaEntrada(System.Text.Encoding.UTF8.GetBytes("evento"), "1763460000", "firma"));
+        Assert.False(b.Intento.ConsultaInmediata);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-13")]
+    public async Task Un_rechazo_en_la_pasarela_nunca_se_vuelve_a_consultar_sin_aviso_ni_cambia_el_intento_resuelto()
+    {
+        var (b, consultar, _) = await VencidoSoloDigital();
+        var p = b.Entorno;
+        p.Reloj.Ahora = p.Reloj.Ahora.AddMinutes(2);
+        p.Pasarela.RespuestaDeConsulta = _ => ResultadoDeCobro.Rechazado(MotivoDeRechazo.Otro);
+
+        await consultar.Ejecutar(10);
+
+        Assert.Equal(EstadoDeIntento.Vencido, b.Intento.Estado);
+        Assert.Empty(p.Confirmador.Llamadas);
     }
 }

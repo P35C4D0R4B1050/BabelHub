@@ -244,7 +244,6 @@ internal sealed class CompensarCompra(
         return true;
     }
 
-/// <summary>Audita un paso de la compensación en la misma transacción, con su motivo de lista cerrada y sin datos de pago ni de la persona.</summary>    private Task Auditar(Guid pedidoId, string paso, MotivoDeCompensacion motivo, CancellationToken token) =>        auditoria.Registrar(            new SolicitudDeRegistro(AccionesAuditables.PasoDeCompensacionHecho)            {                ObjetoTipo = "pedido",                ObjetoId = pedidoId.ToString("D"),                Detalle = new Dictionary<string, string?>                {                    ["paso"] = paso,                    ["motivo"] = motivo switch                    {                        MotivoDeCompensacion.PagoTardio => "pago-tardio",                        MotivoDeCompensacion.FallaPosteriorAlPago => "falla-posterior-al-pago",                        MotivoDeCompensacion.IntencionDesvinculada => "intencion-desvinculada",                        _ => "cancelacion-de-cuenta-en-curso",                    },                },            },            token);
     private Task<Compensacion> Leer(Guid intentoId, CancellationToken cancelacion) =>
         unidad.Ejecutar(async token => (await repositorio.ObtenerCompensacion(intentoId, token).ConfigureAwait(false))!, cancelacion);
 

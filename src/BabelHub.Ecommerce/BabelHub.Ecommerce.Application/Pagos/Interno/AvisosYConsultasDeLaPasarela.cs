@@ -55,7 +55,8 @@ internal sealed class RegistrarAvisoDeLaPasarela(
     IRepositorioDePagos repositorio,
     IUnidadDeTrabajo unidad,
     BloqueoDeIntenciones bloqueo,
-    IAuditoria auditoria) : IAvisosDeLaPasarela
+    IAuditoria auditoria,
+    IReloj reloj) : IAvisosDeLaPasarela
 {
     /// <summary>El proveedor en la lista blanca y los secretos de <c>Plataforma</c>.</summary>
     public const string Proveedor = "culqi";
@@ -116,7 +117,7 @@ internal sealed class RegistrarAvisoDeLaPasarela(
         // El mismo orden de bloqueo (D24): la marca de cancelación de la cuenta y después la intención.
         await bloqueo.Bloquear(existente.IntencionId, token).ConfigureAwait(false);
         var intento = await repositorio.ObtenerIntento(referenciaOpaca, token).ConfigureAwait(false);
-        if (intento is null || !intento.MarcarConsultaInmediata())
+        if (intento is null || !intento.MarcarConsultaInmediata(reloj.Ahora))
         {
             return;
         }
@@ -158,7 +159,7 @@ internal sealed class ConsultarPagosPendientes(
     /// <summary>Revisa hasta <paramref name="limite"/> intentos sin resolver y devuelve cuántos revisó.</summary>
     public async Task<int> Ejecutar(int limite, CancellationToken cancelacion = default)
     {
-        var ids = await unidad.Ejecutar(token => repositorio.ListarIntentosSinResolver(limite, token), cancelacion).ConfigureAwait(false);
+        var ids = await unidad.Ejecutar(token => repositorio.ListarIntentosParaConsultar(reloj.Ahora, limite, token), cancelacion).ConfigureAwait(false);
         foreach (var id in ids)
         {
             try
@@ -178,7 +179,23 @@ internal sealed class ConsultarPagosPendientes(
     private async Task Revisar(Guid intentoId, CancellationToken cancelacion)
     {
         var (intento, intencion) = await Leer(intentoId, cancelacion).ConfigureAwait(false);
-        if (intento is null || intencion is null || intento.Estado is not (EstadoDeIntento.Iniciado or EstadoDeIntento.PendienteDeConfirmacion))
+        if (intento is null || intencion is null)
+        {
+            return;
+        }
+
+        // Un intento ya vencido o rechazado puede aprobarse tarde: se consulta (el aviso lo adelanta, y tras vencer unos minutos más) y un aprobado entra como sobrante que se reembolsa (D23, R02).
+        if (intento.EsConciliable(reloj.Ahora))
+        {
+            if (intento.DebeConsultar(reloj.Ahora))
+            {
+                await ConsultarUnCobroYaResuelto(intento, cancelacion).ConfigureAwait(false);
+            }
+
+            return;
+        }
+
+        if (intento.Estado is not (EstadoDeIntento.Iniciado or EstadoDeIntento.PendienteDeConfirmacion))
         {
             return;
         }
@@ -206,6 +223,22 @@ internal sealed class ConsultarPagosPendientes(
             {
                 await avisador.LiberarElPendienteRetenido(intento.IntencionId, intentoId, CancellationToken.None).ConfigureAwait(false);
             }
+        }
+    }
+
+    /// <summary>Consulta un intento ya resuelto: solo un aprobado válido hace algo (entra por el único punto de entrada del estado aprobado y sigue la variante de cobro sobrante); lo demás no cambia nada.</summary>
+    private async Task ConsultarUnCobroYaResuelto(IntentoDeCobro intento, CancellationToken cancelacion)
+    {
+        var validado = (await Consultar(intento.ReferenciaOpaca).ConfigureAwait(false)).Validar(intento);
+        await unidad.Ejecutar(token => AnotarLaConsulta(intento.Id, token), cancelacion).ConfigureAwait(false);
+        if (validado.EsDudoso)
+        {
+            await Alertar(MotivoDeAlertaCobroDudoso).ConfigureAwait(false);
+        }
+
+        if (validado.Tipo == TipoDeResultadoDeCobro.Aprobado)
+        {
+            await confirmador.Confirmar(intento.IntencionId, intento.Id, validado.ReferenciaDePasarela!, CancellationToken.None).ConfigureAwait(false);
         }
     }
 

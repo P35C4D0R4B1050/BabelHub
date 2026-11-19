@@ -303,7 +303,7 @@ public sealed class AvisarACarritoTests
 
         public Task<IReadOnlyList<AvisoDePago>> ListarAvisosDePagoDeLaIntencion(Guid intencionId, CancellationToken cancelacion = default) => interno.ListarAvisosDePagoDeLaIntencion(intencionId, cancelacion);
 
-        public Task<IReadOnlyList<Guid>> ListarIntentosSinResolver(int limite, CancellationToken cancelacion = default) => interno.ListarIntentosSinResolver(limite, cancelacion);
+        public Task<IReadOnlyList<Guid>> ListarIntentosParaConsultar(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) => interno.ListarIntentosParaConsultar(ahora, limite, cancelacion);
 
         public Task<IReadOnlyList<AvisoDePago>> ListarAvisosDePagoListos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) => interno.ListarAvisosDePagoListos(ahora, limite, cancelacion);
 

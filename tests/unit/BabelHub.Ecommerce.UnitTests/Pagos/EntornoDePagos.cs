@@ -220,8 +220,8 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
     public Task<IReadOnlyList<Compensacion>> ListarCompensacionesSinTerminar(int limite, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<Compensacion>>(_compensaciones.Values.Where(c => !c.EstaTerminada).OrderBy(c => c.IniciadaEn).Select(c => c.Copiar()).Take(limite).ToArray());
 
-    public Task<IReadOnlyList<Guid>> ListarIntentosSinResolver(int limite, CancellationToken cancelacion = default) =>
-        Task.FromResult<IReadOnlyList<Guid>>(_intentos.Values.Where(i => i.Estado is EstadoDeIntento.Iniciado or EstadoDeIntento.PendienteDeConfirmacion).OrderBy(i => i.IniciadoEn).Select(i => i.Id).Take(limite).ToArray());
+    public Task<IReadOnlyList<Guid>> ListarIntentosParaConsultar(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(_intentos.Values.Where(i => i.Estado is EstadoDeIntento.Iniciado or EstadoDeIntento.PendienteDeConfirmacion || i.EsConciliable(ahora)).OrderBy(i => i.IniciadoEn).Select(i => i.Id).Take(limite).ToArray());
 
     public Task<IReadOnlyList<Guid>> ListarIntencionesConAvisosACarritoListos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<Guid>>(_avisosACarrito.Where(a => a.EstaListo(ahora)).OrderBy(a => a.CreadoEn).Select(a => a.IntencionId).Distinct().Take(limite).ToArray());

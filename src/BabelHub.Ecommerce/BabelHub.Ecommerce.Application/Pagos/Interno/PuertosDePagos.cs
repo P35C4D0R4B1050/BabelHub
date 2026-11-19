@@ -145,8 +145,8 @@ internal interface IRepositorioDePagos
 
     Task GuardarIntento(IntentoDeCobro intento, CancellationToken cancelacion = default);
 
-    /// <summary>Los intentos <c>iniciado</c> o <c>pendiente_de_confirmacion</c>, los más antiguos primero: los que el trabajo de consulta revisa.</summary>
-    Task<IReadOnlyList<Guid>> ListarIntentosSinResolver(int limite, CancellationToken cancelacion = default);
+    /// <summary>Los intentos <c>iniciado</c> o <c>pendiente_de_confirmacion</c> y los <c>vencido</c> o <c>rechazado</c> resueltos hace menos de 24 horas (un cobro aprobado tarde sigue siendo posible), los más antiguos primero: los que el trabajo de consulta revisa.</summary>
+    Task<IReadOnlyList<Guid>> ListarIntentosParaConsultar(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default);
 
     /// <summary>Las intenciones <c>aprobada</c> sin completar, las más antiguas primero: las que la retoma completa o compensa.</summary>
     Task<IReadOnlyList<Guid>> ListarIntencionesAprobadas(int limite, CancellationToken cancelacion = default);
