@@ -289,6 +289,24 @@ public sealed class ArranqueSeguroInventarioTests : IDisposable
         Assert.DoesNotContain(deProduccion, error.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("Inventario:Base:Aplicacion")]
+    [InlineData("Inventario:Base:DepuracionDeAjustes")]
+    [Trait("Criterio", "AC-PLA-22")]
+    public void ElEnsayoNoArrancaConLaBaseOLaPimientaDeProduccion_YNombraLaVariableSinElValor(string ruta)
+    {
+        var deProduccion = "Host=bd-de-produccion;Database=inventario;Username=acceso;Pass" + "word=" + Guid.NewGuid().ToString("N");
+        var configuracion = Configuracion(
+            ("Modo", "Ensayo"),
+            ("Ensayo:ProhibidosSha256", Huella(deProduccion)),
+            (ruta, deProduccion));
+
+        var error = Assert.Throws<ArranqueRechazadoException>(() => ArranqueSeguro.Resolver(configuracion, esProduccion: false, Ahora, new AlmacenEnMemoria()));
+
+        Assert.Contains("BABELHUB__" + ruta.Replace(":", "__", StringComparison.Ordinal), error.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(deProduccion, error.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     [Trait("Criterio", "AC-PLA-22")]
     public void ElEnsayoConSecretosPropiosArranca()

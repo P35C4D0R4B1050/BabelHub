@@ -75,7 +75,7 @@ public sealed class AnfitrionDelInventarioTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEG-11")]
+    [Trait("Criterio", "AC-SEG-25")]
     public async Task ConLaConfiguracionCompleta_ElGrafoSeValida_YLaSuperficieDeServicioDeclaraTodasSusOperaciones()
     {
         await using var app = Compuesto();
@@ -86,7 +86,7 @@ public sealed class AnfitrionDelInventarioTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEG-11")]
+    [Trait("Criterio", "AC-SEG-25")]
     public async Task CadaContratoDelInventario_SeResuelve_ConSuImplementacionReal()
     {
         await using var app = Compuesto();
@@ -141,7 +141,7 @@ public sealed class AnfitrionDelInventarioTests
 
     [Theory]
     [MemberData(nameof(Variables))]
-    [Trait("Criterio", "AC-SEG-11")]
+    [Trait("Criterio", "AC-SEG-25")]
     public void SiFaltaUnaVariableObligatoria_ElArranqueFalla_NombrandolaYSinValores(string ruta)
     {
         var configuracion = ConfiguracionCompleta();
@@ -155,7 +155,7 @@ public sealed class AnfitrionDelInventarioTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEG-11")]
+    [Trait("Criterio", "AC-SEG-25")]
     public void UnaCredencialDebilOUnaClaveRepetida_HaceFallarElArranque_SinImprimirElValor()
     {
         var configuracion = ConfiguracionCompleta();
@@ -193,7 +193,7 @@ public sealed class AnfitrionDelInventarioTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEG-11")]
+    [Trait("Criterio", "AC-SEG-25")]
     public void LaMismaCuentaConOtroNombreDeAplicacion_NoLasSepara()
     {
         var configuracion = ConfiguracionCompleta();
@@ -208,7 +208,7 @@ public sealed class AnfitrionDelInventarioTests
     [Theory]
     [InlineData("sin-usuario")]
     [InlineData("sin-contrasena")]
-    [Trait("Criterio", "AC-SEG-11")]
+    [Trait("Criterio", "AC-SEG-25")]
     public void UnaCuentaSinUsuarioOSinContrasena_NoArrancaEnProduccion_PeroSiFueraDeProduccion(string caso)
     {
         var configuracion = ConfiguracionCompleta();
@@ -227,7 +227,7 @@ public sealed class AnfitrionDelInventarioTests
     [Theory]
     [InlineData("Seguridad:Credenciales:BajaDeTitular")]
     [InlineData("Seguridad:ClaveDeHuella")]
-    [Trait("Criterio", "AC-SEG-11")]
+    [Trait("Criterio", "AC-SEG-25")]
     public void LaClaveDelCursor_NoPuedeRepetirUnSecretoComun_NiLaParteSecretaDeLaHuella(string ruta)
     {
         var configuracion = ConfiguracionCompleta();
@@ -242,7 +242,7 @@ public sealed class AnfitrionDelInventarioTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEG-11")]
+    [Trait("Criterio", "AC-SEG-25")]
     public void LaClaveDeBajas_NoPuedeRepetirUnaCredencialDeServicio()
     {
         var configuracion = ConfiguracionCompleta();

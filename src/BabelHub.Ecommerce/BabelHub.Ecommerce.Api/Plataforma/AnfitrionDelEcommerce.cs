@@ -19,7 +19,6 @@ using BabelHub.Ecommerce.Infrastructure.Web;
 using BabelHub.Shared.Contratos;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Hosting;
-using Npgsql;
 
 namespace BabelHub.Ecommerce.Api.Plataforma;
 
@@ -133,12 +132,36 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
             lector.Comprobar(RutaDeLaClaveDeLaCola, claveDeLaCola);
         }
 
-        foreach (var (ruta, valor) in new[] { (RutaDeLaClaveDelCursor, claveDelCursor), (RutaDeLaClaveDeIngresos, claveDeIngresos), (RutaDeLaClaveDeLaCola, claveDeLaCola) })
+        // Ningún secreto del servicio repite otro (§3.2: una réplica comprometida no abre otras claves): todos los que se leen aquí, de los módulos y de los almacenes se comparan con todos los demás.
+        var rutasDeSecretos = new List<string>
         {
-            if (valor is not null)
+            RutaDeLaClaveDelCursor,
+            RutaDeLaClaveDeIngresos,
+            RutaDeLaClaveDeLaCola,
+            "Catalogo:ClaveDeIngresosAnterior",
+            "Web:ClaveDeSesionesTienda",
+            "Web:ClaveDeSesionesTiendaAnterior",
+            "Web:ClaveDeSesionesGestion",
+            "Web:ClaveDeSesionesGestionAnterior",
+            OpcionesDeIdentidad.VariableDeLaClaveDeCifrado,
+            OpcionesDeIdentidad.VariableDeLaPimienta,
+            "Correo:Smtp:Credencial",
+            "Almacen:Catalogo:ClaveDeAcceso",
+            "Almacen:Catalogo:ClaveSecreta",
+            "Almacen:Supresiones:ClaveDeAcceso",
+            "Almacen:Supresiones:ClaveSecreta",
+        };
+        foreach (var ruta in rutasDeSecretos)
+        {
+            if (configuracion[ruta] is { Length: > 0 } valor)
             {
                 RepeticionDeSecretos.Comprobar(lector, configuracion, ruta, valor);
             }
+        }
+
+        foreach (var anterior in (configuracion[OpcionesDeIdentidad.VariableDeLasClavesAnteriores] ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            RepeticionDeSecretos.Comprobar(lector, configuracion, OpcionesDeIdentidad.VariableDeLasClavesAnteriores, anterior);
         }
 
         var version = lector.Opcional(RutaDeLaVersionDelCursor) ?? "v1";
@@ -240,6 +263,11 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
     {
         var direccion = configuracion[RutaDelRedis];
         var clave = configuracion["Seguridad:ClaveDeRedisDeLimites"];
+        if (esProduccion && configuracion["Ecommerce:Redis:Tls"] is not ("1" or "true"))
+        {
+            lector.Problema("Ecommerce:Redis:Tls", "en producción el Redis de contadores va por TLS (su contraseña no viaja en claro)");
+        }
+
         if (string.IsNullOrWhiteSpace(direccion))
         {
             if (esProduccion)
@@ -325,7 +353,10 @@ public static class AnfitrionDelEcommerce
 
         // ---------- Correo, supresiones e Identidad ----------
         servicios.AddSingleton<IRegistroDeSupresiones>(_ => new RegistroDeSupresionesEnObjetos(ClienteDelAlmacenDeObjetos.Crear(opciones.AlmacenDeSupresiones), opciones.AlmacenDeSupresiones.Contenedor));
-        servicios.AgregarCorreoDelEcommerce(opciones.ClaveDeLaCola, opciones.Smtp);
+        // En el ensayo y al restaurar no sale ningún correo: el transporte es el nulo aunque haya SMTP configurado (una base restaurada tiene personas reales).
+        var smtp = soloEnModoNormal ? opciones.Smtp : null;
+        servicios.AgregarCorreoDelEcommerce(opciones.ClaveDeLaCola, smtp);
+        servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDelCorreo(esNulo: smtp is null));
         servicios.AgregarNotificacionesPendientes(esProduccion && soloEnModoNormal);
         var depuracionDeRegistros = BasesDelEcommerce.Abrir(opciones.BaseDeDepuracionDeRegistros);
         servicios.AgregarIdentidad(opciones.Identidad, soloEnModoNormal, AlcanceDelSistemaDeIdentidad, _ => depuracionDeRegistros);
@@ -347,17 +378,13 @@ public static class AnfitrionDelEcommerce
         servicios.AgregarPurgaDeSesionesWeb(modo);
         servicios.AgregarVerificacionDePersonaWeb(opciones.VerificacionWeb);
         servicios.AgregarCarrito(opciones.CostoDeEnvio, esProduccion && soloEnModoNormal);
-        if (soloEnModoNormal)
-        {
-            servicios.AgregarTrabajosDeFondoDelCarrito(sp => AlcanceDelSistemaDelCarrito(sp));
-        }
 
         servicios.AgregarTrabajosDelCarritoEnLaApi(soloEnModoNormal);
         servicios.AgregarBibliotecaPendiente();
         return opciones;
     }
 
-    /// <summary>El pipeline del E-commerce, en el orden que importa: cabeceras, errores, tope previo, credencial de servicio, sesión web, actor de servicio y límites generales; después los endpoints.</summary>
+    /// <summary>El pipeline del E-commerce, en el orden que importa: cabeceras, errores, tope previo, credencial de servicio, sesión web (que fija el actor), contexto de usuario de servicio y límites generales; después los endpoints. Los archivos estáticos se sirven antes de los topes: no llevan sesión ni datos.</summary>
     public static WebApplication UsarEcommerce(this WebApplication app)
     {
         ArgumentNullException.ThrowIfNull(app);
@@ -399,12 +426,8 @@ public static class AnfitrionDelEcommerce
         RutasConContenidoDeTerceros.Validar(fuente.Endpoints);
     }
 
-    private static Task SistemaDeIdentidad(IServiceProvider sp, Func<CancellationToken, Task> corrida, CancellationToken cancelacion) => ComoSistema(sp, corrida, cancelacion);
-
     private static Func<IServiceProvider, Infrastructure.Identidad.AlcanceDeSistemaDeIdentidad> AlcanceDelSistemaDeIdentidad =>
         sp => (corrida, cancelacion) => ComoSistema(sp, corrida, cancelacion);
-
-    private static AlcanceDeSistema AlcanceDelSistemaDelCarrito(IServiceProvider sp) => (corrida, cancelacion) => ComoSistema(sp, corrida, cancelacion);
 
     /// <summary>Fija el actor «sistema» alrededor de una corrida de fondo (nunca el de una persona) y lo limpia al terminar.</summary>
     private static async Task ComoSistema(IServiceProvider sp, Func<CancellationToken, Task> corrida, CancellationToken cancelacion)
@@ -420,4 +443,14 @@ public static class AnfitrionDelEcommerce
             actor.Limpiar();
         }
     }
+}
+
+/// <summary>El correo como adaptador saliente hacia un proveedor (la cuenta SMTP): es nulo cuando no hay servidor o el modo no es el normal, y <see cref="ArranqueSeguro.ExigirCoherencia"/> lo comprueba.</summary>
+internal sealed class AdaptadorSalienteDelCorreo(bool esNulo) : IAdaptadorSaliente
+{
+    public string Nombre => "correo";
+
+    public bool EsHaciaProveedor => true;
+
+    public bool EsNulo => esNulo;
 }

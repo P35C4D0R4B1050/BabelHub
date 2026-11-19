@@ -70,6 +70,7 @@ public sealed class AnfitrionDelEcommerceTests
     {
         [OpcionesDelAnfitrionDelEcommerce.RutaDelRedis] = "redis-contadores.interno:6379",
         [OpcionesDelAnfitrionDelEcommerce.RutaDeLosProxies] = "10.0.0.0/8",
+        ["Ecommerce:Redis:Tls"] = "1",
         ["Correo:Smtp:Servidor"] = "smtp.example.org",
         ["Correo:Smtp:Cuenta"] = "avisos@example.org",
         ["Correo:Smtp:Credencial"] = Secreto(),
@@ -102,7 +103,7 @@ public sealed class AnfitrionDelEcommerceTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEG-11")]
+    [Trait("Criterio", "AC-SEG-25")]
     public async Task ConLaConfiguracionCompleta_ElGrafoSeValida_YLaSuperficieDeServicioDeclaraTodasSusOperaciones()
     {
         await using var app = Compuesto();
@@ -155,7 +156,7 @@ public sealed class AnfitrionDelEcommerceTests
 
     [Theory]
     [MemberData(nameof(Variables))]
-    [Trait("Criterio", "AC-SEG-11")]
+    [Trait("Criterio", "AC-SEG-25")]
     public void SiFaltaUnaVariableObligatoria_ElArranqueFalla_NombrandolaYSinValores(string ruta)
     {
         var configuracion = ConfiguracionCompleta();
@@ -169,7 +170,7 @@ public sealed class AnfitrionDelEcommerceTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEG-11")]
+    [Trait("Criterio", "AC-SEG-25")]
     public void LaClaveDelCursor_NoPuedeRepetirUnSecretoComun_YLasCuentasDeBaseDebenSerDistintas()
     {
         var configuracion = ConfiguracionCompleta();
@@ -184,7 +185,7 @@ public sealed class AnfitrionDelEcommerceTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-SEG-11")]
+    [Trait("Criterio", "AC-SEG-25")]
     public void EnProduccion_ConUnAdaptadorProvisional_ElArranqueFalla_NombrandoloYSoloEnElModoNormal()
     {
         var configuracion = ConfiguracionCompleta();
@@ -199,6 +200,86 @@ public sealed class AnfitrionDelEcommerceTests
 
         Assert.Contains("ICancelacionDeAvisos", falla.Message, StringComparison.Ordinal);
         restauracion.AgregarEcommerce(ModoDeArranque.Restauracion);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-25")]
+    public void UnSecretoNuevo_NoPuedeRepetirOtro_NiLaClaveDeSesionesNiLaPimientaNiLaCredencialDelCorreo()
+    {
+        var casos = new (string Ruta, Func<Dictionary<string, string?>, string?> Valor)[]
+        {
+            ("Web:ClaveDeSesionesTienda", c => c["Seguridad:Credenciales:Historial"]),
+            ("Web:ClaveDeSesionesTienda", c => c["Seguridad:ClaveDeHuella"]![(c["Seguridad:ClaveDeHuella"]!.IndexOf(':') + 1)..]),
+            ("Identidad:Pimienta", c => c["Auditoria:ClaveDeCursor"]),
+            ("Correo:Smtp:Credencial", c => c["Catalogo:ClaveDeIngresos"]),
+            ("Almacen:Supresiones:ClaveSecreta", c => c["Almacen:Catalogo:ClaveSecreta"]),
+            (OpcionesDelAnfitrionDelEcommerce.RutaDeLaClaveDeLaCola, c => c["Web:ClaveDeSesionesTienda"]),
+        };
+
+        foreach (var (ruta, valor) in casos)
+        {
+            var configuracion = ConfiguracionCompleta();
+            configuracion["Correo:Smtp:Servidor"] = "smtp.example.org";
+            configuracion["Correo:Smtp:Cuenta"] = "avisos@example.org";
+            configuracion["Correo:Smtp:Remitente"] = "avisos@example.org";
+            configuracion["Correo:Smtp:Credencial"] = Secreto();
+            var repetido = valor(configuracion)!;
+            configuracion[ruta] = ruta == "Identidad:Pimienta" ? "v1:" + repetido : repetido;
+
+            var excepcion = Record.Exception(() => OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: false));
+            Assert.True(excepcion is ConfiguracionDeSecretosInvalidaException, "Sin fallo para " + ruta + ": " + excepcion?.GetType().Name + " " + excepcion?.Message);
+            var falla = (ConfiguracionDeSecretosInvalidaException)excepcion!;
+
+            Assert.Contains(LectorDeSecretos.Variable(ruta), falla.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain(repetido, falla.Message, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-22")]
+    public async Task EnElEnsayo_ElCorreoEsNuloAunqueHayaSmtp_YEnElModoNormalNo()
+    {
+        var configuracion = ConfiguracionCompleta();
+        foreach (var (ruta, valor) in ConfiguracionDeProduccion())
+        {
+            configuracion[ruta] = valor;
+        }
+
+        static WebApplication Con(Dictionary<string, string?> c, ModoDeArranque modo)
+        {
+            var builder = Constructor(c, "Development");
+            builder.Services.AddSingleton(typeof(ModoDeArranque), modo);
+            builder.AgregarEcommerce(modo);
+            return builder.Build();
+        }
+
+        await using var ensayo = Con(configuracion, ModoDeArranque.Ensayo);
+        await using var normal = Con(configuracion, ModoDeArranque.Normal);
+
+        var deEnsayo = ensayo.Services.GetServices<IAdaptadorSaliente>().Where(a => a.EsHaciaProveedor).ToList();
+        var deNormal = normal.Services.GetServices<IAdaptadorSaliente>().Where(a => a.EsHaciaProveedor).ToList();
+        Assert.All(deEnsayo, a => Assert.True(a.EsNulo, a.Nombre));
+        Assert.Contains(deNormal, a => a.Nombre == "correo" && !a.EsNulo);
+        ArranqueSeguro.ExigirCoherencia(ModoDeArranque.Ensayo, esProduccion: false, deEnsayo);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-25")]
+    public void EnProduccion_ElRedisExigeTls_YLasCuentasDeBaseSinContrasenaNoArrancan()
+    {
+        var configuracion = ConfiguracionCompleta();
+        foreach (var (ruta, valor) in ConfiguracionDeProduccion())
+        {
+            configuracion[ruta] = valor;
+        }
+
+        configuracion.Remove("Ecommerce:Redis:Tls");
+        configuracion[OpcionesDelAnfitrionDelEcommerce.RutaDeLaBaseDeLaAplicacion] = new NpgsqlConnectionStringBuilder { Host = "localhost", Database = "ecommerce", Username = "acceso" }.ConnectionString;
+
+        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: true));
+
+        Assert.Contains("BABELHUB__Ecommerce__Redis__Tls", falla.Message, StringComparison.Ordinal);
+        Assert.Contains("BABELHUB__Ecommerce__Base__Aplicacion", falla.Message, StringComparison.Ordinal);
     }
 
     [Fact]

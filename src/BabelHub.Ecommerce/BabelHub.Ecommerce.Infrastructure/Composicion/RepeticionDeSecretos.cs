@@ -9,7 +9,7 @@ namespace BabelHub.Ecommerce.Infrastructure.Composicion;
 /// </summary>
 public static class RepeticionDeSecretos
 {
-    private static readonly string[] Secciones = ["Seguridad", "Integraciones", "Restauracion"];
+    private static readonly string[] Secciones = ["Seguridad", "Integraciones", "Restauracion", "Web", "Identidad", "Correo", "Almacen"];
     private static readonly string[] RutasSueltas = ["Auditoria:ClaveDeCursor", "Catalogo:ClaveDeIngresos"];
 
     public static void Comprobar(LectorDeSecretos lector, IConfiguration configuracion, string rutaPropia, string valor)
