@@ -150,6 +150,30 @@ public sealed class PagosConPostgresTests(PostgresDePagosFixture bd) : IAsyncLif
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PAG-12")]
+    public async Task Un_pago_que_queda_pendiente_y_luego_se_aprueba_avisa_por_correo_cada_paso_sin_datos_de_pago()
+    {
+        var pedido = await ComprasDePrueba.Sembrar(_entorno);
+        var clave = await Clave(pedido);
+        await Cobrar(pedido, clave, MedioDelContrato.Tarjeta, EscenariosDelSimulador.Lento);
+        _entorno.Reloj.Avanzar(TimeSpan.FromMinutes(1));
+        using (var alcance = _entorno.Alcance())
+        {
+            await alcance.ServiceProvider.GetRequiredService<ConsultarPagosPendientes>().Ejecutar(50);
+            await alcance.ServiceProvider.GetRequiredService<ReanudarComprasAprobadas>().Ejecutar(50);
+            await alcance.ServiceProvider.GetRequiredService<EnviarAvisosDePago>().Ejecutar(50);
+        }
+
+        // Uno al quedar pendiente y otro al aprobarse, al correo de la cuenta, sin el token del medio, la referencia ni el contacto de entrega.
+        Assert.Equal(2, _entorno.Correo.Correos.Count);
+        Assert.All(_entorno.Correo.Correos, c => Assert.Equal("ana.perez@correo.example", c.Destinatario));
+        var texto = string.Join('|', _entorno.Correo.Correos.SelectMany(c => c.Datos.Values.Append(c.Plantilla)));
+        Assert.DoesNotContain("tok_", texto, StringComparison.Ordinal);
+        Assert.DoesNotContain("Olivos", texto, StringComparison.Ordinal);
+        Assert.Equal(2, await Contar("avisos_de_pago", "estado = 'enviado'"));
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-PAG-15")]
     public async Task Un_pago_que_sigue_sin_respuesta_se_consulta_cada_minuto_y_a_los_treinta_minutos_la_intencion_vence()
     {
