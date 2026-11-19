@@ -357,7 +357,7 @@ public sealed class PostgresRepositorioDeBajas(AccesoAlEsquemaDeIdentidad acceso
                 await using var comando = AccesoAlEsquemaDeIdentidad.Comando(
                     c,
                     t,
-                    "SELECT identificador_opaco, creada_en, entregada_en, cerrada_en FROM identidad.bajas_titulares WHERE entregada_en IS NULL OR cerrada_en IS NULL ORDER BY creada_en, identificador_opaco LIMIT @limite",
+                    "SELECT identificador_opaco, creada_en, entregada_en, cerrada_en FROM identidad.bajas_titulares WHERE entregada_en IS NULL OR cerrada_en IS NULL ORDER BY creada_en, identificador_opaco LIMIT @limite FOR UPDATE SKIP LOCKED",
                     ("limite", limite));
                 var bajas = new List<BajaDeTitular>();
                 await using var filas = await comando.ExecuteReaderAsync(ct).ConfigureAwait(false);
