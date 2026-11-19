@@ -130,7 +130,7 @@ public sealed class CancelarYAnularPedidoTests
             Assert.Empty(entorno.Reembolsos.Registrados);
             Assert.Empty(entorno.Repositorio.Anulaciones);
             var auditoria = Assert.Single(entorno.Auditoria.Solicitudes);
-            Assert.Equal(ResultadoAuditado.Rechazado, auditoria.Resultado);
+            Assert.Equal((AccionesAuditables.AnulacionDePedidoRechazada, ResultadoAuditado.Rechazado, "cancelacion"), (auditoria.Accion, auditoria.Resultado, auditoria.Detalle["operacion"]));
         }
     }
 
@@ -363,7 +363,7 @@ public sealed class CancelarYAnularPedidoTests
 
         Assert.Equal((CategoriaDeError.Conflicto, "pedido-sin-lineas-anulables"), (resultado.Error!.Categoria, resultado.Error.Clave));
         var auditoria = Assert.Single(soloDigital.Auditoria.Solicitudes);
-        Assert.Equal(ResultadoAuditado.Rechazado, auditoria.Resultado);
+        Assert.Equal((AccionesAuditables.AnulacionDePedidoRechazada, ResultadoAuditado.Rechazado, "sin-impresas-por-salir"), (auditoria.Accion, auditoria.Resultado, auditoria.Detalle["motivoDeRechazo"]));
         Assert.Empty(soloDigital.Repositorio.Anulaciones);
         Assert.Empty(soloDigital.Accesos.Revocados);
 
