@@ -68,14 +68,14 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **ECO-2c** | `ecommerce-catalogo` T14–T23: Infraestructura, Api, matriz de autorización, integración con S3 e Inventario simulado, trabajos de fondo | C | AUD-4; ampliación de `IClienteDelInventario` y del almacén (carril A) | ☑ |
 | **ECO-2d** | `ecommerce-catalogo` T24–T28: pantallas del catálogo y de la administración, documentos y E2E | B/C/E | WEB-1d | ☑ (T24–T28; Playwright escrito y sin ejecutar, CSS sin compilar y composición del Catálogo pendientes antes de `spec-verify`) |
 | **ECO-3** | Planificar `ecommerce-carrito-checkout`, `ecommerce-pagos` y `ecommerce-pedidos` | C | ECO-2 | ☑ (planes aprobados el 2026-11-18) |
-| **ECO-4** | `ecommerce-carrito-checkout` (reservas e idempotencia) | C | ECO-3, INV-2 | ▶ (subbloques ECO-4a a 4e, T01–T37; ECO-4a y ECO-4b hechos y fundidos, T01–T13; ECO-4c (T14–T23) en curso; la T26b necesita piezas del carril A) |
-| **ECO-5** | `ecommerce-pagos` (pasarela de pruebas de Culqi) | C | ECO-4; B05 (persona) | ▶ (ECO-5a hecho y fundido; subbloques ECO-5a a 5f, T01–T38; 5f condicionado a B05) |
+| **ECO-4** | `ecommerce-carrito-checkout` (reservas e idempotencia) | C | ECO-3, INV-2 | ▶ (subbloques ECO-4a a 4e, T01–T37; ECO-4a a ECO-4d hechos y fundidos (T01–T32 y T37, salvo T25b y T26c que esperan al carril A); faltan T33–T36, pantallas y E2E) |
+| **ECO-5** | `ecommerce-pagos` (pasarela de pruebas de Culqi) | C | ECO-4; B05 (persona) | ▶ (ECO-5a a ECO-5c hechos y fundidos (T01–T23); subbloques ECO-5a a 5f, T01–T38; 5f condicionado a B05) |
 | **ECO-6** | `ecommerce-pedidos` | E | ECO-5 | ☐ (subbloques ECO-6a a 6f, T01–T42) |
 | **ECO-7** | Planificar biblioteca digital, envíos, devoluciones y libro de reclamaciones | C | ECO-6 | ☑ (planes aprobados el 2026-11-18) |
 | **ECO-8** | `ecommerce-biblioteca-digital` (archivos y URLs firmadas) | C | ECO-7 | ☐ (ECO-8a a 8e, T01–T26) |
 | **ECO-9** | `ecommerce-envios` | E | ECO-7 | ☐ (ECO-9a a 9e, T01–T25) |
 | **ECO-10** | `ecommerce-devoluciones` | E | ECO-9 | ☐ (ECO-10a a 10f, T01–T34) |
-| **ECO-11** | `ecommerce-libro-reclamaciones` | E | ECO-7 | ☐ (ECO-11a a 11d, T01–T23) |
+| **ECO-11** | `ecommerce-libro-reclamaciones` | E | ECO-7 | ▶ (ECO-11a hecho; ECO-11b a 11d, T01–T23) |
 | **ECO-12** | `asistente-compra-ia` | C | ECO-6; B06 (persona) | ☐ |
 | **ECO-13** | `web-indice-infinito` | B | WEB-1d | ☐ |
 
