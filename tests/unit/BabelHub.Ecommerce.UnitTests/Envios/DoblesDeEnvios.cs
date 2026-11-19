@@ -2,6 +2,7 @@ using BabelHub.Ecommerce.Application.Envios.Interno;
 using BabelHub.Ecommerce.Application.Pedidos;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Envios;
+using BabelHub.Ecommerce.UnitTests.Auditoria;
 using BabelHub.Ecommerce.UnitTests.Catalogo;
 
 namespace BabelHub.Ecommerce.UnitTests.Envios;
@@ -230,4 +231,77 @@ internal sealed class AuditoriaDeEnviosEspia : BabelHub.Ecommerce.Application.Au
     public object Capturar() => _solicitudes.ToList();
 
     public void Restaurar(object instantanea) => _solicitudes = (List<BabelHub.Ecommerce.Application.Auditoria.SolicitudDeRegistro>)instantanea;
+}
+
+/// <summary>El contacto de entrega que lee Envíos (contrato de Pedidos): sembrado por pedido; sin sembrar, no disponible (falla cerrado). Cuenta las lecturas y si ocurrieron dentro de una transacción.</summary>
+internal sealed class ContactoDeEntregaDoble(UnidadDeTrabajoReversible unidad) : IContactoDeEntregaDelPedido
+{
+    private readonly Dictionary<Guid, LecturaDelContactoDeEntrega> _lecturas = [];
+
+    public int Lecturas { get; private set; }
+
+    public int LecturasDentroDeLaTransaccion { get; private set; }
+
+    public void Sembrar(Guid pedidoId, LecturaDelContactoDeEntrega lectura) => _lecturas[pedidoId] = lectura;
+
+    public void SembrarDisponible(Guid pedidoId) =>
+        Sembrar(pedidoId, LecturaDelContactoDeEntrega.Disponible(new ContactoDeEntrega("Ana Pérez Quispe", "987654321", "Av. Los Olivos 123", "Ayacucho")));
+
+    public Task<LecturaDelContactoDeEntrega> Leer(Guid pedidoId, CancellationToken cancelacion = default)
+    {
+        Lecturas++;
+        if (unidad.EnCurso)
+        {
+            LecturasDentroDeLaTransaccion++;
+        }
+
+        return Task.FromResult(_lecturas.TryGetValue(pedidoId, out var lectura) ? lectura : LecturaDelContactoDeEntrega.NoDisponible());
+    }
+}
+
+/// <summary>
+/// El operador logístico simulado de las pruebas: idempotente por clave de solicitud (la misma clave devuelve la misma guía), con modos de no respuesta, rechazo y respuesta inválida. Guarda lo que recibió
+/// y si la llamada ocurrió dentro de una transacción.
+/// </summary>
+internal sealed class OperadorLogisticoDoble(UnidadDeTrabajoReversible unidad) : IOperadorLogistico
+{
+    private readonly Dictionary<Guid, NumeroDeGuia> _guias = [];
+    private int _secuencia;
+
+    public string Nombre => "operador-a";
+
+    public ResultadoDelOperador? Forzado { get; set; }
+
+    /// <summary>Se ejecuta durante la llamada al operador: simula lo que pasa mientras el operador trabaja (por ejemplo, una cancelación).</summary>
+    public Action? AlLlamar { get; set; }
+
+    public List<(Guid Clave, string Nombre, string Direccion, string Telefono)> Recibidas { get; } = [];
+
+    public int LlamadasDentroDeLaTransaccion { get; private set; }
+
+    /// <summary>Cuántas guías distintas creó el operador (para comprobar que un reintento no duplica).</summary>
+    public int GuiasCreadas => _guias.Count;
+
+    public Task<ResultadoDelOperador> CrearOObtenerGuia(Guid claveDeSolicitud, DestinatarioParaGuia destinatario, CancellationToken cancelacion = default)
+    {
+        if (unidad.EnCurso)
+        {
+            LlamadasDentroDeLaTransaccion++;
+        }
+
+        Recibidas.Add((claveDeSolicitud, destinatario.Nombre, destinatario.Direccion, destinatario.Telefono));
+        AlLlamar?.Invoke();
+        if (Forzado is { } forzado)
+        {
+            return Task.FromResult(forzado);
+        }
+
+        if (!_guias.TryGetValue(claveDeSolicitud, out var numero))
+        {
+            numero = NumeroDeGuia.Crear($"GUIA-{++_secuencia:D6}");
+            _guias[claveDeSolicitud] = numero;
+        }
+
+        return Task.FromResult<ResultadoDelOperador>(new ResultadoDelOperador.GuiaCreada(numero));
+    }
 }

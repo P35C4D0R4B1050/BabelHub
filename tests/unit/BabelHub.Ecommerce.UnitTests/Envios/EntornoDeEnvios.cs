@@ -1,5 +1,6 @@
 using BabelHub.Ecommerce.Application.Envios.Interno;
 using BabelHub.Ecommerce.Application.Pedidos;
+using BabelHub.Ecommerce.UnitTests.Auditoria;
 using BabelHub.Ecommerce.UnitTests.Catalogo;
 using BabelHub.Ecommerce.UnitTests.Plataforma;
 using BabelHub.Ecommerce.UnitTests.Soporte;
@@ -21,6 +22,11 @@ internal sealed class EntornoDeEnvios
         Pedidos = new PedidosParaEnviosDoble(Unidad);
         Denegaciones = new DenegacionesDelCatalogoEspia();
 
+        Contactos = new ContactoDeEntregaDoble(Unidad);
+        Operador = new OperadorLogisticoDoble(Unidad);
+        Alertas = new AlertasTecnicasEspia();
+        var autorizador = new AutorizadorDeEnvios(Actor, Denegaciones);
+        SolicitarGuia = new SolicitarGuia(autorizador, Envios, Contactos, Operador, Unidad, Auditoria, Alertas, Reloj);
         Crear = new CrearEnvio(Pedidos, Envios, Reloj);
         Cancelar = new CancelarEnviosDelPedido(Envios, Auditoria, Reloj);
         Despacho = new DespachoDeEnviosDeLaAplicacion(Crear, Cancelar);
@@ -39,6 +45,14 @@ internal sealed class EntornoDeEnvios
     public AuditoriaDeEnviosEspia Auditoria { get; }
 
     public DenegacionesDelCatalogoEspia Denegaciones { get; }
+
+    public ContactoDeEntregaDoble Contactos { get; }
+
+    public OperadorLogisticoDoble Operador { get; }
+
+    public AlertasTecnicasEspia Alertas { get; }
+
+    public SolicitarGuia SolicitarGuia { get; }
 
     public CrearEnvio Crear { get; }
 
