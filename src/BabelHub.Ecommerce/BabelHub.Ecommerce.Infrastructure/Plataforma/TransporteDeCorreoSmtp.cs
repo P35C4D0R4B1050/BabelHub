@@ -44,9 +44,9 @@ public sealed class OpcionesDelCorreoSmtp
 
     public int Puerto { get; }
 
-    public string Cuenta { get; }
+    internal string Cuenta { get; }
 
-    public string Credencial { get; }
+    internal string Credencial { get; }
 
     public string Remitente { get; }
 
@@ -120,7 +120,11 @@ public sealed class LimpiezaDeEnviadosImap(OpcionesDelCorreoSmtp opciones)
 {
     public static readonly TimeSpan Antiguedad = TimeSpan.FromDays(7);
 
-    /// <summary>Elimina los correos enviados antes del límite y devuelve cuántos; con la cuenta sin IMAP configurado no hace nada.</summary>
+    /// <summary>
+    /// Elimina los correos enviados antes del límite y devuelve cuántos; con la cuenta sin IMAP configurado no hace nada. <b>No basta marcar y expulsar</b> (con Gmail el mensaje quedaría archivado en «Todos los
+    /// mensajes»): los de Enviados se <b>mueven a la Papelera</b> y se expulsa de la Papelera todo lo anterior al límite, de modo que la dirección y el contenido no sobreviven (privacidad §1, Ley 29733). La carpeta de
+    /// enviados nunca es la bandeja de entrada.
+    /// </summary>
     public async Task<int> Vaciar(DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
         if (opciones.ServidorImap is null)
@@ -128,16 +132,33 @@ public sealed class LimpiezaDeEnviadosImap(OpcionesDelCorreoSmtp opciones)
             return 0;
         }
 
+        if (string.Equals(opciones.CarpetaDeEnviados, "INBOX", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("La carpeta de enviados no puede ser la bandeja de entrada.");
+        }
+
+        var limite = ahora.UtcDateTime - Antiguedad;
         using var cliente = new ImapClient { Timeout = (int)opciones.Espera.TotalMilliseconds };
         await cliente.ConnectAsync(opciones.ServidorImap, opciones.PuertoImap, SecureSocketOptions.SslOnConnect, cancelacion).ConfigureAwait(false);
         await cliente.AuthenticateAsync(opciones.Cuenta, opciones.Credencial, cancelacion).ConfigureAwait(false);
-        var carpeta = await cliente.GetFolderAsync(opciones.CarpetaDeEnviados, cancelacion).ConfigureAwait(false);
-        await carpeta.OpenAsync(FolderAccess.ReadWrite, cancelacion).ConfigureAwait(false);
-        var viejos = await carpeta.SearchAsync(SearchQuery.DeliveredBefore(ahora.UtcDateTime - Antiguedad), cancelacion).ConfigureAwait(false);
+        var enviados = await cliente.GetFolderAsync(opciones.CarpetaDeEnviados, cancelacion).ConfigureAwait(false);
+        var papelera = cliente.GetFolder(SpecialFolder.Trash) ?? throw new InvalidOperationException("La cuenta no tiene carpeta de papelera.");
+
+        await enviados.OpenAsync(FolderAccess.ReadWrite, cancelacion).ConfigureAwait(false);
+        var viejos = await enviados.SearchAsync(SearchQuery.DeliveredBefore(limite), cancelacion).ConfigureAwait(false);
         if (viejos.Count > 0)
         {
-            await carpeta.AddFlagsAsync(viejos, MessageFlags.Deleted, silent: true, cancelacion).ConfigureAwait(false);
-            await carpeta.ExpungeAsync(cancelacion).ConfigureAwait(false);
+            await enviados.MoveToAsync(viejos, papelera, cancelacion).ConfigureAwait(false);
+        }
+
+        await enviados.CloseAsync(expunge: false, cancelacion).ConfigureAwait(false);
+
+        await papelera.OpenAsync(FolderAccess.ReadWrite, cancelacion).ConfigureAwait(false);
+        var enLaPapelera = await papelera.SearchAsync(SearchQuery.DeliveredBefore(limite), cancelacion).ConfigureAwait(false);
+        if (enLaPapelera.Count > 0)
+        {
+            await papelera.AddFlagsAsync(enLaPapelera, MessageFlags.Deleted, silent: true, cancelacion).ConfigureAwait(false);
+            await papelera.ExpungeAsync(enLaPapelera, cancelacion).ConfigureAwait(false);
         }
 
         await cliente.DisconnectAsync(quit: true, cancelacion).ConfigureAwait(false);

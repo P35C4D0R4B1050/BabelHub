@@ -51,7 +51,8 @@ public static class DefinicionDelCorreo
         GRANT USAGE ON SCHEMA plataforma TO rol_plataforma;
         GRANT SELECT, INSERT, UPDATE ON plataforma.cuota_correo TO rol_plataforma;
         GRANT SELECT, INSERT, UPDATE ON plataforma.topes_de_alertas_de_correo TO rol_plataforma;
-        GRANT SELECT, INSERT, UPDATE, DELETE ON plataforma.correos_pendientes TO rol_plataforma;
+        GRANT SELECT, INSERT, DELETE ON plataforma.correos_pendientes TO rol_plataforma;
+        GRANT UPDATE (intentos, proximo_intento) ON plataforma.correos_pendientes TO rol_plataforma;
         """;
 }
 
@@ -182,6 +183,9 @@ public sealed class CifradorDeLaColaDeCorreo
 
     private readonly byte[] _clave;
 
+    /// <summary>El identificador de la fila y su contexto en claro (categoría y plantilla) viajan como datos asociados: cambiar la plantilla de una fila la vuelve ilegible.</summary>
+    private static byte[] DatosAsociados(Guid id, string contexto) => [.. id.ToByteArray(), .. Encoding.UTF8.GetBytes(contexto)];
+
     public CifradorDeLaColaDeCorreo(byte[] claveMaestra)
     {
         ArgumentNullException.ThrowIfNull(claveMaestra);
@@ -193,14 +197,14 @@ public sealed class CifradorDeLaColaDeCorreo
         _clave = HKDF.DeriveKey(HashAlgorithmName.SHA256, claveMaestra, 32, salt: null, info: Encoding.ASCII.GetBytes("babelhub/plataforma/cola-de-correo"));
     }
 
-    public byte[] Cifrar(ReadOnlySpan<byte> contenido, Guid id)
+    public byte[] Cifrar(ReadOnlySpan<byte> contenido, Guid id, string contexto = "")
     {
         var nonce = RandomNumberGenerator.GetBytes(BytesDelNonce);
         var cifrado = new byte[contenido.Length];
         var etiqueta = new byte[BytesDeLaEtiqueta];
         using (var aes = new AesGcm(_clave, BytesDeLaEtiqueta))
         {
-            aes.Encrypt(nonce, contenido, cifrado, etiqueta, id.ToByteArray());
+            aes.Encrypt(nonce, contenido, cifrado, etiqueta, DatosAsociados(id, contexto));
         }
 
         var resultado = new byte[1 + BytesDelNonce + BytesDeLaEtiqueta + cifrado.Length];
@@ -211,7 +215,7 @@ public sealed class CifradorDeLaColaDeCorreo
         return resultado;
     }
 
-    public byte[] Descifrar(ReadOnlySpan<byte> cifrado, Guid id)
+    public byte[] Descifrar(ReadOnlySpan<byte> cifrado, Guid id, string contexto = "")
     {
         if (cifrado.Length < 1 + BytesDelNonce + BytesDeLaEtiqueta || cifrado[0] != Version)
         {
@@ -223,7 +227,7 @@ public sealed class CifradorDeLaColaDeCorreo
         var texto = cifrado[(1 + BytesDelNonce + BytesDeLaEtiqueta)..].ToArray();
         var plano = new byte[texto.Length];
         using var aes = new AesGcm(_clave, BytesDeLaEtiqueta);
-        aes.Decrypt(nonce, texto, etiqueta, plano, id.ToByteArray());
+        aes.Decrypt(nonce, texto, etiqueta, plano, DatosAsociados(id, contexto));
         return plano;
     }
 }
@@ -243,7 +247,8 @@ public sealed class PostgresColaDeCorreosPendientes(UnidadDeTrabajoPostgres unid
         var id = Guid.NewGuid();
         var contenido = cifrador.Cifrar(
             JsonSerializer.SerializeToUtf8Bytes(new Contenido(correo.Destinatario, new Dictionary<string, string>(correo.Datos), correo.Motivo, correo.Servicio)),
-            id);
+            id,
+            $"{categoria}|{correo.Plantilla}");
         return EscrituraDePlataforma.Ejecutar(
             unidad,
             async (c, t, ct) =>
@@ -265,6 +270,15 @@ public sealed class PostgresColaDeCorreosPendientes(UnidadDeTrabajoPostgres unid
             cancelacion);
     }
 
+    /// <summary>Tras tantos intentos un correo deja de reintentarse y espera su purga (una dirección inválida no se reintenta para siempre).</summary>
+    public const int MaximoDeIntentos = 20;
+
+    /// <summary>Lo pendiente se conserva a lo sumo 30 días (la dirección cifrada incluida) y después se purga (<see cref="PurgarCaducados"/>).</summary>
+    public static readonly TimeSpan Retencion = TimeSpan.FromDays(30);
+
+    /// <summary>Lo que no se puede descifrar se aparta un día para no ocupar el turno de las demás filas (<see cref="Vencidos"/>).</summary>
+    public static readonly TimeSpan ApartadoDeLoIlegible = TimeSpan.FromDays(1);
+
     public Task<IReadOnlyList<CorreoPendiente>> Vencidos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(limite, 1);
@@ -272,37 +286,65 @@ public sealed class PostgresColaDeCorreosPendientes(UnidadDeTrabajoPostgres unid
             unidad,
             async (c, t, ct) =>
             {
-                await using var comando = new NpgsqlCommand(
-                    "SELECT id, categoria, prioridad, plantilla, contenido, intentos, creada FROM plataforma.correos_pendientes WHERE proximo_intento <= @ahora ORDER BY prioridad, creada, id LIMIT @limite",
-                    c,
-                    t);
-                comando.Parameters.AddWithValue("ahora", ahora.ToUniversalTime());
-                comando.Parameters.AddWithValue("limite", limite);
                 var correos = new List<CorreoPendiente>();
-                await using var filas = await comando.ExecuteReaderAsync(ct).ConfigureAwait(false);
-                while (await filas.ReadAsync(ct).ConfigureAwait(false))
+                var ilegibles = new List<Guid>();
+                await using (var comando = new NpgsqlCommand(
+                    "SELECT id, categoria, prioridad, plantilla, contenido, intentos, creada FROM plataforma.correos_pendientes WHERE proximo_intento <= @ahora AND intentos < @maximo ORDER BY prioridad, creada, id LIMIT @limite",
+                    c,
+                    t))
                 {
-                    try
+                    comando.Parameters.AddWithValue("ahora", ahora.ToUniversalTime());
+                    comando.Parameters.AddWithValue("maximo", MaximoDeIntentos);
+                    comando.Parameters.AddWithValue("limite", limite);
+                    await using var filas = await comando.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                    while (await filas.ReadAsync(ct).ConfigureAwait(false))
                     {
                         var id = filas.GetGuid(0);
-                        var contenido = JsonSerializer.Deserialize<Contenido>(cifrador.Descifrar((byte[])filas.GetValue(4), id))!;
-                        correos.Add(new CorreoPendiente(
-                            id,
-                            new CorreoSaliente(Categoria(filas.GetString(1)), contenido.Destinatario, filas.GetString(3), contenido.Datos, contenido.Motivo, contenido.Servicio),
-                            filas.GetInt16(2),
-                            filas.GetInt32(5),
-                            filas.GetFieldValue<DateTimeOffset>(6)));
+                        try
+                        {
+                            var categoria = filas.GetString(1);
+                            var plantilla = filas.GetString(3);
+                            var contenido = JsonSerializer.Deserialize<Contenido>(cifrador.Descifrar((byte[])filas.GetValue(4), id, $"{categoria}|{plantilla}"))!;
+                            correos.Add(new CorreoPendiente(
+                                id,
+                                new CorreoSaliente(Categoria(categoria), contenido.Destinatario, plantilla, contenido.Datos, contenido.Motivo, contenido.Servicio),
+                                filas.GetInt16(2),
+                                filas.GetInt32(5),
+                                filas.GetFieldValue<DateTimeOffset>(6)));
+                        }
+                        catch (Exception e) when (e is CryptographicException or JsonException or ArgumentException)
+                        {
+                            ilegibles.Add(id);
+                        }
                     }
-                    catch (Exception e) when (e is CryptographicException or JsonException or ArgumentException)
-                    {
-                        // Una fila que no se puede leer no detiene las demás; sigue en la cola y se ve en el recuento de pendientes.
-                    }
+                }
+
+                // Una fila que no se descifra (clave cambiada, alterada) se aparta un día y cuenta un intento: no vuelve a ocupar el turno de las demás en cada pasada y acaba en la purga.
+                foreach (var id in ilegibles)
+                {
+                    await using var apartar = new NpgsqlCommand("UPDATE plataforma.correos_pendientes SET intentos = intentos + 1, proximo_intento = @proximo WHERE id = @id", c, t);
+                    apartar.Parameters.AddWithValue("id", id);
+                    apartar.Parameters.AddWithValue("proximo", (ahora + ApartadoDeLoIlegible).ToUniversalTime());
+                    await apartar.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                 }
 
                 return correos;
             },
             cancelacion);
     }
+
+    /// <summary>Purga lo que superó la retención de 30 días o los intentos máximos (lo ilegible, lo que nunca se pudo entregar); devuelve cuántas filas quitó. Lo llama el trabajo de fondo de Plataforma (T44).</summary>
+    public Task<int> PurgarCaducados(DateTimeOffset ahora, CancellationToken cancelacion = default) =>
+        EscrituraDePlataforma.Ejecutar(
+            unidad,
+            async (c, t, ct) =>
+            {
+                await using var comando = new NpgsqlCommand("DELETE FROM plataforma.correos_pendientes WHERE creada < @limite OR intentos >= @maximo", c, t);
+                comando.Parameters.AddWithValue("limite", (ahora - Retencion).ToUniversalTime());
+                comando.Parameters.AddWithValue("maximo", MaximoDeIntentos);
+                return await comando.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            },
+            cancelacion);
 
     public Task Eliminar(Guid id, CancellationToken cancelacion = default) =>
         EscrituraDePlataforma.Ejecutar(

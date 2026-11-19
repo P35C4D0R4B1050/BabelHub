@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using BabelHub.Ecommerce.Application.Identidad.Interno;
 using BabelHub.Ecommerce.Infrastructure.Identidad;
 using System.Security.Cryptography;
@@ -263,6 +264,73 @@ public sealed class CorreoDeProduccionTests(PostgresDelCorreoFixture bd) : IClas
     }
 
     [Fact]
+    [Trait("Criterio", "AC-IDE-60")]
+    public async Task MasFilasIlegiblesQueElTurno_NoBloqueanLasDemas_YSeApartanUnDia()
+    {
+        await bd.Ejecutar("DELETE FROM plataforma.correos_pendientes");
+        var cola = new PostgresColaDeCorreosPendientes(bd.Unidad, Cifrador(), new RelojDePrueba());
+        var otraClave = new PostgresColaDeCorreosPendientes(bd.Unidad, Cifrador(), new RelojDePrueba());
+        for (var i = 0; i < 5; i++)
+        {
+            await otraClave.Agregar(Correo(CategoriaDeCorreo.AlertaALaAdministracion), 0, Ahora.AddMinutes(-5));
+        }
+
+        await cola.Agregar(Correo(CategoriaDeCorreo.Pago), 2, Ahora.AddMinutes(-1));
+
+        Assert.Empty(await cola.Vencidos(Ahora, 3));
+        var segundaPasada = await cola.Vencidos(Ahora, 3);
+
+        Assert.Equal(CategoriaDeCorreo.Pago, Assert.Single(segundaPasada).Correo.Categoria);
+        Assert.Equal(5, await bd.Consultar<long>("SELECT count(*) FROM plataforma.correos_pendientes WHERE intentos = 1 AND proximo_intento > now() + interval '10 hours'"));
+    }
+
+    [Fact]
+    public async Task LaPurga_QuitaLoQueSuperoLosTreintaDiasOLosIntentosMaximos_YConservaLoDemas()
+    {
+        await bd.Ejecutar("DELETE FROM plataforma.correos_pendientes");
+        var cola = new PostgresColaDeCorreosPendientes(bd.Unidad, Cifrador(), new RelojDePrueba());
+        await cola.Agregar(Correo(CategoriaDeCorreo.Pago), 2, Ahora);
+        await cola.Agregar(Correo(CategoriaDeCorreo.Pago), 2, Ahora);
+        await cola.Agregar(Correo(CategoriaDeCorreo.Pago), 2, Ahora);
+        var todos = await cola.Vencidos(Ahora.AddMinutes(5), 10);
+        await cola.Reprogramar(todos[0].Id, PostgresColaDeCorreosPendientes.MaximoDeIntentos, Ahora);
+        await bd.Ejecutar($"UPDATE plataforma.correos_pendientes SET creada = now() - interval '40 days' WHERE id = '{todos[1].Id}'");
+
+        var quitadas = await cola.PurgarCaducados(DateTimeOffset.UtcNow);
+
+        Assert.Equal(2, quitadas);
+        Assert.Equal(1, await bd.Consultar<long>("SELECT count(*) FROM plataforma.correos_pendientes"));
+        Assert.DoesNotContain(await cola.Vencidos(Ahora.AddMinutes(5), 10), p => p.Id == todos[0].Id);
+    }
+
+    [Fact]
+    public async Task CambiarLaPlantillaOLaCategoriaDeUnaFila_LaVuelveIlegible()
+    {
+        await bd.Ejecutar("DELETE FROM plataforma.correos_pendientes");
+        var cola = new PostgresColaDeCorreosPendientes(bd.Unidad, Cifrador(), new RelojDePrueba());
+        await cola.Agregar(Correo(CategoriaDeCorreo.Pago), 2, Ahora.AddMinutes(-1));
+        await bd.Ejecutar("UPDATE plataforma.correos_pendientes SET plantilla = 'otra-plantilla'");
+
+        Assert.Empty(await cola.Vencidos(Ahora, 10));
+    }
+
+    [Fact]
+    public async Task ElRolDeLaAplicacion_SoloActualizaLosIntentosYElProximoIntento_NuncaElContenido()
+    {
+        await using var conexion = await bd.Administracion.OpenConnectionAsync();
+        await using var transaccion = await conexion.BeginTransactionAsync();
+        await using (var cambio = new NpgsqlCommand("SET LOCAL ROLE rol_plataforma", conexion, transaccion))
+        {
+            await cambio.ExecuteNonQueryAsync();
+        }
+
+        await using var contenido = new NpgsqlCommand("UPDATE plataforma.correos_pendientes SET contenido = decode(repeat('aa', 40), 'hex')", conexion, transaccion);
+        var error = await Assert.ThrowsAsync<PostgresException>(() => contenido.ExecuteNonQueryAsync());
+
+        Assert.Equal("42501", error.SqlState);
+    }
+
+    [Fact]
     public async Task ElRolDeLaAplicacion_NoPuedeVaciarLaColaNiLaCuota()
     {
         await using var conexion = await bd.Administracion.OpenConnectionAsync();
@@ -352,6 +420,14 @@ public sealed class CorreoDeProduccionTests(PostgresDelCorreoFixture bd) : IClas
     }
 
     [Fact]
+    public async Task LaLimpiezaDeEnviados_ConLaBandejaDeEntradaComoCarpeta_SeRechazaAntesDeConectar()
+    {
+        var opciones = new OpcionesDelCorreoSmtp("smtp.example.com", 587, "cuenta@example.com", Guid.NewGuid().ToString("N"), "no-responder@example.com") { ServidorImap = "imap.invalid", CarpetaDeEnviados = "inbox" };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new LimpiezaDeEnviadosImap(opciones).Vaciar(Ahora));
+    }
+
+    [Fact]
     public async Task LaLimpiezaDeEnviadosSinImapConfigurado_NoHaceNada()
     {
         Assert.Equal(0, await new LimpiezaDeEnviadosImap(Opciones()).Vaciar(Ahora));
@@ -383,5 +459,61 @@ public sealed class CanalDeCodigosEnMemoriaTests
 
         Assert.Equal(["a@example.com", "b@example.com", "c@example.com"], salieron);
         Assert.Throws<ArgumentOutOfRangeException>(() => new CanalDeCodigosEnMemoria(0));
+    }
+}
+
+/// <summary>Los consumidores del canal de códigos (T34; IDE-65, AC-IDE-54): cada solicitud corre en su alcance y como «sistema», y un fallo no detiene a las demás.</summary>
+public sealed class ServicioDeCodigosEnSegundoPlanoTests
+{
+    private sealed class ProveedorVacio : IServiceProvider, IServiceScopeFactory, IServiceScope
+    {
+        public IServiceProvider ServiceProvider => this;
+
+        public object? GetService(Type serviceType) => serviceType == typeof(IServiceScopeFactory) ? this : null;
+
+        public IServiceScope CreateScope() => this;
+
+        public void Dispose()
+        {
+        }
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-54")]
+    public async Task UnaSolicitudQueFalla_NoDetieneLasDemas_YCadaUnaCorreComoSistemaEnSuAlcance()
+    {
+        var canal = new CanalDeCodigosEnMemoria(10);
+        var proveedor = new ProveedorVacio();
+        var procesadas = new List<string>();
+        var alcances = 0;
+        var servicio = new ServicioDeCodigosEnSegundoPlano(
+            canal,
+            proveedor,
+            async (corrida, ct) =>
+            {
+                alcances++;
+                await corrida(ct);
+            },
+            1,
+            (_, solicitud, _) =>
+            {
+                if (solicitud.CorreoNormalizado.StartsWith("falla", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Se cayó.");
+                }
+
+                procesadas.Add(solicitud.CorreoNormalizado);
+                return Task.CompletedTask;
+            });
+        foreach (var correo in new[] { "uno@example.com", "falla@example.com", "dos@example.com" })
+        {
+            canal.Encolar(new SolicitudDeCodigoEnSegundoPlano(correo, BabelHub.Ecommerce.Domain.Identidad.PropositoDeCodigo.VerificacionDeCorreo));
+        }
+
+        canal.Completar();
+        await servicio.Consumir(CancellationToken.None);
+
+        Assert.Equal(["uno@example.com", "dos@example.com"], procesadas);
+        Assert.Equal(3, alcances);
     }
 }

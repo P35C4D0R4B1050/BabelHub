@@ -42,7 +42,12 @@ public sealed class CanalDeCodigosEnMemoria : IColaDeCodigos
 /// Los consumidores del canal de códigos (T34): cada solicitud se procesa en su propio alcance de servicios y <b>como «sistema»</b> (lo fija el anfitrión por <see cref="AlcanceDeSistemaDeIdentidad"/>); busca la cuenta,
 /// genera el código y lo envía por el transporte sin cola ni reintento. Un fallo de una solicitud no detiene a las demás ni al servicio: la persona pide otro código.
 /// </summary>
-public sealed class ServicioDeCodigosEnSegundoPlano(CanalDeCodigosEnMemoria canal, IServiceScopeFactory fabrica, AlcanceDeSistemaDeIdentidad alcanceDeSistema, int consumidores = ServicioDeCodigosEnSegundoPlano.ConsumidoresPorDefecto) : BackgroundService
+public sealed class ServicioDeCodigosEnSegundoPlano(
+    CanalDeCodigosEnMemoria canal,
+    IServiceScopeFactory fabrica,
+    AlcanceDeSistemaDeIdentidad alcanceDeSistema,
+    int consumidores = ServicioDeCodigosEnSegundoPlano.ConsumidoresPorDefecto,
+    Func<IServiceProvider, SolicitudDeCodigoEnSegundoPlano, CancellationToken, Task>? procesar = null) : BackgroundService
 {
     public const int ConsumidoresPorDefecto = 4;
 
@@ -61,7 +66,7 @@ public sealed class ServicioDeCodigosEnSegundoPlano(CanalDeCodigosEnMemoria cana
                         async ct =>
                         {
                             using var alcance = fabrica.CreateScope();
-                            await alcance.ServiceProvider.GetRequiredService<ProcesarSolicitudDeCodigo>().Ejecutar(solicitud, ct).ConfigureAwait(false);
+                            await (procesar is null ? alcance.ServiceProvider.GetRequiredService<ProcesarSolicitudDeCodigo>().Ejecutar(solicitud, ct) : procesar(alcance.ServiceProvider, solicitud, ct)).ConfigureAwait(false);
                         },
                         cancelacion).ConfigureAwait(false);
                 }
