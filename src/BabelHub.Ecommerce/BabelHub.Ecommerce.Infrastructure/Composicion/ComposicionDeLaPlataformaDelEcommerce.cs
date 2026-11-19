@@ -38,9 +38,6 @@ public static class ComposicionDeLaPlataformaDelEcommerce
         ArgumentNullException.ThrowIfNull(declaraciones);
 
         servicios.AddSingleton<IReloj, RelojDelSistema>();
-        servicios.AddSingleton<ActorDelFlujo>();
-        servicios.AddSingleton<IActorActual>(sp => sp.GetRequiredService<ActorDelFlujo>());
-        servicios.AddSingleton<IEstablecedorDeActor>(sp => sp.GetRequiredService<ActorDelFlujo>());
         servicios.AddSingleton(aplicacion);
         servicios.AddSingleton(sp => new UnidadDeTrabajoPostgres(sp.GetRequiredService<NpgsqlDataSource>()));
         servicios.AddSingleton<IUnidadDeTrabajo>(sp => sp.GetRequiredService<UnidadDeTrabajoPostgres>());
@@ -70,7 +67,8 @@ public static class ComposicionDeLaPlataformaDelEcommerce
     {
         var opciones = ConfigurationOptions.Parse(redis.Direccion);
         opciones.User = redis.Usuario;
-        opciones.Password = redis.Clave.Revelar();
+        var clave = redis.Clave.Revelar();
+        opciones.Password = clave;
         opciones.Ssl = redis.ConTls;
         opciones.AbortOnConnectFail = false;
         opciones.ConnectTimeout = 2000;

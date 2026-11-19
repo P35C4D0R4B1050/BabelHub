@@ -4,6 +4,7 @@ using BabelHub.Ecommerce.Application.Plataforma.Interno;
 using BabelHub.Ecommerce.Application.Web;
 using BabelHub.Ecommerce.Application.Web.Interno;
 using BabelHub.Ecommerce.Domain.Plataforma;
+using BabelHub.Ecommerce.Domain.Web;
 using BabelHub.Ecommerce.Infrastructure.Plataforma;
 using BabelHub.Ecommerce.Infrastructure.Web;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +26,7 @@ public static class ComposicionDeLaSesionWeb
 
         servicios.TryAddSingleton<ICifradorDeSecretosDeSesion>(new AesGcmCifradorDeSecretosDeSesion(claves));
         servicios.TryAddSingleton<IAleatoriosSeguros, AleatoriosSeguros>();
+        servicios.TryAddSingleton(typeof(HostDeSesion), _ => claves.Host);
         servicios.TryAddSingleton<LimitadorDeRenovaciones>();
         servicios.TryAddScoped<IAlmacenDeSesionesWeb, AlmacenDeSesionesWebPostgres>();
         servicios.TryAddScoped<IAlmacenDeBorradores, AlmacenDeBorradoresPostgres>();
@@ -35,7 +37,7 @@ public static class ComposicionDeLaSesionWeb
         servicios.TryAddScoped<IVaciadoDeLaWeb, VaciadoDeLaWebPostgres>();
         servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IPasoDeRestauracion, PasoDeRestauracionDeSesionesWeb>());
         servicios.TryAddScoped<PurgarSesionesWeb>();
-        servicios.TryAddScoped<TrabajoDePurgaDeSesionesWeb>();
+        servicios.TryAddSingleton(sp => new TrabajoDePurgaDeSesionesWeb(sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<IRegistroDeTrabajosDeFondo>(), new AlertasTecnicasPorCorrida(sp.GetRequiredService<IServiceScopeFactory>()), sp.GetRequiredService<IReloj>()));
 
         // Las claves de Data Protection (antiforgery) viven cifradas en la base del host, no en el disco del contenedor (T12).
         servicios.AddDataProtection();
@@ -68,5 +70,15 @@ public static class ComposicionDelCorreo
         servicios.TryAddScoped(sp => new CuotaDeCorreo(sp.GetRequiredService<PoliticaDeCuotaDeCorreo>(), sp.GetRequiredService<IAlmacenDeCuotaDeCorreo>(), sp.GetRequiredService<IPublicadorDeAlertasTecnicas>(), sp.GetRequiredService<IReloj>()));
         servicios.TryAddScoped<IEnviadorDeCorreo, EnviadorDeCorreoDeProduccion>();
         return servicios;
+    }
+}
+
+/// <summary><see cref="IPublicadorDeAlertasTecnicas"/> para un trabajo que vive más que una solicitud: cada alerta se publica en su propio alcance y nunca interrumpe.</summary>
+public sealed class AlertasTecnicasPorCorrida(IServiceScopeFactory fabrica) : IPublicadorDeAlertasTecnicas
+{
+    public async Task Publicar(AlertaTecnica alerta, CancellationToken cancelacion = default)
+    {
+        await using var alcance = fabrica.CreateAsyncScope();
+        await alcance.ServiceProvider.GetRequiredService<IPublicadorDeAlertasTecnicas>().Publicar(alerta, cancelacion).ConfigureAwait(false);
     }
 }

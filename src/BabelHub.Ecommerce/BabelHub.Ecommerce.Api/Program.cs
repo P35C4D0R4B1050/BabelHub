@@ -13,7 +13,7 @@ var modo = ArranqueSeguro.Resolver(
     TimeProvider.System.GetUtcNow(),
     new AlmacenDeNoncesEnArchivos(builder.Configuration["Restauracion:CarpetaDeMarcas"] ?? "/var/lib/babelhub/marcas"));
 builder.Services.AddSingleton(typeof(ModoDeArranque), modo);
-builder.Services.AddSingleton<EjecutorDePasosDeRestauracion>();
+builder.Services.AddScoped<EjecutorDePasosDeRestauracion>();
 builder.Services.AddControllersWithViews();
 // Detrás del borde la aplicación recibe HTTP: solo se toma el esquema (X-Forwarded-Proto) para que las cookies __Host- y el antiforgery vean HTTPS. El Api solo es alcanzable desde la red del borde (SEG-17); el origen del cliente lo fija
 // OrigenDelBorde con la lista de proxies conocidos (BABELHUB__Ecommerce__ProxiesConocidos).
@@ -35,7 +35,8 @@ if (modo == ModoDeArranque.Restauracion)
 {
     // Antes de abrir: solo los pasos de restauración, en orden, sin trabajos de fondo ni adaptadores hacia proveedores. El servicio no
     // escucha: termina con 0 si puede abrirse y con 1 si no, y restaurar.sh lo arranca después en modo normal.
-    var resultado = await app.Services.GetRequiredService<EjecutorDePasosDeRestauracion>().Ejecutar();
+    await using var alcance = app.Services.CreateAsyncScope();
+    var resultado = await alcance.ServiceProvider.GetRequiredService<EjecutorDePasosDeRestauracion>().Ejecutar();
     foreach (var paso in resultado.PasosEjecutados)
     {
         Console.WriteLine($"paso: {paso}");

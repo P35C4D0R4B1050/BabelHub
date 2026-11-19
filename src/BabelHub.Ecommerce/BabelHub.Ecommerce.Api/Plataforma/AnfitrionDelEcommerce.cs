@@ -295,6 +295,9 @@ public static class AnfitrionDelEcommerce
         // ---------- Plataforma ----------
         servicios.AgregarManejoDeErrores(new OpcionesDeErrores("ECO"));
         servicios.AddHttpContextAccessor();
+        servicios.AddSingleton<ActorDelFlujo>();
+        servicios.AddSingleton<IActorActual>(sp => sp.GetRequiredService<ActorDelFlujo>());
+        servicios.AddSingleton<IEstablecedorDeActor>(sp => sp.GetRequiredService<ActorDelFlujo>());
         servicios.AddScoped<IOrigenDeSolicitud, OrigenDeLaSolicitudHttp>();
         servicios.AgregarOrigenDelBorde(new OpcionesDeOrigenDelBorde(opciones.Proxies.Count > 0 ? opciones.Proxies : ["127.0.0.1", "::1"], aceptarDireccionesInternas: !esProduccion));
         servicios.AgregarLimitesHttp(new OpcionesDeLimitesHttp
@@ -323,7 +326,7 @@ public static class AnfitrionDelEcommerce
         // ---------- Correo, supresiones e Identidad ----------
         servicios.AddSingleton<IRegistroDeSupresiones>(_ => new RegistroDeSupresionesEnObjetos(ClienteDelAlmacenDeObjetos.Crear(opciones.AlmacenDeSupresiones), opciones.AlmacenDeSupresiones.Contenedor));
         servicios.AgregarCorreoDelEcommerce(opciones.ClaveDeLaCola, opciones.Smtp);
-        servicios.AgregarNotificacionesPendientes(esProduccion);
+        servicios.AgregarNotificacionesPendientes(esProduccion && soloEnModoNormal);
         var depuracionDeRegistros = BasesDelEcommerce.Abrir(opciones.BaseDeDepuracionDeRegistros);
         servicios.AgregarIdentidad(opciones.Identidad, soloEnModoNormal, AlcanceDelSistemaDeIdentidad, _ => depuracionDeRegistros);
         servicios.AgregarTrabajosDeIdentidad(soloEnModoNormal, AlcanceDelSistemaDeIdentidad);
@@ -343,7 +346,7 @@ public static class AnfitrionDelEcommerce
         servicios.AgregarPoliticaDeTextosPendientes();
         servicios.AgregarPurgaDeSesionesWeb(modo);
         servicios.AgregarVerificacionDePersonaWeb(opciones.VerificacionWeb);
-        servicios.AgregarCarrito(opciones.CostoDeEnvio, esProduccion);
+        servicios.AgregarCarrito(opciones.CostoDeEnvio, esProduccion && soloEnModoNormal);
         if (soloEnModoNormal)
         {
             servicios.AgregarTrabajosDeFondoDelCarrito(sp => AlcanceDelSistemaDelCarrito(sp));
