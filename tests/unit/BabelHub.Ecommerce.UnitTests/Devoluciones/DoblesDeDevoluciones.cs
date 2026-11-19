@@ -334,6 +334,7 @@ internal sealed class EntornoDeDevoluciones
         SolicitarDigital = new SolicitarReembolsoDeDigital(Autorizador, LimitesDeUso, Pedidos, Accesos, Reembolsos, Marca, Repositorio, Unidad, Auditoria, Reloj);
         Reportar = new ReportarArchivoDefectuoso(Autorizador, LimitesDeUso, Pedidos, Accesos, Marca, Repositorio, Unidad, Auditoria, Reloj);
         Decidir = new DecidirReporte(Autorizador, LimitesDeUso, Pedidos, Accesos, Biblioteca, Reembolsos, Repositorio, Unidad, Auditoria, Reloj);
+        Gestion = new AprobarYRechazarDevolucion(Autorizador, LimitesDeUso, Repositorio, Unidad, Auditoria, Reloj);
     }
 
     public ActorDePrueba Actor { get; private set; }
@@ -373,6 +374,8 @@ internal sealed class EntornoDeDevoluciones
     public ReportarArchivoDefectuoso Reportar { get; private set; } = null!;
 
     public DecidirReporte Decidir { get; private set; } = null!;
+
+    public AprobarYRechazarDevolucion Gestion { get; private set; } = null!;
 
     public ReembolsosDoble Reembolsos { get; private set; }
 
