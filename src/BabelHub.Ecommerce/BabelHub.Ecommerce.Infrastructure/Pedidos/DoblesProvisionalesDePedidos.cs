@@ -1,4 +1,6 @@
+using BabelHub.Ecommerce.Application.Biblioteca;
 using BabelHub.Ecommerce.Application.Pedidos;
+using BabelHub.Ecommerce.Application.Pedidos.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -47,6 +49,30 @@ internal sealed class PedidosParaEnviosProvisional : IPedidosParaEnvios
         Task.FromResult(Resultado<PedidoParaEnvios>.Fallo(FalloDeEnviosProvisional.NoDisponible()));
 }
 
+/// <summary>Los accesos de Biblioteca sin Biblioteca (ECO-8): no concede ni revoca nada y falla cerrado, de modo que una compra con digitales no crea el pedido y Pagos compensa.</summary>
+internal sealed class AccesosDeBibliotecaProvisional : IAccesosDeBiblioteca
+{
+    public Task<Resultado<ResultadoDeConcederAcceso>> Conceder(ConcederAccesoEntrada entrada, CancellationToken cancelacion = default) =>
+        Task.FromResult(Resultado<ResultadoDeConcederAcceso>.Fallo(FalloDeEnviosProvisional.NoDisponible()));
+
+    public Task<Resultado<ResultadoDeRevocarAcceso>> Revocar(RevocarAccesoEntrada entrada, CancellationToken cancelacion = default) =>
+        Task.FromResult(Resultado<ResultadoDeRevocarAcceso>.Fallo(FalloDeEnviosProvisional.NoDisponible()));
+}
+
+/// <summary>Las reservas del pedido sin el adaptador real del Inventario (hace falta <c>cerrar</c> en el cliente de Plataforma): cerrar es incierto y liberar «no se pudo», así que no se entrega ni se anula nada contra el stock.</summary>
+internal sealed class ReservasDelPedidoProvisional : IReservasDelPedido
+{
+    public Task<ResultadoDeCerrarReserva> Cerrar(Guid pedidoId, Guid lineaId, string claveDeCierre, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeCerrarReserva.Incierto);
+
+    public Task<ResultadoDeLiberarReserva> Liberar(Guid pedidoId, string motivo, IReadOnlyList<Guid> lineaIds, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLiberarReserva.NoSePudo);
+}
+
+/// <summary>La resolución de sucursales sin Identidad (D15 de <c>docs/03/08</c>): no resuelve ninguna, así que se niega el alcance del encargado (falla cerrado).</summary>
+internal sealed class ResolucionDeSucursalProvisional : IResolucionDeSucursal
+{
+    public Task<Guid?> IdentificadorDe(string codigoDeSucursal, CancellationToken cancelacion = default) => Task.FromResult<Guid?>(null);
+}
+
 public static class ComposicionProvisionalDePedidos
 {
     private static readonly (Type Puerto, Type Doble)[] Dobles =
@@ -55,6 +81,9 @@ public static class ComposicionProvisionalDePedidos
         (typeof(IProgresoDeEnvios), typeof(ProgresoDeEnviosProvisional)),
         (typeof(IContactoDeEntregaDelPedido), typeof(ContactoDeEntregaProvisional)),
         (typeof(IPedidosParaEnvios), typeof(PedidosParaEnviosProvisional)),
+        (typeof(IAccesosDeBiblioteca), typeof(AccesosDeBibliotecaProvisional)),
+        (typeof(IReservasDelPedido), typeof(ReservasDelPedidoProvisional)),
+        (typeof(IResolucionDeSucursal), typeof(ResolucionDeSucursalProvisional)),
     ];
 
     /// <summary>
@@ -68,6 +97,9 @@ public static class ComposicionProvisionalDePedidos
         servicios.TryAddSingleton<IProgresoDeEnvios, ProgresoDeEnviosProvisional>();
         servicios.TryAddSingleton<IContactoDeEntregaDelPedido, ContactoDeEntregaProvisional>();
         servicios.TryAddSingleton<IPedidosParaEnvios, PedidosParaEnviosProvisional>();
+        servicios.TryAddSingleton<IAccesosDeBiblioteca, AccesosDeBibliotecaProvisional>();
+        servicios.TryAddSingleton<IReservasDelPedido, ReservasDelPedidoProvisional>();
+        servicios.TryAddSingleton<IResolucionDeSucursal, ResolucionDeSucursalProvisional>();
 
         if (esProduccion)
         {
