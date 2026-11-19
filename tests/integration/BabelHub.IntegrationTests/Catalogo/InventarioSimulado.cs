@@ -202,6 +202,8 @@ public Task<ResultadoDelInventario<RespuestaDeConsultaPrevia>> ConsultarPrevia(C
     public Task<ResultadoDelInventario<IReadOnlyList<SucursalPublica>>> ListarSucursales(CancellationToken cancelacion = default) =>
         Task.FromResult(ResultadoDelInventario<IReadOnlyList<SucursalPublica>>.ConValor([]));
 
+    public Task<ResultadoDelInventario<ContactoDeSucursalDelInventario>> ConsultarContactoDeSucursal(string codigoDeSucursal, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
     private static bool Consumir(ref int contador)
     {
         while (true)

@@ -431,6 +431,31 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
         return new ReservaDelInventario(dto.PedidoId, dto.Estado, dto.CreadaEn, dto.ExpiraEn, lineas, traslados);
     }
 
+    public Task<ResultadoDelInventario<ContactoDeSucursalDelInventario>> ConsultarContactoDeSucursal(string codigoDeSucursal, CancellationToken cancelacion = default)
+    {
+        // El código viaja en la ruta: solo se admite la forma de un código de sucursal (letras, dígitos, guion y guion bajo), nunca algo que cambie la ruta.
+        if (string.IsNullOrWhiteSpace(codigoDeSucursal) || codigoDeSucursal.Length > 64 || !codigoDeSucursal.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_'))
+        {
+            throw new ArgumentException("El contacto se pide por un código de sucursal válido.", nameof(codigoDeSucursal));
+        }
+
+        return Pedir(
+            HttpMethod.Get,
+            $"{RutasDeServicio.Inventario}/sucursales/{codigoDeSucursal}/contacto-de-notificacion",
+            AlcanceDeServicio.LecturaDeContacto,
+            cuerpo: null,
+            claveDeIdempotencia: null,
+            conOrigen: false,
+            texto =>
+            {
+                var dto = JsonSerializer.Deserialize<ContactoDeSucursalDto>(texto, Json) ?? throw new JsonException("La respuesta no es un contacto de sucursal.");
+                return string.IsNullOrWhiteSpace(dto.Codigo) || string.IsNullOrWhiteSpace(dto.Numero) || !string.Equals(dto.Codigo, codigoDeSucursal, StringComparison.OrdinalIgnoreCase)
+                    ? throw new JsonException("El contacto no es el de la sucursal pedida.")
+                    : new ContactoDeSucursalDelInventario(dto.Codigo, dto.Numero);
+            },
+            cancelacion);
+    }
+
     public Task<ResultadoDelInventario<IReadOnlyList<SucursalPublica>>> ListarSucursales(CancellationToken cancelacion = default) =>
         Pedir<IReadOnlyList<SucursalPublica>>(
             HttpMethod.Get,

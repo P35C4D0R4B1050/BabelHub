@@ -2,6 +2,7 @@ using BabelHub.Ecommerce.Api.Auditoria;
 using BabelHub.Ecommerce.Api.Carrito;
 using BabelHub.Ecommerce.Api.Catalogo;
 using BabelHub.Ecommerce.Api.Envios;
+using BabelHub.Ecommerce.Api.Notificaciones;
 using BabelHub.Ecommerce.Api.Pagos;
 using BabelHub.Ecommerce.Api.Reclamaciones;
 using BabelHub.Ecommerce.Api.Web;
@@ -86,6 +87,8 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
 
     internal OpcionesDeIdentidad Identidad { get; private init; } = null!;
 
+    internal OpcionesDeNotificaciones Notificaciones { get; private init; } = null!;
+
     internal string ClaveDeIngresos { get; private init; } = string.Empty;
 
     internal OpcionesDelAlmacenDeObjetos AlmacenDelCatalogo { get; private init; } = null!;
@@ -109,7 +112,7 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
     public override string ToString() => "[configuración del anfitrión del E-commerce]";
 
     /// <summary>Lee y valida todo junto: junta todos los problemas y falla una sola vez con el nombre de cada variable (nunca su valor).</summary>
-    public static OpcionesDelAnfitrionDelEcommerce Leer(IConfiguration configuracion, bool esProduccion)
+    public static OpcionesDelAnfitrionDelEcommerce Leer(IConfiguration configuracion, bool esProduccion, bool soloEnModoNormal = true)
     {
         ArgumentNullException.ThrowIfNull(configuracion);
         var lector = new LectorDeSecretos(configuracion);
@@ -164,6 +167,9 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
             "Pagos:ClaveDeIntentos",
             "Pagos:ClaveDeIntentosAnterior",
             "Pagos:LlavePrivada",
+            OpcionesDeNotificaciones.RutaDeLaClaveDeHuella,
+            OpcionesDeNotificaciones.RutaDeLaClaveDeHuellaAnterior,
+            OpcionesDeNotificaciones.RutaDeLaClaveSaliente,
         };
         foreach (var ruta in rutasDeSecretos)
         {
@@ -187,7 +193,8 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
             lector.Problema(RutaDeLosProxies, "falta: en producción el origen del cliente solo se acepta de un proxy conocido");
         }
 
-        ConfiguracionDelEcommerce? comun = Capturar(extra, () => ConfiguracionDelEcommerce.Cargar(configuracion, AlcancesRequeridos, []));
+        ConfiguracionDelEcommerce? comun = Capturar(extra, () => ConfiguracionDelEcommerce.Cargar(configuracion, AlcancesRequeridos, OpcionesDeNotificaciones.ProveedoresDeFirma(configuracion, soloEnModoNormal)));
+        var notificaciones = Capturar(extra, () => OpcionesDeNotificaciones.Leer(configuracion, esProduccion, soloEnModoNormal));
         var identidad = Capturar(extra, () => OpcionesDeIdentidad.Leer(configuracion, esProduccion));
         var almacenDelCatalogo = Capturar(extra, () => OpcionesDelAlmacenDeObjetos.Cargar(configuracion, permitirHttp: !esProduccion, raiz: "Almacen:Catalogo:"));
         var almacenDeSupresiones = Capturar(extra, () => OpcionesDelAlmacenDeObjetos.Cargar(configuracion, permitirHttp: !esProduccion, raiz: "Almacen:Supresiones:"));
@@ -220,6 +227,7 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
             Configuracion = comun!,
             Redis = redis,
             Identidad = identidad!,
+            Notificaciones = notificaciones!,
             ClaveDeIngresos = claveDeIngresos!,
             AlmacenDelCatalogo = almacenDelCatalogo!,
             AlmacenDeSupresiones = almacenDeSupresiones!,
@@ -337,9 +345,9 @@ public static class AnfitrionDelEcommerce
     {
         ArgumentNullException.ThrowIfNull(builder);
         var esProduccion = builder.Environment.IsProduction();
-        var opciones = OpcionesDelAnfitrionDelEcommerce.Leer(builder.Configuration, esProduccion);
-        var servicios = builder.Services;
         var soloEnModoNormal = modo == ModoDeArranque.Normal;
+        var opciones = OpcionesDelAnfitrionDelEcommerce.Leer(builder.Configuration, esProduccion, soloEnModoNormal);
+        var servicios = builder.Services;
 
         // ---------- Plataforma ----------
         servicios.AgregarManejoDeErrores(new OpcionesDeErrores("ECO"));
@@ -381,7 +389,10 @@ public static class AnfitrionDelEcommerce
         var smtp = soloEnModoNormal ? opciones.Smtp : null;
         servicios.AgregarCorreoDelEcommerce(opciones.ClaveDeLaCola, smtp);
         servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDelCorreo(esNulo: smtp is null));
-        servicios.AgregarNotificacionesPendientes(esProduccion && soloEnModoNormal);
+        // Notificaciones: el envío es n8n (o el simulado en desarrollo y pruebas, o el nulo en el ensayo y al restaurar) y reemplaza a los dobles provisionales; el adaptador declara su estado real y ExigirCoherencia lo comprueba.
+        servicios.AgregarNotificaciones(opciones.Notificaciones);
+        servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDeLaInstancia("notificador", esNulo: opciones.Notificaciones.Envio == ModoDelEnvioDeAvisos.Nulo));
+        servicios.AgregarTrabajosDeNotificacionesEnLaApi(soloEnModoNormal);
         var depuracionDeRegistros = BasesDelEcommerce.Abrir(opciones.BaseDeDepuracionDeRegistros);
         servicios.AgregarIdentidad(opciones.Identidad, soloEnModoNormal, AlcanceDelSistemaDeIdentidad, _ => depuracionDeRegistros);
         servicios.AgregarTrabajosDeIdentidad(soloEnModoNormal, AlcanceDelSistemaDeIdentidad);

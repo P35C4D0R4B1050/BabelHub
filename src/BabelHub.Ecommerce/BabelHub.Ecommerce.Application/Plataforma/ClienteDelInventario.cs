@@ -104,6 +104,12 @@ public sealed record PendientesDeTitular(int ReservasActivas);
 /// <summary>Una sucursal tal como la ve quien elige un recojo o una sucursal preferida.</summary>
 public sealed record SucursalPublica(string Codigo, string Nombre, string Region);
 
+/// <summary>El contacto de notificación de una sucursal: su número, que solo se usa para enviar el aviso y <b>nunca se imprime</b> (dato personal).</summary>
+public sealed record ContactoDeSucursalDelInventario(string Codigo, string Numero)
+{
+    public override string ToString() => $"[contacto de {Codigo}]";
+}
+
 /// <summary>
 /// El puerto con el que el E-commerce llama al Inventario por REST (contratos v1, <c>docs/03-diseno-de-software/08-contratos-entre-servicios-v1.md</c>): vive en el contrato público de
 /// <c>Plataforma</c> con modelos propios (ningún DTO de <c>Shared</c> ni tipo del Dominio) y lo consumen los módulos mediante un puerto fino propio, sin abrir un <c>HttpClient</c>
@@ -191,6 +197,12 @@ public interface IClienteDelInventario
 
     /// <summary><c>inventario.sucursales.listar</c>: las sucursales para elegir recojo o sucursal preferida (alcance de lectura, sin token).</summary>
     Task<ResultadoDelInventario<IReadOnlyList<SucursalPublica>>> ListarSucursales(CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// <c>inventario.sucursales.contacto</c>: el número de contacto de notificación de una sucursal (alcance <c>lectura-de-contacto</c>, sin token; NOT-09). Lo usa solo Notificaciones, al enviar. Un código inexistente o una
+    /// sucursal sin contacto es <c>INV-NO-ENCONTRADO</c> (404). Una lectura: se puede reintentar. El número es un dato personal: no se registra.
+    /// </summary>
+    Task<ResultadoDelInventario<ContactoDeSucursalDelInventario>> ConsultarContactoDeSucursal(string codigoDeSucursal, CancellationToken cancelacion = default);
 }
 
 // ---------- Reservas (consulta previa, reservar y liberar; contrato v1 de reservas) ----------

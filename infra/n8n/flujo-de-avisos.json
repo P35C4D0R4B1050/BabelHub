@@ -1,0 +1,241 @@
+{
+  "name": "BabelHub - Avisos por WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "babelhub-avisos",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "babelhub-avisos"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verifica la llamada del servicio (firma HMAC con la clave del sentido saliente, marca de tiempo, forma y plantilla) ANTES de actuar: sin esto el webhook sería un relé abierto de WhatsApp (NOT-12).\n// Las plantillas van aquí, versionadas con el flujo: el texto se cambia editándolo y el servicio no se modifica (NOT-10). Cada una declara los campos que admite; un campo fuera de la lista se rechaza (NOT-07).\nconst crypto = require('crypto');\nconst PLANTILLAS = {\n  'pedido-confirmado': { version: 1, campos: ['numeroDePedido', 'nombre'], texto: '{saludo}, recibimos tu pedido {numeroDePedido}. Te avisaremos cuando avance. — BabelHub' },\n  'pedido-estado': { version: 1, campos: ['numeroDePedido', 'estado'], texto: 'Tu pedido {numeroDePedido} cambió de estado: {estado}. — BabelHub' },\n  'pedido-estado-sucursal': { version: 1, campos: ['numeroDePedido', 'estado'], texto: 'Pedido {numeroDePedido}: estado {estado}. — BabelHub' },\n  'pedido-en-preparacion': { version: 1, campos: ['numeroDePedido', 'nombre'], texto: '{saludo}, tu pedido {numeroDePedido} está en preparación. — BabelHub' },\n  'pedido-en-transito': { version: 1, campos: ['numeroDePedido', 'nombre'], texto: '{saludo}, tu pedido {numeroDePedido} va en tránsito. — BabelHub' },\n  'pedido-listo-para-recojo': { version: 1, campos: ['numeroDePedido', 'nombre', 'sucursal'], texto: '{saludo}, tu pedido {numeroDePedido} está listo para recoger{enSucursal}. — BabelHub' },\n  'pedido-entregado': { version: 1, campos: ['numeroDePedido', 'nombre'], texto: '{saludo}, tu pedido {numeroDePedido} fue entregado. Gracias por leer con nosotros. — BabelHub' },\n  'pedido-no-recogido': { version: 1, campos: ['numeroDePedido', 'nombre'], texto: '{saludo}, tu pedido {numeroDePedido} no fue recogido a tiempo. Escríbenos si aún lo quieres. — BabelHub' },\n  'pago-pendiente': { version: 1, campos: ['numeroDePedido', 'nombre'], texto: '{saludo}, el pago de tu pedido {numeroDePedido} sigue pendiente de confirmación. — BabelHub' },\n  'pago-resultado': { version: 1, campos: ['numeroDePedido', 'resultado', 'nombre'], texto: '{saludo}, el pago de tu pedido {numeroDePedido} fue {resultado}. — BabelHub' },\n  'pedido-anulado': { version: 1, campos: ['numeroDePedido', 'motivo', 'nombre'], texto: '{saludo}, tu pedido {numeroDePedido} fue {motivo}. — BabelHub' },\n  'reembolso-automatico': { version: 1, campos: ['numeroDePedido', 'nombre'], texto: '{saludo}, iniciamos el reembolso de tu pedido {numeroDePedido}. — BabelHub' },\n  'envio-guia': { version: 1, campos: ['numeroDePedido', 'numeroDeGuia', 'estado', 'nombre'], texto: '{saludo}, tu pedido {numeroDePedido} tiene la guía {numeroDeGuia} (estado: {estado}). — BabelHub' },\n  'libro-digital-disponible': { version: 1, campos: ['numeroDePedido', 'nombre'], texto: '{saludo}, tu libro digital del pedido {numeroDePedido} ya está disponible en tu biblioteca. — BabelHub' },\n  'devolucion-estado': { version: 1, campos: ['devolucionId', 'estado', 'nombre'], texto: '{saludo}, tu devolución {devolucionId} está en estado: {estado}. — BabelHub' },\n  'traslado-estado': { version: 1, campos: ['trasladoId', 'estado', 'sucursalDeOrigen', 'sucursalDeDestino'], texto: 'Traslado {trasladoId}: estado {estado}. — BabelHub' }\n};\n// FIN-PLANTILLAS\nconst RUTA = '/webhook/babelhub-avisos';\nconst rechazar = (status) => [{ json: { valido: false, status } }];\nconst entrada = $input.first();\nconst cabeceras = entrada.json.headers || {};\nconst marca = String(cabeceras['x-babelhub-marca'] || '');\nconst firma = String(cabeceras['x-babelhub-firma'] || '');\nconst clave = $env.BABELHUB_FIRMA_DE_AVISOS || '';\nif (clave.length < 32) { return rechazar(401); }\nconst crudo = (await this.helpers.getBinaryDataBuffer(0, 'data')).toString('utf8');\nconst esperada = crypto.createHmac('sha256', clave).update(marca + '.POST.' + RUTA + '.' + crudo).digest('hex');\nif (firma.length !== esperada.length || !crypto.timingSafeEqual(Buffer.from(firma), Buffer.from(esperada))) { return rechazar(401); }\nconst marcaNumerica = Number(marca);\nif (!Number.isFinite(marcaNumerica) || Math.abs(Date.now() / 1000 - marcaNumerica) > 300) { return rechazar(401); }\nlet cuerpo;\ntry { cuerpo = JSON.parse(crudo); } catch (e) { return rechazar(400); }\nconst plantilla = PLANTILLAS[cuerpo.plantilla];\nconst esId = typeof cuerpo.avisoId === 'string' && cuerpo.avisoId.length === 36 && /^[0-9a-f-]+$/.test(cuerpo.avisoId);\nconst esNumero = typeof cuerpo.numero === 'string' && /^[+][1-9][0-9]{7,14}$/.test(cuerpo.numero);\nconst campos = cuerpo.campos && typeof cuerpo.campos === 'object' && !Array.isArray(cuerpo.campos) ? cuerpo.campos : null;\nif (!plantilla || !esId || !esNumero || !campos) { return rechazar(400); }\nfor (const [nombre, valor] of Object.entries(campos)) {\n  if (!plantilla.campos.includes(nombre) || typeof valor !== 'string' || valor.length > 64) { return rechazar(400); }\n}\n// Un avisoId ya entregado no se vuelve a enviar: responde duplicado y vuelve a emitir el estado. Se guarda solo el identificador (nunca el número), 48 horas como mínimo.\nconst datos = $getWorkflowStaticData('global');\ndatos.entregados = datos.entregados || {};\nconst limite = Date.now() - 48 * 3600 * 1000;\nfor (const id of Object.keys(datos.entregados)) { if (datos.entregados[id] < limite) { delete datos.entregados[id]; } }\nconst duplicado = Boolean(datos.entregados[cuerpo.avisoId]);\nreturn [{ json: { valido: true, duplicado, avisoId: cuerpo.avisoId, numero: cuerpo.numero, campos, texto: plantilla.texto } }];"
+      },
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "Verificar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.valido }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Es valido",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"estado\":\"rechazado\"}",
+        "options": {
+          "responseCode": "={{ $json.status }}"
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "Responder rechazo",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [720, 520]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.duplicado }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000005",
+      "name": "Es duplicado",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [720, 220]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"estado\":\"aceptado\",\"duplicado\":true}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000006",
+      "name": "Responder duplicado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [960, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Un duplicado vuelve a emitir el estado entregado (el servicio pudo no haberlo recibido).\nconst aviso = $('Verificar').first().json;\nreturn [{ json: { avisoId: aviso.avisoId, estado: 'entregado' } }];"
+      },
+      "id": "a1000000-0000-4000-8000-000000000007",
+      "name": "Estado duplicado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"estado\":\"aceptado\",\"duplicado\":false}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000008",
+      "name": "Responder aceptado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [960, 340]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Arma el mensaje con la plantilla: {campo} se reemplaza por su valor; {saludo} y {enSucursal} se derivan de los campos opcionales. El texto nunca lleva enlaces ni datos de pago.\nconst aviso = $('Verificar').first().json;\nconst campos = aviso.campos;\nconst derivados = { saludo: campos.nombre ? 'Hola ' + campos.nombre : 'Hola', enSucursal: campos.sucursal ? ' en la sucursal ' + campos.sucursal : '' };\nconst texto = aviso.texto.replace(/[{]([A-Za-z]+)[}]/g, (parte, nombre) => (nombre in derivados ? derivados[nombre] : (campos[nombre] || '')));\nreturn [{ json: { avisoId: aviso.avisoId, numero: aviso.numero, texto } }];"
+      },
+      "id": "a1000000-0000-4000-8000-000000000009",
+      "name": "Armar mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 340]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCIA }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.numero.replace('+', ''), text: $json.texto }) }}",
+        "options": {
+          "timeout": 8000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          }
+        }
+      },
+      "id": "a1000000-0000-4000-8000-00000000000a",
+      "name": "Enviar por Evolution",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1440, 340],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "evolution-api-key",
+          "name": "Evolution API (apikey)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Evolution entregó (sin error) o falló. Solo si entregó se recuerda el avisoId (48 horas, sin el número): un reintento tras un fallo SÍ se envía de nuevo.\nconst base = $('Armar mensaje').first().json;\nconst entregado = !$json.error;\nif (entregado) {\n  const datos = $getWorkflowStaticData('global');\n  datos.entregados = datos.entregados || {};\n  datos.entregados[base.avisoId] = Date.now();\n}\nreturn [{ json: { avisoId: base.avisoId, estado: entregado ? 'entregado' : 'fallido' } }];"
+      },
+      "id": "a1000000-0000-4000-8000-00000000000b",
+      "name": "Resultado del envio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1680, 340]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Firma el estado de entrega con la clave del sentido ENTRANTE (distinta de la que firma la llamada del servicio): HMAC sobre marca.cuerpo, en hexadecimal con el prefijo sha256=.\nconst crypto = require('crypto');\nconst cuerpo = JSON.stringify({ avisoId: $json.avisoId, estado: $json.estado });\nconst marca = String(Math.floor(Date.now() / 1000));\nconst firma = 'sha256=' + crypto.createHmac('sha256', $env.BABELHUB_FIRMA_DE_ESTADOS || '').update(marca + '.' + cuerpo).digest('hex');\nreturn [{ json: { cuerpo, marca, firma } }];"
+      },
+      "id": "a1000000-0000-4000-8000-00000000000c",
+      "name": "Firmar estado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1920, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ECOMMERCE_URL }}/api/ecommerce/v1/integraciones/n8n/estados",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Marca-De-Tiempo", "value": "={{ $json.marca }}" },
+            { "name": "X-Firma", "value": "={{ $json.firma }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.cuerpo }}",
+        "options": {
+          "timeout": 10000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          }
+        }
+      },
+      "id": "a1000000-0000-4000-8000-00000000000d",
+      "name": "Estado de entrega",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2160, 220],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Verificar", "type": "main", "index": 0 }]] },
+    "Verificar": { "main": [[{ "node": "Es valido", "type": "main", "index": 0 }]] },
+    "Es valido": {
+      "main": [
+        [{ "node": "Es duplicado", "type": "main", "index": 0 }],
+        [{ "node": "Responder rechazo", "type": "main", "index": 0 }]
+      ]
+    },
+    "Es duplicado": {
+      "main": [
+        [{ "node": "Responder duplicado", "type": "main", "index": 0 }],
+        [{ "node": "Responder aceptado", "type": "main", "index": 0 }]
+      ]
+    },
+    "Responder duplicado": { "main": [[{ "node": "Estado duplicado", "type": "main", "index": 0 }]] },
+    "Estado duplicado": { "main": [[{ "node": "Firmar estado", "type": "main", "index": 0 }]] },
+    "Responder aceptado": { "main": [[{ "node": "Armar mensaje", "type": "main", "index": 0 }]] },
+    "Armar mensaje": { "main": [[{ "node": "Enviar por Evolution", "type": "main", "index": 0 }]] },
+    "Enviar por Evolution": { "main": [[{ "node": "Resultado del envio", "type": "main", "index": 0 }]] },
+    "Resultado del envio": { "main": [[{ "node": "Firmar estado", "type": "main", "index": 0 }]] },
+    "Firmar estado": { "main": [[{ "node": "Estado de entrega", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false
+  },
+  "active": false,
+  "pinData": {}
+}

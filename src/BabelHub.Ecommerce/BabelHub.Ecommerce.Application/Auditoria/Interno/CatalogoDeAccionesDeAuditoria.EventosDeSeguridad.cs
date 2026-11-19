@@ -72,6 +72,8 @@ public static partial class CatalogoDeAccionesDeAuditoria
         "consultas-de-pedidos-por-usuario",
         "gestion-de-pedidos-por-usuario",
         "lecturas-del-contacto-de-pedidos-por-persona",
+        "avisos-por-numero-por-hora",
+        "avisos-por-numero-en-24-horas",
         "solicitudes-previas-por-origen",
         "solicitudes-del-origen-desconocido",
         "solicitudes-sin-sesion-por-origen",
