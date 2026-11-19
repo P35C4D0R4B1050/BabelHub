@@ -28,7 +28,7 @@ public static class TextosDelPago
     };
 }
 
-/// <summary>La pantalla de pago (T28; el formulario de la pasarela y la cuenta regresiva completa llegan en T33): el resumen, la clave firmada del intento y el estado.</summary>
+/// <summary>La pantalla de pago (T28, T33): el resumen, la clave firmada del intento, la cuenta regresiva y el estado.</summary>
 public sealed class PagoVista : ModeloBaseDePagina
 {
     public Guid PedidoId { get; set; }
