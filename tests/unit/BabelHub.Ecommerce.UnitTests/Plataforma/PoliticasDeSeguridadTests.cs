@@ -294,6 +294,35 @@ public sealed class PoliticasDeSeguridadTests
     }
 
     [Fact]
+    public void LasPoliticasDePedidos_TienenLosValoresDelPlan_LasDeUsoSonGeneralesYLaDelContactoEsCriticaYFallaCerrada()
+    {
+        var consultas = PoliticasDeSeguridad.ConsultasDePedidosPorUsuario;
+        var gestion = PoliticasDeSeguridad.GestionDePedidosPorUsuario;
+        var contacto = PoliticasDeSeguridad.LecturasDelContactoDePedidosPorPersona;
+
+        Assert.Equal(("consultas-de-pedidos-por-usuario", 60, TimeSpan.FromMinutes(1)), (consultas.Nombre, consultas.Maximo, consultas.Ventana));
+        Assert.Equal(("gestion-de-pedidos-por-usuario", 30, TimeSpan.FromMinutes(1)), (gestion.Nombre, gestion.Maximo, gestion.Ventana));
+        Assert.Equal(("lecturas-del-contacto-de-pedidos-por-persona", 200, TimeSpan.FromHours(1)), (contacto.Nombre, contacto.Maximo, contacto.Ventana));
+        Assert.All(new[] { consultas, gestion }, p =>
+        {
+            Assert.Equal(TipoDeSujetoDeLimite.Usuario, p.Tipo);
+            Assert.True(p.RespaldoLocal);
+            Assert.Contains(p, PoliticasDeSeguridad.Generales);
+        });
+        Assert.False(contacto.RespaldoLocal);
+        Assert.Contains(contacto, PoliticasDeSeguridad.Todas);
+        Assert.DoesNotContain(contacto, PoliticasDeSeguridad.Generales);
+        foreach (var politica in new[] { consultas, gestion, contacto })
+        {
+            Assert.Contains(politica.Nombre, BabelHub.Ecommerce.Application.Auditoria.Interno.CatalogoDeAccionesDeAuditoria.MotivosDeLimiteExcedido);
+        }
+
+        Assert.Contains(BabelHub.Ecommerce.Application.Plataforma.PoliticasDeLimite.LecturasDelContactoDePedidosPorPersona, BabelHub.Ecommerce.Application.Plataforma.PoliticasDeLimite.Todas);
+        Assert.Contains(BabelHub.Ecommerce.Application.Plataforma.PoliticasDeLimite.ConsultasDePedidosPorUsuario, BabelHub.Ecommerce.Application.Plataforma.PoliticasDeLimite.Generales);
+        Assert.Contains(BabelHub.Ecommerce.Application.Plataforma.PoliticasDeLimite.GestionDePedidosPorUsuario, BabelHub.Ecommerce.Application.Plataforma.PoliticasDeLimite.Generales);
+    }
+
+    [Fact]
     public void LasPoliticasDeCarrito_TienenLosValoresDelPlan_YSoloPasarAlPagoFallaCerrada()
     {
         Assert.Equal(("carritos-de-visitante-por-origen", 10, TimeSpan.FromHours(1)), (PoliticasDeSeguridad.CarritosDeVisitantePorOrigen.Nombre, PoliticasDeSeguridad.CarritosDeVisitantePorOrigen.Maximo, PoliticasDeSeguridad.CarritosDeVisitantePorOrigen.Ventana));

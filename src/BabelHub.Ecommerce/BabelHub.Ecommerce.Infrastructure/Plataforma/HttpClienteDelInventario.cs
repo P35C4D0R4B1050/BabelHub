@@ -363,6 +363,51 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
             HttpStatusCode.OK);
     }
 
+    public Task<ResultadoDelInventario<CierreDeLaReserva>> CerrarReserva(Guid pedidoId, string motivo, IReadOnlyList<Guid> lineaIds, Guid? envioId, string claveDeIdempotencia, CancellationToken cancelacion = default)
+    {
+        if (pedidoId == Guid.Empty
+            || !MotivosDeCierre.Todos.Contains(motivo)
+            || lineaIds is null || lineaIds.Count is 0 or > LimitesDeContrato.MaximoDeLineasPorReserva || lineaIds.Any(id => id == Guid.Empty) || lineaIds.Distinct().Count() != lineaIds.Count
+            || (motivo == MotivosDeCierre.Reparto) != (envioId is not null && envioId != Guid.Empty)
+            || (motivo == MotivosDeCierre.Entrega && envioId is not null))
+        {
+            throw new ArgumentException("El cierre necesita el pedido, un motivo del contrato, de 1 a las líneas máximas distintas y el envío solo cuando el motivo es el reparto.");
+        }
+
+        if (string.IsNullOrEmpty(claveDeIdempotencia) || !ClaveValida.IsMatch(claveDeIdempotencia))
+        {
+            throw new ArgumentException("La clave de idempotencia tiene de 16 a 80 caracteres de [A-Za-z0-9_-].", nameof(claveDeIdempotencia));
+        }
+
+        var cuerpo = JsonSerializer.Serialize(new CerrarReservaDto(motivo, [.. lineaIds], envioId), Json);
+        var pedidas = lineaIds.ToHashSet();
+        return Pedir(
+            HttpMethod.Post,
+            $"{RutasDeServicio.Inventario}/reservas/{pedidoId:D}/cerrar",
+            AlcanceDeServicio.OperacionDeUsuario,
+            cuerpo,
+            claveDeIdempotencia,
+            conOrigen: false,
+            texto => ACierre(JsonSerializer.Deserialize<CierreDeReservaDto>(texto, Json) ?? throw new JsonException("La respuesta no es un cierre."), pedidoId, pedidas),
+            cancelacion,
+            HttpStatusCode.OK);
+    }
+
+    /// <summary>El cierre del contrato validado: el del pedido pedido, una línea por cada pedida (ni más ni menos) y un resultado de la lista cerrada.</summary>
+    private static CierreDeLaReserva ACierre(CierreDeReservaDto dto, Guid pedidoId, HashSet<Guid> lineasPedidas)
+    {
+        var lineas = dto.Lineas ?? throw new JsonException("Faltan las líneas.");
+        if (dto.PedidoId != pedidoId
+            || lineas.Count != lineasPedidas.Count
+            || lineas.Any(l => !lineasPedidas.Contains(l.LineaId) || !ResultadosDeCierre.Todos.Contains(l.Resultado))
+            || lineas.Select(l => l.LineaId).Distinct().Count() != lineas.Count)
+        {
+            throw new JsonException("El cierre devuelto no es el del pedido, no cubre exactamente las líneas pedidas o trae un resultado fuera del contrato.");
+        }
+
+        return new CierreDeLaReserva(dto.PedidoId, [.. lineas.Select(l => new ResultadoDeCierreDeLinea(l.LineaId, l.Resultado))]);
+    }
+
     private static string TextoDelTipo(TipoDeEntregaDeLaReserva tipo) => tipo == TipoDeEntregaDeLaReserva.Recojo ? TiposDeEntrega.Recojo : TiposDeEntrega.Domicilio;
 
     private static List<LineaDeSolicitudDto> ALasLineasDelContrato(IReadOnlyList<LineaDeSolicitud> lineas) => [.. lineas.Select(l => new LineaDeSolicitudDto(l.LineaId, l.EdicionId, l.Cantidad))];
