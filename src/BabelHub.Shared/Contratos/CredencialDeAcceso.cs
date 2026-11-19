@@ -42,5 +42,5 @@ public static class CredencialDeAcceso
     public const int VigenciaDelContextoDeLecturaEnMinutos = 5;
 
     /// <summary>El desfase de reloj que se tolera entre servicios.</summary>
-    public const int DesfaseTolerado = 30;
+    public const int DesfaseToleradoEnSegundos = 30;
 }
