@@ -34,7 +34,7 @@ Versiones: `@playwright/test` y `playwright-core` fijados en **1.64.0**, la que 
 
 ## Entorno local de punta a punta (T36 de `ecommerce-carrito-checkout`)
 
-Todo en `tests/e2e/entorno/`, solo para desarrollo y sin datos reales (`.env.e2e` lo ignora Git y se genera con secretos aleatorios):
+Todo en `tests/e2e/entorno/`, solo para desarrollo y sin datos reales (el archivo de entorno se genera con secretos aleatorios en `%LOCALAPPDATA%babelhub-e2eenv`, fuera del repositorio; se cambia con `E2E_ENV_FILE`):
 
 ```bash
 bash tests/e2e/entorno/preparar-entorno.sh                # PostgreSQL y Redis aislados (proyecto `bhe2e`, puertos 55432 y 56379) y las dos bases migradas (COMP-2)
@@ -46,7 +46,7 @@ cd tests/e2e && E2E_FORWARDED_PROTO=https npx playwright test carrito/humo-del-e
 - `E2E_FORWARDED_PROTO=https` hace que Playwright envíe `X-Forwarded-Proto: https`: el host local escucha en HTTP y sin esa cabecera las cookies `__Host-` y el antiforgery fallan (el borde real termina el TLS).
 - Cada servicio usa **cuentas de base de datos con nombres distintos** (`acceso_inv`, `depurador_ajustes_inv`, `depurador_auditoria_inv` en el Inventario): los roles de PostgreSQL son del clúster y, en una sola instancia, los nombres iguales de los dos servicios (`acceso`, `depurador_auditoria`) se pisan las contraseñas al migrar.
 - El host se niega a arrancar con las variables `BABELHUB__Migrador__*` en su entorno (COMP-2); `arrancar-host.sh` las quita.
-- Para apagar: `docker compose -p bhe2e -f infra/docker-compose.local.yml --env-file .env.e2e down` (el volumen conserva las bases).
+- Para apagar: `docker compose -p bhe2e -f infra/docker-compose.local.yml --env-file "$LOCALAPPDATA/babelhub-e2e/env" down` (el volumen conserva las bases).
 
 **Estado:** el humo del visitante (carrito vacío, catálogo, cabeceras de seguridad y axe AA) corre en Chromium de escritorio y de teléfono. Los recorridos con compra (`carrito-checkout.spec.ts`) siguen omitidos por faltar: (1) sembrado de catálogo (obras y ediciones) y de inventario (sucursales, fuentes y stock); (2) sesiones de clientes (no hay pantalla de ingreso: es de `web-identidad`) y su `storageState`; (3) el esquema `pedidos` (T28) para confirmar la compra; y (4) Firefox no se puede lanzar en este equipo (`firefox.exe` responde «Permission denied» y Playwright «spawn UNKNOWN», también sin sandbox).
 

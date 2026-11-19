@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Arranca un host local para las pruebas E2E (solo Development, con el entorno de `.env.e2e`). Uso: arrancar-host.sh ecommerce|inventario
+# Arranca un host local para las pruebas E2E (solo Development, con el archivo de entorno de preparar-entorno.sh). Uso: arrancar-host.sh ecommerce|inventario
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
-set -a; source .env.e2e; set +a
+set -a; source "${E2E_ENV_FILE:-${LOCALAPPDATA:-$HOME}/babelhub-e2e/env}"; set +a
 # El servicio se niega a arrancar con las credenciales del migrador en su entorno (COMP-2): fuera.
 for v in $(compgen -v BABELHUB__Migrador__); do unset "$v"; done
 export ASPNETCORE_ENVIRONMENT=Development

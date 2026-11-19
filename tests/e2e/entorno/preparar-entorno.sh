@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Prepara el entorno LOCAL de las pruebas E2E: genera `.env.e2e` (que Git ignora) con secretos aleatorios solo para esta máquina, levanta
+# Prepara el entorno LOCAL de las pruebas E2E: genera el archivo de entorno (fuera del repositorio) con secretos aleatorios solo para esta máquina, levanta
 # PostgreSQL y Redis aislados (proyecto `bhe2e`, puertos 55432 y 56379) y migra las bases de ambos servicios. No toca el Compose de nadie más.
 # Solo desarrollo: ningún valor de aquí es un dato real. Uso: bash tests/e2e/entorno/preparar-entorno.sh
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
 
-archivo=".env.e2e"
+# El archivo de entorno vive FUERA del repositorio (secretos aleatorios solo de esta máquina; el escáner de secretos recorre el árbol de trabajo).
+archivo="${E2E_ENV_FILE:-${LOCALAPPDATA:-$HOME}/babelhub-e2e/env}"
+mkdir -p "$(dirname "$archivo")"
 alea() { head -c 36 /dev/urandom | base64 | tr -d '/+=' | head -c "${1:-40}"; }
 versionada() { printf 'v1:%s' "$(head -c 32 /dev/urandom | base64)"; }
 poner() { grep -q "^$1=" "$archivo" 2>/dev/null || printf "%s='%s'\n" "$1" "$2" >> "$archivo"; }
