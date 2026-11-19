@@ -86,6 +86,10 @@ internal sealed class EntornoDeIdentidad
 
     public BajasEnMemoria BajasGuardadas { get; }
 
+    public AlmacenDeClavesEnMemoria AlmacenDeClaves { get; }
+
+    public GeneradorDeClavesDePrueba GeneradorDeClaves { get; }
+
     public PurgaDeIdentidadDePrueba Purga { get; }
 
     public EntregaDeBajasDePrueba EntregaDeBajas { get; } = new();
@@ -117,6 +121,8 @@ internal sealed class EntornoDeIdentidad
         SolicitudesGuardadas = new SolicitudesDeDatosEnMemoria(Bd);
         CancelacionesGuardadas = new CancelacionesEnMemoria(Bd);
         BajasGuardadas = new BajasEnMemoria(Bd);
+        AlmacenDeClaves = new AlmacenDeClavesEnMemoria(Bd);
+        GeneradorDeClaves = new GeneradorDeClavesDePrueba(AlmacenDeClaves);
         Purga = new PurgaDeIdentidadDePrueba(Bd);
         Ejecutor = new EjecutorDeCancelacionDePrueba(Reloj);
         Renovaciones = new RenovacionesEnMemoria(Bd);
@@ -360,4 +366,25 @@ internal static class EntornoDeLaEjecucionExtensiones
         e.Reloj);
 
     public static ReintentoDeBajas Reintento(this EntornoDeIdentidad e) => new(e.BajasGuardadas, e.Supresiones, e.EntregaDeBajas, e.AlertasDeSeguridad, e.Reloj);
+}
+
+internal static class EntornoDeLasClavesExtensiones
+{
+    public static ClavesDeFirma Claves(this EntornoDeIdentidad e) => new(
+        new AlcanceDeLaAdministracion(new AlcanceDeLaCuenta(e.Actor, e.Denegaciones), e.Cuentas),
+        e.AlmacenDeClaves,
+        e.GeneradorDeClaves,
+        e.Renovaciones,
+        e.Unidad,
+        e.Auditoria,
+        e.Reloj);
+
+    /// <summary>Deja una clave activa creada hace los días indicados, con sus parámetros públicos.</summary>
+    public static ClaveDeFirma ConClaveActiva(this EntornoDeIdentidad e, int diasDeAntiguedad = 10, string kid = "kid-inicial-0001")
+    {
+        var clave = ClaveDeFirma.Nueva(kid, e.Reloj.Ahora.AddDays(-diasDeAntiguedad));
+        e.Bd.Claves.Add(clave);
+        e.AlmacenDeClaves.Parametros[kid] = $"jwk-publico-de-{kid}";
+        return clave;
+    }
 }

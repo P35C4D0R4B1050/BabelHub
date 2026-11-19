@@ -134,6 +134,9 @@ public interface IRepositorioDeRenovaciones
     /// <summary>Revoca todas las renovaciones vigentes del usuario (cerrar todas, recuperación, cambio de contraseña).</summary>
     Task RevocarTodas(Guid usuarioId, DateTimeOffset ahora, CancellationToken cancelacion = default);
 
+    /// <summary>Revoca TODAS las renovaciones vigentes de todos los usuarios: la clave de firma se declaró comprometida (IDE-61).</summary>
+    Task RevocarLasDeTodos(DateTimeOffset ahora, CancellationToken cancelacion = default);
+
     /// <summary>Revoca las renovaciones vigentes salvo una familia (cambio de contraseña o del segundo factor: «las demás», IDE-44).</summary>
     Task RevocarLasDemas(Guid usuarioId, Guid familiaQueSeConserva, DateTimeOffset ahora, CancellationToken cancelacion = default);
 }
@@ -273,6 +276,29 @@ public interface IRepositorioDeBajas
     Task<IReadOnlyList<BajaDeTitular>> Pendientes(int limite, CancellationToken cancelacion = default);
 
     Task Guardar(BajaDeTitular baja, CancellationToken cancelacion = default);
+}
+
+/// <summary>
+/// El juego de claves de firma (<c>identidad.claves_de_firma</c>, IDE-35, IDE-36, IDE-61): <see cref="Cargar"/> con <c>paraActualizar</c> toma el bloqueo del juego completo, de modo que dos rotaciones o declaraciones
+/// simultáneas se serializan; el índice único parcial de «una sola clave activa» impide que una doble rotación deje a una clave fuera del JWKS. Guardar es una operación de la misma transacción.
+/// </summary>
+public interface IAlmacenDeClavesDeFirma
+{
+    Task<JuegoDeClavesDeFirma> Cargar(bool paraActualizar, CancellationToken cancelacion = default);
+
+    Task Guardar(JuegoDeClavesDeFirma juego, CancellationToken cancelacion = default);
+
+    /// <summary>Los parámetros públicos (JWK sin la privada) de cada <c>kid</c> pedido: lo que se publica para verificar.</summary>
+    Task<IReadOnlyDictionary<string, string>> ParametrosPublicos(IReadOnlyCollection<string> kids, CancellationToken cancelacion = default);
+}
+
+/// <summary>
+/// Genera un par de claves ES256 nuevo: guarda la <b>privada cifrada</b> con la clave del entorno (nunca sale de Identidad) y devuelve la clave del Dominio (con su <c>kid</c> aleatorio) y los parámetros públicos. Se llama
+/// dentro de la transacción de la rotación: si esta se revierte, la privada generada queda sin uso.
+/// </summary>
+public interface IGeneradorDeClavesDeFirma
+{
+    Task<(ClaveDeFirma Clave, string ParametrosPublicos)> Generar(DateTimeOffset ahora, CancellationToken cancelacion = default);
 }
 
 /// <summary>El cambio de correo en curso de un usuario (<c>identidad.cambios_de_correo_pendientes</c>, IDE-53, IDE-54): como máximo uno por usuario; <see cref="Guardar"/> reemplaza el anterior.</summary>

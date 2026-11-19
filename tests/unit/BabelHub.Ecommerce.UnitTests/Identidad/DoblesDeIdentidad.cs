@@ -41,6 +41,8 @@ internal sealed class BdIdentidad
 
     public List<BajaDeTitular> Bajas { get; private set; } = [];
 
+    public List<ClaveDeFirma> Claves { get; private set; } = [];
+
     public List<(Guid UsuarioId, AvisoDeCuenta Aviso)> Avisos { get; private set; } = [];
 
     internal sealed record EstadoDeLaBd(
@@ -55,6 +57,7 @@ internal sealed class BdIdentidad
         List<SolicitudDeDatos> Solicitudes,
         List<SolicitudDeCancelacion> Cancelaciones,
         List<BajaDeTitular> Bajas,
+        List<ClaveDeFirma> Claves,
         List<(Guid UsuarioId, AvisoDeCuenta Aviso)> Avisos);
 
     /// <summary>La instantánea guarda una copia del estado de cada cuenta para restaurarlo <b>en el mismo objeto</b>: las pruebas conservan su referencia y ven la reversión como la vería una base de datos.</summary>
@@ -70,6 +73,7 @@ internal sealed class BdIdentidad
         [.. Solicitudes.Select(s => SolicitudDeDatos.Restaurar(s.Id, s.UsuarioId, s.Tipo, s.Estado, s.RecibidaEn, s.FechaLimite, s.AtendidaEn, s.Respuesta, s.Motivo))],
         [.. Cancelaciones.Select(c => SolicitudDeCancelacion.Restaurar(c.Id, c.UsuarioId, c.Estado, c.SolicitadaEn, c.ReconfirmarHasta, c.AvisoVistoEn, c.CerradaEn, c.EjecucionEnCurso))],
         [.. Bajas.Select(b => new BajaDeTitular(b.IdentificadorOpaco, b.Creada, b.EntregadaEn, b.CerradaEn))],
+        [.. Claves.Select(c => ClaveDeFirma.Restaurar(c.Kid, c.Creada, c.Estado, c.DejoDeFirmarEn, c.ComprometidaEn))],
         [.. Avisos]);
 
     public void Restaurar(EstadoDeLaBd estado)
@@ -84,6 +88,7 @@ internal sealed class BdIdentidad
         Solicitudes = estado.Solicitudes;
         Cancelaciones = estado.Cancelaciones;
         Bajas = estado.Bajas;
+        Claves = estado.Claves;
         Avisos = estado.Avisos;
         foreach (var (cuenta, copia) in estado.CopiasDeCuentas)
         {
@@ -225,6 +230,8 @@ internal sealed class RenovacionesEnMemoria(BdIdentidad bd) : IRepositorioDeReno
         Revocar(r => r.UsuarioId == usuarioId && r.Familia == familia, ahora);
 
     public Task RevocarTodas(Guid usuarioId, DateTimeOffset ahora, CancellationToken cancelacion = default) => Revocar(r => r.UsuarioId == usuarioId, ahora);
+
+    public Task RevocarLasDeTodos(DateTimeOffset ahora, CancellationToken cancelacion = default) => Revocar(_ => true, ahora);
 
     public Task RevocarLasDemas(Guid usuarioId, Guid familiaQueSeConserva, DateTimeOffset ahora, CancellationToken cancelacion = default) =>
         Revocar(r => r.UsuarioId == usuarioId && r.Familia != familiaQueSeConserva, ahora);
@@ -904,5 +911,47 @@ internal sealed class EntregaDeBajasDePrueba : IEntregaDeBajas
 
         Entregadas.Add(identificadorOpaco);
         return Task.FromResult(true);
+    }
+}
+
+internal sealed class AlmacenDeClavesEnMemoria(BdIdentidad bd) : IAlmacenDeClavesDeFirma
+{
+    public Dictionary<string, string> Parametros { get; } = [];
+
+    public int Bloqueos { get; private set; }
+
+    public Task<JuegoDeClavesDeFirma> Cargar(bool paraActualizar, CancellationToken cancelacion = default)
+    {
+        if (paraActualizar)
+        {
+            Bloqueos++;
+        }
+
+        return Task.FromResult(JuegoDeClavesDeFirma.Restaurar(bd.Claves.Select(c => ClaveDeFirma.Restaurar(c.Kid, c.Creada, c.Estado, c.DejoDeFirmarEn, c.ComprometidaEn))));
+    }
+
+    public Task Guardar(JuegoDeClavesDeFirma juego, CancellationToken cancelacion = default)
+    {
+        bd.Claves.Clear();
+        bd.Claves.AddRange(juego.Claves.Select(c => ClaveDeFirma.Restaurar(c.Kid, c.Creada, c.Estado, c.DejoDeFirmarEn, c.ComprometidaEn)));
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyDictionary<string, string>> ParametrosPublicos(IReadOnlyCollection<string> kids, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyDictionary<string, string>>(kids.Where(Parametros.ContainsKey).ToDictionary(k => k, k => Parametros[k]));
+}
+
+internal sealed class GeneradorDeClavesDePrueba(AlmacenDeClavesEnMemoria almacen) : IGeneradorDeClavesDeFirma
+{
+    private int _n;
+
+    public int Generadas => _n;
+
+    public Task<(ClaveDeFirma Clave, string ParametrosPublicos)> Generar(DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        var kid = $"kid-generada-{++_n:D4}";
+        var publico = $"jwk-publico-de-{kid}";
+        almacen.Parametros[kid] = publico;
+        return Task.FromResult((ClaveDeFirma.Nueva(kid, ahora), publico));
     }
 }
