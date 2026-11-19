@@ -281,3 +281,27 @@ internal sealed class NotificadorDePedidosEspia : BabelHub.Ecommerce.Application
         return Task.FromResult(BabelHub.Ecommerce.Application.Notificaciones.ResultadoDeLaSolicitudDeAviso.Creado);
     }
 }
+
+/// <summary>Una unidad de trabajo que cuenta cuántas veces se ejecutó y cuántas se revirtió (el trabajo lanzó): para probar que una operación rechazada dentro de su transacción no deja nada a medias.</summary>
+internal sealed class UnidadDeTrabajoEspia : IUnidadDeTrabajo
+{
+    public int Ejecuciones { get; private set; }
+
+    public int Revertidas { get; private set; }
+
+    public async Task<T> Ejecutar<T>(Func<CancellationToken, Task<T>> trabajo, CancellationToken cancelacion = default)
+    {
+        Ejecuciones++;
+        try
+        {
+            return await trabajo(cancelacion);
+        }
+        catch
+        {
+            Revertidas++;
+            throw;
+        }
+    }
+
+    public Task EjecutarComo(EsquemaDeModulo esquema, Func<CancellationToken, Task> bloque, CancellationToken cancelacion = default) => bloque(cancelacion);
+}
