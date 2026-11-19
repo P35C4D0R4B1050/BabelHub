@@ -109,6 +109,29 @@ public sealed class Compensacion
     public bool EstaTerminada => CompletadaEn is not null;
 
     /// <summary>Una copia (para que las pruebas simulen la reversión de una transacción).</summary>
+    /// <summary>La reconstruye desde el almacén (la infraestructura): no valida ni cambia nada. <see cref="Avisar"/> se deriva del motivo.</summary>
+    public static Compensacion Rehidratar(
+        Guid intencionId,
+        Guid intentoId,
+        MotivoDeCompensacion motivo,
+        VarianteDeCompensacion variante,
+        DateTimeOffset iniciadaEn,
+        DateTimeOffset? reservasLiberadasEn,
+        MotivoDeLiberacion? motivoDeLiberacion,
+        DateTimeOffset? reembolsoRegistradoEn,
+        Guid? reembolsoId,
+        DateTimeOffset? checkoutCerradoEn,
+        DateTimeOffset? completadaEn) =>
+        new(intencionId, intentoId, motivo, variante, tieneReservas: true, iniciadaEn)
+        {
+            ReservasLiberadasEn = reservasLiberadasEn,
+            MotivoDeLiberacion = motivoDeLiberacion,
+            ReembolsoRegistradoEn = reembolsoRegistradoEn,
+            ReembolsoId = reembolsoId,
+            CheckoutCerradoEn = checkoutCerradoEn,
+            CompletadaEn = completadaEn,
+        };
+
     internal Compensacion Copiar() => (Compensacion)MemberwiseClone();
 
     /// <summary>La clave natural del reembolso de esta compensación: <c>comp:&lt;intentoId&gt;</c>.</summary>

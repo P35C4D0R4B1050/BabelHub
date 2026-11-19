@@ -72,6 +72,27 @@ public static partial class AccionesAuditables
 
     public static readonly AccionAuditable EstadoDePedidoCambiado = new(nameof(EstadoDePedidoCambiado));
 
+    /// <summary>El contacto de entrega de pedidos se anonimizó al vencer su conservación (actor «sistema»; la causa y el conteo, nunca el contacto).</summary>
+    public static readonly AccionAuditable ContactoDePedidoAnonimizado = new(nameof(ContactoDePedidoAnonimizado));
+
+    /// <summary>Alguien del personal leyó el detalle de un pedido con el contacto del cliente (el pedido y el rol; nunca el contacto).</summary>
+    public static readonly AccionAuditable ContactoDePedidoConsultado = new(nameof(ContactoDePedidoConsultado));
+
+    /// <summary>Una línea de un pedido de recojo se entregó y su reserva se cerró en el Inventario.</summary>
+    public static readonly AccionAuditable LineaDePedidoEntregada = new(nameof(LineaDePedidoEntregada));
+
+    /// <summary>Se inició una anulación o una entrega de pedido (primer tiempo, con el actor de la solicitud y su iniciador); sin esta auditoría no hay fila ni llamada al Inventario.</summary>
+    public static readonly AccionAuditable OperacionDePedidoIniciada = new(nameof(OperacionDePedidoIniciada));
+
+    /// <summary>El cliente canceló su pedido.</summary>
+    public static readonly AccionAuditable PedidoCanceladoPorElCliente = new(nameof(PedidoCanceladoPorElCliente));
+
+    /// <summary>La depuración de pedidos vencidos (actor «sistema» y conteo).</summary>
+    public static readonly AccionAuditable PedidosDepurados = new(nameof(PedidosDepurados));
+
+    /// <summary>La administración reintentó el reembolso pendiente de un pedido.</summary>
+    public static readonly AccionAuditable ReembolsoDePedidoReintentado = new(nameof(ReembolsoDePedidoReintentado));
+
     public static readonly AccionAuditable EstadoDeEnvioCambiado = new(nameof(EstadoDeEnvioCambiado));
 
     public static readonly AccionAuditable DevolucionSolicitada = new(nameof(DevolucionSolicitada));

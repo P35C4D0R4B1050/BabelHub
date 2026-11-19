@@ -45,6 +45,16 @@ public static class ProblemasDelCarrito
         ["servicio-no-disponible"] = new("SERVICIO-NO-DISPONIBLE", StatusCodes.Status503ServiceUnavailable),
         ["verificacion-requerida"] = new("VERIFICACION-REQUERIDA", StatusCodes.Status403Forbidden),
         ["verificacion-fallida"] = new("VERIFICACION-FALLIDA", StatusCodes.Status403Forbidden),
+        ["reserva-expirada"] = new("PAGO-RESERVA-EXPIRADA", StatusCodes.Status409Conflict),
+        ["intencion-cancelada"] = new("PAGO-INTENCION-CANCELADA", StatusCodes.Status409Conflict),
+        ["instantanea-obsoleta"] = new("PAGO-INSTANTANEA-OBSOLETA", StatusCodes.Status409Conflict),
+        ["total-cambio"] = new("PAGO-TOTAL-CAMBIO", StatusCodes.Status409Conflict),
+        ["pago-en-curso"] = new("PAGO-EN-CURSO", StatusCodes.Status409Conflict),
+        ["clave-invalida"] = new("PAGO-CLAVE-INVALIDA", StatusCodes.Status409Conflict),
+        ["sin-cargo-que-reembolsar"] = new("REEMBOLSO-SIN-CARGO", StatusCodes.Status409Conflict),
+        ["reembolso-distinto"] = new("REEMBOLSO-DISTINTO", StatusCodes.Status409Conflict),
+        ["reembolso-supera-el-tope"] = new("REEMBOLSO-SUPERA-EL-TOPE", StatusCodes.Status422UnprocessableEntity),
+        ["reembolso-no-reintentable"] = new("REEMBOLSO-NO-REINTENTABLE", StatusCodes.Status409Conflict),
     };
 
     public static ProblemaDto Crear(HttpContext contexto, OpcionesDeErrores opciones, ErrorDeAplicacion error)
