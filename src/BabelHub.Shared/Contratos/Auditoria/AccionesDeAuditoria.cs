@@ -79,6 +79,20 @@ public static class AccionesDeAuditoria
 
     public const string EstadoDePedidoCambiado = "EstadoDePedidoCambiado";
 
+    public const string ContactoDePedidoAnonimizado = "ContactoDePedidoAnonimizado";
+
+    public const string ContactoDePedidoConsultado = "ContactoDePedidoConsultado";
+
+    public const string LineaDePedidoEntregada = "LineaDePedidoEntregada";
+
+    public const string OperacionDePedidoIniciada = "OperacionDePedidoIniciada";
+
+    public const string PedidoCanceladoPorElCliente = "PedidoCanceladoPorElCliente";
+
+    public const string PedidosDepurados = "PedidosDepurados";
+
+    public const string ReembolsoDePedidoReintentado = "ReembolsoDePedidoReintentado";
+
     public const string FuenteEditada = "FuenteEditada";
 
     public const string FuenteRegistrada = "FuenteRegistrada";
@@ -259,6 +273,13 @@ public static class AccionesDeAuditoria
         EstadoDeDevolucionCambiado,
         EstadoDeEnvioCambiado,
         EstadoDePedidoCambiado,
+        ContactoDePedidoAnonimizado,
+        ContactoDePedidoConsultado,
+        LineaDePedidoEntregada,
+        OperacionDePedidoIniciada,
+        PedidoCanceladoPorElCliente,
+        PedidosDepurados,
+        ReembolsoDePedidoReintentado,
         FuenteEditada,
         FuenteRegistrada,
         GuiaDeTrasladoRegistrada,
