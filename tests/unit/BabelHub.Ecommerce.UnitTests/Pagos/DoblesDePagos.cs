@@ -408,3 +408,65 @@ internal sealed class AlertasTecnicasEspia : IPublicadorDeAlertasTecnicas
         return Task.CompletedTask;
     }
 }
+
+/// <summary>El envío de avisos a Carrito doblado: anota las intenciones avisadas y los pendientes liberados, y si lo llamaron dentro de una transacción.</summary>
+internal sealed class AvisadorACarritoDoble(UnidadDeTrabajoReversible unidad) : IAvisadorACarrito
+{
+    public List<Guid> Enviados { get; } = [];
+
+    public List<(Guid PedidoId, Guid IntentoId)> Liberados { get; } = [];
+
+    public int LlamadasDentroDeUnaTransaccion { get; private set; }
+
+    public Task Enviar(Guid pedidoId, CancellationToken cancelacion = default)
+    {
+        Enviados.Add(pedidoId);
+        if (unidad.EnCurso)
+        {
+            LlamadasDentroDeUnaTransaccion++;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task LiberarElPendienteRetenido(Guid pedidoId, Guid intentoId, CancellationToken cancelacion = default)
+    {
+        Liberados.Add((pedidoId, intentoId));
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>Carrito: responde lo que la prueba fije (o cae) y anota cada aviso recibido con sus instantes.</summary>
+internal sealed class ProgresoDelCheckoutDoble(UnidadDeTrabajoReversible unidad) : IProgresoDelCheckout
+{
+    public ResultadoDelAvisoDePago Respuesta { get; set; } = ResultadoDelAvisoDePago.Aplicado;
+
+    public bool Falla { get; set; }
+
+    public List<string> Recibidos { get; } = [];
+
+    public List<(DateTimeOffset LimiteEn, DateTimeOffset ReservaExpiraEn)> InstantesDePendiente { get; } = [];
+
+    public int LlamadasDentroDeUnaTransaccion { get; private set; }
+
+    public Task<ResultadoDelAvisoDePago> PagoPendiente(Guid pedidoId, DateTimeOffset limiteEn, DateTimeOffset reservaExpiraEn, CancellationToken cancelacion = default)
+    {
+        InstantesDePendiente.Add((limiteEn, reservaExpiraEn));
+        return Anotar("pendiente");
+    }
+
+    public Task<ResultadoDelAvisoDePago> PagoAprobado(Guid pedidoId, CancellationToken cancelacion = default) => Anotar("aprobado");
+
+    public Task<ResultadoDelAvisoDePago> PagoResuelto(Guid pedidoId, MotivoDePagoResueltoDeCompra motivo, CancellationToken cancelacion = default) => Anotar($"resuelto:{motivo}");
+
+    private Task<ResultadoDelAvisoDePago> Anotar(string aviso)
+    {
+        Recibidos.Add(aviso);
+        if (unidad.EnCurso)
+        {
+            LlamadasDentroDeUnaTransaccion++;
+        }
+
+        return Falla ? throw new HttpRequestException("Carrito no responde.") : Task.FromResult(Respuesta);
+    }
+}

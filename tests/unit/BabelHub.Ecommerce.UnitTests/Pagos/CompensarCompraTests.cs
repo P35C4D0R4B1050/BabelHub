@@ -15,7 +15,7 @@ internal sealed class EntornoDeCompensacion
         var bloqueo = new BloqueoDeIntenciones(p.Repositorio, p.Cuenta);
         var registrar = new RegistrarReembolso(p.Repositorio, p.Reembolsos, p.Unidad, bloqueo, p.Auditoria, p.Reloj);
         var procesar = new ProcesarReembolso(p.Repositorio, p.Reembolsos, p.Unidad, p.Pasarela, p.Alertas, p.Reloj, new OpcionesDelCobro(TimeSpan.FromMilliseconds(300)));
-        Compensar = new CompensarCompra(p.Repositorio, p.Unidad, bloqueo, p.Reservas, registrar, procesar, p.Alertas, p.Reloj);
+        Compensar = new CompensarCompra(p.Repositorio, p.Unidad, bloqueo, p.Reservas, registrar, procesar, p.Avisador, p.Alertas, p.Reloj);
     }
 
     public EntornoDeConfirmacion Base { get; }

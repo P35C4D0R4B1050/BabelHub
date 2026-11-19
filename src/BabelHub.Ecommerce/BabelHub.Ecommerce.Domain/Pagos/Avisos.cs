@@ -86,6 +86,48 @@ public sealed class AvisoACarrito
         Estado = EstadoDeAvisoACarrito.Omitido;
         return true;
     }
+
+    /// <summary>La espera tras la primera falla del envío; se duplica con cada falla hasta <see cref="EsperaMaxima"/>.</summary>
+    public static readonly TimeSpan EsperaBase = TimeSpan.FromSeconds(15);
+
+    public static readonly TimeSpan EsperaMaxima = TimeSpan.FromMinutes(15);
+
+    /// <summary><c>reservas.extender</c> terminó: el <c>PagoPendiente</c> retenido ya puede enviarse con los instantes definitivos. Devuelve si cambió.</summary>
+    public bool Liberar()
+    {
+        if (Estado != EstadoDeAvisoACarrito.Retenido)
+        {
+            return false;
+        }
+
+        Estado = EstadoDeAvisoACarrito.Pendiente;
+        return true;
+    }
+
+    /// <summary>Hay que intentar enviarlo ahora: está pendiente y no espera tras una falla.</summary>
+    public bool EstaListo(DateTimeOffset ahora) => Estado == EstadoDeAvisoACarrito.Pendiente && (ProximoIntentoEn is null || ProximoIntentoEn <= ahora);
+
+    /// <summary>Carrito lo aceptó. Idempotente.</summary>
+    public bool MarcarEnviado(DateTimeOffset ahora)
+    {
+        if (Estado != EstadoDeAvisoACarrito.Pendiente)
+        {
+            return false;
+        }
+
+        Estado = EstadoDeAvisoACarrito.Enviado;
+        EnviadoEn = ahora;
+        ProximoIntentoEn = null;
+        return true;
+    }
+
+    /// <summary>Carrito no lo aceptó (no respondió o el checkout aún reserva): se reintenta con una espera creciente.</summary>
+    public void RegistrarFalla(DateTimeOffset ahora)
+    {
+        Intentos++;
+        var espera = TimeSpan.FromTicks(Math.Min(EsperaMaxima.Ticks, EsperaBase.Ticks << Math.Min(Intentos - 1, 10)));
+        ProximoIntentoEn = ahora + espera;
+    }
     internal AvisoACarrito Copiar() => (AvisoACarrito)MemberwiseClone();
 }
 

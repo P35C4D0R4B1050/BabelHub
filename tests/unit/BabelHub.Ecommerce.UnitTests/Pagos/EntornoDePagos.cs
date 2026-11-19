@@ -170,6 +170,9 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
     public Task<IReadOnlyList<AvisoDePago>> ListarAvisosDePagoDeLaIntencion(Guid intencionId, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<AvisoDePago>>(_avisosDePago.Where(a => a.IntencionId == intencionId).Select(a => a.Copiar()).ToArray());
 
+    public Task<IReadOnlyList<Guid>> ListarIntencionesConAvisosACarritoListos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(_avisosACarrito.Where(a => a.EstaListo(ahora)).OrderBy(a => a.CreadoEn).Select(a => a.IntencionId).Distinct().Take(limite).ToArray());
+
     public Task GuardarAvisoACarrito(AvisoACarrito aviso, CancellationToken cancelacion = default)
     {
         Operaciones++;
@@ -283,6 +286,7 @@ internal sealed class EntornoDePagos
         RegistrarIntento = new RegistrarIntento(Autorizador, Repositorio, Unidad, Cuenta, Posesion, Reservas, Checkout, new LimitadorDeCobros(LimitesDeCobro), Auditoria, Reloj);
         Pasarela = new PasarelaDePagoDoble(Unidad);
         Confirmador = new ConfirmadorDeCompraDoble(Unidad);
+        Avisador = new AvisadorACarritoDoble(Unidad);
         Alertas = new AlertasTecnicasEspia();
         Cobrar = CrearIniciarCobro(new OpcionesDelCobro(TimeSpan.FromMilliseconds(300)));
     }
@@ -305,13 +309,15 @@ internal sealed class EntornoDePagos
 
     public ConfirmadorDeCompraDoble Confirmador { get; }
 
+    public AvisadorACarritoDoble Avisador { get; }
+
     public AlertasTecnicasEspia Alertas { get; }
 
     public ICasoDeUso<CobrarEntrada, ResultadoDelCobroDelCliente> Cobrar { get; private set; }
 
     /// <summary>El orquestador con otras opciones (por ejemplo, la pasarela que exige el correo del titular).</summary>
     public IniciarCobro CrearIniciarCobro(OpcionesDelCobro opciones) =>
-        new(Autorizador, Firmador, Repositorio, Unidad, RegistrarIntento, Pasarela, Cuenta, Reservas, Confirmador, Auditoria, Alertas, Reloj, opciones);
+        new(Autorizador, Firmador, Repositorio, Unidad, RegistrarIntento, Pasarela, Cuenta, Reservas, Confirmador, Avisador, Auditoria, Alertas, Reloj, opciones);
 
     public ActorDePrueba Actor { get; }
 

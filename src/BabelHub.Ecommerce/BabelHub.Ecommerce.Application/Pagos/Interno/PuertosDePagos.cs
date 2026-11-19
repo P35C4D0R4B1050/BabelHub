@@ -155,6 +155,9 @@ internal interface IRepositorioDePagos
 
     Task<IReadOnlyList<AvisoDePago>> ListarAvisosDePagoDeLaIntencion(Guid intencionId, CancellationToken cancelacion = default);
 
+    /// <summary>Las intenciones con algún aviso a Carrito pendiente de enviar ahora (listo, sin espera tras una falla), las más antiguas primero.</summary>
+    Task<IReadOnlyList<Guid>> ListarIntencionesConAvisosACarritoListos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default);
+
     Task GuardarAvisoACarrito(AvisoACarrito aviso, CancellationToken cancelacion = default);
 
     Task GuardarAvisoDePago(AvisoDePago aviso, CancellationToken cancelacion = default);

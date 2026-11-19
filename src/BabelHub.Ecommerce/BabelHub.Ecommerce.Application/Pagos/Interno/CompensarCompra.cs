@@ -16,6 +16,7 @@ internal sealed class CompensarCompra(
     IReservasDelPago reservas,
     RegistrarReembolso registrarReembolso,
     ProcesarReembolso procesarReembolso,
+    IAvisadorACarrito avisador,
     IPublicadorDeAlertasTecnicas alertas,
     IReloj reloj) : ICompensadorDeCompra
 {
@@ -59,6 +60,9 @@ internal sealed class CompensarCompra(
             if (compensacion.SiguientePaso == PasoDeCompensacion.CerrarCheckout)
             {
                 await unidad.Ejecutar(token => CerrarElCheckout(pedidoId, intentoId, token), cancelacion).ConfigureAwait(false);
+
+                // Después de confirmar la transacción que anotó el aviso «compensado»: Carrito cierra el checkout y una falla suya no cambia la compensación.
+                await avisador.Enviar(pedidoId, cancelacion).ConfigureAwait(false);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

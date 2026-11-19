@@ -310,6 +310,7 @@ internal sealed class ConfirmarCompraAprobada(
     ConfirmarReservasDeLaCompra confirmarReservas,
     ICompletadorDeCompra completador,
     ICompensadorDeCompra compensador,
+    IAvisadorACarrito avisador,
     IPublicadorDeAlertasTecnicas alertas,
     IReloj reloj) : IConfirmadorDeCompraAprobada
 {
@@ -336,6 +337,8 @@ internal sealed class ConfirmarCompraAprobada(
         switch (marca.Tipo)
         {
             case TipoDeMarcaDeAprobacion.YaCompletada:
+                // Si el proceso cayó entre confirmar la transacción y avisar a Carrito, la retoma lo avisa (idempotente).
+                await avisador.Enviar(pedidoId, cancelacion).ConfigureAwait(false);
                 return new ResultadoDelCobroDelCliente(EstadoDelCobro.Aprobado, null, intentoId);
             case TipoDeMarcaDeAprobacion.CargoDuplicado:
                 await Alertar(MotivoDeAlertaCargoDuplicado).ConfigureAwait(false);
@@ -367,6 +370,8 @@ internal sealed class ConfirmarCompraAprobada(
         switch (completada.Tipo)
         {
             case TipoDeCompletar.Completada:
+                // Después de confirmar la transacción que anotó el aviso PagoAprobado: Carrito se entera y una falla suya no cambia nada.
+                await avisador.Enviar(pedidoId, cancelacion).ConfigureAwait(false);
                 return new ResultadoDelCobroDelCliente(EstadoDelCobro.Aprobado, null, intentoId);
             case TipoDeCompletar.Compensar:
                 await compensador.Compensar(pedidoId, intentoId, completada.Motivo!.Value, VarianteDeCompensacion.Completa, cancelacion).ConfigureAwait(false);
