@@ -109,6 +109,15 @@ public static class AccionesDeAuditoria
     /// <summary>El trabajo de fondo desvinculó las intenciones de pago cerradas hace más de 2 años (cantidad, sin datos personales, PAG-26).</summary>
     public const string IntencionesDePagoDesvinculadas = "IntencionesDePagoDesvinculadas";
 
+    /// <summary>Un reembolso de Pagos se concluyó o quedó pendiente (con su motivo de lista cerrada); el actor es el administrador central o el sistema. Sin datos de pago.</summary>
+    public const string ReembolsoResuelto = "ReembolsoResuelto";
+
+    /// <summary>Un paso de la compensación de un cobro se hizo (abrir, liberar reservas, registrar el reembolso o cerrar el checkout), con su motivo de lista cerrada.</summary>
+    public const string PasoDeCompensacionHecho = "PasoDeCompensacionHecho";
+
+    /// <summary>Pagos eliminó el contacto de entrega de una o varias intenciones (cantidad, sin datos personales, PAG-27).</summary>
+    public const string ContactoDeEntregaLiberado = "ContactoDeEntregaLiberado";
+
     public const string IngresoFallido = "IngresoFallido";
 
     public const string LicenciaCambiada = "LicenciaCambiada";
@@ -248,6 +257,9 @@ public static class AccionesDeAuditoria
         IngresoPendienteConciliado,
         IngresosSolicitadosAnonimizados,
         IntencionesDePagoDesvinculadas,
+        ReembolsoResuelto,
+        PasoDeCompensacionHecho,
+        ContactoDeEntregaLiberado,
         LicenciaCambiada,
         LimiteExcedido,
         LlamadaEntreServiciosSinCredencial,
