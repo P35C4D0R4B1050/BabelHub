@@ -203,7 +203,21 @@ public interface IClienteDelInventario
     /// sucursal sin contacto es <c>INV-NO-ENCONTRADO</c> (404). Una lectura: se puede reintentar. El número es un dato personal: no se registra.
     /// </summary>
     Task<ResultadoDelInventario<ContactoDeSucursalDelInventario>> ConsultarContactoDeSucursal(string codigoDeSucursal, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// <c>inventario.devoluciones.reingresar</c>: suma los impresos de una devolución aceptada a la sucursal receptora (alcance de usuario: lleva el token de la persona que confirma la recepción; DEV-07, AJU-11). <b>Sin clave de idempotencia</b>: la devolución de la ruta identifica el reingreso y repetirlo con la misma carga responde
+    /// <c>yaAplicado</c> sin sumar otra vez (AJU-16); con otra carga, <c>INV-IDEMPOTENCIA-EN-CONFLICTO</c>. De 1 a 20 líneas con ediciones distintas. Con la misma carga se puede reintentar.
+    /// Tiene una <b>implementación por omisión que falla cerrado</b> (sin respuesta): las implementaciones y los dobles que no lo usan siguen compilando y nunca simulan un reingreso; <c>HttpClienteDelInventario</c> lo implementa.
+    /// </summary>
+    Task<ResultadoDelInventario<ReingresoDeDevolucion>> ReingresarDevolucion(Guid devolucionId, Guid pedidoId, string codigoDeFuente, IReadOnlyList<LineaAReingresar> lineas, CancellationToken cancelacion = default) =>
+        Task.FromResult(ResultadoDelInventario<ReingresoDeDevolucion>.SinRespuesta);
 }
+
+/// <summary>Una línea de un reingreso por devolución: la edición y la cantidad.</summary>
+public sealed record LineaAReingresar(Guid EdicionId, int Cantidad);
+
+/// <summary>El resultado de un reingreso por devolución: la devolución y si ya se había aplicado (no se sumó nada).</summary>
+public sealed record ReingresoDeDevolucion(Guid DevolucionId, bool YaAplicado);
 
 // ---------- Reservas (consulta previa, reservar y liberar; contrato v1 de reservas) ----------
 
