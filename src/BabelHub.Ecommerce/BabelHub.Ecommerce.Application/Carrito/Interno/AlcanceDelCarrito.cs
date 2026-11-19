@@ -63,6 +63,12 @@ internal static class ClavesDelCarrito
     public const string EntregaNoValidable = "entrega-no-validable";
 
     public const string CheckoutNoEncontrado = "checkout-no-encontrado";
+
+    /// <summary>Falta aceptar un texto requerido (422): los términos y la privacidad siempre y el reembolso digital si hay digitales (CAR-12, CAR-13).</summary>
+    public const string AceptacionRequerida = "checkout-aceptacion-requerida";
+
+    /// <summary>La versión vigente de un texto cambió respecto de la que se mostró (409): se vuelve a pedir su aceptación (CAR-28). El campo lleva el texto y la clave, la versión vigente.</summary>
+    public const string TextoCambio = "checkout-texto-cambio";
 }
 
 /// <summary>Los motivos de <c>AccesoDenegado</c> que usa el módulo (AUD-05).</summary>

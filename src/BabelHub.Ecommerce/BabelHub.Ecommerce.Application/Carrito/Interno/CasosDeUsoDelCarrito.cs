@@ -55,6 +55,19 @@ internal sealed class ServiciosDelCarrito(
 
     public IUnidadDeTrabajo Unidad => unidad;
 
+    /// <summary>Si la cuenta puede comprar (no cancelada, correo verificado, textos al día, sin cancelación diferida): lo que condiciona guardar el consentimiento de avisos. Ante una falla de Identidad, no.</summary>
+    public async Task<bool> PuedeComprar(Guid cuentaId, CancellationToken cancelacion)
+    {
+        try
+        {
+            return await estadoDeCuenta.Consultar(cuentaId, cancelacion).ConfigureAwait(false) is { PuedeComprar: true };
+        }
+        catch (Exception excepcion) when (excepcion is not OperationCanceledException)
+        {
+            return false;
+        }
+    }
+
     // ---------- Errores ----------
 
     public static Resultado<T> Fallo<T>(CategoriaDeError categoria, string clave, IReadOnlyList<ErrorDeCampo>? errores = null) => Resultado<T>.Fallo(new ErrorDeAplicacion(categoria, clave, errores));

@@ -110,6 +110,9 @@ internal sealed class EstadoDeCuentaFalso : IEstadoDeCuenta
 
     public bool NoExiste { get; set; }
 
+    /// <summary>La cuenta existe y no está cancelada pero no puede comprar (textos pendientes, correo sin verificar o cancelación diferida): puede editar su carrito pero no guardar el consentimiento de avisos.</summary>
+    public bool NoPuedeComprar { get; set; }
+
     public int Consultas { get; private set; }
 
     public Task<EstadoDeCuenta?> Consultar(Guid usuarioId, CancellationToken cancelacion = default)
@@ -120,7 +123,7 @@ internal sealed class EstadoDeCuentaFalso : IEstadoDeCuenta
             throw new InvalidOperationException("Identidad no responde.");
         }
 
-        return Task.FromResult<EstadoDeCuenta?>(NoExiste ? null : new EstadoDeCuenta(usuarioId, !Cancelada, EstadoDeAceptacionDeLosTextos.AlDia, true, Cancelada, false));
+        return Task.FromResult<EstadoDeCuenta?>(NoExiste ? null : new EstadoDeCuenta(usuarioId, !Cancelada && !NoPuedeComprar, EstadoDeAceptacionDeLosTextos.AlDia, true, Cancelada, false));
     }
 
     public Task<ResultadoDeLaAceptacion> AceptarLosTextos(Guid usuarioId, string versionMostrada, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLaAceptacion.Aceptada);
@@ -430,6 +433,10 @@ internal sealed class EntornoDelCarrito
 
     public CostoDeEnvioFijo Costo { get; } = new(12m);
 
+    public TextosLegalesFalsos Textos { get; } = new();
+
+    public ConsentimientoFalso Consentimiento { get; } = new();
+
     public AuditoriaDelCarritoEspia Auditoria { get; } = new();
 
     public EstadoDeCuentaFalso Cuenta { get; } = new();
@@ -447,7 +454,7 @@ internal sealed class EntornoDelCarrito
         new(new AutorizadorDelCarrito(Actor, Denegaciones), Catalogo, Disponibilidad, Posesion, Cuenta, Limites, Carritos, Checkouts, Identificadores, Reloj, Unidad, new EdicionConCheckoutVivo(Pagos, Checkouts), Auditoria);
 
     /// <summary>Los servicios del checkout: los del carrito más el Inventario y el costo de envío.</summary>
-    public ServiciosDelCheckout ServiciosDelCheckout() => new(Servicios(), Inventario, Costo);
+    public ServiciosDelCheckout ServiciosDelCheckout() => new(Servicios(), Inventario, Costo, Textos, Consentimiento);
 
     public static EntornoDelCarrito DeCliente(Guid? cuenta = null) => new(ActorDePrueba.DeCliente(cuenta));
 
@@ -589,5 +596,54 @@ internal sealed class InventarioDelCarritoFalso : IInventarioDelCarrito
     {
         Liberaciones.Add((pedidoId, motivo));
         return Task.FromResult(AlLiberar);
+    }
+}
+
+/// <summary>Los textos legales con su versión vigente (de Identidad, por el contrato público de la web): configurables y con un interruptor de caído.</summary>
+internal sealed class TextosLegalesFalsos : BabelHub.Ecommerce.Application.Web.ITextosLegales
+{
+    private readonly Dictionary<BabelHub.Ecommerce.Application.Web.TipoDeTextoLegal, string> _versiones = new()
+    {
+        [BabelHub.Ecommerce.Application.Web.TipoDeTextoLegal.Terminos] = "t-1",
+        [BabelHub.Ecommerce.Application.Web.TipoDeTextoLegal.Privacidad] = "p-1",
+        [BabelHub.Ecommerce.Application.Web.TipoDeTextoLegal.Reembolso] = "r-1",
+    };
+
+    public bool Caido { get; set; }
+
+    public int Consultas { get; private set; }
+
+    public void Vigente(BabelHub.Ecommerce.Application.Web.TipoDeTextoLegal tipo, string version) => _versiones[tipo] = version;
+
+    public Task<Resultado<BabelHub.Ecommerce.Application.Web.TextoLegal>> Obtener(BabelHub.Ecommerce.Application.Web.TipoDeTextoLegal tipo, CancellationToken cancelacion = default)
+    {
+        Consultas++;
+        return Task.FromResult(Caido
+            ? Resultado<BabelHub.Ecommerce.Application.Web.TextoLegal>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "texto-no-disponible"))
+            : Resultado<BabelHub.Ecommerce.Application.Web.TextoLegal>.Exito(new BabelHub.Ecommerce.Application.Web.TextoLegal(tipo, "Texto", _versiones[tipo], new DateOnly(2026, 1, 1), false, "Resumen", [])));
+    }
+}
+
+/// <summary>El consentimiento de WhatsApp: ofrece o no según se configure y guarda o falla; cuenta lo que se le pidió.</summary>
+internal sealed class ConsentimientoFalso : IConsentimientoDeAvisos
+{
+    public OfertaDeConsentimiento Oferta { get; set; } = new(EstadoDeLaOfertaDeConsentimiento.SeOfrece, "•••• •• 321");
+
+    public bool GuardaBien { get; set; } = true;
+
+    public List<(Guid Cuenta, string Huella)> Guardados { get; } = [];
+
+    public int Consultas { get; private set; }
+
+    public Task<OfertaDeConsentimiento> Consultar(Guid cuentaId, CancellationToken cancelacion = default)
+    {
+        Consultas++;
+        return Task.FromResult(Oferta);
+    }
+
+    public Task<bool> Guardar(Guid cuentaId, string huellaEnmascaradaDelNumero, CancellationToken cancelacion = default)
+    {
+        Guardados.Add((cuentaId, huellaEnmascaradaDelNumero));
+        return Task.FromResult(GuardaBien);
     }
 }

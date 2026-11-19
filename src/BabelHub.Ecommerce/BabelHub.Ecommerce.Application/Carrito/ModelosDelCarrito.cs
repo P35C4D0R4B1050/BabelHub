@@ -258,7 +258,8 @@ public sealed record VistaDelCheckout(
     IReadOnlyList<TextoLegalDeCompra> TextosPorAceptar,
     DateTimeOffset? ReservaExpiraEn,
     Guid? PedidoId,
-    bool CarritoCambio);
+    bool CarritoCambio,
+    ConsentimientoDeWhatsAppDeCompra? ConsentimientoDeWhatsApp = null);
 
 /// <summary>La entrega elegida: recojo con el código de una sucursal, domicilio con el contacto (dirección y región incluidas) o solo digital (CAR-07 a CAR-09, CAR-30).</summary>
 public sealed record ElegirEntregaEntrada(TipoDeEntregaDeCompra Tipo, string? CodigoDeSucursalDeRecojo, ContactoDeCompra? Contacto, Guid? PedidoId = null);
@@ -428,3 +429,24 @@ public interface IProgresoDelCheckout
     /// <summary>El pago pendiente se resolvió sin aprobar: <c>vencido</c> o <c>rechazado</c> con la reserva vigente vuelven a <c>en_pago</c>; con la reserva expirada o <c>compensado</c> pasa a <c>cancelado</c>.</summary>
     Task<ResultadoDelAvisoDePago> PagoResuelto(Guid pedidoId, MotivoDePagoResueltoDeCompra motivo, CancellationToken cancelacion = default);
 }
+
+public enum EstadoDelConsentimientoDeCompra
+{
+    /// <summary>No se ofrece (la cuenta no tiene número o Identidad no respondió).</summary>
+    NoSeOfrece,
+
+    /// <summary>Se ofrece, sin marcar, con la huella enmascarada del número.</summary>
+    SeOfrece,
+
+    /// <summary>La cuenta ya consiente.</summary>
+    YaConsiente,
+
+    /// <summary>Se marcó y Identidad confirmó el guardado.</summary>
+    Guardado,
+
+    /// <summary>Se marcó pero no se pudo guardar: el pago sigue y se informa que no se guardó (nunca se dice «guardado»).</summary>
+    NoGuardado,
+}
+
+/// <summary>El estado del consentimiento de WhatsApp para la pantalla de datos y aceptaciones, con la huella enmascarada del número solo si se ofrece (CAR-18, AC-CAR-16).</summary>
+public sealed record ConsentimientoDeWhatsAppDeCompra(EstadoDelConsentimientoDeCompra Estado, string? HuellaEnmascarada = null);

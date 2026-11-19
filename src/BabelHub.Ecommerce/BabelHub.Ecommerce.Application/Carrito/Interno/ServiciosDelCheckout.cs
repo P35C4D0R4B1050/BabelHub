@@ -2,8 +2,10 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using BabelHub.Ecommerce.Application.Catalogo;
 using BabelHub.Ecommerce.Application.Plataforma;
+using BabelHub.Ecommerce.Application.Web;
 using BabelHub.Ecommerce.Domain.Carrito;
 using CarritoDeDominio = BabelHub.Ecommerce.Domain.Carrito.Carrito;
+using TextoLegal = BabelHub.Ecommerce.Domain.Carrito.TextoLegal;
 using Tipo = BabelHub.Ecommerce.Domain.Carrito.TipoDeEntrega;
 
 namespace BabelHub.Ecommerce.Application.Carrito.Interno;
@@ -15,8 +17,17 @@ internal sealed record InformacionDeLinea(DisponibilidadDeLineaDeCheckout Dispon
 /// Lo que comparten los casos de uso del checkout: los del carrito, el Inventario (disponibilidad real, consulta previa y, más adelante, reservar y liberar) y el costo de envío configurado, más las funciones que arman las
 /// líneas del checkout desde el carrito y el Catálogo y la <see cref="VistaDelCheckout"/>. El Inventario se consulta siempre <b>antes</b> de abrir una transacción y sin memoria (CAR-05); sin respuesta no se avanza (CAR-06).
 /// </summary>
-internal sealed partial class ServiciosDelCheckout(ServiciosDelCarrito carrito, IInventarioDelCarrito inventario, ICostoDeEnvioConfigurado costoDeEnvio)
+internal sealed partial class ServiciosDelCheckout(
+    ServiciosDelCarrito carrito,
+    IInventarioDelCarrito inventario,
+    ICostoDeEnvioConfigurado costoDeEnvio,
+    ITextosLegales textosLegales,
+    IConsentimientoDeAvisos consentimiento)
 {
+    public ITextosLegales Textos => textosLegales;
+
+    public IConsentimientoDeAvisos Consentimiento => consentimiento;
+
     public ServiciosDelCarrito Carrito => carrito;
 
     public IInventarioDelCarrito Inventario => inventario;
@@ -273,6 +284,34 @@ internal sealed partial class ServiciosDelCheckout(ServiciosDelCarrito carrito, 
         Tipo.Recojo => TipoDeEntregaDeCompra.Recojo,
         Tipo.Domicilio => TipoDeEntregaDeCompra.Domicilio,
         _ => TipoDeEntregaDeCompra.Digital,
+    };
+
+    public static string NombreDelTexto(TextoLegal texto) => texto switch
+    {
+        TextoLegal.Terminos => "terminos",
+        TextoLegal.Privacidad => "privacidad",
+        _ => "reembolsoDigital",
+    };
+
+    public static TipoDeTextoLegal TipoDeTextoWeb(TextoLegal texto) => texto switch
+    {
+        TextoLegal.Terminos => TipoDeTextoLegal.Terminos,
+        TextoLegal.Privacidad => TipoDeTextoLegal.Privacidad,
+        _ => TipoDeTextoLegal.Reembolso,
+    };
+
+    public static TextoLegal DeTextoDeCompra(TextoLegalDeCompra texto) => texto switch
+    {
+        TextoLegalDeCompra.Terminos => TextoLegal.Terminos,
+        TextoLegalDeCompra.Privacidad => TextoLegal.Privacidad,
+        _ => TextoLegal.ReembolsoDigital,
+    };
+
+    public static ConsentimientoDeWhatsAppDeCompra DeOferta(OfertaDeConsentimiento oferta) => oferta.Estado switch
+    {
+        EstadoDeLaOfertaDeConsentimiento.SeOfrece => new ConsentimientoDeWhatsAppDeCompra(EstadoDelConsentimientoDeCompra.SeOfrece, oferta.HuellaEnmascarada),
+        EstadoDeLaOfertaDeConsentimiento.YaConsiente => new ConsentimientoDeWhatsAppDeCompra(EstadoDelConsentimientoDeCompra.YaConsiente),
+        _ => new ConsentimientoDeWhatsAppDeCompra(EstadoDelConsentimientoDeCompra.NoSeOfrece),
     };
 
     public static TextoLegalDeCompra DeTexto(TextoLegal texto) => texto switch

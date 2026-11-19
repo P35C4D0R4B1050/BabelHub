@@ -311,3 +311,36 @@ public interface ICostoDeEnvioConfigurado
 /// /checkout/iniciar</c> con un checkout vivo devuelve ese checkout).
 /// </summary>
 public sealed class CheckoutYaExisteException() : Exception("La cuenta ya tiene un checkout vivo: otra solicitud lo creó a la vez.");
+
+// ---------- Consentimiento de avisos por WhatsApp ----------
+
+public enum EstadoDeLaOfertaDeConsentimiento
+{
+    /// <summary>La cuenta no tiene un número guardado, o Identidad no responde: no se ofrece (se ofrece solo si ya hay un número, CAR-18).</summary>
+    NoSeOfrece,
+
+    /// <summary>La cuenta tiene un número y aún no consiente: se ofrece, mostrando la huella enmascarada.</summary>
+    SeOfrece,
+
+    /// <summary>La cuenta ya consiente: no se vuelve a ofrecer.</summary>
+    YaConsiente,
+}
+
+/// <summary>Lo que se ofrece en el checkout: el estado y, si se ofrece, la huella enmascarada del número (nunca el número, que no llega a Carrito).</summary>
+public sealed record OfertaDeConsentimiento(EstadoDeLaOfertaDeConsentimiento Estado, string? HuellaEnmascarada)
+{
+    public static OfertaDeConsentimiento NoSeOfrece { get; } = new(EstadoDeLaOfertaDeConsentimiento.NoSeOfrece, null);
+}
+
+/// <summary>
+/// El consentimiento de avisos por WhatsApp (CAR-18, IDE-31, IDE-32): lo guarda <c>identidad-seguridad</c> y <b>no se exige</b> para pagar. Un puerto propio de Carrito mientras el contrato de Identidad no tenga una operación que reciba la
+/// huella enmascarada en vez del número (el número nunca llega a Carrito, a sus registros ni a su auditoría): Identidad compara la huella con el número vigente al guardar. Una falla no bloquea el pago ni dice «guardado».
+/// </summary>
+public interface IConsentimientoDeAvisos
+{
+    /// <summary>Si se ofrece el consentimiento y la huella enmascarada del número de la cuenta; ante cualquier falla, <see cref="OfertaDeConsentimiento.NoSeOfrece"/>.</summary>
+    Task<OfertaDeConsentimiento> Consultar(Guid cuentaId, CancellationToken cancelacion = default);
+
+    /// <summary><see langword="true"/> solo si Identidad confirmó que guardó el consentimiento para el número al que se refiere la huella; <see langword="false"/> ante cualquier falla, cambio de número o respuesta no entendida.</summary>
+    Task<bool> Guardar(Guid cuentaId, string huellaEnmascaradaDelNumero, CancellationToken cancelacion = default);
+}
