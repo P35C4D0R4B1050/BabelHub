@@ -24,7 +24,7 @@ public enum TipoDeCampo
     /// <summary>El código de una sucursal.</summary>
     CodigoDeSucursal,
 
-    /// <summary>Una cantidad pequeña (hasta tres dígitos).</summary>
+    /// <summary>Una cantidad pequeña (hasta cinco dígitos).</summary>
     Cantidad,
 }
 
@@ -176,7 +176,7 @@ public sealed partial class PlantillaDeAviso
     [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9_-]{1,15}\\z", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 250)]
     private static partial Regex FormatoDelCodigoDeSucursal();
 
-    [GeneratedRegex("^[0-9]{1,3}\\z", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 250)]
+    [GeneratedRegex("^[0-9]{1,5}\\z", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 250)]
     private static partial Regex FormatoDeLaCantidad();
 
     [GeneratedRegex("(://|www\\.|@|\\.(com|pe|net|org|io)\\b)", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 250)]
@@ -234,17 +234,17 @@ public static class CatalogoDePlantillas
             new CampoDePlantilla("estado", TipoDeCampo.Enumeracion, 16, Lista("aprobada", "rechazada", "recibida", "reembolsada")),
             Nombre),
         PlantillaDeAviso.Crear(
-            "traslado-estado",
+            "traslado-cambio-de-estado",
             TipoDeDestinatario.Sucursal,
             1,
-            new CampoDePlantilla("trasladoId", TipoDeCampo.Identificador, 64),
-            new CampoDePlantilla("estado", TipoDeCampo.Enumeracion, 16, Lista("solicitado", "aprobado", "rechazado", "cancelado", "despachado", "recibido")),
-            new CampoDePlantilla("sucursalDeOrigen", TipoDeCampo.CodigoDeSucursal, 16, Obligatorio: false),
-            new CampoDePlantilla("sucursalDeDestino", TipoDeCampo.CodigoDeSucursal, 16, Obligatorio: false)),
+            new CampoDePlantilla("numeroDeTraslado", TipoDeCampo.Identificador, 20),
+            new CampoDePlantilla("estado", TipoDeCampo.Enumeracion, 16, Lista("solicitado", "aprobado", "en-transito", "recibido", "rechazado", "cancelado")),
+            new CampoDePlantilla("rolDeLaSucursal", TipoDeCampo.Enumeracion, 8, Lista("origen", "destino")),
+            new CampoDePlantilla("cantidad", TipoDeCampo.Cantidad, 5)),
     ];
 
     /// <summary>Las plantillas que solo puede pedir el Inventario (solo las de traslado, NOT-09).</summary>
-    public static bool EsDeTraslado(string clave) => clave == "traslado-estado";
+    public static bool EsDeTraslado(string clave) => clave == "traslado-cambio-de-estado";
 
     public static PlantillaDeAviso? Obtener(string? clave) => Todas.FirstOrDefault(p => p.Clave == clave);
 }

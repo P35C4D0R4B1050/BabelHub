@@ -4,6 +4,7 @@ using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Infrastructure.Plataforma;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -507,6 +508,59 @@ public sealed class AnfitrionDelEcommerceTests
         // La firma de los estados de entrega de n8n entra a la lista blanca de entradas de integración.
         Assert.Contains("n8n", n8n.Services.GetRequiredService<BabelHub.Ecommerce.Application.Plataforma.Interno.OpcionesDeEntradasDeIntegracion>().ProveedoresPermitidos);
         Assert.DoesNotContain("n8n", simulado.Services.GetRequiredService<BabelHub.Ecommerce.Application.Plataforma.Interno.OpcionesDeEntradasDeIntegracion>().ProveedoresPermitidos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-01")]
+    public async Task LaSolicitudDeAvisoDelInventario_SinLaCredencialDeAlcanceOConUnaAjena_Es401Uniforme_ConLaCorrectaLlegaALaValidacion()
+    {
+        var configuracion = ConfiguracionCompleta();
+        var builder = Constructor(configuracion, "Development");
+        builder.WebHost.UseTestServer();
+        builder.Services.AddSingleton(typeof(ModoDeArranque), ModoDeArranque.Ensayo);
+        builder.AgregarEcommerce(ModoDeArranque.Ensayo);
+        await using var app = builder.Build();
+        app.UsarEcommerce();
+        await app.StartAsync();
+        using var cliente = app.GetTestClient();
+        cliente.BaseAddress = new Uri("https://localhost");
+
+        async Task<System.Net.HttpStatusCode> Llamar(string? credencial)
+        {
+            using var peticion = new HttpRequestMessage(HttpMethod.Post, BabelHub.Ecommerce.Api.Notificaciones.EndpointsDeNotificaciones.RutaDeLasSolicitudesDelInventario) { Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json") };
+            if (credencial is not null)
+            {
+                peticion.Headers.TryAddWithoutValidation(CredencialDeServicioMiddleware.CabeceraDeCredencial, credencial);
+            }
+
+            using var respuesta = await cliente.SendAsync(peticion);
+            return respuesta.StatusCode;
+        }
+
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, await Llamar(null));
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, await Llamar("una-credencial-que-no-existe-0123456789abcdef"));
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, await Llamar(configuracion["Seguridad:Credenciales:LecturaDeDisponibilidad"]));
+        // Con la credencial de alcance «solicitar-aviso» pasa la autenticación y llega a la validación del cuerpo vacío.
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, await Llamar(configuracion["Seguridad:Credenciales:SolicitarAviso"]));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-11")]
+    public async Task LaEntradaDeEstadosDeN8n_SoloExisteSiElEnvioEsPorN8n()
+    {
+        await using var simulado = Con(ConfiguracionCompleta(), ModoDeArranque.Normal);
+        await using var n8n = Con(ConN8n(ConfiguracionCompleta()), ModoDeArranque.Normal);
+
+        static bool Mapea(WebApplication a)
+        {
+            a.UsarEcommerce();
+            return ((Microsoft.AspNetCore.Routing.IEndpointRouteBuilder)a).DataSources.SelectMany(d => d.Endpoints).OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>()
+                .Any(e => e.RoutePattern.RawText == BabelHub.Ecommerce.Api.Notificaciones.EstadosDeEntregaDeN8nEnLaApi.Ruta);
+        }
+
+        Assert.False(Mapea(simulado));
+        Assert.True(Mapea(n8n));
+        n8n.ExigirComposicionDeProduccion();
     }
 
     private static string Falla(Dictionary<string, string?> c, bool esProduccion = true, bool soloEnModoNormal = true) =>

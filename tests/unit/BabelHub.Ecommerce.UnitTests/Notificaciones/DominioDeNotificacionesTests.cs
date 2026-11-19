@@ -52,7 +52,7 @@ public sealed class DominioDeNotificacionesTests
     public void UnEventoSinElFormatoCerrado_SeRechaza(string evento)
     {
         Assert.False(PlantillaDeAviso.EventoValido(evento));
-        Assert.Throws<ArgumentException>(() => Aviso.Crear(Guid.NewGuid(), evento, "AYACUCHO", TipoDeDestinatario.Sucursal, "traslado-estado", 1, new Dictionary<string, string>(), Ahora));
+        Assert.Throws<ArgumentException>(() => Aviso.Crear(Guid.NewGuid(), evento, "AYACUCHO", TipoDeDestinatario.Sucursal, "traslado-cambio-de-estado", 1, new Dictionary<string, string>(), Ahora));
     }
 
     [Theory]
@@ -280,13 +280,13 @@ public sealed class DominioDeNotificacionesTests
             new[]
             {
                 "pedido-confirmado", "pedido-estado", "pedido-estado-sucursal", "pedido-en-preparacion", "pedido-en-transito", "pedido-listo-para-recojo", "pedido-entregado", "pedido-no-recogido", "pago-pendiente", "pago-resultado", "pedido-anulado",
-                "reembolso-automatico", "envio-guia", "libro-digital-disponible", "devolucion-estado", "traslado-estado",
+                "reembolso-automatico", "envio-guia", "libro-digital-disponible", "devolucion-estado", "traslado-cambio-de-estado",
             },
             claves);
         Assert.Null(CatalogoDePlantillas.Obtener("promocion-de-navidad"));
-        Assert.True(CatalogoDePlantillas.EsDeTraslado("traslado-estado"));
+        Assert.True(CatalogoDePlantillas.EsDeTraslado("traslado-cambio-de-estado"));
         Assert.False(CatalogoDePlantillas.EsDeTraslado("pedido-confirmado"));
-        Assert.Equal(TipoDeDestinatario.Sucursal, CatalogoDePlantillas.Obtener("traslado-estado")!.Destinatario);
+        Assert.Equal(TipoDeDestinatario.Sucursal, CatalogoDePlantillas.Obtener("traslado-cambio-de-estado")!.Destinatario);
     }
 
     [Theory]
@@ -373,11 +373,11 @@ public sealed class DominioDeNotificacionesTests
     [Fact]
     public void UnaEnumeracion_SoloAdmiteSusValores_YElLargoMaximoSeAplica()
     {
-        var plantilla = CatalogoDePlantillas.Obtener("traslado-estado")!;
+        var plantilla = CatalogoDePlantillas.Obtener("traslado-cambio-de-estado")!;
 
-        Assert.True(plantilla.Validar(new Dictionary<string, string> { ["trasladoId"] = "tr-001", ["estado"] = "aprobado", ["sucursalDeDestino"] = "AYACUCHO" }).EsValido);
-        Assert.Equal("valor-fuera-de-la-lista", plantilla.Validar(new Dictionary<string, string> { ["trasladoId"] = "tr-001", ["estado"] = "robado" }).Motivo);
-        Assert.Equal("largo-invalido", plantilla.Validar(new Dictionary<string, string> { ["trasladoId"] = new string('a', 65), ["estado"] = "aprobado" }).Motivo);
+        Assert.True(plantilla.Validar(new Dictionary<string, string> { ["numeroDeTraslado"] = "7", ["rolDeLaSucursal"] = "destino", ["cantidad"] = "3", ["estado"] = "aprobado" }).EsValido);
+        Assert.Equal("valor-fuera-de-la-lista", plantilla.Validar(new Dictionary<string, string> { ["numeroDeTraslado"] = "7", ["rolDeLaSucursal"] = "destino", ["cantidad"] = "3", ["estado"] = "robado" }).Motivo);
+        Assert.Equal("largo-invalido", plantilla.Validar(new Dictionary<string, string> { ["numeroDeTraslado"] = new string('a', 21), ["rolDeLaSucursal"] = "destino", ["cantidad"] = "3", ["estado"] = "aprobado" }).Motivo);
     }
 
     [Fact]

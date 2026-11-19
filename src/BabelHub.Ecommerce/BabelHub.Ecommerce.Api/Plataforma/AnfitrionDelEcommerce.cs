@@ -364,10 +364,12 @@ public static class AnfitrionDelEcommerce
             SinSesionPorOrigen = PoliticasDeLimite.SolicitudesSinSesionPorOrigen,
             PorUsuario = PoliticasDeLimite.SolicitudesPorUsuario,
             // La entrada de avisos de la pasarela no cuenta en el tope previo ni en el límite sin sesión (SEG-18): su único límite es la ráfaga por origen, antes de verificar la firma.
-            RutasExentas = ["/health", AvisosDeLaPasarelaEnLaApi.Ruta],
+            RutasExentas = ["/health", AvisosDeLaPasarelaEnLaApi.Ruta, EstadosDeEntregaDeN8nEnLaApi.Ruta],
         });
         var aplicacion = BasesDelEcommerce.Abrir(opciones.BaseDeLaAplicacion);
-        servicios.AgregarPlataformaDelEcommerce(aplicacion, opciones.Configuracion.Seguridad, opciones.Configuracion.Turnstile, soloEnModoNormal, [], opciones.Redis);
+        // La superficie de servicio del E-commerce declara las operaciones que atiende hoy: la solicitud de aviso del Inventario (alcance solicitar-aviso).
+        (OperacionDeServicio Operacion, AlcanceDeServicio Alcance)[] declaraciones = [(new OperacionDeServicio(EndpointsDeNotificaciones.OperacionDeLasSolicitudesDelInventario), AlcanceDeServicio.SolicitarAviso)];
+        servicios.AgregarPlataformaDelEcommerce(aplicacion, opciones.Configuracion.Seguridad, opciones.Configuracion.Turnstile, soloEnModoNormal, declaraciones, opciones.Redis);
         servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDelProveedor("turnstile", esNulo: !soloEnModoNormal));
         servicios.AgregarCredencialDeServicio(new OpcionesDeSuperficieDeServicio { TopeDeLaDireccionDirecta = PoliticasDeLimite.SolicitudesPorHuellaDirecta }, opciones.Configuracion.Seguridad.CredencialesDeEntrada);
 
@@ -463,6 +465,9 @@ public static class AnfitrionDelEcommerce
         app.MapearSalud();
         // La entrada de avisos de la pasarela solo se mapea con un esquema de firma verificable (hoy ninguno: «culqi» no tiene adaptador), así que responde 404.
         app.MapearAvisosDeLaPasarela(habilitada: false);
+        // Notificaciones: la solicitud del Inventario y la administración (desactivar, reactivar y consultar); los estados de entrega de n8n solo existen si el envío es por n8n (con su firma verificable) y son de la red interna.
+        app.MapearNotificaciones();
+        app.MapearEstadosDeEntregaDeN8n(habilitada: app.Services.GetService<OpcionesDeEnvioPorN8n>() is not null);
         app.MapDefaultControllerRoute();
         return app;
     }

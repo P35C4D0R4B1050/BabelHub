@@ -221,7 +221,7 @@ public sealed class SolicitudesDeAvisosTests
         new(evento, DestinatarioDelAviso.Cliente, cuenta.ToString("D"), "pedido-listo-para-recojo", new Dictionary<string, string> { ["numeroDePedido"] = pedido, ["nombre"] = "María" });
 
     private static SolicitudDeAviso Traslado(string sucursal, string evento = "traslado:7:aprobado") =>
-        new(evento, DestinatarioDelAviso.Sucursal, sucursal, "traslado-estado", new Dictionary<string, string> { ["trasladoId"] = "tr-7", ["estado"] = "aprobado" });
+        new(evento, DestinatarioDelAviso.Sucursal, sucursal, "traslado-cambio-de-estado", new Dictionary<string, string> { ["numeroDeTraslado"] = "7", ["rolDeLaSucursal"] = "destino", ["cantidad"] = "3", ["estado"] = "aprobado" });
 
     // ---------------------------------------------------------------- solicitar (T04)
 
@@ -291,7 +291,7 @@ public sealed class SolicitudesDeAvisosTests
 
     [Theory]
     [InlineData("plantilla-que-no-existe")]
-    [InlineData("traslado-estado")]
+    [InlineData("traslado-cambio-de-estado")]
     [Trait("Criterio", "AC-NOT-06")]
     public async Task UnaPlantillaInexistenteOParaOtroTipoDeDestinatario_SeRechaza_SinTocarLaBaseNiIdentidad(string plantilla)
     {
@@ -505,7 +505,7 @@ public sealed class SolicitudesDeAvisosTests
     }
 
     [Theory]
-    [InlineData("trasladoId", "3f2c9a8e-0000-4000-8000-123456789012")]
+    [InlineData("numeroDeTraslado", "TR3f2c9a8e0000123456")]
     [Trait("Criterio", "AC-NOT-06")]
     public async Task UnIdentificadorMixtoConMuchosDigitos_NoSeRechazaPorParecerUnaTarjeta(string campo, string valor)
     {
@@ -526,7 +526,7 @@ public sealed class SolicitudesDeAvisosTests
         var e = new Entorno();
         var solicitud = Traslado("AYACUCHO");
 
-        var resultado = await e.Solicitar.Solicitar(solicitud with { Campos = new Dictionary<string, string>(solicitud.Campos) { ["trasladoId"] = valor } });
+        var resultado = await e.Solicitar.Solicitar(solicitud with { Campos = new Dictionary<string, string>(solicitud.Campos) { ["numeroDeTraslado"] = valor } });
 
         Assert.Equal(ResultadoDeLaSolicitudDeAviso.Rechazado, resultado);
     }

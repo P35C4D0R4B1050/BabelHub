@@ -84,6 +84,26 @@ public sealed class NginxDelBordeTests : IAsyncLifetime
             .ToDictionary(p => p[0], p => p[1].Trim('[', ']'));
     }
 
+    /// <summary>El código HTTP que da el borde a una ruta, desde un contenedor de la misma red.</summary>
+    private async Task<string> EstadoDe(string servidor, string ruta)
+    {
+        var resultado = await _eco!.ExecAsync(["sh", "-c", $"wget -S -O /dev/null -T 5 --header='Host: {servidor}' http://borde:8080{ruta} 2>&1"]);
+        var coincidencia = System.Text.RegularExpressions.Regex.Match(resultado.Stdout + resultado.Stderr, @"HTTP/\S+\s+(\d{3})", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(2));
+        return coincidencia.Success ? coincidencia.Groups[1].Value : resultado.Stdout.Replace('\n', ' ') + "|" + resultado.ExitCode;
+    }
+
+    [Theory]
+    [InlineData("tienda.example.org")]
+    [InlineData("gestion.example.org")]
+    [Trait("Criterio", "AC-NOT-11")]
+    public async Task LasIntegracionesInternasDeNotificaciones_NoExistenEnElBordePublico_ElRestoSiPasa(string servidor)
+    {
+        Assert.Equal("404", await EstadoDe(servidor, "/api/ecommerce/v1/integraciones/n8n/estados"));
+        Assert.Equal("404", await EstadoDe(servidor, "/api/ecommerce/v1/integraciones/n8n/otra-cosa"));
+        Assert.Equal("404", await EstadoDe(servidor, "/api/ecommerce/v1/integraciones/inventario/avisos"));
+        Assert.Equal("200", await EstadoDe(servidor, "/api/ecommerce/v1/integraciones/pasarela/avisos"));
+    }
+
     [Fact]
     [Trait("Criterio", "AC-SEG-15")]
     public async Task ConLaDireccionDelClienteEntregadaPorElTunel_ElBordeLaFijaComoXOrigenCliente()

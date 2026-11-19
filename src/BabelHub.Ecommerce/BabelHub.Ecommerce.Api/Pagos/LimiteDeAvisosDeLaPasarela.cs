@@ -14,7 +14,8 @@ public sealed class LimiteDeAvisosDeLaPasarelaMiddleware(RequestDelegate siguien
     public async Task InvokeAsync(HttpContext contexto, IControlDeLimites control)
     {
         ArgumentNullException.ThrowIfNull(contexto);
-        if (!contexto.Request.Path.StartsWithSegments(AvisosDeLaPasarelaEnLaApi.Ruta, StringComparison.OrdinalIgnoreCase))
+        if (!contexto.Request.Path.StartsWithSegments(AvisosDeLaPasarelaEnLaApi.Ruta, StringComparison.OrdinalIgnoreCase)
+            && !contexto.Request.Path.StartsWithSegments(Notificaciones.EstadosDeEntregaDeN8nEnLaApi.Ruta, StringComparison.OrdinalIgnoreCase))
         {
             await siguiente(contexto).ConfigureAwait(false);
             return;

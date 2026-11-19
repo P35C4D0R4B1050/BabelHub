@@ -112,7 +112,7 @@ public sealed class EnvioDeAvisosTests
 
         public Aviso AvisoDeSucursal(string codigo = "AYACUCHO")
         {
-            var aviso = Aviso.Crear(Guid.NewGuid(), "traslado:7:aprobado", codigo, TipoDeDestinatario.Sucursal, "traslado-estado", 1, new Dictionary<string, string> { ["trasladoId"] = "tr-7", ["estado"] = "aprobado" }, Ahora);
+            var aviso = Aviso.Crear(Guid.NewGuid(), "traslado:7:aprobado", codigo, TipoDeDestinatario.Sucursal, "traslado-cambio-de-estado", 1, new Dictionary<string, string> { ["numeroDeTraslado"] = "7", ["rolDeLaSucursal"] = "destino", ["cantidad"] = "3", ["estado"] = "aprobado" }, Ahora);
             Base.Avisos.Guardados.Add(aviso);
             return aviso;
         }
@@ -589,7 +589,7 @@ public sealed class EnvioDeAvisosTests
         var m = new Mundo();
         var avisos = Enumerable.Range(1, 8).Select(i =>
         {
-            var aviso = Aviso.Crear(Guid.NewGuid(), $"traslado:{i}:aprobado", "AYACUCHO", TipoDeDestinatario.Sucursal, "traslado-estado", 1, new Dictionary<string, string> { ["trasladoId"] = $"tr-{i}", ["estado"] = "aprobado" }, m.Ahora);
+            var aviso = Aviso.Crear(Guid.NewGuid(), $"traslado:{i}:aprobado", "AYACUCHO", TipoDeDestinatario.Sucursal, "traslado-cambio-de-estado", 1, new Dictionary<string, string> { ["numeroDeTraslado"] = "7", ["rolDeLaSucursal"] = "destino", ["cantidad"] = "3", ["estado"] = "aprobado" }, m.Ahora);
             m.Base.Avisos.Guardados.Add(aviso);
             return aviso;
         }).ToList();
@@ -694,7 +694,7 @@ public sealed class EnvioDeAvisosTests
     {
         var m = new Mundo();
         var recepcion = new RecibirSolicitudDelInventario(m.Base.Solicitar);
-        var solicitud = new SolicitudDeAvisoDelInventario("traslado:9:despachado", "traslado-estado", "AYACUCHO", new Dictionary<string, string> { ["trasladoId"] = "tr-9", ["estado"] = "despachado" });
+        var solicitud = new SolicitudDeAvisoDelInventario("traslado:9:despachado", "traslado-cambio-de-estado", "AYACUCHO", new Dictionary<string, string> { ["numeroDeTraslado"] = "7", ["rolDeLaSucursal"] = "destino", ["cantidad"] = "3", ["estado"] = "en-transito" });
 
         var primera = await recepcion.Recibir(solicitud);
         var repetida = await recepcion.Recibir(solicitud);
@@ -707,10 +707,10 @@ public sealed class EnvioDeAvisosTests
     }
 
     [Theory]
-    [InlineData("pedido:9:despachado", "traslado-estado", "AYACUCHO")]
+    [InlineData("pedido:9:despachado", "traslado-cambio-de-estado", "AYACUCHO")]
     [InlineData("traslado:9:despachado", "pedido-listo-para-recojo", "AYACUCHO")]
-    [InlineData("traslado:9:despachado", "traslado-estado", "+51987654321")]
-    [InlineData("traslado-9-despachado", "traslado-estado", "AYACUCHO")]
+    [InlineData("traslado:9:despachado", "traslado-cambio-de-estado", "+51987654321")]
+    [InlineData("traslado-9-despachado", "traslado-cambio-de-estado", "AYACUCHO")]
     [InlineData("traslado:9:despachado", "no-existe", "AYACUCHO")]
     [Trait("Criterio", "AC-NOT-08")]
     public async Task LaSolicitudDelInventario_ConEventoPlantillaOSucursalInvalidos_SeRechaza_SinGuardarNada(string evento, string plantilla, string sucursal)
@@ -718,7 +718,7 @@ public sealed class EnvioDeAvisosTests
         var m = new Mundo();
         var recepcion = new RecibirSolicitudDelInventario(m.Base.Solicitar);
 
-        var resultado = await recepcion.Recibir(new SolicitudDeAvisoDelInventario(evento, plantilla, sucursal, new Dictionary<string, string> { ["trasladoId"] = "tr-9", ["estado"] = "despachado" }));
+        var resultado = await recepcion.Recibir(new SolicitudDeAvisoDelInventario(evento, plantilla, sucursal, new Dictionary<string, string> { ["numeroDeTraslado"] = "7", ["rolDeLaSucursal"] = "destino", ["cantidad"] = "3", ["estado"] = "en-transito" }));
 
         Assert.Equal(ResultadoDeLaSolicitudDeAviso.Rechazado, resultado);
         Assert.Empty(m.Base.Avisos.Guardados);
@@ -731,7 +731,7 @@ public sealed class EnvioDeAvisosTests
         var m = new Mundo();
         var recepcion = new RecibirSolicitudDelInventario(m.Base.Solicitar);
 
-        var resultado = await recepcion.Recibir(new SolicitudDeAvisoDelInventario("traslado:9:despachado", "traslado-estado", "AYACUCHO", new Dictionary<string, string> { ["trasladoId"] = "tr-9", ["estado"] = "despachado", ["telefono"] = "987654321" }));
+        var resultado = await recepcion.Recibir(new SolicitudDeAvisoDelInventario("traslado:9:despachado", "traslado-cambio-de-estado", "AYACUCHO", new Dictionary<string, string> { ["numeroDeTraslado"] = "7", ["rolDeLaSucursal"] = "destino", ["cantidad"] = "3", ["estado"] = "en-transito", ["telefono"] = "987654321" }));
 
         Assert.Equal(ResultadoDeLaSolicitudDeAviso.Rechazado, resultado);
         Assert.Empty(m.Base.Avisos.Guardados);

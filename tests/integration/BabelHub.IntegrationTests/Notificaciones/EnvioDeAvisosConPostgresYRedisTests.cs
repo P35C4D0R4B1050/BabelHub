@@ -217,7 +217,7 @@ public sealed class EnvioDeAvisosConPostgresYRedisTests(PostgresDeNotificaciones
         var sucursales = new List<Aviso>();
         for (var i = 0; i < 8; i++)
         {
-            var deSucursal = Aviso.Crear(Guid.NewGuid(), $"traslado:{Interlocked.Increment(ref _secuencia)}:aprobado", "AYACUCHO", TipoDeDestinatario.Sucursal, "traslado-estado", 1, new Dictionary<string, string> { ["trasladoId"] = "tr-1", ["estado"] = "aprobado" }, Inicio);
+            var deSucursal = Aviso.Crear(Guid.NewGuid(), $"traslado:{Interlocked.Increment(ref _secuencia)}:aprobado", "AYACUCHO", TipoDeDestinatario.Sucursal, "traslado-cambio-de-estado", 1, new Dictionary<string, string> { ["numeroDeTraslado"] = "7", ["rolDeLaSucursal"] = "destino", ["cantidad"] = "3", ["estado"] = "aprobado" }, Inicio);
             await bd.Unidad.Ejecutar(ct => bd.Avisos.InsertarSiNoExiste(deSucursal, ct));
             sucursales.Add(deSucursal);
         }
