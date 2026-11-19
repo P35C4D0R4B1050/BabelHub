@@ -46,7 +46,7 @@ public static partial class CorreoNormalizado
 
     // Una dirección: parte local de caracteres comunes, arroba, y un dominio de etiquetas de hasta 63 caracteres con al menos un punto y una terminación de letras.
     [GeneratedRegex(
-        @"\A[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,24}\z",
+        @"\A[A-Za-z0-9!#$&'*+=^_`~-]+(?:\.[A-Za-z0-9!#$&'*+=^_`~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,24}\z",
         RegexOptions.CultureInvariant,
         matchTimeoutMilliseconds: 250)]
     private static partial Regex DireccionUnica();

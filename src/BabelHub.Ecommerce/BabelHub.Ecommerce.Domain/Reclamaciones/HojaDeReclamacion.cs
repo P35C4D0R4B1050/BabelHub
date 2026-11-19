@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace BabelHub.Ecommerce.Domain.Reclamaciones;
 
 public enum ResultadoDeTransicion
@@ -76,6 +78,8 @@ public sealed class HojaDeReclamacion
 
     public decimal MontoReclamado { get; }
 
+    /// <summary>Texto libre de un tercero: no se serializa (un registro estructurado no lo repite).</summary>
+    [JsonIgnore]
     public string Detalle { get; private set; }
 
     public string? PedidoReferencia { get; }
@@ -90,6 +94,7 @@ public sealed class HojaDeReclamacion
 
     public EstadoDeHoja Estado { get; private set; }
 
+    [JsonIgnore]
     public string? Respuesta { get; private set; }
 
     public DateTimeOffset? RespondidaEn { get; private set; }

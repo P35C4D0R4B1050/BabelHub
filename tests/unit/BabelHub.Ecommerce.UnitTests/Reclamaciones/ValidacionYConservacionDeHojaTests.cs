@@ -126,6 +126,11 @@ public sealed class ValidacionYConservacionDeHojaTests
     [InlineData("<a@correo.com>")]
     [InlineData("@correo.com")]
     [InlineData("a@.com")]
+    [InlineData("a..b@correo.com")]
+    [InlineData(".a@correo.com")]
+    [InlineData("a.@correo.com")]
+    [InlineData("a%b@correo.com")]
+    [InlineData("a|b@correo.com")]
     public void Un_correo_con_varias_direcciones_nombre_para_mostrar_o_saltos_de_linea_es_invalido(string correo)
     {
         var resultado = ValidacionDeHoja.Validar(Completa() with { Correo = correo });

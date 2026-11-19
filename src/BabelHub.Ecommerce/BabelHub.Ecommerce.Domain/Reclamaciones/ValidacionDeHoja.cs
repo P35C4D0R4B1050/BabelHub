@@ -103,13 +103,13 @@ public static class ValidacionDeHoja
             invalidos.Add(CampoDeHoja.Tipo);
         }
 
-        Texto(CampoDeHoja.Detalle, entrada.Detalle, LongitudMaximaDelDetalle, obligatorio: true, faltan, invalidos);
+        Texto(CampoDeHoja.Detalle, entrada.Detalle, LongitudMaximaDelDetalle, obligatorio: true, faltan, invalidos, permitirSaltos: true);
         Texto(CampoDeHoja.PedidoReferencia, entrada.PedidoReferencia, LongitudMaximaDeLaReferenciaDelPedido, obligatorio: false, faltan, invalidos);
 
         return new ResultadoDeValidacionDeHoja(faltan, invalidos);
     }
 
-    private static void Texto(CampoDeHoja campo, string? valor, int maximo, bool obligatorio, List<CampoDeHoja> faltan, List<CampoDeHoja> invalidos)
+    private static void Texto(CampoDeHoja campo, string? valor, int maximo, bool obligatorio, List<CampoDeHoja> faltan, List<CampoDeHoja> invalidos, bool permitirSaltos = false)
     {
         if (string.IsNullOrWhiteSpace(valor))
         {
@@ -121,7 +121,7 @@ public static class ValidacionDeHoja
             return;
         }
 
-        if (valor.Trim().Length > maximo)
+        if (valor.Trim().Length > maximo || !TextoDeHoja.EsSeguro(valor, permitirSaltos))
         {
             invalidos.Add(campo);
         }
