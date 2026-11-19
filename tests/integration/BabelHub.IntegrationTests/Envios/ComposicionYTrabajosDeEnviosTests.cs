@@ -24,6 +24,8 @@ public sealed class ComposicionYTrabajosDeEnviosTests
     private static T Doble<T>()
         where T : class => DispatchProxy.Create<T, DobleQueLanza>();
 
+    public static ServiceCollection ConDependenciasPublicas() => ConDependencias();
+
     private static ServiceCollection ConDependencias(bool sinOperador = false)
     {
         var servicios = new ServiceCollection();
