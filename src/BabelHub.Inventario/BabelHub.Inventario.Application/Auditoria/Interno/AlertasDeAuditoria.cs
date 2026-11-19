@@ -114,6 +114,18 @@ public static class MotivosDeAlerta
     /// <summary>Alerta de seguridad: se reutilizó una renovación ya rotada y se revocó su familia (D02, IDE-14).</summary>
     public const string RenovacionReutilizada = "renovacion-reutilizada";
 
+    /// <summary>El Notificador rechazó la plantilla o los campos del aviso de un envío (ENV-06).</summary>
+    public const string EnvioAvisoRechazado = "envio-aviso-rechazado";
+
+    /// <summary>El operador logístico devolvió un número de guía que ya pertenece a otro envío (ENV-04).</summary>
+    public const string EnvioGuiaRepetida = "envio-guia-repetida";
+
+    /// <summary>Pedidos no recibió el avance de un envío (guía generada, en reparto o entregado) en más de una hora.</summary>
+    public const string EnvioProgresoSinInformar = "envio-progreso-sin-informar";
+
+    /// <summary>Una guía de un envío cancelado quedó sin uso en el operador logístico y hay que avisarle (R05).</summary>
+    public const string EnvioGuiaSinUso = "envio-guia-sin-uso";
+
     /// <summary>Un trabajo de fondo de Carrito no corrió en el plazo esperado.</summary>
     public const string CarritoTrabajoSinCorrer = "carrito-trabajo-sin-correr";
 
@@ -178,6 +190,10 @@ public static class CatalogoDeAlertasDeAuditoria
         new(MotivosDeAlerta.CuotaDeCorreoAlta, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.CupoDeCodigosAlto, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.RenovacionReutilizada, ClaseDeAlerta.Seguridad),
+        new(MotivosDeAlerta.EnvioAvisoRechazado, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.EnvioGuiaRepetida, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.EnvioProgresoSinInformar, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.EnvioGuiaSinUso, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.CarritoTrabajoSinCorrer, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.CarritoCheckoutsConElPagoPendienteDemasiado, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.CarritoClaveDeReservaEnConflicto, ClaseDeAlerta.Tecnica),
