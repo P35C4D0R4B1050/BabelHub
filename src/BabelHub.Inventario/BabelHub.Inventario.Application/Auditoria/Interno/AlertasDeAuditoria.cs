@@ -113,6 +113,18 @@ public static class MotivosDeAlerta
 
     /// <summary>Alerta de seguridad: se reutilizó una renovación ya rotada y se revocó su familia (D02, IDE-14).</summary>
     public const string RenovacionReutilizada = "renovacion-reutilizada";
+
+    /// <summary>Un trabajo de fondo de Carrito no corrió en el plazo esperado.</summary>
+    public const string CarritoTrabajoSinCorrer = "carrito-trabajo-sin-correr";
+
+    /// <summary>Hay checkouts de Carrito con el pago pendiente más tiempo del permitido.</summary>
+    public const string CarritoCheckoutsConElPagoPendienteDemasiado = "carrito-checkouts-con-el-pago-pendiente-demasiado";
+
+    /// <summary>La clave de idempotencia de una reserva de Carrito chocó con otra reserva distinta.</summary>
+    public const string CarritoClaveDeReservaEnConflicto = "carrito-clave-de-reserva-en-conflicto";
+
+    /// <summary>Carrito intentó liberar la reserva de un pedido que ya estaba confirmado (T26c).</summary>
+    public const string CarritoLiberacionDeUnPedidoConfirmado = "carrito-liberacion-de-un-pedido-confirmado";
 }
 
 /// <summary>El catálogo cerrado de motivos de alerta de los dos servicios (D06). Otros módulos publican por <see cref="IAlertas"/> con estos códigos.</summary>
@@ -166,6 +178,10 @@ public static class CatalogoDeAlertasDeAuditoria
         new(MotivosDeAlerta.CuotaDeCorreoAlta, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.CupoDeCodigosAlto, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.RenovacionReutilizada, ClaseDeAlerta.Seguridad),
+        new(MotivosDeAlerta.CarritoTrabajoSinCorrer, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.CarritoCheckoutsConElPagoPendienteDemasiado, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.CarritoClaveDeReservaEnConflicto, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.CarritoLiberacionDeUnPedidoConfirmado, ClaseDeAlerta.Tecnica),
     ]);
 }
 
