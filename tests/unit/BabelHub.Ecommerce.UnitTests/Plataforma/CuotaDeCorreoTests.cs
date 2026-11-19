@@ -260,6 +260,29 @@ public sealed class CuotaDeCorreoTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-SEG-23")]
+    public async Task UnaAlertaQueSeRepiteTrasCadaVentanaDe15Minutos_NoPasaDe24CorreosAlDiaPorMotivoYServicio_YSeRenuevaAlDiaSiguienteDeLima()
+    {
+        // SEG-27: una alerta por ventana de 15 minutos (la agrupación es de Auditoría, AC-AUD-26) pide un correo; a partir del 24 del día
+        // por motivo y servicio la cuota lo suprime y la alerta sigue en la lista sin correo. Aquí se ejerce el tope contra la cuota real.
+        var e = Crear();
+        var resultados = new List<ResultadoDeEnvio>();
+        for (var i = 0; i < 30; i++)
+        {
+            e.Reloj.Ahora = Ahora.AddMinutes(i * 16);
+            resultados.Add((await e.Cuota.Decidir(Correo(CategoriaDeCorreo.AlertaALaAdministracion, "accesos-denegados", "inventario"))).Resultado);
+        }
+
+        Assert.Equal(24, resultados.Count(r => r == ResultadoDeEnvio.Enviado));
+        Assert.All(resultados.Skip(24), r => Assert.Equal(ResultadoDeEnvio.Suprimido, r));
+        Assert.Equal(ResultadoDeEnvio.Enviado, (await e.Cuota.Decidir(Correo(CategoriaDeCorreo.AlertaALaAdministracion, "accesos-denegados", "ecommerce"))).Resultado);
+
+        e.Reloj.Ahora = Ahora.AddDays(1);
+
+        Assert.Equal(ResultadoDeEnvio.Enviado, (await e.Cuota.Decidir(Correo(CategoriaDeCorreo.AlertaALaAdministracion, "accesos-denegados", "inventario"))).Resultado);
+    }
+
+    [Fact]
     public async Task LaCuotaSeRenuevaCadaDiaDeLima()
     {
         var e = Crear();

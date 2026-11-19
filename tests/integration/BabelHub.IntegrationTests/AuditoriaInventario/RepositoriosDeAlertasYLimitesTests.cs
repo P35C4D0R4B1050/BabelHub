@@ -360,7 +360,7 @@ public sealed class RepositoriosDeAlertasYLimitesTests(PostgresDeAuditoriaFixtur
     }
 
     [Fact]
-    [Trait("Criterio", "AC-AUD-41")]
+    [Trait("Criterio", "AC-AUD-25")]
     public async Task SiLaAuditoriaFallaDuranteElCierre_NadaCambia_ConLaDireccionIntactaYElIntentoAnotado()
     {
         var e = new Entorno(bd);
@@ -391,7 +391,7 @@ public sealed class RepositoriosDeAlertasYLimitesTests(PostgresDeAuditoriaFixtur
     }
 
     [Fact]
-    [Trait("Criterio", "AC-AUD-41")]
+    [Trait("Criterio", "AC-AUD-25")]
     public async Task LasVentanasCerradasSePurganA24HorasDelCierre()
     {
         var e = new Entorno(bd);
