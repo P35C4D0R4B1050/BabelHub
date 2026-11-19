@@ -109,7 +109,7 @@ public sealed partial record EsquemaDeModulo
 
     public override string ToString() => Nombre;
 
-    [GeneratedRegex("^[a-z][a-z0-9_]{1,62}$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^[a-z][a-z0-9_]{1,62}\z", RegexOptions.CultureInvariant)]
     private static partial Regex Forma();
 }
 

@@ -18,6 +18,12 @@ public class ReglasDeAuditoriaTests
         "ICuentasCanceladasPendientes",
     ];
 
+    /// <summary>
+    /// Los tres adaptadores de Identidad sobre <c>identidad.registros</c> (T27, T36): viven en la composición porque unen las utilidades de Auditoría con la unidad de
+    /// trabajo de Identidad, y no pueden estar en ninguno de los dos módulos sin violar la regla 13. Cualquier otro tipo de la composición sigue sin poder usar los puertos.
+    /// </summary>
+    private const string AdaptadoresDeIdentidad = "^Postgres(Almacen|Fuente|Depurador)DeRegistrosAislados$";
+
     [Theory]
     [InlineData("Application")]
     [InlineData("Infrastructure")]
@@ -30,12 +36,25 @@ public class ReglasDeAuditoriaTests
         var resultado = Types.InAssembly(ensamblado)
             .That().DoNotResideInNamespaceStartingWith($"BabelHub.Ecommerce.{capa}.Auditoria")
             .And().DoNotResideInNamespaceStartingWith($"BabelHub.Ecommerce.{capa}.Identidad")
+            .And().DoNotHaveNameMatching(capa == "Infrastructure" ? AdaptadoresDeIdentidad : "^$")
             .ShouldNot().HaveDependencyOnAny(prohibidos)
             .GetResult();
 
         Assert.True(
             resultado.IsSuccessful,
             $"Un módulo que no es Auditoría ni Identidad depende de un puerto de registros aislados: {string.Join(", ", resultado.FailingTypeNames ?? [])}.");
+    }
+
+    [Fact]
+    public void Los_adaptadores_de_Identidad_exentados_viven_solo_en_la_composicion()
+    {
+        var resultado = Types.InAssembly(Cargar("BabelHub.Ecommerce.Infrastructure"))
+            .That().HaveNameMatching(AdaptadoresDeIdentidad)
+            .Should().ResideInNamespace("BabelHub.Ecommerce.Infrastructure.Composicion")
+            .GetResult();
+
+        Assert.True(resultado.IsSuccessful, $"Un adaptador exentado vive fuera de la composición: {string.Join(", ", resultado.FailingTypeNames ?? [])}.");
+        Assert.Equal(3, Types.InAssembly(Cargar("BabelHub.Ecommerce.Infrastructure")).That().HaveNameMatching(AdaptadoresDeIdentidad).GetTypes().Count());
     }
 
     [Fact]
