@@ -247,3 +247,73 @@ public sealed class ReclamacionesApiTests : IAsyncLifetime
         Assert.Equal("ECO-NO-ENCONTRADO", (await ReclamacionesApiHost.Leer(respuesta)).GetProperty("code").GetString());
     }
 }
+
+/// <summary>T17 y T18: las pantallas de error del Libro tienen su propio texto en palabras de la persona (la invitación a verificar el correo, el estado inválido y el conflicto), nunca el texto genérico.</summary>
+public sealed class PantallasDeErrorDeReclamacionesTests : IAsyncLifetime
+{
+    private ReclamacionesApiHost _host = null!;
+
+    public async Task InitializeAsync() => _host = await ReclamacionesApiHost.Crear();
+
+    public async Task DisposeAsync() => await _host.DisposeAsync();
+
+    [Fact]
+    [Trait("Criterio", "AC-REC-12")]
+    public async Task Mis_hojas_sin_correo_verificado_invita_a_verificarlo_con_un_403()
+    {
+        _host.Consumidor.Pagina = Resultado<PaginaDeMisHojas>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Prohibido, "correo-no-verificado"));
+
+        using var respuesta = await _host.Cliente.SendAsync(_host.Pedir("/reclamaciones/mis-hojas"));
+
+        var html = System.Net.WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.Forbidden, respuesta.StatusCode);
+        Assert.Contains("Verifica tu correo para ver tus hojas", html, StringComparison.Ordinal);
+        Assert.Contains("ECO-REC-CORREO-NO-VERIFICADO", html, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("estado-invalido", "Esta hoja ya no admite esa acción")]
+    [InlineData("conflicto", "No pudimos completar la solicitud")]
+    public async Task Un_estado_invalido_o_un_conflicto_de_la_administracion_se_explican_en_su_pantalla(string clave, string titulo)
+    {
+        _host.Administracion.Operacion = Resultado<ResultadoDeLaHoja>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Conflicto, clave));
+
+        using var respuesta = await _host.Enviar([new("respuesta", "Una respuesta.")], ruta: "/administracion/reclamaciones/a0000000-0000-0000-0000-000000000001/responder");
+
+        Assert.Equal(HttpStatusCode.Conflict, respuesta.StatusCode);
+        Assert.Contains(titulo, System.Net.WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync()), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Un_visitante_en_la_administracion_y_la_falta_de_permiso_usan_las_pantallas_estandar()
+    {
+        _host.Administracion.Pagina = Resultado<PaginaDeHojas>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Prohibido, "prohibido"));
+
+        using var respuesta = await _host.Cliente.SendAsync(_host.Pedir("/administracion/reclamaciones"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, respuesta.StatusCode);
+        Assert.Contains("<html", await respuesta.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
+    }
+}
+
+/// <summary>T17 (AC-REC-01): el enlace del pie de toda página lleva al formulario del Libro.</summary>
+public sealed class EnlaceDelPieDelLibroTests : IAsyncLifetime
+{
+    private ReclamacionesApiHost _host = null!;
+
+    public async Task InitializeAsync() => _host = await ReclamacionesApiHost.Crear();
+
+    public async Task DisposeAsync() => await _host.DisposeAsync();
+
+    [Fact]
+    [Trait("Criterio", "AC-REC-01")]
+    public async Task La_ruta_permanente_del_pie_redirige_al_formulario_y_el_pie_de_la_pagina_la_enlaza()
+    {
+        using var enlace = await _host.Cliente.SendAsync(_host.Pedir("/reclamaciones"));
+        using var formulario = await _host.Cliente.SendAsync(_host.Pedir("/reclamaciones/nueva"));
+
+        Assert.Equal(HttpStatusCode.SeeOther, enlace.StatusCode);
+        Assert.Equal("/reclamaciones/nueva", enlace.Headers.Location?.OriginalString);
+        Assert.Contains("href=\"/reclamaciones\"", await formulario.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+}

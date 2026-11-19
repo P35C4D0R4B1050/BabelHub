@@ -33,6 +33,17 @@ public sealed partial class ReclamacionesController(IReclamaciones reclamaciones
 
     // ---------- Registro público ----------
 
+    /// <summary>El enlace permanente del pie de toda página (<c>web-base</c>) es <c>/reclamaciones</c>: lleva al formulario del Libro (REC-01).</summary>
+    [HttpGet("/reclamaciones")]
+    [PermitidaConTextosPendientes(CapacidadWeb.LibroDeReclamaciones)]
+    public IActionResult Entrada()
+    {
+        Response.Headers.CacheControl = "no-store";
+        Response.StatusCode = StatusCodes.Status303SeeOther;
+        Response.Headers.Location = RutaDelFormulario;
+        return new EmptyResult();
+    }
+
     [HttpGet(RutaDelFormulario)]
     [PermitidaConTextosPendientes(CapacidadWeb.LibroDeReclamaciones)]
     [VerificacionDePersona(AccionProtegida.HojaDeReclamacion)]
