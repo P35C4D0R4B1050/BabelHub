@@ -183,6 +183,64 @@ public sealed class ConfirmarReservasTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-SEL-03")]
+    public async Task Confirmar_UnPedidoDeRecojoEnUnTercerDestinoConLineasDeCuscoYDeLima_PideUnTrasladoPorFuenteYEdicion()
+    {
+        var e = Entorno();
+        var a = e.Impresa();
+        var b = e.Impresa();
+        var pedido = Guid.NewGuid();
+        var reserva = e.Pendiente(pedido, [(a, e.Base.Cusco, 2), (b, e.Base.Lima, 1)], recojoEn: e.Base.Ayacucho);
+
+        var resultado = await e.Confirmar().Ejecutar(Entrada(pedido));
+
+        Assert.True(resultado.EsExito, resultado.Error?.Clave);
+        var lote = Assert.Single(e.Traslados.Solicitudes);
+        Assert.Equal(2, lote.Count);
+        Assert.Contains(new SolicitudDeTrasladoDePedido(e.Base.Cusco.Id, a, 2), lote);
+        Assert.Contains(new SolicitudDeTrasladoDePedido(e.Base.Lima.Id, b, 1), lote);
+        Assert.Equal([("cusco", "ayacucho", a, 2), ("lima", "ayacucho", b, 1)], resultado.Valor.Traslados.OrderBy(t => t.CodigoDeOrigen).Select(t => (t.CodigoDeOrigen, t.CodigoDeDestino, t.EdicionId, t.Cantidad)));
+        Assert.All(reserva.Lineas, l => Assert.NotNull(l.TrasladoId));
+        Assert.Equal(2, reserva.Lineas.Select(l => l.TrasladoId).Distinct().Count());
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-03")]
+    public async Task MientrasLaReservaEstaPendiente_NoSePideNingunTraslado()
+    {
+        var e = new EntornoDeReservas();
+        var libro = e.Impresa();
+        e.Base.Existencias.Poner(e.Base.Cusco.Id, libro, 5, 0);
+
+        var resultado = await e.Reservar().Ejecutar(EntornoDeReservas.ARecojo("ayacucho", [EntornoDeReservas.Linea(libro, 2)]));
+
+        Assert.True(resultado.EsExito, resultado.Error?.Clave);
+        var linea = Assert.Single(resultado.Valor.Lineas);
+        Assert.Equal(("cusco", true, EstadoDeReserva.Pendiente), (linea.CodigoDeFuente, linea.RequiereTraslado, resultado.Valor.Estado));
+        Assert.Equal(0, e.Traslados.Llamadas);
+        Assert.Empty(e.Traslados.Solicitudes);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-03")]
+    public async Task SiLaReservaPendienteExpira_NoSePideNingunTraslado()
+    {
+        var e = new EntornoDeReservas(ActorDePrueba.DelSistema());
+        var libro = e.Impresa();
+        e.Base.Existencias.Poner(e.Base.Cusco.Id, libro, 5, 2);
+        var pedido = Guid.NewGuid();
+        var reserva = e.Pendiente(pedido, [(libro, e.Base.Cusco, 2)], haceMinutos: 20, recojoEn: e.Base.Ayacucho);
+
+        var resultado = await e.ExpirarPedido().Ejecutar(new ExpirarReservasEntrada(pedido));
+
+        Assert.True(resultado.EsExito, resultado.Error?.Clave);
+        Assert.Equal(EstadoDeLinea.Expirada, Assert.Single(reserva.Lineas).Estado);
+        Assert.Null(reserva.Lineas.Single().TrasladoId);
+        Assert.Equal(0, e.Traslados.Llamadas);
+        Assert.Empty(e.Traslados.Solicitudes);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-SEL-32")]
     public async Task SiLaAuditoriaFalla_NoSeConfirmaNiSePideElTraslado()
     {

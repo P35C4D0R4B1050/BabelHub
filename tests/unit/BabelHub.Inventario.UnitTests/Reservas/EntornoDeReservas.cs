@@ -625,11 +625,12 @@ internal sealed class EntornoDeReservas
         new(Autorizador, new ValidadorDeConfirmar(), Bloqueos, Reservas, Directorio, Traslados, Auditoria, Volumen, new ConstructorDeLaReserva(Directorio), Base.Reloj);
 
     /// <summary>Una reserva pendiente ya guardada (sin pasar por reservar): una línea por edición y fuente, iniciada hace <paramref name="haceMinutos"/>.</summary>
-    public ReservaDePedido Pendiente(Guid pedidoId, IEnumerable<(Guid Edicion, Fuente Fuente, int Cantidad)> lineas, bool recojoEnLima = true, int haceMinutos = 1, Guid? clienteId = null)
+    public ReservaDePedido Pendiente(Guid pedidoId, IEnumerable<(Guid Edicion, Fuente Fuente, int Cantidad)> lineas, bool recojoEnLima = true, int haceMinutos = 1, Guid? clienteId = null, Fuente? recojoEn = null)
     {
         var iniciada = Base.Reloj.Ahora.AddMinutes(-haceMinutos);
+        Guid? sucursalDeRecojo = recojoEn?.Id ?? (recojoEnLima ? Base.Lima.Id : null);
         var reserva = ReservaDePedido.Iniciar(
-            Guid.NewGuid(), pedidoId, clienteId ?? Guid.NewGuid(), recojoEnLima ? TipoDeEntrega.Recojo : TipoDeEntrega.Domicilio, recojoEnLima ? Base.Lima.Id : null, recojoEnLima ? null : "lima", iniciada,
+            Guid.NewGuid(), pedidoId, clienteId ?? Guid.NewGuid(), sucursalDeRecojo is null ? TipoDeEntrega.Domicilio : TipoDeEntrega.Recojo, sucursalDeRecojo, sucursalDeRecojo is null ? "lima" : null, iniciada,
             lineas.Select(l => LineaDeReserva.Pendiente(Guid.NewGuid(), Guid.NewGuid(), l.Edicion, l.Fuente.Id, l.Cantidad, iniciada)));
         Reservas.Guardadas.Add(reserva);
         return reserva;

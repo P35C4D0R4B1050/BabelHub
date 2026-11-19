@@ -223,6 +223,69 @@ public sealed class ReservarUnidadesTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-SEL-33")]
+    public async Task Reservar_ADomicilioEnUnaRegionSinVendible_ElijeLaFuenteDeMenorPlazoDeRutaYNoGeneraTraslado()
+    {
+        var entorno = new EntornoDeReservas();
+        var libro = entorno.Impresa();
+        entorno.Base.Existencias.Poner(entorno.Base.Cusco.Id, libro, 0, 0);
+        entorno.Base.Existencias.Poner(entorno.Base.Lima.Id, libro, 5, 0);
+        entorno.Base.Existencias.Poner(entorno.Base.Ayacucho.Id, libro, 5, 0);
+        entorno.Base.Rutas.Rutas.Add(RutaEntreFuentes.Definir(entorno.Base.Ayacucho.Id, entorno.Base.Cusco.Id, 1));
+        entorno.Base.Rutas.Rutas.Add(RutaEntreFuentes.Definir(entorno.Base.Lima.Id, entorno.Base.Cusco.Id, 3));
+
+        var resultado = await entorno.Reservar().Ejecutar(ADomicilio("cusco", [Linea(libro, 1)]));
+
+        Assert.True(resultado.EsExito, resultado.Error?.Clave);
+        var linea = Assert.Single(resultado.Valor.Lineas);
+        Assert.Equal(("ayacucho", false), (linea.CodigoDeFuente, linea.RequiereTraslado));
+        Assert.Empty(resultado.Valor.Traslados);
+        Assert.Equal((5, 1), entorno.FilaDe(entorno.Base.Ayacucho, libro));
+        Assert.Equal((5, 0), entorno.FilaDe(entorno.Base.Lima, libro));
+        Assert.Equal(0, entorno.Traslados.Llamadas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-25")]
+    public async Task Reservar_ADomicilioEnUnaRegionSinSucursal_ElijeLaDeMayorVendibleYAIgualdadLaDeCodigoMenor()
+    {
+        // Un cliente solo puede tener una reserva pendiente (SEL-13): cada caso usa su propio entorno.
+        static async Task<string> FuenteElegida(int enLima, int enCusco)
+        {
+            var entorno = new EntornoDeReservas();
+            var libro = entorno.Impresa();
+            entorno.Base.Existencias.Poner(entorno.Base.Lima.Id, libro, enLima, 0);
+            entorno.Base.Existencias.Poner(entorno.Base.Cusco.Id, libro, enCusco, 0);
+
+            var resultado = await entorno.Reservar().Ejecutar(ADomicilio("puno", [Linea(libro, 1)]));
+
+            Assert.True(resultado.EsExito, resultado.Error?.Clave);
+            return Assert.Single(resultado.Valor.Lineas).CodigoDeFuente;
+        }
+
+        Assert.Equal("cusco", await FuenteElegida(enLima: 5, enCusco: 5));
+        Assert.Equal("cusco", await FuenteElegida(enLima: 5, enCusco: 8));
+        Assert.Equal("lima", await FuenteElegida(enLima: 8, enCusco: 5));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-34")]
+    public async Task Reservar_ARecojoConDosFuentesConStock_PrefiereLaDeRutaDefinidaSobreLaQueNoLaTiene()
+    {
+        var entorno = new EntornoDeReservas();
+        var libro = entorno.Impresa();
+        entorno.Base.Existencias.Poner(entorno.Base.Cusco.Id, libro, 5, 0);
+        entorno.Base.Existencias.Poner(entorno.Base.Ayacucho.Id, libro, 5, 0);
+        entorno.Base.Rutas.Rutas.Add(RutaEntreFuentes.Definir(entorno.Base.Ayacucho.Id, entorno.Base.Lima.Id, 4));
+
+        var resultado = await entorno.Reservar().Ejecutar(ARecojo("lima", [Linea(libro, 1)]));
+
+        Assert.True(resultado.EsExito, resultado.Error?.Clave);
+        var linea = Assert.Single(resultado.Valor.Lineas);
+        Assert.Equal(("ayacucho", true, 4), (linea.CodigoDeFuente, linea.RequiereTraslado, linea.PlazoEstimadoEnDias));
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-SEL-10")]
     public async Task Reservar_UsaLaEstrategiaConfiguradaSinCambiarElContrato()
     {
