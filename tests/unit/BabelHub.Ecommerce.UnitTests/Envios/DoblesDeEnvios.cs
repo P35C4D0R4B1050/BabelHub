@@ -24,6 +24,9 @@ internal sealed class RepositorioDeEnviosEnMemoria : IRepositorioDeEnvios, IInst
     /// <summary>La inserción falla después de la validación (un error de la base).</summary>
     public bool FallaAlAgregar { get; set; }
 
+    /// <summary>Se ejecuta justo después de que <c>BuscarPorLineas</c> calcula su respuesta: simula otra transacción que gana la carrera.</summary>
+    public Action? DespuesDeBuscarPorLineas { get; set; }
+
     public int Operaciones { get; private set; }
 
     public int LecturasConBloqueo { get; private set; }
@@ -113,6 +116,9 @@ internal sealed class RepositorioDeEnviosEnMemoria : IRepositorioDeEnvios, IInst
     {
         Comprobar();
         var encontrados = _envios.Values.Where(e => e.Lineas.Any(l => lineaIds.Contains(l.LineaId))).OrderBy(e => e.Id).Select(Clonar).ToList();
+        var hook = DespuesDeBuscarPorLineas;
+        DespuesDeBuscarPorLineas = null;
+        hook?.Invoke();
         return Task.FromResult<IReadOnlyList<Envio>>(encontrados);
     }
 
