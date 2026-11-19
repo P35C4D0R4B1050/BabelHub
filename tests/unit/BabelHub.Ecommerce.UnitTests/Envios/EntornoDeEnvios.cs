@@ -16,9 +16,9 @@ internal sealed class EntornoDeEnvios
         Actor = actor ?? ActorDePrueba.DePersonalDeLogistica();
         Reloj = new RelojFijo(ahora ?? AhoraInicial);
         Envios = new RepositorioDeEnviosEnMemoria();
-        Unidad = new UnidadDeTrabajoReversible(Envios);
+        Auditoria = new AuditoriaDeEnviosEspia();
+        Unidad = new UnidadDeTrabajoReversible(Envios, Auditoria);
         Pedidos = new PedidosParaEnviosDoble(Unidad);
-        Auditoria = new AuditoriaDelCatalogoEspia();
         Denegaciones = new DenegacionesDelCatalogoEspia();
 
         Crear = new CrearEnvio(Pedidos, Envios, Reloj);
@@ -36,7 +36,7 @@ internal sealed class EntornoDeEnvios
 
     public PedidosParaEnviosDoble Pedidos { get; }
 
-    public AuditoriaDelCatalogoEspia Auditoria { get; }
+    public AuditoriaDeEnviosEspia Auditoria { get; }
 
     public DenegacionesDelCatalogoEspia Denegaciones { get; }
 

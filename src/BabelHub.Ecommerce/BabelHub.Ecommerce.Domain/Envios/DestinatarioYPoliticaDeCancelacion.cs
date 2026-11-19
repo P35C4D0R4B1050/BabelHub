@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -15,6 +16,7 @@ public enum CampoDelDestinatario
 /// El contacto que se entrega al operador para generar la guía (ENV-02): solo nombre, dirección y teléfono (ENV-17; sin correo, documento ni datos de pago). Es una <b>clase</b> y no un
 /// <c>record</c> para que su texto y su serialización estén siempre redactados: ningún registro, error ni auditoría los repite (RNF23). Viaja de Pedidos al adaptador y no se guarda (ENV-15).
 /// </summary>
+[DebuggerDisplay("[redactado]")]
 [JsonConverter(typeof(ConvertidorDeDestinatarioParaGuia))]
 public sealed class DestinatarioParaGuia
 {
@@ -46,23 +48,25 @@ public sealed class DestinatarioParaGuia
         var n = nombre?.Trim();
         var d = direccion?.Trim();
         var t = telefono?.Trim();
-        if (string.IsNullOrEmpty(n) || n.Length > LongitudMaximaDelNombre)
+        if (string.IsNullOrEmpty(n) || n.Length > LongitudMaximaDelNombre || TieneControl(n))
         {
             return ResultadoDeValidacionDelDestinatario.Falta(CampoDelDestinatario.Nombre);
         }
 
-        if (string.IsNullOrEmpty(d) || d.Length > LongitudMaximaDeLaDireccion)
+        if (string.IsNullOrEmpty(d) || d.Length > LongitudMaximaDeLaDireccion || TieneControl(d))
         {
             return ResultadoDeValidacionDelDestinatario.Falta(CampoDelDestinatario.Direccion);
         }
 
-        if (string.IsNullOrEmpty(t) || t.Length > LongitudMaximaDelTelefono)
+        if (string.IsNullOrEmpty(t) || t.Length > LongitudMaximaDelTelefono || !t.All(c => char.IsAsciiDigit(c) || c is '+' or ' ' or '-' or '(' or ')') || !t.Any(char.IsAsciiDigit))
         {
             return ResultadoDeValidacionDelDestinatario.Falta(CampoDelDestinatario.Telefono);
         }
 
         return ResultadoDeValidacionDelDestinatario.Completo(new DestinatarioParaGuia(n, d, t));
     }
+
+    private static bool TieneControl(string texto) => texto.Any(char.IsControl);
 
     public override string ToString() => "[redactado]";
 }

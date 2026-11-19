@@ -51,6 +51,20 @@ public sealed class DestinatarioYPoliticaDeCancelacionTests
         Assert.NotNull(resultado.CampoFaltante);
     }
 
+    [Theory]
+    [Trait("Criterio", "AC-ENV-17")]
+    [InlineData("Ana\nPérez", "Av. Los Olivos 123", "987654321", CampoDelDestinatario.Nombre)]
+    [InlineData("Ana Pérez", "Av. Los Olivos\r\n123", "987654321", CampoDelDestinatario.Direccion)]
+    [InlineData("Ana Pérez", "Av. Los Olivos 123", "98765-abc", CampoDelDestinatario.Telefono)]
+    [InlineData("Ana Pérez", "Av. Los Olivos 123", "+ - ()", CampoDelDestinatario.Telefono)]
+    public void Un_campo_con_caracteres_de_control_o_un_telefono_con_letras_se_rechaza_para_ese_campo(string nombre, string direccion, string telefono, CampoDelDestinatario esperado)
+    {
+        var resultado = DestinatarioParaGuia.Validar(nombre, direccion, telefono);
+
+        Assert.False(resultado.EsValido);
+        Assert.Equal(esperado, resultado.CampoFaltante);
+    }
+
     [Fact]
     [Trait("Criterio", "AC-ENV-17")]
     public void El_destinatario_nunca_se_escribe_en_texto_ni_en_json()

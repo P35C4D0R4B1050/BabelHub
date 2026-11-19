@@ -165,7 +165,7 @@ public sealed class EnvioTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-ENV-15")]
+    [Trait("Criterio", "AC-ENV-03")]
     public void Solo_el_pendiente_toma_una_solicitud_de_guia()
     {
         var conGuia = ConGuia();
@@ -211,6 +211,9 @@ public sealed class EnvioTests
     [InlineData("GUIA/000123")]
     [InlineData("GUIA-0001230000000000000000000000000000000000000000")]
     [InlineData("GUÍA-000123")]
+    [InlineData("------")]
+    [InlineData("-GUIA123")]
+    [InlineData("GUIA123-")]
     public void Un_numero_de_guia_de_largo_o_caracteres_no_aceptados_se_rechaza(string texto)
     {
         Assert.False(NumeroDeGuia.TryCrear(texto, out _));
@@ -325,5 +328,36 @@ public sealed class EnvioTests
         // Pendiente con el marcador de despacho.
         Assert.Throws<ArgumentException>(() => Envio.Rehidratar(
             id, pedido, "lima-central", lineas, EstadoDeEnvio.PendienteDeGuia, null, null, null, null, Ahora, null, null, Ahora, null, null, null, null, null, null, 1));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-15")]
+    public void El_numero_de_guia_por_defecto_no_se_acepta_al_registrar_ni_al_rehidratar()
+    {
+        var envio = Nuevo();
+        Assert.Throws<ArgumentException>(() => envio.RegistrarGuia(default, "operador-a", Ahora));
+
+        Assert.Throws<ArgumentException>(() => Envio.Rehidratar(
+            Guid.NewGuid(), Guid.NewGuid(), "lima-central", [Guid.NewGuid()], EstadoDeEnvio.GuiaGenerada, default(NumeroDeGuia), "operador-a", null, null, null, null, null, Ahora, Ahora, null, null, null, null, null, 1));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-03")]
+    public void Rehidratar_rechaza_valores_fuera_de_lo_permitido()
+    {
+        var id = Guid.NewGuid();
+        var lineas = new[] { Guid.NewGuid() };
+
+        // Fuente demasiado larga.
+        Assert.Throws<ArgumentException>(() => Envio.Rehidratar(
+            id, Guid.NewGuid(), new string('a', Envio.LongitudMaximaDeLaFuente + 1), lineas, EstadoDeEnvio.PendienteDeGuia, null, null, null, null, null, null, null, Ahora, null, null, null, null, null, null, 1));
+
+        // Clave de solicitud vacía.
+        Assert.Throws<ArgumentException>(() => Envio.Rehidratar(
+            id, Guid.NewGuid(), "lima-central", lineas, EstadoDeEnvio.PendienteDeGuia, null, null, Guid.Empty, null, null, null, null, Ahora, null, null, null, null, null, null, 1));
+
+        // Arrendamiento de la guía fuera de pendiente.
+        Assert.Throws<ArgumentException>(() => Envio.Rehidratar(
+            id, Guid.NewGuid(), "lima-central", lineas, EstadoDeEnvio.GuiaGenerada, NumeroDeGuia.Crear("GUIA-000123"), "operador-a", Clave, Ahora, null, null, null, Ahora, Ahora, null, null, null, null, null, 1));
     }
 }

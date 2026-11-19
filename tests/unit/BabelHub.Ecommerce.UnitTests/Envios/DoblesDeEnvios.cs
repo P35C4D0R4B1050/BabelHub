@@ -31,6 +31,11 @@ internal sealed class RepositorioDeEnviosEnMemoria : IRepositorioDeEnvios, IInst
 
     public int LecturasConBloqueo { get; private set; }
 
+    /// <summary>Si es mayor que cero, el guardado con ese número (desde 1) falla como un error de la base.</summary>
+    public int FallaEnElGuardadoNumero { get; set; }
+
+    private int _guardados;
+
     /// <summary>El orden en que se bloquearon los envíos (el orden de identificador de <c>Cancelar</c>).</summary>
     public List<Guid> OrdenDeBloqueo { get; } = [];
 
@@ -125,6 +130,12 @@ internal sealed class RepositorioDeEnviosEnMemoria : IRepositorioDeEnvios, IInst
     public Task Guardar(Envio envio, CancellationToken cancelacion = default)
     {
         Comprobar();
+        _guardados++;
+        if (_guardados == FallaEnElGuardadoNumero)
+        {
+            throw new InvalidOperationException("La base falló al guardar.");
+        }
+
         _envios[envio.Id] = Clonar(envio);
         return Task.CompletedTask;
     }
@@ -186,4 +197,37 @@ internal sealed class PedidosParaEnviosDoble(UnidadDeTrabajoReversible unidad) :
                 ? Resultado<PedidoParaEnvios>.Exito(pedido)
                 : Resultado<PedidoParaEnvios>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoEncontrado, "pedido-no-encontrado")));
     }
+}
+
+/// <summary>
+/// Una auditoría que guarda lo registrado, <b>se revierte con la unidad de trabajo</b> (como la auditoría real, que escribe en la misma transacción) y puede caer en la llamada número N, para probar que una falla a
+/// mitad de una operación no deja entradas sueltas (AUD-04).
+/// </summary>
+internal sealed class AuditoriaDeEnviosEspia : BabelHub.Ecommerce.Application.Auditoria.IAuditoria, IInstantanea
+{
+    private List<BabelHub.Ecommerce.Application.Auditoria.SolicitudDeRegistro> _solicitudes = [];
+    private int _llamadas;
+
+    public IReadOnlyList<BabelHub.Ecommerce.Application.Auditoria.SolicitudDeRegistro> Solicitudes => _solicitudes;
+
+    public bool Caida { get; set; }
+
+    /// <summary>Si es mayor que cero, la llamada con ese número (desde 1) falla como una auditoría caída.</summary>
+    public int FallaEnLaLlamada { get; set; }
+
+    public Task Registrar(BabelHub.Ecommerce.Application.Auditoria.SolicitudDeRegistro solicitud, CancellationToken cancelacion = default)
+    {
+        _llamadas++;
+        if (Caida || _llamadas == FallaEnLaLlamada)
+        {
+            return Task.FromException(new BabelHub.Ecommerce.Application.Auditoria.AuditoriaNoDisponibleException("sin auditoría"));
+        }
+
+        _solicitudes.Add(solicitud);
+        return Task.CompletedTask;
+    }
+
+    public object Capturar() => _solicitudes.ToList();
+
+    public void Restaurar(object instantanea) => _solicitudes = (List<BabelHub.Ecommerce.Application.Auditoria.SolicitudDeRegistro>)instantanea;
 }

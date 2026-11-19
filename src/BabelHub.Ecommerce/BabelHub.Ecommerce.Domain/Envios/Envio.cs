@@ -13,7 +13,7 @@ public sealed class Envio
     /// <summary>El arrendamiento del marcador de despacho (AC-ENV-16): la primera solicitud que confirma gana.</summary>
     public static readonly TimeSpan ArrendamientoDelDespacho = TimeSpan.FromSeconds(90);
 
-    private const int LongitudMaximaDeLaFuente = 64;
+    public const int LongitudMaximaDeLaFuente = 64;
 
     private const int LongitudMaximaDelOperador = 32;
 
@@ -154,9 +154,16 @@ public sealed class Envio
     {
         var lineas = lineaIds.Select(l => new LineaDeEnvio(l)).ToList();
         ValidarLineas(lineas);
+        ArgumentNullException.ThrowIfNull(codigoDeFuente);
+        if (codigoDeFuente.Trim().Length is 0 or > LongitudMaximaDeLaFuente || numeroDeGuia is { Valor: null } || operador is { Length: 0 or > LongitudMaximaDelOperador } || claveDeSolicitud == Guid.Empty)
+        {
+            throw new ArgumentException("El envío guardado no cumple los valores permitidos.");
+        }
+
         var conGuia = estado is EstadoDeEnvio.GuiaGenerada or EstadoDeEnvio.EnReparto or EstadoDeEnvio.Entregado;
         var coherente =
-            (estado != EstadoDeEnvio.PendienteDeGuia || (numeroDeGuia is null && operador is null && guiaGeneradaEn is null && despachoIniciadoEn is null))
+            (estado == EstadoDeEnvio.PendienteDeGuia || guiaEnCursoHasta is null)
+            && (estado != EstadoDeEnvio.PendienteDeGuia || (numeroDeGuia is null && operador is null && guiaGeneradaEn is null && despachoIniciadoEn is null))
             && (!conGuia || (numeroDeGuia is not null && operador is not null && guiaGeneradaEn is not null))
             && (estado != EstadoDeEnvio.GuiaGenerada || (enRepartoEn is null && entregadoEn is null))
             && ((estado is EstadoDeEnvio.EnReparto or EstadoDeEnvio.Entregado) == (enRepartoEn is not null))
@@ -211,6 +218,11 @@ public sealed class Envio
     public ResultadoDeRegistroDeGuia RegistrarGuia(NumeroDeGuia numero, string operador, DateTimeOffset ahora)
     {
         ArgumentNullException.ThrowIfNull(operador);
+        if (numero.Valor is null)
+        {
+            throw new ArgumentException("El número de guía no es válido.", nameof(numero));
+        }
+
         var nombre = operador.Trim();
         if (nombre.Length is 0 or > LongitudMaximaDelOperador)
         {

@@ -16,7 +16,7 @@ internal sealed class CrearEnvio(IPedidosParaEnvios pedidos, IRepositorioDeEnvio
         ArgumentNullException.ThrowIfNull(entrada);
         var fuente = entrada.CodigoDeFuente?.Trim();
         var lineaIds = entrada.LineaIds ?? [];
-        if (entrada.PedidoId == Guid.Empty || string.IsNullOrEmpty(fuente) || lineaIds.Count == 0 || lineaIds.Any(l => l == Guid.Empty) || lineaIds.Distinct().Count() != lineaIds.Count)
+        if (entrada.PedidoId == Guid.Empty || string.IsNullOrEmpty(fuente) || fuente.Length > Envio.LongitudMaximaDeLaFuente || lineaIds.Count == 0 || lineaIds.Any(l => l == Guid.Empty) || lineaIds.Distinct().Count() != lineaIds.Count)
         {
             return FallosDeEnvios.De<ResultadoDeCrearEnvio>(CategoriaDeError.Validacion, ClavesDeEnvios.ValidacionFallida);
         }
@@ -34,6 +34,7 @@ internal sealed class CrearEnvio(IPedidosParaEnvios pedidos, IRepositorioDeEnvio
         }
 
         var impresas = new List<Guid>();
+        var algunaSinLista = false;
         var rechazadas = new List<LineaRechazadaDelEnvio>();
         foreach (var lineaId in lineaIds)
         {
@@ -49,16 +50,12 @@ internal sealed class CrearEnvio(IPedidosParaEnvios pedidos, IRepositorioDeEnvio
                 continue;
             }
 
-            if (!linea.EstaLista)
-            {
-                return FallosDeEnvios.De<ResultadoDeCrearEnvio>(CategoriaDeError.ReglaDeNegocio, ClavesDeEnvios.LineaNoEstaLista);
-            }
-
             if (!string.Equals(linea.CodigoDeFuente, fuente, StringComparison.Ordinal))
             {
                 return FallosDeEnvios.De<ResultadoDeCrearEnvio>(CategoriaDeError.ReglaDeNegocio, ClavesDeEnvios.LineaDeOtraFuente);
             }
 
+            algunaSinLista |= !linea.EstaLista;
             impresas.Add(lineaId);
         }
 
@@ -75,6 +72,12 @@ internal sealed class CrearEnvio(IPedidosParaEnvios pedidos, IRepositorioDeEnvio
                 return existentes is [var unico] && EsElMismoEnvio(unico, pedido.PedidoId, fuente, impresas)
                     ? Resultado<ResultadoDeCrearEnvio>.Exito(new ResultadoDeCrearEnvio(unico.Id, true, unico.Lineas.Select(l => l.LineaId).ToList(), rechazadas))
                     : FallosDeEnvios.De<ResultadoDeCrearEnvio>(CategoriaDeError.Conflicto, ClavesDeEnvios.LineasEnOtroEnvio);
+            }
+
+            // La idempotencia se resuelve antes: una repetición cuando las líneas ya avanzaron de estado devuelve el envío existente.
+            if (algunaSinLista)
+            {
+                return FallosDeEnvios.De<ResultadoDeCrearEnvio>(CategoriaDeError.ReglaDeNegocio, ClavesDeEnvios.LineaNoEstaLista);
             }
 
             var envio = Envio.Crear(Guid.NewGuid(), pedido.PedidoId, fuente, impresas, reloj.Ahora);

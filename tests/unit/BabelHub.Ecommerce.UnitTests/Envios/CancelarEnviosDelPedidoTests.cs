@@ -107,7 +107,7 @@ public sealed class CancelarEnviosDelPedidoTests
 
     [Fact]
     [Trait("Criterio", "AC-ENV-19")]
-    public async Task Bloquea_los_envios_del_pedido_en_orden_de_identificador()
+    public async Task Bloquea_los_envios_del_pedido_y_los_procesa_en_el_orden_que_entrega_el_repositorio_por_identificador()
     {
         var entorno = new EntornoDeEnvios();
         var pedido = Guid.NewGuid();
@@ -120,22 +120,71 @@ public sealed class CancelarEnviosDelPedidoTests
 
         Assert.Equal(5, entorno.Envios.LecturasConBloqueo);
         Assert.Equal(entorno.Envios.OrdenDeBloqueo.Order().ToList(), entorno.Envios.OrdenDeBloqueo);
+        Assert.Equal(entorno.Envios.OrdenDeBloqueo.Select(id => id.ToString()), entorno.Auditoria.Solicitudes.Select(s => s.ObjetoId));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-19")]
+    public async Task Cancelar_corre_en_la_unidad_de_trabajo_del_llamador_y_no_abre_una_propia()
+    {
+        var entorno = new EntornoDeEnvios();
+        var pedido = Guid.NewGuid();
+        Sembrar(entorno, pedido);
+
+        var resultado = await entorno.Unidad.Ejecutar(token => entorno.Cancelar.Ejecutar(pedido, token));
+
+        Assert.True(resultado.EsExito);
+        Assert.Equal(1, entorno.Unidad.Ejecuciones);
     }
 
     [Fact]
     [Trait("Criterio", "AC-ENV-12")]
-    public async Task Repetir_la_cancelacion_es_un_exito_idempotente_sin_auditar_de_nuevo()
+    public async Task Un_envio_ya_cancelado_se_mantiene_sin_auditar_de_nuevo_y_sus_lineas_no_se_procesan_otra_vez()
     {
         var entorno = new EntornoDeEnvios();
         var pedido = Guid.NewGuid();
         var envio = Sembrar(entorno, pedido);
 
-        await entorno.Cancelar.Ejecutar(pedido);
+        var primera = await entorno.Cancelar.Ejecutar(pedido);
         var repeticion = await entorno.Cancelar.Ejecutar(pedido);
 
-        Assert.Equal(DestinoDelEnvioAlCancelar.Cancelado, Assert.Single(repeticion.Valor).Destino);
-        Assert.Equal(envio.Id, repeticion.Valor[0].EnvioId);
+        Assert.Equal(DestinoDelEnvioAlCancelar.Cancelado, Assert.Single(primera.Valor).Destino);
+        var mantenido = Assert.Single(repeticion.Valor);
+        Assert.Equal(envio.Id, mantenido.EnvioId);
+        Assert.Equal(DestinoDelEnvioAlCancelar.Mantenido, mantenido.Destino);
         Assert.Single(entorno.Auditoria.Solicitudes);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-12")]
+    public async Task Si_la_segunda_auditoria_falla_la_excepcion_se_propaga_y_la_unidad_del_llamador_revierte_todo()
+    {
+        var entorno = new EntornoDeEnvios();
+        var pedido = Guid.NewGuid();
+        Sembrar(entorno, pedido);
+        Sembrar(entorno, pedido);
+        entorno.Auditoria.FallaEnLaLlamada = 2;
+
+        await Assert.ThrowsAsync<AuditoriaNoDisponibleException>(() => entorno.Unidad.Ejecutar(token => entorno.Cancelar.Ejecutar(pedido, token)));
+
+        Assert.Empty(entorno.Auditoria.Solicitudes);
+        Assert.All(entorno.Envios.Todos, e => Assert.Equal(EstadoDeEnvio.PendienteDeGuia, e.Estado));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-12")]
+    public async Task Si_el_segundo_guardado_falla_se_propaga_y_la_unidad_del_llamador_revierte_todo()
+    {
+        var entorno = new EntornoDeEnvios();
+        var pedido = Guid.NewGuid();
+        Sembrar(entorno, pedido);
+        Sembrar(entorno, pedido);
+        entorno.Envios.FallaEnElGuardadoNumero = 2;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => entorno.Unidad.Ejecutar(token => entorno.Cancelar.Ejecutar(pedido, token)));
+
+        Assert.Empty(entorno.Auditoria.Solicitudes);
+        Assert.All(entorno.Envios.Todos, e => Assert.Equal(EstadoDeEnvio.PendienteDeGuia, e.Estado));
     }
 
     [Fact]

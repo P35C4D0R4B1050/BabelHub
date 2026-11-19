@@ -74,6 +74,12 @@ public readonly record struct NumeroDeGuia
             }
         }
 
+        // Al menos un carácter alfanumérico, sin guion al principio ni al final: «------» no es un número de guía.
+        if (texto[0] == '-' || texto[^1] == '-' || !texto.Any(char.IsAsciiLetterOrDigit))
+        {
+            return false;
+        }
+
         numero = new NumeroDeGuia(texto);
         return true;
     }

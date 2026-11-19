@@ -67,4 +67,18 @@ public sealed class ContratoPublicoDeEnviosTests
 
         Assert.DoesNotContain(campos, c => c is "Nombre" or "Direccion" or "Telefono" or "Correo" or "Documento" or "Destinatario" or "Contacto");
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-17")]
+    public void Ni_el_dominio_ni_el_interior_de_envios_guardan_campos_de_contacto_salvo_el_destinatario_de_la_guia()
+    {
+        var prohibidos = new[] { "Nombre", "Direccion", "Telefono", "Correo", "Documento", "Contacto" };
+        var tipos = typeof(BabelHub.Ecommerce.Domain.Envios.Envio).Assembly.GetTypes().Where(t => t.Namespace == "BabelHub.Ecommerce.Domain.Envios" && t != typeof(BabelHub.Ecommerce.Domain.Envios.DestinatarioParaGuia) && t != typeof(BabelHub.Ecommerce.Domain.Envios.ResultadoDeValidacionDelDestinatario))
+            .Concat(Aplicacion.GetTypes().Where(t => t.Namespace == "BabelHub.Ecommerce.Application.Envios.Interno"));
+
+        var campos = tipos.Where(t => !t.IsEnum && t.Name != "IOperadorLogistico").SelectMany(t => t.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Select(p => p.Name)
+            .Concat(t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Select(f => f.Name))).ToArray();
+
+        Assert.DoesNotContain(campos, c => prohibidos.Any(p => c.Contains(p, StringComparison.OrdinalIgnoreCase)));
+    }
 }

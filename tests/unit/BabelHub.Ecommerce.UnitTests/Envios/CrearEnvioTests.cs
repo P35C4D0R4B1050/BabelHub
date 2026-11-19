@@ -66,7 +66,7 @@ public sealed class CrearEnvioTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-ENV-09")]
+    [Trait("Criterio", "AC-ENV-01")]
     public async Task La_linea_digital_se_rechaza_y_el_envio_se_crea_con_las_impresas()
     {
         var entorno = new EntornoDeEnvios();
@@ -85,7 +85,7 @@ public sealed class CrearEnvioTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-ENV-09")]
+    [Trait("Criterio", "AC-ENV-01")]
     public async Task Sin_lineas_impresas_no_se_crea_nada()
     {
         var entorno = new EntornoDeEnvios();
@@ -231,5 +231,56 @@ public sealed class CrearEnvioTests
         Assert.All([sinFuente, sinLineas, repetidas], r => Assert.Equal(CategoriaDeError.Validacion, r.Error!.Categoria));
         Assert.Empty(entorno.Envios.Todos);
         Assert.Equal(0, entorno.Pedidos.Lecturas); // la validación rechaza antes de leer
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-01")]
+    public async Task Repetir_la_llamada_cuando_las_lineas_ya_avanzaron_de_estado_devuelve_el_envio_existente()
+    {
+        var entorno = new EntornoDeEnvios();
+        var a = EntornoDeEnvios.Impresa();
+        var pedido = entorno.SembrarPedido(true, a);
+        var entrada = new CrearEnvioEntrada(pedido.PedidoId, "lima-central", [a.LineaId]);
+        var primera = await entorno.Crear.Ejecutar(entrada);
+
+        // Pedidos ya despachó la línea: deja de figurar como «lista», pero la repetición sigue siendo idempotente.
+        entorno.Pedidos.Sembrar(pedido with { Lineas = [a with { EstaLista = false }] });
+        var repeticion = await entorno.Crear.Ejecutar(entrada);
+
+        Assert.True(repeticion.EsExito);
+        Assert.True(repeticion.Valor.YaExistia);
+        Assert.Equal(primera.Valor.EnvioId, repeticion.Valor.EnvioId);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-01")]
+    public async Task Una_linea_marcada_lista_dentro_de_la_misma_transaccion_se_ve_al_crear_el_envio()
+    {
+        var entorno = new EntornoDeEnvios();
+        var linea = EntornoDeEnvios.Impresa(lista: false);
+        var pedido = entorno.SembrarPedido(true, linea);
+
+        var resultado = await entorno.Unidad.Ejecutar(async token =>
+        {
+            // Pedidos marca lista la línea y llama a Crear dentro de la misma transacción.
+            entorno.Pedidos.Sembrar(pedido with { Lineas = [linea with { EstaLista = true }] });
+            return await entorno.Crear.Ejecutar(new CrearEnvioEntrada(pedido.PedidoId, "lima-central", [linea.LineaId]), token);
+        });
+
+        Assert.True(resultado.EsExito);
+        Assert.Equal(1, entorno.Pedidos.LecturasDentroDeLaTransaccion);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-01")]
+    public async Task Una_fuente_de_mas_de_64_caracteres_es_una_validacion_fallida_y_no_una_excepcion()
+    {
+        var entorno = new EntornoDeEnvios();
+        var linea = EntornoDeEnvios.Impresa();
+        var pedido = entorno.SembrarPedido(true, linea);
+
+        var resultado = await entorno.Crear.Ejecutar(new CrearEnvioEntrada(pedido.PedidoId, new string('f', 65), [linea.LineaId]));
+
+        Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
     }
 }
