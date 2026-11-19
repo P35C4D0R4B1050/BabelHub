@@ -16,11 +16,12 @@ namespace BabelHub.Inventario.Infrastructure.Auditoria;
 /// </summary>
 internal static class EscrituraDeAuditoria
 {
-    private static readonly EsquemaDeModulo Auditoria = EsquemaDeModulo.Crear("auditoria");
+    /// <summary>El esquema de los registros del módulo; Identidad reutiliza estas utilidades sobre <c>identidad.registros</c> (plantilla de registros aislados).</summary>
+    public const string EsquemaPorDefecto = "auditoria";
 
     public static readonly TimeSpan EsperaDeLaBase = TimeSpan.FromSeconds(1);
 
-    public static async Task<T> EnLaUnidad<T>(IUnidadDeTrabajo unidad, IConexionDeLaUnidadDeTrabajo conexion, Func<NpgsqlConnection, NpgsqlTransaction, CancellationToken, Task<T>> bloque, CancellationToken cancelacion)
+    public static async Task<T> EnLaUnidad<T>(IUnidadDeTrabajo unidad, IConexionDeLaUnidadDeTrabajo conexion, Func<NpgsqlConnection, NpgsqlTransaction, CancellationToken, Task<T>> bloque, CancellationToken cancelacion, string esquema = EsquemaPorDefecto)
     {
         ArgumentNullException.ThrowIfNull(unidad);
         T resultado = default!;
@@ -28,7 +29,7 @@ internal static class EscrituraDeAuditoria
             async token =>
             {
                 await unidad.EjecutarComo(
-                    Auditoria,
+                    EsquemaDeModulo.Crear(esquema),
                     async interno => resultado = await bloque((NpgsqlConnection)conexion.Conexion, (NpgsqlTransaction)conexion.Transaccion, interno).ConfigureAwait(false),
                     token).ConfigureAwait(false);
                 return 0;
@@ -147,9 +148,9 @@ internal static class InsercionDeRegistros
         VALUES (@id, @servicio, @tipo, @actor_tipo, @actor_id, @rol, @instante, @accion, @objeto_tipo, @objeto_id, @sucursal_origen, @sucursal_destino, @motivo, @origen, @ruta, @detalle, @claves, @resultado, @truncado, @correlacion, @anonimizado_en)
         """;
 
-    public static async Task<int> Insertar(NpgsqlConnection conexion, NpgsqlTransaction transaccion, RegistroAuditado r, bool ignorarDuplicado, CancellationToken cancelacion)
+    public static async Task<int> Insertar(NpgsqlConnection conexion, NpgsqlTransaction transaccion, RegistroAuditado r, bool ignorarDuplicado, CancellationToken cancelacion, string esquema = EscrituraDeAuditoria.EsquemaPorDefecto)
     {
-        await using var comando = EscrituraDeAuditoria.Comando(Sql + (ignorarDuplicado ? " ON CONFLICT DO NOTHING" : string.Empty), conexion, transaccion);
+        await using var comando = EscrituraDeAuditoria.Comando(Sql.Replace("auditoria.registros", esquema + ".registros", StringComparison.Ordinal) + (ignorarDuplicado ? " ON CONFLICT DO NOTHING" : string.Empty), conexion, transaccion);
         void P(string nombre, object? valor, NpgsqlDbType? tipo = null)
         {
             var parametro = tipo is { } t ? new NpgsqlParameter(nombre, t) : new NpgsqlParameter { ParameterName = nombre };
@@ -310,7 +311,8 @@ internal static class ConsultaDePaginas
         FiltroDeAuditoria filtro,
         string? cursor,
         (string Sql, Action<NpgsqlParameterCollection> Parametros)? restriccion,
-        CancellationToken cancelacion)
+        CancellationToken cancelacion,
+        string esquema = EscrituraDeAuditoria.EsquemaPorDefecto)
     {
         var posicion = Posicion.Leer(cursor);
         return await EscrituraDeAuditoria.EnLaUnidad(
@@ -326,11 +328,11 @@ internal static class ConsultaDePaginas
                 var instantanea = posicion?.Instantanea;
                 if (instantanea is null)
                 {
-                    await using var maxima = EscrituraDeAuditoria.Comando("SELECT COALESCE(max(secuencia), 0) FROM auditoria.registros", conexion, transaccion);
+                    await using var maxima = EscrituraDeAuditoria.Comando("SELECT COALESCE(max(secuencia), 0) FROM " + esquema + ".registros", conexion, transaccion);
                     instantanea = (long)(await maxima.ExecuteScalarAsync(ct).ConfigureAwait(false))!;
                 }
 
-                var sql = new System.Text.StringBuilder("SELECT " + EscrituraDeAuditoria.ColumnasDeRegistro + " FROM auditoria.registros r WHERE r.secuencia <= @instantanea");
+                var sql = new System.Text.StringBuilder("SELECT " + EscrituraDeAuditoria.ColumnasDeRegistro + " FROM " + esquema + ".registros r WHERE r.secuencia <= @instantanea");
                 await using var comando = EscrituraDeAuditoria.Comando(string.Empty, conexion, transaccion);
                 comando.Parameters.AddWithValue("instantanea", instantanea.Value);
 
@@ -411,7 +413,8 @@ internal static class ConsultaDePaginas
                 var siguiente = hayMas ? Posicion.Escribir(instantanea.Value, pagina[^1]) : null;
                 return new PaginaDeRegistros(pagina, siguiente) { CursorDeLaPagina = cursor ?? $"{Version}|{instantanea.Value.ToString(CultureInfo.InvariantCulture)}" };
             },
-            cancelacion).ConfigureAwait(false);
+            cancelacion,
+            esquema).ConfigureAwait(false);
     }
 
     /// <summary>Los comodines de <c>LIKE</c> y la barra de escape se tratan como texto literal.</summary>

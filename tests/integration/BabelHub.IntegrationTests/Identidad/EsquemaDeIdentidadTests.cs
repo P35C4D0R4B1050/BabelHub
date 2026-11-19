@@ -32,6 +32,9 @@ public sealed class PostgresDeIdentidadFixture : IAsyncLifetime
 
     public AccesoAlEsquemaDeIdentidad AccesoAlEsquema { get; private set; } = null!;
 
+    /// <summary>El rol de depuración: solo ejecuta la función de anonimización.</summary>
+    public NpgsqlDataSource Depuracion { get; private set; } = null!;
+
     public async Task InitializeAsync()
     {
         await _contenedor.StartAsync();
@@ -39,6 +42,9 @@ public sealed class PostgresDeIdentidadFixture : IAsyncLifetime
         await Ejecutar(DefinicionDeAuditoria.MigracionCompleta(PostgresDeAuditoriaFixture.Catalogo));
         await Ejecutar(MigracionDelEsquemaDeIdentidad.Completa());
         await Ejecutar($"CREATE ROLE acceso LOGIN NOINHERIT PASSWORD '{ClaveDeAcceso}'; GRANT rol_auditoria, rol_identidad TO acceso;");
+        var llave = "depura-" + Guid.NewGuid().ToString("N");
+        await Ejecutar($"ALTER ROLE auditoria_depuracion LOGIN PASSWORD '{llave}'");
+        Depuracion = NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString()) { Username = "auditoria_depuracion", Password = llave }.ConnectionString);
         var clave = ClaveDeAcceso;
         Acceso = NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString()) { Username = "acceso", Password = clave }.ConnectionString);
         Unidad = new UnidadDeTrabajoPostgres(Acceso);
@@ -47,7 +53,7 @@ public sealed class PostgresDeIdentidadFixture : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        foreach (var origen in new[] { Acceso, Administracion })
+        foreach (var origen in new[] { Acceso, Depuracion, Administracion })
         {
             if (origen is not null)
             {

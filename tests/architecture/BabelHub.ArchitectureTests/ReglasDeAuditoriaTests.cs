@@ -18,6 +18,12 @@ public class ReglasDeAuditoriaTests
         "ICuentasCanceladasPendientes",
     ];
 
+    /// <summary>
+    /// Los tres adaptadores de Identidad sobre <c>identidad.registros</c> (T27, T36): viven en la composición porque unen las utilidades de Auditoría con la unidad de
+    /// trabajo de Identidad, y no pueden estar en ninguno de los dos módulos sin violar la regla 13. Cualquier otro tipo de la composición sigue sin poder usar los puertos.
+    /// </summary>
+    private const string AdaptadoresDeIdentidad = "^Postgres(Almacen|Fuente|Depurador)DeRegistrosAislados$";
+
     [Theory]
     [InlineData("Application")]
     [InlineData("Infrastructure")]
@@ -30,6 +36,7 @@ public class ReglasDeAuditoriaTests
         var resultado = Types.InAssembly(ensamblado)
             .That().DoNotResideInNamespaceStartingWith($"BabelHub.Ecommerce.{capa}.Auditoria")
             .And().DoNotResideInNamespaceStartingWith($"BabelHub.Ecommerce.{capa}.Identidad")
+            .And().DoNotHaveNameMatching(AdaptadoresDeIdentidad)
             .ShouldNot().HaveDependencyOnAny(prohibidos)
             .GetResult();
 
