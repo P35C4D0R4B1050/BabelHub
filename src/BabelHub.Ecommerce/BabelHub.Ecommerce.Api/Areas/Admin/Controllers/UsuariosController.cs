@@ -45,7 +45,7 @@ public sealed class UsuariosController(IAdministracionDeUsuarios usuarios, Conte
     public Task<IActionResult> Crear(CancellationToken cancelacion) =>
         Operar(["nombre", "correo", "rol", "sucursal"], async (admin, campos, token) =>
         {
-            if (!TryRol(campos.GetValueOrDefault("rol"), out var rol) || !TrySucursal(campos.GetValueOrDefault("sucursal"), out var sucursal) || campos.GetValueOrDefault("nombre") is not { Length: > 0 and <= 120 } nombre || campos.GetValueOrDefault("correo") is not { Length: > 0 and <= 254 } correo)
+            if (!TryRol(campos.GetValueOrDefault("rol"), out var rol) || !TryCodigoDeSucursal(campos.GetValueOrDefault("sucursal"), out var sucursal) || campos.GetValueOrDefault("nombre") is not { Length: > 0 and <= 120 } nombre || campos.GetValueOrDefault("correo") is not { Length: > 0 and <= 254 } correo)
             {
                 return Invalido();
             }
@@ -58,7 +58,7 @@ public sealed class UsuariosController(IAdministracionDeUsuarios usuarios, Conte
     public Task<IActionResult> CambiarElRol(CancellationToken cancelacion) =>
         Operar(["usuarioId", "rol", "sucursal"], async (admin, campos, token) =>
         {
-            if (!EntradasHttpDelCarrito.TryGuid(campos, "usuarioId", out var id) || !TryRol(campos.GetValueOrDefault("rol"), out var rol) || !TrySucursal(campos.GetValueOrDefault("sucursal"), out var sucursal))
+            if (!EntradasHttpDelCarrito.TryGuid(campos, "usuarioId", out var id) || !TryRol(campos.GetValueOrDefault("rol"), out var rol) || !TryCodigoDeSucursal(campos.GetValueOrDefault("sucursal"), out var sucursal))
             {
                 return Invalido();
             }
@@ -176,22 +176,11 @@ public sealed class UsuariosController(IAdministracionDeUsuarios usuarios, Conte
         return texto is not null && Array.IndexOf(Enum.GetNames<RolDeCuenta>(), texto) >= 0 && Enum.TryParse(texto, ignoreCase: false, out rol);
     }
 
-    /// <summary>La sucursal es opcional (el personal de logística y la administración central no la llevan); si viene, es un identificador.</summary>
-    private static bool TrySucursal(string? texto, out Guid? sucursal)
+    /// <summary>La sucursal es opcional (el personal de logística y la administración central no la llevan); si viene, es el <b>código</b> de la sucursal (D20): solo se acota su largo, y Identidad la valida contra el Inventario.</summary>
+    private static bool TryCodigoDeSucursal(string? texto, out string? codigo)
     {
-        sucursal = null;
-        if (string.IsNullOrEmpty(texto))
-        {
-            return true;
-        }
-
-        if (!Guid.TryParseExact(texto, "D", out var id) || id == Guid.Empty)
-        {
-            return false;
-        }
-
-        sucursal = id;
-        return true;
+        codigo = string.IsNullOrWhiteSpace(texto) ? null : texto.Trim();
+        return codigo is null || codigo.Length <= IdentificadorDeSucursal.LargoMaximoDelCodigo;
     }
 
     /// <summary>Lo que devuelve una operación: la pantalla con su resultado o el error de Identidad.</summary>

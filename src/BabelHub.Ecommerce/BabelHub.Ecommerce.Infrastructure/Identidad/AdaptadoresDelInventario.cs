@@ -1,4 +1,5 @@
 using BabelHub.Ecommerce.Application.Identidad;
+using BabelHub.Ecommerce.Application.Identidad.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
 
 namespace BabelHub.Ecommerce.Infrastructure.Identidad;
@@ -34,5 +35,24 @@ public sealed class InventarioPendientesDeCuenta(IClienteDelInventario inventari
         return resultado.Exitosa
             ? resultado.Valor.ReservasActivas
             : throw new PendientesNoDisponiblesException("El Inventario no pudo contar los pendientes del titular.");
+    }
+}
+
+/// <summary>
+/// Las sucursales que existen según el Inventario (<c>inventario.sucursales.listar</c>, D20): el código se compara sin distinguir mayúsculas. Un Inventario que no responde, supera su límite o rechaza es <see cref="ExistenciaDeSucursal.NoDisponible"/>:
+/// nunca se asume que una sucursal existe.
+/// </summary>
+public sealed class InventarioCatalogoDeSucursales(IClienteDelInventario inventario) : ICatalogoDeSucursales
+{
+    public async Task<ExistenciaDeSucursal> Existe(string codigoDeSucursal, CancellationToken cancelacion = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(codigoDeSucursal);
+        var lista = await inventario.ListarSucursales(cancelacion).ConfigureAwait(false);
+        if (!lista.Exitosa)
+        {
+            return ExistenciaDeSucursal.NoDisponible;
+        }
+
+        return lista.Valor.Any(s => string.Equals(s.Codigo, codigoDeSucursal.Trim(), StringComparison.OrdinalIgnoreCase)) ? ExistenciaDeSucursal.Existe : ExistenciaDeSucursal.NoExiste;
     }
 }

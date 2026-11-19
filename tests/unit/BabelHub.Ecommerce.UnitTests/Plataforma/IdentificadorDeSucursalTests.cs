@@ -32,6 +32,7 @@ public sealed class IdentificadorDeSucursalTests
     [InlineData("lima;")]
     [InlineData("a_b")]
     [InlineData("ñandú")]
+    [InlineData("Kusco")] // el signo Kelvin se pliega a «k» en minúsculas: no es un código de sucursal
     public void UnCodigoSinLaFormaDeUnCodigoDeSucursal_NoSeResuelve(string? codigo)
     {
         Assert.Null(IdentificadorDeSucursal.DesdeCodigo(codigo));

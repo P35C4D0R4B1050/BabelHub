@@ -19,6 +19,7 @@ public sealed class AdministracionDeUsuarios(
     RevocacionDeSesiones revocacion,
     ICancelacionDeAvisos cancelacionDeAvisos,
     AvisosDeCuenta avisos,
+    ICatalogoDeSucursales sucursales,
     IUnidadDeTrabajo unidad,
     IAuditoria auditoria,
     IReloj reloj) : IAdministracionDeUsuarios
@@ -26,7 +27,7 @@ public sealed class AdministracionDeUsuarios(
     /// <summary>Cuánto dura una contraseña temporal (IDE-23).</summary>
     public static readonly TimeSpan VigenciaDeLaTemporal = TimeSpan.FromHours(24);
 
-    public async Task<Resultado<ContrasenaTemporalEntregada>> Crear(Guid administradorId, string nombre, string correo, RolDeCuenta rol, Guid? sucursal, CancellationToken cancelacion = default)
+    public async Task<Resultado<ContrasenaTemporalEntregada>> Crear(Guid administradorId, string nombre, string correo, RolDeCuenta rol, string? codigoDeSucursal, CancellationToken cancelacion = default)
     {
         var (error, administrador) = await Administrador(administradorId, cancelacion).ConfigureAwait(false);
         if (error is not null)
@@ -54,6 +55,12 @@ public sealed class AdministracionDeUsuarios(
         if (!rolDeUsuario.EsDePersonal())
         {
             return Resultado<ContrasenaTemporalEntregada>.Fallo(FallosDeIdentidad.Validacion("rol", "no-es-de-personal"));
+        }
+
+        var (falloDeSucursal, sucursal) = await ResolverLaSucursal(rolDeUsuario, codigoDeSucursal, cancelacion).ConfigureAwait(false);
+        if (falloDeSucursal is not null)
+        {
+            return Resultado<ContrasenaTemporalEntregada>.Fallo(falloDeSucursal);
         }
 
         if (!Usuario.SucursalCoincideConElRol(rolDeUsuario, sucursal))
@@ -96,7 +103,7 @@ public sealed class AdministracionDeUsuarios(
             cancelacion).ConfigureAwait(false);
     }
 
-    public async Task<Resultado<UsuarioAdministrado>> CambiarElRol(Guid administradorId, Guid usuarioId, RolDeCuenta rol, Guid? sucursal, CancellationToken cancelacion = default)
+    public async Task<Resultado<UsuarioAdministrado>> CambiarElRol(Guid administradorId, Guid usuarioId, RolDeCuenta rol, string? codigoDeSucursal, CancellationToken cancelacion = default)
     {
         var (error, administrador) = await Administrador(administradorId, cancelacion).ConfigureAwait(false);
         if (error is not null)
@@ -110,6 +117,12 @@ public sealed class AdministracionDeUsuarios(
         }
 
         var nuevoRol = RolDeUsuarioDe(rol);
+        var (falloDeSucursal, sucursal) = await ResolverLaSucursal(nuevoRol, codigoDeSucursal, cancelacion).ConfigureAwait(false);
+        if (falloDeSucursal is not null)
+        {
+            return Resultado<UsuarioAdministrado>.Fallo(falloDeSucursal);
+        }
+
         return await unidad.Ejecutar(
             async ct =>
             {
@@ -334,6 +347,36 @@ public sealed class AdministracionDeUsuarios(
         }
 
         return resultado;
+    }
+
+    /// <summary>
+    /// D20: la sucursal de un encargado se asigna <b>por código</b>. Un código sin la forma de un código de sucursal se rechaza; el de un rol que lleva sucursal debe estar en <c>inventario.sucursales.listar</c> (si el Inventario no responde,
+    /// <c>servicio-no-disponible</c>: nunca se asigna una sucursal sin comprobarla); y el identificador guardado en la cuenta y emitido en la credencial es el derivado del código (<see cref="IdentificadorDeSucursal"/>). Se llama
+    /// <b>fuera</b> de la transacción (no hay una llamada de red con filas bloqueadas). Un rol que no lleva sucursal con un código se deriva igual y lo rechazan las reglas del Dominio.
+    /// </summary>
+    private async Task<(ErrorDeAplicacion? Error, Guid? Sucursal)> ResolverLaSucursal(RolDeUsuario rol, string? codigoDeSucursal, CancellationToken cancelacion)
+    {
+        if (string.IsNullOrWhiteSpace(codigoDeSucursal))
+        {
+            return (null, null);
+        }
+
+        if (IdentificadorDeSucursal.DesdeCodigo(codigoDeSucursal) is not { } derivado)
+        {
+            return (FallosDeIdentidad.Validacion("sucursal", "invalida"), null);
+        }
+
+        if (!rol.LlevaSucursal())
+        {
+            return (null, derivado);
+        }
+
+        return await sucursales.Existe(codigoDeSucursal.Trim(), cancelacion).ConfigureAwait(false) switch
+        {
+            ExistenciaDeSucursal.Existe => (null, derivado),
+            ExistenciaDeSucursal.NoExiste => (FallosDeIdentidad.Validacion("sucursal", "desconocida"), null),
+            _ => (FallosDeIdentidad.NoDisponible, null),
+        };
     }
 
     private static ErrorDeAplicacion CuentaNoActiva { get; } = new(CategoriaDeError.Conflicto, "cuenta-no-activa");

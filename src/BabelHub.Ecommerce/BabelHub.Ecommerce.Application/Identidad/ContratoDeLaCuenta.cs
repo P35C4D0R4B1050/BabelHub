@@ -212,11 +212,12 @@ public sealed record UsuarioAdministrado(Guid UsuarioId, string Nombre, string C
 public sealed record ContrasenaTemporalEntregada(UsuarioAdministrado Usuario, ValorSecreto ContrasenaTemporal, DateTimeOffset VenceEn);
 
 /// <summary>Administración de usuarios por el administrador central (IDE-04 a IDE-07, IDE-23, IDE-38, IDE-44, IDE-49, IDE-66, IDE-87).</summary>
+/// <remarks>La sucursal de un encargado se pasa <b>por su código</b> (D20): Identidad la valida contra <c>inventario.sucursales.listar</c> y guarda el identificador derivado del código (<see cref="IdentificadorDeSucursal"/>).</remarks>
 public interface IAdministracionDeUsuarios
 {
-    Task<Resultado<ContrasenaTemporalEntregada>> Crear(Guid administradorId, string nombre, string correo, RolDeCuenta rol, Guid? sucursal, CancellationToken cancelacion = default);
+    Task<Resultado<ContrasenaTemporalEntregada>> Crear(Guid administradorId, string nombre, string correo, RolDeCuenta rol, string? codigoDeSucursal, CancellationToken cancelacion = default);
 
-    Task<Resultado<UsuarioAdministrado>> CambiarElRol(Guid administradorId, Guid usuarioId, RolDeCuenta rol, Guid? sucursal, CancellationToken cancelacion = default);
+    Task<Resultado<UsuarioAdministrado>> CambiarElRol(Guid administradorId, Guid usuarioId, RolDeCuenta rol, string? codigoDeSucursal, CancellationToken cancelacion = default);
 
     Task<Resultado<UsuarioAdministrado>> Desactivar(Guid administradorId, Guid usuarioId, CancellationToken cancelacion = default);
 

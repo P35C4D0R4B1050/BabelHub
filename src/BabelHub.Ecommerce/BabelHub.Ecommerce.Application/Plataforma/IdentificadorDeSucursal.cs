@@ -17,12 +17,13 @@ public static class IdentificadorDeSucursal
     /// <summary>El identificador del código, o <see langword="null"/> si el código no tiene la forma de un código de sucursal. Insensible a mayúsculas y espacios en los extremos.</summary>
     public static Guid? DesdeCodigo(string? codigoDeSucursal)
     {
-        var codigo = codigoDeSucursal?.Trim().ToLowerInvariant();
-        if (string.IsNullOrEmpty(codigo) || codigo.Length > LargoMaximoDelCodigo || !codigo.All(c => char.IsAsciiLetterOrDigit(c) || c == '-'))
+        // La forma ASCII se comprueba sobre el texto recortado <b>antes</b> de pasar a minúsculas: un carácter que se pliega a ASCII (el signo Kelvin, U+212A) no se cuela como una `k`.
+        var recortado = codigoDeSucursal?.Trim();
+        if (string.IsNullOrEmpty(recortado) || recortado.Length > LargoMaximoDelCodigo || !recortado.All(c => char.IsAsciiLetterOrDigit(c) || c == '-'))
         {
             return null;
         }
 
-        return new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(Prefijo + codigo)).AsSpan(0, 16));
+        return new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(Prefijo + recortado.ToLowerInvariant())).AsSpan(0, 16));
     }
 }

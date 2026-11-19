@@ -393,3 +393,19 @@ public interface IPorAnonimizar
 
     Task<IReadOnlyList<Guid>> Listar(int maximo, CancellationToken cancelacion = default);
 }
+
+/// <summary>Lo que el Inventario dice de un código de sucursal (<c>sucursales.listar</c>, D20).</summary>
+public enum ExistenciaDeSucursal
+{
+    Existe,
+    NoExiste,
+
+    /// <summary>El Inventario no respondió: quien llama falla cerrado y no asigna nada.</summary>
+    NoDisponible,
+}
+
+/// <summary>El catálogo de sucursales para asignar la de un encargado por código (D20): lo implementa un adaptador sobre el cliente del Inventario. Nunca lanza por una falla del Inventario.</summary>
+public interface ICatalogoDeSucursales
+{
+    Task<ExistenciaDeSucursal> Existe(string codigoDeSucursal, CancellationToken cancelacion = default);
+}

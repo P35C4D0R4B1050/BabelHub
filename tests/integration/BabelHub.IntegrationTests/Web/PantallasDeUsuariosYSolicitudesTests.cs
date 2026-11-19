@@ -30,7 +30,7 @@ public sealed class PantallasDeUsuariosYSolicitudesTests : IAsyncLifetime
     {
         var usuarios = DobleDeMetodos.Crear<IAdministracionDeUsuarios>(out var dU);
         dU.Con(nameof(IAdministracionDeUsuarios.Crear), a => { _llamadas.Add("crear"); _argumentos["rol"] = a[3]; _argumentos["sucursal"] = a[4]; return Task.FromResult(De(new ContrasenaTemporalEntregada(Administrado(), new ValorSecreto("Temporal-Una-Sola-Vez-9"), new DateTimeOffset(2026, 11, 20, 15, 0, 0, TimeSpan.Zero)))); });
-        dU.Con(nameof(IAdministracionDeUsuarios.CambiarElRol), a => { _llamadas.Add("rol"); _argumentos["rol"] = a[2]; return Task.FromResult(De(Administrado(RolDeCuenta.EncargadoDeSucursal))); });
+        dU.Con(nameof(IAdministracionDeUsuarios.CambiarElRol), a => { _llamadas.Add("rol"); _argumentos["rol"] = a[2]; _argumentos["sucursalDelCambio"] = a[3]; return Task.FromResult(De(Administrado(RolDeCuenta.EncargadoDeSucursal))); });
         dU.Con(nameof(IAdministracionDeUsuarios.Desactivar), _ => { _llamadas.Add("desactivar"); return Task.FromResult(De(Administrado() with { Activo = false })); });
         dU.Con(nameof(IAdministracionDeUsuarios.Reactivar), _ => { _llamadas.Add("reactivar"); return Task.FromResult(De(Administrado())); });
         dU.Con(nameof(IAdministracionDeUsuarios.RestablecerLaContrasena), _ => { _llamadas.Add("contrasena"); return Task.FromResult(De(new ContrasenaTemporalEntregada(Administrado(), new ValorSecreto("Otra-Temporal-9"), new DateTimeOffset(2026, 11, 20, 15, 0, 0, TimeSpan.Zero)))); });
@@ -82,7 +82,7 @@ public sealed class PantallasDeUsuariosYSolicitudesTests : IAsyncLifetime
     [Trait("Criterio", "AC-WEB-29")]
     public async Task Cambiar_el_rol_desactivar_reactivar_y_restablecer_llaman_a_Identidad_con_el_identificador_del_usuario()
     {
-        using var rol = await Enviar("/administracion/usuarios/rol", ("usuarioId", Usuario.ToString("D")), ("rol", "EncargadoDeSucursal"), ("sucursal", Guid.NewGuid().ToString("D")));
+        using var rol = await Enviar("/administracion/usuarios/rol", ("usuarioId", Usuario.ToString("D")), ("rol", "EncargadoDeSucursal"), ("sucursal", " Ayacucho "));
         using var desactivado = await Enviar("/administracion/usuarios/desactivar", ("usuarioId", Usuario.ToString("D")));
         using var reactivado = await Enviar("/administracion/usuarios/reactivar", ("usuarioId", Usuario.ToString("D")));
         using var contrasena = await Enviar("/administracion/usuarios/contrasena", ("usuarioId", Usuario.ToString("D")));
@@ -92,13 +92,14 @@ public sealed class PantallasDeUsuariosYSolicitudesTests : IAsyncLifetime
         Assert.Equal(["rol", "desactivar", "reactivar", "contrasena", "segundo-factor"], _llamadas);
         Assert.Contains("Otra-Temporal-9", await contrasena.Content.ReadAsStringAsync(), StringComparison.Ordinal);
         Assert.Equal(RolDeCuenta.EncargadoDeSucursal, _argumentos["rol"]);
+        Assert.Equal("Ayacucho", _argumentos["sucursalDelCambio"]); // D20: la sucursal viaja por código, sin espacios en los extremos
     }
 
     [Theory]
     [Trait("Criterio", "AC-WEB-29")]
     [InlineData("rol", "Dueño")]
     [InlineData("rol", "0")]
-    [InlineData("sucursal", "no-es-guid")]
+    [InlineData("sucursal", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
     public async Task Un_rol_o_una_sucursal_invalidos_no_llegan_a_Identidad(string campo, string valor)
     {
         using var respuesta = await Enviar("/administracion/usuarios/crear", ("nombre", "Luis"), ("correo", "luis@babelhub.example"), (campo == "rol" ? "rol" : "rol", campo == "rol" ? valor : "Logistica"), ("sucursal", campo == "sucursal" ? valor : string.Empty));
