@@ -10,6 +10,9 @@ internal sealed class ListarEnvios(AutorizadorDeEnvios autorizador, LimitesDeEnv
 {
     public const int TamanoMaximo = 50;
 
+    /// <summary>Un tope de página evita el desborde de <c>(página - 1) × tamaño</c> en el repositorio.</summary>
+    public const int PaginaMaxima = 100_000;
+
     public async Task<Resultado<PaginaDeEnvios>> Ejecutar(ListarEnviosEntrada entrada, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(entrada);
@@ -23,7 +26,12 @@ internal sealed class ListarEnvios(AutorizadorDeEnvios autorizador, LimitesDeEnv
             return FallosDeEnvios.Fallo<PaginaDeEnvios>(excedido);
         }
 
-        var pagina = Math.Max(1, entrada.Pagina);
+        if (entrada.Estado is { } pedido && !Enum.IsDefined(pedido))
+        {
+            return FallosDeEnvios.De<PaginaDeEnvios>(CategoriaDeError.Validacion, ClavesDeEnvios.ValidacionFallida);
+        }
+
+        var pagina = Math.Clamp(entrada.Pagina, 1, PaginaMaxima);
         var tamano = Math.Clamp(entrada.Tamano, 1, TamanoMaximo);
         EstadoDeEnvio? estado = entrada.Estado is { } e ? (EstadoDeEnvio)(int)e : null;
         try

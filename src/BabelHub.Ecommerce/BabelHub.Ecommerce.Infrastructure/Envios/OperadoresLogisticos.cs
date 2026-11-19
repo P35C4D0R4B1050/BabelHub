@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using BabelHub.Ecommerce.Application.Envios.Interno;
 using BabelHub.Ecommerce.Domain.Envios;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BabelHub.Ecommerce.Infrastructure.Envios;
 
@@ -139,19 +140,19 @@ public static class GuardaDeArranqueDeEnvios
 
 public static class ComposicionDelOperadorLogistico
 {
-    /// <summary>Registra el operador que decide la guarda de arranque (el nulo por defecto). Con <c>TryAdd</c>, no pisa lo registrado antes.</summary>
+    /// <summary>Registra el operador que decide la guarda de arranque (el nulo por defecto). Con <c>Replace</c>: la elección explícita de la guarda gana sobre el nulo por defecto de <c>AgregarEnvios</c>, se llame antes o después.</summary>
     public static IServiceCollection AgregarOperadorLogisticoDeEnvios(this IServiceCollection servicios, OpcionesDeArranqueDeEnvios opciones)
     {
         ArgumentNullException.ThrowIfNull(servicios);
         var elegido = GuardaDeArranqueDeEnvios.Exigir(opciones);
         if (elegido == GuardaDeArranqueDeEnvios.Simulador)
         {
-            servicios.AddSingleton<SimuladorOperadorLogistico>();
-            servicios.AddSingleton<IOperadorLogistico>(p => p.GetRequiredService<SimuladorOperadorLogistico>());
+            servicios.TryAddSingleton<SimuladorOperadorLogistico>();
+            servicios.Replace(ServiceDescriptor.Singleton<IOperadorLogistico>(p => p.GetRequiredService<SimuladorOperadorLogistico>()));
         }
         else
         {
-            servicios.AddSingleton<IOperadorLogistico, NuloOperadorLogistico>();
+            servicios.Replace(ServiceDescriptor.Singleton<IOperadorLogistico, NuloOperadorLogistico>());
         }
 
         return servicios;

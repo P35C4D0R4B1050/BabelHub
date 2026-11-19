@@ -89,6 +89,7 @@ public sealed class LimitesDeEnviosTests
         Assert.True(uno.EsExito);
         Assert.Equal(CategoriaDeError.Limite, dos.Error!.Categoria);
         Assert.Single(entorno.Operador.Recibidas);
+        Assert.Equal(1, entorno.Contactos.Lecturas);
         Assert.Null(entorno.Envios.Todos.Single(e => e.Id == segundo.Id).ClaveDeSolicitud);
         Assert.Contains(entorno.Limites.Reservas, r => r.Politica == "guias-al-operador" && r.Sujeto == LimitesDeEnvios.SujetoDelOperador);
     }

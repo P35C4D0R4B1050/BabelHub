@@ -49,6 +49,12 @@ internal sealed class SolicitarGuia(
                 return FallosDeEnvios.De<DetalleDeEnvio>(CategoriaDeError.Conflicto, ClavesDeEnvios.EstadoInvalido);
             }
 
+            // El tope de solicitudes de guía al operador (30 por minuto en total): se reserva antes de leer el contacto personal y de fijar nada.
+            if (await limites.GuiaAlOperador(cancelacion).ConfigureAwait(false) is { } sobreCarga)
+            {
+                return FallosDeEnvios.Fallo<DetalleDeEnvio>(sobreCarga);
+            }
+
             // (2) El contacto, antes de fijar clave ni arrendamiento y fuera de toda transacción (ENV-10).
             var lectura = await contactos.Leer(inicial.PedidoId, cancelacion).ConfigureAwait(false);
             switch (lectura.Estado)
@@ -72,12 +78,6 @@ internal sealed class SolicitarGuia(
             if (!datosDelAviso.EsExito)
             {
                 return FallosDeEnvios.Fallo<DetalleDeEnvio>(datosDelAviso.Error!);
-            }
-
-            // El tope de solicitudes de guía al operador (30 por minuto en total): se reserva antes de fijar nada.
-            if (await limites.GuiaAlOperador(cancelacion).ConfigureAwait(false) is { } sobreCarga)
-            {
-                return FallosDeEnvios.Fallo<DetalleDeEnvio>(sobreCarga);
             }
 
             // (2b) Transacción corta: la clave y el arrendamiento.

@@ -23,7 +23,7 @@ public sealed class ComposicionYTrabajosDeEnviosTests
     private static T Doble<T>()
         where T : class => DispatchProxy.Create<T, DobleQueLanza>();
 
-    private static ServiceCollection ConDependencias()
+    private static ServiceCollection ConDependencias(bool sinOperador = false)
     {
         var servicios = new ServiceCollection();
         servicios.AddSingleton(Doble<IUnidadDeTrabajo>());
@@ -36,7 +36,11 @@ public sealed class ComposicionYTrabajosDeEnviosTests
         servicios.AddSingleton(Doble<IPublicadorDeAlertasTecnicas>());
         servicios.AddSingleton(Doble<INotificador>());
         servicios.AddSingleton(Doble<IRegistroDeTrabajosDeFondo>());
-        servicios.AddSingleton(Doble<IOperadorLogistico>());
+        if (!sinOperador)
+        {
+            servicios.AddSingleton(Doble<IOperadorLogistico>());
+        }
+
         return servicios;
     }
 
@@ -80,6 +84,28 @@ public sealed class ComposicionYTrabajosDeEnviosTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-ENV-04")]
+    public void Sin_operador_elegido_se_resuelve_el_nulo_y_la_eleccion_del_anfitrion_gana_se_componga_antes_o_despues()
+    {
+        var sinEleccion = ConDependencias(sinOperador: true);
+        sinEleccion.AgregarEnvios(esProduccion: false);
+        var antes = ConDependencias(sinOperador: true);
+        antes.AgregarOperadorLogisticoDeEnvios(new OpcionesDeArranqueDeEnvios("simulador", "Test", false));
+        antes.AgregarEnvios(esProduccion: false);
+        var despues = ConDependencias(sinOperador: true);
+        despues.AgregarEnvios(esProduccion: false);
+        despues.AgregarOperadorLogisticoDeEnvios(new OpcionesDeArranqueDeEnvios("simulador", "Test", false));
+
+        using var a = sinEleccion.BuildServiceProvider();
+        using var b = antes.BuildServiceProvider();
+        using var c = despues.BuildServiceProvider();
+
+        Assert.IsType<NuloOperadorLogistico>(a.GetRequiredService<IOperadorLogistico>());
+        Assert.IsType<SimuladorOperadorLogistico>(b.GetRequiredService<IOperadorLogistico>());
+        Assert.IsType<SimuladorOperadorLogistico>(c.GetRequiredService<IOperadorLogistico>());
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-ENV-10")]
     public void En_produccion_el_arranque_falla_mientras_el_cierre_de_reservas_siga_provisional()
     {
@@ -119,6 +145,20 @@ public sealed class ComposicionYTrabajosDeEnviosTests
         Assert.Equal(TimeSpan.FromMinutes(1), TrabajosDeEnvios.CadaMinuto.Intervalo);
         Assert.Equal(TimeSpan.FromHours(1), TrabajosDeEnvios.PorHora.Intervalo);
         Assert.NotNull(proveedor.GetRequiredService<ServicioDeTrabajosDeEnvios>());
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-07")]
+    public async Task Una_excepcion_con_el_apagado_ya_pedido_no_se_propaga_desde_el_servicio_de_trabajos()
+    {
+        using var apagado = new CancellationTokenSource();
+        var trabajo = Trabajo(async _ =>
+        {
+            await apagado.CancelAsync();
+            throw new InvalidOperationException("conexion cerrada");
+        }, new RegistroEspia(), new AlertasEspia());
+
+        await trabajo.Correr(apagado.Token);
     }
 
     private sealed class RegistroEspia : IRegistroDeTrabajosDeFondo

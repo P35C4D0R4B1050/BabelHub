@@ -78,6 +78,10 @@ public sealed class TrabajoDeFondoDeEnvios(
         {
             // Apagado ordenado del servicio.
         }
+        catch (Exception) when (cancelacion.IsCancellationRequested)
+        {
+            // Una falla de la red o de la base de datos con el apagado ya pedido (la conexión se cierra): no se propaga ni detiene el anfitrión.
+        }
     }
 
     private async Task Registrar(ResultadoDeTrabajo resultado, CancellationToken cancelacion)
