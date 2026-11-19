@@ -204,3 +204,44 @@ public sealed class LectorDeOpcionesDePagosTests
         Assert.Null(opciones.LlavePrivada);
     }
 }
+
+/// <summary>T27 (revisión): lo que el lector, la guarda y la composición deciden juntos, y que el servicio hospedado reciba de verdad los nueve trabajos.</summary>
+public sealed class ArranqueDePagosEncadenadoTests
+{
+    private static IConfiguration Configuracion(string pasarela) =>
+        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Pagos:Pasarela"] = pasarela, ["Pagos:ClaveDeIntentos"] = "clave-de-intentos-de-prueba-0123456789-abcdef" }).Build();
+
+    [Theory]
+    [InlineData("simulador")]
+    [InlineData("culqi")]
+    public void Un_modo_sin_llamadas_reales_arranca_en_produccion_con_la_pasarela_nula_sin_llave_privada(string pasarela)
+    {
+        var opciones = LectorDeOpcionesDePagos.Leer(Configuracion(pasarela), "Production", sinLlamadasReales: true, pedidosDisponible: false);
+        var servicios = new ServiceCollection();
+        servicios.AddSingleton(typeof(IReloj), DispatchProxy.Create<IReloj, ComposicionDePagosTests.ProxyQueNoHaceNada>());
+
+        GuardaDeArranqueDePagos.Exigir(opciones);
+        servicios.AgregarPagos(opciones, esProduccion: false);
+
+        using var proveedor = servicios.BuildServiceProvider();
+        Assert.IsType<NuloPasarelaDePago>(proveedor.GetRequiredService<IPasarelaDePago>());
+    }
+
+    [Fact]
+    public void El_servicio_hospedado_recibe_los_nueve_trabajos_al_registrarlo_como_servicio_alojado()
+    {
+        var servicios = new ServiceCollection();
+        for (var i = 0; i < 9; i++)
+        {
+            var nombre = $"pagos-{i}";
+            servicios.AddSingleton(new TrabajoDeFondoDePagos(nombre, _ => Task.CompletedTask, null!, (c, t) => c(t), null!, null!, new OpcionesDelTrabajoDePagos(TimeSpan.FromMinutes(1))));
+        }
+
+        servicios.AddSingleton<IReadOnlyList<TrabajoDeFondoDePagos>>(sp => [.. sp.GetServices<TrabajoDeFondoDePagos>()]);
+        servicios.AddHostedService<ServicioDeTrabajosDePagos>();
+        using var proveedor = servicios.BuildServiceProvider();
+
+        var servicio = Assert.IsType<ServicioDeTrabajosDePagos>(proveedor.GetRequiredService<IEnumerable<Microsoft.Extensions.Hosting.IHostedService>>().Single());
+        Assert.Equal(9, servicio.Trabajos.Count);
+    }
+}

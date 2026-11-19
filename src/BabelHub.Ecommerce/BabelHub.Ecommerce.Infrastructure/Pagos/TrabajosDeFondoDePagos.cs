@@ -170,7 +170,7 @@ public sealed class TrabajoDeFondoDePagos(
     {
         try
         {
-            await alertas.Publicar(new AlertaTecnica("trabajo-de-pagos-sin-correr", reloj.Ahora), cancelacion).ConfigureAwait(false);
+            await alertas.Publicar(new AlertaTecnica(BabelHub.Shared.Contratos.Auditoria.MotivosDeAlertaDeAuditoria.TrabajoDePagosSinCorrer, reloj.Ahora), cancelacion).ConfigureAwait(false);
         }
         catch (Exception) when (!cancelacion.IsCancellationRequested)
         {
@@ -180,8 +180,10 @@ public sealed class TrabajoDeFondoDePagos(
 }
 
 /// <summary>El servicio en segundo plano que corre los trabajos de Pagos en paralelo hasta el apagado (T27; lo hospeda la Api en T29).</summary>
-public sealed class ServicioDeTrabajosDePagos(IEnumerable<TrabajoDeFondoDePagos> trabajos) : BackgroundService
+public sealed class ServicioDeTrabajosDePagos(IReadOnlyList<TrabajoDeFondoDePagos> trabajos) : BackgroundService
 {
+    public IReadOnlyList<TrabajoDeFondoDePagos> Trabajos => trabajos;
+
     protected override Task ExecuteAsync(CancellationToken cancelacion) =>
         Task.WhenAll(trabajos.Select(trabajo => trabajo.Correr(cancelacion)));
 }
