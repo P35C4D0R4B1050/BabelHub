@@ -318,21 +318,18 @@ public sealed class Envio
     /// <summary>Cancela por la anulación del pedido (ENV-13): el pendiente y el de guía generada sin el marcador de despacho; mantiene el resto. Un cancelado previo es éxito idempotente.</summary>
     public ResultadoDeCancelacion Cancelar(DateTimeOffset ahora)
     {
-        if (Estado == EstadoDeEnvio.Cancelado)
+        switch (PoliticaDeCancelacion.Evaluar(Estado, TieneMarcadorDeDespacho))
         {
-            return ResultadoDeCancelacion.YaEstabaCancelado;
+            case DecisionDeCancelacion.YaCancelado:
+                return ResultadoDeCancelacion.YaEstabaCancelado;
+            case DecisionDeCancelacion.Mantener:
+                return ResultadoDeCancelacion.Mantenido;
+            default:
+                Estado = EstadoDeEnvio.Cancelado;
+                CanceladoEn = ahora;
+                GuiaEnCursoHasta = null;
+                return ResultadoDeCancelacion.Cancelado;
         }
-
-        var cancelable = Estado == EstadoDeEnvio.PendienteDeGuia || (Estado == EstadoDeEnvio.GuiaGenerada && DespachoIniciadoEn is null);
-        if (!cancelable)
-        {
-            return ResultadoDeCancelacion.Mantenido;
-        }
-
-        Estado = EstadoDeEnvio.Cancelado;
-        CanceladoEn = ahora;
-        GuiaEnCursoHasta = null;
-        return ResultadoDeCancelacion.Cancelado;
     }
 
     /// <summary>Anota que Pedidos ya recibió «en reparto». Devuelve falso si ya estaba informado o el envío no salió.</summary>
