@@ -190,7 +190,7 @@ public sealed partial class PlantillaDeAviso
 
 /// <summary>
 /// El catálogo cerrado de plantillas (NOT-02, NOT-07): <b>solo los eventos notificables</b> de la spec —el pedido confirmado, en preparación, en tránsito, listo para recojo, entregado y no recogido, el pago pendiente y su
-/// resultado, la anulación o cancelación de un pedido, el reembolso automático, la guía de envío, el libro digital disponible y los cambios de estado de un traslado y de una devolución—; no hay forma de crear una
+/// resultado, la anulación o cancelación de un pedido, el reembolso automático, la guía de envío (`envio-guia`, con el número de guía), el libro digital disponible y los cambios de estado de un traslado y de una devolución—; no hay forma de crear una
 /// plantilla de publicidad. Ningún campo lleva texto libre, un enlace, un dato de pago ni un código de uso único.
 /// </summary>
 public static class CatalogoDePlantillas
@@ -213,7 +213,7 @@ public static class CatalogoDePlantillas
         PlantillaDeAviso.Crear("pago-resultado", TipoDeDestinatario.Cliente, 1, Pedido, new CampoDePlantilla("resultado", TipoDeCampo.Enumeracion, 12, Lista("aprobado", "rechazado")), Nombre),
         PlantillaDeAviso.Crear("pedido-anulado", TipoDeDestinatario.Cliente, 1, Pedido, new CampoDePlantilla("motivo", TipoDeCampo.Enumeracion, 12, Lista("anulado", "cancelado")), Nombre),
         PlantillaDeAviso.Crear("reembolso-automatico", TipoDeDestinatario.Cliente, 1, Pedido, Nombre),
-        PlantillaDeAviso.Crear("guia-de-envio", TipoDeDestinatario.Cliente, 1, Pedido, new CampoDePlantilla("estado", TipoDeCampo.Enumeracion, 16, Lista("guia-generada", "en-reparto")), Nombre),
+        PlantillaDeAviso.Crear("envio-guia", TipoDeDestinatario.Cliente, 1, Pedido, new CampoDePlantilla("numeroDeGuia", TipoDeCampo.Identificador, 40), new CampoDePlantilla("estado", TipoDeCampo.Enumeracion, 16, Lista("guia-generada", "en-reparto")), Nombre),
         PlantillaDeAviso.Crear("libro-digital-disponible", TipoDeDestinatario.Cliente, 1, Pedido, Nombre),
         PlantillaDeAviso.Crear(
             "devolucion-estado",
