@@ -77,9 +77,9 @@ public sealed class PlantillasDeCorreoConCamposTests
     }
 
     [Theory]
-    [InlineData(' ')]
-    [InlineData(' ')]
-    [InlineData('\u0085')]
+    [InlineData((char)0x2028)]
+    [InlineData((char)0x2029)]
+    [InlineData((char)0x0085)]
     public void LosSeparadoresDeLineaUnicode_SeVuelvenEspacios_AlmenosEnElAsunto(char separador)
     {
         var mensaje = Renderizador().De(Correo(
@@ -94,17 +94,30 @@ public sealed class PlantillasDeCorreoConCamposTests
     }
 
     [Fact]
-    public void UnDatoMuyLargo_SeRecorta()
+    public void LaRespuestaMasLargaQueAdmiteUnReclamo_SaleCompleta_YUnDatoQueNoCabeHaceQueElCorreoNoSalga_SinRecortarseEnSilencio()
     {
-        var mensaje = Renderizador().De(Correo(
-            CategoriaDeCorreo.RespuestaDeReclamo,
-            PlantillasDeCorreoDeReclamos.RespuestaDeReclamo,
-            ("numero", "2026-000123"),
-            ("fecha", "2026-11-19"),
-            ("respuesta", new string('x', 50_000))));
+        var completa = new string('r', 3000);
+        var mensaje = Renderizador().De(Correo(CategoriaDeCorreo.RespuestaDeReclamo, PlantillasDeCorreoDeReclamos.RespuestaDeReclamo, ("numero", "2026-000123"), ("fecha", "2026-11-19"), ("respuesta", completa)));
 
-        Assert.True(mensaje.Cuerpo.Length < RenderizadorDeCorreoDeProduccion.LargoMaximoDeUnDato + 1000);
+        Assert.Contains(completa, mensaje.Cuerpo, StringComparison.Ordinal);
+        Assert.Throws<InvalidOperationException>(() => Renderizador().De(Correo(CategoriaDeCorreo.RespuestaDeReclamo, PlantillasDeCorreoDeReclamos.RespuestaDeReclamo, ("numero", "2026-000123"), ("fecha", "2026-11-19"), ("respuesta", new string('r', RenderizadorDeCorreoDeProduccion.LargoMaximoDeUnDato + 1)))));
+        Assert.Throws<InvalidOperationException>(() => Renderizador().De(Correo(CategoriaDeCorreo.RespuestaDeReclamo, PlantillasDeCorreoDeReclamos.RespuestaDeReclamo, ("numero", new string('1', RenderizadorDeCorreoDeProduccion.LargoMaximoDeUnDatoEnElAsunto + 1)), ("fecha", "2026-11-19"), ("respuesta", "ok"))));
     }
+
+    [Fact]
+    public void UnDatoSoloDeEspaciosOControles_CuentaComoFaltante()
+    {
+        Assert.Throws<InvalidOperationException>(() => Renderizador().De(Correo(CategoriaDeCorreo.RespuestaDeReclamo, PlantillasDeCorreoDeReclamos.RespuestaDeReclamo, ("numero", "2026-000123"), ("fecha", "2026-11-19"), ("respuesta", "   "))));
+    }
+
+    [Fact]
+    public void LosCaracteresDeFormatoBidireccional_SeVuelvenEspacios()
+    {
+        var mensaje = Renderizador().De(Correo(CategoriaDeCorreo.RespuestaDeReclamo, PlantillasDeCorreoDeReclamos.RespuestaDeReclamo, ("numero", "2026" + (char)0x202E + "000123"), ("fecha", "2026-11-19"), ("respuesta", "ok")));
+
+        Assert.DoesNotContain((char)0x202E, mensaje.Asunto);
+    }
+
 
     [Fact]
     public void LasPlantillasDePagos_PonenElMotivoYElImporteDeLaListaCerrada_YElRestoDeLosDatosNoEntra()

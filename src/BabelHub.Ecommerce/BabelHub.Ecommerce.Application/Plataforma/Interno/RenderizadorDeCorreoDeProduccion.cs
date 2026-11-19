@@ -75,8 +75,10 @@ public sealed class RenderizadorDeCorreoDeProduccion : IRenderizadorDeCorreo
         return new MensajeDeCorreo([correo.Destinatario], Rellenar(plantilla.Asunto, plantilla, correo, esAsunto: true), Rellenar(plantilla.Cuerpo, plantilla, correo, esAsunto: false));
     }
 
-    /// <summary>El largo máximo de un dato que entra a un correo: nada que pueda ser un volcado (SEG-10).</summary>
-    public const int LargoMaximoDeUnDato = 2000;
+    /// <summary>El largo máximo de un dato en el cuerpo (cabe la respuesta de un reclamo, 3000) y en el asunto: uno más largo <b>no se recorta en silencio</b>, el correo no sale (SEG-10).</summary>
+    public const int LargoMaximoDeUnDato = 4000;
+
+    public const int LargoMaximoDeUnDatoEnElAsunto = 200;
 
     /// <summary>
     /// Pone los datos en los campos que la plantilla <b>declara</b>, y nada más: un dato no declarado se ignora, uno que falta hace que el correo no salga (lanza) y los saltos de línea y los controles de un dato
@@ -100,19 +102,19 @@ public sealed class RenderizadorDeCorreoDeProduccion : IRenderizadorDeCorreo
                 return coincidencia.Value;
             }
 
-            if (!correo.Datos.TryGetValue(campo, out var valor) || string.IsNullOrEmpty(valor))
+            if (!correo.Datos.TryGetValue(campo, out var valor) || string.IsNullOrWhiteSpace(valor) || valor.Length > (esAsunto ? LargoMaximoDeUnDatoEnElAsunto : LargoMaximoDeUnDato))
             {
-                throw new InvalidOperationException("Faltan datos de la plantilla del correo.");
+                throw new InvalidOperationException("Faltan datos de la plantilla del correo o no caben.");
             }
 
             return Limpiar(valor, conSaltos: !esAsunto);
         });
     }
 
-    /// <summary>Los controles, los separadores de línea y de párrafo Unicode (U+2028, U+2029) y U+0085 se vuelven espacios; en el cuerpo se conserva solo el salto de línea.</summary>
+    /// <summary>Los controles, los separadores de línea y de párrafo (U+2028, U+2029), U+0085 y los caracteres de formato (los de dirección bidireccional) se vuelven espacios; en el cuerpo se conserva solo el salto de línea.</summary>
     private static string Limpiar(string valor, bool conSaltos)
     {
-        var recortado = valor.Length > LargoMaximoDeUnDato ? valor[..LargoMaximoDeUnDato] : valor;
+        var recortado = valor;
         return string.Create(recortado.Length, (recortado, conSaltos), static (destino, par) =>
         {
             var (origen, conSaltos) = par;
@@ -120,7 +122,7 @@ public sealed class RenderizadorDeCorreoDeProduccion : IRenderizadorDeCorreo
             {
                 var c = origen[i];
                 var categoria = char.GetUnicodeCategory(c);
-                var peligroso = char.IsControl(c) || categoria is System.Globalization.UnicodeCategory.LineSeparator or System.Globalization.UnicodeCategory.ParagraphSeparator;
+                var peligroso = char.IsControl(c) || categoria is System.Globalization.UnicodeCategory.LineSeparator or System.Globalization.UnicodeCategory.ParagraphSeparator or System.Globalization.UnicodeCategory.Format;
                 destino[i] = peligroso && !(conSaltos && c == (char)10) ? (char)32 : c;
             }
         });

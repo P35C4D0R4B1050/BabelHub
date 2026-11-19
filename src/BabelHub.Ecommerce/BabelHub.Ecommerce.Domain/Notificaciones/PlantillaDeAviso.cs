@@ -137,7 +137,9 @@ public sealed partial class PlantillaDeAviso
 
         // Un identificador o un número de pedido puede llevar muchos dígitos (un GUID, una guía): solo se rechaza si es todo dígitos y separadores (parece una tarjeta), no por las rachas de un valor mixto.
         var esIdentificador = campo.Tipo is TipoDeCampo.Identificador or TipoDeCampo.NumeroDePedido;
-        var parecenDigitos = esIdentificador ? SoloDigitosYSeparadores().IsMatch(valor) && DigitosSeguidos().IsMatch(valor) : DigitosSeguidos().IsMatch(valor);
+        var esGuia = campo.Nombre == "numeroDeGuia";
+        // El número de guía de un operador puede ser solo de dígitos y largo (13 o más): la heurística de tarjeta no le aplica; su forma cerrada (ASCII, hasta 40) y la ausencia de enlaces bastan.
+        var parecenDigitos = !esGuia && (esIdentificador ? SoloDigitosYSeparadores().IsMatch(valor) && DigitosSeguidos().IsMatch(valor) : DigitosSeguidos().IsMatch(valor));
         if (ParecenEnlaceODireccion().IsMatch(valor) || parecenDigitos)
         {
             return "valor-prohibido";

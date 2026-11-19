@@ -255,6 +255,7 @@ public sealed class DominioDeNotificacionesTests
     {
         var plantilla = CatalogoDePlantillas.Obtener("envio-guia")!;
         var envios = new Dictionary<string, string> { ["numeroDePedido"] = "BH-000123", ["numeroDeGuia"] = "OLVA-20261119-0042", ["estado"] = estado };
+        Assert.True(plantilla.Validar(new Dictionary<string, string>(envios) { ["numeroDeGuia"] = "20261119004212345678" }).EsValido);
 
         Assert.True(plantilla.Validar(envios).EsValido);
         Assert.Equal(TipoDeDestinatario.Cliente, plantilla.Destinatario);
