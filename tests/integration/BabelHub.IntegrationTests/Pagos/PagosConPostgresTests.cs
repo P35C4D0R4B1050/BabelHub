@@ -31,7 +31,7 @@ internal static class ComprasDePrueba
         var ahora = entorno.Reloj.Ahora;
         var intencion = IntencionDePago.Crear(id, Mixta(cuenta ?? Cuenta, ahora), ahora + PlazosDelPago.VigenciaConImpresos, ahora);
         await entorno.Bd.Unidad.Ejecutar(async token => { await entorno.Bd.Pagos.AgregarIntencion(intencion, token); return 0; });
-        entorno.Reservas.Sembrar(id, ahora + PlazosDelPago.VigenciaConImpresos, [new LineaConfirmadaDeReserva(LineaImpresa, "AYA-01", false, null, null), new LineaConfirmadaDeReserva(LineaDigital, "DIG-01", false, null, null)]);
+        entorno.Reservas.Sembrar(id, ahora + PlazosDelPago.VigenciaConImpresos, [new LineaConfirmadaDeReserva(LineaImpresa, "AYA-01", false, null, null)]);
         entorno.Checkout.Con(nameof(BabelHub.Ecommerce.Application.Carrito.ICheckoutDelCliente.ObtenerParaPagar), _ => Task.FromResult(Resultado<BabelHub.Ecommerce.Application.Carrito.CheckoutVivoParaPagar>.Exito(new(id, BabelHub.Ecommerce.Application.Carrito.EstadoVisibleDelCheckout.EnPago))));
         return id;
     }
@@ -99,7 +99,8 @@ public sealed class PagosConPostgresTests(PostgresDePagosFixture bd) : IAsyncLif
         Assert.Equal(1, _entorno.Pasarela.LlamadasDeCobrar);
         Assert.Equal(1, await Contar("intentos"));
         Assert.Single(respuestas, r => r.EsExito && r.Valor.Estado == EstadoDelCobro.Aprobado);
-        Assert.All(respuestas.Where(r => !r.EsExito), r => Assert.Equal(CategoriaDeError.Conflicto, r.Error!.Categoria));
+        // Las demás se rechazan: con un conflicto (otro cobro en curso o la intención ya completada) o, pasado el tope de 5 intentos por intención y hora, con el límite.
+        Assert.All(respuestas.Where(r => !r.EsExito), r => Assert.Contains(r.Error!.Categoria, new[] { CategoriaDeError.Conflicto, CategoriaDeError.Limite }));
         Assert.Single(_entorno.Pedidos.PedidosCreados);
     }
 
@@ -115,7 +116,7 @@ public sealed class PagosConPostgresTests(PostgresDePagosFixture bd) : IAsyncLif
         var aprobado = await Cobrar(pedido, segunda, MedioDelContrato.Yape, EscenariosDelSimulador.Aprobado);
 
         Assert.Equal((EstadoDelCobro.Rechazado, MotivoDeRechazoDePago.TarjetaRechazada), (rechazo.Valor.Estado, rechazo.Valor.Motivo!.Value));
-        Assert.Equal(EstadoDelCobro.Aprobado, aprobado.Valor.Estado);
+        Assert.True(aprobado.Valor.Estado == EstadoDelCobro.Aprobado, $"{aprobado.Valor.Estado}; alertas: {string.Join(',', _entorno.Alertas)}; pedidos: {_entorno.Pedidos.Llamadas}");
         Assert.NotEqual(rechazo.Valor.IntentoId, aprobado.Valor.IntentoId);
         Assert.Equal(1, await Contar("intentos", "estado = 'rechazado'"));
         Assert.Equal(1, await Contar("intentos", "estado = 'aprobado'"));

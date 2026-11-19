@@ -196,6 +196,8 @@ internal sealed class EntornoDePagosConPostgres : IAsyncDisposable
 {
     private const string ClaveDeIntentos = "clave-de-intentos-de-prueba-0123456789-abcdef";
 
+    private static readonly List<string> _alertas = [];
+
     private EntornoDePagosConPostgres(ServiceProvider proveedor, PostgresDePagosFixture bd)
     {
         Proveedor = proveedor;
@@ -218,9 +220,12 @@ internal sealed class EntornoDePagosConPostgres : IAsyncDisposable
 
     public SimuladorPasarelaDePago Pasarela => (SimuladorPasarelaDePago)Proveedor.GetRequiredService<IPasarelaDePago>();
 
-    public CuentaDelPagadorDePrueba Cuenta => (CuentaDelPagadorDePrueba)Proveedor.GetRequiredService<ICuentaDelPagador>();
+    public CuentaDelPagadorDePrueba Cuenta => Proveedor.GetRequiredService<CuentaDelPagadorDePrueba>();
 
-    public ConfirmacionDeCompraDePrueba Pedidos => (ConfirmacionDeCompraDePrueba)Proveedor.GetRequiredService<IConfirmacionDeCompra>();
+    public ConfirmacionDeCompraDePrueba Pedidos => Proveedor.GetRequiredService<ConfirmacionDeCompraDePrueba>();
+
+    /// <summary>Los motivos de las alertas técnicas que Pagos publicó.</summary>
+    public IReadOnlyList<string> Alertas { get { lock (_alertas) { return [.. _alertas]; } } }
 
     public DobleDeMetodos Checkout { get; private set; } = null!;
 
@@ -228,6 +233,7 @@ internal sealed class EntornoDePagosConPostgres : IAsyncDisposable
 
     public static EntornoDePagosConPostgres Crear(PostgresDePagosFixture bd, Action<IServiceCollection>? ajustes = null)
     {
+        _alertas.Clear();
         var servicios = new ServiceCollection();
         var reloj = new RelojManualDePagos();
         servicios.AddSingleton<IReloj>(reloj);
@@ -258,7 +264,7 @@ internal sealed class EntornoDePagosConPostgres : IAsyncDisposable
 
         entradas.Con(nameof(IProcesadorDeEntradasDeIntegracion.Recibir), _ => Task.FromResult(new ResultadoDeEntradaDeIntegracion(EstadoDeEntradaDeIntegracion.Aceptada)));
         entradas.Con(nameof(IProcesadorDeEntradasDeIntegracion.Completar), _ => Task.CompletedTask);
-        alertas.Con(nameof(IPublicadorDeAlertasTecnicas.Publicar), _ => Task.CompletedTask);
+        alertas.Con(nameof(IPublicadorDeAlertasTecnicas.Publicar), argumentos => { lock (_alertas) { _alertas.Add(((AlertaTecnica)argumentos[0]!).Motivo); } return Task.CompletedTask; });
         trabajos.Con(nameof(IRegistroDeTrabajosDeFondo.Registrar), _ => Task.CompletedTask);
         posesion.Con(nameof(IPosesionDeEdiciones.Posee), _ => Task.FromResult(ResultadoDePosesion.NoPosee));
         dobleProgreso.Con(nameof(IProgresoDelCheckout.PagoPendiente), _ => Task.FromResult(ResultadoDelAvisoDePago.Aplicado));
