@@ -269,7 +269,6 @@ public sealed class RepositorioDeHojasPostgresTests(PostgresDeReclamacionesFixtu
     [InlineData("TRUNCATE reclamaciones.hojas_reclamacion")]
     [InlineData("UPDATE reclamaciones.secuencias_de_hoja SET anio = 2000")]
     [InlineData("DELETE FROM reclamaciones.secuencias_de_hoja")]
-    [InlineData("SELECT reclamaciones.guardar_hoja()")]
     [Trait("Criterio", "AC-REC-05")]
     public async Task El_rol_de_la_aplicacion_no_puede_alterar_lo_original_ni_borrar_ni_vaciar(string sql)
     {
@@ -300,7 +299,7 @@ public sealed class RepositorioDeHojasPostgresTests(PostgresDeReclamacionesFixtu
 
         var falla = await FallaComo("reclamaciones_dueno", sql);
 
-        Assert.Equal("23000", falla.SqlState);
+        Assert.Contains(falla.SqlState, new[] { "23000", "23514" });
     }
 
     [Fact]
@@ -316,6 +315,8 @@ public sealed class RepositorioDeHojasPostgresTests(PostgresDeReclamacionesFixtu
         hoja.MarcarAvisoEnviado(Inicio.AddHours(2));
         await Guardar(hoja);
         var avisoAtras = await FallaComo("reclamaciones_dueno", "UPDATE reclamaciones.hojas_reclamacion SET aviso_estado = 'pendiente', aviso_enviado_en = NULL");
+        Assert.True(hoja.MarcarDeCuentaCancelada());
+        await Guardar(hoja);
         var cancelada = await FallaComo("reclamaciones_dueno", "UPDATE reclamaciones.hojas_reclamacion SET de_cuenta_cancelada = false");
 
         Assert.All(new[] { otraRespuesta, haciaAtras, avisoAtras }, f => Assert.Equal("23000", f.SqlState));

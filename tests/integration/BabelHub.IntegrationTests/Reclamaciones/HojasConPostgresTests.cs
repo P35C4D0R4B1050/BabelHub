@@ -79,9 +79,9 @@ public sealed class HojasConPostgresTests(PostgresDeReclamacionesFixture bd) : I
     public async Task La_misma_clave_con_otro_contenido_es_un_conflicto_y_no_crea_otra_hoja()
     {
         var e = Entorno();
-        Assert.True((await e.Reclamaciones.Registrar(e.Entrada("clave-fija", "Primer detalle"))).EsExito);
+        Assert.True((await e.Reclamaciones.Registrar(e.Entrada("clave-fija-de-un-solo-uso", "Primer detalle"))).EsExito);
 
-        var otra = await e.Reclamaciones.Registrar(e.Entrada("clave-fija", "Otro detalle distinto"));
+        var otra = await e.Reclamaciones.Registrar(e.Entrada("clave-fija-de-un-solo-uso", "Otro detalle distinto"));
 
         Assert.False(otra.EsExito);
         Assert.Equal(CategoriaDeError.Conflicto, otra.Error!.Categoria);
@@ -178,7 +178,8 @@ public sealed class HojasConPostgresTests(PostgresDeReclamacionesFixture bd) : I
         Assert.Equal(CategoriaDeError.NoDisponible, sinAuditoria.Error!.Categoria);
         Assert.Equal(CategoriaDeError.Prohibido, encargado.Error!.Categoria);
         Assert.Equal(CategoriaDeError.NoAutenticado, visitante.Error!.Categoria);
-        Assert.Single(e.Denegaciones.Eventos);
+        // La administración registra un acceso denegado por cada intento de una sesión (el encargado) y también por la falta de sesión del visitante.
+        Assert.Equal(2, e.Denegaciones.Eventos.Count);
     }
 
     // ---------- Anonimización ----------
