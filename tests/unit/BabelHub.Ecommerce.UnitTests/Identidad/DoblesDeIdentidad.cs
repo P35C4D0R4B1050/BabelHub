@@ -35,6 +35,8 @@ internal sealed class BdIdentidad
 
     public List<CambioDeCorreoPendiente> Cambios { get; private set; } = [];
 
+    public List<SolicitudDeDatos> Solicitudes { get; private set; } = [];
+
     public List<(Guid UsuarioId, AvisoDeCuenta Aviso)> Avisos { get; private set; } = [];
 
     internal sealed record EstadoDeLaBd(
@@ -46,6 +48,7 @@ internal sealed class BdIdentidad
         List<(CuentaDeIdentidad Cuenta, CuentaDeIdentidad Copia)> CopiasDeCuentas,
         List<Dispositivo> Dispositivos,
         List<CambioDeCorreoPendiente> Cambios,
+        List<SolicitudDeDatos> Solicitudes,
         List<(Guid UsuarioId, AvisoDeCuenta Aviso)> Avisos);
 
     /// <summary>La instantánea guarda una copia del estado de cada cuenta para restaurarlo <b>en el mismo objeto</b>: las pruebas conservan su referencia y ven la reversión como la vería una base de datos.</summary>
@@ -58,6 +61,7 @@ internal sealed class BdIdentidad
         [.. Cuentas.Values.Select(c => (c, Copiar(c)))],
         [.. Dispositivos.Select(d => Dispositivo.Restaurar(d.UsuarioId, d.HuellaDeLaMarca, d.Region, d.Emitido, d.CongeladoHasta))],
         [.. Cambios.Select(c => CambioDeCorreoPendiente.Restaurar(c.Id, c.UsuarioId, c.CorreoNuevo, c.Creado, c.Estado))],
+        [.. Solicitudes.Select(s => SolicitudDeDatos.Restaurar(s.Id, s.UsuarioId, s.Tipo, s.Estado, s.RecibidaEn, s.FechaLimite, s.AtendidaEn, s.Respuesta, s.Motivo))],
         [.. Avisos]);
 
     public void Restaurar(EstadoDeLaBd estado)
@@ -69,6 +73,7 @@ internal sealed class BdIdentidad
         CarritosEliminados = estado.CarritosEliminados;
         Dispositivos = estado.Dispositivos;
         Cambios = estado.Cambios;
+        Solicitudes = estado.Solicitudes;
         Avisos = estado.Avisos;
         foreach (var (cuenta, copia) in estado.CopiasDeCuentas)
         {
@@ -744,4 +749,23 @@ internal sealed class CambiosDeCorreoEnMemoria(BdIdentidad bd) : IRepositorioDeC
         bd.Cambios.Add(cambio);
         return Task.CompletedTask;
     }
+}
+
+internal sealed class SolicitudesDeDatosEnMemoria(BdIdentidad bd) : IRepositorioDeSolicitudesDeDatos
+{
+    public Task Guardar(SolicitudDeDatos solicitud, CancellationToken cancelacion = default)
+    {
+        bd.Solicitudes.RemoveAll(s => s.Id == solicitud.Id);
+        bd.Solicitudes.Add(solicitud);
+        return Task.CompletedTask;
+    }
+
+    public Task<SolicitudDeDatos?> Obtener(Guid solicitudId, bool paraActualizar = false, CancellationToken cancelacion = default) =>
+        Task.FromResult(bd.Solicitudes.FirstOrDefault(s => s.Id == solicitudId));
+
+    public Task<IReadOnlyList<SolicitudDeDatos>> DelUsuario(Guid usuarioId, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<SolicitudDeDatos>>([.. bd.Solicitudes.Where(s => s.UsuarioId == usuarioId)]);
+
+    public Task<IReadOnlyList<SolicitudDeDatos>> Todas(CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<SolicitudDeDatos>>([.. bd.Solicitudes]);
 }

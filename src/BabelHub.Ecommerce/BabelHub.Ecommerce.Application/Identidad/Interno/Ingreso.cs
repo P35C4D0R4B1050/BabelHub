@@ -45,6 +45,11 @@ public sealed class AvisosDeCuenta(IEnviadorDeCorreo correo)
 
     public const string PlantillaDeSegundoFactorRestablecido = "segundo-factor-restablecido";
 
+    public const string PlantillaDeSolicitudDeDatosRespondida = "solicitud-de-datos-respondida";
+
+    /// <summary>El aviso de que la administración respondió una solicitud sobre datos (IDE-26): <b>sin el contenido</b> de la respuesta, que el titular ve en su cuenta.</summary>
+    public Task SolicitudDeDatosRespondida(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeSolicitudDeDatosRespondida, CategoriaDeCorreo.AvisoDeSeguridad, cancelacion);
+
     public const string PlantillaDeCambioDeCorreoNoReconocido = "cambio-de-correo-no-reconocido";
 
     public const string PlantillaDeCorreoCambiado = "correo-cambiado";

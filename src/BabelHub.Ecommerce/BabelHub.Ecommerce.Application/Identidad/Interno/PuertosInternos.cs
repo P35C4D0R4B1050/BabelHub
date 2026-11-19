@@ -201,6 +201,20 @@ public interface IRepositorioDeDispositivos
     Task Guardar(Dispositivo dispositivo, CancellationToken cancelacion = default);
 }
 
+/// <summary>Las solicitudes sobre datos personales (<c>identidad.solicitudes_de_datos</c>, IDE-12, IDE-26): solo identificador, tipo, estado, fechas y la respuesta o el motivo (IDE-69).</summary>
+public interface IRepositorioDeSolicitudesDeDatos
+{
+    Task Guardar(SolicitudDeDatos solicitud, CancellationToken cancelacion = default);
+
+    /// <summary>La solicitud por su identificador; con <paramref name="paraActualizar"/> toma el bloqueo de su fila: dos respuestas simultáneas no se pisan.</summary>
+    Task<SolicitudDeDatos?> Obtener(Guid solicitudId, bool paraActualizar = false, CancellationToken cancelacion = default);
+
+    Task<IReadOnlyList<SolicitudDeDatos>> DelUsuario(Guid usuarioId, CancellationToken cancelacion = default);
+
+    /// <summary>Todas, para la lista de la administración; la ordenación por fecha límite la hace el Dominio.</summary>
+    Task<IReadOnlyList<SolicitudDeDatos>> Todas(CancellationToken cancelacion = default);
+}
+
 /// <summary>El cambio de correo en curso de un usuario (<c>identidad.cambios_de_correo_pendientes</c>, IDE-53, IDE-54): como máximo uno por usuario; <see cref="Guardar"/> reemplaza el anterior.</summary>
 public interface IRepositorioDeCambiosDeCorreo
 {

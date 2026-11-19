@@ -55,6 +55,9 @@ public enum EstadoDeSolicitudDeDatos
     Recibida,
     EnAtencion,
     Atendida,
+
+    /// <summary>La administración la rechazó con un motivo (IDE-26): queda cerrada, igual que una atendida.</summary>
+    Rechazada,
 }
 
 /// <summary>
@@ -67,7 +70,7 @@ public sealed class SolicitudDeDatos
 
     public const int DiasHabilesParaLosDemas = 10;
 
-    private SolicitudDeDatos(Guid id, Guid usuarioId, TipoDeSolicitudDeDatos tipo, EstadoDeSolicitudDeDatos estado, DateTimeOffset recibidaEn, DateOnly fechaLimite, DateTimeOffset? atendidaEn)
+    private SolicitudDeDatos(Guid id, Guid usuarioId, TipoDeSolicitudDeDatos tipo, EstadoDeSolicitudDeDatos estado, DateTimeOffset recibidaEn, DateOnly fechaLimite, DateTimeOffset? atendidaEn, string? respuesta, string? motivo)
     {
         Id = id;
         UsuarioId = usuarioId;
@@ -76,6 +79,8 @@ public sealed class SolicitudDeDatos
         RecibidaEn = recibidaEn;
         FechaLimite = fechaLimite;
         AtendidaEn = atendidaEn;
+        Respuesta = respuesta;
+        Motivo = motivo;
     }
 
     public Guid Id { get; }
@@ -93,6 +98,15 @@ public sealed class SolicitudDeDatos
 
     public DateTimeOffset? AtendidaEn { get; private set; }
 
+    /// <summary>Lo que la administración le responde al titular y este ve en su cuenta (IDE-26); nulo mientras no se atienda.</summary>
+    public string? Respuesta { get; private set; }
+
+    /// <summary>El motivo del rechazo (IDE-26); nulo si no se rechazó.</summary>
+    public string? Motivo { get; private set; }
+
+    /// <summary>Cerrada: atendida o rechazada; ya no cambia (IDE-26).</summary>
+    public bool EstaCerrada => Estado is EstadoDeSolicitudDeDatos.Atendida or EstadoDeSolicitudDeDatos.Rechazada;
+
     public static int DiasHabilesDe(TipoDeSolicitudDeDatos tipo) => tipo == TipoDeSolicitudDeDatos.Acceso ? DiasHabilesParaElAcceso : DiasHabilesParaLosDemas;
 
     /// <summary>Registra la solicitud como recibida; <paramref name="hoyEnLima"/> es la fecha de Lima de <paramref name="ahora"/>.</summary>
@@ -103,12 +117,13 @@ public sealed class SolicitudDeDatos
             throw new ArgumentException("La solicitud necesita su identificador y su titular.");
         }
 
-        return new SolicitudDeDatos(id, usuarioId, tipo, EstadoDeSolicitudDeDatos.Recibida, ahora, CalendarioHabil.SumarDiasHabiles(hoyEnLima, DiasHabilesDe(tipo)), null);
+        return new SolicitudDeDatos(id, usuarioId, tipo, EstadoDeSolicitudDeDatos.Recibida, ahora, CalendarioHabil.SumarDiasHabiles(hoyEnLima, DiasHabilesDe(tipo)), null, null, null);
     }
 
-    public static SolicitudDeDatos Restaurar(Guid id, Guid usuarioId, TipoDeSolicitudDeDatos tipo, EstadoDeSolicitudDeDatos estado, DateTimeOffset recibidaEn, DateOnly fechaLimite, DateTimeOffset? atendidaEn) =>
-        new(id, usuarioId, tipo, estado, recibidaEn, fechaLimite, atendidaEn);
+    public static SolicitudDeDatos Restaurar(Guid id, Guid usuarioId, TipoDeSolicitudDeDatos tipo, EstadoDeSolicitudDeDatos estado, DateTimeOffset recibidaEn, DateOnly fechaLimite, DateTimeOffset? atendidaEn, string? respuesta = null, string? motivo = null) =>
+        new(id, usuarioId, tipo, estado, recibidaEn, fechaLimite, atendidaEn, respuesta, motivo);
 
+    /// <summary>Pasa de recibida a en atención (IDE-26); cualquier otro estado no cambia.</summary>
     public void PonerEnAtencion()
     {
         if (Estado == EstadoDeSolicitudDeDatos.Recibida)
@@ -117,17 +132,38 @@ public sealed class SolicitudDeDatos
         }
     }
 
-    public void Atender(DateTimeOffset ahora)
+    /// <summary>Atiende la solicitud con la respuesta que verá el titular (IDE-26). <see langword="false"/> si ya estaba cerrada: una solicitud cerrada no cambia.</summary>
+    public bool Atender(DateTimeOffset ahora, string? respuesta = null)
     {
-        if (Estado != EstadoDeSolicitudDeDatos.Atendida)
+        if (EstaCerrada)
         {
-            Estado = EstadoDeSolicitudDeDatos.Atendida;
-            AtendidaEn = ahora;
+            return false;
         }
+
+        Estado = EstadoDeSolicitudDeDatos.Atendida;
+        AtendidaEn = ahora;
+        Respuesta = respuesta;
+        return true;
     }
 
-    /// <summary>Vencida: pasó la fecha límite y no está atendida (una solicitud en atención cuenta como sin atender, IDE-32).</summary>
-    public bool EstaVencida(DateOnly hoyEnLima) => Estado != EstadoDeSolicitudDeDatos.Atendida && hoyEnLima > FechaLimite;
+    /// <summary>La rechaza con un motivo (IDE-26). <see langword="false"/> si ya estaba cerrada.</summary>
+    public bool Rechazar(DateTimeOffset ahora, string motivo)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(motivo);
+        if (EstaCerrada)
+        {
+            return false;
+        }
+
+        Estado = EstadoDeSolicitudDeDatos.Rechazada;
+        AtendidaEn = ahora;
+        Motivo = motivo;
+        return true;
+    }
+
+
+    /// <summary>Vencida: pasó la fecha límite y no está cerrada (una solicitud en atención cuenta como sin atender, IDE-32).</summary>
+    public bool EstaVencida(DateOnly hoyEnLima) => !EstaCerrada && hoyEnLima > FechaLimite;
 
     public static IReadOnlyList<SolicitudConVencimiento> Ordenar(IEnumerable<SolicitudDeDatos> solicitudes, DateOnly hoyEnLima)
     {

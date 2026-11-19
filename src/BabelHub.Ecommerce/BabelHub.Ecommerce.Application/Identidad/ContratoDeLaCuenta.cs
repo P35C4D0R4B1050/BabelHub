@@ -106,21 +106,45 @@ public enum TipoDeSolicitudDeDatos
     Oposicion,
 }
 
-/// <summary>Una solicitud sobre datos personales con su plazo en días hábiles (IDE-12, IDE-26, IDE-32): la lista no lleva datos personales.</summary>
+/// <summary>Lo que decide la administración sobre una solicitud (IDE-26): ponerla en atención, atenderla con una respuesta o rechazarla con un motivo.</summary>
+public enum ResolucionDeSolicitud
+{
+    EnAtencion,
+    Atendida,
+    Rechazada,
+}
+
+/// <summary>Una solicitud sobre datos personales con su plazo en días hábiles (IDE-12, IDE-26, IDE-32, IDE-63): la lista de la administración solo lleva identificador, tipo, estado, fecha y fecha límite, sin datos personales.</summary>
 public sealed record SolicitudSobreDatos(Guid Id, TipoDeSolicitudDeDatos Tipo, string Estado, DateOnly Recibida, DateOnly FechaLimite, bool Vencida);
 
-/// <summary>Registro y atención de las solicitudes sobre datos personales (IDE-12, IDE-26, IDE-29, IDE-32, IDE-63).</summary>
+/// <summary>Una solicitud como la ve su titular en su cuenta (IDE-26): con la respuesta o el motivo del rechazo.</summary>
+public sealed record SolicitudDelCliente(SolicitudSobreDatos Solicitud, string? Respuesta, string? Motivo);
+
+/// <summary>El detalle que ve la administración al abrir una solicitud (IDE-63): solo se entrega si la consulta quedó auditada; el titular va por su identificador opaco.</summary>
+public sealed record DetalleDeSolicitud(SolicitudSobreDatos Solicitud, Guid UsuarioId, string? Respuesta, string? Motivo);
+
+/// <summary>
+/// Registro y atención de las solicitudes sobre datos personales (IDE-12, IDE-26, IDE-29, IDE-32, IDE-63). <b>Solo la propia persona presenta y lista las suyas</b> (con el correo verificado, IDE-29) y <b>solo el
+/// administrador central</b> activo lista, abre y responde las de todos; cualquier otro recibe <c>Prohibido</c> con la denegación registrada.
+/// </summary>
 public interface ISolicitudesDeDatos
 {
     Task<Resultado<SolicitudSobreDatos>> Presentar(Guid usuarioId, TipoDeSolicitudDeDatos tipo, CancellationToken cancelacion = default);
 
-    /// <summary>La lista del administrador central ordenada por fecha límite, sin datos personales.</summary>
-    Task<Resultado<IReadOnlyList<SolicitudSobreDatos>>> Listar(CancellationToken cancelacion = default);
+    /// <summary>Las solicitudes del propio titular con la respuesta o el motivo (IDE-26).</summary>
+    Task<Resultado<IReadOnlyList<SolicitudDelCliente>>> ListarLasDelCliente(Guid usuarioId, CancellationToken cancelacion = default);
 
-    /// <summary>El detalle de una solicitud: solo si se puede auditar la consulta (IDE-32, AUD-04).</summary>
-    Task<Resultado<SolicitudSobreDatos>> Consultar(Guid solicitudId, CancellationToken cancelacion = default);
+    /// <summary>La lista de la administración central ordenada por fecha límite, con las vencidas sin atender marcadas (IDE-32), sin datos personales (IDE-63).</summary>
+    Task<Resultado<IReadOnlyList<SolicitudSobreDatos>>> Listar(Guid administradorId, CancellationToken cancelacion = default);
 
-    Task<Resultado<SolicitudSobreDatos>> Responder(Guid solicitudId, string resolucion, string motivo, CancellationToken cancelacion = default);
+    /// <summary>El detalle de una solicitud: la consulta se audita en la misma operación y, si no se puede auditar, no se muestra (IDE-63, AUD-04).</summary>
+    Task<Resultado<DetalleDeSolicitud>> Consultar(Guid administradorId, Guid solicitudId, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Pone la solicitud en atención, la atiende con una <paramref name="respuesta"/> o la rechaza con un <paramref name="motivo"/> (IDE-26): audita, deja la respuesta en la cuenta del titular y le avisa por correo
+    /// sin el contenido.
+    /// </summary>
+    Task<Resultado<SolicitudSobreDatos>> Responder(Guid administradorId, Guid solicitudId, ResolucionDeSolicitud resolucion, string? respuesta, string? motivo, CancellationToken cancelacion = default);
 }
 
 public enum EstadoDeLaCancelacion

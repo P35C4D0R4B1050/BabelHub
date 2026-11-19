@@ -353,20 +353,9 @@ public sealed class AdministracionDeUsuarios(
         cuenta.Usuario.CorreoVerificado);
 
     /// <summary>El administrador que llama: el actor debe ser él y la base debe confirmarlo como administrador central activo; si no, <c>Prohibido</c> con la denegación registrada.</summary>
-    private async Task<(ErrorDeAplicacion? Error, CuentaDeIdentidad? Cuenta)> Administrador(Guid administradorId, CancellationToken cancelacion)
+    private Task<(ErrorDeAplicacion? Error, CuentaDeIdentidad? Cuenta)> Administrador(Guid administradorId, CancellationToken cancelacion)
     {
-        if (await alcance.Comprobar(administradorId, cancelacion).ConfigureAwait(false) is { } prohibido)
-        {
-            return (prohibido, null);
-        }
-
-        var cuenta = await cuentas.PorId(administradorId, paraActualizar: false, cancelacion).ConfigureAwait(false);
-        if (cuenta is not { CanceladaEn: null, Usuario: { Rol: RolDeUsuario.AdministradorCentral, Activo: true } })
-        {
-            return (await alcance.Denegar(cancelacion).ConfigureAwait(false), null);
-        }
-
-        return (null, cuenta);
+        return new AlcanceDeLaAdministracion(alcance, cuentas).Exigir(administradorId, cancelacion);
     }
 
     private async Task<ErrorDeAplicacion> Rechazo(DecisionDeAdministracion decision, CancellationToken cancelacion) => decision.Motivo switch

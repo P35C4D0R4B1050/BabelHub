@@ -80,6 +80,8 @@ internal sealed class EntornoDeIdentidad
 
     public CambiosDeCorreoEnMemoria Cambios { get; }
 
+    public SolicitudesDeDatosEnMemoria SolicitudesGuardadas { get; }
+
     public AvisosDeCuenta Avisos { get; }
 
     public RevocacionDeSesiones Revocacion { get; }
@@ -98,6 +100,7 @@ internal sealed class EntornoDeIdentidad
         AvisosGuardados = new AvisosDeCuentaEnMemoria(Bd);
         Dispositivos = new DispositivosEnMemoria(Bd);
         Cambios = new CambiosDeCorreoEnMemoria(Bd);
+        SolicitudesGuardadas = new SolicitudesDeDatosEnMemoria(Bd);
         Renovaciones = new RenovacionesEnMemoria(Bd);
         Desafios = new DesafiosEnMemoria(Bd);
         Auditoria = new AuditoriaDePrueba(Bd);
@@ -264,4 +267,19 @@ internal static class EntornoDelCambioDeCorreoExtensiones
         e.Bd.Dispositivos.Add(Dispositivo.Emitir(cuenta.Usuario.Id, e.HuellasDeIdentidad.DeValorOpaco(marca), region, e.Reloj.Ahora.AddDays(-diasDeAntiguedad)));
         return new ValorSecreto(marca);
     }
+}
+
+internal static class EntornoDeLasSolicitudesExtensiones
+{
+    public static AtencionDeSolicitudesDeDatos Solicitudes(this EntornoDeIdentidad e) => new(
+        e.Cuentas,
+        new AlcanceDeLaCuenta(e.Actor, e.Denegaciones),
+        new AlcanceDeLaAdministracion(new AlcanceDeLaCuenta(e.Actor, e.Denegaciones), e.Cuentas),
+        e.SolicitudesGuardadas,
+        e.AvisosGuardados,
+        e.Avisos,
+        e.Secretos,
+        e.Unidad,
+        e.Auditoria,
+        e.Reloj);
 }

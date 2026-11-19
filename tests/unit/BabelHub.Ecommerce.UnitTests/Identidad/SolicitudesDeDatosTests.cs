@@ -112,4 +112,37 @@ public sealed class SolicitudesDeDatosTests
         Assert.Equal(0, CalendarioHabil.DiasHabilesEntre(Viernes, Viernes));
         Assert.Equal(0, CalendarioHabil.DiasHabilesEntre(Viernes, Viernes.AddDays(-3)));
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-23")]
+    public void Atender_guarda_la_respuesta_y_cierra_la_solicitud_y_una_cerrada_no_cambia()
+    {
+        var solicitud = SolicitudDeDatos.Recibir(Guid.NewGuid(), Guid.NewGuid(), TipoDeSolicitudDeDatos.Acceso, InstanteViernes, Viernes);
+
+        Assert.True(solicitud.Atender(InstanteViernes.AddDays(1), "Se envió el resumen de sus datos."));
+
+        Assert.Equal(EstadoDeSolicitudDeDatos.Atendida, solicitud.Estado);
+        Assert.Equal("Se envió el resumen de sus datos.", solicitud.Respuesta);
+        Assert.True(solicitud.EstaCerrada);
+        Assert.False(solicitud.Atender(InstanteViernes.AddDays(2), "otra"));
+        Assert.False(solicitud.Rechazar(InstanteViernes.AddDays(2), "no"));
+        Assert.Equal("Se envió el resumen de sus datos.", solicitud.Respuesta);
+        Assert.Null(solicitud.Motivo);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-23")]
+    public void Rechazar_guarda_el_motivo_y_cierra_la_solicitud_y_una_rechazada_ya_no_figura_vencida()
+    {
+        var solicitud = SolicitudDeDatos.Recibir(Guid.NewGuid(), Guid.NewGuid(), TipoDeSolicitudDeDatos.Rectificacion, InstanteViernes, Viernes);
+
+        Assert.True(solicitud.Rechazar(InstanteViernes.AddDays(1), "No se pudo verificar la titularidad."));
+
+        Assert.Equal(EstadoDeSolicitudDeDatos.Rechazada, solicitud.Estado);
+        Assert.Equal("No se pudo verificar la titularidad.", solicitud.Motivo);
+        Assert.Null(solicitud.Respuesta);
+        Assert.False(solicitud.EstaVencida(Viernes.AddDays(60)));
+        Assert.False(solicitud.Atender(InstanteViernes.AddDays(2)));
+        Assert.Throws<ArgumentException>(() => SolicitudDeDatos.Recibir(Guid.NewGuid(), Guid.NewGuid(), TipoDeSolicitudDeDatos.Oposicion, InstanteViernes, Viernes).Rechazar(InstanteViernes, " "));
+    }
 }
