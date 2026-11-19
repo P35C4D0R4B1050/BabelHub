@@ -35,6 +35,62 @@ public sealed class Checkout
         TipoDeEntrega = _lineas.TrueForAll(l => l.EsDigital) ? Tipo.Digital : null;
     }
 
+    /// <summary>
+    /// Reconstruye el checkout desde lo guardado (solo para la Infraestructura): no valida transiciones ni recalcula huellas, porque lo guardado ya salió de ellas; sí exige las invariantes que no dependen del estado (identificadores, contacto solo vivo
+    /// y a domicilio, aceptaciones con versión válida). El contacto, si existe, se vuelve a validar con sus propios tipos.
+    /// </summary>
+    public static Checkout Restaurar(DatosGuardadosDelCheckout datos)
+    {
+        ArgumentNullException.ThrowIfNull(datos);
+        if (datos.Id == Guid.Empty || datos.CuentaId == Guid.Empty || datos.CarritoId == Guid.Empty)
+        {
+            throw new ArgumentException("El checkout necesita su identificador, su cuenta y su carrito.", nameof(datos));
+        }
+
+        var checkout = new Checkout(datos.Id, datos.CuentaId, datos.CarritoId, [.. datos.Lineas], datos.CreadoEn)
+        {
+            Estado = datos.Estado,
+            Version = datos.Version,
+            ModificadoPorLaPersonaEn = datos.ModificadoPorLaPersonaEn,
+            TipoDeEntrega = datos.TipoDeEntrega,
+            CodigoDeSucursalDeRecojo = datos.CodigoDeSucursalDeRecojo,
+            RegionDeEntrega = datos.RegionDeEntrega,
+            EnvioCongelado = datos.EnvioCongelado,
+            TotalCongelado = datos.TotalCongelado,
+            PedidoId = datos.PedidoId,
+            PedidoDescartado = datos.PedidoDescartado,
+            ReservandoDesde = datos.ReservandoDesde,
+            HuellaDeReserva = datos.HuellaDeReserva,
+            GeneracionDeReserva = datos.GeneracionDeReserva,
+            HuellaDeInstantanea = datos.HuellaDeInstantanea,
+            ReservaExpiraEn = datos.ReservaExpiraEn,
+            ReservaALiberarDesde = datos.ReservaALiberarDesde,
+            PedidoALiberar = datos.PedidoALiberar,
+            LimitePendienteEn = datos.LimitePendienteEn,
+            PagoPendienteDesde = datos.PagoPendienteDesde,
+            _pasoDeEdicion = datos.PasoDeEdicion,
+        };
+        foreach (var aceptacion in datos.Aceptaciones)
+        {
+            checkout.Aceptaciones.Aceptar(aceptacion.Texto, aceptacion.Version, aceptacion.AceptadoEn);
+        }
+
+        if (datos.ContactoNombre is not null || datos.ContactoTelefono is not null || datos.ContactoDireccion is not null)
+        {
+            if (!checkout.EsVivo || datos.TipoDeEntrega != Tipo.Domicilio || datos.ContactoNombre is null || datos.ContactoTelefono is null || datos.ContactoDireccion is null)
+            {
+                throw new ArgumentException("El contacto solo existe completo, con el checkout vivo y a domicilio.", nameof(datos));
+            }
+
+            checkout.Contacto = ContactoDeEntrega.Crear(
+                NombreDeContacto.Crear(datos.ContactoNombre),
+                TelefonoDeContacto.Crear(datos.ContactoTelefono),
+                DireccionDeEntrega.Crear(datos.ContactoDireccion, datos.RegionDeEntrega));
+        }
+
+        return checkout;
+    }
+
     public Guid Id { get; }
 
     public Guid CuentaId { get; }
@@ -52,6 +108,9 @@ public sealed class Checkout
     public DateTimeOffset ModificadoPorLaPersonaEn { get; private set; }
 
     public IReadOnlyList<LineaDelCheckout> Lineas => _lineas;
+
+    /// <summary>El último paso de edición alcanzado (1 a 3): lo que guarda la columna <c>paso</c>; el paso visible se deduce de él y del estado.</summary>
+    public PasoDelCheckout PasoDeEdicion => _pasoDeEdicion;
 
     /// <summary>Las aceptaciones de los textos legales con su versión y su fecha (CAR-22); solo se cambian por <see cref="Aceptar"/> y <see cref="RevalidarTextos"/>.</summary>
     public AceptacionesDelCheckout Aceptaciones { get; } = new();
@@ -1002,4 +1061,68 @@ public sealed class Checkout
     /// <summary>Cada campo con su largo delante (o <c>~</c> si es nulo): ningún texto, por más separadores que lleve, se confunde con el campo vecino.</summary>
     private static void Campo(StringBuilder texto, string? valor) =>
         texto.Append('|').Append(valor is null ? "~" : string.Create(CultureInfo.InvariantCulture, $"{valor.Length}:{valor}"));
+}
+
+/// <summary>Todo lo que guarda la tabla <c>checkouts</c> (y sus líneas y aceptaciones) para reconstruir el agregado con <see cref="Checkout.Restaurar"/>. El contacto viaja como texto y se valida al reconstruirlo; nunca se imprime (<see cref="object.ToString"/> está redactado).</summary>
+public sealed record DatosGuardadosDelCheckout
+{
+    public required Guid Id { get; init; }
+
+    public required Guid CuentaId { get; init; }
+
+    public required Guid CarritoId { get; init; }
+
+    public required EstadoDelCheckout Estado { get; init; }
+
+    public required int Version { get; init; }
+
+    public required DateTimeOffset CreadoEn { get; init; }
+
+    public required DateTimeOffset ModificadoPorLaPersonaEn { get; init; }
+
+    public required PasoDelCheckout PasoDeEdicion { get; init; }
+
+    public required IReadOnlyList<LineaDelCheckout> Lineas { get; init; }
+
+    public IReadOnlyList<AceptacionDeTexto> Aceptaciones { get; init; } = [];
+
+    public TipoDeEntrega? TipoDeEntrega { get; init; }
+
+    public string? CodigoDeSucursalDeRecojo { get; init; }
+
+    public string? RegionDeEntrega { get; init; }
+
+    public string? ContactoNombre { get; init; }
+
+    public string? ContactoTelefono { get; init; }
+
+    public string? ContactoDireccion { get; init; }
+
+    public decimal? EnvioCongelado { get; init; }
+
+    public decimal? TotalCongelado { get; init; }
+
+    public Guid? PedidoId { get; init; }
+
+    public Guid? PedidoDescartado { get; init; }
+
+    public DateTimeOffset? ReservandoDesde { get; init; }
+
+    public string? HuellaDeReserva { get; init; }
+
+    public int GeneracionDeReserva { get; init; }
+
+    public string? HuellaDeInstantanea { get; init; }
+
+    public DateTimeOffset? ReservaExpiraEn { get; init; }
+
+    public DateTimeOffset? ReservaALiberarDesde { get; init; }
+
+    public Guid? PedidoALiberar { get; init; }
+
+    public DateTimeOffset? LimitePendienteEn { get; init; }
+
+    public DateTimeOffset? PagoPendienteDesde { get; init; }
+
+    public override string ToString() => DatosRedactados.Texto;
 }

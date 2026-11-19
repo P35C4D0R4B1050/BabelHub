@@ -61,6 +61,21 @@ public sealed class LineaDelCheckout
 
     public decimal Importe => Soles.Importe(PrecioUnitario, Cantidad.Valor);
 
+    /// <summary>Reconstruye una línea desde lo guardado (solo para la Infraestructura): la cantidad ya salió de <see cref="Crear"/>, así que solo se vuelve a validar su rango.</summary>
+    public static LineaDelCheckout Restaurar(
+        Guid lineaId,
+        Guid edicionId,
+        bool esDigital,
+        string titulo,
+        string isbn,
+        int cantidad,
+        decimal precioUnitario,
+        string? codigoDeFuenteInformado,
+        bool? requiereTrasladoInformado,
+        int? plazoInformadoDias,
+        DateTimeOffset? consultadoEn) =>
+        new(lineaId, edicionId, esDigital, titulo, isbn, esDigital ? Cantidad.Uno : Cantidad.Crear(cantidad), precioUnitario, codigoDeFuenteInformado, requiereTrasladoInformado, plazoInformadoDias, consultadoEn);
+
     internal static LineaDelCheckout Crear(Guid lineaId, LineaParaCheckout origen)
     {
         ArgumentNullException.ThrowIfNull(origen);
