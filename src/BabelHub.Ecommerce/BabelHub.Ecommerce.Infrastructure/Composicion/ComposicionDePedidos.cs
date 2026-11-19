@@ -1,0 +1,38 @@
+using BabelHub.Ecommerce.Application.Auditoria;
+using BabelHub.Ecommerce.Application.Pedidos.Interno;
+using BabelHub.Ecommerce.Application.Plataforma;
+using BabelHub.Ecommerce.Infrastructure.Pedidos;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
+namespace BabelHub.Ecommerce.Infrastructure.Composicion;
+
+/// <summary>
+/// La composición del módulo Pedidos (<c>ecommerce-pedidos</c>): registra los adaptadores reales de lo que ya entregaron Plataforma y Auditoría —las reservas sobre el cliente del Inventario, los límites y la auditoría de la lectura del contacto— <b>solo si lo que necesitan ya está registrado</b>, y al final los dobles
+/// provisionales de lo que falta (Biblioteca, Envíos, Identidad…) con su guarda de producción, que nombra cada puerto que siga con un doble. Se llama <b>después</b> de registrar Plataforma, Auditoría e Identidad. Los repositorios, los casos de uso y las fachadas públicas se suman con las tareas T14 a T31.
+/// </summary>
+public static class ComposicionDePedidos
+{
+    public static IServiceCollection AgregarPedidos(this IServiceCollection servicios, bool esProduccion)
+    {
+        ArgumentNullException.ThrowIfNull(servicios);
+        if (Hay<IClienteDelInventario>(servicios))
+        {
+            servicios.TryAddScoped<IReservasDelPedido, RestReservasDelPedido>();
+        }
+
+        if (Hay<IControlDeLimites>(servicios))
+        {
+            servicios.TryAddScoped<ILimitadorDePedidos, LimitadorDePedidosSobreLimites>();
+        }
+
+        if (Hay<IAuditoria>(servicios))
+        {
+            servicios.TryAddScoped<IAuditoriaDeContacto, AuditoriaDeContactoSobreAuditoria>();
+        }
+
+        return servicios.AgregarDoblesProvisionalesDePedidos(esProduccion);
+    }
+
+    private static bool Hay<T>(IServiceCollection servicios) => servicios.Any(d => d.ServiceType == typeof(T));
+}
