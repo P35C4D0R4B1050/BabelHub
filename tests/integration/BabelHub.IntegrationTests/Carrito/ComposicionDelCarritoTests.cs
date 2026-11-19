@@ -110,7 +110,7 @@ public sealed class ComposicionDelCarritoTests
     {
         var servicios = ConDependenciasDeOtrosModulos();
         servicios.AgregarCarrito(Costo, esProduccion: false);
-        servicios.AgregarTrabajosDeFondoDelCarrito((corrida, cancelacion) => corrida(cancelacion));
+        servicios.AgregarTrabajosDeFondoDelCarrito(_ => (corrida, cancelacion) => corrida(cancelacion));
         using var proveedor = servicios.BuildServiceProvider();
 
         var trabajos = proveedor.GetRequiredService<IReadOnlyList<TrabajoDeFondoDeCarrito>>();

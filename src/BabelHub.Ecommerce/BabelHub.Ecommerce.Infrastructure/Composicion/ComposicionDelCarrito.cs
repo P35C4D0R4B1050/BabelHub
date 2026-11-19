@@ -90,17 +90,17 @@ public static class ComposicionDelCarrito
 public static class ComposicionDeLosTrabajosDelCarrito
 {
     /// <summary>
-    /// Registra los seis trabajos de fondo de Carrito y el servicio que los corre (T29). <paramref name="alcanceDeSistema"/> lo da el anfitrión —la Api—, que fija el actor «sistema» alrededor de cada corrida: la Infraestructura de Carrito no fija el actor.
+    /// Registra los seis trabajos de fondo de Carrito y el servicio que los corre (T29). <paramref name="alcanceDeSistema"/> lo construye el anfitrión —la Api— con sus servicios y fija el actor «sistema» alrededor de cada corrida: la Infraestructura de Carrito no fija el actor.
     /// Se llama <b>solo en modo normal</b> y después de <c>AgregarCarrito</c>; quien la llame añade también <c>AddHostedService&lt;ServicioDeTrabajosDelCarrito&gt;()</c>.
     /// </summary>
-    public static IServiceCollection AgregarTrabajosDeFondoDelCarrito(this IServiceCollection servicios, AlcanceDeSistema alcanceDeSistema)
+    public static IServiceCollection AgregarTrabajosDeFondoDelCarrito(this IServiceCollection servicios, Func<IServiceProvider, AlcanceDeSistema> alcanceDeSistema)
     {
         ArgumentNullException.ThrowIfNull(servicios);
         ArgumentNullException.ThrowIfNull(alcanceDeSistema);
         servicios.TryAddSingleton(sp => TrabajosDeFondoDelCarrito.Todos(
             sp.GetRequiredService<IServiceScopeFactory>(),
             sp.GetRequiredService<IRegistroDeTrabajosDeFondo>(),
-            alcanceDeSistema,
+            alcanceDeSistema(sp),
             sp.GetRequiredService<IAlertasDelCarrito>(),
             sp.GetRequiredService<IReloj>()));
         servicios.TryAddSingleton(sp => new ServicioDeTrabajosDelCarrito(sp.GetRequiredService<IReadOnlyList<TrabajoDeFondoDeCarrito>>()));
