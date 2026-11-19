@@ -13,8 +13,11 @@ var modo = ArranqueSeguro.Resolver(
     TimeProvider.System.GetUtcNow(),
     new AlmacenDeNoncesEnArchivos(builder.Configuration["Restauracion:CarpetaDeMarcas"] ?? "/var/lib/babelhub/marcas"));
 builder.Services.AddSingleton(typeof(ModoDeArranque), modo);
-builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("INV"));
 builder.Services.AddSingleton<EjecutorDePasosDeRestauracion>();
+
+// La composición real del servicio (COMP-1): plataforma, auditoría, Fuentes, Reservas, Ajustes, Traslados, la verificación de credenciales de usuario y los trabajos de fondo.
+// Falta una variable obligatoria o es débil: el arranque falla nombrando la variable (nunca su valor).
+builder.AgregarInventario(modo);
 
 var app = builder.Build();
 ArranqueSeguro.ExigirCoherencia(modo, builder.Environment.IsProduction(), app.Services.GetServices<IAdaptadorSaliente>());
@@ -33,9 +36,9 @@ if (modo == ModoDeArranque.Restauracion)
     return resultado.PermiteAbrir ? 0 : 1;
 }
 
-app.UsarManejoDeErrores();
-// Salud para Docker Compose y el reinicio automático (RNF03): sin datos internos, el detalle solo en la red privada.
-app.MapearSalud();
+app.UsarInventario();
+// Con los endpoints ya mapeados: ningún adaptador nulo donde existe el real y toda operación declarada en la matriz de alcances.
+app.ExigirComposicionDeProduccion(builder.Environment.IsProduction());
 
 app.Run();
 return 0;

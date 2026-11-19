@@ -68,6 +68,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
         "consultas-de-envios-por-usuario",
         "operaciones-de-envios-por-usuario",
         "guias-al-operador",
+        "avisos-de-la-pasarela-por-origen",
         "solicitudes-previas-por-origen",
         "solicitudes-del-origen-desconocido",
         "solicitudes-sin-sesion-por-origen",

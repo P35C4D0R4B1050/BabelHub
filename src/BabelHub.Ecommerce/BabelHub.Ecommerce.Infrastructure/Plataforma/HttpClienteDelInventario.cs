@@ -297,6 +297,72 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
         }
     }
 
+    public Task<ResultadoDelInventario<ReservaDelInventario>> ConsultarReserva(Guid pedidoId, CancellationToken cancelacion = default)
+    {
+        if (pedidoId == Guid.Empty)
+        {
+            throw new ArgumentException("La consulta necesita el pedido.", nameof(pedidoId));
+        }
+
+        return Pedir(
+            HttpMethod.Get,
+            $"{RutasDeServicio.Inventario}/reservas/{pedidoId:D}",
+            AlcanceDeServicio.OperacionDeUsuario,
+            cuerpo: null,
+            claveDeIdempotencia: null,
+            conOrigen: false,
+            texto => AReserva(JsonSerializer.Deserialize<ReservaDto>(texto, Json) ?? throw new JsonException("La respuesta no es una reserva."), pedidoId, lineasPedidas: null),
+            cancelacion,
+            HttpStatusCode.OK);
+    }
+
+    public Task<ResultadoDelInventario<ExtensionDeLaReserva>> ExtenderReserva(Guid pedidoId, CancellationToken cancelacion = default)
+    {
+        if (pedidoId == Guid.Empty)
+        {
+            throw new ArgumentException("La extensión necesita el pedido.", nameof(pedidoId));
+        }
+
+        return Pedir(
+            HttpMethod.Post,
+            $"{RutasDeServicio.Inventario}/reservas/{pedidoId:D}/extender",
+            AlcanceDeServicio.ExpiracionDeReservas,
+            cuerpo: null,
+            claveDeIdempotencia: null,
+            conOrigen: false,
+            texto =>
+            {
+                var dto = JsonSerializer.Deserialize<ExtensionDeReservaDto>(texto, Json) ?? throw new JsonException("La respuesta no es una extensión.");
+                return new ExtensionDeLaReserva(dto.Extendida, AReserva(dto.Reserva ?? throw new JsonException("Falta la reserva."), pedidoId, lineasPedidas: null));
+            },
+            cancelacion,
+            HttpStatusCode.OK);
+    }
+
+    public Task<ResultadoDelInventario<ReservaDelInventario>> ConfirmarReserva(Guid pedidoId, string claveDeIdempotencia, CancellationToken cancelacion = default)
+    {
+        if (pedidoId == Guid.Empty)
+        {
+            throw new ArgumentException("La confirmación necesita el pedido.", nameof(pedidoId));
+        }
+
+        if (string.IsNullOrEmpty(claveDeIdempotencia) || !ClaveValida.IsMatch(claveDeIdempotencia))
+        {
+            throw new ArgumentException("La clave de idempotencia tiene de 16 a 80 caracteres de [A-Za-z0-9_-].", nameof(claveDeIdempotencia));
+        }
+
+        return Pedir(
+            HttpMethod.Post,
+            $"{RutasDeServicio.Inventario}/reservas/{pedidoId:D}/confirmar",
+            AlcanceDeServicio.ExpiracionDeReservas,
+            cuerpo: null,
+            claveDeIdempotencia,
+            conOrigen: false,
+            texto => AReserva(JsonSerializer.Deserialize<ReservaDto>(texto, Json) ?? throw new JsonException("La respuesta no es una reserva."), pedidoId, lineasPedidas: null),
+            cancelacion,
+            HttpStatusCode.OK);
+    }
+
     private static string TextoDelTipo(TipoDeEntregaDeLaReserva tipo) => tipo == TipoDeEntregaDeLaReserva.Recojo ? TiposDeEntrega.Recojo : TiposDeEntrega.Domicilio;
 
     private static List<LineaDeSolicitudDto> ALasLineasDelContrato(IReadOnlyList<LineaDeSolicitud> lineas) => [.. lineas.Select(l => new LineaDeSolicitudDto(l.LineaId, l.EdicionId, l.Cantidad))];
