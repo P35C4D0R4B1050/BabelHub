@@ -314,3 +314,49 @@ public sealed class ReintentoAutomaticoDeReembolsosTests
         Assert.True(r.PuedeReintentarse(despues));
     }
 }
+
+/// <summary>La purga de los avisos de pago y de Carrito a los 90 días (T24, T27): sin datos personales, así que solo se acota por la edad y por tanda.</summary>
+public sealed class PurgarAvisosDePagosTests
+{
+    [Fact]
+    public async Task Purga_los_avisos_de_mas_de_noventa_dias_y_conserva_los_recientes()
+    {
+        var e = new EntornoDePagos();
+        e.Repositorio.Sembrar(IntencionesDePrueba.Abierta());
+        var intento = Guid.NewGuid();
+        var viejo = AvisoDePago.Crear(IntencionesDePrueba.PedidoId, intento, EventoDeAvisoDePago.Aprobado, e.Reloj.Ahora.AddDays(-91));
+        var reciente = AvisoDePago.Crear(IntencionesDePrueba.PedidoId, intento, EventoDeAvisoDePago.Vencido, e.Reloj.Ahora.AddDays(-89));
+        var viejoACarrito = AvisoACarrito.Crear(IntencionesDePrueba.PedidoId, intento, TransicionDeAviso.Aprobado, retenido: false, e.Reloj.Ahora.AddDays(-91));
+        await e.Unidad.Ejecutar(async token =>
+        {
+            await e.Repositorio.AgregarAvisoDePago(viejo, token);
+            await e.Repositorio.AgregarAvisoDePago(reciente, token);
+            await e.Repositorio.AgregarAvisoACarrito(viejoACarrito, token);
+            return 0;
+        });
+
+        var purgados = await new PurgarAvisosDePagos(e.Repositorio, e.Unidad, e.Reloj).Ejecutar(50);
+
+        Assert.Equal(2, purgados);
+        Assert.Equal(EventoDeAvisoDePago.Vencido, Assert.Single(e.Repositorio.AvisosDePago).Evento);
+        Assert.Empty(e.Repositorio.AvisosACarrito);
+    }
+
+    [Fact]
+    public async Task El_limite_de_noventa_dias_es_exclusivo_y_la_tanda_acota()
+    {
+        var e = new EntornoDePagos();
+        var intento = Guid.NewGuid();
+        await e.Unidad.Ejecutar(async token =>
+        {
+            await e.Repositorio.AgregarAvisoDePago(AvisoDePago.Crear(IntencionesDePrueba.PedidoId, intento, EventoDeAvisoDePago.Aprobado, e.Reloj.Ahora - PurgarAvisosDePagos.Retencion), token);
+            await e.Repositorio.AgregarAvisoDePago(AvisoDePago.Crear(IntencionesDePrueba.PedidoId, intento, EventoDeAvisoDePago.Vencido, e.Reloj.Ahora - PurgarAvisosDePagos.Retencion - TimeSpan.FromSeconds(1)), token);
+            return 0;
+        });
+
+        var purgados = await new PurgarAvisosDePagos(e.Repositorio, e.Unidad, e.Reloj).Ejecutar(50);
+
+        Assert.Equal(1, purgados);
+        Assert.Equal(EventoDeAvisoDePago.Aprobado, Assert.Single(e.Repositorio.AvisosDePago).Evento);
+    }
+}

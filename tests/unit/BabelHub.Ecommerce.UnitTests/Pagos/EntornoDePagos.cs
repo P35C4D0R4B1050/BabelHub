@@ -84,6 +84,12 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
         return Task.FromResult(_intentos.TryGetValue(intentoId, out var i) ? i.Copiar() : null);
     }
 
+    public Task<IntentoDeCobro?> ObtenerUltimoIntento(Guid intencionId, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        return Task.FromResult(_intentos.Values.Where(i => i.IntencionId == intencionId).OrderByDescending(i => i.IniciadoEn).FirstOrDefault() is { } u ? u.Copiar() : null);
+    }
+
     public Task<IntentoDeCobro?> ObtenerIntentoActivo(Guid intencionId, CancellationToken cancelacion = default)
     {
         Operaciones++;
@@ -240,6 +246,16 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
         var indice = _avisosDePago.FindIndex(a => a.Id == aviso.Id);
         _avisosDePago[indice] = aviso.Copiar();
         return Task.CompletedTask;
+    }
+
+    public Task<int> PurgarAvisosAnterioresA(DateTimeOffset corte, int limite, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        var viejosDePago = _avisosDePago.Where(a => a.CreadoEn < corte).OrderBy(a => a.CreadoEn).Take(limite).ToList();
+        var viejosACarrito = _avisosACarrito.Where(a => a.CreadoEn < corte).OrderBy(a => a.CreadoEn).Take(limite).ToList();
+        _avisosDePago.RemoveAll(viejosDePago.Contains);
+        _avisosACarrito.RemoveAll(viejosACarrito.Contains);
+        return Task.FromResult(viejosDePago.Count + viejosACarrito.Count);
     }
 
     public object Capturar() => (

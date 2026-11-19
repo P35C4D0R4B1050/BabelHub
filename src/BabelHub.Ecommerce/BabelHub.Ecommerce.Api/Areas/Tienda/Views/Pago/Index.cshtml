@@ -1,0 +1,39 @@
+@using BabelHub.Ecommerce.Api.Web.Formato
+@model BabelHub.Ecommerce.Api.Areas.Tienda.Controllers.PagoVista
+<h1 class="font-display text-4xl leading-tight sm:text-5xl">Pagar tu compra</h1>
+
+@if (Model.MotivoTexto is not null)
+{
+    <div class="alert alert-error my-6" role="alert" tabindex="-1" data-bh-foco-inicial>
+        <bh-icono nombre="error" />
+        <div>
+            <h2 class="font-semibold">No se pudo completar el pago</h2>
+            <p>@Model.MotivoTexto No se te cobró nada.</p>
+        </div>
+    </div>
+}
+
+@if (Model.Clave is { } clave)
+{
+    <p class="my-4 text-lg">Total a pagar: <strong>@FormatoPeruano.Soles(clave.Total)</strong></p>
+    <p class="mb-6 text-sm">Tienes hasta las @FormatoPeruano.Hora(clave.VenceEn) para pagar.</p>
+    <form method="post" action="/checkout/pago" class="flex max-w-lg flex-col gap-4" id="formulario-de-pago">
+        <input type="hidden" name="pedidoId" value="@Model.PedidoId.ToString("D")" />
+        <input type="hidden" name="claveDeIntento" value="@clave.Token" />
+        <fieldset class="flex flex-col gap-2">
+            <legend class="font-semibold">Medio de pago</legend>
+            <label class="label cursor-pointer justify-start gap-3"><input type="radio" name="medio" value="yape" class="radio" required /> <span>Yape</span></label>
+            <label class="label cursor-pointer justify-start gap-3"><input type="radio" name="medio" value="tarjeta" class="radio" /> <span>Tarjeta de crédito o débito</span></label>
+        </fieldset>
+        <label class="form-control">
+            <span class="label-text">Identificador del medio de pago</span>
+            <input type="text" name="tokenDelMedio" class="input input-bordered" autocomplete="off" required maxlength="200" />
+        </label>
+        <button type="submit" class="btn btn-primary">Pagar @FormatoPeruano.Soles(clave.Total)</button>
+    </form>
+}
+else
+{
+    <p class="my-6">@Model.EstadoTexto.</p>
+    <a class="btn btn-ghost" href="/checkout/pago/estado?pedidoId=@Model.PedidoId.ToString("D")">Ver el estado de mi pago</a>
+}

@@ -1,0 +1,25 @@
+@using BabelHub.Ecommerce.Api.Web.Formato
+@using BabelHub.Ecommerce.Application.Pagos
+@model BabelHub.Ecommerce.Api.Areas.Tienda.Controllers.PagoVista
+@{
+    var sondear = Model.Estado.Estado is EstadoDelPagoDeLaCompra.ConfirmandoElPago or EstadoDelPagoDeLaCompra.Aprobado;
+    var pedido = Model.PedidoId.ToString("D");
+}
+<div id="estado-del-pago" aria-live="polite"
+     hx-get="@(sondear ? "/checkout/pago/estado?pedidoId=" + pedido : null)"
+     hx-trigger="@(sondear ? "every 5s" : null)"
+     hx-swap="@(sondear ? "outerHTML" : null)">
+    <p class="text-lg font-semibold">@Model.EstadoTexto</p>
+    @if (Model.Estado.LimiteEn is { } limite)
+    {
+        <p class="text-sm">Lo confirmaremos antes de las @FormatoPeruano.Hora(limite).</p>
+    }
+    @if (Model.Estado.PuedeReintentar)
+    {
+        <a class="btn btn-primary mt-4" href="/checkout/pago?pedidoId=@pedido">Pagar</a>
+    }
+    @if (Model.Estado.Estado == EstadoDelPagoDeLaCompra.Completado)
+    {
+        <a class="btn btn-primary mt-4" href="/">Seguir comprando</a>
+    }
+</div>
