@@ -77,6 +77,18 @@ internal sealed class RepositorioDePedidosFalso : IRepositorioDePedidos
         return Task.FromResult(new PaginaDeDominio([.. filtrados.Skip((criterio.Pagina - 1) * criterio.Tamano).Take(criterio.Tamano)], filtrados.Count));
     }
 
+    public Dictionary<string, EstadoDeTrasladoRegistrado> EstadosDeTraslado { get; } = [];
+
+    public Task<EstadoDeTrasladoRegistrado?> ObtenerEstadoDeTraslado(string eventoId, CancellationToken cancelacion = default) =>
+        Task.FromResult(EstadosDeTraslado.GetValueOrDefault(eventoId));
+
+    public Task GuardarEstadoDeTraslado(EstadoDeTrasladoRegistrado estado, CancellationToken cancelacion = default)
+    {
+        Llamadas.Add("guardar-estado-de-traslado");
+        EstadosDeTraslado[estado.EventoId] = estado;
+        return Task.CompletedTask;
+    }
+
     public Task RegistrarLiberacionDeContacto(Guid pedidoId, DateTimeOffset desde, CancellationToken cancelacion = default)
     {
         Llamadas.Add("liberacion-de-contacto");
@@ -250,4 +262,22 @@ internal sealed class ReembolsosFalsos : IReembolsos
     public Task<Resultado<PaginaDeReembolsos>> ListarPendientes(int pagina, int tamano, CancellationToken cancelacion = default) => throw new NotSupportedException();
 
     public Task<Resultado<EstadoDelReembolso>> Reintentar(Guid reembolsoId, CancellationToken cancelacion = default) => Task.FromResult(Resultado<EstadoDelReembolso>.Exito(EstadoDelReembolso.Reembolsado));
+}
+
+internal sealed class NotificadorDePedidosEspia : BabelHub.Ecommerce.Application.Notificaciones.INotificador
+{
+    public List<BabelHub.Ecommerce.Application.Notificaciones.SolicitudDeAviso> Solicitudes { get; } = [];
+
+    public bool Lanza { get; set; }
+
+    public Task<BabelHub.Ecommerce.Application.Notificaciones.ResultadoDeLaSolicitudDeAviso> Solicitar(BabelHub.Ecommerce.Application.Notificaciones.SolicitudDeAviso solicitud, CancellationToken cancelacion = default)
+    {
+        if (Lanza)
+        {
+            throw new InvalidOperationException("sin servicio de avisos");
+        }
+
+        Solicitudes.Add(solicitud);
+        return Task.FromResult(BabelHub.Ecommerce.Application.Notificaciones.ResultadoDeLaSolicitudDeAviso.Creado);
+    }
 }

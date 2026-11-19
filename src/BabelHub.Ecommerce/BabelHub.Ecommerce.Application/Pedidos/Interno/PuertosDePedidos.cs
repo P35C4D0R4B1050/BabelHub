@@ -7,6 +7,12 @@ namespace BabelHub.Ecommerce.Application.Pedidos.Interno;
 /// <summary>Los criterios de un listado: la cuenta (el cliente), la sucursal de recojo (el encargado), solo pedidos a domicilio (logística, PED-26), el estado derivado y la página; el tamaño ya viene acotado a 50.</summary>
 public sealed record CriterioDeListado(Guid? CuentaId, string? CodigoDeSucursalDeRecojo, bool SoloADomicilio, EstadoDePedido? Estado, int Pagina, int Tamano);
 
+/// <summary>Un estado de traslado ya aplicado (<c>estados_de_traslado_recibidos</c>): el evento, el traslado, el pedido, el estado y la huella del cuerpo; se purga a los 90 días.</summary>
+public sealed record EstadoDeTrasladoRegistrado(string EventoId, Guid TrasladoId, Guid PedidoId, string Estado, string HuellaDelCuerpo, DateTimeOffset RecibidoEn);
+
+/// <summary>El bloqueo de un pedido no se obtuvo a tiempo (<c>lock_timeout</c> de 5 s): el caso de uso responde <c>conflicto</c>, reintentable.</summary>
+public sealed class EsperaDeBloqueoDeUnPedidoAgotadaException() : Exception("No se obtuvo el bloqueo del pedido a tiempo.");
+
 public sealed record PaginaDeDominio(IReadOnlyList<Pedido> Pedidos, int Total);
 
 /// <summary>La auditoría de la lectura del contacto por el personal (PED-40, D09): si no se puede auditar lanza y el detalle se muestra sin contacto. Una acción propia del catálogo de auditoría llega con el carril de auditoría.</summary>
@@ -35,6 +41,11 @@ public interface IRepositorioDePedidos
 
     /// <summary>Anota que falta pedir a Pagos que elimine el contacto de la intención de este pedido (<c>liberaciones_de_contacto</c>, PED-35): se registra en la misma transacción de la creación; idempotente.</summary>
     Task RegistrarLiberacionDeContacto(Guid pedidoId, DateTimeOffset desde, CancellationToken cancelacion = default);
+
+    /// <summary>El estado de traslado ya recibido por su <c>eventoId</c> (idempotencia de la entrada del Inventario): su huella dice si el cuerpo es el mismo.</summary>
+    Task<EstadoDeTrasladoRegistrado?> ObtenerEstadoDeTraslado(string eventoId, CancellationToken cancelacion = default);
+
+    Task GuardarEstadoDeTraslado(EstadoDeTrasladoRegistrado estado, CancellationToken cancelacion = default);
 
     Task<IReadOnlyList<Anulacion>> AnulacionesEnCurso(Guid pedidoId, CancellationToken cancelacion = default);
 
