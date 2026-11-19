@@ -2,6 +2,16 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-19 — IDE-6, NOT-1, ECO-9a y los contratos de Pedidos para Envíos
+
+### Cubierto
+- **Carril A:** IDE-6 (T26, T28–T33 de `identidad-seguridad`): credenciales de servicio, topes, clasificación de correos, Argon2id con Konscious 1.3.1 (MIT), emisor ES256, esquema y roles de acceso y repositorios sobre PostgreSQL; cupo de códigos por origen corregido tras la revisión. NOT-1 (T01–T05 y T07 de `transversal-notificaciones`): Dominio, contrato, solicitar y cancelar avisos y desactivación de números. Hallazgo Importante abierto: la lista de contraseñas comunes está generada por patrones y la persona debe elegir la fuente de una lista vetada antes de FIN-1.
+- **Carril B:** contratos de Pedidos para Envíos (T07a de `ecommerce-pedidos`): `IDespachoDeEnvios`, `IProgresoDeEnvios`, `IContactoDeEntregaDelPedido` e `IPedidosParaEnvios`, con dobles que fallan cerrado y guarda de producción.
+- **Carril V:** ECO-9a (T01–T05 de `ecommerce-envios`): Dominio de envíos; planificación terminada (las 20 specs con plan `Planned`).
+
+### Pendiente
+- IDE-7 e IDE-8 (A), resto de pedidos (B), ECO-9b a 9e (V), pagos y reclamaciones (C); la integración completa de `main` con todo esto.
+
 ## 2026-11-19 — IDE-5 y los planes de `web-indice-infinito` y del asistente
 
 ### Cubierto
