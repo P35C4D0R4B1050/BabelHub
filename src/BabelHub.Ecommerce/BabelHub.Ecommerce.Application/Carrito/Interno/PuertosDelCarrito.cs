@@ -201,6 +201,18 @@ public interface IRepositorioDeCarritos
     /// <summary>La constancia de una fusión aplicada (<c>fusiones_aplicadas</c>, única por huella de cookie): hace idempotente la fusión de un segundo dispositivo. Se purga a los 30 días.</summary>
     Task RegistrarFusion(byte[] huellaDeLaCookie, Guid carritoDeCuentaId, DateTimeOffset ahora, CancellationToken cancelacion = default);
 
+    /// <summary>Elimina los carritos de visitante que vencieron (30 días desde su última acción de la persona, CAR-29) y devuelve cuántos: como mucho <paramref name="maximo"/> por corrida.</summary>
+    Task<int> EliminarDeVisitantesVencidos(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Elimina las constancias de fusión anteriores a <paramref name="antesDe"/> (30 días) y devuelve cuántas.</summary>
+    Task<int> EliminarFusionesAnterioresA(DateTimeOffset antesDe, CancellationToken cancelacion = default);
+
+    /// <summary>Elimina los avisos vistos antes de <paramref name="vistosAntesDe"/> (30 días después de vistos) o creados antes de <paramref name="creadosAntesDe"/> (90 días) y devuelve cuántos.</summary>
+    Task<int> EliminarAvisosVencidos(DateTimeOffset vistosAntesDe, DateTimeOffset creadosAntesDe, CancellationToken cancelacion = default);
+
+    /// <summary>Las cuentas con un carrito o un checkout sin movimiento desde antes de <paramref name="antesDe"/>, para comprobar si siguen activas (la purga de las que no lo están).</summary>
+    Task<IReadOnlyList<Guid>> CuentasSinMovimientoDesde(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default);
+
     /// <summary>Elimina el carrito de la cuenta con sus líneas y sus avisos (CAR-32, CAR-33): idempotente ante filas ausentes y siempre <b>después</b> de eliminar el checkout (D10). No toca el carrito de un visitante.</summary>
     Task EliminarDeCuenta(Guid cuentaId, CancellationToken cancelacion = default);
 
@@ -220,6 +232,15 @@ public interface IRepositorioDeCheckouts
     /// <summary>El checkout cuyo <c>pedido_id</c> o <c>pedido_descartado</c> es el dado (vivo o terminado).</summary>
     Task<Checkout?> ObtenerPorPedido(Guid pedidoId, bool conBloqueo, CancellationToken cancelacion = default);
 
+    /// <summary>Los checkouts vivos que la persona no modifica desde <paramref name="antesDe"/> o antes (30 días, inclusive: «a los 30 días»): su cuenta y su estado, sin bloqueo, para aplicarles el vencimiento condicional (CAR-34).</summary>
+    Task<IReadOnlyList<Guid>> CuentasConCheckoutVivoSinMovimientoDesde(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Elimina los checkouts terminados (<c>pagado</c>, <c>cancelado</c>, <c>reiniciado</c>) modificados por la persona hasta <paramref name="antesDe"/> (30 días, inclusive) y <b>sin una reserva por liberar</b> (si no, se perdería la anotación que reintenta <c>LiberarReservasPendientes</c>), y devuelve cuántos: solo guardan cuenta, pedido y fechas.</summary>
+    Task<int> EliminarTerminadosAnterioresA(DateTimeOffset antesDe, CancellationToken cancelacion = default);
+
+    /// <summary>Cuántos checkouts están <c>pago_pendiente</c> desde antes de <paramref name="antesDe"/> (45 minutos): lo que Pagos debía resolver (AUD-31).</summary>
+    Task<int> ContarConElPagoPendienteDesdeAntesDe(DateTimeOffset antesDe, CancellationToken cancelacion = default);
+
     /// <summary>Elimina <b>todos</b> los checkouts de la cuenta (vivos y terminados, con su contacto y sus líneas): idempotente ante filas ausentes y siempre <b>antes</b> que el carrito (D10).</summary>
     Task EliminarDeCuenta(Guid cuentaId, CancellationToken cancelacion = default);
 
@@ -234,7 +255,7 @@ public interface IRepositorioDeCheckouts
     /// <summary>Los checkouts con una reserva por liberar (<c>reserva_a_liberar_desde</c> con valor), sin bloqueo y como mucho <paramref name="maximo"/>: lo que reintenta <c>LiberarReservasPendientes</c>.</summary>
     Task<IReadOnlyList<PedidoPorLiberar>> ConLiberacionPendiente(int maximo, CancellationToken cancelacion = default);
 
-    /// <summary>Los checkouts <c>reservando</c> desde antes de <paramref name="antesDe"/> (atascados por un corte entre los pasos), sin bloqueo: lo que recoge <c>RecuperarCheckoutsReservando</c>.</summary>
+    /// <summary>Los checkouts <c>reservando</c> desde <paramref name="antesDe"/> o antes (2 minutos, inclusive; atascados por un corte entre los pasos), sin bloqueo: lo que recoge <c>RecuperarCheckoutsReservando</c>.</summary>
     Task<IReadOnlyList<CheckoutPorRecuperar>> ReservandoDesdeAntesDe(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default);
 
     /// <summary>Guarda el checkout con su versión (concurrencia optimista) y reconstruye sus líneas conservando el <c>lineaId</c> de las que siguen.</summary>
@@ -311,6 +332,9 @@ public interface IAuditoriaDelCarrito
 
     /// <summary>Identidad pidió eliminar el carrito y los datos de entrega de una cuenta (reemplazo de una cuenta sin verificar o cancelación): sin datos personales; el motivo es <c>reemplazo</c> o <c>cancelacion</c>.</summary>
     Task CarritoEliminadoPorIdentidad(string motivo, CancellationToken cancelacion = default);
+
+    /// <summary>Una corrida de purga: cuántos registros eliminó o venció de cada tipo (solo conteos, sin datos personales; D09).</summary>
+    Task PurgaRealizada(string trabajo, int cantidad, CancellationToken cancelacion = default);
 
     /// <summary>Se pasó al pago (la intención creada y el checkout en <c>en_pago</c>): con o sin impresos y el tipo de entrega; sin contacto, sin cuenta ni pedido en el detalle (D13).</summary>
     Task PasoAlPagoIniciado(bool conImpresos, bool aDomicilio, CancellationToken cancelacion = default);

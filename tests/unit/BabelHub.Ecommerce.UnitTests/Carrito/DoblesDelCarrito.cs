@@ -202,7 +202,8 @@ internal sealed class GeneradorDeIdentificadoresFalso : IGeneradorDeIdentificado
 internal sealed class RepositorioDeCarritosEnMemoria(BitacoraDeBloqueos bitacora) : IRepositorioDeCarritos
 {
     private readonly List<CarritoDeDominio> _carritos = [];
-    private readonly List<(Guid CuentaId, AvisoDelCarrito Aviso, bool Visto)> _avisos = [];
+    private readonly List<(Guid CuentaId, AvisoDelCarrito Aviso, DateTimeOffset? VistoEn)> _avisos = [];
+    private readonly List<DateTimeOffset> _fechasDeFusiones = [];
 
     public IReadOnlyList<CarritoDeDominio> Todos => _carritos;
 
@@ -266,11 +267,11 @@ internal sealed class RepositorioDeCarritosEnMemoria(BitacoraDeBloqueos bitacora
     }
 
     public Task<IReadOnlyList<AvisoDelCarrito>> AvisosSinVer(Guid cuentaId, CancellationToken cancelacion = default) =>
-        Task.FromResult<IReadOnlyList<AvisoDelCarrito>>([.. _avisos.Where(a => a.CuentaId == cuentaId && !a.Visto).Select(a => a.Aviso).OrderByDescending(a => a.CreadoEn)]);
+        Task.FromResult<IReadOnlyList<AvisoDelCarrito>>([.. _avisos.Where(a => a.CuentaId == cuentaId && a.VistoEn is null).Select(a => a.Aviso).OrderByDescending(a => a.CreadoEn)]);
 
     public Task AgregarAvisos(Guid cuentaId, IReadOnlyList<AvisoDelCarrito> avisos, CancellationToken cancelacion = default)
     {
-        _avisos.AddRange(avisos.Select(a => (cuentaId, a, false)));
+        _avisos.AddRange(avisos.Select(a => (cuentaId, a, (DateTimeOffset?)null)));
         return Task.CompletedTask;
     }
 
@@ -289,6 +290,22 @@ internal sealed class RepositorioDeCarritosEnMemoria(BitacoraDeBloqueos bitacora
         return Task.CompletedTask;
     }
 
+    public Task<int> EliminarDeVisitantesVencidos(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult(_carritos.RemoveAll(c => c.Propietario.EsDeVisitante && c.EstaCaducado(ahora)));
+
+    public Task<int> EliminarFusionesAnterioresA(DateTimeOffset antesDe, CancellationToken cancelacion = default)
+    {
+        var quitar = _fechasDeFusiones.Count(f => f < antesDe);
+        _fechasDeFusiones.RemoveAll(f => f < antesDe);
+        return Task.FromResult(quitar);
+    }
+
+    public Task<int> EliminarAvisosVencidos(DateTimeOffset vistosAntesDe, DateTimeOffset creadosAntesDe, CancellationToken cancelacion = default) =>
+        Task.FromResult(_avisos.RemoveAll(a => (a.VistoEn is { } visto && visto < vistosAntesDe) || a.Aviso.CreadoEn < creadosAntesDe));
+
+    public Task<IReadOnlyList<Guid>> CuentasSinMovimientoDesde(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>([.. _carritos.Where(c => c.Propietario.CuentaId is not null && c.ModificadoEn < antesDe).Select(c => c.Propietario.CuentaId!.Value).Distinct().Take(maximo)]);
+
     public Task<IReadOnlyList<CarritoConEdicion>> BuscarConEdiciones(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<CarritoConEdicion>>([.. _carritos.Where(c => c.Lineas.Any(l => edicionIds.Contains(l.EdicionId))).Select(c => new CarritoConEdicion(c.Id, c.Propietario.CuentaId))]);
 
@@ -297,6 +314,7 @@ internal sealed class RepositorioDeCarritosEnMemoria(BitacoraDeBloqueos bitacora
     public Task RegistrarFusion(byte[] huellaDeLaCookie, Guid carritoDeCuentaId, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
         Fusiones.Add((huellaDeLaCookie, carritoDeCuentaId));
+        _fechasDeFusiones.Add(ahora);
         return Task.CompletedTask;
     }
 
@@ -306,7 +324,7 @@ internal sealed class RepositorioDeCarritosEnMemoria(BitacoraDeBloqueos bitacora
         {
             if (_avisos[i].CuentaId == cuentaId && avisoIds.Contains(_avisos[i].Aviso.Id))
             {
-                _avisos[i] = (cuentaId, _avisos[i].Aviso, true);
+                _avisos[i] = (cuentaId, _avisos[i].Aviso, ahora);
             }
         }
 
@@ -357,11 +375,20 @@ internal sealed class RepositorioDeCheckoutsEnMemoria(BitacoraDeBloqueos bitacor
         return Task.CompletedTask;
     }
 
+    public Task<IReadOnlyList<Guid>> CuentasConCheckoutVivoSinMovimientoDesde(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>([.. _checkouts.Where(c => EstaVivo(c) && c.ModificadoPorLaPersonaEn <= antesDe).Select(c => c.CuentaId).Distinct().Take(maximo)]);
+
+    public Task<int> EliminarTerminadosAnterioresA(DateTimeOffset antesDe, CancellationToken cancelacion = default) =>
+        Task.FromResult(_checkouts.RemoveAll(c => !EstaVivo(c) && c.ReservaALiberarDesde is null && c.ModificadoPorLaPersonaEn <= antesDe));
+
+    public Task<int> ContarConElPagoPendienteDesdeAntesDe(DateTimeOffset antesDe, CancellationToken cancelacion = default) =>
+        Task.FromResult(_checkouts.Count(c => c.Estado == EstadoDelCheckout.PagoPendiente && c.PagoPendienteDesde < antesDe));
+
     public Task<IReadOnlyList<PedidoPorLiberar>> ConLiberacionPendiente(int maximo, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<PedidoPorLiberar>>([.. _checkouts.Where(c => c.ReservaALiberarDesde is not null && (c.PedidoDescartado ?? c.PedidoId) is not null).Take(maximo).Select(c => new PedidoPorLiberar(c.Id, (c.PedidoDescartado ?? c.PedidoId)!.Value))]);
 
     public Task<IReadOnlyList<CheckoutPorRecuperar>> ReservandoDesdeAntesDe(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default) =>
-        Task.FromResult<IReadOnlyList<CheckoutPorRecuperar>>([.. _checkouts.Where(c => c.Estado == EstadoDelCheckout.Reservando && c.ReservandoDesde < antesDe && c.PedidoId is not null).Take(maximo).Select(c => new CheckoutPorRecuperar(c.CuentaId, c.PedidoId!.Value, c.GeneracionDeReserva, true))]);
+        Task.FromResult<IReadOnlyList<CheckoutPorRecuperar>>([.. _checkouts.Where(c => c.Estado == EstadoDelCheckout.Reservando && c.ReservandoDesde <= antesDe && c.PedidoId is not null).Take(maximo).Select(c => new CheckoutPorRecuperar(c.CuentaId, c.PedidoId!.Value, c.GeneracionDeReserva, true))]);
 
     public Task<EstadoDelCheckout?> LeerEstadoSinBloqueo(Guid cuentaId, CancellationToken cancelacion = default) =>
         Task.FromResult<EstadoDelCheckout?>(_checkouts.FirstOrDefault(c => c.CuentaId == cuentaId && EstaVivo(c))?.Estado);
@@ -563,6 +590,8 @@ internal sealed class AuditoriaDelCarritoEspia : IAuditoriaDelCarrito
 
     public List<string> Eliminaciones { get; } = [];
 
+    public List<(string Trabajo, int Cantidad)> Purgas { get; } = [];
+
     public bool Caida { get; set; }
 
     public Task FusionAplicada(Guid cuentaId, int lineasDelVisitante, IReadOnlyList<MotivoDeAjusteDeAviso> ajustes, CancellationToken cancelacion = default)
@@ -573,6 +602,17 @@ internal sealed class AuditoriaDelCarritoEspia : IAuditoriaDelCarrito
         }
 
         Fusiones.Add((cuentaId, lineasDelVisitante, ajustes));
+        return Task.CompletedTask;
+    }
+
+    public Task PurgaRealizada(string trabajo, int cantidad, CancellationToken cancelacion = default)
+    {
+        if (Caida)
+        {
+            throw new InvalidOperationException("La auditoría no está disponible.");
+        }
+
+        Purgas.Add((trabajo, cantidad));
         return Task.CompletedTask;
     }
 
