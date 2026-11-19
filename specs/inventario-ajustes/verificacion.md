@@ -9,7 +9,7 @@ fecha: 2026-11-19
 
 ## Resultado: Converge
 
-Converge a nivel de código y pruebas unitarias y de arquitectura. Quedan **dos condiciones que el coordinador debe cerrar antes de marcar `Done`** (no son huecos de la spec): (1) las pruebas de integración y la concurrencia con PostgreSQL **no se ejecutaron en esta sesión** (se corren sobre `main`; si alguna falla, el resultado se reevalúa); (2) el hallazgo heredado de composición del anfitrión (§3, H1).
+Converge a nivel de código y pruebas unitarias y de arquitectura. Las dos condiciones que quedaban se cierran así: (1) las pruebas de integración y de concurrencia con PostgreSQL **no se ejecutaron en esta sesión, pero pasaron en la corrida de integración completa del coordinador sobre `main` el 2026-11-19** (4857 de 4871; las 14 fallas pasaron sueltas y no eran de ajustes), incluidas las de AC-AJU-09, 10, 11, 17 y 18; (2) el hallazgo heredado de composición del anfitrión (§3, H1) queda como hallazgo del bloque de composición y **no bloquea la convergencia de la spec**.
 
 ## 1. Comprobaciones automáticas
 
@@ -17,7 +17,7 @@ Converge a nivel de código y pruebas unitarias y de arquitectura. Quedan **dos 
 | :--- | :--- | :--- |
 | Compilación sin advertencias | `dotnet build BabelHub.sln -warnaserror` | 0 advertencias, 0 errores (comprobado por el coordinador en esta sesión) |
 | Pruebas unitarias de la feature | `dotnet test tests/unit/BabelHub.Inventario.UnitTests --filter "Criterio~AC-AJU-"` | En verde: 96 pruebas (coordinador) |
-| Pruebas de integración | `dotnet test tests/integration/BabelHub.IntegrationTests --filter "Criterio~AC-AJU-"` | **No ejecutadas en esta sesión** (PostgreSQL con Testcontainers; las corre el coordinador sobre `main`) |
+| Pruebas de integración | `dotnet test tests/integration/BabelHub.IntegrationTests --filter "Criterio~AC-AJU-"` | **No ejecutadas en esta sesión; verificadas en la corrida del coordinador del 2026-11-19** sobre `main` (PostgreSQL con Testcontainers; 4857 de 4871 en verde, las 14 fallas pasaron sueltas y no eran de ajustes) |
 | Prueba de arquitectura | `dotnet test tests/architecture --no-build` | En verde: 217 superadas, 0 con error (ejecutada por el verificador) |
 | Specs, planes, tareas y trazabilidad | `dotnet run --project tools/SpecCheck` | 0 errores y 0 avisos (coordinador); los 18 `AC-AJU` tienen al menos una prueba con `[Trait("Criterio", …)]` |
 | Búsqueda de secretos | `git grep -nIiE "password\s*=|api[_-]?key\s*=|secret\s*=" -- src` | Sin coincidencias (coordinador) |
