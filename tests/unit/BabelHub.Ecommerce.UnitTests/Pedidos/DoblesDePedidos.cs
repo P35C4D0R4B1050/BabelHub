@@ -204,6 +204,19 @@ internal sealed class RepositorioDePedidosFalso : IRepositorioDePedidos
         return Task.CompletedTask;
     }
 
+    public Task<int> ContarNoRecogidasSinAnularDesde(DateTimeOffset marcadasAntesDe, CancellationToken cancelacion = default) =>
+        Task.FromResult(_pedidos.Values.SelectMany(p => p.Lineas).Count(l => l.EstadoImpreso == EstadoDeLineaImpresa.NoRecogido && l.NoRecogidaEn < marcadasAntesDe));
+
+    public Task<int> ContarImpresasSinEstadoFinalDesde(DateTimeOffset creadosAntesDe, CancellationToken cancelacion = default) =>
+        Task.FromResult(_pedidos.Values.Where(p => p.CreadoEn < creadosAntesDe).SelectMany(p => p.Lineas).Count(l => !l.EsDigital && l.EstadoImpreso is not (EstadoDeLineaImpresa.Entregado or EstadoDeLineaImpresa.Anulado)));
+
+    public Task<int> PurgarEstadosDeTraslado(DateTimeOffset recibidosAntesDe, CancellationToken cancelacion = default)
+    {
+        var vencidos = EstadosDeTraslado.Where(e => e.Value.RecibidoEn < recibidosAntesDe).Select(e => e.Key).ToList();
+        vencidos.ForEach(k => EstadosDeTraslado.Remove(k));
+        return Task.FromResult(vencidos.Count);
+    }
+
     public Task<int> ContarPedidosConImpresaSinCerrar(Guid cuentaId, CancellationToken cancelacion = default) =>
         Task.FromResult(_pedidos.Values.Count(p => p.CuentaId == cuentaId && p.Lineas.Any(l => !l.EsDigital && l.EstadoImpreso is not (EstadoDeLineaImpresa.Entregado or EstadoDeLineaImpresa.Anulado))));
 

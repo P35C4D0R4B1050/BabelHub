@@ -91,6 +91,15 @@ public interface IRepositorioDePedidos
 
     Task AnotarIntentoDeLiberacionDeContacto(Guid pedidoId, DateTimeOffset cuando, CancellationToken cancelacion = default);
 
+    /// <summary>Cuántas líneas están <c>no recogidas</c> desde antes de <paramref name="marcadasAntesDe"/> sin anularse ni entregarse (T27).</summary>
+    Task<int> ContarNoRecogidasSinAnularDesde(DateTimeOffset marcadasAntesDe, CancellationToken cancelacion = default);
+
+    /// <summary>Cuántas líneas impresas, de pedidos creados antes de <paramref name="creadosAntesDe"/>, no llegaron a entregadas ni anuladas (T27).</summary>
+    Task<int> ContarImpresasSinEstadoFinalDesde(DateTimeOffset creadosAntesDe, CancellationToken cancelacion = default);
+
+    /// <summary>Borra los estados de traslado recibidos antes de <paramref name="recibidosAntesDe"/> (90 días: solo sirven para la idempotencia) y devuelve cuántos.</summary>
+    Task<int> PurgarEstadosDeTraslado(DateTimeOffset recibidosAntesDe, CancellationToken cancelacion = default);
+
     /// <summary>Cuántos pedidos de la cuenta tienen alguna línea impresa sin entregar ni anular, incluidas las no recogidas (PED-31, AC-PED-26): un pedido solo digital no cuenta.</summary>
     Task<int> ContarPedidosConImpresaSinCerrar(Guid cuentaId, CancellationToken cancelacion = default);
 
