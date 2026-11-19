@@ -46,6 +46,10 @@ public sealed class MarcarEntregadoTests
         Assert.Equal(AccionesAuditables.EstadoDeEnvioCambiado, auditoria.Accion);
         Assert.Equal("en_reparto", auditoria.Detalle["estadoAnterior"]);
         Assert.Equal("entregado", auditoria.Detalle["estadoNuevo"]);
+        Assert.Equal("2026-11-20T15:00:00Z", auditoria.Detalle["fecha"]);
+        Assert.Equal("GUIA-000123", auditoria.Detalle["numeroDeGuia"]);
+        Assert.Equal("operador-a", auditoria.Detalle["operador"]);
+        Assert.Equal(envio.PedidoId.ToString(), auditoria.Detalle["pedidoId"]);
 
         var llamada = Assert.Single(entorno.Progreso.Llamadas);
         Assert.Equal(EntornoDeEnvios.AhoraInicial, llamada.Entregado!.Fecha);
@@ -148,7 +152,7 @@ public sealed class MarcarEntregadoTests
         await entorno.InformarProgreso.Ejecutar(10);
 
         var alerta = Assert.Single(entorno.Alertas.Alertas);
-        Assert.Equal("dependencia-no-necesaria-fallida", alerta.Motivo);
+        Assert.Equal("envio-progreso-sin-informar", alerta.Motivo);
     }
 
     [Theory]

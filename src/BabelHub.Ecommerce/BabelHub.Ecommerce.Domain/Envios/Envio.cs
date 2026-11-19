@@ -13,7 +13,8 @@ public sealed class Envio
     /// <summary>El arrendamiento del marcador de despacho (AC-ENV-16): la primera solicitud que confirma gana.</summary>
     public static readonly TimeSpan ArrendamientoDelDespacho = TimeSpan.FromSeconds(90);
 
-    public const int LongitudMaximaDeLaFuente = 64;
+    /// <summary>40, el largo que admite la clave <c>fuente</c> del detalle de auditoría.</summary>
+    public const int LongitudMaximaDeLaFuente = 40;
 
     private const int LongitudMaximaDelOperador = 32;
 

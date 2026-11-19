@@ -13,6 +13,7 @@ namespace BabelHub.Ecommerce.Application.Envios.Interno;
 /// </summary>
 internal sealed class PasarAEnReparto(
     AutorizadorDeEnvios autorizador,
+    LimitesDeEnvios limites,
     IRepositorioDeEnvios envios,
     IReservasDelEnvio reservas,
     InformadorDeProgreso informador,
@@ -27,6 +28,11 @@ internal sealed class PasarAEnReparto(
         if (await autorizador.ExigirLogisticaOAdministracion(cancelacion).ConfigureAwait(false) is { } rechazo)
         {
             return FallosDeEnvios.Fallo<DetalleDeEnvio>(rechazo);
+        }
+
+        if (await limites.Operacion(cancelacion).ConfigureAwait(false) is { } excedido)
+        {
+            return FallosDeEnvios.Fallo<DetalleDeEnvio>(excedido);
         }
 
         try
@@ -116,16 +122,7 @@ internal sealed class PasarAEnReparto(
                         {
                             case ResultadoDeTransicion.Hecha:
                                 await auditoria.Registrar(
-                                    new SolicitudDeRegistro(AccionesAuditables.EstadoDeEnvioCambiado)
-                                    {
-                                        ObjetoTipo = "envio",
-                                        ObjetoId = envio.Id.ToString(),
-                                        Detalle = new Dictionary<string, string?>
-                                        {
-                                            ["estadoAnterior"] = anterior.Codigo(),
-                                            ["estadoNuevo"] = EstadoDeEnvio.EnReparto.Codigo(),
-                                        },
-                                    },
+                                    AuditoriaDeEnvios.Cambio(envio, anterior, EstadoDeEnvio.EnReparto),
                                     token).ConfigureAwait(false);
                                 await avisos.Solicitar(envio, datosDelAviso.Valor, AvisosDeEnvios.EstadoEnReparto, token).ConfigureAwait(false);
                                 await envios.Guardar(envio, token).ConfigureAwait(false);

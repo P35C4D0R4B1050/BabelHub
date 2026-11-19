@@ -157,6 +157,9 @@ Los planes no se pueden editar sin perder la aprobación: lo que cambió al impl
 ## 12. `ecommerce-envios` (ECO-9, implementación del carril V desde 2026-11-20)
 
 - [x] **T03 se divide (2026-11-20; T03a y T03b hechas, los contratos de Pedidos llegaron en el commit 8cb8251 del carril B):** `T03a` = contratos públicos de Envíos (`IEnviosDeLogistica`, `IEnviosDelCliente` y sus modelos) y puertos propios (`IRepositorioDeEnvios`, `IOperadorLogistico`, `IReservasDelEnvio`) con `ContratoPublicoDeEnviosTests`; `T03b` = el consumo de los contratos de Pedidos (`IContactoDeEntregaDelPedido`, `IProgresoDeEnvios`, el de lectura de D01 y `IDespachoDeEnvios`) con sus dobles de prueba. T03b espera a que Pedidos (ECO-6, carril B) publique la firma de esos contratos: ninguna rama los tiene todavía y la regla 13 impide a Envíos compilar sin ellos.
+- [ ] **T14 se divide (2026-11-19):** `T14a` (hecha) = `SimuladorOperadorLogistico` (idempotente por clave, modos de no respuesta, rechazo, respuesta inválida y respuesta perdida), `NuloOperadorLogistico`, la guarda de arranque por `Envios:Operador` y el tope de 30 guías por minuto; `T14b` (diferida por D02 hasta que la persona responsable elija un operador real) = el cliente por `IDependenciasExternas` con plazo de 10 segundos, el método explícito único que arma el cuerpo con el contacto, el rechazo del operador que repite la dirección y la prueba de que no se registran cuerpos ni cabeceras. T14 no se marca hasta T14b.
+- [ ] **T13 (bloqueada):** necesita `IClienteDelInventario.CerrarReservas` (`POST /reservas/{pedidoId}/cerrar`, carril A, bloque PLA-Y). Hasta entonces `AgregarEnvios(esProduccion: true)` falla al arrancar (doble provisional de reservas): el adaptador real se registra antes de `AgregarEnvios`.
+- [ ] **AC-ENV-10 y AC-ENV-11 no convergen** hasta T13; las pruebas de composición que llevan `AC-ENV-10` solo prueban el cableado.
 
 ## 11. `ecommerce-pedidos` (ECO-6a, 2026-11-19)
 
