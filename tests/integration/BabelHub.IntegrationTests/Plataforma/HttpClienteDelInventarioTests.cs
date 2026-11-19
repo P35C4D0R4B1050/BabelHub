@@ -855,6 +855,114 @@ public sealed class HttpClienteDelInventarioTests
         Assert.Single(servidor.Rutas);
     }
 
+    private static HttpResponseMessage RespuestaDeCierre(Guid pedido, params (Guid Linea, string Resultado)[] lineas) =>
+        Json("{\"pedidoId\":\"" + pedido.ToString("D") + "\",\"lineas\":[" + string.Join(",", lineas.Select(l => "{\"lineaId\":\"" + l.Linea.ToString("D") + "\",\"resultado\":\"" + l.Resultado + "\"}")) + "]}");
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-21")]
+    public async Task CerrarReserva_PorReparto_LlevaElEnvio_LaClaveYElTokenDelUsuario_YDevuelveCadaLinea()
+    {
+        var pedido = Guid.NewGuid();
+        var envio = Guid.NewGuid();
+        Guid[] lineas = [Guid.NewGuid(), Guid.NewGuid()];
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(RespuestaDeCierre(pedido, (lineas[0], "cerrada"), (lineas[1], "ya-cerrada"))));
+        var (cliente, _) = Crear(servidor);
+
+        var resultado = await cliente.CerrarReserva(pedido, "reparto", lineas, envio, Clave);
+
+        Assert.True(resultado.Exitosa);
+        Assert.Equal([("cerrada"), "ya-cerrada"], resultado.Valor.Lineas.Select(l => l.Resultado));
+        Assert.Equal(HttpMethod.Post, Assert.Single(servidor.Metodos));
+        Assert.Equal($"/api/inventario/v1/reservas/{pedido:D}/cerrar", Assert.Single(servidor.Rutas));
+        var cabeceras = Assert.Single(servidor.Cabeceras);
+        Assert.Equal(Clave, cabeceras["Idempotency-Key"]);
+        Assert.Equal(SecretoDeUsuario, cabeceras[CredencialesDeSalidaHandler.CabeceraDeCredencial]);
+        Assert.Equal("Bearer " + TokenDelUsuario, cabeceras["Authorization"]);
+        SinCabecerasDeActor(cabeceras);
+        using var cuerpo = System.Text.Json.JsonDocument.Parse(Assert.Single(servidor.Cuerpos)!);
+        Assert.Equal("reparto", cuerpo.RootElement.GetProperty("motivo").GetString());
+        Assert.Equal(envio, cuerpo.RootElement.GetProperty("envioId").GetGuid());
+        Assert.Equal(lineas, cuerpo.RootElement.GetProperty("lineaIds").EnumerateArray().Select(e => e.GetGuid()));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-21")]
+    public async Task CerrarReserva_PorEntrega_NoLlevaEnvio()
+    {
+        var pedido = Guid.NewGuid();
+        var linea = Guid.NewGuid();
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(RespuestaDeCierre(pedido, (linea, "cerrada"))));
+        var (cliente, _) = Crear(servidor);
+
+        var resultado = await cliente.CerrarReserva(pedido, "entrega", [linea], envioId: null, Clave);
+
+        Assert.True(resultado.Exitosa);
+        using var cuerpo = System.Text.Json.JsonDocument.Parse(Assert.Single(servidor.Cuerpos)!);
+        Assert.Equal("entrega", cuerpo.RootElement.GetProperty("motivo").GetString());
+        Assert.True(!cuerpo.RootElement.TryGetProperty("envioId", out var envio) || envio.ValueKind == System.Text.Json.JsonValueKind.Null);
+    }
+
+    [Theory]
+    [InlineData(409, "INV-RESERVA-ESTADO-INVALIDO")]
+    [InlineData(409, "INV-IDEMPOTENCIA-EN-CONFLICTO")]
+    [InlineData(403, "INV-PROHIBIDO")]
+    [InlineData(404, "INV-NO-ENCONTRADO")]
+    [Trait("Criterio", "AC-SEL-29")]
+    public async Task CerrarReserva_ConUnRechazoDelInventario_TraeElCodigoEstable_SinExcepcion(int estado, string codigo)
+    {
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Problema((HttpStatusCode)estado, codigo)));
+        var (cliente, _) = Crear(servidor);
+
+        var resultado = await cliente.CerrarReserva(Guid.NewGuid(), "reparto", [Guid.NewGuid()], Guid.NewGuid(), Clave);
+
+        Assert.Equal(EstadoDeLlamadaAlInventario.Rechazada, resultado.Estado);
+        Assert.Equal(codigo, resultado.Codigo);
+    }
+
+    [Theory]
+    [InlineData("otro-pedido")]
+    [InlineData("otra-linea")]
+    [InlineData("falta-una-linea")]
+    [InlineData("resultado-desconocido")]
+    public async Task CerrarReserva_ConUnaRespuestaFueraDelContrato_EsNoDisponible_YNuncaUnExito(string caso)
+    {
+        var pedido = Guid.NewGuid();
+        Guid[] lineas = [Guid.NewGuid(), Guid.NewGuid()];
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(caso switch
+        {
+            "otro-pedido" => RespuestaDeCierre(Guid.NewGuid(), (lineas[0], "cerrada"), (lineas[1], "cerrada")),
+            "otra-linea" => RespuestaDeCierre(pedido, (lineas[0], "cerrada"), (Guid.NewGuid(), "cerrada")),
+            "falta-una-linea" => RespuestaDeCierre(pedido, (lineas[0], "cerrada")),
+            _ => RespuestaDeCierre(pedido, (lineas[0], "cerrada"), (lineas[1], "quizas")),
+        }));
+        var (cliente, _) = Crear(servidor);
+
+        var resultado = await cliente.CerrarReserva(pedido, "reparto", lineas, Guid.NewGuid(), Clave);
+
+        Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, resultado.Estado);
+    }
+
+    [Fact]
+    public async Task CerrarReserva_ConArgumentosQueNoCumplenElContrato_NoSale()
+    {
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(RespuestaDeCierre(Guid.NewGuid())));
+        var (cliente, _) = Crear(servidor);
+        var pedido = Guid.NewGuid();
+        var linea = Guid.NewGuid();
+        var envio = Guid.NewGuid();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.CerrarReserva(Guid.Empty, "reparto", [linea], envio, Clave));
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.CerrarReserva(pedido, "devolucion", [linea], envio, Clave));
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.CerrarReserva(pedido, "reparto", [linea], envioId: null, Clave));
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.CerrarReserva(pedido, "reparto", [linea], Guid.Empty, Clave));
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.CerrarReserva(pedido, "entrega", [linea], envio, Clave));
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.CerrarReserva(pedido, "reparto", [], envio, Clave));
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.CerrarReserva(pedido, "reparto", [linea, linea], envio, Clave));
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.CerrarReserva(pedido, "reparto", [Guid.Empty], envio, Clave));
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.CerrarReserva(pedido, "reparto", [linea], envio, "corta"));
+        Assert.Empty(servidor.Rutas);
+    }
+
     [Fact]
     public void ElNombreDelClienteEsElQueRecibeElTokenDeLaSesion() =>
         Assert.Equal(TokenDelUsuarioDeLaSesionExtensiones.ClienteDelInventario, HttpClienteDelInventario.NombreDelCliente);

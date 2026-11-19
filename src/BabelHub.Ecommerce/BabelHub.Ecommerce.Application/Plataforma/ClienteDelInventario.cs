@@ -182,6 +182,13 @@ public interface IClienteDelInventario
     /// </summary>
     Task<ResultadoDelInventario<ReservaDelInventario>> ConfirmarReserva(Guid pedidoId, string claveDeIdempotencia, CancellationToken cancelacion = default);
 
+    /// <summary>
+    /// <c>inventario.reservas.cerrar</c>: descuenta el físico de las líneas de una reserva confirmada y las cierra (alcance de usuario: lleva el token de la persona, con clave de idempotencia obligatoria; SEL-11, SEL-21, ENV-12).
+    /// <paramref name="motivo"/> es <c>entrega</c> (un pedido de recojo) o <c>reparto</c> (un envío, con su <paramref name="envioId"/>). Repetir la misma clave devuelve el resultado original; una clave nueva sobre líneas ya cerradas responde
+    /// <c>ya-cerrada</c> sin volver a descontar; <c>INV-RESERVA-ESTADO-INVALIDO</c> si otra operación ganó la competencia (el stock no cambió). Con clave se puede reintentar.
+    /// </summary>
+    Task<ResultadoDelInventario<CierreDeLaReserva>> CerrarReserva(Guid pedidoId, string motivo, IReadOnlyList<Guid> lineaIds, Guid? envioId, string claveDeIdempotencia, CancellationToken cancelacion = default);
+
     /// <summary><c>inventario.sucursales.listar</c>: las sucursales para elegir recojo o sucursal preferida (alcance de lectura, sin token).</summary>
     Task<ResultadoDelInventario<IReadOnlyList<SucursalPublica>>> ListarSucursales(CancellationToken cancelacion = default);
 }
@@ -221,6 +228,12 @@ public sealed record LineaReservada(Guid LineaId, Guid EdicionId, int Cantidad, 
 
 /// <summary>Un traslado vinculado a un pedido; la fecha estimada es <see langword="null"/> si la ruta no está definida (TRA-21).</summary>
 public sealed record TrasladoDeLaReserva(Guid TrasladoId, Guid EdicionId, int Cantidad, string CodigoDeOrigen, string CodigoDeDestino, string Estado, DateOnly? FechaEstimadaDeLlegada);
+
+/// <summary>El resultado de cerrar las líneas de una reserva: por cada una, <c>cerrada</c> ahora o <c>ya-cerrada</c> (el descuento ya estaba aplicado).</summary>
+public sealed record CierreDeLaReserva(Guid PedidoId, IReadOnlyList<ResultadoDeCierreDeLinea> Lineas);
+
+/// <summary>El resultado de cerrar una línea (<see cref="BabelHub.Shared.Contratos.ResultadosDeCierre"/>).</summary>
+public sealed record ResultadoDeCierreDeLinea(Guid LineaId, string Resultado);
 
 /// <summary>El resultado de extender una reserva (SEL-22, SEL-30): si se extendió y cómo quedó la reserva.</summary>
 public sealed record ExtensionDeLaReserva(bool Extendida, ReservaDelInventario Reserva);
