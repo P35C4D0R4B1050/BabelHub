@@ -39,7 +39,23 @@ public static partial class CatalogoDeAccionesDeAuditoria
         yield return Traslado(nameof(AccionesAuditables.TrasladoCancelado));
         yield return Traslado(nameof(AccionesAuditables.TrasladoDespachado));
         yield return Traslado(nameof(AccionesAuditables.TrasladoRecibido));
+        foreach (var carrito in AccionesDeCarrito())
+        {
+            yield return carrito;
+        }
         yield return Auditada(nameof(AccionesAuditables.GuiaDeTrasladoRegistrada), false, false, Clave("numero", 24), Clave("guiaNueva", 40), Clave("reemplazoOtraGuia", 8));
+    }
+
+    /// <summary>Las acciones de Carrito (plan de carrito-checkout §6): en la misma transacción del caso de uso; sin datos personales, sin la cookie del visitante ni su huella, sin identificar al visitante ni al pedido.</summary>
+    private static IEnumerable<AccionDelCatalogo> AccionesDeCarrito()
+    {
+        yield return Auditada(nameof(AccionesAuditables.FusionDeCarritoAplicada), false, false, Clave("lineasDelVisitante", 12), Clave("ajustes", 120));
+        yield return Auditada(nameof(AccionesAuditables.EdicionesRetiradasDeCarritos), false, false, Clave("ediciones", 12), Clave("carritosAfectados", 12), Clave("lineasQuitadas", 12), Clave("lineasAnotadas", 12));
+        yield return Auditada(nameof(AccionesAuditables.CheckoutTerminado), false, false, Clave("motivo", 40));
+        yield return Auditada(nameof(AccionesAuditables.CarritoEliminadoPorIdentidad), false, false, new ClaveDeDetalle("motivo", personal: false) { Valores = ["reemplazo", "cancelacion", "cuenta-inactiva"] });
+        yield return Auditada(nameof(AccionesAuditables.PurgaDeCarritosRealizada), false, false, Clave("trabajo", 40), Clave("cantidad", 12));
+        yield return Auditada(nameof(AccionesAuditables.PasoAlPagoAbortado), false, false, Clave("motivo", 40));
+        yield return Auditada(nameof(AccionesAuditables.PasoAlPagoIniciado), false, false, new ClaveDeDetalle("conImpresos", personal: false) { Valores = ["true", "false"] }, new ClaveDeDetalle("aDomicilio", personal: false) { Valores = ["true", "false"] });
     }
 
     private static AccionDelCatalogo Traslado(string identificador) =>
