@@ -27,11 +27,11 @@ internal sealed class RevisarEnviosEstancados(IActorActual actores, IRepositorio
             var conDespacho = await envios.ObtenerConDespachoIniciadoAntesDe(ahora - Umbral, tope, cancelacion).ConfigureAwait(false);
             var sinUso = await envios.ObtenerCanceladosConGuiaEntre(ahora - Umbral - Ventana, ahora - Umbral, tope, cancelacion).ConfigureAwait(false);
             var publicadas = 0;
-            for (var i = 0; i < conDespacho.Count + sinUso.Count; i++)
+            foreach (var motivo in Enumerable.Repeat(ClavesDeEnvios.MotivoDeAlertaDeDependencia, conDespacho.Count).Concat(Enumerable.Repeat(ClavesDeEnvios.AlertaGuiaSinUso, sinUso.Count)))
             {
                 try
                 {
-                    await alertas.Publicar(new AlertaTecnica(ClavesDeEnvios.MotivoDeAlertaDeDependencia, ahora), cancelacion).ConfigureAwait(false);
+                    await alertas.Publicar(new AlertaTecnica(motivo, ahora), cancelacion).ConfigureAwait(false);
                     publicadas++;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)

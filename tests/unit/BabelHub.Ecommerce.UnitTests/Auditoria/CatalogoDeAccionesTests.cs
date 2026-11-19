@@ -140,6 +140,44 @@ public sealed class CatalogoDeAccionesTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-AUD-13")]
+    public void Las_acciones_de_Pedidos_declaran_sus_claves_el_iniciador_como_campo_personal_y_nunca_el_contacto()
+    {
+        var esperado = new Dictionary<string, string[]>
+        {
+            [nameof(AccionesAuditables.ContactoDePedidoConsultado)] = ["rol"],
+            [nameof(AccionesAuditables.OperacionDePedidoIniciada)] = ["operacion", "iniciadaPor"],
+            [nameof(AccionesAuditables.PedidoCanceladoPorElCliente)] = ["estadoAnterior"],
+            [nameof(AccionesAuditables.ReembolsoDePedidoReintentado)] = ["resultado", "monto", "moneda"],
+            [nameof(AccionesAuditables.LineaDePedidoEntregada)] = ["lineaId", "iniciadaPor"],
+            [nameof(AccionesAuditables.ContactoDePedidoAnonimizado)] = ["causa", "cantidad"],
+            [nameof(AccionesAuditables.PedidosDepurados)] = ["cantidad"],
+            [nameof(AccionesAuditables.EstadoDePedidoCambiado)] = ["estadoAnterior", "estadoNuevo", "iniciadaPor"],
+        };
+
+        foreach (var (nombre, claves) in esperado)
+        {
+            var accion = Catalogo.Obtener(nombre);
+            Assert.Equal(claves, accion.Detalle.Select(c => c.Nombre));
+            Assert.All(accion.Detalle, c => Assert.Equal(c.Nombre == "iniciadaPor", c.Personal));
+            Assert.DoesNotContain(accion.Detalle, c => c.Nombre is "contacto" or "telefono" or "direccion" or "documento");
+            Assert.False(accion.Aislada, nombre);
+        }
+
+        Assert.Equal(["pedido"], Catalogo.Obtener(nameof(AccionesAuditables.ContactoDePedidoConsultado)).TiposDeObjeto);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-05")]
+    public void El_cambio_de_estado_de_un_envio_declara_el_pedido_la_guia_el_operador_la_fuente_y_la_fecha_sin_datos_personales()
+    {
+        var accion = Catalogo.Obtener(nameof(AccionesAuditables.EstadoDeEnvioCambiado));
+
+        Assert.Equal(["estadoAnterior", "estadoNuevo", "pedidoId", "numeroDeGuia", "operador", "fuente", "fecha"], accion.Detalle.Select(c => c.Nombre));
+        Assert.DoesNotContain(accion.Detalle, c => c.Personal);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-AUD-05")]
     public void Un_identificador_de_negocio_un_GUID_y_una_huella_corta_no_se_redactan_en_el_detalle()
     {

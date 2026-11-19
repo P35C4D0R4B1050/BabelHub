@@ -81,6 +81,22 @@ public static class PoliticasDeLimite
 
     public static ClaveDePolitica VolverOReiniciarPorCuenta { get; } = new("volver-o-reiniciar-por-cuenta");
 
+    /// <summary>Los límites de uso de Envíos (plan de envíos §6): consultas y operaciones por usuario y las solicitudes de guía al operador.</summary>
+    public static ClaveDePolitica ConsultasDeEnviosPorUsuario { get; } = new("consultas-de-envios-por-usuario");
+
+    public static ClaveDePolitica OperacionesDeEnviosPorUsuario { get; } = new("operaciones-de-envios-por-usuario");
+
+    public static ClaveDePolitica GuiasAlOperador { get; } = new("guias-al-operador");
+
+    public static ClaveDePolitica ConsultasDePedidosPorUsuario { get; } = new("consultas-de-pedidos-por-usuario");
+
+    public static ClaveDePolitica GestionDePedidosPorUsuario { get; } = new("gestion-de-pedidos-por-usuario");
+
+    public static ClaveDePolitica LecturasDelContactoDePedidosPorPersona { get; } = new("lecturas-del-contacto-de-pedidos-por-persona");
+
+    /// <summary>La ráfaga de avisos de la pasarela de pagos: 120 por origen y minuto, antes de verificar la firma (PAG-05).</summary>
+    public static ClaveDePolitica AvisosDeLaPasarelaPorOrigen { get; } = new("avisos-de-la-pasarela-por-origen");
+
     public static ClaveDePolitica SolicitudesPreviasPorOrigen { get; } = new("solicitudes-previas-por-origen");
 
     public static ClaveDePolitica SolicitudesDelOrigenDesconocido { get; } = new("solicitudes-del-origen-desconocido");
@@ -94,7 +110,8 @@ public static class PoliticasDeLimite
     /// <summary>Los límites generales de uso (con respaldo local), aparte de las políticas críticas de <see cref="Todas"/>.</summary>
     public static IReadOnlyList<ClaveDePolitica> Generales { get; } =
         [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen, ConsultasDeHojasPorUsuario,
-         CarritosDeVisitantePorOrigen, EdicionDeLineasPorCuenta, EdicionDeLineasPorOrigen, RevisionDelCheckoutPorCuenta, VolverOReiniciarPorCuenta];
+         CarritosDeVisitantePorOrigen, EdicionDeLineasPorCuenta, EdicionDeLineasPorOrigen, RevisionDelCheckoutPorCuenta, VolverOReiniciarPorCuenta,
+         ConsultasDeEnviosPorUsuario, OperacionesDeEnviosPorUsuario, GuiasAlOperador, AvisosDeLaPasarelaPorOrigen, ConsultasDePedidosPorUsuario, GestionDePedidosPorUsuario];
 
     public static IReadOnlyList<ClaveDePolitica> Todas { get; } =
     [
@@ -112,5 +129,6 @@ public static class PoliticasDeLimite
         CobrosPorCuenta,
         CobrosPorOrigen,
         PasosAlPagoPorCuenta,
+        LecturasDelContactoDePedidosPorPersona,
     ];
 }

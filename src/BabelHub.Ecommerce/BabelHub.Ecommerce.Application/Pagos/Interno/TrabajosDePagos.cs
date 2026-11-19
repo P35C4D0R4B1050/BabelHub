@@ -181,3 +181,16 @@ internal sealed class DepurarIntencionesAntiguas(IRepositorioDePagos repositorio
             },
             cancelacion);
 }
+
+/// <summary>
+/// Purga los avisos del estado del pago y los avisos a Carrito a los 90 días de su creación (T24, T27): ninguno lleva datos personales (el correo y el teléfono se leen al enviar), pero un registro de avisos no debe crecer sin fin. Purga por tandas acotadas
+/// y es idempotente. Devuelve cuántos purgó.
+/// </summary>
+internal sealed class PurgarAvisosDePagos(IRepositorioDePagos repositorio, IUnidadDeTrabajo unidad, IReloj reloj)
+{
+    /// <summary>Noventa días desde la creación del aviso.</summary>
+    public static readonly TimeSpan Retencion = TimeSpan.FromDays(90);
+
+    public Task<int> Ejecutar(int limite, CancellationToken cancelacion = default) =>
+        unidad.Ejecutar(token => repositorio.PurgarAvisosAnterioresA(reloj.Ahora - Retencion, limite, token), cancelacion);
+}

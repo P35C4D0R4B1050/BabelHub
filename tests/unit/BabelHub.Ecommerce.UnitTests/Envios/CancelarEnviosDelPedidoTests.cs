@@ -60,6 +60,8 @@ public sealed class CancelarEnviosDelPedidoTests
         Assert.Equal(pendiente.Id.ToString(), entrada.ObjetoId);
         Assert.Equal("pendiente_de_guia", entrada.Detalle["estadoAnterior"]);
         Assert.Equal("cancelado", entrada.Detalle["estadoNuevo"]);
+        Assert.Equal(pedido.ToString(), entrada.Detalle["pedidoId"]);
+        Assert.Equal("lima-central", entrada.Detalle["fuente"]);
         Assert.Null(entrada.Motivo);
     }
 

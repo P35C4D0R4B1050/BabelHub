@@ -128,6 +128,24 @@ public sealed class AvisoACarrito
         var espera = TimeSpan.FromTicks(Math.Min(EsperaMaxima.Ticks, EsperaBase.Ticks << Math.Min(Intentos - 1, 10)));
         ProximoIntentoEn = ahora + espera;
     }
+    /// <summary>La reconstruye desde el almacén (la infraestructura): no valida ni cambia nada.</summary>
+    public static AvisoACarrito Rehidratar(
+        Guid id,
+        Guid intencionId,
+        Guid intentoId,
+        TransicionDeAviso transicion,
+        EstadoDeAvisoACarrito estado,
+        DateTimeOffset creadoEn,
+        DateTimeOffset? enviadoEn,
+        int intentos,
+        DateTimeOffset? proximoIntentoEn) =>
+        new(id, intencionId, intentoId, transicion, estado, creadoEn)
+        {
+            EnviadoEn = enviadoEn,
+            Intentos = intentos,
+            ProximoIntentoEn = proximoIntentoEn,
+        };
+
     internal AvisoACarrito Copiar() => (AvisoACarrito)MemberwiseClone();
 }
 
@@ -242,6 +260,25 @@ public sealed class AvisoDePago
         var espera = TimeSpan.FromTicks(Math.Min(AvisoACarrito.EsperaMaxima.Ticks, AvisoACarrito.EsperaBase.Ticks << Math.Min(Intentos - 1, 10)));
         ProximoIntentoEn = ahora + espera;
     }
+
+    /// <summary>La reconstruye desde el almacén (la infraestructura): no valida ni cambia nada.</summary>
+    public static AvisoDePago Rehidratar(
+        Guid id,
+        Guid intencionId,
+        Guid intentoId,
+        EventoDeAvisoDePago evento,
+        EstadoDeAvisoDePago estado,
+        DateTimeOffset creadoEn,
+        DateTimeOffset? enviadoEn,
+        int intentos,
+        DateTimeOffset? proximoIntentoEn) =>
+        new(id, intencionId, intentoId, evento, creadoEn)
+        {
+            Estado = estado,
+            EnviadoEn = enviadoEn,
+            Intentos = intentos,
+            ProximoIntentoEn = proximoIntentoEn,
+        };
 
     internal AvisoDePago Copiar() => (AvisoDePago)MemberwiseClone();
 }

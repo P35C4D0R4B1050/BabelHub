@@ -95,7 +95,10 @@ public sealed class EnviadorDeCorreoDeProduccionTests
 
     private sealed class RenderizadorDePrueba : IRenderizadorDeCorreo
     {
-        public MensajeDeCorreo De(CorreoSaliente correo) => new([correo.Destinatario], $"{correo.Categoria}:{correo.Plantilla}:{correo.Motivo}", "cuerpo");
+        public MensajeDeCorreo De(CorreoSaliente correo) =>
+            correo.Plantilla == "plantilla-rota"
+                ? throw new InvalidOperationException("Faltan datos de la plantilla del correo o no caben.")
+                : new([correo.Destinatario], $"{correo.Categoria}:{correo.Plantilla}:{correo.Motivo}", "cuerpo");
 
         public MensajeDeCorreo DeCodigo(CorreoDeCodigo correo) => new([correo.Destinatario], "codigo", "cuerpo");
 
@@ -226,6 +229,22 @@ public sealed class EnviadorDeCorreoDeProduccionTests
         Assert.Equal(ResultadoDeEnvio.Suprimido, resultado);
         Assert.Empty(e.Cola.Items);
         Assert.Equal(0, e.Almacen.Total(Hoy(e)));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-54")]
+    public async Task UnCorreoQueNoSePuedeArmar_NoSeEncola_NoSeReintenta_DevuelveElCupo_YDejaUnaAlerta()
+    {
+        var e = Crear();
+        var roto = new CorreoSaliente(CategoriaDeCorreo.Pago, "ana@example.com", "plantilla-rota");
+
+        var resultado = await e.Enviador.Enviar(roto);
+
+        Assert.Equal(ResultadoDeEnvio.Suprimido, resultado);
+        Assert.Empty(e.Cola.Items);
+        Assert.Empty(e.Transporte.Enviados);
+        Assert.Equal(0, e.Almacen.Total(Hoy(e)));
+        Assert.NotEmpty(e.Alertas.Alertas);
     }
 
     // ---------------------------------------------------------------- sin cupo

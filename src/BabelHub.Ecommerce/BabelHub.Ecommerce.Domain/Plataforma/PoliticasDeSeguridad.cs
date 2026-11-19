@@ -93,6 +93,34 @@ public static class PoliticasDeSeguridad
     public static PoliticaDeLimite VolverOReiniciarPorCuenta { get; } = new(
         "volver-o-reiniciar-por-cuenta", 20, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
 
+    /// <summary>Las consultas de envíos (el cliente por su pedido, logística por la lista): 60 por usuario y minuto (plan de envíos §6, SEG-05).</summary>
+    public static PoliticaDeLimite ConsultasDeEnviosPorUsuario { get; } = new(
+        "consultas-de-envios-por-usuario", 60, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
+
+    /// <summary>Las operaciones de envíos (pedir la guía, pasar a en reparto, marcar entregado): 30 por usuario y minuto (SEG-07).</summary>
+    public static PoliticaDeLimite OperacionesDeEnviosPorUsuario { get; } = new(
+        "operaciones-de-envios-por-usuario", 30, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
+
+    /// <summary>Las solicitudes de guía al operador logístico: 30 por minuto en total (el sujeto es una constante interna, no una persona); protege al operador de una ráfaga.</summary>
+    public static PoliticaDeLimite GuiasAlOperador { get; } = new(
+        "guias-al-operador", 30, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
+
+    /// <summary>Las consultas de pedidos (el cliente por su cuenta, el personal por la lista y el detalle): 60 por usuario y minuto (plan de pedidos, SEG-05).</summary>
+    public static PoliticaDeLimite ConsultasDePedidosPorUsuario { get; } = new(
+        "consultas-de-pedidos-por-usuario", 60, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
+
+    /// <summary>La gestión de pedidos (anular, entregar, reintentar el reembolso, cancelar): 30 por usuario y minuto (SEG-07).</summary>
+    public static PoliticaDeLimite GestionDePedidosPorUsuario { get; } = new(
+        "gestion-de-pedidos-por-usuario", 30, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
+
+    /// <summary>Las lecturas del detalle de un pedido con el contacto del cliente: 200 por persona y hora. <b>Crítica y falla cerrada</b> (SEG-26): un dato personal no se sirve sin contador; sin el almacén, la lectura con contacto no se sirve.</summary>
+    public static PoliticaDeLimite LecturasDelContactoDePedidosPorPersona { get; } = new(
+        "lecturas-del-contacto-de-pedidos-por-persona", 200, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Usuario);
+
+    /// <summary>La ráfaga de avisos de la pasarela de pagos (PAG-05, SEG-05): 120 por origen y minuto, antes de verificar la firma, para que una entrada pública no pueda agotar el cómputo. Con el almacén caído cae al límite local (SEG-26); el aviso legítimo se reintenta.</summary>
+    public static PoliticaDeLimite AvisosDeLaPasarelaPorOrigen { get; } = new(
+        "avisos-de-la-pasarela-por-origen", 120, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true);
+
     /// <summary>Tope previo barato por huella de origen, antes de autenticar: 600 por minuto (el bucket del origen desconocido tiene el suyo).</summary>
     public static PoliticaDeLimite SolicitudesPreviasPorOrigen { get; } = new(
         "solicitudes-previas-por-origen", 600, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true);
@@ -116,7 +144,8 @@ public static class PoliticasDeSeguridad
     /// <summary>Límites generales de uso: con el almacén caído caen al límite local por instancia (SEG-26), a diferencia de los críticos de <see cref="Todas"/>.</summary>
     public static IReadOnlyList<PoliticaDeLimite> Generales { get; } =
         [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen, ConsultasDeHojasPorUsuario,
-         CarritosDeVisitantePorOrigen, EdicionDeLineasPorCuenta, EdicionDeLineasPorOrigen, RevisionDelCheckoutPorCuenta, VolverOReiniciarPorCuenta];
+         CarritosDeVisitantePorOrigen, EdicionDeLineasPorCuenta, EdicionDeLineasPorOrigen, RevisionDelCheckoutPorCuenta, VolverOReiniciarPorCuenta,
+         ConsultasDeEnviosPorUsuario, OperacionesDeEnviosPorUsuario, GuiasAlOperador, AvisosDeLaPasarelaPorOrigen, ConsultasDePedidosPorUsuario, GestionDePedidosPorUsuario];
 
     public static IReadOnlyList<PoliticaDeLimite> Todas { get; } =
     [
@@ -134,5 +163,6 @@ public static class PoliticasDeSeguridad
         CobrosPorCuenta,
         CobrosPorOrigen,
         PasosAlPagoPorCuenta,
+        LecturasDelContactoDePedidosPorPersona,
     ];
 }

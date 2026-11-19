@@ -13,7 +13,7 @@ internal sealed record DatosParaElAviso(string NumeroDePedido, Guid CuentaId);
 /// <c>envio:&lt;envioId&gt;:&lt;estado&gt;:cliente</c>, el destinatario por la referencia opaca de la cuenta y una plantilla de campos cerrados (número del pedido, número de guía y estado; <b>ningún dato de
 /// contacto</b>). Envíos no avisa en entregado ni en cancelado (el aviso es el de línea de Pedidos). El Notificador nunca interrumpe la operación: una falla deja el aviso sin crear y el estado cambia igual.
 /// </summary>
-internal sealed class AvisosDeEnvios(INotificador notificador, IPedidosParaEnvios pedidos)
+internal sealed class AvisosDeEnvios(INotificador notificador, IPedidosParaEnvios pedidos, IPublicadorDeAlertasTecnicas alertas, IReloj reloj)
 {
     public const string Plantilla = "envio-guia";
 
@@ -35,7 +35,7 @@ internal sealed class AvisosDeEnvios(INotificador notificador, IPedidosParaEnvio
     {
         try
         {
-            await notificador.Solicitar(
+            var resultado = await notificador.Solicitar(
                 new SolicitudDeAviso(
                     $"envio:{envio.Id}:{estado}:cliente",
                     DestinatarioDelAviso.Cliente,
@@ -48,6 +48,12 @@ internal sealed class AvisosDeEnvios(INotificador notificador, IPedidosParaEnvio
                         ["estado"] = estado,
                     }),
                 cancelacion).ConfigureAwait(false);
+
+            if (resultado == ResultadoDeLaSolicitudDeAviso.Rechazado)
+            {
+                // La plantilla o los campos no son válidos: es un defecto de programación que debe verse (la operación sigue).
+                await alertas.Publicar(new AlertaTecnica(ClavesDeEnvios.AlertaAvisoRechazado, reloj.Ahora), cancelacion).ConfigureAwait(false);
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

@@ -1,0 +1,110 @@
+@model BabelHub.Ecommerce.Api.Areas.Sucursal.Controllers.ListaDeEnviosVista
+<div class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+        <h1 class="bh-display">Envíos</h1>
+        <p class="mt-2 max-w-2xl opacity-80">Pide la guía al operador, pasa el envío a reparto cuando el Inventario descuenta los libros y márcalo entregado. Aquí no se muestran los datos de contacto del cliente.</p>
+    </div>
+</div>
+
+<nav class="mt-6 flex flex-wrap gap-2" aria-label="Filtrar por estado">
+    <a class="btn btn-sm @(Model.Filtro is null ? "btn-primary" : "btn-ghost")" href="/logistica/envios" aria-current="@(Model.Filtro is null ? "page" : null)">Todos</a>
+    @foreach (var filtro in Model.Filtros)
+    {
+        <a class="btn btn-sm @(Model.Filtro == filtro.Clave ? "btn-primary" : "btn-ghost")" href="/logistica/envios?estado=@filtro.Clave" aria-current="@(Model.Filtro == filtro.Clave ? "page" : null)">@filtro.Texto</a>
+    }
+</nav>
+
+@if (Model.Aviso is not null)
+{
+    <div class="alert alert-success mt-4" role="status"><bh-icono nombre="exito" /><span>@Model.Aviso</span></div>
+}
+
+<div class="mt-4" aria-live="polite">
+    @if (Model.Estado is not null)
+    {
+        <vc:bh-estado modelo="@Model.Estado" />
+    }
+    else
+    {
+        <p class="mb-2 text-sm opacity-80">@Model.Total @(Model.Total == 1 ? "envío" : "envíos")</p>
+        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+            <table class="table">
+                <caption class="sr-only">Envíos con su estado, su guía, su operador y la acción que sigue</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Envío</th>
+                        <th scope="col">Origen</th>
+                        <th scope="col">Estado</th>
+                        <th scope="col">Guía</th>
+                        <th scope="col">Fechas</th>
+                        <th scope="col"><span class="sr-only">Acción</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var envio in Model.Envios)
+                    {
+                        <tr id="envio-@envio.Id.ToString("N")">
+                            <th scope="row" class="align-top font-normal">
+                                <div class="font-mono text-sm">@envio.IdCorto</div>
+                                <div class="text-xs opacity-70">Pedido <span class="font-mono">@envio.PedidoCorto</span> · @envio.Lineas @(envio.Lineas == 1 ? "línea" : "líneas")</div>
+                            </th>
+                            <td class="align-top text-sm">@envio.Fuente</td>
+                            <td class="align-top"><span class="bh-chip"><bh-icono nombre="@envio.EstadoIcono" clase="size-3.5" />@envio.EstadoTexto</span></td>
+                            <td class="align-top text-sm">
+                                @if (envio.Guia is not null)
+                                {
+                                    <div class="font-mono">@envio.Guia</div>
+                                    <div class="text-xs opacity-70">@envio.Operador</div>
+                                }
+                                else
+                                {
+                                    <span class="opacity-60">Sin guía</span>
+                                }
+                            </td>
+                            <td class="align-top text-xs">
+                                <div>Creado: @envio.CreadoTexto</div>
+                                @if (envio.UltimaFechaTexto is not null)
+                                {
+                                    <div>Última: @envio.UltimaFechaTexto</div>
+                                }
+                            </td>
+                            <td class="whitespace-nowrap text-right align-top">
+                                @if (envio.Accion is { } accion)
+                                {
+                                    <bh-accion-de-cambio>
+                                    <form method="post" action="@accion.Ruta">
+                                        <partial name="_TokenAntifalsificacion" />
+                                        <button type="submit" class="btn btn-sm btn-primary" aria-label="@accion.Texto del envío @envio.IdCorto"><bh-icono nombre="@accion.Icono" clase="size-4" />@accion.Texto</button>
+                                    </form>
+                                    </bh-accion-de-cambio>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (Model.TotalDePaginas > 1)
+        {
+            <nav class="mt-4 flex items-center justify-between gap-3" aria-label="Paginación">
+                @if (Model.Pagina > 1)
+                {
+                    <a class="btn btn-sm" rel="prev" href="@Model.RutaDeLaPagina(Model.Pagina - 1)">Anterior</a>
+                }
+                else
+                {
+                    <span></span>
+                }
+                <span class="text-sm">Página @Model.Pagina de @Model.TotalDePaginas</span>
+                @if (Model.Pagina < Model.TotalDePaginas)
+                {
+                    <a class="btn btn-sm" rel="next" href="@Model.RutaDeLaPagina(Model.Pagina + 1)">Siguiente</a>
+                }
+                else
+                {
+                    <span></span>
+                }
+            </nav>
+        }
+    }
+</div>

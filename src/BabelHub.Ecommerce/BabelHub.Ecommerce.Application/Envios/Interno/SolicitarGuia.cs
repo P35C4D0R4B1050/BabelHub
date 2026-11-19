@@ -13,6 +13,7 @@ namespace BabelHub.Ecommerce.Application.Envios.Interno;
 /// </summary>
 internal sealed class SolicitarGuia(
     AutorizadorDeEnvios autorizador,
+    LimitesDeEnvios limites,
     IRepositorioDeEnvios envios,
     IContactoDeEntregaDelPedido contactos,
     IOperadorLogistico operador,
@@ -29,6 +30,11 @@ internal sealed class SolicitarGuia(
             return FallosDeEnvios.Fallo<DetalleDeEnvio>(rechazo);
         }
 
+        if (await limites.Operacion(cancelacion).ConfigureAwait(false) is { } excedido)
+        {
+            return FallosDeEnvios.Fallo<DetalleDeEnvio>(excedido);
+        }
+
         try
         {
             // (1) Sin bloqueo: solo para saber el pedido y rechazar pronto lo que no se puede pedir.
@@ -41,6 +47,12 @@ internal sealed class SolicitarGuia(
             if (inicial.Estado != EstadoDeEnvio.PendienteDeGuia)
             {
                 return FallosDeEnvios.De<DetalleDeEnvio>(CategoriaDeError.Conflicto, ClavesDeEnvios.EstadoInvalido);
+            }
+
+            // El tope de solicitudes de guía al operador (30 por minuto en total): se reserva antes de leer el contacto personal y de fijar nada.
+            if (await limites.GuiaAlOperador(cancelacion).ConfigureAwait(false) is { } sobreCarga)
+            {
+                return FallosDeEnvios.Fallo<DetalleDeEnvio>(sobreCarga);
             }
 
             // (2) El contacto, antes de fijar clave ni arrendamiento y fuera de toda transacción (ENV-10).
@@ -133,20 +145,12 @@ internal sealed class SolicitarGuia(
                         }
 
                         var anterior = envio.Estado;
-                        switch (envio.RegistrarGuia(creada.Numero, operador.Nombre, reloj.Ahora))
+                        var registro = envio.RegistrarGuia(creada.Numero, operador.Nombre, reloj.Ahora);
+                        switch (registro)
                         {
                             case ResultadoDeRegistroDeGuia.Registrada:
                                 await auditoria.Registrar(
-                                    new SolicitudDeRegistro(AccionesAuditables.EstadoDeEnvioCambiado)
-                                    {
-                                        ObjetoTipo = "envio",
-                                        ObjetoId = envio.Id.ToString(),
-                                        Detalle = new Dictionary<string, string?>
-                                        {
-                                            ["estadoAnterior"] = anterior.Codigo(),
-                                            ["estadoNuevo"] = EstadoDeEnvio.GuiaGenerada.Codigo(),
-                                        },
-                                    },
+                                    AuditoriaDeEnvios.Cambio(envio, anterior, EstadoDeEnvio.GuiaGenerada),
                                     token).ConfigureAwait(false);
                                 await avisos.Solicitar(envio, datosDelAviso.Valor, AvisosDeEnvios.EstadoGuiaGenerada, token).ConfigureAwait(false);
                                 await envios.Guardar(envio, token).ConfigureAwait(false);
@@ -158,7 +162,7 @@ internal sealed class SolicitarGuia(
 
                             case ResultadoDeRegistroDeGuia.OtroNumero:
                             case ResultadoDeRegistroDeGuia.GuiaSinUso:
-                                await alertas.Publicar(new AlertaTecnica(ClavesDeEnvios.MotivoDeAlertaDeDependencia, reloj.Ahora), token).ConfigureAwait(false);
+                                await alertas.Publicar(new AlertaTecnica(registro == ResultadoDeRegistroDeGuia.OtroNumero ? ClavesDeEnvios.AlertaGuiaRepetida : ClavesDeEnvios.AlertaGuiaSinUso, reloj.Ahora), token).ConfigureAwait(false);
                                 return FallosDeEnvios.De<DetalleDeEnvio>(CategoriaDeError.Conflicto, ClavesDeEnvios.EstadoInvalido);
 
                             default:
@@ -166,6 +170,21 @@ internal sealed class SolicitarGuia(
                         }
                     },
                     cancelacion).ConfigureAwait(false);
+            }
+            catch (GuiaRepetidaException)
+            {
+                // El operador devolvió el número de otro envío (ENV-04): alerta técnica sin el número y reintento; nunca se ve la guía de otro pedido.
+                await LiberarElArrendamiento(envioId).ConfigureAwait(false);
+                try
+                {
+                    await alertas.Publicar(new AlertaTecnica(ClavesDeEnvios.AlertaGuiaRepetida, reloj.Ahora), CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // Una alerta que no se publica nunca interrumpe la operación.
+                }
+
+                return FallosDeEnvios.De<DetalleDeEnvio>(CategoriaDeError.NoDisponible, ClavesDeEnvios.OperadorNoDisponible);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

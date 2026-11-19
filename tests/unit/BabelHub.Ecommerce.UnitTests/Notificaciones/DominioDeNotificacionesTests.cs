@@ -237,14 +237,50 @@ public sealed class DominioDeNotificacionesTests
         Assert.Equivalent(
             new[]
             {
-                "pedido-confirmado", "pedido-en-preparacion", "pedido-en-transito", "pedido-listo-para-recojo", "pedido-entregado", "pedido-no-recogido", "pago-pendiente", "pago-resultado", "pedido-anulado",
-                "reembolso-automatico", "guia-de-envio", "libro-digital-disponible", "devolucion-estado", "traslado-estado",
+                "pedido-confirmado", "pedido-estado", "pedido-estado-sucursal", "pedido-en-preparacion", "pedido-en-transito", "pedido-listo-para-recojo", "pedido-entregado", "pedido-no-recogido", "pago-pendiente", "pago-resultado", "pedido-anulado",
+                "reembolso-automatico", "envio-guia", "libro-digital-disponible", "devolucion-estado", "traslado-estado",
             },
             claves);
         Assert.Null(CatalogoDePlantillas.Obtener("promocion-de-navidad"));
         Assert.True(CatalogoDePlantillas.EsDeTraslado("traslado-estado"));
         Assert.False(CatalogoDePlantillas.EsDeTraslado("pedido-confirmado"));
         Assert.Equal(TipoDeDestinatario.Sucursal, CatalogoDePlantillas.Obtener("traslado-estado")!.Destinatario);
+    }
+
+    [Theory]
+    [InlineData("pedido-estado", TipoDeDestinatario.Cliente)]
+    [InlineData("pedido-estado-sucursal", TipoDeDestinatario.Sucursal)]
+    [Trait("Criterio", "AC-NOT-01")]
+    public void LasPlantillasDeEstadoDePedido_TienenUnSoloTipoDeDestinatario_YAceptanSoloElNumeroYUnEstadoDeLaListaCerrada(string clave, TipoDeDestinatario destinatario)
+    {
+        var plantilla = CatalogoDePlantillas.Obtener(clave)!;
+        var valido = new Dictionary<string, string> { ["numeroDePedido"] = "BH-000123", ["estado"] = "listo-para-recojo" };
+
+        Assert.Equal(destinatario, plantilla.Destinatario);
+        Assert.Equal(["numeroDePedido", "estado"], plantilla.Campos.Select(c => c.Nombre));
+        Assert.All(new[] { "confirmado", "en-transito", "recibido", "en-preparacion", "listo-para-recojo", "despachado", "entregado", "no-recogido", "anulado" }, estado =>
+            Assert.True(plantilla.Validar(new Dictionary<string, string>(valido) { ["estado"] = estado }).EsValido, estado));
+        Assert.Equal("valor-fuera-de-la-lista", plantilla.Validar(new Dictionary<string, string>(valido) { ["estado"] = "devuelto" }).Motivo);
+        Assert.Equal("campo-fuera-del-catalogo", plantilla.Validar(new Dictionary<string, string>(valido) { ["nombre"] = "Ana" }).Motivo);
+        Assert.Equal("obligatorio", plantilla.Validar(new Dictionary<string, string> { ["numeroDePedido"] = "BH-000123" }).Motivo);
+        Assert.Equal("valor-prohibido", plantilla.Validar(new Dictionary<string, string>(valido) { ["numeroDePedido"] = "https://malo.example" }).Motivo);
+    }
+
+    [Theory]
+    [InlineData("guia-generada")]
+    [InlineData("en-reparto")]
+    [Trait("Criterio", "AC-NOT-06")]
+    public void LaPlantillaEnvioGuia_AceptaLosCamposQueArmaEnvios_YRechazaUnaGuiaConEnlaceOUnEstadoAjeno(string estado)
+    {
+        var plantilla = CatalogoDePlantillas.Obtener("envio-guia")!;
+        var envios = new Dictionary<string, string> { ["numeroDePedido"] = "BH-000123", ["numeroDeGuia"] = "OLVA-20261119-0042", ["estado"] = estado };
+        Assert.True(plantilla.Validar(new Dictionary<string, string>(envios) { ["numeroDeGuia"] = "20261119004212345678" }).EsValido);
+
+        Assert.True(plantilla.Validar(envios).EsValido);
+        Assert.Equal(TipoDeDestinatario.Cliente, plantilla.Destinatario);
+        Assert.False(plantilla.Validar(new Dictionary<string, string>(envios) { ["numeroDeGuia"] = "https://operador.example/guia" }).EsValido);
+        Assert.False(plantilla.Validar(new Dictionary<string, string>(envios) { ["estado"] = "entregado" }).EsValido);
+        Assert.False(plantilla.Validar(new Dictionary<string, string> { ["numeroDePedido"] = "BH-000123", ["estado"] = estado }).EsValido);
     }
 
     [Fact]

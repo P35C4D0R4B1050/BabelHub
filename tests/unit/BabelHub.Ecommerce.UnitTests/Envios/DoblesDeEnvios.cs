@@ -31,6 +31,9 @@ internal sealed class RepositorioDeEnviosEnMemoria : IRepositorioDeEnvios, IInst
     /// <summary>El próximo guardado falla como un error inesperado de la base (y se rearma solo).</summary>
     public bool FallaAlGuardarElSiguiente { get; set; }
 
+    /// <summary>El próximo guardado de un envío con guía falla como el único (operador, numero_de_guia) de la base.</summary>
+    public bool GuiaRepetidaAlGuardar { get; set; }
+
     public int Operaciones { get; private set; }
 
     public int LecturasConBloqueo { get; private set; }
@@ -135,6 +138,12 @@ internal sealed class RepositorioDeEnviosEnMemoria : IRepositorioDeEnvios, IInst
     {
         Comprobar();
         _guardados++;
+        if (GuiaRepetidaAlGuardar && envio.NumeroDeGuia is not null)
+        {
+            GuiaRepetidaAlGuardar = false;
+            throw new GuiaRepetidaException("guia-repetida");
+        }
+
         if (FallaAlGuardarElSiguiente)
         {
             FallaAlGuardarElSiguiente = false;
@@ -456,4 +465,48 @@ internal sealed class NotificadorDeEnviosEspia(UnidadDeTrabajoReversible unidad)
         Solicitudes.Add(solicitud);
         return Task.FromResult(Resultado);
     }
+}
+
+/// <summary>Los límites de uso de Envíos en memoria: un tope configurable por política, con registro de lo reservado y un almacén que puede estar caído (falla cerrado).</summary>
+internal sealed class LimitesDeEnviosDoble : BabelHub.Ecommerce.Application.Plataforma.IControlDeLimites
+{
+    private readonly Dictionary<string, int> _usadas = [];
+
+    public Dictionary<string, int> Maximos { get; } = [];
+
+    public bool Caido { get; set; }
+
+    public List<(string Politica, string? Sujeto)> Reservas { get; } = [];
+
+    public int Usadas(string politica) => _usadas.GetValueOrDefault(politica);
+
+    public Task<BabelHub.Ecommerce.Application.Plataforma.ResultadoDeLimite> Reservar(
+        BabelHub.Ecommerce.Application.Plataforma.ClaveDePolitica politica,
+        string? sujeto = null,
+        string? claveDelLlamador = null,
+        BabelHub.Ecommerce.Application.Plataforma.HuellaDeSujeto? huellaDelLlamador = null,
+        BabelHub.Ecommerce.Application.Plataforma.ClaveDeIdempotencia? idempotencia = null,
+        CancellationToken cancelacion = default)
+    {
+        Reservas.Add((politica.Valor, sujeto));
+        if (Caido)
+        {
+            return Task.FromResult(BabelHub.Ecommerce.Application.Plataforma.ResultadoDeLimite.NoDisponible());
+        }
+
+        var usadas = _usadas.GetValueOrDefault(politica.Valor);
+        if (usadas >= Maximos.GetValueOrDefault(politica.Valor, int.MaxValue))
+        {
+            return Task.FromResult(BabelHub.Ecommerce.Application.Plataforma.ResultadoDeLimite.Excedido(politica.Valor, 30, DateTimeOffset.UtcNow.AddSeconds(30)));
+        }
+
+        _usadas[politica.Valor] = usadas + 1;
+        return Task.FromResult(BabelHub.Ecommerce.Application.Plataforma.ResultadoDeLimite.Permitido(new BabelHub.Ecommerce.Application.Plataforma.ReservaDeLimite(politica.Valor, "usuario", Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow)));
+    }
+
+    public Task Liberar(BabelHub.Ecommerce.Application.Plataforma.ReservaDeLimite reserva, CancellationToken cancelacion = default) => Task.CompletedTask;
+
+    public Task Completar(BabelHub.Ecommerce.Application.Plataforma.ReservaDeLimite reserva, BabelHub.Ecommerce.Application.Plataforma.ResultadoMinimo resultado, CancellationToken cancelacion = default) => Task.CompletedTask;
+
+    public Task Fallar(BabelHub.Ecommerce.Application.Plataforma.ReservaDeLimite reserva, CancellationToken cancelacion = default) => Task.CompletedTask;
 }

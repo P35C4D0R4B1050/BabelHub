@@ -178,6 +178,78 @@ public sealed class IntencionDePago
     }
 
     /// <summary>Una copia de la intención (para que las pruebas simulen la reversión de una transacción).</summary>
+    /// <summary>La reconstruye desde el almacén (la infraestructura): no valida ni calcula nada, devuelve exactamente lo que se guardó. Lo que se persiste de una intención desvinculada ya viene anulado.</summary>
+    public static IntencionDePago Rehidratar(
+        Guid id,
+        DateTimeOffset creadaEn,
+        Guid? cuentaId,
+        EstadoDeIntencion estado,
+        MotivoDeCierre? motivoDeCierre,
+        bool tieneImpresos,
+        TipoDeEntrega? tipoDeEntrega,
+        string? codigoDeSucursalDeRecojo,
+        string? regionDeEntrega,
+        Importe total,
+        Importe envio,
+        string? huellaDeInstantanea,
+        bool instantaneaObsoleta,
+        IReadOnlyList<LineaDeIntencion> lineas,
+        TextoAceptado? terminos,
+        TextoAceptado? privacidad,
+        TextoAceptado? reembolsoDigital,
+        ContactoDeEntrega? contacto,
+        DateTimeOffset? contactoLiberadoEn,
+        DateTimeOffset? desvinculadaEn,
+        DateTimeOffset iniciadaEn,
+        DateTimeOffset venceEn,
+        DateTimeOffset limitePendienteEn,
+        DateTimeOffset? reservaExpiraEn,
+        bool reservaExtendida,
+        DateTimeOffset? aprobadoEn,
+        DateTimeOffset? confirmacionIniciadaEn,
+        DateTimeOffset? reservasConfirmadasEn,
+        IReadOnlyList<ReservaConfirmadaDeLinea> lineasConfirmadas,
+        DateTimeOffset? reclamadaHasta,
+        DateTimeOffset? cerradaEn) =>
+        new(id, creadaEn)
+        {
+            CuentaId = cuentaId,
+            Estado = estado,
+            MotivoDeCierre = motivoDeCierre,
+            TieneImpresos = tieneImpresos,
+            TipoDeEntrega = tipoDeEntrega,
+            CodigoDeSucursalDeRecojo = codigoDeSucursalDeRecojo,
+            RegionDeEntrega = regionDeEntrega,
+            Total = total,
+            Envio = envio,
+            HuellaDeInstantanea = huellaDeInstantanea,
+            InstantaneaObsoleta = instantaneaObsoleta,
+            Lineas = lineas.ToArray(),
+            Terminos = terminos,
+            Privacidad = privacidad,
+            ReembolsoDigital = reembolsoDigital,
+            Contacto = contacto,
+            ContactoLiberadoEn = contactoLiberadoEn,
+            DesvinculadaEn = desvinculadaEn,
+            IniciadaEn = iniciadaEn,
+            VenceEn = venceEn,
+            LimitePendienteEn = limitePendienteEn,
+            ReservaExpiraEn = reservaExpiraEn,
+            ReservaExtendida = reservaExtendida,
+            AprobadoEn = aprobadoEn,
+            ConfirmacionIniciadaEn = confirmacionIniciadaEn,
+            ReservasConfirmadasEn = reservasConfirmadasEn,
+            LineasConfirmadas = lineasConfirmadas.ToArray(),
+            ReclamadaHasta = reclamadaHasta,
+            CerradaEn = cerradaEn,
+        };
+
+    private IntencionDePago(Guid id, DateTimeOffset creadaEn)
+    {
+        Id = id;
+        CreadaEn = creadaEn;
+    }
+
     internal IntencionDePago Copiar() => (IntencionDePago)MemberwiseClone();
 
     public bool EsDeLaCuenta(Guid cuentaId) => cuentaId != Guid.Empty && CuentaId == cuentaId;

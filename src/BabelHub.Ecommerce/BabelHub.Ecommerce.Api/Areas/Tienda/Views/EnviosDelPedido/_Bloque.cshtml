@@ -1,0 +1,34 @@
+@model BabelHub.Ecommerce.Api.Areas.Tienda.Controllers.EnviosDelPedidoVista
+<section aria-labelledby="envio-titulo" aria-live="polite">
+    <h2 id="envio-titulo" class="text-lg font-semibold">Envío</h2>
+    @if (Model.Estado is not null)
+    {
+        <div class="mt-3"><vc:bh-estado modelo="@Model.Estado" /></div>
+    }
+    else
+    {
+        <ul class="mt-3 grid gap-3">
+            @foreach (var envio in Model.Envios)
+            {
+                <li class="rounded-box border border-base-300 bg-base-100 p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <span class="bh-chip"><bh-icono nombre="@envio.EstadoIcono" clase="size-3.5" />@envio.EstadoTexto</span>
+                        <span class="text-xs opacity-70">Despacha desde: @envio.Origen</span>
+                    </div>
+                    @if (envio.Mensaje is not null)
+                    {
+                        <p class="mt-2 text-sm">@envio.Mensaje</p>
+                    }
+                    @if (envio.Guia is not null)
+                    {
+                        <p class="mt-2 text-sm">Guía <span class="font-mono">@envio.Guia</span>@(envio.Operador is not null ? $" · {envio.Operador}" : string.Empty)</p>
+                    }
+                    @if (envio.EntregadoTexto is not null)
+                    {
+                        <p class="mt-1 text-sm">Entregado el @envio.EntregadoTexto (hora de Lima).</p>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</section>

@@ -141,6 +141,9 @@ internal interface IRepositorioDePagos
 
     Task<IntentoDeCobro?> ObtenerIntentoActivo(Guid intencionId, CancellationToken cancelacion = default);
 
+    /// <summary>El intento más reciente de la intención (por su inicio), activo o no: lo que la pantalla de estado usa para el último motivo de rechazo.</summary>
+    Task<IntentoDeCobro?> ObtenerUltimoIntento(Guid intencionId, CancellationToken cancelacion = default);
+
     Task<ResultadoDeAgregarIntento> AgregarIntento(IntentoDeCobro intento, CancellationToken cancelacion = default);
 
     Task GuardarIntento(IntentoDeCobro intento, CancellationToken cancelacion = default);
@@ -196,6 +199,9 @@ internal interface IRepositorioDePagos
     Task<IReadOnlyList<AvisoDePago>> ListarAvisosDePagoListos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default);
 
     Task GuardarAvisoDePago(AvisoDePago aviso, CancellationToken cancelacion = default);
+
+    /// <summary>Borra los avisos de pago y los avisos a Carrito creados antes de <paramref name="corte"/> (hasta <paramref name="limite"/> de cada tabla); devuelve cuántos borró en total.</summary>
+    Task<int> PurgarAvisosAnterioresA(DateTimeOffset corte, int limite, CancellationToken cancelacion = default);
 }
 
 /// <summary>Los reembolsos de toda la plataforma (D08): clave natural única por origen.</summary>

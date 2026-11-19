@@ -48,8 +48,27 @@ internal static class ClavesDeEnvios
     /// <summary>El motivo cerrado de la alerta técnica de Auditoría para una dependencia que falla (copia del valor del catálogo: un módulo no referencia el interior de otro).</summary>
     public const string MotivoDeAlertaDeDependencia = "dependencia-no-necesaria-fallida";
 
+    /// <summary>Los motivos cerrados de alerta propios de Envíos (catálogo de Auditoría; copiados como constantes porque un módulo no referencia el interior de otro).</summary>
+    public const string AlertaAvisoRechazado = "envio-aviso-rechazado";
+
+    public const string AlertaGuiaRepetida = "envio-guia-repetida";
+
+    public const string AlertaProgresoSinInformar = "envio-progreso-sin-informar";
+
+    public const string AlertaGuiaSinUso = "envio-guia-sin-uso";
+
     /// <summary><c>ECO-ENV-INVENTARIO-RECHAZO</c> (409): el Inventario rechazó el descuento con un rechazo de negocio; el envío sigue en guía generada y no se descontó ninguna línea (ENV-12).</summary>
     public const string InventarioRechazo = "inventario-rechazo";
+
+    /// <summary><c>ECO-LIMITE-EXCEDIDO</c> (429): el campo <c>espera-en-segundos</c> lleva el tiempo sugerido para el <c>Retry-After</c>.</summary>
+    public const string LimiteExcedido = "limite-excedido";
+
+    public const string EsperaEnSegundos = "espera-en-segundos";
+
+    /// <summary>El motivo del límite (la política que se excedió, del catálogo cerrado) y el instante de nueva disponibilidad: SEG-07 los exige en la respuesta única.</summary>
+    public const string Motivo = "motivo";
+
+    public const string DisponibleDesde = "disponibleDesde";
 }
 
 internal static class FallosDeEnvios

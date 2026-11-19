@@ -137,7 +137,9 @@ public sealed partial class PlantillaDeAviso
 
         // Un identificador o un número de pedido puede llevar muchos dígitos (un GUID, una guía): solo se rechaza si es todo dígitos y separadores (parece una tarjeta), no por las rachas de un valor mixto.
         var esIdentificador = campo.Tipo is TipoDeCampo.Identificador or TipoDeCampo.NumeroDePedido;
-        var parecenDigitos = esIdentificador ? SoloDigitosYSeparadores().IsMatch(valor) && DigitosSeguidos().IsMatch(valor) : DigitosSeguidos().IsMatch(valor);
+        var esGuia = campo.Nombre == "numeroDeGuia";
+        // El número de guía de un operador puede ser solo de dígitos y largo (13 o más): la heurística de tarjeta no le aplica; su forma cerrada (ASCII, hasta 40) y la ausencia de enlaces bastan.
+        var parecenDigitos = !esGuia && (esIdentificador ? SoloDigitosYSeparadores().IsMatch(valor) && DigitosSeguidos().IsMatch(valor) : DigitosSeguidos().IsMatch(valor));
         if (ParecenEnlaceODireccion().IsMatch(valor) || parecenDigitos)
         {
             return "valor-prohibido";
@@ -190,7 +192,7 @@ public sealed partial class PlantillaDeAviso
 
 /// <summary>
 /// El catálogo cerrado de plantillas (NOT-02, NOT-07): <b>solo los eventos notificables</b> de la spec —el pedido confirmado, en preparación, en tránsito, listo para recojo, entregado y no recogido, el pago pendiente y su
-/// resultado, la anulación o cancelación de un pedido, el reembolso automático, la guía de envío, el libro digital disponible y los cambios de estado de un traslado y de una devolución—; no hay forma de crear una
+/// resultado, la anulación o cancelación de un pedido, el reembolso automático, la guía de envío (`envio-guia`, con el número de guía), el libro digital disponible y los cambios de estado de un traslado y de una devolución—; no hay forma de crear una
 /// plantilla de publicidad. Ningún campo lleva texto libre, un enlace, un dato de pago ni un código de uso único.
 /// </summary>
 public static class CatalogoDePlantillas
@@ -201,9 +203,18 @@ public static class CatalogoDePlantillas
 
     private static IReadOnlySet<string> Lista(params string[] valores) => new HashSet<string>(valores, StringComparer.Ordinal);
 
+    /// <summary>Los estados de un pedido que Pedidos avisa (PED-05, PED-06): la lista cerrada de su máquina de estados.</summary>
+    private static readonly CampoDePlantilla EstadoDelPedido = new(
+        "estado",
+        TipoDeCampo.Enumeracion,
+        20,
+        new HashSet<string>(["confirmado", "en-transito", "recibido", "en-preparacion", "listo-para-recojo", "despachado", "entregado", "no-recogido", "anulado"], StringComparer.Ordinal));
+
     public static IReadOnlyList<PlantillaDeAviso> Todas { get; } =
     [
         PlantillaDeAviso.Crear("pedido-confirmado", TipoDeDestinatario.Cliente, 1, Pedido, Nombre),
+        PlantillaDeAviso.Crear("pedido-estado", TipoDeDestinatario.Cliente, 1, Pedido, EstadoDelPedido),
+        PlantillaDeAviso.Crear("pedido-estado-sucursal", TipoDeDestinatario.Sucursal, 1, Pedido, EstadoDelPedido),
         PlantillaDeAviso.Crear("pedido-en-preparacion", TipoDeDestinatario.Cliente, 1, Pedido, Nombre),
         PlantillaDeAviso.Crear("pedido-en-transito", TipoDeDestinatario.Cliente, 1, Pedido, Nombre),
         PlantillaDeAviso.Crear("pedido-listo-para-recojo", TipoDeDestinatario.Cliente, 1, Pedido, Nombre, new CampoDePlantilla("sucursal", TipoDeCampo.CodigoDeSucursal, 16, Obligatorio: false)),
@@ -213,7 +224,7 @@ public static class CatalogoDePlantillas
         PlantillaDeAviso.Crear("pago-resultado", TipoDeDestinatario.Cliente, 1, Pedido, new CampoDePlantilla("resultado", TipoDeCampo.Enumeracion, 12, Lista("aprobado", "rechazado")), Nombre),
         PlantillaDeAviso.Crear("pedido-anulado", TipoDeDestinatario.Cliente, 1, Pedido, new CampoDePlantilla("motivo", TipoDeCampo.Enumeracion, 12, Lista("anulado", "cancelado")), Nombre),
         PlantillaDeAviso.Crear("reembolso-automatico", TipoDeDestinatario.Cliente, 1, Pedido, Nombre),
-        PlantillaDeAviso.Crear("guia-de-envio", TipoDeDestinatario.Cliente, 1, Pedido, new CampoDePlantilla("estado", TipoDeCampo.Enumeracion, 16, Lista("guia-generada", "en-reparto")), Nombre),
+        PlantillaDeAviso.Crear("envio-guia", TipoDeDestinatario.Cliente, 1, Pedido, new CampoDePlantilla("numeroDeGuia", TipoDeCampo.Identificador, 40), new CampoDePlantilla("estado", TipoDeCampo.Enumeracion, 16, Lista("guia-generada", "en-reparto")), Nombre),
         PlantillaDeAviso.Crear("libro-digital-disponible", TipoDeDestinatario.Cliente, 1, Pedido, Nombre),
         PlantillaDeAviso.Crear(
             "devolucion-estado",
