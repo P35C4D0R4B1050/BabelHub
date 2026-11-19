@@ -197,6 +197,7 @@ public static class ComposicionDeIdentidad
         servicios.Replace(ServiceDescriptor.Scoped<IEstadoDeCuentaDeLaWeb, EstadoDeCuentaDeLaWebSobreIdentidad>());
         servicios.Replace(ServiceDescriptor.Scoped<IAceptacionDeTextosEnIdentidad, AceptacionDeTextosSobreIdentidad>());
         servicios.Replace(ServiceDescriptor.Scoped<ISesionesDeIdentidad, SesionesDeIdentidadParaLaWeb>());
+        servicios.TryAddScoped<IContextoDelAsistente, ContextoDelAsistenteDeLaWeb>();
 
         // ---------- Códigos en segundo plano: solo en el modo normal ----------
         if (soloEnModoNormal)
