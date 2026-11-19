@@ -29,7 +29,9 @@ public sealed class PagoController(IPagos pagos, ICheckoutDelCliente checkout, C
 
     // ---------- Mostrar el pago ----------
 
+    // La pasarela solo se abre en la ruta exacta del pago (WEB-18): la política de contenido lo lee de este atributo.
     [HttpGet("/checkout/pago")]
+    [PoliticaDeContenido(ContenidoDeTerceros.Pasarela)]
     public async Task<IActionResult> Index([FromQuery] string? pedidoId, CancellationToken cancelacion)
     {
         if (await EntradasHttpDelCarrito.RechazarConsulta(HttpContext, ["pedidoId"]) is { } consulta)

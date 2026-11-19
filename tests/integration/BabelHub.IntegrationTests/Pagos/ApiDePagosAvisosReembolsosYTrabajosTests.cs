@@ -178,6 +178,7 @@ public sealed class ApiDePagosAvisosReembolsosYTrabajosTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PAG-17")]
     public async Task Reintentar_un_reembolso_llama_a_Pagos_y_vuelve_a_la_lista_y_un_rol_sin_permiso_recibe_403()
     {
         await using var host = await PagosApiHost.Crear();

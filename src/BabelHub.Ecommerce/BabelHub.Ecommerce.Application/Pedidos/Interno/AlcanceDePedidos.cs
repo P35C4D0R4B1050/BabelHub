@@ -30,6 +30,9 @@ internal static class ClavesDePedidos
     public const string SinLineasAnulables = "pedido-sin-lineas-anulables";
     public const string TextosPendientes = "textos-pendientes";
     public const string Conflicto = "conflicto";
+
+    /// <summary>Otra instancia o la reanudación ya resolvió la operación en curso: no se aplica de nuevo (se traduce como <c>conflicto</c>).</summary>
+    public const string OperacionYaResuelta = "operacion-ya-resuelta";
     public const string ServicioNoDisponible = "servicio-no-disponible";
     public const string LimiteExcedido = "limite-excedido";
 }

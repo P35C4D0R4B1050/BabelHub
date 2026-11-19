@@ -80,12 +80,30 @@ internal sealed class EntregarLineasDelPedido(
         // Tiempo 3.
         try
         {
-            return await unidad.Ejecutar(token => CompletarLaEntrega(entrega, quien.Valor, token), cancelacion).ConfigureAwait(false);
+            return await unidad.Ejecutar(token => CompletarLaEntrega(entrega, token), cancelacion).ConfigureAwait(false);
         }
         catch (Exception excepcion) when (excepcion is AuditoriaNoDisponibleException or EsperaDeBloqueoDeUnPedidoAgotadaException)
         {
             // El tiempo 3 se revirtió: la fila sigue en curso con el cierre confirmado y la reanudación repite solo lo local.
             return Resultado<LineasOperadas>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDePedidos.ServicioNoDisponible));
+        }
+    }
+
+    /// <summary>
+    /// La reanudación (T22): repite <b>solo el tiempo 3</b> de una entrega en curso (nunca <c>cerrar</c>) para las líneas con el cierre ya confirmado. La ejecuta el trabajo de «sistema», así que la auditoría la registra el sistema con el iniciador guardado en la fila en <c>iniciadaPor</c> (nunca se reconstruye un actor de persona).
+    /// Cualquier falla (auditoría, bloqueo u otra) deja la fila en curso para reintentarla; si otra instancia ya la resolvió, lo dice para no tocarla.
+    /// </summary>
+    public async Task<ResultadoDeReanudarEntrega> Reanudar(Entrega entrega, CancellationToken cancelacion)
+    {
+        ArgumentNullException.ThrowIfNull(entrega);
+        try
+        {
+            var resultado = await unidad.Ejecutar(token => CompletarLaEntrega(entrega, token), cancelacion).ConfigureAwait(false);
+            return resultado.EsExito ? ResultadoDeReanudarEntrega.Aplicada : resultado.Error!.Clave == ClavesDePedidos.OperacionYaResuelta ? ResultadoDeReanudarEntrega.YaResuelta : ResultadoDeReanudarEntrega.Reintentar;
+        }
+        catch (Exception excepcion) when (excepcion is not OperationCanceledException)
+        {
+            return ResultadoDeReanudarEntrega.Reintentar;
         }
     }
 
@@ -128,11 +146,24 @@ internal sealed class EntregarLineasDelPedido(
         return Resultado<Entrega>.Exito(entrega);
     }
 
+    /// <summary>El contrato dice que una falla del Inventario nunca es una excepción; si un adaptador la lanza igual, se trata como un resultado incierto (reintentable con la misma clave).</summary>
+    private async Task<ResultadoDeCerrarReserva> Cerrar(Guid pedidoId, LineaDeEntrega linea, CancellationToken cancelacion)
+    {
+        try
+        {
+            return await reservas.Cerrar(pedidoId, linea.LineaId, linea.ClaveDeCierre, cancelacion).ConfigureAwait(false);
+        }
+        catch (Exception excepcion) when (excepcion is not OperationCanceledException)
+        {
+            return ResultadoDeCerrarReserva.Incierto;
+        }
+    }
+
     private async Task<ErrorDeAplicacion?> CerrarCadaLinea(Entrega entrega, CancellationToken cancelacion)
     {
         foreach (var linea in entrega.Lineas.ToList())
         {
-            var resultado = await reservas.Cerrar(entrega.PedidoId, linea.LineaId, linea.ClaveDeCierre, cancelacion).ConfigureAwait(false);
+            var resultado = await Cerrar(entrega.PedidoId, linea, cancelacion).ConfigureAwait(false);
             var confirmado = resultado switch
             {
                 ResultadoDeCerrarReserva.Cerrada => ResultadoDelCierre.Cerrada,
@@ -176,10 +207,17 @@ internal sealed class EntregarLineasDelPedido(
         return null;
     }
 
-    private async Task<Resultado<LineasOperadas>> CompletarLaEntrega(Entrega entrega, SolicitanteDePedidos solicitante, CancellationToken cancelacion)
+    private async Task<Resultado<LineasOperadas>> CompletarLaEntrega(Entrega entrega, CancellationToken cancelacion)
     {
         var pedido = await pedidos.Obtener(entrega.PedidoId, conBloqueo: true, cancelacion).ConfigureAwait(false)
             ?? throw new InvalidOperationException("El pedido de una entrega en curso no existe.");
+
+        // Se revalida bajo el bloqueo: si otra instancia o la reanudación ya resolvió la fila, no se aplica nada dos veces.
+        if ((await pedidos.EntregasEnCurso(pedido.Id, cancelacion).ConfigureAwait(false)).All(e => e.Id != entrega.Id))
+        {
+            return Resultado<LineasOperadas>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDePedidos.OperacionYaResuelta));
+        }
+
         var ahora = reloj.Ahora;
         var anterior = pedido.Estado;
         var cerradas = entrega.LineasCerradas;
@@ -192,7 +230,7 @@ internal sealed class EntregarLineasDelPedido(
                 {
                     ObjetoTipo = "pedido",
                     ObjetoId = pedido.Id.ToString("D"),
-                    Detalle = new Dictionary<string, string?> { ["lineaId"] = lineaId.ToString("D"), ["iniciadaPor"] = solicitante.UsuarioId.ToString("D") },
+                    Detalle = new Dictionary<string, string?> { ["lineaId"] = lineaId.ToString("D"), ["iniciadaPor"] = entrega.Iniciador.EstaAnonimizado ? null : entrega.Iniciador.UsuarioId.ToString("D") },
                 },
                 cancelacion).ConfigureAwait(false);
         }
@@ -227,4 +265,12 @@ internal sealed class EntregarLineasDelPedido(
 public interface IGeneradorDeIdentificadoresDePedidos
 {
     Guid Nuevo();
+}
+
+/// <summary>Cómo terminó la reanudación de una entrega: aplicada, a reintentar en la próxima pasada o ya resuelta por otra instancia (no se toca).</summary>
+internal enum ResultadoDeReanudarEntrega
+{
+    Aplicada,
+    Reintentar,
+    YaResuelta,
 }

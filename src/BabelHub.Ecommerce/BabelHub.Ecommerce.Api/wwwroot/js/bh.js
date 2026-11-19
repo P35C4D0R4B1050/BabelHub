@@ -47,6 +47,45 @@
     avisoInicial.focus();
   }
 
+  // Cuenta regresiva del pago (PAG-01): el servidor da el instante de vencimiento; sin script la página muestra la hora fija. Al llegar a cero se avisa y se deshabilita el envío (el servidor igual lo rechazaría).
+  Array.prototype.forEach.call(document.querySelectorAll('[data-bh-cuenta-regresiva]'), function (nodo) {
+    var vence = Date.parse(nodo.getAttribute('data-bh-cuenta-regresiva'));
+    var restante = nodo.querySelector('[data-bh-restante]');
+    if (isNaN(vence)) {
+      return;
+    }
+
+    var reloj = null;
+    var pintar = function () {
+      var segundos = Math.max(0, Math.round((vence - Date.now()) / 1000));
+      if (segundos === 0) {
+        window.clearInterval(reloj);
+        if (restante) {
+          restante.textContent = '';
+        }
+
+        var aviso = document.querySelector('[data-bh-vencido]');
+        if (aviso) {
+          aviso.classList.remove('hidden');
+        }
+
+        Array.prototype.forEach.call(document.querySelectorAll('[data-bh-deshabilitar-al-vencer]'), function (boton) {
+          boton.disabled = true;
+        });
+        return;
+      }
+
+      if (restante) {
+        var minutos = Math.floor(segundos / 60);
+        var resto = segundos % 60;
+        restante.textContent = ' (te quedan ' + (minutos < 10 ? '0' : '') + minutos + ':' + (resto < 10 ? '0' : '') + resto + ')';
+      }
+    };
+
+    pintar();
+    reloj = window.setInterval(pintar, 1000);
+  });
+
   // Tema (WEB-09): se aplica al instante y se recuerda; sin elección manda la preferencia del dispositivo.
   var selectorDeTema = document.querySelector('[data-bh-tema]');
   if (selectorDeTema) {

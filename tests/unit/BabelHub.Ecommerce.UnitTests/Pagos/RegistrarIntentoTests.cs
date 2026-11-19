@@ -293,6 +293,28 @@ public sealed class RegistrarIntentoTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PAG-03")]
+    public async Task La_misma_clave_con_la_intencion_ya_con_cobro_es_el_resultado_original_y_no_un_cobro_en_curso_ajeno()
+    {
+        var e = await ConIntencionLista();
+        var clave = Guid.NewGuid();
+        var primera = await e.RegistrarIntento.Registrar(e.Entrada(clave));
+        Assert.Equal(EstadoDeIntencion.ConCobro, e.Repositorio.Intenciones.Single().Estado);
+
+        // La doble pulsación llega después de que el primer cobro registró su intento: la lectura previa ya ve la intención con cobro.
+        var segunda = await e.RegistrarIntento.Registrar(e.Entrada(clave));
+
+        Assert.True(segunda.EsExito);
+        Assert.True(segunda.Valor.EraRepetido);
+        Assert.Equal(primera.Valor.Intento.Id, segunda.Valor.Intento.Id);
+        Assert.Single(e.Repositorio.Intentos);
+
+        // Otra clave sí es un cobro en curso ajeno.
+        var otra = await e.RegistrarIntento.Registrar(e.Entrada(Guid.NewGuid()));
+        Assert.Equal("pago-en-curso", otra.Error!.Clave);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-PAG-21")]
     public async Task El_pedido_de_otra_cuenta_o_inexistente_responde_no_encontrado_con_un_acceso_denegado_y_sin_tocar_nada()
     {

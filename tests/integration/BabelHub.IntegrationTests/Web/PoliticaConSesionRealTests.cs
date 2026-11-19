@@ -87,13 +87,26 @@ public sealed class PoliticaConSesionRealTests(PostgresDeLaWebFixture bd) : IAsy
 
     // ---- La enumeración de todas las rutas de ambos hosts ----
 
-    private static readonly string[] AtribuidasEsperadas =
+    private static readonly string[] AtribuidasComunes =
     [
         "GET /legal/{texto} → TextosLegales",
         "GET /textos/aceptar → TextosLegales",
         "POST /sesion/cerrar → CerrarSesion",
         "POST /textos/aceptar → Aceptar",
     ];
+
+    // El Libro de Reclamaciones solo existe en el host de la tienda (WEB-41): la lista cerrada de cada host es la común y, en la tienda, estas.
+    private static readonly string[] AtribuidasDelLibro =
+    [
+        "GET /reclamaciones → LibroDeReclamaciones",
+        "GET /reclamaciones/mis-hojas → LibroDeReclamaciones",
+        "GET /reclamaciones/nueva → LibroDeReclamaciones",
+        "GET /reclamaciones/{numero:regex(^[0-9]{{4}}-[0-9]{{6}}\\z)} → LibroDeReclamaciones",
+        "POST /reclamaciones/nueva → EnviarHoja",
+    ];
+
+    private static IEnumerable<string> AtribuidasEsperadas(HostWeb host) =>
+        (host == HostWeb.Tienda ? AtribuidasComunes.Concat(AtribuidasDelLibro) : AtribuidasComunes).Order(StringComparer.Ordinal);
 
     private static IEnumerable<RouteEndpoint> DeLaApi(AnfitrionWeb a) =>
         a.Servicios.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>()
@@ -116,7 +129,7 @@ public sealed class PoliticaConSesionRealTests(PostgresDeLaWebFixture bd) : IAsy
             .ToList();
         var sinConsulta = endpoints.Where(e => e.Metadata.GetMetadata<SinConsultaDeEstadoAttribute>() is not null).Select(e => "/" + e.RoutePattern.RawText!.TrimStart('/')).Order(StringComparer.Ordinal).ToList();
 
-        Assert.Equal(AtribuidasEsperadas, atribuidas);
+        Assert.Equal(AtribuidasEsperadas(host), atribuidas);
         Assert.Equal(["/error", "/no-disponible", "/sin-permiso"], sinConsulta);
     }
 
@@ -135,7 +148,9 @@ public sealed class PoliticaConSesionRealTests(PostgresDeLaWebFixture bd) : IAsy
             var url = Regex.Replace(Regex.Replace("/" + endpoint.RoutePattern.RawText!.TrimStart('/'), @"\{[^}:]+:guid\}", Guid.NewGuid().ToString("D")), @"\{[^}]+\}", "terminos");
             foreach (var metodo in endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods ?? ["GET"])
             {
-                if (permitidas.Contains(url) && (metodo == "GET" || url == "/sesion/cerrar" || url == "/textos/aceptar"))
+                // Las rutas del Libro de Reclamaciones están atribuidas a propósito (WEB-41; la lista cerrada de la otra prueba las fija): con textos pendientes siguen abiertas y no se «niegan».
+                var delLibro = endpoint.Metadata.GetMetadata<PermitidaConTextosPendientesAttribute>() is { Capacidad: CapacidadWeb.LibroDeReclamaciones or CapacidadWeb.EnviarHoja };
+                if (delLibro || (permitidas.Contains(url) && (metodo == "GET" || url == "/sesion/cerrar" || url == "/textos/aceptar")))
                 {
                     continue;
                 }

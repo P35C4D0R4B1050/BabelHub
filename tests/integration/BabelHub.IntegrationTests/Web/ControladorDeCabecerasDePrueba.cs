@@ -13,10 +13,6 @@ public sealed class ControladorDeCabecerasDePrueba : Controller
     [VerificacionDePersona(AccionProtegida.Ingreso)]
     public IActionResult Ingreso() => Content("<p>ingreso</p>", "text/html");
 
-    [HttpGet("/checkout/pago")]
-    [PoliticaDeContenido(ContenidoDeTerceros.Pasarela)]
-    public IActionResult Pago() => Content("<p>pago</p>", "text/html");
-
     [HttpGet("/biblioteca")]
     [PoliticaDeContenido(ContenidoDeTerceros.DescargaDeLibro)]
     public IActionResult Biblioteca() => Content("<p>biblioteca</p>", "text/html");
