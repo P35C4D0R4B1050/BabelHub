@@ -1,8 +1,11 @@
 using BabelHub.Ecommerce.Application.Carrito;
+using BabelHub.Ecommerce.Application.Pagos;
 using BabelHub.Ecommerce.Application.Pagos.Interno;
 using BabelHub.Ecommerce.Domain.Pagos;
 using BabelHub.Ecommerce.UnitTests.Catalogo;
+using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.UnitTests.Plataforma;
+using BabelHub.Ecommerce.UnitTests.Soporte;
 
 namespace BabelHub.Ecommerce.UnitTests.Pagos;
 
@@ -164,7 +167,22 @@ internal sealed class EntornoDePagos
         Unidad = new UnidadDeTrabajoReversible(Repositorio);
         Denegaciones = new DenegacionesDelCatalogoEspia();
         Creador = new IntencionesDePagoDeLaAplicacion(Repositorio, Unidad, Reloj, Denegaciones);
+        Actor = ActorDePrueba.DeCliente(InstantaneasDeCompraDePrueba.Cuenta);
+        Checkout = new CheckoutDeCarritoDoble();
+        Firmador = new FirmadorDeClavesDeIntento(new OpcionesDeClavesDeIntento(System.Text.Encoding.UTF8.GetBytes("clave-de-intentos-de-prueba-de-32-bytes-o-mas")));
+        Autorizador = new AutorizadorDePagos(Actor, Denegaciones);
+        EmitirClave = new EmitirClaveDeIntento(Autorizador, Repositorio, Unidad, Checkout, Firmador, Reloj);
     }
+
+    public ActorDePrueba Actor { get; }
+
+    public CheckoutDeCarritoDoble Checkout { get; }
+
+    public FirmadorDeClavesDeIntento Firmador { get; }
+
+    public AutorizadorDePagos Autorizador { get; }
+
+    public ICasoDeUso<EmitirClaveDeIntentoEntrada, ClaveDeIntentoEmitida> EmitirClave { get; }
 
     public RelojFijo Reloj { get; }
 
