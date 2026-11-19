@@ -58,3 +58,7 @@ Docker Desktop guarda su disco en `D:\Docker\wsl\disk` (enlace desde `C:`); si u
 - **Obligatorios (puerta de cierre):** Chromium de escritorio, Chromium en teléfono y WebKit (si la caché de Playwright lo tiene). Un fallo ahí bloquea el cierre del bloque.
 - **Firefox: informativo, no indispensable.** Se ejecuta si el entorno lo permite (hoy `firefox.exe` está bloqueado por el sistema: «Permission denied»; no se toca la seguridad del equipo). Un fallo solo de Firefox se registra como hallazgo (Menor, con dueño y fase) y **no reabre un bloque cerrado**, salvo que revele un defecto real de estándares o accesibilidad que también afecte a los demás.
 - Los proyectos de Playwright de cada carril declaran Firefox como proyecto opcional (se omite si no inicia), sin debilitar ninguna aserción de los obligatorios.
+
+## 7. Plan del Sprint 2 (decisión de la persona, 2026-11-19)
+
+Entrega del código y de la evidencia de atributos de calidad el **28 de noviembre**. Alcance: se hace el recorrido de compra y la **biblioteca digital (ECO-8)**; se **difieren** `asistente-compra-ia` (ECO-12) y `web-indice-infinito` (ECO-13). Calendario, bloques de evidencia (OAS-1 OpenAPI, K6-1 pruebas de carga hasta 2000 usuarios virtuales, DOC-1 base de datos y caché, cobertura), control de tokens (relevos de chat, fusiones en lote) y riesgos: `docs/07-proceso-de-desarrollo/06-plan-sprint-2.md`. Nadie empieza asistente ni índice infinito; A no debe tomar ECO-8 (va a un carril nuevo por relevo).
