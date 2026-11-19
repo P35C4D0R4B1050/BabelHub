@@ -309,6 +309,10 @@ public sealed class AvisarACarritoTests
 
         public Task<IReadOnlyList<Guid>> ListarIntencionesAprobadas(int limite, CancellationToken cancelacion = default) => interno.ListarIntencionesAprobadas(limite, cancelacion);
 
+        public Task<IReadOnlyList<IntencionDePago>> ListarIntencionesDeLaCuenta(Guid cuentaId, bool paraActualizar, CancellationToken cancelacion = default) => interno.ListarIntencionesDeLaCuenta(cuentaId, paraActualizar, cancelacion);
+
+        public Task<int> ContarIntencionesEnCursoDeLaCuenta(Guid cuentaId, CancellationToken cancelacion = default) => interno.ContarIntencionesEnCursoDeLaCuenta(cuentaId, cancelacion);
+
         public Task<IReadOnlyList<Compensacion>> ListarCompensacionesSinTerminar(int limite, CancellationToken cancelacion = default) => interno.ListarCompensacionesSinTerminar(limite, cancelacion);
 
         public Task<IReadOnlyList<Guid>> ListarIntencionesConAvisosACarritoListos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) => interno.ListarIntencionesConAvisosACarritoListos(ahora, limite, cancelacion);

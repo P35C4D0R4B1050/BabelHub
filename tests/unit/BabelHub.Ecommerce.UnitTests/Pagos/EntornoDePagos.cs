@@ -59,9 +59,21 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
         return Task.CompletedTask;
     }
 
+    /// <summary>Cuántas veces se guardó una intención.</summary>
+    public int GuardadosDeIntenciones { get; private set; }
+
+    /// <summary>Hace fallar el guardado de la intención número N (para probar la reversión).</summary>
+    public int? GuardarIntencionLanzaEnLaLlamada { get; set; }
+
     public Task GuardarIntencion(IntencionDePago intencion, CancellationToken cancelacion = default)
     {
         Operaciones++;
+        GuardadosDeIntenciones++;
+        if (GuardarIntencionLanzaEnLaLlamada == GuardadosDeIntenciones)
+        {
+            throw new InvalidOperationException("La base no responde.");
+        }
+
         _intenciones[intencion.Id] = intencion.Copiar();
         return Task.CompletedTask;
     }
@@ -175,6 +187,19 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
 
     public Task<IReadOnlyList<Guid>> ListarIntencionesAprobadas(int limite, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<Guid>>(_intenciones.Values.Where(i => i.Estado == EstadoDeIntencion.Aprobada).OrderBy(i => i.AprobadoEn).Select(i => i.Id).Take(limite).ToArray());
+
+    public Task<IReadOnlyList<IntencionDePago>> ListarIntencionesDeLaCuenta(Guid cuentaId, bool paraActualizar, CancellationToken cancelacion = default)
+    {
+        if (paraActualizar)
+        {
+            LecturasConBloqueo++;
+        }
+
+        return Task.FromResult<IReadOnlyList<IntencionDePago>>(_intenciones.Values.Where(i => i.CuentaId == cuentaId).Select(i => i.Copiar()).ToArray());
+    }
+
+    public Task<int> ContarIntencionesEnCursoDeLaCuenta(Guid cuentaId, CancellationToken cancelacion = default) =>
+        Task.FromResult(_intenciones.Values.Count(i => i.CuentaId == cuentaId && i.Estado is EstadoDeIntencion.ConCobro or EstadoDeIntencion.Aprobada));
 
     public Task<IReadOnlyList<Compensacion>> ListarCompensacionesSinTerminar(int limite, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<Compensacion>>(_compensaciones.Values.Where(c => !c.EstaTerminada).OrderBy(c => c.IniciadaEn).Select(c => c.Copiar()).Take(limite).ToArray());

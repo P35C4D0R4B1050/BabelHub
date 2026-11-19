@@ -151,6 +151,12 @@ internal interface IRepositorioDePagos
     /// <summary>Las intenciones <c>aprobada</c> sin completar, las más antiguas primero: las que la retoma completa o compensa.</summary>
     Task<IReadOnlyList<Guid>> ListarIntencionesAprobadas(int limite, CancellationToken cancelacion = default);
 
+    /// <summary>Las intenciones de una cuenta (con <c>FOR UPDATE</c> si se van a cambiar): lo que la cancelación de la cuenta desvincula. Corre dentro de la transacción de Identidad.</summary>
+    Task<IReadOnlyList<IntencionDePago>> ListarIntencionesDeLaCuenta(Guid cuentaId, bool paraActualizar, CancellationToken cancelacion = default);
+
+    /// <summary>Cuántas intenciones de la cuenta están en curso: con un cobro sin resolver (<c>con_cobro</c>) o aprobadas sin pedido (PAG-24).</summary>
+    Task<int> ContarIntencionesEnCursoDeLaCuenta(Guid cuentaId, CancellationToken cancelacion = default);
+
     /// <summary>Las compensaciones ya iniciadas que no terminaron, las más antiguas primero.</summary>
     Task<IReadOnlyList<Compensacion>> ListarCompensacionesSinTerminar(int limite, CancellationToken cancelacion = default);
 
