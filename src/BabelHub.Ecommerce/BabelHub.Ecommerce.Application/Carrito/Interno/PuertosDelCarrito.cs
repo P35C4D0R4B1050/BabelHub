@@ -201,6 +201,9 @@ public interface IRepositorioDeCarritos
     /// <summary>La constancia de una fusión aplicada (<c>fusiones_aplicadas</c>, única por huella de cookie): hace idempotente la fusión de un segundo dispositivo. Se purga a los 30 días.</summary>
     Task RegistrarFusion(byte[] huellaDeLaCookie, Guid carritoDeCuentaId, DateTimeOffset ahora, CancellationToken cancelacion = default);
 
+    /// <summary>Elimina el carrito de la cuenta con sus líneas y sus avisos (CAR-32, CAR-33): idempotente ante filas ausentes y siempre <b>después</b> de eliminar el checkout (D10). No toca el carrito de un visitante.</summary>
+    Task EliminarDeCuenta(Guid cuentaId, CancellationToken cancelacion = default);
+
     /// <summary>Los carritos (de cuenta o de visitante) que tienen alguna de las ediciones, <b>sin bloqueo</b>: lo que necesita el retiro de ediciones para saber qué bloquear después, en orden (D10).</summary>
     Task<IReadOnlyList<CarritoConEdicion>> BuscarConEdiciones(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default);
 }
@@ -216,6 +219,9 @@ public interface IRepositorioDeCheckouts
 
     /// <summary>El checkout cuyo <c>pedido_id</c> o <c>pedido_descartado</c> es el dado (vivo o terminado).</summary>
     Task<Checkout?> ObtenerPorPedido(Guid pedidoId, bool conBloqueo, CancellationToken cancelacion = default);
+
+    /// <summary>Elimina <b>todos</b> los checkouts de la cuenta (vivos y terminados, con su contacto y sus líneas): idempotente ante filas ausentes y siempre <b>antes</b> que el carrito (D10).</summary>
+    Task EliminarDeCuenta(Guid cuentaId, CancellationToken cancelacion = default);
 
     /// <summary>Los checkouts vivos de esas cuentas, <b>con bloqueo y por <c>id</c> ascendente</b> (D10): lo que usa el retiro de ediciones, que bloquea todos los checkouts antes que los carritos.</summary>
     Task<IReadOnlyList<Checkout>> ObtenerVivosDeCuentasConBloqueo(IReadOnlyCollection<Guid> cuentaIds, CancellationToken cancelacion = default);
@@ -302,6 +308,9 @@ public interface IAuditoriaDelCarrito
 
     /// <summary>El checkout terminó por voluntad de la persona (<c>volver</c> o <c>reiniciar</c>); sin datos personales.</summary>
     Task CheckoutTerminado(string motivo, CancellationToken cancelacion = default);
+
+    /// <summary>Identidad pidió eliminar el carrito y los datos de entrega de una cuenta (reemplazo de una cuenta sin verificar o cancelación): sin datos personales; el motivo es <c>reemplazo</c> o <c>cancelacion</c>.</summary>
+    Task CarritoEliminadoPorIdentidad(string motivo, CancellationToken cancelacion = default);
 
     /// <summary>Se pasó al pago (la intención creada y el checkout en <c>en_pago</c>): con o sin impresos y el tipo de entrega; sin contacto, sin cuenta ni pedido en el detalle (D13).</summary>
     Task PasoAlPagoIniciado(bool conImpresos, bool aDomicilio, CancellationToken cancelacion = default);

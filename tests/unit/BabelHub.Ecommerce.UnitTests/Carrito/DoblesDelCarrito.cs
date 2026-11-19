@@ -274,6 +274,21 @@ internal sealed class RepositorioDeCarritosEnMemoria(BitacoraDeBloqueos bitacora
         return Task.CompletedTask;
     }
 
+    public Exception? FallaAlEliminar { get; set; }
+
+    public Task EliminarDeCuenta(Guid cuentaId, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar(true, "carrito");
+        if (FallaAlEliminar is { } falla)
+        {
+            throw falla;
+        }
+
+        _carritos.RemoveAll(c => c.Propietario.CuentaId == cuentaId);
+        _avisos.RemoveAll(a => a.CuentaId == cuentaId);
+        return Task.CompletedTask;
+    }
+
     public Task<IReadOnlyList<CarritoConEdicion>> BuscarConEdiciones(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<CarritoConEdicion>>([.. _carritos.Where(c => c.Lineas.Any(l => edicionIds.Contains(l.EdicionId))).Select(c => new CarritoConEdicion(c.Id, c.Propietario.CuentaId))]);
 
@@ -333,6 +348,13 @@ internal sealed class RepositorioDeCheckoutsEnMemoria(BitacoraDeBloqueos bitacor
         }
 
         return Task.FromResult<IReadOnlyList<Checkout>>(vivos);
+    }
+
+    public Task EliminarDeCuenta(Guid cuentaId, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar(true, "checkout");
+        _checkouts.RemoveAll(c => c.CuentaId == cuentaId);
+        return Task.CompletedTask;
     }
 
     public Task<IReadOnlyList<PedidoPorLiberar>> ConLiberacionPendiente(int maximo, CancellationToken cancelacion = default) =>
@@ -539,6 +561,8 @@ internal sealed class AuditoriaDelCarritoEspia : IAuditoriaDelCarrito
 
     public List<string> Terminados { get; } = [];
 
+    public List<string> Eliminaciones { get; } = [];
+
     public bool Caida { get; set; }
 
     public Task FusionAplicada(Guid cuentaId, int lineasDelVisitante, IReadOnlyList<MotivoDeAjusteDeAviso> ajustes, CancellationToken cancelacion = default)
@@ -549,6 +573,17 @@ internal sealed class AuditoriaDelCarritoEspia : IAuditoriaDelCarrito
         }
 
         Fusiones.Add((cuentaId, lineasDelVisitante, ajustes));
+        return Task.CompletedTask;
+    }
+
+    public Task CarritoEliminadoPorIdentidad(string motivo, CancellationToken cancelacion = default)
+    {
+        if (Caida)
+        {
+            throw new InvalidOperationException("La auditoría no está disponible.");
+        }
+
+        Eliminaciones.Add(motivo);
         return Task.CompletedTask;
     }
 
