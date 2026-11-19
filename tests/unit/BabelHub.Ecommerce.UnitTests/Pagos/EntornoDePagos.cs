@@ -15,6 +15,9 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
 {
     private Dictionary<Guid, IntencionDePago> _intenciones = [];
     private Dictionary<Guid, IntentoDeCobro> _intentos = [];
+    private Dictionary<Guid, Compensacion> _compensaciones = [];
+    private List<AvisoACarrito> _avisosACarrito = [];
+    private List<AvisoDePago> _avisosDePago = [];
 
     public IReadOnlyCollection<IntencionDePago> Intenciones => _intenciones.Values;
 
@@ -56,9 +59,21 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
         return Task.CompletedTask;
     }
 
+    /// <summary>Cuántas veces se guardó una intención.</summary>
+    public int GuardadosDeIntenciones { get; private set; }
+
+    /// <summary>Hace fallar el guardado de la intención número N (para probar la reversión).</summary>
+    public int? GuardarIntencionLanzaEnLaLlamada { get; set; }
+
     public Task GuardarIntencion(IntencionDePago intencion, CancellationToken cancelacion = default)
     {
         Operaciones++;
+        GuardadosDeIntenciones++;
+        if (GuardarIntencionLanzaEnLaLlamada == GuardadosDeIntenciones)
+        {
+            throw new InvalidOperationException("La base no responde.");
+        }
+
         _intenciones[intencion.Id] = intencion.Copiar();
         return Task.CompletedTask;
     }
@@ -99,13 +114,149 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
         return Task.CompletedTask;
     }
 
-    public object Capturar() => (_intenciones.ToDictionary(p => p.Key, p => p.Value.Copiar()), _intentos.ToDictionary(p => p.Key, p => p.Value.Copiar()));
+    public IReadOnlyCollection<Compensacion> Compensaciones => _compensaciones.Values;
+
+    public Task<Compensacion?> ObtenerCompensacion(Guid intentoId, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        return Task.FromResult(_compensaciones.TryGetValue(intentoId, out var c) ? c.Copiar() : null);
+    }
+
+    public Task<bool> AgregarCompensacion(Compensacion compensacion, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        return Task.FromResult(_compensaciones.TryAdd(compensacion.IntentoId, compensacion.Copiar()));
+    }
+
+    public Task GuardarCompensacion(Compensacion compensacion, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        _compensaciones[compensacion.IntentoId] = compensacion.Copiar();
+        return Task.CompletedTask;
+    }
+
+    public IReadOnlyCollection<AvisoACarrito> AvisosACarrito => _avisosACarrito;
+
+    public IReadOnlyCollection<AvisoDePago> AvisosDePago => _avisosDePago;
+
+    /// <summary>Hace fallar la inserción de los avisos (para probar que la transición se revierte entera).</summary>
+    public bool FallaAlAgregarAvisos { get; set; }
+
+    public Task<bool> AgregarAvisoACarrito(AvisoACarrito aviso, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        if (FallaAlAgregarAvisos)
+        {
+            throw new InvalidOperationException("La base no acepta el aviso.");
+        }
+
+        if (_avisosACarrito.Any(a => a.Clave == aviso.Clave))
+        {
+            return Task.FromResult(false);
+        }
+
+        _avisosACarrito.Add(aviso.Copiar());
+        return Task.FromResult(true);
+    }
+
+    public Task<bool> AgregarAvisoDePago(AvisoDePago aviso, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        if (FallaAlAgregarAvisos)
+        {
+            throw new InvalidOperationException("La base no acepta el aviso.");
+        }
+
+        if (_avisosDePago.Any(a => a.Clave == aviso.Clave))
+        {
+            return Task.FromResult(false);
+        }
+
+        _avisosDePago.Add(aviso.Copiar());
+        return Task.FromResult(true);
+    }
+
+    public Task<IReadOnlyList<AvisoACarrito>> ListarAvisosACarritoDeLaIntencion(Guid intencionId, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<AvisoACarrito>>(_avisosACarrito.Where(a => a.IntencionId == intencionId).Select(a => a.Copiar()).ToArray());
+
+    public Task<IReadOnlyList<AvisoDePago>> ListarAvisosDePagoListos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<AvisoDePago>>(_avisosDePago.Where(a => a.EstaListo(ahora)).OrderBy(a => a.CreadoEn).Select(a => a.Copiar()).Take(limite).ToArray());
+
+    public Task<IReadOnlyList<AvisoDePago>> ListarAvisosDePagoDeLaIntencion(Guid intencionId, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<AvisoDePago>>(_avisosDePago.Where(a => a.IntencionId == intencionId).Select(a => a.Copiar()).ToArray());
+
+    public Task<IReadOnlyList<Guid>> ListarIntencionesAprobadas(int limite, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(_intenciones.Values.Where(i => i.Estado == EstadoDeIntencion.Aprobada).OrderBy(i => i.AprobadoEn).Select(i => i.Id).Take(limite).ToArray());
+
+    public Task<IReadOnlyList<IntencionDePago>> ListarIntencionesDeLaCuenta(Guid cuentaId, bool paraActualizar, CancellationToken cancelacion = default)
+    {
+        if (paraActualizar)
+        {
+            LecturasConBloqueo++;
+        }
+
+        return Task.FromResult<IReadOnlyList<IntencionDePago>>(_intenciones.Values.Where(i => i.CuentaId == cuentaId).Select(i => i.Copiar()).ToArray());
+    }
+
+    public Task<int> ContarIntencionesEnCursoDeLaCuenta(Guid cuentaId, CancellationToken cancelacion = default) =>
+        Task.FromResult(_intenciones.Values.Count(i => i.CuentaId == cuentaId && i.Estado is EstadoDeIntencion.ConCobro or EstadoDeIntencion.Aprobada));
+
+    public Task<IReadOnlyList<Guid>> ListarIntencionesAbiertasVencidas(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(_intenciones.Values
+            .Where(i => i.Estado == EstadoDeIntencion.Abierta && (ahora >= i.VenceEn || (i.TieneImpresos && PlazosDelPago.ReservaExpirada(i.ReservaExpiraEn, ahora))))
+            .OrderBy(i => i.VenceEn).Select(i => i.Id).Take(limite).ToArray());
+
+    public Task<IReadOnlyList<Guid>> ListarIntencionesConContactoVencido(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(_intenciones.Values.Where(i => i.ContactoVencido(ahora)).OrderBy(i => i.CreadaEn).Select(i => i.Id).Take(limite).ToArray());
+
+    public Task<IReadOnlyList<IntencionDePago>> ListarIntencionesCerradasParaDepurar(DateTimeOffset corte, int limite, CancellationToken cancelacion = default)
+    {
+        LecturasConBloqueo++;
+        return Task.FromResult<IReadOnlyList<IntencionDePago>>(_intenciones.Values
+            .Where(i => i.CuentaId is not null && i.Estado is EstadoDeIntencion.Completada or EstadoDeIntencion.Compensada or EstadoDeIntencion.CerradaSinCobro && i.CerradaEn <= corte)
+            .OrderBy(i => i.CerradaEn).Select(i => i.Copiar()).Take(limite).ToArray());
+    }
+
+    public Task<IReadOnlyList<Compensacion>> ListarCompensacionesSinTerminar(int limite, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Compensacion>>(_compensaciones.Values.Where(c => !c.EstaTerminada).OrderBy(c => c.IniciadaEn).Select(c => c.Copiar()).Take(limite).ToArray());
+
+    public Task<IReadOnlyList<Guid>> ListarIntentosParaConsultar(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(_intentos.Values.Where(i => i.Estado is EstadoDeIntento.Iniciado or EstadoDeIntento.PendienteDeConfirmacion || i.EsConciliable(ahora)).OrderBy(i => i.IniciadoEn).Select(i => i.Id).Take(limite).ToArray());
+
+    public Task<IReadOnlyList<Guid>> ListarIntencionesConAvisosACarritoListos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>(_avisosACarrito.Where(a => a.EstaListo(ahora)).OrderBy(a => a.CreadoEn).Select(a => a.IntencionId).Distinct().Take(limite).ToArray());
+
+    public Task GuardarAvisoACarrito(AvisoACarrito aviso, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        var indice = _avisosACarrito.FindIndex(a => a.Id == aviso.Id);
+        _avisosACarrito[indice] = aviso.Copiar();
+        return Task.CompletedTask;
+    }
+
+    public Task GuardarAvisoDePago(AvisoDePago aviso, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        var indice = _avisosDePago.FindIndex(a => a.Id == aviso.Id);
+        _avisosDePago[indice] = aviso.Copiar();
+        return Task.CompletedTask;
+    }
+
+    public object Capturar() => (
+        _intenciones.ToDictionary(p => p.Key, p => p.Value.Copiar()),
+        _intentos.ToDictionary(p => p.Key, p => p.Value.Copiar()),
+        _compensaciones.ToDictionary(p => p.Key, p => p.Value.Copiar()),
+        _avisosACarrito.Select(a => a.Copiar()).ToList(),
+        _avisosDePago.Select(a => a.Copiar()).ToList());
 
     public void Restaurar(object instantanea)
     {
-        var (intenciones, intentos) = ((Dictionary<Guid, IntencionDePago>, Dictionary<Guid, IntentoDeCobro>))instantanea;
+        var (intenciones, intentos, compensaciones, avisosACarrito, avisosDePago) = ((Dictionary<Guid, IntencionDePago>, Dictionary<Guid, IntentoDeCobro>, Dictionary<Guid, Compensacion>, List<AvisoACarrito>, List<AvisoDePago>))instantanea;
         _intenciones = intenciones;
         _intentos = intentos;
+        _compensaciones = compensaciones;
+        _avisosACarrito = avisosACarrito;
+        _avisosDePago = avisosDePago;
     }
 }
 
@@ -169,7 +320,9 @@ internal sealed class EntornoDePagos
     {
         Reloj = new RelojFijo(ahora ?? IntencionesDePrueba.Inicio);
         Repositorio = new RepositorioDePagosEnMemoria();
-        Unidad = new UnidadDeTrabajoReversible(Repositorio);
+        Reembolsos = new RepositorioDeReembolsosEnMemoria(Repositorio);
+        Procesador = new ProcesadorDeEntradasDoble();
+        Unidad = new UnidadDeTrabajoReversible(Repositorio, Reembolsos, Procesador);
         Denegaciones = new DenegacionesDelCatalogoEspia();
         Creador = new IntencionesDePagoDeLaAplicacion(Repositorio, Unidad, Reloj, Denegaciones);
         Actor = ActorDePrueba.DeCliente(InstantaneasDeCompraDePrueba.Cuenta);
@@ -187,6 +340,7 @@ internal sealed class EntornoDePagos
         RegistrarIntento = new RegistrarIntento(Autorizador, Repositorio, Unidad, Cuenta, Posesion, Reservas, Checkout, new LimitadorDeCobros(LimitesDeCobro), Auditoria, Reloj);
         Pasarela = new PasarelaDePagoDoble(Unidad);
         Confirmador = new ConfirmadorDeCompraDoble(Unidad);
+        Avisador = new AvisadorACarritoDoble(Unidad);
         Alertas = new AlertasTecnicasEspia();
         Cobrar = CrearIniciarCobro(new OpcionesDelCobro(TimeSpan.FromMilliseconds(300)));
     }
@@ -209,13 +363,15 @@ internal sealed class EntornoDePagos
 
     public ConfirmadorDeCompraDoble Confirmador { get; }
 
+    public AvisadorACarritoDoble Avisador { get; }
+
     public AlertasTecnicasEspia Alertas { get; }
 
     public ICasoDeUso<CobrarEntrada, ResultadoDelCobroDelCliente> Cobrar { get; private set; }
 
     /// <summary>El orquestador con otras opciones (por ejemplo, la pasarela que exige el correo del titular).</summary>
     public IniciarCobro CrearIniciarCobro(OpcionesDelCobro opciones) =>
-        new(Autorizador, Firmador, Repositorio, Unidad, RegistrarIntento, Pasarela, Cuenta, Reservas, Confirmador, Auditoria, Alertas, Reloj, opciones);
+        new(Autorizador, Firmador, Repositorio, Unidad, RegistrarIntento, Pasarela, Cuenta, new ExtenderReservaDelPago(Repositorio, Unidad, Cuenta, Reservas), Confirmador, Avisador, Auditoria, Alertas, Reloj, opciones);
 
     public ActorDePrueba Actor { get; }
 
@@ -230,6 +386,10 @@ internal sealed class EntornoDePagos
     public RelojFijo Reloj { get; }
 
     public RepositorioDePagosEnMemoria Repositorio { get; }
+
+    public RepositorioDeReembolsosEnMemoria Reembolsos { get; }
+
+    public ProcesadorDeEntradasDoble Procesador { get; }
 
     public UnidadDeTrabajoReversible Unidad { get; }
 

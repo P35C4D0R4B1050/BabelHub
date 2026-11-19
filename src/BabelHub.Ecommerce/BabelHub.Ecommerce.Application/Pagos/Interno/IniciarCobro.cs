@@ -33,8 +33,9 @@ internal sealed class IniciarCobro(
     RegistrarIntento registrar,
     IPasarelaDePago pasarela,
     ICuentaDelPagador cuentas,
-    IReservasDelPago reservas,
+    ExtenderReservaDelPago extender,
     IConfirmadorDeCompraAprobada confirmador,
+    IAvisadorACarrito avisador,
     IAuditoria auditoria,
     IPublicadorDeAlertasTecnicas alertas,
     IReloj reloj,
@@ -73,17 +74,17 @@ internal sealed class IniciarCobro(
         }
 
         // Paso 0: la clave ya existe: el resultado original, sin consultas ni cupo.
-        var (existente, ajeno) = await unidad.Ejecutar(
+        var (existente, ajeno, completada) = await unidad.Ejecutar(
             async token =>
             {
                 var intento = await repositorio.ObtenerIntento(clave.IntentoId, token).ConfigureAwait(false);
                 if (intento is null)
                 {
-                    return ((IntentoDeCobro?)null, false);
+                    return ((IntentoDeCobro?)null, false, false);
                 }
 
                 var intencion = await repositorio.ObtenerIntencion(intento.IntencionId, paraActualizar: false, token).ConfigureAwait(false);
-                return (intento, intento.IntencionId != entrada.PedidoId || intencion is null || !intencion.EsDeLaCuenta(cuentaId));
+                return (intento, intento.IntencionId != entrada.PedidoId || intencion is null || !intencion.EsDeLaCuenta(cuentaId), intencion?.Estado == EstadoDeIntencion.Completada);
             },
             cancelacion).ConfigureAwait(false);
         if (existente is not null)
@@ -94,7 +95,7 @@ internal sealed class IniciarCobro(
                 return FallosDePagos.De<ResultadoDelCobroDelCliente>(CategoriaDeError.Conflicto, ClavesDePagos.ClaveInvalida);
             }
 
-            return Resultado<ResultadoDelCobroDelCliente>.Exito(ResultadoOriginal(existente));
+            return Resultado<ResultadoDelCobroDelCliente>.Exito(ResultadoOriginal(existente, completada));
         }
 
         var medio = entrada.Medio.ADominio();
@@ -121,7 +122,8 @@ internal sealed class IniciarCobro(
         if (registrado.Valor.EraRepetido)
         {
             // Otra solicitud simultánea con la misma clave ya hizo el cobro: este es el resultado original.
-            return Resultado<ResultadoDelCobroDelCliente>.Exito(ResultadoOriginal(intentoRegistrado));
+            var intencionDelCobro = await unidad.Ejecutar(token => repositorio.ObtenerIntencion(entrada.PedidoId, paraActualizar: false, token), cancelacion).ConfigureAwait(false);
+            return Resultado<ResultadoDelCobroDelCliente>.Exito(ResultadoOriginal(intentoRegistrado, intencionDelCobro?.Estado == EstadoDeIntencion.Completada));
         }
 
         // Desde aquí el intento existe y la pasarela puede haber cobrado: nada de lo que sigue depende de que el cliente siga conectado (cerrar la pestaña no deja un cobro sin rastro).
@@ -137,20 +139,30 @@ internal sealed class IniciarCobro(
                 // Fuera de la transacción: el único punto de entrada del estado aprobado.
                 return Resultado<ResultadoDelCobroDelCliente>.Exito(await confirmador.Confirmar(entrada.PedidoId, intentoRegistrado.Id, cierre.Referencia!, CancellationToken.None).ConfigureAwait(false));
             case TipoDeCierre.Rechazado:
+                // Después de confirmar la transacción que anotó el aviso: Carrito se entera, y una falla suya no cambia el rechazo.
+                await avisador.Enviar(entrada.PedidoId, CancellationToken.None).ConfigureAwait(false);
                 return Resultado<ResultadoDelCobroDelCliente>.Exito(new ResultadoDelCobroDelCliente(EstadoDelCobro.Rechazado, MapeoDeMotivos.APublico(cierre.Motivo), intentoRegistrado.Id));
             default:
                 if (cierre.PasoAPendiente)
                 {
-                    await ExtenderLaReservaSiHaceFalta(entrada.PedidoId).ConfigureAwait(false);
+                    // El aviso de «pendiente» con impresos nace retenido: sale con los instantes definitivos cuando termina reservas.extender (si falla, lo libera la consulta del trabajo).
+                    if (await extender.Extender(entrada.PedidoId).ConfigureAwait(false))
+                    {
+                        await avisador.LiberarElPendienteRetenido(entrada.PedidoId, intentoRegistrado.Id, CancellationToken.None).ConfigureAwait(false);
+                    }
                 }
 
                 return Resultado<ResultadoDelCobroDelCliente>.Exito(new ResultadoDelCobroDelCliente(EstadoDelCobro.PendienteDeConfirmacion, null, intentoRegistrado.Id));
         }
     }
 
-    private static ResultadoDelCobroDelCliente ResultadoOriginal(IntentoDeCobro intento) => intento.Estado switch
+    /// <summary>
+    /// El resultado de un intento que ya existe. Un cobro aprobado solo es «aprobado» para el cliente si la compra quedó completada; si no (se está confirmando, se compensó o fue un cobro sobrante que se reembolsa) el cliente
+    /// ve «estamos confirmando tu pago» y la pantalla de estado dice la verdad.
+    /// </summary>
+    private static ResultadoDelCobroDelCliente ResultadoOriginal(IntentoDeCobro intento, bool intencionCompletada) => intento.Estado switch
     {
-        EstadoDeIntento.Aprobado or EstadoDeIntento.AprobadoSobrante => new ResultadoDelCobroDelCliente(EstadoDelCobro.Aprobado, null, intento.Id),
+        EstadoDeIntento.Aprobado when intencionCompletada => new ResultadoDelCobroDelCliente(EstadoDelCobro.Aprobado, null, intento.Id),
         EstadoDeIntento.Rechazado => new ResultadoDelCobroDelCliente(EstadoDelCobro.Rechazado, MapeoDeMotivos.APublico(intento.MotivoDeRechazo), intento.Id),
         EstadoDeIntento.Vencido => new ResultadoDelCobroDelCliente(EstadoDelCobro.Rechazado, MotivoDeRechazoDePago.Otro, intento.Id),
         _ => new ResultadoDelCobroDelCliente(EstadoDelCobro.PendienteDeConfirmacion, null, intento.Id),
@@ -243,6 +255,7 @@ internal sealed class IniciarCobro(
                             await repositorio.GuardarIntento(intento, token).ConfigureAwait(false);
                             await repositorio.GuardarIntencion(intencion, token).ConfigureAwait(false);
                             await Auditar(intento, "rechazado", (validado.Motivo ?? MotivoDeRechazo.Otro).ATexto(), null, token).ConfigureAwait(false);
+                            await AnotarLosAvisos(intencion.Id, intento.Id, TransicionDeAviso.Rechazado, EventoDeAvisoDePago.Rechazado, retenido: false, token).ConfigureAwait(false);
                             return new Cierre(TipoDeCierre.Rechazado, Motivo: validado.Motivo ?? MotivoDeRechazo.Otro);
                         default:
                             if (intento.MarcarPendiente(reloj.Ahora) && intencion.Estado == EstadoDeIntencion.ConCobro)
@@ -251,6 +264,7 @@ internal sealed class IniciarCobro(
                                 await repositorio.GuardarIntento(intento, token).ConfigureAwait(false);
                                 await repositorio.GuardarIntencion(intencion, token).ConfigureAwait(false);
                                 await Auditar(intento, "pendiente", null, validado.Duda, token).ConfigureAwait(false);
+                                await AnotarLosAvisos(intencion.Id, intento.Id, TransicionDeAviso.Pendiente, EventoDeAvisoDePago.Pendiente, retenido: intencion.TieneImpresos, token).ConfigureAwait(false);
                                 return new Cierre(TipoDeCierre.Pendiente, PasoAPendiente: true);
                             }
 
@@ -278,34 +292,8 @@ internal sealed class IniciarCobro(
         }
     }
 
-    private Task Auditar(IntentoDeCobro intento, string resultado, string? motivo, MotivoDeDuda? duda, CancellationToken token)
-    {
-        var detalle = new Dictionary<string, string?> { ["resultado"] = resultado };
-        if (motivo is not null)
-        {
-            detalle["motivo"] = motivo;
-        }
-
-        if (duda is { } d)
-        {
-            // El aprobado dudoso queda identificable en la auditoría (AM11): referencia, moneda o importe distintos del intento.
-            detalle["duda"] = d switch
-            {
-                MotivoDeDuda.ReferenciaDistinta => "referencia",
-                MotivoDeDuda.MonedaDistinta => "moneda",
-                _ => "importe",
-            };
-        }
-
-        return auditoria.Registrar(
-            new SolicitudDeRegistro(AccionesAuditables.CobroResuelto)
-            {
-                ObjetoTipo = "intento-de-cobro",
-                ObjetoId = intento.Id.ToString("D"),
-                Detalle = detalle,
-            },
-            token);
-    }
+    private Task Auditar(IntentoDeCobro intento, string resultado, string? motivo, MotivoDeDuda? duda, CancellationToken token) =>
+        ResolucionesDeCobros.Auditar(auditoria, intento, resultado, motivo, duda, token);
 
     private async Task Alertar(string motivo)
     {
@@ -319,41 +307,9 @@ internal sealed class IniciarCobro(
         }
     }
 
-    /// <summary>Con impresos, el pago pendiente prolonga la reserva una sola vez hasta los 30 minutos desde el inicio (PAG-13), <b>fuera de toda transacción</b>; si falla, la retoma el trabajo de consulta.</summary>
-    private async Task ExtenderLaReservaSiHaceFalta(Guid pedidoId)
-    {
-        try
-        {
-            var intencion = await unidad.Ejecutar(token => repositorio.ObtenerIntencion(pedidoId, paraActualizar: false, token), CancellationToken.None).ConfigureAwait(false);
-            if (intencion is not { TieneImpresos: true, ReservaExtendida: false })
-            {
-                return;
-            }
-
-            var extension = await reservas.Extender(pedidoId, CancellationToken.None).ConfigureAwait(false);
-            if (!extension.EsCorrecta || extension.Valor is null)
-            {
-                return;
-            }
-
-            await unidad.Ejecutar(
-                async token =>
-                {
-                    var actual = await repositorio.ObtenerIntencion(pedidoId, paraActualizar: true, token).ConfigureAwait(false);
-                    if (actual is not null && actual.ExtenderReserva(extension.Valor.ExpiraEn))
-                    {
-                        await repositorio.GuardarIntencion(actual, token).ConfigureAwait(false);
-                    }
-
-                    return true;
-                },
-                CancellationToken.None).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            // El inventario o la base no respondieron: la reserva se extiende en la siguiente consulta del trabajo.
-        }
-    }
+    /// <summary>Anota, en la misma transacción de la transición, el aviso a Carrito y el aviso del estado del pago al cliente (idempotentes por su clave).</summary>
+    private Task AnotarLosAvisos(Guid intencionId, Guid intentoId, TransicionDeAviso transicion, EventoDeAvisoDePago evento, bool retenido, CancellationToken token) =>
+        ResolucionesDeCobros.AnotarLosAvisos(repositorio, intencionId, intentoId, transicion, evento, retenido, reloj.Ahora, token);
 }
 
 /// <summary>Traduce el motivo de rechazo del Dominio al público (mismos nombres, lo comprueba una prueba).</summary>

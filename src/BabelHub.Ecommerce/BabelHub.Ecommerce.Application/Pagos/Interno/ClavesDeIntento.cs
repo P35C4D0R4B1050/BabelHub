@@ -39,6 +39,19 @@ internal static class ClavesDePagos
     /// <summary><c>ECO-PAGO-CLAVE-INVALIDA</c> (409).</summary>
     public const string ClaveInvalida = "clave-invalida";
 
+    /// <summary>No hay un cargo aprobado de una compra completada que reembolsar.</summary>
+    public const string SinCargoQueReembolsar = "sin-cargo-que-reembolsar";
+
+    /// <summary>La misma clave natural con otro monto (D08).</summary>
+    public const string ReembolsoDistinto = "reembolso-distinto";
+
+    /// <summary>El reembolso superaría el cargo, una línea o el envío.</summary>
+    public const string ReembolsoSuperaElTope = "reembolso-supera-el-tope";
+
+    public const string ReembolsoNoReintentable = "reembolso-no-reintentable";
+
+    public const string Prohibido = "prohibido";
+
     public const string LimiteExcedido = "limite-excedido";
     public const string EsperaEnSegundos = "espera-en-segundos";
     public const string ServicioNoDisponible = "servicio-no-disponible";
@@ -184,6 +197,26 @@ internal sealed class AutorizadorDePagos(IActorActual actores, IDenegacionDeAcce
         await Denegar("sin-sesion", "ECO-NO-AUTENTICADO", cancelacion).ConfigureAwait(false);
         return new ErrorDeAplicacion(CategoriaDeError.NoAutenticado, ClavesDePagos.NoAutenticado);
     }
+
+    /// <summary>Solo el administrador central ve y reintenta los reembolsos pendientes de la plataforma (PAG-10): otro rol recibe un 403 y queda el acceso denegado.</summary>
+    public async Task<ErrorDeAplicacion?> ExigirAdministracionCentral(CancellationToken cancelacion)
+    {
+        if (actores.Actual is { Tipo: TipoDeActor.Usuario, UsuarioId: not null } actor && string.Equals(actor.Rol, RolDeAdministracionCentral, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        if (actores.Actual is not { Tipo: not TipoDeActor.Anonimo })
+        {
+            await Denegar("sin-sesion", "ECO-NO-AUTENTICADO", cancelacion).ConfigureAwait(false);
+            return new ErrorDeAplicacion(CategoriaDeError.NoAutenticado, ClavesDePagos.NoAutenticado);
+        }
+
+        await Denegar("fuera-de-rol", "ECO-PROHIBIDO", cancelacion).ConfigureAwait(false);
+        return new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDePagos.Prohibido);
+    }
+
+    private const string RolDeAdministracionCentral = "administrador-central";
 
     /// <summary>Un token firmado por el servidor para otra cuenta u otro pedido, o un intento ajeno: la respuesta es uniforme pero queda el acceso denegado (SEG-09).</summary>
     public Task RegistrarClaveAjena(CancellationToken cancelacion) => Denegar("clave-ajena", "ECO-PAGO-CLAVE-INVALIDA", cancelacion);

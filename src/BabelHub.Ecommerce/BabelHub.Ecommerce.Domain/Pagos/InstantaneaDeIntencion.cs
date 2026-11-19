@@ -17,6 +17,9 @@ public sealed record LineaDeIntencion(Guid LineaId, Guid? EdicionId, bool EsDigi
     public override string ToString() => $"LineaDeIntencion {{ LineaId = {LineaId}, Cantidad = {Cantidad}, Importe = {Importe} }}";
 }
 
+/// <summary>La fuente y el traslado que el Inventario asignó a una línea impresa al confirmar su reserva (D02).</summary>
+public sealed record ReservaConfirmadaDeLinea(Guid LineaId, string CodigoDeFuente, bool RequiereTraslado, Guid? TrasladoId, DateOnly? FechaEstimadaDeLlegada);
+
 /// <summary>La versión de un texto legal que la cuenta aceptó y cuándo.</summary>
 public sealed record TextoAceptado(string Version, DateTimeOffset AceptadoEn);
 

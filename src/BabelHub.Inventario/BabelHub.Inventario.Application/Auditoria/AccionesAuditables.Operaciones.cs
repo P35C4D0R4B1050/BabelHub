@@ -22,11 +22,26 @@ public static partial class AccionesAuditables
     /// <summary>Se resolvió un cobro: aprobado, rechazado (con su motivo de la lista cerrada) o pendiente de confirmación (PAG-11).</summary>
     public static readonly AccionAuditable CobroResuelto = new(nameof(CobroResuelto));
 
+    /// <summary>El aviso firmado de la pasarela adelantó la consulta de un intento sin resolver (PAG-19): sin el cuerpo del aviso ni datos de pago.</summary>
+    public static readonly AccionAuditable AvisoDeLaPasarelaRecibido = new(nameof(AvisoDeLaPasarelaRecibido));
+
     /// <summary>El Catálogo concilió un ingreso de mercadería pendiente con los ingresos del Inventario (registrado, fallido o discrepancia; sin la nota ni la referencia, CAT-22).</summary>
     public static readonly AccionAuditable IngresoPendienteConciliado = new(nameof(IngresoPendienteConciliado));
 
     /// <summary>El trabajo de fondo anonimizó los ingresos solicitados de más de 2 años (cantidad, sin datos personales).</summary>
     public static readonly AccionAuditable IngresosSolicitadosAnonimizados = new(nameof(IngresosSolicitadosAnonimizados));
+
+    /// <summary>El trabajo de fondo desvinculó las intenciones de pago cerradas hace más de 2 años (cantidad, sin datos personales, PAG-26).</summary>
+    public static readonly AccionAuditable IntencionesDePagoDesvinculadas = new(nameof(IntencionesDePagoDesvinculadas));
+
+    /// <summary>Un reembolso de Pagos se concluyó o quedó pendiente (con su motivo de lista cerrada); el actor es el administrador central o el sistema. Sin datos de pago.</summary>
+    public static readonly AccionAuditable ReembolsoResuelto = new(nameof(ReembolsoResuelto));
+
+    /// <summary>Un paso de la compensación de un cobro se hizo (abrir, liberar reservas, registrar el reembolso o cerrar el checkout), con su motivo de lista cerrada.</summary>
+    public static readonly AccionAuditable PasoDeCompensacionHecho = new(nameof(PasoDeCompensacionHecho));
+
+    /// <summary>Pagos eliminó el contacto de entrega de una o varias intenciones (cantidad, sin datos personales, PAG-27).</summary>
+    public static readonly AccionAuditable ContactoDeEntregaLiberado = new(nameof(ContactoDeEntregaLiberado));
 
     /// <summary>Un reingreso de stock por una devolución recibida.</summary>
     public static readonly AccionAuditable ReingresoPorDevolucion = new(nameof(ReingresoPorDevolucion));

@@ -178,6 +178,16 @@ public sealed class IntentoDeCobro
         return ResultadoDeAprobacion.Sobrante;
     }
 
+    /// <summary>Cuánto tiempo después de resolverse un intento rechazado o vencido todavía puede llegar un cobro aprobado que haya que conciliar (D23, R02).</summary>
+    public static readonly TimeSpan VentanaDeConciliacion = TimeSpan.FromHours(24);
+
+    /// <summary>Tras vencer, el trabajo sigue consultando cada minuto este tiempo: cubre el cobro que se aprueba entre la última consulta y el límite.</summary>
+    public static readonly TimeSpan VentanaDeConsultaTrasVencer = TimeSpan.FromMinutes(15);
+
+    /// <summary>Un intento <c>vencido</c> o <c>rechazado</c> resuelto hace menos de 24 horas: si la pasarela lo aprueba tarde, es un cobro sobrante que se reembolsa (nunca completa la intención).</summary>
+    public bool EsConciliable(DateTimeOffset ahora) =>
+        Estado is EstadoDeIntento.Vencido or EstadoDeIntento.Rechazado && ResueltoEn is { } resuelto && ahora - resuelto <= VentanaDeConciliacion;
+
     /// <summary>El aviso de la pasarela adelanta la consulta de un intento sin resolver; en uno resuelto no hace nada.</summary>
     public bool MarcarConsultaInmediata()
     {
@@ -190,9 +200,31 @@ public sealed class IntentoDeCobro
         return true;
     }
 
-    /// <summary>Se consulta cada minuto un pendiente (o ya, si el aviso la adelantó); un intento <c>iniciado</c> lo resuelve la reconciliación por la misma vía.</summary>
+    /// <summary>El aviso de la pasarela también adelanta la consulta de un intento resuelto que aún es conciliable (un aprobado tardío).</summary>
+    public bool MarcarConsultaInmediata(DateTimeOffset ahora)
+    {
+        if (!EstaSinResolver && !EsConciliable(ahora))
+        {
+            return false;
+        }
+
+        ConsultaInmediata = true;
+        return true;
+    }
+
+    /// <summary>Se consulta cada minuto un pendiente (o ya, si el aviso la adelantó); un intento <c>iniciado</c> lo resuelve la reconciliación por la misma vía. Uno <c>vencido</c> se sigue consultando 15 minutos y uno resuelto solo cuando el aviso lo adelanta.</summary>
     public bool DebeConsultar(DateTimeOffset ahora)
     {
+        if (EsConciliable(ahora))
+        {
+            if (ConsultaInmediata)
+            {
+                return true;
+            }
+
+            return Estado == EstadoDeIntento.Vencido && ahora - ResueltoEn <= VentanaDeConsultaTrasVencer && (UltimaConsultaEn is null || ahora - UltimaConsultaEn >= PlazosDelPago.IntervaloDeConsulta);
+        }
+
         if (!EstaSinResolver)
         {
             return false;

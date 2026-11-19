@@ -58,6 +58,8 @@ internal sealed class PasarelaDePagoSinProveedor : IPasarelaDePago
         Task.FromResult(ResultadoDeReembolsoEnPasarela.SinRespuesta);
 
     public Task<IReadOnlyList<ReembolsoEnPasarela>?> ConsultarReembolsos(string referenciaDelCargo, CancellationToken cancelacion = default) => Task.FromResult<IReadOnlyList<ReembolsoEnPasarela>?>(null);
+
+    public AvisoDeLaPasarela? InterpretarAviso(ReadOnlyMemory<byte> cuerpo) => null;
 }
 
 /// <summary>

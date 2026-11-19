@@ -199,6 +199,8 @@ public sealed class GuardaYDoblesDePagosTests
         public Task<ResultadoDeReembolsoEnPasarela> Reembolsar(Guid reembolsoId, string referenciaDelCargo, Importe monto, CancellationToken cancelacion = default) => throw new NotSupportedException();
 
         public Task<IReadOnlyList<ReembolsoEnPasarela>?> ConsultarReembolsos(string referenciaDelCargo, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public AvisoDeLaPasarela? InterpretarAviso(ReadOnlyMemory<byte> cuerpo) => throw new NotSupportedException();
     }
 
     private sealed class ReservasReales : IReservasDelPago

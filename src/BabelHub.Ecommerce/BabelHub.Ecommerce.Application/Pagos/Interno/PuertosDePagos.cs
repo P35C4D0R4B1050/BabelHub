@@ -40,6 +40,9 @@ internal sealed record ResultadoDeReembolsoEnPasarela(TipoDeResultadoDeReembolso
     public override string ToString() => $"ResultadoDeReembolsoEnPasarela {{ Tipo = {Tipo} }}";
 }
 
+/// <summary>Lo que se entiende de un aviso entrante: el identificador del evento (para no repetirlo) y la referencia opaca del cargo, que es la clave del intento. Sin datos de pago ni del cliente.</summary>
+internal sealed record AvisoDeLaPasarela(string IdDeEntrada, Guid ReferenciaOpaca);
+
 /// <summary>Un reembolso que la pasarela dice haber aplicado a un cargo: su <c>reembolsos.id</c> viaja en los metadatos para reconocerlo (D08).</summary>
 internal sealed record ReembolsoEnPasarela(Guid? ReembolsoId, string Referencia, Importe Monto);
 
@@ -59,6 +62,11 @@ internal interface IPasarelaDePago
 
     /// <summary>Los reembolsos que la pasarela tiene de un cargo, para no pedir otro a ciegas; <c>null</c> si no se pudo consultar.</summary>
     Task<IReadOnlyList<ReembolsoEnPasarela>?> ConsultarReembolsos(string referenciaDelCargo, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Lee el aviso entrante sin red y sin confiar en él (su firma la verifica <c>Plataforma</c>): el identificador del evento y la referencia opaca del cargo (los metadatos); <c>null</c> si no se entiende. El aviso solo adelanta la consulta.
+    /// </summary>
+    AvisoDeLaPasarela? InterpretarAviso(ReadOnlyMemory<byte> cuerpo);
 }
 
 // ---------- Las reservas en el Inventario ----------
@@ -136,6 +144,58 @@ internal interface IRepositorioDePagos
     Task<ResultadoDeAgregarIntento> AgregarIntento(IntentoDeCobro intento, CancellationToken cancelacion = default);
 
     Task GuardarIntento(IntentoDeCobro intento, CancellationToken cancelacion = default);
+
+    /// <summary>Los intentos <c>iniciado</c> o <c>pendiente_de_confirmacion</c> y los <c>vencido</c> o <c>rechazado</c> resueltos hace menos de 24 horas (un cobro aprobado tarde sigue siendo posible), los más antiguos primero: los que el trabajo de consulta revisa.</summary>
+    Task<IReadOnlyList<Guid>> ListarIntentosParaConsultar(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default);
+
+    /// <summary>Las intenciones <c>aprobada</c> sin completar, las más antiguas primero: las que la retoma completa o compensa.</summary>
+    Task<IReadOnlyList<Guid>> ListarIntencionesAprobadas(int limite, CancellationToken cancelacion = default);
+
+    /// <summary>Las intenciones de una cuenta (con <c>FOR UPDATE</c> si se van a cambiar): lo que la cancelación de la cuenta desvincula. Corre dentro de la transacción de Identidad.</summary>
+    Task<IReadOnlyList<IntencionDePago>> ListarIntencionesDeLaCuenta(Guid cuentaId, bool paraActualizar, CancellationToken cancelacion = default);
+
+    /// <summary>Cuántas intenciones de la cuenta están en curso: con un cobro sin resolver (<c>con_cobro</c>) o aprobadas sin pedido (PAG-24).</summary>
+    Task<int> ContarIntencionesEnCursoDeLaCuenta(Guid cuentaId, CancellationToken cancelacion = default);
+
+    /// <summary>Las intenciones <c>abierta</c> cuya vigencia ya venció, las más antiguas primero: las que el trabajo cierra sin cobro.</summary>
+    Task<IReadOnlyList<Guid>> ListarIntencionesAbiertasVencidas(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default);
+
+    /// <summary>Las intenciones que aún guardan el contacto de entrega y cumplieron sus 30 días de retención (PAG-27).</summary>
+    Task<IReadOnlyList<Guid>> ListarIntencionesConContactoVencido(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default);
+
+    /// <summary>Las intenciones cerradas antes de <paramref name="corte"/> que siguen vinculadas a una cuenta, con <c>FOR UPDATE</c> (PAG-26).</summary>
+    Task<IReadOnlyList<IntencionDePago>> ListarIntencionesCerradasParaDepurar(DateTimeOffset corte, int limite, CancellationToken cancelacion = default);
+
+    /// <summary>Las compensaciones ya iniciadas que no terminaron, las más antiguas primero.</summary>
+    Task<IReadOnlyList<Compensacion>> ListarCompensacionesSinTerminar(int limite, CancellationToken cancelacion = default);
+
+    /// <summary>La compensación de un cobro (una por cobro, clave <c>(intención, intento)</c>).</summary>
+    Task<Compensacion?> ObtenerCompensacion(Guid intentoId, CancellationToken cancelacion = default);
+
+    /// <summary>Inserta la compensación; <c>false</c> si ya existe la del intento (la clave única).</summary>
+    Task<bool> AgregarCompensacion(Compensacion compensacion, CancellationToken cancelacion = default);
+
+    Task GuardarCompensacion(Compensacion compensacion, CancellationToken cancelacion = default);
+
+    /// <summary>Inserta el aviso a Carrito en la transacción de la transición; <c>false</c> si ya existe el de esa clave <c>(intención, intento, transición)</c>.</summary>
+    Task<bool> AgregarAvisoACarrito(AvisoACarrito aviso, CancellationToken cancelacion = default);
+
+    /// <summary>Inserta el aviso del estado del pago al cliente; <c>false</c> si ya existe el de esa clave <c>(intención, intento, evento)</c>.</summary>
+    Task<bool> AgregarAvisoDePago(AvisoDePago aviso, CancellationToken cancelacion = default);
+
+    Task<IReadOnlyList<AvisoACarrito>> ListarAvisosACarritoDeLaIntencion(Guid intencionId, CancellationToken cancelacion = default);
+
+    Task<IReadOnlyList<AvisoDePago>> ListarAvisosDePagoDeLaIntencion(Guid intencionId, CancellationToken cancelacion = default);
+
+    /// <summary>Las intenciones con algún aviso a Carrito pendiente de enviar ahora (listo, sin espera tras una falla), las más antiguas primero.</summary>
+    Task<IReadOnlyList<Guid>> ListarIntencionesConAvisosACarritoListos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default);
+
+    Task GuardarAvisoACarrito(AvisoACarrito aviso, CancellationToken cancelacion = default);
+
+    /// <summary>Los avisos del estado del pago listos para enviar por correo (pendientes y sin espera tras una falla), los más antiguos primero.</summary>
+    Task<IReadOnlyList<AvisoDePago>> ListarAvisosDePagoListos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default);
+
+    Task GuardarAvisoDePago(AvisoDePago aviso, CancellationToken cancelacion = default);
 }
 
 /// <summary>Los reembolsos de toda la plataforma (D08): clave natural única por origen.</summary>
@@ -152,10 +212,16 @@ internal interface IRepositorioDeReembolsos
 
     Task Guardar(Reembolso reembolso, CancellationToken cancelacion = default);
 
-    /// <summary>Los reembolsos pendientes o solicitados de un origen en las intenciones de una cuenta (PAG-24).</summary>
-    Task<int> ContarPendientesDeLaCuenta(Guid cuentaId, OrigenDeReembolso origen, CancellationToken cancelacion = default);
+    /// <summary>Los reembolsos pendientes o solicitados de un origen en las intenciones de una cuenta (PAG-24); con <paramref name="sinLosDeCancelacionDeCuenta"/> se excluyen los de una compensación por PAG-32, que no difieren la cancelación.</summary>
+    Task<int> ContarPendientesDeLaCuenta(Guid cuentaId, OrigenDeReembolso origen, bool sinLosDeCancelacionDeCuenta = false, CancellationToken cancelacion = default);
 
     Task<(IReadOnlyList<Reembolso> Reembolsos, int Total)> ListarPendientes(int pagina, int tamano, CancellationToken cancelacion = default);
+
+    /// <summary>Los reembolsos <c>solicitado</c> sin resolver desde hace tiempo (huérfanos): el proceso cayó tras pedirlos.</summary>
+    Task<IReadOnlyList<Guid>> ListarHuerfanos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default);
+
+    /// <summary>Los reembolsos <c>pendiente</c> que el trabajo reintenta ahora (<c>PuedeReintentarseAutomaticamente</c>), los más antiguos primero.</summary>
+    Task<IReadOnlyList<Guid>> ListarReintentables(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default);
 }
 
 // ---------- La cuenta del pagador (Identidad) ----------

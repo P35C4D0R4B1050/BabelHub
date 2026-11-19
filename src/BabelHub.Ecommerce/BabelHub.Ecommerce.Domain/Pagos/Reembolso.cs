@@ -216,6 +216,32 @@ public sealed class Reembolso
         return MotivoPendiente != MotivoPendienteDeReembolso.SinRespuesta || UltimoIntentoEn is null || ahora - UltimoIntentoEn.Value > EsperaTrasSinRespuesta;
     }
 
+    /// <summary>Tras este número de intentos el trabajo ya no reintenta solo: lo ve y lo reintenta la administración central (R06).</summary>
+    public const int MaximoDeReintentosAutomaticos = 8;
+
+    /// <summary>La espera máxima entre dos reintentos automáticos.</summary>
+    public static readonly TimeSpan EsperaMaximaEntreReintentos = TimeSpan.FromHours(1);
+
+    /// <summary>
+    /// Lo que reintenta el trabajo (R06): uno pendiente que nunca se pidió o que quedó sin respuesta, con una <b>espera creciente</b> por intento y hasta un máximo. Un reembolso <c>rechazado_por_pasarela</c> o
+    /// <c>no_soportado</c> (por ejemplo, Yape por la API) no se vuelve a pedir solo: lo reintenta la administración central, que sí usa <see cref="PuedeReintentarse"/>.
+    /// </summary>
+    public bool PuedeReintentarseAutomaticamente(DateTimeOffset ahora)
+    {
+        if (!PuedeReintentarse(ahora) || Intentos >= MaximoDeReintentosAutomaticos || MotivoPendiente is MotivoPendienteDeReembolso.RechazadoPorPasarela or MotivoPendienteDeReembolso.NoSoportado)
+        {
+            return false;
+        }
+
+        if (UltimoIntentoEn is null)
+        {
+            return true;
+        }
+
+        var espera = TimeSpan.FromTicks(Math.Min(EsperaMaximaEntreReintentos.Ticks, EsperaTrasSinRespuesta.Ticks << Math.Min(Math.Max(Intentos - 1, 0), 10)));
+        return ahora - UltimoIntentoEn.Value >= espera;
+    }
+
     public bool EsHuerfano(DateTimeOffset ahora) => Estado == EstadoDeReembolso.Solicitado && UltimoIntentoEn is { } ultimo && ahora - ultimo >= PlazoDeHuerfano;
 
     internal Reembolso Copiar() => (Reembolso)MemberwiseClone();

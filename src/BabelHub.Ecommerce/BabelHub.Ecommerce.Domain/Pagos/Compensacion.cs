@@ -72,7 +72,7 @@ public sealed class Compensacion
         Motivo = motivo;
         Variante = variante;
         IniciadaEn = ahora;
-        Avisar = variante == VarianteDeCompensacion.SoloReembolso || motivo is MotivoDeCompensacion.PagoTardio or MotivoDeCompensacion.FallaPosteriorAlPago;
+        Avisar = motivo is MotivoDeCompensacion.PagoTardio or MotivoDeCompensacion.FallaPosteriorAlPago;
 
         // Una compra solo digital no tiene reservas que liberar: el paso ya está hecho.
         if (variante == VarianteDeCompensacion.Completa && !tieneReservas)
@@ -89,7 +89,7 @@ public sealed class Compensacion
 
     public VarianteDeCompensacion Variante { get; }
 
-    /// <summary>PAG-29 y PAG-32 no avisan ni leen el correo (PAG-26); los demás avisan «reembolso automático».</summary>
+    /// <summary>PAG-29 y PAG-32 no avisan ni leen el correo (PAG-26), tampoco en un cobro sobrante; los demás avisan «reembolso automático».</summary>
     public bool Avisar { get; }
 
     public DateTimeOffset IniciadaEn { get; }
@@ -107,6 +107,9 @@ public sealed class Compensacion
     public DateTimeOffset? CompletadaEn { get; private set; }
 
     public bool EstaTerminada => CompletadaEn is not null;
+
+    /// <summary>Una copia (para que las pruebas simulen la reversión de una transacción).</summary>
+    internal Compensacion Copiar() => (Compensacion)MemberwiseClone();
 
     /// <summary>La clave natural del reembolso de esta compensación: <c>comp:&lt;intentoId&gt;</c>.</summary>
     public string ClaveDelReembolso => ClaveDeReembolso.Compensacion(IntentoId);
