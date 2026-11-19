@@ -144,6 +144,12 @@ internal interface IRepositorioDePagos
     Task<bool> AgregarCompensacion(Compensacion compensacion, CancellationToken cancelacion = default);
 
     Task GuardarCompensacion(Compensacion compensacion, CancellationToken cancelacion = default);
+
+    /// <summary>Inserta el aviso a Carrito en la transacción de la transición; <c>false</c> si ya existe el de esa clave <c>(intención, intento, transición)</c>.</summary>
+    Task<bool> AgregarAvisoACarrito(AvisoACarrito aviso, CancellationToken cancelacion = default);
+
+    /// <summary>Inserta el aviso del estado del pago al cliente; <c>false</c> si ya existe el de esa clave <c>(intención, intento, evento)</c>.</summary>
+    Task<bool> AgregarAvisoDePago(AvisoDePago aviso, CancellationToken cancelacion = default);
 }
 
 /// <summary>Los reembolsos de toda la plataforma (D08): clave natural única por origen.</summary>

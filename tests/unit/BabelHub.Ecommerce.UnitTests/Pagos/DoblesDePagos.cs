@@ -234,6 +234,29 @@ internal sealed class ConfirmadorDeCompraDoble(UnidadDeTrabajoReversible unidad)
     }
 }
 
+/// <summary>Lo que Pedidos implementa (D01): guarda lo que recibió, anota si lo llamaron dentro de la transacción y devuelve lo que la prueba fije o lanza.</summary>
+internal sealed class ConfirmacionDeCompraDoble(UnidadDeTrabajoReversible unidad) : IConfirmacionDeCompra
+{
+    public ResultadoDeConfirmarCompra Resultado { get; set; } = ResultadoDeConfirmarCompra.Creado;
+
+    public bool Lanza { get; set; }
+
+    public List<CompraAprobada> Compras { get; } = [];
+
+    public int LlamadasDentroDeUnaTransaccion { get; private set; }
+
+    public Task<ResultadoDeConfirmarCompra> Confirmar(CompraAprobada compra, CancellationToken cancelacion = default)
+    {
+        Compras.Add(compra);
+        if (unidad.EnCurso)
+        {
+            LlamadasDentroDeUnaTransaccion++;
+        }
+
+        return Lanza ? throw new InvalidOperationException("Pedidos cayó a mitad de la transacción.") : Task.FromResult(Resultado);
+    }
+}
+
 /// <summary>El paso (c) de la confirmación (T15): devuelve lo que la prueba fije y anota si lo llamaron dentro de una transacción.</summary>
 internal sealed class CompletadorDeCompraDoble(UnidadDeTrabajoReversible unidad) : ICompletadorDeCompra
 {

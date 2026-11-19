@@ -16,6 +16,8 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
     private Dictionary<Guid, IntencionDePago> _intenciones = [];
     private Dictionary<Guid, IntentoDeCobro> _intentos = [];
     private Dictionary<Guid, Compensacion> _compensaciones = [];
+    private List<AvisoACarrito> _avisosACarrito = [];
+    private List<AvisoDePago> _avisosDePago = [];
 
     public IReadOnlyCollection<IntencionDePago> Intenciones => _intenciones.Values;
 
@@ -121,14 +123,62 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
         return Task.CompletedTask;
     }
 
-    public object Capturar() => (_intenciones.ToDictionary(p => p.Key, p => p.Value.Copiar()), _intentos.ToDictionary(p => p.Key, p => p.Value.Copiar()), _compensaciones.ToDictionary(p => p.Key, p => p.Value.Copiar()));
+    public IReadOnlyCollection<AvisoACarrito> AvisosACarrito => _avisosACarrito;
+
+    public IReadOnlyCollection<AvisoDePago> AvisosDePago => _avisosDePago;
+
+    /// <summary>Hace fallar la inserción de los avisos (para probar que la transición se revierte entera).</summary>
+    public bool FallaAlAgregarAvisos { get; set; }
+
+    public Task<bool> AgregarAvisoACarrito(AvisoACarrito aviso, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        if (FallaAlAgregarAvisos)
+        {
+            throw new InvalidOperationException("La base no acepta el aviso.");
+        }
+
+        if (_avisosACarrito.Any(a => a.Clave == aviso.Clave))
+        {
+            return Task.FromResult(false);
+        }
+
+        _avisosACarrito.Add(aviso.Copiar());
+        return Task.FromResult(true);
+    }
+
+    public Task<bool> AgregarAvisoDePago(AvisoDePago aviso, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        if (FallaAlAgregarAvisos)
+        {
+            throw new InvalidOperationException("La base no acepta el aviso.");
+        }
+
+        if (_avisosDePago.Any(a => a.Clave == aviso.Clave))
+        {
+            return Task.FromResult(false);
+        }
+
+        _avisosDePago.Add(aviso.Copiar());
+        return Task.FromResult(true);
+    }
+
+    public object Capturar() => (
+        _intenciones.ToDictionary(p => p.Key, p => p.Value.Copiar()),
+        _intentos.ToDictionary(p => p.Key, p => p.Value.Copiar()),
+        _compensaciones.ToDictionary(p => p.Key, p => p.Value.Copiar()),
+        _avisosACarrito.Select(a => a.Copiar()).ToList(),
+        _avisosDePago.Select(a => a.Copiar()).ToList());
 
     public void Restaurar(object instantanea)
     {
-        var (intenciones, intentos, compensaciones) = ((Dictionary<Guid, IntencionDePago>, Dictionary<Guid, IntentoDeCobro>, Dictionary<Guid, Compensacion>))instantanea;
+        var (intenciones, intentos, compensaciones, avisosACarrito, avisosDePago) = ((Dictionary<Guid, IntencionDePago>, Dictionary<Guid, IntentoDeCobro>, Dictionary<Guid, Compensacion>, List<AvisoACarrito>, List<AvisoDePago>))instantanea;
         _intenciones = intenciones;
         _intentos = intentos;
         _compensaciones = compensaciones;
+        _avisosACarrito = avisosACarrito;
+        _avisosDePago = avisosDePago;
     }
 }
 
