@@ -32,6 +32,9 @@ internal sealed class AnonimizarContactoDeUnaCuenta(IRepositorioDePedidos pedido
                 await pedidos.Actualizar(pedido, cancelacion).ConfigureAwait(false);
                 anonimizados++;
             }
+
+            // Junto con el contacto (plan §3): la identidad de quien inició sus anulaciones y entregas.
+            await pedidos.AnonimizarIniciadoresDeOperaciones(pedido.Id, cancelacion).ConfigureAwait(false);
         }
 
         if (anonimizados > 0)
@@ -92,7 +95,8 @@ internal sealed class AnonimizarContactosVencidos(
     {
         var ahora = reloj.Ahora;
         var hoy = reloj.HoyEnLima;
-        var vencidos = await pedidos.ListarVencidosParaDepurar(hoy, MaximoPorCorrida, cancelacion).ConfigureAwait(false);
+        // Se vuelve a comprobar el vencimiento con la regla del Dominio: un filtro más amplio del adaptador nunca anonimiza antes de tiempo.
+        var vencidos = (await pedidos.ListarVencidosParaDepurar(hoy, MaximoPorCorrida, cancelacion).ConfigureAwait(false)).Where(p => p.EstaVencidoParaDepurar(hoy)).ToList();
         var anonimizados = vencidos.Count(p => p.Contacto is not null);
 
         // Se audita primero: sin poder auditar no se anonimiza nada (y la transacción se revierte entera si algo falla después).
@@ -172,12 +176,14 @@ internal sealed class LiberarContactoDeIntenciones(
         }
 
         int liberados = 0, pendientes = 0;
+        var vencidaSinLiberar = false;
         foreach (var anotada in anotadas)
         {
             try
             {
-                var pedido = await pedidos.Obtener(anotada.PedidoId, conBloqueo: false, cancelacion).ConfigureAwait(false);
-                if (pedido?.Contacto is not null)
+                var pedido = await pedidos.Obtener(anotada.PedidoId, conBloqueo: false, cancelacion).ConfigureAwait(false)
+                    ?? throw new InvalidOperationException("El pedido de una liberación de contacto no existe.");
+                if (pedido.Contacto is not null)
                 {
                     await liberacion.Liberar(anotada.PedidoId, cancelacion).ConfigureAwait(false);
                 }
@@ -188,26 +194,43 @@ internal sealed class LiberarContactoDeIntenciones(
             catch (Exception excepcion) when (excepcion is not OperationCanceledException)
             {
                 pendientes++;
-                await AnotarElIntento(anotada, cancelacion).ConfigureAwait(false);
+                vencidaSinLiberar |= await AnotarElIntento(anotada, cancelacion).ConfigureAwait(false);
             }
+        }
+
+        // Una sola alerta por pasada, aunque sean muchas las filas vencidas.
+        if (vencidaSinLiberar)
+        {
+            await Alertar(cancelacion).ConfigureAwait(false);
         }
 
         return Resultado<ResultadoDeLaLiberacionDeContactos>.Exito(new ResultadoDeLaLiberacionDeContactos(liberados, pendientes));
     }
 
-    private async Task AnotarElIntento(LiberacionDeContactoPendiente anotada, CancellationToken cancelacion)
+    /// <summary>Anota el intento y dice si la fila ya lleva 24 horas o más sin liberarse.</summary>
+    private async Task<bool> AnotarElIntento(LiberacionDeContactoPendiente anotada, CancellationToken cancelacion)
     {
         try
         {
             await pedidos.AnotarIntentoDeLiberacionDeContacto(anotada.PedidoId, reloj.Ahora, cancelacion).ConfigureAwait(false);
-            if (reloj.Ahora - anotada.Desde >= SinLiberarDurante)
-            {
-                await alertas.Publicar(new AlertaTecnica(AlertaSinLiberar, reloj.Ahora), cancelacion).ConfigureAwait(false);
-            }
         }
         catch (Exception excepcion) when (excepcion is not OperationCanceledException)
         {
             // El intento se repite en la pasada siguiente; nunca se detiene el resto.
+        }
+
+        return reloj.Ahora - anotada.Desde >= SinLiberarDurante;
+    }
+
+    private async Task Alertar(CancellationToken cancelacion)
+    {
+        try
+        {
+            await alertas.Publicar(new AlertaTecnica(AlertaSinLiberar, reloj.Ahora), cancelacion).ConfigureAwait(false);
+        }
+        catch (Exception excepcion) when (excepcion is not OperationCanceledException)
+        {
+            // Una alerta que no se publica nunca interrumpe la pasada.
         }
     }
 }

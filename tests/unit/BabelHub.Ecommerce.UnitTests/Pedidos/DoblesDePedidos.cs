@@ -150,13 +150,17 @@ internal sealed class RepositorioDePedidosFalso : IRepositorioDePedidos
     public Task<IReadOnlyList<Pedido>> ListarDeLaCuentaConBloqueo(Guid cuentaId, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<Pedido>>([.. _pedidos.Values.Where(p => p.CuentaId == cuentaId).OrderBy(p => p.Id)]);
 
+    /// <summary>Pedidos que el listado devuelve aunque no estén vencidos (un filtro del adaptador más amplio que el Dominio).</summary>
+    public HashSet<Guid> ForzadosParaDepurar { get; } = [];
+
     public Task<IReadOnlyList<Pedido>> ListarVencidosParaDepurar(DateOnly hoyEnLima, int maximo, CancellationToken cancelacion = default) =>
-        Task.FromResult<IReadOnlyList<Pedido>>([.. _pedidos.Values
+        Task.FromResult<IReadOnlyList<Pedido>>([.. _pedidos.Values.Where(p => ForzadosParaDepurar.Contains(p.Id)).Concat(_pedidos.Values
             .Where(p => p.EstaVencidoParaDepurar(hoyEnLima) && (p.Contacto is not null
                 || Anulaciones.Any(a => a.PedidoId == p.Id && !a.Iniciador.EstaAnonimizado)
                 || Entregas.Any(e => e.PedidoId == p.Id && !e.Iniciador.EstaAnonimizado)))
             .OrderBy(p => p.Id)
-            .Take(maximo)]);
+            .Take(maximo))
+            .Distinct()]);
 
     public Task<int> AnonimizarIniciadoresDeOperaciones(Guid pedidoId, CancellationToken cancelacion = default)
     {

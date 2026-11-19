@@ -199,5 +199,9 @@ public sealed class MotivosDeAlertaDePedidosTests
         Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.PedidoOperacionFallida, CompletarOperacionesEnCurso.AlertaOperacionFallida);
         Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.PedidoEstadoDeTrasladoInexistente, RecibirEstadoDeTraslado.AlertaPedidoInexistente);
         Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.PedidoEstadoDeTrasladoDeLineaAnulada, RecibirEstadoDeTraslado.AlertaLineaAnulada);
+        // Los motivos de los trabajos de privacidad y revisión: existen en el catálogo (el texto propio de cada uno está pendiente, ver hallazgos).
+        Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.TrabajoDeFondoDetenido, AnonimizarContactosVencidos.AlertaSinCorrida);
+        Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.TrabajoDeFondoDetenido, LiberarContactoDeIntenciones.AlertaSinLiberar);
+        Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.PedidoOperacionFallida, RevisarPedidosSinEstadoFinal.AlertaOperacionPendiente);
     }
 }

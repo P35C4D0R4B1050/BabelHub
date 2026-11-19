@@ -30,13 +30,15 @@ internal sealed class RevisarPedidosSinEstadoFinal(AutorizadorDePedidos autoriza
         var ahora = reloj.Ahora;
         try
         {
+            // Se cuenta y se alerta primero: una purga que falla todos los días no debe silenciar la alerta de la retención sin plazo.
             var noRecogidas = await pedidos.ContarNoRecogidasSinAnularDesde(ahora - NoRecogidaSinAnularDurante, cancelacion).ConfigureAwait(false);
             var sinFinal = await pedidos.ContarImpresasSinEstadoFinalDesde(ahora - SinEstadoFinalDurante, cancelacion).ConfigureAwait(false);
-            var purgados = await pedidos.PurgarEstadosDeTraslado(ahora - RetencionDeEstadosDeTraslado, cancelacion).ConfigureAwait(false);
             if (noRecogidas > 0 || sinFinal > 0)
             {
                 await Alertar(cancelacion).ConfigureAwait(false);
             }
+
+            var purgados = await pedidos.PurgarEstadosDeTraslado(ahora - RetencionDeEstadosDeTraslado, cancelacion).ConfigureAwait(false);
 
             return Resultado<ResultadoDeLaRevisionSinEstadoFinal>.Exito(new ResultadoDeLaRevisionSinEstadoFinal(noRecogidas, sinFinal, purgados));
         }

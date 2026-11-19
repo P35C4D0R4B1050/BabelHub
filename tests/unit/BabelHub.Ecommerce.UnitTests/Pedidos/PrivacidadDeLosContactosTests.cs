@@ -176,6 +176,23 @@ public sealed class PrivacidadDeLosContactosTests
     }
 
     [Fact]
+    public async Task Un_filtro_del_adaptador_mas_amplio_no_anonimiza_antes_de_tiempo_ni_infla_el_conteo()
+    {
+        var entorno = new EntornoDeDepuracion();
+        var noVencido = Domicilio(Cuenta, Ahora.AddYears(-2).AddDays(1));
+        entorno.Repositorio.Poner(noVencido);
+        entorno.Repositorio.ForzadosParaDepurar.Add(noVencido.Id);
+        var fila = Anulacion.Iniciar(Guid.NewGuid(), noVencido.Id, noVencido.PlanearAnulacionDeLaAdministracion(MotivoDeAnulacion.Otro).Plan ?? Domicilio(Cuenta).PlanearAnulacionDeLaAdministracion(MotivoDeAnulacion.Otro).Plan!, new IniciadorDeOperacion(Guid.NewGuid(), "administrador-central", null), Ahora);
+        entorno.Repositorio.Anulaciones.Add(fila);
+
+        var resultado = await entorno.Caso.Depurar();
+
+        Assert.Equal(0, resultado.Valor.Anonimizados);
+        Assert.NotNull(noVencido.Contacto);
+        Assert.False(fila.Iniciador.EstaAnonimizado);
+    }
+
+    [Fact]
     public async Task Solo_el_sistema_depura()
     {
         foreach (var actor in new[] { ActorDePrueba.DeAdministradorCentral(), ActorDePrueba.DeCliente(Cuenta) })
@@ -204,6 +221,23 @@ public sealed class PrivacidadDeLosContactosTests
             Pedidos.Add(pedidoId);
             return Task.CompletedTask;
         }
+    }
+
+    [Fact]
+    public async Task La_liberacion_de_contactos_solo_la_corre_el_sistema_y_una_fila_de_un_pedido_que_no_existe_queda_pendiente_en_vez_de_borrarse()
+    {
+        var repositorio = new RepositorioDePedidosFalso();
+        var pagos = new LiberacionDePagosFalsa();
+        LiberarContactoDeIntenciones Armar(ActorDePrueba actor) => new(new AutorizadorDePedidos(actor, new DenegacionesDelCatalogoEspia(), new ResolucionDeSucursalFalsa()), repositorio, pagos, new AlertasTecnicasEspia(), new RelojFijo(Ahora));
+
+        Assert.Equal("prohibido", (await Armar(ActorDePrueba.DeAdministradorCentral()).Liberar()).Error!.Clave);
+
+        await repositorio.RegistrarLiberacionDeContacto(Guid.NewGuid(), Ahora, default);
+        var resultado = await Armar(ActorDePrueba.DelSistema()).Liberar();
+
+        Assert.Equal((0, 1), (resultado.Valor.Liberados, resultado.Valor.Pendientes));
+        Assert.Single(repositorio.LiberacionesDeContacto);
+        Assert.Empty(pagos.Pedidos);
     }
 
     [Fact]
