@@ -103,19 +103,19 @@ internal sealed partial class ServiciosDelCheckout(ServiciosDelCarrito carrito, 
         return null;
     }
 
-    /// <summary>La consulta previa de los impresos para un recojo (fuente, traslado y plazo por línea); sin respuesta no se avanza.</summary>
-    public async Task<(ErrorDeAplicacion? Error, IReadOnlyDictionary<Guid, InformacionDeLinea> Informacion)> ConsultaPreviaDeRecojo(string codigoDeSucursal, IReadOnlyList<LineaParaElInventario> lineas, CancellationToken cancelacion)
+    /// <summary>La consulta previa de los impresos para una entrega (fuente, traslado y plazo por línea); sin respuesta no se avanza (CAR-06).</summary>
+    public async Task<(ErrorDeAplicacion? Error, IReadOnlyDictionary<Guid, InformacionDeLinea> Informacion, IReadOnlyList<SeleccionDeLinea> Selecciones)> ConsultaPrevia(EntregaParaElInventario entrega, IReadOnlyList<LineaParaElInventario> lineas, CancellationToken cancelacion)
     {
         var informacion = new Dictionary<Guid, InformacionDeLinea>();
         if (lineas.Count == 0)
         {
-            return (null, informacion);
+            return (null, informacion, []);
         }
 
-        var respuesta = await inventario.ConsultarPrevia(new EntregaParaElInventario(Tipo.Recojo, codigoDeSucursal, null), lineas, cancelacion).ConfigureAwait(false);
+        var respuesta = await inventario.ConsultarPrevia(entrega, lineas, cancelacion).ConfigureAwait(false);
         if (!respuesta.Exitosa)
         {
-            return (StockNoValidable(), informacion);
+            return (StockNoValidable(), informacion, []);
         }
 
         foreach (var s in respuesta.Valor.Lineas)
@@ -123,7 +123,60 @@ internal sealed partial class ServiciosDelCheckout(ServiciosDelCarrito carrito, 
             informacion[s.EdicionId] = DeSeleccion(s);
         }
 
-        return (null, informacion);
+        return (null, informacion, respuesta.Valor.Lineas);
+    }
+
+    /// <summary>
+    /// El estado del checkout frente a una edición de la entrega, el contacto o las aceptaciones: con el pago pendiente se rechaza (CAR-26) y con <c>reservando</c> responde «en curso»; con <c>en_pago</c> la decide la edición
+    /// común (<see cref="EdicionConCheckoutVivo"/>, que reabre la intención). Sin error con <c>en_edicion</c> y <c>en_pago</c>.
+    /// </summary>
+    public static ErrorDeAplicacion? ErrorDeEstado(EstadoDelCheckout estado) => estado switch
+    {
+        EstadoDelCheckout.PagoPendiente => new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.PagoPendiente),
+        EstadoDelCheckout.Reservando => new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.EnCurso),
+        _ => null,
+    };
+
+    /// <summary>
+    /// Lo primero de todo caso de uso del checkout: solo un cliente con sesión y cuenta activa (falla cerrado si Identidad no responde), el límite de revisión, el <c>pedidoId</c> oculto si lo trae (uno ajeno o inexistente es «no
+    /// encontrado» uniforme con su evento; el propio ya terminado o descartado, un error amable sin evento) y el checkout vivo de la cuenta leído sin bloqueo (sin checkout, «no encontrado»).
+    /// </summary>
+    public async Task<Resultado<CheckoutDeQuienPide>> EntrarAlCheckout(Guid? pedidoOculto, CancellationToken cancelacion)
+    {
+        var cuenta = await carrito.Autorizador.ExigirCuenta(cancelacion).ConfigureAwait(false);
+        if (!cuenta.EsExito)
+        {
+            return Resultado<CheckoutDeQuienPide>.Fallo(cuenta.Error!);
+        }
+
+        if (await carrito.ExigirCuentaActiva(cuenta.Valor, cancelacion).ConfigureAwait(false) is { } cuentaRechazada)
+        {
+            return Resultado<CheckoutDeQuienPide>.Fallo(cuentaRechazada);
+        }
+
+        if (ServiciosDelCarrito.ErrorDeLimite(await carrito.Limites.RevisarCheckout(cuenta.Valor, cancelacion).ConfigureAwait(false)) is { } limite)
+        {
+            return Resultado<CheckoutDeQuienPide>.Fallo(limite);
+        }
+
+        if (pedidoOculto is { } pedido)
+        {
+            var dueno = await carrito.Checkouts.ObtenerPorPedido(pedido, conBloqueo: false, cancelacion).ConfigureAwait(false);
+            var visto = dueno is null ? null : new PedidoVisto(dueno.CuentaId, dueno.EsVivo && dueno.PedidoId == pedido);
+            if (await carrito.Autorizador.ComprobarPedidoOculto(pedido, cuenta.Valor, visto, cancelacion).ConfigureAwait(false) is { } rechazo)
+            {
+                return Resultado<CheckoutDeQuienPide>.Fallo(rechazo);
+            }
+        }
+
+        var vivo = await carrito.Checkouts.ObtenerVivoDeCuenta(cuenta.Valor, conBloqueo: false, cancelacion).ConfigureAwait(false);
+        if (vivo is null)
+        {
+            return Resultado<CheckoutDeQuienPide>.Fallo(carrito.Autorizador.NoEncontrado());
+        }
+
+        var delCarrito = await carrito.Carritos.ObtenerDeCuenta(cuenta.Valor, conBloqueo: false, cancelacion).ConfigureAwait(false);
+        return Resultado<CheckoutDeQuienPide>.Exito(new CheckoutDeQuienPide(cuenta.Valor, vivo, delCarrito));
     }
 
     public static InformacionDeLinea DeSeleccion(SeleccionDeLinea s) =>

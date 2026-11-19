@@ -58,6 +58,11 @@ internal static class ClavesDelCarrito
 
     /// <summary>El carrito no tiene ninguna línea que se pueda pagar (CAR-05).</summary>
     public const string CheckoutVacio = "checkout-vacio";
+
+    /// <summary>No se pudo validar la entrega (la lista de sucursales y regiones no está disponible): no se continúa (R05).</summary>
+    public const string EntregaNoValidable = "entrega-no-validable";
+
+    public const string CheckoutNoEncontrado = "checkout-no-encontrado";
 }
 
 /// <summary>Los motivos de <c>AccesoDenegado</c> que usa el módulo (AUD-05).</summary>

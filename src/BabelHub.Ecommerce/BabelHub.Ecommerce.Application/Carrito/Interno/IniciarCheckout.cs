@@ -91,8 +91,8 @@ internal sealed class IniciarCheckout(ServiciosDelCheckout servicios) : ICasoDeU
 
             if (entrada.CodigoDeSucursalPreferida is { } sucursal)
             {
-                var previa = await servicios.ConsultaPreviaDeRecojo(
-                    sucursal,
+                var previa = await servicios.ConsultaPrevia(
+                    new EntregaParaElInventario(TipoDeEntrega.Recojo, sucursal, null),
                     [.. impresas.Select(l => new LineaParaElInventario(carrito.Identificadores.NuevoId(), l.EdicionId, l.Cantidad))],
                     cancelacion).ConfigureAwait(false);
                 if (previa.Error is { } previaFallida)

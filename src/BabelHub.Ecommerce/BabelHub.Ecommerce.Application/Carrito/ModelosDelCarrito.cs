@@ -136,16 +136,13 @@ public sealed record ResultadoDeFusionDeCarrito(VistaDelCarrito Carrito, IReadOn
 [JsonConverter(typeof(ConversorDeContactoDeCompra))]
 public sealed class ContactoDeCompra : IEquatable<ContactoDeCompra>
 {
-    public ContactoDeCompra(string nombre, string telefono, string direccion, string region)
+    /// <summary>Los cuatro datos tal como llegan: la validación (obligatorio, formato, largo, región de la lista) es del caso de uso, que responde por campo sin repetir el valor; un dato ausente se guarda como texto vacío.</summary>
+    public ContactoDeCompra(string? nombre, string? telefono, string? direccion, string? region)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(nombre);
-        ArgumentException.ThrowIfNullOrWhiteSpace(telefono);
-        ArgumentException.ThrowIfNullOrWhiteSpace(direccion);
-        ArgumentException.ThrowIfNullOrWhiteSpace(region);
-        Nombre = nombre;
-        Telefono = telefono;
-        Direccion = direccion;
-        Region = region;
+        Nombre = nombre ?? string.Empty;
+        Telefono = telefono ?? string.Empty;
+        Direccion = direccion ?? string.Empty;
+        Region = region ?? string.Empty;
     }
 
     public string Nombre { get; }
