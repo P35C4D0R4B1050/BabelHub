@@ -104,11 +104,62 @@ public sealed class MigradorDeLaBaseTests(InstanciaParaMigrar instancia) : IClas
 
     [Fact]
     [Trait("Criterio", "AC-PLA-04")]
+    public async Task DosServiciosSobreLaMismaInstancia_NoSePisanLasCuentas_AlMigrarNiAlRepetir_YCadaCuentaSoloEntraASuBase()
+    {
+        var propietariaEco = await instancia.NuevaBase();
+        var propietariaInv = await instancia.NuevaBase();
+        var baseEco = Base(propietariaEco);
+        var baseInv = Base(propietariaInv);
+        var eco = NuevasCuentas("ecommerce_mix");
+        var inv = NuevasCuentas("inventario_mix");
+
+        // Las cuentas son del clúster: se migra el uno, el otro y los dos otra vez, como hace el despliegue de VM-INVENTARIO.
+        Assert.True((await MigrarElEcommerce(ConfiguracionDelEcommerce(propietariaEco, eco, baseEco))).Codigo == 0);
+        Assert.True((await MigrarElInventario(ConfiguracionDelInventario(propietariaInv, inv, baseInv))).Codigo == 0);
+        Assert.True((await MigrarElEcommerce(ConfiguracionDelEcommerce(propietariaEco, eco, baseEco))).Codigo == 0);
+        Assert.True((await MigrarElInventario(ConfiguracionDelInventario(propietariaInv, inv, baseInv))).Codigo == 0);
+
+        // Cada cuenta entra a su base con su contraseña (ninguna fue pisada)…
+        Assert.Equal(1, await Consultar<int>(Conexion(baseEco, eco.Aplicacion, eco.ClaveDeLaAplicacion), "SELECT 1"));
+        Assert.Equal(1, await Consultar<int>(Conexion(baseEco, eco.DepuracionUno, eco.ClaveUno), "SELECT 1"));
+        Assert.Equal(1, await Consultar<int>(Conexion(baseInv, inv.Aplicacion, inv.ClaveDeLaAplicacion), "SELECT 1"));
+        Assert.Equal(1, await Consultar<int>(Conexion(baseInv, inv.DepuracionDos, inv.ClaveDos), "SELECT 1"));
+
+        // …y no entra a la del otro servicio, aunque comparta instancia y roles de esquema con el mismo nombre.
+        await Assert.ThrowsAsync<PostgresException>(() => Consultar<int>(Conexion(baseInv, eco.Aplicacion, eco.ClaveDeLaAplicacion), "SELECT 1"));
+        await Assert.ThrowsAsync<PostgresException>(() => Consultar<int>(Conexion(baseEco, inv.Aplicacion, inv.ClaveDeLaAplicacion), "SELECT 1"));
+    }
+
+    [Theory]
+    [InlineData("acceso", "ecommerce")]
+    [InlineData("inventario_acceso", "ecommerce")]
+    [InlineData("ecommerce_acceso", "inventario")]
+    [InlineData("ecommerce", "ecommerce")]
+    [Trait("Criterio", "AC-PLA-04")]
+    public async Task UnaCuentaQueNoLlevaElNombreDeSuServicio_SeRechazaNombrandola_YNoCreaNada(string nombre, string servicio)
+    {
+        var propietaria = await instancia.NuevaBase();
+        var baseDeDatos = Base(propietaria);
+        var cuentas = new Cuentas(nombre, Clave(), nombre + "_dep_uno", Clave(), nombre + "_dep_dos", Clave());
+
+        var resultado = servicio == "ecommerce"
+            ? await MigrarElEcommerce(ConfiguracionDelEcommerce(propietaria, cuentas, baseDeDatos))
+            : await MigrarElInventario(ConfiguracionDelInventario(propietaria, cuentas, baseDeDatos));
+
+        Assert.NotEqual(0, resultado.Codigo);
+        Assert.Contains(servicio + "_", resultado.Error, StringComparison.Ordinal);
+        Assert.Contains(nombre, resultado.Error, StringComparison.Ordinal);
+        Assert.DoesNotContain(cuentas.ClaveDeLaAplicacion, resultado.Error + resultado.Salida, StringComparison.Ordinal);
+        Assert.Equal(0L, await Consultar<long>(propietaria, $"SELECT count(*) FROM pg_roles WHERE rolname = '{nombre}'"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
     public async Task EnUnaBaseLimpia_ElEcommerceQuedaConSusRolesEsquemasYCuentas_ConElPermisoMinimo()
     {
         var propietaria = await instancia.NuevaBase();
         var baseDeDatos = Base(propietaria);
-        var cuentas = NuevasCuentas("eco1");
+        var cuentas = NuevasCuentas("ecommerce_t1");
 
         var resultado = await MigrarElEcommerce(ConfiguracionDelEcommerce(propietaria, cuentas, baseDeDatos));
 
@@ -167,7 +218,7 @@ public sealed class MigradorDeLaBaseTests(InstanciaParaMigrar instancia) : IClas
     {
         var propietaria = await instancia.NuevaBase();
         var baseDeDatos = Base(propietaria);
-        var cuentas = NuevasCuentas("inv1");
+        var cuentas = NuevasCuentas("inventario_t1");
 
         var resultado = await MigrarElInventario(ConfiguracionDelInventario(propietaria, cuentas, baseDeDatos));
 
@@ -223,7 +274,7 @@ public sealed class MigradorDeLaBaseTests(InstanciaParaMigrar instancia) : IClas
     {
         var propietaria = await instancia.NuevaBase();
         var baseDeDatos = Base(propietaria);
-        var cuentas = NuevasCuentas("eco7");
+        var cuentas = NuevasCuentas("ecommerce_t7");
         Assert.True((await MigrarElEcommerce(ConfiguracionDelEcommerce(propietaria, cuentas, baseDeDatos))).Codigo == 0);
         var acceso = Conexion(baseDeDatos, cuentas.Aplicacion, cuentas.ClaveDeLaAplicacion);
 
@@ -252,7 +303,7 @@ public sealed class MigradorDeLaBaseTests(InstanciaParaMigrar instancia) : IClas
     {
         var propietaria = await instancia.NuevaBase();
         var baseDeDatos = Base(propietaria);
-        var cuentas = NuevasCuentas("inv7");
+        var cuentas = NuevasCuentas("inventario_t7");
         Assert.True((await MigrarElInventario(ConfiguracionDelInventario(propietaria, cuentas, baseDeDatos))).Codigo == 0);
         var acceso = Conexion(baseDeDatos, cuentas.Aplicacion, cuentas.ClaveDeLaAplicacion);
 
@@ -271,7 +322,7 @@ public sealed class MigradorDeLaBaseTests(InstanciaParaMigrar instancia) : IClas
     {
         var propietaria = await instancia.NuevaBase();
         var baseDeDatos = Base(propietaria);
-        var cuentas = NuevasCuentas("eco2");
+        var cuentas = NuevasCuentas("ecommerce_t2");
         var primera = await MigrarElEcommerce(ConfiguracionDelEcommerce(propietaria, cuentas, baseDeDatos));
         await using (var origen = NpgsqlDataSource.Create(propietaria))
         {
@@ -301,12 +352,12 @@ public sealed class MigradorDeLaBaseTests(InstanciaParaMigrar instancia) : IClas
     {
         var propietaria = await instancia.NuevaBase();
         var baseDeDatos = Base(propietaria);
-        var cuentas = NuevasCuentas("eco3");
+        var cuentas = NuevasCuentas("ecommerce_t3");
 
         var resultado = await MigrarElEcommerce(ConfiguracionDelEcommerce(propietaria, cuentas, baseDeDatos));
 
         var pasos = resultado.Salida.Split('\n', StringSplitOptions.RemoveEmptyEntries).Where(l => l.StartsWith("paso: ", StringComparison.Ordinal)).Select(l => l[6..].Trim()).ToList();
-        var esperado = Eco.PlanDeMigracionDelEcommerce.Pasos().Select(p => p.Nombre).Prepend("propietario").Prepend("sin-registro-de-sentencias").Append("propiedad").Concat(new[] { $"cuenta {cuentas.Aplicacion}", $"cuenta {cuentas.DepuracionUno}", $"cuenta {cuentas.DepuracionDos}" }).ToList();
+        var esperado = Eco.PlanDeMigracionDelEcommerce.Pasos().Select(p => p.Nombre).Prepend("propietario").Prepend("sin-registro-de-sentencias").Append("propiedad").Append("conexion-solo-de-sus-cuentas").Concat(new[] { $"cuenta {cuentas.Aplicacion}", $"cuenta {cuentas.DepuracionUno}", $"cuenta {cuentas.DepuracionDos}" }).ToList();
         Assert.Equal(esperado, pasos);
         foreach (var secreto in new[] { cuentas.ClaveDeLaAplicacion, cuentas.ClaveUno, cuentas.ClaveDos, propietaria })
         {
@@ -320,7 +371,7 @@ public sealed class MigradorDeLaBaseTests(InstanciaParaMigrar instancia) : IClas
     {
         var propietaria = await instancia.NuevaBase();
         var baseDeDatos = Base(propietaria);
-        var cuentas = NuevasCuentas("eco4");
+        var cuentas = NuevasCuentas("ecommerce_t4");
         foreach (var variable in new[] { "Migrador:Ecommerce:Propietaria", "Ecommerce:Base:Aplicacion", "Ecommerce:Base:DepuracionDeAuditoria", "Ecommerce:Base:DepuracionDeRegistros" })
         {
             var valores = ConfiguracionDelEcommerce(propietaria, cuentas, baseDeDatos).AsEnumerable().Where(p => p.Key != variable && p.Value is not null).ToDictionary(p => p.Key, p => p.Value);
@@ -341,7 +392,7 @@ public sealed class MigradorDeLaBaseTests(InstanciaParaMigrar instancia) : IClas
     {
         var propietaria = await instancia.NuevaBase();
         var baseDeDatos = Base(propietaria);
-        var cuentas = NuevasCuentas("eco5");
+        var cuentas = NuevasCuentas("ecommerce_t5");
         Assert.True((await MigrarElEcommerce(ConfiguracionDelEcommerce(propietaria, cuentas, baseDeDatos))).Codigo == 0);
 
         // La cuenta de la aplicación como propietaria: se rechaza antes de abrirla por no distinguirse de las del servicio, y una cuenta común sin administración se rechaza al abrirla.
@@ -376,14 +427,14 @@ public sealed class MigradorDeLaBaseTests(InstanciaParaMigrar instancia) : IClas
             "ecommerce",
             [new Eco.PasoDeMigracion("vacio", "SELECT 1")],
             [],
-            [new Eco.CuentaDeBase("cuenta_sin_rol", Clave(), ["rol_que_no_existe"])]);
+            [new Eco.CuentaDeBase("ecommerce_sin_rol", Clave(), ["rol_que_no_existe"])]);
         await using var origen = NpgsqlDataSource.Create(propietaria);
         var salida = new StringWriter();
 
         var falla = await Assert.ThrowsAsync<Eco.MigracionFallidaException>(() => new Eco.MigradorDeLaBase(origen, salida).Ejecutar(plan));
 
         Assert.Contains("rol_que_no_existe", falla.Message, StringComparison.Ordinal);
-        Assert.Equal(0L, await Consultar<long>(propietaria, "SELECT count(*) FROM pg_roles WHERE rolname = 'cuenta_sin_rol'"));
+        Assert.Equal(0L, await Consultar<long>(propietaria, "SELECT count(*) FROM pg_roles WHERE rolname = 'ecommerce_sin_rol'"));
     }
 
     [Fact]
@@ -406,7 +457,7 @@ public sealed class MigradorDeLaBaseTests(InstanciaParaMigrar instancia) : IClas
     [Trait("Criterio", "AC-SEG-25")]
     public async Task SiLaCuentaPropietariaNoPuedeConectar_SaleSinTrazaNiTexto()
     {
-        var cuentas = NuevasCuentas("eco6");
+        var cuentas = NuevasCuentas("ecommerce_t6");
         var configuracion = ConfiguracionDelEcommerce(instancia.Cadena("base_que_no_existe", "postgres", Clave()), cuentas, "base_que_no_existe");
 
         var resultado = await MigrarElEcommerce(configuracion);

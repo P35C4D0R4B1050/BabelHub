@@ -85,6 +85,15 @@ public sealed class MigradorDeLaBase(NpgsqlDataSource propietaria, TextWriter sa
                     await Ejecutar(conexion, "propiedad", PasarLaPropiedad(propietario, plan.EsquemasDelPropietario), cancelacion).ConfigureAwait(false);
                 }
 
+                // Las cuentas de conexión son del clúster, no de la base: dos servicios sobre una misma instancia se pisarían la contraseña si se llamaran igual. Cada cuenta lleva el nombre de su servicio, y solo sus cuentas pueden conectarse a su base (ni siquiera «public»: así una cuenta de otro servicio no llega a ella ni usando un rol de esquema del mismo nombre).
+                var prefijoDeCuentas = NombreSeguro(plan.Servicio) + "_";
+                var ajenas = plan.Cuentas.Where(c => !c.Usuario.StartsWith(prefijoDeCuentas, StringComparison.Ordinal)).Select(c => c.Usuario).ToList();
+                if (ajenas.Count > 0)
+                {
+                    throw new MigracionFallidaException($"Las cuentas de {plan.Servicio} deben llamarse «{prefijoDeCuentas}…» para no pisar las de otro servicio en la misma instancia: {string.Join(", ", ajenas)}.");
+                }
+
+                await Ejecutar(conexion, "conexion-solo-de-sus-cuentas", "DO $r$ BEGIN EXECUTE format('REVOKE CONNECT ON DATABASE %I FROM PUBLIC', current_database()); END $r$;", cancelacion).ConfigureAwait(false);
                 foreach (var cuenta in plan.Cuentas)
                 {
                     await AplicarCuenta(conexion, cuenta, cancelacion).ConfigureAwait(false);

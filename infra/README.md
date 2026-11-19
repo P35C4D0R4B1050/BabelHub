@@ -26,6 +26,8 @@ dotnet run --project src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api -- migrar   #
 unset BABELHUB__Migrador__Ecommerce__Propietaria
 ```
 
+**Cuentas de conexión:** cada servicio solo migra cuentas cuyo nombre empieza por el suyo (`ecommerce_acceso`, `ecommerce_depurador_auditoria`, `inventario_acceso`…) porque los roles son del clúster y, con las dos bases en una instancia, un mismo nombre en los dos servicios se pisa la contraseña; el migrador lo exige y deja el `CONNECT` de cada base solo para sus cuentas. Ajusta los usuarios de `BABELHUB__<Servicio>__Base__…` y de las cadenas de `postgres.env` antes de migrar.
+
 Es idempotente (repetirlo es seguro y solo rota las contraseñas), falla cerrado nombrando la variable o el rol que falta y no imprime ninguna clave. La cuenta propietaria debe ser de administración (crea roles y extensiones) y distinta de las del servicio.
 
 ```bash
