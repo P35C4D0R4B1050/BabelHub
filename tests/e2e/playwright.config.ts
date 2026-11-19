@@ -10,7 +10,7 @@ type Proyecto = NonNullable<PlaywrightTestConfig['projects']>[number];
 // Obligatorios: Chromium de escritorio y de teléfono (375 px: el catálogo debe verse bien en ambos). WebKit y Firefox son opcionales: un navegador
 // que no está en la caché de Playwright o que el sistema no deja lanzar se omite con un aviso, nunca falla la corrida. Un fallo solo de Firefox es
 // informativo (no reabre bloques cerrados, salvo un defecto real de estándares o de accesibilidad que afecte también a los demás).
-function disponible(ejecutable: () => string): { disponible: boolean; motivo?: string } {
+function disponible(nombre: 'webkit' | 'firefox', ejecutable: () => string): { disponible: boolean; motivo?: string } {
   let ruta: string;
   try {
     ruta = ejecutable();
@@ -20,9 +20,18 @@ function disponible(ejecutable: () => string): { disponible: boolean; motivo?: s
   if (!ruta || !existsSync(ruta)) {
     return { disponible: false, motivo: 'no está en la caché de Playwright' };
   }
-  // Se prueba que el sistema deje lanzarlo (antivirus, política): «Permission denied» o «spawn UNKNOWN» lo omiten sin tocar nada del sistema.
-  const prueba = spawnSync(ruta, ['--version'], { timeout: 8000 });
-  return prueba.error ? { disponible: false, motivo: `el sistema no lo deja lanzar (${(prueba.error as NodeJS.ErrnoException).code ?? 'error'})` } : { disponible: true };
+  // Se prueba que el navegador realmente inicie (antivirus, política del sistema, dependencias): si no, se omite sin tocar nada del sistema.
+  // El resultado se guarda en el entorno para que los procesos de trabajo de Playwright (que vuelven a cargar este archivo) no lo repitan.
+  const clave = `E2E_SONDEO_${nombre.toUpperCase()}`;
+  if (process.env[clave] === undefined) {
+    const prueba = spawnSync(
+      process.execPath,
+      ['-e', `const { ${nombre} } = require('@playwright/test'); (async () => { const b = await ${nombre}.launch(); await b.close(); })().catch(() => process.exit(1));`],
+      { timeout: 45000, cwd: __dirname },
+    );
+    process.env[clave] = prueba.error || prueba.status !== 0 ? 'no' : 'si';
+  }
+  return process.env[clave] === 'si' ? { disponible: true } : { disponible: false, motivo: 'no inicia en este equipo (el sistema no lo deja lanzar)' };
 }
 
 const opcionales: Proyecto[] = [];
@@ -34,7 +43,7 @@ for (const [nombre, ejecutable, dispositivo] of [
   if (!quiereOpcionales) {
     continue;
   }
-  const estado = disponible(ejecutable);
+  const estado = disponible(nombre, ejecutable);
   if (estado.disponible) {
     opcionales.push({ name: nombre, use: { ...dispositivo } });
   } else {
