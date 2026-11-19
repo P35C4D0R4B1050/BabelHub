@@ -270,3 +270,19 @@ public sealed class PendientesPorCancelacionDeCuentaTests
         Assert.Equal(0, await contar.Contar(InstantaneasDeCompraDePrueba.Cuenta));
     }
 }
+
+public sealed class DesvinculacionDeLineasConfirmadasTests
+{
+    [Fact]
+    [Trait("Criterio", "AC-PAG-22")]
+    public async Task Desvincular_tambien_elimina_la_fuente_y_los_traslados_guardados_de_las_lineas()
+    {
+        var e = await EntornoDeReembolsos.ConCompraCompletada();
+        Assert.NotEmpty(e.Pagos.Repositorio.Intenciones.Single().LineasConfirmadas);
+        var aplicador = new DesvincularPagosDeUnaCuenta(e.Pagos.Repositorio, e.Pagos.Auditoria, e.Pagos.Reloj);
+
+        await aplicador.Aplicar(InstantaneasDeCompraDePrueba.Cuenta, Guid.NewGuid());
+
+        Assert.Empty(e.Pagos.Repositorio.Intenciones.Single().LineasConfirmadas);
+    }
+}

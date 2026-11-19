@@ -225,12 +225,23 @@ public sealed class AvisoDePago
         return true;
     }
 
-    /// <summary>El correo no salió: se reintenta con la misma espera creciente que los avisos a Carrito.</summary>
+    /// <summary>Tras este número de fallas el aviso se omite: un correo que no sale en tantos intentos ya no es útil y no debe leer el correo de la persona para siempre.</summary>
+    public const int MaximoDeIntentos = 10;
+
+    /// <summary>El correo no salió: se reintenta con la misma espera creciente que los avisos a Carrito y, tras <see cref="MaximoDeIntentos"/> fallas, se omite.</summary>
     public void RegistrarFalla(DateTimeOffset ahora)
     {
         Intentos++;
+        if (Intentos >= MaximoDeIntentos)
+        {
+            Estado = EstadoDeAvisoDePago.Omitido;
+            ProximoIntentoEn = null;
+            return;
+        }
+
         var espera = TimeSpan.FromTicks(Math.Min(AvisoACarrito.EsperaMaxima.Ticks, AvisoACarrito.EsperaBase.Ticks << Math.Min(Intentos - 1, 10)));
         ProximoIntentoEn = ahora + espera;
     }
+
     internal AvisoDePago Copiar() => (AvisoDePago)MemberwiseClone();
 }

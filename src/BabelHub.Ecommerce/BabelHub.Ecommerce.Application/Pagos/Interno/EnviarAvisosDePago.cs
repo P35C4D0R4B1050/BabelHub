@@ -21,15 +21,8 @@ internal sealed class EnviarAvisosDePago(
 {
     public const string MotivoDeAlertaAvisoDePagoFallido = "aviso-de-pago-fallido";
 
-    /// <summary>Las plantillas del catálogo de <c>Plataforma</c> (hallazgo para el carril A, como la de reclamos).</summary>
-    public static string Plantilla(EventoDeAvisoDePago evento) => evento switch
-    {
-        EventoDeAvisoDePago.Pendiente => "pago-pendiente",
-        EventoDeAvisoDePago.Aprobado => "pago-aprobado",
-        EventoDeAvisoDePago.Rechazado => "pago-rechazado",
-        EventoDeAvisoDePago.Vencido => "pago-vencido",
-        _ => "reembolso-automatico",
-    };
+    /// <summary>El nombre de la plantilla del catálogo de <c>Plataforma</c> (su contenido lo define <see cref="PlantillasDeCorreoDePagos"/>).</summary>
+    public static string Plantilla(EventoDeAvisoDePago evento) => PlantillasDeCorreoDePagos.Para(evento).Nombre;
 
     /// <summary>Envía los avisos listos (hasta <paramref name="limite"/>) y devuelve cuántos atendió.</summary>
     public async Task<int> Ejecutar(int limite, CancellationToken cancelacion = default)
@@ -87,8 +80,8 @@ internal sealed class EnviarAvisosDePago(
     /// <summary>Los datos que admite la plantilla: nunca datos de pago. Un rechazo lleva su motivo de la lista cerrada; un reembolso, el importe que se devuelve a quien pagó.</summary>
     private static IReadOnlyDictionary<string, string> Datos(AvisoDePago aviso, IntencionDePago intencion, IntentoDeCobro? intento) => aviso.Evento switch
     {
-        EventoDeAvisoDePago.Rechazado when intento?.MotivoDeRechazo is { } motivo => new Dictionary<string, string> { ["motivo"] = MapeoDeMotivos.APublico(motivo).ToString() },
-        EventoDeAvisoDePago.ReembolsoAutomatico => new Dictionary<string, string> { ["importe"] = (intento?.Importe ?? intencion.Total).Valor.ToString("0.00", CultureInfo.InvariantCulture) },
+        EventoDeAvisoDePago.Rechazado => new Dictionary<string, string> { [PlantillasDeCorreoDePagos.Motivo] = PlantillasDeCorreoDePagos.TextoDelMotivo(intento?.MotivoDeRechazo) },
+        EventoDeAvisoDePago.ReembolsoAutomatico => new Dictionary<string, string> { [PlantillasDeCorreoDePagos.Importe] = PlantillasDeCorreoDePagos.ImporteEnSoles((intento?.Importe ?? intencion.Total).Valor) },
         _ => new Dictionary<string, string>(),
     };
 

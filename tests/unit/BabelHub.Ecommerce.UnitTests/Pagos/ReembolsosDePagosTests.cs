@@ -212,7 +212,7 @@ public sealed class ReembolsosDePagosTests
     {
         var e = await EntornoDeReembolsos.ConCompraCompletada();
 
-        var resultado = await e.Registrar.Ejecutar(new RegistrarReembolsoEntrada(Guid.NewGuid(), AppOrigen.Anulacion, ClaveDeReembolso.Anulacion(Guid.NewGuid()), [new LineaAReembolsar(IntencionesDePrueba.LineaImpresa, 10m)], 0m));
+        var resultado = await e.Registrar.Ejecutar(new RegistrarReembolsoEntrada(Guid.Parse("22222222-2222-2222-2222-2222222222ff"), AppOrigen.Anulacion, ClaveDeReembolso.Anulacion(Guid.Parse("22222222-2222-2222-2222-2222222222ff")), [new LineaAReembolsar(IntencionesDePrueba.LineaImpresa, 10m)], 0m));
 
         Assert.Equal(ClavesDePagos.NoEncontrado, resultado.Error!.Clave);
     }
@@ -553,5 +553,55 @@ public sealed class ReembolsosDePagosTests
         Assert.Equal(100m, consultado.Valor!.Monto);
         Assert.Null(ninguno.Valor);
         Assert.Equal(CategoriaDeError.Validacion, invalida.Error!.Categoria);
+    }
+}
+
+public sealed class ReembolsosEndurecidosTests
+{
+    [Theory]
+    [Trait("Criterio", "AC-PAG-08")]
+    [InlineData(OrigenDelReembolso.Anulacion, "anul")]
+    [InlineData(OrigenDelReembolso.CancelacionDelCliente, "canc")]
+    public async Task La_clave_de_anulacion_o_cancelacion_debe_ser_la_del_mismo_pedido(OrigenDelReembolso origen, string prefijo)
+    {
+        var e = await EntornoDeReembolsos.ConCompraCompletada();
+
+        var resultado = await e.Registrar.Ejecutar(new RegistrarReembolsoEntrada(InstantaneasDeCompraDePrueba.Pedido, origen, $"{prefijo}:{Guid.NewGuid():D}", [new LineaAReembolsar(IntencionesDePrueba.LineaImpresa, 10m)], 0m));
+
+        Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
+        Assert.Empty(e.Pagos.Reembolsos.Todos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-08")]
+    public async Task Una_clave_de_devolucion_ya_usada_por_otra_intencion_no_se_devuelve_como_repetida()
+    {
+        var e = await EntornoDeReembolsos.ConCompraCompletada();
+        var clave = EntornoDeReembolsos.ClaveDeDevolucion();
+        var ajeno = Reembolso.Crear(Guid.NewGuid(), OrigenDeReembolso.Devolucion, clave, Guid.NewGuid(), Guid.NewGuid(), [new LineaDeReembolso(IntencionesDePrueba.LineaImpresa, Importe.De(10m))], Importe.Cero, e.Pagos.Reloj.Ahora);
+        await e.Pagos.Reembolsos.Agregar(ajeno);
+
+        var resultado = await e.Registrar.Ejecutar(new RegistrarReembolsoEntrada(InstantaneasDeCompraDePrueba.Pedido, OrigenDelReembolso.Devolucion, clave, [new LineaAReembolsar(IntencionesDePrueba.LineaImpresa, 10m)], 0m));
+
+        Assert.Equal(ClavesDePagos.ReembolsoDistinto, resultado.Error!.Clave);
+        Assert.Single(e.Pagos.Reembolsos.Todos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-17")]
+    public async Task Un_reembolso_de_otro_monto_en_la_pasarela_no_se_da_por_aplicado()
+    {
+        var e = await EntornoDeReembolsos.ConCompraCompletada();
+        var id = await e.UnReembolsoPendiente();
+        e.Pagos.Pasarela.RespuestaDeReembolso = _ => ResultadoDeReembolsoEnPasarela.SinRespuesta;
+        await e.Procesar.Ejecutar(id);
+        e.Pagos.Reloj.Ahora = e.Pagos.Reloj.Ahora.AddMinutes(1);
+        e.Pagos.Pasarela.ReembolsosDelCargo = [new ReembolsoEnPasarela(id, "re_7", Importe.De(1m))];
+        e.Pagos.Pasarela.RespuestaDeReembolso = null;
+
+        await e.Procesar.Ejecutar(id);
+
+        // No coincide el monto: no se reconoce y se pide de nuevo.
+        Assert.Equal(2, e.Pagos.Pasarela.Reembolsos.Count);
     }
 }

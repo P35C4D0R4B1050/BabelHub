@@ -79,6 +79,9 @@ internal sealed class RegistrarReembolso(
         var existente = await reembolsos.BuscarPorOrigen(origen, clave, token).ConfigureAwait(false);
         switch (ReglasDeReembolso.ResolverSolicitud(existente, origen, clave, nuevo.Monto))
         {
+            case ResultadoDeSolicitud.Repetida when existente!.IntencionId != intencion.Id:
+                // La misma clave natural ya existe para otra intención: no es una repetición de esta solicitud.
+                return FallosDePagos.De<ReembolsoRegistrado>(CategoriaDeError.Conflicto, ClavesDePagos.ReembolsoDistinto);
             case ResultadoDeSolicitud.Repetida:
                 return Resultado<ReembolsoRegistrado>.Exito(new ReembolsoRegistrado(existente!.Id, existente.Monto.Valor, existente.Estado.APublico(), EraRepetido: true));
             case ResultadoDeSolicitud.MontoDistinto:
@@ -128,7 +131,7 @@ internal sealed class RegistrarReembolso(
         {
             errores.Add(new ErrorDeCampo("origen", "invalido"));
         }
-        else if (!ClaveNaturalValida(entrada.Origen, entrada.ClaveNatural))
+        else if (!ClaveNaturalValida(entrada.Origen, entrada.ClaveNatural, entrada.PedidoId))
         {
             errores.Add(new ErrorDeCampo("claveNatural", "invalida"));
         }
@@ -150,8 +153,8 @@ internal sealed class RegistrarReembolso(
         return errores.Count == 0 ? null : FallosDePagos.De<ReembolsoRegistrado>(CategoriaDeError.Validacion, ClavesDePagos.ValidacionFallida, errores);
     }
 
-    /// <summary>Cada origen tiene su forma de clave (D08): <c>anul:</c>, <c>canc:</c> o <c>dev:</c> con identificadores reales, de hasta 100 caracteres.</summary>
-    private static bool ClaveNaturalValida(OrigenDelReembolso origen, string? clave)
+    /// <summary>Cada origen tiene su forma de clave (D08): <c>anul:</c> y <c>canc:</c> con el identificador <b>del mismo pedido</b>, o <c>dev:</c> con los de la devolución y la línea; de hasta 100 caracteres.</summary>
+    private static bool ClaveNaturalValida(OrigenDelReembolso origen, string? clave, Guid pedidoId)
     {
         if (string.IsNullOrWhiteSpace(clave) || clave.Trim().Length > Reembolso.LongitudMaximaDeLaClave)
         {
@@ -161,8 +164,8 @@ internal sealed class RegistrarReembolso(
         var partes = clave.Trim().Split(':');
         return origen switch
         {
-            OrigenDelReembolso.Anulacion => partes is ["anul", var id] && Guid.TryParseExact(id, "D", out _),
-            OrigenDelReembolso.CancelacionDelCliente => partes is ["canc", var id] && Guid.TryParseExact(id, "D", out _),
+            OrigenDelReembolso.Anulacion => partes is ["anul", var id] && Guid.TryParseExact(id, "D", out var anulado) && anulado == pedidoId,
+            OrigenDelReembolso.CancelacionDelCliente => partes is ["canc", var id] && Guid.TryParseExact(id, "D", out var cancelado) && cancelado == pedidoId,
             OrigenDelReembolso.Devolucion => partes is ["dev", var devolucion, var linea] && Guid.TryParseExact(devolucion, "D", out _) && Guid.TryParseExact(linea, "D", out _),
             _ => false,
         };
@@ -263,7 +266,7 @@ internal sealed class ProcesarReembolso(
             async token =>
             {
                 var actual = (await reembolsos.Obtener(reembolsoId, paraActualizar: true, token).ConfigureAwait(false))!;
-                if (existentes.FirstOrDefault(e => e.ReembolsoId == reembolsoId) is { } aplicado)
+                if (existentes.FirstOrDefault(e => e.ReembolsoId == reembolsoId && e.Monto == actual.Monto) is { } aplicado)
                 {
                     actual.MarcarReembolsado(aplicado.Referencia, reloj.Ahora);
                 }
@@ -343,7 +346,7 @@ internal sealed class ProcesarReembolso(
                     return ResultadoDeReembolsoEnPasarela.SinRespuesta;
                 }
 
-                if (existentes.FirstOrDefault(e => e.ReembolsoId == reembolso.Id) is { } aplicado)
+                if (existentes.FirstOrDefault(e => e.ReembolsoId == reembolso.Id && e.Monto == reembolso.Monto) is { } aplicado)
                 {
                     return ResultadoDeReembolsoEnPasarela.Aplicado(aplicado.Referencia);
                 }

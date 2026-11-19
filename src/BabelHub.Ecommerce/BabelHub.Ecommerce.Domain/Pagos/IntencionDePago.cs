@@ -511,6 +511,7 @@ public sealed class IntencionDePago
         RegionDeEntrega = null;
         CodigoDeSucursalDeRecojo = null;
         Lineas = Lineas.Select(l => l with { EdicionId = null, Titulo = null, Isbn = null }).ToArray();
+        LineasConfirmadas = Array.Empty<ReservaConfirmadaDeLinea>();
         HuellaDeInstantanea = null;
         if (Contacto is not null)
         {

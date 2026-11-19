@@ -257,7 +257,7 @@ internal sealed class ConfirmarReservasDeLaCompra(IRepositorioDePagos repositori
             return new ResultadoDeConfirmarReservas(TipoDeConfirmacionDeReservas.Reintentar);
         }
 
-        intencion.MarcarReservasConfirmadas(reloj.Ahora, lineas);
+        intencion.MarcarReservasConfirmadas(reloj.Ahora, intencion.EstaDesvinculada ? null : lineas);
         await repositorio.GuardarIntencion(intencion, token).ConfigureAwait(false);
 
         // Tras confirmar se vuelve a comprobar: la desvinculación (PAG-29) o la cancelación de la cuenta en ejecución (PAG-32) prevalecen y se libera lo confirmado.

@@ -94,8 +94,8 @@ public sealed class EnviarAvisosDePagoTests
 
         var rechazo = e.Correo.Enviados.Single(c => c.Plantilla == "pago-rechazado");
         Assert.Equal(["motivo"], rechazo.Datos.Keys);
-        Assert.Equal("FondosInsuficientes", rechazo.Datos["motivo"]);
-        Assert.Equal("140.00", e.Correo.Enviados.Single(c => c.Plantilla == "reembolso-automatico").Datos["importe"]);
+        Assert.Equal("los fondos no fueron suficientes", rechazo.Datos["motivo"]);
+        Assert.Equal("S/ 140,00", e.Correo.Enviados.Single(c => c.Plantilla == "reembolso-automatico").Datos["importe"]);
         Assert.Empty(e.Correo.Enviados.Single(c => c.Plantilla == "pago-aprobado").Datos);
         var todo = string.Join(' ', e.Correo.Enviados.SelectMany(c => c.Datos.Values.Concat(c.Datos.Keys)));
         Assert.DoesNotContain("ch_", todo);
@@ -245,5 +245,86 @@ public sealed class EnviarAvisosDePagoTests
         await e.Enviar.Ejecutar(10);
 
         Assert.DoesNotContain("ana@correo.com", e.Correo.Enviados.Single().ToString());
+    }
+}
+
+public sealed class PlantillasDeCorreoDePagosTests
+{
+    private static readonly string[] Prohibidos = ["http", "www.", "contraseña", "token", "tarjeta número", "referencia", "ch_", "cvv", "clic", "haz clic"];
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-12")]
+    public void Hay_una_plantilla_por_evento_con_nombres_unicos()
+    {
+        var eventos = Enum.GetValues<EventoDeAvisoDePago>();
+
+        Assert.Equal(eventos.Length, PlantillasDeCorreoDePagos.Catalogo.Count);
+        Assert.Equal(eventos.Length, PlantillasDeCorreoDePagos.Catalogo.Select(p => p.Nombre).Distinct().Count());
+        Assert.All(eventos, e => Assert.Contains(PlantillasDeCorreoDePagos.Para(e), PlantillasDeCorreoDePagos.Catalogo));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-12")]
+    public void Cada_campo_del_texto_esta_declarado_y_cada_campo_declarado_se_usa()
+    {
+        foreach (var p in PlantillasDeCorreoDePagos.Catalogo)
+        {
+            var usados = System.Text.RegularExpressions.Regex.Matches(p.Asunto + " " + p.Cuerpo, @"\{(\w+)\}").Select(m => m.Groups[1].Value).Distinct().Order().ToArray();
+            Assert.Equal(p.Campos.Order().ToArray(), usados);
+        }
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-12")]
+    public void Ninguna_plantilla_lleva_datos_de_pago_enlaces_ni_peticiones_de_datos_y_sigue_la_guia_de_contenido()
+    {
+        foreach (var p in PlantillasDeCorreoDePagos.Catalogo)
+        {
+            var texto = (p.Asunto + " " + p.Cuerpo).ToLowerInvariant();
+            Assert.All(Prohibidos, prohibido => Assert.DoesNotContain(prohibido, texto));
+            Assert.True(p.Asunto.Length <= 60, p.Nombre);
+            Assert.Contains("tu", texto);
+            Assert.DoesNotContain("usted", texto);
+            Assert.Matches("^[a-z]+(-[a-z]+)*$", p.Nombre);
+        }
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-12")]
+    [InlineData(0.5, "S/ 0,50")]
+    [InlineData(140, "S/ 140,00")]
+    [InlineData(1234.5, "S/ 1 234,50")]
+    public void El_importe_se_escribe_en_soles_con_el_formato_de_la_guia(double valor, string esperado)
+    {
+        Assert.Equal(esperado, PlantillasDeCorreoDePagos.ImporteEnSoles((decimal)valor));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-12")]
+    public void Todo_motivo_de_rechazo_tiene_un_texto_para_la_persona_y_nunca_el_de_la_pasarela()
+    {
+        foreach (var motivo in Enum.GetValues<MotivoDeRechazo>())
+        {
+            var texto = PlantillasDeCorreoDePagos.TextoDelMotivo(motivo);
+            Assert.False(string.IsNullOrWhiteSpace(texto));
+            Assert.DoesNotContain("_", texto);
+        }
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-12")]
+    public void Un_aviso_se_omite_tras_diez_fallas_y_no_antes()
+    {
+        var aviso = AvisoDePago.Crear(Guid.NewGuid(), Guid.NewGuid(), EventoDeAvisoDePago.Aprobado, IntencionesDePrueba.Inicio);
+
+        for (var i = 1; i < AvisoDePago.MaximoDeIntentos; i++)
+        {
+            aviso.RegistrarFalla(IntencionesDePrueba.Inicio);
+            Assert.Equal(EstadoDeAvisoDePago.Pendiente, aviso.Estado);
+        }
+
+        aviso.RegistrarFalla(IntencionesDePrueba.Inicio);
+
+        Assert.Equal(EstadoDeAvisoDePago.Omitido, aviso.Estado);
     }
 }

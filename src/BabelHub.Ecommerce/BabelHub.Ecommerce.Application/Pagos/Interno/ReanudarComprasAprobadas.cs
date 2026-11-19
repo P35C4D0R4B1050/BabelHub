@@ -27,6 +27,7 @@ internal sealed class ReanudarComprasAprobadas(
 
     public const string MotivoDeAlertaCompraSinCompletar = "compra-aprobada-sin-completar";
     public const string MotivoDeAlertaRetomaFallida = "retoma-de-pagos-fallida";
+    public const string MotivoDeAlertaCompraSinReferencia = "compra-aprobada-sin-referencia";
 
     public async Task<ResultadoDeReanudar> Ejecutar(int limite, CancellationToken cancelacion = default)
     {
@@ -61,8 +62,15 @@ internal sealed class ReanudarComprasAprobadas(
     private async Task ReanudarUna(Guid pedidoId, CancellationToken cancelacion)
     {
         var (intencion, intento) = await Leer(pedidoId, cancelacion).ConfigureAwait(false);
-        if (intencion is not { Estado: EstadoDeIntencion.Aprobada } || intento?.ReferenciaDePasarela is not { } referencia)
+        if (intencion is not { Estado: EstadoDeIntencion.Aprobada } || intento is null)
         {
+            return;
+        }
+
+        if (intento.ReferenciaDePasarela is not { } referencia)
+        {
+            // Un intento aprobado sin la referencia del cargo no se puede retomar: se alerta para conciliar a mano.
+            await Alertar(MotivoDeAlertaCompraSinReferencia).ConfigureAwait(false);
             return;
         }
 
@@ -76,7 +84,8 @@ internal sealed class ReanudarComprasAprobadas(
         await confirmador.Confirmar(pedidoId, intento.Id, referencia, CancellationToken.None).ConfigureAwait(false);
 
         (intencion, _) = await Leer(pedidoId, cancelacion).ConfigureAwait(false);
-        if (intencion is { Estado: EstadoDeIntencion.Aprobada, AprobadoEn: { } aprobadoEn } && reloj.Ahora - aprobadoEn >= EsperaAntesDeCompensar)
+        // Si otro ejecutor la reclamó mientras tanto (la está completando), no se compensa por encima de él.
+        if (intencion is { Estado: EstadoDeIntencion.Aprobada, AprobadoEn: { } aprobadoEn } && !intencion.EstaReclamada(reloj.Ahora) && reloj.Ahora - aprobadoEn >= EsperaAntesDeCompensar)
         {
             // Sigue sin completarse a los 30 minutos: se compensa y se reembolsa (PAG-20).
             await Alertar(MotivoDeAlertaCompraSinCompletar).ConfigureAwait(false);
