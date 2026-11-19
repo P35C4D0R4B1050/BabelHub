@@ -248,4 +248,22 @@ public sealed class PuertosQueImplementaIdentidadTests
         Assert.Equal(ResultadoDePaso.Correcto, await paso.Ejecutar());
         Assert.False(e.Bd.Bajas.Single().Pendiente);
     }
+
+    // ---------------------------------------------------------------- direcciones (T34, SEG-28)
+
+    [Fact]
+    public async Task LaDireccionDeUnaAlerta_EsLaRegistradaDeLaCuentaActiva_YNuncaLaDeUnaCuentaDesactivadaCanceladaOInexistente()
+    {
+        var e = new EntornoDeIdentidad();
+        var activa = e.Cuenta("admin@example.com", RolDeUsuario.AdministradorCentral);
+        var inactiva = e.Cuenta("inactiva@example.com", RolDeUsuario.AdministradorCentral, activa: false);
+        var cancelada = e.Cuenta("cancelada@example.com", RolDeUsuario.AdministradorCentral);
+        cancelada.CanceladaEn = e.Reloj.Ahora;
+        var direcciones = new DireccionesDeCuentasDeIdentidad(e.Cuentas);
+
+        Assert.Equal("admin@example.com", await direcciones.DeLaCuenta(activa.Usuario.Id));
+        Assert.Null(await direcciones.DeLaCuenta(inactiva.Usuario.Id));
+        Assert.Null(await direcciones.DeLaCuenta(cancelada.Usuario.Id));
+        Assert.Null(await direcciones.DeLaCuenta(Guid.NewGuid()));
+    }
 }

@@ -95,3 +95,12 @@ public interface IEnviadorDeCorreo
     /// <summary>Envía un código de un solo uso por el canal en memoria, sin cola ni reintento (vence a los 10 minutos): <see cref="ResultadoDeEnvio.Suprimido"/> si su cupo se agotó o el canal está lleno.</summary>
     Task<ResultadoDeEnvio> EnviarCodigo(CorreoDeCodigo correo, CancellationToken cancelacion = default);
 }
+
+/// <summary>
+/// La dirección registrada de una cuenta (T34): la resuelve Identidad con la dirección de la cuenta activa, <b>nunca</b> una que venga de una solicitud (SEG-28). Una cuenta inexistente, desactivada o cancelada no tiene
+/// dirección: <see langword="null"/>.
+/// </summary>
+public interface IDireccionesDeCuentas
+{
+    Task<string?> DeLaCuenta(Guid cuentaId, CancellationToken cancelacion = default);
+}

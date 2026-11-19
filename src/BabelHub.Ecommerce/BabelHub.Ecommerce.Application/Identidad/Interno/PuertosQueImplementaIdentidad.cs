@@ -128,3 +128,10 @@ public sealed class PasoDeRestauracionReenviarBajas(ReintentoDeBajas reintento) 
         }
     }
 }
+
+/// <summary>La dirección registrada de una cuenta activa para el envío de alertas (T34; SEG-28): nunca una dirección que venga de una solicitud; una cuenta inexistente, desactivada o cancelada no tiene.</summary>
+public sealed class DireccionesDeCuentasDeIdentidad(IRepositorioDeCuentas cuentas) : IDireccionesDeCuentas
+{
+    public async Task<string?> DeLaCuenta(Guid cuentaId, CancellationToken cancelacion = default) =>
+        await cuentas.PorId(cuentaId, paraActualizar: false, cancelacion).ConfigureAwait(false) is { CanceladaEn: null, Usuario: { Activo: true } usuario } ? usuario.Correo : null;
+}
