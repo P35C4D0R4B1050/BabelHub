@@ -57,3 +57,19 @@ Requisitos previos de los recorridos del carrito: la composición del Carrito en
 Requisitos previos de los recorridos del catálogo: el CSS compilado (`scripts/construir-estilos.sh`) y la composición del Catálogo en `Program.cs`.
 
 Los `storageState` (cookies de sesión) van en `tests/e2e/.auth/`, que Git ignora: nunca se suben. Los `trace` de Playwright pueden contener cookies; `test-results/` también está ignorado.
+
+## Sembrador de sesiones (solo desarrollo)
+
+`POST /desarrollo/sesion` en el host del E-commerce crea una cuenta con el correo verificado y la hace ingresar **por el camino real** (el ingreso, el segundo factor del personal con su secreto TOTP y la sesión web); devuelve el `storageState` de Playwright con la cookie `__Host-bh-tienda` (cliente) o `__Host-bh-gestion` (personal). La cabecera `X-Usuario-Id` trae el identificador de la cuenta creada. Cada llamada crea una cuenta nueva con correo `e2e-<rol>-<hex>@example.test` y contraseña aleatoria que no se devuelve.
+
+```bash
+source "$LOCALAPPDATA/babelhub-e2e/env"   # trae BABELHUB__Sembrador__Clave
+curl -s -X POST http://localhost:8080/desarrollo/sesion -H "X-Sembrador-De-Desarrollo: $BABELHUB__Sembrador__Clave" -H "Content-Type: application/json" -d '{"rol":"cliente"}' > .auth/cliente.json
+curl -s -X POST http://localhost:8080/desarrollo/sesion -H "X-Sembrador-De-Desarrollo: $BABELHUB__Sembrador__Clave" -H "Content-Type: application/json" -d '{"rol":"encargado","sucursal":"ayacucho"}' > .auth/encargado.json
+```
+
+- Roles: `cliente`, `encargado` (con `sucursal`: el **código** de la sucursal, convertido al identificador canónico de `IdentificadorDeSucursal`), `logistica` y `administrador`. El cliente solo existe en el host de la tienda y el personal solo en el de la gestión: una instancia sirve un host (`BABELHUB__Web__Host`); para sembrar personal se levanta otra con `gestion`.
+- **No existe en producción, ni siquiera por configuración**: (1) el código está bajo `#if DEBUG` y la imagen se publica en `Release`, así que el endpoint no está en el binario; (2) solo se registra con `ASPNETCORE_ENVIRONMENT=Development`; (3) solo atiende conexiones de la propia máquina (loopback); (4) exige la cabecera `X-Sembrador-De-Desarrollo` con la clave aleatoria `BABELHUB__Sembrador__Clave` (la genera `preparar-entorno.sh` en el archivo de entorno; sin ella el endpoint ni se mapea). El host solo atiende conexiones con origen y destino loopback hacia `localhost`, `127.0.0.1` o `[::1]`: un túnel o una reasignación de DNS no pasan. Lo que falla responde 404 sin pista (sin leer el cuerpo). `arrancar-host.sh` ya arranca en Debug y Development. Una prueba (`SembradorDeSesionesTests`) comprueba cada cerrojo.
+- Requisitos: las bases migradas (COMP-2) y una fila en `identidad.versiones_de_textos` (`terminos`, `privacidad` y `reembolso` vigentes; el sembrado de la operación aún no la crea). Si no hay clave de firma activa, el sembrador crea la primera, como haría la operación.
+- El navegador acepta la cookie `__Host-` solo sobre HTTPS: con el host local en HTTP, Playwright manda `X-Forwarded-Proto: https` (`E2E_FORWARDED_PROTO=https`).
+- Los archivos resultantes van en `tests/e2e/.auth/` (ignorado por Git): son sesiones vivas.

@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text;
 using BabelHub.Ecommerce.Application.Pedidos.Interno;
 using BabelHub.Ecommerce.Domain.Pedidos;
 
@@ -23,20 +22,8 @@ public sealed class GeneradorDeIdentificadoresDePedidos : IGeneradorDeIdentifica
 /// </summary>
 public sealed class CodigoResolucionDeSucursal : IResolucionDeSucursal
 {
-    private const string Prefijo = "babelhub:sucursal:";
-
     public Task<Guid?> IdentificadorDe(string codigoDeSucursal, CancellationToken cancelacion = default) => Task.FromResult(Derivar(codigoDeSucursal));
 
     /// <summary>El identificador de una sucursal a partir de su código (<c>null</c> si el código no tiene la forma de un código de sucursal).</summary>
-    public static Guid? Derivar(string? codigoDeSucursal)
-    {
-        var codigo = codigoDeSucursal?.Trim().ToLowerInvariant();
-        if (string.IsNullOrEmpty(codigo) || codigo.Length > 40 || !codigo.All(c => char.IsAsciiLetterOrDigit(c) || c == '-'))
-        {
-            return null;
-        }
-
-        var huella = SHA256.HashData(Encoding.UTF8.GetBytes(Prefijo + codigo));
-        return new Guid(huella.AsSpan(0, 16));
-    }
+    public static Guid? Derivar(string? codigoDeSucursal) => BabelHub.Ecommerce.Application.Plataforma.IdentificadorDeSucursal.DesdeCodigo(codigoDeSucursal);
 }
