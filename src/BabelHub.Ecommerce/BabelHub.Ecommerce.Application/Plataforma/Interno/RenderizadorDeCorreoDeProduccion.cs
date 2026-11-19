@@ -1,8 +1,5 @@
 namespace BabelHub.Ecommerce.Application.Plataforma.Interno;
 
-/// <summary>Una plantilla de correo del catálogo cerrado: el asunto y el cuerpo, fijos, sin enlaces ni peticiones de datos.</summary>
-public sealed record PlantillaDeCorreo(string Asunto, string Cuerpo);
-
 /// <summary>
 /// Las plantillas de los correos de seguridad (T29; IDE-67, AC-IDE-56): <b>cada una nombra a BabelHub, no lleva enlaces ni pide datos, contraseñas o códigos, y recuerda que nunca se pedirá el código por otro medio</b>. El
 /// aviso de una respuesta a una solicitud sobre datos personales <b>no incluye su contenido</b>; el titular lo ve en su cuenta. El texto es fijo: ningún dato de quien provoca el correo entra en él (SEG-10). Los módulos de
@@ -48,6 +45,13 @@ public sealed class RenderizadorDeCorreoDeProduccion : IRenderizadorDeCorreo
 {
     private readonly Dictionary<string, PlantillaDeCorreo> _plantillas;
 
+    /// <summary>El renderizador con las plantillas que aportan los módulos (pagos y reclamaciones), además de las de seguridad.</summary>
+    public static RenderizadorDeCorreoDeProduccion Con(IEnumerable<IProveedorDePlantillasDeCorreo> proveedores)
+    {
+        ArgumentNullException.ThrowIfNull(proveedores);
+        return new RenderizadorDeCorreoDeProduccion(proveedores.SelectMany(p => p.Plantillas).ToList());
+    }
+
     public RenderizadorDeCorreoDeProduccion(IEnumerable<KeyValuePair<string, PlantillaDeCorreo>>? adicionales = null)
     {
         _plantillas = new Dictionary<string, PlantillaDeCorreo>(PlantillasDeCorreoDeSeguridad.DeLaCuenta, StringComparer.Ordinal);
@@ -68,7 +72,60 @@ public sealed class RenderizadorDeCorreoDeProduccion : IRenderizadorDeCorreo
             throw new InvalidOperationException("La plantilla del correo no está en el catálogo.");
         }
 
-        return new MensajeDeCorreo([correo.Destinatario], plantilla.Asunto, plantilla.Cuerpo);
+        return new MensajeDeCorreo([correo.Destinatario], Rellenar(plantilla.Asunto, plantilla, correo, esAsunto: true), Rellenar(plantilla.Cuerpo, plantilla, correo, esAsunto: false));
+    }
+
+    /// <summary>El largo máximo de un dato en el cuerpo (cabe la respuesta de un reclamo, 3000) y en el asunto: uno más largo <b>no se recorta en silencio</b>, el correo no sale (SEG-10).</summary>
+    public const int LargoMaximoDeUnDato = 4000;
+
+    public const int LargoMaximoDeUnDatoEnElAsunto = 200;
+
+    /// <summary>
+    /// Pone los datos en los campos que la plantilla <b>declara</b>, y nada más: un dato no declarado se ignora, uno que falta hace que el correo no salga (lanza) y los saltos de línea y los controles de un dato
+    /// se vuelven espacios, de modo que ningún dato puede abrir una cabecera ni partir el asunto. Una plantilla sin campos es de texto fijo.
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex Marca = new(@"\{([A-Za-z][A-Za-z0-9]*)\}", System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(250));
+
+    private static string Rellenar(string texto, PlantillaDeCorreo plantilla, CorreoSaliente correo, bool esAsunto)
+    {
+        if (plantilla.Campos is not { Count: > 0 } campos)
+        {
+            return texto;
+        }
+
+        // Una sola pasada sobre el texto de la plantilla: un valor insertado nunca se vuelve a examinar, así que un dato que contenga «{otroCampo}» no puede colar el de otro campo.
+        return Marca.Replace(texto, coincidencia =>
+        {
+            var campo = coincidencia.Groups[1].Value;
+            if (!campos.Contains(campo))
+            {
+                return coincidencia.Value;
+            }
+
+            if (!correo.Datos.TryGetValue(campo, out var valor) || string.IsNullOrWhiteSpace(valor) || valor.Length > (esAsunto ? LargoMaximoDeUnDatoEnElAsunto : LargoMaximoDeUnDato))
+            {
+                throw new InvalidOperationException("Faltan datos de la plantilla del correo o no caben.");
+            }
+
+            return Limpiar(valor, conSaltos: !esAsunto);
+        });
+    }
+
+    /// <summary>Los controles, los separadores de línea y de párrafo (U+2028, U+2029), U+0085 y los caracteres de formato (los de dirección bidireccional) se vuelven espacios; en el cuerpo se conserva solo el salto de línea.</summary>
+    private static string Limpiar(string valor, bool conSaltos)
+    {
+        var recortado = valor;
+        return string.Create(recortado.Length, (recortado, conSaltos), static (destino, par) =>
+        {
+            var (origen, conSaltos) = par;
+            for (var i = 0; i < origen.Length; i++)
+            {
+                var c = origen[i];
+                var categoria = char.GetUnicodeCategory(c);
+                var peligroso = char.IsControl(c) || categoria is System.Globalization.UnicodeCategory.LineSeparator or System.Globalization.UnicodeCategory.ParagraphSeparator or System.Globalization.UnicodeCategory.Format;
+                destino[i] = peligroso && !(conSaltos && c == (char)10) ? (char)32 : c;
+            }
+        });
     }
 
     public MensajeDeCorreo DeCodigo(CorreoDeCodigo correo)
@@ -86,4 +143,21 @@ public sealed class RenderizadorDeCorreoDeProduccion : IRenderizadorDeCorreo
         var plantilla = PlantillasDeCorreoDeSeguridad.DeAlerta(servicio, motivo, primeraOcurrencia, ocurrencias);
         return new MensajeDeCorreo(direcciones, plantilla.Asunto, plantilla.Cuerpo);
     }
+}
+
+/// <summary>
+/// La plantilla de la respuesta a una hoja de reclamación (PLA-X, REC-07, REC-13): el número de la hoja, la fecha de la respuesta y la respuesta misma; <b>sin el documento ni el domicilio</b> del consumidor (D11).
+/// El texto de la respuesta es de quien responde y entra tal cual, sin saltos que abran una cabecera.
+/// </summary>
+public sealed class PlantillasDeCorreoDeReclamos : IProveedorDePlantillasDeCorreo
+{
+    public const string RespuestaDeReclamo = "respuesta-de-reclamo";
+
+    public IReadOnlyDictionary<string, PlantillaDeCorreo> Plantillas { get; } = new Dictionary<string, PlantillaDeCorreo>(StringComparer.Ordinal)
+    {
+        [RespuestaDeReclamo] = new(
+            "BabelHub: respondimos tu hoja de reclamación {numero}",
+            "Hola, te escribe BabelHub.\n\nRespondimos tu hoja de reclamación N.° {numero} el {fecha}. Esta es la respuesta:\n\n{respuesta}\n\n" + PlantillasDeCorreoDeSeguridad.Firma,
+            ["numero", "fecha", "respuesta"]),
+    };
 }

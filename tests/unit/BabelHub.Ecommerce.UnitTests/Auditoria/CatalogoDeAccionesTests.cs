@@ -141,6 +141,16 @@ public sealed class CatalogoDeAccionesTests
 
     [Fact]
     [Trait("Criterio", "AC-AUD-05")]
+    public void El_cambio_de_estado_de_un_envio_declara_el_pedido_la_guia_el_operador_la_fuente_y_la_fecha_sin_datos_personales()
+    {
+        var accion = Catalogo.Obtener(nameof(AccionesAuditables.EstadoDeEnvioCambiado));
+
+        Assert.Equal(["estadoAnterior", "estadoNuevo", "pedidoId", "numeroDeGuia", "operador", "fuente", "fecha"], accion.Detalle.Select(c => c.Nombre));
+        Assert.DoesNotContain(accion.Detalle, c => c.Personal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-05")]
     public void Un_identificador_de_negocio_un_GUID_y_una_huella_corta_no_se_redactan_en_el_detalle()
     {
         var detalle = DetalleSeguro.Construir(

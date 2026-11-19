@@ -268,6 +268,19 @@ public sealed class PoliticasDeSeguridadTests
     }
 
     [Fact]
+    public void LasPoliticasDeEnvios_TienenLosValoresDelPlan_SonGeneralesYCaenAlLimiteLocal()
+    {
+        Assert.Equal(("consultas-de-envios-por-usuario", 60, TimeSpan.FromMinutes(1)), (PoliticasDeSeguridad.ConsultasDeEnviosPorUsuario.Nombre, PoliticasDeSeguridad.ConsultasDeEnviosPorUsuario.Maximo, PoliticasDeSeguridad.ConsultasDeEnviosPorUsuario.Ventana));
+        Assert.Equal(("operaciones-de-envios-por-usuario", 30, TimeSpan.FromMinutes(1)), (PoliticasDeSeguridad.OperacionesDeEnviosPorUsuario.Nombre, PoliticasDeSeguridad.OperacionesDeEnviosPorUsuario.Maximo, PoliticasDeSeguridad.OperacionesDeEnviosPorUsuario.Ventana));
+        Assert.Equal(("guias-al-operador", 30, TimeSpan.FromMinutes(1)), (PoliticasDeSeguridad.GuiasAlOperador.Nombre, PoliticasDeSeguridad.GuiasAlOperador.Maximo, PoliticasDeSeguridad.GuiasAlOperador.Ventana));
+        foreach (var politica in new[] { PoliticasDeSeguridad.ConsultasDeEnviosPorUsuario, PoliticasDeSeguridad.OperacionesDeEnviosPorUsuario, PoliticasDeSeguridad.GuiasAlOperador })
+        {
+            Assert.Contains(politica, PoliticasDeSeguridad.Generales);
+            Assert.True(politica.RespaldoLocal);
+        }
+    }
+
+    [Fact]
     public void LasPoliticasDeCarrito_TienenLosValoresDelPlan_YSoloPasarAlPagoFallaCerrada()
     {
         Assert.Equal(("carritos-de-visitante-por-origen", 10, TimeSpan.FromHours(1)), (PoliticasDeSeguridad.CarritosDeVisitantePorOrigen.Nombre, PoliticasDeSeguridad.CarritosDeVisitantePorOrigen.Maximo, PoliticasDeSeguridad.CarritosDeVisitantePorOrigen.Ventana));

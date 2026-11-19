@@ -238,13 +238,30 @@ public sealed class DominioDeNotificacionesTests
             new[]
             {
                 "pedido-confirmado", "pedido-en-preparacion", "pedido-en-transito", "pedido-listo-para-recojo", "pedido-entregado", "pedido-no-recogido", "pago-pendiente", "pago-resultado", "pedido-anulado",
-                "reembolso-automatico", "guia-de-envio", "libro-digital-disponible", "devolucion-estado", "traslado-estado",
+                "reembolso-automatico", "envio-guia", "libro-digital-disponible", "devolucion-estado", "traslado-estado",
             },
             claves);
         Assert.Null(CatalogoDePlantillas.Obtener("promocion-de-navidad"));
         Assert.True(CatalogoDePlantillas.EsDeTraslado("traslado-estado"));
         Assert.False(CatalogoDePlantillas.EsDeTraslado("pedido-confirmado"));
         Assert.Equal(TipoDeDestinatario.Sucursal, CatalogoDePlantillas.Obtener("traslado-estado")!.Destinatario);
+    }
+
+    [Theory]
+    [InlineData("guia-generada")]
+    [InlineData("en-reparto")]
+    [Trait("Criterio", "AC-NOT-06")]
+    public void LaPlantillaEnvioGuia_AceptaLosCamposQueArmaEnvios_YRechazaUnaGuiaConEnlaceOUnEstadoAjeno(string estado)
+    {
+        var plantilla = CatalogoDePlantillas.Obtener("envio-guia")!;
+        var envios = new Dictionary<string, string> { ["numeroDePedido"] = "BH-000123", ["numeroDeGuia"] = "OLVA-20261119-0042", ["estado"] = estado };
+        Assert.True(plantilla.Validar(new Dictionary<string, string>(envios) { ["numeroDeGuia"] = "20261119004212345678" }).EsValido);
+
+        Assert.True(plantilla.Validar(envios).EsValido);
+        Assert.Equal(TipoDeDestinatario.Cliente, plantilla.Destinatario);
+        Assert.False(plantilla.Validar(new Dictionary<string, string>(envios) { ["numeroDeGuia"] = "https://operador.example/guia" }).EsValido);
+        Assert.False(plantilla.Validar(new Dictionary<string, string>(envios) { ["estado"] = "entregado" }).EsValido);
+        Assert.False(plantilla.Validar(new Dictionary<string, string> { ["numeroDePedido"] = "BH-000123", ["estado"] = estado }).EsValido);
     }
 
     [Fact]

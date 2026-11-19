@@ -91,9 +91,22 @@ public sealed class EnviadorDeCorreoDeProduccion(
                 return await EncolarOSuprimir(correo, clase, cancelacion, decision.Prioridad).ConfigureAwait(false);
         }
 
+        // Un fallo al armar el correo (plantilla ausente, dato que falta o que no cabe) es del correo y no del transporte: reintentarlo daría siempre lo mismo, así que no se encola; el cupo se devuelve, se avisa y el llamador lo ve como no enviado.
+        MensajeDeCorreo mensaje;
         try
         {
-            await transporte.Enviar(plantillas.De(correo), cancelacion).ConfigureAwait(false);
+            mensaje = plantillas.De(correo);
+        }
+        catch (Exception)
+        {
+            await DevolverSinInterrumpir(decision.Reserva!, cancelacion).ConfigureAwait(false);
+            await AlertarSinInterrumpir(cancelacion).ConfigureAwait(false);
+            return ResultadoDeEnvio.Suprimido;
+        }
+
+        try
+        {
+            await transporte.Enviar(mensaje, cancelacion).ConfigureAwait(false);
             return ResultadoDeEnvio.Enviado;
         }
         catch (Exception)
