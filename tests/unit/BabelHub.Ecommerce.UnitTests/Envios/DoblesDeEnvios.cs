@@ -141,6 +141,15 @@ internal sealed class RepositorioDeEnviosEnMemoria : IRepositorioDeEnvios, IInst
         return Task.CompletedTask;
     }
 
+    public Task<IReadOnlyList<Envio>> ObtenerConProgresoPendiente(int maximo, CancellationToken cancelacion = default)
+    {
+        Comprobar();
+        var pendientes = _envios.Values
+            .Where(e => (e.EnRepartoEn is not null && e.ProgresoEnRepartoInformadoEn is null) || (e.EntregadoEn is not null && e.ProgresoEntregadoInformadoEn is null))
+            .OrderBy(e => e.EnRepartoEn).ThenBy(e => e.Id).Take(maximo).Select(Clonar).ToList();
+        return Task.FromResult<IReadOnlyList<Envio>>(pendientes);
+    }
+
     public Task<ListadoDeEnvios> Listar(EstadoDeEnvio? estado, int pagina, int tamano, CancellationToken cancelacion = default)
     {
         Comprobar();

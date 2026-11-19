@@ -50,6 +50,9 @@ internal interface IRepositorioDeEnvios
     /// <summary>Guarda solo lo que cambia: estado, guía, clave, arrendamientos, marcador y fechas.</summary>
     Task Guardar(Envio envio, CancellationToken cancelacion = default);
 
+    /// <summary>Los envíos en reparto o entregados cuyo progreso todavía no se informó a Pedidos, del más antiguo al más reciente (para que el reparto se informe antes que la entrega).</summary>
+    Task<IReadOnlyList<Envio>> ObtenerConProgresoPendiente(int maximo, CancellationToken cancelacion = default);
+
     /// <summary>Lista por fecha de creación descendente, con el estado opcional.</summary>
     Task<ListadoDeEnvios> Listar(EstadoDeEnvio? estado, int pagina, int tamano, CancellationToken cancelacion = default);
 }

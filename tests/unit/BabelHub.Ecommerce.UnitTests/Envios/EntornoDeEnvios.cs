@@ -29,7 +29,10 @@ internal sealed class EntornoDeEnvios
         SolicitarGuia = new SolicitarGuia(autorizador, Envios, Contactos, Operador, Unidad, Auditoria, Alertas, Reloj);
         Reservas = new ReservasDelEnvioDoble(Unidad);
         Progreso = new ProgresoDeEnviosDoble(Unidad, Envios);
-        PasarAEnReparto = new PasarAEnReparto(autorizador, Envios, Reservas, Progreso, Unidad, Auditoria, Alertas, Reloj);
+        Informador = new InformadorDeProgreso(Envios, Progreso, Unidad, Reloj);
+        PasarAEnReparto = new PasarAEnReparto(autorizador, Envios, Reservas, Informador, Unidad, Auditoria, Alertas, Reloj);
+        MarcarEntregado = new MarcarEntregado(autorizador, Envios, Unidad, Auditoria, Informador, Reloj);
+        InformarProgreso = new InformarProgresoAPedidos(ActorDePrueba.DelSistema(), Envios, Informador, Alertas, Reloj);
         Crear = new CrearEnvio(Pedidos, Envios, Reloj);
         Cancelar = new CancelarEnviosDelPedido(Envios, Auditoria, Reloj);
         Despacho = new DespachoDeEnviosDeLaAplicacion(Crear, Cancelar);
@@ -61,7 +64,13 @@ internal sealed class EntornoDeEnvios
 
     public ProgresoDeEnviosDoble Progreso { get; }
 
+    public InformadorDeProgreso Informador { get; }
+
     public PasarAEnReparto PasarAEnReparto { get; }
+
+    public MarcarEntregado MarcarEntregado { get; }
+
+    public InformarProgresoAPedidos InformarProgreso { get; }
 
     public CrearEnvio Crear { get; }
 

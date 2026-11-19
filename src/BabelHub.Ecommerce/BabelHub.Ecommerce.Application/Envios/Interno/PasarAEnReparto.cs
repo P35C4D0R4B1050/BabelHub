@@ -15,7 +15,7 @@ internal sealed class PasarAEnReparto(
     AutorizadorDeEnvios autorizador,
     IRepositorioDeEnvios envios,
     IReservasDelEnvio reservas,
-    IProgresoDeEnvios progreso,
+    InformadorDeProgreso informador,
     IUnidadDeTrabajo unidad,
     IAuditoria auditoria,
     IPublicadorDeAlertasTecnicas alertas,
@@ -127,41 +127,12 @@ internal sealed class PasarAEnReparto(
             }
 
             // (4) Después de confirmar: Pedidos marca las líneas «despachadas». Si falla, queda pendiente y un trabajo lo reintenta (idempotente).
-            await InformarAPedidos(terminado.Valor, lineas, cancelacion).ConfigureAwait(false);
+            await informador.Informar(terminado.Valor.Id, CancellationToken.None).ConfigureAwait(false);
             return terminado;
         }
         catch (EnviosNoDisponiblesException)
         {
             return FallosDeEnvios.NoDisponible<DetalleDeEnvio>();
-        }
-    }
-
-    private async Task InformarAPedidos(DetalleDeEnvio detalle, List<Guid> lineas, CancellationToken cancelacion)
-    {
-        try
-        {
-            var respuesta = await progreso.EnvioEnReparto(new EnvioEnRepartoEntrada(detalle.PedidoId, detalle.Id, lineas), cancelacion).ConfigureAwait(false);
-            if (!respuesta.EsExito)
-            {
-                return;
-            }
-
-            await unidad.Ejecutar(
-                async token =>
-                {
-                    var envio = await envios.Obtener(detalle.Id, paraActualizar: true, token).ConfigureAwait(false);
-                    if (envio is not null && envio.RegistrarProgresoEnRepartoInformado(reloj.Ahora))
-                    {
-                        await envios.Guardar(envio, token).ConfigureAwait(false);
-                    }
-
-                    return true;
-                },
-                CancellationToken.None).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            // Queda sin informar: el trabajo de fondo lo reintenta.
         }
     }
 
