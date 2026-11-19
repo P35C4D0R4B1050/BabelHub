@@ -74,6 +74,7 @@ public sealed class ComposicionDeIdentidadTests
         servicios.AddSingleton(Doble.De<ICancelacionDeAvisos>());
 
         // Lo provisional de la web (AgregarModuloWeb): la composición de Identidad lo reemplaza aunque ya esté registrado.
+        servicios.AddSingleton<IEstadoDeCuenta, BabelHub.Ecommerce.Infrastructure.Carrito.EstadoDeCuentaDelCarritoSinIdentidad>();
         servicios.AddSingleton<IEstadoDeCuentaDeLaWeb, EstadoDeCuentaSinIdentidad>();
         servicios.AddSingleton<IAceptacionDeTextosEnIdentidad, AceptacionDeTextosSinIdentidad>();
         servicios.AddSingleton(Doble.De<ISesionesDeIdentidad>());
@@ -104,6 +105,7 @@ public sealed class ComposicionDeIdentidadTests
         Assert.IsType<Sesiones>(s.GetRequiredService<ISesiones>());
         Assert.IsType<RecuperacionDeAcceso>(s.GetRequiredService<IRecuperacionDeAcceso>());
         Assert.IsType<EstadoDeCuentaDeIdentidad>(s.GetRequiredService<IEstadoDeCuenta>());
+        Assert.Single(s.GetServices<IEstadoDeCuenta>());
         Assert.IsType<GestionDeLaCuenta>(s.GetRequiredService<ICuentaDelCliente>());
         Assert.IsType<CambioDeCorreo>(s.GetRequiredService<ICambioDeCorreo>());
         Assert.IsType<DispositivosDeLaCuenta>(s.GetRequiredService<IDispositivosDeLaCuenta>());
@@ -173,6 +175,16 @@ public sealed class ComposicionDeIdentidadTests
         var falla = Assert.Throws<ArgumentException>(() => OpcionesDeIdentidad.Leer(Configuracion(cifrado: valor, pimienta: Clave()), esProduccion: false));
 
         Assert.DoesNotContain(valor, falla.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LaClaveDeCifradoYLaPimienta_NoPuedenSerLaMisma()
+    {
+        var misma = Clave();
+
+        var falla = Assert.Throws<ArgumentException>(() => OpcionesDeIdentidad.Leer(Configuracion(cifrado: misma, pimienta: misma), esProduccion: true));
+
+        Assert.DoesNotContain(misma, falla.Message, StringComparison.Ordinal);
     }
 
     [Fact]

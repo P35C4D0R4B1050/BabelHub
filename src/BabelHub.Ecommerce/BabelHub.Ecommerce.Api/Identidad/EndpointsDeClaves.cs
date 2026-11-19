@@ -4,6 +4,8 @@ using BabelHub.Ecommerce.Application.Identidad;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Infrastructure.Identidad;
 using BabelHub.Shared.Contratos.Ecommerce;
+using BabelHub.Ecommerce.Api.Web;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BabelHub.Ecommerce.Api.Identidad;
@@ -16,13 +18,21 @@ namespace BabelHub.Ecommerce.Api.Identidad;
 /// </summary>
 public static class EndpointsDeClaves
 {
-    public static IEndpointRouteBuilder MapearClavesDeIdentidad(this IEndpointRouteBuilder rutas)
+    /// <param name="rutas">Los endpoints.</param>
+    /// <param name="conAdministracion">Rotar y declarar comprometida solo se mapean en el host de gestión (D03); la publicación va donde la sirva la réplica.</param>
+    public static IEndpointRouteBuilder MapearClavesDeIdentidad(this IEndpointRouteBuilder rutas, bool conAdministracion = true)
     {
         ArgumentNullException.ThrowIfNull(rutas);
         rutas.MapGet(RutasDeClavesDeFirma.Jwks, Jwks).WithMetadata(new RequestSizeLimitAttribute(0));
         rutas.MapGet(RutasDeClavesDeFirma.Revocaciones, Revocaciones).WithMetadata(new RequestSizeLimitAttribute(0));
 
+        if (!conAdministracion)
+        {
+            return rutas;
+        }
+
         var admin = rutas.MapGroup(string.Empty);
+        admin.AddEndpointFilter<ProteccionDeLaAdministracionDeClaves>();
         admin.WithMetadata(new RequestSizeLimitAttribute(1024));
         admin.MapPost(RutasDeClavesDeFirma.Rotar, Rotar);
         admin.MapPost(RutasDeClavesDeFirma.Comprometida, Comprometida);
@@ -98,4 +108,34 @@ public static class EndpointsDeClaves
 
     /// <summary>Solo el <c>kid</c>, el algoritmo y el estado: ni la clave privada ni los parámetros públicos salen de aquí.</summary>
     private static ClaveDeFirmaDto ADto(ClavePublicaDeFirma clave) => new(clave.Kid, clave.Algoritmo, clave.Estado);
+}
+
+/// <summary>
+/// La protección de los <c>POST</c> de administración de claves contra la falsificación de solicitudes (WEB-05, D07): el actor sale de la cookie de sesión de la web, así que, como en toda operación que cambia estado,
+/// se comprueban <b>Origin y Sec-Fetch-Site</b> y el <b>token antifalsificación</b> (cabecera); un formulario de otro origen o sin token no llega a <see cref="IClavesDeFirma"/>. Cada rechazo se registra como acceso denegado
+/// y responde sin detalles.
+/// </summary>
+internal sealed class ProteccionDeLaAdministracionDeClaves : IEndpointFilter
+{
+    public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext contexto, EndpointFilterDelegate siguiente)
+    {
+        var c = contexto.HttpContext;
+        var errores = c.RequestServices.GetRequiredService<OpcionesDeErrores>();
+        var host = c.RequestServices.GetRequiredService<OpcionesDelHostWeb>();
+        if (ComprobadorDeOrigen.Comprobar(c.Request, host.HostsPermitidos) != ResultadoDeOrigen.Valido)
+        {
+            return await RespuestasDeAuditoria.Falla(c, errores, new ErrorDeAplicacion(CategoriaDeError.Prohibido, "origen-no-permitido")).ConfigureAwait(false);
+        }
+
+        try
+        {
+            await c.RequestServices.GetRequiredService<IAntiforgery>().ValidateRequestAsync(c).ConfigureAwait(false);
+        }
+        catch (AntiforgeryValidationException)
+        {
+            return await RespuestasDeAuditoria.Falla(c, errores, new ErrorDeAplicacion(CategoriaDeError.Prohibido, "token-antifalsificacion-invalido")).ConfigureAwait(false);
+        }
+
+        return await siguiente(contexto).ConfigureAwait(false);
+    }
 }

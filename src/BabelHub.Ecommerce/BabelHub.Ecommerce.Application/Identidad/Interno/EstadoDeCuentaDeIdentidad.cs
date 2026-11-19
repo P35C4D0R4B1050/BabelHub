@@ -12,6 +12,7 @@ public sealed class EstadoDeCuentaDeIdentidad(
     IRepositorioDeCuentas cuentas,
     IRepositorioDeCancelaciones cancelaciones,
     IVersionesDeTextosVigentes versiones,
+    AlcanceDeLaCuenta alcance,
     IUnidadDeTrabajo unidad,
     IReloj reloj) : IEstadoDeCuenta
 {
@@ -50,6 +51,12 @@ public sealed class EstadoDeCuentaDeIdentidad(
         if (usuarioId == Guid.Empty || string.IsNullOrWhiteSpace(versionMostrada) || versionMostrada.Length > 200)
         {
             return ResultadoDeLaAceptacion.VersionCambiada;
+        }
+
+        // Solo el titular acepta por sí mismo (AGENTS.md §5): otro actor no registra el consentimiento de nadie; la denegación queda registrada sin interrumpir.
+        if (await alcance.Comprobar(usuarioId, cancelacion).ConfigureAwait(false) is not null)
+        {
+            return ResultadoDeLaAceptacion.NoDisponible;
         }
 
         return await unidad.Ejecutar(

@@ -1,8 +1,11 @@
+using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Identidad;
 using BabelHub.Ecommerce.Application.Identidad.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Identidad;
 using BabelHub.Ecommerce.Infrastructure.Identidad;
+using TextoDeLaWeb = BabelHub.Ecommerce.Application.Web.TextoLegal;
+using TipoDeTextoDeLaWeb = BabelHub.Ecommerce.Application.Web.TipoDeTextoLegal;
 
 namespace BabelHub.IntegrationTests.Identidad;
 
@@ -22,15 +25,33 @@ public sealed class EstadoDeCuentaDeIdentidadTests : IClassFixture<PostgresDeIde
         public DateOnly HoyEnLima => DateOnly.FromDateTime(EstadoDeCuentaDeIdentidadTests.Ahora.UtcDateTime.AddHours(-5));
     }
 
+    private sealed class ActorFijo : IActorActual
+    {
+        public ActorActual? Actual { get; set; }
+    }
+
+    private sealed class DenegacionesGuardadas : IDenegacionDeAcceso
+    {
+        public int Cantidad { get; private set; }
+
+        public Task Registrar(DenegacionDeAcceso denegacion, CancellationToken cancelacion = default)
+        {
+            Cantidad++;
+            return Task.CompletedTask;
+        }
+    }
+
     private readonly PostgresDeIdentidadFixture _bd;
     private readonly PostgresRepositorioDeCuentas _cuentas;
     private readonly EstadoDeCuentaDeIdentidad _estado;
+    private readonly ActorFijo _actor = new();
+    private readonly DenegacionesGuardadas _denegaciones = new();
 
     public EstadoDeCuentaDeIdentidadTests(PostgresDeIdentidadFixture bd)
     {
         _bd = bd;
         _cuentas = new PostgresRepositorioDeCuentas(bd.AccesoAlEsquema);
-        _estado = new EstadoDeCuentaDeIdentidad(_cuentas, new PostgresRepositorioDeCancelaciones(bd.AccesoAlEsquema), new PostgresVersionesDeTextosVigentes(bd.AccesoAlEsquema), bd.Unidad, new RelojFijo());
+        _estado = new EstadoDeCuentaDeIdentidad(_cuentas, new PostgresRepositorioDeCancelaciones(bd.AccesoAlEsquema), new PostgresVersionesDeTextosVigentes(bd.AccesoAlEsquema), new AlcanceDeLaCuenta(_actor, _denegaciones), bd.Unidad, new RelojFijo());
         bd.Ejecutar("INSERT INTO identidad.versiones_de_textos (id, terminos, privacidad, reembolso) VALUES (1, 'T1', 'P1', 'R1') ON CONFLICT (id) DO UPDATE SET terminos = 'T1', privacidad = 'P1', reembolso = 'R1'").GetAwaiter().GetResult();
     }
 
@@ -54,6 +75,7 @@ public sealed class EstadoDeCuentaDeIdentidadTests : IClassFixture<PostgresDeIde
         }
 
         Assert.True(await _cuentas.Insertar(cuenta));
+        _actor.Actual = ActorActual.DeUsuario(cuenta.Usuario.Id, "cliente", null);
         return cuenta.Usuario.Id;
     }
 
@@ -148,6 +170,27 @@ public sealed class EstadoDeCuentaDeIdentidadTests : IClassFixture<PostgresDeIde
         }
     }
 
+    private sealed class TextosDeLaWebFijos : BabelHub.Ecommerce.Application.Web.ITextosLegales
+    {
+        public Task<Resultado<TextoDeLaWeb>> Obtener(TipoDeTextoDeLaWeb tipo, CancellationToken cancelacion = default) =>
+            Task.FromResult(Resultado<TextoDeLaWeb>.Exito(new TextoDeLaWeb(tipo, "Título", tipo switch { TipoDeTextoDeLaWeb.Terminos => "T1", TipoDeTextoDeLaWeb.Privacidad => "P1", _ => "R1" }, new DateOnly(2026, 11, 1), false, "Resumen", [])));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-14")]
+    public async Task ElIdentificadorQueArmaLaWeb_EsElQueIdentidadAcepta()
+    {
+        var web = new BabelHub.Ecommerce.Application.Web.Interno.AceptarTextosLegales(new TextosDeLaWebFijos(), new BabelHub.Ecommerce.Infrastructure.Composicion.AceptacionDeTextosSobreIdentidad(_estado));
+        var id = await Cuenta(alDia: false);
+        var version = await web.VersionVigente();
+        Assert.True(version.EsExito);
+
+        var resultado = await _estado.AceptarLosTextos(id, version.Valor.Identificador);
+
+        Assert.Equal(ResultadoDeLaAceptacion.Aceptada, resultado);
+        Assert.Equal(EstadoDeAceptacionDeLosTextos.AlDia, (await _estado.Consultar(id))!.Textos);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
@@ -161,6 +204,23 @@ public sealed class EstadoDeCuentaDeIdentidadTests : IClassFixture<PostgresDeIde
         var id = await Cuenta(alDia: false);
 
         Assert.Equal(ResultadoDeLaAceptacion.VersionCambiada, await _estado.AceptarLosTextos(id, version));
+        Assert.Equal(EstadoDeAceptacionDeLosTextos.Pendiente, (await _estado.Consultar(id))!.Textos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-14")]
+    public async Task SoloElTitularAceptaSusTextos_OtroActorNoRegistraElConsentimientoDeNadie_YSeRegistraLaDenegacion()
+    {
+        var id = await Cuenta(alDia: false);
+
+        foreach (var otro in new[] { ActorActual.DeUsuario(Guid.NewGuid(), "cliente", null), ActorActual.Anonimo(), ActorActual.DeUsuario(Guid.NewGuid(), "administrador-central", null) })
+        {
+            _actor.Actual = otro;
+            Assert.Equal(ResultadoDeLaAceptacion.NoDisponible, await _estado.AceptarLosTextos(id, "terminos:T1|privacidad:P1|reembolso:R1"));
+        }
+
+        Assert.Equal(3, _denegaciones.Cantidad);
+        _actor.Actual = ActorActual.DeUsuario(id, "cliente", null);
         Assert.Equal(EstadoDeAceptacionDeLosTextos.Pendiente, (await _estado.Consultar(id))!.Textos);
     }
 

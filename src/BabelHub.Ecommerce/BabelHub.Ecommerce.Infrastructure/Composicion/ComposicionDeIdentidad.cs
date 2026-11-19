@@ -46,6 +46,11 @@ public sealed class OpcionesDeIdentidad
         ArgumentNullException.ThrowIfNull(configuracion);
         var cifrado = Clave(configuracion, VariableDeLaClaveDeCifrado, esProduccion);
         var pimienta = Clave(configuracion, VariableDeLaPimienta, esProduccion);
+        if (CryptographicOperations.FixedTimeEquals(cifrado.Clave, pimienta.Clave))
+        {
+            throw new ArgumentException($"«{VariableDeLaClaveDeCifrado}» y «{VariableDeLaPimienta}» deben ser claves distintas.");
+        }
+
         var anteriores = (configuracion[VariableDeLasClavesAnteriores] ?? string.Empty)
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select((valor, i) => ClaveVersionadaDeIdentidad.Analizar(valor, $"{VariableDeLasClavesAnteriores}[{i}]"))
@@ -165,7 +170,8 @@ public static class ComposicionDeIdentidad
         servicios.TryAddScoped<IIngreso, Ingreso>();
         servicios.TryAddScoped<ISesiones, Sesiones>();
         servicios.TryAddScoped<IRecuperacionDeAcceso, RecuperacionDeAcceso>();
-        servicios.TryAddScoped<IEstadoDeCuenta, EstadoDeCuentaDeIdentidad>();
+        // Reemplaza al doble provisional de Carrito (TryAddSingleton) aunque ya esté registrado: la implementación real nunca se ignora en silencio.
+        servicios.Replace(ServiceDescriptor.Scoped<IEstadoDeCuenta, EstadoDeCuentaDeIdentidad>());
         servicios.TryAddScoped<ICuentaDelCliente, GestionDeLaCuenta>();
         servicios.TryAddScoped<ICambioDeCorreo, CambioDeCorreo>();
         servicios.TryAddScoped<IDispositivosDeLaCuenta, DispositivosDeLaCuenta>();

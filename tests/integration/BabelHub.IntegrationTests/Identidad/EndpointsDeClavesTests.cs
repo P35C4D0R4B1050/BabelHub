@@ -126,6 +126,8 @@ public sealed class EndpointsDeClavesTests : IAsyncDisposable
         builder.Services.AddSingleton<IReloj>(_reloj);
         builder.Services.AddSingleton<IClavesDeFirma>(_claves);
         builder.Services.AddSingleton<IRegistradorDeDenegacionesHttp>(_denegaciones);
+        builder.Services.AddAntiforgery();
+        builder.Services.AddSingleton(new BabelHub.Ecommerce.Api.Web.OpcionesDelHostWeb(BabelHub.Ecommerce.Application.Web.HostWeb.Gestion, []));
         _app = builder.Build();
         _app.UsarManejoDeErrores();
         _app.Use(async (contexto, siguiente) =>
@@ -140,6 +142,7 @@ public sealed class EndpointsDeClavesTests : IAsyncDisposable
             await siguiente();
         });
         _app.MapearClavesDeIdentidad();
+        _app.MapGet("/prueba/token", (HttpContext c, Microsoft.AspNetCore.Antiforgery.IAntiforgery a) => Results.Json(new { token = a.GetAndStoreTokens(c).RequestToken }));
         await _app.StartAsync();
         _cliente = _app.GetTestClient();
     }
@@ -151,12 +154,63 @@ public sealed class EndpointsDeClavesTests : IAsyncDisposable
         return e;
     }
 
-    private HttpRequestMessage Admin(string ruta, object? cuerpo = null, Guid? usuario = null, string rol = RolesDeUsuario.AdministradorCentral)
+    /// <summary>Una solicitud de administración con la cookie y el token antifalsificación que la web entregaría (<paramref name="conToken"/> = falso para probar el rechazo).</summary>
+    private async Task<HttpRequestMessage> Admin(string ruta, object? cuerpo = null, Guid? usuario = null, string rol = RolesDeUsuario.AdministradorCentral, bool conToken = true)
     {
         var solicitud = new HttpRequestMessage(HttpMethod.Post, ruta) { Content = cuerpo is null ? null : JsonContent.Create(cuerpo) };
         solicitud.Headers.Add("X-Prueba-Rol", rol);
         solicitud.Headers.Add("X-Prueba-Usuario", (usuario ?? _claves.Administrador).ToString());
+        if (conToken)
+        {
+            var respuesta = await _cliente.GetAsync("/prueba/token");
+            using var documento = JsonDocument.Parse(await respuesta.Content.ReadAsStringAsync());
+            solicitud.Headers.Add("RequestVerificationToken", documento.RootElement.GetProperty("token").GetString());
+            solicitud.Headers.Add("Cookie", string.Join("; ", respuesta.Headers.GetValues("Set-Cookie").Select(c => c.Split(';')[0])));
+        }
+
         return solicitud;
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-33")]
+    public async Task SinElTokenAntifalsificacion_ElPostDeAdministracionDa403_YNoLlegaALaAplicacion()
+    {
+        await using var e = await Crear();
+
+        var respuesta = await e._cliente.SendAsync(await e.Admin(RutasDeClavesDeFirma.Rotar, conToken: false));
+
+        Assert.Equal(HttpStatusCode.Forbidden, respuesta.StatusCode);
+        Assert.Empty(e._claves.Llamadas);
+        Assert.Contains(e._denegaciones.Registradas, d => d.Motivo == "token-antifalsificacion-invalido");
+    }
+
+    [Theory]
+    [InlineData("Origin", "https://otro-sitio.example")]
+    [InlineData("Sec-Fetch-Site", "cross-site")]
+    [InlineData("Sec-Fetch-Site", "same-site")]
+    [Trait("Criterio", "AC-IDE-33")]
+    public async Task UnPostDeAdministracionDeOtroOrigenOSitio_Da403_AunConToken(string cabecera, string valor)
+    {
+        await using var e = await Crear();
+        var solicitud = await e.Admin(RutasDeClavesDeFirma.Rotar);
+        solicitud.Headers.Add(cabecera, valor);
+
+        var respuesta = await e._cliente.SendAsync(solicitud);
+
+        Assert.Equal(HttpStatusCode.Forbidden, respuesta.StatusCode);
+        Assert.Empty(e._claves.Llamadas);
+        Assert.Contains(e._denegaciones.Registradas, d => d.Motivo == "origen-no-permitido");
+    }
+
+    [Fact]
+    public async Task UnCuerpoDeMasDeUnKiB_NoLlegaALaAplicacion()
+    {
+        await using var e = await Crear();
+
+        var respuesta = await e._cliente.SendAsync(await e.Admin(RutasDeClavesDeFirma.Comprometida, new DeclararClaveComprometidaDto(new string('k', 2000))));
+
+        Assert.NotEqual(HttpStatusCode.OK, respuesta.StatusCode);
+        Assert.Empty(e._claves.Llamadas);
     }
 
     [Fact]
@@ -229,7 +283,7 @@ public sealed class EndpointsDeClavesTests : IAsyncDisposable
         Assert.Equal(EstadoDeLaCredencial.Valida, verificador.Verificar(credencial, Ahora).Estado);
 
         // El administrador declara comprometida la clave: la siguiente renovación de la caché la rechaza.
-        var declaracion = await e._cliente.SendAsync(e.Admin(RutasDeClavesDeFirma.Comprometida, new DeclararClaveComprometidaDto("kid-activo")));
+        var declaracion = await e._cliente.SendAsync(await e.Admin(RutasDeClavesDeFirma.Comprometida, new DeclararClaveComprometidaDto("kid-activo")));
         Assert.Equal(HttpStatusCode.OK, declaracion.StatusCode);
         tiempo.Ahora = Ahora.AddMinutes(1);
         e._reloj.Instante = tiempo.Ahora;
@@ -250,7 +304,7 @@ public sealed class EndpointsDeClavesTests : IAsyncDisposable
     {
         await using var e = await Crear();
 
-        var respuesta = await e._cliente.SendAsync(e.Admin(RutasDeClavesDeFirma.Rotar));
+        var respuesta = await e._cliente.SendAsync(await e.Admin(RutasDeClavesDeFirma.Rotar));
         var texto = await respuesta.Content.ReadAsStringAsync();
         using var documento = JsonDocument.Parse(texto);
 
@@ -269,7 +323,10 @@ public sealed class EndpointsDeClavesTests : IAsyncDisposable
         await using var e = await Crear();
         var ruta = cual == "rotar" ? RutasDeClavesDeFirma.Rotar : RutasDeClavesDeFirma.Comprometida;
 
-        var respuesta = await e._cliente.PostAsJsonAsync(ruta, new DeclararClaveComprometidaDto("kid-activo"));
+        var solicitud = await e.Admin(ruta, new DeclararClaveComprometidaDto("kid-activo"));
+        solicitud.Headers.Remove("X-Prueba-Rol");
+        solicitud.Headers.Remove("X-Prueba-Usuario");
+        var respuesta = await e._cliente.SendAsync(solicitud);
 
         Assert.Equal(HttpStatusCode.Unauthorized, respuesta.StatusCode);
         Assert.Empty(e._claves.Llamadas);
@@ -282,7 +339,7 @@ public sealed class EndpointsDeClavesTests : IAsyncDisposable
     {
         await using var e = await Crear();
 
-        var respuesta = await e._cliente.SendAsync(e.Admin(RutasDeClavesDeFirma.Comprometida, new DeclararClaveComprometidaDto("kid-activo"), usuario: Guid.NewGuid(), rol: RolesDeUsuario.EncargadoDeSucursal));
+        var respuesta = await e._cliente.SendAsync(await e.Admin(RutasDeClavesDeFirma.Comprometida, new DeclararClaveComprometidaDto("kid-activo"), usuario: Guid.NewGuid(), rol: RolesDeUsuario.EncargadoDeSucursal));
 
         Assert.Equal(HttpStatusCode.Forbidden, respuesta.StatusCode);
         Assert.Empty(e._claves.KidsRevocados);
@@ -297,7 +354,7 @@ public sealed class EndpointsDeClavesTests : IAsyncDisposable
     public async Task UnCuerpoInvalidoOConCamposDeMas_Da400_YNoLlegaALaAplicacion(string cuerpo)
     {
         await using var e = await Crear();
-        var solicitud = e.Admin(RutasDeClavesDeFirma.Comprometida);
+        var solicitud = await e.Admin(RutasDeClavesDeFirma.Comprometida);
         solicitud.Content = new StringContent(cuerpo, System.Text.Encoding.UTF8, "application/json");
 
         var respuesta = await e._cliente.SendAsync(solicitud);
@@ -325,6 +382,7 @@ public sealed class EndpointsDeClavesTests : IAsyncDisposable
 
         var rutas = ((IEndpointRouteBuilder)e._app).DataSources.SelectMany(d => d.Endpoints).OfType<RouteEndpoint>()
             .Select(r => r.RoutePattern.RawText!)
+            .Where(r => !r.StartsWith("/prueba", StringComparison.Ordinal))
             .Order(StringComparer.Ordinal)
             .ToList();
 
