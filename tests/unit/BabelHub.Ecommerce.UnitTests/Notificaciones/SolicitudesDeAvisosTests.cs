@@ -430,6 +430,77 @@ public sealed class SolicitudesDeAvisosTests
         Assert.Equal(99, resultados.Count(r => r == ResultadoDeLaSolicitudDeAviso.YaExistia));
     }
 
+    [Theory]
+    [InlineData("N")]
+    [InlineData("D-mayusculas")]
+    [Trait("Criterio", "AC-NOT-04")]
+    public async Task LaReferenciaDelClienteSeGuardaCanonica_ElMismoEventoEscritoDeOtraFormaNoDuplica_YLaCancelacionLoEncuentra(string forma)
+    {
+        var e = new Entorno();
+        var cuenta = e.Cuentas.Con(consiente: true);
+        var escrita = forma switch
+        {
+            "N" => cuenta.ToString("N"),
+            _ => cuenta.ToString("D").ToUpperInvariant(),
+        };
+
+        await e.Solicitar.Solicitar(Listo(cuenta));
+        var otra = await e.Solicitar.Solicitar(Listo(cuenta) with { DestinatarioRef = escrita });
+
+        Assert.Equal(ResultadoDeLaSolicitudDeAviso.YaExistia, otra);
+        Assert.Equal(cuenta.ToString("D"), Assert.Single(e.Avisos.Guardados).DestinatarioRef);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-07")]
+    public async Task UnAvisoPedidoConLaCuentaEnMayusculas_QuedaCancelado_AlCancelarLaCuenta()
+    {
+        var e = new Entorno();
+        var cuenta = e.Cuentas.Con(consiente: true);
+        await e.Solicitar.Solicitar(Listo(cuenta) with { DestinatarioRef = cuenta.ToString("N").ToUpperInvariant() });
+
+        await e.Cancelar.CancelarLosAvisosDe(cuenta);
+
+        Assert.Equal(EstadoDelAviso.Cancelado, Assert.Single(e.Avisos.Guardados).Estado);
+    }
+
+    [Theory]
+    [InlineData("trasladoId", "3f2c9a8e-0000-4000-8000-123456789012")]
+    [Trait("Criterio", "AC-NOT-06")]
+    public async Task UnIdentificadorMixtoConMuchosDigitos_NoSeRechazaPorParecerUnaTarjeta(string campo, string valor)
+    {
+        var e = new Entorno();
+        var solicitud = Traslado("AYACUCHO");
+
+        var resultado = await e.Solicitar.Solicitar(solicitud with { Campos = new Dictionary<string, string>(solicitud.Campos) { [campo] = valor } });
+
+        Assert.Equal(ResultadoDeLaSolicitudDeAviso.Creado, resultado);
+    }
+
+    [Theory]
+    [InlineData("4111111111111111")]
+    [InlineData("4111-1111-1111-1111")]
+    [Trait("Criterio", "AC-NOT-06")]
+    public async Task UnIdentificadorSoloDeDigitosQueParecenUnaTarjeta_SiSeRechaza(string valor)
+    {
+        var e = new Entorno();
+        var solicitud = Traslado("AYACUCHO");
+
+        var resultado = await e.Solicitar.Solicitar(solicitud with { Campos = new Dictionary<string, string>(solicitud.Campos) { ["trasladoId"] = valor } });
+
+        Assert.Equal(ResultadoDeLaSolicitudDeAviso.Rechazado, resultado);
+    }
+
+    [Fact]
+    public async Task UnaSolicitudRechazada_DejaUnaAlertaTecnica_PorqueEsUnErrorDelModuloQueLlama()
+    {
+        var e = new Entorno();
+
+        await e.Solicitar.Solicitar(Listo(Guid.NewGuid()) with { Plantilla = "no-existe" });
+
+        Assert.Equal(SolicitarAviso.MotivoDeFallaPropia, Assert.Single(e.Alertas.Tecnicas));
+    }
+
     // ---------------------------------------------------------------- cancelar (T06)
 
     [Fact]
@@ -561,7 +632,7 @@ public sealed class SolicitudesDeAvisosTests
     [Theory]
     [InlineData("cliente")]
     [InlineData("encargado-de-sucursal")]
-    [InlineData("logistica")]
+    [InlineData("personal-de-logistica")]
     [Trait("Criterio", "AC-NOT-13")]
     public async Task QuienNoEsAdministracionCentral_EsProhibido_YQuedaRegistrado_SinDesactivarNada(string rol)
     {
@@ -595,6 +666,12 @@ public sealed class SolicitudesDeAvisosTests
     [InlineData("999111222", "   ")]
     [InlineData("999111222", "llamar al 999 111 222 de nuevo")]
     [InlineData("999111222", "ver https://example.com/x")]
+    [InlineData("999111222", "llamar al 999.111.222")]
+    [InlineData("999111222", "llamar al (999) 111 222")]
+    [InlineData("999111222", "al ٩٩٩١١١٢٢٢")]
+    [InlineData("999111222", "al 999‑111‑222")]
+    [InlineData("999111222", "escribir a titular@example.com")]
+    [InlineData("999111222", "escribir a titular＠example.com")]
     public async Task UnNumeroOUnMotivoInvalidos_SeRechazan(string numero, string motivo)
     {
         var e = new Entorno();

@@ -20,3 +20,15 @@ Decisiones tomadas al construir (no cambian la spec ni el plan aprobados). Lee t
 
 - `IEstadoDeCuenta` (consentimiento) aún no tiene adaptador real: lo entrega la Infraestructura de Identidad (IDE-6).
 - Adaptadores EF de `IRepositorioDeAvisos` y `IRepositorioDeNumerosDesactivados`, el índice único y `IHuellasDeNumeros` (HMAC con clave versionada) son de la Infraestructura de Notificaciones.
+
+## Correcciones tras la revisión de NOT-1
+
+Revisión de arquitectura («Cumple con observaciones», sin Bloqueantes ni Importantes) y de seguridad («Cumple con observaciones», 3 Importantes, sin Bloqueantes). **Corregido y probado:**
+
+- **Referencia del cliente canónica:** `SolicitarAviso` guarda el id de la cuenta en su forma «D» en minúsculas (acepta «N» y mayúsculas); así la unicidad (NOT-05) y la cancelación (NOT-08) no dependen de cómo se escribió. La forma «B» (con llaves) sigue rechazada.
+- **Motivo de la desactivación:** se rechaza con siete o más cifras de cualquier alfabeto (cualquier separador), un `@` (o su forma de ancho completo), un enlace o caracteres de control; antes solo detectaba dígitos ASCII seguidos.
+- **Filtro de tarjeta:** en los campos `Identificador` y `NumeroDePedido` solo se rechaza el valor hecho únicamente de dígitos y separadores; un GUID o una guía mixta ya no se pierde.
+- Una solicitud `Rechazado` deja una alerta técnica (es un error del módulo que llama).
+- El rol exige `UsuarioId` no nulo y su constante se compara con `RolesDeUsuario.AdministradorCentral` en `tests/architecture` (`ReglasDeNotificacionesTests`); la prueba usaba un rol inexistente (`logistica`) y ahora usa `personal-de-logistica`.
+
+**Para las tareas siguientes (en `progress/hallazgos.md`):** la implementación de `ICancelacionDeAvisos` (`CancelarAvisosPendientes`) se entrega en T06 aunque su contrato es de T03; `EstaDesactivado` necesita un puerto para el enviador (T08), que además debe revisar `EsFinal` tras un `IniciarEnvio` falso y comprobar el consentimiento y el estado vigente justo antes de cada envío; el cupo reservado se devuelve al cancelar en T09; la atomicidad de AC-NOT-04 se prueba con PostgreSQL en T22; `IHuellasDeNumeros` es el puerto que implementa el calculador de huella de T13.

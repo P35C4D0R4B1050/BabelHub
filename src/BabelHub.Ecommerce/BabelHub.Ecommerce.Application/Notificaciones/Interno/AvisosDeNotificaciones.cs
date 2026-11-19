@@ -72,6 +72,8 @@ public sealed class SolicitarAviso(IRepositorioDeAvisos avisos, IEstadoDeCuenta 
     {
         if (solicitud is null || Validar(solicitud) is not { } valida)
         {
+            // Una solicitud inválida es un error del módulo que llama: se deja constancia técnica para que no se pierda en silencio.
+            await AlertarSinInterrumpir(cancelacion).ConfigureAwait(false);
             return ResultadoDeLaSolicitudDeAviso.Rechazado;
         }
 
@@ -79,15 +81,16 @@ public sealed class SolicitarAviso(IRepositorioDeAvisos avisos, IEstadoDeCuenta 
         {
             var ahora = reloj.Ahora;
             var tipo = valida.Plantilla.Destinatario;
+            var referencia = valida.Referencia;
             if (tipo == TipoDeDestinatario.Cliente && !await ConsienteElCliente(valida.CuentaId!.Value, cancelacion).ConfigureAwait(false))
             {
-                var omitido = Aviso.OmitidoSinConsentimiento(Guid.NewGuid(), solicitud.EventoId, solicitud.DestinatarioRef, tipo, solicitud.Plantilla, valida.Plantilla.Version, MotivoDeOmisionSinConsentimiento, ahora);
+                var omitido = Aviso.OmitidoSinConsentimiento(Guid.NewGuid(), solicitud.EventoId, referencia, tipo, solicitud.Plantilla, valida.Plantilla.Version, MotivoDeOmisionSinConsentimiento, ahora);
                 return await avisos.InsertarSiNoExiste(omitido, cancelacion).ConfigureAwait(false)
                     ? ResultadoDeLaSolicitudDeAviso.OmitidoSinConsentimiento
                     : ResultadoDeLaSolicitudDeAviso.YaExistia;
             }
 
-            var aviso = Aviso.Crear(Guid.NewGuid(), solicitud.EventoId, solicitud.DestinatarioRef, tipo, solicitud.Plantilla, valida.Plantilla.Version, solicitud.Campos, ahora);
+            var aviso = Aviso.Crear(Guid.NewGuid(), solicitud.EventoId, referencia, tipo, solicitud.Plantilla, valida.Plantilla.Version, solicitud.Campos, ahora);
             return await avisos.InsertarSiNoExiste(aviso, cancelacion).ConfigureAwait(false) ? ResultadoDeLaSolicitudDeAviso.Creado : ResultadoDeLaSolicitudDeAviso.YaExistia;
         }
         catch (Exception) when (!cancelacion.IsCancellationRequested)
@@ -97,7 +100,7 @@ public sealed class SolicitarAviso(IRepositorioDeAvisos avisos, IEstadoDeCuenta 
         }
     }
 
-    private sealed record Valida(PlantillaDeAviso Plantilla, Guid? CuentaId);
+    private sealed record Valida(PlantillaDeAviso Plantilla, Guid? CuentaId, string Referencia);
 
     private static Valida? Validar(SolicitudDeAviso solicitud)
     {
@@ -114,11 +117,11 @@ public sealed class SolicitarAviso(IRepositorioDeAvisos avisos, IEstadoDeCuenta 
 
         if (plantilla.Destinatario == TipoDeDestinatario.Cliente)
         {
-            // La referencia de un cliente es el identificador de su cuenta.
-            return Guid.TryParse(solicitud.DestinatarioRef, out var cuenta) && cuenta != Guid.Empty ? new Valida(plantilla, cuenta) : null;
+            // La referencia de un cliente es el id de su cuenta, guardada en su forma canónica («D», minúsculas): así la unicidad y la cancelación no dependen de cómo se escribió.
+            return Guid.TryParse(solicitud.DestinatarioRef, out var cuenta) && cuenta != Guid.Empty ? new Valida(plantilla, cuenta, cuenta.ToString("D")) : null;
         }
 
-        return new Valida(plantilla, null);
+        return new Valida(plantilla, null, solicitud.DestinatarioRef);
     }
 
     private async Task<bool> ConsienteElCliente(Guid cuentaId, CancellationToken cancelacion)
@@ -250,7 +253,7 @@ public sealed class DesactivarAvisosDeUnNumero(
 
     private async Task<ErrorDeAplicacion?> ComprobarAdministracion(CancellationToken cancelacion)
     {
-        if (actor.Actual is { Tipo: TipoDeActor.Usuario, Rol: RolDeAdministracionCentral })
+        if (actor.Actual is { Tipo: TipoDeActor.Usuario, UsuarioId: not null, Rol: RolDeAdministracionCentral })
         {
             return null;
         }
@@ -279,8 +282,11 @@ public sealed class DesactivarAvisosDeUnNumero(
 
     private static ErrorDeAplicacion Validacion(string campo, string clave) => new(CategoriaDeError.Validacion, "validacion-invalida", [new ErrorDeCampo(campo, clave)]);
 
-    /// <summary>El motivo es un texto corto: no lleva números largos (un teléfono), enlaces ni caracteres de control.</summary>
+    /// <summary>
+    /// El motivo es un texto corto sin datos de contacto: ni un teléfono (siete o más cifras en total, de cualquier alfabeto y con los separadores que sean), ni una dirección de correo, ni un enlace, ni caracteres de control.
+    /// </summary>
     private static bool MotivoValido(string? motivo) =>
-        !string.IsNullOrWhiteSpace(motivo) && motivo.Trim().Length <= LargoMaximoDelMotivo && !motivo.Any(char.IsControl) && !motivo.Contains("://", StringComparison.Ordinal)
-        && !System.Text.RegularExpressions.Regex.IsMatch(motivo, "[0-9][0-9 -]{6,}", System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(250));
+        !string.IsNullOrWhiteSpace(motivo) && motivo.Trim().Length <= LargoMaximoDelMotivo && !motivo.Any(char.IsControl)
+        && !motivo.Contains("://", StringComparison.Ordinal) && !motivo.Contains('@') && !motivo.Contains('＠')
+        && motivo.Count(char.IsDigit) < 7;
 }

@@ -135,7 +135,10 @@ public sealed partial class PlantillaDeAviso
             return "caracteres-de-control";
         }
 
-        if (ParecenEnlaceODireccion().IsMatch(valor) || DigitosSeguidos().IsMatch(valor))
+        // Un identificador o un número de pedido puede llevar muchos dígitos (un GUID, una guía): solo se rechaza si es todo dígitos y separadores (parece una tarjeta), no por las rachas de un valor mixto.
+        var esIdentificador = campo.Tipo is TipoDeCampo.Identificador or TipoDeCampo.NumeroDePedido;
+        var parecenDigitos = esIdentificador ? SoloDigitosYSeparadores().IsMatch(valor) && DigitosSeguidos().IsMatch(valor) : DigitosSeguidos().IsMatch(valor);
+        if (ParecenEnlaceODireccion().IsMatch(valor) || parecenDigitos)
         {
             return "valor-prohibido";
         }
@@ -176,6 +179,9 @@ public sealed partial class PlantillaDeAviso
 
     [GeneratedRegex("(://|www\\.|@|\\.(com|pe|net|org|io)\\b)", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 250)]
     private static partial Regex ParecenEnlaceODireccion();
+
+    [GeneratedRegex("^[0-9 -]+\\z", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 250)]
+    private static partial Regex SoloDigitosYSeparadores();
 
     /// <summary>Trece o más dígitos seguidos (con o sin espacios o guiones): parece el número de una tarjeta.</summary>
     [GeneratedRegex("([0-9][ -]?){13,}", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 250)]
