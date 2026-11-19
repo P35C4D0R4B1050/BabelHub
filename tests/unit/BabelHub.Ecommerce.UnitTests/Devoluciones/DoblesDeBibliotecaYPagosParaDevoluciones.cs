@@ -146,3 +146,24 @@ internal sealed class ReembolsosDoble : IReembolsos, IInstantanea
 
     public void Restaurar(object instantanea) => _registrados = (List<RegistrarReembolsoEntrada>)instantanea;
 }
+
+/// <summary>La revocación de Biblioteca que usa Devoluciones al aprobar un reporte: anota cada llamada y responde «ya revocado» si la prueba lo pide.</summary>
+internal sealed class BibliotecaParaDevolucionesDoble : IAccesosDeBiblioteca
+{
+    public bool YaRevocado { get; set; }
+
+    public bool NoResponde { get; set; }
+
+    public List<(Guid PedidoId, Guid EdicionId, MotivoDeRevocacionDeAcceso Motivo)> Revocados { get; } = [];
+
+    public Task<Resultado<ResultadoDeConcederAcceso>> Conceder(ConcederAccesoEntrada entrada, CancellationToken cancelacion = default) =>
+        Task.FromResult(Resultado<ResultadoDeConcederAcceso>.Exito(ResultadoDeConcederAcceso.Concedido));
+
+    public Task<Resultado<ResultadoDeRevocarAcceso>> Revocar(RevocarAccesoEntrada entrada, CancellationToken cancelacion = default)
+    {
+        Revocados.Add((entrada.PedidoId, entrada.EdicionId, entrada.Motivo));
+        return Task.FromResult(NoResponde
+            ? Resultado<ResultadoDeRevocarAcceso>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible"))
+            : Resultado<ResultadoDeRevocarAcceso>.Exito(YaRevocado ? ResultadoDeRevocarAcceso.YaRevocado : ResultadoDeRevocarAcceso.Revocado));
+    }
+}

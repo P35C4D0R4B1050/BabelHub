@@ -174,20 +174,20 @@ internal sealed class RepositorioDeDevolucionesEnMemoria : IRepositorioDeDevoluc
     public Task<Devolucion?> Obtener(Guid devolucionId, bool paraActualizar, CancellationToken cancelacion = default)
     {
         Comprobar();
-        return Task.FromResult(_devoluciones.GetValueOrDefault(devolucionId));
+        return Task.FromResult(_devoluciones.TryGetValue(devolucionId, out var guardada) ? Clonar(guardada) : null);
     }
 
     public Task Agregar(Devolucion devolucion, CancellationToken cancelacion = default)
     {
         Comprobar();
-        _devoluciones[devolucion.Id] = devolucion;
+        _devoluciones[devolucion.Id] = Clonar(devolucion);
         return Task.CompletedTask;
     }
 
     public Task Guardar(Devolucion devolucion, CancellationToken cancelacion = default)
     {
         Comprobar();
-        _devoluciones[devolucion.Id] = devolucion;
+        _devoluciones[devolucion.Id] = Clonar(devolucion);
         return Task.CompletedTask;
     }
 
@@ -249,7 +249,24 @@ internal sealed class RepositorioDeDevolucionesEnMemoria : IRepositorioDeDevoluc
         }
     }
 
-    public object Capturar() => (new Dictionary<Guid, Devolucion>(_devoluciones), _cupos.ToDictionary(c => c.Key, c => CupoDeLinea.Rehidratar(c.Value.LineaId, c.Value.CantidadComprada, c.Value.CantidadComprometida)));
+    /// <summary>Una copia profunda: lo que la transacción cambie sobre un objeto leído no altera lo guardado hasta que se guarde, y revertir descarta los cambios.</summary>
+    private static Devolucion Clonar(Devolucion d) =>
+        Devolucion.Rehidratar(
+            d.Id,
+            d.PedidoId,
+            d.Tipo,
+            d.Origen,
+            d.CodigoDeSucursalReceptora,
+            d.Motivo,
+            d.Texto,
+            d.CreadaEn,
+            d.RedactadaEn,
+            d.ReingresoIniciadoEn,
+            d.ReingresoIncertoEn,
+            d.ReingresoConfirmadoEn,
+            [.. d.Lineas.Select(l => new LineaRehidratada(l.Id, l.LineaDePedidoId, l.EdicionId, l.Cantidad, l.PrecioUnitario, l.Monto, l.AccesoId, [.. l.Cambios], l.ReembolsoRegistradoEn))]);
+
+    public object Capturar() => (_devoluciones.ToDictionary(x => x.Key, x => Clonar(x.Value)), _cupos.ToDictionary(c => c.Key, c => CupoDeLinea.Rehidratar(c.Value.LineaId, c.Value.CantidadComprada, c.Value.CantidadComprometida)));
 
     public void Restaurar(object instantanea)
     {
@@ -281,47 +298,85 @@ internal sealed class EntornoDeDevoluciones
         Pedidos = new PedidosParaDevolucionesDoble();
         Inventario = new InventarioDeDevolucionesDoble(Unidad);
         Marca = new MarcaDeCancelacionDoble();
+        Biblioteca = new BibliotecaParaDevolucionesDoble();
+        Armar();
+    }
+
+    /// <summary>El mismo estado (almacén, dobles y auditoría) visto por otro actor: por ejemplo, la administración central decidiendo lo que un cliente reportó.</summary>
+    public EntornoDeDevoluciones ConLosDatosDe(EntornoDeDevoluciones otro) =>
+        new(this, otro);
+
+    private EntornoDeDevoluciones(EntornoDeDevoluciones actor, EntornoDeDevoluciones compartido)
+    {
+        Actor = actor.Actor;
+        Reloj = compartido.Reloj;
+        Repositorio = compartido.Repositorio;
+        Auditoria = compartido.Auditoria;
+        Reembolsos = compartido.Reembolsos;
+        Unidad = compartido.Unidad;
+        Accesos = compartido.Accesos;
+        Denegaciones = compartido.Denegaciones;
+        Cuentas = compartido.Cuentas;
+        Sucursales = compartido.Sucursales;
+        Limites = compartido.Limites;
+        Pedidos = compartido.Pedidos;
+        Inventario = compartido.Inventario;
+        Marca = compartido.Marca;
+        Biblioteca = compartido.Biblioteca;
+        Armar();
+    }
+
+    private void Armar()
+    {
         Autorizador = new AutorizadorDeDevoluciones(Actor, Denegaciones, Cuentas, Sucursales);
         LimitesDeUso = new LimitesDeDevoluciones(Limites, Actor);
         SolicitarImpreso = new SolicitarDevolucionDeImpreso(Autorizador, LimitesDeUso, Pedidos, Inventario, Marca, Repositorio, Unidad, Auditoria, Reloj);
         SolicitarDigital = new SolicitarReembolsoDeDigital(Autorizador, LimitesDeUso, Pedidos, Accesos, Reembolsos, Marca, Repositorio, Unidad, Auditoria, Reloj);
+        Reportar = new ReportarArchivoDefectuoso(Autorizador, LimitesDeUso, Pedidos, Accesos, Marca, Repositorio, Unidad, Auditoria, Reloj);
+        Decidir = new DecidirReporte(Autorizador, LimitesDeUso, Pedidos, Accesos, Biblioteca, Reembolsos, Repositorio, Unidad, Auditoria, Reloj);
     }
 
-    public ActorDePrueba Actor { get; }
+    public ActorDePrueba Actor { get; private set; }
 
-    public RelojFijo Reloj { get; }
+    public RelojFijo Reloj { get; private set; }
 
-    public RepositorioDeDevolucionesEnMemoria Repositorio { get; }
+    public RepositorioDeDevolucionesEnMemoria Repositorio { get; private set; }
 
-    public AuditoriaDeDevolucionesEspia Auditoria { get; }
+    public AuditoriaDeDevolucionesEspia Auditoria { get; private set; }
 
-    public UnidadDeTrabajoReversible Unidad { get; }
+    public UnidadDeTrabajoReversible Unidad { get; private set; }
 
-    public DenegacionesDelCatalogoEspia Denegaciones { get; }
+    public DenegacionesDelCatalogoEspia Denegaciones { get; private set; }
 
-    public EstadoDeCuentaFalso Cuentas { get; }
+    public EstadoDeCuentaFalso Cuentas { get; private set; }
 
-    public ResolucionDeSucursalDoble Sucursales { get; }
+    public ResolucionDeSucursalDoble Sucursales { get; private set; }
 
-    public LimitesDeEnviosDoble Limites { get; }
+    public LimitesDeEnviosDoble Limites { get; private set; }
 
-    public PedidosParaDevolucionesDoble Pedidos { get; }
+    public PedidosParaDevolucionesDoble Pedidos { get; private set; }
 
-    public InventarioDeDevolucionesDoble Inventario { get; }
+    public InventarioDeDevolucionesDoble Inventario { get; private set; }
 
-    public MarcaDeCancelacionDoble Marca { get; }
+    public MarcaDeCancelacionDoble Marca { get; private set; }
 
-    public AutorizadorDeDevoluciones Autorizador { get; }
+    public AutorizadorDeDevoluciones Autorizador { get; private set; } = null!;
 
-    public LimitesDeDevoluciones LimitesDeUso { get; }
+    public LimitesDeDevoluciones LimitesDeUso { get; private set; } = null!;
 
-    public SolicitarDevolucionDeImpreso SolicitarImpreso { get; }
+    public SolicitarDevolucionDeImpreso SolicitarImpreso { get; private set; } = null!;
 
-    public SolicitarReembolsoDeDigital SolicitarDigital { get; }
+    public SolicitarReembolsoDeDigital SolicitarDigital { get; private set; } = null!;
 
-    public ReembolsosDoble Reembolsos { get; }
+    public BibliotecaParaDevolucionesDoble Biblioteca { get; private set; }
 
-    public AccesosParaDevolucionesDoble Accesos { get; }
+    public ReportarArchivoDefectuoso Reportar { get; private set; } = null!;
+
+    public DecidirReporte Decidir { get; private set; } = null!;
+
+    public ReembolsosDoble Reembolsos { get; private set; }
+
+    public AccesosParaDevolucionesDoble Accesos { get; private set; }
 
     /// <summary>Siembra un pedido de la cuenta del actor con las líneas dadas y lo devuelve.</summary>
     public PedidoParaDevoluciones SembrarPedido(params LineaDePedidoParaDevoluciones[] lineas)

@@ -20,6 +20,9 @@ public enum ResultadoDeRevocarAcceso
 public enum MotivoDeRevocacionDeAcceso
 {
     PedidoAnulado,
+
+    /// <summary>La administración central aprobó el reporte de un archivo defectuoso (DEV-06): lo añade Devoluciones como cambio aditivo; Biblioteca (ECO-8) lo adopta junto con <c>reembolso</c> (su plan §4).</summary>
+    ReporteAprobado,
 }
 
 public sealed record ConcederAccesoEntrada(Guid CuentaId, Guid PedidoId, Guid EdicionId);
