@@ -211,6 +211,42 @@ public sealed class PostgresRepositorioDeCuentas(AccesoAlEsquemaDeIdentidad acce
             },
             cancelacion);
 
+    public Task<IReadOnlyList<CuentaDeIdentidad>> Listar(RolDeUsuario? rol, bool? activo, string? correo, string? despuesDelCorreo, bool soloPersonal, int tamano, CancellationToken cancelacion = default) =>
+        acceso.Ejecutar<IReadOnlyList<CuentaDeIdentidad>>(
+            async (c, t, ct) =>
+            {
+                // Sin correo exacto solo el personal: la lista de clientes no se entrega (privacidad); con el correo, esa cuenta. Los parámetros nulos no filtran.
+                await using var comando = AccesoAlEsquemaDeIdentidad.Comando(
+                    c,
+                    t,
+                    $"""
+                    SELECT {Columnas} FROM identidad.usuarios
+                    WHERE cancelada_en IS NULL
+                      AND (@rol::text IS NULL OR rol = @rol)
+                      AND (@activo::boolean IS NULL OR activo = @activo)
+                      AND (@correo::text IS NULL OR correo = @correo)
+                      AND (NOT @solo_personal OR rol <> 'cliente')
+                      AND (@despues::text IS NULL OR correo > @despues)
+                    ORDER BY correo
+                    LIMIT @limite
+                    """,
+                    ("rol", rol is { } r ? AccesoAlEsquemaDeIdentidad.Rol(r) : null),
+                    ("activo", activo),
+                    ("correo", correo is null ? null : Usuario.NormalizarCorreo(correo)),
+                    ("despues", despuesDelCorreo),
+                    ("solo_personal", soloPersonal),
+                    ("limite", tamano));
+                var cuentas = new List<CuentaDeIdentidad>();
+                await using var filas = await comando.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                while (await filas.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    cuentas.Add(Mapear(filas));
+                }
+
+                return cuentas;
+            },
+            cancelacion);
+
     private Task<CuentaDeIdentidad?> Leer(string sql, (string, object?)[] parametros, CancellationToken cancelacion) =>
         acceso.Ejecutar(
             async (c, t, ct) =>

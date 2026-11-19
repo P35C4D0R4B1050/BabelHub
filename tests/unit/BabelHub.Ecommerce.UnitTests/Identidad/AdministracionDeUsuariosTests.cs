@@ -668,4 +668,94 @@ public sealed class AdministracionDeUsuariosTests
         Assert.Equal("sucursal", Assert.Single(resultado.Error.Errores).Campo);
         Assert.Equal(0, e.Inventario.Consultas);
     }
+
+    // ---------------------------------------------------------------- listar (WEB-35)
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-29")]
+    public async Task Listar_SinCorreo_EntregaSoloElPersonal_OrdenadoPorCorreo_YNuncaLosClientes()
+    {
+        var (e, admin, administracion) = Escenario();
+        e.Cuenta("zeta@example.com", RolDeUsuario.Logistica);
+        e.Cuenta("ana@example.com", RolDeUsuario.Logistica);
+        e.Cuenta("cliente@example.com", RolDeUsuario.Cliente);
+
+        var pagina = (await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios())).Valor;
+
+        Assert.Equal(["admin@example.com", "ana@example.com", "zeta@example.com"], pagina.Usuarios.Select(u => u.Correo));
+        Assert.DoesNotContain(pagina.Usuarios, u => u.Rol == RolDeCuenta.Cliente);
+        Assert.Null(pagina.Siguiente);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-29")]
+    public async Task Listar_UnClienteSoloSeEncuentraPorSuCorreoExacto()
+    {
+        var (e, admin, administracion) = Escenario();
+        e.Cuenta("cliente@example.com", RolDeUsuario.Cliente);
+
+        var exacto = (await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Correo: " Cliente@Example.com "))).Valor;
+        var otro = (await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Correo: "otro@example.com"))).Valor;
+        var porRol = await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Rol: RolDeCuenta.Cliente));
+
+        Assert.Equal("cliente@example.com", Assert.Single(exacto.Usuarios).Correo);
+        Assert.Empty(otro.Usuarios);
+        Assert.Equal("cliente-solo-por-correo", Assert.Single(porRol.Error!.Errores).Clave);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-29")]
+    public async Task Listar_PaginaPorCursor_YFiltraPorRolYEstado()
+    {
+        var (e, admin, administracion) = Escenario();
+        e.Cuenta("a@example.com", RolDeUsuario.Logistica);
+        e.Cuenta("b@example.com", RolDeUsuario.Logistica);
+        e.Cuenta("c@example.com", RolDeUsuario.Logistica, activa: false);
+
+        var primera = (await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Rol: RolDeCuenta.Logistica, Tamano: 2))).Valor;
+        var segunda = (await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Rol: RolDeCuenta.Logistica, Tamano: 2, Despues: primera.Siguiente))).Valor;
+        var inactivos = (await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Activo: false))).Valor;
+
+        Assert.Equal(["a@example.com", "b@example.com"], primera.Usuarios.Select(u => u.Correo));
+        Assert.Equal("b@example.com", primera.Siguiente);
+        Assert.Equal(["c@example.com"], segunda.Usuarios.Select(u => u.Correo));
+        Assert.Null(segunda.Siguiente);
+        Assert.Equal(["c@example.com"], inactivos.Usuarios.Select(u => u.Correo));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-29")]
+    public async Task Listar_ElTamanoSeAcota_YUnFiltroInvalidoSeRechaza()
+    {
+        var (e, admin, administracion) = Escenario();
+        for (var i = 0; i < 55; i++)
+        {
+            e.Cuenta($"p{i:D2}@example.com", RolDeUsuario.Logistica);
+        }
+
+        var grande = (await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Tamano: 500))).Valor;
+        var porOmision = (await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Tamano: 0))).Valor;
+        var rolInvalido = await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Rol: (RolDeCuenta)99));
+        var correoInvalido = await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Correo: "no es un correo"));
+        var cursorLargo = await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Despues: new string('a', 255)));
+
+        Assert.Equal(50, grande.Usuarios.Count);
+        Assert.NotNull(grande.Siguiente);
+        Assert.Equal(20, porOmision.Usuarios.Count);
+        Assert.All(new[] { rolInvalido, correoInvalido, cursorLargo }, r => Assert.Equal(CategoriaDeError.Validacion, r.Error!.Categoria));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-29")]
+    public async Task Listar_SoloLoHaceElAdministradorCentralActivo()
+    {
+        var (e, _, administracion) = Escenario();
+        var encargado = e.Cuenta("encargado@example.com", RolDeUsuario.EncargadoDeSucursal, sucursal: Guid.NewGuid());
+        e.Actor.Actual = ActorActual.DeUsuario(encargado.Usuario.Id, "encargado-de-sucursal");
+
+        var resultado = await administracion.Listar(encargado.Usuario.Id, new FiltroDeUsuarios());
+
+        Assert.Equal(CategoriaDeError.Prohibido, resultado.Error!.Categoria);
+        Assert.Single(e.Denegaciones.Registradas);
+    }
 }

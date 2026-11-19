@@ -21,6 +21,7 @@ public sealed class PantallasDeLaCuentaTests : IAsyncLifetime
     private AnfitrionWeb _anfitrion = null!;
     private Resultado<EstadoDeLaCancelacionDeCuenta> _cancelacion = Resultado<EstadoDeLaCancelacionDeCuenta>.Exito(new EstadoDeLaCancelacionDeCuenta(EstadoDeLaCancelacion.SinSolicitud, 0, null, null, false));
     private bool _textosPendientes;
+    private bool _reconocida;
     private ErrorDeAplicacion? _falla;
 
     private static readonly Guid Aviso = Guid.Parse("a1000000-0000-0000-0000-000000000001");
@@ -46,6 +47,8 @@ public sealed class PantallasDeLaCuentaTests : IAsyncLifetime
         dCuenta.Con(nameof(ICuentaDelCliente.DesactivarElSegundoFactor), a => { _llamadas.Add("desactivar-2fa"); return Task.FromResult(De(new RespuestaUniforme())); });
         dCuenta.Con(nameof(ICuentaDelCliente.ListarLosAvisos), _ => Task.FromResult(Resultado<IReadOnlyList<AvisoDeCuenta>>.Exito([new AvisoDeCuenta(Aviso, "contrasena-cambiada", new DateTimeOffset(2026, 11, 19, 15, 0, 0, TimeSpan.Zero), false)])));
         dCuenta.Con(nameof(ICuentaDelCliente.MarcarElAvisoComoVisto), a => { _llamadas.Add("visto"); _argumentos["reconocida"] = a[2]; return Task.FromResult(De(new RespuestaUniforme())); });
+        var dispositivos = DobleDeMetodos.Crear<IDispositivosDeLaCuenta>(out var dDispositivos);
+        dDispositivos.Con(nameof(IDispositivosDeLaCuenta.Reconoce), a => { _llamadas.Add("reconoce"); _argumentos["marca"] = (a[1] as ValorSecreto)?.Revelar(); _argumentos["region"] = a[2]; return Task.FromResult(De(_reconocida)); });
         var correo = DobleDeMetodos.Crear<ICambioDeCorreo>(out var dCorreo);
         dCorreo.Con(nameof(ICambioDeCorreo.Solicitar), a => { _llamadas.Add("correo"); _argumentos["correoNuevo"] = a[1]; return Task.FromResult(De(new RespuestaUniforme())); });
         dCorreo.Con(nameof(ICambioDeCorreo.ConfirmarElCambioPendiente), a => { _llamadas.Add("confirmar-correo"); return Task.FromResult(De(new RespuestaUniforme())); });
@@ -74,6 +77,7 @@ public sealed class PantallasDeLaCuentaTests : IAsyncLifetime
             {
                 s.AddSingleton(cuenta);
                 s.AddSingleton(correo);
+                s.AddSingleton(dispositivos);
                 s.AddSingleton(cancelaciones);
                 s.AddSingleton(solicitudes);
                 s.AddSingleton(borradores);
@@ -197,6 +201,32 @@ public sealed class PantallasDeLaCuentaTests : IAsyncLifetime
         using var get = await _anfitrion.Cliente.SendAsync(new HttpRequestMessage(HttpMethod.Get, $"/cuenta/avisos/{Aviso:D}/visto") { Headers = { { "Cookie", AnfitrionConSesion.Cookie() } } });
         Assert.Contains(get.StatusCode, new[] { HttpStatusCode.NotFound, HttpStatusCode.MethodNotAllowed });
         Assert.Single(_llamadas, "visto");
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-33")]
+    public async Task Marcar_un_aviso_como_visto_entrega_la_marca_y_la_region_a_Identidad_y_solo_esa_decide_si_la_sesion_es_reconocida()
+    {
+        var marca = new string('a', 43);
+        async Task<HttpResponseMessage> Marcar()
+        {
+            using var solicitud = await AnfitrionConSesion.Post(_anfitrion, $"/cuenta/avisos/{Aviso:D}/visto", AnfitrionConSesion.Cookie() + "; " + BabelHub.Ecommerce.Api.Web.CookieDeDispositivo.Nombre + "=" + marca);
+            solicitud.Headers.TryAddWithoutValidation("Accept", "text/html");
+            solicitud.Headers.TryAddWithoutValidation(BabelHub.Ecommerce.Api.Web.DatosDelBorde.CabeceraDeRegion, "PE");
+            solicitud.Content = new FormUrlEncodedContent([]);
+            return await _anfitrion.Cliente.SendAsync(solicitud);
+        }
+
+        using var desconocida = await Marcar();
+        Assert.Equal(false, _argumentos["reconocida"]);
+        _reconocida = true;
+        using var reconocida = await Marcar();
+
+        Assert.Equal(marca, _argumentos["marca"]);
+        Assert.Equal("PE", _argumentos["region"]);
+        Assert.Equal(true, _argumentos["reconocida"]);
+        Assert.Equal(HttpStatusCode.SeeOther, reconocida.StatusCode);
+        Assert.Equal(HttpStatusCode.SeeOther, desconocida.StatusCode);
     }
 
     [Fact]

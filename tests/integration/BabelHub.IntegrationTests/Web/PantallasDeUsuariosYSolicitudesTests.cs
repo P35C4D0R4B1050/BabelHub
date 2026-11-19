@@ -31,6 +31,7 @@ public sealed class PantallasDeUsuariosYSolicitudesTests : IAsyncLifetime
         var usuarios = DobleDeMetodos.Crear<IAdministracionDeUsuarios>(out var dU);
         dU.Con(nameof(IAdministracionDeUsuarios.Crear), a => { _llamadas.Add("crear"); _argumentos["rol"] = a[3]; _argumentos["sucursal"] = a[4]; return Task.FromResult(De(new ContrasenaTemporalEntregada(Administrado(), new ValorSecreto("Temporal-Una-Sola-Vez-9"), new DateTimeOffset(2026, 11, 20, 15, 0, 0, TimeSpan.Zero)))); });
         dU.Con(nameof(IAdministracionDeUsuarios.CambiarElRol), a => { _llamadas.Add("rol"); _argumentos["rol"] = a[2]; _argumentos["sucursalDelCambio"] = a[3]; return Task.FromResult(De(Administrado(RolDeCuenta.EncargadoDeSucursal))); });
+        dU.Con(nameof(IAdministracionDeUsuarios.Listar), _ => Task.FromResult(De(new PaginaDeUsuarios([Administrado()], null))));
         dU.Con(nameof(IAdministracionDeUsuarios.Desactivar), _ => { _llamadas.Add("desactivar"); return Task.FromResult(De(Administrado() with { Activo = false })); });
         dU.Con(nameof(IAdministracionDeUsuarios.Reactivar), _ => { _llamadas.Add("reactivar"); return Task.FromResult(De(Administrado())); });
         dU.Con(nameof(IAdministracionDeUsuarios.RestablecerLaContrasena), _ => { _llamadas.Add("contrasena"); return Task.FromResult(De(new ContrasenaTemporalEntregada(Administrado(), new ValorSecreto("Otra-Temporal-9"), new DateTimeOffset(2026, 11, 20, 15, 0, 0, TimeSpan.Zero)))); });
@@ -138,6 +139,42 @@ public sealed class PantallasDeUsuariosYSolicitudesTests : IAsyncLifetime
         Assert.DoesNotContain("detalle-interno", html, StringComparison.Ordinal);
     }
 
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-29")]
+    public async Task La_pantalla_lista_al_personal_codificado_y_si_la_lista_falla_lo_dice_sin_romper_las_acciones()
+    {
+        using var conLista = await Pedir("/administracion/usuarios");
+        _falla = new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "detalle-interno-que-no-se-muestra");
+        using var sinLista = await Pedir("/administracion/usuarios");
+
+        var crudo = await conLista.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, conLista.StatusCode);
+        Assert.Contains("Personal registrado", crudo, StringComparison.Ordinal);
+        Assert.DoesNotContain("<i>Soto</i>", crudo, StringComparison.Ordinal);
+        Assert.Contains("&lt;i&gt;Soto&lt;/i&gt;", crudo, StringComparison.Ordinal);
+        Assert.Contains("luis@babelhub.example", crudo, StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.OK, sinLista.StatusCode);
+        var html = WebUtility.HtmlDecode(await sinLista.Content.ReadAsStringAsync());
+        Assert.Contains("No pudimos leer la lista", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("detalle-interno", html, StringComparison.Ordinal);
+        Assert.Contains("Otras acciones sobre un usuario", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-29")]
+    public async Task Si_Identidad_niega_la_lista_la_pantalla_dice_sin_permiso_y_no_que_no_esta_disponible()
+    {
+        _falla = new ErrorDeAplicacion(CategoriaDeError.Prohibido, "detalle-interno-que-no-se-muestra");
+
+        using var respuesta = await Pedir("/administracion/usuarios");
+
+        Assert.Equal(HttpStatusCode.Forbidden, respuesta.StatusCode);
+        var html = WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync());
+        Assert.Contains("No tienes permiso", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("No pudimos leer la lista", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("detalle-interno", html, StringComparison.Ordinal);
+    }
     [Fact]
     [Trait("Criterio", "AC-WEB-29")]
     public async Task Las_solicitudes_se_listan_con_su_fecha_limite_y_las_vencidas_sin_atender_se_senalan()

@@ -165,6 +165,37 @@ public sealed class RepositoriosDeIdentidadTests : IClassFixture<PostgresDeIdent
         Assert.Null(await _cuentas.EncargadoActivoDe(Guid.NewGuid()));
     }
 
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-29")]
+    public async Task ListarCuentas_FiltraPorRolEstadoYCorreo_PaginaPorElUltimoCorreo_YSinCorreoNoEntregaClientes()
+    {
+        await _bd.Ejecutar("TRUNCATE identidad.usuarios CASCADE"); // la prueba necesita una tabla sin otras cuentas del personal
+        var etiqueta = Guid.NewGuid().ToString("N")[..6];
+        var a = Cuenta(rol: RolDeUsuario.Logistica, correo: $"a-{etiqueta}@lista.example");
+        var b = Cuenta(rol: RolDeUsuario.Logistica, correo: $"b-{etiqueta}@lista.example");
+        var c = Cuenta(rol: RolDeUsuario.Logistica, correo: $"c-{etiqueta}@lista.example");
+        c.Usuario = Usuario.Restaurar(c.Usuario.Id, c.Usuario.Correo, c.Usuario.Rol, null, correoVerificado: true, activo: false);
+        var cliente = Cuenta(rol: RolDeUsuario.Cliente, correo: $"cliente-{etiqueta}@lista.example");
+        var cancelada = Cuenta(rol: RolDeUsuario.Logistica, correo: $"d-{etiqueta}@lista.example");
+        cancelada.CanceladaEn = Ahora;
+        foreach (var cuenta in new[] { a, b, c, cliente, cancelada })
+        {
+            Assert.True(await _cuentas.Insertar(cuenta));
+        }
+
+        var personal = await _cuentas.Listar(null, null, null, null, true, 10);
+        var primera = await _cuentas.Listar(RolDeUsuario.Logistica, null, null, null, true, 2);
+        var segunda = await _cuentas.Listar(RolDeUsuario.Logistica, null, null, primera[^1].Usuario.Correo, true, 2);
+        var inactivas = await _cuentas.Listar(null, false, null, null, true, 10);
+        var exacta = await _cuentas.Listar(null, null, cliente.Usuario.Correo.ToUpperInvariant(), null, false, 10);
+
+        Assert.Equal([a.Usuario.Id, b.Usuario.Id, c.Usuario.Id], personal.Select(x => x.Usuario.Id));
+        Assert.Equal([a.Usuario.Id, b.Usuario.Id], primera.Select(x => x.Usuario.Id));
+        Assert.Equal([c.Usuario.Id], segunda.Select(x => x.Usuario.Id));
+        Assert.Equal([c.Usuario.Id], inactivas.Select(x => x.Usuario.Id));
+        Assert.Equal(cliente.Usuario.Id, Assert.Single(exacta).Usuario.Id);
+    }
     [Fact]
     public async Task EliminarUnaCuenta_SeLlevaSusFilasDependientes_SinDejarHuerfanas()
     {

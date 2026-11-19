@@ -163,6 +163,48 @@ public sealed class AdministracionDeUsuarios(
             cancelacion).ConfigureAwait(false);
     }
 
+    public async Task<Resultado<PaginaDeUsuarios>> Listar(Guid administradorId, FiltroDeUsuarios filtro, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(filtro);
+        var (error, _) = await Administrador(administradorId, cancelacion).ConfigureAwait(false);
+        if (error is not null)
+        {
+            return Resultado<PaginaDeUsuarios>.Fallo(error);
+        }
+
+        if (filtro.Rol is { } rolPedido && !Enum.IsDefined(rolPedido))
+        {
+            return Resultado<PaginaDeUsuarios>.Fallo(FallosDeIdentidad.Validacion("rol", "invalido"));
+        }
+
+        string? correo = null;
+        if (!string.IsNullOrWhiteSpace(filtro.Correo))
+        {
+            if (!EntradasDeIdentidad.TryNormalizarElCorreo(filtro.Correo, out var normalizado))
+            {
+                return Resultado<PaginaDeUsuarios>.Fallo(FallosDeIdentidad.Validacion("correo", "invalido"));
+            }
+
+            correo = normalizado;
+        }
+
+        // La lista de clientes no se entrega: un cliente se encuentra solo por su correo exacto.
+        if (correo is null && filtro.Rol == RolDeCuenta.Cliente)
+        {
+            return Resultado<PaginaDeUsuarios>.Fallo(FallosDeIdentidad.Validacion("rol", "cliente-solo-por-correo"));
+        }
+
+        if (filtro.Despues is { Length: > 254 })
+        {
+            return Resultado<PaginaDeUsuarios>.Fallo(FallosDeIdentidad.Validacion("despues", "invalido"));
+        }
+
+        var tamano = filtro.Tamano <= 0 ? 20 : Math.Min(filtro.Tamano, FiltroDeUsuarios.TamanoMaximo);
+        var encontradas = await cuentas.Listar(filtro.Rol is { } r ? RolDeUsuarioDe(r) : null, filtro.Activo, correo, filtro.Despues, soloPersonal: correo is null, tamano + 1, cancelacion).ConfigureAwait(false);
+        var pagina = encontradas.Take(tamano).ToList();
+        return Resultado<PaginaDeUsuarios>.Exito(new PaginaDeUsuarios([.. pagina.Select(Modelo)], encontradas.Count > tamano ? pagina[^1].Usuario.Correo : null));
+    }
+
     public async Task<Resultado<UsuarioAdministrado>> Desactivar(Guid administradorId, Guid usuarioId, CancellationToken cancelacion = default)
     {
         var (error, administrador) = await Administrador(administradorId, cancelacion).ConfigureAwait(false);

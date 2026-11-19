@@ -19,11 +19,16 @@ public sealed class UsuariosVista : ModeloBaseDePagina
     public string? ContrasenaTemporal { get; set; }
 
     public DateTimeOffset? ContrasenaVenceEn { get; set; }
+
+    /// <summary>Los primeros usuarios del personal (por correo), para no pedir el identificador a mano; <see langword="null"/> si no se pudo leer.</summary>
+    public PaginaDeUsuarios? Lista { get; set; }
+
+    public bool ListaNoDisponible { get; set; }
 }
 
 /// <summary>
 /// Los usuarios y roles (T30; WEB-35, AC-WEB-29): crear un usuario del personal con su contraseña temporal, cambiar su rol y sucursal, desactivarlo o reactivarlo y restablecer su contraseña o su segundo factor, <b>solo para la administración central</b> (la decide Identidad, <see cref="IAdministracionDeUsuarios"/>; otro rol recibe «sin permiso»).
-/// <b>Presentación pura</b>: cada acción es un <c>POST</c> con esquema estricto; la contraseña temporal se muestra una sola vez en la respuesta (<c>no-store</c>) y no se guarda ni se registra. Identidad aún no ofrece una lista ni una búsqueda de usuarios: las acciones sobre un usuario existente piden su identificador (hallazgo registrado).
+/// <b>Presentación pura</b>: cada acción es un <c>POST</c> con esquema estricto; la contraseña temporal se muestra una sola vez en la respuesta (<c>no-store</c>) y no se guarda ni se registra.
 /// </summary>
 [Area("Admin")]
 public sealed class UsuariosController(IAdministracionDeUsuarios usuarios, ContextoDePagina pagina) : Controller
@@ -164,6 +169,28 @@ public sealed class UsuariosController(IAdministracionDeUsuarios usuarios, Conte
 
     private async Task<IActionResult> Pintar(UsuariosVista vista, int estado, CancellationToken cancelacion)
     {
+        if (estado == StatusCodes.Status200OK && HttpContext.ActorDeLaSolicitud() is { } actor)
+        {
+            try
+            {
+                var lista = await usuarios.Listar(actor.UsuarioId, new FiltroDeUsuarios(Tamano: FiltroDeUsuarios.TamanoMaximo), cancelacion);
+                vista.Lista = lista.EsExito ? lista.Valor : null;
+                vista.ListaNoDisponible = !lista.EsExito;
+                if (lista.Error is { Categoria: CategoriaDeError.Prohibido or CategoriaDeError.NoAutenticado })
+                {
+                    // Sin permiso no es «no disponible»: se pinta el estado de sin permiso (AGENTS.md §6).
+                    vista.ListaNoDisponible = false;
+                    vista.Mensaje = "No tienes permiso para administrar usuarios.";
+                    vista.EsError = true;
+                    estado = StatusCodes.Status403Forbidden;
+                }
+            }
+            catch (Exception) when (!cancelacion.IsCancellationRequested)
+            {
+                vista.ListaNoDisponible = true;
+            }
+        }
+
         await pagina.Completar(vista, "Usuarios y roles", AreaDeLaPagina.Admin, cancelacion);
         Response.Headers.CacheControl = "no-store";
         Response.StatusCode = Request.EsHtmx() ? StatusCodes.Status200OK : estado;
