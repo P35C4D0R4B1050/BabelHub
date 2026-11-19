@@ -23,7 +23,7 @@ internal sealed class ConsultasDePedidos(
         Listar(OperacionDePedidos.PedidosDelCliente, filtro, s => new CriterioDeListado(s.UsuarioId, null, false, null, 1, 1), codigoDeSucursal: null, cancelacion);
 
     public Task<Resultado<PaginaDePedidos>> ListarDeRecojo(string codigoDeSucursal, FiltroDePedidos filtro, CancellationToken cancelacion) =>
-        Listar(OperacionDePedidos.GestionDeRecojo, filtro, _ => new CriterioDeListado(null, codigoDeSucursal.Trim(), false, null, 1, 1), codigoDeSucursal, cancelacion);
+        Listar(OperacionDePedidos.GestionDeRecojo, filtro, _ => new CriterioDeListado(null, codigoDeSucursal?.Trim(), false, null, 1, 1), codigoDeSucursal ?? string.Empty, cancelacion);
 
     public Task<Resultado<PaginaDePedidos>> ListarADomicilio(FiltroDePedidos filtro, CancellationToken cancelacion) =>
         Listar(OperacionDePedidos.GestionDeDespacho, filtro, _ => new CriterioDeListado(null, null, true, null, 1, 1), codigoDeSucursal: null, cancelacion);
@@ -96,6 +96,11 @@ internal sealed class ConsultasDePedidos(
     /// <summary>El detalle de logística o de la administración central: con el contacto auditado, que falla cerrado (D09).</summary>
     public async Task<Resultado<DetalleDelPedidoDePersonal>> ObtenerParaElPersonal(OperacionDePedidos operacion, Guid pedidoId, CancellationToken cancelacion)
     {
+        if (operacion is not (OperacionDePedidos.GestionDeDespacho or OperacionDePedidos.Administracion))
+        {
+            throw new ArgumentOutOfRangeException(nameof(operacion), "El detalle con contacto es solo de logística y la administración central.");
+        }
+
         var (pedido, error, solicitante) = await CargarConSolicitante(operacion, pedidoId, null, cancelacion).ConfigureAwait(false);
         if (pedido is null)
         {

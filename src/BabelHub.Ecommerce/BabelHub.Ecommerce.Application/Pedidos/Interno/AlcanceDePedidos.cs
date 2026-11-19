@@ -168,7 +168,7 @@ internal sealed class AutorizadorDePedidos(IActorActual actores, IDenegacionDeAc
 
         if (solicitante.EsLogistica)
         {
-            return pedido.Tipo != TipoDeEntregaDelPedido.Recojo;
+            return pedido.Tipo == TipoDeEntregaDelPedido.Domicilio;
         }
 
         if (solicitante.EsEncargado && pedido.Tipo == TipoDeEntregaDelPedido.Recojo && pedido.CodigoDeSucursalDeRecojo is { } codigo)

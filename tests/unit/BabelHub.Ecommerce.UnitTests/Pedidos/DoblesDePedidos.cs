@@ -70,7 +70,7 @@ internal sealed class RepositorioDePedidosFalso : IRepositorioDePedidos
         var filtrados = _pedidos.Values
             .Where(p => criterio.CuentaId is null || p.CuentaId == criterio.CuentaId)
             .Where(p => criterio.CodigoDeSucursalDeRecojo is null || (p.Tipo == TipoDeEntregaDelPedido.Recojo && p.CodigoDeSucursalDeRecojo == criterio.CodigoDeSucursalDeRecojo))
-            .Where(p => !criterio.SoloQueNoSonDeRecojo || p.Tipo != TipoDeEntregaDelPedido.Recojo)
+            .Where(p => !criterio.SoloADomicilio || p.Tipo == TipoDeEntregaDelPedido.Domicilio)
             .Where(p => criterio.Estado is null || p.Estado == criterio.Estado)
             .OrderByDescending(p => p.CreadoEn)
             .ToList();

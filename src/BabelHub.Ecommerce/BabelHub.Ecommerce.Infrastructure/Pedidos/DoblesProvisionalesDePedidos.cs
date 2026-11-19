@@ -73,10 +73,10 @@ internal sealed class ResolucionDeSucursalProvisional : IResolucionDeSucursal
     public Task<Guid?> IdentificadorDe(string codigoDeSucursal, CancellationToken cancelacion = default) => Task.FromResult<Guid?>(null);
 }
 
-/// <summary>Los límites de Pedidos sin las políticas de Plataforma: las consultas pasan (solo leen) pero la gestión (que toca stock y reembolsos) y la lectura del contacto fallan cerrado.</summary>
+/// <summary>Los límites de Pedidos sin las políticas de Plataforma: las consultas, la gestión (que toca stock y reembolsos) y la lectura del contacto fallan cerrado (el límite protege contra la enumeración de identificadores).</summary>
 internal sealed class LimitadorDePedidosProvisional : ILimitadorDePedidos
 {
-    public Task<ResultadoDeLimiteDePedidos> Consultar(Guid usuarioId, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLimiteDePedidos.Permitido);
+    public Task<ResultadoDeLimiteDePedidos> Consultar(Guid usuarioId, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLimiteDePedidos.NoDisponible);
 
     public Task<ResultadoDeLimiteDePedidos> Gestionar(Guid usuarioId, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLimiteDePedidos.NoDisponible);
 

@@ -90,6 +90,25 @@ public sealed class ConsultasDePedidosTests
     }
 
     [Fact]
+    public async Task Logistica_no_ve_pedidos_solo_digitales_ni_el_detalle_con_contacto_se_abre_con_la_operacion_del_encargado_ni_una_ruta_sin_sucursal_pasa()
+    {
+        var digital = Crear(TipoDeEntregaDelPedido.Digital, null, "LIM", null, Digital());
+        var logistica = new Entorno(ActorDePrueba.DePersonalDeLogistica());
+        logistica.Repositorio.Poner(digital);
+        var encargado = new Entorno(ActorDePrueba.DeEncargadoDe(ResolucionDeSucursalFalsa.Lima));
+
+        var detalle = await logistica.Consultas.ObtenerParaElPersonal(OperacionDePedidos.GestionDeDespacho, digital.Id, default);
+        var listado = await logistica.Consultas.ListarADomicilio(new FiltroDePedidos(), default);
+        var sinRuta = await encargado.Consultas.ListarDeRecojo(null!, new FiltroDePedidos(), default);
+
+        Assert.Equal("no-encontrado", detalle.Error!.Clave);
+        Assert.Empty(listado.Valor.Pedidos);
+        Assert.Equal("prohibido", sinRuta.Error!.Clave);
+        Assert.Contains("fuera-de-sucursal", encargado.Denegaciones.Eventos.Select(e => e.Motivo));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => encargado.Consultas.ObtenerParaElPersonal(OperacionDePedidos.GestionDeRecojo, digital.Id, default));
+    }
+
+    [Fact]
     public async Task El_encargado_no_lista_otra_sucursal_y_un_cliente_no_lista_de_gestion()
     {
         var encargado = new Entorno(ActorDePrueba.DeEncargadoDe(ResolucionDeSucursalFalsa.Lima));

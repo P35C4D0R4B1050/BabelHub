@@ -40,7 +40,7 @@ public class DoblesProvisionalesDePedidosTests
         Assert.Equal(ResultadoDeLiberarReserva.NoSePudo, await new ReservasDelPedidoProvisional().Liberar(pedido, "pedido-anulado", lineas));
         Assert.Null(await new ResolucionDeSucursalProvisional().IdentificadorDe("LIM"));
         var limitador = new LimitadorDePedidosProvisional();
-        Assert.Equal(DecisionDeLimiteDePedidos.Permitido, (await limitador.Consultar(Guid.NewGuid())).Decision);
+        Assert.Equal(DecisionDeLimiteDePedidos.NoDisponible, (await limitador.Consultar(Guid.NewGuid())).Decision);
         Assert.Equal(DecisionDeLimiteDePedidos.NoDisponible, (await limitador.Gestionar(Guid.NewGuid())).Decision);
         Assert.Equal(DecisionDeLimiteDePedidos.NoDisponible, (await limitador.LeerContacto(Guid.NewGuid())).Decision);
     }
