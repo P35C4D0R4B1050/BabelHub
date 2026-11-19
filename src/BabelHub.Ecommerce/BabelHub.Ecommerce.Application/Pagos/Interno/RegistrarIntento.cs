@@ -160,8 +160,25 @@ internal sealed class RegistrarIntento(
 
 
         // Carrito en la misma transacción, sin bloqueo: solo `en_pago` con el pedido de esta intención y sin retiro pendiente.
-        var vivo = await checkout.ObtenerParaPagar(token).ConfigureAwait(false);
-        if (!vivo.EsExito || vivo.Valor.PedidoId != intencion.Id)
+        Resultado<CheckoutVivoParaPagar> vivo;
+        try
+        {
+            vivo = await checkout.ObtenerParaPagar(token).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Todavía no se escribió nada: sin respuesta de Carrito no se cobra (falla cerrada).
+            return FallosDePagos.De<IntentoRegistrado>(CategoriaDeError.NoDisponible, ClavesDePagos.ServicioNoDisponible);
+        }
+
+        if (!vivo.EsExito)
+        {
+            return vivo.Error!.Categoria == CategoriaDeError.NoEncontrado
+                ? FallosDePagos.De<IntentoRegistrado>(CategoriaDeError.Conflicto, ClavesDePagos.InstantaneaObsoleta)
+                : FallosDePagos.De<IntentoRegistrado>(CategoriaDeError.NoDisponible, ClavesDePagos.ServicioNoDisponible);
+        }
+
+        if (vivo.Valor.PedidoId != intencion.Id)
         {
             return FallosDePagos.De<IntentoRegistrado>(CategoriaDeError.Conflicto, ClavesDePagos.InstantaneaObsoleta);
         }

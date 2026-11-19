@@ -11,7 +11,7 @@ namespace BabelHub.Ecommerce.Application.Pagos.Interno;
 /// Lo que se envía a la pasarela para cobrar (PAG-30): solo el importe, la moneda (siempre <c>PEN</c>), la referencia opaca del intento, el token del medio y, si la pasarela lo exige, el correo del titular. No tiene un
 /// campo para el nombre, el teléfono ni la dirección de entrega (lo comprueba una prueba de contrato). Su texto no repite el token ni el correo.
 /// </summary>
-internal sealed record SolicitudDeCobroEnPasarela(Guid ReferenciaOpaca, Importe Importe, Domain.Pagos.MedioDePago Medio, TokenDelMedioDePago Token, string? CorreoDelTitular)
+internal sealed record SolicitudDeCobroEnPasarela(Guid ReferenciaOpaca, Importe Importe, Domain.Pagos.MedioDePago Medio, TokenDelMedioDePago Token, [property: System.Text.Json.Serialization.JsonIgnore] string? CorreoDelTitular)
 {
     public override string ToString() => $"SolicitudDeCobroEnPasarela {{ ReferenciaOpaca = {ReferenciaOpaca}, Importe = {Importe} }}";
 }

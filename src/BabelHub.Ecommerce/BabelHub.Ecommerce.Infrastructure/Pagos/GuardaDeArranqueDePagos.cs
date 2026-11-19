@@ -28,9 +28,9 @@ public sealed record OpcionesDeArranqueDePagos(
     bool SinLlamadasReales,
     bool PasarelaEsNula,
     bool PedidosDisponible,
-    string? LlavePrivada,
-    string? ClaveDeIntentos,
-    string? ClaveDeIntentosAnterior)
+    [property: System.Text.Json.Serialization.JsonIgnore] string? LlavePrivada,
+    [property: System.Text.Json.Serialization.JsonIgnore] string? ClaveDeIntentos,
+    [property: System.Text.Json.Serialization.JsonIgnore] string? ClaveDeIntentosAnterior)
 {
     public override string ToString() => $"OpcionesDeArranqueDePagos {{ Pasarela = {Pasarela}, Entorno = {Entorno} }}";
 }

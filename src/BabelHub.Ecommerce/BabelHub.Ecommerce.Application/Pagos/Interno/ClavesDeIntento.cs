@@ -185,6 +185,9 @@ internal sealed class AutorizadorDePagos(IActorActual actores, IDenegacionDeAcce
         return new ErrorDeAplicacion(CategoriaDeError.NoAutenticado, ClavesDePagos.NoAutenticado);
     }
 
+    /// <summary>Un token firmado por el servidor para otra cuenta u otro pedido, o un intento ajeno: la respuesta es uniforme pero queda el acceso denegado (SEG-09).</summary>
+    public Task RegistrarClaveAjena(CancellationToken cancelacion) => Denegar("clave-ajena", "ECO-PAGO-CLAVE-INVALIDA", cancelacion);
+
     public Task<ErrorDeAplicacion> RechazarAjena(CancellationToken cancelacion) => RechazarAjenaAsync(cancelacion);
 
     private async Task<ErrorDeAplicacion> RechazarAjenaAsync(CancellationToken cancelacion)

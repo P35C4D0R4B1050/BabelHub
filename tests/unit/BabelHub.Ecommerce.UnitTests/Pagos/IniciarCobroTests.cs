@@ -367,4 +367,141 @@ public sealed class IniciarCobroTests
         Assert.Equal("pago-en-curso", segundo.Error!.Clave);
         Assert.Single(e.Pasarela.Solicitudes);
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-06")]
+    public async Task Si_el_cliente_se_desconecta_mientras_la_pasarela_cobra_igual_se_registra_y_se_confirma_el_resultado()
+    {
+        var e = await ConIntencionLista();
+        var entrada = await Pedir(e);
+        using var cliente = new CancellationTokenSource();
+        e.Pasarela.Respuesta = s =>
+        {
+            cliente.Cancel();
+            return ResultadoDeCobro.Aprobado("ch_1", s.Importe, "PEN", s.ReferenciaOpaca);
+        };
+
+        var resultado = await e.Cobrar.Ejecutar(entrada, cliente.Token);
+
+        Assert.Equal(EstadoDelCobro.Aprobado, resultado.Valor.Estado);
+        Assert.Single(e.Confirmador.Llamadas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-06")]
+    public async Task Si_el_cliente_se_desconecta_durante_un_rechazo_el_intento_queda_cerrado_igual()
+    {
+        var e = await ConIntencionLista();
+        var entrada = await Pedir(e);
+        using var cliente = new CancellationTokenSource();
+        e.Pasarela.Respuesta = _ =>
+        {
+            cliente.Cancel();
+            return ResultadoDeCobro.Rechazado(MotivoDeRechazo.TarjetaVencida);
+        };
+
+        var resultado = await e.Cobrar.Ejecutar(entrada, cliente.Token);
+
+        Assert.Equal(EstadoDelCobro.Rechazado, resultado.Valor.Estado);
+        Assert.Equal(EstadoDeIntento.Rechazado, Assert.Single(e.Repositorio.Intentos).Estado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-06")]
+    public async Task Un_fallo_de_la_base_al_registrar_el_resultado_tras_el_cobro_deja_el_intento_iniciado_publica_una_alerta_y_el_cliente_ve_pendiente()
+    {
+        var e = await ConIntencionLista();
+        var entrada = await Pedir(e);
+        e.Pasarela.Respuesta = s =>
+        {
+            e.Repositorio.BloqueoNoDisponible = true;
+            return ResultadoDeCobro.Rechazado(MotivoDeRechazo.Otro);
+        };
+
+        var resultado = await e.Cobrar.Ejecutar(entrada);
+
+        Assert.Equal(EstadoDelCobro.PendienteDeConfirmacion, resultado.Valor.Estado);
+        Assert.Equal(EstadoDeIntento.Iniciado, Assert.Single(e.Repositorio.Intentos).Estado);
+        Assert.Contains(e.Alertas.Publicadas, a => a.Motivo == IniciarCobro.MotivoDeAlertaRegistroDelCobroFallido);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-30")]
+    public async Task Si_la_pasarela_exige_el_correo_y_identidad_no_lo_da_no_se_registra_el_intento_ni_se_cobra()
+    {
+        var e = await ConIntencionLista();
+        e.Cuenta.Correo = null;
+        var cobrar = e.CrearIniciarCobro(new OpcionesDelCobro(TimeSpan.FromMilliseconds(300), EnviarElCorreoDelTitular: true));
+
+        var resultado = await cobrar.Ejecutar(await Pedir(e));
+
+        Assert.Equal(CategoriaDeError.NoDisponible, resultado.Error!.Categoria);
+        Assert.Empty(e.Repositorio.Intentos);
+        Assert.Empty(e.Pasarela.Solicitudes);
+        Assert.Equal(0, e.LimitesDeCobro.Reservas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-02")]
+    public async Task Un_token_del_medio_ausente_o_un_medio_fuera_de_la_lista_se_rechazan_antes_de_gastar_cupo()
+    {
+        var e = await ConIntencionLista();
+        var entrada = await Pedir(e);
+
+        var sinToken = await e.Cobrar.Ejecutar(entrada with { TokenDelMedio = null! });
+        var medioRaro = await e.Cobrar.Ejecutar(entrada with { Medio = (AppMedio)99 });
+
+        Assert.Equal(CategoriaDeError.Validacion, sinToken.Error!.Categoria);
+        Assert.Equal(CategoriaDeError.Validacion, medioRaro.Error!.Categoria);
+        Assert.Equal(0, e.LimitesDeCobro.Reservas);
+        Assert.Empty(e.Repositorio.Intentos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-21")]
+    public async Task Un_token_valido_de_otra_cuenta_o_de_otro_pedido_responde_uniforme_pero_deja_un_acceso_denegado()
+    {
+        var e = await ConIntencionLista();
+        var entrada = await Pedir(e);
+        var deOtraCuenta = e.Firmador.Emitir(new DatosDeLaClaveDeIntento(Guid.NewGuid(), Pedido, Guid.NewGuid(), "huella-a", 14_000, e.Reloj.Ahora.AddMinutes(30)));
+        var deOtroPedido = e.Firmador.Emitir(new DatosDeLaClaveDeIntento(Guid.NewGuid(), Guid.NewGuid(), Cuenta, "huella-a", 14_000, e.Reloj.Ahora.AddMinutes(30)));
+
+        var a = await e.Cobrar.Ejecutar(entrada with { ClaveDeIntento = deOtraCuenta });
+        var b = await e.Cobrar.Ejecutar(entrada with { ClaveDeIntento = deOtroPedido });
+
+        Assert.Equal("clave-invalida", a.Error!.Clave);
+        Assert.Equal("clave-invalida", b.Error!.Clave);
+        Assert.Equal(2, e.Denegaciones.Eventos.Count);
+        Assert.All(e.Denegaciones.Eventos, d => Assert.Equal("ECO-PAGO-CLAVE-INVALIDA", d.CodigoDeError));
+        Assert.Empty(e.Repositorio.Intentos);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-16")]
+    [InlineData("USD", "139.99", "moneda")]
+    [InlineData("PEN", "139.99", "importe")]
+    public async Task Un_aprobado_dudoso_deja_su_duda_identificable_en_la_auditoria(string moneda, string importe, string duda)
+    {
+        var e = await ConIntencionLista();
+        var monto = moneda == "PEN" ? Importe.De(decimal.Parse(importe, System.Globalization.CultureInfo.InvariantCulture)) : Importe.De(140m);
+        e.Pasarela.Respuesta = s => ResultadoDeCobro.Aprobado("ch_1", monto, moneda, s.ReferenciaOpaca);
+
+        await e.Cobrar.Ejecutar(await Pedir(e));
+
+        var resuelto = e.Auditoria.Solicitudes.Single(s => s.Accion.Identificador == "CobroResuelto");
+        Assert.Equal("pendiente", resuelto.Detalle["resultado"]);
+        Assert.Equal(duda, resuelto.Detalle["duda"]);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-16")]
+    public async Task Un_cargo_con_otra_referencia_opaca_queda_senalado_como_referencia_en_la_auditoria()
+    {
+        var e = await ConIntencionLista();
+        e.Pasarela.Respuesta = s => ResultadoDeCobro.Aprobado("ch_ajeno", s.Importe, "PEN", Guid.NewGuid());
+
+        await e.Cobrar.Ejecutar(await Pedir(e));
+
+        Assert.Equal("referencia", e.Auditoria.Solicitudes.Single(s => s.Accion.Identificador == "CobroResuelto").Detalle["duda"]);
+    }
 }
