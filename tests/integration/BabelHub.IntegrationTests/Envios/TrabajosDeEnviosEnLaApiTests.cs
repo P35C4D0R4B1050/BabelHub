@@ -50,6 +50,28 @@ public sealed class TrabajosDeEnviosEnLaApiTests
         protected override object? Invoke(MethodInfo? metodo, object?[]? argumentos) => throw new NotSupportedException();
     }
 
+    /// <summary>Un repositorio que anota con qué actor lo llaman y devuelve listas vacías: la corrida termina bien si el caso de uso aceptó al actor.</summary>
+    public class RepositorioEspia : DispatchProxy
+    {
+        public static ActorDelFlujo? Actor { get; set; }
+
+        public static List<(string Metodo, string? Tipo)> Llamadas { get; } = [];
+
+        protected override object? Invoke(MethodInfo? metodo, object?[]? argumentos)
+        {
+            Llamadas.Add((metodo!.Name, Actor?.Actual?.Tipo.ToString()));
+            var retorno = metodo.ReturnType;
+            if (retorno.IsGenericType && retorno.GetGenericTypeDefinition() == typeof(Task<>))
+            {
+                var interno = retorno.GetGenericArguments()[0];
+                object? valor = interno.IsGenericType ? Array.CreateInstance(interno.GetGenericArguments()[0], 0) : null;
+                return typeof(Task).GetMethod(nameof(Task.FromResult))!.MakeGenericMethod(interno).Invoke(null, [valor]);
+            }
+
+            return Task.CompletedTask;
+        }
+    }
+
     private static T Doble<T>()
         where T : class => DispatchProxy.Create<T, DobleQueLanza>();
 
@@ -115,6 +137,9 @@ public sealed class TrabajosDeEnviosEnLaApiTests
     public async Task Con_un_actor_de_usuario_en_lugar_del_sistema_la_corrida_termina_en_fallo()
     {
         var (servicios, actor, registro) = Crear();
+        RepositorioEspia.Actor = actor;
+        RepositorioEspia.Llamadas.Clear();
+        servicios.AddScoped(_ => DispatchProxy.Create<Ecommerce.Application.Envios.Interno.IRepositorioDeEnvios, RepositorioEspia>());
         servicios.AgregarTrabajosDeFondoDeEnvios(sp => async (corrida, ct) =>
         {
             actor.Establecer(ActorActual.DeUsuario(Guid.NewGuid(), "personal-de-logistica", null));
@@ -133,6 +158,26 @@ public sealed class TrabajosDeEnviosEnLaApiTests
 
         var corrida = Assert.Single(registro.Corridas);
         Assert.Equal(ResultadoDeTrabajo.Fallo, corrida.Resultado);
+        Assert.Empty(RepositorioEspia.Llamadas);
+        Assert.Null(actor.Actual);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-07")]
+    public async Task La_revision_corre_como_sistema_y_termina_bien_y_con_un_usuario_el_caso_de_uso_la_rechaza_sin_tocar_la_base()
+    {
+        var (servicios, actor, registro) = Crear();
+        RepositorioEspia.Actor = actor;
+        RepositorioEspia.Llamadas.Clear();
+        servicios.AddScoped(_ => DispatchProxy.Create<Ecommerce.Application.Envios.Interno.IRepositorioDeEnvios, RepositorioEspia>());
+        servicios.AgregarTrabajosDeEnviosEnLaApi(soloEnModoNormal: false);
+        using var proveedor = servicios.BuildServiceProvider();
+
+        await proveedor.GetRequiredService<IReadOnlyList<TrabajoDeFondoDeEnvios>>()[1].EjecutarUnaVez();
+
+        Assert.Equal(ResultadoDeTrabajo.Exito, Assert.Single(registro.Corridas).Resultado);
+        Assert.All(RepositorioEspia.Llamadas, l => Assert.Equal("Sistema", l.Tipo));
+        Assert.NotEmpty(RepositorioEspia.Llamadas);
         Assert.Null(actor.Actual);
     }
 }

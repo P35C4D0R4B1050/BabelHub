@@ -50,11 +50,11 @@ public static class PantallasDeEnvios
         return solicitud.GetTypedHeaders().Accept.Any(a => a.MediaType.HasValue && string.Equals(a.MediaType.Value, "text/html", StringComparison.OrdinalIgnoreCase));
     }
 
-    public static RespuestaDePantalla Traducir(ProblemaDto problema, ErrorDeAplicacion error, string rutaDeReintento)
+    public static RespuestaDePantalla Traducir(ProblemaDto problema, ErrorDeAplicacion error, string rutaDeReintento, bool paraElTitular = false)
     {
         ArgumentNullException.ThrowIfNull(problema);
         ArgumentNullException.ThrowIfNull(error);
-        var texto = problema.Code == "ECO-ENV-CONTACTO-INCOMPLETO" ? DelContactoIncompleto(problema) : PorCodigo.GetValueOrDefault(problema.Code);
+        var texto = problema.Code == "ECO-ENV-CONTACTO-INCOMPLETO" ? DelContactoIncompleto(problema) : paraElTitular && problema.Code == "ECO-NO-ENCONTRADO" ? new Texto("No encontramos este pedido", "Revisa el enlace o vuelve a tu cuenta.") : PorCodigo.GetValueOrDefault(problema.Code);
         if (texto is not null)
         {
             // El contacto incompleto no se arregla reintentando: se corrige en el pedido. Lo demás vuelve a la lista.
@@ -75,7 +75,7 @@ public static class PantallasDeEnvios
                 []);
         }
 
-        var respuesta = TraductorDeErrores.Traducir(problema, rutaDeReintento: rutaDeReintento, parteAfectada: "No podemos operar los envíos ahora. No se cambió nada.");
+        var respuesta = TraductorDeErrores.Traducir(problema, rutaDeReintento: rutaDeReintento, parteAfectada: paraElTitular ? "No podemos mostrar el seguimiento de tu envío ahora. Inténtalo de nuevo en unos minutos." : "No podemos operar los envíos ahora. No se cambió nada.");
         return error.Categoria == CategoriaDeError.Limite
             ? respuesta with { Vista = respuesta.Vista with { EsperaSugeridaSegundos = ProblemasDeEnvios.EsperaEnSegundos(error) } }
             : respuesta;

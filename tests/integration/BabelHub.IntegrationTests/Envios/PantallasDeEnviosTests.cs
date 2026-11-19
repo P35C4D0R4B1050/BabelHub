@@ -90,7 +90,7 @@ public sealed class PantallasDeEnviosTests
 
         Assert.Equal(EstadoDelEnvio.EnReparto, falso.UltimaConsulta!.Estado);
         Assert.Equal(2, falso.UltimaConsulta.Pagina);
-        Assert.Contains("El envío salió a reparto", html, StringComparison.Ordinal);
+        Assert.Contains("Envío pasado a reparto.", html, StringComparison.Ordinal);
         Assert.Contains("Página 2 de 3", html, StringComparison.Ordinal);
         Assert.Contains("estado=en-reparto", html, StringComparison.Ordinal);
     }
@@ -124,6 +124,20 @@ public sealed class PantallasDeEnviosTests
 
         Assert.Equal(codigo, estado);
         Assert.Contains(texto, html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-08")]
+    public async Task Un_encargado_entra_al_area_pero_la_Aplicacion_lo_rechaza_y_se_pinta_sin_permiso()
+    {
+        var falso = new EnviosDeLogisticaFalso { RespuestaDeLista = Resultado<PaginaDeEnvios>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Prohibido, "prohibido")) };
+        await using var anfitrion = await IniciarLogistica(falso, RolWeb.Encargado);
+
+        var (estado, html) = await Pedir(anfitrion, "/logistica/envios", HostWeb.Gestion);
+
+        Assert.Equal(HttpStatusCode.Forbidden, estado);
+        Assert.Contains("No tienes acceso", html, StringComparison.Ordinal);
+        Assert.Equal(["listar"], falso.Llamadas);
     }
 
     [Fact]
@@ -281,5 +295,24 @@ public sealed class PantallasDeEnviosTests
 
         Assert.Equal(codigo, estado);
         Assert.Contains("Envío", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-05")]
+    public async Task Un_visitante_sin_sesion_va_al_ingreso_sin_llamar_a_la_Aplicacion()
+    {
+        var falso = new EnviosDelClienteFalso();
+        await using var anfitrion = await AnfitrionConSesion.Iniciar(new SesionesWebDePrueba(), HostWeb.Tienda, servicios: s =>
+        {
+            s.AddSingleton<IEnviosDelCliente>(falso);
+            s.AddSingleton<IListaDeSucursales>(new ListaVacia());
+        });
+        using var solicitud = new HttpRequestMessage(HttpMethod.Get, $"/cuenta/pedidos/{Guid.NewGuid():D}/envios");
+        solicitud.Headers.TryAddWithoutValidation("Accept", "text/html");
+
+        using var respuesta = await anfitrion.Cliente.SendAsync(solicitud);
+
+        Assert.Equal(HttpStatusCode.Found, respuesta.StatusCode);
+        Assert.StartsWith("/ingreso", respuesta.Headers.Location!.OriginalString, StringComparison.Ordinal);
     }
 }

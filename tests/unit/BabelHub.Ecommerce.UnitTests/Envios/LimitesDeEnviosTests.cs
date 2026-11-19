@@ -34,7 +34,8 @@ public sealed class LimitesDeEnviosTests
 
         Assert.Equal(CategoriaDeError.Limite, excedido.Error!.Categoria);
         Assert.Equal("limite-excedido", excedido.Error.Clave);
-        Assert.Equal("espera-en-segundos", Assert.Single(excedido.Error.Errores).Campo);
+        Assert.Equal(["espera-en-segundos", "motivo", "disponibleDesde"], excedido.Error.Errores.Select(e => e.Campo));
+        Assert.Equal("consultas-de-envios-por-usuario", excedido.Error.Errores.Single(e => e.Campo == "motivo").Clave);
         Assert.All(entorno.Limites.Reservas, r => Assert.Equal(((Guid)entorno.Actor.Actual!.UsuarioId!).ToString("N"), r.Sujeto));
     }
 

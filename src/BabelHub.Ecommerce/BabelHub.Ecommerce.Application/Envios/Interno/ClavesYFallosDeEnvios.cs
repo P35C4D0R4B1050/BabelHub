@@ -64,6 +64,11 @@ internal static class ClavesDeEnvios
     public const string LimiteExcedido = "limite-excedido";
 
     public const string EsperaEnSegundos = "espera-en-segundos";
+
+    /// <summary>El motivo del límite (la política que se excedió, del catálogo cerrado) y el instante de nueva disponibilidad: SEG-07 los exige en la respuesta única.</summary>
+    public const string Motivo = "motivo";
+
+    public const string DisponibleDesde = "disponibleDesde";
 }
 
 internal static class FallosDeEnvios

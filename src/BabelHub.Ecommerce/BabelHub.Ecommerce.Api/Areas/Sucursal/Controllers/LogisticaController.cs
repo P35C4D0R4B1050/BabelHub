@@ -78,10 +78,19 @@ public sealed class LogisticaController(IEnviosDeLogistica envios, ContextoDePag
         ("cancelado", "Cancelados"),
     ];
 
+    private static readonly Dictionary<string, EstadoDelEnvio> EstadoPorFiltro = new(StringComparer.Ordinal)
+    {
+        ["pendiente-de-guia"] = EstadoDelEnvio.PendienteDeGuia,
+        ["guia-generada"] = EstadoDelEnvio.GuiaGenerada,
+        ["en-reparto"] = EstadoDelEnvio.EnReparto,
+        ["entregado"] = EstadoDelEnvio.Entregado,
+        ["cancelado"] = EstadoDelEnvio.Cancelado,
+    };
+
     private static readonly Dictionary<string, string> AvisoPorAccion = new(StringComparer.Ordinal)
     {
-        ["guia"] = "Guía generada: avisamos al cliente.",
-        ["reparto"] = "El envío salió a reparto y el Inventario descontó los libros.",
+        ["guia"] = "Guía generada.",
+        ["reparto"] = "Envío pasado a reparto.",
         ["entregado"] = "Envío marcado como entregado.",
     };
 
@@ -98,21 +107,12 @@ public sealed class LogisticaController(IEnviosDeLogistica envios, ContextoDePag
         string? filtro = null;
         if (Request.Query["estado"].ToString() is { Length: > 0 } pedido)
         {
-            var indice = -1;
-            for (var i = 0; i < Filtros.Count; i++)
-            {
-                if (Filtros[i].Clave == pedido)
-                {
-                    indice = i;
-                }
-            }
-
-            if (indice < 0)
+            if (!EstadoPorFiltro.TryGetValue(pedido, out var elegido))
             {
                 return await Falla(Invalido("estado"), cancelacion);
             }
 
-            estado = (EstadoDelEnvio)indice;
+            estado = elegido;
             filtro = pedido;
         }
 
@@ -141,7 +141,7 @@ public sealed class LogisticaController(IEnviosDeLogistica envios, ContextoDePag
         vista.Total = resultado.Valor.Total;
         vista.Pagina = resultado.Valor.Pagina;
         vista.TotalDePaginas = Math.Max(1, (int)Math.Ceiling(resultado.Valor.Total / (double)Math.Max(1, resultado.Valor.Tamano)));
-        if (resultado.Valor.Total == 0)
+        if (resultado.Valor.Total == 0 || resultado.Valor.Envios.Count == 0)
         {
             vista.Estado = filtro is null
                 ? EstadoVista.Vacio("Aún no hay envíos", "Los pedidos a domicilio aparecerán aquí cuando sus libros estén listos para despachar.")

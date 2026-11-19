@@ -42,6 +42,7 @@ public sealed class EnviosDelPedidoController(IEnviosDelCliente envios, Contexto
     private const string Bloque = "~/Areas/Tienda/Views/EnviosDelPedido/_Bloque.cshtml";
 
     [HttpGet("/cuenta/pedidos/{pedidoId:guid}/envios")]
+    [RequiereSesion]
     public async Task<IActionResult> Index(Guid pedidoId, CancellationToken cancelacion)
     {
         Response.Headers.CacheControl = "no-store";
@@ -79,10 +80,15 @@ public sealed class EnviosDelPedidoController(IEnviosDelCliente envios, Contexto
 
         var problema = ProblemasDeEnvios.Crear(HttpContext, errores, error);
         await DenegacionesHttp.Registrar(HttpContext, error.Categoria, error.Clave, problema.Code);
-        var respuesta = PantallasDeEnvios.Traducir(problema, error, modelo.Ruta);
+        var respuesta = PantallasDeEnvios.Traducir(problema, error, modelo.Ruta, paraElTitular: true);
         if (respuesta.RedirigirA is { } destino)
         {
             return modelo.EsFragmento ? new HxRedirectResult(destino) : new LocalRedirectResult(destino);
+        }
+
+        if (error.Categoria == CategoriaDeError.Limite)
+        {
+            Response.Headers["Retry-After"] = ProblemasDeEnvios.EsperaEnSegundos(error).ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
         modelo.Estado = respuesta.Vista;

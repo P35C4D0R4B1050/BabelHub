@@ -92,13 +92,17 @@ public sealed class LogisticaApiTests
     public async Task Un_limite_excedido_es_429_con_Retry_After_y_sin_otro_dato()
     {
         await using var host = await LogisticaApiHost.Crear();
-        host.Envios.RespuestaDeOperacion = Resultado<Ecommerce.Application.Envios.DetalleDeEnvio>.Fallo(Error(CategoriaDeError.Limite, "limite-excedido", new ErrorDeCampo("espera-en-segundos", "42")));
+        host.Envios.RespuestaDeOperacion = Resultado<Ecommerce.Application.Envios.DetalleDeEnvio>.Fallo(Error(CategoriaDeError.Limite, "limite-excedido", new ErrorDeCampo("espera-en-segundos", "42"), new ErrorDeCampo("motivo", "operaciones-de-envios-por-usuario"), new ErrorDeCampo("disponibleDesde", "2026-11-20T15:00:42.0000000+00:00")));
 
         using var respuesta = await host.Enviar($"/logistica/envios/{Envio:D}/guia");
 
         Assert.Equal(HttpStatusCode.TooManyRequests, respuesta.StatusCode);
         Assert.Equal("42", respuesta.Headers.GetValues("Retry-After").Single());
-        Assert.Equal("ECO-LIMITE-EXCEDIDO", (await LogisticaApiHost.Leer(respuesta)).GetProperty("code").GetString());
+        var problema = await LogisticaApiHost.Leer(respuesta);
+        Assert.Equal("ECO-LIMITE-EXCEDIDO", problema.GetProperty("code").GetString());
+        Assert.Equal("operaciones-de-envios-por-usuario", problema.GetProperty("motivo").GetString());
+        Assert.Equal(42, problema.GetProperty("retryAfterSeconds").GetInt32());
+        Assert.Equal(DateTimeOffset.Parse("2026-11-20T15:00:42+00:00"), problema.GetProperty("disponibleDesde").GetDateTimeOffset());
     }
 
     [Fact]

@@ -50,6 +50,30 @@ public static class ProblemasDeEnvios
         };
     }
 
+    /// <summary>La respuesta única de un límite excedido (SEG-07): el código, el motivo (la política), la espera y el instante de nueva disponibilidad. Sin datos de cuentas.</summary>
+    public static RespuestaDeLimiteDto ComoLimite(ProblemaDto problema, ErrorDeAplicacion error)
+    {
+        ArgumentNullException.ThrowIfNull(problema);
+        ArgumentNullException.ThrowIfNull(error);
+        var espera = EsperaEnSegundos(error);
+        var motivo = error.Errores.FirstOrDefault(e => e.Campo == "motivo")?.Clave ?? string.Empty;
+        var desde = error.Errores.FirstOrDefault(e => e.Campo == "disponibleDesde") is { } campo && DateTimeOffset.TryParse(campo.Clave, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var instante)
+            ? instante
+            : DateTimeOffset.UtcNow.AddSeconds(espera);
+        return new RespuestaDeLimiteDto
+        {
+            Type = problema.Type,
+            Title = problema.Title,
+            Status = problema.Status,
+            Detail = problema.Detail,
+            Code = problema.Code,
+            TraceId = problema.TraceId,
+            Motivo = motivo,
+            RetryAfterSeconds = espera,
+            DisponibleDesde = desde,
+        };
+    }
+
     /// <summary>La espera sugerida de un límite excedido, en segundos (el campo <c>espera-en-segundos</c> que fija la Aplicación), acotada; 60 si falta o no es válida.</summary>
     public static int EsperaEnSegundos(ErrorDeAplicacion error)
     {
@@ -76,7 +100,7 @@ public static class ProblemasDeEnvios
         var problema = Crear(contexto, opciones, error);
         if (error.Categoria == CategoriaDeError.Limite)
         {
-            await ProblemasHttp.Escribir(contexto, problema, new Dictionary<string, string> { ["Retry-After"] = EsperaEnSegundos(error).ToString(CultureInfo.InvariantCulture) }).ConfigureAwait(false);
+            await ProblemasHttp.Escribir(contexto, ComoLimite(problema, error), new Dictionary<string, string> { ["Retry-After"] = EsperaEnSegundos(error).ToString(CultureInfo.InvariantCulture) }).ConfigureAwait(false);
             return;
         }
 
