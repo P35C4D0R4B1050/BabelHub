@@ -48,6 +48,8 @@ public sealed class AnfitrionDelEcommerceTests
             ["Web:HostsPermitidos"] = "tienda.example.org",
             ["Web:ClaveDeSesionesTienda"] = Secreto(),
             ["Carrito:CostoDeEnvio"] = "12.00",
+            ["Pagos:Pasarela"] = "simulador",
+            ["Pagos:ClaveDeIntentos"] = Secreto(),
         };
         foreach (var raiz in new[] { "Almacen:Catalogo:", "Almacen:Supresiones:" })
         {
@@ -145,6 +147,8 @@ public sealed class AnfitrionDelEcommerceTests
             "Web:ClaveDeSesionesTienda",
             "Almacen:Catalogo:ClaveSecreta",
             "Almacen:Supresiones:Endpoint",
+            "Pagos:Pasarela",
+            "Pagos:ClaveDeIntentos",
         };
         foreach (var alcance in OpcionesDelAnfitrionDelEcommerce.AlcancesRequeridos)
         {
@@ -214,6 +218,7 @@ public sealed class AnfitrionDelEcommerceTests
             ("Correo:Smtp:Credencial", c => c["Catalogo:ClaveDeIngresos"]),
             ("Almacen:Supresiones:ClaveSecreta", c => c["Almacen:Catalogo:ClaveSecreta"]),
             (OpcionesDelAnfitrionDelEcommerce.RutaDeLaClaveDeLaCola, c => c["Web:ClaveDeSesionesTienda"]),
+            ("Pagos:ClaveDeIntentos", c => c["Seguridad:Credenciales:Historial"]),
         };
 
         foreach (var (ruta, valor) in casos)
@@ -280,6 +285,66 @@ public sealed class AnfitrionDelEcommerceTests
 
         Assert.Contains("BABELHUB__Ecommerce__Redis__Tls", falla.Message, StringComparison.Ordinal);
         Assert.Contains("BABELHUB__Ecommerce__Base__Aplicacion", falla.Message, StringComparison.Ordinal);
+    }
+
+    private static WebApplication Con(Dictionary<string, string?> c, ModoDeArranque modo, string entorno = "Development")
+    {
+        var builder = Constructor(c, entorno);
+        builder.Services.AddSingleton(typeof(ModoDeArranque), modo);
+        builder.AgregarEcommerce(modo);
+        return builder.Build();
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-10")]
+    public async Task Pagos_EnElEnsayoLaPasarelaYElVerificadorDePersonaSonNulos_YEnElModoNormalElSimuladorYTurnstile()
+    {
+        var configuracion = ConfiguracionCompleta();
+
+        await using var ensayo = Con(configuracion, ModoDeArranque.Ensayo);
+        await using var normal = Con(configuracion, ModoDeArranque.Normal);
+
+        Assert.IsType<BabelHub.Ecommerce.Infrastructure.Pagos.NuloPasarelaDePago>(ensayo.Services.GetRequiredService<BabelHub.Ecommerce.Application.Pagos.Interno.IPasarelaDePago>());
+        Assert.IsType<BabelHub.Ecommerce.Infrastructure.Pagos.SimuladorPasarelaDePago>(normal.Services.GetRequiredService<BabelHub.Ecommerce.Application.Pagos.Interno.IPasarelaDePago>());
+        Assert.IsType<BabelHub.Ecommerce.Infrastructure.Composicion.VerificadorDePersonaNulo>(ensayo.Services.GetRequiredService<IVerificadorDePersona>());
+        Assert.IsType<BabelHub.Ecommerce.Infrastructure.Plataforma.VerificadorTurnstile>(normal.Services.GetRequiredService<IVerificadorDePersona>());
+        Assert.All(ensayo.Services.GetServices<IAdaptadorSaliente>().Where(a => a.EsHaciaProveedor), a => Assert.True(a.EsNulo, a.Nombre));
+    }
+
+    [Theory]
+    [InlineData("culqi")]
+    [InlineData("otra-pasarela")]
+    [Trait("Criterio", "AC-PAG-10")]
+    public void UnaPasarelaSinAdaptadorODesconocida_FallaElArranque_NombrandoLaVariable_SinLasClaves(string pasarela)
+    {
+        var configuracion = ConfiguracionCompleta();
+        configuracion["Pagos:Pasarela"] = pasarela;
+        configuracion["Pagos:LlavePrivada"] = "sk_test_" + Secreto();
+
+        var falla = Assert.ThrowsAny<Exception>(() => Con(configuracion, ModoDeArranque.Normal));
+
+        Assert.Contains("Pagos:Pasarela", falla.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(configuracion["Pagos:ClaveDeIntentos"]!, falla.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(configuracion["Pagos:LlavePrivada"]!, falla.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-12")]
+    public async Task ElOperadorLogisticoEsElNuloPorDefecto_ElSimuladorSoloEnDesarrollo_YUnoDesconocidoFalla()
+    {
+        var configuracion = ConfiguracionCompleta();
+        await using var porDefecto = Con(configuracion, ModoDeArranque.Normal);
+        configuracion["Envios:Operador"] = "simulador";
+        await using var simulado = Con(configuracion, ModoDeArranque.Normal);
+        await using var enEnsayo = Con(configuracion, ModoDeArranque.Ensayo);
+        configuracion["Envios:Operador"] = "olva";
+
+        var falla = Assert.ThrowsAny<Exception>(() => Con(configuracion, ModoDeArranque.Normal));
+
+        Assert.IsType<BabelHub.Ecommerce.Infrastructure.Envios.NuloOperadorLogistico>(porDefecto.Services.GetRequiredService<BabelHub.Ecommerce.Application.Envios.Interno.IOperadorLogistico>());
+        Assert.IsType<BabelHub.Ecommerce.Infrastructure.Envios.SimuladorOperadorLogistico>(simulado.Services.GetRequiredService<BabelHub.Ecommerce.Application.Envios.Interno.IOperadorLogistico>());
+        Assert.IsType<BabelHub.Ecommerce.Infrastructure.Envios.NuloOperadorLogistico>(enEnsayo.Services.GetRequiredService<BabelHub.Ecommerce.Application.Envios.Interno.IOperadorLogistico>());
+        Assert.Contains("Envios:Operador", falla.Message, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -9,6 +9,12 @@ using StackExchange.Redis;
 
 namespace BabelHub.Ecommerce.Infrastructure.Composicion;
 
+/// <summary>El verificador de persona nulo del ensayo y de la restauración: nunca llama a Cloudflare y responde <see cref="ResultadoDeVerificacionDePersona.NoDisponible"/>.</summary>
+public sealed class VerificadorDePersonaNulo : IVerificadorDePersona
+{
+    public Task<ResultadoDeVerificacionDePersona> Verificar(string token, string accion, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeVerificacionDePersona.NoDisponible);
+}
+
 /// <summary>
 /// El Redis dedicado de contadores del E-commerce (SEG-26): la dirección <c>host:puerto</c>, el usuario ACL restringido <c>limites</c> y su contraseña (<c>BABELHUB__Seguridad__ClaveDeRedisDeLimites</c>); con TLS en el despliegue.
 /// Sin él (solo fuera de producción) los límites usan el contador local por instancia.
@@ -29,6 +35,8 @@ public static class ComposicionDeLaPlataformaDelEcommerce
         this IServiceCollection servicios,
         NpgsqlDataSource aplicacion,
         ConfiguracionDeSeguridad seguridad,
+        OpcionesDeTurnstile turnstile,
+        bool conLlamadasReales,
         IEnumerable<(OperacionDeServicio Operacion, AlcanceDeServicio Alcance)> declaraciones,
         OpcionesDelRedisDeLimites? redis)
     {
@@ -59,6 +67,28 @@ public static class ComposicionDeLaPlataformaDelEcommerce
         servicios.AddSingleton<IMotorDeLimites>(sp => redis is null ? local : new MotorDeLimitesRedis(ConectarRedis(redis), new OpcionesDeMotorRedis()));
         servicios.AddScoped<IControlDeLimites>(sp => new EvaluarLimite(
             sp.GetRequiredService<CatalogoDePoliticas>(), sp.GetRequiredService<IMotorDeLimites>(), local, sp.GetRequiredService<IOrigenDeSolicitud>(), sp.GetRequiredService<IPublicadorDeEventosDeSeguridad>(), sp.GetRequiredService<IReloj>()));
+
+        // Las entradas de integración (firma HMAC de proveedor, marca de tiempo, deduplicación): sin ningún proveedor habilitado todo se rechaza como «proveedor desconocido»; «culqi» se agrega con su adaptador (T37).
+        servicios.AddSingleton<IVerificadorDeFirma>(new VerificadorDeFirmaHmac(seguridad.Integraciones));
+        servicios.AddSingleton<IAlmacenDeEntradasProcesadas>(sp => new AlmacenDeEntradasProcesadas(sp.GetRequiredService<UnidadDeTrabajoPostgres>()));
+        servicios.AddSingleton(new OpcionesDeEntradasDeIntegracion([]));
+        servicios.AddScoped<IProcesadorDeEntradasDeIntegracion, ProcesarEntradaDeIntegracion>();
+
+        // La verificación de persona (Turnstile, SEG-31): solo en el modo normal llama a Cloudflare; en el ensayo y al restaurar el verificador es el nulo y responde «no disponible» (falla cerrado).
+        servicios.AddSingleton(new OpcionesDeVerificacionDePersona());
+        servicios.AddSingleton(new OpcionesDeDependencias());
+        servicios.AddSingleton<IDependenciasExternas>(sp => new DependenciasExternas(sp.GetRequiredService<OpcionesDeDependencias>()));
+        servicios.AddHttpClient("turnstile").ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, ConnectTimeout = TimeSpan.FromSeconds(5) });
+        if (conLlamadasReales)
+        {
+            servicios.AddSingleton<IVerificadorDePersona>(sp => new VerificadorTurnstile(sp.GetRequiredService<IHttpClientFactory>().CreateClient("turnstile"), turnstile, sp.GetRequiredService<IDependenciasExternas>()));
+        }
+        else
+        {
+            servicios.AddSingleton<IVerificadorDePersona, VerificadorDePersonaNulo>();
+        }
+
+        servicios.AddScoped<IExigenciaDeVerificacionDePersona, ExigirVerificacionDePersona>();
         return servicios;
     }
 

@@ -85,7 +85,7 @@ public static class ComposicionDeLosTrabajosDeEnvios
             sp.GetRequiredService<IServiceScopeFactory>(),
             sp.GetRequiredService<IRegistroDeTrabajosDeFondo>(),
             alcanceDeSistema(sp),
-            sp.GetRequiredService<IPublicadorDeAlertasTecnicas>(),
+            new AlertasTecnicasPorCorrida(sp.GetRequiredService<IServiceScopeFactory>()),
             sp.GetRequiredService<IReloj>()));
         servicios.TryAddSingleton(sp => new ServicioDeTrabajosDeEnvios(sp.GetRequiredService<IReadOnlyList<TrabajoDeFondoDeEnvios>>()));
         return servicios;
