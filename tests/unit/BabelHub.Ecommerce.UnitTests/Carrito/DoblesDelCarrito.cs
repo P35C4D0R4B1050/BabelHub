@@ -166,6 +166,12 @@ internal sealed class RepositorioDeCarritosEnMemoria(BitacoraDeBloqueos bitacora
 
     public IReadOnlyList<CarritoDeDominio> Todos => _carritos;
 
+    /// <summary>Se ejecuta una sola vez al agregar: simula a otro dispositivo que crea el carrito a la vez (puede lanzar <c>CarritoYaExisteException</c>).</summary>
+    public Action? AntesDeAgregar { get; set; }
+
+    /// <summary>Se ejecuta una sola vez justo antes de una lectura con bloqueo por id: simula otra solicitud que cambia el carrito mientras tanto.</summary>
+    public Action? AlBloquear { get; set; }
+
     public int Guardados { get; private set; }
 
     public void Sembrar(CarritoDeDominio carrito) => _carritos.Add(carrito);
@@ -184,12 +190,24 @@ internal sealed class RepositorioDeCarritosEnMemoria(BitacoraDeBloqueos bitacora
 
     public Task<CarritoDeDominio?> Obtener(Guid carritoId, bool conBloqueo, CancellationToken cancelacion = default)
     {
+        if (conBloqueo && AlBloquear is { } alBloquear)
+        {
+            AlBloquear = null;
+            alBloquear();
+        }
+
         bitacora.Anotar(conBloqueo, $"carrito:{carritoId}");
         return Task.FromResult(_carritos.FirstOrDefault(c => c.Id == carritoId));
     }
 
     public Task Agregar(CarritoDeDominio carrito, CancellationToken cancelacion = default)
     {
+        if (AntesDeAgregar is { } antes)
+        {
+            AntesDeAgregar = null;
+            antes();
+        }
+
         _carritos.Add(carrito);
         Guardados++;
         return Task.CompletedTask;
@@ -277,7 +295,13 @@ internal sealed class RepositorioDeCheckoutsEnMemoria(BitacoraDeBloqueos bitacor
         return Task.CompletedTask;
     }
 
-    public Task Guardar(Checkout checkout, CancellationToken cancelacion = default) => Task.CompletedTask;
+    public List<Checkout> Guardados { get; } = [];
+
+    public Task Guardar(Checkout checkout, CancellationToken cancelacion = default)
+    {
+        Guardados.Add(checkout);
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>Quién bloqueó qué y en qué orden (solo cuenta las lecturas con bloqueo).</summary>

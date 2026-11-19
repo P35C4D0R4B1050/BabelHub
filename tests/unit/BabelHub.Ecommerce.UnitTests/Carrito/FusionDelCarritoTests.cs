@@ -234,7 +234,7 @@ public sealed class FusionDelCarritoTests
     }
 
     [Fact]
-    public async Task Si_la_auditoria_falla_la_operacion_falla_y_no_se_guarda_la_constancia()
+    public async Task Si_la_auditoria_falla_la_operacion_falla_para_que_la_transaccion_se_revierta()
     {
         var (e, cuenta) = Escenario();
         SembrarCuenta(e, cuenta, (e.Impreso(5), false, 1));

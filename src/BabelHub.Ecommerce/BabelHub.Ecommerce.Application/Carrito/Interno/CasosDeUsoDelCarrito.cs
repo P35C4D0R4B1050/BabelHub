@@ -127,6 +127,7 @@ internal sealed class ServiciosDelCarrito(
 
         var ids = carrito.Lineas.Select(l => l.EdicionId).ToList();
         var ediciones = new Dictionary<Guid, EdicionConsultada>(conocidas ?? new Dictionary<Guid, EdicionConsultada>());
+        var catalogoFallo = false;
         var faltan = ids.Where(id => !ediciones.ContainsKey(id)).ToList();
         if (faltan.Count > 0)
         {
@@ -137,6 +138,10 @@ internal sealed class ServiciosDelCarrito(
                 {
                     ediciones[edicion.EdicionId] = edicion;
                 }
+            }
+            else
+            {
+                catalogoFallo = true;
             }
         }
 
@@ -155,7 +160,8 @@ internal sealed class ServiciosDelCarrito(
         {
             ediciones.TryGetValue(linea.EdicionId, out var edicion);
             disponibles.TryGetValue(linea.EdicionId, out var dato);
-            var retirada = linea.RetiroPendiente || edicion is null || edicion.Estado != EstadoDeEdicionConsultado.Activa;
+            // Una edición que el Catálogo no devolvió por un fallo no es una edición retirada: no se marca así, y los precios quedan sin confirmar.
+            var retirada = linea.RetiroPendiente || (edicion is null ? !catalogoFallo : edicion.Estado != EstadoDeEdicionConsultado.Activa);
             var precio = edicion?.Precio ?? 0m;
             lineas.Add(new LineaDelCarritoVista(
                 linea.EdicionId,
@@ -173,7 +179,7 @@ internal sealed class ServiciosDelCarrito(
         var avisos = cuentaId is { } cuenta ? await carritos.AvisosSinVer(cuenta, cancelacion).ConfigureAwait(false) : [];
         var estado = cuentaId is { } propietaria ? await checkouts.LeerEstadoSinBloqueo(propietaria, cancelacion).ConfigureAwait(false) : null;
         var hayCompra = estado is EstadoDelCheckout.Reservando or EstadoDelCheckout.EnPago or EstadoDelCheckout.PagoPendiente;
-        return new VistaDelCarrito(lineas, subtotal, avisos, hayCompra);
+        return new VistaDelCarrito(lineas, subtotal, avisos, hayCompra, catalogoFallo);
     }
 
     /// <summary>Convierte las ediciones retiradas con anotación huérfana en avisos persistentes («X fue retirada del catálogo»).</summary>
@@ -237,6 +243,12 @@ internal abstract class EdicionDeLineaDelCarrito<TEntrada>(ServiciosDelCarrito s
     /// <summary>Aplica la operación al carrito bloqueado y devuelve el rechazo, o <see langword="null"/> si quedó aplicada. Debe revalidar contra lo obtenido antes.</summary>
     protected abstract ErrorDeAplicacion? Aplicar(ContextoDeEdicion contexto);
 
+    /// <summary>Un cambio que no cambia nada (quitar una línea que no está, pedir la misma cantidad, agregar una digital que ya está): no reabre la intención ni abre la transacción.</summary>
+    protected virtual bool EsNoOp(TEntrada entrada, CarritoDeDominio existente) => false;
+
+    /// <summary>Lo que se puede rechazar con lo ya obtenido (el máximo del stock) <b>antes</b> de reabrir la intención de Pagos: así un rechazo no deja la compra reabierta. Aplicar lo revalida al bloquear.</summary>
+    protected virtual ErrorDeAplicacion? Prevalidar(TEntrada entrada, CarritoDeDominio? existente, TerrenoDeLaEdicion terreno) => null;
+
     protected sealed record ContextoDeEdicion(TEntrada Entrada, CarritoDeDominio Carrito, TerrenoDeLaEdicion Terreno, DateTimeOffset Ahora);
 
     public async Task<Resultado<ResultadoDeCarrito>> Ejecutar(TEntrada entrada, CancellationToken cancelacion = default)
@@ -291,6 +303,17 @@ internal abstract class EdicionDeLineaDelCarrito<TEntrada>(ServiciosDelCarrito s
             return Resultado<ResultadoDeCarrito>.Fallo(error);
         }
 
+        if (existente is not null && EsNoOp(entrada, existente))
+        {
+            var igual = await servicios.ConstruirVista(existente, solicitante.CuentaId, preparado.Terreno.Ediciones, cancelacion).ConfigureAwait(false);
+            return Resultado<ResultadoDeCarrito>.Exito(new ResultadoDeCarrito(igual, null, BorrarLaCookie: false));
+        }
+
+        if (Prevalidar(entrada, existente, preparado.Terreno) is { } rechazoPrevio)
+        {
+            return Resultado<ResultadoDeCarrito>.Fallo(rechazoPrevio);
+        }
+
         // La edición con el checkout vivo (T11): Reabrir fuera de la transacción y antes de bloquear; solo para una cuenta con sesión.
         var puerta = PuertaDeEdicion.Libre;
         if (solicitante.Tipo == TipoDeSolicitante.Cuenta)
@@ -305,9 +328,18 @@ internal abstract class EdicionDeLineaDelCarrito<TEntrada>(ServiciosDelCarrito s
         }
 
         // 3. La transacción: el checkout primero y el carrito después (D10), sin red.
-        var (resultado, cookieNueva) = await servicios.Unidad.Ejecutar(
-            token => EnLaTransaccion(entrada, solicitante, cookie, preparado.Terreno, puerta, token),
-            cancelacion).ConfigureAwait(false);
+        (Resultado<CarritoDeDominio> Resultado, string? CookieNueva) transaccion;
+        try
+        {
+            transaccion = await servicios.Unidad.Ejecutar(token => EnLaTransaccion(entrada, solicitante, cookie, preparado.Terreno, puerta, token), cancelacion).ConfigureAwait(false);
+        }
+        catch (CarritoYaExisteException)
+        {
+            // Otro dispositivo creó el carrito a la vez (índice único): la transacción se rehace y ahora lo encuentra y lo bloquea.
+            transaccion = await servicios.Unidad.Ejecutar(token => EnLaTransaccion(entrada, solicitante, cookie, preparado.Terreno, puerta, token), cancelacion).ConfigureAwait(false);
+        }
+
+        var (resultado, cookieNueva) = transaccion;
         if (!resultado.EsExito)
         {
             return Resultado<ResultadoDeCarrito>.Fallo(resultado.Error!);
@@ -383,9 +415,17 @@ internal abstract class EdicionDeLineaDelCarrito<TEntrada>(ServiciosDelCarrito s
         IReadOnlyList<EdicionRetirada> huerfanas = [.. retiradasAlEditar, .. carrito.QuitarRetirosHuerfanos(checkout?.Estado, ahora)];
 
         var rechazo = Aplicar(new ContextoDeEdicion(entrada, carrito, terreno, ahora));
-        if (rechazo is not null)
+
+        // Con la intención ya reabierta (irreversible) o con retiros pendientes aplicados, lo que cambió se guarda aunque la operación se rechace: la unidad de trabajo confirma un fallo esperado y, sin esto, el checkout quedaría en pago con una intención ya inservible. Sin efectos previos, un rechazo no guarda nada.
+        var huboEfectosPrevios = puerta.Decision != DecisionDeLaPuerta.Libre || huerfanas.Count > 0;
+        if (rechazo is not null && !huboEfectosPrevios)
         {
             return (Resultado<CarritoDeDominio>.Fallo(rechazo), null);
+        }
+
+        if (checkout is not null && puerta.Decision != DecisionDeLaPuerta.Libre)
+        {
+            await servicios.Checkouts.Guardar(checkout, cancelacion).ConfigureAwait(false);
         }
 
         if (esNuevo)
@@ -402,7 +442,7 @@ internal abstract class EdicionDeLineaDelCarrito<TEntrada>(ServiciosDelCarrito s
             await servicios.Carritos.AgregarAvisos(cuenta, servicios.AvisosDeRetiro(huerfanas, terreno.Ediciones, ahora), cancelacion).ConfigureAwait(false);
         }
 
-        return (Resultado<CarritoDeDominio>.Exito(carrito), cookieNueva);
+        return (rechazo is null ? Resultado<CarritoDeDominio>.Exito(carrito) : Resultado<CarritoDeDominio>.Fallo(rechazo), cookieNueva);
     }
 
     protected static ErrorDeAplicacion DeRechazo(RechazoDeCarrito rechazo) => rechazo switch
@@ -480,6 +520,21 @@ internal sealed class AgregarLinea(ServiciosDelCarrito servicios) : EdicionDeLin
         return (null, new TerrenoDeLaEdicion(ediciones, dato));
     }
 
+    protected override bool EsNoOp(AgregarLineaEntrada entrada, CarritoDeDominio existente) =>
+        existente.Lineas.Any(l => l.EdicionId == entrada.EdicionId && l.EsDigital && !l.RetiroPendiente);
+
+    protected override ErrorDeAplicacion? Prevalidar(AgregarLineaEntrada entrada, CarritoDeDominio? existente, TerrenoDeLaEdicion terreno)
+    {
+        var esDigital = terreno.Ediciones.TryGetValue(entrada.EdicionId, out var edicion) && edicion.Formato == FormatoDeEdicion.Digital;
+        if (esDigital || MaximoConocido(terreno.Disponibilidad) is not { } maximo)
+        {
+            return null;
+        }
+
+        var yaHay = existente?.Lineas.FirstOrDefault(l => l.EdicionId == entrada.EdicionId)?.Cantidad.Valor ?? 0;
+        return yaHay + entrada.Cantidad > maximo ? SinStock(maximo) : null;
+    }
+
     protected override ErrorDeAplicacion? Aplicar(ContextoDeEdicion contexto)
     {
         var ediciones = contexto.Terreno.Ediciones;
@@ -540,6 +595,18 @@ internal sealed class ModificarLinea(ServiciosDelCarrito servicios) : EdicionDeL
         return (null, new TerrenoDeLaEdicion(ediciones, dato));
     }
 
+    protected override bool EsNoOp(ModificarLineaEntrada entrada, CarritoDeDominio existente) =>
+        existente.Lineas.FirstOrDefault(l => l.EdicionId == entrada.EdicionId) is { RetiroPendiente: false } linea
+        && linea.Cantidad.Valor == (linea.EsDigital ? 1 : entrada.Cantidad);
+
+    protected override ErrorDeAplicacion? Prevalidar(ModificarLineaEntrada entrada, CarritoDeDominio? existente, TerrenoDeLaEdicion terreno) =>
+        existente?.Lineas.FirstOrDefault(l => l.EdicionId == entrada.EdicionId) is { EsDigital: false } linea
+        && entrada.Cantidad > linea.Cantidad.Valor
+        && MaximoConocido(terreno.Disponibilidad) is { } maximo
+        && entrada.Cantidad > maximo
+            ? SinStock(maximo)
+            : null;
+
     protected override ErrorDeAplicacion? Aplicar(ContextoDeEdicion contexto)
     {
         var linea = contexto.Carrito.Lineas.FirstOrDefault(l => l.EdicionId == contexto.Entrada.EdicionId);
@@ -573,6 +640,8 @@ internal sealed class EliminarLinea(ServiciosDelCarrito servicios) : EdicionDeLi
         return (null, new TerrenoDeLaEdicion(ediciones, null));
     }
 
+    protected override bool EsNoOp(EliminarLineaEntrada entrada, CarritoDeDominio existente) => existente.Lineas.All(l => l.EdicionId != entrada.EdicionId);
+
     protected override ErrorDeAplicacion? Aplicar(ContextoDeEdicion contexto)
     {
         var resultado = contexto.Carrito.Eliminar(contexto.Entrada.EdicionId, contexto.Ahora);
@@ -597,5 +666,45 @@ internal static class ValidadorDeLineas
         }
 
         return errores.Count == 0 ? ResultadoDeValidacion.Valido : ResultadoDeValidacion.Invalido(errores);
+    }
+}
+
+/// <summary>Los avisos que la persona marca como vistos (CAT-18, D15): hasta 50 identificadores, solo de su cuenta (el repositorio los filtra por la cuenta del actor, nunca por una cuenta recibida).</summary>
+public sealed record MarcarAvisosEntrada(IReadOnlyCollection<Guid> AvisoIds);
+
+/// <summary>
+/// <c>MarcarAvisosComoVistos</c> (CAT-18): marca los avisos del carrito de la cuenta como vistos (los de retiro y de ajuste por fusión), en una transacción corta; un identificador ajeno o inexistente no hace nada ni revela si
+/// existe. Solo un cliente con sesión: un visitante no tiene avisos. Devuelve el carrito para que la pantalla se redibuje sin los avisos vistos.
+/// </summary>
+internal sealed class MarcarAvisosComoVistos(ServiciosDelCarrito servicios) : ICasoDeUso<MarcarAvisosEntrada, ResultadoDeCarrito>
+{
+    public const int MaximoDeAvisos = 50;
+
+    public async Task<Resultado<ResultadoDeCarrito>> Ejecutar(MarcarAvisosEntrada entrada, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(entrada);
+        var cuenta = await servicios.Autorizador.ExigirCuenta(cancelacion).ConfigureAwait(false);
+        if (!cuenta.EsExito)
+        {
+            return Resultado<ResultadoDeCarrito>.Fallo(cuenta.Error!);
+        }
+
+        if (entrada.AvisoIds is null || entrada.AvisoIds.Count is 0 or > MaximoDeAvisos || entrada.AvisoIds.Any(id => id == Guid.Empty))
+        {
+            return ServiciosDelCarrito.Validacion<ResultadoDeCarrito>(ResultadoDeValidacion.Invalido([new ErrorDeCampo("avisoIds", ConstructorDeValidacion.FueraDeRango)]));
+        }
+
+        var ahora = servicios.Reloj.Ahora;
+        await servicios.Unidad.Ejecutar(
+            async token =>
+            {
+                await servicios.Carritos.MarcarAvisosComoVistos(cuenta.Valor, [.. entrada.AvisoIds.Distinct()], ahora, token).ConfigureAwait(false);
+                return true;
+            },
+            cancelacion).ConfigureAwait(false);
+
+        var carrito = await servicios.Carritos.ObtenerDeCuenta(cuenta.Valor, conBloqueo: false, cancelacion).ConfigureAwait(false);
+        var vista = await servicios.ConstruirVista(carrito, cuenta.Valor, null, cancelacion).ConfigureAwait(false);
+        return Resultado<ResultadoDeCarrito>.Exito(new ResultadoDeCarrito(vista, null, BorrarLaCookie: false));
     }
 }

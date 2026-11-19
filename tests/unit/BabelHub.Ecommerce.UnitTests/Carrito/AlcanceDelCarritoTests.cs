@@ -1,4 +1,3 @@
-using System.Text.Json;
 using BabelHub.Ecommerce.Application.Carrito.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.UnitTests.Catalogo;
@@ -132,15 +131,15 @@ public sealed class AlcanceDelCarritoTests
 
     [Fact]
     [Trait("Criterio", "AC-CAR-31")]
-    public async Task El_evento_de_un_identificador_ajeno_no_contiene_su_valor()
+    public async Task El_evento_de_un_identificador_ajeno_solo_lleva_el_nombre_del_campo()
     {
         var (autorizador, denegaciones) = Crear(ActorDePrueba.DeCliente());
-        var valorAjeno = Guid.NewGuid();
-
         await autorizador.RechazarIdentificadorAjeno(CampoDeIdentificadorAjeno.CarritoId, default);
 
-        Assert.DoesNotContain(valorAjeno.ToString(), JsonSerializer.Serialize(denegaciones.Eventos), StringComparison.OrdinalIgnoreCase);
-        Assert.Null(Assert.Single(denegaciones.Eventos).Ruta);
+        // El método no recibe el valor del identificador: el evento solo puede llevar el nombre del campo y ninguna ruta.
+        var evento = Assert.Single(denegaciones.Eventos);
+        Assert.Null(evento.Ruta);
+        Assert.Equal("recurso-ajeno-carrito-id", evento.Motivo);
     }
 
     [Fact]

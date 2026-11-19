@@ -285,3 +285,9 @@ public interface IAuditoriaDelCarrito
     /// <summary>La baja de ediciones aplicada a los carritos: cuántas ediciones, cuántos carritos afectados y cuántas líneas se quitaron o quedaron anotadas con retiro pendiente (sin identificar a nadie).</summary>
     Task EdicionesRetiradas(int ediciones, int carritosAfectados, int lineasQuitadas, int lineasAnotadas, CancellationToken cancelacion = default);
 }
+
+/// <summary>
+/// <c>IRepositorioDeCarritos.Agregar</c> la lanza cuando el carrito de esa cuenta (o de esa cookie) ya existe (índice único): otro dispositivo lo creó a la vez. La Aplicación <b>rehace la transacción</b> una vez, y esta vez lo
+/// encuentra y lo bloquea (AC-CAR-01, AC-CAR-02). Con PostgreSQL una violación de unicidad aborta la transacción, así que no se puede seguir dentro de ella.
+/// </summary>
+public sealed class CarritoYaExisteException() : Exception("El carrito ya existe: otro dispositivo lo creó a la vez.");

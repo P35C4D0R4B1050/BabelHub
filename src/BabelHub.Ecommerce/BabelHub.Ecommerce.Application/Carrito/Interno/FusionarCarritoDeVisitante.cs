@@ -6,7 +6,15 @@ using CarritoDeDominio = BabelHub.Ecommerce.Domain.Carrito.Carrito;
 namespace BabelHub.Ecommerce.Application.Carrito.Interno;
 
 /// <summary>La cookie del visitante cuyo carrito se fusiona con el de la cuenta de la sesión (la cuenta sale del actor, nunca de la entrada).</summary>
-public sealed record FusionarCarritoEntrada(string? CookieDelVisitante);
+public sealed record FusionarCarritoEntrada(string? CookieDelVisitante)
+{
+    /// <summary>La cookie del visitante es una capacidad: no se imprime.</summary>
+    private bool PrintMembers(System.Text.StringBuilder constructor)
+    {
+        constructor.Append("ConCookie = ").Append(CookieDelVisitante is not null);
+        return true;
+    }
+}
 
 /// <summary>
 /// <c>FusionarCarritoDeVisitante</c> (CAR-24, AC-CAR-22): al terminar el ingreso o el registro suma el carrito del visitante al de la cuenta con la función pura <c>Fusion</c>, <b>idempotente</b> (el carrito del visitante
@@ -68,9 +76,18 @@ internal sealed class FusionarCarritoDeVisitante(ServiciosDelCarrito servicios) 
         }
 
         var visitanteId = visitante.Id;
-        var (aplicada, delaCuentaFinal) = await servicios.Unidad.Ejecutar(
-            token => EnLaTransaccion(cuenta, visitanteId, huella!, delaCuenta?.Id, terreno.Valor!, puerta, token),
-            cancelacion).ConfigureAwait(false);
+        (ResultadoDeLaFusion Estado, CarritoDeDominio? DeLaCuenta) transaccion;
+        try
+        {
+            transaccion = await servicios.Unidad.Ejecutar(token => EnLaTransaccion(cuenta, visitanteId, huella!, delaCuenta?.Id, terreno.Valor!, puerta, token), cancelacion).ConfigureAwait(false);
+        }
+        catch (CarritoYaExisteException)
+        {
+            // Otro dispositivo creó el carrito de la cuenta a la vez: se rehace la transacción y ahora lo encuentra y lo bloquea (en orden).
+            transaccion = await servicios.Unidad.Ejecutar(token => EnLaTransaccion(cuenta, visitanteId, huella!, delaCuenta?.Id, terreno.Valor!, puerta, token), cancelacion).ConfigureAwait(false);
+        }
+
+        var (aplicada, delaCuentaFinal) = transaccion;
         return aplicada switch
         {
             ResultadoDeLaFusion.Aplazada => await Responder(delaCuentaFinal ?? delaCuenta, cuenta, [], aplazada: true, borrarLaCookie: false, null, cancelacion).ConfigureAwait(false),
@@ -153,7 +170,9 @@ internal sealed class FusionarCarritoDeVisitante(ServiciosDelCarrito servicios) 
         var checkout = await servicios.Checkouts.ObtenerVivoDeCuenta(cuenta, conBloqueo: true, cancelacion).ConfigureAwait(false);
         CarritoDeDominio? visitante = null;
         CarritoDeDominio? delaCuenta = null;
-        foreach (var id in new[] { visitanteId, cuentaCarritoId ?? Guid.Empty }.Where(i => i != Guid.Empty).Order())
+        // Si la cuenta no tenía carrito en la primera lectura, otro dispositivo pudo crearlo: se relee su id sin bloqueo para bloquear siempre en orden ascendente (D10).
+        var idDeLaCuenta = cuentaCarritoId ?? (await servicios.Carritos.ObtenerDeCuenta(cuenta, conBloqueo: false, cancelacion).ConfigureAwait(false))?.Id;
+        foreach (var id in new[] { visitanteId, idDeLaCuenta ?? Guid.Empty }.Where(i => i != Guid.Empty).Order())
         {
             var carrito = await servicios.Carritos.Obtener(id, conBloqueo: true, cancelacion).ConfigureAwait(false);
             if (id == visitanteId)
@@ -166,16 +185,16 @@ internal sealed class FusionarCarritoDeVisitante(ServiciosDelCarrito servicios) 
             }
         }
 
-        if (cuentaCarritoId is null)
-        {
-            // Otro dispositivo pudo crearlo entre la lectura y el bloqueo: se toma el que exista.
-            delaCuenta = await servicios.Carritos.ObtenerDeCuenta(cuenta, conBloqueo: true, cancelacion).ConfigureAwait(false);
-        }
-
         // Una fusión ya aplicada (otro dispositivo, o una repetición) no suma otra vez.
         if (!servicios.EsUtil(visitante))
         {
             return (ResultadoDeLaFusion.Aplicada, delaCuenta);
+        }
+
+        // Si el terreno quedó obsoleto (otra pestaña con la misma cookie agregó una línea después de armarlo), no se fusiona a ciegas: se aplaza y se reintenta, sin marcar fusionado.
+        if (visitante!.Lineas.Any(l => !terreno.ParaLaFusion.ContainsKey(l.EdicionId)))
+        {
+            return (ResultadoDeLaFusion.Aplazada, delaCuenta);
         }
 
         var nuevo = delaCuenta is null;
@@ -193,6 +212,11 @@ internal sealed class FusionarCarritoDeVisitante(ServiciosDelCarrito servicios) 
             }
 
             retiradas = [.. alEditar, .. delaCuenta.QuitarRetirosHuerfanos(checkout?.Estado, ahora)];
+
+            if (checkout is not null && puerta.Decision != DecisionDeLaPuerta.Libre)
+            {
+                await servicios.Checkouts.Guardar(checkout, cancelacion).ConfigureAwait(false);
+            }
         }
 
         var avisos = new List<AvisoDelCarrito>();
