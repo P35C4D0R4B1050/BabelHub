@@ -266,4 +266,24 @@ public sealed class PoliticasDeSeguridadTests
         Assert.True(PoliticasDeSeguridad.SolicitudesDelOrigenDesconocido.Maximo > PoliticasDeSeguridad.SolicitudesPreviasPorOrigen.Maximo);
         Assert.True(PoliticasDeSeguridad.SolicitudesPreviasPorOrigen.Maximo > PoliticasDeSeguridad.SolicitudesSinSesionPorOrigen.Maximo);
     }
+
+    [Fact]
+    public void LasPoliticasDeCarrito_TienenLosValoresDelPlan_YSoloPasarAlPagoFallaCerrada()
+    {
+        Assert.Equal(("carritos-de-visitante-por-origen", 10, TimeSpan.FromHours(1)), (PoliticasDeSeguridad.CarritosDeVisitantePorOrigen.Nombre, PoliticasDeSeguridad.CarritosDeVisitantePorOrigen.Maximo, PoliticasDeSeguridad.CarritosDeVisitantePorOrigen.Ventana));
+        Assert.Equal((60, TimeSpan.FromMinutes(1)), (PoliticasDeSeguridad.EdicionDeLineasPorCuenta.Maximo, PoliticasDeSeguridad.EdicionDeLineasPorCuenta.Ventana));
+        Assert.Equal((60, TimeSpan.FromMinutes(1)), (PoliticasDeSeguridad.EdicionDeLineasPorOrigen.Maximo, PoliticasDeSeguridad.EdicionDeLineasPorOrigen.Ventana));
+        Assert.Equal((30, TimeSpan.FromMinutes(1)), (PoliticasDeSeguridad.RevisionDelCheckoutPorCuenta.Maximo, PoliticasDeSeguridad.RevisionDelCheckoutPorCuenta.Ventana));
+        Assert.Equal((10, TimeSpan.FromHours(1)), (PoliticasDeSeguridad.PasosAlPagoPorCuenta.Maximo, PoliticasDeSeguridad.PasosAlPagoPorCuenta.Ventana));
+        Assert.Equal((20, TimeSpan.FromHours(1)), (PoliticasDeSeguridad.VolverOReiniciarPorCuenta.Maximo, PoliticasDeSeguridad.VolverOReiniciarPorCuenta.Ventana));
+
+        // Pasar al pago reserva stock: falla cerrada, entre las críticas y sin respaldo local; las demás de Carrito son generales.
+        Assert.Contains(PoliticasDeSeguridad.PasosAlPagoPorCuenta, PoliticasDeSeguridad.Todas);
+        Assert.False(PoliticasDeSeguridad.PasosAlPagoPorCuenta.RespaldoLocal);
+        foreach (var general in new[] { PoliticasDeSeguridad.CarritosDeVisitantePorOrigen, PoliticasDeSeguridad.EdicionDeLineasPorCuenta, PoliticasDeSeguridad.EdicionDeLineasPorOrigen, PoliticasDeSeguridad.RevisionDelCheckoutPorCuenta, PoliticasDeSeguridad.VolverOReiniciarPorCuenta })
+        {
+            Assert.Contains(general, PoliticasDeSeguridad.Generales);
+            Assert.True(general.RespaldoLocal, general.Nombre);
+        }
+    }
 }

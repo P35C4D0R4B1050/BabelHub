@@ -43,22 +43,61 @@ public sealed class AvisosDeCuenta(IEnviadorDeCorreo correo)
 {
     public const string PlantillaDeContrasenaCambiada = "contrasena-cambiada";
 
-    public async Task ContrasenaCambiada(Usuario usuario, CancellationToken cancelacion)
+    public const string PlantillaDeSegundoFactorRestablecido = "segundo-factor-restablecido";
+
+    public const string PlantillaDeCancelacionDiferida = "cancelacion-diferida";
+
+    public const string PlantillaDePendientesCerrados = "cancelacion-pendientes-cerrados";
+
+    public const string PlantillaDeCancelacionDescartada = "cancelacion-descartada";
+
+    /// <summary>El aviso de IDE-27: la cancelación quedó diferida por los pendientes y puede desistir. Devuelve si <b>salió</b> por correo.</summary>
+    public Task<bool> CancelacionDiferida(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeCancelacionDiferida, CategoriaDeCorreo.AvisoDeSeguridad, cancelacion);
+
+    /// <summary>El aviso de IDE-68: se cerraron los pendientes y puede reconfirmar. Si no sale, el plazo de 7 días cuenta desde que se muestre en la cuenta (IDE-76).</summary>
+    public Task<bool> PendientesCerrados(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDePendientesCerrados, CategoriaDeCorreo.AvisoDeSeguridad, cancelacion);
+
+    /// <summary>El aviso de IDE-81: la cancelación se descartó y puede volver a comprar.</summary>
+    public Task<bool> CancelacionDescartada(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeCancelacionDescartada, CategoriaDeCorreo.AvisoDeSeguridad, cancelacion);
+
+    public const string PlantillaDeSolicitudDeDatosRespondida = "solicitud-de-datos-respondida";
+
+    /// <summary>El aviso de que la administración respondió una solicitud sobre datos (IDE-26): <b>sin el contenido</b> de la respuesta, que el titular ve en su cuenta.</summary>
+    public Task SolicitudDeDatosRespondida(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeSolicitudDeDatosRespondida, CategoriaDeCorreo.AvisoDeSeguridad, cancelacion);
+
+    public const string PlantillaDeCambioDeCorreoNoReconocido = "cambio-de-correo-no-reconocido";
+
+    public const string PlantillaDeCorreoCambiado = "correo-cambiado";
+
+    public Task ContrasenaCambiada(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeContrasenaCambiada, CategoriaDeCorreo.AlertaCriticaDeCuenta, cancelacion);
+
+    /// <summary>La alerta al correo <b>anterior</b> por un cambio de correo desde un dispositivo o una región no reconocidos (IDE-54): crítica, sin enlaces ni el correo nuevo.</summary>
+    public Task CambioDeCorreoNoReconocido(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeCambioDeCorreoNoReconocido, CategoriaDeCorreo.AlertaCriticaDeCuenta, cancelacion);
+
+    /// <summary>El aviso al correo <b>nuevo</b> ya aplicado el cambio (IDE-53); nada sale al correo anterior.</summary>
+    public Task CorreoCambiado(Usuario usuarioConElCorreoNuevo, CancellationToken cancelacion) => Avisar(usuarioConElCorreoNuevo, PlantillaDeCorreoCambiado, CategoriaDeCorreo.AvisoDeSeguridad, cancelacion);
+
+    /// <summary>El aviso al titular cuando la administración restablece su segundo factor (IDE-38): sin enlaces ni códigos.</summary>
+    public Task SegundoFactorRestablecido(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeSegundoFactorRestablecido, CategoriaDeCorreo.AlertaCriticaDeCuenta, cancelacion);
+
+    /// <summary>Envía el aviso; devuelve verdadero solo si <b>salió</b> (no si se encoló o se suprimió: el plazo de IDE-68 no empieza sin un aviso que el titular haya podido ver, IDE-76).</summary>
+    private async Task<bool> Avisar(Usuario usuario, string plantilla, CategoriaDeCorreo categoria, CancellationToken cancelacion)
     {
         ArgumentNullException.ThrowIfNull(usuario);
         if (!usuario.CorreoVerificado)
         {
             // Un aviso de seguridad no sale a un correo sin verificar (IDE-86): solo se muestra en la cuenta.
-            return;
+            return false;
         }
 
         try
         {
-            await correo.Enviar(new CorreoSaliente(CategoriaDeCorreo.AlertaCriticaDeCuenta, usuario.Correo, PlantillaDeContrasenaCambiada), cancelacion).ConfigureAwait(false);
+            return await correo.Enviar(new CorreoSaliente(categoria, usuario.Correo, plantilla), cancelacion).ConfigureAwait(false) == ResultadoDeEnvio.Enviado;
         }
         catch (Exception) when (!cancelacion.IsCancellationRequested)
         {
-            // El cambio ya se hizo; el correo no es necesario para él.
+            // La operación ya se hizo; el correo no es necesario para ella.
+            return false;
         }
     }
 }
@@ -143,7 +182,7 @@ public sealed class Ingreso(
         }
 
         var usuarioId = cuenta.Usuario.Id;
-        var (rechazo, reservas) = await ReservarLosLimitesDelSegundoFactor(usuarioId, cancelacion).ConfigureAwait(false);
+        var (rechazo, reservas) = await LimitesDelSegundoFactor.Reservar(limites, usuarioId, cancelacion).ConfigureAwait(false);
         if (rechazo is not null)
         {
             return Resultado<ResultadoDelIngreso>.Fallo(rechazo);
@@ -233,7 +272,7 @@ public sealed class Ingreso(
 
         if (resultado.EsExito)
         {
-            await DevolverLosCupos(reservas, cancelacion).ConfigureAwait(false);
+            await LimitesDelSegundoFactor.Devolver(limites, reservas, cancelacion).ConfigureAwait(false);
         }
 
         return resultado;
@@ -272,7 +311,7 @@ public sealed class Ingreso(
         }
 
         var usuarioId = cuenta.Usuario.Id;
-        var (rechazo, reservas) = await ReservarLosLimitesDelSegundoFactor(usuarioId, cancelacion).ConfigureAwait(false);
+        var (rechazo, reservas) = await LimitesDelSegundoFactor.Reservar(limites, usuarioId, cancelacion).ConfigureAwait(false);
         if (rechazo is not null)
         {
             return Resultado<ResultadoDelIngreso>.Fallo(rechazo);
@@ -313,7 +352,7 @@ public sealed class Ingreso(
 
         if (confirmada.EsExito)
         {
-            await DevolverLosCupos(reservas, cancelacion).ConfigureAwait(false);
+            await LimitesDelSegundoFactor.Devolver(limites, reservas, cancelacion).ConfigureAwait(false);
         }
 
         return confirmada;
@@ -432,38 +471,5 @@ public sealed class Ingreso(
     {
         var desafio = await desafios.PorHuella(huellasDeIdentidad.DeValorOpaco(valor.Revelar()), cancelacion).ConfigureAwait(false);
         return desafio is not null && desafio.Evaluar(reloj.Ahora) == EstadoDelDesafio.Vigente && desafio.Permite(accion) ? desafio : null;
-    }
-
-    /// <summary>Reserva los dos cupos del segundo factor (SEG-20, SEG-29) y devuelve los reservados: se devuelven al acertar, porque los límites cuentan los códigos <b>incorrectos</b>.</summary>
-    private async Task<(ErrorDeAplicacion? Error, List<ReservaDeLimite> Reservas)> ReservarLosLimitesDelSegundoFactor(Guid usuarioId, CancellationToken cancelacion)
-    {
-        var reservas = new List<ReservaDeLimite>();
-        var sujeto = usuarioId.ToString("N");
-        var porOrigen = await limites.Reservar(PoliticasDeLimite.SegundoFactorPorOrigen, sujeto, cancelacion: cancelacion).ConfigureAwait(false);
-        if (LimitesDeIdentidad.Rechazo(porOrigen) is { } rechazoPorOrigen)
-        {
-            return (rechazoPorOrigen, reservas);
-        }
-
-        if (porOrigen.Reserva is { } reservaPorOrigen)
-        {
-            reservas.Add(reservaPorOrigen);
-        }
-
-        var porCuenta = await limites.Reservar(PoliticasDeLimite.SegundoFactorPorCuenta, sujeto, cancelacion: cancelacion).ConfigureAwait(false);
-        if (porCuenta.Reserva is { } reservaPorCuenta)
-        {
-            reservas.Add(reservaPorCuenta);
-        }
-
-        return (LimitesDeIdentidad.Rechazo(porCuenta), reservas);
-    }
-
-    private async Task DevolverLosCupos(IEnumerable<ReservaDeLimite> reservas, CancellationToken cancelacion)
-    {
-        foreach (var reserva in reservas)
-        {
-            await limites.Liberar(reserva, cancelacion).ConfigureAwait(false);
-        }
     }
 }

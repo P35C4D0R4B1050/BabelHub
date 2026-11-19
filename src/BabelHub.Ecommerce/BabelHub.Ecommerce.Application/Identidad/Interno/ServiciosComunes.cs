@@ -102,7 +102,16 @@ public sealed class EmisionDeCodigos(ICodigosDeUnSoloUso codigos, IHuellasDeIden
     /// <summary>El motivo del catálogo cerrado para una dependencia no necesaria que falló (el correo de un código): la alerta técnica de IDE-65.</summary>
     public const string MotivoDeFallaDelCorreo = "dependencia-no-necesaria-fallida";
 
-    public async Task Emitir(Usuario usuario, DominioProposito proposito, CancellationToken cancelacion)
+    public Task Emitir(Usuario usuario, DominioProposito proposito, CancellationToken cancelacion)
+    {
+        ArgumentNullException.ThrowIfNull(usuario);
+        return EmitirA(usuario, usuario.Correo, proposito, cancelacion);
+    }
+
+    /// <summary>
+    /// Emite el código y lo envía a <paramref name="correoDestino"/>: la dirección registrada del titular, o la <b>del correo nuevo guardado en el cambio de correo en curso</b> (nunca la de la solicitud en vuelo, SEG-28).
+    /// </summary>
+    public async Task EmitirA(Usuario usuario, string correoDestino, DominioProposito proposito, CancellationToken cancelacion)
     {
         ArgumentNullException.ThrowIfNull(usuario);
         var ahora = reloj.Ahora;
@@ -112,7 +121,7 @@ public sealed class EmisionDeCodigos(ICodigosDeUnSoloUso codigos, IHuellasDeIden
 
         try
         {
-            var mensaje = CorreoDeCodigo.ParaElTitular(usuario.Correo, PropositoDelCorreoDe(proposito), new ValorSecreto(codigo));
+            var mensaje = CorreoDeCodigo.ParaElTitular(correoDestino, PropositoDelCorreoDe(proposito), new ValorSecreto(codigo));
             await correo.EnviarCodigo(mensaje, cancelacion).ConfigureAwait(false);
         }
         catch (Exception) when (!cancelacion.IsCancellationRequested)
@@ -158,6 +167,9 @@ public sealed class EventosDeSeguridadDeIdentidad(IRegistroDeSeguridad registro)
 
     public Task RenovacionReutilizada(Guid usuarioId, CancellationToken cancelacion) =>
         Registrar(AccionesAuditables.RenovacionReutilizada, "reutilizacion-de-renovacion", usuarioId, cancelacion);
+
+    public Task CambioDeCorreoRechazado(Guid usuarioId, CancellationToken cancelacion) =>
+        Registrar(AccionesAuditables.CambioDeCorreoNoReconocidoRechazado, "rechazado-por-el-titular", usuarioId, cancelacion);
 
     public Task RecuperacionSolicitada(Guid? usuarioId, CancellationToken cancelacion) =>
         Registrar(AccionesAuditables.RecuperacionDeAccesoSolicitada, "solicitud-de-recuperacion", usuarioId, cancelacion);

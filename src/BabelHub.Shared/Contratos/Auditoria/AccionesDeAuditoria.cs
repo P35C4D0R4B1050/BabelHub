@@ -118,6 +118,20 @@ public static class AccionesDeAuditoria
     /// <summary>Pagos eliminó el contacto de entrega de una o varias intenciones (cantidad, sin datos personales, PAG-27).</summary>
     public const string ContactoDeEntregaLiberado = "ContactoDeEntregaLiberado";
 
+    public const string FusionDeCarritoAplicada = "FusionDeCarritoAplicada";
+
+    public const string EdicionesRetiradasDeCarritos = "EdicionesRetiradasDeCarritos";
+
+    public const string CheckoutTerminado = "CheckoutTerminado";
+
+    public const string CarritoEliminadoPorIdentidad = "CarritoEliminadoPorIdentidad";
+
+    public const string PurgaDeCarritosRealizada = "PurgaDeCarritosRealizada";
+
+    public const string PasoAlPagoAbortado = "PasoAlPagoAbortado";
+
+    public const string PasoAlPagoIniciado = "PasoAlPagoIniciado";
+
     public const string IngresoFallido = "IngresoFallido";
 
     public const string LicenciaCambiada = "LicenciaCambiada";
@@ -260,6 +274,13 @@ public static class AccionesDeAuditoria
         ReembolsoResuelto,
         PasoDeCompensacionHecho,
         ContactoDeEntregaLiberado,
+        FusionDeCarritoAplicada,
+        EdicionesRetiradasDeCarritos,
+        CheckoutTerminado,
+        CarritoEliminadoPorIdentidad,
+        PurgaDeCarritosRealizada,
+        PasoAlPagoAbortado,
+        PasoAlPagoIniciado,
         LicenciaCambiada,
         LimiteExcedido,
         LlamadaEntreServiciosSinCredencial,

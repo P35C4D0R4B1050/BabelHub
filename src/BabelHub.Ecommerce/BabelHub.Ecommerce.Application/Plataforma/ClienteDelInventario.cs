@@ -39,6 +39,12 @@ public record ResultadoDelInventario
     /// <summary>El estado HTTP de una respuesta rechazada o limitada; <see langword="null"/> si no hubo respuesta.</summary>
     public int? EstadoHttp { get; }
 
+    /// <summary>En un rechazo por falta de stock (<c>INV-STOCK-INSUFICIENTE</c>, 409): las líneas que no alcanzan y lo máximo que hay en la red (CAR-04, CAR-27); ninguna se reservó.</summary>
+    public IReadOnlyList<LineaSinStockDelInventario>? LineasSinStock { get; init; }
+
+    /// <summary>En un rechazo por límite (429): el motivo (la clave de la política), la espera sugerida y desde cuándo se puede reintentar (SEG-07).</summary>
+    public RechazoPorLimiteDelInventario? Limite { get; init; }
+
     public static ResultadoDelInventario Correcta { get; } = new(EstadoDeLlamadaAlInventario.Exitosa, null, null);
 
     public static ResultadoDelInventario Rechazo(int estadoHttp, string? codigo) => new(EstadoDeLlamadaAlInventario.Rechazada, codigo, estadoHttp);
@@ -140,6 +146,69 @@ public interface IClienteDelInventario
     /// </summary>
     Task<ResultadoDelInventario> DarDeBajaAlTitular(Guid titularId, CancellationToken cancelacion = default);
 
+    /// <summary>
+    /// <c>inventario.reservas.consulta-previa</c>: qué fuente se seleccionaría para cada línea impresa, sin reservar (alcance de lectura, sin token; SEL-20). Una lectura: se puede reintentar. Reenvía el origen del cliente final
+    /// si la solicitud en curso lo tiene (SEG-17).
+    /// </summary>
+    Task<ResultadoDelInventario<RespuestaDeConsultaPrevia>> ConsultarPrevia(ConsultaPrevia consulta, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// <c>inventario.reservas.crear</c>: reserva los impresos de un pedido, todas las líneas o ninguna (token del usuario, clave de idempotencia obligatoria; SEL-01). <b>Un 409 de stock</b> trae <see cref="ResultadoDelInventario.LineasSinStock"/>;
+    /// <b>un 429</b> trae <see cref="ResultadoDelInventario.Limite"/> (con el instante de reintento). Repetir la clave con la misma carga devuelve la reserva original.
+    /// </summary>
+    Task<ResultadoDelInventario<ReservaDelInventario>> Reservar(SolicitudDeReservaDeStock solicitud, string claveDeIdempotencia, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// <c>inventario.reservas.liberar</c>: libera la reserva de un pedido o solo algunas líneas (<paramref name="lineaIds"/> nulo o vacío son todas), con un motivo del contrato (alcance <c>expiracion-de-reservas</c>, sin token; SEL-07). Repetirla no cambia el stock,
+    /// así que se puede reintentar.
+    /// </summary>
+    Task<ResultadoDelInventario<ReservaDelInventario>> Liberar(Guid pedidoId, string motivo, IReadOnlyList<Guid>? lineaIds = null, CancellationToken cancelacion = default);
+
     /// <summary><c>inventario.sucursales.listar</c>: las sucursales para elegir recojo o sucursal preferida (alcance de lectura, sin token).</summary>
     Task<ResultadoDelInventario<IReadOnlyList<SucursalPublica>>> ListarSucursales(CancellationToken cancelacion = default);
 }
+
+// ---------- Reservas (consulta previa, reservar y liberar; contrato v1 de reservas) ----------
+
+/// <summary>Cómo recibe la persona un pedido con impresos (CAR-08).</summary>
+public enum TipoDeEntregaDeLaReserva
+{
+    Recojo,
+    Domicilio,
+}
+
+/// <summary>Una línea impresa de un carrito o pedido: su identificador (el que asigna el E-commerce), la edición y la cantidad.</summary>
+public sealed record LineaDeSolicitud(Guid LineaId, Guid EdicionId, int Cantidad);
+
+/// <summary>
+/// La consulta previa de la selección de fuentes de un carrito, sin reservar (SEL-20). Recojo: <see cref="CodigoDeSucursalDeRecojo"/>; domicilio: <see cref="RegionDeEntrega"/>, el identificador de región de la dirección en
+/// minúsculas y con guiones.
+/// </summary>
+public sealed record ConsultaPrevia(TipoDeEntregaDeLaReserva Tipo, string? CodigoDeSucursalDeRecojo, string? RegionDeEntrega, IReadOnlyList<LineaDeSolicitud> Lineas);
+
+/// <summary>La fuente que se seleccionaría para una línea (o la falta de stock), si implica traslado y su plazo en días (<see langword="null"/> es «a confirmar», FUE-13).</summary>
+public sealed record SeleccionDeLineaDelInventario(Guid LineaId, Guid EdicionId, bool Disponible, string? CodigoDeFuente, bool RequiereTraslado, int? PlazoEstimadoDias, int DisponibleEnLaRed);
+
+/// <summary>La respuesta de la consulta previa: una entrada por línea impresa; las digitales se ignoran (SEL-20).</summary>
+public sealed record RespuestaDeConsultaPrevia(IReadOnlyList<SeleccionDeLineaDelInventario> Lineas, DateTimeOffset ConsultadaEn);
+
+/// <summary>
+/// La reserva de los impresos de un pedido (SEL-01): todas las líneas o ninguna. <see cref="PedidoId"/> es el identificador opaco que el E-commerce asigna al iniciar el pago; repetirlo con una reserva pendiente la
+/// reemplaza (SEL-16). Expira a los 15 minutos de crearla.
+/// </summary>
+public sealed record SolicitudDeReservaDeStock(Guid PedidoId, TipoDeEntregaDeLaReserva Tipo, string? CodigoDeSucursalDeRecojo, string? RegionDeEntrega, IReadOnlyList<LineaDeSolicitud> Lineas);
+
+/// <summary>Una línea reservada con la fuente asignada (nunca se divide entre fuentes, SEL-25).</summary>
+public sealed record LineaReservada(Guid LineaId, Guid EdicionId, int Cantidad, string Estado, string CodigoDeFuente, bool RequiereTraslado, int? PlazoEstimadoDias);
+
+/// <summary>Un traslado vinculado a un pedido; la fecha estimada es <see langword="null"/> si la ruta no está definida (TRA-21).</summary>
+public sealed record TrasladoDeLaReserva(Guid TrasladoId, Guid EdicionId, int Cantidad, string CodigoDeOrigen, string CodigoDeDestino, string Estado, DateOnly? FechaEstimadaDeLlegada);
+
+/// <summary>La reserva de un pedido tal como la devuelve el Inventario; los traslados solo traen contenido después de confirmarla (SEL-03).</summary>
+public sealed record ReservaDelInventario(Guid PedidoId, string Estado, DateTimeOffset CreadaEn, DateTimeOffset? ExpiraEn, IReadOnlyList<LineaReservada> Lineas, IReadOnlyList<TrasladoDeLaReserva> Traslados);
+
+/// <summary>Una línea sin stock suficiente y lo máximo que hay en la red (CAR-04, CAR-27).</summary>
+public sealed record LineaSinStockDelInventario(Guid LineaId, Guid EdicionId, int Solicitada, int DisponibleEnLaRed);
+
+/// <summary>Un rechazo por límite: la clave de la política, la espera sugerida y el instante desde el que se puede reintentar. La respuesta es la misma para todos los motivos (SEL-15).</summary>
+public sealed record RechazoPorLimiteDelInventario(string Motivo, int EsperaEnSegundos, DateTimeOffset DisponibleDesde);

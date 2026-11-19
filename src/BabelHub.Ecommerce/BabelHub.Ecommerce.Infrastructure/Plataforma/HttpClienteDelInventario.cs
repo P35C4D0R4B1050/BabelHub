@@ -191,6 +191,135 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
         return resultado.Exitosa ? ResultadoDelInventario.Correcta : ComoSinValor(resultado);
     }
 
+    public Task<ResultadoDelInventario<RespuestaDeConsultaPrevia>> ConsultarPrevia(ConsultaPrevia consulta, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(consulta);
+        ValidarLasLineas(consulta.Lineas, nameof(consulta));
+        ValidarLaEntrega(consulta.Tipo, consulta.CodigoDeSucursalDeRecojo, consulta.RegionDeEntrega, nameof(consulta));
+
+        var cuerpo = JsonSerializer.Serialize(new ConsultaPreviaDto(TextoDelTipo(consulta.Tipo), consulta.CodigoDeSucursalDeRecojo, consulta.RegionDeEntrega, ALasLineasDelContrato(consulta.Lineas)), Json);
+        var pedidas = consulta.Lineas.ToDictionary(l => l.LineaId);
+        return Pedir(
+            HttpMethod.Post,
+            $"{RutasDeServicio.Inventario}/reservas/consulta-previa",
+            AlcanceDeServicio.LecturaDeDisponibilidad,
+            cuerpo,
+            claveDeIdempotencia: null,
+            conOrigen: true,
+            texto =>
+            {
+                var dto = JsonSerializer.Deserialize<ConsultaPreviaRespuestaDto>(texto, Json) ?? throw new JsonException("La respuesta no es una consulta previa.");
+                var vistas = new HashSet<Guid>();
+                var lineas = (dto.Lineas ?? throw new JsonException("Faltan las líneas.")).Select(l =>
+                {
+                    if (!pedidas.TryGetValue(l.LineaId, out var pedida) || pedida.EdicionId != l.EdicionId || !vistas.Add(l.LineaId) || l.DisponibleEnLaRed < 0 || l.PlazoEstimadoDias is < 0)
+                    {
+                        throw new JsonException("Una línea no es de las pedidas o no cumple el contrato.");
+                    }
+
+                    var disponible = l.Resultado == ResultadosDeSeleccion.Disponible;
+                    return !disponible && l.Resultado != ResultadosDeSeleccion.SinStock
+                        ? throw new JsonException("El resultado de una línea no es del contrato.")
+                        : new SeleccionDeLineaDelInventario(l.LineaId, l.EdicionId, disponible, l.CodigoDeFuente, l.RequiereTraslado, l.PlazoEstimadoDias, l.DisponibleEnLaRed);
+                }).ToList();
+                return new RespuestaDeConsultaPrevia(lineas, dto.ConsultadaEn);
+            },
+            cancelacion,
+            HttpStatusCode.OK);
+    }
+
+    public Task<ResultadoDelInventario<ReservaDelInventario>> Reservar(SolicitudDeReservaDeStock solicitud, string claveDeIdempotencia, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(solicitud);
+        if (solicitud.PedidoId == Guid.Empty)
+        {
+            throw new ArgumentException("La reserva necesita el identificador opaco del pedido.", nameof(solicitud));
+        }
+
+        ValidarLasLineas(solicitud.Lineas, nameof(solicitud));
+        ValidarLaEntrega(solicitud.Tipo, solicitud.CodigoDeSucursalDeRecojo, solicitud.RegionDeEntrega, nameof(solicitud));
+        if (string.IsNullOrEmpty(claveDeIdempotencia) || !ClaveValida.IsMatch(claveDeIdempotencia))
+        {
+            throw new ArgumentException("La clave de idempotencia tiene de 16 a 80 caracteres de [A-Za-z0-9_-].", nameof(claveDeIdempotencia));
+        }
+
+        var cuerpo = JsonSerializer.Serialize(new CrearReservaDto(solicitud.PedidoId, TextoDelTipo(solicitud.Tipo), solicitud.CodigoDeSucursalDeRecojo, solicitud.RegionDeEntrega, ALasLineasDelContrato(solicitud.Lineas)), Json);
+        return Pedir(
+            HttpMethod.Post,
+            $"{RutasDeServicio.Inventario}/reservas",
+            AlcanceDeServicio.OperacionDeUsuario,
+            cuerpo,
+            claveDeIdempotencia,
+            conOrigen: false,
+            texto => AReserva(JsonSerializer.Deserialize<ReservaDto>(texto, Json) ?? throw new JsonException("La respuesta no es una reserva."), solicitud.PedidoId, solicitud.Lineas.Select(l => l.LineaId).ToHashSet()),
+            cancelacion,
+            HttpStatusCode.Created);
+    }
+
+    public Task<ResultadoDelInventario<ReservaDelInventario>> Liberar(Guid pedidoId, string motivo, IReadOnlyList<Guid>? lineaIds = null, CancellationToken cancelacion = default)
+    {
+        if (pedidoId == Guid.Empty || !MotivosDeLiberacion.Todos.Contains(motivo) || lineaIds is not null && (lineaIds.Count > LimitesDeContrato.MaximoDeLineasPorReserva || lineaIds.Any(id => id == Guid.Empty)))
+        {
+            throw new ArgumentException("La liberación necesita el pedido, un motivo del contrato y, si lleva líneas, hasta el tope de líneas con identificador.");
+        }
+
+        var cuerpo = JsonSerializer.Serialize(new LiberarReservaDto(motivo, lineaIds is { Count: > 0 } ? [.. lineaIds] : null), Json);
+        return Pedir(
+            HttpMethod.Post,
+            $"{RutasDeServicio.Inventario}/reservas/{pedidoId:D}/liberar",
+            AlcanceDeServicio.ExpiracionDeReservas,
+            cuerpo,
+            claveDeIdempotencia: null,
+            conOrigen: false,
+            texto => AReserva(JsonSerializer.Deserialize<ReservaDto>(texto, Json) ?? throw new JsonException("La respuesta no es una reserva."), pedidoId, lineasPedidas: null),
+            cancelacion,
+            HttpStatusCode.OK);
+    }
+
+    private static void ValidarLasLineas(IReadOnlyList<LineaDeSolicitud> lineas, string parametro)
+    {
+        if (lineas is null || lineas.Count is 0 or > LimitesDeContrato.MaximoDeLineasPorReserva
+            || lineas.Any(l => l.LineaId == Guid.Empty || l.EdicionId == Guid.Empty || l.Cantidad < 1)
+            || lineas.Select(l => l.LineaId).Distinct().Count() != lineas.Count)
+        {
+            throw new ArgumentException($"La solicitud lleva de 1 a {LimitesDeContrato.MaximoDeLineasPorReserva} líneas distintas, con identificador y cantidad positiva.", parametro);
+        }
+    }
+
+    private static void ValidarLaEntrega(TipoDeEntregaDeLaReserva tipo, string? sucursal, string? region, string parametro)
+    {
+        var correcta = tipo == TipoDeEntregaDeLaReserva.Recojo
+            ? !string.IsNullOrWhiteSpace(sucursal) && string.IsNullOrWhiteSpace(region)
+            : !string.IsNullOrWhiteSpace(region) && string.IsNullOrWhiteSpace(sucursal);
+        if (!correcta)
+        {
+            throw new ArgumentException("El recojo lleva la sucursal y el domicilio, la región; nunca los dos.", parametro);
+        }
+    }
+
+    private static string TextoDelTipo(TipoDeEntregaDeLaReserva tipo) => tipo == TipoDeEntregaDeLaReserva.Recojo ? TiposDeEntrega.Recojo : TiposDeEntrega.Domicilio;
+
+    private static List<LineaDeSolicitudDto> ALasLineasDelContrato(IReadOnlyList<LineaDeSolicitud> lineas) => [.. lineas.Select(l => new LineaDeSolicitudDto(l.LineaId, l.EdicionId, l.Cantidad))];
+
+    /// <summary>La reserva del contrato con sus valores validados: la del pedido pedido y, si se sabe, solo con líneas de las pedidas (la liberación no las conoce).</summary>
+    private static ReservaDelInventario AReserva(ReservaDto dto, Guid pedidoId, HashSet<Guid>? lineasPedidas)
+    {
+        if (dto.PedidoId != pedidoId || string.IsNullOrWhiteSpace(dto.Estado) || !EstadosDeReserva.Todos.Contains(dto.Estado))
+        {
+            throw new JsonException("La reserva devuelta no es la del pedido o su estado no es del contrato.");
+        }
+
+        var lineas = (dto.Lineas ?? throw new JsonException("Faltan las líneas.")).Select(l =>
+            l.LineaId == Guid.Empty || l.EdicionId == Guid.Empty || l.Cantidad < 1 || string.IsNullOrWhiteSpace(l.CodigoDeFuente) || l.PlazoEstimadoDias is < 0 || (lineasPedidas is not null && !lineasPedidas.Contains(l.LineaId))
+                ? throw new JsonException("Una línea de la reserva no cumple el contrato o no es de las pedidas.")
+                : new LineaReservada(l.LineaId, l.EdicionId, l.Cantidad, l.Estado ?? string.Empty, l.CodigoDeFuente, l.RequiereTraslado, l.PlazoEstimadoDias)).ToList();
+        var traslados = (dto.Traslados ?? []).Select(t =>
+            t.TrasladoId == Guid.Empty || t.Cantidad < 1 || string.IsNullOrWhiteSpace(t.CodigoDeOrigen) || string.IsNullOrWhiteSpace(t.CodigoDeDestino)
+                ? throw new JsonException("Un traslado de la reserva no cumple el contrato.")
+                : new TrasladoDeLaReserva(t.TrasladoId, t.EdicionId, t.Cantidad, t.CodigoDeOrigen, t.CodigoDeDestino, t.Estado ?? string.Empty, t.FechaEstimadaDeLlegada)).ToList();
+        return new ReservaDelInventario(dto.PedidoId, dto.Estado, dto.CreadaEn, dto.ExpiraEn, lineas, traslados);
+    }
+
     public Task<ResultadoDelInventario<IReadOnlyList<SucursalPublica>>> ListarSucursales(CancellationToken cancelacion = default) =>
         Pedir<IReadOnlyList<SucursalPublica>>(
             HttpMethod.Get,
@@ -236,7 +365,7 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
         }
 
         // Un POST se reintenta solo si lleva clave de idempotencia, es una consulta con cuerpo (EsLectura del contrato: disponibilidad y pendientes) o es la baja de un titular (repetirla no tiene efecto duplicado): el resto no se repite.
-        if (claveDeIdempotencia is not null || (metodo == HttpMethod.Post && alcance is AlcanceDeServicio.LecturaDeDisponibilidad or AlcanceDeServicio.ConsultaDePendientes or AlcanceDeServicio.BajaDeTitular))
+        if (claveDeIdempotencia is not null || (metodo == HttpMethod.Post && alcance is AlcanceDeServicio.LecturaDeDisponibilidad or AlcanceDeServicio.ConsultaDePendientes or AlcanceDeServicio.BajaDeTitular or AlcanceDeServicio.ExpiracionDeReservas))
         {
             solicitud.ComoIdempotente();
         }
@@ -281,12 +410,15 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
 
             if (respuesta.StatusCode == HttpStatusCode.TooManyRequests)
             {
-                return ResultadoDelInventario<T>.Limitada(await LeerCodigo(respuesta, cancelacion).ConfigureAwait(false));
+                var (codigoLimitado, textoLimitado) = await LeerProblema(respuesta, cancelacion).ConfigureAwait(false);
+                return ResultadoDelInventario<T>.Limitada(codigoLimitado) with { Limite = LeerElLimite(textoLimitado) };
             }
 
             if (respuesta.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.NotFound or HttpStatusCode.Conflict or HttpStatusCode.UnprocessableEntity)
             {
-                return ResultadoDelInventario<T>.Rechazo(estado, await LeerCodigo(respuesta, cancelacion).ConfigureAwait(false));
+                var (codigoRechazado, textoRechazado) = await LeerProblema(respuesta, cancelacion).ConfigureAwait(false);
+                var rechazo = ResultadoDelInventario<T>.Rechazo(estado, codigoRechazado);
+                return codigoRechazado == CodigosDeErrorDelInventario.StockInsuficiente ? rechazo with { LineasSinStock = LeerLasLineasSinStock(textoRechazado) } : rechazo;
             }
 
             return ResultadoDelInventario<T>.SinRespuesta;
@@ -308,20 +440,50 @@ public sealed class HttpClienteDelInventario(IHttpClientFactory fabrica) : IClie
     }
 
     /// <summary>El <c>code</c> estable de un <c>problem+json</c>, solo si tiene la forma de un código del contrato; nunca el título ni el detalle.</summary>
-    private static async Task<string?> LeerCodigo(HttpResponseMessage respuesta, CancellationToken cancelacion)
+    private static async Task<(string? Codigo, string? Texto)> LeerProblema(HttpResponseMessage respuesta, CancellationToken cancelacion)
     {
         try
         {
             var texto = await LeerAcotado(respuesta, MaximoDeBytesDelProblema, cancelacion).ConfigureAwait(false);
             if (texto is null)
             {
-                return null;
+                return (null, null);
             }
 
             var problema = JsonSerializer.Deserialize<ProblemaDto>(texto, Json);
-            return problema is { Code.Length: > 0 and <= 80 } && CodigoDeError.IsMatch(problema.Code) ? problema.Code : null;
+            return (problema is { Code.Length: > 0 and <= 80 } && CodigoDeError.IsMatch(problema.Code) ? problema.Code : null, texto);
         }
         catch (Exception ex) when (ex is JsonException or RegexMatchTimeoutException or IOException or HttpRequestException)
+        {
+            return (null, null);
+        }
+    }
+
+    /// <summary>Los datos de un 429 (<see cref="RespuestaDeLimiteDto"/>), solo si son válidos: la clave de la política, una espera de 0 a un día y el instante de reintento; si no, <see langword="null"/>.</summary>
+    private static RechazoPorLimiteDelInventario? LeerElLimite(string? texto)
+    {
+        try
+        {
+            var dto = texto is null ? null : JsonSerializer.Deserialize<RespuestaDeLimiteDto>(texto, Json);
+            return dto is { Motivo.Length: > 0 and <= 80, RetryAfterSeconds: >= 0 and <= 86_400 } ? new RechazoPorLimiteDelInventario(dto.Motivo, dto.RetryAfterSeconds, dto.DisponibleDesde) : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Las líneas de un 409 de stock (<see cref="ProblemaDeStockDto"/>), solo si son válidas (cantidades positivas, a lo sumo las del tope del contrato); si no, <see langword="null"/>.</summary>
+    private static IReadOnlyList<LineaSinStockDelInventario>? LeerLasLineasSinStock(string? texto)
+    {
+        try
+        {
+            var dto = texto is null ? null : JsonSerializer.Deserialize<ProblemaDeStockDto>(texto, Json);
+            return dto is { Lineas.Count: > 0 and <= LimitesDeContrato.MaximoDeLineasPorReserva } && dto.Lineas.All(l => l.LineaId != Guid.Empty && l.EdicionId != Guid.Empty && l.Solicitada > 0 && l.DisponibleEnLaRed >= 0)
+                ? [.. dto.Lineas.Select(l => new LineaSinStockDelInventario(l.LineaId, l.EdicionId, l.Solicitada, l.DisponibleEnLaRed))]
+                : null;
+        }
+        catch (JsonException)
         {
             return null;
         }

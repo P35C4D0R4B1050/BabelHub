@@ -56,6 +56,19 @@ public static class PoliticasDeLimite
     /// <summary>20 intentos de cobro por origen y hora.</summary>
     public static ClaveDePolitica CobrosPorOrigen { get; } = new("cobros-por-origen");
 
+    /// <summary>Los límites de uso de Carrito (plan de carrito-checkout §6): crear carritos de visitante, editar líneas, revisar el checkout, pasar al pago (falla cerrada) y volver o reiniciar.</summary>
+    public static ClaveDePolitica CarritosDeVisitantePorOrigen { get; } = new("carritos-de-visitante-por-origen");
+
+    public static ClaveDePolitica EdicionDeLineasPorCuenta { get; } = new("edicion-de-lineas-por-cuenta");
+
+    public static ClaveDePolitica EdicionDeLineasPorOrigen { get; } = new("edicion-de-lineas-por-origen");
+
+    public static ClaveDePolitica RevisionDelCheckoutPorCuenta { get; } = new("revision-del-checkout-por-cuenta");
+
+    public static ClaveDePolitica PasosAlPagoPorCuenta { get; } = new("pasos-al-pago-por-cuenta");
+
+    public static ClaveDePolitica VolverOReiniciarPorCuenta { get; } = new("volver-o-reiniciar-por-cuenta");
+
     public static ClaveDePolitica SolicitudesPreviasPorOrigen { get; } = new("solicitudes-previas-por-origen");
 
     public static ClaveDePolitica SolicitudesDelOrigenDesconocido { get; } = new("solicitudes-del-origen-desconocido");
@@ -68,7 +81,8 @@ public static class PoliticasDeLimite
 
     /// <summary>Los límites generales de uso (con respaldo local), aparte de las políticas críticas de <see cref="Todas"/>.</summary>
     public static IReadOnlyList<ClaveDePolitica> Generales { get; } =
-        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen, ConsultasDeHojasPorUsuario];
+        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen, ConsultasDeHojasPorUsuario,
+         CarritosDeVisitantePorOrigen, EdicionDeLineasPorCuenta, EdicionDeLineasPorOrigen, RevisionDelCheckoutPorCuenta, VolverOReiniciarPorCuenta];
 
     public static IReadOnlyList<ClaveDePolitica> Todas { get; } =
     [
@@ -81,5 +95,6 @@ public static class PoliticasDeLimite
         CobrosPorIntencion,
         CobrosPorCuenta,
         CobrosPorOrigen,
+        PasosAlPagoPorCuenta,
     ];
 }

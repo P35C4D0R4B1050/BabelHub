@@ -72,6 +72,20 @@ internal sealed class EntornoDeIdentidad
 
     public DenegacionesDePrueba Denegaciones { get; } = new();
 
+    public CancelacionDeAvisosDePrueba CancelacionDeAvisos { get; } = new();
+
+    public AvisosDeCuentaEnMemoria AvisosGuardados { get; }
+
+    public DispositivosEnMemoria Dispositivos { get; }
+
+    public CambiosDeCorreoEnMemoria Cambios { get; }
+
+    public SolicitudesDeDatosEnMemoria SolicitudesGuardadas { get; }
+
+    public CancelacionesEnMemoria CancelacionesGuardadas { get; }
+
+    public EjecutorDeCancelacionDePrueba Ejecutor { get; }
+
     public AvisosDeCuenta Avisos { get; }
 
     public RevocacionDeSesiones Revocacion { get; }
@@ -87,6 +101,12 @@ internal sealed class EntornoDeIdentidad
         Unidad = new UnidadDeTrabajoEnMemoria(Bd);
         Carrito = new CarritoDePrueba(Bd);
         Cuentas = new RepositorioDeCuentasEnMemoria(Bd);
+        AvisosGuardados = new AvisosDeCuentaEnMemoria(Bd);
+        Dispositivos = new DispositivosEnMemoria(Bd);
+        Cambios = new CambiosDeCorreoEnMemoria(Bd);
+        SolicitudesGuardadas = new SolicitudesDeDatosEnMemoria(Bd);
+        CancelacionesGuardadas = new CancelacionesEnMemoria(Bd);
+        Ejecutor = new EjecutorDeCancelacionDePrueba(Reloj);
         Renovaciones = new RenovacionesEnMemoria(Bd);
         Desafios = new DesafiosEnMemoria(Bd);
         Auditoria = new AuditoriaDePrueba(Bd);
@@ -162,4 +182,137 @@ internal static class EntornoDeIdentidadExtensiones
     /// <summary>El código TOTP que mostraría la aplicación de autenticación en el instante del reloj del entorno (con un desplazamiento opcional de pasos).</summary>
     public static string Totp(this EntornoDeIdentidad e, byte[] secreto, int pasos = 0) =>
         Domain.Identidad.Totp.Codigo(secreto, Domain.Identidad.Totp.PasoDe(e.Reloj.Ahora) + pasos);
+}
+
+internal static class EntornoDeLaCuentaExtensiones
+{
+    public static Reautenticacion Reautenticacion(this EntornoDeIdentidad e) =>
+        new(e.Hasher, e.Limites, e.Huellas, e.SegundoFactor, e.Cifrador, e.HuellasDeIdentidad, e.Eventos, e.Reloj);
+
+    public static GestionDeLaCuenta Gestion(this EntornoDeIdentidad e) => new(
+        e.Cuentas,
+        new AlcanceDeLaCuenta(e.Actor, e.Denegaciones),
+        e.Confianza(),
+        e.Reautenticacion(),
+        e.Limites,
+        new ListaDeContrasenasDePrueba(),
+        e.Hasher,
+        e.Secretos,
+        e.HuellasDeIdentidad,
+        e.Cifrador,
+        e.SegundoFactor,
+        e.Renovaciones,
+        e.Revocacion,
+        e.AvisosGuardados,
+        e.CancelacionDeAvisos,
+        e.Avisos,
+        e.Unidad,
+        e.Auditoria,
+        e.Reloj);
+
+    /// <summary>Hace que el actor de la prueba sea el cliente dado (la persona autenticada).</summary>
+    public static void ActuarComo(this EntornoDeIdentidad e, CuentaDeIdentidad cuenta) =>
+        e.Actor.Actual = ActorActual.DeUsuario(cuenta.Usuario.Id, "cliente");
+}
+
+internal static class EntornoDeLaAdministracionExtensiones
+{
+    public static AdministracionDeUsuarios Administracion(this EntornoDeIdentidad e) => new(
+        e.Cuentas,
+        new AlcanceDeLaCuenta(e.Actor, e.Denegaciones),
+        e.Hasher,
+        e.Secretos,
+        e.SegundoFactor,
+        e.Revocacion,
+        e.CancelacionDeAvisos,
+        e.Avisos,
+        e.Unidad,
+        e.Auditoria,
+        e.Reloj);
+
+    /// <summary>Siembra un administrador central activo y hace que sea el actor de la prueba.</summary>
+    public static CuentaDeIdentidad ActuarComoAdministrador(this EntornoDeIdentidad e, string correo = "admin@example.com")
+    {
+        var admin = e.Cuenta(correo, RolDeUsuario.AdministradorCentral);
+        e.Actor.Actual = ActorActual.DeUsuario(admin.Usuario.Id, "administrador-central");
+        return admin;
+    }
+}
+
+internal static class EntornoDelCambioDeCorreoExtensiones
+{
+    public static ConfianzaDelDispositivo Confianza(this EntornoDeIdentidad e) => new(e.Dispositivos, e.Cambios, e.HuellasDeIdentidad, e.Reloj);
+
+    public static CambioDeCorreo CambioDeCorreo(this EntornoDeIdentidad e) => new(
+        e.Cuentas,
+        new AlcanceDeLaCuenta(e.Actor, e.Denegaciones),
+        e.Reautenticacion(),
+        e.Confianza(),
+        e.Dispositivos,
+        e.Cambios,
+        e.EmisionDeCodigos,
+        e.Codigos,
+        e.HuellasDeIdentidad,
+        e.Secretos,
+        e.Limites,
+        e.Huellas,
+        e.AvisosGuardados,
+        e.Avisos,
+        e.Eventos,
+        e.Unidad,
+        e.Auditoria,
+        e.Reloj);
+
+    public static DispositivosDeLaCuenta DispositivosDeLaCuenta(this EntornoDeIdentidad e) =>
+        new(new AlcanceDeLaCuenta(e.Actor, e.Denegaciones), e.Dispositivos, e.HuellasDeIdentidad, e.Secretos, e.Unidad, e.Reloj);
+
+    /// <summary>Siembra un dispositivo ya reconocido (con la antigüedad que exige el Dominio) y devuelve su marca en claro.</summary>
+    public static ValorSecreto DispositivoReconocido(this EntornoDeIdentidad e, CuentaDeIdentidad cuenta, string region = "PE", int diasDeAntiguedad = 5)
+    {
+        var marca = e.Secretos.ValorOpaco();
+        e.Bd.Dispositivos.Add(Dispositivo.Emitir(cuenta.Usuario.Id, e.HuellasDeIdentidad.DeValorOpaco(marca), region, e.Reloj.Ahora.AddDays(-diasDeAntiguedad)));
+        return new ValorSecreto(marca);
+    }
+}
+
+internal static class EntornoDeLasSolicitudesExtensiones
+{
+    public static AtencionDeSolicitudesDeDatos Solicitudes(this EntornoDeIdentidad e) => new(
+        e.Cuentas,
+        new AlcanceDeLaCuenta(e.Actor, e.Denegaciones),
+        new AlcanceDeLaAdministracion(new AlcanceDeLaCuenta(e.Actor, e.Denegaciones), e.Cuentas),
+        e.SolicitudesGuardadas,
+        e.AvisosGuardados,
+        e.Avisos,
+        e.Secretos,
+        e.Unidad,
+        e.Auditoria,
+        e.Reloj);
+}
+
+internal static class EntornoDeLaCancelacionExtensiones
+{
+    public static CancelacionDeCuenta Cancelacion(this EntornoDeIdentidad e) => new(
+        e.Cuentas,
+        new AlcanceDeLaCuenta(e.Actor, e.Denegaciones),
+        e.Reautenticacion(),
+        e.CancelacionesGuardadas,
+        e.Pendientes,
+        e.Ejecutor,
+        e.AvisosGuardados,
+        e.Avisos,
+        e.Secretos,
+        e.Unidad,
+        e.Auditoria,
+        e.Reloj);
+
+    public static RevisionDeLasCancelaciones Revision(this EntornoDeIdentidad e) => new(
+        e.Cuentas,
+        e.CancelacionesGuardadas,
+        e.Pendientes,
+        e.AvisosGuardados,
+        e.Avisos,
+        e.Unidad,
+        e.Auditoria,
+        e.Reloj);
 }

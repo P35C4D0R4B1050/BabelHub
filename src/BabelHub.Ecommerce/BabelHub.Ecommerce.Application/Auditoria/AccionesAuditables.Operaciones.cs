@@ -43,6 +43,27 @@ public static partial class AccionesAuditables
     /// <summary>Pagos eliminó el contacto de entrega de una o varias intenciones (cantidad, sin datos personales, PAG-27).</summary>
     public static readonly AccionAuditable ContactoDeEntregaLiberado = new(nameof(ContactoDeEntregaLiberado));
 
+    /// <summary>Carrito aplicó una fusión del carrito de visitante a la cuenta (cuántas líneas aportó y los motivos de los ajustes; sin identificar al visitante).</summary>
+    public static readonly AccionAuditable FusionDeCarritoAplicada = new(nameof(FusionDeCarritoAplicada));
+
+    /// <summary>La baja de ediciones se aplicó a los carritos: cuántas ediciones, carritos afectados y líneas quitadas o anotadas con retiro pendiente (sin identificar a nadie).</summary>
+    public static readonly AccionAuditable EdicionesRetiradasDeCarritos = new(nameof(EdicionesRetiradasDeCarritos));
+
+    /// <summary>El checkout terminó por voluntad de la persona (volver o reiniciar), con su motivo de lista cerrada.</summary>
+    public static readonly AccionAuditable CheckoutTerminado = new(nameof(CheckoutTerminado));
+
+    /// <summary>Identidad pidió eliminar el carrito y los datos de entrega de una cuenta (reemplazo, cancelación o cuenta inactiva); sin datos personales.</summary>
+    public static readonly AccionAuditable CarritoEliminadoPorIdentidad = new(nameof(CarritoEliminadoPorIdentidad));
+
+    /// <summary>Una corrida de purga de Carrito: cuántos registros eliminó o venció de cada tipo (solo conteos, D09).</summary>
+    public static readonly AccionAuditable PurgaDeCarritosRealizada = new(nameof(PurgaDeCarritosRealizada));
+
+    /// <summary>Se abortó el paso al pago, o lo recuperó el trabajo de fondo, con un motivo cerrado (DD-11); sin datos personales ni identificadores.</summary>
+    public static readonly AccionAuditable PasoAlPagoAbortado = new(nameof(PasoAlPagoAbortado));
+
+    /// <summary>Se pasó al pago (intención creada y checkout en pago): con o sin impresos y el tipo de entrega; sin contacto, cuenta ni pedido (D13).</summary>
+    public static readonly AccionAuditable PasoAlPagoIniciado = new(nameof(PasoAlPagoIniciado));
+
     /// <summary>Un reingreso de stock por una devolución recibida.</summary>
     public static readonly AccionAuditable ReingresoPorDevolucion = new(nameof(ReingresoPorDevolucion));
 

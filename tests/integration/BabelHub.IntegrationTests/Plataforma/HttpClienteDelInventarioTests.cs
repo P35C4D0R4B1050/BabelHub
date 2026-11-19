@@ -19,6 +19,7 @@ public sealed class HttpClienteDelInventarioTests
     private static readonly string SecretoDeOrigen = "origen-" + Guid.NewGuid().ToString("N");
     private static readonly string SecretoDePendientes = "pendientes-" + Guid.NewGuid().ToString("N");
     private static readonly string SecretoDeBaja = "baja-" + Guid.NewGuid().ToString("N");
+    private static readonly string SecretoDeExpiracion = "expiracion-" + Guid.NewGuid().ToString("N");
     private static readonly string TokenDelUsuario = "jwt." + Guid.NewGuid().ToString("N");
     private static readonly string Clave = "ingreso-" + Guid.NewGuid().ToString("N");
 
@@ -69,6 +70,7 @@ public sealed class HttpClienteDelInventarioTests
             new(AlcanceDeServicio.OrigenReenviado, new ValorSecreto(SecretoDeOrigen)),
             new(AlcanceDeServicio.ConsultaDePendientes, new ValorSecreto(SecretoDePendientes)),
             new(AlcanceDeServicio.BajaDeTitular, new ValorSecreto(SecretoDeBaja)),
+            new(AlcanceDeServicio.ExpiracionDeReservas, new ValorSecreto(SecretoDeExpiracion)),
         ]));
         servicios.AddSingleton<IOrigenDeSolicitud>(new OrigenDePrueba(origen ?? OrigenDeSolicitud.Desconocido));
         var tokenDePrueba = new TokenDePrueba(token == "usar-el-del-usuario" ? TokenDelUsuario : token);
@@ -564,6 +566,165 @@ public sealed class HttpClienteDelInventarioTests
         Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, baja.Estado);
         Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, edicionRegistrada.Estado);
         Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, ingreso.Estado);
+    }
+
+    // ---------- Consulta previa, reservar y liberar (carril de Carrito) ----------
+
+    private static readonly Guid Edicion1 = Guid.NewGuid();
+
+    private static string LineaReserva(Guid lineaId, Guid edicion, int cantidad = 1) =>
+        $"{{\"lineaId\":\"{lineaId}\",\"edicionId\":\"{edicion}\",\"cantidad\":{cantidad},\"estado\":\"pendiente\",\"codigoDeFuente\":\"central\",\"requiereTraslado\":false,\"plazoEstimadoDias\":null}}";
+
+    private static string Reserva(Guid pedido, params string[] lineas) =>
+        $"{{\"pedidoId\":\"{pedido}\",\"estado\":\"pendiente\",\"creadaEn\":\"{DateTimeOffset.UtcNow:O}\",\"expiraEn\":\"{DateTimeOffset.UtcNow.AddMinutes(15):O}\",\"lineas\":[{string.Join(',', lineas)}],\"traslados\":[]}}";
+
+    private static SolicitudDeReservaDeStock SolicitudDeReserva(Guid pedido, Guid linea) =>
+        new(pedido, TipoDeEntregaDeLaReserva.Recojo, "lima", null, [new LineaDeSolicitud(linea, Edicion1, 2)]);
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-04")]
+    public async Task ConsultarPrevia_UsaLaCredencialDeLecturaSinToken_ReenviaElOrigen_YValidaLasLineas()
+    {
+        var linea = Guid.NewGuid();
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json($"{{\"lineas\":[{{\"lineaId\":\"{linea}\",\"edicionId\":\"{Edicion1}\",\"resultado\":\"disponible\",\"codigoDeFuente\":\"central\",\"requiereTraslado\":true,\"plazoEstimadoDias\":null,\"disponibleEnLaRed\":4}}],\"consultadaEn\":\"{DateTimeOffset.UtcNow:O}\"}}")));
+        var origen = new OrigenDeSolicitud(HuellaDeOrigen.Crear("k3Jx9bQ2vT7mYw1ZpLr4NfA8sUe0dHcGiXoVtB5yMqE", "v1"), "203.0.113.7");
+        var (cliente, token) = Crear(servidor, origen: origen);
+
+        var resultado = await cliente.ConsultarPrevia(new ConsultaPrevia(TipoDeEntregaDeLaReserva.Domicilio, null, "lima", [new LineaDeSolicitud(linea, Edicion1, 2)]));
+
+        Assert.True(resultado.Exitosa);
+        var seleccion = Assert.Single(resultado.Valor.Lineas);
+        Assert.True(seleccion.Disponible && seleccion.RequiereTraslado);
+        Assert.Null(seleccion.PlazoEstimadoDias);
+        Assert.Equal("/api/inventario/v1/reservas/consulta-previa", Assert.Single(servidor.Rutas));
+        var cabeceras = Assert.Single(servidor.Cabeceras);
+        Assert.Equal(SecretoDeLectura, cabeceras[CredencialesDeSalidaHandler.CabeceraDeCredencial]);
+        Assert.Equal("203.0.113.7", cabeceras[CredencialesDeSalidaHandler.CabeceraDeOrigenReenviado]);
+        Assert.False(cabeceras.ContainsKey("Authorization"));
+        Assert.Equal(0, token.Pedidos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-04")]
+    public async Task ConsultarPrevia_ConUnaLineaQueNoSePidio_OUnResultadoInventado_EsNoDisponible()
+    {
+        var linea = Guid.NewGuid();
+        var respuestas = new Queue<string>(
+        [
+            $"{{\"lineas\":[{{\"lineaId\":\"{Guid.NewGuid()}\",\"edicionId\":\"{Edicion1}\",\"resultado\":\"disponible\",\"codigoDeFuente\":\"c\",\"requiereTraslado\":false,\"plazoEstimadoDias\":null,\"disponibleEnLaRed\":1}}],\"consultadaEn\":\"{DateTimeOffset.UtcNow:O}\"}}",
+            $"{{\"lineas\":[{{\"lineaId\":\"{linea}\",\"edicionId\":\"{Edicion1}\",\"resultado\":\"quizas\",\"codigoDeFuente\":\"c\",\"requiereTraslado\":false,\"plazoEstimadoDias\":null,\"disponibleEnLaRed\":1}}],\"consultadaEn\":\"{DateTimeOffset.UtcNow:O}\"}}",
+        ]);
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json(respuestas.Dequeue())));
+        var (cliente, _) = Crear(servidor);
+        var consulta = new ConsultaPrevia(TipoDeEntregaDeLaReserva.Recojo, "lima", null, [new LineaDeSolicitud(linea, Edicion1, 1)]);
+
+        Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, (await cliente.ConsultarPrevia(consulta)).Estado);
+        Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, (await cliente.ConsultarPrevia(consulta)).Estado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-12")]
+    public async Task Reservar_LlevaLaClaveElTokenYLaCredencialDeUsuario_YDevuelveLaReservaValidada()
+    {
+        var pedido = Guid.NewGuid();
+        var linea = Guid.NewGuid();
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json(Reserva(pedido, LineaReserva(linea, Edicion1, 2)), HttpStatusCode.Created)));
+        var (cliente, _) = Crear(servidor);
+
+        var resultado = await cliente.Reservar(SolicitudDeReserva(pedido, linea), Clave);
+
+        Assert.True(resultado.Exitosa);
+        Assert.Equal(pedido, resultado.Valor.PedidoId);
+        Assert.Equal("pendiente", resultado.Valor.Estado);
+        Assert.Equal("central", Assert.Single(resultado.Valor.Lineas).CodigoDeFuente);
+        Assert.Equal("/api/inventario/v1/reservas", Assert.Single(servidor.Rutas));
+        var cabeceras = Assert.Single(servidor.Cabeceras);
+        Assert.Equal(Clave, cabeceras["Idempotency-Key"]);
+        Assert.Equal(SecretoDeUsuario, cabeceras[CredencialesDeSalidaHandler.CabeceraDeCredencial]);
+        Assert.Equal("Bearer " + TokenDelUsuario, cabeceras["Authorization"]);
+        SinCabecerasDeActor(cabeceras);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-12")]
+    public async Task Reservar_ConUnaReservaDeOtroPedidoOConLineasAjenas_EsNoDisponible()
+    {
+        var pedido = Guid.NewGuid();
+        var linea = Guid.NewGuid();
+        var respuestas = new Queue<string>([Reserva(Guid.NewGuid(), LineaReserva(linea, Edicion1)), Reserva(pedido, LineaReserva(Guid.NewGuid(), Edicion1))]);
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json(respuestas.Dequeue(), HttpStatusCode.Created)));
+        var (cliente, _) = Crear(servidor);
+
+        Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, (await cliente.Reservar(SolicitudDeReserva(pedido, linea), Clave)).Estado);
+        Assert.Equal(EstadoDeLlamadaAlInventario.NoDisponible, (await cliente.Reservar(SolicitudDeReserva(pedido, linea), Clave)).Estado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-04")]
+    public async Task Reservar_ConUn409DeStock_TraeLasLineasSinStock()
+    {
+        var linea = Guid.NewGuid();
+        var cuerpo = $"{{\"type\":\"about:blank\",\"title\":\"x\",\"status\":409,\"detail\":\"d\",\"code\":\"INV-STOCK-INSUFICIENTE\",\"traceId\":\"t\",\"lineas\":[{{\"lineaId\":\"{linea}\",\"edicionId\":\"{Edicion1}\",\"solicitada\":2,\"disponibleEnLaRed\":1}}]}}";
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Conflict) { Content = new StringContent(cuerpo, Encoding.UTF8, "application/problem+json") }));
+        var (cliente, _) = Crear(servidor);
+
+        var resultado = await cliente.Reservar(SolicitudDeReserva(Guid.NewGuid(), linea), Clave);
+
+        Assert.Equal(EstadoDeLlamadaAlInventario.Rechazada, resultado.Estado);
+        Assert.Equal("INV-STOCK-INSUFICIENTE", resultado.Codigo);
+        var sin = Assert.Single(resultado.LineasSinStock!);
+        Assert.Equal((linea, 2, 1), (sin.LineaId, sin.Solicitada, sin.DisponibleEnLaRed));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-12")]
+    public async Task Reservar_Con429_TraeElMotivoLaEsperaYElInstanteDeReintento()
+    {
+        var disponible = DateTimeOffset.UtcNow.AddMinutes(10);
+        var cuerpo = $"{{\"code\":\"INV-LIMITE-EXCEDIDO\",\"status\":429,\"motivo\":\"reservas-por-hora-por-cliente\",\"retryAfterSeconds\":600,\"disponibleDesde\":\"{disponible:O}\"}}";
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests) { Content = new StringContent(cuerpo, Encoding.UTF8, "application/problem+json") }));
+        var (cliente, _) = Crear(servidor);
+
+        var resultado = await cliente.Reservar(SolicitudDeReserva(Guid.NewGuid(), Guid.NewGuid()), Clave);
+
+        Assert.Equal(EstadoDeLlamadaAlInventario.LimiteExcedido, resultado.Estado);
+        Assert.Equal(("reservas-por-hora-por-cliente", 600), (resultado.Limite!.Motivo, resultado.Limite.EsperaEnSegundos));
+        Assert.Equal(disponible.ToUnixTimeSeconds(), resultado.Limite.DisponibleDesde.ToUnixTimeSeconds());
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-12")]
+    public async Task Reservar_ConArgumentosQueElContratoRechaza_NoSale()
+    {
+        var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json("{}", HttpStatusCode.Created)));
+        var (cliente, _) = Crear(servidor);
+        var pedido = Guid.NewGuid();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.Reservar(SolicitudDeReserva(pedido, Guid.NewGuid()), "corta"));
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.Reservar(new SolicitudDeReservaDeStock(pedido, TipoDeEntregaDeLaReserva.Recojo, "lima", "lima", [new LineaDeSolicitud(Guid.NewGuid(), Edicion1, 1)]), Clave));
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.Reservar(new SolicitudDeReservaDeStock(pedido, TipoDeEntregaDeLaReserva.Recojo, "lima", null, []), Clave));
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.Reservar(new SolicitudDeReservaDeStock(pedido, TipoDeEntregaDeLaReserva.Recojo, "lima", null, [new LineaDeSolicitud(Guid.NewGuid(), Edicion1, 0)]), Clave));
+        Assert.Empty(servidor.Rutas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-14")]
+    public async Task Liberar_UsaLaCredencialDeExpiracionSinToken_SeReintenta_YValidaElMotivo()
+    {
+        var pedido = Guid.NewGuid();
+        var servidor = new ServidorSimulado((_, n) => Task.FromResult(n == 1 ? new HttpResponseMessage(HttpStatusCode.BadGateway) : Json(Reserva(pedido).Replace("\"pendiente\"", "\"liberada\"", StringComparison.Ordinal))));
+        var (cliente, token) = Crear(servidor, opciones: new OpcionesDelClienteDeServicio { ReintentosMaximos = 2, RetrasoDelReintento = TimeSpan.FromMilliseconds(1) });
+
+        var resultado = await cliente.Liberar(pedido, "checkout-cancelado");
+        await Assert.ThrowsAsync<ArgumentException>(() => cliente.Liberar(pedido, "motivo-inventado"));
+
+        Assert.True(resultado.Exitosa);
+        Assert.Equal("liberada", resultado.Valor.Estado);
+        Assert.Equal(2, servidor.Rutas.Count);
+        Assert.All(servidor.Rutas, r => Assert.Equal($"/api/inventario/v1/reservas/{pedido:D}/liberar", r));
+        Assert.All(servidor.Cabeceras, c => Assert.False(c.ContainsKey("Authorization")));
+        Assert.Equal(SecretoDeExpiracion, servidor.Cabeceras[0][CredencialesDeSalidaHandler.CabeceraDeCredencial]);
+        Assert.Equal(0, token.Pedidos);
     }
     [Fact]
     public void ElNombreDelClienteEsElQueRecibeElTokenDeLaSesion() =>

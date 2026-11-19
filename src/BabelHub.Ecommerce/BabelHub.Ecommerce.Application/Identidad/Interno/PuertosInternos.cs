@@ -26,6 +26,9 @@ public sealed class CuentaDeIdentidad
 
     /// <summary>Si la cuenta ya se canceló (IDE-47): no ingresa ni se recupera.</summary>
     public DateTimeOffset? CanceladaEn { get; set; }
+
+    /// <summary>El número de WhatsApp y el consentimiento para los avisos (IDE-11, IDE-31): el número solo lo ve su titular y nunca sale de Identidad.</summary>
+    public ConsentimientoDeWhatsApp Whatsapp { get; set; } = ConsentimientoDeWhatsApp.SinNumero();
 }
 
 /// <summary>El repositorio de cuentas (EF Core, esquema <c>identidad</c>, T33): lo que lee un caso de uso, siempre dentro de la unidad de trabajo del caso de uso.</summary>
@@ -43,6 +46,15 @@ public interface IRepositorioDeCuentas
 
     /// <summary>Elimina una cuenta de cliente sin verificar que se reemplaza (IDE-84): no se hereda ningún dato.</summary>
     Task Eliminar(Guid usuarioId, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Cuántos administradores centrales activos hay. Se llama dentro de la transacción de la administración y <b>toma el bloqueo de sus filas</b> (<c>FOR UPDATE</c>): dos desactivaciones o degradaciones simultáneas
+    /// no pueden dejar el sistema sin administrador (IDE-49, D17).
+    /// </summary>
+    Task<int> ContarAdministradoresActivos(CancellationToken cancelacion = default);
+
+    /// <summary>El encargado activo de la sucursal, si lo hay (IDE-06); el índice único parcial de la base respalda la regla ante dos asignaciones simultáneas.</summary>
+    Task<Domain.Identidad.EncargadoDeSucursal?> EncargadoActivoDe(Guid sucursal, CancellationToken cancelacion = default);
 }
 
 /// <summary>Argon2id (T31): el resumen y la verificación, con el semáforo global de concurrencia y el cálculo señuelo para cuentas inexistentes (D03, IDE-03).</summary>
@@ -156,6 +168,83 @@ public interface ISegundoFactorAlmacen
 
     /// <summary>Consume un código de respaldo con <c>UPDATE … WHERE usado_en IS NULL</c>: <see langword="false"/> si ya estaba usado.</summary>
     Task<bool> ConsumirCodigoDeRespaldo(Guid usuarioId, string huella, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>Desactiva el segundo factor de un cliente (IDE-37): elimina el secreto y los códigos de respaldo.</summary>
+    Task Desactivar(Guid usuarioId, CancellationToken cancelacion = default);
+
+    /// <summary>Reemplaza los códigos de respaldo por otros 8 (IDE-52): los anteriores dejan de servir en la misma operación.</summary>
+    Task ReemplazarCodigosDeRespaldo(Guid usuarioId, IReadOnlyList<string> huellasNuevas, CancellationToken cancelacion = default);
+}
+
+/// <summary>Los avisos de seguridad que se muestran en la cuenta (<c>identidad.avisos_de_cuenta</c>, IDE-53, IDE-76, IDE-79): sin datos sensibles.</summary>
+public interface IAvisosDeCuentaAlmacen
+{
+    Task<IReadOnlyList<AvisoDeCuenta>> Listar(Guid usuarioId, CancellationToken cancelacion = default);
+
+    /// <summary>Marca el aviso del usuario como visto con un <c>UPDATE</c> condicional: <see langword="false"/> si no existe o es de otro usuario.</summary>
+    Task<bool> MarcarVisto(Guid usuarioId, Guid avisoId, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>Deja un aviso en la cuenta (sin datos sensibles: solo el tipo del catálogo y la fecha); se llama dentro de la transacción del hecho que lo causa.</summary>
+    Task Agregar(Guid usuarioId, string tipo, DateTimeOffset ahora, CancellationToken cancelacion = default);
+}
+
+/// <summary>
+/// Los dispositivos reconocidos de un usuario (<c>identidad.dispositivos</c>, IDE-55, D11): solo la huella SHA-256 de la marca y la región. <see cref="Guardar"/> inserta o actualiza por (usuario, huella) y
+/// conserva como máximo <see cref="Maximo"/> por usuario, eliminando los más antiguos: iniciar sesión muchas veces sin la marca no hace crecer la tabla sin límite.
+/// </summary>
+public interface IRepositorioDeDispositivos
+{
+    public const int Maximo = 10;
+
+    Task<IReadOnlyList<Dispositivo>> Listar(Guid usuarioId, CancellationToken cancelacion = default);
+
+    Task Guardar(Dispositivo dispositivo, CancellationToken cancelacion = default);
+}
+
+/// <summary>Las solicitudes sobre datos personales (<c>identidad.solicitudes_de_datos</c>, IDE-12, IDE-26): solo identificador, tipo, estado, fechas y la respuesta o el motivo (IDE-69).</summary>
+public interface IRepositorioDeSolicitudesDeDatos
+{
+    Task Guardar(SolicitudDeDatos solicitud, CancellationToken cancelacion = default);
+
+    /// <summary>La solicitud por su identificador; con <paramref name="paraActualizar"/> toma el bloqueo de su fila: dos respuestas simultáneas no se pisan.</summary>
+    Task<SolicitudDeDatos?> Obtener(Guid solicitudId, bool paraActualizar = false, CancellationToken cancelacion = default);
+
+    Task<IReadOnlyList<SolicitudDeDatos>> DelUsuario(Guid usuarioId, CancellationToken cancelacion = default);
+
+    /// <summary>Todas, para la lista de la administración; la ordenación por fecha límite la hace el Dominio.</summary>
+    Task<IReadOnlyList<SolicitudDeDatos>> Todas(CancellationToken cancelacion = default);
+}
+
+/// <summary>Las solicitudes de cancelación de cuenta (<c>identidad.solicitudes_de_cancelacion</c>, IDE-27, IDE-68, IDE-81): como máximo una abierta (diferida o esperando la reconfirmación) por usuario.</summary>
+public interface IRepositorioDeCancelaciones
+{
+    Task Guardar(SolicitudDeCancelacion solicitud, CancellationToken cancelacion = default);
+
+    /// <summary>La solicitud abierta (diferida o esperando la reconfirmación) del usuario; con <paramref name="paraActualizar"/> toma el bloqueo de su fila.</summary>
+    Task<SolicitudDeCancelacion?> AbiertaDe(Guid usuarioId, bool paraActualizar = false, CancellationToken cancelacion = default);
+
+    /// <summary>La más reciente del usuario, abierta o cerrada.</summary>
+    Task<SolicitudDeCancelacion?> UltimaDe(Guid usuarioId, CancellationToken cancelacion = default);
+
+    /// <summary>Las abiertas para la revisión periódica, con <c>FOR UPDATE SKIP LOCKED</c> en la base: dos revisiones simultáneas no procesan la misma.</summary>
+    Task<IReadOnlyList<SolicitudDeCancelacion>> AbiertasParaRevisar(int limite, CancellationToken cancelacion = default);
+}
+
+/// <summary>
+/// Quien ejecuta la cancelación de la cuenta en una sola transacción (T23, IDE-47, IDE-70, IDE-75): desactiva, revoca, cancela avisos, pide a los módulos anonimizar, desvincular o eliminar, audita y anonimiza. Se llama <b>dentro</b>
+/// de la transacción que reconfirma o solicita; si algo falla lanza y todo se revierte.
+/// </summary>
+public interface IEjecutorDeLaCancelacion
+{
+    Task Ejecutar(CuentaDeIdentidad cuenta, CancellationToken cancelacion = default);
+}
+
+/// <summary>El cambio de correo en curso de un usuario (<c>identidad.cambios_de_correo_pendientes</c>, IDE-53, IDE-54): como máximo uno por usuario; <see cref="Guardar"/> reemplaza el anterior.</summary>
+public interface IRepositorioDeCambiosDeCorreo
+{
+    Task<CambioDeCorreoPendiente?> Obtener(Guid usuarioId, CancellationToken cancelacion = default);
+
+    Task Guardar(CambioDeCorreoPendiente cambio, CancellationToken cancelacion = default);
 }
 
 /// <summary>El cifrado de los secretos del segundo factor (AES-GCM, nonce aleatorio, clave versionada por propósito, AAD ligado al usuario, D04).</summary>
