@@ -139,7 +139,7 @@ public sealed partial class PlantillaDeAviso
         var esIdentificador = campo.Tipo is TipoDeCampo.Identificador or TipoDeCampo.NumeroDePedido;
         var esGuia = campo.Nombre == "numeroDeGuia";
         // El número de guía de un operador puede ser solo de dígitos y largo (13 o más): la heurística de tarjeta no le aplica; su forma cerrada (ASCII, hasta 40) y la ausencia de enlaces bastan.
-        var parecenDigitos = !esGuia && (esIdentificador ? SoloDigitosYSeparadores().IsMatch(valor) && DigitosSeguidos().IsMatch(valor) : DigitosSeguidos().IsMatch(valor));
+        var parecenDigitos = esGuia ? PareceUnNumeroDeTarjeta(valor) : (esIdentificador ? SoloDigitosYSeparadores().IsMatch(valor) && DigitosSeguidos().IsMatch(valor) : DigitosSeguidos().IsMatch(valor));
         if (ParecenEnlaceODireccion().IsMatch(valor) || parecenDigitos)
         {
             return "valor-prohibido";
@@ -178,6 +178,34 @@ public sealed partial class PlantillaDeAviso
 
     [GeneratedRegex("^[0-9]{1,5}\\z", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 250)]
     private static partial Regex FormatoDeLaCantidad();
+
+    /// <summary>Una guía solo de dígitos de 13 a 19 cifras que pasa la comprobación de Luhn es un número de tarjeta, no una guía: no sale en un aviso (NOT-07, SEG-10).</summary>
+    private static bool PareceUnNumeroDeTarjeta(string conSeparadores)
+    {
+        var valor = conSeparadores.Replace("-", string.Empty, StringComparison.Ordinal).Replace(" ", string.Empty, StringComparison.Ordinal);
+        if (valor.Length is < 13 or > 19 || !valor.All(char.IsAsciiDigit))
+        {
+            return false;
+        }
+
+        var suma = 0;
+        for (var i = 0; i < valor.Length; i++)
+        {
+            var cifra = valor[^(i + 1)] - '0';
+            if (i % 2 == 1)
+            {
+                cifra *= 2;
+                if (cifra > 9)
+                {
+                    cifra -= 9;
+                }
+            }
+
+            suma += cifra;
+        }
+
+        return suma % 10 == 0;
+    }
 
     [GeneratedRegex("(://|www\\.|@|\\.(com|pe|net|org|io)\\b)", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 250)]
     private static partial Regex ParecenEnlaceODireccion();

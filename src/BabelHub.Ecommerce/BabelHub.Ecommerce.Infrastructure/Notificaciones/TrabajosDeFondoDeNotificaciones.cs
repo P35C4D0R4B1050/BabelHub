@@ -108,17 +108,17 @@ public sealed class TrabajoDeFondoDeNotificaciones(
 /// <summary>Los trabajos de fondo de Notificaciones con sus nombres estables en <c>plataforma.trabajos_de_fondo</c>, sus intervalos y sus corridas.</summary>
 public static class TrabajosDeNotificaciones
 {
-    /// <summary>Envía los avisos pendientes (NOT-04): cada 30 segundos, por lotes de 25 y hasta 20 lotes por corrida.</summary>
+    /// <summary>Envía los avisos pendientes (NOT-04): cada 30 segundos, por lotes de 10 y hasta 10 lotes por corrida.</summary>
     public const string EnvioDeAvisos = "notificaciones-envio-de-avisos";
 
     /// <summary>Depura los avisos terminados hace más de 90 días (AUD-31): cada 6 horas.</summary>
     public const string PurgaDeAvisos = "notificaciones-purga-de-avisos";
 
-    public static readonly OpcionesDelTrabajoDeNotificaciones OpcionesDelEnvio = new(TimeSpan.FromSeconds(30));
+    public static readonly OpcionesDelTrabajoDeNotificaciones OpcionesDelEnvio = new(TimeSpan.FromSeconds(30), PlazoMaximoDeLaCorrida: TimeSpan.FromMinutes(10));
 
-    public static readonly OpcionesDelTrabajoDeNotificaciones OpcionesDeLaPurga = new(TimeSpan.FromHours(6));
+    public static readonly OpcionesDelTrabajoDeNotificaciones OpcionesDeLaPurga = new(TimeSpan.FromHours(6), FallosSeguidosParaAlertar: 1);
 
-    public const int LotesPorCorrida = 20;
+    public const int LotesPorCorrida = 10;
 
     public static IReadOnlyList<TrabajoDeFondoDeNotificaciones> Todos(
         IServiceScopeFactory fabrica,

@@ -87,7 +87,11 @@ public sealed record UnidadesVendidasDto(
 /// <summary>Número de contacto de notificación de una sucursal, para que el E-commerce entregue los avisos (NOT, <c>transversal-notificaciones</c>). Nunca se registra.</summary>
 public sealed record ContactoDeSucursalDto(
     [property: JsonPropertyName("codigo")] string Codigo,
-    [property: JsonPropertyName("numero")] string Numero);
+    [property: JsonPropertyName("numero")] string Numero)
+{
+    /// <summary>No imprime el número de contacto (dato personal).</summary>
+    public override string ToString() => $"[contacto de {Codigo}]";
+}
 
 /// <summary>Pregunta cuántas reservas activas tiene un titular (IDE-27, SEL-33). El identificador viaja en el cuerpo, nunca en la ruta.</summary>
 public sealed record ConsultaDePendientesDto(

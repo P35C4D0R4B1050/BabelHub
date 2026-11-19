@@ -2,11 +2,13 @@ using System.Globalization;
 using System.Text.Json;
 using BabelHub.Ecommerce.Api.Carrito;
 using BabelHub.Ecommerce.Api.Plataforma;
+using BabelHub.Ecommerce.Api.Web;
 using BabelHub.Ecommerce.Application.Notificaciones;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Shared.Contratos;
 using BabelHub.Shared.Contratos.Ecommerce;
 using BabelHub.Shared.Errores;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BabelHub.Ecommerce.Api.Notificaciones;
@@ -148,8 +150,12 @@ public static class EndpointsDeNotificaciones
         rutas.MapPost(RutaDeLasSolicitudesDelInventario, SolicitudDelInventario)
             .WithMetadata(new OperacionDeServicioAttribute(OperacionDeLasSolicitudesDelInventario), new RequestSizeLimitAttribute(TopeDeLaSolicitudDelInventario))
             .DisableAntiforgery();
-        rutas.MapPost(RutaDeLosNumerosDesactivados, Desactivar).WithMetadata(new RequestSizeLimitAttribute(TopeDeLaAdministracion)).DisableAntiforgery();
-        rutas.MapPost(RutaDeLaReactivacion, Reactivar).WithMetadata(new RequestSizeLimitAttribute(TopeDeLaAdministracion)).DisableAntiforgery();
+        // Las dos operaciones que cambian a quién se le avisa van con la cookie de la sesión: origen y Sec-Fetch-Site, token antifalsificación y cuerpo JSON (un «text/plain» cruzado no pasa), como la administración de claves.
+        var cambios = rutas.MapGroup(string.Empty);
+        cambios.AddEndpointFilter<ProteccionDeLaAdministracionDeAvisos>();
+        cambios.WithMetadata(new RequestSizeLimitAttribute(TopeDeLaAdministracion));
+        cambios.MapPost(RutaDeLosNumerosDesactivados, Desactivar).DisableAntiforgery();
+        cambios.MapPost(RutaDeLaReactivacion, Reactivar).DisableAntiforgery();
         rutas.MapGet(RutaDeLaConsulta, Consultar);
         return rutas;
     }
@@ -297,5 +303,38 @@ public static class EndpointsDeNotificaciones
     {
         await ProblemasDelCarrito.Escribir(contexto, errores, error).ConfigureAwait(false);
         return Results.Empty;
+    }
+}
+
+/// <summary>
+/// La protección de las operaciones de administración de Notificaciones que cambian a quién se le avisa (NOT-13): <b>Origin y Sec-Fetch-Site</b> (mismo origen), <b>token antifalsificación</b> y <b>cuerpo JSON</b>. Como la cookie de
+/// sesión es del sitio y no del origen, sin esto una página hermana podría reactivar los avisos de un número que su titular pidió bloquear con un «text/plain». Cada rechazo es el mismo 403 sin detalles.
+/// </summary>
+internal sealed class ProteccionDeLaAdministracionDeAvisos : IEndpointFilter
+{
+    public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext contexto, EndpointFilterDelegate siguiente)
+    {
+        var c = contexto.HttpContext;
+        var errores = c.RequestServices.GetRequiredService<OpcionesDeErrores>();
+        var host = c.RequestServices.GetRequiredService<OpcionesDelHostWeb>();
+        var prohibido = new ErrorDeAplicacion(CategoriaDeError.Prohibido, "acceso-denegado");
+        if (ComprobadorDeOrigen.Comprobar(c.Request, host.HostsPermitidos) != ResultadoDeOrigen.Valido
+            || c.Request.ContentType is not { } tipo || !tipo.StartsWith("application/json", StringComparison.OrdinalIgnoreCase))
+        {
+            await ProblemasDelCarrito.Escribir(c, errores, prohibido).ConfigureAwait(false);
+            return Results.Empty;
+        }
+
+        try
+        {
+            await c.RequestServices.GetRequiredService<IAntiforgery>().ValidateRequestAsync(c).ConfigureAwait(false);
+        }
+        catch (AntiforgeryValidationException)
+        {
+            await ProblemasDelCarrito.Escribir(c, errores, prohibido).ConfigureAwait(false);
+            return Results.Empty;
+        }
+
+        return await siguiente(contexto).ConfigureAwait(false);
     }
 }

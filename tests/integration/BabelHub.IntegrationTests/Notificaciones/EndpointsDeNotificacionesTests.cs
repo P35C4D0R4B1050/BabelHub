@@ -10,6 +10,9 @@ using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Application.Plataforma.Interno;
 using BabelHub.Ecommerce.Infrastructure.Plataforma;
 using BabelHub.Shared.Contratos.Ecommerce;
+using BabelHub.Ecommerce.Api.Web;
+using BabelHub.Ecommerce.Application.Web;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -113,6 +116,25 @@ public sealed class EndpointsDeNotificacionesTests : IAsyncLifetime
         }
     }
 
+    /// <summary>Un antifalsificación de prueba: el token válido es la cabecera <c>X-Token</c> con el valor esperado.</summary>
+    private sealed class AntifalsificacionDePrueba : IAntiforgery
+    {
+        public const string Token = "token-de-prueba";
+
+        public AntiforgeryTokenSet GetAndStoreTokens(HttpContext httpContext) => new(Token, Token, "X-Token", "campo");
+
+        public AntiforgeryTokenSet GetTokens(HttpContext httpContext) => GetAndStoreTokens(httpContext);
+
+        public Task<bool> IsRequestValidAsync(HttpContext httpContext) => Task.FromResult(httpContext.Request.Headers["X-Token"] == Token);
+
+        public Task ValidateRequestAsync(HttpContext httpContext) =>
+            httpContext.Request.Headers["X-Token"] == Token ? Task.CompletedTask : throw new AntiforgeryValidationException("sin token");
+
+        public void SetCookieTokenAndHeader(HttpContext httpContext)
+        {
+        }
+    }
+
     private sealed class OrigenDePrueba : IOrigenDeSolicitud
     {
         public OrigenDeSolicitud Actual => OrigenDeSolicitud.Desconocido;
@@ -191,6 +213,8 @@ public sealed class EndpointsDeNotificacionesTests : IAsyncLifetime
         builder.Services.AddSingleton<IRecepcionDeAvisos>(_recepcion);
         builder.Services.AddSingleton<IDesactivacionDeNumeros>(_desactivacion);
         builder.Services.AddSingleton<IConsultaDeAvisos>(_consulta);
+        builder.Services.AddSingleton<IAntiforgery>(new AntifalsificacionDePrueba());
+        builder.Services.AddSingleton(new OpcionesDelHostWeb(HostWeb.Tienda, ["tienda.example.org"]));
         _app = builder.Build();
         _app.UsarManejoDeErrores();
         _app.MapearNotificaciones();
@@ -440,12 +464,76 @@ public sealed class EndpointsDeNotificacionesTests : IAsyncLifetime
 
     // ---------------------------------------------------------------- la administración (T21)
 
+    private async Task<HttpResponseMessage> PostAdmin(string ruta, HttpContent contenido, bool conToken = true, string? origen = null, string? sitio = null)
+    {
+        using var peticion = new HttpRequestMessage(HttpMethod.Post, ruta) { Content = contenido };
+        if (conToken)
+        {
+            peticion.Headers.TryAddWithoutValidation("X-Token", AntifalsificacionDePrueba.Token);
+        }
+
+        if (origen is not null)
+        {
+            peticion.Headers.TryAddWithoutValidation("Origin", origen);
+        }
+
+        if (sitio is not null)
+        {
+            peticion.Headers.TryAddWithoutValidation("Sec-Fetch-Site", sitio);
+        }
+
+        return await _cliente.SendAsync(peticion);
+    }
+
+    [Theory]
+    [InlineData("sin-token")]
+    [InlineData("origen-ajeno")]
+    [InlineData("otro-sitio")]
+    [InlineData("text-plain")]
+    [Trait("Criterio", "AC-NOT-13")]
+    public async Task LasOperacionesQueCambianAQuienSeAvisa_RechazanLaFalsificacionEntreSitios_ConElMismo403(string caso)
+    {
+        _actor.Actual = ActorActual.DeUsuario(Guid.NewGuid(), "administrador-central");
+        var json = "{\"numero\":\"987654321\"}";
+
+        foreach (var ruta in new[] { EndpointsDeNotificaciones.RutaDeLaReactivacion, EndpointsDeNotificaciones.RutaDeLosNumerosDesactivados })
+        {
+            var respuesta = caso switch
+            {
+                "sin-token" => await PostAdmin(ruta, new StringContent(json, Encoding.UTF8, "application/json"), conToken: false),
+                "origen-ajeno" => await PostAdmin(ruta, new StringContent(json, Encoding.UTF8, "application/json"), origen: "https://sitio-hermano.example.org"),
+                "otro-sitio" => await PostAdmin(ruta, new StringContent(json, Encoding.UTF8, "application/json"), sitio: "same-site"),
+                _ => await PostAdmin(ruta, new StringContent(json, Encoding.UTF8, "text/plain")),
+            };
+
+            Assert.Equal(HttpStatusCode.Forbidden, respuesta.StatusCode);
+            Assert.DoesNotContain("987654321", await respuesta.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        }
+
+        Assert.Empty(_desactivacion.Llamadas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-12")]
+    public async Task UnSegundoEstadoFallido_DeOtroReintento_SiSeRegistra_ElMismoMensajeRepetidoNo()
+    {
+        var aviso = Guid.NewGuid();
+        var primero = await EstadoFirmado(aviso, estado: "fallido");
+        var repetido = await EstadoFirmado(aviso, estado: "fallido");
+        _reloj.Ahora = _reloj.Ahora.AddMinutes(1);
+        var otroReintento = await EstadoFirmado(aviso, estado: "fallido");
+
+        Assert.All(new[] { primero, repetido, otroReintento }, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));
+        Assert.Equal(2, _registro.Registrados.Count(r => r.Aviso == aviso && r.Estado == EstadoDeEntrega.Fallido));
+    }
+
+
     [Fact]
     [Trait("Criterio", "AC-NOT-13")]
     public async Task LaDesactivacionYLaConsulta_SinUsuarioAutenticado_SonUn401_YNoLlegaALaAplicacion()
     {
-        var desactivar = await _cliente.PostAsync(EndpointsDeNotificaciones.RutaDeLosNumerosDesactivados, System.Net.Http.Json.JsonContent.Create(new DesactivarNumeroDto("987654321", "a pedido del titular")));
-        var reactivar = await _cliente.PostAsync(EndpointsDeNotificaciones.RutaDeLaReactivacion, System.Net.Http.Json.JsonContent.Create(new ReactivarNumeroDto("987654321")));
+        var desactivar = await PostAdmin(EndpointsDeNotificaciones.RutaDeLosNumerosDesactivados, System.Net.Http.Json.JsonContent.Create(new DesactivarNumeroDto("987654321", "a pedido del titular")));
+        var reactivar = await PostAdmin(EndpointsDeNotificaciones.RutaDeLaReactivacion, System.Net.Http.Json.JsonContent.Create(new ReactivarNumeroDto("987654321")));
         var consultar = await _cliente.GetAsync(EndpointsDeNotificaciones.RutaDeLaConsulta);
 
         Assert.All(new[] { desactivar, reactivar, consultar }, r => Assert.Equal(HttpStatusCode.Unauthorized, r.StatusCode));
@@ -459,7 +547,7 @@ public sealed class EndpointsDeNotificacionesTests : IAsyncLifetime
     {
         _actor.Actual = ActorActual.DeUsuario(Guid.NewGuid(), "administrador-central");
 
-        var respuesta = await _cliente.PostAsync(EndpointsDeNotificaciones.RutaDeLosNumerosDesactivados, System.Net.Http.Json.JsonContent.Create(new DesactivarNumeroDto("987 654 321", "a pedido del titular")));
+        var respuesta = await PostAdmin(EndpointsDeNotificaciones.RutaDeLosNumerosDesactivados, System.Net.Http.Json.JsonContent.Create(new DesactivarNumeroDto("987 654 321", "a pedido del titular")));
 
         Assert.Equal(HttpStatusCode.NoContent, respuesta.StatusCode);
         Assert.Equal(("987 654 321", "a pedido del titular"), Assert.Single(_desactivacion.Llamadas));
@@ -475,7 +563,7 @@ public sealed class EndpointsDeNotificacionesTests : IAsyncLifetime
         _actor.Actual = ActorActual.DeUsuario(Guid.NewGuid(), "cliente");
         _desactivacion.Respuesta = Resultado<ConfirmacionDeNotificaciones>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Prohibido, "acceso-denegado"));
 
-        var respuesta = await _cliente.PostAsync(EndpointsDeNotificaciones.RutaDeLosNumerosDesactivados, System.Net.Http.Json.JsonContent.Create(new DesactivarNumeroDto("987654321", "motivo")));
+        var respuesta = await PostAdmin(EndpointsDeNotificaciones.RutaDeLosNumerosDesactivados, System.Net.Http.Json.JsonContent.Create(new DesactivarNumeroDto("987654321", "motivo")));
 
         Assert.Equal(HttpStatusCode.Forbidden, respuesta.StatusCode);
         Assert.Contains("ECO-PROHIBIDO", await respuesta.Content.ReadAsStringAsync(), StringComparison.Ordinal);
@@ -490,7 +578,7 @@ public sealed class EndpointsDeNotificacionesTests : IAsyncLifetime
     {
         _actor.Actual = ActorActual.DeUsuario(Guid.NewGuid(), "administrador-central");
 
-        var respuesta = await _cliente.PostAsync(EndpointsDeNotificaciones.RutaDeLosNumerosDesactivados, new StringContent(cuerpo, Encoding.UTF8, "application/json"));
+        var respuesta = await PostAdmin(EndpointsDeNotificaciones.RutaDeLosNumerosDesactivados, new StringContent(cuerpo, Encoding.UTF8, "application/json"));
 
         Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
         Assert.DoesNotContain("987654321", await respuesta.Content.ReadAsStringAsync(), StringComparison.Ordinal);

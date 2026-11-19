@@ -111,7 +111,9 @@ internal sealed class RepositorioDeAvisosPostgres(AccesoAlEsquemaDeNotificacione
                     tx);
                 comando.Parameters.AddWithValue("tipo", Texto(tipo));
                 comando.Parameters.AddWithValue("ref", destinatarioRef);
-                return await Leer(comando, ct).ConfigureAwait(false);
+                var avisos = await Leer(comando, ct).ConfigureAwait(false);
+                await RestaurarEspera(cx, tx, ct).ConfigureAwait(false);
+                return avisos;
             },
             cancelacion);
 
@@ -138,7 +140,13 @@ internal sealed class RepositorioDeAvisosPostgres(AccesoAlEsquemaDeNotificacione
 
                 await using var comando = new NpgsqlCommand($"SELECT {Columnas} FROM notificaciones.avisos WHERE id = @id{(paraActualizar ? " FOR UPDATE" : string.Empty)}", cx, tx);
                 comando.Parameters.AddWithValue("id", id);
-                return (await Leer(comando, ct).ConfigureAwait(false)).FirstOrDefault();
+                var aviso = (await Leer(comando, ct).ConfigureAwait(false)).FirstOrDefault();
+                if (paraActualizar)
+                {
+                    await RestaurarEspera(cx, tx, ct).ConfigureAwait(false);
+                }
+
+                return aviso;
             },
             cancelacion);
 
@@ -266,6 +274,13 @@ internal sealed class RepositorioDeAvisosPostgres(AccesoAlEsquemaDeNotificacione
     private static async Task FijarEspera(NpgsqlConnection cx, NpgsqlTransaction tx, CancellationToken ct)
     {
         await using var comando = new NpgsqlCommand($"SET LOCAL lock_timeout = '{EsperaDelBloqueo}'", cx, tx);
+        await comando.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Devuelve la espera del bloqueo al valor de la sesión: la transacción es la de otro módulo (Identidad) y no debe quedar con la de este.</summary>
+    private static async Task RestaurarEspera(NpgsqlConnection cx, NpgsqlTransaction tx, CancellationToken ct)
+    {
+        await using var comando = new NpgsqlCommand("SET LOCAL lock_timeout TO DEFAULT", cx, tx);
         await comando.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 

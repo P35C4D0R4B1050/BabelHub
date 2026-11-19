@@ -94,7 +94,11 @@ public interface IDesactivacionDeNumeros
 public sealed record ConfirmacionDeNotificaciones;
 
 /// <summary>El estado de entrega tal como llegó de n8n: el cuerpo crudo y la marca y la firma de sus cabeceras (NOT-12). Se verifica antes de leerlo.</summary>
-public sealed record EstadoDeEntregaFirmadoEntrada(ReadOnlyMemory<byte> Cuerpo, string MarcaDeTiempo, string Firma);
+public sealed record EstadoDeEntregaFirmadoEntrada(ReadOnlyMemory<byte> Cuerpo, string MarcaDeTiempo, string Firma)
+{
+    /// <summary>No imprime la firma ni el cuerpo.</summary>
+    public override string ToString() => "[estado de entrega firmado]";
+}
 
 /// <summary>
 /// La entrada firmada del estado de entrega (T19; NOT-06, NOT-12, AC-NOT-11): verifica la firma HMAC con la clave del sentido entrante y la marca de tiempo (tolerancia de 5 minutos), deduplica por aviso y estado, y solo

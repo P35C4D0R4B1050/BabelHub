@@ -444,3 +444,22 @@ public sealed class DominioDeNotificacionesTests
         Assert.DoesNotContain("999", $"{numero}", StringComparison.Ordinal);
     }
 }
+
+public sealed class GuiaDeEnvioConAspectoDeTarjetaTests
+{
+    [Theory]
+    [InlineData("4111111111111111", false)]
+    [InlineData("4111-1111-1111-1111", false)]
+    [InlineData("1234567890123", true)]
+    [InlineData("ABC1234567890123XYZ", true)]
+    [InlineData("12345678901234567890123", true)]
+    [Trait("Criterio", "AC-NOT-06")]
+    public void UnaGuiaDeDigitosQuePasaLuhnEsUnaTarjeta_UnaGuiaCualquieraDeOperadorSiSale(string guia, bool valida)
+    {
+        var plantilla = CatalogoDePlantillas.Obtener("envio-guia")!;
+
+        var resultado = plantilla.Validar(new Dictionary<string, string> { ["numeroDePedido"] = "BH-000123", ["numeroDeGuia"] = guia, ["estado"] = "guia-generada" });
+
+        Assert.Equal(valida, resultado.EsValido);
+    }
+}

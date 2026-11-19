@@ -29,7 +29,11 @@ public sealed class RecibirEstadoDeEntregaDeN8n(IProcesadorDeEntradasDeIntegraci
         var estado = Interpretar(entrada.Cuerpo.Span);
 
         // El identificador de la entrada es el aviso y el estado; un cuerpo que no se entiende usa su resumen, para que igual se verifique la firma y se deje el evento.
-        var idDeEntrada = estado is { } valido ? $"{valido.AvisoId:N}.{valido.Estado}" : "ilegible." + Convert.ToHexString(SHA256.HashData(entrada.Cuerpo.Span))[..32];
+        // Un «entregado» es terminal y se deduplica por aviso; cada «fallido» es un intento distinto, así que su identificador lleva la marca firmada: repetir el mismo mensaje no cuenta dos veces, pero un segundo fallo del siguiente reintento sí llega (AC-NOT-12).
+        var marca = new string(entrada.MarcaDeTiempo.Where(char.IsAsciiDigit).Take(20).ToArray());
+        var idDeEntrada = estado is { } valido
+            ? valido.Estado == Fallido ? $"{valido.AvisoId:N}.{valido.Estado}.{marca}" : $"{valido.AvisoId:N}.{valido.Estado}"
+            : "ilegible." + Convert.ToHexString(SHA256.HashData(entrada.Cuerpo.Span))[..32];
         try
         {
             return await unidad.Ejecutar(token => RecibirEnLaTransaccion(estado, idDeEntrada, entrada, token), cancelacion).ConfigureAwait(false);

@@ -394,7 +394,8 @@ public static class AnfitrionDelEcommerce
         // Notificaciones: el envío es n8n (o el simulado en desarrollo y pruebas, o el nulo en el ensayo y al restaurar) y reemplaza a los dobles provisionales; el adaptador declara su estado real y ExigirCoherencia lo comprueba.
         servicios.AgregarNotificaciones(opciones.Notificaciones);
         servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDeLaInstancia("notificador", esNulo: opciones.Notificaciones.Envio == ModoDelEnvioDeAvisos.Nulo));
-        servicios.AgregarTrabajosDeNotificacionesEnLaApi(soloEnModoNormal);
+        // El trabajo de envío corre solo en la réplica de la tienda (VM-VENTAS, que alcanza a n8n): la de gestión (VM-INVENTARIO) no tiene ruta al puerto 5678 y competiría por los avisos fallándolos.
+        servicios.AgregarTrabajosDeNotificacionesEnLaApi(soloEnModoNormal && opciones.Host.Host == HostWeb.Tienda);
         var depuracionDeRegistros = BasesDelEcommerce.Abrir(opciones.BaseDeDepuracionDeRegistros);
         servicios.AgregarIdentidad(opciones.Identidad, soloEnModoNormal, AlcanceDelSistemaDeIdentidad, _ => depuracionDeRegistros);
         servicios.AgregarTrabajosDeIdentidad(soloEnModoNormal, AlcanceDelSistemaDeIdentidad);

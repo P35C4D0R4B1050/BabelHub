@@ -80,7 +80,7 @@ public sealed class OpcionesDeNotificaciones
             else if (string.Equals(texto, "n8n", StringComparison.OrdinalIgnoreCase))
             {
                 envio = ModoDelEnvioDeAvisos.N8n;
-                n8n = LeerN8n(configuracion, lector, esProduccion);
+                n8n = LeerN8n(configuracion, lector);
             }
             else if (string.Equals(texto, "simulado", StringComparison.OrdinalIgnoreCase))
             {
@@ -100,7 +100,7 @@ public sealed class OpcionesDeNotificaciones
         return new OpcionesDeNotificaciones(envio, huella!, n8n);
     }
 
-    private static OpcionesDeEnvioPorN8n? LeerN8n(IConfiguration configuracion, LectorDeSecretos lector, bool esProduccion)
+    private static OpcionesDeEnvioPorN8n? LeerN8n(IConfiguration configuracion, LectorDeSecretos lector)
     {
         var direccion = lector.Obligatorio(RutaDelWebhook);
         var clave = lector.Obligatorio(RutaDeLaClaveSaliente);
@@ -122,8 +122,6 @@ public sealed class OpcionesDeNotificaciones
         {
             // El mensaje describe la regla incumplida, nunca el valor.
             lector.Problema(RutaDelWebhook, excepcion is UriFormatException ? "no es una dirección válida" : "no cumple las reglas del webhook de n8n (http o https absoluta, http solo interna)");
-            _ = esProduccion;
-            _ = configuracion;
             return null;
         }
     }

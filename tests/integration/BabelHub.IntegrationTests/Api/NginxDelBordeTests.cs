@@ -101,6 +101,9 @@ public sealed class NginxDelBordeTests : IAsyncLifetime
         Assert.Equal("404", await EstadoDe(servidor, "/api/ecommerce/v1/integraciones/n8n/estados"));
         Assert.Equal("404", await EstadoDe(servidor, "/api/ecommerce/v1/integraciones/n8n/otra-cosa"));
         Assert.Equal("404", await EstadoDe(servidor, "/api/ecommerce/v1/integraciones/inventario/avisos"));
+        // El enrutado de la aplicación no distingue mayúsculas: tampoco el borde.
+        Assert.Equal("404", await EstadoDe(servidor, "/API/ecommerce/v1/integraciones/N8N/estados"));
+        Assert.Equal("404", await EstadoDe(servidor, "/api/ecommerce/v1/Integraciones/Inventario/avisos"));
         Assert.Equal("200", await EstadoDe(servidor, "/api/ecommerce/v1/integraciones/pasarela/avisos"));
     }
 

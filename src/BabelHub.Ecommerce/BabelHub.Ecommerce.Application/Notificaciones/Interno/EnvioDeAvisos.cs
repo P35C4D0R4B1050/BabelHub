@@ -146,10 +146,10 @@ public sealed class EnviarAvisosPendientes(
     IAlertas alertas,
     IReloj reloj)
 {
-    public const int LoteMaximo = 25;
+    public const int LoteMaximo = 10;
 
-    /// <summary>Cuánto tiene un aviso para que el servicio de envío responda antes de que otro trabajo pueda recogerlo.</summary>
-    public static readonly TimeSpan Arrendamiento = TimeSpan.FromMinutes(2);
+    /// <summary>Cuánto tiene un aviso para que el servicio de envío responda antes de que otro trabajo pueda recogerlo (un lote de 10 en serie, con hasta 20 s de espera cada uno, cabe en 6 minutos).</summary>
+    public static readonly TimeSpan Arrendamiento = TimeSpan.FromMinutes(6);
 
     public const string MotivoDeCuentaCancelada = "cuenta-cancelada";
 
