@@ -114,6 +114,10 @@ if [[ -n "$SECRETOS" ]]; then
     if grep -q 'AGE-SECRET-KEY-' "$ruta" 2>/dev/null; then
       anotar "el archivo $archivo contiene una clave privada de age: no puede estar en la VM"
     fi
+    # La cuenta propietaria de las bases (administración, COMP-2) solo puede estar en migrador.env: un servicio con ella en su entorno la tendría en un proceso expuesto.
+    if grep -q 'BABELHUB__Migrador__' "$ruta" 2>/dev/null; then
+      anotar "el archivo $archivo lleva claves BABELHUB__Migrador__*: la cuenta propietaria de las bases solo puede estar en migrador.env"
+    fi
   done
 
   tabla="$INFRA/secretos-requeridos.txt"
@@ -176,6 +180,11 @@ if [[ "$VM" == inventario && -n "$SECRETOS" ]]; then
     anotar "la carpeta scripts/vm-aux es de ${lectura% *} con permisos ${lectura#* }: debe ser de root y sin escritura para otros (la ejecuta el cron como root)"
   fi
   [[ "$RAIZ" =~ ^[A-Za-z0-9._:/-]+$ && "$SECRETOS" =~ ^[A-Za-z0-9._:/-]+$ ]] || anotar "las rutas del repositorio y de los secretos solo pueden tener letras, números y . _ : / - (se escriben en la tarea de cron)"
+fi
+
+# migrador.env solo existe en la VM de datos: en cualquier otra sería una credencial de administración sin uso.
+if [[ "$VM" != inventario && -n "$SECRETOS" && -e "$SECRETOS/migrador.env" ]]; then
+  anotar "existe migrador.env en la VM $VM: la cuenta propietaria de las bases solo puede estar en la VM de datos"
 fi
 
 # La migración de las bases (COMP-2): la VM de datos aloja PostgreSQL de los dos servicios y es la única que migra, con las cuentas propietarias de

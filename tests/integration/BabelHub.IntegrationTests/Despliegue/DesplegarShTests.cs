@@ -429,6 +429,25 @@ public sealed class DesplegarShTests : IDisposable
     }
 
     [Fact]
+    [Trait("Criterio", "AC-SEG-25")]
+    public void LaCuentaPropietariaEnElArchivoDeUnServicio_OMigradorEnEnUnaVmQueNoMigra_NoSeDespliega()
+    {
+        PrepararSecretos("inventario");
+        File.AppendAllText(Path.Combine(_secretos, "inventario.env"), "BABELHUB__Migrador__Inventario__Propietaria=algo\n");
+        var (enServicio, _, erroresEnServicio) = Desplegar("inventario");
+        PrepararSecretos("ventas");
+        File.WriteAllText(Path.Combine(_secretos, "migrador.env"), "BABELHUB__Migrador__Ecommerce__Propietaria=algo\n");
+
+        var (enVentas, _, erroresEnVentas) = Desplegar("ventas");
+
+        Assert.Equal(1, enServicio);
+        Assert.Contains("inventario.env lleva claves BABELHUB__Migrador__*", erroresEnServicio, StringComparison.Ordinal);
+        Assert.Equal(1, enVentas);
+        Assert.Contains("existe migrador.env en la VM ventas", erroresEnVentas, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-PLA-04")]
     public void SiLaMigracionFalla_NoSeLevantanLosServicios()
     {

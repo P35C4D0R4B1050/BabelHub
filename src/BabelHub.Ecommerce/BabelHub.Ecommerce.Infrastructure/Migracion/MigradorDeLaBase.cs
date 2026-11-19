@@ -64,6 +64,9 @@ public sealed class MigradorDeLaBase(NpgsqlDataSource propietaria, TextWriter sa
         await using (conexion)
         {
             await ExigirAdministracion(conexion, cancelacion).ConfigureAwait(false);
+
+            // La contraseña de las cuentas viaja en una sentencia SQL: el servidor no debe registrar sentencias, errores con su texto ni parámetros en esta sesión (solo un superusuario puede cambiarlo).
+            await Ejecutar(conexion, "sin-registro-de-sentencias", "SET log_statement = 'none'; SET log_min_error_statement = 'panic'; SET log_parameter_max_length = 0; SET log_parameter_max_length_on_error = 0;", cancelacion).ConfigureAwait(false);
             if (!await Escalar<bool>(conexion, $"SELECT pg_try_advisory_lock({CandadoDeMigracion})", cancelacion).ConfigureAwait(false))
             {
                 throw new MigracionFallidaException("Hay otra migración en curso sobre esta base.");
@@ -89,7 +92,14 @@ public sealed class MigradorDeLaBase(NpgsqlDataSource propietaria, TextWriter sa
             }
             finally
             {
-                await Escalar<bool>(conexion, $"SELECT pg_advisory_unlock({CandadoDeMigracion})", CancellationToken.None).ConfigureAwait(false);
+                try
+                {
+                    await Escalar<bool>(conexion, $"SELECT pg_advisory_unlock({CandadoDeMigracion})", CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (Exception)
+                {
+                    // La conexión se perdió: el candado de sesión se libera solo al cerrarla.
+                }
             }
         }
 
@@ -152,8 +162,9 @@ public sealed class MigradorDeLaBase(NpgsqlDataSource propietaria, TextWriter sa
         DO $p$
         BEGIN
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{{propietario}}') THEN
-                CREATE ROLE {{propietario}} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
+                CREATE ROLE {{propietario}} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
             END IF;
+            ALTER ROLE {{propietario}} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
         END
         $p$;
         """;
@@ -220,7 +231,7 @@ public sealed class MigradorDeLaBase(NpgsqlDataSource propietaria, TextWriter sa
         string sql;
         await using (var armar = new NpgsqlCommand(
             $$"""
-            SELECT format('DO $c$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = %L) THEN CREATE ROLE %I; END IF; END $c$; ALTER ROLE %I LOGIN {{herencia}} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION CONNECTION LIMIT 20 PASSWORD %L; GRANT CONNECT ON DATABASE %I TO %I;',
+            SELECT format('DO $c$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = %L) THEN CREATE ROLE %I; END IF; END $c$; ALTER ROLE %I LOGIN {{herencia}} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 20 PASSWORD %L; GRANT CONNECT ON DATABASE %I TO %I;',
                           @u, @u, @u, @p, current_database(), @u)
             """,
             conexion))

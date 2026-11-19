@@ -32,6 +32,9 @@ public sealed class InstanciaParaMigrar : IAsyncLifetime
         await _contenedor.DisposeAsync();
     }
 
+    /// <summary>El registro del servidor de PostgreSQL (lo que un administrador vería en los logs del contenedor).</summary>
+    public async Task<(string Salida, string Errores)> RegistroDelServidor() => await _contenedor.GetLogsAsync();
+
     /// <summary>Una base nueva y la cadena de la cuenta propietaria (administradora) para ella.</summary>
     public async Task<string> NuevaBase()
     {
@@ -185,6 +188,83 @@ public sealed class MigradorDeLaBaseTests(InstanciaParaMigrar instancia) : IClas
         Assert.False(await Consultar<bool>(propietaria, $"SELECT rolinherit FROM pg_roles WHERE rolname = '{cuentas.Aplicacion}'"));
     }
 
+    private static async Task<string?> EstadoDeLaSentencia(string cadena, string rol, string sql)
+    {
+        await using var origen = NpgsqlDataSource.Create(cadena);
+        await using var conexion = await origen.OpenConnectionAsync();
+        await using var transaccion = await conexion.BeginTransactionAsync();
+        await using (var cambio = new NpgsqlCommand($"SET LOCAL ROLE {rol}", conexion, transaccion))
+        {
+            await cambio.ExecuteNonQueryAsync();
+        }
+
+        try
+        {
+            await using var comando = new NpgsqlCommand(sql, conexion, transaccion);
+            await comando.ExecuteNonQueryAsync();
+            return null;
+        }
+        catch (PostgresException e)
+        {
+            return e.SqlState;
+        }
+    }
+
+    private static Task<long> ObjetosDeLaAdministracion(string propietaria) => Consultar<long>(propietaria, """
+        SELECT (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname NOT IN ('pg_catalog', 'information_schema', 'public') AND n.nspname NOT LIKE 'pg_%' AND c.relkind IN ('r', 'p', 'v', 'm') AND pg_get_userbyid(c.relowner) = 'postgres')
+             + (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+                WHERE n.nspname NOT IN ('pg_catalog', 'information_schema', 'public') AND n.nspname NOT LIKE 'pg_%' AND pg_get_userbyid(p.proowner) = 'postgres')
+        """)!;
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-04")]
+    public async Task ElEsquemaMigradoDelEcommerce_ConservaLasGarantiasDeSeguridadDeSusModulos()
+    {
+        var propietaria = await instancia.NuevaBase();
+        var baseDeDatos = Base(propietaria);
+        var cuentas = NuevasCuentas("eco7");
+        Assert.True((await MigrarElEcommerce(ConfiguracionDelEcommerce(propietaria, cuentas, baseDeDatos))).Codigo == 0);
+        var acceso = Conexion(baseDeDatos, cuentas.Aplicacion, cuentas.ClaveDeLaAplicacion);
+
+        // Los dueños que fijan los módulos se conservan: la depuración de reclamaciones y los registros de auditoría no son de la cuenta de administración.
+        Assert.Equal("reclamaciones_dueno", await Consultar<string>(propietaria, "SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname = 'reclamaciones'"));
+        Assert.Equal("reclamaciones_dueno", await Consultar<string>(propietaria, "SELECT tableowner FROM pg_tables WHERE schemaname = 'reclamaciones' AND tablename = 'hojas_reclamacion'"));
+        Assert.Equal("reclamaciones_dueno", await Consultar<string>(propietaria, "SELECT pg_get_userbyid(proowner) FROM pg_proc WHERE oid = 'reclamaciones.anonimizar_hojas()'::regprocedure"));
+        Assert.Equal("auditoria_migraciones", await Consultar<string>(propietaria, "SELECT tableowner FROM pg_tables WHERE schemaname = 'auditoria' AND tablename = 'registros'"));
+        Assert.Equal("auditoria_migraciones", await Consultar<string>(propietaria, "SELECT tableowner FROM pg_tables WHERE schemaname = 'identidad' AND tablename = 'registros'"));
+
+        // Lo que la aplicación no puede hacer, aun con el rol del módulo: reescribir o borrar los registros de auditoría y borrar hojas de reclamación (42501 = permiso denegado).
+        Assert.Equal("42501", await EstadoDeLaSentencia(acceso, "rol_auditoria", "DELETE FROM auditoria.registros"));
+        Assert.Equal("42501", await EstadoDeLaSentencia(acceso, "rol_auditoria", "UPDATE auditoria.registros SET accion = accion"));
+        Assert.Equal("42501", await EstadoDeLaSentencia(acceso, "rol_reclamaciones", "DELETE FROM reclamaciones.hojas_reclamacion"));
+
+        // Los roles de depuración solo ejecutan su función; la aplicación no.
+        Assert.False(await Consultar<bool>(propietaria, $"SELECT has_function_privilege('{cuentas.Aplicacion}', 'reclamaciones.anonimizar_hojas()', 'EXECUTE')"));
+
+        // Nada queda a nombre de la cuenta de administración.
+        Assert.Equal(0L, await ObjetosDeLaAdministracion(propietaria));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-04")]
+    public async Task ElEsquemaMigradoDelInventario_ConservaLasGarantiasDeSeguridadDeSusModulos()
+    {
+        var propietaria = await instancia.NuevaBase();
+        var baseDeDatos = Base(propietaria);
+        var cuentas = NuevasCuentas("inv7");
+        Assert.True((await MigrarElInventario(ConfiguracionDelInventario(propietaria, cuentas, baseDeDatos))).Codigo == 0);
+        var acceso = Conexion(baseDeDatos, cuentas.Aplicacion, cuentas.ClaveDeLaAplicacion);
+
+        Assert.Equal("ajustes_depuracion_dueno", await Consultar<string>(propietaria, "SELECT pg_get_userbyid(proowner) FROM pg_proc WHERE oid = 'ajustes.anonimizar_registros()'::regprocedure"));
+        Assert.Equal("auditoria_migraciones", await Consultar<string>(propietaria, "SELECT tableowner FROM pg_tables WHERE schemaname = 'auditoria' AND tablename = 'registros'"));
+        Assert.Equal("42501", await EstadoDeLaSentencia(acceso, "rol_auditoria", "DELETE FROM auditoria.registros"));
+        Assert.Equal("42501", await EstadoDeLaSentencia(acceso, "rol_ajustes", "DELETE FROM ajustes.ajustes"));
+        Assert.True(await Consultar<bool>(propietaria, $"SELECT has_function_privilege('{cuentas.DepuracionUno}', 'ajustes.anonimizar_registros()', 'EXECUTE')"));
+        Assert.False(await Consultar<bool>(propietaria, $"SELECT has_function_privilege('{cuentas.Aplicacion}', 'ajustes.anonimizar_registros()', 'EXECUTE')"));
+        Assert.Equal(0L, await ObjetosDeLaAdministracion(propietaria));
+    }
+
     [Fact]
     [Trait("Criterio", "AC-PLA-04")]
     public async Task RepetirLaMigracion_NoDañaNadaYSoloRotaLasContrasenas()
@@ -226,7 +306,7 @@ public sealed class MigradorDeLaBaseTests(InstanciaParaMigrar instancia) : IClas
         var resultado = await MigrarElEcommerce(ConfiguracionDelEcommerce(propietaria, cuentas, baseDeDatos));
 
         var pasos = resultado.Salida.Split('\n', StringSplitOptions.RemoveEmptyEntries).Where(l => l.StartsWith("paso: ", StringComparison.Ordinal)).Select(l => l[6..].Trim()).ToList();
-        var esperado = Eco.PlanDeMigracionDelEcommerce.Pasos().Select(p => p.Nombre).Prepend("propietario").Append("propiedad").Concat(new[] { $"cuenta {cuentas.Aplicacion}", $"cuenta {cuentas.DepuracionUno}", $"cuenta {cuentas.DepuracionDos}" }).ToList();
+        var esperado = Eco.PlanDeMigracionDelEcommerce.Pasos().Select(p => p.Nombre).Prepend("propietario").Prepend("sin-registro-de-sentencias").Append("propiedad").Concat(new[] { $"cuenta {cuentas.Aplicacion}", $"cuenta {cuentas.DepuracionUno}", $"cuenta {cuentas.DepuracionDos}" }).ToList();
         Assert.Equal(esperado, pasos);
         foreach (var secreto in new[] { cuentas.ClaveDeLaAplicacion, cuentas.ClaveUno, cuentas.ClaveDos, propietaria })
         {
@@ -266,7 +346,15 @@ public sealed class MigradorDeLaBaseTests(InstanciaParaMigrar instancia) : IClas
 
         // La cuenta de la aplicación como propietaria: se rechaza antes de abrirla por no distinguirse de las del servicio, y una cuenta común sin administración se rechaza al abrirla.
         var comoAplicacion = ConfiguracionDelEcommerce(Conexion(baseDeDatos, cuentas.Aplicacion, cuentas.ClaveDeLaAplicacion), cuentas, baseDeDatos);
-        var sinAdministracion = ConfiguracionDelEcommerce(Conexion(baseDeDatos, "otra_cuenta_" + Guid.NewGuid().ToString("N")[..6], Clave()), cuentas, baseDeDatos);
+        var comun = "comun_" + Guid.NewGuid().ToString("N")[..6];
+        var claveComun = Clave();
+        await using (var admin = NpgsqlDataSource.Create(propietaria))
+        {
+            await using var crear = admin.CreateCommand($"CREATE ROLE {comun} LOGIN NOSUPERUSER PASSWORD '{claveComun}'");
+            await crear.ExecuteNonQueryAsync();
+        }
+
+        var sinAdministracion = ConfiguracionDelEcommerce(Conexion(baseDeDatos, comun, claveComun), cuentas, baseDeDatos);
 
         var mismaCuenta = await MigrarElEcommerce(comoAplicacion);
         var noAdministra = await MigrarElEcommerce(sinAdministracion);
@@ -296,6 +384,36 @@ public sealed class MigradorDeLaBaseTests(InstanciaParaMigrar instancia) : IClas
 
         Assert.Contains("rol_que_no_existe", falla.Message, StringComparison.Ordinal);
         Assert.Equal(0L, await Consultar<long>(propietaria, "SELECT count(*) FROM pg_roles WHERE rolname = 'cuenta_sin_rol'"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-25")]
+    public async Task UnaFallaAlPonerLaContrasena_NoDejaLaClaveEnElRegistroDelServidor()
+    {
+        var propietaria = await instancia.NuevaBase();
+        var clave = Clave();
+        // «postgres» es el superusuario de arranque: PostgreSQL rechaza quitarle el privilegio, así que el paso de la cuenta falla después de armar la sentencia con la contraseña.
+        var plan = new Eco.PlanDeMigracion("ecommerce", [new Eco.PasoDeMigracion("vacio", "SELECT 1")], [], [new Eco.CuentaDeBase("postgres", clave, [])]);
+        await using var origen = NpgsqlDataSource.Create(propietaria);
+
+        await Assert.ThrowsAsync<Eco.MigracionFallidaException>(() => new Eco.MigradorDeLaBase(origen, new StringWriter()).Ejecutar(plan));
+
+        var (salida, errores) = await instancia.RegistroDelServidor();
+        Assert.DoesNotContain(clave, salida + errores, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-25")]
+    public async Task SiLaCuentaPropietariaNoPuedeConectar_SaleSinTrazaNiTexto()
+    {
+        var cuentas = NuevasCuentas("eco6");
+        var configuracion = ConfiguracionDelEcommerce(instancia.Cadena("base_que_no_existe", "postgres", Clave()), cuentas, "base_que_no_existe");
+
+        var resultado = await MigrarElEcommerce(configuracion);
+
+        Assert.Equal(1, resultado.Codigo);
+        Assert.Contains("migracion: No se pudo abrir la cuenta propietaria", resultado.Error, StringComparison.Ordinal);
+        Assert.DoesNotContain("   at ", resultado.Error, StringComparison.Ordinal);
     }
 
     [Fact]

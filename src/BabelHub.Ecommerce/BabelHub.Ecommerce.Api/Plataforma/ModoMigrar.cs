@@ -27,5 +27,12 @@ public static class ModoMigrar
             await error.WriteLineAsync("migracion: " + e.Message).ConfigureAwait(false);
             return 1;
         }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            // Una falla que no es de la migración (la red, la cuenta): solo el tipo y el código de PostgreSQL, nunca la traza ni el texto, que pueden nombrar objetos.
+            var codigo = e is Npgsql.PostgresException pg ? " (SQLSTATE " + pg.SqlState + ")" : string.Empty;
+            await error.WriteLineAsync("migracion: falló la conexión o una consulta de la migración: " + e.GetType().Name + codigo).ConfigureAwait(false);
+            return 1;
+        }
     }
 }

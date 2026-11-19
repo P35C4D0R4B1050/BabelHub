@@ -20,7 +20,10 @@ Reglas (ver `docs/02-arquitectura-de-software/02-decisiones-arquitectonicas.md` 
 **Migrar las bases en local** (COMP-2): con el Compose local arriba, las cuentas del servicio (`BABELHUB__<Servicio>__Base__…`) y la cuenta propietaria en el entorno:
 
 ```bash
-BABELHUB__Migrador__Ecommerce__Propietaria="Host=localhost;Database=ecommerce;Username=postgres;Password=<administradora>" \n  dotnet run --project src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api -- migrar   # y lo mismo con Inventario y su variable
+read -rs -p "Contraseña de la cuenta administradora: " ADMIN && echo
+export BABELHUB__Migrador__Ecommerce__Propietaria="Host=localhost;Database=ecommerce;Username=postgres;Password=$ADMIN"; unset ADMIN
+dotnet run --project src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api -- migrar   # y lo mismo con Inventario y su variable
+unset BABELHUB__Migrador__Ecommerce__Propietaria
 ```
 
 Es idempotente (repetirlo es seguro y solo rota las contraseñas), falla cerrado nombrando la variable o el rol que falta y no imprime ninguna clave. La cuenta propietaria debe ser de administración (crea roles y extensiones) y distinta de las del servicio.

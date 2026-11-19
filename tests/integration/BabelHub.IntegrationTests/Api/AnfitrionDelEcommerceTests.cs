@@ -297,6 +297,20 @@ public sealed class AnfitrionDelEcommerceTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-SEG-25")]
+    public void UnServicioConLaCuentaPropietariaEnSuEntorno_NoArranca_NombrandoLaVariableSinElValor()
+    {
+        var configuracion = ConfiguracionCompleta();
+        var cuenta = Cuenta("postgres");
+        configuracion["Migrador:Ecommerce:Propietaria"] = cuenta;
+
+        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: false));
+
+        Assert.Contains("BABELHUB__Migrador", falla.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(cuenta, falla.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LasOpciones_NoImprimenNingunValor()
     {
         var opciones = OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(ConfiguracionCompleta()).Build(), esProduccion: false);

@@ -107,6 +107,11 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
     {
         ArgumentNullException.ThrowIfNull(configuracion);
         var lector = new LectorDeSecretos(configuracion);
+        if (configuracion.GetSection("Migrador").GetChildren().Any())
+        {
+            lector.Problema("Migrador", "la cuenta propietaria de las bases es solo para el modo migrar y no debe estar en el entorno del servicio");
+        }
+
         var extra = new List<string>();
 
         var baseDeLaAplicacion = BasesDelEcommerce.Leer(lector, RutaDeLaBaseDeLaAplicacion, esProduccion);
