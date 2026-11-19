@@ -127,7 +127,7 @@ public sealed class PoliticaDeAudienciaYAlcanceTests
         var contexto = await ContextoDe(e, Guid.NewGuid());
 
         // Todo endpoint (escritura, otro cliente, biblioteca, cuenta, descarga, Inventario) autentica con el verificador de credenciales: el contexto no pasa.
-        Assert.NotEqual(EstadoWeb.Valida, e.Web.Verificar(contexto, Ahora).Estado);
+        Assert.Equal(EstadoWeb.Invalida, e.Web.Verificar(contexto, Ahora).Estado);
         Assert.Equal(BabelHub.Inventario.Application.Plataforma.EstadoDeLaCredencial.Invalida, e.Inventario.Verificar(contexto, Ahora).Estado);
     }
 
@@ -170,6 +170,23 @@ public sealed class PoliticaDeAudienciaYAlcanceTests
         e.Actor.Actual = ActorActual.DeUsuario(Guid.NewGuid(), BabelHub.Shared.Contratos.RolesDeUsuario.Cliente, null);
 
         var resultado = await e.Contexto.Emitir(otro);
+
+        Assert.False(resultado.EsExito);
+        Assert.Equal(CategoriaDeError.Prohibido, resultado.Error!.Categoria);
+        Assert.Equal(1, e.Denegaciones.Cantidad);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-30")]
+    public async Task ElActorDeLaSesionQueNoEsElDeLaSolicitud_NoObtieneElContextoPorLaWeb_YLaDenegacionSeRegistra()
+    {
+        var e = new Escenario();
+        var clienteDeLaSesion = Guid.NewGuid();
+        var otroActorDeLaSolicitud = Guid.NewGuid();
+        e.Actor.Actual = ActorActual.DeUsuario(otroActorDeLaSolicitud, BabelHub.Shared.Contratos.RolesDeUsuario.Cliente, null);
+        var web = new BabelHub.Ecommerce.Application.Web.Interno.ContextoDelAsistenteDeLaWeb(e.Contexto);
+
+        var resultado = await web.Pedir(new BabelHub.Ecommerce.Application.Web.ActorVerificado(clienteDeLaSesion, BabelHub.Ecommerce.Application.Web.RolWeb.Cliente, null));
 
         Assert.False(resultado.EsExito);
         Assert.Equal(CategoriaDeError.Prohibido, resultado.Error!.Categoria);

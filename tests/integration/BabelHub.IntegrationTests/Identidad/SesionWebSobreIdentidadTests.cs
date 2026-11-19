@@ -152,6 +152,7 @@ public sealed class SesionWebSobreIdentidadTests
         Assert.Equal(Ahora.AddMinutes(15), renovada.CredencialVenceEn);
         Assert.Equal(["renovacion-vieja"], sesiones.Renovaciones);
         Assert.DoesNotContain("jwt-de-prueba", renovada.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("renovacion-nueva", renovada.ToString(), StringComparison.Ordinal);
     }
 
     [Theory]
@@ -161,6 +162,9 @@ public sealed class SesionWebSobreIdentidadTests
     [InlineData(CategoriaDeError.NoDisponible, false)]
     [InlineData(CategoriaDeError.Limite, false)]
     [InlineData(CategoriaDeError.Inesperado, false)]
+    [InlineData(CategoriaDeError.Conflicto, false)]
+    [InlineData(CategoriaDeError.NoEncontrado, false)]
+    [InlineData(CategoriaDeError.ReglaDeNegocio, false)]
     [Trait("Criterio", "AC-IDE-50")]
     public async Task UnRechazoDeLaRenovacionCierraLaSesion_UnaFallaTransitoriaNo(CategoriaDeError categoria, bool cierra)
     {
@@ -173,6 +177,7 @@ public sealed class SesionWebSobreIdentidadTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-IDE-50")]
     public async Task UnaExcepcionDeIdentidadAlRenovar_EsTransitoria_YNoCierraLaSesion()
     {
         var sesiones = new SesionesFalsas { Renovacion = () => throw new InvalidOperationException("La base no responde.") };
