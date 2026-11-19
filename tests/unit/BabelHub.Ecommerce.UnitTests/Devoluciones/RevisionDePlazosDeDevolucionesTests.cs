@@ -58,7 +58,7 @@ public sealed class RevisionDePlazosDeDevolucionesTests
 
     [Fact]
     [Trait("Criterio", "AC-DEV-13")]
-    public async Task Diez_dias_exactos_no_vencen_y_una_linea_rechazada_puede_volver_a_solicitarse()
+    public async Task Diez_dias_exactos_no_vencen_y_el_cupo_de_la_linea_rechazada_queda_libre()
     {
         var (sistema, id, lineas) = await ConAprobada();
         sistema.Reloj.Ahora = Ahora.AddDays(10);
@@ -108,7 +108,7 @@ public sealed class RevisionDePlazosDeDevolucionesTests
 
     [Fact]
     [Trait("Criterio", "AC-DEV-13")]
-    public async Task Repetir_la_revision_no_cambia_nada_ni_audita_otra_vez_y_una_recibida_o_solicitada_no_se_toca()
+    public async Task Repetir_la_revision_no_cambia_nada_ni_audita_otra_vez()
     {
         var (sistema, id, _) = await ConAprobada();
         sistema.Reloj.Ahora = Ahora.AddDays(11);
@@ -138,6 +138,36 @@ public sealed class RevisionDePlazosDeDevolucionesTests
         Assert.All(Guardada(sistema, id).Lineas, l => Assert.Equal(EstadoDeLineaDeDevolucion.Aprobada, l.Estado));
         Assert.Equal(2, sistema.Repositorio.Cupos[lineas[0]].CantidadComprometida);
         Assert.Equal(1, (await sistema.Vencidas.Ejecutar(50)).Valor);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-13")]
+    public async Task Una_devolucion_que_falla_al_bloquearse_no_detiene_a_las_demas()
+    {
+        var cliente = new EntornoDeDevoluciones();
+        var ids = new List<Guid>();
+        for (var i = 0; i < 3; i++)
+        {
+            var linea = EntornoDeDevoluciones.Entregada(Ahora.AddDays(-2), 3, 50m);
+            var pedido = cliente.SembrarPedido(linea);
+            var solicitada = await cliente.SolicitarImpreso.Ejecutar(new SolicitarDevolucionDeImpresoEntrada(pedido.PedidoId, [new LineaPedidaParaDevolver(linea.LineaId, 1)], new TextoLibre("x"), "lima-central"));
+            ids.Add(solicitada.Valor.DevolucionId);
+        }
+
+        var admin = new EntornoDeDevoluciones(ActorDePrueba.DeAdministradorCentral()).ConLosDatosDe(cliente);
+        foreach (var id in ids)
+        {
+            await admin.Gestion.Aprobar(id);
+        }
+
+        var sistema = new EntornoDeDevoluciones(ActorDePrueba.DelSistema()).ConLosDatosDe(cliente);
+        sistema.Reloj.Ahora = Ahora.AddDays(11);
+        sistema.Repositorio.FallanAlBloquear.Add(ids.OrderBy(i => i).First());
+
+        var resultado = await sistema.Vencidas.Ejecutar(50);
+
+        Assert.Equal(2, resultado.Valor);
+        Assert.Equal(1, ids.Count(i => Guardada(sistema, i).Lineas[0].Estado == EstadoDeLineaDeDevolucion.Aprobada));
     }
 
     [Fact]

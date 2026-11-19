@@ -241,14 +241,14 @@ internal sealed class RepositorioDeDevolucionesEnMemoria : IRepositorioDeDevoluc
     public Task<PaginaDeDevolucionesDelDominio> ListarDePedidos(IReadOnlyCollection<Guid> pedidoIds, int pagina, int tamano, CancellationToken cancelacion = default)
     {
         Comprobar();
-        var todas = _devoluciones.Values.Where(d => pedidoIds.Contains(d.PedidoId)).OrderByDescending(d => d.CreadaEn).ToList();
+        var todas = _devoluciones.Values.Where(d => pedidoIds.Contains(d.PedidoId)).OrderByDescending(d => d.CreadaEn).ThenBy(d => d.Id).ToList();
         return Task.FromResult(new PaginaDeDevolucionesDelDominio([.. todas.Skip((pagina - 1) * tamano).Take(tamano)], todas.Count));
     }
 
     public Task<PaginaDeDevolucionesDelDominio> ListarDeLaSucursal(string codigoDeSucursal, int pagina, int tamano, CancellationToken cancelacion = default)
     {
         Comprobar();
-        var todas = _devoluciones.Values.Where(d => d.Tipo == TipoDeDevolucion.Impreso && d.Origen == OrigenDeDevolucion.Solicitud && d.CodigoDeSucursalReceptora == codigoDeSucursal).OrderByDescending(d => d.CreadaEn).ToList();
+        var todas = _devoluciones.Values.Where(d => d.Tipo == TipoDeDevolucion.Impreso && d.Origen == OrigenDeDevolucion.Solicitud && d.CodigoDeSucursalReceptora == codigoDeSucursal).OrderByDescending(d => d.CreadaEn).ThenBy(d => d.Id).ToList();
         return Task.FromResult(new PaginaDeDevolucionesDelDominio([.. todas.Skip((pagina - 1) * tamano).Take(tamano)], todas.Count));
     }
 
@@ -262,9 +262,17 @@ internal sealed class RepositorioDeDevolucionesEnMemoria : IRepositorioDeDevoluc
     /// <summary>Las devoluciones que otra transacción tiene bloqueadas: <c>SKIP LOCKED</c> las salta.</summary>
     public HashSet<Guid> Bloqueadas { get; } = [];
 
+    /// <summary>Las devoluciones cuya lectura bloqueada falla (un bloqueo agotado o el almacén): la revisión sigue con las demás.</summary>
+    public HashSet<Guid> FallanAlBloquear { get; } = [];
+
     public Task<Devolucion?> ObtenerParaActualizarSinEsperar(Guid devolucionId, CancellationToken cancelacion = default)
     {
         Comprobar();
+        if (FallanAlBloquear.Contains(devolucionId))
+        {
+            throw new DevolucionesNoDisponiblesException("El bloqueo agotó su espera.");
+        }
+
         return Task.FromResult(!Bloqueadas.Contains(devolucionId) && _devoluciones.TryGetValue(devolucionId, out var guardada) ? Clonar(guardada) : null);
     }
 
@@ -304,7 +312,7 @@ internal sealed class RepositorioDeDevolucionesEnMemoria : IRepositorioDeDevoluc
     public Task<PaginaDeDevolucionesDelDominio> ListarDeLaAdministracion(FiltroDeLaAdministracion filtro, int pagina, int tamano, CancellationToken cancelacion = default)
     {
         Comprobar();
-        var todas = _devoluciones.Values.Where(d => (filtro.Tipo is null || d.Tipo == filtro.Tipo) && (!filtro.SoloReportes || d.Origen == OrigenDeDevolucion.Reporte)).OrderByDescending(d => d.CreadaEn).ToList();
+        var todas = _devoluciones.Values.Where(d => (filtro.Tipo is null || d.Tipo == filtro.Tipo) && (!filtro.SoloReportes || d.Origen == OrigenDeDevolucion.Reporte)).OrderByDescending(d => d.CreadaEn).ThenBy(d => d.Id).ToList();
         return Task.FromResult(new PaginaDeDevolucionesDelDominio([.. todas.Skip((pagina - 1) * tamano).Take(tamano)], todas.Count));
     }
 
@@ -411,8 +419,8 @@ internal sealed class EntornoDeDevoluciones
         Gestion = new AprobarYRechazarDevolucion(Autorizador, LimitesDeUso, Repositorio, Unidad, Auditoria, Avisos, Reloj);
         Recepcion = new ConfirmarRecepcion(Autorizador, LimitesDeUso, Inventario, Reembolsos, Repositorio, Unidad, Auditoria, Avisos, Alertas, Procesador, Reloj);
         Conciliacion = new ConciliarReembolsosDeDevoluciones(Autorizador, Repositorio, Reembolsos, Unidad, Procesador, Reloj);
-        Consultas = new ConsultasDeDevoluciones(Autorizador, LimitesDeUso, Pedidos, Repositorio);
         Localizador = new LocalizadorDeDevolucionesDeUnaCuenta(Pedidos, Repositorio);
+        Consultas = new ConsultasDeDevoluciones(Autorizador, LimitesDeUso, Pedidos, Localizador, Repositorio);
         Pendientes = new ContarPendientesDeCuenta(Localizador);
         Redaccion = new RedactarDevolucionesDeUnaCuenta(Localizador, Repositorio, Auditoria, Reloj);
         ControlDeDepuracion = new ControlDeLaDepuracionDeDevoluciones(Reloj);

@@ -10,64 +10,6 @@ using BabelHub.Ecommerce.Domain.Devoluciones;
 namespace BabelHub.Ecommerce.Application.Devoluciones.Interno;
 
 /// <summary>
-/// Las entradas de auditoría de los cambios de una devolución (DEV-12, AC-DEV-11): el pedido, la devolución y el monto (en soles, con dos decimales) en cada paso, <b>nunca el motivo ni el texto</b>. El usuario o el actor «sistema» los pone la Auditoría desde el actor.
-/// </summary>
-internal static class AuditoriaDeDevoluciones
-{
-    public const string Moneda = "PEN";
-
-    public static SolicitudDeRegistro Solicitada(Devolucion d) =>
-        new(AccionesAuditables.DevolucionSolicitada)
-        {
-            ObjetoTipo = "devolucion",
-            ObjetoId = d.Id.ToString(),
-            Detalle = new Dictionary<string, string?>
-            {
-                ["pedidoId"] = d.PedidoId.ToString(),
-                ["cantidadDeLineas"] = d.Lineas.Count.ToString(CultureInfo.InvariantCulture),
-                ["monto"] = Monto(d.Lineas.Sum(l => l.Monto)),
-                ["moneda"] = Moneda,
-            },
-        };
-
-    /// <summary>
-    /// El cambio de estado: el anterior y el nuevo, el pedido, la devolución y el monto. Con <paramref name="lineaDePedidoId"/> el monto es el de esa línea (el reembolso es por línea); sin ella, el de toda la devolución.
-    /// </summary>
-    public static SolicitudDeRegistro Cambio(Devolucion d, EstadoDeLineaDeDevolucion anterior, EstadoDeLineaDeDevolucion nuevo, string? estadoNuevoPropio = null, Guid? lineaDePedidoId = null) =>
-        new(AccionesAuditables.EstadoDeDevolucionCambiado)
-        {
-            ObjetoTipo = "devolucion",
-            ObjetoId = d.Id.ToString(),
-            Detalle = new Dictionary<string, string?>
-            {
-                ["estadoAnterior"] = anterior.Codigo(),
-                ["estadoNuevo"] = estadoNuevoPropio ?? nuevo.Codigo(),
-                ["pedidoId"] = d.PedidoId.ToString(),
-                ["devolucionId"] = d.Id.ToString(),
-                ["monto"] = Monto(lineaDePedidoId is { } id ? d.Lineas.Single(l => l.LineaDePedidoId == id).Monto : d.Lineas.Sum(l => l.Monto)),
-                ["moneda"] = Moneda,
-            },
-        };
-
-    /// <summary>El reingreso al Inventario confirmado: el pedido, la devolución y el valor de lo reingresado.</summary>
-    public static SolicitudDeRegistro Reingreso(Devolucion d) =>
-        new(AccionesAuditables.ReingresoPorDevolucion)
-        {
-            ObjetoTipo = "devolucion",
-            ObjetoId = d.Id.ToString(),
-            Detalle = new Dictionary<string, string?>
-            {
-                ["devolucionId"] = d.Id.ToString(),
-                ["pedidoId"] = d.PedidoId.ToString(),
-                ["monto"] = Monto(d.Lineas.Sum(l => l.Monto)),
-                ["moneda"] = Moneda,
-            },
-        };
-
-    private static string Monto(decimal monto) => monto.ToString("0.00", CultureInfo.InvariantCulture);
-}
-
-/// <summary>
 /// <c>SolicitarReembolsoDeDigital</c> (T07; DEV-04, DEV-05, DEV-09, DEV-19, DEV-20, DEV-21; plan §1): lee de Pedidos y de Biblioteca; rechaza por política (enlace entregado), por plazo (más de 14 días desde el pago) o por línea no devolvible
 /// (anulada, reembolsada o con el acceso revocado o suspendido); si procede, <b>una sola transacción</b> en el orden global de bloqueo: marca de cancelación → cupo → devolución → <c>IReembolsos.Registrar</c> → <c>RevocarSiNoHayEnlace</c>
 /// (un enlace ya entregado, un acceso suspendido o el tope de Pagos revierten <b>toda</b> la transacción). Después de confirmar, <c>Procesar</c>; solo si la pasarela confirma, otra transacción pasa la línea a reembolsada. Un digital nunca llama al Inventario (regla 12).

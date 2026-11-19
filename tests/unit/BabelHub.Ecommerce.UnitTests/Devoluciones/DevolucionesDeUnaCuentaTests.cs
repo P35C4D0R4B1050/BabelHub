@@ -213,7 +213,7 @@ public sealed class DevolucionesDeUnaCuentaTests
 
     [Fact]
     [Trait("Criterio", "AC-DEV-27")]
-    public async Task Es_reaplicable_una_devolucion_nueva_o_reaparecida_se_redacta_en_la_siguiente_corrida()
+    public async Task Es_reaplicable_una_devolucion_nueva_se_redacta_en_la_siguiente_corrida()
     {
         var cliente = new EntornoDeDevoluciones();
         await Impreso(cliente);

@@ -1,3 +1,4 @@
+using BabelHub.Ecommerce.Application.Identidad;
 using BabelHub.Ecommerce.Application.Pedidos;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Devoluciones;
@@ -9,15 +10,12 @@ namespace BabelHub.Ecommerce.Application.Devoluciones.Interno;
 /// Todas con el orden fijo rol → textos legales → límite de consultas → alcance, paginadas con tope de 50, <b>sin el responsable de ningún cambio</b> (la vista no lo trae) y sin la cuenta. Una devolución ajena o inexistente responde lo mismo (<c>ECO-NO-ENCONTRADO</c>) y registra un acceso denegado por cada intento.
 /// Cada línea lleva si su reembolso está pendiente (DEV-21). Son lecturas: no abren transacción ni bloquean.
 /// </summary>
-internal sealed class ConsultasDeDevoluciones(AutorizadorDeDevoluciones autorizador, LimitesDeDevoluciones limites, IPedidosParaDevoluciones pedidos, IRepositorioDeDevoluciones repositorio)
+internal sealed class ConsultasDeDevoluciones(AutorizadorDeDevoluciones autorizador, LimitesDeDevoluciones limites, IPedidosParaDevoluciones pedidos, LocalizadorDeDevolucionesDeUnaCuenta localizador, IRepositorioDeDevoluciones repositorio)
 {
     public const int TamanoMaximo = 50;
 
     /// <summary>Un tope de página evita el desborde de <c>(página - 1) × tamaño</c> en el repositorio.</summary>
     public const int PaginaMaxima = 100_000;
-
-    /// <summary>Las páginas de pedidos de la cuenta que se recorren a lo sumo para localizar sus devoluciones (cada una de <see cref="IPedidosParaDevoluciones.TamanoMaximo"/>).</summary>
-    private const int PaginasDePedidosMaximas = 50;
 
     public async Task<Resultado<PaginaDeDevoluciones>> ListarMias(ListarDevolucionesEntrada entrada, CancellationToken cancelacion = default)
     {
@@ -35,18 +33,14 @@ internal sealed class ConsultasDeDevoluciones(AutorizadorDeDevoluciones autoriza
         try
         {
             var (pagina, tamano) = Paginar(entrada.Pagina, entrada.Tamano);
-            var pedidoIds = await PedidosDeLaCuenta(autorizador.Actor!.UsuarioId!.Value, cancelacion).ConfigureAwait(false);
-            if (pedidoIds is null)
-            {
-                return FallosDeDevoluciones.NoDisponible<PaginaDeDevoluciones>();
-            }
+            var pedidoIds = await localizador.PedidosDeLaCuenta(autorizador.Actor!.UsuarioId!.Value, cancelacion).ConfigureAwait(false);
 
             var devoluciones = pedidoIds.Count == 0
                 ? new PaginaDeDevolucionesDelDominio([], 0)
                 : await repositorio.ListarDePedidos(pedidoIds, pagina, tamano, cancelacion).ConfigureAwait(false);
             return Resultado<PaginaDeDevoluciones>.Exito(Pagina(devoluciones, pagina, tamano));
         }
-        catch (DevolucionesNoDisponiblesException)
+        catch (Exception ex) when (ex is DevolucionesNoDisponiblesException or PendientesNoDisponiblesException)
         {
             return FallosDeDevoluciones.NoDisponible<PaginaDeDevoluciones>();
         }
@@ -142,14 +136,14 @@ internal sealed class ConsultasDeDevoluciones(AutorizadorDeDevoluciones autoriza
             return FallosDeDevoluciones.Fallo<PaginaDeDevoluciones>(MapeoDeDevoluciones.ValidacionDeCampo("codigoDeSucursal", ClavesDeDevoluciones.ValidacionFallida));
         }
 
-        if (await autorizador.ExigirSucursalDeLaRuta(codigoDeSucursal, cancelacion).ConfigureAwait(false) is { } fueraDeLaRuta)
-        {
-            return FallosDeDevoluciones.Fallo<PaginaDeDevoluciones>(fueraDeLaRuta);
-        }
-
         if (await limites.Consulta(cancelacion).ConfigureAwait(false) is { } excedido)
         {
             return FallosDeDevoluciones.Fallo<PaginaDeDevoluciones>(excedido);
+        }
+
+        if (await autorizador.ExigirSucursalDeLaRuta(codigoDeSucursal, cancelacion).ConfigureAwait(false) is { } fueraDeLaRuta)
+        {
+            return FallosDeDevoluciones.Fallo<PaginaDeDevoluciones>(fueraDeLaRuta);
         }
 
         try
@@ -200,26 +194,4 @@ internal sealed class ConsultasDeDevoluciones(AutorizadorDeDevoluciones autoriza
 
     private static PaginaDeDevoluciones Pagina(PaginaDeDevolucionesDelDominio devoluciones, int pagina, int tamano) =>
         new([.. devoluciones.Devoluciones.Select(MapeoDeDevoluciones.Vista)], pagina, tamano, devoluciones.Total);
-
-    /// <summary>Los pedidos de la cuenta (de a <see cref="IPedidosParaDevoluciones.TamanoMaximo"/>) o <see langword="null"/> si Pedidos no responde.</summary>
-    private async Task<IReadOnlyCollection<Guid>?> PedidosDeLaCuenta(Guid cuentaId, CancellationToken cancelacion)
-    {
-        var ids = new List<Guid>();
-        for (var pagina = 1; pagina <= PaginasDePedidosMaximas; pagina++)
-        {
-            var lectura = await pedidos.ListarDeUnaCuenta(cuentaId, pagina, IPedidosParaDevoluciones.TamanoMaximo, cancelacion).ConfigureAwait(false);
-            if (!lectura.EsExito)
-            {
-                return null;
-            }
-
-            ids.AddRange(lectura.Valor.PedidoIds);
-            if (lectura.Valor.PedidoIds.Count == 0 || ids.Count >= lectura.Valor.Total)
-            {
-                break;
-            }
-        }
-
-        return ids;
-    }
 }

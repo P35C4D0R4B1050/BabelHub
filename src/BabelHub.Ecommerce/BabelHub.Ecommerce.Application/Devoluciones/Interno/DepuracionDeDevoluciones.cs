@@ -68,7 +68,8 @@ internal sealed class RedactarDevolucionesVencidas(
                 async token =>
                 {
                     var cantidad = 0;
-                    foreach (var devolucionId in candidatas)
+                    // Bloquea en orden de identificador, como la redacción de una cuenta: una cancelación concurrente no se interbloquea con la depuración.
+                    foreach (var devolucionId in candidatas.Order())
                     {
                         var devolucion = await repositorio.Obtener(devolucionId, paraActualizar: true, token).ConfigureAwait(false);
                         if (devolucion is null || !devolucion.EstaVencidaParaDepurar(hoy))

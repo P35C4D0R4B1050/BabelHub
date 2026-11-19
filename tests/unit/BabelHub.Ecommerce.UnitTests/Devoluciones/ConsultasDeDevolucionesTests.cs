@@ -282,4 +282,19 @@ public sealed class ConsultasDeDevolucionesTests
 
         Assert.All(new[] { mias.Error, obtener.Error, todas.Error }, e => Assert.Equal(CategoriaDeError.NoDisponible, e!.Categoria));
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-12")]
+    public async Task El_limite_de_consultas_se_aplica_antes_de_comprobar_la_sucursal_de_la_ruta_y_no_deja_un_evento_por_intento()
+    {
+        var cliente = new EntornoDeDevoluciones();
+        await SolicitarImpreso(cliente, "arequipa");
+        var encargado = Como(ActorDePrueba.DeEncargadoDe(SucursalDeLima), cliente);
+        encargado.Limites.Maximos["consultas-de-devoluciones-por-usuario"] = 0;
+
+        var resultado = await encargado.Consultas.ListarDeLaSucursal("arequipa", new ListarDevolucionesEntrada());
+
+        Assert.Equal(CategoriaDeError.Limite, resultado.Error!.Categoria);
+        Assert.Empty(encargado.Denegaciones.Eventos);
+    }
 }

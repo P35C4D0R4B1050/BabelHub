@@ -122,7 +122,7 @@ internal sealed class ContarPendientesDeCuenta(LocalizadorDeDevolucionesDeUnaCue
 
 /// <summary>
 /// <c>RedactarDevolucionesDeUnaCuenta</c> (T16; DEV-24, DEV-25; AC-DEV-26, AC-DEV-27): la parte de Devoluciones de la cancelación de la cuenta (<see cref="IAplicadorDeCancelacion"/>). Redacta el motivo y el texto de <b>todas</b> las devoluciones de los pedidos de la cuenta (abiertas o cerradas), quita el identificador del cliente
-/// de cada cambio y la referencia al acceso de los reportes, y conserva pedido, líneas, cantidades, importes, estados y fechas. <b>Todo o nada</b>: corre dentro de la transacción única de Identidad (bajo el rol del esquema, que abre la Infraestructura), bloquea cada devolución después de leerlas (cuenta → pedido → devolución), no captura
+/// de cada cambio y la referencia al acceso de los reportes, y conserva pedido, líneas, cantidades, importes, estados y fechas. <b>Todo o nada</b>: corre dentro de la transacción única de Identidad (bajo el rol del esquema, que abre la Infraestructura), bloquea cada devolución después de leerlas, <b>en orden de identificador</b> (cuenta → pedido → devolución, y entre devoluciones por identificador, igual que la depuración, para que no se interbloqueen), no captura
 /// ninguna excepción —si algo falla, <b>lanza</b> para que Identidad no ejecute la cancelación— y es <b>idempotente y reaplicable</b> (una devolución ya redactada no cambia y no falla; tras restaurar un respaldo, la que reapareció con su texto se vuelve a redactar). Sin devoluciones no hace nada ni falla. Audita el conteo, sin datos personales.
 /// </summary>
 internal sealed class RedactarDevolucionesDeUnaCuenta(LocalizadorDeDevolucionesDeUnaCuenta localizador, IRepositorioDeDevoluciones repositorio, IAuditoria auditoria, IReloj reloj) : IAplicadorDeCancelacion
@@ -139,7 +139,7 @@ internal sealed class RedactarDevolucionesDeUnaCuenta(LocalizadorDeDevolucionesD
         // Los pedidos y las devoluciones de la cuenta se leen sin bloqueo; después cada una se vuelve a leer bloqueada para redactarla.
         var ahora = reloj.Ahora;
         var redactadas = 0;
-        foreach (var leida in await localizador.DevolucionesDeLaCuenta(usuarioId, cancelacion).ConfigureAwait(false))
+        foreach (var leida in (await localizador.DevolucionesDeLaCuenta(usuarioId, cancelacion).ConfigureAwait(false)).OrderBy(d => d.Id))
         {
             var devolucion = await repositorio.Obtener(leida.Id, paraActualizar: true, cancelacion).ConfigureAwait(false);
             if (devolucion is not null && devolucion.Redactar(ahora, quitarElAcceso: true))

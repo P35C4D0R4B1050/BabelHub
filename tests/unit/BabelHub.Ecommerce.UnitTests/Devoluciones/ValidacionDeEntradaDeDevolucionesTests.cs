@@ -109,6 +109,7 @@ public sealed class ValidacionDeEntradaDeDevolucionesTests
         Assert.Equal(CategoriaDeError.Validacion, largo.Error!.Categoria);
         Assert.DoesNotContain("SEMBRADO", JsonSerializer.Serialize(new { Nulo = nulo.Error, Largo = largo.Error }), StringComparison.Ordinal);
         Assert.DoesNotContain("<script>", largo.Error.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("003Cscript", JsonSerializer.Serialize(largo.Error), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -126,6 +127,7 @@ public sealed class ValidacionDeEntradaDeDevolucionesTests
         var salidas = JsonSerializer.Serialize(new { auditoria = entorno.Auditoria.Solicitudes.Select(s => s.Detalle), avisos = entorno.Notificador.Solicitudes.Select(a => a.Campos), vista = resultado.Valor });
         Assert.DoesNotContain("SEMBRADO", salidas, StringComparison.Ordinal);
         Assert.DoesNotContain("<script>", salidas, StringComparison.Ordinal);
+        Assert.DoesNotContain("003Cscript", salidas, StringComparison.OrdinalIgnoreCase);
     }
 
     // ---------- Las líneas ----------

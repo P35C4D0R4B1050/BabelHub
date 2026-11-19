@@ -53,7 +53,7 @@ internal interface IRepositorioDeDevoluciones
     /// <summary>Devuelve las unidades de líneas rechazadas, también en orden de <c>linea_id</c> (DEV-18).</summary>
     Task DevolverCupos(IReadOnlyList<(Guid LineaId, int Unidades)> cupos, CancellationToken cancelacion = default);
 
-    /// <summary>Las devoluciones de los pedidos dados, de la más reciente a la más antigua (las de una cuenta: sus pedidos salen del contrato de lectura de Pedidos).</summary>
+    /// <summary>Las devoluciones de los pedidos dados, de la más reciente a la más antigua <b>con un orden total estable (desempate por identificador)</b>, porque se lee por páginas sin bloqueo (las de una cuenta: sus pedidos salen del contrato de lectura de Pedidos).</summary>
     Task<PaginaDeDevolucionesDelDominio> ListarDePedidos(IReadOnlyCollection<Guid> pedidoIds, int pagina, int tamano, CancellationToken cancelacion = default);
 
     /// <summary>Solo las de <b>impresos</b> con esa sucursal receptora (un encargado nunca ve un reporte ni un digital, DEV-28).</summary>
