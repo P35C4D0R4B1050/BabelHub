@@ -64,6 +64,11 @@ internal sealed class EntregarLineasDelPedido(
         {
             return Resultado<LineasOperadas>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDePedidos.Conflicto));
         }
+        catch (OperacionRechazadaException rechazo)
+        {
+            // La segunda defensa de PED-21 (el único de la base): la operación que llegó segunda se rechaza.
+            return Resultado<LineasOperadas>.Fallo(rechazo.Error);
+        }
         catch (AuditoriaNoDisponibleException)
         {
             // Sin auditoría no hay fila ni llamada al Inventario.

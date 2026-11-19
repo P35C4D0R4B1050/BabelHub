@@ -269,7 +269,9 @@ public sealed class AdaptadoresRealesDePedidosTests
         }
 
         Assert.Contains("IAccesosDeBiblioteca", error.Message, StringComparison.Ordinal);
-        Assert.Contains("IResolucionDeSucursal", error.Message, StringComparison.Ordinal);
+        // La sucursal ya se resuelve por su código (T30): deja de ser un doble provisional.
+        Assert.DoesNotContain("IResolucionDeSucursal", error.Message, StringComparison.Ordinal);
+        Assert.Contains(servicios, d => d.ServiceType == typeof(IResolucionDeSucursal) && d.ImplementationType == typeof(CodigoResolucionDeSucursal));
         Assert.Contains(servicios, d => d.ServiceType == typeof(IReservasDelPedido) && d.ImplementationType == typeof(RestReservasDelPedido));
         Assert.Contains(servicios, d => d.ServiceType == typeof(ILimitadorDePedidos) && d.ImplementationType == typeof(LimitadorDePedidosSobreLimites));
         Assert.Contains(servicios, d => d.ServiceType == typeof(IAuditoriaDeContacto) && d.ImplementationType == typeof(AuditoriaDeContactoSobreAuditoria));
