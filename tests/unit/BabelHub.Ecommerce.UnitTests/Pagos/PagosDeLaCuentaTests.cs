@@ -90,7 +90,7 @@ public sealed class PagosDeLaCuentaTests
         var e = await ConCompraCompletada();
         await CrearOtraIntencion(e.Pagos);
         var antes = e.Pagos.Repositorio.Intenciones.ToDictionary(i => i.Id, i => (i.Estado, i.Total, i.Envio, i.CreadaEn));
-        var aplicador = new DesvincularPagosDeUnaCuenta(e.Pagos.Repositorio, e.Pagos.Reloj);
+        var aplicador = new DesvincularPagosDeUnaCuenta(e.Pagos.Repositorio, e.Pagos.Auditoria, e.Pagos.Reloj);
 
         await aplicador.Aplicar(Cuenta, Guid.NewGuid());
 
@@ -123,7 +123,7 @@ public sealed class PagosDeLaCuentaTests
     {
         var e = await ConCompraCompletada();
         await CrearOtraIntencion(e.Pagos, cuenta: Guid.Parse("11111111-1111-1111-1111-111111111199"));
-        var aplicador = new DesvincularPagosDeUnaCuenta(e.Pagos.Repositorio, e.Pagos.Reloj);
+        var aplicador = new DesvincularPagosDeUnaCuenta(e.Pagos.Repositorio, e.Pagos.Auditoria, e.Pagos.Reloj);
 
         await aplicador.Aplicar(Cuenta, Guid.NewGuid());
 
@@ -139,7 +139,7 @@ public sealed class PagosDeLaCuentaTests
         var e = await ConCompraCompletada();
         var respaldo = e.Pagos.Repositorio.Intenciones.Single();
         e.Pagos.Repositorio.Sembrar(respaldo);
-        var aplicador = new DesvincularPagosDeUnaCuenta(e.Pagos.Repositorio, e.Pagos.Reloj);
+        var aplicador = new DesvincularPagosDeUnaCuenta(e.Pagos.Repositorio, e.Pagos.Auditoria, e.Pagos.Reloj);
         var bloqueosAntes = e.Pagos.Repositorio.LecturasConBloqueo;
 
         await aplicador.Aplicar(Cuenta, Guid.NewGuid());
@@ -163,7 +163,7 @@ public sealed class PagosDeLaCuentaTests
     {
         var e = await ConCompraCompletada();
         await CrearOtraIntencion(e.Pagos);
-        var aplicador = new DesvincularPagosDeUnaCuenta(e.Pagos.Repositorio, e.Pagos.Reloj);
+        var aplicador = new DesvincularPagosDeUnaCuenta(e.Pagos.Repositorio, e.Pagos.Auditoria, e.Pagos.Reloj);
         e.Pagos.Repositorio.GuardarIntencionLanzaEnLaLlamada = e.Pagos.Repositorio.GuardadosDeIntenciones + 2;
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => e.Pagos.Unidad.Ejecutar(token => Aplicar(aplicador, token)));
@@ -200,7 +200,7 @@ public sealed class PagosDeLaCuentaTests
     {
         var e = await ConCompraCompletada();
         Assert.NotNull(e.Pagos.Repositorio.Intenciones.Single().Contacto);
-        var liberar = new LiberarContactoDeLaIntencion(e.Pagos.Repositorio, e.Pagos.Unidad, new BloqueoDeIntenciones(e.Pagos.Repositorio, e.Pagos.Cuenta), e.Pagos.Reloj);
+        var liberar = new LiberarContactoDeLaIntencion(e.Pagos.Repositorio, e.Pagos.Unidad, new BloqueoDeIntenciones(e.Pagos.Repositorio, e.Pagos.Cuenta), e.Pagos.Auditoria, e.Pagos.Reloj);
 
         await liberar.Liberar(Pedido);
 
@@ -215,7 +215,7 @@ public sealed class PagosDeLaCuentaTests
     public async Task Liberar_el_contacto_dos_veces_es_idempotente_y_lee_la_marca_antes_de_bloquear()
     {
         var e = await ConCompraCompletada();
-        var liberar = new LiberarContactoDeLaIntencion(e.Pagos.Repositorio, e.Pagos.Unidad, new BloqueoDeIntenciones(e.Pagos.Repositorio, e.Pagos.Cuenta), e.Pagos.Reloj);
+        var liberar = new LiberarContactoDeLaIntencion(e.Pagos.Repositorio, e.Pagos.Unidad, new BloqueoDeIntenciones(e.Pagos.Repositorio, e.Pagos.Cuenta), e.Pagos.Auditoria, e.Pagos.Reloj);
         e.Pagos.Orden.Clear();
 
         await liberar.Liberar(Pedido);
@@ -233,7 +233,7 @@ public sealed class PagosDeLaCuentaTests
     {
         var b = await EntornoDeConfirmacion.ConIntentoIniciado();
         var p = b.Entorno;
-        var liberar = new LiberarContactoDeLaIntencion(p.Repositorio, p.Unidad, new BloqueoDeIntenciones(p.Repositorio, p.Cuenta), p.Reloj);
+        var liberar = new LiberarContactoDeLaIntencion(p.Repositorio, p.Unidad, new BloqueoDeIntenciones(p.Repositorio, p.Cuenta), p.Auditoria, p.Reloj);
 
         await liberar.Liberar(Pedido);
 
@@ -245,7 +245,7 @@ public sealed class PagosDeLaCuentaTests
     public async Task Liberar_el_contacto_de_una_intencion_desconocida_o_vacia_no_falla()
     {
         var e = await ConCompraCompletada();
-        var liberar = new LiberarContactoDeLaIntencion(e.Pagos.Repositorio, e.Pagos.Unidad, new BloqueoDeIntenciones(e.Pagos.Repositorio, e.Pagos.Cuenta), e.Pagos.Reloj);
+        var liberar = new LiberarContactoDeLaIntencion(e.Pagos.Repositorio, e.Pagos.Unidad, new BloqueoDeIntenciones(e.Pagos.Repositorio, e.Pagos.Cuenta), e.Pagos.Auditoria, e.Pagos.Reloj);
 
         await liberar.Liberar(Guid.NewGuid());
         await liberar.Liberar(Guid.Empty);

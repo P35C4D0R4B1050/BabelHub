@@ -1,3 +1,4 @@
+using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Identidad;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Pagos;
@@ -28,7 +29,7 @@ internal sealed class ContarPendientesDeCuenta(IRepositorioDePagos repositorio, 
 /// contacto y la huella— y conserva los importes, las fechas y los estados. Las lee con bloqueo (el orden global: la marca de cancelación es de Identidad), corre <b>dentro de la transacción de Identidad</b> (si falla, todo
 /// se revierte) y es idempotente y reaplicable: tras restaurar un respaldo, una intención que reapareció con su cuenta se vuelve a desvincular.
 /// </summary>
-internal sealed class DesvincularPagosDeUnaCuenta(IRepositorioDePagos repositorio, IReloj reloj) : IAplicadorDeCancelacion
+internal sealed class DesvincularPagosDeUnaCuenta(IRepositorioDePagos repositorio, IAuditoria auditoria, IReloj reloj) : IAplicadorDeCancelacion
 {
     public string Modulo => "pagos";
 
@@ -40,12 +41,24 @@ internal sealed class DesvincularPagosDeUnaCuenta(IRepositorioDePagos repositori
         }
 
         var ahora = reloj.Ahora;
+        var cantidad = 0;
         foreach (var intencion in await repositorio.ListarIntencionesDeLaCuenta(usuarioId, paraActualizar: true, cancelacion).ConfigureAwait(false))
         {
             if (intencion.Desvincular(ahora))
             {
                 await repositorio.GuardarIntencion(intencion, cancelacion).ConfigureAwait(false);
+                cantidad++;
             }
+        }
+
+        if (cantidad > 0)
+        {
+            await auditoria.Registrar(
+                new SolicitudDeRegistro(AccionesAuditables.IntencionesDePagoDesvinculadas)
+                {
+                    Detalle = new Dictionary<string, string?> { ["cantidad"] = cantidad.ToString(System.Globalization.CultureInfo.InvariantCulture) },
+                },
+                cancelacion).ConfigureAwait(false);
         }
     }
 }
@@ -54,7 +67,7 @@ internal sealed class DesvincularPagosDeUnaCuenta(IRepositorioDePagos repositori
 /// Que Pedidos pida eliminar el contacto de la intención tras guardar su copia (T22, PED-35, PAG-27): <b>idempotente</b>. Solo libera el de una compra <c>completada</c> (con pedido); en cualquier otro estado el contacto aún lo
 /// necesita la compra, o ya se eliminó al resolverse sin pedido, y no hace nada. Una intención desconocida no falla.
 /// </summary>
-internal sealed class LiberarContactoDeLaIntencion(IRepositorioDePagos repositorio, IUnidadDeTrabajo unidad, BloqueoDeIntenciones bloqueo, IReloj reloj) : ILiberacionDeContactoDePago
+internal sealed class LiberarContactoDeLaIntencion(IRepositorioDePagos repositorio, IUnidadDeTrabajo unidad, BloqueoDeIntenciones bloqueo, IAuditoria auditoria, IReloj reloj) : ILiberacionDeContactoDePago
 {
     public Task Liberar(Guid pedidoId, CancellationToken cancelacion = default)
     {
@@ -70,10 +83,23 @@ internal sealed class LiberarContactoDeLaIntencion(IRepositorioDePagos repositor
                 if (intencion is { Estado: EstadoDeIntencion.Completada } && intencion.LiberarContacto(reloj.Ahora))
                 {
                     await repositorio.GuardarIntencion(intencion, token).ConfigureAwait(false);
+                    await AuditoriasDeContacto.Liberado(auditoria, "pedido", token).ConfigureAwait(false);
                 }
 
                 return true;
             },
             cancelacion);
     }
+}
+
+/// <summary>La auditoría de la eliminación del contacto de entrega (PAG-27): una fila por eliminación, con su origen de lista cerrada y sin datos personales.</summary>
+internal static class AuditoriasDeContacto
+{
+    public static Task Liberado(IAuditoria auditoria, string origen, CancellationToken token) =>
+        auditoria.Registrar(
+            new SolicitudDeRegistro(AccionesAuditables.ContactoDeEntregaLiberado)
+            {
+                Detalle = new Dictionary<string, string?> { ["origen"] = origen, ["cantidad"] = "1" },
+            },
+            token);
 }

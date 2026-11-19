@@ -94,7 +94,7 @@ internal sealed class ReintentarReembolsosPendientes(IRepositorioDeReembolsos re
 /// Purga el contacto de entrega a los 30 días de creada la intención, haya o no pedido (T23, PAG-27). Una compra <b>aprobada sin pedido</b> que llega a los 30 días también lo pierde y <b>publica una alerta técnica</b> (algo
 /// quedó trabado), y toda falla al purgar alerta y no detiene a las demás. Devuelve cuántos contactos eliminó.
 /// </summary>
-internal sealed class PurgarContactoDeIntenciones(IRepositorioDePagos repositorio, IUnidadDeTrabajo unidad, BloqueoDeIntenciones bloqueo, IPublicadorDeAlertasTecnicas alertas, IReloj reloj)
+internal sealed class PurgarContactoDeIntenciones(IRepositorioDePagos repositorio, IUnidadDeTrabajo unidad, BloqueoDeIntenciones bloqueo, IAuditoria auditoria, IPublicadorDeAlertasTecnicas alertas, IReloj reloj)
 {
     public const string MotivoDeAlertaPurgaFallida = "purga-de-contacto-fallida";
     public const string MotivoDeAlertaAprobadaSinPedidoALos30Dias = "compra-aprobada-sin-pedido-a-los-30-dias";
@@ -138,6 +138,7 @@ internal sealed class PurgarContactoDeIntenciones(IRepositorioDePagos repositori
         var estabaAprobada = intencion.Estado == EstadoDeIntencion.Aprobada;
         intencion.LiberarContacto(reloj.Ahora);
         await repositorio.GuardarIntencion(intencion, token).ConfigureAwait(false);
+        await AuditoriasDeContacto.Liberado(auditoria, "retencion", token).ConfigureAwait(false);
         return (true, estabaAprobada);
     }
 }

@@ -17,7 +17,7 @@ internal sealed class EntornoDeReembolsos
         var p = b.Entorno;
         var bloqueo = new BloqueoDeIntenciones(p.Repositorio, p.Cuenta);
         Registrar = new RegistrarReembolso(p.Repositorio, p.Reembolsos, p.Unidad, bloqueo, p.Auditoria, p.Reloj);
-        Procesar = new ProcesarReembolso(p.Repositorio, p.Reembolsos, p.Unidad, p.Pasarela, p.Alertas, p.Reloj, new OpcionesDelCobro(TimeSpan.FromMilliseconds(300)));
+        Procesar = new ProcesarReembolso(p.Repositorio, p.Reembolsos, p.Unidad, p.Pasarela, p.Auditoria, p.Alertas, p.Reloj, new OpcionesDelCobro(TimeSpan.FromMilliseconds(300)));
         Reintentar = new ReintentarReembolso(p.Autorizador, p.Reembolsos, p.Unidad, Procesar, p.Reloj);
         Listar = new ListarReembolsosPendientes(p.Autorizador, p.Reembolsos, p.Unidad);
         Fachada = new ReembolsosDePagos(Registrar, Procesar, Reintentar, Listar, p.Reembolsos, p.Unidad);

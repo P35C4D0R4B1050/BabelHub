@@ -119,7 +119,7 @@ public sealed class TrabajosDePagosTests
     public async Task El_contacto_se_elimina_a_los_30_dias_de_creada_la_intencion_haya_o_no_pedido()
     {
         var e = await EntornoDePagosExtensiones.ConIntencionLista();
-        var purgar = new PurgarContactoDeIntenciones(e.Repositorio, e.Unidad, Bloqueo(e), e.Alertas, e.Reloj);
+        var purgar = new PurgarContactoDeIntenciones(e.Repositorio, e.Unidad, Bloqueo(e), e.Auditoria, e.Alertas, e.Reloj);
 
         e.Reloj.Ahora = IntencionesDePrueba.Inicio.AddDays(29).AddHours(23);
         Assert.Equal(0, await purgar.Ejecutar(10));
@@ -141,7 +141,7 @@ public sealed class TrabajosDePagosTests
         var intencion = b.Intencion;
         intencion.AplicarAprobacion(b.Intento, "ch_1", p.Reloj.Ahora);
         await p.Repositorio.GuardarIntencion(intencion);
-        var purgar = new PurgarContactoDeIntenciones(p.Repositorio, p.Unidad, Bloqueo(p), p.Alertas, p.Reloj);
+        var purgar = new PurgarContactoDeIntenciones(p.Repositorio, p.Unidad, Bloqueo(p), p.Auditoria, p.Alertas, p.Reloj);
         p.Reloj.Ahora = IntencionesDePrueba.Inicio.AddDays(31);
 
         var purgados = await purgar.Ejecutar(10);
@@ -156,7 +156,7 @@ public sealed class TrabajosDePagosTests
     public async Task Si_la_purga_falla_se_alerta_y_el_contacto_sigue_hasta_la_proxima_corrida()
     {
         var e = await EntornoDePagosExtensiones.ConIntencionLista();
-        var purgar = new PurgarContactoDeIntenciones(e.Repositorio, e.Unidad, Bloqueo(e), e.Alertas, e.Reloj);
+        var purgar = new PurgarContactoDeIntenciones(e.Repositorio, e.Unidad, Bloqueo(e), e.Auditoria, e.Alertas, e.Reloj);
         e.Reloj.Ahora = IntencionesDePrueba.Inicio.AddDays(31);
         e.Repositorio.BloqueoNoDisponible = true;
 

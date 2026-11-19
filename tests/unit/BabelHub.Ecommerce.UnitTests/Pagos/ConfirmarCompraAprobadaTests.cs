@@ -14,7 +14,7 @@ internal sealed class EntornoDeConfirmacion
         Completador = new CompletadorDeCompraDoble(entorno.Unidad);
         Compensador = new CompensadorDeCompraDoble(entorno.Unidad);
         var bloqueo = new BloqueoDeIntenciones(entorno.Repositorio, entorno.Cuenta);
-        Marcar = new MarcarCompraAprobada(entorno.Repositorio, entorno.Unidad, bloqueo, entorno.Reloj);
+        Marcar = new MarcarCompraAprobada(entorno.Repositorio, entorno.Unidad, bloqueo, entorno.Auditoria, entorno.Reloj);
         Reservas = new ConfirmarReservasDeLaCompra(entorno.Repositorio, entorno.Unidad, bloqueo, entorno.Reservas, entorno.Alertas, entorno.Reloj);
         Confirmar = new ConfirmarCompraAprobada(Marcar, Reservas, Completador, Compensador, entorno.Avisador, entorno.Alertas, entorno.Reloj);
     }

@@ -179,6 +179,7 @@ internal sealed class ProcesarReembolso(
     IRepositorioDeReembolsos reembolsos,
     IUnidadDeTrabajo unidad,
     IPasarelaDePago pasarela,
+    IAuditoria auditoria,
     IPublicadorDeAlertasTecnicas alertas,
     IReloj reloj,
     OpcionesDelCobro opciones) : ICasoDeUso<Guid, EstadoDelReembolso>
@@ -272,9 +273,34 @@ internal sealed class ProcesarReembolso(
                 }
 
                 await reembolsos.Guardar(actual, token).ConfigureAwait(false);
+                await AuditarResolucion(actual, token).ConfigureAwait(false);
                 return Resultado<EstadoDelReembolso>.Exito(actual.Estado.APublico());
             },
             cancelacion).ConfigureAwait(false);
+    }
+
+    /// <summary>Audita en la misma transacción cómo quedó el reembolso (reembolsado o pendiente con su motivo de lista cerrada), sin datos de pago; el actor es el administrador central o el sistema.</summary>
+    private Task AuditarResolucion(Reembolso reembolso, CancellationToken token)
+    {
+        var detalle = new Dictionary<string, string?> { ["resultado"] = reembolso.Estado == EstadoDeReembolso.Reembolsado ? "reembolsado" : "pendiente" };
+        if (reembolso.Estado != EstadoDeReembolso.Reembolsado && reembolso.MotivoPendiente is { } motivo)
+        {
+            detalle["motivo"] = motivo switch
+            {
+                MotivoPendienteDeReembolso.RechazadoPorPasarela => "rechazado-por-pasarela",
+                MotivoPendienteDeReembolso.NoSoportado => "no-soportado",
+                _ => "sin-respuesta",
+            };
+        }
+
+        return auditoria.Registrar(
+            new SolicitudDeRegistro(AccionesAuditables.ReembolsoResuelto)
+            {
+                ObjetoTipo = "pedido",
+                ObjetoId = reembolso.IntencionId.ToString("D"),
+                Detalle = detalle,
+            },
+            token);
     }
 
     private sealed record Reclamo(Reembolso? Reembolso, bool Reclamado, string? ReferenciaDelCargo);
@@ -352,6 +378,7 @@ internal sealed class ProcesarReembolso(
         }
 
         await reembolsos.Guardar(reembolso, token).ConfigureAwait(false);
+        await AuditarResolucion(reembolso, token).ConfigureAwait(false);
         return Resultado<EstadoDelReembolso>.Exito(reembolso.Estado.APublico());
     }
 

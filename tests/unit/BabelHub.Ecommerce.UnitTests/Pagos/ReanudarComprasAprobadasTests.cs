@@ -39,7 +39,7 @@ public sealed class ReanudarComprasAprobadasTests
     private static Entorno Armar(EntornoDeConfirmacion b)
     {
         var p = b.Entorno;
-        var procesar = new ProcesarReembolso(p.Repositorio, p.Reembolsos, p.Unidad, p.Pasarela, p.Alertas, p.Reloj, new OpcionesDelCobro(TimeSpan.FromMilliseconds(300)));
+        var procesar = new ProcesarReembolso(p.Repositorio, p.Reembolsos, p.Unidad, p.Pasarela, p.Auditoria, p.Alertas, p.Reloj, new OpcionesDelCobro(TimeSpan.FromMilliseconds(300)));
         var reanudar = new ReanudarComprasAprobadas(p.Repositorio, p.Reembolsos, p.Unidad, p.Confirmador, b.Compensador, procesar, p.Alertas, p.Reloj);
         return new Entorno { Base = b, Reanudar = reanudar, Procesar = procesar };
     }

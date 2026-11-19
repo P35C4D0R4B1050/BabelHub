@@ -1,3 +1,4 @@
+using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Pagos;
 
@@ -86,7 +87,7 @@ internal sealed record ResultadoDeMarcarAprobada(TipoDeMarcaDeAprobacion Tipo, M
 /// la reclamación, clasifica si la compra es tardía o si prevalecen PAG-29 o PAG-32 y, solo si va a llamar a <c>reservas.confirmar</c>, marca <c>confirmacion_iniciada_en</c> <b>antes</b> de llamar. Es idempotente: la retoma y la
 /// consulta de un pendiente lo repiten. Una compensación ya iniciada se termina con su motivo.
 /// </summary>
-internal sealed class MarcarCompraAprobada(IRepositorioDePagos repositorio, IUnidadDeTrabajo unidad, BloqueoDeIntenciones bloqueo, IReloj reloj)
+internal sealed class MarcarCompraAprobada(IRepositorioDePagos repositorio, IUnidadDeTrabajo unidad, BloqueoDeIntenciones bloqueo, IAuditoria auditoria, IReloj reloj)
 {
     public Task<ResultadoDeMarcarAprobada> Marcar(Guid pedidoId, Guid intentoId, string referenciaDePasarela, CancellationToken cancelacion = default) =>
         unidad.Ejecutar(token => MarcarEnLaTransaccion(pedidoId, intentoId, referenciaDePasarela, token), cancelacion);
@@ -117,10 +118,20 @@ internal sealed class MarcarCompraAprobada(IRepositorioDePagos repositorio, IUni
         if (intento.Estado == EstadoDeIntento.AprobadoSobrante)
         {
             await repositorio.GuardarIntento(intento, token).ConfigureAwait(false);
+            if (resultado == ResultadoDeAprobacion.Sobrante)
+            {
+                await ResolucionesDeCobros.Auditar(auditoria, intento, "aprobado", null, null, token).ConfigureAwait(false);
+            }
+
             return new ResultadoDeMarcarAprobada(TipoDeMarcaDeAprobacion.Compensar, MotivoDelSobrante(intencion, cancelacionEnCurso), VarianteDeCompensacion.SoloReembolso);
         }
 
         await repositorio.GuardarIntento(intento, token).ConfigureAwait(false);
+        if (resultado == ResultadoDeAprobacion.Aprobado)
+        {
+            await ResolucionesDeCobros.Auditar(auditoria, intento, "aprobado", null, null, token).ConfigureAwait(false);
+        }
+
         switch (intencion.Estado)
         {
             case EstadoDeIntencion.Completada:
