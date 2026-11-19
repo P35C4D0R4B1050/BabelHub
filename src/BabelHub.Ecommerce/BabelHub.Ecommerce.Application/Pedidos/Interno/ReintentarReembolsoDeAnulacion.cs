@@ -65,7 +65,7 @@ internal sealed class ReintentarReembolsoDeAnulacion(
                 {
                     ObjetoTipo = "pedido",
                     ObjetoId = pedido.Id.ToString("D"),
-                    Detalle = new Dictionary<string, string?> { ["origen"] = vista.Origen == OrigenDelReembolso.CancelacionDelCliente ? "cancelacion" : "anulacion", ["intentosPrevios"] = vista.Intentos.ToString(System.Globalization.CultureInfo.InvariantCulture) },
+                    Detalle = new Dictionary<string, string?> { ["monto"] = vista.Monto.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) },
                 },
                 cancelacion).ConfigureAwait(false);
         }

@@ -114,7 +114,8 @@ public sealed class CompletarOperacionesEnCursoTests
         // Las reservas ya estaban liberadas: la reanudación no las libera otra vez.
         Assert.Single(entorno.Reservas.Liberaciones);
         var compleccion = entorno.Auditoria.Solicitudes.Last(s => s.Accion == AccionesAuditables.EstadoDePedidoCambiado);
-        Assert.Equal((Administrador.ToString("D"), "administrador-central"), (compleccion.Detalle["iniciadaPor"], compleccion.Detalle["rolDelIniciador"]));
+        Assert.Equal(Administrador.ToString("D"), compleccion.Detalle["iniciadaPor"]);
+        Assert.Equal("pago-duplicado", entorno.Auditoria.Solicitudes.Single(s => s.Accion == AccionesAuditables.PedidoAnulado).Detalle["causa"]);
         Assert.Single(entorno.Reembolsos.Procesados);
     }
 

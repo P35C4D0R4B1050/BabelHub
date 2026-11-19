@@ -64,7 +64,7 @@ public sealed class ReintentarReembolsoDeAnulacionTests
         Assert.Empty(entorno.Reembolsos.Registrados);
         var auditoria = Assert.Single(entorno.Auditoria.Solicitudes);
         Assert.Equal(AccionesAuditables.ReembolsoDePedidoReintentado, auditoria.Accion);
-        Assert.Equal("anulacion", auditoria.Detalle["origen"]);
+        Assert.Equal("50.00", auditoria.Detalle["monto"]);
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public sealed class ReintentarReembolsoDeAnulacionTests
 
         Assert.True(reintentado.EsExito);
         Assert.Equal([reembolsoId], delCliente.Reembolsos.Reintentados);
-        Assert.Equal("cancelacion", delCliente.Auditoria.Solicitudes.Single().Detalle["origen"]);
+        Assert.Equal("50.00", delCliente.Auditoria.Solicitudes.Single().Detalle["monto"]);
     }
 
     [Fact]

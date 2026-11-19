@@ -67,7 +67,10 @@ public interface IRepositorioDePedidos
 
     Task<IReadOnlyList<Entrega>> EntregasEnCurso(Guid pedidoId, CancellationToken cancelacion = default);
 
-    /// <summary>Las anulaciones y entregas <c>en_curso</c> cuyo <c>proximo_intento_en</c> ya llegó (la reanudación de T22), las más antiguas primero y hasta <paramref name="maximo"/> en total; el adaptador las lee con <c>FOR UPDATE SKIP LOCKED</c> para que dos instancias no tomen la misma.</summary>
+    /// <summary>Las anulaciones <c>fallida</c>s del pedido (repetir una anulación fallida crea una fila nueva): sus líneas ya pasaron por la cancelación de envíos, así que un envío que Envíos informa «mantenido» por estar ya cancelado no cuenta como salido.</summary>
+    Task<IReadOnlyList<Anulacion>> AnulacionesFallidas(Guid pedidoId, CancellationToken cancelacion = default);
+
+    /// <summary>Las anulaciones y entregas <c>en_curso</c> cuyo <c>proximo_intento_en</c> ya llegó (la reanudación de T22), las más antiguas primero y hasta <paramref name="maximo"/> en total; el adaptador reclama cada fila empujando su <c>proximo_intento_en</c> en una transacción corta (una concesión), para que dos instancias no tomen la misma; además el tiempo 3 revalida bajo el bloqueo del pedido que la fila siga en curso.</summary>
     Task<OperacionesPorReanudar> OperacionesEnCursoParaReanudar(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default);
 
     /// <summary>Los pedidos de recojo con alguna línea que lleva más de 360 horas en listo para recojo (candidatos de la revisión de plazos, PED-15), hasta <paramref name="maximo"/>; sin bloqueo: cada uno se revisa luego bajo el suyo.</summary>

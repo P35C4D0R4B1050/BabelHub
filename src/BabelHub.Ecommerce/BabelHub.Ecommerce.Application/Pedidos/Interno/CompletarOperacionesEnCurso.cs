@@ -108,7 +108,7 @@ internal sealed class CompletarOperacionesEnCurso(
         // Otra operación ya resolvió sus líneas: se descarta.
         if (pedido.Lineas.Where(l => anulacion.LineaIds.Contains(l.Id)).All(l => l.EstadoImpreso == EstadoDeLineaImpresa.Anulado || l.EstadoDigital == EstadoDeLineaDigital.Anulado))
         {
-            await Guardar(() => anulacion.Descartar(ahora), a => pedidos.ActualizarAnulacion(a, cancelacion), anulacion).ConfigureAwait(false);
+            await Guardar(() => anulacion.Descartar(ahora), a => pedidos.ActualizarAnulacion(a, cancelacion), anulacion, cancelacion).ConfigureAwait(false);
             return Salida.Descartada;
         }
 
@@ -116,6 +116,11 @@ internal sealed class CompletarOperacionesEnCurso(
         if (aplicada.EsExito)
         {
             return Salida.Completada;
+        }
+
+        if (aplicada.Error!.Clave == ClavesDePedidos.OperacionYaResuelta)
+        {
+            return Salida.Omitida;
         }
 
         if (anulacion.Estado == EstadoDeOperacion.Descartada)
@@ -128,7 +133,7 @@ internal sealed class CompletarOperacionesEnCurso(
             return await Fallar(() => anulacion.Fallar(ahora), anulacion, cancelacion).ConfigureAwait(false);
         }
 
-        await Guardar(() => anulacion.RegistrarIntento(ahora), a => pedidos.ActualizarAnulacion(a, cancelacion), anulacion).ConfigureAwait(false);
+        await Guardar(() => anulacion.RegistrarIntento(ahora), a => pedidos.ActualizarAnulacion(a, cancelacion), anulacion, cancelacion).ConfigureAwait(false);
         if (anulacion.Estado != EstadoDeOperacion.EnCurso)
         {
             // Pasados 15 minutos el intento la deja fallida.
@@ -152,9 +157,15 @@ internal sealed class CompletarOperacionesEnCurso(
         // Lo local primero: pasa a entregadas las líneas con el cierre ya confirmado (nunca se llama a cerrar).
         if (entrega.LineasCerradas.Count > 0 || entrega.LineasPendientesDeCierre.Count == 0)
         {
-            if (!await entregas.Reanudar(entrega, cancelacion).ConfigureAwait(false))
+            var reanudada = await entregas.Reanudar(entrega, cancelacion).ConfigureAwait(false);
+            if (reanudada == ResultadoDeReanudarEntrega.YaResuelta)
             {
-                await Guardar(() => entrega.RegistrarIntento(ahora), e => pedidos.ActualizarEntrega(e, cancelacion), entrega).ConfigureAwait(false);
+                return Salida.Omitida;
+            }
+
+            if (reanudada == ResultadoDeReanudarEntrega.Reintentar)
+            {
+                await Guardar(() => entrega.RegistrarIntento(ahora), e => pedidos.ActualizarEntrega(e, cancelacion), entrega, cancelacion).ConfigureAwait(false);
                 return await TrasElIntento(entrega, cancelacion).ConfigureAwait(false);
             }
 
@@ -167,7 +178,7 @@ internal sealed class CompletarOperacionesEnCurso(
         // Quedan líneas sin cierre confirmado: sin ninguna confirmada y pasada la espera corta, la entrega queda fallida para que el encargado la reintente con la misma clave; a los 15 minutos, también.
         if (entrega.DebeFallarPorFaltaDeCierre(ahora))
         {
-            await Guardar(() => entrega.Fallar(ahora), e => pedidos.ActualizarEntrega(e, cancelacion), entrega).ConfigureAwait(false);
+            await Guardar(() => entrega.Fallar(ahora), e => pedidos.ActualizarEntrega(e, cancelacion), entrega, cancelacion).ConfigureAwait(false);
             return Salida.Fallida;
         }
 
@@ -176,7 +187,7 @@ internal sealed class CompletarOperacionesEnCurso(
             return await Fallar(() => entrega.Fallar(ahora), entrega, cancelacion).ConfigureAwait(false);
         }
 
-        await Guardar(() => entrega.RegistrarIntento(ahora), e => pedidos.ActualizarEntrega(e, cancelacion), entrega).ConfigureAwait(false);
+        await Guardar(() => entrega.RegistrarIntento(ahora), e => pedidos.ActualizarEntrega(e, cancelacion), entrega, cancelacion).ConfigureAwait(false);
         return await TrasElIntento(entrega, cancelacion).ConfigureAwait(false);
     }
 
@@ -193,14 +204,14 @@ internal sealed class CompletarOperacionesEnCurso(
 
     private async Task<Salida> Fallar(Action fallar, Anulacion anulacion, CancellationToken cancelacion)
     {
-        await Guardar(fallar, a => pedidos.ActualizarAnulacion(a, cancelacion), anulacion).ConfigureAwait(false);
+        await Guardar(fallar, a => pedidos.ActualizarAnulacion(a, cancelacion), anulacion, cancelacion).ConfigureAwait(false);
         await PublicarAlerta(cancelacion).ConfigureAwait(false);
         return Salida.Fallida;
     }
 
     private async Task<Salida> Fallar(Action fallar, Entrega entrega, CancellationToken cancelacion)
     {
-        await Guardar(fallar, e => pedidos.ActualizarEntrega(e, cancelacion), entrega).ConfigureAwait(false);
+        await Guardar(fallar, e => pedidos.ActualizarEntrega(e, cancelacion), entrega, cancelacion).ConfigureAwait(false);
         await PublicarAlerta(cancelacion).ConfigureAwait(false);
         return Salida.Fallida;
     }
@@ -208,7 +219,7 @@ internal sealed class CompletarOperacionesEnCurso(
     /// <summary>Un error que repetir no arregla: el pedido o su operación ya no existen o no se pueden aplicar. «Servicio no disponible» y el <c>conflicto</c> del bloqueo se reintentan.</summary>
     private static bool EsPermanente(ErrorDeAplicacion error) => error.Clave is not (ClavesDePedidos.ServicioNoDisponible or ClavesDePedidos.Conflicto);
 
-    private async Task Guardar<T>(Action cambio, Func<T, Task> persistir, T operacion)
+    private async Task Guardar<T>(Action cambio, Func<T, Task> persistir, T operacion, CancellationToken cancelacion)
     {
         cambio();
         await unidad.Ejecutar(
@@ -216,7 +227,8 @@ internal sealed class CompletarOperacionesEnCurso(
             {
                 await persistir(operacion).ConfigureAwait(false);
                 return true;
-            }).ConfigureAwait(false);
+            },
+            cancelacion).ConfigureAwait(false);
     }
 
     private async Task PublicarAlerta(CancellationToken cancelacion)

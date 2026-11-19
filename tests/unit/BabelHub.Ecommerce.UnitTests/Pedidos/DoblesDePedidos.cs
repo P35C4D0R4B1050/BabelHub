@@ -133,6 +133,9 @@ internal sealed class RepositorioDePedidosFalso : IRepositorioDePedidos
     public Task<IReadOnlyList<Entrega>> EntregasEnCurso(Guid pedidoId, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<Entrega>>([.. Entregas.Where(e => e.PedidoId == pedidoId && e.BloqueaLasLineas)]);
 
+    public Task<IReadOnlyList<Anulacion>> AnulacionesFallidas(Guid pedidoId, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Anulacion>>([.. Anulaciones.Where(a => a.PedidoId == pedidoId && a.Estado == EstadoDeOperacion.Fallida)]);
+
     public Task<OperacionesPorReanudar> OperacionesEnCursoParaReanudar(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) =>
         Task.FromResult(new OperacionesPorReanudar(
             [.. Anulaciones.Where(a => a.Estado == EstadoDeOperacion.EnCurso && a.ProximoIntentoEn is { } p && p <= ahora).OrderBy(a => a.CreadaEn).Take(maximo)],
@@ -493,7 +496,31 @@ internal sealed class AuditoriaDePedidosEspia : BabelHub.Ecommerce.Application.A
             return Task.FromException(new BabelHub.Ecommerce.Application.Auditoria.AuditoriaNoDisponibleException("sin auditoría"));
         }
 
+        VerificarContraElCatalogo(solicitud);
         Solicitudes.Add(solicitud);
         return Task.CompletedTask;
+    }
+
+    private static readonly BabelHub.Ecommerce.Domain.Auditoria.CatalogoDeAcciones Catalogo = BabelHub.Ecommerce.Application.Auditoria.Interno.CatalogoDeAccionesDeAuditoria.Crear();
+
+    /// <summary>
+    /// Lo que persistiría la auditoría real: una acción que no está en el catálogo, una clave del detalle que no declara o un valor fuera de su lista cerrada se descartan en silencio (<c>DetalleSeguro</c>). Este doble lo hace fallar para que una prueba no afirme un detalle que producción perdería (hallazgo de la revisión de ECO-6c).
+    /// </summary>
+    private static void VerificarContraElCatalogo(BabelHub.Ecommerce.Application.Auditoria.SolicitudDeRegistro solicitud)
+    {
+        if (!Catalogo.TryObtener(solicitud.Accion.Identificador, out var accion) || accion is null)
+        {
+            throw new InvalidOperationException($"La acción {solicitud.Accion} no está en el catálogo de auditoría.");
+        }
+
+        foreach (var (clave, valor) in solicitud.Detalle)
+        {
+            var declarada = accion.Detalle.FirstOrDefault(c => c.Nombre == clave)
+                ?? throw new InvalidOperationException($"La clave «{clave}» no está declarada para {solicitud.Accion}: la auditoría real la descartaría.");
+            if (declarada.Valores is { Count: > 0 } valores && valor is not null && !valores.Contains(valor))
+            {
+                throw new InvalidOperationException($"El valor de «{clave}» no está en la lista cerrada de {solicitud.Accion}.");
+            }
+        }
     }
 }

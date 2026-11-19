@@ -102,7 +102,7 @@ public sealed class CancelarYAnularPedidoTests
         Assert.Equal((OrigenDelReembolso.CancelacionDelCliente, $"canc:{pedido.Id:N}", 12m), (reembolso.Origen, reembolso.ClaveNatural, reembolso.Envio));
         Assert.Equal(EstadoDeOperacion.Completada, Assert.Single(entorno.Repositorio.Anulaciones).Estado);
         Assert.Empty(entorno.Despacho.Cancelaciones);
-        Assert.Equal([AccionesAuditables.OperacionDePedidoIniciada, AccionesAuditables.PedidoCanceladoPorElCliente], entorno.Auditoria.Solicitudes.Select(s => s.Accion));
+        Assert.Equal([AccionesAuditables.OperacionDePedidoIniciada, AccionesAuditables.PedidoCanceladoPorElCliente, AccionesAuditables.EstadoDePedidoCambiado], entorno.Auditoria.Solicitudes.Select(s => s.Accion));
         Assert.All(entorno.Notificador.Solicitudes, s => Assert.Equal("anulado", s.Campos["estado"]));
         Assert.Single(entorno.Reembolsos.Procesados);
     }
@@ -130,7 +130,7 @@ public sealed class CancelarYAnularPedidoTests
             Assert.Empty(entorno.Reembolsos.Registrados);
             Assert.Empty(entorno.Repositorio.Anulaciones);
             var auditoria = Assert.Single(entorno.Auditoria.Solicitudes);
-            Assert.Equal("rechazada", auditoria.Detalle["resultado"]);
+            Assert.Equal(ResultadoAuditado.Rechazado, auditoria.Resultado);
         }
     }
 
@@ -254,7 +254,7 @@ public sealed class CancelarYAnularPedidoTests
         Assert.Equal((OrigenDelReembolso.Anulacion, $"anul:{pedido.Id:N}", 12m, 2), (reembolso.Origen, reembolso.ClaveNatural, reembolso.Envio, reembolso.Lineas.Count));
         Assert.Equal(pedido.Lineas[1].EdicionId, Assert.Single(entorno.Accesos.Revocados).EdicionId);
         Assert.All(pedido.Lineas, l => Assert.True(l.EstadoImpreso == EstadoDeLineaImpresa.Anulado || l.EstadoDigital == EstadoDeLineaDigital.Anulado));
-        Assert.Equal([AccionesAuditables.OperacionDePedidoIniciada, AccionesAuditables.EstadoDePedidoCambiado], entorno.Auditoria.Solicitudes.Select(s => s.Accion));
+        Assert.Equal([AccionesAuditables.OperacionDePedidoIniciada, AccionesAuditables.PedidoAnulado, AccionesAuditables.EstadoDePedidoCambiado], entorno.Auditoria.Solicitudes.Select(s => s.Accion));
         Assert.DoesNotContain(entorno.Auditoria.Solicitudes.SelectMany(s => s.Detalle.Values), v => v is not null && v.Contains("Jr. Lima", StringComparison.Ordinal));
     }
 
@@ -310,6 +310,7 @@ public sealed class CancelarYAnularPedidoTests
 
     [Fact]
     [Trait("Criterio", "AC-PED-22")]
+    [Trait("Criterio", "AC-PED-14")]
     public async Task Una_linea_en_preparacion_otra_lista_y_otra_no_recogida_se_anulan_y_cada_reserva_se_libera_una_sola_vez()
     {
         var entorno = ComoAdministracion();
@@ -362,7 +363,7 @@ public sealed class CancelarYAnularPedidoTests
 
         Assert.Equal((CategoriaDeError.Conflicto, "pedido-sin-lineas-anulables"), (resultado.Error!.Categoria, resultado.Error.Clave));
         var auditoria = Assert.Single(soloDigital.Auditoria.Solicitudes);
-        Assert.Equal(("rechazada", "sin-impresas-por-salir"), (auditoria.Detalle["resultado"], auditoria.Detalle["rechazo"]));
+        Assert.Equal(ResultadoAuditado.Rechazado, auditoria.Resultado);
         Assert.Empty(soloDigital.Repositorio.Anulaciones);
         Assert.Empty(soloDigital.Accesos.Revocados);
 
@@ -437,5 +438,52 @@ public sealed class CancelarYAnularPedidoTests
 
         Assert.Equal("pedido-operacion-en-curso", enCurso.Error!.Clave);
         Assert.Empty(entorno.Reservas.Liberaciones);
+    }
+
+    [Fact]
+    public async Task Repetir_una_anulacion_fallida_no_trata_como_salido_un_envio_ya_cancelado_y_anula_y_reembolsa_sus_lineas()
+    {
+        var entorno = ComoAdministracion();
+        var pedido = Crear(TipoDeEntregaDelPedido.Domicilio, 12m, Impresa("Uno", "CUS"));
+        var linea = pedido.Lineas[0].Id;
+        var envio = Guid.NewGuid();
+        pedido.PrepararLineas([linea], Ahora);
+        pedido.MarcarListas([linea], Ahora);
+        pedido.AsignarEnvio([linea], envio);
+        entorno.Repositorio.Poner(pedido);
+        entorno.Despacho.Resultado.Add(new ResultadoDeCancelarEnvio(envio, DestinoDelEnvioAlCancelar.Cancelado, [linea]));
+        entorno.Reservas.RespuestaDeLiberar = () => ResultadoDeLiberarReserva.NoSePudo;
+        await entorno.Anular.Anular(new AnularPedidoEntrada(pedido.Id, "otro"), default);
+        entorno.Repositorio.Anulaciones[0].Fallar(Ahora);
+
+        // Envíos informa «mantenido» el envío que ya cancelo la primera vez.
+        entorno.Despacho.Resultado.Clear();
+        entorno.Despacho.Resultado.Add(new ResultadoDeCancelarEnvio(envio, DestinoDelEnvioAlCancelar.Mantenido, [linea]));
+        entorno.Reservas.RespuestaDeLiberar = () => ResultadoDeLiberarReserva.Liberada;
+        var reintento = await entorno.Anular.Anular(new AnularPedidoEntrada(pedido.Id, "otro"), default);
+
+        Assert.True(reintento.EsExito, reintento.Error?.Clave);
+        Assert.Equal(EstadoDeLineaImpresa.Anulado, pedido.Lineas[0].EstadoImpreso);
+        Assert.Equal(62m, reintento.Valor.Reembolso);
+    }
+
+    [Fact]
+    public async Task Si_otra_instancia_resolvio_la_fila_entre_el_tiempo_2_y_el_3_no_se_aplica_nada_dos_veces()
+    {
+        var entorno = ComoAdministracion();
+        var pedido = Crear(TipoDeEntregaDelPedido.Recojo, 0m, Impresa("Uno"));
+        entorno.Repositorio.Poner(pedido);
+        entorno.Reservas.RespuestaDeLiberar = () =>
+        {
+            entorno.Repositorio.Anulaciones[0].Descartar(Ahora);
+            return ResultadoDeLiberarReserva.Liberada;
+        };
+
+        var resultado = await entorno.Anular.Anular(new AnularPedidoEntrada(pedido.Id, "otro"), default);
+
+        Assert.Equal((CategoriaDeError.Conflicto, "operacion-ya-resuelta"), (resultado.Error!.Categoria, resultado.Error.Clave));
+        Assert.Empty(entorno.Reembolsos.Registrados);
+        Assert.Equal(EstadoDeLineaImpresa.Confirmado, pedido.Lineas[0].EstadoImpreso);
+        Assert.DoesNotContain(entorno.Auditoria.Solicitudes, s => s.Accion == AccionesAuditables.PedidoAnulado);
     }
 }

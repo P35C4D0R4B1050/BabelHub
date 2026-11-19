@@ -114,7 +114,7 @@ public sealed class AvanzarLineasPorEnvio(
                     {
                         ObjetoTipo = "pedido",
                         ObjetoId = pedido.Id.ToString("D"),
-                        Detalle = new Dictionary<string, string?> { ["lineaId"] = linea.Id.ToString("D"), ["envioId"] = envioId.ToString("D") },
+                        Detalle = new Dictionary<string, string?> { ["lineaId"] = linea.Id.ToString("D") },
                     },
                     cancelacion).ConfigureAwait(false);
             }

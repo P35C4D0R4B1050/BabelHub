@@ -94,7 +94,7 @@ public sealed class AvanzarLineasPorEnvioTests
         Assert.Equal((EstadoDeLineaImpresa.Entregado, (DateTimeOffset?)Entrega), (linea.EstadoImpreso!.Value, linea.EntregadaEn));
         var auditoria = Assert.Single(entorno.Auditoria.Solicitudes);
         Assert.Equal(AccionesAuditables.LineaDePedidoEntregada, auditoria.Accion);
-        Assert.Equal(EnvioCusco.ToString("D"), auditoria.Detalle["envioId"]);
+        Assert.Equal(entorno.Cusco.ToString("D"), auditoria.Detalle["lineaId"]);
         Assert.All(entorno.Notificador.Solicitudes, s => Assert.Equal("entregado", s.Campos["estado"]));
     }
 
