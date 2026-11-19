@@ -244,3 +244,14 @@ Revisión de arquitectura («Cumple con observaciones», 0 Bloqueantes, 0 Import
 - **Versión fija** en `Directory.Packages.props` (administración central) y en los `packages.lock.json`; `dotnet restore BabelHub.sln --locked-mode` pasa en limpio.
 - **Vulnerabilidades:** `dotnet list package --vulnerable --include-transitive` no reporta ninguna para `BabelHub.Ecommerce.Infrastructure` (2026-11-19).
 - **Lockfiles:** se probó `dotnet restore --force-evaluate`; en este entorno **reescribe unas 200 líneas ajenas** (dependencias transitivas de `Microsoft.Extensions.*` del marco compartido), por lo que se conservó la edición mínima (solo las entradas de Konscious): NuGet valida los `contentHash` al restaurar y el modo bloqueado pasa.
+
+## IDE-6d · T30 — esquema `identidad`, roles e inmutabilidad (Infraestructura)
+
+| Tarea | Decisión | Criterios |
+| :--- | :--- | :--- |
+| T30 | **`DefinicionDeIdentidad`** (migración idempotente, aplicada **después** de la de `Auditoria`): 16 tablas del esquema `identidad` más los registros aislados (`registros` y `por_anonimizar`) con la plantilla de inmutabilidad, los roles, los disparadores y la función de depuración de `transversal-auditoria` (`DefinicionDeAuditoria.RegistrosInmutables` y las demás). Propietario de todo: `auditoria_migraciones`. | AC-IDE-05, AC-IDE-37 |
+| T30 | **Rol de acceso:** `rol_identidad` (sin login, convención `rol_<esquema>` de `EjecutarComo`) con el **permiso mínimo por tabla** (nunca `TRUNCATE`; sin `DELETE` en claves de firma, bajas ni solicitudes; registros y `por_anonimizar` solo `SELECT` e `INSERT`). Una prueba con Testcontainers comprueba que el rol de acceso `NOINHERIT`, **sin** `SET LOCAL ROLE`, no lee ni escribe ninguna tabla de `identidad`. | AC-IDE-05 |
+| T30 | **Las reglas de unicidad las respalda la base:** correo único normalizado, **un encargado activo por sucursal** (índice parcial), **una sola clave de firma activa**, **una cancelación abierta por usuario**, **un código vigente por usuario y propósito** y **un cambio de correo pendiente por usuario**; la sucursal es del encargado y solo suya; el consentimiento de WhatsApp exige un número E.164; los secretos solo caben cifrados (`bytea` de 30 a 200 bytes) o como huella hexadecimal de 64 caracteres (nunca un valor en claro). | AC-IDE-37, IDE-06 |
+| T30 | **`bajas_titulares` cubre también `cierres_pendientes`** (el plan nombra dos tablas; el Dominio las une en `BajaDeTitular`: una fila con `entregada_en` y `cerrada_en`, sin clave foránea para sobrevivir a la anonimización). | IDE-64, IDE-75 |
+
+**Pendiente (T33):** los repositorios que escriben estas tablas; si al hacerlos hace falta una columna se añade aquí con `ADD COLUMN IF NOT EXISTS`.
