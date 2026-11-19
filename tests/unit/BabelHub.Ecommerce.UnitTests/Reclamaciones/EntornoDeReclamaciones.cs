@@ -204,6 +204,11 @@ internal sealed class LimitesDeHojasDoble : IControlDeLimites
 
     public int Usadas { get; set; }
 
+    /// <summary>El tope de las consultas del consumidor por minuto (política aparte de la de registrar hojas).</summary>
+    public int MaximoDeConsultas { get; set; } = 60;
+
+    public int Consultas { get; private set; }
+
     public bool Caido { get; set; }
 
     /// <summary>Simula un almacén que perdió su estado: ignora las claves (el índice único de la base es entonces la autoridad).</summary>
@@ -226,6 +231,22 @@ internal sealed class LimitesDeHojasDoble : IControlDeLimites
         ClaveDeIdempotencia? idempotencia = null,
         CancellationToken cancelacion = default)
     {
+        if (politica == PoliticasDeLimite.ConsultasDeHojasPorUsuario)
+        {
+            if (Caido)
+            {
+                return Task.FromResult(ResultadoDeLimite.NoDisponible());
+            }
+
+            if (Consultas >= MaximoDeConsultas)
+            {
+                return Task.FromResult(ResultadoDeLimite.Excedido(politica.Valor, 30, DateTimeOffset.UtcNow.AddSeconds(30)));
+            }
+
+            Consultas++;
+            return Task.FromResult(ResultadoDeLimite.Permitido(new ReservaDeLimite(politica.Valor, "usuario", Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow)));
+        }
+
         if (Forzado is not null)
         {
             return Task.FromResult(Forzado);

@@ -9,7 +9,7 @@ internal sealed record ObtenerMiHojaEntrada(string? Numero);
 /// Las hojas del consumidor con una sesión de correo verificado (T08, REC-10, REC-14, REC-20). Orden fijo: sesión → rol → correo verificado de la sesión (<see cref="ICorreoVerificadoDeLaCuenta"/>; si Identidad no responde,
 /// falla cerrada) → hoja y alcance. Solo se ven las hojas del <b>correo normalizado</b> igual al de la sesión y que no son de una cuenta cancelada; también las descartadas. Sin documento ni domicilio.
 /// </summary>
-internal sealed class ListarMisHojas(AutorizadorDeReclamaciones autorizador, ICorreoVerificadoDeLaCuenta correos, IRepositorioDeHojas hojas, IUnidadDeTrabajo unidad) : ICasoDeUso<ListarMisHojasEntrada, PaginaDeMisHojas>
+internal sealed class ListarMisHojas(AutorizadorDeReclamaciones autorizador, ICorreoVerificadoDeLaCuenta correos, IRepositorioDeHojas hojas, IUnidadDeTrabajo unidad, LimiteDeConsultaDeHojas limite) : ICasoDeUso<ListarMisHojasEntrada, PaginaDeMisHojas>
 {
     public const int TamanoMaximoDePagina = 50;
 
@@ -19,6 +19,11 @@ internal sealed class ListarMisHojas(AutorizadorDeReclamaciones autorizador, ICo
         if (await autorizador.ExigirConsumidor(cancelacion).ConfigureAwait(false) is { } rechazo)
         {
             return FallosDeReclamaciones.Fallo<PaginaDeMisHojas>(rechazo);
+        }
+
+        if (await limite.Reservar(autorizador.ConsumidorId!.Value, cancelacion).ConfigureAwait(false) is { } excedido)
+        {
+            return FallosDeReclamaciones.Fallo<PaginaDeMisHojas>(excedido);
         }
 
         string? correo;
@@ -54,7 +59,7 @@ internal sealed class ListarMisHojas(AutorizadorDeReclamaciones autorizador, ICo
 }
 
 /// <summary>Una hoja propia por su número (T08): una hoja ajena, inexistente, de una cuenta cancelada, de otro correo o un número mal escrito reciben <b>el mismo</b> «no encontrada» con un acceso denegado por cada intento.</summary>
-internal sealed class ObtenerMiHoja(AutorizadorDeReclamaciones autorizador, ICorreoVerificadoDeLaCuenta correos, IRepositorioDeHojas hojas, IUnidadDeTrabajo unidad) : ICasoDeUso<ObtenerMiHojaEntrada, MiHoja>
+internal sealed class ObtenerMiHoja(AutorizadorDeReclamaciones autorizador, ICorreoVerificadoDeLaCuenta correos, IRepositorioDeHojas hojas, IUnidadDeTrabajo unidad, LimiteDeConsultaDeHojas limite) : ICasoDeUso<ObtenerMiHojaEntrada, MiHoja>
 {
     public async Task<Resultado<MiHoja>> Ejecutar(ObtenerMiHojaEntrada entrada, CancellationToken cancelacion = default)
     {
@@ -62,6 +67,11 @@ internal sealed class ObtenerMiHoja(AutorizadorDeReclamaciones autorizador, ICor
         if (await autorizador.ExigirConsumidor(cancelacion).ConfigureAwait(false) is { } rechazo)
         {
             return FallosDeReclamaciones.Fallo<MiHoja>(rechazo);
+        }
+
+        if (await limite.Reservar(autorizador.ConsumidorId!.Value, cancelacion).ConfigureAwait(false) is { } excedido)
+        {
+            return FallosDeReclamaciones.Fallo<MiHoja>(excedido);
         }
 
         string? correo;
@@ -110,4 +120,43 @@ internal static class CorreosDeSesion
 {
     /// <summary>El correo que devuelve Identidad, normalizado de nuevo (recortado y en minúsculas): sin una dirección válida cuenta como «sin correo verificado».</summary>
     public static string? Normalizar(string? correo) => correo is not null && CorreoNormalizado.TryCrear(correo, out var normalizado) ? normalizado : null;
+}
+
+/// <summary>
+/// El límite de las consultas del consumidor (T09, REC-10): 60 por usuario y minuto (valor inicial configurable), un límite general con respaldo local. Se reserva después de comprobar la sesión y el rol y antes de leer
+/// ninguna hoja; el exceso es un 429 con su espera y, si el motor de límites no responde, la consulta es «servicio no disponible» (falla cerrada).
+/// </summary>
+internal sealed class LimiteDeConsultaDeHojas(IControlDeLimites limites)
+{
+    public async Task<ErrorDeAplicacion?> Reservar(Guid usuarioId, CancellationToken cancelacion)
+    {
+        ResultadoDeLimite resultado;
+        try
+        {
+            resultado = await limites.Reservar(PoliticasDeLimite.ConsultasDeHojasPorUsuario, usuarioId.ToString("N"), cancelacion: cancelacion).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDeReclamaciones.ServicioNoDisponible);
+        }
+
+        switch (resultado.Estado)
+        {
+            case EstadoDeLimite.Excedido:
+                return new ErrorDeAplicacion(CategoriaDeError.Limite, ClavesDeReclamaciones.LimiteExcedido, [new ErrorDeCampo(ClavesDeReclamaciones.EsperaEnSegundos, (resultado.EsperaEnSegundos ?? 1).ToString(System.Globalization.CultureInfo.InvariantCulture))]);
+            case EstadoDeLimite.Permitido:
+                try
+                {
+                    await limites.Completar(resultado.Reserva!, new ResultadoMinimo("consultada"), cancelacion).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // Una consulta ya contada no se devuelve por un fallo del almacén de contadores.
+                }
+
+                return null;
+            default:
+                return new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDeReclamaciones.ServicioNoDisponible);
+        }
+    }
 }

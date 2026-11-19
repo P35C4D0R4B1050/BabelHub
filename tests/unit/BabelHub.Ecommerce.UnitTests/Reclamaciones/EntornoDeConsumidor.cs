@@ -38,8 +38,9 @@ internal sealed class EntornoDeConsumidor
         Correos.Fijar(usuarioId, correoVerificado);
         Actor = ActorDePrueba.DeCliente(usuarioId);
         Autorizador = new AutorizadorDeReclamaciones(Actor, Base.Denegaciones);
-        var listar = new ListarMisHojas(Autorizador, Correos, Base.Hojas, Base.Unidad);
-        var obtener = new ObtenerMiHoja(Autorizador, Correos, Base.Hojas, Base.Unidad);
+        var limite = new LimiteDeConsultaDeHojas(Base.Limites);
+        var listar = new ListarMisHojas(Autorizador, Correos, Base.Hojas, Base.Unidad, limite);
+        var obtener = new ObtenerMiHoja(Autorizador, Correos, Base.Hojas, Base.Unidad, limite);
         Consumidor = new HojasDelConsumidorDeLaAplicacion(listar, obtener);
     }
 
