@@ -42,7 +42,11 @@ public sealed class PostgresPurgaDeVencidos(AccesoAlEsquemaDeIdentidad acceso) :
 public delegate Task AlcanceDeSistemaDeIdentidad(Func<CancellationToken, Task> corrida, CancellationToken cancelacion);
 
 /// <summary>Cuándo corre un trabajo de fondo de Identidad y cuántos fallos seguidos hacen falta para avisar.</summary>
-public sealed record OpcionesDelTrabajoDeIdentidad(TimeSpan Intervalo, int FallosSeguidosParaAlertar = 3);
+public sealed record OpcionesDelTrabajoDeIdentidad(TimeSpan Intervalo, int FallosSeguidosParaAlertar = 3, TimeSpan? PlazoMaximoDeLaCorrida = null)
+{
+    /// <summary>Una corrida colgada (red o base de datos) se cancela y cuenta como fallo: sin un plazo nunca llegaría a alertar.</summary>
+    public TimeSpan PlazoDeLaCorrida => PlazoMaximoDeLaCorrida ?? TimeSpan.FromMinutes(10);
+}
 
 /// <summary>
 /// Un trabajo de fondo de Identidad (T37 a T40): corre su corrida cada intervalo <b>como «sistema» fijado explícitamente</b> (un trabajo de fondo sin actor es un defecto, no un permiso), registra el resultado enumerado de
@@ -69,7 +73,9 @@ public sealed class TrabajoDeFondoDeIdentidad(
     {
         try
         {
-            await alcanceDeSistema(corrida, cancelacion).ConfigureAwait(false);
+            using var plazo = CancellationTokenSource.CreateLinkedTokenSource(cancelacion);
+            plazo.CancelAfter(opciones.PlazoDeLaCorrida);
+            await alcanceDeSistema(corrida, plazo.Token).ConfigureAwait(false);
             _fallosSeguidos = 0;
             await Registrar(ResultadoDeTrabajo.Exito, cancelacion).ConfigureAwait(false);
         }
@@ -149,10 +155,10 @@ public static class TrabajosDeIdentidad
     public static readonly OpcionesDelTrabajoDeIdentidad IntervaloDelDescarte = new(TimeSpan.FromHours(1));
 
     /// <summary>Cada 6 horas se decide si toca: la rotación es a los 90 días (IDE-36).</summary>
-    public static readonly OpcionesDelTrabajoDeIdentidad IntervaloDeLaRotacion = new(TimeSpan.FromHours(6));
+    public static readonly OpcionesDelTrabajoDeIdentidad IntervaloDeLaRotacion = new(TimeSpan.FromHours(6), FallosSeguidosParaAlertar: 1);
 
     /// <summary>Cada minuto: la caché de claves y revocaciones debe renovarse al menos cada 5 minutos (IDE-61) y su foto vale 5.</summary>
-    public static readonly OpcionesDelTrabajoDeIdentidad IntervaloDeLaRenovacionDeClaves = new(TimeSpan.FromMinutes(1), FallosSeguidosParaAlertar: 3);
+    public static readonly OpcionesDelTrabajoDeIdentidad IntervaloDeLaRenovacionDeClaves = new(TimeSpan.FromMinutes(1), FallosSeguidosParaAlertar: 3, PlazoMaximoDeLaCorrida: TimeSpan.FromMinutes(2));
 
     /// <summary>Cada 15 minutos (T40).</summary>
     public static readonly OpcionesDelTrabajoDeIdentidad IntervaloDeLasBajas = new(TimeSpan.FromMinutes(15));
@@ -226,23 +232,17 @@ public static class TrabajosDeIdentidad
             tiempo);
 
     /// <summary>
-    /// La entrega de las bajas y el reintento de los cierres pendientes cada 15 minutos (T40; IDE-64, PLA-41): <c>ReintentoDeBajas</c> (con la alerta a las 24 horas) corre en <b>una sola transacción</b> que toma las bajas
-    /// con <c>FOR UPDATE SKIP LOCKED</c>, de modo que dos instancias de Identidad no procesan la misma baja a la vez (la entrega y el cierre además son idempotentes).
+    /// La entrega de las bajas y el reintento de los cierres pendientes cada 15 minutos (T40; IDE-64, PLA-41): <c>ReintentoDeBajas</c> (con la alerta a las 24 horas) corre con cada operación en su propia transacción corta
+    /// y <b>sin retener bloqueos durante las llamadas al Inventario</b>. Dos instancias de Identidad pueden repetir un paso sobre la misma baja, sin efecto: la entrega y el cierre son idempotentes (IDE-64) y guardar no
+    /// deshace lo ya hecho. Una transacción única con <c>FOR UPDATE SKIP LOCKED</c> se descartó: mezclaría pasos que se tragan sus errores y un fallo de SQL abortaría toda la pasada sin dejar rastro.
     /// </summary>
     public static TrabajoDeFondoDeIdentidad Bajas(IServiceScopeFactory fabrica, IRegistroDeTrabajosDeFondo registro, AlcanceDeSistemaDeIdentidad alcance, IAlertas alertas, IReloj reloj, TimeProvider? tiempo = null) =>
         new(
             EntregaDeBajas,
             async ct =>
             {
-                using var alcance = fabrica.CreateScope();
-                var servicios = alcance.ServiceProvider;
-                await servicios.GetRequiredService<IUnidadDeTrabajo>().Ejecutar(
-                    async token =>
-                    {
-                        await servicios.GetRequiredService<ReintentoDeBajas>().Procesar(token).ConfigureAwait(false);
-                        return 0;
-                    },
-                    ct).ConfigureAwait(false);
+                using var alcanceDeServicios = fabrica.CreateScope();
+                await alcanceDeServicios.ServiceProvider.GetRequiredService<ReintentoDeBajas>().Procesar(ct).ConfigureAwait(false);
             },
             registro,
             alcance,

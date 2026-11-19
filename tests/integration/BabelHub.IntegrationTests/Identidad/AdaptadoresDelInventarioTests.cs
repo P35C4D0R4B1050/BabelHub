@@ -93,7 +93,7 @@ public sealed class AdaptadoresDelInventarioTests
     {
         var inventario = new InventarioFalso { Pendientes = _ => ResultadoDelInventario<PendientesDeTitular>.ConValor(new PendientesDeTitular(3)) };
 
-        Assert.Equal(3, await new InventarioPendientesDeUnModulo(inventario).Contar(Guid.NewGuid()));
+        Assert.Equal(3, await new InventarioPendientesDeCuenta(inventario).Contar(Guid.NewGuid()));
     }
 
     [Theory]
@@ -113,10 +113,10 @@ public sealed class AdaptadoresDelInventarioTests
             },
         };
 
-        await Assert.ThrowsAsync<PendientesNoDisponiblesException>(() => new InventarioPendientesDeUnModulo(inventario).Contar(Guid.NewGuid()));
+        await Assert.ThrowsAsync<PendientesNoDisponiblesException>(() => new InventarioPendientesDeCuenta(inventario).Contar(Guid.NewGuid()));
     }
 
-    private sealed class ModuloFijo(int pendientes, bool falla = false) : IPendientesDeUnModulo
+    private sealed class ModuloFijo(int pendientes, bool falla = false) : IPendientesDeCuenta
     {
         public Task<int> Contar(Guid usuarioId, CancellationToken cancelacion = default) =>
             falla ? throw new PendientesNoDisponiblesException() : Task.FromResult(pendientes);
@@ -124,12 +124,13 @@ public sealed class AdaptadoresDelInventarioTests
 
     [Fact]
     [Trait("Criterio", "AC-IDE-24")]
-    public async Task LosPendientesDeLaCuenta_SumanLosDeCadaModulo_YUnNegativoNoRestaDeLoDemas()
+    public async Task LosPendientesDeLaCuenta_SumanLosDeCadaModulo_YSinModulosOConUnNegativoLanzan()
     {
-        var compuesto = new PendientesDeCuentaCompuestos([new ModuloFijo(2), new ModuloFijo(0), new ModuloFijo(-5), new ModuloFijo(4)]);
+        var compuesto = new PendientesDeCuentaCompuestos([new ModuloFijo(2), new ModuloFijo(0), new ModuloFijo(4)]);
 
         Assert.Equal(6, await compuesto.Contar(Guid.NewGuid()));
-        Assert.Equal(0, await new PendientesDeCuentaCompuestos([]).Contar(Guid.NewGuid()));
+        await Assert.ThrowsAsync<PendientesNoDisponiblesException>(() => new PendientesDeCuentaCompuestos([]).Contar(Guid.NewGuid()));
+        await Assert.ThrowsAsync<PendientesNoDisponiblesException>(() => new PendientesDeCuentaCompuestos([new ModuloFijo(1), new ModuloFijo(-5)]).Contar(Guid.NewGuid()));
     }
 
     [Fact]

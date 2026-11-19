@@ -26,7 +26,7 @@ public sealed class InventarioEntregaDeBajas(IClienteDelInventario inventario) :
 /// Los pendientes de una cuenta en el Inventario (T36; IDE-27): las reservas activas del titular. <b>Si no se puede contar lanza</b> (el Inventario no responde, supera su límite o rechaza): la cancelación falla
 /// cerrada y nunca se asume cero.
 /// </summary>
-public sealed class InventarioPendientesDeUnModulo(IClienteDelInventario inventario) : IPendientesDeUnModulo
+public sealed class InventarioPendientesDeCuenta(IClienteDelInventario inventario) : IPendientesDeCuenta
 {
     public async Task<int> Contar(Guid usuarioId, CancellationToken cancelacion = default)
     {

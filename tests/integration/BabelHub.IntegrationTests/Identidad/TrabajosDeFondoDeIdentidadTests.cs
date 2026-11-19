@@ -297,6 +297,35 @@ public sealed class TrabajosDeFondoDeIdentidadTests(PostgresDeIdentidadFixture b
     }
 
     [Fact]
+    public async Task UnaCorridaColgada_SeCancelaALosPlazos_YCuentaComoFallo_ParaPoderAlertar()
+    {
+        var registro = new RegistroDePrueba();
+        var alertas = new AlertasDePrueba();
+        var alcance = new AlcanceDePrueba();
+        var trabajo = new TrabajoDeFondoDeIdentidad(
+            "identidad-colgado",
+            ct => Task.Delay(Timeout.Infinite, ct),
+            registro,
+            alcance.Ejecutar,
+            alertas,
+            new RelojDePrueba(Ahora),
+            new OpcionesDelTrabajoDeIdentidad(TimeSpan.FromMinutes(1), 1, TimeSpan.FromMilliseconds(50)));
+
+        await trabajo.EjecutarUnaVez();
+
+        Assert.Equal([("identidad-colgado", ResultadoDeTrabajo.Fallo)], registro.Corridas);
+        Assert.Single(alertas.Tecnicas);
+    }
+
+    [Fact]
+    public void LaRotacionAlertaConUnSoloFallo_YLaRenovacionDeClavesTieneUnPlazoCorto()
+    {
+        Assert.Equal(1, TrabajosDeIdentidad.IntervaloDeLaRotacion.FallosSeguidosParaAlertar);
+        Assert.True(TrabajosDeIdentidad.IntervaloDeLaRenovacionDeClaves.PlazoDeLaCorrida <= TimeSpan.FromMinutes(2));
+        Assert.Equal(TimeSpan.FromMinutes(10), TrabajosDeIdentidad.IntervaloDeLasBajas.PlazoDeLaCorrida);
+    }
+
+    [Fact]
     public void LosTrabajosDeIdentidad_TienenNombresEstables_IntervalosYLaRenovacionDeClavesMenorQueLaFoto()
     {
         Assert.Equal(TimeSpan.FromMinutes(15), TrabajosDeIdentidad.IntervaloDeLasBajas.Intervalo);

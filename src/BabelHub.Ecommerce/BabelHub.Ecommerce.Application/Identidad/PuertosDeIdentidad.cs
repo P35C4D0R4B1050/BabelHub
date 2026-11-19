@@ -13,15 +13,6 @@ public interface IPendientesDeCuenta
     Task<int> Contar(Guid usuarioId, CancellationToken cancelacion = default);
 }
 
-/// <summary>
-/// La parte de los pendientes de una cuenta que cuenta <b>un</b> módulo o el Inventario (T36): cada uno implementa este puerto con lo suyo y <see cref="PendientesDeCuentaCompuestos"/> los suma. Si no puede contar,
-/// lanza: nunca se asume cero.
-/// </summary>
-public interface IPendientesDeUnModulo
-{
-    Task<int> Contar(Guid usuarioId, CancellationToken cancelacion = default);
-}
-
 /// <summary>No se pudo contar los pendientes de una cuenta: la cancelación o el reemplazo fallan cerrados (IDE-27, IDE-84).</summary>
 public sealed class PendientesNoDisponiblesException : InvalidOperationException
 {
@@ -42,17 +33,24 @@ public sealed class PendientesNoDisponiblesException : InvalidOperationException
 }
 
 /// <summary>
-/// Los pendientes de una cuenta en todos los módulos y el Inventario (IDE-27): suma lo que cuenta cada <see cref="IPendientesDeUnModulo"/>. Basta que <b>uno</b> falle para que lance, y no se cuenta nada a medias:
-/// un pendiente que no se pudo contar podría ser el que impide cancelar.
+/// Los pendientes de una cuenta en todos los módulos y el Inventario (IDE-27): suma lo que cuenta cada <see cref="IPendientesDeCuenta"/> concreto. La composición (T44) lo construye <b>por fábrica</b> con la lista
+/// explícita de las implementaciones (Pagos, Reclamaciones, Inventario…), sin registrarlo como <see cref="IPendientesDeCuenta"/> de la enumeración, para no recursar. Falla cerrado: <b>sin ningún módulo, con un
+/// conteo negativo o si uno solo no puede contar, lanza</b>; nunca se asume cero.
 /// </summary>
-public sealed class PendientesDeCuentaCompuestos(IEnumerable<IPendientesDeUnModulo> modulos) : IPendientesDeCuenta
+public sealed class PendientesDeCuentaCompuestos(IReadOnlyList<IPendientesDeCuenta> modulos) : IPendientesDeCuenta
 {
     public async Task<int> Contar(Guid usuarioId, CancellationToken cancelacion = default)
     {
+        if (modulos.Count == 0)
+        {
+            throw new PendientesNoDisponiblesException("No hay ningún módulo que cuente los pendientes.");
+        }
+
         var total = 0;
         foreach (var modulo in modulos)
         {
-            total = checked(total + Math.Max(0, await modulo.Contar(usuarioId, cancelacion).ConfigureAwait(false)));
+            var cuenta = await modulo.Contar(usuarioId, cancelacion).ConfigureAwait(false);
+            total = cuenta < 0 ? throw new PendientesNoDisponiblesException("Un módulo devolvió un conteo inválido de pendientes.") : checked(total + cuenta);
         }
 
         return total;
