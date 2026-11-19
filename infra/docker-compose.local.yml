@@ -31,7 +31,7 @@ services:
 
   redis:
     # Caché de disponibilidad y catálogo (AD06), con memoria acotada (RNF12).
-    image: redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
+    image: redis:8-alpine@sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3
     command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
@@ -45,7 +45,7 @@ services:
   redis-contadores:
     # Contadores de límites de uso (transversal-seguridad): instancia dedicada, sin expulsión de claves, con AOF y un usuario ACL
     # restringido. La contraseña (32 caracteres o más) llega por variable de entorno; en el despliegue se activa TLS (REDIS_TLS=1).
-    image: redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
+    image: redis:8-alpine@sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3
     entrypoint: ["sh", "/etc/redis-contadores/iniciar.sh"]
     environment:
       BABELHUB__Seguridad__ClaveDeRedisDeLimites: ${BABELHUB__Seguridad__ClaveDeRedisDeLimites:?define una contraseña de al menos 32 caracteres}
