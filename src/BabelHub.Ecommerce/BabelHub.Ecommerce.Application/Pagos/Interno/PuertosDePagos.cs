@@ -102,7 +102,7 @@ internal sealed record LineaConfirmadaDeReserva(Guid LineaId, string CodigoDeFue
 /// </summary>
 internal interface IReservasDelPago
 {
-    /// <summary>Con alcance de usuario: ¿la reserva sigue vigente?</summary>
+    /// <summary>Con alcance de usuario: ¿la reserva sigue vigente? La cuenta sale del token de la persona que llama (el cliente del Inventario lo pone), no de <paramref name="cuentaId"/>, que solo documenta a quién pertenece la consulta.</summary>
     Task<RespuestaDeReserva<EstadoDeLaReserva>> Consultar(Guid pedidoId, Guid cuentaId, CancellationToken cancelacion = default);
 
     /// <summary>Pide extender una sola vez la reserva de los impresos (PAG-13, contrato v1: <c>POST /reservas/{pedidoId}/extender</c> sin cuerpo): el Inventario calcula el nuevo instante.</summary>

@@ -155,6 +155,9 @@ internal sealed class ConfirmacionDeCompraDePrueba : IConfirmacionDeCompra
 
     public Exception? Falla { get; set; }
 
+    /// <summary>Una espera dentro de la confirmación para dar tiempo a otro ejecutor simultáneo.</summary>
+    public TimeSpan Retraso { get; set; }
+
     public IReadOnlyCollection<Guid> PedidosCreados
     {
         get
@@ -168,14 +171,19 @@ internal sealed class ConfirmacionDeCompraDePrueba : IConfirmacionDeCompra
 
     public int Llamadas { get; private set; }
 
-    public Task<ResultadoDeConfirmarCompra> Confirmar(CompraAprobada compra, CancellationToken cancelacion = default)
+    public async Task<ResultadoDeConfirmarCompra> Confirmar(CompraAprobada compra, CancellationToken cancelacion = default)
     {
+        if (Retraso > TimeSpan.Zero)
+        {
+            await Task.Delay(Retraso, cancelacion).ConfigureAwait(false);
+        }
+
         lock (_candado)
         {
             Llamadas++;
             if (Falla is not null)
             {
-                return Task.FromException<ResultadoDeConfirmarCompra>(Falla);
+                throw Falla;
             }
 
             if (Resultado == ResultadoDeConfirmarCompra.Creado)
@@ -183,7 +191,7 @@ internal sealed class ConfirmacionDeCompraDePrueba : IConfirmacionDeCompra
                 _creados.Add(compra.PedidoId);
             }
 
-            return Task.FromResult(Resultado);
+            return Resultado;
         }
     }
 }
@@ -197,6 +205,8 @@ internal sealed class EntornoDePagosConPostgres : IAsyncDisposable
     private const string ClaveDeIntentos = "clave-de-intentos-de-prueba-0123456789-abcdef";
 
     private static readonly List<string> _alertas = [];
+
+    private static readonly List<(Guid Pedido, MotivoDeLiberacion Motivo)> _liberaciones = [];
 
     private EntornoDePagosConPostgres(ServiceProvider proveedor, PostgresDePagosFixture bd)
     {
@@ -227,6 +237,9 @@ internal sealed class EntornoDePagosConPostgres : IAsyncDisposable
     /// <summary>Los motivos de las alertas técnicas que Pagos publicó.</summary>
     public IReadOnlyList<string> Alertas { get { lock (_alertas) { return [.. _alertas]; } } }
 
+    /// <summary>Las liberaciones de reserva pedidas al Inventario, con su motivo.</summary>
+    public IReadOnlyList<(Guid Pedido, MotivoDeLiberacion Motivo)> Liberaciones { get { lock (_liberaciones) { return [.. _liberaciones]; } } }
+
     public DobleDeMetodos Checkout { get; private set; } = null!;
 
     public DobleDeMetodos Progreso { get; private set; } = null!;
@@ -234,6 +247,7 @@ internal sealed class EntornoDePagosConPostgres : IAsyncDisposable
     public static EntornoDePagosConPostgres Crear(PostgresDePagosFixture bd, Action<IServiceCollection>? ajustes = null)
     {
         _alertas.Clear();
+        _liberaciones.Clear();
         var servicios = new ServiceCollection();
         var reloj = new RelojManualDePagos();
         servicios.AddSingleton<IReloj>(reloj);
@@ -260,7 +274,7 @@ internal sealed class EntornoDePagosConPostgres : IAsyncDisposable
         servicios.AddScoped<IConfirmacionDeCompra>(sp => sp.GetRequiredService<ConfirmacionDeCompraDePrueba>());
         servicios.AddSingleton<ConfirmacionDeCompraDePrueba>();
         servicios.AddSingleton<ReservasSimuladasDelPago>();
-        servicios.AddScoped<IReservasDelPago>(sp => sp.GetRequiredService<ReservasSimuladasDelPago>());
+        servicios.AddScoped<IReservasDelPago>(sp => new ReservasConRegistroDeLiberaciones(sp.GetRequiredService<ReservasSimuladasDelPago>(), _liberaciones));
 
         var vistos = new HashSet<string>();
         entradas.Con(
@@ -304,4 +318,24 @@ internal sealed class EntornoDePagosConPostgres : IAsyncDisposable
 
     private static T Falso<T>(out DobleDeMetodos doble)
         where T : class => DobleDeMetodos.Crear<T>(out doble);
+}
+
+/// <summary>Las reservas del Inventario simulado con el registro de lo que se liberó y por qué motivo: la prueba comprueba el motivo del contrato (<c>falla-posterior-al-pago</c> o <c>pago-vencido</c>).</summary>
+internal sealed class ReservasConRegistroDeLiberaciones(IReservasDelPago interior, List<(Guid Pedido, MotivoDeLiberacion Motivo)> liberaciones) : IReservasDelPago
+{
+    public Task<RespuestaDeReserva<EstadoDeLaReserva>> Consultar(Guid pedidoId, Guid cuentaId, CancellationToken cancelacion = default) => interior.Consultar(pedidoId, cuentaId, cancelacion);
+
+    public Task<RespuestaDeReserva<ResultadoDeExtension>> Extender(Guid pedidoId, CancellationToken cancelacion = default) => interior.Extender(pedidoId, cancelacion);
+
+    public Task<RespuestaDeReserva<IReadOnlyList<LineaConfirmadaDeReserva>>> Confirmar(Guid pedidoId, string claveDeIdempotencia, CancellationToken cancelacion = default) => interior.Confirmar(pedidoId, claveDeIdempotencia, cancelacion);
+
+    public async Task<RespuestaDeReserva<bool>> Liberar(Guid pedidoId, MotivoDeLiberacion motivo, CancellationToken cancelacion = default)
+    {
+        lock (liberaciones)
+        {
+            liberaciones.Add((pedidoId, motivo));
+        }
+
+        return await interior.Liberar(pedidoId, motivo, cancelacion).ConfigureAwait(false);
+    }
 }

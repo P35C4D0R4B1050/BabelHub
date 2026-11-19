@@ -224,6 +224,31 @@ public sealed class RestReservasDelPagoTests
     }
 
     [Fact]
+    public async Task Confirmar_empareja_el_traslado_con_la_fuente_de_la_linea_y_un_traslado_de_otro_origen_no_sirve()
+    {
+        var (adaptador, cliente) = CrearSinLiberar();
+        var distinto = new ReservaDelInventario(
+            Pedido,
+            EstadosDeReserva.Confirmada,
+            DateTimeOffset.UnixEpoch,
+            null,
+            [new LineaReservada(Linea2, Edicion2, 1, "confirmada", "LIM-02", true, 5)],
+            [new TrasladoDeLaReserva(Traslado, Edicion2, 1, "CUS-03", "AYA-01", "solicitado", new DateOnly(2026, 11, 25))]);
+        cliente.Confirmacion = () => ResultadoDelInventario<ReservaDelInventario>.ConValor(distinto);
+
+        Assert.Equal(ResultadoDeLaLlamadaDeReserva.SinRespuesta, (await adaptador.Confirmar(Pedido, "conf-1")).Resultado);
+    }
+
+    [Fact]
+    public async Task Extender_con_extendida_verdadera_exige_la_reserva_pendiente()
+    {
+        var (adaptador, cliente) = CrearSinLiberar();
+        cliente.Extension = () => ResultadoDelInventario<ExtensionDeLaReserva>.ConValor(new ExtensionDeLaReserva(true, ReservaConExpiracion(EstadosDeReserva.Confirmada, Ahora.AddMinutes(30))));
+
+        Assert.Equal(ResultadoDeLaLlamadaDeReserva.SinRespuesta, (await adaptador.Extender(Pedido)).Resultado);
+    }
+
+    [Fact]
     public async Task Confirmar_falla_cerrado_si_falta_el_traslado_de_una_linea_la_reserva_no_quedo_confirmada_o_es_de_otro_pedido()
     {
         var (adaptador, cliente) = CrearSinLiberar();

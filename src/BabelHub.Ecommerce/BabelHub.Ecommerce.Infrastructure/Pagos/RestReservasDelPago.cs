@@ -54,6 +54,12 @@ internal sealed class RestReservasDelPago(IClienteDelInventario cliente, IReloj 
             return Fallo<ResultadoDeExtension>(ResultadoDeLaLlamadaDeReserva.SinRespuesta);
         }
 
+        // Una reserva que dice haberse extendido debe seguir pendiente: cualquier otro estado no es lo que pedimos (falla cerrada, como confirmar y liberar).
+        if (extension.Extendida && reserva.Estado != EstadosDeReserva.Pendiente)
+        {
+            return Fallo<ResultadoDeExtension>(ResultadoDeLaLlamadaDeReserva.SinRespuesta);
+        }
+
         // Sin cambios (ya extendida, vencida o confirmada) es un éxito con Extendida = false, nunca un error (contrato v1).
         return new RespuestaDeReserva<ResultadoDeExtension>(ResultadoDeLaLlamadaDeReserva.Correcto, new ResultadoDeExtension(expiraEn, extension.Extendida));
     }
@@ -81,7 +87,7 @@ internal sealed class RestReservasDelPago(IClienteDelInventario cliente, IReloj 
             TrasladoDeLaReserva? traslado = null;
             if (linea.RequiereTraslado)
             {
-                traslado = disponibles.FirstOrDefault(t => t.EdicionId == linea.EdicionId && t.Cantidad == linea.Cantidad);
+                traslado = disponibles.FirstOrDefault(t => t.EdicionId == linea.EdicionId && t.Cantidad == linea.Cantidad && t.CodigoDeOrigen == linea.CodigoDeFuente);
                 if (traslado is null)
                 {
                     return Fallo<IReadOnlyList<LineaConfirmadaDeReserva>>(ResultadoDeLaLlamadaDeReserva.SinRespuesta);
