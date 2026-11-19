@@ -153,8 +153,15 @@ public sealed class ComprasAprobadasConPostgresTests(PostgresDePagosFixture bd) 
         Assert.Equal(0, await Contar("reembolsos", "estado = 'reembolsado'"));
         Assert.Equal(1, await Contar("reembolsos", "estado IN ('pendiente', 'solicitado')"));
 
+        // La administración reintenta: consulta antes a la pasarela, ve que ya lo aplicó y lo marca como hecho sin pedirlo otra vez.
         _entorno.Reloj.Avanzar(TimeSpan.FromMinutes(10));
-        await Reanudar();
+        _entorno.Actor.Actual = ActorActual.DeUsuario(Guid.NewGuid(), BabelHub.Shared.Contratos.RolesDeUsuario.AdministradorCentral, null);
+        var reembolso = await bd.Consultar<Guid>("SELECT id FROM pagos.reembolsos LIMIT 1");
+        using (var alcance = _entorno.Alcance())
+        {
+            Assert.True((await alcance.ServiceProvider.GetRequiredService<IReembolsos>().Reintentar(reembolso)).EsExito);
+        }
+
 
         Assert.Equal(1, await ReembolsosEnLaPasarela());
         Assert.Equal(1, await Contar("reembolsos", "estado = 'reembolsado'"));
