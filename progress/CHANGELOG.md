@@ -2,6 +2,17 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-19 — ECO-4c, ECO-4d y ECO-5c fundidos; tablero de coordinación
+
+### Cubierto
+- **Carril B:** ECO-4c (T14–T23) y ECO-4d (T24–T32 y T37 de `ecommerce-carrito-checkout`): casos de uso de la reserva y el pago del checkout, esquema y repositorios sobre PostgreSQL, adaptador del Inventario (disponibilidad por lotes y sucursales), composición con guarda de producción, presentación del carrito y checkout, trabajos de fondo y las pruebas de integración del carrito con PostgreSQL real (198 de 198). T25b y T26c esperan al carril A.
+- **Carril C:** ECO-5b y ECO-5c (T07–T23 de `ecommerce-pagos`) y ECO-11a (reclamaciones), con revisiones sin Bloqueantes.
+- **Coordinación:** nuevo `progress/coordinacion.md` con el protocolo de los carriles, el encargo de cada uno, la matriz de qué espera a quién y los turnos de integración. La sesión de planificación de ECO-7 pasa a ser el carril V (verificación FIN-1 de las specs completas); el carril A se reactiva con las piezas que esperan B y C, IDE-4 e IDE-5.
+- Validación de `main`: unitarias 3638 y 2309, arquitectura 217, CoverageCheck 12, gitleaks limpio, integración 4857 de 4871 (las 14 pasan sueltas: 13 de bloqueos asesores y el escáner de secretos, contención de la máquina).
+
+### Pendiente
+- T25b y T26c del carrito (carril A), ECO-5d en adelante, ECO-11b a 11d, IDE-4 e IDE-5, ECO-6 de pedidos, `spec-verify` de las specs completas; el disco de Docker en D crece rápido (quedan ~38 GB libres).
+
 ## 2026-11-18 — ECO-4b fundido (casos de uso del carrito)
 
 ### Cubierto
