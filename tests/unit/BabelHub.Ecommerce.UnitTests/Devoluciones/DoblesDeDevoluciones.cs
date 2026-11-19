@@ -1,6 +1,8 @@
 using BabelHub.Ecommerce.Application.Auditoria;
+using BabelHub.Ecommerce.Application.Biblioteca;
 using BabelHub.Ecommerce.Application.Devoluciones.Interno;
 using BabelHub.Ecommerce.Application.Identidad;
+using BabelHub.Ecommerce.Application.Pagos;
 using BabelHub.Ecommerce.Application.Pedidos;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Devoluciones;
@@ -268,7 +270,10 @@ internal sealed class EntornoDeDevoluciones
         Reloj = new RelojFijo(ahora ?? AhoraInicial);
         Repositorio = new RepositorioDeDevolucionesEnMemoria();
         Auditoria = new AuditoriaDeDevolucionesEspia();
-        Unidad = new UnidadDeTrabajoReversible(Repositorio, Auditoria);
+        Reembolsos = new ReembolsosDoble();
+        Unidad = new UnidadDeTrabajoReversible(Repositorio, Auditoria, Reembolsos);
+        Reembolsos.Unidad = Unidad;
+        Accesos = new AccesosParaDevolucionesDoble();
         Denegaciones = new DenegacionesDelCatalogoEspia();
         Cuentas = new EstadoDeCuentaFalso();
         Sucursales = new ResolucionDeSucursalDoble();
@@ -279,6 +284,7 @@ internal sealed class EntornoDeDevoluciones
         Autorizador = new AutorizadorDeDevoluciones(Actor, Denegaciones, Cuentas, Sucursales);
         LimitesDeUso = new LimitesDeDevoluciones(Limites, Actor);
         SolicitarImpreso = new SolicitarDevolucionDeImpreso(Autorizador, LimitesDeUso, Pedidos, Inventario, Marca, Repositorio, Unidad, Auditoria, Reloj);
+        SolicitarDigital = new SolicitarReembolsoDeDigital(Autorizador, LimitesDeUso, Pedidos, Accesos, Reembolsos, Marca, Repositorio, Unidad, Auditoria, Reloj);
     }
 
     public ActorDePrueba Actor { get; }
@@ -310,6 +316,12 @@ internal sealed class EntornoDeDevoluciones
     public LimitesDeDevoluciones LimitesDeUso { get; }
 
     public SolicitarDevolucionDeImpreso SolicitarImpreso { get; }
+
+    public SolicitarReembolsoDeDigital SolicitarDigital { get; }
+
+    public ReembolsosDoble Reembolsos { get; }
+
+    public AccesosParaDevolucionesDoble Accesos { get; }
 
     /// <summary>Siembra un pedido de la cuenta del actor con las líneas dadas y lo devuelve.</summary>
     public PedidoParaDevoluciones SembrarPedido(params LineaDePedidoParaDevoluciones[] lineas)
