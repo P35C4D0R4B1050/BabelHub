@@ -17,6 +17,12 @@ public static partial class AccionesAuditables
     public static readonly AccionAuditable IngresoDeMercaderiaRegistrado = new(nameof(IngresoDeMercaderiaRegistrado));
 
     /// <summary>El Catálogo concilió un ingreso de mercadería pendiente con los ingresos del Inventario (registrado, fallido o discrepancia; sin la nota ni la referencia, CAT-22).</summary>
+    /// <summary>Un cliente inició un cobro (un intento con un medio): el importe y el medio, sin token ni datos de pago (PAG-11).</summary>
+    public static readonly AccionAuditable CobroIniciado = new(nameof(CobroIniciado));
+
+    /// <summary>Se resolvió un cobro: aprobado, rechazado (con su motivo de la lista cerrada) o pendiente de confirmación (PAG-11).</summary>
+    public static readonly AccionAuditable CobroResuelto = new(nameof(CobroResuelto));
+
     public static readonly AccionAuditable IngresoPendienteConciliado = new(nameof(IngresoPendienteConciliado));
 
     /// <summary>El trabajo de fondo anonimizó los ingresos solicitados de más de 2 años (cantidad, sin datos personales).</summary>
