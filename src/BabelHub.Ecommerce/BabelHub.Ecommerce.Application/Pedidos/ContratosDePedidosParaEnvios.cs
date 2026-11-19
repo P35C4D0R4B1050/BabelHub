@@ -182,3 +182,30 @@ public interface IPedidosParaEnvios
 {
     Task<Resultado<PedidoParaEnvios>> Obtener(Guid pedidoId, CancellationToken cancelacion = default);
 }
+
+// ---------- El contrato de lectura de Pedidos para Devoluciones (D01 de ecommerce-devoluciones) ----------
+
+/// <summary>
+/// Una línea del pedido tal como la necesita Devoluciones: si es digital, cuánto costó y su estado con la fecha de entrega (la de una impresa entregada; <see langword="null"/> si no se entregó). Sin título, sin fuente y sin contacto: el envío no se reembolsa en una devolución, así que
+/// tampoco se entrega su costo.
+/// </summary>
+public sealed record LineaDePedidoParaDevoluciones(Guid LineaId, Guid EdicionId, bool EsDigital, int Cantidad, decimal PrecioUnitario, decimal Importe, EstadoVisibleDeLaLinea Estado, DateTimeOffset? EntregadaEn);
+
+/// <summary>El pedido para Devoluciones: su número, la cuenta opaca (el titular, y de donde salen los avisos: nunca del actor), la fecha de creación (la «aprobación del pago» de DEV-04 y DEV-06, D05) y sus líneas. Sin contacto, sin datos de pago y sin el envío.</summary>
+public sealed record PedidoParaDevoluciones(Guid PedidoId, string Numero, Guid CuentaId, DateTimeOffset CreadoEn, IReadOnlyList<LineaDePedidoParaDevoluciones> Lineas);
+
+/// <summary>Los identificadores de los pedidos de una cuenta, paginados y acotados (<see cref="IPedidosParaDevoluciones.TamanoMaximo"/>), del más reciente al más antiguo.</summary>
+public sealed record PaginaDePedidosDeUnaCuenta(IReadOnlyList<Guid> PedidoIds, int Pagina, int Tamano, int Total);
+
+/// <summary>
+/// El contrato de lectura de Pedidos para Devoluciones (D01 de Devoluciones; AD02): es del dueño de los datos y se llama hacia abajo, <b>sin bloqueo</b> y sin abrir transacción propia. <see cref="Obtener"/> devuelve <c>NoEncontrado</c> para un pedido que no existe y la cuenta que trae es la que Devoluciones usa para
+/// comprobar la propiedad y para avisar. <see cref="ListarDeUnaCuenta"/> localiza lo de una cuenta (pendientes y cancelación de la cuenta, DEV-23 a DEV-26): se lee <b>antes</b> de abrir el rol del esquema de la transacción única de Identidad.
+/// </summary>
+public interface IPedidosParaDevoluciones
+{
+    public const int TamanoMaximo = 100;
+
+    Task<Resultado<PedidoParaDevoluciones>> Obtener(Guid pedidoId, CancellationToken cancelacion = default);
+
+    Task<Resultado<PaginaDePedidosDeUnaCuenta>> ListarDeUnaCuenta(Guid cuentaId, int pagina, int tamano, CancellationToken cancelacion = default);
+}

@@ -109,3 +109,9 @@ internal sealed class ControlesDeGestionDePedidos(ILimitadorDePedidos limites, I
         _ => new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDePedidos.ServicioNoDisponible),
     };
 }
+
+/// <summary>Una operación que se rechaza dentro de su transacción: lanza para <b>revertirla entera</b> (un <c>Fallo</c> o una excepción de Envíos no deja estados a medias) y el caso de uso la convierte en el error que devuelve.</summary>
+internal sealed class OperacionRechazadaException(ErrorDeAplicacion error) : Exception("La operación sobre el pedido se rechazó dentro de la transacción.")
+{
+    public ErrorDeAplicacion Error { get; } = error;
+}

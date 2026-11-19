@@ -30,6 +30,9 @@ Variables de datos (los recorridos que las necesitan se omiten si faltan; nunca 
 | `E2E_VISITANTE_STORAGE_STATE` | Visitante con un libro en su carrito (cookie `__Host-bh-carrito`; AC-CAR-13). |
 | `E2E_CLIENTE_TRAS_FUSION_STORAGE_STATE` | Cliente recién ingresado con avisos de ajuste sin ver (AC-CAR-22). |
 
+Versiones: `@playwright/test` y `playwright-core` fijados en **1.64.0**, la que usa los navegadores de la caché local (`chromium-1248`, `firefox-1555`); con otra versión Playwright pide otros navegadores y falla al lanzarlos. Node en `C:Program Files
+odejs` (si el shell no lo ve: `export PATH="$PATH:/c/Program Files/nodejs"`); `npm install` y `npx playwright test carrito` (sin las variables `E2E_*` los recorridos se omiten).
+
 Navegadores: `escritorio` y `telefono` (Chromium) y `firefox`; los tres usan los navegadores de la caché de Playwright (`%LOCALAPPDATA%ms-playwright`) y solo hace falta Node para ejecutarlos.
 
 Requisitos previos de los recorridos del carrito: la composición del Carrito en `Program.cs` (`AgregarCarrito`, `AgregarTrabajosDelCarritoEnLaApi`, `UsarLimiteDeCuerpoDelCarrito`), el Inventario y Pagos reales o sus pantallas, y el carrito sembrado en cada `storageState` (la ficha aún no agrega al carrito).
