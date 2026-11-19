@@ -126,8 +126,8 @@ public sealed class Reautenticacion(
             return rechazo;
         }
 
-        var contrasena = Contrasena.Presentada(presentada?.Revelar());
-        var coincide = contrasena is not null && await hasher.Verificar(cuenta.ResumenDeAcceso, contrasena, cancelacion).ConfigureAwait(false);
+        var secretoPresentado = Contrasena.Presentada(presentada?.Revelar());
+        var coincide = secretoPresentado is not null && await hasher.Verificar(cuenta.ResumenDeAcceso, secretoPresentado, cancelacion).ConfigureAwait(false);
         if (!coincide)
         {
             await eventos.IngresoFallido(usuarioId, cancelacion).ConfigureAwait(false);
