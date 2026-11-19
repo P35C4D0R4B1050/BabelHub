@@ -84,6 +84,27 @@ public sealed class ResultadoDeCrearPedido
     internal static ResultadoDeCrearPedido Rechazado(RechazoDeCrearPedido rechazo) => new(null, rechazo);
 }
 
+/// <summary>Qué pasó con cada línea de una operación (preparar, marcar lista, despachar o entregar): se aplicó, la línea espera un traslado sin recibir (PED-10), el estado no lo permite o la línea no es del pedido.</summary>
+public enum ResultadoDeOperacionDeLinea
+{
+    Aplicada,
+    EsperaElTraslado,
+    EstadoInvalido,
+    NoEncontrada,
+}
+
+public sealed record ResultadoPorLinea(Guid LineaId, ResultadoDeOperacionDeLinea Resultado);
+
+/// <summary>
+/// La política de no recogidos (PED-15, D07): una línea de recojo que lleva <b>más de 360 horas</b> (15 días) en listo para recojo pasa a no recogida. Se mide en instantes, no en días de calendario: 14 días no vencen y 15 días y 1 hora sí.
+/// </summary>
+public static class PoliticaDeNoRecogido
+{
+    public const int PlazoEnHoras = 360;
+
+    public static bool EstaVencida(DateTimeOffset listoEn, DateTimeOffset ahora) => ahora - listoEn > TimeSpan.FromHours(PlazoEnHoras);
+}
+
 /// <summary>
 /// Una línea de un pedido (una por edición, PED-01): la copia del título, el ISBN, el precio y la cantidad con su propio ciclo (PED-02). Una impresa nace <see cref="EstadoDeLineaImpresa.Confirmado"/> y una digital <see cref="EstadoDeLineaDigital.Disponible"/> (el acceso
 /// ya lo concedió la biblioteca, PED-03). Los cambios de estado pasan por <see cref="PasarA"/>, que solo aplica una transición que la máquina permite y fija la fecha que le corresponde (PED-29).
@@ -170,6 +191,12 @@ public sealed class LineaDePedido
             return false;
         }
 
+        // A domicilio una línea solo sale (despachada) si logística la marcó lista (PED-28).
+        if (hacia == EstadoDeLineaImpresa.Despachado && ListoEn is null)
+        {
+            return false;
+        }
+
         EstadoImpreso = hacia;
         switch (hacia)
         {
@@ -187,6 +214,20 @@ public sealed class LineaDePedido
                 break;
         }
 
+        return true;
+    }
+
+    /// <summary>
+    /// A domicilio, marcar lista es un hito sin estado propio (PED-28): la línea sigue en preparación y solo guarda la fecha de listo, una vez. Una línea que no está en preparación, ya marcada o de un pedido de recojo no cambia.
+    /// </summary>
+    internal bool MarcarListaSinEstado(DateTimeOffset ahora)
+    {
+        if (_esDeRecojo || EstadoImpreso != EstadoDeLineaImpresa.EnPreparacion || ListoEn is not null)
+        {
+            return false;
+        }
+
+        ListoEn = ahora;
         return true;
     }
 
@@ -349,6 +390,82 @@ public sealed class Pedido
 
         return true;
     }
+
+    // ---------- Gestión de las líneas (PED-09, PED-10, PED-11, PED-28, PED-29) ----------
+
+    /// <summary>
+    /// Pasa a en preparación las líneas pedidas (PED-09, PED-19): una confirmada sin traslado o una recibida; <b>una con traslado sin recibir no se prepara</b> y se informa que espera el traslado (PED-10) mientras las demás sí se preparan. Devuelve el resultado de cada línea;
+    /// el pedido se recalcula en la misma operación.
+    /// </summary>
+    public IReadOnlyList<ResultadoPorLinea> PrepararLineas(IReadOnlyCollection<Guid> lineaIds, DateTimeOffset ahora) => Aplicar(lineaIds, ahora, (linea, instante) =>
+    {
+        if (linea.RequiereTraslado && linea.EstadoImpreso is EstadoDeLineaImpresa.Confirmado or EstadoDeLineaImpresa.EnTransito)
+        {
+            return ResultadoDeOperacionDeLinea.EsperaElTraslado;
+        }
+
+        return Resultado(linea.PasarA(EstadoDeLineaImpresa.EnPreparacion, instante));
+    });
+
+    /// <summary>
+    /// Marca listas las líneas en preparación: en recojo pasan a listo para recojo y arranca su plazo (PED-09, PED-15); a domicilio es un <b>hito sin estado propio</b> (la línea sigue en preparación con su fecha de listo) que habilita crear el envío (PED-28). Marcar de nuevo una
+    /// línea ya lista es estado inválido.
+    /// </summary>
+    public IReadOnlyList<ResultadoPorLinea> MarcarListas(IReadOnlyCollection<Guid> lineaIds, DateTimeOffset ahora) => Aplicar(lineaIds, ahora, (linea, instante) =>
+        Tipo == TipoDeEntregaDelPedido.Recojo
+            ? Resultado(linea.PasarA(EstadoDeLineaImpresa.ListoParaRecojo, instante))
+            : Resultado(linea.MarcarListaSinEstado(instante)));
+
+    /// <summary>Pasa a despachadas las líneas a domicilio marcadas listas cuando su envío pasa a en reparto (PED-29): una no marcada lista no sale.</summary>
+    public IReadOnlyList<ResultadoPorLinea> DespacharLineas(IReadOnlyCollection<Guid> lineaIds, DateTimeOffset ahora) =>
+        Aplicar(lineaIds, ahora, (linea, instante) => Resultado(linea.PasarA(EstadoDeLineaImpresa.Despachado, instante)));
+
+    /// <summary>
+    /// Entrega las líneas en <paramref name="fecha"/> (PED-11, PED-29): en recojo desde listo para recojo (o no recogido), a domicilio desde despachado con la fecha de entrega del envío. El que el Inventario haya descontado el físico lo decide la Aplicación antes de llamarlo.
+    /// </summary>
+    public IReadOnlyList<ResultadoPorLinea> EntregarLineas(IReadOnlyCollection<Guid> lineaIds, DateTimeOffset fecha) =>
+        Aplicar(lineaIds, fecha, (linea, instante) => Resultado(linea.PasarA(EstadoDeLineaImpresa.Entregado, instante)));
+
+    /// <summary>
+    /// Marca no recogidas, en un pedido de recojo, las líneas que llevan más de 360 horas en listo para recojo (PED-15, D07), <b>omitiendo las que tienen una operación en curso</b> (<paramref name="enCurso"/>). Devuelve las líneas marcadas y recalcula el pedido; repetir la revisión no
+    /// cambia nada.
+    /// </summary>
+    public IReadOnlyList<Guid> MarcarNoRecogidas(DateTimeOffset ahora, IReadOnlySet<Guid> enCurso)
+    {
+        ArgumentNullException.ThrowIfNull(enCurso);
+        if (Tipo != TipoDeEntregaDelPedido.Recojo)
+        {
+            return [];
+        }
+
+        var marcadas = _lineas
+            .Where(l => l.EstadoImpreso == EstadoDeLineaImpresa.ListoParaRecojo && l.ListoEn is { } listoEn && PoliticaDeNoRecogido.EstaVencida(listoEn, ahora) && !enCurso.Contains(l.Id))
+            .Where(l => l.PasarA(EstadoDeLineaImpresa.NoRecogido, ahora))
+            .Select(l => l.Id)
+            .ToList();
+        if (marcadas.Count > 0)
+        {
+            RecalcularEstado(ahora);
+        }
+
+        return marcadas;
+    }
+
+    private IReadOnlyList<ResultadoPorLinea> Aplicar(IReadOnlyCollection<Guid> lineaIds, DateTimeOffset ahora, Func<LineaDePedido, DateTimeOffset, ResultadoDeOperacionDeLinea> operacion)
+    {
+        ArgumentNullException.ThrowIfNull(lineaIds);
+        var resultados = new List<ResultadoPorLinea>(lineaIds.Count);
+        foreach (var id in lineaIds)
+        {
+            var linea = _lineas.FirstOrDefault(l => l.Id == id);
+            resultados.Add(new ResultadoPorLinea(id, linea is null ? ResultadoDeOperacionDeLinea.NoEncontrada : linea.EsDigital ? ResultadoDeOperacionDeLinea.EstadoInvalido : operacion(linea, ahora)));
+        }
+
+        RecalcularEstado(ahora);
+        return resultados;
+    }
+
+    private static ResultadoDeOperacionDeLinea Resultado(bool aplicada) => aplicada ? ResultadoDeOperacionDeLinea.Aplicada : ResultadoDeOperacionDeLinea.EstadoInvalido;
 
     private EstadoDePedido Derivar() => DerivacionDelEstadoDelPedido.Derivar(
         [.. _lineas.Where(l => !l.EsDigital).Select(l => l.EstadoImpreso!.Value)],
