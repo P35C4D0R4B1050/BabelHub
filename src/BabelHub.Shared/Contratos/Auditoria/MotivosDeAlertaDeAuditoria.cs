@@ -38,6 +38,48 @@ public static class MotivosDeAlertaDeAuditoria
 
     public const string TrasladoVinculadoSinAprobar = "traslado-vinculado-sin-aprobar";
 
+    public const string RetomaDePagosFallida = "retoma-de-pagos-fallida";
+
+    public const string ReservasConfirmadasInconsistentes = "reservas-confirmadas-inconsistentes";
+
+    public const string ReservaConfirmadaInexistente = "reserva-confirmada-inexistente";
+
+    public const string ReservaConfirmadaSinLiberar = "reserva-confirmada-sin-liberar";
+
+    public const string ReintentoDeReembolsosFallido = "reintento-de-reembolsos-fallido";
+
+    public const string RegistroDelCobroFallido = "registro-del-cobro-fallido";
+
+    public const string ReembolsoPedidoSinRegistrar = "reembolso-pedido-sin-registrar";
+
+    public const string PurgaDeContactoFallida = "purga-de-contacto-fallida";
+
+    public const string ConsultaDePagoFallida = "consulta-de-pago-fallida";
+
+    public const string ConfirmacionDeCompraFallida = "confirmacion-de-compra-fallida";
+
+    public const string CompraAprobadaSinReferencia = "compra-aprobada-sin-referencia";
+
+    public const string CompraAprobadaSinCompletar = "compra-aprobada-sin-completar";
+
+    public const string CompensacionNoAplicable = "compensacion-no-aplicable";
+
+    public const string CompensacionDeCompraFallida = "compensacion-fallida";
+
+    public const string CobroDudosoParaConciliar = "cobro-dudoso-para-conciliar";
+
+    public const string CierreDeIntencionesFallido = "cierre-de-intenciones-fallido";
+
+    public const string CargoDuplicadoParaConciliar = "cargo-duplicado-para-conciliar";
+
+    public const string AvisoDePagoFallido = "aviso-de-pago-fallido";
+
+    public const string AvisoACarritoFallido = "aviso-a-carrito-fallido";
+
+    public const string CompraAprobadaSinPedidoALos30Dias = "compra-aprobada-sin-pedido-a-los-30-dias";
+
+    public const string AnonimizacionDeHojasSinCorrer = "anonimizacion-de-hojas-sin-correr";
+
     public const string LecturaDeAlertasDelInventarioNoDisponible = "lectura-de-alertas-del-inventario-no-disponible";
 
     public const string AlcanceDeDatosSinActor = "alcance-de-datos-sin-actor";
@@ -81,6 +123,27 @@ public static class MotivosDeAlertaDeAuditoria
         DepuracionDiariaSinExito,
         BajaDeTitularSinEntregar,
         TrasladoVinculadoSinAprobar,
+        RetomaDePagosFallida,
+        ReservasConfirmadasInconsistentes,
+        ReservaConfirmadaInexistente,
+        ReservaConfirmadaSinLiberar,
+        ReintentoDeReembolsosFallido,
+        RegistroDelCobroFallido,
+        ReembolsoPedidoSinRegistrar,
+        PurgaDeContactoFallida,
+        ConsultaDePagoFallida,
+        ConfirmacionDeCompraFallida,
+        CompraAprobadaSinReferencia,
+        CompraAprobadaSinCompletar,
+        CompensacionNoAplicable,
+        CompensacionDeCompraFallida,
+        CobroDudosoParaConciliar,
+        CierreDeIntencionesFallido,
+        CargoDuplicadoParaConciliar,
+        AvisoDePagoFallido,
+        AvisoACarritoFallido,
+        CompraAprobadaSinPedidoALos30Dias,
+        AnonimizacionDeHojasSinCorrer,
         LecturaDeAlertasDelInventarioNoDisponible,
         AlcanceDeDatosSinActor,
         ConfirmacionesDeReservasAnomalas,
