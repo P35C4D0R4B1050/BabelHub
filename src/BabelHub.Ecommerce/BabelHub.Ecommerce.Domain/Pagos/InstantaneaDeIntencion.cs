@@ -133,9 +133,9 @@ public sealed class InstantaneaDeIntencion
             throw new ArgumentException("Una línea aparece una sola vez en la compra.", nameof(lineas));
         }
 
-        if (lineas.Any(l => l.EdicionId is null || string.IsNullOrWhiteSpace(l.Titulo) || string.IsNullOrWhiteSpace(l.Isbn)))
+        if (lineas.Any(l => l.EdicionId is null || string.IsNullOrWhiteSpace(l.Titulo)))
         {
-            throw new ArgumentException("Cada línea de una compra lleva su edición, su título y su ISBN: solo se anulan al desvincular la cuenta.", nameof(lineas));
+            throw new ArgumentException("Cada línea de una compra lleva su edición y su título (el ISBN es opcional): solo se anulan al desvincular la cuenta.", nameof(lineas));
         }
 
         if (envio.Valor > 0m && entrega != TipoDeEntrega.Domicilio)
