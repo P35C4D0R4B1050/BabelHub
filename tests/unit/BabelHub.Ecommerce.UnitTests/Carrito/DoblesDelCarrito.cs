@@ -514,6 +514,8 @@ internal sealed class AuditoriaDelCarritoEspia : IAuditoriaDelCarrito
 
     public List<(int Ediciones, int Carritos, int Quitadas, int Anotadas)> Retiros { get; } = [];
 
+    public List<(bool ConImpresos, bool ADomicilio)> PasosAlPago { get; } = [];
+
     public bool Caida { get; set; }
 
     public Task FusionAplicada(Guid cuentaId, int lineasDelVisitante, IReadOnlyList<MotivoDeAjusteDeAviso> ajustes, CancellationToken cancelacion = default)
@@ -524,6 +526,17 @@ internal sealed class AuditoriaDelCarritoEspia : IAuditoriaDelCarrito
         }
 
         Fusiones.Add((cuentaId, lineasDelVisitante, ajustes));
+        return Task.CompletedTask;
+    }
+
+    public Task PasoAlPagoIniciado(bool conImpresos, bool aDomicilio, CancellationToken cancelacion = default)
+    {
+        if (Caida)
+        {
+            throw new InvalidOperationException("La auditoría no está disponible.");
+        }
+
+        PasosAlPago.Add((conImpresos, aDomicilio));
         return Task.CompletedTask;
     }
 

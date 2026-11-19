@@ -519,6 +519,27 @@ public sealed class Checkout
     }
 
     /// <summary>
+    /// Había un retiro pendiente al confirmar en pago (3b, D21) y <c>Reabrir</c> dejó la intención abierta: el cambio local condicional <c>reservando</c> → <c>en_edicion</c> <b>conservando el <c>pedidoId</c></b>, subiendo la generación (la reserva
+    /// siguiente usa otra clave y reemplaza la vigente) y aplicando los retiros pendientes. Condicional al <c>pedidoId</c> y la generación de la solicitud. Si <c>Reabrir</c> respondió <c>Cerrada</c>, <c>NoExiste</c> o falló, el checkout se queda
+    /// <c>reservando</c> y lo recoge <c>RecuperarCheckoutsReservando</c>.
+    /// </summary>
+    public ResultadoDeCheckout VolverALaEdicionPorRetiroPendiente(Guid pedidoId, int generacionDeReserva, Carrito carrito, DateTimeOffset ahora)
+    {
+        ExigirCarritoPropio(carrito);
+        if (Estado != EstadoDelCheckout.Reservando || PedidoId != pedidoId || GeneracionDeReserva != generacionDeReserva)
+        {
+            return ResultadoDeCheckout.De(EfectoDeTransicion.NoAplica);
+        }
+
+        GeneracionDeReserva++;
+        ReservandoDesde = null;
+        Estado = EstadoDelCheckout.EnEdicion;
+        var retiradas = carrito.AplicarRetirosPendientes(ahora);
+        Cambiar(porLaPersona: false, ahora);
+        return ResultadoDeCheckout.Aplicada(retiradas);
+    }
+
+    /// <summary>
     /// El Inventario respondió 429 al reservar (DD-04, SEL-36, SEL-37): <b>no se aborta</b>, porque el Inventario conserva la reserva vigente (si la hay) y abortar la liberaría. Vuelve de <c>reservando</c> a <c>en_edicion</c> conservando el
     /// <c>pedidoId</c>, la generación y la reserva anotada (nada que liberar): la persona espera al instante de reintento o reinicia. Condicional al <c>pedidoId</c> y la generación de la solicitud: si el checkout ya cambió, no hace nada.
     /// </summary>
