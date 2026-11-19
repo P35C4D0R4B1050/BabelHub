@@ -63,6 +63,40 @@ public sealed class RegistrosAisladosDeIdentidadTests(PostgresDeIdentidadFixture
     }
 
     [Fact]
+    [Trait("Criterio", "AC-IDE-43")]
+    public async Task UnaOperacionQueFallaEnElPuntoDeGuardado_DejaValidaLaTransaccion_YElFalloOriginalSeLanza()
+    {
+        var antes = Guid.NewGuid();
+        var despues = Guid.NewGuid();
+        var almacen = Almacen();
+
+        await bd.Unidad.Ejecutar(
+            async ct =>
+            {
+                await almacen.Insertar(Registro(id: antes), ct);
+                await Assert.ThrowsAsync<Npgsql.PostgresException>(() => BabelHub.Ecommerce.Infrastructure.Auditoria.EscrituraDeAuditoria.EnLaUnidad(
+                    bd.Unidad,
+                    bd.Unidad,
+                    (c, t, token) => RegistrosAisladosDeIdentidad.ConPuntoDeGuardado(
+                        c,
+                        t,
+                        async () =>
+                        {
+                            await using var comando = new Npgsql.NpgsqlCommand("SELECT 1 / 0", c, t);
+                            return await comando.ExecuteScalarAsync(token);
+                        },
+                        token),
+                    ct,
+                    RegistrosAisladosDeIdentidad.Esquema));
+                await almacen.Insertar(Registro(id: despues), ct);
+                return 0;
+            },
+            CancellationToken.None);
+
+        Assert.Equal(2, await bd.Consultar<long>($"SELECT count(*) FROM identidad.registros WHERE id IN ('{antes}', '{despues}')"));
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-IDE-51")]
     public async Task ElConteoPorAccion_VaEnUnaVentana_YSoloDevuelveUnNumero()
     {

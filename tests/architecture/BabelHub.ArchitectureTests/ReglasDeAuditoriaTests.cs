@@ -36,13 +36,25 @@ public class ReglasDeAuditoriaTests
         var resultado = Types.InAssembly(ensamblado)
             .That().DoNotResideInNamespaceStartingWith($"BabelHub.Ecommerce.{capa}.Auditoria")
             .And().DoNotResideInNamespaceStartingWith($"BabelHub.Ecommerce.{capa}.Identidad")
-            .And().DoNotHaveNameMatching(AdaptadoresDeIdentidad)
+            .And().DoNotHaveNameMatching(capa == "Infrastructure" ? AdaptadoresDeIdentidad : "^$")
             .ShouldNot().HaveDependencyOnAny(prohibidos)
             .GetResult();
 
         Assert.True(
             resultado.IsSuccessful,
             $"Un módulo que no es Auditoría ni Identidad depende de un puerto de registros aislados: {string.Join(", ", resultado.FailingTypeNames ?? [])}.");
+    }
+
+    [Fact]
+    public void Los_adaptadores_de_Identidad_exentados_viven_solo_en_la_composicion()
+    {
+        var resultado = Types.InAssembly(Cargar("BabelHub.Ecommerce.Infrastructure"))
+            .That().HaveNameMatching(AdaptadoresDeIdentidad)
+            .Should().ResideInNamespace("BabelHub.Ecommerce.Infrastructure.Composicion")
+            .GetResult();
+
+        Assert.True(resultado.IsSuccessful, $"Un adaptador exentado vive fuera de la composición: {string.Join(", ", resultado.FailingTypeNames ?? [])}.");
+        Assert.Equal(3, Types.InAssembly(Cargar("BabelHub.Ecommerce.Infrastructure")).That().HaveNameMatching(AdaptadoresDeIdentidad).GetTypes().Count());
     }
 
     [Fact]
