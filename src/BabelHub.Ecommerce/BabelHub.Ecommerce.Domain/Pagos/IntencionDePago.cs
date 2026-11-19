@@ -174,6 +174,9 @@ public sealed class IntencionDePago
         return new IntencionDePago(pedidoId, instantanea, reservaExpiraEn, ahora);
     }
 
+    /// <summary>Una copia de la intención (para que las pruebas simulen la reversión de una transacción).</summary>
+    internal IntencionDePago Copiar() => (IntencionDePago)MemberwiseClone();
+
     public bool EsDeLaCuenta(Guid cuentaId) => cuentaId != Guid.Empty && CuentaId == cuentaId;
 
     /// <summary>
@@ -312,7 +315,7 @@ public sealed class IntencionDePago
     }
 
     /// <summary>
-    /// El Inventario extendió la reserva de los impresos hasta <paramref name="nuevoInstante"/> (a lo más <c>limite_pendiente_en</c>): se hace una sola vez y no aplica a una compra
+    /// El Inventario extendió la reserva de los impresos y su respuesta trae el instante real (el contrato v1 no recibe uno: lo calcula el Inventario): se anota una sola vez y no aplica a una compra
     /// solo digital. Devuelve si se anotó.
     /// </summary>
     public bool ExtenderReserva(DateTimeOffset nuevoInstante)
@@ -322,10 +325,6 @@ public sealed class IntencionDePago
             return false;
         }
 
-        if (nuevoInstante > LimitePendienteEn)
-        {
-            throw new ArgumentOutOfRangeException(nameof(nuevoInstante), "La reserva se extiende como máximo hasta los 30 minutos desde el inicio del pago.");
-        }
 
         ReservaExpiraEn = nuevoInstante;
         ReservaExtendida = true;

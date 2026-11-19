@@ -93,6 +93,10 @@ public static class AccionesDeAuditoria
 
     public const string HojaDeReclamacionRespondida = "HojaDeReclamacionRespondida";
 
+    public const string CobroIniciado = "CobroIniciado";
+
+    public const string CobroResuelto = "CobroResuelto";
+
     public const string IngresoDeMercaderiaRegistrado = "IngresoDeMercaderiaRegistrado";
 
     public const string IngresoPendienteConciliado = "IngresoPendienteConciliado";
@@ -210,6 +214,8 @@ public static class AccionesDeAuditoria
         ContrasenaCambiada,
         ContrasenaRestablecidaPorAdministracion,
         CorreoCambiado,
+        CobroIniciado,
+        CobroResuelto,
         CuentaCancelada,
         CuentaReemplazada,
         DepuracionDiariaEjecutada,

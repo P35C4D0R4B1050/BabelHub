@@ -218,6 +218,8 @@ public sealed class Reembolso
 
     public bool EsHuerfano(DateTimeOffset ahora) => Estado == EstadoDeReembolso.Solicitado && UltimoIntentoEn is { } ultimo && ahora - ultimo >= PlazoDeHuerfano;
 
+    internal Reembolso Copiar() => (Reembolso)MemberwiseClone();
+
     /// <summary>Sin la referencia de la pasarela ni la clave.</summary>
     public override string ToString() => $"Reembolso {{ Id = {Id}, Origen = {Origen}, Estado = {Estado} }}";
 

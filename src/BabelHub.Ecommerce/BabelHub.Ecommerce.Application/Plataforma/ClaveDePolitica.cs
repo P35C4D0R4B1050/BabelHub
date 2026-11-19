@@ -41,6 +41,18 @@ public static class PoliticasDeLimite
 
     public static ClaveDePolitica RegistrosPorOrigen { get; } = new("registros-por-origen");
 
+    /// <summary>3 hojas de reclamación por hora y por origen (REC-11).</summary>
+    public static ClaveDePolitica HojasPorOrigen { get; } = new("hojas-por-origen");
+
+    /// <summary>5 intentos de cobro por intención y hora.</summary>
+    public static ClaveDePolitica CobrosPorIntencion { get; } = new("cobros-por-intencion");
+
+    /// <summary>10 intentos de cobro por cuenta y hora.</summary>
+    public static ClaveDePolitica CobrosPorCuenta { get; } = new("cobros-por-cuenta");
+
+    /// <summary>20 intentos de cobro por origen y hora.</summary>
+    public static ClaveDePolitica CobrosPorOrigen { get; } = new("cobros-por-origen");
+
     public static ClaveDePolitica SolicitudesPreviasPorOrigen { get; } = new("solicitudes-previas-por-origen");
 
     public static ClaveDePolitica SolicitudesDelOrigenDesconocido { get; } = new("solicitudes-del-origen-desconocido");
@@ -53,7 +65,7 @@ public static class PoliticasDeLimite
 
     /// <summary>Los límites generales de uso (con respaldo local), aparte de las políticas críticas de <see cref="Todas"/>.</summary>
     public static IReadOnlyList<ClaveDePolitica> Generales { get; } =
-        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta];
+        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen];
 
     public static IReadOnlyList<ClaveDePolitica> Todas { get; } =
     [
@@ -63,5 +75,8 @@ public static class PoliticasDeLimite
         SegundoFactorPorOrigen,
         SegundoFactorPorCuenta,
         RegistrosPorOrigen,
+        CobrosPorIntencion,
+        CobrosPorCuenta,
+        CobrosPorOrigen,
     ];
 }

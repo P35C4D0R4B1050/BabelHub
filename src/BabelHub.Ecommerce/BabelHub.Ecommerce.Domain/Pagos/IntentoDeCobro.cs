@@ -97,6 +97,8 @@ public sealed class IntentoDeCobro
         return new IntentoDeCobro(id, intencionId, medio, importe, ahora);
     }
 
+    internal IntentoDeCobro Copiar() => (IntentoDeCobro)MemberwiseClone();
+
     /// <summary>Anota el instante en que se llamó a la pasarela (una sola vez).</summary>
     public void MarcarEnviado(DateTimeOffset ahora) => EnviadoEn ??= ahora;
 
