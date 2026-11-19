@@ -87,6 +87,12 @@ public static partial class AccionesAuditables
     /// <summary>El cliente canceló su pedido.</summary>
     public static readonly AccionAuditable PedidoCanceladoPorElCliente = new(nameof(PedidoCanceladoPorElCliente));
 
+    /// <summary>Se rechazó una anulación o una cancelación de pedido (la solicitud, sin datos personales; el motivo del rechazo de la lista de Pedidos y el iniciador).</summary>
+    public static readonly AccionAuditable AnulacionDePedidoRechazada = new(nameof(AnulacionDePedidoRechazada));
+
+    /// <summary>Una línea de un pedido de recojo se marcó como no recogida y su reserva se liberó (la línea y el iniciador).</summary>
+    public static readonly AccionAuditable LineaDePedidoMarcadaNoRecogida = new(nameof(LineaDePedidoMarcadaNoRecogida));
+
     /// <summary>La depuración de pedidos vencidos (actor «sistema» y conteo).</summary>
     public static readonly AccionAuditable PedidosDepurados = new(nameof(PedidosDepurados));
 

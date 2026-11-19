@@ -113,7 +113,7 @@ public static class ComposicionDeLosTrabajosDePagos
             sp.GetRequiredService<IServiceScopeFactory>(),
             sp.GetRequiredService<IRegistroDeTrabajosDeFondo>(),
             alcanceDeSistema(sp),
-            sp.GetRequiredService<IPublicadorDeAlertasTecnicas>(),
+            new AlertasTecnicasPorCorrida(sp.GetRequiredService<IServiceScopeFactory>()),
             sp.GetRequiredService<IReloj>()));
         servicios.TryAddSingleton(sp => new ServicioDeTrabajosDePagos(sp.GetRequiredService<IReadOnlyList<TrabajoDeFondoDePagos>>()));
         return servicios;

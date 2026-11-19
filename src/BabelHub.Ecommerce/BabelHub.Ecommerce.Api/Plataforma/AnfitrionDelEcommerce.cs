@@ -1,6 +1,9 @@
 using BabelHub.Ecommerce.Api.Auditoria;
 using BabelHub.Ecommerce.Api.Carrito;
 using BabelHub.Ecommerce.Api.Catalogo;
+using BabelHub.Ecommerce.Api.Envios;
+using BabelHub.Ecommerce.Api.Pagos;
+using BabelHub.Ecommerce.Api.Reclamaciones;
 using BabelHub.Ecommerce.Api.Web;
 using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Carrito;
@@ -13,6 +16,9 @@ using BabelHub.Ecommerce.Infrastructure.Auditoria;
 using BabelHub.Ecommerce.Infrastructure.Carrito;
 using BabelHub.Ecommerce.Infrastructure.Catalogo;
 using BabelHub.Ecommerce.Infrastructure.Composicion;
+using BabelHub.Ecommerce.Infrastructure.Envios;
+using BabelHub.Ecommerce.Infrastructure.Pagos;
+using BabelHub.Ecommerce.Infrastructure.Pedidos;
 using BabelHub.Ecommerce.Infrastructure.Notificaciones;
 using BabelHub.Ecommerce.Infrastructure.Plataforma;
 using BabelHub.Ecommerce.Infrastructure.Web;
@@ -155,6 +161,9 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
             "Almacen:Catalogo:ClaveSecreta",
             "Almacen:Supresiones:ClaveDeAcceso",
             "Almacen:Supresiones:ClaveSecreta",
+            "Pagos:ClaveDeIntentos",
+            "Pagos:ClaveDeIntentosAnterior",
+            "Pagos:LlavePrivada",
         };
         foreach (var ruta in rutasDeSecretos)
         {
@@ -185,6 +194,13 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
         var host = Capturar(extra, () => OpcionesDelHostWeb.Leer(configuracion, esProduccion));
         var sesiones = host is null ? null : Capturar(extra, () => ConfiguracionDeSesionesWeb.Leer(configuracion, host.Host == HostWeb.Tienda ? HostDeSesion.Tienda : HostDeSesion.Gestion));
         var verificacion = Capturar(extra, () => new OpcionesDeVerificacionWeb(configuracion["Seguridad:Turnstile:ClaveDeSitio"] ?? string.Empty));
+        // Pagos: la pasarela se declara siempre (el simulador solo vale en Development y Test; «culqi» aún no tiene adaptador) y la clave de los intentos es un secreto; el resto lo valida su guarda de arranque nombrando la variable.
+        _ = lector.Obligatorio("Pagos:Pasarela");
+        if (lector.Obligatorio("Pagos:ClaveDeIntentos") is { } claveDeIntentos)
+        {
+            lector.Comprobar("Pagos:ClaveDeIntentos", claveDeIntentos);
+        }
+
         var costo = Capturar(extra, () => AppSettingsOpcionesDeEnvio.Cargar(configuracion));
         var smtp = LeerSmtp(configuracion, esProduccion, extra);
 
@@ -339,9 +355,12 @@ public static class AnfitrionDelEcommerce
             TopePrevioDelOrigenDesconocido = PoliticasDeLimite.SolicitudesDelOrigenDesconocido,
             SinSesionPorOrigen = PoliticasDeLimite.SolicitudesSinSesionPorOrigen,
             PorUsuario = PoliticasDeLimite.SolicitudesPorUsuario,
+            // La entrada de avisos de la pasarela no cuenta en el tope previo ni en el límite sin sesión (SEG-18): su único límite es la ráfaga por origen, antes de verificar la firma.
+            RutasExentas = ["/health", AvisosDeLaPasarelaEnLaApi.Ruta],
         });
         var aplicacion = BasesDelEcommerce.Abrir(opciones.BaseDeLaAplicacion);
-        servicios.AgregarPlataformaDelEcommerce(aplicacion, opciones.Configuracion.Seguridad, [], opciones.Redis);
+        servicios.AgregarPlataformaDelEcommerce(aplicacion, opciones.Configuracion.Seguridad, opciones.Configuracion.Turnstile, soloEnModoNormal, [], opciones.Redis);
+        servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDelProveedor("turnstile", esNulo: !soloEnModoNormal));
         servicios.AgregarCredencialDeServicio(new OpcionesDeSuperficieDeServicio { TopeDeLaDireccionDirecta = PoliticasDeLimite.SolicitudesPorHuellaDirecta }, opciones.Configuracion.Seguridad.CredencialesDeEntrada);
 
         // ---------- Auditoría ----------
@@ -382,10 +401,33 @@ public static class AnfitrionDelEcommerce
         servicios.AgregarPoliticaDeTextosPendientes();
         servicios.AgregarPurgaDeSesionesWeb(modo);
         servicios.AgregarVerificacionDePersonaWeb(opciones.VerificacionWeb);
-        servicios.AgregarCarrito(opciones.CostoDeEnvio, esProduccion && soloEnModoNormal);
+        // Las guardas de producción de los dobles provisionales (Carrito, Pagos y Pedidos) corren al final, cuando ya están todas las implementaciones reales: cada módulo reemplaza o completa lo del anterior.
+        servicios.AgregarCarrito(opciones.CostoDeEnvio, esProduccion: false);
 
         servicios.AgregarTrabajosDelCarritoEnLaApi(soloEnModoNormal);
+
+        // ---------- Pagos, Envíos, Reclamaciones y Pedidos ----------
+        // Pagos reemplaza al creador de intenciones provisional de Carrito; en el ensayo y al restaurar la pasarela es siempre la nula (nunca una llamada a un proveedor). «culqi» aún no tiene adaptador: su guarda lo rechaza nombrando la variable.
+        var guardarProduccion = esProduccion && soloEnModoNormal;
+        var opcionesDePagos = LectorDeOpcionesDePagos.Leer(builder.Configuration, builder.Environment.EnvironmentName, sinLlamadasReales: !soloEnModoNormal, pedidosDisponible: false);
+        servicios.AgregarPagos(opcionesDePagos, esProduccion: false);
+        servicios.AgregarTrabajosDePagosEnLaApi(soloEnModoNormal);
+
+        // Envíos antes de los dobles de Pedidos (su guarda exige que las implementaciones reales ya estén); el operador logístico es el nulo salvo el simulador en Development y Test. En el ensayo y al restaurar siempre es el nulo (nunca una llamada a un proveedor).
+        servicios.AgregarEnvios(guardarProduccion);
+        var opcionesDeEnvios = new OpcionesDeArranqueDeEnvios(soloEnModoNormal ? builder.Configuration["Envios:Operador"] : GuardaDeArranqueDeEnvios.Nulo, builder.Environment.EnvironmentName, SinLlamadasReales: !soloEnModoNormal);
+        servicios.AgregarOperadorLogisticoDeEnvios(opcionesDeEnvios);
+        servicios.AgregarTrabajosDeEnviosEnLaApi(soloEnModoNormal);
+        // Los dos adaptadores hacia un proveedor declaran su estado real (leído de las mismas opciones con las que se compuso, no de una suposición aparte): ExigirCoherencia lo comprueba en el ensayo y al restaurar.
+        servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDeLaInstancia("pasarela-de-pago", esNulo: opcionesDePagos.PasarelaEsNula));
+        servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDeLaInstancia("operador-logistico", esNulo: GuardaDeArranqueDeEnvios.Exigir(opcionesDeEnvios) == GuardaDeArranqueDeEnvios.Nulo));
+        servicios.AgregarReclamaciones();
+        servicios.AgregarTrabajosDeReclamacionesEnLaApi(soloEnModoNormal);
+        servicios.AgregarPedidos(esProduccion: false);
         servicios.AgregarBibliotecaPendiente();
+        servicios.AgregarDoblesProvisionalesDelCarrito(guardarProduccion);
+        servicios.AgregarDoblesProvisionalesDePagos(guardarProduccion);
+        servicios.AgregarDoblesProvisionalesDePedidos(guardarProduccion);
         return opciones;
     }
 
@@ -398,6 +440,7 @@ public static class AnfitrionDelEcommerce
         app.UsarManejoDeErrores();
         app.UseStaticFiles();
         app.UsarOrigenDelBorde();
+        app.UsarLimiteDeAvisosDeLaPasarela();
         app.UsarRegistroDeDenegaciones();
         app.UsarTopePrevio();
         app.UsarCredencialDeServicio();
@@ -407,6 +450,8 @@ public static class AnfitrionDelEcommerce
         app.UsarLimiteDeCuerpoDelCarrito();
         app.UsarPoliticaDeTextosPendientes();
         app.MapearSalud();
+        // La entrada de avisos de la pasarela solo se mapea con un esquema de firma verificable (hoy ninguno: «culqi» no tiene adaptador), así que responde 404.
+        app.MapearAvisosDeLaPasarela(habilitada: false);
         app.MapDefaultControllerRoute();
         return app;
     }
@@ -454,6 +499,26 @@ public static class AnfitrionDelEcommerce
 internal sealed class AdaptadorSalienteDelCorreo(bool esNulo) : IAdaptadorSaliente
 {
     public string Nombre => "correo";
+
+    public bool EsHaciaProveedor => true;
+
+    public bool EsNulo => esNulo;
+}
+
+/// <summary>Un adaptador hacia un proveedor externo (por ahora Turnstile): es nulo cuando el modo no es el normal, y <see cref="ArranqueSeguro.ExigirCoherencia"/> lo comprueba.</summary>
+internal sealed class AdaptadorSalienteDelProveedor(string nombre, bool esNulo) : IAdaptadorSaliente
+{
+    public string Nombre => nombre;
+
+    public bool EsHaciaProveedor => true;
+
+    public bool EsNulo => esNulo;
+}
+
+/// <summary>Un adaptador saliente cuyo estado sale de las opciones con las que se compuso el adaptador real.</summary>
+internal sealed class AdaptadorSalienteDeLaInstancia(string nombre, bool esNulo) : IAdaptadorSaliente
+{
+    public string Nombre => nombre;
 
     public bool EsHaciaProveedor => true;
 

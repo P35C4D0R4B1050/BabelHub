@@ -70,6 +70,9 @@ public sealed class ValidadorDeRespuestaDeTurnstile : IValidadorDeRespuestaExter
 /// </summary>
 public sealed class VerificadorTurnstile : IVerificadorDePersona, IDisposable
 {
+    /// <summary>El destino fijo de la verificación en el servidor de Cloudflare: el cliente HTTP se compone con esta dirección base (nunca sale de un dato).</summary>
+    public const string UrlDeVerificacion = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+
     private const int TopeDeTokensRecordados = 100_000;
 
     private readonly HttpClient _http;

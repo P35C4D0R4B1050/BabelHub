@@ -146,20 +146,23 @@ public sealed class CatalogoDeAccionesTests
         var esperado = new Dictionary<string, string[]>
         {
             [nameof(AccionesAuditables.ContactoDePedidoConsultado)] = ["rol"],
-            [nameof(AccionesAuditables.OperacionDePedidoIniciada)] = ["operacion", "iniciadaPor"],
-            [nameof(AccionesAuditables.PedidoCanceladoPorElCliente)] = ["estadoAnterior"],
-            [nameof(AccionesAuditables.ReembolsoDePedidoReintentado)] = ["resultado", "monto", "moneda"],
-            [nameof(AccionesAuditables.LineaDePedidoEntregada)] = ["lineaId", "iniciadaPor"],
+            [nameof(AccionesAuditables.OperacionDePedidoIniciada)] = ["operacion", "iniciadaPor", "rolDelIniciador", "sucursalDelIniciador", "motivoDeRechazo"],
+            [nameof(AccionesAuditables.PedidoCanceladoPorElCliente)] = ["estadoAnterior", "iniciadaPor", "rolDelIniciador", "sucursalDelIniciador", "motivoDeRechazo"],
+            [nameof(AccionesAuditables.ReembolsoDePedidoReintentado)] = ["resultado", "monto", "moneda", "origen"],
+            [nameof(AccionesAuditables.LineaDePedidoEntregada)] = ["lineaId", "iniciadaPor", "rolDelIniciador", "sucursalDelIniciador"],
+            [nameof(AccionesAuditables.LineaDePedidoMarcadaNoRecogida)] = ["lineaId", "iniciadaPor", "rolDelIniciador", "sucursalDelIniciador"],
+            [nameof(AccionesAuditables.AnulacionDePedidoRechazada)] = ["operacion", "motivoDeRechazo", "estadoAnterior", "iniciadaPor", "rolDelIniciador", "sucursalDelIniciador"],
+            [nameof(AccionesAuditables.PedidoAnulado)] = ["estadoAnterior", "causa", "iniciadaPor", "rolDelIniciador", "sucursalDelIniciador"],
             [nameof(AccionesAuditables.ContactoDePedidoAnonimizado)] = ["causa", "cantidad"],
             [nameof(AccionesAuditables.PedidosDepurados)] = ["cantidad"],
-            [nameof(AccionesAuditables.EstadoDePedidoCambiado)] = ["estadoAnterior", "estadoNuevo", "iniciadaPor"],
+            [nameof(AccionesAuditables.EstadoDePedidoCambiado)] = ["estadoAnterior", "estadoNuevo", "iniciadaPor", "rolDelIniciador", "sucursalDelIniciador"],
         };
 
         foreach (var (nombre, claves) in esperado)
         {
             var accion = Catalogo.Obtener(nombre);
             Assert.Equal(claves, accion.Detalle.Select(c => c.Nombre));
-            Assert.All(accion.Detalle, c => Assert.Equal(c.Nombre == "iniciadaPor", c.Personal));
+            Assert.All(accion.Detalle, c => Assert.Equal(c.Nombre is "iniciadaPor" or "sucursalDelIniciador", c.Personal));
             Assert.DoesNotContain(accion.Detalle, c => c.Nombre is "contacto" or "telefono" or "direccion" or "documento");
             Assert.False(accion.Aislada, nombre);
         }
