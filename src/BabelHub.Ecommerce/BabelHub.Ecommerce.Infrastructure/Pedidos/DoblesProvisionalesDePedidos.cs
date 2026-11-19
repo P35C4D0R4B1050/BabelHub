@@ -35,6 +35,16 @@ internal sealed class ProgresoDeEnviosProvisional : IProgresoDeEnvios
         Task.FromResult(Resultado<ProgresoDeEnvioAplicado>.Fallo(FalloDeEnviosProvisional.NoDisponible()));
 }
 
+/// <summary>La lectura de pedidos para Devoluciones sin Pedidos: ningún pedido está disponible (falla cerrado).</summary>
+internal sealed class PedidosParaDevolucionesProvisional : IPedidosParaDevoluciones
+{
+    public Task<Resultado<PedidoParaDevoluciones>> Obtener(Guid pedidoId, CancellationToken cancelacion = default) =>
+        Task.FromResult(Resultado<PedidoParaDevoluciones>.Fallo(FalloDeEnviosProvisional.NoDisponible()));
+
+    public Task<Resultado<PaginaDePedidosDeUnaCuenta>> ListarDeUnaCuenta(Guid cuentaId, int pagina, int tamano, CancellationToken cancelacion = default) =>
+        Task.FromResult(Resultado<PaginaDePedidosDeUnaCuenta>.Fallo(FalloDeEnviosProvisional.NoDisponible()));
+}
+
 /// <summary>El contacto de entrega sin Pedidos: nunca hay contacto (la lectura es «no disponible», reintentable).</summary>
 internal sealed class ContactoDeEntregaProvisional : IContactoDeEntregaDelPedido
 {
@@ -98,6 +108,7 @@ public static class ComposicionProvisionalDePedidos
         (typeof(IProgresoDeEnvios), typeof(ProgresoDeEnviosProvisional)),
         (typeof(IContactoDeEntregaDelPedido), typeof(ContactoDeEntregaProvisional)),
         (typeof(IPedidosParaEnvios), typeof(PedidosParaEnviosProvisional)),
+        (typeof(IPedidosParaDevoluciones), typeof(PedidosParaDevolucionesProvisional)),
         (typeof(IAccesosDeBiblioteca), typeof(AccesosDeBibliotecaProvisional)),
         (typeof(IReservasDelPedido), typeof(ReservasDelPedidoProvisional)),
         (typeof(IResolucionDeSucursal), typeof(ResolucionDeSucursalProvisional)),
@@ -116,6 +127,7 @@ public static class ComposicionProvisionalDePedidos
         servicios.TryAddSingleton<IProgresoDeEnvios, ProgresoDeEnviosProvisional>();
         servicios.TryAddSingleton<IContactoDeEntregaDelPedido, ContactoDeEntregaProvisional>();
         servicios.TryAddSingleton<IPedidosParaEnvios, PedidosParaEnviosProvisional>();
+        servicios.TryAddSingleton<IPedidosParaDevoluciones, PedidosParaDevolucionesProvisional>();
         servicios.TryAddSingleton<IAccesosDeBiblioteca, AccesosDeBibliotecaProvisional>();
         servicios.TryAddSingleton<IReservasDelPedido, ReservasDelPedidoProvisional>();
         servicios.TryAddSingleton<IResolucionDeSucursal, ResolucionDeSucursalProvisional>();

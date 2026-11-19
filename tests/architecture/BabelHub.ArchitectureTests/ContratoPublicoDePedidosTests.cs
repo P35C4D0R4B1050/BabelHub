@@ -33,6 +33,7 @@ public class ContratoPublicoDePedidosTests
         "IProgresoDeEnvios",
         "IContactoDeEntregaDelPedido",
         "IPedidosParaEnvios",
+        "IPedidosParaDevoluciones",
         "DetalleDelPedidoDelCliente",
         "DetalleDelPedidoDePersonal",
         "DetalleDelPedidoDeSucursal",

@@ -24,9 +24,11 @@ public class DoblesProvisionalesDePedidosTests
         var enReparto = await new ProgresoDeEnviosProvisional().EnvioEnReparto(new EnvioEnRepartoEntrada(pedido, Guid.NewGuid(), lineas));
         var entregado = await new ProgresoDeEnviosProvisional().EnvioEntregado(new EnvioEntregadoEntrada(pedido, Guid.NewGuid(), lineas, DateTimeOffset.UnixEpoch));
         var leido = await new PedidosParaEnviosProvisional().Obtener(pedido);
+        var paraDevoluciones = await new PedidosParaDevolucionesProvisional().Obtener(pedido);
+        var delaCuenta = await new PedidosParaDevolucionesProvisional().ListarDeUnaCuenta(Guid.NewGuid(), 1, 20);
         var contacto = await new ContactoDeEntregaProvisional().Leer(pedido);
 
-        Assert.All(new[] { crear.Error, cancelar.Error, enReparto.Error, entregado.Error, leido.Error }, error =>
+        Assert.All(new[] { crear.Error, cancelar.Error, enReparto.Error, entregado.Error, leido.Error, paraDevoluciones.Error, delaCuenta.Error }, error =>
         {
             Assert.NotNull(error);
             Assert.Equal((CategoriaDeError.NoDisponible, "servicio-no-disponible"), (error.Categoria, error.Clave));
@@ -73,6 +75,7 @@ public class DoblesProvisionalesDePedidosTests
         Assert.IsType<DespachoDeEnviosProvisional>(proveedor.GetRequiredService<IDespachoDeEnvios>());
         Assert.IsType<ContactoDeEntregaProvisional>(proveedor.GetRequiredService<IContactoDeEntregaDelPedido>());
         Assert.IsType<PedidosParaEnviosProvisional>(proveedor.GetRequiredService<IPedidosParaEnvios>());
+        Assert.IsType<PedidosParaDevolucionesProvisional>(proveedor.GetRequiredService<IPedidosParaDevoluciones>());
         Assert.IsType<AccesosDeBibliotecaProvisional>(proveedor.GetRequiredService<IAccesosDeBiblioteca>());
         Assert.IsType<ReservasDelPedidoProvisional>(proveedor.GetRequiredService<IReservasDelPedido>());
         Assert.IsType<ResolucionDeSucursalProvisional>(proveedor.GetRequiredService<IResolucionDeSucursal>());
@@ -91,6 +94,7 @@ public class DoblesProvisionalesDePedidosTests
         Assert.Contains(nameof(IDespachoDeEnvios), error.Message, StringComparison.Ordinal);
         Assert.Contains(nameof(IContactoDeEntregaDelPedido), error.Message, StringComparison.Ordinal);
         Assert.Contains(nameof(IPedidosParaEnvios), error.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IPedidosParaDevoluciones), error.Message, StringComparison.Ordinal);
         Assert.Contains(nameof(IAccesosDeBiblioteca), error.Message, StringComparison.Ordinal);
         Assert.Contains(nameof(IReservasDelPedido), error.Message, StringComparison.Ordinal);
         Assert.Contains(nameof(IResolucionDeSucursal), error.Message, StringComparison.Ordinal);
@@ -107,6 +111,7 @@ public class DoblesProvisionalesDePedidosTests
         servicios.AddSingleton<IProgresoDeEnvios, ProgresoReal>();
         servicios.AddSingleton<IContactoDeEntregaDelPedido, ContactoReal>();
         servicios.AddSingleton<IPedidosParaEnvios, LecturaReal>();
+        servicios.AddSingleton<IPedidosParaDevoluciones, LecturaParaDevolucionesReal>();
         servicios.AddSingleton<IAccesosDeBiblioteca, AccesosReales>();
         servicios.AddSingleton<IReservasDelPedido, ReservasReales>();
         servicios.AddSingleton<IResolucionDeSucursal, ResolucionReal>();
@@ -168,6 +173,13 @@ public class DoblesProvisionalesDePedidosTests
     private sealed class ResolucionReal : IResolucionDeSucursal
     {
         public Task<Guid?> IdentificadorDe(string codigoDeSucursal, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    }
+
+    private sealed class LecturaParaDevolucionesReal : IPedidosParaDevoluciones
+    {
+        public Task<Resultado<PedidoParaDevoluciones>> Obtener(Guid pedidoId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<Resultado<PaginaDePedidosDeUnaCuenta>> ListarDeUnaCuenta(Guid cuentaId, int pagina, int tamano, CancellationToken cancelacion = default) => throw new NotSupportedException();
     }
 
     private sealed class LecturaReal : IPedidosParaEnvios
