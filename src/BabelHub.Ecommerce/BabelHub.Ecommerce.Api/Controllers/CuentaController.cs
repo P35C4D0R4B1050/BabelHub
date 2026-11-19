@@ -277,7 +277,7 @@ public sealed class CuentaController(
     public Task<IActionResult> PresentarUnaSolicitud(CancellationToken cancelacion) =>
         Accion(["tipo"], PantallaDeLaCuenta.Solicitudes, "solicitud-presentada", async (actor, campos, token) =>
         {
-            if (!Enum.TryParse<TipoDeSolicitudDeDatos>(campos.GetValueOrDefault("tipo"), ignoreCase: true, out var tipo) || !Enum.IsDefined(tipo))
+            if (Array.FindIndex(Enum.GetNames<TipoDeSolicitudDeDatos>(), n => string.Equals(n, campos.GetValueOrDefault("tipo"), StringComparison.OrdinalIgnoreCase)) < 0 || !Enum.TryParse<TipoDeSolicitudDeDatos>(campos.GetValueOrDefault("tipo"), ignoreCase: true, out var tipo))
             {
                 return new ErrorDeAplicacion(CategoriaDeError.Validacion, "tipo-invalido");
             }
