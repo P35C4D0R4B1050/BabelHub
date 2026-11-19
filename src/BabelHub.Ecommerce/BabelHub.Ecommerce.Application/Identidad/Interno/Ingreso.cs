@@ -43,7 +43,14 @@ public sealed class AvisosDeCuenta(IEnviadorDeCorreo correo)
 {
     public const string PlantillaDeContrasenaCambiada = "contrasena-cambiada";
 
-    public async Task ContrasenaCambiada(Usuario usuario, CancellationToken cancelacion)
+    public const string PlantillaDeSegundoFactorRestablecido = "segundo-factor-restablecido";
+
+    public Task ContrasenaCambiada(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeContrasenaCambiada, cancelacion);
+
+    /// <summary>El aviso al titular cuando la administración restablece su segundo factor (IDE-38): sin enlaces ni códigos.</summary>
+    public Task SegundoFactorRestablecido(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeSegundoFactorRestablecido, cancelacion);
+
+    private async Task Avisar(Usuario usuario, string plantilla, CancellationToken cancelacion)
     {
         ArgumentNullException.ThrowIfNull(usuario);
         if (!usuario.CorreoVerificado)
@@ -54,7 +61,7 @@ public sealed class AvisosDeCuenta(IEnviadorDeCorreo correo)
 
         try
         {
-            await correo.Enviar(new CorreoSaliente(CategoriaDeCorreo.AlertaCriticaDeCuenta, usuario.Correo, PlantillaDeContrasenaCambiada), cancelacion).ConfigureAwait(false);
+            await correo.Enviar(new CorreoSaliente(CategoriaDeCorreo.AlertaCriticaDeCuenta, usuario.Correo, plantilla), cancelacion).ConfigureAwait(false);
         }
         catch (Exception) when (!cancelacion.IsCancellationRequested)
         {

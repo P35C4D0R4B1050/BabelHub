@@ -140,6 +140,18 @@ internal sealed class RepositorioDeCuentasEnMemoria(BdIdentidad bd) : IRepositor
         bd.Cuentas.Remove(usuarioId);
         return Task.CompletedTask;
     }
+
+    /// <summary>Si se fija, simula que la lectura bajo bloqueo ve ese número de administradores activos (una desactivación simultánea ya ocurrió).</summary>
+    public int? ForzarAdministradoresActivos { get; set; }
+
+    public Task<int> ContarAdministradoresActivos(CancellationToken cancelacion = default) =>
+        Task.FromResult(ForzarAdministradoresActivos ?? bd.Cuentas.Values.Count(c => c is { CanceladaEn: null, Usuario: { Rol: RolDeUsuario.AdministradorCentral, Activo: true } }));
+
+    public Task<EncargadoDeSucursal?> EncargadoActivoDe(Guid sucursal, CancellationToken cancelacion = default)
+    {
+        var encargado = bd.Cuentas.Values.FirstOrDefault(c => c is { CanceladaEn: null, Usuario: { Rol: RolDeUsuario.EncargadoDeSucursal, Activo: true } } && c.Usuario.Sucursal == sucursal);
+        return Task.FromResult<EncargadoDeSucursal?>(encargado is null ? null : new EncargadoDeSucursal(encargado.Usuario.Id, sucursal));
+    }
 }
 
 internal sealed class RenovacionesEnMemoria(BdIdentidad bd) : IRepositorioDeRenovaciones

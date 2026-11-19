@@ -146,8 +146,6 @@ public interface IAdministracionDeUsuarios
 {
     Task<Resultado<ContrasenaTemporalEntregada>> Crear(Guid administradorId, string nombre, string correo, RolDeCuenta rol, Guid? sucursal, CancellationToken cancelacion = default);
 
-    Task<Resultado<UsuarioAdministrado>> Actualizar(Guid administradorId, Guid usuarioId, string nombre, CancellationToken cancelacion = default);
-
     Task<Resultado<UsuarioAdministrado>> CambiarElRol(Guid administradorId, Guid usuarioId, RolDeCuenta rol, Guid? sucursal, CancellationToken cancelacion = default);
 
     Task<Resultado<UsuarioAdministrado>> Desactivar(Guid administradorId, Guid usuarioId, CancellationToken cancelacion = default);

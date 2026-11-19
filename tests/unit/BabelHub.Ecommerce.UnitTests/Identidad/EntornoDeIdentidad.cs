@@ -197,3 +197,27 @@ internal static class EntornoDeLaCuentaExtensiones
     public static void ActuarComo(this EntornoDeIdentidad e, CuentaDeIdentidad cuenta) =>
         e.Actor.Actual = ActorActual.DeUsuario(cuenta.Usuario.Id, "cliente");
 }
+
+internal static class EntornoDeLaAdministracionExtensiones
+{
+    public static AdministracionDeUsuarios Administracion(this EntornoDeIdentidad e) => new(
+        e.Cuentas,
+        new AlcanceDeLaCuenta(e.Actor, e.Denegaciones),
+        e.Hasher,
+        e.Secretos,
+        e.SegundoFactor,
+        e.Revocacion,
+        e.CancelacionDeAvisos,
+        e.Avisos,
+        e.Unidad,
+        e.Auditoria,
+        e.Reloj);
+
+    /// <summary>Siembra un administrador central activo y hace que sea el actor de la prueba.</summary>
+    public static CuentaDeIdentidad ActuarComoAdministrador(this EntornoDeIdentidad e, string correo = "admin@example.com")
+    {
+        var admin = e.Cuenta(correo, RolDeUsuario.AdministradorCentral);
+        e.Actor.Actual = ActorActual.DeUsuario(admin.Usuario.Id, "administrador-central");
+        return admin;
+    }
+}

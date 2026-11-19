@@ -22,6 +22,12 @@ public sealed class AlcanceDeLaCuenta(IActorActual actor, IDenegacionDeAcceso de
             return null;
         }
 
+        return await Denegar(cancelacion).ConfigureAwait(false);
+    }
+
+    /// <summary>Registra la denegación (sin interrumpir) y devuelve el rechazo: también la usa quien llama con identidad propia pero sin el rol que la operación exige.</summary>
+    public async Task<ErrorDeAplicacion> Denegar(CancellationToken cancelacion)
+    {
         try
         {
             await denegaciones.Registrar(new DenegacionDeAcceso("recurso-ajeno", ruta: null), cancelacion).ConfigureAwait(false);

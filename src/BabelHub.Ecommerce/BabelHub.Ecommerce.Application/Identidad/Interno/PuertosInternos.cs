@@ -46,6 +46,15 @@ public interface IRepositorioDeCuentas
 
     /// <summary>Elimina una cuenta de cliente sin verificar que se reemplaza (IDE-84): no se hereda ningún dato.</summary>
     Task Eliminar(Guid usuarioId, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Cuántos administradores centrales activos hay. Se llama dentro de la transacción de la administración y <b>toma el bloqueo de sus filas</b> (<c>FOR UPDATE</c>): dos desactivaciones o degradaciones simultáneas
+    /// no pueden dejar el sistema sin administrador (IDE-49, D17).
+    /// </summary>
+    Task<int> ContarAdministradoresActivos(CancellationToken cancelacion = default);
+
+    /// <summary>El encargado activo de la sucursal, si lo hay (IDE-06); el índice único parcial de la base respalda la regla ante dos asignaciones simultáneas.</summary>
+    Task<Domain.Identidad.EncargadoDeSucursal?> EncargadoActivoDe(Guid sucursal, CancellationToken cancelacion = default);
 }
 
 /// <summary>Argon2id (T31): el resumen y la verificación, con el semáforo global de concurrencia y el cálculo señuelo para cuentas inexistentes (D03, IDE-03).</summary>
