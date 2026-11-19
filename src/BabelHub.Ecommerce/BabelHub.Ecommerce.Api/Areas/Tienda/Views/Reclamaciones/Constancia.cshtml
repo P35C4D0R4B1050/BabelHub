@@ -1,0 +1,26 @@
+@using BabelHub.Ecommerce.Api.Areas.Tienda.Controllers
+@using BabelHub.Ecommerce.Api.Web.Formato
+@model ConstanciaVista
+@{
+    var c = Model.Constancia;
+}
+<article class="max-w-2xl" aria-labelledby="titulo-de-la-constancia">
+    <h1 id="titulo-de-la-constancia" class="font-display text-4xl leading-tight sm:text-5xl">Hoja de reclamación @c.Numero</h1>
+    <p class="my-4">Registrada el @FormatoPeruano.FechaYHora(c.FechaDeRegistro). Responderemos a más tardar el <strong>@FormatoPeruano.Fecha(c.FechaLimiteDeRespuesta)</strong> (@c.PlazoDeRespuestaEnDias días calendario).</p>
+    <dl class="grid grid-cols-1 gap-2 sm:grid-cols-[12rem_1fr]">
+        <dt class="font-semibold">Tipo</dt><dd>@TextosDeReclamaciones.Tipo(c.Tipo)</dd>
+        <dt class="font-semibold">Nombre</dt><dd>@c.Nombre</dd>
+        <dt class="font-semibold">Documento</dt><dd>@c.Documento</dd>
+        <dt class="font-semibold">Domicilio</dt><dd>@c.Domicilio</dd>
+        <dt class="font-semibold">Correo</dt><dd>@c.Correo</dd>
+        <dt class="font-semibold">Bien contratado</dt><dd>@c.BienContratado</dd>
+        <dt class="font-semibold">Monto reclamado</dt><dd>@FormatoPeruano.Soles(c.MontoReclamado)</dd>
+        @if (c.PedidoReferencia is not null)
+        {
+            <dt class="font-semibold">Pedido</dt><dd>@c.PedidoReferencia</dd>
+        }
+        <dt class="font-semibold">Detalle</dt><dd class="whitespace-pre-line">@c.Detalle</dd>
+    </dl>
+    <p class="mt-6 text-sm">Guarda este número: con él puedes consultar el estado de tu hoja iniciando sesión con el correo que registraste, una vez verificado.</p>
+    <button type="button" class="btn btn-ghost mt-4 print:hidden" onclick="window.print()">Imprimir constancia</button>
+</article>

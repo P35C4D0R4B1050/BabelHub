@@ -55,6 +55,10 @@ public static class ProblemasDelCarrito
         ["reembolso-distinto"] = new("REEMBOLSO-DISTINTO", StatusCodes.Status409Conflict),
         ["reembolso-supera-el-tope"] = new("REEMBOLSO-SUPERA-EL-TOPE", StatusCodes.Status422UnprocessableEntity),
         ["reembolso-no-reintentable"] = new("REEMBOLSO-NO-REINTENTABLE", StatusCodes.Status409Conflict),
+        ["correo-no-verificado"] = new("REC-CORREO-NO-VERIFICADO", StatusCodes.Status403Forbidden),
+        ["estado-invalido"] = new("REC-ESTADO-INVALIDO", StatusCodes.Status409Conflict),
+        ["conflicto"] = new("CONFLICTO", StatusCodes.Status409Conflict),
+        ["hoja-no-encontrada"] = new("NO-ENCONTRADO"),
     };
 
     public static ProblemaDto Crear(HttpContext contexto, OpcionesDeErrores opciones, ErrorDeAplicacion error)
@@ -83,11 +87,20 @@ public static class ProblemasDelCarrito
     /// <summary>
     /// El instante de reintento de un límite (el campo <c>disponibleDesde</c> que traduce la Aplicación desde el 429 del Inventario o del límite propio), si lo hay y es válido.
     /// </summary>
-    public static DateTimeOffset? ReintentarEn(ErrorDeAplicacion error) =>
-        error.Errores.FirstOrDefault(e => e.Campo == "disponibleDesde") is { } campo
-        && DateTimeOffset.TryParse(campo.Clave, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var instante)
-            ? instante
-            : null;
+    public static DateTimeOffset? ReintentarEn(ErrorDeAplicacion error)
+    {
+        if (error.Errores.FirstOrDefault(e => e.Campo == "disponibleDesde") is { } campo
+            && DateTimeOffset.TryParse(campo.Clave, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var instante))
+        {
+            return instante;
+        }
+
+        // El límite de las hojas de reclamación informa la espera sugerida en segundos (REC-11).
+        return error.Errores.FirstOrDefault(e => e.Campo == "espera-en-segundos") is { } espera
+            && int.TryParse(espera.Clave, NumberStyles.None, CultureInfo.InvariantCulture, out var segundos) && segundos is > 0 and <= 86_400
+                ? DateTimeOffset.UtcNow.AddSeconds(segundos)
+                : null;
+    }
 
     /// <summary>
     /// Escribe el fallo: el problema uniforme, nunca cacheable (<c>no-store</c>), con <c>Retry-After</c> en un límite. El acceso denegado ya lo registró la Aplicación (un evento por solicitud) y el de límite excedido también.
