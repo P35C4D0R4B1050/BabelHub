@@ -5,7 +5,7 @@ namespace BabelHub.Inventario.Infrastructure.Plataforma;
 
 /// <summary>
 /// De dónde obtiene el Inventario las claves públicas y las revocaciones (identidad-seguridad T41; IDE-85): las URL internas de la <b>réplica de gestión de su propia VM</b>, configuradas por entorno; nunca se derivan
-/// de una credencial ni de una respuesta. Absolutas, HTTP o HTTPS, sin usuario ni contraseña en la dirección.
+/// de una credencial ni de una respuesta. Absolutas, HTTPS (o HTTP solo hacia la propia máquina, loopback) y sin usuario ni contraseña en la dirección.
 /// </summary>
 public sealed class OpcionesDeClavesPublicadas
 {
@@ -30,9 +30,11 @@ public sealed class OpcionesDeClavesPublicadas
     private static void Validar(Uri url, string nombre)
     {
         ArgumentNullException.ThrowIfNull(url);
-        if (!url.IsAbsoluteUri || (url.Scheme != Uri.UriSchemeHttp && url.Scheme != Uri.UriSchemeHttps) || !string.IsNullOrEmpty(url.UserInfo))
+        // La raíz de confianza (el JWKS) no viaja en claro por la red: HTTPS, o HTTP solo hacia la propia máquina (la réplica de gestión de la misma VM).
+        var seguro = url.IsAbsoluteUri && (url.Scheme == Uri.UriSchemeHttps || (url.Scheme == Uri.UriSchemeHttp && url.IsLoopback));
+        if (!seguro || !string.IsNullOrEmpty(url.UserInfo))
         {
-            throw new ArgumentException("La dirección de las claves publicadas es absoluta, HTTP o HTTPS y sin usuario.", nombre);
+            throw new ArgumentException("La dirección de las claves publicadas es HTTPS (o HTTP hacia la propia máquina) y sin usuario.", nombre);
         }
     }
 }

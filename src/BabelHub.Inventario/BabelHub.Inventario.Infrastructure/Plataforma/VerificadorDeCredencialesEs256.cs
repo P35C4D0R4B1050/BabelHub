@@ -192,6 +192,12 @@ public sealed class VerificadorDeCredencialesDelInventario(IFuenteDeClavesDeVeri
             sucursal = id;
         }
 
+        // Un encargado sin sucursal no tiene alcance definido: se rechaza en vez de aceptarlo «sin restricción» (AGENTS.md §5).
+        if (rol == RolesDeUsuario.EncargadoDeSucursal && sucursal is null)
+        {
+            return Invalida;
+        }
+
         var desfase = TimeSpan.FromSeconds(CredencialDeAcceso.DesfaseToleradoEnSegundos);
         if (vence <= desde || vence - desde > TimeSpan.FromMinutes(CredencialDeAcceso.VigenciaDeLaCredencialEnMinutos) + desfase || ahora + desfase < desde)
         {
@@ -254,7 +260,7 @@ public sealed class CacheDeClavesDelInventario(IObtenedorDeClavesPublicadas obte
 {
     public const int MaximoDeClaves = 16;
 
-    public const int MaximoDeRevocadas = 64;
+    public const int MaximoDeRevocadas = 512;
 
     private readonly TimeProvider _reloj = reloj ?? TimeProvider.System;
     private volatile CopiaDeClavesDeVerificacion? _copia;
@@ -266,17 +272,18 @@ public sealed class CacheDeClavesDelInventario(IObtenedorDeClavesPublicadas obte
     {
         try
         {
+            var inicio = _reloj.GetUtcNow();
             var jwks = await obtenedor.ObtenerJwks(cancelacion).ConfigureAwait(false);
             var revocaciones = await obtenedor.ObtenerRevocaciones(cancelacion).ConfigureAwait(false);
-            var ahora = _reloj.GetUtcNow();
-            var revocadas = LeerRevocaciones(revocaciones, ahora);
+            var revocadas = LeerRevocaciones(revocaciones, _reloj.GetUtcNow(), out var generadoEn);
             var claves = LeerClaves(jwks);
             if (revocadas is null || claves.Count == 0)
             {
                 return false;
             }
 
-            _copia = new CopiaDeClavesDeVerificacion(claves, revocadas, ahora);
+            // La copia vale 5 minutos desde lo más antiguo entre el inicio de la renovación y la generación de las revocaciones: una lista vieja o una descarga lenta no alargan la vigencia (IDE-61).
+            _copia = new CopiaDeClavesDeVerificacion(claves, revocadas, generadoEn < inicio ? generadoEn : inicio);
             return true;
         }
         catch (Exception) when (!cancelacion.IsCancellationRequested)
@@ -306,8 +313,9 @@ public sealed class CacheDeClavesDelInventario(IObtenedorDeClavesPublicadas obte
         return claves;
     }
 
-    private static HashSet<string>? LeerRevocaciones(string revocaciones, DateTimeOffset ahora)
+    private static HashSet<string>? LeerRevocaciones(string revocaciones, DateTimeOffset ahora, out DateTimeOffset generadoEn)
     {
+        generadoEn = default;
         using var documento = JsonDocument.Parse(revocaciones, new JsonDocumentOptions { MaxDepth = 6 });
         var raiz = documento.RootElement;
         if (raiz.ValueKind != JsonValueKind.Object || !raiz.TryGetProperty("revocadas", out var lista) || lista.ValueKind != JsonValueKind.Array
@@ -316,7 +324,7 @@ public sealed class CacheDeClavesDelInventario(IObtenedorDeClavesPublicadas obte
             return null;
         }
 
-        var generadoEn = DateTimeOffset.FromUnixTimeSeconds(segundos);
+        generadoEn = DateTimeOffset.FromUnixTimeSeconds(segundos);
         var plazo = TimeSpan.FromMinutes(CredencialDeAcceso.RenovacionDeClavesEnMinutos);
         var desfase = TimeSpan.FromSeconds(CredencialDeAcceso.DesfaseToleradoEnSegundos);
         if (ahora - generadoEn > plazo || generadoEn - ahora > desfase || lista.GetArrayLength() > MaximoDeRevocadas)

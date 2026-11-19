@@ -295,6 +295,44 @@ public sealed class VerificadorDelInventarioTests
 
     [Fact]
     [Trait("Criterio", "AC-IDE-33")]
+    public async Task UnaListaDeRevocacionesAntigua_NoAlargaLaVigenciaDeLaCopia_MasAllaDe5MinutosDesdeSuGeneracion()
+    {
+        var e = new Escenario();
+        var credencial = await e.Credencial();
+        e.Replica.RevocacionesGeneradasEn = Ahora.AddMinutes(-4).AddSeconds(-50);
+
+        Assert.True(await e.Cache.Renovar());
+
+        Assert.Equal(EstadoDeLaCredencial.Valida, e.Verificador.Verificar(credencial, Ahora).Estado);
+        Assert.Equal(EstadoDeLaCredencial.SinClavesVigentes, e.Verificador.Verificar(credencial, Ahora.AddSeconds(15)).Estado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-32")]
+    public async Task UnEncargadoSinSucursal_NoTieneAlcanceDefinido_YSeRechaza()
+    {
+        var e = await ConClavesRenovadas();
+        var reclamos = e.Reclamos();
+        reclamos["rol"] = RolesDeUsuario.EncargadoDeSucursal;
+
+        Assert.Equal(EstadoDeLaCredencial.Invalida, e.Verificador.Verificar(e.Firmar(reclamos), Ahora).Estado);
+        reclamos["sucursal"] = Guid.NewGuid().ToString("D");
+        Assert.Equal(EstadoDeLaCredencial.Valida, e.Verificador.Verificar(e.Firmar(reclamos), Ahora).Estado);
+    }
+
+    [Theory]
+    [InlineData("http://localhost:8080/.well-known/jwks.json")]
+    [InlineData("http://127.0.0.1/.well-known/jwks.json")]
+    [InlineData("https://replica.interna/.well-known/jwks.json")]
+    public void LasDireccionesSeguras_SeAceptan_HttpsOHttpHaciaLaPropiaMaquina(string direccion)
+    {
+        var opciones = new OpcionesDeClavesPublicadas(new Uri(direccion), new Uri(direccion));
+
+        Assert.Equal(new Uri(direccion), opciones.Jwks);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-33")]
     public async Task UnaRespuestaViciada_NoReemplazaLaCopiaAnterior()
     {
         var e = await ConClavesRenovadas();
@@ -362,7 +400,7 @@ public sealed class VerificadorDelInventarioTests
     }
 
     private static HttpObtenedorDeClavesPublicadas Cliente(ManejadorFijo manejador, OpcionesDeClavesPublicadas? opciones = null) =>
-        new(new HttpClient(manejador), opciones ?? new OpcionesDeClavesPublicadas(new Uri("http://replica.interna/.well-known/jwks.json"), new Uri("http://replica.interna/.well-known/revocaciones")));
+        new(new HttpClient(manejador), opciones ?? new OpcionesDeClavesPublicadas(new Uri("https://replica.interna/.well-known/jwks.json"), new Uri("https://replica.interna/.well-known/revocaciones")));
 
     [Fact]
     [Trait("Criterio", "AC-IDE-64")]
@@ -374,7 +412,7 @@ public sealed class VerificadorDelInventarioTests
         Assert.Equal("{\"keys\":[]}", await cliente.ObtenerJwks());
         await cliente.ObtenerRevocaciones();
 
-        Assert.Equal(["http://replica.interna/.well-known/jwks.json", "http://replica.interna/.well-known/revocaciones"], manejador.Pedidas.Select(u => u.ToString()));
+        Assert.Equal(["https://replica.interna/.well-known/jwks.json", "https://replica.interna/.well-known/revocaciones"], manejador.Pedidas.Select(u => u.ToString()));
     }
 
     [Theory]
@@ -394,7 +432,7 @@ public sealed class VerificadorDelInventarioTests
     [Trait("Criterio", "AC-IDE-64")]
     public async Task UnDocumentoMasGrandeQueElLimite_SeDescarta()
     {
-        var opciones = new OpcionesDeClavesPublicadas(new Uri("http://replica.interna/jwks"), new Uri("http://replica.interna/rev")) { MaximoDeBytes = 100 };
+        var opciones = new OpcionesDeClavesPublicadas(new Uri("https://replica.interna/jwks"), new Uri("https://replica.interna/rev")) { MaximoDeBytes = 100 };
         var cliente = Cliente(new ManejadorFijo(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(new string('x', 101)) }), opciones);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => cliente.ObtenerJwks());
@@ -402,11 +440,12 @@ public sealed class VerificadorDelInventarioTests
 
     [Theory]
     [InlineData("ftp://replica.interna/jwks")]
-    [InlineData("http://usuario:clave@replica.interna/jwks")]
+    [InlineData("http://replica.interna/jwks")]
+    [InlineData("https://usuario:clave@replica.interna/jwks")]
     [InlineData("file:///etc/jwks")]
     public void LasDireccionesDeLasClaves_SonHttpSinUsuario(string direccion)
     {
-        Assert.Throws<ArgumentException>(() => new OpcionesDeClavesPublicadas(new Uri(direccion), new Uri("http://replica.interna/rev")));
+        Assert.Throws<ArgumentException>(() => new OpcionesDeClavesPublicadas(new Uri(direccion), new Uri("https://replica.interna/rev")));
     }
 
     private sealed class AlertasGuardadas : IPublicadorDeAlertasTecnicas
