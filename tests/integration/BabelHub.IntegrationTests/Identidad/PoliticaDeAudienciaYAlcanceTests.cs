@@ -220,7 +220,7 @@ public sealed class PoliticaDeAudienciaYAlcanceTests
         Assert.False(porNombre["inventario.titulares.baja"].RequiereTokenDeUsuario);
         Assert.False(porNombre["inventario.titulares.consultar-pendientes"].RequiereTokenDeUsuario);
 
-        // Ningún otro operación del Inventario comparte esos dos alcances: no hay una credencial que sirva para algo más.
+        // Ninguna otra operación del Inventario comparte esos dos alcances: no hay una credencial que sirva para algo más.
         Assert.Single(CatalogoDeOperaciones.V1, o => o.Alcance == AlcancesDeCredencial.BajaDeTitular);
         Assert.Single(CatalogoDeOperaciones.V1, o => o.Alcance == AlcancesDeCredencial.ConsultaDePendientes);
     }

@@ -5,7 +5,7 @@ namespace BabelHub.Ecommerce.Application.Web.Interno;
 
 /// <summary>
 /// <see cref="IContextoDelAsistente"/> sobre el contrato público de Identidad (<see cref="IContextoDeLectura"/>): <b>sin caché</b> (cada consulta pide un contexto nuevo), solo para el cliente de la sesión y con el
-/// mismo error que Identidad cuando no se puede (la web no decide quién puede leer qué: lo decide Identidad, que además lo compara con el actor de la solicitud).
+/// mismo error que Identidad cuando no se puede. La web solo descarta lo que nunca es de un cliente (otro rol o un visitante); quién puede leer qué lo decide Identidad, que además compara el cliente con el actor de la solicitud y registra la denegación.
 /// </summary>
 public sealed class ContextoDelAsistenteDeLaWeb(IContextoDeLectura identidad) : IContextoDelAsistente
 {
