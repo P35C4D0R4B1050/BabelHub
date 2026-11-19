@@ -1,6 +1,6 @@
 namespace BabelHub.Ecommerce.Application.Plataforma;
 
-/// <summary>Una plantilla de correo del catálogo cerrado: el asunto y el cuerpo, fijos, sin enlaces ni peticiones de datos.</summary>
+/// <summary>Una plantilla de correo del catálogo cerrado: el asunto y el cuerpo. Las de seguridad son de texto fijo, sin enlaces ni peticiones de datos (IDE-67); las que declaran <see cref="Campos"/> (pagos y reclamaciones) admiten solo esos campos y nada más.</summary>
 public sealed record PlantillaDeCorreo(string Asunto, string Cuerpo, IReadOnlyList<string>? Campos = null);
 
 /// <summary>

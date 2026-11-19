@@ -82,6 +82,8 @@ public sealed class RenderizadorDeCorreoDeProduccion : IRenderizadorDeCorreo
     /// Pone los datos en los campos que la plantilla <b>declara</b>, y nada más: un dato no declarado se ignora, uno que falta hace que el correo no salga (lanza) y los saltos de línea y los controles de un dato
     /// se vuelven espacios, de modo que ningún dato puede abrir una cabecera ni partir el asunto. Una plantilla sin campos es de texto fijo.
     /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex Marca = new(@"\{([A-Za-z][A-Za-z0-9]*)\}", System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(250));
+
     private static string Rellenar(string texto, PlantillaDeCorreo plantilla, CorreoSaliente correo, bool esAsunto)
     {
         if (plantilla.Campos is not { Count: > 0 } campos)
@@ -89,12 +91,13 @@ public sealed class RenderizadorDeCorreoDeProduccion : IRenderizadorDeCorreo
             return texto;
         }
 
-        foreach (var campo in campos)
+        // Una sola pasada sobre el texto de la plantilla: un valor insertado nunca se vuelve a examinar, así que un dato que contenga «{otroCampo}» no puede colar el de otro campo.
+        return Marca.Replace(texto, coincidencia =>
         {
-            var marca = "{" + campo + "}";
-            if (!texto.Contains(marca, StringComparison.Ordinal))
+            var campo = coincidencia.Groups[1].Value;
+            if (!campos.Contains(campo))
             {
-                continue;
+                return coincidencia.Value;
             }
 
             if (!correo.Datos.TryGetValue(campo, out var valor) || string.IsNullOrEmpty(valor))
@@ -102,12 +105,11 @@ public sealed class RenderizadorDeCorreoDeProduccion : IRenderizadorDeCorreo
                 throw new InvalidOperationException("Faltan datos de la plantilla del correo.");
             }
 
-            texto = texto.Replace(marca, Limpiar(valor, conSaltos: !esAsunto), StringComparison.Ordinal);
-        }
-
-        return texto;
+            return Limpiar(valor, conSaltos: !esAsunto);
+        });
     }
 
+    /// <summary>Los controles, los separadores de línea y de párrafo Unicode (U+2028, U+2029) y U+0085 se vuelven espacios; en el cuerpo se conserva solo el salto de línea.</summary>
     private static string Limpiar(string valor, bool conSaltos)
     {
         var recortado = valor.Length > LargoMaximoDeUnDato ? valor[..LargoMaximoDeUnDato] : valor;
@@ -116,7 +118,10 @@ public sealed class RenderizadorDeCorreoDeProduccion : IRenderizadorDeCorreo
             var (origen, conSaltos) = par;
             for (var i = 0; i < origen.Length; i++)
             {
-                destino[i] = char.IsControl(origen[i]) && !(conSaltos && origen[i] == (char)10) ? (char)32 : origen[i];
+                var c = origen[i];
+                var categoria = char.GetUnicodeCategory(c);
+                var peligroso = char.IsControl(c) || categoria is System.Globalization.UnicodeCategory.LineSeparator or System.Globalization.UnicodeCategory.ParagraphSeparator;
+                destino[i] = peligroso && !(conSaltos && c == (char)10) ? (char)32 : c;
             }
         });
     }

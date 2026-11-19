@@ -63,6 +63,37 @@ public sealed class PlantillasDeCorreoConCamposTests
     }
 
     [Fact]
+    public void UnDatoQueContieneLaMarcaDeOtroCampo_NoColaElValorDeEseCampo()
+    {
+        var mensaje = Renderizador().De(Correo(
+            CategoriaDeCorreo.RespuestaDeReclamo,
+            PlantillasDeCorreoDeReclamos.RespuestaDeReclamo,
+            ("numero", "{respuesta}"),
+            ("fecha", "2026-11-19"),
+            ("respuesta", "TEXTO-SECRETO-DE-OTRO-CAMPO")));
+
+        Assert.Equal("BabelHub: respondimos tu hoja de reclamación {respuesta}", mensaje.Asunto);
+        Assert.Equal(1, mensaje.Cuerpo.Split("TEXTO-SECRETO-DE-OTRO-CAMPO").Length - 1);
+    }
+
+    [Theory]
+    [InlineData(' ')]
+    [InlineData(' ')]
+    [InlineData('\u0085')]
+    public void LosSeparadoresDeLineaUnicode_SeVuelvenEspacios_AlmenosEnElAsunto(char separador)
+    {
+        var mensaje = Renderizador().De(Correo(
+            CategoriaDeCorreo.RespuestaDeReclamo,
+            PlantillasDeCorreoDeReclamos.RespuestaDeReclamo,
+            ("numero", $"2026{separador}000123"),
+            ("fecha", "2026-11-19"),
+            ("respuesta", "ok")));
+
+        Assert.DoesNotContain(separador, mensaje.Asunto);
+        Assert.Contains("2026 000123", mensaje.Asunto, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void UnDatoMuyLargo_SeRecorta()
     {
         var mensaje = Renderizador().De(Correo(
