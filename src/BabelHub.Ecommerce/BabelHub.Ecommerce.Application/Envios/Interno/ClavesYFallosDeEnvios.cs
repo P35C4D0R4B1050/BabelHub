@@ -32,6 +32,21 @@ internal static class ClavesDeEnvios
 
     /// <summary><c>ECO-ENV-LINEAS-EN-OTRO-ENVIO</c> (409): las líneas pertenecen a otro envío o se solapan parcialmente con uno.</summary>
     public const string LineasEnOtroEnvio = "lineas-en-otro-envio";
+
+    /// <summary><c>ECO-ENV-ESTADO-INVALIDO</c> (409): el envío no está en el estado que la operación exige (ENV-03).</summary>
+    public const string EstadoInvalido = "estado-invalido";
+
+    /// <summary><c>ECO-ENV-GUIA-EN-CURSO</c> (409): otra solicitud tiene el arrendamiento de la guía (ENV-18).</summary>
+    public const string GuiaEnCurso = "guia-en-curso";
+
+    /// <summary><c>ECO-ENV-CONTACTO-INCOMPLETO</c> (422): falta un campo del contacto o está anonimizado (ENV-10); el error indica el campo y nunca el valor.</summary>
+    public const string ContactoIncompleto = "contacto-incompleto";
+
+    /// <summary><c>ECO-ENV-OPERADOR-NO-DISPONIBLE</c> (503, reintentable): el operador no respondió, rechazó o devolvió una respuesta inválida (ENV-04).</summary>
+    public const string OperadorNoDisponible = "operador-no-disponible";
+
+    /// <summary>El motivo cerrado de la alerta técnica de Auditoría para una dependencia que falla (copia del valor del catálogo: un módulo no referencia el interior de otro).</summary>
+    public const string MotivoDeAlertaDeDependencia = "dependencia-no-necesaria-fallida";
 }
 
 internal static class FallosDeEnvios

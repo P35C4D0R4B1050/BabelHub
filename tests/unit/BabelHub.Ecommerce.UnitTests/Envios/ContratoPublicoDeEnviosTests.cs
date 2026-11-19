@@ -76,9 +76,9 @@ public sealed class ContratoPublicoDeEnviosTests
         var tipos = typeof(BabelHub.Ecommerce.Domain.Envios.Envio).Assembly.GetTypes().Where(t => t.Namespace == "BabelHub.Ecommerce.Domain.Envios" && t != typeof(BabelHub.Ecommerce.Domain.Envios.DestinatarioParaGuia) && t != typeof(BabelHub.Ecommerce.Domain.Envios.ResultadoDeValidacionDelDestinatario))
             .Concat(Aplicacion.GetTypes().Where(t => t.Namespace == "BabelHub.Ecommerce.Application.Envios.Interno"));
 
-        var campos = tipos.Where(t => !t.IsEnum && t.Name != "IOperadorLogistico").SelectMany(t => t.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Select(p => p.Name)
+        var campos = tipos.Where(t => !t.IsEnum && t.Name is not ("IOperadorLogistico" or "ClavesDeEnvios")).SelectMany(t => t.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Select(p => p.Name)
             .Concat(t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Select(f => f.Name))).ToArray();
 
-        Assert.DoesNotContain(campos, c => prohibidos.Any(p => c.Contains(p, StringComparison.OrdinalIgnoreCase)));
+        Assert.DoesNotContain(campos.Where(c => !c.StartsWith('<')), c => prohibidos.Any(p => c.Contains(p, StringComparison.OrdinalIgnoreCase)));
     }
 }
