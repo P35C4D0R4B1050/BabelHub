@@ -69,13 +69,13 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **ECO-2d** | `ecommerce-catalogo` T24–T28: pantallas del catálogo y de la administración, documentos y E2E | B/C/E | WEB-1d | ☑ (T24–T28; Playwright escrito y sin ejecutar, CSS sin compilar y composición del Catálogo pendientes antes de `spec-verify`) |
 | **ECO-3** | Planificar `ecommerce-carrito-checkout`, `ecommerce-pagos` y `ecommerce-pedidos` | C | ECO-2 | ☑ (planes aprobados el 2026-11-18) |
 | **ECO-4** | `ecommerce-carrito-checkout` (reservas e idempotencia) | C | ECO-3, INV-2 | ▶ (subbloques ECO-4a a 4e, T01–T37; ECO-4a a ECO-4d hechos y fundidos (T01–T32 y T37, salvo T25b y T26c que esperan al carril A); faltan T33–T36, pantallas y E2E) |
-| **ECO-5** | `ecommerce-pagos` (pasarela de pruebas de Culqi) | C | ECO-4; B05 (persona) | ▶ (ECO-5a a ECO-5c hechos y fundidos (T01–T23); subbloques ECO-5a a 5f, T01–T38; 5f condicionado a B05) |
-| **ECO-6** | `ecommerce-pedidos` | E | ECO-5 | ▶ (ECO-6a hecho, T01–T06; ECO-6b a 6f, T07–T42) |
+| **ECO-5** | `ecommerce-pagos` (pasarela de pruebas de Culqi) | C | ECO-4; B05 (persona) | ▶ (ECO-5a a ECO-5d hechos y fundidos (T01–T29); subbloques ECO-5a a 5f, T01–T38; 5f condicionado a B05) |
+| **ECO-6** | `ecommerce-pedidos` | E | ECO-5 | ▶ (ECO-6a y ECO-6b hechos, T01–T13, más los contratos T07a/T07b y los adaptadores reales sobre PLA-Y; ECO-6c a 6f, T14–T42) |
 | **ECO-7** | Planificar biblioteca digital, envíos, devoluciones y libro de reclamaciones | C | ECO-6 | ☑ (planes aprobados el 2026-11-18) |
 | **ECO-8** | `ecommerce-biblioteca-digital` (archivos y URLs firmadas) | C | ECO-7 | ☐ (ECO-8a a 8e, T01–T26) |
-| **ECO-9** | `ecommerce-envios` | E | ECO-7 | ▶ (ECO-9a y ECO-9b hechos, T01–T11; ECO-9c a 9e, T12–T25) |
+| **ECO-9** | `ecommerce-envios` | E | ECO-7 | ▶ (ECO-9a a ECO-9d y parte de 9e hechos, T01–T19, T21a, T23, T25 y T13; esperan T14b, T20, T21b, T22 y T24) |
 | **ECO-10** | `ecommerce-devoluciones` | E | ECO-9 | ☐ (ECO-10a a 10f, T01–T34) |
-| **ECO-11** | `ecommerce-libro-reclamaciones` | E | ECO-7 | ▶ (ECO-11a y ECO-11b hechos, T01–T12; faltan 11c y 11d) |
+| **ECO-11** | `ecommerce-libro-reclamaciones` | E | ECO-7 | ☑ (T01–T23 salvo el E2E T22, que espera Node y COMP-1; integración PostgreSQL 114 de 114) |
 | **ECO-12** | `asistente-compra-ia` | C | ECO-6; B06 (persona) | ☐ (plan aprobado el 2026-11-19 tras la ronda 4: ECO-12a T01–T07, 12b T08–T14, 12c T15–T19, 12d T20–T24; depende de ECO-6, IDE-6, web-base T08 y las políticas de límite del carril A; el adaptador real espera B06) |
 | **ECO-13** | `web-indice-infinito` | B | WEB-1d | ☐ (plan aprobado el 2026-11-19: ECO-13a T01–T06, 13b T07–T11, 13c T12–T15) |
 

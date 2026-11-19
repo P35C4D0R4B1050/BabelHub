@@ -2,6 +2,18 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-19 — Plataforma para Pagos y Pedidos, ECO-5d, ECO-6b, ECO-9c a 9e y ECO-11 completo
+
+### Cubierto
+- **Carril A:** PLA-X y PLA-Y: catálogos compartidos (motivos `carrito-*` y `envio-*`, claves del detalle de envíos, plantillas de correo de Pagos, Envíos y Pedidos), `IClienteDelInventario` con consultar, extender, confirmar y cerrar reservas, políticas de límite de Pedidos y de ráfaga de avisos de la pasarela, 7 acciones de auditoría de Pedidos; COMP-1 del Inventario (composición de `Program.cs` con credenciales y cuentas de base de datos propias por host).
+- **Carril B:** ECO-6a y ECO-6b (T01–T13 de `ecommerce-pedidos`), contratos de Pedidos para Envíos (T07a) y para Devoluciones (T07b) y los adaptadores reales de Pedidos sobre `CerrarReserva`, límites y auditoría.
+- **Carril C:** ECO-5d (T24–T29 de Pagos: esquema, simulador, llaves por entorno, acciones MVC, reservas del pago) y **ECO-11 completo** (reclamaciones: esquema, anonimización, composición, trabajos, pantallas y documentos; 114 pruebas contra PostgreSQL).
+- **Carril V:** ECO-9c a ECO-9e parcial (T12–T19, T21a, T23, T25 y T13 de `ecommerce-envios`: límites, simulador, operador nulo, trabajos de fondo, Api y Web, matriz de roles, privacidad, `RestReservasDelEnvio`).
+- Integración completa de `main` (con 20 merges): 5884 de 5891; fallos reales por corregir: dos de C por `GET /checkout/pago` ambiguo en el host de pruebas de la política de textos pendientes (y la CSP de la pasarela), el fixture de Pagos con contraseña literal y otras dos flaky que pasan sueltas (auditoría y humo de imágenes).
+
+### Pendiente
+- Correcciones de C; COMP-1 del E-commerce (A); ECO-6c en adelante (B); devoluciones y T20/T22 de envíos (V); biblioteca digital (ECO-8) sin dueño; E2E (Node instalado, falta el host compuesto).
+
 ## 2026-11-19 — IDE-9 cierra Identidad; carrito completo salvo el E2E; ECO-6a y ECO-9b
 
 ### Cubierto
