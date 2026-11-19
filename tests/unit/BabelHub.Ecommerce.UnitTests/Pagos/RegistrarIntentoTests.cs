@@ -51,7 +51,6 @@ public sealed class RegistrarIntentoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-25")]
     public async Task La_marca_de_cancelacion_se_lee_con_bloqueo_antes_de_bloquear_la_intencion()
     {
         var e = await ConIntencionLista();
@@ -272,7 +271,7 @@ public sealed class RegistrarIntentoTests
 
     [Fact]
     [Trait("Criterio", "AC-PAG-04")]
-    public async Task Una_clave_ya_usada_no_inserta_otro_intento()
+    public async Task Una_clave_ya_usada_devuelve_el_intento_original_sin_insertar_otro()
     {
         var e = await ConIntencionLista();
         var clave = Guid.NewGuid();
@@ -286,8 +285,10 @@ public sealed class RegistrarIntentoTests
 
         var repetida = await e.RegistrarIntento.Registrar(e.Entrada(clave));
 
-        Assert.Equal(CategoriaDeError.Conflicto, repetida.Error!.Categoria);
-        Assert.Equal("clave-invalida", repetida.Error.Clave);
+        // La misma clave que ya se registró (por ejemplo, una solicitud simultánea que ganó el bloqueo) es el resultado original: no inserta otro intento.
+        Assert.True(repetida.EsExito);
+        Assert.True(repetida.Valor.EraRepetido);
+        Assert.Equal(clave, repetida.Valor.Intento.Id);
         Assert.Single(e.Repositorio.Intentos);
     }
 

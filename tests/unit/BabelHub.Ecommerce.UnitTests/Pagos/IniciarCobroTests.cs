@@ -134,7 +134,7 @@ public sealed class IniciarCobroTests
 
     [Fact]
     [Trait("Criterio", "AC-PAG-06")]
-    public async Task Una_falla_de_la_pasarela_o_una_respuesta_dudosa_dejan_el_pago_pendiente_y_no_cobran_otra_vez()
+    public async Task Una_falla_de_la_pasarela_o_una_respuesta_dudosa_dejan_el_pago_pendiente_y_no_confirman_la_compra()
     {
         var cae = await ConIntencionLista();
         cae.Pasarela.Lanza = true;
@@ -153,7 +153,7 @@ public sealed class IniciarCobroTests
 
     [Fact]
     [Trait("Criterio", "AC-PAG-16")]
-    public async Task Un_aprobado_dudoso_publica_una_alerta_tecnica_para_conciliar_y_nunca_un_reembolso()
+    public async Task Un_aprobado_dudoso_publica_una_alerta_tecnica_para_conciliar_y_no_confirma_la_compra()
     {
         var e = await ConIntencionLista();
         e.Pasarela.Respuesta = s => ResultadoDeCobro.Aprobado("ch_1", s.Importe, "USD", s.ReferenciaOpaca);
@@ -311,7 +311,7 @@ public sealed class IniciarCobroTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-30")]
+    [Trait("Criterio", "AC-PAG-26")]
     public async Task El_correo_del_titular_solo_viaja_a_la_pasarela_si_esta_lo_exige()
     {
         var sinCorreo = await ConIntencionLista();
@@ -353,7 +353,7 @@ public sealed class IniciarCobroTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-05")]
+    [Trait("Criterio", "AC-PAG-14")]
     public async Task Un_cobro_con_la_intencion_ya_con_un_intento_activo_no_llama_a_la_pasarela_de_nuevo()
     {
         var e = await ConIntencionLista();
@@ -426,7 +426,7 @@ public sealed class IniciarCobroTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-30")]
+    [Trait("Criterio", "AC-PAG-26")]
     public async Task Si_la_pasarela_exige_el_correo_y_identidad_no_lo_da_no_se_registra_el_intento_ni_se_cobra()
     {
         var e = await ConIntencionLista();
@@ -503,5 +503,99 @@ public sealed class IniciarCobroTests
         await e.Cobrar.Ejecutar(await Pedir(e));
 
         Assert.Equal("referencia", e.Auditoria.Solicitudes.Single(s => s.Accion.Identificador == "CobroResuelto").Detalle["duda"]);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-09")]
+    public async Task Una_pestana_vieja_con_el_total_cambiado_no_consulta_a_nadie_ni_gasta_cupo_aunque_pulse_pagar_varias_veces()
+    {
+        var e = await ConIntencionLista();
+        var entrada = await Pedir(e);
+        await e.Creador.Reabrir(Cuenta, Pedido);
+        await e.Creador.Crear(Cuenta, Mixta("huella-nueva", envio: 20m), "huella-nueva", e.ReservaExpiraEn);
+        var consultasDeCuenta = e.Cuenta.Consultas;
+
+        for (var i = 0; i < 6; i++)
+        {
+            var resultado = await e.Cobrar.Ejecutar(entrada with { ClaveDeIntento = (await e.EmitirClaveConTotalViejo()) });
+            Assert.Equal("total-cambio", resultado.Error!.Clave);
+        }
+
+        Assert.Equal(0, e.LimitesDeCobro.Reservas);
+        Assert.Equal(consultasDeCuenta, e.Cuenta.Consultas);
+        Assert.Equal(0, e.Reservas.Consultas);
+        Assert.Empty(e.Pasarela.Solicitudes);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-07")]
+    public async Task Una_intencion_ya_cerrada_no_gasta_cupo_ni_consulta_a_identidad()
+    {
+        var e = await ConIntencionLista();
+        var entrada = await Pedir(e);
+        await e.Creador.Cancelar(Cuenta, Pedido);
+
+        var resultado = await e.Cobrar.Ejecutar(entrada);
+
+        Assert.Equal("intencion-cancelada", resultado.Error!.Clave);
+        Assert.Equal(0, e.LimitesDeCobro.Reservas);
+        Assert.Equal(0, e.Cuenta.Consultas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-11")]
+    public async Task Solo_se_extiende_la_reserva_cuando_el_intento_paso_realmente_a_pendiente()
+    {
+        var pendiente = await ConIntencionLista();
+        pendiente.Pasarela.NoResponde = true;
+        var sinAuditoria = await ConIntencionLista();
+        sinAuditoria.Pasarela.Respuesta = _ =>
+        {
+            sinAuditoria.Auditoria.Caida = true;
+            return ResultadoDeCobro.SinRespuesta();
+        };
+
+        await pendiente.Cobrar.Ejecutar(await Pedir(pendiente));
+        await sinAuditoria.Cobrar.Ejecutar(await Pedir(sinAuditoria));
+
+        Assert.Single(pendiente.Reservas.Extensiones);
+        Assert.Empty(sinAuditoria.Reservas.Extensiones);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-11")]
+    public async Task La_reserva_se_anota_con_el_instante_real_que_devuelve_el_inventario_aunque_difiera_de_lo_esperado()
+    {
+        var e = await ConIntencionLista();
+        e.Pasarela.NoResponde = true;
+        e.Reservas.Extension = new RespuestaDeReserva<ResultadoDeExtension>(ResultadoDeLaLlamadaDeReserva.Correcto, new ResultadoDeExtension(IntencionesDePrueba.Inicio.AddMinutes(29).AddSeconds(30), true));
+
+        await e.Cobrar.Ejecutar(await Pedir(e));
+
+        Assert.Equal(IntencionesDePrueba.Inicio.AddMinutes(29).AddSeconds(30), e.Repositorio.Intenciones.Single().ReservaExpiraEn);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-06")]
+    public async Task El_instante_del_envio_a_la_pasarela_queda_anotado_en_el_intento_resuelto()
+    {
+        var e = await ConIntencionLista();
+        e.Pasarela.Respuesta = _ => ResultadoDeCobro.Rechazado(MotivoDeRechazo.Otro);
+
+        await e.Cobrar.Ejecutar(await Pedir(e));
+
+        Assert.Equal(IntencionesDePrueba.Inicio.AddSeconds(30), e.Repositorio.Intentos.Single().EnviadoEn);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-06")]
+    public async Task Una_cancelacion_interna_del_cliente_http_del_adaptador_deja_el_pago_pendiente_y_no_un_error()
+    {
+        var e = await ConIntencionLista();
+        e.Pasarela.Respuesta = _ => throw new TaskCanceledException("HttpClient agotó su tiempo.");
+
+        var resultado = await e.Cobrar.Ejecutar(await Pedir(e));
+
+        Assert.Equal(EstadoDelCobro.PendienteDeConfirmacion, resultado.Valor.Estado);
     }
 }

@@ -205,7 +205,7 @@ public sealed class GuardaYDoblesDePagosTests
     {
         public Task<RespuestaDeReserva<EstadoDeLaReserva>> Consultar(Guid pedidoId, Guid cuentaId, CancellationToken cancelacion = default) => throw new NotSupportedException();
 
-        public Task<RespuestaDeReserva<EstadoDeLaReserva>> Extender(Guid pedidoId, DateTimeOffset hasta, CancellationToken cancelacion = default) => throw new NotSupportedException();
+        public Task<RespuestaDeReserva<ResultadoDeExtension>> Extender(Guid pedidoId, CancellationToken cancelacion = default) => throw new NotSupportedException();
 
         public Task<RespuestaDeReserva<IReadOnlyList<LineaConfirmadaDeReserva>>> Confirmar(Guid pedidoId, string claveDeIdempotencia, CancellationToken cancelacion = default) => throw new NotSupportedException();
 
@@ -300,13 +300,14 @@ public sealed class GuardaYDoblesDePagosTests
         var (inventario, reloj) = Inventario();
 
         var consulta = await inventario.Consultar(Pedido, Cuenta);
-        var primera = await inventario.Extender(Pedido, reloj.Ahora.AddMinutes(30));
-        var segunda = await inventario.Extender(Pedido, reloj.Ahora.AddMinutes(45));
+        var primera = await inventario.Extender(Pedido);
+        var segunda = await inventario.Extender(Pedido);
 
         Assert.True(consulta.EsCorrecta);
         Assert.True(consulta.Valor!.Vigente);
-        Assert.Equal(reloj.Ahora.AddMinutes(30), primera.Valor!.ExpiraEn);
-        Assert.Equal(reloj.Ahora.AddMinutes(30), segunda.Valor!.ExpiraEn);
+        // Sin cuerpo: el Inventario calcula el instante (inicio de la reserva más 30 minutos) y la segunda llamada es un éxito sin cambios.
+        Assert.Equal(new ResultadoDeExtension(reloj.Ahora.AddMinutes(30), true), primera.Valor);
+        Assert.Equal(new ResultadoDeExtension(reloj.Ahora.AddMinutes(30), false), segunda.Valor);
     }
 
     [Fact]
@@ -317,7 +318,10 @@ public sealed class GuardaYDoblesDePagosTests
         reloj.Ahora = reloj.Ahora.AddMinutes(16);
 
         Assert.False((await inventario.Consultar(Pedido, Cuenta)).Valor!.Vigente);
-        Assert.Equal(ResultadoDeLaLlamadaDeReserva.EstadoInvalido, (await inventario.Extender(Pedido, reloj.Ahora.AddMinutes(10))).Resultado);
+        // Extender una reserva vencida no es un error: es un éxito sin cambios (contrato v1).
+        var extension = await inventario.Extender(Pedido);
+        Assert.True(extension.EsCorrecta);
+        Assert.False(extension.Valor!.Extendida);
         Assert.Equal(ResultadoDeLaLlamadaDeReserva.EstadoInvalido, (await inventario.Confirmar(Pedido, "conf-1")).Resultado);
     }
 
@@ -354,13 +358,13 @@ public sealed class GuardaYDoblesDePagosTests
 
     [Fact]
     [Trait("Criterio", "AC-PAG-17")]
-    public async Task Liberar_una_reserva_expirada_desconocida_o_ya_liberada_es_un_exito_sin_cambios()
+    public async Task Liberar_una_reserva_expirada_o_ya_liberada_es_un_exito_sin_cambios_y_una_desconocida_no_existe()
     {
         var (inventario, reloj) = Inventario();
         reloj.Ahora = reloj.Ahora.AddMinutes(16);
 
         Assert.True((await inventario.Liberar(Pedido, MotivoDeLiberacion.PagoVencido)).EsCorrecta);
-        Assert.True((await inventario.Liberar(Guid.NewGuid(), MotivoDeLiberacion.PagoVencido)).EsCorrecta);
+        Assert.Equal(ResultadoDeLaLlamadaDeReserva.NoExiste, (await inventario.Liberar(Guid.NewGuid(), MotivoDeLiberacion.PagoVencido)).Resultado);
     }
 
     [Fact]
@@ -373,7 +377,7 @@ public sealed class GuardaYDoblesDePagosTests
         inventario.Caido = true;
         Assert.Equal(ResultadoDeLaLlamadaDeReserva.SinRespuesta, (await inventario.Consultar(Pedido, Cuenta)).Resultado);
         Assert.Equal(ResultadoDeLaLlamadaDeReserva.SinRespuesta, (await inventario.Confirmar(Pedido, "conf-1")).Resultado);
-        Assert.Equal(ResultadoDeLaLlamadaDeReserva.SinRespuesta, (await inventario.Extender(Pedido, DateTimeOffset.UtcNow)).Resultado);
+        Assert.Equal(ResultadoDeLaLlamadaDeReserva.SinRespuesta, (await inventario.Extender(Pedido)).Resultado);
         Assert.Equal(ResultadoDeLaLlamadaDeReserva.SinRespuesta, (await inventario.Liberar(Pedido, MotivoDeLiberacion.PagoVencido)).Resultado);
     }
 }

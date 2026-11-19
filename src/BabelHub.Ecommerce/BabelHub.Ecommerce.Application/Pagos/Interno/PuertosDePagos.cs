@@ -83,6 +83,9 @@ internal sealed record RespuestaDeReserva<T>(ResultadoDeLaLlamadaDeReserva Resul
 
 internal sealed record EstadoDeLaReserva(DateTimeOffset ExpiraEn, bool Vigente);
 
+/// <summary>Lo que responde <c>reservas.extender</c> (contrato v1): el instante actual de expiración y si esta llamada la extendió. Sin cambios (ya extendida, vencida o confirmada) es un éxito con <c>Extendida = false</c>, nunca un error.</summary>
+internal sealed record ResultadoDeExtension(DateTimeOffset ExpiraEn, bool Extendida);
+
 internal sealed record LineaConfirmadaDeReserva(Guid LineaId, string CodigoDeFuente, bool RequiereTraslado, Guid? TrasladoId, DateOnly? FechaEstimadaDeLlegada);
 
 /// <summary>
@@ -94,8 +97,8 @@ internal interface IReservasDelPago
     /// <summary>Con alcance de usuario: ¿la reserva sigue vigente?</summary>
     Task<RespuestaDeReserva<EstadoDeLaReserva>> Consultar(Guid pedidoId, Guid cuentaId, CancellationToken cancelacion = default);
 
-    /// <summary>Extiende una sola vez la reserva de los impresos hasta el instante dado (PAG-13).</summary>
-    Task<RespuestaDeReserva<EstadoDeLaReserva>> Extender(Guid pedidoId, DateTimeOffset hasta, CancellationToken cancelacion = default);
+    /// <summary>Pide extender una sola vez la reserva de los impresos (PAG-13, contrato v1: <c>POST /reservas/{pedidoId}/extender</c> sin cuerpo): el Inventario calcula el nuevo instante.</summary>
+    Task<RespuestaDeReserva<ResultadoDeExtension>> Extender(Guid pedidoId, CancellationToken cancelacion = default);
 
     /// <summary>Confirma las reservas con la clave <c>conf-&lt;intentoId&gt;</c> y devuelve la fuente y los traslados de cada línea.</summary>
     Task<RespuestaDeReserva<IReadOnlyList<LineaConfirmadaDeReserva>>> Confirmar(Guid pedidoId, string claveDeIdempotencia, CancellationToken cancelacion = default);

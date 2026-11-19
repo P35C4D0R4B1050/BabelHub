@@ -41,6 +41,18 @@ internal sealed class RegistrarIntento(
             return Resultado<IntentoRegistrado>.Fallo(await autorizador.RechazarAjena(cancelacion).ConfigureAwait(false));
         }
 
+        // Lo que se decide con lo ya leído se decide antes de gastar nada: una intención cerrada, obsoleta o vencida, o un token de lo que ya cambió, no consume consultas externas ni cupo (una pestaña vieja no quema el límite).
+        var previa = intencion.ValidarCobro(reloj.Ahora);
+        if (previa != ValidacionDelCobro.Permitido)
+        {
+            return FallosDePagos.De<IntentoRegistrado>(CategoriaDeError.Conflicto, EmitirClaveDeIntento.Clave(previa));
+        }
+
+        if (intencion.Total.EnCentimos != entrada.Clave.TotalEnCentimos || !string.Equals(intencion.HuellaDeInstantanea, entrada.Clave.HuellaDeInstantanea, StringComparison.Ordinal))
+        {
+            return FallosDePagos.De<IntentoRegistrado>(CategoriaDeError.Conflicto, ClavesDePagos.TotalCambio);
+        }
+
         // (1) Fuera de toda transacción: Identidad, posesión, reserva y límite.
         if (await ComprobarFueraDeLaTransaccion(entrada, intencion, cancelacion).ConfigureAwait(false) is { } rechazo)
         {
@@ -142,6 +154,15 @@ internal sealed class RegistrarIntento(
         if (intencion is null || !intencion.EsDeLaCuenta(entrada.CuentaId))
         {
             return Resultado<IntentoRegistrado>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoEncontrado, ClavesDePagos.NoEncontrado));
+        }
+
+        // La misma clave que otra solicitud simultánea ya registró mientras esta esperaba el bloqueo: es el resultado original, no un cobro en curso ajeno (PAG-04).
+        var yaRegistrado = await repositorio.ObtenerIntento(entrada.Clave.IntentoId, token).ConfigureAwait(false);
+        if (yaRegistrado is not null)
+        {
+            return yaRegistrado.IntencionId == intencion.Id
+                ? Resultado<IntentoRegistrado>.Exito(new IntentoRegistrado(yaRegistrado, true))
+                : FallosDePagos.De<IntentoRegistrado>(CategoriaDeError.Conflicto, ClavesDePagos.ClaveInvalida);
         }
 
         // Primero si se puede cobrar (cerrada, obsoleta, con la reserva vencida o con otro cobro en curso) y después si el token coincide con lo vigente.

@@ -260,3 +260,10 @@ internal static class EntornoDePagosExtensiones
         return e;
     }
 }
+
+internal static class EmisionDeClavesDePrueba
+{
+    /// <summary>Una clave firmada con el total y la huella que el cliente vio antes de que el carrito cambiara en otra pestaña.</summary>
+    public static Task<string> EmitirClaveConTotalViejo(this EntornoDePagos e) =>
+        Task.FromResult(e.Firmador.Emitir(new DatosDeLaClaveDeIntento(Guid.NewGuid(), InstantaneasDeCompraDePrueba.Pedido, InstantaneasDeCompraDePrueba.Cuenta, "huella-a", 14_000, e.Reloj.Ahora.AddMinutes(30))));
+}

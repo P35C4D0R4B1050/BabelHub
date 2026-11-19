@@ -39,7 +39,7 @@ public sealed class IntencionDePagoCicloDeVidaTests
 
     [Fact]
     [Trait("Criterio", "AC-PAG-11")]
-    public void La_reserva_no_se_extiende_en_una_compra_solo_digital_ni_mas_alla_del_limite()
+    public void La_reserva_no_se_extiende_en_una_compra_solo_digital_y_se_anota_el_instante_real_que_dio_el_inventario()
     {
         var digital = AbiertaSoloDigital();
         digital.IniciarCobro(Inicio.AddSeconds(5));
@@ -49,7 +49,9 @@ public sealed class IntencionDePagoCicloDeVidaTests
 
         var mixta = ConCobro();
         mixta.PasarAPendiente();
-        Assert.Throws<ArgumentOutOfRangeException>(() => mixta.ExtenderReserva(Inicio.AddMinutes(31)));
+        // El Inventario calcula el instante (inicio de la reserva más 30 minutos): Pagos lo anota tal cual, una sola vez.
+        Assert.True(mixta.ExtenderReserva(Inicio.AddMinutes(30)));
+        Assert.Equal(Inicio.AddMinutes(30), mixta.ReservaExpiraEn);
     }
 
     [Fact]

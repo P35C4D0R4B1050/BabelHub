@@ -118,13 +118,19 @@ internal sealed class IniciarCobro(
         }
 
         var intentoRegistrado = registrado.Valor.Intento;
+        if (registrado.Valor.EraRepetido)
+        {
+            // Otra solicitud simultánea con la misma clave ya hizo el cobro: este es el resultado original.
+            return Resultado<ResultadoDelCobroDelCliente>.Exito(ResultadoOriginal(intentoRegistrado));
+        }
 
         // Desde aquí el intento existe y la pasarela puede haber cobrado: nada de lo que sigue depende de que el cliente siga conectado (cerrar la pestaña no deja un cobro sin rastro).
         // Paso 2: la pasarela, fuera de toda transacción y cortada solo por el plazo de respuesta.
+        var enviadoEn = reloj.Ahora;
         var resultadoDeLaPasarela = await Cobrar(new SolicitudDeCobroEnPasarela(intentoRegistrado.ReferenciaOpaca, intentoRegistrado.Importe, medio, entrada.TokenDelMedio, correo)).ConfigureAwait(false);
 
         // Paso 3: registrar el resultado en una transacción corta (con el mismo orden de bloqueo).
-        var cierre = await RegistrarElResultado(intentoRegistrado.Id, entrada.PedidoId, resultadoDeLaPasarela).ConfigureAwait(false);
+        var cierre = await RegistrarElResultado(intentoRegistrado.Id, entrada.PedidoId, resultadoDeLaPasarela, enviadoEn).ConfigureAwait(false);
         switch (cierre.Tipo)
         {
             case TipoDeCierre.Aprobado:
@@ -133,7 +139,11 @@ internal sealed class IniciarCobro(
             case TipoDeCierre.Rechazado:
                 return Resultado<ResultadoDelCobroDelCliente>.Exito(new ResultadoDelCobroDelCliente(EstadoDelCobro.Rechazado, MapeoDeMotivos.APublico(cierre.Motivo), intentoRegistrado.Id));
             default:
-                await ExtenderLaReservaSiHaceFalta(entrada.PedidoId).ConfigureAwait(false);
+                if (cierre.PasoAPendiente)
+                {
+                    await ExtenderLaReservaSiHaceFalta(entrada.PedidoId).ConfigureAwait(false);
+                }
+
                 return Resultado<ResultadoDelCobroDelCliente>.Exito(new ResultadoDelCobroDelCliente(EstadoDelCobro.PendienteDeConfirmacion, null, intentoRegistrado.Id));
         }
     }
@@ -169,12 +179,9 @@ internal sealed class IniciarCobro(
         {
             return await pasarela.Cobrar(solicitud, plazo.Token).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (plazo.IsCancellationRequested)
+        catch (Exception)
         {
-            return ResultadoDeCobro.SinRespuesta();
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
+            // Sin respuesta a tiempo o una falla del adaptador (también una cancelación interna de su cliente HTTP): el cobro queda pendiente y se consulta después.
             return ResultadoDeCobro.SinRespuesta();
         }
     }
@@ -186,13 +193,13 @@ internal sealed class IniciarCobro(
         Pendiente,
     }
 
-    private sealed record Cierre(TipoDeCierre Tipo, string? Referencia = null, MotivoDeRechazo? Motivo = null);
+    private sealed record Cierre(TipoDeCierre Tipo, string? Referencia = null, MotivoDeRechazo? Motivo = null, bool PasoAPendiente = false);
 
     /// <summary>
     /// Registra el resultado en una transacción corta, <b>sin depender de la cancelación de la solicitud</b>. Cualquier falla (auditoría, bloqueo, conexión) tras un cobro que la pasarela pudo aplicar deja el intento <c>iniciado</c>
     /// (la reconciliación lo recoge), publica una alerta técnica y el cliente ve «estamos confirmando tu pago»: nunca «no se cobró».
     /// </summary>
-    private async Task<Cierre> RegistrarElResultado(Guid intentoId, Guid pedidoId, ResultadoDeCobro resultado)
+    private async Task<Cierre> RegistrarElResultado(Guid intentoId, Guid pedidoId, ResultadoDeCobro resultado, DateTimeOffset enviadoEn)
     {
         ResultadoValidado? validado = null;
         try
@@ -215,6 +222,7 @@ internal sealed class IniciarCobro(
 
                     var intencion = (await repositorio.ObtenerIntencion(pedidoId, paraActualizar: true, token).ConfigureAwait(false))!;
                     validado = resultado.Validar(intento);
+                    intento.MarcarEnviado(enviadoEn);
 
                     switch (validado.Tipo)
                     {
@@ -243,6 +251,7 @@ internal sealed class IniciarCobro(
                                 await repositorio.GuardarIntento(intento, token).ConfigureAwait(false);
                                 await repositorio.GuardarIntencion(intencion, token).ConfigureAwait(false);
                                 await Auditar(intento, "pendiente", null, validado.Duda, token).ConfigureAwait(false);
+                                return new Cierre(TipoDeCierre.Pendiente, PasoAPendiente: true);
                             }
 
                             return new Cierre(TipoDeCierre.Pendiente);
@@ -321,7 +330,7 @@ internal sealed class IniciarCobro(
                 return;
             }
 
-            var extension = await reservas.Extender(pedidoId, intencion.LimitePendienteEn, CancellationToken.None).ConfigureAwait(false);
+            var extension = await reservas.Extender(pedidoId, CancellationToken.None).ConfigureAwait(false);
             if (!extension.EsCorrecta || extension.Valor is null)
             {
                 return;

@@ -95,33 +95,29 @@ internal sealed class ReservasSimuladasDelPago(IReloj reloj) : IReservasDelPago
         }
     }
 
-    public Task<RespuestaDeReserva<EstadoDeLaReserva>> Extender(Guid pedidoId, DateTimeOffset hasta, CancellationToken cancelacion = default)
+    /// <summary>Como el Inventario real (<c>ExtenderReservas</c>, contrato v1): sin cuerpo, el instante lo calcula el servicio (inicio de la reserva más 30 minutos) y lo que no se puede extender (ya extendida, vencida o confirmada) es un éxito sin cambios con <c>Extendida = false</c>, nunca un error.</summary>
+    public Task<RespuestaDeReserva<ResultadoDeExtension>> Extender(Guid pedidoId, CancellationToken cancelacion = default)
     {
         lock (_candado)
         {
             if (Caido)
             {
-                return Task.FromResult(new RespuestaDeReserva<EstadoDeLaReserva>(ResultadoDeLaLlamadaDeReserva.SinRespuesta, null));
+                return Task.FromResult(new RespuestaDeReserva<ResultadoDeExtension>(ResultadoDeLaLlamadaDeReserva.SinRespuesta, null));
             }
 
             if (!_reservas.TryGetValue(pedidoId, out var r))
             {
-                return Task.FromResult(new RespuestaDeReserva<EstadoDeLaReserva>(ResultadoDeLaLlamadaDeReserva.NoExiste, null));
+                return Task.FromResult(new RespuestaDeReserva<ResultadoDeExtension>(ResultadoDeLaLlamadaDeReserva.NoExiste, null));
             }
 
-            if (r.Estado != EstadoDeReserva.Pendiente || r.ExpiraEn <= reloj.Ahora)
+            var extendible = r.Estado == EstadoDeReserva.Pendiente && !r.Extendida && r.ExpiraEn > reloj.Ahora;
+            if (extendible)
             {
-                return Task.FromResult(new RespuestaDeReserva<EstadoDeLaReserva>(ResultadoDeLaLlamadaDeReserva.EstadoInvalido, null));
-            }
-
-            // Idempotente: una segunda extensión no mueve el instante.
-            if (!r.Extendida)
-            {
-                r.ExpiraEn = hasta;
+                r.ExpiraEn = r.IniciadaEn + PlazosDelPago.PlazoDePendiente;
                 r.Extendida = true;
             }
 
-            return Task.FromResult(new RespuestaDeReserva<EstadoDeLaReserva>(ResultadoDeLaLlamadaDeReserva.Correcto, new EstadoDeLaReserva(r.ExpiraEn, true)));
+            return Task.FromResult(new RespuestaDeReserva<ResultadoDeExtension>(ResultadoDeLaLlamadaDeReserva.Correcto, new ResultadoDeExtension(r.ExpiraEn, extendible)));
         }
     }
 
@@ -166,7 +162,7 @@ internal sealed class ReservasSimuladasDelPago(IReloj reloj) : IReservasDelPago
 
             if (!_reservas.TryGetValue(pedidoId, out var r))
             {
-                return Task.FromResult(new RespuestaDeReserva<bool>(ResultadoDeLaLlamadaDeReserva.Correcto, true));
+                return Task.FromResult(new RespuestaDeReserva<bool>(ResultadoDeLaLlamadaDeReserva.NoExiste, false));
             }
 
             if (r.Estado == EstadoDeReserva.Confirmada && motivo == MotivoDeLiberacion.PagoVencido)
@@ -189,6 +185,9 @@ internal sealed class ReservasSimuladasDelPago(IReloj reloj) : IReservasDelPago
     private sealed class Reserva(DateTimeOffset expiraEn, IReadOnlyList<LineaConfirmadaDeReserva> lineas)
     {
         public DateTimeOffset ExpiraEn { get; set; } = expiraEn;
+
+        /// <summary>El inicio de la reserva: 15 minutos antes de su expiración original.</summary>
+        public DateTimeOffset IniciadaEn { get; } = expiraEn - PlazosDelPago.VigenciaConImpresos;
 
         public IReadOnlyList<LineaConfirmadaDeReserva> Lineas { get; } = lineas;
 

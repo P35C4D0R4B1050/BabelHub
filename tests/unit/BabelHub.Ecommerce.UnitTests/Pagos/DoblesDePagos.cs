@@ -71,7 +71,7 @@ internal sealed class ReservasDelPagoDoble(UnidadDeTrabajoReversible unidad, Rel
 {
     public RespuestaDeReserva<EstadoDeLaReserva>? Consulta { get; set; }
 
-    public RespuestaDeReserva<EstadoDeLaReserva>? Extension { get; set; }
+    public RespuestaDeReserva<ResultadoDeExtension>? Extension { get; set; }
 
     public RespuestaDeReserva<IReadOnlyList<LineaConfirmadaDeReserva>>? Confirmacion { get; set; }
 
@@ -81,6 +81,7 @@ internal sealed class ReservasDelPagoDoble(UnidadDeTrabajoReversible unidad, Rel
 
     public int LlamadasDentroDeUnaTransaccion { get; private set; }
 
+    /// <summary>Los instantes de expiración que devolvió el Inventario en cada pedido de extensión.</summary>
     public List<DateTimeOffset> Extensiones { get; } = [];
 
     public List<string> Confirmaciones { get; } = [];
@@ -109,11 +110,16 @@ internal sealed class ReservasDelPagoDoble(UnidadDeTrabajoReversible unidad, Rel
         return Task.FromResult(Consulta ?? new RespuestaDeReserva<EstadoDeLaReserva>(ResultadoDeLaLlamadaDeReserva.Correcto, new EstadoDeLaReserva(reloj.Ahora.AddMinutes(10), true)));
     }
 
-    public Task<RespuestaDeReserva<EstadoDeLaReserva>> Extender(Guid pedidoId, DateTimeOffset hasta, CancellationToken cancelacion = default)
+    public Task<RespuestaDeReserva<ResultadoDeExtension>> Extender(Guid pedidoId, CancellationToken cancelacion = default)
     {
         Anotar();
-        Extensiones.Add(hasta);
-        return Task.FromResult(Extension ?? new RespuestaDeReserva<EstadoDeLaReserva>(ResultadoDeLaLlamadaDeReserva.Correcto, new EstadoDeLaReserva(hasta, true)));
+        var respuesta = Extension ?? new RespuestaDeReserva<ResultadoDeExtension>(ResultadoDeLaLlamadaDeReserva.Correcto, new ResultadoDeExtension(IntencionesDePrueba.Inicio.AddMinutes(30), true));
+        if (respuesta.Valor is { } valor)
+        {
+            Extensiones.Add(valor.ExpiraEn);
+        }
+
+        return Task.FromResult(respuesta);
     }
 
     public Task<RespuestaDeReserva<IReadOnlyList<LineaConfirmadaDeReserva>>> Confirmar(Guid pedidoId, string claveDeIdempotencia, CancellationToken cancelacion = default)
