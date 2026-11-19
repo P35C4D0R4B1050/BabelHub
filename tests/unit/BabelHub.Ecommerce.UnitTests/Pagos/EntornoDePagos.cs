@@ -242,7 +242,8 @@ internal sealed class EntornoDePagos
     {
         Reloj = new RelojFijo(ahora ?? IntencionesDePrueba.Inicio);
         Repositorio = new RepositorioDePagosEnMemoria();
-        Unidad = new UnidadDeTrabajoReversible(Repositorio);
+        Reembolsos = new RepositorioDeReembolsosEnMemoria(Repositorio);
+        Unidad = new UnidadDeTrabajoReversible(Repositorio, Reembolsos);
         Denegaciones = new DenegacionesDelCatalogoEspia();
         Creador = new IntencionesDePagoDeLaAplicacion(Repositorio, Unidad, Reloj, Denegaciones);
         Actor = ActorDePrueba.DeCliente(InstantaneasDeCompraDePrueba.Cuenta);
@@ -303,6 +304,8 @@ internal sealed class EntornoDePagos
     public RelojFijo Reloj { get; }
 
     public RepositorioDePagosEnMemoria Repositorio { get; }
+
+    public RepositorioDeReembolsosEnMemoria Reembolsos { get; }
 
     public UnidadDeTrabajoReversible Unidad { get; }
 

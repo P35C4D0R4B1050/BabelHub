@@ -210,9 +210,110 @@ internal sealed class PasarelaDePagoDoble(UnidadDeTrabajoReversible unidad) : IP
 
     public Task<ResultadoDeCobro> ConsultarEstado(Guid referenciaOpaca, CancellationToken cancelacion = default) => throw new NotSupportedException();
 
-    public Task<ResultadoDeReembolsoEnPasarela> Reembolsar(Guid reembolsoId, string referenciaDelCargo, Importe monto, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    /// <summary>Lo que responde la pasarela a un pedido de reembolso (por defecto, lo aplica).</summary>
+    public Func<Guid, ResultadoDeReembolsoEnPasarela>? RespuestaDeReembolso { get; set; }
 
-    public Task<IReadOnlyList<ReembolsoEnPasarela>?> ConsultarReembolsos(string referenciaDelCargo, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    /// <summary>Los reembolsos que la pasarela dice tener del cargo; <c>null</c> si no se puede consultar.</summary>
+    public IReadOnlyList<ReembolsoEnPasarela>? ReembolsosDelCargo { get; set; } = [];
+
+    public bool ReembolsarLanza { get; set; }
+
+    public List<(Guid ReembolsoId, string Cargo, Importe Monto)> Reembolsos { get; } = [];
+
+    public int ConsultasDeReembolsos { get; private set; }
+
+    public int ReembolsosDentroDeUnaTransaccion { get; private set; }
+
+    public Task<ResultadoDeReembolsoEnPasarela> Reembolsar(Guid reembolsoId, string referenciaDelCargo, Importe monto, CancellationToken cancelacion = default)
+    {
+        Reembolsos.Add((reembolsoId, referenciaDelCargo, monto));
+        if (unidad.EnCurso)
+        {
+            ReembolsosDentroDeUnaTransaccion++;
+        }
+
+        if (ReembolsarLanza)
+        {
+            throw new HttpRequestException("La pasarela falló.");
+        }
+
+        return Task.FromResult(RespuestaDeReembolso is { } f ? f(reembolsoId) : ResultadoDeReembolsoEnPasarela.Aplicado("re_1"));
+    }
+
+    public Task<IReadOnlyList<ReembolsoEnPasarela>?> ConsultarReembolsos(string referenciaDelCargo, CancellationToken cancelacion = default)
+    {
+        ConsultasDeReembolsos++;
+        if (unidad.EnCurso)
+        {
+            ReembolsosDentroDeUnaTransaccion++;
+        }
+
+        return Task.FromResult(ReembolsosDelCargo);
+    }
+}
+
+/// <summary>Los reembolsos de toda la plataforma en memoria: copias, clave natural única por origen y reversión con la unidad de trabajo.</summary>
+internal sealed class RepositorioDeReembolsosEnMemoria(RepositorioDePagosEnMemoria pagos) : IRepositorioDeReembolsos, IInstantanea
+{
+    private Dictionary<Guid, Reembolso> _reembolsos = [];
+
+    public IReadOnlyCollection<Reembolso> Todos => _reembolsos.Values;
+
+    /// <summary>Hace fallar toda escritura de un reembolso existente (la base cae tras pedirlo a la pasarela).</summary>
+    public bool GuardarLanza { get; set; }
+
+    public int LecturasConBloqueo { get; private set; }
+
+    public Task<Reembolso?> Obtener(Guid reembolsoId, bool paraActualizar, CancellationToken cancelacion = default)
+    {
+        if (paraActualizar)
+        {
+            LecturasConBloqueo++;
+        }
+
+        return Task.FromResult(_reembolsos.TryGetValue(reembolsoId, out var r) ? r.Copiar() : null);
+    }
+
+    public Task<Reembolso?> BuscarPorOrigen(OrigenDeReembolso origen, string claveNatural, CancellationToken cancelacion = default) =>
+        Task.FromResult(_reembolsos.Values.FirstOrDefault(r => r.Origen == origen && r.ClaveNatural == claveNatural) is { } e ? e.Copiar() : null);
+
+    public Task<IReadOnlyList<Reembolso>> ListarDeLaIntencion(Guid intencionId, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Reembolso>>(_reembolsos.Values.Where(r => r.IntencionId == intencionId).Select(r => r.Copiar()).ToArray());
+
+    public Task Agregar(Reembolso reembolso, CancellationToken cancelacion = default)
+    {
+        if (_reembolsos.Values.Any(r => r.Origen == reembolso.Origen && r.ClaveNatural == reembolso.ClaveNatural))
+        {
+            throw new InvalidOperationException("La clave natural del reembolso ya existe.");
+        }
+
+        _reembolsos.Add(reembolso.Id, reembolso.Copiar());
+        return Task.CompletedTask;
+    }
+
+    public Task Guardar(Reembolso reembolso, CancellationToken cancelacion = default)
+    {
+        if (GuardarLanza)
+        {
+            throw new InvalidOperationException("La base no responde.");
+        }
+
+        _reembolsos[reembolso.Id] = reembolso.Copiar();
+        return Task.CompletedTask;
+    }
+
+    public Task<int> ContarPendientesDeLaCuenta(Guid cuentaId, OrigenDeReembolso origen, CancellationToken cancelacion = default) =>
+        Task.FromResult(_reembolsos.Values.Count(r => r.Origen == origen && r.CuentaComoPendiente && pagos.Intenciones.Any(i => i.Id == r.IntencionId && i.CuentaId == cuentaId)));
+
+    public Task<(IReadOnlyList<Reembolso> Reembolsos, int Total)> ListarPendientes(int pagina, int tamano, CancellationToken cancelacion = default)
+    {
+        var pendientes = _reembolsos.Values.Where(r => r.CuentaComoPendiente).OrderBy(r => r.CreadoEn).ToArray();
+        return Task.FromResult(((IReadOnlyList<Reembolso>)pendientes.Skip((pagina - 1) * tamano).Take(tamano).Select(r => r.Copiar()).ToArray(), pendientes.Length));
+    }
+
+    public object Capturar() => _reembolsos.ToDictionary(p => p.Key, p => p.Value.Copiar());
+
+    public void Restaurar(object instantanea) => _reembolsos = (Dictionary<Guid, Reembolso>)instantanea;
 }
 
 /// <summary>La confirmación de la compra aprobada (T14): anota la llamada y si ocurrió dentro de una transacción.</summary>
