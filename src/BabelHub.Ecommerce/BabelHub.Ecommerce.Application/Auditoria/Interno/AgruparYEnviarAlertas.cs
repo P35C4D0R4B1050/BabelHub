@@ -143,7 +143,7 @@ public sealed class AgruparYEnviarAlertas(
 
             try
             {
-                var resultado = await correo.Enviar(ADelCorreo(alerta), activos, cancelacion).ConfigureAwait(false);
+                var resultado = await correo.Enviar(ADelCorreo(alerta), await DestinatariosDe(alerta.Motivo, activos, contadores, cancelacion).ConfigureAwait(false), cancelacion).ConfigureAwait(false);
                 await Anotar(() => Marcar(alerta, cancelacion)).ConfigureAwait(false);
                 contadores.Sumar(resultado);
             }
@@ -186,7 +186,7 @@ public sealed class AgruparYEnviarAlertas(
 
             try
             {
-                var resultado = await correo.Enviar(new CorreoDeAlerta(alerta.Servicio, alerta.Motivo, alerta.Clase, alerta.PrimeraOcurrencia, alerta.Ocurrencias), activos, cancelacion).ConfigureAwait(false);
+                var resultado = await correo.Enviar(new CorreoDeAlerta(alerta.Servicio, alerta.Motivo, alerta.Clase, alerta.PrimeraOcurrencia, alerta.Ocurrencias), await DestinatariosDe(alerta.Motivo.Valor, activos, contadores, cancelacion).ConfigureAwait(false), cancelacion).ConfigureAwait(false);
                 await Anotar(() => yaEnviadas.Marcar(alerta.Id, cancelacion)).ConfigureAwait(false);
                 contadores.Sumar(resultado);
             }
@@ -223,6 +223,32 @@ public sealed class AgruparYEnviarAlertas(
         {
             // Se reintenta en la próxima corrida.
         }
+    }
+
+    /// <summary>Los motivos cuya alerta llega además a <b>logística</b> (TRA-22: un traslado vinculado a un pedido lleva más de 48 horas sin aprobarse y logística puede aprobarlo).</summary>
+    public static readonly IReadOnlySet<string> MotivosParaLogistica = new HashSet<string>(StringComparer.Ordinal) { MotivosDeAlerta.TrasladoVinculadoSinAprobar };
+
+    /// <summary>Los destinatarios de una alerta: los administradores centrales activos y, si el motivo lo dice, también logística. Si no se puede leer a logística, la alerta sale igual a la administración (nunca se pierde por eso).</summary>
+    private async Task<IReadOnlyList<DestinatarioDeAlerta>> DestinatariosDe(string motivo, IReadOnlyList<DestinatarioDeAlerta> activos, Contadores contadores, CancellationToken cancelacion)
+    {
+        if (!MotivosParaLogistica.Contains(motivo))
+        {
+            return activos;
+        }
+
+        if (contadores.Logistica is null)
+        {
+            try
+            {
+                contadores.Logistica = await destinatarios.DeLogistica(cancelacion).ConfigureAwait(false);
+            }
+            catch (Exception falla) when (falla is not OperationCanceledException)
+            {
+                contadores.Logistica = [];
+            }
+        }
+
+        return [.. activos.Concat(contadores.Logistica.Where(l => activos.All(a => a.CuentaId != l.CuentaId)))];
     }
 
     private static CorreoDeAlerta ADelCorreo(AlertaAgrupada alerta) =>
@@ -272,6 +298,9 @@ public sealed class AgruparYEnviarAlertas(
 
     private sealed class Contadores
     {
+        /// <summary>Los destinatarios de logística, leídos una sola vez por corrida y solo si alguna alerta lo necesita.</summary>
+        public IReadOnlyList<DestinatarioDeAlerta>? Logistica { get; set; }
+
         public int Enviadas { get; set; }
 
         public int Encoladas { get; set; }

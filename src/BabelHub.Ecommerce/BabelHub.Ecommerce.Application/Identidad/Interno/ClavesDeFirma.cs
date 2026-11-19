@@ -37,6 +37,9 @@ public sealed class ClavesDeFirma(
         return Resultado<ClavePublicaDeFirma>.Exito((await RotarAsync(cancelacion).ConfigureAwait(false))!);
     }
 
+    /// <summary>Rota la clave sin un administrador: tras restaurar un respaldo, el arranque en modo restauración rota las claves antes de abrir (PLA-43). Corre con el actor del sistema y audita igual.</summary>
+    public async Task<ClavePublicaDeFirma> RotarParaLaRestauracion(CancellationToken cancelacion = default) => (await RotarAsync(cancelacion).ConfigureAwait(false))!;
+
     /// <summary>La rotación periódica (IDE-36): si pasaron 90 días desde la última, rota y audita; devuelve la clave nueva o <see langword="null"/> si no tocaba. Corre con el actor del sistema.</summary>
     public async Task<ClavePublicaDeFirma?> RotarSiHanPasado90Dias(CancellationToken cancelacion = default)
     {

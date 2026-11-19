@@ -316,4 +316,59 @@ public sealed class AgruparYEnviarAlertasTests
         Assert.Equal(TimeSpan.FromMinutes(60), EsperaCrecienteDeCorreo.Para(500));
         Assert.Throws<ArgumentOutOfRangeException>(() => EsperaCrecienteDeCorreo.Para(0));
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-TRA-21")]
+    public async Task LaAlertaDeUnTrasladoVinculadoSinAprobar_LlegaALaAdministracionYALogistica_UnaSolaVez()
+    {
+        var e = new Entorno();
+        var logistica = new[] { new DestinatarioDeAlerta(Guid.NewGuid()), new DestinatarioDeAlerta(Guid.NewGuid()), new DestinatarioDeAlerta(Guid.NewGuid()) };
+        e.Destinatarios.Logistica.AddRange(logistica);
+        e.Inventario.Alertas = [DelInventario("22222222-2222-4222-8222-222222222222", MotivosDeAlerta.TrasladoVinculadoSinAprobar, Ahora.AddMinutes(-2))];
+
+        var resultado = await e.Enviar.Ejecutar();
+
+        Assert.Equal(1, resultado.Enviadas);
+        var enviado = Assert.Single(e.Correo.Enviados);
+        // Los dos administradores y los tres de logística, sin repetir a nadie.
+        Assert.Equal(5, enviado.Destinatarios);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-TRA-21")]
+    public async Task UnaAlertaQueNoEsDeTraslados_NoLlegaALogistica()
+    {
+        var e = new Entorno();
+        e.Destinatarios.Logistica.Add(new DestinatarioDeAlerta(Guid.NewGuid()));
+        await e.Tecnica(MotivosDeAlerta.TrabajoDeFondoDetenido, Ahora);
+
+        await e.Enviar.Ejecutar();
+
+        Assert.Equal(2, Assert.Single(e.Correo.Enviados).Destinatarios);
+    }
+
+    [Fact]
+    public async Task UnaCuentaQueEsAdministradoraYDeLogistica_RecibeUnSoloCorreo()
+    {
+        var e = new Entorno();
+        e.Destinatarios.Logistica.Add(e.Destinatarios.Cuentas[0]);
+        e.Inventario.Alertas = [DelInventario("33333333-3333-4333-8333-333333333333", MotivosDeAlerta.TrasladoVinculadoSinAprobar, Ahora.AddMinutes(-2))];
+
+        await e.Enviar.Ejecutar();
+
+        Assert.Equal(2, Assert.Single(e.Correo.Enviados).Destinatarios);
+    }
+
+    [Fact]
+    public async Task SiNoSePuedeLeerALogistica_LaAlertaSaleIgualALaAdministracion()
+    {
+        var e = new Entorno();
+        e.Destinatarios.LogisticaFalla = true;
+        e.Inventario.Alertas = [DelInventario("44444444-4444-4444-8444-444444444444", MotivosDeAlerta.TrasladoVinculadoSinAprobar, Ahora.AddMinutes(-2))];
+
+        var resultado = await e.Enviar.Ejecutar();
+
+        Assert.Equal(1, resultado.Enviadas);
+        Assert.Equal(2, Assert.Single(e.Correo.Enviados).Destinatarios);
+    }
 }

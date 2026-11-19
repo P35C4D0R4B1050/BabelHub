@@ -53,6 +53,9 @@ public interface IRepositorioDeCuentas
     /// </summary>
     Task<int> ContarAdministradoresActivos(CancellationToken cancelacion = default);
 
+    /// <summary>Los identificadores de los usuarios activos con alguno de esos roles y no cancelados: los destinatarios de las alertas (administración central y, para algunos motivos, logística). Solo identificadores, nunca direcciones.</summary>
+    Task<IReadOnlyList<Guid>> IdsActivosConRol(IReadOnlyCollection<RolDeUsuario> roles, CancellationToken cancelacion = default);
+
     /// <summary>El encargado activo de la sucursal, si lo hay (IDE-06); el índice único parcial de la base respalda la regla ante dos asignaciones simultáneas.</summary>
     Task<Domain.Identidad.EncargadoDeSucursal?> EncargadoActivoDe(Guid sucursal, CancellationToken cancelacion = default);
 }
@@ -355,4 +358,15 @@ public interface IColaDeCodigos
 public interface IRegistroDeSolicitudesDeCodigo
 {
     Task Registrar(string huellaDelCorreo, PropositoDeCodigo proposito, DateTimeOffset ahora, CancellationToken cancelacion = default);
+}
+
+/// <summary>
+/// Los identificadores opacos de las cuentas canceladas cuyos registros aislados aún no se anonimizaron (<c>identidad.por_anonimizar</c>, AUD-19, AUD-31): se llena al ejecutar la cancelación, en la misma transacción, y
+/// la depuración los consume; tras restaurar un respaldo se vuelve a poblar desde las cuentas canceladas.
+/// </summary>
+public interface IPorAnonimizar
+{
+    Task Agregar(Guid usuarioId, CancellationToken cancelacion = default);
+
+    Task<IReadOnlyList<Guid>> Listar(int maximo, CancellationToken cancelacion = default);
 }

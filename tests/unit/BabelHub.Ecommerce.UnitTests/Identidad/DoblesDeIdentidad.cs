@@ -43,6 +43,8 @@ internal sealed class BdIdentidad
 
     public List<ClaveDeFirma> Claves { get; private set; } = [];
 
+    public List<Guid> PorAnonimizar { get; private set; } = [];
+
     public List<(Guid UsuarioId, AvisoDeCuenta Aviso)> Avisos { get; private set; } = [];
 
     internal sealed record EstadoDeLaBd(
@@ -58,6 +60,7 @@ internal sealed class BdIdentidad
         List<SolicitudDeCancelacion> Cancelaciones,
         List<BajaDeTitular> Bajas,
         List<ClaveDeFirma> Claves,
+        List<Guid> PorAnonimizar,
         List<(Guid UsuarioId, AvisoDeCuenta Aviso)> Avisos);
 
     /// <summary>La instantánea guarda una copia del estado de cada cuenta para restaurarlo <b>en el mismo objeto</b>: las pruebas conservan su referencia y ven la reversión como la vería una base de datos.</summary>
@@ -74,6 +77,7 @@ internal sealed class BdIdentidad
         [.. Cancelaciones.Select(c => SolicitudDeCancelacion.Restaurar(c.Id, c.UsuarioId, c.Estado, c.SolicitadaEn, c.ReconfirmarHasta, c.AvisoVistoEn, c.CerradaEn, c.EjecucionEnCurso))],
         [.. Bajas.Select(b => new BajaDeTitular(b.IdentificadorOpaco, b.Creada, b.EntregadaEn, b.CerradaEn))],
         [.. Claves.Select(c => ClaveDeFirma.Restaurar(c.Kid, c.Creada, c.Estado, c.DejoDeFirmarEn, c.ComprometidaEn))],
+        [.. PorAnonimizar],
         [.. Avisos]);
 
     public void Restaurar(EstadoDeLaBd estado)
@@ -89,6 +93,7 @@ internal sealed class BdIdentidad
         Cancelaciones = estado.Cancelaciones;
         Bajas = estado.Bajas;
         Claves = estado.Claves;
+        PorAnonimizar = estado.PorAnonimizar;
         Avisos = estado.Avisos;
         foreach (var (cuenta, copia) in estado.CopiasDeCuentas)
         {
@@ -191,6 +196,9 @@ internal sealed class RepositorioDeCuentasEnMemoria(BdIdentidad bd) : IRepositor
 
     /// <summary>Si se fija, simula que la lectura bajo bloqueo ve ese número de administradores activos (una desactivación simultánea ya ocurrió).</summary>
     public int? ForzarAdministradoresActivos { get; set; }
+
+    public Task<IReadOnlyList<Guid>> IdsActivosConRol(IReadOnlyCollection<RolDeUsuario> roles, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>([.. bd.Cuentas.Values.Where(c => c is { CanceladaEn: null, Usuario.Activo: true } && roles.Contains(c.Usuario.Rol)).Select(c => c.Usuario.Id)]);
 
     public Task<int> ContarAdministradoresActivos(CancellationToken cancelacion = default) =>
         Task.FromResult(ForzarAdministradoresActivos ?? bd.Cuentas.Values.Count(c => c is { CanceladaEn: null, Usuario: { Rol: RolDeUsuario.AdministradorCentral, Activo: true } }));
@@ -954,4 +962,20 @@ internal sealed class GeneradorDeClavesDePrueba(AlmacenDeClavesEnMemoria almacen
         almacen.Parametros[kid] = publico;
         return Task.FromResult((ClaveDeFirma.Nueva(kid, ahora), publico));
     }
+}
+
+internal sealed class PorAnonimizarEnMemoria(BdIdentidad bd) : IPorAnonimizar
+{
+    public Task Agregar(Guid usuarioId, CancellationToken cancelacion = default)
+    {
+        if (!bd.PorAnonimizar.Contains(usuarioId))
+        {
+            bd.PorAnonimizar.Add(usuarioId);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<Guid>> Listar(int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>([.. bd.PorAnonimizar.Take(maximo)]);
 }

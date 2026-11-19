@@ -21,6 +21,7 @@ public sealed class EjecutorDeLaCancelacion(
     RevocacionDeSesiones revocacion,
     IRepositorioDeCancelaciones cancelaciones,
     IRepositorioDeBajas bajas,
+    IPorAnonimizar porAnonimizar,
     IGeneradorDeSecretos secretos,
     IAuditoria auditoria,
     IReloj reloj) : IEjecutorDeLaCancelacion
@@ -35,10 +36,38 @@ public sealed class EjecutorDeLaCancelacion(
     {
         ArgumentNullException.ThrowIfNull(cuenta);
         var usuarioId = cuenta.Usuario.Id;
-        var ahora = reloj.Ahora;
 
         // (1) La intención va ANTES de ejecutar y fuera de las bases: si el registro no responde, la excepción sube y no se ejecuta nada (IDE-75, IDE-70).
-        await registro.Agregar(usuarioId.ToString("D"), ClaseDeSupresion.Cancelacion, EtapaDeSupresion.Intencion, ahora, cancelacion).ConfigureAwait(false);
+        await registro.Agregar(usuarioId.ToString("D"), ClaseDeSupresion.Cancelacion, EtapaDeSupresion.Intencion, reloj.Ahora, cancelacion).ConfigureAwait(false);
+
+        var causa = await cancelaciones.AbiertaDe(usuarioId, paraActualizar: true, cancelacion).ConfigureAwait(false) is null ? CausaPorSolicitudDelTitular : CausaPorReconfirmacion;
+        await Aplicar(cuenta, conBaja: true, cancelacion).ConfigureAwait(false);
+
+        // (6) La auditoría del titular, sin datos personales en el detalle; si no se puede auditar, la cancelación no se ejecuta.
+        await auditoria.Registrar(
+            new SolicitudDeRegistro(AccionesAuditables.CuentaCancelada)
+            {
+                ObjetoTipo = "cuenta",
+                ObjetoId = usuarioId.ToString("D"),
+                Detalle = new Dictionary<string, string?> { ["causa"] = causa },
+            },
+            cancelacion).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Vuelve a aplicar la cancelación o la anonimización de una cuenta tras restaurar un respaldo (PLA-19, IDE-75): <b>sin intención</b> (el registro ya la tiene) ni consulta de pendientes, de forma idempotente y sin
+    /// auditar de nuevo. Una anonimización no entrega baja al Inventario.
+    /// </summary>
+    public Task Reaplicar(CuentaDeIdentidad cuenta, bool conBaja, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(cuenta);
+        return Aplicar(cuenta, conBaja, cancelacion);
+    }
+
+    private async Task Aplicar(CuentaDeIdentidad cuenta, bool conBaja, CancellationToken cancelacion)
+    {
+        var usuarioId = cuenta.Usuario.Id;
+        var ahora = reloj.Ahora;
 
         // (2) Cada módulo receptor, con el mismo identificador opaco; si uno falla, todo se revierte.
         foreach (var aplicador in aplicadores)
@@ -50,7 +79,6 @@ public sealed class EjecutorDeLaCancelacion(
 
         // (3) Avisos pendientes y sesiones.
         await cancelacionDeAvisos.CancelarLosAvisosDe(usuarioId, cancelacion).ConfigureAwait(false);
-        var causa = await cancelaciones.AbiertaDe(usuarioId, paraActualizar: true, cancelacion).ConfigureAwait(false) is null ? CausaPorSolicitudDelTitular : CausaPorReconfirmacion;
         await revocacion.Todas(cuenta, cancelacion).ConfigureAwait(false);
 
         // (4) La cuenta queda anonimizada; lo que se conserva es el identificador opaco y lo que exige una obligación legal en los demás módulos (IDE-89).
@@ -61,21 +89,17 @@ public sealed class EjecutorDeLaCancelacion(
         cuenta.DebeCambiarLaTemporal = false;
         cuenta.Whatsapp.Eliminar();
         cuenta.Aceptacion = AceptacionDeTextos.Vacia();
-        cuenta.CanceladaEn = ahora;
+        cuenta.CanceladaEn ??= ahora;
         await cuentas.Guardar(cuenta, cancelacion).ConfigureAwait(false);
 
         // (5) La baja del titular y el cierre pendiente, en la misma transacción.
-        await bajas.Agregar(new BajaDeTitular(usuarioId, ahora), cancelacion).ConfigureAwait(false);
+        if (conBaja)
+        {
+            await bajas.Agregar(new BajaDeTitular(usuarioId, ahora), cancelacion).ConfigureAwait(false);
+        }
 
-        // (6) La auditoría del titular, sin datos personales en el detalle; si no se puede auditar, la cancelación no se ejecuta.
-        await auditoria.Registrar(
-            new SolicitudDeRegistro(AccionesAuditables.CuentaCancelada)
-            {
-                ObjetoTipo = "cuenta",
-                ObjetoId = usuarioId.ToString("D"),
-                Detalle = new Dictionary<string, string?> { ["causa"] = causa },
-            },
-            cancelacion).ConfigureAwait(false);
+        // Para la depuración de los registros aislados y la restauración (AUD-19, AUD-31): el identificador opaco de la cuenta cancelada queda por anonimizar en sus registros.
+        await porAnonimizar.Agregar(usuarioId, cancelacion).ConfigureAwait(false);
     }
 }
 

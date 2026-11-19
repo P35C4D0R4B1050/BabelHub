@@ -86,6 +86,8 @@ internal sealed class EntornoDeIdentidad
 
     public BajasEnMemoria BajasGuardadas { get; }
 
+    public PorAnonimizarEnMemoria PorAnonimizarGuardadas { get; }
+
     public AlmacenDeClavesEnMemoria AlmacenDeClaves { get; }
 
     public GeneradorDeClavesDePrueba GeneradorDeClaves { get; }
@@ -121,6 +123,7 @@ internal sealed class EntornoDeIdentidad
         SolicitudesGuardadas = new SolicitudesDeDatosEnMemoria(Bd);
         CancelacionesGuardadas = new CancelacionesEnMemoria(Bd);
         BajasGuardadas = new BajasEnMemoria(Bd);
+        PorAnonimizarGuardadas = new PorAnonimizarEnMemoria(Bd);
         AlmacenDeClaves = new AlmacenDeClavesEnMemoria(Bd);
         GeneradorDeClaves = new GeneradorDeClavesDePrueba(AlmacenDeClaves);
         Purga = new PurgaDeIdentidadDePrueba(Bd);
@@ -346,6 +349,7 @@ internal static class EntornoDeLaEjecucionExtensiones
         e.Revocacion,
         e.CancelacionesGuardadas,
         e.BajasGuardadas,
+        e.PorAnonimizarGuardadas,
         e.Secretos,
         e.Auditoria,
         e.Reloj);
@@ -387,4 +391,13 @@ internal static class EntornoDeLasClavesExtensiones
         e.AlmacenDeClaves.Parametros[kid] = $"jwk-publico-de-{kid}";
         return clave;
     }
+}
+
+internal static class EntornoDeLosPuertosExtensiones
+{
+    public static AplicadorDeSupresionDeIdentidad AplicadorDeSupresion(this EntornoDeIdentidad e) => new(e.Cuentas, e.EjecutorReal(), e.Unidad);
+
+    public static DestinatariosDeAlertasDeIdentidad Destinatarios(this EntornoDeIdentidad e) => new(e.Cuentas);
+
+    public static RestauracionDeIdentidad Restauracion(this EntornoDeIdentidad e) => new(e.Claves(), e.Renovaciones, e.Unidad, e.Reloj);
 }
