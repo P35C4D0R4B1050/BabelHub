@@ -471,6 +471,23 @@ public sealed class IngresoTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-IDE-21")]
+    public async Task IniciarLaConfiguracionVariasVeces_EntregaElMismoSecretoSinConfirmar_YUnSegundoFactorActivoNoSeReemplaza()
+    {
+        var e = new EntornoDeIdentidad();
+        e.Cuenta("jefe@example.com", RolDeUsuario.AdministradorCentral);
+        var ingreso = e.Ingreso();
+        var desafio = (await ingreso.Ingresar(Solicitud("jefe@example.com"))).Valor.Desafio!;
+
+        var primero = await ingreso.IniciarConfiguracionDelSegundoFactor(desafio.Identificador);
+        var errado = await ingreso.ConfirmarElSegundoFactor(desafio.Identificador, new ValorSecreto("000000"));
+        var segundo = await ingreso.IniciarConfiguracionDelSegundoFactor(desafio.Identificador);
+
+        Assert.Equal(FallosDeIdentidad.CodigoInvalido, errado.Error);
+        Assert.Equal(primero.Valor.SecretoBase32.Revelar(), segundo.Valor.SecretoBase32.Revelar());
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-WEB-28")]
     public async Task UnDesafioVencido_NoTienePaso()
     {

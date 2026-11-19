@@ -219,8 +219,8 @@ public sealed class CuentaController(
     public Task<IActionResult> MarcarElAvisoComoVisto(Guid id, CancellationToken cancelacion) =>
         Accion([], PantallaDeLaCuenta.Avisos, "aviso-visto", async (actor, _, token) =>
         {
-            // Que un aviso se mostró lo informa solo esta acción explícita de la persona (nunca una consulta automática ni un prefetch). Si el dispositivo es reconocido lo decide Identidad con su marca; la web solo la entrega.
-            var resultado = await cuenta.MarcarElAvisoComoVisto(actor.UsuarioId, id, DatosDelBorde.Leer(Request).Marca is not null, token);
+            // Que un aviso se mostró lo informa solo esta acción explícita de la persona (nunca una consulta automática ni un prefetch). La web no puede afirmar que la sesión es reconocida (la cookie del dispositivo la controla quien tiene la sesión): falla cerrada con false hasta que Identidad ofrezca «reconoce este dispositivo» (hallazgo).
+            var resultado = await cuenta.MarcarElAvisoComoVisto(actor.UsuarioId, id, desdeUnaSesionReconocida: false, token);
             return resultado.EsExito ? null : resultado.Error;
         }, cancelacion);
 
@@ -306,7 +306,15 @@ public sealed class CuentaController(
         if (resultado.Valor.Estado == EstadoDeLaCancelacion.Ejecutada)
         {
             // La cancelación se ejecutó: se cierran todas las sesiones de la cuenta (la de este navegador incluida) y el navegador queda limpio.
-            await sesiones.CerrarTodasDeUnUsuario(actor.UsuarioId, cancelacionDeLaSolicitud);
+            try
+            {
+                await sesiones.CerrarTodasDeUnUsuario(actor.UsuarioId, cancelacionDeLaSolicitud);
+            }
+            catch (Exception) when (!cancelacionDeLaSolicitud.IsCancellationRequested)
+            {
+                // La cuenta ya se canceló: igual se borra la cookie y se limpia el navegador; las sesiones vencen solas al renovarse.
+            }
+
             CookieDeSesionWeb.Borrar(Response, host.Host);
             Response.LimpiarElNavegador();
             return Request.EsHtmx() ? new HxRedirectResult(RespuestasDeSesion.RutaDelIngreso) : new LocalRedirectResult(RespuestasDeSesion.RutaDelIngreso);

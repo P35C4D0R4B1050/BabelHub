@@ -146,7 +146,7 @@ public sealed class AuditoriaController(IConsultasDeAuditoria auditoria, Context
             filtro = new FiltroDeAuditoria { Accion = accion, Origen = origen, Texto = texto, UsuarioId = usuario, Desde = desde, Hasta = hasta };
             return true;
         }
-        catch (FormatException)
+        catch (Exception excepcion) when (excepcion is FormatException or ArgumentOutOfRangeException)
         {
             return false;
         }

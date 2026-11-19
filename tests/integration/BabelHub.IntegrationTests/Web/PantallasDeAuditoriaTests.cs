@@ -95,11 +95,12 @@ public sealed class PantallasDeAuditoriaTests : IAsyncLifetime
         using var repetida = await Pedir("/administracion/auditoria?accion=a&accion=b");
         using var invertido = await Pedir("/administracion/auditoria?desde=2026-11-15&hasta=2026-11-14");
         using var ajeno = await Pedir("/administracion/auditoria?rol=administrador");
+        using var enElLimite = await Pedir("/administracion/auditoria?hasta=9999-12-31");
 
         var consulta = Assert.Single(_consultas);
         Assert.Equal(new DateTimeOffset(2026, 11, 14, 5, 0, 0, TimeSpan.Zero), consulta.Filtro.Desde!.Value.ToUniversalTime());
         Assert.Equal(new DateTimeOffset(2026, 11, 15, 5, 0, 0, TimeSpan.Zero), consulta.Filtro.Hasta!.Value.ToUniversalTime());
-        foreach (var respuesta in new[] { mala, usuario, repetida, invertido, ajeno })
+        foreach (var respuesta in new[] { mala, usuario, repetida, invertido, ajeno, enElLimite })
         {
             Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
         }

@@ -2,7 +2,7 @@
 @using BabelHub.Ecommerce.Application.Web
 @model RegistroVista
 @{
-    var informativo = Model.Pantalla == PantallaDelRegistro.Listo || (Model.Mensaje?.StartsWith("Si el correo", StringComparison.Ordinal) ?? false);
+    var informativo = Model.Pantalla == PantallaDelRegistro.Listo || Model.MensajeInformativo;
 }
 <section class="mx-auto max-w-md" aria-labelledby="titulo-del-registro">
     <h1 id="titulo-del-registro" class="font-display text-4xl leading-tight">@Model.Titulo</h1>

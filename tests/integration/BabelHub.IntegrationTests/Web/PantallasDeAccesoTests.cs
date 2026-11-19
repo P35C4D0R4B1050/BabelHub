@@ -163,6 +163,21 @@ public sealed class PantallasDeAccesoTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Criterio", "AC-WEB-24")]
+    public async Task La_pareja_invalida_y_la_contrasena_incorrecta_responden_con_las_mismas_cabeceras_y_la_sesion_descartada_se_revoca()
+    {
+        _host.Ingreso.Resultado = Resultado<ResultadoDelIngreso>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoAutenticado, "credenciales-invalidas"));
+        using var incorrecta = await _host.Enviar("/ingreso", Datos);
+        _host.Ingreso.Resultado = Completo(RolDeCuenta.AdministradorCentral);
+        _host.IniciarRechaza = true;
+        using var pareja = await _host.Enviar("/ingreso", Datos);
+
+        Assert.Equal(incorrecta.StatusCode, pareja.StatusCode);
+        Assert.Equal(Galletas(incorrecta).Order(), Galletas(pareja).Order());
+        Assert.Equal(["cerrar"], _host.Revocaciones);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-WEB-19")]
     public async Task Al_ingresar_un_cliente_se_fusiona_el_carrito_del_visitante_y_el_ingreso_no_depende_de_ello()
     {

@@ -29,6 +29,9 @@ public sealed class RegistroVista : ModeloBaseDePagina
     public string? Correo { get; set; }
 
     public VersionParaAceptar? Textos { get; set; }
+
+    /// <summary>Si el mensaje informa (no es un error): se decide en el controlador, no por el texto.</summary>
+    public bool MensajeInformativo { get; set; }
 }
 
 /// <summary>
@@ -106,7 +109,7 @@ public sealed class RegistroController(
             return await Formulario(TextoDelError(resultado.Error!), CodigoHttp(resultado.Error!), cancelacion);
         }
 
-        // La misma respuesta exista o no la cuenta (IDE-56): se pide el código del correo.
+        // Se pide el código del correo sin decir si la cuenta existía; el único caso que lo distingue es «correo en uso» (riesgo aceptado en AM21, acotado por SEG-19 y SEG-24).
         return await Pintar(PantallaDelRegistro.Verificar, correo, null, StatusCodes.Status200OK, "Verifica tu correo", cancelacion);
     }
 
@@ -304,7 +307,7 @@ public sealed class RegistroController(
 
     private async Task<IActionResult> Pintar(PantallaDelRegistro pantalla, string? correo, string? mensaje, int estado, string titulo, CancellationToken cancelacion, VersionParaAceptar? vigente = null)
     {
-        var vista = await pagina.Completar(new RegistroVista { Pantalla = pantalla, Correo = correo, Mensaje = mensaje, Textos = vigente }, titulo, cancelacion: cancelacion);
+        var vista = await pagina.Completar(new RegistroVista { Pantalla = pantalla, Correo = correo, Mensaje = mensaje, Textos = vigente, MensajeInformativo = estado == StatusCodes.Status200OK && mensaje is not null }, titulo, cancelacion: cancelacion);
         Response.Headers.CacheControl = "no-store";
         Response.StatusCode = Request.EsHtmx() ? StatusCodes.Status200OK : estado;
         return View("Registro", vista);

@@ -181,6 +181,8 @@ internal sealed class AccesoApiHost : IAsyncDisposable
 
     public List<string> LlamadasDeCarrito { get; } = [];
 
+    public List<string> Revocaciones { get; } = [];
+
     public HostWeb Host { get; private set; }
 
     public static async Task<AccesoApiHost> Crear(HostWeb host = HostWeb.Tienda)
@@ -203,6 +205,8 @@ internal sealed class AccesoApiHost : IAsyncDisposable
                     ? Resultado<SesionIniciada>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Prohibido, "prohibido"))
                     : Resultado<SesionIniciada>.Exito(new SesionIniciada("valor-opaco-de-la-sesion-0123456789abcdef", "marca-nueva-de-dispositivo-0123456789abcdefghijk")));
             });
+        var isesiones = DobleDeMetodos.Crear<ISesiones>(out var dobleSesiones);
+        dobleSesiones.Con(nameof(ISesiones.Cerrar), _ => { Revocaciones.Add("cerrar"); return Task.FromResult(Resultado<RespuestaUniforme>.Exito(new RespuestaUniforme())); });
         var carrito = DobleDeMetodos.Crear<ICarritoDelCliente>(out var dobleCarrito);
         dobleCarrito.Con(
             nameof(ICarritoDelCliente.FusionarCarritoDeVisitante),
@@ -223,6 +227,7 @@ internal sealed class AccesoApiHost : IAsyncDisposable
                 servicios.AddSingleton<IExigenciaDeVerificacionDePersona>(Verificacion);
                 servicios.AddSingleton<IAceptacionDeTextos>(new TextosFalsos());
                 servicios.AddSingleton(sesiones);
+                servicios.AddSingleton(isesiones);
                 servicios.AddSingleton(carrito);
                 servicios.AddSingleton(new OpcionesDelHostWeb(Host, []));
                 servicios.AddSingleton(new OpcionesDeVerificacionWeb("clave-de-sitio-de-prueba"));

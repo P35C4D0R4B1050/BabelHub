@@ -58,6 +58,7 @@ internal sealed class AnfitrionWeb : IAsyncDisposable
         builder.Services.TryAddSingleton(new OpcionesDeVerificacionWeb("clave-de-sitio-de-prueba"));
         builder.Services.TryAddScoped(sp => new CierreDelIngresoWeb(
             sp.GetService<BabelHub.Ecommerce.Application.Web.ISesionesWeb>() ?? DobleDeMetodos.Crear<BabelHub.Ecommerce.Application.Web.ISesionesWeb>(out _),
+            sp.GetService<BabelHub.Ecommerce.Application.Identidad.ISesiones>() ?? DobleDeMetodos.Crear<BabelHub.Ecommerce.Application.Identidad.ISesiones>(out _),
             sp.GetService<OpcionesDelHostWeb>() ?? new OpcionesDelHostWeb(BabelHub.Ecommerce.Application.Web.HostWeb.Tienda, []),
             sp.GetService<BabelHub.Ecommerce.Application.Plataforma.IEstablecedorDeActor>() ?? DobleDeMetodos.Crear<BabelHub.Ecommerce.Application.Plataforma.IEstablecedorDeActor>(out _),
             sp.GetRequiredService<BabelHub.Ecommerce.Application.Carrito.ICarritoDelCliente>()));

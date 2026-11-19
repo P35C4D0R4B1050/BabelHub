@@ -451,9 +451,17 @@ public sealed class Ingreso(
         }
 
         // Un desafío de configuración rezagado no puede reemplazar el secreto de un segundo factor que otro ingreso ya activó (IDE-21).
-        if (await segundoFactor.Obtener(cuenta.Usuario.Id, cancelacion).ConfigureAwait(false) is { Factor.EstaActivo: true })
+        var existente = await segundoFactor.Obtener(cuenta.Usuario.Id, cancelacion).ConfigureAwait(false);
+        if (existente is { Factor.EstaActivo: true })
         {
             return Resultado<SecretoDelSegundoFactor>.Fallo(FallosDeIdentidad.DesafioInvalido);
+        }
+
+        // Idempotente: un secreto que todavía no se confirmó se entrega igual mientras la persona sigue configurando (una recarga, un código errado o un prefetch no la dejan con la aplicación en un secreto y la pantalla en otro).
+        if (existente is { Factor.Estado: EstadoDelSegundoFactor.SinConfirmar } pendiente)
+        {
+            var guardado = cifrador.Descifrar(pendiente.SecretoCifrado, cuenta.Usuario.Id);
+            return Resultado<SecretoDelSegundoFactor>.Exito(new SecretoDelSegundoFactor(new ValorSecreto(Base32.Codificar(guardado)), Emisor, cuenta.Usuario.Correo));
         }
 
         var secreto = secretos.SecretoDelSegundoFactor();

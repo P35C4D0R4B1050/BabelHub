@@ -275,7 +275,11 @@ public sealed class IngresoController(
             if (!cerrado.Iniciada)
             {
                 // La pareja de rol y host no corresponde (un cliente en gestión, personal en la tienda) o el servicio no responde: el mismo mensaje de un dato incorrecto.
-                CookieDelDesafio.Borrar(Response);
+                if (CookieDelDesafio.Leer(Request) is not null)
+                {
+                    CookieDelDesafio.Borrar(Response);
+                }
+
                 return cerrado.ServicioNoDisponible
                     ? await Pintar(PantallaDelIngreso.Credenciales, TextoNoDisponible, StatusCodes.Status503ServiceUnavailable, cancelacion)
                     : await Pintar(PantallaDelIngreso.Credenciales, TextoCredencialesInvalidas, StatusCodes.Status401Unauthorized, cancelacion);
@@ -311,6 +315,7 @@ public sealed class IngresoController(
             CategoriaDeError.Limite => (TextoLimite, StatusCodes.Status429TooManyRequests),
             CategoriaDeError.NoDisponible => (TextoNoDisponible, StatusCodes.Status503ServiceUnavailable),
             CategoriaDeError.Validacion when error.Clave is "codigo-invalido" => (TextoCodigoInvalido, StatusCodes.Status400BadRequest),
+            CategoriaDeError.Validacion when pantalla == PantallaDelIngreso.Credenciales => (TextoCredencialesInvalidas, StatusCodes.Status401Unauthorized),
             CategoriaDeError.Validacion => (TextoDeLaContrasena(error), StatusCodes.Status400BadRequest),
             _ when pantalla is PantallaDelIngreso.Credenciales => (TextoCredencialesInvalidas, StatusCodes.Status401Unauthorized),
             // Un desafío inválido (venció, ya se usó o es de otro paso): no sirve y se empieza otra vez.

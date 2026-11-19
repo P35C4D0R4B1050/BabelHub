@@ -20,7 +20,7 @@ public sealed record ResultadoDelCierreDelIngreso(bool Iniciada, string Destino,
 /// El final de un ingreso, de un registro verificado o de una recuperación con credencial (T28; WEB-19, WEB-20, WEB-31, WEB-37): entrega la credencial que Identidad emitió <b>solo</b> a la sesión del servidor (<see cref="ISesionesWeb.Iniciar"/>, que acepta o rechaza la pareja de rol y host), escribe la cookie
 /// de sesión, borra la del desafío, emite la marca de dispositivo si hace falta y, para un cliente, <b>fusiona el carrito del visitante</b> con el de su cuenta (idempotente; si falla se reintenta en el siguiente <c>POST</c> del carrito y nunca impide el ingreso). El navegador nunca ve la credencial ni la renovación.
 /// </summary>
-public sealed class CierreDelIngresoWeb(ISesionesWeb sesiones, OpcionesDelHostWeb host, IEstablecedorDeActor actor, ICarritoDelCliente carrito)
+public sealed class CierreDelIngresoWeb(ISesionesWeb sesiones, ISesiones identidad, OpcionesDelHostWeb host, IEstablecedorDeActor actor, ICarritoDelCliente carrito)
 {
     private const string Portada = "/";
 
@@ -43,11 +43,14 @@ public sealed class CierreDelIngresoWeb(ISesionesWeb sesiones, OpcionesDelHostWe
         }
         catch (Exception) when (!cancelacion.IsCancellationRequested)
         {
+            await RevocarLaDescartada(credencial).ConfigureAwait(false);
             return ResultadoDelCierreDelIngreso.NoDisponible;
         }
 
         if (!iniciada.EsExito)
         {
+            // La web descarta esta credencial (la pareja de rol y host no corresponde o el servicio no responde): se revoca la sesión que Identidad ya emitió para que no quede viva sin dueño. Mejor esfuerzo: nunca cambia lo que ve la persona.
+            await RevocarLaDescartada(credencial).ConfigureAwait(false);
             return iniciada.Error!.Categoria == CategoriaDeError.NoDisponible ? ResultadoDelCierreDelIngreso.NoDisponible : ResultadoDelCierreDelIngreso.Rechazada;
         }
 
@@ -83,6 +86,18 @@ public sealed class CierreDelIngresoWeb(ISesionesWeb sesiones, OpcionesDelHostWe
         RolDeCuenta.AdministradorCentral => RolWeb.AdministradorCentral,
         _ => throw new ArgumentOutOfRangeException(nameof(rol)),
     };
+
+    private async Task RevocarLaDescartada(CredencialDeSesion credencial)
+    {
+        try
+        {
+            await identidad.Cerrar(credencial.Renovacion, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // Mejor esfuerzo: la renovación descartada nadie la tiene y vence sola.
+        }
+    }
 
     private async Task FusionarElCarrito(HttpContext contexto, CredencialDeSesion credencial, CancellationToken cancelacion)
     {
