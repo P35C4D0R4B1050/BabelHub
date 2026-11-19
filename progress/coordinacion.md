@@ -34,6 +34,17 @@ Lo mantiene **el coordinador** (la sesión raíz «BabelHub documentación y spe
 | Pagos y Pedidos | B | Contrato público de Carrito fijado en `progress/decisiones-delegadas.md` (DD-07) | hecho |
 | Biblioteca (ECO-8) | B | `IPosesionDeEdiciones.Posee` → `ResultadoDePosesion` (DD-06) | hecho |
 
+### Huecos que dejó la verificación FIN-1 (2026-11-19; detalle en `specs/<spec>/verificacion.md`)
+
+| Spec | Resultado | Hueco | Dueño |
+| :--- | :--- | :--- | :--- |
+| `inventario-ajustes` | Converge | Composición de `Ajustes` en el `Program.cs` del Inventario | bloque de composición |
+| `inventario-fuentes` | No converge (3 Parciales) | AC-FUE-08 (k6, FIN-2); FUE-09 y FUE-11 sin dueño en `web-base` (búsqueda por título, autor o ISBN, y encargado asignado); composición de `Fuentes` | persona (FUE-09/11), FIN-2, composición |
+| `inventario-traslados` | No converge solo por TRA-22 | `IDestinatariosDeAlertas` del E-commerce solo devuelve administradores centrales: logística no recibe la alerta de 48 h | **A** (con IDE-5/NOT) |
+| `inventario-seleccion-fuente` | No converge (3 Parciales) | SEL-03 y SEL-24 sin prueba (**V**, solo tests); SEL-39 validación de la clave antes del alcance (**B**, corregir el código; la spec manda) | V y B |
+| `transversal-seguridad` | No converge (3 Parciales) | Tope de 24 correos (AC-SEG-23): prueba (**V**) y adaptador de correo de producción (**A**, IDE-7); SEG-31 solo en reserva y reclamación, no en registro ni ingreso (**web-base** WEB-2 T28) | V, A, C/web |
+| `transversal-auditoria` | No converge (16 Parciales) | Todos por piezas de otras specs (Identidad, correo, Pedidos, Envíos, Devoluciones, Biblioteca, Notificaciones) y por la composición; etiquetas AC-AUD-09 y 25 (**V**); hora de Lima (persona) | cada spec dependiente |
+
 ## 4. Decisiones de la persona
 
 Pendientes: tope de unidades por línea y por reserva (hoy 100 y 50 líneas) y residual de 75 minutos (reservas); hora de Lima en `transversal-auditoria` (D13); tareas externas B03 a B07 y spikes T01 a T05 de `transversal-plataforma`. Tomadas: umbral de 50 bloqueos por ventana de 15 minutos; D18 y D19 (cambios aditivos al contrato v1); delegación al carril B de los hallazgos de `ecommerce-carrito-checkout` (`progress/decisiones-delegadas.md`).
