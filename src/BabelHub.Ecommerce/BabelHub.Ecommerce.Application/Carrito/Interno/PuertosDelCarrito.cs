@@ -272,6 +272,9 @@ public interface ILimitadorDelCarrito
 
     /// <summary>Revisar el checkout y elegir la entrega: consultan el Inventario sin memoria, 30 por cuenta y minuto.</summary>
     Task<ResultadoDeLimiteDelCarrito> RevisarCheckout(Guid cuentaId, CancellationToken cancelacion = default);
+
+    /// <summary>Pasar al pago reserva stock: 10 por cuenta y hora y <b>falla cerrado</b>. <paramref name="claveDeRepeticion"/> identifica el pedido en curso: repetir el mismo (un doble clic, otra pestaña) no cuenta otra vez (DD-12).</summary>
+    Task<ResultadoDeLimiteDelCarrito> PasarAlPago(Guid cuentaId, string claveDeRepeticion, CancellationToken cancelacion = default);
 }
 
 // ---------- Auditoría ----------
@@ -343,4 +346,30 @@ public interface IConsentimientoDeAvisos
 
     /// <summary><see langword="true"/> solo si Identidad confirmó que guardó el consentimiento para el número al que se refiere la huella; <see langword="false"/> ante cualquier falla, cambio de número o respuesta no entendida.</summary>
     Task<bool> Guardar(Guid cuentaId, string huellaEnmascaradaDelNumero, CancellationToken cancelacion = default);
+}
+
+// ---------- Marca de cancelación de la cuenta ----------
+
+public enum EstadoDeLaMarcaDeCancelacion
+{
+    /// <summary>La cuenta está activa y sin cancelación en marcha.</summary>
+    Libre,
+
+    /// <summary>Tiene una cancelación diferida (IDE-27, CAR-31).</summary>
+    Diferida,
+
+    /// <summary>La cancelación está en ejecución (IDE-71): no se inicia el pago.</summary>
+    EnEjecucion,
+
+    /// <summary>La cuenta ya se canceló o no existe.</summary>
+    Ejecutada,
+}
+
+/// <summary>
+/// La marca de cancelación de la cuenta leída <b>con bloqueo</b> dentro de la transacción de pasar al pago (D10: es lo primero que se bloquea): la cancelación de una cuenta y el paso a <c>reservando</c> se serializan, de modo que
+/// una cancelación que empezó entre la revisión y el pago impide iniciarlo (AC-CAR-27). La implementa Identidad (T26b); mientras tanto, un doble que falla cerrado. Si no se puede leer, lanza: nunca se asume libre.
+/// </summary>
+public interface IMarcaDeCancelacion
+{
+    Task<EstadoDeLaMarcaDeCancelacion> LeerConBloqueo(Guid cuentaId, CancellationToken cancelacion = default);
 }

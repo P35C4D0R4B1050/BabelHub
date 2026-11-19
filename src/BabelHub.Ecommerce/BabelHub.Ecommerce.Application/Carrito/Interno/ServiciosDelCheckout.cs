@@ -22,8 +22,17 @@ internal sealed partial class ServiciosDelCheckout(
     IInventarioDelCarrito inventario,
     ICostoDeEnvioConfigurado costoDeEnvio,
     ITextosLegales textosLegales,
-    IConsentimientoDeAvisos consentimiento)
+    IConsentimientoDeAvisos consentimiento,
+    IMarcaDeCancelacion marcaDeCancelacion,
+    ICalculadorDeHuella calculadorDeHuella)
 {
+    public IMarcaDeCancelacion Marca => marcaDeCancelacion;
+
+    /// <summary>La huella de instantánea (D19): un digest <b>con clave</b> y propósito propio, de modo que el teléfono que lleva su texto canónico no se pueda recuperar por fuerza bruta. Se guarda con la versión de la clave.</summary>
+    public string HuellaDeLaInstantanea(string textoCanonico) => calculadorDeHuella.DeSujeto(textoCanonico, "instantanea-de-compra").ToString();
+
+    public ICalculadorDeHuella Huellas => calculadorDeHuella;
+
     public ITextosLegales Textos => textosLegales;
 
     public IConsentimientoDeAvisos Consentimiento => consentimiento;

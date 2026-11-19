@@ -113,6 +113,13 @@ internal sealed class EstadoDeCuentaFalso : IEstadoDeCuenta
     /// <summary>La cuenta existe y no está cancelada pero no puede comprar (textos pendientes, correo sin verificar o cancelación diferida): puede editar su carrito pero no guardar el consentimiento de avisos.</summary>
     public bool NoPuedeComprar { get; set; }
 
+    public bool CorreoSinVerificar { get; set; }
+
+    public bool TextosPendientes { get; set; }
+
+    /// <summary>Una cancelación diferida o en ejecución: no puede comprar, pero la cuenta no está cancelada ni desactivada.</summary>
+    public bool CancelacionDiferida { get; set; }
+
     public int Consultas { get; private set; }
 
     public Task<EstadoDeCuenta?> Consultar(Guid usuarioId, CancellationToken cancelacion = default)
@@ -123,7 +130,7 @@ internal sealed class EstadoDeCuentaFalso : IEstadoDeCuenta
             throw new InvalidOperationException("Identidad no responde.");
         }
 
-        return Task.FromResult<EstadoDeCuenta?>(NoExiste ? null : new EstadoDeCuenta(usuarioId, !Cancelada && !NoPuedeComprar, EstadoDeAceptacionDeLosTextos.AlDia, true, Cancelada, false));
+        return Task.FromResult<EstadoDeCuenta?>(NoExiste ? null : new EstadoDeCuenta(usuarioId, !Cancelada && !NoPuedeComprar && !CorreoSinVerificar && !TextosPendientes && !CancelacionDiferida, TextosPendientes ? EstadoDeAceptacionDeLosTextos.Pendiente : EstadoDeAceptacionDeLosTextos.AlDia, !CorreoSinVerificar, Cancelada, false));
     }
 
     public Task<ResultadoDeLaAceptacion> AceptarLosTextos(Guid usuarioId, string versionMostrada, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLaAceptacion.Aceptada);
@@ -140,6 +147,12 @@ internal sealed class LimitadorDeCarritoFalso : ILimitadorDelCarrito
     public int Ediciones { get; private set; }
 
     public ResultadoDeLimiteDelCarrito Revisar { get; set; } = ResultadoDeLimiteDelCarrito.Permitido;
+
+    public ResultadoDeLimiteDelCarrito Pagar { get; set; } = ResultadoDeLimiteDelCarrito.Permitido;
+
+    public HashSet<string> ClavesDePagar { get; } = [];
+
+    public int ConsumosDePagar { get; private set; }
 
     public int Revisiones { get; private set; }
 
@@ -159,6 +172,16 @@ internal sealed class LimitadorDeCarritoFalso : ILimitadorDelCarrito
     {
         Revisiones++;
         return Task.FromResult(Revisar);
+    }
+
+    public Task<ResultadoDeLimiteDelCarrito> PasarAlPago(Guid cuentaId, string claveDeRepeticion, CancellationToken cancelacion = default)
+    {
+        if (ClavesDePagar.Add(claveDeRepeticion))
+        {
+            ConsumosDePagar++;
+        }
+
+        return Task.FromResult(Pagar);
     }
 }
 
@@ -409,6 +432,7 @@ internal sealed class EntornoDelCarrito
         Carritos = new RepositorioDeCarritosEnMemoria(Bitacora);
         Checkouts = new RepositorioDeCheckoutsEnMemoria(Bitacora);
         Pagos = new PagosFalso(Bitacora);
+        Marca = new MarcaDeCancelacionFalsa(Bitacora);
     }
 
     public ActorDePrueba Actor { get; }
@@ -437,6 +461,10 @@ internal sealed class EntornoDelCarrito
 
     public ConsentimientoFalso Consentimiento { get; } = new();
 
+    public MarcaDeCancelacionFalsa Marca { get; }
+
+    public BabelHub.Ecommerce.UnitTests.Identidad.CalculadorDeHuellaDePrueba Huellas { get; } = new();
+
     public AuditoriaDelCarritoEspia Auditoria { get; } = new();
 
     public EstadoDeCuentaFalso Cuenta { get; } = new();
@@ -454,7 +482,7 @@ internal sealed class EntornoDelCarrito
         new(new AutorizadorDelCarrito(Actor, Denegaciones), Catalogo, Disponibilidad, Posesion, Cuenta, Limites, Carritos, Checkouts, Identificadores, Reloj, Unidad, new EdicionConCheckoutVivo(Pagos, Checkouts), Auditoria);
 
     /// <summary>Los servicios del checkout: los del carrito más el Inventario y el costo de envío.</summary>
-    public ServiciosDelCheckout ServiciosDelCheckout() => new(Servicios(), Inventario, Costo, Textos, Consentimiento);
+    public ServiciosDelCheckout ServiciosDelCheckout() => new(Servicios(), Inventario, Costo, Textos, Consentimiento, Marca, Huellas);
 
     public static EntornoDelCarrito DeCliente(Guid? cuenta = null) => new(ActorDePrueba.DeCliente(cuenta));
 
@@ -645,5 +673,28 @@ internal sealed class ConsentimientoFalso : IConsentimientoDeAvisos
     {
         Guardados.Add((cuentaId, huellaEnmascaradaDelNumero));
         return Task.FromResult(GuardaBien);
+    }
+}
+
+/// <summary>La marca de cancelación de la cuenta: se lee con bloqueo (queda en la bitácora) y puede cambiar a mitad de la solicitud o fallar.</summary>
+internal sealed class MarcaDeCancelacionFalsa(BitacoraDeBloqueos bitacora) : IMarcaDeCancelacion
+{
+    public EstadoDeLaMarcaDeCancelacion Estado { get; set; } = EstadoDeLaMarcaDeCancelacion.Libre;
+
+    public bool Falla { get; set; }
+
+    /// <summary>Se ejecuta justo antes de leer la marca: simula que la cancelación empieza entre la revisión y el pago.</summary>
+    public Action? AntesDeLeer { get; set; }
+
+    public Task<EstadoDeLaMarcaDeCancelacion> LeerConBloqueo(Guid cuentaId, CancellationToken cancelacion = default)
+    {
+        if (AntesDeLeer is { } antes)
+        {
+            AntesDeLeer = null;
+            antes();
+        }
+
+        bitacora.Anotar(true, "marca");
+        return Falla ? throw new InvalidOperationException("Identidad no responde.") : Task.FromResult(Estado);
     }
 }

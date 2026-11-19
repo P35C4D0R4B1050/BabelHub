@@ -69,6 +69,20 @@ internal static class ClavesDelCarrito
 
     /// <summary>La versión vigente de un texto cambió respecto de la que se mostró (409): se vuelve a pedir su aceptación (CAR-28). El campo lleva el texto y la clave, la versión vigente.</summary>
     public const string TextoCambio = "checkout-texto-cambio";
+
+    public const string CuentaNoPuedeComprar = "checkout-cuenta-no-puede-comprar";
+
+    public const string CorreoSinVerificar = "checkout-correo-sin-verificar";
+
+    public const string TextosPendientes = "checkout-textos-pendientes";
+
+    /// <summary>Una edición digital dejó de estar disponible por su licencia antes de iniciar el pago (409, CAR-14): se invita a quitarla.</summary>
+    public const string LicenciaNoVigente = "checkout-licencia-no-vigente";
+
+    public const string DatosDeEntregaIncompletos = "checkout-datos-de-entrega-incompletos";
+
+    /// <summary>El total que la persona vio ya no es el calculado (409, D17): no se crea nada.</summary>
+    public const string TotalCambio = "checkout-total-cambio";
 }
 
 /// <summary>Los motivos de <c>AccesoDenegado</c> que usa el módulo (AUD-05).</summary>

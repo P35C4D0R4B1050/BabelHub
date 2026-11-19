@@ -43,6 +43,8 @@ internal sealed class ServiciosDelCarrito(
 
     public IPosesionDeEdiciones Posesion => posesion;
 
+    public IEstadoDeCuenta EstadoDeLaCuenta => estadoDeCuenta;
+
     public ILimitadorDelCarrito Limites => limites;
 
     public IRepositorioDeCarritos Carritos => carritos;
