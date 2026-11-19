@@ -148,6 +148,8 @@ public sealed class CatalogoDeAccionesTests
             [nameof(AccionesAuditables.DevolucionSolicitada)] = ["pedidoId", "cantidadDeLineas", "monto", "moneda"],
             [nameof(AccionesAuditables.EstadoDeDevolucionCambiado)] = ["estadoAnterior", "estadoNuevo", "pedidoId", "devolucionId", "monto", "moneda"],
             [nameof(AccionesAuditables.ReingresoPorDevolucion)] = ["ajusteId", "devolucionId", "edicionId", "cantidadAnterior", "cantidadPosterior", "pedidoId", "monto", "moneda"],
+            [nameof(AccionesAuditables.DevolucionesDepuradas)] = ["cantidad"],
+            [nameof(AccionesAuditables.DevolucionesDeCuentaRedactadas)] = ["cantidad"],
         };
 
         foreach (var (nombre, claves) in esperado)

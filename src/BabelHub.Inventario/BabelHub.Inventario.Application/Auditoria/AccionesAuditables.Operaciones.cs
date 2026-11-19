@@ -90,6 +90,12 @@ public static partial class AccionesAuditables
     /// <summary>La depuración de pedidos vencidos (actor «sistema» y conteo).</summary>
     public static readonly AccionAuditable PedidosDepurados = new(nameof(PedidosDepurados));
 
+    /// <summary>La depuración de devoluciones vencidas a los dos años (actor «sistema» y conteo; nunca el motivo ni el texto).</summary>
+    public static readonly AccionAuditable DevolucionesDepuradas = new(nameof(DevolucionesDepuradas));
+
+    /// <summary>Las devoluciones de una cuenta se redactaron al cancelarla (el conteo; nunca el motivo ni el texto).</summary>
+    public static readonly AccionAuditable DevolucionesDeCuentaRedactadas = new(nameof(DevolucionesDeCuentaRedactadas));
+
     /// <summary>La administración reintentó el reembolso pendiente de un pedido.</summary>
     public static readonly AccionAuditable ReembolsoDePedidoReintentado = new(nameof(ReembolsoDePedidoReintentado));
 

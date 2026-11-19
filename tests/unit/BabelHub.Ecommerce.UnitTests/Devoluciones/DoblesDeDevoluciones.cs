@@ -401,11 +401,20 @@ internal sealed class EntornoDeDevoluciones
         Recepcion = new ConfirmarRecepcion(Autorizador, LimitesDeUso, Inventario, Reembolsos, Repositorio, Unidad, Auditoria, Avisos, Alertas, Procesador, Reloj);
         Conciliacion = new ConciliarReembolsosDeDevoluciones(Autorizador, Repositorio, Reembolsos, Unidad, Procesador, Reloj);
         Consultas = new ConsultasDeDevoluciones(Autorizador, LimitesDeUso, Pedidos, Repositorio);
+        Localizador = new LocalizadorDeDevolucionesDeUnaCuenta(Pedidos, Repositorio);
+        Pendientes = new ContarPendientesDeCuenta(Localizador);
+        Redaccion = new RedactarDevolucionesDeUnaCuenta(Localizador, Repositorio, Auditoria, Reloj);
         Vencidas = new RechazarDevolucionesVencidas(Autorizador, Repositorio, Unidad, Auditoria, Avisos, Reloj);
         Estancadas = new RevisarDevolucionesEstancadas(Autorizador, Repositorio, Alertas, Reloj);
     }
 
     public ConsultasDeDevoluciones Consultas { get; private set; } = null!;
+
+    public LocalizadorDeDevolucionesDeUnaCuenta Localizador { get; private set; } = null!;
+
+    public ContarPendientesDeCuenta Pendientes { get; private set; } = null!;
+
+    public RedactarDevolucionesDeUnaCuenta Redaccion { get; private set; } = null!;
 
     public NotificadorDeDevolucionesEspia Notificador { get; private set; }
 
