@@ -136,6 +136,52 @@ internal sealed class RepositorioDeHojasEnMemoria : IRepositorioDeHojas, IInstan
         return Task.FromResult(new ListadoDeHojas(filtradas.Skip((pagina - 1) * tamano).Take(tamano).Select(Clonar).ToList(), filtradas.Count));
     }
 
+    /// <summary>El marcado de las hojas de una cuenta cancelada falla a mitad (para probar que Identidad lo revierte todo).</summary>
+    public bool FallaAlMarcar { get; set; }
+
+    public Task<HojaDeReclamacion?> ObtenerPorNumero(NumeroDeHoja numero, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        return Task.FromResult(_hojas.Values.FirstOrDefault(h => h.Numero == numero) is { } h ? Clonar(h) : null);
+    }
+
+    public Task<ListadoDeHojas> ListarDelCorreo(string correoNormalizado, int pagina, int tamano, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        var filtradas = _hojas.Values
+            .Where(h => h.Datos.CorreoNormalizado == correoNormalizado && !h.DeCuentaCancelada)
+            .OrderByDescending(h => h.FechaRegistro)
+            .ThenByDescending(h => h.Numero.Secuencia)
+            .ToList();
+        return Task.FromResult(new ListadoDeHojas(filtradas.Skip((pagina - 1) * tamano).Take(tamano).Select(Clonar).ToList(), filtradas.Count));
+    }
+
+    public Task<int> ContarPendientesDelCorreo(string correoNormalizado, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        return Task.FromResult(_hojas.Values.Count(h => h.Datos.CorreoNormalizado == correoNormalizado && h.Estado == EstadoDeHoja.Pendiente && !h.DeCuentaCancelada));
+    }
+
+    public Task<int> MarcarDeCuentaCancelada(string correoNormalizado, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        var cambiadas = 0;
+        foreach (var hoja in _hojas.Values.Where(h => h.Datos.CorreoNormalizado == correoNormalizado).ToList())
+        {
+            if (FallaAlMarcar && cambiadas >= 1)
+            {
+                throw new InvalidOperationException("La base falló a mitad del marcado.");
+            }
+
+            if (hoja.MarcarDeCuentaCancelada())
+            {
+                cambiadas++;
+            }
+        }
+
+        return Task.FromResult(cambiadas);
+    }
+
     public object Capturar() => (_hojas.ToDictionary(p => p.Key, p => Clonar(p.Value)), new Dictionary<int, int>(_secuencias));
 
     public void Restaurar(object instantanea)

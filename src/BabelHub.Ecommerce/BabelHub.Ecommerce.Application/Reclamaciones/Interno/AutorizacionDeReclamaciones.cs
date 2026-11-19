@@ -8,6 +8,8 @@ internal static class RolesDeReclamaciones
 {
     public const string AdministradorCentral = "administrador-central";
 
+    public const string Cliente = "cliente";
+
     public static bool EsAdministradorCentral(ActorActual? actor) =>
         actor is { Tipo: TipoDeActor.Usuario, UsuarioId: not null } && string.Equals(actor.Rol, AdministradorCentral, StringComparison.Ordinal);
 }
@@ -17,6 +19,10 @@ internal static class MotivosDeDenegacionDeReclamaciones
     public const string FueraDeRol = "fuera-de-rol";
 
     public const string SinSesion = "sin-sesion";
+
+    public const string RecursoAjeno = "recurso-ajeno";
+
+    public const string CorreoNoVerificado = "correo-no-verificado";
 }
 
 /// <summary>Las claves simbólicas de los fallos del módulo; la Api las traduce a los códigos <c>ECO-…</c> y <c>ECO-REC-…</c> (plan §4).</summary>
@@ -95,6 +101,44 @@ internal sealed class AutorizadorDeReclamaciones(IActorActual actores, IDenegaci
 
         await Denegar(MotivosDeDenegacionDeReclamaciones.FueraDeRol, "ECO-PROHIBIDO", cancelacion).ConfigureAwait(false);
         return new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDeReclamaciones.Prohibido);
+    }
+
+    /// <summary>El identificador del consumidor actual; solo tiene valor tras <see cref="ExigirConsumidor"/> sin rechazo.</summary>
+    public Guid? ConsumidorId => Actor is { Tipo: TipoDeActor.Usuario, UsuarioId: { } id, Rol: RolesDeReclamaciones.Cliente } ? id : null;
+
+    /// <summary>
+    /// Las rutas del consumidor (mis hojas), en el orden fijo sesión → rol: un visitante recibe «no autenticado» <b>sin tocar nada y sin generar evento</b> (no hay número que registrar: lo acota el límite general por
+    /// origen); un rol que no es el de cliente (el encargado de sucursal y la logística nunca ven datos de hojas, y la administración usa sus propias rutas) recibe «prohibido» con un acceso denegado por cada intento.
+    /// </summary>
+    public async Task<ErrorDeAplicacion?> ExigirConsumidor(CancellationToken cancelacion)
+    {
+        var actor = Actor;
+        if (actor is null)
+        {
+            return new ErrorDeAplicacion(CategoriaDeError.NoAutenticado, ClavesDeReclamaciones.NoAutenticado);
+        }
+
+        if (ConsumidorId is not null)
+        {
+            return null;
+        }
+
+        await Denegar(MotivosDeDenegacionDeReclamaciones.FueraDeRol, "ECO-PROHIBIDO", cancelacion).ConfigureAwait(false);
+        return new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDeReclamaciones.Prohibido);
+    }
+
+    /// <summary>Una hoja ajena, inexistente, de una cuenta cancelada o un número mal escrito: <b>la misma respuesta</b> (no hay oráculo), con un acceso denegado por cada intento de una sesión.</summary>
+    public async Task<ErrorDeAplicacion> RechazarHojaAjena(CancellationToken cancelacion)
+    {
+        await Denegar(MotivosDeDenegacionDeReclamaciones.RecursoAjeno, "ECO-NO-ENCONTRADO", cancelacion).ConfigureAwait(false);
+        return new ErrorDeAplicacion(CategoriaDeError.NoEncontrado, ClavesDeReclamaciones.HojaNoEncontrada);
+    }
+
+    /// <summary>La lista de una sesión sin correo verificado: <c>ECO-REC-CORREO-NO-VERIFICADO</c> (403) sin datos y con un acceso denegado.</summary>
+    public async Task<ErrorDeAplicacion> RechazarCorreoNoVerificado(CancellationToken cancelacion)
+    {
+        await Denegar(MotivosDeDenegacionDeReclamaciones.CorreoNoVerificado, "ECO-REC-CORREO-NO-VERIFICADO", cancelacion).ConfigureAwait(false);
+        return new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDeReclamaciones.CorreoNoVerificado);
     }
 
     private Task Denegar(string motivo, string codigoDeError, CancellationToken cancelacion) =>
