@@ -50,7 +50,7 @@ RUN set -eu; \
 RUN dotnet publish src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api/BabelHub.Ecommerce.Api.csproj -c Release -o /app --no-restore /p:UseAppHost=false
 
 # La imagen final es de la arquitectura de destino. Corre sin privilegios (el usuario «app» de la imagen base).
-FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:bfd912c83295ce66d4b706ebb8541b9f14259b0e76fbb88b2751f58ce2399d2e AS final
+FROM mcr.microsoft.com/dotnet/aspnet:11.0@sha256:bc0d6653979efba491ab3d6f589d691f96c309c3c3ef81325efa6978e7b7f242 AS final
 WORKDIR /app
 COPY --from=publicar /app .
 
