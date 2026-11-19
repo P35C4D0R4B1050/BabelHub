@@ -1,0 +1,43 @@
+@model BabelHub.Ecommerce.Api.Areas.Tienda.Controllers.CarritoVista
+@{
+    var carrito = Model.Carrito;
+    var cultura = System.Globalization.CultureInfo.GetCultureInfo("es-PE");
+}
+<h1 class="font-display text-4xl leading-tight">Tu carrito</h1>
+
+@foreach (var aviso in carrito.Avisos)
+{
+    <div class="alert alert-info mt-4" role="status">
+        <span>@(aviso.Tipo == BabelHub.Ecommerce.Application.Carrito.TipoDeAvisoDelCarrito.EdicionRetirada ? $"«{aviso.Titulo}» fue retirada del catálogo y se quitó de tu carrito." : $"Ajustamos «{aviso.Titulo}» en tu carrito.")</span>
+    </div>
+}
+
+@if (carrito.Lineas.Count == 0)
+{
+    <p class="mt-6">Tu carrito está vacío.</p>
+    <a class="btn btn-primary mt-4" href="/catalogo">Ver el catálogo</a>
+}
+else
+{
+    <ul class="mt-6 space-y-4" aria-label="Líneas del carrito">
+        @foreach (var linea in carrito.Lineas)
+        {
+            <li class="card bg-base-100 p-4">
+                <p class="font-semibold">@linea.Titulo</p>
+                <p class="text-sm opacity-80">@(linea.Formato == BabelHub.Ecommerce.Application.Catalogo.FormatoDeEdicion.Digital ? "Libro digital" : "Libro impreso") · @linea.Cantidad × @linea.PrecioUnitario.ToString("C", cultura) = @linea.Importe.ToString("C", cultura)</p>
+                @if (linea.Retirada)
+                {
+                    <p class="text-sm" role="status">Esta edición se retiró del catálogo: se quitará al terminar tu compra en curso.</p>
+                }
+            </li>
+        }
+    </ul>
+    @if (carrito.PreciosNoConfirmados)
+    {
+        <p class="mt-4" role="status">No pudimos confirmar los precios ahora. Inténtalo de nuevo en unos minutos.</p>
+    }
+    else
+    {
+        <p class="mt-6 text-lg font-semibold">Subtotal: @carrito.Subtotal.ToString("C", cultura)</p>
+    }
+}
