@@ -157,7 +157,11 @@ internal sealed class LimitesDeEnvios(IControlDeLimites limites, IActorActual ac
             EstadoDeLimite.Excedido => new ErrorDeAplicacion(
                 CategoriaDeError.Limite,
                 ClavesDeEnvios.LimiteExcedido,
-                [new ErrorDeCampo(ClavesDeEnvios.EsperaEnSegundos, (resultado.EsperaEnSegundos ?? 1).ToString(System.Globalization.CultureInfo.InvariantCulture))]),
+                [
+                    new ErrorDeCampo(ClavesDeEnvios.EsperaEnSegundos, (resultado.EsperaEnSegundos ?? 1).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                    new ErrorDeCampo(ClavesDeEnvios.Motivo, resultado.Motivo ?? politica.Valor),
+                    new ErrorDeCampo(ClavesDeEnvios.DisponibleDesde, (resultado.DisponibleDesde ?? DateTimeOffset.UtcNow.AddSeconds(resultado.EsperaEnSegundos ?? 1)).ToString("O", System.Globalization.CultureInfo.InvariantCulture)),
+                ]),
             _ => new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDeEnvios.ServicioNoDisponible),
         };
     }

@@ -57,6 +57,10 @@ public sealed class ContextoDePagina(IHttpContextAccessor acceso, IPreferenciaDe
             new ItemDeMenu("Catálogo", "/catalogo", "libro"),
             new ItemDeMenu("Carrito", "/carrito", "carrito"),
         ],
+        AreaDeLaPagina.Sucursal =>
+        [
+            new ItemDeMenu("Envíos", "/logistica/envios", "camion"),
+        ],
         AreaDeLaPagina.Admin =>
         [
             new ItemDeMenu("Catálogo nacional", "/administracion/obras", "libro"),
