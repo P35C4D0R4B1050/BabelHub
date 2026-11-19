@@ -261,6 +261,12 @@ public sealed class Envio
             return ResultadoDeInicioDeDespacho.EnCurso;
         }
 
+        // Retomar un marcador existente es un intento anterior que pudo quedar a medias: cuenta como incierto (D05).
+        if (DespachoIniciadoEn is not null)
+        {
+            DespachoIncertoEn ??= ahora;
+        }
+
         DespachoIniciadoEn ??= ahora;
         DespachoEnCursoHasta = ahora.Add(ArrendamientoDelDespacho);
         return ResultadoDeInicioDeDespacho.Iniciado;

@@ -50,6 +50,15 @@ internal interface IRepositorioDeEnvios
     /// <summary>Guarda solo lo que cambia: estado, guía, clave, arrendamientos, marcador y fechas.</summary>
     Task Guardar(Envio envio, CancellationToken cancelacion = default);
 
+    /// <summary>Los envíos en reparto o entregados cuyo progreso todavía no se informó a Pedidos, del más antiguo al más reciente (para que el reparto se informe antes que la entrega).</summary>
+    Task<IReadOnlyList<Envio>> ObtenerConProgresoPendiente(int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Los envíos en guía generada con el marcador de despacho iniciado antes de <paramref name="limite"/> (más de 24 horas sin pasar a en reparto).</summary>
+    Task<IReadOnlyList<Envio>> ObtenerConDespachoIniciadoAntesDe(DateTimeOffset limite, int maximo, CancellationToken cancelacion = default);
+
+    /// <summary>Los envíos cancelados que tenían guía y se cancelaron en la ventana dada (una guía sin uso en el operador que logística debe avisar fuera del sistema).</summary>
+    Task<IReadOnlyList<Envio>> ObtenerCanceladosConGuiaEntre(DateTimeOffset desde, DateTimeOffset hasta, int maximo, CancellationToken cancelacion = default);
+
     /// <summary>Lista por fecha de creación descendente, con el estado opcional.</summary>
     Task<ListadoDeEnvios> Listar(EstadoDeEnvio? estado, int pagina, int tamano, CancellationToken cancelacion = default);
 }
@@ -85,7 +94,7 @@ internal abstract record ResultadoDelOperador
 internal interface IReservasDelEnvio
 {
     /// <summary>Todas las líneas del envío en una sola llamada (todo o nada), con el <c>envioId</c> y <c>Idempotency-Key</c> = <c>envioId</c>.</summary>
-    Task<ResultadoDeCierreDeReservas> Cerrar(Guid envioId, IReadOnlyCollection<Guid> lineaIds, CancellationToken cancelacion = default);
+    Task<ResultadoDeCierreDeReservas> Cerrar(Guid pedidoId, Guid envioId, IReadOnlyCollection<Guid> lineaIds, CancellationToken cancelacion = default);
 }
 
 /// <summary>El resultado del cierre, reducido a la lista cerrada que el caso de uso necesita (D05): un rechazo de negocio solo si no cambió nada; todo lo demás es incierto.</summary>

@@ -28,6 +28,9 @@ internal sealed class RepositorioDeEnviosEnMemoria : IRepositorioDeEnvios, IInst
     /// <summary>Se ejecuta justo después de que <c>BuscarPorLineas</c> calcula su respuesta: simula otra transacción que gana la carrera.</summary>
     public Action? DespuesDeBuscarPorLineas { get; set; }
 
+    /// <summary>El próximo guardado falla como un error inesperado de la base (y se rearma solo).</summary>
+    public bool FallaAlGuardarElSiguiente { get; set; }
+
     public int Operaciones { get; private set; }
 
     public int LecturasConBloqueo { get; private set; }
@@ -132,6 +135,12 @@ internal sealed class RepositorioDeEnviosEnMemoria : IRepositorioDeEnvios, IInst
     {
         Comprobar();
         _guardados++;
+        if (FallaAlGuardarElSiguiente)
+        {
+            FallaAlGuardarElSiguiente = false;
+            throw new InvalidOperationException("TEXTO-INTERNO-DE-LA-BASE");
+        }
+
         if (_guardados == FallaEnElGuardadoNumero)
         {
             throw new InvalidOperationException("La base falló al guardar.");
@@ -139,6 +148,29 @@ internal sealed class RepositorioDeEnviosEnMemoria : IRepositorioDeEnvios, IInst
 
         _envios[envio.Id] = Clonar(envio);
         return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<Envio>> ObtenerConProgresoPendiente(int maximo, CancellationToken cancelacion = default)
+    {
+        Comprobar();
+        var pendientes = _envios.Values
+            .Where(e => (e.EnRepartoEn is not null && e.ProgresoEnRepartoInformadoEn is null) || (e.EntregadoEn is not null && e.ProgresoEntregadoInformadoEn is null))
+            .OrderBy(e => e.EnRepartoEn).ThenBy(e => e.Id).Take(maximo).Select(Clonar).ToList();
+        return Task.FromResult<IReadOnlyList<Envio>>(pendientes);
+    }
+
+    public Task<IReadOnlyList<Envio>> ObtenerConDespachoIniciadoAntesDe(DateTimeOffset limite, int maximo, CancellationToken cancelacion = default)
+    {
+        Comprobar();
+        var lista = _envios.Values.Where(e => e.Estado == EstadoDeEnvio.GuiaGenerada && e.DespachoIniciadoEn is { } d && d < limite).OrderBy(e => e.DespachoIniciadoEn).Take(maximo).Select(Clonar).ToList();
+        return Task.FromResult<IReadOnlyList<Envio>>(lista);
+    }
+
+    public Task<IReadOnlyList<Envio>> ObtenerCanceladosConGuiaEntre(DateTimeOffset desde, DateTimeOffset hasta, int maximo, CancellationToken cancelacion = default)
+    {
+        Comprobar();
+        var lista = _envios.Values.Where(e => e.Estado == EstadoDeEnvio.Cancelado && e.NumeroDeGuia is not null && e.CanceladoEn is { } c && c > desde && c <= hasta).OrderBy(e => e.CanceladoEn).Take(maximo).Select(Clonar).ToList();
+        return Task.FromResult<IReadOnlyList<Envio>>(lista);
     }
 
     public Task<ListadoDeEnvios> Listar(EstadoDeEnvio? estado, int pagina, int tamano, CancellationToken cancelacion = default)
@@ -275,6 +307,9 @@ internal sealed class OperadorLogisticoDoble(UnidadDeTrabajoReversible unidad) :
     /// <summary>Se ejecuta durante la llamada al operador: simula lo que pasa mientras el operador trabaja (por ejemplo, una cancelación).</summary>
     public Action? AlLlamar { get; set; }
 
+    /// <summary>La próxima llamada lanza una excepción inesperada (con un texto que no debe propagarse).</summary>
+    public bool Lanza { get; set; }
+
     public List<(Guid Clave, string Nombre, string Direccion, string Telefono)> Recibidas { get; } = [];
 
     public int LlamadasDentroDeLaTransaccion { get; private set; }
@@ -291,6 +326,12 @@ internal sealed class OperadorLogisticoDoble(UnidadDeTrabajoReversible unidad) :
 
         Recibidas.Add((claveDeSolicitud, destinatario.Nombre, destinatario.Direccion, destinatario.Telefono));
         AlLlamar?.Invoke();
+        if (Lanza)
+        {
+            Lanza = false;
+            throw new InvalidOperationException("TEXTO-INTERNO-DEL-OPERADOR");
+        }
+
         if (Forzado is { } forzado)
         {
             return Task.FromResult(forzado);
@@ -303,5 +344,116 @@ internal sealed class OperadorLogisticoDoble(UnidadDeTrabajoReversible unidad) :
         }
 
         return Task.FromResult<ResultadoDelOperador>(new ResultadoDelOperador.GuiaCreada(numero));
+    }
+}
+
+/// <summary>
+/// El cierre de reservas con motivo reparto del Inventario (T07): idempotente por <c>envioId</c> (una segunda llamada del mismo envío no descuenta otra vez), con una cola de resultados forzados por llamada y registro de las
+/// llamadas y de si ocurrieron dentro de una transacción.
+/// </summary>
+internal sealed class ReservasDelEnvioDoble(UnidadDeTrabajoReversible unidad) : IReservasDelEnvio
+{
+    /// <summary>Se ejecuta durante la llamada al Inventario: simula lo que pasa mientras el Inventario trabaja (por ejemplo, una cancelación).</summary>
+    public Action? AlCerrar { get; set; }
+
+    private readonly Queue<ResultadoDeCierreDeReservas> _forzados = new();
+    private readonly HashSet<Guid> _descontados = [];
+
+    public List<(Guid EnvioId, IReadOnlyCollection<Guid> Lineas, Guid PedidoId)> Llamadas { get; } = [];
+
+    /// <summary>La próxima llamada lanza una excepción inesperada (con un texto que no debe propagarse).</summary>
+    public bool Lanza { get; set; }
+
+    public int LlamadasDentroDeLaTransaccion { get; private set; }
+
+    /// <summary>Cuántos envíos tienen el físico descontado (una sola vez cada uno).</summary>
+    public int EnviosDescontados => _descontados.Count;
+
+    /// <summary>Un resultado para la próxima llamada; si el resultado es <c>Cerrado</c> el descuento se aplica.</summary>
+    public void Encolar(ResultadoDeCierreDeReservas resultado) => _forzados.Enqueue(resultado);
+
+    public Task<ResultadoDeCierreDeReservas> Cerrar(Guid pedidoId, Guid envioId, IReadOnlyCollection<Guid> lineaIds, CancellationToken cancelacion = default)
+    {
+        if (unidad.EnCurso)
+        {
+            LlamadasDentroDeLaTransaccion++;
+        }
+
+        Llamadas.Add((envioId, lineaIds, pedidoId));
+        if (Lanza)
+        {
+            Lanza = false;
+            throw new InvalidOperationException("TEXTO-INTERNO-DEL-INVENTARIO");
+        }
+
+        AlCerrar?.Invoke();
+        var resultado = _forzados.Count > 0 ? _forzados.Dequeue() : new ResultadoDeCierreDeReservas.Cerrado();
+        if (resultado is ResultadoDeCierreDeReservas.Cerrado)
+        {
+            _descontados.Add(envioId);
+        }
+
+        return Task.FromResult(resultado);
+    }
+}
+
+/// <summary>
+/// El progreso de los envíos hacia Pedidos (contrato de Pedidos): guarda las llamadas, el estado que tenía el envío guardado en ese momento (para comprobar que se llama <b>después de confirmar</b>) y si ocurrieron dentro de una
+/// transacción; puede fallar.
+/// </summary>
+internal sealed class ProgresoDeEnviosDoble(UnidadDeTrabajoReversible unidad, RepositorioDeEnviosEnMemoria envios) : IProgresoDeEnvios
+{
+    public bool Falla { get; set; }
+
+    public List<(EnvioEnRepartoEntrada? EnReparto, EnvioEntregadoEntrada? Entregado, EstadoDeEnvio EstadoGuardado)> Llamadas { get; } = [];
+
+    public int LlamadasDentroDeLaTransaccion { get; private set; }
+
+    public Task<Resultado<ProgresoDeEnvioAplicado>> EnvioEnReparto(EnvioEnRepartoEntrada entrada, CancellationToken cancelacion = default) =>
+        Registrar(entrada, null, entrada.EnvioId);
+
+    public Task<Resultado<ProgresoDeEnvioAplicado>> EnvioEntregado(EnvioEntregadoEntrada entrada, CancellationToken cancelacion = default) =>
+        Registrar(null, entrada, entrada.EnvioId);
+
+    private Task<Resultado<ProgresoDeEnvioAplicado>> Registrar(EnvioEnRepartoEntrada? enReparto, EnvioEntregadoEntrada? entregado, Guid envioId)
+    {
+        if (unidad.EnCurso)
+        {
+            LlamadasDentroDeLaTransaccion++;
+        }
+
+        Llamadas.Add((enReparto, entregado, envios.Todos.Single(e => e.Id == envioId).Estado));
+        return Task.FromResult(
+            Falla
+                ? Resultado<ProgresoDeEnvioAplicado>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible"))
+                : Resultado<ProgresoDeEnvioAplicado>.Exito(new ProgresoDeEnvioAplicado(false)));
+    }
+}
+
+/// <summary>El Notificador de las pruebas: guarda las solicitudes y si se pidieron dentro de una transacción; puede devolver «no se guardó», rechazar o lanzar (el contrato dice que nunca lanza, pero Envíos no debe depender de ello).</summary>
+internal sealed class NotificadorDeEnviosEspia(UnidadDeTrabajoReversible unidad) : BabelHub.Ecommerce.Application.Notificaciones.INotificador
+{
+    public List<BabelHub.Ecommerce.Application.Notificaciones.SolicitudDeAviso> Solicitudes { get; } = [];
+
+    public int DentroDeLaTransaccion { get; private set; }
+
+    public BabelHub.Ecommerce.Application.Notificaciones.ResultadoDeLaSolicitudDeAviso Resultado { get; set; } = BabelHub.Ecommerce.Application.Notificaciones.ResultadoDeLaSolicitudDeAviso.Creado;
+
+    public bool Lanza { get; set; }
+
+    public Task<BabelHub.Ecommerce.Application.Notificaciones.ResultadoDeLaSolicitudDeAviso> Solicitar(BabelHub.Ecommerce.Application.Notificaciones.SolicitudDeAviso solicitud, CancellationToken cancelacion = default)
+    {
+        if (Lanza)
+        {
+            throw new InvalidOperationException("El notificador falló.");
+        }
+
+        if (unidad.EnCurso)
+        {
+            DentroDeLaTransaccion++;
+        }
+
+        Solicitudes.Add(solicitud);
+        return Task.FromResult(Resultado);
     }
 }
