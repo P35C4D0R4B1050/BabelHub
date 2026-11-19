@@ -202,7 +202,7 @@ public sealed class ConservacionDeHojasTests
     }
 
     [Theory]
-    [Trait("Criterio", "AC-REC-18")]
+    [Trait("Criterio", "AC-REC-15")]
     [InlineData("administrador")]
     [InlineData("cliente")]
     [InlineData("integracion")]
@@ -292,5 +292,22 @@ internal sealed class AlertasDeReclamacionesEspia : IPublicadorDeAlertasTecnicas
     {
         Publicadas.Add(alerta);
         return Task.CompletedTask;
+    }
+}
+
+public sealed class RevisionConRelojDesfasadoTests
+{
+    [Fact]
+    [Trait("Criterio", "AC-REC-15")]
+    public async Task Una_ultima_corrida_en_el_futuro_no_es_confiable_y_alerta()
+    {
+        var e = new EntornoDeReclamaciones(ActorDePrueba.DelSistema());
+        var anonimizador = new AnonimizadorDeHojasDoble(e.Hojas, e.Reloj) { Ultima = e.Reloj.Ahora.AddHours(5) };
+        var alertas = new AlertasDeReclamacionesEspia();
+
+        var resultado = await new RevisarHojasSinAnonimizar(anonimizador, alertas, e.Reloj).Ejecutar();
+
+        Assert.True(resultado.Valor);
+        Assert.Single(alertas.Publicadas);
     }
 }

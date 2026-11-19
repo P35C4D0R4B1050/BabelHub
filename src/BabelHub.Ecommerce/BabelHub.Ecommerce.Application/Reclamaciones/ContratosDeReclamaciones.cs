@@ -115,7 +115,7 @@ public sealed record DetalleDeHoja(
     [property: JsonIgnore] string BienContratado,
     decimal MontoReclamado,
     [property: JsonIgnore] string Detalle,
-    string? PedidoReferencia,
+    [property: JsonIgnore] string? PedidoReferencia,
     [property: JsonIgnore] string? Respuesta,
     DateTimeOffset? RespondidaEn,
     AvisoDeLaRespuesta? Aviso,

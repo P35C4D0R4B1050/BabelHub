@@ -13,6 +13,9 @@ internal sealed class ListarMisHojas(AutorizadorDeReclamaciones autorizador, ICo
 {
     public const int TamanoMaximoDePagina = 50;
 
+    /// <summary>Una paginación profunda sería un <c>OFFSET</c> enorme sobre el índice del correo: el tope acota el costo de cada consulta.</summary>
+    public const int PaginaMaxima = 10_000;
+
     public async Task<Resultado<PaginaDeMisHojas>> Ejecutar(ListarMisHojasEntrada entrada, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(entrada);
@@ -41,9 +44,9 @@ internal sealed class ListarMisHojas(AutorizadorDeReclamaciones autorizador, ICo
             return FallosDeReclamaciones.Fallo<PaginaDeMisHojas>(await autorizador.RechazarCorreoNoVerificado(cancelacion).ConfigureAwait(false));
         }
 
-        if (entrada.Pagina is < 1 or > 1_000_000 || entrada.Tamano is < 1 or > TamanoMaximoDePagina)
+        if (entrada.Pagina is < 1 or > PaginaMaxima || entrada.Tamano is < 1 or > TamanoMaximoDePagina)
         {
-            return FallosDeReclamaciones.De<PaginaDeMisHojas>(CategoriaDeError.Validacion, ClavesDeReclamaciones.ValidacionFallida, [new ErrorDeCampo(entrada.Pagina is < 1 or > 1_000_000 ? "pagina" : "tamano", "invalido")]);
+            return FallosDeReclamaciones.De<PaginaDeMisHojas>(CategoriaDeError.Validacion, ClavesDeReclamaciones.ValidacionFallida, [new ErrorDeCampo(entrada.Pagina is < 1 or > PaginaMaxima ? "pagina" : "tamano", "invalido")]);
         }
 
         try
@@ -118,8 +121,17 @@ internal sealed class HojasDelConsumidorDeLaAplicacion(ICasoDeUso<ListarMisHojas
 
 internal static class CorreosDeSesion
 {
-    /// <summary>El correo que devuelve Identidad, normalizado de nuevo (recortado y en minúsculas): sin una dirección válida cuenta como «sin correo verificado».</summary>
-    public static string? Normalizar(string? correo) => correo is not null && CorreoNormalizado.TryCrear(correo, out var normalizado) ? normalizado : null;
+    /// <summary>El correo que devuelve Identidad, normalizado de nuevo (recortado y en minúsculas). <c>null</c> solo significa «la cuenta no tiene correo verificado»; un valor que no es una dirección lanza.</summary>
+    public static string? Normalizar(string? correo)
+    {
+        if (correo is null)
+        {
+            return null;
+        }
+
+        // Un valor que no es una dirección no es «sin correo verificado»: es que no se pudo resolver, y se falla cerrado (REC-20, IDE-27: nunca se asume cero ni «no hay hojas»).
+        return CorreoNormalizado.TryCrear(correo, out var normalizado) ? normalizado : throw new InvalidOperationException("Identidad devolvió un correo verificado que no es una dirección válida.");
+    }
 }
 
 /// <summary>
@@ -145,15 +157,6 @@ internal sealed class LimiteDeConsultaDeHojas(IControlDeLimites limites)
             case EstadoDeLimite.Excedido:
                 return new ErrorDeAplicacion(CategoriaDeError.Limite, ClavesDeReclamaciones.LimiteExcedido, [new ErrorDeCampo(ClavesDeReclamaciones.EsperaEnSegundos, (resultado.EsperaEnSegundos ?? 1).ToString(System.Globalization.CultureInfo.InvariantCulture))]);
             case EstadoDeLimite.Permitido:
-                try
-                {
-                    await limites.Completar(resultado.Reserva!, new ResultadoMinimo("consultada"), cancelacion).ConfigureAwait(false);
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    // Una consulta ya contada no se devuelve por un fallo del almacén de contadores.
-                }
-
                 return null;
             default:
                 return new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDeReclamaciones.ServicioNoDisponible);

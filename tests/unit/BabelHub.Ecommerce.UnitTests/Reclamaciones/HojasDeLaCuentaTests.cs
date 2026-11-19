@@ -195,3 +195,48 @@ public sealed class MarcarHojasDeUnaCuentaCanceladaTests
         Assert.Equal("reclamaciones", Aplicador(e).Modulo);
     }
 }
+
+public sealed class CorreoVerificadoNoResolubleTests
+{
+    private static readonly Guid Ana = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+
+    [Fact]
+    [Trait("Criterio", "AC-REC-18")]
+    public async Task Un_valor_que_no_es_una_direccion_no_se_toma_por_sin_correo_verificado_y_el_conteo_y_la_cancelacion_fallan_cerrados()
+    {
+        var e = EntornoDeConsumidor.Nuevo(Ana, "esto no es un correo");
+        await e.RegistrarDeOtroCorreo("ana@correo.com");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new ContarHojasPendientesDeUnCorreo(e.Correos, e.Hojas).Contar(Ana));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new MarcarHojasDeUnaCuentaCancelada(e.Correos, e.Hojas).Aplicar(Ana, Guid.NewGuid()));
+        Assert.False(e.Hojas.Todas.Single().DeCuentaCancelada);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-REC-12")]
+    public async Task En_mis_hojas_un_correo_irresoluble_es_servicio_no_disponible_y_no_correo_no_verificado()
+    {
+        var e = EntornoDeConsumidor.Nuevo(Ana, "esto no es un correo");
+
+        var lista = await e.Consumidor.Listar(new ListarMisHojasEntrada());
+        var una = await e.Consumidor.Obtener("2026-000001");
+
+        Assert.Equal(Application.Plataforma.CategoriaDeError.NoDisponible, lista.Error!.Categoria);
+        Assert.Equal(Application.Plataforma.CategoriaDeError.NoDisponible, una.Error!.Categoria);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-REC-12")]
+    [InlineData(10_001)]
+    [InlineData(1_000_000)]
+    public async Task La_paginacion_muy_profunda_se_rechaza_sin_consultar_las_hojas(int pagina)
+    {
+        var e = EntornoDeConsumidor.Nuevo(Ana, "ana@correo.com");
+        var antes = e.Hojas.Operaciones;
+
+        var resultado = await e.Consumidor.Listar(new ListarMisHojasEntrada(pagina, 50));
+
+        Assert.Equal(Application.Plataforma.CategoriaDeError.Validacion, resultado.Error!.Categoria);
+        Assert.Equal(antes, e.Hojas.Operaciones);
+    }
+}

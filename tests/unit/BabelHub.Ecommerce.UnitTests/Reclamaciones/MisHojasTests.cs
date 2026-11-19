@@ -92,6 +92,7 @@ public sealed class MisHojasTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-REC-08")]
     [Trait("Criterio", "AC-REC-12")]
     public async Task Obtener_una_hoja_propia_por_su_numero_devuelve_su_estado_y_respuesta()
     {

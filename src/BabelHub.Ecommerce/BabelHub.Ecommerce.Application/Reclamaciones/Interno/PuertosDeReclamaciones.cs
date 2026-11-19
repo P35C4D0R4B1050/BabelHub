@@ -82,7 +82,7 @@ internal interface IRepositorioDeHojas
 
 /// <summary>
 /// El correo <b>verificado</b> de una cuenta, normalizado (recortado y en minúsculas), o <c>null</c> si la cuenta no tiene un correo verificado (D04). Lo implementa un adaptador sobre el contrato de Identidad; si Identidad no responde,
-/// lanza y la operación falla cerrada. Solo un correo verificado da acceso a las hojas y solo uno verificado marca las hojas al cancelar la cuenta: un correo sin verificar podría ser de otra persona.
+/// lanza y la operación falla cerrada. <b><c>null</c> significa únicamente «la cuenta no tiene un correo verificado»</b>, decidido <b>antes</b> de aplicar la cancelación (el adaptador lee el correo antes de que Identidad toque la cuenta); si no se puede determinar, lanza, nunca devuelve <c>null</c>. Solo un correo verificado da acceso a las hojas y solo uno verificado marca las hojas al cancelar la cuenta: un correo sin verificar podría ser de otra persona.
 /// </summary>
 internal interface ICorreoVerificadoDeLaCuenta
 {

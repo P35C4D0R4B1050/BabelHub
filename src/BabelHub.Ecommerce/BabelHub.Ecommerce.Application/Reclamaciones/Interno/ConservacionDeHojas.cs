@@ -76,7 +76,8 @@ internal sealed class RevisarHojasSinAnonimizar(IAnonimizadorDeHojas anonimizado
             ultima = null;
         }
 
-        if (ultima is { } corrida && ahora - corrida < EsperaMaxima)
+        // Una corrida «en el futuro» (desfase de reloj entre la base y la aplicación) no es confiable: se alerta.
+        if (ultima is { } corrida && corrida <= ahora && ahora - corrida < EsperaMaxima)
         {
             return Resultado<bool>.Exito(false);
         }
