@@ -80,7 +80,15 @@ internal sealed class PasarAlPago(ServiciosDelCheckout servicios) : ICasoDeUso<P
         }
         catch (Exception excepcion) when (excepcion is not OperationCanceledException)
         {
-            await Abortar(preparado, EstadoDelCheckout.Reservando, true, "falla-en-confirmacion", null, cancelacion).ConfigureAwait(false);
+            try
+            {
+                await Abortar(preparado, EstadoDelCheckout.Reservando, true, "falla-en-confirmacion", null, cancelacion).ConfigureAwait(false);
+            }
+            catch (Exception compensacion) when (compensacion is not OperationCanceledException)
+            {
+                // Si ni siquiera se puede compensar (por ejemplo, la auditoría sigue caída), el checkout queda reservando y lo recupera el trabajo de fondo: la persona recibe igual «servicio no disponible».
+            }
+
             return Resultado<ResultadoDePasarAlPago>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDelCarrito.ServicioNoDisponible));
         }
 

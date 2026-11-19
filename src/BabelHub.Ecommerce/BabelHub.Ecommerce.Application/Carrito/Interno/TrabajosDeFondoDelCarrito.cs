@@ -64,7 +64,7 @@ internal sealed class PurgarAvisosVistos(ServiciosDelCarrito servicios) : ICasoD
         var tocados = await servicios.Unidad.Ejecutar(
             async token =>
             {
-                var eliminados = await servicios.Carritos.EliminarAvisosVencidos(ahora - TrabajosDelCarrito.AvisosVistos, ahora - TrabajosDelCarrito.AvisosSinVer, token).ConfigureAwait(false);
+                var eliminados = await servicios.Carritos.EliminarAvisosVencidos(ahora - TrabajosDelCarrito.AvisosVistos, ahora - TrabajosDelCarrito.AvisosSinVer, TrabajosDelCarrito.MaximoPorCorrida, token).ConfigureAwait(false);
                 await servicios.Auditoria.PurgaRealizada("avisos", eliminados, token).ConfigureAwait(false);
                 return eliminados;
             },

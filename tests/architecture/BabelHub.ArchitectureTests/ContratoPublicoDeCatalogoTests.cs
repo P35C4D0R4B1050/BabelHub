@@ -94,7 +94,7 @@ public class ContratoPublicoDeCatalogoTests
 
     [Fact]
     [Trait("Criterio", "AC-CAT-15")]
-    public void Mientras_Carrito_no_exista_el_retiro_de_carritos_es_el_nulo_y_la_composicion_lo_registra_sin_pisar_a_otro()
+    public void El_retiro_de_carritos_real_es_el_de_Carrito_el_nulo_es_solo_respaldo_y_la_composicion_lo_registra_sin_pisar_a_otro()
     {
         var infraestructura = Cargar("BabelHub.Ecommerce.Infrastructure");
         var implementaciones = infraestructura.GetTypes()
@@ -102,9 +102,10 @@ public class ContratoPublicoDeCatalogoTests
             .Where(t => t is { IsClass: true, IsAbstract: false } && typeof(IRetiroDeEdicionDeCarritos).IsAssignableFrom(t))
             .ToList();
 
+        // La implementación real es la de Carrito (T26b de ecommerce-carrito-checkout); el nulo de Catálogo queda solo como respaldo mientras Catálogo se compone sin Carrito, y la composición de Carrito lo reemplaza. Si aparece otra implementación, esta prueba falla.
         Assert.True(
-            implementaciones.Count == 1 && implementaciones[0].Name == "RetiroDeEdicionDeCarritosNulo",
-            "Ya existe una implementación real de IRetiroDeEdicionDeCarritos (de Carrito): quita AgregarRetiroNuloDeCarritos de la composición, borra RetiroDeEdicionDeCarritosNulo y actualiza esta prueba. "
+            implementaciones.Select(i => i.Name).Order().SequenceEqual(["RetirarEdicionDelCarrito", "RetiroDeEdicionDeCarritosNulo"]),
+            "Las únicas implementaciones de IRetiroDeEdicionDeCarritos deben ser la de Carrito (RetirarEdicionDelCarrito) y el respaldo nulo de Catálogo. "
             + $"Implementaciones: {string.Join(", ", implementaciones.Select(i => i.FullName))}.");
 
         var servicios = new ServiceCollection();

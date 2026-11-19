@@ -49,6 +49,11 @@ public class DoblesProvisionalesDelCarritoTests
         Assert.IsType<CreadorDeIntencionesSinPagos>(proveedor.GetRequiredService<ICreadorDeIntencionesDePago>());
         Assert.IsType<InventarioSimuladoDelCarrito>(proveedor.GetRequiredService<IInventarioDelCarrito>());
         Assert.IsType<EstadoDeCuentaDelCarritoSinIdentidad>(proveedor.GetRequiredService<IEstadoDeCuenta>());
+        Assert.IsType<LimitadorDelCarritoProvisional>(proveedor.GetRequiredService<ILimitadorDelCarrito>());
+        Assert.IsType<AuditoriaDelCarritoProvisional>(proveedor.GetRequiredService<IAuditoriaDelCarrito>());
+        Assert.IsType<MarcaDeCancelacionProvisional>(proveedor.GetRequiredService<IMarcaDeCancelacion>());
+        Assert.IsType<ConsentimientoDeAvisosProvisional>(proveedor.GetRequiredService<IConsentimientoDeAvisos>());
+        Assert.IsType<AlertasDelCarritoProvisional>(proveedor.GetRequiredService<IAlertasDelCarrito>());
     }
 
     [Fact]
@@ -62,16 +67,26 @@ public class DoblesProvisionalesDelCarritoTests
         Assert.Contains(nameof(ICreadorDeIntencionesDePago), error.Message, StringComparison.Ordinal);
         Assert.Contains(nameof(IInventarioDelCarrito), error.Message, StringComparison.Ordinal);
         Assert.Contains(nameof(IEstadoDeCuenta), error.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(ILimitadorDelCarrito), error.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IAuditoriaDelCarrito), error.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IMarcaDeCancelacion), error.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IConsentimientoDeAvisos), error.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IAlertasDelCarrito), error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void En_produccion_el_arranque_pasa_cuando_los_cuatro_puertos_tienen_su_implementacion_real()
+    public void En_produccion_el_arranque_pasa_cuando_todos_los_puertos_tienen_su_implementacion_real()
     {
         var servicios = ConReloj();
         servicios.AddSingleton<IPosesionDeEdiciones, PosesionReal>();
         servicios.AddSingleton<ICreadorDeIntencionesDePago, CreadorReal>();
         servicios.AddSingleton<IInventarioDelCarrito, InventarioReal>();
         servicios.AddSingleton<IEstadoDeCuenta, EstadoReal>();
+        servicios.AddSingleton<ILimitadorDelCarrito, LimitadorReal>();
+        servicios.AddSingleton<IAuditoriaDelCarrito, AuditoriaReal>();
+        servicios.AddSingleton<IMarcaDeCancelacion, MarcaReal>();
+        servicios.AddSingleton<IConsentimientoDeAvisos, ConsentimientoReal>();
+        servicios.AddSingleton<IAlertasDelCarrito, AlertasReales>();
 
         var resultado = servicios.AgregarDoblesProvisionalesDelCarrito(esProduccion: true);
 
@@ -260,6 +275,53 @@ public class DoblesProvisionalesDelCarritoTests
         public Task<ResultadoDeReservar> Reservar(Guid pedidoId, int generacionDeReserva, EntregaParaElInventario entrega, IReadOnlyList<LineaParaElInventario> lineas, CancellationToken cancelacion = default) => throw new NotSupportedException();
 
         public Task<ResultadoDeLiberar> Liberar(Guid pedidoId, string motivo, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    }
+
+    private sealed class LimitadorReal : ILimitadorDelCarrito
+    {
+        public Task<ResultadoDeLimiteDelCarrito> CrearCarritoDeVisitante(CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<ResultadoDeLimiteDelCarrito> EditarLineas(Guid? cuentaId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<ResultadoDeLimiteDelCarrito> RevisarCheckout(Guid cuentaId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<ResultadoDeLimiteDelCarrito> PasarAlPago(Guid cuentaId, string claveDeRepeticion, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<ResultadoDeLimiteDelCarrito> VolverOReiniciar(Guid cuentaId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    }
+
+    private sealed class AuditoriaReal : IAuditoriaDelCarrito
+    {
+        public Task FusionAplicada(Guid cuentaId, int lineasDelVisitante, IReadOnlyList<MotivoDeAjusteDeAviso> ajustes, CancellationToken cancelacion = default) => Task.CompletedTask;
+
+        public Task EdicionesRetiradas(int ediciones, int carritosAfectados, int lineasQuitadas, int lineasAnotadas, CancellationToken cancelacion = default) => Task.CompletedTask;
+
+        public Task CheckoutTerminado(string motivo, CancellationToken cancelacion = default) => Task.CompletedTask;
+
+        public Task CarritoEliminadoPorIdentidad(string motivo, CancellationToken cancelacion = default) => Task.CompletedTask;
+
+        public Task PurgaRealizada(string trabajo, int cantidad, CancellationToken cancelacion = default) => Task.CompletedTask;
+
+        public Task PasoAlPagoIniciado(bool conImpresos, bool aDomicilio, CancellationToken cancelacion = default) => Task.CompletedTask;
+
+        public Task PasoAlPagoAbortado(string motivo, CancellationToken cancelacion = default) => Task.CompletedTask;
+    }
+
+    private sealed class MarcaReal : IMarcaDeCancelacion
+    {
+        public Task<EstadoDeLaMarcaDeCancelacion> LeerConBloqueo(Guid cuentaId, CancellationToken cancelacion = default) => Task.FromResult(EstadoDeLaMarcaDeCancelacion.Libre);
+    }
+
+    private sealed class ConsentimientoReal : IConsentimientoDeAvisos
+    {
+        public Task<OfertaDeConsentimiento> Consultar(Guid cuentaId, CancellationToken cancelacion = default) => Task.FromResult(OfertaDeConsentimiento.NoSeOfrece);
+
+        public Task<bool> Guardar(Guid cuentaId, string huellaEnmascaradaDelNumero, CancellationToken cancelacion = default) => Task.FromResult(true);
+    }
+
+    private sealed class AlertasReales : IAlertasDelCarrito
+    {
+        public Task Publicar(TipoDeAlertaDelCarrito tipo, int cantidad, CancellationToken cancelacion = default) => Task.CompletedTask;
     }
 
     private sealed class EstadoReal : IEstadoDeCuenta

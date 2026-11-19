@@ -50,7 +50,7 @@ public static class CatalogoPendienteExtensiones
     }
 
     /// <summary>
-    /// Registra el retiro nulo de carritos (D07). <c>Carrito</c>, cuando exista, registra el suyo <b>antes</b> de esta llamada (<c>TryAdd</c> lo respeta) y quita esta llamada de la composición.
+    /// Registra el retiro nulo de carritos (D07) como respaldo con <c>TryAdd</c>. La composición de <c>Carrito</c> registra el suyo con <c>Replace</c>, así que prevalece se componga antes o después; el nulo se puede quitar cuando Catálogo y Carrito se compongan siempre juntos.
     /// </summary>
     public static IServiceCollection AgregarRetiroNuloDeCarritos(this IServiceCollection servicios)
     {

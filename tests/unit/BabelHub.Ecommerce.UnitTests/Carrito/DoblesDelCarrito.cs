@@ -300,7 +300,7 @@ internal sealed class RepositorioDeCarritosEnMemoria(BitacoraDeBloqueos bitacora
         return Task.FromResult(quitar);
     }
 
-    public Task<int> EliminarAvisosVencidos(DateTimeOffset vistosAntesDe, DateTimeOffset creadosAntesDe, CancellationToken cancelacion = default) =>
+    public Task<int> EliminarAvisosVencidos(DateTimeOffset vistosAntesDe, DateTimeOffset creadosAntesDe, int maximo, CancellationToken cancelacion = default) =>
         Task.FromResult(_avisos.RemoveAll(a => (a.VistoEn is { } visto && visto < vistosAntesDe) || a.Aviso.CreadoEn < creadosAntesDe));
 
     public Task<IReadOnlyList<Guid>> CuentasSinMovimientoDesde(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default) =>

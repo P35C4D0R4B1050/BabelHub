@@ -1,0 +1,49 @@
+@model BabelHub.Ecommerce.Api.Areas.Tienda.Controllers.CheckoutVista
+@{
+    var checkout = Model.Checkout;
+    var cultura = System.Globalization.CultureInfo.GetCultureInfo("es-PE");
+}
+<h1 class="font-display text-4xl leading-tight">Tu compra</h1>
+<p class="mt-2 text-sm" aria-label="Progreso">Paso @checkout.Paso de @checkout.TotalDePasos</p>
+
+@if (checkout.CarritoCambio)
+{
+    <div class="alert alert-warning mt-4" role="status">
+        <span>Tu carrito cambió: revisa tu compra antes de pagar.</span>
+    </div>
+}
+
+<ul class="mt-6 space-y-4" aria-label="Líneas de la compra">
+    @foreach (var linea in checkout.Lineas)
+    {
+        <li class="card bg-base-100 p-4">
+            <p class="font-semibold">@linea.Titulo</p>
+            <p class="text-sm opacity-80">@linea.Cantidad × @linea.PrecioUnitario.ToString("C", cultura) = @linea.Importe.ToString("C", cultura)</p>
+            @if (linea.Retirada)
+            {
+                <p class="text-sm" role="status">Esta edición se retiró del catálogo: se quitará de tu carrito.</p>
+            }
+            @if (linea.Disponibilidad == BabelHub.Ecommerce.Application.Carrito.DisponibilidadDeLineaDeCheckout.NoSePuedeValidar)
+            {
+                <p class="text-sm" role="status">No pudimos validar el stock ahora. Inténtalo de nuevo en unos minutos.</p>
+            }
+            @if (linea.PlazoAConfirmar)
+            {
+                <p class="text-sm">Plazo de entrega: a confirmar.</p>
+            }
+            else if (linea.PlazoInformadoDias is { } dias)
+            {
+                <p class="text-sm">Plazo estimado: @dias días.</p>
+            }
+        </li>
+    }
+</ul>
+
+<dl class="mt-6 space-y-1">
+    <div class="flex justify-between"><dt>Subtotal</dt><dd>@checkout.Subtotal.ToString("C", cultura)</dd></div>
+    @if (checkout.Envio is { } envio)
+    {
+        <div class="flex justify-between"><dt>Envío</dt><dd>@envio.ToString("C", cultura)</dd></div>
+    }
+    <div class="flex justify-between font-semibold"><dt>Total</dt><dd>@checkout.Total.ToString("C", cultura)</dd></div>
+</dl>

@@ -101,6 +101,8 @@ La CLI independiente de Tailwind CSS, daisyUI, htmx y las fuentes autoalojadas (
 
 Retención de registros de auditoría y seguridad: dos años (AUD-11).
 
+**El servidor de PostgreSQL del E-commerce se configura con `log_error_verbosity = terse`** (ecommerce-carrito-checkout, T24 y D08): un `CHECK` fallido de `carrito.checkouts` hace que PostgreSQL escriba la fila entera (nombre, teléfono y dirección de entrega) en el `DETAIL` de su registro, además de en `PostgresException.Detail` (que la aplicación descarta). Con `terse` no se escribe el `DETAIL`, el `HINT` ni la consulta. Tampoco se activan `log_statement` ni `log_parameter_max_length` con parámetros. **Nota de `pedido_descartado`:** el checkout conserva un solo `pedido_descartado` (el último abortado) para liberar su reserva y reconocer una pestaña obsoleta; un pedido abortado anterior cuya reserva no se liberó se acota por la expiración de la reserva (15 minutos).
+
 ## 5. Respaldo y recuperación (RNF24, AD27)
 
 | Elemento | Decisión |
