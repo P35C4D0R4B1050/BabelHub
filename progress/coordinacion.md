@@ -52,3 +52,9 @@ Pendientes: tope de unidades por línea y por reserva (hoy 100 y 50 líneas) y r
 ## 5. Entorno
 
 Docker Desktop guarda su disco en `D:\Docker\wsl\disk` (enlace desde `C:`); si una integración da cientos de `DockerUnavailableException`, Docker está parado: avisar al coordinador, no reiniciar procesos. Un solo conjunto de pruebas de integración a la vez en toda la máquina.
+
+## 6. Política de navegadores de los E2E (decisión de la persona, 2026-11-20)
+
+- **Obligatorios (puerta de cierre):** Chromium de escritorio, Chromium en teléfono y WebKit (si la caché de Playwright lo tiene). Un fallo ahí bloquea el cierre del bloque.
+- **Firefox: informativo, no indispensable.** Se ejecuta si el entorno lo permite (hoy `firefox.exe` está bloqueado por el sistema: «Permission denied»; no se toca la seguridad del equipo). Un fallo solo de Firefox se registra como hallazgo (Menor, con dueño y fase) y **no reabre un bloque cerrado**, salvo que revele un defecto real de estándares o accesibilidad que también afecte a los demás.
+- Los proyectos de Playwright de cada carril declaran Firefox como proyecto opcional (se omite si no inicia), sin debilitar ninguna aserción de los obligatorios.
