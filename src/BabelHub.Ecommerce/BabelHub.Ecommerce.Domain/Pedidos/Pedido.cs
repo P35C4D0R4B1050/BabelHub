@@ -252,7 +252,7 @@ public sealed class LineaDePedido
 /// (<see cref="RecalcularEstado"/>). Un pedido solo digital nace entregado (PED-12). <see cref="FechaEstadoFinal"/> es la del último cambio a entregado o anulado y de ella cuentan los dos años de la retención (PED-34). Su texto nunca incluye el contacto.
 /// </summary>
 [DebuggerDisplay("Pedido {Id}")]
-public sealed class Pedido
+public sealed partial class Pedido
 {
     private readonly List<LineaDePedido> _lineas;
 
