@@ -131,6 +131,47 @@ internal sealed class RepositorioDePedidosFalso : IRepositorioDePedidos
 
     public Task<IReadOnlyList<Entrega>> EntregasEnCurso(Guid pedidoId, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<Entrega>>([.. Entregas.Where(e => e.PedidoId == pedidoId && e.BloqueaLasLineas)]);
+
+    public List<LiberacionDeReservaPendiente> LiberacionesDeReserva { get; } = [];
+
+    public Task<IReadOnlyList<Guid>> PedidosConRecojoVencido(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>([.. _pedidos.Values
+            .Where(p => p.Tipo == TipoDeEntregaDelPedido.Recojo && p.Lineas.Any(l => l.EstadoImpreso == EstadoDeLineaImpresa.ListoParaRecojo && l.ListoEn is { } listo && PoliticaDeNoRecogido.EstaVencida(listo, ahora)))
+            .Select(p => p.Id)
+            .Take(maximo)]);
+
+    public Task RegistrarLiberacionesDeReserva(Guid pedidoId, IReadOnlyCollection<Guid> lineaIds, string motivo, DateTimeOffset desde, CancellationToken cancelacion = default)
+    {
+        Llamadas.Add("registrar-liberaciones-de-reserva");
+        foreach (var linea in lineaIds.Where(l => LiberacionesDeReserva.All(x => x.LineaId != l)))
+        {
+            LiberacionesDeReserva.Add(new LiberacionDeReservaPendiente(pedidoId, linea, motivo, desde, 0));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<LiberacionDeReservaPendiente>> LiberacionesDeReservaPendientes(int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<LiberacionDeReservaPendiente>>([.. LiberacionesDeReserva.OrderBy(l => l.PendienteDesde).Take(maximo)]);
+
+    public Task QuitarLiberacionesDeReserva(IReadOnlyCollection<Guid> lineaIds, CancellationToken cancelacion = default)
+    {
+        LiberacionesDeReserva.RemoveAll(l => lineaIds.Contains(l.LineaId));
+        return Task.CompletedTask;
+    }
+
+    public Task AnotarIntentoDeLiberacion(IReadOnlyCollection<Guid> lineaIds, CancellationToken cancelacion = default)
+    {
+        for (var i = 0; i < LiberacionesDeReserva.Count; i++)
+        {
+            if (lineaIds.Contains(LiberacionesDeReserva[i].LineaId))
+            {
+                LiberacionesDeReserva[i] = LiberacionesDeReserva[i] with { Intentos = LiberacionesDeReserva[i].Intentos + 1 };
+            }
+        }
+
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class MarcaDeCancelacionFalsa(EstadoDeLaMarca estado = EstadoDeLaMarca.Libre) : IMarcaDeCancelacionDeCuenta
