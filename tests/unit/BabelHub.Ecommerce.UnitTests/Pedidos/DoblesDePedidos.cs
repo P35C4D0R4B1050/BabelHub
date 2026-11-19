@@ -1,6 +1,7 @@
 using BabelHub.Ecommerce.Application.Biblioteca;
 using BabelHub.Ecommerce.Application.Identidad;
 using BabelHub.Ecommerce.Application.Pagos;
+using BabelHub.Ecommerce.Application.Pedidos;
 using BabelHub.Ecommerce.Application.Pedidos.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Pedidos;
@@ -210,8 +211,12 @@ internal sealed class AccesosDeBibliotecaFalsos : IAccesosDeBiblioteca
         return Task.FromResult(Resultado<ResultadoDeConcederAcceso>.Exito(YaPoseidas.Contains(entrada.EdicionId) ? ResultadoDeConcederAcceso.YaPoseidoPorOtraCompra : Respuesta));
     }
 
+    /// <summary>Se ejecuta justo antes de revocar (para comprobar el orden: el reembolso se registra antes).</summary>
+    public Action? AntesDeRevocar { get; set; }
+
     public Task<Resultado<ResultadoDeRevocarAcceso>> Revocar(RevocarAccesoEntrada entrada, CancellationToken cancelacion = default)
     {
+        AntesDeRevocar?.Invoke();
         if (Falla)
         {
             return Task.FromResult(Resultado<ResultadoDeRevocarAcceso>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible")));
@@ -305,14 +310,43 @@ internal sealed class ReembolsosFalsos : IReembolsos
 
     public bool Falla { get; set; }
 
+    public bool FallaAlRegistrar { get; set; }
+
+    /// <summary>El estado con el que responde <c>Procesar</c>; <see langword="null"/> simula la pasarela caída (un <c>Fallo</c>).</summary>
+    public EstadoDelReembolso? EstadoAlProcesar { get; set; } = EstadoDelReembolso.Reembolsado;
+
+    public List<Guid> Procesados { get; } = [];
+
+    public List<Guid> Reintentados { get; } = [];
+
+    private readonly Dictionary<string, Guid> _porClave = [];
+
     public Task<Resultado<ReembolsoRegistrado>> Registrar(RegistrarReembolsoEntrada entrada, CancellationToken cancelacion = default)
     {
+        if (FallaAlRegistrar)
+        {
+            return Task.FromResult(Resultado<ReembolsoRegistrado>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible")));
+        }
+
         Registrados.Add(entrada);
         var monto = entrada.Lineas.Sum(l => l.Monto) + entrada.Envio;
-        return Task.FromResult(Resultado<ReembolsoRegistrado>.Exito(new ReembolsoRegistrado(Guid.NewGuid(), monto, EstadoDelReembolso.Pendiente, false)));
+        var repetido = _porClave.TryGetValue(entrada.ClaveNatural, out var id);
+        if (!repetido)
+        {
+            id = Guid.NewGuid();
+            _porClave[entrada.ClaveNatural] = id;
+        }
+
+        return Task.FromResult(Resultado<ReembolsoRegistrado>.Exito(new ReembolsoRegistrado(id, monto, EstadoDelReembolso.Pendiente, repetido)));
     }
 
-    public Task<Resultado<EstadoDelReembolso>> Procesar(Guid reembolsoId, CancellationToken cancelacion = default) => Task.FromResult(Resultado<EstadoDelReembolso>.Exito(EstadoDelReembolso.Reembolsado));
+    public Task<Resultado<EstadoDelReembolso>> Procesar(Guid reembolsoId, CancellationToken cancelacion = default)
+    {
+        Procesados.Add(reembolsoId);
+        return Task.FromResult(EstadoAlProcesar is { } estado
+            ? Resultado<EstadoDelReembolso>.Exito(estado)
+            : Resultado<EstadoDelReembolso>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible")));
+    }
 
     public Task<int> ContarPendientes(Guid cuentaId, OrigenDelReembolso origen, CancellationToken cancelacion = default) => Task.FromResult(0);
 
@@ -328,7 +362,40 @@ internal sealed class ReembolsosFalsos : IReembolsos
 
     public Task<Resultado<PaginaDeReembolsos>> ListarPendientes(int pagina, int tamano, CancellationToken cancelacion = default) => throw new NotSupportedException();
 
-    public Task<Resultado<EstadoDelReembolso>> Reintentar(Guid reembolsoId, CancellationToken cancelacion = default) => Task.FromResult(Resultado<EstadoDelReembolso>.Exito(EstadoDelReembolso.Reembolsado));
+    public Task<Resultado<EstadoDelReembolso>> Reintentar(Guid reembolsoId, CancellationToken cancelacion = default)
+    {
+        Reintentados.Add(reembolsoId);
+        return Task.FromResult(EstadoAlProcesar is { } estado
+            ? Resultado<EstadoDelReembolso>.Exito(estado)
+            : Resultado<EstadoDelReembolso>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible")));
+    }
+}
+
+/// <summary>El despacho de Envíos para las pruebas: crea y cancela con lo que se le configure (un envío cancelado o mantenido por identificador).</summary>
+internal sealed class DespachoDeEnviosFalso : IDespachoDeEnvios
+{
+    public List<Guid> Cancelaciones { get; } = [];
+
+    public List<ResultadoDeCancelarEnvio> Resultado { get; } = [];
+
+    public bool Falla { get; set; }
+
+    public bool Lanza { get; set; }
+
+    public Task<Resultado<ResultadoDeCrearEnvio>> Crear(CrearEnvioEntrada entrada, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+    public Task<Resultado<IReadOnlyList<ResultadoDeCancelarEnvio>>> Cancelar(Guid pedidoId, CancellationToken cancelacion = default)
+    {
+        if (Lanza)
+        {
+            throw new InvalidOperationException("Envíos cayó a mitad de la operación");
+        }
+
+        Cancelaciones.Add(pedidoId);
+        return Task.FromResult(Falla
+            ? Resultado<IReadOnlyList<ResultadoDeCancelarEnvio>>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible"))
+            : Resultado<IReadOnlyList<ResultadoDeCancelarEnvio>>.Exito([.. Resultado]));
+    }
 }
 
 internal sealed class NotificadorDePedidosEspia : BabelHub.Ecommerce.Application.Notificaciones.INotificador
@@ -383,6 +450,9 @@ internal sealed class ReservasFalsas : IReservasDelPedido
 
     public Func<ResultadoDeLiberarReserva> RespuestaDeLiberar { get; set; } = () => ResultadoDeLiberarReserva.Liberada;
 
+    /// <summary>Si se fija, decide la respuesta de <c>Liberar</c> según las líneas pedidas (un 409 solo para alguna).</summary>
+    public Func<IReadOnlyList<Guid>, ResultadoDeLiberarReserva>? RespuestaPorLineas { get; set; }
+
     public Task<ResultadoDeCerrarReserva> Cerrar(Guid pedidoId, Guid lineaId, string claveDeCierre, CancellationToken cancelacion = default)
     {
         Cierres.Add((pedidoId, lineaId, claveDeCierre));
@@ -392,7 +462,7 @@ internal sealed class ReservasFalsas : IReservasDelPedido
     public Task<ResultadoDeLiberarReserva> Liberar(Guid pedidoId, string motivo, IReadOnlyList<Guid> lineaIds, CancellationToken cancelacion = default)
     {
         Liberaciones.Add((pedidoId, motivo, lineaIds));
-        return Task.FromResult(RespuestaDeLiberar());
+        return Task.FromResult(RespuestaPorLineas is { } porLineas ? porLineas(lineaIds) : RespuestaDeLiberar());
     }
 }
 
