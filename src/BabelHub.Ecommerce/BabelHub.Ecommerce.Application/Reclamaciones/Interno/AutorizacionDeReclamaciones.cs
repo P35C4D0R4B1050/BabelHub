@@ -141,6 +141,20 @@ internal sealed class AutorizadorDeReclamaciones(IActorActual actores, IDenegaci
         return new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDeReclamaciones.CorreoNoVerificado);
     }
 
+    /// <summary>
+    /// Lo que corre un trabajo de fondo (la anonimización): solo el actor «sistema». Cualquier otro actor recibe «prohibido» con un acceso denegado: ni un usuario ni una integración dispara la anonimización.
+    /// </summary>
+    public async Task<ErrorDeAplicacion?> ExigirSistema(CancellationToken cancelacion)
+    {
+        if (actores.Actual is { Tipo: TipoDeActor.Sistema })
+        {
+            return null;
+        }
+
+        await Denegar(MotivosDeDenegacionDeReclamaciones.FueraDeRol, "ECO-PROHIBIDO", cancelacion).ConfigureAwait(false);
+        return new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDeReclamaciones.Prohibido);
+    }
+
     private Task Denegar(string motivo, string codigoDeError, CancellationToken cancelacion) =>
         denegaciones.Registrar(new DenegacionDeAcceso(motivo, ruta: null) { CodigoDeError = codigoDeError }, cancelacion);
 }

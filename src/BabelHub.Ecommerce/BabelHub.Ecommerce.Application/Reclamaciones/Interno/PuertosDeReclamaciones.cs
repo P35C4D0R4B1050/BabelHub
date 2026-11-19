@@ -88,3 +88,17 @@ internal interface ICorreoVerificadoDeLaCuenta
 {
     Task<string?> De(Guid usuarioId, CancellationToken cancelacion = default);
 }
+
+/// <summary>
+/// La anonimización de las hojas que cumplieron dos años (D10, REC-17): invoca la <b>función de base de datos</b> sin parámetros, bajo el rol del esquema y <b>dentro de la transacción actual</b> (la misma que la auditoría),
+/// que anonimiza nombre, documento, domicilio y correo, deja el correo normalizado y el resumen del contenido en nulo, redacta el detalle y la respuesta, y conserva número, fecha, tipo, estado, bien, monto y
+/// referencia del pedido. Lo implementa la Infraestructura (T13 y siguientes).
+/// </summary>
+internal interface IAnonimizadorDeHojas
+{
+    /// <summary>Anonimiza las hojas con dos años por día de Lima (idempotente: una ya anonimizada no se toca) y devuelve cuántas.</summary>
+    Task<int> Anonimizar(CancellationToken cancelacion = default);
+
+    /// <summary>El instante de la última corrida completa de la anonimización, o <c>null</c> si nunca corrió.</summary>
+    Task<DateTimeOffset?> UltimaCorridaEn(CancellationToken cancelacion = default);
+}

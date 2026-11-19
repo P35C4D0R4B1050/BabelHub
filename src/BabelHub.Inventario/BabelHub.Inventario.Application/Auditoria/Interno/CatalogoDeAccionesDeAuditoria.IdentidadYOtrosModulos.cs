@@ -36,7 +36,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
         // Libro de Reclamaciones.
         yield return Auditada(nameof(AccionesAuditables.HojaDeReclamacionRespondida), false, false, Clave("estadoNuevo"));
         yield return Auditada(nameof(AccionesAuditables.HojaDeReclamacionDescartada), false, false, Clave("causa"));
-        yield return Auditada(nameof(AccionesAuditables.HojaDeReclamacionAnonimizada), false, false, Clave("causa"));
+        yield return Auditada(nameof(AccionesAuditables.HojaDeReclamacionAnonimizada), false, false, Clave("causa"), Clave("cantidad", 12));
         yield return Auditada(nameof(AccionesAuditables.HojaDeReclamacionConsultada), false, false);
 
         // Notificaciones: el número se identifica por su huella (objeto personal: una huella estable identifica a quien tiene el número).
