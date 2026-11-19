@@ -21,8 +21,8 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **IDE-4** | Cuenta del cliente, administración de usuarios, cambio de correo, solicitudes de datos, cancelación (solicitud) | T18–T22 | C | IDE-3 | ☑ (T18–T22; integración pendiente de la corrida del coordinador) |
 | **IDE-5** | Cancelación (ejecución), cierre y baja, rotación de la clave, puertos de Auditoría y de restauración | T23–T25, T27 | C | IDE-4, AUD-3 | ☑ (T23–T25; T27 y T34 parciales en Aplicación, completan en IDE-7) |
 | **IDE-6** | Credenciales de servicio, topes, clasificación de correos y la infraestructura de seguridad (roles de acceso, Argon2id, emisor ES256, repositorios) | T26, T28, T29, T30–T33 | C | IDE-5 | ☑ (T26, T28–T33; T27 y T34 sin marcar) |
-| **IDE-7** | Adaptadores de correo e Inventario, trabajos de fondo (vencimiento, descarte, rotación, bajas) | T34–T40 | C | IDE-6 | ☐ |
-| **IDE-8** | Verificador del Inventario, endpoints y la cookie de sesión de la web | T41–T45 | C | IDE-7 | ☐ |
+| **IDE-7** | Adaptadores de correo e Inventario, trabajos de fondo (vencimiento, descarte, rotación, bajas) | T34–T40 | C | IDE-6 | ☑ (T27, T34, T36–T40) |
+| **IDE-8** | Verificador del Inventario, endpoints y la cookie de sesión de la web | T41–T45 | C | IDE-7 | ▶ (T41 hecho; T42–T43 con alcance reducido y claves de T44 hechos, ver `decisiones-de-implementacion.md` IDE-8b; faltan el resto de T44 y T45) |
 | **IDE-9** | Integración con el Inventario, carga de Argon2id, tiempos uniformes, concurrencia y custodia de la clave | T46–T50 | C | IDE-8 | ☐ |
 | **NOT-1** | `transversal-notificaciones`: Dominio y contrato, solicitar y cancelar avisos, desactivación de números | T01–T07 | C | IDE-2 | ☑ (T01–T05 y T07; T06 queda para T08) |
 | **NOT-2** | Envío, tope por número, recepción del Inventario y estado de entrega | T08–T11 | E | NOT-1 | ☐ |

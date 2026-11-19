@@ -2,6 +2,16 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-19 — IDE-7 e IDE-8 (primera entrega) fundidos; `main` completamente verde
+
+### Cubierto
+- **Carril A:** IDE-7 (T27, T34, T36–T40): adaptadores de correo (MailKit 4.18.2, cola cifrada, tope de 24 al día), adaptadores de `identidad.registros` con una exención estrecha y registrada a la regla de Auditoría, adaptadores del Inventario y trabajos de fondo de Identidad. IDE-8, primera entrega: verificador de credenciales del Inventario con caché de 5 minutos que falla cerrada (T41), composición real de Identidad con guarda de producción, `IEstadoDeCuenta` real, puertos de la web, endpoints de claves (`/.well-known/jwks.json`, `/revocaciones`, rotar y comprometida) y prueba negativa de que ningún endpoint JSON expone la credencial. T42 y T43 con alcance reducido por `AGENTS.md` §3.9 (decisión IDE-8b).
+- Corrección de integración: el catálogo de eventos de seguridad del Inventario vuelve a ser copia idéntica del del E-commerce (4 motivos de límite).
+- Validación de `main` con los carriles quietos: unitarias 4302 y 2334, arquitectura 229, SpecCheck 23, CoverageCheck 12, **integración 5364 de 5364**, gitleaks limpio.
+
+### Pendiente
+- Resto de T44 y T45 (A); `web-base` WEB-2 (pantallas de ingreso, registro, cuenta y administración) ya con la composición de Identidad disponible; pedidos (B), pagos y reclamaciones (C), envíos (V); bloque de composición de los `Program.cs`; verificaciones FIN-1 de las specs que se completen.
+
 ## 2026-11-19 — IDE-6, NOT-1, ECO-9a y los contratos de Pedidos para Envíos
 
 ### Cubierto
