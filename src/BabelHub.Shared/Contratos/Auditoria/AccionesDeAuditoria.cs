@@ -106,6 +106,9 @@ public static class AccionesDeAuditoria
 
     public const string IngresosSolicitadosAnonimizados = "IngresosSolicitadosAnonimizados";
 
+    /// <summary>El trabajo de fondo desvinculó las intenciones de pago cerradas hace más de 2 años (cantidad, sin datos personales, PAG-26).</summary>
+    public const string IntencionesDePagoDesvinculadas = "IntencionesDePagoDesvinculadas";
+
     public const string IngresoFallido = "IngresoFallido";
 
     public const string LicenciaCambiada = "LicenciaCambiada";
@@ -244,6 +247,7 @@ public static class AccionesDeAuditoria
         IngresoFallido,
         IngresoPendienteConciliado,
         IngresosSolicitadosAnonimizados,
+        IntencionesDePagoDesvinculadas,
         LicenciaCambiada,
         LimiteExcedido,
         LlamadaEntreServiciosSinCredencial,
