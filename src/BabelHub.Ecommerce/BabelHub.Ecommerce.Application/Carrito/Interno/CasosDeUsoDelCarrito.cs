@@ -23,9 +23,12 @@ internal sealed class ServiciosDelCarrito(
     IRepositorioDeCheckouts checkouts,
     IGeneradorDeIdentificadores identificadores,
     IReloj reloj,
-    IUnidadDeTrabajo unidad)
+    IUnidadDeTrabajo unidad,
+    EdicionConCheckoutVivo edicionConCheckoutVivo)
 {
     public AutorizadorDelCarrito Autorizador => autorizador;
+
+    public EdicionConCheckoutVivo Edicion => edicionConCheckoutVivo;
 
     public IConsultaDeCatalogo Catalogo => catalogo;
 
@@ -83,19 +86,6 @@ internal sealed class ServiciosDelCarrito(
             ? null
             : new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDelCarrito.CuentaNoPuedeOperar);
     }
-
-    // ---------- La compuerta del checkout vivo (CAR-26) ----------
-
-    /// <summary>
-    /// Editar el carrito con un checkout vivo: con el pago pendiente se rechaza (<c>checkout-pago-pendiente</c>) y con <c>reservando</c> responde <c>checkout-en-curso</c>. Con <c>en_pago</c> la edición pasa por <c>Reabrir</c> (T11);
-    /// hasta entonces responde <c>checkout-en-curso</c> en vez de dejar editar bajo una intención viva. Sin checkout o en <c>en_edicion</c> se puede.
-    /// </summary>
-    public static ErrorDeAplicacion? CompuertaDeEdicion(EstadoDelCheckout? estado) => estado switch
-    {
-        null or EstadoDelCheckout.EnEdicion => null,
-        EstadoDelCheckout.PagoPendiente => new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.PagoPendiente),
-        _ => new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.EnCurso),
-    };
 
     // ---------- El carrito de quien pide ----------
 
@@ -294,9 +284,22 @@ internal abstract class EdicionDeLineaDelCarrito<TEntrada>(ServiciosDelCarrito s
             return Resultado<ResultadoDeCarrito>.Fallo(error);
         }
 
+        // La edición con el checkout vivo (T11): Reabrir fuera de la transacción y antes de bloquear; solo para una cuenta con sesión.
+        var puerta = PuertaDeEdicion.Libre;
+        if (solicitante.Tipo == TipoDeSolicitante.Cuenta)
+        {
+            var decidida = await servicios.Edicion.PrepararAntesDeBloquear(solicitante.CuentaId!.Value, cancelacion).ConfigureAwait(false);
+            if (!decidida.EsExito)
+            {
+                return Resultado<ResultadoDeCarrito>.Fallo(decidida.Error!);
+            }
+
+            puerta = decidida.Valor;
+        }
+
         // 3. La transacción: el checkout primero y el carrito después (D10), sin red.
         var (resultado, cookieNueva) = await servicios.Unidad.Ejecutar(
-            token => EnLaTransaccion(entrada, solicitante, cookie, preparado.Terreno, token),
+            token => EnLaTransaccion(entrada, solicitante, cookie, preparado.Terreno, puerta, token),
             cancelacion).ConfigureAwait(false);
         if (!resultado.EsExito)
         {
@@ -317,19 +320,14 @@ internal abstract class EdicionDeLineaDelCarrito<TEntrada>(ServiciosDelCarrito s
     /// <summary>La respuesta cuando no hay carrito y la operación no lo crea: quitar es un éxito vacío; cambiar una línea que no está es «no encontrada».</summary>
     protected abstract Resultado<ResultadoDeCarrito> SinCarritoRespuesta(VistaDelCarrito vacio, SolicitanteDelCarrito solicitante, string? cookie, TEntrada entrada);
 
-    private async Task<(Resultado<CarritoDeDominio> Resultado, string? CookieNueva)> EnLaTransaccion(TEntrada entrada, SolicitanteDelCarrito solicitante, string? cookie, TerrenoDeLaEdicion terreno, CancellationToken cancelacion)
+    private async Task<(Resultado<CarritoDeDominio> Resultado, string? CookieNueva)> EnLaTransaccion(TEntrada entrada, SolicitanteDelCarrito solicitante, string? cookie, TerrenoDeLaEdicion terreno, PuertaDeEdicion puerta, CancellationToken cancelacion)
     {
         var ahora = servicios.Reloj.Ahora;
-        EstadoDelCheckout? estadoDelCheckout = null;
+        Checkout? checkout = null;
         if (solicitante.Tipo == TipoDeSolicitante.Cuenta)
         {
-            // El checkout se bloquea antes que el carrito (D10): la compuerta decide con el estado ya bloqueado.
-            var checkout = await servicios.Checkouts.ObtenerVivoDeCuenta(solicitante.CuentaId!.Value, conBloqueo: true, cancelacion).ConfigureAwait(false);
-            estadoDelCheckout = checkout?.Estado;
-            if (ServiciosDelCarrito.CompuertaDeEdicion(estadoDelCheckout) is { } cerrada)
-            {
-                return (Resultado<CarritoDeDominio>.Fallo(cerrada), null);
-            }
+            // El checkout se bloquea antes que el carrito (D10); la compuerta se aplica con los dos ya bloqueados y el estado releído.
+            checkout = await servicios.Checkouts.ObtenerVivoDeCuenta(solicitante.CuentaId!.Value, conBloqueo: true, cancelacion).ConfigureAwait(false);
         }
 
         string? cookieNueva = null;
@@ -367,8 +365,15 @@ internal abstract class EdicionDeLineaDelCarrito<TEntrada>(ServiciosDelCarrito s
             return (ServiciosDelCarrito.Fallo<CarritoDeDominio>(CategoriaDeError.NoEncontrado, ClavesDelCarrito.LineaNoEncontrada), null);
         }
 
+        // La compuerta del checkout vivo (T11): con los dos bloqueados, aplica lo decidido antes de bloquear o rechaza si el checkout cambió entre tanto.
+        var (cerrada, retiradasAlEditar) = servicios.Edicion.AplicarDentroDeLaTransaccion(checkout, carrito, puerta, ahora);
+        if (cerrada is not null)
+        {
+            return (Resultado<CarritoDeDominio>.Fallo(cerrada), null);
+        }
+
         // Una anotación de retiro huérfana (sin checkout vivo, o con el checkout ya en edición) la quita la primera lectura con bloqueo del carrito, dejando el aviso.
-        var huerfanas = carrito.QuitarRetirosHuerfanos(estadoDelCheckout, ahora);
+        IReadOnlyList<EdicionRetirada> huerfanas = [.. retiradasAlEditar, .. carrito.QuitarRetirosHuerfanos(checkout?.Estado, ahora)];
 
         var rechazo = Aplicar(new ContextoDeEdicion(entrada, carrito, terreno, ahora));
         if (rechazo is not null)

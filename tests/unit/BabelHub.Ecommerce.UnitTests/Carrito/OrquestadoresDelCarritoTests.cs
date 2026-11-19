@@ -621,16 +621,6 @@ public sealed class OrquestadoresDelCarritoTests
         Assert.Equal(["checkout", "carrito"], e.Bitacora.Bloqueos);
     }
 
-    [Fact]
-    public async Task Una_edicion_con_el_pago_en_marcha_se_deja_para_la_edicion_con_checkout_vivo_de_T11_y_por_ahora_responde_en_curso()
-    {
-        var (e, libro) = ConCheckoutEn(AEnPago);
-
-        var resultado = await Modificar(e, libro, 2);
-
-        Assert.Equal(ClavesDelCarrito.EnCurso, Clave(resultado.Error));
-    }
-
     // ---------- Retiros pendientes huérfanos ----------
 
     [Fact]

@@ -263,12 +263,62 @@ internal sealed class BitacoraDeBloqueos
 {
     public List<string> Bloqueos { get; } = [];
 
+    /// <summary>Un hecho que importa para el orden (una llamada a Pagos) sin ser un bloqueo.</summary>
+    public void Evento(string nombre) => Bloqueos.Add(nombre);
+
     public void Anotar(bool conBloqueo, string recurso)
     {
         if (conBloqueo)
         {
             Bloqueos.Add(recurso);
         }
+    }
+}
+
+/// <summary>Pagos visto por Carrito: cuenta las llamadas y responde lo que se le indique; puede lanzar (Pagos no responde) o hacer algo justo al reabrir (una carrera).</summary>
+internal sealed class PagosFalso(BitacoraDeBloqueos bitacora) : ICreadorDeIntencionesDePago
+{
+    public ResultadoDeReabrirIntencion AlReabrir { get; set; } = ResultadoDeReabrirIntencion.Reabierta;
+
+    public ResultadoDeCancelarIntencion AlCancelar { get; set; } = ResultadoDeCancelarIntencion.Cancelada;
+
+    public ResultadoDeCrearIntencion AlCrear { get; set; } = ResultadoDeCrearIntencion.Creada;
+
+    public bool NoResponde { get; set; }
+
+    /// <summary>Se ejecuta justo después de que Pagos responde a <c>Reabrir</c>: simula otra solicitud que cambia el checkout mientras tanto.</summary>
+    public Action? EnLaCarreraDeReabrir { get; set; }
+
+    public int Reaperturas { get; private set; }
+
+    public int Cancelaciones { get; private set; }
+
+    public int Creaciones { get; private set; }
+
+    public Task<ResultadoDeCrearIntencion> Crear(Guid cuentaId, InstantaneaDeCompra instantanea, string huellaDeInstantanea, DateTimeOffset reservaExpiraEn, CancellationToken cancelacion = default)
+    {
+        Creaciones++;
+        return NoResponde ? throw new InvalidOperationException("Pagos no responde.") : Task.FromResult(AlCrear);
+    }
+
+    public Task<ResultadoDeReabrirIntencion> Reabrir(Guid cuentaId, Guid pedidoId, CancellationToken cancelacion = default)
+    {
+        Reaperturas++;
+        bitacora.Evento("reabrir");
+        if (NoResponde)
+        {
+            throw new InvalidOperationException("Pagos no responde.");
+        }
+
+        EnLaCarreraDeReabrir?.Invoke();
+        return Task.FromResult(AlReabrir);
+    }
+
+    public Task<ResultadoDeCancelarIntencion> Cancelar(Guid cuentaId, Guid pedidoId, CancellationToken cancelacion = default)
+    {
+        Cancelaciones++;
+        bitacora.Evento("cancelar");
+        return NoResponde ? throw new InvalidOperationException("Pagos no responde.") : Task.FromResult(AlCancelar);
     }
 }
 
@@ -284,6 +334,7 @@ internal sealed class EntornoDelCarrito
         Bitacora = new BitacoraDeBloqueos();
         Carritos = new RepositorioDeCarritosEnMemoria(Bitacora);
         Checkouts = new RepositorioDeCheckoutsEnMemoria(Bitacora);
+        Pagos = new PagosFalso(Bitacora);
     }
 
     public ActorDePrueba Actor { get; }
@@ -302,6 +353,8 @@ internal sealed class EntornoDelCarrito
 
     public PosesionFalsa Posesion { get; } = new();
 
+    public PagosFalso Pagos { get; }
+
     public EstadoDeCuentaFalso Cuenta { get; } = new();
 
     public LimitadorDeCarritoFalso Limites { get; } = new();
@@ -314,7 +367,7 @@ internal sealed class EntornoDelCarrito
 
     /// <summary>Los servicios compartidos de los casos de uso, armados con los dobles de este entorno.</summary>
     public ServiciosDelCarrito Servicios() =>
-        new(new AutorizadorDelCarrito(Actor, Denegaciones), Catalogo, Disponibilidad, Posesion, Cuenta, Limites, Carritos, Checkouts, Identificadores, Reloj, Unidad);
+        new(new AutorizadorDelCarrito(Actor, Denegaciones), Catalogo, Disponibilidad, Posesion, Cuenta, Limites, Carritos, Checkouts, Identificadores, Reloj, Unidad, new EdicionConCheckoutVivo(Pagos, Checkouts));
 
     public static EntornoDelCarrito DeCliente(Guid? cuenta = null) => new(ActorDePrueba.DeCliente(cuenta));
 
