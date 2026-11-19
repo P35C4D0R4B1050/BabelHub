@@ -1,7 +1,7 @@
 ---
 id: web-indice-infinito
 titulo: El índice infinito (experimento opcional)
-estado: Approved
+estado: Planned
 servicio: E-commerce
 prefijo: IND
 origen: [RF29, NN17]
@@ -9,6 +9,8 @@ calidad: [AC06]
 depende: [web-base, transversal-seguridad]
 aprobado_por: Diego Amiquero
 aprobado_en: 2026-10-16
+plan_aprobado_por: Claude (delegado por Diego Amiquero)
+plan_aprobado_en: 2026-11-19
 ---
 
 # Spec — El índice infinito (experimento opcional)
