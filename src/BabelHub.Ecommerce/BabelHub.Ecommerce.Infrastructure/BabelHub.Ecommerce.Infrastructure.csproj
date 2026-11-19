@@ -5,6 +5,7 @@
   <ItemGroup>
     <PackageReference Include="StackExchange.Redis" />
     <PackageReference Include="Npgsql" />
+    <PackageReference Include="Konscious.Security.Cryptography.Argon2" />
     <PackageReference Include="AWSSDK.S3" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
   </ItemGroup>
@@ -15,6 +16,8 @@
   <ItemGroup>
     <!-- Cuerpo de los textos legales de la web (WEB-29): recursos versionados, sin la versión ni la vigencia, que informa Identidad. -->
     <EmbeddedResource Include="Web\Textos\*.txt" />
+    <!-- La lista local de contraseñas comunes (IDE-59): una por línea, en minúsculas, de 10 o más caracteres. -->
+    <EmbeddedResource Include="Identidad\Recursos\contrasenas-comunes.txt" LogicalName="BabelHub.Ecommerce.Identidad.contrasenas-comunes.txt" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\BabelHub.Ecommerce.Application\BabelHub.Ecommerce.Application.csproj" />

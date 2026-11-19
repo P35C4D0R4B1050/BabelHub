@@ -72,6 +72,28 @@ public interface IHasherDeContrasenas
     Task<bool> Verificar(string? resumen, Contrasena presentada, CancellationToken cancelacion = default);
 }
 
+/// <summary>
+/// El cálculo de contraseñas está saturado (el semáforo global de Argon2id, D03): no se pudo empezar en el tiempo de espera. La Api lo responde con 503 y <c>Retry-After</c>, sin decir nada de la cuenta; nunca se cae a un
+/// cálculo más barato.
+/// </summary>
+public sealed class CalculoDeContrasenasSaturadoException : Exception
+{
+    public CalculoDeContrasenasSaturadoException()
+        : base("El cálculo de contraseñas está saturado.")
+    {
+    }
+
+    public CalculoDeContrasenasSaturadoException(string message)
+        : base(message)
+    {
+    }
+
+    public CalculoDeContrasenasSaturadoException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
 /// <summary>La lista local de contraseñas comunes o filtradas (al menos 10 000, IDE-59), ya normalizadas y en minúsculas.</summary>
 public interface IListaDeContrasenasComunes
 {
