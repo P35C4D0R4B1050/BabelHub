@@ -25,7 +25,7 @@ internal static class AuditoriaDeDevoluciones
         };
 
     /// <summary>El cambio de estado: el anterior y el nuevo y, cuando el catálogo de Auditoría los admita (hallazgo para el carril A), el pedido, la devolución y el monto.</summary>
-    public static SolicitudDeRegistro Cambio(Devolucion d, EstadoDeLineaDeDevolucion anterior, EstadoDeLineaDeDevolucion nuevo) =>
+    public static SolicitudDeRegistro Cambio(Devolucion d, EstadoDeLineaDeDevolucion anterior, EstadoDeLineaDeDevolucion nuevo, string? estadoNuevoPropio = null) =>
         new(AccionesAuditables.EstadoDeDevolucionCambiado)
         {
             ObjetoTipo = "devolucion",
@@ -33,7 +33,7 @@ internal static class AuditoriaDeDevoluciones
             Detalle = new Dictionary<string, string?>
             {
                 ["estadoAnterior"] = anterior.Codigo(),
-                ["estadoNuevo"] = nuevo.Codigo(),
+                ["estadoNuevo"] = estadoNuevoPropio ?? nuevo.Codigo(),
             },
         };
 }

@@ -6,6 +6,7 @@ using BabelHub.Ecommerce.Application.Pagos;
 using BabelHub.Ecommerce.Application.Pedidos;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Devoluciones;
+using BabelHub.Ecommerce.UnitTests.Auditoria;
 using BabelHub.Ecommerce.UnitTests.Carrito;
 using BabelHub.Ecommerce.UnitTests.Catalogo;
 using BabelHub.Ecommerce.UnitTests.Envios;
@@ -77,6 +78,9 @@ internal sealed class InventarioDeDevolucionesDoble(UnidadDeTrabajoReversible un
 
     public ResultadoDelReingreso Resultado { get; set; } = new ResultadoDelReingreso.Reingresado();
 
+    /// <summary>El adaptador lanza una excepción con texto interno al reingresar (se trata como incierto).</summary>
+    public bool LanzaAlReingresar { get; set; }
+
     public List<ReingresoPorDevolucion> Reingresos { get; } = [];
 
     public int ConsultasDeSucursales { get; private set; }
@@ -107,6 +111,11 @@ internal sealed class InventarioDeDevolucionesDoble(UnidadDeTrabajoReversible un
         }
 
         Reingresos.Add(reingreso);
+        if (LanzaAlReingresar)
+        {
+            throw new InvalidOperationException("TEXTO-INTERNO-DEL-INVENTARIO");
+        }
+
         return Task.FromResult(Resultado);
     }
 }
@@ -298,6 +307,7 @@ internal sealed class EntornoDeDevoluciones
         Pedidos = new PedidosParaDevolucionesDoble();
         Inventario = new InventarioDeDevolucionesDoble(Unidad);
         Marca = new MarcaDeCancelacionDoble();
+        Alertas = new BabelHub.Ecommerce.UnitTests.Auditoria.AlertasTecnicasEspia();
         Biblioteca = new BibliotecaParaDevolucionesDoble();
         Armar();
     }
@@ -323,6 +333,7 @@ internal sealed class EntornoDeDevoluciones
         Inventario = compartido.Inventario;
         Marca = compartido.Marca;
         Biblioteca = compartido.Biblioteca;
+        Alertas = compartido.Alertas;
         Armar();
     }
 
@@ -335,6 +346,7 @@ internal sealed class EntornoDeDevoluciones
         Reportar = new ReportarArchivoDefectuoso(Autorizador, LimitesDeUso, Pedidos, Accesos, Marca, Repositorio, Unidad, Auditoria, Reloj);
         Decidir = new DecidirReporte(Autorizador, LimitesDeUso, Pedidos, Accesos, Biblioteca, Reembolsos, Repositorio, Unidad, Auditoria, Reloj);
         Gestion = new AprobarYRechazarDevolucion(Autorizador, LimitesDeUso, Repositorio, Unidad, Auditoria, Reloj);
+        Recepcion = new ConfirmarRecepcion(Autorizador, LimitesDeUso, Inventario, Reembolsos, Repositorio, Unidad, Auditoria, Alertas, Reloj);
     }
 
     public ActorDePrueba Actor { get; private set; }
@@ -376,6 +388,10 @@ internal sealed class EntornoDeDevoluciones
     public DecidirReporte Decidir { get; private set; } = null!;
 
     public AprobarYRechazarDevolucion Gestion { get; private set; } = null!;
+
+    public ConfirmarRecepcion Recepcion { get; private set; } = null!;
+
+    public BabelHub.Ecommerce.UnitTests.Auditoria.AlertasTecnicasEspia Alertas { get; private set; } = null!;
 
     public ReembolsosDoble Reembolsos { get; private set; }
 

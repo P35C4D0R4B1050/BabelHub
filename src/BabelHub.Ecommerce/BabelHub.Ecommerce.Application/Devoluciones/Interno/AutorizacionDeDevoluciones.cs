@@ -53,6 +53,9 @@ internal static class ClavesDeDevoluciones
     public const string Motivo = "motivo";
 
     public const string DisponibleDesde = "disponibleDesde";
+
+    /// <summary>El motivo del catálogo cerrado de alertas técnicas para un reingreso rechazado, en conflicto o estancado (hasta que el carril A dé de alta motivos propios de Devoluciones).</summary>
+    public const string AlertaGenerica = "dependencia-no-necesaria-fallida";
 }
 
 internal static class FallosDeDevoluciones
