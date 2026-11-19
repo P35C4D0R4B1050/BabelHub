@@ -13,10 +13,10 @@ namespace BabelHub.Ecommerce.UnitTests.Pagos;
 /// <summary>El orquestador del cobro: paso 0, registrar, la pasarela fuera de la transacción y registrar el resultado (T13; PAG-01, PAG-02, PAG-05 a PAG-07, PAG-09, PAG-11, PAG-30).</summary>
 public sealed class IniciarCobroTests
 {
-    private static async Task<CobrarEntrada> Pedir(EntornoDePagos e, AppMedio medio = AppMedio.Yape, string token = "tkn_test_abc123XYZ")
+    private static async Task<CobrarEntrada> Pedir(EntornoDePagos e, AppMedio medio = AppMedio.Yape, string? medioDePago = null)
     {
         var clave = (await e.EmitirClave.Ejecutar(new EmitirClaveDeIntentoEntrada(Pedido))).Valor;
-        return new CobrarEntrada(Pedido, clave.Token, medio, TokenDelMedioDePago.Crear(token));
+        return new CobrarEntrada(Pedido, clave.Token, medio, TokenDelMedioDePago.Crear(medioDePago ?? "tkn_test_abc123XYZ"));
     }
 
     [Fact]
