@@ -72,6 +72,33 @@ public sealed class ComposicionDelCarritoTests
     }
 
     [Fact]
+    public void Con_lo_de_Plataforma_Auditoria_e_Identidad_ya_registrado_se_usan_los_adaptadores_reales_y_la_guarda_ya_no_los_nombra()
+    {
+        var servicios = ConDependenciasDeOtrosModulos();
+        servicios.AddSingleton(Doble<IControlDeLimites>());
+        servicios.AddSingleton(Doble<IAuditoria>());
+        servicios.AddSingleton(Doble<IMarcaDeCancelacionDeCuenta>());
+        servicios.AddSingleton(Doble<ICuentaDelCliente>());
+        servicios.AddSingleton(Doble<IPublicadorDeAlertasTecnicas>());
+
+        var error = Assert.Throws<InvalidOperationException>(() => servicios.AgregarCarrito(Costo, esProduccion: true));
+
+        // Quedan nombrados solo los que siguen provisionales: ni los cinco reales ni el Inventario aparecen.
+        foreach (var real in new[] { nameof(ILimitadorDelCarrito), nameof(IAuditoriaDelCarrito), nameof(IMarcaDeCancelacion), nameof(IConsentimientoDeAvisos), nameof(IAlertasDelCarrito), nameof(IInventarioDelCarrito) })
+        {
+            Assert.DoesNotContain(real, error.Message, StringComparison.Ordinal);
+        }
+
+        Assert.Contains(nameof(IPosesionDeEdiciones), error.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(ICreadorDeIntencionesDePago), error.Message, StringComparison.Ordinal);
+        Assert.Contains(servicios, d => d.ServiceType == typeof(ILimitadorDelCarrito) && d.ImplementationType == typeof(LimitadorDelCarritoSobreLimites));
+        Assert.Contains(servicios, d => d.ServiceType == typeof(IAuditoriaDelCarrito) && d.ImplementationType == typeof(AuditoriaDelCarritoSobreAuditoria));
+        Assert.Contains(servicios, d => d.ServiceType == typeof(IMarcaDeCancelacion) && d.ImplementationType == typeof(MarcaDeCancelacionSobreIdentidad));
+        Assert.Contains(servicios, d => d.ServiceType == typeof(IConsentimientoDeAvisos) && d.ImplementationType == typeof(ConsentimientoDeAvisosSobreIdentidad));
+        Assert.Contains(servicios, d => d.ServiceType == typeof(IAlertasDelCarrito) && d.ImplementationType == typeof(AlertasDelCarritoSobrePublicador));
+    }
+
+    [Fact]
     public void El_retiro_de_carritos_de_Carrito_reemplaza_al_nulo_de_Catalogo_se_componga_antes_o_despues()
     {
         var catalogoPrimero = ConDependenciasDeOtrosModulos();
@@ -101,8 +128,8 @@ public sealed class ComposicionDelCarritoTests
             Assert.Contains(puerto, error.Message, StringComparison.Ordinal);
         }
 
-        // El adaptador real del Inventario aún no tiene consulta previa, reservar ni liberar (T25b): la guarda impide publicarlo hasta entonces.
-        Assert.Contains(nameof(IInventarioDelCarrito), error.Message, StringComparison.Ordinal);
+        // T25b: el Inventario real ya implementa consulta previa, reservar y liberar, así que ya no figura entre los dobles que la guarda impide publicar.
+        Assert.DoesNotContain(nameof(IInventarioDelCarrito), error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
