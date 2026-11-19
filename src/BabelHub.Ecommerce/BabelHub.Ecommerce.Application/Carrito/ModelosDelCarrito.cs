@@ -221,6 +221,9 @@ public sealed record IniciarCheckoutEntrada(string? CodigoDeSucursalPreferida = 
 
 public enum DisponibilidadDeLineaDeCheckout
 {
+    /// <summary>Hay stock vendible en la red y todavía no se eligió la entrega: no se sabe de qué fuente saldrá.</summary>
+    Disponible,
+
     EnSuSucursal,
     PorTraslado,
     Agotada,

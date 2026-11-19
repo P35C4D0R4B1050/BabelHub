@@ -269,6 +269,9 @@ public interface ILimitadorDelCarrito
 
     /// <summary>Agregar, cambiar o quitar una línea: por la cuenta si la hay y, si no, por el origen.</summary>
     Task<ResultadoDeLimiteDelCarrito> EditarLineas(Guid? cuentaId, CancellationToken cancelacion = default);
+
+    /// <summary>Revisar el checkout y elegir la entrega: consultan el Inventario sin memoria, 30 por cuenta y minuto.</summary>
+    Task<ResultadoDeLimiteDelCarrito> RevisarCheckout(Guid cuentaId, CancellationToken cancelacion = default);
 }
 
 // ---------- Auditoría ----------
@@ -291,3 +294,20 @@ public interface IAuditoriaDelCarrito
 /// encuentra y lo bloquea (AC-CAR-01, AC-CAR-02). Con PostgreSQL una violación de unicidad aborta la transacción, así que no se puede seguir dentro de ella.
 /// </summary>
 public sealed class CarritoYaExisteException() : Exception("El carrito ya existe: otro dispositivo lo creó a la vez.");
+
+// ---------- Opciones ----------
+
+/// <summary>
+/// El costo de envío fijo configurado (<c>Carrito:CostoDeEnvio</c>, CAR-23): soles con dos decimales y no negativo, validado al arrancar. Se lee al elegir el domicilio y se <b>congela</b> al pasar al pago; uno por pedido a
+/// domicilio. No es un puerto de un tercero sino una opción tipada: la Infraestructura lee la configuración y la Aplicación solo ve este valor.
+/// </summary>
+public interface ICostoDeEnvioConfigurado
+{
+    CostoDeEnvio Valor { get; }
+}
+
+/// <summary>
+/// <c>IRepositorioDeCheckouts.Agregar</c> la lanza cuando la cuenta ya tiene un checkout vivo (índice único parcial): otra solicitud lo creó a la vez. La Aplicación rehace la lectura y devuelve ese checkout (<c>POST
+/// /checkout/iniciar</c> con un checkout vivo devuelve ese checkout).
+/// </summary>
+public sealed class CheckoutYaExisteException() : Exception("La cuenta ya tiene un checkout vivo: otra solicitud lo creó a la vez.");

@@ -52,6 +52,12 @@ internal static class ClavesDelCarrito
     public const string ServicioNoDisponible = "servicio-no-disponible";
 
     public const string LimiteExcedido = "limite-excedido";
+
+    /// <summary>El Inventario no respondió (o respondió algo inválido) al validar el stock: no se avanza ni se cobra (CAR-06).</summary>
+    public const string StockNoValidable = "checkout-stock-no-validable";
+
+    /// <summary>El carrito no tiene ninguna línea que se pueda pagar (CAR-05).</summary>
+    public const string CheckoutVacio = "checkout-vacio";
 }
 
 /// <summary>Los motivos de <c>AccesoDenegado</c> que usa el módulo (AUD-05).</summary>

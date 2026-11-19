@@ -136,6 +136,10 @@ internal sealed class LimitadorDeCarritoFalso : ILimitadorDelCarrito
 
     public int Ediciones { get; private set; }
 
+    public ResultadoDeLimiteDelCarrito Revisar { get; set; } = ResultadoDeLimiteDelCarrito.Permitido;
+
+    public int Revisiones { get; private set; }
+
     public Task<ResultadoDeLimiteDelCarrito> CrearCarritoDeVisitante(CancellationToken cancelacion = default)
     {
         CarritosCreados++;
@@ -146,6 +150,12 @@ internal sealed class LimitadorDeCarritoFalso : ILimitadorDelCarrito
     {
         Ediciones++;
         return Task.FromResult(Editar);
+    }
+
+    public Task<ResultadoDeLimiteDelCarrito> RevisarCheckout(Guid cuentaId, CancellationToken cancelacion = default)
+    {
+        Revisiones++;
+        return Task.FromResult(Revisar);
     }
 }
 
@@ -178,6 +188,12 @@ internal sealed class RepositorioDeCarritosEnMemoria(BitacoraDeBloqueos bitacora
 
     public Task<CarritoDeDominio?> ObtenerDeCuenta(Guid cuentaId, bool conBloqueo, CancellationToken cancelacion = default)
     {
+        if (conBloqueo && AlBloquear is { } alBloquear)
+        {
+            AlBloquear = null;
+            alBloquear();
+        }
+
         bitacora.Anotar(conBloqueo, "carrito");
         return Task.FromResult(_carritos.FirstOrDefault(c => c.Propietario.CuentaId == cuentaId));
     }
@@ -261,6 +277,9 @@ internal sealed class RepositorioDeCheckoutsEnMemoria(BitacoraDeBloqueos bitacor
 
     public void Sembrar(Checkout checkout) => _checkouts.Add(checkout);
 
+    /// <summary>Se ejecuta una sola vez al agregar: simula a otra solicitud que crea el checkout a la vez (puede lanzar <c>CheckoutYaExisteException</c>).</summary>
+    public Action? AntesDeAgregar { get; set; }
+
     private static bool EstaVivo(Checkout c) => c.Estado is EstadoDelCheckout.EnEdicion or EstadoDelCheckout.Reservando or EstadoDelCheckout.EnPago or EstadoDelCheckout.PagoPendiente;
 
     public Task<Checkout?> ObtenerVivoDeCuenta(Guid cuentaId, bool conBloqueo, CancellationToken cancelacion = default)
@@ -291,6 +310,12 @@ internal sealed class RepositorioDeCheckoutsEnMemoria(BitacoraDeBloqueos bitacor
 
     public Task Agregar(Checkout checkout, CancellationToken cancelacion = default)
     {
+        if (AntesDeAgregar is { } antes)
+        {
+            AntesDeAgregar = null;
+            antes();
+        }
+
         _checkouts.Add(checkout);
         return Task.CompletedTask;
     }
@@ -401,6 +426,10 @@ internal sealed class EntornoDelCarrito
 
     public PagosFalso Pagos { get; }
 
+    public InventarioDelCarritoFalso Inventario { get; } = new();
+
+    public CostoDeEnvioFijo Costo { get; } = new(12m);
+
     public AuditoriaDelCarritoEspia Auditoria { get; } = new();
 
     public EstadoDeCuentaFalso Cuenta { get; } = new();
@@ -417,6 +446,9 @@ internal sealed class EntornoDelCarrito
     public ServiciosDelCarrito Servicios() =>
         new(new AutorizadorDelCarrito(Actor, Denegaciones), Catalogo, Disponibilidad, Posesion, Cuenta, Limites, Carritos, Checkouts, Identificadores, Reloj, Unidad, new EdicionConCheckoutVivo(Pagos, Checkouts), Auditoria);
 
+    /// <summary>Los servicios del checkout: los del carrito más el Inventario y el costo de envío.</summary>
+    public ServiciosDelCheckout ServiciosDelCheckout() => new(Servicios(), Inventario, Costo);
+
     public static EntornoDelCarrito DeCliente(Guid? cuenta = null) => new(ActorDePrueba.DeCliente(cuenta));
 
     public static EntornoDelCarrito DeVisitante() => new(ActorDePrueba.Anonimo());
@@ -427,6 +459,7 @@ internal sealed class EntornoDelCarrito
         var id = Guid.NewGuid();
         Catalogo.Poner(id, FormatoDeEdicion.Impresa, precio, titulo);
         Disponibilidad.Vendible(id, vendible);
+        Inventario.FijarStock(id, vendible);
         return id;
     }
 
@@ -468,5 +501,93 @@ internal sealed class AuditoriaDelCarritoEspia : IAuditoriaDelCarrito
 
         Retiros.Add((ediciones, carritosAfectados, lineasQuitadas, lineasAnotadas));
         return Task.CompletedTask;
+    }
+}
+
+/// <summary>El costo de envío configurado de las pruebas.</summary>
+internal sealed class CostoDeEnvioFijo(decimal soles) : ICostoDeEnvioConfigurado
+{
+    public CostoDeEnvio Valor { get; set; } = CostoDeEnvio.Crear(soles);
+}
+
+/// <summary>El Inventario visto por Carrito: stock y fuente por edición configurables, con contadores de consultas y un interruptor de caído. Reservar y liberar se configuran con sus resultados (T18, T20).</summary>
+internal sealed class InventarioDelCarritoFalso : IInventarioDelCarrito
+{
+    private readonly Dictionary<Guid, int> _stock = [];
+    private readonly Dictionary<Guid, (string Fuente, bool Traslado, int? Plazo)> _fuentes = [];
+
+    public bool Caido { get; set; }
+
+    public bool PreviaCaida { get; set; }
+
+    public int ConsultasDeDisponibilidad { get; private set; }
+
+    public int ConsultasPrevias { get; private set; }
+
+    public List<IReadOnlyList<Guid>> EdicionesConsultadas { get; } = [];
+
+    public EntregaParaElInventario? UltimaEntregaPrevia { get; private set; }
+
+    public ResultadoDeReservar AlReservar { get; set; } = ResultadoDeReservar.De(TipoDeResultadoDeReservar.NoDisponible);
+
+    public ResultadoDeLiberar AlLiberar { get; set; } = ResultadoDeLiberar.Liberada;
+
+    public List<(Guid PedidoId, int Generacion, IReadOnlyList<LineaParaElInventario> Lineas)> Reservas { get; } = [];
+
+    public List<(Guid PedidoId, string Motivo)> Liberaciones { get; } = [];
+
+    public ListaDeSucursales? Sucursales { get; set; } = new([new("sede-central", "Sede central", "ayacucho"), new("cusco", "Cusco", "cusco")], EntornoDelCarrito.Inicio, false);
+
+    public void FijarStock(Guid edicionId, int vendible) => _stock[edicionId] = vendible;
+
+    /// <summary>El Inventario no conoce la edición: sale en <c>noRegistradas</c>.</summary>
+    public void Olvidar(Guid edicionId) => _stock.Remove(edicionId);
+
+    public void FijarFuente(Guid edicionId, string fuente, bool traslado, int? plazo) => _fuentes[edicionId] = (fuente, traslado, plazo);
+
+    public Task<RespuestaDelInventarioDelCarrito<StockDeVariasEdiciones>> ConsultarDisponibilidad(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default)
+    {
+        ConsultasDeDisponibilidad++;
+        EdicionesConsultadas.Add([.. edicionIds]);
+        if (Caido)
+        {
+            return Task.FromResult(RespuestaDelInventarioDelCarrito<StockDeVariasEdiciones>.SinRespuesta);
+        }
+
+        var conocidas = edicionIds.Where(_stock.ContainsKey).Select(id => new StockDeEdicion(id, _stock[id])).ToList();
+        var noRegistradas = edicionIds.Where(id => !_stock.ContainsKey(id)).ToList();
+        return Task.FromResult(RespuestaDelInventarioDelCarrito<StockDeVariasEdiciones>.ConValor(new StockDeVariasEdiciones(conocidas, noRegistradas, EntornoDelCarrito.Inicio)));
+    }
+
+    public Task<RespuestaDelInventarioDelCarrito<ConsultaPreviaDelInventario>> ConsultarPrevia(EntregaParaElInventario entrega, IReadOnlyList<LineaParaElInventario> lineas, CancellationToken cancelacion = default)
+    {
+        ConsultasPrevias++;
+        UltimaEntregaPrevia = entrega;
+        if (Caido || PreviaCaida)
+        {
+            return Task.FromResult(RespuestaDelInventarioDelCarrito<ConsultaPreviaDelInventario>.SinRespuesta);
+        }
+
+        var selecciones = lineas.Select(l =>
+        {
+            var (fuente, traslado, plazo) = _fuentes.GetValueOrDefault(l.EdicionId, ("sede-central", false, (int?)null));
+            var hay = _stock.GetValueOrDefault(l.EdicionId) >= l.Cantidad;
+            return new SeleccionDeLinea(l.LineaId, l.EdicionId, hay, hay ? fuente : null, traslado, plazo, _stock.GetValueOrDefault(l.EdicionId));
+        }).ToList();
+        return Task.FromResult(RespuestaDelInventarioDelCarrito<ConsultaPreviaDelInventario>.ConValor(new ConsultaPreviaDelInventario(selecciones, EntornoDelCarrito.Inicio)));
+    }
+
+    public Task<ListaDeSucursales?> ListarSucursales(CancellationToken cancelacion = default) => Task.FromResult(Caido ? null : Sucursales);
+
+    public Task<ResultadoDeReservar> Reservar(Guid pedidoId, int generacionDeReserva, EntregaParaElInventario entrega, IReadOnlyList<LineaParaElInventario> lineas, CancellationToken cancelacion = default)
+    {
+        Reservas.Add((pedidoId, generacionDeReserva, lineas));
+        return Task.FromResult(AlReservar);
+    }
+
+    public Task<ResultadoDeLiberar> Liberar(Guid pedidoId, string motivo, CancellationToken cancelacion = default)
+    {
+        Liberaciones.Add((pedidoId, motivo));
+        return Task.FromResult(AlLiberar);
     }
 }
