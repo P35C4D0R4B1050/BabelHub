@@ -32,6 +32,26 @@ public sealed class CredencialDeUsuarioDelInventarioTests : IAsyncDisposable
         public Task<string> ObtenerRevocaciones(CancellationToken cancelacion = default) => Task.FromResult(revocaciones);
     }
 
+    private sealed class ControlRegistrador : IControlDeLimites
+    {
+        public List<(ClaveDePolitica Politica, string? Sujeto)> Reservas { get; } = [];
+
+        public bool Rechazar { get; set; }
+
+        public Task<ResultadoDeLimite> Reservar(ClaveDePolitica politica, string? sujeto = null, string? claveDelLlamador = null, BabelHub.Inventario.Application.Plataforma.ClaveDeIdempotencia? idempotencia = null, CancellationToken cancelacion = default)
+        {
+            Reservas.Add((politica, sujeto));
+            return Task.FromResult(Rechazar ? ResultadoDeLimite.Excedido("solicitudes-por-usuario", 30, DateTimeOffset.UtcNow.AddSeconds(30)) : ResultadoDeLimite.PermitidoSinContar());
+        }
+
+        public Task Liberar(ReservaDeLimite reserva, CancellationToken cancelacion = default) => Task.CompletedTask;
+
+        public Task Completar(ReservaDeLimite reserva, ResultadoMinimo resultado, CancellationToken cancelacion = default) => Task.CompletedTask;
+
+        public Task Fallar(ReservaDeLimite reserva, CancellationToken cancelacion = default) => Task.CompletedTask;
+    }
+
+    private readonly ControlRegistrador _control = new();
     private readonly ECDsa _clave = ECDsa.Create(ECCurve.NamedCurves.nistP256);
     private WebApplication _app = null!;
     private HttpClient _cliente = null!;
@@ -50,6 +70,9 @@ public sealed class CredencialDeUsuarioDelInventarioTests : IAsyncDisposable
         builder.Services.AddSingleton<IEstablecedorDeActor>(actor);
         builder.Services.AddSingleton<IActorActual>(actor);
         builder.Services.AddSingleton<IVerificadorDeCredenciales>(new VerificadorDeCredencialesDelInventario(cache));
+        builder.Services.AddSingleton<IControlDeLimites>(_control);
+        builder.Services.AddSingleton(new OpcionesDeErrores("INV"));
+        builder.Services.AddSingleton(new OpcionesDeLimitesHttp { PorUsuario = PoliticasDeLimite.SolicitudesPorUsuario });
         _app = builder.Build();
         _app.Use(async (contexto, siguiente) =>
         {
@@ -57,6 +80,7 @@ public sealed class CredencialDeUsuarioDelInventarioTests : IAsyncDisposable
             await siguiente();
         });
         _app.UsarCredencialDeUsuario();
+        _app.UsarLimitesGenerales();
         _app.MapGet("/quien", (HttpContext c, IActorActual actores) =>
             Results.Json(new { actor = actores.Actual?.UsuarioId, rol = actores.Actual?.Rol, sucursal = actores.Actual?.SucursalId, autorizacion = c.Request.Headers.Authorization.ToString() }));
         await _app.StartAsync();
@@ -166,6 +190,34 @@ public sealed class CredencialDeUsuarioDelInventarioTests : IAsyncDisposable
         var (_, sinToken) = await e.Quien(null, ("X-Prueba-Usuario", Guid.NewGuid().ToString()), ("X-Prueba-Rol", "administrador-central"), ("X-Usuario-Id", Guid.NewGuid().ToString()));
 
         Assert.Equal(System.Text.Json.JsonValueKind.Null, sinToken.GetProperty("actor").ValueKind);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-05")]
+    public async Task ElLimiteGeneral_CuentaAlUsuarioDeLaCredencialVerificada_YLoCorta()
+    {
+        await using var e = await Crear();
+        var usuario = Guid.NewGuid();
+
+        var (permitido, _) = await e.Quien("Bearer " + e.Token(r => { r["sub"] = usuario.ToString("D"); return r; }));
+        e._control.Rechazar = true;
+        var (rechazado, _) = await e.Quien("Bearer " + e.Token(r => { r["sub"] = usuario.ToString("D"); return r; }));
+
+        Assert.Equal(HttpStatusCode.OK, permitido);
+        Assert.Equal(HttpStatusCode.TooManyRequests, rechazado);
+        Assert.All(e._control.Reservas, r => Assert.Equal((PoliticasDeLimite.SolicitudesPorUsuario, usuario.ToString("D")), (r.Politica, r.Sujeto)));
+        Assert.Equal(2, e._control.Reservas.Count);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-05")]
+    public async Task UnaCabeceraDeUsuario_QueNoEsUnaCredencialVerificada_NoCuentaComoUsuarioParaElLimite()
+    {
+        await using var e = await Crear();
+
+        await e.Quien("Bearer no.es.token", ("X-Usuario-Id", Guid.NewGuid().ToString()));
+
+        Assert.Empty(e._control.Reservas);
     }
 
     [Fact]

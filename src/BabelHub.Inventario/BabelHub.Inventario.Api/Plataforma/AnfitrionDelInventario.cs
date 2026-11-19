@@ -87,25 +87,27 @@ public sealed class OpcionesDelAnfitrionDelInventario
     public override string ToString() => "[configuración del anfitrión del Inventario]";
 
     /// <summary>Lee y valida todo junto: junta todos los problemas y falla una sola vez con el nombre de cada variable (nunca su valor).</summary>
-    public static OpcionesDelAnfitrionDelInventario Leer(IConfiguration configuracion, bool esProduccion = true)
+    public static OpcionesDelAnfitrionDelInventario Leer(IConfiguration configuracion, bool esProduccion)
     {
         ArgumentNullException.ThrowIfNull(configuracion);
         var lector = new LectorDeSecretos(configuracion);
-        var baseDeLaAplicacion = Cadena(lector, RutaDeLaBaseDeLaAplicacion);
-        var depuracionDeAjustes = Cadena(lector, RutaDeLaBaseDeDepuracionDeAjustes);
-        var depuracionDeAuditoria = Cadena(lector, RutaDeLaBaseDeDepuracionDeAuditoria);
-        if (baseDeLaAplicacion is not null && (baseDeLaAplicacion == depuracionDeAjustes || baseDeLaAplicacion == depuracionDeAuditoria || (depuracionDeAjustes is not null && depuracionDeAjustes == depuracionDeAuditoria)))
-        {
-            lector.Problema(RutaDeLaBaseDeLaAplicacion, "las cuentas de la aplicación y de depuración deben ser distintas");
-        }
+        var baseDeLaAplicacion = Cadena(lector, RutaDeLaBaseDeLaAplicacion, esProduccion);
+        var depuracionDeAjustes = Cadena(lector, RutaDeLaBaseDeDepuracionDeAjustes, esProduccion);
+        var depuracionDeAuditoria = Cadena(lector, RutaDeLaBaseDeDepuracionDeAuditoria, esProduccion);
+        ComprobarQueSeanCuentasDistintas(lector, (RutaDeLaBaseDeLaAplicacion, baseDeLaAplicacion), (RutaDeLaBaseDeDepuracionDeAjustes, depuracionDeAjustes), (RutaDeLaBaseDeDepuracionDeAuditoria, depuracionDeAuditoria));
 
         var claveDelCursor = lector.Obligatorio(RutaDeLaClaveDelCursor);
         if (claveDelCursor is not null)
         {
             lector.Comprobar(RutaDeLaClaveDelCursor, claveDelCursor);
+            RepeticionDeSecretos.Comprobar(lector, configuracion, RutaDeLaClaveDelCursor, claveDelCursor);
         }
 
-        _ = ClaveDeBajasDelEntorno.Leer(lector);
+        if (ClaveDeBajasDelEntorno.Leer(lector) is not null && configuracion["Inventario:ClaveDeBajas"] is { Length: > 0 } clave)
+        {
+            RepeticionDeSecretos.Comprobar(lector, configuracion, "Inventario:ClaveDeBajas", clave);
+        }
+
         var version = lector.Opcional(RutaDeLaVersionDelCursor) ?? "v1";
         var claves = DireccionesDeIdentidad(lector);
         var ecommerce = Direccion(lector, RutaDelEcommerce);
@@ -135,7 +137,7 @@ public sealed class OpcionesDelAnfitrionDelInventario
         return new OpcionesDelAnfitrionDelInventario(baseDeLaAplicacion!, depuracionDeAjustes!, depuracionDeAuditoria!, claveDelCursor!, version, claves!, ecommerce!, seguridad!);
     }
 
-    private static string? Cadena(LectorDeSecretos lector, string ruta)
+    private static string? Cadena(LectorDeSecretos lector, string ruta, bool esProduccion)
     {
         var valor = lector.Obligatorio(ruta);
         if (valor is null)
@@ -143,15 +145,48 @@ public sealed class OpcionesDelAnfitrionDelInventario
             return null;
         }
 
+        NpgsqlConnectionStringBuilder cadena;
         try
         {
-            _ = new NpgsqlConnectionStringBuilder(valor);
-            return valor;
+            cadena = new NpgsqlConnectionStringBuilder(valor);
         }
         catch (ArgumentException)
         {
             lector.Problema(ruta, "no es una cadena de conexión válida");
             return null;
+        }
+
+        // Cada rol entra con su cuenta y su contraseña (D10): sin usuario o sin contraseña la cuenta no está aislada.
+        if (esProduccion && (string.IsNullOrWhiteSpace(cadena.Username) || string.IsNullOrEmpty(cadena.Password)))
+        {
+            lector.Problema(ruta, "en producción exige usuario y contraseña propios");
+            return null;
+        }
+
+        return valor;
+    }
+
+    /// <summary>Las tres cuentas deben ser <b>cuentas</b> distintas (servidor, puerto, base y usuario): cambiar el nombre de la aplicación u otro parámetro no las separa.</summary>
+    private static void ComprobarQueSeanCuentasDistintas(LectorDeSecretos lector, params (string Ruta, string? Cadena)[] cuentas)
+    {
+        var vistas = new List<(string Ruta, string Cuenta)>();
+        foreach (var (ruta, cadena) in cuentas)
+        {
+            if (cadena is null)
+            {
+                continue;
+            }
+
+            var c = new NpgsqlConnectionStringBuilder(cadena);
+            var cuenta = string.Join('|', c.Host?.ToLowerInvariant(), c.Port, c.Database?.ToLowerInvariant(), c.Username?.ToLowerInvariant());
+            if (vistas.FirstOrDefault(v => v.Cuenta == cuenta) is { Ruta: not null } igual)
+            {
+                lector.Problema(ruta, $"usa la misma cuenta que {LectorDeSecretos.Variable(igual.Ruta)}: las cuentas de la aplicación y de depuración deben ser distintas");
+            }
+            else
+            {
+                vistas.Add((ruta, cuenta));
+            }
         }
     }
 

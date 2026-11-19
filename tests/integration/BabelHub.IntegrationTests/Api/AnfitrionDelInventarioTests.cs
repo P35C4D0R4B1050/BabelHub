@@ -11,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 using BabelHub.Inventario.Application.Auditoria;
 
 namespace BabelHub.IntegrationTests.Api;
@@ -23,13 +24,19 @@ public sealed class AnfitrionDelInventarioTests
 {
     private static string Secreto() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(36));
 
+    private static string Cuenta(string usuario)
+    {
+        var pruebaClave = Secreto();
+        return new NpgsqlConnectionStringBuilder { Host = "localhost", Database = "inventario", Username = usuario, Password = pruebaClave }.ConnectionString;
+    }
+
     private static Dictionary<string, string?> ConfiguracionCompleta()
     {
         var valores = new Dictionary<string, string?>
         {
-            [OpcionesDelAnfitrionDelInventario.RutaDeLaBaseDeLaAplicacion] = "Host=localhost;Database=inventario;Username=acceso",
-            [OpcionesDelAnfitrionDelInventario.RutaDeLaBaseDeDepuracionDeAjustes] = "Host=localhost;Database=inventario;Username=depurador_ajustes",
-            [OpcionesDelAnfitrionDelInventario.RutaDeLaBaseDeDepuracionDeAuditoria] = "Host=localhost;Database=inventario;Username=depurador_auditoria",
+            [OpcionesDelAnfitrionDelInventario.RutaDeLaBaseDeLaAplicacion] = Cuenta("acceso"),
+            [OpcionesDelAnfitrionDelInventario.RutaDeLaBaseDeDepuracionDeAjustes] = Cuenta("depurador_ajustes"),
+            [OpcionesDelAnfitrionDelInventario.RutaDeLaBaseDeDepuracionDeAuditoria] = Cuenta("depurador_auditoria"),
             [OpcionesDelAnfitrionDelInventario.RutaDeLaClaveDelCursor] = Secreto(),
             [OpcionesDelAnfitrionDelInventario.RutaDeLaClaveDeVerificacionDeIdentidad] = "http://localhost:8083/.well-known/jwks.json",
             [OpcionesDelAnfitrionDelInventario.RutaDeLasRevocacionesDeIdentidad] = "http://localhost:8083/.well-known/revocaciones",
@@ -186,9 +193,71 @@ public sealed class AnfitrionDelInventarioTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-SEG-11")]
+    public void LaMismaCuentaConOtroNombreDeAplicacion_NoLasSepara()
+    {
+        var configuracion = ConfiguracionCompleta();
+        configuracion[OpcionesDelAnfitrionDelInventario.RutaDeLaBaseDeDepuracionDeAuditoria] = configuracion[OpcionesDelAnfitrionDelInventario.RutaDeLaBaseDeLaAplicacion] + ";Application Name=depurador";
+
+        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => Constructor(configuracion).AgregarInventario(ModoDeArranque.Normal));
+
+        Assert.Contains("BABELHUB__Inventario__Base__DepuracionDeAuditoria", falla.Message, StringComparison.Ordinal);
+        Assert.Contains("BABELHUB__Inventario__Base__Aplicacion", falla.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("sin-usuario")]
+    [InlineData("sin-contrasena")]
+    [Trait("Criterio", "AC-SEG-11")]
+    public void UnaCuentaSinUsuarioOSinContrasena_NoArrancaEnProduccion_PeroSiFueraDeProduccion(string caso)
+    {
+        var configuracion = ConfiguracionCompleta();
+        var pruebaSecreto = Secreto();
+        configuracion[OpcionesDelAnfitrionDelInventario.RutaDeLaBaseDeLaAplicacion] = caso == "sin-usuario"
+            ? new NpgsqlConnectionStringBuilder { Host = "localhost", Database = "inventario", Password = pruebaSecreto }.ConnectionString
+            : new NpgsqlConnectionStringBuilder { Host = "localhost", Database = "inventario", Username = "acceso" }.ConnectionString;
+
+        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => OpcionesDelAnfitrionDelInventario.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: true));
+        _ = OpcionesDelAnfitrionDelInventario.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: false);
+
+        Assert.Contains("BABELHUB__Inventario__Base__Aplicacion", falla.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(pruebaSecreto, falla.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Seguridad:Credenciales:BajaDeTitular")]
+    [InlineData("Seguridad:ClaveDeHuella")]
+    [Trait("Criterio", "AC-SEG-11")]
+    public void LaClaveDelCursor_NoPuedeRepetirUnSecretoComun_NiLaParteSecretaDeLaHuella(string ruta)
+    {
+        var configuracion = ConfiguracionCompleta();
+        var valor = configuracion[ruta]!;
+        configuracion[OpcionesDelAnfitrionDelInventario.RutaDeLaClaveDelCursor] = ruta == "Seguridad:ClaveDeHuella" ? valor[(valor.IndexOf(':') + 1)..] : valor;
+
+        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => Constructor(configuracion).AgregarInventario(ModoDeArranque.Normal));
+
+        Assert.Contains("BABELHUB__Auditoria__ClaveDeCursor", falla.Message, StringComparison.Ordinal);
+        Assert.Contains(LectorDeSecretos.Variable(ruta), falla.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(valor, falla.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-11")]
+    public void LaClaveDeBajas_NoPuedeRepetirUnaCredencialDeServicio()
+    {
+        var configuracion = ConfiguracionCompleta();
+        configuracion["Inventario:ClaveDeBajas"] = configuracion["Seguridad:Credenciales:Historial"];
+
+        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => Constructor(configuracion).AgregarInventario(ModoDeArranque.Normal));
+
+        Assert.Contains("BABELHUB__Inventario__ClaveDeBajas", falla.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(configuracion["Inventario:ClaveDeBajas"]!, falla.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LasOpciones_NoImprimenNingunValor()
     {
-        var opciones = OpcionesDelAnfitrionDelInventario.Leer(new ConfigurationBuilder().AddInMemoryCollection(ConfiguracionCompleta()).Build());
+        var opciones = OpcionesDelAnfitrionDelInventario.Leer(new ConfigurationBuilder().AddInMemoryCollection(ConfiguracionCompleta()).Build(), esProduccion: true);
 
         Assert.Equal("[configuración del anfitrión del Inventario]", opciones.ToString());
     }

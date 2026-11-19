@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using BabelHub.Inventario.Application.Plataforma;
 using BabelHub.Inventario.Infrastructure.Plataforma;
 using Microsoft.Extensions.Hosting;
@@ -24,6 +25,9 @@ public sealed class CredencialDeUsuarioMiddleware(RequestDelegate siguiente)
             if (leida is { EsValida: true, UsuarioId: { } usuario, Rol: { } rol })
             {
                 actor.Establecer(ActorActual.DeUsuario(usuario, rol, leida.SucursalId));
+
+                // Los límites generales (SEG-05) cuentan al usuario por su identificador: solo lo que salió de la credencial verificada entra como identidad autenticada.
+                contexto.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, usuario.ToString("D"))], "CredencialDeUsuario"));
             }
         }
 
