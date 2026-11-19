@@ -197,7 +197,7 @@ public sealed class EventosDeSeguridadTests
         var politicas = PoliticasDeLimite.Generales.Concat(PoliticasDeLimite.Todas).Select(p => p.Valor).ToHashSet();
 
         Assert.All(politicas, p => Assert.Contains(p, CatalogoDeAccionesDeAuditoria.MotivosDeLimiteExcedido));
-        Assert.Equal(19, CatalogoDeAccionesDeAuditoria.MotivosDeLimiteExcedido.Count);
+        Assert.Equal(22, CatalogoDeAccionesDeAuditoria.MotivosDeLimiteExcedido.Count);
         Assert.Equal(CatalogoDeAccionesDeAuditoria.MotivosDeLimiteExcedido.Order(StringComparer.Ordinal), Catalogo.Obtener("LimiteExcedido").Motivos.Order(StringComparer.Ordinal));
     }
 
