@@ -448,6 +448,42 @@ public sealed class IngresoTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-WEB-28")]
+    public async Task ElPasoDelDesafio_DiceQueFalta_YCancelarloLoDejaSinPaso_AunSiVenceOEsAjeno()
+    {
+        var e = new EntornoDeIdentidad();
+        ConTemporal(e, RolDeUsuario.Logistica);
+        var ingreso = e.Ingreso();
+        var desafio = (await ingreso.Ingresar(Solicitud("nuevo@example.com", "Temporal-de-prueba-0001"))).Valor.Desafio!;
+
+        var paso = await ingreso.PasoDelDesafio(desafio.Identificador);
+        var ajeno = await ingreso.PasoDelDesafio(new ValorSecreto("ajeno-que-no-existe-0123456789-0123456789ab"));
+        await ingreso.CancelarElDesafio(desafio.Identificador);
+        await ingreso.CancelarElDesafio(desafio.Identificador);
+        await ingreso.CancelarElDesafio(new ValorSecreto("ajeno-que-no-existe-0123456789-0123456789ab"));
+        var trasCancelar = await ingreso.PasoDelDesafio(desafio.Identificador);
+        var cambiarTrasCancelar = await ingreso.CambiarLaContrasenaTemporal(desafio.Identificador, new ValorSecreto("una frase nueva y segura"));
+
+        Assert.Equal(PasoPendienteDelIngreso.CambiarContrasenaTemporal, paso);
+        Assert.Null(ajeno);
+        Assert.Null(trasCancelar);
+        Assert.False(cambiarTrasCancelar.EsExito);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-28")]
+    public async Task UnDesafioVencido_NoTienePaso()
+    {
+        var e = new EntornoDeIdentidad();
+        ConTemporal(e, RolDeUsuario.Logistica);
+        var ingreso = e.Ingreso();
+        var desafio = (await ingreso.Ingresar(Solicitud("nuevo@example.com", "Temporal-de-prueba-0001"))).Valor.Desafio!;
+        e.Reloj.Ahora = EntornoDeIdentidad.Inicio.AddMinutes(6);
+
+        Assert.Null(await ingreso.PasoDelDesafio(desafio.Identificador));
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-IDE-21")]
     public async Task ElCambioDeLaContrasenaTemporal_ValidaLaPolitica_RevocaSesiones_Audita_Avisa_YSigueConElSegundoFactor()
     {

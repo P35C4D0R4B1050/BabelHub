@@ -628,6 +628,33 @@ public sealed class Ingreso(
         return new ResultadoDelIngreso { Desafio = new DesafioDelIngreso(new ValorSecreto(valor), paso, desafio.Vence) };
     }
 
+    public async Task<PasoPendienteDelIngreso?> PasoDelDesafio(ValorSecreto desafio, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(desafio);
+        var encontrado = await desafios.PorHuella(huellasDeIdentidad.DeValorOpaco(desafio.Revelar()), cancelacion).ConfigureAwait(false);
+        if (encontrado is null || encontrado.Evaluar(reloj.Ahora) != EstadoDelDesafio.Vigente)
+        {
+            return null;
+        }
+
+        return encontrado.Modo switch
+        {
+            ModoDelDesafio.PresentarSegundoFactor => PasoPendienteDelIngreso.PresentarSegundoFactor,
+            ModoDelDesafio.ConfigurarSegundoFactor => PasoPendienteDelIngreso.ConfigurarSegundoFactor,
+            _ => PasoPendienteDelIngreso.CambiarContrasenaTemporal,
+        };
+    }
+
+    public async Task CancelarElDesafio(ValorSecreto desafio, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(desafio);
+        var encontrado = await desafios.PorHuella(huellasDeIdentidad.DeValorOpaco(desafio.Revelar()), cancelacion).ConfigureAwait(false);
+        if (encontrado is not null && encontrado.Evaluar(reloj.Ahora) == EstadoDelDesafio.Vigente)
+        {
+            await unidad.Ejecutar(async ct => await desafios.MarcarUsado(encontrado.Id, ct).ConfigureAwait(false), cancelacion).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>El desafío vigente que permite esa acción, o <see langword="null"/> si no existe, venció, ya se usó o es de otro modo (IDE-42).</summary>
     private async Task<DesafioDeIngreso?> DesafioVigente(ValorSecreto valor, AccionConDesafio accion, CancellationToken cancelacion)
     {

@@ -44,6 +44,14 @@ public interface IIngreso
 
     /// <summary>Cambia la contraseña temporal (IDE-23): la única acción que permite ese desafío; sigue el segundo factor, si le toca, antes de emitir la credencial.</summary>
     Task<Resultado<ResultadoDelIngreso>> CambiarLaContrasenaTemporal(ValorSecreto desafio, ValorSecreto contrasenaNueva, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// El paso que le falta a un desafío vigente (para que la pantalla de ingreso muestre el correcto), o <see langword="null"/> si no existe, venció o ya se usó. No consume nada ni revela nada del usuario.
+    /// </summary>
+    Task<PasoPendienteDelIngreso?> PasoDelDesafio(ValorSecreto desafio, CancellationToken cancelacion = default);
+
+    /// <summary>Descarta un desafío vigente (quien cancela el ingreso): lo marca usado. Idempotente; un desafío que no existe o ya no sirve no es un error.</summary>
+    Task CancelarElDesafio(ValorSecreto desafio, CancellationToken cancelacion = default);
 }
 
 /// <summary>Sesiones (IDE-08, IDE-14, IDE-43, IDE-44, IDE-46, IDE-60): renovar, cerrar y cerrar todas.</summary>
