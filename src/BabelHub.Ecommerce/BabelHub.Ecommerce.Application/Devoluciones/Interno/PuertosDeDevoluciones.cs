@@ -30,7 +30,7 @@ internal sealed class DevolucionesNoDisponiblesException : Exception
 }
 
 /// <summary>
-/// El repositorio del agregado <see cref="Devolucion"/> y de los cupos de línea (plan §3). <b>Siempre dentro de la unidad de trabajo del llamador</b>: <c>EjecutarComo(devoluciones)</c>. <see cref="TomarCupos"/> y
+/// El repositorio del agregado <see cref="Devolucion"/> y de los cupos de línea (plan §3). Las escrituras y las lecturas con bloqueo van <b>dentro de la unidad de trabajo del llamador</b>; la Infraestructura abre su propio rol de esquema (<c>EjecutarComo(devoluciones)</c>) como Envíos y decide cómo lee fuera de una transacción (T22). <see cref="TomarCupos"/> y
 /// <see cref="DevolverCupos"/> operan <b>en orden de <c>linea_id</c></b> (dos solicitudes con las mismas líneas no se interbloquean) con un <c>UPDATE</c> condicional: la atomicidad frente a solicitudes simultáneas es de la base (DEV-03).
 /// No guarda la cuenta: Devoluciones localiza lo de una cuenta por el pedido (D01).
 /// </summary>
@@ -60,6 +60,9 @@ internal interface IRepositorioDeDevoluciones
     Task<PaginaDeDevolucionesDelDominio> ListarDeLaSucursal(string codigoDeSucursal, int pagina, int tamano, CancellationToken cancelacion = default);
 
     Task<PaginaDeDevolucionesDelDominio> ListarDeLaAdministracion(FiltroDeLaAdministracion filtro, int pagina, int tamano, CancellationToken cancelacion = default);
+
+    /// <summary>Las líneas con el reembolso pendiente (recibida de un impreso o aprobada de un digital), de las más antiguas a las más recientes, hasta <paramref name="maximo"/>: la conciliación de reembolsos (T11).</summary>
+    Task<IReadOnlyList<(Guid DevolucionId, Guid LineaDePedidoId)>> ObtenerConReembolsoPendiente(int maximo, CancellationToken cancelacion = default);
 }
 
 /// <summary>El resultado de pedir el reingreso de una devolución al Inventario, reducido a la lista cerrada que el orquestador necesita (D07).</summary>

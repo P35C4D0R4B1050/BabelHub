@@ -9,58 +9,6 @@ using BabelHub.Ecommerce.UnitTests.Soporte;
 
 namespace BabelHub.Ecommerce.UnitTests.Devoluciones;
 
-/// <summary>La resolución de sucursal de las pruebas: el código de cada sucursal y si el Inventario no responde.</summary>
-internal sealed class ResolucionDeSucursalDoble : IResolucionDeSucursal
-{
-    public Dictionary<Guid, string> Codigos { get; } = [];
-
-    public bool NoResponde { get; set; }
-
-    public int Consultas { get; private set; }
-
-    public Task<string?> CodigoDe(Guid sucursalId, CancellationToken cancelacion = default)
-    {
-        Consultas++;
-        if (NoResponde)
-        {
-            throw new InvalidOperationException("El Inventario no responde.");
-        }
-
-        return Task.FromResult(Codigos.GetValueOrDefault(sucursalId));
-    }
-}
-
-/// <summary>El entorno de las pruebas de Devoluciones: la autorización, los límites y sus dobles. Crece con cada tarea.</summary>
-internal sealed class EntornoDeDevoluciones
-{
-    public static readonly DateTimeOffset AhoraInicial = new(2026, 11, 20, 15, 0, 0, TimeSpan.Zero);
-
-    public EntornoDeDevoluciones(ActorDePrueba? actor = null)
-    {
-        Actor = actor ?? ActorDePrueba.DeCliente();
-        Denegaciones = new DenegacionesDelCatalogoEspia();
-        Cuentas = new EstadoDeCuentaFalso();
-        Sucursales = new ResolucionDeSucursalDoble();
-        Limites = new LimitesDeEnviosDoble();
-        Autorizador = new AutorizadorDeDevoluciones(Actor, Denegaciones, Cuentas, Sucursales);
-        LimitesDeUso = new LimitesDeDevoluciones(Limites, Actor);
-    }
-
-    public ActorDePrueba Actor { get; }
-
-    public DenegacionesDelCatalogoEspia Denegaciones { get; }
-
-    public EstadoDeCuentaFalso Cuentas { get; }
-
-    public ResolucionDeSucursalDoble Sucursales { get; }
-
-    public LimitesDeEnviosDoble Limites { get; }
-
-    public AutorizadorDeDevoluciones Autorizador { get; }
-
-    public LimitesDeDevoluciones LimitesDeUso { get; }
-}
-
 /// <summary>La autorización y el alcance de Devoluciones (T05; DEV-13, DEV-28, AC-DEV-12, AC-DEV-23, AC-DEV-30): el orden rol → textos → alcance, el mismo «no encontrado» con un acceso denegado por intento y los límites.</summary>
 public sealed class AutorizacionYAlcanceDeDevolucionesTests
 {
