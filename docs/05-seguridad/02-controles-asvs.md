@@ -73,7 +73,7 @@ Traduce el **OWASP Application Security Verification Standard 5.0** a controles 
 | :--- | :--- | :---: | :--- | :--- | :---: |
 | **CTL-27** | TLS 1.2 o superior hacia el exterior; HSTS. | L1 | RNF06, RNF18, AD13 | Escáner de configuración | Decisión |
 | **CTL-28** | Respaldos y volúmenes cifrados, con la clave fuera de la VM, del repositorio y del almacén de respaldos. | L2 | RNF18, AD27, PLA-09, PLA-15, PLA-16, PLA-17 | Inspección y ensayo de restauración | Especificado |
-| **CTL-29** | La firma de las credenciales usa una clave que solo posee Identidad, rota cada 90 días y se guarda fuera del repositorio. | L2 | IDE-35, IDE-36, AD22 (custodia de la clave: plan) | Pruebas de integración y revisión | Especificado |
+| **CTL-29** | La firma de las credenciales usa una clave que solo posee Identidad, rota cada 90 días y se guarda fuera del repositorio. | L2 | IDE-35, IDE-36, AD22; custodia fijada en `03-autenticacion-y-autorizacion.md` §6 y `infra/respaldos/custodia.md` §3 | Pruebas de integración y revisión | Especificado |
 
 ## 9. Configuración y protección de datos
 

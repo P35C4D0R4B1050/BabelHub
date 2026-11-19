@@ -29,6 +29,7 @@ public sealed class BajaDeTitularPostgresTests(PostgresDeReservasFixture bd) : I
 
     [Fact]
     [Trait("Criterio", "AC-SEL-36")]
+    [Trait("Criterio", "AC-IDE-58")]
     public async Task LaBaja_SustituyeElTitularEnReservasYEnClavesDeLimite_SinTocarStockNiConteoDelOrigen()
     {
         var lima = await bd.AgregarFuente("lima", recepcion: true);
@@ -102,6 +103,7 @@ public sealed class BajaDeTitularPostgresTests(PostgresDeReservasFixture bd) : I
 
     [Fact]
     [Trait("Criterio", "AC-SEL-36")]
+    [Trait("Criterio", "AC-IDE-58")]
     public async Task RepetirLaBaja_NoCambiaNada_NiAudita_YUnTitularSinReservasNoFalla()
     {
         var lima = await bd.AgregarFuente("lima", recepcion: true);
@@ -128,6 +130,7 @@ public sealed class BajaDeTitularPostgresTests(PostgresDeReservasFixture bd) : I
 
     [Fact]
     [Trait("Criterio", "AC-SEL-36")]
+    [Trait("Criterio", "AC-IDE-58")]
     public async Task UnaBajaSinLaCredencialDeSuAlcance_SeRechaza_SinEscribirNada()
     {
         var lima = await bd.AgregarFuente("lima", recepcion: true);

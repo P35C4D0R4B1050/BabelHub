@@ -41,3 +41,5 @@ Las claves que otras features dejan fuera de la plataforma se registran aquí co
 | Clave | Para qué sirve | Titular | Ubicación de las copias | Última prueba |
 | :--- | :--- | :--- | :--- | :--- |
 | Clave de cifrado de los respaldos (`age`) | Descifrar los respaldos y el archivo de cambios | (apartado 1) | (apartado 1) | (apartado 1) |
+| Clave de entorno de Identidad (`BABELHUB__Identidad__ClaveDeCifradoDeClaves`) | Descifrar la clave privada de firma de credenciales (`identidad.claves_de_firma`) y los secretos del segundo factor; se entrega por separado a la VM de ventas y a la réplica de gestión | pendiente | pendiente (dos copias fuera de línea, en lugares distintos; las copias de custodia que se registran aquí nunca están en el repositorio, una VM, el almacén de objetos ni un respaldo; cada VM de Identidad recibe el valor operativo solo en su archivo de secretos) | pendiente |
+| Pimienta de las huellas de Identidad (`BABELHUB__Identidad__Pimienta`) | HMAC de los códigos de un solo uso, las renovaciones y las marcas de dispositivo; distinta de la clave anterior | pendiente | pendiente (misma regla) | pendiente |

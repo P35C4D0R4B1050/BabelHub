@@ -464,6 +464,7 @@ public sealed class ApiDeReservasTests(PostgresDeReservasFixture bd) : IClassFix
 
     [Fact]
     [Trait("Criterio", "AC-SEL-36")]
+    [Trait("Criterio", "AC-IDE-58")]
     public async Task Baja_ConLaCredencialDeSuAlcance_Responde204_TambienAlRepetirla_AnonimizaYElTitularYaNoReserva()
     {
         var (_, libro) = await Escenario();
@@ -486,6 +487,7 @@ public sealed class ApiDeReservasTests(PostgresDeReservasFixture bd) : IClassFix
 
     [Fact]
     [Trait("Criterio", "AC-SEL-36")]
+    [Trait("Criterio", "AC-IDE-58")]
     public async Task Baja_SinLaCredencialDeSuAlcance_SeRechaza_SinEscribirNada_YUnCuerpoConCampoDeMasEs400()
     {
         var (_, libro) = await Escenario();
