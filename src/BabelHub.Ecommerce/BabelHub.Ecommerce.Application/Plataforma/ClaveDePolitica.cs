@@ -88,6 +88,9 @@ public static class PoliticasDeLimite
 
     public static ClaveDePolitica GuiasAlOperador { get; } = new("guias-al-operador");
 
+    /// <summary>La ráfaga de avisos de la pasarela de pagos: 120 por origen y minuto, antes de verificar la firma (PAG-05).</summary>
+    public static ClaveDePolitica AvisosDeLaPasarelaPorOrigen { get; } = new("avisos-de-la-pasarela-por-origen");
+
     public static ClaveDePolitica SolicitudesPreviasPorOrigen { get; } = new("solicitudes-previas-por-origen");
 
     public static ClaveDePolitica SolicitudesDelOrigenDesconocido { get; } = new("solicitudes-del-origen-desconocido");
@@ -102,7 +105,7 @@ public static class PoliticasDeLimite
     public static IReadOnlyList<ClaveDePolitica> Generales { get; } =
         [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen, ConsultasDeHojasPorUsuario,
          CarritosDeVisitantePorOrigen, EdicionDeLineasPorCuenta, EdicionDeLineasPorOrigen, RevisionDelCheckoutPorCuenta, VolverOReiniciarPorCuenta,
-         ConsultasDeEnviosPorUsuario, OperacionesDeEnviosPorUsuario, GuiasAlOperador];
+         ConsultasDeEnviosPorUsuario, OperacionesDeEnviosPorUsuario, GuiasAlOperador, AvisosDeLaPasarelaPorOrigen];
 
     public static IReadOnlyList<ClaveDePolitica> Todas { get; } =
     [

@@ -105,6 +105,10 @@ public static class PoliticasDeSeguridad
     public static PoliticaDeLimite GuiasAlOperador { get; } = new(
         "guias-al-operador", 30, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
 
+    /// <summary>La ráfaga de avisos de la pasarela de pagos (PAG-05, SEG-05): 120 por origen y minuto, antes de verificar la firma, para que una entrada pública no pueda agotar el cómputo. Con el almacén caído cae al límite local (SEG-26); el aviso legítimo se reintenta.</summary>
+    public static PoliticaDeLimite AvisosDeLaPasarelaPorOrigen { get; } = new(
+        "avisos-de-la-pasarela-por-origen", 120, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true);
+
     /// <summary>Tope previo barato por huella de origen, antes de autenticar: 600 por minuto (el bucket del origen desconocido tiene el suyo).</summary>
     public static PoliticaDeLimite SolicitudesPreviasPorOrigen { get; } = new(
         "solicitudes-previas-por-origen", 600, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true);
@@ -129,7 +133,7 @@ public static class PoliticasDeSeguridad
     public static IReadOnlyList<PoliticaDeLimite> Generales { get; } =
         [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen, ConsultasDeHojasPorUsuario,
          CarritosDeVisitantePorOrigen, EdicionDeLineasPorCuenta, EdicionDeLineasPorOrigen, RevisionDelCheckoutPorCuenta, VolverOReiniciarPorCuenta,
-         ConsultasDeEnviosPorUsuario, OperacionesDeEnviosPorUsuario, GuiasAlOperador];
+         ConsultasDeEnviosPorUsuario, OperacionesDeEnviosPorUsuario, GuiasAlOperador, AvisosDeLaPasarelaPorOrigen];
 
     public static IReadOnlyList<PoliticaDeLimite> Todas { get; } =
     [
