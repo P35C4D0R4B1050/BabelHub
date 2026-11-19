@@ -78,7 +78,12 @@ public static class ComposicionDeLaPlataformaDelEcommerce
         servicios.AddSingleton(new OpcionesDeVerificacionDePersona());
         servicios.AddSingleton(new OpcionesDeDependencias());
         servicios.AddSingleton<IDependenciasExternas>(sp => new DependenciasExternas(sp.GetRequiredService<OpcionesDeDependencias>()));
-        servicios.AddHttpClient("turnstile").ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, ConnectTimeout = TimeSpan.FromSeconds(5) });
+        servicios.AddHttpClient("turnstile", cliente =>
+            {
+                // El destino es fijo (nunca viene de un dato): la verificación del token en el servidor de Cloudflare.
+                cliente.BaseAddress = new Uri(VerificadorTurnstile.UrlDeVerificacion);
+                cliente.Timeout = TimeSpan.FromSeconds(10);
+            }).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, ConnectTimeout = TimeSpan.FromSeconds(5) });
         if (conLlamadasReales)
         {
             servicios.AddSingleton<IVerificadorDePersona>(sp => new VerificadorTurnstile(sp.GetRequiredService<IHttpClientFactory>().CreateClient("turnstile"), turnstile, sp.GetRequiredService<IDependenciasExternas>()));

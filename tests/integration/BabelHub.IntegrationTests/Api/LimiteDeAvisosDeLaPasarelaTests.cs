@@ -55,6 +55,7 @@ public sealed class LimiteDeAvisosDeLaPasarelaTests : IAsyncLifetime
             return Results.Ok();
         });
         _app.MapGet(AvisosDeLaPasarelaEnLaApi.Ruta, () => Results.Ok());
+        _app.MapPost(AvisosDeLaPasarelaEnLaApi.Ruta + "/{**resto}", () => Results.Ok());
         _app.MapPost("/otra", () => Results.Ok());
         await _app.StartAsync();
         _cliente = _app.GetTestClient();
@@ -83,17 +84,26 @@ public sealed class LimiteDeAvisosDeLaPasarelaTests : IAsyncLifetime
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-16")]
-    public async Task SoloCuentaElPostALaRutaDeLosAvisos()
+    [Trait("Criterio", "AC-SEG-08")]
+    public async Task CuentaTodoLoQueLaExencionDejaPasar_ConElMismoCriterioDeRuta_YNadaMas()
     {
+        // Lo exento nunca queda sin límite: la barra final, las mayúsculas, las subrutas y los demás métodos cuentan igual que el POST exacto.
+        await _cliente.PostAsync(AvisosDeLaPasarelaEnLaApi.Ruta + "/", new StringContent("{}"));
+        await _cliente.PostAsync(AvisosDeLaPasarelaEnLaApi.Ruta.ToUpperInvariant(), new StringContent("{}"));
+        await _cliente.PostAsync(AvisosDeLaPasarelaEnLaApi.Ruta + "/otra-cosa", new StringContent("{}"));
         await _cliente.GetAsync(AvisosDeLaPasarelaEnLaApi.Ruta);
-        await _cliente.PostAsync("/otra", new StringContent("{}"));
+        using var put = new HttpRequestMessage(HttpMethod.Put, AvisosDeLaPasarelaEnLaApi.Ruta) { Content = new StringContent("{}") };
+        await _cliente.SendAsync(put);
+        Assert.Equal(5, _control.Reservas.Count);
 
-        Assert.Empty(_control.Reservas);
+        // Otras rutas, aunque se parezcan, no cuentan ni están exentas.
+        await _cliente.PostAsync("/otra", new StringContent("{}"));
+        await _cliente.PostAsync(AvisosDeLaPasarelaEnLaApi.Ruta + "x", new StringContent("{}"));
+        Assert.Equal(5, _control.Reservas.Count);
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-16")]
+    [Trait("Criterio", "AC-SEG-16")]
     public void LaRutaDeLosAvisos_EstaExentaDelTopePrevioYDelLimiteSinSesion_ConSuPropiaRafaga()
     {
         // La política es por origen y su tope es mayor que el límite sin sesión de 60 por minuto: la composición exime la ruta y la ráfaga es su único límite.

@@ -219,6 +219,8 @@ public sealed class AnfitrionDelEcommerceTests
             ("Almacen:Supresiones:ClaveSecreta", c => c["Almacen:Catalogo:ClaveSecreta"]),
             (OpcionesDelAnfitrionDelEcommerce.RutaDeLaClaveDeLaCola, c => c["Web:ClaveDeSesionesTienda"]),
             ("Pagos:ClaveDeIntentos", c => c["Seguridad:Credenciales:Historial"]),
+            ("Pagos:ClaveDeIntentosAnterior", c => c["Seguridad:Credenciales:LecturaDeContacto"]),
+            ("Pagos:LlavePrivada", c => c["Auditoria:ClaveDeCursor"]),
         };
 
         foreach (var (ruta, valor) in casos)
@@ -296,7 +298,6 @@ public sealed class AnfitrionDelEcommerceTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-10")]
     public async Task Pagos_EnElEnsayoLaPasarelaYElVerificadorDePersonaSonNulos_YEnElModoNormalElSimuladorYTurnstile()
     {
         var configuracion = ConfiguracionCompleta();
@@ -308,7 +309,72 @@ public sealed class AnfitrionDelEcommerceTests
         Assert.IsType<BabelHub.Ecommerce.Infrastructure.Pagos.SimuladorPasarelaDePago>(normal.Services.GetRequiredService<BabelHub.Ecommerce.Application.Pagos.Interno.IPasarelaDePago>());
         Assert.IsType<BabelHub.Ecommerce.Infrastructure.Composicion.VerificadorDePersonaNulo>(ensayo.Services.GetRequiredService<IVerificadorDePersona>());
         Assert.IsType<BabelHub.Ecommerce.Infrastructure.Plataforma.VerificadorTurnstile>(normal.Services.GetRequiredService<IVerificadorDePersona>());
-        Assert.All(ensayo.Services.GetServices<IAdaptadorSaliente>().Where(a => a.EsHaciaProveedor), a => Assert.True(a.EsNulo, a.Nombre));
+        var salientesDelEnsayo = ensayo.Services.GetServices<IAdaptadorSaliente>().Where(a => a.EsHaciaProveedor).ToList();
+        Assert.All(salientesDelEnsayo, a => Assert.True(a.EsNulo, a.Nombre));
+        Assert.Contains(salientesDelEnsayo, a => a.Nombre == "pasarela-de-pago");
+        Assert.Contains(salientesDelEnsayo, a => a.Nombre == "operador-logistico");
+        Assert.Contains(normal.Services.GetServices<IAdaptadorSaliente>(), a => a.Nombre == "pasarela-de-pago" && !a.EsNulo);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-16")]
+    public async Task ElHostCompuesto_EximeLaRutaDeLosAvisosDelTopePrevioYDelLimiteSinSesion_SoloEsaRuta()
+    {
+        await using var app = Compuesto();
+
+        var opciones = app.Services.GetRequiredService<BabelHub.Ecommerce.Api.Plataforma.OpcionesDeLimitesHttp>();
+
+        Assert.True(opciones.EsExenta(BabelHub.Ecommerce.Api.Pagos.AvisosDeLaPasarelaEnLaApi.Ruta));
+        Assert.True(opciones.EsExenta(BabelHub.Ecommerce.Api.Pagos.AvisosDeLaPasarelaEnLaApi.Ruta + "/"));
+        Assert.True(opciones.EsExenta("/health/live"));
+        Assert.False(opciones.EsExenta("/api/ecommerce/v1/integraciones"));
+        Assert.False(opciones.EsExenta("/checkout/pago"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-25")]
+    public void EnProduccion_LasGuardasDeLosDoblesCorrenAlFinal_ElPrimerRechazoEsElDePagosYNoElDeCarrito()
+    {
+        var configuracion = ConfiguracionCompleta();
+        foreach (var (ruta, valor) in ConfiguracionDeProduccion())
+        {
+            configuracion[ruta] = valor;
+        }
+
+        var builder = Constructor(configuracion, "Production");
+
+        // Con Notificaciones ya real (aquí, dobles de otra clase), lo primero que rechaza producción es el simulador de Pagos: la guarda de Carrito ya no se adelanta a ver como doble lo que Pagos reemplaza después.
+        builder.Services.AddScoped<BabelHub.Ecommerce.Application.Identidad.ICancelacionDeAvisos, OtraCancelacionDeAvisos>();
+        builder.Services.AddScoped<BabelHub.Ecommerce.Application.Notificaciones.INotificador, OtroNotificador>();
+        var falla = Assert.Throws<BabelHub.Ecommerce.Infrastructure.Pagos.ConfiguracionDePagosInvalidaException>(() => builder.AgregarEcommerce(ModoDeArranque.Normal));
+
+        Assert.Contains("simulador", falla.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("ICreadorDeIntencionesDePago", falla.Message, StringComparison.Ordinal);
+    }
+
+    private sealed class OtraCancelacionDeAvisos : BabelHub.Ecommerce.Application.Identidad.ICancelacionDeAvisos
+    {
+        public Task CancelarLosAvisosDe(Guid usuarioId, CancellationToken cancelacion = default) => Task.CompletedTask;
+    }
+
+    private sealed class OtroNotificador : BabelHub.Ecommerce.Application.Notificaciones.INotificador
+    {
+        public Task<BabelHub.Ecommerce.Application.Notificaciones.ResultadoDeLaSolicitudDeAviso> Solicitar(BabelHub.Ecommerce.Application.Notificaciones.SolicitudDeAviso solicitud, CancellationToken cancelacion = default) =>
+            Task.FromResult(BabelHub.Ecommerce.Application.Notificaciones.ResultadoDeLaSolicitudDeAviso.Creado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-25")]
+    public async Task ElClienteDeTurnstile_VaAlDestinoFijoDeCloudflareConSuPlazo_YLaEntradaDeAvisosNoSeMapea()
+    {
+        await using var app = Compuesto();
+
+        using var cliente = app.Services.GetRequiredService<IHttpClientFactory>().CreateClient("turnstile");
+
+        Assert.Equal(BabelHub.Ecommerce.Infrastructure.Plataforma.VerificadorTurnstile.UrlDeVerificacion, cliente.BaseAddress!.ToString());
+        Assert.Equal(TimeSpan.FromSeconds(10), cliente.Timeout);
+        var rutas = ((Microsoft.AspNetCore.Routing.IEndpointRouteBuilder)app).DataSources.SelectMany(d => d.Endpoints).OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>();
+        Assert.DoesNotContain(rutas, e => (e.RoutePattern.RawText ?? string.Empty).Contains("integraciones/pasarela", StringComparison.OrdinalIgnoreCase));
     }
 
     [Theory]
@@ -329,7 +395,6 @@ public sealed class AnfitrionDelEcommerceTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-ENV-12")]
     public async Task ElOperadorLogisticoEsElNuloPorDefecto_ElSimuladorSoloEnDesarrollo_YUnoDesconocidoFalla()
     {
         var configuracion = ConfiguracionCompleta();

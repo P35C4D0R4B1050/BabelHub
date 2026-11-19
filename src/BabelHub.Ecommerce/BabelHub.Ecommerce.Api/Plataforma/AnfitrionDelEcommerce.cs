@@ -18,6 +18,7 @@ using BabelHub.Ecommerce.Infrastructure.Catalogo;
 using BabelHub.Ecommerce.Infrastructure.Composicion;
 using BabelHub.Ecommerce.Infrastructure.Envios;
 using BabelHub.Ecommerce.Infrastructure.Pagos;
+using BabelHub.Ecommerce.Infrastructure.Pedidos;
 using BabelHub.Ecommerce.Infrastructure.Notificaciones;
 using BabelHub.Ecommerce.Infrastructure.Plataforma;
 using BabelHub.Ecommerce.Infrastructure.Web;
@@ -400,24 +401,33 @@ public static class AnfitrionDelEcommerce
         servicios.AgregarPoliticaDeTextosPendientes();
         servicios.AgregarPurgaDeSesionesWeb(modo);
         servicios.AgregarVerificacionDePersonaWeb(opciones.VerificacionWeb);
-        servicios.AgregarCarrito(opciones.CostoDeEnvio, esProduccion && soloEnModoNormal);
+        // Las guardas de producción de los dobles provisionales (Carrito, Pagos y Pedidos) corren al final, cuando ya están todas las implementaciones reales: cada módulo reemplaza o completa lo del anterior.
+        servicios.AgregarCarrito(opciones.CostoDeEnvio, esProduccion: false);
 
         servicios.AgregarTrabajosDelCarritoEnLaApi(soloEnModoNormal);
 
         // ---------- Pagos, Envíos, Reclamaciones y Pedidos ----------
         // Pagos reemplaza al creador de intenciones provisional de Carrito; en el ensayo y al restaurar la pasarela es siempre la nula (nunca una llamada a un proveedor). «culqi» aún no tiene adaptador: su guarda lo rechaza nombrando la variable.
         var guardarProduccion = esProduccion && soloEnModoNormal;
-        servicios.AgregarPagos(LectorDeOpcionesDePagos.Leer(builder.Configuration, builder.Environment.EnvironmentName, sinLlamadasReales: !soloEnModoNormal, pedidosDisponible: true), guardarProduccion);
+        var opcionesDePagos = LectorDeOpcionesDePagos.Leer(builder.Configuration, builder.Environment.EnvironmentName, sinLlamadasReales: !soloEnModoNormal, pedidosDisponible: false);
+        servicios.AgregarPagos(opcionesDePagos, esProduccion: false);
         servicios.AgregarTrabajosDePagosEnLaApi(soloEnModoNormal);
 
         // Envíos antes de los dobles de Pedidos (su guarda exige que las implementaciones reales ya estén); el operador logístico es el nulo salvo el simulador en Development y Test. En el ensayo y al restaurar siempre es el nulo (nunca una llamada a un proveedor).
         servicios.AgregarEnvios(guardarProduccion);
-        servicios.AgregarOperadorLogisticoDeEnvios(new OpcionesDeArranqueDeEnvios(soloEnModoNormal ? builder.Configuration["Envios:Operador"] : GuardaDeArranqueDeEnvios.Nulo, builder.Environment.EnvironmentName, SinLlamadasReales: !soloEnModoNormal));
+        var opcionesDeEnvios = new OpcionesDeArranqueDeEnvios(soloEnModoNormal ? builder.Configuration["Envios:Operador"] : GuardaDeArranqueDeEnvios.Nulo, builder.Environment.EnvironmentName, SinLlamadasReales: !soloEnModoNormal);
+        servicios.AgregarOperadorLogisticoDeEnvios(opcionesDeEnvios);
         servicios.AgregarTrabajosDeEnviosEnLaApi(soloEnModoNormal);
+        // Los dos adaptadores hacia un proveedor declaran su estado real (leído de las mismas opciones con las que se compuso, no de una suposición aparte): ExigirCoherencia lo comprueba en el ensayo y al restaurar.
+        servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDeLaInstancia("pasarela-de-pago", esNulo: opcionesDePagos.PasarelaEsNula));
+        servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDeLaInstancia("operador-logistico", esNulo: GuardaDeArranqueDeEnvios.Exigir(opcionesDeEnvios) == GuardaDeArranqueDeEnvios.Nulo));
         servicios.AgregarReclamaciones();
         servicios.AgregarTrabajosDeReclamacionesEnLaApi(soloEnModoNormal);
-        servicios.AgregarPedidos(guardarProduccion);
+        servicios.AgregarPedidos(esProduccion: false);
         servicios.AgregarBibliotecaPendiente();
+        servicios.AgregarDoblesProvisionalesDelCarrito(guardarProduccion);
+        servicios.AgregarDoblesProvisionalesDePagos(guardarProduccion);
+        servicios.AgregarDoblesProvisionalesDePedidos(guardarProduccion);
         return opciones;
     }
 
@@ -497,6 +507,16 @@ internal sealed class AdaptadorSalienteDelCorreo(bool esNulo) : IAdaptadorSalien
 
 /// <summary>Un adaptador hacia un proveedor externo (por ahora Turnstile): es nulo cuando el modo no es el normal, y <see cref="ArranqueSeguro.ExigirCoherencia"/> lo comprueba.</summary>
 internal sealed class AdaptadorSalienteDelProveedor(string nombre, bool esNulo) : IAdaptadorSaliente
+{
+    public string Nombre => nombre;
+
+    public bool EsHaciaProveedor => true;
+
+    public bool EsNulo => esNulo;
+}
+
+/// <summary>Un adaptador saliente cuyo estado sale de las opciones con las que se compuso el adaptador real.</summary>
+internal sealed class AdaptadorSalienteDeLaInstancia(string nombre, bool esNulo) : IAdaptadorSaliente
 {
     public string Nombre => nombre;
 
