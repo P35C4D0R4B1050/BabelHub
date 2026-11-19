@@ -97,6 +97,9 @@ public static class AccionesDeAuditoria
 
     public const string CobroResuelto = "CobroResuelto";
 
+    /// <summary>El aviso firmado de la pasarela adelantó la consulta de un intento sin resolver (PAG-19): sin el cuerpo del aviso ni datos de pago.</summary>
+    public const string AvisoDeLaPasarelaRecibido = "AvisoDeLaPasarelaRecibido";
+
     public const string IngresoDeMercaderiaRegistrado = "IngresoDeMercaderiaRegistrado";
 
     public const string IngresoPendienteConciliado = "IngresoPendienteConciliado";
@@ -216,6 +219,7 @@ public static class AccionesDeAuditoria
         CorreoCambiado,
         CobroIniciado,
         CobroResuelto,
+        AvisoDeLaPasarelaRecibido,
         CuentaCancelada,
         CuentaReemplazada,
         DepuracionDiariaEjecutada,
