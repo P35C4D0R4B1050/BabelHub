@@ -1,9 +1,11 @@
 ---
 id: ecommerce-biblioteca-digital
 titulo: Biblioteca y descarga de libros digitales
-estado: Approved
+estado: Planned
 aprobado_por: Claude (delegado por Diego Amiquero)
 aprobado_en: 2026-11-13
+plan_aprobado_por: Claude (delegado por Diego Amiquero)
+plan_aprobado_en: 2026-11-18
 servicio: E-commerce
 prefijo: BIB
 origen: [RF22, RF23, RF24, RF27, NN13, NN15, NN18]
