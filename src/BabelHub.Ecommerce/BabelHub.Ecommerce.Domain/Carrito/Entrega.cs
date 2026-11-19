@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -27,7 +28,23 @@ internal static class TextoDeEntrega
         }
 
         var recortado = texto.Trim(' ');
-        if (recortado.Length == 0 || recortado.Length > maximo)
+
+        // NFC (DD-10): el texto se compara y se mide ya compuesto («e» + acento combinante es «é»); un texto con sustitutos sueltos no se normaliza y se rechaza. El tope previo acota el costo.
+        if (recortado.Length == 0 || recortado.Length > maximo * 4)
+        {
+            return false;
+        }
+
+        try
+        {
+            recortado = recortado.Normalize(NormalizationForm.FormC);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+
+        if (recortado.Length > maximo)
         {
             return false;
         }

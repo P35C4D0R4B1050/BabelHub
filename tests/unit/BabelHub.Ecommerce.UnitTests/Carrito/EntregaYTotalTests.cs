@@ -66,6 +66,28 @@ public sealed class EntregaYTotalTests
         Assert.Equal(valido, NombreDeContacto.TryCrear(texto, out _));
 
     [Fact]
+    public void El_nombre_y_la_direccion_se_normalizan_a_NFC_antes_de_medirlos()
+    {
+        var descompuesto = "Jose\u0301 Pe\u0301rez";
+
+        Assert.True(NombreDeContacto.TryCrear(descompuesto, out var nombre));
+        Assert.Equal("José Pérez", nombre!.Valor);
+        Assert.True(NombreDeContacto.TryCrear(string.Concat(Enumerable.Repeat("e\u0301", 80)), out var largo));
+        Assert.Equal(80, largo!.Valor.Length);
+        Assert.False(NombreDeContacto.TryCrear(string.Concat(Enumerable.Repeat("e\u0301", 81)), out _));
+        Assert.True(DireccionDeEntrega.TryCrear("Jr. Cuzco 12, Huama\u0301nga", "Ayacucho", out var direccion));
+        Assert.Equal("Jr. Cuzco 12, Huamánga", direccion!.Texto);
+        Assert.Equal(NombreDeContacto.Crear("José Pérez"), nombre);
+    }
+
+    [Fact]
+    public void Un_texto_con_sustitutos_sueltos_se_rechaza_en_vez_de_lanzar()
+    {
+        Assert.False(NombreDeContacto.TryCrear("Ana\uD800Pérez", out _));
+        Assert.False(DireccionDeEntrega.TryCrear("Jr. \uDC00", "Ayacucho", out _));
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-CAR-26")]
     public void El_nombre_tiene_un_tope_de_80_caracteres()
     {

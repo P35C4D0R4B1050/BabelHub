@@ -1,0 +1,56 @@
+# Decisiones delegadas
+
+> **Qué es.** La persona responsable del proyecto (mensaje del 2026-11-18, «dejo a tu criterio y buen juicio la decisión sobre lo que sigue», por ir contrarreloj) delegó en el agente del carril B la **coordinación de los hallazgos de `ecommerce-carrito-checkout` y de sus bordes con las demás specs**: decidir lo que se pueda decidir con la spec, los planes y `docs/`, y **documentar lo diferido** para que no se pase por alto. Cada fila dice qué se decidió, por qué y **dónde se hace cumplir** (una tarea, un plan o un ajuste de `progress/ajustes-al-implementar.md`).
+>
+> **Límites.** Estas decisiones no modifican una spec ni un plan aprobados (sus huellas no cambian; lo que contradicen vive en `ajustes-al-implementar.md`, que **prevalece** sobre el plan). Una decisión que **cambia un requisito** (spec Approved) o `AGENTS.md` no está aquí: se marca «a la persona» y el agente se detiene. Todo lo de esta lista se puede revertir con una nueva fila.
+
+## A. Supuestos de negocio ratificados (hallazgo del 2026-11-18: «Supuestos del plan que la persona debe ratificar»)
+
+| Id | Decisión | Motivo | Se hace cumplir en |
+| :--- | :--- | :--- | :--- |
+| DD-01 | **Se ratifican D14, D16 y D17 del plan.** D14: topes técnicos de 50 líneas por carrito y 99 unidades por línea (el máximo de la red sigue mandando al agregar). D16: al aprobarse el pago se quitan del carrito las líneas pagadas, por la cantidad comprada, y se conservan las no pagadas. D17: «pulsar pagar» de un visitante lo envía a ingresar y continúa al checkout con el retorno de `web-base`; no hay checkout anónimo. | Son la lectura más conservadora de CAR-02, CAR-16 y CAR-20; ya están implementadas y probadas en el Dominio (T01 a T06) y no contradicen ninguna spec. El tope de unidades por reserva del Inventario sigue siendo una decisión de negocio aparte (no se resuelve aquí). | T21 (D16), T27 y T28 (D17), T10 (D14, hecha). |
+| DD-02 | **Se ratifica la lectura de Carrito de CAT-18 (`retiro_pendiente`).** Con el checkout `reservando`, `en_pago` o `pago_pendiente`, la baja de una edición **anota** `retiro_pendiente` en la línea (que para la persona ya está retirada y no se puede pagar) y la quita, dejando su aviso, en la primera salida de ese estado; para Catálogo el puerto responde éxito en ambos casos. **Catálogo llama a `IRetiroDeEdicionDeCarritos.Retirar` una sola vez por baja con todos los `edicionId`.** | Un retiro nunca debe cancelar un cobro en marcha ni hacer esperar a Catálogo por Pagos; CAT-18 y AC-CAT-15 se cumplen (la persona ve la línea retirada y no la puede pagar). | T13 (hecha) y T26b. El carril de Catálogo no cambia su plan: su prueba con el retiro nulo se actualiza en T26b, coordinada. |
+
+## B. Contrato con el Inventario (hallazgo ECO-4a, T18 y T19)
+
+| Id | Decisión | Motivo | Se hace cumplir en |
+| :--- | :--- | :--- | :--- |
+| DD-03 | **Repetir `reservas.crear` con la misma clave devuelve la reserva original aunque haya expirado**, así que Carrito **compara siempre `ExpiraEn` con el reloj** de lo que devuelve `Reservar` (en el primer paso y al repetirlo desde `en_pago`): una reserva ya expirada se trata como el aborto de ese estado (`pedidoId` nuevo, liberación anotada); un `INV-RESERVA-ESTADO-INVALIDO` (clave nueva sobre una reserva expirada o liberada) hace lo mismo. | Es lo que hace el Inventario (verificado contra `Reservas`); el plan asumía lo contrario. Sin la comparación, un cliente pagaría con una reserva vencida. | T18 y T19. |
+| DD-04 | **El cuarto reemplazo de un mismo `pedidoId` (SEL-36, tope de 3) responde 429 y el Inventario conserva la reserva vigente: Carrito NO aborta.** Devuelve `ECO-LIMITE-EXCEDIDO` («demasiados cambios», con `disponibleDesde`) y el checkout vuelve a `en_edicion` **conservando el `pedidoId` y sin anotar liberación** (nueva transición de Dominio `VolverALaRevisionPorLimite`, condicional al `pedidoId` y la generación). Al pasar `disponibleDesde` la reserva vigente expira y el siguiente intento recorre el aborto normal (DD-03); «Reiniciar» libera la reserva y empieza otro `pedidoId`. Cualquier otro 429 de `reservar` (límite horario) tampoco libera ninguna reserva vigente. | Abortar liberaría una reserva válida y el `pedidoId` nuevo contaría contra el límite horario (SEL-37): el cliente quedaría peor que si espera. | T18 (con su prueba de Dominio). |
+
+## C. Contratos de otros módulos que aún no existen (dependencias que no bloquean)
+
+| Id | Decisión | Motivo | Se hace cumplir en |
+| :--- | :--- | :--- | :--- |
+| DD-05 | **Carrito declara sus propios puertos delgados** (en `Interno`, con modelos propios) para lo que Identidad e Inventario todavía no entregan: la lectura con bloqueo de la marca de cancelación de la cuenta, el guardado del consentimiento de WhatsApp con la huella enmascarada del número y el cliente del Inventario para consulta previa, reservar y liberar (`IInventarioDelCarrito`, ya hecho). Cada uno tiene su **doble provisional que falla cerrado** y la guarda de producción de T08; el adaptador real lo escribe T26b cuando el carril A entregue el contrato. Las **versiones vigentes de los textos** se leen del contrato público existente `ITextosLegales` (`web-base`). | Evita bloquear ECO-4c a ECO-4e por el carril A sin saltarse la regla 13 ni inventar contratos ajenos. | T16, T17 y T19 (puertos y dobles); T26b (adaptadores). |
+| DD-06 | **El ciclo de CAR-20 (posesión de ediciones) queda resuelto** con `IPosesionDeEdiciones` (declarado por Carrito en T07, implementado por Biblioteca, reutilizado por Pagos); Biblioteca lo implementa devolviendo `ResultadoDePosesion` (`Posee` con la lista de `Poseidas`, `NoPosee` o `NoSePuedeConfirmar`). | Coincide con los planes de Pagos y de Biblioteca ya aprobados. | ECO-8 (Biblioteca), ECO-5 (Pagos). |
+| DD-07 | **Nombres del contrato público de Carrito que consumen Pagos y Pedidos:** `ICheckoutDelCliente.ObtenerParaPagar()` (el `pedidoId` y el estado solo en `en_pago` y `pago_pendiente`, y no con un retiro pendiente en `en_pago`), `IProgresoDelCheckout.PagoPendiente(pedidoId, limiteEn, reservaExpiraEn)`, `PagoAprobado(pedidoId)` y `PagoResuelto(pedidoId, motivo)` (todos con `pedidoId`, condicionales a él), `ICreadorDeIntencionesDePago.Crear/Reabrir/Cancelar` con los resultados de T07, e `InstantaneaDeCompra` con su `huellaDeInstantanea`. | Los planes de Pagos y Pedidos los citan sin fijar el nombre del método; fijarlos evita que cada carril invente el suyo. | Carril de Pagos y Pedidos (ECO-5, ECO-6). |
+
+## D. Menores de las revisiones: qué se hace y cuándo
+
+| Id | Decisión | Se hace cumplir en |
+| :--- | :--- | :--- |
+| DD-08 | `pedido_descartado` guarda **un solo valor**: un segundo aborto con la liberación pendiente pierde el primero; **se acepta** (la reserva expira sola a los 15 minutos y la liberación de `LiberarReservasPendientes` cubre el último). Se documenta en `docs/05-seguridad/07-operacion-segura.md` al cerrar la spec. | T20, T37. |
+| DD-09 | La fusión aplazada («en el siguiente `POST` de la misma sesión») se marca con un **valor en la sesión web de `web-base`** (no hay columna ni tabla): la Presentación lo crea al recibir `Aplazada` y solo reintenta mientras el valor esté en esa sesión y la cookie del visitante viaje en la solicitud. Nunca en un `GET`. | T27. |
+| DD-10 | **Normalización NFC** del nombre y la dirección (además de rechazar Cc, Cf, Zl y Zp, que ya está): se aplica tras recortar y antes de medir el largo. | Se hace ahora en el Dominio (T03). |
+| DD-11 | La **auditoría de los abortos** y de `RecuperarCheckoutsReservando` lleva un motivo de lista cerrada (`falta-de-stock`, `plazo-cambiado`, `limite`, `reserva-expirada`, `intencion-cerrada`, `recuperacion`); el puerto `IAuditoriaDelCarrito` recibe cada método con la tarea que lo usa. | T17 a T20. |
+| DD-12 | El límite de **pasar al pago** (10 por cuenta y hora) **no cuenta** la repetición del mismo `pedidoId` y huella (clave idempotente del llamador), y falla cerrado si el almacén no responde. | T26b (`ILimitadorDelCarrito`), T17. |
+| DD-13 | `T17` y `T19` se **parten** (un commit por parte): T17a comprobaciones y orden, T17b congelar y transición a `reservando`; T19a `SolicitarIntencionDePago` (3a), T19b `ConfirmarEnPago` (3b). El comportamiento de `IniciarCheckout` que T11 menciona (devolver el checkout vivo) es de T14. | Este archivo y `ajustes-al-implementar.md` §10. |
+| DD-14 | **AM39** (inflado de carritos de visitante y robo de cookie) se agrega a `docs/05-seguridad/01-modelo-de-amenazas.md` en **T37** (no quedaba nadie con esa tarea). | T37. |
+| DD-15 | `Sha256HuellaDeCookie` es la función de Aplicación `HuellaDeLaCookie` (ya hecha) y `AppSettingsOpcionesDeEnvio` es una clase de opciones `Carrito:CostoDeEnvio` validada al arrancar: ninguna implementa un puerto; T26 se lee así. | T26a. |
+
+## E. Lo que se difiere a propósito (para que no se pase por alto)
+
+Cada fila es **trabajo que otra tarea debe hacer** aunque hoy parezca resuelto. Está también en `progress/ajustes-al-implementar.md` §10, que se lee antes de cada tarea de este plan.
+
+| Diferido | Por qué hoy no | Quién lo cierra |
+| :--- | :--- | :--- |
+| Adaptador de `IRetiroDeEdicionDeCarritos` y retiro del `RetiroDeEdicionDeCarritosNulo` (más la actualización de `ContratoPublicoDeCatalogoTests`) | Implementarlo antes rompe una prueba de arquitectura de Catálogo | T26b, coordinado con Catálogo |
+| `ILimitadorDelCarrito` sobre `IControlDeLimites` y las políticas de Carrito en `Plataforma` | `Plataforma` no las tiene | T26b, con el carril A |
+| `IAuditoriaDelCarrito` sobre `IAuditoria` y las acciones de Carrito en `AccionesAuditables` | El catálogo de acciones es de Auditoría | T26b, con el carril A |
+| Implementaciones públicas `ICarritoDelCliente`, `ICheckoutDelCliente`, `IProgresoDelCheckout` y `ComposicionDelCarrito` con `AgregarDoblesProvisionalesDelCarrito(Environment.IsProduction())` | Los casos de uso se completan en ECO-4c | T26b |
+| Traducir la violación del índice único de `carritos` a `CarritoYaExisteException` y leer con `SELECT … FOR UPDATE` real (no reutilizar una entidad sin bloqueo) | Los repositorios son de T24 | T24 y su prueba de integración (T30) |
+| Prueba de dos bajas simultáneas sin interbloqueo, de «ninguna llamada de red dentro de una transacción» y de «estado releído» con PostgreSQL real | Los dobles devuelven la misma instancia | T30 |
+| Sincronizar las líneas del `Checkout` con las del `Carrito` tras una edición (`SincronizarLineas`) | Necesita el título, el ISBN y el precio vigentes del Catálogo | T14 y T15 |
+| Que la Presentación llame a la fusión al ingresar o registrarse y borre la cookie | Es de la Api | T27 |
+| El doble de posesión (abierto) y el de Pagos no pueden llegar a producción | Pagos y Biblioteca no existen | Guarda de T08, activada por T26b |

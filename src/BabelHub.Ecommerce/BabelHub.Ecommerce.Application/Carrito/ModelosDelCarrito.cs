@@ -69,29 +69,65 @@ public sealed record LineaDelCarritoVista(
     DisponibilidadDeEdicion? Disponibilidad,
     bool Retirada);
 
-/// <summary>El carrito de la cuenta o del visitante: sus líneas, el subtotal (sin envío) y los avisos sin ver. Una lectura no tiene efectos (CAR-25).</summary>
-public sealed record VistaDelCarrito(IReadOnlyList<LineaDelCarritoVista> Lineas, decimal Subtotal, IReadOnlyList<AvisoDelCarrito> Avisos, bool HayUnaCompraEnCurso);
+/// <summary>El carrito de la cuenta o del visitante: sus líneas, el subtotal (sin envío) y los avisos sin ver. <see cref="PreciosNoConfirmados"/> es verdadero cuando el Catálogo no respondió: los precios y el subtotal no se pueden mostrar y ninguna línea se marca como retirada por ese motivo. Una lectura no tiene efectos (CAR-25).</summary>
+public sealed record VistaDelCarrito(IReadOnlyList<LineaDelCarritoVista> Lineas, decimal Subtotal, IReadOnlyList<AvisoDelCarrito> Avisos, bool HayUnaCompraEnCurso, bool PreciosNoConfirmados = false);
 
 /// <summary>
 /// Quién pide sobre el carrito: con sesión, la cuenta sale del actor y <see cref="CookieDelVisitante"/> es <see langword="null"/>; sin sesión, la cookie opaca <c>__Host-bh-carrito</c> (256 bits) identifica el carrito del
 /// visitante. Un identificador de carrito, checkout o cuenta nunca llega de afuera (CAR-35).
 /// </summary>
-public sealed record SolicitudSobreElCarrito(string? CookieDelVisitante = null);
+public sealed record SolicitudSobreElCarrito(string? CookieDelVisitante = null)
+{
+    private bool PrintMembers(System.Text.StringBuilder constructor)
+    {
+        constructor.Append("ConCookie = ").Append(CookieDelVisitante is not null);
+        return true;
+    }
+}
 
-public sealed record AgregarLineaEntrada(Guid EdicionId, int Cantidad, string? CookieDelVisitante = null);
+public sealed record AgregarLineaEntrada(Guid EdicionId, int Cantidad, string? CookieDelVisitante = null)
+{
+    /// <summary>La cookie del visitante es una capacidad: no se imprime.</summary>
+    private bool PrintMembers(System.Text.StringBuilder constructor)
+    {
+        constructor.Append("EdicionId = ").Append(EdicionId).Append(", Cantidad = ").Append(Cantidad);
+        return true;
+    }
+}
 
-public sealed record ModificarLineaEntrada(Guid EdicionId, int Cantidad, string? CookieDelVisitante = null);
+public sealed record ModificarLineaEntrada(Guid EdicionId, int Cantidad, string? CookieDelVisitante = null)
+{
+    private bool PrintMembers(System.Text.StringBuilder constructor)
+    {
+        constructor.Append("EdicionId = ").Append(EdicionId).Append(", Cantidad = ").Append(Cantidad);
+        return true;
+    }
+}
 
-public sealed record EliminarLineaEntrada(Guid EdicionId, string? CookieDelVisitante = null);
+public sealed record EliminarLineaEntrada(Guid EdicionId, string? CookieDelVisitante = null)
+{
+    private bool PrintMembers(System.Text.StringBuilder constructor)
+    {
+        constructor.Append("EdicionId = ").Append(EdicionId);
+        return true;
+    }
+}
 
 /// <summary>
 /// El carrito después de una operación y, si se creó el de un visitante o se rotó la cookie al fusionar, el valor <b>en claro</b> de la cookie nueva (que solo la Presentación escribe) o <see langword="null"/>
 /// para borrarla cuando <see cref="BorrarLaCookie"/> es verdadero. El servidor guarda solo su SHA-256.
 /// </summary>
-public sealed record ResultadoDeCarrito(VistaDelCarrito Carrito, string? CookieNueva, bool BorrarLaCookie);
+public sealed record ResultadoDeCarrito(VistaDelCarrito Carrito, string? CookieNueva, bool BorrarLaCookie)
+{
+    private bool PrintMembers(System.Text.StringBuilder constructor)
+    {
+        constructor.Append("Lineas = ").Append(Carrito.Lineas.Count).Append(", CookieNueva = ").Append(CookieNueva is not null).Append(", BorrarLaCookie = ").Append(BorrarLaCookie);
+        return true;
+    }
+}
 
-/// <summary>Resultado de la fusión al ingresar (CAR-24): el carrito de la cuenta, los ajustes hechos y si se aplazó por una compra en curso (se reintenta en el siguiente <c>POST</c> de la misma sesión).</summary>
-public sealed record ResultadoDeFusionDeCarrito(VistaDelCarrito Carrito, IReadOnlyList<AvisoDelCarrito> Ajustes, bool Aplazada);
+/// <summary>Resultado de la fusión al ingresar (CAR-24): el carrito de la cuenta, los ajustes hechos, si se aplazó por una compra en curso (se reintenta en el siguiente <c>POST</c> de la misma sesión y la cookie <b>sigue</b>) y si la Presentación debe borrar la cookie (la fusión se aplicó o ya estaba aplicada, o no había nada que fusionar).</summary>
+public sealed record ResultadoDeFusionDeCarrito(VistaDelCarrito Carrito, IReadOnlyList<AvisoDelCarrito> Ajustes, bool Aplazada, bool BorrarLaCookie);
 
 /// <summary>
 /// El contacto de la entrega a domicilio (CAR-08, CAR-30): nombre, teléfono móvil peruano, dirección y región. Es dato personal: <c>ToString</c> y la serialización devuelven <c>[redactado]</c> y no se interpola en

@@ -197,7 +197,16 @@ public interface IRepositorioDeCarritos
     Task AgregarAvisos(Guid cuentaId, IReadOnlyList<AvisoDelCarrito> avisos, CancellationToken cancelacion = default);
 
     Task MarcarAvisosComoVistos(Guid cuentaId, IReadOnlyCollection<Guid> avisoIds, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>La constancia de una fusión aplicada (<c>fusiones_aplicadas</c>, única por huella de cookie): hace idempotente la fusión de un segundo dispositivo. Se purga a los 30 días.</summary>
+    Task RegistrarFusion(byte[] huellaDeLaCookie, Guid carritoDeCuentaId, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>Los carritos (de cuenta o de visitante) que tienen alguna de las ediciones, <b>sin bloqueo</b>: lo que necesita el retiro de ediciones para saber qué bloquear después, en orden (D10).</summary>
+    Task<IReadOnlyList<CarritoConEdicion>> BuscarConEdiciones(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default);
 }
+
+/// <summary>Un carrito que tiene alguna de las ediciones buscadas: su <c>id</c> y su cuenta (nulo si es de un visitante).</summary>
+public sealed record CarritoConEdicion(Guid CarritoId, Guid? CuentaId);
 
 /// <summary>Los checkouts del módulo: a lo más uno vivo por cuenta (índice único parcial). Las lecturas con bloqueo siguen el orden global (D10): checkout antes que carrito.</summary>
 public interface IRepositorioDeCheckouts
@@ -207,6 +216,9 @@ public interface IRepositorioDeCheckouts
 
     /// <summary>El checkout cuyo <c>pedido_id</c> o <c>pedido_descartado</c> es el dado (vivo o terminado).</summary>
     Task<Checkout?> ObtenerPorPedido(Guid pedidoId, bool conBloqueo, CancellationToken cancelacion = default);
+
+    /// <summary>Los checkouts vivos de esas cuentas, <b>con bloqueo y por <c>id</c> ascendente</b> (D10): lo que usa el retiro de ediciones, que bloquea todos los checkouts antes que los carritos.</summary>
+    Task<IReadOnlyList<Checkout>> ObtenerVivosDeCuentasConBloqueo(IReadOnlyCollection<Guid> cuentaIds, CancellationToken cancelacion = default);
 
     /// <summary>El estado del checkout vivo de la cuenta <b>sin bloqueo</b>: para decidir si hay que llamar a <c>Reabrir</c> antes de bloquear (D10).</summary>
     Task<EstadoDelCheckout?> LeerEstadoSinBloqueo(Guid cuentaId, CancellationToken cancelacion = default);
@@ -225,3 +237,57 @@ public interface IGeneradorDeIdentificadores
     /// <summary>El valor en claro de la cookie del visitante: 32 bytes aleatorios en base64url sin relleno. Solo la Presentación lo escribe; el servidor guarda su SHA-256.</summary>
     string NuevaCookieDeVisitante();
 }
+
+// ---------- Límites de uso ----------
+
+public enum DecisionDeLimiteDelCarrito
+{
+    Permitido,
+
+    /// <summary>Se pasó del límite: <see cref="ResultadoDeLimiteDelCarrito.ReintentarEn"/> dice desde cuándo.</summary>
+    Excedido,
+
+    /// <summary>El almacén de contadores no responde y la política falla cerrada (SEG-26): se responde «servicio no disponible».</summary>
+    NoDisponible,
+}
+
+public sealed record ResultadoDeLimiteDelCarrito(DecisionDeLimiteDelCarrito Decision, DateTimeOffset? ReintentarEn = null)
+{
+    public static ResultadoDeLimiteDelCarrito Permitido { get; } = new(DecisionDeLimiteDelCarrito.Permitido);
+
+    public static ResultadoDeLimiteDelCarrito NoDisponible { get; } = new(DecisionDeLimiteDelCarrito.NoDisponible);
+}
+
+/// <summary>
+/// Los límites de uso de Carrito (plan §6, SEG-05, SEG-07, SEG-26), valores iniciales y configurables: <b>crear carritos de visitante</b>, 10 por origen y hora; <b>agregar o cambiar líneas</b>, 60 por cuenta o por origen y
+/// minuto; <b>pasar al pago</b>, 10 por cuenta y hora y <b>falla cerrado</b>; volver y reiniciar, 20 por cuenta y hora; revisión y entrega, 30 por cuenta y minuto. Un puerto propio hasta que <c>Plataforma</c> defina las
+/// políticas (hallazgo para el carril de plataforma): la Infraestructura lo implementa sobre <c>IControlDeLimites</c> y, mientras tanto, con un doble que falla cerrado en lo que reserva stock.
+/// </summary>
+public interface ILimitadorDelCarrito
+{
+    Task<ResultadoDeLimiteDelCarrito> CrearCarritoDeVisitante(CancellationToken cancelacion = default);
+
+    /// <summary>Agregar, cambiar o quitar una línea: por la cuenta si la hay y, si no, por el origen.</summary>
+    Task<ResultadoDeLimiteDelCarrito> EditarLineas(Guid? cuentaId, CancellationToken cancelacion = default);
+}
+
+// ---------- Auditoría ----------
+
+/// <summary>
+/// La auditoría de Carrito (plan §6): en la <b>misma transacción</b> del caso de uso, y si no se puede auditar la operación falla. Sin datos personales, sin la cookie del visitante ni su huella. Es un puerto propio hasta que
+/// el catálogo de acciones de auditoría (<c>AccionesAuditables</c>, del carril de auditoría) tenga las de Carrito: la Infraestructura lo implementa sobre <c>IAuditoria</c> (T25). Cada tarea agrega el método de su evento.
+/// </summary>
+public interface IAuditoriaDelCarrito
+{
+    /// <summary>Una fusión aplicada: cuántas líneas aportó el visitante y los motivos de los ajustes (sin identificar al visitante).</summary>
+    Task FusionAplicada(Guid cuentaId, int lineasDelVisitante, IReadOnlyList<MotivoDeAjusteDeAviso> ajustes, CancellationToken cancelacion = default);
+
+    /// <summary>La baja de ediciones aplicada a los carritos: cuántas ediciones, cuántos carritos afectados y cuántas líneas se quitaron o quedaron anotadas con retiro pendiente (sin identificar a nadie).</summary>
+    Task EdicionesRetiradas(int ediciones, int carritosAfectados, int lineasQuitadas, int lineasAnotadas, CancellationToken cancelacion = default);
+}
+
+/// <summary>
+/// <c>IRepositorioDeCarritos.Agregar</c> la lanza cuando el carrito de esa cuenta (o de esa cookie) ya existe (índice único): otro dispositivo lo creó a la vez. La Aplicación <b>rehace la transacción</b> una vez, y esta vez lo
+/// encuentra y lo bloquea (AC-CAR-01, AC-CAR-02). Con PostgreSQL una violación de unicidad aborta la transacción, así que no se puede seguir dentro de ella.
+/// </summary>
+public sealed class CarritoYaExisteException() : Exception("El carrito ya existe: otro dispositivo lo creó a la vez.");
