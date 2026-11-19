@@ -167,6 +167,9 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
     public Task<IReadOnlyList<AvisoACarrito>> ListarAvisosACarritoDeLaIntencion(Guid intencionId, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<AvisoACarrito>>(_avisosACarrito.Where(a => a.IntencionId == intencionId).Select(a => a.Copiar()).ToArray());
 
+    public Task<IReadOnlyList<AvisoDePago>> ListarAvisosDePagoListos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<AvisoDePago>>(_avisosDePago.Where(a => a.EstaListo(ahora)).OrderBy(a => a.CreadoEn).Select(a => a.Copiar()).Take(limite).ToArray());
+
     public Task<IReadOnlyList<AvisoDePago>> ListarAvisosDePagoDeLaIntencion(Guid intencionId, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<AvisoDePago>>(_avisosDePago.Where(a => a.IntencionId == intencionId).Select(a => a.Copiar()).ToArray());
 

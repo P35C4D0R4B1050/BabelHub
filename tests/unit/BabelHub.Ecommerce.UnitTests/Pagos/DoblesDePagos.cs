@@ -52,7 +52,13 @@ internal sealed class CuentaDelPagadorDoble(UnidadDeTrabajoReversible unidad, Li
         return Falla ? throw new InvalidOperationException("Identidad no responde.") : Task.FromResult(CancelacionEnCurso);
     }
 
-    public Task<string?> CorreoDelTitular(Guid cuentaId, CancellationToken cancelacion = default) => Task.FromResult(Correo);
+    public int CorreosLeidos { get; private set; }
+
+    public Task<string?> CorreoDelTitular(Guid cuentaId, CancellationToken cancelacion = default)
+    {
+        CorreosLeidos++;
+        return Falla ? throw new InvalidOperationException("Identidad no responde.") : Task.FromResult(Correo);
+    }
 }
 
 internal sealed class PosesionDeEdicionesDoble : IPosesionDeEdiciones

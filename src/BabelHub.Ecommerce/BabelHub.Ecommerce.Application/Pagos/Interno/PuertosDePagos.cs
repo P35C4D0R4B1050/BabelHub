@@ -177,6 +177,9 @@ internal interface IRepositorioDePagos
 
     Task GuardarAvisoACarrito(AvisoACarrito aviso, CancellationToken cancelacion = default);
 
+    /// <summary>Los avisos del estado del pago listos para enviar por correo (pendientes y sin espera tras una falla), los más antiguos primero.</summary>
+    Task<IReadOnlyList<AvisoDePago>> ListarAvisosDePagoListos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default);
+
     Task GuardarAvisoDePago(AvisoDePago aviso, CancellationToken cancelacion = default);
 }
 

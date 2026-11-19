@@ -207,5 +207,30 @@ public sealed class AvisoDePago
         Estado = EstadoDeAvisoDePago.Omitido;
         return true;
     }
+
+    /// <summary>Hay que intentar enviarlo ahora: está pendiente y no espera tras una falla.</summary>
+    public bool EstaListo(DateTimeOffset ahora) => Estado == EstadoDeAvisoDePago.Pendiente && (ProximoIntentoEn is null || ProximoIntentoEn <= ahora);
+
+    /// <summary>El correo salió (o quedó encolado por la cuota de Plataforma, que lo reintenta). Idempotente.</summary>
+    public bool MarcarEnviado(DateTimeOffset ahora)
+    {
+        if (Estado != EstadoDeAvisoDePago.Pendiente)
+        {
+            return false;
+        }
+
+        Estado = EstadoDeAvisoDePago.Enviado;
+        EnviadoEn = ahora;
+        ProximoIntentoEn = null;
+        return true;
+    }
+
+    /// <summary>El correo no salió: se reintenta con la misma espera creciente que los avisos a Carrito.</summary>
+    public void RegistrarFalla(DateTimeOffset ahora)
+    {
+        Intentos++;
+        var espera = TimeSpan.FromTicks(Math.Min(AvisoACarrito.EsperaMaxima.Ticks, AvisoACarrito.EsperaBase.Ticks << Math.Min(Intentos - 1, 10)));
+        ProximoIntentoEn = ahora + espera;
+    }
     internal AvisoDePago Copiar() => (AvisoDePago)MemberwiseClone();
 }
