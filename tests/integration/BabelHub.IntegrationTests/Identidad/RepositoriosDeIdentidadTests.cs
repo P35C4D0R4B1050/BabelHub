@@ -13,7 +13,7 @@ namespace BabelHub.IntegrationTests.Identidad;
 public sealed class RepositoriosDeIdentidadTests : IClassFixture<PostgresDeIdentidadFixture>
 {
     private static readonly DateTimeOffset Ahora = new(2026, 11, 19, 15, 0, 0, TimeSpan.Zero);
-    private const string Resumen = "$argon2id$v=19$m=19456,t=2,p=1$c2FsLXNhbC1zYWwtc2Fs$c2FsLXNhbC1zYWwtc2Fsc2FsLXNhbC1zYWwtc2Fsc2E";
+    private const string Resumen = "$argon2id$v=19$m=19456,t=2,p=1$c2FsLXNhbC1zYWwtc2FsYQ$c2FsLXNhbC1zYWwtc2Fsc2FsLXNhbC1zYWwtc2Fsc2E";
 
     private readonly PostgresDeIdentidadFixture _bd;
     private readonly PostgresRepositorioDeCuentas _cuentas;
@@ -45,7 +45,6 @@ public sealed class RepositoriosDeIdentidadTests : IClassFixture<PostgresDeIdent
     // ---------------------------------------------------------------- cuentas
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-17")]
     public async Task UnaCuenta_SeGuardaYSeLeeCompleta_PorCorreoYPorIdentificador()
     {
         var cuenta = Cuenta();
@@ -77,7 +76,6 @@ public sealed class RepositoriosDeIdentidadTests : IClassFixture<PostgresDeIdent
     }
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-17")]
     public async Task DosRegistrosSimultaneosDelMismoCorreo_DejanUnaSolaCuenta()
     {
         var correo = Correo();
@@ -111,7 +109,6 @@ public sealed class RepositoriosDeIdentidadTests : IClassFixture<PostgresDeIdent
     }
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-20")]
     public async Task ElRecuentoDeAdministradores_TomaElBloqueo_YDosDesactivacionesNoDejanElSistemaSinAdministrador()
     {
         // Esquema limpio de administradores para esta prueba: se cuentan y se compara con lo que la base dice.
@@ -173,7 +170,7 @@ public sealed class RepositoriosDeIdentidadTests : IClassFixture<PostgresDeIdent
     {
         var cuenta = await Insertada();
         var id = cuenta.Usuario.Id;
-        await new PostgresAvisosDeCuenta(_bd.AccesoAlEsquema).Agregar(id, "contrasena-cambiada", Ahora);
+        await new PostgresAvisosDeCuentaAlmacen(_bd.AccesoAlEsquema).Agregar(id, "contrasena-cambiada", Ahora);
         await new PostgresRepositorioDeDispositivos(_bd.AccesoAlEsquema).Guardar(Dispositivo.Emitir(id, new string('a', 64), "pe", Ahora));
 
         await _cuentas.Eliminar(id);
@@ -280,7 +277,6 @@ public sealed class RepositoriosDeIdentidadTests : IClassFixture<PostgresDeIdent
         BabelHub.Ecommerce.Domain.Identidad.Renovacion.Restaurar(huella, usuario, familia, Ahora, Ahora.AddDays(30), usada, revocada);
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-20")]
     public async Task UnaRenovacion_SeRotaUnaSolaVez_ConSolicitudesSimultaneas()
     {
         var renovaciones = new PostgresRepositorioDeRenovaciones(_bd.AccesoAlEsquema);
@@ -298,7 +294,6 @@ public sealed class RepositoriosDeIdentidadTests : IClassFixture<PostgresDeIdent
     }
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-20")]
     public async Task RevocarLasRenovaciones_PorFamilia_PorUsuario_LasDemas_YLasDeTodos()
     {
         var renovaciones = new PostgresRepositorioDeRenovaciones(_bd.AccesoAlEsquema);
@@ -353,7 +348,7 @@ public sealed class RepositoriosDeIdentidadTests : IClassFixture<PostgresDeIdent
     // ---------------------------------------------------------------- segundo factor
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-20")]
+    [Trait("Criterio", "AC-IDE-38")]
     public async Task ElSegundoFactor_SeConfirmaConCodigosDeRespaldo_YUnPasoSeAceptaUnaSolaVez()
     {
         var almacen = new PostgresSegundoFactorAlmacen(_bd.AccesoAlEsquema);
@@ -381,7 +376,7 @@ public sealed class RepositoriosDeIdentidadTests : IClassFixture<PostgresDeIdent
     }
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-38")]
+    [Trait("Criterio", "AC-IDE-20")]
     public async Task UnCodigoDeRespaldo_SeConsumeUnaSolaVez_ConSolicitudesSimultaneas()
     {
         var almacen = new PostgresSegundoFactorAlmacen(_bd.AccesoAlEsquema);
@@ -398,7 +393,6 @@ public sealed class RepositoriosDeIdentidadTests : IClassFixture<PostgresDeIdent
     }
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-38")]
     public async Task RegenerarLosCodigosDeRespaldo_DejaSinEfectoLosAnteriores_YDesactivarEliminaTodo()
     {
         var almacen = new PostgresSegundoFactorAlmacen(_bd.AccesoAlEsquema);
@@ -441,7 +435,7 @@ public sealed class RepositoriosDeIdentidadTests : IClassFixture<PostgresDeIdent
     [Fact]
     public async Task LosAvisosDeLaCuenta_SeListanMarcanVistosSoloPorSuTitular()
     {
-        var avisos = new PostgresAvisosDeCuenta(_bd.AccesoAlEsquema);
+        var avisos = new PostgresAvisosDeCuentaAlmacen(_bd.AccesoAlEsquema);
         var titular = (await Insertada()).Usuario.Id;
         var otro = (await Insertada()).Usuario.Id;
         await avisos.Agregar(titular, "contrasena-cambiada", Ahora);
@@ -618,13 +612,13 @@ public sealed class RepositoriosDeIdentidadTests : IClassFixture<PostgresDeIdent
     }
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-20")]
+    [Trait("Criterio", "AC-IDE-43")]
     public async Task LaPurgaDeCancelacion_EliminaLosDatosDelModulo_ConservaLaSolicitudSinSuTexto_YNoTocaLaCuenta()
     {
         var purga = new PostgresPurgaDeIdentidad(_bd.AccesoAlEsquema);
         var cuenta = await Insertada();
         var id = cuenta.Usuario.Id;
-        await new PostgresAvisosDeCuenta(_bd.AccesoAlEsquema).Agregar(id, "contrasena-cambiada", Ahora);
+        await new PostgresAvisosDeCuentaAlmacen(_bd.AccesoAlEsquema).Agregar(id, "contrasena-cambiada", Ahora);
         await new PostgresRepositorioDeDispositivos(_bd.AccesoAlEsquema).Guardar(Dispositivo.Emitir(id, new string('e', 64), "pe", Ahora));
         var almacen = new PostgresSegundoFactorAlmacen(_bd.AccesoAlEsquema);
         await almacen.GuardarSinConfirmar(id, RandomNumberGenerator.GetBytes(60));
@@ -653,7 +647,7 @@ public sealed class RepositoriosDeIdentidadTests : IClassFixture<PostgresDeIdent
     // ---------------------------------------------------------------- claves de firma
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-20")]
+    [Trait("Criterio", "AC-IDE-33")]
     public async Task LaRotacionDeLaClaveDeFirma_ActivaLaNueva_DejaLaAnterior_YLaPrivadaSoloSaleDescifrada()
     {
         await _bd.Ejecutar("DELETE FROM identidad.claves_de_firma");

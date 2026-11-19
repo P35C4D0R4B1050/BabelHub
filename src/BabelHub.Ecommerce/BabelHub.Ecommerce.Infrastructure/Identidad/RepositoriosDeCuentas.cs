@@ -445,7 +445,7 @@ public sealed class PostgresRegistroDeSolicitudesDeCodigo(AccesoAlEsquemaDeIdent
 }
 
 /// <summary>Los avisos de seguridad que se muestran en la cuenta (<c>identidad.avisos_de_cuenta</c>, IDE-53, IDE-76, IDE-79): sin datos sensibles; marcar visto es un <c>UPDATE</c> condicional por usuario.</summary>
-public sealed class PostgresAvisosDeCuenta(AccesoAlEsquemaDeIdentidad acceso) : IAvisosDeCuentaAlmacen
+public sealed class PostgresAvisosDeCuentaAlmacen(AccesoAlEsquemaDeIdentidad acceso) : IAvisosDeCuentaAlmacen
 {
     public Task<IReadOnlyList<AvisoDeCuenta>> Listar(Guid usuarioId, CancellationToken cancelacion = default) =>
         acceso.Ejecutar<IReadOnlyList<AvisoDeCuenta>>(

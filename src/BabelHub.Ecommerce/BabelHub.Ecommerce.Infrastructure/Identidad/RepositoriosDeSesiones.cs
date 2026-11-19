@@ -16,7 +16,7 @@ public sealed class PostgresRepositorioDeRenovaciones(AccesoAlEsquemaDeIdentidad
         return Escribir(
             """
             INSERT INTO identidad.renovaciones (huella, usuario_id, familia, emitida_en, expira_absoluta, usada_en, revocada_en) VALUES (@h, @u, @f, @emitida, @expira, @usada, @revocada)
-            ON CONFLICT (huella) DO UPDATE SET usada_en = EXCLUDED.usada_en, revocada_en = EXCLUDED.revocada_en
+            ON CONFLICT (huella) DO UPDATE SET usada_en = COALESCE(identidad.renovaciones.usada_en, EXCLUDED.usada_en), revocada_en = COALESCE(identidad.renovaciones.revocada_en, EXCLUDED.revocada_en)
             """,
             cancelacion,
             ("h", renovacion.Huella),

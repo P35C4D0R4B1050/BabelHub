@@ -84,7 +84,6 @@ public sealed class EsquemaDeIdentidadTests(PostgresDeIdentidadFixture bd) : ICl
     private Task<PostgresException?> IntentarAsync(string? rol, string sql) => PostgresDeAuditoriaFixture.IntentarComo(bd.Acceso, rol, sql);
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-05")]
     public async Task SinElRolDelEsquema_LaAplicacionNoPuedeLeerNiEscribirIdentidad()
     {
         foreach (var tabla in new[] { "usuarios", "renovaciones", "claves_de_firma", "segundo_factor", "registros", "bajas_titulares" })
@@ -96,7 +95,6 @@ public sealed class EsquemaDeIdentidadTests(PostgresDeIdentidadFixture bd) : ICl
     }
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-05")]
     public async Task ElRolDelEsquema_EscribeYLeeSusTablas()
     {
         var id = Guid.NewGuid();
@@ -107,7 +105,6 @@ public sealed class EsquemaDeIdentidadTests(PostgresDeIdentidadFixture bd) : ICl
     }
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-05")]
     public async Task ElRolDelEsquema_NoPuedeVaciarNiAlterarLaEstructuraNiBorrarLoQueSeConserva()
     {
         Assert.Equal("42501", (await IntentarAsync("rol_identidad", "TRUNCATE identidad.usuarios CASCADE"))?.SqlState);
@@ -120,7 +117,38 @@ public sealed class EsquemaDeIdentidadTests(PostgresDeIdentidadFixture bd) : ICl
     }
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-05")]
+    public async Task ElRolDelEsquema_NoPuedeEscribirLosTextosVigentes_NiAlterarLaClavePublicaOPrivadaDeUnaClaveExistente()
+    {
+        Assert.Equal("42501", (await IntentarAsync("rol_identidad", "INSERT INTO identidad.versiones_de_textos (id, terminos, privacidad, reembolso) VALUES (1, 'a', 'b', 'c')"))?.SqlState);
+        Assert.Equal("42501", (await IntentarAsync("rol_identidad", "UPDATE identidad.claves_de_firma SET jwk_publico = repeat('x', 60)"))?.SqlState);
+        Assert.Equal("42501", (await IntentarAsync("rol_identidad", "UPDATE identidad.claves_de_firma SET privada_cifrada = decode(repeat('aa', 40), 'hex')"))?.SqlState);
+        Assert.Null(await IntentarAsync("rol_identidad", "UPDATE identidad.claves_de_firma SET estado = estado WHERE false"));
+    }
+
+    [Fact]
+    public async Task LaMigracionRetiraLosPermisosDeMas_QueUnDespliegueAnteriorHayaConcedido()
+    {
+        await bd.Ejecutar("GRANT DELETE, TRUNCATE ON identidad.claves_de_firma TO rol_identidad");
+        Assert.Null(await IntentarAsync("rol_identidad", "DELETE FROM identidad.claves_de_firma WHERE false"));
+
+        await bd.Ejecutar(MigracionDelEsquemaDeIdentidad.Completa());
+
+        Assert.Equal("42501", (await IntentarAsync("rol_identidad", "DELETE FROM identidad.claves_de_firma WHERE false"))?.SqlState);
+        Assert.Equal(0, await bd.Consultar<long>("SELECT count(*) FROM information_schema.role_table_grants WHERE grantee = 'rol_identidad' AND table_schema = 'identidad' AND privilege_type IN ('TRUNCATE', 'REFERENCES', 'TRIGGER')"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-37")]
+    public async Task ElResumenDeLaContrasena_DebeTenerElFormatoPHCCompleto()
+    {
+        var id = Guid.NewGuid();
+        await bd.Ejecutar(Usuario(id, "phc@example.com"));
+
+        Assert.Equal("23514", (await IntentarAsync("rol_identidad", $"UPDATE identidad.usuarios SET hash_contrasena = '$argon2id$hunter2' WHERE id = '{id}'"))?.SqlState);
+        Assert.Null(await IntentarAsync("rol_identidad", $"UPDATE identidad.usuarios SET hash_contrasena = '$argon2id$v=19$m=19456,t=2,p=1$c2FsLXNhbC1zYWwtc2FsYQ$c2FsLXNhbC1zYWwtc2Fsc2FsLXNhbC1zYWwtc2Fsc2E' WHERE id = '{id}'"));
+    }
+
+    [Fact]
     public async Task LaMigracionEsIdempotente_YLasTablasTienenSuPropietario()
     {
         await bd.Ejecutar(MigracionDelEsquemaDeIdentidad.Completa());
@@ -166,7 +194,6 @@ public sealed class EsquemaDeIdentidadTests(PostgresDeIdentidadFixture bd) : ICl
     }
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-37")]
     public async Task LaClaveDeFirma_TieneUnaSolaActiva_YLaComprometidaLlevaSuFecha()
     {
         const string jwk = "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"y\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"}";
@@ -181,7 +208,6 @@ public sealed class EsquemaDeIdentidadTests(PostgresDeIdentidadFixture bd) : ICl
     }
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-37")]
     public async Task UnaCancelacionAbiertaPorUsuario_YUnCodigoVigentePorPropositoYUnCambioDeCorreoPendiente()
     {
         var usuario = Guid.NewGuid();
@@ -218,7 +244,6 @@ public sealed class EsquemaDeIdentidadTests(PostgresDeIdentidadFixture bd) : ICl
     }
 
     [Fact]
-    [Trait("Criterio", "AC-IDE-05")]
     public async Task LosRegistrosAislados_SonDeSoloInsercion_AunParaElRolDelEsquema()
     {
         var id = Guid.NewGuid();

@@ -35,7 +35,7 @@ public static class DefinicionDeIdentidad
             rol text NOT NULL CHECK (rol IN ('cliente', 'encargado-de-sucursal', 'personal-de-logistica', 'administrador-central')),
             sucursal uuid,
             activo boolean NOT NULL,
-            hash_contrasena text CHECK (hash_contrasena IS NULL OR hash_contrasena LIKE '$argon2id$%'),
+            hash_contrasena text CHECK (hash_contrasena IS NULL OR hash_contrasena ~ '^\$argon2id\$v=[0-9]+\$m=[0-9]+,t=[0-9]+,p=[0-9]+\$[A-Za-z0-9+/]{22,}\$[A-Za-z0-9+/]{43,}$'),
             contrasena_temporal_hasta timestamptz,
             debe_cambiar boolean NOT NULL DEFAULT false,
             sesiones_validas_desde timestamptz,
@@ -179,7 +179,7 @@ public static class DefinicionDeIdentidad
         CREATE TABLE IF NOT EXISTS identidad.cambios_de_correo_pendientes (
             id uuid PRIMARY KEY,
             usuario_id uuid NOT NULL REFERENCES identidad.usuarios (id),
-            correo_nuevo text NOT NULL CHECK (char_length(correo_nuevo) BETWEEN 3 AND 254),
+            correo_nuevo text NOT NULL CHECK (char_length(correo_nuevo) BETWEEN 3 AND 254 AND correo_nuevo = lower(correo_nuevo)),
             creado_en timestamptz NOT NULL,
             vence_en timestamptz NOT NULL,
             estado text NOT NULL CHECK (estado IN ('esperando-verificacion', 'pendiente-de-confirmacion', 'aplicado', 'rechazado')),
@@ -236,9 +236,11 @@ public static class DefinicionDeIdentidad
     /// solo se leen y se insertan.
     /// </summary>
     public const string Permisos = """
+        -- Primero se retira todo: la migración deja exactamente estos permisos, aunque un despliegue anterior haya concedido más.
+        REVOKE ALL ON ALL TABLES IN SCHEMA identidad FROM rol_identidad;
         GRANT USAGE ON SCHEMA identidad TO rol_identidad;
         GRANT SELECT, INSERT, UPDATE, DELETE ON identidad.usuarios TO rol_identidad;
-        GRANT SELECT, INSERT, UPDATE ON identidad.versiones_de_textos TO rol_identidad;
+        GRANT SELECT ON identidad.versiones_de_textos TO rol_identidad;
         GRANT SELECT, INSERT, UPDATE, DELETE ON identidad.segundo_factor TO rol_identidad;
         GRANT SELECT, INSERT, UPDATE, DELETE ON identidad.codigos_de_respaldo TO rol_identidad;
         GRANT SELECT, INSERT, UPDATE, DELETE ON identidad.desafios_de_ingreso TO rol_identidad;
@@ -249,7 +251,8 @@ public static class DefinicionDeIdentidad
         GRANT SELECT, INSERT, UPDATE ON identidad.solicitudes_de_cancelacion TO rol_identidad;
         GRANT SELECT, INSERT, UPDATE, DELETE ON identidad.dispositivos TO rol_identidad;
         GRANT SELECT, INSERT, UPDATE, DELETE ON identidad.cambios_de_correo_pendientes TO rol_identidad;
-        GRANT SELECT, INSERT, UPDATE ON identidad.claves_de_firma TO rol_identidad;
+        GRANT SELECT, INSERT ON identidad.claves_de_firma TO rol_identidad;
+        GRANT UPDATE (estado, dejo_de_firmar_en, comprometida_en) ON identidad.claves_de_firma TO rol_identidad;
         GRANT SELECT, INSERT, UPDATE, DELETE ON identidad.avisos_de_cuenta TO rol_identidad;
         GRANT SELECT, INSERT, UPDATE ON identidad.bajas_titulares TO rol_identidad;
         GRANT SELECT, INSERT ON identidad.registros TO rol_identidad;
