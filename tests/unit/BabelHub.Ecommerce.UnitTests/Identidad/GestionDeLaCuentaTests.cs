@@ -194,7 +194,7 @@ public sealed class GestionDeLaCuentaTests
         await gestion.CambiarLaContrasena(cuenta.Usuario.Id, S("equivocada y larga de verdad"), S(Nueva));
         await gestion.CambiarLaContrasena(cuenta.Usuario.Id, S(EntornoDeIdentidad.ContrasenaSegura), S(Nueva));
 
-        var huella = e.Limites.Reservas.Select(r => r.Sujeto).Distinct().Single();
+        var huella = e.Limites.Reservas.Where(r => r.Politica == "ingresos-fallidos").Select(r => r.Sujeto).Distinct().Single();
         Assert.Equal(1, e.Limites.Cuenta("ingresos-fallidos", huella));
     }
 

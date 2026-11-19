@@ -97,7 +97,7 @@ public sealed class EmisionDeSesion(IRepositorioDeRenovaciones renovaciones, IEm
 /// el anterior, IDE-56) y lo entrega por el canal de códigos. <b>Nunca interrumpe</b> a quien lo llama (AGENTS.md §3.10): si el envío falla, deja una alerta técnica y el resultado es el mismo para la persona
 /// (IDE-65). El código no se imprime ni se registra (IDE-40).
 /// </summary>
-public sealed class EmisionDeCodigos(ICodigosDeUnSoloUso codigos, IHuellasDeIdentidad huellas, IEnviadorDeCorreo correo, IPublicadorDeAlertasTecnicas alertas, IReloj reloj)
+public sealed class EmisionDeCodigos(ICodigosDeUnSoloUso codigos, IHuellasDeIdentidad huellas, IEnviadorDeCorreo correo, IControlDeLimites limites, IPublicadorDeAlertasTecnicas alertas, IReloj reloj)
 {
     /// <summary>El motivo del catálogo cerrado para una dependencia no necesaria que falló (el correo de un código): la alerta técnica de IDE-65.</summary>
     public const string MotivoDeFallaDelCorreo = "dependencia-no-necesaria-fallida";
@@ -121,6 +121,13 @@ public sealed class EmisionDeCodigos(ICodigosDeUnSoloUso codigos, IHuellasDeIden
 
         try
         {
+            // El tope de 10 al día por origen del consumo del cupo de códigos (IDE-83): superado, o sin el almacén de contadores, el código no sale (falla cerrada) y la respuesta es la misma. El código ya emitido vence solo.
+            var cupo = await limites.Reservar(PoliticasDeLimite.CupoDeCodigosPorOrigen, cancelacion: cancelacion).ConfigureAwait(false);
+            if (!cupo.EsPermitido)
+            {
+                return;
+            }
+
             var mensaje = CorreoDeCodigo.ParaElTitular(correoDestino, PropositoDelCorreoDe(proposito), new ValorSecreto(codigo));
             await correo.EnviarCodigo(mensaje, cancelacion).ConfigureAwait(false);
         }
@@ -170,6 +177,10 @@ public sealed class EventosDeSeguridadDeIdentidad(IRegistroDeSeguridad registro)
 
     public Task CambioDeCorreoRechazado(Guid usuarioId, CancellationToken cancelacion) =>
         Registrar(AccionesAuditables.CambioDeCorreoNoReconocidoRechazado, "rechazado-por-el-titular", usuarioId, cancelacion);
+
+    /// <summary>Un aviso de seguridad no salió por correo (IDE-79, AUD-43): por la cuota, un tope por cuenta o por origen o un correo sin verificar. Guarda la cuenta y el motivo, nunca el correo ni el contenido.</summary>
+    public Task AvisoSuprimido(Guid usuarioId, string motivo, CancellationToken cancelacion) =>
+        Registrar(AccionesAuditables.AvisoDeSeguridadSuprimido, motivo, usuarioId, cancelacion);
 
     public Task RecuperacionSolicitada(Guid? usuarioId, CancellationToken cancelacion) =>
         Registrar(AccionesAuditables.RecuperacionDeAccesoSolicitada, "solicitud-de-recuperacion", usuarioId, cancelacion);

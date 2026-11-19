@@ -132,9 +132,9 @@ internal sealed class EntornoDeIdentidad
         Desafios = new DesafiosEnMemoria(Bd);
         Auditoria = new AuditoriaDePrueba(Bd);
         Sesiones = new EmisionDeSesion(Renovaciones, Emisor, Secretos, HuellasDeIdentidad);
-        EmisionDeCodigos = new EmisionDeCodigos(Codigos, HuellasDeIdentidad, Correo, Alertas, Reloj);
+        EmisionDeCodigos = new EmisionDeCodigos(Codigos, HuellasDeIdentidad, Correo, Limites, Alertas, Reloj);
         Eventos = new EventosDeSeguridadDeIdentidad(Seguridad);
-        Avisos = new AvisosDeCuenta(Correo);
+        Avisos = new AvisosDeCuenta(Correo, Limites, Eventos, AvisosGuardados, Unidad, Reloj);
         Revocacion = new RevocacionDeSesiones(Cuentas, Renovaciones, Reloj);
         SegundoPlano = new ProcesarSolicitudDeCodigo(Cuentas, EmisionDeCodigos, Eventos);
     }

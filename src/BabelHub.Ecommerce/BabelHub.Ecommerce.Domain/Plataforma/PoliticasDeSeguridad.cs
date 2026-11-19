@@ -30,6 +30,25 @@ public static class PoliticasDeSeguridad
         "segundo-factor-por-cuenta", 10, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Usuario,
         duracionDeBloqueo: TimeSpan.FromMinutes(15), liberable: true);
 
+    /// <summary>
+    /// Tope de avisos de seguridad <b>no críticos</b> por correo, por cuenta y 24 horas (IDE-74): 3 por defecto, configurable. El que lo supera no sale por correo y queda en la cuenta (IDE-79). No cuenta las alertas críticas,
+    /// las alertas a la administración ni los correos de reclamos y de pagos.
+    /// </summary>
+    public static PoliticaDeLimite AvisosNoCriticosPorCuenta { get; } = new(
+        "avisos-no-criticos-por-cuenta", 3, TimeSpan.FromHours(24), TipoDeSujetoDeLimite.Usuario, liberable: true);
+
+    /// <summary>La alerta crítica de cuenta es la primera de cada tipo por cuenta en 24 horas (IDE-74): el sujeto es la cuenta con el tipo, así una de otro tipo en la misma ventana sale igual.</summary>
+    public static PoliticaDeLimite AlertasCriticasPorTipoYCuenta { get; } = new(
+        "alertas-criticas-por-tipo-y-cuenta", 1, TimeSpan.FromHours(24), TipoDeSujetoDeLimite.Usuario, liberable: true);
+
+    /// <summary>Tope diario por origen de las alertas críticas de cuenta que salen por correo (IDE-86): 20 al día por defecto, configurable (valor inicial a confirmar con la persona responsable).</summary>
+    public static PoliticaDeLimite AlertasCriticasPorOrigen { get; } = new(
+        "alertas-criticas-por-origen", 20, TimeSpan.FromHours(24), TipoDeSujetoDeLimite.Origen, liberable: true);
+
+    /// <summary>Tope de 10 al día por origen del consumo del cupo de códigos de verificación y de recuperación, de modo que un origen no pueda agotarlo (IDE-83).</summary>
+    public static PoliticaDeLimite CupoDeCodigosPorOrigen { get; } = new(
+        "cupo-de-codigos-por-origen", 10, TimeSpan.FromHours(24), TipoDeSujetoDeLimite.Origen);
+
     /// <summary>3 cuentas nuevas por hora y por origen, con una ventana deslizante (SEG-24).</summary>
     public static PoliticaDeLimite RegistrosPorOrigen { get; } = new(
         "registros-por-origen", 3, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Origen);
@@ -107,6 +126,10 @@ public static class PoliticasDeSeguridad
         SegundoFactorPorOrigen,
         SegundoFactorPorCuenta,
         RegistrosPorOrigen,
+        AvisosNoCriticosPorCuenta,
+        AlertasCriticasPorTipoYCuenta,
+        AlertasCriticasPorOrigen,
+        CupoDeCodigosPorOrigen,
         CobrosPorIntencion,
         CobrosPorCuenta,
         CobrosPorOrigen,
