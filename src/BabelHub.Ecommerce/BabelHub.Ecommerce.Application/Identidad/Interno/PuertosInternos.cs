@@ -297,7 +297,7 @@ public interface IRepositorioDeBajas
 {
     Task Agregar(BajaDeTitular baja, CancellationToken cancelacion = default);
 
-    /// <summary>Las que aún no se entregaron o no se cerraron. Entregar y cerrar son idempotentes, así que dos reintentos simultáneos (dos instancias, o el paso de restauración y el trabajo) a lo sumo repiten un paso sin efecto; el trabajo de fondo (T40) puede tomar cada baja con <c>FOR UPDATE SKIP LOCKED</c> en una transacción por baja.</summary>
+    /// <summary>Las que aún no se entregaron o no se cerraron. Entregar y cerrar son idempotentes, así que dos reintentos simultáneos (dos instancias, o el paso de restauración y el trabajo) a lo sumo repiten un paso sin efecto; el trabajo de fondo (T40) puede tomar cada baja con <c>FOR UPDATE SKIP LOCKED</c> de modo que dos reintentos simultáneos repiten un paso sin efecto.</summary>
     Task<IReadOnlyList<BajaDeTitular>> Pendientes(int limite, CancellationToken cancelacion = default);
 
     Task Guardar(BajaDeTitular baja, CancellationToken cancelacion = default);
