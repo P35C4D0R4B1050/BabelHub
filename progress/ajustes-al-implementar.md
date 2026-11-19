@@ -157,3 +157,13 @@ Los planes no se pueden editar sin perder la aprobación: lo que cambió al impl
 ## 12. `ecommerce-envios` (ECO-9, implementación del carril V desde 2026-11-20)
 
 - [x] **T03 se divide (2026-11-20; T03a y T03b hechas, los contratos de Pedidos llegaron en el commit 8cb8251 del carril B):** `T03a` = contratos públicos de Envíos (`IEnviosDeLogistica`, `IEnviosDelCliente` y sus modelos) y puertos propios (`IRepositorioDeEnvios`, `IOperadorLogistico`, `IReservasDelEnvio`) con `ContratoPublicoDeEnviosTests`; `T03b` = el consumo de los contratos de Pedidos (`IContactoDeEntregaDelPedido`, `IProgresoDeEnvios`, el de lectura de D01 y `IDespachoDeEnvios`) con sus dobles de prueba. T03b espera a que Pedidos (ECO-6, carril B) publique la firma de esos contratos: ninguna rama los tiene todavía y la regla 13 impide a Envíos compilar sin ellos.
+
+## 11. `ecommerce-pedidos` (ECO-6a, 2026-11-19)
+
+Lo que cambió o se aclaró al implementar el Dominio (T01 a T06) vive en `specs/ecommerce-pedidos/decisiones-de-implementacion.md`; aquí lo que obliga a las tareas siguientes:
+
+- [ ] **T07a (hecha):** los contratos que consume Envíos (`IDespachoDeEnvios`, `IProgresoDeEnvios`, `IContactoDeEntregaDelPedido`, `IPedidosParaEnvios`) ya están en `Application/Pedidos`; un `Fallo` o una excepción de Envíos obliga a Pedidos a **revertir toda su transacción** (marcar listas y anular), con prueba.
+- [ ] **T11 a T22 (Aplicación):** **planear una anulación o una entrega bajo el bloqueo del pedido y rechazarla si otra operación `EnCurso` (`BloqueaLasLineas`) toca esas líneas**: el Dominio no ve las operaciones en curso, y la unicidad del reembolso por pedido (D04) es la segunda defensa; con prueba de concurrencia (AC01).
+- [ ] **T24 y T25 (anonimización):** anonimizar también el `Iniciador` de las `Anulacion` y `Entrega` del pedido (`AnonimizarIniciador`), no solo el contacto, y registrar la corrida sin datos personales.
+- [ ] **T28 y T30 (Infraestructura):** el mapeo de EF Core de `ContactoDeEntrega` usa propiedades con campo de respaldo y conversor explícito, y **ningún registro usa destructuración** (`{@}`) de pedidos ni de contactos; el generador del número es criptográfico (`RandomNumberGenerator.GetInt32`) y su unicidad la garantiza el índice único con reintento.
+- [ ] **Proyección (T12, T31):** el Dominio expone `Contacto` sin filtrar; las proyecciones lo ocultan al encargado de sucursal y al asistente (PED-40, AC-PED-34).

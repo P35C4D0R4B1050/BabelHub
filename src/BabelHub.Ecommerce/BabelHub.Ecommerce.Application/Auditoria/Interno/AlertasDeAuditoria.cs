@@ -77,6 +77,8 @@ public static class MotivosDeAlerta
 
     public const string CierreDeIntencionesFallido = "cierre-de-intenciones-fallido";
 
+    public const string TrabajoDePagosSinCorrer = "trabajo-de-pagos-sin-correr";
+
     public const string CargoDuplicadoParaConciliar = "cargo-duplicado-para-conciliar";
 
     public const string AvisoDePagoFallido = "aviso-de-pago-fallido";
@@ -176,6 +178,7 @@ public static class CatalogoDeAlertasDeAuditoria
         new(MotivosDeAlerta.CompensacionDeCompraFallida, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.CobroDudosoParaConciliar, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.CierreDeIntencionesFallido, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.TrabajoDePagosSinCorrer, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.CargoDuplicadoParaConciliar, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.AvisoDePagoFallido, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.AvisoACarritoFallido, ClaseDeAlerta.Tecnica),

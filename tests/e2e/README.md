@@ -30,6 +30,8 @@ Variables de datos (los recorridos que las necesitan se omiten si faltan; nunca 
 | `E2E_VISITANTE_STORAGE_STATE` | Visitante con un libro en su carrito (cookie `__Host-bh-carrito`; AC-CAR-13). |
 | `E2E_CLIENTE_TRAS_FUSION_STORAGE_STATE` | Cliente recién ingresado con avisos de ajuste sin ver (AC-CAR-22). |
 
+Navegadores: `escritorio` y `telefono` (Chromium) y `firefox`; los tres usan los navegadores de la caché de Playwright (`%LOCALAPPDATA%ms-playwright`) y solo hace falta Node para ejecutarlos.
+
 Requisitos previos de los recorridos del carrito: la composición del Carrito en `Program.cs` (`AgregarCarrito`, `AgregarTrabajosDelCarritoEnLaApi`, `UsarLimiteDeCuerpoDelCarrito`), el Inventario y Pagos reales o sus pantallas, y el carrito sembrado en cada `storageState` (la ficha aún no agrega al carrito).
 
 Requisitos previos de los recorridos del catálogo: el CSS compilado (`scripts/construir-estilos.sh`) y la composición del Catálogo en `Program.cs`.

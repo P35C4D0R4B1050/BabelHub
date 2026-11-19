@@ -19,5 +19,7 @@ export default defineConfig({
     // Escritorio y teléfono (375 px): el catálogo debe verse bien en ambos.
     { name: 'escritorio', use: { ...devices['Desktop Chrome'] } },
     { name: 'telefono', use: { ...devices['Pixel 5'] } },
+    // Firefox corre en este equipo (el navegador ya está en la caché de Playwright): los recorridos se repiten en él.
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
   ],
 });

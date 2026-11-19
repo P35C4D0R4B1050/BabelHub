@@ -23,7 +23,7 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **IDE-6** | Credenciales de servicio, topes, clasificación de correos y la infraestructura de seguridad (roles de acceso, Argon2id, emisor ES256, repositorios) | T26, T28, T29, T30–T33 | C | IDE-5 | ☑ (T26, T28–T33; T27 y T34 sin marcar) |
 | **IDE-7** | Adaptadores de correo e Inventario, trabajos de fondo (vencimiento, descarte, rotación, bajas) | T34–T40 | C | IDE-6 | ☑ (T27, T34, T36–T40) |
 | **IDE-8** | Verificador del Inventario, endpoints y la cookie de sesión de la web | T41–T45 | C | IDE-7 | ☑ (T41–T45; T42 y T43 con alcance reducido, decisión IDE-8b) |
-| **IDE-9** | Integración con el Inventario, carga de Argon2id, tiempos uniformes, concurrencia y custodia de la clave | T46–T50 | C | IDE-8 | ☐ |
+| **IDE-9** | Integración con el Inventario, carga de Argon2id, tiempos uniformes, concurrencia y custodia de la clave | T46–T50 | C | IDE-8 | ☑ (T46–T50; `identidad-seguridad` 50/50, falta `spec-verify`) |
 | **NOT-1** | `transversal-notificaciones`: Dominio y contrato, solicitar y cancelar avisos, desactivación de números | T01–T07 | C | IDE-2 | ☑ (T01–T05 y T07; T06 queda para T08) |
 | **NOT-2** | Envío, tope por número, recepción del Inventario y estado de entrega | T08–T11 | E | NOT-1 | ☐ |
 | **NOT-3** | Infraestructura: migraciones, huella del número, n8n firmado, simulado y nulo, contacto de sucursal, flujo de n8n y Evolution | T12–T18 | C | NOT-2 | ☐ |
@@ -70,10 +70,10 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **ECO-3** | Planificar `ecommerce-carrito-checkout`, `ecommerce-pagos` y `ecommerce-pedidos` | C | ECO-2 | ☑ (planes aprobados el 2026-11-18) |
 | **ECO-4** | `ecommerce-carrito-checkout` (reservas e idempotencia) | C | ECO-3, INV-2 | ▶ (subbloques ECO-4a a 4e, T01–T37; ECO-4a a ECO-4d hechos y fundidos (T01–T32 y T37, salvo T25b y T26c que esperan al carril A); faltan T33–T36, pantallas y E2E) |
 | **ECO-5** | `ecommerce-pagos` (pasarela de pruebas de Culqi) | C | ECO-4; B05 (persona) | ▶ (ECO-5a a ECO-5c hechos y fundidos (T01–T23); subbloques ECO-5a a 5f, T01–T38; 5f condicionado a B05) |
-| **ECO-6** | `ecommerce-pedidos` | E | ECO-5 | ☐ (subbloques ECO-6a a 6f, T01–T42) |
+| **ECO-6** | `ecommerce-pedidos` | E | ECO-5 | ▶ (ECO-6a hecho, T01–T06; ECO-6b a 6f, T07–T42) |
 | **ECO-7** | Planificar biblioteca digital, envíos, devoluciones y libro de reclamaciones | C | ECO-6 | ☑ (planes aprobados el 2026-11-18) |
 | **ECO-8** | `ecommerce-biblioteca-digital` (archivos y URLs firmadas) | C | ECO-7 | ☐ (ECO-8a a 8e, T01–T26) |
-| **ECO-9** | `ecommerce-envios` | E | ECO-7 | ▶ (ECO-9a hecho, T01–T05; ECO-9b a 9e, T06–T25) |
+| **ECO-9** | `ecommerce-envios` | E | ECO-7 | ▶ (ECO-9a y ECO-9b hechos, T01–T11; ECO-9c a 9e, T12–T25) |
 | **ECO-10** | `ecommerce-devoluciones` | E | ECO-9 | ☐ (ECO-10a a 10f, T01–T34) |
 | **ECO-11** | `ecommerce-libro-reclamaciones` | E | ECO-7 | ▶ (ECO-11a y ECO-11b hechos, T01–T12; faltan 11c y 11d) |
 | **ECO-12** | `asistente-compra-ia` | C | ECO-6; B06 (persona) | ☐ (plan aprobado el 2026-11-19 tras la ronda 4: ECO-12a T01–T07, 12b T08–T14, 12c T15–T19, 12d T20–T24; depende de ECO-6, IDE-6, web-base T08 y las políticas de límite del carril A; el adaptador real espera B06) |

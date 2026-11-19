@@ -75,6 +75,17 @@ public static class GuardaDeArranqueDePagos
             Secreto(VariableClaveDeIntentosAnterior, opciones.ClaveDeIntentosAnterior, LargoMinimoDeLaClaveDeIntentos);
         }
 
+        // Un modo que prohíbe llamadas reales (Restauracion y Ensayo) solo admite el adaptador nulo: ninguna llamada a un proveedor, así que no se exige la llave, su prefijo, Pedidos ni un entorno de pruebas (PAG-12).
+        if (opciones.SinLlamadasReales)
+        {
+            if (!opciones.PasarelaEsNula)
+            {
+                throw Rechazo(VariablePasarela, "en Restauracion y Ensayo solo se acepta el adaptador nulo de la pasarela");
+            }
+
+            return;
+        }
+
         if (opciones.Pasarela == Simulador)
         {
             if (!esDePruebas)

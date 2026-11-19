@@ -1,0 +1,49 @@
+@using BabelHub.Ecommerce.Api.Web.Formato
+@using BabelHub.Ecommerce.Application.Pagos
+@model BabelHub.Ecommerce.Api.Areas.Admin.Controllers.ReembolsosVista
+<h1 class="font-display text-4xl leading-tight sm:text-5xl">Reembolsos pendientes</h1>
+
+@if (Model.Pagina.Reembolsos.Count == 0)
+{
+    <p class="my-6">No hay reembolsos pendientes.</p>
+}
+else
+{
+    <div class="my-6 overflow-x-auto">
+        <table class="table">
+            <caption class="sr-only">Reembolsos pendientes de la plataforma</caption>
+            <thead>
+                <tr><th scope="col">Origen</th><th scope="col">Monto</th><th scope="col">Estado</th><th scope="col">Motivo</th><th scope="col">Intentos</th><th scope="col">Creado</th><th scope="col"><span class="sr-only">Acciones</span></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var r in Model.Pagina.Reembolsos)
+                {
+                    <tr>
+                        <td>@BabelHub.Ecommerce.Api.Areas.Admin.Controllers.ReembolsosVista.Origen(r.Origen)</td>
+                        <td>@FormatoPeruano.Soles(r.Monto)</td>
+                        <td>@(r.Estado == EstadoDelReembolso.Solicitado ? "Pedido a la pasarela" : "Pendiente")</td>
+                        <td>@BabelHub.Ecommerce.Api.Areas.Admin.Controllers.ReembolsosVista.Motivo(r.Motivo)</td>
+                        <td>@r.Intentos</td>
+                        <td>@FormatoPeruano.FechaYHora(r.CreadoEn)</td>
+                        <td>
+                            <form method="post" action="/administracion/reembolsos/reintentar">
+                                <input type="hidden" name="reembolsoId" value="@r.Id.ToString("D")" />
+                                <button type="submit" class="btn btn-sm btn-primary">Reintentar</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <nav class="join" aria-label="Páginas de reembolsos">
+        @if (Model.HayAnterior)
+        {
+            <a class="btn join-item" href="/administracion/reembolsos?pagina=@(Model.Pagina.Pagina - 1)&tamano=@Model.Pagina.Tamano">Anterior</a>
+        }
+        @if (Model.HaySiguiente)
+        {
+            <a class="btn join-item" href="/administracion/reembolsos?pagina=@(Model.Pagina.Pagina + 1)&tamano=@Model.Pagina.Tamano">Siguiente</a>
+        }
+    </nav>
+}
