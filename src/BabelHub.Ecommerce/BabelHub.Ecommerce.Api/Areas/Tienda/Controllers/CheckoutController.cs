@@ -59,16 +59,16 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
         var (campos, error) = await EntradasHttpDelCarrito.Leer(HttpContext, CamposDeIniciar, cancelacion);
         if (campos is null)
         {
-            return await Falla(error!);
+            return await Falla(error!, cancelacion);
         }
 
         var sucursal = campos.GetValueOrDefault("sucursalPreferida");
         if (sucursal is not null && (sucursal.Length is 0 or > 40 || sucursal.Any(char.IsControl)))
         {
-            return await Falla(EntradasHttpDelCarrito.Invalido("sucursalPreferida"));
+            return await Falla(EntradasHttpDelCarrito.Invalido("sucursalPreferida"), cancelacion);
         }
 
-        return await Terminar(await checkout.Iniciar(new IniciarCheckoutEntrada(sucursal), cancelacion), "/checkout");
+        return await Terminar(await checkout.Iniciar(new IniciarCheckoutEntrada(sucursal), cancelacion), "/checkout", cancelacion);
     }
 
     [HttpGet("/checkout")]
@@ -77,13 +77,13 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
     {
         if (await EntradasHttpDelCarrito.RechazarConsulta(HttpContext) is { } consulta)
         {
-            return await Falla(consulta);
+            return await Falla(consulta, cancelacion);
         }
 
         var resultado = await checkout.Obtener(cancelacion);
         if (!resultado.EsExito)
         {
-            return await Falla(resultado.Error!);
+            return await Falla(resultado.Error!, cancelacion);
         }
 
         // Con un retiro pendiente la Aplicación no entrega el pedidoId: se muestra la revisión con su aviso, sin redirigir al pago (CAR-26).
@@ -100,12 +100,12 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
         var (campos, error) = await EntradasHttpDelCarrito.Leer(HttpContext, CamposDeEntrega, cancelacion);
         if (campos is null)
         {
-            return await Falla(error!);
+            return await Falla(error!, cancelacion);
         }
 
         if (!campos.TryGetValue("tipoDeEntrega", out var tipoTexto))
         {
-            return await Falla(EntradasHttpDelCarrito.Falta("tipoDeEntrega"));
+            return await Falla(EntradasHttpDelCarrito.Falta("tipoDeEntrega"), cancelacion);
         }
 
         TipoDeEntregaDeCompra? tipo = tipoTexto switch
@@ -117,30 +117,30 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
         };
         if (tipo is null)
         {
-            return await Falla(EntradasHttpDelCarrito.Invalido("tipoDeEntrega"));
+            return await Falla(EntradasHttpDelCarrito.Invalido("tipoDeEntrega"), cancelacion);
         }
 
         if (!PedidoOculto(campos, out var pedidoId, out var errorDelPedido))
         {
-            return await Falla(errorDelPedido!);
+            return await Falla(errorDelPedido!, cancelacion);
         }
 
         // Solo el domicilio lleva contacto; con otro tipo, un campo de contacto es validación (nunca se ignora en silencio).
         var contactoEnviado = new[] { "direccion", "region", "nombre", "telefono" }.Where(campos.ContainsKey).ToList();
         if (tipo != TipoDeEntregaDeCompra.Domicilio && contactoEnviado.Count > 0)
         {
-            return await Falla(EntradasHttpDelCarrito.Invalido(contactoEnviado[0]));
+            return await Falla(EntradasHttpDelCarrito.Invalido(contactoEnviado[0]), cancelacion);
         }
 
         if (tipo != TipoDeEntregaDeCompra.Recojo && campos.ContainsKey("sucursal"))
         {
-            return await Falla(EntradasHttpDelCarrito.Invalido("sucursal"));
+            return await Falla(EntradasHttpDelCarrito.Invalido("sucursal"), cancelacion);
         }
 
         var contacto = tipo == TipoDeEntregaDeCompra.Domicilio
             ? new ContactoDeCompra(campos.GetValueOrDefault("nombre"), campos.GetValueOrDefault("telefono"), campos.GetValueOrDefault("direccion"), campos.GetValueOrDefault("region"))
             : null;
-        return await Terminar(await checkout.ElegirEntrega(new ElegirEntregaEntrada(tipo.Value, campos.GetValueOrDefault("sucursal"), contacto, pedidoId), cancelacion), "/checkout");
+        return await Terminar(await checkout.ElegirEntrega(new ElegirEntregaEntrada(tipo.Value, campos.GetValueOrDefault("sucursal"), contacto, pedidoId), cancelacion), "/checkout", cancelacion);
     }
 
     // ---------- Pasar al pago ----------
@@ -156,7 +156,7 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
         var (campos, error) = await EntradasHttpDelCarrito.Leer(HttpContext, CamposDePasarAlPago, cancelacion);
         if (campos is null)
         {
-            return await Falla(error!);
+            return await Falla(error!, cancelacion);
         }
 
         var token = campos.GetValueOrDefault(VerificacionDePersonaWeb.CampoDelToken) ?? Request.Headers["X-Verificacion-De-Persona"].FirstOrDefault();
@@ -167,17 +167,17 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
             case ResultadoDeExigencia.Fallida:
                 return await FallaDeVerificacion("VERIFICACION-FALLIDA", CategoriaDeError.Prohibido);
             case ResultadoDeExigencia.NoDisponible:
-                return await Falla(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible"));
+                return await Falla(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible"), cancelacion);
         }
 
         if (!PedidoOculto(campos, out var pedidoId, out var errorDelPedido))
         {
-            return await Falla(errorDelPedido!);
+            return await Falla(errorDelPedido!, cancelacion);
         }
 
         if (!TryTotal(campos, out var total))
         {
-            return await Falla(campos.ContainsKey("totalVisto") ? EntradasHttpDelCarrito.Invalido("totalVisto") : EntradasHttpDelCarrito.Falta("totalVisto"));
+            return await Falla(campos.ContainsKey("totalVisto") ? EntradasHttpDelCarrito.Invalido("totalVisto") : EntradasHttpDelCarrito.Falta("totalVisto"), cancelacion);
         }
 
         var textos = new List<TextoVistoDeCompra>();
@@ -190,7 +190,7 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
 
             if (version.Length is 0 or > 40 || version.Any(char.IsControl))
             {
-                return await Falla(EntradasHttpDelCarrito.Invalido(campo));
+                return await Falla(EntradasHttpDelCarrito.Invalido(campo), cancelacion);
             }
 
             textos.Add(new TextoVistoDeCompra(texto, version));
@@ -207,26 +207,26 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
             };
             if (whatsapp is null)
             {
-                return await Falla(EntradasHttpDelCarrito.Invalido("consentimientoDeWhatsApp"));
+                return await Falla(EntradasHttpDelCarrito.Invalido("consentimientoDeWhatsApp"), cancelacion);
             }
         }
 
         var huella = campos.GetValueOrDefault("huellaDelNumero");
         if (huella is not null && (huella.Length is 0 or > 40 || huella.Any(char.IsControl)))
         {
-            return await Falla(EntradasHttpDelCarrito.Invalido("huellaDelNumero"));
+            return await Falla(EntradasHttpDelCarrito.Invalido("huellaDelNumero"), cancelacion);
         }
 
         var aceptaciones = await checkout.RegistrarAceptaciones(new RegistrarAceptacionesEntrada(textos, whatsapp, huella, pedidoId), cancelacion);
         if (!aceptaciones.EsExito)
         {
-            return await Falla(aceptaciones.Error!);
+            return await Falla(aceptaciones.Error!, cancelacion);
         }
 
         var resultado = await checkout.PasarAlPago(new PasarAlPagoEntrada(total, textos, pedidoId), cancelacion);
         if (!resultado.EsExito)
         {
-            return await Falla(resultado.Error!);
+            return await Falla(resultado.Error!, cancelacion);
         }
 
         var pago = resultado.Valor;
@@ -247,16 +247,16 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
         var (campos, error) = await EntradasHttpDelCarrito.Leer(HttpContext, CamposDeSalir, cancelacion);
         if (campos is null)
         {
-            return await Falla(error!);
+            return await Falla(error!, cancelacion);
         }
 
         if (!PedidoOculto(campos, out var pedidoId, out var errorDelPedido))
         {
-            return await Falla(errorDelPedido!);
+            return await Falla(errorDelPedido!, cancelacion);
         }
 
         var resultado = await checkout.VolverAlCarrito(new SalirDelCheckoutEntrada(pedidoId), cancelacion);
-        return resultado.EsExito ? Redirigir("/carrito") : await Falla(resultado.Error!);
+        return resultado.EsExito ? Redirigir("/carrito") : await Falla(resultado.Error!, cancelacion);
     }
 
     [HttpPost("/checkout/reiniciar")]
@@ -265,16 +265,16 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
         var (campos, error) = await EntradasHttpDelCarrito.Leer(HttpContext, CamposDeSalir, cancelacion);
         if (campos is null)
         {
-            return await Falla(error!);
+            return await Falla(error!, cancelacion);
         }
 
         if (!PedidoOculto(campos, out var pedidoId, out var errorDelPedido))
         {
-            return await Falla(errorDelPedido!);
+            return await Falla(errorDelPedido!, cancelacion);
         }
 
         var resultado = await checkout.Reiniciar(new SalirDelCheckoutEntrada(pedidoId), cancelacion);
-        return resultado.EsExito ? Redirigir("/carrito") : await Falla(resultado.Error!);
+        return resultado.EsExito ? Redirigir("/carrito") : await Falla(resultado.Error!, cancelacion);
     }
 
     // ---------- Piezas ----------
@@ -311,8 +311,8 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
     [GeneratedRegex(@"^\d{1,10}(\.\d{1,2})?$", RegexOptions.CultureInvariant)]
     private static partial Regex FormaDelTotal();
 
-    private async Task<IActionResult> Terminar(Resultado<VistaDelCheckout> resultado, string destino) =>
-        resultado.EsExito ? Redirigir(destino) : await Falla(resultado.Error!);
+    private async Task<IActionResult> Terminar(Resultado<VistaDelCheckout> resultado, string destino, CancellationToken cancelacion) =>
+        resultado.EsExito ? Redirigir(destino) : await Falla(resultado.Error!, cancelacion);
 
     private IActionResult Redirigir(string destino)
     {
@@ -341,8 +341,13 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
         return new EmptyResult();
     }
 
-    private async Task<IActionResult> Falla(ErrorDeAplicacion error)
+    private async Task<IActionResult> Falla(ErrorDeAplicacion error, CancellationToken cancelacion)
     {
+        if (PantallasDelCarrito.PrefiereHtml(Request))
+        {
+            return await PantallasDelCarrito.Escribir(this, pagina, errores, error, "/checkout", cancelacion);
+        }
+
         await ProblemasDelCarrito.Escribir(HttpContext, errores, error);
         return new EmptyResult();
     }
