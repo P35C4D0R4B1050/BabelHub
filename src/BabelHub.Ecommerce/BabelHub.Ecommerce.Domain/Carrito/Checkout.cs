@@ -518,6 +518,23 @@ public sealed class Checkout
         return ResultadoDeCheckout.Aplicada(retiradas);
     }
 
+    /// <summary>
+    /// El Inventario respondió 429 al reservar (DD-04, SEL-36, SEL-37): <b>no se aborta</b>, porque el Inventario conserva la reserva vigente (si la hay) y abortar la liberaría. Vuelve de <c>reservando</c> a <c>en_edicion</c> conservando el
+    /// <c>pedidoId</c>, la generación y la reserva anotada (nada que liberar): la persona espera al instante de reintento o reinicia. Condicional al <c>pedidoId</c> y la generación de la solicitud: si el checkout ya cambió, no hace nada.
+    /// </summary>
+    public ResultadoDeCheckout VolverALaRevisionPorLimite(Guid pedidoId, int generacionDeReserva, DateTimeOffset ahora)
+    {
+        if (Estado != EstadoDelCheckout.Reservando || PedidoId != pedidoId || GeneracionDeReserva != generacionDeReserva)
+        {
+            return ResultadoDeCheckout.De(EfectoDeTransicion.NoAplica);
+        }
+
+        ReservandoDesde = null;
+        Estado = EstadoDelCheckout.EnEdicion;
+        Cambiar(porLaPersona: false, ahora);
+        return ResultadoDeCheckout.Aplicada();
+    }
+
     /// <summary>Un <c>reservando</c> de dos minutos o más está atascado (un corte entre los pasos): lo recupera el trabajo de fondo (D20).</summary>
     public bool ReservandoVencido(DateTimeOffset ahora) => Estado == EstadoDelCheckout.Reservando && ReservandoDesde is { } desde && ahora - desde >= DuracionMaximaDeReservando;
 

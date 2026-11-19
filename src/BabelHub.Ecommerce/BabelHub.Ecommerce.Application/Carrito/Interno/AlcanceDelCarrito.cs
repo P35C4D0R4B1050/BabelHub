@@ -83,6 +83,9 @@ internal static class ClavesDelCarrito
 
     /// <summary>El total que la persona vio ya no es el calculado (409, D17): no se crea nada.</summary>
     public const string TotalCambio = "checkout-total-cambio";
+
+    /// <summary>El Inventario rechazó la reserva (409): falta de stock con las líneas y el máximo, un plazo o una fuente distinta de lo informado, o una reserva expirada. Se vuelve a la revisión con el carrito conservado (CAR-27).</summary>
+    public const string ReservaRechazada = "checkout-reserva-rechazada";
 }
 
 /// <summary>Los motivos de <c>AccesoDenegado</c> que usa el módulo (AUD-05).</summary>
