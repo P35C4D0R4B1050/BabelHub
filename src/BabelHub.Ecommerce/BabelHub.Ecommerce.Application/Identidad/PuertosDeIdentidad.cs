@@ -13,6 +13,52 @@ public interface IPendientesDeCuenta
     Task<int> Contar(Guid usuarioId, CancellationToken cancelacion = default);
 }
 
+/// <summary>
+/// La parte de los pendientes de una cuenta que cuenta <b>un</b> módulo o el Inventario (T36): cada uno implementa este puerto con lo suyo y <see cref="PendientesDeCuentaCompuestos"/> los suma. Si no puede contar,
+/// lanza: nunca se asume cero.
+/// </summary>
+public interface IPendientesDeUnModulo
+{
+    Task<int> Contar(Guid usuarioId, CancellationToken cancelacion = default);
+}
+
+/// <summary>No se pudo contar los pendientes de una cuenta: la cancelación o el reemplazo fallan cerrados (IDE-27, IDE-84).</summary>
+public sealed class PendientesNoDisponiblesException : InvalidOperationException
+{
+    public PendientesNoDisponiblesException()
+        : base("No se pudieron contar los pendientes de la cuenta.")
+    {
+    }
+
+    public PendientesNoDisponiblesException(string message)
+        : base(message)
+    {
+    }
+
+    public PendientesNoDisponiblesException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
+/// <summary>
+/// Los pendientes de una cuenta en todos los módulos y el Inventario (IDE-27): suma lo que cuenta cada <see cref="IPendientesDeUnModulo"/>. Basta que <b>uno</b> falle para que lance, y no se cuenta nada a medias:
+/// un pendiente que no se pudo contar podría ser el que impide cancelar.
+/// </summary>
+public sealed class PendientesDeCuentaCompuestos(IEnumerable<IPendientesDeUnModulo> modulos) : IPendientesDeCuenta
+{
+    public async Task<int> Contar(Guid usuarioId, CancellationToken cancelacion = default)
+    {
+        var total = 0;
+        foreach (var modulo in modulos)
+        {
+            total = checked(total + Math.Max(0, await modulo.Contar(usuarioId, cancelacion).ConfigureAwait(false)));
+        }
+
+        return total;
+    }
+}
+
 /// <summary>Lo que Carrito implementa para que Identidad elimine el carrito de una cuenta de cliente sin verificar que se reemplaza (IDE-84, IDE-88): si no puede, lanza y el reemplazo no se hace.</summary>
 public interface ICarritoDeCuentaReemplazada
 {

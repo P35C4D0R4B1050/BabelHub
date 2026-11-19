@@ -284,3 +284,12 @@ Revisión de seguridad («Cumple con observaciones», 0 Bloqueantes, 0 Important
 | T37 a T40 | **`TrabajoDeFondoDeIdentidad`:** corre como «sistema» fijado explícitamente, registra el resultado enumerado en `plataforma.trabajos_de_fondo` y alerta tras tres fallos seguidos (`trabajo-de-fondo-detenido`); solo se propaga la cancelación del apagado. **`AgregarTrabajosDeIdentidad(soloEnModoNormal)`** (en `Composicion`) registra el servicio hospedado; el anfitrión (T44) la llama. | AC-IDE-19 |
 
 **Nota de trazabilidad:** `tasks.md` cita AC-IDE-19 para T37, pero su texto en la spec habla del segundo factor; las pruebas de la purga llevan ese criterio por lo que dice la tarea y queda como hallazgo Menor para corregir la matriz con la persona responsable.
+
+## IDE-7b · T36 (parcial) — adaptadores de Identidad sobre el Inventario
+
+| Tarea | Decisión | Criterios |
+| :--- | :--- | :--- |
+| T36 | **`InventarioEntregaDeBajas`** (`IEntregaDeBajas`): llama a `DarDeBajaAlTitular` con solo el identificador opaco y es **verdadera solo si el Inventario aceptó** la baja; «no disponible», límite o rechazo se reintentan sin deshacer la cancelación y nunca lanzan. | AC-IDE-53, IDE-64 |
+| T36 | **Pendientes de la cuenta:** nuevo puerto `IPendientesDeUnModulo` (lo implementa cada módulo con lo suyo) y `PendientesDeCuentaCompuestos` (`IPendientesDeCuenta`) que **suma**; basta que uno falle para que lance (nunca se asume cero). **`InventarioPendientesDeUnModulo`** aporta las reservas activas del titular y lanza `PendientesNoDisponiblesException` si no puede contar. Pedidos, Envíos, Devoluciones y Pagos aportarán el suyo al construirse. | AC-IDE-24, IDE-27 |
+
+**Sin marcar T36 ni T27:** faltan los adaptadores de los puertos de Auditoría sobre `identidad.registros` (`IAlmacenDeRegistrosAislados`, `IFuenteDeRegistrosAislados` con el conteo por acción en ventana de 5 minutos, `IDepuradorDeRegistrosAislados`). Las utilidades de inserción y consulta de `Auditoria` están fijadas al esquema `auditoria` y son internas: hay que parametrizarlas por esquema (cambio en `Infrastructure/Auditoria`) y reutilizarlas desde `Composicion`. También falta T34 (MailKit, cola cifrada y cuota).
