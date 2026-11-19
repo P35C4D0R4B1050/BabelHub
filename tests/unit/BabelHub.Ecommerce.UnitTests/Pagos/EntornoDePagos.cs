@@ -6,6 +6,7 @@ using BabelHub.Ecommerce.UnitTests.Catalogo;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.UnitTests.Plataforma;
 using BabelHub.Ecommerce.UnitTests.Soporte;
+using DomMedioDePago = BabelHub.Ecommerce.Domain.Pagos.MedioDePago;
 
 namespace BabelHub.Ecommerce.UnitTests.Pagos;
 
@@ -24,6 +25,9 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
 
     public int Operaciones { get; private set; }
 
+    /// <summary>El orden de los bloqueos, compartido con la cuenta del pagador (marca de cancelación y luego intención).</summary>
+    public List<string>? Orden { get; set; }
+
     public bool BloqueoNoDisponible { get; set; }
 
     public void Sembrar(IntencionDePago intencion) => _intenciones[intencion.Id] = intencion.Copiar();
@@ -39,6 +43,7 @@ internal sealed class RepositorioDePagosEnMemoria : IRepositorioDePagos, IInstan
             }
 
             LecturasConBloqueo++;
+            Orden?.Add("intencion-con-bloqueo");
         }
 
         return Task.FromResult(_intenciones.TryGetValue(pedidoId, out var i) ? i.Copiar() : null);
@@ -172,7 +177,29 @@ internal sealed class EntornoDePagos
         Firmador = new FirmadorDeClavesDeIntento(new OpcionesDeClavesDeIntento(System.Text.Encoding.UTF8.GetBytes("clave-de-intentos-de-prueba-de-32-bytes-o-mas")));
         Autorizador = new AutorizadorDePagos(Actor, Denegaciones);
         EmitirClave = new EmitirClaveDeIntento(Autorizador, Repositorio, Unidad, Checkout, Firmador, Reloj);
+        Orden = [];
+        Repositorio.Orden = Orden;
+        Cuenta = new CuentaDelPagadorDoble(Unidad, Orden);
+        Posesion = new PosesionDeEdicionesDoble();
+        Reservas = new ReservasDelPagoDoble(Unidad, Reloj);
+        LimitesDeCobro = new LimitesDeCobroDoble();
+        Auditoria = new AuditoriaDelCatalogoEspia();
+        RegistrarIntento = new RegistrarIntento(Autorizador, Repositorio, Unidad, Cuenta, Posesion, Reservas, Checkout, new LimitadorDeCobros(LimitesDeCobro), Auditoria, Reloj);
     }
+
+    public List<string> Orden { get; }
+
+    public CuentaDelPagadorDoble Cuenta { get; }
+
+    public PosesionDeEdicionesDoble Posesion { get; }
+
+    public ReservasDelPagoDoble Reservas { get; }
+
+    public LimitesDeCobroDoble LimitesDeCobro { get; }
+
+    public AuditoriaDelCatalogoEspia Auditoria { get; }
+
+    public RegistrarIntento RegistrarIntento { get; }
 
     public ActorDePrueba Actor { get; }
 
@@ -200,4 +227,20 @@ internal sealed class EntornoDePagos
     /// <summary>Crea la intención mixta y devuelve el resultado.</summary>
     public async Task<ResultadoDeCrearIntencion> CrearMixta(string huella = "huella-a") =>
         await Creador.Crear(InstantaneasDeCompraDePrueba.Cuenta, InstantaneasDeCompraDePrueba.Mixta(huella), huella, ReservaExpiraEn);
+}
+
+internal static class EntornoDePagosExtensiones
+{
+    /// <summary>Una entrada de registro con una clave nueva (o la dada), para el medio elegido.</summary>
+    public static EntradaDeRegistroDeIntento Entrada(this EntornoDePagos e, Guid? intentoId = null, DomMedioDePago medio = DomMedioDePago.Yape, string huella = "huella-a", long total = 14_000) =>
+        new(InstantaneasDeCompraDePrueba.Cuenta, InstantaneasDeCompraDePrueba.Pedido, new DatosDeLaClaveDeIntento(intentoId ?? Guid.NewGuid(), InstantaneasDeCompraDePrueba.Pedido, InstantaneasDeCompraDePrueba.Cuenta, huella, total, e.Reloj.Ahora.AddMinutes(30)), medio);
+
+    /// <summary>La intención mixta creada, con el reloj a los 30 segundos del inicio (como cuando el cliente aprieta pagar).</summary>
+    public static async Task<EntornoDePagos> ConIntencionLista()
+    {
+        var e = new EntornoDePagos();
+        await e.CrearMixta();
+        e.Reloj.Ahora = IntencionesDePrueba.Inicio.AddSeconds(30);
+        return e;
+    }
 }
