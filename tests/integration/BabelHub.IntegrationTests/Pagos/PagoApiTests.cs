@@ -137,6 +137,26 @@ public sealed class PagoApiTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PAG-01")]
+    public async Task La_pantalla_del_pago_tiene_cuenta_regresiva_por_atributo_medios_accesibles_y_ningun_dato_de_tarjeta()
+    {
+        using var respuesta = await _host.Cliente.SendAsync(_host.Pedir($"/checkout/pago?pedidoId={Pedido:D}", html: true));
+
+        var html = await respuesta.Content.ReadAsStringAsync();
+        Assert.Contains("role=\"timer\"", html, StringComparison.Ordinal);
+        Assert.Contains("data-bh-cuenta-regresiva=\"", html, StringComparison.Ordinal);
+        Assert.Contains("data-bh-vencido", html, StringComparison.Ordinal);
+        Assert.Contains("name=\"medio\" value=\"yape\"", html, StringComparison.Ordinal);
+        Assert.Contains("name=\"medio\" value=\"tarjeta\"", html, StringComparison.Ordinal);
+        Assert.Contains("role=\"radiogroup\"", html, StringComparison.Ordinal);
+        // Sin scripts en línea (la política de contenido no los admite) ni campos de tarjeta: solo el identificador que entrega la pasarela.
+        Assert.DoesNotContain("<script", html.Replace("<script src=", string.Empty, StringComparison.Ordinal), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("onclick=", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("cc-number", html, StringComparison.Ordinal);
+        Assert.Contains("name=\"tokenDelMedio\"", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Mostrar_el_pago_sin_pedidoId_usa_el_checkout_vivo_en_pago()
     {
         using var respuesta = await _host.Cliente.SendAsync(_host.Pedir("/checkout/pago", html: true));
@@ -187,6 +207,7 @@ public sealed class PagoApiTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PAG-05")]
     public async Task Tras_un_rechazo_la_pantalla_dice_el_motivo_en_palabras_de_la_persona()
     {
         _host.Pagos.EstadoDelPago = Resultado<EstadoDelPagoVista>.Exito(new EstadoDelPagoVista(EstadoDelPagoDeLaCompra.ListoParaPagar, DateTimeOffset.UtcNow.AddMinutes(10), null, MotivoDeRechazoDePago.FondosInsuficientes, true));
@@ -215,6 +236,7 @@ public sealed class PagoApiTests : IAsyncLifetime
     // ---------- Estado y retorno ----------
 
     [Fact]
+    [Trait("Criterio", "AC-PAG-12")]
     public async Task El_estado_pinta_la_pagina_y_con_htmx_solo_el_fragmento_que_sigue_sondeando_mientras_se_confirma()
     {
         _host.Pagos.EstadoDelPago = Resultado<EstadoDelPagoVista>.Exito(new EstadoDelPagoVista(EstadoDelPagoDeLaCompra.ConfirmandoElPago, DateTimeOffset.UtcNow.AddMinutes(20), null, null, false));

@@ -91,6 +91,11 @@ public sealed class OpcionesDelAnfitrionDelInventario
     {
         ArgumentNullException.ThrowIfNull(configuracion);
         var lector = new LectorDeSecretos(configuracion);
+        if (configuracion.GetSection("Migrador").GetChildren().Any())
+        {
+            lector.Problema("Migrador", "la cuenta propietaria de las bases es solo para el modo migrar y no debe estar en el entorno del servicio");
+        }
+
         var baseDeLaAplicacion = BasesDelInventario.Leer(lector, RutaDeLaBaseDeLaAplicacion, esProduccion);
         var depuracionDeAjustes = BasesDelInventario.Leer(lector, RutaDeLaBaseDeDepuracionDeAjustes, esProduccion);
         var depuracionDeAuditoria = BasesDelInventario.Leer(lector, RutaDeLaBaseDeDepuracionDeAuditoria, esProduccion);
