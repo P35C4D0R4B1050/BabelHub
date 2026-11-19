@@ -45,3 +45,4 @@ Una fila por cada spec o plan que el agente aprobó por delegación de la person
 | 2026-11-18 | plan | ecommerce-biblioteca-digital | Claude (delegado) | 0/0 | Lista para aprobar | Cumple | Cumple | 0 | 14 | bf832ccfb547ced8 |
 | 2026-11-18 | plan | ecommerce-devoluciones | Claude (delegado) | 0/0 | Lista para aprobar | Cumple | Cumple | 0 | 16 | f6e81d57e9fa7b8b |
 | 2026-11-19 | plan | web-indice-infinito | Claude (delegado) | 0/0 | Lista para aprobar | Cumple | Cumple | 0 | 20 | 16c9e3bd57173996 |
+| 2026-11-19 | plan | asistente-compra-ia | Claude (delegado) | 0/0 | Lista para aprobar | Cumple | Cumple | 0 | 33 | 4f5b5f3e7ccee067 |
