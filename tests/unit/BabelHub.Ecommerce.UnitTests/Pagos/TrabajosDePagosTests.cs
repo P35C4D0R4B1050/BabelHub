@@ -251,3 +251,66 @@ public sealed class TrabajosDePagosTests
         Assert.Equal(Pedido, e.Pagos.Repositorio.Intenciones.Single().Id);
     }
 }
+
+public sealed class ReintentoAutomaticoDeReembolsosTests
+{
+    private static Reembolso Pendiente(MotivoPendienteDeReembolso? motivo, int intentos, DateTimeOffset inicio)
+    {
+        var r = Reembolso.CrearDeCargo(Guid.NewGuid(), OrigenDeReembolso.Compensacion, "comp:x", Guid.NewGuid(), Guid.NewGuid(), Importe.De(10m), inicio);
+        var momento = inicio;
+        for (var i = 0; i < intentos; i++)
+        {
+            r.Reclamar(momento);
+            r.DejarPendiente(motivo ?? MotivoPendienteDeReembolso.SinRespuesta, momento);
+            momento = momento.AddHours(2);
+        }
+
+        return r;
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-17")]
+    public void Un_reembolso_que_nunca_se_pidio_se_reintenta_de_inmediato()
+    {
+        Assert.True(Pendiente(null, 0, IntencionesDePrueba.Inicio).PuedeReintentarseAutomaticamente(IntencionesDePrueba.Inicio));
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-17")]
+    [InlineData(MotivoPendienteDeReembolso.RechazadoPorPasarela)]
+    [InlineData(MotivoPendienteDeReembolso.NoSoportado)]
+    public void Un_rechazo_o_un_medio_no_soportado_nunca_se_reintenta_solo_pero_la_administracion_si_puede(MotivoPendienteDeReembolso motivo)
+    {
+        var r = Pendiente(motivo, 1, IntencionesDePrueba.Inicio);
+        var despues = IntencionesDePrueba.Inicio.AddDays(1);
+
+        Assert.False(r.PuedeReintentarseAutomaticamente(despues));
+        Assert.True(r.PuedeReintentarse(despues));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-17")]
+    public void Tras_un_sin_respuesta_la_espera_crece_con_cada_intento_y_tiene_un_tope()
+    {
+        var inicio = IntencionesDePrueba.Inicio;
+        var uno = Pendiente(MotivoPendienteDeReembolso.SinRespuesta, 1, inicio);
+        var tres = Pendiente(MotivoPendienteDeReembolso.SinRespuesta, 3, inicio);
+        var ultimoUno = uno.UltimoIntentoEn!.Value;
+        var ultimoTres = tres.UltimoIntentoEn!.Value;
+
+        Assert.True(uno.PuedeReintentarseAutomaticamente(ultimoUno.AddSeconds(31)));
+        Assert.False(tres.PuedeReintentarseAutomaticamente(ultimoTres.AddSeconds(31)));
+        Assert.True(tres.PuedeReintentarseAutomaticamente(ultimoTres.AddMinutes(3)));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-17")]
+    public void Tras_el_maximo_de_intentos_solo_lo_reintenta_la_administracion()
+    {
+        var r = Pendiente(MotivoPendienteDeReembolso.SinRespuesta, Reembolso.MaximoDeReintentosAutomaticos, IntencionesDePrueba.Inicio);
+        var despues = r.UltimoIntentoEn!.Value.AddDays(2);
+
+        Assert.False(r.PuedeReintentarseAutomaticamente(despues));
+        Assert.True(r.PuedeReintentarse(despues));
+    }
+}

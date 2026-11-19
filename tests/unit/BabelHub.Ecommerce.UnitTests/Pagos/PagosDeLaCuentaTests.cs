@@ -18,7 +18,7 @@ public sealed class PagosDeLaCuentaTests
     // ---------- Contar pendientes ----------
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-22")]
+    [Trait("Criterio", "AC-PAG-20")]
     public async Task Una_cuenta_sin_pagos_en_curso_ni_reembolsos_de_compensacion_cuenta_cero()
     {
         var e = await ConCompraCompletada();
@@ -28,7 +28,7 @@ public sealed class PagosDeLaCuentaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-22")]
+    [Trait("Criterio", "AC-PAG-20")]
     public async Task Un_cobro_sin_resolver_y_una_compra_aprobada_sin_pedido_cuentan_como_pendientes()
     {
         var b = await EntornoDeConfirmacion.ConIntentoIniciado();
@@ -47,7 +47,7 @@ public sealed class PagosDeLaCuentaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-22")]
+    [Trait("Criterio", "AC-PAG-20")]
     public async Task Una_intencion_abierta_no_es_un_pendiente()
     {
         var e = await EntornoDePagosExtensiones.ConIntencionLista();
@@ -57,7 +57,7 @@ public sealed class PagosDeLaCuentaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-22")]
+    [Trait("Criterio", "AC-PAG-20")]
     public async Task Los_reembolsos_de_compensacion_cuentan_pero_los_de_otro_origen_los_cuentan_Pedidos_y_Devoluciones()
     {
         var e = await ConCompraCompletada();
@@ -71,7 +71,7 @@ public sealed class PagosDeLaCuentaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-22")]
+    [Trait("Criterio", "AC-PAG-20")]
     public async Task Los_pendientes_de_otra_cuenta_no_cuentan_y_una_cuenta_vacia_se_rechaza()
     {
         var b = await EntornoDeConfirmacion.ConIntentoIniciado();
@@ -84,7 +84,7 @@ public sealed class PagosDeLaCuentaTests
     // ---------- Desvincular ----------
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-27")]
+    [Trait("Criterio", "AC-PAG-22")]
     public async Task Cancelar_la_cuenta_desvincula_todas_sus_intenciones_y_conserva_importes_fechas_y_estados()
     {
         var e = await ConCompraCompletada();
@@ -118,7 +118,7 @@ public sealed class PagosDeLaCuentaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-27")]
+    [Trait("Criterio", "AC-PAG-22")]
     public async Task Las_intenciones_de_otra_cuenta_no_se_tocan()
     {
         var e = await ConCompraCompletada();
@@ -133,7 +133,7 @@ public sealed class PagosDeLaCuentaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-27")]
+    [Trait("Criterio", "AC-PAG-22")]
     public async Task Desvincular_es_idempotente_lee_con_bloqueo_y_se_reaplica_tras_restaurar_un_respaldo()
     {
         var e = await ConCompraCompletada();
@@ -158,7 +158,7 @@ public sealed class PagosDeLaCuentaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-27")]
+    [Trait("Criterio", "AC-PAG-22")]
     public async Task Si_falla_a_mitad_de_la_cancelacion_se_revierte_todo_dentro_de_la_transaccion_de_Identidad()
     {
         var e = await ConCompraCompletada();
@@ -251,5 +251,22 @@ public sealed class PagosDeLaCuentaTests
         await liberar.Liberar(Guid.Empty);
 
         Assert.NotNull(e.Pagos.Repositorio.Intenciones.Single().Contacto);
+    }
+}
+
+public sealed class PendientesPorCancelacionDeCuentaTests
+{
+    [Fact]
+    [Trait("Criterio", "AC-PAG-28")]
+    public async Task El_reembolso_de_una_compensacion_por_PAG_32_no_cuenta_como_pendiente_y_no_difiere_la_cancelacion_pero_el_de_otros_motivos_si()
+    {
+        var e = await EntornoDeReembolsos.ConCompraCompletada();
+        var contar = new ContarPendientesDeCuenta(e.Pagos.Repositorio, e.Pagos.Reembolsos);
+        await e.Pagos.Unidad.Ejecutar(token => e.Registrar.RegistrarDeCompensacion(e.Base.Intento, token));
+        Assert.Equal(1, await contar.Contar(InstantaneasDeCompraDePrueba.Cuenta));
+
+        await e.Pagos.Repositorio.AgregarCompensacion(Compensacion.Iniciar(InstantaneasDeCompraDePrueba.Pedido, e.Base.IntentoId, MotivoDeCompensacion.CancelacionDeCuentaEnCurso, VarianteDeCompensacion.Completa, true, e.Pagos.Reloj.Ahora));
+
+        Assert.Equal(0, await contar.Contar(InstantaneasDeCompraDePrueba.Cuenta));
     }
 }

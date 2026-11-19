@@ -115,7 +115,7 @@ internal sealed class CompensarCompra(
         // Sin aviso al cliente (PAG-29 y PAG-32, también en un cobro sobrante) no queda ningún aviso sin enviar que lea su correo; y una compensación completa supera los avisos de «pendiente».
         if (variante == VarianteDeCompensacion.Completa || !compensacion.Avisar)
         {
-            await OmitirLosAvisosQueYaNoTienenSentido(pedidoId, todos: !compensacion.Avisar, token).ConfigureAwait(false);
+            await OmitirLosAvisosQueYaNoTienenSentido(pedidoId, todos: !compensacion.Avisar, soloDelIntento: variante == VarianteDeCompensacion.SoloReembolso ? intentoId : null, token).ConfigureAwait(false);
         }
 
         if (variante == VarianteDeCompensacion.Completa && intencion.Estado == EstadoDeIntencion.Aprobada)
@@ -129,12 +129,12 @@ internal sealed class CompensarCompra(
         return (compensacion, false);
     }
 
-    /// <summary>Los avisos de «pendiente» (a Carrito y al cliente) de esta intención quedan superados por la compensación: pasan a <c>omitido</c>; si la compensación no avisa (PAG-29 y PAG-32), <b>todo</b> aviso sin enviar pasa a omitido para no leer el correo.</summary>
-    private async Task OmitirLosAvisosQueYaNoTienenSentido(Guid pedidoId, bool todos, CancellationToken token)
+    /// <summary>Los avisos de «pendiente» (a Carrito y al cliente) de esta intención quedan superados por la compensación: pasan a <c>omitido</c>; si la compensación no avisa (PAG-29 y PAG-32), <b>todo</b> aviso sin enviar pasa a omitido para no leer el correo (en un cobro sobrante, solo los de ese intento: los de la compra legítima siguen).</summary>
+    private async Task OmitirLosAvisosQueYaNoTienenSentido(Guid pedidoId, bool todos, Guid? soloDelIntento, CancellationToken token)
     {
         foreach (var aviso in await repositorio.ListarAvisosACarritoDeLaIntencion(pedidoId, token).ConfigureAwait(false))
         {
-            if ((todos || aviso.Transicion == TransicionDeAviso.Pendiente) && aviso.Omitir())
+            if ((soloDelIntento is null || aviso.IntentoId == soloDelIntento) && (todos || aviso.Transicion == TransicionDeAviso.Pendiente) && aviso.Omitir())
             {
                 await repositorio.GuardarAvisoACarrito(aviso, token).ConfigureAwait(false);
             }
@@ -142,7 +142,7 @@ internal sealed class CompensarCompra(
 
         foreach (var aviso in await repositorio.ListarAvisosDePagoDeLaIntencion(pedidoId, token).ConfigureAwait(false))
         {
-            if ((todos || aviso.Evento == EventoDeAvisoDePago.Pendiente) && aviso.Omitir())
+            if ((soloDelIntento is null || aviso.IntentoId == soloDelIntento) && (todos || aviso.Evento == EventoDeAvisoDePago.Pendiente) && aviso.Omitir())
             {
                 await repositorio.GuardarAvisoDePago(aviso, token).ConfigureAwait(false);
             }

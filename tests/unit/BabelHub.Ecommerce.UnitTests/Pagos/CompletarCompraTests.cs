@@ -157,7 +157,7 @@ public sealed class CompletarCompraTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-28")]
+    [Trait("Criterio", "AC-PAG-25")]
     public async Task Una_intencion_desvinculada_va_a_compensar_por_PAG_29_sin_llamar_a_Pedidos_ni_avisar()
     {
         var e = await Aprobada();

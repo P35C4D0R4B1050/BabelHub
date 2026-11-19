@@ -117,7 +117,7 @@ public sealed class CompensarCompraTests
     }
 
     [Theory]
-    [Trait("Criterio", "AC-PAG-28")]
+    [Trait("Criterio", "AC-PAG-25")]
     [InlineData(MotivoDeCompensacion.IntencionDesvinculada)]
     [InlineData(MotivoDeCompensacion.CancelacionDeCuentaEnCurso)]
     public async Task En_la_desvinculacion_o_la_cancelacion_de_la_cuenta_se_reembolsa_sin_avisar_al_cliente(MotivoDeCompensacion motivo)
@@ -138,7 +138,7 @@ public sealed class CompensarCompraTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-28")]
+    [Trait("Criterio", "AC-PAG-25")]
     public async Task Compensar_no_lee_el_correo_de_la_cuenta()
     {
         var e = await EntornoDeCompensacion.Aprobada();
@@ -236,7 +236,7 @@ public sealed class CompensarCompraTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-25")]
+    [Trait("Criterio", "AC-PAG-17")]
     public async Task Un_estado_invalido_al_liberar_con_pago_vencido_es_una_reserva_ya_confirmada_sin_reintento_y_con_alerta()
     {
         var e = await EntornoDeCompensacion.Aprobada();
@@ -251,7 +251,7 @@ public sealed class CompensarCompraTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-25")]
+    [Trait("Criterio", "AC-PAG-17")]
     public async Task Liberar_una_reserva_expirada_o_que_no_existe_es_un_exito_sin_cambios_y_sin_alerta()
     {
         var e = await EntornoDeCompensacion.Aprobada(confirmacionIniciada: true);
@@ -367,7 +367,7 @@ public sealed class CompensarCompraTests
     }
 
     [Theory]
-    [Trait("Criterio", "AC-PAG-28")]
+    [Trait("Criterio", "AC-PAG-25")]
     [InlineData(MotivoDeCompensacion.CancelacionDeCuentaEnCurso)]
     [InlineData(MotivoDeCompensacion.IntencionDesvinculada)]
     public async Task Un_cobro_sobrante_con_la_cuenta_en_cancelacion_o_desvinculada_no_avisa_ni_deja_avisos_que_lean_el_correo(MotivoDeCompensacion motivo)

@@ -19,7 +19,7 @@ internal sealed class ContarPendientesDeCuenta(IRepositorioDePagos repositorio, 
         }
 
         var enCurso = await repositorio.ContarIntencionesEnCursoDeLaCuenta(usuarioId, cancelacion).ConfigureAwait(false);
-        var reembolsosDeCompensacion = await reembolsos.ContarPendientesDeLaCuenta(usuarioId, OrigenDeReembolso.Compensacion, cancelacion).ConfigureAwait(false);
+        var reembolsosDeCompensacion = await reembolsos.ContarPendientesDeLaCuenta(usuarioId, OrigenDeReembolso.Compensacion, sinLosDeCancelacionDeCuenta: true, cancelacion).ConfigureAwait(false);
         return enCurso + reembolsosDeCompensacion;
     }
 }

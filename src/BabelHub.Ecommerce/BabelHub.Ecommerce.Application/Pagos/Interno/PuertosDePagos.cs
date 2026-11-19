@@ -212,15 +212,15 @@ internal interface IRepositorioDeReembolsos
 
     Task Guardar(Reembolso reembolso, CancellationToken cancelacion = default);
 
-    /// <summary>Los reembolsos pendientes o solicitados de un origen en las intenciones de una cuenta (PAG-24).</summary>
-    Task<int> ContarPendientesDeLaCuenta(Guid cuentaId, OrigenDeReembolso origen, CancellationToken cancelacion = default);
+    /// <summary>Los reembolsos pendientes o solicitados de un origen en las intenciones de una cuenta (PAG-24); con <paramref name="sinLosDeCancelacionDeCuenta"/> se excluyen los de una compensación por PAG-32, que no difieren la cancelación.</summary>
+    Task<int> ContarPendientesDeLaCuenta(Guid cuentaId, OrigenDeReembolso origen, bool sinLosDeCancelacionDeCuenta = false, CancellationToken cancelacion = default);
 
     Task<(IReadOnlyList<Reembolso> Reembolsos, int Total)> ListarPendientes(int pagina, int tamano, CancellationToken cancelacion = default);
 
     /// <summary>Los reembolsos <c>solicitado</c> sin resolver desde hace tiempo (huérfanos): el proceso cayó tras pedirlos.</summary>
     Task<IReadOnlyList<Guid>> ListarHuerfanos(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default);
 
-    /// <summary>Los reembolsos <c>pendiente</c> que se pueden pedir ahora, los más antiguos primero.</summary>
+    /// <summary>Los reembolsos <c>pendiente</c> que el trabajo reintenta ahora (<c>PuedeReintentarseAutomaticamente</c>), los más antiguos primero.</summary>
     Task<IReadOnlyList<Guid>> ListarReintentables(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default);
 }
 

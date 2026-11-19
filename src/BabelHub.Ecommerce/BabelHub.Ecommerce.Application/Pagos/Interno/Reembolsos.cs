@@ -459,7 +459,7 @@ internal sealed class ReembolsosDePagos(
     public Task<Resultado<EstadoDelReembolso>> Procesar(Guid reembolsoId, CancellationToken cancelacion = default) => procesar.Ejecutar(reembolsoId, cancelacion);
 
     public Task<int> ContarPendientes(Guid cuentaId, OrigenDelReembolso origen, CancellationToken cancelacion = default) =>
-        unidad.Ejecutar(token => reembolsos.ContarPendientesDeLaCuenta(cuentaId, origen.ADominio(), token), cancelacion);
+        unidad.Ejecutar(token => reembolsos.ContarPendientesDeLaCuenta(cuentaId, origen.ADominio(), cancelacion: token), cancelacion);
 
     public async Task<Resultado<ReembolsoPendienteVista?>> ConsultarPorOrigen(OrigenDelReembolso origen, string claveNatural, CancellationToken cancelacion = default)
     {

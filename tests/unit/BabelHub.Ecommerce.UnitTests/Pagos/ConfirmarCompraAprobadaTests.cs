@@ -202,7 +202,7 @@ public sealed class ConfirmarCompraAprobadaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-28")]
+    [Trait("Criterio", "AC-PAG-25")]
     public async Task Una_intencion_desvinculada_se_compensa_por_PAG_29_sin_confirmar_reservas()
     {
         var e = await EntornoDeConfirmacion.ConIntentoIniciado();
@@ -231,7 +231,7 @@ public sealed class ConfirmarCompraAprobadaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-28")]
+    [Trait("Criterio", "AC-PAG-25")]
     public async Task La_desvinculacion_entre_la_lectura_de_la_cuenta_y_el_bloqueo_va_a_PAG_29_sin_leer_nada_mas()
     {
         var e = await EntornoDeConfirmacion.ConIntentoIniciado();
@@ -312,7 +312,7 @@ public sealed class ConfirmarCompraAprobadaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-28")]
+    [Trait("Criterio", "AC-PAG-25")]
     public async Task Si_la_intencion_se_desvincula_mientras_se_confirmaban_las_reservas_se_anotan_y_se_compensa_por_PAG_29()
     {
         var e = await EntornoDeConfirmacion.ConIntentoIniciado();

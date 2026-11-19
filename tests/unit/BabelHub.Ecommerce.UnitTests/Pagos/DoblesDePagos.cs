@@ -336,8 +336,8 @@ internal sealed class RepositorioDeReembolsosEnMemoria(RepositorioDePagosEnMemor
         return Task.CompletedTask;
     }
 
-    public Task<int> ContarPendientesDeLaCuenta(Guid cuentaId, OrigenDeReembolso origen, CancellationToken cancelacion = default) =>
-        Task.FromResult(_reembolsos.Values.Count(r => r.Origen == origen && r.CuentaComoPendiente && pagos.Intenciones.Any(i => i.Id == r.IntencionId && i.CuentaId == cuentaId)));
+    public Task<int> ContarPendientesDeLaCuenta(Guid cuentaId, OrigenDeReembolso origen, bool sinLosDeCancelacionDeCuenta = false, CancellationToken cancelacion = default) =>
+        Task.FromResult(_reembolsos.Values.Count(r => r.Origen == origen && r.CuentaComoPendiente && pagos.Intenciones.Any(i => i.Id == r.IntencionId && i.CuentaId == cuentaId) && !(sinLosDeCancelacionDeCuenta && pagos.Compensaciones.Any(c => c.IntentoId == r.IntentoId && c.Motivo == MotivoDeCompensacion.CancelacionDeCuentaEnCurso))));
 
     public Task<(IReadOnlyList<Reembolso> Reembolsos, int Total)> ListarPendientes(int pagina, int tamano, CancellationToken cancelacion = default)
     {
@@ -349,7 +349,7 @@ internal sealed class RepositorioDeReembolsosEnMemoria(RepositorioDePagosEnMemor
         Task.FromResult<IReadOnlyList<Guid>>(_reembolsos.Values.Where(r => r.EsHuerfano(ahora)).OrderBy(r => r.CreadoEn).Select(r => r.Id).Take(limite).ToArray());
 
     public Task<IReadOnlyList<Guid>> ListarReintentables(DateTimeOffset ahora, int limite, CancellationToken cancelacion = default) =>
-        Task.FromResult<IReadOnlyList<Guid>>(_reembolsos.Values.Where(r => r.PuedeReintentarse(ahora)).OrderBy(r => r.CreadoEn).Select(r => r.Id).Take(limite).ToArray());
+        Task.FromResult<IReadOnlyList<Guid>>(_reembolsos.Values.Where(r => r.PuedeReintentarseAutomaticamente(ahora)).OrderBy(r => r.CreadoEn).Select(r => r.Id).Take(limite).ToArray());
 
     public object Capturar() => _reembolsos.ToDictionary(p => p.Key, p => p.Value.Copiar());
 
