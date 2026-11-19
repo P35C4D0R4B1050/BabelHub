@@ -113,7 +113,10 @@ public sealed class PendientesYAutorizacionConPostgresTests(PostgresDePagosFixtu
         var alMes = await ComprasDePrueba.Sembrar(_entorno);
         Assert.Equal(3, await Contar("intenciones", "contacto_nombre IS NOT NULL"));
 
-        // (1) Pedidos guardó su copia y pide liberar el contacto de su pedido.
+        // (1) La compra se completó y Pedidos guardó su copia: pide liberar el contacto de su pedido (solo una intención completada lo libera).
+        ComprasDePrueba.VivoEnPago(_entorno, porPedidos);
+        await Cobrar(ComprasDePrueba.Cuenta, porPedidos, EscenariosDelSimulador.Aprobado);
+        Assert.Equal(1, await Contar("intenciones", $"id = '{porPedidos:D}' AND estado = 'completada' AND contacto_nombre IS NOT NULL"));
         await Correr<ILiberacionDeContactoDePago>(l => l.Liberar(porPedidos));
         Assert.Equal(1, await Contar("intenciones", $"id = '{porPedidos:D}' AND contacto_nombre IS NULL AND contacto_liberado_en IS NOT NULL"));
 
@@ -124,7 +127,7 @@ public sealed class PendientesYAutorizacionConPostgresTests(PostgresDePagosFixtu
 
         // (3) Una intención que sigue abierta conserva el contacto a los 29 días y 23 horas y lo pierde a los 30.
         await bd.Ejecutar($"UPDATE pagos.intenciones SET estado = 'abierta', motivo_de_cierre = NULL, cerrada_en = NULL, vence_en = '2030-01-01', limite_pendiente_en = '2030-01-01', contacto_nombre = 'Ana Pérez Quispe', contacto_telefono = '987654321', contacto_direccion = 'Av. Los Olivos 123', contacto_liberado_en = NULL WHERE id = '{alMes:D}'");
-        var creada = await bd.Consultar<DateTimeOffset>($"SELECT creada_en FROM pagos.intenciones WHERE id = '{alMes:D}'");
+        var creada = new DateTimeOffset(DateTime.SpecifyKind(await bd.Consultar<DateTime>($"SELECT creada_en FROM pagos.intenciones WHERE id = '{alMes:D}'"), DateTimeKind.Utc));
         _entorno.Reloj.Avanzar(creada + TimeSpan.FromDays(29) + TimeSpan.FromHours(23) - _entorno.Reloj.Ahora);
         await Correr<PurgarContactoDeIntenciones>(p => p.Ejecutar(50));
         Assert.Equal(1, await Contar("intenciones", $"id = '{alMes:D}' AND contacto_nombre IS NOT NULL"));
