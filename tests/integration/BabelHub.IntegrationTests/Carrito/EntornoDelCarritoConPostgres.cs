@@ -115,6 +115,9 @@ public sealed class CuentasDelCarrito : IEstadoDeCuenta
 
 public sealed class PagosDelCarrito : ICreadorDeIntencionesDePago
 {
+    /// <summary>La última instantánea que recibió Pagos (lleva el contacto, que es dato personal y se imprime redactado).</summary>
+    public InstantaneaDeCompra? UltimaInstantanea { get; private set; }
+
     public ResultadoDeCrearIntencion AlCrear { get; set; } = ResultadoDeCrearIntencion.Creada;
 
     public ResultadoDeCancelarIntencion AlCancelar { get; set; } = ResultadoDeCancelarIntencion.Cancelada;
@@ -131,6 +134,7 @@ public sealed class PagosDelCarrito : ICreadorDeIntencionesDePago
 
     public Task<ResultadoDeCrearIntencion> Crear(Guid cuentaId, InstantaneaDeCompra instantanea, string huellaDeInstantanea, DateTimeOffset reservaExpiraEn, CancellationToken cancelacion = default)
     {
+        UltimaInstantanea = instantanea;
         Interlocked.Increment(ref _creaciones);
         return Task.FromResult(AlCrear);
     }
@@ -269,6 +273,7 @@ public sealed class EntornoDelCarritoConPostgres : IAsyncDisposable
         Bd = bd;
         Reloj = new RelojDelCarrito();
         Inventario = new InventarioSimuladoDelCarrito(Reloj);
+        InventarioDeLasPruebas = new InventarioDeLasPruebas(Inventario);
         var servicios = new ServiceCollection();
         servicios.AddSingleton<IReloj>(Reloj);
         servicios.AddSingleton<IActorActual>(_actor);
@@ -282,7 +287,7 @@ public sealed class EntornoDelCarritoConPostgres : IAsyncDisposable
         servicios.AddSingleton<IPosesionDeEdiciones>(Posesion);
         servicios.AddSingleton<IEstadoDeCuenta>(Cuentas);
         servicios.AddSingleton<ICreadorDeIntencionesDePago>(Pagos);
-        servicios.AddSingleton<IInventarioDelCarrito>(Inventario);
+        servicios.AddSingleton<IInventarioDelCarrito>(InventarioDeLasPruebas);
         servicios.AddSingleton<ITextosLegales>(Textos);
         servicios.AddSingleton<IMarcaDeCancelacion>(Marca);
         servicios.AddSingleton<IAuditoriaDelCarrito>(Auditoria);
@@ -311,6 +316,8 @@ public sealed class EntornoDelCarritoConPostgres : IAsyncDisposable
     public PagosDelCarrito Pagos { get; } = new();
 
     public InventarioSimuladoDelCarrito Inventario { get; }
+
+    public InventarioDeLasPruebas InventarioDeLasPruebas { get; }
 
     public TextosDelCarrito Textos { get; } = new();
 
@@ -423,4 +430,42 @@ public sealed class EntornoDelCarritoConPostgres : IAsyncDisposable
         Como(cuenta, sp => sp.GetRequiredService<ICheckoutDelCliente>().PasarAlPago(new PasarAlPagoEntrada(total, conDigitales ? LosTresTextos : LosDosTextos, pedidoId)));
 
     public async ValueTask DisposeAsync() => await _proveedor.DisposeAsync();
+}
+
+/// <summary>
+/// El Inventario de las pruebas: delega en el simulado fiel a los contratos v1 salvo que una prueba le fije otra respuesta (caído, sin respuesta, límite, sin stock, respuesta inválida).
+/// </summary>
+public sealed class InventarioDeLasPruebas(IInventarioDelCarrito real) : IInventarioDelCarrito
+{
+    public Func<RespuestaDelInventarioDelCarrito<StockDeVariasEdiciones>>? RespuestaDeDisponibilidad { get; set; }
+
+    public Func<RespuestaDelInventarioDelCarrito<ConsultaPreviaDelInventario>>? RespuestaDePrevia { get; set; }
+
+    public Func<ResultadoDeReservar>? RespuestaDeReserva { get; set; }
+
+    public Func<ResultadoDeLiberar>? RespuestaDeLiberar { get; set; }
+
+    public int Reservas { get; private set; }
+
+    public int Liberaciones { get; private set; }
+
+    public Task<RespuestaDelInventarioDelCarrito<StockDeVariasEdiciones>> ConsultarDisponibilidad(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default) =>
+        RespuestaDeDisponibilidad is { } r ? Task.FromResult(r()) : real.ConsultarDisponibilidad(edicionIds, cancelacion);
+
+    public Task<RespuestaDelInventarioDelCarrito<ConsultaPreviaDelInventario>> ConsultarPrevia(EntregaParaElInventario entrega, IReadOnlyList<LineaParaElInventario> lineas, CancellationToken cancelacion = default) =>
+        RespuestaDePrevia is { } r ? Task.FromResult(r()) : real.ConsultarPrevia(entrega, lineas, cancelacion);
+
+    public Task<BabelHub.Ecommerce.Application.Carrito.Interno.ListaDeSucursales?> ListarSucursales(CancellationToken cancelacion = default) => real.ListarSucursales(cancelacion);
+
+    public Task<ResultadoDeReservar> Reservar(Guid pedidoId, int generacionDeReserva, EntregaParaElInventario entrega, IReadOnlyList<LineaParaElInventario> lineas, CancellationToken cancelacion = default)
+    {
+        Reservas++;
+        return RespuestaDeReserva is { } r ? Task.FromResult(r()) : real.Reservar(pedidoId, generacionDeReserva, entrega, lineas, cancelacion);
+    }
+
+    public Task<ResultadoDeLiberar> Liberar(Guid pedidoId, string motivo, CancellationToken cancelacion = default)
+    {
+        Liberaciones++;
+        return RespuestaDeLiberar is { } r ? Task.FromResult(r()) : real.Liberar(pedidoId, motivo, cancelacion);
+    }
 }
