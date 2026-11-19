@@ -2,6 +2,18 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-19 — COMP-1 y COMP-2 de A; devoluciones, pedidos y pagos avanzan
+
+### Cubierto
+- **Carril A:** COMP-1 completo del E-commerce (`Program.cs` compone plataforma, Auditoría, Identidad, Catálogo y Carrito reales, sesión web, correo y Turnstile; en la parte 2 Pagos con la ráfaga de avisos de la pasarela y la exención SEG-18, Envíos, Reclamaciones y Pedidos) y **COMP-2: migrador de esquemas y roles de PostgreSQL** (modo `migrar` en el Api de cada servicio, idempotente, falla cerrado, integrado en `desplegar.sh`); lista blanca de auditoría y motivos de alerta de Pedidos.
+- **Carril B:** ECO-6c (T14–T22) y T23 de `ecommerce-pedidos`.
+- **Carril C:** Pagos T30 (13 pruebas contra PostgreSQL, con la corrección real de AC-PAG-03), T31 parcial, T33–T35 y correcciones de rutas y cabeceras; ECO-11 completo.
+- **Carril V:** ECO-10a y ECO-10b (T01–T11 de `ecommerce-devoluciones`).
+- Integración completa de `main` antes de los últimos merges: 6228 de 6233; fallos: 2 reales de Reclamaciones (en manos de C) y 3 por contención o Docker (reservas con reloj y humo de imágenes).
+
+### Pendiente
+- Fallos de Reclamaciones en el host de pruebas (C); ECO-5e, ECO-6d, ECO-10c, parte restante de envíos; E2E con el host sembrado (Node ya instalado); biblioteca digital sin dueño; notificaciones NOT-2 a NOT-4; `spec-verify` de las specs completas.
+
 ## 2026-11-19 — Plataforma para Pagos y Pedidos, ECO-5d, ECO-6b, ECO-9c a 9e y ECO-11 completo
 
 ### Cubierto

@@ -1,4 +1,5 @@
 using BabelHub.Ecommerce.Application.Auditoria;
+using BabelHub.Ecommerce.Application.Identidad;
 using BabelHub.Ecommerce.Application.Pedidos.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Infrastructure.Pedidos;
@@ -16,6 +17,13 @@ public static class ComposicionDePedidos
     public static IServiceCollection AgregarPedidos(this IServiceCollection servicios, bool esProduccion)
     {
         ArgumentNullException.ThrowIfNull(servicios);
+        if (Hay<IUnidadDeTrabajo>(servicios) && Hay<IConexionDeLaUnidadDeTrabajo>(servicios))
+        {
+            // El repositorio real (T28) sobre el esquema `pedidos` bajo `EjecutarComo(pedidos)`.
+            servicios.TryAddScoped<AccesoAlEsquemaDePedidos>();
+            servicios.TryAddScoped<IRepositorioDePedidos, RepositorioDePedidosPostgres>();
+        }
+
         if (Hay<IClienteDelInventario>(servicios))
         {
             servicios.TryAddScoped<IReservasDelPedido, RestReservasDelPedido>();
@@ -30,6 +38,22 @@ public static class ComposicionDePedidos
         {
             servicios.TryAddScoped<IAuditoriaDeContacto, AuditoriaDeContactoSobreAuditoria>();
         }
+
+        // T30: la sucursal por su código, los generadores y los casos de uso de los trabajos de fondo (el anfitrión de la Api los hospeda, T32).
+        servicios.TryAddSingleton<IGeneradorDeNumerosDePedido, AleatorioGeneradorDeNumerosDePedido>();
+        servicios.TryAddSingleton<IGeneradorDeIdentificadoresDePedidos, GeneradorDeIdentificadoresDePedidos>();
+        servicios.TryAddSingleton<IResolucionDeSucursal, CodigoResolucionDeSucursal>();
+        servicios.TryAddScoped<AutorizadorDePedidos>();
+        servicios.TryAddScoped<ControlesDeGestionDePedidos>();
+        servicios.TryAddScoped<OrquestadorDeAnulaciones>();
+        servicios.TryAddScoped<EntregarLineasDelPedido>();
+        servicios.TryAddScoped<CompletarOperacionesEnCurso>();
+        servicios.TryAddScoped<MarcarLineasNoRecogidas>();
+        servicios.TryAddScoped<LiberarContactoDeIntenciones>();
+        servicios.TryAddScoped<AnonimizarContactosVencidos>();
+        servicios.TryAddScoped<RevisarPedidosSinEstadoFinal>();
+        servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IPendientesDeCuenta, ContarPendientesDePedidos>());
+        servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IAplicadorDeCancelacion, AnonimizarContactoDeUnaCuenta>());
 
         return servicios.AgregarDoblesProvisionalesDePedidos(esProduccion);
     }

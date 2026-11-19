@@ -5,6 +5,7 @@ using BabelHub.Ecommerce.Infrastructure.Catalogo;
 using BabelHub.Ecommerce.Infrastructure.Composicion;
 using BabelHub.Ecommerce.Infrastructure.Envios;
 using BabelHub.Ecommerce.Infrastructure.Notificaciones;
+using BabelHub.Ecommerce.Infrastructure.Pedidos;
 using BabelHub.Ecommerce.Infrastructure.Pagos;
 using BabelHub.Ecommerce.Infrastructure.Plataforma;
 using BabelHub.Ecommerce.Infrastructure.Reclamaciones;
@@ -26,10 +27,10 @@ public static class PlanDeMigracionDelEcommerce
     /// <summary>Los roles de esquema de los que la aplicación es miembro (<c>NOINHERIT</c>): lo único que puede hacer con <c>SET LOCAL ROLE</c> (AD18).</summary>
     public static IReadOnlyList<string> RolesDeLaAplicacion { get; } =
     [
-        "rol_plataforma", "rol_auditoria", "rol_identidad", "rol_web", "rol_catalogo", "rol_carrito", "rol_pagos", "rol_envios", "rol_reclamaciones", "rol_notificaciones",
+        "rol_plataforma", "rol_auditoria", "rol_identidad", "rol_web", "rol_catalogo", "rol_carrito", "rol_pagos", "rol_envios", "rol_pedidos", "rol_reclamaciones", "rol_notificaciones",
     ];
 
-    public static IReadOnlyList<string> Esquemas { get; } = ["plataforma", "web", "catalogo", "carrito", "pagos", "envios", "reclamaciones", "notificaciones"];
+    public static IReadOnlyList<string> Esquemas { get; } = ["plataforma", "web", "catalogo", "carrito", "pagos", "envios", "pedidos", "reclamaciones", "notificaciones"];
 
     public static IReadOnlyList<PasoDeMigracion> Pasos() =>
     [
@@ -37,7 +38,7 @@ public static class PlanDeMigracionDelEcommerce
             DO $r$
             DECLARE rol text;
             BEGIN
-                FOREACH rol IN ARRAY ARRAY['rol_plataforma', 'rol_web', 'rol_catalogo', 'rol_carrito', 'rol_pagos', 'rol_envios', 'rol_reclamaciones', 'rol_notificaciones', 'reclamaciones_dueno'] LOOP
+                FOREACH rol IN ARRAY ARRAY['rol_plataforma', 'rol_web', 'rol_catalogo', 'rol_carrito', 'rol_pagos', 'rol_envios', 'rol_pedidos', 'rol_reclamaciones', 'rol_notificaciones', 'reclamaciones_dueno'] LOOP
                     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = rol) THEN EXECUTE format('CREATE ROLE %I NOLOGIN', rol); END IF;
                 END LOOP;
             END
@@ -54,6 +55,7 @@ public static class PlanDeMigracionDelEcommerce
         new("carrito", DefinicionDelCarrito.Sql + DefinicionDelCarrito.Permisos),
         new("pagos", DefinicionDePagos.Sql + DefinicionDePagos.Permisos),
         new("envios", DefinicionDeEnvios.Sql + DefinicionDeEnvios.Permisos),
+        new("pedidos", DefinicionDePedidos.Sql + DefinicionDePedidos.Permisos),
         new("reclamaciones", DefinicionDeReclamaciones.Sql + DefinicionDeReclamaciones.Propiedad + DefinicionDeReclamaciones.FuncionDeAnonimizacion + DefinicionDeReclamaciones.Permisos),
         new("notificaciones", DefinicionDeNotificaciones.Sql + DefinicionDeNotificaciones.Permisos),
     ];

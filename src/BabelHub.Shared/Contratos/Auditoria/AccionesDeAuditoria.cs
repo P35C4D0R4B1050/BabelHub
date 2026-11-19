@@ -95,6 +95,10 @@ public static class AccionesDeAuditoria
 
     public const string LineaDePedidoMarcadaNoRecogida = "LineaDePedidoMarcadaNoRecogida";
 
+    public const string DevolucionesDepuradas = "DevolucionesDepuradas";
+
+    public const string DevolucionesDeCuentaRedactadas = "DevolucionesDeCuentaRedactadas";
+
     public const string ReembolsoDePedidoReintentado = "ReembolsoDePedidoReintentado";
 
     public const string FuenteEditada = "FuenteEditada";
@@ -285,6 +289,8 @@ public static class AccionesDeAuditoria
         PedidosDepurados,
         AnulacionDePedidoRechazada,
         LineaDePedidoMarcadaNoRecogida,
+        DevolucionesDepuradas,
+        DevolucionesDeCuentaRedactadas,
         ReembolsoDePedidoReintentado,
         FuenteEditada,
         FuenteRegistrada,

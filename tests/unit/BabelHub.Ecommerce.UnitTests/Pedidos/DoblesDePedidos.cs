@@ -61,6 +61,11 @@ internal sealed class RepositorioDePedidosFalso : IRepositorioDePedidos
     public Task Actualizar(Pedido pedido, CancellationToken cancelacion = default)
     {
         Llamadas.Add("actualizar");
+        if (ActualizacionesQueFallan.Contains(pedido.Id))
+        {
+            throw new InvalidOperationException("La base no responde");
+        }
+
         _pedidos[pedido.Id] = pedido;
         return Task.CompletedTask;
     }
@@ -132,6 +137,89 @@ internal sealed class RepositorioDePedidosFalso : IRepositorioDePedidos
 
     public Task<IReadOnlyList<Entrega>> EntregasEnCurso(Guid pedidoId, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<Entrega>>([.. Entregas.Where(e => e.PedidoId == pedidoId && e.BloqueaLasLineas)]);
+
+    /// <summary>Pedidos cuyo <c>Actualizar</c> falla (para probar que una anonimización que no puede terminar se informa).</summary>
+    public HashSet<Guid> ActualizacionesQueFallan { get; } = [];
+
+    public Dictionary<Guid, int> IntentosDeContacto { get; } = [];
+
+    public DateTimeOffset? UltimaDepuracion { get; set; }
+
+    public bool FallaLaDepuracion { get; set; }
+
+    public Task<IReadOnlyList<Pedido>> ListarDeLaCuentaConBloqueo(Guid cuentaId, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Pedido>>([.. _pedidos.Values.Where(p => p.CuentaId == cuentaId).OrderBy(p => p.Id)]);
+
+    /// <summary>Pedidos que el listado devuelve aunque no estén vencidos (un filtro del adaptador más amplio que el Dominio).</summary>
+    public HashSet<Guid> ForzadosParaDepurar { get; } = [];
+
+    public Task<IReadOnlyList<Pedido>> ListarVencidosParaDepurar(DateOnly hoyEnLima, int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Pedido>>([.. _pedidos.Values.Where(p => ForzadosParaDepurar.Contains(p.Id)).Concat(_pedidos.Values
+            .Where(p => p.EstaVencidoParaDepurar(hoyEnLima) && (p.Contacto is not null
+                || Anulaciones.Any(a => a.PedidoId == p.Id && !a.Iniciador.EstaAnonimizado)
+                || Entregas.Any(e => e.PedidoId == p.Id && !e.Iniciador.EstaAnonimizado)))
+            .OrderBy(p => p.Id)
+            .Take(maximo))
+            .Distinct()]);
+
+    public Task<int> AnonimizarIniciadoresDeOperaciones(Guid pedidoId, CancellationToken cancelacion = default)
+    {
+        if (FallaLaDepuracion)
+        {
+            throw new InvalidOperationException("La base no responde");
+        }
+
+        var cambiadas = 0;
+        foreach (var anulacion in Anulaciones.Where(a => a.PedidoId == pedidoId && !a.Iniciador.EstaAnonimizado))
+        {
+            anulacion.AnonimizarIniciador();
+            cambiadas++;
+        }
+
+        foreach (var entrega in Entregas.Where(e => e.PedidoId == pedidoId && !e.Iniciador.EstaAnonimizado))
+        {
+            entrega.AnonimizarIniciador();
+            cambiadas++;
+        }
+
+        return Task.FromResult(cambiadas);
+    }
+
+    public Task<DateTimeOffset?> UltimaDepuracionExitosaEn(CancellationToken cancelacion = default) => Task.FromResult(UltimaDepuracion);
+
+    public Task RegistrarDepuracionExitosa(DateTimeOffset cuando, CancellationToken cancelacion = default)
+    {
+        UltimaDepuracion = cuando;
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<LiberacionDeContactoPendiente>> LiberacionesDeContactoPendientes(int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<LiberacionDeContactoPendiente>>([.. LiberacionesDeContacto.OrderBy(l => l.Desde).Take(maximo).Select(l => new LiberacionDeContactoPendiente(l.PedidoId, l.Desde, IntentosDeContacto.GetValueOrDefault(l.PedidoId)))]);
+
+    public Task QuitarLiberacionDeContacto(Guid pedidoId, CancellationToken cancelacion = default)
+    {
+        LiberacionesDeContacto.RemoveAll(l => l.PedidoId == pedidoId);
+        return Task.CompletedTask;
+    }
+
+    public Task AnotarIntentoDeLiberacionDeContacto(Guid pedidoId, DateTimeOffset cuando, CancellationToken cancelacion = default)
+    {
+        IntentosDeContacto[pedidoId] = IntentosDeContacto.GetValueOrDefault(pedidoId) + 1;
+        return Task.CompletedTask;
+    }
+
+    public Task<int> ContarNoRecogidasSinAnularDesde(DateTimeOffset marcadasAntesDe, CancellationToken cancelacion = default) =>
+        Task.FromResult(_pedidos.Values.SelectMany(p => p.Lineas).Count(l => l.EstadoImpreso == EstadoDeLineaImpresa.NoRecogido && l.NoRecogidaEn < marcadasAntesDe));
+
+    public Task<int> ContarImpresasSinEstadoFinalDesde(DateTimeOffset creadosAntesDe, CancellationToken cancelacion = default) =>
+        Task.FromResult(_pedidos.Values.Where(p => p.CreadoEn < creadosAntesDe).SelectMany(p => p.Lineas).Count(l => !l.EsDigital && l.EstadoImpreso is not (EstadoDeLineaImpresa.Entregado or EstadoDeLineaImpresa.Anulado)));
+
+    public Task<int> PurgarEstadosDeTraslado(DateTimeOffset recibidosAntesDe, CancellationToken cancelacion = default)
+    {
+        var vencidos = EstadosDeTraslado.Where(e => e.Value.RecibidoEn < recibidosAntesDe).Select(e => e.Key).ToList();
+        vencidos.ForEach(k => EstadosDeTraslado.Remove(k));
+        return Task.FromResult(vencidos.Count);
+    }
 
     public Task<int> ContarPedidosConImpresaSinCerrar(Guid cuentaId, CancellationToken cancelacion = default) =>
         Task.FromResult(_pedidos.Values.Count(p => p.CuentaId == cuentaId && p.Lineas.Any(l => !l.EsDigital && l.EstadoImpreso is not (EstadoDeLineaImpresa.Entregado or EstadoDeLineaImpresa.Anulado))));

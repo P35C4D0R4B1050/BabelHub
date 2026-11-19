@@ -74,7 +74,7 @@ public enum PasoDeAnulacion
 /// Una anulación en curso (administración o cancelación del cliente; D03, D04, D21): la fila durable que deja el tiempo 1, con el plan (líneas, envío y monto), el iniciador, los pasos ya hechos, la espera y los reintentos. Mientras está <see cref="EstadoDeOperacion.EnCurso"/>
 /// bloquea sus líneas; <see cref="AjustarAlPlan"/> la recalcula si un 409 revela que una línea ya salió y la descarta si no queda ninguna. Reintentar una fallida es repetir la anulación: una fila nueva que reutiliza los pasos por idempotencia.
 /// </summary>
-public sealed class Anulacion
+public sealed partial class Anulacion
 {
     private readonly Dictionary<PasoDeAnulacion, DateTimeOffset> _pasos = [];
     private readonly List<Guid> _lineaIds;
@@ -298,7 +298,7 @@ public sealed record LineaDeEntrega(Guid LineaId, string ClaveDeCierre, DateTime
 /// Una entrega en curso (D03, PED-11, PED-25): una llamada de cierre por línea con su clave, el paso confirmado justo tras cada respuesta del Inventario y la reanudación que solo repite lo local. La línea pasa a entregada <b>solo si el cierre tuvo éxito</b>; una entrega sin ningún cierre confirmado
 /// pasada la espera corta (2 minutos) queda fallida para que el encargado la reintente con la misma clave (descuenta una sola vez).
 /// </summary>
-public sealed class Entrega
+public sealed partial class Entrega
 {
     public static readonly TimeSpan EsperaCortaSinCierre = TimeSpan.FromMinutes(2);
 

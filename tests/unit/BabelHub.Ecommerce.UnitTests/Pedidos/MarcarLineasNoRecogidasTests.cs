@@ -83,8 +83,7 @@ public sealed class MarcarLineasNoRecogidasTests
         // Un aviso al cliente y otro a la sucursal, con el estado «no recogido».
         Assert.Equal(2, entorno.Notificador.Solicitudes.Count);
         Assert.All(entorno.Notificador.Solicitudes, s => Assert.Equal("no-recogido", s.Campos["estado"]));
-        var auditoria = Assert.Single(entorno.Auditoria.Solicitudes);
-        Assert.Equal(AccionesAuditables.EstadoDePedidoCambiado, auditoria.Accion);
+        Assert.Equal([AccionesAuditables.LineaDePedidoMarcadaNoRecogida, AccionesAuditables.EstadoDePedidoCambiado], entorno.Auditoria.Solicitudes.Select(s => s.Accion));
     }
 
     [Fact]
@@ -186,5 +185,23 @@ public sealed class MarcarLineasNoRecogidasTests
             Assert.Equal("prohibido", resultado.Error!.Clave);
             Assert.Empty(entorno.Reservas.Liberaciones);
         }
+    }
+}
+
+/// <summary>Los motivos de alerta técnica de Pedidos coinciden con los que el catálogo de Auditoría declara (si no, la alerta se descartaría como «no catalogada»).</summary>
+public sealed class MotivosDeAlertaDePedidosTests
+{
+    [Fact]
+    public void Los_motivos_de_alerta_de_Pedidos_son_los_del_catalogo()
+    {
+        Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.PedidoLiberacionNoRecogidoYaCerrada, MarcarLineasNoRecogidas.AlertaLiberacionYaCerrada);
+        Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.PedidoLiberacionDeAnulacionYaCerrada, OrquestadorDeAnulaciones.AlertaLiberacionYaCerrada);
+        Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.PedidoOperacionFallida, CompletarOperacionesEnCurso.AlertaOperacionFallida);
+        Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.PedidoEstadoDeTrasladoInexistente, RecibirEstadoDeTraslado.AlertaPedidoInexistente);
+        Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.PedidoEstadoDeTrasladoDeLineaAnulada, RecibirEstadoDeTraslado.AlertaLineaAnulada);
+        // Los motivos de los trabajos de privacidad y revisión: existen en el catálogo (el texto propio de cada uno está pendiente, ver hallazgos).
+        Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.TrabajoDeFondoDetenido, AnonimizarContactosVencidos.AlertaSinCorrida);
+        Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.TrabajoDeFondoDetenido, LiberarContactoDeIntenciones.AlertaSinLiberar);
+        Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.PedidoOperacionFallida, RevisarPedidosSinEstadoFinal.AlertaOperacionPendiente);
     }
 }

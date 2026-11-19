@@ -1,0 +1,65 @@
+@using BabelHub.Ecommerce.Api.Areas.Admin.Controllers
+@using BabelHub.Ecommerce.Api.Web.Formato
+@model SolicitudesDeDatosVista
+<h1 class="bh-display">Solicitudes sobre datos personales</h1>
+<p class="mt-2 max-w-2xl opacity-80">Acceso, rectificación, cancelación y oposición (Ley N.° 29733), ordenadas por fecha límite. Una solicitud en atención cuenta como sin atender.</p>
+
+@if (Model.Mensaje is not null)
+{
+    <div class="alert @(Model.EsError ? "alert-error" : "alert-success") alert-soft mt-4" role="@(Model.EsError ? "alert" : "status")" tabindex="-1" data-bh-foco-inicial><bh-icono nombre="@(Model.EsError ? "error" : "exito")" /><span>@Model.Mensaje</span></div>
+}
+
+@if (Model.Pantalla == PantallaDeSolicitudes.Lista && !Model.EsError)
+{
+    @if (Model.Solicitudes.Count == 0)
+    {
+        <p class="mt-6">No hay solicitudes.</p>
+    }
+    else
+    {
+        <div class="mt-6 overflow-x-auto rounded-box border border-base-300 bg-base-100">
+            <table class="table">
+                <caption class="sr-only">Solicitudes sobre datos personales, por fecha límite</caption>
+                <thead><tr><th scope="col">Tipo</th><th scope="col">Estado</th><th scope="col">Recibida</th><th scope="col">Fecha límite</th><th scope="col"><span class="sr-only">Abrir</span></th></tr></thead>
+                <tbody>
+                    @foreach (var s in Model.Solicitudes)
+                    {
+                        <tr>
+                            <td>@s.Tipo</td>
+                            <td>@s.Estado @(s.Vencida ? "· VENCIDA sin atender" : string.Empty)</td>
+                            <td>@FormatoPeruano.Fecha(s.Recibida)</td>
+                            <td>@FormatoPeruano.Fecha(s.FechaLimite)</td>
+                            <td><a class="btn btn-sm btn-outline" href="/administracion/solicitudes/@s.Id.ToString("D")">Abrir</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+else if (Model.Pantalla == PantallaDeSolicitudes.Detalle && Model.Detalle is { } d)
+{
+    <dl class="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-[12rem_1fr]">
+        <dt class="font-semibold">Tipo</dt><dd>@d.Solicitud.Tipo</dd>
+        <dt class="font-semibold">Estado</dt><dd>@d.Solicitud.Estado @(d.Solicitud.Vencida ? "· VENCIDA sin atender" : string.Empty)</dd>
+        <dt class="font-semibold">Recibida</dt><dd>@FormatoPeruano.Fecha(d.Solicitud.Recibida)</dd>
+        <dt class="font-semibold">Fecha límite</dt><dd>@FormatoPeruano.Fecha(d.Solicitud.FechaLimite)</dd>
+        <dt class="font-semibold">Titular</dt><dd>@d.UsuarioId.ToString("D")</dd>
+        <dt class="font-semibold">Respuesta</dt><dd class="whitespace-pre-line">@(d.Respuesta ?? "—")</dd>
+        <dt class="font-semibold">Motivo</dt><dd class="whitespace-pre-line">@(d.Motivo ?? "—")</dd>
+    </dl>
+    <h2 class="mt-8 font-display text-2xl">Responder</h2>
+    <form method="post" action="/administracion/solicitudes/@d.Solicitud.Id.ToString("D")/responder" class="mt-3 flex max-w-xl flex-col gap-4">
+        <partial name="_TokenAntifalsificacion" />
+        <label class="form-control"><span class="label-text">Resolución</span>
+            <select name="resolucion" class="select select-bordered w-full" required>
+                <option value="EnAtencion">En atención</option>
+                <option value="Atendida">Atendida</option>
+                <option value="Rechazada">Rechazada (indica el motivo)</option>
+            </select>
+        </label>
+        <label class="form-control"><span class="label-text">Respuesta al titular</span><textarea name="respuesta" class="textarea textarea-bordered" rows="5" maxlength="2000"></textarea></label>
+        <label class="form-control"><span class="label-text">Motivo del rechazo</span><textarea name="motivo" class="textarea textarea-bordered" rows="3" maxlength="500"></textarea></label>
+        <div class="flex gap-3"><button type="submit" class="btn btn-primary">Registrar la respuesta</button><a class="btn btn-ghost" href="/administracion/solicitudes">Volver a la lista</a></div>
+    </form>
+}

@@ -124,6 +124,12 @@ public static class PoliticaDeRetencion
     public static DateOnly FechaEnLima(DateTimeOffset instante) => DateOnly.FromDateTime(instante.ToOffset(DesfaseDeLima).DateTime);
 
     public static bool EstaVencida(DateTimeOffset ultimoCambio, DateOnly hoyEnLima) => hoyEnLima >= FechaEnLima(ultimoCambio).AddYears(Anios);
+
+    /// <summary>
+    /// El instante antes del cual <b>puede</b> haber una devolución vencida: una cota holgada (el 29 de febrero cumple el 28) para pedir candidatas al almacén; la regla que decide es <see cref="EstaVencida"/>, que el llamador vuelve a aplicar bajo el bloqueo.
+    /// </summary>
+    public static DateTimeOffset CotaDeCandidatas(DateOnly hoyEnLima) =>
+        new(hoyEnLima.AddYears(-Anios).AddDays(2).ToDateTime(TimeOnly.MinValue), DesfaseDeLima);
 }
 
 /// <summary>

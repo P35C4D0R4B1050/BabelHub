@@ -70,7 +70,7 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **ECO-3** | Planificar `ecommerce-carrito-checkout`, `ecommerce-pagos` y `ecommerce-pedidos` | C | ECO-2 | ☑ (planes aprobados el 2026-11-18) |
 | **ECO-4** | `ecommerce-carrito-checkout` (reservas e idempotencia) | C | ECO-3, INV-2 | ▶ (subbloques ECO-4a a 4e, T01–T37; ECO-4a a ECO-4d hechos y fundidos (T01–T32 y T37, salvo T25b y T26c que esperan al carril A); faltan T33–T36, pantallas y E2E) |
 | **ECO-5** | `ecommerce-pagos` (pasarela de pruebas de Culqi) | C | ECO-4; B05 (persona) | ▶ (ECO-5a a ECO-5d hechos y fundidos (T01–T29); subbloques ECO-5a a 5f, T01–T38; 5f condicionado a B05) |
-| **ECO-6** | `ecommerce-pedidos` | E | ECO-5 | ▶ (ECO-6a y ECO-6b hechos, T01–T13, más los contratos T07a/T07b y los adaptadores reales sobre PLA-Y; ECO-6c a 6f, T14–T42) |
+| **ECO-6** | `ecommerce-pedidos` | E | ECO-5 | ▶ (ECO-6a a ECO-6c y T23 hechos (T01–T23); ECO-6d a 6f, T24–T42) |
 | **ECO-7** | Planificar biblioteca digital, envíos, devoluciones y libro de reclamaciones | C | ECO-6 | ☑ (planes aprobados el 2026-11-18) |
 | **ECO-8** | `ecommerce-biblioteca-digital` (archivos y URLs firmadas) | C | ECO-7 | ☐ (ECO-8a a 8e, T01–T26) |
 | **ECO-9** | `ecommerce-envios` | E | ECO-7 | ▶ (ECO-9a a ECO-9d y parte de 9e hechos, T01–T19, T21a, T23, T25 y T13; esperan T14b, T20, T21b, T22 y T24) |

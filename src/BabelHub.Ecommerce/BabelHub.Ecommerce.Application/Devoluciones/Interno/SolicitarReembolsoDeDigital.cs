@@ -9,35 +9,6 @@ using BabelHub.Ecommerce.Domain.Devoluciones;
 
 namespace BabelHub.Ecommerce.Application.Devoluciones.Interno;
 
-/// <summary>Las entradas de auditoría de los cambios de una devolución (DEV-12): sin el motivo ni el texto, con el monto cuando lo hay.</summary>
-internal static class AuditoriaDeDevoluciones
-{
-    public static SolicitudDeRegistro Solicitada(Devolucion d) =>
-        new(AccionesAuditables.DevolucionSolicitada)
-        {
-            ObjetoTipo = "devolucion",
-            ObjetoId = d.Id.ToString(),
-            Detalle = new Dictionary<string, string?>
-            {
-                ["pedidoId"] = d.PedidoId.ToString(),
-                ["cantidadDeLineas"] = d.Lineas.Count.ToString(CultureInfo.InvariantCulture),
-            },
-        };
-
-    /// <summary>El cambio de estado: el anterior y el nuevo y, cuando el catálogo de Auditoría los admita (hallazgo para el carril A), el pedido, la devolución y el monto.</summary>
-    public static SolicitudDeRegistro Cambio(Devolucion d, EstadoDeLineaDeDevolucion anterior, EstadoDeLineaDeDevolucion nuevo, string? estadoNuevoPropio = null) =>
-        new(AccionesAuditables.EstadoDeDevolucionCambiado)
-        {
-            ObjetoTipo = "devolucion",
-            ObjetoId = d.Id.ToString(),
-            Detalle = new Dictionary<string, string?>
-            {
-                ["estadoAnterior"] = anterior.Codigo(),
-                ["estadoNuevo"] = estadoNuevoPropio ?? nuevo.Codigo(),
-            },
-        };
-}
-
 /// <summary>
 /// <c>SolicitarReembolsoDeDigital</c> (T07; DEV-04, DEV-05, DEV-09, DEV-19, DEV-20, DEV-21; plan §1): lee de Pedidos y de Biblioteca; rechaza por política (enlace entregado), por plazo (más de 14 días desde el pago) o por línea no devolvible
 /// (anulada, reembolsada o con el acceso revocado o suspendido); si procede, <b>una sola transacción</b> en el orden global de bloqueo: marca de cancelación → cupo → devolución → <c>IReembolsos.Registrar</c> → <c>RevocarSiNoHayEnlace</c>
@@ -53,6 +24,7 @@ internal sealed class SolicitarReembolsoDeDigital(
     IRepositorioDeDevoluciones repositorio,
     IUnidadDeTrabajo unidad,
     IAuditoria auditoria,
+    AvisosDeDevoluciones avisos,
     ProcesarReembolsoDeLinea procesador,
     IReloj reloj) : ICasoDeUso<PedirReembolsoDeDigitalEntrada, DevolucionVista>
 {
@@ -214,6 +186,7 @@ internal sealed class SolicitarReembolsoDeDigital(
         await repositorio.Guardar(devolucion, token).ConfigureAwait(false);
         await auditoria.Registrar(AuditoriaDeDevoluciones.Solicitada(devolucion), token).ConfigureAwait(false);
         await auditoria.Registrar(AuditoriaDeDevoluciones.Cambio(devolucion, EstadoDeLineaDeDevolucion.Solicitada, EstadoDeLineaDeDevolucion.Aprobada), token).ConfigureAwait(false);
+        await avisos.Solicitar(devolucion, pedido.CuentaId, EstadoDeLineaDeDevolucion.Aprobada, token).ConfigureAwait(false);
         return registrado.Valor.ReembolsoId;
     }
 

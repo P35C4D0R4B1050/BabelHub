@@ -171,6 +171,7 @@ internal sealed class DecidirReporte(
     IRepositorioDeDevoluciones repositorio,
     IUnidadDeTrabajo unidad,
     IAuditoria auditoria,
+    AvisosDeDevoluciones avisos,
     ProcesarReembolsoDeLinea procesador,
     IReloj reloj)
 {
@@ -279,6 +280,7 @@ internal sealed class DecidirReporte(
 
         await repositorio.Guardar(devolucion, token).ConfigureAwait(false);
         await auditoria.Registrar(AuditoriaDeDevoluciones.Cambio(devolucion, EstadoDeLineaDeDevolucion.Solicitada, EstadoDeLineaDeDevolucion.Aprobada), token).ConfigureAwait(false);
+        await avisos.Solicitar(devolucion, pedido.CuentaId, EstadoDeLineaDeDevolucion.Aprobada, token).ConfigureAwait(false);
         return registrado.Valor.ReembolsoId;
     }
 
@@ -302,6 +304,7 @@ internal sealed class DecidirReporte(
 
         await repositorio.Guardar(devolucion, token).ConfigureAwait(false);
         await auditoria.Registrar(AuditoriaDeDevoluciones.Cambio(devolucion, EstadoDeLineaDeDevolucion.Solicitada, EstadoDeLineaDeDevolucion.Rechazada), token).ConfigureAwait(false);
+        await avisos.Solicitar(devolucion, pedido.CuentaId, EstadoDeLineaDeDevolucion.Rechazada, token).ConfigureAwait(false);
     }
 
 }

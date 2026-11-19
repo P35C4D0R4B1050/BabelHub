@@ -137,6 +137,32 @@ public sealed class LineaDePedido
         _esDeRecojo = esDeRecojo;
     }
 
+    /// <summary>Rehidrata una línea desde su fila (solo la Infraestructura, por <see cref="Pedido.Rehidratar"/>): no valida ni dispara transiciones, porque lo guardado ya se validó al escribirlo.</summary>
+    internal LineaDePedido(DatosPersistidosDeLinea datos, Guid pedidoId, bool esDeRecojo)
+    {
+        Id = datos.Id;
+        PedidoId = pedidoId;
+        EdicionId = datos.EdicionId;
+        EsDigital = datos.EsDigital;
+        Titulo = datos.Titulo;
+        Isbn = datos.Isbn;
+        Cantidad = datos.Cantidad;
+        PrecioUnitario = datos.PrecioUnitario;
+        Importe = datos.Importe;
+        CodigoDeFuente = datos.CodigoDeFuente;
+        RequiereTraslado = datos.RequiereTraslado;
+        TrasladoId = datos.TrasladoId;
+        FechaEstimadaDeLlegada = datos.FechaEstimadaDeLlegada;
+        EstadoImpreso = datos.EstadoImpreso;
+        EstadoDigital = datos.EstadoDigital;
+        ListoEn = datos.ListoEn;
+        EntregadaEn = datos.EntregadaEn;
+        NoRecogidaEn = datos.NoRecogidaEn;
+        AnuladaEn = datos.AnuladaEn;
+        EnvioId = datos.EnvioId;
+        _esDeRecojo = esDeRecojo;
+    }
+
     public Guid Id { get; }
 
     public Guid PedidoId { get; }
@@ -281,6 +307,28 @@ public sealed partial class Pedido
         _lineas = lineas;
         Estado = Derivar();
         FechaEstadoFinal = Estado.EsFinal() ? datos.CreadoEn : null;
+    }
+
+    /// <summary>Rehidrata el pedido desde sus filas (solo la Infraestructura, por <see cref="Rehidratar"/>); no recalcula el estado: lo guardado es el que se derivó al escribirlo.</summary>
+    private Pedido(DatosPersistidosDePedido datos, NumeroDePedido numero, ContactoDeEntrega? contacto)
+    {
+        Id = datos.Id;
+        Numero = numero;
+        CuentaId = datos.CuentaId;
+        Tipo = datos.Tipo;
+        CodigoDeSucursalDeRecojo = datos.CodigoDeSucursalDeRecojo;
+        RegionDeEntrega = datos.RegionDeEntrega;
+        CostoDeEnvio = datos.CostoDeEnvio;
+        Total = datos.Total;
+        Estado = datos.Estado;
+        CreadoEn = datos.CreadoEn;
+        FechaEstadoFinal = datos.FechaEstadoFinal;
+        Contacto = contacto;
+        ContactoAnonimizadoEn = datos.ContactoAnonimizadoEn;
+        Terminos = datos.Terminos;
+        Privacidad = datos.Privacidad;
+        ReembolsoDigital = datos.ReembolsoDigital;
+        _lineas = [.. datos.Lineas.Select(l => new LineaDePedido(l, datos.Id, datos.Tipo == TipoDeEntregaDelPedido.Recojo))];
     }
 
     public Guid Id { get; }

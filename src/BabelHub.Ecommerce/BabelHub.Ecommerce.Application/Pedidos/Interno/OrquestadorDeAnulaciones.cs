@@ -79,7 +79,7 @@ internal sealed class OrquestadorDeAnulaciones(
         var plan = Planear(pedido, origen, motivo, null);
         if (plan.Rechazo is { } rechazo)
         {
-            return await Rechazar(pedido, origen, rechazo, cancelacion).ConfigureAwait(false);
+            return await Rechazar(pedido, solicitante, origen, rechazo, cancelacion).ConfigureAwait(false);
         }
 
         // Los envíos que no salieron se cancelan en el tiempo 1; los mantenidos dejan fuera sus líneas y el plan se recalcula sin ellas, sin el envío y sin las digitales.
@@ -95,7 +95,7 @@ internal sealed class OrquestadorDeAnulaciones(
                 plan = Planear(pedido, origen, motivo, mantenidas);
                 if (plan.Rechazo is { } sinLineas)
                 {
-                    return await Rechazar(pedido, origen, sinLineas, cancelacion).ConfigureAwait(false);
+                    return await Rechazar(pedido, solicitante, origen, sinLineas, cancelacion).ConfigureAwait(false);
                 }
             }
         }
@@ -105,8 +105,7 @@ internal sealed class OrquestadorDeAnulaciones(
             {
                 ObjetoTipo = "pedido",
                 ObjetoId = pedido.Id.ToString("D"),
-                // El catálogo solo admite «anulacion» y «entrega»: la cancelación del cliente es una anulación con el actor titular (el motivo figura en la fila).
-                Detalle = new Dictionary<string, string?> { ["operacion"] = "anulacion", ["iniciadaPor"] = solicitante.UsuarioId.ToString("D") },
+                Detalle = DetalleDelIniciador(solicitante, new Dictionary<string, string?> { ["operacion"] = origen == OrigenDeLaAnulacion.Cliente ? "cancelacion" : "anulacion" }),
             },
             cancelacion).ConfigureAwait(false);
 
@@ -141,14 +140,20 @@ internal sealed class OrquestadorDeAnulaciones(
     }
 
     /// <summary>
-    /// Un rechazo se audita como un registro con resultado <c>Rechazado</c> (la solicitud, sin datos personales; el catálogo no declara aún un motivo de rechazo) y se explica con su alternativa en el error (PED-18, PED-23).
+    /// Un rechazo se audita con la acción propia <c>AnulacionDePedidoRechazada</c> (la operación, el motivo de rechazo cerrado, el estado y el iniciador; sin datos personales de entrega) y se explica con su alternativa en el error (PED-18, PED-23).
     /// </summary>
-    private async Task<Resultado<Anulacion>> Rechazar(Pedido pedido, OrigenDeLaAnulacion origen, RechazoDeAnulacion rechazo, CancellationToken cancelacion)
+    private async Task<Resultado<Anulacion>> Rechazar(Pedido pedido, SolicitanteDePedidos solicitante, OrigenDeLaAnulacion origen, RechazoDeAnulacion rechazo, CancellationToken cancelacion)
     {
-        var solicitud = origen == OrigenDeLaAnulacion.Cliente
-            ? new SolicitudDeRegistro(AccionesAuditables.PedidoCanceladoPorElCliente) { Detalle = new Dictionary<string, string?> { ["estadoAnterior"] = AvisosDePedidos.NombreDelEstado(pedido.Estado) } }
-            : new SolicitudDeRegistro(AccionesAuditables.OperacionDePedidoIniciada) { Detalle = new Dictionary<string, string?> { ["operacion"] = "anulacion" } };
-        await auditoria.Registrar(solicitud with { ObjetoTipo = "pedido", ObjetoId = pedido.Id.ToString("D"), Resultado = ResultadoAuditado.Rechazado }, cancelacion).ConfigureAwait(false);
+        var codigo = rechazo switch
+        {
+            RechazoDeAnulacion.MotivoNoCorresponde => "motivo-no-corresponde",
+            RechazoDeAnulacion.PedidoYaAnulado => "pedido-ya-anulado",
+            RechazoDeAnulacion.NoQuedaImpresaPorSalir => "sin-impresas-por-salir",
+            RechazoDeAnulacion.IncluyeDigital => "incluye-digital",
+            _ => "impreso-en-camino",
+        };
+        var detalle = DetalleDelIniciador(solicitante, new Dictionary<string, string?> { ["operacion"] = origen == OrigenDeLaAnulacion.Cliente ? "cancelacion" : "anulacion", ["motivoDeRechazo"] = codigo, ["estadoAnterior"] = AvisosDePedidos.NombreDelEstado(pedido.Estado) });
+        await auditoria.Registrar(new SolicitudDeRegistro(AccionesAuditables.AnulacionDePedidoRechazada) { ObjetoTipo = "pedido", ObjetoId = pedido.Id.ToString("D"), Detalle = detalle, Resultado = ResultadoAuditado.Rechazado }, cancelacion).ConfigureAwait(false);
 
         return Resultado<Anulacion>.Fallo(rechazo switch
         {
@@ -419,21 +424,39 @@ internal sealed class OrquestadorDeAnulaciones(
     private async Task AuditarLaCompleccion(Pedido pedido, Anulacion anulacion, EstadoDePedido anterior, bool reanudacion, CancellationToken cancelacion)
     {
         var anteriorNombre = AvisosDePedidos.NombreDelEstado(anterior);
+
+        // Una reanudación se audita como «sistema» y nombra al iniciador guardado en la fila (identificador, rol y sucursal); una solicitud directa ya lleva su actor.
+        Dictionary<string, string?> ConElIniciador(Dictionary<string, string?> detalle)
+        {
+            if (reanudacion && !anulacion.Iniciador.EstaAnonimizado)
+            {
+                detalle["iniciadaPor"] = anulacion.Iniciador.UsuarioId.ToString("D");
+                detalle["rolDelIniciador"] = anulacion.Iniciador.Rol;
+                detalle["sucursalDelIniciador"] = anulacion.Iniciador.SucursalId?.ToString("D");
+            }
+
+            return detalle;
+        }
+
         var propia = anulacion.Origen == OrigenDeLaAnulacion.Cliente
-            ? new SolicitudDeRegistro(AccionesAuditables.PedidoCanceladoPorElCliente) { Detalle = new Dictionary<string, string?> { ["estadoAnterior"] = anteriorNombre } }
-            : new SolicitudDeRegistro(AccionesAuditables.PedidoAnulado) { Detalle = new Dictionary<string, string?> { ["estadoAnterior"] = anteriorNombre, ["causa"] = MotivosDeAnulacion.Codigo(anulacion.Motivo) } };
+            ? new SolicitudDeRegistro(AccionesAuditables.PedidoCanceladoPorElCliente) { Detalle = ConElIniciador(new() { ["estadoAnterior"] = anteriorNombre }) }
+            : new SolicitudDeRegistro(AccionesAuditables.PedidoAnulado) { Detalle = ConElIniciador(new() { ["estadoAnterior"] = anteriorNombre, ["causa"] = MotivosDeAnulacion.Codigo(anulacion.Motivo) }) };
         await auditoria.Registrar(propia with { ObjetoTipo = "pedido", ObjetoId = pedido.Id.ToString("D") }, cancelacion).ConfigureAwait(false);
 
         if (pedido.Estado != anterior || reanudacion)
         {
-            var detalle = new Dictionary<string, string?> { ["estadoAnterior"] = anteriorNombre, ["estadoNuevo"] = AvisosDePedidos.NombreDelEstado(pedido.Estado) };
-            if (reanudacion && !anulacion.Iniciador.EstaAnonimizado)
-            {
-                detalle["iniciadaPor"] = anulacion.Iniciador.UsuarioId.ToString("D");
-            }
-
+            var detalle = ConElIniciador(new() { ["estadoAnterior"] = anteriorNombre, ["estadoNuevo"] = AvisosDePedidos.NombreDelEstado(pedido.Estado) });
             await auditoria.Registrar(new SolicitudDeRegistro(AccionesAuditables.EstadoDePedidoCambiado) { ObjetoTipo = "pedido", ObjetoId = pedido.Id.ToString("D"), Detalle = detalle }, cancelacion).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>El actor de la solicitud en el detalle: su identificador, su rol y su sucursal (las claves personales las anonimiza la depuración).</summary>
+    private static Dictionary<string, string?> DetalleDelIniciador(SolicitanteDePedidos solicitante, Dictionary<string, string?> detalle)
+    {
+        detalle["iniciadaPor"] = solicitante.UsuarioId.ToString("D");
+        detalle["rolDelIniciador"] = solicitante.Rol;
+        detalle["sucursalDelIniciador"] = solicitante.SucursalId?.ToString("D");
+        return detalle;
     }
 
     /// <summary>Procesa el reembolso con la pasarela: verdadero si quedó reembolsado; cualquier otra cosa (o una excepción) lo deja pendiente y visible.</summary>

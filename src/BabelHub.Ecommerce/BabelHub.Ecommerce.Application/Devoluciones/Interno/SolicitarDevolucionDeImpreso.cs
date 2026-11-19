@@ -179,18 +179,7 @@ internal sealed class SolicitarDevolucionDeImpreso(
         }
 
         await repositorio.Agregar(devolucion, token).ConfigureAwait(false);
-        await auditoria.Registrar(
-            new SolicitudDeRegistro(AccionesAuditables.DevolucionSolicitada)
-            {
-                ObjetoTipo = "devolucion",
-                ObjetoId = devolucion.Id.ToString(),
-                Detalle = new Dictionary<string, string?>
-                {
-                    ["pedidoId"] = devolucion.PedidoId.ToString(),
-                    ["cantidadDeLineas"] = devolucion.Lineas.Count.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                },
-            },
-            token).ConfigureAwait(false);
+        await auditoria.Registrar(AuditoriaDeDevoluciones.Solicitada(devolucion), token).ConfigureAwait(false);
     }
 
     /// <summary>Valida la forma de la entrada sin repetir ningún valor: líneas, cantidades, sucursal y el motivo (que no se devuelve).</summary>

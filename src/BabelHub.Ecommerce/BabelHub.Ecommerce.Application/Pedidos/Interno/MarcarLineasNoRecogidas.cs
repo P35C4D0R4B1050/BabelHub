@@ -92,7 +92,19 @@ internal sealed class MarcarLineasNoRecogidas(
             return 0;
         }
 
-        // Se audita primero: sin poder auditar no se guarda nada y la transacción se revierte entera.
+        // Se audita primero: sin poder auditar no se guarda nada y la transacción se revierte entera. Cada línea marcada deja su registro (aunque el estado del pedido no cambie): afecta al stock.
+        foreach (var lineaId in marcadas)
+        {
+            await auditoria.Registrar(
+                new SolicitudDeRegistro(AccionesAuditables.LineaDePedidoMarcadaNoRecogida)
+                {
+                    ObjetoTipo = "pedido",
+                    ObjetoId = pedido.Id.ToString("D"),
+                    Detalle = new Dictionary<string, string?> { ["lineaId"] = lineaId.ToString("D") },
+                },
+                cancelacion).ConfigureAwait(false);
+        }
+
         if (pedido.Estado != anterior)
         {
             await auditoria.Registrar(

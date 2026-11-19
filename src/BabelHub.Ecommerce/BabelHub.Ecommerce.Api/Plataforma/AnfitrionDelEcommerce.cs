@@ -406,6 +406,7 @@ public static class AnfitrionDelEcommerce
 
         // ---------- La web: textos legales, sesión, Carrito y verificación de persona ----------
         servicios.AgregarInterfazWeb();
+        servicios.AgregarIngresoWeb();
         servicios.AgregarHostWeb(opciones.Host);
         servicios.AgregarProteccionContraFalsificacion();
         servicios.AgregarFiltroDeAccesoDeLaInterfaz();
