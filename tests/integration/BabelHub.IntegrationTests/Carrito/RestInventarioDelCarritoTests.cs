@@ -7,7 +7,7 @@ namespace BabelHub.IntegrationTests.Carrito;
 
 /// <summary>
 /// T25: el adaptador <c>RestInventarioDelCarrito</c> sobre <c>IClienteDelInventario</c> (CAR-05, CAR-06; AC-CAR-05): la disponibilidad por lotes de a lo más 50, la validación de la respuesta (SEG-13), la traducción de rechazos, límites y fallas sin
-/// excepciones, la última lista de sucursales y que la consulta previa, reservar y liberar fallen cerrado mientras no existan en el cliente de <c>Plataforma</c>.
+/// excepciones, la última lista de sucursales y (T25b) la consulta previa, reservar y liberar sobre el cliente real.
 /// </summary>
 public sealed class RestInventarioDelCarritoTests
 {
@@ -34,7 +34,35 @@ public sealed class RestInventarioDelCarritoTests
             return Task.FromResult(Disponibilidad!(edicionIds));
         }
 
-public Task<ResultadoDelInventario<RespuestaDeConsultaPrevia>> ConsultarPrevia(ConsultaPrevia consulta, CancellationToken cancelacion = default) => throw new NotSupportedException();        public Task<ResultadoDelInventario<ReservaDelInventario>> Reservar(SolicitudDeReservaDeStock solicitud, string claveDeIdempotencia, CancellationToken cancelacion = default) => throw new NotSupportedException();        public Task<ResultadoDelInventario<ReservaDelInventario>> Liberar(Guid pedidoId, string motivo, IReadOnlyList<Guid>? lineaIds = null, CancellationToken cancelacion = default) => throw new NotSupportedException();
+        public Func<ConsultaPrevia, ResultadoDelInventario<RespuestaDeConsultaPrevia>>? Previa { get; set; }
+
+        public Func<SolicitudDeReservaDeStock, string, ResultadoDelInventario<ReservaDelInventario>>? Reserva { get; set; }
+
+        public Func<Guid, string, ResultadoDelInventario<ReservaDelInventario>>? Liberacion { get; set; }
+
+        public List<ConsultaPrevia> Previas { get; } = [];
+
+        public List<(SolicitudDeReservaDeStock Solicitud, string Clave)> Reservas { get; } = [];
+
+        public List<(Guid Pedido, string Motivo)> Liberaciones { get; } = [];
+
+        public Task<ResultadoDelInventario<RespuestaDeConsultaPrevia>> ConsultarPrevia(ConsultaPrevia consulta, CancellationToken cancelacion = default)
+        {
+            Previas.Add(consulta);
+            return Task.FromResult(Previa!(consulta));
+        }
+
+        public Task<ResultadoDelInventario<ReservaDelInventario>> Reservar(SolicitudDeReservaDeStock solicitud, string claveDeIdempotencia, CancellationToken cancelacion = default)
+        {
+            Reservas.Add((solicitud, claveDeIdempotencia));
+            return Task.FromResult(Reserva!(solicitud, claveDeIdempotencia));
+        }
+
+        public Task<ResultadoDelInventario<ReservaDelInventario>> Liberar(Guid pedidoId, string motivo, IReadOnlyList<Guid>? lineaIds = null, CancellationToken cancelacion = default)
+        {
+            Liberaciones.Add((pedidoId, motivo));
+            return Task.FromResult(Liberacion!(pedidoId, motivo));
+        }
         public Task<ResultadoDelInventario<IReadOnlyList<SucursalPublica>>> ListarSucursales(CancellationToken cancelacion = default) => Task.FromResult(Sucursales!());
 
         public Task<ResultadoDelInventario> RegistrarEdicion(EdicionARegistrar edicion, CancellationToken cancelacion = default) => throw new NotSupportedException();
@@ -179,19 +207,203 @@ public Task<ResultadoDelInventario<RespuestaDeConsultaPrevia>> ConsultarPrevia(C
         Assert.Null(invalida);
     }
 
+    // ---------- T25b: consulta previa, reservar y liberar sobre el cliente real ----------
+
+    private static readonly EntregaParaElInventario Recojo = new(TipoDeEntrega.Recojo, "sede-central", null);
+
+    private static LineaParaElInventario Pedida(int cantidad = 2) => new(Guid.NewGuid(), Guid.NewGuid(), cantidad);
+
+    private static ReservaDelInventario ReservaPendiente(Guid pedido, IReadOnlyList<LineaParaElInventario> lineas, DateTimeOffset? expira = null) =>
+        new(pedido, "pendiente", Inicio, expira ?? Inicio.AddMinutes(15), [.. lineas.Select(l => new LineaReservada(l.LineaId, l.EdicionId, l.Cantidad, "pendiente", "sede-central", false, null))], []);
+
     [Fact]
-    public async Task La_consulta_previa_reservar_y_liberar_fallan_cerrado_hasta_que_existan_en_el_cliente_de_Plataforma()
+    [Trait("Criterio", "AC-CAR-05")]
+    public async Task La_consulta_previa_manda_el_tipo_la_sucursal_y_las_lineas_y_devuelve_la_fuente_y_el_plazo_de_cada_una()
     {
-        var (adaptador, _, _) = Crear();
-        var entrega = new EntregaParaElInventario(TipoDeEntrega.Recojo, "sede-central", null);
-        var lineas = new[] { new LineaParaElInventario(Guid.NewGuid(), Guid.NewGuid(), 1) };
+        var (adaptador, cliente, _) = Crear();
+        var uno = Pedida();
+        var dos = Pedida(1);
+        cliente.Previa = c => ResultadoDelInventario<RespuestaDeConsultaPrevia>.ConValor(new RespuestaDeConsultaPrevia(
+            [new SeleccionDeLineaDelInventario(uno.LineaId, uno.EdicionId, true, "sede-central", false, null, 9), new SeleccionDeLineaDelInventario(dos.LineaId, dos.EdicionId, true, "lima", true, 3, 4)], Inicio.AddSeconds(-2)));
 
-        var previa = await adaptador.ConsultarPrevia(entrega, lineas);
-        var reserva = await adaptador.Reservar(Guid.NewGuid(), 1, entrega, lineas);
-        var liberada = await adaptador.Liberar(Guid.NewGuid(), "checkout-cancelado");
+        var respuesta = await adaptador.ConsultarPrevia(Recojo, [uno, dos]);
 
-        Assert.Equal(EstadoDeRespuestaDelInventarioDelCarrito.NoDisponible, previa.Estado);
-        Assert.Equal(TipoDeResultadoDeReservar.NoDisponible, reserva.Tipo);
-        Assert.Equal(ResultadoDeLiberar.NoSePudo, liberada);
+        Assert.True(respuesta.Exitosa);
+        var enviada = Assert.Single(cliente.Previas);
+        Assert.Equal((TipoDeEntregaDeLaReserva.Recojo, "sede-central", null), (enviada.Tipo, enviada.CodigoDeSucursalDeRecojo, enviada.RegionDeEntrega));
+        Assert.Equal([uno.LineaId, dos.LineaId], enviada.Lineas.Select(l => l.LineaId));
+        Assert.Equal((true, "lima", true, 3), (respuesta.Valor.Lineas[1].HayStock, respuesta.Valor.Lineas[1].CodigoDeFuente, respuesta.Valor.Lineas[1].RequiereTraslado, respuesta.Valor.Lineas[1].PlazoEstimadoDias));
+        Assert.Equal(Inicio.AddSeconds(-2), respuesta.Valor.ConsultadaEn);
+    }
+
+    [Fact]
+    public async Task Una_consulta_previa_con_una_linea_de_mas_o_de_menos_es_sin_respuesta_y_nunca_stock()
+    {
+        var (adaptador, cliente, _) = Crear();
+        var uno = Pedida();
+        var dos = Pedida();
+        cliente.Previa = _ => ResultadoDelInventario<RespuestaDeConsultaPrevia>.ConValor(new RespuestaDeConsultaPrevia([new SeleccionDeLineaDelInventario(uno.LineaId, uno.EdicionId, true, "sede-central", false, null, 9)], Inicio));
+        var faltante = await adaptador.ConsultarPrevia(Recojo, [uno, dos]);
+        cliente.Previa = _ => ResultadoDelInventario<RespuestaDeConsultaPrevia>.ConValor(new RespuestaDeConsultaPrevia([new SeleccionDeLineaDelInventario(Guid.NewGuid(), uno.EdicionId, true, "sede-central", false, null, 9)], Inicio));
+        var ajena = await adaptador.ConsultarPrevia(Recojo, [uno]);
+
+        Assert.Equal(EstadoDeRespuestaDelInventarioDelCarrito.NoDisponible, faltante.Estado);
+        Assert.Equal(EstadoDeRespuestaDelInventarioDelCarrito.NoDisponible, ajena.Estado);
+    }
+
+    [Fact]
+    public async Task La_consulta_previa_traduce_el_rechazo_el_limite_y_la_caida()
+    {
+        var (adaptador, cliente, _) = Crear();
+        var linea = Pedida();
+        var desde = Inicio.AddSeconds(30);
+
+        cliente.Previa = _ => ResultadoDelInventario<RespuestaDeConsultaPrevia>.Rechazo(400, "INV-VALIDACION-INVALIDA");
+        var rechazada = await adaptador.ConsultarPrevia(Recojo, [linea]);
+        cliente.Previa = _ => ResultadoDelInventario<RespuestaDeConsultaPrevia>.Limitada("INV-LIMITE-EXCEDIDO") with { Limite = new RechazoPorLimiteDelInventario("x", 30, desde) };
+        var limitada = await adaptador.ConsultarPrevia(Recojo, [linea]);
+        cliente.Previa = _ => throw new HttpRequestException("caído");
+        var caida = await adaptador.ConsultarPrevia(Recojo, [linea]);
+
+        Assert.Equal((EstadoDeRespuestaDelInventarioDelCarrito.Rechazada, "INV-VALIDACION-INVALIDA"), (rechazada.Estado, rechazada.Codigo));
+        Assert.Equal((EstadoDeRespuestaDelInventarioDelCarrito.LimiteExcedido, desde), (limitada.Estado, limitada.DisponibleDesde));
+        Assert.Equal(EstadoDeRespuestaDelInventarioDelCarrito.NoDisponible, caida.Estado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-10")]
+    public async Task Reservar_manda_la_clave_derivada_del_pedido_y_la_generacion_y_devuelve_la_reserva_con_su_expiracion()
+    {
+        var (adaptador, cliente, _) = Crear();
+        var pedido = Guid.NewGuid();
+        var lineas = new[] { Pedida(), Pedida(1) };
+        cliente.Reserva = (s, _) => ResultadoDelInventario<ReservaDelInventario>.ConValor(ReservaPendiente(s.PedidoId, lineas));
+
+        var resultado = await adaptador.Reservar(pedido, 3, Recojo, lineas);
+
+        Assert.Equal(TipoDeResultadoDeReservar.Reservada, resultado.Tipo);
+        var (solicitud, clave) = Assert.Single(cliente.Reservas);
+        Assert.Equal(ClaveDeReserva.Para(pedido, 3), clave);
+        Assert.Equal((pedido, TipoDeEntregaDeLaReserva.Recojo, "sede-central"), (solicitud.PedidoId, solicitud.Tipo, solicitud.CodigoDeSucursalDeRecojo));
+        Assert.Equal(Inicio.AddMinutes(15), resultado.Reserva!.ExpiraEn);
+        Assert.Equal(lineas.Select(l => l.LineaId), resultado.Reserva.Lineas.Select(l => l.LineaId));
+    }
+
+    [Fact]
+    public async Task Una_reserva_con_otro_pedido_otras_lineas_o_sin_expiracion_es_sin_respuesta_y_nunca_una_reserva()
+    {
+        var (adaptador, cliente, _) = Crear();
+        var pedido = Guid.NewGuid();
+        var lineas = new[] { Pedida() };
+
+        cliente.Reserva = (_, _) => ResultadoDelInventario<ReservaDelInventario>.ConValor(ReservaPendiente(Guid.NewGuid(), lineas));
+        var otroPedido = await adaptador.Reservar(pedido, 1, Recojo, lineas);
+        cliente.Reserva = (_, _) => ResultadoDelInventario<ReservaDelInventario>.ConValor(ReservaPendiente(pedido, [Pedida()]));
+        var otrasLineas = await adaptador.Reservar(pedido, 1, Recojo, lineas);
+        cliente.Reserva = (_, _) => ResultadoDelInventario<ReservaDelInventario>.ConValor(ReservaPendiente(pedido, lineas) with { ExpiraEn = null });
+        var sinExpiracion = await adaptador.Reservar(pedido, 1, Recojo, lineas);
+
+        Assert.All(new[] { otroPedido, otrasLineas, sinExpiracion }, r => Assert.Equal(TipoDeResultadoDeReservar.NoDisponible, r.Tipo));
+    }
+
+    [Theory]
+    [InlineData("INV-IDEMPOTENCIA-EN-CURSO", TipoDeResultadoDeReservar.EnCurso)]
+    [InlineData("INV-IDEMPOTENCIA-EN-CONFLICTO", TipoDeResultadoDeReservar.ConflictoDeIdempotencia)]
+    [InlineData("INV-RESERVA-ESTADO-INVALIDO", TipoDeResultadoDeReservar.EstadoInvalido)]
+    [InlineData("INV-VALIDACION-INVALIDA", TipoDeResultadoDeReservar.Rechazada)]
+    [InlineData("INV-PROHIBIDO", TipoDeResultadoDeReservar.Rechazada)]
+    public async Task Reservar_traduce_cada_rechazo_del_contrato_a_su_tipo(string codigo, TipoDeResultadoDeReservar esperado)
+    {
+        var (adaptador, cliente, _) = Crear();
+        cliente.Reserva = (_, _) => ResultadoDelInventario<ReservaDelInventario>.Rechazo(409, codigo);
+
+        var resultado = await adaptador.Reservar(Guid.NewGuid(), 1, Recojo, [Pedida()]);
+
+        Assert.Equal((esperado, codigo), (resultado.Tipo, resultado.Codigo));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-04")]
+    public async Task Sin_stock_trae_las_lineas_que_no_alcanzan_y_sin_ellas_es_un_rechazo_y_no_un_aviso_de_stock()
+    {
+        var (adaptador, cliente, _) = Crear();
+        var linea = Pedida(5);
+        cliente.Reserva = (_, _) => ResultadoDelInventario<ReservaDelInventario>.Rechazo(409, "INV-STOCK-INSUFICIENTE") with { LineasSinStock = [new LineaSinStockDelInventario(linea.LineaId, linea.EdicionId, 5, 2)] };
+        var con = await adaptador.Reservar(Guid.NewGuid(), 1, Recojo, [linea]);
+        cliente.Reserva = (_, _) => ResultadoDelInventario<ReservaDelInventario>.Rechazo(409, "INV-STOCK-INSUFICIENTE");
+        var sin = await adaptador.Reservar(Guid.NewGuid(), 1, Recojo, [linea]);
+
+        Assert.Equal(TipoDeResultadoDeReservar.StockInsuficiente, con.Tipo);
+        Assert.Equal((linea.LineaId, 5, 2), (con.SinStock![0].LineaId, con.SinStock[0].Solicitada, con.SinStock[0].DisponibleEnLaRed));
+        Assert.Equal(TipoDeResultadoDeReservar.Rechazada, sin.Tipo);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-14")]
+    public async Task Reservar_con_un_limite_trae_el_instante_de_reintento_y_con_una_caida_es_no_disponible()
+    {
+        var (adaptador, cliente, _) = Crear();
+        var desde = Inicio.AddMinutes(7);
+        cliente.Reserva = (_, _) => ResultadoDelInventario<ReservaDelInventario>.Limitada("INV-LIMITE-EXCEDIDO") with { Limite = new RechazoPorLimiteDelInventario("reemplazos", 420, desde) };
+        var limitada = await adaptador.Reservar(Guid.NewGuid(), 1, Recojo, [Pedida()]);
+        cliente.Reserva = (_, _) => throw new TimeoutException();
+        var caida = await adaptador.Reservar(Guid.NewGuid(), 1, Recojo, [Pedida()]);
+        cliente.Reserva = (_, _) => ResultadoDelInventario<ReservaDelInventario>.SinRespuesta;
+        var sinRespuesta = await adaptador.Reservar(Guid.NewGuid(), 1, Recojo, [Pedida()]);
+
+        Assert.Equal((TipoDeResultadoDeReservar.LimiteExcedido, desde), (limitada.Tipo, limitada.DisponibleDesde));
+        Assert.Equal(TipoDeResultadoDeReservar.NoDisponible, caida.Tipo);
+        Assert.Equal(TipoDeResultadoDeReservar.NoDisponible, sinRespuesta.Tipo);
+    }
+
+    [Fact]
+    public async Task Una_entrega_a_domicilio_manda_la_region_y_no_la_sucursal()
+    {
+        var (adaptador, cliente, _) = Crear();
+        var lineas = new[] { Pedida() };
+        cliente.Reserva = (s, _) => ResultadoDelInventario<ReservaDelInventario>.ConValor(ReservaPendiente(s.PedidoId, lineas));
+
+        await adaptador.Reservar(Guid.NewGuid(), 1, new EntregaParaElInventario(TipoDeEntrega.Domicilio, null, "ayacucho"), lineas);
+
+        var (solicitud, _) = Assert.Single(cliente.Reservas);
+        Assert.Equal((TipoDeEntregaDeLaReserva.Domicilio, null, "ayacucho"), (solicitud.Tipo, solicitud.CodigoDeSucursalDeRecojo, solicitud.RegionDeEntrega));
+    }
+
+    [Fact]
+    public async Task Liberar_manda_el_motivo_y_es_idempotente_y_cada_resultado_se_traduce()
+    {
+        var (adaptador, cliente, _) = Crear();
+        var pedido = Guid.NewGuid();
+        var lineas = new[] { Pedida() };
+
+        cliente.Liberacion = (p, _) => ResultadoDelInventario<ReservaDelInventario>.ConValor(ReservaPendiente(p, lineas) with { Estado = "liberada" });
+        var liberada = await adaptador.Liberar(pedido, "checkout-cancelado");
+        cliente.Liberacion = (_, _) => ResultadoDelInventario<ReservaDelInventario>.Rechazo(404, "INV-NO-ENCONTRADO");
+        var noExistia = await adaptador.Liberar(pedido, "checkout-reiniciado");
+        cliente.Liberacion = (_, _) => ResultadoDelInventario<ReservaDelInventario>.Rechazo(409, "INV-RESERVA-ESTADO-INVALIDO");
+        var confirmado = await adaptador.Liberar(pedido, "checkout-cancelado");
+
+        Assert.Equal([(pedido, "checkout-cancelado"), (pedido, "checkout-reiniciado"), (pedido, "checkout-cancelado")], cliente.Liberaciones);
+        Assert.Equal(ResultadoDeLiberar.Liberada, liberada);
+        Assert.Equal(ResultadoDeLiberar.NoExistia, noExistia);
+        Assert.Equal(ResultadoDeLiberar.PedidoConfirmado, confirmado);
+    }
+
+    [Fact]
+    public async Task Liberar_sin_respuesta_con_limite_con_otro_rechazo_o_con_una_excepcion_es_no_se_pudo()
+    {
+        var (adaptador, cliente, _) = Crear();
+        var pedido = Guid.NewGuid();
+
+        cliente.Liberacion = (_, _) => ResultadoDelInventario<ReservaDelInventario>.SinRespuesta;
+        var sinRespuesta = await adaptador.Liberar(pedido, "checkout-cancelado");
+        cliente.Liberacion = (_, _) => ResultadoDelInventario<ReservaDelInventario>.Limitada("INV-LIMITE-EXCEDIDO");
+        var limitada = await adaptador.Liberar(pedido, "checkout-cancelado");
+        cliente.Liberacion = (_, _) => ResultadoDelInventario<ReservaDelInventario>.Rechazo(403, "INV-PROHIBIDO");
+        var prohibida = await adaptador.Liberar(pedido, "checkout-cancelado");
+        cliente.Liberacion = (_, _) => throw new HttpRequestException("caído");
+        var excepcion = await adaptador.Liberar(pedido, "checkout-cancelado");
+
+        Assert.All(new[] { sinRespuesta, limitada, prohibida, excepcion }, r => Assert.Equal(ResultadoDeLiberar.NoSePudo, r));
     }
 }

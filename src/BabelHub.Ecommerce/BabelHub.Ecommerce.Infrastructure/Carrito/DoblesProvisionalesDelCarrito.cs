@@ -401,8 +401,6 @@ public static class ComposicionProvisionalDelCarrito
         (typeof(ICreadorDeIntencionesDePago), typeof(CreadorDeIntencionesSinPagos)),
         (typeof(IInventarioDelCarrito), typeof(InventarioSimuladoDelCarrito)),
         (typeof(IEstadoDeCuenta), typeof(EstadoDeCuentaDelCarritoSinIdentidad)),
-        // El adaptador real del Inventario aún no tiene consulta previa, reservar ni liberar (T25b, carril de plataforma): falla cerrado, y mientras tanto la guarda impide publicarlo. Quita esta fila al cerrar T25b.
-        (typeof(IInventarioDelCarrito), typeof(RestInventarioDelCarrito)),
         (typeof(ILimitadorDelCarrito), typeof(LimitadorDelCarritoProvisional)),
         (typeof(IAuditoriaDelCarrito), typeof(AuditoriaDelCarritoProvisional)),
         (typeof(IMarcaDeCancelacion), typeof(MarcaDeCancelacionProvisional)),
