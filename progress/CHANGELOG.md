@@ -2,6 +2,17 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-19 — IDE-9 cierra Identidad; carrito completo salvo el E2E; ECO-6a y ECO-9b
+
+### Cubierto
+- **Carril A:** IDE-8 completo (T44 resto y T45: audiencia y alcance del contexto de lectura, `IContextoDelAsistente` sin caché, puertos de sesión) e IDE-9 (T46–T50: integración con el Inventario, carga de Argon2id, tiempos uniformes, concurrencia y custodia de la clave): **`identidad-seguridad` queda con sus 50 tareas**. Cuatro variables `BABELHUB__Identidad__*` nuevas en `infra/secretos-requeridos.txt`, obligatorias en producción.
+- **Carril B:** T25b y T26c del carrito con el Inventario real y los puertos de límites, auditoría, marca de cancelación, consentimiento y alertas reales (`ecommerce-carrito-checkout` 36 de 37; el E2E T36 espera la composición de los `Program.cs`); ECO-6a (T01–T06 de `ecommerce-pedidos`: Dominio de Pedidos).
+- **Carril V:** ECO-9b (T06–T11 de `ecommerce-envios`: casos de uso de envíos).
+- Validación de `main` con IDE-9: unitarias 4395 y 2334, arquitectura 230, SpecCheck 23, CoverageCheck 12, integración 5447 de 5449 (las 2 pasan sueltas: una de restauración con `tar` y el escáner de secretos, contención), gitleaks limpio.
+
+### Pendiente
+- PLA-X, COMP-1 e NOT-2 a NOT-4 (A); ECO-6b en adelante (B); ECO-5d en adelante y ECO-11c y 11d (C); ECO-9c a 9e (V); `spec-verify` de las specs que se completen (identidad, catálogo y carrito, entre ellas); WEB-2.
+
 ## 2026-11-19 — IDE-7 e IDE-8 (primera entrega) fundidos; `main` completamente verde
 
 ### Cubierto
