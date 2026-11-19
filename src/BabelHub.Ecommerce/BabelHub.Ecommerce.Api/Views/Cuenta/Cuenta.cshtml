@@ -1,0 +1,299 @@
+@using BabelHub.Ecommerce.Api.Controllers
+@using BabelHub.Ecommerce.Api.Web.Formato
+@using BabelHub.Ecommerce.Application.Identidad
+@model CuentaVista
+@{
+    var c = Model.Cuenta;
+    var acciones = Model.ConAcciones;
+    string Activa(PantallaDeLaCuenta p) => Model.Pantalla == p ? "tab tab-active" : "tab";
+}
+<section class="mx-auto max-w-3xl" aria-labelledby="titulo-de-la-cuenta">
+    <h1 id="titulo-de-la-cuenta" class="font-display text-4xl leading-tight">Mi cuenta</h1>
+
+    <nav class="tabs tabs-border mt-4 flex-wrap" aria-label="Secciones de tu cuenta">
+        <a class="@Activa(PantallaDeLaCuenta.Resumen)" href="/cuenta" aria-current="@(Model.Pantalla == PantallaDeLaCuenta.Resumen ? "page" : null)">Resumen</a>
+        <a class="@Activa(PantallaDeLaCuenta.Datos)" href="/cuenta/datos">Mis datos</a>
+        <a class="@Activa(PantallaDeLaCuenta.SegundoFactor)" href="/cuenta/segundo-factor">Segundo factor</a>
+        <a class="@Activa(PantallaDeLaCuenta.Correo)" href="/cuenta/correo">Correo</a>
+        <a class="@Activa(PantallaDeLaCuenta.Avisos)" href="/cuenta/avisos">Avisos</a>
+        <a class="@Activa(PantallaDeLaCuenta.Solicitudes)" href="/cuenta/solicitudes">Mis datos personales</a>
+        <a class="@Activa(PantallaDeLaCuenta.Cancelacion)" href="/cuenta/cancelacion">Cancelar mi cuenta</a>
+    </nav>
+
+    @if (Model.TextosPendientes)
+    {
+        <div class="alert alert-warning mt-4" role="status">
+            <bh-icono nombre="aviso" />
+            <span>Tienes textos legales por aceptar. Mientras tanto puedes ver tu cuenta, pero no cambiar nada. <a class="link" href="/textos/aceptar">Aceptar los textos</a>.</span>
+        </div>
+    }
+
+    @if (Model.Mensaje is not null)
+    {
+        <div class="alert @(Model.EsError ? "alert-error" : "alert-success") alert-soft my-4" role="@(Model.EsError ? "alert" : "status")" tabindex="-1" data-bh-foco-inicial>
+            <bh-icono nombre="@(Model.EsError ? "error" : "exito")" />
+            <span>@Model.Mensaje</span>
+        </div>
+    }
+
+    @if (c is null && Model.Pantalla != PantallaDeLaCuenta.CodigosDeRespaldo)
+    {
+        <p class="mt-6">No pudimos cargar esta sección.</p>
+    }
+    else
+    {
+        switch (Model.Pantalla)
+        {
+            case PantallaDeLaCuenta.Resumen:
+                <dl class="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-[12rem_1fr]">
+                    <dt class="font-semibold">Nombre</dt><dd>@c!.Nombre</dd>
+                    <dt class="font-semibold">Correo</dt><dd>@c.Correo @(c.CorreoVerificado ? "(verificado)" : "(sin verificar)")</dd>
+                    <dt class="font-semibold">Segundo factor</dt><dd>@(c.SegundoFactorActivo ? "Activado" : "No activado")</dd>
+                    <dt class="font-semibold">WhatsApp</dt><dd>@(c.ConsentimientoDeWhatsApp ? "Recibes avisos de tus pedidos" : "Sin avisos por WhatsApp")</dd>
+                </dl>
+                @if (Model.Cancelacion is { Estado: not EstadoDeLaCancelacion.SinSolicitud and not EstadoDeLaCancelacion.Descartada } cancelacion)
+                {
+                    <div class="alert alert-warning mt-6" role="status"><bh-icono nombre="aviso" /><span>Tienes una cancelación de cuenta en curso. <a class="link" href="/cuenta/cancelacion">Ver qué falta</a>.</span></div>
+                }
+                @if (Model.Avisos.Count(a => !a.Visto) is > 0 and var pendientes)
+                {
+                    <p class="mt-6">Tienes <strong>@pendientes</strong> aviso(s) de seguridad sin ver. <a class="link" href="/cuenta/avisos">Verlos</a>.</p>
+                }
+                <form method="post" action="/sesion/cerrar-todas" class="mt-8">
+                    <partial name="_TokenAntifalsificacion" />
+                    <button type="submit" class="btn btn-ghost">Cerrar todas mis sesiones</button>
+                </form>
+                break;
+
+            case PantallaDeLaCuenta.Datos:
+                <form method="post" action="/cuenta/datos" class="mt-6 flex max-w-md flex-col gap-4">
+                    <partial name="_TokenAntifalsificacion" />
+                    <label class="form-control"><span class="label-text">Nombre completo</span><input type="text" name="nombre" value="@(Model.Borrador.GetValueOrDefault("nombre") ?? c!.Nombre)" class="input input-bordered w-full" required maxlength="120" autocomplete="name" /></label>
+                    @if (Model.Borrador.Count > 0)
+                    {
+                        <p class="text-sm" role="status">Recuperamos lo que estabas escribiendo cuando venció tu sesión (nunca contraseñas ni códigos).</p>
+                    }
+                    @if (acciones)
+                    {
+                        <button type="submit" class="btn btn-primary">Guardar mi nombre</button>
+                    }
+                </form>
+                <h2 class="mt-10 font-display text-2xl">Avisos por WhatsApp</h2>
+                <form method="post" action="/cuenta/whatsapp" class="mt-3 flex max-w-md flex-col gap-4">
+                    <partial name="_TokenAntifalsificacion" />
+                    <label class="form-control"><span class="label-text">Número de WhatsApp (opcional)</span><input type="tel" name="numero" value="@c!.NumeroDeWhatsApp" class="input input-bordered w-full" maxlength="20" autocomplete="tel" inputmode="tel" /></label>
+                    <label class="flex cursor-pointer items-start gap-3"><input type="checkbox" name="consiente" value="si" class="checkbox checkbox-primary mt-0.5" checked="@c.ConsentimientoDeWhatsApp" /><span class="text-sm">Acepto recibir avisos de mis pedidos por WhatsApp y el tratamiento de mis datos para ello (Ley N.° 29733). Puedo cambiarlo cuando quiera.</span></label>
+                    @if (acciones)
+                    {
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    }
+                </form>
+                <h2 class="mt-10 font-display text-2xl">Cambiar mi contraseña</h2>
+                <form method="post" action="/cuenta/contrasena" class="mt-3 flex max-w-md flex-col gap-4">
+                    <partial name="_TokenAntifalsificacion" />
+                    <label class="form-control"><span class="label-text">Contraseña actual</span><input type="password" name="actual" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
+                    <label class="form-control"><span class="label-text">Contraseña nueva (mínimo 12 caracteres)</span><input type="password" name="nueva" class="input input-bordered w-full" required minlength="12" maxlength="1024" autocomplete="new-password" /></label>
+                    <label class="form-control"><span class="label-text">Repite la contraseña nueva</span><input type="password" name="confirmacion" class="input input-bordered w-full" required maxlength="1024" autocomplete="new-password" /></label>
+                    @if (acciones)
+                    {
+                        <button type="submit" class="btn btn-primary">Cambiar contraseña</button>
+                    }
+                </form>
+                break;
+
+            case PantallaDeLaCuenta.SegundoFactor:
+                <p class="mt-6">El segundo factor pide, además de tu contraseña, un código de tu aplicación de autenticación. Está <strong>@(c!.SegundoFactorActivo ? "activado" : "desactivado")</strong>@(c.SegundoFactorActivo ? $" y te quedan {c.CodigosDeRespaldoRestantes} códigos de respaldo" : string.Empty).</p>
+                @if (Model.SecretoBase32 is not null)
+                {
+                    <div class="my-4 rounded-box border border-base-300 p-4">
+                        <p class="text-sm font-semibold">Clave para tu aplicación (se muestra solo ahora)</p>
+                        <p class="mt-1 break-all font-mono text-lg">@Model.SecretoBase32</p>
+                        <p class="mt-2 text-sm"><a class="link" href="@Model.UriDelSecreto">Abrir en mi aplicación de autenticación</a></p>
+                    </div>
+                    <form method="post" action="/cuenta/segundo-factor/confirmar" class="flex max-w-md flex-col gap-4">
+                        <partial name="_TokenAntifalsificacion" />
+                        <label class="form-control"><span class="label-text">Código de 6 dígitos</span><input type="text" name="codigo" class="input input-bordered w-full" required maxlength="64" autocomplete="one-time-code" inputmode="numeric" /></label>
+                        <button type="submit" class="btn btn-primary">Activar</button>
+                    </form>
+                }
+                else if (acciones && !c.SegundoFactorActivo)
+                {
+                    <form method="post" action="/cuenta/segundo-factor/iniciar" class="mt-4 flex max-w-md flex-col gap-4">
+                        <partial name="_TokenAntifalsificacion" />
+                        <label class="form-control"><span class="label-text">Contraseña actual</span><input type="password" name="actual" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
+                        <button type="submit" class="btn btn-primary">Activar el segundo factor</button>
+                    </form>
+                }
+                else if (acciones)
+                {
+                    <form method="post" action="/cuenta/segundo-factor/regenerar" class="mt-4 flex max-w-md flex-col gap-4">
+                        <partial name="_TokenAntifalsificacion" />
+                        <label class="form-control"><span class="label-text">Contraseña actual</span><input type="password" name="actual" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
+                        <label class="form-control"><span class="label-text">Código de tu aplicación</span><input type="text" name="codigo" class="input input-bordered w-full" required maxlength="64" autocomplete="one-time-code" inputmode="numeric" /></label>
+                        <button type="submit" class="btn btn-outline">Generar códigos de respaldo nuevos</button>
+                    </form>
+                    <form method="post" action="/cuenta/segundo-factor/desactivar" class="mt-8 flex max-w-md flex-col gap-4">
+                        <partial name="_TokenAntifalsificacion" />
+                        <label class="form-control"><span class="label-text">Contraseña actual</span><input type="password" name="actual" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
+                        <label class="form-control"><span class="label-text">Código de tu aplicación</span><input type="text" name="codigo" class="input input-bordered w-full" required maxlength="64" autocomplete="one-time-code" inputmode="numeric" /></label>
+                        <button type="submit" class="btn btn-error btn-outline">Desactivar el segundo factor</button>
+                    </form>
+                }
+                break;
+
+            case PantallaDeLaCuenta.CodigosDeRespaldo:
+                <div class="alert alert-warning my-6" role="alert"><bh-icono nombre="aviso" /><span>Estos códigos se muestran <strong>solo esta vez</strong>. Cada uno sirve una sola vez. Guárdalos en un lugar seguro.</span></div>
+                <ol class="grid grid-cols-2 gap-2 font-mono text-lg">
+                    @foreach (var codigo in Model.Codigos)
+                    {
+                        <li class="rounded-box border border-base-300 px-3 py-2">@codigo</li>
+                    }
+                </ol>
+                <div class="mt-6 flex gap-3 print:hidden"><button type="button" class="btn btn-ghost" data-bh-imprimir>Imprimir</button><a class="btn btn-primary" href="/cuenta/segundo-factor">Ya los guardé</a></div>
+                break;
+
+            case PantallaDeLaCuenta.Correo:
+                <p class="mt-6">Tu correo actual es <strong>@c!.Correo</strong>. Para cambiarlo te pedimos tu contraseña y verificamos el correo nuevo. Si el cambio se pide desde un dispositivo que no reconocemos, te avisamos y puedes rechazarlo desde uno que sí.</p>
+                @if (acciones)
+                {
+                    <form method="post" action="/cuenta/correo/solicitar" class="mt-4 flex max-w-md flex-col gap-4">
+                        <partial name="_TokenAntifalsificacion" />
+                        <label class="form-control"><span class="label-text">Correo nuevo</span><input type="email" name="correoNuevo" class="input input-bordered w-full" required maxlength="254" autocomplete="email" /></label>
+                        <label class="form-control"><span class="label-text">Contraseña actual</span><input type="password" name="actual" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
+                        <button type="submit" class="btn btn-primary">Pedir el cambio</button>
+                    </form>
+                    <form method="post" action="/cuenta/correo/verificar" class="mt-8 flex max-w-md flex-col gap-4">
+                        <partial name="_TokenAntifalsificacion" />
+                        <label class="form-control"><span class="label-text">Código enviado al correo nuevo</span><input type="text" name="codigo" class="input input-bordered w-full" required maxlength="64" autocomplete="one-time-code" inputmode="numeric" /></label>
+                        <button type="submit" class="btn btn-outline">Verificar el correo nuevo</button>
+                    </form>
+                    <h2 class="mt-10 font-display text-2xl">Un cambio pendiente de confirmar</h2>
+                    <p class="mt-2 text-sm">Si pediste un cambio desde otro dispositivo, tienes 24 horas para confirmarlo o rechazarlo desde este con tu contraseña actual.</p>
+                    <form method="post" class="mt-3 flex max-w-md flex-col gap-4">
+                        <partial name="_TokenAntifalsificacion" />
+                        <label class="form-control"><span class="label-text">Contraseña actual</span><input type="password" name="actual" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
+                        <div class="flex gap-3">
+                            <button type="submit" class="btn btn-primary" formaction="/cuenta/correo/confirmar">Confirmar el cambio</button>
+                            <button type="submit" class="btn btn-error btn-outline" formaction="/cuenta/correo/rechazar">Rechazarlo</button>
+                        </div>
+                    </form>
+                }
+                break;
+
+            case PantallaDeLaCuenta.Avisos:
+                @if (Model.Avisos.Count == 0)
+                {
+                    <p class="mt-6">No tienes avisos de seguridad.</p>
+                }
+                else
+                {
+                    <ul class="mt-6 space-y-3">
+                        @foreach (var aviso in Model.Avisos)
+                        {
+                            <li class="flex flex-wrap items-center justify-between gap-3 rounded-box border border-base-300 p-4">
+                                <div>
+                                    <p class="font-semibold">@aviso.Tipo.Replace('-', ' ')</p>
+                                    <p class="text-sm"><time datetime="@aviso.Fecha.ToString("O")">@FormatoPeruano.FechaYHora(aviso.Fecha)</time> · @(aviso.Visto ? "Visto" : "Sin ver")</p>
+                                </div>
+                                @if (!aviso.Visto && acciones)
+                                {
+                                    <form method="post" action="/cuenta/avisos/@aviso.Id.ToString("D")/visto"><partial name="_TokenAntifalsificacion" /><button type="submit" class="btn btn-sm btn-outline">Marcar como visto</button></form>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+                break;
+
+            case PantallaDeLaCuenta.Solicitudes:
+                <p class="mt-6">Puedes pedir acceso, rectificación, cancelación u oposición sobre tus datos personales (Ley N.° 29733). Respondemos antes de la fecha límite de cada solicitud.</p>
+                @if (acciones)
+                {
+                    <form method="post" action="/cuenta/solicitudes" class="mt-4 flex max-w-md flex-col gap-4">
+                        <partial name="_TokenAntifalsificacion" />
+                        <label class="form-control"><span class="label-text">Tipo de solicitud</span>
+                            <select name="tipo" class="select select-bordered w-full" required>
+                                <option value="Acceso">Acceso a mis datos</option>
+                                <option value="Rectificacion">Rectificación</option>
+                                <option value="Cancelacion">Cancelación de mis datos</option>
+                                <option value="Oposicion">Oposición al tratamiento</option>
+                            </select>
+                        </label>
+                        <button type="submit" class="btn btn-primary">Presentar la solicitud</button>
+                    </form>
+                }
+                @if (Model.Solicitudes.Count == 0)
+                {
+                    <p class="mt-6">No tienes solicitudes.</p>
+                }
+                else
+                {
+                    <div class="mt-6 overflow-x-auto">
+                        <table class="table">
+                            <caption class="sr-only">Tus solicitudes sobre datos personales</caption>
+                            <thead><tr><th scope="col">Tipo</th><th scope="col">Estado</th><th scope="col">Recibida</th><th scope="col">Fecha límite</th><th scope="col">Respuesta</th></tr></thead>
+                            <tbody>
+                                @foreach (var s in Model.Solicitudes)
+                                {
+                                    <tr>
+                                        <td>@s.Solicitud.Tipo</td>
+                                        <td>@s.Solicitud.Estado @(s.Solicitud.Vencida ? "(fuera de plazo)" : string.Empty)</td>
+                                        <td>@FormatoPeruano.Fecha(s.Solicitud.Recibida)</td>
+                                        <td>@FormatoPeruano.Fecha(s.Solicitud.FechaLimite)</td>
+                                        <td>@(s.Respuesta ?? s.Motivo ?? "—")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                break;
+
+            case PantallaDeLaCuenta.Cancelacion:
+                var estado = Model.Cancelacion;
+                <p class="mt-6">Al cancelar tu cuenta se anonimizan tus datos personales y se cierran todas tus sesiones. Si tienes pedidos, envíos o reembolsos por cerrar, la cancelación queda <strong>diferida</strong> hasta que se cierren: tienes 7 días para reconfirmarla desde que lo ves y 30 días en total antes de que se descarte.</p>
+                @switch (estado?.Estado)
+                {
+                    case EstadoDeLaCancelacion.Diferida:
+                        <div class="alert alert-info my-4" role="status"><bh-icono nombre="info" /><span>Tu cancelación está diferida: faltan cerrar <strong>@estado.PendientesAbiertos</strong> pendiente(s) (pedidos, envíos, devoluciones o reembolsos).@(estado.SeDescartaEl is { } descarte ? $" Si no se cierran, se descartará el {FormatoPeruano.Fecha(DateOnly.FromDateTime(descarte.UtcDateTime))}." : string.Empty)</span></div>
+                        @if (acciones)
+                        {
+                            <form method="post" action="/cuenta/cancelacion/desistir" class="mt-2"><partial name="_TokenAntifalsificacion" /><button type="submit" class="btn btn-ghost">Desistir de cancelar mi cuenta</button></form>
+                        }
+                        break;
+                    case EstadoDeLaCancelacion.EsperandoReconfirmacion:
+                        <div class="alert alert-warning my-4" role="status"><bh-icono nombre="aviso" /><span>Ya se cerraron tus pendientes. Reconfirma la cancelación@(estado.ReconfirmarHasta is { } hasta ? $" antes del {FormatoPeruano.FechaYHora(hasta)}" : string.Empty) con tu contraseña@(c!.SegundoFactorActivo ? " y tu segundo factor" : string.Empty).</span></div>
+                        @if (acciones)
+                        {
+                            <form method="post" action="/cuenta/cancelacion/reconfirmar" class="mt-2 flex max-w-md flex-col gap-4">
+                                <partial name="_TokenAntifalsificacion" />
+                                <label class="form-control"><span class="label-text">Contraseña actual</span><input type="password" name="contrasena" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
+                                @if (c.SegundoFactorActivo)
+                                {
+                                    <label class="form-control"><span class="label-text">Código de tu aplicación</span><input type="text" name="codigo" class="input input-bordered w-full" required maxlength="64" autocomplete="one-time-code" inputmode="numeric" /></label>
+                                }
+                                <button type="submit" class="btn btn-error">Reconfirmar la cancelación</button>
+                            </form>
+                            <form method="post" action="/cuenta/cancelacion/desistir" class="mt-4"><partial name="_TokenAntifalsificacion" /><button type="submit" class="btn btn-ghost">Desistir</button></form>
+                        }
+                        break;
+                    case EstadoDeLaCancelacion.Descartada:
+                        <div class="alert alert-info my-4" role="status"><bh-icono nombre="info" /><span>Tu solicitud de cancelación se descartó porque pasaron 30 días. Puedes volver a comprar y, si quieres, pedirla de nuevo.</span></div>
+                        break;
+                }
+                @if (acciones && estado?.Estado is null or EstadoDeLaCancelacion.SinSolicitud or EstadoDeLaCancelacion.Descartada)
+                {
+                    <form method="post" action="/cuenta/cancelacion/solicitar" class="mt-4 flex max-w-md flex-col gap-4">
+                        <partial name="_TokenAntifalsificacion" />
+                        <label class="form-control"><span class="label-text">Contraseña actual</span><input type="password" name="contrasena" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
+                        @if (c!.SegundoFactorActivo)
+                        {
+                            <label class="form-control"><span class="label-text">Código de tu aplicación</span><input type="text" name="codigo" class="input input-bordered w-full" required maxlength="64" autocomplete="one-time-code" inputmode="numeric" /></label>
+                        }
+                        <button type="submit" class="btn btn-error btn-outline">Pedir la cancelación de mi cuenta</button>
+                    </form>
+                }
+                break;
+        }
+    }
+</section>
