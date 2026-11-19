@@ -150,6 +150,24 @@ public sealed class VerificadorDelInventarioTests
         Assert.NotNull(leida.UsuarioId);
     }
 
+
+    [Theory]
+    [InlineData("ayacucho", "lima")]
+    [InlineData("sede-1", "sede-2")]
+    [Trait("Criterio", "AC-FUE-06")]
+    public async Task UnEncargadoCreadoPorCodigo_TieneAlcanceSobreLaFuenteDeEseCodigo_YNoSobreOtra(string codigo, string otroCodigo)
+    {
+        // D20: Identidad guarda y emite el identificador derivado del código; el Inventario da a cada fuente ese mismo identificador. El alcance (FUE-08) es la igualdad entre ambos.
+        var e = await ConClavesRenovadas();
+        var sucursalDeIdentidad = BabelHub.Ecommerce.Application.Plataforma.IdentificadorDeSucursal.DesdeCodigo(codigo);
+
+        var leida = e.Verificador.Verificar(await e.Credencial(RolDeUsuario.EncargadoDeSucursal, sucursalDeIdentidad), Ahora);
+        var actor = ActorActual.DeUsuario(leida.UsuarioId!.Value, leida.Rol!, leida.SucursalId);
+
+        Assert.Equal(EstadoDeLaCredencial.Valida, leida.Estado);
+        Assert.True(actor.EsEncargadoDe(BabelHub.Inventario.Domain.Fuentes.Fuente.IdentificadorDe(codigo)));
+        Assert.False(actor.EsEncargadoDe(BabelHub.Inventario.Domain.Fuentes.Fuente.IdentificadorDe(otroCodigo)));
+    }
     [Fact]
     [Trait("Criterio", "AC-IDE-09")]
     public async Task UnaCredencialVencida_SeDistingueDeUnaInvalida()

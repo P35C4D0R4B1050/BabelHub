@@ -94,10 +94,16 @@ public sealed class PostgresDeFuentesFixture : IAsyncLifetime
     /// <summary>Una unidad de trabajo con el rol real de la aplicación y el actor dado (<see langword="null"/> = nadie estableció el contexto).</summary>
     public UnidadDeTrabajoPostgres Unidad(ActorActual? actor) => new(Acceso, actor: new ActorFijo(actor));
 
+
+    /// <summary>
+    /// El identificador que el dominio da a una fuente de ese código (D20). Aquí se calcula <b>sin validar el código</b>, para que las pruebas del CHECK de la base puedan insertar códigos de forma inválida y comprobar que es la base
+    /// la que los rechaza; con un código válido es exactamente <c>Fuente.IdentificadorDe</c> (una prueba de dominio fija los valores).
+    /// </summary>
+    public static Guid IdDeFuente(string codigo) => new(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("babelhub:sucursal:" + codigo)).AsSpan(0, 16));
     /// <summary>Inserta una fuente con la cuenta de despliegue y devuelve su identificador.</summary>
     public async Task<Guid> AgregarFuente(string codigo, string? nombre = null, string region = "lima", bool recepcion = false)
     {
-        var id = Guid.NewGuid();
+        var id = IdDeFuente(codigo);
         await using var comando = Administracion.CreateCommand(
             "INSERT INTO fuentes.fuentes (id, codigo, nombre, region, es_recepcion) VALUES (@id, @codigo, @nombre, @region, @recepcion)");
         comando.Parameters.AddWithValue("id", id);

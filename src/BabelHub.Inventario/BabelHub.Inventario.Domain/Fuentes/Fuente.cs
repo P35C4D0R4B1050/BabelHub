@@ -13,7 +13,7 @@ public static class CamposDeFuente
 }
 
 /// <summary>
-/// Una fuente de stock: cada sucursal es una fuente independiente (FUE-01). Su identificador lo genera el servidor y es el <c>sucursal_id</c> de
+/// Una fuente de stock: cada sucursal es una fuente independiente (FUE-01). Su identificador se deriva de su código (D20) y es el <c>sucursal_id</c> de
 /// Identidad y el <c>branch_id</c> del token; el código, único, es lo que viaja en las rutas y los avisos. No hay desactivación de fuentes. La
 /// fuente es inmutable: cada cambio devuelve otra instancia.
 /// </summary>
@@ -28,6 +28,8 @@ public sealed partial class Fuente
     public const int LargoMaximoDeLaRegion = 40;
 
     public const int LargoMaximoDelContacto = 20;
+
+    private const string PrefijoDelIdentificador = "babelhub:sucursal:";
 
     private const int MinimoDeDigitosDelContacto = 6;
 
@@ -75,7 +77,21 @@ public sealed partial class Fuente
             && FormaDelContacto().IsMatch(contacto)
             && contacto.Count(char.IsAsciiDigit) >= MinimoDeDigitosDelContacto);
 
-    /// <summary>Registra una fuente nueva. Los datos inválidos lanzan: la Aplicación valida la entrada antes y devuelve los campos erróneos.</summary>
+    /// <summary>
+    /// El identificador de la fuente de un código (D20 de <c>docs/03-diseno-de-software/08-contratos-entre-servicios-v1.md</c>): los 16 primeros bytes del SHA-256 de <c>babelhub:sucursal:&lt;código&gt;</c>. Es el mismo valor con que el E-commerce deriva la
+    /// sucursal de un encargado (<c>IdentificadorDeSucursal</c>), así que <c>actor.SucursalId == fuente.Id</c> es el alcance por sucursal (FUE-08) sin una tabla ni una llamada. Una prueba fija los mismos valores en los dos servicios.
+    /// </summary>
+    public static Guid IdentificadorDe(string codigo)
+    {
+        if (!EsCodigoValido(codigo))
+        {
+            throw new ArgumentException("El código es de 2 a 20 caracteres: minúsculas, dígitos y guiones.", nameof(codigo));
+        }
+
+        return new Guid(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(PrefijoDelIdentificador + codigo)).AsSpan(0, 16));
+    }
+
+    /// <summary>Registra una fuente nueva. Los datos inválidos lanzan: la Aplicación valida la entrada antes y devuelve los campos erróneos. El identificador <b>debe ser el derivado del código</b> (D20).</summary>
     public static Fuente Registrar(Guid id, string codigo, string nombre, string region, string? contactoDeNotificacion, bool esRecepcion)
     {
         if (id == Guid.Empty)
@@ -86,6 +102,11 @@ public sealed partial class Fuente
         if (!EsCodigoValido(codigo))
         {
             throw new ArgumentException("El código es de 2 a 20 caracteres: minúsculas, dígitos y guiones.", nameof(codigo));
+        }
+
+        if (id != IdentificadorDe(codigo))
+        {
+            throw new ArgumentException("El identificador de la fuente se deriva de su código (D20): uno ajeno dejaría al encargado sin alcance.", nameof(id));
         }
 
         ComprobarDatos(nombre, region, contactoDeNotificacion);

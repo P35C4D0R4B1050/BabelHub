@@ -30,7 +30,7 @@ public sealed class RepositoriosDeFuentesPostgresTests(PostgresDeFuentesFixture 
 
     private static Task<T> En<T>(PilaDeFuentes pila, Func<CancellationToken, Task<T>> trabajo) => pila.Unidad.Ejecutar(trabajo);
 
-    private static Fuente Nueva(string codigo, string nombre, string region = "lima", bool recepcion = false) => Fuente.Registrar(Guid.NewGuid(), codigo, nombre, region, null, recepcion);
+    private static Fuente Nueva(string codigo, string nombre, string region = "lima", bool recepcion = false) => Fuente.Registrar(Fuente.IdentificadorDe(codigo), codigo, nombre, region, null, recepcion);
 
     // --- fuentes ---
 
@@ -51,13 +51,35 @@ public sealed class RepositoriosDeFuentesPostgresTests(PostgresDeFuentesFixture 
         Assert.Equal(1, await En(pila, t => repo.Contar(t)));
     }
 
+
+    [Fact]
+    [Trait("Criterio", "AC-FUE-06")]
+    public async Task UnaFuenteConUnIdentificadorQueNoEsElDerivado_FallaCerradoAlLeerse_ConUnaExcepcionPropia_SinElIdentificador()
+    {
+        await bd.Ejecutar("INSERT INTO fuentes.fuentes (id, codigo, nombre, region, es_recepcion) VALUES (gen_random_uuid(), 'antigua', 'Antigua', 'lima', false)");
+        var pila = new PilaDeFuentes(bd, Admin);
+        var repo = new NpgsqlRepositorioDeFuentes(pila.Acceso);
+
+        var ex = await Assert.ThrowsAsync<FuenteConIdentificadorInconsistenteException>(() => En(pila, t => repo.PorCodigo("antigua", t)));
+
+        Assert.Contains("antigua", ex.Message, StringComparison.Ordinal);
+        Assert.DoesNotMatch("[0-9a-f]{8}-[0-9a-f]{4}-", ex.Message);
+        await bd.Ejecutar("DELETE FROM fuentes.fuentes WHERE codigo = 'antigua'");
+    }
+
+    [Theory]
+    [InlineData("ayacucho")]
+    [InlineData("sede-1")]
+    [Trait("Criterio", "AC-FUE-06")]
+    public void ElIdentificadorQueUsaElFixtureParaInsertar_EsElDelDominio_ParaUnCodigoValido(string codigo) =>
+        Assert.Equal(Fuente.IdentificadorDe(codigo), PostgresDeFuentesFixture.IdDeFuente(codigo));
     [Fact]
     [Trait("Criterio", "AC-FUE-01")]
     public async Task Fuentes_LeeLasFuentesPorIdCodigoYRegion_YElContactoSoloSiEsLaSuya()
     {
         var pila = new PilaDeFuentes(bd, Admin);
         var repo = new NpgsqlRepositorioDeFuentes(pila.Acceso);
-        var piura = Fuente.Registrar(Guid.NewGuid(), "piura", "Piura", "piura", "+51 944 555 666", esRecepcion: false);
+        var piura = Fuente.Registrar(Fuente.IdentificadorDe("piura"), "piura", "Piura", "piura", "+51 944 555 666", esRecepcion: false);
         await En(pila, t => repo.Agregar(Nueva("lima", "Lima", recepcion: true), t));
         await En(pila, t => repo.Agregar(piura, t));
 
