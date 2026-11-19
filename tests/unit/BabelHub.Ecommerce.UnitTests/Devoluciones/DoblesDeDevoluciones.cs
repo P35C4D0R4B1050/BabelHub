@@ -62,6 +62,12 @@ internal sealed class PedidosParaDevolucionesDoble : IPedidosParaDevoluciones
 
     public Task<Resultado<PaginaDePedidosDeUnaCuenta>> ListarDeUnaCuenta(Guid cuentaId, int pagina, int tamano, CancellationToken cancelacion = default)
     {
+        Lecturas++;
+        if (NoResponde)
+        {
+            return Task.FromResult(Resultado<PaginaDePedidosDeUnaCuenta>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible")));
+        }
+
         var ids = _pedidos.Values.Where(p => p.CuentaId == cuentaId).Select(p => p.PedidoId).ToList();
         return Task.FromResult(Resultado<PaginaDePedidosDeUnaCuenta>.Exito(new PaginaDePedidosDeUnaCuenta([.. ids.Skip((pagina - 1) * tamano).Take(tamano)], pagina, tamano, ids.Count)));
     }
@@ -234,12 +240,14 @@ internal sealed class RepositorioDeDevolucionesEnMemoria : IRepositorioDeDevoluc
 
     public Task<PaginaDeDevolucionesDelDominio> ListarDePedidos(IReadOnlyCollection<Guid> pedidoIds, int pagina, int tamano, CancellationToken cancelacion = default)
     {
+        Comprobar();
         var todas = _devoluciones.Values.Where(d => pedidoIds.Contains(d.PedidoId)).OrderByDescending(d => d.CreadaEn).ToList();
         return Task.FromResult(new PaginaDeDevolucionesDelDominio([.. todas.Skip((pagina - 1) * tamano).Take(tamano)], todas.Count));
     }
 
     public Task<PaginaDeDevolucionesDelDominio> ListarDeLaSucursal(string codigoDeSucursal, int pagina, int tamano, CancellationToken cancelacion = default)
     {
+        Comprobar();
         var todas = _devoluciones.Values.Where(d => d.Tipo == TipoDeDevolucion.Impreso && d.Origen == OrigenDeDevolucion.Solicitud && d.CodigoDeSucursalReceptora == codigoDeSucursal).OrderByDescending(d => d.CreadaEn).ToList();
         return Task.FromResult(new PaginaDeDevolucionesDelDominio([.. todas.Skip((pagina - 1) * tamano).Take(tamano)], todas.Count));
     }
@@ -284,6 +292,7 @@ internal sealed class RepositorioDeDevolucionesEnMemoria : IRepositorioDeDevoluc
 
     public Task<PaginaDeDevolucionesDelDominio> ListarDeLaAdministracion(FiltroDeLaAdministracion filtro, int pagina, int tamano, CancellationToken cancelacion = default)
     {
+        Comprobar();
         var todas = _devoluciones.Values.Where(d => (filtro.Tipo is null || d.Tipo == filtro.Tipo) && (!filtro.SoloReportes || d.Origen == OrigenDeDevolucion.Reporte)).OrderByDescending(d => d.CreadaEn).ToList();
         return Task.FromResult(new PaginaDeDevolucionesDelDominio([.. todas.Skip((pagina - 1) * tamano).Take(tamano)], todas.Count));
     }
@@ -387,9 +396,12 @@ internal sealed class EntornoDeDevoluciones
         Gestion = new AprobarYRechazarDevolucion(Autorizador, LimitesDeUso, Repositorio, Unidad, Auditoria, Reloj);
         Recepcion = new ConfirmarRecepcion(Autorizador, LimitesDeUso, Inventario, Reembolsos, Repositorio, Unidad, Auditoria, Alertas, Procesador, Reloj);
         Conciliacion = new ConciliarReembolsosDeDevoluciones(Autorizador, Repositorio, Reembolsos, Unidad, Procesador, Reloj);
+        Consultas = new ConsultasDeDevoluciones(Autorizador, LimitesDeUso, Pedidos, Repositorio);
         Vencidas = new RechazarDevolucionesVencidas(Autorizador, Repositorio, Unidad, Auditoria, Reloj);
         Estancadas = new RevisarDevolucionesEstancadas(Autorizador, Repositorio, Alertas, Reloj);
     }
+
+    public ConsultasDeDevoluciones Consultas { get; private set; } = null!;
 
     public RechazarDevolucionesVencidas Vencidas { get; private set; } = null!;
 
