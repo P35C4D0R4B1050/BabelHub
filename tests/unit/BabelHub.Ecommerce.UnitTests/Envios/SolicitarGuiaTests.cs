@@ -56,7 +56,7 @@ public sealed class SolicitarGuiaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-ENV-17")]
+    [Trait("Criterio", "AC-ENV-15")]
     public async Task El_operador_recibe_solo_nombre_direccion_y_telefono_y_la_llamada_ocurre_fuera_de_toda_transaccion()
     {
         var entorno = new EntornoDeEnvios();
@@ -250,7 +250,7 @@ public sealed class SolicitarGuiaTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-ENV-17")]
+    [Trait("Criterio", "AC-ENV-18")]
     public async Task Ni_la_auditoria_ni_los_errores_ni_las_alertas_llevan_el_contacto()
     {
         var entorno = new EntornoDeEnvios();

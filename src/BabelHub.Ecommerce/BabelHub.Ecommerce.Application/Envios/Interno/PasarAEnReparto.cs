@@ -74,17 +74,23 @@ internal sealed class PasarAEnReparto(
             }
 
             var lineas = inicio.Lineas!;
+            var pedidoId = inicio.PedidoId;
 
             // (2) Fuera de toda transacción y sin ningún bloqueo: el Inventario descuenta todas las líneas o ninguna.
             ResultadoDeCierreDeReservas cierre;
             try
             {
-                cierre = await reservas.Cerrar(envioId, lineas, cancelacion).ConfigureAwait(false);
+                cierre = await reservas.Cerrar(pedidoId, envioId, lineas, cancelacion).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancelacion.IsCancellationRequested)
             {
                 await TrasUnFallo(envioId, new ResultadoDeCierreDeReservas.Incierto(), CancellationToken.None).ConfigureAwait(false);
                 throw;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Una excepción inesperada del adaptador es un resultado incierto: se anota, se libera el arrendamiento y el texto nunca se propaga (ENV-12, D05).
+                cierre = new ResultadoDeCierreDeReservas.Incierto();
             }
 
             if (cierre is not ResultadoDeCierreDeReservas.Cerrado)
@@ -135,7 +141,7 @@ internal sealed class PasarAEnReparto(
                     },
                     cancelacion).ConfigureAwait(false);
             }
-            catch (Exception ex) when (ex is AuditoriaNoDisponibleException or EnviosNoDisponiblesException)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 await LiberarElArrendamiento(envioId).ConfigureAwait(false);
                 return FallosDeEnvios.NoDisponible<DetalleDeEnvio>();

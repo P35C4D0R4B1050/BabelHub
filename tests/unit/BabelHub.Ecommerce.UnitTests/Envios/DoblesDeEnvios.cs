@@ -28,6 +28,9 @@ internal sealed class RepositorioDeEnviosEnMemoria : IRepositorioDeEnvios, IInst
     /// <summary>Se ejecuta justo después de que <c>BuscarPorLineas</c> calcula su respuesta: simula otra transacción que gana la carrera.</summary>
     public Action? DespuesDeBuscarPorLineas { get; set; }
 
+    /// <summary>El próximo guardado falla como un error inesperado de la base (y se rearma solo).</summary>
+    public bool FallaAlGuardarElSiguiente { get; set; }
+
     public int Operaciones { get; private set; }
 
     public int LecturasConBloqueo { get; private set; }
@@ -132,6 +135,12 @@ internal sealed class RepositorioDeEnviosEnMemoria : IRepositorioDeEnvios, IInst
     {
         Comprobar();
         _guardados++;
+        if (FallaAlGuardarElSiguiente)
+        {
+            FallaAlGuardarElSiguiente = false;
+            throw new InvalidOperationException("TEXTO-INTERNO-DE-LA-BASE");
+        }
+
         if (_guardados == FallaEnElGuardadoNumero)
         {
             throw new InvalidOperationException("La base falló al guardar.");
@@ -298,6 +307,9 @@ internal sealed class OperadorLogisticoDoble(UnidadDeTrabajoReversible unidad) :
     /// <summary>Se ejecuta durante la llamada al operador: simula lo que pasa mientras el operador trabaja (por ejemplo, una cancelación).</summary>
     public Action? AlLlamar { get; set; }
 
+    /// <summary>La próxima llamada lanza una excepción inesperada (con un texto que no debe propagarse).</summary>
+    public bool Lanza { get; set; }
+
     public List<(Guid Clave, string Nombre, string Direccion, string Telefono)> Recibidas { get; } = [];
 
     public int LlamadasDentroDeLaTransaccion { get; private set; }
@@ -314,6 +326,12 @@ internal sealed class OperadorLogisticoDoble(UnidadDeTrabajoReversible unidad) :
 
         Recibidas.Add((claveDeSolicitud, destinatario.Nombre, destinatario.Direccion, destinatario.Telefono));
         AlLlamar?.Invoke();
+        if (Lanza)
+        {
+            Lanza = false;
+            throw new InvalidOperationException("TEXTO-INTERNO-DEL-OPERADOR");
+        }
+
         if (Forzado is { } forzado)
         {
             return Task.FromResult(forzado);
@@ -341,7 +359,10 @@ internal sealed class ReservasDelEnvioDoble(UnidadDeTrabajoReversible unidad) : 
     private readonly Queue<ResultadoDeCierreDeReservas> _forzados = new();
     private readonly HashSet<Guid> _descontados = [];
 
-    public List<(Guid EnvioId, IReadOnlyCollection<Guid> Lineas)> Llamadas { get; } = [];
+    public List<(Guid EnvioId, IReadOnlyCollection<Guid> Lineas, Guid PedidoId)> Llamadas { get; } = [];
+
+    /// <summary>La próxima llamada lanza una excepción inesperada (con un texto que no debe propagarse).</summary>
+    public bool Lanza { get; set; }
 
     public int LlamadasDentroDeLaTransaccion { get; private set; }
 
@@ -351,14 +372,20 @@ internal sealed class ReservasDelEnvioDoble(UnidadDeTrabajoReversible unidad) : 
     /// <summary>Un resultado para la próxima llamada; si el resultado es <c>Cerrado</c> el descuento se aplica.</summary>
     public void Encolar(ResultadoDeCierreDeReservas resultado) => _forzados.Enqueue(resultado);
 
-    public Task<ResultadoDeCierreDeReservas> Cerrar(Guid envioId, IReadOnlyCollection<Guid> lineaIds, CancellationToken cancelacion = default)
+    public Task<ResultadoDeCierreDeReservas> Cerrar(Guid pedidoId, Guid envioId, IReadOnlyCollection<Guid> lineaIds, CancellationToken cancelacion = default)
     {
         if (unidad.EnCurso)
         {
             LlamadasDentroDeLaTransaccion++;
         }
 
-        Llamadas.Add((envioId, lineaIds));
+        Llamadas.Add((envioId, lineaIds, pedidoId));
+        if (Lanza)
+        {
+            Lanza = false;
+            throw new InvalidOperationException("TEXTO-INTERNO-DEL-INVENTARIO");
+        }
+
         AlCerrar?.Invoke();
         var resultado = _forzados.Count > 0 ? _forzados.Dequeue() : new ResultadoDeCierreDeReservas.Cerrado();
         if (resultado is ResultadoDeCierreDeReservas.Cerrado)

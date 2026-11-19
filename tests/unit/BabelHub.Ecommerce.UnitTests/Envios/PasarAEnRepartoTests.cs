@@ -211,13 +211,15 @@ public sealed class PasarAEnRepartoTests
     {
         var entorno = new EntornoDeEnvios();
         var envio = SembrarConGuia(entorno);
-        entorno.Reservas.AlCerrar = () => entorno.Cancelar.Ejecutar(envio.PedidoId).GetAwaiter().GetResult();
+        Resultado<IReadOnlyList<ResultadoDeCancelarEnvio>>? cancelacion = null;
+        entorno.Reservas.AlCerrar = () => cancelacion = entorno.Cancelar.Ejecutar(envio.PedidoId).GetAwaiter().GetResult();
 
         var resultado = await entorno.PasarAEnReparto.Ejecutar(envio.Id);
 
         Assert.True(resultado.EsExito);
         Assert.Equal(EstadoDeEnvio.EnReparto, Guardado(entorno, envio.Id).Estado);
         Assert.Equal(1, entorno.Reservas.EnviosDescontados);
+        Assert.Equal(DestinoDelEnvioAlCancelar.Mantenido, Assert.Single(cancelacion!.Valor).Destino);
     }
 
     [Fact]

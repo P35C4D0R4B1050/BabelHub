@@ -94,7 +94,7 @@ internal abstract record ResultadoDelOperador
 internal interface IReservasDelEnvio
 {
     /// <summary>Todas las líneas del envío en una sola llamada (todo o nada), con el <c>envioId</c> y <c>Idempotency-Key</c> = <c>envioId</c>.</summary>
-    Task<ResultadoDeCierreDeReservas> Cerrar(Guid envioId, IReadOnlyCollection<Guid> lineaIds, CancellationToken cancelacion = default);
+    Task<ResultadoDeCierreDeReservas> Cerrar(Guid pedidoId, Guid envioId, IReadOnlyCollection<Guid> lineaIds, CancellationToken cancelacion = default);
 }
 
 /// <summary>El resultado del cierre, reducido a la lista cerrada que el caso de uso necesita (D05): un rechazo de negocio solo si no cambió nada; todo lo demás es incierto.</summary>

@@ -173,7 +173,7 @@ internal sealed class InformarProgresoAPedidos(IActorActual actores, IRepositori
             {
                 alDia++;
             }
-            else if (envio.EnRepartoEn is { } desde && reloj.Ahora - desde > UmbralDeAlerta)
+            else if ((envio.ProgresoEnRepartoInformadoEn is null ? envio.EnRepartoEn : envio.EntregadoEn) is { } desde && reloj.Ahora - desde > UmbralDeAlerta)
             {
                 await Alertar().ConfigureAwait(false);
             }
