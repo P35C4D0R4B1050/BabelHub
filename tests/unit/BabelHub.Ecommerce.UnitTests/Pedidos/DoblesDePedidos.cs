@@ -133,6 +133,9 @@ internal sealed class RepositorioDePedidosFalso : IRepositorioDePedidos
     public Task<IReadOnlyList<Entrega>> EntregasEnCurso(Guid pedidoId, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<Entrega>>([.. Entregas.Where(e => e.PedidoId == pedidoId && e.BloqueaLasLineas)]);
 
+    public Task<int> ContarPedidosConImpresaSinCerrar(Guid cuentaId, CancellationToken cancelacion = default) =>
+        Task.FromResult(_pedidos.Values.Count(p => p.CuentaId == cuentaId && p.Lineas.Any(l => !l.EsDigital && l.EstadoImpreso is not (EstadoDeLineaImpresa.Entregado or EstadoDeLineaImpresa.Anulado))));
+
     public Task<IReadOnlyList<Anulacion>> AnulacionesFallidas(Guid pedidoId, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<Anulacion>>([.. Anulaciones.Where(a => a.PedidoId == pedidoId && a.Estado == EstadoDeOperacion.Fallida)]);
 
@@ -356,7 +359,12 @@ internal sealed class ReembolsosFalsos : IReembolsos
             : Resultado<EstadoDelReembolso>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible")));
     }
 
-    public Task<int> ContarPendientes(Guid cuentaId, OrigenDelReembolso origen, CancellationToken cancelacion = default) => Task.FromResult(0);
+    public Dictionary<(Guid CuentaId, OrigenDelReembolso Origen), int> PendientesPorCuenta { get; } = [];
+
+    public bool FallaAlContar { get; set; }
+
+    public Task<int> ContarPendientes(Guid cuentaId, OrigenDelReembolso origen, CancellationToken cancelacion = default) =>
+        FallaAlContar ? throw new InvalidOperationException("Pagos caído") : Task.FromResult(PendientesPorCuenta.GetValueOrDefault((cuentaId, origen)));
 
     public Task<Resultado<ReembolsoPendienteVista?>> ConsultarPorOrigen(OrigenDelReembolso origen, string claveNatural, CancellationToken cancelacion = default)
     {
