@@ -41,6 +41,9 @@ public static class PoliticasDeLimite
 
     public static ClaveDePolitica RegistrosPorOrigen { get; } = new("registros-por-origen");
 
+    /// <summary>3 hojas de reclamación por hora y por origen (REC-11).</summary>
+    public static ClaveDePolitica HojasPorOrigen { get; } = new("hojas-por-origen");
+
     public static ClaveDePolitica SolicitudesPreviasPorOrigen { get; } = new("solicitudes-previas-por-origen");
 
     public static ClaveDePolitica SolicitudesDelOrigenDesconocido { get; } = new("solicitudes-del-origen-desconocido");
@@ -53,7 +56,7 @@ public static class PoliticasDeLimite
 
     /// <summary>Los límites generales de uso (con respaldo local), aparte de las políticas críticas de <see cref="Todas"/>.</summary>
     public static IReadOnlyList<ClaveDePolitica> Generales { get; } =
-        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta];
+        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen];
 
     public static IReadOnlyList<ClaveDePolitica> Todas { get; } =
     [

@@ -34,6 +34,10 @@ public static class PoliticasDeSeguridad
     public static PoliticaDeLimite RegistrosPorOrigen { get; } = new(
         "registros-por-origen", 3, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Origen);
 
+    /// <summary>3 hojas de reclamación por hora y por origen, con una ventana deslizante (REC-11). No falla cerrada: con el almacén de contadores caído cae al límite local por instancia (SEG-26).</summary>
+    public static PoliticaDeLimite HojasPorOrigen { get; } = new(
+        "hojas-por-origen", 3, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true);
+
     /// <summary>Tope previo barato por huella de origen, antes de autenticar: 600 por minuto (el bucket del origen desconocido tiene el suyo).</summary>
     public static PoliticaDeLimite SolicitudesPreviasPorOrigen { get; } = new(
         "solicitudes-previas-por-origen", 600, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true);
@@ -56,7 +60,7 @@ public static class PoliticasDeSeguridad
 
     /// <summary>Límites generales de uso: con el almacén caído caen al límite local por instancia (SEG-26), a diferencia de los críticos de <see cref="Todas"/>.</summary>
     public static IReadOnlyList<PoliticaDeLimite> Generales { get; } =
-        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta];
+        [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen];
 
     public static IReadOnlyList<PoliticaDeLimite> Todas { get; } =
     [

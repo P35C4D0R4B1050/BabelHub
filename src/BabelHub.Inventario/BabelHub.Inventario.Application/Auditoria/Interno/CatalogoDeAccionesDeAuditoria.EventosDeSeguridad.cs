@@ -50,6 +50,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
         "segundo-factor-por-origen",
         "segundo-factor-por-cuenta",
         "registros-por-origen",
+        "hojas-por-origen",
         "solicitudes-previas-por-origen",
         "solicitudes-del-origen-desconocido",
         "solicitudes-sin-sesion-por-origen",
