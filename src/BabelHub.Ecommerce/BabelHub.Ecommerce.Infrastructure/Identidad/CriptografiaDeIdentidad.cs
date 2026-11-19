@@ -212,6 +212,8 @@ public sealed class AesGcmCifradorDeSecretos : ICifradorDeSecretos
 {
     public const string PropositoDelSegundoFactor = "segundo-factor";
 
+    public const string PropositoDeLaClaveDeFirma = "clave-de-firma";
+
     private const int BytesDelNonce = 12;
 
     private const int BytesDeLaEtiqueta = 16;
@@ -238,17 +240,20 @@ public sealed class AesGcmCifradorDeSecretos : ICifradorDeSecretos
         }
     }
 
-    public byte[] Cifrar(ReadOnlySpan<byte> secreto, Guid usuarioId)
+    public byte[] Cifrar(ReadOnlySpan<byte> secreto, Guid usuarioId) => Cifrar(PropositoDelSegundoFactor, usuarioId.ToString("N"), secreto);
+
+    /// <summary>Cifra para un propósito (con su propia clave derivada) y un contexto que viaja como dato asociado: una clave de firma privada se liga a su <c>kid</c>.</summary>
+    public byte[] Cifrar(string proposito, string contexto, ReadOnlySpan<byte> secreto)
     {
         var version = Encoding.ASCII.GetBytes(_actual.Version);
         var nonce = RandomNumberGenerator.GetBytes(BytesDelNonce);
         var cifrado = new byte[secreto.Length];
         var etiqueta = new byte[BytesDeLaEtiqueta];
-        var clave = DerivarLaClave(_actual);
+        var clave = DerivarLaClave(_actual, proposito);
         try
         {
             using var aes = new AesGcm(clave, BytesDeLaEtiqueta);
-            aes.Encrypt(nonce, secreto, cifrado, etiqueta, DatosAsociados(usuarioId, version));
+            aes.Encrypt(nonce, secreto, cifrado, etiqueta, DatosAsociados(proposito, contexto, version));
         }
         finally
         {
@@ -264,7 +269,9 @@ public sealed class AesGcmCifradorDeSecretos : ICifradorDeSecretos
         return resultado;
     }
 
-    public byte[] Descifrar(ReadOnlySpan<byte> cifrado, Guid usuarioId)
+    public byte[] Descifrar(ReadOnlySpan<byte> cifrado, Guid usuarioId) => Descifrar(PropositoDelSegundoFactor, usuarioId.ToString("N"), cifrado);
+
+    public byte[] Descifrar(string proposito, string contexto, ReadOnlySpan<byte> cifrado)
     {
         if (cifrado.Length < 2 || cifrado[0] is 0 or > 16 || cifrado.Length < 1 + cifrado[0] + BytesDelNonce + BytesDeLaEtiqueta)
         {
@@ -283,11 +290,11 @@ public sealed class AesGcmCifradorDeSecretos : ICifradorDeSecretos
         var etiqueta = cifrado.Slice(desplazamiento + BytesDelNonce, BytesDeLaEtiqueta);
         var texto = cifrado[(desplazamiento + BytesDelNonce + BytesDeLaEtiqueta)..];
         var plano = new byte[texto.Length];
-        var clave = DerivarLaClave(maestra);
+        var clave = DerivarLaClave(maestra, proposito);
         try
         {
             using var aes = new AesGcm(clave, BytesDeLaEtiqueta);
-            aes.Decrypt(nonce, texto, etiqueta, plano, DatosAsociados(usuarioId, version.ToArray()));
+            aes.Decrypt(nonce, texto, etiqueta, plano, DatosAsociados(proposito, contexto, version.ToArray()));
             return plano;
         }
         catch (CryptographicException)
@@ -301,11 +308,11 @@ public sealed class AesGcmCifradorDeSecretos : ICifradorDeSecretos
         }
     }
 
-    private static byte[] DerivarLaClave(ClaveVersionadaDeIdentidad maestra) =>
-        HKDF.DeriveKey(HashAlgorithmName.SHA256, maestra.Clave, 32, salt: null, info: Encoding.ASCII.GetBytes($"babelhub/identidad/{PropositoDelSegundoFactor}"));
+    private static byte[] DerivarLaClave(ClaveVersionadaDeIdentidad maestra, string proposito) =>
+        HKDF.DeriveKey(HashAlgorithmName.SHA256, maestra.Clave, 32, salt: null, info: Encoding.ASCII.GetBytes($"babelhub/identidad/{proposito}"));
 
-    private static byte[] DatosAsociados(Guid usuarioId, byte[] version) =>
-        Encoding.ASCII.GetBytes($"babelhub/identidad/{PropositoDelSegundoFactor}/{usuarioId:N}/{Encoding.ASCII.GetString(version)}");
+    private static byte[] DatosAsociados(string proposito, string contexto, byte[] version) =>
+        Encoding.UTF8.GetBytes($"babelhub/identidad/{proposito}/{contexto}/{Encoding.ASCII.GetString(version)}");
 }
 
 /// <summary>
