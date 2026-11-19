@@ -30,7 +30,7 @@ public sealed class AnfitrionDelInventarioTests
         return new NpgsqlConnectionStringBuilder { Host = "localhost", Database = "inventario", Username = usuario, Password = pruebaClave }.ConnectionString;
     }
 
-    private static Dictionary<string, string?> ConfiguracionCompleta()
+    internal static Dictionary<string, string?> ConfiguracionCompleta()
     {
         var valores = new Dictionary<string, string?>
         {

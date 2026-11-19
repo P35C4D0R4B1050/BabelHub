@@ -10,8 +10,8 @@ using BabelHub.Inventario.Infrastructure.Auditoria;
 using BabelHub.Inventario.Infrastructure.Composicion;
 using BabelHub.Inventario.Infrastructure.Plataforma;
 using BabelHub.Shared.Contratos;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Hosting;
-using Npgsql;
 
 namespace BabelHub.Inventario.Api.Plataforma;
 
@@ -91,10 +91,10 @@ public sealed class OpcionesDelAnfitrionDelInventario
     {
         ArgumentNullException.ThrowIfNull(configuracion);
         var lector = new LectorDeSecretos(configuracion);
-        var baseDeLaAplicacion = Cadena(lector, RutaDeLaBaseDeLaAplicacion, esProduccion);
-        var depuracionDeAjustes = Cadena(lector, RutaDeLaBaseDeDepuracionDeAjustes, esProduccion);
-        var depuracionDeAuditoria = Cadena(lector, RutaDeLaBaseDeDepuracionDeAuditoria, esProduccion);
-        ComprobarQueSeanCuentasDistintas(lector, (RutaDeLaBaseDeLaAplicacion, baseDeLaAplicacion), (RutaDeLaBaseDeDepuracionDeAjustes, depuracionDeAjustes), (RutaDeLaBaseDeDepuracionDeAuditoria, depuracionDeAuditoria));
+        var baseDeLaAplicacion = BasesDelInventario.Leer(lector, RutaDeLaBaseDeLaAplicacion, esProduccion);
+        var depuracionDeAjustes = BasesDelInventario.Leer(lector, RutaDeLaBaseDeDepuracionDeAjustes, esProduccion);
+        var depuracionDeAuditoria = BasesDelInventario.Leer(lector, RutaDeLaBaseDeDepuracionDeAuditoria, esProduccion);
+        BasesDelInventario.ComprobarCuentasDistintas(lector, (RutaDeLaBaseDeLaAplicacion, baseDeLaAplicacion), (RutaDeLaBaseDeDepuracionDeAjustes, depuracionDeAjustes), (RutaDeLaBaseDeDepuracionDeAuditoria, depuracionDeAuditoria));
 
         var claveDelCursor = lector.Obligatorio(RutaDeLaClaveDelCursor);
         if (claveDelCursor is not null)
@@ -135,59 +135,6 @@ public sealed class OpcionesDelAnfitrionDelInventario
 
 
         return new OpcionesDelAnfitrionDelInventario(baseDeLaAplicacion!, depuracionDeAjustes!, depuracionDeAuditoria!, claveDelCursor!, version, claves!, ecommerce!, seguridad!);
-    }
-
-    private static string? Cadena(LectorDeSecretos lector, string ruta, bool esProduccion)
-    {
-        var valor = lector.Obligatorio(ruta);
-        if (valor is null)
-        {
-            return null;
-        }
-
-        NpgsqlConnectionStringBuilder cadena;
-        try
-        {
-            cadena = new NpgsqlConnectionStringBuilder(valor);
-        }
-        catch (ArgumentException)
-        {
-            lector.Problema(ruta, "no es una cadena de conexión válida");
-            return null;
-        }
-
-        // Cada rol entra con su cuenta y su contraseña (D10): sin usuario o sin contraseña la cuenta no está aislada.
-        if (esProduccion && (string.IsNullOrWhiteSpace(cadena.Username) || string.IsNullOrEmpty(cadena.Password)))
-        {
-            lector.Problema(ruta, "en producción exige usuario y contraseña propios");
-            return null;
-        }
-
-        return valor;
-    }
-
-    /// <summary>Las tres cuentas deben ser <b>cuentas</b> distintas (servidor, puerto, base y usuario): cambiar el nombre de la aplicación u otro parámetro no las separa.</summary>
-    private static void ComprobarQueSeanCuentasDistintas(LectorDeSecretos lector, params (string Ruta, string? Cadena)[] cuentas)
-    {
-        var vistas = new List<(string Ruta, string Cuenta)>();
-        foreach (var (ruta, cadena) in cuentas)
-        {
-            if (cadena is null)
-            {
-                continue;
-            }
-
-            var c = new NpgsqlConnectionStringBuilder(cadena);
-            var cuenta = string.Join('|', c.Host?.ToLowerInvariant(), c.Port, c.Database?.ToLowerInvariant(), c.Username?.ToLowerInvariant());
-            if (vistas.FirstOrDefault(v => v.Cuenta == cuenta) is { Ruta: not null } igual)
-            {
-                lector.Problema(ruta, $"usa la misma cuenta que {LectorDeSecretos.Variable(igual.Ruta)}: las cuentas de la aplicación y de depuración deben ser distintas");
-            }
-            else
-            {
-                vistas.Add((ruta, cuenta));
-            }
-        }
     }
 
     private static Uri? Direccion(LectorDeSecretos lector, string ruta)
@@ -267,17 +214,16 @@ public static class AnfitrionDelInventario
         servicios.AgregarCredencialDeServicio(new OpcionesDeSuperficieDeServicio { TopeDeLaDireccionDirecta = PoliticasDeLimite.SolicitudesPorHuellaDirecta }, opciones.Seguridad.CredencialesDeEntrada);
 
         // ---------- Datos: el rol de acceso de la aplicación y las cuentas de depuración, aparte ----------
-        var aplicacion = NpgsqlDataSource.Create(opciones.BaseDeLaAplicacion);
-        servicios.AddSingleton(aplicacion);
+        BasesDelInventario.RegistrarLaDeLaAplicacion(servicios, opciones.BaseDeLaAplicacion);
         servicios.AddSingleton<IRegistroDeTrabajosDeFondo>(sp => new RegistroDeTrabajosDeFondoPostgres(sp.GetRequiredService<UnidadDeTrabajoPostgres>()));
 
         // ---------- Auditoría y los cuatro módulos ----------
         servicios.AddSingleton<IPlantillasDeRuta>(sp => new PlantillasDeRutaDeLaApi(sp.GetRequiredService<EndpointDataSource>()));
-        servicios.AgregarModuloAuditoria(new OpcionesDelModuloDeAuditoria(NpgsqlDataSource.Create(opciones.BaseDeDepuracionDeAuditoria), new ClavesDeCursorDelEntorno(opciones.ClaveDelCursor, opciones.VersionDelCursor)));
+        servicios.AgregarModuloAuditoria(new OpcionesDelModuloDeAuditoria(BasesDelInventario.Abrir(opciones.BaseDeDepuracionDeAuditoria), new ClavesDeCursorDelEntorno(opciones.ClaveDelCursor, opciones.VersionDelCursor)));
         servicios.AgregarRegistroDeDenegaciones();
         servicios.AgregarModuloFuentes();
         servicios.AgregarModuloReservas(builder.Configuration);
-        servicios.AgregarModuloAjustes(new OpcionesDelModuloDeAjustes(NpgsqlDataSource.Create(opciones.BaseDeDepuracionDeAjustes)));
+        servicios.AgregarModuloAjustes(new OpcionesDelModuloDeAjustes(BasesDelInventario.Abrir(opciones.BaseDeDepuracionDeAjustes)));
         servicios.AgregarModuloTraslados();
         servicios.AgregarSalidaAlEcommerce(opciones.Ecommerce, permitirHttp: !builder.Environment.IsProduction());
 
@@ -320,10 +266,10 @@ public static class AnfitrionDelInventario
         ComposicionDeFuentes.ExigirAdaptadoresReales(app.Services, esProduccion);
         _ = ComposicionDeReservas.ExigirClaveDeBajas(app.Services);
         _ = ComposicionDeReservas.ExigirEstrategiaDeSeleccion(app.Services);
-        var problemas = SuperficieDeServicio.Verificar(
-            new CompositeEndpointDataSource(((IEndpointRouteBuilder)app).DataSources),
-            app.Services.GetRequiredService<IMatrizDeAlcancesDeServicio>(),
-            new OpcionesDeSuperficieDeServicio());
+        var fuente = new CompositeEndpointDataSource(((IEndpointRouteBuilder)app).DataSources);
+        var superficie = app.Services.GetRequiredService<OpcionesDeSuperficieDeServicio>();
+        var problemas = SuperficieDeServicio.Verificar(fuente, app.Services.GetRequiredService<IMatrizDeAlcancesDeServicio>(), superficie).ToList();
+
         if (problemas.Count > 0)
         {
             throw new InvalidOperationException("La superficie entre servicios no declara todas sus operaciones: " + string.Join("; ", problemas));
