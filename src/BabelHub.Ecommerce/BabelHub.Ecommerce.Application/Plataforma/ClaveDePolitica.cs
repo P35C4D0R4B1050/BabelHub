@@ -41,6 +41,18 @@ public static class PoliticasDeLimite
 
     public static ClaveDePolitica RegistrosPorOrigen { get; } = new("registros-por-origen");
 
+    /// <summary>3 avisos de seguridad no críticos por correo por cuenta y 24 horas (IDE-74).</summary>
+    public static ClaveDePolitica AvisosNoCriticosPorCuenta { get; } = new("avisos-no-criticos-por-cuenta");
+
+    /// <summary>La primera alerta crítica de cada tipo por cuenta en 24 horas (IDE-74).</summary>
+    public static ClaveDePolitica AlertasCriticasPorTipoYCuenta { get; } = new("alertas-criticas-por-tipo-y-cuenta");
+
+    /// <summary>Tope diario por origen de las alertas críticas de cuenta por correo (IDE-86).</summary>
+    public static ClaveDePolitica AlertasCriticasPorOrigen { get; } = new("alertas-criticas-por-origen");
+
+    /// <summary>10 al día por origen del consumo del cupo de códigos (IDE-83).</summary>
+    public static ClaveDePolitica CupoDeCodigosPorOrigen { get; } = new("cupo-de-codigos-por-origen");
+
     /// <summary>3 hojas de reclamación por hora y por origen (REC-11).</summary>
     public static ClaveDePolitica HojasPorOrigen { get; } = new("hojas-por-origen");
 
@@ -92,6 +104,10 @@ public static class PoliticasDeLimite
         SegundoFactorPorOrigen,
         SegundoFactorPorCuenta,
         RegistrosPorOrigen,
+        AvisosNoCriticosPorCuenta,
+        AlertasCriticasPorTipoYCuenta,
+        AlertasCriticasPorOrigen,
+        CupoDeCodigosPorOrigen,
         CobrosPorIntencion,
         CobrosPorCuenta,
         CobrosPorOrigen,

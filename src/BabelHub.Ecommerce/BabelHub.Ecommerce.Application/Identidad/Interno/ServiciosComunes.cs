@@ -97,23 +97,30 @@ public sealed class EmisionDeSesion(IRepositorioDeRenovaciones renovaciones, IEm
 /// el anterior, IDE-56) y lo entrega por el canal de códigos. <b>Nunca interrumpe</b> a quien lo llama (AGENTS.md §3.10): si el envío falla, deja una alerta técnica y el resultado es el mismo para la persona
 /// (IDE-65). El código no se imprime ni se registra (IDE-40).
 /// </summary>
-public sealed class EmisionDeCodigos(ICodigosDeUnSoloUso codigos, IHuellasDeIdentidad huellas, IEnviadorDeCorreo correo, IPublicadorDeAlertasTecnicas alertas, IReloj reloj)
+public sealed class EmisionDeCodigos(ICodigosDeUnSoloUso codigos, IHuellasDeIdentidad huellas, IEnviadorDeCorreo correo, IControlDeLimites limites, IPublicadorDeAlertasTecnicas alertas, IReloj reloj)
 {
     /// <summary>El motivo del catálogo cerrado para una dependencia no necesaria que falló (el correo de un código): la alerta técnica de IDE-65.</summary>
     public const string MotivoDeFallaDelCorreo = "dependencia-no-necesaria-fallida";
 
-    public Task Emitir(Usuario usuario, DominioProposito proposito, CancellationToken cancelacion)
+    public Task Emitir(Usuario usuario, DominioProposito proposito, CancellationToken cancelacion, bool cupoYaReservado = false)
     {
         ArgumentNullException.ThrowIfNull(usuario);
-        return EmitirA(usuario, usuario.Correo, proposito, cancelacion);
+        return EmitirA(usuario, usuario.Correo, proposito, cancelacion, cupoYaReservado);
     }
 
     /// <summary>
     /// Emite el código y lo envía a <paramref name="correoDestino"/>: la dirección registrada del titular, o la <b>del correo nuevo guardado en el cambio de correo en curso</b> (nunca la de la solicitud en vuelo, SEG-28).
     /// </summary>
-    public async Task EmitirA(Usuario usuario, string correoDestino, DominioProposito proposito, CancellationToken cancelacion)
+    public async Task EmitirA(Usuario usuario, string correoDestino, DominioProposito proposito, CancellationToken cancelacion, bool cupoYaReservado = false)
     {
         ArgumentNullException.ThrowIfNull(usuario);
+        // El tope de 10 al día por origen del consumo del cupo de códigos (IDE-83) se reserva **antes** de invalidar el código vigente, para no dejar a la persona sin código si el tope lo impide. Lo reserva el camino
+        // síncrono de la solicitud (<see cref="SolicitudDeCodigos.Reservar"/>), donde existe el origen; el trabajo en segundo plano no tiene origen y llega con <paramref name="cupoYaReservado"/>.
+        if (!cupoYaReservado && !await ReservarElCupoDelOrigen(cancelacion).ConfigureAwait(false))
+        {
+            return;
+        }
+
         var ahora = reloj.Ahora;
         var codigo = CodigoDeUnSoloUso.Generar();
         var emitido = CodigoDeUnSoloUso.Emitir(usuario.Id, proposito, huellas.DeCodigo(usuario.Id, proposito, codigo), ahora);
@@ -127,6 +134,20 @@ public sealed class EmisionDeCodigos(ICodigosDeUnSoloUso codigos, IHuellasDeIden
         catch (Exception) when (!cancelacion.IsCancellationRequested)
         {
             await AlertarSinInterrumpir().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Superado el tope, o sin el almacén de contadores (falla cerrada), el código no sale y la respuesta a la persona es la misma.</summary>
+    private async Task<bool> ReservarElCupoDelOrigen(CancellationToken cancelacion)
+    {
+        try
+        {
+            return (await limites.Reservar(PoliticasDeLimite.CupoDeCodigosPorOrigen, cancelacion: cancelacion).ConfigureAwait(false)).EsPermitido;
+        }
+        catch (Exception) when (!cancelacion.IsCancellationRequested)
+        {
+            await AlertarSinInterrumpir().ConfigureAwait(false);
+            return false;
         }
     }
 
@@ -170,6 +191,10 @@ public sealed class EventosDeSeguridadDeIdentidad(IRegistroDeSeguridad registro)
 
     public Task CambioDeCorreoRechazado(Guid usuarioId, CancellationToken cancelacion) =>
         Registrar(AccionesAuditables.CambioDeCorreoNoReconocidoRechazado, "rechazado-por-el-titular", usuarioId, cancelacion);
+
+    /// <summary>Un aviso de seguridad no salió por correo (IDE-79, AUD-43): por la cuota, un tope por cuenta o por origen o un correo sin verificar. Guarda la cuenta y el motivo, nunca el correo ni el contenido.</summary>
+    public Task AvisoSuprimido(Guid usuarioId, string motivo, CancellationToken cancelacion) =>
+        Registrar(AccionesAuditables.AvisoDeSeguridadSuprimido, motivo, usuarioId, cancelacion);
 
     public Task RecuperacionSolicitada(Guid? usuarioId, CancellationToken cancelacion) =>
         Registrar(AccionesAuditables.RecuperacionDeAccesoSolicitada, "solicitud-de-recuperacion", usuarioId, cancelacion);

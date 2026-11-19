@@ -249,5 +249,15 @@ public interface IClavesDeFirma
 /// </summary>
 public interface IContextoDeLectura
 {
+    /// <summary>Lo emite solo para el propio cliente autenticado (otro actor: <c>Prohibido</c>) y con la cuenta vigente.</summary>
     Task<Resultado<ValorSecreto>> Emitir(Guid clienteId, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Verifica un contexto en proceso (lo usa Pedidos): firma, vigencia de 5 minutos sin renovación, <c>aud=pedidos</c>, <c>typ=lectura-asistente</c> y el alcance único de leer pedidos, con la cuenta aún vigente. Todo fallo
+    /// devuelve el mismo error <c>NoAutenticado</c>, sin decir cuál comprobación falló. El único cliente a quien da acceso es el del contexto.
+    /// </summary>
+    Task<Resultado<ClienteDelContexto>> Verificar(ValorSecreto contexto, CancellationToken cancelacion = default);
 }
+
+/// <summary>El cliente cuyos pedidos puede leer un contexto verificado: el único dato que de él se desprende.</summary>
+public sealed record ClienteDelContexto(Guid ClienteId);
