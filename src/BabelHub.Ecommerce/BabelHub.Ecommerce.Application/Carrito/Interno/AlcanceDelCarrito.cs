@@ -52,6 +52,40 @@ internal static class ClavesDelCarrito
     public const string ServicioNoDisponible = "servicio-no-disponible";
 
     public const string LimiteExcedido = "limite-excedido";
+
+    /// <summary>El Inventario no respondió (o respondió algo inválido) al validar el stock: no se avanza ni se cobra (CAR-06).</summary>
+    public const string StockNoValidable = "checkout-stock-no-validable";
+
+    /// <summary>El carrito no tiene ninguna línea que se pueda pagar (CAR-05).</summary>
+    public const string CheckoutVacio = "checkout-vacio";
+
+    /// <summary>No se pudo validar la entrega (la lista de sucursales y regiones no está disponible): no se continúa (R05).</summary>
+    public const string EntregaNoValidable = "entrega-no-validable";
+
+    public const string CheckoutNoEncontrado = "checkout-no-encontrado";
+
+    /// <summary>Falta aceptar un texto requerido (422): los términos y la privacidad siempre y el reembolso digital si hay digitales (CAR-12, CAR-13).</summary>
+    public const string AceptacionRequerida = "checkout-aceptacion-requerida";
+
+    /// <summary>La versión vigente de un texto cambió respecto de la que se mostró (409): se vuelve a pedir su aceptación (CAR-28). El campo lleva el texto y la clave, la versión vigente.</summary>
+    public const string TextoCambio = "checkout-texto-cambio";
+
+    public const string CuentaNoPuedeComprar = "checkout-cuenta-no-puede-comprar";
+
+    public const string CorreoSinVerificar = "checkout-correo-sin-verificar";
+
+    public const string TextosPendientes = "checkout-textos-pendientes";
+
+    /// <summary>Una edición digital dejó de estar disponible por su licencia antes de iniciar el pago (409, CAR-14): se invita a quitarla.</summary>
+    public const string LicenciaNoVigente = "checkout-licencia-no-vigente";
+
+    public const string DatosDeEntregaIncompletos = "checkout-datos-de-entrega-incompletos";
+
+    /// <summary>El total que la persona vio ya no es el calculado (409, D17): no se crea nada.</summary>
+    public const string TotalCambio = "checkout-total-cambio";
+
+    /// <summary>El Inventario rechazó la reserva (409): falta de stock con las líneas y el máximo, un plazo o una fuente distinta de lo informado, o una reserva expirada. Se vuelve a la revisión con el carrito conservado (CAR-27).</summary>
+    public const string ReservaRechazada = "checkout-reserva-rechazada";
 }
 
 /// <summary>Los motivos de <c>AccesoDenegado</c> que usa el módulo (AUD-05).</summary>
@@ -142,6 +176,19 @@ internal sealed class AutorizadorDelCarrito(IActorActual actores, IDenegacionDeA
 
         await Denegar(MotivosDeDenegacionDelCarrito.FueraDeRol, "ECO-PROHIBIDO", cancelacion).ConfigureAwait(false);
         return Resultado<SolicitanteDelCarrito>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDelCarrito.Prohibido));
+    }
+
+    /// <summary>Solo el sistema (un trabajo de fondo): cualquier otro actor, incluido el personal y los clientes, se rechaza con su evento.</summary>
+    public async Task<ErrorDeAplicacion?> ExigirSistema(CancellationToken cancelacion)
+    {
+        if (actores.Actual is { Tipo: TipoDeActor.Sistema })
+        {
+            return null;
+        }
+
+        var sinContexto = actores.Actual is null;
+        await Denegar(sinContexto ? MotivosDeDenegacionDelCarrito.SinSesion : MotivosDeDenegacionDelCarrito.FueraDeRol, sinContexto ? "ECO-NO-AUTENTICADO" : "ECO-PROHIBIDO", cancelacion).ConfigureAwait(false);
+        return sinContexto ? new ErrorDeAplicacion(CategoriaDeError.NoAutenticado, ClavesDelCarrito.NoAutenticado) : new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDelCarrito.Prohibido);
     }
 
     /// <summary>El «no encontrado» uniforme: el mismo para un recurso ajeno, inexistente o mal formado.</summary>

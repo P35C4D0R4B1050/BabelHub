@@ -31,6 +31,9 @@ internal sealed record PuertaDeEdicion(DecisionDeLaPuerta Decision, Guid? Pedido
 /// </summary>
 internal sealed class EdicionConCheckoutVivo(ICreadorDeIntencionesDePago pagos, IRepositorioDeCheckouts checkouts)
 {
+    /// <summary>Pagos, para el aborto (<c>Cancelar</c>) que reutiliza esta clase junto con la edición.</summary>
+    public ICreadorDeIntencionesDePago Pagos => pagos;
+
     /// <summary>Se llama antes de abrir la transacción, solo para un cliente con sesión.</summary>
     public async Task<Resultado<PuertaDeEdicion>> PrepararAntesDeBloquear(Guid cuentaId, CancellationToken cancelacion)
     {

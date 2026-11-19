@@ -136,16 +136,13 @@ public sealed record ResultadoDeFusionDeCarrito(VistaDelCarrito Carrito, IReadOn
 [JsonConverter(typeof(ConversorDeContactoDeCompra))]
 public sealed class ContactoDeCompra : IEquatable<ContactoDeCompra>
 {
-    public ContactoDeCompra(string nombre, string telefono, string direccion, string region)
+    /// <summary>Los cuatro datos tal como llegan: la validación (obligatorio, formato, largo, región de la lista) es del caso de uso, que responde por campo sin repetir el valor; un dato ausente se guarda como texto vacío.</summary>
+    public ContactoDeCompra(string? nombre, string? telefono, string? direccion, string? region)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(nombre);
-        ArgumentException.ThrowIfNullOrWhiteSpace(telefono);
-        ArgumentException.ThrowIfNullOrWhiteSpace(direccion);
-        ArgumentException.ThrowIfNullOrWhiteSpace(region);
-        Nombre = nombre;
-        Telefono = telefono;
-        Direccion = direccion;
-        Region = region;
+        Nombre = nombre ?? string.Empty;
+        Telefono = telefono ?? string.Empty;
+        Direccion = direccion ?? string.Empty;
+        Region = region ?? string.Empty;
     }
 
     public string Nombre { get; }
@@ -221,6 +218,9 @@ public sealed record IniciarCheckoutEntrada(string? CodigoDeSucursalPreferida = 
 
 public enum DisponibilidadDeLineaDeCheckout
 {
+    /// <summary>Hay stock vendible en la red y todavía no se eligió la entrega: no se sabe de qué fuente saldrá.</summary>
+    Disponible,
+
     EnSuSucursal,
     PorTraslado,
     Agotada,
@@ -258,7 +258,8 @@ public sealed record VistaDelCheckout(
     IReadOnlyList<TextoLegalDeCompra> TextosPorAceptar,
     DateTimeOffset? ReservaExpiraEn,
     Guid? PedidoId,
-    bool CarritoCambio);
+    bool CarritoCambio,
+    ConsentimientoDeWhatsAppDeCompra? ConsentimientoDeWhatsApp = null);
 
 /// <summary>La entrega elegida: recojo con el código de una sucursal, domicilio con el contacto (dirección y región incluidas) o solo digital (CAR-07 a CAR-09, CAR-30).</summary>
 public sealed record ElegirEntregaEntrada(TipoDeEntregaDeCompra Tipo, string? CodigoDeSucursalDeRecojo, ContactoDeCompra? Contacto, Guid? PedidoId = null);
@@ -282,8 +283,11 @@ public sealed record PasarAlPagoEntrada(decimal TotalVisto, IReadOnlyList<TextoV
 /// <summary>Volver al carrito o reiniciar: el <c>pedidoId</c> oculto cuando el checkout ya lo tiene; si no, se usa el checkout vivo de quien pide.</summary>
 public sealed record SalirDelCheckoutEntrada(Guid? PedidoId = null);
 
-/// <summary>Cómo quedó el checkout tras pasar al pago: el <c>pedidoId</c> y el estado (<c>en_pago</c> o <c>pago_pendiente</c>); la Presentación redirige a la pantalla de Pagos.</summary>
-public sealed record ResultadoDePasarAlPago(Guid PedidoId, EstadoVisibleDelCheckout Estado);
+/// <summary>
+/// Cómo quedó el checkout tras pasar al pago: el <c>pedidoId</c> y el estado (<c>en_pago</c>) y la Presentación redirige a la pantalla de Pagos; con <see cref="PagoEnCurso"/> la intención ya estaba aprobada o completada y se redirige a su estado;
+/// con <see cref="Revision"/> (un retiro pendiente o un conflicto con un intento activo) no se paga: se muestra esa revisión con el aviso «tu carrito cambió», sin <c>pedidoId</c>.
+/// </summary>
+public sealed record ResultadoDePasarAlPago(Guid? PedidoId, EstadoVisibleDelCheckout Estado, VistaDelCheckout? Revision = null, bool PagoEnCurso = false);
 
 /// <summary>El checkout vivo de la cuenta cuando Pagos necesita su <c>pedidoId</c>: solo en <c>en_pago</c> y <c>pago_pendiente</c>, y en <c>en_pago</c> no con una línea retirada (D13).</summary>
 public sealed record CheckoutVivoParaPagar(Guid PedidoId, EstadoVisibleDelCheckout Estado);
@@ -428,3 +432,24 @@ public interface IProgresoDelCheckout
     /// <summary>El pago pendiente se resolvió sin aprobar: <c>vencido</c> o <c>rechazado</c> con la reserva vigente vuelven a <c>en_pago</c>; con la reserva expirada o <c>compensado</c> pasa a <c>cancelado</c>.</summary>
     Task<ResultadoDelAvisoDePago> PagoResuelto(Guid pedidoId, MotivoDePagoResueltoDeCompra motivo, CancellationToken cancelacion = default);
 }
+
+public enum EstadoDelConsentimientoDeCompra
+{
+    /// <summary>No se ofrece (la cuenta no tiene número o Identidad no respondió).</summary>
+    NoSeOfrece,
+
+    /// <summary>Se ofrece, sin marcar, con la huella enmascarada del número.</summary>
+    SeOfrece,
+
+    /// <summary>La cuenta ya consiente.</summary>
+    YaConsiente,
+
+    /// <summary>Se marcó y Identidad confirmó el guardado.</summary>
+    Guardado,
+
+    /// <summary>Se marcó pero no se pudo guardar: el pago sigue y se informa que no se guardó (nunca se dice «guardado»).</summary>
+    NoGuardado,
+}
+
+/// <summary>El estado del consentimiento de WhatsApp para la pantalla de datos y aceptaciones, con la huella enmascarada del número solo si se ofrece (CAR-18, AC-CAR-16).</summary>
+public sealed record ConsentimientoDeWhatsAppDeCompra(EstadoDelConsentimientoDeCompra Estado, string? HuellaEnmascarada = null);

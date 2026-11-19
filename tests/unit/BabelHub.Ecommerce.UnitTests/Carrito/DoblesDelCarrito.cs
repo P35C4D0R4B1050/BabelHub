@@ -110,6 +110,16 @@ internal sealed class EstadoDeCuentaFalso : IEstadoDeCuenta
 
     public bool NoExiste { get; set; }
 
+    /// <summary>La cuenta existe y no está cancelada pero no puede comprar (textos pendientes, correo sin verificar o cancelación diferida): puede editar su carrito pero no guardar el consentimiento de avisos.</summary>
+    public bool NoPuedeComprar { get; set; }
+
+    public bool CorreoSinVerificar { get; set; }
+
+    public bool TextosPendientes { get; set; }
+
+    /// <summary>Una cancelación diferida o en ejecución: no puede comprar, pero la cuenta no está cancelada ni desactivada.</summary>
+    public bool CancelacionDiferida { get; set; }
+
     public int Consultas { get; private set; }
 
     public Task<EstadoDeCuenta?> Consultar(Guid usuarioId, CancellationToken cancelacion = default)
@@ -120,7 +130,7 @@ internal sealed class EstadoDeCuentaFalso : IEstadoDeCuenta
             throw new InvalidOperationException("Identidad no responde.");
         }
 
-        return Task.FromResult<EstadoDeCuenta?>(NoExiste ? null : new EstadoDeCuenta(usuarioId, !Cancelada, EstadoDeAceptacionDeLosTextos.AlDia, true, Cancelada, false));
+        return Task.FromResult<EstadoDeCuenta?>(NoExiste ? null : new EstadoDeCuenta(usuarioId, !Cancelada && !NoPuedeComprar && !CorreoSinVerificar && !TextosPendientes && !CancelacionDiferida, TextosPendientes ? EstadoDeAceptacionDeLosTextos.Pendiente : EstadoDeAceptacionDeLosTextos.AlDia, !CorreoSinVerificar, Cancelada, false));
     }
 
     public Task<ResultadoDeLaAceptacion> AceptarLosTextos(Guid usuarioId, string versionMostrada, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLaAceptacion.Aceptada);
@@ -136,6 +146,18 @@ internal sealed class LimitadorDeCarritoFalso : ILimitadorDelCarrito
 
     public int Ediciones { get; private set; }
 
+    public ResultadoDeLimiteDelCarrito Revisar { get; set; } = ResultadoDeLimiteDelCarrito.Permitido;
+
+    public ResultadoDeLimiteDelCarrito Pagar { get; set; } = ResultadoDeLimiteDelCarrito.Permitido;
+
+    public HashSet<string> ClavesDePagar { get; } = [];
+
+    public int ConsumosDePagar { get; private set; }
+
+    public ResultadoDeLimiteDelCarrito Volver { get; set; } = ResultadoDeLimiteDelCarrito.Permitido;
+
+    public int Revisiones { get; private set; }
+
     public Task<ResultadoDeLimiteDelCarrito> CrearCarritoDeVisitante(CancellationToken cancelacion = default)
     {
         CarritosCreados++;
@@ -146,6 +168,24 @@ internal sealed class LimitadorDeCarritoFalso : ILimitadorDelCarrito
     {
         Ediciones++;
         return Task.FromResult(Editar);
+    }
+
+    public Task<ResultadoDeLimiteDelCarrito> RevisarCheckout(Guid cuentaId, CancellationToken cancelacion = default)
+    {
+        Revisiones++;
+        return Task.FromResult(Revisar);
+    }
+
+    public Task<ResultadoDeLimiteDelCarrito> VolverOReiniciar(Guid cuentaId, CancellationToken cancelacion = default) => Task.FromResult(Volver);
+
+    public Task<ResultadoDeLimiteDelCarrito> PasarAlPago(Guid cuentaId, string claveDeRepeticion, CancellationToken cancelacion = default)
+    {
+        if (ClavesDePagar.Add(claveDeRepeticion))
+        {
+            ConsumosDePagar++;
+        }
+
+        return Task.FromResult(Pagar);
     }
 }
 
@@ -162,7 +202,8 @@ internal sealed class GeneradorDeIdentificadoresFalso : IGeneradorDeIdentificado
 internal sealed class RepositorioDeCarritosEnMemoria(BitacoraDeBloqueos bitacora) : IRepositorioDeCarritos
 {
     private readonly List<CarritoDeDominio> _carritos = [];
-    private readonly List<(Guid CuentaId, AvisoDelCarrito Aviso, bool Visto)> _avisos = [];
+    private readonly List<(Guid CuentaId, AvisoDelCarrito Aviso, DateTimeOffset? VistoEn)> _avisos = [];
+    private readonly List<DateTimeOffset> _fechasDeFusiones = [];
 
     public IReadOnlyList<CarritoDeDominio> Todos => _carritos;
 
@@ -178,6 +219,12 @@ internal sealed class RepositorioDeCarritosEnMemoria(BitacoraDeBloqueos bitacora
 
     public Task<CarritoDeDominio?> ObtenerDeCuenta(Guid cuentaId, bool conBloqueo, CancellationToken cancelacion = default)
     {
+        if (conBloqueo && AlBloquear is { } alBloquear)
+        {
+            AlBloquear = null;
+            alBloquear();
+        }
+
         bitacora.Anotar(conBloqueo, "carrito");
         return Task.FromResult(_carritos.FirstOrDefault(c => c.Propietario.CuentaId == cuentaId));
     }
@@ -220,13 +267,44 @@ internal sealed class RepositorioDeCarritosEnMemoria(BitacoraDeBloqueos bitacora
     }
 
     public Task<IReadOnlyList<AvisoDelCarrito>> AvisosSinVer(Guid cuentaId, CancellationToken cancelacion = default) =>
-        Task.FromResult<IReadOnlyList<AvisoDelCarrito>>([.. _avisos.Where(a => a.CuentaId == cuentaId && !a.Visto).Select(a => a.Aviso).OrderByDescending(a => a.CreadoEn)]);
+        Task.FromResult<IReadOnlyList<AvisoDelCarrito>>([.. _avisos.Where(a => a.CuentaId == cuentaId && a.VistoEn is null).Select(a => a.Aviso).OrderByDescending(a => a.CreadoEn)]);
 
     public Task AgregarAvisos(Guid cuentaId, IReadOnlyList<AvisoDelCarrito> avisos, CancellationToken cancelacion = default)
     {
-        _avisos.AddRange(avisos.Select(a => (cuentaId, a, false)));
+        _avisos.AddRange(avisos.Select(a => (cuentaId, a, (DateTimeOffset?)null)));
         return Task.CompletedTask;
     }
+
+    public Exception? FallaAlEliminar { get; set; }
+
+    public Task EliminarDeCuenta(Guid cuentaId, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar(true, "carrito");
+        if (FallaAlEliminar is { } falla)
+        {
+            throw falla;
+        }
+
+        _carritos.RemoveAll(c => c.Propietario.CuentaId == cuentaId);
+        _avisos.RemoveAll(a => a.CuentaId == cuentaId);
+        return Task.CompletedTask;
+    }
+
+    public Task<int> EliminarDeVisitantesVencidos(DateTimeOffset ahora, int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult(_carritos.RemoveAll(c => c.Propietario.EsDeVisitante && c.EstaCaducado(ahora)));
+
+    public Task<int> EliminarFusionesAnterioresA(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default)
+    {
+        var quitar = _fechasDeFusiones.Count(f => f < antesDe);
+        _fechasDeFusiones.RemoveAll(f => f < antesDe);
+        return Task.FromResult(quitar);
+    }
+
+    public Task<int> EliminarAvisosVencidos(DateTimeOffset vistosAntesDe, DateTimeOffset creadosAntesDe, CancellationToken cancelacion = default) =>
+        Task.FromResult(_avisos.RemoveAll(a => (a.VistoEn is { } visto && visto < vistosAntesDe) || a.Aviso.CreadoEn < creadosAntesDe));
+
+    public Task<IReadOnlyList<Guid>> CuentasSinMovimientoDesde(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>([.. _carritos.Where(c => c.Propietario.CuentaId is not null && c.ModificadoEn < antesDe).Select(c => c.Propietario.CuentaId!.Value).Distinct().Take(maximo)]);
 
     public Task<IReadOnlyList<CarritoConEdicion>> BuscarConEdiciones(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<CarritoConEdicion>>([.. _carritos.Where(c => c.Lineas.Any(l => edicionIds.Contains(l.EdicionId))).Select(c => new CarritoConEdicion(c.Id, c.Propietario.CuentaId))]);
@@ -236,6 +314,7 @@ internal sealed class RepositorioDeCarritosEnMemoria(BitacoraDeBloqueos bitacora
     public Task RegistrarFusion(byte[] huellaDeLaCookie, Guid carritoDeCuentaId, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
         Fusiones.Add((huellaDeLaCookie, carritoDeCuentaId));
+        _fechasDeFusiones.Add(ahora);
         return Task.CompletedTask;
     }
 
@@ -245,7 +324,7 @@ internal sealed class RepositorioDeCarritosEnMemoria(BitacoraDeBloqueos bitacora
         {
             if (_avisos[i].CuentaId == cuentaId && avisoIds.Contains(_avisos[i].Aviso.Id))
             {
-                _avisos[i] = (cuentaId, _avisos[i].Aviso, true);
+                _avisos[i] = (cuentaId, _avisos[i].Aviso, ahora);
             }
         }
 
@@ -261,6 +340,9 @@ internal sealed class RepositorioDeCheckoutsEnMemoria(BitacoraDeBloqueos bitacor
 
     public void Sembrar(Checkout checkout) => _checkouts.Add(checkout);
 
+    /// <summary>Se ejecuta una sola vez al agregar: simula a otra solicitud que crea el checkout a la vez (puede lanzar <c>CheckoutYaExisteException</c>).</summary>
+    public Action? AntesDeAgregar { get; set; }
+
     private static bool EstaVivo(Checkout c) => c.Estado is EstadoDelCheckout.EnEdicion or EstadoDelCheckout.Reservando or EstadoDelCheckout.EnPago or EstadoDelCheckout.PagoPendiente;
 
     public Task<Checkout?> ObtenerVivoDeCuenta(Guid cuentaId, bool conBloqueo, CancellationToken cancelacion = default)
@@ -272,7 +354,7 @@ internal sealed class RepositorioDeCheckoutsEnMemoria(BitacoraDeBloqueos bitacor
     public Task<Checkout?> ObtenerPorPedido(Guid pedidoId, bool conBloqueo, CancellationToken cancelacion = default)
     {
         bitacora.Anotar(conBloqueo, "checkout");
-        return Task.FromResult(_checkouts.FirstOrDefault(c => c.PedidoId == pedidoId || c.PedidoDescartado == pedidoId));
+        return Task.FromResult(_checkouts.FirstOrDefault(c => c.PedidoId == pedidoId || c.PedidoDescartado == pedidoId || c.PedidoALiberar == pedidoId));
     }
 
     public Task<IReadOnlyList<Checkout>> ObtenerVivosDeCuentasConBloqueo(IReadOnlyCollection<Guid> cuentaIds, CancellationToken cancelacion = default)
@@ -286,11 +368,39 @@ internal sealed class RepositorioDeCheckoutsEnMemoria(BitacoraDeBloqueos bitacor
         return Task.FromResult<IReadOnlyList<Checkout>>(vivos);
     }
 
+    public Task EliminarDeCuenta(Guid cuentaId, CancellationToken cancelacion = default)
+    {
+        bitacora.Anotar(true, "checkout");
+        _checkouts.RemoveAll(c => c.CuentaId == cuentaId);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<Guid>> CuentasConCheckoutVivoSinMovimientoDesde(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<Guid>>([.. _checkouts.Where(c => EstaVivo(c) && c.ModificadoPorLaPersonaEn <= antesDe).Select(c => c.CuentaId).Distinct().Take(maximo)]);
+
+    public Task<int> EliminarTerminadosAnterioresA(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult(_checkouts.RemoveAll(c => !EstaVivo(c) && c.ReservaALiberarDesde is null && c.ModificadoPorLaPersonaEn <= antesDe));
+
+    public Task<int> ContarConElPagoPendienteDesdeAntesDe(DateTimeOffset antesDe, CancellationToken cancelacion = default) =>
+        Task.FromResult(_checkouts.Count(c => c.Estado == EstadoDelCheckout.PagoPendiente && c.PagoPendienteDesde < antesDe));
+
+    public Task<IReadOnlyList<PedidoPorLiberar>> ConLiberacionPendiente(int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<PedidoPorLiberar>>([.. _checkouts.Where(c => c.ReservaALiberarDesde is not null && c.PedidoALiberar is not null).Take(maximo).Select(c => new PedidoPorLiberar(c.Id, c.PedidoALiberar!.Value))]);
+
+    public Task<IReadOnlyList<CheckoutPorRecuperar>> ReservandoDesdeAntesDe(DateTimeOffset antesDe, int maximo, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<CheckoutPorRecuperar>>([.. _checkouts.Where(c => c.Estado == EstadoDelCheckout.Reservando && c.ReservandoDesde <= antesDe && c.PedidoId is not null).Take(maximo).Select(c => new CheckoutPorRecuperar(c.CuentaId, c.PedidoId!.Value, c.GeneracionDeReserva, true))]);
+
     public Task<EstadoDelCheckout?> LeerEstadoSinBloqueo(Guid cuentaId, CancellationToken cancelacion = default) =>
         Task.FromResult<EstadoDelCheckout?>(_checkouts.FirstOrDefault(c => c.CuentaId == cuentaId && EstaVivo(c))?.Estado);
 
     public Task Agregar(Checkout checkout, CancellationToken cancelacion = default)
     {
+        if (AntesDeAgregar is { } antes)
+        {
+            AntesDeAgregar = null;
+            antes();
+        }
+
         _checkouts.Add(checkout);
         return Task.CompletedTask;
     }
@@ -335,6 +445,9 @@ internal sealed class PagosFalso(BitacoraDeBloqueos bitacora) : ICreadorDeIntenc
     /// <summary>Se ejecuta justo después de que Pagos responde a <c>Reabrir</c>: simula otra solicitud que cambia el checkout mientras tanto.</summary>
     public Action? EnLaCarreraDeReabrir { get; set; }
 
+    /// <summary>Se ejecuta una sola vez justo antes de responder a <c>Crear</c>: simula otra solicitud que cambia el carrito entre 3a y 3b.</summary>
+    public Action? AlCrearAccion { get; set; }
+
     public int Reaperturas { get; private set; }
 
     public int Cancelaciones { get; private set; }
@@ -344,6 +457,12 @@ internal sealed class PagosFalso(BitacoraDeBloqueos bitacora) : ICreadorDeIntenc
     public Task<ResultadoDeCrearIntencion> Crear(Guid cuentaId, InstantaneaDeCompra instantanea, string huellaDeInstantanea, DateTimeOffset reservaExpiraEn, CancellationToken cancelacion = default)
     {
         Creaciones++;
+        if (AlCrearAccion is { } accion)
+        {
+            AlCrearAccion = null;
+            accion();
+        }
+
         return NoResponde ? throw new InvalidOperationException("Pagos no responde.") : Task.FromResult(AlCrear);
     }
 
@@ -381,6 +500,7 @@ internal sealed class EntornoDelCarrito
         Carritos = new RepositorioDeCarritosEnMemoria(Bitacora);
         Checkouts = new RepositorioDeCheckoutsEnMemoria(Bitacora);
         Pagos = new PagosFalso(Bitacora);
+        Marca = new MarcaDeCancelacionFalsa(Bitacora);
     }
 
     public ActorDePrueba Actor { get; }
@@ -401,6 +521,20 @@ internal sealed class EntornoDelCarrito
 
     public PagosFalso Pagos { get; }
 
+    public InventarioDelCarritoFalso Inventario { get; } = new();
+
+    public CostoDeEnvioFijo Costo { get; } = new(12m);
+
+    public TextosLegalesFalsos Textos { get; } = new();
+
+    public ConsentimientoFalso Consentimiento { get; } = new();
+
+    public MarcaDeCancelacionFalsa Marca { get; }
+
+    public BabelHub.Ecommerce.UnitTests.Identidad.CalculadorDeHuellaDePrueba Huellas { get; } = new();
+
+    public AlertasFalsas Alertas { get; } = new();
+
     public AuditoriaDelCarritoEspia Auditoria { get; } = new();
 
     public EstadoDeCuentaFalso Cuenta { get; } = new();
@@ -417,6 +551,9 @@ internal sealed class EntornoDelCarrito
     public ServiciosDelCarrito Servicios() =>
         new(new AutorizadorDelCarrito(Actor, Denegaciones), Catalogo, Disponibilidad, Posesion, Cuenta, Limites, Carritos, Checkouts, Identificadores, Reloj, Unidad, new EdicionConCheckoutVivo(Pagos, Checkouts), Auditoria);
 
+    /// <summary>Los servicios del checkout: los del carrito más el Inventario y el costo de envío.</summary>
+    public ServiciosDelCheckout ServiciosDelCheckout() => new(Servicios(), Inventario, Costo, Textos, Consentimiento, Marca, Huellas, Alertas);
+
     public static EntornoDelCarrito DeCliente(Guid? cuenta = null) => new(ActorDePrueba.DeCliente(cuenta));
 
     public static EntornoDelCarrito DeVisitante() => new(ActorDePrueba.Anonimo());
@@ -427,6 +564,7 @@ internal sealed class EntornoDelCarrito
         var id = Guid.NewGuid();
         Catalogo.Poner(id, FormatoDeEdicion.Impresa, precio, titulo);
         Disponibilidad.Vendible(id, vendible);
+        Inventario.FijarStock(id, vendible);
         return id;
     }
 
@@ -446,7 +584,18 @@ internal sealed class AuditoriaDelCarritoEspia : IAuditoriaDelCarrito
 
     public List<(int Ediciones, int Carritos, int Quitadas, int Anotadas)> Retiros { get; } = [];
 
+    public List<(bool ConImpresos, bool ADomicilio)> PasosAlPago { get; } = [];
+
+    public List<string> Terminados { get; } = [];
+
+    public List<string> Eliminaciones { get; } = [];
+
+    public List<(string Trabajo, int Cantidad)> Purgas { get; } = [];
+
     public bool Caida { get; set; }
+
+    /// <summary>Solo falla <c>PasoAlPagoIniciado</c> (el cuerpo de 3b): simula que 3b lanza sin que caiga el resto de la auditoría.</summary>
+    public bool FallaAlIniciarElPago { get; set; }
 
     public Task FusionAplicada(Guid cuentaId, int lineasDelVisitante, IReadOnlyList<MotivoDeAjusteDeAviso> ajustes, CancellationToken cancelacion = default)
     {
@@ -459,6 +608,63 @@ internal sealed class AuditoriaDelCarritoEspia : IAuditoriaDelCarrito
         return Task.CompletedTask;
     }
 
+    public Task PurgaRealizada(string trabajo, int cantidad, CancellationToken cancelacion = default)
+    {
+        if (Caida)
+        {
+            throw new InvalidOperationException("La auditoría no está disponible.");
+        }
+
+        Purgas.Add((trabajo, cantidad));
+        return Task.CompletedTask;
+    }
+
+    public Task CarritoEliminadoPorIdentidad(string motivo, CancellationToken cancelacion = default)
+    {
+        if (Caida)
+        {
+            throw new InvalidOperationException("La auditoría no está disponible.");
+        }
+
+        Eliminaciones.Add(motivo);
+        return Task.CompletedTask;
+    }
+
+    public Task CheckoutTerminado(string motivo, CancellationToken cancelacion = default)
+    {
+        if (Caida)
+        {
+            throw new InvalidOperationException("La auditoría no está disponible.");
+        }
+
+        Terminados.Add(motivo);
+        return Task.CompletedTask;
+    }
+
+    public List<string> Abortos { get; } = [];
+
+    public Task PasoAlPagoAbortado(string motivo, CancellationToken cancelacion = default)
+    {
+        if (Caida)
+        {
+            throw new InvalidOperationException("La auditoría no está disponible.");
+        }
+
+        Abortos.Add(motivo);
+        return Task.CompletedTask;
+    }
+
+    public Task PasoAlPagoIniciado(bool conImpresos, bool aDomicilio, CancellationToken cancelacion = default)
+    {
+        if (Caida || FallaAlIniciarElPago)
+        {
+            throw new InvalidOperationException("La auditoría no está disponible.");
+        }
+
+        PasosAlPago.Add((conImpresos, aDomicilio));
+        return Task.CompletedTask;
+    }
+
     public Task EdicionesRetiradas(int ediciones, int carritosAfectados, int lineasQuitadas, int lineasAnotadas, CancellationToken cancelacion = default)
     {
         if (Caida)
@@ -467,6 +673,199 @@ internal sealed class AuditoriaDelCarritoEspia : IAuditoriaDelCarrito
         }
 
         Retiros.Add((ediciones, carritosAfectados, lineasQuitadas, lineasAnotadas));
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>El costo de envío configurado de las pruebas.</summary>
+internal sealed class CostoDeEnvioFijo(decimal soles) : ICostoDeEnvioConfigurado
+{
+    public CostoDeEnvio Valor { get; set; } = CostoDeEnvio.Crear(soles);
+}
+
+/// <summary>El Inventario visto por Carrito: stock y fuente por edición configurables, con contadores de consultas y un interruptor de caído. Reservar y liberar se configuran con sus resultados (T18, T20).</summary>
+internal sealed class InventarioDelCarritoFalso : IInventarioDelCarrito
+{
+    private readonly Dictionary<Guid, int> _stock = [];
+    private readonly Dictionary<Guid, (string Fuente, bool Traslado, int? Plazo)> _fuentes = [];
+
+    public bool Caido { get; set; }
+
+    public bool PreviaCaida { get; set; }
+
+    public int ConsultasDeDisponibilidad { get; private set; }
+
+    public int ConsultasPrevias { get; private set; }
+
+    public List<IReadOnlyList<Guid>> EdicionesConsultadas { get; } = [];
+
+    public EntregaParaElInventario? UltimaEntregaPrevia { get; private set; }
+
+    public ResultadoDeReservar AlReservar { get; set; } = ResultadoDeReservar.De(TipoDeResultadoDeReservar.NoDisponible);
+
+    public ResultadoDeLiberar AlLiberar { get; set; } = ResultadoDeLiberar.Liberada;
+
+    public List<(Guid PedidoId, int Generacion, IReadOnlyList<LineaParaElInventario> Lineas)> Reservas { get; } = [];
+
+    public List<(Guid PedidoId, string Motivo)> Liberaciones { get; } = [];
+
+    public ListaDeSucursales? Sucursales { get; set; } = new([new("sede-central", "Sede central", "ayacucho"), new("cusco", "Cusco", "cusco")], EntornoDelCarrito.Inicio, false);
+
+    public void FijarStock(Guid edicionId, int vendible) => _stock[edicionId] = vendible;
+
+    /// <summary>El Inventario no conoce la edición: sale en <c>noRegistradas</c>.</summary>
+    public void Olvidar(Guid edicionId) => _stock.Remove(edicionId);
+
+    public void FijarFuente(Guid edicionId, string fuente, bool traslado, int? plazo) => _fuentes[edicionId] = (fuente, traslado, plazo);
+
+    public Task<RespuestaDelInventarioDelCarrito<StockDeVariasEdiciones>> ConsultarDisponibilidad(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default)
+    {
+        ConsultasDeDisponibilidad++;
+        EdicionesConsultadas.Add([.. edicionIds]);
+        if (Caido)
+        {
+            return Task.FromResult(RespuestaDelInventarioDelCarrito<StockDeVariasEdiciones>.SinRespuesta);
+        }
+
+        var conocidas = edicionIds.Where(_stock.ContainsKey).Select(id => new StockDeEdicion(id, _stock[id])).ToList();
+        var noRegistradas = edicionIds.Where(id => !_stock.ContainsKey(id)).ToList();
+        return Task.FromResult(RespuestaDelInventarioDelCarrito<StockDeVariasEdiciones>.ConValor(new StockDeVariasEdiciones(conocidas, noRegistradas, EntornoDelCarrito.Inicio)));
+    }
+
+    public Task<RespuestaDelInventarioDelCarrito<ConsultaPreviaDelInventario>> ConsultarPrevia(EntregaParaElInventario entrega, IReadOnlyList<LineaParaElInventario> lineas, CancellationToken cancelacion = default)
+    {
+        ConsultasPrevias++;
+        UltimaEntregaPrevia = entrega;
+        if (Caido || PreviaCaida)
+        {
+            return Task.FromResult(RespuestaDelInventarioDelCarrito<ConsultaPreviaDelInventario>.SinRespuesta);
+        }
+
+        var selecciones = lineas.Select(l =>
+        {
+            var (fuente, traslado, plazo) = _fuentes.GetValueOrDefault(l.EdicionId, ("sede-central", false, (int?)null));
+            var hay = _stock.GetValueOrDefault(l.EdicionId) >= l.Cantidad;
+            return new SeleccionDeLinea(l.LineaId, l.EdicionId, hay, hay ? fuente : null, traslado, plazo, _stock.GetValueOrDefault(l.EdicionId));
+        }).ToList();
+        return Task.FromResult(RespuestaDelInventarioDelCarrito<ConsultaPreviaDelInventario>.ConValor(new ConsultaPreviaDelInventario(selecciones, EntornoDelCarrito.Inicio)));
+    }
+
+    public Task<ListaDeSucursales?> ListarSucursales(CancellationToken cancelacion = default) => Task.FromResult(Caido ? null : Sucursales);
+
+    public Task<ResultadoDeReservar> Reservar(Guid pedidoId, int generacionDeReserva, EntregaParaElInventario entrega, IReadOnlyList<LineaParaElInventario> lineas, CancellationToken cancelacion = default)
+    {
+        Reservas.Add((pedidoId, generacionDeReserva, lineas));
+        return Task.FromResult(AlReservar);
+    }
+
+    public Task<ResultadoDeLiberar> Liberar(Guid pedidoId, string motivo, CancellationToken cancelacion = default)
+    {
+        Liberaciones.Add((pedidoId, motivo));
+        return Task.FromResult(AlLiberar);
+    }
+}
+
+/// <summary>Los textos legales con su versión vigente (de Identidad, por el contrato público de la web): configurables y con un interruptor de caído.</summary>
+internal sealed class TextosLegalesFalsos : BabelHub.Ecommerce.Application.Web.ITextosLegales
+{
+    private readonly Dictionary<BabelHub.Ecommerce.Application.Web.TipoDeTextoLegal, string> _versiones = new()
+    {
+        [BabelHub.Ecommerce.Application.Web.TipoDeTextoLegal.Terminos] = "t-1",
+        [BabelHub.Ecommerce.Application.Web.TipoDeTextoLegal.Privacidad] = "p-1",
+        [BabelHub.Ecommerce.Application.Web.TipoDeTextoLegal.Reembolso] = "r-1",
+    };
+
+    public bool Caido { get; set; }
+
+    public int Consultas { get; private set; }
+
+    public void Vigente(BabelHub.Ecommerce.Application.Web.TipoDeTextoLegal tipo, string version) => _versiones[tipo] = version;
+
+    public Task<Resultado<BabelHub.Ecommerce.Application.Web.TextoLegal>> Obtener(BabelHub.Ecommerce.Application.Web.TipoDeTextoLegal tipo, CancellationToken cancelacion = default)
+    {
+        Consultas++;
+        return Task.FromResult(Caido
+            ? Resultado<BabelHub.Ecommerce.Application.Web.TextoLegal>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "texto-no-disponible"))
+            : Resultado<BabelHub.Ecommerce.Application.Web.TextoLegal>.Exito(new BabelHub.Ecommerce.Application.Web.TextoLegal(tipo, "Texto", _versiones[tipo], new DateOnly(2026, 1, 1), false, "Resumen", [])));
+    }
+}
+
+/// <summary>El consentimiento de WhatsApp: ofrece o no según se configure y guarda o falla; cuenta lo que se le pidió.</summary>
+internal sealed class ConsentimientoFalso : IConsentimientoDeAvisos
+{
+    public OfertaDeConsentimiento Oferta { get; set; } = new(EstadoDeLaOfertaDeConsentimiento.SeOfrece, "•••• •• 321");
+
+    public bool GuardaBien { get; set; } = true;
+
+    public List<(Guid Cuenta, string Huella)> Guardados { get; } = [];
+
+    public int Consultas { get; private set; }
+
+    public Task<OfertaDeConsentimiento> Consultar(Guid cuentaId, CancellationToken cancelacion = default)
+    {
+        Consultas++;
+        return Task.FromResult(Oferta);
+    }
+
+    public Task<bool> Guardar(Guid cuentaId, string huellaEnmascaradaDelNumero, CancellationToken cancelacion = default)
+    {
+        Guardados.Add((cuentaId, huellaEnmascaradaDelNumero));
+        return Task.FromResult(GuardaBien);
+    }
+}
+
+/// <summary>La marca de cancelación de la cuenta: se lee con bloqueo (queda en la bitácora) y puede cambiar a mitad de la solicitud o fallar.</summary>
+internal sealed class MarcaDeCancelacionFalsa(BitacoraDeBloqueos bitacora) : IMarcaDeCancelacion
+{
+    public EstadoDeLaMarcaDeCancelacion Estado { get; set; } = EstadoDeLaMarcaDeCancelacion.Libre;
+
+    public bool Falla { get; set; }
+
+    /// <summary>Después de esta cantidad de lecturas la marca pasa a <see cref="EstadoTrasLasLecturas"/>: simula una cancelación que empieza entre los pasos.</summary>
+    public int? LecturasHastaCambiar { get; set; }
+
+    public EstadoDeLaMarcaDeCancelacion EstadoTrasLasLecturas { get; set; } = EstadoDeLaMarcaDeCancelacion.EnEjecucion;
+
+    /// <summary>Lanza en esta lectura (1 = la primera): simula una caída de la base en un paso concreto.</summary>
+    public int? LecturaQueLanza { get; set; }
+
+    public int Lecturas { get; private set; }
+
+    /// <summary>Se ejecuta justo antes de leer la marca: simula que la cancelación empieza entre la revisión y el pago.</summary>
+    public Action? AntesDeLeer { get; set; }
+
+    public Task<EstadoDeLaMarcaDeCancelacion> LeerConBloqueo(Guid cuentaId, CancellationToken cancelacion = default)
+    {
+        if (AntesDeLeer is { } antes)
+        {
+            AntesDeLeer = null;
+            antes();
+        }
+
+        bitacora.Anotar(true, "marca");
+        Lecturas++;
+        if (LecturasHastaCambiar is { } hasta && Lecturas > hasta)
+        {
+            Estado = EstadoTrasLasLecturas;
+        }
+
+        if (LecturaQueLanza == Lecturas)
+        {
+            throw new InvalidOperationException("La base de datos no responde.");
+        }
+
+        return Falla ? throw new InvalidOperationException("Identidad no responde.") : Task.FromResult(Estado);
+    }
+}
+
+/// <summary>Las alertas técnicas publicadas.</summary>
+internal sealed class AlertasFalsas : IAlertasDelCarrito
+{
+    public List<(TipoDeAlertaDelCarrito Tipo, int Cantidad)> Publicadas { get; } = [];
+
+    public Task Publicar(TipoDeAlertaDelCarrito tipo, int cantidad, CancellationToken cancelacion = default)
+    {
+        Publicadas.Add((tipo, cantidad));
         return Task.CompletedTask;
     }
 }

@@ -43,6 +43,8 @@ internal sealed class ServiciosDelCarrito(
 
     public IPosesionDeEdiciones Posesion => posesion;
 
+    public IEstadoDeCuenta EstadoDeLaCuenta => estadoDeCuenta;
+
     public ILimitadorDelCarrito Limites => limites;
 
     public IRepositorioDeCarritos Carritos => carritos;
@@ -54,6 +56,19 @@ internal sealed class ServiciosDelCarrito(
     public IReloj Reloj => reloj;
 
     public IUnidadDeTrabajo Unidad => unidad;
+
+    /// <summary>Si la cuenta puede comprar (no cancelada, correo verificado, textos al día, sin cancelación diferida): lo que condiciona guardar el consentimiento de avisos. Ante una falla de Identidad, no.</summary>
+    public async Task<bool> PuedeComprar(Guid cuentaId, CancellationToken cancelacion)
+    {
+        try
+        {
+            return await estadoDeCuenta.Consultar(cuentaId, cancelacion).ConfigureAwait(false) is { PuedeComprar: true };
+        }
+        catch (Exception excepcion) when (excepcion is not OperationCanceledException)
+        {
+            return false;
+        }
+    }
 
     // ---------- Errores ----------
 
@@ -73,6 +88,19 @@ internal sealed class ServiciosDelCarrito(
             limite.ReintentarEn is { } desde ? [new ErrorDeCampo("disponibleDesde", desde.ToString("O", CultureInfo.InvariantCulture))] : null),
         _ => new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDelCarrito.ServicioNoDisponible),
     };
+
+    /// <summary>Si la cuenta ya no está activa (cancelada, desactivada o inexistente): lo que decide la purga de sus datos. Si Identidad no responde, <b>no</b> se purga (no se asume inactiva).</summary>
+    public async Task<bool> CuentaYaNoEstaActiva(Guid cuentaId, CancellationToken cancelacion)
+    {
+        try
+        {
+            return await estadoDeCuenta.Consultar(cuentaId, cancelacion).ConfigureAwait(false) is not { CuentaCanceladaODesactivada: false };
+        }
+        catch (Exception excepcion) when (excepcion is not OperationCanceledException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// La cuenta del cliente debe estar activa: una cancelada, desactivada o inexistente no opera (el token vive hasta 15 minutos), y si Identidad no responde se falla cerrado (CAR-37). No lleva datos personales.
