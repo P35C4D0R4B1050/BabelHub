@@ -81,6 +81,10 @@ public sealed class CarritoApiHost : IAsyncDisposable
 
     public CarritoDelClienteFalso Carrito { get; } = new();
 
+    public CheckoutDelClienteFalso Checkout { get; } = new();
+
+    public ExigenciaDeVerificacionFalsa Verificacion { get; } = new();
+
     public DenegacionesEspia Denegaciones { get; } = new();
 
     public static async Task<CarritoApiHost> Crear()
@@ -101,6 +105,8 @@ public sealed class CarritoApiHost : IAsyncDisposable
         builder.Services.AddSingleton<IActorActual>(actor);
         builder.Services.AddSingleton<IEstablecedorDeActor>(actor);
         builder.Services.AddSingleton<ICarritoDelCliente>(Carrito);
+        builder.Services.AddSingleton<ICheckoutDelCliente>(Checkout);
+        builder.Services.AddSingleton<IExigenciaDeVerificacionDePersona>(Verificacion);
         builder.Services.AddSingleton<IRegistradorDeDenegacionesHttp>(Denegaciones);
         builder.Services.AddSingleton(new OpcionesDelHostWeb(HostWeb.Tienda, []));
         builder.Services.AgregarProteccionContraFalsificacion();
@@ -111,7 +117,7 @@ public sealed class CarritoApiHost : IAsyncDisposable
             .ConfigureApplicationPartManager(gestor =>
             {
                 gestor.ApplicationParts.Clear();
-                gestor.ApplicationParts.Add(new PartesDeTipos(typeof(CarritoController)));
+                gestor.ApplicationParts.Add(new PartesDeTipos(typeof(CarritoController), typeof(CheckoutController)));
             });
 
         _app = builder.Build();
@@ -167,7 +173,8 @@ public sealed class CarritoApiHost : IAsyncDisposable
         string? cookieDelCarrito = null,
         bool conToken = true,
         bool htmx = false,
-        HttpContent? cuerpo = null)
+        HttpContent? cuerpo = null,
+        IEnumerable<(string Nombre, string Valor)>? cabeceras = null)
     {
         using var solicitud = new HttpRequestMessage(HttpMethod.Post, ruta);
         var cookies = new List<string>();
@@ -196,6 +203,11 @@ public sealed class CarritoApiHost : IAsyncDisposable
         if (htmx)
         {
             solicitud.Headers.TryAddWithoutValidation("HX-Request", "true");
+        }
+
+        foreach (var (nombre, valor) in cabeceras ?? [])
+        {
+            solicitud.Headers.TryAddWithoutValidation(nombre, valor);
         }
 
         solicitud.Content = cuerpo ?? new FormUrlEncodedContent(campos ?? []);
