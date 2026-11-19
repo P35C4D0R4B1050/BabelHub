@@ -210,6 +210,9 @@ internal sealed class RepositorioDeCarritosEnMemoria(BitacoraDeBloqueos bitacora
         return Task.CompletedTask;
     }
 
+    public Task<IReadOnlyList<CarritoConEdicion>> BuscarConEdiciones(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<CarritoConEdicion>>([.. _carritos.Where(c => c.Lineas.Any(l => edicionIds.Contains(l.EdicionId))).Select(c => new CarritoConEdicion(c.Id, c.Propietario.CuentaId))]);
+
     public List<(byte[] Huella, Guid CarritoId)> Fusiones { get; } = [];
 
     public Task RegistrarFusion(byte[] huellaDeLaCookie, Guid carritoDeCuentaId, DateTimeOffset ahora, CancellationToken cancelacion = default)
@@ -252,6 +255,17 @@ internal sealed class RepositorioDeCheckoutsEnMemoria(BitacoraDeBloqueos bitacor
     {
         bitacora.Anotar(conBloqueo, "checkout");
         return Task.FromResult(_checkouts.FirstOrDefault(c => c.PedidoId == pedidoId || c.PedidoDescartado == pedidoId));
+    }
+
+    public Task<IReadOnlyList<Checkout>> ObtenerVivosDeCuentasConBloqueo(IReadOnlyCollection<Guid> cuentaIds, CancellationToken cancelacion = default)
+    {
+        var vivos = _checkouts.Where(c => cuentaIds.Contains(c.CuentaId) && EstaVivo(c)).OrderBy(c => c.Id).ToList();
+        foreach (var checkout in vivos)
+        {
+            bitacora.Anotar(true, $"checkout:{checkout.Id}");
+        }
+
+        return Task.FromResult<IReadOnlyList<Checkout>>(vivos);
     }
 
     public Task<EstadoDelCheckout?> LeerEstadoSinBloqueo(Guid cuentaId, CancellationToken cancelacion = default) =>
@@ -406,6 +420,8 @@ internal sealed class AuditoriaDelCarritoEspia : IAuditoriaDelCarrito
 {
     public List<(Guid CuentaId, int LineasDelVisitante, IReadOnlyList<MotivoDeAjusteDeAviso> Ajustes)> Fusiones { get; } = [];
 
+    public List<(int Ediciones, int Carritos, int Quitadas, int Anotadas)> Retiros { get; } = [];
+
     public bool Caida { get; set; }
 
     public Task FusionAplicada(Guid cuentaId, int lineasDelVisitante, IReadOnlyList<MotivoDeAjusteDeAviso> ajustes, CancellationToken cancelacion = default)
@@ -416,6 +432,17 @@ internal sealed class AuditoriaDelCarritoEspia : IAuditoriaDelCarrito
         }
 
         Fusiones.Add((cuentaId, lineasDelVisitante, ajustes));
+        return Task.CompletedTask;
+    }
+
+    public Task EdicionesRetiradas(int ediciones, int carritosAfectados, int lineasQuitadas, int lineasAnotadas, CancellationToken cancelacion = default)
+    {
+        if (Caida)
+        {
+            throw new InvalidOperationException("La auditoría no está disponible.");
+        }
+
+        Retiros.Add((ediciones, carritosAfectados, lineasQuitadas, lineasAnotadas));
         return Task.CompletedTask;
     }
 }

@@ -200,7 +200,13 @@ public interface IRepositorioDeCarritos
 
     /// <summary>La constancia de una fusión aplicada (<c>fusiones_aplicadas</c>, única por huella de cookie): hace idempotente la fusión de un segundo dispositivo. Se purga a los 30 días.</summary>
     Task RegistrarFusion(byte[] huellaDeLaCookie, Guid carritoDeCuentaId, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>Los carritos (de cuenta o de visitante) que tienen alguna de las ediciones, <b>sin bloqueo</b>: lo que necesita el retiro de ediciones para saber qué bloquear después, en orden (D10).</summary>
+    Task<IReadOnlyList<CarritoConEdicion>> BuscarConEdiciones(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default);
 }
+
+/// <summary>Un carrito que tiene alguna de las ediciones buscadas: su <c>id</c> y su cuenta (nulo si es de un visitante).</summary>
+public sealed record CarritoConEdicion(Guid CarritoId, Guid? CuentaId);
 
 /// <summary>Los checkouts del módulo: a lo más uno vivo por cuenta (índice único parcial). Las lecturas con bloqueo siguen el orden global (D10): checkout antes que carrito.</summary>
 public interface IRepositorioDeCheckouts
@@ -210,6 +216,9 @@ public interface IRepositorioDeCheckouts
 
     /// <summary>El checkout cuyo <c>pedido_id</c> o <c>pedido_descartado</c> es el dado (vivo o terminado).</summary>
     Task<Checkout?> ObtenerPorPedido(Guid pedidoId, bool conBloqueo, CancellationToken cancelacion = default);
+
+    /// <summary>Los checkouts vivos de esas cuentas, <b>con bloqueo y por <c>id</c> ascendente</b> (D10): lo que usa el retiro de ediciones, que bloquea todos los checkouts antes que los carritos.</summary>
+    Task<IReadOnlyList<Checkout>> ObtenerVivosDeCuentasConBloqueo(IReadOnlyCollection<Guid> cuentaIds, CancellationToken cancelacion = default);
 
     /// <summary>El estado del checkout vivo de la cuenta <b>sin bloqueo</b>: para decidir si hay que llamar a <c>Reabrir</c> antes de bloquear (D10).</summary>
     Task<EstadoDelCheckout?> LeerEstadoSinBloqueo(Guid cuentaId, CancellationToken cancelacion = default);
@@ -272,4 +281,7 @@ public interface IAuditoriaDelCarrito
 {
     /// <summary>Una fusión aplicada: cuántas líneas aportó el visitante y los motivos de los ajustes (sin identificar al visitante).</summary>
     Task FusionAplicada(Guid cuentaId, int lineasDelVisitante, IReadOnlyList<MotivoDeAjusteDeAviso> ajustes, CancellationToken cancelacion = default);
+
+    /// <summary>La baja de ediciones aplicada a los carritos: cuántas ediciones, cuántos carritos afectados y cuántas líneas se quitaron o quedaron anotadas con retiro pendiente (sin identificar a nadie).</summary>
+    Task EdicionesRetiradas(int ediciones, int carritosAfectados, int lineasQuitadas, int lineasAnotadas, CancellationToken cancelacion = default);
 }
