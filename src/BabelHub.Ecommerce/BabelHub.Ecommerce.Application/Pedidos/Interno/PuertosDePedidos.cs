@@ -67,6 +67,9 @@ public interface IRepositorioDePedidos
 
     Task<IReadOnlyList<Entrega>> EntregasEnCurso(Guid pedidoId, CancellationToken cancelacion = default);
 
+    /// <summary>Cuántos pedidos de la cuenta tienen alguna línea impresa sin entregar ni anular, incluidas las no recogidas (PED-31, AC-PED-26): un pedido solo digital no cuenta.</summary>
+    Task<int> ContarPedidosConImpresaSinCerrar(Guid cuentaId, CancellationToken cancelacion = default);
+
     /// <summary>Las anulaciones <c>fallida</c>s del pedido (repetir una anulación fallida crea una fila nueva): sus líneas ya pasaron por la cancelación de envíos, así que un envío que Envíos informa «mantenido» por estar ya cancelado no cuenta como salido.</summary>
     Task<IReadOnlyList<Anulacion>> AnulacionesFallidas(Guid pedidoId, CancellationToken cancelacion = default);
 
