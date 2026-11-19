@@ -1,6 +1,6 @@
 # Tablero de coordinación de los carriles
 
-Lo mantiene **el coordinador** (la sesión raíz «BabelHub documentación y specs»); los carriles lo **leen al empezar cada turno** y no lo editan: lo que necesiten de otro carril lo dejan en su informe de bloque y en `progress/hallazgos.md`, y el coordinador lo traslada aquí. Complementa `progress/bloques.md` (qué bloques hay) con **quién hace qué ahora, qué espera a quién y cómo se integra**. Última actualización: 2026-11-19.
+Lo mantiene **el coordinador** (la sesión raíz «BabelHub documentación y specs»); los carriles lo **leen al empezar cada turno** y no lo editan: lo que necesiten de otro carril lo dejan en su informe de bloque y en `progress/hallazgos.md`, y el coordinador lo traslada aquí. Complementa `progress/bloques.md` (qué bloques hay) con **quién hace qué ahora, qué espera a quién y cómo se integra**. Última actualización: 2026-11-19 (tarde).
 
 ## 1. Protocolo (obligatorio para todos los carriles)
 
@@ -16,20 +16,20 @@ Lo mantiene **el coordinador** (la sesión raíz «BabelHub documentación y spe
 
 | Carril | Sesión | Ahora | Después |
 | :--- | :--- | :--- | :--- |
-| **A — Transversales** | carril-a-contratos-de-pl | **(1) Piezas que esperan B y C** (sección 3); **(2) IDE-4** (T18–T22 de `identidad-seguridad`) e **IDE-5** (T23–T25, T27) | IDE-6 a IDE-9, `transversal-notificaciones` (NOT-1 a NOT-4: Pagos y Pedidos dependen de `INotificador`), `transversal-plataforma` PLA-R2 (T29, T31–T34) |
-| **B — Inventario y Carrito** | carril-b-inv-2d-ajustes | `ecommerce-carrito-checkout`: T33–T36 (pantallas y E2E); T25b y T26c cuando A entregue | `ecommerce-pedidos` (ECO-6, T01–T42, 6 subbloques) |
-| **C — Pagos, catálogo y reclamaciones** | carril-c-cat-logo-eco-2a | `ecommerce-pagos` (ECO-5d en adelante; ECO-5f espera las llaves B05 de la persona) y `ecommerce-libro-reclamaciones` (ECO-11b a 11d) | `ecommerce-envios` (ECO-9), `ecommerce-devoluciones` (ECO-10) |
-| **V — Envíos y verificación** | planificar-eco-7-bibliot | Planificación completa (las 20 specs tienen plan `Planned`). `spec-verify` de las seis specs completas hecho (ver huecos abajo). **Ahora implementa `ecommerce-envios`** (ECO-9a a 9e, T01–T25) con dobles para Pedidos (ECO-6, aún no existe) | `ecommerce-biblioteca-digital` (ECO-8), `web-indice-infinito` (ECO-13) y la verificación de las specs que se completen |
+| **A — Transversales** | carril-a-contratos-de-pl | Terminar IDE-8 (resto de T44 y T45) → IDE-9 (T46–T50) → **COMP-1: componer los `Program.cs`** (Inventario primero: Fuentes, Reservas, Ajustes, Traslados, Auditoría y verificador de tokens; luego E-commerce) → NOT-2 a NOT-4 (envío, tope por número, recepción, adaptadores) | PLA-R2 (T29, T31–T34), PLA-R3/R4, `identidad-seguridad` T27/T34 pendientes de Infraestructura de correo |
+| **B — Carrito y Pedidos** | carril-b-inv-2d-ajustes | **T25b y T26c del carrito** (ya no esperan: A entregó el cliente del Inventario, límites y auditoría de Carrito) y T36 (E2E) → `ecommerce-pedidos` (ECO-6a a 6f, T01–T42; los contratos para Envíos ya están) | `ecommerce-biblioteca-digital` (ECO-8) |
+| **C — Pagos y reclamaciones** | carril-c-cat-logo-eco-2a | `ecommerce-pagos` ECO-5d en adelante (T24–T36 y T37; ECO-5f, T38, espera B05) y `ecommerce-libro-reclamaciones` ECO-11c y 11d (T13–T23) | **WEB-2** (`web-base` T28–T31, con Identidad ya en main) y `ecommerce-devoluciones` (ECO-10) |
+| **V — Envíos** | planificar-eco-7-bibliot | `ecommerce-envios` ECO-9b a 9e (T06–T25), con los contratos de Pedidos ya en main | `ecommerce-devoluciones` (ECO-10) o `web-base` T32–T35 (E2E, axe, rendimiento) según quién termine antes; la verificación FIN-1 de cada spec que se complete |
 
 ## 3. Qué espera a quién
 
 | Quién espera | A quién | Qué | Estado |
 | :--- | :--- | :--- | :--- |
-| B (Carrito T25b) | A | `IClienteDelInventario` con consulta previa, reservar y liberar (contrato v1 de reservas) | pendiente |
-| B (Carrito T26c) | A | Políticas de límite de Carrito en `Plataforma`; acciones de auditoría de Carrito en `AccionesAuditables`; lectura con bloqueo de la marca de cancelación y consentimiento de WhatsApp en Identidad; alertas | pendiente |
+| B (Carrito T25b) | A | `IClienteDelInventario` con consulta previa, reservar y liberar (contrato v1 de reservas) | **entregado por A y en main** (IDE-4 e IDE-8) |
+| B (Carrito T26c) | A | Políticas de límite de Carrito en `Plataforma`; acciones de auditoría de Carrito en `AccionesAuditables`; lectura con bloqueo de la marca de cancelación y consentimiento de WhatsApp en Identidad; alertas | **entregado por A y en main** (IDE-4 e IDE-8) |
 | C (Pagos) | A | `INotificador` de Notificaciones (NOT-1 a NOT-4) y las plantillas de correo de Pagos en el catálogo de `Plataforma` | pendiente |
-| C (Reclamaciones) | A | Estado de cuenta de Identidad (`IEstadoDeCuenta`) y contrato público de Identidad | IDE-2 y IDE-3 hechos; el resto en IDE-4/5 |
-| `web-base` T28–T31 | A | Identidad IDE-3 a IDE-5 y Auditoría (hecha) | pendiente de IDE-4/5 |
+| C (Reclamaciones) | A | Estado de cuenta de Identidad (`IEstadoDeCuenta`) y contrato público de Identidad | IDE-2 a IDE-7 hechos y en main |
+| `web-base` T28–T31 | A | Identidad IDE-3 a IDE-5 y Auditoría (hecha) | **listo para empezar** (Identidad en main); falta dueño: ver tabla de carriles |
 | Todos (`Program.cs`) | A | Verificador de tokens de Identidad (IDE-8) y la base: bloque de composición único de los dos `Program.cs` (Auditoría, Fuentes, Reservas, Ajustes, Traslados, Catálogo, Carrito, Pagos, Sesión web) | después de IDE-8 |
 | Pagos y Pedidos | B | Contrato público de Carrito fijado en `progress/decisiones-delegadas.md` (DD-07) | hecho |
 | Biblioteca (ECO-8) | B | `IPosesionDeEdiciones.Posee` → `ResultadoDePosesion` (DD-06) | hecho |
