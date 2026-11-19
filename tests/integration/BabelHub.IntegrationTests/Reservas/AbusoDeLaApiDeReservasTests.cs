@@ -150,10 +150,9 @@ public sealed class AbusoDeLaApiDeReservasTests(PostgresDeReservasFixture bd) : 
         var clienteEnReparto = await _api.Enviar(HttpMethod.Post, $"/reservas/{domicilio}/cerrar", ApiDeReservasHost.CredencialDeUsuario, RolesDeUsuario.Cliente, usuario: cliente, json: Reparto(lineaDeDomicilio), clave: Clave());
         var sinClaveEnReparto = await _api.Enviar(HttpMethod.Post, $"/reservas/{domicilio}/cerrar", ApiDeReservasHost.CredencialDeUsuario, RolesDeUsuario.EncargadoDeSucursal, lima, json: Reparto(lineaDeDomicilio));
 
-        Assert.All([conClave, encargadoEnReparto, clienteEnReparto, sinClaveEnReparto], r => Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode));
-        // Sin clave de idempotencia el encargado de otra sucursal recibe el 400 de forma (idéntico exista o no la reserva): la sucursal solo se compara contra una reserva y esa lectura va después de validar la forma.
-        Assert.Equal(HttpStatusCode.BadRequest, sinClave.StatusCode);
-        Assert.Equal(denegacionesAntes + 4, _api.Denegaciones.Registros.Count);
+        Assert.All([sinClave, conClave, encargadoEnReparto, clienteEnReparto, sinClaveEnReparto], r => Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode));
+        // SEL-39: el alcance va antes que la forma de la clave, así que sin clave el encargado de otra sucursal recibe el mismo 403, con su evento.
+        Assert.Equal(denegacionesAntes + 5, _api.Denegaciones.Registros.Count);
         Assert.Equal((50, 5), await bd.StockDe(lima, libro));
 
         // Con la reserva ya cerrada por quien sí puede, el encargado de Cusco sigue recibiendo el mismo 403: ni «ya-cerrada» ni el resultado guardado.

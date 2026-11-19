@@ -33,6 +33,12 @@
     }
   });
 
+  // El foco pasa al mensaje de error de una pantalla repintada por el servidor (docs/06 §8): el aviso marcado con data-bh-foco-inicial.
+  var avisoInicial = document.querySelector('[data-bh-foco-inicial]');
+  if (avisoInicial) {
+    avisoInicial.focus();
+  }
+
   // Tema (WEB-09): se aplica al instante y se recuerda; sin elección manda la preferencia del dispositivo.
   var selectorDeTema = document.querySelector('[data-bh-tema]');
   if (selectorDeTema) {

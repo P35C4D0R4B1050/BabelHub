@@ -1,0 +1,3 @@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@* El token antifalsificación de un formulario sin JavaScript (WEB-05): el filtro global lo valida antes de la acción. Con htmx, bh.js lo manda en la cabecera. *@
+<input type="hidden" name="@ProteccionContraFalsificacion.NombreDelCampo" value="@Antiforgery.GetAndStoreTokens(Context).RequestToken" />

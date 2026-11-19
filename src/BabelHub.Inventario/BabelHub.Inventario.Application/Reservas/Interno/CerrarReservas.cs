@@ -53,7 +53,7 @@ internal sealed class ValidadorDeCerrar : IValidador<CerrarReservasEntrada>
 /// <summary>
 /// Cerrar una reserva confirmada descontando el físico: la <b>entrega</b> en la sucursal de recojo o el paso a <b>en reparto</b> de un envío a domicilio (SEL-11, SEL-21, SEL-28, SEL-29, SEL-38, SEL-39). Orden fijo:
 /// (1) el <b>rol</b> antes de leer nada, (2) el bloqueo del pedido, (3) el <b>alcance sobre la reserva</b> (la sucursal de recojo de su cabecera; un encargado que consulta algo ajeno o inexistente recibe 403 sin pistas), (4) la
-/// <b>clave</b> en <c>operaciones_idempotentes</c> (misma carga: el resultado original sin descontar otra vez; otra: conflicto), (5) el estado de cada línea y (6) el descuento: <c>Aplicar(−c, −c)</c> agregado y ordenado
+/// <b>clave</b> (su forma se valida después del alcance de sucursal en la entrega: una entrada mal formada de otra sucursal recibe el mismo 403) en <c>operaciones_idempotentes</c> (misma carga: el resultado original sin descontar otra vez; otra: conflicto), (5) el estado de cada línea y (6) el descuento: <c>Aplicar(−c, −c)</c> agregado y ordenado
 /// con las filas de stock ya bloqueadas, y las líneas pasan a cerradas con una sentencia condicional (<b>la primera operación que llega gana</b>: la otra recibe estado inválido sin cambios parciales). Una línea ya
 /// cerrada por esta misma causa responde <c>ya-cerrada</c> aunque la clave sea nueva y el físico no baja otra vez. Una línea liberada, expirada, pendiente, cerrada por otra causa o cuyas unidades siguen en la fuente
 /// de origen de un traslado es estado inválido y se rechaza todo. Cada cierre se audita en la misma transacción (si no se puede, no se descuenta).
@@ -87,6 +87,17 @@ internal sealed class CerrarReservas(
         var validacion = validador.Validar(entrada);
         if (!validacion.EsValido)
         {
+            // El alcance va antes que la forma de la clave (SEL-39): un encargado de otra sucursal recibe el mismo 403 con su evento aunque la entrada esté mal formada, y no un 400 que dejaría pasar el intento sin registro.
+            // Solo se lee la cabecera de la reserva (sin bloquear ni escribir) y no se revela si existe.
+            if (entrada.Motivo == MotivoDeCierreDeReserva.Entrega)
+            {
+                var cabecera = entrada.PedidoId == Guid.Empty ? null : await reservas.UltimaDelPedido(entrada.PedidoId, cancelacion).ConfigureAwait(false);
+                if (await autorizador.ExigirSucursalDeRecojo(cabecera?.SucursalDeRecojoId, cancelacion).ConfigureAwait(false) is { } fueraDeAlcance)
+                {
+                    return FallosDeReservas.Fallo<CierreDeReserva>(fueraDeAlcance);
+                }
+            }
+
             return FallosDeReservas.Validacion<CierreDeReserva>(validacion);
         }
 

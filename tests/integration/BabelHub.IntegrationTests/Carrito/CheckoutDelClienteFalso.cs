@@ -14,6 +14,9 @@ public sealed class CheckoutDelClienteFalso : ICheckoutDelCliente
 
     public Resultado<VistaDelCheckout> RespuestaDeVista { get; set; } = Resultado<VistaDelCheckout>.Exito(VistaVacia);
 
+    /// <summary>Una respuesta distinta para una llamada concreta (por su nombre: <c>entrega</c>, <c>aceptaciones</c>…); <see langword="null"/> usa <see cref="RespuestaDeVista"/>.</summary>
+    public Func<string, Resultado<VistaDelCheckout>?>? RespuestaDeVistaPorLlamada { get; set; }
+
     public Resultado<ResultadoDePasarAlPago> RespuestaDePago { get; set; } = Resultado<ResultadoDePasarAlPago>.Exito(new ResultadoDePasarAlPago(Guid.Parse("f0000000-0000-0000-0000-000000000001"), EstadoVisibleDelCheckout.EnPago));
 
     public Resultado<VistaDelCarrito> RespuestaDeSalida { get; set; } = Resultado<VistaDelCarrito>.Exito(new VistaDelCarrito([], 0m, [], false));
@@ -47,7 +50,7 @@ public sealed class CheckoutDelClienteFalso : ICheckoutDelCliente
             Entradas.Add(entrada);
         }
 
-        return Task.FromResult(RespuestaDeVista);
+        return Task.FromResult(RespuestaDeVistaPorLlamada?.Invoke(llamada) ?? RespuestaDeVista);
     }
 
     private Task<Resultado<VistaDelCarrito>> Salida(string llamada, object entrada)

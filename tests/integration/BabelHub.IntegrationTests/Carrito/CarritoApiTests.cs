@@ -120,6 +120,19 @@ public sealed class CarritoApiTests : IAsyncLifetime
         Assert.Equal(Edicion, ((EliminarLineaEntrada)_host.Carrito.Entradas[1]).EdicionId);
     }
 
+    [Fact]
+    public async Task Marcar_un_aviso_como_visto_llama_a_la_Aplicacion_con_su_id_y_un_id_invalido_es_validacion()
+    {
+        var aviso = Guid.Parse("a0000000-0000-0000-0000-000000000009");
+
+        using var bueno = await _host.Enviar($"/carrito/avisos/{aviso:D}/visto", conSesion: true);
+        using var malo = await _host.Enviar("/carrito/avisos/no-es-guid/visto", conSesion: true);
+
+        Assert.Equal(HttpStatusCode.SeeOther, bueno.StatusCode);
+        Assert.Equal(aviso, Assert.Single(Assert.IsAssignableFrom<IReadOnlyCollection<Guid>>(Assert.Single(_host.Carrito.Entradas))));
+        Assert.Equal(HttpStatusCode.BadRequest, malo.StatusCode);
+    }
+
     // ---------- Esquema estricto ----------
 
     [Theory]

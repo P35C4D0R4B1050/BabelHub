@@ -1,43 +1,148 @@
+@using BabelHub.Ecommerce.Api.Web.Estados
 @model BabelHub.Ecommerce.Api.Areas.Tienda.Controllers.CarritoVista
-@{
-    var carrito = Model.Carrito;
-    var cultura = System.Globalization.CultureInfo.GetCultureInfo("es-PE");
-}
-<h1 class="font-display text-4xl leading-tight">Tu carrito</h1>
+<h1 class="font-display text-4xl leading-tight sm:text-5xl">Tu carrito</h1>
+<p class="mt-2 mb-6 max-w-2xl opacity-80">Se conserva mientras no lo cambies: puedes mezclar libros impresos y digitales.@(Model.HaySesion ? " Lo ves igual desde tu celular o tu computadora." : " Inicia sesión para verlo desde cualquier dispositivo.")</p>
 
-@foreach (var aviso in carrito.Avisos)
+@if (Model.Avisos.Count > 0)
 {
-    <div class="alert alert-info mt-4" role="status">
-        <span>@(aviso.Tipo == BabelHub.Ecommerce.Application.Carrito.TipoDeAvisoDelCarrito.EdicionRetirada ? $"«{aviso.Titulo}» fue retirada del catálogo y se quitó de tu carrito." : $"Ajustamos «{aviso.Titulo}» en tu carrito.")</span>
+    <section class="mb-6 space-y-3" aria-label="Avisos sobre tu carrito" aria-live="polite">
+        @foreach (var aviso in Model.Avisos)
+        {
+            <div class="alert alert-info alert-vertical sm:alert-horizontal" role="status">
+                <bh-icono nombre="info" />
+                <span>@aviso.Texto</span>
+                <bh-accion-de-cambio>
+                    <form method="post" action="/carrito/avisos/@aviso.Id.ToString("D")/visto">
+                        <partial name="_TokenAntifalsificacion" />
+                        <button type="submit" class="btn btn-sm">Entendido</button>
+                    </form>
+                </bh-accion-de-cambio>
+            </div>
+        }
+    </section>
+}
+
+@if (Model.PreciosNoConfirmados)
+{
+    <div class="alert alert-warning mb-6" role="status">
+        <bh-icono nombre="aviso" />
+        <span>No pudimos confirmar los precios ahora. Tu carrito sigue igual; inténtalo de nuevo en unos minutos.</span>
+        <a class="btn btn-sm" href="/carrito"><bh-icono nombre="reintentar" clase="size-4" />Reintentar</a>
     </div>
 }
 
-@if (carrito.Lineas.Count == 0)
+@if (Model.Estado is not null)
 {
-    <p class="mt-6">Tu carrito está vacío.</p>
-    <a class="btn btn-primary mt-4" href="/catalogo">Ver el catálogo</a>
+    <vc:bh-estado modelo="@Model.Estado" />
 }
 else
 {
-    <ul class="mt-6 space-y-4" aria-label="Líneas del carrito">
-        @foreach (var linea in carrito.Lineas)
-        {
-            <li class="card bg-base-100 p-4">
-                <p class="font-semibold">@linea.Titulo</p>
-                <p class="text-sm opacity-80">@(linea.Formato == BabelHub.Ecommerce.Application.Catalogo.FormatoDeEdicion.Digital ? "Libro digital" : "Libro impreso") · @linea.Cantidad × @linea.PrecioUnitario.ToString("C", cultura) = @linea.Importe.ToString("C", cultura)</p>
-                @if (linea.Retirada)
+    <div class="grid items-start gap-8 lg:grid-cols-[1fr_22rem]">
+        <section aria-label="Libros en tu carrito" class="rounded-box border border-base-300 bg-base-100">
+            <ul class="divide-y divide-base-300">
+                @foreach (var linea in Model.Lineas)
                 {
-                    <p class="text-sm" role="status">Esta edición se retiró del catálogo: se quitará al terminar tu compra en curso.</p>
+                    var etiqueta = $"«{linea.Titulo}»";
+                    <li class="flex flex-col gap-3 p-4 sm:flex-row">
+                        <div class="flex min-w-0 flex-1 gap-4">
+                            <div class="grid h-24 w-16 shrink-0 place-items-center rounded-box bg-base-300" aria-hidden="true"><bh-icono nombre="libro" clase="size-8 opacity-70" /></div>
+                            <div class="min-w-0 flex-1 space-y-2">
+                                <p class="font-display text-xl leading-tight">@linea.Titulo</p>
+                                <p class="text-sm opacity-80">@linea.FormatoTexto@(linea.Isbn is null ? string.Empty : " · ISBN " + linea.Isbn)</p>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    @if (linea.Retirada)
+                                    {
+                                        <span class="badge badge-warning h-auto gap-1 py-1 font-semibold"><bh-icono nombre="aviso" clase="size-4" /><span>Retirada del catálogo</span></span>
+                                    }
+                                    else if (linea.Disponibilidad is not null)
+                                    {
+                                        <vc:bh-disponibilidad modelo="@linea.Disponibilidad" />
+                                    }
+                                    @if (linea.NotaDeFrescura is not null)
+                                    {
+                                        <span class="text-xs opacity-80">@linea.NotaDeFrescura</span>
+                                    }
+                                </div>
+                                @if (linea.Retirada)
+                                {
+                                    <p class="text-sm" role="status">Esta edición se retiró del catálogo: se quitará de tu carrito al terminar tu compra en curso.</p>
+                                }
+                                else if (linea.Disponibilidad?.Estado == EstadoDeDisponibilidad.Agotado)
+                                {
+                                    <p class="text-sm" role="status">Ya no hay unidades: quita este libro para continuar con la compra.</p>
+                                }
+                                <bh-accion-de-cambio>
+                                    <div class="flex flex-wrap items-end gap-3 pt-1">
+                                        @if (linea.EsDigital)
+                                        {
+                                            <p class="text-sm">Una licencia por cuenta.</p>
+                                        }
+                                        else if (!linea.Retirada)
+                                        {
+                                            <form method="post" action="/carrito/lineas/@linea.EdicionId.ToString("D")" class="flex items-end gap-2">
+                                                <partial name="_TokenAntifalsificacion" />
+                                                <label class="flex flex-col gap-1 text-sm">
+                                                    <span>Cantidad de @etiqueta</span>
+                                                    <input class="input input-sm w-24" type="number" name="cantidad" value="@linea.Cantidad" min="1" max="@linea.CantidadMaxima" inputmode="numeric" required />
+                                                </label>
+                                                <button type="submit" class="btn btn-sm">Actualizar</button>
+                                            </form>
+                                        }
+                                        <form method="post" action="/carrito/lineas/@linea.EdicionId.ToString("D")/quitar">
+                                            <partial name="_TokenAntifalsificacion" />
+                                            <button type="submit" class="btn btn-ghost btn-sm" aria-label="Quitar @etiqueta del carrito">Quitar</button>
+                                        </form>
+                                    </div>
+                                </bh-accion-de-cambio>
+                            </div>
+                        </div>
+                        <div class="text-right sm:w-36">
+                            <p class="font-display text-xl">@linea.ImporteTexto</p>
+                            <p class="text-sm opacity-80">@(Model.PreciosNoConfirmados ? "Cantidad: " + linea.Cantidad : linea.Cantidad + " × " + linea.PrecioTexto)</p>
+                        </div>
+                    </li>
                 }
-            </li>
-        }
-    </ul>
-    @if (carrito.PreciosNoConfirmados)
-    {
-        <p class="mt-4" role="status">No pudimos confirmar los precios ahora. Inténtalo de nuevo en unos minutos.</p>
-    }
-    else
-    {
-        <p class="mt-6 text-lg font-semibold">Subtotal: @carrito.Subtotal.ToString("C", cultura)</p>
-    }
+            </ul>
+        </section>
+
+        <aside class="space-y-3 rounded-box border border-base-300 bg-base-100 p-5 lg:sticky lg:top-28" aria-label="Resumen de tu compra">
+            <h2 class="font-display text-2xl">Resumen</h2>
+            <div class="flex justify-between"><span>Subtotal</span><span>@Model.SubtotalTexto</span></div>
+            <div class="flex justify-between text-sm opacity-80"><span>Envío</span><span>@(Model.HayImpresos ? "Se elige en el siguiente paso" : "No aplica (solo digitales)")</span></div>
+            <div class="flex justify-between border-t border-base-300 pt-3 font-display text-xl"><span>Total</span><span>@Model.SubtotalTexto</span></div>
+            @if (Model.HayImpresos)
+            {
+                <p class="flex gap-2 text-xs opacity-80"><bh-icono nombre="reloj" clase="size-4 shrink-0" />Reservamos tus libros impresos durante 15 minutos cuando inicias el pago.</p>
+            }
+            @if (Model.HayDigitales)
+            {
+                <p class="flex gap-2 text-xs opacity-80"><bh-icono nombre="candado" clase="size-4 shrink-0" />Los libros digitales aparecen en tu biblioteca cuando se aprueba el pago.</p>
+            }
+
+            @if (Model.HayProblema)
+            {
+                <p class="flex gap-2 text-sm" role="status"><bh-icono nombre="aviso" clase="size-5 shrink-0" />Resuelve los avisos de arriba para continuar con la compra.</p>
+                <span class="btn btn-primary btn-disabled w-full" aria-disabled="true">Continuar con la compra</span>
+            }
+            else if (!Model.HaySesion)
+            {
+                <p class="text-sm">Para pagar necesitas una cuenta. Tu carrito se conserva al ingresar.</p>
+                <a class="btn btn-primary w-full" href="/ingreso">Ingresar para continuar</a>
+            }
+            else if (Model.HayCompraEnCurso)
+            {
+                <a class="btn btn-primary w-full" href="/checkout">Volver a mi compra</a>
+            }
+            else
+            {
+                <bh-accion-de-cambio>
+                    <form method="post" action="/checkout/iniciar">
+                        <partial name="_TokenAntifalsificacion" />
+                        <button type="submit" class="btn btn-primary w-full">Continuar con la compra</button>
+                    </form>
+                </bh-accion-de-cambio>
+            }
+            <a class="btn btn-ghost btn-sm w-full" href="/catalogo">Seguir comprando</a>
+        </aside>
+    </div>
 }

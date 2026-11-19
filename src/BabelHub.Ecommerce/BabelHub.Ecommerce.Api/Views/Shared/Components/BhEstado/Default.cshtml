@@ -62,7 +62,7 @@
 
     default:
         var esNoDisponible = Model.Estado == EstadoDePantalla.ServicioNoDisponible;
-        <div class="bh-estado alert alert-vertical sm:alert-horizontal @(esNoDisponible ? "alert-warning" : "alert-error")" role="alert">
+        <div class="bh-estado alert alert-vertical sm:alert-horizontal @(esNoDisponible ? "alert-warning" : "alert-error")" role="alert" tabindex="-1" data-bh-foco-inicial>
             <bh-icono nombre="@(esNoDisponible ? "aviso" : "error")" />
             <div>
                 <h2 class="font-semibold">@Model.Titulo</h2>
