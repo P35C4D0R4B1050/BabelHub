@@ -45,6 +45,13 @@ internal sealed class RegistrarIntento(
         var previa = intencion.ValidarCobro(reloj.Ahora);
         if (previa != ValidacionDelCobro.Permitido)
         {
+            // Una solicitud simultánea con la misma clave pudo registrar su intento entre el paso 0 del cobro y esta lectura (la intención ya está «con cobro»): es el resultado original, no un cobro en curso ajeno (PAG-04, AC-PAG-03).
+            var repetido = await unidad.Ejecutar(token => repositorio.ObtenerIntento(entrada.Clave.IntentoId, token), cancelacion).ConfigureAwait(false);
+            if (repetido is not null && repetido.IntencionId == intencion.Id)
+            {
+                return Resultado<IntentoRegistrado>.Exito(new IntentoRegistrado(repetido, true));
+            }
+
             return FallosDePagos.De<IntentoRegistrado>(CategoriaDeError.Conflicto, EmitirClaveDeIntento.Clave(previa));
         }
 

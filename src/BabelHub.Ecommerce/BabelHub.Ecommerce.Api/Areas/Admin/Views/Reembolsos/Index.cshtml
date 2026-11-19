@@ -27,7 +27,7 @@ else
                         <td>@FormatoPeruano.FechaYHora(r.CreadoEn)</td>
                         <td>
                             <form method="post" action="/administracion/reembolsos/reintentar">
-        <partial name="_TokenAntifalsificacion" />
+                                <partial name="_TokenAntifalsificacion" />
                                 <input type="hidden" name="reembolsoId" value="@r.Id.ToString("D")" />
                                 <button type="submit" class="btn btn-sm btn-primary">Reintentar</button>
                             </form>

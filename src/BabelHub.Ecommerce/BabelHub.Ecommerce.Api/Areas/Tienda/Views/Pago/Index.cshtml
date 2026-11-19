@@ -4,11 +4,11 @@
 
 @if (Model.MotivoTexto is not null)
 {
-    <div class="alert alert-error my-6" role="alert" tabindex="-1" data-bh-foco-inicial>
+    <div class="alert alert-error alert-soft my-6" role="alert" tabindex="-1" data-bh-foco-inicial>
         <bh-icono nombre="error" />
         <div>
             <h2 class="font-semibold">No se pudo completar el pago</h2>
-            <p>@Model.MotivoTexto No se te cobró nada.</p>
+            <p>@Model.MotivoTexto No se te cobró nada. Puedes intentarlo de nuevo con el mismo medio u otro.</p>
         </div>
     </div>
 }
@@ -16,21 +16,37 @@
 @if (Model.Clave is { } clave)
 {
     <p class="my-4 text-lg">Total a pagar: <strong>@FormatoPeruano.Soles(clave.Total)</strong></p>
-    <p class="mb-6 text-sm">Tienes hasta las @FormatoPeruano.Hora(clave.VenceEn) para pagar.</p>
+    <p class="text-sm" role="timer" data-bh-cuenta-regresiva="@clave.VenceEn.UtcDateTime.ToString("O")">
+        Tienes hasta las @FormatoPeruano.Hora(clave.VenceEn) para pagar<span data-bh-restante></span>.
+    </p>
+    @if (clave.ReservaExpiraEn is { } reserva)
+    {
+        <p class="mb-2 text-sm">Reservamos tus libros impresos hasta las @FormatoPeruano.Hora(reserva).</p>
+    }
+    <div class="alert alert-warning alert-soft my-4 hidden" role="alert" data-bh-vencido>
+        <bh-icono nombre="aviso" />
+        <div>
+            <p>Se acabó el tiempo para pagar.</p>
+            <a class="btn btn-ghost mt-2" href="/checkout">Volver a mi compra</a>
+        </div>
+    </div>
     <form method="post" action="/checkout/pago" class="flex max-w-lg flex-col gap-4" id="formulario-de-pago">
         <partial name="_TokenAntifalsificacion" />
         <input type="hidden" name="pedidoId" value="@Model.PedidoId.ToString("D")" />
         <input type="hidden" name="claveDeIntento" value="@clave.Token" />
         <fieldset class="flex flex-col gap-2">
-            <legend class="font-semibold">Medio de pago</legend>
-            <label class="label cursor-pointer justify-start gap-3"><input type="radio" name="medio" value="yape" class="radio" required /> <span>Yape</span></label>
-            <label class="label cursor-pointer justify-start gap-3"><input type="radio" name="medio" value="tarjeta" class="radio" /> <span>Tarjeta de crédito o débito</span></label>
+            <legend class="mb-1 font-semibold">Medio de pago</legend>
+            <div class="tabs tabs-box max-w-md" role="radiogroup" aria-label="Medio de pago">
+                <label class="tab flex-1 gap-2 has-[:checked]:tab-active has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2"><input type="radio" name="medio" value="yape" class="sr-only" required checked /> <span>Yape</span></label>
+                <label class="tab flex-1 gap-2 has-[:checked]:tab-active has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2"><input type="radio" name="medio" value="tarjeta" class="sr-only" /> <span>Tarjeta</span></label>
+            </div>
         </fieldset>
         <label class="form-control">
             <span class="label-text">Identificador del medio de pago</span>
-            <input type="text" name="tokenDelMedio" class="input input-bordered" autocomplete="off" required maxlength="200" />
+            <input type="text" name="tokenDelMedio" class="input input-bordered" autocomplete="off" required maxlength="200" aria-describedby="ayuda-del-medio" />
+            <span id="ayuda-del-medio" class="label-text-alt mt-1">Es el código que genera la pasarela; BabelHub nunca ve ni guarda el número de tu tarjeta.</span>
         </label>
-        <button type="submit" class="btn btn-primary">Pagar @FormatoPeruano.Soles(clave.Total)</button>
+        <button type="submit" class="btn btn-primary" data-bh-deshabilitar-al-vencer>Pagar @FormatoPeruano.Soles(clave.Total)</button>
     </form>
 }
 else
