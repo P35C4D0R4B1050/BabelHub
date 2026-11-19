@@ -51,6 +51,7 @@ internal sealed class BdIdentidad
             cuenta.DebeCambiarLaTemporal = copia.DebeCambiarLaTemporal;
             cuenta.Aceptacion = copia.Aceptacion;
             cuenta.CanceladaEn = copia.CanceladaEn;
+            cuenta.Whatsapp = copia.Whatsapp;
         }
     }
 
@@ -72,6 +73,7 @@ internal sealed class BdIdentidad
             Aceptacion = c.Aceptacion,
             CreadaEn = c.CreadaEn,
             CanceladaEn = c.CanceladaEn,
+            Whatsapp = ConsentimientoDeWhatsApp.Restaurar(c.Whatsapp.Numero, c.Whatsapp.Consentido, c.Whatsapp.Fecha),
         };
     }
 }
@@ -561,6 +563,19 @@ internal sealed class SegundoFactorEnMemoria : ISegundoFactorAlmacen
         return Task.FromResult(true);
     }
 
+    public Task Desactivar(Guid usuarioId, CancellationToken cancelacion = default)
+    {
+        _factores.Remove(usuarioId);
+        return Task.CompletedTask;
+    }
+
+    public Task ReemplazarCodigosDeRespaldo(Guid usuarioId, IReadOnlyList<string> huellasNuevas, CancellationToken cancelacion = default)
+    {
+        var actual = _factores[usuarioId];
+        _factores[usuarioId] = (SegundoFactor.Restaurar(usuarioId, actual.Factor.Estado, actual.Factor.UltimoPasoUsado, huellasNuevas), actual.Secreto);
+        return Task.CompletedTask;
+    }
+
     /// <summary>Deja un segundo factor activo con el secreto dado y los códigos de respaldo dados (por su huella).</summary>
     public void Sembrar(Guid usuarioId, byte[] secretoEnClaro, IEnumerable<string> huellasDeRespaldo, CifradorDePrueba cifrador) =>
         _factores[usuarioId] = (SegundoFactor.Restaurar(usuarioId, EstadoDelSegundoFactor.Activo, null, huellasDeRespaldo), cifrador.Cifrar(secretoEnClaro, usuarioId));
@@ -605,5 +620,50 @@ internal sealed class DenegacionesDePrueba : IDenegacionDeAcceso
     {
         Registradas.Add(denegacion);
         return Task.CompletedTask;
+    }
+}
+
+internal sealed class CancelacionDeAvisosDePrueba : ICancelacionDeAvisos
+{
+    public List<Guid> Cancelados { get; } = [];
+
+    public bool Falla { get; set; }
+
+    public Task CancelarLosAvisosDe(Guid usuarioId, CancellationToken cancelacion = default)
+    {
+        if (Falla)
+        {
+            throw new InvalidOperationException("Notificaciones no responde.");
+        }
+
+        Cancelados.Add(usuarioId);
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class AvisosDeCuentaEnMemoria : IAvisosDeCuentaAlmacen
+{
+    public List<(Guid UsuarioId, AvisoDeCuenta Aviso)> Avisos { get; } = [];
+
+    public Guid Sembrar(Guid usuarioId, string tipo, DateTimeOffset fecha)
+    {
+        var id = Guid.NewGuid();
+        Avisos.Add((usuarioId, new AvisoDeCuenta(id, tipo, fecha, false)));
+        return id;
+    }
+
+    public Task<IReadOnlyList<AvisoDeCuenta>> Listar(Guid usuarioId, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<AvisoDeCuenta>>([.. Avisos.Where(a => a.UsuarioId == usuarioId).Select(a => a.Aviso)]);
+
+    public Task<bool> MarcarVisto(Guid usuarioId, Guid avisoId, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        var indice = Avisos.FindIndex(a => a.UsuarioId == usuarioId && a.Aviso.Id == avisoId);
+        if (indice < 0)
+        {
+            return Task.FromResult(false);
+        }
+
+        Avisos[indice] = (usuarioId, Avisos[indice].Aviso with { Visto = true });
+        return Task.FromResult(true);
     }
 }

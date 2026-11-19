@@ -72,6 +72,10 @@ internal sealed class EntornoDeIdentidad
 
     public DenegacionesDePrueba Denegaciones { get; } = new();
 
+    public CancelacionDeAvisosDePrueba CancelacionDeAvisos { get; } = new();
+
+    public AvisosDeCuentaEnMemoria AvisosGuardados { get; } = new();
+
     public AvisosDeCuenta Avisos { get; }
 
     public RevocacionDeSesiones Revocacion { get; }
@@ -162,4 +166,34 @@ internal static class EntornoDeIdentidadExtensiones
     /// <summary>El código TOTP que mostraría la aplicación de autenticación en el instante del reloj del entorno (con un desplazamiento opcional de pasos).</summary>
     public static string Totp(this EntornoDeIdentidad e, byte[] secreto, int pasos = 0) =>
         Domain.Identidad.Totp.Codigo(secreto, Domain.Identidad.Totp.PasoDe(e.Reloj.Ahora) + pasos);
+}
+
+internal static class EntornoDeLaCuentaExtensiones
+{
+    public static Reautenticacion Reautenticacion(this EntornoDeIdentidad e) =>
+        new(e.Hasher, e.Limites, e.Huellas, e.SegundoFactor, e.Cifrador, e.HuellasDeIdentidad, e.Eventos, e.Reloj);
+
+    public static GestionDeLaCuenta Gestion(this EntornoDeIdentidad e) => new(
+        e.Cuentas,
+        new AlcanceDeLaCuenta(e.Actor, e.Denegaciones),
+        e.Reautenticacion(),
+        e.Limites,
+        new ListaDeContrasenasDePrueba(),
+        e.Hasher,
+        e.Secretos,
+        e.HuellasDeIdentidad,
+        e.Cifrador,
+        e.SegundoFactor,
+        e.Renovaciones,
+        e.Revocacion,
+        e.AvisosGuardados,
+        e.CancelacionDeAvisos,
+        e.Avisos,
+        e.Unidad,
+        e.Auditoria,
+        e.Reloj);
+
+    /// <summary>Hace que el actor de la prueba sea el cliente dado (la persona autenticada).</summary>
+    public static void ActuarComo(this EntornoDeIdentidad e, CuentaDeIdentidad cuenta) =>
+        e.Actor.Actual = ActorActual.DeUsuario(cuenta.Usuario.Id, "cliente");
 }

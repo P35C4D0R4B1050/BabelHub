@@ -143,7 +143,7 @@ public sealed class Ingreso(
         }
 
         var usuarioId = cuenta.Usuario.Id;
-        var (rechazo, reservas) = await ReservarLosLimitesDelSegundoFactor(usuarioId, cancelacion).ConfigureAwait(false);
+        var (rechazo, reservas) = await LimitesDelSegundoFactor.Reservar(limites, usuarioId, cancelacion).ConfigureAwait(false);
         if (rechazo is not null)
         {
             return Resultado<ResultadoDelIngreso>.Fallo(rechazo);
@@ -233,7 +233,7 @@ public sealed class Ingreso(
 
         if (resultado.EsExito)
         {
-            await DevolverLosCupos(reservas, cancelacion).ConfigureAwait(false);
+            await LimitesDelSegundoFactor.Devolver(limites, reservas, cancelacion).ConfigureAwait(false);
         }
 
         return resultado;
@@ -272,7 +272,7 @@ public sealed class Ingreso(
         }
 
         var usuarioId = cuenta.Usuario.Id;
-        var (rechazo, reservas) = await ReservarLosLimitesDelSegundoFactor(usuarioId, cancelacion).ConfigureAwait(false);
+        var (rechazo, reservas) = await LimitesDelSegundoFactor.Reservar(limites, usuarioId, cancelacion).ConfigureAwait(false);
         if (rechazo is not null)
         {
             return Resultado<ResultadoDelIngreso>.Fallo(rechazo);
@@ -313,7 +313,7 @@ public sealed class Ingreso(
 
         if (confirmada.EsExito)
         {
-            await DevolverLosCupos(reservas, cancelacion).ConfigureAwait(false);
+            await LimitesDelSegundoFactor.Devolver(limites, reservas, cancelacion).ConfigureAwait(false);
         }
 
         return confirmada;
@@ -432,38 +432,5 @@ public sealed class Ingreso(
     {
         var desafio = await desafios.PorHuella(huellasDeIdentidad.DeValorOpaco(valor.Revelar()), cancelacion).ConfigureAwait(false);
         return desafio is not null && desafio.Evaluar(reloj.Ahora) == EstadoDelDesafio.Vigente && desafio.Permite(accion) ? desafio : null;
-    }
-
-    /// <summary>Reserva los dos cupos del segundo factor (SEG-20, SEG-29) y devuelve los reservados: se devuelven al acertar, porque los límites cuentan los códigos <b>incorrectos</b>.</summary>
-    private async Task<(ErrorDeAplicacion? Error, List<ReservaDeLimite> Reservas)> ReservarLosLimitesDelSegundoFactor(Guid usuarioId, CancellationToken cancelacion)
-    {
-        var reservas = new List<ReservaDeLimite>();
-        var sujeto = usuarioId.ToString("N");
-        var porOrigen = await limites.Reservar(PoliticasDeLimite.SegundoFactorPorOrigen, sujeto, cancelacion: cancelacion).ConfigureAwait(false);
-        if (LimitesDeIdentidad.Rechazo(porOrigen) is { } rechazoPorOrigen)
-        {
-            return (rechazoPorOrigen, reservas);
-        }
-
-        if (porOrigen.Reserva is { } reservaPorOrigen)
-        {
-            reservas.Add(reservaPorOrigen);
-        }
-
-        var porCuenta = await limites.Reservar(PoliticasDeLimite.SegundoFactorPorCuenta, sujeto, cancelacion: cancelacion).ConfigureAwait(false);
-        if (porCuenta.Reserva is { } reservaPorCuenta)
-        {
-            reservas.Add(reservaPorCuenta);
-        }
-
-        return (LimitesDeIdentidad.Rechazo(porCuenta), reservas);
-    }
-
-    private async Task DevolverLosCupos(IEnumerable<ReservaDeLimite> reservas, CancellationToken cancelacion)
-    {
-        foreach (var reserva in reservas)
-        {
-            await limites.Liberar(reserva, cancelacion).ConfigureAwait(false);
-        }
     }
 }

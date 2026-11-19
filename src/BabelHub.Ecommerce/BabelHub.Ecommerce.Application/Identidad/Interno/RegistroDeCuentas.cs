@@ -40,6 +40,15 @@ public static class EntradasDeIdentidad
         return true;
     }
 
+    /// <summary>La clave de validación del campo de una contraseña nueva que no cumple la política (IDE-59).</summary>
+    public static string ClaveDeValidacion(ResultadoDeContrasena resultado) => resultado switch
+    {
+        ResultadoDeContrasena.Corta => "demasiado-corta",
+        ResultadoDeContrasena.Larga => "demasiado-larga",
+        ResultadoDeContrasena.Comun => "demasiado-comun",
+        _ => "obligatoria",
+    };
+
     public static bool NombreValido(string? nombre) => !string.IsNullOrWhiteSpace(nombre) && nombre.Trim().Length <= LargoMaximoDelNombre && !nombre.Any(char.IsControl);
 }
 

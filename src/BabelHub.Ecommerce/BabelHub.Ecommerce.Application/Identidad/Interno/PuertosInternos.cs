@@ -26,6 +26,9 @@ public sealed class CuentaDeIdentidad
 
     /// <summary>Si la cuenta ya se canceló (IDE-47): no ingresa ni se recupera.</summary>
     public DateTimeOffset? CanceladaEn { get; set; }
+
+    /// <summary>El número de WhatsApp y el consentimiento para los avisos (IDE-11, IDE-31): el número solo lo ve su titular y nunca sale de Identidad.</summary>
+    public ConsentimientoDeWhatsApp Whatsapp { get; set; } = ConsentimientoDeWhatsApp.SinNumero();
 }
 
 /// <summary>El repositorio de cuentas (EF Core, esquema <c>identidad</c>, T33): lo que lee un caso de uso, siempre dentro de la unidad de trabajo del caso de uso.</summary>
@@ -156,6 +159,21 @@ public interface ISegundoFactorAlmacen
 
     /// <summary>Consume un código de respaldo con <c>UPDATE … WHERE usado_en IS NULL</c>: <see langword="false"/> si ya estaba usado.</summary>
     Task<bool> ConsumirCodigoDeRespaldo(Guid usuarioId, string huella, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>Desactiva el segundo factor de un cliente (IDE-37): elimina el secreto y los códigos de respaldo.</summary>
+    Task Desactivar(Guid usuarioId, CancellationToken cancelacion = default);
+
+    /// <summary>Reemplaza los códigos de respaldo por otros 8 (IDE-52): los anteriores dejan de servir en la misma operación.</summary>
+    Task ReemplazarCodigosDeRespaldo(Guid usuarioId, IReadOnlyList<string> huellasNuevas, CancellationToken cancelacion = default);
+}
+
+/// <summary>Los avisos de seguridad que se muestran en la cuenta (<c>identidad.avisos_de_cuenta</c>, IDE-53, IDE-76, IDE-79): sin datos sensibles.</summary>
+public interface IAvisosDeCuentaAlmacen
+{
+    Task<IReadOnlyList<AvisoDeCuenta>> Listar(Guid usuarioId, CancellationToken cancelacion = default);
+
+    /// <summary>Marca el aviso del usuario como visto con un <c>UPDATE</c> condicional: <see langword="false"/> si no existe o es de otro usuario.</summary>
+    Task<bool> MarcarVisto(Guid usuarioId, Guid avisoId, DateTimeOffset ahora, CancellationToken cancelacion = default);
 }
 
 /// <summary>El cifrado de los secretos del segundo factor (AES-GCM, nonce aleatorio, clave versionada por propósito, AAD ligado al usuario, D04).</summary>
