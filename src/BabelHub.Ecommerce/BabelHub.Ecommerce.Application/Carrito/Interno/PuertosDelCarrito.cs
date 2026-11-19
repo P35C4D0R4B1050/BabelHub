@@ -197,6 +197,9 @@ public interface IRepositorioDeCarritos
     Task AgregarAvisos(Guid cuentaId, IReadOnlyList<AvisoDelCarrito> avisos, CancellationToken cancelacion = default);
 
     Task MarcarAvisosComoVistos(Guid cuentaId, IReadOnlyCollection<Guid> avisoIds, DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>La constancia de una fusión aplicada (<c>fusiones_aplicadas</c>, única por huella de cookie): hace idempotente la fusión de un segundo dispositivo. Se purga a los 30 días.</summary>
+    Task RegistrarFusion(byte[] huellaDeLaCookie, Guid carritoDeCuentaId, DateTimeOffset ahora, CancellationToken cancelacion = default);
 }
 
 /// <summary>Los checkouts del módulo: a lo más uno vivo por cuenta (índice único parcial). Las lecturas con bloqueo siguen el orden global (D10): checkout antes que carrito.</summary>
@@ -257,4 +260,16 @@ public interface ILimitadorDelCarrito
 
     /// <summary>Agregar, cambiar o quitar una línea: por la cuenta si la hay y, si no, por el origen.</summary>
     Task<ResultadoDeLimiteDelCarrito> EditarLineas(Guid? cuentaId, CancellationToken cancelacion = default);
+}
+
+// ---------- Auditoría ----------
+
+/// <summary>
+/// La auditoría de Carrito (plan §6): en la <b>misma transacción</b> del caso de uso, y si no se puede auditar la operación falla. Sin datos personales, sin la cookie del visitante ni su huella. Es un puerto propio hasta que
+/// el catálogo de acciones de auditoría (<c>AccionesAuditables</c>, del carril de auditoría) tenga las de Carrito: la Infraestructura lo implementa sobre <c>IAuditoria</c> (T25). Cada tarea agrega el método de su evento.
+/// </summary>
+public interface IAuditoriaDelCarrito
+{
+    /// <summary>Una fusión aplicada: cuántas líneas aportó el visitante y los motivos de los ajustes (sin identificar al visitante).</summary>
+    Task FusionAplicada(Guid cuentaId, int lineasDelVisitante, IReadOnlyList<MotivoDeAjusteDeAviso> ajustes, CancellationToken cancelacion = default);
 }

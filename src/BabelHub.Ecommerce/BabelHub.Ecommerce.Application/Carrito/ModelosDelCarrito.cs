@@ -90,8 +90,8 @@ public sealed record EliminarLineaEntrada(Guid EdicionId, string? CookieDelVisit
 /// </summary>
 public sealed record ResultadoDeCarrito(VistaDelCarrito Carrito, string? CookieNueva, bool BorrarLaCookie);
 
-/// <summary>Resultado de la fusión al ingresar (CAR-24): el carrito de la cuenta, los ajustes hechos y si se aplazó por una compra en curso (se reintenta en el siguiente <c>POST</c> de la misma sesión).</summary>
-public sealed record ResultadoDeFusionDeCarrito(VistaDelCarrito Carrito, IReadOnlyList<AvisoDelCarrito> Ajustes, bool Aplazada);
+/// <summary>Resultado de la fusión al ingresar (CAR-24): el carrito de la cuenta, los ajustes hechos, si se aplazó por una compra en curso (se reintenta en el siguiente <c>POST</c> de la misma sesión y la cookie <b>sigue</b>) y si la Presentación debe borrar la cookie (la fusión se aplicó o ya estaba aplicada, o no había nada que fusionar).</summary>
+public sealed record ResultadoDeFusionDeCarrito(VistaDelCarrito Carrito, IReadOnlyList<AvisoDelCarrito> Ajustes, bool Aplazada, bool BorrarLaCookie);
 
 /// <summary>
 /// El contacto de la entrega a domicilio (CAR-08, CAR-30): nombre, teléfono móvil peruano, dirección y región. Es dato personal: <c>ToString</c> y la serialización devuelven <c>[redactado]</c> y no se interpola en

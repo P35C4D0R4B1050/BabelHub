@@ -24,8 +24,15 @@ internal sealed class ServiciosDelCarrito(
     IGeneradorDeIdentificadores identificadores,
     IReloj reloj,
     IUnidadDeTrabajo unidad,
-    EdicionConCheckoutVivo edicionConCheckoutVivo)
+    EdicionConCheckoutVivo edicionConCheckoutVivo,
+    IAuditoriaDelCarrito auditoria)
 {
+    public IAuditoriaDelCarrito Auditoria => auditoria;
+
+    /// <summary>El máximo que dice el Inventario para un impreso con dato fresco: el de la red, o cero si está agotado. <see langword="null"/> si no se puede confirmar (la línea se acepta, D03).</summary>
+    public static int? MaximoConocido(DisponibilidadDeEdicion? disponibilidad) =>
+        disponibilidad is { Estado: EstadoDeDisponibilidad.Disponible or EstadoDeDisponibilidad.Agotada } ? Math.Max(0, disponibilidad.VendibleEnLaRed ?? 0) : null;
+
     public AutorizadorDelCarrito Autorizador => autorizador;
 
     public EdicionConCheckoutVivo Edicion => edicionConCheckoutVivo;
@@ -411,9 +418,7 @@ internal abstract class EdicionDeLineaDelCarrito<TEntrada>(ServiciosDelCarrito s
     protected static ErrorDeAplicacion SinStock(int maximo) =>
         new(CategoriaDeError.Conflicto, ClavesDelCarrito.SinStock, [new ErrorDeCampo("maximo", maximo.ToString(CultureInfo.InvariantCulture))]);
 
-    /// <summary>El máximo que dice el Inventario para un impreso con dato fresco: el de la red, o cero si está agotado. <see langword="null"/> si no se puede confirmar (la línea se acepta, D03).</summary>
-    protected static int? MaximoConocido(DisponibilidadDeEdicion? disponibilidad) =>
-        disponibilidad is { Estado: EstadoDeDisponibilidad.Disponible or EstadoDeDisponibilidad.Agotada } ? Math.Max(0, disponibilidad.VendibleEnLaRed ?? 0) : null;
+    protected static int? MaximoConocido(DisponibilidadDeEdicion? disponibilidad) => ServiciosDelCarrito.MaximoConocido(disponibilidad);
 
     protected async Task<IReadOnlyDictionary<Guid, EdicionConsultada>?> EdicionesDeLaVista(Guid edicionId, CarritoDeDominio? existente, CancellationToken cancelacion)
     {

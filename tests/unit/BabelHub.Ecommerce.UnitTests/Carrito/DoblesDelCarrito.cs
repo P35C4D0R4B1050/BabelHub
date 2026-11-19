@@ -184,7 +184,7 @@ internal sealed class RepositorioDeCarritosEnMemoria(BitacoraDeBloqueos bitacora
 
     public Task<CarritoDeDominio?> Obtener(Guid carritoId, bool conBloqueo, CancellationToken cancelacion = default)
     {
-        bitacora.Anotar(conBloqueo, "carrito");
+        bitacora.Anotar(conBloqueo, $"carrito:{carritoId}");
         return Task.FromResult(_carritos.FirstOrDefault(c => c.Id == carritoId));
     }
 
@@ -207,6 +207,14 @@ internal sealed class RepositorioDeCarritosEnMemoria(BitacoraDeBloqueos bitacora
     public Task AgregarAvisos(Guid cuentaId, IReadOnlyList<AvisoDelCarrito> avisos, CancellationToken cancelacion = default)
     {
         _avisos.AddRange(avisos.Select(a => (cuentaId, a, false)));
+        return Task.CompletedTask;
+    }
+
+    public List<(byte[] Huella, Guid CarritoId)> Fusiones { get; } = [];
+
+    public Task RegistrarFusion(byte[] huellaDeLaCookie, Guid carritoDeCuentaId, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        Fusiones.Add((huellaDeLaCookie, carritoDeCuentaId));
         return Task.CompletedTask;
     }
 
@@ -355,6 +363,8 @@ internal sealed class EntornoDelCarrito
 
     public PagosFalso Pagos { get; }
 
+    public AuditoriaDelCarritoEspia Auditoria { get; } = new();
+
     public EstadoDeCuentaFalso Cuenta { get; } = new();
 
     public LimitadorDeCarritoFalso Limites { get; } = new();
@@ -367,7 +377,7 @@ internal sealed class EntornoDelCarrito
 
     /// <summary>Los servicios compartidos de los casos de uso, armados con los dobles de este entorno.</summary>
     public ServiciosDelCarrito Servicios() =>
-        new(new AutorizadorDelCarrito(Actor, Denegaciones), Catalogo, Disponibilidad, Posesion, Cuenta, Limites, Carritos, Checkouts, Identificadores, Reloj, Unidad, new EdicionConCheckoutVivo(Pagos, Checkouts));
+        new(new AutorizadorDelCarrito(Actor, Denegaciones), Catalogo, Disponibilidad, Posesion, Cuenta, Limites, Carritos, Checkouts, Identificadores, Reloj, Unidad, new EdicionConCheckoutVivo(Pagos, Checkouts), Auditoria);
 
     public static EntornoDelCarrito DeCliente(Guid? cuenta = null) => new(ActorDePrueba.DeCliente(cuenta));
 
@@ -388,5 +398,24 @@ internal sealed class EntornoDelCarrito
         Catalogo.Poner(id, FormatoDeEdicion.Digital, precio, titulo);
         Disponibilidad.Digital(id);
         return id;
+    }
+}
+
+/// <summary>La auditoría de Carrito que guarda lo registrado y puede fallar como una auditoría caída (el caso de uso entonces falla).</summary>
+internal sealed class AuditoriaDelCarritoEspia : IAuditoriaDelCarrito
+{
+    public List<(Guid CuentaId, int LineasDelVisitante, IReadOnlyList<MotivoDeAjusteDeAviso> Ajustes)> Fusiones { get; } = [];
+
+    public bool Caida { get; set; }
+
+    public Task FusionAplicada(Guid cuentaId, int lineasDelVisitante, IReadOnlyList<MotivoDeAjusteDeAviso> ajustes, CancellationToken cancelacion = default)
+    {
+        if (Caida)
+        {
+            throw new InvalidOperationException("La auditoría no está disponible.");
+        }
+
+        Fusiones.Add((cuentaId, lineasDelVisitante, ajustes));
+        return Task.CompletedTask;
     }
 }
