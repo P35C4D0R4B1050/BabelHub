@@ -48,6 +48,8 @@ RUN set -eu; \
 # --- fin: estilos de la interfaz web ---
 
 RUN dotnet publish src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api/BabelHub.Ecommerce.Api.csproj -c Release -o /app --no-restore /p:UseAppHost=false
+# El sembrador de sesiones de desarrollo solo existe en una compilación Debug: si el binario publicado lo nombra, la construcción falla.
+RUN ! grep -rl --include=*.dll SembradorDeSesiones /app
 
 # La imagen final es de la arquitectura de destino. Corre sin privilegios (el usuario «app» de la imagen base).
 FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:bfd912c83295ce66d4b706ebb8541b9f14259b0e76fbb88b2751f58ce2399d2e AS final

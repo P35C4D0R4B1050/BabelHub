@@ -31,7 +31,7 @@ internal sealed class RepositorioDeFuentesEnMemoria : IRepositorioDeFuentes
 
     public Fuente Agregar(string codigo, string? region = null, bool recepcion = false)
     {
-        var fuente = Fuente.Registrar(Guid.NewGuid(), codigo, char.ToUpperInvariant(codigo[0]) + codigo[1..], region ?? codigo, null, recepcion);
+        var fuente = Fuente.Registrar(Fuente.IdentificadorDe(codigo), codigo, char.ToUpperInvariant(codigo[0]) + codigo[1..], region ?? codigo, null, recepcion);
         Fuentes.Add(fuente);
         return fuente;
     }

@@ -1,6 +1,7 @@
 using BabelHub.Inventario.Application.Fuentes;
 using BabelHub.Inventario.Application.Fuentes.Interno;
 using BabelHub.Inventario.Application.Plataforma;
+using BabelHub.Inventario.Domain.Fuentes;
 using BabelHub.Inventario.UnitTests.Soporte;
 
 namespace BabelHub.Inventario.UnitTests.Fuentes;
@@ -89,14 +90,16 @@ public sealed class ConsultasDeFuenteTests
     public async Task ListarFuentes_LaAdministracionVeTodas_ElEncargadoSoloLaSuya()
     {
         var admin = new EntornoDeFuentes();
-        var cusco = new EntornoDeFuentes();
-        var encargadoDeCusco = new EntornoDeFuentes(ActorDePrueba.DeEncargadoDe(cusco.Cusco.Id));
+        var encargadoDeCusco = new EntornoDeFuentes(ActorDePrueba.DeEncargadoDe(Fuente.IdentificadorDe("cusco")));
+        var encargadoDeOtra = new EntornoDeFuentes(ActorDePrueba.DeEncargadoDe(Fuente.IdentificadorDe("piura")));
 
         var todas = await Listar(admin).Ejecutar(new ListarFuentesEntrada());
         var suya = await Listar(encargadoDeCusco).Ejecutar(new ListarFuentesEntrada());
+        var deOtraSucursal = await Listar(encargadoDeOtra).Ejecutar(new ListarFuentesEntrada());
 
         Assert.Equal(["ayacucho", "cusco", "lima"], todas.Valor.Select(f => f.Codigo));
-        Assert.Empty(suya.Valor);
+        Assert.Equal(["cusco"], suya.Valor.Select(f => f.Codigo));
+        Assert.Empty(deOtraSucursal.Valor); // el encargado de una sucursal que no está entre las fuentes no ve ninguna
 
         // El encargado de una sucursal que sí existe en su entorno ve exactamente la suya.
         var propio = new EntornoDeFuentes();

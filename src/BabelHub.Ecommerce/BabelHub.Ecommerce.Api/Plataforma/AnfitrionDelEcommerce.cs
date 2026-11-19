@@ -443,6 +443,10 @@ public static class AnfitrionDelEcommerce
         servicios.AgregarDoblesProvisionalesDelCarrito(guardarProduccion);
         servicios.AgregarDoblesProvisionalesDePagos(guardarProduccion);
         servicios.AgregarDoblesProvisionalesDePedidos(guardarProduccion);
+#if DEBUG
+        // Solo en una compilación Debug y en Development (nunca en la imagen de producción, que se publica en Release): el sembrador de sesiones de los recorridos E2E.
+        servicios.AgregarSembradorDeSesiones(builder.Environment.IsDevelopment());
+#endif
         return opciones;
     }
 
@@ -470,6 +474,9 @@ public static class AnfitrionDelEcommerce
         // Notificaciones: la solicitud del Inventario y la administración (desactivar, reactivar y consultar); los estados de entrega de n8n solo existen si el envío es por n8n (con su firma verificable) y son de la red interna.
         app.MapearNotificaciones();
         app.MapearEstadosDeEntregaDeN8n(habilitada: app.Services.GetService<OpcionesDeEnvioPorN8n>() is not null);
+#if DEBUG
+        app.MapearSembradorDeSesiones();
+#endif
         app.MapDefaultControllerRoute();
         return app;
     }

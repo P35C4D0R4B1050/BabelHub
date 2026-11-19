@@ -38,6 +38,8 @@ poner BABELHUB__Seguridad__Turnstile__Hostnames "localhost"
 poner BABELHUB__Seguridad__Turnstile__ClaveDeSitio "0x4AAAAAAAdeSitioLocal"
 poner BABELHUB__Identidad__ClaveDeCifradoDeClaves "$(versionada)"
 poner BABELHUB__Identidad__Pimienta "$(versionada)"
+# Clave aleatoria del sembrador de sesiones de desarrollo (solo Debug + Development, tests/e2e/README.md): sin ella el endpoint ni se mapea.
+poner BABELHUB__Sembrador__Clave "$(alea 40)"
 poner BABELHUB__Web__Host tienda
 poner BABELHUB__Web__HostsPermitidos "localhost"
 poner BABELHUB__Web__ClaveDeSesionesTienda "$(alea 40)"

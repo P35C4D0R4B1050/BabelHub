@@ -60,6 +60,18 @@ public sealed class DispositivosDeLaCuenta(
     IUnidadDeTrabajo unidad,
     IReloj reloj) : IDispositivosDeLaCuenta
 {
+    public async Task<Resultado<bool>> Reconoce(Guid usuarioId, ValorSecreto? marcaPresentada, string? region, CancellationToken cancelacion = default)
+    {
+        if (await alcance.Comprobar(usuarioId, cancelacion).ConfigureAwait(false) is { } prohibido)
+        {
+            return Resultado<bool>.Fallo(prohibido);
+        }
+
+        var lista = await dispositivos.Listar(usuarioId, cancelacion).ConfigureAwait(false);
+        var huella = marcaPresentada is null ? null : huellas.DeValorOpaco(marcaPresentada.Revelar());
+        return Resultado<bool>.Exito(ConfianzaDeDispositivos.Evaluar(huella, region, [.. lista], reloj.Ahora).PermiteAplicarElCambio);
+    }
+
     public async Task<Resultado<MarcaDeDispositivoEmitida>> RegistrarElIngresoCompleto(Guid usuarioId, ValorSecreto? marcaPresentada, string? region, CancellationToken cancelacion = default)
     {
         if (await alcance.Comprobar(usuarioId, cancelacion).ConfigureAwait(false) is { } prohibido)

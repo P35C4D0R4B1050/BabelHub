@@ -208,6 +208,20 @@ internal sealed class RepositorioDeCuentasEnMemoria(BdIdentidad bd) : IRepositor
         var encargado = bd.Cuentas.Values.FirstOrDefault(c => c is { CanceladaEn: null, Usuario: { Rol: RolDeUsuario.EncargadoDeSucursal, Activo: true } } && c.Usuario.Sucursal == sucursal);
         return Task.FromResult<EncargadoDeSucursal?>(encargado is null ? null : new EncargadoDeSucursal(encargado.Usuario.Id, sucursal));
     }
+
+    public Task<IReadOnlyList<CuentaDeIdentidad>> Listar(RolDeUsuario? rol, bool? activo, string? correo, string? despuesDelCorreo, bool soloPersonal, int tamano, CancellationToken cancelacion = default)
+    {
+        var normalizado = correo is null ? null : Usuario.NormalizarCorreo(correo);
+        return Task.FromResult<IReadOnlyList<CuentaDeIdentidad>>([.. bd.Cuentas.Values
+            .Where(c => c.CanceladaEn is null
+                && (rol is null || c.Usuario.Rol == rol)
+                && (activo is null || c.Usuario.Activo == activo)
+                && (!soloPersonal || c.Usuario.Rol != RolDeUsuario.Cliente)
+                && (normalizado is null || c.Usuario.Correo == normalizado)
+                && (despuesDelCorreo is null || string.CompareOrdinal(c.Usuario.Correo, despuesDelCorreo) > 0))
+            .OrderBy(c => c.Usuario.Correo, StringComparer.Ordinal)
+            .Take(tamano)]);
+    }
 }
 
 internal sealed class RenovacionesEnMemoria(BdIdentidad bd) : IRepositorioDeRenovaciones

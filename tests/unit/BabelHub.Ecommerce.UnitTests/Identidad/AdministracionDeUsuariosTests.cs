@@ -29,9 +29,9 @@ public sealed class AdministracionDeUsuariosTests
     public async Task Crear_UnEncargado_DaUnaContrasenaTemporalDe24Horas_YAudita_SinRegistrarLaContrasena()
     {
         var (e, admin, administracion) = Escenario();
-        var sucursal = Guid.NewGuid();
+        var sucursal = IdentificadorDeSucursal.DesdeCodigo("ayacucho")!.Value;
 
-        var creado = await administracion.Crear(admin.Usuario.Id, "  Beatriz  ", "Beatriz@Example.com", RolDeCuenta.EncargadoDeSucursal, sucursal);
+        var creado = await administracion.Crear(admin.Usuario.Id, "  Beatriz  ", "Beatriz@Example.com", RolDeCuenta.EncargadoDeSucursal, "  Ayacucho ");
 
         Assert.True(creado.EsExito);
         Assert.Equal("beatriz@example.com", creado.Valor.Usuario.Correo);
@@ -85,7 +85,7 @@ public sealed class AdministracionDeUsuariosTests
     {
         var (e, admin, administracion) = Escenario();
 
-        var resultado = await administracion.Crear(admin.Usuario.Id, "Persona", "otra@example.com", rol, conSucursal ? Guid.NewGuid() : null);
+        var resultado = await administracion.Crear(admin.Usuario.Id, "Persona", "otra@example.com", rol, conSucursal ? "lima" : null);
 
         Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
         Assert.Single(e.Bd.Cuentas);
@@ -119,10 +119,10 @@ public sealed class AdministracionDeUsuariosTests
     public async Task Crear_UnEncargado_EnUnaSucursalOcupada_SeRechazaIndicandoQuienLaTiene()
     {
         var (e, admin, administracion) = Escenario();
-        var sucursal = Guid.NewGuid();
+        var sucursal = IdentificadorDeSucursal.DesdeCodigo("lima")!.Value;
         var actual = e.Cuenta("actual@example.com", RolDeUsuario.EncargadoDeSucursal, sucursal: sucursal);
 
-        var resultado = await administracion.Crear(admin.Usuario.Id, "Otro", "otro@example.com", RolDeCuenta.EncargadoDeSucursal, sucursal);
+        var resultado = await administracion.Crear(admin.Usuario.Id, "Otro", "otro@example.com", RolDeCuenta.EncargadoDeSucursal, "lima");
 
         Assert.Equal(CategoriaDeError.Conflicto, resultado.Error!.Categoria);
         Assert.Equal("sucursal-con-encargado", resultado.Error.Clave);
@@ -235,7 +235,7 @@ public sealed class AdministracionDeUsuariosTests
         var sesion = await e.Sesiones.Nueva(objetivo.Usuario, e.Reloj.Ahora, default);
         e.Reloj.Ahora = EntornoDeIdentidad.Inicio.AddMinutes(5);
 
-        var cambio = await administracion.CambiarElRol(admin.Usuario.Id, objetivo.Usuario.Id, RolDeCuenta.EncargadoDeSucursal, Guid.NewGuid());
+        var cambio = await administracion.CambiarElRol(admin.Usuario.Id, objetivo.Usuario.Id, RolDeCuenta.EncargadoDeSucursal, "cusco");
 
         Assert.True(cambio.EsExito);
         var auditada = Assert.Single(e.Auditoria.Registradas);
@@ -254,7 +254,7 @@ public sealed class AdministracionDeUsuariosTests
         var objetivo = e.Cuenta("persona@example.com");
 
         var sinSucursal = await administracion.CambiarElRol(admin.Usuario.Id, objetivo.Usuario.Id, RolDeCuenta.EncargadoDeSucursal, null);
-        var conSucursal = await administracion.CambiarElRol(admin.Usuario.Id, objetivo.Usuario.Id, RolDeCuenta.Logistica, Guid.NewGuid());
+        var conSucursal = await administracion.CambiarElRol(admin.Usuario.Id, objetivo.Usuario.Id, RolDeCuenta.Logistica, "cusco");
 
         Assert.Equal(CategoriaDeError.Validacion, sinSucursal.Error!.Categoria);
         Assert.Equal(CategoriaDeError.Validacion, conSucursal.Error!.Categoria);
@@ -267,11 +267,11 @@ public sealed class AdministracionDeUsuariosTests
     public async Task CambiarElRol_ASegundoEncargadoDeUnaSucursal_SeRechazaIndicandoQuienLaTiene()
     {
         var (e, admin, administracion) = Escenario();
-        var sucursal = Guid.NewGuid();
+        var sucursal = IdentificadorDeSucursal.DesdeCodigo("lima")!.Value;
         var actual = e.Cuenta("actual@example.com", RolDeUsuario.EncargadoDeSucursal, sucursal: sucursal);
         var candidato = e.Cuenta("candidato@example.com", RolDeUsuario.Logistica);
 
-        var resultado = await administracion.CambiarElRol(admin.Usuario.Id, candidato.Usuario.Id, RolDeCuenta.EncargadoDeSucursal, sucursal);
+        var resultado = await administracion.CambiarElRol(admin.Usuario.Id, candidato.Usuario.Id, RolDeCuenta.EncargadoDeSucursal, "lima");
 
         Assert.Equal("sucursal-con-encargado", resultado.Error!.Clave);
         Assert.Equal(actual.Usuario.Id.ToString("D"), Assert.Single(resultado.Error.Errores).Clave);
@@ -588,5 +588,174 @@ public sealed class AdministracionDeUsuariosTests
 
         Assert.All(e.Denegaciones.Registradas, d => Assert.Equal("fuera-de-rol", d.Motivo));
         Assert.Equal(2, e.Denegaciones.Registradas.Count);
+    }
+
+    // ---------------------------------------------------------------- D20: la sucursal del encargado se asigna por código
+
+    [Theory]
+    [InlineData("Ayacucho", "ayacucho")]
+    [InlineData("  LIMA  ", "lima")]
+    [Trait("Criterio", "AC-IDE-05")]
+    public async Task Crear_UnEncargado_PorCodigo_GuardaElIdentificadorDerivado_YLoEmiteEnLaCredencial(string escrito, string canonico)
+    {
+        var (e, admin, administracion) = Escenario();
+
+        var creado = await administracion.Crear(admin.Usuario.Id, "Beatriz", "beatriz@example.com", RolDeCuenta.EncargadoDeSucursal, escrito);
+
+        var esperado = IdentificadorDeSucursal.DesdeCodigo(canonico);
+        Assert.True(creado.EsExito);
+        Assert.Equal(esperado, creado.Valor.Usuario.Sucursal);
+        Assert.Equal(esperado, (await e.Cuentas.PorId(creado.Valor.Usuario.UsuarioId, paraActualizar: false, default))!.Usuario.Sucursal);
+        Assert.Equal(1, e.Inventario.Consultas);
+    }
+
+    [Theory]
+    [InlineData("no-existe", "validacion-invalida", "desconocida")]
+    [InlineData("lima central", "validacion-invalida", "invalida")]
+    [InlineData("../lima", "validacion-invalida", "invalida")]
+    [Trait("Criterio", "AC-IDE-05")]
+    public async Task Crear_UnEncargado_ConUnCodigoQueNoEsDeUnaSucursalDelInventario_SeRechaza_SinCrearLaCuenta(string codigo, string claveEsperada, string claveDeCampo)
+    {
+        var (e, admin, administracion) = Escenario();
+
+        var resultado = await administracion.Crear(admin.Usuario.Id, "Beatriz", "beatriz@example.com", RolDeCuenta.EncargadoDeSucursal, codigo);
+
+        Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
+        Assert.Equal(claveEsperada, resultado.Error.Clave);
+        Assert.Equal(claveDeCampo, Assert.Single(resultado.Error.Errores!).Clave);
+        Assert.Null(await e.Cuentas.PorCorreo("beatriz@example.com", default));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-05")]
+    public async Task AsignarUnaSucursal_SiElInventarioNoResponde_FallaCerrado_NuncaSeAsignaSinComprobar()
+    {
+        var (e, admin, administracion) = Escenario();
+        var objetivo = e.Cuenta("persona@example.com");
+        var rolOriginal = objetivo.Usuario.Rol;
+        e.Inventario.NoResponde = true;
+
+        var crear = await administracion.Crear(admin.Usuario.Id, "Beatriz", "beatriz@example.com", RolDeCuenta.EncargadoDeSucursal, "lima");
+        var cambiar = await administracion.CambiarElRol(admin.Usuario.Id, objetivo.Usuario.Id, RolDeCuenta.EncargadoDeSucursal, "lima");
+
+        Assert.Equal("servicio-no-disponible", crear.Error!.Clave);
+        Assert.Equal("servicio-no-disponible", cambiar.Error!.Clave);
+        Assert.Equal(rolOriginal, (await e.Cuentas.PorId(objetivo.Usuario.Id, paraActualizar: false, default))!.Usuario.Rol);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-05")]
+    public async Task CambiarElRol_AEncargado_PorCodigo_GuardaElIdentificadorDerivado()
+    {
+        var (e, admin, administracion) = Escenario();
+        var objetivo = e.Cuenta("persona@example.com");
+
+        var cambio = await administracion.CambiarElRol(admin.Usuario.Id, objetivo.Usuario.Id, RolDeCuenta.EncargadoDeSucursal, "cusco");
+
+        Assert.True(cambio.EsExito);
+        Assert.Equal(IdentificadorDeSucursal.DesdeCodigo("cusco"), cambio.Valor.Sucursal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-05")]
+    public async Task UnRolQueNoLlevaSucursal_NoConsultaAlInventario_YRechazaElCodigo()
+    {
+        var (e, admin, administracion) = Escenario();
+
+        var resultado = await administracion.Crear(admin.Usuario.Id, "Luis", "luis@example.com", RolDeCuenta.Logistica, "lima");
+
+        Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
+        Assert.Equal("sucursal", Assert.Single(resultado.Error.Errores).Campo);
+        Assert.Equal(0, e.Inventario.Consultas);
+    }
+
+    // ---------------------------------------------------------------- listar (WEB-35)
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-29")]
+    public async Task Listar_SinCorreo_EntregaSoloElPersonal_OrdenadoPorCorreo_YNuncaLosClientes()
+    {
+        var (e, admin, administracion) = Escenario();
+        e.Cuenta("zeta@example.com", RolDeUsuario.Logistica);
+        e.Cuenta("ana@example.com", RolDeUsuario.Logistica);
+        e.Cuenta("cliente@example.com", RolDeUsuario.Cliente);
+
+        var pagina = (await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios())).Valor;
+
+        Assert.Equal(["admin@example.com", "ana@example.com", "zeta@example.com"], pagina.Usuarios.Select(u => u.Correo));
+        Assert.DoesNotContain(pagina.Usuarios, u => u.Rol == RolDeCuenta.Cliente);
+        Assert.Null(pagina.Siguiente);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-29")]
+    public async Task Listar_UnClienteSoloSeEncuentraPorSuCorreoExacto()
+    {
+        var (e, admin, administracion) = Escenario();
+        e.Cuenta("cliente@example.com", RolDeUsuario.Cliente);
+
+        var exacto = (await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Correo: " Cliente@Example.com "))).Valor;
+        var otro = (await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Correo: "otro@example.com"))).Valor;
+        var porRol = await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Rol: RolDeCuenta.Cliente));
+
+        Assert.Equal("cliente@example.com", Assert.Single(exacto.Usuarios).Correo);
+        Assert.Empty(otro.Usuarios);
+        Assert.Equal("cliente-solo-por-correo", Assert.Single(porRol.Error!.Errores).Clave);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-29")]
+    public async Task Listar_PaginaPorCursor_YFiltraPorRolYEstado()
+    {
+        var (e, admin, administracion) = Escenario();
+        e.Cuenta("a@example.com", RolDeUsuario.Logistica);
+        e.Cuenta("b@example.com", RolDeUsuario.Logistica);
+        e.Cuenta("c@example.com", RolDeUsuario.Logistica, activa: false);
+
+        var primera = (await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Rol: RolDeCuenta.Logistica, Tamano: 2))).Valor;
+        var segunda = (await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Rol: RolDeCuenta.Logistica, Tamano: 2, Despues: primera.Siguiente))).Valor;
+        var inactivos = (await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Activo: false))).Valor;
+
+        Assert.Equal(["a@example.com", "b@example.com"], primera.Usuarios.Select(u => u.Correo));
+        Assert.Equal("b@example.com", primera.Siguiente);
+        Assert.Equal(["c@example.com"], segunda.Usuarios.Select(u => u.Correo));
+        Assert.Null(segunda.Siguiente);
+        Assert.Equal(["c@example.com"], inactivos.Usuarios.Select(u => u.Correo));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-29")]
+    public async Task Listar_ElTamanoSeAcota_YUnFiltroInvalidoSeRechaza()
+    {
+        var (e, admin, administracion) = Escenario();
+        for (var i = 0; i < 55; i++)
+        {
+            e.Cuenta($"p{i:D2}@example.com", RolDeUsuario.Logistica);
+        }
+
+        var grande = (await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Tamano: 500))).Valor;
+        var porOmision = (await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Tamano: 0))).Valor;
+        var rolInvalido = await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Rol: (RolDeCuenta)99));
+        var correoInvalido = await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Correo: "no es un correo"));
+        var cursorLargo = await administracion.Listar(admin.Usuario.Id, new FiltroDeUsuarios(Despues: new string('a', 255)));
+
+        Assert.Equal(50, grande.Usuarios.Count);
+        Assert.NotNull(grande.Siguiente);
+        Assert.Equal(20, porOmision.Usuarios.Count);
+        Assert.All(new[] { rolInvalido, correoInvalido, cursorLargo }, r => Assert.Equal(CategoriaDeError.Validacion, r.Error!.Categoria));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-29")]
+    public async Task Listar_SoloLoHaceElAdministradorCentralActivo()
+    {
+        var (e, _, administracion) = Escenario();
+        var encargado = e.Cuenta("encargado@example.com", RolDeUsuario.EncargadoDeSucursal, sucursal: Guid.NewGuid());
+        e.Actor.Actual = ActorActual.DeUsuario(encargado.Usuario.Id, "encargado-de-sucursal");
+
+        var resultado = await administracion.Listar(encargado.Usuario.Id, new FiltroDeUsuarios());
+
+        Assert.Equal(CategoriaDeError.Prohibido, resultado.Error!.Categoria);
+        Assert.Single(e.Denegaciones.Registradas);
     }
 }

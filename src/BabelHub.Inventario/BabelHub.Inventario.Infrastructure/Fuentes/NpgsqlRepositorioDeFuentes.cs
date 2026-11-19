@@ -6,7 +6,7 @@ namespace BabelHub.Inventario.Infrastructure.Fuentes;
 
 /// <summary>
 /// <see cref="IRepositorioDeFuentes"/> sobre PostgreSQL. Las restricciones únicas de código y de nombre son la última defensa de dos altas simultáneas: se distinguen por el <b>nombre de la
-/// restricción</b> (<c>uq_fuentes_codigo</c>, <c>uq_fuentes_nombre</c>) y se devuelven como resultado. La violación del índice parcial de recepción <b>no</b> se traduce a «código repetido»: es un
+/// restricción</b> (<c>uq_fuentes_codigo</c> o, como el identificador se deriva del código, <c>fuentes_pkey</c>; <c>uq_fuentes_nombre</c>) y se devuelven como resultado. La violación del índice parcial de recepción <b>no</b> se traduce a «código repetido»: es un
 /// defecto (otro camino dejó dos recepciones) y se deja subir. Tras una violación la transacción queda abortada: el caso de uso termina con un fallo y la unidad de trabajo la revierte.
 /// Nunca se concatena SQL con datos del usuario.
 /// </summary>
@@ -14,6 +14,9 @@ internal sealed class NpgsqlRepositorioDeFuentes(AccesoAFuentes acceso) : IRepos
 {
     private const string ViolacionDeUnicidad = "23505";
     private const string RestriccionDelCodigo = "uq_fuentes_codigo";
+
+    /// <summary>El identificador de una fuente se deriva de su código (D20): repetir el código choca primero con la clave primaria, y significa lo mismo que chocar con la unicidad del código.</summary>
+    private const string RestriccionDelIdentificador = "fuentes_pkey";
     private const string RestriccionDelNombre = "uq_fuentes_nombre";
     private const string Columnas = "id, codigo, nombre, region, contacto_aviso, es_recepcion";
 
@@ -102,7 +105,7 @@ internal sealed class NpgsqlRepositorioDeFuentes(AccesoAFuentes acceso) : IRepos
                     await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);
                     return ResultadoDeEscrituraDeFuente.Escrita;
                 }
-                catch (PostgresException ex) when (ex.SqlState == ViolacionDeUnicidad && ex.ConstraintName == RestriccionDelCodigo)
+                catch (PostgresException ex) when (ex.SqlState == ViolacionDeUnicidad && ex.ConstraintName is RestriccionDelCodigo or RestriccionDelIdentificador)
                 {
                     return ResultadoDeEscrituraDeFuente.CodigoRepetido;
                 }
@@ -127,9 +130,17 @@ internal sealed class NpgsqlRepositorioDeFuentes(AccesoAFuentes acceso) : IRepos
                 await using var lector = await comando.ExecuteReaderAsync(token).ConfigureAwait(false);
                 while (await lector.ReadAsync(token).ConfigureAwait(false))
                 {
+                    var id = lector.GetGuid(0);
+                    var codigo = lector.GetString(1);
+                    if (Fuente.EsCodigoValido(codigo) && id != Fuente.IdentificadorDe(codigo))
+                    {
+                        // Una fila anterior a D20 (con un Id aleatorio): dejaría al encargado sin alcance. Se distingue de un error de programación y no lleva el Id.
+                        throw new FuenteConIdentificadorInconsistenteException(codigo);
+                    }
+
                     fuentes.Add(Fuente.Registrar(
-                        lector.GetGuid(0),
-                        lector.GetString(1),
+                        id,
+                        codigo,
                         lector.GetString(2),
                         lector.GetString(3),
                         lector.IsDBNull(4) ? null : lector.GetString(4),
@@ -140,3 +151,10 @@ internal sealed class NpgsqlRepositorioDeFuentes(AccesoAFuentes acceso) : IRepos
             },
             cancelacion);
 }
+
+/// <summary>
+/// Una fila de <c>fuentes.fuentes</c> cuyo <c>id</c> no es el derivado de su código (D20): suele ser una fuente registrada antes de D20, con un identificador aleatorio. Falla cerrado (esa sucursal no tendría alcance) y se
+/// distingue de un error de programación; <b>solo lleva el código</b> (público), nunca el identificador. Se corrige recreando la base de desarrollo o migrando el <c>id</c> de la fuente y de sus tablas dependientes.
+/// </summary>
+public sealed class FuenteConIdentificadorInconsistenteException(string codigo)
+    : InvalidOperationException($"La fuente de código «{codigo}» tiene un identificador que no es el derivado de su código (D20).");

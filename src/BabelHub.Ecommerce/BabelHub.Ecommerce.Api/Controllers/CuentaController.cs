@@ -58,6 +58,7 @@ public sealed class CuentaVista : ModeloBaseDePagina
 public sealed class CuentaController(
     ICuentaDelCliente cuenta,
     ICambioDeCorreo correo,
+    IDispositivosDeLaCuenta dispositivos,
     ICancelacionDeCuenta cancelacion,
     ISolicitudesDeDatos solicitudes,
     ISesionesWeb sesiones,
@@ -219,8 +220,15 @@ public sealed class CuentaController(
     public Task<IActionResult> MarcarElAvisoComoVisto(Guid id, CancellationToken cancelacion) =>
         Accion([], PantallaDeLaCuenta.Avisos, "aviso-visto", async (actor, _, token) =>
         {
-            // Que un aviso se mostró lo informa solo esta acción explícita de la persona (nunca una consulta automática ni un prefetch). La web no puede afirmar que la sesión es reconocida (la cookie del dispositivo la controla quien tiene la sesión): falla cerrada con false hasta que Identidad ofrezca «reconoce este dispositivo» (hallazgo).
-            var resultado = await cuenta.MarcarElAvisoComoVisto(actor.UsuarioId, id, desdeUnaSesionReconocida: false, token);
+            // Que un aviso se mostró lo informa solo esta acción explícita de la persona (nunca una consulta automática ni un prefetch). La web no afirma que la sesión es reconocida (la cookie del dispositivo la controla quien tiene la sesión): lo decide Identidad con la marca y la región del borde (IDE-55, IDE-76).
+            var borde = DatosDelBorde.Leer(Request);
+            var reconocida = await dispositivos.Reconoce(actor.UsuarioId, borde.Marca is null ? null : new ValorSecreto(borde.Marca), borde.Region, token);
+            if (!reconocida.EsExito)
+            {
+                return reconocida.Error;
+            }
+
+            var resultado = await cuenta.MarcarElAvisoComoVisto(actor.UsuarioId, id, desdeUnaSesionReconocida: reconocida.Valor, token);
             return resultado.EsExito ? null : resultado.Error;
         }, cancelacion);
 

@@ -141,7 +141,7 @@ public sealed class PostgresDeReservasFixture : IAsyncLifetime
 
     public async Task<Guid> AgregarFuente(string codigo, string? region = null, bool recepcion = false)
     {
-        var id = Guid.NewGuid();
+        var id = PostgresDeFuentesFixture.IdDeFuente(codigo);
         await using var comando = Administracion.CreateCommand(
             "INSERT INTO fuentes.fuentes (id, codigo, nombre, region, es_recepcion) VALUES (@id, @codigo, @nombre, @region, @recepcion)");
         comando.Parameters.AddWithValue("id", id);

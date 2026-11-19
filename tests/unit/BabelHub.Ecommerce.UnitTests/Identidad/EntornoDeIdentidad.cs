@@ -74,6 +74,9 @@ internal sealed class EntornoDeIdentidad
 
     public CancelacionDeAvisosDePrueba CancelacionDeAvisos { get; } = new();
 
+    /// <summary>Las sucursales que el Inventario dice tener (<c>sucursales.listar</c>) y si responde: lo que Identidad valida al asignar la sucursal de un encargado por código (D20).</summary>
+    public InventarioDeSucursalesDePrueba Inventario { get; } = new();
+
     public AvisosDeCuentaEnMemoria AvisosGuardados { get; }
 
     public DispositivosEnMemoria Dispositivos { get; }
@@ -247,6 +250,7 @@ internal static class EntornoDeLaAdministracionExtensiones
         e.Revocacion,
         e.CancelacionDeAvisos,
         e.Avisos,
+        e.Inventario,
         e.Unidad,
         e.Auditoria,
         e.Reloj);
@@ -400,4 +404,22 @@ internal static class EntornoDeLosPuertosExtensiones
     public static DestinatariosDeAlertasDeIdentidad Destinatarios(this EntornoDeIdentidad e) => new(e.Cuentas);
 
     public static RestauracionDeIdentidad Restauracion(this EntornoDeIdentidad e) => new(e.Claves(), e.Renovaciones, e.Unidad, e.Reloj);
+}
+
+/// <summary>El catálogo de sucursales de prueba (lo que <c>sucursales.listar</c> del Inventario dice, D20): los códigos que existen, si el Inventario responde y cuántas veces se consultó.</summary>
+public sealed class InventarioDeSucursalesDePrueba : ICatalogoDeSucursales
+{
+    public List<string> Codigos { get; } = ["ayacucho", "lima", "cusco"];
+
+    public bool NoResponde { get; set; }
+
+    public int Consultas { get; private set; }
+
+    public Task<ExistenciaDeSucursal> Existe(string codigoDeSucursal, CancellationToken cancelacion = default)
+    {
+        Consultas++;
+        return Task.FromResult(NoResponde
+            ? ExistenciaDeSucursal.NoDisponible
+            : Codigos.Contains(codigoDeSucursal.Trim(), StringComparer.OrdinalIgnoreCase) ? ExistenciaDeSucursal.Existe : ExistenciaDeSucursal.NoExiste);
+    }
 }

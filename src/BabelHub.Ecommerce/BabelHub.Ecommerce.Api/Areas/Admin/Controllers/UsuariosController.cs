@@ -19,11 +19,16 @@ public sealed class UsuariosVista : ModeloBaseDePagina
     public string? ContrasenaTemporal { get; set; }
 
     public DateTimeOffset? ContrasenaVenceEn { get; set; }
+
+    /// <summary>Los primeros usuarios del personal (por correo), para no pedir el identificador a mano; <see langword="null"/> si no se pudo leer.</summary>
+    public PaginaDeUsuarios? Lista { get; set; }
+
+    public bool ListaNoDisponible { get; set; }
 }
 
 /// <summary>
 /// Los usuarios y roles (T30; WEB-35, AC-WEB-29): crear un usuario del personal con su contraseña temporal, cambiar su rol y sucursal, desactivarlo o reactivarlo y restablecer su contraseña o su segundo factor, <b>solo para la administración central</b> (la decide Identidad, <see cref="IAdministracionDeUsuarios"/>; otro rol recibe «sin permiso»).
-/// <b>Presentación pura</b>: cada acción es un <c>POST</c> con esquema estricto; la contraseña temporal se muestra una sola vez en la respuesta (<c>no-store</c>) y no se guarda ni se registra. Identidad aún no ofrece una lista ni una búsqueda de usuarios: las acciones sobre un usuario existente piden su identificador (hallazgo registrado).
+/// <b>Presentación pura</b>: cada acción es un <c>POST</c> con esquema estricto; la contraseña temporal se muestra una sola vez en la respuesta (<c>no-store</c>) y no se guarda ni se registra.
 /// </summary>
 [Area("Admin")]
 public sealed class UsuariosController(IAdministracionDeUsuarios usuarios, ContextoDePagina pagina) : Controller
@@ -45,7 +50,7 @@ public sealed class UsuariosController(IAdministracionDeUsuarios usuarios, Conte
     public Task<IActionResult> Crear(CancellationToken cancelacion) =>
         Operar(["nombre", "correo", "rol", "sucursal"], async (admin, campos, token) =>
         {
-            if (!TryRol(campos.GetValueOrDefault("rol"), out var rol) || !TrySucursal(campos.GetValueOrDefault("sucursal"), out var sucursal) || campos.GetValueOrDefault("nombre") is not { Length: > 0 and <= 120 } nombre || campos.GetValueOrDefault("correo") is not { Length: > 0 and <= 254 } correo)
+            if (!TryRol(campos.GetValueOrDefault("rol"), out var rol) || !TryCodigoDeSucursal(campos.GetValueOrDefault("sucursal"), out var sucursal) || campos.GetValueOrDefault("nombre") is not { Length: > 0 and <= 120 } nombre || campos.GetValueOrDefault("correo") is not { Length: > 0 and <= 254 } correo)
             {
                 return Invalido();
             }
@@ -58,7 +63,7 @@ public sealed class UsuariosController(IAdministracionDeUsuarios usuarios, Conte
     public Task<IActionResult> CambiarElRol(CancellationToken cancelacion) =>
         Operar(["usuarioId", "rol", "sucursal"], async (admin, campos, token) =>
         {
-            if (!EntradasHttpDelCarrito.TryGuid(campos, "usuarioId", out var id) || !TryRol(campos.GetValueOrDefault("rol"), out var rol) || !TrySucursal(campos.GetValueOrDefault("sucursal"), out var sucursal))
+            if (!EntradasHttpDelCarrito.TryGuid(campos, "usuarioId", out var id) || !TryRol(campos.GetValueOrDefault("rol"), out var rol) || !TryCodigoDeSucursal(campos.GetValueOrDefault("sucursal"), out var sucursal))
             {
                 return Invalido();
             }
@@ -164,6 +169,28 @@ public sealed class UsuariosController(IAdministracionDeUsuarios usuarios, Conte
 
     private async Task<IActionResult> Pintar(UsuariosVista vista, int estado, CancellationToken cancelacion)
     {
+        if (estado == StatusCodes.Status200OK && HttpContext.ActorDeLaSolicitud() is { } actor)
+        {
+            try
+            {
+                var lista = await usuarios.Listar(actor.UsuarioId, new FiltroDeUsuarios(Tamano: FiltroDeUsuarios.TamanoMaximo), cancelacion);
+                vista.Lista = lista.EsExito ? lista.Valor : null;
+                vista.ListaNoDisponible = !lista.EsExito;
+                if (lista.Error is { Categoria: CategoriaDeError.Prohibido or CategoriaDeError.NoAutenticado })
+                {
+                    // Sin permiso no es «no disponible»: se pinta el estado de sin permiso (AGENTS.md §6).
+                    vista.ListaNoDisponible = false;
+                    vista.Mensaje = "No tienes permiso para administrar usuarios.";
+                    vista.EsError = true;
+                    estado = StatusCodes.Status403Forbidden;
+                }
+            }
+            catch (Exception) when (!cancelacion.IsCancellationRequested)
+            {
+                vista.ListaNoDisponible = true;
+            }
+        }
+
         await pagina.Completar(vista, "Usuarios y roles", AreaDeLaPagina.Admin, cancelacion);
         Response.Headers.CacheControl = "no-store";
         Response.StatusCode = Request.EsHtmx() ? StatusCodes.Status200OK : estado;
@@ -176,22 +203,11 @@ public sealed class UsuariosController(IAdministracionDeUsuarios usuarios, Conte
         return texto is not null && Array.IndexOf(Enum.GetNames<RolDeCuenta>(), texto) >= 0 && Enum.TryParse(texto, ignoreCase: false, out rol);
     }
 
-    /// <summary>La sucursal es opcional (el personal de logística y la administración central no la llevan); si viene, es un identificador.</summary>
-    private static bool TrySucursal(string? texto, out Guid? sucursal)
+    /// <summary>La sucursal es opcional (el personal de logística y la administración central no la llevan); si viene, es el <b>código</b> de la sucursal (D20): solo se acota su largo, y Identidad la valida contra el Inventario.</summary>
+    private static bool TryCodigoDeSucursal(string? texto, out string? codigo)
     {
-        sucursal = null;
-        if (string.IsNullOrEmpty(texto))
-        {
-            return true;
-        }
-
-        if (!Guid.TryParseExact(texto, "D", out var id) || id == Guid.Empty)
-        {
-            return false;
-        }
-
-        sucursal = id;
-        return true;
+        codigo = string.IsNullOrWhiteSpace(texto) ? null : texto.Trim();
+        return codigo is null || codigo.Length <= IdentificadorDeSucursal.LargoMaximoDelCodigo;
     }
 
     /// <summary>Lo que devuelve una operación: la pantalla con su resultado o el error de Identidad.</summary>

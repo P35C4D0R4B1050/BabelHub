@@ -58,6 +58,12 @@ public interface IRepositorioDeCuentas
 
     /// <summary>El encargado activo de la sucursal, si lo hay (IDE-06); el índice único parcial de la base respalda la regla ante dos asignaciones simultáneas.</summary>
     Task<Domain.Identidad.EncargadoDeSucursal?> EncargadoActivoDe(Guid sucursal, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Una página de cuentas no canceladas para la administración, ordenada por correo (clave única, paginación por cursor sobre el último correo): sin <paramref name="correo"/> solo el personal (nunca la lista de clientes); con el correo exacto,
+    /// esa cuenta de cualquier rol. Pide <paramref name="tamano"/> + 1 filas para saber si hay otra página.
+    /// </summary>
+    Task<IReadOnlyList<CuentaDeIdentidad>> Listar(RolDeUsuario? rol, bool? activo, string? correo, string? despuesDelCorreo, bool soloPersonal, int tamano, CancellationToken cancelacion = default);
 }
 
 /// <summary>Argon2id (T31): el resumen y la verificación, con el semáforo global de concurrencia y el cálculo señuelo para cuentas inexistentes (D03, IDE-03).</summary>
@@ -392,4 +398,20 @@ public interface IPorAnonimizar
     Task Agregar(Guid usuarioId, CancellationToken cancelacion = default);
 
     Task<IReadOnlyList<Guid>> Listar(int maximo, CancellationToken cancelacion = default);
+}
+
+/// <summary>Lo que el Inventario dice de un código de sucursal (<c>sucursales.listar</c>, D20).</summary>
+public enum ExistenciaDeSucursal
+{
+    Existe,
+    NoExiste,
+
+    /// <summary>El Inventario no respondió: quien llama falla cerrado y no asigna nada.</summary>
+    NoDisponible,
+}
+
+/// <summary>El catálogo de sucursales para asignar la de un encargado por código (D20): lo implementa un adaptador sobre el cliente del Inventario. Nunca lanza por una falla del Inventario.</summary>
+public interface ICatalogoDeSucursales
+{
+    Task<ExistenciaDeSucursal> Existe(string codigoDeSucursal, CancellationToken cancelacion = default);
 }

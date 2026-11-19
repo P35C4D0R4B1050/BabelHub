@@ -108,7 +108,7 @@ internal sealed class RegistrarFuente(
         }
 
         var fuente = Fuente.Registrar(
-            Guid.NewGuid(),
+            Fuente.IdentificadorDe(entrada.Codigo),
             entrada.Codigo,
             entrada.Nombre,
             entrada.Region,

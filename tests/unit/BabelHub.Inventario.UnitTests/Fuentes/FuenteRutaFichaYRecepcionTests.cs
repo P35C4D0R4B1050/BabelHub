@@ -5,13 +5,13 @@ namespace BabelHub.Inventario.UnitTests.Fuentes;
 public sealed class FuenteTests
 {
     private static Fuente Nueva(string codigo = "ayacucho", string nombre = "Ayacucho", string region = "ayacucho", string? contacto = "+51 966 123 456", bool recepcion = false) =>
-        Fuente.Registrar(Guid.NewGuid(), codigo, nombre, region, contacto, recepcion);
+        Fuente.Registrar(Fuente.IdentificadorDe(codigo), codigo, nombre, region, contacto, recepcion);
 
     [Fact]
     [Trait("Criterio", "AC-FUE-01")]
     public void Registrar_ConDatosValidos_CreaLaFuente()
     {
-        var id = Guid.NewGuid();
+        var id = Fuente.IdentificadorDe("ayacucho");
 
         var fuente = Fuente.Registrar(id, "ayacucho", "Ayacucho", "ayacucho", "+51 966 123 456", esRecepcion: false);
 
@@ -96,11 +96,35 @@ public sealed class FuenteTests
     {
         Assert.Throws<ArgumentException>(() => Fuente.Registrar(Guid.Empty, "lima", "Lima", "lima", null, true));
         Assert.Throws<ArgumentException>(() => Fuente.Registrar(Guid.NewGuid(), "Lima", "Lima", "lima", null, true));
-        Assert.Throws<ArgumentException>(() => Fuente.Registrar(Guid.NewGuid(), "lima", " ", "lima", null, true));
-        Assert.Throws<ArgumentException>(() => Fuente.Registrar(Guid.NewGuid(), "lima", "Lima", "Lima Norte", null, true));
-        Assert.Throws<ArgumentException>(() => Fuente.Registrar(Guid.NewGuid(), "lima", "Lima", "lima", "no-es-un-numero", true));
+        Assert.Throws<ArgumentException>(() => Fuente.Registrar(Fuente.IdentificadorDe("lima"), "lima", " ", "lima", null, true));
+        Assert.Throws<ArgumentException>(() => Fuente.Registrar(Fuente.IdentificadorDe("lima"), "lima", "Lima", "Lima Norte", null, true));
+        Assert.Throws<ArgumentException>(() => Fuente.Registrar(Fuente.IdentificadorDe("lima"), "lima", "Lima", "lima", "no-es-un-numero", true));
     }
 
+
+    [Theory]
+    [InlineData("ayacucho", "f1bbf775-a5fd-d22c-19c7-c0e9abe9a86c")]
+    [InlineData("lima", "7cd06781-c66a-48f3-d73b-265d20f181fc")]
+    [InlineData("central", "06d078f4-a8ef-9632-652f-e6f952ea9370")]
+    [InlineData("sede-1", "e2944a4a-1642-bdda-ce53-db09a292c62c")]
+    [Trait("Criterio", "AC-FUE-06")]
+    public void ElIdentificadorDeUnaFuente_SeDerivaDeSuCodigo_ConLosMismosValoresQueElEcommerce(string codigo, string esperado)
+    {
+        // Los mismos valores fijos que la prueba de IdentificadorDeSucursal del E-commerce (D20): si uno cambia sin el otro, el encargado pierde su alcance.
+        Assert.Equal(Guid.Parse(esperado), Fuente.IdentificadorDe(codigo));
+        Assert.Equal(Guid.Parse(esperado), Fuente.Registrar(Guid.Parse(esperado), codigo, "Nombre", "lima", null, false).Id);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-FUE-06")]
+    public void Registrar_ConUnIdentificadorQueNoEsElDerivadoDelCodigo_Lanza()
+    {
+        var ex = Assert.Throws<ArgumentException>(() => Fuente.Registrar(Guid.NewGuid(), "lima", "Lima", "lima", null, true));
+
+        Assert.Equal("id", ex.ParamName);
+        Assert.Throws<ArgumentException>(() => Fuente.Registrar(Fuente.IdentificadorDe("ayacucho"), "lima", "Lima", "lima", null, true));
+        Assert.Throws<ArgumentException>(() => Fuente.IdentificadorDe("Lima"));
+    }
     [Fact]
     public void Registrar_SinContacto_Procede()
     {
@@ -292,7 +316,7 @@ public sealed class FichaDeEdicionTests
 
 public sealed class ReglaDeRecepcionTests
 {
-    private static Fuente Una(string codigo, bool recepcion = false) => Fuente.Registrar(Guid.NewGuid(), codigo, codigo.ToUpperInvariant(), "lima", null, recepcion);
+    private static Fuente Una(string codigo, bool recepcion = false) => Fuente.Registrar(Fuente.IdentificadorDe(codigo), codigo, codigo.ToUpperInvariant(), "lima", null, recepcion);
 
     [Fact]
     [Trait("Criterio", "AC-FUE-16")]
@@ -380,7 +404,7 @@ public sealed class ReglaDeRecepcionTests
         var fuentes = new List<Fuente>();
         foreach (var codigo in new[] { "lima", "cusco", "ayacucho", "arequipa", "piura", "tacna" })
         {
-            fuentes.Add(Fuente.Registrar(Guid.NewGuid(), codigo, codigo.ToUpperInvariant(), "lima", null, ReglaDeRecepcion.LaNuevaEsRecepcion(fuentes.Count)));
+            fuentes.Add(Fuente.Registrar(Fuente.IdentificadorDe(codigo), codigo, codigo.ToUpperInvariant(), "lima", null, ReglaDeRecepcion.LaNuevaEsRecepcion(fuentes.Count)));
         }
 
         Assert.True(ReglaDeRecepcion.CumpleElInvariante(fuentes));

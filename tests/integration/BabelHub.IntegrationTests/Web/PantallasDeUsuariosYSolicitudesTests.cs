@@ -30,7 +30,8 @@ public sealed class PantallasDeUsuariosYSolicitudesTests : IAsyncLifetime
     {
         var usuarios = DobleDeMetodos.Crear<IAdministracionDeUsuarios>(out var dU);
         dU.Con(nameof(IAdministracionDeUsuarios.Crear), a => { _llamadas.Add("crear"); _argumentos["rol"] = a[3]; _argumentos["sucursal"] = a[4]; return Task.FromResult(De(new ContrasenaTemporalEntregada(Administrado(), new ValorSecreto("Temporal-Una-Sola-Vez-9"), new DateTimeOffset(2026, 11, 20, 15, 0, 0, TimeSpan.Zero)))); });
-        dU.Con(nameof(IAdministracionDeUsuarios.CambiarElRol), a => { _llamadas.Add("rol"); _argumentos["rol"] = a[2]; return Task.FromResult(De(Administrado(RolDeCuenta.EncargadoDeSucursal))); });
+        dU.Con(nameof(IAdministracionDeUsuarios.CambiarElRol), a => { _llamadas.Add("rol"); _argumentos["rol"] = a[2]; _argumentos["sucursalDelCambio"] = a[3]; return Task.FromResult(De(Administrado(RolDeCuenta.EncargadoDeSucursal))); });
+        dU.Con(nameof(IAdministracionDeUsuarios.Listar), _ => Task.FromResult(De(new PaginaDeUsuarios([Administrado()], null))));
         dU.Con(nameof(IAdministracionDeUsuarios.Desactivar), _ => { _llamadas.Add("desactivar"); return Task.FromResult(De(Administrado() with { Activo = false })); });
         dU.Con(nameof(IAdministracionDeUsuarios.Reactivar), _ => { _llamadas.Add("reactivar"); return Task.FromResult(De(Administrado())); });
         dU.Con(nameof(IAdministracionDeUsuarios.RestablecerLaContrasena), _ => { _llamadas.Add("contrasena"); return Task.FromResult(De(new ContrasenaTemporalEntregada(Administrado(), new ValorSecreto("Otra-Temporal-9"), new DateTimeOffset(2026, 11, 20, 15, 0, 0, TimeSpan.Zero)))); });
@@ -82,7 +83,7 @@ public sealed class PantallasDeUsuariosYSolicitudesTests : IAsyncLifetime
     [Trait("Criterio", "AC-WEB-29")]
     public async Task Cambiar_el_rol_desactivar_reactivar_y_restablecer_llaman_a_Identidad_con_el_identificador_del_usuario()
     {
-        using var rol = await Enviar("/administracion/usuarios/rol", ("usuarioId", Usuario.ToString("D")), ("rol", "EncargadoDeSucursal"), ("sucursal", Guid.NewGuid().ToString("D")));
+        using var rol = await Enviar("/administracion/usuarios/rol", ("usuarioId", Usuario.ToString("D")), ("rol", "EncargadoDeSucursal"), ("sucursal", " Ayacucho "));
         using var desactivado = await Enviar("/administracion/usuarios/desactivar", ("usuarioId", Usuario.ToString("D")));
         using var reactivado = await Enviar("/administracion/usuarios/reactivar", ("usuarioId", Usuario.ToString("D")));
         using var contrasena = await Enviar("/administracion/usuarios/contrasena", ("usuarioId", Usuario.ToString("D")));
@@ -92,13 +93,14 @@ public sealed class PantallasDeUsuariosYSolicitudesTests : IAsyncLifetime
         Assert.Equal(["rol", "desactivar", "reactivar", "contrasena", "segundo-factor"], _llamadas);
         Assert.Contains("Otra-Temporal-9", await contrasena.Content.ReadAsStringAsync(), StringComparison.Ordinal);
         Assert.Equal(RolDeCuenta.EncargadoDeSucursal, _argumentos["rol"]);
+        Assert.Equal("Ayacucho", _argumentos["sucursalDelCambio"]); // D20: la sucursal viaja por código, sin espacios en los extremos
     }
 
     [Theory]
     [Trait("Criterio", "AC-WEB-29")]
     [InlineData("rol", "Dueño")]
     [InlineData("rol", "0")]
-    [InlineData("sucursal", "no-es-guid")]
+    [InlineData("sucursal", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
     public async Task Un_rol_o_una_sucursal_invalidos_no_llegan_a_Identidad(string campo, string valor)
     {
         using var respuesta = await Enviar("/administracion/usuarios/crear", ("nombre", "Luis"), ("correo", "luis@babelhub.example"), (campo == "rol" ? "rol" : "rol", campo == "rol" ? valor : "Logistica"), ("sucursal", campo == "sucursal" ? valor : string.Empty));
@@ -137,6 +139,42 @@ public sealed class PantallasDeUsuariosYSolicitudesTests : IAsyncLifetime
         Assert.DoesNotContain("detalle-interno", html, StringComparison.Ordinal);
     }
 
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-29")]
+    public async Task La_pantalla_lista_al_personal_codificado_y_si_la_lista_falla_lo_dice_sin_romper_las_acciones()
+    {
+        using var conLista = await Pedir("/administracion/usuarios");
+        _falla = new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "detalle-interno-que-no-se-muestra");
+        using var sinLista = await Pedir("/administracion/usuarios");
+
+        var crudo = await conLista.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, conLista.StatusCode);
+        Assert.Contains("Personal registrado", crudo, StringComparison.Ordinal);
+        Assert.DoesNotContain("<i>Soto</i>", crudo, StringComparison.Ordinal);
+        Assert.Contains("&lt;i&gt;Soto&lt;/i&gt;", crudo, StringComparison.Ordinal);
+        Assert.Contains("luis@babelhub.example", crudo, StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.OK, sinLista.StatusCode);
+        var html = WebUtility.HtmlDecode(await sinLista.Content.ReadAsStringAsync());
+        Assert.Contains("No pudimos leer la lista", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("detalle-interno", html, StringComparison.Ordinal);
+        Assert.Contains("Otras acciones sobre un usuario", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-29")]
+    public async Task Si_Identidad_niega_la_lista_la_pantalla_dice_sin_permiso_y_no_que_no_esta_disponible()
+    {
+        _falla = new ErrorDeAplicacion(CategoriaDeError.Prohibido, "detalle-interno-que-no-se-muestra");
+
+        using var respuesta = await Pedir("/administracion/usuarios");
+
+        Assert.Equal(HttpStatusCode.Forbidden, respuesta.StatusCode);
+        var html = WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync());
+        Assert.Contains("No tienes permiso", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("No pudimos leer la lista", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("detalle-interno", html, StringComparison.Ordinal);
+    }
     [Fact]
     [Trait("Criterio", "AC-WEB-29")]
     public async Task Las_solicitudes_se_listan_con_su_fecha_limite_y_las_vencidas_sin_atender_se_senalan()

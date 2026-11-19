@@ -516,6 +516,41 @@ public sealed class CambioDeCorreoTests
         Assert.Equal(2, e.Bd.Dispositivos.Count);
     }
 
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-33")]
+    public async Task Reconoce_SoloUnDispositivoConocidoMaduroYUnaRegionHabitual_Es_UnaSesionReconocida()
+    {
+        var (e, cuenta, _, marca) = Escenario();
+        var dispositivos = e.DispositivosDeLaCuenta();
+
+        var reconocida = await dispositivos.Reconoce(cuenta.Usuario.Id, marca, "PE");
+        var otraRegion = await dispositivos.Reconoce(cuenta.Usuario.Id, marca, "BR");
+        var sinMarca = await dispositivos.Reconoce(cuenta.Usuario.Id, null, "PE");
+        var desconocida = await dispositivos.Reconoce(cuenta.Usuario.Id, S("marca-que-no-esta-guardada"), "PE");
+
+        Assert.True(reconocida.Valor);
+        Assert.False(otraRegion.Valor);
+        Assert.False(sinMarca.Valor);
+        Assert.False(desconocida.Valor);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-33")]
+    public async Task Reconoce_UnDispositivoRecienEmitido_NoEsReconocido_YSoloLoConsultaElPropioUsuario()
+    {
+        var e = new EntornoDeIdentidad();
+        var cuenta = e.Cuenta(Antiguo);
+        e.ActuarComo(cuenta);
+        var emitida = (await e.DispositivosDeLaCuenta().RegistrarElIngresoCompleto(cuenta.Usuario.Id, null, "PE")).Valor.MarcaNueva!;
+        var otra = e.Cuenta("otra@example.com");
+
+        var reciente = await e.DispositivosDeLaCuenta().Reconoce(cuenta.Usuario.Id, emitida, "PE");
+        var deOtro = await e.DispositivosDeLaCuenta().Reconoce(otra.Usuario.Id, emitida, "PE");
+
+        Assert.False(reciente.Valor);
+        Assert.Equal(CategoriaDeError.Prohibido, deOtro.Error!.Categoria);
+    }
     [Fact]
     public async Task RegistrarElIngresoCompleto_ConservaComoMaximoDiezDispositivos()
     {

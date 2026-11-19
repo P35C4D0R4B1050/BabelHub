@@ -96,6 +96,12 @@ public sealed record MarcaDeDispositivoEmitida(ValorSecreto? MarcaNueva);
 public interface IDispositivosDeLaCuenta
 {
     Task<Resultado<MarcaDeDispositivoEmitida>> RegistrarElIngresoCompleto(Guid usuarioId, ValorSecreto? marcaPresentada, string? region, CancellationToken cancelacion = default);
+
+    /// <summary>
+    /// Si la sesión que pide algo es <b>reconocida</b> (IDE-55, IDE-76): trae la marca de un dispositivo guardado, con 24 horas de antigüedad y no congelado, y su región coincide con la habitual. Solo lo consulta el propio usuario
+    /// autenticado. La web no puede afirmarlo por su cuenta (la cookie la controla quien tiene la sesión): lo decide Identidad. Sin marca o con una desconocida, <see langword="false"/>.
+    /// </summary>
+    Task<Resultado<bool>> Reconoce(Guid usuarioId, ValorSecreto? marcaPresentada, string? region, CancellationToken cancelacion = default);
 }
 
 public enum TipoDeSolicitudDeDatos
@@ -211,12 +217,26 @@ public sealed record UsuarioAdministrado(Guid UsuarioId, string Nombre, string C
 /// <summary>El resultado de crear un usuario del personal o restablecer su contraseña: la contraseña temporal se muestra <b>solo al administrador</b> una vez y vence a las 24 horas (IDE-23).</summary>
 public sealed record ContrasenaTemporalEntregada(UsuarioAdministrado Usuario, ValorSecreto ContrasenaTemporal, DateTimeOffset VenceEn);
 
+/// <summary>Lo que se pide al listar usuarios: filtros opcionales por rol y estado, el correo exacto (única forma de ver una cuenta de cliente), el cursor (el último correo de la página anterior) y el tamaño (1 a 50; 20 por omisión).</summary>
+public sealed record FiltroDeUsuarios(RolDeCuenta? Rol = null, bool? Activo = null, string? Correo = null, string? Despues = null, int Tamano = 20)
+{
+    /// <summary>El tamaño de página que pide la pantalla y el tope que aplica Identidad.</summary>
+    public const int TamanoMaximo = 50;
+}
+
+/// <summary>Una página de usuarios ordenada por correo; <paramref name="Siguiente"/> es el cursor de la página que sigue, o <see langword="null"/> si no hay más.</summary>
+public sealed record PaginaDeUsuarios(IReadOnlyList<UsuarioAdministrado> Usuarios, string? Siguiente);
+
 /// <summary>Administración de usuarios por el administrador central (IDE-04 a IDE-07, IDE-23, IDE-38, IDE-44, IDE-49, IDE-66, IDE-87).</summary>
+/// <remarks>La sucursal de un encargado se pasa <b>por su código</b> (D20): Identidad la valida contra <c>inventario.sucursales.listar</c> y guarda el identificador derivado del código (<see cref="IdentificadorDeSucursal"/>).</remarks>
 public interface IAdministracionDeUsuarios
 {
-    Task<Resultado<ContrasenaTemporalEntregada>> Crear(Guid administradorId, string nombre, string correo, RolDeCuenta rol, Guid? sucursal, CancellationToken cancelacion = default);
+    Task<Resultado<ContrasenaTemporalEntregada>> Crear(Guid administradorId, string nombre, string correo, RolDeCuenta rol, string? codigoDeSucursal, CancellationToken cancelacion = default);
 
-    Task<Resultado<UsuarioAdministrado>> CambiarElRol(Guid administradorId, Guid usuarioId, RolDeCuenta rol, Guid? sucursal, CancellationToken cancelacion = default);
+    Task<Resultado<UsuarioAdministrado>> CambiarElRol(Guid administradorId, Guid usuarioId, RolDeCuenta rol, string? codigoDeSucursal, CancellationToken cancelacion = default);
+
+    /// <summary>La lista de usuarios para la administración central (WEB-35): sin correo exacto solo el personal (la lista de clientes no se entrega); con el correo, esa cuenta. Quien llama debe ser el administrador central activo.</summary>
+    Task<Resultado<PaginaDeUsuarios>> Listar(Guid administradorId, FiltroDeUsuarios filtro, CancellationToken cancelacion = default);
 
     Task<Resultado<UsuarioAdministrado>> Desactivar(Guid administradorId, Guid usuarioId, CancellationToken cancelacion = default);
 

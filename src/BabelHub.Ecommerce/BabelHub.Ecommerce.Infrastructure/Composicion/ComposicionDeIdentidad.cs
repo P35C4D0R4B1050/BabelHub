@@ -142,6 +142,7 @@ public static class ComposicionDeIdentidad
         servicios.TryAddScoped<IFirmaDeContextosDeLectura>(sp => new Es256FirmaDeContextosDeLectura(sp.GetRequiredService<IClavePrivadaDeFirma>(), sp.GetRequiredService<IFuenteDeClavesDeVerificacion>()));
 
         // ---------- Adaptadores sobre el Inventario ----------
+        servicios.TryAddScoped<ICatalogoDeSucursales, InventarioCatalogoDeSucursales>();
         servicios.TryAddScoped<IEntregaDeBajas, InventarioEntregaDeBajas>();
         servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IPendientesDeCuenta, InventarioPendientesDeCuenta>());
 
