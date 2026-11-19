@@ -27,7 +27,7 @@ internal sealed class EntornoDeEnvios
         Alertas = new AlertasTecnicasEspia();
         var autorizador = new AutorizadorDeEnvios(Actor, Denegaciones);
         Notificador = new NotificadorDeEnviosEspia(Unidad);
-        Avisos = new AvisosDeEnvios(Notificador, Pedidos);
+        Avisos = new AvisosDeEnvios(Notificador, Pedidos, Alertas, Reloj);
         SolicitarGuia = new SolicitarGuia(autorizador, Envios, Contactos, Operador, Unidad, Auditoria, Alertas, Avisos, Reloj);
         Reservas = new ReservasDelEnvioDoble(Unidad);
         Progreso = new ProgresoDeEnviosDoble(Unidad, Envios);

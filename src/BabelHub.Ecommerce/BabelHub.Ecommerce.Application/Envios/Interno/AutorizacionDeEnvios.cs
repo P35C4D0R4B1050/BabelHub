@@ -83,3 +83,42 @@ internal static class MapeoDeEnvios
             e.EntregadoEn,
             e.CanceladoEn);
 }
+
+internal static class AuditoriaDeEnvios
+{
+    /// <summary>
+    /// La entrada de auditoría de un cambio de estado (ENV-02, ENV-13, ENV-14, ENV-17): el estado anterior y el nuevo, el pedido, la fuente y, si existen, el número de guía y el operador; en la entrega, también la fecha.
+    /// <b>Nunca lleva nombre, dirección ni teléfono.</b> El responsable lo registra la propia auditoría desde el actor actual.
+    /// </summary>
+    public static SolicitudDeRegistro Cambio(Envio envio, EstadoDeEnvio anterior, EstadoDeEnvio nuevo, DateTimeOffset? fecha = null)
+    {
+        var detalle = new Dictionary<string, string?>
+        {
+            ["estadoAnterior"] = anterior.Codigo(),
+            ["estadoNuevo"] = nuevo.Codigo(),
+            ["pedidoId"] = envio.PedidoId.ToString(),
+            ["fuente"] = envio.CodigoDeFuente,
+        };
+        if (envio.NumeroDeGuia is { } numero)
+        {
+            detalle["numeroDeGuia"] = numero.ToString();
+        }
+
+        if (envio.Operador is { } operador)
+        {
+            detalle["operador"] = operador;
+        }
+
+        if (fecha is { } f)
+        {
+            detalle["fecha"] = f.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        return new SolicitudDeRegistro(AccionesAuditables.EstadoDeEnvioCambiado)
+        {
+            ObjetoTipo = "envio",
+            ObjetoId = envio.Id.ToString(),
+            Detalle = detalle,
+        };
+    }
+}

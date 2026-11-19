@@ -133,20 +133,12 @@ internal sealed class SolicitarGuia(
                         }
 
                         var anterior = envio.Estado;
-                        switch (envio.RegistrarGuia(creada.Numero, operador.Nombre, reloj.Ahora))
+                        var registro = envio.RegistrarGuia(creada.Numero, operador.Nombre, reloj.Ahora);
+                        switch (registro)
                         {
                             case ResultadoDeRegistroDeGuia.Registrada:
                                 await auditoria.Registrar(
-                                    new SolicitudDeRegistro(AccionesAuditables.EstadoDeEnvioCambiado)
-                                    {
-                                        ObjetoTipo = "envio",
-                                        ObjetoId = envio.Id.ToString(),
-                                        Detalle = new Dictionary<string, string?>
-                                        {
-                                            ["estadoAnterior"] = anterior.Codigo(),
-                                            ["estadoNuevo"] = EstadoDeEnvio.GuiaGenerada.Codigo(),
-                                        },
-                                    },
+                                    AuditoriaDeEnvios.Cambio(envio, anterior, EstadoDeEnvio.GuiaGenerada),
                                     token).ConfigureAwait(false);
                                 await avisos.Solicitar(envio, datosDelAviso.Valor, AvisosDeEnvios.EstadoGuiaGenerada, token).ConfigureAwait(false);
                                 await envios.Guardar(envio, token).ConfigureAwait(false);
@@ -158,7 +150,7 @@ internal sealed class SolicitarGuia(
 
                             case ResultadoDeRegistroDeGuia.OtroNumero:
                             case ResultadoDeRegistroDeGuia.GuiaSinUso:
-                                await alertas.Publicar(new AlertaTecnica(ClavesDeEnvios.MotivoDeAlertaDeDependencia, reloj.Ahora), token).ConfigureAwait(false);
+                                await alertas.Publicar(new AlertaTecnica(registro == ResultadoDeRegistroDeGuia.OtroNumero ? ClavesDeEnvios.AlertaGuiaRepetida : ClavesDeEnvios.AlertaGuiaSinUso, reloj.Ahora), token).ConfigureAwait(false);
                                 return FallosDeEnvios.De<DetalleDeEnvio>(CategoriaDeError.Conflicto, ClavesDeEnvios.EstadoInvalido);
 
                             default:
