@@ -250,4 +250,67 @@ public sealed class MatrizDeRolesDeEnviosTests
         Assert.Empty(entorno.Reservas.Llamadas);
         Assert.Empty(entorno.Auditoria.Solicitudes);
     }
+    [Theory]
+    [Trait("Criterio", "AC-ENV-08")]
+    [InlineData("sistema")]
+    [InlineData("integracion")]
+    [InlineData("sin-contexto")]
+    public async Task Un_actor_de_sistema_de_integracion_o_sin_contexto_no_opera_envios(string tipo)
+    {
+        var actor = tipo switch
+        {
+            "sistema" => ActorDePrueba.DelSistema(),
+            "integracion" => ActorDePrueba.DeIntegracion("n8n"),
+            _ => ActorDePrueba.SinContexto(),
+        };
+        var entorno = new EntornoDeEnvios(actor);
+        var envio = Sembrar(entorno, EstadoDeEnvio.PendienteDeGuia);
+
+        foreach (var operacion in Enum.GetValues<Operacion>())
+        {
+            var error = await Ejecutar(entorno, operacion, envio);
+
+            Assert.NotNull(error);
+            Assert.True(error.Categoria is CategoriaDeError.Prohibido or CategoriaDeError.NoAutenticado, $"{operacion}: {error.Categoria}");
+        }
+
+        Assert.Empty(entorno.Operador.Recibidas);
+        Assert.Empty(entorno.Reservas.Llamadas);
+        Assert.Empty(entorno.Auditoria.Solicitudes);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-ENV-08")]
+    [InlineData(Rol.Logistica)]
+    [InlineData(Rol.Administracion)]
+    public async Task Logistica_y_administracion_sobre_un_envio_inexistente_reciben_no_encontrado_sin_evento_de_denegacion(Rol rol)
+    {
+        var entorno = new EntornoDeEnvios(Actor(rol));
+        var inexistente = Envio.Crear(Guid.NewGuid(), Guid.NewGuid(), "lima-central", [Guid.NewGuid()], EntornoDeEnvios.AhoraInicial);
+
+        foreach (var operacion in new[] { Operacion.Obtener, Operacion.SolicitarGuia, Operacion.PasarAEnReparto, Operacion.MarcarEntregado })
+        {
+            var error = await Ejecutar(entorno, operacion, inexistente);
+
+            Assert.Equal(CategoriaDeError.NoEncontrado, error!.Categoria);
+        }
+
+        Assert.Empty(entorno.Denegaciones.Eventos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-08")]
+    public async Task Cada_operacion_consume_su_propia_politica_y_las_guias_el_tope_global_del_operador()
+    {
+        var entorno = new EntornoDeEnvios();
+        var envio = Sembrar(entorno, EstadoDeEnvio.PendienteDeGuia);
+
+        await entorno.Listar.Ejecutar(new ListarEnviosEntrada());
+        await entorno.SolicitarGuia.Ejecutar(envio.Id);
+
+        var politicas = entorno.Limites.Reservas.Select(r => r.Politica).ToList();
+        Assert.Contains("consultas-de-envios-por-usuario", politicas);
+        Assert.Contains("operaciones-de-envios-por-usuario", politicas);
+        Assert.Contains("guias-al-operador", politicas);
+    }
 }

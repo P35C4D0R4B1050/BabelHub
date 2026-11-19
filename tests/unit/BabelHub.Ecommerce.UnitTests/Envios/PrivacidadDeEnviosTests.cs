@@ -98,9 +98,74 @@ public sealed class PrivacidadDeEnviosTests
 
         var resultado = await entorno.SolicitarGuia.Ejecutar(envio.Id);
 
+        // Control positivo: el contacto llegó al operador y el fallo es el esperado, no uno anterior que dejara las listas vacías.
+        var recibida = Assert.Single(entorno.Operador.Recibidas);
+        Assert.Equal(Nombre, recibida.Nombre);
+        Assert.Equal(CategoriaDeError.NoDisponible, resultado.Error!.Categoria);
+        Assert.Equal("operador-no-disponible", resultado.Error.Clave);
         Assert.False(resultado.EsExito);
         SinCentinelas(LoObservable(entorno, resultado.EsExito ? resultado.Valor : resultado.Error));
         SinCentinelas(resultado.Error!.Clave + string.Concat(resultado.Error.Errores.Select(e => e.Campo + e.Clave)));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-18")]
+    public void El_detector_de_centinelas_detecta_un_contacto_serializado()
+    {
+        var texto = JsonSerializer.Serialize(new { detalle = $"{Nombre} {Direccion}" });
+
+        Assert.ThrowsAny<Exception>(() => SinCentinelas(texto));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-18")]
+    public async Task La_auditoria_de_una_guia_exitosa_lleva_exactamente_las_claves_cerradas_y_ningun_dato_de_contacto()
+    {
+        var entorno = new EntornoDeEnvios();
+        var envio = Sembrar(entorno);
+
+        await entorno.SolicitarGuia.Ejecutar(envio.Id);
+
+        var solicitud = Assert.Single(entorno.Auditoria.Solicitudes);
+        Assert.Equal(["estadoAnterior", "estadoNuevo", "fuente", "numeroDeGuia", "operador", "pedidoId"], solicitud.Detalle.Keys.Order());
+        Assert.Equal("operador-a", solicitud.Detalle["operador"]);
+        Assert.StartsWith("GUIA-", solicitud.Detalle["numeroDeGuia"], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-18")]
+    public async Task Un_numero_de_guia_repetido_publica_una_alerta_sin_contacto_y_deja_el_envio_pendiente()
+    {
+        var entorno = new EntornoDeEnvios();
+        var envio = Sembrar(entorno);
+        entorno.Envios.GuiaRepetidaAlGuardar = true;
+
+        var resultado = await entorno.SolicitarGuia.Ejecutar(envio.Id);
+
+        Assert.Equal("envio-guia-repetida", Assert.Single(entorno.Alertas.Alertas).Motivo);
+        Assert.Single(entorno.Operador.Recibidas);
+        SinCentinelas(LoObservable(entorno, resultado.EsExito ? resultado.Valor : resultado.Error));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-18")]
+    public async Task Con_la_auditoria_caida_tras_crear_la_guia_el_reintento_recupera_la_misma_sin_contacto_en_ningun_registro()
+    {
+        var entorno = new EntornoDeEnvios();
+        var envio = Sembrar(entorno);
+        entorno.Auditoria.Caida = true;
+
+        var primero = await entorno.SolicitarGuia.Ejecutar(envio.Id);
+        entorno.Auditoria.Caida = false;
+        var reintento = await entorno.SolicitarGuia.Ejecutar(envio.Id);
+
+        Assert.False(primero.EsExito);
+        Assert.True(reintento.EsExito);
+        Assert.Equal(2, entorno.Operador.Recibidas.Count);
+        Assert.Single(entorno.Operador.Recibidas.Select(r => r.Clave).Distinct());
+        Assert.Equal(1, entorno.Operador.GuiasCreadas);
+        SinCentinelas(LoObservable(entorno, primero.Error));
+        SinCentinelas(LoObservable(entorno, reintento.Valor));
     }
 
     [Theory]
@@ -143,6 +208,7 @@ public sealed class PrivacidadDeEnviosTests
         {
             var miembros = tipo.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Select(p => p.Name)
                 .Concat(tipo.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Select(f => f.Name));
+            Assert.NotEmpty(miembros);
             Assert.DoesNotContain(miembros, m => prohibidos.Any(p => m.Contains(p, StringComparison.OrdinalIgnoreCase)));
         }
     }
@@ -153,6 +219,7 @@ public sealed class PrivacidadDeEnviosTests
     {
         var destinatario = DestinatarioParaGuia.Validar(Nombre, $"{Direccion}, {Region}", Telefono).Destinatario!;
 
+        Assert.Contains("[redactado]", JsonSerializer.Serialize(destinatario), StringComparison.Ordinal);
         SinCentinelas(destinatario.ToString()!);
         SinCentinelas(JsonSerializer.Serialize(destinatario));
         SinCentinelas(JsonSerializer.Serialize(new { destinatario }));
