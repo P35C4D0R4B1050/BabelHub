@@ -159,16 +159,50 @@ public enum EstadoDeLaCancelacion
 /// <summary>El estado y los plazos de la cancelación de una cuenta (IDE-27, IDE-68, IDE-71, IDE-76, IDE-81): pendientes como números, sin detalle de otros módulos.</summary>
 public sealed record EstadoDeLaCancelacionDeCuenta(EstadoDeLaCancelacion Estado, int PendientesAbiertos, DateTimeOffset? ReconfirmarHasta, DateTimeOffset? SeDescartaEl, bool AvisoMostrado);
 
-/// <summary>Cancelación de la cuenta (IDE-27, IDE-28, IDE-47, IDE-62, IDE-68 a IDE-71, IDE-75, IDE-81): se pide con contraseña y segundo factor y se ejecuta en una sola transacción.</summary>
+/// <summary>
+/// Cancelación de la cuenta de un cliente (IDE-27, IDE-28, IDE-47, IDE-62, IDE-68 a IDE-71, IDE-75, IDE-76, IDE-81). Solo el titular la pide, la reconfirma, desiste y la consulta; la <b>advertencia</b> de que perderá su
+/// biblioteca digital la muestra la interfaz antes de pedir la contraseña y el segundo factor (IDE-28). Sin pendientes se ejecuta en esa misma operación; con pendientes queda <b>diferida</b> (no puede comprar, ve cuántos
+/// faltan, recibe un aviso y puede desistir); al cerrarse todos recibe otro aviso y tiene 7 días, sin pasar de 30 desde la solicitud, para <b>reconfirmar</b> con su contraseña y su segundo factor; la reconfirmación consulta
+/// los pendientes de nuevo en la misma operación que ejecuta.
+/// </summary>
 public interface ICancelacionDeCuenta
 {
     Task<Resultado<EstadoDeLaCancelacionDeCuenta>> Solicitar(Guid usuarioId, ValorSecreto contrasena, ValorSecreto? codigoDelSegundoFactor, CancellationToken cancelacion = default);
 
+    /// <summary>El estado y los plazos de la solicitud más reciente del titular; <see cref="EstadoDeLaCancelacion.SinSolicitud"/> si no hay.</summary>
     Task<Resultado<EstadoDeLaCancelacionDeCuenta>> Consultar(Guid usuarioId, CancellationToken cancelacion = default);
 
-    Task<Resultado<EstadoDeLaCancelacionDeCuenta>> Reconfirmar(Guid usuarioId, ValorSecreto contrasena, CancellationToken cancelacion = default);
+    Task<Resultado<EstadoDeLaCancelacionDeCuenta>> Reconfirmar(Guid usuarioId, ValorSecreto contrasena, ValorSecreto? codigoDelSegundoFactor, CancellationToken cancelacion = default);
 
     Task<Resultado<EstadoDeLaCancelacionDeCuenta>> Desistir(Guid usuarioId, CancellationToken cancelacion = default);
+
+    /// <summary>El aviso de «ya puede reconfirmar» se mostró en una <b>sesión reconocida</b> del titular: si el correo se suprimió, el plazo de 7 días cuenta desde ahora (IDE-76). Desde otra sesión no cuenta.</summary>
+    Task<Resultado<EstadoDeLaCancelacionDeCuenta>> MostrarElAviso(Guid usuarioId, bool desdeUnaSesionReconocida, CancellationToken cancelacion = default);
+}
+
+/// <summary>La marca de cancelación de una cuenta tal como la leen los módulos que deciden si se puede comprar (Carrito, Pagos; IDE-71, CAR-31).</summary>
+public enum EstadoDeLaMarca
+{
+    /// <summary>La cuenta está activa y sin cancelación en marcha.</summary>
+    Libre,
+
+    /// <summary>Tiene una cancelación diferida o esperando la reconfirmación (IDE-27): no compra.</summary>
+    Diferida,
+
+    /// <summary>Una ejecución empezó y no terminó (IDE-70, IDE-71): no se inicia ningún pago.</summary>
+    EnEjecucion,
+
+    /// <summary>La cuenta ya se canceló, está desactivada o no existe.</summary>
+    Ejecutada,
+}
+
+/// <summary>
+/// La marca de cancelación leída <b>con bloqueo</b> (IDE-71): toma el bloqueo de la fila del usuario, de modo que la cancelación de una cuenta y el paso al pago de ese mismo usuario se serializan. Se llama <b>dentro de la
+/// transacción</b> del módulo que decide; si no se puede leer, lanza (nunca se asume libre).
+/// </summary>
+public interface IMarcaDeCancelacionDeCuenta
+{
+    Task<EstadoDeLaMarca> LeerConBloqueo(Guid usuarioId, CancellationToken cancelacion = default);
 }
 
 /// <summary>Un usuario del personal o un cliente como lo ve la administración (IDE-04 a IDE-07, IDE-49, IDE-87).</summary>

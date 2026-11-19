@@ -83,6 +83,9 @@ public static class LimitesDelSegundoFactor
 /// <summary>Un código del segundo factor ya evaluado por el Dominio y aún sin aceptar en la base: el paso TOTP o la huella del código de respaldo, y cuántos respaldos quedarían.</summary>
 public sealed record CodigoPresentado(long? Paso, string? HuellaDeRespaldo, int RespaldosRestantes);
 
+/// <summary>El resultado de reautenticar: el rechazo si lo hubo, el código del segundo factor ya evaluado (si la cuenta lo tiene) y los cupos reservados que se devuelven al acertar.</summary>
+public sealed record VerificacionDeAcceso(ErrorDeAplicacion? Error, CodigoPresentado? Codigo, List<ReservaDeLimite> Reservas);
+
 /// <summary>
 /// La reautenticación de quien ya tiene sesión antes de una operación sensible (IDE-25, IDE-37, IDE-52): la contraseña actual y, si hace falta, un código del segundo factor. Una contraseña equivocada cuenta
 /// contra el límite de ingresos fallidos de la cuenta (se reserva <b>antes</b> de verificar y se devuelve al acertar) y deja el evento de seguridad; un código equivocado cuenta contra los dos límites del segundo factor.
@@ -169,4 +172,42 @@ public sealed class Reautenticacion(
     }
 
     public Task CodigoIncorrecto(Guid usuarioId, CancellationToken cancelacion) => eventos.SegundoFactorFallido(usuarioId, cancelacion);
+
+    /// <summary>
+    /// La contraseña actual y, <b>solo si la cuenta tiene el segundo factor activo</b>, un código TOTP o de respaldo (IDE-28, IDE-68): una cuenta sin segundo factor solo presenta la contraseña. El código queda evaluado y
+    /// sin aceptar; las reservas de los límites del segundo factor se devuelven al acertar.
+    /// </summary>
+    public async Task<VerificacionDeAcceso> ContrasenaYCodigoSiLoTiene(CuentaDeIdentidad cuenta, ValorSecreto? contrasena, ValorSecreto? codigo, CancellationToken cancelacion)
+    {
+        ArgumentNullException.ThrowIfNull(cuenta);
+        if (await ContrasenaActual(cuenta, contrasena, cancelacion).ConfigureAwait(false) is { } rechazo)
+        {
+            return new VerificacionDeAcceso(rechazo, null, []);
+        }
+
+        var usuarioId = cuenta.Usuario.Id;
+        var guardado = await segundoFactor.Obtener(usuarioId, cancelacion).ConfigureAwait(false);
+        if (guardado is not { Factor.EstaActivo: true })
+        {
+            return new VerificacionDeAcceso(null, null, []);
+        }
+
+        var (limite, reservas) = await LimitesDelSegundoFactor.Reservar(limites, usuarioId, cancelacion).ConfigureAwait(false);
+        if (limite is not null)
+        {
+            return new VerificacionDeAcceso(limite, null, reservas);
+        }
+
+        var presentado = Evaluar(usuarioId, guardado, codigo?.Revelar(), permiteRespaldo: true);
+        if (presentado is null)
+        {
+            await CodigoIncorrecto(usuarioId, cancelacion).ConfigureAwait(false);
+            return new VerificacionDeAcceso(FallosDeIdentidad.CodigoInvalido, null, reservas);
+        }
+
+        return new VerificacionDeAcceso(null, presentado, reservas);
+    }
+
+    /// <summary>Devuelve las reservas de los límites del segundo factor tras acertar (los límites cuentan los códigos <b>incorrectos</b>).</summary>
+    public Task DevolverLosCupos(IEnumerable<ReservaDeLimite> reservas, CancellationToken cancelacion) => LimitesDelSegundoFactor.Devolver(limites, reservas, cancelacion);
 }

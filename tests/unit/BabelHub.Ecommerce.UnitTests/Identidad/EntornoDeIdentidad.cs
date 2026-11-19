@@ -82,6 +82,10 @@ internal sealed class EntornoDeIdentidad
 
     public SolicitudesDeDatosEnMemoria SolicitudesGuardadas { get; }
 
+    public CancelacionesEnMemoria CancelacionesGuardadas { get; }
+
+    public EjecutorDeCancelacionDePrueba Ejecutor { get; }
+
     public AvisosDeCuenta Avisos { get; }
 
     public RevocacionDeSesiones Revocacion { get; }
@@ -101,6 +105,8 @@ internal sealed class EntornoDeIdentidad
         Dispositivos = new DispositivosEnMemoria(Bd);
         Cambios = new CambiosDeCorreoEnMemoria(Bd);
         SolicitudesGuardadas = new SolicitudesDeDatosEnMemoria(Bd);
+        CancelacionesGuardadas = new CancelacionesEnMemoria(Bd);
+        Ejecutor = new EjecutorDeCancelacionDePrueba(Reloj);
         Renovaciones = new RenovacionesEnMemoria(Bd);
         Desafios = new DesafiosEnMemoria(Bd);
         Auditoria = new AuditoriaDePrueba(Bd);
@@ -279,6 +285,33 @@ internal static class EntornoDeLasSolicitudesExtensiones
         e.AvisosGuardados,
         e.Avisos,
         e.Secretos,
+        e.Unidad,
+        e.Auditoria,
+        e.Reloj);
+}
+
+internal static class EntornoDeLaCancelacionExtensiones
+{
+    public static CancelacionDeCuenta Cancelacion(this EntornoDeIdentidad e) => new(
+        e.Cuentas,
+        new AlcanceDeLaCuenta(e.Actor, e.Denegaciones),
+        e.Reautenticacion(),
+        e.CancelacionesGuardadas,
+        e.Pendientes,
+        e.Ejecutor,
+        e.AvisosGuardados,
+        e.Avisos,
+        e.Secretos,
+        e.Unidad,
+        e.Auditoria,
+        e.Reloj);
+
+    public static RevisionDeLasCancelaciones Revision(this EntornoDeIdentidad e) => new(
+        e.Cuentas,
+        e.CancelacionesGuardadas,
+        e.Pendientes,
+        e.AvisosGuardados,
+        e.Avisos,
         e.Unidad,
         e.Auditoria,
         e.Reloj);

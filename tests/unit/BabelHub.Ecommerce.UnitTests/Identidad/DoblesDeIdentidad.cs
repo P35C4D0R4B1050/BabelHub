@@ -37,6 +37,8 @@ internal sealed class BdIdentidad
 
     public List<SolicitudDeDatos> Solicitudes { get; private set; } = [];
 
+    public List<SolicitudDeCancelacion> Cancelaciones { get; private set; } = [];
+
     public List<(Guid UsuarioId, AvisoDeCuenta Aviso)> Avisos { get; private set; } = [];
 
     internal sealed record EstadoDeLaBd(
@@ -49,6 +51,7 @@ internal sealed class BdIdentidad
         List<Dispositivo> Dispositivos,
         List<CambioDeCorreoPendiente> Cambios,
         List<SolicitudDeDatos> Solicitudes,
+        List<SolicitudDeCancelacion> Cancelaciones,
         List<(Guid UsuarioId, AvisoDeCuenta Aviso)> Avisos);
 
     /// <summary>La instantánea guarda una copia del estado de cada cuenta para restaurarlo <b>en el mismo objeto</b>: las pruebas conservan su referencia y ven la reversión como la vería una base de datos.</summary>
@@ -62,6 +65,7 @@ internal sealed class BdIdentidad
         [.. Dispositivos.Select(d => Dispositivo.Restaurar(d.UsuarioId, d.HuellaDeLaMarca, d.Region, d.Emitido, d.CongeladoHasta))],
         [.. Cambios.Select(c => CambioDeCorreoPendiente.Restaurar(c.Id, c.UsuarioId, c.CorreoNuevo, c.Creado, c.Estado))],
         [.. Solicitudes.Select(s => SolicitudDeDatos.Restaurar(s.Id, s.UsuarioId, s.Tipo, s.Estado, s.RecibidaEn, s.FechaLimite, s.AtendidaEn, s.Respuesta, s.Motivo))],
+        [.. Cancelaciones.Select(c => SolicitudDeCancelacion.Restaurar(c.Id, c.UsuarioId, c.Estado, c.SolicitadaEn, c.ReconfirmarHasta, c.AvisoVistoEn, c.CerradaEn, c.EjecucionEnCurso))],
         [.. Avisos]);
 
     public void Restaurar(EstadoDeLaBd estado)
@@ -74,6 +78,7 @@ internal sealed class BdIdentidad
         Dispositivos = estado.Dispositivos;
         Cambios = estado.Cambios;
         Solicitudes = estado.Solicitudes;
+        Cancelaciones = estado.Cancelaciones;
         Avisos = estado.Avisos;
         foreach (var (cuenta, copia) in estado.CopiasDeCuentas)
         {
@@ -523,6 +528,9 @@ internal sealed class EnviadorDeCorreoDePrueba : IEnviadorDeCorreo
 
     public bool Falla { get; set; }
 
+    /// <summary>Lo que responde el envío de un correo que no es un código: salió, se encoló o se suprimió.</summary>
+    public ResultadoDeEnvio Resultado { get; set; } = ResultadoDeEnvio.Enviado;
+
     public Task<ResultadoDeEnvio> Enviar(CorreoSaliente correo, CancellationToken cancelacion = default)
     {
         if (Falla)
@@ -531,7 +539,7 @@ internal sealed class EnviadorDeCorreoDePrueba : IEnviadorDeCorreo
         }
 
         Correos.Add(correo);
-        return Task.FromResult(ResultadoDeEnvio.Enviado);
+        return Task.FromResult(Resultado);
     }
 
     public Task<ResultadoDeEnvio> EnviarCodigo(CorreoDeCodigo correo, CancellationToken cancelacion = default)
@@ -542,7 +550,7 @@ internal sealed class EnviadorDeCorreoDePrueba : IEnviadorDeCorreo
         }
 
         Codigos.Add(correo);
-        return Task.FromResult(ResultadoDeEnvio.Enviado);
+        return Task.FromResult(Resultado);
     }
 }
 
@@ -768,4 +776,44 @@ internal sealed class SolicitudesDeDatosEnMemoria(BdIdentidad bd) : IRepositorio
 
     public Task<IReadOnlyList<SolicitudDeDatos>> Todas(CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<SolicitudDeDatos>>([.. bd.Solicitudes]);
+}
+
+internal sealed class CancelacionesEnMemoria(BdIdentidad bd) : IRepositorioDeCancelaciones
+{
+    public Task Guardar(SolicitudDeCancelacion solicitud, CancellationToken cancelacion = default)
+    {
+        bd.Cancelaciones.RemoveAll(s => s.Id == solicitud.Id);
+        bd.Cancelaciones.Add(solicitud);
+        return Task.CompletedTask;
+    }
+
+    public Task<SolicitudDeCancelacion?> AbiertaDe(Guid usuarioId, bool paraActualizar = false, CancellationToken cancelacion = default) =>
+        Task.FromResult(bd.Cancelaciones.FirstOrDefault(s => s.UsuarioId == usuarioId && s.Estado is EstadoDeCancelacion.Diferida or EstadoDeCancelacion.EsperandoReconfirmacion));
+
+    public Task<SolicitudDeCancelacion?> UltimaDe(Guid usuarioId, CancellationToken cancelacion = default) =>
+        Task.FromResult(bd.Cancelaciones.Where(s => s.UsuarioId == usuarioId).OrderByDescending(s => s.SolicitadaEn).FirstOrDefault());
+
+    public Task<IReadOnlyList<SolicitudDeCancelacion>> AbiertasParaRevisar(int limite, CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<SolicitudDeCancelacion>>([.. bd.Cancelaciones.Where(s => s.Estado is EstadoDeCancelacion.Diferida or EstadoDeCancelacion.EsperandoReconfirmacion).Take(limite)]);
+}
+
+/// <summary>El ejecutor de la cancelación de prueba (T23 hace el real): deja la cuenta cancelada dentro de la transacción o falla.</summary>
+internal sealed class EjecutorDeCancelacionDePrueba(BabelHub.Ecommerce.UnitTests.Plataforma.RelojFijo reloj) : IEjecutorDeLaCancelacion
+{
+    public List<Guid> Ejecutadas { get; } = [];
+
+    public bool Falla { get; set; }
+
+    public Task Ejecutar(CuentaDeIdentidad cuenta, CancellationToken cancelacion = default)
+    {
+        if (Falla)
+        {
+            throw new InvalidOperationException("Un módulo no pudo anonimizar.");
+        }
+
+        cuenta.CanceladaEn = reloj.Ahora;
+        cuenta.Usuario.Desactivar();
+        Ejecutadas.Add(cuenta.Usuario.Id);
+        return Task.CompletedTask;
+    }
 }

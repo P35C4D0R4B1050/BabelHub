@@ -215,6 +215,30 @@ public interface IRepositorioDeSolicitudesDeDatos
     Task<IReadOnlyList<SolicitudDeDatos>> Todas(CancellationToken cancelacion = default);
 }
 
+/// <summary>Las solicitudes de cancelación de cuenta (<c>identidad.solicitudes_de_cancelacion</c>, IDE-27, IDE-68, IDE-81): como máximo una abierta (diferida o esperando la reconfirmación) por usuario.</summary>
+public interface IRepositorioDeCancelaciones
+{
+    Task Guardar(SolicitudDeCancelacion solicitud, CancellationToken cancelacion = default);
+
+    /// <summary>La solicitud abierta (diferida o esperando la reconfirmación) del usuario; con <paramref name="paraActualizar"/> toma el bloqueo de su fila.</summary>
+    Task<SolicitudDeCancelacion?> AbiertaDe(Guid usuarioId, bool paraActualizar = false, CancellationToken cancelacion = default);
+
+    /// <summary>La más reciente del usuario, abierta o cerrada.</summary>
+    Task<SolicitudDeCancelacion?> UltimaDe(Guid usuarioId, CancellationToken cancelacion = default);
+
+    /// <summary>Las abiertas para la revisión periódica, con <c>FOR UPDATE SKIP LOCKED</c> en la base: dos revisiones simultáneas no procesan la misma.</summary>
+    Task<IReadOnlyList<SolicitudDeCancelacion>> AbiertasParaRevisar(int limite, CancellationToken cancelacion = default);
+}
+
+/// <summary>
+/// Quien ejecuta la cancelación de la cuenta en una sola transacción (T23, IDE-47, IDE-70, IDE-75): desactiva, revoca, cancela avisos, pide a los módulos anonimizar, desvincular o eliminar, audita y anonimiza. Se llama <b>dentro</b>
+/// de la transacción que reconfirma o solicita; si algo falla lanza y todo se revierte.
+/// </summary>
+public interface IEjecutorDeLaCancelacion
+{
+    Task Ejecutar(CuentaDeIdentidad cuenta, CancellationToken cancelacion = default);
+}
+
 /// <summary>El cambio de correo en curso de un usuario (<c>identidad.cambios_de_correo_pendientes</c>, IDE-53, IDE-54): como máximo uno por usuario; <see cref="Guardar"/> reemplaza el anterior.</summary>
 public interface IRepositorioDeCambiosDeCorreo
 {

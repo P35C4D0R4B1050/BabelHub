@@ -45,6 +45,21 @@ public sealed class AvisosDeCuenta(IEnviadorDeCorreo correo)
 
     public const string PlantillaDeSegundoFactorRestablecido = "segundo-factor-restablecido";
 
+    public const string PlantillaDeCancelacionDiferida = "cancelacion-diferida";
+
+    public const string PlantillaDePendientesCerrados = "cancelacion-pendientes-cerrados";
+
+    public const string PlantillaDeCancelacionDescartada = "cancelacion-descartada";
+
+    /// <summary>El aviso de IDE-27: la cancelación quedó diferida por los pendientes y puede desistir. Devuelve si <b>salió</b> por correo.</summary>
+    public Task<bool> CancelacionDiferida(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeCancelacionDiferida, CategoriaDeCorreo.AvisoDeSeguridad, cancelacion);
+
+    /// <summary>El aviso de IDE-68: se cerraron los pendientes y puede reconfirmar. Si no sale, el plazo de 7 días cuenta desde que se muestre en la cuenta (IDE-76).</summary>
+    public Task<bool> PendientesCerrados(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDePendientesCerrados, CategoriaDeCorreo.AvisoDeSeguridad, cancelacion);
+
+    /// <summary>El aviso de IDE-81: la cancelación se descartó y puede volver a comprar.</summary>
+    public Task<bool> CancelacionDescartada(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeCancelacionDescartada, CategoriaDeCorreo.AvisoDeSeguridad, cancelacion);
+
     public const string PlantillaDeSolicitudDeDatosRespondida = "solicitud-de-datos-respondida";
 
     /// <summary>El aviso de que la administración respondió una solicitud sobre datos (IDE-26): <b>sin el contenido</b> de la respuesta, que el titular ve en su cuenta.</summary>
@@ -65,22 +80,24 @@ public sealed class AvisosDeCuenta(IEnviadorDeCorreo correo)
     /// <summary>El aviso al titular cuando la administración restablece su segundo factor (IDE-38): sin enlaces ni códigos.</summary>
     public Task SegundoFactorRestablecido(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeSegundoFactorRestablecido, CategoriaDeCorreo.AlertaCriticaDeCuenta, cancelacion);
 
-    private async Task Avisar(Usuario usuario, string plantilla, CategoriaDeCorreo categoria, CancellationToken cancelacion)
+    /// <summary>Envía el aviso; devuelve verdadero solo si <b>salió</b> (no si se encoló o se suprimió: el plazo de IDE-68 no empieza sin un aviso que el titular haya podido ver, IDE-76).</summary>
+    private async Task<bool> Avisar(Usuario usuario, string plantilla, CategoriaDeCorreo categoria, CancellationToken cancelacion)
     {
         ArgumentNullException.ThrowIfNull(usuario);
         if (!usuario.CorreoVerificado)
         {
             // Un aviso de seguridad no sale a un correo sin verificar (IDE-86): solo se muestra en la cuenta.
-            return;
+            return false;
         }
 
         try
         {
-            await correo.Enviar(new CorreoSaliente(categoria, usuario.Correo, plantilla), cancelacion).ConfigureAwait(false);
+            return await correo.Enviar(new CorreoSaliente(categoria, usuario.Correo, plantilla), cancelacion).ConfigureAwait(false) == ResultadoDeEnvio.Enviado;
         }
         catch (Exception) when (!cancelacion.IsCancellationRequested)
         {
-            // El cambio ya se hizo; el correo no es necesario para él.
+            // La operación ya se hizo; el correo no es necesario para ella.
+            return false;
         }
     }
 }
