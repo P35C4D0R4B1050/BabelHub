@@ -30,7 +30,7 @@ internal sealed class DevolucionesNoDisponiblesException : Exception
 }
 
 /// <summary>
-/// El repositorio del agregado <see cref="Devolucion"/> y de los cupos de línea (plan §3). <b>Siempre dentro de la unidad de trabajo del llamador</b>: <c>EjecutarComo(devoluciones)</c>. <see cref="TomarCupos"/> y
+/// El repositorio del agregado <see cref="Devolucion"/> y de los cupos de línea (plan §3). Las escrituras y las lecturas con bloqueo van <b>dentro de la unidad de trabajo del llamador</b>; la Infraestructura abre su propio rol de esquema (<c>EjecutarComo(devoluciones)</c>) como Envíos y decide cómo lee fuera de una transacción (T22). <see cref="TomarCupos"/> y
 /// <see cref="DevolverCupos"/> operan <b>en orden de <c>linea_id</c></b> (dos solicitudes con las mismas líneas no se interbloquean) con un <c>UPDATE</c> condicional: la atomicidad frente a solicitudes simultáneas es de la base (DEV-03).
 /// No guarda la cuenta: Devoluciones localiza lo de una cuenta por el pedido (D01).
 /// </summary>

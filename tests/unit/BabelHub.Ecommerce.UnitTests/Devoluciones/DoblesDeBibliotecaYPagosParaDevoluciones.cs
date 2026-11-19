@@ -2,13 +2,25 @@ using BabelHub.Ecommerce.Application.Biblioteca;
 using BabelHub.Ecommerce.Application.Pagos;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.UnitTests.Catalogo;
+using BabelHub.Ecommerce.UnitTests.Soporte;
 
 namespace BabelHub.Ecommerce.UnitTests.Devoluciones;
 
 /// <summary>Los accesos de Biblioteca para Devoluciones: sembrados por cuenta, pedido y edición; la revocación y la suspensión cambian el estado y <see cref="NoResponde"/> es «no disponible».</summary>
-internal sealed class AccesosParaDevolucionesDoble : IAccesosParaDevoluciones
+internal sealed class AccesosParaDevolucionesDoble : IAccesosParaDevoluciones, IInstantanea
 {
-    private readonly Dictionary<(Guid Cuenta, Guid Pedido, Guid Edicion), AccesoParaDevoluciones> _accesos = [];
+    private Dictionary<(Guid Cuenta, Guid Pedido, Guid Edicion), AccesoParaDevoluciones> _accesos = [];
+
+    /// <summary>Lo que responde <c>Suspender</c> (por omisión suspende de verdad) y <c>Reanudar</c>.</summary>
+    public ResultadoDeSuspenderAcceso SuspenderResponde { get; set; } = ResultadoDeSuspenderAcceso.Suspendido;
+
+    public ResultadoDeReanudarAcceso ReanudarResponde { get; set; } = ResultadoDeReanudarAcceso.Reanudado;
+
+    public bool ReanudarFalla { get; set; }
+
+    public object Capturar() => new Dictionary<(Guid, Guid, Guid), AccesoParaDevoluciones>(_accesos);
+
+    public void Restaurar(object instantanea) => _accesos = (Dictionary<(Guid Cuenta, Guid Pedido, Guid Edicion), AccesoParaDevoluciones>)instantanea;
 
     public bool NoResponde { get; set; }
 
@@ -65,13 +77,30 @@ internal sealed class AccesosParaDevolucionesDoble : IAccesosParaDevoluciones
     public Task<Resultado<ResultadoDeSuspenderAcceso>> Suspender(Guid cuentaId, Guid accesoId, CancellationToken cancelacion = default)
     {
         Llamadas.Add("suspender");
-        return Task.FromResult(Resultado<ResultadoDeSuspenderAcceso>.Exito(ResultadoDeSuspenderAcceso.Suspendido));
+        var clave = _accesos.Where(a => a.Key.Cuenta == cuentaId && a.Value.AccesoId == accesoId).Select(a => (a.Key, a.Value)).FirstOrDefault();
+        if (SuspenderResponde == ResultadoDeSuspenderAcceso.Suspendido && clave.Value is not null)
+        {
+            _accesos[clave.Key] = clave.Value with { Estado = EstadoDelAccesoParaDevoluciones.Suspendido };
+        }
+
+        return Task.FromResult(Resultado<ResultadoDeSuspenderAcceso>.Exito(SuspenderResponde));
     }
 
     public Task<Resultado<ResultadoDeReanudarAcceso>> Reanudar(Guid cuentaId, Guid accesoId, CancellationToken cancelacion = default)
     {
         Llamadas.Add("reanudar");
-        return Task.FromResult(Resultado<ResultadoDeReanudarAcceso>.Exito(ResultadoDeReanudarAcceso.Reanudado));
+        if (ReanudarFalla)
+        {
+            return Task.FromResult(Resultado<ResultadoDeReanudarAcceso>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible")));
+        }
+
+        var clave = _accesos.Where(a => a.Key.Cuenta == cuentaId && a.Value.AccesoId == accesoId).Select(a => (a.Key, a.Value)).FirstOrDefault();
+        if (ReanudarResponde == ResultadoDeReanudarAcceso.Reanudado && clave.Value is { Estado: EstadoDelAccesoParaDevoluciones.Suspendido })
+        {
+            _accesos[clave.Key] = clave.Value with { Estado = EstadoDelAccesoParaDevoluciones.Vigente };
+        }
+
+        return Task.FromResult(Resultado<ResultadoDeReanudarAcceso>.Exito(ReanudarResponde));
     }
 }
 

@@ -291,4 +291,21 @@ public sealed class SolicitarReembolsoDeDigitalTests
         Assert.Equal(0, entorno.Pedidos.Lecturas);
         Assert.Equal(0, encargado.Pedidos.Lecturas);
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-09")]
+    public async Task Con_la_auditoria_caida_tras_registrar_y_revocar_se_revierte_todo_incluido_el_acceso_y_el_reembolso()
+    {
+        var (entorno, pedido, linea) = Preparar();
+        entorno.Auditoria.Caida = true;
+
+        var excepcion = await Record.ExceptionAsync(() => entorno.SolicitarDigital.Ejecutar(Entrada(pedido.PedidoId, linea.LineaId)));
+
+        Assert.NotNull(excepcion);
+        Assert.Empty(entorno.Repositorio.Todas);
+        Assert.Empty(entorno.Repositorio.Cupos);
+        Assert.Empty(entorno.Reembolsos.Registrados);
+        Assert.Equal(EstadoDelAccesoParaDevoluciones.Vigente, entorno.Accesos.Estado(pedido.CuentaId, pedido.PedidoId, linea.EdicionId)!.Estado);
+        Assert.Equal(0, entorno.Reembolsos.Procesados);
+    }
 }

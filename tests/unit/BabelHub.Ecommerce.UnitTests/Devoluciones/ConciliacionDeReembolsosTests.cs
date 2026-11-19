@@ -138,4 +138,29 @@ public sealed class ConciliacionDeReembolsosTests
         var caido = await sistema.Conciliacion.Ejecutar(10);
         Assert.Equal(CategoriaDeError.NoDisponible, caido.Error!.Categoria);
     }
+
+    [Theory]
+    [Trait("Criterio", "AC-DEV-08")]
+    [InlineData("cliente")]
+    [InlineData("encargado")]
+    [InlineData("anonimo")]
+    [InlineData("integracion")]
+    public async Task Un_actor_que_no_es_el_sistema_no_concilia_y_cada_intento_deja_un_evento(string quien)
+    {
+        var (sistema, _) = await ConRecibidaPendiente();
+        var actor = quien switch
+        {
+            "cliente" => ActorDePrueba.DeCliente(),
+            "encargado" => ActorDePrueba.DeEncargadoDe(Guid.NewGuid()),
+            "integracion" => ActorDePrueba.DeIntegracion("n8n"),
+            _ => ActorDePrueba.Anonimo(),
+        };
+        var otro = new EntornoDeDevoluciones(actor).ConLosDatosDe(sistema);
+
+        var resultado = await otro.Conciliacion.Ejecutar(10);
+
+        Assert.True(resultado.Error!.Categoria is CategoriaDeError.Prohibido or CategoriaDeError.NoAutenticado);
+        Assert.Single(otro.Denegaciones.Eventos);
+        Assert.Equal(EstadoDeLineaDeDevolucion.Recibida, otro.Repositorio.Todas.Single().Lineas[0].Estado);
+    }
 }

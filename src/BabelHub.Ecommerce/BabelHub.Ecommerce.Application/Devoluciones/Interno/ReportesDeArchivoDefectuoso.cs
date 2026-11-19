@@ -255,7 +255,7 @@ internal sealed class DecidirReporte(
         }
 
         var registrado = await reembolsos.Registrar(
-            new RegistrarReembolsoEntrada(pedido.PedidoId, OrigenDelReembolso.Devolucion, $"dev:{devolucion.Id:D}:{linea.LineaDePedidoId:D}", [new LineaAReembolsar(linea.LineaDePedidoId, linea.Monto)], 0m),
+            new RegistrarReembolsoEntrada(pedido.PedidoId, OrigenDelReembolso.Devolucion, ClaveDeReembolso.De(devolucion.Id, linea.LineaDePedidoId), [new LineaAReembolsar(linea.LineaDePedidoId, linea.Monto)], 0m),
             token).ConfigureAwait(false);
         if (!registrado.EsExito)
         {
@@ -292,14 +292,11 @@ internal sealed class DecidirReporte(
         await repositorio.DevolverCupos([(linea.LineaDePedidoId, linea.Cantidad)], token).ConfigureAwait(false);
         if (linea.AccesoId is { } accesoId)
         {
-            // Rechazar tolera que el acceso ya no esté suspendido o esté revocado por una anulación: el reporte debe poder cerrarse siempre.
-            try
+            // Rechazar tolera que el acceso ya no esté suspendido (<c>NoDisponible</c>): el reporte debe poder cerrarse. Una falla técnica de Biblioteca no se traga: revierte para que la administración reintente y el acceso no quede suspendido para siempre.
+            var reanudado = await accesos.Reanudar(pedido.CuentaId, accesoId, token).ConfigureAwait(false);
+            if (!reanudado.EsExito)
             {
-                await accesos.Reanudar(pedido.CuentaId, accesoId, token).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                // Sin Biblioteca no se reanuda, pero el reporte se cierra: la administración lo ve y Biblioteca lo concilia.
+                throw new RechazoQueRevierteException(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDeDevoluciones.ServicioNoDisponible));
             }
         }
 

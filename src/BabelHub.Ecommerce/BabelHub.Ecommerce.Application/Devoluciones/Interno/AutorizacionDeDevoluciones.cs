@@ -58,6 +58,12 @@ internal static class ClavesDeDevoluciones
     public const string AlertaGenerica = "dependencia-no-necesaria-fallida";
 }
 
+/// <summary>La clave natural del reembolso de una línea (DEV-17): una sola definición, porque si una copia divergiera el reembolso dejaría de ser idempotente.</summary>
+internal static class ClaveDeReembolso
+{
+    public static string De(Guid devolucionId, Guid lineaDePedidoId) => $"dev:{devolucionId:D}:{lineaDePedidoId:D}";
+}
+
 internal static class FallosDeDevoluciones
 {
     public static Resultado<T> De<T>(CategoriaDeError categoria, string clave, IReadOnlyList<ErrorDeCampo>? errores = null) =>

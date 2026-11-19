@@ -99,7 +99,7 @@ internal sealed class ConfirmarRecepcion(
                     foreach (var linea in devolucion.Lineas)
                     {
                         var registrado = await reembolsos.Registrar(
-                            new RegistrarReembolsoEntrada(devolucion.PedidoId, OrigenDelReembolso.Devolucion, $"dev:{devolucion.Id:D}:{linea.LineaDePedidoId:D}", [new LineaAReembolsar(linea.LineaDePedidoId, linea.Monto)], 0m),
+                            new RegistrarReembolsoEntrada(devolucion.PedidoId, OrigenDelReembolso.Devolucion, ClaveDeReembolso.De(devolucion.Id, linea.LineaDePedidoId), [new LineaAReembolsar(linea.LineaDePedidoId, linea.Monto)], 0m),
                             token).ConfigureAwait(false);
                         if (!registrado.EsExito)
                         {
@@ -163,7 +163,13 @@ internal sealed class ConfirmarRecepcion(
                     async token =>
                     {
                         var devolucion = await Bloquear(devolucionId, token).ConfigureAwait(false);
+                        var yaConfirmado = devolucion.ReingresoConfirmadoEn is not null;
                         devolucion.ConfirmarReingreso(reloj.Ahora);
+                        if (yaConfirmado)
+                        {
+                            return true;
+                        }
+
                         await repositorio.Guardar(devolucion, token).ConfigureAwait(false);
                         await auditoria.Registrar(
                             new SolicitudDeRegistro(AccionesAuditables.ReingresoPorDevolucion)
@@ -196,7 +202,16 @@ internal sealed class ConfirmarRecepcion(
                 return new ErrorDeAplicacion(CategoriaDeError.ReglaDeNegocio, ClavesDeDevoluciones.ReingresoRechazado);
 
             case ResultadoDelReingreso.ConflictoDeIdempotencia:
-                // Implica un reingreso previo de esa devolución con otra carga (AJU-16): no limpia el marcador, alerta y se resuelve a mano.
+                // Implica un reingreso previo de esa devolución con otra carga (AJU-16): no limpia el marcador y lo deja como incierto (un rechazo posterior tampoco lo limpiará), alerta y se resuelve a mano.
+                await unidad.Ejecutar(
+                    async token =>
+                    {
+                        var devolucion = await Bloquear(devolucionId, token).ConfigureAwait(false);
+                        devolucion.MarcarReingresoIncierto(reloj.Ahora);
+                        await repositorio.Guardar(devolucion, token).ConfigureAwait(false);
+                        return true;
+                    },
+                    cancelacion).ConfigureAwait(false);
                 await Alertar(cancelacion).ConfigureAwait(false);
                 return new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDeDevoluciones.Conflicto);
 

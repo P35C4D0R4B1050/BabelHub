@@ -276,4 +276,52 @@ public sealed class ReporteDeArchivoDefectuosoTests
         Assert.Equal(CategoriaDeError.NoEncontrado, inexistente.Error!.Categoria);
         Assert.Single(admin.Reembolsos.Registrados);
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-21")]
+    public async Task Con_la_auditoria_caida_el_reporte_se_revierte_y_el_acceso_no_queda_suspendido()
+    {
+        var (entorno, pedido, linea) = Preparar();
+        entorno.Auditoria.Caida = true;
+
+        var excepcion = await Record.ExceptionAsync(() => entorno.Reportar.Ejecutar(Entrada(pedido.PedidoId, linea.LineaId)));
+
+        Assert.NotNull(excepcion);
+        Assert.Empty(entorno.Repositorio.Todas);
+        Assert.Equal(EstadoDelAccesoParaDevoluciones.Vigente, entorno.Accesos.Estado(pedido.CuentaId, pedido.PedidoId, linea.EdicionId)!.Estado);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-DEV-21")]
+    [InlineData("yaSuspendido")]
+    [InlineData("noDisponible")]
+    public async Task Si_Biblioteca_no_puede_suspender_el_reporte_se_rechaza_sin_crear_nada(string caso)
+    {
+        var (entorno, pedido, linea) = Preparar();
+        entorno.Accesos.SuspenderResponde = caso == "yaSuspendido" ? ResultadoDeSuspenderAcceso.YaSuspendido : ResultadoDeSuspenderAcceso.NoDisponible;
+
+        var resultado = await entorno.Reportar.Ejecutar(Entrada(pedido.PedidoId, linea.LineaId));
+
+        Assert.Equal("reporte-no-admitido", resultado.Error!.Clave);
+        Assert.Empty(entorno.Repositorio.Todas);
+        Assert.Empty(entorno.Repositorio.Cupos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-24")]
+    public async Task Rechazar_tolera_que_Reanudar_responda_no_disponible_pero_una_falla_tecnica_de_Biblioteca_revierte_y_el_reporte_sigue_abierto()
+    {
+        var (tolerado, _, _, idTolerado) = await ConReporteAbierto();
+        tolerado.Accesos.ReanudarResponde = ResultadoDeReanudarAcceso.NoDisponible;
+        var (falla, _, linea, idFalla) = await ConReporteAbierto();
+        falla.Accesos.ReanudarFalla = true;
+
+        var cerrado = await tolerado.Decidir.Rechazar(idTolerado);
+        var revertido = await falla.Decidir.Rechazar(idFalla);
+
+        Assert.True(cerrado.EsExito);
+        Assert.Equal(CategoriaDeError.NoDisponible, revertido.Error!.Categoria);
+        Assert.Equal(EstadoDeLineaDeDevolucion.Solicitada, falla.Repositorio.Todas.Single().Lineas[0].Estado);
+        Assert.Equal(1, falla.Repositorio.Cupos[linea.LineaId].CantidadComprometida);
+    }
 }

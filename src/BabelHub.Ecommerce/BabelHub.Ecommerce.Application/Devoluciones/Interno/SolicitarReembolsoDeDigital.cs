@@ -186,7 +186,7 @@ internal sealed class SolicitarReembolsoDeDigital(
 
         // El reembolso se registra antes de pedir a Biblioteca que revoque (el orden global: la intención antes que el acceso).
         var registrado = await reembolsos.Registrar(
-            new RegistrarReembolsoEntrada(pedido.PedidoId, OrigenDelReembolso.Devolucion, $"dev:{devolucion.Id:D}:{linea.LineaId:D}", [new LineaAReembolsar(linea.LineaId, lineaDeDevolucion.Monto)], 0m),
+            new RegistrarReembolsoEntrada(pedido.PedidoId, OrigenDelReembolso.Devolucion, ClaveDeReembolso.De(devolucion.Id, linea.LineaId), [new LineaAReembolsar(linea.LineaId, lineaDeDevolucion.Monto)], 0m),
             token).ConfigureAwait(false);
         if (!registrado.EsExito)
         {

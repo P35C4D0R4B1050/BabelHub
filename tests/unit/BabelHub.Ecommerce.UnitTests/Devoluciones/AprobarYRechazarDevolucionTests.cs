@@ -25,7 +25,7 @@ public sealed class AprobarYRechazarDevolucionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-10")]
+    [Trait("Criterio", "AC-DEV-12")]
     public async Task El_encargado_de_la_sucursal_receptora_aprueba_la_devolucion_completa_con_su_fecha_responsable_y_auditoria()
     {
         var (entorno, id, _) = await ConSolicitud(ActorDePrueba.DeEncargadoDe(Sucursal));
@@ -42,7 +42,7 @@ public sealed class AprobarYRechazarDevolucionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-11")]
+    [Trait("Criterio", "AC-DEV-12")]
     public async Task Rechazar_devuelve_el_cupo_y_permite_volver_a_solicitar_la_linea()
     {
         var (entorno, id, linea) = await ConSolicitud(ActorDePrueba.DeAdministradorCentral());
@@ -55,7 +55,7 @@ public sealed class AprobarYRechazarDevolucionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-17")]
+    [Trait("Criterio", "AC-DEV-16")]
     public async Task Repetir_aprobar_o_rechazar_es_estado_invalido_y_no_cambia_nada()
     {
         var (entorno, id, linea) = await ConSolicitud(ActorDePrueba.DeAdministradorCentral());
@@ -82,7 +82,7 @@ public sealed class AprobarYRechazarDevolucionTests
 
         Assert.Equal(CategoriaDeError.NoEncontrado, resultado.Error!.Categoria);
         Assert.Equal("fuera-de-sucursal", Assert.Single(entorno.Denegaciones.Eventos).Motivo);
-        Assert.Equal(EstadoDeLaLineaDeDevolucion.Solicitada, (await entorno.Repositorio.Obtener(id, false))!.Lineas[0].Estado == EstadoDeLineaDeDevolucion.Solicitada ? EstadoDeLaLineaDeDevolucion.Solicitada : EstadoDeLaLineaDeDevolucion.Aprobada);
+        Assert.Equal(EstadoDeLineaDeDevolucion.Solicitada, (await entorno.Repositorio.Obtener(id, false))!.Lineas[0].Estado);
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public sealed class AprobarYRechazarDevolucionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-10")]
+    [Trait("Criterio", "AC-DEV-12")]
     public async Task Con_la_auditoria_caida_el_cambio_no_se_guarda_y_con_el_almacen_caido_es_servicio_no_disponible()
     {
         var (sinAuditoria, idA, _) = await ConSolicitud(ActorDePrueba.DeAdministradorCentral());
@@ -156,7 +156,7 @@ public sealed class AprobarYRechazarDevolucionTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-10")]
+    [Trait("Criterio", "AC-DEV-12")]
     public async Task El_limite_de_operaciones_se_aplica_despues_del_rol_y_su_exceso_es_el_429_uniforme()
     {
         var (entorno, id, _) = await ConSolicitud(ActorDePrueba.DeAdministradorCentral());

@@ -122,7 +122,7 @@ internal sealed class ConciliarReembolsosDeDevoluciones(
             return false;
         }
 
-        var clave = $"dev:{devolucion.Id:D}:{linea.LineaDePedidoId:D}";
+        var clave = ClaveDeReembolso.De(devolucion.Id, linea.LineaDePedidoId);
         if (linea.ReembolsoRegistradoEn is null)
         {
             // Falta el reembolso: se registra (idempotente por la clave natural) en su propia transacción corta y se procesa.

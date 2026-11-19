@@ -304,9 +304,9 @@ internal sealed class EntornoDeDevoluciones
         Repositorio = new RepositorioDeDevolucionesEnMemoria();
         Auditoria = new AuditoriaDeDevolucionesEspia();
         Reembolsos = new ReembolsosDoble();
-        Unidad = new UnidadDeTrabajoReversible(Repositorio, Auditoria, Reembolsos);
-        Reembolsos.Unidad = Unidad;
         Accesos = new AccesosParaDevolucionesDoble();
+        Unidad = new UnidadDeTrabajoReversible(Repositorio, Auditoria, Reembolsos, Accesos);
+        Reembolsos.Unidad = Unidad;
         Denegaciones = new DenegacionesDelCatalogoEspia();
         Cuentas = new EstadoDeCuentaFalso();
         Sucursales = new ResolucionDeSucursalDoble();
