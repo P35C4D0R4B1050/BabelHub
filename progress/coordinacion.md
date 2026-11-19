@@ -19,7 +19,7 @@ Lo mantiene **el coordinador** (la sesión raíz «BabelHub documentación y spe
 | **A — Transversales** | carril-a-contratos-de-pl | **(1) Piezas que esperan B y C** (sección 3); **(2) IDE-4** (T18–T22 de `identidad-seguridad`) e **IDE-5** (T23–T25, T27) | IDE-6 a IDE-9, `transversal-notificaciones` (NOT-1 a NOT-4: Pagos y Pedidos dependen de `INotificador`), `transversal-plataforma` PLA-R2 (T29, T31–T34) |
 | **B — Inventario y Carrito** | carril-b-inv-2d-ajustes | `ecommerce-carrito-checkout`: T33–T36 (pantallas y E2E); T25b y T26c cuando A entregue | `ecommerce-pedidos` (ECO-6, T01–T42, 6 subbloques) |
 | **C — Pagos, catálogo y reclamaciones** | carril-c-cat-logo-eco-2a | `ecommerce-pagos` (ECO-5d en adelante; ECO-5f espera las llaves B05 de la persona) y `ecommerce-libro-reclamaciones` (ECO-11b a 11d) | `ecommerce-envios` (ECO-9), `ecommerce-devoluciones` (ECO-10) |
-| **V — Verificación (FIN-1)** | planificar-eco-7-bibliot | `spec-verify` de las specs ya completas: `transversal-seguridad`, `transversal-auditoria`, `inventario-fuentes`, `inventario-seleccion-fuente`, `inventario-ajustes`, `inventario-traslados` (solo lectura y pruebas dirigidas; escribe `verificacion.md`) | planificar `asistente-compra-ia` y `web-indice-infinito` (los primeros en sacrificarse si el calendario no alcanza) |
+| **V — Envíos y verificación** | planificar-eco-7-bibliot | Planificación completa (las 20 specs tienen plan `Planned`). `spec-verify` de las seis specs completas hecho (ver huecos abajo). **Ahora implementa `ecommerce-envios`** (ECO-9a a 9e, T01–T25) con dobles para Pedidos (ECO-6, aún no existe) | `ecommerce-biblioteca-digital` (ECO-8), `web-indice-infinito` (ECO-13) y la verificación de las specs que se completen |
 
 ## 3. Qué espera a quién
 

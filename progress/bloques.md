@@ -76,7 +76,7 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **ECO-9** | `ecommerce-envios` | E | ECO-7 | ☐ (ECO-9a a 9e, T01–T25) |
 | **ECO-10** | `ecommerce-devoluciones` | E | ECO-9 | ☐ (ECO-10a a 10f, T01–T34) |
 | **ECO-11** | `ecommerce-libro-reclamaciones` | E | ECO-7 | ▶ (ECO-11a y ECO-11b hechos, T01–T12; faltan 11c y 11d) |
-| **ECO-12** | `asistente-compra-ia` | C | ECO-6; B06 (persona) | ☐ (plan redactado, spec `Approved` sin plan aprobado: falta la ronda 4 acotada de arch-reviewer, que la persona debe autorizar; 24 tareas; valores ratificados el 2026-11-19) |
+| **ECO-12** | `asistente-compra-ia` | C | ECO-6; B06 (persona) | ☐ (plan aprobado el 2026-11-19 tras la ronda 4: ECO-12a T01–T07, 12b T08–T14, 12c T15–T19, 12d T20–T24; depende de ECO-6, IDE-6, web-base T08 y las políticas de límite del carril A; el adaptador real espera B06) |
 | **ECO-13** | `web-indice-infinito` | B | WEB-1d | ☐ (plan aprobado el 2026-11-19: ECO-13a T01–T06, 13b T07–T11, 13c T12–T15) |
 
 ## Cierre (todos los carriles)
