@@ -119,6 +119,21 @@ public static class MotivosDeAlertaDeAuditoria
     /// <summary>Una guía de un envío cancelado quedó sin uso en el operador logístico y hay que avisarle (R05).</summary>
     public const string EnvioGuiaSinUso = "envio-guia-sin-uso";
 
+    /// <summary>Una anulación o una entrega de pedido quedó fallida: su reanudación no pudo completarla y alguien debe revisarla.</summary>
+    public const string PedidoOperacionFallida = "pedido-operacion-fallida";
+
+    /// <summary>Al marcar líneas no recogidas, el Inventario respondió que la reserva de una línea ya estaba cerrada.</summary>
+    public const string PedidoLiberacionNoRecogidoYaCerrada = "pedido-liberacion-no-recogido-ya-cerrada";
+
+    /// <summary>Al anular un pedido, el Inventario respondió que la reserva de una línea ya estaba cerrada.</summary>
+    public const string PedidoLiberacionDeAnulacionYaCerrada = "pedido-liberacion-de-anulacion-ya-cerrada";
+
+    /// <summary>El Inventario informó el estado de un traslado de un pedido o de una línea que Pedidos no conoce.</summary>
+    public const string PedidoEstadoDeTrasladoInexistente = "pedido-estado-de-traslado-de-un-pedido-o-linea-inexistente";
+
+    /// <summary>El Inventario informó el estado de un traslado de una línea que ya estaba anulada.</summary>
+    public const string PedidoEstadoDeTrasladoDeLineaAnulada = "pedido-estado-de-traslado-de-una-linea-anulada";
+
     /// <summary>Un trabajo de fondo de Carrito no corrió en el plazo esperado.</summary>
     public const string CarritoTrabajoSinCorrer = "carrito-trabajo-sin-correr";
 
@@ -184,6 +199,11 @@ public static class MotivosDeAlertaDeAuditoria
         EnvioGuiaRepetida,
         EnvioProgresoSinInformar,
         EnvioGuiaSinUso,
+        PedidoOperacionFallida,
+        PedidoLiberacionNoRecogidoYaCerrada,
+        PedidoLiberacionDeAnulacionYaCerrada,
+        PedidoEstadoDeTrasladoInexistente,
+        PedidoEstadoDeTrasladoDeLineaAnulada,
         CarritoTrabajoSinCorrer,
         CarritoCheckoutsConElPagoPendienteDemasiado,
         CarritoClaveDeReservaEnConflicto,

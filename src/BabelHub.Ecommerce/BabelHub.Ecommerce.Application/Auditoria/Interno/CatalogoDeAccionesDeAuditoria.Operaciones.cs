@@ -13,7 +13,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
     private static IEnumerable<AccionDelCatalogo> AccionesDeOperaciones()
     {
         yield return Auditada(nameof(AccionesAuditables.PrecioDeEdicionCambiado), false, false, Clave("precioAnterior", 16), Clave("precioNuevo", 16), Moneda());
-        yield return Auditada(nameof(AccionesAuditables.PedidoAnulado), false, false, Clave("estadoAnterior", 32), Clave("causa", 40));
+        yield return Auditada(nameof(AccionesAuditables.PedidoAnulado), false, false, Clave("estadoAnterior", 32), Clave("causa", 40), ClavePersonal("iniciadaPor"), Clave("rolDelIniciador", 32), ClavePersonal("sucursalDelIniciador"));
         yield return Auditada(nameof(AccionesAuditables.IngresoPendienteConciliado), false, false, Clave("edicionId", 40), Clave("cantidad", 12), Clave("intentos", 12), new ClaveDeDetalle("resolucion", personal: false) { Valores = ["registrado", "fallido", "discrepancia"] });
         yield return Auditada(nameof(AccionesAuditables.IngresosSolicitadosAnonimizados), false, false, Clave("cantidad", 12));
         yield return Auditada(nameof(AccionesAuditables.IntencionesDePagoDesvinculadas), false, false, Clave("cantidad", 12));
@@ -27,12 +27,14 @@ public static partial class CatalogoDeAccionesDeAuditoria
         yield return Auditada(nameof(AccionesAuditables.IngresoDeMercaderiaRegistrado), false, false, Clave("ajusteId", 40), Clave("ingresoId", 40), Clave("edicionId", 40), Clave("cantidadAnterior", 12), Clave("cantidadPosterior", 12));
         yield return Auditada(nameof(AccionesAuditables.ReingresoPorDevolucion), false, false, Clave("ajusteId", 40), Clave("devolucionId", 40), Clave("edicionId", 40), Clave("cantidadAnterior", 12), Clave("cantidadPosterior", 12));
         yield return Auditada(nameof(AccionesAuditables.ReembolsoRegistrado), false, false, Clave("monto", 16), Moneda(), Modalidad(), Clave("medio", 32));
-        yield return Auditada(nameof(AccionesAuditables.EstadoDePedidoCambiado), false, false, Clave("estadoAnterior", 32), Clave("estadoNuevo", 32), ClavePersonal("iniciadaPor"));
+        yield return Auditada(nameof(AccionesAuditables.EstadoDePedidoCambiado), false, false, Clave("estadoAnterior", 32), Clave("estadoNuevo", 32), ClavePersonal("iniciadaPor"), Clave("rolDelIniciador", 32), ClavePersonal("sucursalDelIniciador"));
         yield return Auditada(nameof(AccionesAuditables.ContactoDePedidoConsultado), false, false, Clave("rol", 32));
-        yield return Auditada(nameof(AccionesAuditables.OperacionDePedidoIniciada), false, false, new ClaveDeDetalle("operacion", personal: false) { Valores = ["anulacion", "entrega"] }, ClavePersonal("iniciadaPor"));
-        yield return Auditada(nameof(AccionesAuditables.PedidoCanceladoPorElCliente), false, false, Clave("estadoAnterior", 32));
-        yield return Auditada(nameof(AccionesAuditables.ReembolsoDePedidoReintentado), false, false, new ClaveDeDetalle("resultado", personal: false) { Valores = ["reembolsado", "pendiente"] }, Clave("monto", 16), Moneda());
-        yield return Auditada(nameof(AccionesAuditables.LineaDePedidoEntregada), false, false, Clave("lineaId", 40), ClavePersonal("iniciadaPor"));
+        yield return Auditada(nameof(AccionesAuditables.OperacionDePedidoIniciada), false, false, new ClaveDeDetalle("operacion", personal: false) { Valores = ["anulacion", "entrega", "cancelacion"] }, ClavePersonal("iniciadaPor"), Clave("rolDelIniciador", 32), ClavePersonal("sucursalDelIniciador"), Clave("motivoDeRechazo", 48));
+        yield return Auditada(nameof(AccionesAuditables.PedidoCanceladoPorElCliente), false, false, Clave("estadoAnterior", 32), ClavePersonal("iniciadaPor"), Clave("rolDelIniciador", 32), ClavePersonal("sucursalDelIniciador"), Clave("motivoDeRechazo", 48));
+        yield return Auditada(nameof(AccionesAuditables.ReembolsoDePedidoReintentado), false, false, new ClaveDeDetalle("resultado", personal: false) { Valores = ["reembolsado", "pendiente"] }, Clave("monto", 16), Moneda(), Clave("origen", 32));
+        yield return Auditada(nameof(AccionesAuditables.LineaDePedidoEntregada), false, false, Clave("lineaId", 40), ClavePersonal("iniciadaPor"), Clave("rolDelIniciador", 32), ClavePersonal("sucursalDelIniciador"));
+        yield return Auditada(nameof(AccionesAuditables.AnulacionDePedidoRechazada), false, false, new ClaveDeDetalle("operacion", personal: false) { Valores = ["anulacion", "cancelacion"] }, Clave("motivoDeRechazo", 48), Clave("estadoAnterior", 32), ClavePersonal("iniciadaPor"), Clave("rolDelIniciador", 32), ClavePersonal("sucursalDelIniciador"));
+        yield return Auditada(nameof(AccionesAuditables.LineaDePedidoMarcadaNoRecogida), false, false, Clave("lineaId", 40), ClavePersonal("iniciadaPor"), Clave("rolDelIniciador", 32), ClavePersonal("sucursalDelIniciador"));
         yield return Auditada(nameof(AccionesAuditables.ContactoDePedidoAnonimizado), false, false, Clave("causa"), Clave("cantidad", 12));
         yield return Auditada(nameof(AccionesAuditables.PedidosDepurados), false, false, Clave("cantidad", 12));
         yield return Auditada(nameof(AccionesAuditables.EstadoDeEnvioCambiado), false, false, Clave("estadoAnterior", 32), Clave("estadoNuevo", 32), Clave("pedidoId", 40), Clave("numeroDeGuia", 40), Clave("operador", 32), Clave("fuente", 40), Clave("fecha", 32));
