@@ -8,11 +8,6 @@ namespace BabelHub.IntegrationTests.Web;
 /// <summary>Rutas de prueba de las cabeceras y de la política de contenido por ruta (T17): cada una en la ruta exacta que le corresponde.</summary>
 public sealed class ControladorDeCabecerasDePrueba : Controller
 {
-    [HttpGet("/ingreso")]
-    [PermitidaConPasoPendiente]
-    [VerificacionDePersona(AccionProtegida.Ingreso)]
-    public IActionResult Ingreso() => Content("<p>ingreso</p>", "text/html");
-
     [HttpGet("/biblioteca")]
     [PoliticaDeContenido(ContenidoDeTerceros.DescargaDeLibro)]
     public IActionResult Biblioteca() => Content("<p>biblioteca</p>", "text/html");

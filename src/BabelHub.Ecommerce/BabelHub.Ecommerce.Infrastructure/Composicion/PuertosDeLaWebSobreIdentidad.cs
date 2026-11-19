@@ -88,3 +88,35 @@ public sealed class SesionesDeIdentidadParaLaWeb(ISesiones sesiones) : ISesiones
         }
     }
 }
+
+/// <summary>
+/// <see cref="IDesafioDelIngreso"/> (el paso que le falta al ingreso abierto y su cancelación) sobre <see cref="IIngreso"/>: la cookie del desafío lleva solo el valor opaco y Identidad dice qué paso toca. Un desafío que no existe, venció o ya se usó es «ningún paso»; cualquier falla de Identidad es
+/// <see cref="PasoDelIngresoWeb.Desconocido"/> y la web falla cerrada (WEB-34).
+/// </summary>
+public sealed class DesafioDelIngresoSobreIdentidad(IIngreso ingreso) : IDesafioDelIngreso
+{
+    public async Task<PasoDelIngresoWeb> PasoPendiente(string valorDelDesafio, CancellationToken cancelacion = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(valorDelDesafio);
+        try
+        {
+            return await ingreso.PasoDelDesafio(new ValorSecreto(valorDelDesafio), cancelacion).ConfigureAwait(false) switch
+            {
+                PasoPendienteDelIngreso.CambiarContrasenaTemporal => PasoDelIngresoWeb.ContrasenaTemporal,
+                PasoPendienteDelIngreso.ConfigurarSegundoFactor => PasoDelIngresoWeb.ConfigurarSegundoFactor,
+                PasoPendienteDelIngreso.PresentarSegundoFactor => PasoDelIngresoWeb.PresentarSegundoFactor,
+                _ => PasoDelIngresoWeb.Ninguno,
+            };
+        }
+        catch (Exception) when (!cancelacion.IsCancellationRequested)
+        {
+            return PasoDelIngresoWeb.Desconocido;
+        }
+    }
+
+    public Task Cancelar(string valorDelDesafio, CancellationToken cancelacion = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(valorDelDesafio);
+        return ingreso.CancelarElDesafio(new ValorSecreto(valorDelDesafio), cancelacion);
+    }
+}

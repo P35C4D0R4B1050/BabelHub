@@ -89,6 +89,13 @@ public sealed class PoliticaConSesionRealTests(PostgresDeLaWebFixture bd) : IAsy
 
     private static readonly string[] AtribuidasComunes =
     [
+        "GET /cuenta → Cuenta",
+        "GET /cuenta/avisos → Cuenta",
+        "GET /cuenta/cancelacion → Cuenta",
+        "GET /cuenta/correo → Cuenta",
+        "GET /cuenta/datos → Cuenta",
+        "GET /cuenta/segundo-factor → Cuenta",
+        "GET /cuenta/solicitudes → Cuenta",
         "GET /legal/{texto} → TextosLegales",
         "GET /textos/aceptar → TextosLegales",
         "POST /sesion/cerrar → CerrarSesion",
@@ -149,7 +156,7 @@ public sealed class PoliticaConSesionRealTests(PostgresDeLaWebFixture bd) : IAsy
             foreach (var metodo in endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods ?? ["GET"])
             {
                 // Las rutas del Libro de Reclamaciones están atribuidas a propósito (WEB-41; la lista cerrada de la otra prueba las fija): con textos pendientes siguen abiertas y no se «niegan».
-                var delLibro = endpoint.Metadata.GetMetadata<PermitidaConTextosPendientesAttribute>() is { Capacidad: CapacidadWeb.LibroDeReclamaciones or CapacidadWeb.EnviarHoja };
+                var delLibro = endpoint.Metadata.GetMetadata<PermitidaConTextosPendientesAttribute>() is { Capacidad: CapacidadWeb.LibroDeReclamaciones or CapacidadWeb.EnviarHoja or CapacidadWeb.Cuenta };
                 if (delLibro || (permitidas.Contains(url) && (metodo == "GET" || url == "/sesion/cerrar" || url == "/textos/aceptar")))
                 {
                     continue;

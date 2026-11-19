@@ -1,0 +1,95 @@
+@using BabelHub.Ecommerce.Api.Areas.Tienda.Controllers
+@using BabelHub.Ecommerce.Application.Web
+@model RegistroVista
+@{
+    var informativo = Model.Pantalla == PantallaDelRegistro.Listo || Model.MensajeInformativo;
+}
+<section class="mx-auto max-w-md" aria-labelledby="titulo-del-registro">
+    <h1 id="titulo-del-registro" class="font-display text-4xl leading-tight">@Model.Titulo</h1>
+    @if (Model.Mensaje is not null)
+    {
+        <div class="alert @(informativo ? "alert-info" : "alert-error") alert-soft my-6" role="@(informativo ? "status" : "alert")" tabindex="-1" data-bh-foco-inicial>
+            <bh-icono nombre="@(informativo ? "info" : "error")" />
+            <span>@Model.Mensaje</span>
+        </div>
+    }
+
+    @switch (Model.Pantalla)
+    {
+        case PantallaDelRegistro.Formulario:
+            <p class="mt-2">¿Ya tienes cuenta? <a class="link" href="/ingreso">Ingresa</a>.</p>
+            <form method="post" action="/registro" class="mt-6 flex flex-col gap-4" id="formulario-de-registro">
+                <partial name="_TokenAntifalsificacion" />
+                <label class="form-control"><span class="label-text">Nombre completo</span><input type="text" name="nombre" class="input input-bordered w-full" required maxlength="120" autocomplete="name" /></label>
+                <label class="form-control"><span class="label-text">Correo electrónico</span><input type="email" name="correo" class="input input-bordered w-full" required maxlength="254" autocomplete="username" autocapitalize="none" spellcheck="false" /></label>
+                <label class="form-control"><span class="label-text">Contraseña (mínimo 12 caracteres)</span><input type="password" name="contrasena" class="input input-bordered w-full" required minlength="12" maxlength="1024" autocomplete="new-password" /></label>
+                @if (Model.Textos is { } textos)
+                {
+                    <input type="hidden" name="versionDeTerminos" value="@textos.Textos.FirstOrDefault(t => t.Tipo == TipoDeTextoLegal.Terminos)?.Version" />
+                    <input type="hidden" name="versionDePrivacidad" value="@textos.Textos.FirstOrDefault(t => t.Tipo == TipoDeTextoLegal.Privacidad)?.Version" />
+                    <label class="flex cursor-pointer items-start gap-3">
+                        <input type="checkbox" name="acepto" value="si" class="checkbox checkbox-primary mt-0.5" required />
+                        <span class="text-sm">He leído y acepto los <a class="link" href="/legal/terminos">términos y condiciones</a> y la <a class="link" href="/legal/privacidad">política de privacidad</a> (Ley N.° 29733).</span>
+                    </label>
+                }
+                else
+                {
+                    <p class="text-sm" role="status">No podemos mostrar los textos legales ahora, así que no puedes crear la cuenta todavía. Inténtalo en unos minutos.</p>
+                }
+                <label class="flex cursor-pointer items-start gap-3">
+                    <input type="checkbox" name="mayorDeEdad" value="si" class="checkbox checkbox-primary mt-0.5" required />
+                    <span class="text-sm">Declaro que soy mayor de edad.</span>
+                </label>
+                <verificacion-de-persona></verificacion-de-persona>
+                @if (Model.Textos is null)
+                {
+                    <button type="submit" class="btn btn-primary" disabled>Crear mi cuenta</button>
+                }
+                else
+                {
+                    <button type="submit" class="btn btn-primary">Crear mi cuenta</button>
+                }
+            </form>
+            break;
+
+        case PantallaDelRegistro.Verificar:
+            <p class="mt-2">Escribe el código de 6 dígitos que enviamos a tu correo. Vence en pocos minutos.</p>
+            <form method="post" action="/verificacion" class="mt-6 flex flex-col gap-4">
+                <partial name="_TokenAntifalsificacion" />
+                <label class="form-control"><span class="label-text">Correo electrónico</span><input type="email" name="correo" value="@Model.Correo" class="input input-bordered w-full" required maxlength="254" autocomplete="username" autocapitalize="none" spellcheck="false" /></label>
+                <label class="form-control"><span class="label-text">Código</span><input type="text" name="codigo" class="input input-bordered w-full" required maxlength="64" autocomplete="one-time-code" inputmode="numeric" spellcheck="false" /></label>
+                <button type="submit" class="btn btn-primary">Verificar</button>
+            </form>
+            <form method="post" action="/verificacion/reenviar" class="mt-4">
+                <partial name="_TokenAntifalsificacion" />
+                <input type="hidden" name="correo" value="@Model.Correo" />
+                <button type="submit" class="btn btn-ghost btn-sm">Enviarme un código nuevo</button>
+            </form>
+            break;
+
+        case PantallaDelRegistro.Recuperar:
+            <p class="mt-2">Escribe tu correo y te enviaremos un código para elegir una contraseña nueva.</p>
+            <form method="post" action="/recuperacion" class="mt-6 flex flex-col gap-4">
+                <partial name="_TokenAntifalsificacion" />
+                <label class="form-control"><span class="label-text">Correo electrónico</span><input type="email" name="correo" value="@Model.Correo" class="input input-bordered w-full" required maxlength="254" autocomplete="username" autocapitalize="none" spellcheck="false" /></label>
+                <button type="submit" class="btn btn-primary">Enviarme el código</button>
+            </form>
+            <p class="mt-4 text-sm"><a class="link" href="/ingreso">Volver a ingresar</a></p>
+            break;
+
+        case PantallaDelRegistro.ConfirmarRecuperacion:
+            <form method="post" action="/recuperacion/confirmar" class="mt-6 flex flex-col gap-4">
+                <partial name="_TokenAntifalsificacion" />
+                <label class="form-control"><span class="label-text">Correo electrónico</span><input type="email" name="correo" value="@Model.Correo" class="input input-bordered w-full" required maxlength="254" autocomplete="username" autocapitalize="none" spellcheck="false" /></label>
+                <label class="form-control"><span class="label-text">Código</span><input type="text" name="codigo" class="input input-bordered w-full" required maxlength="64" autocomplete="one-time-code" inputmode="numeric" spellcheck="false" /></label>
+                <label class="form-control"><span class="label-text">Contraseña nueva (mínimo 12 caracteres)</span><input type="password" name="contrasenaNueva" class="input input-bordered w-full" required minlength="12" maxlength="1024" autocomplete="new-password" /></label>
+                <label class="form-control"><span class="label-text">Repite la contraseña nueva</span><input type="password" name="confirmacion" class="input input-bordered w-full" required maxlength="1024" autocomplete="new-password" /></label>
+                <button type="submit" class="btn btn-primary">Cambiar mi contraseña</button>
+            </form>
+            break;
+
+        case PantallaDelRegistro.Listo:
+            <p class="mt-4"><a class="btn btn-primary" href="/ingreso">Ingresar</a></p>
+            break;
+    }
+</section>

@@ -217,18 +217,6 @@ public sealed class ControladorDeSesionDePrueba(IActorActual actor, ITokenDelUsu
     [HttpPost("ignorada")]
     [IgnoreAntiforgeryToken]
     public IActionResult Ignorada() => Ok();
-
-    /// <summary>Un formulario de la lista cerrada de plantillas con borrador: solo <c>Nombre</c> es conservable.</summary>
-    [HttpPost("/cuenta/datos")]
-    public IActionResult Datos([FromForm] FormularioDePrueba formulario) => Ok(formulario.Nombre);
-}
-
-public sealed class FormularioDePrueba
-{
-    [Conservar]
-    public string? Nombre { get; set; }
-
-    public string? Otro { get; set; }
 }
 
 /// <summary>Un <see cref="IDenegacionDeAcceso"/> que anota lo que se le registra (y puede fallar a pedido).</summary>

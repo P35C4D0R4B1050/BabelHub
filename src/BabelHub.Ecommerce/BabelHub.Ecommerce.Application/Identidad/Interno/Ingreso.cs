@@ -451,9 +451,17 @@ public sealed class Ingreso(
         }
 
         // Un desafío de configuración rezagado no puede reemplazar el secreto de un segundo factor que otro ingreso ya activó (IDE-21).
-        if (await segundoFactor.Obtener(cuenta.Usuario.Id, cancelacion).ConfigureAwait(false) is { Factor.EstaActivo: true })
+        var existente = await segundoFactor.Obtener(cuenta.Usuario.Id, cancelacion).ConfigureAwait(false);
+        if (existente is { Factor.EstaActivo: true })
         {
             return Resultado<SecretoDelSegundoFactor>.Fallo(FallosDeIdentidad.DesafioInvalido);
+        }
+
+        // Idempotente: un secreto que todavía no se confirmó se entrega igual mientras la persona sigue configurando (una recarga, un código errado o un prefetch no la dejan con la aplicación en un secreto y la pantalla en otro).
+        if (existente is { Factor.Estado: EstadoDelSegundoFactor.SinConfirmar } pendiente)
+        {
+            var guardado = cifrador.Descifrar(pendiente.SecretoCifrado, cuenta.Usuario.Id);
+            return Resultado<SecretoDelSegundoFactor>.Exito(new SecretoDelSegundoFactor(new ValorSecreto(Base32.Codificar(guardado)), Emisor, cuenta.Usuario.Correo));
         }
 
         var secreto = secretos.SecretoDelSegundoFactor();
@@ -626,6 +634,33 @@ public sealed class Ingreso(
             : DesafioDeIngreso.Crear(id, usuarioId, modo, ahora);
         await desafios.Guardar(desafio, huellasDeIdentidad.DeValorOpaco(valor), cancelacion).ConfigureAwait(false);
         return new ResultadoDelIngreso { Desafio = new DesafioDelIngreso(new ValorSecreto(valor), paso, desafio.Vence) };
+    }
+
+    public async Task<PasoPendienteDelIngreso?> PasoDelDesafio(ValorSecreto desafio, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(desafio);
+        var encontrado = await desafios.PorHuella(huellasDeIdentidad.DeValorOpaco(desafio.Revelar()), cancelacion).ConfigureAwait(false);
+        if (encontrado is null || encontrado.Evaluar(reloj.Ahora) != EstadoDelDesafio.Vigente)
+        {
+            return null;
+        }
+
+        return encontrado.Modo switch
+        {
+            ModoDelDesafio.PresentarSegundoFactor => PasoPendienteDelIngreso.PresentarSegundoFactor,
+            ModoDelDesafio.ConfigurarSegundoFactor => PasoPendienteDelIngreso.ConfigurarSegundoFactor,
+            _ => PasoPendienteDelIngreso.CambiarContrasenaTemporal,
+        };
+    }
+
+    public async Task CancelarElDesafio(ValorSecreto desafio, CancellationToken cancelacion = default)
+    {
+        ArgumentNullException.ThrowIfNull(desafio);
+        var encontrado = await desafios.PorHuella(huellasDeIdentidad.DeValorOpaco(desafio.Revelar()), cancelacion).ConfigureAwait(false);
+        if (encontrado is not null && encontrado.Evaluar(reloj.Ahora) == EstadoDelDesafio.Vigente)
+        {
+            await unidad.Ejecutar(async ct => await desafios.MarcarUsado(encontrado.Id, ct).ConfigureAwait(false), cancelacion).ConfigureAwait(false);
+        }
     }
 
     /// <summary>El desafío vigente que permite esa acción, o <see langword="null"/> si no existe, venció, ya se usó o es de otro modo (IDE-42).</summary>

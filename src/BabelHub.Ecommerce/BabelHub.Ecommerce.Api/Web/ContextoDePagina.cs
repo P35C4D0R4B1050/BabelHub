@@ -80,3 +80,14 @@ public static class InterfazWebExtensiones
         return servicios;
     }
 }
+
+public static class IngresoWebExtensiones
+{
+    /// <summary>Registra el cierre del ingreso (sesión del servidor, cookies y fusión del carrito): necesita <c>ISesionesWeb</c>, el host de la web, el establecedor de actor y Carrito, que componen el anfitrión.</summary>
+    public static IServiceCollection AgregarIngresoWeb(this IServiceCollection servicios)
+    {
+        ArgumentNullException.ThrowIfNull(servicios);
+        servicios.AddScoped<CierreDelIngresoWeb>();
+        return servicios;
+    }
+}

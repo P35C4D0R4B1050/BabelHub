@@ -1,0 +1,89 @@
+@using BabelHub.Ecommerce.Api.Controllers
+@model IngresoVista
+@{
+    var gestion = Model.EsGestion;
+}
+<section class="mx-auto max-w-md" aria-labelledby="titulo-del-ingreso">
+    @switch (Model.Pantalla)
+    {
+        case PantallaDelIngreso.Credenciales:
+            <h1 id="titulo-del-ingreso" class="font-display text-4xl leading-tight">Ingresar</h1>
+            @if (!gestion)
+            {
+                <p class="mt-2">¿Primera vez? <a class="link" href="/registro">Crea tu cuenta</a>.</p>
+            }
+            <partial name="_MensajeDelIngreso" model="Model" />
+            <form method="post" action="/ingreso" class="mt-6 flex flex-col gap-4" id="formulario-de-ingreso">
+                <partial name="_TokenAntifalsificacion" />
+                <label class="form-control"><span class="label-text">Correo electrónico</span><input type="email" name="correo" class="input input-bordered w-full" required maxlength="254" autocomplete="username" autocapitalize="none" spellcheck="false" /></label>
+                <label class="form-control"><span class="label-text">Contraseña</span><input type="password" name="contrasena" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
+                <verificacion-de-persona></verificacion-de-persona>
+                <button type="submit" class="btn btn-primary">Ingresar</button>
+            </form>
+            @if (!gestion)
+            {
+                <p class="mt-4 text-sm"><a class="link" href="/recuperacion">Olvidé mi contraseña</a></p>
+            }
+            break;
+
+        case PantallaDelIngreso.SegundoFactor:
+            <h1 id="titulo-del-ingreso" class="font-display text-4xl leading-tight">Tu código de verificación</h1>
+            <p class="mt-2">Escribe el código de 6 dígitos de tu aplicación de autenticación o uno de tus códigos de respaldo.</p>
+            <partial name="_MensajeDelIngreso" model="Model" />
+            <form method="post" action="/ingreso/segundo-factor" class="mt-6 flex flex-col gap-4">
+                <partial name="_TokenAntifalsificacion" />
+                <label class="form-control"><span class="label-text">Código</span><input type="text" name="codigo" class="input input-bordered w-full" required maxlength="64" autocomplete="one-time-code" inputmode="numeric" autocapitalize="none" spellcheck="false" /></label>
+                <button type="submit" class="btn btn-primary">Verificar</button>
+            </form>
+            <partial name="_CancelarElIngreso" />
+            break;
+
+        case PantallaDelIngreso.ConfigurarSegundoFactor:
+            <h1 id="titulo-del-ingreso" class="font-display text-4xl leading-tight">Configura tu segundo factor</h1>
+            <p class="mt-2">Para proteger tu cuenta necesitas una aplicación de autenticación (Google Authenticator, Microsoft Authenticator, Aegis u otra). Agrega esta cuenta con la clave de abajo y escribe el código de 6 dígitos que te muestre.</p>
+            <partial name="_MensajeDelIngreso" model="Model" />
+            <div class="my-4 rounded-box border border-base-300 p-4">
+                <p class="text-sm font-semibold">Clave para tu aplicación (se muestra solo ahora)</p>
+                <p class="mt-1 break-all font-mono text-lg" data-bh-secreto>@Model.SecretoBase32</p>
+                <p class="mt-2 text-sm"><a class="link" href="@Model.UriDelSecreto">Abrir en mi aplicación de autenticación</a></p>
+            </div>
+            <form method="post" action="/ingreso/configuracion" class="flex flex-col gap-4">
+                <partial name="_TokenAntifalsificacion" />
+                <label class="form-control"><span class="label-text">Código de 6 dígitos</span><input type="text" name="codigo" class="input input-bordered w-full" required maxlength="64" autocomplete="one-time-code" inputmode="numeric" spellcheck="false" /></label>
+                <button type="submit" class="btn btn-primary">Confirmar y entrar</button>
+            </form>
+            <partial name="_CancelarElIngreso" />
+            break;
+
+        case PantallaDelIngreso.ContrasenaTemporal:
+            <h1 id="titulo-del-ingreso" class="font-display text-4xl leading-tight">Cambia tu contraseña temporal</h1>
+            <p class="mt-2">Ingresaste con una contraseña temporal. Elige una nueva de al menos 12 caracteres; puedes pegarla desde tu gestor de contraseñas.</p>
+            <partial name="_MensajeDelIngreso" model="Model" />
+            <form method="post" action="/ingreso/contrasena" class="mt-6 flex flex-col gap-4">
+                <partial name="_TokenAntifalsificacion" />
+                <label class="form-control"><span class="label-text">Contraseña nueva</span><input type="password" name="contrasenaNueva" class="input input-bordered w-full" required maxlength="1024" autocomplete="new-password" /></label>
+                <label class="form-control"><span class="label-text">Repite la contraseña nueva</span><input type="password" name="confirmacion" class="input input-bordered w-full" required maxlength="1024" autocomplete="new-password" /></label>
+                <button type="submit" class="btn btn-primary">Cambiar contraseña</button>
+            </form>
+            <partial name="_CancelarElIngreso" />
+            break;
+
+        case PantallaDelIngreso.CodigosDeRespaldo:
+            <h1 id="titulo-del-ingreso" class="font-display text-4xl leading-tight">Guarda tus códigos de respaldo</h1>
+            <div class="alert alert-warning my-4" role="alert">
+                <bh-icono nombre="aviso" />
+                <span>Estos códigos se muestran <strong>solo esta vez</strong>. Cada uno sirve una sola vez si pierdes tu aplicación. Guárdalos en un lugar seguro.</span>
+            </div>
+            <ol class="grid grid-cols-2 gap-2 font-mono text-lg">
+                @foreach (var codigo in Model.CodigosDeRespaldo)
+                {
+                    <li class="rounded-box border border-base-300 px-3 py-2">@codigo</li>
+                }
+            </ol>
+            <div class="mt-6 flex gap-3 print:hidden">
+                <button type="button" class="btn btn-ghost" data-bh-imprimir>Imprimir</button>
+                <a class="btn btn-primary" href="@Model.Destino">Ya los guardé, continuar</a>
+            </div>
+            break;
+    }
+</section>

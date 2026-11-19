@@ -1,0 +1,9 @@
+@using BabelHub.Ecommerce.Api.Controllers
+@model IngresoVista
+@if (Model.Mensaje is not null)
+{
+    <div class="alert alert-error alert-soft my-6" role="alert" tabindex="-1" data-bh-foco-inicial>
+        <bh-icono nombre="error" />
+        <span>@Model.Mensaje</span>
+    </div>
+}
