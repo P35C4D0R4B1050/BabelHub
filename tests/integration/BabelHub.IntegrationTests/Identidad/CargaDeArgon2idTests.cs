@@ -7,8 +7,8 @@ namespace BabelHub.IntegrationTests.Identidad;
 
 /// <summary>
 /// La carga de Argon2id con el semáforo de concurrencia (identidad-seguridad T47; AC-IDE-08, AC-IDE-57; IDE-09, D03): la VM de ventas (6 GB) comparte el hash de contraseñas con el resto del sistema, así que <b>a lo sumo
-/// 4 cálculos simultáneos</b> de 19 MiB cada uno, aunque lleguen decenas de ingresos a la vez; todos los ingresos legítimos terminan con el resultado correcto, la memoria administrada no crece más allá de lo que esos turnos
-/// permiten y, saturado, se responde con una excepción y <b>nunca</b> con un cálculo más barato ni con un «sí» (la cuenta inexistente cuesta lo mismo y no acierta). La reversión de la cancelación por módulo y por verbo
+/// 4 cálculos simultáneos</b> de 19 MiB cada uno, aunque lleguen decenas de ingresos a la vez; todos los ingresos legítimos terminan con el resultado correcto y,
+/// saturado, se responde con una excepción y <b>nunca</b> con un cálculo más barato ni con un «sí» (la cuenta inexistente cuesta lo mismo y no acierta). La reversión de la cancelación por módulo y por verbo
 /// (pendientes, anonimizar, desvincular, eliminar, marcar y auditar) la prueban <c>EjecucionDeLaCancelacionTests</c> y <c>CancelacionDeCuentaTests</c> (AC-IDE-57).
 /// </summary>
 public sealed class CargaDeArgon2idTests
