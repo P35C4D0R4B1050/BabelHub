@@ -57,7 +57,7 @@ public sealed class AvisosDePedidosTests
         Assert.Equal(2, notificador.Solicitudes.Count);
         var cliente = notificador.Solicitudes.Single(s => s.Destinatario == DestinatarioDelAviso.Cliente);
         var sucursal = notificador.Solicitudes.Single(s => s.Destinatario == DestinatarioDelAviso.Sucursal);
-        Assert.Equal((Cuenta.ToString("D"), "LIM", "pedido-estado"), (cliente.DestinatarioRef, sucursal.DestinatarioRef, cliente.Plantilla));
+        Assert.Equal((Cuenta.ToString("D"), "LIM", "pedido-estado", "pedido-estado-sucursal"), (cliente.DestinatarioRef, sucursal.DestinatarioRef, cliente.Plantilla, sucursal.Plantilla));
         Assert.Equal(("ABCD234567", "listo-para-recojo"), (cliente.Campos["numeroDePedido"], cliente.Campos["estado"]));
     }
 

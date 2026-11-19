@@ -14,7 +14,10 @@ namespace BabelHub.Ecommerce.Application.Pedidos.Interno;
 /// </summary>
 internal sealed class AvisosDePedidos(INotificador notificador)
 {
+    /// <summary>La plantilla del cliente; cada plantilla del catálogo cerrado tiene un solo tipo de destinatario, así que la sucursal usa la suya.</summary>
     public const string Plantilla = "pedido-estado";
+
+    public const string PlantillaDeLaSucursal = "pedido-estado-sucursal";
 
     /// <summary>Pide los avisos de una operación. Nunca lanza.</summary>
     public async Task Solicitar(Pedido pedido, string estadoDestino, string identificadorDeLaOperacion, IReadOnlyCollection<string> sucursalesResponsables, CancellationToken cancelacion)
@@ -74,7 +77,7 @@ internal sealed class AvisosDePedidos(INotificador notificador)
         try
         {
             var evento = string.Create(CultureInfo.InvariantCulture, $"pedido:{pedido.Id:N}:{estadoDestino}:{operacion}:{referencia}");
-            await notificador.Solicitar(new SolicitudDeAviso(evento, destinatario, referencia, Plantilla, campos), cancelacion).ConfigureAwait(false);
+            await notificador.Solicitar(new SolicitudDeAviso(evento, destinatario, referencia, destinatario == DestinatarioDelAviso.Cliente ? Plantilla : PlantillaDeLaSucursal, campos), cancelacion).ConfigureAwait(false);
         }
         catch (Exception excepcion) when (excepcion is not OperationCanceledException)
         {

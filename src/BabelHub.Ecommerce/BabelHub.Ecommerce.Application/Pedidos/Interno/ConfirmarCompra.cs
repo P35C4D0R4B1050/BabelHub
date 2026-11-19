@@ -1,4 +1,3 @@
-using System.Globalization;
 using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Biblioteca;
 using BabelHub.Ecommerce.Application.Carrito;

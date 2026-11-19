@@ -295,6 +295,25 @@ public sealed class ConsultasDePedidosTests
     }
 
     [Fact]
+    public void Los_estados_visibles_corresponden_uno_a_uno_con_los_del_dominio_y_el_tipo_de_entrega()
+    {
+        foreach (var estado in Enum.GetValues<EstadoDePedido>())
+        {
+            Assert.Equal(estado, ProyeccionesDePedidos.AEstadoDeDominio(ProyeccionesDePedidos.AEstadoVisible(estado)));
+        }
+
+        foreach (var estado in Enum.GetValues<EstadoDeLineaImpresa>())
+        {
+            Assert.Contains(estado.ToString(), Enum.GetNames<EstadoVisibleDeLaLinea>());
+        }
+
+        foreach (var tipo in Enum.GetValues<TipoDeEntregaDelPedido>())
+        {
+            Assert.Equal(tipo.ToString(), ProyeccionesDePedidos.Tipo(tipo).ToString());
+        }
+    }
+
+    [Fact]
     public async Task Un_pedido_de_recojo_sin_contacto_no_audita_ninguna_lectura_de_contacto_y_un_anonimizado_tampoco_lo_muestra()
     {
         var entorno = new Entorno(ActorDePrueba.DeAdministradorCentral());

@@ -105,8 +105,7 @@ public sealed class ConfirmarCompraTests
     {
         var entorno = new Entorno();
         var sinContacto = Compra(TipoDeEntregaDeCompra.Domicilio, Impresa()) with { Contacto = null };
-        var incompleto = Compra(TipoDeEntregaDeCompra.Domicilio, Impresa()) with { Contacto = new ContactoDeLaCompra("Ana", "987654321", "Jr. Lima 123", "ayacucho") };
-        var invalido = incompleto with { Contacto = new ContactoDeLaCompra("Ana\n", "987654321", "Jr. Lima 123", "ayacucho") };
+        var invalido = Compra(TipoDeEntregaDeCompra.Domicilio, Impresa()) with { Contacto = new ContactoDeLaCompra("Ana\n", "987654321", "Jr. Lima 123", "ayacucho") };
 
         var a = await entorno.Caso.Confirmar(sinContacto);
         var b = await entorno.Caso.Confirmar(invalido);
@@ -117,7 +116,6 @@ public sealed class ConfirmarCompraTests
         Assert.Empty(entorno.Repositorio.LiberacionesDeContacto);
         Assert.Empty(entorno.Accesos.Concedidos);
         Assert.Empty(entorno.Auditoria.Solicitudes);
-        Assert.NotNull(incompleto);
     }
 
     [Fact]

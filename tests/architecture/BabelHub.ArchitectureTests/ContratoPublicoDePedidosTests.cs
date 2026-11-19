@@ -89,6 +89,7 @@ public class ContratoPublicoDePedidosTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PED-34")]
     public void El_encargado_los_listados_y_el_asistente_reciben_tipos_sin_contacto()
     {
         var sinContacto = new[] { typeof(DetalleDelPedidoDeSucursal), typeof(PedidoParaElAsistente), typeof(ResumenDePedido), typeof(PaginaDePedidos), typeof(LineaVisibleDelPedido), typeof(LineaParaElAsistente), typeof(LineasOperadas) };
@@ -97,6 +98,8 @@ public class ContratoPublicoDePedidosTests
         {
             var conContacto = tipo.GetProperties().Where(p => TocaElContacto(p.PropertyType)).Select(p => $"{tipo.Name}.{p.Name}").ToList();
             Assert.True(conContacto.Count == 0, $"{tipo.Name} no puede llevar el contacto de entrega: {string.Join(", ", conContacto)}.");
+            var camposPersonales = tipo.GetProperties().Where(p => p.Name is "Telefono" or "Direccion" or "Nombre" or "Contacto").Select(p => p.Name).ToList();
+            Assert.True(camposPersonales.Count == 0, $"{tipo.Name} tiene campos de contacto por nombre: {string.Join(", ", camposPersonales)}.");
         }
 
         Assert.Contains(typeof(DetalleDelPedidoDelCliente).GetProperties(), p => p.PropertyType == typeof(ContactoDeEntrega));

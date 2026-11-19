@@ -237,6 +237,7 @@ public sealed class AlcanceDePedidosTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PED-34")]
     public async Task Los_eventos_de_denegacion_nunca_llevan_el_identificador_ni_el_contacto()
     {
         var (autorizador, denegaciones) = Crear(ActorDePrueba.DeCliente(Cuenta));

@@ -50,7 +50,7 @@ internal sealed class ConsultasDePedidos(
             return Resultado<PaginaDePedidos>.Fallo(limite);
         }
 
-        var pagina = Math.Max(1, filtro.Pagina);
+        var pagina = Math.Clamp(filtro.Pagina, 1, 10_000);
         var tamano = Math.Clamp(filtro.Tamano, 1, FiltroDePedidos.TamanoMaximo);
         var criterio = alcance(quien.Valor) with { Estado = filtro.Estado is { } e ? ProyeccionesDePedidos.AEstadoDeDominio(e) : null, Pagina = pagina, Tamano = tamano };
         var resultado = await pedidos.Listar(criterio, cancelacion).ConfigureAwait(false);
@@ -87,7 +87,7 @@ internal sealed class ConsultasDePedidos(
 
     public async Task<Resultado<DetalleDelPedidoDeSucursal>> ObtenerParaLaSucursal(string codigoDeSucursal, Guid pedidoId, CancellationToken cancelacion)
     {
-        var (pedido, error) = await Cargar(OperacionDePedidos.GestionDeRecojo, pedidoId, codigoDeSucursal, cancelacion).ConfigureAwait(false);
+        var (pedido, error) = await Cargar(OperacionDePedidos.GestionDeRecojo, pedidoId, codigoDeSucursal ?? string.Empty, cancelacion).ConfigureAwait(false);
         return pedido is null
             ? Resultado<DetalleDelPedidoDeSucursal>.Fallo(error!)
             : Resultado<DetalleDelPedidoDeSucursal>.Exito(new DetalleDelPedidoDeSucursal(ProyeccionesDePedidos.Resumen(pedido), [.. pedido.Lineas.Select(ProyeccionesDePedidos.Linea)]));
