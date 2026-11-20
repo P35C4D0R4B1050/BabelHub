@@ -76,7 +76,7 @@
                                     <div class="text-xs opacity-70">
                                         @(linea.EsDigital ? "Libro digital" : "Libro impreso")
                                         @if (linea.Isbn is not null) { <text> · ISBN @linea.Isbn</text> }
-                                        @if (linea.FuenteTexto is not null) { <text> · Sucursal de origen @linea.FuenteTexto</text> }
+                                        @if (Model.MostrarLaFuente && linea.FuenteTexto is not null) { <text> · Sucursal de origen @linea.FuenteTexto</text> }
                                     </div>
                                 </th>
                                 <td class="align-top text-right tabular-nums">@linea.Cantidad</td>
@@ -155,7 +155,7 @@
         }
         else if (Model.ContactoOculto)
         {
-            <div class="alert alert-warning text-sm" role="status"><bh-icono nombre="candado" /><span>No pudimos mostrar los datos de contacto ahora porque no se pudo registrar su consulta. El resto del pedido sí se muestra; vuelve a intentarlo en unos minutos.</span></div>
+            <div class="alert alert-warning text-sm" role="status"><bh-icono nombre="candado" /><span>No pudimos mostrar los datos de contacto ahora. El resto del pedido sí se muestra; vuelve a intentarlo en unos minutos.</span></div>
         }
         else if (Model.ContactoAnonimizado)
         {

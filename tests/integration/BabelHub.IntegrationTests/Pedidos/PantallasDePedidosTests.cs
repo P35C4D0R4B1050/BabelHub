@@ -306,12 +306,14 @@ public sealed class PantallasDePedidosTests
         var (estado, html) = await Pedir(anfitrion, $"/cuenta/pedidos/{Pedido:D}?hecho=cancelar", HostWeb.Tienda);
 
         Assert.Equal(HttpStatusCode.OK, estado);
-        foreach (var texto in new[] { "Traslado en camino, llega el 25/11/2026", "Disponible en tu biblioteca", NombreDelContacto, DireccionDelContacto, $"{FormatoPeruano.Soles(30m)} pendiente", "puedes pedir una devolución", "El pedido se canceló" })
+        foreach (var texto in new[] { "Traslado en camino, llega el 25/11/2026", "Disponible en tu biblioteca", NombreDelContacto, DireccionDelContacto, $"{FormatoPeruano.Soles(30m)} pendiente", "puedes pedir una devolución" })
         {
             Assert.Contains(texto, html, StringComparison.Ordinal);
         }
 
         Assert.DoesNotContain("/cancelar\"", html, StringComparison.Ordinal);
+        // El titular no ve la sucursal de origen de cada línea.
+        Assert.DoesNotContain("Sucursal de origen", html, StringComparison.Ordinal);
         Assert.Contains($"/cuenta/pedidos/{Pedido:D}/envios", html, StringComparison.Ordinal);
     }
 
@@ -326,6 +328,17 @@ public sealed class PantallasDePedidosTests
         Assert.Contains($"action=\"/cuenta/pedidos/{Pedido:D}/cancelar\"", html, StringComparison.Ordinal);
         Assert.Contains("name=\"__RequestVerificationToken\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain(NombreDelContacto, html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PED-15")]
+    public async Task Un_enlace_con_hecho_cancelar_no_afirma_una_cancelacion_que_no_ocurrio()
+    {
+        await using var anfitrion = await ComoTitular(new PedidosDelClienteFalso());
+
+        var (_, html) = await Pedir(anfitrion, $"/cuenta/pedidos/{Pedido:D}?hecho=cancelar", HostWeb.Tienda);
+
+        Assert.DoesNotContain("El pedido se canceló", html, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -579,7 +592,7 @@ public sealed class PantallasDePedidosTests
         var (estado, html) = await Pedir(anfitrion, $"/logistica/pedidos/{Pedido:D}", HostWeb.Gestion);
 
         Assert.Equal(HttpStatusCode.OK, estado);
-        Assert.Contains("no se pudo registrar su consulta", html, StringComparison.Ordinal);
+        Assert.Contains("No pudimos mostrar los datos de contacto ahora", html, StringComparison.Ordinal);
         Assert.Contains("Cien años de soledad", html, StringComparison.Ordinal);
         Assert.DoesNotContain(NombreDelContacto, html, StringComparison.Ordinal);
     }

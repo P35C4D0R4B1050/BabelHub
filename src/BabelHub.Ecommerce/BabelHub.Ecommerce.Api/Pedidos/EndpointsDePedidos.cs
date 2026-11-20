@@ -24,7 +24,13 @@ public static class EndpointsDePedidos
     /// <summary>Un estado de traslado (un evento, tres identificadores, una cantidad y dos fechas) cabe holgado en 4 KiB.</summary>
     public const int TopeDelEstadoDeTraslado = 4 * 1024;
 
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow };
+    // Esquema estricto: nombres con su mayúscula exacta, números como números y ningún campo que el contrato no declare.
+    private static readonly JsonSerializerOptions Json = new()
+    {
+        PropertyNameCaseInsensitive = false,
+        NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.Strict,
+        UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow,
+    };
 
     public static IEndpointRouteBuilder MapearPedidos(this IEndpointRouteBuilder rutas)
     {
@@ -37,6 +43,11 @@ public static class EndpointsDePedidos
 
     private static async Task<IResult> EstadoDeTraslado(HttpContext contexto, OpcionesDeErrores errores, IReceptorDeEstadosDeTraslado receptor, IEstablecedorDeActor actor)
     {
+        if (contexto.Request.ContentType is not { } tipo || !tipo.StartsWith("application/json", StringComparison.OrdinalIgnoreCase))
+        {
+            return await Falla(contexto, errores, EstadosDeEntregaDeN8nEnLaApi.Validacion("cuerpo", "invalido")).ConfigureAwait(false);
+        }
+
         var cuerpo = await Leer(contexto).ConfigureAwait(false);
         if (cuerpo is null || cuerpo.EventoId is null || cuerpo.Estado is null || !EstadoConocido(cuerpo.Estado, out var estado))
         {
