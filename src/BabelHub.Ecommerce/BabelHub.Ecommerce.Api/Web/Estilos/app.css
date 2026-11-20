@@ -139,6 +139,15 @@ body {
   color: var(--color-base-content);
 }
 
+/* Las pestañas inactivas (3,03:1 al 50 %) y las etiquetas (4,02:1 al 60 %) de daisyUI no llegan a AA (4,5:1; hallazgo de ui-review de WEB-2 y del Libro de Reclamaciones). Las pestañas inactivas usan el texto casi pleno (la activa se distingue por su borde y por aria-current, no solo por el color) y las etiquetas, el texto pleno. */
+.tab:not(.tab-active) {
+  color: color-mix(in oklab, var(--color-base-content) 88%, transparent);
+}
+
+.label {
+  color: var(--color-base-content);
+}
+
 /* Foco visible en todos los controles (WEB-10) */
 :focus-visible {
   outline: 3px solid var(--bh-foco);

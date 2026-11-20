@@ -68,11 +68,14 @@ test.describe('Visitante: ingreso, registro y recuperación', () => {
   test('el teclado recorre el formulario de ingreso en orden y siempre con el foco visible', async ({ page }) => {
     await page.goto('/ingreso');
     const visibles: string[] = [];
-    for (let i = 0; i < 12; i++) {
+    // La cabecera trae el enlace de saltar, la marca, la navegación, los selectores y «Ingresar» antes del formulario.
+    for (let i = 0; i < 25; i++) {
       await page.keyboard.press('Tab');
       const nombre = await page.evaluate(() => {
         const e = document.activeElement as HTMLElement | null;
         if (!e || e === document.body) return '';
+        // El contenedor vacío que deja el widget de Turnstile (de tercero, con la clave de sitio de mentira del entorno local) no es un control de la página.
+        if (e.tagName === 'DIV' && e.children.length === 0 && !e.textContent?.trim()) return '';
         const sombra = getComputedStyle(e);
         const conAnillo = sombra.outlineStyle !== 'none' || sombra.boxShadow !== 'none';
         return `${e.tagName}:${(e.getAttribute('name') ?? e.textContent ?? '').trim().slice(0, 30)}:${conAnillo}`;
@@ -88,8 +91,10 @@ test.describe('Visitante: ingreso, registro y recuperación', () => {
     await page.goto('/registro');
     await expect(page.getByRole('heading', { level: 1, name: 'Crear mi cuenta' })).toBeVisible();
     await expect(page.getByLabel('Contraseña (mínimo 12 caracteres)')).toHaveAttribute('autocomplete', 'new-password');
-    await expect(page.getByRole('link', { name: 'términos y condiciones' })).toHaveAttribute('href', '/legal/terminos');
-    await expect(page.getByRole('link', { name: 'política de privacidad' })).toHaveAttribute('href', '/legal/privacidad');
+    // El pie también enlaza los textos legales: la aceptación se busca dentro del formulario.
+    const formulario = page.getByRole('main');
+    await expect(formulario.getByRole('link', { name: 'términos y condiciones', exact: true })).toHaveAttribute('href', '/legal/terminos');
+    await expect(formulario.getByRole('link', { name: 'política de privacidad', exact: true })).toHaveAttribute('href', '/legal/privacidad');
     await expect(page.getByLabel('Declaro que soy mayor de edad.')).toBeVisible();
     await sinDesplazamientoHorizontal(page);
     await sinViolacionesAA(page);

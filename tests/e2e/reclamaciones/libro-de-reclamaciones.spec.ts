@@ -80,7 +80,8 @@ test.describe('Visitante: el Libro de Reclamaciones', () => {
 
   test('el texto de un tercero se muestra siempre como texto, nunca como código (AC-REC-04)', async ({ page }) => {
     const errores: string[] = [];
-    page.on('pageerror', (e) => errores.push(e.message));
+    // El entorno local usa una clave de sitio de Turnstile de mentira: el widget de Cloudflare protesta (400020) y eso no es de la página.
+    page.on('pageerror', (e) => { if (!e.message.startsWith('[Cloudflare Turnstile]')) errores.push(e.message); });
     await page.goto('/reclamaciones/nueva');
     await llenarLaHoja(page, '<script>window.__xss = 1</script><img src=x onerror="window.__xss = 2"> pedido dañado');
     await page.getByRole('button', { name: 'Registrar hoja' }).click();
