@@ -392,7 +392,9 @@ public static class AnfitrionDelEcommerce
             servicios.AddSingleton(new ComprobacionDeLaBaseDeDatos(aplicacion));
             servicios.AddSingleton<IComprobacionDeSalud, ComprobacionDeSaludDeLaBase>();
         }
-        servicios.AgregarCredencialDeServicio(new OpcionesDeSuperficieDeServicio { TopeDeLaDireccionDirecta = PoliticasDeLimite.SolicitudesPorHuellaDirecta }, opciones.Configuracion.Seguridad.CredencialesDeEntrada);
+        // Solo en Development y con la variable explícita: las pruebas E2E locales llaman entre procesos por HTTP (no hay TLS entre ellos). Nunca se enciende en producción ni por defecto.
+        var servicioSinHttps = builder.Environment.IsDevelopment() && string.Equals(builder.Configuration["Seguridad:ServicioSinHttps"], "true", StringComparison.OrdinalIgnoreCase);
+        servicios.AgregarCredencialDeServicio(new OpcionesDeSuperficieDeServicio { ExigirHttps = !servicioSinHttps, TopeDeLaDireccionDirecta = PoliticasDeLimite.SolicitudesPorHuellaDirecta }, opciones.Configuracion.Seguridad.CredencialesDeEntrada);
 
         // ---------- Auditoría ----------
         servicios.AddSingleton<IPlantillasDeRuta>(sp => new PlantillasDeRutaDeLaApi(sp.GetRequiredService<EndpointDataSource>()));

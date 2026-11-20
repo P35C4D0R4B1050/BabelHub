@@ -21,6 +21,21 @@ public sealed class FuenteDeSucursalesNoDisponible : IFuenteDeSucursales
         throw new HttpRequestException("El Inventario no ofrece todavía la lista de sucursales.");
 }
 
+/// <summary>La fuente real de sucursales: el Inventario por REST (<c>ListarSucursales</c>, operación pública de solo lectura). Un fallo del Inventario lanza <see cref="HttpRequestException"/>: la lista usa entonces la última conocida (D16).</summary>
+public sealed class FuenteDeSucursalesDelInventario(BabelHub.Ecommerce.Application.Plataforma.IClienteDelInventario inventario) : IFuenteDeSucursales
+{
+    public async Task<IReadOnlyList<SucursalDeLaLista>> Listar(CancellationToken cancelacion = default)
+    {
+        var resultado = await inventario.ListarSucursales(cancelacion).ConfigureAwait(false);
+        if (!resultado.Exitosa)
+        {
+            throw new HttpRequestException("El Inventario no devolvió la lista de sucursales.");
+        }
+
+        return [.. resultado.Valor.Select(s => new SucursalDeLaLista(s.Codigo, s.Nombre))];
+    }
+}
+
 /// <summary>
 /// La lista de sucursales con su <b>última lista conocida</b> (D16): si la fuente falla se devuelve la última que respondió, marcada como no
 /// actualizada, para que el valor guardado de la persona se siga validando; sin ninguna lista conocida no hay nada que validar.
@@ -107,7 +122,8 @@ public static class ModuloWebExtensiones
         // La política de textos pendientes (T36): el estado y la aceptación los informa Identidad (provisionales y fallando cerrado hasta entonces); el tope de consultas es uno por proceso.
         servicios.TryAddSingleton<IEstadoDeCuentaDeLaWeb, EstadoDeCuentaSinIdentidad>();
         servicios.TryAddSingleton<IAceptacionDeTextosEnIdentidad, AceptacionDeTextosSinIdentidad>();
-        servicios.AddSingleton<IFuenteDeSucursales, FuenteDeSucursalesNoDisponible>();
+        // La fuente real es el Inventario; sin su cliente registrado (por ejemplo, en una prueba de la interfaz sola) sigue la fuente que falla.
+        servicios.AddSingleton<IFuenteDeSucursales>(sp => sp.GetService<BabelHub.Ecommerce.Application.Plataforma.IClienteDelInventario>() is { } cliente ? new FuenteDeSucursalesDelInventario(cliente) : new FuenteDeSucursalesNoDisponible());
         servicios.AddSingleton<IListaDeSucursales, ListaDeSucursalesConUltimaConocida>();
         servicios.AddScoped<IPreferenciaDeSucursal, PreferenciaDeSucursal>();
         return servicios;

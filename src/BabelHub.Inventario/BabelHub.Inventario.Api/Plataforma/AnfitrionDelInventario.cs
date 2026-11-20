@@ -217,7 +217,9 @@ public static class AnfitrionDelInventario
 
         // La matriz de alcances: lo que cada operación declarada permite a cada credencial de servicio (rechazo por defecto).
         servicios.AgregarSeguridadYLimitesDelInventario([.. MatrizDeFuentes.Declaraciones(), .. MatrizDeReservas.Declaraciones(), .. MatrizDeAjustes.Declaraciones(), .. MatrizDeTraslados.Declaraciones(), .. MatrizDeAuditoria.Declaraciones()]);
-        servicios.AgregarCredencialDeServicio(new OpcionesDeSuperficieDeServicio { TopeDeLaDireccionDirecta = PoliticasDeLimite.SolicitudesPorHuellaDirecta }, opciones.Seguridad.CredencialesDeEntrada);
+        // Solo en Development y con la variable explícita: las pruebas E2E locales llaman entre procesos por HTTP (no hay TLS entre ellos). Nunca se enciende en producción ni por defecto.
+        var servicioSinHttps = builder.Environment.IsDevelopment() && string.Equals(builder.Configuration["Seguridad:ServicioSinHttps"], "true", StringComparison.OrdinalIgnoreCase);
+        servicios.AgregarCredencialDeServicio(new OpcionesDeSuperficieDeServicio { ExigirHttps = !servicioSinHttps, TopeDeLaDireccionDirecta = PoliticasDeLimite.SolicitudesPorHuellaDirecta }, opciones.Seguridad.CredencialesDeEntrada);
 
         // ---------- Datos: el rol de acceso de la aplicación y las cuentas de depuración, aparte ----------
         BasesDelInventario.RegistrarLaDeLaAplicacion(servicios, opciones.BaseDeLaAplicacion);
