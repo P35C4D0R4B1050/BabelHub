@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Recrea el Inventario (y la base) con otros límites de CPU y memoria para medir su efecto.
-# Uso: ajustar-limites.sh <cpus-inventario> [<cpus-postgres> [<mem-inventario> [<tope-del-grupo>]]]
-# Por omisión el entorno usa los límites declarados en infra/docker-compose.inventario.yml (0.3 CPU y 350m el Inventario; 0.8 CPU y 2g la base) y el tope de 16 conexiones del grupo.
+# Uso: ajustar-limites.sh [<cpus-inventario=0.6> [<cpus-postgres=0.4> [<mem-inventario=512m> [<tope-del-grupo>]]]]
+# Por omisión el entorno usa el dimensionamiento declarado de VM-INVENTARIO (DD-17, infra/docker-compose.inventario.yml): Inventario 0.6 CPU y 512m, base 0.4 CPU y 2g, y el tope de 16 conexiones del grupo. Antes de DD-17 eran 0.3 CPU y 350m el Inventario y 0.8 CPU la base (histórico: `ajustar-limites.sh 0.3 0.8 350m`).
 # Con <tope-del-grupo> se fija `Maximum Pool Size` del Inventario y el CONNECTION LIMIT de su cuenta (tope + 4), para medir cuánta concurrencia de base sostiene más CPU.
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
 CARGA_CARPETA="${CARGA_CARPETA:-$(cygpath -m "$(cd "$(git rev-parse --git-common-dir)/../.." && pwd)")/babelhub-carga}"
 set -a; source "$CARGA_CARPETA/env"; set +a
 export CARGA_CARPETA CARGA_ENV_CONTENEDOR="$CARGA_CARPETA/env-contenedor"
-export CARGA_CPUS_INVENTARIO="${1:?cpus del Inventario}" CARGA_CPUS_POSTGRES="${2:-0.8}" CARGA_MEM_INVENTARIO="${3:-350m}"
+export CARGA_CPUS_INVENTARIO="${1:-0.6}" CARGA_CPUS_POSTGRES="${2:-0.4}" CARGA_MEM_INVENTARIO="${3:-512m}"
 pool="${4:-}"
 compose() { docker compose -p bhcarga -f tests/load/entorno/docker-compose.carga.yml --env-file "$CARGA_CARPETA/env" "$@"; }
 
