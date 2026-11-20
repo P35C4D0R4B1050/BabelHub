@@ -236,7 +236,9 @@ public static class AnfitrionDelInventario
         servicios.AddSingleton<IPlantillasDeRuta>(sp => new PlantillasDeRutaDeLaApi(sp.GetRequiredService<EndpointDataSource>()));
         servicios.AgregarModuloAuditoria(new OpcionesDelModuloDeAuditoria(BasesDelInventario.Abrir(opciones.BaseDeDepuracionDeAuditoria), new ClavesDeCursorDelEntorno(opciones.ClaveDelCursor, opciones.VersionDelCursor)));
         servicios.AgregarRegistroDeDenegaciones();
-        servicios.AgregarModuloFuentes();
+        // Memoria de referencias de la consulta pública de disponibilidad: apagada salvo que la persona responsable la encienda (Inventario:ReferenciasEnMemoriaSegundos, de 1 a 30).
+        var segundosDeReferencias = int.TryParse(builder.Configuration["Inventario:ReferenciasEnMemoriaSegundos"], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var s) ? Math.Clamp(s, 0, 30) : 0;
+        servicios.AgregarModuloFuentes(vidaDeLasReferencias: TimeSpan.FromSeconds(segundosDeReferencias));
         servicios.AgregarModuloReservas(builder.Configuration);
         servicios.AgregarModuloAjustes(new OpcionesDelModuloDeAjustes(BasesDelInventario.Abrir(opciones.BaseDeDepuracionDeAjustes)));
         servicios.AgregarModuloTraslados();

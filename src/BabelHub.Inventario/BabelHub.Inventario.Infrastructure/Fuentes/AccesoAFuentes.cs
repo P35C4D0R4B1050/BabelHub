@@ -24,7 +24,8 @@ internal sealed class AccesoAFuentes(
     IElevacionDeAlcance elevacion,
     IActorActual actores,
     IPublicadorDeAlertasTecnicas alertas,
-    IReloj reloj)
+    IReloj reloj,
+    IAlcanceDeDatosFijado alcance)
 {
     /// <summary>El motivo de la alerta técnica cuando se intenta tocar el stock sin actor (debe constar en el catálogo de motivos de alertas técnicas).</summary>
     public const string MotivoDeAlertaSinActor = "alcance-de-datos-sin-actor";
@@ -57,14 +58,15 @@ internal sealed class AccesoAFuentes(
         {
             await elevacion.TraducirRechazoDeLaPolitica(async () =>
             {
+                if (elevar)
+                {
+                    resultado = await elevacion.EjecutarComoConAlcanceDeRed(Esquema, t => bloque(conexionActiva, transaccion, t), cancelacion).ConfigureAwait(false);
+                    return 0;
+                }
+
                 await unidad.EjecutarComo(
                     Esquema,
-                    async token =>
-                    {
-                        resultado = elevar
-                            ? await elevacion.ConAlcanceDeRed(t => bloque(conexionActiva, transaccion, t), token).ConfigureAwait(false)
-                            : await bloque(conexionActiva, transaccion, token).ConfigureAwait(false);
-                    },
+                    async token => resultado = await bloque(conexionActiva, transaccion, token).ConfigureAwait(false),
                     cancelacion).ConfigureAwait(false);
                 return 0;
             }).ConfigureAwait(false);
@@ -78,17 +80,11 @@ internal sealed class AccesoAFuentes(
         return resultado;
     }
 
-    private async Task<bool> HayAlcanceFijado(CancellationToken cancelacion)
-    {
-        await using var comando = new NpgsqlCommand("SELECT coalesce(current_setting('babelhub.alcance', true), '') <> ''", (NpgsqlConnection)conexion.Conexion, (NpgsqlTransaction)conexion.Transaccion);
-        return (bool)(await comando.ExecuteScalarAsync(cancelacion).ConfigureAwait(false))!;
-    }
-
     private async Task ExigirActor(CancellationToken cancelacion)
     {
         // Un actor con contexto Y un alcance de datos que la unidad de trabajo pudo fijar para él: un encargado sin sucursal o un rol desconocido tienen actor pero no alcance, y las políticas
         // les devolverían cero filas sin error igual que a quien no tiene actor.
-        if (actores.Actual is { Tipo: not TipoDeActor.Anonimo } && await HayAlcanceFijado(cancelacion).ConfigureAwait(false))
+        if (actores.Actual is { Tipo: not TipoDeActor.Anonimo } && alcance.HayAlcanceFijado)
         {
             return;
         }

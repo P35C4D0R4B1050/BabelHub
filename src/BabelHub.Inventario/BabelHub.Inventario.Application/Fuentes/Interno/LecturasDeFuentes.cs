@@ -6,18 +6,30 @@ namespace BabelHub.Inventario.Application.Fuentes.Interno;
 /// <summary>
 /// <see cref="IExistencias"/>: el vendible de una o varias ediciones, siempre en <b>una sola instantánea</b> (<c>REPEATABLE READ</c> de solo lectura): el stock, las reservas
 /// vencidas sin procesar y las fuentes salen del mismo momento, así que el resultado nunca refleja un estado intermedio inválido (spec §6, D06). El vendible es
-/// <c>max(0, físico − reservado + vencidas)</c> y las fuentes sin fila figuran en cero (FUE-05, FUE-06). No hay caché (D05).
+/// <c>max(0, físico − reservado + vencidas)</c> y las fuentes sin fila figuran en cero (FUE-05, FUE-06). Esta consulta siempre lee la base; solo la lista de fuentes de la consulta pública puede venir de una memoria de 5 s (D05, <see cref="CacheDeReferencias"/>).
 /// El alcance del actor lo comprueba el caso de uso que llama (FUE-08): aquí se lee la red completa.
 /// </summary>
 public sealed class ConsultaDeExistencias(
     ILecturaCoherente lectura,
     IRepositorioDeFuentes fuentes,
     IRepositorioDeExistencias existencias,
-    IReservasDeStock reservas) : IExistencias
+    IReservasDeStock reservas,
+    CacheDeReferencias? referencias = null) : IExistencias
 {
     private const int TamanoMaximoDePagina = 100;
+    private const string ClaveDeFuentes = "fuentes";
 
-    public async Task<IReadOnlyList<DisponibilidadDeEdicion>> Disponibilidad(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default)
+    public Task<IReadOnlyList<DisponibilidadDeEdicion>> Disponibilidad(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default) =>
+        Calcular(edicionIds, conReferenciasEnMemoria: false, cancelacion);
+
+    /// <summary>
+    /// Lo mismo que <see cref="Disponibilidad"/>, para la consulta pública: la lista de fuentes (código y nombre) puede venir de la memoria del proceso, a lo sumo 5 s atrasada (<see cref="CacheDeReferencias"/>).
+    /// El stock y las vencidas salen siempre de la base. Quien decide algo con la disponibilidad (traslados, reservas) usa <see cref="Disponibilidad"/>.
+    /// </summary>
+    internal Task<IReadOnlyList<DisponibilidadDeEdicion>> DisponibilidadParaLaConsultaPublica(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default) =>
+        Calcular(edicionIds, conReferenciasEnMemoria: true, cancelacion);
+
+    private async Task<IReadOnlyList<DisponibilidadDeEdicion>> Calcular(IReadOnlyCollection<Guid> edicionIds, bool conReferenciasEnMemoria, CancellationToken cancelacion)
     {
         ArgumentNullException.ThrowIfNull(edicionIds);
 
@@ -30,7 +42,7 @@ public sealed class ConsultaDeExistencias(
         return await lectura.EjecutarLectura(
             async token =>
             {
-                var todasLasFuentes = (await fuentes.Listar(token).ConfigureAwait(false)).OrderBy(f => f.Codigo, StringComparer.Ordinal).ToList();
+                var todasLasFuentes = await ListarFuentes(conReferenciasEnMemoria, token).ConfigureAwait(false);
                 var filas = (await existencias.Leer(ediciones, token).ConfigureAwait(false)).ToDictionary(f => (f.FuenteId, f.EdicionId));
                 var vencidas = Sumar(await reservas.VencidasPorEdicion(ediciones, token).ConfigureAwait(false));
 
@@ -47,6 +59,26 @@ public sealed class ConsultaDeExistencias(
                 return (IReadOnlyList<DisponibilidadDeEdicion>)resultado;
             },
             cancelacion).ConfigureAwait(false);
+    }
+
+    private async Task<List<FuenteDeReferencia>> ListarFuentes(bool conReferenciasEnMemoria, CancellationToken cancelacion)
+    {
+        var usaMemoria = conReferenciasEnMemoria && referencias is not null;
+        if (usaMemoria && referencias!.Obtener<List<FuenteDeReferencia>>(ClaveDeFuentes) is { } guardadas)
+        {
+            return guardadas;
+        }
+
+        var leidas = (await fuentes.Listar(cancelacion).ConfigureAwait(false))
+            .OrderBy(f => f.Codigo, StringComparer.Ordinal)
+            .Select(f => new FuenteDeReferencia(f.Id, f.Codigo, f.Nombre))
+            .ToList();
+        if (usaMemoria)
+        {
+            referencias!.Guardar(ClaveDeFuentes, leidas);
+        }
+
+        return leidas;
     }
 
     public async Task<PaginaDeExistencias> DeLaFuente(ConsultaDeExistenciasDeFuente consulta, CancellationToken cancelacion = default)
@@ -93,7 +125,10 @@ public sealed class ConsultaDeExistencias(
             .GroupBy(v => (v.FuenteId, v.EdicionId))
             .ToDictionary(g => g.Key, g => (int)Math.Min(int.MaxValue, g.Sum(v => (long)Math.Max(0, v.Unidades))));
 
-    internal static ExistenciaEnFuente Existencia(Fuente fuente, Guid edicionId, FilaDeStock? fila, IReadOnlyDictionary<(Guid FuenteId, Guid EdicionId), int> vencidas)
+    internal static ExistenciaEnFuente Existencia(Fuente fuente, Guid edicionId, FilaDeStock? fila, IReadOnlyDictionary<(Guid FuenteId, Guid EdicionId), int> vencidas) =>
+        Existencia(new FuenteDeReferencia(fuente.Id, fuente.Codigo, fuente.Nombre), edicionId, fila, vencidas);
+
+    internal static ExistenciaEnFuente Existencia(FuenteDeReferencia fuente, Guid edicionId, FilaDeStock? fila, IReadOnlyDictionary<(Guid FuenteId, Guid EdicionId), int> vencidas)
     {
         var stock = fila is null ? ExistenciaDeStock.Vacia : new ExistenciaDeStock(fila.Fisico, fila.Reservado);
 

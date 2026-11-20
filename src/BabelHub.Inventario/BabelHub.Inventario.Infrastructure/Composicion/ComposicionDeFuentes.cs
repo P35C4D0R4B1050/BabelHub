@@ -29,7 +29,7 @@ public static class ComposicionDeFuentes
     /// <summary>Los casos de uso del módulo que se pueden repetir entero ante un interbloqueo: sus claves naturales los hacen idempotentes (plan §5).</summary>
     public static IReadOnlyList<Type> CasosDeUsoIdempotentes { get; } = [typeof(RegistrarRuta), typeof(RegistrarFichaDeEdicion), typeof(DesignarFuenteDeRecepcion)];
 
-    public static IServiceCollection AgregarModuloFuentes(this IServiceCollection servicios, OpcionesDeReintentoPorInterbloqueo? reintento = null, OpcionesDeBloqueosAsesores? bloqueos = null)
+    public static IServiceCollection AgregarModuloFuentes(this IServiceCollection servicios, OpcionesDeReintentoPorInterbloqueo? reintento = null, OpcionesDeBloqueosAsesores? bloqueos = null, TimeSpan? vidaDeLasReferencias = null)
     {
         ArgumentNullException.ThrowIfNull(servicios);
         var opcionesDeReintento = reintento ?? new OpcionesDeReintentoPorInterbloqueo();
@@ -38,6 +38,7 @@ public static class ComposicionDeFuentes
         servicios.TryAddSingleton(sp => new UnidadDeTrabajoPostgres(sp.GetRequiredService<NpgsqlDataSource>(), actor: sp.GetRequiredService<IActorActual>()));
         servicios.TryAddSingleton<IUnidadDeTrabajo>(sp => sp.GetRequiredService<UnidadDeTrabajoPostgres>());
         servicios.TryAddSingleton<IConexionDeLaUnidadDeTrabajo>(sp => sp.GetRequiredService<UnidadDeTrabajoPostgres>());
+        servicios.TryAddSingleton<IAlcanceDeDatosFijado>(sp => sp.GetRequiredService<UnidadDeTrabajoPostgres>());
         servicios.TryAddSingleton<ILecturaCoherente>(sp => sp.GetRequiredService<UnidadDeTrabajoPostgres>());
         servicios.TryAddSingleton<IBloqueosAsesores>(sp => new NpgsqlBloqueosAsesores(sp.GetRequiredService<IConexionDeLaUnidadDeTrabajo>(), bloqueos));
 
@@ -51,7 +52,9 @@ public static class ComposicionDeFuentes
         servicios.AddScoped<IRepositorioDeExistencias, NpgsqlRepositorioDeExistencias>();
         servicios.AddScoped<IAplicadorDeMovimientos, AplicadorDeMovimientos>();
         servicios.AddScoped<IMovimientosDeStock, MovimientosDeStock>();
-        servicios.AddScoped<IExistencias, ConsultaDeExistencias>();
+        servicios.TryAddSingleton(sp => new CacheDeReferencias(sp.GetRequiredService<IReloj>(), vidaDeLasReferencias));
+        servicios.AddScoped<ConsultaDeExistencias>();
+        servicios.AddScoped<IExistencias>(sp => sp.GetRequiredService<ConsultaDeExistencias>());
         servicios.AddScoped<DirectorioDeFuentes>();
         servicios.AddScoped<IDirectorioDeFuentes>(sp => sp.GetRequiredService<DirectorioDeFuentes>());
         servicios.AddScoped<IFichasDeEdiciones>(sp => sp.GetRequiredService<DirectorioDeFuentes>());

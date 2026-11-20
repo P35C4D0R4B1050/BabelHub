@@ -40,7 +40,14 @@ internal sealed class RepositorioDeFuentesEnMemoria : IRepositorioDeFuentes
 
     public Task<Fuente?> PorCodigo(string codigo, CancellationToken cancelacion = default) => Task.FromResult(Fuentes.FirstOrDefault(f => f.Codigo == codigo));
 
-    public Task<IReadOnlyList<Fuente>> Listar(CancellationToken cancelacion = default) => Task.FromResult<IReadOnlyList<Fuente>>([.. Fuentes]);
+    /// <summary>Cuántas veces se leyó la lista completa (las pruebas de la memoria de referencias comprueban que no se repite).</summary>
+    public int LecturasDeLaLista { get; private set; }
+
+    public Task<IReadOnlyList<Fuente>> Listar(CancellationToken cancelacion = default)
+    {
+        LecturasDeLaLista++;
+        return Task.FromResult<IReadOnlyList<Fuente>>([.. Fuentes]);
+    }
 
     public Task<IReadOnlyList<Fuente>> DeLaRegion(string region, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<Fuente>>([.. Fuentes.Where(f => f.Region == region)]);
@@ -150,8 +157,15 @@ internal sealed class RepositorioDeFichasEnMemoria(BitacoraDeLlamadas? bitacora 
 
     public Task<FichaDeEdicion?> PorId(Guid edicionId, CancellationToken cancelacion = default) => Task.FromResult(Fichas.GetValueOrDefault(edicionId));
 
-    public Task<IReadOnlyList<FichaDeEdicion>> PorIds(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default) =>
-        Task.FromResult<IReadOnlyList<FichaDeEdicion>>([.. edicionIds.Distinct().Where(Fichas.ContainsKey).Select(id => Fichas[id])]);
+
+    /// <summary>Los identificadores que se pidieron a la base en cada lectura por identificadores.</summary>
+    public List<IReadOnlyCollection<Guid>> LecturasPorIds { get; } = [];
+
+    public Task<IReadOnlyList<FichaDeEdicion>> PorIds(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion = default)
+    {
+        LecturasPorIds.Add([.. edicionIds]);
+        return Task.FromResult<IReadOnlyList<FichaDeEdicion>>([.. edicionIds.Distinct().Where(Fichas.ContainsKey).Select(id => Fichas[id])]);
+    }
 
     /// <summary>Si tiene valor, el próximo guardado responde eso (la clave compuesta de formato ante una carrera que la lectura previa no vio).</summary>
     public ResultadoDeGuardadoDeFicha? RespuestaForzada { get; set; }

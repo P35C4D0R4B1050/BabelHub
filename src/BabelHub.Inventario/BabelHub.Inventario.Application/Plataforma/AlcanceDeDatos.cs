@@ -13,8 +13,24 @@ internal interface IElevacionDeAlcance
     Task<T> ConAlcanceDeRed<T>(Func<CancellationToken, Task<T>> bloque, CancellationToken cancelacion = default);
 
     /// <summary>
+    /// <see cref="IUnidadDeTrabajo.EjecutarComo"/> del esquema y <see cref="ConAlcanceDeRed{T}"/> en un solo bloque: la entrada (rol y alcance) y la salida (alcance y rol anteriores) viajan cada una en
+    /// <b>una sola ida a la base</b> en lugar de dos. Es exactamente lo mismo que anidarlos: el bloque corre con el rol del esquema y el alcance de la red, y al salir vuelven ambos.
+    /// </summary>
+    Task<T> EjecutarComoConAlcanceDeRed<T>(EsquemaDeModulo esquema, Func<CancellationToken, Task<T>> bloque, CancellationToken cancelacion = default);
+
+    /// <summary>
     /// Ejecuta la operación y traduce el rechazo de la política de filas de la base (<c>42501</c> con nombre de tabla) a <see cref="AlcanceDeDatosDenegadoException"/>, sin confundirlo con «sin stock» ni con un error
     /// inesperado. Vive aquí, y no en la Infraestructura de la plataforma, porque la Infraestructura de un módulo no puede depender de la de otro (regla 13).
     /// </summary>
     Task<T> TraducirRechazoDeLaPolitica<T>(Func<Task<T>> operacion);
+}
+
+/// <summary>
+/// Si la unidad de trabajo fijó un alcance de datos (sucursal o red) en la transacción en curso. Lo sabe por haberlo fijado ella misma (<c>set_config</c> al abrir la transacción y al elevar), sin preguntarle a la
+/// base en cada acceso. Sin alcance, las políticas de filas devuelven cero filas sin error, y los accesos a los esquemas con seguridad por filas fallan cerrado en lugar de leer «sin stock». Solo la Infraestructura la usa.
+/// </summary>
+internal interface IAlcanceDeDatosFijado
+{
+    /// <summary><see langword="true"/> si hay una transacción con un alcance fijado; lanza si no hay transacción.</summary>
+    bool HayAlcanceFijado { get; }
 }
