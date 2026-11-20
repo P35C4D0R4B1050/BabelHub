@@ -1,6 +1,6 @@
 # Tablero de coordinación de los carriles
 
-Lo mantiene **el coordinador** (la sesión raíz «BabelHub documentación y specs»); los carriles lo **leen al empezar cada turno** y no lo editan: lo que necesiten de otro carril lo dejan en su informe de bloque y en `progress/hallazgos.md`, y el coordinador lo traslada aquí. Complementa `progress/bloques.md` (qué bloques hay) con **quién hace qué ahora, qué espera a quién y cómo se integra**. Última actualización: 2026-11-19 (tarde).
+Lo mantiene **el coordinador** (la sesión raíz «BabelHub documentación y specs»); los carriles lo **leen al empezar cada turno** y no lo editan: lo que necesiten de otro carril lo dejan en su informe de bloque y en `progress/hallazgos.md`, y el coordinador lo traslada aquí. Complementa `progress/bloques.md` (qué bloques hay) con **quién hace qué ahora, qué espera a quién y cómo se integra**. Última actualización: 2026-11-20 (mediodía).
 
 ## 1. Protocolo (obligatorio para todos los carriles)
 
@@ -14,12 +14,17 @@ Lo mantiene **el coordinador** (la sesión raíz «BabelHub documentación y spe
 
 ## 2. Carriles y su siguiente encargo
 
-| Carril | Sesión | Ahora | Después |
+| Carril | Sesión | Ahora (2026-11-20, mediodía) | Después |
 | :--- | :--- | :--- | :--- |
-| **A — Transversales** | carril-a-contratos-de-pl | Terminar IDE-8 (resto de T44 y T45) → IDE-9 (T46–T50) → **COMP-1: componer los `Program.cs`** (Inventario primero: Fuentes, Reservas, Ajustes, Traslados, Auditoría y verificador de tokens; luego E-commerce) → NOT-2 a NOT-4 (envío, tope por número, recepción, adaptadores) | PLA-R2 (T29, T31–T34), PLA-R3/R4, `identidad-seguridad` T27/T34 pendientes de Infraestructura de correo |
-| **B — Carrito y Pedidos** | carril-b-inv-2d-ajustes | **T25b y T26c del carrito** (ya no esperan: A entregó el cliente del Inventario, límites y auditoría de Carrito) y T36 (E2E) → `ecommerce-pedidos` (ECO-6a a 6f, T01–T42; los contratos para Envíos ya están) | `ecommerce-biblioteca-digital` (ECO-8) |
-| **C — Pagos y reclamaciones** | carril-c-cat-logo-eco-2a | `ecommerce-pagos` ECO-5d en adelante (T24–T36 y T37; ECO-5f, T38, espera B05) y `ecommerce-libro-reclamaciones` ECO-11c y 11d (T13–T23) | **WEB-2** (`web-base` T28–T31, con Identidad ya en main) y `ecommerce-devoluciones` (ECO-10) |
-| **V — Envíos** | planificar-eco-7-bibliot | `ecommerce-envios` ECO-9b a 9e (T06–T25), con los contratos de Pedidos ya en main | `ecommerce-devoluciones` (ECO-10) o `web-base` T32–T35 (E2E, axe, rendimiento) según quién termine antes; la verificación FIN-1 de cada spec que se complete |
+| **A — Transversales** | carril-a-contratos-de-pl | COMP-1 cerrado (auditoría y claves de Identidad en el E-commerce); hallazgos Importantes abiertos de plataforma del Sprint 2 (TRA-22, SEG-31, tope de 24 correos, IDE-7) y `spec-verify` de identidad, auditoría y seguridad | PLA-R2 a R4 y spikes (fuera del Sprint 2) |
+| **B — Carrito y Pedidos** | carril-b-inv-2d-ajustes | ECO-6g: T33–T36 con módulos reales, T41 (E2E de personal y `ui-review`), Menores acumulados, E2E del carrito mixto/digital/visitante; `spec-verify` de pedidos y carrito | — |
+| **C — Pagos, reclamaciones y web** | carril-c-cat-logo-eco-2a | Pagos T31 (T37/T38 esperan B05), reclamaciones T22, WEB-2 `ui-review`/E2E, resto de `web-base` (FUE-09/FUE-11 diferidas) y `spec-verify` | — |
+| **V — Envíos y devoluciones** | planificar-eco-7-bibliot | ECO-10d revisores, devoluciones T23–T34, envíos T14b/T20/T21b/T22/T24 y `spec-verify` | — |
+| **Biblioteca (ECO-8)** | carril-biblioteca | T01–T24 en main; T25 (E2E + `ui-review`) y `spec-verify` | — |
+| **Evidencias** | carril-evidencias | OAS-1, K6-1, cobertura y DOC-1 hechos; rampa final 50→2000 con 0,6/0,4/512m (espera Docker) e informe final de la rúbrica | — |
+| **Rendimiento** | reducir-el-costo-por-sol | Cerrado: ~31 → ~18 sentencias por solicitud; memoria opt-in apagada (DD-17) | — |
+
+**Turnos de máquina (Docker):** evidencias (rampa) → B → C → biblioteca; V y A, filtrados y cortos; integración completa final del coordinador al cierre. **Docker Desktop caído** desde la rampa colgada: espera a la persona.
 
 ## 3. Qué espera a quién
 
@@ -47,7 +52,7 @@ Lo mantiene **el coordinador** (la sesión raíz «BabelHub documentación y spe
 
 ## 4. Decisiones de la persona
 
-Pendientes: tope de unidades por línea y por reserva (hoy 100 y 50 líneas) y residual de 75 minutos (reservas); hora de Lima en `transversal-auditoria` (D13); tareas externas B03 a B07 y spikes T01 a T05 de `transversal-plataforma`. Tomadas: umbral de 50 bloqueos por ventana de 15 minutos; D18 y D19 (cambios aditivos al contrato v1); delegación al carril B de los hallazgos de `ecommerce-carrito-checkout` (`progress/decisiones-delegadas.md`).
+Pendientes: tareas externas B03 a B07 y spikes T01 a T05 de `transversal-plataforma` (fuera del Sprint 2). Tomadas (2026-11-19 y 20): tope de reserva de 20 unidades por línea y 30 líneas (DD-16), residual de 75 minutos, desvío de la hora de Lima registrado, lista de contraseñas SecLists, memoria de referencias del Inventario apagada y dimensionamiento 0,6 CPU/512 MB para el Inventario y 0,4 CPU para PostgreSQL (DD-17), FUE-09 y FUE-11 diferidas. Anteriores: umbral de 50 bloqueos por ventana de 15 minutos; D18 y D19 (cambios aditivos al contrato v1); delegación al carril B de los hallazgos de `ecommerce-carrito-checkout` (`progress/decisiones-delegadas.md`).
 
 ## 5. Entorno
 
