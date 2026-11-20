@@ -118,11 +118,12 @@ internal sealed class RepositorioDeAccesosPostgres(AccesoAlEsquemaDeBiblioteca a
         acceso.Ejecutar(
             async (conexion, transaccion, token) =>
             {
+                // «ON CONFLICT DO NOTHING» sin destino: dos concesiones simultáneas del mismo pedido chocan con el único (cuenta, edición) o con el único (pedido, edición) según quién se compruebe primero, y ambos casos son «ya existe» (BIB-19), nunca un error.
                 // Dos vueltas como máximo: si el acceso existente desaparece entre las sentencias (la cancelación de la cuenta), se inserta de nuevo.
                 for (var vuelta = 0; vuelta < 2; vuelta++)
                 {
                     await using (var insertar = new NpgsqlCommand(
-                        $"INSERT INTO biblioteca.accesos ({Columnas}) VALUES (@id, @cuenta, @edicion, @pedido, 'vigente', 0, 0, @ahora, NULL, NULL, NULL, NULL) ON CONFLICT (cuenta_id, edicion_id) DO NOTHING",
+                        $"INSERT INTO biblioteca.accesos ({Columnas}) VALUES (@id, @cuenta, @edicion, @pedido, 'vigente', 0, 0, @ahora, NULL, NULL, NULL, NULL) ON CONFLICT DO NOTHING",
                         conexion,
                         transaccion))
                     {
