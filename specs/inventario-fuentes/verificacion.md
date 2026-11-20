@@ -11,6 +11,8 @@ fecha: 2026-11-19
 
 El módulo `Fuentes` está implementado y probado sin diferencias de código: 19 de 22 requisitos cumplen, 3 quedan **Parcial** (FUE-09, FUE-10 y FUE-11) y ninguno **No cumple**. Los tres huecos no se arreglan en el módulo: dependen de `web-base` (FUE-09 y FUE-11), del despliegue con k6 (FUE-10) y de la composición del anfitrión del Inventario (transversal a todos). Ver la sección 3.
 
+> **Decisión del coordinador (2026-11-20): FUE-09 y FUE-11 se difieren** (sus pantallas dependen de `web-base` y no se construyen en esta fase). Con esa salvedad el módulo **converge salvo FUE-09/FUE-11**: queda anotado aquí y la spec no pasa a `Done` hasta que se construyan o la persona responsable decida otra cosa.
+
 ## 1. Comprobaciones automáticas
 
 | Comprobación | Comando | Resultado |
