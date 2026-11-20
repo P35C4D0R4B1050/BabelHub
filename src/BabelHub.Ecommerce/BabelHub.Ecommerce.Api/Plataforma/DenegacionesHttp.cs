@@ -114,7 +114,10 @@ public static class DenegacionesHttpExtensiones
         servicios.AddHttpContextAccessor();
         servicios.AddScoped<IRutaDeLaSolicitud, RutaDeLaSolicitudHttp>();
         // El registro de petición del servidor web escribe la dirección completa con su consulta (el usuario, el origen y el texto buscado de la auditoría, AUD-06, SEG-10): solo avisos y errores.
-        servicios.AddLogging(registro => registro.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Warning));
+        // Lo mismo, por costo: el servidor web y el cliente HTTP escribían varias líneas de información por solicitud (hallazgo de K6-1); los registros propios de BabelHub conservan su nivel.
+        servicios.AddLogging(registro => registro
+            .AddFilter("Microsoft.AspNetCore", LogLevel.Warning)
+            .AddFilter("System.Net.Http.HttpClient", LogLevel.Warning));
         return servicios;
     }
 
