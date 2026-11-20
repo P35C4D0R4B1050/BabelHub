@@ -147,6 +147,78 @@
         "x-alcance": "SesionWeb"
       }
     },
+    "/api/ecommerce/v1/integraciones/inventario/traslados": {
+      "post": {
+        "tags": [
+          "integraciones"
+        ],
+        "summary": "ecommerce.traslados.informar-estado",
+        "description": "Alcance de la credencial: `solicitar-aviso`. No lleva token de usuario. Cambia el estado.",
+        "operationId": "ecommerce.traslados.informar-estado",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EstadoDeTrasladoDePedidoDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Resultado normal de la operación."
+          },
+          "400": {
+            "description": "Error. Códigos estables posibles: `ECO-VALIDACION-INVALIDA`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error. Códigos estables posibles: `ECO-NO-AUTENTICADO`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error. Códigos estables posibles: `ECO-NO-ENCONTRADO`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error. Códigos estables posibles: `ECO-SERVICIO-NO-DISPONIBLE`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "credencialDeServicio": [ ]
+          }
+        ],
+        "x-operacion": "ecommerce.traslados.informar-estado",
+        "x-alcance": "solicitar-aviso"
+      }
+    },
     "/.well-known/jwks.json": {
       "get": {
         "tags": [
@@ -657,6 +729,60 @@
   },
   "components": {
     "schemas": {
+      "EstadoDeTrasladoDePedidoDto": {
+        "required": [
+          "eventoId",
+          "trasladoId",
+          "pedidoId",
+          "edicionId",
+          "cantidad",
+          "estado",
+          "fechaEstimadaDeLlegada",
+          "ocurridoEn"
+        ],
+        "type": "object",
+        "properties": {
+          "eventoId": {
+            "type": "string"
+          },
+          "trasladoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pedidoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "edicionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cantidad": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "format": "int32"
+          },
+          "estado": {
+            "type": "string"
+          },
+          "fechaEstimadaDeLlegada": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "ocurridoEn": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "MarcarAlertaRevisadaDto": {
         "required": [
           "contadorVisto"

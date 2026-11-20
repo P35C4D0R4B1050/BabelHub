@@ -281,7 +281,9 @@ public sealed class CorreoDeProduccionTests(PostgresDelCorreoFixture bd) : IClas
         var segundaPasada = await cola.Vencidos(Ahora, 3);
 
         Assert.Equal(CategoriaDeCorreo.Pago, Assert.Single(segundaPasada).Correo.Categoria);
-        Assert.Equal(5, await bd.Consultar<long>("SELECT count(*) FROM plataforma.correos_pendientes WHERE intentos = 1 AND proximo_intento > now() + interval '10 hours'"));
+        // Se compara con el reloj de la prueba (`Ahora`, fijo), no con `now()` de la base: de lo contrario la aserción depende del día en que corre.
+        var umbral = Ahora.AddHours(10).ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Equal(5, await bd.Consultar<long>($"SELECT count(*) FROM plataforma.correos_pendientes WHERE intentos = 1 AND proximo_intento > '{umbral}'::timestamptz"));
     }
 
     [Fact]
