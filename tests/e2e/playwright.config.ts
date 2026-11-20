@@ -4,6 +4,8 @@ import { defineConfig, devices, firefox, webkit, type PlaywrightTestConfig } fro
 
 // La URL base es la del E-commerce local de `infra/` (host de la tienda). Se cambia con E2E_BASE_URL.
 const baseURL = process.env.E2E_BASE_URL ?? 'http://localhost:8080';
+// Solo el host local (certificado de desarrollo de .NET) salta la validación TLS; cualquier otro destino la conserva.
+const esLocal = ['localhost', '127.0.0.1', '[::1]'].includes(new URL(baseURL).hostname);
 
 type Proyecto = NonNullable<PlaywrightTestConfig['projects']>[number];
 
@@ -62,7 +64,7 @@ export default defineConfig({
     locale: 'es-PE',
     timezoneId: 'America/Lima',
     // El host local de los recorridos con compra se sirve por HTTPS con el certificado de desarrollo de .NET (E2E_TLS=1, entorno/arrancar-host.sh): no está en la raíz de confianza del sistema.
-    ignoreHTTPSErrors: true,
+    ignoreHTTPSErrors: esLocal,
     trace: 'retain-on-failure',
     // El host local escucha en HTTP; detrás del borde recibe X-Forwarded-Proto: https (las cookies __Host- y el antiforgery lo exigen).
     extraHTTPHeaders: process.env.E2E_FORWARDED_PROTO ? { 'X-Forwarded-Proto': process.env.E2E_FORWARDED_PROTO } : undefined,

@@ -120,3 +120,12 @@ public interface IContactoDeAvisosDelCliente
 {
     Task<ContactoDeAvisosDelCliente?> Consultar(Guid usuarioId, CancellationToken cancelacion = default);
 }
+
+/// <summary>
+/// El correo del titular de una cuenta para quien debe <b>enviarle</b> un aviso sin ser él (el trabajo de fondo de avisos de pago, PAG-22, PAG-23): solo el correo, sin caché, sin guardarlo y sin registrar denegaciones
+/// (el actor es el sistema). <see langword="null"/> si la cuenta no existe, está cancelada o desactivada, o si su correo no está verificado; si Identidad no responde, la excepción sube y quien llama reintenta.
+/// </summary>
+public interface ICorreoDelTitular
+{
+    Task<string?> Consultar(Guid usuarioId, CancellationToken cancelacion = default);
+}

@@ -28,7 +28,7 @@ public sealed class AcotadorDeAlertasDePedidos
                 continue;
             }
 
-            if (ahora - anterior < Intervalo)
+            if (ahora >= anterior && ahora - anterior < Intervalo)
             {
                 return false;
             }
