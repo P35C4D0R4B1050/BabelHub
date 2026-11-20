@@ -10,6 +10,11 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 - **Carril A:** `/health/ready` detecta la caída de la base en los dos servicios. **Carril B:** fachadas y lecturas de Pedidos (ECO-6f).
 - Validación de `main`: compilación sin advertencias, SpecCheck 0 avisos, unitarias 5376 y 2368, arquitectura 243, integración 6954 de 6966; 12 fallos: 2 flaky que pasan sueltos, 2 de imágenes por contención de Docker, y 8 reales repartidos a sus dueños (4 pruebas por fixtures con contraseña o clave literal, composición de la biblioteca, Dockerfiles distintos, prueba de reservas con el tope nuevo).
 
+## 2026-11-20 (mediodía) — Decisiones de la persona sobre RNF02 (DD-17)
+
+### Cubierto
+- La memoria de 5 s de referencias del Inventario queda **apagada** (D05 y la spec no cambian). Dimensionamiento de VM-INVENTARIO adoptado: Inventario 0,6 CPU y 512 MB, PostgreSQL 0,4 CPU (`infra/docker-compose.inventario.yml`, `docs/02/07` con nota fechada: es un cambio de decisión de dimensionamiento, no de una spec aprobada). Hallazgos de RNF02, dimensionamiento y memoria cerrados; el de costo por solicitud queda «en curso» hasta la rampa final con ese reparto.
+
 ## 2026-11-20 (mañana) — E2E de compra y pedido, optimización del Inventario y tercera integración
 
 ### Cubierto
