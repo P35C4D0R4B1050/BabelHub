@@ -69,20 +69,22 @@ Catálogo y criterios en [`docs/03/03`](../../docs/03-diseno-de-software/03-prin
 ## 8. Atributos de calidad con k6 (50 hasta 2 000 usuarios virtuales)
 
 - **Qué:** un escenario por atributo, con su umbral como criterio de paso, contra un entorno local en Docker con los límites de CPU y memoria de VM-INVENTARIO ([`tests/load/README.md`](../../tests/load/README.md)). k6 corre con la imagen oficial `grafana/k6` fijada por huella.
-- **Resultados del entorno con el dimensionamiento anterior a DD-17 (Inventario 0,3 CPU / 350 MB, PostgreSQL 0,8 CPU)** en [`k6/2026-11-20/`](k6/2026-11-20/):
+- **Resultados con el dimensionamiento declarado por DD-17 (Inventario 0,6 CPU / 512 MB, PostgreSQL 0,4 CPU)**, corrida final sobre `main` en [`k6/2026-11-20-final-escenarios/`](k6/2026-11-20-final-escenarios/):
 
 | Escenario | Atributo | Resultado |
 | :--- | :--- | :--- |
-| [`disponibilidad`](k6/2026-11-20/disponibilidad.md) | RNF02: 50 usuarios, p95 < 500 ms | **Cumple** (p95 327 ms, 0 % errores) |
-| [`checkout-confirmacion`](k6/2026-11-20/checkout-confirmacion.md) | checkout: p95 < 3 s | **Cumple** (p95 226 ms) |
-| [`sobreventa`](k6/2026-11-20/sobreventa.md) | AC01: 100 usuarios por 10 unidades | **Cumple**: 10 reservas, 90 rechazos, vendible final 0 |
-| [`limites-de-uso`](k6/2026-11-20/limites-de-uso.md) | límites (API4) | **Cumple**: 100 permitidas, el resto 429 con `Retry-After`, el vecino no se ve afectado |
-| [`resiliencia`](k6/2026-11-20/resiliencia.md) | RNF03: PostgreSQL pausado 25 s | **Cumple**: 503 uniforme, nunca 500, recuperación sola |
-| [`rampa-de-usuarios`](k6/2026-11-20/rampa-de-usuarios.md) | escalabilidad 50 → 2 000 | **No cumple** con ese dimensionamiento (ver abajo) |
+| [`disponibilidad`](k6/2026-11-20-final-escenarios/disponibilidad.md) | RNF02: 50 usuarios, p95 < 500 ms | **No cumple**: p95 908 ms; repetida con el servicio caliente, 897 ms ([caliente](k6/2026-11-20-final-escenarios-caliente/disponibilidad.md)); 0 % de errores |
+| [`checkout-confirmacion`](k6/2026-11-20-final-escenarios/checkout-confirmacion.md) | checkout: p95 < 3 s | **Cumple** (p95 108 ms) |
+| [`sobreventa`](k6/2026-11-20-final-escenarios/sobreventa.md) | AC01: 100 usuarios por 10 unidades | **Cumple**: 10 reservas y 90 rechazos |
+| [`limites-de-uso`](k6/2026-11-20-final-escenarios/limites-de-uso.md) | límites (API4) | **Cumple**: 100 permitidas, el resto 429; el vecino sin afectar |
+| [`resiliencia`](k6/2026-11-20-final-escenarios/resiliencia.md) | RNF03: PostgreSQL pausado 25 s | **Cumple**: 503 uniforme, ningún 500, recuperación sola |
+| [`rampa-de-usuarios`](k6/2026-11-20-final/inventario-0.6cpu_postgres-0.4cpu_pool-16/rampa-de-usuarios.md) | escalabilidad 50 → 2 000 | **No cumple**: p95 1,4 s a 50 usuarios y 16,9 s con 2 000 (51 % de errores) |
 
-- **Capacidad medida frente a recursos:** tabla completa en [`docs/03/09` §6b](../../docs/03-diseno-de-software/09-analisis-de-base-de-datos-y-cache.md) (series en [`k6/2026-11-20-capacidad/`](k6/2026-11-20-capacidad/), [`k6/2026-11-20-costo-despues/`](k6/2026-11-20-costo-despues/) y la final con el dimensionamiento de DD-17 en [`k6/2026-11-20-final/`](k6/2026-11-20-final/)). Conclusiones sin maquillar:
+  La corrida de la mañana, con el dimensionamiento anterior (0,3 CPU / 350 MB; [`k6/2026-11-20/`](k6/2026-11-20/)), cumplió RNF02 (p95 327 ms); esa cifra **no se reprodujo** en la serie final (hubo ruido del host y entró la reducción de idas a la base entre ambas), así que el informe no la presenta como vigente.
+
+- **Capacidad medida frente a recursos:** tabla completa en [`docs/03/09` §6b](../../docs/03-diseno-de-software/09-analisis-de-base-de-datos-y-cache.md) (series en [`k6/2026-11-20-capacidad/`](k6/2026-11-20-capacidad/), [`k6/2026-11-20-costo-despues/`](k6/2026-11-20-costo-despues/) y la final sobre `main` en [`k6/2026-11-20-final/`](k6/2026-11-20-final/); §6b-bis). Conclusiones sin maquillar:
   1. **Ninguna configuración medida sostiene 2 000 usuarios virtuales con p95 < 500 ms** en esta máquina; la mejor (4 CPU de servicio + 2 de base) da p95 de 7,2 s sin errores.
-  2. **El cuello de botella es la CPU de PostgreSQL**; con 0,3 CPU, RNF02 no se cumplía a 50 usuarios en la rampa. Con ello la persona decidió el dimensionamiento declarado de VM-INVENTARIO: Inventario 0,6 CPU y 512 MB, PostgreSQL 0,4 CPU (DD-17).
+  2. **El cuello de botella es la CPU** (de PostgreSQL y del Inventario, que cuestan unos 8 y 6 a 12 ms por solicitud). **Con el dimensionamiento declarado (DD-17), RNF02 no se cumple en la serie final** (≈ 900 ms a 50 usuarios con pausa de 0,5 s, unas 80 solicitudes por segundo frente a las 44 que se atienden); con 1 CPU para cada servicio sí en la rampa a 50 usuarios (425 ms).
   3. 2 000 usuarios con pausa de 0,5 s son ≈ 4 000 solicitudes por segundo, inalcanzables en 1 OCPU; con pausas de persona (5 a 10 s) son 200 a 400 por segundo, lo que sostiene 4 + 2 CPU con latencia degradada.
   4. Bajo sobrecarga el sistema **se degrada de forma controlada** (503 y plazos vencidos), sin 500 ni sobreventa.
 - **Reproducir:** `bash tests/load/entorno/preparar-carga.sh`, `bash tests/load/ejecutar.sh <escenario>` y `bash tests/load/entorno/serie-de-capacidad.sh`; luego `bash tests/load/entorno/bajar-carga.sh`.
@@ -92,5 +94,5 @@ Catálogo y criterios en [`docs/03/03`](../../docs/03-diseno-de-software/03-prin
 
 - Corrida de CI en GitHub (depende del `push` de la persona).
 - Verificación (`spec-verify`) de las specs restantes (cierre FIN-1).
-- Repetir los escenarios k6 y la rampa con el dimensionamiento de DD-17 (en curso al escribir este informe, en `k6/2026-11-20-final/`); los resultados de arriba son los del dimensionamiento anterior y el §6b los distingue como histórico.
+- **RNF02 con el dimensionamiento declarado (0,6 / 0,4)**: medido y no cumplido en la serie final; la decisión de qué hacer (más CPU, menor costo por solicitud o aceptar la lectura de 50 personas reales con 5 a 10 s entre acciones) es de la persona responsable.
 - Hallazgos abiertos de otros carriles en `progress/hallazgos.md` (por ejemplo, rutas del E-commerce aún sin mapear en el host).
