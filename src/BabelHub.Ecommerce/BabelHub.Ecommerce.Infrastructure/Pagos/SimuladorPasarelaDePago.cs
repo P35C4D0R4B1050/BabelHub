@@ -55,6 +55,9 @@ public static class EscenariosDelSimulador
 /// </summary>
 internal sealed class SimuladorPasarelaDePago(IReloj reloj, Func<TimeSpan, CancellationToken, Task>? espera = null) : IPasarelaDePago
 {
+    /// <summary>Distingue los cargos de esta instancia de los de una anterior: la referencia de la pasarela es única en la base de datos y un reinicio del simulador (que vuelve a contar desde 1) no puede repetir una ya guardada.</summary>
+    private readonly string _instancia = Guid.NewGuid().ToString("N")[..8];
+
     /// <summary>Lo que tarda el escenario <see cref="EscenariosDelSimulador.Lento"/>: más que el plazo de respuesta de la llamada.</summary>
     public static readonly TimeSpan RetrasoDelCobroLento = TimeSpan.FromSeconds(11);
 
@@ -214,7 +217,7 @@ internal sealed class SimuladorPasarelaDePago(IReloj reloj, Func<TimeSpan, Cance
     {
         lock (_candado)
         {
-            var cargo = new Cargo(++_secuencia, $"ch_sim_{_secuencia}", solicitud.ReferenciaOpaca, importe, solicitud.Medio, aprobadoDesde, motivo, escenario);
+            var cargo = new Cargo(++_secuencia, $"ch_sim_{_instancia}_{_secuencia}", solicitud.ReferenciaOpaca, importe, solicitud.Medio, aprobadoDesde, motivo, escenario);
             _cargos.Add(cargo);
             return cargo;
         }

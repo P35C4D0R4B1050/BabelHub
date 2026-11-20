@@ -392,7 +392,9 @@ public static class AnfitrionDelEcommerce
             servicios.AddSingleton(new ComprobacionDeLaBaseDeDatos(aplicacion));
             servicios.AddSingleton<IComprobacionDeSalud, ComprobacionDeSaludDeLaBase>();
         }
-        servicios.AgregarCredencialDeServicio(new OpcionesDeSuperficieDeServicio { TopeDeLaDireccionDirecta = PoliticasDeLimite.SolicitudesPorHuellaDirecta }, opciones.Configuracion.Seguridad.CredencialesDeEntrada);
+        // Solo en Development y con la variable explícita: las pruebas E2E locales llaman entre procesos por HTTP (no hay TLS entre ellos). Nunca se enciende en producción ni por defecto.
+        var servicioSinHttps = builder.Environment.IsDevelopment() && string.Equals(builder.Configuration["Seguridad:ServicioSinHttps"], "true", StringComparison.OrdinalIgnoreCase);
+        servicios.AgregarCredencialDeServicio(new OpcionesDeSuperficieDeServicio { ExigirHttps = !servicioSinHttps, TopeDeLaDireccionDirecta = PoliticasDeLimite.SolicitudesPorHuellaDirecta }, opciones.Configuracion.Seguridad.CredencialesDeEntrada);
 
         // ---------- Auditoría ----------
         servicios.AddSingleton<IPlantillasDeRuta>(sp => new PlantillasDeRutaDeLaApi(sp.GetRequiredService<EndpointDataSource>()));
@@ -445,7 +447,7 @@ public static class AnfitrionDelEcommerce
         // ---------- Pagos, Envíos, Reclamaciones y Pedidos ----------
         // Pagos reemplaza al creador de intenciones provisional de Carrito; en el ensayo y al restaurar la pasarela es siempre la nula (nunca una llamada a un proveedor). «culqi» aún no tiene adaptador: su guarda lo rechaza nombrando la variable.
         var guardarProduccion = esProduccion && soloEnModoNormal;
-        var opcionesDePagos = LectorDeOpcionesDePagos.Leer(builder.Configuration, builder.Environment.EnvironmentName, sinLlamadasReales: !soloEnModoNormal, pedidosDisponible: false);
+        var opcionesDePagos = LectorDeOpcionesDePagos.Leer(builder.Configuration, builder.Environment.EnvironmentName, sinLlamadasReales: !soloEnModoNormal, pedidosDisponible: true);
         servicios.AgregarPagos(opcionesDePagos, esProduccion: false);
         servicios.AgregarTrabajosDePagosEnLaApi(soloEnModoNormal);
 

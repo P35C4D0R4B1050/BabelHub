@@ -16,6 +16,7 @@ public sealed class ComposicionRealDePedidosTests
         Assert.NotNull(escenario.Resolver<IGestionDeDespacho>());
         Assert.NotNull(escenario.Resolver<IAdministracionDePedidos>());
         Assert.NotNull(escenario.Resolver<IReceptorDeEstadosDeTraslado>());
+        Assert.IsType<ConfirmarCompra>(escenario.Resolver<BabelHub.Ecommerce.Application.Pagos.IConfirmacionDeCompra>());
         Assert.NotNull(escenario.Resolver<IProgresoDeEnvios>());
         Assert.NotNull(escenario.Resolver<IPedidosParaEnvios>());
         Assert.NotNull(escenario.Resolver<IPedidosParaDevoluciones>());

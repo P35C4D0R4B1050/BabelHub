@@ -23,7 +23,7 @@
     else
     {
         <p class="mb-2 text-sm opacity-80">@Model.Total @(Model.Total == 1 ? "pedido" : "pedidos")</p>
-        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100" tabindex="0" role="region" aria-label="Pedidos (se desplaza horizontalmente)">
             <table class="table">
                 <caption class="sr-only">Pedidos con su fecha, su estado, su tipo de entrega y su total</caption>
                 <thead>

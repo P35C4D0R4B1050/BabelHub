@@ -13,7 +13,7 @@
     else
     {
         <p class="mb-2 text-sm opacity-80">@Model.Total @(Model.Total == 1 ? "operación fallida" : "operaciones fallidas")</p>
-        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100" tabindex="0" role="region" aria-label="Operaciones fallidas (se desplaza horizontalmente)">
             <table class="table">
                 <caption class="sr-only">Operaciones fallidas con su tipo, su pedido, su motivo, los pasos hechos y cuándo ocurrieron</caption>
                 <thead>

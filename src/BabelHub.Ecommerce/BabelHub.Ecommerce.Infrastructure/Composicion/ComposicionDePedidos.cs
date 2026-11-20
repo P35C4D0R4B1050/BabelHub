@@ -1,5 +1,6 @@
 using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Identidad;
+using BabelHub.Ecommerce.Application.Pagos;
 using BabelHub.Ecommerce.Application.Pedidos;
 using BabelHub.Ecommerce.Application.Pedidos.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
@@ -69,6 +70,14 @@ public static class ComposicionDePedidos
         servicios.TryAddScoped<IContactoDeEntregaDelPedido, ContactoDeEntregaDelPedidoDeLaAplicacion>();
         servicios.TryAddScoped<IProgresoDeEnvios, AvanzarLineasPorEnvio>();
         servicios.TryAddScoped<IReceptorDeEstadosDeTraslado, RecibirEstadoDeTraslado>();
+        // La compra aprobada de Pagos crea el pedido (PED-30..PED-38): sin esto el host usaría el doble «sin pedidos» de Pagos y ninguna compra dejaría un pedido.
+        // Pagos registra su doble «sin pedidos» al componerse (antes que este módulo) y un TryAdd no lo pisaría: se reemplaza solo si lo que hay es ese doble.
+        if (servicios.FirstOrDefault(d => d.ServiceType == typeof(IConfirmacionDeCompra) && d.ImplementationType == typeof(Pagos.ConfirmacionDeCompraSinPedidos)) is { } provisional)
+        {
+            servicios.Remove(provisional);
+        }
+
+        servicios.TryAddScoped<IConfirmacionDeCompra, ConfirmarCompra>();
         servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IPendientesDeCuenta, ContarPendientesDePedidos>());
         servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IAplicadorDeCancelacion, AnonimizarContactoDeUnaCuenta>());
 

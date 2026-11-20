@@ -44,7 +44,7 @@ cd tests/e2e && E2E_FORWARDED_PROTO=https npx playwright test carrito/humo-del-e
 ```
 
 - `E2E_FORWARDED_PROTO=https` hace que Playwright envíe `X-Forwarded-Proto: https`: el host local escucha en HTTP y sin esa cabecera las cookies `__Host-` y el antiforgery fallan (el borde real termina el TLS).
-- Cada servicio usa **cuentas de base de datos con nombres distintos** (`acceso_inv`, `depurador_ajustes_inv`, `depurador_auditoria_inv` en el Inventario): los roles de PostgreSQL son del clúster y, en una sola instancia, los nombres iguales de los dos servicios (`acceso`, `depurador_auditoria`) se pisan las contraseñas al migrar.
+- Cada servicio usa **cuentas de base de datos con nombres distintos** (`inventario_acceso`, `inventario_depurador_ajustes`, `inventario_depurador_auditoria` en el Inventario): los roles de PostgreSQL son del clúster y, en una sola instancia, los nombres iguales de los dos servicios (`acceso`, `depurador_auditoria`) se pisan las contraseñas al migrar.
 - El host se niega a arrancar con las variables `BABELHUB__Migrador__*` en su entorno (COMP-2); `arrancar-host.sh` las quita.
 - Para apagar: `docker compose -p bhe2e -f infra/docker-compose.local.yml --env-file "$LOCALAPPDATA/babelhub-e2e/env" down` (el volumen conserva las bases).
 
@@ -57,6 +57,24 @@ Requisitos previos de los recorridos del carrito: la composición del Carrito en
 Requisitos previos de los recorridos del catálogo: el CSS compilado (`scripts/construir-estilos.sh`) y la composición del Catálogo en `Program.cs`.
 
 Los `storageState` (cookies de sesión) van en `tests/e2e/.auth/`, que Git ignora: nunca se suben. Los `trace` de Playwright pueden contener cookies; `test-results/` también está ignorado.
+
+
+### Recorrido de compra y pedido (T36 del carrito y T41 de Pedidos)
+
+`pedidos/compra-y-pedido.spec.ts` compra un libro impreso con recojo, paga con el simulador y comprueba «Mis pedidos», su detalle, la cancelación y que otra cuenta no ve el pedido; corre en Chromium de escritorio y de teléfono y en WebKit (Firefox, informativo, se omite si el sistema no lo deja lanzar). Necesita el host del E-commerce **por HTTPS** (el navegador envía un `Origin` https que debe coincidir con el esquema de la solicitud) y datos sembrados:
+
+```bash
+bash tests/e2e/entorno/preparar-entorno.sh                          # una vez: bases migradas
+E2E_TLS=1 bash tests/e2e/entorno/arrancar-host.sh ecommerce &       # https://localhost:8443 (y http://localhost:8080 para que el Inventario lea las claves de verificación)
+bash tests/e2e/entorno/arrancar-host.sh inventario &                # arrancar DESPUÉS del E-commerce: si el Inventario arranca antes, su primera lectura de claves de verificación falla y rechaza (401) las reservas
+bash tests/e2e/entorno/sembrar-datos.sh --limpiar                   # datos ficticios (3 obras, 3 sucursales, stock) y estado transaccional limpio, antes de cada corrida
+cd tests/e2e && source "$LOCALAPPDATA/babelhub-e2e/env" && E2E_BASE_URL=https://localhost:8443 npx playwright test pedidos/compra-y-pedido --workers=1
+```
+
+- `E2E_TLS=1` usa el certificado de desarrollo de .NET (`dotnet dev-certs https`); Playwright lo acepta con `ignoreHTTPSErrors`.
+- `BABELHUB__Seguridad__ServicioSinHttps=true` (solo `Development`; el archivo de entorno lo trae) deja que los dos servicios se llamen por HTTP local; nunca se enciende en producción.
+- `BABELHUB__Ecommerce__ProxiesConocidos=127.0.0.1,::1` hace que el host confíe en `X-Origen-Cliente` desde la propia máquina: cada recorrido llega desde su propio origen (el Inventario limita las reservas a 10 por hora por origen, SEL-19) y `sembrar-datos.sh --limpiar` vacía los contadores de límites y las reservas.
+- La ficha del catálogo aún no agrega al carrito: el recorrido agrega el libro con la misma petición que enviará su botón (`POST /carrito/lineas`, con el token y el `Origin` del navegador).
 
 ## Sembrador de sesiones (solo desarrollo)
 

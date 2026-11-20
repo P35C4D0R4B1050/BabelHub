@@ -50,6 +50,11 @@ public static class ComposicionDePagos
         servicios.TryAddScoped<IRepositorioDePagos, RepositorioDePagosPostgres>();
         servicios.TryAddScoped<IRepositorioDeReembolsos, RepositorioDeReembolsosPostgres>();
         servicios.TryAddScoped<IReservasDelPago, RestReservasDelPago>();
+        // La cuenta del pagador sale de Identidad cuando esta ya está compuesta (sin ella el doble provisional falla cerrado y ninguna compra se cobra; en producción su guarda lo exige).
+        if (servicios.Any(d => d.ServiceType == typeof(IEstadoDeCuenta)) && servicios.Any(d => d.ServiceType == typeof(IMarcaDeCancelacionDeCuenta)) && servicios.Any(d => d.ServiceType == typeof(ICuentaDelCliente)))
+        {
+            servicios.TryAddScoped<ICuentaDelPagador, CuentaDelPagadorSobreIdentidad>();
+        }
 
         // ---------- Aplicación ----------
         servicios.TryAddScoped<AutorizadorDePagos>();
