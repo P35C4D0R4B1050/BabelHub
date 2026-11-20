@@ -53,10 +53,10 @@ public sealed class RelojDeIntegracion : IReloj
 /// </summary>
 public sealed class PilaDeFuentes
 {
-    public PilaDeFuentes(PostgresDeFuentesFixture bd, ActorActual? actor, ReservasDeStockFijo? reservas = null)
+    public PilaDeFuentes(PostgresDeFuentesFixture bd, ActorActual? actor, ReservasDeStockFijo? reservas = null, Npgsql.NpgsqlDataSource? origen = null)
     {
         Actor = new ActorFijo(actor);
-        Unidad = new UnidadDeTrabajoPostgres(bd.Acceso, actor: Actor);
+        Unidad = new UnidadDeTrabajoPostgres(origen ?? bd.Acceso, actor: Actor);
         Alertas = new AlertasTecnicasEspia();
         Reservas = reservas ?? new ReservasDeStockFijo();
         Acceso = new AccesoAFuentes(Unidad, Unidad, Unidad, Actor, Alertas, new RelojDeIntegracion());
@@ -64,7 +64,13 @@ public sealed class PilaDeFuentes
         Fichas = new NpgsqlRepositorioDeFichas(Acceso);
         Aplicador = new AplicadorDeMovimientos(Existencias);
         Movimientos = new MovimientosDeStock(Fichas, Existencias, Reservas, Aplicador);
+        Fuentes = new NpgsqlRepositorioDeFuentes(Acceso);
+        Consulta = new ConsultaDeExistencias(Unidad, Fuentes, Existencias, Reservas);
     }
+
+    internal NpgsqlRepositorioDeFuentes Fuentes { get; }
+
+    internal ConsultaDeExistencias Consulta { get; }
 
     public ActorFijo Actor { get; }
 

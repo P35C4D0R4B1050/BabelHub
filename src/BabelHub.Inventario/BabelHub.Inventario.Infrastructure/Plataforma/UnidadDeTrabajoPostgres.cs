@@ -40,6 +40,8 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
 
     public DbTransaction Transaccion => (_activa.Value ?? throw SinTransaccion()).Transaccion;
 
+    public bool HayAlcanceDeDatosFijado => !string.IsNullOrEmpty((_activa.Value ?? throw SinTransaccion()).Alcance);
+
     public Task<T> Ejecutar<T>(Func<CancellationToken, Task<T>> trabajo, CancellationToken cancelacion = default) =>
         EjecutarEn(IsolationLevel.ReadCommitted, soloLectura: false, trabajo, cancelacion);
 
@@ -63,14 +65,8 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
         _activa.Value = activa;
         try
         {
-            if (soloLectura)
-            {
-                await EjecutarSql(activa, "SET TRANSACTION READ ONLY", cancelacion).ConfigureAwait(false);
-            }
-
             // Sin puerto del actor, o con el puerto pero sin actor establecido, no se fija valor y las políticas de filas deniegan (falla cerrada, SEG-15).
-            await FijarAlcance(activa, AlcanceDeDatosDelActor.Para(actor?.Actual), cancelacion).ConfigureAwait(false);
-            await EjecutarSql(activa, $"SET LOCAL lock_timeout = {((long)Math.Ceiling(_opciones.EsperaMaximaDeBloqueos.TotalMilliseconds)).ToString(System.Globalization.CultureInfo.InvariantCulture)}", cancelacion).ConfigureAwait(false);
+            await PrepararTransaccion(activa, soloLectura, AlcanceDeDatosDelActor.Para(actor?.Actual), cancelacion).ConfigureAwait(false);
 
             var resultado = await trabajo(cancelacion).ConfigureAwait(false);
             await transaccion.CommitAsync(cancelacion).ConfigureAwait(false);
@@ -93,16 +89,26 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
         ArgumentNullException.ThrowIfNull(bloque);
 
         var activa = _activa.Value ?? throw new InvalidOperationException("EjecutarComo exige una transacción activa.");
-        var previo = (string)(await Escalar(activa, "SELECT current_user", cancelacion).ConfigureAwait(false))!;
 
-        await EjecutarSql(activa, $"SET LOCAL ROLE {Citar(_opciones.PrefijoDelRolDeEsquema + esquema.Nombre)}", cancelacion).ConfigureAwait(false);
+        // El rol vigente lo lleva la propia unidad de trabajo (es la única que lo cambia): se lee una vez al abrir la transacción, no antes de cada bloque.
+        var previo = activa.Rol;
+        var destino = _opciones.PrefijoDelRolDeEsquema + esquema.Nombre;
+        if (previo == destino)
+        {
+            // Un bloque anidado del mismo esquema ya corre con ese rol: no hay nada que cambiar ni que restaurar.
+            await bloque(cancelacion).ConfigureAwait(false);
+            return;
+        }
+
+        await EjecutarSql(activa, $"SET LOCAL ROLE {Citar(destino)}", cancelacion).ConfigureAwait(false);
+        activa.Rol = destino;
         try
         {
             await bloque(cancelacion).ConfigureAwait(false);
         }
         finally
         {
-            await RestaurarRol(activa, previo).ConfigureAwait(false);
+            await RestaurarRol(activa, previo!).ConfigureAwait(false);
         }
     }
 
@@ -115,7 +121,7 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
         ArgumentNullException.ThrowIfNull(bloque);
 
         var activa = _activa.Value ?? throw new InvalidOperationException("ConAlcanceDeRed exige una transacción activa.");
-        var previo = await Escalar(activa, $"SELECT current_setting('{AlcanceDeDatosDelActor.Parametro}', true)", cancelacion).ConfigureAwait(false) as string;
+        var previo = activa.Alcance;
 
         await FijarAlcance(activa, AlcanceDeDatosDelActor.Red, cancelacion).ConfigureAwait(false);
         try
@@ -154,6 +160,41 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
         comando.Parameters.AddWithValue("nombre", AlcanceDeDatosDelActor.Parametro);
         comando.Parameters.AddWithValue("valor", valor);
         await comando.ExecuteNonQueryAsync(cancelacion).ConfigureAwait(false);
+        activa.Alcance = valor;
+    }
+
+    /// <summary>
+    /// Todo lo que una transacción necesita antes de su primer caso de uso, <b>en una sola ida a la base</b>: solo lectura si corresponde, la espera máxima de bloqueos (<c>lock_timeout</c>),
+    /// el alcance de datos del actor (<c>set_config(…, true)</c>: vale solo para esta transacción) y el rol con el que se abrió la sesión, que la unidad lleva en memoria desde entonces.
+    /// </summary>
+    private async Task PrepararTransaccion(Activa activa, bool soloLectura, string? alcance, CancellationToken cancelacion)
+    {
+        var espera = ((long)Math.Ceiling(_opciones.EsperaMaximaDeBloqueos.TotalMilliseconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var sql = (soloLectura ? "SET TRANSACTION READ ONLY; " : string.Empty)
+            + "SELECT current_user, set_config('lock_timeout', @espera, true)"
+            + (alcance is null ? string.Empty : ", set_config(@nombre, @valor, true)");
+
+        await using var comando = new NpgsqlCommand(sql, activa.Conexion, activa.Transaccion);
+        comando.Parameters.AddWithValue("espera", espera);
+        if (alcance is not null)
+        {
+            comando.Parameters.AddWithValue("nombre", AlcanceDeDatosDelActor.Parametro);
+            comando.Parameters.AddWithValue("valor", alcance);
+        }
+
+        await using var lector = await comando.ExecuteReaderAsync(cancelacion).ConfigureAwait(false);
+        do
+        {
+            if (await lector.ReadAsync(cancelacion).ConfigureAwait(false))
+            {
+                activa.Rol = lector.GetString(0);
+                activa.Alcance = alcance;
+                return;
+            }
+        }
+        while (await lector.NextResultAsync(cancelacion).ConfigureAwait(false));
+
+        throw new InvalidOperationException("La base no devolvió el rol de la sesión al preparar la transacción.");
     }
 
     private static InvalidOperationException SinTransaccion() => new("No hay una unidad de trabajo activa.");
@@ -163,6 +204,8 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
 
     private static async Task RestaurarRol(Activa activa, string previo)
     {
+        // El rol lógico vuelve al del bloque que contiene al que termina, aunque la base ya no pueda confirmarlo (la transacción abortada se revierte entera).
+        activa.Rol = previo;
         try
         {
             // SET LOCAL ROLE <previo> y no RESET ROLE: un EjecutarComo anidado debe volver al rol del bloque que lo contiene.
@@ -192,11 +235,17 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
         await comando.ExecuteNonQueryAsync(cancelacion).ConfigureAwait(false);
     }
 
-    private static async Task<object?> Escalar(Activa activa, string sql, CancellationToken cancelacion)
+    /// <summary>La transacción en curso y lo que la unidad de trabajo fijó en ella: es la única que cambia el rol y el alcance de datos, así que sabe cuáles rigen sin preguntarle a la base.</summary>
+    private sealed class Activa(NpgsqlConnection conexion, NpgsqlTransaction transaccion)
     {
-        await using var comando = new NpgsqlCommand(sql, activa.Conexion, activa.Transaccion);
-        return await comando.ExecuteScalarAsync(cancelacion).ConfigureAwait(false);
-    }
+        public NpgsqlConnection Conexion { get; } = conexion;
 
-    private sealed record Activa(NpgsqlConnection Conexion, NpgsqlTransaction Transaccion);
+        public NpgsqlTransaction Transaccion { get; } = transaccion;
+
+        /// <summary>El rol vigente (<c>current_user</c>): el de la sesión al abrir, y el de un esquema dentro de <see cref="EjecutarComo"/>.</summary>
+        public string? Rol { get; set; }
+
+        /// <summary>El valor de <c>babelhub.alcance</c> fijado en esta transacción, o <see langword="null"/> si no se fijó (las políticas de filas deniegan).</summary>
+        public string? Alcance { get; set; }
+    }
 }

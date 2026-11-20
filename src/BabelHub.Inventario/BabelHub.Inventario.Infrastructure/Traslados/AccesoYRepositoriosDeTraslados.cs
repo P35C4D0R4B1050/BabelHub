@@ -64,7 +64,7 @@ internal sealed class AccesoATraslados(IUnidadDeTrabajo unidad, IConexionDeLaUni
 
     private async Task ExigirActorConAlcance(CancellationToken cancelacion)
     {
-        if (actores.Actual is { Tipo: not TipoDeActor.Anonimo } && await HayAlcanceFijado(cancelacion).ConfigureAwait(false))
+        if (actores.Actual is { Tipo: not TipoDeActor.Anonimo } && conexion.HayAlcanceDeDatosFijado)
         {
             return;
         }
@@ -79,12 +79,6 @@ internal sealed class AccesoATraslados(IUnidadDeTrabajo unidad, IConexionDeLaUni
         }
 
         throw new ContextoDeActorAusenteException("Se intentó acceder a los traslados sin un actor con alcance de datos: cada caso de uso autoriza antes, una ruta de servicio establece el actor de integración y un trabajo de fondo, el del sistema.");
-    }
-
-    private async Task<bool> HayAlcanceFijado(CancellationToken cancelacion)
-    {
-        await using var comando = new NpgsqlCommand("SELECT coalesce(current_setting('babelhub.alcance', true), '') <> ''", (NpgsqlConnection)conexion.Conexion, (NpgsqlTransaction)conexion.Transaccion);
-        return (bool)(await comando.ExecuteScalarAsync(cancelacion).ConfigureAwait(false))!;
     }
 }
 
