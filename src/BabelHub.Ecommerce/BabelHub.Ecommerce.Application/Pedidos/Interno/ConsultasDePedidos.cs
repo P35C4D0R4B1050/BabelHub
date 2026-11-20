@@ -186,7 +186,7 @@ internal sealed class ConsultasDePedidos(
             return null;
         }
 
-        foreach (var (origen, clave) in new[] { (OrigenDelReembolso.Anulacion, $"anul:{pedido.Id:N}"), (OrigenDelReembolso.CancelacionDelCliente, $"canc:{pedido.Id:N}") })
+        foreach (var (origen, clave) in new[] { (OrigenDelReembolso.Anulacion, OrquestadorDeAnulaciones.ClaveDelReembolso(OrigenDeLaAnulacion.Administracion, pedido.Id)), (OrigenDelReembolso.CancelacionDelCliente, OrquestadorDeAnulaciones.ClaveDelReembolso(OrigenDeLaAnulacion.Cliente, pedido.Id)) })
         {
             Resultado<ReembolsoPendienteVista?> respuesta;
             try

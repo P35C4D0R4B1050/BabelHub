@@ -99,7 +99,7 @@ public sealed class CancelarYAnularPedidoTests
         Assert.Equal((pedido.Id, "cancelado-por-el-cliente"), (liberacion.Pedido, liberacion.Motivo));
         Assert.Equal([pedido.Lineas[0].Id], liberacion.Lineas);
         var reembolso = Assert.Single(entorno.Reembolsos.Registrados);
-        Assert.Equal((OrigenDelReembolso.CancelacionDelCliente, $"canc:{pedido.Id:N}", 12m), (reembolso.Origen, reembolso.ClaveNatural, reembolso.Envio));
+        Assert.Equal((OrigenDelReembolso.CancelacionDelCliente, $"canc:{pedido.Id:D}", 12m), (reembolso.Origen, reembolso.ClaveNatural, reembolso.Envio));
         Assert.Equal(EstadoDeOperacion.Completada, Assert.Single(entorno.Repositorio.Anulaciones).Estado);
         Assert.Empty(entorno.Despacho.Cancelaciones);
         Assert.Equal([AccionesAuditables.OperacionDePedidoIniciada, AccionesAuditables.PedidoCanceladoPorElCliente, AccionesAuditables.EstadoDePedidoCambiado], entorno.Auditoria.Solicitudes.Select(s => s.Accion));
@@ -251,7 +251,7 @@ public sealed class CancelarYAnularPedidoTests
         Assert.Equal([pedido.Id], entorno.Despacho.Cancelaciones);
         Assert.Equal("pedido-anulado", Assert.Single(entorno.Reservas.Liberaciones).Motivo);
         var reembolso = Assert.Single(entorno.Reembolsos.Registrados);
-        Assert.Equal((OrigenDelReembolso.Anulacion, $"anul:{pedido.Id:N}", 12m, 2), (reembolso.Origen, reembolso.ClaveNatural, reembolso.Envio, reembolso.Lineas.Count));
+        Assert.Equal((OrigenDelReembolso.Anulacion, $"anul:{pedido.Id:D}", 12m, 2), (reembolso.Origen, reembolso.ClaveNatural, reembolso.Envio, reembolso.Lineas.Count));
         Assert.Equal(pedido.Lineas[1].EdicionId, Assert.Single(entorno.Accesos.Revocados).EdicionId);
         Assert.All(pedido.Lineas, l => Assert.True(l.EstadoImpreso == EstadoDeLineaImpresa.Anulado || l.EstadoDigital == EstadoDeLineaDigital.Anulado));
         Assert.Equal([AccionesAuditables.OperacionDePedidoIniciada, AccionesAuditables.PedidoAnulado, AccionesAuditables.EstadoDePedidoCambiado], entorno.Auditoria.Solicitudes.Select(s => s.Accion));

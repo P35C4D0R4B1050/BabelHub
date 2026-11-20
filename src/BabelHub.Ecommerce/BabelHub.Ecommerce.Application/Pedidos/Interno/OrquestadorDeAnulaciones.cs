@@ -38,7 +38,7 @@ internal sealed class OrquestadorDeAnulaciones(
     public const string AlertaLiberacionYaCerrada = "pedido-liberacion-de-anulacion-ya-cerrada";
 
     public static string ClaveDelReembolso(OrigenDeLaAnulacion origen, Guid pedidoId) =>
-        string.Concat(origen == OrigenDeLaAnulacion.Cliente ? "canc:" : "anul:", pedidoId.ToString("N"));
+        string.Concat(origen == OrigenDeLaAnulacion.Cliente ? "canc:" : "anul:", pedidoId.ToString("D"));
 
     /// <summary>El tiempo 1: planea, cancela los envíos que no salieron, audita y deja la fila en curso.</summary>
     public async Task<Resultado<Anulacion>> Iniciar(SolicitanteDePedidos solicitante, Guid pedidoId, OrigenDeLaAnulacion origen, MotivoDeAnulacion motivo, CancellationToken cancelacion)

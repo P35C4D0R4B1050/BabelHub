@@ -362,7 +362,7 @@ public sealed class ConsultasDePedidosTests
         var pedido = Crear(TipoDeEntregaDelPedido.Recojo);
         pedido.AplicarAnulacion(pedido.PlanearAnulacionDeLaAdministracion(MotivoDeAnulacion.PagoDuplicado).Plan!, Ahora);
         entorno.Repositorio.Poner(pedido);
-        entorno.Reembolsos.Pendientes[$"anul:{pedido.Id:N}"] = new ReembolsoPendienteVista(Guid.NewGuid(), OrigenDelReembolso.Anulacion, 50m, EstadoDelReembolso.Pendiente, MotivoPendienteDelReembolso.SinRespuesta, Ahora, 1);
+        entorno.Reembolsos.Pendientes[$"anul:{pedido.Id:D}"] = new ReembolsoPendienteVista(Guid.NewGuid(), OrigenDelReembolso.Anulacion, 50m, EstadoDelReembolso.Pendiente, MotivoPendienteDelReembolso.SinRespuesta, Ahora, 1);
 
         var con = (await entorno.Consultas.ObtenerParaElPersonal(OperacionDePedidos.Administracion, pedido.Id, default)).Valor;
         entorno.Reembolsos.Falla = true;
