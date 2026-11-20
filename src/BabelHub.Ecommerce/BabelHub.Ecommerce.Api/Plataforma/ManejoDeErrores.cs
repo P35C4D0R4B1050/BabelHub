@@ -202,6 +202,8 @@ public sealed class ManejadorDeExcepciones(OpcionesDeErrores opciones, ILogger<M
             ContextoDeActorAusenteException => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.NoAutenticado),
             // La auditoría caída no deja pasar la operación (AUD-04, la transacción ya revirtió): «servicio no disponible», no un error inesperado (AC-AUD-03).
             AuditoriaNoDisponibleException => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.NoDisponible),
+            // La base de pedidos no responde o el esquema no está listo: 503 uniforme y reintentable, sin el motivo técnico (PED-41).
+            PedidosNoDisponiblesException => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.NoDisponible),
             // La política de filas rechazó el acceso: es un acceso fuera de alcance (403 registrado), nunca «sin stock» ni un 500 (INV-1a).
             AlcanceDeDatosDenegadoException => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.Prohibido, "alcance-insuficiente"),
             BadHttpRequestException => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.Validacion),

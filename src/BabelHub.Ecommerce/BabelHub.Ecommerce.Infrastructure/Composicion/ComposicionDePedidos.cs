@@ -75,5 +75,22 @@ public static class ComposicionDePedidos
         return servicios.AgregarDoblesProvisionalesDePedidos(esProduccion);
     }
 
+    /// <summary>
+    /// Registra los cinco trabajos de fondo de Pedidos y el servicio que los corre (T32). <paramref name="alcanceDeSistema"/> lo da la Api: fija el actor «sistema» alrededor de cada corrida (la Infraestructura no lo fija).
+    /// El servicio hospedado lo añade la Api solo en el modo normal. Se llama <b>después</b> de <see cref="AgregarPedidos"/>.
+    /// </summary>
+    public static IServiceCollection AgregarTrabajosDeFondoDePedidos(this IServiceCollection servicios, Func<IServiceProvider, AlcanceDeSistemaDePedidos> alcanceDeSistema)
+    {
+        ArgumentNullException.ThrowIfNull(servicios);
+        ArgumentNullException.ThrowIfNull(alcanceDeSistema);
+        servicios.TryAddSingleton(sp => new ServicioDeTrabajosDePedidos(TrabajosDePedidos.Todos(
+            sp.GetRequiredService<IServiceScopeFactory>(),
+            sp.GetRequiredService<IRegistroDeTrabajosDeFondo>(),
+            alcanceDeSistema(sp),
+            new AlertasTecnicasPorCorrida(sp.GetRequiredService<IServiceScopeFactory>()),
+            sp.GetRequiredService<IReloj>())));
+        return servicios;
+    }
+
     private static bool Hay<T>(IServiceCollection servicios) => servicios.Any(d => d.ServiceType == typeof(T));
 }
