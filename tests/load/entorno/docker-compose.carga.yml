@@ -11,7 +11,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?}
       POSTGRES_ECOMMERCE_PASSWORD: ${POSTGRES_ECOMMERCE_PASSWORD:?}
       POSTGRES_INVENTARIO_PASSWORD: ${POSTGRES_INVENTARIO_PASSWORD:?}
-    command: ["postgres", "-c", "shared_buffers=768MB", "-c", "max_connections=100"]
+    command: ["postgres", "-c", "shared_buffers=768MB", "-c", "max_connections=100", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=all"]
     ports: ["127.0.0.1:${POSTGRES_PORT:-56432}:5432"]
     volumes:
       - postgres-data:/var/lib/postgresql/data

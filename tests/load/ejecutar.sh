@@ -29,6 +29,7 @@ win() { cygpath -w "$1"; }
 extra=()
 for v in DURACION RITMO UNIDADES COMPETIDORES NIVELES SEGUNDOS_POR_NIVEL PENSAR_S; do [ -n "${!v:-}" ] && { export "$v"; extra+=(-e "$v"); }; done
 
+estadisticas() { bash tests/load/entorno/estadisticas-de-base.sh "$@" || true; }
 correr() {
   docker run --rm -i --ulimit nofile=1048576:1048576 \
     -v "$(win "$PWD/tests/load"):/carga:ro" -v "$(win "$CARGA_CARPETA/k6"):/credenciales:ro" -v "$(win "$PWD/$resultados"):/resultados" \
@@ -37,6 +38,7 @@ correr() {
     "$IMAGEN_K6" run "/carga/escenarios/$escenario.js"
 }
 
+estadisticas reiniciar
 if [ "$escenario" = "resiliencia" ]; then
   # PostgreSQL se pausa entre los 20 s y los 45 s desde que k6 empieza a generar carga (tras la siembra).
   registro="$CARGA_CARPETA/k6/resiliencia.log"
@@ -46,7 +48,10 @@ if [ "$escenario" = "resiliencia" ]; then
   sleep 20; docker pause bhcarga-postgres-1 >/dev/null; echo "PostgreSQL pausado"
   sleep 25; docker unpause bhcarga-postgres-1 >/dev/null; echo "PostgreSQL reanudado"
   wait $k6pid && estado=0 || estado=$?
+  estadisticas volcar "$resultados/$escenario-base.txt"
   cat "$registro" | tail -40
   exit $estado
 fi
-correr
+correr && estado=0 || estado=$?
+estadisticas volcar "$resultados/$escenario-base.txt"
+exit $estado

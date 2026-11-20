@@ -49,6 +49,7 @@ compose build inventario
 compose up -d postgres
 for i in $(seq 1 30); do compose exec -T postgres pg_isready -U "$POSTGRES_ADMIN_USER" >/dev/null 2>&1 && break; sleep 2; done
 dotnet run --project src/BabelHub.Inventario/BabelHub.Inventario.Api -- migrar
+compose exec -T postgres psql -U "$POSTGRES_ADMIN_USER" -d inventario -qc "CREATE EXTENSION IF NOT EXISTS pg_stat_statements" >/dev/null
 mkdir -p "$CARGA_CARPETA/claves"
 node tests/load/entorno/servidor-de-claves.mjs emitir "$CARGA_CARPETA/claves" 1 >/dev/null
 compose up -d inventario claves
