@@ -20,7 +20,7 @@ internal sealed class RestReservasDelEnvio(IClienteDelInventario cliente) : IRes
     public const string MotivoReparto = "reparto";
 
     /// <summary>El tope del contrato de reservas (50 líneas por llamada): una entrada mayor no se envía y no deja el marcador de despacho sin salida.</summary>
-    public const int MaximoDeLineas = 50;
+    public const int MaximoDeLineas = 30;
 
     private static readonly string[] RechazosDeNegocio = ["INV-RESERVA-ESTADO-INVALIDO", "INV-VALIDACION-INVALIDA", "INV-NO-ENCONTRADO"];
 

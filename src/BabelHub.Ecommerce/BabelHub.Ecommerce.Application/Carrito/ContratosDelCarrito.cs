@@ -12,7 +12,7 @@ public interface ICarritoDelCliente
     /// <summary>El carrito con el precio vigente, la disponibilidad (con frescura) y los avisos; sin carrito o con una cookie desconocida o mal formada es «sin carrito» (vacío), sin crear nada.</summary>
     Task<Resultado<ResultadoDeCarrito>> Obtener(SolicitudSobreElCarrito solicitud, CancellationToken cancelacion = default);
 
-    /// <summary>Agrega una edición (1 a 99; una digital, una sola; rechaza la ya poseída solo con sesión) y crea el carrito del visitante si no existe, con la cookie nueva en el resultado.</summary>
+    /// <summary>Agrega una edición (1 a 20; una digital, una sola; rechaza la ya poseída solo con sesión) y crea el carrito del visitante si no existe, con la cookie nueva en el resultado.</summary>
     Task<Resultado<ResultadoDeCarrito>> AgregarLinea(AgregarLineaEntrada entrada, CancellationToken cancelacion = default);
 
     Task<Resultado<ResultadoDeCarrito>> ModificarLinea(ModificarLineaEntrada entrada, CancellationToken cancelacion = default);

@@ -63,9 +63,9 @@ public sealed class CorreccionesDeLaRevisionDeEco4bTests
     [Fact]
     public async Task Si_la_operacion_se_rechaza_despues_de_reabrir_el_checkout_igual_se_guarda()
     {
-        var (e, checkout, carrito, libro) = EnPago(cantidad: 98);
+        var (e, checkout, carrito, libro) = EnPago(cantidad: 18);
 
-        // Con el stock sin confirmar no se puede prevalidar: el rechazo de las 99 unidades lo da el Dominio ya con la intención reabierta.
+        // Con el stock sin confirmar no se puede prevalidar: el rechazo de las 20 unidades lo da el Dominio ya con la intención reabierta.
         e.Disponibilidad.Digital(libro);
         var resultado = await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(libro, 5));
 
@@ -73,7 +73,7 @@ public sealed class CorreccionesDeLaRevisionDeEco4bTests
         Assert.Equal(1, e.Pagos.Reaperturas);
         Assert.Equal(EstadoDelCheckout.EnEdicion, checkout.Estado);
         Assert.Same(checkout, Assert.Single(e.Checkouts.Guardados));
-        Assert.Equal(98, carrito.Lineas.Single().Cantidad.Valor);
+        Assert.Equal(18, carrito.Lineas.Single().Cantidad.Valor);
     }
 
     [Fact]

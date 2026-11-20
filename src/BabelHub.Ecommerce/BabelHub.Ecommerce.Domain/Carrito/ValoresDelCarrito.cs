@@ -2,12 +2,12 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace BabelHub.Ecommerce.Domain.Carrito;
 
-/// <summary>Las unidades de una línea (CAR-02, D14): de 1 a 99. Una edición digital siempre lleva una (CAR-03).</summary>
+/// <summary>Las unidades de una línea (CAR-02, D14): de 1 a 20 (el tope de unidades por línea de una reserva, decisión de la persona del 2026-11-19; antes 99). Una edición digital siempre lleva una (CAR-03).</summary>
 public sealed record Cantidad
 {
     public const int Minima = 1;
 
-    public const int Maxima = 99;
+    public const int Maxima = 20;
 
     private Cantidad(int valor) => Valor = valor;
 
@@ -22,7 +22,7 @@ public sealed record Cantidad
     }
 
     public static Cantidad Crear(int valor) =>
-        TryCrear(valor, out var cantidad) ? cantidad : throw new ArgumentOutOfRangeException(nameof(valor), "La cantidad debe estar entre 1 y 99.");
+        TryCrear(valor, out var cantidad) ? cantidad : throw new ArgumentOutOfRangeException(nameof(valor), "La cantidad debe estar entre 1 y 20.");
 }
 
 /// <summary>Quién es el dueño del carrito: una cuenta, o un visitante identificado solo por el SHA-256 de su cookie (D01). Nunca los dos.</summary>

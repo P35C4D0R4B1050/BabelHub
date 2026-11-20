@@ -10,13 +10,13 @@ public enum EstadoDeCarrito
 
 public enum RechazoDeCarrito
 {
-    /// <summary>La cantidad no está entre 1 y 99 (CAR-02, D14).</summary>
+    /// <summary>La cantidad no está entre 1 y 20 (CAR-02, D14).</summary>
     CantidadInvalida,
 
-    /// <summary>El carrito ya tiene 50 líneas (CAR-29, D14).</summary>
+    /// <summary>El carrito ya tiene 30 líneas (CAR-29, D14).</summary>
     TopeDeLineas,
 
-    /// <summary>La suma de unidades de un impreso pasaría de 99 (D14).</summary>
+    /// <summary>La suma de unidades de un impreso pasaría de 20 (D14).</summary>
     TopeDeUnidades,
 
     EdicionNoEstaEnElCarrito,
@@ -66,12 +66,12 @@ public sealed class ResultadoDeLinea
 }
 
 /// <summary>
-/// El carrito de una cuenta o de un visitante (CAR-01, CAR-29, D01, D02): una línea por edición, un impreso de 1 a 99 unidades y una digital siempre una, hasta 50 líneas (D14), con su total. El de un visitante caduca a los 30 días
+/// El carrito de una cuenta o de un visitante (CAR-01, CAR-29, D01, D02): una línea por edición, un impreso de 1 a 20 unidades y una digital siempre una, hasta 50 líneas (D14), con su total. El de un visitante caduca a los 30 días
 /// de la última acción <b>de la persona</b> (un <c>GET</c> no la mueve: aquí solo la mueve una operación que cambia el carrito). No lleva precios (los lee el servidor del Catálogo): el total los recibe. Los instantes llegan como parámetros.
 /// </summary>
 public sealed class Carrito
 {
-    public const int MaximoDeLineas = 50;
+    public const int MaximoDeLineas = 30;
 
     public static readonly TimeSpan DuracionDelVisitante = TimeSpan.FromDays(30);
 
@@ -147,8 +147,8 @@ public sealed class Carrito
     public bool EstaCaducado(DateTimeOffset ahora) => VenceEn is { } vence && ahora >= vence;
 
     /// <summary>
-    /// Agrega una edición (CAR-02): un impreso nuevo crea su línea y uno que ya está suma las unidades (hasta 99); una digital queda siempre en una unidad aunque se pidan más (CAR-03, AC-CAR-02). Rechaza una cantidad
-    /// fuera de 1 a 99, la línea 51 y un carrito ya fusionado, sin cambiar nada.
+    /// Agrega una edición (CAR-02): un impreso nuevo crea su línea y uno que ya está suma las unidades (hasta 20); una digital queda siempre en una unidad aunque se pidan más (CAR-03, AC-CAR-02). Rechaza una cantidad
+    /// fuera de 1 a 20, la línea 31 y un carrito ya fusionado, sin cambiar nada.
     /// </summary>
     public ResultadoDeLinea Agregar(Guid edicionId, bool esDigital, int cantidad, DateTimeOffset ahora)
     {

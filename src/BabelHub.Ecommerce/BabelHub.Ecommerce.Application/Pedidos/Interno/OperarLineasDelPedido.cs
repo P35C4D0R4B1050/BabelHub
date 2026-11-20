@@ -20,7 +20,7 @@ internal sealed class OperarLineasDelPedido(
     INotificador notificador,
     IReloj reloj)
 {
-    public const int MaximoDeLineasPorOperacion = 50;
+    public const int MaximoDeLineasPorOperacion = 30;
 
     public Task<Resultado<LineasOperadas>> PrepararDeRecojo(string codigoDeSucursal, OperarLineasEntrada entrada, CancellationToken cancelacion) =>
         Operar(OperacionDePedidos.GestionDeRecojo, codigoDeSucursal, entrada, TipoDeOperacionDeLineas.Preparar, cancelacion);

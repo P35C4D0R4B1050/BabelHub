@@ -116,7 +116,7 @@ public sealed class ReservarUnidadesReemplazoTests
         var (entorno, libro, pedido) = Escenario(stock: 3);
         await Reemplazar(entorno, pedido, libro, 2);
 
-        var fallido = await entorno.Reservar().Ejecutar(ARecojo("lima", [Linea(libro, 50)], pedido));
+        var fallido = await entorno.Reservar().Ejecutar(ARecojo("lima", [Linea(libro, 20)], pedido));
 
         Assert.Equal("stock-insuficiente", fallido.Error!.Clave);
 

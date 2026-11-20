@@ -450,11 +450,11 @@ public sealed class ReservarUnidadesTests
         {
             { "sin líneas", ARecojo("lima", []), "lineas" },
             { "cantidad cero", ARecojo("lima", [Linea(libro, 0)]), "lineas.cantidad" },
-            { "cantidad sobre el tope", ARecojo("lima", [Linea(libro, 101)]), "lineas.cantidad" },
+            { "cantidad sobre el tope", ARecojo("lima", [Linea(libro, 21)]), "lineas.cantidad" },
             { "edición repetida", ARecojo("lima", [Linea(libro), Linea(libro)]), "lineas" },
             { "línea repetida", ARecojo("lima", [Linea(libro, 1, otro), Linea(Guid.NewGuid(), 1, otro)]), "lineas" },
             { "edición vacía", ARecojo("lima", [new LineaSolicitada(Guid.NewGuid(), Guid.Empty, 1)]), "lineas" },
-            { "demasiadas líneas", ARecojo("lima", [.. Enumerable.Range(0, 51).Select(_ => Linea(Guid.NewGuid()))]), "lineas" },
+            { "demasiadas líneas", ARecojo("lima", [.. Enumerable.Range(0, 31).Select(_ => Linea(Guid.NewGuid()))]), "lineas" },
             { "pedido vacío", ARecojo("lima", [Linea(libro)], Guid.Empty), "pedidoId" },
             { "recojo sin sucursal", new ReservarEntrada(Guid.NewGuid(), TipoDeEntregaDeReserva.Recojo, null, null, [Linea(libro)], ClaveNueva()), "codigoDeSucursalDeRecojo" },
             { "recojo con región", new ReservarEntrada(Guid.NewGuid(), TipoDeEntregaDeReserva.Recojo, "lima", "cusco", [Linea(libro)], ClaveNueva()), "regionDeEntrega" },

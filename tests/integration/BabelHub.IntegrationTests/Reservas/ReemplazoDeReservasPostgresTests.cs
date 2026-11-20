@@ -50,7 +50,7 @@ public sealed class ReemplazoDeReservasPostgresTests(PostgresDeReservasFixture b
         var pedido = Guid.NewGuid();
         Assert.True((await pila.Reservar(cliente, ARecojo("lima", [Linea(libro, 3)], pedido))).EsExito);
 
-        var fallido = await pila.Reservar(cliente, ARecojo("lima", [Linea(libro, 80)], pedido));
+        var fallido = await pila.Reservar(cliente, ARecojo("lima", [Linea(libro, 20)], pedido));
 
         Assert.Equal("stock-insuficiente", fallido.Error!.Clave);
         Assert.Equal((5, 3), await bd.StockDe(lima, libro));
