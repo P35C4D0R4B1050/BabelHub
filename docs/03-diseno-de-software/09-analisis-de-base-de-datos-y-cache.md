@@ -109,6 +109,18 @@ La conclusión 2 de la sección 6b (el costo está en las idas, no en las lectur
 - **Sin `DISCARD ALL`:** ver la conclusión 4 de la sección 2 y su invariante. Prueba: tras una transacción, la conexión reutilizada tiene el rol de la aplicación, ningún alcance, `lock_timeout` 0 y escritura habilitada. Hallazgo de la revisión de seguridad, corregido: los bloqueos asesores de sesión (instancia única de trabajos y depuración) ahora cierran la conexión física si no se pueden soltar, porque ya nada los liberaría al devolverla.
 - **La memoria de referencias queda apagada por omisión** (`Inventario:ReferenciasEnMemoriaSegundos`, de 1 a 30; 0 la apaga). Motivo: la decisión D05 de `inventario-fuentes` dice que no hay caché de disponibilidad en el Inventario, y cambiarla es de la persona responsable (AGENTS.md §2). Solo guarda tablas sin seguridad por filas, con la proyección mínima (id, código, nombre; formato), nunca stock, reservado ni vencidas, y nunca la usan los casos que deciden (reservar, traslados, ajustes). No guarda ausencias y se vacía a las 10 000 entradas. Desfase máximo: el plazo configurado, y solo en nombres de fuente y formato mostrados.
 
+**Rampa antes y después** (`tests/load/escenarios/rampa.js`, pausa de 0,5 s; resultados en `progress/evidencias/k6/2026-11-20-costo-despues/`; la «antes» es la de la sección 6b, mismo código de carga, **una corrida por fila, en una máquina compartida**: las diferencias de ±20 % entre corridas son ruido):
+
+| Inventario / PostgreSQL (CPU) | Sentencias por solicitud en la base (`pg_stat_statements`) | p95 con 50 / 100 / 250 usuarios | Iteraciones en la rampa |
+| :--- | :--- | :--- | :--- |
+| 0,3 / 0,8 — antes | ≈ 31 | 897 ms / 1,5 s / 5,1 s | 23 013 |
+| 0,3 / 0,8 — después | ≈ 18 | 1 286 ms / 1,9 s / 4,1 s | 19 635 |
+| 0,3 / 0,8 — después, con memoria de 5 s | ≈ 12 | 1 296 ms / 2,3 s / 4,4 s | 24 206 |
+| 1 / 1 — antes | ≈ 31 | 242 ms / 679 ms / 1,4 s | 44 195 |
+| 1 / 1 — después | ≈ 18 | 113 ms / 614 ms / 2,0 s | 40 520 |
+
+**Lo que se mide, sin maquillar:** el conteo de sentencias bajó un 40 % (y un 60 % con la memoria), pero **el rendimiento medido con k6 no mejoró de forma consistente**: con 1 / 1 el p95 con 50 usuarios bajó de 242 a 113 ms (RNF02 se sigue cumpliendo con margen), pero con 250 usuarios y en las iteraciones totales las corridas «después» no superan a las «antes» (dentro del ruido de la máquina). Con 0,3 CPU para el Inventario **RNF02 sigue sin cumplirse** (≈ 1,3 s con 50 usuarios, con o sin memoria): ahí el cuello es la CPU del propio servicio (autenticación, serialización, 3 a 4 transacciones por solicitud y el trabajo de Npgsql por sentencia), no el conteo de sentencias, y una sentencia fusionada cuesta lo mismo en el servidor y en Npgsql que la misma sentencia suelta: solo se ahorra la espera de la ida. Lo conseguido es **menos viajes de red y menos trabajo de la base por solicitud** (útil en la VM real, con la red entre contenedores), no una capacidad medible mayor en esta máquina. Las palancas que quedan (hallazgo Importante abierto): un comando por lote que fusione el cambio de rol con la primera sentencia del bloque, menos bloques de rol por consulta (hoy tres), contadores de límites fuera de PostgreSQL y, sobre todo, la CPU declarada del Inventario (0,6 como mínimo, sección 6b).
+
 ## 7. Qué cubre y qué no
 
 - Cubre el Inventario (el servicio que concentra la concurrencia de stock) con datos de carga, en una máquina de desarrollo con los límites declarados de contenedor.
