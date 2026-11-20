@@ -2,6 +2,12 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-19 (noche) — Tope de reserva de 20 unidades por línea y 30 líneas
+
+### Cubierto
+- **Carril B:** decisión de la persona aplicada en `LimitesDeReservas` del Inventario (también acota cerrar y liberar), carrito (30 líneas, 20 unidades, fusión, CHECK de la base, controlador), Pedidos y Envíos (lotes de 30); registrado en DD-16 y residual de 600 unidades en AM01. Sin tocar specs aprobadas.
+- Validación de `main` tras la fusión: compilación sin advertencias, SpecCheck 0 avisos, unitarias 5208 y 2364, arquitectura 238 (integración filtrada de reservas, carrito, envíos y migrador en verde, según B).
+
 ## 2026-11-19 — COMP-1 y COMP-2 de A; devoluciones, pedidos y pagos avanzan
 
 ### Cubierto
