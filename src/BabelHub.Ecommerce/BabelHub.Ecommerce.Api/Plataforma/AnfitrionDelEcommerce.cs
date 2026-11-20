@@ -351,6 +351,7 @@ public static class AnfitrionDelEcommerce
 
         // ---------- Plataforma ----------
         servicios.AgregarManejoDeErrores(new OpcionesDeErrores("ECO"));
+        servicios.AgregarDocumentacionOpenApi();
         servicios.AddHttpContextAccessor();
         servicios.AddSingleton<ActorDelFlujo>();
         servicios.AddSingleton<IActorActual>(sp => sp.GetRequiredService<ActorDelFlujo>());
@@ -477,6 +478,7 @@ public static class AnfitrionDelEcommerce
 #if DEBUG
         app.MapearSembradorDeSesiones();
 #endif
+        app.MapearDocumentacionOpenApi();
         app.MapDefaultControllerRoute();
         return app;
     }
