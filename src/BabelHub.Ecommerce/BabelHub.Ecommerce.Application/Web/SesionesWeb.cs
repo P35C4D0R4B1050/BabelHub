@@ -131,6 +131,9 @@ public interface ISesionesWeb
 
     /// <summary>Cierra todas las sesiones web de un usuario y las renovaciones en Identidad, en una sola unidad de trabajo (motivo «voluntario»).</summary>
     Task CerrarTodasDeUnUsuario(Guid usuarioId, CancellationToken cancelacion = default);
+
+    /// <summary>La renovación de la sesión abierta de esta cookie, solo en proceso, para que Identidad conserve la sesión actual al revocar las demás (cambio de contraseña o de segundo factor); <see langword="null"/> si no hay sesión abierta o no se puede leer.</summary>
+    Task<ValorSecreto?> RenovacionDeLaSesion(string valorDeLaCookie, HostWeb host, CancellationToken cancelacion = default);
 }
 
 /// <summary>Contrato público: qué áreas ve un rol y qué host sirve cada una (WEB-02, D03).</summary>

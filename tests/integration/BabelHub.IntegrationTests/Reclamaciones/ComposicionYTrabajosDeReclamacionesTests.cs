@@ -27,12 +27,12 @@ public sealed class ComposicionYTrabajosDeReclamacionesTests
         where T : class => DispatchProxy.Create<T, ProxyQueNoHaceNada>();
 
     /// <summary>Una cuenta de Identidad que solo responde <c>Consultar</c>.</summary>
-    public class ProxyDeCuenta : DispatchProxy
+    public class ProxyDeCorreo : DispatchProxy
     {
-        public Func<Guid, Task<Resultado<CuentaDelCliente>>> Consultar { get; set; } = _ => throw new NotSupportedException();
+        public Func<Guid, Task<string?>> Consultar { get; set; } = _ => throw new NotSupportedException();
 
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args) =>
-            targetMethod?.Name == nameof(ICuentaDelCliente.Consultar) ? Consultar((Guid)args![0]!) : throw new NotSupportedException();
+            targetMethod?.Name == nameof(ICorreoVerificadoDeSistema.Consultar) ? Consultar((Guid)args![0]!) : throw new NotSupportedException();
     }
 
     private static ServiceCollection ConExternos()
@@ -50,7 +50,7 @@ public sealed class ComposicionYTrabajosDeReclamacionesTests
         servicios.AddSingleton(Falso<IAuditoria>());
         servicios.AddSingleton(Falso<IPublicadorDeAlertasTecnicas>());
         servicios.AddSingleton(Falso<IRegistroDeTrabajosDeFondo>());
-        servicios.AddSingleton(Falso<ICuentaDelCliente>());
+        servicios.AddSingleton(Falso<ICorreoVerificadoDeSistema>());
         return servicios;
     }
 
@@ -90,31 +90,29 @@ public sealed class ComposicionYTrabajosDeReclamacionesTests
 
     // ---------- Correo verificado ----------
 
-    private static CorreoVerificadoDeLaCuenta Adaptador(Func<Guid, Task<Resultado<CuentaDelCliente>>> consultar)
+    private static CorreoVerificadoDeLaCuenta Adaptador(Func<Guid, Task<string?>> consultar)
     {
-        var proxy = DispatchProxy.Create<ICuentaDelCliente, ProxyDeCuenta>();
-        ((ProxyDeCuenta)(object)proxy).Consultar = consultar;
+        var proxy = DispatchProxy.Create<ICorreoVerificadoDeSistema, ProxyDeCorreo>();
+        ((ProxyDeCorreo)(object)proxy).Consultar = consultar;
         return new CorreoVerificadoDeLaCuenta(proxy);
     }
-
-    private static Resultado<CuentaDelCliente> Cuenta(string correo, bool verificado) =>
-        Resultado<CuentaDelCliente>.Exito(new CuentaDelCliente(Guid.NewGuid(), "Ana", correo, verificado, null, false, false, 0));
 
     [Fact]
     public async Task Un_correo_verificado_sale_normalizado_y_uno_sin_verificar_es_nulo()
     {
-        Assert.Equal("ana@example.com", await Adaptador(_ => Task.FromResult(Cuenta("  Ana@Example.COM ", true))).De(Guid.NewGuid()));
-        Assert.Null(await Adaptador(_ => Task.FromResult(Cuenta("ana@example.com", false))).De(Guid.NewGuid()));
+        // Identidad entrega el correo verificado (o nulo si no lo hay); el adaptador lo normaliza para el Dominio de Reclamaciones.
+        Assert.Equal("ana@example.com", await Adaptador(_ => Task.FromResult<string?>("  Ana@Example.COM ")).De(Guid.NewGuid()));
+        Assert.Null(await Adaptador(_ => Task.FromResult<string?>(null)).De(Guid.NewGuid()));
     }
 
     [Fact]
     public async Task Si_Identidad_no_entrega_la_cuenta_o_lanza_falla_cerrado_en_vez_de_decir_sin_correo()
     {
-        var sinCuenta = Adaptador(_ => Task.FromResult(Resultado<CuentaDelCliente>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible"))));
         var lanza = Adaptador(_ => throw new HttpRequestException("Identidad cayó"));
+        var sinCuenta = Adaptador(_ => throw new InvalidOperationException("Identidad no entregó la cuenta."));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => sinCuenta.De(Guid.NewGuid()));
         await Assert.ThrowsAsync<HttpRequestException>(() => lanza.De(Guid.NewGuid()));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => sinCuenta.De(Guid.NewGuid()));
         await Assert.ThrowsAsync<ArgumentException>(() => sinCuenta.De(Guid.Empty));
     }
 

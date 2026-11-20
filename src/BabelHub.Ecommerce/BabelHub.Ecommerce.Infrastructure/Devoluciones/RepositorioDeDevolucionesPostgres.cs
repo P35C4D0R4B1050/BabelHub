@@ -129,6 +129,11 @@ internal sealed class RepositorioDeDevolucionesPostgres(AccesoAlEsquemaDeDevoluc
     public Task<Guid?> TomarCupos(IReadOnlyList<CupoPedido> cupos, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(cupos);
+        if (cupos.Any(c => c.Unidades < 1 || c.CantidadComprada < 1 || c.LineaId == Guid.Empty || c.PedidoId == Guid.Empty))
+        {
+            throw new ArgumentOutOfRangeException(nameof(cupos), "Un cupo necesita la línea, el pedido, lo comprado y al menos una unidad.");
+        }
+
         return acceso.Ejecutar<Guid?>(
             async (conexion, transaccion, token) =>
             {
@@ -172,14 +177,17 @@ internal sealed class RepositorioDeDevolucionesPostgres(AccesoAlEsquemaDeDevoluc
             {
                 foreach (var (lineaId, unidades) in cupos.OrderBy(c => c.LineaId))
                 {
-                    // Nunca baja de cero: la idempotencia defensiva del Dominio también vale aquí.
+                    // Nunca se devuelve más de lo comprometido: recortar a cero liberaría en silencio unidades de otra devolución sobre la misma línea (defecto de programación, no un hecho que se acepte).
                     await using var comando = new NpgsqlCommand(
-                        "UPDATE devoluciones.cupos_de_linea SET cantidad_comprometida = GREATEST(cantidad_comprometida - @unidades, 0) WHERE linea_id = @linea",
+                        "UPDATE devoluciones.cupos_de_linea SET cantidad_comprometida = cantidad_comprometida - @unidades WHERE linea_id = @linea AND cantidad_comprometida >= @unidades",
                         conexion,
                         transaccion);
                     comando.Parameters.AddWithValue("linea", lineaId);
                     comando.Parameters.AddWithValue("unidades", unidades);
-                    await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                    if (unidades < 1 || await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false) == 0)
+                    {
+                        throw new InvalidOperationException("Se devolvió más de lo comprometido en el cupo de una línea.");
+                    }
                 }
 
                 return 0;
@@ -481,6 +489,9 @@ internal sealed class RepositorioDeDevolucionesPostgres(AccesoAlEsquemaDeDevoluc
         DateTimeOffset? Incierto,
         DateTimeOffset? Confirmado)
     {
+        // Un record vuelca sus miembros en ToString: este lleva el motivo y el texto (DEV-31), así que no vuelca nada.
+        public override string ToString() => nameof(FilaDeLaDevolucion);
+
         public static FilaDeLaDevolucion Leer(NpgsqlDataReader f) =>
             new(
                 f.GetGuid(0),

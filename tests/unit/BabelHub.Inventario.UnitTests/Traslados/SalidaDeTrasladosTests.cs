@@ -228,6 +228,7 @@ public sealed class SalidaDeTrasladosTests
         Assert.All(entorno.Buzon.Mensajes.Where(m => entorno.Cola.De(m).Valor == "fallido"), m => Assert.Equal(motivo, entorno.Cola.De(m).MotivoDeFallo));
         Assert.Equal(2, entorno.Buzon.Mensajes.Count(m => entorno.Cola.De(m).Valor == "fallido"));
         Assert.Equal(2, entorno.Alertas.Tecnicas.Count);
+        Assert.All(entorno.Alertas.Tecnicas, a => Assert.Equal(motivo == "permanente" ? "entrega-de-traslado-con-error-permanente" : "credencial-del-ecommerce-rechazada", a));
         Assert.Equal(motivo == "credencial" ? 1 : 0, despues.Valor.Reclamados);
     }
 
@@ -245,6 +246,7 @@ public sealed class SalidaDeTrasladosTests
         Assert.Equal(2, resultado.Valor.Fallidos);
         Assert.All(entorno.Buzon.Mensajes, m => Assert.Equal("vencido", entorno.Cola.De(m).MotivoDeFallo));
         Assert.Equal(2, entorno.Alertas.Tecnicas.Count);
+        Assert.All(entorno.Alertas.Tecnicas, a => Assert.Equal("aviso-de-traslado-no-entregado", a));
     }
 
     [Fact]
@@ -268,6 +270,8 @@ public sealed class SalidaDeTrasladosTests
         Assert.Equal(3, primera);
         Assert.Equal(2, entorno.Envio.Estados.Count);
         Assert.Equal(3, entorno.Alertas.Tecnicas.Count);
+        Assert.Equal(1, entorno.Alertas.Tecnicas.Count(a => a == "estado-de-traslado-sin-entregar"));
+        Assert.Equal(2, entorno.Alertas.Tecnicas.Count(a => a == "aviso-de-traslado-no-entregado"));
     }
 
     [Fact]
@@ -307,7 +311,11 @@ public sealed class SalidaDeTrasladosTests
     {
         var catalogo = BabelHub.Inventario.Application.Auditoria.Interno.CatalogoDeAlertasDeAuditoria.Crear();
 
-        Assert.True(catalogo.Contiene(EntregarMensajesSalientes.MotivoDeAlerta));
+        foreach (var motivo in new[] { EntregarMensajesSalientes.MotivoDeAvisoNoEntregado, EntregarMensajesSalientes.MotivoDeEstadoSinEntregar, EntregarMensajesSalientes.MotivoDeErrorPermanente, EntregarMensajesSalientes.MotivoDeCredencialRechazada })
+        {
+            Assert.True(catalogo.Contiene(motivo), motivo);
+        }
+
         Assert.True(catalogo.Contiene(RevisarTrasladosSinAprobar.MotivoDeAlerta));
     }
 
