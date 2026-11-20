@@ -76,6 +76,18 @@ cd tests/e2e && source "$LOCALAPPDATA/babelhub-e2e/env" && E2E_BASE_URL=https://
 - `BABELHUB__Ecommerce__ProxiesConocidos=127.0.0.1,::1` hace que el host confíe en `X-Origen-Cliente` desde la propia máquina: cada recorrido llega desde su propio origen (el Inventario limita las reservas a 10 por hora por origen, SEL-19) y `sembrar-datos.sh --limpiar` vacía los contadores de límites y las reservas.
 - La ficha del catálogo aún no agrega al carrito: el recorrido agrega el libro con la misma petición que enviará su botón (`POST /carrito/lineas`, con el token y el `Origin` del navegador).
 
+### Recorrido de la biblioteca digital (T25 de `ecommerce-biblioteca-digital`)
+
+`biblioteca/biblioteca.spec.ts` compra el libro digital de la obra ficticia «El zorro y el cóndor del Ande» (checkout 100 % digital), paga con el simulador y comprueba «Mi biblioteca» («0 de 5 descargas usadas», formato, aviso de cinco minutos, axe AA), la descarga (302 al almacén con `no-store` y sin cuerpo, por teclado; la descarga se cuenta), la ayuda de lista cerrada y que otra cuenta no ve el libro ni puede pedir ayuda sobre él (404). Corre en Chromium de escritorio y de teléfono y en WebKit con el mismo entorno que el recorrido de pedidos (`sembrar-datos.sh --limpiar` antes de cada corrida):
+
+```bash
+cd tests/e2e && source "$LOCALAPPDATA/babelhub-e2e/env" && E2E_BASE_URL=https://localhost:8443 npx playwright test biblioteca/biblioteca --workers=1
+# con la administración (un segundo host con BABELHUB__Web__Host=gestion): E2E_ADMIN_URL=https://localhost:8444
+```
+
+- Sin `Almacen:Biblioteca:*` el host entrega **contenido sintético en memoria** (URL `.invalid`): el recorrido comprueba la redirección y el conteo, nunca el archivo; la descarga real contra un almacén S3 está en `tests/integration/.../Biblioteca/DescargaConAlmacenRealTests`.
+- La CSP real solo abre `form-action` al almacén si `BABELHUB__Web__OrigenDelAlmacen` coincide con el endpoint de `Almacen:Biblioteca:`; en el entorno local no se configura y el navegador no sigue la redirección (el recorrido observa la respuesta `302`, no la navegación).
+
 ## Sembrador de sesiones (solo desarrollo)
 
 `POST /desarrollo/sesion` en el host del E-commerce crea una cuenta con el correo verificado y la hace ingresar **por el camino real** (el ingreso, el segundo factor del personal con su secreto TOTP y la sesión web); devuelve el `storageState` de Playwright con la cookie `__Host-bh-tienda` (cliente) o `__Host-bh-gestion` (personal). La cabecera `X-Usuario-Id` trae el identificador de la cuenta creada. Cada llamada crea una cuenta nueva con correo `e2e-<rol>-<hex>@example.test` y contraseña aleatoria que no se devuelve.
