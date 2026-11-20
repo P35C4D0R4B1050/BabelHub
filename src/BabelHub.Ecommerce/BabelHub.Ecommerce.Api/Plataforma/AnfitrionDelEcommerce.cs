@@ -445,7 +445,7 @@ public static class AnfitrionDelEcommerce
         // ---------- Pagos, Envíos, Reclamaciones y Pedidos ----------
         // Pagos reemplaza al creador de intenciones provisional de Carrito; en el ensayo y al restaurar la pasarela es siempre la nula (nunca una llamada a un proveedor). «culqi» aún no tiene adaptador: su guarda lo rechaza nombrando la variable.
         var guardarProduccion = esProduccion && soloEnModoNormal;
-        var opcionesDePagos = LectorDeOpcionesDePagos.Leer(builder.Configuration, builder.Environment.EnvironmentName, sinLlamadasReales: !soloEnModoNormal, pedidosDisponible: false);
+        var opcionesDePagos = LectorDeOpcionesDePagos.Leer(builder.Configuration, builder.Environment.EnvironmentName, sinLlamadasReales: !soloEnModoNormal, pedidosDisponible: true);
         servicios.AgregarPagos(opcionesDePagos, esProduccion: false);
         servicios.AgregarTrabajosDePagosEnLaApi(soloEnModoNormal);
 
