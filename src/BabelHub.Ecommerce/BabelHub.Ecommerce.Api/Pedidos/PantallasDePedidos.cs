@@ -62,7 +62,11 @@ public sealed record LineaDePedidoVista(
     bool Operable);
 
 /// <summary>El contacto de entrega: solo lo ven el titular y el personal autorizado (la lectura del personal se audita); nunca se escribe en un registro ni en un aviso.</summary>
-public sealed record ContactoDelPedidoVista(string Nombre, string Telefono, string Direccion);
+public sealed record ContactoDelPedidoVista(string Nombre, string Telefono, string Direccion)
+{
+    /// <summary>Imprimirlo nunca muestra el contacto (como el de la Aplicación): ni un registro ni un mensaje lo filtran.</summary>
+    public override string ToString() => "[redactado]";
+}
 
 /// <summary>Una acción sobre líneas del pedido (preparar, marcar listas, entregar): su texto, su ruta y su icono.</summary>
 public sealed record AccionSobreLineasVista(string Clave, string Texto, string Ruta, string Icono);
@@ -98,6 +102,9 @@ public sealed class DetalleDePedidoVista : ModeloBaseDePagina
     public bool ContactoOculto { get; set; }
 
     public bool ContactoAnonimizado { get; set; }
+
+    /// <summary>Se muestra la sucursal de origen de cada línea: solo al personal y al encargado, no al titular (minimización de datos).</summary>
+    public bool MostrarLaFuente { get; set; } = true;
 
     public string RutaDeLaLista { get; set; } = string.Empty;
 
@@ -543,7 +550,8 @@ public abstract class ControladorDePedidos(ContextoDePagina pagina, OpcionesDeEr
         vista.Lineas = LineasComoVista(lineas);
         vista.RutaDeLaLista = rutaDeLaLista;
         vista.RutaDelDetalle = rutaDelDetalle;
-        vista.Aviso = aviso;
+        // Un aviso de «cancelado» o «anulado» solo se muestra si el pedido lo está: un enlace con `?hecho=` no puede afirmar lo que no pasó.
+        vista.Aviso = Request.Query["hecho"].ToString() is "cancelar" or "anular" && resumen.Estado != EstadoVisibleDelPedido.Anulado ? null : aviso;
         return vista;
     }
 
