@@ -120,3 +120,13 @@ public interface IContactoDeAvisosDelCliente
 {
     Task<ContactoDeAvisosDelCliente?> Consultar(Guid usuarioId, CancellationToken cancelacion = default);
 }
+
+/// <summary>
+/// El correo <b>verificado</b> de una cuenta para los módulos que lo necesitan sin ser su titular (el Libro de Reclamaciones al reemplazar una cuenta sin verificar, IDE-84, o al reaplicar supresiones tras una restauración,
+/// PLA-19): un contrato <b>de sistema</b>, en proceso y sin comprobar titularidad ni actor, que <b>no se expone por HTTP</b> y solo lee. Devuelve el correo normalizado (recortado y en minúsculas) o <see langword="null"/> si la
+/// cuenta no existe o su correo no está verificado. Si Identidad no puede leer la cuenta, <b>lanza</b> (falla cerrado: nunca se confunde «no se pudo saber» con «no hay correo verificado»).
+/// </summary>
+public interface ICorreoVerificadoDeSistema
+{
+    Task<string?> Consultar(Guid usuarioId, CancellationToken cancelacion = default);
+}
