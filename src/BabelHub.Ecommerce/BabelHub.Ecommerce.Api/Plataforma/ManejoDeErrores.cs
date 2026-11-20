@@ -164,11 +164,18 @@ public static class ProblemasHttp
 public sealed class ManejadorDeExcepciones(OpcionesDeErrores opciones, ILogger<ManejadorDeExcepciones> registro) : IExceptionHandler
 {
     /// <summary>Un fallo transitorio de la base (conexión perdida, plazo vencido, sin conexiones libres) en cualquier nivel de la cadena de excepciones; un error de base que no es transitorio es un defecto y no entra aquí.</summary>
+    /// <summary>Registra la caída (solo el tipo de la excepción y el identificador de seguimiento, nunca su mensaje) y responde el 503 uniforme.</summary>
+    private ProblemaDto AvisarBaseNoDisponible(HttpContext httpContext, OpcionesDeErrores opciones, Exception excepcion)
+    {
+        registro.LogWarning("Base de datos no disponible en {Metodo} {Ruta}: {Tipo} (traza {Traza})", httpContext.Request.Method, httpContext.Request.Path.Value, excepcion.GetType().Name, httpContext.TraceIdentifier);
+        return ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.NoDisponible);
+    }
+
     internal static bool EsBaseNoDisponible(Exception excepcion)
     {
         for (var actual = excepcion; actual is not null; actual = actual.InnerException)
         {
-            if (actual is TimeoutException or System.Data.Common.DbException { IsTransient: true })
+            if (actual is System.Data.Common.DbException { IsTransient: true })
             {
                 return true;
             }
@@ -201,7 +208,7 @@ public sealed class ManejadorDeExcepciones(OpcionesDeErrores opciones, ILogger<M
             AlcanceDeDatosDenegadoException => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.Prohibido, "alcance-insuficiente"),
             BadHttpRequestException => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.Validacion),
             // La base inalcanzable, sin conexiones libres o vencida en plazo es «servicio no disponible» (503 uniforme: el cliente reintenta), no un error inesperado (hallazgo de K6-1, resiliencia).
-            _ when EsBaseNoDisponible(exception) => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.NoDisponible),
+            _ when EsBaseNoDisponible(exception) => AvisarBaseNoDisponible(httpContext, opciones, exception),
             _ => null,
         };
 
