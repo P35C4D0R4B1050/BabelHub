@@ -36,6 +36,8 @@ internal sealed class EntornoDeBiblioteca
         Listar = new ListarMiBiblioteca(Autorizador, Accesos, Proyector);
         Obtener = new ObtenerAcceso(Autorizador, Accesos, Proyector);
         ConsultarDeUnCliente = new ConsultarBibliotecaDeUnCliente(Autorizador, Accesos, Proyector, Auditoria, Unidad);
+        Consumir = new ConsumirDescarga(Accesos, Descargas, Entrega, Unidad);
+        Descarga = new OrquestadorDeDescargas(Autorizador, Limites, Accesos, Descargas, Referencias, Catalogo, Entrega, Consumir, Alertas, Reloj);
     }
 
     public ActorDePrueba Actor { get; }
@@ -73,6 +75,10 @@ internal sealed class EntornoDeBiblioteca
     public ObtenerAcceso Obtener { get; }
 
     public ConsultarBibliotecaDeUnCliente ConsultarDeUnCliente { get; }
+
+    public ConsumirDescarga Consumir { get; }
+
+    public OrquestadorDeDescargas Descarga { get; }
 
     /// <summary>Un libro digital en el catálogo con su archivo y un acceso sembrado para la cuenta del actor (o la dada).</summary>
     public Domain.Biblioteca.Acceso SembrarLibro(string titulo, Guid? cuenta = null, DateTimeOffset? compra = null, int descargas = 0, FormatoDeArchivoDigital formato = FormatoDeArchivoDigital.Epub)

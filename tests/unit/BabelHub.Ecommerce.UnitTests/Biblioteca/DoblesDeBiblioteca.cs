@@ -197,6 +197,9 @@ internal sealed class RepositorioDeDescargasEnMemoria(RepositorioDeAccesosEnMemo
     /// <summary>Si es verdadero, el registro de descargas falla (para probar la reversión de la cancelación, AC-BIB-25).</summary>
     public bool FallaAlEliminar { get; set; }
 
+    /// <summary>Si es verdadero, registrar la clave falla como una violación de la clave foránea (23503): el acceso desapareció tras el conteo (BIB-28).</summary>
+    public bool ForzarAccesoInexistente { get; set; }
+
     public void Enlazar()
     {
         accesos.EnCascada = ids =>
@@ -231,7 +234,7 @@ internal sealed class RepositorioDeDescargasEnMemoria(RepositorioDeAccesosEnMemo
 
     public Task<ResultadoDeRegistrarClave> RegistrarClave(ClaveRegistrada clave, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
-        if (accesos.Buscar(clave.AccesoId) is null)
+        if (ForzarAccesoInexistente || accesos.Buscar(clave.AccesoId) is null)
         {
             return Task.FromResult(ResultadoDeRegistrarClave.AccesoInexistente);
         }
@@ -423,6 +426,11 @@ internal sealed class LimitesDeBibliotecaDoble : IControlDeLimites
         if (Caido)
         {
             return Task.FromResult(ResultadoDeLimite.NoDisponible());
+        }
+
+        if (EnCurso)
+        {
+            return Task.FromResult(ResultadoDeLimite.RepeticionEnCurso());
         }
 
         var reserva = new ReservaDeLimite(politica.Valor, "usuario", Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow);
