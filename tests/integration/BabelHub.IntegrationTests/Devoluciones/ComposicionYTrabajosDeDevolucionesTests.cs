@@ -57,7 +57,7 @@ public sealed class ComposicionYTrabajosDeDevolucionesTests
         public DateOnly HoyEnLima => DateOnly.FromDateTime(Ahora.ToOffset(TimeSpan.FromHours(-5)).DateTime);
     }
 
-    private static ServiceCollection ConDependencias(bool conInventario = false, bool conResolucion = false, bool conAccesos = false)
+    private static ServiceCollection ConDependencias(bool conInventario = false, bool conAccesos = false)
     {
         var servicios = new ServiceCollection();
         servicios.AddSingleton(Doble<IUnidadDeTrabajo>());
@@ -80,11 +80,6 @@ public sealed class ComposicionYTrabajosDeDevolucionesTests
             servicios.AddSingleton(Doble<IClienteDelInventario>());
         }
 
-        if (conResolucion)
-        {
-            servicios.AddSingleton(Doble<BabelHub.Ecommerce.Application.Devoluciones.Interno.IResolucionDeSucursal>());
-        }
-
         if (conAccesos)
         {
             servicios.AddSingleton(Doble<IAccesosParaDevoluciones>());
@@ -97,7 +92,7 @@ public sealed class ComposicionYTrabajosDeDevolucionesTests
     [Trait("Criterio", "AC-DEV-13")]
     public void La_composicion_resuelve_los_contratos_publicos_los_casos_de_uso_y_el_repositorio_de_PostgreSQL()
     {
-        var servicios = ConDependencias(conInventario: true);
+        var servicios = ConDependencias(conInventario: true, conAccesos: true);
         servicios.AgregarDevoluciones(esProduccion: false);
         using var proveedor = servicios.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = false });
         using var alcance = proveedor.CreateScope();
@@ -121,7 +116,7 @@ public sealed class ComposicionYTrabajosDeDevolucionesTests
     [Trait("Criterio", "AC-DEV-25")]
     public void Devoluciones_suma_su_parte_de_los_pendientes_y_de_la_cancelacion_sin_reemplazar_las_de_otros_modulos()
     {
-        var servicios = ConDependencias(conInventario: true);
+        var servicios = ConDependencias(conInventario: true, conAccesos: true);
         servicios.AddScoped<IPendientesDeCuenta>(_ => Doble<IPendientesDeCuenta>());
         servicios.AddScoped<IAplicadorDeCancelacion>(_ => Doble<IAplicadorDeCancelacion>());
         servicios.AgregarDevoluciones(esProduccion: false);
@@ -144,24 +139,24 @@ public sealed class ComposicionYTrabajosDeDevolucionesTests
     public void En_produccion_la_guarda_nombra_los_dobles_provisionales_y_sin_ellos_el_arranque_continua()
     {
         var sinNada = ConDependencias();
-        var conTodo = ConDependencias(conInventario: true, conResolucion: true, conAccesos: true);
+        var conTodo = ConDependencias(conInventario: true, conAccesos: true);
 
         var falla = Assert.Throws<ConfiguracionDeDevolucionesInvalidaException>(() => sinNada.AgregarDevoluciones(esProduccion: true));
         conTodo.AgregarDevoluciones(esProduccion: true);
 
         Assert.Contains(nameof(IInventarioDeDevoluciones), falla.Message, StringComparison.Ordinal);
-        Assert.Contains("IResolucionDeSucursal", falla.Message, StringComparison.Ordinal);
         Assert.Contains(nameof(IAccesosParaDevoluciones), falla.Message, StringComparison.Ordinal);
         using var proveedor = conTodo.BuildServiceProvider();
         using var alcance = proveedor.CreateScope();
         Assert.IsType<RestInventarioDeDevoluciones>(alcance.ServiceProvider.GetRequiredService<IInventarioDeDevoluciones>());
+        Assert.IsType<ResolucionDeSucursalDeDevoluciones>(alcance.ServiceProvider.GetRequiredService<BabelHub.Ecommerce.Application.Devoluciones.Interno.IResolucionDeSucursal>());
     }
 
     [Fact]
     [Trait("Criterio", "AC-DEV-13")]
-    public async Task Sin_desarrollo_los_dobles_provisionales_fallan_cerrado()
+    public async Task Sin_el_cliente_del_inventario_el_doble_provisional_y_la_resolucion_fallan_cerrado()
     {
-        var servicios = ConDependencias();
+        var servicios = ConDependencias(conAccesos: true);
         servicios.AgregarDevoluciones(esProduccion: false);
         using var proveedor = servicios.BuildServiceProvider();
         using var alcance = proveedor.CreateScope();
@@ -170,14 +165,10 @@ public sealed class ComposicionYTrabajosDeDevolucionesTests
         var reingreso = await s.GetRequiredService<IInventarioDeDevoluciones>().Reingresar(new ReingresoPorDevolucion(Guid.NewGuid(), Guid.NewGuid(), "lima-central", [new LineaDeReingreso(Guid.NewGuid(), 1)]));
         var sucursales = await s.GetRequiredService<IInventarioDeDevoluciones>().ListarSucursalesActivas();
         var codigo = await s.GetRequiredService<BabelHub.Ecommerce.Application.Devoluciones.Interno.IResolucionDeSucursal>().CodigoDe(Guid.NewGuid());
-        var acceso = await s.GetRequiredService<IAccesosParaDevoluciones>().Consultar(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
-        var revocar = await s.GetRequiredService<IAccesosParaDevoluciones>().RevocarSiNoHayEnlace(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
 
         Assert.IsType<ResultadoDelReingreso.Incierto>(reingreso);
         Assert.IsType<ResultadoDeSucursalesActivas.NoDisponible>(sucursales);
         Assert.Null(codigo);
-        Assert.False(acceso.EsExito);
-        Assert.False(revocar.EsExito);
     }
 
     // ---------- Los trabajos ----------

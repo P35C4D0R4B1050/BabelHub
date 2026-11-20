@@ -66,22 +66,21 @@ public static class ComposicionDeDevoluciones
         }
 
         servicios.TryAddSingleton<IInventarioDeDevoluciones, InventarioDeDevolucionesProvisional>();
-        servicios.TryAddSingleton<IResolucionDeSucursal, ResolucionDeSucursalDeDevolucionesProvisional>();
-        servicios.TryAddSingleton<IAccesosParaDevoluciones, AccesosParaDevolucionesProvisional>();
+
+        // La resolución de la sucursal del actor es real: se apoya en las sucursales activas del Inventario (con el Inventario provisional falla cerrado) y en la equivalencia D20 (código ↔ identificador).
+        servicios.TryAddScoped<IResolucionDeSucursal, ResolucionDeSucursalDeDevoluciones>();
         if (esProduccion)
         {
             var provisionales = new List<string>();
-            foreach (var (puerto, doble) in new[]
+            if (servicios.Any(d => d.ServiceType == typeof(IInventarioDeDevoluciones) && (d.ImplementationType == typeof(InventarioDeDevolucionesProvisional) || d.ImplementationInstance?.GetType() == typeof(InventarioDeDevolucionesProvisional))))
             {
-                (typeof(IInventarioDeDevoluciones), typeof(InventarioDeDevolucionesProvisional)),
-                (typeof(IResolucionDeSucursal), typeof(ResolucionDeSucursalDeDevolucionesProvisional)),
-                (typeof(IAccesosParaDevoluciones), typeof(AccesosParaDevolucionesProvisional)),
-            })
+                provisionales.Add(nameof(IInventarioDeDevoluciones));
+            }
+
+            // Los accesos digitales los entrega Biblioteca (ECO-8): se registra antes que Devoluciones y ya no hay un doble que lo sustituya.
+            if (!servicios.Any(d => d.ServiceType == typeof(IAccesosParaDevoluciones)))
             {
-                if (servicios.Any(d => d.ServiceType == puerto && (d.ImplementationType == doble || d.ImplementationInstance?.GetType() == doble)))
-                {
-                    provisionales.Add(puerto.Name);
-                }
+                provisionales.Add(nameof(IAccesosParaDevoluciones));
             }
 
             if (provisionales.Count > 0)
@@ -99,7 +98,7 @@ public static class ComposicionDeLosTrabajosDeDevoluciones
 {
     /// <summary>
     /// Registra los trabajos de fondo de Devoluciones y el servicio que los corre. <paramref name="alcanceDeSistema"/> lo construye el anfitrión —la Api— con sus servicios y fija el actor «sistema» alrededor de cada corrida. Se llama <b>solo en modo normal</b> y después de
-    /// <see cref="ComposicionDeDevoluciones.AgregarDevoluciones"/>; quien la llame añade también <c>AddHostedService&lt;ServicioDeTrabajosDeDevoluciones&gt;()</c>.
+    /// <see cref="ComposicionDeDevoluciones.AgregarDevoluciones"/>; quien la llame añade también el servicio con la fábrica <c>AddHostedService(sp =&gt; sp.GetRequiredService&lt;ServicioDeTrabajosDeDevoluciones&gt;())</c> (la forma genérica lo construiría con una lista vacía de trabajos y no correría ninguno).
     /// </summary>
     public static IServiceCollection AgregarTrabajosDeFondoDeDevoluciones(this IServiceCollection servicios, Func<IServiceProvider, AlcanceDeSistemaDeDevoluciones> alcanceDeSistema)
     {
@@ -122,31 +121,4 @@ internal sealed class InventarioDeDevolucionesProvisional : IInventarioDeDevoluc
     public Task<ResultadoDelReingreso> Reingresar(ReingresoPorDevolucion reingreso, CancellationToken cancelacion = default) => Task.FromResult<ResultadoDelReingreso>(new ResultadoDelReingreso.Incierto());
 
     public Task<ResultadoDeSucursalesActivas> ListarSucursalesActivas(CancellationToken cancelacion = default) => Task.FromResult<ResultadoDeSucursalesActivas>(new ResultadoDeSucursalesActivas.NoDisponible());
-}
-
-/// <summary>
-/// La resolución del código de la sucursal de un actor sin la equivalencia entre el identificador y el código (D15 de <c>docs/03/08</c>, pendiente de Identidad): no resuelve ninguna, así que se niega el alcance del encargado y se registra (falla cerrado; la administración central
-/// no la necesita).
-/// </summary>
-internal sealed class ResolucionDeSucursalDeDevolucionesProvisional : IResolucionDeSucursal
-{
-    public Task<string?> CodigoDe(Guid sucursalId, CancellationToken cancelacion = default) => Task.FromResult<string?>(null);
-}
-
-/// <summary>Los accesos digitales sin Biblioteca (ECO-8): ninguna consulta, revocación, suspensión ni reanudación responde, así que un reembolso o un reporte digital no se crea (falla cerrado).</summary>
-internal sealed class AccesosParaDevolucionesProvisional : IAccesosParaDevoluciones
-{
-    private static ErrorDeAplicacion NoDisponible() => new(CategoriaDeError.NoDisponible, "servicio-no-disponible");
-
-    public Task<Resultado<AccesoParaDevoluciones?>> Consultar(Guid cuentaId, Guid pedidoId, Guid edicionId, CancellationToken cancelacion = default) =>
-        Task.FromResult(Resultado<AccesoParaDevoluciones?>.Fallo(NoDisponible()));
-
-    public Task<Resultado<ResultadoDeRevocarSiNoHayEnlace>> RevocarSiNoHayEnlace(Guid cuentaId, Guid pedidoId, Guid edicionId, CancellationToken cancelacion = default) =>
-        Task.FromResult(Resultado<ResultadoDeRevocarSiNoHayEnlace>.Fallo(NoDisponible()));
-
-    public Task<Resultado<ResultadoDeSuspenderAcceso>> Suspender(Guid cuentaId, Guid accesoId, CancellationToken cancelacion = default) =>
-        Task.FromResult(Resultado<ResultadoDeSuspenderAcceso>.Fallo(NoDisponible()));
-
-    public Task<Resultado<ResultadoDeReanudarAcceso>> Reanudar(Guid cuentaId, Guid accesoId, CancellationToken cancelacion = default) =>
-        Task.FromResult(Resultado<ResultadoDeReanudarAcceso>.Fallo(NoDisponible()));
 }
