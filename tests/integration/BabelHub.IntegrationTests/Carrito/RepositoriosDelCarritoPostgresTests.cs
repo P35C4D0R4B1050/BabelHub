@@ -215,7 +215,7 @@ public sealed class RepositoriosDelCarritoPostgresTests(PostgresDelCarritoFixtur
     {
         var cuenta = Guid.NewGuid();
         var avisoViejo = new AvisoDelCarrito(Guid.NewGuid(), TipoDeAvisoDelCarrito.EdicionRetirada, Guid.NewGuid(), "A", null, null, Inicio.AddDays(-91));
-        var avisoVisto = new AvisoDelCarrito(Guid.NewGuid(), TipoDeAvisoDelCarrito.FusionAjustada, Guid.NewGuid(), "B", MotivoDeAjusteDeAviso.RecortadaAlMaximo, 99, Inicio.AddDays(-40));
+        var avisoVisto = new AvisoDelCarrito(Guid.NewGuid(), TipoDeAvisoDelCarrito.FusionAjustada, Guid.NewGuid(), "B", MotivoDeAjusteDeAviso.RecortadaAlMaximo, 20, Inicio.AddDays(-40));
         var avisoNuevo = new AvisoDelCarrito(Guid.NewGuid(), TipoDeAvisoDelCarrito.EdicionRetirada, Guid.NewGuid(), "C", null, null, Inicio);
         await bd.Unidad.Ejecutar(
             async token =>

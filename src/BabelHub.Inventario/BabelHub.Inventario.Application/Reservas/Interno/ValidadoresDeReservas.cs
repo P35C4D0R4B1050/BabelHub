@@ -9,12 +9,12 @@ namespace BabelHub.Inventario.Application.Reservas.Interno;
 /// <summary>Los topes de entrada de las operaciones de reservas (plan §6): las líneas del carrito (CAR-29) y la cantidad por línea.</summary>
 internal static class LimitesDeReservas
 {
-    public const int MaximoDeLineas = 50;
+    public const int MaximoDeLineas = 30;
 
     public const int MinimoDeCantidad = 1;
 
-    /// <summary>Tope de unidades por línea: la spec no lo fija, es un supuesto (registrado en las decisiones de implementación) que acota lo que se puede apartar con una solicitud.</summary>
-    public const int MaximoDeCantidad = 100;
+    /// <summary>Tope de unidades por línea: 20 (decisión de la persona, 2026-11-19; la spec no lo fija, consta en `progress/hallazgos.md`). Con 30 líneas, una cuenta retiene a lo más 600 unidades (residual de AM01).</summary>
+    public const int MaximoDeCantidad = 20;
 }
 
 /// <summary>Las reglas de forma de la entrada de reservar y de la consulta previa: cada error lleva el campo y una clave, nunca el valor recibido (SEG-01).</summary>

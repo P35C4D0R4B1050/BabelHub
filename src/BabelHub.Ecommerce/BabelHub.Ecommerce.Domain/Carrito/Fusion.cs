@@ -18,10 +18,10 @@ public enum MotivoDeAjusteDeFusion
     /// <summary>Una digital que ya estaba en el otro carrito: queda en una unidad (CAR-03).</summary>
     DigitalAUnaUnidad,
 
-    /// <summary>El carrito de la cuenta ya tiene 50 líneas: la línea del visitante no entra (D14).</summary>
+    /// <summary>El carrito de la cuenta ya tiene 30 líneas: la línea del visitante no entra (D14).</summary>
     TopeDeLineas,
 
-    /// <summary>La suma pasaba de 99 unidades: queda en 99 (D14).</summary>
+    /// <summary>La suma pasaba de 20 unidades: queda en 20 (D14).</summary>
     TopeDeUnidades,
 }
 
@@ -38,7 +38,7 @@ public sealed record ResultadoDeFusion(IReadOnlyList<LineaFusionada> Lineas, IRe
 
 /// <summary>
 /// La regla de fusión del carrito de un visitante con el de la cuenta (CAR-24, AC-CAR-22) como <b>función pura</b>: suma las cantidades de una misma edición hasta el máximo disponible (y 99), deja las digitales en una unidad,
-/// descarta las que la cuenta ya posee o dejaron de venderse, aplica el tope de 50 líneas y devuelve los ajustes con su motivo. <b>Nunca quita ni reduce lo que la cuenta ya tenía</b>: solo limita lo que aporta el visitante.
+/// descarta las que la cuenta ya posee o dejaron de venderse, aplica el tope de 30 líneas y devuelve los ajustes con su motivo. <b>Nunca quita ni reduce lo que la cuenta ya tenía</b>: solo limita lo que aporta el visitante.
 /// Las líneas de la cuenta conservan su orden y las nuevas del visitante van después, en su orden; una edición que el Catálogo no conoce se trata como no vendible.
 /// </summary>
 public static class Fusion

@@ -125,19 +125,19 @@ public sealed class FusionTests
     }
 
     [Fact]
-    public void Una_suma_de_mas_de_99_unidades_se_recorta_al_tope_con_su_motivo()
+    public void Una_suma_de_mas_de_20_unidades_se_recorta_al_tope_con_su_motivo()
     {
-        var resultado = Fusionar([Impresa(1, 60)], [Impresa(1, 60)], Ediciones(Vendible(1, maximo: null)));
+        var resultado = Fusionar([Impresa(1, 15)], [Impresa(1, 15)], Ediciones(Vendible(1, maximo: null)));
 
         var ajuste = Assert.Single(resultado.Ajustes);
-        Assert.Equal(99, Assert.Single(resultado.Lineas).Cantidad.Valor);
-        Assert.Equal((MotivoDeAjusteDeFusion.TopeDeUnidades, 99), (ajuste.Motivo, ajuste.CantidadFinal));
+        Assert.Equal(20, Assert.Single(resultado.Lineas).Cantidad.Valor);
+        Assert.Equal((MotivoDeAjusteDeFusion.TopeDeUnidades, 20), (ajuste.Motivo, ajuste.CantidadFinal));
     }
 
     [Fact]
-    public void El_tope_de_50_lineas_descarta_las_ultimas_del_visitante_y_nunca_las_de_la_cuenta()
+    public void El_tope_de_30_lineas_descarta_las_ultimas_del_visitante_y_nunca_las_de_la_cuenta()
     {
-        var cuenta = Enumerable.Range(1, 49).Select(i => Impresa(i, 1)).ToList();
+        var cuenta = Enumerable.Range(1, 29).Select(i => Impresa(i, 1)).ToList();
         var visitante = new[] { Impresa(100, 1), Impresa(101, 1), Impresa(102, 1) };
         var ediciones = Ediciones(Vendible(100), Vendible(101), Vendible(102));
 

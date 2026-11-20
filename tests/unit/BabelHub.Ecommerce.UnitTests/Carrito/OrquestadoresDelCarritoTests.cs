@@ -202,10 +202,10 @@ public sealed class OrquestadoresDelCarritoTests
 
     [Fact]
     [Trait("Criterio", "AC-CAR-25")]
-    public async Task La_linea_51_se_rechaza_con_su_motivo()
+    public async Task La_linea_31_se_rechaza_con_su_motivo()
     {
         var e = EntornoDelCarrito.DeCliente();
-        for (var i = 0; i < 50; i++)
+        for (var i = 0; i < 30; i++)
         {
             Assert.True((await Agregar(e, e.Impreso(10), 1)).EsExito);
         }
@@ -214,7 +214,7 @@ public sealed class OrquestadoresDelCarritoTests
 
         Assert.Equal(ClavesDelCarrito.LimiteDeLineas, Clave(resultado.Error));
         Assert.Equal(CategoriaDeError.ReglaDeNegocio, resultado.Error!.Categoria);
-        Assert.Equal(50, e.Carritos.Todos.Single().Lineas.Count);
+        Assert.Equal(30, e.Carritos.Todos.Single().Lineas.Count);
     }
 
     [Theory]

@@ -95,34 +95,34 @@ public sealed class CarritoTests
     }
 
     [Fact]
-    public void Sumar_mas_de_99_unidades_de_un_impreso_se_rechaza_y_deja_la_linea_como_estaba()
+    public void Sumar_mas_de_20_unidades_de_un_impreso_se_rechaza_y_deja_la_linea_como_estaba()
     {
         var carrito = DeCuenta();
-        carrito.Agregar(Libro, esDigital: false, cantidad: 90, Ahora);
+        carrito.Agregar(Libro, esDigital: false, cantidad: 15, Ahora);
 
-        var resultado = carrito.Agregar(Libro, esDigital: false, cantidad: 10, Ahora);
+        var resultado = carrito.Agregar(Libro, esDigital: false, cantidad: 6, Ahora);
 
         Assert.Equal(RechazoDeCarrito.TopeDeUnidades, resultado.Rechazo);
-        Assert.Equal(90, Assert.Single(carrito.Lineas).Cantidad.Valor);
+        Assert.Equal(15, Assert.Single(carrito.Lineas).Cantidad.Valor);
     }
 
     [Fact]
     [Trait("Criterio", "AC-CAR-25")]
-    public void La_linea_cincuenta_y_uno_se_rechaza_con_su_motivo_y_las_cincuenta_primeras_se_aceptan()
+    public void La_linea_treinta_y_una_se_rechaza_con_su_motivo_y_las_treinta_primeras_se_aceptan()
     {
         var carrito = DeVisitante();
-        for (var i = 1; i <= 50; i++)
+        for (var i = 1; i <= 30; i++)
         {
             Assert.True(carrito.Agregar(Edicion(i), esDigital: false, cantidad: 1, Ahora).EsExito);
         }
 
-        var cincuentaYUna = carrito.Agregar(Edicion(51), esDigital: false, cantidad: 1, Ahora);
-        var repetida = carrito.Agregar(Edicion(50), esDigital: false, cantidad: 1, Ahora);
+        var treintaYUna = carrito.Agregar(Edicion(31), esDigital: false, cantidad: 1, Ahora);
+        var repetida = carrito.Agregar(Edicion(30), esDigital: false, cantidad: 1, Ahora);
 
-        Assert.Equal(RechazoDeCarrito.TopeDeLineas, cincuentaYUna.Rechazo);
-        Assert.Equal(50, carrito.Lineas.Count);
+        Assert.Equal(RechazoDeCarrito.TopeDeLineas, treintaYUna.Rechazo);
+        Assert.Equal(30, carrito.Lineas.Count);
         Assert.True(repetida.EsExito);
-        Assert.Equal(2, carrito.Lineas.Single(l => l.EdicionId == Edicion(50)).Cantidad.Valor);
+        Assert.Equal(2, carrito.Lineas.Single(l => l.EdicionId == Edicion(30)).Cantidad.Valor);
     }
 
     [Fact]

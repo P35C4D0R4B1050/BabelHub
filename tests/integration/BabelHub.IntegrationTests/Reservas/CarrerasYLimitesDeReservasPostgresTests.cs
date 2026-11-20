@@ -132,7 +132,7 @@ public sealed class CarrerasYLimitesDeReservasPostgresTests(PostgresDeReservasFi
         Assert.True(eventosTrasLaPrimera > 0);
 
         var aceptado = await pila.Reservar(cliente, ARecojo("lima", [Linea(libro, 4)], pedido));
-        var sinStock = await pila.Reservar(cliente, ARecojo("lima", [Linea(libro, 90)], pedido));
+        var sinStock = await pila.Reservar(cliente, ARecojo("lima", [Linea(libro, 20)], pedido));
 
         Assert.True(aceptado.EsExito, aceptado.Error?.Clave);
         Assert.Equal("stock-insuficiente", sinStock.Error!.Clave);
