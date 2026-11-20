@@ -24,6 +24,28 @@ public sealed class RecuperacionDeAccesoTests
     // ---------- Solicitar ----------
 
     [Fact]
+    [Trait("Criterio", "AC-IDE-65")]
+    public async Task Solicitar_RegistraUnaHuellaOpacaDe64Hexadecimales_QueNoContieneElCorreoYEsEstablePorCorreo()
+    {
+        var e = new EntornoDeIdentidad();
+        var recuperacion = e.Recuperacion();
+        e.Limites.Maximos["codigos-por-origen"] = 100;
+
+        await recuperacion.Solicitar("Ana@Example.com");
+        await recuperacion.Solicitar("ana@example.com");
+        await recuperacion.Solicitar("otra@example.com");
+
+        var huellas = e.Solicitudes.Registradas.Select(r => r.Huella).ToList();
+        Assert.All(huellas, h =>
+        {
+            Assert.Matches("^[0-9a-f]{64}$", h);
+            Assert.DoesNotContain("example", h, StringComparison.OrdinalIgnoreCase);
+        });
+        Assert.Equal(huellas[0], huellas[1]);
+        Assert.NotEqual(huellas[0], huellas[2]);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-IDE-16")]
     public async Task LaRespuestaYElCaminoSincronoSonIdenticos_ExistaONoLaCuenta_SeaDelPersonalONoEsteVerificada()
     {
