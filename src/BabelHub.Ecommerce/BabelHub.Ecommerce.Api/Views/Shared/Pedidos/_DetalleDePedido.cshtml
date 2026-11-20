@@ -5,7 +5,7 @@
 <div class="mt-3 flex flex-wrap items-end justify-between gap-4">
     <div>
         <p class="text-sm opacity-70">Pedido del @Model.FechaTexto</p>
-        <h1 class="bh-display">@Model.Numero</h1>
+        <h1 class="font-display text-3xl font-semibold tracking-wide sm:text-4xl">@Model.Numero</h1>
     </div>
     <span class="bh-chip"><bh-icono nombre="@Model.EstadoIcono" clase="size-3.5" />@Model.EstadoTexto</span>
 </div>
@@ -33,7 +33,7 @@
 }
 
 <div class="mt-6 grid gap-6 lg:grid-cols-[1fr_20rem]">
-    <section aria-labelledby="titulo-de-lineas">
+    <section aria-labelledby="titulo-de-lineas" class="min-w-0">
         <h2 id="titulo-de-lineas" class="font-semibold">Libros del pedido</h2>
         @{
             var seleccionable = Model.Acciones.Count > 0 && Model.Lineas.Any(l => l.Operable);
@@ -43,7 +43,7 @@
             {
                 <partial name="_TokenAntifalsificacion" />
             }
-            <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+            <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100" tabindex="0" role="region" aria-label="Libros del pedido (se desplaza horizontalmente)">
                 <table class="table">
                     <caption class="sr-only">Líneas del pedido con su cantidad, su importe y su estado</caption>
                     <thead>

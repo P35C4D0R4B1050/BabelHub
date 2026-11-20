@@ -134,6 +134,11 @@ body {
   color: var(--color-base-content);
 }
 
+/* Las cabeceras de las tablas de daisyUI usan el texto al 60 %: sobre el fondo crema quedan en 4,02:1 y no llegan a AA (4,5:1; hallazgo de ui-review de Mis pedidos). Se usa el color de texto pleno: el peso y el tamaño ya las distinguen. */
+.table :where(thead, tfoot) {
+  color: var(--color-base-content);
+}
+
 /* Foco visible en todos los controles (WEB-10) */
 :focus-visible {
   outline: 3px solid var(--bh-foco);
