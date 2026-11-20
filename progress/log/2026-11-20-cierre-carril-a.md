@@ -39,4 +39,14 @@ No se pudo ejecutar el `spec-verify` completo: exige `dotnet test BabelHub.sln` 
 
 Ronda 1 (seguridad y arquitectura, solo lectura): **sin Bloqueantes ni Importantes**. Menores atendidos: una cuenta cancelada no entrega correo (con prueba), la excepción del repositorio sube (con prueba), la composición real resuelve el contrato nuevo, regla de arquitectura que prohíbe a la Api los contratos de sistema de Identidad (`ICorreoVerificadoDeSistema` e `IContactoDeAvisosDelCliente`), lista de interfaces del módulo, nombres y trazas de pruebas, textos de la alerta y comentarios. Menores abiertos: clase de `credencial-del-ecommerce-rechazada` (técnica o de seguridad) y la cuota de correo de alertas del Inventario (se anota en el seguimiento).
 
-**Pendiente de verificar al terminar la ventana de medición:** los cambios de la ronda 1 se editaron sin compilar ni ejecutar (el coordinador pidió no cargar la máquina): `dotnet build BabelHub.sln -warnaserror`, unitarias, arquitectura y las pruebas de integración filtradas que los tocan (Reclamaciones, composición de Identidad, OpenAPI, traslados con PostgreSQL).
+**Estado de la verificación:** los cambios de código y las unitarias de la ronda 1 están compilados y en verde (`3c0c0989`). Quedan **editados sin compilar ni commitear** cuatro archivos de prueba (la regla de arquitectura de `ReglasDeCredencialesEnLaApiTests` y los de integración `ComposicionDeIdentidadTests`, `ComposicionYTrabajosDeReclamacionesTests` y `DocumentacionOpenApiEcommerceTests`) hasta poder correr el `.sln` completo, la arquitectura y la integración filtrada.
+
+## 5. `spec-verify` por correr y por qué
+
+| Spec | Falta | Motivo |
+| :--- | :--- | :--- |
+| `identidad-seguridad` | `verificacion.md` (requisito por requisito, IDE-1 a IDE-88) | Integración con PostgreSQL y revisión larga: un carril dedicado, con Docker. |
+| `transversal-notificaciones` | `verificacion.md` | Integración con PostgreSQL y Redis; y la prueba de humo del runtime real de n8n (FIN-2). |
+| `transversal-auditoria`, `transversal-seguridad` | Repetir la verificación existente (No converge) | Integración no ejecutada y Menores abiertos. |
+| `inventario-fuentes`, `inventario-seleccion-fuente`, `inventario-ajustes`, `inventario-traslados` | Repetir (No converge, salvo ajustes) | Integración con PostgreSQL; D20 cambió el `Id` de las fuentes y los motivos de alerta de traslados: hay que re-ejecutar sus pruebas de PostgreSQL. |
+| `transversal-plataforma` | Cerrar PLA-R2, R3, R4 y los spikes | Fuera de este encargo y de Docker. |
