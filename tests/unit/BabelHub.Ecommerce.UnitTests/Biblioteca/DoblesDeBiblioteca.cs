@@ -94,11 +94,17 @@ internal sealed class RepositorioDeAccesosEnMemoria : IRepositorioDeAccesos, IIn
         return Task.FromResult(existente.Reconceder(pedidoId, ahora));
     }
 
-    public Task<ResultadoDeRevocacion> Revocar(Guid pedidoId, Guid edicionId, CausaDeRevocacion causa, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    public Task<CambioDeAcceso<ResultadoDeRevocacion>> Revocar(Guid pedidoId, Guid edicionId, CausaDeRevocacion causa, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
         Verificar();
         var acceso = _accesos.Values.FirstOrDefault(a => a.PedidoId == pedidoId && a.EdicionId == edicionId);
-        return Task.FromResult(acceso?.Revocar(pedidoId, causa, ahora) ?? ResultadoDeRevocacion.YaRevocado);
+        if (acceso is null)
+        {
+            return Task.FromResult(new CambioDeAcceso<ResultadoDeRevocacion>(ResultadoDeRevocacion.YaRevocado, null));
+        }
+
+        var resultado = acceso.Revocar(pedidoId, causa, ahora);
+        return Task.FromResult(new CambioDeAcceso<ResultadoDeRevocacion>(resultado, Clonar(acceso)));
     }
 
     public Task<CambioDeAcceso<ResultadoDeRevocacionSinEnlace>> RevocarSiNoHayEnlace(Guid cuentaId, Guid pedidoId, Guid edicionId, DateTimeOffset ahora, CancellationToken cancelacion = default)

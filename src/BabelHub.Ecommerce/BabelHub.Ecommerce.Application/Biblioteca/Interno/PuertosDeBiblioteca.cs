@@ -67,7 +67,7 @@ internal interface IRepositorioDeAccesos
     Task<ResultadoDeConcesion> Conceder(Guid cuentaId, Guid edicionId, Guid pedidoId, DateTimeOffset ahora, CancellationToken cancelacion = default);
 
     /// <summary><c>UPDATE … WHERE pedido_id AND edicion_id AND estado &lt;&gt; 'revocado'</c> (BIB-24, D16).</summary>
-    Task<ResultadoDeRevocacion> Revocar(Guid pedidoId, Guid edicionId, CausaDeRevocacion causa, DateTimeOffset ahora, CancellationToken cancelacion = default);
+    Task<CambioDeAcceso<ResultadoDeRevocacion>> Revocar(Guid pedidoId, Guid edicionId, CausaDeRevocacion causa, DateTimeOffset ahora, CancellationToken cancelacion = default);
 
     Task<CambioDeAcceso<ResultadoDeRevocacionSinEnlace>> RevocarSiNoHayEnlace(Guid cuentaId, Guid pedidoId, Guid edicionId, DateTimeOffset ahora, CancellationToken cancelacion = default);
 
