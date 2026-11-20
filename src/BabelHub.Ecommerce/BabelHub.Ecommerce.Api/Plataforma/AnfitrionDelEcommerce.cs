@@ -1,4 +1,5 @@
 using BabelHub.Ecommerce.Api.Auditoria;
+using BabelHub.Ecommerce.Api.Identidad;
 using BabelHub.Ecommerce.Api.Carrito;
 using BabelHub.Ecommerce.Api.Catalogo;
 using BabelHub.Ecommerce.Api.Biblioteca;
@@ -490,6 +491,9 @@ public static class AnfitrionDelEcommerce
         // Notificaciones: la solicitud del Inventario y la administración (desactivar, reactivar y consultar); los estados de entrega de n8n solo existen si el envío es por n8n (con su firma verificable) y son de la red interna.
         app.MapearNotificaciones();
         app.MapearEstadosDeEntregaDeN8n(habilitada: app.Services.GetService<OpcionesDeEnvioPorN8n>() is not null);
+        // Auditoría, alertas e historial (T28) y las claves de Identidad (T44): la publicación de la clave de verificación y de las revocaciones va donde la sirva la réplica; rotar y declarar comprometida solo en el host de gestión (D03).
+        app.MapearAuditoria();
+        app.MapearClavesDeIdentidad(conAdministracion: app.Services.GetRequiredService<OpcionesDelHostWeb>().Host == HostWeb.Gestion);
 #if DEBUG
         app.MapearSembradorDeSesiones();
 #endif
