@@ -24,6 +24,8 @@ bash tests/load/entorno/bajar-carga.sh             # apagar (con -v borra la bas
 
 Variables opcionales de `ejecutar.sh`: `DURACION`, `RITMO` (compras por segundo), `UNIDADES`, `COMPETIDORES`, `NIVELES`, `SEGUNDOS_POR_NIVEL`, `PENSAR_S` (pausa de cada usuario entre solicitudes; 0,5 s por omisión, `0` mide el peor caso) y `CARGA_FECHA` (carpeta de resultados).
 
+**Requisitos:** Windows con Docker Desktop y Git Bash (los scripts usan `cygpath` y `docker`), Node (para emitir las credenciales de prueba) y .NET (migrar la base). En Linux o macOS habría que cambiar `cygpath -m` por la ruta directa.
+
 ## Cómo funciona el entorno (`entorno/`)
 
 - **Fuera del repositorio:** los secretos son aleatorios, de esta máquina y viven en una carpeta hermana del repositorio (`…/babelhub-carga`; Docker Desktop no comparte `C:\Users\…\AppData`). El escáner de secretos no ve nada. Nada de esto es un dato real.
@@ -31,6 +33,8 @@ Variables opcionales de `ejecutar.sh`: `DURACION`, `RITMO` (compras por segundo)
 - **Credenciales de servicio** (cabecera `X-Credencial-De-Servicio`, más la de origen y el origen reenviado de un cliente distinto por usuario virtual) salen del archivo de entorno y se pasan a k6 por variables, nunca por la línea de comandos ni por los resultados.
 - **Siembra** (`lib/comun.js`, `setup()` de cada escenario): por la propia Api, con el token del administrador: una fuente de recepción, ediciones nuevas y su mercadería en cada corrida (el stock inicial es exacto).
 - La Api exige HTTPS entre servicios: Kestrel usa un certificado autofirmado y k6 corre con `insecureSkipTLSVerify`.
+
+El contenedor del Inventario corre con `ASPNETCORE_ENVIRONMENT=Development` (como el entorno E2E): sirve el documento OpenAPI y permite HTTP hacia el E-commerce; **no** es una medición de `Production`, cuyo comportamiento de arranque seguro (modos y adaptadores reales) no entra en la carga.
 
 ## Alcance y límites de lo medido
 
