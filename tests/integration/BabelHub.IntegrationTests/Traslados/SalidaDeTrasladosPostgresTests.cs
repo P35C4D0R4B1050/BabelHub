@@ -183,7 +183,7 @@ public sealed class SalidaDeTrasladosPostgresTests(PostgresDeReservasFixture bd)
         Assert.Equal(fallidos, await bd.Consultar<long>($"SELECT count(*) FROM traslados.mensajes_salientes WHERE estado = 'fallido' AND motivo_de_fallo = '{motivo}' AND fallido_en IS NOT NULL"));
         Assert.Equal(motivo == "credencial" ? 2L : 0L, await bd.Consultar<long>("SELECT count(*) FROM traslados.mensajes_salientes WHERE estado = 'pendiente'"));
         Assert.Equal(motivo == "credencial" ? 3 : 0, despues.Valor.Reclamados);
-        Assert.Equal(fallidos, escenario.Pila.AlertasPublicadas.Tecnicas.Count(t => t == "dependencia-no-necesaria-fallida"));
+        Assert.Equal(fallidos, escenario.Pila.AlertasPublicadas.Tecnicas.Count(t => t == (motivo == "credencial" ? "credencial-del-ecommerce-rechazada" : "entrega-de-traslado-con-error-permanente")));
     }
 
     [Fact]

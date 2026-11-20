@@ -66,7 +66,7 @@ internal static class PlanDeEntrega
 /// deja el cambio aplicado y el mensaje pendiente) y registra el resultado en otra. Un aviso va a su sucursal por código con campos tipados; el estado del traslado de un pedido, con su clave de idempotencia y <b>en orden por traslado</b>.
 /// Reintentos de 1, 5, 15, 30 y 60 minutos y luego cada hora; un aviso con más de 24 horas, un error permanente (400, 404, 409 o 422) o una carga inválida quedan <c>fallido</c> con alerta técnica; 401 y 403 dejan <c>fallido</c> por
 /// credencial con alerta para reencolar a mano; el estado del pedido avisa a las 24 horas una sola vez y sigue cada hora. La respuesta del E-commerce se trata como no confiable (la valida el adaptador). <b>Exige el actor «sistema»</b>.
-/// Las alertas usan el motivo <c>dependencia-no-necesaria-fallida</c> del catálogo (el E-commerce es una dependencia no necesaria): faltan motivos propios (hallazgo).
+/// Cada caso publica su motivo propio del catálogo: aviso no entregado en 24 horas, estado del pedido sin entregar en 24 horas, error permanente (o carga inválida) y credencial rechazada.
 /// </summary>
 internal sealed class EntregarMensajesSalientes(
     AutorizadorDeTraslados autorizador,
@@ -76,8 +76,14 @@ internal sealed class EntregarMensajesSalientes(
     IAlertas alertas,
     IReloj reloj) : ICasoDeUso<EntregarMensajesSalientesEntrada, ResultadoDeLaEntrega>
 {
-    /// <summary>El motivo del catálogo cerrado para toda falla de entrega (no hay motivos propios de traslados).</summary>
-    public const string MotivoDeAlerta = "dependencia-no-necesaria-fallida";
+    /// <summary>Los motivos del catálogo cerrado de alertas para cada falla de entrega (TRA-10, TRA-11).</summary>
+    public const string MotivoDeAvisoNoEntregado = "aviso-de-traslado-no-entregado";
+
+    public const string MotivoDeEstadoSinEntregar = "estado-de-traslado-sin-entregar";
+
+    public const string MotivoDeErrorPermanente = "entrega-de-traslado-con-error-permanente";
+
+    public const string MotivoDeCredencialRechazada = "credencial-del-ecommerce-rechazada";
 
     public async Task<Resultado<ResultadoDeLaEntrega>> Ejecutar(EntregarMensajesSalientesEntrada entrada, CancellationToken cancelacion = default)
     {
@@ -96,7 +102,7 @@ internal sealed class EntregarMensajesSalientes(
         {
             var resultado = await Enviar(mensaje, cancelacion).ConfigureAwait(false);
             var momento = reloj.Ahora;
-            var (nuevoEstado, alertar) = await unidad.Ejecutar(token => Registrar(mensaje, resultado, momento, token), cancelacion).ConfigureAwait(false);
+            var (nuevoEstado, motivoDeAlerta) = await unidad.Ejecutar(token => Registrar(mensaje, resultado, momento, token), cancelacion).ConfigureAwait(false);
 
             switch (nuevoEstado)
             {
@@ -108,17 +114,17 @@ internal sealed class EntregarMensajesSalientes(
             // Una credencial rechazada vale para todo lo que sigue: se corta la corrida y el resto queda pendiente (su arrendamiento vence solo), en vez de dejar fallido todo el lote.
             if (resultado == ResultadoDeEnvio.CredencialRechazada)
             {
-                if (alertar)
+                if (motivoDeAlerta is not null)
                 {
-                    await Alertar(cancelacion).ConfigureAwait(false);
+                    await Alertar(motivoDeAlerta, cancelacion).ConfigureAwait(false);
                 }
 
                 break;
             }
 
-            if (alertar)
+            if (motivoDeAlerta is not null)
             {
-                await Alertar(cancelacion).ConfigureAwait(false);
+                await Alertar(motivoDeAlerta, cancelacion).ConfigureAwait(false);
             }
         }
 
@@ -132,35 +138,35 @@ internal sealed class EntregarMensajesSalientes(
         Fallido,
     }
 
-    private async Task<(EstadoDeLaEntrega Estado, bool Alertar)> Registrar(MensajeParaEntregar mensaje, ResultadoDeEnvio resultado, DateTimeOffset ahora, CancellationToken cancelacion)
+    private async Task<(EstadoDeLaEntrega Estado, string? MotivoDeAlerta)> Registrar(MensajeParaEntregar mensaje, ResultadoDeEnvio resultado, DateTimeOffset ahora, CancellationToken cancelacion)
     {
         var intentos = mensaje.Intentos + 1;
         switch (resultado)
         {
             case ResultadoDeEnvio.Entregado:
                 await cola.MarcarEnviado(mensaje.Id, ahora, cancelacion).ConfigureAwait(false);
-                return (EstadoDeLaEntrega.Enviado, false);
+                return (EstadoDeLaEntrega.Enviado, null);
 
             case ResultadoDeEnvio.Permanente:
                 await cola.MarcarFallido(mensaje.Id, MotivoDeFalloDeMensaje.Permanente, intentos, ahora, cancelacion).ConfigureAwait(false);
-                return (EstadoDeLaEntrega.Fallido, true);
+                return (EstadoDeLaEntrega.Fallido, MotivoDeErrorPermanente);
 
             case ResultadoDeEnvio.CredencialRechazada:
                 await cola.MarcarFallido(mensaje.Id, MotivoDeFalloDeMensaje.Credencial, intentos, ahora, cancelacion).ConfigureAwait(false);
-                return (EstadoDeLaEntrega.Fallido, true);
+                return (EstadoDeLaEntrega.Fallido, MotivoDeCredencialRechazada);
 
             default:
                 var edad = ahora - mensaje.CreadoEn;
                 if (mensaje.Tipo == TiposDeMensaje.Aviso && edad >= PlanDeEntrega.EdadMaxima)
                 {
                     await cola.MarcarFallido(mensaje.Id, MotivoDeFalloDeMensaje.Vencido, intentos, ahora, cancelacion).ConfigureAwait(false);
-                    return (EstadoDeLaEntrega.Fallido, true);
+                    return (EstadoDeLaEntrega.Fallido, MotivoDeAvisoNoEntregado);
                 }
 
                 // El estado del pedido sigue cada hora y avisa una sola vez al cumplir las 24 horas.
                 var alertarAhora = mensaje.Tipo == TiposDeMensaje.EstadoDePedido && edad >= PlanDeEntrega.EdadMaxima && !mensaje.YaAlertado;
                 await cola.Reprogramar(mensaje.Id, intentos, ahora + PlanDeEntrega.Espera(intentos), mensaje.YaAlertado || alertarAhora, cancelacion).ConfigureAwait(false);
-                return (EstadoDeLaEntrega.Reprogramado, alertarAhora);
+                return (EstadoDeLaEntrega.Reprogramado, alertarAhora ? MotivoDeEstadoSinEntregar : null);
         }
     }
 
@@ -229,11 +235,11 @@ internal sealed class EntregarMensajesSalientes(
     private static DateTimeOffset Instante(JsonElement carga) =>
         DateTimeOffset.ParseExact(carga.GetProperty("ocurridoEn").GetString()!, "yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
 
-    private async Task Alertar(CancellationToken cancelacion)
+    private async Task Alertar(string motivo, CancellationToken cancelacion)
     {
         try
         {
-            await alertas.PublicarTecnica(new CodigoDeAlerta(MotivoDeAlerta), cancelacion).ConfigureAwait(false);
+            await alertas.PublicarTecnica(new CodigoDeAlerta(motivo), cancelacion).ConfigureAwait(false);
         }
         catch (Exception) when (!cancelacion.IsCancellationRequested)
         {
