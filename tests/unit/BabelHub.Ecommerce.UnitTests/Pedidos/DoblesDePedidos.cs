@@ -208,6 +208,16 @@ internal sealed class RepositorioDePedidosFalso : IRepositorioDePedidos
         return Task.CompletedTask;
     }
 
+    public Task<PaginaDeOperacionesFallidasGuardada> OperacionesFallidas(int pagina, int tamano, CancellationToken cancelacion = default)
+    {
+        var todas = Anulaciones.Where(a => a.Estado == EstadoDeOperacion.Fallida)
+            .Select(a => new OperacionFallidaGuardada(a.Id, a.PedidoId, "anulacion", MotivosDeAnulacion.Codigo(a.Motivo), [.. Enum.GetValues<PasoDeAnulacion>().Where(p => a.PasoConfirmadoEn(p) is not null).Select(p => p.ToString())], a.CreadaEn))
+            .Concat(Entregas.Where(e => e.Estado == EstadoDeOperacion.Fallida).Select(e => new OperacionFallidaGuardada(e.Id, e.PedidoId, "entrega", null, e.Lineas.Any(l => l.CierreConfirmadoEn is not null) ? ["cierre-confirmado"] : [], e.CreadaEn)))
+            .OrderByDescending(o => o.CreadaEn)
+            .ToList();
+        return Task.FromResult(new PaginaDeOperacionesFallidasGuardada([.. todas.Skip((pagina - 1) * tamano).Take(tamano)], todas.Count));
+    }
+
     public Task<int> ContarNoRecogidasSinAnularDesde(DateTimeOffset marcadasAntesDe, CancellationToken cancelacion = default) =>
         Task.FromResult(_pedidos.Values.SelectMany(p => p.Lineas).Count(l => l.EstadoImpreso == EstadoDeLineaImpresa.NoRecogido && l.NoRecogidaEn < marcadasAntesDe));
 

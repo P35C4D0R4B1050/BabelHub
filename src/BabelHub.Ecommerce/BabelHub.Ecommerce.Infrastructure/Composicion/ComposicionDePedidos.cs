@@ -1,5 +1,6 @@
 using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Identidad;
+using BabelHub.Ecommerce.Application.Pedidos;
 using BabelHub.Ecommerce.Application.Pedidos.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Infrastructure.Pedidos;
@@ -52,6 +53,22 @@ public static class ComposicionDePedidos
         servicios.TryAddScoped<LiberarContactoDeIntenciones>();
         servicios.TryAddScoped<AnonimizarContactosVencidos>();
         servicios.TryAddScoped<RevisarPedidosSinEstadoFinal>();
+        // Las fachadas públicas por rol y las lecturas para otros módulos (ECO-6f): delgadas traducciones a los casos de uso, sin reglas.
+        servicios.TryAddScoped<ConsultasDePedidos>();
+        servicios.TryAddScoped<OperarLineasDelPedido>();
+        servicios.TryAddScoped<CancelarPedidoDelCliente>();
+        servicios.TryAddScoped<AnularPedido>();
+        servicios.TryAddScoped<ReintentarReembolsoDeAnulacion>();
+        servicios.TryAddScoped<OperacionesFallidasDePedidos>();
+        servicios.TryAddScoped<IPedidosDelCliente, PedidosDelClienteDeLaAplicacion>();
+        servicios.TryAddScoped<IGestionDeRecojo, GestionDeRecojoDeLaAplicacion>();
+        servicios.TryAddScoped<IGestionDeDespacho, GestionDeDespachoDeLaAplicacion>();
+        servicios.TryAddScoped<IAdministracionDePedidos, AdministracionDePedidosDeLaAplicacion>();
+        servicios.TryAddScoped<IPedidosParaEnvios, PedidosParaEnviosDeLaAplicacion>();
+        servicios.TryAddScoped<IPedidosParaDevoluciones, PedidosParaDevolucionesDeLaAplicacion>();
+        servicios.TryAddScoped<IContactoDeEntregaDelPedido, ContactoDeEntregaDelPedidoDeLaAplicacion>();
+        servicios.TryAddScoped<IProgresoDeEnvios, AvanzarLineasPorEnvio>();
+        servicios.TryAddScoped<IReceptorDeEstadosDeTraslado, RecibirEstadoDeTraslado>();
         servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IPendientesDeCuenta, ContarPendientesDePedidos>());
         servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IAplicadorDeCancelacion, AnonimizarContactoDeUnaCuenta>());
 

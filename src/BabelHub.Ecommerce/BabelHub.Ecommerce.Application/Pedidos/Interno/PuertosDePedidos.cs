@@ -19,6 +19,11 @@ public sealed class PedidosNoDisponiblesException(string motivo) : Exception($"L
 /// <summary>Una línea marcada no recogida a la que aún falta liberar la reserva en el Inventario (<c>liberaciones_de_reserva</c>, PED-15): se borra al lograrlo o al saber que la reserva ya se cerró.</summary>
 public sealed record LiberacionDeReservaPendiente(Guid PedidoId, Guid LineaId, string Motivo, DateTimeOffset PendienteDesde, int Intentos);
 
+/// <summary>Una anulación o entrega que quedó <c>fallida</c> tal como la lee la administración (PED-24): sin datos personales, con los pasos que alcanzó a hacer.</summary>
+public sealed record OperacionFallidaGuardada(Guid Id, Guid PedidoId, string Tipo, string? Motivo, IReadOnlyList<string> PasosHechos, DateTimeOffset CreadaEn);
+
+public sealed record PaginaDeOperacionesFallidasGuardada(IReadOnlyList<OperacionFallidaGuardada> Operaciones, int Total);
+
 /// <summary>Una liberación del contacto de la intención de pago que aún falta pedir a Pagos (PED-35): desde cuándo y cuántos intentos lleva.</summary>
 public sealed record LiberacionDeContactoPendiente(Guid PedidoId, DateTimeOffset Desde, int Intentos);
 
@@ -102,6 +107,9 @@ public interface IRepositorioDePedidos
 
     /// <summary>Borra los estados de traslado recibidos antes de <paramref name="recibidosAntesDe"/> (90 días: solo sirven para la idempotencia) y devuelve cuántos.</summary>
     Task<int> PurgarEstadosDeTraslado(DateTimeOffset recibidosAntesDe, CancellationToken cancelacion = default);
+
+    /// <summary>Las anulaciones y entregas <c>fallida</c>s, de la más reciente a la más antigua (PED-24): lo que ve la administración para reintentar.</summary>
+    Task<PaginaDeOperacionesFallidasGuardada> OperacionesFallidas(int pagina, int tamano, CancellationToken cancelacion = default);
 
     /// <summary>Cuántos pedidos de la cuenta tienen alguna línea impresa sin entregar ni anular, incluidas las no recogidas (PED-31, AC-PED-26): un pedido solo digital no cuenta.</summary>
     Task<int> ContarPedidosConImpresaSinCerrar(Guid cuentaId, CancellationToken cancelacion = default);
