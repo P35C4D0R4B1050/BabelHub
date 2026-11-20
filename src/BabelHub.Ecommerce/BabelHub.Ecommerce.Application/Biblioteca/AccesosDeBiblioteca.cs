@@ -21,6 +21,9 @@ public enum MotivoDeRevocacionDeAcceso
 {
     PedidoAnulado,
 
+    /// <summary>Un reembolso (automático o aprobado) revocó el acceso (BIB-24): lo añade Biblioteca (ECO-8) como cambio aditivo, junto con <c>anulacion-de-pedido</c> y <c>reporte-aprobado</c> (su plan §4, D01).</summary>
+    Reembolso,
+
     /// <summary>La administración central aprobó el reporte de un archivo defectuoso (DEV-06): lo añade Devoluciones como cambio aditivo; Biblioteca (ECO-8) lo adopta junto con <c>reembolso</c> (su plan §4).</summary>
     ReporteAprobado,
 }
