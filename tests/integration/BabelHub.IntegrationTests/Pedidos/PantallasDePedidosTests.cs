@@ -36,7 +36,7 @@ public sealed class PantallasDePedidosTests
         new(Pedido, "BH-2026-001", Creado, estado, tipo, tipo == TipoDeEntregaVisible.Recojo ? "LIM-01" : null, 85.50m, 2);
 
     private static LineaVisibleDelPedido Linea(Guid id, string titulo, EstadoVisibleDeLaLinea estado = EstadoVisibleDeLaLinea.Confirmado, TrasladoVisible? traslado = null, bool digital = false) =>
-        new(id, titulo, "9786123456789", digital, 1, 42.75m, 42.75m, estado, digital ? null : "LIM-01", traslado, null, null, null);
+        new(id, titulo, "9786123456789", digital, 1, 42.75m, 42.75m, estado, digital ? null : "LIM-01", traslado, null, null, null, Operable: !digital && estado is not (EstadoVisibleDeLaLinea.Entregado or EstadoVisibleDeLaLinea.Anulado or EstadoVisibleDeLaLinea.NoRecogido));
 
     private static ContactoDeEntrega Contacto() => new(NombreDelContacto, TelefonoDelContacto, DireccionDelContacto, "Ayacucho");
 
@@ -154,7 +154,7 @@ public sealed class PantallasDePedidosTests
         public List<string> Llamadas { get; } = [];
 
         public Resultado<DetalleDelPedidoDePersonal> Detalle { get; set; } = Resultado<DetalleDelPedidoDePersonal>.Exito(
-            new DetalleDelPedidoDePersonal(Resumen(EstadoVisibleDelPedido.Confirmado, TipoDeEntregaVisible.Domicilio), 12m, "Ayacucho", [Linea(LineaA, "Cien años de soledad")], Contacto(), false, new ReembolsoPendienteDelPedido(85.50m)));
+            new DetalleDelPedidoDePersonal(Resumen(EstadoVisibleDelPedido.Confirmado, TipoDeEntregaVisible.Domicilio), 12m, "Ayacucho", [Linea(LineaA, "Cien años de soledad")], Contacto(), false, new ReembolsoPendienteDelPedido(85.50m), PuedeAnular: true));
 
         public Resultado<ResultadoDeAnulacion> Anulacion { get; set; } = Resultado<ResultadoDeAnulacion>.Exito(new ResultadoDeAnulacion(Pedido, EstadoVisibleDelPedido.Anulado, 85.50m, false));
 
@@ -585,7 +585,7 @@ public sealed class PantallasDePedidosTests
     {
         var falso = new GestionDeDespachoFalsa
         {
-            Detalle = Resultado<DetalleDelPedidoDePersonal>.Exito(new DetalleDelPedidoDePersonal(Resumen(EstadoVisibleDelPedido.Confirmado, TipoDeEntregaVisible.Domicilio), 12m, "Ayacucho", [Linea(LineaA, "Cien años de soledad")], null, true, null)),
+            Detalle = Resultado<DetalleDelPedidoDePersonal>.Exito(new DetalleDelPedidoDePersonal(Resumen(EstadoVisibleDelPedido.Confirmado, TipoDeEntregaVisible.Domicilio), 12m, "Ayacucho", [Linea(LineaA, "Cien años de soledad")], null, true, null, ContactoAnonimizado: false)),
         };
         await using var anfitrion = await ComoLogistica(falso);
 

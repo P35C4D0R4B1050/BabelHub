@@ -5,6 +5,7 @@ using BabelHub.Ecommerce.Domain.Pedidos;
 using BabelHub.Ecommerce.UnitTests.Auditoria;
 using BabelHub.Ecommerce.UnitTests.Catalogo;
 using BabelHub.Ecommerce.UnitTests.Plataforma;
+using BabelHub.Ecommerce.UnitTests.Soporte;
 using PedidoDeDominio = BabelHub.Ecommerce.Domain.Pedidos.Pedido;
 
 namespace BabelHub.Ecommerce.UnitTests.Pedidos;
@@ -25,7 +26,7 @@ public sealed class RecibirEstadoDeTrasladoTests
 
         public NotificadorDePedidosEspia Notificador { get; } = new();
 
-        public RecibirEstadoDeTraslado Caso => new(Repositorio, new UnidadDeTrabajoDeAuditoria(), Auditoria, Alertas, Notificador, new RelojFijo(Ahora));
+        public RecibirEstadoDeTraslado Caso => new(Repositorio, new UnidadDeTrabajoDeAuditoria(), Auditoria, Alertas, Notificador, new RelojFijo(Ahora), ActorDePrueba.DeIntegracion(IntegracionesDeServicio.Inventario));
     }
 
     private static (PedidoDeDominio Pedido, LineaDePedido Con, LineaDePedido Sin) PedidoConTraslado()
@@ -41,6 +42,27 @@ public sealed class RecibirEstadoDeTrasladoTests
 
     private static EstadoDeTrasladoRecibido Cuerpo(PedidoDeDominio pedido, LineaDePedido linea, EstadoDelTrasladoInformado estado, string nombre, DateOnly? llegada = null) =>
         new(Evento(linea.TrasladoId!.Value, nombre), linea.TrasladoId!.Value, pedido.Id, linea.EdicionId, linea.Cantidad, estado, llegada);
+
+    [Fact]
+    [Trait("Criterio", "AC-PED-03")]
+    public async Task Un_actor_que_no_es_la_integracion_del_Inventario_no_informa_estados_de_traslado()
+    {
+        var entorno = new Entorno();
+        var (pedido, con, _) = PedidoConTraslado();
+        entorno.Repositorio.Poner(pedido);
+        var estado = new EstadoDeTrasladoRecibido(Evento(con.TrasladoId!.Value, "en-transito"), con.TrasladoId.Value, pedido.Id, con.EdicionId, con.Cantidad, EstadoDelTrasladoInformado.EnTransito, null);
+
+        foreach (var otro in new[] { ActorDePrueba.DeAdministradorCentral(), ActorDePrueba.DelSistema(), ActorDePrueba.DeIntegracion("n8n"), ActorDePrueba.Anonimo() })
+        {
+            var caso = new RecibirEstadoDeTraslado(entorno.Repositorio, new UnidadDeTrabajoDeAuditoria(), entorno.Auditoria, entorno.Alertas, entorno.Notificador, new RelojFijo(Ahora), otro);
+            var resultado = await caso.Recibir(estado);
+
+            Assert.False(resultado.EsExito);
+            Assert.Equal(CategoriaDeError.Prohibido, resultado.Error!.Categoria);
+        }
+
+        Assert.Equal(EstadoDeLineaImpresa.Confirmado, pedido.Lineas.Single(l => l.Id == con.Id).EstadoImpreso);
+    }
 
     [Fact]
     [Trait("Criterio", "AC-PED-03")]
@@ -126,6 +148,27 @@ public sealed class RecibirEstadoDeTrasladoTests
         Assert.Equal(CategoriaDeError.Validacion, edicion.Error!.Categoria);
         Assert.Equal(CategoriaDeError.Validacion, cantidad.Error!.Categoria);
         Assert.Equal(EstadoDeLineaImpresa.Confirmado, con.EstadoImpreso);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PED-03")]
+    public async Task Un_aluvion_de_estados_de_pedidos_inexistentes_publica_una_sola_alerta_por_intervalo()
+    {
+        var entorno = new Entorno();
+        var acotador = new AcotadorDeAlertasDePedidos();
+        var reloj = new RelojFijo(Ahora);
+        RecibirEstadoDeTraslado Caso(DateTimeOffset instante) => new(entorno.Repositorio, new UnidadDeTrabajoDeAuditoria(), entorno.Auditoria, entorno.Alertas, entorno.Notificador, new RelojFijo(instante), ActorDePrueba.DeIntegracion(IntegracionesDeServicio.Inventario), acotador);
+        EstadoDeTrasladoRecibido Ajeno() { var t = Guid.NewGuid(); return new(Evento(t, "en-transito"), t, Guid.NewGuid(), Guid.NewGuid(), 1, EstadoDelTrasladoInformado.EnTransito, null); }
+
+        for (var i = 0; i < 20; i++)
+        {
+            Assert.False((await Caso(Ahora.AddSeconds(i)).Recibir(Ajeno())).EsExito);
+        }
+
+        Assert.Single(entorno.Alertas.Alertas, a => a.Motivo == RecibirEstadoDeTraslado.AlertaPedidoInexistente);
+        await Caso(Ahora.Add(AcotadorDeAlertasDePedidos.Intervalo).AddMinutes(1)).Recibir(Ajeno());
+        Assert.Equal(2, entorno.Alertas.Alertas.Count(a => a.Motivo == RecibirEstadoDeTraslado.AlertaPedidoInexistente));
+        Assert.NotNull(reloj);
     }
 
     [Fact]

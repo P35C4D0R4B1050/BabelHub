@@ -58,7 +58,8 @@ public sealed record LineaVisibleDelPedido(
     TrasladoVisible? Traslado,
     DateTimeOffset? ListoEn,
     DateTimeOffset? EntregadaEn,
-    DateTimeOffset? AnuladaEn);
+    DateTimeOffset? AnuladaEn,
+    bool Operable = false);
 
 /// <summary>Una fila de un listado: nunca lleva contacto, cuenta ni identificador de usuario.</summary>
 public sealed record ResumenDePedido(
@@ -111,7 +112,9 @@ public sealed record DetalleDelPedidoDePersonal(
     IReadOnlyList<LineaVisibleDelPedido> Lineas,
     ContactoDeEntrega? Contacto,
     bool ContactoOculto,
-    ReembolsoPendienteDelPedido? ReembolsoPendiente);
+    ReembolsoPendienteDelPedido? ReembolsoPendiente,
+    bool ContactoAnonimizado = false,
+    bool PuedeAnular = false);
 
 /// <summary>El detalle para el encargado de sucursal (PED-08, PED-40): un pedido de recojo, <b>sin contacto</b> ni cuenta.</summary>
 public sealed record DetalleDelPedidoDeSucursal(

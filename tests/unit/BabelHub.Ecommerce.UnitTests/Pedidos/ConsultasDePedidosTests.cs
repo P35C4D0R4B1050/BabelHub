@@ -239,6 +239,28 @@ public sealed class ConsultasDePedidosTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PED-34")]
+    public async Task El_detalle_del_personal_dice_si_el_pedido_se_puede_anular_si_su_contacto_se_anonimizo_y_que_lineas_se_operan()
+    {
+        var pedido = Crear(TipoDeEntregaDelPedido.Domicilio, Cuenta);
+        var admin = new Entorno(ActorDePrueba.DeAdministradorCentral());
+        admin.Repositorio.Poner(pedido);
+
+        var antes = (await admin.Consultas.ObtenerParaElPersonal(OperacionDePedidos.Administracion, pedido.Id, default)).Valor;
+
+        Assert.True(antes.PuedeAnular);
+        Assert.False(antes.ContactoAnonimizado);
+        Assert.Contains(antes.Lineas, l => l.Operable);
+        Assert.All(antes.Lineas.Where(l => l.EsDigital), l => Assert.False(l.Operable));
+
+        pedido.AnonimizarContacto(Ahora);
+        var despues = (await admin.Consultas.ObtenerParaElPersonal(OperacionDePedidos.Administracion, pedido.Id, default)).Valor;
+
+        Assert.True(despues.ContactoAnonimizado);
+        Assert.Null(despues.Contacto);
+    }
+
+    [Fact]
     public async Task El_encargado_recibe_el_detalle_de_recojo_sin_contacto_y_uno_a_domicilio_es_no_encontrado()
     {
         var entorno = new Entorno(ActorDePrueba.DeEncargadoDe(ResolucionDeSucursalFalsa.Lima));
