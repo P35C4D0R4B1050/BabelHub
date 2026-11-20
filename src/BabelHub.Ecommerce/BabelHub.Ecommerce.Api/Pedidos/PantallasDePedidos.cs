@@ -332,7 +332,7 @@ public abstract class ControladorDePedidos(ContextoDePagina pagina, OpcionesDeEr
     protected const int TamanoDePagina = 20;
 
     /// <summary>La página más lejana que se pide (20 por página: 10 000 filas): un offset mayor no lo necesita ninguna pantalla y lo acota también el límite de consultas por usuario.</summary>
-    protected const int PaginaMaxima = 500;
+    protected const int PaginaMaxima = FiltroDePedidos.PaginaMaxima;
 
     private static readonly Dictionary<string, string> AvisoPorAccion = new(StringComparer.Ordinal)
     {

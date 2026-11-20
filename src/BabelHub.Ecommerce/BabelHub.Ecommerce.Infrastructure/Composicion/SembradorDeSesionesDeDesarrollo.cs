@@ -92,7 +92,7 @@ public sealed class SembradorDeSesionesDeDesarrollo(
                 [(BabelHub.Ecommerce.Domain.Identidad.TextoLegal.Terminos, vigentes.Terminos, ahora), (BabelHub.Ecommerce.Domain.Identidad.TextoLegal.Privacidad, vigentes.Privacidad, ahora), (BabelHub.Ecommerce.Domain.Identidad.TextoLegal.Reembolso, vigentes.Reembolso, ahora)]),
             CreadaEn = ahora,
         };
-        if (!await unidad.Ejecutar(ct => cuentas.Insertar(cuenta, ct), cancelacion).ConfigureAwait(false))
+        if (!await unidad.Ejecutar(async ct => await RetirarAlEncargadoDePruebasAnterior(sucursal, ct).ConfigureAwait(false) && await cuentas.Insertar(cuenta, ct).ConfigureAwait(false), cancelacion).ConfigureAwait(false))
         {
             throw new InvalidOperationException("No se pudo crear la cuenta de pruebas.");
         }
@@ -104,6 +104,25 @@ public sealed class SembradorDeSesionesDeDesarrollo(
         return iniciada.EsExito
             ? new SesionSembrada(cuenta.Usuario.Id, correo, rol, sucursal, host, iniciada.Valor.ValorDeLaCookie)
             : throw new InvalidOperationException("La sesión web no se pudo abrir.");
+    }
+
+    /// <summary>Solo un encargado activo por sucursal (IDE-06): el que sembró una corrida anterior (una cuenta <c>e2e-…@example.test</c>) se retira para que cada recorrido tenga el suyo. Nunca toca a otra cuenta.</summary>
+    private async Task<bool> RetirarAlEncargadoDePruebasAnterior(Guid? sucursal, CancellationToken cancelacion)
+    {
+        if (sucursal is not { } codigo || await cuentas.EncargadoActivoDe(codigo, cancelacion).ConfigureAwait(false) is not { } anterior)
+        {
+            return true;
+        }
+
+        var previa = await cuentas.PorId(anterior.UsuarioId, paraActualizar: true, cancelacion).ConfigureAwait(false);
+        if (previa is null || !previa.Usuario.Correo.StartsWith("e2e-", StringComparison.Ordinal) || !previa.Usuario.Correo.EndsWith("@example.test", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        previa.Usuario.Anonimizar($"retirado-{Guid.NewGuid():N}@example.test");
+        await cuentas.Guardar(previa, cancelacion).ConfigureAwait(false);
+        return true;
     }
 
     private async Task<CredencialDeSesion> Ingresar(string correo, string contrasena, DateTimeOffset ahora, CancellationToken cancelacion)

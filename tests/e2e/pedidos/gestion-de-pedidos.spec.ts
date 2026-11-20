@@ -127,14 +127,14 @@ test.describe('Gestión de pedidos por el personal', () => {
     await sinViolacionesDeAccesibilidad(page);
 
     await page.goto(`${urlDeLaGestion}/administracion/pedidos/${id}`);
-    await page.getByText('Anular el pedido', { exact: true }).click();
+    await page.locator('summary', { hasText: 'Anular el pedido' }).click();
     await expect(page.getByLabel('Motivo').locator('option')).toHaveText(['Pago duplicado', 'No recogido', 'Otro']);
     await page.getByLabel('Motivo').selectOption('pago-duplicado');
     await page.getByRole('button', { name: 'Anular el pedido' }).click();
 
     await expect(page.getByText('El pedido se anuló y el reembolso quedó registrado.')).toBeVisible();
     await expect(page.getByText('Anulado').first()).toBeVisible();
-    await expect(page.getByText('Anular el pedido', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Anular el pedido' })).toHaveCount(0);
     await page.screenshot({ path: info.outputPath('administracion-anulado.png'), fullPage: true });
     await sinViolacionesDeAccesibilidad(page);
 
