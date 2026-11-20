@@ -117,9 +117,9 @@ Tercera ola fundida (merges `22df391` de A, `claude/festive-feynman-2c4bef` de B
 | Bloque | Contenido | Nivel | Estado |
 | :--- | :--- | :---: | :---: |
 | **OAS-1** | OpenAPI 3 por servicio generado desde el código y prueba de rutas documentadas (`Microsoft.AspNetCore.OpenApi` 10.0.14) | E | ☑ |
-| **K6-1** | Escenarios k6 por atributo de calidad, entorno local limitado en Docker, estadísticas de PostgreSQL por corrida y corrida oficial (`progress/evidencias/k6/2026-11-20/`); correcciones de pool Npgsql y 503 con la base caída | E | ☑ (rampa de capacidad a 1/2/4 CPU pendiente) |
-| **DOC-1** | Análisis de base de datos y caché (`docs/03-diseno-de-software/09-analisis-de-base-de-datos-y-cache.md`) | E | ☑ (falta la tabla de capacidad) |
-| **COV-1** | Reporte HTML de cobertura desde `tools/CoverageCheck` archivado en el CI; corrida completa | E | ▶ |
+| **K6-1** | Escenarios k6 por atributo de calidad, entorno local limitado en Docker, estadísticas de PostgreSQL por corrida y corrida oficial (`progress/evidencias/k6/2026-11-20/`); correcciones de pool Npgsql y 503 con la base caída | E | ☑ (incluye rampa de capacidad a 0,3/1/2/4 CPU) |
+| **DOC-1** | Análisis de base de datos y caché (`docs/03-diseno-de-software/09-analisis-de-base-de-datos-y-cache.md`) | E | ☑ (con tabla de capacidad §6b) |
+| **COV-1** | Reporte HTML de cobertura desde `tools/CoverageCheck` archivado en el CI; corrida completa | E | ☑ (cobertura 94–95 %) |
 
 ## Acordado y pendiente de la persona
 
