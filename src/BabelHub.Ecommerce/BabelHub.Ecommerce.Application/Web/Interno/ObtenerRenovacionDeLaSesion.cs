@@ -1,3 +1,4 @@
+using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Web;
 
 namespace BabelHub.Ecommerce.Application.Web.Interno;
@@ -8,7 +9,7 @@ namespace BabelHub.Ecommerce.Application.Web.Interno;
 /// </summary>
 internal sealed class ObtenerRenovacionDeLaSesion(ServiciosDeSesion comun)
 {
-    public async Task<CredencialEnMemoria?> Ejecutar(string? valorDeLaCookie, HostWeb host, CancellationToken cancelacion)
+    public async Task<ValorSecreto?> Ejecutar(string? valorDeLaCookie, HostWeb host, CancellationToken cancelacion)
     {
         if (!ValorDeCookieDeSesion.TieneFormaValida(valorDeLaCookie))
         {
@@ -24,7 +25,7 @@ internal sealed class ObtenerRenovacionDeLaSesion(ServiciosDeSesion comun)
 
         try
         {
-            return comun.DescifrarRenovacion(fila) is { Length: > 0 } renovacion ? new CredencialEnMemoria(renovacion) : null;
+            return comun.DescifrarRenovacion(fila) is { Length: > 0 } renovacion ? new ValorSecreto(renovacion) : null;
         }
         catch (Exception)
         {

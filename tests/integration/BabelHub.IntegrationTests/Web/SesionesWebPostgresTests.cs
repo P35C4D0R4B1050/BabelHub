@@ -74,7 +74,7 @@ public sealed class SesionesWebPostgresTests(PostgresDeLaWebFixture bd) : IAsync
 
         Assert.NotNull(abierta);
         Assert.NotEmpty(abierta.Revelar());
-        Assert.DoesNotContain("renov", abierta.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(abierta.Revelar(), abierta.ToString(), StringComparison.Ordinal);
         Assert.Null(otroHost);
         Assert.Null(cerradaLeida);
         Assert.Null(inexistente);

@@ -44,5 +44,5 @@ public sealed class SesionesWeb : ISesionesWeb
 
     public Task CerrarTodasDeUnUsuario(Guid usuarioId, CancellationToken cancelacion = default) => _cerrar.CerrarTodasDeUnUsuario(usuarioId, cancelacion);
 
-    public Task<CredencialEnMemoria?> RenovacionDeLaSesion(string valorDeLaCookie, HostWeb host, CancellationToken cancelacion = default) => _renovacion.Ejecutar(valorDeLaCookie, host, cancelacion);
+    public Task<ValorSecreto?> RenovacionDeLaSesion(string valorDeLaCookie, HostWeb host, CancellationToken cancelacion = default) => _renovacion.Ejecutar(valorDeLaCookie, host, cancelacion);
 }

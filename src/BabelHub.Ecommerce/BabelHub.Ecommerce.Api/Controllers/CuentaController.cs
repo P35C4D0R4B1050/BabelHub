@@ -375,10 +375,9 @@ public sealed class CuentaController(
 
         return (actor, campos, null);
     }
-/// <summary>La renovación de la sesión de este navegador, solo en proceso, para que Identidad la conserve al revocar las demás; sin sesión legible es `null` (se revocan todas, que es lo seguro).</summary>    private async Task<ValorSecreto?> RenovacionActual(CancellationToken cancelacionDeLaSolicitud) =>        CookieDeSesionWeb.Leer(Request, host.Host) is { } cookie && await sesiones.RenovacionDeLaSesion(cookie, host.Host, cancelacionDeLaSolicitud) is { } renovacion ? new ValorSecreto(renovacion.Revelar()) : null;
     /// <summary>La renovación de la sesión de este navegador, solo en proceso, para que Identidad la conserve al revocar las demás; sin una sesión legible es <see langword="null"/> (se revocan todas, que es lo seguro).</summary>
     private async Task<ValorSecreto?> RenovacionActual(CancellationToken cancelacionDeLaSolicitud) =>
-        CookieDeSesionWeb.Leer(Request, host.Host) is { } cookie && await sesiones.RenovacionDeLaSesion(cookie, host.Host, cancelacionDeLaSolicitud) is { } renovacion ? new ValorSecreto(renovacion.Revelar()) : null;
+        CookieDeSesionWeb.Leer(Request, host.Host) is { } cookie ? await sesiones.RenovacionDeLaSesion(cookie, host.Host, cancelacionDeLaSolicitud) : null;
 
     private static string RutaDe(PantallaDeLaCuenta pantalla) => pantalla switch
     {

@@ -87,7 +87,7 @@ internal sealed class SesionesWebDePrueba : ISesionesWeb
 
     public string? Renovacion { get; set; } = "renovacion-de-la-sesion-actual";
 
-    public Task<CredencialEnMemoria?> RenovacionDeLaSesion(string valorDeLaCookie, HostWeb host, CancellationToken cancelacion = default) => Task.FromResult<CredencialEnMemoria?>(Renovacion is null ? null : new CredencialEnMemoria(Renovacion));
+    public Task<ValorSecreto?> RenovacionDeLaSesion(string valorDeLaCookie, HostWeb host, CancellationToken cancelacion = default) => Task.FromResult<ValorSecreto?>(Renovacion is null ? null : new ValorSecreto(Renovacion));
 
     public Task CerrarTodasDeUnUsuario(Guid usuarioId, CancellationToken cancelacion = default)
     {
