@@ -24,7 +24,7 @@ Conclusiones medidas:
 1. **Ninguna consulta crítica lee la tabla completa.** Las lecturas secuenciales que aparecen son de `fuentes.fuentes` (16 filas: es más barato leerla entera que usar un índice) y son lo correcto para esa tabla.
 2. **La base no es el cuello de botella de la consulta de disponibilidad:** son ~5 sentencias de décimas de milisegundo (~1 ms de base por solicitud) y el acierto de caché del búfer es del 99,99 %. Esta cifra mide solo el tiempo de ejecución de cada sentencia; **la capacidad medida (sección 6b) la corrige**: cada solicitud cuesta unas 13 idas a la base y PostgreSQL es, con el servicio, el cuello de botella.
 3. **Costo fijo por transacción de la seguridad por filas** (sección 4): `SET LOCAL ROLE`, `current_user` y `current_setting` suman 3 sentencias de ~0,01 ms; despreciable en tiempo, visibles en el conteo de sentencias (18 000 `SET LOCAL ROLE` en 4 500 solicitudes).
-4. Cada conexión devuelta al grupo ejecuta `DISCARD ALL` (reinicio de sesión de Npgsql, ~0,05 ms), necesario para que el rol y la configuración de una transacción no se filtren a la siguiente.
+4. **Reinicio de sesión (`DISCARD ALL`):** Npgsql lo manda al devolver cada conexión al grupo (~0,05 ms; en la carga fue la tercera sentencia por tiempo total). Se quitó del Inventario (`No Reset On Close`, sección 6c) porque la aplicación no deja estado de sesión: el rol, el alcance y las esperas valen solo dentro de la transacción. **Invariante que lo sostiene: ningún código del Inventario deja estado de sesión (`SET` sin `LOCAL`, `set_config(…, false)`, tablas temporales); los bloqueos asesores de sesión cierran la conexión física si no pueden soltarse.** El E-commerce conserva el reinicio.
 
 ## 3. Bloqueos y concurrencia (AC01)
 
@@ -93,6 +93,21 @@ Rampa de la consulta de disponibilidad (`tests/load/escenarios/rampa.js`, pausa 
 - **2 000 usuarios virtuales con pausa de 0,5 s equivalen a ~4 000 solicitudes por segundo**: con el costo actual por solicitud necesitarían del orden de 30 CPU para PostgreSQL y otras tantas para el servicio; **no es un objetivo alcanzable en una VM de 1 OCPU**. Con una pausa realista de 5 a 10 s entre acciones de una persona, 2 000 usuarios son 200 a 400 solicitudes por segundo, que es **lo que sostiene la configuración de 4 / 2 CPU** (p95 degradado, sin errores). Para 2 000 usuarios reales en la VM de 1 OCPU de hoy hace falta, antes que más CPU, **reducir el costo por solicitud**.
 - **Palancas de ingeniería (candidatas, no hechas; Importantes en `progress/hallazgos.md`):** (a) fusionar el cambio de rol y la primera sentencia de cada transacción en un solo viaje y quitar las comprobaciones de `current_user` y de `current_setting` por sentencia; (b) evitar el reinicio de sesión (`DISCARD ALL`) en cada devolución al grupo, compatible porque el rol es local a la transacción; (c) caché de disponibilidad delante del Inventario (sección 5), que quita solicitudes enteras; (d) los contadores de límites por origen en memoria o en Redis en lugar de insertar y leer en PostgreSQL en cada llamada.
 
+
+## 6c. Reducción de idas a la base por consulta (K6-1, capacidad)
+
+La conclusión 2 de la sección 6b (el costo está en las idas, no en las lecturas) se atendió así. **Medición por conteo de sentencias** con PostgreSQL real y el rol real de la aplicación (`CostoPorSolicitudDeDisponibilidadTests`, que cuenta lo que Npgsql envía a la base):
+
+| Paso | Qué cambia | Sentencias por consulta (fichas, fuentes y stock; sin el tramo de Reservas) |
+| :--- | :--- | :--- |
+| Antes | `SELECT current_user` y `current_setting` por bloque, 3 sentencias de arranque, 2 por la elevación, `SET LOCAL ROLE` y su restauración por bloque | 21 (más 4 de Reservas, `BEGIN`/`COMMIT` y `DISCARD ALL`) |
+| 1 | La unidad de trabajo lleva el rol y el alcance **en memoria** (es la única que los cambia): se quitan `current_user`, `current_setting` y la lectura previa de la elevación; un bloque anidado del mismo esquema no cambia de rol; el arranque (solo lectura, `lock_timeout`, alcance, rol) viaja en **una** sentencia | 12 |
+| 2 | La entrada y la salida del bloque con alcance de red (rol + alcance) viajan cada una en **una** ida (`EjecutarComoConAlcanceDeRed`) | 10 |
+| 3 (opcional, apagada) | Memoria de 5 s de la lista de fuentes (código y nombre) y del formato de las ediciones, **solo para la consulta pública** | 4 (la 2.ª consulta) |
+
+- **Seguridad por filas y alcance intactos:** el rol y el alcance que rigen en la base son los mismos de antes; el espejo en memoria solo sustituye a la pregunta («¿hay alcance?») que el acceso hacía a la base, y el cierre en falla (sin actor o sin alcance → rechazo y alerta) se mantiene. Las políticas de filas siguen siendo la autoridad. Cubierto con las pruebas de existencias, alcance de datos y las nuevas: la elevación fusionada restaura rol y alcance (también si el bloque falla), y un actor sin alcance tras un encargado sobre **la misma conexión física** sigue rechazado.
+- **Sin `DISCARD ALL`:** ver la conclusión 4 de la sección 2 y su invariante. Prueba: tras una transacción, la conexión reutilizada tiene el rol de la aplicación, ningún alcance, `lock_timeout` 0 y escritura habilitada. Hallazgo de la revisión de seguridad, corregido: los bloqueos asesores de sesión (instancia única de trabajos y depuración) ahora cierran la conexión física si no se pueden soltar, porque ya nada los liberaría al devolverla.
+- **La memoria de referencias queda apagada por omisión** (`Inventario:ReferenciasEnMemoriaSegundos`, de 1 a 30; 0 la apaga). Motivo: la decisión D05 de `inventario-fuentes` dice que no hay caché de disponibilidad en el Inventario, y cambiarla es de la persona responsable (AGENTS.md §2). Solo guarda tablas sin seguridad por filas, con la proyección mínima (id, código, nombre; formato), nunca stock, reservado ni vencidas, y nunca la usan los casos que deciden (reservar, traslados, ajustes). No guarda ausencias y se vacía a las 10 000 entradas. Desfase máximo: el plazo configurado, y solo en nombres de fuente y formato mostrados.
 
 ## 7. Qué cubre y qué no
 
