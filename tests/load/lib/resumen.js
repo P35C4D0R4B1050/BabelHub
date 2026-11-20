@@ -15,6 +15,7 @@ function fila(nombre, metrica) {
 export function resumen(nombre, descripcion) {
   return (datos) => {
     const m = datos.metrics;
+    const ejecutada = m.iterations && m.iterations.values.count > 0;
     const filas = Object.keys(m)
       .filter((k) => Object.keys(m[k].thresholds || {}).length > 0 || ['http_req_duration', 'http_reqs', 'http_req_failed', 'iterations', 'vus_max'].includes(k))
       .map((k) => fila(k, m[k]));
@@ -24,7 +25,7 @@ export function resumen(nombre, descripcion) {
       '',
       descripcion,
       '',
-      `Resultado: **${todo ? 'CUMPLE todos los umbrales' : 'NO cumple algún umbral (ver tabla)'}** — duración de la prueba: ${(datos.state.testRunDurationMs / 1000).toFixed(0)} s`,
+      `Resultado: **${!ejecutada ? 'NO SE EJECUTÓ (falló la preparación del escenario)' : todo ? 'CUMPLE todos los umbrales' : 'NO cumple algún umbral (ver tabla)'}** — duración de la prueba: ${(datos.state.testRunDurationMs / 1000).toFixed(0)} s`,
       '',
       '| Métrica | Valores | Umbrales |',
       '| :--- | :--- | :--- |',
