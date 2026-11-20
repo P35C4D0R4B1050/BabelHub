@@ -18,7 +18,7 @@ namespace BabelHub.IntegrationTests.Fuentes;
 public sealed class CostoPorSolicitudDeDisponibilidadTests(PostgresDeFuentesFixture bd) : IClassFixture<PostgresDeFuentesFixture>, IAsyncLifetime
 {
     /// <summary>Presupuesto de sentencias de una consulta de disponibilidad de una edición, sin el tramo de Reservas (que aquí es un doble): la misma consulta enviaba 21 antes de la reducción (más 4 del tramo de Reservas).</summary>
-    private const int PresupuestoDeSentencias = 12;
+    private const int PresupuestoDeSentencias = 10;
 
     public Task InitializeAsync() => bd.Limpiar();
 
@@ -79,6 +79,31 @@ public sealed class CostoPorSolicitudDeDisponibilidadTests(PostgresDeFuentesFixt
         Assert.Equal(string.Empty, lector.GetString(1));
         Assert.Equal("0", lector.GetString(2));
         Assert.Equal("off", lector.GetString(3));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-FUE-08")]
+    public async Task LaElevacionFusionadaConElRol_RestauraElRolYElAlcanceDelActorAlSalir()
+    {
+        var propia = await bd.AgregarFuente("propia");
+        var edicion = await bd.AgregarEdicion();
+        await bd.PonerStock(propia, edicion, 4, 0);
+        var pila = new PilaDeFuentes(bd, ActorActual.DeUsuario(Guid.NewGuid(), RolesDeUsuario.EncargadoDeSucursal, propia));
+
+        var (rol, alcance, fijado) = await pila.Unidad.EjecutarLectura(async token =>
+        {
+            var filas = await pila.Existencias.Leer([edicion], token); // lee la red completa con alcance elevado, y vuelve al del encargado
+            Assert.Single(filas);
+
+            await using var comando = new NpgsqlCommand("SELECT current_user, current_setting('babelhub.alcance', true)", (NpgsqlConnection)pila.Unidad.Conexion, (NpgsqlTransaction)pila.Unidad.Transaccion);
+            await using var lector = await comando.ExecuteReaderAsync(token);
+            Assert.True(await lector.ReadAsync(token));
+            return (lector.GetString(0), lector.GetString(1), pila.Unidad.HayAlcanceDeDatosFijado);
+        });
+
+        Assert.Equal("acceso", rol);
+        Assert.Equal(propia.ToString("D"), alcance);
+        Assert.True(fijado);
     }
 
     /// <summary>Lo que hace <c>ConsultarDisponibilidad</c>: en una sola transacción de solo lectura, las fichas de las ediciones y su disponibilidad (fuentes, stock y vencidas).</summary>

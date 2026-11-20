@@ -142,6 +142,62 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
         }
     }
 
+    async Task<T> IElevacionDeAlcance.EjecutarComoConAlcanceDeRed<T>(EsquemaDeModulo esquema, Func<CancellationToken, Task<T>> bloque, CancellationToken cancelacion)
+    {
+        ArgumentNullException.ThrowIfNull(esquema);
+        ArgumentNullException.ThrowIfNull(bloque);
+
+        var activa = _activa.Value ?? throw new InvalidOperationException("EjecutarComoConAlcanceDeRed exige una transacción activa.");
+        var previoRol = activa.Rol!;
+        var destino = _opciones.PrefijoDelRolDeEsquema + esquema.Nombre;
+        if (previoRol == destino)
+        {
+            // Ya corre con el rol del esquema: solo falta el alcance.
+            return await ((IElevacionDeAlcance)this).ConAlcanceDeRed(bloque, cancelacion).ConfigureAwait(false);
+        }
+
+        var previoAlcance = activa.Alcance;
+        await EntrarComo(activa, destino, AlcanceDeDatosDelActor.Red, cancelacion).ConfigureAwait(false);
+        try
+        {
+            return await bloque(cancelacion).ConfigureAwait(false);
+        }
+        finally
+        {
+            // Si el actor no tenía alcance, queda vacío (no coincide con ninguna sucursal ni con «red»): las políticas deniegan.
+            await SalirA(activa, previoRol, string.IsNullOrEmpty(previoAlcance) ? string.Empty : previoAlcance).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Entra al rol del esquema y fija el alcance en una sola ida a la base.</summary>
+    private static async Task EntrarComo(Activa activa, string rol, string alcance, CancellationToken cancelacion)
+    {
+        await using var comando = new NpgsqlCommand($"SET LOCAL ROLE {Citar(rol)}; SELECT set_config(@nombre, @valor, true)", activa.Conexion, activa.Transaccion);
+        comando.Parameters.AddWithValue("nombre", AlcanceDeDatosDelActor.Parametro);
+        comando.Parameters.AddWithValue("valor", alcance);
+        await comando.ExecuteNonQueryAsync(cancelacion).ConfigureAwait(false);
+        activa.Rol = rol;
+        activa.Alcance = alcance;
+    }
+
+    /// <summary>Restaura el alcance y el rol anteriores en una sola ida (en ese orden, como lo hacen los dos bloques anidados). Una transacción ya abortada no enmascara el error del bloque.</summary>
+    private static async Task SalirA(Activa activa, string rol, string alcance)
+    {
+        activa.Rol = rol;
+        activa.Alcance = alcance;
+        try
+        {
+            await using var comando = new NpgsqlCommand($"SELECT set_config(@nombre, @valor, true); SET LOCAL ROLE {Citar(rol)}", activa.Conexion, activa.Transaccion);
+            comando.Parameters.AddWithValue("nombre", AlcanceDeDatosDelActor.Parametro);
+            comando.Parameters.AddWithValue("valor", alcance);
+            await comando.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (PostgresException ex) when (ex.SqlState == TransaccionAbortada)
+        {
+            // La transacción ya falló: el rol y el valor vuelven solos al revertirla.
+        }
+    }
+
     /// <summary>Traduce el rechazo de la política de filas (ver <see cref="IElevacionDeAlcance.TraducirRechazoDeLaPolitica{T}"/>).</summary>
     Task<T> IElevacionDeAlcance.TraducirRechazoDeLaPolitica<T>(Func<Task<T>> operacion) => RechazoDeLaPolitica.Traducir(operacion);
 

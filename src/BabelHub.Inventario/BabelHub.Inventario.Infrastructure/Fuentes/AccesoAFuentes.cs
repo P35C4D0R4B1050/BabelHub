@@ -57,14 +57,15 @@ internal sealed class AccesoAFuentes(
         {
             await elevacion.TraducirRechazoDeLaPolitica(async () =>
             {
+                if (elevar)
+                {
+                    resultado = await elevacion.EjecutarComoConAlcanceDeRed(Esquema, t => bloque(conexionActiva, transaccion, t), cancelacion).ConfigureAwait(false);
+                    return 0;
+                }
+
                 await unidad.EjecutarComo(
                     Esquema,
-                    async token =>
-                    {
-                        resultado = elevar
-                            ? await elevacion.ConAlcanceDeRed(t => bloque(conexionActiva, transaccion, t), token).ConfigureAwait(false)
-                            : await bloque(conexionActiva, transaccion, token).ConfigureAwait(false);
-                    },
+                    async token => resultado = await bloque(conexionActiva, transaccion, token).ConfigureAwait(false),
                     cancelacion).ConfigureAwait(false);
                 return 0;
             }).ConfigureAwait(false);
