@@ -28,6 +28,9 @@ public sealed class AlmacenDeLibrosFixture : IAsyncLifetime
 
     public OpcionesDelAlmacenDeObjetos Opciones { get; private set; } = null!;
 
+    /// <summary>Las mismas opciones, con la forma propia de Biblioteca (solo lectura de <c>libros</c>).</summary>
+    internal BabelHub.Ecommerce.Infrastructure.Biblioteca.OpcionesDelAlmacenDeLibros OpcionesDeLibros => new(Opciones.Endpoint, Opciones.Region, Opciones.ClaveDeAcceso, Opciones.ClaveSecreta, Contenedor, Opciones.RutaEnLaUrl);
+
     public async Task InitializeAsync()
     {
         await _contenedor.StartAsync();

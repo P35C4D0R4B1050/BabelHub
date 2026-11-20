@@ -14,7 +14,7 @@ public sealed class S3EntregaDeArchivosTests(AlmacenDeLibrosFixture almacen)
 {
     private static readonly HttpClient Http = new(new HttpClientHandler { AllowAutoRedirect = false });
 
-    private S3EntregaDeArchivos Entrega(TimeSpan? plazo = null) => new(almacen.Cliente, almacen.Opciones, AlmacenDeLibrosFixture.Contenedor, plazo);
+    private S3EntregaDeArchivos Entrega(TimeSpan? plazo = null) => new(almacen.Cliente, almacen.OpcionesDeLibros, plazo);
 
     [Fact]
     [Trait("Criterio", "AC-BIB-12")]
@@ -129,8 +129,7 @@ public sealed class S3EntregaDeArchivosTests(AlmacenDeLibrosFixture almacen)
 
         var caido = new S3EntregaDeArchivos(
             BabelHub.Ecommerce.Infrastructure.Plataforma.ClienteDelAlmacenDeObjetos.Crear(almacen.Opciones with { Endpoint = new Uri("http://127.0.0.1:1") }),
-            almacen.Opciones with { Endpoint = new Uri("http://127.0.0.1:1") },
-            AlmacenDeLibrosFixture.Contenedor,
+            almacen.OpcionesDeLibros with { Endpoint = new Uri("http://127.0.0.1:1") },
             TimeSpan.FromSeconds(3));
         var inicio = DateTime.UtcNow;
         Assert.Equal(ExistenciaDelArchivo.NoDisponible, await caido.ExisteArchivo(clave));

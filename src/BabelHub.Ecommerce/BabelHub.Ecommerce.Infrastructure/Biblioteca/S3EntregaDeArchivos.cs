@@ -7,7 +7,6 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using BabelHub.Ecommerce.Application.Biblioteca.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
-using BabelHub.Ecommerce.Infrastructure.Plataforma;
 
 namespace BabelHub.Ecommerce.Infrastructure.Biblioteca;
 
@@ -93,7 +92,7 @@ internal static class FirmaDeEnlaceSigV4
 /// El almacén de objetos visto desde Biblioteca sobre S3 (T14, AD19, RNF14): <b>solo lectura</b> con la credencial <c>biblioteca-lector</c> (leer en <c>libros</c>). <c>ExisteArchivo</c> es un <c>HEAD</c> con plazo de 3 segundos y sin reintento (un 404 es «no existe»; un plazo agotado o un fallo, «no disponible»);
 /// <c>FirmarEnlace</c> firma localmente (<see cref="FirmaDeEnlaceSigV4"/>) con <c>Content-Disposition: attachment</c>, el nombre saneado y 300 segundos como máximo. <b>Nunca registra la URL ni ningún parámetro <c>X-Amz-*</c></b> (SEG-10) y el archivo nunca pasa por el servidor (BIB-14).
 /// </summary>
-internal sealed partial class S3EntregaDeArchivos(IAmazonS3 almacen, OpcionesDelAlmacenDeObjetos opciones, string contenedor = "libros", TimeSpan? plazoDelHead = null) : IEntregaDeArchivos
+internal sealed partial class S3EntregaDeArchivos(IAmazonS3 almacen, OpcionesDelAlmacenDeLibros opciones, TimeSpan? plazoDelHead = null) : IEntregaDeArchivos
 {
     /// <summary>El plazo del <c>HEAD</c> (R04).</summary>
     public static readonly TimeSpan PlazoPorOmision = TimeSpan.FromSeconds(3);
@@ -112,7 +111,7 @@ internal sealed partial class S3EntregaDeArchivos(IAmazonS3 almacen, OpcionesDel
         plazo.CancelAfter(plazoDelHead ?? PlazoPorOmision);
         try
         {
-            await almacen.GetObjectMetadataAsync(new GetObjectMetadataRequest { BucketName = contenedor, Key = claveEnAlmacen }, plazo.Token).ConfigureAwait(false);
+            await almacen.GetObjectMetadataAsync(new GetObjectMetadataRequest { BucketName = opciones.Contenedor, Key = claveEnAlmacen }, plazo.Token).ConfigureAwait(false);
             return ExistenciaDelArchivo.Existe;
         }
         catch (AmazonS3Exception error) when (error.StatusCode == HttpStatusCode.NotFound)
@@ -141,7 +140,7 @@ internal sealed partial class S3EntregaDeArchivos(IAmazonS3 almacen, OpcionesDel
         return FirmaDeEnlaceSigV4.Firmar(
             opciones.Endpoint,
             opciones.RutaEnLaUrl,
-            contenedor,
+            opciones.Contenedor,
             claveEnAlmacen,
             opciones.Region,
             opciones.ClaveDeAcceso,
@@ -180,4 +179,18 @@ internal sealed class EntregaDeArchivosEnMemoria : IEntregaDeArchivos
 
     public Uri FirmarEnlace(string claveEnAlmacen, string nombreDeArchivo, DateTimeOffset firmadoEn, int vigenciaEnSegundos) =>
         new($"https://almacen-de-desarrollo.invalid/libros/{Uri.EscapeDataString(claveEnAlmacen)}?X-Amz-Date={firmadoEn.ToUniversalTime().UtcTicks}&X-Amz-Expires={vigenciaEnSegundos}");
+}
+
+/// <summary>
+/// Dónde y con qué credencial Biblioteca lee los libros: el almacén de objetos compatible con S3 con la credencial <c>biblioteca-lector</c> (solo <b>leer</b> en <c>libros</c>, <c>infra/almacen/</c>). Propia del módulo (un módulo no usa los tipos de infraestructura de otro): la composición la arma desde
+/// <c>Almacen:Biblioteca:</c>. Lo que se imprime no lleva la clave de acceso ni la secreta (SEG-10).
+/// </summary>
+public sealed record OpcionesDelAlmacenDeLibros(Uri Endpoint, string Region, string ClaveDeAcceso, ValorSecreto ClaveSecreta, string Contenedor = "libros", bool RutaEnLaUrl = true)
+{
+    private bool PrintMembers(System.Text.StringBuilder constructor)
+    {
+        ArgumentNullException.ThrowIfNull(constructor);
+        constructor.Append("Endpoint = ").Append(Endpoint).Append(", Contenedor = ").Append(Contenedor);
+        return true;
+    }
 }

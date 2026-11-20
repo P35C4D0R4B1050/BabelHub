@@ -84,6 +84,11 @@ public sealed class AnfitrionDelEcommerceTests
         ["Notificaciones:N8n:ClaveSaliente"] = Secreto(),
         ["Notificaciones:ClaveDeHuellaDeNumero"] = "1:" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
         ["Integraciones:n8n:Secreto"] = Secreto(),
+        // Biblioteca: el almacén de libros (credencial de solo lectura) es obligatorio en producción.
+        ["Almacen:Biblioteca:Endpoint"] = "https://almacen.example.org/",
+        ["Almacen:Biblioteca:Region"] = "sa-lima-1",
+        ["Almacen:Biblioteca:ClaveDeAcceso"] = Secreto(),
+        ["Almacen:Biblioteca:ClaveSecreta"] = Secreto(),
     };
 
     private static WebApplicationBuilder Constructor(Dictionary<string, string?> configuracion, string entorno)
@@ -213,6 +218,23 @@ public sealed class AnfitrionDelEcommerceTests
         Assert.Contains("simulador", falla.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("ICancelacionDeAvisos", falla.Message, StringComparison.Ordinal);
         restauracion.AgregarEcommerce(ModoDeArranque.Restauracion);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-BIB-12")]
+    public void EnProduccion_SinElAlmacenDeLibros_ElArranqueNombraLasVariablesYNuncaUnValor()
+    {
+        var configuracion = ConfiguracionCompleta();
+        foreach (var (ruta, valor) in ConfiguracionDeProduccion().Where(p => !p.Key.StartsWith("Almacen:Biblioteca:", StringComparison.Ordinal)))
+        {
+            configuracion[ruta] = valor;
+        }
+
+        var constructor = Constructor(configuracion, "Production");
+        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => constructor.AgregarEcommerce(ModoDeArranque.Normal));
+
+        Assert.Contains("BABELHUB__Almacen__Biblioteca__ClaveSecreta", falla.Message, StringComparison.Ordinal);
+        Assert.Contains("BABELHUB__Almacen__Biblioteca__Endpoint", falla.Message, StringComparison.Ordinal);
     }
 
     [Fact]
