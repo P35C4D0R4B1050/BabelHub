@@ -58,7 +58,8 @@ public sealed record LineaVisibleDelPedido(
     TrasladoVisible? Traslado,
     DateTimeOffset? ListoEn,
     DateTimeOffset? EntregadaEn,
-    DateTimeOffset? AnuladaEn);
+    DateTimeOffset? AnuladaEn,
+    bool Operable = false);
 
 /// <summary>Una fila de un listado: nunca lleva contacto, cuenta ni identificador de usuario.</summary>
 public sealed record ResumenDePedido(
@@ -75,6 +76,9 @@ public sealed record ResumenDePedido(
 public sealed record FiltroDePedidos(EstadoVisibleDelPedido? Estado = null, int Pagina = 1, int Tamano = 20)
 {
     public const int TamanoMaximo = 50;
+
+    /// <summary>La página más lejana que se atiende (20 por página: 10 000 filas): la acota la Aplicación y no solo la Api.</summary>
+    public const int PaginaMaxima = 500;
 }
 
 public sealed record PaginaDePedidos(IReadOnlyList<ResumenDePedido> Pedidos, int Pagina, int Tamano, int Total);
@@ -111,7 +115,9 @@ public sealed record DetalleDelPedidoDePersonal(
     IReadOnlyList<LineaVisibleDelPedido> Lineas,
     ContactoDeEntrega? Contacto,
     bool ContactoOculto,
-    ReembolsoPendienteDelPedido? ReembolsoPendiente);
+    ReembolsoPendienteDelPedido? ReembolsoPendiente,
+    bool ContactoAnonimizado = false,
+    bool PuedeAnular = false);
 
 /// <summary>El detalle para el encargado de sucursal (PED-08, PED-40): un pedido de recojo, <b>sin contacto</b> ni cuenta.</summary>
 public sealed record DetalleDelPedidoDeSucursal(

@@ -41,10 +41,10 @@ public sealed class PantallasDeLaCuentaTests : IAsyncLifetime
         dCuenta.Con(nameof(ICuentaDelCliente.CorregirElNombre), a => { _llamadas.Add("nombre"); _argumentos["nombre"] = a[1]; return Task.FromResult(De(datos)); });
         dCuenta.Con(nameof(ICuentaDelCliente.GuardarElNumeroDeWhatsApp), a => { _llamadas.Add("numero"); return Task.FromResult(De(datos)); });
         dCuenta.Con(nameof(ICuentaDelCliente.CambiarElConsentimientoDeWhatsApp), a => { _llamadas.Add("consentimiento"); _argumentos["consiente"] = a[1]; return Task.FromResult(De(datos)); });
-        dCuenta.Con(nameof(ICuentaDelCliente.CambiarLaContrasena), a => { _llamadas.Add("contrasena"); return Task.FromResult(De(new RespuestaUniforme())); });
+        dCuenta.Con(nameof(ICuentaDelCliente.CambiarLaContrasena), a => { _llamadas.Add("contrasena"); _argumentos["renovacion"] = ((ValorSecreto?)a[3])?.Revelar(); return Task.FromResult(De(new RespuestaUniforme())); });
         dCuenta.Con(nameof(ICuentaDelCliente.IniciarElSegundoFactor), a => { _llamadas.Add("iniciar-2fa"); return Task.FromResult(De(new SecretoDelSegundoFactor(new ValorSecreto("JBSWY3DPEHPK3PXP"), "BabelHub", "ana@correo.example"))); });
         dCuenta.Con(nameof(ICuentaDelCliente.ConfirmarElSegundoFactor), a => { _llamadas.Add("confirmar-2fa"); return Task.FromResult(De<IReadOnlyList<ValorSecreto>>([new ValorSecreto("AAAA-1111"), new ValorSecreto("BBBB-2222")])); });
-        dCuenta.Con(nameof(ICuentaDelCliente.DesactivarElSegundoFactor), a => { _llamadas.Add("desactivar-2fa"); return Task.FromResult(De(new RespuestaUniforme())); });
+        dCuenta.Con(nameof(ICuentaDelCliente.DesactivarElSegundoFactor), a => { _llamadas.Add("desactivar-2fa"); _argumentos["renovacion"] = ((ValorSecreto?)a[3])?.Revelar(); return Task.FromResult(De(new RespuestaUniforme())); });
         dCuenta.Con(nameof(ICuentaDelCliente.ListarLosAvisos), _ => Task.FromResult(Resultado<IReadOnlyList<AvisoDeCuenta>>.Exito([new AvisoDeCuenta(Aviso, "contrasena-cambiada", new DateTimeOffset(2026, 11, 19, 15, 0, 0, TimeSpan.Zero), false)])));
         dCuenta.Con(nameof(ICuentaDelCliente.MarcarElAvisoComoVisto), a => { _llamadas.Add("visto"); _argumentos["reconocida"] = a[2]; return Task.FromResult(De(new RespuestaUniforme())); });
         var dispositivos = DobleDeMetodos.Crear<IDispositivosDeLaCuenta>(out var dDispositivos);
@@ -155,6 +155,7 @@ public sealed class PantallasDeLaCuentaTests : IAsyncLifetime
         using var inventado = await Pedir("/cuenta/datos?aviso=%3Cscript%3E");
         Assert.DoesNotContain("<script>", await inventado.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
+[Fact]    [Trait("Criterio", "AC-WEB-33")]    public async Task Cambiar_la_contrasena_o_desactivar_el_segundo_factor_entrega_a_Identidad_la_renovacion_de_la_sesion_actual_para_conservarla()    {        using var contrasena = await Enviar("/cuenta/contrasena", ("actual", "la contraseña actual"), ("nueva", "una frase nueva y segura"), ("confirmacion", "una frase nueva y segura"));        Assert.Equal("renovacion-de-la-sesion-actual", _argumentos["renovacion"]);        _argumentos.Remove("renovacion");        using var desactivado = await Enviar("/cuenta/segundo-factor/desactivar", ("actual", "la contraseña actual"), ("codigo", "123456"));        Assert.Equal(HttpStatusCode.SeeOther, contrasena.StatusCode);        Assert.Equal(HttpStatusCode.SeeOther, desactivado.StatusCode);        Assert.Equal("renovacion-de-la-sesion-actual", _argumentos["renovacion"]);        _sesiones.Renovacion = null;        _argumentos.Remove("renovacion");        using var sinSesionLegible = await Enviar("/cuenta/contrasena", ("actual", "x"), ("nueva", "una frase nueva y segura"), ("confirmacion", "una frase nueva y segura"));        Assert.Null(_argumentos["renovacion"]);    }
 
     [Fact]
     [Trait("Criterio", "AC-WEB-29")]

@@ -38,7 +38,7 @@
         @{
             var seleccionable = Model.Acciones.Count > 0 && Model.Lineas.Any(l => l.Operable);
         }
-        <form method="post" id="operar-lineas" class="mt-3">
+        <form method="post" id="operar-lineas" class="mt-3" asp-antiforgery="false">
             @if (seleccionable)
             {
                 <partial name="_TokenAntifalsificacion" />

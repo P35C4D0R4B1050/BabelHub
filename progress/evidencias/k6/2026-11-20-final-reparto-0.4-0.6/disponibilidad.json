@@ -1,0 +1,274 @@
+{
+  "root_group": {
+    "name": "",
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [],
+    "checks": [
+      {
+        "name": "responde 200",
+        "path": "::responde 200",
+        "id": "98ed9f003132871fdd4cbb00c48e8f42",
+        "passes": 3011,
+        "fails": 0
+      },
+      {
+        "fails": 0,
+        "name": "trae el vendible de la red",
+        "path": "::trae el vendible de la red",
+        "id": "bba8b840938816667b3e37f97f935ef3",
+        "passes": 3011
+      },
+      {
+        "id": "823d3d35297021a8f5fdd5fc89277833",
+        "passes": 3011,
+        "fails": 0,
+        "name": "no revela físico ni reservado",
+        "path": "::no revela físico ni reservado"
+      }
+    ]
+  },
+  "options": {
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(90)",
+      "p(95)"
+    ],
+    "summaryTimeUnit": "",
+    "noColor": false
+  },
+  "state": {
+    "isStdOutTTY": false,
+    "isStdErrTTY": false,
+    "testRunDurationMs": 62717.937316
+  },
+  "metrics": {
+    "http_req_sending": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 0.4051556,
+        "avg": 0.17226861447756284,
+        "min": 0.011421,
+        "med": 0.144477,
+        "max": 2.193332,
+        "p(90)": 0.3192920000000001
+      }
+    },
+    "http_req_waiting": {
+      "contains": "time",
+      "values": {
+        "avg": 444.1321160072067,
+        "min": 7.441141,
+        "med": 387.634106,
+        "max": 1704.248407,
+        "p(90)": 909.5922344,
+        "p(95)": 1097.1170804
+      },
+      "type": "trend"
+    },
+    "data_received": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 21068210,
+        "rate": 335920.00792132685
+      }
+    },
+    "http_req_failed": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0,
+        "passes": 0,
+        "fails": 3053
+      },
+      "thresholds": {
+        "rate<0.001": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_tls_handshaking": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 2.430270409105798,
+        "min": 0,
+        "med": 0,
+        "max": 270.317831,
+        "p(90)": 0,
+        "p(95)": 0
+      }
+    },
+    "vus": {
+      "values": {
+        "value": 50,
+        "min": 0,
+        "max": 50
+      },
+      "type": "gauge",
+      "contains": "default"
+    },
+    "data_sent": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 420077,
+        "rate": 6697.87652427839
+      }
+    },
+    "http_req_blocked": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 0.000936,
+        "max": 309.255636,
+        "p(90)": 0.0016948,
+        "p(95)": 0.0020444000000000005,
+        "avg": 3.0395115496233154,
+        "min": 0.000087
+      }
+    },
+    "estados": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 3011,
+        "rate": 48.00859417345447
+      }
+    },
+    "iteration_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 1005.3884196768532,
+        "min": 508.056099,
+        "med": 918.721305,
+        "max": 2296.425007,
+        "p(90)": 1544.153189,
+        "p(95)": 1710.0543095
+      }
+    },
+    "http_req_duration{expected_response:true}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 7.641331,
+        "med": 411.177405,
+        "max": 1795.753864,
+        "p(90)": 999.8133092,
+        "p(95)": 1189.2484314,
+        "avg": 494.69058833769947
+      }
+    },
+    "http_reqs": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "rate": 48.678259053987546,
+        "count": 3053
+      }
+    },
+    "checks": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "passes": 9033,
+        "fails": 0,
+        "rate": 1
+      },
+      "thresholds": {
+        "rate>0.999": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 7.641331,
+        "med": 411.177405,
+        "max": 1795.753864,
+        "p(90)": 999.8133092,
+        "p(95)": 1189.2484314,
+        "avg": 494.69058833769947
+      },
+      "thresholds": {
+        "p(95)<500": {
+          "ok": false
+        }
+      }
+    },
+    "http_req_receiving": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 50.38620371601717,
+        "min": 0.034003,
+        "med": 17.838229,
+        "max": 492.661238,
+        "p(90)": 103.98285560000001,
+        "p(95)": 179.0571668
+      }
+    },
+    "vus_max": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "max": 50,
+        "value": 50,
+        "min": 50
+      }
+    },
+    "http_req_connecting": {
+      "contains": "time",
+      "values": {
+        "med": 0,
+        "max": 64.526072,
+        "p(90)": 0,
+        "p(95)": 0,
+        "avg": 0.6044407065181789,
+        "min": 0
+      },
+      "type": "trend"
+    },
+    "iterations": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 3011,
+        "rate": 48.00859417345447
+      }
+    }
+  },
+  "setup_data": {
+    "ediciones": [
+      "18588cc6-ae35-4d9a-929d-28b5138d15a8",
+      "448ed3bc-351c-4832-89f5-bdff0009e982",
+      "903a72cd-8128-4446-bff8-9e15970c6847",
+      "b85f1b60-efa9-4b92-aa33-09d307f187d9",
+      "7668e7e4-4949-4a41-926e-c546cba82b94",
+      "082b3556-6fc5-4c4e-bf4a-ed0c02fdd005",
+      "31743533-84f7-47d9-b022-f5bc56b7622a",
+      "22ab2226-0b10-4c94-8831-13234d79abcd",
+      "84aec764-34a4-4876-bdfe-63a3621adec0",
+      "1d6ae787-a652-4c4f-8d43-e7f2a7ac065f",
+      "ab3c873c-2272-4155-8b27-282ee9ab2496",
+      "faa258ae-674a-40d5-ba8f-2a990b9ea47f",
+      "37ffa416-8582-4c9e-a7c2-b1078efd898f",
+      "b04c50aa-a821-4933-bdd7-47a0a97e952f",
+      "1f9006f1-5c86-4df6-811a-5e77f1c55412",
+      "90256304-acc0-4add-90b6-248fb00a41f9",
+      "07a89cf1-af90-42f3-a49b-8527b3bf95d4",
+      "5176a209-3a55-453b-ac46-807df3b25728",
+      "72e746b3-a1b5-40b0-91d2-5495f3e9b2d0",
+      "00f7f0ab-e286-44fe-9ed9-197f71640fe6"
+    ],
+    "codigo": "carga-8a595b59"
+  }
+}

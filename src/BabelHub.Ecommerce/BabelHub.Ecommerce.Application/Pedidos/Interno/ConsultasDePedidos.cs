@@ -50,7 +50,7 @@ internal sealed class ConsultasDePedidos(
             return Resultado<PaginaDePedidos>.Fallo(limite);
         }
 
-        var pagina = Math.Clamp(filtro.Pagina, 1, 10_000);
+        var pagina = Math.Clamp(filtro.Pagina, 1, FiltroDePedidos.PaginaMaxima);
         var tamano = Math.Clamp(filtro.Tamano, 1, FiltroDePedidos.TamanoMaximo);
         var criterio = alcance(quien.Valor) with { Estado = filtro.Estado is { } e ? ProyeccionesDePedidos.AEstadoDeDominio(e) : null, Pagina = pagina, Tamano = tamano };
         var resultado = await pedidos.Listar(criterio, cancelacion).ConfigureAwait(false);
@@ -122,7 +122,9 @@ internal sealed class ConsultasDePedidos(
             [.. pedido.Lineas.Select(ProyeccionesDePedidos.Linea)],
             contacto,
             oculto,
-            await ReembolsoPendiente(pedido, cancelacion).ConfigureAwait(false)));
+            await ReembolsoPendiente(pedido, cancelacion).ConfigureAwait(false),
+            pedido.ContactoEstaAnonimizado,
+            pedido.PlanearAnulacionDeLaAdministracion(MotivoDeAnulacion.Otro).EsValido));
     }
 
     private async Task<ContactoDeEntregaPublico?> LeerElContactoAuditado(Pedido pedido, SolicitanteDePedidos solicitante, CancellationToken cancelacion)
@@ -245,7 +247,8 @@ internal static class ProyeccionesDePedidos
         TrasladoEnCurso(linea),
         linea.ListoEn,
         linea.EntregadaEn,
-        linea.AnuladaEn);
+        linea.AnuladaEn,
+        Operable: !linea.EsDigital && linea.EstadoImpreso is EstadoDeLineaImpresa.Confirmado or EstadoDeLineaImpresa.EnTransito or EstadoDeLineaImpresa.Recibido or EstadoDeLineaImpresa.EnPreparacion or EstadoDeLineaImpresa.ListoParaRecojo);
 
     /// <summary>El traslado mientras la línea lo espera: confirmada o en tránsito, con su fecha estimada («a confirmar» si no hay).</summary>
     private static TrasladoVisible? TrasladoEnCurso(LineaDePedido linea) =>

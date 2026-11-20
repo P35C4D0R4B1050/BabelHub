@@ -9,8 +9,8 @@ namespace BabelHub.Ecommerce.Api.Areas.Sucursal.Controllers;
 
 /// <summary>
 /// Los pedidos de recojo del encargado de su sucursal (T31, T38; PED-08, PED-09, PED-11, PED-40, PED-41; AC-PED-07, AC-PED-08, AC-PED-09): <c>GET /sucursal/{codigo}/pedidos</c> (lista), el detalle y los <c>POST</c>
-/// <c>…/{pedidoId}/preparar</c>, <c>…/listas</c> y <c>…/entregar</c> con <c>lineaIds</c>. <b>Presentación pura</b>: <b>sin contacto ni cuenta</b> (el tipo de detalle del encargado no los tiene), el código de la ruta se declara con
-/// <c>[ParametroDeSucursal]</c> y lo compara la Aplicación con la sucursal del actor (otra sucursal, sin sucursal resoluble o un rol que no es el del encargado responden <b>igual</b>: la administración central no figura en esta
+/// <c>…/{pedidoId}/preparar</c>, <c>…/listas</c> y <c>…/entregar</c> con <c>lineaIds</c>. <b>Presentación pura</b>: <b>sin contacto ni cuenta</b> (el tipo de detalle del encargado no los tiene), el código de la ruta
+/// <b>no declara <c>[ParametroDeSucursal]</c></b> (el atributo de web-base compara un identificador de sucursal y esta ruta lleva el código: con él todo encargado recibiría «sin permiso») y lo compara la Aplicación con la sucursal del actor (otra sucursal, sin sucursal resoluble o un rol que no es el del encargado responden <b>igual</b>: la administración central no figura en esta
 /// capacidad). Rechaza un cuerpo con campos que no declara y llama a <see cref="IGestionDeRecojo"/>. Tras operar responde <c>303</c> al detalle con lo hecho y cuántas líneas no cambiaron (esperan su traslado o ya cambiaron);
 /// un fallo se pinta en pantalla para un navegador y sale como <c>application/problem+json</c> para quien no pide HTML. Cada respuesta es <c>no-store</c>.
 /// </summary>
@@ -21,7 +21,6 @@ public sealed class PedidosDeSucursalController(IGestionDeRecojo recojo, Context
     private const string Plantilla = "/sucursal/{codigo:minlength(1):maxlength(32)}/pedidos";
 
     [HttpGet(Plantilla)]
-    [ParametroDeSucursal("codigo")]
     public async Task<IActionResult> Lista(string codigo, CancellationToken cancelacion)
     {
         Response.Headers.CacheControl = "no-store";
@@ -55,7 +54,6 @@ public sealed class PedidosDeSucursalController(IGestionDeRecojo recojo, Context
     }
 
     [HttpGet(Plantilla + "/{pedidoId:guid}")]
-    [ParametroDeSucursal("codigo")]
     public async Task<IActionResult> Detalle(string codigo, Guid pedidoId, CancellationToken cancelacion)
     {
         Response.Headers.CacheControl = "no-store";
@@ -90,17 +88,14 @@ public sealed class PedidosDeSucursalController(IGestionDeRecojo recojo, Context
     }
 
     [HttpPost(Plantilla + "/{pedidoId:guid}/preparar")]
-    [ParametroDeSucursal("codigo")]
     public Task<IActionResult> Preparar(string codigo, Guid pedidoId, CancellationToken cancelacion) =>
         Operar(codigo, pedidoId, "preparar", (entrada, c) => recojo.Preparar(codigo, entrada, c), cancelacion);
 
     [HttpPost(Plantilla + "/{pedidoId:guid}/listas")]
-    [ParametroDeSucursal("codigo")]
     public Task<IActionResult> MarcarListas(string codigo, Guid pedidoId, CancellationToken cancelacion) =>
         Operar(codigo, pedidoId, "listas", (entrada, c) => recojo.MarcarListas(codigo, entrada, c), cancelacion);
 
     [HttpPost(Plantilla + "/{pedidoId:guid}/entregar")]
-    [ParametroDeSucursal("codigo")]
     public Task<IActionResult> Entregar(string codigo, Guid pedidoId, CancellationToken cancelacion) =>
         Operar(codigo, pedidoId, "entregar", (entrada, c) => recojo.Entregar(codigo, entrada, c), cancelacion);
 

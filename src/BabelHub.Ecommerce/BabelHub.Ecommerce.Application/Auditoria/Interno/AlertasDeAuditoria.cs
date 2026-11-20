@@ -143,6 +143,15 @@ public static class MotivosDeAlerta
     /// <summary>El archivo de una edición digital falta en el almacén de objetos al pedir una descarga (BIB-13); agrupada por edición y hora, sin datos del cliente.</summary>
     public const string BibliotecaArchivoFaltante = "biblioteca-archivo-faltante";
 
+    /// <summary>Un trabajo de fondo de Pedidos falló varias veces seguidas o dejó de correr.</summary>
+    public const string TrabajoDePedidosSinCorrer = "trabajo-de-pedidos-sin-correr";
+
+    /// <summary>Pasaron 24 horas sin una depuración de contactos de pedidos con éxito (PED-39).</summary>
+    public const string DepuracionDePedidosSinExito = "depuracion-de-pedidos-sin-exito";
+
+    /// <summary>Pasaron 24 horas sin liberar el contacto de una intención de pago que Pedidos ya guardó (PED-35).</summary>
+    public const string ContactoDePedidoSinLiberar = "contacto-de-pedido-sin-liberar";
+
     /// <summary>Una anulación o una entrega de pedido quedó fallida: su reanudación no pudo completarla y alguien debe revisarla.</summary>
     public const string PedidoOperacionFallida = "pedido-operacion-fallida";
 
@@ -232,6 +241,9 @@ public static class CatalogoDeAlertasDeAuditoria
         new(MotivosDeAlerta.EnvioProgresoSinInformar, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.EnvioGuiaSinUso, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.BibliotecaArchivoFaltante, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.TrabajoDePedidosSinCorrer, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.DepuracionDePedidosSinExito, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.ContactoDePedidoSinLiberar, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.PedidoOperacionFallida, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.PedidoLiberacionNoRecogidoYaCerrada, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.PedidoLiberacionDeAnulacionYaCerrada, ClaseDeAlerta.Tecnica),

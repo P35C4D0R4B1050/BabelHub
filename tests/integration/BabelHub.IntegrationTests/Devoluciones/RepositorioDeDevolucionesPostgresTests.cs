@@ -336,7 +336,7 @@ public sealed class RepositorioDeDevolucionesPostgresTests(PostgresDeDevolucione
 
     [Fact]
     [Trait("Criterio", "AC-DEV-03")]
-    public async Task Devolver_un_cupo_lo_libera_en_orden_de_linea_y_nunca_baja_de_cero()
+    public async Task Devolver_un_cupo_lo_libera_y_devolver_mas_de_lo_comprometido_es_un_defecto_que_falla()
     {
         var linea = Guid.NewGuid();
         await En(token => bd.Devoluciones.TomarCupos([new CupoPedido(linea, Guid.NewGuid(), 3, 2)], token));
@@ -347,14 +347,14 @@ public sealed class RepositorioDeDevolucionesPostgresTests(PostgresDeDevolucione
             return 0;
         });
         var libre = await En(token => bd.Devoluciones.TomarCupos([new CupoPedido(linea, Guid.NewGuid(), 3, 2)], token));
-        await En(async token =>
+        await Assert.ThrowsAsync<InvalidOperationException>(() => En(async token =>
         {
             await bd.Devoluciones.DevolverCupos([(linea, 9)], token);
             return 0;
-        });
+        }));
 
         Assert.Null(libre);
-        Assert.Equal(0, await bd.Consultar<int>($"SELECT cantidad_comprometida FROM devoluciones.cupos_de_linea WHERE linea_id = '{linea}'"));
+        Assert.Equal(2, await bd.Consultar<int>($"SELECT cantidad_comprometida FROM devoluciones.cupos_de_linea WHERE linea_id = '{linea}'"));
     }
 
     // ---------- El bloqueo por devolución (DEV-16) ----------

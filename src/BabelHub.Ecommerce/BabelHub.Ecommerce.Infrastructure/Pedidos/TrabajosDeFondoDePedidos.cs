@@ -18,7 +18,7 @@ public sealed record OpcionesDelTrabajoDePedidos(TimeSpan Intervalo, int FallosS
 }
 
 /// <summary>
-/// Un trabajo de fondo de Pedidos (T30): corre su corrida cada intervalo <b>como «sistema»</b>, registra el resultado enumerado de cada corrida en <c>plataforma.trabajos_de_fondo</c> y, tras varios fallos seguidos, publica la alerta técnica <c>trabajo-de-fondo-detenido</c> (sin datos personales). <b>Falla cerrado</b>: un caso de uso
+/// Un trabajo de fondo de Pedidos (T30): corre su corrida cada intervalo <b>como «sistema»</b>, registra el resultado enumerado de cada corrida en <c>plataforma.trabajos_de_fondo</c> y, tras varios fallos seguidos, publica la alerta técnica <c>trabajo-de-pedidos-sin-correr</c> (sin datos personales). <b>Falla cerrado</b>: un caso de uso
 /// que rechaza (porque el actor no es «sistema») es una corrida fallida, nunca un éxito silencioso. Nunca deja caer el servicio: solo se propaga la cancelación del apagado ordenado.
 /// </summary>
 public sealed class TrabajoDeFondoDePedidos(
@@ -31,7 +31,7 @@ public sealed class TrabajoDeFondoDePedidos(
     OpcionesDelTrabajoDePedidos opciones,
     TimeProvider? tiempo = null)
 {
-    public const string MotivoDelTrabajoDetenido = "trabajo-de-fondo-detenido";
+    public const string MotivoDelTrabajoDetenido = "trabajo-de-pedidos-sin-correr";
 
     private int _fallosSeguidos;
 
@@ -172,7 +172,7 @@ public static class TrabajosDePedidos
                     // Aunque hoy no toque (o el trabajo no haya podido correr), una depuración sin éxito desde hace más de un día alerta en cada tick: nunca queda en silencio (PED-39).
                     if (ultima is { } ultimaVez && reloj.Ahora - ultimaVez >= SinDepuracionDurante)
                     {
-                        await alertas.Publicar(new AlertaTecnica(TrabajoDeFondoDePedidos.MotivoDelTrabajoDetenido, reloj.Ahora), ct).ConfigureAwait(false);
+                        await alertas.Publicar(new AlertaTecnica(AnonimizarContactosVencidos.AlertaSinCorrida, reloj.Ahora), ct).ConfigureAwait(false);
                     }
 
                     return false;

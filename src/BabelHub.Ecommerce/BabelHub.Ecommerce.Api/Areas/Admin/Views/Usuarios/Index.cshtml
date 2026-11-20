@@ -107,7 +107,7 @@ else if (Model.Lista is { } lista)
 </form>
 
 <h2 class="mt-10 font-display text-2xl">Otras acciones sobre un usuario</h2>
-<form method="post" class="mt-3 flex max-w-lg flex-col gap-4">
+<form method="post" class="mt-3 flex max-w-lg flex-col gap-4" asp-antiforgery="false">
     <partial name="_TokenAntifalsificacion" />
     <label class="form-control"><span class="label-text">Identificador del usuario</span><input type="text" name="usuarioId" class="input input-bordered w-full" required maxlength="36" /></label>
     <div class="flex flex-wrap gap-3">

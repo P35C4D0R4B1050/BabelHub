@@ -69,6 +69,7 @@ public static class ComposicionDePedidos
         servicios.TryAddScoped<IPedidosParaDevoluciones, PedidosParaDevolucionesDeLaAplicacion>();
         servicios.TryAddScoped<IContactoDeEntregaDelPedido, ContactoDeEntregaDelPedidoDeLaAplicacion>();
         servicios.TryAddScoped<IProgresoDeEnvios, AvanzarLineasPorEnvio>();
+        servicios.TryAddSingleton<AcotadorDeAlertasDePedidos>();
         servicios.TryAddScoped<IReceptorDeEstadosDeTraslado, RecibirEstadoDeTraslado>();
         // La compra aprobada de Pagos crea el pedido (PED-30..PED-38): sin esto el host usaría el doble «sin pedidos» de Pagos y ninguna compra dejaría un pedido.
         // Pagos registra su doble «sin pedidos» al componerse (antes que este módulo) y un TryAdd no lo pisaría: se reemplaza solo si lo que hay es ese doble.

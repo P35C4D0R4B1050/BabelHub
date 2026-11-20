@@ -71,10 +71,25 @@ bash tests/e2e/entorno/sembrar-datos.sh --limpiar                   # datos fict
 cd tests/e2e && source "$LOCALAPPDATA/babelhub-e2e/env" && E2E_BASE_URL=https://localhost:8443 npx playwright test pedidos/compra-y-pedido --workers=1
 ```
 
+- Las pantallas del personal (`pedidos/gestion-de-pedidos.spec.ts`) necesitan además el host de la gestión sobre la misma base: `E2E_TLS=1 E2E_HOST=gestion bash tests/e2e/entorno/arrancar-host.sh ecommerce &` (https://localhost:8444; `E2E_GESTION_URL` lo cambia). Sus sesiones salen del sembrador de ese host (`encargado` con el código de su sucursal, `logistica`, `administrador`).
+- **Una siembra por archivo y por proyecto:** cada checkout reserva una unidad y el stock de Ayacucho es de 8; con las reservas de los recorridos anteriores, el pedido siguiente se sirve desde Lima y su línea queda «esperando traslado», así que `gestion-de-pedidos` no puede prepararla. Corre `sembrar-datos.sh --limpiar` antes de cada archivo (`carrito/carrito-sembrado`, `pedidos/compra-y-pedido`, `pedidos/gestion-de-pedidos`) y de cada proyecto (`escritorio`, `telefono`, `webkit`).
+- La tienda (8443) y la gestión (8444) comparten el nombre de host `localhost` y, con él, las cookies (también la `__Host-bh-antiforgery`): solo ocurre en este entorno local; en producción son dominios distintos.
 - `E2E_TLS=1` usa el certificado de desarrollo de .NET (`dotnet dev-certs https`); Playwright lo acepta con `ignoreHTTPSErrors`.
 - `BABELHUB__Seguridad__ServicioSinHttps=true` (solo `Development`; el archivo de entorno lo trae) deja que los dos servicios se llamen por HTTP local; nunca se enciende en producción.
 - `BABELHUB__Ecommerce__ProxiesConocidos=127.0.0.1,::1` hace que el host confíe en `X-Origen-Cliente` desde la propia máquina: cada recorrido llega desde su propio origen (el Inventario limita las reservas a 10 por hora por origen, SEL-19) y `sembrar-datos.sh --limpiar` vacía los contadores de límites y las reservas.
 - La ficha del catálogo aún no agrega al carrito: el recorrido agrega el libro con la misma petición que enviará su botón (`POST /carrito/lineas`, con el token y el `Origin` del navegador).
+
+### Recorrido de la biblioteca digital (T25 de `ecommerce-biblioteca-digital`)
+
+`biblioteca/biblioteca.spec.ts` compra el libro digital de la obra ficticia «El zorro y el cóndor del Ande» (checkout 100 % digital), paga con el simulador y comprueba «Mi biblioteca» («0 de 5 descargas usadas», formato, aviso de cinco minutos, axe AA), la descarga (302 al almacén con `no-store` y sin cuerpo, por teclado; la descarga se cuenta), la ayuda de lista cerrada y que otra cuenta no ve el libro ni puede pedir ayuda sobre él (404). Corre en Chromium de escritorio y de teléfono y en WebKit con el mismo entorno que el recorrido de pedidos (`sembrar-datos.sh --limpiar` antes de cada corrida):
+
+```bash
+cd tests/e2e && source "$LOCALAPPDATA/babelhub-e2e/env" && E2E_BASE_URL=https://localhost:8443 npx playwright test biblioteca/biblioteca --workers=1
+# con la administración (un segundo host con BABELHUB__Web__Host=gestion): E2E_ADMIN_URL=https://localhost:8444
+```
+
+- Sin `Almacen:Biblioteca:*` el host entrega **contenido sintético en memoria** (URL `.invalid`): el recorrido comprueba la redirección y el conteo, nunca el archivo; la descarga real contra un almacén S3 está en `tests/integration/.../Biblioteca/DescargaConAlmacenRealTests`.
+- La CSP real solo abre `form-action` al almacén si `BABELHUB__Web__OrigenDelAlmacen` coincide con el endpoint de `Almacen:Biblioteca:`; en el entorno local no se configura y el navegador no sigue la redirección (el recorrido observa la respuesta `302`, no la navegación).
 
 ## Sembrador de sesiones (solo desarrollo)
 
