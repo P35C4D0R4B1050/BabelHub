@@ -39,4 +39,12 @@ jobs:
       - name: Probar con cobertura (unitarias, integración, arquitectura y herramientas)
         run: dotnet test BabelHub.sln --no-build --nologo --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings --results-directory TestResults
       - name: Verificar los umbrales de cobertura (Dominio y Aplicación 85 %, total 70 %)
-        run: dotnet run --project tools/CoverageCheck -- TestResults
+        run: dotnet run --project tools/CoverageCheck -- TestResults --html TestResults/reporte-de-cobertura/index.html
+      - name: Archivar el reporte HTML de cobertura (evidencia del Sprint 2)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: reporte-de-cobertura
+          path: TestResults/reporte-de-cobertura/
+          if-no-files-found: warn
+          retention-days: 30

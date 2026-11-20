@@ -1,0 +1,57 @@
+# Entorno LOCAL de las pruebas de carga (K6-1): el Inventario y su PostgreSQL con los límites de CPU y memoria de infra/docker-compose.inventario.yml
+# (VM-INVENTARIO, docs/02-arquitectura-de-software/07). Proyecto propio (`bhcarga`) y puertos propios: no toca el entorno E2E de nadie más.
+# Solo desarrollo: los secretos son aleatorios y viven fuera del repositorio (preparar-carga.sh).
+name: bhcarga
+
+services:
+  postgres:
+    image: postgres:17-alpine@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065
+    environment:
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?}
+      POSTGRES_ECOMMERCE_PASSWORD: ${POSTGRES_ECOMMERCE_PASSWORD:?}
+      POSTGRES_INVENTARIO_PASSWORD: ${POSTGRES_INVENTARIO_PASSWORD:?}
+    command: ["postgres", "-c", "shared_buffers=768MB", "-c", "max_connections=100", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=all"]
+    ports: ["127.0.0.1:${POSTGRES_PORT:-56432}:5432"]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../../../infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    mem_limit: ${CARGA_MEM_POSTGRES:-2g}
+    cpus: ${CARGA_CPUS_POSTGRES:-0.8}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_ADMIN_USER:-postgres} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  inventario:
+    build:
+      context: ../../..
+      dockerfile: src/BabelHub.Inventario/BabelHub.Inventario.Api/Dockerfile
+    image: babelhub-carga-inventario:local
+    env_file: ["${CARGA_ENV_CONTENEDOR:?}"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: https://+:8443
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /certificado/carga.pfx
+      ASPNETCORE_Kestrel__Certificates__Default__Password: ${CARGA_CLAVE_PFX:?}
+    volumes: ["${CARGA_CARPETA:?}/certificado:/certificado:ro"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    ports: ["127.0.0.1:${CARGA_PUERTO:-8443}:8443"]
+    mem_limit: ${CARGA_MEM_INVENTARIO:-350m}
+    cpus: ${CARGA_CPUS_INVENTARIO:-0.3}
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  claves:
+    # Sustituto de Identidad solo para la carga: comparte la red del Inventario porque este solo acepta HTTP hacia la propia máquina para sus claves de verificación.
+    image: node:22-alpine
+    network_mode: "service:inventario"
+    command: ["node", "/entorno/servidor-de-claves.mjs", "servir", "/datos", "8083"]
+    volumes:
+      - ./servidor-de-claves.mjs:/entorno/servidor-de-claves.mjs:ro
+      - ${CARGA_CARPETA:?}/claves:/datos
+    depends_on: [inventario]
+
+volumes:
+  postgres-data:

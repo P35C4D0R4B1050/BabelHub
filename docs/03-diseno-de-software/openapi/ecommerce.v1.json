@@ -1,0 +1,349 @@
+{
+  "openapi": "3.0.4",
+  "info": {
+    "title": "BabelHub — API del E-commerce",
+    "description": "Contrato v1 del E-commerce (`/api/ecommerce/v1`), generado desde el código. Lo llama el Inventario con la credencial de servicio del alcance `solicitar-aviso` (`X-Credencial-De-Servicio`); la administración de avisos va con la sesión web y la de auditoría, alertas e historial con el token del usuario verificado por Identidad. Solo describe las rutas que el host mapea. La interfaz web (vistas Razor) no forma parte de este contrato. Los errores son `application/problem+json` con un `code` estable y un `traceId`.",
+    "version": "v1"
+  },
+  "paths": {
+    "/health/live": {
+      "get": {
+        "tags": [
+          "plataforma"
+        ],
+        "summary": "Sonda de vida: el proceso responde.",
+        "responses": {
+          "200": {
+            "description": "Sonda de vida: el proceso responde."
+          }
+        },
+        "security": [ ],
+        "x-alcance": "Ninguna"
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "plataforma"
+        ],
+        "summary": "Sonda de preparación: base de datos y dependencias disponibles.",
+        "responses": {
+          "200": {
+            "description": "Sonda de preparación: base de datos y dependencias disponibles."
+          }
+        },
+        "security": [ ],
+        "x-alcance": "Ninguna"
+      }
+    },
+    "/api/ecommerce/v1/integraciones/inventario/avisos": {
+      "post": {
+        "tags": [
+          "integraciones"
+        ],
+        "summary": "ecommerce.avisos.solicitar-del-inventario",
+        "description": "Alcance de la credencial: `solicitar-aviso`. No lleva token de usuario. Cambia el estado.",
+        "operationId": "ecommerce.avisos.solicitar-del-inventario",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitudDeAvisoDeInventarioDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Resultado normal de la operación."
+          },
+          "400": {
+            "description": "Error. Códigos estables posibles: `ECO-VALIDACION-INVALIDA`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error. Códigos estables posibles: `ECO-NO-AUTENTICADO`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error. Códigos estables posibles: `ECO-LIMITE-EXCEDIDO`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "credencialDeServicio": [ ]
+          }
+        ],
+        "x-operacion": "ecommerce.avisos.solicitar-del-inventario",
+        "x-alcance": "solicitar-aviso"
+      }
+    },
+    "/api/ecommerce/v1/avisos": {
+      "get": {
+        "tags": [
+          "plataforma"
+        ],
+        "summary": "Consulta de avisos para la administración: estado y fechas, nunca el número ni los campos.",
+        "responses": {
+          "200": {
+            "description": "Consulta de avisos para la administración: estado y fechas, nunca el número ni los campos."
+          },
+          "401": {
+            "description": "Error (`application/problem+json`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error (`application/problem+json`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error (`application/problem+json`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sesionWeb": [ ]
+          }
+        ],
+        "x-alcance": "SesionWeb"
+      }
+    },
+    "/api/ecommerce/v1/avisos/numeros-desactivados": {
+      "post": {
+        "tags": [
+          "plataforma"
+        ],
+        "summary": "Desactiva el aviso por WhatsApp de un número (administración, con la sesión web).",
+        "responses": {
+          "204": {
+            "description": "Desactiva el aviso por WhatsApp de un número (administración, con la sesión web)."
+          },
+          "401": {
+            "description": "Error (`application/problem+json`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error (`application/problem+json`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error (`application/problem+json`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sesionWeb": [ ]
+          }
+        ],
+        "x-alcance": "SesionWeb"
+      }
+    },
+    "/api/ecommerce/v1/avisos/numeros-desactivados/reactivar": {
+      "post": {
+        "tags": [
+          "plataforma"
+        ],
+        "summary": "Reactiva el aviso por WhatsApp de un número (administración, con la sesión web).",
+        "responses": {
+          "204": {
+            "description": "Reactiva el aviso por WhatsApp de un número (administración, con la sesión web)."
+          },
+          "401": {
+            "description": "Error (`application/problem+json`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error (`application/problem+json`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error (`application/problem+json`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sesionWeb": [ ]
+          }
+        ],
+        "x-alcance": "SesionWeb"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ProblemaDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "traceId": {
+            "type": "string"
+          },
+          "errores": {
+            "type": "array",
+            "items": {
+              "required": [
+                "campo",
+                "clave"
+              ],
+              "type": "object",
+              "properties": {
+                "campo": {
+                  "type": "string"
+                },
+                "clave": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "SolicitudDeAvisoDeInventarioDto": {
+        "required": [
+          "eventoId",
+          "plantilla",
+          "codigoDeSucursal",
+          "campos"
+        ],
+        "type": "object",
+        "properties": {
+          "eventoId": {
+            "type": "string"
+          },
+          "plantilla": {
+            "type": "string"
+          },
+          "codigoDeSucursal": {
+            "type": "string"
+          },
+          "campos": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "credencialDeServicio": {
+        "type": "apiKey",
+        "description": "Credencial de servicio del alcance de la operación (el alcance exigido va en `x-alcance`). Solo por HTTPS entre servicios.",
+        "name": "X-Credencial-De-Servicio",
+        "in": "header"
+      },
+      "tokenDeUsuario": {
+        "type": "http",
+        "description": "Credencial de acceso del usuario, firmada por Identidad; el servicio la verifica con la clave pública publicada. Nunca se acepta una cabecera de actor.",
+        "scheme": "bearer",
+        "bearerFormat": "JWT (ES256, emitido por Identidad)"
+      },
+      "sesionWeb": {
+        "type": "apiKey",
+        "description": "Cookie de la sesión web (`__Host-`, `Secure`, `HttpOnly`), con comprobación de origen, `Sec-Fetch-Site` y token antifalsificación en las operaciones que cambian algo.",
+        "name": "__Host-bh-gestion",
+        "in": "cookie"
+      }
+    }
+  }
+}

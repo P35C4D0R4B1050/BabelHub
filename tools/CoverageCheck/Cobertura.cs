@@ -158,7 +158,7 @@ public static class Cobertura
         return indice < 0 ? rutaNormalizada : rutaNormalizada[indice..];
     }
 
-    private static bool TryServicioYCapa(string ensamblado, out string servicio, out string capa)
+    internal static bool TryServicioYCapa(string ensamblado, out string servicio, out string capa)
     {
         servicio = string.Empty;
         capa = string.Empty;

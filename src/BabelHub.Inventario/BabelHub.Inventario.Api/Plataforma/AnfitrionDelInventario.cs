@@ -200,6 +200,7 @@ public static class AnfitrionDelInventario
             "INV",
             ErroresDeFuentes.Especificos.Concat(ErroresDeReservas.Especificos).Concat(ErroresDeAjustes.Especificos).Concat(ErroresDeTraslados.Especificos).ToDictionary(p => p.Key, p => p.Value));
         servicios.AgregarManejoDeErrores(errores);
+        servicios.AgregarDocumentacionOpenApi();
         servicios.AddHttpContextAccessor();
         servicios.AddSingleton<IReloj, RelojDelSistema>();
         servicios.AddSingleton<ActorDelFlujo>();
@@ -261,6 +262,7 @@ public static class AnfitrionDelInventario
         app.MapearAjustes();
         app.MapearTraslados();
         app.MapearAuditoria();
+        app.MapearDocumentacionOpenApi();
         return app;
     }
 

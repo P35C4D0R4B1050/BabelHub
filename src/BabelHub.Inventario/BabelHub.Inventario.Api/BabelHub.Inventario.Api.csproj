@@ -3,6 +3,7 @@
     <RootNamespace>BabelHub.Inventario.Api</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <ProjectReference Include="..\BabelHub.Inventario.Application\BabelHub.Inventario.Application.csproj" />
     <ProjectReference Include="..\BabelHub.Inventario.Infrastructure\BabelHub.Inventario.Infrastructure.csproj" />
     <ProjectReference Include="..\..\BabelHub.Shared\BabelHub.Shared.csproj" />
