@@ -51,7 +51,9 @@ public static class ComposicionDeFuentes
         servicios.AddScoped<IRepositorioDeExistencias, NpgsqlRepositorioDeExistencias>();
         servicios.AddScoped<IAplicadorDeMovimientos, AplicadorDeMovimientos>();
         servicios.AddScoped<IMovimientosDeStock, MovimientosDeStock>();
-        servicios.AddScoped<IExistencias, ConsultaDeExistencias>();
+        servicios.TryAddSingleton<CacheDeReferencias>();
+        servicios.AddScoped<ConsultaDeExistencias>();
+        servicios.AddScoped<IExistencias>(sp => sp.GetRequiredService<ConsultaDeExistencias>());
         servicios.AddScoped<DirectorioDeFuentes>();
         servicios.AddScoped<IDirectorioDeFuentes>(sp => sp.GetRequiredService<DirectorioDeFuentes>());
         servicios.AddScoped<IFichasDeEdiciones>(sp => sp.GetRequiredService<DirectorioDeFuentes>());

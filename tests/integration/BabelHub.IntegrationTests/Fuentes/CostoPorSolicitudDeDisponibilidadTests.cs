@@ -106,6 +106,25 @@ public sealed class CostoPorSolicitudDeDisponibilidadTests(PostgresDeFuentesFixt
         Assert.True(fijado);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-FUE-08")]
+    public async Task LaConsultaPublicaConLasReferenciasEnMemoria_SoloVaALaBaseParaElStock()
+    {
+        var (origen, sentencias) = AbrirContando();
+        await using var _ = origen;
+        var edicion = await Sembrar();
+        var pila = Pila(origen, Cliente);
+        await pila.Unidad.EjecutarLectura(token => pila.Consulta.DisponibilidadParaLaConsultaPublica([edicion], token)); // llena la memoria
+
+        sentencias.Clear();
+        var segunda = await pila.Unidad.EjecutarLectura(token => pila.Consulta.DisponibilidadParaLaConsultaPublica([edicion], token));
+
+        Assert.Equal(8, Assert.Single(segunda).VendibleDeLaRed); // 10 físicas − 2 reservadas
+        // La lista de fuentes no se vuelve a pedir: queda el arranque de la transacción y la lectura del stock con su rol y su alcance.
+        Assert.DoesNotContain(sentencias, s => s.Contains("fuentes.fuentes", StringComparison.Ordinal));
+        Assert.True(sentencias.Count <= 4, $"Se enviaron {sentencias.Count} sentencias:{Environment.NewLine}{string.Join(Environment.NewLine, sentencias)}");
+    }
+
     /// <summary>Lo que hace <c>ConsultarDisponibilidad</c>: en una sola transacción de solo lectura, las fichas de las ediciones y su disponibilidad (fuentes, stock y vencidas).</summary>
     private static Task<IReadOnlyList<BabelHub.Inventario.Application.Fuentes.DisponibilidadDeEdicion>> Consultar(PilaDeFuentes pila, Guid edicion) =>
         pila.Unidad.EjecutarLectura(async token =>

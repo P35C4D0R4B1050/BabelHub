@@ -1,3 +1,4 @@
+using BabelHub.Inventario.Domain.Fuentes;
 using BabelHub.Inventario.Application.Plataforma;
 
 namespace BabelHub.Inventario.Application.Fuentes.Interno;
@@ -14,8 +15,9 @@ internal sealed class ConsultarDisponibilidad(
     IValidador<ConsultarDisponibilidadEntrada> validador,
     ILecturaCoherente lectura,
     IRepositorioDeFichas fichas,
-    IExistencias existencias,
-    IReloj reloj) : ICasoDeUso<ConsultarDisponibilidadEntrada, DisponibilidadConsultada>
+    ConsultaDeExistencias existencias,
+    IReloj reloj,
+    CacheDeReferencias? referencias = null) : ICasoDeUso<ConsultarDisponibilidadEntrada, DisponibilidadConsultada>
 {
     public async Task<Resultado<DisponibilidadConsultada>> Ejecutar(ConsultarDisponibilidadEntrada entrada, CancellationToken cancelacion = default)
     {
@@ -37,11 +39,11 @@ internal sealed class ConsultarDisponibilidad(
         var consulta = await lectura.EjecutarLectura(
             async token =>
             {
-                var conFicha = (await fichas.PorIds(pedidas, token).ConfigureAwait(false)).ToDictionary(f => f.EdicionId);
+                var conFicha = await FichasDe(pedidas, token).ConfigureAwait(false);
                 var impresas = pedidas.Where(id => conFicha.TryGetValue(id, out var ficha) && ficha.PuedeTenerStock).ToList();
                 var disponibilidad = impresas.Count == 0
                     ? []
-                    : (await existencias.Disponibilidad(impresas, token).ConfigureAwait(false)).ToDictionary(d => d.EdicionId);
+                    : (await existencias.DisponibilidadParaLaConsultaPublica(impresas, token).ConfigureAwait(false)).ToDictionary(d => d.EdicionId);
 
                 return new DisponibilidadConsultada(
                     [.. impresas.Where(disponibilidad.ContainsKey).Select(id => Publica(disponibilidad[id]))],
@@ -52,6 +54,35 @@ internal sealed class ConsultarDisponibilidad(
             cancelacion).ConfigureAwait(false);
 
         return Resultado<DisponibilidadConsultada>.Exito(consulta);
+    }
+
+    /// <summary>Las fichas de las ediciones pedidas: las que están en la memoria de 5 s (<see cref="CacheDeReferencias"/>) no van a la base; las demás sí, y solo se guardan las que existen.</summary>
+    private async Task<Dictionary<Guid, FichaDeEdicion>> FichasDe(List<Guid> pedidas, CancellationToken cancelacion)
+    {
+        var resultado = new Dictionary<Guid, FichaDeEdicion>();
+        var faltan = new List<Guid>();
+        foreach (var id in pedidas)
+        {
+            if (referencias?.Obtener<FichaDeEdicion>("ficha:" + id.ToString("N")) is { } guardada)
+            {
+                resultado[id] = guardada;
+            }
+            else
+            {
+                faltan.Add(id);
+            }
+        }
+
+        if (faltan.Count > 0)
+        {
+            foreach (var ficha in await fichas.PorIds(faltan, cancelacion).ConfigureAwait(false))
+            {
+                resultado[ficha.EdicionId] = ficha;
+                referencias?.Guardar("ficha:" + ficha.EdicionId.ToString("N"), ficha);
+            }
+        }
+
+        return resultado;
     }
 
     private static DisponibilidadPublicaDeEdicion Publica(DisponibilidadDeEdicion disponibilidad) =>
