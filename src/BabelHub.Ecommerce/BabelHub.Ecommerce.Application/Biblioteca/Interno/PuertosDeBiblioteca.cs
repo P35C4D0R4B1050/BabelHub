@@ -33,6 +33,13 @@ internal enum ResultadoDelConteoAtomico
     NoAfecto,
 }
 
+internal enum ResultadoDeAgregarAyuda
+{
+    Agregada,
+    YaHayAbierta,
+    AccesoInexistente,
+}
+
 internal enum ResultadoDeRegistrarClave
 {
     Registrada,
@@ -106,8 +113,8 @@ internal interface IRepositorioDeDescargas
 
     Task<SolicitudDeAyuda?> ObtenerAyuda(Guid ayudaId, CancellationToken cancelacion = default);
 
-    /// <summary>Inserta la ayuda; devuelve falso si ya hay una abierta para el acceso (el único parcial).</summary>
-    Task<bool> AgregarAyuda(SolicitudDeAyuda ayuda, CancellationToken cancelacion = default);
+    /// <summary>Inserta la ayuda: «ya hay abierta» si el único parcial lo impide; «acceso inexistente» si la cuenta se canceló entre la lectura y la inserción (clave foránea, 23503; BIB-28).</summary>
+    Task<ResultadoDeAgregarAyuda> AgregarAyuda(SolicitudDeAyuda ayuda, CancellationToken cancelacion = default);
 
     /// <summary>Cierra la ayuda solo si está abierta; devuelve falso si no afectó filas.</summary>
     Task<bool> CerrarAyuda(Guid ayudaId, DateTimeOffset ahora, CancellationToken cancelacion = default);

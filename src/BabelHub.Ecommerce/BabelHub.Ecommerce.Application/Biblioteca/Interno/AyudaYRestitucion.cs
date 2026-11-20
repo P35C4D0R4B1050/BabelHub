@@ -56,7 +56,12 @@ internal sealed class PedirAyuda(AutorizadorDeBiblioteca autorizador, IRepositor
 
             var nueva = SolicitudDeAyuda.Abrir(acceso.Id, motivo, reloj.Ahora);
             var agregada = await unidad.Ejecutar(token => descargas.AgregarAyuda(nueva, token), cancelacion).ConfigureAwait(false);
-            if (agregada)
+            if (agregada == ResultadoDeAgregarAyuda.AccesoInexistente)
+            {
+                return FallosDeBiblioteca.Fallo<AyudaDeBiblioteca>(await autorizador.NoEncontradoYDenegado(cancelacion).ConfigureAwait(false));
+            }
+
+            if (agregada == ResultadoDeAgregarAyuda.Agregada)
             {
                 return Resultado<AyudaDeBiblioteca>.Exito(MapeoDeBiblioteca.Ayuda(nueva));
             }

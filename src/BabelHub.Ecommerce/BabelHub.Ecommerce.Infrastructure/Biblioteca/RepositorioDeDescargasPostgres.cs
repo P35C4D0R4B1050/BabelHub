@@ -135,7 +135,7 @@ internal sealed class RepositorioDeDescargasPostgres(AccesoAlEsquemaDeBiblioteca
             },
             cancelacion);
 
-    public Task<bool> AgregarAyuda(SolicitudDeAyuda ayuda, CancellationToken cancelacion = default) =>
+    public Task<ResultadoDeAgregarAyuda> AgregarAyuda(SolicitudDeAyuda ayuda, CancellationToken cancelacion = default) =>
         acceso.Ejecutar(
             async (conexion, transaccion, token) =>
             {
@@ -152,13 +152,19 @@ internal sealed class RepositorioDeDescargasPostgres(AccesoAlEsquemaDeBiblioteca
                     comando.Parameters.AddWithValue("creada", ayuda.CreadaEn.ToUniversalTime());
                     await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);
                     await transaccion.ReleaseAsync("agregar_ayuda", token).ConfigureAwait(false);
-                    return true;
+                    return ResultadoDeAgregarAyuda.Agregada;
                 }
                 catch (PostgresException excepcion) when (excepcion.SqlState == AccesoAlEsquemaDeBiblioteca.ViolacionDeUnicidad)
                 {
                     // Ya hay una abierta para el acceso (el único parcial): se deshace solo este intento.
                     await transaccion.RollbackAsync("agregar_ayuda", token).ConfigureAwait(false);
-                    return false;
+                    return ResultadoDeAgregarAyuda.YaHayAbierta;
+                }
+                catch (PostgresException excepcion) when (excepcion.SqlState == AccesoAlEsquemaDeBiblioteca.ViolacionDeClaveForanea)
+                {
+                    // El acceso desapareció (la cuenta se canceló entre la lectura y la inserción): se deshace solo este intento y no queda ninguna ayuda huérfana.
+                    await transaccion.RollbackAsync("agregar_ayuda", token).ConfigureAwait(false);
+                    return ResultadoDeAgregarAyuda.AccesoInexistente;
                 }
             },
             cancelacion);

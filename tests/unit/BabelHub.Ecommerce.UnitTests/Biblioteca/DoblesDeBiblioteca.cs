@@ -281,15 +281,20 @@ internal sealed class RepositorioDeDescargasEnMemoria(RepositorioDeAccesosEnMemo
     public Task<SolicitudDeAyuda?> ObtenerAyuda(Guid ayudaId, CancellationToken cancelacion = default) =>
         Task.FromResult(_ayudas.FirstOrDefault(a => a.Id == ayudaId));
 
-    public Task<bool> AgregarAyuda(SolicitudDeAyuda ayuda, CancellationToken cancelacion = default)
+    public Task<ResultadoDeAgregarAyuda> AgregarAyuda(SolicitudDeAyuda ayuda, CancellationToken cancelacion = default)
     {
+        if (accesos.Buscar(ayuda.AccesoId) is null)
+        {
+            return Task.FromResult(ResultadoDeAgregarAyuda.AccesoInexistente);
+        }
+
         if (_ayudas.Any(a => a.AccesoId == ayuda.AccesoId && a.Estado == EstadoDeAyuda.Abierta))
         {
-            return Task.FromResult(false);
+            return Task.FromResult(ResultadoDeAgregarAyuda.YaHayAbierta);
         }
 
         _ayudas.Add(ayuda);
-        return Task.FromResult(true);
+        return Task.FromResult(ResultadoDeAgregarAyuda.Agregada);
     }
 
     public Task<bool> CerrarAyuda(Guid ayudaId, DateTimeOffset ahora, CancellationToken cancelacion = default)

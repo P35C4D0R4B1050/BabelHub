@@ -432,18 +432,36 @@ public sealed class RepositoriosDeBibliotecaPostgresTests(PostgresDeBibliotecaFi
             return (a, b, c);
         });
 
-        Assert.True(resultados.a);
-        Assert.False(resultados.b);
+        Assert.Equal(ResultadoDeAgregarAyuda.Agregada, resultados.a);
+        Assert.Equal(ResultadoDeAgregarAyuda.YaHayAbierta, resultados.b);
         Assert.Equal(primera.Id, resultados.c!.Id);
         Assert.Equal([id], await En(token => bd.Descargas.AccesosConAyudaAbierta([id, Guid.NewGuid()], token)));
         Assert.True(await En(token => bd.Descargas.CerrarAyuda(primera.Id, Ahora.AddHours(1), token)));
         Assert.False(await En(token => bd.Descargas.CerrarAyuda(primera.Id, Ahora.AddHours(2), token)));
         Assert.Equal(EstadoDeAyuda.Cerrada, (await En(token => bd.Descargas.ObtenerAyuda(primera.Id, token)))!.Estado);
-        Assert.True(await En(token => bd.Descargas.AgregarAyuda(SolicitudDeAyuda.Abrir(id, MotivoDeAyuda.Otro, Ahora.AddDays(1)), token)));
+        Assert.Equal(ResultadoDeAgregarAyuda.Agregada, await En(token => bd.Descargas.AgregarAyuda(SolicitudDeAyuda.Abrir(id, MotivoDeAyuda.Otro, Ahora.AddDays(1)), token)));
 
         var (todas, total) = await En(token => bd.Descargas.ListarAyudas(null, 0, 10, token));
         Assert.Equal((2, 2), (todas.Count, total));
         Assert.Equal(1, (await En(token => bd.Descargas.ListarAyudas(EstadoDeAyuda.Abierta, 0, 10, token))).Total);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-BIB-26")]
+    public async Task Una_ayuda_sobre_un_acceso_inexistente_se_traduce_sin_abortar_la_transaccion_ni_dejar_huerfanas()
+    {
+        var cuenta = Guid.NewGuid();
+        var id = await Conceder(cuenta, Guid.NewGuid(), Guid.NewGuid());
+
+        var resultados = await En(async token =>
+        {
+            var inexistente = await bd.Descargas.AgregarAyuda(SolicitudDeAyuda.Abrir(Guid.NewGuid(), MotivoDeAyuda.Otro, Ahora), token);
+            var valida = await bd.Descargas.AgregarAyuda(SolicitudDeAyuda.Abrir(id, MotivoDeAyuda.Otro, Ahora), token);
+            return (inexistente, valida);
+        });
+
+        Assert.Equal(ResultadoDeAgregarAyuda.AccesoInexistente, resultados.inexistente);
+        Assert.Equal(ResultadoDeAgregarAyuda.Agregada, resultados.valida);
     }
 
     [Fact]
