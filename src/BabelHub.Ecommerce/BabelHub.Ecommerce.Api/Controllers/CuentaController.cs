@@ -152,7 +152,7 @@ public sealed class CuentaController(
             }
 
             var dispositivo = DatosDelBorde.Leer(Request);
-            var resultado = await cuenta.CambiarLaContrasena(actor.UsuarioId, new ValorSecreto(actual), new ValorSecreto(nueva), null, dispositivo.Marca is null ? null : new ValorSecreto(dispositivo.Marca), token);
+            var resultado = await cuenta.CambiarLaContrasena(actor.UsuarioId, new ValorSecreto(actual), new ValorSecreto(nueva), await RenovacionActual(token), dispositivo.Marca is null ? null : new ValorSecreto(dispositivo.Marca), token);
             return resultado.EsExito ? null : resultado.Error;
         }, cancelacion);
 
@@ -189,7 +189,8 @@ public sealed class CuentaController(
         }
 
         var dispositivo = DatosDelBorde.Leer(Request);
-        var resultado = await Llamar(() => cuenta.ConfirmarElSegundoFactor(actor.UsuarioId, new ValorSecreto(campos!.GetValueOrDefault("codigo") ?? string.Empty), null, dispositivo.Marca is null ? null : new ValorSecreto(dispositivo.Marca), cancelacion), cancelacion);
+        var renovacion = await RenovacionActual(cancelacion);
+        var resultado = await Llamar(() => cuenta.ConfirmarElSegundoFactor(actor.UsuarioId, new ValorSecreto(campos!.GetValueOrDefault("codigo") ?? string.Empty), renovacion, dispositivo.Marca is null ? null : new ValorSecreto(dispositivo.Marca), cancelacion), cancelacion);
         return resultado.EsExito ? await MostrarCodigos(actor, resultado.Valor, cancelacion) : await Volver(PantallaDeLaCuenta.SegundoFactor, resultado.Error!, cancelacion);
     }
 
@@ -198,7 +199,7 @@ public sealed class CuentaController(
         Accion(["actual", "codigo"], PantallaDeLaCuenta.SegundoFactor, "segundo-factor-desactivado", async (actor, campos, token) =>
         {
             var dispositivo = DatosDelBorde.Leer(Request);
-            var resultado = await cuenta.DesactivarElSegundoFactor(actor.UsuarioId, new ValorSecreto(campos.GetValueOrDefault("actual") ?? string.Empty), new ValorSecreto(campos.GetValueOrDefault("codigo") ?? string.Empty), null, dispositivo.Marca is null ? null : new ValorSecreto(dispositivo.Marca), token);
+            var resultado = await cuenta.DesactivarElSegundoFactor(actor.UsuarioId, new ValorSecreto(campos.GetValueOrDefault("actual") ?? string.Empty), new ValorSecreto(campos.GetValueOrDefault("codigo") ?? string.Empty), await RenovacionActual(token), dispositivo.Marca is null ? null : new ValorSecreto(dispositivo.Marca), token);
             return resultado.EsExito ? null : resultado.Error;
         }, cancelacion);
 
@@ -374,6 +375,10 @@ public sealed class CuentaController(
 
         return (actor, campos, null);
     }
+/// <summary>La renovación de la sesión de este navegador, solo en proceso, para que Identidad la conserve al revocar las demás; sin sesión legible es `null` (se revocan todas, que es lo seguro).</summary>    private async Task<ValorSecreto?> RenovacionActual(CancellationToken cancelacionDeLaSolicitud) =>        CookieDeSesionWeb.Leer(Request, host.Host) is { } cookie && await sesiones.RenovacionDeLaSesion(cookie, host.Host, cancelacionDeLaSolicitud) is { } renovacion ? new ValorSecreto(renovacion.Revelar()) : null;
+    /// <summary>La renovación de la sesión de este navegador, solo en proceso, para que Identidad la conserve al revocar las demás; sin una sesión legible es <see langword="null"/> (se revocan todas, que es lo seguro).</summary>
+    private async Task<ValorSecreto?> RenovacionActual(CancellationToken cancelacionDeLaSolicitud) =>
+        CookieDeSesionWeb.Leer(Request, host.Host) is { } cookie && await sesiones.RenovacionDeLaSesion(cookie, host.Host, cancelacionDeLaSolicitud) is { } renovacion ? new ValorSecreto(renovacion.Revelar()) : null;
 
     private static string RutaDe(PantallaDeLaCuenta pantalla) => pantalla switch
     {

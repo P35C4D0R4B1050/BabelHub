@@ -9,6 +9,7 @@ public sealed class SesionesWeb : ISesionesWeb
     private readonly CargarSesionWeb _cargar;
     private readonly AsegurarCredencialDeSesion _asegurar;
     private readonly CerrarSesionWeb _cerrar;
+    private readonly ObtenerRenovacionDeLaSesion _renovacion;
 
     public SesionesWeb(
         IAlmacenDeSesionesWeb sesiones,
@@ -27,6 +28,7 @@ public sealed class SesionesWeb : ISesionesWeb
         _cargar = new CargarSesionWeb(comun, unidad);
         _asegurar = new AsegurarCredencialDeSesion(comun, unidad, verificador, alertas, limitador);
         _cerrar = new CerrarSesionWeb(comun, unidad, alertas);
+        _renovacion = new ObtenerRenovacionDeLaSesion(comun);
     }
 
     public Task<Resultado<SesionIniciada>> Iniciar(SolicitudDeInicioDeSesion solicitud, CancellationToken cancelacion = default) =>
@@ -41,4 +43,6 @@ public sealed class SesionesWeb : ISesionesWeb
     public Task Cerrar(string valorDeLaCookie, CancellationToken cancelacion = default) => _cerrar.Cerrar(valorDeLaCookie, cancelacion);
 
     public Task CerrarTodasDeUnUsuario(Guid usuarioId, CancellationToken cancelacion = default) => _cerrar.CerrarTodasDeUnUsuario(usuarioId, cancelacion);
+
+    public Task<CredencialEnMemoria?> RenovacionDeLaSesion(string valorDeLaCookie, HostWeb host, CancellationToken cancelacion = default) => _renovacion.Ejecutar(valorDeLaCookie, host, cancelacion);
 }

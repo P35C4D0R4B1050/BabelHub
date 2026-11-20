@@ -58,6 +58,30 @@ public sealed class SesionesWebPostgresTests(PostgresDeLaWebFixture bd) : IAsync
     }
 
     [Fact]
+    [Trait("Criterio", "AC-WEB-33")]
+    public async Task La_renovacion_de_la_sesion_actual_solo_se_entrega_en_proceso_a_una_sesion_abierta_del_mismo_host()
+    {
+        var e = new EntornoDeSesiones(bd);
+        var cookie = await e.Abrir(HostWeb.Gestion, RolWeb.Encargado);
+        var cerrada = await e.Abrir(HostWeb.Gestion, RolWeb.Encargado);
+        await e.Web.Cerrar(cerrada);
+
+        var abierta = await e.Web.RenovacionDeLaSesion(cookie, HostWeb.Gestion);
+        var otroHost = await e.Web.RenovacionDeLaSesion(cookie, HostWeb.Tienda);
+        var cerradaLeida = await e.Web.RenovacionDeLaSesion(cerrada, HostWeb.Gestion);
+        var inexistente = await e.Web.RenovacionDeLaSesion(new string('A', 43), HostWeb.Gestion);
+        var malformada = await e.Web.RenovacionDeLaSesion("corta", HostWeb.Gestion);
+
+        Assert.NotNull(abierta);
+        Assert.NotEmpty(abierta.Revelar());
+        Assert.DoesNotContain("renov", abierta.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Null(otroHost);
+        Assert.Null(cerradaLeida);
+        Assert.Null(inexistente);
+        Assert.Null(malformada);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-WEB-23")]
     public async Task Cerrar_borra_la_credencial_y_la_renovacion_solo_cuando_Identidad_confirma_su_revocacion()
     {
