@@ -75,7 +75,7 @@ test.describe('Visitante: ingreso, registro y recuperación', () => {
         const e = document.activeElement as HTMLElement | null;
         if (!e || e === document.body) return '';
         // El contenedor vacío que deja el widget de Turnstile (de tercero, con la clave de sitio de mentira del entorno local) no es un control de la página.
-        if (e.tagName === 'DIV' && e.children.length === 0 && !e.textContent?.trim()) return '';
+        if (e.tagName === 'DIV' && e.children.length === 0 && !e.textContent?.trim() && !e.className) return '';
         const sombra = getComputedStyle(e);
         const conAnillo = sombra.outlineStyle !== 'none' || sombra.boxShadow !== 'none';
         return `${e.tagName}:${(e.getAttribute('name') ?? e.textContent ?? '').trim().slice(0, 30)}:${conAnillo}`;
@@ -182,7 +182,7 @@ test.describe('Cliente con sesión: la cuenta', () => {
 test.describe('Cliente con sesión: tema oscuro', () => {
   test('la cuenta cumple AA también con el tema oscuro (pestañas y etiquetas)', async ({ page }) => {
     await ingresarComoClienteNuevo(page);
-    await page.context().addCookies([{ name: 'bh-tema', value: 'babelhub-dark', url: page.url() === 'about:blank' ? 'https://localhost:8443/' : page.url() }]);
+    await page.context().addCookies([{ name: 'bh-tema', value: 'babelhub-dark', url: new URL('/', test.info().project.use.baseURL ?? process.env.E2E_BASE_URL ?? 'http://localhost:8080').toString() }]);
     for (const ruta of ['/cuenta', '/cuenta/datos', '/cuenta/solicitudes']) {
       await page.goto(ruta);
       await expect(page.locator('html')).toHaveAttribute('data-theme', 'babelhub-dark');
