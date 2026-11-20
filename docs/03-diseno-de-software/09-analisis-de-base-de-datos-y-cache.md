@@ -22,7 +22,7 @@ Qué hace la base de datos en las consultas críticas del Inventario, cómo se p
 Conclusiones medidas:
 
 1. **Ninguna consulta crítica lee la tabla completa.** Las lecturas secuenciales que aparecen son de `fuentes.fuentes` (16 filas: es más barato leerla entera que usar un índice) y son lo correcto para esa tabla.
-2. **La base no es el cuello de botella de la consulta de disponibilidad:** son ~5 sentencias de décimas de milisegundo (~1 ms de base por solicitud) y el acierto de caché del búfer es del 99,99 %. El costo está en el servicio .NET (autenticación de la credencial, límites, auditoría y serialización): unos 7 ms de CPU por solicitud, que explican el techo medido (sección 6).
+2. **La base no es el cuello de botella de la consulta de disponibilidad:** son ~5 sentencias de décimas de milisegundo (~1 ms de base por solicitud) y el acierto de caché del búfer es del 99,99 %. Esta cifra mide solo el tiempo de ejecución de cada sentencia; **la capacidad medida (sección 6b) la corrige**: cada solicitud cuesta unas 13 idas a la base y PostgreSQL es, con el servicio, el cuello de botella.
 3. **Costo fijo por transacción de la seguridad por filas** (sección 4): `SET LOCAL ROLE`, `current_user` y `current_setting` suman 3 sentencias de ~0,01 ms; despreciable en tiempo, visibles en el conteo de sentencias (18 000 `SET LOCAL ROLE` en 4 500 solicitudes).
 4. Cada conexión devuelta al grupo ejecuta `DISCARD ALL` (reinicio de sesión de Npgsql, ~0,05 ms), necesario para que el rol y la configuración de una transacción no se filtren a la siguiente.
 
@@ -49,7 +49,7 @@ Cada transacción asume un rol de base de datos por módulo (`SET LOCAL ROLE "ro
 
 **Qué no se cachea y por qué:** la decisión de reservar **nunca** usa la caché (se valida contra la base con bloqueo; `06-tacticas-arquitectonicas.md`), el stock exacto ni los datos de reserva, ni nada que dependa del alcance del usuario.
 
-**Con y sin caché:** el plan pedía comparar el p95 con y sin caché de disponibilidad. Como esa caché no existe en el código, **no hay medición con caché**; la línea base sin caché es la de la sección 6. Dado que la base no es el cuello de botella (de ~7 ms de CPU por solicitud, ~1 ms es la base y el resto el servicio), una caché de disponibilidad en el E-commerce evitaría la llamada entre servicios, no la consulta a PostgreSQL: su valor sería quitar carga al **Inventario** (la VM de 1 OCPU), no a la base. Decidirla es de la persona responsable (alcance del Sprint 2).
+**Con y sin caché:** el plan pedía comparar el p95 con y sin caché de disponibilidad. Como esa caché no existe en el código, **no hay medición con caché**; la línea base sin caché es la de la sección 6. Como la CPU de PostgreSQL es parte del cuello de botella (sección 6b), una caché de disponibilidad en el E-commerce quitaría solicitudes enteras al **Inventario y a PostgreSQL** (la VM de 1 OCPU). Decidirla es de la persona responsable (alcance del Sprint 2).
 
 ## 6. Techo medido de la consulta de disponibilidad
 
@@ -62,6 +62,37 @@ Cada transacción asume un rol de base de datos por módulo (`SET LOCAL ROLE "ro
 | Inventario 0,6 CPU y PostgreSQL 0,4 | 5 compras por segundo, hasta 50 usuarios (`checkout-confirmacion`, reservar y confirmar) | 226 ms (umbral 3 s) | **Cumple** |
 
 **Lectura:** con la CPU que la VM-INVENTARIO da hoy al Inventario según el Compose (0,3), RNF02 no se cumple en esta máquina; repartida la OCPU de otra forma sí. Palancas, de mayor a menor efecto: (1) subir la CPU del contenedor del Inventario; (2) reducir el costo por solicitud en el servicio (la autorización, los límites y la auditoría hacen su propia ida a la base por solicitud; agrupar o diferir los contadores de límites de las lecturas); (3) caché de disponibilidad delante del Inventario (sección 5). La rampa muestra además que el servicio **se degrada de forma controlada** (503 uniformes, sin 500 ni interbloqueos) más allá de su techo; los 2 000 usuarios virtuales no se sostienen con una sola VM de 1 OCPU, y la extrapolación está documentada aquí (`docs/07-proceso-de-desarrollo/06-plan-sprint-2.md` §8).
+
+## 6b. Capacidad medida frente a recursos (rampa de 50 a 2000 usuarios virtuales)
+
+Rampa de la consulta de disponibilidad (`tests/load/escenarios/rampa.js`, pausa de 0,5 s entre solicitudes, 40 s por nivel), con el Inventario y PostgreSQL en contenedores con los recursos de cada fila (memoria del Inventario 350 MB). **p95 por nivel de usuarios virtuales** (entre paréntesis, la tasa de errores cuando supera el 0,05 %; el criterio es p95 < 500 ms y menos de 1 % de errores):
+
+| Inventario / PostgreSQL (CPU) / tope del grupo | 50 | 100 | 250 | 500 | 1 000 | 2 000 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **0,3 / 0,8 / 16 (los declarados en el Compose)** | 897 ms | 1,5 s | 5,1 s | 8,3 s | 18,8 s (10 %) | 19,4 s (48 %) |
+| 1 / 1 / 16 | 242 ms | 679 ms | 1,4 s | 5,2 s | 7,3 s | 13,3 s |
+| 2 / 1 / 16 | 146 ms | 403 ms | 2,1 s | 7,6 s | 13,2 s | 15,2 s (27 %) |
+| 2 / 1 / 40 | 308 ms | 981 ms | 3,3 s | 6,4 s | 13,6 s | 15,5 s (18 %) |
+| 4 / 2 / 16 | 50 ms | 133 ms | 1,3 s | 2,4 s | 5,0 s | 7,2 s |
+| 4 / 2 / 60 | 25 ms | 133 ms | 885 ms | 2,4 s | 5,7 s | 13,7 s |
+
+(Referencia previa, 0,6 / 0,4 / 16: 434 ms con 50 usuarios y 1,1 s con 100.) Resultados completos en `progress/evidencias/k6/2026-11-20-capacidad/`.
+
+**Lo que se mide, sin maquillar**
+
+1. **Ninguna configuración sostiene 2 000 usuarios virtuales con p95 < 500 ms**; la mejor (4 / 2 CPU) da p95 de 7,2 s y sin errores, y con los límites declarados (0,3 CPU) ni siquiera 50 usuarios cumplen (897 ms) y con 2 000 falla casi la mitad de las solicitudes. Los usuarios que se sostienen con p95 < 500 ms son: 0 con 0,3 CPU, 50 con 1 / 1, 100 con 2 / 1 y 100 con 4 / 2 (con 250: 885 ms a 1,3 s).
+2. **El cuello de botella medido es la CPU de PostgreSQL, junto con la del servicio.** Muestreo de `docker stats` en el nivel de 1 000 usuarios con 4 / 2 CPU: PostgreSQL queda **fijo en ~200 % (su tope de 2 CPU)**, el Inventario usa 130 a 300 % de sus 400 % y el generador de carga, 40 a 75 % de una CPU. Duplicar la CPU de PostgreSQL de 1 a 2 junto con la del Inventario baja el p95 de 1 000 usuarios de 13 s a 5 s. Esto **corrige** la conclusión 2 de la sección 2: el tiempo de ejecución de cada sentencia es pequeño, pero cada solicitud cuesta unas **13 idas a la base** (cambio de rol, comprobación del usuario y del alcance, reinicio de sesión y 3 lecturas), y esas idas, no las lecturas, consumen la CPU de PostgreSQL.
+3. **Subir el tope del grupo de conexiones no ayuda** (2 / 1: 308 ms con tope 40 frente a 146 ms con 16 en 50 usuarios; 4 / 2: sin mejora en 1 000 y peor en 2 000): con la CPU de PostgreSQL saturada, más conexiones solo aumentan la contención. El tope de 16 queda.
+4. **Rendimiento sostenido estimado** (ley de Little con la mediana: usuarios / (mediana + pausa)): con 0,3 / 0,8 ≈ 65 a 85 solicitudes por segundo; con 1 / 1 ≈ 100 a 170; con 4 / 2 ≈ 280 a 300. Cada solicitud cuesta del orden de 8 ms de CPU de PostgreSQL y 6 a 12 ms de CPU del servicio.
+5. **Memoria:** el Inventario llegó a 263 MiB de los 350 MiB con 1 000 usuarios (75 %). El presupuesto de 350 MB queda justo para esa carga; se propone 512 MB si se espera ese nivel.
+6. Con los recursos declarados, el sistema **se degrada de forma controlada** (503 y plazos vencidos, sin 500 ni sobreventa), pero degrada.
+
+**Dimensionamiento propuesto (lo que no cumple)**
+
+- **RNF02 (50 usuarios, p95 < 500 ms):** se cumple con el reparto de la OCPU de VM-INVENTARIO en 0,6 para el Inventario y 0,4 para PostgreSQL (434 ms medido con pausa de 0,5 s) y con 1 / 1 (242 ms); **no se cumple con los 0,3 CPU del Compose**: el límite del contenedor del Inventario debe subir a 0,6 como mínimo y el de PostgreSQL a 0,4 como mínimo, repartiendo la única OCPU de la VM.
+- **2 000 usuarios virtuales con pausa de 0,5 s equivalen a ~4 000 solicitudes por segundo**: con el costo actual por solicitud necesitarían del orden de 30 CPU para PostgreSQL y otras tantas para el servicio; **no es un objetivo alcanzable en una VM de 1 OCPU**. Con una pausa realista de 5 a 10 s entre acciones de una persona, 2 000 usuarios son 200 a 400 solicitudes por segundo, que es **lo que sostiene la configuración de 4 / 2 CPU** (p95 degradado, sin errores). Para 2 000 usuarios reales en la VM de 1 OCPU de hoy hace falta, antes que más CPU, **reducir el costo por solicitud**.
+- **Palancas de ingeniería (candidatas, no hechas; Importantes en `progress/hallazgos.md`):** (a) fusionar el cambio de rol y la primera sentencia de cada transacción en un solo viaje y quitar las comprobaciones de `current_user` y de `current_setting` por sentencia; (b) evitar el reinicio de sesión (`DISCARD ALL`) en cada devolución al grupo, compatible porque el rol es local a la transacción; (c) caché de disponibilidad delante del Inventario (sección 5), que quita solicitudes enteras; (d) los contadores de límites por origen en memoria o en Redis en lugar de insertar y leer en PostgreSQL en cada llamada.
+
 
 ## 7. Qué cubre y qué no
 
