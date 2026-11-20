@@ -41,7 +41,7 @@
 | Spec | Servicio | Estado | Requisitos | Criterios | Depende de |
 | :--- | :--- | :--- | ---: | ---: | :--- |
 | asistente-compra-ia | E-commerce | Planned | 20 | 19 | ecommerce-catalogo, ecommerce-pedidos, identidad-seguridad, transversal-seguridad |
-| ecommerce-biblioteca-digital | E-commerce | Planned | 29 | 26 | ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-pagos, identidad-seguridad, transversal-auditoria, transversal-seguridad |
+| ecommerce-biblioteca-digital | E-commerce | InProgress | 29 | 26 | ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-pagos, identidad-seguridad, transversal-auditoria, transversal-seguridad |
 | ecommerce-carrito-checkout | E-commerce | Planned | 37 | 31 | ecommerce-catalogo, inventario-seleccion-fuente, identidad-seguridad, transversal-seguridad |
 | ecommerce-catalogo | E-commerce | Planned | 23 | 19 | inventario-fuentes, inventario-ajustes, transversal-auditoria |
 | ecommerce-devoluciones | E-commerce | Planned | 31 | 32 | ecommerce-pedidos, ecommerce-pagos, ecommerce-biblioteca-digital, inventario-ajustes, transversal-auditoria, transversal-notificaciones, identidad-seguridad, transversal-seguridad |
