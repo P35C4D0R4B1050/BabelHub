@@ -31,8 +31,11 @@ export function uuid() {
 }
 
 /** Un cliente final distinto por número (usuario virtual o iteración): cada uno cae en su propio límite por origen (SEG-17, SEG-32). */
+// El desplazamiento cambia en cada corrida: el tope de 10 reservas por hora y por origen sigue vigente entre corridas, y repetir los mismos orígenes lo agotaría.
+const DESPLAZO = Number(__ENV.DESPLAZO_DE_ORIGEN || 0);
 export function origen(vu) {
-  return `10.${(vu >> 16) & 255}.${(vu >> 8) & 255}.${vu & 255}`;
+  const n = (vu + DESPLAZO) & 0xffffff;
+  return `10.${(n >> 16) & 255}.${(n >> 8) & 255}.${n & 255}`;
 }
 
 export function usuarioDe(vu) {
