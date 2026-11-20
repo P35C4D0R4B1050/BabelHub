@@ -243,7 +243,7 @@ public sealed class EstadoDeCuentaDeIdentidadTests : IClassFixture<PostgresDeIde
         var correo = (await _cuentas.PorId(id))!.Usuario.Correo;
         _actor.Actual = ActorActual.DelSistema();
 
-        var leido = await new CorreoDelTitularDeIdentidad(_cuentas).Consultar(id);
+        var leido = await new CorreoVerificadoDeSistemaDeIdentidad(_cuentas).Consultar(id);
 
         Assert.Equal(correo, leido);
         Assert.Equal(0, _denegaciones.Cantidad);
@@ -251,13 +251,12 @@ public sealed class EstadoDeCuentaDeIdentidadTests : IClassFixture<PostgresDeIde
 
     [Fact]
     [Trait("Criterio", "AC-PAG-12")]
-    public async Task ElCorreoDelTitular_NoSale_SiLaCuentaNoExisteEstaDesactivadaOSinVerificar()
+    public async Task ElCorreoVerificado_NoSale_SiLaCuentaNoExisteOEstaSinVerificar()
     {
-        var puerto = new CorreoDelTitularDeIdentidad(_cuentas);
+        var puerto = new CorreoVerificadoDeSistemaDeIdentidad(_cuentas);
 
         Assert.Null(await puerto.Consultar(Guid.NewGuid()));
-        Assert.Null(await puerto.Consultar(Guid.Empty));
-        Assert.Null(await puerto.Consultar(await Cuenta(activo: false)));
+        await Assert.ThrowsAsync<ArgumentException>(() => puerto.Consultar(Guid.Empty));
         Assert.Null(await puerto.Consultar(await Cuenta(correoVerificado: false)));
     }
 }

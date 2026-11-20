@@ -185,7 +185,7 @@ public static class ComposicionDeIdentidad
         servicios.TryAddScoped<IClavesDeFirma>(sp => sp.GetRequiredService<ClavesDeFirma>());
         servicios.TryAddScoped<IContextoDeLectura, ContextoDeLecturaDelAsistente>();
         servicios.TryAddScoped<IContactoDeAvisosDelCliente, ContactoDeAvisosDeIdentidad>();
-        servicios.TryAddScoped<ICorreoDelTitular, CorreoDelTitularDeIdentidad>();
+        servicios.TryAddScoped<ICorreoVerificadoDeSistema, CorreoVerificadoDeSistemaDeIdentidad>();
 
         // ---------- Puertos que Identidad implementa para otros módulos (los de Auditoría, aparte: solo Identidad y Auditoría pueden depender de ellos) ----------
         servicios.AgregarPuertosDeAuditoriaDeIdentidad(depuracionDeRegistros);

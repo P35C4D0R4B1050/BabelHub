@@ -45,6 +45,18 @@ public static class MotivosDeAlerta
     /// <summary>Un traslado vinculado sigue sin aprobar a las 48 horas (TRA-22).</summary>
     public const string TrasladoVinculadoSinAprobar = "traslado-vinculado-sin-aprobar";
 
+    /// <summary>Un aviso de traslado del buzón no llegó al E-commerce: más de 24 horas sin entregarse (TRA-10).</summary>
+    public const string AvisoDeTrasladoNoEntregado = "aviso-de-traslado-no-entregado";
+
+    /// <summary>El estado de un traslado de pedido lleva 24 horas sin entregarse al E-commerce (TRA-11); la alerta sale una vez.</summary>
+    public const string EstadoDeTrasladoSinEntregar = "estado-de-traslado-sin-entregar";
+
+    /// <summary>El E-commerce rechazó un mensaje del buzón de traslados con un error permanente (400, 404, 409 o 422) o la carga guardada no es válida: no se reintenta.</summary>
+    public const string EntregaDeTrasladoConErrorPermanente = "entrega-de-traslado-con-error-permanente";
+
+    /// <summary>El E-commerce rechazó la credencial de servicio del Inventario (401 o 403): los mensajes quedan fallidos para reencolarlos a mano al corregirla.</summary>
+    public const string CredencialDelEcommerceRechazada = "credencial-del-ecommerce-rechazada";
+
     public const string RetomaDePagosFallida = "retoma-de-pagos-fallida";
 
     public const string ReservasConfirmadasInconsistentes = "reservas-confirmadas-inconsistentes";
@@ -189,6 +201,10 @@ public static class CatalogoDeAlertasDeAuditoria
         new(MotivosDeAlerta.DepuracionDiariaSinExito, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.BajaDeTitularSinEntregar, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.TrasladoVinculadoSinAprobar, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.AvisoDeTrasladoNoEntregado, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.EstadoDeTrasladoSinEntregar, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.EntregaDeTrasladoConErrorPermanente, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.CredencialDelEcommerceRechazada, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.RetomaDePagosFallida, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.ReservasConfirmadasInconsistentes, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.ReservaConfirmadaInexistente, ClaseDeAlerta.Tecnica),

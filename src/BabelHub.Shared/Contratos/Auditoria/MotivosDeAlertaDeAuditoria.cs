@@ -38,6 +38,14 @@ public static class MotivosDeAlertaDeAuditoria
 
     public const string TrasladoVinculadoSinAprobar = "traslado-vinculado-sin-aprobar";
 
+    public const string AvisoDeTrasladoNoEntregado = "aviso-de-traslado-no-entregado";
+
+    public const string EstadoDeTrasladoSinEntregar = "estado-de-traslado-sin-entregar";
+
+    public const string EntregaDeTrasladoConErrorPermanente = "entrega-de-traslado-con-error-permanente";
+
+    public const string CredencialDelEcommerceRechazada = "credencial-del-ecommerce-rechazada";
+
     public const string RetomaDePagosFallida = "retoma-de-pagos-fallida";
 
     public const string ReservasConfirmadasInconsistentes = "reservas-confirmadas-inconsistentes";
@@ -176,6 +184,10 @@ public static class MotivosDeAlertaDeAuditoria
         DepuracionDiariaSinExito,
         BajaDeTitularSinEntregar,
         TrasladoVinculadoSinAprobar,
+        AvisoDeTrasladoNoEntregado,
+        EstadoDeTrasladoSinEntregar,
+        EntregaDeTrasladoConErrorPermanente,
+        CredencialDelEcommerceRechazada,
         RetomaDePagosFallida,
         ReservasConfirmadasInconsistentes,
         ReservaConfirmadaInexistente,

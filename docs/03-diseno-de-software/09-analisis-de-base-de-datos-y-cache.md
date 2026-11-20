@@ -69,14 +69,14 @@ Rampa de la consulta de disponibilidad (`tests/load/escenarios/rampa.js`, pausa 
 
 | Inventario / PostgreSQL (CPU) / tope del grupo | 50 | 100 | 250 | 500 | 1 000 | 2 000 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **0,3 / 0,8 / 16 (los declarados en el Compose)** | 897 ms | 1,5 s | 5,1 s | 8,3 s | 18,8 s (10 %) | 19,4 s (48 %) |
+| 0,3 / 0,8 / 16 (histórico: declarado antes de DD-17) | 897 ms | 1,5 s | 5,1 s | 8,3 s | 18,8 s (10 %) | 19,4 s (48 %) |
 | 1 / 1 / 16 | 242 ms | 679 ms | 1,4 s | 5,2 s | 7,3 s | 13,3 s |
 | 2 / 1 / 16 | 146 ms | 403 ms | 2,1 s | 7,6 s | 13,2 s | 15,2 s (27 %) |
 | 2 / 1 / 40 | 308 ms | 981 ms | 3,3 s | 6,4 s | 13,6 s | 15,5 s (18 %) |
 | 4 / 2 / 16 | 50 ms | 133 ms | 1,3 s | 2,4 s | 5,0 s | 7,2 s |
 | 4 / 2 / 60 | 25 ms | 133 ms | 885 ms | 2,4 s | 5,7 s | 13,7 s |
 
-(Referencia previa, 0,6 / 0,4 / 16: 434 ms con 50 usuarios y 1,1 s con 100.) Resultados completos en `progress/evidencias/k6/2026-11-20-capacidad/`.
+(Referencia previa, 0,6 / 0,4 / 16, hoy el dimensionamiento **declarado** por DD-17: 434 ms con 50 usuarios y 1,1 s con 100; la serie final sobre `main` con ese dimensionamiento va en `progress/evidencias/k6/2026-11-20-final/`.) Resultados completos en `progress/evidencias/k6/2026-11-20-capacidad/`.
 
 **Lo que se mide, sin maquillar**
 
@@ -89,10 +89,41 @@ Rampa de la consulta de disponibilidad (`tests/load/escenarios/rampa.js`, pausa 
 
 **Dimensionamiento propuesto (lo que no cumple)**
 
-- **RNF02 (50 usuarios, p95 < 500 ms):** se cumple con el reparto de la OCPU de VM-INVENTARIO en 0,6 para el Inventario y 0,4 para PostgreSQL (434 ms medido con pausa de 0,5 s) y con 1 / 1 (242 ms); **no se cumple con los 0,3 CPU del Compose**: el límite del contenedor del Inventario debe subir a 0,6 como mínimo y el de PostgreSQL a 0,4 como mínimo, repartiendo la única OCPU de la VM.
+- **RNF02 (50 usuarios, p95 < 500 ms):** se midió que cumple con el reparto 0,6 / 0,4 en la primera serie (434 ms) y con 1 / 1 (242 ms), pero **la serie final de la sección 6b-bis, con `main` y el dimensionamiento declarado (DD-17), no lo reprodujo (≈ 900 ms con 0,6 / 0,4)**; con los 0,3 CPU anteriores tampoco se cumplía. La OCPU de la VM es la restricción: ver 6b-bis para el techo medido y lo que falta.
 - **2 000 usuarios virtuales con pausa de 0,5 s equivalen a ~4 000 solicitudes por segundo**: con el costo actual por solicitud necesitarían del orden de 30 CPU para PostgreSQL y otras tantas para el servicio; **no es un objetivo alcanzable en una VM de 1 OCPU**. Con una pausa realista de 5 a 10 s entre acciones de una persona, 2 000 usuarios son 200 a 400 solicitudes por segundo, que es **lo que sostiene la configuración de 4 / 2 CPU** (p95 degradado, sin errores). Para 2 000 usuarios reales en la VM de 1 OCPU de hoy hace falta, antes que más CPU, **reducir el costo por solicitud**.
 - **Palancas de ingeniería (candidatas, no hechas; Importantes en `progress/hallazgos.md`):** (a) fusionar el cambio de rol y la primera sentencia de cada transacción en un solo viaje y quitar las comprobaciones de `current_user` y de `current_setting` por sentencia; (b) evitar el reinicio de sesión (`DISCARD ALL`) en cada devolución al grupo, compatible porque el rol es local a la transacción; (c) caché de disponibilidad delante del Inventario (sección 5), que quita solicitudes enteras; (d) los contadores de límites por origen en memoria o en Redis en lugar de insertar y leer en PostgreSQL en cada llamada.
 
+
+## 6b-bis. Serie final sobre `main` con el dimensionamiento declarado (DD-17)
+
+Corrida final del 2026-11-20 (16:02 a 17:23), con `main` ya con la reducción de idas a la base (§6c), un solo cliente k6 por paso, memoria de referencias apagada, tope del grupo 16. Resultados en `progress/evidencias/k6/2026-11-20-final/` (rampa por configuración), `…-final-escenarios/` (los cinco escenarios con 0,6 / 0,4 / 512 MB), `…-final-escenarios-caliente/` (disponibilidad repetida con el servicio ya caliente) y `…-final-reparto-*/` (disponibilidad con otros repartos de CPU). **p95 por nivel de usuarios virtuales de la rampa** (entre paréntesis, tasa de errores si supera el 0,05 %):
+
+| Inventario / PostgreSQL (CPU) / memoria | 50 | 100 | 250 | 500 | 1 000 | 2 000 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| 0,3 / 0,8 / 350 MB (histórico, antes de DD-17) | 1,4 s | 1,6 s | 5,3 s | 8,6 s | 14,6 s | 17,2 s (82 %) |
+| **0,6 / 0,4 / 512 MB (declarado, DD-17)** | **1,4 s** | **1,9 s** | **4,3 s** | **7,4 s** | **16,4 s (11,5 %)** | **16,9 s (51 %)** |
+| 1 / 1 / 512 MB | 425 ms | 603 ms | 2,1 s | 4,1 s | 8,1 s (33 %) | 14,7 s (0,2 %) |
+| 2 / 1 / 512 MB | 66 ms | 603 ms | 2,3 s | 4,4 s | 8,9 s | 15,2 s (15 %) |
+| 4 / 2 / 512 MB | 35 ms | 47 ms | 937 ms | 2,2 s | 5,0 s | 10,1 s |
+
+**Disponibilidad con 50 usuarios y pausa de 0,5 s, 60 s (RNF02; `disponibilidad`)**
+
+| Inventario / PostgreSQL (CPU) | p95 | Mediana | Iteraciones | RNF02 (p95 < 500 ms) |
+| :--- | :--- | :--- | :--- | :--- |
+| **0,6 / 0,4 (declarado), primera corrida** | **908 ms** | 597 ms | 2 727 | **No cumple** |
+| **0,6 / 0,4 (declarado), segunda corrida, servicio caliente** | **897 ms** | 598 ms | 2 723 | **No cumple** |
+| 0,4 / 0,6 | 1 189 ms | 411 ms | 3 011 | No cumple |
+| 0,3 / 0,8 | 2 610 ms | 1 902 ms | 1 227 | No cumple |
+
+Los demás escenarios con 0,6 / 0,4 / 512 MB **cumplen**: `checkout-confirmacion` (reservar y confirmar, p95 108 ms frente a 3 s), `sobreventa` (exactamente 10 reservas y 90 rechazos, sin sobreventa), `limites` (100 permitidas y el resto 429; el vecino sin afectar) y `resiliencia` (PostgreSQL pausado 25 s: 503 uniforme, ningún 500, recuperación sola).
+
+**Lo que se mide, sin maquillar**
+
+1. **Con el dimensionamiento declarado (0,6 / 0,4) RNF02 no se cumple en esta corrida**, ni en la rampa (1,4 s a 50 usuarios) ni en estado estable (≈ 900 ms, dos corridas, también con el servicio caliente: no es el arranque en frío). La conclusión de la sección 6b («434 ms con 0,6 / 0,4») y la medición de la sección 6 (327 ms) **no se reprodujeron** en esta serie.
+2. **La razón que sí se ve en los datos:** 50 usuarios con 0,5 s de pausa piden del orden de 80 solicitudes por segundo y el entorno atendió 44 (2 727 en 62 s). El rendimiento sostenible lo fija la cuota de CPU: con 0,3 / 0,4 / 0,6 CPU para el Inventario el p95 fue 2,6 s, 1,2 s y 0,9 s. Es la misma saturación de la sección 6b (cada solicitud cuesta unos 6 a 12 ms de CPU del servicio y unos 8 ms de PostgreSQL): el costo por solicitud no baja lo suficiente para que 0,6 CPU alcance a 80 solicitudes por segundo.
+3. **Las cifras absolutas de esta serie son peores que las de la mañana con los mismos límites** (con 0,3 CPU, 1 227 iteraciones frente a 4 501 en la corrida oficial; con 1 / 1 en la rampa, 425 ms frente a 242 ms), mientras que con 2 / 1 y 4 / 2 mejoraron (66 y 35 ms frente a 146 y 50 ms). Hay **ruido del host**: es una máquina de desarrollo compartida (en la corrida seguían activos contenedores de otros carriles y un reproductor de medios; no se registró la carga del procesador) y la reducción de idas a la base de §6c entró entre las dos mediciones, de modo que **no se puede atribuir la diferencia a una sola causa**. Lo reproducible es el orden: más CPU para el Inventario, menor p95, y ninguna configuración sostiene 2 000 usuarios con p95 < 500 ms (la mejor, 4 / 2, da 10,1 s sin errores).
+4. **Techo medido con el dimensionamiento declarado:** con 50 usuarios, p95 de 0,9 s (en la rampa, 1,4 s); con 2 000 usuarios, p95 de 16,9 s y el 51 % de las solicitudes fallan (503 y plazos vencidos; sin 500 ni sobreventa). Con 1 / 1 se cumple RNF02 en la rampa a 50 usuarios (425 ms) pero ya no a 100 (603 ms).
+5. **Qué haría falta para cumplir RNF02 con una OCPU:** que cada solicitud cueste menos CPU (hallazgos Importantes abiertos en `progress/hallazgos.md`: fusionar el cambio de rol, mover los contadores de límites fuera de PostgreSQL, caché de disponibilidad por decisión de la persona) o aceptar que la prueba de 50 usuarios con 0,5 s de pausa (≈ 80 solicitudes por segundo) es más exigente que 50 personas reales (que piden cada 5 a 10 s: 5 a 10 solicitudes por segundo); esa lectura **no se midió** en esta serie y no se afirma que se cumpla.
 
 ## 6c. Reducción de idas a la base por consulta (K6-1, capacidad)
 

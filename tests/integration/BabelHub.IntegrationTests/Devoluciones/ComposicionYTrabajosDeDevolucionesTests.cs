@@ -201,6 +201,22 @@ public sealed class ComposicionYTrabajosDeDevolucionesTests
 
     [Fact]
     [Trait("Criterio", "AC-DEV-13")]
+    public void Los_trabajos_de_fondo_se_registran_con_el_publicador_de_alertas_scoped_sin_capturarlo_en_un_singleton()
+    {
+        var servicios = ConDependencias(conInventario: true);
+        servicios.AddScoped<IPublicadorDeAlertasTecnicas>(_ => new AlertasEspia());
+        servicios.AddSingleton(Doble<IServiceScopeFactory>());
+        servicios.AgregarDevoluciones(esProduccion: false);
+        servicios.AgregarTrabajosDeFondoDeDevoluciones(_ => (corrida, token) => corrida(token));
+        using var proveedor = servicios.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = false });
+
+        var servicio = proveedor.GetRequiredService<ServicioDeTrabajosDeDevoluciones>();
+
+        Assert.NotNull(servicio);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-13")]
     public void Los_tres_trabajos_tienen_sus_nombres_estables_y_sus_horarios()
     {
         var trabajos = TrabajosDeDevoluciones.Todos(Doble<IServiceScopeFactory>(), new RegistroEspia(), (c, t) => c(t), new AlertasEspia(), new RelojFijo(DateTimeOffset.UtcNow));

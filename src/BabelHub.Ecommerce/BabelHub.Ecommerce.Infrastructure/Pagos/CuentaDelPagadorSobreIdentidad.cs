@@ -6,9 +6,9 @@ namespace BabelHub.Ecommerce.Infrastructure.Pagos;
 /// <summary>
 /// La cuenta del pagador sobre los contratos de Identidad (PAG-21, PAG-25, PAG-31; reemplaza a <c>CuentaDelPagadorSinIdentidad</c>): puede pagar si <see cref="IEstadoDeCuenta"/> lo dice y, si no, el primer motivo en el orden
 /// cuenta inactiva, correo sin verificar, textos pendientes; la marca de cancelación se lee con bloqueo (<see cref="IMarcaDeCancelacionDeCuenta"/>, orden global cuenta → pedido → …) y el correo del titular sale de
-/// <see cref="ICorreoDelTitular"/> (puerto estrecho que también sirve al trabajo de fondo, sin actor titular) sin guardarse (D12). <b>Falla cerrada</b>: una cuenta que no existe es <see langword="null"/> y cualquier excepción de Identidad sube (Pagos la trata como «no se pudo saber» y no cobra).
+/// <see cref="ICorreoVerificadoDeSistema"/> (contrato de sistema: sirve también al trabajo de fondo, sin actor titular) sin guardarse (D12). <b>Falla cerrada</b>: una cuenta que no existe es <see langword="null"/> y cualquier excepción de Identidad sube (Pagos la trata como «no se pudo saber» y no cobra).
 /// </summary>
-internal sealed class CuentaDelPagadorSobreIdentidad(IEstadoDeCuenta estados, IMarcaDeCancelacionDeCuenta marcas, ICorreoDelTitular correos) : ICuentaDelPagador
+internal sealed class CuentaDelPagadorSobreIdentidad(IEstadoDeCuenta estados, IMarcaDeCancelacionDeCuenta marcas, ICorreoVerificadoDeSistema correos) : ICuentaDelPagador
 {
     public async Task<EstadoDeLaCuentaParaPagar?> Consultar(Guid cuentaId, CancellationToken cancelacion = default)
     {
