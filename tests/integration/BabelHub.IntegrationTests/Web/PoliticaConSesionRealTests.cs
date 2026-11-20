@@ -94,8 +94,6 @@ public sealed class PoliticaConSesionRealTests(PostgresDeLaWebFixture bd) : IAsy
         "GET /cuenta/cancelacion → Cuenta",
         "GET /cuenta/correo → Cuenta",
         "GET /cuenta/datos → Cuenta",
-        "GET /cuenta/pedidos → Pedidos",
-        "GET /cuenta/pedidos/{pedidoId:guid} → Pedidos",
         "GET /cuenta/segundo-factor → Cuenta",
         "GET /cuenta/solicitudes → Cuenta",
         "GET /legal/{texto} → TextosLegales",
@@ -114,8 +112,15 @@ public sealed class PoliticaConSesionRealTests(PostgresDeLaWebFixture bd) : IAsy
         "POST /reclamaciones/nueva → EnviarHoja",
     ];
 
+    // Los pedidos del cliente solo existen en el host de la tienda.
+    private static readonly string[] AtribuidasDePedidos =
+    [
+        "GET /cuenta/pedidos → Pedidos",
+        "GET /cuenta/pedidos/{pedidoId:guid} → Pedidos",
+    ];
+
     private static IEnumerable<string> AtribuidasEsperadas(HostWeb host) =>
-        (host == HostWeb.Tienda ? AtribuidasComunes.Concat(AtribuidasDelLibro) : AtribuidasComunes).Order(StringComparer.Ordinal);
+        (host == HostWeb.Tienda ? AtribuidasComunes.Concat(AtribuidasDelLibro).Concat(AtribuidasDePedidos) : AtribuidasComunes).Order(StringComparer.Ordinal);
 
     private static IEnumerable<RouteEndpoint> DeLaApi(AnfitrionWeb a) =>
         a.Servicios.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>()
