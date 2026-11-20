@@ -124,6 +124,20 @@ public sealed class AnfitrionDelEcommerceTests
 
     [Fact]
     [Trait("Criterio", "AC-PLA-19")]
+    public async Task LaSalud_CompruebaLaBaseDeDatosSoloEnModoNormal()
+    {
+        await using var normal = Compuesto(ModoDeArranque.Normal);
+        await using var restauracion = Compuesto(ModoDeArranque.Restauracion);
+
+        var enNormal = normal.Services.GetServices<BabelHub.Ecommerce.Api.Plataforma.IComprobacionDeSalud>().Select(c => c.Nombre);
+        var enRestauracion = restauracion.Services.GetServices<BabelHub.Ecommerce.Api.Plataforma.IComprobacionDeSalud>();
+
+        Assert.Equal(["base-de-datos"], enNormal);
+        Assert.Empty(enRestauracion);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-19")]
     public async Task EnElModoDeRestauracion_NoSeRegistraNingunTrabajoDeFondo()
     {
         await using var normal = Compuesto(ModoDeArranque.Normal);
