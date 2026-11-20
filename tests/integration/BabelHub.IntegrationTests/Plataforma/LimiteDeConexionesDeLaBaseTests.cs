@@ -12,7 +12,13 @@ namespace BabelHub.IntegrationTests.Plataforma;
 public sealed class LimiteDeConexionesDeLaBaseTests
 {
     // Sin literales de contraseña en el repositorio: la cadena se arma con una clave aleatoria de la prueba.
-    private static readonly string Cadena = new NpgsqlConnectionStringBuilder { Host = "localhost", Port = 5432, Database = "inventario", Username = "cuenta", Password = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(18)) }.ConnectionString;
+    private static readonly string Cadena = ArmarCadena();
+
+    private static string ArmarCadena()
+    {
+        var pruebaClave = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(18));
+        return new NpgsqlConnectionStringBuilder { Host = "localhost", Port = 5432, Database = "inventario", Username = "cuenta", Password = pruebaClave }.ConnectionString;
+    }
 
     private static int Tope(NpgsqlDataSource fuente) => new NpgsqlConnectionStringBuilder(fuente.ConnectionString).MaxPoolSize;
 
