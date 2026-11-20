@@ -10,6 +10,12 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 - **Carril A:** `/health/ready` detecta la caída de la base en los dos servicios. **Carril B:** fachadas y lecturas de Pedidos (ECO-6f).
 - Validación de `main`: compilación sin advertencias, SpecCheck 0 avisos, unitarias 5376 y 2368, arquitectura 243, integración 6954 de 6966; 12 fallos: 2 flaky que pasan sueltos, 2 de imágenes por contención de Docker, y 8 reales repartidos a sus dueños (4 pruebas por fixtures con contraseña o clave literal, composición de la biblioteca, Dockerfiles distintos, prueba de reservas con el tope nuevo).
 
+## 2026-11-20 (madrugada) — Segunda integración de `main`, cobertura y COMP-1
+
+### Cubierto
+- **Evidencias:** reporte de cobertura completo en `progress/evidencias/cobertura/` (E-commerce 95,5 % Dominio+Aplicación y 94,6 % total; Inventario 95,7 % y 93,7 %; umbrales 85/70 cumplidos). **A:** COMP-1 (auditoría y claves de Identidad en el host del E-commerce). **B:** 45 pruebas de pantallas y concurrencia de Pedidos.
+- Integración completa de `main` (4aa7c568 más cobertura): 7086 de 7098 en 31 min; escáner de secretos limpio. De los 12 fallos: `HumoDeImagenes` ×2 (conocidos, Docker), `CargaDelAcumulado`, `ArranqueSeguroEcommerce` y el escáner por tiempo (pasan solos) y 7 reales repartidos: OpenAPI publicado desactualizado y `CorreoDeProduccion` con reloj fijo (A), copia de `ManejoDeErrores` y rutas/composición de Pedidos del cliente (B, 4 casos), carrera de concesión simultánea de la biblioteca (23505, biblioteca).
+
 ## 2026-11-19 (noche) — Tope de reserva de 20 unidades por línea y 30 líneas
 
 ### Cubierto
