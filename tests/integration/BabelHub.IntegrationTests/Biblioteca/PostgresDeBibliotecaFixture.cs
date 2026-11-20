@@ -55,7 +55,8 @@ public sealed class PostgresDeBibliotecaFixture : IAsyncLifetime
             + DefinicionDeBiblioteca.Permisos);
         await preparacion.ExecuteNonQueryAsync();
 
-        var cadena = new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString()) { Username = "acceso", Password = ClaveDeAcceso, MaxPoolSize = 100 };
+        var clave = ClaveDeAcceso;
+        var cadena = new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString()) { Username = "acceso", Password = clave, MaxPoolSize = 100 };
         Acceso = NpgsqlDataSource.Create(cadena.ConnectionString);
         Unidad = new UnidadDeTrabajoPostgres(Acceso);
         AccesoAlEsquema = new AccesoAlEsquemaDeBiblioteca(Unidad, Unidad);

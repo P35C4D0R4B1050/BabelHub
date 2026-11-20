@@ -127,6 +127,40 @@ public sealed class AnfitrionDelEcommerceTests
         Assert.NotNull(app.Services.GetRequiredService<IMatrizDeAlcancesDeServicio>());
     }
 
+
+    private static HashSet<string> Rutas(WebApplication app) =>
+        [.. ((Microsoft.AspNetCore.Routing.IEndpointRouteBuilder)app).DataSources.SelectMany(d => d.Endpoints).OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>().Select(e => e.RoutePattern.RawText!)];
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-25")]
+    public async Task UsarEcommerce_MapeaLaAuditoriaYLasClavesDeIdentidad_YRotarSoloEnElHostDeGestion()
+    {
+        var configuracion = ConfiguracionCompleta();
+        configuracion["Web:Host"] = "gestion";
+        configuracion["Web:ClaveDeSesionesGestion"] = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(36));
+        var constructor = Constructor(configuracion, "Development");
+        constructor.Services.AddSingleton(typeof(ModoDeArranque), ModoDeArranque.Normal);
+        constructor.Services.AddScoped<EjecutorDePasosDeRestauracion>();
+        constructor.AgregarEcommerce(ModoDeArranque.Normal);
+        var gestion = constructor.Build();
+        gestion.UsarEcommerce();
+        await using var tienda = Compuesto(ModoDeArranque.Normal);
+        await using var _ = gestion;
+
+        var enTienda = Rutas(tienda);
+        var enGestion = Rutas(gestion);
+
+        foreach (var ruta in new[] { BabelHub.Shared.Contratos.Ecommerce.RutasDeClavesDeFirma.Jwks, BabelHub.Shared.Contratos.Ecommerce.RutasDeClavesDeFirma.Revocaciones, BabelHub.Shared.Contratos.RutasDeServicio.Ecommerce + "/auditoria", BabelHub.Shared.Contratos.RutasDeServicio.Ecommerce + "/alertas", BabelHub.Shared.Contratos.RutasDeServicio.Ecommerce + "/historial" })
+        {
+            Assert.Contains(ruta, enTienda);
+            Assert.Contains(ruta, enGestion);
+        }
+
+        Assert.DoesNotContain(BabelHub.Shared.Contratos.Ecommerce.RutasDeClavesDeFirma.Rotar, enTienda);
+        Assert.DoesNotContain(BabelHub.Shared.Contratos.Ecommerce.RutasDeClavesDeFirma.Comprometida, enTienda);
+        Assert.Contains(BabelHub.Shared.Contratos.Ecommerce.RutasDeClavesDeFirma.Rotar, enGestion);
+        Assert.Contains(BabelHub.Shared.Contratos.Ecommerce.RutasDeClavesDeFirma.Comprometida, enGestion);
+    }
     [Fact]
     [Trait("Criterio", "AC-PLA-19")]
     public async Task LaSalud_CompruebaLaBaseDeDatosSoloEnModoNormal()

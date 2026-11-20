@@ -116,7 +116,7 @@ public static class ComposicionDeLosTrabajosDeBiblioteca
             sp.GetRequiredService<IServiceScopeFactory>(),
             sp.GetRequiredService<IRegistroDeTrabajosDeFondo>(),
             alcanceDeSistema(sp),
-            sp.GetRequiredService<IPublicadorDeAlertasTecnicas>(),
+            new AlertasTecnicasPorCorrida(sp.GetRequiredService<IServiceScopeFactory>()),
             sp.GetRequiredService<IReloj>()));
         servicios.TryAddSingleton(sp => new ServicioDeTrabajosDeBiblioteca(sp.GetRequiredService<IReadOnlyList<TrabajoDeFondoDeBiblioteca>>()));
         return servicios;

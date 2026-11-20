@@ -1,0 +1,79 @@
+@model BabelHub.Ecommerce.Api.Pedidos.OperacionesFallidasVista
+<nav class="text-sm" aria-label="Migas de pan"><a class="link" href="/administracion/pedidos">← Volver a los pedidos</a></nav>
+<div class="mt-3">
+    <h1 class="bh-display">Operaciones fallidas</h1>
+    <p class="mt-2 max-w-2xl opacity-80">Anulaciones y entregas que quedaron a medias, con los pasos que alcanzaron a hacer. Para reintentar, repite la operación desde el pedido: no se repiten los pasos ya hechos.</p>
+</div>
+
+<div class="mt-4" aria-live="polite">
+    @if (Model.Estado is not null)
+    {
+        <vc:bh-estado modelo="@Model.Estado" />
+    }
+    else
+    {
+        <p class="mb-2 text-sm opacity-80">@Model.Total @(Model.Total == 1 ? "operación fallida" : "operaciones fallidas")</p>
+        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+            <table class="table">
+                <caption class="sr-only">Operaciones fallidas con su tipo, su pedido, su motivo, los pasos hechos y cuándo ocurrieron</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Operación</th>
+                        <th scope="col">Pedido</th>
+                        <th scope="col">Motivo</th>
+                        <th scope="col">Pasos hechos</th>
+                        <th scope="col">Cuándo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var operacion in Model.Operaciones)
+                    {
+                        <tr>
+                            <th scope="row" class="align-top font-normal"><span class="bh-chip"><bh-icono nombre="error" clase="size-3.5" />@operacion.Tipo</span></th>
+                            <td class="align-top"><a class="link font-mono text-sm" href="@operacion.RutaDelPedido" aria-label="Ver el pedido @operacion.PedidoCorto">@operacion.PedidoCorto</a></td>
+                            <td class="align-top text-sm">@(operacion.Motivo ?? "—")</td>
+                            <td class="align-top text-sm">
+                                @if (operacion.Pasos.Count == 0)
+                                {
+                                    <span class="opacity-60">Ninguno</span>
+                                }
+                                else
+                                {
+                                    <ul class="list-disc pl-4">
+                                        @foreach (var paso in operacion.Pasos)
+                                        {
+                                            <li>@paso</li>
+                                        }
+                                    </ul>
+                                }
+                            </td>
+                            <td class="align-top text-xs">@operacion.CreadaTexto</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (Model.TotalDePaginas > 1)
+        {
+            <nav class="mt-4 flex items-center justify-between gap-3" aria-label="Paginación">
+                @if (Model.Pagina > 1)
+                {
+                    <a class="btn btn-sm" rel="prev" href="@Model.RutaDeLaPagina(Model.Pagina - 1)">Anterior</a>
+                }
+                else
+                {
+                    <span></span>
+                }
+                <span class="text-sm">Página @Model.Pagina de @Model.TotalDePaginas</span>
+                @if (Model.Pagina < Model.TotalDePaginas)
+                {
+                    <a class="btn btn-sm" rel="next" href="@Model.RutaDeLaPagina(Model.Pagina + 1)">Siguiente</a>
+                }
+                else
+                {
+                    <span></span>
+                }
+            </nav>
+        }
+    }
+</div>

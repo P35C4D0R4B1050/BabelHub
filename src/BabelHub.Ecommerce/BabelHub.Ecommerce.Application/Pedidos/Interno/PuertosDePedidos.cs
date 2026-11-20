@@ -13,9 +13,6 @@ public sealed record EstadoDeTrasladoRegistrado(string EventoId, Guid TrasladoId
 /// <summary>El bloqueo de un pedido no se obtuvo a tiempo (<c>lock_timeout</c> de 5 s): el caso de uso responde <c>conflicto</c>, reintentable.</summary>
 public sealed class EsperaDeBloqueoDeUnPedidoAgotadaException() : Exception("No se obtuvo el bloqueo del pedido a tiempo.");
 
-/// <summary>La base de pedidos no respondió a tiempo (conexión caída, interbloqueo, serialización o consulta cancelada): la Api la traduce a «servicio no disponible» (503) y es reintentable. Vive en la Aplicación para que los casos de uso y la Api la vean sin depender de la Infraestructura.</summary>
-public sealed class PedidosNoDisponiblesException(string motivo) : Exception($"La base de pedidos no está disponible ({motivo}).");
-
 /// <summary>Una línea marcada no recogida a la que aún falta liberar la reserva en el Inventario (<c>liberaciones_de_reserva</c>, PED-15): se borra al lograrlo o al saber que la reserva ya se cerró.</summary>
 public sealed record LiberacionDeReservaPendiente(Guid PedidoId, Guid LineaId, string Motivo, DateTimeOffset PendienteDesde, int Intentos);
 

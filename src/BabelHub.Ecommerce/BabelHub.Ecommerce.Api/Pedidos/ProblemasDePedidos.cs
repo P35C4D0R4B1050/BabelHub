@@ -1,0 +1,79 @@
+using System.Globalization;
+using BabelHub.Ecommerce.Api.Envios;
+using BabelHub.Ecommerce.Api.Plataforma;
+using BabelHub.Ecommerce.Application.Plataforma;
+using BabelHub.Shared.Errores;
+
+namespace BabelHub.Ecommerce.Api.Pedidos;
+
+/// <summary>
+/// La traducción de los fallos de Pedidos a los códigos <c>ECO-…</c> y a los estados HTTP de <c>plan.md</c> §4 (PED-41, AC-PED-12): la Aplicación devuelve una categoría y una clave simbólica y esta tabla publica solo
+/// lo que el plan declara. El único motivo que se expone es <b>la alternativa</b> de un pedido que no se puede cancelar (<c>devolucion</c> o <c>politica-de-reembolso-digital</c>) y los campos de una validación; nunca un
+/// dato del pedido, de la cuenta ni del contacto. Cada respuesta es <c>no-store</c>; un límite excedido lleva <c>Retry-After</c>.
+/// </summary>
+public static class ProblemasDePedidos
+{
+    private sealed record Publicada(string Sufijo, int? Estado = null, bool ExponeCampos = false);
+
+    private static readonly Dictionary<string, Publicada> PorClave = new(StringComparer.Ordinal)
+    {
+        ["no-encontrado"] = new("NO-ENCONTRADO"),
+        ["validacion-fallida"] = new("VALIDACION-INVALIDA", ExponeCampos: true),
+        ["pedido-estado-invalido"] = new("PEDIDO-ESTADO-INVALIDO", StatusCodes.Status409Conflict),
+        ["pedido-no-cancelable"] = new("PEDIDO-NO-CANCELABLE", StatusCodes.Status409Conflict, ExponeCampos: true),
+        ["pedido-operacion-en-curso"] = new("PEDIDO-OPERACION-EN-CURSO", StatusCodes.Status409Conflict),
+        ["linea-espera-traslado"] = new("LINEA-ESPERA-TRASLADO", StatusCodes.Status409Conflict),
+        ["pedido-sin-lineas-anulables"] = new("PEDIDO-SIN-LINEAS-ANULABLES", StatusCodes.Status422UnprocessableEntity),
+        ["textos-pendientes"] = new("TEXTOS-PENDIENTES", StatusCodes.Status403Forbidden),
+        ["conflicto"] = new("CONFLICTO", StatusCodes.Status409Conflict),
+        ["operacion-ya-resuelta"] = new("CONFLICTO", StatusCodes.Status409Conflict),
+        ["servicio-no-disponible"] = new("SERVICIO-NO-DISPONIBLE", StatusCodes.Status503ServiceUnavailable),
+    };
+
+    public static ProblemaDto Crear(HttpContext contexto, OpcionesDeErrores opciones, ErrorDeAplicacion error)
+    {
+        ArgumentNullException.ThrowIfNull(contexto);
+        ArgumentNullException.ThrowIfNull(opciones);
+        ArgumentNullException.ThrowIfNull(error);
+
+        var generico = ProblemasHttp.Crear(contexto, opciones, error.Categoria, error.Clave, error.Errores);
+        if (!PorClave.TryGetValue(error.Clave, out var publicada))
+        {
+            return generico;
+        }
+
+        var errores = publicada.ExponeCampos
+            ? error.Errores.Select(e => new ErrorDeCampoDto(e.Campo, e.Clave)).ToList()
+            : [];
+        return generico with
+        {
+            Code = CodigosDeError.De(opciones.Servicio, publicada.Sufijo),
+            Status = publicada.Estado ?? generico.Status,
+            Errores = errores,
+        };
+    }
+
+    /// <summary>Escribe el fallo: el problema uniforme, nunca cacheable, con <c>Retry-After</c> en un límite.</summary>
+    public static async Task Escribir(HttpContext contexto, OpcionesDeErrores opciones, ErrorDeAplicacion error)
+    {
+        ArgumentNullException.ThrowIfNull(contexto);
+        contexto.Response.OnStarting(() =>
+        {
+            contexto.Response.Headers.CacheControl = "no-store";
+            return Task.CompletedTask;
+        });
+
+        var problema = Crear(contexto, opciones, error);
+        if (error.Categoria == CategoriaDeError.Limite)
+        {
+            await ProblemasHttp.Escribir(
+                contexto,
+                ProblemasDeEnvios.ComoLimite(problema, error),
+                new Dictionary<string, string> { ["Retry-After"] = ProblemasDeEnvios.EsperaEnSegundos(error).ToString(CultureInfo.InvariantCulture) }).ConfigureAwait(false);
+            return;
+        }
+
+        await DenegacionesHttp.Registrar(contexto, error.Categoria, error.Clave, problema.Code).ConfigureAwait(false);
+        await ProblemasHttp.Escribir(contexto, problema).ConfigureAwait(false);
+    }
+}

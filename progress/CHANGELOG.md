@@ -2,6 +2,14 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-20 — Biblioteca digital (ECO-8a a 8d), evidencias OAS-1, K6-1 y DOC-1, y `/health/ready`
+
+### Cubierto
+- **Carril biblioteca (nuevo):** ECO-8 hasta T24 (esquema y rol `rol_biblioteca`, adaptador S3 con enlaces SigV4, trabajos, pantallas); T25 (E2E) espera el host compuesto.
+- **Carril de evidencias (nuevo):** OAS-1 (OpenAPI por servicio), K6-1 (escenarios, entorno limitado y corrida oficial en `progress/evidencias/k6/2026-11-20/`), DOC-1 y el reporte HTML de cobertura; dos correcciones reales (pool de Npgsql y 503 con la base caída).
+- **Carril A:** `/health/ready` detecta la caída de la base en los dos servicios. **Carril B:** fachadas y lecturas de Pedidos (ECO-6f).
+- Validación de `main`: compilación sin advertencias, SpecCheck 0 avisos, unitarias 5376 y 2368, arquitectura 243, integración 6954 de 6966; 12 fallos: 2 flaky que pasan sueltos, 2 de imágenes por contención de Docker, y 8 reales repartidos a sus dueños (4 pruebas por fixtures con contraseña o clave literal, composición de la biblioteca, Dockerfiles distintos, prueba de reservas con el tope nuevo).
+
 ## 2026-11-19 (noche) — Tope de reserva de 20 unidades por línea y 30 líneas
 
 ### Cubierto

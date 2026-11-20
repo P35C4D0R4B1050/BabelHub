@@ -222,11 +222,11 @@ public sealed class ContratoRestDeReservasTests(PostgresDeReservasFixture bd) : 
             ecommerce.Llamar<CrearReservaDto, ReservaDto>("inventario.reservas.crear", solicitud: cuerpo, rol: RolesDeUsuario.Cliente, usuario: usuario, clave: k ?? Clave());
 
         // Falta de stock: 409 con las líneas sin stock y lo que hay en la red.
-        var sinStock = await Crear(cliente, ReservaARecojo(Guid.NewGuid(), LineaDto(libro, 50)));
+        var sinStock = await Crear(cliente, ReservaARecojo(Guid.NewGuid(), LineaDto(libro, 20)));
         Assert.Equal(HttpStatusCode.Conflict, sinStock.Estado);
         Assert.Equal(CodigosDeErrorDelInventario.StockInsuficiente, sinStock.Problema!.Code);
         var detalle = Assert.IsType<ProblemaDeStockDto>(sinStock.Problema);
-        Assert.Equal((50, 5), (detalle.Lineas.Single().Solicitada, detalle.Lineas.Single().DisponibleEnLaRed));
+        Assert.Equal((20, 5), (detalle.Lineas.Single().Solicitada, detalle.Lineas.Single().DisponibleEnLaRed));
 
         // Un libro digital no se reserva (422), una cantidad en cero es 400 con su campo y un pedido ajeno es 404.
         Assert.Equal((HttpStatusCode.UnprocessableEntity, CodigosDeErrorDelInventario.EdicionNoImpresa), ((await Crear(cliente, ReservaARecojo(Guid.NewGuid(), LineaDto(digital)))) is { } d ? (d.Estado, d.Problema!.Code) : default));

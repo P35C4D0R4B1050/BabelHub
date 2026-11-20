@@ -23,8 +23,8 @@ public sealed class DocumentacionOpenApiEcommerceTests
 {
     private const string Publicado = "docs/03-diseno-de-software/openapi/ecommerce.v1.json";
 
-    /// <summary>Operaciones del contrato v1 que el E-commerce publica y aún no se sirven: el traslado informado (Pedidos, ECO-6) y las de auditoría, cuyos endpoints existen (<c>MapearAuditoria</c>) pero <c>UsarEcommerce</c> todavía no los mapea (hallazgo para el bloque de composición); cuando se mapeen entran en la verificación sin tocar esta lista de más.</summary>
-    private static readonly HashSet<string> PendientesDeImplementar = ["ecommerce.traslados.informar-estado", "ecommerce.auditoria.consultar", "ecommerce.alertas.listar", "ecommerce.alertas.marcar-revisada", "ecommerce.historial.consultar"];
+    /// <summary>Operaciones del contrato v1 que el E-commerce publica y aún no se sirven: el traslado informado (Pedidos, ECO-6). Las de auditoría ya se mapean en <c>UsarEcommerce</c> (COMP-1); cuando se mapee la de traslados, se quita de esta lista.</summary>
+    private static readonly HashSet<string> PendientesDeImplementar = ["ecommerce.traslados.informar-estado"];
 
     private static async Task<WebApplication> Compuesto(Action<WebApplication>? antes = null)
     {

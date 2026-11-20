@@ -1,0 +1,86 @@
+@model BabelHub.Ecommerce.Api.Pedidos.ListaDePedidosVista
+@* La lista de pedidos de las cuatro pantallas (cliente, sucursal, logística y administración): filtro por estado, tabla con estado en texto e icono, páginas y los estados estándar. Nunca lleva contacto, cuenta ni usuario (PED-40). *@
+<div class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+        <h1 class="bh-display">@Model.Encabezado</h1>
+        <p class="mt-2 max-w-2xl opacity-80">@Model.Descripcion</p>
+    </div>
+</div>
+
+<nav class="mt-6 flex flex-wrap gap-2" aria-label="Filtrar por estado">
+    <a class="btn btn-sm @(Model.Filtro is null ? "btn-primary" : "btn-ghost")" href="@Model.RutaDeLaLista" aria-current="@(Model.Filtro is null ? "page" : null)">Todos</a>
+    @foreach (var filtro in Model.Filtros)
+    {
+        <a class="btn btn-sm @(Model.Filtro == filtro.Clave ? "btn-primary" : "btn-ghost")" href="@Model.RutaDeLaLista?estado=@filtro.Clave" aria-current="@(Model.Filtro == filtro.Clave ? "page" : null)">@filtro.Texto</a>
+    }
+</nav>
+
+<div class="mt-4" aria-live="polite">
+    @if (Model.Estado is not null)
+    {
+        <vc:bh-estado modelo="@Model.Estado" />
+    }
+    else
+    {
+        <p class="mb-2 text-sm opacity-80">@Model.Total @(Model.Total == 1 ? "pedido" : "pedidos")</p>
+        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+            <table class="table">
+                <caption class="sr-only">Pedidos con su fecha, su estado, su tipo de entrega y su total</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Pedido</th>
+                        <th scope="col">Estado</th>
+                        <th scope="col">Entrega</th>
+                        <th scope="col" class="text-right">Total</th>
+                        <th scope="col"><span class="sr-only">Detalle</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var pedido in Model.Pedidos)
+                    {
+                        <tr id="pedido-@pedido.Id.ToString("N")">
+                            <th scope="row" class="align-top font-normal">
+                                <div class="font-mono text-sm">@pedido.Numero</div>
+                                <div class="text-xs opacity-70">@pedido.FechaTexto · @pedido.Lineas @(pedido.Lineas == 1 ? "línea" : "líneas")</div>
+                            </th>
+                            <td class="align-top"><span class="bh-chip"><bh-icono nombre="@pedido.EstadoIcono" clase="size-3.5" />@pedido.EstadoTexto</span></td>
+                            <td class="align-top text-sm">
+                                @pedido.TipoTexto
+                                @if (pedido.Sucursal is not null)
+                                {
+                                    <div class="text-xs opacity-70">Sucursal @pedido.Sucursal</div>
+                                }
+                            </td>
+                            <td class="align-top text-right text-sm tabular-nums">@pedido.TotalTexto</td>
+                            <td class="whitespace-nowrap text-right align-top">
+                                <a class="btn btn-sm btn-primary" href="@pedido.RutaDelDetalle" aria-label="Ver el pedido @pedido.Numero">Ver detalle</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (Model.TotalDePaginas > 1)
+        {
+            <nav class="mt-4 flex items-center justify-between gap-3" aria-label="Paginación">
+                @if (Model.Pagina > 1)
+                {
+                    <a class="btn btn-sm" rel="prev" href="@Model.RutaDeLaPagina(Model.Pagina - 1)">Anterior</a>
+                }
+                else
+                {
+                    <span></span>
+                }
+                <span class="text-sm">Página @Model.Pagina de @Model.TotalDePaginas</span>
+                @if (Model.Pagina < Model.TotalDePaginas)
+                {
+                    <a class="btn btn-sm" rel="next" href="@Model.RutaDeLaPagina(Model.Pagina + 1)">Siguiente</a>
+                }
+                else
+                {
+                    <span></span>
+                }
+            </nav>
+        }
+    }
+</div>

@@ -72,7 +72,7 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **ECO-5** | `ecommerce-pagos` (pasarela de pruebas de Culqi) | C | ECO-4; B05 (persona) | ▶ (ECO-5a a ECO-5d hechos y fundidos (T01–T29); subbloques ECO-5a a 5f, T01–T38; 5f condicionado a B05) |
 | **ECO-6** | `ecommerce-pedidos` | E | ECO-5 | ▶ (ECO-6a a ECO-6c y T23 hechos (T01–T23); ECO-6d a 6f, T24–T42) |
 | **ECO-7** | Planificar biblioteca digital, envíos, devoluciones y libro de reclamaciones | C | ECO-6 | ☑ (planes aprobados el 2026-11-18) |
-| **ECO-8** | `ecommerce-biblioteca-digital` (archivos y URLs firmadas) | C | ECO-7 | ☐ (ECO-8a a 8e, T01–T26) |
+| **ECO-8** | `ecommerce-biblioteca-digital` (archivos y URLs firmadas) | C | ECO-7 | ▶ (ECO-8a a 8d y parte de 8e fundidos, T01–T24; T25 E2E espera el host compuesto; fallos de integración en corrección) |
 | **ECO-9** | `ecommerce-envios` | E | ECO-7 | ▶ (ECO-9a a ECO-9d y parte de 9e hechos, T01–T19, T21a, T23, T25 y T13; esperan T14b, T20, T21b, T22 y T24) |
 | **ECO-10** | `ecommerce-devoluciones` | E | ECO-9 | ☐ (ECO-10a a 10f, T01–T34) |
 | **ECO-11** | `ecommerce-libro-reclamaciones` | E | ECO-7 | ☑ (T01–T23 salvo el E2E T22, que espera Node y COMP-1; integración PostgreSQL 114 de 114) |
@@ -111,6 +111,15 @@ Cuarta tanda fundida (AUD-4 T22–T27 del carril A y WEB-1b/WEB-1c del carril C)
 Tercera ola fundida (merges `22df391` de A, `claude/festive-feynman-2c4bef` de B y `claude/elastic-jepsen-1b3bd3` de C): unitarias 1541 y 1479, arquitectura 155, SpecCheck 23, CoverageCheck 12, **integración 2601 de 2601** (22 min, sola), gitleaks limpio. Ritmo: cada ola de carriles rinde unas 35 a 50 tareas por 1,5 a 2 horas de reloj.
 
 **Lectura de la primera ola (2026-11-14).** La planificación con puerta delegada es el cuello de botella real: tres de cuatro carriles-ola gastaron 4 a 6 rondas de revisión en planes. Para las specs que aún no tienen plan (biblioteca digital, envíos, devoluciones, reclamaciones, carrito, pagos, pedidos, asistente), conviene planificar en lote desde el inicio y presupuestar 2 rondas extra por spec crítica.
+
+## Carril de evidencias — Sprint 2
+
+| Bloque | Contenido | Nivel | Estado |
+| :--- | :--- | :---: | :---: |
+| **OAS-1** | OpenAPI 3 por servicio generado desde el código y prueba de rutas documentadas (`Microsoft.AspNetCore.OpenApi` 10.0.14) | E | ☑ |
+| **K6-1** | Escenarios k6 por atributo de calidad, entorno local limitado en Docker, estadísticas de PostgreSQL por corrida y corrida oficial (`progress/evidencias/k6/2026-11-20/`); correcciones de pool Npgsql y 503 con la base caída | E | ☑ (rampa de capacidad a 1/2/4 CPU pendiente) |
+| **DOC-1** | Análisis de base de datos y caché (`docs/03-diseno-de-software/09-analisis-de-base-de-datos-y-cache.md`) | E | ☑ (falta la tabla de capacidad) |
+| **COV-1** | Reporte HTML de cobertura desde `tools/CoverageCheck` archivado en el CI; corrida completa | E | ▶ |
 
 ## Acordado y pendiente de la persona
 
