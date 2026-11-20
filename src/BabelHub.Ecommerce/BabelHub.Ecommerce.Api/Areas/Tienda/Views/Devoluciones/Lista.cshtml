@@ -1,0 +1,77 @@
+@model BabelHub.Ecommerce.Api.Devoluciones.ListaDeDevolucionesVista
+<div>
+    <h1 class="bh-display">@Model.Titulo</h1>
+    <p class="mt-2 max-w-2xl opacity-80">@Model.Descripcion</p>
+</div>
+
+@if (Model.Aviso is not null)
+{
+    <div class="alert alert-success mt-4" role="status"><bh-icono nombre="exito" /><span>@Model.Aviso</span></div>
+}
+
+<div class="mt-4" aria-live="polite">
+    @if (Model.Estado is not null)
+    {
+        <vc:bh-estado modelo="@Model.Estado" />
+    }
+    else
+    {
+        <p class="mb-2 text-sm opacity-80">@Model.Total @(Model.Total == 1 ? "devolución" : "devoluciones")</p>
+        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+            <table class="table">
+                <caption class="sr-only">Devoluciones con su tipo, el estado de cada libro y su reembolso</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Devolución</th>
+                        <th scope="col">Tipo</th>
+                        <th scope="col">Estado de los libros</th>
+                        <th scope="col">Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in Model.Devoluciones)
+                    {
+                        <tr id="devolucion-@d.Id.ToString("N")">
+                            <th scope="row" class="align-top font-normal">
+                                <a class="link font-mono text-sm" href="@d.Ruta">@d.IdCorto</a>
+                                <div class="text-xs opacity-70">Pedido <span class="font-mono">@d.PedidoCorto</span></div>
+                            </th>
+                            <td class="align-top text-sm">@d.Tipo@(d.EsReporte ? " · reporte de archivo" : string.Empty)@(d.Sucursal is not null ? " · " + d.Sucursal : string.Empty)</td>
+                            <td class="align-top">
+                                <ul class="grid gap-1">
+                                    @foreach (var l in d.Lineas)
+                                    {
+                                        <li><span class="bh-chip"><bh-icono nombre="@l.EstadoIcono" clase="size-3.5" />@l.EstadoTexto</span> <span class="text-xs">@l.Cantidad × @l.MontoTexto@(l.ReembolsoPendiente ? " · reembolso pendiente" : string.Empty)</span></li>
+                                    }
+                                </ul>
+                            </td>
+                            <td class="align-top text-xs">@d.CreadaTexto</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (Model.TotalDePaginas > 1)
+        {
+            <nav class="mt-4 flex items-center justify-between gap-3" aria-label="Paginación">
+                @if (Model.Pagina > 1)
+                {
+                    <a class="btn btn-sm" rel="prev" href="@Model.RutaDeLaPagina(Model.Pagina - 1)">Anterior</a>
+                }
+                else
+                {
+                    <span></span>
+                }
+                <span class="text-sm">Página @Model.Pagina de @Model.TotalDePaginas</span>
+                @if (Model.Pagina < Model.TotalDePaginas)
+                {
+                    <a class="btn btn-sm" rel="next" href="@Model.RutaDeLaPagina(Model.Pagina + 1)">Siguiente</a>
+                }
+                else
+                {
+                    <span></span>
+                }
+            </nav>
+        }
+    }
+</div>

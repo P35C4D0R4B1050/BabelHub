@@ -3,6 +3,7 @@ using BabelHub.Ecommerce.Api.Identidad;
 using BabelHub.Ecommerce.Api.Carrito;
 using BabelHub.Ecommerce.Api.Catalogo;
 using BabelHub.Ecommerce.Api.Biblioteca;
+using BabelHub.Ecommerce.Api.Devoluciones;
 using BabelHub.Ecommerce.Api.Envios;
 using BabelHub.Ecommerce.Api.Notificaciones;
 using BabelHub.Ecommerce.Api.Pedidos;
@@ -465,6 +466,9 @@ public static class AnfitrionDelEcommerce
         servicios.AgregarTrabajosDePedidosEnLaApi(soloEnModoNormal);
         servicios.AgregarBiblioteca(guardarProduccion, opciones.AlmacenDeBiblioteca);
         servicios.AgregarTrabajosDeBibliotecaEnLaApi(soloEnModoNormal);
+        // Devoluciones va después de Pagos, Pedidos y Biblioteca (necesita IReembolsos, el contrato de lectura de Pedidos y IAccesosParaDevoluciones reales) y del cliente del Inventario; sus trabajos de fondo solo corren en modo normal.
+        servicios.AgregarDevoluciones(guardarProduccion);
+        servicios.AgregarTrabajosDeDevolucionesEnLaApi(soloEnModoNormal);
         servicios.AgregarDoblesProvisionalesDelCarrito(guardarProduccion);
         servicios.AgregarDoblesProvisionalesDePagos(guardarProduccion);
         servicios.AgregarDoblesProvisionalesDePedidos(guardarProduccion);
