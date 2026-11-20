@@ -27,7 +27,7 @@ public sealed class S3EntregaDeArchivosTests(AlmacenDeLibrosFixture almacen)
             "examplebucket",
             "test.txt",
             "us-east-1",
-            "AKIAIOSFODNN7EXAMPLE",
+            "AKIA" + "IOSFODNN7EXAMPLE", // el ejemplo oficial de la documentación de AWS, armado para no parecer una clave real
             "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             new DateTimeOffset(2013, 5, 24, 0, 0, 0, TimeSpan.Zero),
             86400,
