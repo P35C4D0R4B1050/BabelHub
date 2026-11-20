@@ -199,6 +199,7 @@ internal sealed class EntornoIntegradoDeBiblioteca
         Listar = new ListarMiBiblioteca(Autorizador, bd.Accesos, Proyector);
         Consulta = new ConsultarBibliotecaDeUnCliente(Autorizador, bd.Accesos, Proyector, Auditoria, bd.Unidad);
         PedirAyuda = new PedirAyuda(Autorizador, bd.Accesos, bd.Descargas, bd.Unidad, Reloj);
+        ListarAyudas = new ListarAyudas(Autorizador, bd.Descargas);
         Restituir = new RestituirDescargas(Autorizador, bd.Accesos, bd.Descargas, Proyector, Auditoria, bd.Unidad, Reloj);
         DepurarRegistros = new DepurarRegistrosDeDescargas(Actor, bd.Descargas, Auditoria, bd.Unidad, Reloj);
         DepurarAyudas = new DepurarAyudas(Actor, bd.Descargas, Auditoria, bd.Unidad, Reloj);
@@ -243,6 +244,8 @@ internal sealed class EntornoIntegradoDeBiblioteca
     public ConsultarBibliotecaDeUnCliente Consulta { get; }
 
     public PedirAyuda PedirAyuda { get; }
+
+    public ListarAyudas ListarAyudas { get; }
 
     public RestituirDescargas Restituir { get; }
 
