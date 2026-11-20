@@ -24,9 +24,9 @@ Cuatro VMs de una sola cuenta: dos ARM de **1 OCPU y 6 GB** y dos AMD micro de *
 | Redis (contadores de límites) | 100 MB | 10–40 MB | VM-VENTAS | Instancia dedicada con `noeviction`, tope de claves, ACL y TLS (`transversal-seguridad` D17); alerta al 70 %. |
 | n8n | 600 MB | 300–500 MB | VM-VENTAS | Proceso de Node; el mayor consumo individual. |
 | Evolution API | 600 MB | 300–500 MB | VM-VENTAS | Proceso de Node. |
-| BabelHub.Inventario | 350 MB | 150–250 MB | VM-INVENTARIO | |
+| BabelHub.Inventario | 512 MB | 150–250 MB | VM-INVENTARIO | Dimensionamiento por decisión de la persona del 2026-11-20 (DD-17): 0,6 CPU y 512 MB (antes 0,3 CPU y 350 MB), para cumplir RNF02 según la medición de K6-1. |
 | BabelHub.Ecommerce (gestión) | 450 MB | 200–350 MB | VM-INVENTARIO | Réplica de respaldo: mismo código, solo las áreas Sucursal y Admin. |
-| PostgreSQL | 2,0 GB | 1,2–1,8 GB | VM-INVENTARIO | Una instancia con dos bases de negocio (`ecommerce` e `inventario`) y la técnica de Evolution API; `shared_buffers` ~768 MB; `CONNECTION LIMIT` por rol. |
+| PostgreSQL | 2,0 GB | 1,2–1,8 GB | VM-INVENTARIO | 0,4 CPU (DD-17). Una instancia con dos bases de negocio (`ecommerce` e `inventario`) y la técnica de Evolution API; `shared_buffers` ~768 MB; `CONNECTION LIMIT` por rol. |
 | Tareas de respaldo | 256 MB | — | VM-INVENTARIO | Volcado y cifrado secuenciales, fuera de horas pico. |
 | Sistema y Docker | — | ~0,3–0,5 GB | Cada VM | |
 
@@ -34,7 +34,7 @@ Cuatro VMs de una sola cuenta: dos ARM de **1 OCPU y 6 GB** y dos AMD micro de *
 | :--- | :---: | :---: | :--- |
 | VM-BORDE | ~0,13 GB + sistema | ~0,5 GB | Dentro del 70 % (0,7 GB); es la más justa. |
 | VM-VENTAS | ~2,1 GB + sistema | ~1,5–2,3 GB | Dentro del 70 % (4,2 GB), con holgura para picos. |
-| VM-INVENTARIO | ~3,1 GB + sistema | ~2,1–2,9 GB | **La VM ARM más justa en memoria:** la suma de límites (350 + 450 + 2000 + 256 MB = ~3,1 GB) más el sistema (0,3–0,5 GB) llega a unos 3,4–3,6 GB, con 0,6–0,8 GB de margen bajo el 70 % (4,2 GB); el respaldo y el archivado de WAL corren dentro de esa suma (PLA-05). Orden de recorte si supera el 70 %: bajar `shared_buffers` de PostgreSQL (768 MB), reducir el límite de la réplica de gestión (450 MB), correr el respaldo solo fuera de horas pico y, al final, mover la réplica a otro lugar. Se mide en B11. |
+| VM-INVENTARIO | ~3,2 GB + sistema | ~2,1–2,9 GB | **La VM ARM más justa en memoria:** la suma de límites (512 + 450 + 2000 + 256 MB = ~3,2 GB) más el sistema (0,3–0,5 GB) llega a unos 3,5–3,7 GB, con 0,5–0,7 GB de margen bajo el 70 % (4,2 GB); el respaldo y el archivado de WAL corren dentro de esa suma (PLA-05). Orden de recorte si supera el 70 %: bajar `shared_buffers` de PostgreSQL (768 MB), reducir el límite de la réplica de gestión (450 MB), correr el respaldo solo fuera de horas pico y, al final, mover la réplica a otro lugar. Se mide en B11. |
 | VM-AUX | — | ~0,3 GB | Amplia. |
 
 ## 3. CPU, concurrencia y red
