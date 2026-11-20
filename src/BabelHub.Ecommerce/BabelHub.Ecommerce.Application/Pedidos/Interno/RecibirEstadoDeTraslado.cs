@@ -19,7 +19,9 @@ public sealed class RecibirEstadoDeTraslado(
     IAuditoria auditoria,
     IPublicadorDeAlertasTecnicas alertas,
     Notificaciones.INotificador notificador,
-    IReloj reloj) : IReceptorDeEstadosDeTraslado
+    IReloj reloj,
+    IActorActual actores,
+    AcotadorDeAlertasDePedidos? acotador = null) : IReceptorDeEstadosDeTraslado
 {
     public const string AlertaPedidoInexistente = "pedido-estado-de-traslado-de-un-pedido-o-linea-inexistente";
     public const string AlertaLineaAnulada = "pedido-estado-de-traslado-de-una-linea-anulada";
@@ -27,6 +29,12 @@ public sealed class RecibirEstadoDeTraslado(
     public async Task<Resultado<bool>> Recibir(EstadoDeTrasladoRecibido estado, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(estado);
+        // Defensa en profundidad: aunque la Api se equivoque de ruta, solo la integración del Inventario informa estados de traslado.
+        if (actores.Actual is not { Tipo: TipoDeActor.Integracion, Integracion: IntegracionesDeServicio.Inventario })
+        {
+            return Resultado<bool>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDePedidos.Prohibido));
+        }
+
         if (Validar(estado) is { } invalido)
         {
             return Resultado<bool>.Fallo(invalido);
@@ -122,6 +130,11 @@ public sealed class RecibirEstadoDeTraslado(
 
     private async Task PublicarAlerta(string motivo, CancellationToken cancelacion)
     {
+        if (acotador is not null && !acotador.Permitir(motivo, reloj.Ahora))
+        {
+            return;
+        }
+
         try
         {
             await alertas.Publicar(new AlertaTecnica(motivo, reloj.Ahora), cancelacion).ConfigureAwait(false);
