@@ -56,15 +56,18 @@ public sealed class ContextoDePagina(IHttpContextAccessor acceso, IPreferenciaDe
         [
             new ItemDeMenu("Catálogo", "/catalogo", "libro"),
             new ItemDeMenu("Carrito", "/carrito", "carrito"),
+            new ItemDeMenu("Mis pedidos", "/cuenta/pedidos", "bandeja"),
             new ItemDeMenu("Mi biblioteca", "/biblioteca", "libro"),
         ],
         AreaDeLaPagina.Sucursal =>
         [
             new ItemDeMenu("Envíos", "/logistica/envios", "camion"),
+            new ItemDeMenu("Pedidos a domicilio", "/logistica/pedidos", "bandeja"),
         ],
         AreaDeLaPagina.Admin =>
         [
             new ItemDeMenu("Catálogo nacional", "/administracion/obras", "libro"),
+            new ItemDeMenu("Pedidos", "/administracion/pedidos", "bandeja"),
             new ItemDeMenu("Ayudas de la biblioteca", "/administracion/biblioteca/ayudas", "bandeja"),
         ],
         _ => [],

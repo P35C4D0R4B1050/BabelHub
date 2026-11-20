@@ -1,0 +1,206 @@
+@model BabelHub.Ecommerce.Api.Pedidos.DetalleDePedidoVista
+@* El detalle de un pedido de las cuatro pantallas. El contacto solo aparece para el titular y el personal (la lectura del personal se audita en la Aplicación); las acciones sobre líneas, la cancelación y la anulación solo si el controlador las ofrece (no con los textos legales pendientes). *@
+<nav class="text-sm" aria-label="Migas de pan"><a class="link" href="@Model.RutaDeLaLista">← Volver a la lista</a></nav>
+
+<div class="mt-3 flex flex-wrap items-end justify-between gap-4">
+    <div>
+        <p class="text-sm opacity-70">Pedido del @Model.FechaTexto</p>
+        <h1 class="bh-display">@Model.Numero</h1>
+    </div>
+    <span class="bh-chip"><bh-icono nombre="@Model.EstadoIcono" clase="size-3.5" />@Model.EstadoTexto</span>
+</div>
+
+@if (Model.Aviso is not null)
+{
+    <div class="alert alert-success mt-4" role="status"><bh-icono nombre="exito" /><span>@Model.Aviso</span></div>
+}
+
+@if (Model.ReembolsoPendienteTexto is not null)
+{
+    <div class="alert alert-warning mt-4" role="status">
+        <bh-icono nombre="aviso" />
+        <span>@Model.ReembolsoPendienteTexto</span>
+        @if (Model.RutaDeReintentarElReembolso is not null)
+        {
+            <bh-accion-de-cambio>
+                <form method="post" action="@Model.RutaDeReintentarElReembolso">
+                    <partial name="_TokenAntifalsificacion" />
+                    <button type="submit" class="btn btn-sm"><bh-icono nombre="reintentar" clase="size-4" />Reintentar el reembolso</button>
+                </form>
+            </bh-accion-de-cambio>
+        }
+    </div>
+}
+
+<div class="mt-6 grid gap-6 lg:grid-cols-[1fr_20rem]">
+    <section aria-labelledby="titulo-de-lineas">
+        <h2 id="titulo-de-lineas" class="font-semibold">Libros del pedido</h2>
+        @{
+            var seleccionable = Model.Acciones.Count > 0 && Model.Lineas.Any(l => l.Operable);
+        }
+        <form method="post" id="operar-lineas" class="mt-3">
+            @if (seleccionable)
+            {
+                <partial name="_TokenAntifalsificacion" />
+            }
+            <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+                <table class="table">
+                    <caption class="sr-only">Líneas del pedido con su cantidad, su importe y su estado</caption>
+                    <thead>
+                        <tr>
+                            @if (seleccionable)
+                            {
+                                <th scope="col"><span class="sr-only">Elegir</span></th>
+                            }
+                            <th scope="col">Libro</th>
+                            <th scope="col" class="text-right">Cant.</th>
+                            <th scope="col" class="text-right">Importe</th>
+                            <th scope="col">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var linea in Model.Lineas)
+                        {
+                            <tr id="linea-@linea.Id.ToString("N")">
+                                @if (seleccionable)
+                                {
+                                    <td class="align-top">
+                                        @if (linea.Operable)
+                                        {
+                                            <input type="checkbox" class="checkbox checkbox-sm" name="lineaIds" value="@linea.Id.ToString("D")" aria-label="Elegir @linea.Titulo" />
+                                        }
+                                    </td>
+                                }
+                                <th scope="row" class="align-top font-normal">
+                                    <div>@linea.Titulo</div>
+                                    <div class="text-xs opacity-70">
+                                        @(linea.EsDigital ? "Libro digital" : "Libro impreso")
+                                        @if (linea.Isbn is not null) { <text> · ISBN @linea.Isbn</text> }
+                                        @if (linea.FuenteTexto is not null) { <text> · Sucursal de origen @linea.FuenteTexto</text> }
+                                    </div>
+                                </th>
+                                <td class="align-top text-right tabular-nums">@linea.Cantidad</td>
+                                <td class="align-top text-right tabular-nums">
+                                    @linea.ImporteTexto
+                                    <div class="text-xs opacity-70">@linea.PrecioTexto c/u</div>
+                                </td>
+                                <td class="align-top text-sm">
+                                    <span class="bh-chip"><bh-icono nombre="@linea.EstadoIcono" clase="size-3.5" />@linea.EstadoTexto</span>
+                                    @if (linea.TrasladoTexto is not null)
+                                    {
+                                        <div class="mt-1 text-xs">@linea.TrasladoTexto</div>
+                                    }
+                                    @if (linea.ListoTexto is not null && linea.EntregadaTexto is null)
+                                    {
+                                        <div class="mt-1 text-xs opacity-70">Listo desde @linea.ListoTexto</div>
+                                    }
+                                    @if (linea.EntregadaTexto is not null)
+                                    {
+                                        <div class="mt-1 text-xs opacity-70">Entregado el @linea.EntregadaTexto</div>
+                                    }
+                                    @if (linea.AnuladaTexto is not null)
+                                    {
+                                        <div class="mt-1 text-xs opacity-70">Anulado el @linea.AnuladaTexto</div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (seleccionable)
+            {
+                <bh-accion-de-cambio>
+                    <div class="mt-3 flex flex-wrap items-center gap-2">
+                        <span class="text-sm opacity-80">Con las líneas elegidas:</span>
+                        @foreach (var accion in Model.Acciones)
+                        {
+                            <button type="submit" class="btn btn-sm @(accion.Clave == "entregar" ? "btn-primary" : "btn-outline")" formaction="@accion.Ruta"><bh-icono nombre="@accion.Icono" clase="size-4" />@accion.Texto</button>
+                        }
+                    </div>
+                </bh-accion-de-cambio>
+            }
+        </form>
+    </section>
+
+    <aside class="space-y-4" aria-label="Resumen del pedido">
+        <div class="rounded-box border border-base-300 bg-base-100 p-4 text-sm">
+            <h2 class="font-semibold">Resumen</h2>
+            <dl class="mt-2 space-y-1">
+                <div class="flex justify-between gap-2"><dt>Entrega</dt><dd>@Model.TipoTexto</dd></div>
+                @if (Model.Sucursal is not null)
+                {
+                    <div class="flex justify-between gap-2"><dt>Sucursal de recojo</dt><dd>@Model.Sucursal</dd></div>
+                }
+                @if (Model.CostoDeEnvioTexto is not null)
+                {
+                    <div class="flex justify-between gap-2"><dt>Envío</dt><dd class="tabular-nums">@Model.CostoDeEnvioTexto</dd></div>
+                }
+                <div class="flex justify-between gap-2 font-semibold"><dt>Total</dt><dd class="tabular-nums">@Model.TotalTexto</dd></div>
+            </dl>
+        </div>
+
+        @if (Model.Contacto is not null)
+        {
+            <div class="rounded-box border border-base-300 bg-base-100 p-4 text-sm">
+                <h2 class="font-semibold">Entrega a domicilio</h2>
+                <p class="mt-2">@Model.Contacto.Nombre</p>
+                <p>@Model.Contacto.Telefono</p>
+                <p>@Model.Contacto.Direccion</p>
+                @if (Model.Region is not null)
+                {
+                    <p class="opacity-70">@Model.Region</p>
+                }
+            </div>
+        }
+        else if (Model.ContactoOculto)
+        {
+            <div class="alert alert-warning text-sm" role="status"><bh-icono nombre="candado" /><span>No pudimos mostrar los datos de contacto ahora porque no se pudo registrar su consulta. El resto del pedido sí se muestra; vuelve a intentarlo en unos minutos.</span></div>
+        }
+        else if (Model.ContactoAnonimizado)
+        {
+            <div class="alert text-sm" role="status"><bh-icono nombre="info" /><span>Los datos de contacto de este pedido se anonimizaron y ya no están disponibles.</span></div>
+        }
+
+        @if (Model.RutaDeCancelar is not null)
+        {
+            <bh-accion-de-cambio>
+                <details class="rounded-box border border-base-300 bg-base-100 p-4 text-sm">
+                    <summary class="cursor-pointer font-semibold">Cancelar el pedido</summary>
+                    <p class="mt-2">Se cancela todo el pedido y se te reembolsa el total. Esta acción no se puede deshacer.</p>
+                    <form method="post" action="@Model.RutaDeCancelar" class="mt-3">
+                        <partial name="_TokenAntifalsificacion" />
+                        <button type="submit" class="btn btn-sm btn-error">Sí, cancelar el pedido</button>
+                    </form>
+                </details>
+            </bh-accion-de-cambio>
+        }
+        else if (Model.AlternativaTexto is not null)
+        {
+            <div class="alert text-sm" role="status"><bh-icono nombre="info" /><span>@Model.AlternativaTexto</span></div>
+        }
+
+        @if (Model.RutaDeAnular is not null)
+        {
+            <bh-accion-de-cambio>
+                <details class="rounded-box border border-base-300 bg-base-100 p-4 text-sm">
+                    <summary class="cursor-pointer font-semibold">Anular el pedido</summary>
+                    <form method="post" action="@Model.RutaDeAnular" class="mt-3 space-y-3">
+                        <partial name="_TokenAntifalsificacion" />
+                        <label class="form-control w-full">
+                            <span class="label-text">Motivo</span>
+                            <select class="select select-bordered select-sm w-full" name="motivo" required>
+                                @foreach (var motivo in Model.MotivosDeAnulacion)
+                                {
+                                    <option value="@motivo.Clave">@motivo.Texto</option>
+                                }
+                            </select>
+                        </label>
+                        <p class="text-xs opacity-80">Se liberan las reservas, se revoca el acceso a los libros digitales y se reembolsa lo que corresponda.</p>
+                        <button type="submit" class="btn btn-sm btn-error">Anular el pedido</button>
+                    </form>
+                </details>
+            </bh-accion-de-cambio>
+        }
+    </aside>
+</div>

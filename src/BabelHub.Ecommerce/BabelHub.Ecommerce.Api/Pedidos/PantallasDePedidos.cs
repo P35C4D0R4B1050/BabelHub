@@ -58,7 +58,8 @@ public sealed record LineaDePedidoVista(
     string? FuenteTexto,
     string? ListoTexto,
     string? EntregadaTexto,
-    string? AnuladaTexto);
+    string? AnuladaTexto,
+    bool Operable);
 
 /// <summary>El contacto de entrega: solo lo ven el titular y el personal autorizado (la lectura del personal se audita); nunca se escribe en un registro ni en un aviso.</summary>
 public sealed record ContactoDelPedidoVista(string Nombre, string Telefono, string Direccion);
@@ -583,7 +584,8 @@ public abstract class ControladorDePedidos(ContextoDePagina pagina, OpcionesDeEr
                 l.CodigoDeFuente,
                 l.ListoEn is { } listo ? FormatoPeruano.FechaYHora(listo) : null,
                 l.EntregadaEn is { } entregada ? FormatoPeruano.FechaYHora(entregada) : null,
-                l.AnuladaEn is { } anulada ? FormatoPeruano.FechaYHora(anulada) : null);
+                l.AnuladaEn is { } anulada ? FormatoPeruano.FechaYHora(anulada) : null,
+                !l.EsDigital && l.Estado is not (EstadoVisibleDeLaLinea.Entregado or EstadoVisibleDeLaLinea.Anulado or EstadoVisibleDeLaLinea.NoRecogido));
         }),
     ];
 
