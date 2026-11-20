@@ -4,13 +4,14 @@ using BabelHub.Tools.CoverageCheck;
 // Verifica los umbrales de cobertura de líneas por servicio (PLA-14): Dominio y Aplicación al menos 85 % y el total al menos 70 %,
 // sin código generado ni migraciones. Uso:
 //   dotnet run --project tools/CoverageCheck -- <archivo-o-carpeta>... [--minimo-dominio-aplicacion 85] [--minimo-total 70]
-//                                                [--servicios Ecommerce,Inventario]
+//                                                [--servicios Ecommerce,Inventario] [--html reporte.html]
 // Cada carpeta se recorre buscando informes *.cobertura.xml (el formato de coverlet). Sale con 0 si se cumplen, 1 si no y 2 si el
 // uso o los informes son inválidos.
 var rutas = new List<string>();
 var dominioYAplicacion = 85;
 var total = 70;
 var servicios = new List<string> { "Ecommerce", "Inventario" };
+string? archivoHtml = null;
 
 for (var i = 0; i < args.Length; i++)
 {
@@ -22,6 +23,10 @@ for (var i = 0; i < args.Length; i++)
             break;
         case "--minimo-total" when i + 1 < args.Length && int.TryParse(args[i + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var t):
             total = t;
+            i++;
+            break;
+        case "--html" when i + 1 < args.Length:
+            archivoHtml = args[i + 1];
             i++;
             break;
         case "--servicios" when i + 1 < args.Length:
@@ -73,7 +78,14 @@ if (informes.Count == 0)
 IReadOnlyList<CoberturaDeServicio> resultado;
 try
 {
-    resultado = Cobertura.Calcular(Cobertura.Leer(informes.Select(File.ReadAllText)));
+    var lineasLeidas = Cobertura.Leer(informes.Select(File.ReadAllText));
+    resultado = Cobertura.Calcular(lineasLeidas);
+    if (archivoHtml is not null)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(archivoHtml))!);
+        File.WriteAllText(archivoHtml, ReporteHtml.Generar(lineasLeidas, servicios, new Umbrales(dominioYAplicacion, total)));
+        Console.WriteLine($"Reporte HTML: {archivoHtml}");
+    }
 }
 catch (System.Xml.XmlException error)
 {
