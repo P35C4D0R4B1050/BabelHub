@@ -421,6 +421,8 @@ public sealed class PostgresBloqueoDeLaDepuracion(NpgsqlDataSource origen, strin
         }
         catch
         {
+            // Cancelada entre que la base tomó el bloqueo y llegó la respuesta: no se sabe si quedó tomado, y el grupo no reinicia la sesión; se cierra la conexión física.
+            NpgsqlConnection.ClearPool(conexion);
             await conexion.DisposeAsync().ConfigureAwait(false);
             throw;
         }
@@ -441,7 +443,9 @@ public sealed class PostgresBloqueoDeLaDepuracion(NpgsqlDataSource origen, strin
             }
             catch (NpgsqlException)
             {
-                // Si la conexión se perdió, la base ya liberó el bloqueo al cerrarse la sesión.
+                // Si la conexión se perdió, la base ya liberó el bloqueo al cerrarse la sesión. Si la conexión sigue viva pero no se pudo desbloquear (por ejemplo, un `statement_timeout`), el bloqueo de sesión
+                // sobreviviría en el grupo, que no reinicia la sesión: se cierra la conexión física en lugar de devolverla.
+                NpgsqlConnection.ClearPool(conexion);
             }
             finally
             {
