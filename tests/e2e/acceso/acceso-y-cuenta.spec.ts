@@ -103,7 +103,8 @@ test.describe('Visitante: ingreso, registro y recuperación', () => {
   test('la recuperación responde igual exista o no la cuenta (AC-WEB-20)', async ({ page }) => {
     await page.goto('/recuperacion');
     await expect(page.getByRole('heading', { level: 1, name: 'Recupera tu acceso' })).toBeVisible();
-    await page.getByLabel('Correo electrónico').fill('nadie-existe@correo.example');
+    // El límite por correo (SEG-19) cuenta las solicitudes de la última hora: cada corrida usa un correo propio.
+    await page.getByLabel('Correo electrónico').fill(`nadie-${Date.now()}-${Math.floor(Math.random() * 1e6)}@correo.example`);
     await page.getByRole('button', { name: 'Enviarme el código' }).click();
 
     await expect(page.getByRole('status')).toContainText('Si el correo corresponde a una cuenta');
@@ -175,5 +176,17 @@ test.describe('Cliente con sesión: la cuenta', () => {
     await expect(page).toHaveURL(/\/ingreso$/);
     await page.goto('/cuenta');
     await expect(page).toHaveURL(/\/ingreso$/);
+  });
+});
+
+test.describe('Cliente con sesión: tema oscuro', () => {
+  test('la cuenta cumple AA también con el tema oscuro (pestañas y etiquetas)', async ({ page }) => {
+    await ingresarComoClienteNuevo(page);
+    await page.context().addCookies([{ name: 'bh-tema', value: 'babelhub-dark', url: page.url() === 'about:blank' ? 'https://localhost:8443/' : page.url() }]);
+    for (const ruta of ['/cuenta', '/cuenta/datos', '/cuenta/solicitudes']) {
+      await page.goto(ruta);
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'babelhub-dark');
+      await sinViolacionesAA(page);
+    }
   });
 });

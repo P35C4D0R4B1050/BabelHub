@@ -41,6 +41,8 @@ test.describe('Visitante: el Libro de Reclamaciones', () => {
   test('el enlace del pie está en toda página y lleva al formulario (AC-REC-01)', async ({ page }) => {
     for (const ruta of ['/', '/catalogo', '/carrito', '/legal/terminos', '/ingreso', '/registro']) {
       await page.goto(ruta);
+      // El widget de Turnstile (de tercero) se inserta tarde en las pantallas de acceso y mueve el pie: se espera a que termine antes de hacer clic.
+      await page.waitForLoadState('networkidle');
       const enlace = page.getByRole('navigation', { name: 'Información legal' }).getByRole('link', { name: /Libro de Reclamaciones/ });
       await expect(enlace, `el pie de ${ruta}`).toHaveAttribute('href', '/reclamaciones');
     }
@@ -124,6 +126,16 @@ test.describe('Cliente con sesión: Mis hojas', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Mis hojas de reclamación' })).toBeVisible();
     await expect(page.locator('body')).toContainText('No tienes hojas registradas con tu correo verificado.');
     await sinDesplazamientoHorizontal(page);
+    await sinViolacionesAA(page);
+  });
+});
+
+test.describe('Visitante: el Libro de Reclamaciones con el tema oscuro', () => {
+  test('el formulario cumple AA también con el tema oscuro', async ({ page }) => {
+    await conOrigenPropio(page);
+    await page.context().addCookies([{ name: 'bh-tema', value: 'babelhub-dark', url: 'https://localhost:8443/' }]);
+    await page.goto('/reclamaciones/nueva');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'babelhub-dark');
     await sinViolacionesAA(page);
   });
 });

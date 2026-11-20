@@ -146,6 +146,8 @@ body {
 
 .label {
   color: var(--color-base-content);
+  /* daisyUI no parte las líneas de una etiqueta (nowrap): un texto largo desbordaba la pantalla de 375 px. */
+  white-space: normal;
 }
 
 /* Foco visible en todos los controles (WEB-10) */
