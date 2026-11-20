@@ -475,6 +475,43 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
             cancelacion);
     }
 
+    public Task<PaginaDeOperacionesFallidasGuardada> OperacionesFallidas(int pagina, int tamano, CancellationToken cancelacion = default) =>
+        acceso.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                const string Union = """
+                    SELECT id, pedido_id, 'anulacion' AS tipo, motivo, creada_en,
+                           array_remove(ARRAY[
+                               CASE WHEN envios_cancelados_en IS NOT NULL THEN 'envios-cancelados' END,
+                               CASE WHEN reservas_liberadas_en IS NOT NULL THEN 'reservas-liberadas' END,
+                               CASE WHEN reembolso_registrado_en IS NOT NULL THEN 'reembolso-registrado' END,
+                               CASE WHEN accesos_revocados_en IS NOT NULL THEN 'accesos-revocados' END], NULL) AS pasos
+                    FROM pedidos.anulaciones WHERE estado = 'fallida'
+                    UNION ALL
+                    SELECT e.id, e.pedido_id, 'entrega', NULL::text, e.creada_en,
+                           array_remove(ARRAY[CASE WHEN EXISTS (SELECT 1 FROM pedidos.entrega_lineas l WHERE l.entrega_id = e.id AND l.cierre_confirmado_en IS NOT NULL) THEN 'cierre-confirmado' END], NULL)
+                    FROM pedidos.entregas e WHERE e.estado = 'fallida'
+                    """;
+                int total;
+                await using (var contar = new NpgsqlCommand($"SELECT count(*) FROM ({Union}) f", conexion, transaccion))
+                {
+                    total = Convert.ToInt32(await contar.ExecuteScalarAsync(token).ConfigureAwait(false), System.Globalization.CultureInfo.InvariantCulture);
+                }
+
+                var filas = new List<OperacionFallidaGuardada>();
+                await using var comando = new NpgsqlCommand($"SELECT id, pedido_id, tipo, motivo, creada_en, pasos FROM ({Union}) f ORDER BY creada_en DESC, id LIMIT @tamano OFFSET @desplazamiento", conexion, transaccion);
+                comando.Parameters.AddWithValue("tamano", Math.Max(1, tamano));
+                comando.Parameters.AddWithValue("desplazamiento", Math.Max(0, (pagina - 1) * tamano));
+                await using var lector = await comando.ExecuteReaderAsync(token).ConfigureAwait(false);
+                while (await lector.ReadAsync(token).ConfigureAwait(false))
+                {
+                    filas.Add(new OperacionFallidaGuardada(lector.GetGuid(0), lector.GetGuid(1), lector.GetString(2), AccesoAlEsquemaDePedidos.LeerTexto(lector, 3), lector.GetFieldValue<string[]>(5), lector.GetFieldValue<DateTimeOffset>(4)));
+                }
+
+                return new PaginaDeOperacionesFallidasGuardada(filas, total);
+            },
+            cancelacion);
+
     public Task<IReadOnlyList<Anulacion>> AnulacionesEnCurso(Guid pedidoId, CancellationToken cancelacion = default) =>
         LeerAnulaciones("pedido_id = @valor AND estado = 'en_curso'", [new NpgsqlParameter("valor", pedidoId)], " ORDER BY creada_en", cancelacion);
 
