@@ -44,8 +44,13 @@ extra=()
 for v in DURACION RITMO UNIDADES COMPETIDORES NIVELES SEGUNDOS_POR_NIVEL PENSAR_S; do [ -n "${!v:-}" ] && { export "$v"; extra+=(-e "$v"); }; done
 
 estadisticas() { bash tests/load/entorno/estadisticas-de-base.sh "$@" || true; }
+# Un solo cliente k6 a la vez: se elimina cualquier residuo del anterior, el contenedor lleva nombre fijo (un duplicado falla en vez de competir por la máquina) y un tope de tiempo
+# (TOPE_K6_S, 1800 s por omisión) evita una corrida colgada; al salir se retira el contenedor.
+nombre_k6=bhcarga-k6
+docker rm -f "$nombre_k6" >/dev/null 2>&1 || true
+trap 'docker rm -f "$nombre_k6" >/dev/null 2>&1 || true' EXIT
 correr() {
-  docker run --rm -i --ulimit nofile=1048576:1048576 \
+  timeout "${TOPE_K6_S:-1800}" docker run --name "$nombre_k6" --rm -i --ulimit nofile=1048576:1048576 \
     -v "$(win "$PWD/tests/load"):/carga:ro" -v "$(win "$CARGA_CARPETA/k6"):/credenciales:ro" -v "$(win "$PWD/$resultados"):/resultados" \
     -e BASE_URL -e CREDENCIAL_DISPONIBILIDAD -e CREDENCIAL_OPERACION_DE_USUARIO -e CREDENCIAL_EXPIRACION_DE_RESERVAS -e CREDENCIAL_ORIGEN \
     -e ARCHIVO_DE_CREDENCIALES -e DIRECTORIO_DE_RESULTADOS -e DESPLAZO_DE_ORIGEN "${extra[@]}" \

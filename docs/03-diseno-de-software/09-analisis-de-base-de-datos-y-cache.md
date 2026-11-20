@@ -69,14 +69,14 @@ Rampa de la consulta de disponibilidad (`tests/load/escenarios/rampa.js`, pausa 
 
 | Inventario / PostgreSQL (CPU) / tope del grupo | 50 | 100 | 250 | 500 | 1 000 | 2 000 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **0,3 / 0,8 / 16 (los declarados en el Compose)** | 897 ms | 1,5 s | 5,1 s | 8,3 s | 18,8 s (10 %) | 19,4 s (48 %) |
+| 0,3 / 0,8 / 16 (histórico: declarado antes de DD-17) | 897 ms | 1,5 s | 5,1 s | 8,3 s | 18,8 s (10 %) | 19,4 s (48 %) |
 | 1 / 1 / 16 | 242 ms | 679 ms | 1,4 s | 5,2 s | 7,3 s | 13,3 s |
 | 2 / 1 / 16 | 146 ms | 403 ms | 2,1 s | 7,6 s | 13,2 s | 15,2 s (27 %) |
 | 2 / 1 / 40 | 308 ms | 981 ms | 3,3 s | 6,4 s | 13,6 s | 15,5 s (18 %) |
 | 4 / 2 / 16 | 50 ms | 133 ms | 1,3 s | 2,4 s | 5,0 s | 7,2 s |
 | 4 / 2 / 60 | 25 ms | 133 ms | 885 ms | 2,4 s | 5,7 s | 13,7 s |
 
-(Referencia previa, 0,6 / 0,4 / 16: 434 ms con 50 usuarios y 1,1 s con 100.) Resultados completos en `progress/evidencias/k6/2026-11-20-capacidad/`.
+(Referencia previa, 0,6 / 0,4 / 16, hoy el dimensionamiento **declarado** por DD-17: 434 ms con 50 usuarios y 1,1 s con 100; la serie final sobre `main` con ese dimensionamiento va en `progress/evidencias/k6/2026-11-20-final/`.) Resultados completos en `progress/evidencias/k6/2026-11-20-capacidad/`.
 
 **Lo que se mide, sin maquillar**
 
