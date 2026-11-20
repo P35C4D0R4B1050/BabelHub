@@ -163,6 +163,20 @@ public static class ProblemasHttp
 /// </summary>
 public sealed class ManejadorDeExcepciones(OpcionesDeErrores opciones, ILogger<ManejadorDeExcepciones> registro) : IExceptionHandler
 {
+    /// <summary>Un fallo transitorio de la base (conexión perdida, plazo vencido, sin conexiones libres) en cualquier nivel de la cadena de excepciones; un error de base que no es transitorio es un defecto y no entra aquí.</summary>
+    internal static bool EsBaseNoDisponible(Exception excepcion)
+    {
+        for (var actual = excepcion; actual is not null; actual = actual.InnerException)
+        {
+            if (actual is TimeoutException or System.Data.Common.DbException { IsTransient: true })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(httpContext);
@@ -184,6 +198,8 @@ public sealed class ManejadorDeExcepciones(OpcionesDeErrores opciones, ILogger<M
             // La política de filas rechazó el acceso: es un acceso fuera de alcance (403 registrado), nunca «sin stock» ni un 500 (INV-1a).
             AlcanceDeDatosDenegadoException => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.Prohibido, "alcance-insuficiente"),
             BadHttpRequestException => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.Validacion),
+            // La base inalcanzable, sin conexiones libres o vencida en plazo es «servicio no disponible» (503 uniforme: el cliente reintenta), no un error inesperado (hallazgo de K6-1, resiliencia).
+            _ when EsBaseNoDisponible(exception) => ProblemasHttp.Crear(httpContext, opciones, CategoriaDeError.NoDisponible),
             _ => null,
         };
 
