@@ -535,6 +535,12 @@ internal sealed class SolicitudesDeCodigoDePrueba : IRegistroDeSolicitudesDeCodi
 
     public Task Registrar(string huellaDelCorreo, PropositoDeCodigo proposito, DateTimeOffset ahora, CancellationToken cancelacion = default)
     {
+        // La misma restricción que la columna `huella_correo` (64 hexadecimales en minúscula): una huella de otra forma solo fallaba contra la base real.
+        if (!System.Text.RegularExpressions.Regex.IsMatch(huellaDelCorreo, "^[0-9a-f]{64}$"))
+        {
+            throw new InvalidOperationException("La huella del correo no cumple la restricción de la columna huella_correo.");
+        }
+
         Registradas.Add((huellaDelCorreo, proposito));
         return Task.CompletedTask;
     }
