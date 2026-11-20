@@ -56,6 +56,7 @@ public sealed class ContextoDePagina(IHttpContextAccessor acceso, IPreferenciaDe
         [
             new ItemDeMenu("Catálogo", "/catalogo", "libro"),
             new ItemDeMenu("Carrito", "/carrito", "carrito"),
+            new ItemDeMenu("Mi biblioteca", "/biblioteca", "libro"),
         ],
         AreaDeLaPagina.Sucursal =>
         [
@@ -64,6 +65,7 @@ public sealed class ContextoDePagina(IHttpContextAccessor acceso, IPreferenciaDe
         AreaDeLaPagina.Admin =>
         [
             new ItemDeMenu("Catálogo nacional", "/administracion/obras", "libro"),
+            new ItemDeMenu("Ayudas de la biblioteca", "/administracion/biblioteca/ayudas", "bandeja"),
         ],
         _ => [],
     };

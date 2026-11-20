@@ -64,6 +64,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
         "edicion-de-lineas-por-origen",
         "revision-del-checkout-por-cuenta",
         "pasos-al-pago-por-cuenta",
+        "enlaces-de-descarga-por-cuenta",
         "volver-o-reiniciar-por-cuenta",
         "consultas-de-envios-por-usuario",
         "operaciones-de-envios-por-usuario",

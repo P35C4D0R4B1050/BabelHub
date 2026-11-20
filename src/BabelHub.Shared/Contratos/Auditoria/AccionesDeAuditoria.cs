@@ -61,6 +61,10 @@ public static class AccionesDeAuditoria
 
     public const string DescargasRestituidas = "DescargasRestituidas";
 
+    public const string DescargasDeBibliotecaDepuradas = "DescargasDeBibliotecaDepuradas";
+
+    public const string AyudasDeBibliotecaDepuradas = "AyudasDeBibliotecaDepuradas";
+
     public const string DevolucionSolicitada = "DevolucionSolicitada";
 
     public const string EdicionDadaDeBaja = "EdicionDadaDeBaja";
@@ -272,6 +276,8 @@ public static class AccionesDeAuditoria
         CuentaReemplazada,
         DepuracionDiariaEjecutada,
         DescargasRestituidas,
+        DescargasDeBibliotecaDepuradas,
+        AyudasDeBibliotecaDepuradas,
         DevolucionSolicitada,
         EdicionDadaDeBaja,
         EdicionDigitalRetirada,

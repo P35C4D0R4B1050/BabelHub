@@ -128,6 +128,9 @@ public static class MotivosDeAlerta
     /// <summary>Una guía de un envío cancelado quedó sin uso en el operador logístico y hay que avisarle (R05).</summary>
     public const string EnvioGuiaSinUso = "envio-guia-sin-uso";
 
+    /// <summary>El archivo de una edición digital falta en el almacén de objetos al pedir una descarga (BIB-13); agrupada por edición y hora, sin datos del cliente.</summary>
+    public const string BibliotecaArchivoFaltante = "biblioteca-archivo-faltante";
+
     /// <summary>Una anulación o una entrega de pedido quedó fallida: su reanudación no pudo completarla y alguien debe revisarla.</summary>
     public const string PedidoOperacionFallida = "pedido-operacion-fallida";
 
@@ -212,6 +215,7 @@ public static class CatalogoDeAlertasDeAuditoria
         new(MotivosDeAlerta.EnvioGuiaRepetida, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.EnvioProgresoSinInformar, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.EnvioGuiaSinUso, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.BibliotecaArchivoFaltante, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.PedidoOperacionFallida, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.PedidoLiberacionNoRecogidoYaCerrada, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.PedidoLiberacionDeAnulacionYaCerrada, ClaseDeAlerta.Tecnica),

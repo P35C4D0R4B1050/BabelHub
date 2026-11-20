@@ -49,8 +49,8 @@ public sealed partial class BibliotecaController(IDescargasDeLaBiblioteca biblio
         var resultado = await biblioteca.SolicitarEnlace(id, clave, cancelacion);
         if (!resultado.EsExito)
         {
-            var problema = ProblemasHttp.Crear(HttpContext, opciones, resultado.Error!);
-            return await Estado(TraductorDeErrores.Traducir(problema, parteAfectada: "No podemos preparar tu descarga ahora.", rutaDeReintento: null), cancelacion);
+            var problema = Biblioteca.ProblemasDeBiblioteca.Crear(HttpContext, opciones, resultado.Error!);
+            return await Estado(Biblioteca.PantallasDeBiblioteca.Traducir(problema, resultado.Error!, Biblioteca.PantallasDeBiblioteca.RutaDeMiBiblioteca, "No podemos preparar tu descarga ahora."), cancelacion);
         }
 
         // Solo se redirige a un enlace https: nunca a otro esquema, aunque el módulo lo entregara (defensa en profundidad).

@@ -98,6 +98,7 @@ public static class PresentadorDeAuditoria
         ["envio-guia-repetida"] = "El operador devolvió un número de guía que ya usa otro envío",
         ["envio-progreso-sin-informar"] = "Pedidos no recibió el avance de un envío en más de una hora",
         ["envio-guia-sin-uso"] = "Una guía de un envío cancelado quedó sin uso en el operador",
+        ["biblioteca-archivo-faltante"] = "El archivo de un libro digital falta en el almacén y un cliente no pudo descargarlo",
         ["pedido-operacion-fallida"] = "Una anulación o una entrega de un pedido quedó fallida y hay que revisarla",
         ["pedido-liberacion-no-recogido-ya-cerrada"] = "Al marcar un pedido no recogido, la reserva de una línea ya estaba cerrada",
         ["pedido-liberacion-de-anulacion-ya-cerrada"] = "Al anular un pedido, la reserva de una línea ya estaba cerrada",

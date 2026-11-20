@@ -1,6 +1,7 @@
 using BabelHub.Ecommerce.Api.Auditoria;
 using BabelHub.Ecommerce.Api.Carrito;
 using BabelHub.Ecommerce.Api.Catalogo;
+using BabelHub.Ecommerce.Api.Biblioteca;
 using BabelHub.Ecommerce.Api.Envios;
 using BabelHub.Ecommerce.Api.Notificaciones;
 using BabelHub.Ecommerce.Api.Pagos;
@@ -95,6 +96,9 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
 
     internal OpcionesDelAlmacenDeObjetos AlmacenDeSupresiones { get; private init; } = null!;
 
+    /// <summary>El almacén de libros de solo lectura de Biblioteca (<c>Almacen:Biblioteca:</c>): obligatorio en producción; fuera de ella, si falta, Biblioteca entrega contenido sintético en memoria.</summary>
+    internal OpcionesDelAlmacenDeObjetos? AlmacenDeBiblioteca { get; private init; }
+
     internal OpcionesDelHostWeb Host { get; private init; } = null!;
 
     internal ConfiguracionDeSesionesWeb Sesiones { get; private init; } = null!;
@@ -164,6 +168,8 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
             "Almacen:Catalogo:ClaveSecreta",
             "Almacen:Supresiones:ClaveDeAcceso",
             "Almacen:Supresiones:ClaveSecreta",
+            "Almacen:Biblioteca:ClaveDeAcceso",
+            "Almacen:Biblioteca:ClaveSecreta",
             "Pagos:ClaveDeIntentos",
             "Pagos:ClaveDeIntentosAnterior",
             "Pagos:LlavePrivada",
@@ -198,6 +204,7 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
         var identidad = Capturar(extra, () => OpcionesDeIdentidad.Leer(configuracion, esProduccion));
         var almacenDelCatalogo = Capturar(extra, () => OpcionesDelAlmacenDeObjetos.Cargar(configuracion, permitirHttp: !esProduccion, raiz: "Almacen:Catalogo:"));
         var almacenDeSupresiones = Capturar(extra, () => OpcionesDelAlmacenDeObjetos.Cargar(configuracion, permitirHttp: !esProduccion, raiz: "Almacen:Supresiones:"));
+        var almacenDeBiblioteca = esProduccion || configuracion["Almacen:Biblioteca:Endpoint"] is { Length: > 0 } ? Capturar(extra, () => OpcionesDelAlmacenDeObjetos.Cargar(configuracion, permitirHttp: !esProduccion, raiz: "Almacen:Biblioteca:")) : null;
         var host = Capturar(extra, () => OpcionesDelHostWeb.Leer(configuracion, esProduccion));
         var sesiones = host is null ? null : Capturar(extra, () => ConfiguracionDeSesionesWeb.Leer(configuracion, host.Host == HostWeb.Tienda ? HostDeSesion.Tienda : HostDeSesion.Gestion));
         var verificacion = Capturar(extra, () => new OpcionesDeVerificacionWeb(configuracion["Seguridad:Turnstile:ClaveDeSitio"] ?? string.Empty));
@@ -231,6 +238,7 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
             ClaveDeIngresos = claveDeIngresos!,
             AlmacenDelCatalogo = almacenDelCatalogo!,
             AlmacenDeSupresiones = almacenDeSupresiones!,
+            AlmacenDeBiblioteca = almacenDeBiblioteca,
             Host = host!,
             Sesiones = sesiones!,
             VerificacionWeb = verificacion!,
@@ -446,7 +454,8 @@ public static class AnfitrionDelEcommerce
         servicios.AgregarReclamaciones();
         servicios.AgregarTrabajosDeReclamacionesEnLaApi(soloEnModoNormal);
         servicios.AgregarPedidos(esProduccion: false);
-        servicios.AgregarBibliotecaPendiente();
+        servicios.AgregarBiblioteca(guardarProduccion, opciones.AlmacenDeBiblioteca);
+        servicios.AgregarTrabajosDeBibliotecaEnLaApi(soloEnModoNormal);
         servicios.AgregarDoblesProvisionalesDelCarrito(guardarProduccion);
         servicios.AgregarDoblesProvisionalesDePagos(guardarProduccion);
         servicios.AgregarDoblesProvisionalesDePedidos(guardarProduccion);

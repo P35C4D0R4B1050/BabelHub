@@ -100,6 +100,8 @@ public static partial class CatalogoDeAccionesDeAuditoria
         [nameof(AccionesAuditables.ClaveDeFirmaRotada)] = ["clave-de-firma"],
         [nameof(AccionesAuditables.ClaveDeFirmaDeclaradaComprometida)] = ["clave-de-firma"],
         [nameof(AccionesAuditables.DescargasRestituidas)] = ["acceso-digital"],
+        [nameof(AccionesAuditables.DescargasDeBibliotecaDepuradas)] = [],
+        [nameof(AccionesAuditables.AyudasDeBibliotecaDepuradas)] = [],
         [nameof(AccionesAuditables.AccesoDigitalRevocado)] = ["acceso-digital"],
         [nameof(AccionesAuditables.ReporteDeArchivoResuelto)] = ["reporte-de-archivo"],
         [nameof(AccionesAuditables.BibliotecaDeClienteConsultada)] = ["cliente"],

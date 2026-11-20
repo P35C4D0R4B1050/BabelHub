@@ -86,6 +86,8 @@ public static class ComposicionDelCatalogo
             sp.GetRequiredService<ILecturasDelCatalogo>(), sp.GetRequiredService<ResolutorDeDisponibilidad>(), sp.GetRequiredService<IReloj>(), sp.GetRequiredService<IAzarDelCatalogo>(), opciones.PlazoDeLaSolicitud));
         servicios.TryAddScoped<IConsultaDeCatalogo>(sp => sp.GetRequiredService<ConsultaDeCatalogoDeLaAplicacion>());
         servicios.TryAddScoped<IDisponibilidadDeEdiciones>(sp => sp.GetRequiredService<ConsultaDeCatalogoDeLaAplicacion>());
+        // Solo para Biblioteca (D13, D17): la clave del archivo, su formato, su huella y su tamaño; una arquitectura lo exige.
+        servicios.AgregarLaReferenciaDeArchivos();
 
         // Los casos de uso que escriben van dentro de su transacción (un fallo, también el de la auditoría, lo revierte todo).
         AgregarTransaccional(servicios, sp => new RegistrarObra(

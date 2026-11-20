@@ -5,13 +5,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BabelHub.IntegrationTests.Web;
 
-/// <summary>Rutas de prueba de las cabeceras y de la política de contenido por ruta (T17): cada una en la ruta exacta que le corresponde.</summary>
+/// <summary>Rutas de prueba de las cabeceras (T17). La página de la descarga (<c>/biblioteca</c>, la única que abre <c>form-action</c> al almacén) es la real de Biblioteca (<c>MiBibliotecaController</c>), no un doble.</summary>
 public sealed class ControladorDeCabecerasDePrueba : Controller
 {
-    [HttpGet("/biblioteca")]
-    [PoliticaDeContenido(ContenidoDeTerceros.DescargaDeLibro)]
-    public IActionResult Biblioteca() => Content("<p>biblioteca</p>", "text/html");
-
     [HttpGet("/prueba/cabeceras/pagina")]
     public IActionResult Pagina() => Content("<p>hola</p>", "text/html");
 
