@@ -201,4 +201,11 @@ public static class PoliticaDeRetencion
     public const int Anios = 2;
 
     public static bool EstaVencido(DateOnly dia, DateOnly hoyEnLima) => hoyEnLima >= dia.AddYears(Anios);
+
+    /// <summary>El último día de Lima cuyo registro ya está vencido (todo día menor o igual se depura); coherente con <see cref="EstaVencido"/> también en un 29 de febrero.</summary>
+    public static DateOnly UltimoDiaVencido(DateOnly hoyEnLima)
+    {
+        var candidato = hoyEnLima.AddYears(-Anios);
+        return candidato.AddDays(1).AddYears(Anios) <= hoyEnLima ? candidato.AddDays(1) : candidato;
+    }
 }
