@@ -38,6 +38,7 @@ public static class ComposicionDeFuentes
         servicios.TryAddSingleton(sp => new UnidadDeTrabajoPostgres(sp.GetRequiredService<NpgsqlDataSource>(), actor: sp.GetRequiredService<IActorActual>()));
         servicios.TryAddSingleton<IUnidadDeTrabajo>(sp => sp.GetRequiredService<UnidadDeTrabajoPostgres>());
         servicios.TryAddSingleton<IConexionDeLaUnidadDeTrabajo>(sp => sp.GetRequiredService<UnidadDeTrabajoPostgres>());
+        servicios.TryAddSingleton<IAlcanceDeDatosFijado>(sp => sp.GetRequiredService<UnidadDeTrabajoPostgres>());
         servicios.TryAddSingleton<ILecturaCoherente>(sp => sp.GetRequiredService<UnidadDeTrabajoPostgres>());
         servicios.TryAddSingleton<IBloqueosAsesores>(sp => new NpgsqlBloqueosAsesores(sp.GetRequiredService<IConexionDeLaUnidadDeTrabajo>(), bloqueos));
 

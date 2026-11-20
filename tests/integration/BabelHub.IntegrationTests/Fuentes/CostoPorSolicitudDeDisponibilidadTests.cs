@@ -98,7 +98,7 @@ public sealed class CostoPorSolicitudDeDisponibilidadTests(PostgresDeFuentesFixt
             await using var comando = new NpgsqlCommand("SELECT current_user, current_setting('babelhub.alcance', true)", (NpgsqlConnection)pila.Unidad.Conexion, (NpgsqlTransaction)pila.Unidad.Transaccion);
             await using var lector = await comando.ExecuteReaderAsync(token);
             Assert.True(await lector.ReadAsync(token));
-            return (lector.GetString(0), lector.GetString(1), pila.Unidad.HayAlcanceDeDatosFijado);
+            return (lector.GetString(0), lector.GetString(1), ((IAlcanceDeDatosFijado)pila.Unidad).HayAlcanceFijado);
         });
 
         Assert.Equal("acceso", rol);

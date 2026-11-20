@@ -24,3 +24,13 @@ internal interface IElevacionDeAlcance
     /// </summary>
     Task<T> TraducirRechazoDeLaPolitica<T>(Func<Task<T>> operacion);
 }
+
+/// <summary>
+/// Si la unidad de trabajo fijó un alcance de datos (sucursal o red) en la transacción en curso. Lo sabe por haberlo fijado ella misma (<c>set_config</c> al abrir la transacción y al elevar), sin preguntarle a la
+/// base en cada acceso. Sin alcance, las políticas de filas devuelven cero filas sin error, y los accesos a los esquemas con seguridad por filas fallan cerrado en lugar de leer «sin stock». Solo la Infraestructura la usa.
+/// </summary>
+internal interface IAlcanceDeDatosFijado
+{
+    /// <summary><see langword="true"/> si hay una transacción con un alcance fijado; lanza si no hay transacción.</summary>
+    bool HayAlcanceFijado { get; }
+}

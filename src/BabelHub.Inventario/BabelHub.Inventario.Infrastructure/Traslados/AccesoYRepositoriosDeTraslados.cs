@@ -16,7 +16,7 @@ namespace BabelHub.Inventario.Infrastructure.Traslados;
 /// y de datos (<c>23xxx</c> y <c>22xxx</c>) se reenvían <b>sin</b> la excepción original: su <c>Detail</c> trae la fila, con el motivo y la guía, y nunca debe registrarse ni propagarse. Un interbloqueo o un fallo de serialización
 /// pasan tal cual para que el decorador de reintento los reconozca.
 /// </summary>
-internal sealed class AccesoATraslados(IUnidadDeTrabajo unidad, IConexionDeLaUnidadDeTrabajo conexion, IActorActual actores, IPublicadorDeAlertasTecnicas alertas, IReloj reloj)
+internal sealed class AccesoATraslados(IUnidadDeTrabajo unidad, IConexionDeLaUnidadDeTrabajo conexion, IActorActual actores, IPublicadorDeAlertasTecnicas alertas, IReloj reloj, IAlcanceDeDatosFijado alcance)
 {
     /// <summary>El motivo de la alerta técnica cuando se intenta tocar los traslados sin actor o sin alcance de datos (consta en el catálogo de motivos de alertas técnicas).</summary>
     public const string MotivoDeAlertaSinActor = "alcance-de-datos-sin-actor";
@@ -64,7 +64,7 @@ internal sealed class AccesoATraslados(IUnidadDeTrabajo unidad, IConexionDeLaUni
 
     private async Task ExigirActorConAlcance(CancellationToken cancelacion)
     {
-        if (actores.Actual is { Tipo: not TipoDeActor.Anonimo } && conexion.HayAlcanceDeDatosFijado)
+        if (actores.Actual is { Tipo: not TipoDeActor.Anonimo } && alcance.HayAlcanceFijado)
         {
             return;
         }

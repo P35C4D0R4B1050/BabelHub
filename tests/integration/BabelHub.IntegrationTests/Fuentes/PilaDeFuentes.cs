@@ -59,7 +59,7 @@ public sealed class PilaDeFuentes
         Unidad = new UnidadDeTrabajoPostgres(origen ?? bd.Acceso, actor: Actor);
         Alertas = new AlertasTecnicasEspia();
         Reservas = reservas ?? new ReservasDeStockFijo();
-        Acceso = new AccesoAFuentes(Unidad, Unidad, Unidad, Actor, Alertas, new RelojDeIntegracion());
+        Acceso = new AccesoAFuentes(Unidad, Unidad, Unidad, Actor, Alertas, new RelojDeIntegracion(), Unidad);
         Existencias = new NpgsqlRepositorioDeExistencias(Acceso);
         Fichas = new NpgsqlRepositorioDeFichas(Acceso);
         Aplicador = new AplicadorDeMovimientos(Existencias);

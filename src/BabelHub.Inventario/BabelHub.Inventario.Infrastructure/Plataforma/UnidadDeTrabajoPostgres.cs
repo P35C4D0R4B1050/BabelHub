@@ -27,7 +27,7 @@ public sealed record OpcionesDeUnidadDeTrabajo
 /// La conexión pertenece al flujo asíncrono que abrió la transacción: no debe usarse desde tareas paralelas.
 /// </summary>
 public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeUnidadDeTrabajo? opciones = null, IActorActual? actor = null)
-    : IUnidadDeTrabajo, IConexionDeLaUnidadDeTrabajo, ILecturaCoherente, IElevacionDeAlcance
+    : IUnidadDeTrabajo, IConexionDeLaUnidadDeTrabajo, ILecturaCoherente, IElevacionDeAlcance, IAlcanceDeDatosFijado
 {
     private const string TransaccionAbortada = "25P02";
 
@@ -40,7 +40,7 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
 
     public DbTransaction Transaccion => (_activa.Value ?? throw SinTransaccion()).Transaccion;
 
-    public bool HayAlcanceDeDatosFijado => !string.IsNullOrEmpty((_activa.Value ?? throw SinTransaccion()).Alcance);
+    bool IAlcanceDeDatosFijado.HayAlcanceFijado => !string.IsNullOrEmpty((_activa.Value ?? throw SinTransaccion()).Alcance);
 
     public Task<T> Ejecutar<T>(Func<CancellationToken, Task<T>> trabajo, CancellationToken cancelacion = default) =>
         EjecutarEn(IsolationLevel.ReadCommitted, soloLectura: false, trabajo, cancelacion);

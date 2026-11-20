@@ -24,7 +24,8 @@ internal sealed class AccesoAFuentes(
     IElevacionDeAlcance elevacion,
     IActorActual actores,
     IPublicadorDeAlertasTecnicas alertas,
-    IReloj reloj)
+    IReloj reloj,
+    IAlcanceDeDatosFijado alcance)
 {
     /// <summary>El motivo de la alerta técnica cuando se intenta tocar el stock sin actor (debe constar en el catálogo de motivos de alertas técnicas).</summary>
     public const string MotivoDeAlertaSinActor = "alcance-de-datos-sin-actor";
@@ -83,7 +84,7 @@ internal sealed class AccesoAFuentes(
     {
         // Un actor con contexto Y un alcance de datos que la unidad de trabajo pudo fijar para él: un encargado sin sucursal o un rol desconocido tienen actor pero no alcance, y las políticas
         // les devolverían cero filas sin error igual que a quien no tiene actor.
-        if (actores.Actual is { Tipo: not TipoDeActor.Anonimo } && conexion.HayAlcanceDeDatosFijado)
+        if (actores.Actual is { Tipo: not TipoDeActor.Anonimo } && alcance.HayAlcanceFijado)
         {
             return;
         }
