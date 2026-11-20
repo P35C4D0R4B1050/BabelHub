@@ -207,6 +207,26 @@ public sealed class ConcurrenciaYCancelacionDeBibliotecaTests(PostgresDeBibliote
 
     [Fact]
     [Trait("Criterio", "AC-BIB-17")]
+    public async Task Muchas_rondas_de_aprobaciones_simultaneas_del_mismo_pedido_nunca_fallan_con_la_restriccion_unica_y_dejan_un_acceso_por_ronda()
+    {
+        // La carrera de 23505 sobre (pedido_id, edicion_id) solo asoma con repeticiones: 15 rondas de 12 concesiones simultáneas con el mismo pedido.
+        for (var ronda = 0; ronda < 15; ronda++)
+        {
+            var cuenta = Guid.NewGuid();
+            var edicion = _entorno.Catalogo.Sembrar(ClaveDelArchivo);
+            var pedido = Guid.NewGuid();
+
+            var resultados = await Task.WhenAll(Enumerable.Range(0, 12).Select(_ => Task.Run(() => bd.Unidad.Ejecutar(token => _entorno.Conceder.Ejecutar(new ConcederAccesoEntrada(cuenta, pedido, edicion), token)))));
+
+            Assert.Equal(1, resultados.Count(r => r.Valor == ResultadoDeConcederAcceso.Concedido));
+            Assert.Equal(11, resultados.Count(r => r.Valor == ResultadoDeConcederAcceso.YaConcedidoPorEstePedido));
+        }
+
+        Assert.Equal(15L, await bd.Consultar<long>("SELECT count(*) FROM biblioteca.accesos"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-BIB-17")]
     public async Task Dos_aprobaciones_simultaneas_del_mismo_pedido_dejan_un_solo_acceso()
     {
         var cuenta = Guid.NewGuid();
