@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prepara el entorno LOCAL de las pruebas de carga (K6-1): secretos aleatorios solo de esta máquina (FUERA del repositorio, en una carpeta hermana del repositorio (…/babelhub-carga; Docker Desktop no comparte C:SERS�APPDATA)),
+# Prepara el entorno LOCAL de las pruebas de carga (K6-1): secretos aleatorios solo de esta máquina, FUERA del repositorio, en una carpeta hermana del repositorio (.../babelhub-carga: Docker Desktop no comparte la carpeta AppData del usuario),
 # certificado autofirmado, PostgreSQL y el Inventario en contenedores con los límites de VM-INVENTARIO, la base migrada y el servidor de claves de carga.
 # Uso: bash tests/load/entorno/preparar-carga.sh   (apagar: bash tests/load/entorno/bajar-carga.sh)
 set -euo pipefail

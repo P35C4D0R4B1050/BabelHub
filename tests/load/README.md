@@ -24,6 +24,8 @@ bash tests/load/entorno/bajar-carga.sh             # apagar (con -v borra la bas
 
 Variables opcionales de `ejecutar.sh`: `DURACION`, `RITMO` (compras por segundo), `UNIDADES`, `COMPETIDORES`, `NIVELES`, `SEGUNDOS_POR_NIVEL`, `PENSAR_S` (pausa de cada usuario entre solicitudes; 0,5 s por omisión, `0` mide el peor caso) y `CARGA_FECHA` (carpeta de resultados).
 
+**Requisitos:** Windows con Docker Desktop y Git Bash (los scripts usan `cygpath` y `docker`), Node (para emitir las credenciales de prueba) y .NET (migrar la base). En Linux o macOS habría que cambiar `cygpath -m` por la ruta directa.
+
 ## Cómo funciona el entorno (`entorno/`)
 
 - **Fuera del repositorio:** los secretos son aleatorios, de esta máquina y viven en una carpeta hermana del repositorio (`…/babelhub-carga`; Docker Desktop no comparte `C:\Users\…\AppData`). El escáner de secretos no ve nada. Nada de esto es un dato real.
