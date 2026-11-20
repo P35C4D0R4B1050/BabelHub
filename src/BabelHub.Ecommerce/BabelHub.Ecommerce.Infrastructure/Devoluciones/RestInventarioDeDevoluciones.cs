@@ -132,6 +132,12 @@ internal sealed class RestInventarioDeDevoluciones(IClienteDelInventario cliente
         }
 
         IReadOnlyCollection<string> distintos = [.. codigos.Distinct(StringComparer.Ordinal)];
+        if (distintos.Count == 0)
+        {
+            // Una lista vacía no es una respuesta útil: se rechazarían todas las sucursales como «desconocidas». Es «no disponible» y no se guarda.
+            return new ResultadoDeSucursalesActivas.NoDisponible();
+        }
+
         cache.Guardar(distintos);
         return new ResultadoDeSucursalesActivas.Lista(distintos);
     }
