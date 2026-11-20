@@ -1,0 +1,89 @@
+@using BabelHub.Ecommerce.Api.Biblioteca
+@model BabelHub.Ecommerce.Api.Areas.Admin.Controllers.AyudasDeBibliotecaVista
+<h1 class="bh-display">Ayudas de la biblioteca</h1>
+<p class="mt-2 max-w-3xl opacity-80">Solicitudes de los clientes sobre sus libros digitales. No muestran datos de la cuenta: se atienden por el acceso. Restituir descargas queda en la auditoría con su motivo.</p>
+
+<nav class="join mt-4" aria-label="Filtro de ayudas">
+    @foreach (var (clave, texto) in new[] { ("abiertas", "Abiertas"), ("cerradas", "Cerradas"), ("todas", "Todas") })
+    {
+        <a class="btn btn-sm join-item @(Model.Filtro == clave ? "btn-primary" : string.Empty)" href="/administracion/biblioteca/ayudas?estado=@clave" aria-current="@(Model.Filtro == clave ? "page" : null)">@texto</a>
+    }
+</nav>
+
+<section class="mt-4" aria-labelledby="ayudas-titulo" aria-live="polite">
+    <h2 id="ayudas-titulo" class="sr-only">Solicitudes de ayuda</h2>
+    @if (Model.Estado is not null)
+    {
+        <vc:bh-estado modelo="@Model.Estado" />
+    }
+    else
+    {
+        <div class="my-4 overflow-x-auto">
+            <table class="table">
+                <caption class="sr-only">Solicitudes de ayuda de la biblioteca</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Acceso</th>
+                        <th scope="col">Motivo</th>
+                        <th scope="col">Pedida</th>
+                        <th scope="col">Estado</th>
+                        <th scope="col"><span class="sr-only">Acciones</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var ayuda in Model.Ayudas)
+                    {
+                        <tr>
+                            <td class="align-top font-mono text-sm">@ayuda.AccesoCorto</td>
+                            <td class="align-top">@ayuda.Motivo</td>
+                            <td class="align-top text-xs">@ayuda.CreadaTexto</td>
+                            <td class="align-top"><span class="bh-chip"><bh-icono nombre="@(ayuda.Abierta ? "bandeja" : "exito")" clase="size-3.5" />@(ayuda.Abierta ? "Abierta" : "Cerrada")</span>@if (ayuda.CerradaTexto is not null) { <div class="text-xs">Cerrada: @ayuda.CerradaTexto</div> }</td>
+                            <td class="align-top">
+                                @if (ayuda.Abierta)
+                                {
+                                    <bh-accion-de-cambio>
+                                        <div class="flex flex-col gap-2">
+                                            <form method="post" action="/administracion/biblioteca/accesos/@ayuda.AccesoId.ToString("D")/restituir" class="flex flex-wrap items-end gap-2">
+                                                <partial name="_TokenAntifalsificacion" />
+                                                <input type="hidden" name="ayudaId" value="@ayuda.AyudaId.ToString("D")" />
+                                                <label class="text-xs" for="cantidad-@ayuda.AccesoCorto">Cantidad
+                                                    <input id="cantidad-@ayuda.AccesoCorto" name="cantidad" type="number" min="1" max="5" value="1" class="input input-sm w-20" required />
+                                                </label>
+                                                <label class="text-xs" for="motivo-@ayuda.AccesoCorto">Motivo
+                                                    <select id="motivo-@ayuda.AccesoCorto" name="motivo" class="select select-sm" required>
+                                                        @foreach (var (codigo, texto) in TextosDeBiblioteca.MotivosDeRestitucion)
+                                                        {
+                                                            <option value="@codigo">@texto</option>
+                                                        }
+                                                    </select>
+                                                </label>
+                                                <button type="submit" class="btn btn-sm btn-primary" aria-label="Restituir descargas y cerrar la ayuda del acceso @ayuda.AccesoCorto">Restituir y cerrar</button>
+                                            </form>
+                                            <form method="post" action="/administracion/biblioteca/ayudas/@ayuda.AyudaId.ToString("D")/cerrar">
+                                                <partial name="_TokenAntifalsificacion" />
+                                                <button type="submit" class="btn btn-sm" aria-label="Cerrar la ayuda del acceso @ayuda.AccesoCorto sin restituir">Cerrar sin restituir</button>
+                                            </form>
+                                        </div>
+                                    </bh-accion-de-cambio>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (Model.HayAnterior || Model.HaySiguiente)
+        {
+            <nav class="join" aria-label="Páginas de ayudas">
+                @if (Model.HayAnterior)
+                {
+                    <a class="btn join-item" href="@Model.Ruta(Model.Pagina - 1)">Anterior</a>
+                }
+                @if (Model.HaySiguiente)
+                {
+                    <a class="btn join-item" href="@Model.Ruta(Model.Pagina + 1)">Siguiente</a>
+                }
+            </nav>
+        }
+    }
+</section>

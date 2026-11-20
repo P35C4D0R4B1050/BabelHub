@@ -1,0 +1,109 @@
+@using BabelHub.Ecommerce.Api.Biblioteca
+@model BabelHub.Ecommerce.Api.Areas.Tienda.Controllers.MiBibliotecaVista
+<h1 class="bh-display">Mi biblioteca</h1>
+<p class="mt-2 max-w-2xl opacity-80">Tus libros digitales. Puedes descargar cada uno hasta 5 veces; cada descarga usa un enlace seguro que dura <b>5 minutos</b>. Son para tu uso personal.</p>
+<div class="alert alert-info alert-soft mt-4 max-w-2xl" role="note">
+    <bh-icono nombre="reloj" />
+    <span>Si el enlace vence antes de que termine la descarga, vuelve aquí y pide uno nuevo. Repetir la solicitud dentro de los 5 minutos no gasta otra descarga.</span>
+</div>
+
+<section class="mt-8" aria-labelledby="lista-titulo" aria-live="polite">
+    <h2 id="lista-titulo" class="sr-only">Tus libros digitales</h2>
+    @if (Model.Estado is not null)
+    {
+        <vc:bh-estado modelo="@Model.Estado" />
+    }
+    else
+    {
+        <ul class="bh-grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+            @foreach (var libro in Model.Libros)
+            {
+                <li class="bh-celda" id="libro-@libro.IdCorto">
+                    <h3 class="font-display text-lg leading-tight">@libro.Titulo</h3>
+                    <p class="text-xs opacity-80">@libro.Formato · comprado el @libro.CompradoTexto (hora de Lima)</p>
+                    <p>
+                        <span class="bh-chip"><bh-icono nombre="@libro.EstadoIcono" clase="size-3.5" />@libro.EstadoTexto</span>
+                    </p>
+                    @if (libro.EstadoMensaje is not null)
+                    {
+                        <p class="text-sm">@libro.EstadoMensaje</p>
+                    }
+                    <div>
+                        <div class="mb-1 flex justify-between text-xs">
+                            <span>Descargas</span>
+                            <span class="tabular-nums">@libro.DescargasTexto</span>
+                        </div>
+                        <progress class="progress @(libro.Agotado ? "progress-error" : "progress-primary") w-full" value="@libro.Usadas" max="@libro.Maximas" aria-label="Descargas usadas de @libro.Titulo"></progress>
+                        @if (libro.Agotado)
+                        {
+                            <p class="mt-1 text-xs"><bh-icono nombre="agotado" clase="size-3.5" /> Alcanzaste el límite de descargas. Si perdiste el archivo, pide ayuda.</p>
+                        }
+                        else
+                        {
+                            <p class="mt-1 text-xs">Te @(libro.Restantes == 1 ? "queda 1 descarga" : $"quedan {libro.Restantes} descargas").</p>
+                        }
+                    </div>
+                    <div class="mt-auto flex flex-col gap-2 pt-1">
+                        @if (libro.PuedeDescargar)
+                        {
+                            <bh-accion-de-cambio>
+                                <vc:bh-boton-de-descarga acceso-id="@libro.AccesoId" />
+                            </bh-accion-de-cambio>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-sm" disabled aria-label="Descargar @libro.Titulo no está disponible"><bh-icono nombre="candado" clase="size-4" />Descarga no disponible</button>
+                        }
+                        @if (libro.TieneAyudaAbierta)
+                        {
+                            <p class="text-sm" role="status"><bh-icono nombre="bandeja" clase="size-4" /> Ya pediste ayuda sobre este libro. La administración la revisará.</p>
+                        }
+                        else if (libro.PuedePedirAyuda)
+                        {
+                            <bh-accion-de-cambio>
+                                <details class="collapse collapse-arrow border border-base-300 bg-base-100">
+                                    <summary class="collapse-title min-h-0 py-2 text-sm font-medium">Pedir ayuda con este libro</summary>
+                                    <div class="collapse-content">
+                                        <form method="post" action="/biblioteca/@libro.AccesoId.ToString("D")/ayuda" class="grid gap-2">
+                                            <partial name="_TokenAntifalsificacion" />
+                                            <label class="text-sm" for="motivo-@libro.IdCorto">¿Qué pasó?</label>
+                                            <select id="motivo-@libro.IdCorto" name="motivo" class="select select-sm w-full" required>
+                                                @foreach (var (codigo, texto) in TextosDeBiblioteca.MotivosDeAyuda)
+                                                {
+                                                    <option value="@codigo">@texto</option>
+                                                }
+                                            </select>
+                                            <button type="submit" class="btn btn-sm btn-primary">Enviar solicitud</button>
+                                        </form>
+                                    </div>
+                                </details>
+                            </bh-accion-de-cambio>
+                        }
+                    </div>
+                </li>
+            }
+        </ul>
+        @if (Model.HayAnterior || Model.HaySiguiente)
+        {
+            <nav class="mt-6 flex items-center justify-between gap-3" aria-label="Paginación de tu biblioteca">
+                @if (Model.HayAnterior)
+                {
+                    <a class="btn btn-sm" rel="prev" href="/biblioteca?pagina=@(Model.Pagina - 1)&tamano=@Model.Tamano">Anterior</a>
+                }
+                else
+                {
+                    <span></span>
+                }
+                <span class="text-sm">Página @Model.Pagina</span>
+                @if (Model.HaySiguiente)
+                {
+                    <a class="btn btn-sm" rel="next" href="/biblioteca?pagina=@(Model.Pagina + 1)&tamano=@Model.Tamano">Siguiente</a>
+                }
+                else
+                {
+                    <span></span>
+                }
+            </nav>
+        }
+    }
+</section>

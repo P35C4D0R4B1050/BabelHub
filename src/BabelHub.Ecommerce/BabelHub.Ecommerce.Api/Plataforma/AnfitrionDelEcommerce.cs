@@ -1,6 +1,7 @@
 using BabelHub.Ecommerce.Api.Auditoria;
 using BabelHub.Ecommerce.Api.Carrito;
 using BabelHub.Ecommerce.Api.Catalogo;
+using BabelHub.Ecommerce.Api.Biblioteca;
 using BabelHub.Ecommerce.Api.Envios;
 using BabelHub.Ecommerce.Api.Notificaciones;
 using BabelHub.Ecommerce.Api.Pagos;
@@ -447,6 +448,7 @@ public static class AnfitrionDelEcommerce
         servicios.AgregarTrabajosDeReclamacionesEnLaApi(soloEnModoNormal);
         servicios.AgregarPedidos(esProduccion: false);
         servicios.AgregarBiblioteca(guardarProduccion, opciones.AlmacenDeBiblioteca);
+        servicios.AgregarTrabajosDeBibliotecaEnLaApi(soloEnModoNormal);
         servicios.AgregarDoblesProvisionalesDelCarrito(guardarProduccion);
         servicios.AgregarDoblesProvisionalesDePagos(guardarProduccion);
         servicios.AgregarDoblesProvisionalesDePedidos(guardarProduccion);

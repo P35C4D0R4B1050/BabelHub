@@ -1,0 +1,68 @@
+@using BabelHub.Ecommerce.Api.Biblioteca
+@model BabelHub.Ecommerce.Api.Areas.Admin.Controllers.BibliotecaDeUnClienteVista
+<h1 class="bh-display">Biblioteca del cliente</h1>
+<div class="alert alert-info alert-soft mt-4 max-w-3xl" role="note">
+    <bh-icono nombre="info" />
+    <span>Esta consulta <b>queda registrada en la auditoría</b> con tu usuario y la cuenta consultada. Si no se puede registrar, no se muestra.</span>
+</div>
+
+<section class="mt-6" aria-labelledby="lista-titulo" aria-live="polite">
+    <h2 id="lista-titulo" class="text-lg font-semibold">Libros digitales de la cuenta <span class="font-mono text-sm">@Model.CuentaId.ToString("N")[..8]</span></h2>
+    @if (Model.Estado is not null)
+    {
+        <div class="mt-3"><vc:bh-estado modelo="@Model.Estado" /></div>
+    }
+    else
+    {
+        <div class="my-4 overflow-x-auto">
+            <table class="table">
+                <caption class="sr-only">Libros digitales de la cuenta consultada</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Libro</th>
+                        <th scope="col">Formato</th>
+                        <th scope="col">Comprado</th>
+                        <th scope="col">Estado</th>
+                        <th scope="col">Descargas</th>
+                        <th scope="col"><span class="sr-only">Restituir descargas</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var libro in Model.Libros)
+                    {
+                        <tr>
+                            <td class="align-top font-medium">@libro.Titulo</td>
+                            <td class="align-top">@libro.Formato</td>
+                            <td class="align-top text-xs">@libro.CompradoTexto</td>
+                            <td class="align-top"><span class="bh-chip"><bh-icono nombre="@libro.EstadoIcono" clase="size-3.5" />@libro.EstadoTexto</span>@if (libro.TieneAyudaAbierta) { <span class="bh-chip ml-1"><bh-icono nombre="bandeja" clase="size-3.5" />Ayuda abierta</span> }</td>
+                            <td class="align-top tabular-nums">@libro.DescargasTexto</td>
+                            <td class="align-top">
+                                @if (libro.PuedePedirAyuda && libro.Usadas > 0)
+                                {
+                                    <bh-accion-de-cambio>
+                                        <form method="post" action="/administracion/biblioteca/accesos/@libro.AccesoId.ToString("D")/restituir" class="flex flex-wrap items-end gap-2">
+                                            <partial name="_TokenAntifalsificacion" />
+                                            <input type="hidden" name="cuentaId" value="@Model.CuentaId.ToString("D")" />
+                                            <label class="text-xs" for="cantidad-@libro.IdCorto">Cantidad
+                                                <input id="cantidad-@libro.IdCorto" name="cantidad" type="number" min="1" max="@libro.Usadas" value="1" class="input input-sm w-20" required />
+                                            </label>
+                                            <label class="text-xs" for="motivo-@libro.IdCorto">Motivo
+                                                <select id="motivo-@libro.IdCorto" name="motivo" class="select select-sm" required>
+                                                    @foreach (var (codigo, texto) in TextosDeBiblioteca.MotivosDeRestitucion)
+                                                    {
+                                                        <option value="@codigo">@texto</option>
+                                                    }
+                                                </select>
+                                            </label>
+                                            <button type="submit" class="btn btn-sm btn-primary" aria-label="Restituir descargas de @libro.Titulo">Restituir</button>
+                                        </form>
+                                    </bh-accion-de-cambio>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

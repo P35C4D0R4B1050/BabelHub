@@ -123,6 +123,33 @@ public class ComposicionDeBibliotecaTests
         Assert.False(TrabajosDeBiblioteca.TocaHoy(new RelojDePrueba(new DateTimeOffset(2026, 11, 20, 20, 0, 0, TimeSpan.Zero)), new DateOnly(2026, 11, 20)));
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-BIB-23")]
+    public void El_servicio_de_trabajos_de_la_api_solo_se_hospeda_en_el_modo_normal_y_sin_referenciar_lo_interno()
+    {
+        var normal = new ServiceCollection();
+        normal.AddSingleton<BabelHub.Ecommerce.Application.Plataforma.IEstablecedorDeActor>(new ActorDePrueba());
+        BabelHub.Ecommerce.Api.Biblioteca.TrabajosDeFondoDeBibliotecaEnLaApi.AgregarTrabajosDeBibliotecaEnLaApi(normal, soloEnModoNormal: true);
+        var ensayo = new ServiceCollection();
+        ensayo.AddSingleton<BabelHub.Ecommerce.Application.Plataforma.IEstablecedorDeActor>(new ActorDePrueba());
+        BabelHub.Ecommerce.Api.Biblioteca.TrabajosDeFondoDeBibliotecaEnLaApi.AgregarTrabajosDeBibliotecaEnLaApi(ensayo, soloEnModoNormal: false);
+
+        Assert.Contains(normal, d => d.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService));
+        Assert.DoesNotContain(ensayo, d => d.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService));
+        Assert.Contains(ensayo, d => d.ServiceType == typeof(ServicioDeTrabajosDeBiblioteca));
+    }
+
+    private sealed class ActorDePrueba : BabelHub.Ecommerce.Application.Plataforma.IEstablecedorDeActor
+    {
+        public void Establecer(BabelHub.Ecommerce.Application.Plataforma.ActorActual actor)
+        {
+        }
+
+        public void Limpiar()
+        {
+        }
+    }
+
     private sealed class RelojDePrueba(DateTimeOffset ahora) : IReloj
     {
         public DateTimeOffset Ahora { get; } = ahora;
