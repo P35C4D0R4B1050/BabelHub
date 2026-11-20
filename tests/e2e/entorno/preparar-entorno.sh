@@ -24,9 +24,9 @@ set -a; source "$archivo"; set +a
 base="Host=localhost;Port=$POSTGRES_PORT"
 
 # E-commerce
-poner BABELHUB__Ecommerce__Base__Aplicacion "$base;Database=ecommerce;Username=acceso;Password=$(alea 32)"
-poner BABELHUB__Ecommerce__Base__DepuracionDeAuditoria "$base;Database=ecommerce;Username=depurador_auditoria;Password=$(alea 32)"
-poner BABELHUB__Ecommerce__Base__DepuracionDeRegistros "$base;Database=ecommerce;Username=depurador_registros;Password=$(alea 32)"
+poner BABELHUB__Ecommerce__Base__Aplicacion "$base;Database=ecommerce;Username=ecommerce_acceso;Password=$(alea 32)"
+poner BABELHUB__Ecommerce__Base__DepuracionDeAuditoria "$base;Database=ecommerce;Username=ecommerce_depurador_auditoria;Password=$(alea 32)"
+poner BABELHUB__Ecommerce__Base__DepuracionDeRegistros "$base;Database=ecommerce;Username=ecommerce_depurador_registros;Password=$(alea 32)"
 poner BABELHUB__Migrador__Ecommerce__Propietaria "$base;Database=ecommerce;Username=$POSTGRES_ADMIN_USER;Password=$POSTGRES_ADMIN_PASSWORD"
 poner BABELHUB__Ecommerce__Inventario__Direccion "http://localhost:8082/"
 poner BABELHUB__Auditoria__ClaveDeCursor "$(alea 40)"
@@ -39,6 +39,8 @@ poner BABELHUB__Seguridad__Turnstile__ClaveDeSitio "0x4AAAAAAAdeSitioLocal"
 poner BABELHUB__Identidad__ClaveDeCifradoDeClaves "$(versionada)"
 poner BABELHUB__Identidad__Pimienta "$(versionada)"
 # Clave aleatoria del sembrador de sesiones de desarrollo (solo Debug + Development, tests/e2e/README.md): sin ella el endpoint ni se mapea.
+poner BABELHUB__Seguridad__ServicioSinHttps true
+poner BABELHUB__Ecommerce__ProxiesConocidos "127.0.0.1,::1"
 poner BABELHUB__Sembrador__Clave "$(alea 40)"
 poner BABELHUB__Web__Host tienda
 poner BABELHUB__Web__HostsPermitidos "localhost"
@@ -58,9 +60,9 @@ for alcance in LecturaDeDisponibilidad OperacionDeUsuario LecturaDeContacto Expi
 done
 
 # Inventario
-poner BABELHUB__Inventario__Base__Aplicacion "$base;Database=inventario;Username=acceso_inv;Password=$(alea 32)"
-poner BABELHUB__Inventario__Base__DepuracionDeAjustes "$base;Database=inventario;Username=depurador_ajustes_inv;Password=$(alea 32)"
-poner BABELHUB__Inventario__Base__DepuracionDeAuditoria "$base;Database=inventario;Username=depurador_auditoria_inv;Password=$(alea 32)"
+poner BABELHUB__Inventario__Base__Aplicacion "$base;Database=inventario;Username=inventario_acceso;Password=$(alea 32)"
+poner BABELHUB__Inventario__Base__DepuracionDeAjustes "$base;Database=inventario;Username=inventario_depurador_ajustes;Password=$(alea 32)"
+poner BABELHUB__Inventario__Base__DepuracionDeAuditoria "$base;Database=inventario;Username=inventario_depurador_auditoria;Password=$(alea 32)"
 poner BABELHUB__Migrador__Inventario__Propietaria "$base;Database=inventario;Username=$POSTGRES_ADMIN_USER;Password=$POSTGRES_ADMIN_PASSWORD"
 poner BABELHUB__Inventario__Ecommerce__Direccion "http://localhost:8080/"
 poner BABELHUB__Inventario__ClaveDeBajas "$(alea 40)"

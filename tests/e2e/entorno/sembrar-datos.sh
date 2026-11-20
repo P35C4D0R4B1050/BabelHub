@@ -2,7 +2,7 @@
 # Siembra el catálogo (obras y ediciones) y el inventario (sucursales, ediciones y stock) del entorno E2E LOCAL con datos FICTICIOS (AGENTS.md §5: ningún dato real) y la
 # fila de las versiones vigentes de los textos legales que el sembrador de sesiones necesita. Es idempotente (ON CONFLICT DO NOTHING) y solo para desarrollo: escribe en las bases
 # del proyecto aislado `bhe2e` con la cuenta propietaria del entorno, nunca con la de la aplicación.
-# Uso (tras preparar-entorno.sh): bash tests/e2e/entorno/sembrar-datos.sh
+# Uso (tras preparar-entorno.sh): bash tests/e2e/entorno/sembrar-datos.sh [--limpiar]
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
 
@@ -20,8 +20,25 @@ CREATE OR REPLACE FUNCTION pg_temp.guid_de_sucursal(codigo text) RETURNS uuid LA
   FROM (SELECT encode(substring(sha256(convert_to('babelhub:sucursal:' || codigo, 'UTF8')) FROM 1 FOR 16), 'hex') AS h) t;
 \$\$;"
 
+# --limpiar: antes de sembrar, vacía lo transaccional del entorno E2E (carritos, checkouts, pagos, pedidos y las reservas del Inventario) para que cada corrida parta de un stock conocido.
+if [ "${1:-}" = "--limpiar" ]; then
+  psql_en ecommerce <<'SQL'
+TRUNCATE carrito.avisos_de_carrito, carrito.fusiones_aplicadas, carrito.lineas_de_carrito, carrito.lineas_del_checkout, carrito.checkouts, carrito.carritos CASCADE;
+TRUNCATE pagos.avisos_a_carrito, pagos.avisos_de_pago, pagos.compensaciones, pagos.intencion_lineas, pagos.intencion_reserva_lineas, pagos.intenciones, pagos.intentos, pagos.reembolso_lineas, pagos.reembolsos CASCADE;
+TRUNCATE pedidos.pedidos CASCADE;
+TRUNCATE auditoria.acumulado_de_limites;
+SQL
+  psql_en inventario <<'SQL'
+TRUNCATE reservas.reserva_lineas, reservas.reservas, reservas.operaciones_idempotentes CASCADE;
+UPDATE fuentes.stock SET reservado = 0;
+TRUNCATE auditoria.acumulado_de_limites, plataforma.eventos_limite;
+SQL
+  echo "estado transaccional del entorno E2E reiniciado"
+fi
+
 # ---------- E-commerce: textos legales vigentes y catálogo ----------
 psql_en ecommerce <<'SQL'
+BEGIN;
 INSERT INTO identidad.versiones_de_textos (id, terminos, privacidad, reembolso) VALUES (1, 'e2e-2026-11', 'e2e-2026-11', 'e2e-2026-11') ON CONFLICT DO NOTHING;
 
 -- Obras ficticias (autores, editoriales e ISBN inventados; la portada es una clave sin archivo: el almacén local no existe).
@@ -32,12 +49,23 @@ INSERT INTO catalogo.obras (id, titulo, autor, editorial, categoria, portada_cla
 ON CONFLICT DO NOTHING;
 
 INSERT INTO catalogo.ediciones (id, obra_id, tipo, isbn13, isbn_ingresado, precio, estado) VALUES
-  ('b0000000-0000-0000-0000-000000000011', 'a0000000-0000-0000-0000-000000000001', 'impresa', '9786123450011', '9786123450011', 45.00, 'activa'),
-  ('b0000000-0000-0000-0000-000000000012', 'a0000000-0000-0000-0000-000000000001', 'digital', '9786123450028', '9786123450028', 18.00, 'activa'),
-  ('b0000000-0000-0000-0000-000000000021', 'a0000000-0000-0000-0000-000000000002', 'impresa', '9786123450035', '9786123450035', 38.50, 'activa'),
-  ('b0000000-0000-0000-0000-000000000022', 'a0000000-0000-0000-0000-000000000002', 'digital', '9786123450042', '9786123450042', 15.00, 'activa'),
-  ('b0000000-0000-0000-0000-000000000031', 'a0000000-0000-0000-0000-000000000003', 'impresa', '9786123450059', '9786123450059', 52.00, 'activa')
+  ('b0000000-0000-0000-0000-000000000011', 'a0000000-0000-0000-0000-000000000001', 'impresa', '9786123450014', '9786123450014', 45.00, 'activa'),
+  ('b0000000-0000-0000-0000-000000000012', 'a0000000-0000-0000-0000-000000000001', 'digital', '9786123450021', '9786123450021', 18.00, 'activa'),
+  ('b0000000-0000-0000-0000-000000000021', 'a0000000-0000-0000-0000-000000000002', 'impresa', '9786123450038', '9786123450038', 38.50, 'activa'),
+  ('b0000000-0000-0000-0000-000000000022', 'a0000000-0000-0000-0000-000000000002', 'digital', '9786123450045', '9786123450045', 15.00, 'activa'),
+  ('b0000000-0000-0000-0000-000000000031', 'a0000000-0000-0000-0000-000000000003', 'impresa', '9786123450052', '9786123450052', 52.00, 'activa')
 ON CONFLICT DO NOTHING;
+
+-- Una edición digital exige su licencia y la referencia de su archivo (el archivo no existe: el almacén local es inválido a propósito; la compra no lo descarga).
+INSERT INTO catalogo.licencias (edicion_id, tipo, titular, territorios, vigente_hasta, formato) VALUES
+  ('b0000000-0000-0000-0000-000000000012', 'dominio_publico', 'Titular de prueba', ARRAY['PE'], NULL, 'epub'),
+  ('b0000000-0000-0000-0000-000000000022', 'dominio_publico', 'Titular de prueba', ARRAY['PE'], NULL, 'epub')
+ON CONFLICT DO NOTHING;
+INSERT INTO catalogo.archivos_digitales (edicion_id, clave_en_almacen, tipo_detectado, tamano, huella_sha256, subido_en, subido_por) VALUES
+  ('b0000000-0000-0000-0000-000000000012', 'f2e00000000000000000000000000012', 'epub', 1024, decode(repeat('12', 32), 'hex'), now(), '00000000-0000-0000-0000-000000000000'),
+  ('b0000000-0000-0000-0000-000000000022', 'f2e00000000000000000000000000022', 'epub', 1024, decode(repeat('22', 32), 'hex'), now(), '00000000-0000-0000-0000-000000000000')
+ON CONFLICT DO NOTHING;
+COMMIT;
 SQL
 
 # ---------- Inventario: sucursales, ediciones impresas y stock ----------
@@ -45,9 +73,9 @@ SQL
   echo "$FUNCION_GUID"
   cat <<'SQL'
 INSERT INTO fuentes.fuentes (id, codigo, nombre, region, contacto_aviso, es_recepcion) VALUES
-  (pg_temp.guid_de_sucursal('lima'),      'lima',      'Sucursal Lima (prueba)',      'Lima',      NULL, true),
-  (pg_temp.guid_de_sucursal('ayacucho'),  'ayacucho',  'Sucursal Ayacucho (prueba)',  'Ayacucho',  NULL, false),
-  (pg_temp.guid_de_sucursal('cusco'),     'cusco',     'Sucursal Cusco (prueba)',     'Cusco',     NULL, false)
+  (pg_temp.guid_de_sucursal('lima'),      'lima',      'Sucursal Lima (prueba)',      'lima',      NULL, true),
+  (pg_temp.guid_de_sucursal('ayacucho'),  'ayacucho',  'Sucursal Ayacucho (prueba)',  'ayacucho',  NULL, false),
+  (pg_temp.guid_de_sucursal('cusco'),     'cusco',     'Sucursal Cusco (prueba)',     'cusco',     NULL, false)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO fuentes.ediciones (edicion_id, formato) VALUES

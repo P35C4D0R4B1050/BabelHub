@@ -61,6 +61,8 @@ export default defineConfig({
     baseURL,
     locale: 'es-PE',
     timezoneId: 'America/Lima',
+    // El host local de los recorridos con compra se sirve por HTTPS con el certificado de desarrollo de .NET (E2E_TLS=1, entorno/arrancar-host.sh): no está en la raíz de confianza del sistema.
+    ignoreHTTPSErrors: true,
     trace: 'retain-on-failure',
     // El host local escucha en HTTP; detrás del borde recibe X-Forwarded-Proto: https (las cookies __Host- y el antiforgery lo exigen).
     extraHTTPHeaders: process.env.E2E_FORWARDED_PROTO ? { 'X-Forwarded-Proto': process.env.E2E_FORWARDED_PROTO } : undefined,
