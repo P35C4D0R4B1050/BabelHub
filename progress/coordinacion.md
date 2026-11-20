@@ -19,7 +19,7 @@ Lo mantiene **el coordinador** (la sesión raíz «BabelHub documentación y spe
 | **A — Transversales** | carril-a-contratos-de-pl | COMP-1 cerrado (auditoría y claves de Identidad en el E-commerce); hallazgos Importantes abiertos de plataforma del Sprint 2 (TRA-22, SEG-31, tope de 24 correos, IDE-7) y `spec-verify` de identidad, auditoría y seguridad | PLA-R2 a R4 y spikes (fuera del Sprint 2) |
 | **B — Carrito y Pedidos** | carril-b-inv-2d-ajustes | ECO-6g: T33–T36 con módulos reales, T41 (E2E de personal y `ui-review`), Menores acumulados, E2E del carrito mixto/digital/visitante; `spec-verify` de pedidos y carrito | — |
 | **C — Pagos, reclamaciones y web** | carril-c-cat-logo-eco-2a | Pagos T31 (T37/T38 esperan B05), reclamaciones T22, WEB-2 `ui-review`/E2E, resto de `web-base` (FUE-09/FUE-11 diferidas) y `spec-verify` | — |
-| **V — Envíos y devoluciones** | planificar-eco-7-bibliot | ECO-10d revisores, devoluciones T23–T34, envíos T14b/T20/T21b/T22/T24 y `spec-verify` | — |
+| **V — Envíos y devoluciones** | carril-v-relevo (`local_119e83ae-…`) | ECO-10d revisores, devoluciones T23–T34, envíos T14b/T20/T21b/T22/T24 y `spec-verify` | — |
 | **Biblioteca (ECO-8)** | carril-biblioteca | T01–T24 en main; T25 (E2E + `ui-review`) y `spec-verify` | — |
 | **Evidencias** | carril-evidencias | OAS-1, K6-1, cobertura y DOC-1 hechos; rampa final 50→2000 con 0,6/0,4/512m (espera Docker) e informe final de la rúbrica | — |
 | **Rendimiento** | reducir-el-costo-por-sol | Cerrado: ~31 → ~18 sentencias por solicitud; memoria opt-in apagada (DD-17) | — |
