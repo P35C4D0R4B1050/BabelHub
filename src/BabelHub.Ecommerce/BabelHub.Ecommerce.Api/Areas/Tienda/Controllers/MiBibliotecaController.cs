@@ -81,6 +81,7 @@ public sealed class MiBibliotecaController(IBibliotecaDelCliente biblioteca, IAy
             "Mi biblioteca",
             AreaDeLaPagina.Tienda,
             cancelacion);
+        modelo.HaySesion = true; // la ruta exige sesión: la cabecera muestra «Mi cuenta» y «Cerrar sesión»
         if (modelo.Libros.Count == 0)
         {
             modelo.Estado = EstadoVista.Vacio("Aún no tienes libros digitales", "Cuando compres uno, aparecerá aquí al instante.", "Ver libros digitales", "/catalogo?formato=digital");
