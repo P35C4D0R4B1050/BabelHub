@@ -169,7 +169,7 @@ public static class EndpointsDeNotificaciones
         }
 
         // El actor es la integración del Inventario (la credencial ya se verificó): ningún actor sale de una cabecera.
-        actor.Establecer(ActorActual.DeIntegracion("inventario"));
+        actor.Establecer(ActorActual.DeIntegracion(IntegracionesDeServicio.Inventario));
         try
         {
             var resultado = await recepcion.Recibir(new SolicitudDeAvisoDelInventario(cuerpo.EventoId, cuerpo.Plantilla, cuerpo.CodigoDeSucursal, cuerpo.Campos), contexto.RequestAborted).ConfigureAwait(false);

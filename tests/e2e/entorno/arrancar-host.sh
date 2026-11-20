@@ -10,7 +10,12 @@ for v in $(compgen -v BABELHUB__Migrador__); do unset "$v"; done
 export ASPNETCORE_ENVIRONMENT=Development
 case "$1" in
   ecommerce)
-    if [ "${E2E_TLS:-0}" = "1" ]; then
+    if [ "${E2E_HOST:-tienda}" = "gestion" ]; then
+      # El host de la gestión (personal): otro proceso sobre la misma base, con su propia cookie de sesión y su propio puerto.
+      export ASPNETCORE_URLS="https://localhost:8444"
+      export BABELHUB__Web__Host="gestion"
+      export BABELHUB__Web__HostsPermitidos="localhost:8444"
+    elif [ "${E2E_TLS:-0}" = "1" ]; then
       export ASPNETCORE_URLS="https://localhost:8443;http://localhost:8080"
       export BABELHUB__Web__HostsPermitidos="localhost:8443"
     else

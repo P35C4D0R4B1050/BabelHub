@@ -191,7 +191,7 @@ public sealed class PublicadoresDePlataformaTests
         foreach (var motivo in new[]
         {
             "credencial-de-servicio-anterior-en-uso", "dependencia-no-necesaria-fallida", "trabajo-de-fondo-detenido", "memoria-de-contadores-alta",
-            "verificador-de-credenciales-sin-claves", "revocacion-de-sesiones-pendiente", "traslado-vinculado-sin-aprobar", "accesos-denegados", "ingresos-fallidos",
+            "verificador-de-credenciales-sin-claves", "revocacion-de-sesiones-pendiente", "traslado-vinculado-sin-aprobar", "aviso-de-traslado-no-entregado", "estado-de-traslado-sin-entregar", "entrega-de-traslado-con-error-permanente", "credencial-del-ecommerce-rechazada", "accesos-denegados", "ingresos-fallidos",
         })
         {
             Assert.True(catalogo.Contiene(motivo), motivo);

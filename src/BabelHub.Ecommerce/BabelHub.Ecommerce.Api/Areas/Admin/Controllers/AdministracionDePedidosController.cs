@@ -80,7 +80,7 @@ public sealed class AdministracionDePedidosController(IAdministracionDePedidos a
         var vista = await DetalleDePersonalComoVista(detalle, RutaDeLaLista, ruta, aviso, cancelacion);
         if (!vista.TextosPendientes)
         {
-            if (detalle.Resumen.Estado != EstadoVisibleDelPedido.Anulado)
+            if (detalle.PuedeAnular)
             {
                 vista.RutaDeAnular = ruta + "/anular";
             }
@@ -133,7 +133,7 @@ public sealed class AdministracionDePedidosController(IAdministracionDePedidos a
         }
 
         var numero = 1;
-        if (Request.Query["pagina"].ToString() is { Length: > 0 } p && (!int.TryParse(p, NumberStyles.None, CultureInfo.InvariantCulture, out numero) || numero is < 1 or > 10_000))
+        if (Request.Query["pagina"].ToString() is { Length: > 0 } p && (!int.TryParse(p, NumberStyles.None, CultureInfo.InvariantCulture, out numero) || numero is < 1 or > PaginaMaxima))
         {
             return await Falla(Invalido("pagina"), RutaDeLasOperacionesFallidas, cancelacion);
         }

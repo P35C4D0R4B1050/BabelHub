@@ -31,7 +31,7 @@ public sealed class TrabajoDeFondoDePedidos(
     OpcionesDelTrabajoDePedidos opciones,
     TimeProvider? tiempo = null)
 {
-    public const string MotivoDelTrabajoDetenido = "trabajo-de-fondo-detenido";
+    public const string MotivoDelTrabajoDetenido = "trabajo-de-pedidos-sin-correr";
 
     private int _fallosSeguidos;
 
@@ -172,7 +172,7 @@ public static class TrabajosDePedidos
                     // Aunque hoy no toque (o el trabajo no haya podido correr), una depuración sin éxito desde hace más de un día alerta en cada tick: nunca queda en silencio (PED-39).
                     if (ultima is { } ultimaVez && reloj.Ahora - ultimaVez >= SinDepuracionDurante)
                     {
-                        await alertas.Publicar(new AlertaTecnica(TrabajoDeFondoDePedidos.MotivoDelTrabajoDetenido, reloj.Ahora), ct).ConfigureAwait(false);
+                        await alertas.Publicar(new AlertaTecnica(AnonimizarContactosVencidos.AlertaSinCorrida, reloj.Ahora), ct).ConfigureAwait(false);
                     }
 
                     return false;
