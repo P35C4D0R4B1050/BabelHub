@@ -28,7 +28,9 @@ public static partial class CatalogoDeAccionesDeAuditoria
         yield return AuditadaYSeguridadAislada(nameof(AccionesAuditables.ClaveDeFirmaDeclaradaComprometida), false, ["declaracion-de-administracion"], Clave("version"));
 
         // Biblioteca digital.
-        yield return Auditada(nameof(AccionesAuditables.DescargasRestituidas), false, false, Clave("edicionId"), Clave("cantidad"));
+        yield return Auditada(nameof(AccionesAuditables.DescargasRestituidas), false, false, Clave("edicionId"), Clave("cantidad"), Clave("motivo"));
+        yield return Auditada(nameof(AccionesAuditables.DescargasDeBibliotecaDepuradas), false, false, Clave("cantidad", 12));
+        yield return Auditada(nameof(AccionesAuditables.AyudasDeBibliotecaDepuradas), false, false, Clave("cantidad", 12));
         yield return Auditada(nameof(AccionesAuditables.AccesoDigitalRevocado), false, false, Clave("edicionId"), Clave("causa"));
         yield return Auditada(nameof(AccionesAuditables.ReporteDeArchivoResuelto), false, false, Clave("edicionId"), Clave("resolucion"));
         yield return Auditada(nameof(AccionesAuditables.BibliotecaDeClienteConsultada), true, false);

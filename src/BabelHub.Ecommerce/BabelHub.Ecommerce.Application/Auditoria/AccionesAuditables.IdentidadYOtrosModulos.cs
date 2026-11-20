@@ -42,6 +42,12 @@ public static partial class AccionesAuditables
 
     public static readonly AccionAuditable DescargasRestituidas = new(nameof(DescargasRestituidas));
 
+    /// <summary>El trabajo diario quitó del registro de descargas de dos años la referencia al acceso y al usuario (solo la cantidad, BIB-26).</summary>
+    public static readonly AccionAuditable DescargasDeBibliotecaDepuradas = new(nameof(DescargasDeBibliotecaDepuradas));
+
+    /// <summary>El trabajo diario eliminó las solicitudes de ayuda de dos años (solo la cantidad, BIB-29).</summary>
+    public static readonly AccionAuditable AyudasDeBibliotecaDepuradas = new(nameof(AyudasDeBibliotecaDepuradas));
+
     public static readonly AccionAuditable AccesoDigitalRevocado = new(nameof(AccesoDigitalRevocado));
 
     /// <summary>La administración resolvió el reporte de un archivo defectuoso.</summary>

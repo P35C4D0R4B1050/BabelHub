@@ -119,6 +119,9 @@ public static class MotivosDeAlertaDeAuditoria
     /// <summary>Una guía de un envío cancelado quedó sin uso en el operador logístico y hay que avisarle (R05).</summary>
     public const string EnvioGuiaSinUso = "envio-guia-sin-uso";
 
+    /// <summary>El archivo de una edición digital falta en el almacén de objetos al pedir una descarga (BIB-13).</summary>
+    public const string BibliotecaArchivoFaltante = "biblioteca-archivo-faltante";
+
     /// <summary>Una anulación o una entrega de pedido quedó fallida: su reanudación no pudo completarla y alguien debe revisarla.</summary>
     public const string PedidoOperacionFallida = "pedido-operacion-fallida";
 
@@ -199,6 +202,7 @@ public static class MotivosDeAlertaDeAuditoria
         EnvioGuiaRepetida,
         EnvioProgresoSinInformar,
         EnvioGuiaSinUso,
+        BibliotecaArchivoFaltante,
         PedidoOperacionFallida,
         PedidoLiberacionNoRecogidoYaCerrada,
         PedidoLiberacionDeAnulacionYaCerrada,

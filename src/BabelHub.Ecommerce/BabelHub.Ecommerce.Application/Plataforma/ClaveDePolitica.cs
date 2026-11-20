@@ -79,6 +79,9 @@ public static class PoliticasDeLimite
 
     public static ClaveDePolitica PasosAlPagoPorCuenta { get; } = new("pasos-al-pago-por-cuenta");
 
+    /// <summary>10 enlaces de descarga por cliente y hora, fallando cerrado (BIB-15).</summary>
+    public static ClaveDePolitica EnlacesDeDescargaPorCuenta { get; } = new("enlaces-de-descarga-por-cuenta");
+
     public static ClaveDePolitica VolverOReiniciarPorCuenta { get; } = new("volver-o-reiniciar-por-cuenta");
 
     /// <summary>Los límites de uso de Envíos (plan de envíos §6): consultas y operaciones por usuario y las solicitudes de guía al operador.</summary>
@@ -135,6 +138,7 @@ public static class PoliticasDeLimite
         CobrosPorCuenta,
         CobrosPorOrigen,
         PasosAlPagoPorCuenta,
+        EnlacesDeDescargaPorCuenta,
         LecturasDelContactoDePedidosPorPersona,
         AvisosPorNumeroPorHora,
         AvisosPorNumeroEn24Horas,

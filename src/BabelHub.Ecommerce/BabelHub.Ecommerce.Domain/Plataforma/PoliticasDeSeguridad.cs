@@ -89,6 +89,9 @@ public static class PoliticasDeSeguridad
     /// <summary>Pasar al pago reserva stock: 10 por cuenta y hora. <b>Falla cerrada</b> (SEG-26): una operación que reserva stock no cae a un contador local; repetir el mismo pedido no cuenta otra vez (DD-12).</summary>
     public static PoliticaDeLimite PasosAlPagoPorCuenta { get; } = new("pasos-al-pago-por-cuenta", 10, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Usuario);
 
+    /// <summary>Los enlaces de descarga de libros digitales: 10 por cliente y hora (BIB-15). <b>Crítica y falla cerrada</b> (SEG-26): sin el almacén de contadores no se entrega ningún enlace; repetir la misma clave de un solo uso sobre el mismo acceso no cuenta otra vez (SEG-22).</summary>
+    public static PoliticaDeLimite EnlacesDeDescargaPorCuenta { get; } = new("enlaces-de-descarga-por-cuenta", 10, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Usuario);
+
     /// <summary>Volver al carrito y reiniciar el checkout: 20 por cuenta y hora.</summary>
     public static PoliticaDeLimite VolverOReiniciarPorCuenta { get; } = new(
         "volver-o-reiniciar-por-cuenta", 20, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
@@ -174,6 +177,7 @@ public static class PoliticasDeSeguridad
         CobrosPorCuenta,
         CobrosPorOrigen,
         PasosAlPagoPorCuenta,
+        EnlacesDeDescargaPorCuenta,
         LecturasDelContactoDePedidosPorPersona,
         AvisosPorNumeroPorHora,
         AvisosPorNumeroEn24Horas,
