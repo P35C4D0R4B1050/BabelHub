@@ -4,6 +4,7 @@ using BabelHub.Ecommerce.Api.Catalogo;
 using BabelHub.Ecommerce.Api.Biblioteca;
 using BabelHub.Ecommerce.Api.Envios;
 using BabelHub.Ecommerce.Api.Notificaciones;
+using BabelHub.Ecommerce.Api.Pedidos;
 using BabelHub.Ecommerce.Api.Pagos;
 using BabelHub.Ecommerce.Api.Reclamaciones;
 using BabelHub.Ecommerce.Api.Web;
@@ -377,7 +378,11 @@ public static class AnfitrionDelEcommerce
         });
         var aplicacion = BasesDelEcommerce.Abrir(opciones.BaseDeLaAplicacion);
         // La superficie de servicio del E-commerce declara las operaciones que atiende hoy: la solicitud de aviso del Inventario (alcance solicitar-aviso).
-        (OperacionDeServicio Operacion, AlcanceDeServicio Alcance)[] declaraciones = [(new OperacionDeServicio(EndpointsDeNotificaciones.OperacionDeLasSolicitudesDelInventario), AlcanceDeServicio.SolicitarAviso)];
+        (OperacionDeServicio Operacion, AlcanceDeServicio Alcance)[] declaraciones =
+        [
+            (new OperacionDeServicio(EndpointsDeNotificaciones.OperacionDeLasSolicitudesDelInventario), AlcanceDeServicio.SolicitarAviso),
+            (new OperacionDeServicio(EndpointsDePedidos.OperacionDeLosEstadosDeTraslado), AlcanceDeServicio.SolicitarAviso),
+        ];
         servicios.AgregarPlataformaDelEcommerce(aplicacion, opciones.Configuracion.Seguridad, opciones.Configuracion.Turnstile, soloEnModoNormal, declaraciones, opciones.Redis);
         servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDelProveedor("turnstile", esNulo: !soloEnModoNormal));
         if (soloEnModoNormal)
@@ -454,6 +459,7 @@ public static class AnfitrionDelEcommerce
         servicios.AgregarReclamaciones();
         servicios.AgregarTrabajosDeReclamacionesEnLaApi(soloEnModoNormal);
         servicios.AgregarPedidos(esProduccion: false);
+        servicios.AgregarTrabajosDePedidosEnLaApi(soloEnModoNormal);
         servicios.AgregarBiblioteca(guardarProduccion, opciones.AlmacenDeBiblioteca);
         servicios.AgregarTrabajosDeBibliotecaEnLaApi(soloEnModoNormal);
         servicios.AgregarDoblesProvisionalesDelCarrito(guardarProduccion);
@@ -489,6 +495,8 @@ public static class AnfitrionDelEcommerce
         app.MapearAvisosDeLaPasarela(habilitada: false);
         // Notificaciones: la solicitud del Inventario y la administración (desactivar, reactivar y consultar); los estados de entrega de n8n solo existen si el envío es por n8n (con su firma verificable) y son de la red interna.
         app.MapearNotificaciones();
+        // Pedidos: los estados de traslado que informa el Inventario (alcance solicitar-aviso, operación ecommerce.traslados.informar-estado).
+        app.MapearPedidos();
         app.MapearEstadosDeEntregaDeN8n(habilitada: app.Services.GetService<OpcionesDeEnvioPorN8n>() is not null);
 #if DEBUG
         app.MapearSembradorDeSesiones();
