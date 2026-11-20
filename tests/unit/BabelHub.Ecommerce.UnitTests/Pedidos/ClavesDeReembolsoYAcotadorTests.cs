@@ -26,6 +26,7 @@ public sealed class ClavesDeReembolsoYAcotadorTests
 
         Assert.True(acotador.Permitir("motivo", ahora));
         Assert.False(acotador.Permitir("motivo", ahora.AddMinutes(1)));
+        Assert.False(acotador.Permitir("motivo", ahora.AddSeconds(-10)));
         Assert.True(acotador.Permitir("motivo", ahora.AddHours(-3)));
     }
 }
