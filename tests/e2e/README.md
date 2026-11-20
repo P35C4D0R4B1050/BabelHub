@@ -71,6 +71,7 @@ bash tests/e2e/entorno/sembrar-datos.sh --limpiar                   # datos fict
 cd tests/e2e && source "$LOCALAPPDATA/babelhub-e2e/env" && E2E_BASE_URL=https://localhost:8443 npx playwright test pedidos/compra-y-pedido --workers=1
 ```
 
+- Las pantallas del personal (`pedidos/gestion-de-pedidos.spec.ts`) necesitan además el host de la gestión sobre la misma base: `E2E_TLS=1 E2E_HOST=gestion bash tests/e2e/entorno/arrancar-host.sh ecommerce &` (https://localhost:8444; `E2E_GESTION_URL` lo cambia). Sus sesiones salen del sembrador de ese host (`encargado` con el código de su sucursal, `logistica`, `administrador`).
 - `E2E_TLS=1` usa el certificado de desarrollo de .NET (`dotnet dev-certs https`); Playwright lo acepta con `ignoreHTTPSErrors`.
 - `BABELHUB__Seguridad__ServicioSinHttps=true` (solo `Development`; el archivo de entorno lo trae) deja que los dos servicios se llamen por HTTP local; nunca se enciende en producción.
 - `BABELHUB__Ecommerce__ProxiesConocidos=127.0.0.1,::1` hace que el host confíe en `X-Origen-Cliente` desde la propia máquina: cada recorrido llega desde su propio origen (el Inventario limita las reservas a 10 por hora por origen, SEL-19) y `sembrar-datos.sh --limpiar` vacía los contadores de límites y las reservas.
