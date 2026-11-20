@@ -41,6 +41,13 @@ public sealed class TrabajosYServiciosDePedidosTests
     private static readonly AlcanceDeSistemaDePedidos SinActor = (corrida, cancelacion) => corrida(cancelacion);
 
     [Fact]
+    public void Los_trabajos_de_Pedidos_publican_sus_motivos_propios_del_catalogo()
+    {
+        Assert.Equal("trabajo-de-pedidos-sin-correr", TrabajoDeFondoDePedidos.MotivoDelTrabajoDetenido);
+        Assert.Contains(TrabajoDeFondoDePedidos.MotivoDelTrabajoDetenido, BabelHub.Shared.Contratos.Auditoria.MotivosDeAlertaDeAuditoria.Todos);
+    }
+
+    [Fact]
     public async Task La_sucursal_se_resuelve_por_su_codigo_siempre_al_mismo_identificador_sin_distinguir_mayusculas_y_un_codigo_invalido_no_se_resuelve()
     {
         var resolucion = new CodigoResolucionDeSucursal();

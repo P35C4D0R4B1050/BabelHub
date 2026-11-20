@@ -68,7 +68,7 @@ internal sealed class AnonimizarContactosVencidos(
     public const int MaximoPorCorrida = 1000;
 
     /// <summary>El motivo catalogado de un trabajo de fondo que dejó de correr (el catálogo no tiene uno propio de la depuración de pedidos).</summary>
-    public const string AlertaSinCorrida = "trabajo-de-fondo-detenido";
+    public const string AlertaSinCorrida = "depuracion-de-pedidos-sin-exito";
 
     public static readonly TimeSpan SinCorridaDurante = TimeSpan.FromHours(24);
 
@@ -154,7 +154,7 @@ internal sealed class LiberarContactoDeIntenciones(
 {
     public const int MaximoPorPasada = 200;
 
-    public const string AlertaSinLiberar = "trabajo-de-fondo-detenido";
+    public const string AlertaSinLiberar = "contacto-de-pedido-sin-liberar";
 
     public static readonly TimeSpan SinLiberarDurante = TimeSpan.FromHours(24);
 

@@ -8,6 +8,9 @@ public sealed class AlertasDePedidosTests
 {
     public static TheoryData<string> Motivos => new()
     {
+        "trabajo-de-pedidos-sin-correr",
+        "depuracion-de-pedidos-sin-exito",
+        "contacto-de-pedido-sin-liberar",
         "pedido-operacion-fallida",
         "pedido-liberacion-no-recogido-ya-cerrada",
         "pedido-liberacion-de-anulacion-ya-cerrada",
