@@ -151,7 +151,7 @@ test.describe('Biblioteca digital (compra, mi biblioteca, descarga y ayuda)', ()
     const accion = (await page.locator('form[action$="/descargar"]').first().getAttribute('action'))!;
     const accesoAjeno = accion.split('/')[2];
 
-    const otro = await browser.newContext({ ...info.project.use, ignoreHTTPSErrors: true });
+    const otro = await browser.newContext({ ...info.project.use });
     const otraPagina = await otro.newPage();
     await ingresarComoClienteNuevo(otraPagina);
     await otraPagina.goto('/biblioteca');
@@ -171,7 +171,7 @@ test.describe('Administración de la biblioteca', () => {
   test.skip(!clave || !urlDeAdministracion, 'Falta BABELHUB__Sembrador__Clave o E2E_ADMIN_URL (el host de gestión del entorno E2E)');
 
   test('BIB-12, BIB-16: la lista de ayudas no muestra datos de la cuenta y cumple axe AA', async ({ browser }, info) => {
-    const contexto = await browser.newContext({ ...info.project.use, baseURL: urlDeAdministracion, ignoreHTTPSErrors: true });
+    const contexto = await browser.newContext({ ...info.project.use, baseURL: urlDeAdministracion });
     const page = await contexto.newPage();
     await conOrigenPropio(page);
     const sesion = await page.request.post('/desarrollo/sesion', { headers: { 'X-Sembrador-De-Desarrollo': clave! }, data: { rol: 'administrador' } });

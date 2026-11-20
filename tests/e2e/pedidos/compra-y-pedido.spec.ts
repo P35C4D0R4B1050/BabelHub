@@ -60,7 +60,7 @@ test.describe('Compra y pedido (carrito, checkout, pago y Mis pedidos)', () => {
     await esperarElPedido(page);
     const rutaDelPedido = (await page.getByRole('link', { name: /^Ver el pedido/ }).first().getAttribute('href'))!;
 
-    const otro = await browser.newContext({ ...info.project.use, ignoreHTTPSErrors: true });
+    const otro = await browser.newContext({ ...info.project.use });
     const otraPagina = await otro.newPage();
     await ingresarComoClienteNuevo(otraPagina);
     await otraPagina.goto('/cuenta/pedidos');

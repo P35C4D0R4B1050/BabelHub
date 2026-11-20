@@ -10,6 +10,9 @@ public sealed class AcotadorDeAlertasDePedidos
 {
     public static readonly TimeSpan Intervalo = TimeSpan.FromMinutes(15);
 
+    /// <summary>Cuánto puede llegar una lectura del reloj por detrás de la anterior (solicitudes concurrentes) sin tratarse como un retroceso del reloj.</summary>
+    public static readonly TimeSpan ToleranciaDelReloj = TimeSpan.FromMinutes(1);
+
     private readonly ConcurrentDictionary<string, DateTimeOffset> _ultima = new(StringComparer.Ordinal);
 
     /// <summary>Verdadero si el motivo no se publicó en el último intervalo (y lo anota); falso si hay que omitirla.</summary>
@@ -28,7 +31,8 @@ public sealed class AcotadorDeAlertasDePedidos
                 continue;
             }
 
-            if (ahora >= anterior && ahora - anterior < Intervalo)
+            // Una solicitud concurrente con unos milisegundos de desorden no abre el paso; solo un retroceso del reloj mayor que la tolerancia reanuda la cuenta.
+            if (ahora - anterior < Intervalo && anterior - ahora <= ToleranciaDelReloj)
             {
                 return false;
             }
