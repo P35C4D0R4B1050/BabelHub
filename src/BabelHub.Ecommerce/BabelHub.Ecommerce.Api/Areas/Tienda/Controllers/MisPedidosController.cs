@@ -73,6 +73,7 @@ public sealed class MisPedidosController(IPedidosDelCliente pedidos, ContextoDeP
         var detalle = resultado.Valor;
         var vista = await NuevoDetalle(detalle.Resumen, detalle.Lineas, RutaDeLaLista, ruta, aviso, cancelacion);
         vista.MostrarLaFuente = false;
+        vista.RutaDeDevolver = ruta + "/devolver";
         vista.CostoDeEnvioTexto = FormatoPeruano.Soles(detalle.CostoDeEnvio);
         vista.Region = detalle.RegionDeEntrega;
         vista.Contacto = ContactoComoVista(detalle.Contacto);

@@ -113,6 +113,9 @@ public sealed class DetalleDePedidoVista : ModeloBaseDePagina
     /// <summary>La acción de cancelar (solo el titular y solo si procede) y, si no procede, la alternativa que le corresponde.</summary>
     public string? RutaDeCancelar { get; set; }
 
+    /// <summary>El enlace a la pantalla de devolver (solo el titular, T26 de Devoluciones).</summary>
+    public string? RutaDeDevolver { get; set; }
+
     public string? AlternativaTexto { get; set; }
 
     public string? ReembolsoPendienteTexto { get; set; }

@@ -180,6 +180,11 @@
             <div class="alert text-sm" role="status"><bh-icono nombre="info" /><span>@Model.AlternativaTexto</span></div>
         }
 
+        @if (Model.RutaDeDevolver is not null)
+        {
+            <a class="btn btn-sm btn-outline self-start" href="@Model.RutaDeDevolver"><bh-icono nombre="sucursal" clase="size-4" />Devolver libros</a>
+        }
+
         @if (Model.RutaDeAnular is not null)
         {
             <bh-accion-de-cambio>
