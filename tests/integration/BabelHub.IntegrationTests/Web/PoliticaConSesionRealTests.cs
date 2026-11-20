@@ -94,6 +94,8 @@ public sealed class PoliticaConSesionRealTests(PostgresDeLaWebFixture bd) : IAsy
         "GET /cuenta/cancelacion → Cuenta",
         "GET /cuenta/correo → Cuenta",
         "GET /cuenta/datos → Cuenta",
+        "GET /cuenta/pedidos → Pedidos",
+        "GET /cuenta/pedidos/{pedidoId:guid} → Pedidos",
         "GET /cuenta/segundo-factor → Cuenta",
         "GET /cuenta/solicitudes → Cuenta",
         "GET /legal/{texto} → TextosLegales",
@@ -156,7 +158,7 @@ public sealed class PoliticaConSesionRealTests(PostgresDeLaWebFixture bd) : IAsy
             foreach (var metodo in endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods ?? ["GET"])
             {
                 // Las rutas del Libro de Reclamaciones están atribuidas a propósito (WEB-41; la lista cerrada de la otra prueba las fija): con textos pendientes siguen abiertas y no se «niegan».
-                var delLibro = endpoint.Metadata.GetMetadata<PermitidaConTextosPendientesAttribute>() is { Capacidad: CapacidadWeb.LibroDeReclamaciones or CapacidadWeb.EnviarHoja or CapacidadWeb.Cuenta };
+                var delLibro = endpoint.Metadata.GetMetadata<PermitidaConTextosPendientesAttribute>() is { Capacidad: CapacidadWeb.LibroDeReclamaciones or CapacidadWeb.EnviarHoja or CapacidadWeb.Cuenta or CapacidadWeb.Pedidos };
                 if (delLibro || (permitidas.Contains(url) && (metodo == "GET" || url == "/sesion/cerrar" || url == "/textos/aceptar")))
                 {
                     continue;
@@ -167,8 +169,10 @@ public sealed class PoliticaConSesionRealTests(PostgresDeLaWebFixture bd) : IAsy
                 var cuerpo = await respuesta.Content.ReadAsStringAsync();
                 // Una ruta de la administración que el rol no ve la niega primero el filtro de área (403 ECO-PROHIBIDO, antes de la acción): también es una negación, no una ejecución.
                 var delAreaDeAdministracion = rol == RolWeb.Encargado && endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Mvc.AreaAttribute>()?.RouteValue == "Admin";
+                // Una ruta con el valor de sucursal en la ruta ([ParametroDeSucursal]) compara primero con la sucursal del actor, antes de consultar a Identidad (D15): la sucursal «terminos» de la prueba no es la suya y se niega como fuera de alcance (403 ECO-PROHIBIDO), tampoco una ejecución.
+                var delAlcanceDeSucursal = endpoint.Metadata.GetMetadata<ParametroDeSucursalAttribute>() is not null;
                 var negada = (respuesta.StatusCode == HttpStatusCode.Found && respuesta.Headers.Location!.OriginalString is "/textos/aceptar" or "/sin-permiso")
-                             || (delAreaDeAdministracion && respuesta.StatusCode == HttpStatusCode.Forbidden && cuerpo.Contains("ECO-PROHIBIDO", StringComparison.Ordinal))
+                             || ((delAreaDeAdministracion || delAlcanceDeSucursal) && respuesta.StatusCode == HttpStatusCode.Forbidden && cuerpo.Contains("ECO-PROHIBIDO", StringComparison.Ordinal))
                              || (respuesta.StatusCode == HttpStatusCode.Forbidden && (cuerpo.Contains("ECO-TEXTOS-PENDIENTES", StringComparison.Ordinal) || cuerpo.Length == 0));
                 Assert.True(negada, $"{host} {metodo} {url} → {(int)respuesta.StatusCode} {cuerpo}");
             }
