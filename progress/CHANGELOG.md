@@ -10,6 +10,13 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 - **Carril A:** `/health/ready` detecta la caída de la base en los dos servicios. **Carril B:** fachadas y lecturas de Pedidos (ECO-6f).
 - Validación de `main`: compilación sin advertencias, SpecCheck 0 avisos, unitarias 5376 y 2368, arquitectura 243, integración 6954 de 6966; 12 fallos: 2 flaky que pasan sueltos, 2 de imágenes por contención de Docker, y 8 reales repartidos a sus dueños (4 pruebas por fixtures con contraseña o clave literal, composición de la biblioteca, Dockerfiles distintos, prueba de reservas con el tope nuevo).
 
+## 2026-11-20 (mañana) — E2E de compra y pedido, optimización del Inventario y tercera integración
+
+### Cubierto
+- **Carril B:** ECO-6f cerrada con reservas (T33–T36 y T41 como «ECO-6g»); E2E `pedidos/compra-y-pedido.spec.ts` 9/9 (Chromium escritorio y teléfono, WebKit; axe AA); correcciones reales: `IConfirmacionDeCompra`, `ICuentaDelPagador`, lista de sucursales, clave de reembolso (Guid «N»/«D») y simulador.
+- **Carril de rendimiento (nuevo):** sentencias por solicitud del Inventario ~31 → ~18 (~12 con la memoria opt-in apagada, D05), sin mejora consistente de capacidad con 0,3 CPU (RNF02 sigue sin cumplirse; cuello = CPU del servicio); decisión de dimensionamiento de la persona pendiente (doc 09 §6c).
+- Integración completa de `main` (1d92fe25): 7161 de 7165 en 21 min; escáner de secretos limpio. Fallos: `HumoDeImagenes` ×2 (conocidos), una prueba de carrera de biblioteca que pasa sola y una copia de adaptadores sin espejar (carril de rendimiento, en corrección).
+
 ## 2026-11-20 (madrugada) — Segunda integración de `main`, cobertura y COMP-1
 
 ### Cubierto
