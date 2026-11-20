@@ -220,6 +220,13 @@ public static class AnfitrionDelInventario
 
         // ---------- Datos: el rol de acceso de la aplicación y las cuentas de depuración, aparte ----------
         BasesDelInventario.RegistrarLaDeLaAplicacion(servicios, opciones.BaseDeLaAplicacion);
+        if (soloEnModoNormal)
+        {
+            // La salud (/health/ready) comprueba la base de la aplicación: en ensayo y restauración no hay una base con la que comprobar.
+            servicios.AddSingleton<ComprobacionDeLaBaseDeDatos>();
+            servicios.AddSingleton<IComprobacionDeSalud, ComprobacionDeSaludDeLaBase>();
+        }
+
         servicios.AddSingleton<IRegistroDeTrabajosDeFondo>(sp => new RegistroDeTrabajosDeFondoPostgres(sp.GetRequiredService<UnidadDeTrabajoPostgres>()));
 
         // ---------- Auditoría y los cuatro módulos ----------

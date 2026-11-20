@@ -371,6 +371,12 @@ public static class AnfitrionDelEcommerce
         (OperacionDeServicio Operacion, AlcanceDeServicio Alcance)[] declaraciones = [(new OperacionDeServicio(EndpointsDeNotificaciones.OperacionDeLasSolicitudesDelInventario), AlcanceDeServicio.SolicitarAviso)];
         servicios.AgregarPlataformaDelEcommerce(aplicacion, opciones.Configuracion.Seguridad, opciones.Configuracion.Turnstile, soloEnModoNormal, declaraciones, opciones.Redis);
         servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDelProveedor("turnstile", esNulo: !soloEnModoNormal));
+        if (soloEnModoNormal)
+        {
+            // La salud (/health/ready) comprueba la base de la aplicación: en ensayo y restauración no hay una base con la que comprobar.
+            servicios.AddSingleton(new ComprobacionDeLaBaseDeDatos(aplicacion));
+            servicios.AddSingleton<IComprobacionDeSalud, ComprobacionDeSaludDeLaBase>();
+        }
         servicios.AgregarCredencialDeServicio(new OpcionesDeSuperficieDeServicio { TopeDeLaDireccionDirecta = PoliticasDeLimite.SolicitudesPorHuellaDirecta }, opciones.Configuracion.Seguridad.CredencialesDeEntrada);
 
         // ---------- Auditoría ----------
