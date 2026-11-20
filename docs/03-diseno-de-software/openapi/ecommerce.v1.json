@@ -147,6 +147,36 @@
         "x-alcance": "SesionWeb"
       }
     },
+    "/.well-known/jwks.json": {
+      "get": {
+        "tags": [
+          "plataforma"
+        ],
+        "summary": "Claves públicas de firma de Identidad (JWKS), sin autenticación; el Inventario las renueva cada 5 minutos.",
+        "responses": {
+          "200": {
+            "description": "Claves públicas de firma de Identidad (JWKS), sin autenticación; el Inventario las renueva cada 5 minutos."
+          }
+        },
+        "security": [ ],
+        "x-alcance": "Ninguna"
+      }
+    },
+    "/.well-known/revocaciones": {
+      "get": {
+        "tags": [
+          "plataforma"
+        ],
+        "summary": "Identificadores de clave (`kid`) revocados, sin autenticación.",
+        "responses": {
+          "200": {
+            "description": "Identificadores de clave (`kid`) revocados, sin autenticación."
+          }
+        },
+        "security": [ ],
+        "x-alcance": "Ninguna"
+      }
+    },
     "/api/ecommerce/v1/avisos/numeros-desactivados": {
       "post": {
         "tags": [
@@ -244,10 +274,639 @@
         ],
         "x-alcance": "SesionWeb"
       }
+    },
+    "/api/ecommerce/v1/auditoria": {
+      "get": {
+        "tags": [
+          "auditoria"
+        ],
+        "summary": "ecommerce.auditoria.consultar",
+        "description": "Operación de usuario (alcance `{contrato.Alcance}` del token verificado por Identidad; sin credencial de servicio). Lleva el token del usuario. Es una lectura: el cliente puede reintentarla.",
+        "operationId": "ecommerce.auditoria.consultar",
+        "parameters": [
+          {
+            "name": "accion",
+            "in": "query",
+            "description": "texto",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "usuarioId",
+            "in": "query",
+            "description": "guid",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "origen",
+            "in": "query",
+            "description": "texto",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "in": "query",
+            "description": "instante",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "description": "instante",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "texto",
+            "in": "query",
+            "description": "texto(3-100)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "texto",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado normal de la operación.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaDeRegistrosDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error. Códigos estables posibles: `ECO-VALIDACION-INVALIDA`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error. Códigos estables posibles: `ECO-NO-AUTENTICADO`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error. Códigos estables posibles: `ECO-PROHIBIDO`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error. Códigos estables posibles: `ECO-SERVICIO-NO-DISPONIBLE`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "tokenDeUsuario": [ ]
+          }
+        ],
+        "x-operacion": "ecommerce.auditoria.consultar",
+        "x-alcance": "operacion-de-usuario"
+      }
+    },
+    "/api/ecommerce/v1/alertas": {
+      "get": {
+        "tags": [
+          "alertas"
+        ],
+        "summary": "ecommerce.alertas.listar",
+        "description": "Operación de usuario (alcance `{contrato.Alcance}` del token verificado por Identidad; sin credencial de servicio). Lleva el token del usuario. Es una lectura: el cliente puede reintentarla.",
+        "operationId": "ecommerce.alertas.listar",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "texto",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado normal de la operación.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaDeAlertasDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error. Códigos estables posibles: `ECO-VALIDACION-INVALIDA`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error. Códigos estables posibles: `ECO-NO-AUTENTICADO`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error. Códigos estables posibles: `ECO-PROHIBIDO`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error. Códigos estables posibles: `ECO-SERVICIO-NO-DISPONIBLE`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "tokenDeUsuario": [ ]
+          }
+        ],
+        "x-operacion": "ecommerce.alertas.listar",
+        "x-alcance": "operacion-de-usuario"
+      }
+    },
+    "/api/ecommerce/v1/alertas/{id}/revisada": {
+      "post": {
+        "tags": [
+          "alertas"
+        ],
+        "summary": "ecommerce.alertas.marcar-revisada",
+        "description": "Operación de usuario (alcance `{contrato.Alcance}` del token verificado por Identidad; sin credencial de servicio). Lleva el token del usuario. Cambia el estado.",
+        "operationId": "ecommerce.alertas.marcar-revisada",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarcarAlertaRevisadaDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Resultado normal de la operación."
+          },
+          "400": {
+            "description": "Error. Códigos estables posibles: `ECO-VALIDACION-INVALIDA`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error. Códigos estables posibles: `ECO-NO-AUTENTICADO`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error. Códigos estables posibles: `ECO-PROHIBIDO`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error. Códigos estables posibles: `ECO-SERVICIO-NO-DISPONIBLE`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "tokenDeUsuario": [ ]
+          }
+        ],
+        "x-operacion": "ecommerce.alertas.marcar-revisada",
+        "x-alcance": "operacion-de-usuario"
+      }
+    },
+    "/api/ecommerce/v1/historial": {
+      "get": {
+        "tags": [
+          "historial"
+        ],
+        "summary": "ecommerce.historial.consultar",
+        "description": "Operación de usuario (alcance `{contrato.Alcance}` del token verificado por Identidad; sin credencial de servicio). Lleva el token del usuario. Es una lectura: el cliente puede reintentarla.",
+        "operationId": "ecommerce.historial.consultar",
+        "parameters": [
+          {
+            "name": "sucursal",
+            "in": "query",
+            "description": "guid",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "texto",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado normal de la operación.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaDeRegistrosDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error. Códigos estables posibles: `ECO-VALIDACION-INVALIDA`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error. Códigos estables posibles: `ECO-NO-AUTENTICADO`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error. Códigos estables posibles: `ECO-PROHIBIDO`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error. Códigos estables posibles: `ECO-SERVICIO-NO-DISPONIBLE`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "tokenDeUsuario": [ ]
+          }
+        ],
+        "x-operacion": "ecommerce.historial.consultar",
+        "x-alcance": "operacion-de-usuario"
+      }
     }
   },
   "components": {
     "schemas": {
+      "MarcarAlertaRevisadaDto": {
+        "required": [
+          "contadorVisto"
+        ],
+        "type": "object",
+        "properties": {
+          "contadorVisto": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "PaginaDeAlertasDto": {
+        "required": [
+          "alertas",
+          "siguienteCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "alertas": {
+            "type": "array",
+            "items": {
+              "required": [
+                "id",
+                "servicio",
+                "motivo",
+                "clase",
+                "primeraOcurrencia",
+                "ultimaOcurrencia",
+                "ocurrencias",
+                "revisadasHasta",
+                "revisadaPor",
+                "revisadaEn"
+              ],
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "servicio": {
+                  "type": "string"
+                },
+                "motivo": {
+                  "type": "string"
+                },
+                "clase": {
+                  "type": "string"
+                },
+                "primeraOcurrencia": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "ultimaOcurrencia": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "ocurrencias": {
+                  "pattern": "^-?(?:0|[1-9]\\d*)$",
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ],
+                  "format": "int32"
+                },
+                "revisadasHasta": {
+                  "pattern": "^-?(?:0|[1-9]\\d*)$",
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ],
+                  "format": "int32"
+                },
+                "revisadaPor": {
+                  "type": "string",
+                  "format": "uuid",
+                  "nullable": true
+                },
+                "revisadaEn": {
+                  "type": "string",
+                  "format": "date-time",
+                  "nullable": true
+                },
+                "estado": {
+                  "type": "string",
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "siguienteCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "faltanDelInventario": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "PaginaDeRegistrosDto": {
+        "required": [
+          "registros",
+          "siguienteCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "registros": {
+            "type": "array",
+            "items": {
+              "required": [
+                "id",
+                "servicio",
+                "tipo",
+                "tipoDeActor",
+                "usuarioId",
+                "rol",
+                "instanteUtc",
+                "accion",
+                "resultado",
+                "objetoTipo",
+                "objetoId",
+                "sucursalOrigen",
+                "sucursalDestino",
+                "motivo",
+                "origen",
+                "ruta",
+                "detalle",
+                "clavesPersonales",
+                "truncado",
+                "correlacion",
+                "anonimizadoEn"
+              ],
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "servicio": {
+                  "type": "string"
+                },
+                "tipo": {
+                  "type": "string"
+                },
+                "tipoDeActor": {
+                  "type": "string"
+                },
+                "usuarioId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "nullable": true
+                },
+                "rol": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "instanteUtc": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "accion": {
+                  "type": "string"
+                },
+                "resultado": {
+                  "type": "string"
+                },
+                "objetoTipo": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "objetoId": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "sucursalOrigen": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "sucursalDestino": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "motivo": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "origen": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "ruta": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "detalle": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "clavesPersonales": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "nullable": true
+                },
+                "truncado": {
+                  "type": "boolean"
+                },
+                "correlacion": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "anonimizadoEn": {
+                  "type": "string",
+                  "format": "date-time",
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "siguienteCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "cursorDeLaPagina": {
+            "type": "string",
+            "nullable": true
+          },
+          "faltanDelInventario": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
       "ProblemaDto": {
         "type": "object",
         "properties": {
