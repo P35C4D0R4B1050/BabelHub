@@ -94,5 +94,5 @@ Catálogo y criterios en [`docs/03/03`](../../docs/03-diseno-de-software/03-prin
 
 - Corrida de CI en GitHub (depende del `push` de la persona).
 - Verificación (`spec-verify`) de las specs restantes (cierre FIN-1).
-- **RNF02 con el dimensionamiento declarado (0,6 / 0,4)**: medido y no cumplido en la serie final; la decisión de qué hacer (más CPU, menor costo por solicitud o aceptar la lectura de 50 personas reales con 5 a 10 s entre acciones) es de la persona responsable.
+- **RNF02 con el dimensionamiento declarado (0,6 / 0,4)**: medido y no cumplido en la serie final (p95 ≈ 900 ms a 50 usuarios). **Decisión de la persona (DD-18, 2026-11-20, opción A):** se demuestra con el entorno de prueba sin el tope de CPU de la VM (1/1 CPU, p95 < 500 ms a 50 usuarios) y se declara con honestidad que en la VM de 1 OCPU compartida no se sostiene; palancas: memoria de referencias (apagada por D05), separar PostgreSQL, ARM con más OCPU. El resultado de 2 000 usuarios (p95 16,9 s y 51 % de errores; mejor configuración 4/2 CPU: 10,1 s sin errores) es la capacidad medida con ese dimensionamiento.
 - Hallazgos abiertos de otros carriles en `progress/hallazgos.md` (por ejemplo, rutas del E-commerce aún sin mapear en el host).

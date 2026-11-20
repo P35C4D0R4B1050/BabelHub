@@ -10,6 +10,13 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 - **Carril A:** `/health/ready` detecta la caída de la base en los dos servicios. **Carril B:** fachadas y lecturas de Pedidos (ECO-6f).
 - Validación de `main`: compilación sin advertencias, SpecCheck 0 avisos, unitarias 5376 y 2368, arquitectura 243, integración 6954 de 6966; 12 fallos: 2 flaky que pasan sueltos, 2 de imágenes por contención de Docker, y 8 reales repartidos a sus dueños (4 pruebas por fixtures con contraseña o clave literal, composición de la biblioteca, Dockerfiles distintos, prueba de reservas con el tope nuevo).
 
+## 2026-11-20 (tarde) — Serie final de k6 y decisión sobre RNF02 (DD-18)
+
+### Cubierto
+- **Evidencias:** serie final sobre `main` con DD-17: RNF02 no se cumple con 0,6/0,4/512m (p95 ≈ 900 ms a 50 usuarios; 1,4 s en rampa); cumplen checkout (< 3 s), sobreventa (AC01), límites y resiliencia; a 2 000 usuarios p95 16,9 s y 51 % de errores (mejor 4/2 CPU: 10,1 s sin errores). DOC-1 §6b-bis e informe final de la rúbrica actualizados.
+- **Decisión de la persona (DD-18, opción A):** RNF02 se demuestra con el entorno de prueba sin tope de CPU de la VM (1/1 CPU) y se declara con honestidad que en la VM de 1 OCPU compartida no se sostiene a 50 usuarios; D05 y las specs se conservan, la memoria de 5 s sigue apagada. Hallazgo cerrado como «declarado con evidencia».
+- **Fundido en `main`:** carril B (ECO-6g escrito), C (renovación de la sesión de WEB-2), A (cierre de ronda 1) y el relevo del carril V (sesión nueva).
+
 ## 2026-11-20 (mediodía) — Decisiones de la persona sobre RNF02 (DD-17)
 
 ### Cubierto
