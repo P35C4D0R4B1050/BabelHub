@@ -29,7 +29,7 @@ public static class ComposicionDeFuentes
     /// <summary>Los casos de uso del módulo que se pueden repetir entero ante un interbloqueo: sus claves naturales los hacen idempotentes (plan §5).</summary>
     public static IReadOnlyList<Type> CasosDeUsoIdempotentes { get; } = [typeof(RegistrarRuta), typeof(RegistrarFichaDeEdicion), typeof(DesignarFuenteDeRecepcion)];
 
-    public static IServiceCollection AgregarModuloFuentes(this IServiceCollection servicios, OpcionesDeReintentoPorInterbloqueo? reintento = null, OpcionesDeBloqueosAsesores? bloqueos = null)
+    public static IServiceCollection AgregarModuloFuentes(this IServiceCollection servicios, OpcionesDeReintentoPorInterbloqueo? reintento = null, OpcionesDeBloqueosAsesores? bloqueos = null, TimeSpan? vidaDeLasReferencias = null)
     {
         ArgumentNullException.ThrowIfNull(servicios);
         var opcionesDeReintento = reintento ?? new OpcionesDeReintentoPorInterbloqueo();
@@ -52,7 +52,7 @@ public static class ComposicionDeFuentes
         servicios.AddScoped<IRepositorioDeExistencias, NpgsqlRepositorioDeExistencias>();
         servicios.AddScoped<IAplicadorDeMovimientos, AplicadorDeMovimientos>();
         servicios.AddScoped<IMovimientosDeStock, MovimientosDeStock>();
-        servicios.TryAddSingleton<CacheDeReferencias>();
+        servicios.TryAddSingleton(sp => new CacheDeReferencias(sp.GetRequiredService<IReloj>(), vidaDeLasReferencias));
         servicios.AddScoped<ConsultaDeExistencias>();
         servicios.AddScoped<IExistencias>(sp => sp.GetRequiredService<ConsultaDeExistencias>());
         servicios.AddScoped<DirectorioDeFuentes>();

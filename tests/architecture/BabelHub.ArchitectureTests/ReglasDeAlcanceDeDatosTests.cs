@@ -160,7 +160,7 @@ namespace BabelHub.ArchitectureTests
                 .SelectMany(capa => Cargar($"{Servicio}.{capa}").GetTypes())
                 .Where(t => t.IsVisible)
                 .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static))
-                .Where(m => m.Name == "ConAlcanceDeRed")
+                .Where(m => m.Name.EndsWith("ConAlcanceDeRed", StringComparison.Ordinal))
                 .Select(m => $"{m.DeclaringType?.FullName}.{m.Name}")
                 .ToList();
 

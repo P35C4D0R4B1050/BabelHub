@@ -84,6 +84,8 @@ public static class BasesDelInventario
         // Sin reinicio de sesión al devolver la conexión al grupo (Npgsql manda <c>DISCARD ALL</c> por omisión: era la tercera sentencia que más tiempo gastaba la base en la carga, DOC-1 §6b). Es
         // compatible con el aislamiento porque la aplicación no deja nada en la sesión: el rol (<c>SET LOCAL ROLE</c>), el alcance de datos (<c>set_config(…, true)</c>) y las esperas máximas valen solo
         // dentro de la transacción y la base los descarta al confirmar o revertir (la prueba de «no sobreviven a la transacción» lo comprueba). Lo que el operador fijó en la cadena se respeta.
+        // Invariante: ningún código del Inventario deja estado de sesión (un `SET` sin LOCAL, `set_config(…, false)`, tablas temporales). Los bloqueos asesores de sesión cierran la conexión física si no se pueden soltar.
+        // El migrador usa estado de sesión (`SET log_statement`, bloqueo asesor) pero su origen de datos se destruye al terminar, así que no se reutiliza.
         if (!escrito.ContainsKey("No Reset On Close") && !escrito.ContainsKey("NoResetOnClose"))
         {
             constructor.NoResetOnClose = true;

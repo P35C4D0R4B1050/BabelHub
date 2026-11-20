@@ -17,10 +17,13 @@ public readonly record struct FuenteDeReferencia(Guid Id, string Codigo, string 
 /// <item><b>Acotada:</b> no guarda ausencias (un identificador inventado no ocupa memoria) y se vacía entera al pasar de 10 000 entradas.</item>
 /// </list>
 /// </summary>
-public sealed class CacheDeReferencias(IReloj reloj)
+public sealed class CacheDeReferencias(IReloj reloj, TimeSpan? vida = null)
 {
-    /// <summary>Cuánto vive una entrada.</summary>
-    public static readonly TimeSpan Vida = TimeSpan.FromSeconds(5);
+    /// <summary>Cuánto vive una entrada si la configuración no dice otra cosa (la memoria viene <b>apagada</b> por omisión: ver <see cref="Vida"/>).</summary>
+    public static readonly TimeSpan VidaSugerida = TimeSpan.FromSeconds(5);
+
+    /// <summary>Cuánto vive una entrada; <see cref="TimeSpan.Zero"/> (por omisión) la apaga: nada se guarda y todo se lee de la base. Encenderla es una decisión de la persona responsable (D05 de <c>inventario-fuentes</c>).</summary>
+    public TimeSpan Vida { get; } = vida ?? TimeSpan.Zero;
 
     private const int MaximoDeEntradas = 10_000;
 
@@ -35,6 +38,10 @@ public sealed class CacheDeReferencias(IReloj reloj)
     public void Guardar<T>(string clave, T valor)
     {
         ArgumentNullException.ThrowIfNull(valor);
+        if (Vida <= TimeSpan.Zero)
+        {
+            return;
+        }
 
         if (_entradas.Count >= MaximoDeEntradas)
         {

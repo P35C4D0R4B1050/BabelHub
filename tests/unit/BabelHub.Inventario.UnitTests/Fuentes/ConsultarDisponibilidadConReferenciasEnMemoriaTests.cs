@@ -14,7 +14,7 @@ public sealed class ConsultarDisponibilidadConReferenciasEnMemoriaTests
     private static (ConsultarDisponibilidad Caso, ConsultaDeExistencias Existencias, EntornoDeFuentes Entorno) Montar()
     {
         var e = new EntornoDeFuentes(ActorDePrueba.DeIntegracion("e-commerce"));
-        var referencias = new CacheDeReferencias(e.Reloj);
+        var referencias = new CacheDeReferencias(e.Reloj, CacheDeReferencias.VidaSugerida);
         var existencias = new ConsultaDeExistencias(e.Lectura, e.Fuentes, e.Existencias, e.Reservas, referencias);
         var caso = new ConsultarDisponibilidad(e.Autorizador, new ValidadorDeConsultarDisponibilidad(), e.Lectura, e.Fichas, existencias, e.Reloj, referencias);
         return (caso, existencias, e);
@@ -66,7 +66,7 @@ public sealed class ConsultarDisponibilidadConReferenciasEnMemoriaTests
         await caso.Ejecutar(new ConsultarDisponibilidadEntrada([libro]));
         var fuentesLeidas = e.Fuentes.LecturasDeLaLista;
 
-        e.Reloj.Ahora += CacheDeReferencias.Vida + TimeSpan.FromMilliseconds(1);
+        e.Reloj.Ahora += CacheDeReferencias.VidaSugerida + TimeSpan.FromMilliseconds(1);
         await caso.Ejecutar(new ConsultarDisponibilidadEntrada([libro]));
 
         Assert.Equal(fuentesLeidas + 1, e.Fuentes.LecturasDeLaLista);
@@ -112,10 +112,30 @@ public sealed class ConsultarDisponibilidadConReferenciasEnMemoriaTests
         var antes = await caso.Ejecutar(new ConsultarDisponibilidadEntrada([libro]));
         e.Fuentes.Agregar("arequipa", "arequipa");
 
-        e.Reloj.Ahora += CacheDeReferencias.Vida + TimeSpan.FromMilliseconds(1);
+        e.Reloj.Ahora += CacheDeReferencias.VidaSugerida + TimeSpan.FromMilliseconds(1);
         var despues = await caso.Ejecutar(new ConsultarDisponibilidadEntrada([libro]));
 
         Assert.Equal(3, Assert.Single(antes.Valor.Ediciones).PorFuente.Count);
         Assert.Equal(4, Assert.Single(despues.Valor.Ediciones).PorFuente.Count);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-FUE-08")]
+    public async Task SinConfigurarLaVida_LaMemoriaEstaApagada_YCadaConsultaLeeLaBase()
+    {
+        var e = new EntornoDeFuentes(ActorDePrueba.DeIntegracion("e-commerce"));
+        var referencias = new CacheDeReferencias(e.Reloj);
+        var existencias = new ConsultaDeExistencias(e.Lectura, e.Fuentes, e.Existencias, e.Reservas, referencias);
+        var caso = new ConsultarDisponibilidad(e.Autorizador, new ValidadorDeConsultarDisponibilidad(), e.Lectura, e.Fichas, existencias, e.Reloj, referencias);
+        var libro = e.Impresa();
+        e.Existencias.Poner(e.Lima.Id, libro, 8, 0);
+
+        await caso.Ejecutar(new ConsultarDisponibilidadEntrada([libro]));
+        var fuentesLeidas = e.Fuentes.LecturasDeLaLista;
+        await caso.Ejecutar(new ConsultarDisponibilidadEntrada([libro]));
+
+        Assert.Equal(TimeSpan.Zero, referencias.Vida);
+        Assert.Equal(fuentesLeidas + 1, e.Fuentes.LecturasDeLaLista);
+        Assert.Equal(2, e.Fichas.LecturasPorIds.Count);
     }
 }

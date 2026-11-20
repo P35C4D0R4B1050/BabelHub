@@ -137,7 +137,8 @@ public sealed class UnidadDeTrabajoPostgres(NpgsqlDataSource origen, OpcionesDeU
             }
             catch (PostgresException ex) when (ex.SqlState == TransaccionAbortada)
             {
-                // La transacción ya falló: el valor vuelve solo al revertirla, y no se enmascara el error original del bloque.
+                // La transacción ya falló: el valor vuelve solo al revertirla, y no se enmascara el error original del bloque. El espejo en memoria vuelve igual que en SalirA.
+                activa.Alcance = string.IsNullOrEmpty(previo) ? string.Empty : previo;
             }
         }
     }

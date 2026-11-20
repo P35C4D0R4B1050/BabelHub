@@ -65,7 +65,7 @@ public sealed class PilaDeFuentes
         Aplicador = new AplicadorDeMovimientos(Existencias);
         Movimientos = new MovimientosDeStock(Fichas, Existencias, Reservas, Aplicador);
         Fuentes = new NpgsqlRepositorioDeFuentes(Acceso);
-        Consulta = new ConsultaDeExistencias(Unidad, Fuentes, Existencias, Reservas, new CacheDeReferencias(new RelojDeIntegracion()));
+        Consulta = new ConsultaDeExistencias(Unidad, Fuentes, Existencias, Reservas, new CacheDeReferencias(new RelojDeIntegracion(), CacheDeReferencias.VidaSugerida));
     }
 
     internal NpgsqlRepositorioDeFuentes Fuentes { get; }

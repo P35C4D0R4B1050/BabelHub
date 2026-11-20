@@ -125,6 +125,49 @@ public sealed class CostoPorSolicitudDeDisponibilidadTests(PostgresDeFuentesFixt
         Assert.True(sentencias.Count <= 4, $"Se enviaron {sentencias.Count} sentencias:{Environment.NewLine}{string.Join(Environment.NewLine, sentencias)}");
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-FUE-08")]
+    public async Task UnBloqueoElevadoQueFalla_PropagaElErrorOriginal_YLaConexionVuelveSinRolNiAlcanceElevados()
+    {
+        var (origen, _) = AbrirContando(maximoDeConexiones: 1);
+        await using var _ = origen;
+        var pila = Pila(origen, ActorActual.DeUsuario(Guid.NewGuid(), RolesDeUsuario.EncargadoDeSucursal, await bd.AgregarFuente("propia")));
+
+        var error = await Assert.ThrowsAsync<PostgresException>(() => pila.Unidad.Ejecutar(token =>
+            pila.Acceso.ConAlcanceDeRed<int>(
+                async (conexion, transaccion, t) =>
+                {
+                    await using var comando = new NpgsqlCommand("SELECT 1 / 0", conexion, transaccion);
+                    return (int)(await comando.ExecuteScalarAsync(t))!;
+                },
+                token)));
+
+        Assert.Equal("22012", error.SqlState); // la división por cero, no el 25P02 de la restauración
+        await using var conexionDelGrupo = await origen.OpenConnectionAsync();
+        await using var comandoDeEstado = new NpgsqlCommand("SELECT current_user, coalesce(current_setting('babelhub.alcance', true), '')", conexionDelGrupo);
+        await using var lector = await comandoDeEstado.ExecuteReaderAsync();
+        Assert.True(await lector.ReadAsync());
+        Assert.Equal("acceso", lector.GetString(0));
+        Assert.Equal(string.Empty, lector.GetString(1));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-FUE-08")]
+    public async Task UnActorSinAlcance_DespuesDeUnEncargado_EnLaMismaConexionFisica_SigueFallandoCerrado()
+    {
+        var (origen, _) = AbrirContando(maximoDeConexiones: 1);
+        await using var _ = origen;
+        var propia = await bd.AgregarFuente("propia");
+        var edicion = await bd.AgregarEdicion();
+        await bd.PonerStock(propia, edicion, 4, 0);
+        var encargado = Pila(origen, ActorActual.DeUsuario(Guid.NewGuid(), RolesDeUsuario.EncargadoDeSucursal, propia));
+        await encargado.Unidad.EjecutarLectura(token => encargado.Existencias.Leer([edicion], token));
+
+        // Un encargado sin sucursal no tiene alcance: la conexión es la misma, y no debe heredar el de la transacción anterior.
+        var sinAlcance = Pila(origen, ActorActual.DeUsuario(Guid.NewGuid(), RolesDeUsuario.EncargadoDeSucursal, null));
+        await Assert.ThrowsAsync<ContextoDeActorAusenteException>(() => sinAlcance.Unidad.EjecutarLectura(token => sinAlcance.Fichas.PorIds([edicion], token)));
+    }
+
     /// <summary>Lo que hace <c>ConsultarDisponibilidad</c>: en una sola transacción de solo lectura, las fichas de las ediciones y su disponibilidad (fuentes, stock y vencidas).</summary>
     private static Task<IReadOnlyList<BabelHub.Inventario.Application.Fuentes.DisponibilidadDeEdicion>> Consultar(PilaDeFuentes pila, Guid edicion) =>
         pila.Unidad.EjecutarLectura(async token =>
