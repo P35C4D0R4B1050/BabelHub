@@ -19,8 +19,8 @@ public sealed class SaludDeLaBaseDeDatosTests
     /// <summary>Una cadena a un puerto en el que nadie escucha: abrir la conexión falla de inmediato. La contraseña se genera al vuelo (nunca un secreto fijo).</summary>
     private static string BaseCaida()
     {
-        var cadena = new NpgsqlConnectionStringBuilder { Host = "127.0.0.1", Port = 1, Database = "ninguna", Username = "acceso", Timeout = 1, CommandTimeout = 1, Pooling = false };
-        cadena.Password = Guid.NewGuid().ToString("N");
+        var clave = Guid.NewGuid().ToString("N");
+        var cadena = new NpgsqlConnectionStringBuilder { Host = "127.0.0.1", Port = 1, Database = "ninguna", Username = "acceso", Timeout = 1, CommandTimeout = 1, Pooling = false, Password = clave };
         return cadena.ConnectionString;
     }
 
