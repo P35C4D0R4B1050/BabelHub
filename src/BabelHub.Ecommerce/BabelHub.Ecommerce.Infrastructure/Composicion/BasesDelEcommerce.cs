@@ -65,7 +65,21 @@ public static class BasesDelEcommerce
         }
     }
 
-    public static NpgsqlDataSource Abrir(string cadena) => NpgsqlDataSource.Create(cadena);
+    /// <summary>Máximo de conexiones del grupo de una cuenta cuando la cadena no fija uno: la cuenta tiene <c>CONNECTION LIMIT 20</c> (migrador y aprovisionamiento) y el grupo por omisión de Npgsql abre hasta 100, lo que con más de 20 consultas simultáneas daba «too many connections» y un 500 (hallazgo de K6-1). Por debajo del límite, el exceso espera un turno.</summary>
+    public const int MaximoDeConexionesPorOmision = 16;
+
+    public static NpgsqlDataSource Abrir(string cadena)
+    {
+        // El constructor de Npgsql responde «sí» a toda palabra clave conocida: lo que el operador fijó se lee en la cadena tal cual.
+        var escrito = new System.Data.Common.DbConnectionStringBuilder { ConnectionString = cadena };
+        var constructor = new NpgsqlConnectionStringBuilder(cadena);
+        if (!escrito.ContainsKey("Maximum Pool Size") && !escrito.ContainsKey("MaxPoolSize"))
+        {
+            constructor.MaxPoolSize = MaximoDeConexionesPorOmision;
+        }
+
+        return NpgsqlDataSource.Create(constructor.ConnectionString);
+    }
 
     public static void RegistrarLaDeLaAplicacion(IServiceCollection servicios, string cadena)
     {
