@@ -10,7 +10,7 @@ env_host="$CARGA_CARPETA/env"; env_cont="$CARGA_CARPETA/env-contenedor"
 alea() { head -c 36 /dev/urandom | base64 | tr -d '/+=' | head -c "${1:-40}"; }
 versionada() { printf 'v1:%s' "$(head -c 32 /dev/urandom | base64)"; }
 poner() { grep -q "^$1=" "$env_host" 2>/dev/null || printf "%s='%s'\n" "$1" "$2" >> "$env_host"; }
-touch "$env_host"
+touch "$env_host"; chmod 600 "$env_host" 2>/dev/null || true
 poner POSTGRES_ADMIN_USER postgres
 poner POSTGRES_ADMIN_PASSWORD "$(alea 24)"
 poner POSTGRES_ECOMMERCE_PASSWORD "$(alea 24)"

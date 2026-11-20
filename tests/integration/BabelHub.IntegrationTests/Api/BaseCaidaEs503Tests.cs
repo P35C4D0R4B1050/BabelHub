@@ -17,7 +17,6 @@ public sealed class BaseCaidaEs503Tests
         new NpgsqlException("conexión perdida", new SocketException()),
         new NpgsqlException("plazo vencido", new TimeoutException()),
         new InvalidOperationException("envoltura", new NpgsqlException("sin red", new SocketException())),
-        new TimeoutException("el grupo de conexiones no entregó una a tiempo"),
     };
 
     private static async Task<(int Estado, JsonElement Cuerpo)> Inventario(Exception e)
@@ -59,6 +58,15 @@ public sealed class BaseCaidaEs503Tests
 
         Assert.Equal(503, estado);
         Assert.Equal("ECO-SERVICIO-NO-DISPONIBLE", cuerpo.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task UnTimeoutQueNoEsDeLaBase_SigueSiendoInesperado()
+    {
+        var otro = new TimeoutException("plazo de un cliente HTTP");
+
+        Assert.Equal(500, (await Inventario(otro)).Estado);
+        Assert.Equal(500, (await Ecommerce(otro)).Estado);
     }
 
     [Fact]

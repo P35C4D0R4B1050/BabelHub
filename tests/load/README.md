@@ -34,6 +34,8 @@ Variables opcionales de `ejecutar.sh`: `DURACION`, `RITMO` (compras por segundo)
 - **Siembra** (`lib/comun.js`, `setup()` de cada escenario): por la propia Api, con el token del administrador: una fuente de recepción, ediciones nuevas y su mercadería en cada corrida (el stock inicial es exacto).
 - La Api exige HTTPS entre servicios: Kestrel usa un certificado autofirmado y k6 corre con `insecureSkipTLSVerify`.
 
+El contenedor del Inventario corre con `ASPNETCORE_ENVIRONMENT=Development` (como el entorno E2E): sirve el documento OpenAPI y permite HTTP hacia el E-commerce; **no** es una medición de `Production`, cuyo comportamiento de arranque seguro (modos y adaptadores reales) no entra en la carga.
+
 ## Alcance y límites de lo medido
 
 - Se mide el **Inventario** (el servicio que concentra la concurrencia de stock); el tramo del E-commerce del checkout (carrito, pedido) se medirá cuando su Web esté completa. La pasarela no entra (RNF).
