@@ -259,7 +259,8 @@ public sealed class RegistroDeCuentas(
         }
 
         // La fila idéntica del camino síncrono, exista o no la cuenta (IDE-65): la búsqueda y el envío van en segundo plano.
-        await solicitudesDeCodigo.Registrar(huellas.DeSujeto(normalizado, "codigos-verificacion").Valor, PropositoDeCodigo.VerificacionDeCorreo, reloj.Ahora, cancelacion).ConfigureAwait(false);
+        // La columna guarda 64 hexadecimales: el resumen de la huella con clave del correo.
+        await solicitudesDeCodigo.Registrar(huellasDeIdentidad.DeValorOpaco(huellas.DeSujeto(normalizado, "codigos-verificacion").Valor), PropositoDeCodigo.VerificacionDeCorreo, reloj.Ahora, cancelacion).ConfigureAwait(false);
         EncolarElCodigo(normalizado, PropositoDeCodigo.VerificacionDeCorreo);
         return Resultado<RespuestaUniforme>.Exito(new RespuestaUniforme());
     }
