@@ -67,7 +67,7 @@ internal sealed class AnonimizarContactosVencidos(
 {
     public const int MaximoPorCorrida = 1000;
 
-    /// <summary>El motivo catalogado de un trabajo de fondo que dejó de correr (el catálogo no tiene uno propio de la depuración de pedidos).</summary>
+    /// <summary>El motivo propio de la depuración de pedidos que lleva 24 horas sin completarse con éxito (PED-39).</summary>
     public const string AlertaSinCorrida = "depuracion-de-pedidos-sin-exito";
 
     public static readonly TimeSpan SinCorridaDurante = TimeSpan.FromHours(24);

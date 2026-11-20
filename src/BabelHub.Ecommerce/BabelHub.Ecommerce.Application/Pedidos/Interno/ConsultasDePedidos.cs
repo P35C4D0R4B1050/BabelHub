@@ -50,7 +50,7 @@ internal sealed class ConsultasDePedidos(
             return Resultado<PaginaDePedidos>.Fallo(limite);
         }
 
-        var pagina = Math.Clamp(filtro.Pagina, 1, 10_000);
+        var pagina = Math.Clamp(filtro.Pagina, 1, FiltroDePedidos.PaginaMaxima);
         var tamano = Math.Clamp(filtro.Tamano, 1, FiltroDePedidos.TamanoMaximo);
         var criterio = alcance(quien.Valor) with { Estado = filtro.Estado is { } e ? ProyeccionesDePedidos.AEstadoDeDominio(e) : null, Pagina = pagina, Tamano = tamano };
         var resultado = await pedidos.Listar(criterio, cancelacion).ConfigureAwait(false);

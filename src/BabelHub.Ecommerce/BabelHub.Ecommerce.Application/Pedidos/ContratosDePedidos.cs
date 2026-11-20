@@ -76,6 +76,9 @@ public sealed record ResumenDePedido(
 public sealed record FiltroDePedidos(EstadoVisibleDelPedido? Estado = null, int Pagina = 1, int Tamano = 20)
 {
     public const int TamanoMaximo = 50;
+
+    /// <summary>La página más lejana que se atiende (20 por página: 10 000 filas): la acota la Aplicación y no solo la Api.</summary>
+    public const int PaginaMaxima = 500;
 }
 
 public sealed record PaginaDePedidos(IReadOnlyList<ResumenDePedido> Pedidos, int Pagina, int Tamano, int Total);

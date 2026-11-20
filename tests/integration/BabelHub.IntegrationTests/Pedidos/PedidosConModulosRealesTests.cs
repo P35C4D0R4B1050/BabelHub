@@ -85,6 +85,20 @@ public sealed class PedidosConModulosRealesTests(PostgresDelEcommerceCompletoFix
         return new CompraAprobada(pedido, cuenta, TipoDeEntregaDeCompra.Domicilio, null, "ayacucho", 12m, total, new ContactoDeLaCompra(NombreDelContacto, TelefonoDelContacto, DireccionDelContacto, "ayacucho"), aceptaciones, lineas);
     }
 
+    /// <summary>Una cuenta de cliente real de Identidad (activa, con el correo verificado y los tres textos vigentes aceptados): Pedidos la consulta por la marca de cancelación y por el alcance, y una cuenta inexistente es «ejecutada».</summary>
+    private async Task<Guid> SembrarCuenta()
+    {
+        var id = Guid.NewGuid();
+        await bd.Ejecutar(
+            $"""
+            INSERT INTO identidad.versiones_de_textos (id, terminos, privacidad, reembolso) VALUES (1, 'v1', 'v1', 'v1')
+              ON CONFLICT (id) DO UPDATE SET terminos = 'v1', privacidad = 'v1', reembolso = 'v1';
+            INSERT INTO identidad.usuarios (id, nombre, correo, correo_verificado, rol, activo, creada_en, acepto_terminos_version, acepto_terminos_en, acepto_privacidad_version, acepto_privacidad_en, acepto_reembolso_version, acepto_reembolso_en)
+              VALUES ('{id}', 'Ana Pérez', 'p{id:N}@example.test', true, 'cliente', true, now(), 'v1', now(), 'v1', now(), 'v1', now());
+            """);
+        return id;
+    }
+
     private async Task<T?> Consultar<T>(string sql, Guid pedido) => await bd.Consultar<T>(sql, ("p", pedido));
 
     [Fact]
@@ -94,7 +108,7 @@ public sealed class PedidosConModulosRealesTests(PostgresDelEcommerceCompletoFix
     {
         await using var anfitrion = Anfitrion();
         var pedido = Guid.NewGuid();
-        var cuenta = Guid.NewGuid();
+        var cuenta = await SembrarCuenta();
         var compra = Compra(pedido, cuenta, conDigital: false);
         var salida = new TaskCompletionSource();
 
@@ -108,7 +122,7 @@ public sealed class PedidosConModulosRealesTests(PostgresDelEcommerceCompletoFix
 
         Assert.All(resultados, r => Assert.Equal(ResultadoDeConfirmarCompra.Creado, r));
         Assert.Equal(1, await Consultar<int>("SELECT count(*) FROM pedidos.pedidos WHERE id = @p", pedido));
-        Assert.Equal(2, await Consultar<int>("SELECT count(*) FROM pedidos.lineas_de_pedido WHERE pedido_id = @p", pedido));
+        Assert.Equal(1, await Consultar<int>("SELECT count(*) FROM pedidos.lineas_de_pedido WHERE pedido_id = @p", pedido));
         // La creación queda auditada en la misma transacción, una sola vez, y el registro persistido no lleva el contacto.
         Assert.Equal(1, await bd.Consultar<int>("SELECT count(*) FROM auditoria.registros WHERE objeto_id = @o AND accion = 'EstadoDePedidoCambiado'", ("o", pedido.ToString("D"))));
         Assert.Equal(0, await bd.Consultar<int>("SELECT count(*) FROM auditoria.registros WHERE detalle::text ILIKE ANY (ARRAY['%Ana P%', '%987654321%', '%Jr. Lima%'])"));
@@ -121,7 +135,7 @@ public sealed class PedidosConModulosRealesTests(PostgresDelEcommerceCompletoFix
     {
         await using var anfitrion = Anfitrion();
         var pedido = Guid.NewGuid();
-        var cuenta = Guid.NewGuid();
+        var cuenta = await SembrarCuenta();
         var compra = Compra(pedido, cuenta, conDigital: true);
         Assert.Equal(ResultadoDeConfirmarCompra.Creado, await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<IConfirmacionDeCompra>().Confirmar(compra)));
         Assert.Equal("vigente", await Consultar<string>("SELECT estado FROM biblioteca.accesos WHERE pedido_id = @p", pedido));
@@ -145,8 +159,8 @@ public sealed class PedidosConModulosRealesTests(PostgresDelEcommerceCompletoFix
     public async Task El_limite_de_consultas_de_pedidos_responde_429_con_la_espera_en_el_pedido_numero_61_de_la_misma_persona_y_no_afecta_a_otra()
     {
         await using var anfitrion = Anfitrion();
-        var titular = Guid.NewGuid();
-        var otra = Guid.NewGuid();
+        var titular = await SembrarCuenta();
+        var otra = await SembrarCuenta();
 
         var respuestas = new List<Resultado<PaginaDePedidos>>();
         for (var i = 0; i < 61; i++)
@@ -158,7 +172,7 @@ public sealed class PedidosConModulosRealesTests(PostgresDelEcommerceCompletoFix
         var excedida = respuestas[60];
         Assert.False(excedida.EsExito);
         Assert.Equal(CategoriaDeError.Limite, excedida.Error!.Categoria);
-        Assert.Contains(excedida.Error.Errores, e => e.Campo == "espera-en-segundos");
+        Assert.Contains(excedida.Error.Errores, e => e.Campo == "disponibleDesde");
         Assert.True((await anfitrion.Como(DelTitular(otra), sp => sp.GetRequiredService<IPedidosDelCliente>().Listar(new FiltroDePedidos()))).EsExito);
     }
 
@@ -167,7 +181,7 @@ public sealed class PedidosConModulosRealesTests(PostgresDelEcommerceCompletoFix
     public async Task El_limite_de_gestion_responde_429_en_la_operacion_numero_31_y_un_pedido_ajeno_no_se_cancela()
     {
         await using var anfitrion = Anfitrion();
-        var titular = Guid.NewGuid();
+        var titular = await SembrarCuenta();
 
         var respuestas = new List<Resultado<ResultadoDeCancelacionDePedido>>();
         for (var i = 0; i < 31; i++)

@@ -40,9 +40,15 @@ public static class EndpointsDePedidos
         return rutas;
     }
 
+    /// <summary>Solo <c>application/json</c> exacto (con <c>charset</c> utf-8 o sin él): <c>application/jsonp</c> o <c>application/json-x</c> no son JSON de esta entrada.</summary>
+    private static bool EsJsonEstricto(string? tipo) =>
+        Microsoft.Net.Http.Headers.MediaTypeHeaderValue.TryParse(tipo, out var medio)
+        && string.Equals(medio.MediaType.Value, "application/json", StringComparison.OrdinalIgnoreCase)
+        && (medio.Charset.Length == 0 || string.Equals(medio.Charset.Value, "utf-8", StringComparison.OrdinalIgnoreCase));
+
     private static async Task<IResult> EstadoDeTraslado(HttpContext contexto, OpcionesDeErrores errores, IReceptorDeEstadosDeTraslado receptor, IEstablecedorDeActor actor)
     {
-        if (contexto.Request.ContentType is not { } tipo || !tipo.StartsWith("application/json", StringComparison.OrdinalIgnoreCase))
+        if (!EsJsonEstricto(contexto.Request.ContentType))
         {
             return await Falla(contexto, errores, Validacion("cuerpo", "invalido")).ConfigureAwait(false);
         }

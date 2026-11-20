@@ -15,6 +15,18 @@ async function mezclarImpresoYDigital(page: Page) {
   await agregarAlCarrito(page, EDICION_DIGITAL_DEL_ZORRO, 1);
 }
 
+// El checkout se abre desde el carrito (POST /checkout/iniciar): pedir `/checkout` sin haberlo iniciado no muestra los pasos.
+async function irA(page: Page, ruta: string) {
+  if (ruta !== '/checkout') {
+    await page.goto(ruta);
+    return;
+  }
+
+  await page.goto('/carrito');
+  await page.getByRole('button', { name: 'Continuar con la compra' }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+}
+
 async function marcarLosTextos(page: Page) {
   for (const casilla of await page.getByRole('group', { name: 'Para continuar, acepta:' }).getByRole('checkbox').all()) {
     await casilla.check();
@@ -55,7 +67,7 @@ test.describe('Carrito y checkout con el entorno sembrado', () => {
 
   test('un bloqueo se dice en la misma pantalla y el carrito se conserva', async ({ page }) => {
     await mezclarImpresoYDigital(page);
-    await page.goto('/checkout');
+    await irA(page, '/checkout');
     await page.getByLabel('Sucursal de recojo').selectOption({ label: 'Sucursal Ayacucho (prueba)' });
     await page.getByRole('button', { name: 'Elegir recojo' }).click();
 
@@ -107,7 +119,7 @@ test.describe('Carrito y checkout con el entorno sembrado', () => {
     for (const tema of ['babelhub', 'babelhub-dark'] as const) {
       test(`accesibilidad del ${nombre} (${tema}): sin violaciones de contraste ni de etiquetas`, async ({ page }) => {
         await mezclarImpresoYDigital(page);
-        await page.goto(ruta);
+        await irA(page, ruta);
         await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), tema);
         const resultado = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
         expect(resultado.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)).toEqual([]);
@@ -116,7 +128,7 @@ test.describe('Carrito y checkout con el entorno sembrado', () => {
 
     test(`teclado en el ${nombre}: el foco es visible y se llega a la acción principal sin ratón`, async ({ page }) => {
       await mezclarImpresoYDigital(page);
-      await page.goto(ruta);
+      await irA(page, ruta);
       const principal = page.getByRole('button', { name: /Continuar con la compra|Elegir recojo|Ir al pago/ }).first();
       let llegado = false;
       for (let i = 0; i < 60 && !llegado; i += 1) {
@@ -132,7 +144,7 @@ test.describe('Carrito y checkout con el entorno sembrado', () => {
     test(`teléfono en el ${nombre}: sin desplazamiento horizontal`, async ({ page }) => {
       await mezclarImpresoYDigital(page);
       await page.setViewportSize({ width: 375, height: 812 });
-      await page.goto(ruta);
+      await irA(page, ruta);
       const ancho = await page.evaluate(() => ({ doc: document.documentElement.scrollWidth, vista: window.innerWidth }));
       expect(ancho.doc).toBeLessThanOrEqual(ancho.vista);
     });
