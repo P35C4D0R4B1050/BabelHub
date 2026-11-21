@@ -162,11 +162,17 @@ public sealed class GestionDeLaCuenta(
         return Resultado<RespuestaUniforme>.Exito(new RespuestaUniforme());
     }
 
-    public async Task<Resultado<CuentaDelCliente>> GuardarElNumeroDeWhatsApp(Guid usuarioId, string? numero, CancellationToken cancelacion = default)
+    public async Task<Resultado<CuentaDelCliente>> GuardarElNumeroDeWhatsApp(Guid usuarioId, string? numero, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default)
     {
         if (await alcance.Comprobar(usuarioId, cancelacion).ConfigureAwait(false) is { } prohibido)
         {
             return Resultado<CuentaDelCliente>.Fallo(prohibido);
+        }
+
+        // Con un cambio de correo no reconocido pendiente, los cambios sensibles piden un dispositivo reconocido (IDE-96).
+        if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)
+        {
+            return Resultado<CuentaDelCliente>.Fallo(congelado);
         }
 
         return await unidad.Ejecutar(
@@ -206,11 +212,17 @@ public sealed class GestionDeLaCuenta(
             cancelacion).ConfigureAwait(false);
     }
 
-    public async Task<Resultado<CuentaDelCliente>> CambiarElConsentimientoDeWhatsApp(Guid usuarioId, bool consiente, string? numeroConfirmado, CancellationToken cancelacion = default)
+    public async Task<Resultado<CuentaDelCliente>> CambiarElConsentimientoDeWhatsApp(Guid usuarioId, bool consiente, string? numeroConfirmado, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default)
     {
         if (await alcance.Comprobar(usuarioId, cancelacion).ConfigureAwait(false) is { } prohibido)
         {
             return Resultado<CuentaDelCliente>.Fallo(prohibido);
+        }
+
+        // Con un cambio de correo no reconocido pendiente, los cambios sensibles piden un dispositivo reconocido (IDE-96).
+        if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)
+        {
+            return Resultado<CuentaDelCliente>.Fallo(congelado);
         }
 
         return await unidad.Ejecutar(

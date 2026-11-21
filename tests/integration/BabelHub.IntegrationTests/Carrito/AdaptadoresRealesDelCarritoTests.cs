@@ -189,9 +189,9 @@ public sealed class AdaptadoresRealesDelCarritoTests
 
         public Task<Resultado<RespuestaUniforme>> CambiarLaContrasena(Guid usuarioId, ValorSecreto actual, ValorSecreto nueva, ValorSecreto? renovacionDeLaSesion = null, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default) => throw new NotSupportedException();
 
-        public Task<Resultado<CuentaDelCliente>> GuardarElNumeroDeWhatsApp(Guid usuarioId, string? numero, CancellationToken cancelacion = default) => throw new NotSupportedException();
+        public Task<Resultado<CuentaDelCliente>> GuardarElNumeroDeWhatsApp(Guid usuarioId, string? numero, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default) => throw new NotSupportedException();
 
-        public Task<Resultado<CuentaDelCliente>> CambiarElConsentimientoDeWhatsApp(Guid usuarioId, bool consiente, string? numeroConfirmado, CancellationToken cancelacion = default) => throw new NotSupportedException();
+        public Task<Resultado<CuentaDelCliente>> CambiarElConsentimientoDeWhatsApp(Guid usuarioId, bool consiente, string? numeroConfirmado, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default) => throw new NotSupportedException();
 
         public Task<Resultado<SecretoDelSegundoFactor>> IniciarElSegundoFactor(Guid usuarioId, ValorSecreto contrasenaActual, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default) => throw new NotSupportedException();
 

@@ -24,7 +24,7 @@ public sealed class AvisosDeSeguridadPorCorreoTests
 
     [Fact]
     [Trait("Criterio", "AC-IDE-59")]
-    public void CadaPlantillaDeAvisoEstaClasificada_YSoloTresSonAlertasCriticas()
+    public void CadaPlantillaDeAvisoEstaClasificada_YSoloCuatroSonAlertasCriticas()
     {
         var plantillas = typeof(AvisosDeCuenta).GetFields(BindingFlags.Public | BindingFlags.Static)
             .Where(f => f.IsLiteral && f.Name.StartsWith("Plantilla", StringComparison.Ordinal)).Select(f => (string)f.GetRawConstantValue()!).ToList();
@@ -33,7 +33,7 @@ public sealed class AvisosDeSeguridadPorCorreoTests
         Assert.All(plantillas, p => Assert.Contains(p, ClasificacionDeAvisosDeCuenta.Todas.Keys));
         Assert.Equal(plantillas.Order(StringComparer.Ordinal), ClasificacionDeAvisosDeCuenta.Todas.Keys.Order(StringComparer.Ordinal));
         Assert.Equal(
-            ["cambio-de-correo-no-reconocido", "contrasena-cambiada", "segundo-factor-restablecido"],
+            ["cambio-de-correo-no-reconocido", "contrasena-cambiada", "correo-anterior-cambiado", "segundo-factor-restablecido"],
             ClasificacionDeAvisosDeCuenta.Todas.Where(p => p.Value == CategoriaDeCorreo.AlertaCriticaDeCuenta).Select(p => p.Key).Order(StringComparer.Ordinal));
         Assert.All(ClasificacionDeAvisosDeCuenta.Todas.Where(p => p.Value != CategoriaDeCorreo.AlertaCriticaDeCuenta), p => Assert.Equal(CategoriaDeCorreo.AvisoDeSeguridad, p.Value));
         Assert.Throws<ArgumentOutOfRangeException>(() => ClasificacionDeAvisosDeCuenta.De("plantilla-desconocida"));

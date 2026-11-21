@@ -40,10 +40,11 @@ public static class ClasificacionDeAvisosDeCuenta
 {
     private static readonly IReadOnlyDictionary<string, CategoriaDeCorreo> Categorias = new Dictionary<string, CategoriaDeCorreo>(StringComparer.Ordinal)
     {
-        // Críticos (IDE-74): dispositivo o región no reconocidos, restablecimiento del segundo factor y cambio de contraseña.
+        // Críticos (IDE-74): dispositivo o región no reconocidos, restablecimiento del segundo factor, cambio de contraseña y correo cambiado (al correo anterior).
         [AvisosDeCuenta.PlantillaDeContrasenaCambiada] = CategoriaDeCorreo.AlertaCriticaDeCuenta,
         [AvisosDeCuenta.PlantillaDeSegundoFactorRestablecido] = CategoriaDeCorreo.AlertaCriticaDeCuenta,
         [AvisosDeCuenta.PlantillaDeCambioDeCorreoNoReconocido] = CategoriaDeCorreo.AlertaCriticaDeCuenta,
+        [AvisosDeCuenta.PlantillaDeCorreoCambiadoAlAnterior] = CategoriaDeCorreo.AlertaCriticaDeCuenta,
 
         // No críticos: sin cupo no salen y quedan en la cuenta (IDE-79).
         [AvisosDeCuenta.PlantillaDeCancelacionDiferida] = CategoriaDeCorreo.AvisoDeSeguridad,
@@ -65,7 +66,8 @@ public static class ClasificacionDeAvisosDeCuenta
     /// </summary>
     public static bool YaDejaSuAvisoEnLaCuenta(string plantilla) =>
         plantilla is AvisosDeCuenta.PlantillaDeCancelacionDiferida or AvisosDeCuenta.PlantillaDePendientesCerrados or AvisosDeCuenta.PlantillaDeCancelacionDescartada
-            or AvisosDeCuenta.PlantillaDeSolicitudDeDatosRespondida or AvisosDeCuenta.PlantillaDeCorreoCambiado or AvisosDeCuenta.PlantillaDeCambioDeCorreoNoReconocido;
+            or AvisosDeCuenta.PlantillaDeSolicitudDeDatosRespondida or AvisosDeCuenta.PlantillaDeCorreoCambiado or AvisosDeCuenta.PlantillaDeCambioDeCorreoNoReconocido
+            or AvisosDeCuenta.PlantillaDeCorreoCambiadoAlAnterior;
 }
 
 /// <summary>
@@ -98,6 +100,9 @@ public sealed class AvisosDeCuenta(
 
     public const string PlantillaDeCorreoCambiado = "correo-cambiado";
 
+    /// <summary>El aviso al correo <b>anterior</b> cuando se aplicó el cambio (IDE-94): alerta crítica, sin enlaces ni el correo nuevo.</summary>
+    public const string PlantillaDeCorreoCambiadoAlAnterior = "correo-anterior-cambiado";
+
     public const string MotivoCuotaDeCorreo = "cuota-de-correo";
 
     public const string MotivoTopePorCuenta = "tope-por-cuenta";
@@ -123,8 +128,10 @@ public sealed class AvisosDeCuenta(
     /// <summary>La alerta al correo <b>anterior</b> por un cambio de correo desde un dispositivo o una región no reconocidos (IDE-54): crítica, sin enlaces ni el correo nuevo.</summary>
     public Task CambioDeCorreoNoReconocido(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeCambioDeCorreoNoReconocido, cancelacion);
 
-    /// <summary>El aviso al correo <b>nuevo</b> ya aplicado el cambio (IDE-53); nada sale al correo anterior.</summary>
+    /// <summary>El aviso al correo <b>nuevo</b> ya aplicado el cambio (IDE-53, IDE-94).</summary>
     public Task CorreoCambiado(Usuario usuarioConElCorreoNuevo, CancellationToken cancelacion) => Avisar(usuarioConElCorreoNuevo, PlantillaDeCorreoCambiado, cancelacion);
+/// <summary>El aviso al correo <b>anterior</b> ya aplicado el cambio (IDE-94): una alerta crítica sin enlaces ni el correo nuevo; no la suprime el tope diario por origen de IDE-86, solo la primera de su tipo por cuenta.</summary>    public Task CorreoCambiadoAlAnterior(Usuario usuarioConElCorreoAnterior, CancellationToken cancelacion) => Avisar(usuarioConElCorreoAnterior, PlantillaDeCorreoCambiadoAlAnterior, cancelacion);
+    public Task CorreoCambiadoAlAnterior(Usuario usuarioConElCorreoAnterior, CancellationToken cancelacion) => Avisar(usuarioConElCorreoAnterior, PlantillaDeCorreoCambiadoAlAnterior, cancelacion);
 
     /// <summary>El aviso al titular cuando la administración restablece su segundo factor (IDE-38): sin enlaces ni códigos.</summary>
     public Task SegundoFactorRestablecido(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeSegundoFactorRestablecido, cancelacion);
@@ -197,6 +204,12 @@ public sealed class AvisosDeCuenta(
             if (porTipo.Reserva is { } deTipo)
             {
                 reservas.Add(deTipo);
+            }
+
+            // El aviso al correo anterior de un cambio de correo (IDE-94) solo lo acota la primera de su tipo por cuenta: es la única señal para quien no hizo el cambio y el tope por origen (IDE-86) no la puede suprimir; cada cambio ya gasta un cupo de códigos (IDE-83).
+            if (plantilla == PlantillaDeCorreoCambiadoAlAnterior)
+            {
+                return null;
             }
 
             var porOrigen = await limites.Reservar(PoliticasDeLimite.AlertasCriticasPorOrigen, cancelacion: cancelacion).ConfigureAwait(false);
