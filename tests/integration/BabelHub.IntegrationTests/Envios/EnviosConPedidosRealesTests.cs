@@ -281,8 +281,8 @@ public sealed class EnviosConPedidosRealesTests(PostgresDePedidosYEnviosFixture 
 
             var guias = await Task.WhenAll(Task.Run(() => Logistica(e, l => l.SolicitarGuia(envio))), Task.Run(() => Logistica(e, l => l.SolicitarGuia(envio))));
             Assert.Contains(guias, r => r.EsExito);
-            // La simultánea o repite la misma guía (idempotente) o recibe `guia-en-curso`: nunca otro error ni otra guía.
-            Assert.All(guias.Where(r => !r.EsExito), r => Assert.Equal(ClavesDeEnvios.GuiaEnCurso, r.Error!.Clave));
+            // La que no gana, según el orden real de llegada: o la guía ya estaba en curso (`guia-en-curso`) o la otra ya la había generado (`estado-invalido`); nunca otro error ni otra guía (lo comprueba el total de guías creadas).
+            Assert.All(guias.Where(r => !r.EsExito), r => Assert.Contains(r.Error!.Clave, new[] { ClavesDeEnvios.GuiaEnCurso, ClavesDeEnvios.EstadoInvalido }));
 
             var antes = reservas.Cierres.Count;
             var pasos = await Task.WhenAll(Task.Run(() => Logistica(e, l => l.PasarAEnReparto(envio))), Task.Run(() => Logistica(e, l => l.PasarAEnReparto(envio))));
