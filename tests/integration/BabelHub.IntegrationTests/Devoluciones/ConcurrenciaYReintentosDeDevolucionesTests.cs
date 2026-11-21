@@ -152,7 +152,10 @@ public sealed class ConcurrenciaYReintentosDeDevolucionesTests(PostgresDeDevoluc
             // Justo pasado el plazo de 10 días desde la aprobación: la recepción y la revisión de plazos compiten.
             e.Reloj.Ahora = e.Reloj.Ahora.AddDays(10).AddMinutes(1);
 
-            var resultados = await Task.WhenAll(Task.Run(() => e.Recibir(devolucionId)), Task.Run(() => e.RechazarVencidas()));
+            var recepcion = Task.Run(() => e.Recibir(devolucionId));
+            var revision = Task.Run(() => e.RechazarVencidas());
+            await Task.WhenAll(recepcion, revision);
+            var resultados = new[] { await recepcion };
 
             var estado = await EstadoDeLaLinea(devolucionId);
             Assert.Contains(estado, new[] { "recibida", "reembolsada", "rechazada" });
