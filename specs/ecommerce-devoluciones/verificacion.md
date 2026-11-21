@@ -7,7 +7,11 @@ fecha: 2026-11-20
 
 > La produce la skill `spec-verify` al terminar las tareas. Una spec solo pasa a `Done` si el resultado es **Converge**.
 
-## Resultado: No converge
+## Resultado: Converge
+
+> **Estado vigente (2026-11-21): Converge.** Las secciones 2 a 8 son el historial de las rondas; la sección 9 es el cierre y manda sobre lo que difiera. D5 y D9 quedaron ratificadas por la persona responsable (DD-21 en `progress/decisiones-delegadas.md`) y los tres Parciales internos (DEV-08, DEV-21, DEV-26) se cerraron con Pagos real y la marca real de Identidad.
+
+### Rondas anteriores (historial)
 
 Esta ronda (carril V) revisó los 31 requisitos `DEV-01` a `DEV-31` y los 32 criterios `AC-DEV-01` a `AC-DEV-32`: **17 Cumple, 14 Parcial, 0 No cumple**. Todos los criterios tienen al menos una prueba que los nombra, y las tareas T01 a T29 y T34 están hechas, pero **faltan T30, T31, T33 y la mitad de T32** (las pruebas con los módulos reales, de privacidad y cuenta, de la matriz completa y el E2E), y hay tres diferencias de fondo que no dependen solo de pruebas: los límites de uso de Devoluciones no existen en el catálogo de Plataforma (en el host compuesto toda operación fallaría cerrada con 503), Pedidos no excluye de una anulación la línea digital ya reembolsada por una devolución, y DEV-23 pide tres números y el puerto de Identidad entrega uno.
 
@@ -191,3 +195,14 @@ Ejecutado: integración filtrada `Devoluciones|Envios` con PostgreSQL real, **28
 - **DEV-26 → Cumple.** `DevolucionesConModulosRealesTests.Con_la_marca_real_de_Identidad…` (AC-DEV-28 sobre `identidad.solicitudes_de_cancelacion` real): sin cancelación y con cancelación diferida se aceptan el impreso y el reporte; con la ejecución en curso se rechazan ambos sin escribir ninguna devolución ni el motivo.
 
 **Recuento final: Cumple 31, Parcial 0, No cumple 0.** Siguen abiertas solo las decisiones de la persona responsable: **D5** (confirmar que Identidad cuenta la suma de los tres pendientes para IDE-27) y **D9** (cinco supuestos del plan sin ratificar), más los Menores de `progress/hallazgos.md`. Con esas dos decisiones y esta verificación repetida, la spec puede pasar a `Done`; el resultado se mantiene **No converge** solo hasta entonces (AGENTS.md: las decisiones de negocio son de la persona responsable).
+
+## 9. Cierre (carril V, 2026-11-21)
+
+Resultado: **Converge.**
+
+- **Requisitos:** los 31 (`DEV-01` a `DEV-31`) **Cumplen**, 0 Parciales, 0 No cumple (sección 7 con los cierres de la sección 8). Cada criterio `AC-DEV-01` a `AC-DEV-32` tiene al menos una prueba que lo nombra y que falla si se rompe la regla.
+- **Decisiones de la persona responsable:** **D5 y los cinco supuestos de D9 (a a e) ratificados, tal cual**, el 2026-11-21 (**DD-21**, `progress/decisiones-delegadas.md`): la cancelación cuenta la suma de los tres pendientes; aprobar, rechazar y recibir operan sobre la devolución completa; el «pago» de los plazos de 14 y 30 días es la creación del pedido; un rechazo por política no crea fila; con el Inventario caído más de 10 días una recepción incierta detiene el plazo de DEV-14; la sucursal receptora se valida contra las activas, con tope de 20 líneas y sin aviso al solicitar.
+- **Tareas:** T01 a T34 `[x]`.
+- **Comprobaciones:** integración filtrada `Devoluciones|Envios` con PostgreSQL real, 289 de 289 verdes (2026-11-21); Playwright de Devoluciones 3 de 3 en escritorio y teléfono con axe AA; arquitectura 244 de 244; SpecCheck 0 avisos; revisores de arquitectura y seguridad sin Bloqueantes ni Importantes (el Importante de la ronda se corrigió).
+- **Menores abiertos (no bloquean, con dueño en `progress/hallazgos.md`):** D10 («línea por línea»), D12 (`AjustarAlSaldo` sin uso), D13 (campos del aviso), trazas `Criterio` y los Menores de las revisiones de la ronda; el Menor de `ui-review` (no se comparó con `prototype/ui-v2/` ni se revisó el tema oscuro).
+- **Límite de la verificación:** Pagos se ejercita con su simulador de pasarela (Culqi real queda para T37 y T38 de Pagos); el Inventario y el Notificador de Devoluciones, simulados fieles a v1.
