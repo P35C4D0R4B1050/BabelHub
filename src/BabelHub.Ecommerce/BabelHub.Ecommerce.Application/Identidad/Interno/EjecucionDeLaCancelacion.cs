@@ -32,6 +32,9 @@ public sealed class EjecutorDeLaCancelacion(
 
     public const string NombreAnonimo = "Cuenta cancelada";
 
+    /// <summary>El orden en que se llama a los receptores (decisión D04 de <c>ecommerce-devoluciones</c> y orden global de bloqueo AD18): Pedidos, Devoluciones, Pagos, Carrito, Biblioteca y Reclamaciones; un módulo que no figura va al final, en el orden en que se registró. No depende del orden de la composición.</summary>
+    internal static readonly string[] OrdenDeLosReceptores = ["pedidos", "devoluciones", "pagos", "carrito", "biblioteca", "reclamaciones"];
+
     public async Task Ejecutar(CuentaDeIdentidad cuenta, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(cuenta);
@@ -64,13 +67,20 @@ public sealed class EjecutorDeLaCancelacion(
         return Aplicar(cuenta, conBaja, cancelacion);
     }
 
+    internal static IEnumerable<IAplicadorDeCancelacion> EnElOrdenDeLosReceptores(IEnumerable<IAplicadorDeCancelacion> receptores) =>
+        receptores
+            .Select((receptor, posicion) => (receptor, posicion, rango: Array.IndexOf(OrdenDeLosReceptores, receptor.Modulo)))
+            .OrderBy(r => r.rango < 0 ? int.MaxValue : r.rango)
+            .ThenBy(r => r.posicion)
+            .Select(r => r.receptor);
+
     private async Task Aplicar(CuentaDeIdentidad cuenta, bool conBaja, CancellationToken cancelacion)
     {
         var usuarioId = cuenta.Usuario.Id;
         var ahora = reloj.Ahora;
 
         // (2) Cada módulo receptor, con el mismo identificador opaco; si uno falla, todo se revierte.
-        foreach (var aplicador in aplicadores)
+        foreach (var aplicador in EnElOrdenDeLosReceptores(aplicadores))
         {
             await aplicador.Aplicar(usuarioId, usuarioId, cancelacion).ConfigureAwait(false);
         }

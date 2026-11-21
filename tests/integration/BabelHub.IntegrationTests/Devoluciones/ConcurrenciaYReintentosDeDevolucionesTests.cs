@@ -137,4 +137,39 @@ public sealed class ConcurrenciaYReintentosDeDevolucionesTests(PostgresDeDevoluc
         Assert.Equal("reembolsada", await EstadoDeLaLinea(devolucionId));
         Assert.Equal(1, e.Reembolsos.Registrados);
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-15")]
+    [Trait("Criterio", "AC-DEV-16")]
+    public async Task Veinte_pares_recepcion_por_vencimiento_del_plazo_terminan_con_una_sola_decision_y_sin_reingreso_si_vencio()
+    {
+        var e = new EscenarioDeDevolucionesConPostgres(bd);
+        for (var i = 0; i < 20; i++)
+        {
+            var (cliente, pedido, linea) = e.SembrarPedidoDeImpresos();
+            var devolucionId = await Solicitada(e, cliente, pedido.PedidoId, linea.LineaId, 1);
+            Assert.True((await e.Aprobar(devolucionId)).EsExito);
+            // Justo pasado el plazo de 10 días desde la aprobación: la recepción y la revisión de plazos compiten.
+            e.Reloj.Ahora = e.Reloj.Ahora.AddDays(10).AddMinutes(1);
+
+            var recepcion = Task.Run(() => e.Recibir(devolucionId));
+            var revision = Task.Run(() => e.RechazarVencidas());
+            await Task.WhenAll(recepcion, revision);
+            var resultados = new[] { await recepcion };
+
+            var estado = await EstadoDeLaLinea(devolucionId);
+            Assert.Contains(estado, new[] { "recibida", "reembolsada", "rechazada" });
+            if (estado == "rechazada")
+            {
+                Assert.Equal(0, e.Inventario.Aplicaciones(devolucionId));
+                Assert.False(resultados[0].EsExito);
+            }
+            else
+            {
+                Assert.Equal(1, e.Inventario.Aplicaciones(devolucionId));
+            }
+
+            e.Reloj.Ahora = EscenarioDeDevolucionesConPostgres.Ahora;
+        }
+    }
 }

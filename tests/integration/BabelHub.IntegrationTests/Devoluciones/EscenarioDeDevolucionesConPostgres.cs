@@ -288,6 +288,12 @@ internal sealed class EscenarioDeDevolucionesConPostgres(PostgresDeDevolucionesF
         return new RedactarDevolucionesVencidas(Autorizador(actor), fixture.Devoluciones, fixture.Unidad, Auditoria, new ControlDeLaDepuracionDeDevoluciones(Reloj), Reloj).Ejecutar();
     }
 
+    public Task<Resultado<int>> RechazarVencidas()
+    {
+        var actor = ActorActual.DelSistema();
+        return new RechazarDevolucionesVencidas(Autorizador(actor), fixture.Devoluciones, fixture.Unidad, Auditoria, Avisos(), Reloj).Ejecutar(100);
+    }
+
     public Task<Resultado<int>> Conciliar()
     {
         var actor = ActorActual.DelSistema();
