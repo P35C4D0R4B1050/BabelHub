@@ -9,7 +9,7 @@ fecha: 2026-11-20
 
 ## Resultado: Converge salvo D-02 (E2E de la fusión AC-CAR-22, que exige el ingreso real de web-identidad; la fusión está probada con PostgreSQL real)
 
-Resultado final de esta ronda (ECO-6g): **No converge**; las comprobaciones de la sección 1 se ejecutaron el 2026-11-20 (E2E de carrito, compra y pantallas del personal verdes en escritorio, teléfono y WebKit). Las secciones 2 y 3 son una **revisión de lectura** (código, pruebas y trazas `Criterio`); no se ejecutó `dotnet build`, `dotnet test`, Docker ni Playwright al redactarla, y la sección 1 está pendiente. Quedan 4 requisitos **Parciales** y 0 «No cumple» (sección 2), y las diferencias abiertas de la sección 3 (la más seria: los topes de 30 líneas y 20 unidades del código contradicen los 50 líneas de CAR-29 y no están reflejados en la spec). T25 y T36 de `tasks.md` siguen sin marcar.
+Resultado final de esta ronda (ECO-6g): **ver el resultado de arriba y el cierre al final**; las comprobaciones de la sección 1 se ejecutaron el 2026-11-20 (E2E de carrito, compra y pantallas del personal verdes en escritorio, teléfono y WebKit). Las secciones 2 y 3 son una **revisión de lectura** (código, pruebas y trazas `Criterio`); no se ejecutó `dotnet build`, `dotnet test`, Docker ni Playwright al redactarla, y la sección 1 está pendiente. Quedan 4 requisitos **Parciales** y 0 «No cumple» (sección 2), y las diferencias abiertas de la sección 3 (la más seria: los topes de 30 líneas y 20 unidades del código contradicen los 50 líneas de CAR-29 y no están reflejados en la spec). T25 y T36 de `tasks.md` siguen sin marcar.
 
 ## 1. Comprobaciones automáticas
 

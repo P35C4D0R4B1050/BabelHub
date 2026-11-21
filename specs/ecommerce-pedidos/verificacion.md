@@ -9,7 +9,7 @@ fecha: 2026-11-20
 
 ## Resultado: Converge salvo D9 y D10 (precisiones de redacción de la spec; ver el cierre de la ronda 3)
 
-Resultado final de esta ronda (ECO-6g): **No converge**; las comprobaciones de la sección 1 se ejecutaron el 2026-11-20 y E2E de carrito, compra y pantallas del personal pasan en escritorio, teléfono y WebKit. Las secciones 2 y 3 se redactaron **solo por lectura** de la spec, el código y las pruebas (`Read`, `Grep`, `Glob`); no se ejecutó `dotnet build`, `dotnet test`, Docker ni Playwright, así que «la prueba existe y nombra el criterio» no significa «la prueba pasó en esta sesión».
+Resultado final de esta ronda (ECO-6g): **ver el resultado de arriba y el cierre al final**; las comprobaciones de la sección 1 se ejecutaron el 2026-11-20 y E2E de carrito, compra y pantallas del personal pasan en escritorio, teléfono y WebKit. Las secciones 2 y 3 se redactaron **solo por lectura** de la spec, el código y las pruebas (`Read`, `Grep`, `Glob`); no se ejecutó `dotnet build`, `dotnet test`, Docker ni Playwright, así que «la prueba existe y nombra el criterio» no significa «la prueba pasó en esta sesión».
 
 ## 1. Comprobaciones automáticas
 
