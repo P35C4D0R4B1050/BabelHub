@@ -41,7 +41,7 @@ public static class PoliticasDeSeguridad
     public static PoliticaDeLimite AlertasCriticasPorTipoYCuenta { get; } = new(
         "alertas-criticas-por-tipo-y-cuenta", 1, TimeSpan.FromHours(24), TipoDeSujetoDeLimite.Usuario, liberable: true);
 
-    /// <summary>5 correcciones de nombre por hora y cuenta (IDE-98, valor inicial del agente a confirmar con la persona responsable, configurable): acota el inflado de la auditoría que cada corrección deja (AUD-45).</summary>
+    /// <summary>5 correcciones de nombre por hora y cuenta (IDE-98, confirmado por la persona responsable el 2026-11-21, configurable): acota el inflado de la auditoría que cada corrección deja (AUD-45).</summary>
     public static PoliticaDeLimite CorreccionesDeNombrePorCuenta { get; } = new(
         "correcciones-de-nombre-por-cuenta", 5, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Usuario);
 
