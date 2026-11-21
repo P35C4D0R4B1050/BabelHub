@@ -35,7 +35,9 @@ public sealed class PostgresDeBibliotecaFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _contenedor.StartAsync();
-        Administracion = NpgsqlDataSource.Create(_contenedor.GetConnectionString());
+        // Los dos pools suman bastante menos que los 100 de max_connections de PostgreSQL: las pruebas de concurrencia lanzan 100 tareas a la vez y las que no caben en el pool esperan su turno
+        // (con 40 conexiones simultáneas la contención sigue siendo real), en vez de agotar los cupos del servidor (53300) según la carga de la máquina.
+        Administracion = NpgsqlDataSource.Create(new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString()) { MaxPoolSize = 10 }.ConnectionString);
 
         await using var preparacion = Administracion.CreateCommand(
             $"""
@@ -56,7 +58,7 @@ public sealed class PostgresDeBibliotecaFixture : IAsyncLifetime
         await preparacion.ExecuteNonQueryAsync();
 
         var clave = ClaveDeAcceso;
-        var cadena = new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString()) { Username = "acceso", Password = clave, MaxPoolSize = 100 };
+        var cadena = new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString()) { Username = "acceso", Password = clave, MaxPoolSize = 40 };
         Acceso = NpgsqlDataSource.Create(cadena.ConnectionString);
         Unidad = new UnidadDeTrabajoPostgres(Acceso);
         AccesoAlEsquema = new AccesoAlEsquemaDeBiblioteca(Unidad, Unidad);
