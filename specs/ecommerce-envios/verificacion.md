@@ -7,7 +7,7 @@ fecha: 2026-11-20
 
 > La produce la skill `spec-verify` al terminar las tareas. Una spec solo pasa a `Done` si el resultado es **Converge**.
 
-## Resultado: Converge salvo T14b y T21b (operador real; simulador en el Sprint 2)
+## Resultado: Converge salvo T14b y T21b (operador real fuera de alcance por decisión de la persona, DD-22; el simulador es el operador del proyecto)
 
 > **Estado vigente (2026-11-21):** la sección final («Cierre de T20 y declaración de T14b/T21b») manda sobre lo que difiera. Las secciones anteriores son el historial de las rondas.
 
