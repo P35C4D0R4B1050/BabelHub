@@ -1,11 +1,11 @@
 ---
 id: ecommerce-libro-reclamaciones
 titulo: Libro de Reclamaciones virtual
-estado: Draft
+estado: Planned
 aprobado_por: Claude (delegado por Diego Amiquero)
-aprobado_en: 2026-11-13
+aprobado_en: 2026-11-21
 plan_aprobado_por: Claude (delegado por Diego Amiquero)
-plan_aprobado_en: 2026-11-18
+plan_aprobado_en: 2026-11-21
 servicio: E-commerce
 prefijo: REC
 origen: [RF25, RF27, NN15]
