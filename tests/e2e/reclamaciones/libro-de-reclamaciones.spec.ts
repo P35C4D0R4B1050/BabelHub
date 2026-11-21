@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { execFileSync } from 'node:child_process';
 
 // El Libro de Reclamaciones del consumidor de punta a punta (ecommerce-libro-reclamaciones T22; AC-REC-01, AC-REC-04, AC-REC-12): el enlace del pie en toda página, el formulario sin sesión, la constancia imprimible, los campos que faltan sin eco de valores, el texto de un tercero siempre
 // codificado y «Mis hojas» de un cliente. La gestión de la administración (AC-REC-06, AC-REC-10) vive en el host de gestión y la cubre `acceso/` cuando exista su sembrador de administración.
@@ -60,6 +61,13 @@ test.describe('Visitante: el Libro de Reclamaciones', () => {
     await expect(page.getByRole('radio', { name: /^Queja/ })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Registrar hoja' })).toBeVisible();
     await expect(page.locator('body')).toContainText('No escribas datos personales');
+    // El aviso de la Ley N.° 29733 (DD-26): finalidad, conservación, derechos ARCO, destinatarios y quién puede ver la hoja.
+    const aviso = page.getByRole('complementary', { name: /Cómo usamos tus datos/ });
+    await expect(aviso).toContainText('Ley N.° 29733');
+    await expect(aviso).toContainText('dos años');
+    await expect(aviso).toContainText('acceso, rectificación, cancelación y oposición');
+    await expect(aviso).toContainText('proveedor de correo');
+    await expect(aviso).toContainText('visibles para quien verifique el correo de contacto');
     await sinDesplazamientoHorizontal(page);
     await sinViolacionesAA(page);
   });
@@ -127,9 +135,66 @@ test.describe('Cliente con sesión: Mis hojas', () => {
 
     await page.goto('/reclamaciones/mis-hojas');
     await expect(page.getByRole('heading', { level: 1, name: 'Mis hojas de reclamación' })).toBeVisible();
-    await expect(page.locator('body')).toContainText('No tienes hojas registradas con tu correo verificado.');
+    await expect(page.locator('body')).toContainText('No tienes hojas vinculadas a tu cuenta.');
+    await expect(page.locator('body')).not.toContainText('Verifica tu correo para ver también');
     await sinDesplazamientoHorizontal(page);
     await sinViolacionesAA(page);
+  });
+
+  test('un cliente con sesión registra una hoja con otro correo de contacto y la ve en «Mis hojas», vinculada a su cuenta (AC-REC-20, AC-REC-12)', async ({ page }) => {
+    await conOrigenPropio(page);
+    const respuesta = await page.request.post('/desarrollo/sesion', { headers: { 'X-Sembrador-De-Desarrollo': clave! }, data: { rol: 'cliente' } });
+    expect(respuesta.ok(), 'el sembrador de sesiones responde').toBeTruthy();
+    await page.context().addCookies((await respuesta.json()).cookies);
+
+    await page.goto('/reclamaciones/nueva');
+    await llenarLaHoja(page, 'Registrada con la sesión de un cliente.');
+    await page.getByLabel('Correo electrónico').fill('contacto.distinto@correo.example');
+    await page.getByRole('button', { name: 'Registrar hoja' }).click();
+    const titulo = page.getByRole('heading', { level: 1, name: /^Hoja de reclamación \d{4}-\d{6}$/ });
+    await expect(titulo).toBeVisible();
+    const numero = ((await titulo.textContent()) ?? '').match(/\d{4}-\d{6}/)![0];
+
+    // Aunque el correo de contacto sea otro, la hoja está vinculada a la cuenta de la sesión: sale en su lista y se abre por su número.
+    await page.goto('/reclamaciones/mis-hojas');
+    await expect(page.getByRole('link', { name: numero })).toBeVisible();
+    await page.getByRole('link', { name: numero }).click();
+    await expect(page.getByRole('heading', { level: 1, name: new RegExp(numero) })).toBeVisible();
+    await sinViolacionesAA(page);
+  });
+});
+
+// El correo verificado de la cuenta lo decide Identidad: para probar el estado «sin correo verificado» se desverifica la cuenta recién sembrada en la base local del entorno (contenedor de `entorno/`; E2E_POSTGRES_CONTENEDOR, por omisión bhe2e-postgres-1).
+function desverificarAlUltimoCliente() {
+  const contenedor = process.env.E2E_POSTGRES_CONTENEDOR ?? 'bhe2e-postgres-1';
+  execFileSync('docker', ['exec', contenedor, 'psql', '-U', 'postgres', '-d', 'ecommerce', '-c', "UPDATE identidad.usuarios SET correo_verificado = false WHERE rol = 'cliente'"], { stdio: 'pipe' });
+}
+
+test.describe('Cliente sin correo verificado: Mis hojas', () => {
+  test('ve el aviso para verificar su correo, la lista vacía y las hojas que registra con su sesión (AC-REC-12, AC-REC-20)', async ({ page }) => {
+    await conOrigenPropio(page);
+    const respuesta = await page.request.post('/desarrollo/sesion', { headers: { 'X-Sembrador-De-Desarrollo': clave! }, data: { rol: 'cliente' } });
+    expect(respuesta.ok(), 'el sembrador de sesiones responde').toBeTruthy();
+    await page.context().addCookies((await respuesta.json()).cookies);
+    desverificarAlUltimoCliente();
+
+    await page.goto('/reclamaciones/mis-hojas');
+    const aviso = page.getByRole('status').filter({ hasText: 'Verifica tu correo para ver también las hojas que registraste sin sesión' });
+    await expect(aviso).toBeVisible();
+    await expect(page.locator('body')).toContainText('No tienes hojas vinculadas a tu cuenta.');
+    await sinDesplazamientoHorizontal(page);
+    await sinViolacionesAA(page);
+
+    // Con la sesión, la hoja que registra queda vinculada a su cuenta y sale en la lista aunque su correo no esté verificado.
+    await page.goto('/reclamaciones/nueva');
+    await llenarLaHoja(page, 'Registrada con una cuenta sin correo verificado.');
+    await page.getByRole('button', { name: 'Registrar hoja' }).click();
+    const titulo = page.getByRole('heading', { level: 1, name: /^Hoja de reclamación \d{4}-\d{6}$/ });
+    await expect(titulo).toBeVisible();
+    const numero = ((await titulo.textContent()) ?? '').match(/\d{4}-\d{6}/)![0];
+    await page.goto('/reclamaciones/mis-hojas');
+    await expect(page.getByRole('link', { name: numero })).toBeVisible();
+    await expect(aviso).toBeVisible();
   });
 });
 

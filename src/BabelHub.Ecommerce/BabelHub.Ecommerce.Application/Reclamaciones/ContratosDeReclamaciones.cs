@@ -132,7 +132,8 @@ public sealed record MiHoja(string Numero, DateTimeOffset FechaDeRegistro, strin
     public override string ToString() => $"MiHoja {{ Numero = {Numero}, Estado = {Estado} }}";
 }
 
-public sealed record PaginaDeMisHojas(IReadOnlyList<MiHoja> Hojas, int Pagina, int Tamano, int Total);
+/// <summary><paramref name="CorreoSinVerificar"/> es verdadero cuando la cuenta no tiene un correo verificado: solo ve las hojas que registró con sesión y la pantalla la invita a verificarlo (REC-22, REC-23).</summary>
+public sealed record PaginaDeMisHojas(IReadOnlyList<MiHoja> Hojas, int Pagina, int Tamano, int Total, bool CorreoSinVerificar = false);
 
 public sealed record ListarMisHojasEntrada(int Pagina = 1, int Tamano = 20);
 

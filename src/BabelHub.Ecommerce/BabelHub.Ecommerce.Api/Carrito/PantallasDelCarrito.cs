@@ -42,7 +42,6 @@ public static class PantallasDelCarrito
         ["ECO-CHECKOUT-PEDIDO-OBSOLETO"] = new("Esta pantalla quedó desactualizada", "Tu compra cambió en otra pestaña. Vuelve a revisarla."),
         ["ECO-VERIFICACION-REQUERIDA"] = new("Confirma que eres una persona", "Completa la verificación e inténtalo de nuevo."),
         ["ECO-VERIFICACION-FALLIDA"] = new("No pudimos verificarte", "Completa la verificación de nuevo e inténtalo otra vez."),
-        ["ECO-REC-CORREO-NO-VERIFICADO"] = new("Verifica tu correo para ver tus hojas", "Tus hojas se muestran solo con un correo verificado: confirma tu correo con el enlace que te enviamos y vuelve a esta página. Tus hojas siguen registradas."),
         ["ECO-REC-ESTADO-INVALIDO"] = new("Esta hoja ya no admite esa acción", "Otra persona la respondió o la descartó, o ya pasó su plazo de conservación. Vuelve al listado para ver su estado."),
         ["ECO-CONFLICTO"] = new("No pudimos completar la solicitud", "Otra solicitud igual sigue en curso o la información cambió. Espera unos segundos y revisa el estado antes de repetirla."),
     };
@@ -124,6 +123,25 @@ public static class PantallasDelCarrito
     public static RespuestaDePantalla Traducir(ProblemaDto problema, string rutaDeReintento)
     {
         ArgumentNullException.ThrowIfNull(problema);
+        if (problema.Errores.Any(e => e.Campo == ProblemasDelCarrito.CampoRegistrarSinSesion))
+        {
+            // REC-33: la hoja no se guardó con la sesión. La guía lleva a registrarla sin sesión; no dice por qué ni repite ningún dato.
+            return new RespuestaDePantalla(
+                new EstadoVista
+                {
+                    Estado = EstadoDePantalla.ServicioNoDisponible,
+                    Titulo = "No pudimos registrar tu hoja con tu sesión",
+                    Mensaje = "Tu hoja no se guardó. Puedes registrarla sin iniciar sesión: cierra tu sesión o abre una ventana privada, vuelve al Libro de Reclamaciones y envía el formulario de nuevo. Te daremos tu número igual.",
+                    RutaDeReintento = rutaDeReintento,
+                    CodigoDeSoporte = problema.Code,
+                    IdentificadorDeSeguimiento = problema.TraceId,
+                },
+                problema.Status,
+                null,
+                true,
+                []);
+        }
+
         if (PorCodigo.TryGetValue(problema.Code, out var texto))
         {
             return new RespuestaDePantalla(

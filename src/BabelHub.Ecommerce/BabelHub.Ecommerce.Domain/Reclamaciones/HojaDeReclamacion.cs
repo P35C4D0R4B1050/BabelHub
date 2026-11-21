@@ -111,6 +111,10 @@ public sealed class HojaDeReclamacion
 
     public bool DeCuentaCancelada { get; private set; }
 
+    /// <summary>El identificador opaco de la cuenta de su titular (REC-21, REC-22; D14): nulo en la hoja de un visitante o del personal, en la de una cuenta cancelada y en la anonimizada. No es un dato que salga del módulo.</summary>
+    [JsonIgnore]
+    public Guid? CuentaId { get; private set; }
+
     public DateTimeOffset? AnonimizadaEn { get; private set; }
 
     public bool EstaPendiente => Estado == EstadoDeHoja.Pendiente;
@@ -132,9 +136,15 @@ public sealed class HojaDeReclamacion
         string? pedidoReferencia,
         string contenidoHash,
         string claveHash,
-        DateTimeOffset fechaRegistro)
+        DateTimeOffset fechaRegistro,
+        Guid? cuentaId = null)
     {
         ArgumentNullException.ThrowIfNull(datos);
+        if (cuentaId == Guid.Empty)
+        {
+            throw new ArgumentException("La cuenta de la hoja necesita su identificador.", nameof(cuentaId));
+        }
+
         if (id == Guid.Empty || string.IsNullOrWhiteSpace(contenidoHash) || string.IsNullOrWhiteSpace(claveHash))
         {
             throw new ArgumentException("La hoja necesita su identificador, el resumen de su contenido y el de su clave.");
@@ -166,7 +176,10 @@ public sealed class HojaDeReclamacion
             string.IsNullOrWhiteSpace(pedidoReferencia) ? null : pedidoReferencia.Trim(),
             contenidoHash.Trim(),
             fechaRegistro,
-            claveHash.Trim());
+            claveHash.Trim())
+        {
+            CuentaId = cuentaId,
+        };
     }
 
     /// <summary>Reconstruye una hoja guardada.</summary>
@@ -191,8 +204,15 @@ public sealed class HojaDeReclamacion
         DateTimeOffset? avisoEnCursoHasta,
         DateTimeOffset? descartadaEn,
         bool deCuentaCancelada,
-        DateTimeOffset? anonimizadaEn)
+        DateTimeOffset? anonimizadaEn,
+        Guid? cuentaId = null)
     {
+        // El vínculo es nulo siempre que la hoja sea de una cuenta cancelada o esté anonimizada (D14): una hoja guardada que lo rompe es un dato corrupto, no algo que se corrige en silencio.
+        if (cuentaId is not null && (deCuentaCancelada || anonimizadaEn is not null))
+        {
+            throw new ArgumentException("Una hoja de una cuenta cancelada o anonimizada no lleva cuenta.", nameof(cuentaId));
+        }
+
         var hoja = new HojaDeReclamacion(id, numero, tipo, datos, bienContratado, montoReclamado, detalle, pedidoReferencia, contenidoHash, fechaRegistro, claveHash)
         {
             Estado = estado,
@@ -205,6 +225,7 @@ public sealed class HojaDeReclamacion
             DescartadaEn = descartadaEn,
             DeCuentaCancelada = deCuentaCancelada,
             AnonimizadaEn = anonimizadaEn,
+            CuentaId = cuentaId,
         };
         return hoja;
     }
@@ -302,7 +323,9 @@ public sealed class HojaDeReclamacion
     /// <summary>El envío falló o fue suprimido: se suelta el arrendamiento y el aviso sigue <c>pendiente</c> para reintentarlo (REC-13).</summary>
     public void LiberarArrendamientoDeAviso() => AvisoEnCursoHasta = null;
 
-    /// <summary>La cancelación de la cuenta marca la hoja (REC-20): solo de falso a verdadero, sin tocar nada más. Devuelve si hizo el cambio.</summary>
+    /// <summary>
+    /// La cancelación de la cuenta marca la hoja (REC-20): solo de falso a verdadero y la desvincula de la cuenta, sin tocar nada más. Devuelve si hizo el cambio.
+    /// </summary>
     public bool MarcarDeCuentaCancelada()
     {
         if (DeCuentaCancelada)
@@ -311,6 +334,39 @@ public sealed class HojaDeReclamacion
         }
 
         DeCuentaCancelada = true;
+        CuentaId = null;
+        return true;
+    }
+
+    /// <summary>
+    /// Vincula la hoja a la cuenta de su titular (REC-21, REC-22, REC-25, REC-26): solo si no tiene cuenta, no es de una cuenta cancelada ni está anonimizada. Una hoja ya vinculada <b>nunca cambia de cuenta</b> (REC-28).
+    /// Devuelve si hizo el cambio. La base de datos aplica la misma regla en una sola sentencia atómica; esta es la regla del Dominio.
+    /// </summary>
+    public bool Vincular(Guid cuentaId)
+    {
+        if (cuentaId == Guid.Empty)
+        {
+            throw new ArgumentException("La cuenta necesita su identificador.", nameof(cuentaId));
+        }
+
+        if (CuentaId is not null || DeCuentaCancelada || EstaAnonimizada)
+        {
+            return false;
+        }
+
+        CuentaId = cuentaId;
+        return true;
+    }
+
+    /// <summary>Desvincula la hoja de su cuenta (REC-17, REC-20, REC-30): de una cuenta a ninguna. Devuelve si hizo el cambio.</summary>
+    public bool Desvincular()
+    {
+        if (CuentaId is null)
+        {
+            return false;
+        }
+
+        CuentaId = null;
         return true;
     }
 

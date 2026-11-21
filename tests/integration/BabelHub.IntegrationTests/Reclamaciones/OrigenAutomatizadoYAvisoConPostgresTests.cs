@@ -34,7 +34,7 @@ public sealed class OrigenAutomatizadoYAvisoConPostgresTests(PostgresDeReclamaci
     {
         var e = new EntornoDeReclamacionesConPostgres(bd);
         var verificacion = new VerificacionControlable();
-        var reclamaciones = new ReclamacionesDeLaAplicacion(new RegistrarHoja(verificacion, new HuellasNormalizantes(), e.Limites, bd.Hojas, bd.Unidad, new RelojDeLaPrueba()));
+        var reclamaciones = new ReclamacionesDeLaAplicacion(new RegistrarHoja(verificacion, new HuellasNormalizantes(), e.Limites, bd.Hojas, bd.Unidad, new RelojDeLaPrueba(), e.Actor, e.Vinculador));
         return (e, reclamaciones, verificacion);
     }
 

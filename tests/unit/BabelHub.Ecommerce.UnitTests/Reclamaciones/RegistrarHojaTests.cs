@@ -336,7 +336,7 @@ public sealed class RegistrarHojaTests
 
     [Fact]
     [Trait("Criterio", "AC-REC-09")]
-    public async Task Un_fallo_de_la_base_pierde_el_cupo_ya_contado_porque_la_politica_no_es_liberable_pero_suelta_la_clave()
+    public async Task Un_fallo_de_la_base_pierde_el_cupo_ya_contado_porque_solo_la_rama_de_la_auditoria_lo_devuelve_pero_suelta_la_clave()
     {
         var e = Entorno();
         e.Hojas.FallaAlAgregar = true;

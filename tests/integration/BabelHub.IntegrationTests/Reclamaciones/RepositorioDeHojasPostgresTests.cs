@@ -14,6 +14,10 @@ public sealed class RepositorioDeHojasPostgresTests(PostgresDeReclamacionesFixtu
 {
     private static readonly DateTimeOffset Inicio = new(2026, 11, 18, 15, 0, 0, TimeSpan.Zero);
 
+    private static readonly Guid Cuenta = Guid.Parse("c0000000-0000-0000-0000-00000000b001");
+
+    private static readonly Guid OtraCuenta = Guid.Parse("c0000000-0000-0000-0000-00000000b002");
+
     public Task InitializeAsync() => bd.Limpiar();
 
     public Task DisposeAsync() => Task.CompletedTask;
@@ -181,10 +185,11 @@ public sealed class RepositorioDeHojasPostgresTests(PostgresDeReclamacionesFixtu
 
         Assert.Equal(a.Id, (await bd.Unidad.Ejecutar(token => bd.Hojas.ObtenerPorNumero(a.Numero, token)))!.Id);
         Assert.Null(await bd.Unidad.Ejecutar(token => bd.Hojas.ObtenerPorNumero(NumeroDeHoja.Crear(2026, 999), token)));
-        var delCorreo = await bd.Unidad.Ejecutar(token => bd.Hojas.ListarDelCorreo("ana@example.com", 1, 10, token));
+        Assert.Equal(2, await bd.Unidad.Ejecutar(token => bd.Vinculos.ReclamarDelCorreo(Cuenta, "ana@example.com", token)));
+        var delCorreo = await bd.Unidad.Ejecutar(token => bd.Vinculos.ListarDeLaCuenta(Cuenta, 1, 10, token));
         Assert.Equal(new[] { b.Id, a.Id }, delCorreo.Hojas.Select(h => h.Id));
         Assert.Equal(2, delCorreo.Total);
-        Assert.Equal(1, await bd.Unidad.Ejecutar(token => bd.Hojas.ContarPendientesDelCorreo("ana@example.com", token)));
+        Assert.Equal(1, await bd.Unidad.Ejecutar(token => bd.Vinculos.ContarPendientesDeLaCuenta(Cuenta, token)));
         var sinEstado = await bd.Unidad.Ejecutar(token => bd.Hojas.Listar(null, 1, 10, token));
         Assert.Equal(new[] { c.Id, a.Id }, sinEstado.Hojas.Select(h => h.Id));
         var descartadas = await bd.Unidad.Ejecutar(token => bd.Hojas.Listar(EstadoDeHoja.Descartado, 1, 10, token));
@@ -201,12 +206,17 @@ public sealed class RepositorioDeHojasPostgresTests(PostgresDeReclamacionesFixtu
         await Agregar(Hoja(2, "clave-b"));
         await Agregar(Hoja(3, "clave-c", correo: "otra@example.com"));
 
-        Assert.Equal(2, await bd.Unidad.Ejecutar(token => bd.Hojas.MarcarDeCuentaCancelada("ana@example.com", token)));
-        Assert.Equal(0, await bd.Unidad.Ejecutar(token => bd.Hojas.MarcarDeCuentaCancelada("ana@example.com", token)));
+        Assert.Equal(2, await bd.Unidad.Ejecutar(token => bd.Vinculos.ReclamarDelCorreo(Cuenta, "ana@example.com", token)));
 
-        Assert.Equal(0, (await bd.Unidad.Ejecutar(token => bd.Hojas.ListarDelCorreo("ana@example.com", 1, 10, token))).Total);
-        Assert.Equal(0, await bd.Unidad.Ejecutar(token => bd.Hojas.ContarPendientesDelCorreo("ana@example.com", token)));
-        Assert.Equal(1, (await bd.Unidad.Ejecutar(token => bd.Hojas.ListarDelCorreo("otra@example.com", 1, 10, token))).Total);
+        // Marca y desvincula, en una sola sentencia, las de la cuenta (y las sin cuenta de su correo verificado); repetirla no cambia nada.
+        Assert.Equal(2, await bd.Unidad.Ejecutar(token => bd.Vinculos.MarcarYDesvincularDeLaCuenta(Cuenta, "ana@example.com", token)));
+        Assert.Equal(0, await bd.Unidad.Ejecutar(token => bd.Vinculos.MarcarYDesvincularDeLaCuenta(Cuenta, "ana@example.com", token)));
+
+        Assert.Equal(0, (await bd.Unidad.Ejecutar(token => bd.Vinculos.ListarDeLaCuenta(Cuenta, 1, 10, token))).Total);
+        Assert.Equal(0, await bd.Unidad.Ejecutar(token => bd.Vinculos.ContarPendientesDeLaCuenta(Cuenta, token)));
+        Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM reclamaciones.hojas_reclamacion WHERE cuenta_id IS NOT NULL AND de_cuenta_cancelada"));
+        Assert.Equal(1, await bd.Unidad.Ejecutar(token => bd.Vinculos.ReclamarDelCorreo(OtraCuenta, "otra@example.com", token)));
+        Assert.Equal(1, (await bd.Unidad.Ejecutar(token => bd.Vinculos.ListarDeLaCuenta(OtraCuenta, 1, 10, token))).Total);
     }
 
     [Fact]
@@ -214,14 +224,16 @@ public sealed class RepositorioDeHojasPostgresTests(PostgresDeReclamacionesFixtu
     {
         await Agregar(Hoja(1, "clave-a"));
 
+        Assert.Equal(1, await bd.Unidad.Ejecutar(token => bd.Vinculos.ReclamarDelCorreo(Cuenta, "ana@example.com", token)));
+
         await Assert.ThrowsAsync<InvalidOperationException>(() => bd.Unidad.Ejecutar<int>(
             async token =>
             {
-                Assert.Equal(1, await bd.Hojas.MarcarDeCuentaCancelada("ana@example.com", token));
+                Assert.Equal(1, await bd.Vinculos.MarcarYDesvincularDeLaCuenta(Cuenta, "ana@example.com", token));
                 throw new InvalidOperationException("Identidad falla");
             }));
 
-        Assert.Equal(1, await bd.Unidad.Ejecutar(token => bd.Hojas.ContarPendientesDelCorreo("ana@example.com", token)));
+        Assert.Equal(1, await bd.Unidad.Ejecutar(token => bd.Vinculos.ContarPendientesDeLaCuenta(Cuenta, token)));
     }
 
     // ---------- Bloqueo ----------

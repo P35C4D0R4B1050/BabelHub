@@ -39,8 +39,8 @@ internal sealed class EntornoDeConsumidor
         Actor = ActorDePrueba.DeCliente(usuarioId);
         Autorizador = new AutorizadorDeReclamaciones(Actor, Base.Denegaciones);
         var limite = new LimiteDeConsultaDeHojas(Base.Limites);
-        var listar = new ListarMisHojas(Autorizador, Correos, Base.Hojas, Base.Unidad, limite);
-        var obtener = new ObtenerMiHoja(Autorizador, Correos, Base.Hojas, Base.Unidad, limite);
+        var listar = new ListarMisHojas(Autorizador, Correos, Base.Vinculador, Base.Hojas, Base.Unidad, limite);
+        var obtener = new ObtenerMiHoja(Autorizador, Correos, Base.Vinculador, Base.Hojas, Base.Unidad, limite);
         Consumidor = new HojasDelConsumidorDeLaAplicacion(listar, obtener);
     }
 
@@ -59,6 +59,8 @@ internal sealed class EntornoDeConsumidor
     public IHojasDelConsumidor Consumidor { get; }
 
     public RepositorioDeHojasEnMemoria Hojas => Base.Hojas;
+
+    public VinculadorDeHojas Vinculador => Base.Vinculador;
 
     public DenegacionesDelCatalogoEspia Denegaciones => Base.Denegaciones;
 

@@ -61,7 +61,7 @@ internal interface IRepositorioDeHojas
     /// <summary>Lee una hoja; con <paramref name="paraActualizar"/>, con <c>FOR UPDATE</c> y <c>lock_timeout</c>.</summary>
     Task<HojaDeReclamacion?> Obtener(Guid id, bool paraActualizar, CancellationToken cancelacion = default);
 
-    /// <summary>Guarda solo lo que cambia: la respuesta, el estado, el aviso y la marca de cuenta cancelada.</summary>
+    /// <summary>Guarda solo lo que cambia: la respuesta, el estado, el aviso y la marca de cuenta cancelada. <b>No toca <c>cuenta_id</c></b>: el vínculo solo cambia por las sentencias de <see cref="IVinculosDeHojas"/>.</summary>
     Task Guardar(HojaDeReclamacion hoja, CancellationToken cancelacion = default);
 
     /// <summary>Lista por fecha de registro descendente. Sin estado, las pendientes y las respondidas; con un estado, solo ese.</summary>
@@ -70,14 +70,7 @@ internal interface IRepositorioDeHojas
     /// <summary>Una hoja por su número (sin bloqueo): el consumidor consulta por número y la Aplicación comprueba el correo y la marca de cuenta cancelada.</summary>
     Task<HojaDeReclamacion?> ObtenerPorNumero(NumeroDeHoja numero, CancellationToken cancelacion = default);
 
-    /// <summary>Las hojas de un correo normalizado, también las descartadas y sin las de una cuenta cancelada, por fecha de registro descendente (REC-14, REC-20).</summary>
-    Task<ListadoDeHojas> ListarDelCorreo(string correoNormalizado, int pagina, int tamano, CancellationToken cancelacion = default);
-
-    /// <summary>Cuántas hojas pendientes tiene un correo normalizado, sin las descartadas ni las de una cuenta cancelada (REC-19).</summary>
-    Task<int> ContarPendientesDelCorreo(string correoNormalizado, CancellationToken cancelacion = default);
-
-    /// <summary>Marca como de una cuenta cancelada todas las hojas de un correo normalizado: todo o nada (la transacción de Identidad lo revierte si algo falla), idempotente. Devuelve cuántas cambió (REC-20).</summary>
-    Task<int> MarcarDeCuentaCancelada(string correoNormalizado, CancellationToken cancelacion = default);
+    // Las operaciones por correo (listar, contar y marcar) pasaron a IVinculosDeHojas, por cuenta (DD-26, T27).
 }
 
 /// <summary>

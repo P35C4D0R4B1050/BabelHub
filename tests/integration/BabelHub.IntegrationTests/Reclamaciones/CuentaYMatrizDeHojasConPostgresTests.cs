@@ -49,6 +49,10 @@ public sealed class CuentaYMatrizDeHojasConPostgresTests(PostgresDeReclamaciones
         return await bd.Consultar<Guid>($"SELECT id FROM reclamaciones.hojas_reclamacion WHERE numero = '{resultado.Valor.Numero}'");
     }
 
+    /// <summary>Las pendientes de un correo de contacto que no son de una cuenta cancelada, leídas como administrador de la prueba (la base, sin pasar por el módulo).</summary>
+    private Task<long> PendientesDelCorreo(string correo) =>
+        bd.Consultar<long>($"SELECT count(*) FROM reclamaciones.hojas_reclamacion WHERE correo_normalizado = '{correo}' AND estado = 'pendiente' AND NOT de_cuenta_cancelada");
+
     private static ActorActual Usuario(string rol) => ActorActual.DeUsuario(Guid.NewGuid(), rol);
 
     // ---------- Pendientes y cancelación de la cuenta (T20) ----------
@@ -66,7 +70,7 @@ public sealed class CuentaYMatrizDeHojasConPostgresTests(PostgresDeReclamaciones
         e.Actor.ComoAdministracion();
         Assert.True((await e.Administracion.Responder(new ResponderHojaEntrada(respondida, "Gracias por escribirnos."))).EsExito);
         Assert.True((await e.Administracion.Descartar(descartada)).EsExito);
-        var contar = new ContarHojasPendientesDeUnCorreo(Correos(), e.Hojas);
+        var contar = new ContarHojasPendientesDeUnCorreo(Correos(), e.Vinculador, e.Vinculos);
 
         // Una cuenta sin correo verificado no tiene hojas que contar: un correo sin verificar podría ser de otra persona.
         var (ana, luis, sinVerificar) = await bd.Unidad.Ejecutar(async token => (await contar.Contar(CuentaDeAna, token), await contar.Contar(CuentaDeLuis, token), await contar.Contar(CuentaSinVerificar, token)));
@@ -85,14 +89,14 @@ public sealed class CuentaYMatrizDeHojasConPostgresTests(PostgresDeReclamaciones
         await Registrar(e, CorreoDeAna);
         var caido = new CorreosDeLasCuentas { Falla = true };
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => bd.Unidad.Ejecutar(token => new ContarHojasPendientesDeUnCorreo(caido, e.Hojas).Contar(CuentaDeAna, token)));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => bd.Unidad.Ejecutar(token => new ContarHojasPendientesDeUnCorreo(caido, e.Vinculador, e.Vinculos).Contar(CuentaDeAna, token)));
         await Assert.ThrowsAsync<InvalidOperationException>(() => bd.Unidad.Ejecutar<int>(async token =>
         {
-            await new MarcarHojasDeUnaCuentaCancelada(caido, e.Hojas).Aplicar(CuentaDeAna, Guid.NewGuid(), token);
+            await new MarcarHojasDeUnaCuentaCancelada(caido, e.Vinculos).Aplicar(CuentaDeAna, Guid.NewGuid(), token);
             return 0;
         }));
 
-        Assert.Equal(1, await bd.Unidad.Ejecutar(token => e.Hojas.ContarPendientesDelCorreo(CorreoDeAna, token)));
+        Assert.Equal(1L, await PendientesDelCorreo(CorreoDeAna));
     }
 
     [Fact]
@@ -103,7 +107,7 @@ public sealed class CuentaYMatrizDeHojasConPostgresTests(PostgresDeReclamaciones
         var e = Entorno();
         var hojaDeAna = await Registrar(e, CorreoDeAna);
         var hojaDeLuis = await Registrar(e, CorreoDeLuis);
-        var marcar = new MarcarHojasDeUnaCuentaCancelada(Correos(), e.Hojas);
+        var marcar = new MarcarHojasDeUnaCuentaCancelada(Correos(), e.Vinculos);
 
         await bd.Unidad.Ejecutar<int>(async token =>
         {
@@ -121,9 +125,9 @@ public sealed class CuentaYMatrizDeHojasConPostgresTests(PostgresDeReclamaciones
         Assert.Equal("Ana Pérez Quispe", detalle.Valor.Nombre);
         Assert.Contains((await e.Administracion.Listar(new ListarHojasEntrada())).Valor.Hojas, h => h.Id == hojaDeAna);
         // Otra persona que se registre después con el mismo correo no ve la hoja; la del otro consumidor sigue visible para su dueño.
-        Assert.Equal(0, (await bd.Unidad.Ejecutar(token => e.Hojas.ListarDelCorreo(CorreoDeAna, 1, 10, token))).Total);
-        Assert.Equal(1, (await bd.Unidad.Ejecutar(token => e.Hojas.ListarDelCorreo(CorreoDeLuis, 1, 10, token))).Total);
-        Assert.Equal(0, await bd.Unidad.Ejecutar(token => new ContarHojasPendientesDeUnCorreo(Correos(), e.Hojas).Contar(CuentaNuevaConElCorreoDeAna, token)));
+        Assert.Equal(0, await bd.Unidad.Ejecutar(async token => (await e.Vinculador.Reclamar(CuentaNuevaConElCorreoDeAna, CorreoDeAna, "consulta", token), (await e.Vinculos.ListarDeLaCuenta(CuentaNuevaConElCorreoDeAna, 1, 10, token)).Total).Total));
+        Assert.Equal(1, await bd.Unidad.Ejecutar(async token => (await e.Vinculador.Reclamar(CuentaDeLuis, CorreoDeLuis, "consulta", token), (await e.Vinculos.ListarDeLaCuenta(CuentaDeLuis, 1, 10, token)).Total).Total));
+        Assert.Equal(0, await bd.Unidad.Ejecutar(token => new ContarHojasPendientesDeUnCorreo(Correos(), e.Vinculador, e.Vinculos).Contar(CuentaNuevaConElCorreoDeAna, token)));
         Assert.NotEqual(hojaDeAna, hojaDeLuis);
     }
 
@@ -134,7 +138,7 @@ public sealed class CuentaYMatrizDeHojasConPostgresTests(PostgresDeReclamaciones
         var e = Entorno();
         await Registrar(e, CorreoDeAna);
         await Registrar(e, CorreoDeAna);
-        var marcar = new MarcarHojasDeUnaCuentaCancelada(Correos(), e.Hojas);
+        var marcar = new MarcarHojasDeUnaCuentaCancelada(Correos(), e.Vinculos);
 
         // Identidad falla después de que Reclamaciones marcó: todo se revierte.
         await Assert.ThrowsAsync<InvalidOperationException>(() => bd.Unidad.Ejecutar<int>(async token =>
@@ -142,7 +146,7 @@ public sealed class CuentaYMatrizDeHojasConPostgresTests(PostgresDeReclamaciones
             await marcar.Aplicar(CuentaDeAna, Guid.NewGuid(), token);
             throw new InvalidOperationException("Identidad falla");
         }));
-        Assert.Equal(2, await bd.Unidad.Ejecutar(token => e.Hojas.ContarPendientesDelCorreo(CorreoDeAna, token)));
+        Assert.Equal(2L, await PendientesDelCorreo(CorreoDeAna));
         Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM reclamaciones.hojas_reclamacion WHERE de_cuenta_cancelada"));
 
         // El reintento (y repetirlo) deja todas marcadas una sola vez.
@@ -156,7 +160,7 @@ public sealed class CuentaYMatrizDeHojasConPostgresTests(PostgresDeReclamaciones
         }
 
         Assert.Equal(2L, await bd.Consultar<long>("SELECT count(*) FROM reclamaciones.hojas_reclamacion WHERE de_cuenta_cancelada"));
-        Assert.Equal(0, await bd.Unidad.Ejecutar(token => e.Hojas.ContarPendientesDelCorreo(CorreoDeAna, token)));
+        Assert.Equal(0L, await PendientesDelCorreo(CorreoDeAna));
     }
 
     [Fact]
@@ -173,7 +177,7 @@ public sealed class CuentaYMatrizDeHojasConPostgresTests(PostgresDeReclamaciones
         var hoja = await bd.Consultar<Guid>("SELECT id FROM reclamaciones.hojas_reclamacion WHERE numero = '2023-000001'");
         await bd.Unidad.Ejecutar<int>(async token =>
         {
-            await new MarcarHojasDeUnaCuentaCancelada(Correos(), e.Hojas).Aplicar(CuentaDeAna, Guid.NewGuid(), token);
+            await new MarcarHojasDeUnaCuentaCancelada(Correos(), e.Vinculos).Aplicar(CuentaDeAna, Guid.NewGuid(), token);
             return 0;
         });
         e.Actor.ComoSistema();

@@ -2,6 +2,13 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-21 (noche) — Libro de Reclamaciones: vínculo de las hojas con la cuenta (DD-26), Done
+
+### Cubierto
+- `ecommerce-libro-reclamaciones` reabierta y vuelta a **Done**: las hojas se vinculan por el identificador opaco de la cuenta (`cuenta_id`), con reclamo atómico por correo verificado, registro con sesión que audita la vinculación (REC-33: sin auditar no se guarda, el cupo vuelve con `Liberar` y la clave se suelta), receptor real de los cambios de cuenta (cambio de correo y reemplazo, cerrando la regresión del host real), vinculación inicial por lotes con cursor, cancelación que marca y desvincula, y anonimización que desvincula. T24 a T36 cerradas; REC-01 a REC-34 cumplen (`verificacion.md`: Converge).
+- Verificado con PostgreSQL real (suite de integración: 7827 de 7828; la roja es un flaky de S3 de Plataforma que pasa sola), E2E (20 de la tienda y 12 de la gestión), arquitectura (259), unitarias (5662) y `ui-review`. Revisiones de arquitectura y de seguridad del código: sin Bloqueantes; Importantes corregidos.
+- Alerta técnica nueva `vinculacion-inicial-de-hojas-sin-completar` en el catálogo cerrado (Shared, ambos servicios y presentador).
+
 ## 2026-11-21 (noche) — Primer CI de GitHub en verde
 
 ### Cubierto

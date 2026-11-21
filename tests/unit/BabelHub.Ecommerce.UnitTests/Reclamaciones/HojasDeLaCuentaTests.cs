@@ -10,7 +10,7 @@ public sealed class ContarHojasPendientesDeUnCorreoTests
     private static readonly Guid Beto = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
     private static readonly Guid Carla = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
 
-    private static ContarHojasPendientesDeUnCorreo Contador(EntornoDeConsumidor e) => new(e.Correos, e.Hojas);
+    private static ContarHojasPendientesDeUnCorreo Contador(EntornoDeConsumidor e) => new(e.Correos, e.Vinculador, e.Hojas);
 
     [Fact]
     [Trait("Criterio", "AC-REC-17")]
@@ -207,7 +207,7 @@ public sealed class CorreoVerificadoNoResolubleTests
         var e = EntornoDeConsumidor.Nuevo(Ana, "esto no es un correo");
         await e.RegistrarDeOtroCorreo("ana@correo.com");
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => new ContarHojasPendientesDeUnCorreo(e.Correos, e.Hojas).Contar(Ana));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new ContarHojasPendientesDeUnCorreo(e.Correos, e.Vinculador, e.Hojas).Contar(Ana));
         await Assert.ThrowsAsync<InvalidOperationException>(() => new MarcarHojasDeUnaCuentaCancelada(e.Correos, e.Hojas).Aplicar(Ana, Guid.NewGuid()));
         Assert.False(e.Hojas.Todas.Single().DeCuentaCancelada);
     }

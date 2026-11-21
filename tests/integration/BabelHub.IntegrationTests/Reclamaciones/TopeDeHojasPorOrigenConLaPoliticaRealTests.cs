@@ -1,8 +1,10 @@
+using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Application.Reclamaciones;
 using BabelHub.Ecommerce.Application.Reclamaciones.Interno;
 using BabelHub.IntegrationTests.Pedidos;
 using Microsoft.Extensions.DependencyInjection;
+using RolesDeUsuario = BabelHub.Shared.Contratos.RolesDeUsuario;
 
 namespace BabelHub.IntegrationTests.Reclamaciones;
 
@@ -48,6 +50,47 @@ public sealed class TopeDeHojasPorOrigenConLaPoliticaRealTests(PostgresDelEcomme
         Assert.Equal(CategoriaDeError.Limite, cuarta.Error!.Categoria);
         Assert.Contains(cuarta.Error.Errores, e => e.Campo == ClavesDeReclamaciones.EsperaEnSegundos && int.Parse(e.Clave, System.Globalization.CultureInfo.InvariantCulture) > 0);
         Assert.Equal(3L, await bd.Consultar<long>($"SELECT count(*) FROM reclamaciones.hojas_reclamacion WHERE detalle LIKE '%({marca}-%'"));
+    }
+
+    /// <summary>Una auditoría que no responde: el registro con sesión de un cliente no puede auditar su vinculación (REC-33).</summary>
+    private sealed class AuditoriaCaida : IAuditoria
+    {
+        public Task Registrar(SolicitudDeRegistro solicitud, CancellationToken cancelacion = default) => Task.FromException(new AuditoriaNoDisponibleException("sin auditoría"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-REC-30")]
+    public async Task Tres_rechazos_por_no_poder_auditar_el_registro_con_sesion_devuelven_el_cupo_y_despues_se_registran_tres_hojas_sin_sesion_del_mismo_origen()
+    {
+        var marca = Guid.NewGuid().ToString("N")[..12];
+        await using var caida = bd.Anfitrion(servicios => servicios.AddScoped<IAuditoria, AuditoriaCaida>());
+        var cliente = ActorActual.DeUsuario(Guid.NewGuid(), RolesDeUsuario.Cliente);
+
+        // Con la política real hojas-por-origen liberable (DD-29): cada rechazo devuelve su cupo y suelta su clave.
+        var rechazos = new List<Resultado<ConstanciaDeHoja>>();
+        for (var i = 1; i <= 3; i++)
+        {
+            var entrada = Entrada(marca, i);
+            rechazos.Add(await caida.Como(cliente, sp => sp.GetRequiredService<IReclamaciones>().Registrar(entrada)));
+        }
+
+        Assert.All(rechazos, r =>
+        {
+            Assert.Equal(CategoriaDeError.NoDisponible, r.Error!.Categoria);
+            Assert.Contains(r.Error.Errores, e => e.Campo == ClavesDeReclamaciones.RegistrarSinSesion);
+        });
+        Assert.Equal(0L, await bd.Consultar<long>($"SELECT count(*) FROM reclamaciones.hojas_reclamacion WHERE detalle LIKE '%({marca}-%'"));
+
+        // Las mismas tres hojas, ahora sin sesión y con las mismas claves del formulario, se registran: el cupo del origen y las claves quedaron libres.
+        await using var anfitrion = bd.Anfitrion(_ => { });
+        for (var i = 1; i <= 3; i++)
+        {
+            var entrada = Entrada(marca, i);
+            var resultado = await anfitrion.Como(ActorActual.Anonimo(), sp => sp.GetRequiredService<IReclamaciones>().Registrar(entrada));
+            Assert.True(resultado.EsExito, resultado.Error?.Clave);
+        }
+
+        Assert.Equal(3L, await bd.Consultar<long>($"SELECT count(*) FROM reclamaciones.hojas_reclamacion WHERE detalle LIKE '%({marca}-%' AND cuenta_id IS NULL"));
     }
 
     [Fact]

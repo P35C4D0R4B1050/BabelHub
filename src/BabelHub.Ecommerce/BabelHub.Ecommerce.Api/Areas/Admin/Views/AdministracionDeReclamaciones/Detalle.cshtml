@@ -42,7 +42,8 @@
 {
     <form method="post" action="/administracion/reclamaciones/@id/responder" class="my-6 flex max-w-xl flex-col gap-3">
         <partial name="_TokenAntifalsificacion" />
-        <label class="form-control"><span class="label-text">Respuesta al consumidor (hasta 3000 caracteres)</span><textarea name="respuesta" class="textarea textarea-bordered" rows="6" required maxlength="3000"></textarea></label>
+        <p class="text-sm" id="aviso-sin-datos-personales">No escribas el documento ni el domicilio del consumidor en la respuesta: no hace falta y se conserva dos años.</p>
+        <label class="form-control"><span class="label-text">Respuesta al consumidor (hasta 3000 caracteres)</span><textarea name="respuesta" class="textarea textarea-bordered" rows="6" required maxlength="3000" aria-describedby="aviso-sin-datos-personales"></textarea></label>
         <button type="submit" class="btn btn-primary">Responder</button>
     </form>
     <form method="post" action="/administracion/reclamaciones/@id/descartar" class="my-6">

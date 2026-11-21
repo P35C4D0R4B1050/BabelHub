@@ -194,7 +194,6 @@ public sealed class ReclamacionesApiTests : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData(CategoriaDeError.Prohibido, "correo-no-verificado", HttpStatusCode.Forbidden, "ECO-REC-CORREO-NO-VERIFICADO")]
     [InlineData(CategoriaDeError.NoAutenticado, "no-autenticado", HttpStatusCode.Unauthorized, "ECO-NO-AUTENTICADO")]
     [InlineData(CategoriaDeError.Limite, "limite-excedido", HttpStatusCode.TooManyRequests, "ECO-LIMITE-EXCEDIDO")]
     public async Task Los_errores_de_mis_hojas_se_traducen_a_su_codigo_estable(CategoriaDeError categoria, string clave, HttpStatusCode estado, string codigo)
@@ -259,16 +258,71 @@ public sealed class PantallasDeErrorDeReclamacionesTests : IAsyncLifetime
 
     [Fact]
     [Trait("Criterio", "AC-REC-12")]
-    public async Task Mis_hojas_sin_correo_verificado_invita_a_verificarlo_con_un_403()
+    public async Task Mis_hojas_de_una_cuenta_sin_correo_verificado_responde_200_con_el_aviso_para_verificarlo()
     {
-        _host.Consumidor.Pagina = Resultado<PaginaDeMisHojas>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Prohibido, "correo-no-verificado"));
+        _host.Consumidor.Pagina = Resultado<PaginaDeMisHojas>.Exito(new PaginaDeMisHojas([], 1, 20, 0, CorreoSinVerificar: true));
 
         using var respuesta = await _host.Cliente.SendAsync(_host.Pedir("/reclamaciones/mis-hojas"));
 
         var html = System.Net.WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync());
-        Assert.Equal(HttpStatusCode.Forbidden, respuesta.StatusCode);
-        Assert.Contains("Verifica tu correo para ver tus hojas", html, StringComparison.Ordinal);
-        Assert.Contains("ECO-REC-CORREO-NO-VERIFICADO", html, StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
+        Assert.Contains("Verifica tu correo para ver también las hojas que registraste sin sesión", html, StringComparison.Ordinal);
+        Assert.Contains("no-store", respuesta.Headers.CacheControl?.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-REC-12")]
+    public async Task Mis_hojas_con_el_correo_verificado_no_muestra_el_aviso()
+    {
+        using var respuesta = await _host.Cliente.SendAsync(_host.Pedir("/reclamaciones/mis-hojas"));
+
+        Assert.DoesNotContain("Verifica tu correo para ver también", System.Net.WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync()), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-REC-30")]
+    public async Task El_rechazo_de_la_auditoria_al_registrar_con_sesion_ofrece_registrar_sin_sesion_sin_repetir_ningun_dato()
+    {
+        _host.Reclamaciones.Respuesta = Resultado<ConstanciaDeHoja>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible", [new ErrorDeCampo("rec-registrar-sin-sesion", "disponible")]));
+
+        using var pantalla = await _host.Enviar([new("nombre", "NombreUnico987"), new("documento", "12345678")]);
+        using var problema = await _host.Enviar([new("nombre", "NombreUnico987"), new("documento", "12345678")], html: false);
+
+        var html = System.Net.WebUtility.HtmlDecode(await pantalla.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, pantalla.StatusCode);
+        Assert.Contains("No pudimos registrar tu hoja con tu sesión", html, StringComparison.Ordinal);
+        Assert.Contains("cierra tu sesión o abre una ventana privada", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("NombreUnico987", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("12345678", html, StringComparison.Ordinal);
+        var cuerpo = await ReclamacionesApiHost.Leer(problema);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, problema.StatusCode);
+        Assert.Equal("ECO-SERVICIO-NO-DISPONIBLE", cuerpo.GetProperty("code").GetString());
+        Assert.Equal("rec-registrar-sin-sesion", cuerpo.GetProperty("errores")[0].GetProperty("campo").GetString());
+        Assert.DoesNotContain("NombreUnico987", cuerpo.GetRawText(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-REC-30")]
+    public async Task Un_servicio_no_disponible_sin_el_campo_de_la_guia_no_ofrece_registrar_sin_sesion()
+    {
+        _host.Reclamaciones.Respuesta = Resultado<ConstanciaDeHoja>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible"));
+
+        using var pantalla = await _host.Enviar([new("nombre", "Ana")]);
+
+        Assert.DoesNotContain("ventana privada", System.Net.WebUtility.HtmlDecode(await pantalla.Content.ReadAsStringAsync()), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-REC-20")]
+    public async Task El_formulario_muestra_el_aviso_de_la_Ley_29733_con_quien_puede_ver_la_hoja()
+    {
+        using var respuesta = await _host.Cliente.SendAsync(_host.Pedir("/reclamaciones/nueva"));
+
+        var html = System.Net.WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync());
+        Assert.Contains("Ley N.° 29733", html, StringComparison.Ordinal);
+        Assert.Contains("dos años", html, StringComparison.Ordinal);
+        Assert.Contains("acceso, rectificación, cancelación y oposición", html, StringComparison.Ordinal);
+        Assert.Contains("visibles para quien verifique el correo de contacto", html, StringComparison.Ordinal);
     }
 
     [Theory]
