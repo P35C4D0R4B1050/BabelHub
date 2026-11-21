@@ -9,7 +9,8 @@ Un escenario por atributo de calidad, con su umbral como criterio de paso. Se ej
 | [`sobreventa`](escenarios/sobreventa.js) | Concurrencia — AC01 | 100 usuarios compiten por 10 unidades: exactamente 10 reservas, 90 rechazos `INV-STOCK-INSUFICIENTE` y vendible final 0 |
 | [`limites`](escenarios/limites.js) | Seguridad — límites de uso (API4) | Más de 100 solicitudes/min de un usuario: 429 con `Retry-After`; otro usuario no se ve afectado |
 | [`resiliencia`](escenarios/resiliencia.js) | Disponibilidad — RNF03 | PostgreSQL pausado 25 s: el proceso sigue vivo, las operaciones fallan con 503 uniforme (nunca 500) y el servicio se recupera solo |
-| [`rampa`](escenarios/rampa.js) | Escalabilidad | 50 → 100 → 250 → 500 → 1000 → 2000 usuarios virtuales por niveles, con p95 y errores por nivel (el techo medido del entorno acotado) |
+| [`rampa`](escenarios/rampa.js) | Escalabilidad (perfil de estrés, pausa de 0,5 s: evidencia de límite y degradación) | 50 → 100 → 250 → 500 → 1000 → 2000 usuarios virtuales por niveles, con p95 y errores por nivel (el techo medido del entorno acotado) |
+| [`perfil-realista`](escenarios/perfil-realista.js) | Capacidad realista (RNF02) | 100 a 2 000 sesiones de lectores concurrentes (pausa de 5 a 30 s, media 15 s; 75 % catálogo, 18 % detalle, 5 % carrito, 2 % checkout) con el dimensionamiento fijo de producción: por nivel, p95 < 500 ms (disponibilidad), p95 < 3 s (reservar + confirmar) y < 1 % de errores; la curva de sesiones sostenibles |
 
 `disponibilidad-inventario.js` (raíz) es el script original de T25 de `inventario-fuentes`; los escenarios de `escenarios/` lo reemplazan en la evidencia.
 
@@ -22,7 +23,7 @@ bash tests/load/entorno/ajustar-limites.sh 0.6 0.4 # opcional: otros límites de
 bash tests/load/entorno/bajar-carga.sh             # apagar (con -v borra la base)
 ```
 
-Variables opcionales de `ejecutar.sh`: `DURACION`, `RITMO` (compras por segundo), `UNIDADES`, `COMPETIDORES`, `NIVELES`, `SEGUNDOS_POR_NIVEL`, `PENSAR_S` (pausa de cada usuario entre solicitudes; 0,5 s por omisión, `0` mide el peor caso) y `CARGA_FECHA` (carpeta de resultados).
+Variables opcionales de `ejecutar.sh`: `PANEL=1` (exporta además el panel web integrado de k6 como `<escenario>-panel.html`), `DURACION`, `RITMO` (compras por segundo), `UNIDADES`, `COMPETIDORES`, `NIVELES`, `SEGUNDOS_POR_NIVEL`, `PENSAR_S` (pausa de cada usuario entre solicitudes; 0,5 s por omisión, `0` mide el peor caso) y `CARGA_FECHA` (carpeta de resultados).
 
 **Requisitos:** Windows con Docker Desktop y Git Bash (los scripts usan `cygpath` y `docker`), Node (para emitir las credenciales de prueba) y .NET (migrar la base). En Linux o macOS habría que cambiar `cygpath -m` por la ruta directa.
 

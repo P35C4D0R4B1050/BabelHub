@@ -2,11 +2,11 @@
 
 Punto por punto de la rúbrica de `docs/07-proceso-de-desarrollo/06-plan-sprint-2.md` §1. El criterio fundamental: la implementación respeta las decisiones arquitectónicas documentadas y se **demuestra con pruebas** que cumple los atributos de calidad. Cada punto indica **qué se demuestra, dónde se ve y cómo se reproduce**; lo que no se pudo demostrar (o se demuestra a medias) se dice en «Límites».
 
-Fecha de las mediciones: 2026-11-20 (máquina de desarrollo con Docker Desktop; no es la VM ARM de despliegue).
+Fechas: mediciones de carga y cobertura del 2026-11-20 y estado de cierre del 2026-11-21 (`progress/bloques.md`, «Estado de cierre»). Máquina de desarrollo con Docker Desktop; no es la VM ARM de despliegue. La hoja única para la entrega es [`docs/07-proceso-de-desarrollo/07-evidencias-sprint-2.md`](../../docs/07-proceso-de-desarrollo/07-evidencias-sprint-2.md); este informe es el detalle.
 
 | # | Punto de la rúbrica | Evidencia principal |
 | :-- | :--- | :--- |
-| 1 | Estilo arquitectónico | [`docs/02`](../../docs/02-arquitectura-de-software/03-estilo-arquitectonico.md) y 243 pruebas de arquitectura |
+| 1 | Estilo arquitectónico | [`docs/02`](../../docs/02-arquitectura-de-software/03-estilo-arquitectonico.md) y 244 pruebas de arquitectura |
 | 2 | Patrón (Clean Architecture, módulos) | [`docs/03/01`](../../docs/03-diseno-de-software/01-clean-architecture.md), [`docs/03/04`](../../docs/03-diseno-de-software/04-modulos-y-contratos.md), `tests/architecture` |
 | 3 | SDD: criterios de aceptación y tareas | `specs/<feature>/`, [`specs/TRACEABILITY.md`](../../specs/TRACEABILITY.md), `tools/SpecCheck` |
 | 4 | REST con OpenAPI | [`docs/03/openapi/`](../../docs/03-diseno-de-software/openapi/README.md) (generado del código) |
@@ -18,7 +18,7 @@ Fecha de las mediciones: 2026-11-20 (máquina de desarrollo con Docker Desktop; 
 ## 1. Estilo arquitectónico
 
 - **Qué:** dos servicios (E-commerce e Inventario), cada uno un **monolito modular**, comunicados solo por REST; el estilo, sus tácticas y su presupuesto de recursos están decididos y justificados en `docs/02-arquitectura-de-software/` (drivers, decisiones AD, estilo, escenarios, despliegue, tácticas, presupuesto de recursos).
-- **Se demuestra:** las reglas 1, 2, 5, 6 y 13 de `AGENTS.md` (capas, referencias entre servicios, `Shared` solo contratos, módulos por contrato público) y parte de la 9 las hace cumplir `tests/architecture` (**243 pruebas**, verdes): si una referencia de proyecto o de tipo viola la regla, la compilación de pruebas falla.
+- **Se demuestra:** las reglas 1, 2, 5, 6 y 13 de `AGENTS.md` (capas, referencias entre servicios, `Shared` solo contratos, módulos por contrato público) y parte de la 9 las hace cumplir `tests/architecture` (**244 pruebas**, verdes): si una referencia de proyecto o de tipo viola la regla, la compilación de pruebas falla.
 - **Reproducir:** `dotnet test tests/architecture`.
 
 ## 2. Patrón: Clean Architecture con módulos
@@ -31,7 +31,7 @@ Fecha de las mediciones: 2026-11-20 (máquina de desarrollo con Docker Desktop; 
 
 - **Qué:** nada se programa sin spec **Approved** (EARS, criterios `AC-XXX-NN`) y plan **Planned**; cada feature tiene `spec.md`, `plan.md`, `tasks.md`, `decisions.md` y, al cerrar, `verificacion.md`.
 - **Se demuestra:** `tools/SpecCheck` valida estructura, tareas y trazabilidad (23 pruebas propias) y regenera [`specs/TRACEABILITY.md`](../../specs/TRACEABILITY.md): cada criterio tiene al menos una prueba que lo nombra con `[Trait("Criterio", "AC-XXX-NN")]`. Las aprobaciones delegadas quedan en `progress/aprobaciones.md` y los hallazgos en `progress/hallazgos.md`.
-- **Verificaciones convergentes (`Resultado: Converge`):** `inventario-fuentes`, `inventario-seleccion-fuente`, `inventario-traslados`, `inventario-ajustes`, `transversal-auditoria` y `transversal-seguridad`. Las demás están en el cierre FIN-1.
+- **Estado de cierre (2026-11-21, `progress/bloques.md`):** 547 de 611 tareas (89 %). **Siete specs en `Done`** con `Resultado: Converge`: `ecommerce-biblioteca-digital`, `ecommerce-carrito-checkout`, `ecommerce-catalogo`, `ecommerce-devoluciones`, `ecommerce-libro-reclamaciones`, `ecommerce-pedidos` e `inventario-traslados`. Las demás con verificación convergen **salvo** excepciones registradas: `ecommerce-envios` (operador real, DD-22), `ecommerce-pagos` (llaves de Culqi y WhatsApp real), `web-base` (partes humanas y WEB-25), `identidad-seguridad` (D5 y D6), `inventario-ajustes` (AJU-22), `inventario-fuentes` (FUE-09/FUE-11 diferidas y FUE-10, DD-18), `inventario-seleccion-fuente` (S2, k6 previo a producción), `transversal-auditoria`, `transversal-notificaciones` (NOT-02) y `transversal-seguridad` (SEG-17/23 y SEG-31). `transversal-plataforma` (despliegue y spikes) queda sin verificación por estar fuera del Sprint 2; `asistente-compra-ia` y `web-indice-infinito` están diferidas (ECO-12 y ECO-13).
 - **Reproducir:** `dotnet run --project tools/SpecCheck`.
 
 ## 4. Endpoints REST con OpenAPI
@@ -45,7 +45,7 @@ Fecha de las mediciones: 2026-11-20 (máquina de desarrollo con Docker Desktop; 
 
 - **Qué:** [`docs/03/09`](../../docs/03-diseno-de-software/09-analisis-de-base-de-datos-y-cache.md): consultas críticas con sus índices (plan de ejecución y `pg_stat_statements`), bloqueos y concurrencia (`SELECT … FOR UPDATE` ordenado, AC01), seguridad por filas, qué se cachea y qué no, y la **capacidad medida frente a recursos** (§6b) y el costo por solicitud antes y después de reducirlo (§6c).
 - **Hallazgos con arreglo y prueba:** el tope del grupo de conexiones superaba el límite de la cuenta (500 «too many connections»; ahora 16 por omisión, `LimiteDeConexionesDeLaBaseTests`); la base caída respondía 500 (ahora 503 uniforme, `BaseCaidaEs503Tests`); ≈ 31 → ≈ 18 idas a la base por solicitud (`CostoPorSolicitudDeDisponibilidadTests`).
-- **Se dice sin maquillar:** la caché de disponibilidad **no existe** (la regla de stock manda; D05 de `inventario-fuentes`); el análisis explica por qué y qué la reemplazaría. Hay caché implementada para los contadores de límites del E-commerce (Redis dedicado) y las claves públicas de Identidad (en memoria). La conclusión inicial «la base no es el cuello de botella» era errónea y se corrigió con `docker stats`: **el cuello es la CPU de PostgreSQL**.
+- **Se dice sin maquillar:** la caché de disponibilidad **no existe** (la regla de stock manda; D05 de `inventario-fuentes`); el análisis explica por qué y qué la reemplazaría. Hay caché implementada para los contadores de límites del E-commerce (Redis dedicado) y las claves públicas de Identidad (en memoria). La conclusión inicial «la base no es el cuello de botella» era errónea y se corrigió con `docker stats`: **el cuello es la CPU (la de PostgreSQL y la del servicio)**.
 
 ## 6. SOLID y patrones
 
@@ -61,7 +61,7 @@ Catálogo y criterios en [`docs/03/03`](../../docs/03-diseno-de-software/03-prin
 
 ## 7. Pruebas automatizadas, cobertura y CI/CD
 
-- **Qué:** xUnit (unitarias sin base ni red; integración con Testcontainers), pruebas de arquitectura, E2E con Playwright y carga con k6. Corrida de cobertura del 2026-11-20: 243 de arquitectura, 2 368 y 5 376 unitarias, 6 960 de 6 973 de integración, 15 de `CoverageCheck` y 23 de `SpecCheck`.
+- **Qué:** xUnit (unitarias sin base ni red; integración con Testcontainers), pruebas de arquitectura, E2E con Playwright y carga con k6. Estado de `main` al 2026-11-21: 244 de arquitectura, 5 437 y 2 380 unitarias y **7 601 de 7 603 de integración** (los 2 fallos son `HumoDeImagenes`, que necesita Docker y arquitecturas que esta máquina no tiene); compilación sin advertencias y `SpecCheck` sin avisos. La corrida de cobertura del 2026-11-20 (el reporte archivado) fue de 243 de arquitectura, 2 368 y 5 376 unitarias y 6 960 de 6 973 de integración.
 - **Cobertura:** [`cobertura/index.html`](cobertura/index.html) (reporte HTML por servicio, capa y archivo) y su [resumen](cobertura/README.md): **E-commerce 95,5 % en Dominio y Aplicación y 94,6 % total; Inventario 95,7 % y 93,7 %**, contra los umbrales de 85 % y 70 %. Las 13 pruebas de integración que fallaron en esa corrida están listadas con su dueño en ese resumen (no son de esta evidencia).
 - **CI/CD:** `.github/workflows/ci.yml` (especificaciones y trazabilidad, compilación sin advertencias, pruebas sin red, pruebas con cobertura y umbrales; archiva el reporte HTML) y `secretos.yml` (escaneo de secretos); `dependabot.yml`. **El flujo todavía no se ha ejecutado en GitHub** (el `push` lo hace la persona): no hay corrida de CI que mostrar.
 - **Reproducir:** `dotnet build BabelHub.sln -warnaserror`, `dotnet test BabelHub.sln --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings` y `dotnet run --project tools/CoverageCheck -- --html`.
@@ -82,8 +82,22 @@ Catálogo y criterios en [`docs/03/03`](../../docs/03-diseno-de-software/03-prin
 
   La corrida de la mañana, con el dimensionamiento anterior (0,3 CPU / 350 MB; [`k6/2026-11-20/`](k6/2026-11-20/)), cumplió RNF02 (p95 327 ms); esa cifra **no se reprodujo** en la serie final (hubo ruido del host y entró la reducción de idas a la base entre ambas), así que el informe no la presenta como vigente.
 
+- **Paneles interactivos de k6** (panel web integrado, un HTML autocontenido por escenario que se abre en el navegador), serie nueva del 2026-11-21 con el mismo código y el mismo dimensionamiento, para confirmar la serie final:
+
+| Escenario | Panel HTML | Resultado en esta serie | ¿Coincide con la serie final? |
+| :--- | :--- | :--- | :--- |
+| `disponibilidad` (0,6 / 0,4 CPU) | [panel](../../progress/evidencias/k6/2026-11-21-paneles/disponibilidad-panel.html) | p95 **802 ms**, mediana 297 ms: **no cumple** RNF02 | Mismo veredicto (908 y 897 ms); algo mejor, dentro del ruido |
+| `disponibilidad` (Inventario 1 CPU, PostgreSQL 1 CPU; DD-18) | [panel](../../progress/evidencias/k6/2026-11-21-paneles-1cpu/disponibilidad-panel.html) | p95 **207 ms**, mediana 44 ms, 0 % de errores: **cumple** RNF02 | Nueva medición (demostración de DD-18) |
+| `checkout-confirmacion` | [panel](../../progress/evidencias/k6/2026-11-21-paneles/checkout-confirmacion-panel.html) | p95 100 ms (umbral 3 s): cumple | Sí (108 ms) |
+| `sobreventa` | [panel](../../progress/evidencias/k6/2026-11-21-paneles/sobreventa-panel.html) | 10 reservas y 90 rechazos: cumple | Sí |
+| `limites` | [panel](../../progress/evidencias/k6/2026-11-21-paneles/limites-panel.html) | 100 permitidas, el resto 429, vecino sin afectar: cumple | Sí |
+| `resiliencia` | [panel](../../progress/evidencias/k6/2026-11-21-paneles/resiliencia-panel.html) | 503 uniforme, 0 respuestas inesperadas: cumple | Sí |
+| `rampa` (0,6 / 0,4 CPU, perfil de estrés) | [panel](../../progress/evidencias/k6/2026-11-21-paneles/rampa-panel.html) | p95 por nivel de 50 / 100 / 250 / 500 / 1 000 / 2 000 usuarios: 0,9 s / 1,6 s / 4,0 s / 10,9 s / 16,4 s (13 % de errores) / 16,9 s (28 % de errores): **no cumple** | Mismo veredicto y misma forma; con 1 000 y 2 000 usuarios la tasa de errores varió (13 % y 28 % frente a 11,5 % y 51 %) y a 500 el p95 fue mayor (10,9 s frente a 7,4 s): el límite se degrada de forma controlada pero la cifra exacta varía entre corridas |
+
+  Conclusión: **la serie de paneles confirma la serie final**: mismos veredictos en todos los escenarios y mismas conclusiones (RNF02 no se cumple con 0,6 / 0,4 y sí sin el tope de CPU de la VM; los 2 000 usuarios del perfil de estrés no se sostienen). Difieren las cifras absolutas (ruido de una máquina compartida), no los veredictos.
+
 - **Capacidad medida frente a recursos:** tabla completa en [`docs/03/09` §6b](../../docs/03-diseno-de-software/09-analisis-de-base-de-datos-y-cache.md) (series en [`k6/2026-11-20-capacidad/`](k6/2026-11-20-capacidad/), [`k6/2026-11-20-costo-despues/`](k6/2026-11-20-costo-despues/) y la final sobre `main` en [`k6/2026-11-20-final/`](k6/2026-11-20-final/); §6b-bis). Conclusiones sin maquillar:
-  1. **Ninguna configuración medida sostiene 2 000 usuarios virtuales con p95 < 500 ms** en esta máquina; la mejor (4 CPU de servicio + 2 de base) da p95 de 7,2 s sin errores.
+  1. **Ninguna configuración medida sostiene 2 000 usuarios virtuales con p95 < 500 ms** en esta máquina; la mejor (4 CPU de servicio + 2 de base) da **p95 de 10,1 s sin errores en la serie final sobre `main` (la cifra vigente)**. La primera serie de la mañana midió 7,2 s con la misma configuración, pero con el código anterior a la reducción de idas a la base, 350 MB de memoria y la máquina más descargada; no se reprodujo, y cuando dos series difieren vale la última sobre `main` (DOC-1 §6b-bis, punto 3).
   2. **El cuello de botella es la CPU** (de PostgreSQL y del Inventario, que cuestan unos 8 y 6 a 12 ms por solicitud). **Con el dimensionamiento declarado (DD-17), RNF02 no se cumple en la serie final** (≈ 900 ms a 50 usuarios con pausa de 0,5 s, unas 80 solicitudes por segundo frente a las 44 que se atienden); con 1 CPU para cada servicio sí en la rampa a 50 usuarios (425 ms).
   3. 2 000 usuarios con pausa de 0,5 s son ≈ 4 000 solicitudes por segundo, inalcanzables en 1 OCPU; con pausas de persona (5 a 10 s) son 200 a 400 por segundo, lo que sostiene 4 + 2 CPU con latencia degradada.
   4. Bajo sobrecarga el sistema **se degrada de forma controlada** (503 y plazos vencidos), sin 500 ni sobreventa.
@@ -92,7 +106,8 @@ Catálogo y criterios en [`docs/03/03`](../../docs/03-diseno-de-software/03-prin
 
 ## Qué falta o se demuestra a medias
 
-- Corrida de CI en GitHub (depende del `push` de la persona).
-- Verificación (`spec-verify`) de las specs restantes (cierre FIN-1).
-- **RNF02 con el dimensionamiento declarado (0,6 / 0,4)**: medido y no cumplido en la serie final (p95 ≈ 900 ms a 50 usuarios). **Decisión de la persona (DD-18, 2026-11-20, opción A):** se demuestra con el entorno de prueba sin el tope de CPU de la VM (1/1 CPU, p95 < 500 ms a 50 usuarios) y se declara con honestidad que en la VM de 1 OCPU compartida no se sostiene; palancas: memoria de referencias (apagada por D05), separar PostgreSQL, ARM con más OCPU. El resultado de 2 000 usuarios (p95 16,9 s y 51 % de errores; mejor configuración 4/2 CPU: 10,1 s sin errores) es la capacidad medida con ese dimensionamiento.
-- Hallazgos abiertos de otros carriles en `progress/hallazgos.md` (por ejemplo, rutas del E-commerce aún sin mapear en el host).
+- **CI en GitHub:** el flujo (`ci.yml`, `secretos.yml`) aún **no se ha ejecutado** en GitHub porque depende del `push` de la persona; no hay corrida que mostrar. Todo lo del flujo se ejecuta y pasa en local.
+- **Specs sin cierre completo:** 7 en `Done`; las demás convergen salvo las excepciones listadas en el punto 3 (operador de envíos real, llaves de Culqi, partes humanas de la interfaz, etc.); `transversal-plataforma` queda fuera del Sprint 2.
+- **RNF02 con el dimensionamiento declarado (0,6 / 0,4)**: medido y no cumplido en la serie final (p95 ≈ 900 ms a 50 usuarios). **Decisión de la persona (DD-18, 2026-11-20, opción A):** se demuestra con el entorno de prueba sin el tope de CPU de la VM (1/1 CPU, p95 < 500 ms a 50 usuarios) y se declara con honestidad que en la VM de 1 OCPU compartida no se sostiene; palancas: memoria de referencias (apagada por D05), separar PostgreSQL, ARM con más OCPU.
+- **2 000 usuarios virtuales:** no se sostienen con p95 < 500 ms en ninguna configuración medida. La cifra vigente es la de la serie final sobre `main`: con el dimensionamiento declarado, p95 de 16,9 s y 51 % de errores; con la mejor configuración (4 / 2 CPU), 10,1 s sin errores. Es la capacidad medida con su dimensionamiento.
+- Hallazgos abiertos de otros carriles en `progress/hallazgos.md`.
