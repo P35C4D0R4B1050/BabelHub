@@ -20,7 +20,7 @@ public sealed class VigilarRetencionTests : IDisposable
     {
         _almacen = Path.Combine(_carpeta, "almacen");
         Directory.CreateDirectory(_almacen);
-        File.WriteAllText(
+        ArchivosDeDoble.Escribir(
             Path.Combine(_carpeta, "rclone-doble.sh"),
             """
             #!/usr/bin/env bash
