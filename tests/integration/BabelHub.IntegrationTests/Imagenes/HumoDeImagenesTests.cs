@@ -14,6 +14,10 @@ public sealed class HumoDeImagenesTests : IDisposable
     private static readonly string[] Arquitecturas = ["amd64", "arm64"];
     private readonly List<string> _contenedores = [];
     private readonly List<string> _imagenes = [];
+    private readonly List<string> _redes = [];
+
+    // El mismo PostgreSQL (con su digest) que base la imagen de infra/postgres: el servicio solo necesita conectarse y responder SELECT 1.
+    private const string ImagenDePostgres = "postgres:17-alpine@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065";
 
     public void Dispose()
     {
@@ -26,6 +30,11 @@ public sealed class HumoDeImagenesTests : IDisposable
         foreach (var imagen in _imagenes)
         {
             Docker(TimeSpan.FromSeconds(60), "rmi", "--force", imagen);
+        }
+
+        foreach (var red in _redes)
+        {
+            Docker(TimeSpan.FromSeconds(30), "network", "rm", red);
         }
     }
 
@@ -94,6 +103,41 @@ public sealed class HumoDeImagenesTests : IDisposable
         return nombre;
     }
 
+    private string CrearRed()
+    {
+        var red = "babelhub-humo-red-" + Guid.NewGuid().ToString("N")[..12];
+        Exigir(Docker(TimeSpan.FromSeconds(30), "network", "create", red), "No se pudo crear la red de la prueba");
+        _redes.Add(red);
+        return red;
+    }
+
+    /// <summary>
+    /// Un PostgreSQL desechable de la misma arquitectura que el servicio, con las bases y las cuentas del entorno ya dadas de alta. Espera por TCP (no por el socket): durante la inicialización la imagen oficial solo escucha en el socket y luego se reinicia.
+    /// La arquitectura que no es la del equipo corre en emulación y se le da un plazo mayor.
+    /// </summary>
+    private void ArrancarPostgresDesechable(string red, string arquitectura, EntornoDeHumo entorno)
+    {
+        var nombre = "babelhub-humo-pg-" + Guid.NewGuid().ToString("N")[..12];
+        var claveDelAdministrador = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24)).Replace('/', 'a').Replace('+', 'b').Replace('=', 'c');
+        Exigir(
+            Docker(TimeSpan.FromMinutes(2), "run", "--detach", "--name", nombre, "--network", red, "--network-alias", "pg", "--platform", $"linux/{arquitectura}", "--env", "POSTGRES_PASSWORD=" + claveDelAdministrador, ImagenDePostgres),
+            "No se pudo arrancar PostgreSQL");
+        _contenedores.Add(nombre);
+
+        var nativa = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture == System.Runtime.InteropServices.Architecture.Arm64 ? "arm64" : "amd64";
+        var limite = DateTime.UtcNow.Add(arquitectura == nativa ? TimeSpan.FromMinutes(3) : TimeSpan.FromMinutes(12));
+        while (Docker(TimeSpan.FromSeconds(30), "exec", nombre, "pg_isready", "-q", "-h", "127.0.0.1", "-U", "postgres").Codigo != 0)
+        {
+            Assert.True(DateTime.UtcNow < limite, $"PostgreSQL no quedó listo en {arquitectura}.");
+            Thread.Sleep(TimeSpan.FromSeconds(2));
+        }
+
+        foreach (var sentencia in entorno.SentenciasDeAlta())
+        {
+            Exigir(Docker(TimeSpan.FromSeconds(60), "exec", nombre, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", sentencia), "No se pudo dar de alta la base o la cuenta de la prueba");
+        }
+    }
+
     /// <summary>Espera la salud del contenedor. La arquitectura que no es la del equipo corre en emulación (QEMU), donde un servicio .NET tarda varios minutos en arrancar: se le da un plazo mayor, sin cambiar lo que se exige.</summary>
     private static async Task<(string Vivo, string Listo)> EsperarSalud(string contenedor, string arquitectura)
     {
@@ -139,7 +183,11 @@ public sealed class HumoDeImagenesTests : IDisposable
         foreach (var arquitectura in Arquitecturas)
         {
             var imagen = Construir(".", $"src/BabelHub.{servicio}/BabelHub.{servicio}.Api/Dockerfile", arquitectura, servicio.ToLowerInvariant());
-            var contenedor = Arrancar(imagen, arquitectura, "--publish", "127.0.0.1::8080", "--env", "BABELHUB__Web__Host=tienda", "--env", "BABELHUB__Web__HostsPermitidos=www.babelhub.example");
+            // La imagen valida sus secretos al arrancar: se le entrega la configuración completa (valores aleatorios) y un PostgreSQL desechable de su arquitectura al que conectarse.
+            var entorno = EntornoDeHumo.Para(servicio, "pg");
+            var red = CrearRed();
+            ArrancarPostgresDesechable(red, arquitectura, entorno);
+            var contenedor = Arrancar(imagen, arquitectura, ["--publish", "127.0.0.1::8080", "--network", red, .. entorno.Argumentos]);
             resultados[arquitectura] = await EsperarSalud(contenedor, arquitectura);
 
             // La arquitectura del contenedor es la pedida y no corre como root.
