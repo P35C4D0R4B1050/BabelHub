@@ -10,6 +10,13 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 - **Carril A:** `/health/ready` detecta la caída de la base en los dos servicios. **Carril B:** fachadas y lecturas de Pedidos (ECO-6f).
 - Validación de `main`: compilación sin advertencias, SpecCheck 0 avisos, unitarias 5376 y 2368, arquitectura 243, integración 6954 de 6966; 12 fallos: 2 flaky que pasan sueltos, 2 de imágenes por contención de Docker, y 8 reales repartidos a sus dueños (4 pruebas por fixtures con contraseña o clave literal, composición de la biblioteca, Dockerfiles distintos, prueba de reservas con el tope nuevo).
 
+## 2026-11-21 (madrugada) — Cuarta integración completa de `main` y convergencia de specs
+
+### Cubierto
+- **Integración completa de `main` (5bb0a9ac):** 7519 de 7523 en 22 min; escáner de secretos limpio; unitarias 5428 y 2376; arquitectura 244; SpecCheck 0 avisos. Los 4 fallos son conocidos o flaky: `HumoDeImagenes` ×2 (Docker), `CargaDelAcumulado` y el escáner por tiempo (pasan solos).
+- **Verificación (`verificacion.md`):** biblioteca **Converge**; carrito **converge salvo D-02**; catálogo, reclamaciones, pagos, pedidos y web-base **convergen salvo** Menores, partes humanas o externos (T37/T38 B05, WhatsApp Evolution/n8n, D9/D10) con motivo y dueño; devoluciones y envíos siguen «No converge» (V cierra su ronda); A re-verifica las specs de Inventario, seguridad, auditoría e identidad.
+- **Cambios de fondo en esta ronda:** adaptador real de versiones de textos legales sobre Identidad (A), orden global de los receptores de la cancelación de cuenta (V), línea digital reembolsada excluida de la anulación y E2E de compra a domicilio y solo digital (B), WEB-02 menú por rol y PAG-22 WhatsApp vía `INotificador` (C), enmienda de topes del Carrito aprobada por excepción única (DD-19).
+
 ## 2026-11-20 (tarde) — Serie final de k6 y decisión sobre RNF02 (DD-18)
 
 ### Cubierto
