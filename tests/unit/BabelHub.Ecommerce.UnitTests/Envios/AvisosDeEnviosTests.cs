@@ -51,6 +51,20 @@ public sealed class AvisosDeEnviosTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-NOT-01")]
+    public async Task Los_avisos_de_guia_y_de_en_reparto_cumplen_el_validador_real_del_catalogo()
+    {
+        var entorno = new EntornoDeEnvios();
+        var guia = SembrarPendiente(entorno);
+        await entorno.SolicitarGuia.Ejecutar(guia.Id);
+        var reparto = SembrarConGuia(entorno);
+        await entorno.PasarAEnReparto.Ejecutar(reparto.Id);
+
+        Assert.Equal(2, entorno.Notificador.Solicitudes.Count);
+        BabelHub.Ecommerce.UnitTests.Notificaciones.AvisosContraElCatalogo.Comprobar(entorno.Notificador.Solicitudes);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-ENV-06")]
     public async Task El_paso_a_en_reparto_pide_el_aviso_de_en_reparto_con_la_guia()
     {

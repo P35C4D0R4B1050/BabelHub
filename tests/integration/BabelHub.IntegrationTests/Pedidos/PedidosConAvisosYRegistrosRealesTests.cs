@@ -169,6 +169,27 @@ public sealed class PedidosConAvisosYRegistrosRealesTests(PostgresDelEcommerceCo
     }
 
     [Fact]
+    [Trait("Criterio", "AC-NOT-01")]
+    public async Task Confirmar_una_compra_con_un_impreso_y_un_digital_deja_pendientes_los_avisos_de_pedido_confirmado_y_de_libro_digital_disponible_y_repetirla_no_los_duplica()
+    {
+        await PrepararLaEdicionDigital();
+        await using var anfitrion = Anfitrion();
+        var cuenta = await SembrarCuenta();
+        // Sin el número y el consentimiento de WhatsApp (NOT-03) los avisos nacen omitidos, no pendientes.
+        await bd.Ejecutar($"UPDATE identidad.usuarios SET numero_whatsapp = '+51999111222', consentimiento_whatsapp = true WHERE id = '{cuenta}'");
+        var pedido = Guid.NewGuid();
+        var compra = Compra(pedido, cuenta, Guid.NewGuid(), null, conDigital: true);
+
+        Assert.Equal(ResultadoDeConfirmarCompra.Creado, await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<IConfirmacionDeCompra>().Confirmar(compra)));
+        Assert.Equal(ResultadoDeConfirmarCompra.Creado, await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<IConfirmacionDeCompra>().Confirmar(compra)));
+
+        // NOT-02 y AC-NOT-01 con el Notificador real: un aviso por plantilla, al cliente, pendiente de envío, con el evento determinista y sin duplicados.
+        Assert.Equal(1, await bd.Consultar<int>("SELECT count(*) FROM notificaciones.avisos WHERE plantilla = 'pedido-confirmado' AND evento_id = @e AND estado = 'pendiente'", ("e", $"pedido:{pedido:N}:confirmado:compra")));
+        Assert.Equal(1, await bd.Consultar<int>("SELECT count(*) FROM notificaciones.avisos WHERE plantilla = 'libro-digital-disponible' AND evento_id = @e AND estado = 'pendiente'", ("e", $"pedido:{pedido:N}:libro-digital:compra")));
+        Assert.Equal(2, await bd.Consultar<int>("SELECT count(*) FROM notificaciones.avisos WHERE evento_id LIKE @e", ("e", $"pedido:{pedido:N}:%")));
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-PED-34")]
     public async Task El_contacto_de_un_pedido_a_domicilio_no_llega_a_los_registros_tecnicos_en_su_creacion_su_anulacion_ni_su_lectura()
     {

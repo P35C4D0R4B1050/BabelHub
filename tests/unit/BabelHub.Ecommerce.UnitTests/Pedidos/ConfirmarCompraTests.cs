@@ -2,8 +2,10 @@ using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Biblioteca;
 using BabelHub.Ecommerce.Application.Carrito;
 using BabelHub.Ecommerce.Application.Identidad;
+using BabelHub.Ecommerce.Application.Notificaciones;
 using BabelHub.Ecommerce.Application.Pagos;
 using BabelHub.Ecommerce.Application.Pedidos.Interno;
+using BabelHub.Ecommerce.Domain.Notificaciones;
 using BabelHub.Ecommerce.Domain.Pedidos;
 using BabelHub.Ecommerce.UnitTests.Catalogo;
 using BabelHub.Ecommerce.UnitTests.Plataforma;
@@ -45,7 +47,9 @@ public sealed class ConfirmarCompraTests
 
         public AuditoriaDelCatalogoEspia Auditoria { get; } = new();
 
-        public ConfirmarCompra Caso => new(Repositorio, Marca, Accesos, Numeros, Auditoria, new RelojFijo(Ahora));
+        public NotificadorDePedidosEspia Notificador { get; } = new();
+
+        public ConfirmarCompra Caso => new(Repositorio, Marca, Accesos, Numeros, Auditoria, Notificador, new RelojFijo(Ahora));
     }
 
     [Fact]
@@ -251,5 +255,105 @@ public sealed class ConfirmarCompraTests
         Assert.True(impresa.RequiereTraslado);
         Assert.Equal(new DateOnly(2026, 11, 25), impresa.FechaEstimadaDeLlegada);
         Assert.Equal(compra.Lineas.Select(l => l.LineaId).Order(), pedido.Lineas.Select(l => l.Id).Order());
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-01")]
+    public async Task Una_compra_con_un_impreso_y_un_digital_pide_el_aviso_de_pedido_confirmado_y_el_de_libro_digital_disponible_al_cliente()
+    {
+        var entorno = new Entorno();
+        var compra = Compra(TipoDeEntregaDeCompra.Recojo, Impresa(), Digital());
+
+        await entorno.Caso.Confirmar(compra);
+
+        var pedido = Assert.Single(entorno.Repositorio.Pedidos);
+        var solicitudes = entorno.Notificador.Solicitudes;
+        Assert.Equal(["pedido-confirmado", "libro-digital-disponible"], solicitudes.Select(s => s.Plantilla));
+        Assert.All(solicitudes, s => Assert.Equal((DestinatarioDelAviso.Cliente, Cuenta.ToString("D")), (s.Destinatario, s.DestinatarioRef)));
+        Assert.Equal([$"pedido:{compra.PedidoId:N}:confirmado:compra", $"pedido:{compra.PedidoId:N}:libro-digital:compra"], solicitudes.Select(s => s.EventoId));
+        Assert.All(solicitudes, s => Assert.Equal(pedido.Numero.Valor, s.Campos["numeroDePedido"]));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-01")]
+    public async Task Una_compra_solo_de_impresos_no_pide_el_aviso_del_libro_digital_y_una_solo_digital_pide_los_dos()
+    {
+        var entorno = new Entorno();
+
+        await entorno.Caso.Confirmar(Compra(TipoDeEntregaDeCompra.Recojo, Impresa()));
+        var soloImpresos = entorno.Notificador.Solicitudes.Select(s => s.Plantilla).ToList();
+        entorno.Notificador.Solicitudes.Clear();
+        await entorno.Caso.Confirmar(Compra(TipoDeEntregaDeCompra.Digital, Digital()));
+
+        Assert.Equal(["pedido-confirmado"], soloImpresos);
+        Assert.Equal(["pedido-confirmado", "libro-digital-disponible"], entorno.Notificador.Solicitudes.Select(s => s.Plantilla));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-01")]
+    public async Task Cada_aviso_que_pide_el_pedido_confirmado_cumple_el_validador_real_del_catalogo()
+    {
+        var entorno = new Entorno();
+
+        await entorno.Caso.Confirmar(Compra(TipoDeEntregaDeCompra.Recojo, Impresa(), Digital()));
+
+        Assert.NotEmpty(entorno.Notificador.Solicitudes);
+        foreach (var solicitud in entorno.Notificador.Solicitudes)
+        {
+            var plantilla = CatalogoDePlantillas.Obtener(solicitud.Plantilla);
+            Assert.NotNull(plantilla);
+            var validacion = plantilla.Validar(solicitud.Campos);
+            Assert.True(validacion.EsValido, $"{solicitud.Plantilla}: {validacion.Campo} {validacion.Motivo}");
+            Assert.Equal(TipoDeDestinatario.Cliente, plantilla.Destinatario);
+            Assert.True(PlantillaDeAviso.EventoValido(solicitud.EventoId), solicitud.EventoId);
+            Assert.True(PlantillaDeAviso.ReferenciaValida(solicitud.DestinatarioRef));
+        }
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-01")]
+    public async Task Una_repeticion_de_la_confirmacion_no_vuelve_a_pedir_los_avisos()
+    {
+        var entorno = new Entorno();
+        var compra = Compra(TipoDeEntregaDeCompra.Recojo, Impresa(), Digital());
+
+        await entorno.Caso.Confirmar(compra);
+        var primera = entorno.Notificador.Solicitudes.Count;
+        var repetida = await entorno.Caso.Confirmar(compra);
+
+        Assert.Equal(ResultadoDeConfirmarCompra.Creado, repetida);
+        Assert.Equal(2, primera);
+        Assert.Equal(primera, entorno.Notificador.Solicitudes.Count);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-03")]
+    public async Task Si_el_Notificador_falla_el_pedido_se_crea_igual_y_el_caso_de_uso_no_se_interrumpe()
+    {
+        var entorno = new Entorno();
+        entorno.Notificador.Lanza = true;
+
+        var resultado = await entorno.Caso.Confirmar(Compra(TipoDeEntregaDeCompra.Recojo, Impresa(), Digital()));
+
+        Assert.Equal(ResultadoDeConfirmarCompra.Creado, resultado);
+        Assert.Single(entorno.Repositorio.Pedidos);
+        Assert.Single(entorno.Accesos.Concedidos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-01")]
+    public async Task Una_compra_que_no_se_crea_no_pide_ningun_aviso()
+    {
+        var entorno = new Entorno();
+        entorno.Auditoria.Caida = true;
+        var sinContacto = Compra(TipoDeEntregaDeCompra.Domicilio, Impresa()) with { Contacto = null };
+
+        var sinAuditoria = await entorno.Caso.Confirmar(Compra(TipoDeEntregaDeCompra.Recojo, Impresa(), Digital()));
+        entorno.Auditoria.Caida = false;
+        var rechazada = await entorno.Caso.Confirmar(sinContacto);
+
+        Assert.Equal(ResultadoDeConfirmarCompra.Fallo, sinAuditoria);
+        Assert.Equal(ResultadoDeConfirmarCompra.Fallo, rechazada);
+        Assert.Empty(entorno.Notificador.Solicitudes);
     }
 }
