@@ -105,7 +105,7 @@ public sealed class AnfitrionDelEcommerceTests
         return builder;
     }
 
-    private static WebApplication Compuesto(ModoDeArranque modo = ModoDeArranque.Normal, string entorno = "Development")
+    internal static WebApplication Compuesto(ModoDeArranque modo = ModoDeArranque.Normal, string entorno = "Development")
     {
         var builder = Constructor(ConfiguracionCompleta(), entorno);
         builder.Services.AddSingleton(typeof(ModoDeArranque), modo);

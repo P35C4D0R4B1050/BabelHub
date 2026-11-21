@@ -1,4 +1,5 @@
 using BabelHub.Ecommerce.Application.Auditoria;
+using BabelHub.Ecommerce.Application.Auditoria.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Application.Plataforma.Interno;
 using BabelHub.Ecommerce.Application.Web;
@@ -64,11 +65,21 @@ public static class ComposicionDelCorreo
         servicios.TryAddSingleton(new PoliticaDeCuotaDeCorreo(ConfiguracionDeCuotaDeCorreo.Predeterminada.Validar()));
         servicios.TryAddSingleton(new CifradorDeLaColaDeCorreo(claveDeLaCola));
         servicios.TryAddSingleton<IAlmacenDeCuotaDeCorreo>(sp => new PostgresAlmacenDeCuotaDeCorreo(sp.GetRequiredService<UnidadDeTrabajoPostgres>()));
-        servicios.TryAddSingleton<IColaDeCorreosPendientes>(sp => new PostgresColaDeCorreosPendientes(sp.GetRequiredService<UnidadDeTrabajoPostgres>(), sp.GetRequiredService<CifradorDeLaColaDeCorreo>(), sp.GetRequiredService<IReloj>()));
+        servicios.TryAddSingleton(sp => new PostgresColaDeCorreosPendientes(sp.GetRequiredService<UnidadDeTrabajoPostgres>(), sp.GetRequiredService<CifradorDeLaColaDeCorreo>(), sp.GetRequiredService<IReloj>()));
+        servicios.TryAddSingleton<IColaDeCorreosPendientes>(sp => sp.GetRequiredService<PostgresColaDeCorreosPendientes>());
         servicios.TryAddSingleton<ITransporteDeCorreo>(smtp is null ? new TransporteDeCorreoNoConfigurado() : new SmtpTransporteDeCorreo(smtp));
         servicios.TryAddSingleton<IRenderizadorDeCorreo>(RenderizadorDeCorreoDeProduccion.Con([new Application.Pagos.PlantillasDeCorreoDePagosParaPlataforma(), new PlantillasDeCorreoDeReclamos()]));
         servicios.TryAddScoped(sp => new CuotaDeCorreo(sp.GetRequiredService<PoliticaDeCuotaDeCorreo>(), sp.GetRequiredService<IAlmacenDeCuotaDeCorreo>(), sp.GetRequiredService<IPublicadorDeAlertasTecnicas>(), sp.GetRequiredService<IReloj>()));
         servicios.TryAddScoped<IEnviadorDeCorreo, EnviadorDeCorreoDeProduccion>();
+        // Lo que corre en segundo plano (IDE-66, IDE-78, IDE-80): el reintento de lo pendiente al renovarse la cuota y el vaciado semanal de Enviados (solo con IMAP configurado).
+        servicios.TryAddScoped<ReintentoDeCorreosPendientes>();
+        if (smtp is not null)
+        {
+            servicios.TryAddSingleton(new LimpiezaDeEnviadosImap(smtp));
+        }
+
+        // El correo de las alertas a la administración (AUD-29, IDE-82): sin este registro el trabajo de correo de Auditoría no puede resolverse y ninguna alerta sale. Las direcciones las aporta Identidad (IDireccionesDeCuentas).
+        servicios.TryAddScoped<IEnvioDeCorreoDeAlertas, EnvioDeCorreoDeAlertasDeProduccion>();
         return servicios;
     }
 }

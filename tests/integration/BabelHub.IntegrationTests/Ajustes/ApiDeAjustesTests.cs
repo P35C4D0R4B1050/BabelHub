@@ -91,6 +91,8 @@ public sealed class ApiDeAjustesTests(PostgresDeReservasFixture bd) : IClassFixt
         Assert.Equal((libro, "lima", 10, "GR-001"), (dto.EdicionId, dto.CodigoDeFuente, dto.Cantidad, dto.Referencia));
         var listado = JsonSerializer.Deserialize<ListaDeIngresosDto>(await lista.Content.ReadAsStringAsync(), Estricto)!;
         Assert.Equal([dto.IngresoId], listado.Ingresos.Select(i => i.IngresoId));
+        // La lista trae de cada ingreso lo mismo que el alta: edición, fuente, cantidad, referencia, nota, usuario y fecha (AJU-20).
+        Assert.Equal(dto, listado.Ingresos.Single());
         Assert.Equal(HttpStatusCode.Forbidden, deEncargado.StatusCode);
         Assert.Equal((10, 0), await bd.StockDe(lima, libro));
     }

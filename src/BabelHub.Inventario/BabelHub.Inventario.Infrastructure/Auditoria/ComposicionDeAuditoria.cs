@@ -90,6 +90,8 @@ public static class ComposicionDeAuditoria
             sp.GetRequiredService<IAlmacenDePorAnonimizar>(), sp.GetRequiredService<IAnonimizadorDeRegistros>(), [.. sp.GetServices<IDepuradorAdicional>()], sp.GetRequiredService<IAuditoria>(),
             sp.GetRequiredService<IEstadoDeLaDepuracion>(), sp.GetRequiredService<IBloqueoDeLaDepuracion>(), sp.GetRequiredService<IAlertas>(), sp.GetRequiredService<IActorActual>(),
             sp.GetRequiredService<IUnidadDeTrabajo>(), sp.GetRequiredService<IReloj>()));
+        // El último paso de la restauración (AUD-31): vuelve a llenar por_anonimizar y depura antes de abrir al público.
+        servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IPasoDeRestauracion, PasoDeRestauracionDeDepuracion>());
         return servicios;
     }
 

@@ -19,7 +19,7 @@ public sealed record SesionSembrada(Guid UsuarioId, string Correo, RolDeCuenta R
 /// El sembrador de sesiones de <b>solo desarrollo</b> (los recorridos E2E con compra necesitan un cliente con sesión y la pantalla de ingreso no basta para sembrar personal): crea una cuenta con el correo verificado y el rol pedido
 /// (un encargado con su sucursal <b>por código</b>, con el identificador canónico de <see cref="IdentificadorDeSucursal"/>) y la <b>hace ingresar por el mismo camino real</b> —<see cref="IIngreso"/> (y el segundo factor del personal,
 /// configurado con su secreto) y <see cref="ISesionesWeb"/>—, de modo que lo sembrado es exactamente lo que produce un ingreso. <b>No existe fuera de una compilación <c>Debug</c></b>: todo este archivo va bajo <c>#if DEBUG</c> y la imagen
-/// se publica en <c>Release</c>, así que no hay configuración, variable de entorno ni nombre de entorno que lo encienda en producción. Las contraseñas se generan al azar en cada siembra y no se devuelven.
+/// se publica en <c>Release</c>, así que no hay configuración, variable de entorno ni nombre de entorno que lo encienda en producción. Las contraseñas se generan al azar en cada siembra y no se devuelven; la prueba que necesite ingresar por la pantalla real puede elegir la suya (se valida con la política de contraseñas y nunca se repite en la respuesta).
 /// </summary>
 public sealed class SembradorDeSesionesDeDesarrollo(
     IRepositorioDeCuentas cuentas,
@@ -36,7 +36,7 @@ public sealed class SembradorDeSesionesDeDesarrollo(
 {
     private const string Alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 
-    public async Task<SesionSembrada> Sembrar(RolDeCuenta rol, string? codigoDeSucursal, HostWeb host, CancellationToken cancelacion = default)
+    public async Task<SesionSembrada> Sembrar(RolDeCuenta rol, string? codigoDeSucursal, HostWeb host, string? contrasenaElegida = null, CancellationToken cancelacion = default)
     {
         if (!Enum.IsDefined(rol) || (rol == RolDeCuenta.Cliente) != (host == HostWeb.Tienda))
         {
@@ -72,11 +72,11 @@ public sealed class SembradorDeSesionesDeDesarrollo(
             await cacheDeVerificacion.Renovar(cancelacion).ConfigureAwait(false);
         }
 
-        var texto = ContrasenaAleatoria();
+        var texto = string.IsNullOrWhiteSpace(contrasenaElegida) ? ContrasenaAleatoria() : contrasenaElegida;
         var (contrasena, _) = Contrasena.Crear(texto, comunes.EsComun);
         if (contrasena is null)
         {
-            throw new InvalidOperationException("La contraseña generada no cumple la política.");
+            throw new ArgumentException("La contraseña elegida no cumple la política de contraseñas.", nameof(contrasenaElegida));
         }
 
         var ahora = reloj.Ahora;

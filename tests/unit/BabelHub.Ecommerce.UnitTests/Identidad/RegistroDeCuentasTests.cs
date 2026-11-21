@@ -104,6 +104,22 @@ public sealed class RegistroDeCuentasTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-IDE-62")]
+    public async Task Registrar_ReservaElCupoDeCodigosDelOrigen_YAlAgotarloLaCuentaSeCreaSinEncolarElCodigo()
+    {
+        var e = new EntornoDeIdentidad();
+        e.Limites.Maximos["cupo-de-codigos-por-origen"] = 1;
+
+        var primera = await e.Registro().Registrar(e.Alta("Ana@Example.com"));
+        var segunda = await e.Registro().Registrar(e.Alta("Luis@Example.com"));
+
+        Assert.True(primera.EsExito);
+        Assert.True(segunda.EsExito);
+        Assert.Equal(new SolicitudDeCodigoEnSegundoPlano("ana@example.com", PropositoDeCodigo.VerificacionDeCorreo), Assert.Single(e.Cola.Encoladas));
+        Assert.NotNull(await e.Cuentas.PorCorreo("luis@example.com"));
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-IDE-14")]
     public async Task Registrar_EncolaElCodigoDeVerificacion_ElCorreoNoSaleEnElCaminoSincrono()
     {

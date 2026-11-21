@@ -145,12 +145,12 @@ public static class EndpointsDeReservas
         var (cuerpo, clave) = await CuerpoEstricto.Leer<CerrarReservaDto>(c).ConfigureAwait(false);
         if (cuerpo is null)
         {
-            return await AutorizarAntes(caso, EntradaInvalidaDeCerrar, c, e, "cuerpo", clave!).ConfigureAwait(false);
+            return await AutorizarAntes(caso, EntradaInvalidaDeCerrar(pedidoId), c, e, "cuerpo", clave!).ConfigureAwait(false);
         }
 
         if (!MotivoDeCierre(cuerpo.Motivo, out var motivo))
         {
-            return await AutorizarAntes(caso, EntradaInvalidaDeCerrar, c, e, "motivo", "formato-invalido").ConfigureAwait(false);
+            return await AutorizarAntes(caso, EntradaInvalidaDeCerrar(pedidoId), c, e, "motivo", "formato-invalido").ConfigureAwait(false);
         }
 
         var resultado = await caso.Ejecutar(new CerrarReservasEntrada(pedidoId, motivo, cuerpo.LineaIds ?? [], cuerpo.EnvioId, ClaveDeIdempotencia(c)), c.RequestAborted).ConfigureAwait(false);
@@ -194,7 +194,8 @@ public static class EndpointsDeReservas
 
     private static readonly LiberarReservasEntrada EntradaInvalidaDeLiberar = new(Guid.Empty, MotivoDeLiberacionDeReserva.CheckoutCancelado, null);
 
-    private static readonly CerrarReservasEntrada EntradaInvalidaDeCerrar = new(Guid.Empty, MotivoDeCierreDeReserva.Entrega, [], null, string.Empty);
+    /// <summary>Lleva el pedido de la ruta: la Aplicación lee su cabecera (sin bloquear ni escribir) para comprobar la sucursal de recojo, de modo que quien sí tiene alcance recibe el 400 de forma y no un 403 por un pedido vacío.</summary>
+    private static CerrarReservasEntrada EntradaInvalidaDeCerrar(Guid pedidoId) => new(pedidoId, MotivoDeCierreDeReserva.Entrega, [], null, string.Empty);
 
     /// <summary>
     /// Un cuerpo o un valor mal formado no se responde con 400 antes de autorizar: se pasa a la Aplicación una entrada que su validación rechaza, de modo que quien no tiene alcance recibe su 403 con el evento de acceso

@@ -192,6 +192,10 @@ public sealed class EventosDeSeguridadDeIdentidad(IRegistroDeSeguridad registro)
     public Task CambioDeCorreoRechazado(Guid usuarioId, CancellationToken cancelacion) =>
         Registrar(AccionesAuditables.CambioDeCorreoNoReconocidoRechazado, "rechazado-por-el-titular", usuarioId, cancelacion);
 
+    /// <summary>Un cambio de correo desde un dispositivo o una región no reconocidos venció sin que el titular lo confirmara ni lo rechazara (IDE-54, AUD-33): el cambio no se aplicó y queda el evento.</summary>
+    public Task CambioDeCorreoVencido(Guid usuarioId, CancellationToken cancelacion) =>
+        Registrar(AccionesAuditables.CambioDeCorreoNoReconocidoVencido, "vencido-sin-confirmar", usuarioId, cancelacion);
+
     /// <summary>Un aviso de seguridad no salió por correo (IDE-79, AUD-43): por la cuota, un tope por cuenta o por origen o un correo sin verificar. Guarda la cuenta y el motivo, nunca el correo ni el contenido.</summary>
     public Task AvisoSuprimido(Guid usuarioId, string motivo, CancellationToken cancelacion) =>
         Registrar(AccionesAuditables.AvisoDeSeguridadSuprimido, motivo, usuarioId, cancelacion);

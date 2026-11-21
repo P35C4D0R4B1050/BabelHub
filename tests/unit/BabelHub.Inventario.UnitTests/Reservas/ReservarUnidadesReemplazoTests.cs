@@ -109,6 +109,49 @@ public sealed class ReservarUnidadesReemplazoTests
         Assert.Equal(1, entorno.Eventos.Eventos.Count(e => e.Limite == MotivosDeLimiteDeReservas.ReemplazosPorPedido));
     }
 
+    [Theory]
+    [Trait("Criterio", "AC-SEL-38")]
+    [InlineData("confirmada")]
+    [InlineData("liberada")]
+    [InlineData("expirada")]
+    public async Task UnPedidoNuevo_TrasConfirmarseLiberarseOExpirarElAnterior_ParteDeCeroYAdmiteSusTresReemplazos(string fin)
+    {
+        var (entorno, libro, anterior) = Escenario(stock: 20);
+        for (var i = 0; i < 4; i++)
+        {
+            await Reemplazar(entorno, anterior, libro, 1);
+        }
+
+        var delAnterior = entorno.Reservas.Guardadas.Where(r => r.PedidoId == anterior).OrderByDescending(r => r.Reemplazos).First();
+        Assert.Equal(3, delAnterior.Reemplazos);
+        switch (fin)
+        {
+            case "confirmada":
+                Assert.True(delAnterior.Confirmar(entorno.Base.Reloj.Ahora));
+                break;
+            case "liberada":
+                delAnterior.Lineas.Single().Liberar(entorno.Base.Reloj.Ahora);
+                break;
+            default:
+                delAnterior.Lineas.Single().Expirar(entorno.Base.Reloj.Ahora);
+                break;
+        }
+
+        var nuevo = Guid.NewGuid();
+        await Reemplazar(entorno, nuevo, libro, 1);
+        for (var i = 0; i < 3; i++)
+        {
+            await Reemplazar(entorno, nuevo, libro, 1);
+        }
+
+        var delNuevo = entorno.Reservas.Guardadas.Where(r => r.PedidoId == nuevo).OrderByDescending(r => r.Reemplazos).First();
+        var cuarto = await entorno.Reservar().Ejecutar(ARecojo("lima", [Linea(libro, 1)], nuevo));
+
+        Assert.Equal(3, delNuevo.Reemplazos);
+        Assert.Equal("limite-excedido", cuarto.Error!.Clave);
+        Assert.Equal(3, delAnterior.Reemplazos);
+    }
+
     [Fact]
     [Trait("Criterio", "AC-SEL-37")]
     public async Task UnReemplazoRechazadoPorFaltaDeStock_NoIncrementaLaCuenta_YConservaLaAnterior()

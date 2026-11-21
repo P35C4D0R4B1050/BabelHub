@@ -38,14 +38,21 @@ public static class ComposicionDeAuditoria
         servicios.TryAddSingleton(limitador);
 
         // Escrituras en transacción propia (fuera de la de la operación) y conexiones aparte.
-        servicios.TryAddSingleton<IAlmacenDeEventosDeSeguridad>(sp => new PostgresAlmacenDeEventosDeSeguridad(sp.GetRequiredService<NpgsqlDataSource>(), sp.GetRequiredService<LimitadorDeEscrituras>()));
+        servicios.TryAddSingleton(sp => new PostgresAlmacenDeEventosDeSeguridad(sp.GetRequiredService<NpgsqlDataSource>(), sp.GetRequiredService<LimitadorDeEscrituras>()));
+        // Los eventos de Identidad van a su propio almacén (D17, AUD-12): el enrutador se resuelve al pedirlo, así que no depende del orden en que el anfitrión registre a Identidad; sin Identidad compuesta todo va al almacén propio.
+        servicios.TryAddScoped<IAlmacenDeEventosDeSeguridad>(sp => sp.GetService<IAlmacenDeRegistrosAislados>() is { } aislado
+            ? new EnrutadorDeEventosDeSeguridad(sp.GetRequiredService<PostgresAlmacenDeEventosDeSeguridad>(), aislado)
+            : sp.GetRequiredService<PostgresAlmacenDeEventosDeSeguridad>());
         servicios.TryAddSingleton<IEscritorDeDenegaciones>(sp => new PostgresEscritorDeDenegaciones(sp.GetRequiredService<NpgsqlDataSource>(), sp.GetRequiredService<LimitadorDeEscrituras>()));
         servicios.TryAddSingleton<IAcumuladorDeLimites>(sp => new PostgresAcumuladorDeLimites(sp.GetRequiredService<NpgsqlDataSource>(), sp.GetRequiredService<LimitadorDeEscrituras>()));
         servicios.TryAddSingleton<IAnonimizadorDeRegistros>(new PostgresAnonimizadorDeRegistros(opciones.Depuracion));
         servicios.TryAddSingleton<IBloqueoDeLaDepuracion>(sp => new PostgresBloqueoDeLaDepuracion(sp.GetRequiredService<NpgsqlDataSource>()));
 
         // Almacenes dentro de la unidad de trabajo.
-        servicios.TryAddScoped<IAlmacenDeRegistros, PostgresAlmacenDeRegistros>();
+        servicios.TryAddScoped<PostgresAlmacenDeRegistros>();
+        servicios.TryAddScoped<IAlmacenDeRegistros>(sp => sp.GetService<IAlmacenDeRegistrosAislados>() is { } aislado
+            ? new EnrutadorDeRegistros(sp.GetRequiredService<PostgresAlmacenDeRegistros>(), aislado)
+            : sp.GetRequiredService<PostgresAlmacenDeRegistros>());
         servicios.TryAddScoped<IConsultaLocalDeRegistros, PostgresConsultaLocalDeRegistros>();
         servicios.TryAddScoped<IAlmacenDeAlertas, PostgresAlmacenDeAlertas>();
         servicios.TryAddScoped<IConteoLocalDeEventos, PostgresConteoLocalDeEventos>();
@@ -88,10 +95,15 @@ public static class ComposicionDeAuditoria
         servicios.TryAddScoped<CerrarVentanasDeLimite>(sp => new CerrarVentanasDeLimite(
             sp.GetRequiredService<IAcumuladoParaCerrar>(), sp.GetRequiredService<IAlmacenDeRegistros>(), sp.GetRequiredService<CatalogoDeAcciones>(), ServicioDeOrigen.Ecommerce,
             sp.GetRequiredService<IUnidadDeTrabajo>(), sp.GetRequiredService<IAlertas>(), sp.GetRequiredService<IActorActual>(), sp.GetRequiredService<IReloj>()));
+        // Lo que Identidad aporta a la depuración (AUD-17, AUD-19, D17): las cuentas canceladas por anonimizar y la depuración de identidad.registros; sin Identidad compuesta no hay nada que aportar.
         servicios.TryAddScoped<DepurarAuditoria>(sp => new DepurarAuditoria(
-            [.. sp.GetServices<IFuenteDeIdentificadoresPorAnonimizar>()], sp.GetRequiredService<IAlmacenDePorAnonimizar>(), sp.GetRequiredService<IAnonimizadorDeRegistros>(),
-            [.. sp.GetServices<IDepuradorAdicional>()], sp.GetRequiredService<IAuditoria>(), sp.GetRequiredService<IEstadoDeLaDepuracion>(), sp.GetRequiredService<IBloqueoDeLaDepuracion>(),
+            [.. sp.GetServices<IFuenteDeIdentificadoresPorAnonimizar>(), .. (sp.GetService<ICuentasCanceladasPendientes>() is { } cuentas ? new IFuenteDeIdentificadoresPorAnonimizar[] { new CuentasCanceladasComoFuente(cuentas) } : [])],
+            sp.GetRequiredService<IAlmacenDePorAnonimizar>(), sp.GetRequiredService<IAnonimizadorDeRegistros>(),
+            [.. sp.GetServices<IDepuradorAdicional>(), .. (sp.GetService<IDepuradorDeRegistrosAislados>() is { } identidad ? new IDepuradorAdicional[] { new DepuradorDeRegistrosDeIdentidad(identidad) } : [])],
+            sp.GetRequiredService<IAuditoria>(), sp.GetRequiredService<IEstadoDeLaDepuracion>(), sp.GetRequiredService<IBloqueoDeLaDepuracion>(),
             sp.GetRequiredService<IAlertas>(), sp.GetRequiredService<IActorActual>(), sp.GetRequiredService<IUnidadDeTrabajo>(), sp.GetRequiredService<IReloj>()));
+        // El último paso de la restauración (AUD-31): vuelve a llenar por_anonimizar y depura antes de abrir al público.
+        servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IPasoDeRestauracion, PasoDeRestauracionDeDepuracion>());
         servicios.TryAddScoped<AgruparYEnviarAlertas>(sp => new AgruparYEnviarAlertas(
             sp.GetRequiredService<IAlmacenDeAlertas>(), sp.GetRequiredService<IAlmacenDeCorreoDeAlertas>(), sp.GetRequiredService<IAlertasYaEnviadas>(), sp.GetRequiredService<IMarcaDeLecturaDeAlertas>(),
             sp.GetRequiredService<IClienteDeAuditoriaDelInventario>(), sp.GetRequiredService<IDestinatariosDeAlertas>(), sp.GetRequiredService<IEnvioDeCorreoDeAlertas>(), sp.GetRequiredService<IAlertas>(),

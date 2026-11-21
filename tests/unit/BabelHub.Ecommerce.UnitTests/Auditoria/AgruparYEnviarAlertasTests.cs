@@ -149,6 +149,31 @@ public sealed class AgruparYEnviarAlertasTests
 
     [Fact]
     [Trait("Criterio", "AC-AUD-26")]
+    public async Task SinCupoDeCorreo_LaAlertaSigueSiendoPendienteYSaleCuandoHayCupo_SinContarComoCorreoCaido()
+    {
+        var e = new Entorno();
+        await e.Tecnica(MotivosDeAlerta.TrabajoDeFondoDetenido, Ahora);
+        e.Correo.SinCupo = true;
+        var id = e.Alertas.Alertas.Single().Id;
+
+        var sinCupo = await e.Enviar.Ejecutar();
+
+        Assert.Equal(1, sinCupo.Encoladas);
+        Assert.Equal(0, sinCupo.Fallidas);
+        Assert.False(e.Alertas.Buscar(MotivosDeAlerta.TrabajoDeFondoDetenido)!.EnviadaPorCorreo);
+        Assert.Equal((1, Ahora + TimeSpan.FromMinutes(1)), e.Pendientes.Intentos[id]);
+        Assert.DoesNotContain(e.Alertas.Alertas, a => a.Motivo == MotivosDeAlerta.CorreoDeAlertasNoDisponible);
+
+        e.Correo.SinCupo = false;
+        e.Reloj.Ahora = Ahora.AddMinutes(1);
+        var conCupo = await e.Enviar.Ejecutar();
+
+        Assert.Equal(1, conCupo.Enviadas);
+        Assert.True(e.Alertas.Buscar(MotivosDeAlerta.TrabajoDeFondoDetenido)!.EnviadaPorCorreo);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-26")]
     public async Task ConElCorreoCaido_LaAlertaPermaneceEnElRegistroTecnicoYSeReintentaConEsperasCrecientesSinInterrumpirNada()
     {
         var e = new Entorno();

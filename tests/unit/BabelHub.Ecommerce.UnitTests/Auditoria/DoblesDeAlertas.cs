@@ -235,9 +235,17 @@ internal sealed class EnvioDeCorreoFalso(IReloj reloj) : IEnvioDeCorreoDeAlertas
 
     public int Intentos { get; private set; }
 
+    /// <summary>Sin cupo de correo: el puerto no envía ni guarda nada y responde «encolado» (la alerta sigue pendiente en Auditoría).</summary>
+    public bool SinCupo { get; set; }
+
     public Task<ResultadoDeEnvioDeAlerta> Enviar(CorreoDeAlerta correo, IReadOnlyList<DestinatarioDeAlerta> destinatarios, CancellationToken cancelacion = default)
     {
         Intentos++;
+        if (SinCupo)
+        {
+            return Task.FromResult(ResultadoDeEnvioDeAlerta.Encolado);
+        }
+
         if (Falla is not null)
         {
             return Task.FromException<ResultadoDeEnvioDeAlerta>(Falla);
