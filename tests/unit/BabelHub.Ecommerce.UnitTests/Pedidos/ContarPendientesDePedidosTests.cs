@@ -58,6 +58,41 @@ public sealed class ContarPendientesDePedidosTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PED-26")]
+    public async Task ContarPorTipo_informa_los_dos_numeros_separados_y_Contar_devuelve_su_suma()
+    {
+        var (cuenta, ajena) = (Guid.NewGuid(), Guid.NewGuid());
+        var repositorio = new RepositorioDePedidosFalso();
+        repositorio.Poner(Pedido(cuenta, false));
+        repositorio.Poner(Pedido(cuenta, false));
+        repositorio.Poner(Pedido(cuenta, true));
+        repositorio.Poner(Pedido(ajena, false));
+        var reembolsos = new ReembolsosFalsos();
+        reembolsos.PendientesPorCuenta[(cuenta, OrigenDelReembolso.Anulacion)] = 1;
+        reembolsos.PendientesPorCuenta[(cuenta, OrigenDelReembolso.CancelacionDelCliente)] = 2;
+        reembolsos.PendientesPorCuenta[(ajena, OrigenDelReembolso.Anulacion)] = 9;
+        IPendientesDeCuentaPorTipo caso = new ContarPendientesDePedidos(repositorio, reembolsos);
+
+        var porTipo = await caso.ContarPorTipo(cuenta);
+
+        Assert.Equal(new PendientesDeCuentaPorTipo(PedidosSinCerrar: 2, ReembolsosPendientes: 3), porTipo);
+        Assert.Equal(porTipo.Total, await caso.Contar(cuenta));
+        Assert.Equal(5, await caso.Contar(cuenta));
+        Assert.Equal(new PendientesDeCuentaPorTipo(1, 9), await caso.ContarPorTipo(ajena));
+        Assert.Equal(default, await caso.ContarPorTipo(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task ContarPorTipo_si_no_puede_contar_lanza_y_exige_la_cuenta()
+    {
+        var reembolsos = new ReembolsosFalsos { FallaAlContar = true };
+        var caso = new ContarPendientesDePedidos(new RepositorioDePedidosFalso(), reembolsos);
+
+        await Assert.ThrowsAsync<PendientesNoDisponiblesException>(() => caso.ContarPorTipo(Guid.NewGuid()));
+        await Assert.ThrowsAsync<ArgumentException>(() => caso.ContarPorTipo(Guid.Empty));
+    }
+
+    [Fact]
     public async Task Los_reembolsos_de_cancelacion_del_cliente_cuentan_y_si_no_puede_contar_lanza_en_vez_de_asumir_cero()
     {
         var cuenta = Guid.NewGuid();
