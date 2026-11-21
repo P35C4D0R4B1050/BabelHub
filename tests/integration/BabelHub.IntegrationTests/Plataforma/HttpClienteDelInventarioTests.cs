@@ -687,7 +687,7 @@ public sealed class HttpClienteDelInventarioTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAR-12")]
+    [Trait("Criterio", "AC-CAR-09")]
     public async Task Reservar_LlevaLaClaveElTokenYLaCredencialDeUsuario_YDevuelveLaReservaValidada()
     {
         var pedido = Guid.NewGuid();
@@ -710,7 +710,7 @@ public sealed class HttpClienteDelInventarioTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAR-12")]
+    [Trait("Criterio", "AC-CAR-09")]
     public async Task Reservar_ConUnaReservaDeOtroPedidoOConLineasAjenas_EsNoDisponible()
     {
         var pedido = Guid.NewGuid();
@@ -741,7 +741,7 @@ public sealed class HttpClienteDelInventarioTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAR-12")]
+    [Trait("Criterio", "AC-CAR-14")]
     public async Task Reservar_Con429_TraeElMotivoLaEsperaYElInstanteDeReintento()
     {
         var disponible = DateTimeOffset.UtcNow.AddMinutes(10);
@@ -757,7 +757,7 @@ public sealed class HttpClienteDelInventarioTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAR-12")]
+    [Trait("Criterio", "AC-CAR-09")]
     public async Task Reservar_ConArgumentosQueElContratoRechaza_NoSale()
     {
         var servidor = new ServidorSimulado((_, _) => Task.FromResult(Json("{}", HttpStatusCode.Created)));
