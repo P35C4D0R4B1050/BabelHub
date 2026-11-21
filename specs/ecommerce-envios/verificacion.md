@@ -97,3 +97,18 @@ No converge: los 18 requisitos tienen código y pruebas y 11 cumplen, pero 7 son
 ## Actualización (carril V, segundo turno de Docker, 2026-11-20)
 
 Resultado: **No converge** (sin cambios de fondo). Con `main` fundido, la integración filtrada de Pedidos, Envíos y Devoluciones con PostgreSQL real da **474 verdes, 0 rojas**. Siguen abiertos T14b (esperando el operador real, D02), T20 y T22 completos, T21b y T24 (E2E y `ui-review`, que esperan el host compuesto); las diferencias D-1 a D-10 de este informe no cambian. Las etiquetas `Criterio` de `EnviosConPedidosRealesTests` (D-8) ya están corregidas.
+
+## Actualización final (carril V, tercer turno de Docker, 2026-11-20)
+
+Resultado: **No converge**. No es «converge salvo T14b»: además del operador real (T14b, decisión D02 de la persona responsable y del operador) siguen abiertas partes de T20 y T22. Con `main` fundido, la integración filtrada `Devoluciones|Envios` con PostgreSQL real da **277 de 277 verdes**; SpecCheck da 0 avisos; Playwright (`tests/e2e/envios`) pasa **2 de 2 en Chromium de escritorio y de teléfono**, con axe WCAG 2 A/AA sin violaciones.
+
+| # | Estado | Evidencia |
+| :--- | :--- | :--- |
+| D-1 (operador real, T14b) | Abierta (persona y operador) | Sin operador elegido el entorno usa el nulo o el simulador (`BABELHUB__Envios__Operador=simulador` en Development). Dueño: persona responsable (D02), luego el agente. |
+| D-5 / T21b | **Parcial** | Cerrado el escenario literal de AC-ENV-17 con el Pedidos real: un envío entregado, otro en reparto y otro cancelado, cancelación de la cuenta con los receptores reales, y el almacén de Envíos conserva guía, operador, estados y fechas y no contiene nombre, dirección ni teléfono (`EnviosConPedidosRealesTests.La_cancelacion_de_la_cuenta_conserva_los_envios…`). **Falta:** los registros del adaptador real (depende de T14b) y el registro de datos sensibles de EF activado; el redactor sigue sin incluir `nombre`, `direccion`, `telefono` (carril de seguridad). |
+| D-9 / T24 | **Cerrada** | E2E de logística (guía, reparto, entrega, la lista sin contacto, el cliente ve cada estado) y del acceso (un encargado no gestiona envíos y otra cuenta no ve el envío), AC-ENV-02, 06 y 13. `ui-review`: capturas de teléfono revisadas; **la tabla de la lista de logística se corta a la derecha en 375 px** (se desplaza dentro de su contenedor; Menor); no se revisó el tema oscuro ni la paridad con el prototipo. Defecto encontrado y corregido: el texto «Sin guía» usaba `opacity-60` y fallaba AA (4.02:1). |
+| D-8 (etiquetas) | Cerrada | Etiquetas `Criterio` corregidas en la ronda anterior. |
+| D-2 / T20, D-3, D-4 / T22 | **Abiertas** | Faltan los 20 pares `Cancelar` × en reparto con el Pedidos real, el Inventario duplicado y la falla tras el REST, el progreso a Pedidos caído con su reintento, la cota de `GuiasCreadas` por igualdad y las aserciones del estado del pedido y la fecha de la línea. |
+| D-6, D-7, D-10, D-11 | Abiertas (persona / agente) | Sin cambios. |
+
+Para pasar a `Done` falta: T14b (operador), cerrar T20 y T22 y el resto de T21b, y las decisiones D-6, D-7 y D-10 de la persona responsable.

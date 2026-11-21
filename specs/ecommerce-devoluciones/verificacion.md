@@ -121,3 +121,24 @@ Resultado: **No converge** (sin cambios de fondo). Con `main` fundido (política
 - **D6 / T31: parcial → más cubierto.** `PrivacidadYCuentaDeDevolucionesTests` (PostgreSQL real, Aplicación real): el motivo sembrado no llega a la auditoría, los avisos, las alertas, las denegaciones ni a un error en todo el recorrido solicitar–aprobar–recibir (AC-DEV-29, AC-DEV-31); la redacción por cuenta reemplaza solo lo de esa cuenta y conserva pedido, línea, importe y estado (AC-DEV-25, AC-DEV-28); la depuración a los dos años redacta solo lo cerrado, no antes y no lo abierto (AC-DEV-27). **Sigue pendiente:** la cancelación real de Identidad (orden de receptores, reversión todo o nada), la solicitud frente a la cancelación y el registro de datos sensibles de un ORM (el módulo usa Npgsql, no EF).
 - **D7 / T32:** igual que antes (matriz de `Aprobar`; faltan recibir, listar, reportes y el 429).
 - **D3 / T30, D4 / T29, D8 / T33:** sin cambios (T29 sigue reabierta).
+
+## 6. Actualización final (carril V, tercer turno de Docker, 2026-11-20)
+
+Resultado: **No converge, por T31 (parcial) y por dos decisiones de la persona responsable (D5 y D9)**. Todo lo demás de las diferencias D1 a D8 quedó cerrado o con su dueño. Con `main` fundido (5bb0a9ac y posteriores), la integración filtrada `Devoluciones|Envios` con PostgreSQL real da **277 de 277 verdes**; la prueba unitaria del orden de receptores y las 716 unitarias de Identidad pasan; SpecCheck da 0 avisos; Playwright (`tests/e2e/devoluciones`) pasa **3 de 3 en Chromium de escritorio y de teléfono**, con axe WCAG 2 A/AA sin violaciones.
+
+| # | Estado | Evidencia |
+| :--- | :--- | :--- |
+| D1 límites | Cerrada | Catálogo de Plataforma (carril A, `763a80a2`) y **429 real** en `DevolucionesConModulosRealesTests.Con_los_limites_reales_la_operacion_numero_treinta_y_uno…` (AC-DEV-21). |
+| D2 anulación tras reembolso digital | Cerrada | Carril B; `La_anulacion_del_pedido_mixto_tras_el_reembolso_digital_excluye_la_linea_ya_reembolsada` con Pedidos, Pagos (doble) y Biblioteca reales. |
+| D3 / T30 | **Cerrada** | `DevolucionesConModulosRealesTests`: 14 días exactos y 15 (AC-DEV-04, 22), enlace entregado (AC-DEV-05, 09), reporte rechazado y aprobado y su decisión con la línea ya revocada por una anulación (AC-DEV-24), 50 pares descarga × reembolso (AC-DEV-19), impreso sin envío y sin superar lo cobrado (AC-DEV-08), pasarela caída con conciliación una sola vez (AC-DEV-20). |
+| D4 / T29 | **Cerrada** | Los 20 pares recepción × vencimiento (`ConcurrenciaYReintentosDeDevolucionesTests`, AC-DEV-15 y 16). |
+| D6 / T31 | **Parcial** | Cubierto: pendientes en tres números por cuenta (AC-DEV-25), cuenta cancelada no solicita (AC-DEV-26), cancelación real con el orden Pedidos → Devoluciones → Pagos y reversión todo o nada (AC-DEV-26, 27), siembra del motivo (AC-DEV-29, 31), redacción y depuración (AC-DEV-27, 28). **Falta:** la siembra con el registro de datos sensibles de EF activado, la falla forzada en la segunda redacción y la depuración con la auditoría caída sobre PostgreSQL real. Sigue abierta T31. |
+| D7 / T32 | **Cerrada** | Matriz Aprobar, Rechazar y Confirmar recepción × 8 roles (AC-DEV-12, 30), un encargado no ve ni decide los reportes y un ajeno recibe lo mismo que ante una inexistente (AC-DEV-23), 429 real. |
+| D8 / T33 | **Cerrada** | E2E de impreso (encargado entrega, el cliente pide, aprueba y confirma la recepción), reembolso de un digital y reporte decidido por la administración (AC-DEV-01, 04, 10, 14). `ui-review`: revisadas las capturas de teléfono (foco visible, estado con texto, contraste AA por axe, sin desborde horizontal); **no se comparó pixel a pixel con `prototype/ui-v2/` ni se revisó el tema oscuro**. |
+| D5 (tres números) | Abierta (persona) | El carril A añadió `ContarEnTres` y la prueba de pendientes lo ejercita; la persona responsable debe confirmar que ese es el contrato de DEV-23. |
+| D9 (supuestos del plan) | Abierta (persona) | Sin cambios: D02, D05, D06, D07 y D09 del plan siguen sin ratificar. |
+| D10 a D13 | Menores abiertos | Siguen en `progress/hallazgos.md`. |
+
+**Hallazgo nuevo de esta ronda (corregido):** Identidad llamaba a los receptores de la cancelación como carrito, pagos, reclamaciones, pedidos, biblioteca, devoluciones, en contra de D04 y del orden global de bloqueo (riesgo de interbloqueo entre `AprobarDevolucion` y la cancelación). `EjecutorDeLaCancelacion` ahora los ordena explícitamente (commit `953173c7`, con prueba unitaria y de integración). Además, `Lista.cshtml` de logística usaba `opacity-60` y fallaba AA (4.02:1) una vez compilados los estilos; corregido a `opacity-70`.
+
+Para pasar a `Done` falta: cerrar T31, las dos decisiones de la persona (D5, D9) y repetir esta verificación.
