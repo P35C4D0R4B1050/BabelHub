@@ -28,7 +28,7 @@
     }
     else
     {
-        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100" tabindex="0" role="region" aria-label="Registros de auditoría (se desplaza en horizontal)">
             <table class="table table-sm">
                 <caption class="sr-only">Registros de auditoría</caption>
                 <thead>
@@ -50,7 +50,7 @@
                                     <dl class="text-xs">
                                         @foreach (var dato in fila.Detalle)
                                         {
-                                            <dt class="inline font-semibold">@dato.Clave:</dt><dd class="inline">@dato.Valor</dd><br />
+                                            <div><dt class="inline font-semibold">@dato.Clave:</dt> <dd class="inline">@dato.Valor</dd></div>
                                         }
                                     </dl>
                                 }

@@ -7,6 +7,7 @@ import { agregarAlCarrito, clave, EDICION_IMPRESA_DEL_ZORRO, ingresarComoCliente
 // Chromium de escritorio y de teléfono y WebKit; Firefox es informativo.
 
 test.describe.configure({ mode: 'serial' });
+test.setTimeout(90_000);
 
 // Carrito → checkout con recojo en Ayacucho → aceptaciones → pantalla de pago (sin pagar).
 async function llegarAlPago(page: Page) {
@@ -26,7 +27,9 @@ async function llegarAlPago(page: Page) {
 }
 
 async function pagarCon(page: Page, token: string, medio: 'Yape' | 'Tarjeta') {
-  await page.getByRole('radio', { name: new RegExp(medio, 'i') }).check();
+  // La entrada del medio es visualmente oculta: se elige con un clic en su etiqueta, como lo haría una persona.
+  await page.getByRole('radiogroup', { name: 'Medio de pago' }).locator('label', { hasText: new RegExp(medio, 'i') }).click();
+  await expect(page.getByRole('radio', { name: new RegExp(medio, 'i') })).toBeChecked();
   await page.getByLabel(/Identificador del medio de pago/).fill(token);
   await page.getByRole('button', { name: /^Pagar S\// }).click();
 }
@@ -76,9 +79,12 @@ test.describe('Pago de la compra con el simulador de la pasarela', () => {
     await sinViolacionesDeAccesibilidad(page);
 
     // El mismo formulario deja intentarlo con otro medio: Yape rechazado y después una tarjeta aprobada.
+    // Tras el rechazo la pantalla de estado ofrece volver a pagar.
+    await page.getByRole('link', { name: 'Pagar', exact: true }).click();
     await pagarCon(page, 'tok_yape_rechazado', 'Yape');
     await expect(page.getByRole('alert').filter({ hasText: 'No se pudo completar el pago' })).toBeVisible();
 
+    await page.getByRole('link', { name: 'Pagar', exact: true }).click();
     await pagarCon(page, 'tok_aprobado', 'Tarjeta');
     await expect(page).toHaveURL(/\/checkout\/pago\/estado/);
     await expect(page.getByRole('heading', { level: 1, name: 'Estado de tu pago' })).toBeVisible();
@@ -90,7 +96,8 @@ test.describe('Pago de la compra con el simulador de la pasarela', () => {
     await llegarAlPago(page);
 
     await pagarCon(page, 'tok_lento', 'Tarjeta');
-    await expect(page).toHaveURL(/\/checkout\/pago\/estado/);
+    // La pasarela tarda más que el plazo del cobro (el simulador responde a los 11 s): la redirección al estado puede tardar.
+    await expect(page).toHaveURL(/\/checkout\/pago\/estado/, { timeout: 40_000 });
     await expect(page.getByRole('heading', { level: 1, name: 'Estado de tu pago' })).toBeVisible();
     await expect(page.getByText(/Lo confirmaremos antes de las/)).toBeVisible();
     await sinDesplazamientoHorizontal(page);
