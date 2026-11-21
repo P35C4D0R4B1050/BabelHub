@@ -82,7 +82,7 @@ Traduce el **OWASP Application Security Verification Standard 5.0** a controles 
 | **CTL-30** | Las bases de datos no tienen puertos expuestos a Internet; los paneles de n8n y Evolution API tampoco. | L1 | RNF06, AM22 | Escaneo de puertos | Decisión |
 | **CTL-31** | Contenedores sin privilegios, con límites de memoria y `healthcheck`. | L2 | RNF19, PLA-27 | Verificación automática del lanzamiento | Especificado |
 | **CTL-32** | No se guardan datos de tarjeta ni se registran datos sensibles. | L1 | PAG-02, SEG-10, NOT-07, NOT-12, NOT-13, NOT-14, NOT-16 | Revisión y pruebas | Especificado |
-| **CTL-33** | Los datos personales tienen inventario, base legal, retención y borrado o anonimización. | L2 | RNF23, AUD-11, IDE-28, IDE-47, IDE-69, IDE-89 y los receptores PED-33, PED-34, ENV-15, DEV-24, DEV-27, PAG-26, PAG-27, BIB-25, BIB-26, BIB-29, CAR-33, CAR-34, REC-20, SEL-34, SEL-35 | Inspección documental | Especificado (las ocho specs receptoras y su retención de 2 años están Approved desde el 2026-11-13; las decisiones están en progress/decisiones-previas-al-plan.md) |
+| **CTL-33** | Los datos personales tienen inventario, base legal, retención y borrado o anonimización. | L2 | RNF23, AUD-11, IDE-28, IDE-47, IDE-69, IDE-89 y los receptores PED-33, PED-34, ENV-15, DEV-24, DEV-27, PAG-26, PAG-27, BIB-25, BIB-26, BIB-29, CAR-33, CAR-34, REC-17, REC-20, REC-21, REC-22, REC-25, REC-26, REC-30, SEL-34, SEL-35 | Inspección documental | Especificado (las ocho specs receptoras y su retención de 2 años están Approved desde el 2026-11-13; las decisiones están en progress/decisiones-previas-al-plan.md) |
 
 ## 10. Código seguro, registro y manejo de errores
 
