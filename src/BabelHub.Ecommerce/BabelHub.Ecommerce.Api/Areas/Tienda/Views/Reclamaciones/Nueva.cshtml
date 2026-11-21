@@ -19,22 +19,30 @@
     </div>
 }
 
-<form method="post" action="/reclamaciones/nueva" class="flex max-w-xl flex-col gap-4" id="formulario-de-reclamacion">
+<form method="post" action="/reclamaciones/nueva" class="flex max-w-xl flex-col gap-6" id="formulario-de-reclamacion">
         <partial name="_TokenAntifalsificacion" />
     <input type="hidden" name="claveDelFormulario" value="@Model.ClaveDelFormulario" />
-    <fieldset class="flex flex-col gap-2">
-        <legend class="font-semibold">Tipo</legend>
-        <label class="label cursor-pointer justify-start gap-3"><input type="radio" name="tipo" value="reclamo" class="radio" required /> <span>Reclamo: disconformidad con un producto o servicio</span></label>
-        <label class="label cursor-pointer justify-start gap-3"><input type="radio" name="tipo" value="queja" class="radio" /> <span>Queja: malestar por la atención recibida</span></label>
+    <fieldset class="flex flex-col gap-4 rounded-box border border-base-300 p-4">
+        <legend class="px-2 font-semibold">1. Identificación del consumidor</legend>
+        <label class="form-control flex flex-col gap-1"><span class="label-text">Nombre completo</span><input type="text" name="nombre" class="input input-bordered" required maxlength="120" autocomplete="name" /></label>
+        <label class="form-control flex flex-col gap-1"><span class="label-text">Documento de identidad</span><input type="text" name="documento" class="input input-bordered" required maxlength="20" autocomplete="off" /></label>
+        <label class="form-control flex flex-col gap-1"><span class="label-text">Domicilio</span><input type="text" name="domicilio" class="input input-bordered" required maxlength="200" autocomplete="street-address" /></label>
+        <label class="form-control flex flex-col gap-1"><span class="label-text">Correo electrónico</span><input type="email" name="correo" class="input input-bordered" required maxlength="254" autocomplete="email" /></label>
     </fieldset>
-    <label class="form-control"><span class="label-text">Nombre completo</span><input type="text" name="nombre" class="input input-bordered" required maxlength="120" autocomplete="name" /></label>
-    <label class="form-control"><span class="label-text">Documento de identidad</span><input type="text" name="documento" class="input input-bordered" required maxlength="20" autocomplete="off" /></label>
-    <label class="form-control"><span class="label-text">Domicilio</span><input type="text" name="domicilio" class="input input-bordered" required maxlength="200" autocomplete="street-address" /></label>
-    <label class="form-control"><span class="label-text">Correo electrónico</span><input type="email" name="correo" class="input input-bordered" required maxlength="254" autocomplete="email" /></label>
-    <label class="form-control"><span class="label-text">Bien contratado</span><input type="text" name="bienContratado" class="input input-bordered" required maxlength="200" /></label>
-    <label class="form-control"><span class="label-text">Monto reclamado (S/)</span><input type="text" inputmode="decimal" name="montoReclamado" class="input input-bordered" required pattern="\d{1,10}(\.\d{1,2})?" /></label>
-    <label class="form-control"><span class="label-text">Referencia del pedido (opcional)</span><input type="text" name="pedidoReferencia" class="input input-bordered" maxlength="40" /></label>
-    <label class="form-control"><span class="label-text">Detalle</span><textarea name="detalle" class="textarea textarea-bordered" rows="6" required maxlength="3000"></textarea></label>
+    <fieldset class="flex flex-col gap-4 rounded-box border border-base-300 p-4">
+        <legend class="px-2 font-semibold">2. Identificación del bien contratado</legend>
+        <label class="form-control flex flex-col gap-1"><span class="label-text">Bien contratado</span><input type="text" name="bienContratado" class="input input-bordered" required maxlength="200" /></label>
+        <label class="form-control flex flex-col gap-1"><span class="label-text">Monto reclamado (S/)</span><input type="text" inputmode="decimal" name="montoReclamado" class="input input-bordered" required pattern="\d{1,10}(\.\d{1,2})?" /></label>
+        <label class="form-control flex flex-col gap-1"><span class="label-text">Referencia del pedido (opcional)</span><input type="text" name="pedidoReferencia" class="input input-bordered" maxlength="40" /></label>
+    </fieldset>
+    <fieldset class="flex flex-col gap-4 rounded-box border border-base-300 p-4">
+        <legend class="px-2 font-semibold">3. Detalle de la reclamación</legend>
+        <div class="flex flex-col gap-2" role="radiogroup" aria-label="Tipo de reclamación">
+            <label class="label cursor-pointer justify-start gap-3"><input type="radio" name="tipo" value="reclamo" class="radio" required /> <span>Reclamo: disconformidad con un producto o servicio</span></label>
+            <label class="label cursor-pointer justify-start gap-3"><input type="radio" name="tipo" value="queja" class="radio" /> <span>Queja: malestar por la atención recibida</span></label>
+        </div>
+        <label class="form-control flex flex-col gap-1"><span class="label-text">Detalle</span><textarea name="detalle" class="textarea textarea-bordered" rows="6" required maxlength="3000"></textarea></label>
+    </fieldset>
     <verificacion-de-persona></verificacion-de-persona>
     <button type="submit" class="btn btn-primary">Registrar hoja</button>
 </form>
