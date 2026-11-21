@@ -89,7 +89,7 @@ internal sealed class EscenarioDePedidos : IAsyncDisposable
     public LiberacionDeContactoDePagosFalsa LiberacionDeContacto { get; private init; } = null!;
 
     /// <summary>Compone la Aplicación real sobre la unidad de trabajo dada. Con una unidad que nunca se usa sirve para comprobar solo la composición (sin base de datos).</summary>
-    public static EscenarioDePedidos Crear(UnidadDeTrabajoPostgres unidad)
+    public static EscenarioDePedidos Crear(UnidadDeTrabajoPostgres unidad, Action<IServiceCollection>? configurar = null, bool enviosReales = false)
     {
         ArgumentNullException.ThrowIfNull(unidad);
         var reloj = new RelojDePedidos(InicioDelDia);
@@ -113,7 +113,11 @@ internal sealed class EscenarioDePedidos : IAsyncDisposable
         servicios.AddSingleton<IReservasDelPedido>(reservas);
         servicios.AddSingleton<IReembolsos>(reembolsos);
         servicios.AddSingleton<IAccesosDeBiblioteca>(accesos);
-        servicios.AddSingleton<IDespachoDeEnvios>(despacho);
+        if (!enviosReales)
+        {
+            servicios.AddSingleton<IDespachoDeEnvios>(despacho);
+        }
+
         servicios.AddSingleton<INotificador>(avisos);
         servicios.AddSingleton<IAuditoria>(auditoria);
         servicios.AddSingleton<IDenegacionDeAcceso>(denegaciones);
@@ -125,7 +129,13 @@ internal sealed class EscenarioDePedidos : IAsyncDisposable
         servicios.AddSingleton<IMarcaDeCancelacionDeCuenta>(new MarcaDeCancelacionFalsa());
         var liberacion = new LiberacionDeContactoDePagosFalsa();
         servicios.AddSingleton<ILiberacionDeContactoDePago>(liberacion);
+        configurar?.Invoke(servicios);
         servicios.AgregarPedidos(esProduccion: false);
+        if (enviosReales)
+        {
+            // Envíos real: reemplaza al doble de despacho y lee y avanza a Pedidos por sus contratos.
+            servicios.AgregarEnvios(esProduccion: false);
+        }
         var proveedor = servicios.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = false });
 
         return new EscenarioDePedidos(proveedor)
