@@ -209,6 +209,24 @@ public sealed class EntregarLineasDelPedidoTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PED-09")]
+    public async Task Una_linea_no_recogida_no_se_entrega_se_rechaza_antes_de_llamar_al_Inventario_y_no_deja_rastro_de_operacion()
+    {
+        var entorno = new Entorno();
+        var pedido = ListoParaRecojo("Olvidado");
+        Assert.Single(pedido.MarcarNoRecogidas(Ahora.AddHours(361), new HashSet<Guid>()));
+        entorno.Repositorio.Poner(pedido);
+
+        var resultado = await entorno.Caso.Entregar("LIM", new OperarLineasEntrada(pedido.Id, [pedido.Lineas[0].Id]), default);
+
+        Assert.Equal("pedido-estado-invalido", resultado.Error!.Clave);
+        Assert.Empty(entorno.Reservas.Cierres);
+        Assert.Empty(entorno.Repositorio.Entregas);
+        Assert.Empty(entorno.Auditoria.Solicitudes);
+        Assert.Equal(EstadoDeLineaImpresa.NoRecogido, pedido.Lineas[0].EstadoImpreso);
+    }
+
+    [Fact]
     public async Task Solo_se_entrega_lo_que_esta_listo_y_un_pedido_a_domicilio_o_de_otra_sucursal_es_no_encontrado()
     {
         var entorno = new Entorno();

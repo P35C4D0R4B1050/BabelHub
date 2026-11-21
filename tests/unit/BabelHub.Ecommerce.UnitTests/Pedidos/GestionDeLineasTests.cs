@@ -269,7 +269,8 @@ public sealed class GestionDeLineasTests
     }
 
     [Fact]
-    public void Una_linea_no_recogida_todavia_puede_entregarse()
+    [Trait("Criterio", "AC-PED-09")]
+    public void Una_linea_no_recogida_no_se_entrega_y_solo_se_anula()
     {
         var pedido = Crear(TipoDeEntregaDelPedido.Recojo, Impresa("Uno"));
         var linea = De(pedido, "Uno");
@@ -279,7 +280,8 @@ public sealed class GestionDeLineasTests
 
         var entregada = pedido.EntregarLineas([linea.Id], Inicio.AddDays(17));
 
-        Assert.Equal(ResultadoDeOperacionDeLinea.Aplicada, Assert.Single(entregada).Resultado);
-        Assert.Equal(EstadoDePedido.Entregado, pedido.Estado);
+        Assert.Equal(ResultadoDeOperacionDeLinea.EstadoInvalido, Assert.Single(entregada).Resultado);
+        Assert.Equal(EstadoDeLineaImpresa.NoRecogido, linea.EstadoImpreso);
+        Assert.Equal(EstadoDePedido.NoRecogido, pedido.Estado);
     }
 }

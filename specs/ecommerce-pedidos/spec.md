@@ -3,9 +3,9 @@ id: ecommerce-pedidos
 titulo: Pedidos y seguimiento
 estado: Planned
 aprobado_por: Claude (delegado por Diego Amiquero)
-aprobado_en: 2026-11-13
+aprobado_en: 2026-11-21
 plan_aprobado_por: Claude (delegado por Diego Amiquero)
-plan_aprobado_en: 2026-11-18
+plan_aprobado_en: 2026-11-21
 servicio: E-commerce
 prefijo: PED
 origen: [RF04, RF06, RF07, RF27, NN03, NN13, NN09]
@@ -41,11 +41,11 @@ Que el cliente vea siempre en qué estado está su compra, incluso cuando viaja 
 | PED-08 | Estado | Mientras un usuario es encargado de sucursal, el sistema deberá mostrarle únicamente los pedidos de recojo de su sucursal y rechazar, registrando el acceso denegado, los de otra por su identificador. | RNF05 |
 | PED-09 | Evento | Cuando el encargado prepara las líneas de un pedido de recojo, el sistema deberá pasarlas a en preparación, y al marcarlas listas, a listo para recojo. | RF06 |
 | PED-10 | No deseado | Si una línea de recojo con traslado aún no recibido es llevada a preparación, entonces el sistema deberá impedirlo. | RF06 |
-| PED-11 | Evento | Cuando el encargado entrega las líneas listas de un pedido de recojo, el sistema deberá pedir al inventario que descuente el físico y cierre la reserva de cada línea y, solo si lo logra, pasarla a entregada. | RF06 |
+| PED-11 | Evento | Cuando el encargado entrega las líneas listas de un pedido de recojo, el sistema deberá pedir al inventario que descuente el físico y cierre la reserva de cada línea y, solo si lo logra, pasarla a entregada; una línea no recogida no se entrega: se rechaza sin llamar al inventario y solo la administración la anula (PED-16). | RF06 |
 | PED-12 | Ubicuo | El sistema deberá marcar como entregado un pedido formado solo por líneas digitales en cuanto se concede el acceso. | RF06 |
 | PED-13 | Evento | Cuando la administración central anula un pedido, el sistema deberá exigir un motivo, anular las líneas que no han salido (confirmadas, en tránsito, recibidas, en preparación, listas para recojo o no recogidas), liberar las reservas que sigan activas y registrarlo en la auditoría en la misma transacción. | RF20, NN09 |
 | PED-14 | Ubicuo | El sistema deberá mostrar a la administración central todos los pedidos con filtros por estado. | NN09 |
-| PED-15 | Estado | Mientras una línea de recojo lleva más de 15 días calendario, en hora de Lima, en listo para recojo sin entregarse, el sistema deberá marcarla como no recogida, pedir al inventario que libere su reserva y avisar al cliente y a la sucursal. | RF06, RF07 |
+| PED-15 | Estado | Mientras una línea de recojo lleva más de 360 horas (15 días corridos) en listo para recojo sin entregarse, el sistema deberá marcarla como no recogida, pedir al inventario que libere su reserva y avisar al cliente y a la sucursal. | RF06, RF07 |
 | PED-16 | Ubicuo | El sistema deberá permitir a la administración central anular un pedido no recogido con las mismas reglas de la anulación de PED-13. | RF06, NN09 |
 | PED-17 | Evento | Cuando un cliente cancela un pedido formado solo por líneas impresas que están todas confirmadas, sin traslado en tránsito, el sistema deberá anularlo con el motivo «cancelado por el cliente», liberar sus reservas, cancelar sus traslados vinculados, solicitar el reembolso del total, incluido el envío, y registrarlo en la auditoría. | RF06, NN05 |
 | PED-18 | No deseado | Si un cliente intenta cancelar un pedido que incluye una línea digital o una línea impresa en tránsito, en preparación o posterior, entonces el sistema deberá rechazar la cancelación e indicar la alternativa: devolución una vez entregado, o política de reembolso digital. | RF06, NN05 |
@@ -61,7 +61,7 @@ Que el cliente vea siempre en qué estado está su compra, incluso cuando viaja 
 | PED-28 | Evento | Cuando logística prepara las líneas de un pedido a domicilio en su fuente, el sistema deberá pasarlas a en preparación y, al marcarlas listas (un hito sin estado propio), avisar por el puerto de despacho que implementa `ecommerce-envios` para crear su envío; y rechazar esta acción a quien no sea logística o administración central. | RF06, RF11, RNF05 |
 | PED-29 | Evento | Cuando una línea impresa pasa a entregada, el sistema deberá registrar la fecha de entrega de esa línea. | RF06 |
 | PED-30 | Ubicuo | El sistema deberá ordenar los estados de una línea impresa, para PED-20, como confirmado, en tránsito, recibido, en preparación, listo para recojo o despachado, y entregado. | RF06 |
-| PED-31 | Evento | Cuando Identidad consulta los pendientes de una cuenta, el sistema deberá informar solo dos números de esa cuenta: cuántos pedidos tienen alguna línea impresa sin entregar ni anular (incluidas las no recogidas hasta que se anulen o se entreguen) y cuántos reembolsos pendientes tiene. | RF06, RF27 |
+| PED-31 | Evento | Cuando Identidad consulta los pendientes de una cuenta, el sistema deberá informar solo dos números de esa cuenta: cuántos pedidos tienen alguna línea impresa sin entregar ni anular (incluidas las no recogidas hasta que se anulen) y cuántos reembolsos pendientes tiene. | RF06, RF27 |
 | PED-32 | Evento | Cuando se crea un pedido a domicilio, el sistema deberá guardar una copia del nombre, el teléfono y la dirección de entrega que le llegan con la intención de pago (CAR-30), y ser el único que los guarda: Envíos los lee del pedido. | RF04, RF06 |
 | PED-33 | Evento | Cuando se ejecuta la cancelación de una cuenta, el sistema deberá anonimizar el nombre, el teléfono y la dirección de entrega de sus pedidos y conservar el pedido, sus líneas, importes, fechas y el identificador opaco de la cuenta. | RF06, RF27, RNF23 |
 | PED-34 | Evento | Cuando un pedido a domicilio cumple dos años calendario, en hora de Lima, desde el último cambio de su estado a entregado o anulado, el sistema deberá anonimizar su nombre, teléfono y dirección de entrega y conservar el resto. | RF06, RNF23 |
@@ -85,11 +85,11 @@ Que el cliente vea siempre en qué estado está su compra, incluso cuando viaja 
 | AC-PED-06 | PED-07, PED-08, PED-26 | **Dado** pedidos de varios clientes, **cuando** un cliente consulta los suyos y un encargado de Ayacucho consulta los de recojo, **entonces** cada uno ve solo lo que le corresponde; si piden por identificador el pedido de otro cliente o de otra sucursal, se rechaza y queda un acceso denegado; y logística ve los pedidos a domicilio y la administración todos. |
 | AC-PED-07 | PED-09 | **Dado** un pedido de recojo confirmado, **cuando** el encargado lo prepara y luego lo marca listo, **entonces** pasa por en preparación y listo para recojo. |
 | AC-PED-08 | PED-10 | **Dado** un pedido con una línea que espera el traslado TR-0042 sin recibir y otra del mismo pedido ya en la sucursal, **cuando** el encargado intenta prepararlas, **entonces** se rechaza la primera indicando que espera el traslado y se puede preparar la segunda. |
-| AC-PED-09 | PED-11, PED-25 | **Dado** un pedido listo para recojo, **cuando** el encargado entrega sus líneas, **entonces** el inventario descuenta el físico, cierra la reserva y cada línea pasa a entregada (y el pedido, a entregado si no queda otra); y si el inventario no responde, el pedido sigue listo, se informa el error y al reintentar el descuento se aplica una sola vez. |
+| AC-PED-09 | PED-11, PED-25 | **Dado** un pedido listo para recojo, **cuando** el encargado entrega sus líneas, **entonces** el inventario descuenta el físico, cierra la reserva y cada línea pasa a entregada (y el pedido, a entregado si no queda otra); y si el inventario no responde, el pedido sigue listo, se informa el error y al reintentar el descuento se aplica una sola vez. Y una línea no recogida no se entrega: se rechaza por estado inválido, el inventario no recibe ninguna llamada y la línea sigue no recogida. |
 | AC-PED-10 | PED-12 | **Dado** un pedido solo con un libro digital, **cuando** se concede el acceso, **entonces** el pedido queda entregado. |
 | AC-PED-11 | PED-13, PED-22 | **Dado** un pedido con impreso confirmado y un digital ya descargado, **cuando** la administración lo anula con el motivo «pago duplicado», **entonces** se liberan las reservas, se revoca el acceso digital aunque se haya descargado, se solicita el reembolso del total, incluido el envío si lo hubo, y queda la auditoría. |
 | AC-PED-12 | PED-14, PED-20, PED-30 | **Dado** pedidos en varios estados, **cuando** la administración filtra por «en tránsito», **entonces** ve solo los que están en ese estado; y un pedido con un digital disponible y un impreso en tránsito figura en tránsito. |
-| AC-PED-13 | PED-15 | **Dado** una línea de recojo que lleva 15 días y 1 hora en listo para recojo, **cuando** corre la revisión de plazos, **entonces** pasa a no recogida, el inventario libera su reserva y el cliente y la sucursal reciben un aviso; y una con 14 días no cambia. |
+| AC-PED-13 | PED-15 | **Dado** una línea de recojo que lleva 15 días y 1 hora en listo para recojo, **cuando** corre la revisión de plazos, **entonces** pasa a no recogida, el inventario libera su reserva y el cliente y la sucursal reciben un aviso; y una con 14 días, o con exactamente 15 días, no cambia. |
 | AC-PED-14 | PED-16 | **Dado** un pedido no recogido, **cuando** la administración lo anula con el motivo «no recogido», **entonces** se exige el motivo, se solicita el reembolso y queda la auditoría, sin liberar dos veces las reservas. |
 | AC-PED-15 | PED-17 | **Dado** un pedido pagado de un impreso confirmado cuyo traslado está aprobado, **cuando** el cliente lo cancela, **entonces** el pedido queda anulado con el motivo «cancelado por el cliente», la reserva se libera, el traslado pasa a cancelado, se solicita el reembolso y queda la auditoría. |
 | AC-PED-16 | PED-18 | **Dado** un pedido con un impreso en preparación, otro con un impreso en tránsito entre sucursales y otro con un libro digital, **cuando** el cliente intenta cancelarlos, **entonces** se rechaza en los tres casos indicando la devolución o la política de reembolso digital. |
@@ -117,7 +117,7 @@ Que el cliente vea siempre en qué estado está su compra, incluso cuando viaja 
 
 - Un pedido se confirma solo con el pago aprobado y, para los impresos, con las reservas confirmadas.
 - El estado del pedido se deriva del estado de sus líneas; cada línea sigue su propio ciclo.
-- Ciclo de una línea impresa con traslado: confirmado → en tránsito entre sucursales → recibido en la sucursal → en preparación → listo para recojo → entregado; sin traslado: confirmado → en preparación → listo para recojo o despachado → entregado. En recojo, listo para recojo → no recogido a los 15 días calendario. Una línea confirmada puede pasar a anulado.
+- Ciclo de una línea impresa con traslado: confirmado → en tránsito entre sucursales → recibido en la sucursal → en preparación → listo para recojo → entregado; sin traslado: confirmado → en preparación → listo para recojo o despachado → entregado. En recojo, listo para recojo → no recogido a las más de 360 horas (15 días corridos). Una línea confirmada puede pasar a anulado.
 - Una línea queda despachada cuando su envío pasa a en reparto (`ecommerce-envios`). Una línea digital pasa a disponible en la biblioteca al aprobarse el pago.
 - La anulación es una operación sensible: motivo obligatorio y auditoría.
 
@@ -132,6 +132,7 @@ Que el cliente vea siempre en qué estado está su compra, incluso cuando viaja 
 
 - [x] ¿Un pedido de recojo no recogido caduca después de cierto tiempo? Resuelto el 2026-10-16: a los 15 días calendario en listo para recojo pasa a no recogido, libera sus reservas y queda a revisión de la administración, que puede anularlo con reembolso (PED-15, PED-16).
 - [x] ¿Se cuentan los 15 días de forma calendario corrida o se excluyen feriados? Resuelto el 2026-10-16 (confirmado por el responsable): corrida.
+- [x] ¿Una línea no recogida puede entregarse después? Resuelto el 2026-11-21 (decisión de la persona): no; su reserva ya se liberó y solo se anula con reembolso (PED-11, PED-16; coherente con SEL-28 de `inventario-seleccion-fuente`).
 - [x] ¿Puede el cliente cancelar por sí mismo un pedido pagado? Resuelto el 2026-10-16: sí, mientras todas sus líneas sean impresas y estén confirmadas; después, por devolución (PED-17, PED-18).
 - [x] ¿Cuál es el orden del ciclo de una línea con traslado? Resuelto el 2026-10-16 (confirmado por el responsable): confirmado → en tránsito entre sucursales → en preparación → listo (PED-19).
 - [x] ¿Se reembolsa el costo de envío? Resuelto el 2026-10-16: solo al anular o cancelar todo antes de que salga (PED-17, PED-22).

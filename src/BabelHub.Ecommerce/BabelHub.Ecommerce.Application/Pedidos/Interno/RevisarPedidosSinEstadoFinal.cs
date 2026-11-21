@@ -6,7 +6,7 @@ namespace BabelHub.Ecommerce.Application.Pedidos.Interno;
 public sealed record ResultadoDeLaRevisionSinEstadoFinal(int NoRecogidasSinAnular, int ImpresasSinEstadoFinal, int EstadosDeTrasladoPurgados);
 
 /// <summary>
-/// La revisión diaria de lo que no se resuelve y la purga de los estados de traslado (T27; PED-15, AUD-31): la corre el trabajo de fondo como actor «sistema». Publica una <b>alerta técnica</b> (sin datos del pedido) si una línea <b>no recogida</b> lleva más de 30 días sin anularse o entregarse, o si una línea impresa lleva más de 90 días desde que se creó el pedido sin estado final: la retención del contacto
+/// La revisión diaria de lo que no se resuelve y la purga de los estados de traslado (T27; PED-15, AUD-31): la corre el trabajo de fondo como actor «sistema». Publica una <b>alerta técnica</b> (sin datos del pedido) si una línea <b>no recogida</b> lleva más de 30 días sin anularse, o si una línea impresa lleva más de 90 días desde que se creó el pedido sin estado final: la retención del contacto
 /// no tiene plazo si el pedido nunca llega a entregado o anulado. Y <b>purga a los 90 días</b> los estados de traslado recibidos (<c>estados_de_traslado_recibidos</c>), que solo sirven para la idempotencia de la entrada. Nunca modifica un pedido; repetirla no cambia nada.
 /// </summary>
 internal sealed class RevisarPedidosSinEstadoFinal(AutorizadorDePedidos autorizador, IRepositorioDePedidos pedidos, IPublicadorDeAlertasTecnicas alertas, IReloj reloj)

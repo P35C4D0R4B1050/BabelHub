@@ -32,7 +32,7 @@ public readonly record struct ContextoDeLinea(bool RequiereTraslado, bool EsDeRe
 /// <summary>
 /// La máquina de transiciones de una línea (PED-02, PED-19, PED-30): <c>confirmado → [en tránsito → recibido →] en preparación → listo para recojo | despachado → entregado</c>, con <c>no recogido</c> (desde listo para recojo, solo recojo) y <c>anulado</c>
 /// (lo que no salió: nunca despachado, entregado ni anulado). Un salto (de confirmado a entregado) se rechaza; una línea con traslado no se prepara sin recibirse y una sin traslado no pasa por el tránsito; entregado y anulado son terminales.
-/// Un no recogido todavía puede entregarse o anularse (PED-16, PED-31).
+/// Un no recogido solo se anula: no se entrega, porque su reserva ya se liberó (PED-16, PED-31, DD-20).
 /// </summary>
 public static class MaquinaDeEstadosDeLinea
 {
@@ -58,7 +58,6 @@ public static class MaquinaDeEstadosDeLinea
             (EstadoDeLineaImpresa.EnPreparacion, EstadoDeLineaImpresa.Despachado) => !contexto.EsDeRecojo,
             (EstadoDeLineaImpresa.ListoParaRecojo, EstadoDeLineaImpresa.NoRecogido) => contexto.EsDeRecojo,
             (EstadoDeLineaImpresa.ListoParaRecojo, EstadoDeLineaImpresa.Entregado) => contexto.EsDeRecojo,
-            (EstadoDeLineaImpresa.NoRecogido, EstadoDeLineaImpresa.Entregado) => contexto.EsDeRecojo,
             (EstadoDeLineaImpresa.Despachado, EstadoDeLineaImpresa.Entregado) => !contexto.EsDeRecojo,
             _ => false,
         };

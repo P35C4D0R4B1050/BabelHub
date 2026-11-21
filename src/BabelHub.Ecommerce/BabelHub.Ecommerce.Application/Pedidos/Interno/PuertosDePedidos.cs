@@ -96,7 +96,7 @@ public interface IRepositorioDePedidos
 
     Task AnotarIntentoDeLiberacionDeContacto(Guid pedidoId, DateTimeOffset cuando, CancellationToken cancelacion = default);
 
-    /// <summary>Cuántas líneas están <c>no recogidas</c> desde antes de <paramref name="marcadasAntesDe"/> sin anularse ni entregarse (T27).</summary>
+    /// <summary>Cuántas líneas están <c>no recogidas</c> desde antes de <paramref name="marcadasAntesDe"/> sin anularse (T27; un no recogido no se entrega, DD-20).</summary>
     Task<int> ContarNoRecogidasSinAnularDesde(DateTimeOffset marcadasAntesDe, CancellationToken cancelacion = default);
 
     /// <summary>Cuántas líneas impresas, de pedidos creados antes de <paramref name="creadosAntesDe"/>, no llegaron a entregadas ni anuladas (T27).</summary>
@@ -108,7 +108,7 @@ public interface IRepositorioDePedidos
     /// <summary>Las anulaciones y entregas <c>fallida</c>s, de la más reciente a la más antigua (PED-24): lo que ve la administración para reintentar.</summary>
     Task<PaginaDeOperacionesFallidasGuardada> OperacionesFallidas(int pagina, int tamano, CancellationToken cancelacion = default);
 
-    /// <summary>Cuántos pedidos de la cuenta tienen alguna línea impresa sin entregar ni anular, incluidas las no recogidas (PED-31, AC-PED-26): un pedido solo digital no cuenta.</summary>
+    /// <summary>Cuántos pedidos de la cuenta tienen alguna línea impresa sin entregar ni anular, incluidas las no recogidas hasta que se anulen (PED-31, AC-PED-26): un pedido solo digital no cuenta.</summary>
     Task<int> ContarPedidosConImpresaSinCerrar(Guid cuentaId, CancellationToken cancelacion = default);
 
     /// <summary>Las anulaciones <c>fallida</c>s del pedido (repetir una anulación fallida crea una fila nueva): sus líneas ya pasaron por la cancelación de envíos, así que un envío que Envíos informa «mantenido» por estar ya cancelado no cuenta como salido.</summary>
