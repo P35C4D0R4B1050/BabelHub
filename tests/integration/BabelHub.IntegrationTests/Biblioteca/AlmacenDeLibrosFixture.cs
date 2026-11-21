@@ -14,8 +14,8 @@ namespace BabelHub.IntegrationTests.Biblioteca;
 public sealed class AlmacenDeLibrosFixture : IAsyncLifetime
 {
     public const string Contenedor = "libros";
-    public const string ClaveDeAcceso = "acceso-de-pruebas-del-almacen-0123456789";
-    public const string ClaveSecreta = "secreta-de-pruebas-del-almacen-9876543210-abcdefgh";
+    public static readonly string ClaveDeAcceso = "acceso-" + Guid.NewGuid().ToString("N");
+    public static readonly string ClaveSecreta = "secreta-" + Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
 
     private readonly IContainer _contenedor = new ContainerBuilder("rustfs/rustfs:latest")
         .WithPortBinding(9000, true)
