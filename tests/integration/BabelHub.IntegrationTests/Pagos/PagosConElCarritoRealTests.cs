@@ -4,6 +4,7 @@ using BabelHub.Ecommerce.Application.Pagos;
 using BabelHub.Ecommerce.Application.Pagos.Interno;
 using BabelHub.Ecommerce.Application.Pedidos;
 using BabelHub.Ecommerce.Application.Plataforma;
+using BabelHub.Ecommerce.Application.Web;
 using BabelHub.Ecommerce.Domain.Pagos;
 using BabelHub.Ecommerce.Infrastructure.Carrito;
 using BabelHub.Ecommerce.Infrastructure.Pagos;
@@ -29,7 +30,6 @@ public sealed class PagosConElCarritoRealTests(PostgresDelEcommerceCompletoFixtu
 
     private static readonly Guid EdicionImpresa = Guid.Parse("b0000000-0000-0000-0000-0000000000f1");
 
-    private static readonly TextoVistoDeCompra[] Textos = [new(TextoLegalDeCompra.Terminos, "v1"), new(TextoLegalDeCompra.Privacidad, "v1")];
 
     private const decimal PrecioDeLaEdicion = 50m;
 
@@ -110,15 +110,16 @@ public sealed class PagosConElCarritoRealTests(PostgresDelEcommerceCompletoFixtu
     private async Task<(Guid Cuenta, Guid Pedido)> ComprarHastaElPago(AnfitrionRealDelEcommerce anfitrion, int cantidad = 2)
     {
         var cuenta = await SembrarCuenta();
+        var textos = await TextosVigentes(anfitrion);
         var agregado = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICarritoDelCliente>().AgregarLinea(new AgregarLineaEntrada(EdicionImpresa, cantidad)));
         Assert.True(agregado.EsExito, agregado.Error?.Clave);
         Assert.True((await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().Iniciar(new IniciarCheckoutEntrada()))).EsExito);
         var entrega = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().ElegirEntrega(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, "sede-central", null)));
         Assert.True(entrega.EsExito, entrega.Error?.Clave);
-        var aceptado = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().RegistrarAceptaciones(new RegistrarAceptacionesEntrada(Textos)));
+        var aceptado = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().RegistrarAceptaciones(new RegistrarAceptacionesEntrada(textos)));
         Assert.True(aceptado.EsExito, aceptado.Error?.Clave);
 
-        var pasar = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().PasarAlPago(new PasarAlPagoEntrada(PrecioDeLaEdicion * cantidad, Textos)));
+        var pasar = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().PasarAlPago(new PasarAlPagoEntrada(PrecioDeLaEdicion * cantidad, textos)));
         Assert.True(pasar.EsExito, pasar.Error?.Clave);
         var pedido = pasar.Valor.PedidoId ?? throw new InvalidOperationException("Pasar al pago no devolvió el pedido.");
 
@@ -128,6 +129,15 @@ public sealed class PagosConElCarritoRealTests(PostgresDelEcommerceCompletoFixtu
         Assert.NotEmpty(lineas);
         _reservasDelPago.Sembrar(pedido, ahora + PlazosDelPago.VigenciaConImpresos, [.. lineas.Select(l => new LineaConfirmadaDeReserva(l, "AYA-01", false, null, null))]);
         return (cuenta, pedido);
+    }
+
+    /// <summary>Los términos y la privacidad con la versión vigente que Identidad publica (la que Carrito compara al aceptar), tal como los vería la persona.</summary>
+    private static async Task<TextoVistoDeCompra[]> TextosVigentes(AnfitrionRealDelEcommerce anfitrion)
+    {
+        var terminos = await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<ITextosLegales>().Obtener(TipoDeTextoLegal.Terminos));
+        var privacidad = await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<ITextosLegales>().Obtener(TipoDeTextoLegal.Privacidad));
+        Assert.True(terminos.EsExito && privacidad.EsExito, "Identidad debe publicar las versiones vigentes de los textos.");
+        return [new(TextoLegalDeCompra.Terminos, terminos.Valor.Version), new(TextoLegalDeCompra.Privacidad, privacidad.Valor.Version)];
     }
 
     private async Task<List<Guid>> ConsultarLineasDeLaIntencion(Guid pedido)
