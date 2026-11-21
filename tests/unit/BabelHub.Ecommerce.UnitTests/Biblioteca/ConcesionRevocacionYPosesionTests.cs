@@ -216,9 +216,27 @@ public sealed class ConcesionRevocacionYPosesionTests
     [Trait("Criterio", "AC-BIB-01")]
     public async Task La_fachada_de_accesos_delega_en_los_casos_de_uso()
     {
-        IAccesosDeBiblioteca fachada = new AccesosDeBibliotecaDeLaAplicacion(_conceder, _revocar);
+        IAccesosDeBiblioteca fachada = new AccesosDeBibliotecaDeLaAplicacion(_conceder, _revocar, _accesos);
 
         Assert.Equal(ResultadoDeConcederAcceso.Concedido, (await fachada.Conceder(new ConcederAccesoEntrada(Cuenta, Pedido1, Edicion))).Valor);
         Assert.Equal(ResultadoDeRevocarAcceso.Revocado, (await fachada.Revocar(new RevocarAccesoEntrada(Pedido1, Edicion, MotivoDeRevocacionDeAcceso.PedidoAnulado))).Valor);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PED-11")]
+    public async Task Un_acceso_revocado_por_reembolso_o_por_reporte_aprobado_se_dice_y_uno_vigente_o_anulado_con_el_pedido_no()
+    {
+        IAccesosDeBiblioteca fachada = new AccesosDeBibliotecaDeLaAplicacion(_conceder, _revocar, _accesos);
+        await Conceder(Pedido1);
+        Assert.False((await fachada.EstaRevocadoPorReembolso(Cuenta, Pedido1, Edicion)).Valor);
+
+        await Revocar(Pedido1, MotivoDeRevocacionDeAcceso.Reembolso);
+        Assert.True((await fachada.EstaRevocadoPorReembolso(Cuenta, Pedido1, Edicion)).Valor);
+
+        await Conceder(Pedido2);
+        await Revocar(Pedido2, MotivoDeRevocacionDeAcceso.PedidoAnulado);
+        Assert.False((await fachada.EstaRevocadoPorReembolso(Cuenta, Pedido2, Edicion)).Valor);
+        Assert.False((await fachada.EstaRevocadoPorReembolso(Cuenta, Guid.NewGuid(), Edicion)).Valor);
+        Assert.False((await fachada.EstaRevocadoPorReembolso(Guid.Empty, Pedido1, Edicion)).EsExito);
     }
 }

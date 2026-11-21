@@ -299,6 +299,12 @@ internal sealed class MarcaDeCancelacionFalsa(EstadoDeLaMarca estado = EstadoDeL
 
 internal sealed class AccesosDeBibliotecaFalsos : IAccesosDeBiblioteca
 {
+    /// <summary>Las ediciones cuyo acceso ya se revocó por un reembolso de Devoluciones.</summary>
+    public HashSet<Guid> ReembolsadasPorDevolucion { get; } = [];
+
+    public Task<Resultado<bool>> EstaRevocadoPorReembolso(Guid cuentaId, Guid pedidoId, Guid edicionId, CancellationToken cancelacion = default) =>
+        Task.FromResult(Falla ? Resultado<bool>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible")) : Resultado<bool>.Exito(ReembolsadasPorDevolucion.Contains(edicionId)));
+
     public List<(Guid CuentaId, Guid PedidoId, Guid EdicionId)> Concedidos { get; } = [];
 
     public List<(Guid PedidoId, Guid EdicionId, MotivoDeRevocacionDeAcceso Motivo)> Revocados { get; } = [];

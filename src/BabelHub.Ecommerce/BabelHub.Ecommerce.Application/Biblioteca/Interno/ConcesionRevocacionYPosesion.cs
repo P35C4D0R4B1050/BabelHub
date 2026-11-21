@@ -89,8 +89,27 @@ internal sealed class RevocarAcceso(IRepositorioDeAccesos accesos, IAuditoria au
 }
 
 /// <summary>La implementación de <see cref="IAccesosDeBiblioteca"/> (de Pedidos) por los casos de uso de Biblioteca: ambas operaciones participan en la unidad de trabajo del llamador.</summary>
-internal sealed class AccesosDeBibliotecaDeLaAplicacion(ConcederAcceso conceder, RevocarAcceso revocar) : IAccesosDeBiblioteca
+internal sealed class AccesosDeBibliotecaDeLaAplicacion(ConcederAcceso conceder, RevocarAcceso revocar, IRepositorioDeAccesos accesos) : IAccesosDeBiblioteca
 {
+    public async Task<Resultado<bool>> EstaRevocadoPorReembolso(Guid cuentaId, Guid pedidoId, Guid edicionId, CancellationToken cancelacion = default)
+    {
+        if (cuentaId == Guid.Empty || pedidoId == Guid.Empty || edicionId == Guid.Empty)
+        {
+            return FallosDeBiblioteca.Validacion<bool>();
+        }
+
+        try
+        {
+            var acceso = await accesos.ObtenerDeLaCompra(cuentaId, pedidoId, edicionId, cancelacion).ConfigureAwait(false);
+            return Resultado<bool>.Exito(acceso is { Estado: EstadoDeAcceso.Revocado, CausaDeRevocacion: CausaDeRevocacion.Reembolso or CausaDeRevocacion.ReporteAprobado });
+        }
+        catch (BibliotecaNoDisponibleException)
+        {
+            return FallosDeBiblioteca.NoDisponible<bool>();
+        }
+    }
+
+
     public Task<Resultado<ResultadoDeConcederAcceso>> Conceder(ConcederAccesoEntrada entrada, CancellationToken cancelacion = default) => conceder.Ejecutar(entrada, cancelacion);
 
     public Task<Resultado<ResultadoDeRevocarAcceso>> Revocar(RevocarAccesoEntrada entrada, CancellationToken cancelacion = default) => revocar.Ejecutar(entrada, cancelacion);

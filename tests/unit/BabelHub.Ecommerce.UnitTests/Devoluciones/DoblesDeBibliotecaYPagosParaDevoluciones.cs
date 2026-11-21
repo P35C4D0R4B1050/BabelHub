@@ -193,6 +193,8 @@ internal sealed class ReembolsosDoble : IReembolsos, IInstantanea
 /// <summary>La revocación de Biblioteca que usa Devoluciones al aprobar un reporte: anota cada llamada y responde «ya revocado» si la prueba lo pide.</summary>
 internal sealed class BibliotecaParaDevolucionesDoble : IAccesosDeBiblioteca
 {
+    public Task<Resultado<bool>> EstaRevocadoPorReembolso(Guid cuentaId, Guid pedidoId, Guid edicionId, CancellationToken cancelacion = default) => Task.FromResult(Resultado<bool>.Exito(false));
+
     public bool YaRevocado { get; set; }
 
     public bool NoResponde { get; set; }

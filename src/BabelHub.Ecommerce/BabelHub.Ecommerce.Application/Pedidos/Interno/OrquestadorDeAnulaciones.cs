@@ -335,8 +335,17 @@ internal sealed class OrquestadorDeAnulaciones(
         var anterior = pedido.Estado;
         var lineas = pedido.Lineas.Where(l => anulacion.LineaIds.Contains(l.Id)).ToList();
 
-        // 1. El reembolso se registra primero (clave natural única por pedido: repetir no reembolsa dos veces).
-        var registrado = await RegistrarElReembolso(pedido, anulacion, lineas, cancelacion).ConfigureAwait(false);
+        // 1. El reembolso se registra primero (clave natural única por pedido: repetir no reembolsa dos veces). Una digital que Devoluciones ya reembolsó (su acceso se revocó por reembolso) no se reembolsa otra vez: el tope de Pagos dejaría la anulación fallida.
+        var aReembolsar = new List<LineaDePedido>();
+        foreach (var linea in lineas)
+        {
+            if (!linea.EsDigital || !await YaReembolsadaPorDevolucion(pedido, linea, cancelacion).ConfigureAwait(false))
+            {
+                aReembolsar.Add(linea);
+            }
+        }
+
+        var registrado = await RegistrarElReembolso(pedido, anulacion, aReembolsar, cancelacion).ConfigureAwait(false);
         anulacion.RegistrarReembolso(registrado, ahora);
 
         // 2. Los accesos digitales se revocan aunque se hayan descargado.
@@ -397,6 +406,22 @@ internal sealed class OrquestadorDeAnulaciones(
         }
 
         return registrado.Valor.ReembolsoId;
+    }
+
+    private async Task<bool> YaReembolsadaPorDevolucion(Pedido pedido, LineaDePedido digital, CancellationToken cancelacion)
+    {
+        Resultado<bool> revocado;
+        try
+        {
+            revocado = await accesos.EstaRevocadoPorReembolso(pedido.CuentaId, pedido.Id, digital.EdicionId, cancelacion).ConfigureAwait(false);
+        }
+        catch (Exception excepcion) when (excepcion is not (OperationCanceledException or OperacionRechazadaException))
+        {
+            throw new OperacionRechazadaException(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDePedidos.ServicioNoDisponible));
+        }
+
+        // Falla cerrado: sin saberlo no se reembolsa (el reintento de la operación en curso lo vuelve a preguntar).
+        return revocado.EsExito ? revocado.Valor : throw new OperacionRechazadaException(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDePedidos.ServicioNoDisponible));
     }
 
     private async Task RevocarElAcceso(Guid pedidoId, Guid edicionId, CancellationToken cancelacion)
