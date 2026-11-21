@@ -105,3 +105,10 @@ No converge (provisional): el código implementa los 37 requisitos y 33 tienen p
 - **D-01 cerrada:** la spec se enmendó (CAR-29 solo retención; CAR-38 y AC-CAR-32 y 33 para los topes de 30 líneas y 20 unidades) y está **Planned** (filas de `progress/aprobaciones.md` del 2026-11-20; excepción DD-19). El código y las pruebas ya nombran AC-CAR-32 y 33.
 - **D-03 cerrada:** T25 marcada. **D-04:** trazas `AC-CAR` corregidas en lo tocado por esta ronda (el resto de las trazas de `InventarioDelCarritoConPostgresTests` sigue por revisar). **D-06 y D-07 cerradas** (campo oculto `sucursalPreferida`; «Te quedan N min.» con prueba).
 - **Siguen abiertas:** D-02 y D-05 (E2E de fusión, de compra a domicilio y solo digital con las cadenas reales, y `ui-review`; turno de Docker) y D-08 (prueba de «cambia de sucursal preferida y mantiene su carrito»). Resultado: **No converge** hasta cerrarlas.
+
+## Cierre de la sesión Docker (2026-11-20, ECO-6g ronda 2)
+
+- **Corridas:** integración de Carrito, Envíos, Pagos e `HttpClienteDelInventario` en verde; E2E de carrito mixto, solo digital, visitante, accesibilidad, teclado y teléfono, la compra con recojo y a domicilio (vía las pantallas del personal) y la compra solo digital con Biblioteca: verdes en escritorio, teléfono y WebKit. `ui-review` del carrito y del checkout (claro, oscuro y teléfono) registrado en `progress/hallazgos.md`.
+- **Cerradas:** D-05 en lo esencial (compra a domicilio y solo digital completas con Carrito, Pagos, Pedidos, Inventario y Biblioteca reales), D-08 (prueba del cambio de sucursal preferida), D-04 en lo tocado (trazas de `InventarioDelCarritoConPostgresTests` y `HttpClienteDelInventarioTests`).
+- **Abierta, externa:** D-02 el E2E de la fusión de carritos (AC-CAR-22) necesita el ingreso real de `web-identidad` con verificación del correo; el recorrido de fusión tiene pruebas de integración con PostgreSQL real (`FusionDelCarrito`, AC-CAR-22 y 33) pero no E2E. T36 sigue sin marcar por eso.
+- **Resultado: converge salvo D-02** (E2E de la fusión con el ingreso real, externo al carril de Carrito); no se marca `Done` hasta cerrarlo.
