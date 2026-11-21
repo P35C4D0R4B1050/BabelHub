@@ -24,15 +24,23 @@ public sealed class BajaDeEdicionConElCarritoRealTests(PostgresDelEcommerceCompl
 
     private async Task<(Guid Obra, Guid Edicion)> SembrarLaEdicion()
     {
-        var (obra, edicion) = (Guid.NewGuid(), Guid.NewGuid());
-        var isbn = "97861" + Random.Shared.NextInt64(10_000_000, 99_999_999).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var (obra, edicion, digital) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        // Un ISBN-13 con su dígito de control válido (el catálogo lo comprueba al leer la edición).
+        var doce = "97861" + Random.Shared.NextInt64(1_000_000, 9_999_999).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var suma = doce.Select((c, i) => (c - '0') * (i % 2 == 0 ? 1 : 3)).Sum();
+        var isbn = doce + ((10 - (suma % 10)) % 10).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        // Una obra conserva al menos una edición activa (y una por tipo): la impresa se da de baja y queda la digital.
+        var otroDoce = "97862" + Random.Shared.NextInt64(1_000_000, 9_999_999).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var otroIsbn = otroDoce + ((10 - (otroDoce.Select((c, i) => (c - '0') * (i % 2 == 0 ? 1 : 3)).Sum() % 10)) % 10).ToString(System.Globalization.CultureInfo.InvariantCulture);
         await bd.Ejecutar(
             $"""
             BEGIN;
             INSERT INTO catalogo.obras (id, titulo, autor, editorial, categoria, portada_clave, portada_huella, portada_tipo, estado, version, creada_en)
-              VALUES ('{obra}', 'El túnel (prueba de baja)', 'Autor de prueba', 'Editorial de prueba', 'Narrativa', 'e2e{obra:N}', decode(repeat('b1', 32), 'hex'), 'jpeg', 'activa', 1, now());
+              VALUES ('{obra}', 'El túnel (prueba de baja)', 'Autor de prueba', 'Editorial de prueba', 'Narrativa', '{obra:N}', decode(repeat('b1', 32), 'hex'), 'jpeg', 'activa', 1, now());
             INSERT INTO catalogo.ediciones (id, obra_id, tipo, isbn13, isbn_ingresado, precio, estado)
-              VALUES ('{edicion}', '{obra}', 'impresa', '{isbn}', '{isbn}', 45.00, 'activa');
+              VALUES ('{edicion}', '{obra}', 'impresa', '{isbn}', '{isbn}', 45.00, 'activa'), ('{digital}', '{obra}', 'digital', '{otroIsbn}', '{otroIsbn}', 20.00, 'activa');
+            INSERT INTO catalogo.licencias (edicion_id, tipo, titular, territorios, vigente_hasta, formato) VALUES ('{digital}', 'dominio_publico', 'Titular de prueba', ARRAY['PE'], NULL, 'epub');
+            INSERT INTO catalogo.archivos_digitales (edicion_id, clave_en_almacen, tipo_detectado, tamano, huella_sha256, subido_en, subido_por) VALUES ('{digital}', '{digital:N}', 'epub', 1024, decode(repeat('d3', 32), 'hex'), now(), '00000000-0000-0000-0000-000000000000');
             COMMIT;
             """);
         return (obra, edicion);
