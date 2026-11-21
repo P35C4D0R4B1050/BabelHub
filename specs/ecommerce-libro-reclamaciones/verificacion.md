@@ -5,7 +5,7 @@ fecha: 2026-11-21
 
 # Verificación — Libro de Reclamaciones
 
-## Resultado: Converge salvo la paridad visual con el prototipo (ui-review), Menor
+## Resultado: Converge
 
 ## 1. Comprobaciones automáticas
 
@@ -82,10 +82,10 @@ Resultado de la matriz: 19 Cumple, 1 Parcial, 0 No cumple (REC-01 a REC-20).
 3. REC-08, REC-12 y REC-15: la auditoría de las pruebas de módulo es un espía, y la atomicidad real (revertir la hoja si la auditoría falla) se prueba con PostgreSQL solo para la consulta (`I/HojasConPostgresTests.cs:165`) y la anonimización (`:200`); responder y descartar con la auditoría caída se prueban con la unidad de trabajo de prueba (`U/AdministracionDeHojasTests.cs:209,328`), no con PostgreSQL. Los E2E usan la auditoría real, pero no leen la fila. Dueño: carril de Reclamaciones; Menor.
 4. §5: no hay una prueba específica de una hoja **descartada** que cumple dos años (la función no filtra por estado, así que se cubre por construcción). Dueño: carril de Reclamaciones; Menor.
 5. T20: «registro de datos sensibles de EF activado» no aplica porque el módulo usa Npgsql; se cumple por equivalente con pruebas que llevan `AC-REC-13` (`I/RepositorioDeHojasPostgresTests.cs:156,342`, `I/HojasConPostgresTests.cs:145`, `I/ReclamacionesApiTests.cs:120`). Cerrado.
-6. T22 pide la revisión de paridad con `prototype/ui-v2/tienda/reclamos.html`: los E2E cubren temas, AA, 375 px, teclado y estados, pero no hay registro de una comparación con el prototipo (`decisiones-de-implementacion.md`, filas T22). Dueño: quien cierre la verificación visual (`ui-review`); Menor.
+6. **Cerrado (ui-review, 2026-11-21).** Paridad con `prototype/ui-v2/tienda/reclamos.html` revisada en el host compuesto (claro y oscuro, 1280 y 375 px, sin desbordes y con axe sin A ni AA): el formulario se agrupó en las tres secciones del prototipo («1. Identificación del consumidor», «2. Identificación del bien contratado», «3. Detalle de la reclamación») y las etiquetas quedaron sobre cada campo. Diferencias deliberadas con el prototipo: los campos son los de REC-03 (sin teléfono ni «pedido del consumidor») y el formulario nunca devuelve lo escrito (REC-04). Menor restante: los campos no ocupan todo el ancho de la sección (el prototipo usa `w-full`).
 7. REC-10 y REC-14 con una cuenta real: el recorrido «cliente con correo verificado ve sus hojas» está probado con el correo verificado como doble (módulo y PostgreSQL) y el adaptador sobre `ICorreoVerificadoDeSistema` por separado; el E2E solo prueba el estado vacío y la invitación a verificar. Dueño: carril A (Identidad) o el E2E de acceso; Menor.
 8. Los E2E de administración se omiten si falta `BABELHUB__Sembrador__Clave` (`E/administracion-de-reclamaciones.spec.ts:101`): deben correr con ella en la verificación final (ya corrieron: 6 en verde en tres navegadores).
 
 ## 4. Conclusión
 
-**Converge** en requisitos, tareas (T01 a T23) y pruebas. Queda como Menor, sin bloquear, el registro de la paridad visual con el prototipo (`ui-review`) y los demás Menores de la sección 3. Pasar la spec a Done lo decide quien cierra la verificación.
+**Converge** en requisitos, tareas (T01 a T23), pruebas y paridad visual (`ui-review`); los E2E de reclamaciones (14) pasan en escritorio, teléfono y WebKit. Quedan solo Menores de la sección 3 y el ancho de los campos. Pasar la spec a Done lo decide quien cierra la verificación.
