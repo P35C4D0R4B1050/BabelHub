@@ -175,4 +175,25 @@ public sealed class AvisosDePedidosTests
             ["confirmado", "en-transito", "recibido", "en-preparacion", "listo-para-recojo", "despachado", "entregado", "no-recogido", "anulado"],
             Enum.GetValues<EstadoDePedido>().Select(AvisosDePedidos.NombreDelEstado));
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-01")]
+    public async Task Los_avisos_de_cada_estado_del_pedido_cumplen_el_validador_real_del_catalogo()
+    {
+        var notificador = new NotificadorEspia();
+        var avisos = new AvisosDePedidos(notificador);
+        var recojo = Crear(TipoDeEntregaDelPedido.Recojo, Impresa("Uno"));
+        var domicilio = Crear(TipoDeEntregaDelPedido.Domicilio, Impresa("Dos", "CUS"));
+        var lineas = recojo.Lineas.Select(l => l.Id).ToList();
+
+        foreach (var estado in Enum.GetValues<EstadoDePedido>())
+        {
+            var nombre = AvisosDePedidos.NombreDelEstado(estado);
+            await avisos.Solicitar(recojo, nombre, AvisosDePedidos.HuellaDeLineas(lineas), AvisosDePedidos.SucursalesResponsables(recojo), default);
+            await avisos.Solicitar(domicilio, nombre, Guid.NewGuid().ToString("N"), AvisosDePedidos.SucursalesResponsables(domicilio), default);
+        }
+
+        Assert.Equal(Enum.GetValues<EstadoDePedido>().Length * 4, notificador.Solicitudes.Count);
+        BabelHub.Ecommerce.UnitTests.Notificaciones.AvisosContraElCatalogo.Comprobar(notificador.Solicitudes);
+    }
 }

@@ -19,6 +19,26 @@ internal sealed class AvisosDePedidos(INotificador notificador)
 
     public const string PlantillaDeLaSucursal = "pedido-estado-sucursal";
 
+    /// <summary>Las plantillas de la compra confirmada (NOT-02): el pedido confirmado y, si hay libros digitales con su acceso concedido, el libro digital disponible; solo al cliente.</summary>
+    public const string PlantillaDelPedidoConfirmado = "pedido-confirmado";
+
+    public const string PlantillaDelLibroDigital = "libro-digital-disponible";
+
+    /// <summary>
+    /// Pide los avisos de una compra recién confirmada (NOT-02, AC-NOT-01): <c>pedido-confirmado</c> y, si el pedido tiene una línea digital (su acceso ya se concedió en la misma transacción), <c>libro-digital-disponible</c>, ambos al cliente con la referencia opaca de su cuenta y
+    /// eventos deterministas (<c>pedido:&lt;id&gt;:confirmado:compra</c> y <c>pedido:&lt;id&gt;:libro-digital:compra</c>), de modo que repetir la confirmación no duplica el aviso (NOT-05). Nunca lanza: una falla del Notificador no interrumpe la compra (regla 10).
+    /// </summary>
+    public async Task SolicitarLaConfirmacion(Pedido pedido, CancellationToken cancelacion)
+    {
+        ArgumentNullException.ThrowIfNull(pedido);
+        var campos = new Dictionary<string, string> { ["numeroDePedido"] = pedido.Numero.Valor };
+        await PedirALaCuenta(pedido, PlantillaDelPedidoConfirmado, "confirmado", campos, cancelacion).ConfigureAwait(false);
+        if (pedido.Lineas.Any(l => l.EsDigital))
+        {
+            await PedirALaCuenta(pedido, PlantillaDelLibroDigital, "libro-digital", campos, cancelacion).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>Pide los avisos de una operación. Nunca lanza.</summary>
     public async Task Solicitar(Pedido pedido, string estadoDestino, string identificadorDeLaOperacion, IReadOnlyCollection<string> sucursalesResponsables, CancellationToken cancelacion)
     {
@@ -71,6 +91,20 @@ internal sealed class AvisosDePedidos(INotificador notificador)
         EstadoDePedido.Anulado => "anulado",
         _ => throw new ArgumentOutOfRangeException(nameof(estado)),
     };
+
+    private async Task PedirALaCuenta(Pedido pedido, string plantilla, string hecho, IReadOnlyDictionary<string, string> campos, CancellationToken cancelacion)
+    {
+        try
+        {
+            var referencia = pedido.CuentaId.ToString("D");
+            var evento = string.Create(CultureInfo.InvariantCulture, $"pedido:{pedido.Id:N}:{hecho}:compra");
+            await notificador.Solicitar(new SolicitudDeAviso(evento, DestinatarioDelAviso.Cliente, referencia, plantilla, campos), cancelacion).ConfigureAwait(false);
+        }
+        catch (Exception excepcion) when (excepcion is not OperationCanceledException)
+        {
+            // Una falla del Notificador nunca interrumpe un caso de uso (regla 10): la compra sigue (el aviso no se crea: una repetición de la confirmación no lo vuelve a pedir, como los demás avisos de Pedidos).
+        }
+    }
 
     private async Task Pedir(Pedido pedido, string estadoDestino, string operacion, DestinatarioDelAviso destinatario, string referencia, IReadOnlyDictionary<string, string> campos, CancellationToken cancelacion)
     {
