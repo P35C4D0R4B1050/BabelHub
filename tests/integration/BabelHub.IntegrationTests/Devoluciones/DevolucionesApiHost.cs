@@ -61,15 +61,36 @@ public sealed class DevolucionesFalsas : IDevolucionesDelCliente, IGestionDeDevo
         return Anotar("reporte");
     }
 
-    public Task<Resultado<PaginaDeDevoluciones>> ListarMias(ListarDevolucionesEntrada entrada, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    public Resultado<PaginaDeDevoluciones> Lista { get; set; } = Resultado<PaginaDeDevoluciones>.Exito(new PaginaDeDevoluciones([], 1, 20, 0));
 
-    public Task<Resultado<DevolucionVista>> ObtenerMia(Guid devolucionId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    public ListarDevolucionesEntrada? UltimaConsulta { get; private set; }
 
-    public Task<Resultado<PaginaDeDevoluciones>> ListarDeLaSucursal(string codigoDeSucursal, ListarDevolucionesEntrada entrada, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    public ListarDevolucionesDeLaAdministracionEntrada? UltimaConsultaDeLaAdministracion { get; private set; }
 
-    public Task<Resultado<PaginaDeDevoluciones>> ListarDeLaAdministracion(ListarDevolucionesDeLaAdministracionEntrada entrada, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    public Task<Resultado<PaginaDeDevoluciones>> ListarMias(ListarDevolucionesEntrada entrada, CancellationToken cancelacion = default)
+    {
+        UltimaConsulta = entrada;
+        Llamadas.Add("listar-mias");
+        return Task.FromResult(Lista);
+    }
 
-    public Task<Resultado<DevolucionVista>> Obtener(Guid devolucionId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    public Task<Resultado<DevolucionVista>> ObtenerMia(Guid devolucionId, CancellationToken cancelacion = default) => Anotar($"obtener-mia:{devolucionId:D}");
+
+    public Task<Resultado<PaginaDeDevoluciones>> ListarDeLaSucursal(string codigoDeSucursal, ListarDevolucionesEntrada entrada, CancellationToken cancelacion = default)
+    {
+        UltimaConsulta = entrada;
+        Llamadas.Add($"listar-sucursal:{codigoDeSucursal}");
+        return Task.FromResult(Lista);
+    }
+
+    public Task<Resultado<PaginaDeDevoluciones>> ListarDeLaAdministracion(ListarDevolucionesDeLaAdministracionEntrada entrada, CancellationToken cancelacion = default)
+    {
+        UltimaConsultaDeLaAdministracion = entrada;
+        Llamadas.Add("listar-administracion");
+        return Task.FromResult(Lista);
+    }
+
+    public Task<Resultado<DevolucionVista>> Obtener(Guid devolucionId, CancellationToken cancelacion = default) => Anotar($"obtener:{devolucionId:D}");
 
     public Task<Resultado<DevolucionVista>> Aprobar(Guid devolucionId, CancellationToken cancelacion = default) => Anotar($"aprobar:{devolucionId:D}");
 
