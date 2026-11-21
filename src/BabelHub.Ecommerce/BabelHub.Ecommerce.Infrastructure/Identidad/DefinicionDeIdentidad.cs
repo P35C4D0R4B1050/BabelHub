@@ -67,6 +67,8 @@ public static class DefinicionDeIdentidad
             privacidad text NOT NULL CHECK (char_length(privacidad) BETWEEN 1 AND 40),
             reembolso text NOT NULL CHECK (char_length(reembolso) BETWEEN 1 AND 40)
         );
+        -- La fecha desde la que rige el conjunto (la web la muestra junto a cada texto). Una base anterior la recibe con la fecha de la migración; el despliegue la fija al sembrar o cambiar las versiones.
+        ALTER TABLE identidad.versiones_de_textos ADD COLUMN IF NOT EXISTS vigente_desde date NOT NULL DEFAULT CURRENT_DATE;
 
         -- El segundo factor (IDE-20, IDE-21, IDE-51): el secreto va cifrado con AES-GCM; el paso aceptado y los códigos de respaldo se consumen con actualizaciones condicionales atómicas.
         CREATE TABLE IF NOT EXISTS identidad.segundo_factor (

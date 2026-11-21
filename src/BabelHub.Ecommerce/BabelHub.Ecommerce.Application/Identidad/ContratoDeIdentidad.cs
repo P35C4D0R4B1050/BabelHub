@@ -130,3 +130,16 @@ public interface ICorreoVerificadoDeSistema
 {
     Task<string?> Consultar(Guid usuarioId, CancellationToken cancelacion = default);
 }
+
+/// <summary>La versión vigente de cada texto legal y la fecha desde la que rige el conjunto, tal como la guarda Identidad (IDE-34, IDE-43, IDE-57).</summary>
+public sealed record VersionesVigentesDeLosTextos(string Terminos, string Privacidad, string Reembolso, DateOnly VigenteDesde);
+
+/// <summary>
+/// Lo que la web (y cualquier módulo que muestre los textos) lee de Identidad para mostrar la versión vigente y enviarla al aceptar: <b>la misma</b> fila que Identidad compara al registrar la aceptación (IDE-57), de modo que lo que se
+/// muestra y lo que se acepta no pueden diferir. Solo lee, sin datos personales y sin actor. Si Identidad no puede leer (por ejemplo, no se sembraron las versiones), <b>lanza</b>: quien consulta muestra el texto como no disponible,
+/// nunca una versión inventada.
+/// </summary>
+public interface IVersionesVigentesDeLosTextos
+{
+    Task<VersionesVigentesDeLosTextos> Consultar(CancellationToken cancelacion = default);
+}
