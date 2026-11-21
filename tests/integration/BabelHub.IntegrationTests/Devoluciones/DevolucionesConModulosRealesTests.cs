@@ -1,3 +1,4 @@
+using BabelHub.Ecommerce.Application.Biblioteca;
 using BabelHub.Ecommerce.Application.Carrito;
 using BabelHub.Ecommerce.Application.Pedidos.Interno;
 using BabelHub.Ecommerce.Application.Devoluciones;
@@ -21,6 +22,10 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
 {
     private const string Sembrado = "SEMBRADO-motivo-t30";
 
+    private const string SucursalT30 = "t30-lima";
+
+    private static readonly Guid EncargadoT30 = Guid.Parse("55555555-5555-5555-5555-555555555530");
+
     private static readonly Guid EdicionDigital = Guid.Parse("b0000000-0000-0000-0000-0000000000d1");
 
     private readonly ReembolsosFalsos _reembolsos = new();
@@ -31,7 +36,16 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
 
     private readonly RelojDeDevoluciones _reloj = new(new DateTimeOffset(DateTimeOffset.UtcNow.UtcDateTime.Date.AddSeconds(Math.Floor(DateTimeOffset.UtcNow.TimeOfDay.TotalSeconds)), TimeSpan.Zero));
 
-    public async Task InitializeAsync() =>
+    public async Task InitializeAsync()
+    {
+        _inventario.Sucursales.Add(SucursalT30);
+        await bd.Ejecutar(
+            $"""
+            INSERT INTO identidad.versiones_de_textos (id, terminos, privacidad, reembolso) VALUES (1, 'v1', 'v1', 'v1') ON CONFLICT (id) DO UPDATE SET terminos = 'v1', privacidad = 'v1', reembolso = 'v1';
+            INSERT INTO identidad.usuarios (id, nombre, correo, correo_verificado, rol, activo, creada_en, sucursal, acepto_terminos_version, acepto_terminos_en, acepto_privacidad_version, acepto_privacidad_en, acepto_reembolso_version, acepto_reembolso_en)
+              VALUES ('{EncargadoT30}', 'Encargado de prueba', 'encargado-t30@example.test', true, 'encargado-de-sucursal', true, now(), '{IdentificadorDeSucursal.DesdeCodigo(SucursalT30)}', 'v1', now(), 'v1', now(), 'v1', now())
+              ON CONFLICT DO NOTHING;
+            """);
         await bd.Ejecutar(
             """
             BEGIN;
@@ -53,6 +67,7 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
               ON CONFLICT DO NOTHING;
             COMMIT;
             """);
+    }
 
     public Task DisposeAsync() => Task.CompletedTask;
 
@@ -88,19 +103,26 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
     /// <summary>Un pedido de recojo con un impreso y un libro digital, confirmado por el Pedidos real (el acceso digital lo concede la Biblioteca real).</summary>
     private async Task<(Guid Pedido, Guid Cuenta, Guid LineaDigital)> ComprarMixto(AnfitrionRealDelEcommerce anfitrion)
     {
+        var (pedido, cuenta, digital, _) = await ComprarMixtoConImpreso(anfitrion);
+        return (pedido, cuenta, digital);
+    }
+
+    private async Task<(Guid Pedido, Guid Cuenta, Guid LineaDigital, Guid LineaImpresa)> ComprarMixtoConImpreso(AnfitrionRealDelEcommerce anfitrion)
+    {
+        var lineaImpresa = Guid.NewGuid();
         var pedido = Guid.NewGuid();
         var cuenta = await SembrarCuenta();
         var ahora = _reloj.Ahora;
         var lineaDigital = Guid.NewGuid();
         var lineas = new List<LineaDeCompraAprobada>
         {
-            new(Guid.NewGuid(), Guid.NewGuid(), false, "Ficciones", null, 1, 50m, 50m, "lima", false, null, null),
+            new(lineaImpresa, Guid.NewGuid(), false, "Ficciones", null, 1, 50m, 50m, SucursalT30, false, null, null),
             new(lineaDigital, EdicionDigital, true, "El Aleph (digital)", null, 1, 30m, 30m, null, false, null, null),
         };
         var aceptaciones = new List<AceptacionDeCompra> { new(TextoLegalDeCompra.Terminos, "v1", ahora), new(TextoLegalDeCompra.Privacidad, "v1", ahora), new(TextoLegalDeCompra.ReembolsoDigital, "v1", ahora) };
-        var compra = new CompraAprobada(pedido, cuenta, TipoDeEntregaDeCompra.Recojo, "lima", null, 0m, 80m, null, aceptaciones, lineas);
+        var compra = new CompraAprobada(pedido, cuenta, TipoDeEntregaDeCompra.Recojo, SucursalT30, null, 0m, 80m, null, aceptaciones, lineas);
         Assert.Equal(ResultadoDeConfirmarCompra.Creado, await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<IConfirmacionDeCompra>().Confirmar(compra)));
-        return (pedido, cuenta, lineaDigital);
+        return (pedido, cuenta, lineaDigital, lineaImpresa);
     }
 
     private static Task<Resultado<DevolucionVista>> PedirReembolso(AnfitrionRealDelEcommerce anfitrion, Guid cuenta, Guid pedido, Guid linea) =>
@@ -108,7 +130,7 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
 
     [Fact]
     [Trait("Criterio", "AC-DEV-04")]
-    [Trait("Criterio", "AC-DEV-08")]
+    [Trait("Criterio", "AC-DEV-22")]
     public async Task El_reembolso_de_un_digital_a_los_catorce_dias_exactos_se_aprueba_revoca_el_acceso_real_y_registra_un_solo_reembolso_a_los_quince_no()
     {
         await using var anfitrion = Anfitrion();
@@ -149,8 +171,7 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
     }
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-18")]
-    [Trait("Criterio", "AC-DEV-20")]
+    [Trait("Criterio", "AC-DEV-24")]
     public async Task Un_reporte_suspende_las_descargas_el_rechazo_las_reanuda_y_el_aprobado_revoca_y_reembolsa()
     {
         await using var anfitrion = Anfitrion();
@@ -176,8 +197,7 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
     }
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-19")]
-    [Trait("Criterio", "AC-DEV-22")]
+    [Trait("Criterio", "AC-DEV-18")]
     public async Task La_anulacion_del_pedido_mixto_tras_el_reembolso_digital_excluye_la_linea_ya_reembolsada()
     {
         await using var anfitrion = Anfitrion();
@@ -244,5 +264,119 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
         await Assert.ThrowsAsync<InvalidOperationException>(() => anfitrion.Como(ActorActual.DelSistema(), sp => AplicarLosReceptores(sp, cuenta, new AplicadorQueFalla()).ContinueWith(t => t.IsFaulted ? throw t.Exception!.InnerException! : true, TaskScheduler.Default)));
 
         Assert.Equal(Sembrado, await bd.Consultar<string>("SELECT motivo FROM devoluciones.devoluciones WHERE pedido_id = @p", ("p", pedido)));
+    }
+
+    private static ActorActual DelEncargadoT30() => ActorActual.DeUsuario(EncargadoT30, RolesDeUsuario.EncargadoDeSucursal, IdentificadorDeSucursal.DesdeCodigo(SucursalT30));
+
+    /// <summary>Deja el impreso como entregado hace tres días (la entrega por Pedidos y el Inventario la cubren otras pruebas; aquí interesa Devoluciones sobre el pedido y la biblioteca reales).</summary>
+    private async Task EntregarElImpreso(Guid pedido, Guid lineaImpresa) =>
+        await bd.Ejecutar($"UPDATE pedidos.lineas_de_pedido SET estado = 'entregado', entregada_en = '{_reloj.Ahora.AddDays(-3):O}' WHERE id = '{lineaImpresa:D}' AND pedido_id = '{pedido:D}'");
+
+    private static Task<Resultado<DevolucionVista>> SolicitarImpreso(AnfitrionRealDelEcommerce anfitrion, Guid cuenta, Guid pedido, Guid linea) =>
+        anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<IDevolucionesDelCliente>().SolicitarImpreso(new SolicitarDevolucionDeImpresoEntrada(pedido, [new LineaPedidaParaDevolver(linea, 1)], new TextoLibre(Sembrado), SucursalT30)));
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-08")]
+    public async Task El_impreso_se_reembolsa_solo_al_confirmar_la_recepcion_por_su_precio_sin_el_envio_y_sin_superar_lo_cobrado()
+    {
+        await using var anfitrion = Anfitrion();
+        var (pedido, cuenta, _, impresa) = await ComprarMixtoConImpreso(anfitrion);
+        await EntregarElImpreso(pedido, impresa);
+
+        var solicitada = await SolicitarImpreso(anfitrion, cuenta, pedido, impresa);
+        Assert.True(solicitada.EsExito, solicitada.Error?.Clave);
+        var aprobada = await anfitrion.Como(DelEncargadoT30(), sp => sp.GetRequiredService<IGestionDeDevoluciones>().Aprobar(solicitada.Valor.DevolucionId));
+        Assert.True(aprobada.EsExito, aprobada.Error?.Clave);
+        Assert.Empty(_reembolsos.Registrados);
+
+        var recibida = await anfitrion.Como(DelEncargadoT30(), sp => sp.GetRequiredService<IGestionDeDevoluciones>().ConfirmarRecepcion(solicitada.Valor.DevolucionId));
+
+        Assert.True(recibida.EsExito, recibida.Error?.Clave);
+        var reembolso = Assert.Single(_reembolsos.Registrados);
+        Assert.Equal(50m, reembolso.Lineas.Sum(l => l.Monto));
+        Assert.Equal(0m, reembolso.Envio);
+        Assert.True(reembolso.Lineas.Sum(l => l.Monto) + reembolso.Envio <= 80m);
+        Assert.Equal(1, _inventario.Aplicaciones(solicitada.Valor.DevolucionId));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-20")]
+    public async Task Con_la_pasarela_caida_el_impreso_queda_con_el_reembolso_pendiente_y_la_conciliacion_lo_completa_una_sola_vez()
+    {
+        await using var anfitrion = Anfitrion();
+        var (pedido, cuenta, _, impresa) = await ComprarMixtoConImpreso(anfitrion);
+        await EntregarElImpreso(pedido, impresa);
+        var solicitada = await SolicitarImpreso(anfitrion, cuenta, pedido, impresa);
+        Assert.True(solicitada.EsExito, solicitada.Error?.Clave);
+        Assert.True((await anfitrion.Como(DelEncargadoT30(), sp => sp.GetRequiredService<IGestionDeDevoluciones>().Aprobar(solicitada.Valor.DevolucionId))).EsExito);
+
+        _reembolsos.EstadoAlProcesar = null;
+        var recibida = await anfitrion.Como(DelEncargadoT30(), sp => sp.GetRequiredService<IGestionDeDevoluciones>().ConfirmarRecepcion(solicitada.Valor.DevolucionId));
+
+        Assert.True(recibida.EsExito, recibida.Error?.Clave);
+        var pendiente = await anfitrion.Como(DelEncargadoT30(), sp => sp.GetRequiredService<IGestionDeDevoluciones>().Obtener(solicitada.Valor.DevolucionId));
+        Assert.True(pendiente.Valor.Lineas.Single().ReembolsoPendiente);
+
+        _reembolsos.EstadoAlProcesar = EstadoDelReembolso.Reembolsado;
+        var primera = await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<ConciliarReembolsosDeDevoluciones>().Ejecutar(100));
+        var segunda = await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<ConciliarReembolsosDeDevoluciones>().Ejecutar(100));
+
+        Assert.True(primera.EsExito && segunda.EsExito);
+        Assert.Equal("reembolsada", await bd.Consultar<string>("SELECT l.estado FROM devoluciones.lineas_de_devolucion l JOIN devoluciones.devoluciones d ON d.id = l.devolucion_id WHERE d.pedido_id = @p", ("p", pedido)));
+        Assert.Single(_reembolsos.Registrados.Select(r => r.ClaveNatural).Distinct());
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-19")]
+    public async Task Cincuenta_pares_de_descarga_por_reembolso_automatico_los_deciden_a_favor_de_uno_solo()
+    {
+        await using var anfitrion = Anfitrion();
+        var reembolsos = 0;
+        var descargas = 0;
+        for (var i = 0; i < 50; i++)
+        {
+            var (pedido, cuenta, linea) = await ComprarMixto(anfitrion);
+            var acceso = await bd.Consultar<Guid>("SELECT id FROM biblioteca.accesos WHERE pedido_id = @p", ("p", pedido));
+
+            var reembolso = anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<IDevolucionesDelCliente>().PedirReembolsoDeDigital(new PedirReembolsoDeDigitalEntrada(pedido, linea, new TextoLibre(Sembrado))));
+            var descarga = anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<IDescargasDeLaBiblioteca>().SolicitarEnlace(acceso, "clave-" + Guid.NewGuid().ToString("N")));
+            await Task.WhenAll(reembolso, descarga);
+
+            var gananElReembolso = (await reembolso).EsExito;
+            var ganaLaDescarga = (await descarga).EsExito;
+            Assert.True(gananElReembolso ^ ganaLaDescarga, $"par {i}: reembolso={gananElReembolso}, descarga={ganaLaDescarga}");
+            if (gananElReembolso)
+            {
+                reembolsos++;
+                Assert.Equal("revocado", await bd.Consultar<string>("SELECT estado FROM biblioteca.accesos WHERE id = @a", ("a", acceso)));
+            }
+            else
+            {
+                descargas++;
+                Assert.Equal("politica-digital", (await reembolso).Error!.Clave);
+                Assert.Equal("vigente", await bd.Consultar<string>("SELECT estado FROM biblioteca.accesos WHERE id = @a", ("a", acceso)));
+            }
+        }
+
+        Assert.Equal(50, reembolsos + descargas);
+        Assert.Equal(reembolsos, _reembolsos.Registrados.Count);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-24")]
+    public async Task Aprobar_un_reporte_cuya_linea_una_anulacion_ya_revoco_responde_linea_no_devolvible_y_rechazarlo_lo_cierra()
+    {
+        await using var anfitrion = Anfitrion();
+        var (pedido, cuenta, linea) = await ComprarMixto(anfitrion);
+        var reportado = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<IDevolucionesDelCliente>().ReportarArchivoDefectuoso(new ReportarArchivoDefectuosoEntrada(pedido, linea, new TextoLibre(Sembrado), new TextoLibre("No abre"))));
+        Assert.True(reportado.EsExito, reportado.Error?.Clave);
+        Assert.True((await anfitrion.Como(DelAdministrador(), sp => sp.GetRequiredService<IAdministracionDePedidos>().Anular(new AnularPedidoEntrada(pedido, "otro")))).EsExito);
+
+        var aprobado = await anfitrion.Como(DelAdministrador(), sp => sp.GetRequiredService<IGestionDeDevoluciones>().AprobarReporte(reportado.Valor.DevolucionId));
+        var rechazado = await anfitrion.Como(DelAdministrador(), sp => sp.GetRequiredService<IGestionDeDevoluciones>().RechazarReporte(reportado.Valor.DevolucionId));
+
+        Assert.False(aprobado.EsExito);
+        Assert.Equal("linea-no-devolvible", aprobado.Error!.Clave);
+        Assert.True(rechazado.EsExito, rechazado.Error?.Clave);
     }
 }
