@@ -8,7 +8,7 @@ namespace BabelHub.IntegrationTests.Pedidos;
 
 /// <summary>
 /// Las operaciones simultáneas sobre un mismo pedido, con la Aplicación real sobre PostgreSQL real (T33; PED-21, PED-22, PED-25; AC-PED-08, AC-PED-09, AC-PED-17, AC-PED-18, AC-PED-21): cada par de operaciones
-/// (cancelar, anular, preparar, marcar listas, entregar) corre <b>20 veces a la vez</b> sobre un pedido de recojo con una línea lista y otra confirmada. No importa quién gane: importa que <b>nunca</b> haya una línea con la
+/// (cancelar, anular, preparar, marcar listas, entregar y el despacho del traslado de una línea) corre <b>20 veces a la vez</b> sobre un pedido de recojo con una línea lista y otra confirmada. No importa quién gane: importa que <b>nunca</b> haya una línea con la
 /// reserva cerrada y liberada a la vez, ni dos reembolsos distintos, ni una operación que quede «en curso» sin dueño, ni una excepción que escape al llamador (todo fallo es un <see cref="Resultado{T}"/>).
 /// </summary>
 [Collection(ColeccionPostgresDePedidos.Nombre)]
@@ -27,6 +27,7 @@ public sealed class ConcurrenciaDePedidosTests(PostgresDePedidosFixture bd) : IA
         Preparar,
         MarcarListas,
         Entregar,
+        DespacharElTraslado,
     }
 
     public static TheoryData<Operacion, Operacion> Pares()
@@ -57,7 +58,7 @@ public sealed class ConcurrenciaDePedidosTests(PostgresDePedidosFixture bd) : IA
         var lineas = new[]
         {
             new DatosDeLineaNueva(Guid.NewGuid(), Guid.NewGuid(), false, "Ficciones", null, 1, 50m, 50m, "LIM", false, null, null),
-            new DatosDeLineaNueva(Guid.NewGuid(), Guid.NewGuid(), false, "El Aleph", null, 1, 40m, 40m, "LIM", false, null, null),
+            new DatosDeLineaNueva(Guid.NewGuid(), Guid.NewGuid(), false, "El Aleph", null, 1, 40m, 40m, "LIM", true, Guid.NewGuid(), new DateOnly(2026, 11, 25)),
         };
         var pedido = Pedido.Crear(new DatosDePedidoNuevo(Guid.NewGuid(), Numero(), EscenarioDePedidos.Titular, TipoDeEntregaDelPedido.Recojo, "LIM", null, 0m, 90m, null, new("t-1", ahora), new("p-1", ahora), null, lineas, ahora)).Pedido!;
         Assert.True(await bd.Pedidos.Agregar(pedido));
@@ -79,7 +80,14 @@ public sealed class ConcurrenciaDePedidosTests(PostgresDePedidosFixture bd) : IA
             Operacion.Anular => await escenario.Como(EscenarioDePedidos.DeLaAdministracion(), async sp => Describir(await sp.GetRequiredService<IAdministracionDePedidos>().Anular(new AnularPedidoEntrada(pedido.Id, "otro")))),
             Operacion.Preparar => await escenario.Como(EscenarioDePedidos.DelEncargado(Sucursal), async sp => Describir(await sp.GetRequiredService<IGestionDeRecojo>().Preparar("LIM", entrada))),
             Operacion.MarcarListas => await escenario.Como(EscenarioDePedidos.DelEncargado(Sucursal), async sp => Describir(await sp.GetRequiredService<IGestionDeRecojo>().MarcarListas("LIM", entrada))),
-            _ => await escenario.Como(EscenarioDePedidos.DelEncargado(Sucursal), async sp => Describir(await sp.GetRequiredService<IGestionDeRecojo>().Entregar("LIM", entrada))),
+            Operacion.Entregar => await escenario.Como(EscenarioDePedidos.DelEncargado(Sucursal), async sp => Describir(await sp.GetRequiredService<IGestionDeRecojo>().Entregar("LIM", entrada))),
+            _ => await escenario.Como(
+                ActorActual.DeIntegracion(IntegracionesDeServicio.Inventario),
+                async sp =>
+                {
+                    var conTraslado = pedido.Lineas.Single(l => l.TrasladoId is not null);
+                    return Describir(await sp.GetRequiredService<IReceptorDeEstadosDeTraslado>().Recibir(new EstadoDeTrasladoRecibido($"traslado:{conTraslado.TrasladoId:D}:en-transito", conTraslado.TrasladoId!.Value, pedido.Id, conTraslado.EdicionId, conTraslado.Cantidad, EstadoDelTrasladoInformado.EnTransito, new DateOnly(2026, 11, 25))));
+                }),
         };
         return resultado;
     }
