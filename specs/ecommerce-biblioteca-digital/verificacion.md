@@ -53,6 +53,8 @@ Casos límite de la sección 6: cubiertos por las mismas pruebas (clave de un so
 - **E2E sin estilos si falta `app.css`.** Sin `scripts/construir-estilos.sh` las capturas salen sin diseño y axe pasa sin significado. El README del E2E ya lo exige como requisito; la revisión visual se hizo con el CSS compilado.
 - **Revisión visual (`ui-review`)** de Mi biblioteca en escritorio y teléfono, claro y oscuro: tarjeta con título, formato, fecha en hora de Lima, estado con texto e icono, «N de 5 descargas usadas» con barra, ayuda en `<details>` y foco por teclado. Sin hallazgos abiertos.
 
+- **Alcance del E2E de la administración (T25).** El E2E cubre la lista de ayudas con axe en tema claro; la biblioteca de un cliente, la restitución y los estados «archivo no disponible» y «límite» se cubren con pruebas de integración (AC-BIB-11, AC-BIB-13). Registrado en `progress/hallazgos.md` como Menor.
+
 ## 4. Conclusión
 
 La Biblioteca digital converge con su spec: 26 de 26 criterios con prueba, E2E verde en tres navegadores, axe AA en claro y oscuro, y concurrencia y cancelación probadas contra PostgreSQL real. Falta solo que el coordinador corrija la prueba de arquitectura ajena y ejecute la suite completa.

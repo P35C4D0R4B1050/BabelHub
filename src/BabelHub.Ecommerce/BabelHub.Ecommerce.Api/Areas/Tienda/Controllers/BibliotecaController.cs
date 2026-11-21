@@ -31,12 +31,14 @@ public sealed record BotonDeDescargaVista(Guid AccesoId, string Clave);
 /// <c>GET</c> que un prefetch pueda gastar de las cinco descargas. La titularidad, el cupo y la idempotencia son de la Biblioteca.
 /// </summary>
 [Area("Tienda")]
+[RequestSizeLimit(4096)]
 public sealed partial class BibliotecaController(IDescargasDeLaBiblioteca biblioteca, ContextoDePagina pagina, OpcionesDeErrores opciones) : Controller
 {
     [GeneratedRegex("^[0-9a-f]{32}$", RegexOptions.CultureInvariant)]
     private static partial Regex FormaDeLaClave();
 
     [HttpPost("/biblioteca/{id:guid}/descargar")]
+    [RequiereSesion]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Descargar(Guid id, [FromForm] string? clave, CancellationToken cancelacion)
     {
