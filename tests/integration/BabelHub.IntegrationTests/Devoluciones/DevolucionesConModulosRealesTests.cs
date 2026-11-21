@@ -318,6 +318,8 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
         var pendiente = await anfitrion.Como(DelEncargadoT30(), sp => sp.GetRequiredService<IGestionDeDevoluciones>().Obtener(solicitada.Valor.DevolucionId));
         Assert.True(pendiente.Valor.Lineas.Single().ReembolsoPendiente);
 
+        // El doble de Pagos solo contesta la consulta por origen con lo que se le siembra: la pasarela aceptó el registro, pero no confirmó.
+        _reembolsos.Pendientes[ClaveDeReembolso.De(solicitada.Valor.DevolucionId, impresa)] = new ReembolsoPendienteVista(Guid.NewGuid(), OrigenDelReembolso.Devolucion, 50m, EstadoDelReembolso.Pendiente, null, _reloj.Ahora, 1);
         _reembolsos.EstadoAlProcesar = EstadoDelReembolso.Reembolsado;
         var primera = await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<ConciliarReembolsosDeDevoluciones>().Ejecutar(100));
         var segunda = await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<ConciliarReembolsosDeDevoluciones>().Ejecutar(100));
@@ -334,9 +336,11 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
         await using var anfitrion = Anfitrion();
         var reembolsos = 0;
         var descargas = 0;
+        var pedidos = new List<Guid>();
         for (var i = 0; i < 50; i++)
         {
             var (pedido, cuenta, linea) = await ComprarMixto(anfitrion);
+            pedidos.Add(pedido);
             var acceso = await bd.Consultar<Guid>("SELECT id FROM biblioteca.accesos WHERE pedido_id = @p", ("p", pedido));
 
             var reembolso = anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<IDevolucionesDelCliente>().PedirReembolsoDeDigital(new PedirReembolsoDeDigitalEntrada(pedido, linea, new TextoLibre(Sembrado))));
@@ -360,7 +364,8 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
         }
 
         Assert.Equal(50, reembolsos + descargas);
-        Assert.Equal(reembolsos, _reembolsos.Registrados.Count);
+        // El doble de Pagos anota hasta lo que la transacción revierte; lo que cuenta es lo que quedó guardado.
+        Assert.Equal(reembolsos, await bd.Consultar<long>("SELECT count(*) FROM devoluciones.devoluciones WHERE pedido_id = ANY(@ids)", ("ids", pedidos.ToArray())));
     }
 
     [Fact]

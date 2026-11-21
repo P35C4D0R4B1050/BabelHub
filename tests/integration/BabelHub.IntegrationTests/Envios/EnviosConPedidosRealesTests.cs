@@ -320,8 +320,8 @@ public sealed class EnviosConPedidosRealesTests(PostgresDePedidosYEnviosFixture 
         Assert.Contains("en_reparto", estados);
         Assert.Contains("cancelado", estados);
         Assert.Equal(antes, await bd.Consultar<string>("SELECT string_agg(id::text || estado || coalesce(numero_de_guia, '') || coalesce(operador, ''), '|' ORDER BY id) FROM envios.envios"));
-        Assert.Equal(0, await bd.Consultar<int>("SELECT count(*) FROM envios.envios x WHERE row_to_json(x)::text ~* '(Ana P|987654321|Jr\\. Lima)'"));
-        Assert.Equal(0, await bd.Consultar<int>("SELECT count(*) FROM envios.envio_lineas x WHERE row_to_json(x)::text ~* '(Ana P|987654321|Jr\\. Lima)'"));
-        Assert.Equal(0, await bd.Consultar<int>("SELECT count(*) FROM pedidos.pedidos WHERE contacto_nombre IS NOT NULL OR contacto_telefono IS NOT NULL OR contacto_direccion IS NOT NULL"));
+        Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM envios.envios x WHERE row_to_json(x)::text ~* '(Ana P|987654321|Jr\\. Lima)'"));
+        Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM envios.envio_lineas x WHERE row_to_json(x)::text ~* '(Ana P|987654321|Jr\\. Lima)'"));
+        Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM pedidos.pedidos WHERE contacto_nombre IS NOT NULL OR contacto_telefono IS NOT NULL OR contacto_direccion IS NOT NULL"));
     }
 }
