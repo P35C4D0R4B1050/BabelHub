@@ -109,6 +109,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
         [nameof(AccionesAuditables.HojaDeReclamacionRespondida)] = ["hoja-de-reclamacion"],
         [nameof(AccionesAuditables.HojaDeReclamacionDescartada)] = ["hoja-de-reclamacion"],
         [nameof(AccionesAuditables.HojaDeReclamacionAnonimizada)] = [],
+        [nameof(AccionesAuditables.HojaDeReclamacionVinculada)] = ["usuario"],
         [nameof(AccionesAuditables.HojaDeReclamacionConsultada)] = ["hoja-de-reclamacion"],
         [nameof(AccionesAuditables.AvisosDeNumeroDesactivados)] = ["numero"],
 

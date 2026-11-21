@@ -132,6 +132,7 @@ public sealed class RegistroDeCuentas(
     IUnidadDeTrabajo unidad,
     IPendientesDeCuenta pendientes,
     ICarritoDeCuentaReemplazada carrito,
+    ReceptoresDeCambiosDeCuentaCompuestos receptores,
     IRepositorioDeRenovaciones renovaciones,
     ISegundoFactorAlmacen segundoFactor,
     IAuditoria auditoria,
@@ -339,6 +340,9 @@ public sealed class RegistroDeCuentas(
 
             await renovaciones.RevocarTodas(existente.Usuario.Id, reloj.Ahora, cancelacion).ConfigureAwait(false);
             await carrito.Eliminar(existente.Usuario.Id, cancelacion).ConfigureAwait(false);
+
+            // Los módulos receptores desvinculan lo suyo antes de que la cuenta se elimine y su correo se reasigne (IDE-99); si uno falla, o no hay ninguno, el reemplazo no se hace y el rechazo es el de IDE-13 (IDE-88).
+            await receptores.AlReemplazarLaCuenta(existente.Usuario.Id, cancelacion).ConfigureAwait(false);
             await auditoria.Registrar(
                 new SolicitudDeRegistro(AccionesAuditables.CuentaReemplazada) { ObjetoTipo = "cuenta", ObjetoId = existente.Usuario.Id.ToString("D") },
                 cancelacion).ConfigureAwait(false);

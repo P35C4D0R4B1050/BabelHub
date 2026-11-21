@@ -511,6 +511,7 @@ public sealed class CatalogoDeAccionesTests
             nameof(AccionesAuditables.HojaDeReclamacionRespondida),
             nameof(AccionesAuditables.HojaDeReclamacionDescartada),
             nameof(AccionesAuditables.HojaDeReclamacionAnonimizada),
+            nameof(AccionesAuditables.HojaDeReclamacionVinculada),
             nameof(AccionesAuditables.BibliotecaDeClienteConsultada),
             nameof(AccionesAuditables.HojaDeReclamacionConsultada),
             nameof(AccionesAuditables.AvisosDeNumeroDesactivados),
@@ -575,6 +576,7 @@ public sealed class CatalogoDeAccionesTests
     [InlineData(nameof(AccionesAuditables.UsuarioDesactivado), true)]
     [InlineData(nameof(AccionesAuditables.UsuarioReactivado), true)]
     [InlineData(nameof(AccionesAuditables.UsuarioActualizado), true)]
+    [InlineData(nameof(AccionesAuditables.HojaDeReclamacionVinculada), true)]
     [InlineData(nameof(AccionesAuditables.CuentaCancelada), true)]
     [InlineData(nameof(AccionesAuditables.CuentaReemplazada), true)]
     [InlineData(nameof(AccionesAuditables.CancelacionDiferidaDescartada), true)]
@@ -636,6 +638,7 @@ public sealed class CatalogoDeAccionesTests
             nameof(AccionesAuditables.HojaDeReclamacionRespondida),
             nameof(AccionesAuditables.HojaDeReclamacionDescartada),
             nameof(AccionesAuditables.HojaDeReclamacionAnonimizada),
+            nameof(AccionesAuditables.HojaDeReclamacionVinculada),
             nameof(AccionesAuditables.BibliotecaDeClienteConsultada),
             nameof(AccionesAuditables.HojaDeReclamacionConsultada),
             nameof(AccionesAuditables.AvisosDeNumeroDesactivados),

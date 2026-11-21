@@ -56,6 +56,27 @@ public class ReglasDeCredencialesEnLaApiTests
     }
 
 
+
+    [Fact]
+    public void Solo_Identidad_y_Reclamaciones_usan_el_contrato_de_la_cuenta_por_correo_verificado()
+    {
+        // IClientePorCorreoVerificadoDeSistema resuelve un correo a una cuenta sin actor (IDE-99, AC-IDE-73): sería un oráculo de enumeración en cualquier otro módulo. Solo Reclamaciones (la vinculación inicial de las
+        // hojas) lo usa; Identidad lo define, lo implementa y lo registra en su composición.
+        const string Contrato = "BabelHub.Ecommerce.Application.Identidad.IClientePorCorreoVerificadoDeSistema";
+        var enLaAplicacion = Types.InAssembly(Cargar("BabelHub.Ecommerce.Application"))
+            .That().HaveDependencyOn(Contrato)
+            .And().DoNotResideInNamespaceStartingWith("BabelHub.Ecommerce.Application.Identidad")
+            .And().DoNotResideInNamespaceStartingWith("BabelHub.Ecommerce.Application.Reclamaciones")
+            .GetTypes();
+        var enLaInfraestructura = Types.InAssembly(Cargar("BabelHub.Ecommerce.Infrastructure"))
+            .That().HaveDependencyOn(Contrato)
+            .And().DoNotResideInNamespaceStartingWith("BabelHub.Ecommerce.Infrastructure.Reclamaciones")
+            .And().DoNotResideInNamespaceStartingWith("BabelHub.Ecommerce.Infrastructure.Composicion")
+            .GetTypes();
+
+        Assert.Empty(enLaAplicacion);
+        Assert.Empty(enLaInfraestructura);
+    }
     [Fact]
     public void Ningun_tipo_de_la_Api_lee_el_correo_ni_el_contacto_de_una_cuenta_por_los_contratos_de_sistema()
     {
@@ -64,6 +85,7 @@ public class ReglasDeCredencialesEnLaApiTests
         var resultado = Types.InAssembly(Cargar("BabelHub.Ecommerce.Api"))
             .ShouldNot().HaveDependencyOnAny(
                 "BabelHub.Ecommerce.Application.Identidad.ICorreoVerificadoDeSistema",
+                "BabelHub.Ecommerce.Application.Identidad.IClientePorCorreoVerificadoDeSistema",
                 "BabelHub.Ecommerce.Application.Identidad.IContactoDeAvisosDelCliente")
             .GetResult();
 

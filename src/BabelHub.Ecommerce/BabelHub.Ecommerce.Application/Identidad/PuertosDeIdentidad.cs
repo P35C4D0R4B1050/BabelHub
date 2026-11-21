@@ -121,3 +121,81 @@ public interface IEntregaDeBajas
 {
     Task<bool> Entregar(Guid identificadorOpaco, CancellationToken cancelacion = default);
 }
+
+/// <summary>
+/// Lo que cada módulo receptor implementa para los cambios de cuenta que le importan (IDE-99, DD-26): Reclamaciones vincula a la cuenta las hojas del correo anterior de un cliente antes de que ese correo quede libre.
+/// Se llama <b>dentro de la transacción</b> del cambio de correo de un cliente (<see cref="AlCambiarElCorreo"/>) o de la de reemplazo de una cuenta sin verificar (<see cref="AlReemplazarLaCuenta"/>); si lanza, no se
+/// aplica el cambio ni el reemplazo. El correo anterior viaja <b>solo en memoria</b>: el receptor no lo guarda, no lo audita ni lo registra, y cada receptor escribe bajo su propio <c>EjecutarComo</c> desde su Infraestructura (D23).
+/// </summary>
+public interface IReceptorDeCambiosDeCuenta
+{
+    /// <summary>El nombre estable del módulo (define el orden de llamada, el mismo de la cancelación).</summary>
+    string Modulo { get; }
+
+    /// <summary>Se llama antes de liberar el correo anterior de un cliente (ya normalizado): el receptor lo usa solo para vincular lo suyo a la cuenta.</summary>
+    Task AlCambiarElCorreo(Guid usuarioId, string correoAnteriorNormalizado, CancellationToken cancelacion = default);
+
+    /// <summary>Se llama antes de eliminar una cuenta de cliente sin verificar que se reemplaza (IDE-84): el receptor desvincula lo suyo.</summary>
+    Task AlReemplazarLaCuenta(Guid usuarioId, CancellationToken cancelacion = default);
+}
+
+/// <summary>Un módulo receptor no pudo aplicar un cambio de cuenta, o no hay ninguno registrado (IDE-99): el cambio o el reemplazo no se aplican. El mensaje es fijo y nunca lleva el correo ni la causa del receptor.</summary>
+public sealed class CambiosDeCuentaNoAplicablesException : InvalidOperationException
+{
+    public CambiosDeCuentaNoAplicablesException()
+        : base("Un módulo receptor no pudo aplicar el cambio de cuenta.")
+    {
+    }
+
+    public CambiosDeCuentaNoAplicablesException(string message)
+        : base(message)
+    {
+    }
+
+    public CambiosDeCuentaNoAplicablesException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+
+    /// <summary>El nombre del módulo que falló (sin datos del cambio), o <see langword="null"/> si no había ninguno.</summary>
+    public string? Modulo { get; init; }
+}
+
+/// <summary>
+/// Los receptores de los cambios de cuenta como uno solo (IDE-99): los llama por <see cref="IReceptorDeCambiosDeCuenta.Modulo"/> en el orden de la cancelación y <b>falla cerrado</b> si no hay ninguno (como
+/// <see cref="PendientesDeCuentaCompuestos"/>) o si uno lanza. Descarta el mensaje y la causa del receptor: el correo anterior viaja como parámetro y no debe llegar a un log ni a un mensaje. Cada receptor escribe
+/// bajo su propio rol desde su Infraestructura; este compuesto no conoce esquemas.
+/// </summary>
+public sealed class ReceptoresDeCambiosDeCuentaCompuestos(IReadOnlyList<IReceptorDeCambiosDeCuenta> receptores)
+{
+    public Task AlCambiarElCorreo(Guid usuarioId, string correoAnteriorNormalizado, CancellationToken cancelacion = default) =>
+        Llamar(receptor => receptor.AlCambiarElCorreo(usuarioId, correoAnteriorNormalizado, cancelacion), cancelacion);
+
+    public Task AlReemplazarLaCuenta(Guid usuarioId, CancellationToken cancelacion = default) =>
+        Llamar(receptor => receptor.AlReemplazarLaCuenta(usuarioId, cancelacion), cancelacion);
+
+    private async Task Llamar(Func<IReceptorDeCambiosDeCuenta, Task> llamada, CancellationToken cancelacion)
+    {
+        if (receptores.Count == 0)
+        {
+            throw new CambiosDeCuentaNoAplicablesException("No hay ningún módulo receptor de los cambios de cuenta.");
+        }
+
+        foreach (var receptor in receptores
+            .Select((receptor, posicion) => (receptor, posicion, rango: Array.IndexOf(Interno.EjecutorDeLaCancelacion.OrdenDeLosReceptores, receptor.Modulo)))
+            .OrderBy(r => r.rango < 0 ? int.MaxValue : r.rango)
+            .ThenBy(r => r.posicion)
+            .Select(r => r.receptor))
+        {
+            try
+            {
+                await llamada(receptor).ConfigureAwait(false);
+            }
+            catch (Exception) when (!cancelacion.IsCancellationRequested)
+            {
+                // Sin el mensaje ni la causa del receptor (podrían llevar el correo anterior): solo el módulo que falló.
+                throw new CambiosDeCuentaNoAplicablesException { Modulo = receptor.Modulo };
+            }
+        }
+    }
+}

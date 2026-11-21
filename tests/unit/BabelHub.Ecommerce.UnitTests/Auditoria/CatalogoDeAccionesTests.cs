@@ -574,6 +574,7 @@ public sealed class CatalogoDeAccionesTests
             nameof(AccionesAuditables.HojaDeReclamacionRespondida),
             nameof(AccionesAuditables.HojaDeReclamacionDescartada),
             nameof(AccionesAuditables.HojaDeReclamacionAnonimizada),
+            nameof(AccionesAuditables.HojaDeReclamacionVinculada),
             nameof(AccionesAuditables.BibliotecaDeClienteConsultada),
             nameof(AccionesAuditables.HojaDeReclamacionConsultada),
             nameof(AccionesAuditables.AvisosDeNumeroDesactivados),
@@ -604,6 +605,41 @@ public sealed class CatalogoDeAccionesTests
         Assert.True(Catalogo.Obtener("CambioDeRol").ObjetoPersonal);
     }
 
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-34")]
+    public async Task La_vinculacion_de_hojas_solo_guarda_el_disparador_y_el_conteo_sin_el_correo_ni_la_hoja()
+    {
+        var entorno = new Entorno(ActorDePrueba.DeAdministradorCentral());
+
+        await entorno.Registrar(
+            AccionesAuditables.HojaDeReclamacionVinculada,
+            new Dictionary<string, string?> { ["disparador"] = "cambio-de-correo", ["conteo"] = "3", ["correo"] = "persona@example.test", ["numeroDeHoja"] = "HR-000123" },
+            objetoTipo: "usuario",
+            objetoId: Guid.NewGuid().ToString("D"));
+
+        var registro = Assert.Single(entorno.Almacen.Registros);
+        Assert.Equal("cambio-de-correo", registro.Detalle.Valores["disparador"]);
+        Assert.Equal("3", registro.Detalle.Valores["conteo"]);
+        Assert.Equal(2, registro.Detalle.Valores.Count);
+        Assert.DoesNotContain("persona@example.test", registro.Detalle.Texto);
+        Assert.DoesNotContain("HR-000123", registro.Detalle.Texto);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-AUD-34")]
+    [InlineData("registro")]
+    [InlineData("consulta")]
+    [InlineData("pendientes")]
+    [InlineData("cambio-de-correo")]
+    [InlineData("vinculacion-inicial")]
+    public void El_disparador_de_la_vinculacion_es_de_valores_cerrados(string disparador)
+    {
+        var clave = Assert.Single(Catalogo.Obtener(nameof(AccionesAuditables.HojaDeReclamacionVinculada)).Detalle, c => c.Nombre == "disparador");
+
+        Assert.Contains(disparador, clave.Valores!);
+        Assert.Equal(5, clave.Valores!.Count);
+    }
     [Fact]
     [Trait("Criterio", "AC-AUD-05")]
     public async Task El_restablecimiento_de_una_contrasena_temporal_no_guarda_secretos()
@@ -638,6 +674,7 @@ public sealed class CatalogoDeAccionesTests
     [InlineData(nameof(AccionesAuditables.UsuarioDesactivado), true)]
     [InlineData(nameof(AccionesAuditables.UsuarioReactivado), true)]
     [InlineData(nameof(AccionesAuditables.UsuarioActualizado), true)]
+    [InlineData(nameof(AccionesAuditables.HojaDeReclamacionVinculada), true)]
     [InlineData(nameof(AccionesAuditables.CuentaCancelada), true)]
     [InlineData(nameof(AccionesAuditables.CuentaReemplazada), true)]
     [InlineData(nameof(AccionesAuditables.CancelacionDiferidaDescartada), true)]
@@ -699,6 +736,7 @@ public sealed class CatalogoDeAccionesTests
             nameof(AccionesAuditables.HojaDeReclamacionRespondida),
             nameof(AccionesAuditables.HojaDeReclamacionDescartada),
             nameof(AccionesAuditables.HojaDeReclamacionAnonimizada),
+            nameof(AccionesAuditables.HojaDeReclamacionVinculada),
             nameof(AccionesAuditables.BibliotecaDeClienteConsultada),
             nameof(AccionesAuditables.HojaDeReclamacionConsultada),
             nameof(AccionesAuditables.AvisosDeNumeroDesactivados),
