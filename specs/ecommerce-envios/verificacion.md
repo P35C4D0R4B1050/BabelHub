@@ -127,3 +127,13 @@ Resultado: **No converge**. **Recuento: Cumple 12, Parcial 6, No cumple 0.** ENV
 | ENV-18 | La prueba de 20 pares de guía acepta `GuiasCreadas >= 20` (D-3) | Agente: cota por igualdad y rechazo del segundo par (cierra T20) |
 
 Diferencias abiertas: D-1 (operador, T14b), D-3, D-5 parcial (T21b), D-6, D-7, D-10 y D-11. Cerradas: D-4 (T22) y D-9 (T24, con el Menor de la tabla de logística en 375 px) y D-8. Para pasar a `Done` hace falta: el operador elegido y T14b, cerrar T20 y T21b, y las decisiones D-6, D-7 y D-10.
+
+## Cierre interno (carril V, 2026-11-21, última ronda)
+
+Ejecutado: integración filtrada `Devoluciones|Envios` con PostgreSQL real, **289 de 289 verdes**. Se cierran los parciales que no dependen del operador:
+
+- **ENV-18 → Cumple.** `Veinte_pares_de_solicitudes_de_guia_y_de_pasos_a_en_reparto…` ahora exige `GuiasCreadas == 20` (una guía por envío), que la solicitud simultánea que no gana reciba `guia-en-curso` (D-3 cerrada) y un cierre de reserva por envío.
+- **ENV-06 → Cumple (D-7).** `EnviosConAvisosRealesTests`: con el **Notificador real**, la guía generada deja el aviso al cliente `pendiente` en la misma transacción (su envío y su reintento son del Notificador, como en Pedidos), y con un Notificador que lanza la guía y el estado se conservan. El caso de un rechazo de plantilla ya publicaba una alerta técnica. La redacción de la spec («queda pendiente de reintento») queda satisfecha por el Notificador real; no hace falta cambiarla.
+- **T20 (parcial):** con las 20 parejas guía y reparto y las 20 parejas `Cancelar` × en reparto con el Pedidos real, faltan en integración el rechazo de negocio seguido de `Cancelar`, el cierre lento con `INV-IDEMPOTENCIA-EN-CURSO` y la falla tras el REST (cubiertos por pruebas unitarias).
+
+**Recuento final: Cumple 14 (ENV-01, 03, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 18, 19), Parcial 4 (ENV-02, 04, 15, 17), No cumple 0.** Los cuatro Parciales dependen del operador y de seguridad, no de este carril: **T14b** (operador real, decisión D02: plazo de 10 s, validación de la respuesta y registros del adaptador real; dueño persona responsable y operador) y el redactor de datos prohibidos sin `nombre`, `direccion` ni `telefono` (carril de seguridad). El registro de datos sensibles de EF no aplica: Envíos usa Npgsql sin EF Core. **Resultado: converge salvo T14b** y las decisiones D-6 y D-10 de la persona responsable (el estado de la spec sigue `InProgress` hasta entonces; no se marca `Done`).

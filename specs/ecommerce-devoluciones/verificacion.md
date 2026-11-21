@@ -181,3 +181,13 @@ Resultado: **No converge**, solo por lo que no es del código de este carril: (1
 | DEV-31 | Cumple | `DevolucionesApiTests` (adjuntos y campos no declarados) |
 
 Diferencias abiertas: **D5** (confirmar que Identidad usa la suma para IDE-27; `ContarEnTres` ya se usa en la prueba), **D9** (cinco supuestos del plan sin ratificar), los tres Parciales de arriba, y los Menores de `progress/hallazgos.md` (D10 a D13 y los de las revisiones de esta ronda). Para pasar a `Done` hace falta: la ratificación de D5 y D9, una prueba con Pagos real (o con la pasarela de Culqi cuando exista, T37/T38 de Pagos) para DEV-08 y DEV-21, y la prueba simultánea de DEV-26.
+
+## 8. Cierre interno (carril V, 2026-11-21, última ronda)
+
+Ejecutado: integración filtrada `Devoluciones|Envios` con PostgreSQL real, **289 de 289 verdes** (Testcontainer breve). Se cierran los tres Parciales de la sección 7:
+
+- **DEV-08 → Cumple.** `DevolucionesConPagosRealTests.El_reembolso_del_impreso_lo_registra_y_aplica_el_Pagos_real…`: una compra a domicilio real (carrito, checkout, cobro del simulador, pedido real) y un impreso devuelto por la Aplicación real; el `IReembolsos` **real** registra 50 sin el envío (el costo de envío no se reembolsa), el reembolso queda `reembolsado`, la línea `reembolsada`, un segundo reembolso sobre la misma línea lo rechaza el tope de Pagos y lo reembolsado nunca supera lo cobrado.
+- **DEV-21 → Cumple.** `…Con_la_pasarela_que_aplica_sin_responder…`: con el escenario `tok_reembolso_sin_respuesta` del simulador, la línea queda `recibida` con el reembolso `pendiente` y visible (`ReembolsoPendiente`); tras la espera de Pagos, tres pasadas de la conciliación lo resuelven y **la pasarela guarda un solo reembolso** (Pagos consulta antes de pedir de nuevo).
+- **DEV-26 → Cumple.** `DevolucionesConModulosRealesTests.Con_la_marca_real_de_Identidad…` (AC-DEV-28 sobre `identidad.solicitudes_de_cancelacion` real): sin cancelación y con cancelación diferida se aceptan el impreso y el reporte; con la ejecución en curso se rechazan ambos sin escribir ninguna devolución ni el motivo.
+
+**Recuento final: Cumple 31, Parcial 0, No cumple 0.** Siguen abiertas solo las decisiones de la persona responsable: **D5** (confirmar que Identidad cuenta la suma de los tres pendientes para IDE-27) y **D9** (cinco supuestos del plan sin ratificar), más los Menores de `progress/hallazgos.md`. Con esas dos decisiones y esta verificación repetida, la spec puede pasar a `Done`; el resultado se mantiene **No converge** solo hasta entonces (AGENTS.md: las decisiones de negocio son de la persona responsable).
