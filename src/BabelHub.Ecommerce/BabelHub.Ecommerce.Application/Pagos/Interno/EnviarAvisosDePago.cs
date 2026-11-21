@@ -1,4 +1,5 @@
 using System.Globalization;
+using BabelHub.Ecommerce.Application.Notificaciones;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Pagos;
 
@@ -17,7 +18,8 @@ internal sealed class EnviarAvisosDePago(
     ICuentaDelPagador cuentas,
     IEnviadorDeCorreo correo,
     IPublicadorDeAlertasTecnicas alertas,
-    IReloj reloj)
+    IReloj reloj,
+    INotificador? notificador = null)
 {
     public const string MotivoDeAlertaAvisoDePagoFallido = "aviso-de-pago-fallido";
 
@@ -73,8 +75,54 @@ internal sealed class EnviarAvisosDePago(
             return;
         }
 
+        // Con el correo ya fuera, el mismo evento también va por WhatsApp si la persona lo consintió (PAG-22): Notificaciones decide el consentimiento y solo guarda la solicitud.
+        await AvisarPorWhatsApp(aviso, intencion, cuentaId, cancelacion).ConfigureAwait(false);
+
         // Enviado, o encolado por la cuota de Plataforma (que lo reintenta): el aviso ya salió de Pagos.
         await Guardar(aviso, a => a.MarcarEnviado(reloj.Ahora), cancelacion).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// El aviso por WhatsApp del mismo evento (PAG-22, AC-PAG-12): <c>pago-pendiente</c>, <c>pago-resultado</c> (aprobado o rechazado) y <c>reembolso-automatico</c>; un pago vencido no tiene plantilla de WhatsApp. El evento es determinista por intención,
+    /// intento y estado (Notificaciones no repite un aviso que ya tiene), el destinatario es la cuenta como referencia opaca (nunca un número) y el único campo es la referencia del pedido (la intención): ningún dato de pago. Nunca interrumpe
+    /// ni cambia el cobro (regla 10): una falla de Notificaciones no impide marcar el correo como enviado.
+    /// </summary>
+    private async Task AvisarPorWhatsApp(AvisoDePago aviso, IntencionDePago intencion, Guid cuentaId, CancellationToken cancelacion)
+    {
+        if (notificador is null)
+        {
+            return;
+        }
+
+        var referencia = intencion.Id.ToString("N", CultureInfo.InvariantCulture);
+        (string Plantilla, Dictionary<string, string> Campos)? solicitud = aviso.Evento switch
+        {
+            EventoDeAvisoDePago.Pendiente => ("pago-pendiente", new Dictionary<string, string> { ["numeroDePedido"] = referencia }),
+            EventoDeAvisoDePago.Aprobado => ("pago-resultado", new Dictionary<string, string> { ["numeroDePedido"] = referencia, ["resultado"] = "aprobado" }),
+            EventoDeAvisoDePago.Rechazado => ("pago-resultado", new Dictionary<string, string> { ["numeroDePedido"] = referencia, ["resultado"] = "rechazado" }),
+            EventoDeAvisoDePago.ReembolsoAutomatico => ("reembolso-automatico", new Dictionary<string, string> { ["numeroDePedido"] = referencia }),
+            _ => null,
+        };
+        if (solicitud is not { } pedido)
+        {
+            return;
+        }
+
+        var eventoId = $"pago:{referencia}:{aviso.IntentoId.ToString("N", CultureInfo.InvariantCulture)}:{aviso.Evento.ToString().ToLowerInvariant()}";
+        try
+        {
+            await unidad.Ejecutar(
+                async token =>
+                {
+                    _ = await notificador.Solicitar(new SolicitudDeAviso(eventoId, DestinatarioDelAviso.Cliente, cuentaId.ToString("D", CultureInfo.InvariantCulture), pedido.Plantilla, pedido.Campos), token).ConfigureAwait(false);
+                    return true;
+                },
+                cancelacion).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // El correo ya salió y el cobro no cambia: Notificaciones nunca debería lanzar, y si lo hace queda sin aviso por WhatsApp.
+        }
     }
 
     /// <summary>Los datos que admite la plantilla: nunca datos de pago. Un rechazo lleva su motivo de la lista cerrada; un reembolso, el importe que se devuelve a quien pagó.</summary>

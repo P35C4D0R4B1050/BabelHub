@@ -5,7 +5,7 @@ fecha: 2026-11-21
 
 # Verificación — Base de la interfaz web
 
-## Resultado: No converge
+## Resultado: Converge salvo las partes humanas de T32 a T34 y WEB-25 en /reclamaciones/nueva
 
 ## 1. Comprobaciones automáticas
 
@@ -83,6 +83,13 @@ Abreviaturas de ruta. Código, bajo `src/BabelHub.Ecommerce/`: `Api/` = `BabelHu
 
 **Lo que el código hace y la spec no pide.** `SembradorDeSesiones` (`Api/Web/SembradorDeSesionesEnLaApi.cs`), solo en compilación Debug y en Development, para los E2E: no entra a la imagen de producción. Las rutas de administración son `/administracion/…` y no `/admin/…` como dice el plan §4 (hallazgo Menor ya registrado).
 
+## 2b. Actualización de la ronda 3 (2026-11-21)
+
+- **WEB-02: Cumple.** `IMenuDeNavegacion` y `ResolverMenu` componen el menú por rol y alcance (`MenuDeNavegacionTests`, 27 pruebas con `AC-WEB-02`, y `acceso/menu-por-rol.spec.ts` en los tres navegadores: el encargado no ve Administración y recibe 403 en esa dirección). Límite Menor: fuera de las pantallas de su sucursal el encargado ve solo «Envíos» (su sucursal no se traduce a código en el menú).
+- **WEB-25: Cumple salvo `/reclamaciones/nueva`.** El contacto de entrega del checkout (`/checkout/entrega`) ya se conserva y se recupera (`BorradorDeLaEntregaDelCheckoutTests`, `AC-WEB-24`) además de `/cuenta/datos`. `/reclamaciones/nueva` no se cablea por **REC-04** (`ecommerce-libro-reclamaciones`: el formulario nunca devuelve lo escrito, documento y domicilio incluidos, y es público): la regla específica prevalece; no se debilita ningún criterio. El ingreso y la administración no conservan lo escrito por diseño (D06).
+- **T28 cerrada** (con el adaptador real de textos legales y el borrador de entrega). La administración, la cabecera y las tablas de administración se corrigieron en esta ronda: el menú largo de Administración desbordaba la página a 1280 px y ahora se ajusta en varias líneas.
+- Integración Web, Pagos, Reclamaciones, Catálogo y Carrito: 1751 correctas; E2E por navegador (escritorio 59, teléfono 59 y WebKit 56, con stock repuesto): todas correctas.
+
 ## 3. Diferencias abiertas
 
 **Parcial o No cumple por trabajo de personas (no son defectos; dueño: la persona responsable; fase: posterior al Sprint 2).** Las partes automáticas (T32a, T33a, T34a) pasan.
@@ -109,4 +116,4 @@ Abreviaturas de ruta. Código, bajo `src/BabelHub.Ecommerce/`: `Api/` = `BabelHu
 
 ## 4. Conclusión
 
-**No converge.** Cumple 42 de 49 requisitos. Abiertos con trabajo propio: WEB-02 (menú provisional sin filtro por rol, Importante), WEB-25 (borrador recuperado solo en `/cuenta/datos`, Importante; por eso **T28 queda sin marcar**, su texto incluye el borrador recuperado). Abiertos por personas, posterior al Sprint 2: WEB-20 (lista manual con lector de pantalla), WEB-22 (dos rondas de usabilidad) y WEB-23 (navegadores y móviles reales); T32 a T34 siguen sin marcar por sus partes humanas. T35 cerrada con el adaptador real de textos legales.
+**Converge salvo** (1) las partes humanas de T32, T33 y T34 (navegadores y móviles reales, lista manual con lector de pantalla NVDA y VoiceOver, dos rondas de usabilidad con diez personas: WEB-20, WEB-22 y WEB-23; dueño: la persona responsable; fase posterior al Sprint 2, con guías y registros listos) y (2) WEB-25 en `/reclamaciones/nueva`, que no se cablea por REC-04 (decisión del coordinador de carriles: la regla específica prevalece). Menores heredados: ver sección 3.

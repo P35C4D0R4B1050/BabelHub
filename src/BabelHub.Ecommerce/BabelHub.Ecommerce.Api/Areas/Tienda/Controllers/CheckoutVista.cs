@@ -130,3 +130,22 @@ public static class ConstructorDeLaVistaDelCheckout
         return new LineaDeRevisionPintada(l.Titulo, digital ? "Libro digital" : "Libro impreso", l.Cantidad, FormatoPeruano.Soles(l.PrecioUnitario), FormatoPeruano.Soles(l.Importe), disponibilidad, plazo, l.Retirada);
     }
 }
+
+/// <summary>
+/// Los datos de entrega del checkout, para que la sesión que vence a mitad de la acción conserve lo escrito (WEB-25): el contacto del despacho a domicilio. Nunca contraseñas ni códigos. El modelo solo declara qué campos se conservan; la acción
+/// sigue leyendo el formulario con su lector estricto.
+/// </summary>
+public sealed class FormularioDeEntregaDelCheckout
+{
+    [Conservar]
+    public string? Nombre { get; set; }
+
+    [Conservar]
+    public string? Telefono { get; set; }
+
+    [Conservar]
+    public string? Direccion { get; set; }
+
+    [Conservar]
+    public string? Region { get; set; }
+}

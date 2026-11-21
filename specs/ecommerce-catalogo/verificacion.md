@@ -5,7 +5,7 @@ fecha: 2026-11-21
 
 # Verificación — Catálogo
 
-## Resultado: No converge
+## Resultado: Converge salvo los Menores CAT-12 y CAT-22
 
 ## 1. Comprobaciones automáticas
 
@@ -61,6 +61,11 @@ Criterio de «Cumple»: existe una prueba, a la altura del módulo que posee la 
 | Búsqueda sin resultados: estado vacío con acción de limpiar filtros | IW `PantallasDelCatalogoTests.cs:132` (AC-CAT-06); `Areas/Tienda/Views/Catalogo/Index.cshtml:55` | Sí |
 | La disponibilidad por sucursal solo se muestra para impresos | U `ConsultaDeCatalogoTests.cs:194` (las digitales nunca se consultan); IW `PantallasDelCatalogoTests.cs:278` (la pestaña digital no consulta stock); E `catalogo-publico.spec.ts` (AC-CAT-07, se omite sin variables) | Sí |
 
+## 2b. Actualización de la ronda 3 (2026-11-21)
+
+- **CAT-18 (AC-CAT-15): Cumple.** `BajaDeEdicionConElCarritoRealTests` (anfitrión real sobre PostgreSQL con todos los esquemas y la auditoría persistida; solo el Inventario del Carrito es un doble): dos clientes con la edición impresa en el carrito y un pedido en curso con ella; al darla de baja se quita de los dos carritos con aviso a cada cliente, el pedido conserva su línea y queda el registro `EdicionDadaDeBaja`.
+- Integración del Catálogo: 263 correctas (cierra D-06). Quedan los Menores CAT-12 (sin prueba nombrada de «agregar al carrito sigue permitido» con el Inventario caído), CAT-22 (el historial de ingresos muestra el usuario abreviado y el ingreso en la fuente de recepción solo se prueba contra el Inventario simulado) y las pantallas de administración sin `ui-review` registrado.
+
 ## 3. Diferencias abiertas
 
 Todas las tareas de `tasks.md` figuran marcadas. Primero lo que impide converger (Parcial); después lo menor.
@@ -77,4 +82,4 @@ Todas las tareas de `tasks.md` figuran marcadas. Primero lo que impide converger
 
 ## 4. Conclusión
 
-**No converge.** Cumple 20 de 23 requisitos; faltan una prueba de integración de la baja real del Catálogo con el retiro real de Carrito en PostgreSQL (CAT-18, Importante) y dos Menores (CAT-12 y CAT-22). La integración del catálogo se corrió en este cierre: 263 correctas (cierra D-06).
+**Converge salvo** los Menores CAT-12 y CAT-22 y el registro de `ui-review` de las pantallas (sección 3). Los 23 requisitos tienen prueba; ninguno queda sin cubrir.

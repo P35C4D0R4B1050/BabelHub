@@ -22,7 +22,7 @@ namespace BabelHub.Ecommerce.Api.Areas.Tienda.Controllers;
 [Area("Tienda")]
 [RequestSizeLimit(EntradasHttpDelCarrito.TopeDelCuerpo)]
 [RequiereSesion]
-public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IExigenciaDeVerificacionDePersona verificacion, ITextosLegales textos, ContextoDePagina pagina, OpcionesDeErrores errores) : Controller
+public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IExigenciaDeVerificacionDePersona verificacion, ITextosLegales textos, ContextoDePagina pagina, OpcionesDeErrores errores, IBorradoresDePantalla? borradores = null) : Controller
 {
     public const string RutaDelPago = "/checkout/pago";
 
@@ -83,14 +83,39 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
 
         // Con un retiro pendiente la Aplicación no entrega el pedidoId: se muestra la revisión con su aviso, sin redirigir al pago (CAR-26).
         var vista = await Armar(resultado.Valor, cancelacion);
+        await RecuperarElBorradorDeLaEntrega(vista, cancelacion);
         Response.Headers.CacheControl = "no-store";
         return View("Index", vista);
+    }
+
+    /// <summary>
+    /// Lo que la persona tenía escrito en los datos de entrega cuando venció su sesión (WEB-25): una sola vez, solo para ella y por 30 minutos como máximo. Recuperarlo es un favor: si falla, el formulario sale vacío.
+    /// Las claves se leen sin distinguir mayúsculas (el borrador guarda el nombre de cada propiedad).
+    /// </summary>
+    private async Task RecuperarElBorradorDeLaEntrega(CheckoutVista vista, CancellationToken cancelacion)
+    {
+        if (borradores is null || HttpContext.ActorDeLaSolicitud() is not { } actor)
+        {
+            return;
+        }
+
+        try
+        {
+            if (await borradores.Recuperar(actor.UsuarioId, "/checkout/entrega", cancelacion) is { Count: > 0 } recuperado)
+            {
+                vista.Valores = new Dictionary<string, string>(recuperado, StringComparer.OrdinalIgnoreCase);
+            }
+        }
+        catch (Exception) when (!cancelacion.IsCancellationRequested)
+        {
+            // Sin el borrador la pantalla sigue con sus datos guardados.
+        }
     }
 
     // ---------- Entrega ----------
 
     [HttpPost("/checkout/entrega")]
-    public async Task<IActionResult> ElegirEntrega(CancellationToken cancelacion)
+    public async Task<IActionResult> ElegirEntrega([FromForm] FormularioDeEntregaDelCheckout? formulario, CancellationToken cancelacion)
     {
         var (campos, error) = await EntradasHttpDelCarrito.Leer(HttpContext, CamposDeEntrega, cancelacion);
         if (campos is null)

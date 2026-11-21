@@ -22,7 +22,7 @@ public static class Temas
 /// Arma la parte común del modelo de cada página: el tema recordado y el menú. El menú es provisional hasta que la sesión (WEB-1b) y el
 /// módulo <c>Web</c> (<c>IMenuDeNavegacion</c>) lo entreguen ya filtrado por el rol y el alcance de quien mira (T15, T18).
 /// </summary>
-public sealed class ContextoDePagina(IHttpContextAccessor acceso, IPreferenciaDeSucursal sucursales)
+public sealed class ContextoDePagina(IHttpContextAccessor acceso, IPreferenciaDeSucursal sucursales, IMenuDeNavegacion? menu = null)
 {
     /// <summary>
     /// Clave de <c>HttpContext.Items</c> con la que la política de textos pendientes (T37) avisa a la página de que la persona debe aceptar
@@ -37,7 +37,7 @@ public sealed class ContextoDePagina(IHttpContextAccessor acceso, IPreferenciaDe
         modelo.Titulo = titulo;
         modelo.Area = area;
         modelo.Tema = Temas.Validar(acceso.HttpContext?.Request.Cookies[Temas.Cookie]);
-        modelo.Menu = MenuProvisional(area);
+        modelo.Menu = MenuDe(area);
         modelo.TextosPendientes = acceso.HttpContext?.Items[ClaveTextosPendientes] is true;
         // La cabecera ofrece «Mi cuenta» y «Cerrar sesión» en toda página de quien tiene sesión, no solo en las que lo piden a mano (hallazgo del E2E de la sesión).
         modelo.HaySesion |= acceso.HttpContext?.ActorDeLaSolicitud() is not null;
@@ -52,28 +52,24 @@ public sealed class ContextoDePagina(IHttpContextAccessor acceso, IPreferenciaDe
         return modelo;
     }
 
-    private static List<ItemDeMenu> MenuProvisional(AreaDeLaPagina area) => area switch
+    /// <summary>El menú del área para quien mira (WEB-02): lo decide el módulo <c>Web</c> por el rol de la sesión (visitante si no hay) y, en una sucursal, por el código de la ruta; sin el módulo registrado no hay menú.</summary>
+    private List<ItemDeMenu> MenuDe(AreaDeLaPagina area)
     {
-        AreaDeLaPagina.Tienda =>
-        [
-            new ItemDeMenu("Catálogo", "/catalogo", "libro"),
-            new ItemDeMenu("Carrito", "/carrito", "carrito"),
-            new ItemDeMenu("Mis pedidos", "/cuenta/pedidos", "bandeja"),
-            new ItemDeMenu("Mi biblioteca", "/biblioteca", "libro"),
-        ],
-        AreaDeLaPagina.Sucursal =>
-        [
-            new ItemDeMenu("Envíos", "/logistica/envios", "camion"),
-            new ItemDeMenu("Pedidos a domicilio", "/logistica/pedidos", "bandeja"),
-        ],
-        AreaDeLaPagina.Admin =>
-        [
-            new ItemDeMenu("Catálogo nacional", "/administracion/obras", "libro"),
-            new ItemDeMenu("Pedidos", "/administracion/pedidos", "bandeja"),
-            new ItemDeMenu("Ayudas de la biblioteca", "/administracion/biblioteca/ayudas", "bandeja"),
-        ],
-        _ => [],
-    };
+        if (menu is null)
+        {
+            return [];
+        }
+
+        var rol = acceso.HttpContext?.ActorDeLaSolicitud()?.Rol ?? RolWeb.Visitante;
+        var areaWeb = area switch
+        {
+            AreaDeLaPagina.Sucursal => AreaWeb.Sucursal,
+            AreaDeLaPagina.Admin => AreaWeb.Administracion,
+            _ => AreaWeb.Tienda,
+        };
+        var codigo = acceso.HttpContext?.Request.RouteValues["codigo"] as string;
+        return [.. menu.Resolver(rol, areaWeb, codigo).Select(o => new ItemDeMenu(o.Texto, o.Ruta, o.Icono))];
+    }
 }
 
 public static class InterfazWebExtensiones
