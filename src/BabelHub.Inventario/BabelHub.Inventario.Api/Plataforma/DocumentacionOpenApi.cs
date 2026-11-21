@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi;
+using Scalar.AspNetCore;
 
 namespace BabelHub.Inventario.Api.Plataforma;
 
@@ -39,6 +40,12 @@ public static partial class DocumentacionOpenApi
 {
     public const string Documento = "v1";
     public const string RutaDelDocumento = "/openapi/v1.json";
+
+    /// <summary>La ruta de la interfaz interactiva de la documentación (solo en Development).</summary>
+    public const string RutaDeLaInterfaz = "/documentacion";
+
+    /// <summary>Si la ruta es de la interfaz interactiva o de sus recursos (no es parte de la API que se documenta).</summary>
+    public static bool EsDeLaInterfaz(string ruta) => ruta.Equals(RutaDeLaInterfaz, StringComparison.Ordinal) || ruta.StartsWith(RutaDeLaInterfaz + "/", StringComparison.Ordinal);
     public const string EsquemaCredencialDeServicio = "credencialDeServicio";
     public const string EsquemaTokenDeUsuario = "tokenDeUsuario";
     public const string TipoDeProblema = "application/problem+json";
@@ -113,13 +120,15 @@ public static partial class DocumentacionOpenApi
         return servicios;
     }
 
-    /// <summary>Sirve el documento en <c>/openapi/v1.json</c> solo en <c>Development</c>.</summary>
+    /// <summary>Sirve el documento en <c>/openapi/v1.json</c> y su interfaz interactiva en <c>/documentacion</c>, solo en <c>Development</c>.</summary>
     public static WebApplication MapearDocumentacionOpenApi(this WebApplication app)
     {
         ArgumentNullException.ThrowIfNull(app);
         if (app.Environment.IsDevelopment())
         {
             app.MapOpenApi(RutaDelDocumento);
+            // La UI interactiva (Scalar) sobre el mismo documento, con sus recursos embebidos en el paquete (funciona sin internet) y solo en Development: en producción no se expone (SEG-11).
+            app.MapScalarApiReference(RutaDeLaInterfaz, opciones => opciones.WithTitle("BabelHub — API del Inventario").WithOpenApiRoutePattern(RutaDelDocumento));
         }
 
         return app;

@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Scalar.AspNetCore" />
     <ProjectReference Include="..\BabelHub.Inventario.Application\BabelHub.Inventario.Application.csproj" />
     <ProjectReference Include="..\BabelHub.Inventario.Infrastructure\BabelHub.Inventario.Infrastructure.csproj" />
     <ProjectReference Include="..\..\BabelHub.Shared\BabelHub.Shared.csproj" />
