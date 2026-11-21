@@ -78,10 +78,22 @@ public sealed class HumoDeImagenesTests : IDisposable
 
     private static void ExigirEmulacionDeArm64()
     {
-        var salida = Exigir(Docker(TimeSpan.FromSeconds(30), "buildx", "ls"), "No se pudo listar los constructores de Docker");
+        // La lista de plataformas de buildx puede tardar en reflejar la emulación (se vio vacía de arm64 en una de varias corridas seguidas): se reintenta antes de dar el entorno por no apto.
+        var salida = string.Empty;
+        for (var intento = 0; intento < 4; intento++)
+        {
+            salida = Exigir(Docker(TimeSpan.FromSeconds(30), "buildx", "ls"), "No se pudo listar los constructores de Docker");
+            if (salida.Contains("linux/arm64", StringComparison.Ordinal))
+            {
+                break;
+            }
+
+            Thread.Sleep(TimeSpan.FromSeconds(10));
+        }
+
         Assert.True(
             salida.Contains("linux/arm64", StringComparison.Ordinal),
-            "Docker no puede construir para linux/arm64: instala la emulación (QEMU de Docker Desktop o docker/setup-qemu-action).");
+            $"Docker no puede construir para linux/arm64: instala la emulación (QEMU de Docker Desktop o docker/setup-qemu-action). Salida de buildx ls: {salida}");
     }
 
     private string Construir(string contexto, string? dockerfile, string arquitectura, string nombre)
