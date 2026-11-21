@@ -93,7 +93,7 @@ cd tests/e2e && source "$LOCALAPPDATA/babelhub-e2e/env" && E2E_BASE_URL=https://
 
 ## Sembrador de sesiones (solo desarrollo)
 
-`POST /desarrollo/sesion` en el host del E-commerce crea una cuenta con el correo verificado y la hace ingresar **por el camino real** (el ingreso, el segundo factor del personal con su secreto TOTP y la sesión web); devuelve el `storageState` de Playwright con la cookie `__Host-bh-tienda` (cliente) o `__Host-bh-gestion` (personal). La cabecera `X-Usuario-Id` trae el identificador de la cuenta creada. Cada llamada crea una cuenta nueva con correo `e2e-<rol>-<hex>@example.test` y contraseña aleatoria que no se devuelve.
+`POST /desarrollo/sesion` en el host del E-commerce crea una cuenta con el correo verificado y la hace ingresar **por el camino real** (el ingreso, el segundo factor del personal con su secreto TOTP y la sesión web); devuelve el `storageState` de Playwright con la cookie `__Host-bh-tienda` (cliente) o `__Host-bh-gestion` (personal). La cabecera `X-Usuario-Id` trae el identificador de la cuenta creada. Cada llamada crea una cuenta nueva con correo `e2e-<rol>-<hex>@example.test` y contraseña aleatoria que no se devuelve (o la que elija la prueba con el campo `contrasena`, para ingresar luego por la pantalla real; se valida con la política y nunca se repite; la respuesta trae el correo en `X-Correo-Sembrado`).
 
 ```bash
 source "$LOCALAPPDATA/babelhub-e2e/env"   # trae BABELHUB__Sembrador__Clave

@@ -1,7 +1,7 @@
 ---
 id: ecommerce-carrito-checkout
 titulo: Carrito y checkout
-estado: Planned
+estado: Done
 aprobado_por: Claude (delegado por Diego Amiquero)
 aprobado_en: 2026-11-20
 plan_aprobado_por: Claude (delegado por Diego Amiquero)

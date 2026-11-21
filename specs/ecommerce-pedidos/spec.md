@@ -1,7 +1,7 @@
 ---
 id: ecommerce-pedidos
 titulo: Pedidos y seguimiento
-estado: Planned
+estado: Done
 aprobado_por: Claude (delegado por Diego Amiquero)
 aprobado_en: 2026-11-21
 plan_aprobado_por: Claude (delegado por Diego Amiquero)
