@@ -22,7 +22,7 @@ public sealed class AvisosDeVmAuxTests : IDisposable
     private string Comando(string texto, int codigo)
     {
         var ruta = Path.Combine(_entorno.Carpeta, $"cmd-{Guid.NewGuid():N}.sh");
-        File.WriteAllText(ruta, $"#!/usr/bin/env bash\ncat <<'FIN'\n{texto}\nFIN\nexit {codigo}\n");
+        ArchivosDeDoble.Escribir(ruta, $"#!/usr/bin/env bash\ncat <<'FIN'\n{texto}\nFIN\nexit {codigo}\n");
         return EntornoDeVmAux.EnLinux(ruta);
     }
 
