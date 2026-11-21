@@ -72,6 +72,52 @@ public sealed class OrigenDeUnidadesVendidasPostgresTests(PostgresDeReservasFixt
     }
 
     [Fact]
+    [Trait("Criterio", "AC-FUE-17")]
+    public async Task UnPedidoAnulado_NoCuentaComoVenta_NiLiberadoNiConLaLineaCerradaPorTraslado_YElDemasSiCuenta()
+    {
+        var lima = await bd.AgregarFuente("lima", recepcion: true);
+        var cusco = await bd.AgregarFuente("cusco");
+        var local = await bd.AgregarEdicion();
+        var conTraslado = await bd.AgregarEdicion();
+        await bd.PonerStock(lima, local, 10, 0);
+        await bd.PonerStock(lima, conTraslado, 0, 0);
+        await bd.PonerStock(cusco, conTraslado, 9, 0);
+        await bd.DefinirRuta(cusco, lima, 2);
+        var traslados = new TrasladosDeIntegracionDoble(bd);
+        using var pila = new PilaDeReservas(bd, s =>
+        {
+            s.AddScoped<IGeneradorDeTrasladosDePedido>(_ => traslados);
+            s.AddSingleton<IAlLiberarPedido>(new ReceptorSinEfecto());
+        });
+        var vigente = ARecojo("lima", [Linea(local, 2)]);
+        var anuladoLiberado = ARecojo("lima", [Linea(local, 1)]);
+        var anuladoConTraslado = ARecojo("lima", [Linea(conTraslado, 1)]);
+        foreach (var entrada in new[] { vigente, anuladoLiberado, anuladoConTraslado })
+        {
+            Assert.True((await pila.Reservar(Cliente(), entrada)).EsExito);
+            Assert.True((await Confirmar(pila, entrada.PedidoId)).EsExito);
+        }
+
+        await pila.EnUnAmbito(
+            ActorActual.DeUsuario(Guid.NewGuid(), RolesDeUsuario.EncargadoDeSucursal, cusco),
+            sp => sp.GetRequiredService<IUnidadDeTrabajo>().Ejecutar(_ => sp.GetRequiredService<IReservasParaTraslados>().ConsumirEnElOrigen(anuladoConTraslado.PedidoId, cusco, conTraslado)));
+        var antes = await Ventas(pila, null);
+
+        Assert.Equal(3, antes.Select(v => v.PedidoId).Distinct().Count());
+
+        foreach (var pedido in new[] { anuladoLiberado.PedidoId, anuladoConTraslado.PedidoId })
+        {
+            var anulado = await pila.Ejecutar<LiberarReservasEntrada, ReservaDelPedido>(Servicio, new LiberarReservasEntrada(pedido, MotivoDeLiberacionDeReserva.PedidoAnulado, null));
+            Assert.True(anulado.EsExito, anulado.Error?.Clave);
+        }
+
+        // La línea cerrada por traslado y anulada quedó marcada (anulada_en) y la liberada cambió de estado: ninguna cuenta; el pedido vigente sí.
+        Assert.True(await bd.Consultar<bool>($"SELECT anulada_en IS NOT NULL FROM reservas.reserva_lineas WHERE pedido_id = '{anuladoConTraslado.PedidoId}' AND estado = 'cerrada'"));
+        var despues = await Ventas(pila, null);
+        Assert.Equal([new VentaAtribuida(vigente.PedidoId, local, lima, 2)], despues);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-FUE-18")]
     public async Task ElTrasladoDeReposicionNoEsUnaVenta_ElPedidoCuentaUnaSolaVezEnLaSucursalDeRecojo()
     {
