@@ -28,7 +28,8 @@ public sealed class EvaluarLimiteTests
         _local = new MotorDeMemoria(_reloj);
         _origen = new OrigenFijo(new OrigenDeSolicitud(HuellaDeOrigen.Crear(Resumen, "v1"), "203.0.113.7"));
 
-        var politicas = PoliticasDeSeguridad.Todas.Concat(
+        // El catálogo real de la composición: las críticas y las generales (con respaldo local).
+        var politicas = PoliticasDeSeguridad.Todas.Concat(PoliticasDeSeguridad.Generales).Concat(
         [
             new PoliticaDeLimite(General.Valor, 3, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true),
             new PoliticaDeLimite(Avisos.Valor, 2, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Numero, liberable: true, publicarEvento: false),
@@ -274,6 +275,62 @@ public sealed class EvaluarLimiteTests
         await _control.Liberar(uno.Reserva!);
 
         Assert.Equal(EstadoDeLimite.Excedido, (await _control.Reservar(PoliticasDeLimite.CodigosPorOrigen)).Estado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-19")]
+    public async Task Reservar_HojasPorOrigen_ConLaPoliticaReal_FallarYLiberarDevuelvenElCupoYLaClaveParaReintentar()
+    {
+        // REC-33: si falla la auditoría de la vinculación, Reclamaciones devuelve el cupo y la clave del formulario (con la política real, no un doble).
+        Assert.True(PoliticasDeSeguridad.HojasPorOrigen.Liberable);
+        var idempotencia = new ClaveDeIdempotencia("hoja-1", "/libro-de-reclamaciones", "huella-del-contenido");
+        var primera = await _control.Reservar(PoliticasDeLimite.HojasPorOrigen, idempotencia: idempotencia);
+        await _control.Reservar(PoliticasDeLimite.HojasPorOrigen, idempotencia: new ClaveDeIdempotencia("hoja-2", "/libro-de-reclamaciones", "otro-a"));
+        await _control.Reservar(PoliticasDeLimite.HojasPorOrigen, idempotencia: new ClaveDeIdempotencia("hoja-3", "/libro-de-reclamaciones", "otro-b"));
+        Assert.Equal(EstadoDeLimite.Excedido, (await _control.Reservar(PoliticasDeLimite.HojasPorOrigen, idempotencia: new ClaveDeIdempotencia("hoja-4", "/libro-de-reclamaciones", "otro-c"))).Estado);
+
+        await _control.Fallar(primera.Reserva!);
+        await _control.Liberar(primera.Reserva!);
+
+        var reintento = await _control.Reservar(PoliticasDeLimite.HojasPorOrigen, idempotencia: idempotencia);
+        Assert.True(reintento.EsPermitido);
+        Assert.Equal(EstadoDeLimite.Excedido, (await _control.Reservar(PoliticasDeLimite.HojasPorOrigen, idempotencia: new ClaveDeIdempotencia("hoja-5", "/libro-de-reclamaciones", "otro-d"))).Estado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-19")]
+    public async Task Reservar_HojasPorOrigen_SoloFallar_NoDevuelveElCupo()
+    {
+        // Sin Liberar el cupo sigue gastado: reintentar con la clave liberada no abre un cuarto cupo.
+        var idempotencia = new ClaveDeIdempotencia("hoja-1", "/libro-de-reclamaciones", "huella-del-contenido");
+        var primera = await _control.Reservar(PoliticasDeLimite.HojasPorOrigen, idempotencia: idempotencia);
+        await _control.Reservar(PoliticasDeLimite.HojasPorOrigen, idempotencia: new ClaveDeIdempotencia("hoja-2", "/libro-de-reclamaciones", "otro-a"));
+        await _control.Reservar(PoliticasDeLimite.HojasPorOrigen, idempotencia: new ClaveDeIdempotencia("hoja-3", "/libro-de-reclamaciones", "otro-b"));
+
+        await _control.Fallar(primera.Reserva!);
+
+        Assert.Equal(EstadoDeLimite.Excedido, (await _control.Reservar(PoliticasDeLimite.HojasPorOrigen, idempotencia: idempotencia)).Estado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-24")]
+    public async Task Liberar_HojasPorOrigen_ConElAlmacenCaido_NoInterrumpeYElCupoDelContadorLocalNoSeDevuelve()
+    {
+        // SEG-26: con el almacén caído la política cae al contador local; Fallar y Liberar solo actúan sobre el motor principal, así que no interrumpen y el cupo local no se devuelve
+        // (conservador: se pierde cupo, no se gana).
+        _motor.NoDisponible = true;
+        var reservas = new List<ReservaDeLimite>();
+        for (var i = 0; i < 3; i++)
+        {
+            var resultado = await _control.Reservar(PoliticasDeLimite.HojasPorOrigen);
+            Assert.True(resultado.EsPermitido);
+            reservas.Add(resultado.Reserva!);
+        }
+
+        await _control.Fallar(reservas[0]);
+        await _control.Liberar(reservas[0]);
+
+        Assert.Equal(EstadoDeLimite.Excedido, (await _control.Reservar(PoliticasDeLimite.HojasPorOrigen)).Estado);
     }
 
     [Fact]
