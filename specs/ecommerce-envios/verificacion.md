@@ -7,7 +7,11 @@ fecha: 2026-11-20
 
 > La produce la skill `spec-verify` al terminar las tareas. Una spec solo pasa a `Done` si el resultado es **Converge**.
 
-## Resultado: No converge
+## Resultado: Converge salvo T14b y T21b (operador real; simulador en el Sprint 2)
+
+> **Estado vigente (2026-11-21):** la sección final («Cierre de T20 y declaración de T14b/T21b») manda sobre lo que difiera. Las secciones anteriores son el historial de las rondas.
+
+### Rondas anteriores (historial)
 
 Verificación del carril V del 2026-11-20 con las tareas T14b, T20 (parte), T21, T21b, T22 (parte) y T24 todavía abiertas. De los 18 requisitos de la spec (ENV-01 a ENV-15, ENV-17, ENV-18 y ENV-19; la numeración no tiene ENV-16 ni AC-ENV-14), **11 Cumplen, 7 son Parciales y 0 No cumplen**. Las diferencias de la sección 3 tienen cada una su tarea o su dueño. La spec sigue en `InProgress`; no se marca `Done`.
 
@@ -137,3 +141,13 @@ Ejecutado: integración filtrada `Devoluciones|Envios` con PostgreSQL real, **28
 - **T20 (parcial):** con las 20 parejas guía y reparto y las 20 parejas `Cancelar` × en reparto con el Pedidos real, faltan en integración el rechazo de negocio seguido de `Cancelar`, el cierre lento con `INV-IDEMPOTENCIA-EN-CURSO` y la falla tras el REST (cubiertos por pruebas unitarias).
 
 **Recuento final: Cumple 14 (ENV-01, 03, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 18, 19), Parcial 4 (ENV-02, 04, 15, 17), No cumple 0.** Los cuatro Parciales dependen del operador y de seguridad, no de este carril: **T14b** (operador real, decisión D02: plazo de 10 s, validación de la respuesta y registros del adaptador real; dueño persona responsable y operador) y el redactor de datos prohibidos sin `nombre`, `direccion` ni `telefono` (carril de seguridad). El registro de datos sensibles de EF no aplica: Envíos usa Npgsql sin EF Core. **Resultado: converge salvo T14b** y las decisiones D-6 y D-10 de la persona responsable (el estado de la spec sigue `InProgress` hasta entonces; no se marca `Done`).
+
+## Cierre de T20 y declaración de T14b y T21b (carril V, 2026-11-21)
+
+Resultado: **Converge salvo T14b y T21b (operador real; simulador en el Sprint 2).**
+
+- **T20 cerrada** (integración con PostgreSQL real, Pedidos real y el Inventario simulado; `EnviosConPedidosRealesTests`, 12 de 12 verdes, y 289 de 289 en el filtro `Devoluciones|Envios`): los 20 pares de guía y los 20 de paso a en reparto (una guía y un cierre por envío), los 20 pares `Cancelar` × en reparto, el Inventario caído y luego duplicado, **un rechazo de negocio del cierre seguido de `Cancelar`** (el envío queda `cancelado`, sin marcador y sin descuento), **un cierre lento en curso** (`INV-IDEMPOTENCIA-EN-CURSO`, incierto) seguido de `Cancelar` (el envío se **mantiene**) y del reintento (en reparto, un solo descuento), y **la falla tras el REST** (el Inventario aplicó el cierre y la respuesta se perdió: `Cancelar` no lo cancela y el reintento no descuenta dos veces), más el progreso a Pedidos caído con la entrega marcada antes del reparto informado (se reintenta en orden).
+- **T22 y T24 cerradas** (ejecuciones anteriores): Pedidos caído con su reintento; E2E de logística y del cliente en escritorio y teléfono con axe AA. `ui-review` hecho sobre las capturas de teléfono; **Menor abierto:** la tabla de la lista de logística se corta a la derecha en 375 px (se desplaza dentro de su contenedor), y no se comparó con `prototype/ui-v2/` ni se revisó el tema oscuro.
+- **T14b y T21b, declaradas abiertas por una decisión que no es de este carril.** T14 (T14a hecha: simulador, nulo, guarda de arranque y tope de guías; **T14b** pendiente: el cliente del operador real con plazo de 10 s, el cuerpo con el contacto en un único método explícito y la ausencia de registros de cuerpos) y T21 (T21a hecha: privacidad con el contacto centinela y el escenario literal de AC-ENV-17 con el Pedidos real; **T21b** pendiente: los registros del adaptador real) dependen de que la persona responsable elija el operador logístico (D02, fuera del Sprint 2). Hasta entonces rige el operador nulo en producción y el simulador solo en `Development` y `Test`. El registro de datos sensibles de EF no aplica a Envíos (usa Npgsql). La división T14a/T14b y T21a/T21b está en `progress/ajustes-al-implementar.md` (líneas 160 y 164); **no se reflejó en `tasks.md`** porque cualquier cambio de texto del archivo aprobado lo devuelve a Draft (`SpecCheck`: «el contenido cambió después de aprobar»); en `tasks.md` solo se marcó T20.
+- **Requisitos:** 14 Cumplen (ENV-01, 03, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 18, 19) y 4 Parciales por el operador y el redactor (ENV-02, 04, 15, 17): `RedactorDeDatosProhibidos` sin `nombre`, `direccion`, `telefono` (carril de seguridad).
+- **Pendiente de la persona responsable:** D-6 (la auditoría guarda además estado anterior, nuevo, pedido y fuente) y D-10 (mecanismos del plan fuera de la spec). La spec sigue `InProgress` hasta T14b y T21b.

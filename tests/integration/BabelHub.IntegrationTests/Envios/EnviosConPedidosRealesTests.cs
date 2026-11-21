@@ -25,16 +25,42 @@ public sealed class EnviosConPedidosRealesTests(PostgresDePedidosYEnviosFixture 
 
     private static string Numero() => "ENVP2345" + "ABCDEFGHJKLMNPQRSTUVWXYZ"[Interlocked.Increment(ref _contador) % 24] + "E";
 
+    private enum ModoDeCierre
+    {
+        Normal,
+        Rechazo,
+        EnCurso,
+        TrasElRest,
+    }
+
     private sealed class ReservasDelEnvioSimuladas : IReservasDelEnvio
     {
         public List<Guid> Cierres { get; } = [];
 
         public volatile bool Caido;
 
+        /// <summary>Cómo responde el cierre: normal; un rechazo de negocio (no cambió nada); «en curso» (el primer cierre aún corre: incierto y sin aplicar); o la falla tras el REST (el Inventario aplicó el cierre pero la respuesta se perdió: incierto y aplicado).</summary>
+        public volatile ModoDeCierre Modo = ModoDeCierre.Normal;
+
         public Task<ResultadoDeCierreDeReservas> Cerrar(Guid pedidoId, Guid envioId, IReadOnlyCollection<Guid> lineaIds, CancellationToken cancelacion = default)
         {
-            if (Caido)
+            if (Caido || Modo == ModoDeCierre.EnCurso)
             {
+                return Task.FromResult<ResultadoDeCierreDeReservas>(new ResultadoDeCierreDeReservas.Incierto());
+            }
+
+            if (Modo == ModoDeCierre.Rechazo)
+            {
+                return Task.FromResult<ResultadoDeCierreDeReservas>(new ResultadoDeCierreDeReservas.RechazoDeNegocio());
+            }
+
+            if (Modo == ModoDeCierre.TrasElRest)
+            {
+                lock (Cierres)
+                {
+                    Cierres.Add(envioId);
+                }
+
                 return Task.FromResult<ResultadoDeCierreDeReservas>(new ResultadoDeCierreDeReservas.Incierto());
             }
 
@@ -417,5 +443,96 @@ public sealed class EnviosConPedidosRealesTests(PostgresDePedidosYEnviosFixture 
             // En reparto: el físico se descontó una sola vez. Cancelado: nunca se descontó.
             Assert.Equal(estado == "en_reparto" ? 1 : 0, cierres);
         }
+    }
+
+    private async Task<(Pedido Pedido, Guid Envio)> PrepararUnEnvioConGuia(EscenarioDePedidos e)
+    {
+        var pedido = await SembrarADomicilio();
+        Assert.True((await MarcarListas(e, pedido)).EsExito);
+        var envio = (await EnviosDe(pedido.Id))[0];
+        Assert.True((await Logistica(e, l => l.SolicitarGuia(envio))).EsExito);
+        return (pedido, envio);
+    }
+
+    private Task<string?> EstadoDelEnvio(Guid envio) => bd.Consultar<string>($"SELECT estado FROM envios.envios WHERE id = '{envio:D}'");
+
+    private static Task<Resultado<ResultadoDeAnulacion>> Anular(EscenarioDePedidos e, Guid pedidoId) =>
+        e.Como(EscenarioDePedidos.DeLaAdministracion(), sp => sp.GetRequiredService<IAdministracionDePedidos>().Anular(new AnularPedidoEntrada(pedidoId, "otro")));
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-12")]
+    [Trait("Criterio", "AC-ENV-19")]
+    public async Task Un_rechazo_de_negocio_del_cierre_deja_el_envio_sin_marcador_y_la_anulacion_lo_cancela()
+    {
+        var (e, reservas, _) = Crear();
+        await using var _ = e;
+        var (pedido, envio) = await PrepararUnEnvioConGuia(e);
+        reservas.Modo = ModoDeCierre.Rechazo;
+
+        var rechazado = await Logistica(e, l => l.PasarAEnReparto(envio));
+
+        Assert.False(rechazado.EsExito);
+        Assert.Equal("guia_generada", await EstadoDelEnvio(envio));
+        Assert.Null(await bd.Consultar<DateTime?>($"SELECT despacho_iniciado_en FROM envios.envios WHERE id = '{envio:D}'"));
+
+        Assert.NotNull(await Anular(e, pedido.Id));
+
+        // Un rechazo de negocio garantiza que no cambió nada: el envío se cancela y el físico nunca se descontó.
+        Assert.Equal("cancelado", await EstadoDelEnvio(envio));
+        Assert.Empty(reservas.Cierres);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-12")]
+    [Trait("Criterio", "AC-ENV-19")]
+    public async Task Con_un_cierre_lento_en_curso_la_anulacion_mantiene_el_envio_y_el_reintento_lo_pasa_a_en_reparto_una_sola_vez()
+    {
+        var (e, reservas, _) = Crear();
+        await using var _ = e;
+        var (pedido, envio) = await PrepararUnEnvioConGuia(e);
+        reservas.Modo = ModoDeCierre.EnCurso;
+
+        var incierto = await Logistica(e, l => l.PasarAEnReparto(envio));
+
+        Assert.False(incierto.EsExito);
+        Assert.NotNull(await bd.Consultar<DateTime?>($"SELECT despacho_iniciado_en FROM envios.envios WHERE id = '{envio:D}'"));
+
+        Assert.NotNull(await Anular(e, pedido.Id));
+
+        // El primer cierre pudo aplicarse: nunca se cancela un envío con el físico posiblemente descontado.
+        Assert.Equal("guia_generada", await EstadoDelEnvio(envio));
+
+        reservas.Modo = ModoDeCierre.Normal;
+        var reintento = await Logistica(e, l => l.PasarAEnReparto(envio));
+
+        Assert.True(reintento.EsExito, reintento.Error?.Clave);
+        Assert.Equal("en_reparto", await EstadoDelEnvio(envio));
+        Assert.Single(reservas.Cierres.Distinct());
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-12")]
+    [Trait("Criterio", "AC-ENV-19")]
+    public async Task Si_el_cierre_se_aplica_y_la_respuesta_se_pierde_la_anulacion_no_cancela_el_envio_y_el_reintento_lo_deja_en_reparto_sin_descontar_dos_veces()
+    {
+        var (e, reservas, _) = Crear();
+        await using var _ = e;
+        var (pedido, envio) = await PrepararUnEnvioConGuia(e);
+        reservas.Modo = ModoDeCierre.TrasElRest;
+
+        var perdido = await Logistica(e, l => l.PasarAEnReparto(envio));
+
+        Assert.False(perdido.EsExito);
+        Assert.Contains(envio, reservas.Cierres);
+        Assert.NotNull(await Anular(e, pedido.Id));
+        Assert.NotEqual("cancelado", await EstadoDelEnvio(envio));
+
+        reservas.Modo = ModoDeCierre.Normal;
+        var reintento = await Logistica(e, l => l.PasarAEnReparto(envio));
+
+        Assert.True(reintento.EsExito, reintento.Error?.Clave);
+        Assert.Equal("en_reparto", await EstadoDelEnvio(envio));
+        // El Inventario trata el cierre repetido como ya cerrado: el físico se descontó una sola vez.
+        Assert.Single(reservas.Cierres.Distinct());
     }
 }
