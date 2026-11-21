@@ -255,15 +255,18 @@ public sealed class EnviosConPedidosRealesTests(PostgresDePedidosYEnviosFixture 
 
             var guias = await Task.WhenAll(Task.Run(() => Logistica(e, l => l.SolicitarGuia(envio))), Task.Run(() => Logistica(e, l => l.SolicitarGuia(envio))));
             Assert.Contains(guias, r => r.EsExito);
+            // La simultánea o repite la misma guía (idempotente) o recibe `guia-en-curso`: nunca otro error ni otra guía.
+            Assert.All(guias.Where(r => !r.EsExito), r => Assert.Equal(ClavesDeEnvios.GuiaEnCurso, r.Error!.Clave));
 
             var antes = reservas.Cierres.Count;
             var pasos = await Task.WhenAll(Task.Run(() => Logistica(e, l => l.PasarAEnReparto(envio))), Task.Run(() => Logistica(e, l => l.PasarAEnReparto(envio))));
             Assert.Contains(pasos, r => r.EsExito);
+            Assert.All(pasos.Where(r => !r.EsExito), r => Assert.Contains(r.Error!.Clave, new[] { ClavesDeEnvios.EstadoInvalido, ClavesDeEnvios.GuiaEnCurso, "operacion-en-curso" }));
             Assert.Equal(antes + 1, reservas.Cierres.Count(c => c == envio) + antes);
         }
 
         Assert.Equal(20, reservas.Cierres.Distinct().Count());
-        Assert.True(operador.GuiasCreadas >= 20);
+        Assert.Equal(20, operador.GuiasCreadas);
     }
 
     [Fact]
@@ -282,7 +285,7 @@ public sealed class EnviosConPedidosRealesTests(PostgresDePedidosYEnviosFixture 
         Assert.True((await Logistica(e, l => l.SolicitarGuia(lima))).EsExito);
         Assert.True((await Logistica(e, l => l.PasarAEnReparto(lima))).EsExito);
         Assert.True((await Logistica(e, l => l.MarcarEntregado(lima))).EsExito);
-        Assert.NotNull(await e.Como(EscenarioDePedidos.DeLaAdministracion(), sp => sp.GetRequiredService<IAdministracionDePedidos>().Anular(new AnularPedidoEntrada(primero.Id, "otro"))));
+        Assert.True((await e.Como(EscenarioDePedidos.DeLaAdministracion(), sp => sp.GetRequiredService<IAdministracionDePedidos>().Anular(new AnularPedidoEntrada(primero.Id, "otro")))).EsExito);
 
         // Pedido 2: una fuente en reparto (la otra queda pendiente).
         var segundo = await SembrarADomicilio();
@@ -320,8 +323,99 @@ public sealed class EnviosConPedidosRealesTests(PostgresDePedidosYEnviosFixture 
         Assert.Contains("en_reparto", estados);
         Assert.Contains("cancelado", estados);
         Assert.Equal(antes, await bd.Consultar<string>("SELECT string_agg(id::text || estado || coalesce(numero_de_guia, '') || coalesce(operador, ''), '|' ORDER BY id) FROM envios.envios"));
-        Assert.Equal(0, await bd.Consultar<int>("SELECT count(*) FROM envios.envios x WHERE row_to_json(x)::text ~* '(Ana P|987654321|Jr\\. Lima)'"));
-        Assert.Equal(0, await bd.Consultar<int>("SELECT count(*) FROM envios.envio_lineas x WHERE row_to_json(x)::text ~* '(Ana P|987654321|Jr\\. Lima)'"));
-        Assert.Equal(0, await bd.Consultar<int>("SELECT count(*) FROM pedidos.pedidos WHERE contacto_nombre IS NOT NULL OR contacto_telefono IS NOT NULL OR contacto_direccion IS NOT NULL"));
+        Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM envios.envios x WHERE row_to_json(x)::text ~* '(Ana P|987654321|Jr\\. Lima)'"));
+        Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM envios.envio_lineas x WHERE row_to_json(x)::text ~* '(Ana P|987654321|Jr\\. Lima)'"));
+        Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM pedidos.pedidos WHERE contacto_nombre IS NOT NULL OR contacto_telefono IS NOT NULL OR contacto_direccion IS NOT NULL"));
+    }
+
+    /// <summary>El progreso hacia Pedidos real, salvo que <see cref="Caido"/> lo hace fallar (Pedidos no responde).</summary>
+    private sealed class ProgresoQueFalla(IProgresoDeEnvios real, EstadoDelProgreso estado) : IProgresoDeEnvios
+    {
+        public Task<Resultado<ProgresoDeEnvioAplicado>> EnvioEnReparto(EnvioEnRepartoEntrada entrada, CancellationToken cancelacion = default) =>
+            estado.Caido ? Task.FromResult(Resultado<ProgresoDeEnvioAplicado>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible"))) : real.EnvioEnReparto(entrada, cancelacion);
+
+        public Task<Resultado<ProgresoDeEnvioAplicado>> EnvioEntregado(EnvioEntregadoEntrada entrada, CancellationToken cancelacion = default) =>
+            estado.Caido ? Task.FromResult(Resultado<ProgresoDeEnvioAplicado>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible"))) : real.EnvioEntregado(entrada, cancelacion);
+    }
+
+    private sealed class EstadoDelProgreso
+    {
+        public volatile bool Caido;
+    }
+
+    private (EscenarioDePedidos Escenario, ReservasDelEnvioSimuladas Reservas, EstadoDelProgreso Progreso) CrearConProgresoQueFalla()
+    {
+        var reservas = new ReservasDelEnvioSimuladas();
+        var progreso = new EstadoDelProgreso();
+        var escenario = EscenarioDePedidos.Crear(
+            bd.Unidad,
+            servicios =>
+            {
+                servicios.AddSingleton<IControlDeLimites>(new LimitesPermisivos());
+                servicios.AddSingleton<IReservasDelEnvio>(reservas);
+                servicios.AddSingleton<IOperadorLogistico>(new SimuladorOperadorLogistico());
+                servicios.AddScoped<IProgresoDeEnvios>(sp => new ProgresoQueFalla(Microsoft.Extensions.DependencyInjection.ActivatorUtilities.CreateInstance<BabelHub.Ecommerce.Application.Pedidos.Interno.AvanzarLineasPorEnvio>(sp), progreso));
+            },
+            enviosReales: true);
+        return (escenario, reservas, progreso);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-07")]
+    [Trait("Criterio", "AC-ENV-10")]
+    public async Task Con_Pedidos_caido_la_entrega_marcada_antes_del_reparto_informado_se_reintenta_en_orden_y_una_sola_vez()
+    {
+        var (e, _, progreso) = CrearConProgresoQueFalla();
+        await using var _ = e;
+        var pedido = await SembrarADomicilio();
+        Assert.True((await MarcarListas(e, pedido)).EsExito);
+        var envio = (await EnviosDe(pedido.Id))[0];
+        Assert.True((await Logistica(e, l => l.SolicitarGuia(envio))).EsExito);
+
+        progreso.Caido = true;
+        Assert.True((await Logistica(e, l => l.PasarAEnReparto(envio))).EsExito);
+        Assert.True((await Logistica(e, l => l.MarcarEntregado(envio))).EsExito);
+
+        var conPedidosCaido = (await bd.Pedidos.Obtener(pedido.Id, conBloqueo: false))!;
+        Assert.DoesNotContain(conPedidosCaido.Lineas, l => l.EstadoImpreso is EstadoDeLineaImpresa.Despachado or EstadoDeLineaImpresa.Entregado);
+        Assert.Null(await bd.Consultar<DateTime?>($"SELECT progreso_en_reparto_informado_en FROM envios.envios WHERE id = '{envio:D}'"));
+        Assert.Null(await bd.Consultar<DateTime?>($"SELECT progreso_entregado_informado_en FROM envios.envios WHERE id = '{envio:D}'"));
+
+        progreso.Caido = false;
+        var primera = await e.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<InformarProgresoAPedidos>().Ejecutar(100));
+        var segunda = await e.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<InformarProgresoAPedidos>().Ejecutar(100));
+
+        Assert.True(primera.EsExito && segunda.EsExito);
+        var tras = (await bd.Pedidos.Obtener(pedido.Id, conBloqueo: false))!;
+        Assert.Equal(1, tras.Lineas.Count(l => l.EstadoImpreso == EstadoDeLineaImpresa.Entregado));
+        Assert.All(tras.Lineas.Where(l => l.EstadoImpreso == EstadoDeLineaImpresa.Entregado), l => Assert.NotNull(l.EntregadaEn));
+        Assert.NotNull(await bd.Consultar<DateTime?>($"SELECT progreso_en_reparto_informado_en FROM envios.envios WHERE id = '{envio:D}'"));
+        Assert.NotNull(await bd.Consultar<DateTime?>($"SELECT progreso_entregado_informado_en FROM envios.envios WHERE id = '{envio:D}'"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-12")]
+    [Trait("Criterio", "AC-ENV-19")]
+    public async Task Veinte_pares_de_pasar_a_en_reparto_por_anular_el_pedido_nunca_dejan_un_cancelado_con_el_fisico_descontado()
+    {
+        var (e, reservas, _) = Crear();
+        await using var _ = e;
+        for (var i = 0; i < 20; i++)
+        {
+            var pedido = await SembrarADomicilio();
+            Assert.True((await MarcarListas(e, pedido)).EsExito);
+            var envio = (await EnviosDe(pedido.Id))[0];
+            Assert.True((await Logistica(e, l => l.SolicitarGuia(envio))).EsExito);
+
+            var reparto = Logistica(e, l => l.PasarAEnReparto(envio));
+            var anulacion = e.Como(EscenarioDePedidos.DeLaAdministracion(), sp => sp.GetRequiredService<IAdministracionDePedidos>().Anular(new AnularPedidoEntrada(pedido.Id, "otro")));
+            await Task.WhenAll(reparto, anulacion);
+
+            var estado = await bd.Consultar<string>($"SELECT estado FROM envios.envios WHERE id = '{envio:D}'");
+            var cierres = reservas.Cierres.Count(c => c == envio);
+            Assert.Contains(estado, new[] { "en_reparto", "cancelado" });
+            // En reparto: el físico se descontó una sola vez. Cancelado: nunca se descontó.
+            Assert.Equal(estado == "en_reparto" ? 1 : 0, cierres);
+        }
     }
 }

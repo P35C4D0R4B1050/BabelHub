@@ -374,4 +374,26 @@ public sealed class EjecucionDeLaCancelacionTests
 
         Assert.True(catalogo.Contiene(ReintentoDeBajas.MotivoDeBajaSinEntregar));
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-26")]
+    [Trait("Criterio", "AC-IDE-43")]
+    public async Task Al_ejecutarse_la_cancelacion_llama_a_los_receptores_en_el_orden_decidido_aunque_esten_registrados_en_otro()
+    {
+        var (e, cliente, cancelacion) = Escenario();
+        var id = cliente.Usuario.Id;
+        e.ConSegundoFactor(cliente);
+        var codigo = new ValorSecreto(e.Totp(e.Secretos.SecretoDelSegundoFactor()));
+        lock (AplicadorDePrueba.OrdenDeLlamada)
+        {
+            AplicadorDePrueba.OrdenDeLlamada.Clear();
+        }
+
+        await cancelacion.Solicitar(id, Contrasena, codigo);
+
+        lock (AplicadorDePrueba.OrdenDeLlamada)
+        {
+            Assert.Equal(["pedidos", "devoluciones", "pagos", "carrito", "biblioteca", "reclamaciones"], AplicadorDePrueba.OrdenDeLlamada);
+        }
+    }
 }

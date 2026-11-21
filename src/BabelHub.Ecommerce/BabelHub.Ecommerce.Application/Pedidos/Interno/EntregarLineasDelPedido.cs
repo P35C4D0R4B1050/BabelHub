@@ -130,8 +130,8 @@ internal sealed class EntregarLineasDelPedido(
             return Resultado<Entrega>.Fallo(enCurso);
         }
 
-        // Se entrega lo que está listo para recojo (o no recogido): cualquier otro estado es inválido y no se llama al Inventario.
-        if (pedido.Lineas.Where(l => lineaIds.Contains(l.Id)).Any(l => l.EsDigital || l.EstadoImpreso is not (EstadoDeLineaImpresa.ListoParaRecojo or EstadoDeLineaImpresa.NoRecogido)))
+        // Solo se entrega lo que está listo para recojo: un no recogido (su reserva ya se liberó) y cualquier otro estado son inválidos y no se llama al Inventario (DD-20, SEL-28).
+        if (pedido.Lineas.Where(l => lineaIds.Contains(l.Id)).Any(l => l.EsDigital || l.EstadoImpreso is not EstadoDeLineaImpresa.ListoParaRecojo))
         {
             return Resultado<Entrega>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDePedidos.EstadoInvalido));
         }

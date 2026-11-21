@@ -1,7 +1,7 @@
 ---
 id: ecommerce-biblioteca-digital
 titulo: Biblioteca y descarga de libros digitales
-estado: InProgress
+estado: Done
 aprobado_por: Claude (delegado por Diego Amiquero)
 aprobado_en: 2026-11-13
 plan_aprobado_por: Claude (delegado por Diego Amiquero)

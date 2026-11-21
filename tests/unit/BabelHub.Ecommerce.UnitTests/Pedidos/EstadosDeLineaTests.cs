@@ -43,11 +43,11 @@ public sealed class EstadosDeLineaTests
     }
 
     [Fact]
-    public void Se_entrega_desde_listo_para_recojo_o_desde_despachado_y_un_no_recogido_tambien_se_entrega()
+    public void Se_entrega_desde_listo_para_recojo_o_desde_despachado_y_un_no_recogido_no_se_entrega()
     {
         Assert.True(MaquinaDeEstadosDeLinea.Permite(EstadoDeLineaImpresa.ListoParaRecojo, EstadoDeLineaImpresa.Entregado, SinTrasladoRecojo));
         Assert.True(MaquinaDeEstadosDeLinea.Permite(EstadoDeLineaImpresa.Despachado, EstadoDeLineaImpresa.Entregado, Domicilio));
-        Assert.True(MaquinaDeEstadosDeLinea.Permite(EstadoDeLineaImpresa.NoRecogido, EstadoDeLineaImpresa.Entregado, SinTrasladoRecojo));
+        Assert.False(MaquinaDeEstadosDeLinea.Permite(EstadoDeLineaImpresa.NoRecogido, EstadoDeLineaImpresa.Entregado, SinTrasladoRecojo));
         Assert.False(MaquinaDeEstadosDeLinea.Permite(EstadoDeLineaImpresa.EnPreparacion, EstadoDeLineaImpresa.Entregado, SinTrasladoRecojo));
     }
 

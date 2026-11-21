@@ -1,7 +1,7 @@
 ---
 id: ecommerce-catalogo
 titulo: Catálogo de obras y ediciones
-estado: Planned
+estado: Done
 servicio: E-commerce
 prefijo: CAT
 origen: [RF01, RF02, RF10, RF24, NN01, NN08, NN13, NN14]

@@ -2,7 +2,11 @@ using System.Net;
 using System.Text.RegularExpressions;
 using BabelHub.Ecommerce.Api.Web.Formato;
 using BabelHub.Ecommerce.Application.Catalogo;
+using BabelHub.Ecommerce.Api.Web;
+using BabelHub.Ecommerce.Application.Identidad;
+using BabelHub.Ecommerce.Application.Web;
 using BabelHub.Ecommerce.Application.Plataforma;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BabelHub.IntegrationTests.Web;
@@ -453,5 +457,77 @@ public sealed partial class PantallasDeAdministracionDelCatalogoTests
         Assert.Contains("credentials: 'same-origin'", js, StringComparison.Ordinal);
         Assert.Contains("textContent", js, StringComparison.Ordinal);
         Assert.Contains("/administracion/archivos?finalidad=", js, StringComparison.Ordinal);
+    }
+
+    // ---------- El autor de cada ingreso (CAT-22) ----------
+
+    /// <summary>Identidad vista por el Catálogo: lista a los usuarios del personal con su nombre, o falla.</summary>
+    private sealed class UsuariosDePrueba(IReadOnlyList<UsuarioAdministrado> lista, bool falla = false) : IAdministracionDeUsuarios
+    {
+        public Task<Resultado<PaginaDeUsuarios>> Listar(Guid administradorId, FiltroDeUsuarios filtro, CancellationToken cancelacion = default) =>
+            falla ? throw new InvalidOperationException("Identidad no responde.") : Task.FromResult(Resultado<PaginaDeUsuarios>.Exito(new PaginaDeUsuarios(lista, null)));
+
+        public Task<Resultado<ContrasenaTemporalEntregada>> Crear(Guid administradorId, string nombre, string correo, RolDeCuenta rol, string? codigoDeSucursal, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<Resultado<UsuarioAdministrado>> CambiarElRol(Guid administradorId, Guid usuarioId, RolDeCuenta rol, string? codigoDeSucursal, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<Resultado<UsuarioAdministrado>> Desactivar(Guid administradorId, Guid usuarioId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<Resultado<UsuarioAdministrado>> Reactivar(Guid administradorId, Guid usuarioId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<Resultado<ContrasenaTemporalEntregada>> RestablecerLaContrasena(Guid administradorId, Guid usuarioId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
+        public Task<Resultado<RespuestaUniforme>> RestablecerElSegundoFactor(Guid administradorId, Guid usuarioId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    }
+
+    private static Task<AnfitrionWeb> IniciarConUsuarios(IngresosDePrueba ingresos, IAdministracionDeUsuarios usuarios) =>
+        AnfitrionWeb.Iniciar(servicios =>
+        {
+            servicios.AddSingleton<IAdministracionDelCatalogo>(new AdministracionDePrueba());
+            servicios.AddSingleton<IIngresosDeMercaderia>(ingresos);
+            servicios.AddSingleton<IConsultaDeCatalogo>(new CatalogoDePrueba(EdicionImpresa()));
+            servicios.AddSingleton<IDisponibilidadDeEdiciones>(new DisponibilidadDePrueba(EstadoDeDisponibilidad.Disponible));
+            servicios.AddSingleton(usuarios);
+        },
+        antesDeLasRutas: app => app.Use((Microsoft.AspNetCore.Http.HttpContext contexto, Func<Task> siguiente) =>
+        {
+            // La administración con sesión: el actor verificado de la solicitud, como lo deja el manejador de la sesión.
+            contexto.EstablecerCredencial(new ResultadoDeCredencial(EstadoDeCredencial.Asegurada, new ActorVerificado(Guid.Parse("55555555-5555-5555-5555-555555555555"), RolWeb.AdministradorCentral, null), null));
+            return siguiente();
+        }));
+
+    [Fact]
+    [Trait("Criterio", "AC-CAT-18")]
+    public async Task El_historial_muestra_el_nombre_de_quien_registro_el_ingreso_resuelto_por_Identidad_y_sin_Identidad_el_identificador_abreviado()
+    {
+        var autor = Guid.Parse("abcdef01-2345-6789-abcd-ef0123456789");
+        var otro = Guid.Parse("12345678-0000-0000-0000-000000000099");
+        var ingresos = new IngresosDePrueba
+        {
+            Historial = () => Resultado<HistorialDeIngresos>.Exito(new HistorialDeIngresos(
+                ImpresaId,
+                [new IngresoDeLaLista(Guid.NewGuid(), null, 30, "GR-001", autor, DateTimeOffset.UtcNow.AddDays(-5), null), new IngresoDeLaLista(Guid.NewGuid(), null, 5, "GR-002", otro, DateTimeOffset.UtcNow.AddDays(-4), null)],
+                false)),
+        };
+        var lista = new[] { new UsuarioAdministrado(autor, "Rosa Quispe Ficticia", "rosa@example.test", RolDeCuenta.AdministradorCentral, null, true, true) };
+
+        await using (var conIdentidad = await IniciarConUsuarios(ingresos, new UsuariosDePrueba(lista)))
+        {
+            using var respuesta = await conIdentidad.Cliente.GetAsync($"/administracion/ediciones/{ImpresaId}/ingreso");
+            var html = await Texto(respuesta);
+
+            Assert.Contains("Rosa Quispe Ficticia", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("Usuario abcdef01", html, StringComparison.Ordinal);
+            // Quien Identidad no devuelve conserva el identificador abreviado, y el correo del autor nunca se muestra.
+            Assert.Contains("Usuario 12345678", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("rosa@example.test", html, StringComparison.Ordinal);
+        }
+
+        await using var sinIdentidad = await IniciarConUsuarios(ingresos, new UsuariosDePrueba(lista, falla: true));
+        using var caida = await sinIdentidad.Cliente.GetAsync($"/administracion/ediciones/{ImpresaId}/ingreso");
+        var htmlCaida = await Texto(caida);
+        Assert.Equal(HttpStatusCode.OK, caida.StatusCode);
+        Assert.Contains("GR-001", htmlCaida, StringComparison.Ordinal);
+        Assert.Contains("Usuario abcdef01", htmlCaida, StringComparison.Ordinal);
     }
 }

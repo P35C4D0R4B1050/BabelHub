@@ -97,3 +97,43 @@ No converge: los 18 requisitos tienen código y pruebas y 11 cumplen, pero 7 son
 ## Actualización (carril V, segundo turno de Docker, 2026-11-20)
 
 Resultado: **No converge** (sin cambios de fondo). Con `main` fundido, la integración filtrada de Pedidos, Envíos y Devoluciones con PostgreSQL real da **474 verdes, 0 rojas**. Siguen abiertos T14b (esperando el operador real, D02), T20 y T22 completos, T21b y T24 (E2E y `ui-review`, que esperan el host compuesto); las diferencias D-1 a D-10 de este informe no cambian. Las etiquetas `Criterio` de `EnviosConPedidosRealesTests` (D-8) ya están corregidas.
+
+## Actualización final (carril V, tercer turno de Docker, 2026-11-20)
+
+Resultado: **No converge**. No es «converge salvo T14b»: además del operador real (T14b, decisión D02 de la persona responsable y del operador) siguen abiertas partes de T20 y T22. Con `main` fundido, la integración filtrada `Devoluciones|Envios` con PostgreSQL real da **277 de 277 verdes**; SpecCheck da 0 avisos; Playwright (`tests/e2e/envios`) pasa **2 de 2 en Chromium de escritorio y de teléfono**, con axe WCAG 2 A/AA sin violaciones.
+
+| # | Estado | Evidencia |
+| :--- | :--- | :--- |
+| D-1 (operador real, T14b) | Abierta (persona y operador) | Sin operador elegido el entorno usa el nulo o el simulador (`BABELHUB__Envios__Operador=simulador` en Development). Dueño: persona responsable (D02), luego el agente. |
+| D-5 / T21b | **Parcial** | Cerrado el escenario literal de AC-ENV-17 con el Pedidos real: un envío entregado, otro en reparto y otro cancelado, cancelación de la cuenta con los receptores reales, y el almacén de Envíos conserva guía, operador, estados y fechas y no contiene nombre, dirección ni teléfono (`EnviosConPedidosRealesTests.La_cancelacion_de_la_cuenta_conserva_los_envios…`). **Falta:** los registros del adaptador real (depende de T14b) y el registro de datos sensibles de EF activado; el redactor sigue sin incluir `nombre`, `direccion`, `telefono` (carril de seguridad). |
+| D-9 / T24 | **Cerrada** | E2E de logística (guía, reparto, entrega, la lista sin contacto, el cliente ve cada estado) y del acceso (un encargado no gestiona envíos y otra cuenta no ve el envío), AC-ENV-02, 06 y 13. `ui-review`: capturas de teléfono revisadas; **la tabla de la lista de logística se corta a la derecha en 375 px** (se desplaza dentro de su contenedor; Menor); no se revisó el tema oscuro ni la paridad con el prototipo. Defecto encontrado y corregido: el texto «Sin guía» usaba `opacity-60` y fallaba AA (4.02:1). |
+| D-8 (etiquetas) | Cerrada | Etiquetas `Criterio` corregidas en la ronda anterior. |
+| D-2 / T20, D-3, D-4 / T22 | **Abiertas** | Faltan los 20 pares `Cancelar` × en reparto con el Pedidos real, el Inventario duplicado y la falla tras el REST, el progreso a Pedidos caído con su reintento, la cota de `GuiasCreadas` por igualdad y las aserciones del estado del pedido y la fecha de la línea. |
+| D-6, D-7, D-10, D-11 | Abiertas (persona / agente) | Sin cambios. |
+
+Para pasar a `Done` falta: T14b (operador), cerrar T20 y T22 y el resto de T21b, y las decisiones D-6, D-7 y D-10 de la persona responsable.
+
+## Matriz vigente (carril V, 2026-11-20, tras la última ejecución en PostgreSQL real)
+
+Reemplaza el estado por requisito de la sección 2 y las diferencias de la sección 3 donde difieran. Ejecutado ahora: integración filtrada `Devoluciones|Envios` con PostgreSQL real, **282 de 282 verdes**; Playwright de Envíos 2 de 2 en escritorio y teléfono (ejecución anterior); SpecCheck 0 avisos. Tareas: T22 y T24 `[x]`; abiertas T14b, T20 (parcial) y T21 (parcial, T21b).
+
+Resultado: **No converge**. **Recuento: Cumple 12, Parcial 6, No cumple 0.** ENV-19 pasa a Cumple (los 20 pares `PasarAEnReparto` × `Anular` con el Pedidos real: nunca un cancelado con el físico descontado) y ENV-07 queda cubierto también con Pedidos caído (la entrega marcada antes del reparto informado se reintenta en orden, una sola vez). Siguen Parciales:
+
+| Requisito | Por qué | Quién lo cierra |
+| :--- | :--- | :--- |
+| ENV-02, ENV-04 | Sin operador real (T14b): el plazo de 10 s, la validación de la respuesta y los registros del adaptador real | Persona responsable (D02), luego el agente |
+| ENV-06 | El aviso se pierde si el Notificador falla (D-7): la spec dice «queda pendiente» | Persona responsable (spec) o agente |
+| ENV-15, ENV-17 | AC-ENV-17 literal ya probado con el Pedidos real (`La_cancelacion_de_la_cuenta_conserva_los_envios…`); falta el registro de datos sensibles de EF activado, los registros del adaptador real (T14b) y el redactor de datos prohibidos sin `nombre`, `direccion`, `telefono` | Agente y carril de seguridad |
+| ENV-18 | La prueba de 20 pares de guía acepta `GuiasCreadas >= 20` (D-3) | Agente: cota por igualdad y rechazo del segundo par (cierra T20) |
+
+Diferencias abiertas: D-1 (operador, T14b), D-3, D-5 parcial (T21b), D-6, D-7, D-10 y D-11. Cerradas: D-4 (T22) y D-9 (T24, con el Menor de la tabla de logística en 375 px) y D-8. Para pasar a `Done` hace falta: el operador elegido y T14b, cerrar T20 y T21b, y las decisiones D-6, D-7 y D-10.
+
+## Cierre interno (carril V, 2026-11-21, última ronda)
+
+Ejecutado: integración filtrada `Devoluciones|Envios` con PostgreSQL real, **289 de 289 verdes**. Se cierran los parciales que no dependen del operador:
+
+- **ENV-18 → Cumple.** `Veinte_pares_de_solicitudes_de_guia_y_de_pasos_a_en_reparto…` ahora exige `GuiasCreadas == 20` (una guía por envío), que la solicitud simultánea que no gana reciba `guia-en-curso` (D-3 cerrada) y un cierre de reserva por envío.
+- **ENV-06 → Cumple (D-7).** `EnviosConAvisosRealesTests`: con el **Notificador real**, la guía generada deja el aviso al cliente `pendiente` en la misma transacción (su envío y su reintento son del Notificador, como en Pedidos), y con un Notificador que lanza la guía y el estado se conservan. El caso de un rechazo de plantilla ya publicaba una alerta técnica. La redacción de la spec («queda pendiente de reintento») queda satisfecha por el Notificador real; no hace falta cambiarla.
+- **T20 (parcial):** con las 20 parejas guía y reparto y las 20 parejas `Cancelar` × en reparto con el Pedidos real, faltan en integración el rechazo de negocio seguido de `Cancelar`, el cierre lento con `INV-IDEMPOTENCIA-EN-CURSO` y la falla tras el REST (cubiertos por pruebas unitarias).
+
+**Recuento final: Cumple 14 (ENV-01, 03, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 18, 19), Parcial 4 (ENV-02, 04, 15, 17), No cumple 0.** Los cuatro Parciales dependen del operador y de seguridad, no de este carril: **T14b** (operador real, decisión D02: plazo de 10 s, validación de la respuesta y registros del adaptador real; dueño persona responsable y operador) y el redactor de datos prohibidos sin `nombre`, `direccion` ni `telefono` (carril de seguridad). El registro de datos sensibles de EF no aplica: Envíos usa Npgsql sin EF Core. **Resultado: converge salvo T14b** y las decisiones D-6 y D-10 de la persona responsable (el estado de la spec sigue `InProgress` hasta entonces; no se marca `Done`).

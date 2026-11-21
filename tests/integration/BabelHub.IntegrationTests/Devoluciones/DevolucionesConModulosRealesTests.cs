@@ -245,7 +245,11 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
         Assert.True(devolucion.EsExito, devolucion.Error?.Clave);
 
         var orden = await anfitrion.Como(ActorActual.DelSistema(), sp => Task.FromResult(BabelHub.Ecommerce.Application.Identidad.Interno.EjecutorDeLaCancelacion.EnElOrdenDeLosReceptores(sp.GetServices<BabelHub.Ecommerce.Application.Identidad.IAplicadorDeCancelacion>()).Select(a => a.Modulo).ToList()));
-        await anfitrion.Como(ActorActual.DelSistema(), sp => AplicarLosReceptores(sp, cuenta).ContinueWith(_ => true, TaskScheduler.Default));
+        await anfitrion.Como(ActorActual.DelSistema(), async sp =>
+            {
+                await AplicarLosReceptores(sp, cuenta);
+                return true;
+            });
 
         Assert.True(orden.IndexOf("pedidos") < orden.IndexOf("devoluciones"), string.Join(",", orden));
         Assert.True(orden.IndexOf("devoluciones") < orden.IndexOf("pagos"), string.Join(",", orden));
@@ -318,6 +322,8 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
         var pendiente = await anfitrion.Como(DelEncargadoT30(), sp => sp.GetRequiredService<IGestionDeDevoluciones>().Obtener(solicitada.Valor.DevolucionId));
         Assert.True(pendiente.Valor.Lineas.Single().ReembolsoPendiente);
 
+        // El doble de Pagos solo contesta la consulta por origen con lo que se le siembra: la pasarela aceptó el registro, pero no confirmó.
+        _reembolsos.Pendientes[ClaveDeReembolso.De(solicitada.Valor.DevolucionId, impresa)] = new ReembolsoPendienteVista(Guid.NewGuid(), OrigenDelReembolso.Devolucion, 50m, EstadoDelReembolso.Pendiente, null, _reloj.Ahora, 1);
         _reembolsos.EstadoAlProcesar = EstadoDelReembolso.Reembolsado;
         var primera = await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<ConciliarReembolsosDeDevoluciones>().Ejecutar(100));
         var segunda = await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<ConciliarReembolsosDeDevoluciones>().Ejecutar(100));
@@ -334,9 +340,11 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
         await using var anfitrion = Anfitrion();
         var reembolsos = 0;
         var descargas = 0;
+        var pedidos = new List<Guid>();
         for (var i = 0; i < 50; i++)
         {
             var (pedido, cuenta, linea) = await ComprarMixto(anfitrion);
+            pedidos.Add(pedido);
             var acceso = await bd.Consultar<Guid>("SELECT id FROM biblioteca.accesos WHERE pedido_id = @p", ("p", pedido));
 
             var reembolso = anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<IDevolucionesDelCliente>().PedirReembolsoDeDigital(new PedirReembolsoDeDigitalEntrada(pedido, linea, new TextoLibre(Sembrado))));
@@ -360,7 +368,8 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
         }
 
         Assert.Equal(50, reembolsos + descargas);
-        Assert.Equal(reembolsos, _reembolsos.Registrados.Count);
+        // El doble de Pagos anota hasta lo que la transacción revierte; lo que cuenta es lo que quedó guardado.
+        Assert.Equal(reembolsos, await bd.Consultar<long>("SELECT count(*) FROM devoluciones.devoluciones WHERE pedido_id = ANY(@ids)", ("ids", pedidos.ToArray())));
     }
 
     [Fact]
@@ -465,7 +474,11 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
         await using var anfitrion = Anfitrion();
         var (pedido, cuenta, _, impresa) = await ComprarMixtoConImpreso(anfitrion);
         await EntregarElImpreso(pedido, impresa);
-        await anfitrion.Como(ActorActual.DelSistema(), sp => AplicarLosReceptores(sp, cuenta).ContinueWith(_ => true, TaskScheduler.Default));
+        await anfitrion.Como(ActorActual.DelSistema(), async sp =>
+            {
+                await AplicarLosReceptores(sp, cuenta);
+                return true;
+            });
         await bd.Ejecutar($"UPDATE identidad.usuarios SET activo = false WHERE id = '{cuenta:D}'");
 
         var solicitud = await SolicitarImpreso(anfitrion, cuenta, pedido, impresa);
@@ -473,5 +486,33 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
         Assert.False(solicitud.EsExito);
         Assert.Equal("no-autenticado", solicitud.Error!.Clave);
         Assert.Equal(0, await bd.Consultar<int>("SELECT count(*) FROM devoluciones.devoluciones WHERE pedido_id = @p", ("p", pedido)));
+    }
+
+    [Theory]
+    [InlineData("sin-cancelacion", true)]
+    [InlineData("cancelacion-diferida", true)]
+    [InlineData("ejecucion-en-curso", false)]
+    [Trait("Criterio", "AC-DEV-28")]
+    public async Task Con_la_marca_real_de_Identidad_solo_se_rechaza_sin_escribir_nada_a_la_cuenta_cuya_cancelacion_ya_esta_en_ejecucion(string estadoDeLaCancelacion, bool seAcepta)
+    {
+        await using var anfitrion = Anfitrion();
+        var (pedido, cuenta, digital, impresa) = await ComprarMixtoConImpreso(anfitrion);
+        await EntregarElImpreso(pedido, impresa);
+        if (estadoDeLaCancelacion != "sin-cancelacion")
+        {
+            var enCurso = estadoDeLaCancelacion == "ejecucion-en-curso" ? "true" : "false";
+            await bd.Ejecutar($"INSERT INTO identidad.solicitudes_de_cancelacion (id, usuario_id, estado, solicitada_en, ejecucion_en_curso) VALUES ('{Guid.NewGuid():D}', '{cuenta:D}', 'diferida', now(), {enCurso})");
+        }
+
+        var impreso = await SolicitarImpreso(anfitrion, cuenta, pedido, impresa);
+        var reporte = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<IDevolucionesDelCliente>().ReportarArchivoDefectuoso(new ReportarArchivoDefectuosoEntrada(pedido, digital, new TextoLibre(Sembrado), new TextoLibre("No abre"))));
+
+        Assert.Equal(seAcepta, impreso.EsExito);
+        Assert.Equal(seAcepta, reporte.EsExito);
+        Assert.Equal(seAcepta ? 2L : 0L, await bd.Consultar<long>("SELECT count(*) FROM devoluciones.devoluciones WHERE pedido_id = @p", ("p", pedido)));
+        if (!seAcepta)
+        {
+            Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM devoluciones.devoluciones WHERE motivo = @m AND pedido_id = @p", ("m", Sembrado), ("p", pedido)));
+        }
     }
 }

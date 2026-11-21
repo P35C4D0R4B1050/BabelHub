@@ -10,7 +10,11 @@ using Microsoft.AspNetCore.Routing;
 namespace BabelHub.Ecommerce.Api.Web;
 
 /// <summary>Lo que pide el recorrido: el rol (<c>cliente</c>, <c>encargado</c>, <c>logistica</c> o <c>administrador</c>) y, para un encargado, el código de su sucursal.</summary>
-public sealed record SolicitudDeSiembraDto(string? Rol, string? Sucursal);
+public sealed record SolicitudDeSiembraDto(string? Rol, string? Sucursal, string? Contrasena = null)
+{
+    /// <summary>Nunca imprime la contraseña elegida (AGENTS.md sección 5).</summary>
+    public override string ToString() => $"SolicitudDeSiembraDto {{ Rol = {Rol}, Sucursal = {Sucursal} }}";
+}
 
 /// <summary>
 /// El sembrador de sesiones de <b>solo desarrollo</b> en la Api: <c>POST /desarrollo/sesion</c> devuelve el <c>storageState</c> de Playwright con la cookie de sesión de una cuenta recién sembrada (ver
@@ -83,9 +87,10 @@ public static class SembradorDeSesionesEnLaApi
         var sembrador = contexto.RequestServices.GetRequiredService<SembradorDeSesionesDeDesarrollo>();
         try
         {
-            var sesion = await sembrador.Sembrar(rol, cuerpo.Sucursal, host, contexto.RequestAborted).ConfigureAwait(false);
+            var sesion = await sembrador.Sembrar(rol, cuerpo.Sucursal, host, cuerpo.Contrasena, contexto.RequestAborted).ConfigureAwait(false);
             contexto.Response.Headers.CacheControl = "no-store";
             contexto.Response.Headers["X-Usuario-Id"] = sesion.UsuarioId.ToString("D");
+            contexto.Response.Headers["X-Correo-Sembrado"] = sesion.Correo;
             return Results.Json(new
             {
                 cookies = new[]
