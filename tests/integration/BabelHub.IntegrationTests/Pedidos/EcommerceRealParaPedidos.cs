@@ -48,7 +48,7 @@ public sealed class PostgresDelEcommerceCompletoFixture : IAsyncLifetime
     public string CadenaDeDepuracionDeRegistros => Cadena(_baseDeDatos, _depuradorDeRegistros, _claveDelDepuradorDeRegistros);
 
     private string Cadena(string baseDeDatos, string usuario, string clave) =>
-        new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString()) { Database = baseDeDatos, Username = usuario, Password = clave, Pooling = true, MaxPoolSize = 40 }.ConnectionString;
+        new NpgsqlConnectionStringBuilder(_contenedor.GetConnectionString()) { Database = baseDeDatos, Username = usuario, Password = clave, Pooling = true, MaxPoolSize = 6, ConnectionIdleLifetime = 1, ConnectionPruningInterval = 1 }.ConnectionString;
 
     public async Task InitializeAsync()
     {
@@ -163,7 +163,10 @@ internal sealed class AnfitrionRealDelEcommerce : IAsyncDisposable
         }
     }
 
-    public async ValueTask DisposeAsync() => await Aplicacion.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        await Aplicacion.DisposeAsync();
+    }
 }
 
 [CollectionDefinition(Nombre)]
