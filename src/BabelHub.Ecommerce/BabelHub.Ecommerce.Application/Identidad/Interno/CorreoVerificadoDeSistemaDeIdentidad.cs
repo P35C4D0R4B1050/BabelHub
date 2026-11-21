@@ -13,6 +13,7 @@ public sealed class CorreoVerificadoDeSistemaDeIdentidad(IRepositorioDeCuentas c
         }
 
         var cuenta = await cuentas.PorId(usuarioId, paraActualizar: false, cancelacion).ConfigureAwait(false);
-        return cuenta is { Usuario.CorreoVerificado: true } ? Usuario.NormalizarCorreo(cuenta.Usuario.Correo) : null;
+        // Una cuenta cancelada nunca entrega su correo (defensa en profundidad: la anonimización ya apaga la verificación); una cuenta inexistente es «sin correo verificado» a propósito.
+        return cuenta is { CanceladaEn: null, Usuario.CorreoVerificado: true } ? Usuario.NormalizarCorreo(cuenta.Usuario.Correo) : null;
     }
 }

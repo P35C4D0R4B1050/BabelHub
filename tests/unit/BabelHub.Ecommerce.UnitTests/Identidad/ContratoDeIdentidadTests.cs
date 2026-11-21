@@ -68,6 +68,7 @@ public sealed class ContratoDeIdentidadTests
         [
             "IRegistroDeCuentas", "IIngreso", "ISesiones", "IRecuperacionDeAcceso", "ICuentaDelCliente", "ISolicitudesDeDatos", "ICancelacionDeCuenta", "IAdministracionDeUsuarios", "IClavesDeFirma",
             "IEstadoDeCuenta", "IContextoDeLectura", "IPendientesDeCuenta", "IAplicadorDeCancelacion", "ICarritoDeCuentaReemplazada", "ICancelacionDeAvisos", "IEntregaDeBajas",
+            "IContactoDeAvisosDelCliente", "ICorreoVerificadoDeSistema",
         ];
         var publicas = typeof(IIngreso).Assembly.GetExportedTypes().Where(t => t.Namespace == Espacio && t.IsInterface).Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
 
