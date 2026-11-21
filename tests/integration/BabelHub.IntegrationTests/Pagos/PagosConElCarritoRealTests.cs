@@ -117,7 +117,8 @@ public sealed class PagosConElCarritoRealTests(PostgresDelEcommerceCompletoFixtu
         var entrega = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().ElegirEntrega(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, "sede-central", null)));
         Assert.True(entrega.EsExito, entrega.Error?.Clave);
         var aceptado = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().RegistrarAceptaciones(new RegistrarAceptacionesEntrada(textos)));
-        Assert.True(aceptado.EsExito, aceptado.Error?.Clave);
+        // Si las versiones cambiaron entre la lectura y la aceptación, el mensaje dice cuáles eran (un defecto de aislamiento o de la fuente de versiones se vería aquí).
+        Assert.True(aceptado.EsExito, aceptado.Error?.Clave + " | vistas: " + string.Join(", ", textos.Select(t => $"{t.Texto}={t.VersionVista}")) + " | vigentes ahora: " + string.Join(", ", (await TextosVigentes(anfitrion)).Select(t => $"{t.Texto}={t.VersionVista}")) + " | en la base: " + await bd.Consultar<string>("SELECT terminos || '/' || privacidad || '/' || reembolso FROM identidad.versiones_de_textos WHERE id = 1"));
 
         var pasar = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().PasarAlPago(new PasarAlPagoEntrada(PrecioDeLaEdicion * cantidad, textos)));
         Assert.True(pasar.EsExito, pasar.Error?.Clave);
