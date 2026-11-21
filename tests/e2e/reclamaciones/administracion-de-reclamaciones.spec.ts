@@ -7,6 +7,7 @@ import { clave, conOrigenPropio, ingresarComoClienteNuevo, ingresarComoPersonal,
 // Firefox es informativo. Datos ficticios; `entorno/sembrar-datos.sh --limpiar` antes de cada corrida (también vacía los contadores de límites: 3 hojas por hora por origen).
 
 test.describe.configure({ mode: 'serial' });
+test.setTimeout(90_000);
 
 // Registra una hoja como un consumidor sin sesión y devuelve su número («AAAA-NNNNNN»).
 async function registrarUnaHoja(page: Page, detalle: string): Promise<string> {

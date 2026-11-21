@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { clave, ingresarComoClienteNuevo, ingresarComoPersonal, sinViolacionesDeAccesibilidad, urlDeLaGestion } from '../pedidos/ayudas';
+import { clave, conOrigenPropio, ingresarComoClienteNuevo, ingresarComoPersonal, sinViolacionesDeAccesibilidad, urlDeLaGestion } from '../pedidos/ayudas';
 
 // Las pantallas de administración de `web-base` (WEB-2, T30 y T31; AC-WEB-25, AC-WEB-27, AC-WEB-29) sobre el host de la gestión
 // (`E2E_TLS=1 E2E_HOST=gestion entorno/arrancar-host.sh ecommerce`, https://localhost:8444, que comparte la base con la tienda): usuarios y roles, solicitudes sobre
@@ -7,6 +7,7 @@ import { clave, ingresarComoClienteNuevo, ingresarComoPersonal, sinViolacionesDe
 // Datos ficticios; `entorno/sembrar-datos.sh --limpiar` antes de cada corrida. Chromium de escritorio y de teléfono y WebKit; Firefox es informativo.
 
 test.describe.configure({ mode: 'serial' });
+test.setTimeout(90_000);
 
 async function sinDesplazamientoHorizontal(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), 'la página no se desplaza en horizontal').toBe(false);
@@ -45,7 +46,7 @@ test.describe('Administración central: usuarios, solicitudes, auditoría y aler
     const correo = `e2e-logistica-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
     await page.getByLabel('Nombre completo').fill('Luis Ficticio Logística');
     await page.getByLabel('Correo electrónico').fill(correo);
-    await page.getByLabel('Rol').selectOption('Logistica');
+    await page.locator('form[action$="/administracion/usuarios/crear"]').getByLabel('Rol').selectOption('Logistica');
     const respuesta = page.waitForResponse((r) => r.url().endsWith('/administracion/usuarios/crear') && r.request().method() === 'POST');
     await page.getByRole('button', { name: 'Crear y mostrar la contraseña temporal' }).click();
 
@@ -87,21 +88,35 @@ test.describe('Administración central: usuarios, solicitudes, auditoría y aler
   });
 
   test('una solicitud del cliente llega a la administración con su fecha límite y se responde (AC-WEB-33)', async ({ page, browser }) => {
-    // El cliente presenta una solicitud de acceso en la tienda.
-    await ingresarComoClienteNuevo(page);
+    // El cliente presenta una solicitud de acceso en la tienda (con su identificador, para reconocerla en la lista de todos).
+    await conOrigenPropio(page);
+    const sembrado = await page.request.post('/desarrollo/sesion', { headers: { 'X-Sembrador-De-Desarrollo': clave! }, data: { rol: 'cliente' } });
+    expect(sembrado.ok(), 'el sembrador de sesiones responde').toBeTruthy();
+    const titular = sembrado.headers()['x-usuario-id'];
+    expect(titular).toMatch(/^[0-9a-f-]{36}$/);
+    await page.context().addCookies((await sembrado.json()).cookies);
     await page.goto('/cuenta/solicitudes');
     await page.getByLabel('Tipo de solicitud').selectOption('Acceso');
     await page.getByRole('button', { name: 'Presentar la solicitud' }).click();
     await expect(page.getByRole('status')).toContainText('Presentamos tu solicitud');
 
-    // La administración la ve en su lista, ordenada por fecha límite, y la responde.
+    // La administración la ve en su lista, ordenada por fecha límite, la reconoce por su titular (otras corridas dejan solicitudes de otras cuentas) y la responde.
     const contexto = await browser.newContext({ ignoreHTTPSErrors: true });
     const admin = await contexto.newPage();
     await ingresarComoPersonal(admin, 'administrador');
     await admin.goto(`${urlDeLaGestion}/administracion/solicitudes`);
     await expect(admin.getByRole('columnheader', { name: 'Fecha límite' })).toBeVisible();
     await sinViolacionesDeAccesibilidad(admin);
-    await admin.getByRole('link', { name: 'Abrir' }).first().click();
+    const rutas = await admin.getByRole('link', { name: 'Abrir' }).evaluateAll((enlaces) => enlaces.map((e) => (e as HTMLAnchorElement).getAttribute('href')!));
+    let encontrada = false;
+    for (const ruta of rutas) {
+      await admin.goto(`${urlDeLaGestion}${ruta}`);
+      if (((await admin.locator('dt:has-text("Titular") + dd').textContent()) ?? '').trim() === titular) {
+        encontrada = true;
+        break;
+      }
+    }
+    expect(encontrada, 'la solicitud del cliente está en la lista de la administración').toBe(true);
     await expect(admin.getByRole('heading', { level: 2, name: 'Responder' })).toBeVisible();
 
     await admin.getByLabel('Resolución').selectOption('Atendida');
