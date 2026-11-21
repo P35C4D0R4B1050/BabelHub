@@ -364,6 +364,19 @@ public sealed class AdministracionDeUsuariosTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-AUD-03")]
+    public async Task CambiarElRol_SiLaAuditoriaFalla_LaOperacionFallaYNoQuedaNingunRegistro()
+    {
+        var (e, admin, administracion) = Escenario();
+        var objetivo = e.Cuenta("persona@example.com");
+        e.Auditoria.Falla = true;
+
+        await Assert.ThrowsAsync<AuditoriaNoDisponibleException>(() => administracion.CambiarElRol(admin.Usuario.Id, objetivo.Usuario.Id, RolDeCuenta.EncargadoDeSucursal, "cusco"));
+
+        Assert.Empty(e.Auditoria.Registradas);
+    }
+
+    [Fact]
     public async Task Desactivar_SiLaAuditoriaFalla_NoSeAplicaNada()
     {
         var (e, admin, administracion) = Escenario();
