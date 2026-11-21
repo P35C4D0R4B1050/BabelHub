@@ -54,3 +54,7 @@ Una fila por cada spec o plan que el agente aprobó por delegación de la person
 | 2026-11-21 | plan | inventario-seleccion-fuente | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 12 | eafa632001292cba |
 | 2026-11-21 | spec | identidad-seguridad | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 11 | 52df030618eafde7 |
 | 2026-11-21 | plan | identidad-seguridad | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 4 | 044e8e746d808343 |
+| 2026-11-21 | spec | transversal-auditoria | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 10 | ad52c96b03474a1e |
+| 2026-11-21 | plan | transversal-auditoria | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 7 | 1a10b725e879f9e1 |
+| 2026-11-21 | spec | identidad-seguridad | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 16 | e52632d2f265e14a |
+| 2026-11-21 | plan | identidad-seguridad | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 8 | c860692137393969 |

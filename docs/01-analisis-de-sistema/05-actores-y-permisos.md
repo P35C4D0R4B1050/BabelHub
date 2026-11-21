@@ -45,6 +45,7 @@ Soporte (ayudas del cliente) lo cubre hoy el administrador central. Un rol de so
 | Usar el asistente de compra | ◐ (solo catálogo) | ● | ● | ● | ● | `asistente-compra-ia` |
 | Gestionar usuarios, roles y sucursales | — | — | — | — | ● | `identidad-seguridad` |
 | Gestionar mi cuenta, consentimientos y solicitudes ARCO | — | ◐ | — | — | — | `identidad-seguridad` |
+| Corregir mi nombre y cambiar mi correo (con contraseña y verificación del correo nuevo) | — | ● | ● | ● | ● | `identidad-seguridad` |
 | Atender solicitudes ARCO y restablecer contraseñas del personal | — | — | — | — | ● | `identidad-seguridad` |
 | Consultar la auditoría | — | — | ◐ (historial de su sucursal) | — | ● | `transversal-auditoria` |
 | Consultar la biblioteca de un cliente | — | — | — | — | ● (auditado) | `ecommerce-biblioteca-digital` |
