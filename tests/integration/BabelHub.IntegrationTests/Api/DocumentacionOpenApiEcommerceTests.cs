@@ -23,8 +23,8 @@ public sealed class DocumentacionOpenApiEcommerceTests
 {
     private const string Publicado = "docs/03-diseno-de-software/openapi/ecommerce.v1.json";
 
-    /// <summary>Operaciones del contrato v1 que el E-commerce publica y aún no se sirven: el traslado informado (Pedidos, ECO-6). Las de auditoría ya se mapean en <c>UsarEcommerce</c> (COMP-1); cuando se mapee la de traslados, se quita de esta lista.</summary>
-    private static readonly HashSet<string> PendientesDeImplementar = ["ecommerce.traslados.informar-estado"];
+    /// <summary>Operaciones del contrato v1 que el E-commerce publica y aún no se sirven: ninguna (los estados de traslado de Pedidos y la auditoría ya se mapean en <c>UsarEcommerce</c>); si se añade una operación antes que su endpoint, entra aquí.</summary>
+    private static readonly HashSet<string> PendientesDeImplementar = [];
 
     private static async Task<WebApplication> Compuesto(Action<WebApplication>? antes = null)
     {
