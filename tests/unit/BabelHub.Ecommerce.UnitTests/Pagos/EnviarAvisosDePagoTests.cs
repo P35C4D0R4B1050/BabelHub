@@ -1,3 +1,4 @@
+using BabelHub.Ecommerce.Application.Notificaciones;
 using BabelHub.Ecommerce.Application.Pagos;
 using BabelHub.Ecommerce.Application.Pagos.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
@@ -326,5 +327,128 @@ public sealed class PlantillasDeCorreoDePagosTests
         aviso.RegistrarFalla(IntencionesDePrueba.Inicio);
 
         Assert.Equal(EstadoDeAvisoDePago.Omitido, aviso.Estado);
+    }
+}
+
+/// <summary>El aviso por WhatsApp de Pagos (PAG-22, AC-PAG-12): con el correo ya enviado, el mismo evento se pide a Notificaciones, que decide el consentimiento y solo guarda la solicitud; nunca interrumpe el aviso por correo.</summary>
+public sealed class AvisosDePagoPorWhatsAppTests
+{
+    private static readonly Guid Pedido = InstantaneasDeCompraDePrueba.Pedido;
+
+    private sealed class CorreoDoble : IEnviadorDeCorreo
+    {
+        public List<CorreoSaliente> Enviados { get; } = [];
+
+        public Task<ResultadoDeEnvio> Enviar(CorreoSaliente correo, CancellationToken cancelacion = default)
+        {
+            Enviados.Add(correo);
+            return Task.FromResult(ResultadoDeEnvio.Enviado);
+        }
+
+        public Task<ResultadoDeEnvio> EnviarCodigo(CorreoDeCodigo correo, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    }
+
+    /// <summary>Notificaciones como la ve Pagos: anota lo que se le pide y puede fallar o decir que el cliente no consintió.</summary>
+    private sealed class NotificadorDoble : INotificador
+    {
+        public List<SolicitudDeAviso> Pedidas { get; } = [];
+
+        public bool Lanza { get; set; }
+
+        public ResultadoDeLaSolicitudDeAviso Resultado { get; set; } = ResultadoDeLaSolicitudDeAviso.Creado;
+
+        public Task<ResultadoDeLaSolicitudDeAviso> Solicitar(SolicitudDeAviso solicitud, CancellationToken cancelacion = default)
+        {
+            if (Lanza)
+            {
+                throw new InvalidOperationException("Notificaciones no responde.");
+            }
+
+            Pedidas.Add(solicitud);
+            return Task.FromResult(Resultado);
+        }
+    }
+
+    private sealed class Montaje
+    {
+        public required EntornoDeConfirmacion Base { get; init; }
+
+        public required CorreoDoble Correo { get; init; }
+
+        public required NotificadorDoble Notificador { get; init; }
+
+        public required EnviarAvisosDePago Enviar { get; init; }
+
+        public IEnumerable<AvisoDePago> Avisos => Base.Entorno.Repositorio.AvisosDePago;
+
+        public Task Anotar(EventoDeAvisoDePago evento) => Base.Entorno.Repositorio.AgregarAvisoDePago(AvisoDePago.Crear(Pedido, Base.IntentoId, evento, Base.Entorno.Reloj.Ahora));
+    }
+
+    private static async Task<Montaje> Nuevo()
+    {
+        var b = await EntornoDeConfirmacion.ConIntentoIniciado();
+        var correo = new CorreoDoble();
+        var notificador = new NotificadorDoble();
+        var p = b.Entorno;
+        return new Montaje { Base = b, Correo = correo, Notificador = notificador, Enviar = new EnviarAvisosDePago(p.Repositorio, p.Unidad, p.Cuenta, correo, p.Alertas, p.Reloj, notificador) };
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-12")]
+    [InlineData(EventoDeAvisoDePago.Pendiente, "pago-pendiente", null)]
+    [InlineData(EventoDeAvisoDePago.Aprobado, "pago-resultado", "aprobado")]
+    [InlineData(EventoDeAvisoDePago.Rechazado, "pago-resultado", "rechazado")]
+    [InlineData(EventoDeAvisoDePago.ReembolsoAutomatico, "reembolso-automatico", null)]
+    public async Task Cada_evento_con_plantilla_de_WhatsApp_pide_el_aviso_al_cliente_por_su_cuenta_sin_datos_de_pago_ni_numero(EventoDeAvisoDePago evento, string plantilla, string? resultado)
+    {
+        var m = await Nuevo();
+        await m.Anotar(evento);
+
+        await m.Enviar.Ejecutar(10);
+
+        var pedida = Assert.Single(m.Notificador.Pedidas);
+        Assert.Equal(plantilla, pedida.Plantilla);
+        Assert.Equal(DestinatarioDelAviso.Cliente, pedida.Destinatario);
+        Assert.Equal(InstantaneasDeCompraDePrueba.Cuenta.ToString("D"), pedida.DestinatarioRef);
+        Assert.StartsWith($"pago:{Pedido:N}:", pedida.EventoId, StringComparison.Ordinal);
+        Assert.EndsWith($":{evento.ToString().ToLowerInvariant()}", pedida.EventoId, StringComparison.Ordinal);
+        Assert.Equal(resultado is null ? 1 : 2, pedida.Campos.Count);
+        Assert.Equal($"{Pedido:N}", pedida.Campos["numeroDePedido"]);
+        Assert.Equal(resultado, pedida.Campos.GetValueOrDefault("resultado"));
+        Assert.DoesNotContain("tok_", string.Join(' ', pedida.Campos.Values));
+        Assert.Equal(EstadoDeAvisoDePago.Enviado, m.Avisos.Single().Estado);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-12")]
+    public async Task Un_pago_vencido_no_tiene_plantilla_de_WhatsApp_y_sale_solo_por_correo()
+    {
+        var m = await Nuevo();
+        await m.Anotar(EventoDeAvisoDePago.Vencido);
+
+        await m.Enviar.Ejecutar(10);
+
+        Assert.Empty(m.Notificador.Pedidas);
+        Assert.Single(m.Correo.Enviados);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-12")]
+    public async Task Una_falla_de_Notificaciones_no_impide_marcar_el_correo_como_enviado_y_un_cliente_sin_consentimiento_se_atiende_igual()
+    {
+        var m = await Nuevo();
+        m.Notificador.Lanza = true;
+        await m.Anotar(EventoDeAvisoDePago.Aprobado);
+        await m.Enviar.Ejecutar(10);
+        Assert.Equal(EstadoDeAvisoDePago.Enviado, m.Avisos.Single().Estado);
+        Assert.Single(m.Correo.Enviados);
+
+        var sinConsentimiento = await Nuevo();
+        sinConsentimiento.Notificador.Resultado = ResultadoDeLaSolicitudDeAviso.OmitidoSinConsentimiento;
+        await sinConsentimiento.Anotar(EventoDeAvisoDePago.Pendiente);
+        await sinConsentimiento.Enviar.Ejecutar(10);
+
+        Assert.Single(sinConsentimiento.Notificador.Pedidas);
+        Assert.Equal(EstadoDeAvisoDePago.Enviado, sinConsentimiento.Avisos.Single().Estado);
     }
 }

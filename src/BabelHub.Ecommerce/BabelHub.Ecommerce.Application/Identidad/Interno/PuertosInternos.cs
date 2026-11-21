@@ -352,6 +352,9 @@ public interface ICifradorDeSecretos
 public interface IVersionesDeTextosVigentes
 {
     Task<VersionesDeTextos> Obtener(CancellationToken cancelacion = default);
+
+    /// <summary>Las mismas versiones con la fecha desde la que rigen, leídas juntas (una sola fila): lo que Identidad informa a la web (IDE-57).</summary>
+    Task<(VersionesDeTextos Versiones, DateOnly VigenteDesde)> ObtenerConVigencia(CancellationToken cancelacion = default);
 }
 
 /// <summary>La credencial de acceso emitida: el JWT y su vencimiento.</summary>

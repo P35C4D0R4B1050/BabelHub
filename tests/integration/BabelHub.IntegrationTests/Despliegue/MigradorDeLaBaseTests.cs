@@ -214,6 +214,32 @@ public sealed class MigradorDeLaBaseTests(InstanciaParaMigrar instancia) : IClas
 
     [Fact]
     [Trait("Criterio", "AC-PLA-04")]
+    [Trait("Criterio", "AC-IDE-39")]
+    public async Task ElMigradorDelEcommerce_AplicaLaFechaDeVigenciaDeLosTextos_EnUnaBaseNuevaYEnUnaAnterior_YLaVersionSeSiembraSinEllaConLaFechaPorDefecto()
+    {
+        var propietaria = await instancia.NuevaBase();
+        var baseDeDatos = Base(propietaria);
+        var cuentas = NuevasCuentas("ecommerce_t7");
+        var configuracion = ConfiguracionDelEcommerce(propietaria, cuentas, baseDeDatos);
+
+        Assert.True((await MigrarElEcommerce(configuracion)).Codigo == 0);
+        Assert.Equal(1L, await Consultar<long>(propietaria, "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'identidad' AND table_name = 'versiones_de_textos' AND column_name = 'vigente_desde' AND is_nullable = 'NO'"));
+
+        // La siembra del despliegue y del E2E (sin la fecha) recibe la de hoy por defecto.
+        await Consultar<object>(propietaria, "INSERT INTO identidad.versiones_de_textos (id, terminos, privacidad, reembolso) VALUES (1, 'e2e-2026-11', 'e2e-2026-11', 'e2e-2026-11')");
+        Assert.Equal(1L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.versiones_de_textos WHERE id = 1 AND abs(vigente_desde - CURRENT_DATE) <= 1"));
+
+        // Una base anterior (sin la columna) con las versiones ya sembradas la recibe al migrar de nuevo, sin perder la fila ni fallar.
+        await Consultar<object>(propietaria, "ALTER TABLE identidad.versiones_de_textos DROP COLUMN vigente_desde");
+        Assert.True((await MigrarElEcommerce(configuracion)).Codigo == 0);
+        Assert.Equal(1L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.versiones_de_textos WHERE id = 1 AND terminos = 'e2e-2026-11' AND abs(vigente_desde - CURRENT_DATE) <= 1"));
+
+        // Y migrar otra vez es idempotente.
+        Assert.True((await MigrarElEcommerce(configuracion)).Codigo == 0);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
     public async Task EnUnaBaseLimpia_ElInventarioQuedaConSusRolesEsquemasYCuentas()
     {
         var propietaria = await instancia.NuevaBase();

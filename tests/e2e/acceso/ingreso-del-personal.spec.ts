@@ -67,13 +67,15 @@ async function desactivar(browser: Browser, usuarioId: string) {
   const formulario = admin.locator('form').filter({ has: admin.getByRole('button', { name: 'Desactivar' }) });
   await formulario.getByLabel('Identificador del usuario').fill(usuarioId);
   await formulario.getByRole('button', { name: 'Desactivar' }).click();
+  // Se espera la respuesta antes de cerrar el contexto: si no, la desactivación puede quedar a medias y el siguiente recorrido choca con el encargado de la sucursal.
+  await expect(admin.getByRole('status')).toContainText('Desactivamos el usuario');
   await contexto.close();
 }
 
 const creados: string[] = [];
 
 test.afterEach(async ({ browser }) => {
-  for (const id of creados.splice(0)) await desactivar(browser, id).catch(() => undefined);
+  for (const id of creados.splice(0)) await desactivar(browser, id).catch((e) => console.warn('No se pudo desactivar', id, String(e).slice(0, 200)));
 });
 
 test.describe('Ingreso del personal con contraseña temporal y segundo factor', () => {
@@ -125,14 +127,16 @@ test.describe('Ingreso del personal con contraseña temporal y segundo factor', 
     await sinViolacionesDeAccesibilidad(page);
     await page.getByRole('link', { name: 'Ya los guardé, continuar' }).click();
 
-    // Una cuenta nueva tiene los textos legales pendientes: la política lleva a aceptarlos, también si intenta entrar a otra parte (AC-WEB-34). Aceptarlos en el host compuesto hoy no avanza: ver `progress/hallazgos.md` (versión de los textos de la Web frente a la de Identidad) y la prueba marcada como pendiente al final.
+    // Una cuenta nueva tiene los textos legales pendientes: la política lleva a aceptarlos, también si intenta entrar a otra parte, y al aceptar la versión vigente de Identidad recupera su destino (AC-WEB-34).
     await expect(page).toHaveURL(/\/textos\/aceptar/);
     await expect(page.getByRole('heading', { level: 1, name: 'Actualizamos nuestros textos legales' })).toBeVisible();
     await sinViolacionesDeAccesibilidad(page);
     await page.goto(`${urlDeLaGestion}/logistica/envios`);
     await expect(page).toHaveURL(/\/textos\/aceptar/);
+    await page.getByRole('button', { name: 'Acepto los textos legales' }).click();
+    await expect(page).toHaveURL(/\/logistica\/envios/);
 
-    // 5. Un ingreso posterior pide la contraseña nueva y el código de la aplicación (un paso posterior al ya aceptado); sigue con los textos pendientes.
+    // 5. Un ingreso posterior pide la contraseña nueva y el código de la aplicación (un paso posterior al ya aceptado) y, con los textos ya aceptados, va directo a su destino.
     await page.context().clearCookies();
     await conOrigenPropio(page);
     await page.goto(`${urlDeLaGestion}/ingreso`);
@@ -144,7 +148,7 @@ test.describe('Ingreso del personal con contraseña temporal y segundo factor', 
     await sinViolacionesDeAccesibilidad(page);
     await page.getByRole('textbox', { name: 'Código' }).fill(codigoTotp(secreto, 1));
     await page.getByRole('button', { name: 'Verificar' }).click();
-    await expect(page).toHaveURL(/\/textos\/aceptar/);
+    await expect(page).toHaveURL(/\/logistica\/envios/);
   });
 
   test('un código de verificación incorrecto no abre la sesión y el mensaje no delata nada (AC-WEB-19)', async ({ page, browser }) => {
@@ -170,10 +174,4 @@ test.describe('Ingreso del personal con contraseña temporal y segundo factor', 
     await expect(page.locator('body')).not.toContainText(nueva);
     expect((await cookiesDeLaGestion(page)).some((c) => c.name === '__Host-bh-gestion')).toBe(false);
   });
-});
-
-test.describe('Textos legales pendientes de una cuenta nueva del personal', () => {
-  // Hallazgo abierto (progress/hallazgos.md, 2026-11-21): el identificador de versión que la Web muestra y envía («terminos:0.1-provisional|…», del proveedor provisional) nunca coincide con el conjunto vigente de Identidad
-  // (`identidad.versiones_de_textos`), así que aceptar responde siempre «Los textos cambiaron» y una cuenta nueva no sale de /textos/aceptar. Cuando exista el proveedor de versiones sobre Identidad, quitar `fixme`.
-  test.fixme('al aceptar los textos vigentes la persona recupera su destino (AC-WEB-34)', async () => {});
 });

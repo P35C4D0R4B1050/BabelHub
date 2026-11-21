@@ -186,6 +186,7 @@ public static class ComposicionDeIdentidad
         servicios.TryAddScoped<IContextoDeLectura, ContextoDeLecturaDelAsistente>();
         servicios.TryAddScoped<IContactoDeAvisosDelCliente, ContactoDeAvisosDeIdentidad>();
         servicios.TryAddScoped<ICorreoVerificadoDeSistema, CorreoVerificadoDeSistemaDeIdentidad>();
+        servicios.TryAddScoped<IVersionesVigentesDeLosTextos, VersionesVigentesDeLosTextosDeIdentidad>();
 
         // ---------- Puertos que Identidad implementa para otros módulos (los de Auditoría, aparte: solo Identidad y Auditoría pueden depender de ellos) ----------
         servicios.AgregarPuertosDeAuditoriaDeIdentidad(depuracionDeRegistros);
