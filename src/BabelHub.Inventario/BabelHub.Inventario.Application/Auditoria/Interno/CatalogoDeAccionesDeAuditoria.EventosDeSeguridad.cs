@@ -51,6 +51,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
         "segundo-factor-por-cuenta",
         "registros-por-origen",
         "avisos-no-criticos-por-cuenta",
+        "correcciones-de-nombre-por-cuenta",
         "alertas-criticas-por-tipo-y-cuenta",
         "alertas-criticas-por-origen",
         "cupo-de-codigos-por-origen",

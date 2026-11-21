@@ -481,6 +481,7 @@ public sealed class CatalogoDeAccionesTests
         nameof(AccionesAuditables.UsuarioDadoDeAlta),
         nameof(AccionesAuditables.UsuarioDesactivado),
         nameof(AccionesAuditables.UsuarioReactivado),
+        nameof(AccionesAuditables.UsuarioActualizado),
         nameof(AccionesAuditables.CambioDeRol),
         nameof(AccionesAuditables.ContrasenaRestablecidaPorAdministracion),
         nameof(AccionesAuditables.SegundoFactorRestablecidoPorAdministracion),
@@ -573,6 +574,7 @@ public sealed class CatalogoDeAccionesTests
     [InlineData(nameof(AccionesAuditables.UsuarioDadoDeAlta), true)]
     [InlineData(nameof(AccionesAuditables.UsuarioDesactivado), true)]
     [InlineData(nameof(AccionesAuditables.UsuarioReactivado), true)]
+    [InlineData(nameof(AccionesAuditables.UsuarioActualizado), true)]
     [InlineData(nameof(AccionesAuditables.CuentaCancelada), true)]
     [InlineData(nameof(AccionesAuditables.CuentaReemplazada), true)]
     [InlineData(nameof(AccionesAuditables.CancelacionDiferidaDescartada), true)]

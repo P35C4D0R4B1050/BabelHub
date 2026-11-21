@@ -14,6 +14,7 @@ namespace BabelHub.Ecommerce.Application.Identidad.Interno;
 public sealed class CancelacionDeCuenta(
     IRepositorioDeCuentas cuentas,
     AlcanceDeLaCuenta alcance,
+    ConfianzaDelDispositivo confianza,
     Reautenticacion reautenticacion,
     IRepositorioDeCancelaciones cancelaciones,
     IPendientesDeCuenta pendientes,
@@ -41,12 +42,18 @@ public sealed class CancelacionDeCuenta(
 
     private static ErrorDeAplicacion EjecucionEnCurso { get; } = new(CategoriaDeError.Conflicto, "ejecucion-en-curso");
 
-    public async Task<Resultado<EstadoDeLaCancelacionDeCuenta>> Solicitar(Guid usuarioId, ValorSecreto contrasena, ValorSecreto? codigoDelSegundoFactor, CancellationToken cancelacion = default)
+    public async Task<Resultado<EstadoDeLaCancelacionDeCuenta>> Solicitar(Guid usuarioId, ValorSecreto contrasena, ValorSecreto? codigoDelSegundoFactor, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(contrasena);
         if (await alcance.Comprobar(usuarioId, cancelacion).ConfigureAwait(false) is { } prohibido)
         {
             return Resultado<EstadoDeLaCancelacionDeCuenta>.Fallo(prohibido);
+        }
+
+        // Con un cambio de correo no reconocido pendiente, pedir o reconfirmar la cancelación exige un dispositivo reconocido (IDE-96); desistir sigue permitido.
+        if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)
+        {
+            return Resultado<EstadoDeLaCancelacionDeCuenta>.Fallo(congelado);
         }
 
         var cuenta = await Cargar(usuarioId, false, cancelacion).ConfigureAwait(false);
@@ -149,12 +156,18 @@ public sealed class CancelacionDeCuenta(
         return Resultado<EstadoDeLaCancelacionDeCuenta>.Exito(Estado(solicitud, abiertos));
     }
 
-    public async Task<Resultado<EstadoDeLaCancelacionDeCuenta>> Reconfirmar(Guid usuarioId, ValorSecreto contrasena, ValorSecreto? codigoDelSegundoFactor, CancellationToken cancelacion = default)
+    public async Task<Resultado<EstadoDeLaCancelacionDeCuenta>> Reconfirmar(Guid usuarioId, ValorSecreto contrasena, ValorSecreto? codigoDelSegundoFactor, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(contrasena);
         if (await alcance.Comprobar(usuarioId, cancelacion).ConfigureAwait(false) is { } prohibido)
         {
             return Resultado<EstadoDeLaCancelacionDeCuenta>.Fallo(prohibido);
+        }
+
+        // Con un cambio de correo no reconocido pendiente, pedir o reconfirmar la cancelación exige un dispositivo reconocido (IDE-96); desistir sigue permitido.
+        if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)
+        {
+            return Resultado<EstadoDeLaCancelacionDeCuenta>.Fallo(congelado);
         }
 
         var cuenta = await Cargar(usuarioId, false, cancelacion).ConfigureAwait(false);

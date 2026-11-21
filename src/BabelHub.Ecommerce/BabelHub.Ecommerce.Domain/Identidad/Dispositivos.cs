@@ -172,7 +172,7 @@ public sealed class CambioDeCorreoPendiente
     public bool CongelaAlDispositivo => Estado == EstadoDelCambioDeCorreo.PendienteDeConfirmacion;
 
     /// <summary>
-    /// El código del correo nuevo es correcto: si el cambio esperaba la verificación y está en plazo, se aplica (IDE-53, sin avisar al correo anterior). Un cambio pendiente de confirmación no se aplica por verificar el correo
+    /// El código del correo nuevo es correcto: si el cambio esperaba la verificación y está en plazo, se aplica (IDE-53; los avisos de IDE-94 los envía la Aplicación). Un cambio pendiente de confirmación no se aplica por verificar el correo
     /// nuevo: necesita la confirmación del titular.
     /// </summary>
     public ResultadoDelCambioDeCorreo CorreoNuevoVerificado(DateTimeOffset ahora)

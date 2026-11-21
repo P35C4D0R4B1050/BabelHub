@@ -238,6 +238,8 @@ public static class AccionesDeAuditoria
 
     public const string TrasladoSolicitado = "TrasladoSolicitado";
 
+    public const string UsuarioActualizado = "UsuarioActualizado";
+
     public const string UsuarioDadoDeAlta = "UsuarioDadoDeAlta";
 
     public const string UsuarioDesactivado = "UsuarioDesactivado";
@@ -361,6 +363,7 @@ public static class AccionesDeAuditoria
         TrasladoRechazado,
         TrasladoRecibido,
         TrasladoSolicitado,
+        UsuarioActualizado,
         UsuarioDadoDeAlta,
         UsuarioDesactivado,
         UsuarioReactivado,

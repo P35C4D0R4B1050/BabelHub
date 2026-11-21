@@ -45,6 +45,9 @@ public sealed class CuentaVista : ModeloBaseDePagina
 
     public IReadOnlyDictionary<string, string> Borrador { get; set; } = new Dictionary<string, string>();
 
+    /// <summary>La cuenta es de un miembro del personal (DD-25): solo ve su nombre, su correo y sus avisos.</summary>
+    public bool EsDelPersonal { get; set; }
+
     public bool ConAcciones => !TextosPendientes;
 }
 
@@ -87,6 +90,8 @@ public sealed class CuentaController(
 
     private static readonly string[] SoloAviso = ["aviso"];
 
+    private static readonly PantallaDeLaCuenta[] PantallasDelPersonal = [PantallaDeLaCuenta.Resumen, PantallaDeLaCuenta.Datos, PantallaDeLaCuenta.Correo, PantallaDeLaCuenta.Avisos];
+
     // ---------- Lectura ----------
 
     [HttpGet("/cuenta")]
@@ -125,20 +130,22 @@ public sealed class CuentaController(
         {
             var resultado = await cuenta.CorregirElNombre(actor.UsuarioId, campos.GetValueOrDefault("nombre") ?? string.Empty, token);
             return resultado.EsExito ? null : resultado.Error;
-        }, cancelacion);
+        }, cancelacion, tambienElPersonal: true);
 
     [HttpPost("/cuenta/whatsapp")]
     public Task<IActionResult> Whatsapp(CancellationToken cancelacion) =>
         Accion(["numero", "consiente"], PantallaDeLaCuenta.Datos, "whatsapp-guardado", async (actor, campos, token) =>
         {
             var numero = campos.GetValueOrDefault("numero");
-            var guardado = await cuenta.GuardarElNumeroDeWhatsApp(actor.UsuarioId, string.IsNullOrWhiteSpace(numero) ? null : numero, token);
+            var borde = DatosDelBorde.Leer(Request);
+            var marca = borde.Marca is null ? null : new ValorSecreto(borde.Marca);
+            var guardado = await cuenta.GuardarElNumeroDeWhatsApp(actor.UsuarioId, string.IsNullOrWhiteSpace(numero) ? null : numero, marca, token);
             if (!guardado.EsExito)
             {
                 return guardado.Error;
             }
 
-            var consentimiento = await cuenta.CambiarElConsentimientoDeWhatsApp(actor.UsuarioId, campos.ContainsKey("consiente"), string.IsNullOrWhiteSpace(numero) ? null : numero, token);
+            var consentimiento = await cuenta.CambiarElConsentimientoDeWhatsApp(actor.UsuarioId, campos.ContainsKey("consiente"), string.IsNullOrWhiteSpace(numero) ? null : numero, marca, token);
             return consentimiento.EsExito ? null : consentimiento.Error;
         }, cancelacion);
 
@@ -231,24 +238,24 @@ public sealed class CuentaController(
 
             var resultado = await cuenta.MarcarElAvisoComoVisto(actor.UsuarioId, id, desdeUnaSesionReconocida: reconocida.Valor, token);
             return resultado.EsExito ? null : resultado.Error;
-        }, cancelacion);
+        }, cancelacion, tambienElPersonal: true);
 
     [HttpPost("/cuenta/correo/solicitar")]
     public Task<IActionResult> SolicitarElCorreo(CancellationToken cancelacion) =>
-        Accion(["correoNuevo", "actual"], PantallaDeLaCuenta.Correo, "correo-solicitado", async (actor, campos, token) =>
+        Accion(["correoNuevo", "actual", "codigo"], PantallaDeLaCuenta.Correo, "correo-solicitado", async (actor, campos, token) =>
         {
             var dispositivo = DatosDelBorde.Leer(Request);
-            var resultado = await correo.Solicitar(actor.UsuarioId, campos.GetValueOrDefault("correoNuevo") ?? string.Empty, new ValorSecreto(campos.GetValueOrDefault("actual") ?? string.Empty), dispositivo.Marca is null ? null : new ValorSecreto(dispositivo.Marca), dispositivo.Region, token);
+            var resultado = await correo.Solicitar(actor.UsuarioId, campos.GetValueOrDefault("correoNuevo") ?? string.Empty, new ValorSecreto(campos.GetValueOrDefault("actual") ?? string.Empty), dispositivo.Marca is null ? null : new ValorSecreto(dispositivo.Marca), dispositivo.Region, string.IsNullOrWhiteSpace(campos.GetValueOrDefault("codigo")) ? null : new ValorSecreto(campos["codigo"]), token);
             return resultado.EsExito ? null : resultado.Error;
-        }, cancelacion);
+        }, cancelacion, tambienElPersonal: true);
 
     [HttpPost("/cuenta/correo/verificar")]
     public Task<IActionResult> VerificarElCorreoNuevo(CancellationToken cancelacion) =>
         Accion(["codigo"], PantallaDeLaCuenta.Correo, "correo-verificado", async (actor, campos, token) =>
         {
-            var resultado = await correo.VerificarElCorreoNuevo(actor.UsuarioId, new ValorSecreto(campos.GetValueOrDefault("codigo") ?? string.Empty), token);
+            var resultado = await correo.VerificarElCorreoNuevo(actor.UsuarioId, new ValorSecreto(campos.GetValueOrDefault("codigo") ?? string.Empty), await RenovacionActual(token), token);
             return resultado.EsExito ? null : resultado.Error;
-        }, cancelacion);
+        }, cancelacion, tambienElPersonal: true);
 
     [HttpPost("/cuenta/correo/confirmar")]
     public Task<IActionResult> ConfirmarElCambioPendiente(CancellationToken cancelacion) =>
@@ -257,7 +264,7 @@ public sealed class CuentaController(
             var dispositivo = DatosDelBorde.Leer(Request);
             var resultado = await correo.ConfirmarElCambioPendiente(actor.UsuarioId, new ValorSecreto(campos.GetValueOrDefault("actual") ?? string.Empty), dispositivo.Marca is null ? null : new ValorSecreto(dispositivo.Marca), dispositivo.Region, token);
             return resultado.EsExito ? null : resultado.Error;
-        }, cancelacion);
+        }, cancelacion, tambienElPersonal: true);
 
     [HttpPost("/cuenta/correo/rechazar")]
     public Task<IActionResult> RechazarElCambioPendiente(CancellationToken cancelacion) =>
@@ -266,13 +273,13 @@ public sealed class CuentaController(
             var dispositivo = DatosDelBorde.Leer(Request);
             var resultado = await correo.RechazarElCambioPendiente(actor.UsuarioId, new ValorSecreto(campos.GetValueOrDefault("actual") ?? string.Empty), dispositivo.Marca is null ? null : new ValorSecreto(dispositivo.Marca), dispositivo.Region, token);
             return resultado.EsExito ? null : resultado.Error;
-        }, cancelacion);
+        }, cancelacion, tambienElPersonal: true);
 
     [HttpPost("/cuenta/cancelacion/solicitar")]
-    public Task<IActionResult> SolicitarLaCancelacion(CancellationToken cancelacionDeLaSolicitud) => AccionDeCancelacion("cancelacion-solicitada", (actor, contrasena, codigo, token) => cancelacion.Solicitar(actor.UsuarioId, contrasena, codigo, token), cancelacionDeLaSolicitud);
+    public Task<IActionResult> SolicitarLaCancelacion(CancellationToken cancelacionDeLaSolicitud) => AccionDeCancelacion("cancelacion-solicitada", (actor, contrasena, codigo, token) => cancelacion.Solicitar(actor.UsuarioId, contrasena, codigo, MarcaDelBorde(), token), cancelacionDeLaSolicitud);
 
     [HttpPost("/cuenta/cancelacion/reconfirmar")]
-    public Task<IActionResult> ReconfirmarLaCancelacion(CancellationToken cancelacionDeLaSolicitud) => AccionDeCancelacion("cancelacion-reconfirmada", (actor, contrasena, codigo, token) => cancelacion.Reconfirmar(actor.UsuarioId, contrasena, codigo, token), cancelacionDeLaSolicitud);
+    public Task<IActionResult> ReconfirmarLaCancelacion(CancellationToken cancelacionDeLaSolicitud) => AccionDeCancelacion("cancelacion-reconfirmada", (actor, contrasena, codigo, token) => cancelacion.Reconfirmar(actor.UsuarioId, contrasena, codigo, MarcaDelBorde(), token), cancelacionDeLaSolicitud);
 
     [HttpPost("/cuenta/cancelacion/desistir")]
     public Task<IActionResult> DesistirDeLaCancelacion(CancellationToken cancelacionDeLaSolicitud) =>
@@ -333,9 +340,9 @@ public sealed class CuentaController(
     }
 
     /// <summary>Una acción de la cuenta: sesión de cliente, esquema estricto del cuerpo, la llamada a Identidad y, si sale bien, <c>303</c> a la pantalla con un aviso de lista cerrada; si no, la misma pantalla con el motivo.</summary>
-    private async Task<IActionResult> Accion(string[] permitidos, PantallaDeLaCuenta pantalla, string aviso, Func<ActorVerificado, IReadOnlyDictionary<string, string>, CancellationToken, Task<ErrorDeAplicacion?>> operacion, CancellationToken cancelacionDeLaSolicitud)
+    private async Task<IActionResult> Accion(string[] permitidos, PantallaDeLaCuenta pantalla, string aviso, Func<ActorVerificado, IReadOnlyDictionary<string, string>, CancellationToken, Task<ErrorDeAplicacion?>> operacion, CancellationToken cancelacionDeLaSolicitud, bool tambienElPersonal = false)
     {
-        var (actor, campos, fallo) = await Preparar(permitidos, cancelacionDeLaSolicitud);
+        var (actor, campos, fallo) = await Preparar(permitidos, cancelacionDeLaSolicitud, tambienElPersonal);
         if (actor is null)
         {
             return fallo!;
@@ -354,15 +361,15 @@ public sealed class CuentaController(
         return error is null ? Redirigir($"{RutaDe(pantalla)}?aviso={aviso}") : await Volver(pantalla, error, cancelacionDeLaSolicitud);
     }
 
-    /// <summary>La sesión de un cliente y el cuerpo con su esquema estricto; sin sesión, al ingreso; con otro rol, sin permiso.</summary>
-    private async Task<(ActorVerificado? Actor, IReadOnlyDictionary<string, string>? Campos, IActionResult? Fallo)> Preparar(string[] permitidos, CancellationToken cancelacionDeLaSolicitud)
+    /// <summary>La sesión de un cliente (o, en las acciones de nombre, correo y avisos, la de cualquier rol, DD-25) y el cuerpo con su esquema estricto; sin sesión, al ingreso; con otro rol, sin permiso.</summary>
+    private async Task<(ActorVerificado? Actor, IReadOnlyDictionary<string, string>? Campos, IActionResult? Fallo)> Preparar(string[] permitidos, CancellationToken cancelacionDeLaSolicitud, bool tambienElPersonal = false)
     {
         if (HttpContext.ActorDeLaSolicitud() is not { } actor)
         {
             return (null, null, HttpContext.RedirigirAlIngreso());
         }
 
-        if (actor.Rol != RolWeb.Cliente)
+        if (actor.Rol != RolWeb.Cliente && !tambienElPersonal)
         {
             return (null, null, Redirigir(RespuestasDeSesion.RutaSinPermiso));
         }
@@ -375,6 +382,10 @@ public sealed class CuentaController(
 
         return (actor, campos, null);
     }
+
+    /// <summary>La marca de dispositivo de la cookie de esta solicitud, solo en proceso: Identidad decide si el dispositivo es reconocido (IDE-55, IDE-96).</summary>
+    private ValorSecreto? MarcaDelBorde() => DatosDelBorde.Leer(Request).Marca is { } marca ? new ValorSecreto(marca) : null;
+
     /// <summary>La renovación de la sesión de este navegador, solo en proceso, para que Identidad la conserve al revocar las demás; sin una sesión legible es <see langword="null"/> (se revocan todas, que es lo seguro).</summary>
     private async Task<ValorSecreto?> RenovacionActual(CancellationToken cancelacionDeLaSolicitud) =>
         CookieDeSesionWeb.Leer(Request, host.Host) is { } cookie ? await sesiones.RenovacionDeLaSesion(cookie, host.Host, cancelacionDeLaSolicitud) : null;
@@ -402,21 +413,22 @@ public sealed class CuentaController(
             return HttpContext.RedirigirAlIngreso();
         }
 
+        // El personal solo ve su nombre, su correo y sus avisos (DD-25): el segundo factor, los datos personales, la cancelación y las solicitudes son del cliente.
+        if (actor.Rol != RolWeb.Cliente && !PantallasDelPersonal.Contains(pantalla))
+        {
+            return Redirigir(RespuestasDeSesion.RutaSinPermiso);
+        }
+
         var vista = await Armar(pantalla, actor, aviso, cancelacionDeLaSolicitud);
         return Pintar(vista, vista.EsError ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status200OK);
     }
 
     private async Task<CuentaVista> Armar(PantallaDeLaCuenta pantalla, ActorVerificado actor, string? aviso, CancellationToken cancelacionDeLaSolicitud)
     {
-        var vista = await pagina.Completar(new CuentaVista { Pantalla = pantalla }, "Mi cuenta", cancelacion: cancelacionDeLaSolicitud);
+        var vista = await pagina.Completar(new CuentaVista { Pantalla = pantalla, EsDelPersonal = actor.Rol != RolWeb.Cliente }, "Mi cuenta", cancelacion: cancelacionDeLaSolicitud);
         if (aviso is not null && Avisos.TryGetValue(aviso, out var texto))
         {
             vista.Mensaje = texto;
-        }
-
-        if (actor.Rol != RolWeb.Cliente)
-        {
-            return vista;
         }
 
         try
@@ -433,7 +445,7 @@ public sealed class CuentaController(
                 case PantallaDeLaCuenta.Avisos or PantallaDeLaCuenta.Resumen:
                     var avisos = await cuenta.ListarLosAvisos(actor.UsuarioId, cancelacionDeLaSolicitud);
                     vista.Avisos = avisos.EsExito ? avisos.Valor : [];
-                    if (pantalla == PantallaDeLaCuenta.Resumen)
+                    if (pantalla == PantallaDeLaCuenta.Resumen && actor.Rol == RolWeb.Cliente)
                     {
                         var estado = await cancelacion.Consultar(actor.UsuarioId, cancelacionDeLaSolicitud);
                         vista.Cancelacion = estado.EsExito ? estado.Valor : null;

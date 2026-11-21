@@ -113,6 +113,150 @@ public sealed class GestionDeLaCuentaTests
         Assert.Equal(CategoriaDeError.Validacion, largo.Error!.Categoria);
     }
 
+    // ---------------------------------------------------------------- nombre de cualquier rol (IDE-90, IDE-93, IDE-98, AUD-45)
+
+    [Theory]
+    [Trait("Criterio", "AC-IDE-67")]
+    [Trait("Criterio", "AC-AUD-33")]
+    [InlineData(RolDeUsuario.Cliente, "cliente")]
+    [InlineData(RolDeUsuario.EncargadoDeSucursal, "encargado-de-sucursal")]
+    [InlineData(RolDeUsuario.Logistica, "logistica")]
+    [InlineData(RolDeUsuario.AdministradorCentral, "administrador-central")]
+    public async Task CorregirElNombre_DeCualquierRol_Guarda_YAudita_SinElNombreEnElDetalle(RolDeUsuario rol, string actorDelRol)
+    {
+        var e = new EntornoDeIdentidad();
+        var cuenta = e.Cuenta("persona@example.com", rol);
+        e.Actor.Actual = ActorActual.DeUsuario(cuenta.Usuario.Id, actorDelRol);
+
+        var resultado = await e.Gestion().CorregirElNombre(cuenta.Usuario.Id, "  Ana Lucía  ");
+
+        Assert.True(resultado.EsExito);
+        Assert.Equal("Ana Lucía", cuenta.Nombre);
+        var registro = Assert.Single(e.Auditoria.Registradas);
+        Assert.Equal(AccionesAuditables.UsuarioActualizado, registro.Accion);
+        Assert.Equal("usuario", registro.ObjetoTipo);
+        Assert.Equal(cuenta.Usuario.Id.ToString("D"), registro.ObjetoId);
+        Assert.Empty(registro.Detalle);
+        Assert.DoesNotContain("Ana", registro.Motivo ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-33")]
+    public async Task CorregirElNombre_SiElValorNoCambia_NoDejaRegistroDeAuditoria()
+    {
+        var (e, cuenta, gestion) = Titular();
+
+        var resultado = await gestion.CorregirElNombre(cuenta.Usuario.Id, " Persona ");
+
+        Assert.True(resultado.EsExito);
+        Assert.Empty(e.Auditoria.Registradas);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-IDE-67")]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("Ana\u0007")]
+    [InlineData("Ana\u202EBorrada")]
+    [InlineData("Ana\u200BLarga")]
+    [InlineData("Ana\U000E0041Etiqueta")]
+    public async Task CorregirElNombre_Invalido_SeRechaza_SinGuardarNiAuditar(string nombre)
+    {
+        var (e, cuenta, gestion) = Titular();
+
+        var resultado = await gestion.CorregirElNombre(cuenta.Usuario.Id, nombre);
+
+        Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
+        Assert.Equal("Persona", cuenta.Nombre);
+        Assert.Empty(e.Auditoria.Registradas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-67")]
+    public async Task CorregirElNombre_ConUnSustitutoSuelto_SeRechaza()
+    {
+        var (e, cuenta, gestion) = Titular();
+
+        var resultado = await gestion.CorregirElNombre(cuenta.Usuario.Id, "Ana" + (char)0xD800 + "Suelto");
+
+        Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
+        Assert.Equal("Persona", cuenta.Nombre);
+        Assert.Empty(e.Auditoria.Registradas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-67")]
+    public async Task CorregirElNombre_ElBordeDeCienCaracteresSeAcepta_YCientoUnoSeRechaza()
+    {
+        var (_, cuenta, gestion) = Titular();
+
+        Assert.True((await gestion.CorregirElNombre(cuenta.Usuario.Id, new string('a', 100))).EsExito);
+        Assert.Equal(CategoriaDeError.Validacion, (await gestion.CorregirElNombre(cuenta.Usuario.Id, new string('b', 101))).Error!.Categoria);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-67")]
+    [Trait("Criterio", "AC-AUD-33")]
+    public async Task CorregirElNombre_SiLaAuditoriaFalla_LaOperacionFalla_YElNombreNoCambia()
+    {
+        var (e, cuenta, gestion) = Titular();
+        e.Auditoria.Falla = true;
+
+        await Assert.ThrowsAsync<AuditoriaNoDisponibleException>(() => gestion.CorregirElNombre(cuenta.Usuario.Id, "Otro nombre"));
+
+        Assert.Empty(e.Auditoria.Registradas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-67")]
+    public async Task CorregirElNombre_LaSextaDeLaHora_SeRechazaConElLimite_YNoDejaRegistro()
+    {
+        var (e, cuenta, gestion) = Titular();
+        for (var i = 1; i <= 5; i++)
+        {
+            Assert.True((await gestion.CorregirElNombre(cuenta.Usuario.Id, $"Nombre {i}")).EsExito);
+        }
+
+        var sexta = await gestion.CorregirElNombre(cuenta.Usuario.Id, "Nombre 6");
+
+        Assert.Equal(FallosDeIdentidad.LimiteExcedido, sexta.Error);
+        Assert.Equal("Nombre 5", cuenta.Nombre);
+        Assert.Equal(5, e.Auditoria.Registradas.Count);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-67")]
+    public async Task CorregirElNombre_ElLimiteEsPorCuenta()
+    {
+        var (e, cuenta, gestion) = Titular();
+        for (var i = 1; i <= 5; i++)
+        {
+            await gestion.CorregirElNombre(cuenta.Usuario.Id, $"Nombre {i}");
+        }
+
+        var otra = e.Cuenta("otra@example.com", RolDeUsuario.Logistica);
+        e.Actor.Actual = ActorActual.DeUsuario(otra.Usuario.Id, "logistica");
+
+        Assert.True((await e.Gestion().CorregirElNombre(otra.Usuario.Id, "Otra persona")).EsExito);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-67")]
+    public async Task LosCasosDeUsoDeWhatsApp_DelPersonal_SeRechazanEnLaAplicacion()
+    {
+        var e = new EntornoDeIdentidad();
+        var cuenta = e.Cuenta("logistica@example.com", RolDeUsuario.Logistica);
+        e.Actor.Actual = ActorActual.DeUsuario(cuenta.Usuario.Id, "logistica");
+        var gestion = e.Gestion();
+
+        var numero = await gestion.GuardarElNumeroDeWhatsApp(cuenta.Usuario.Id, "+51999111222");
+        var consentimiento = await gestion.CambiarElConsentimientoDeWhatsApp(cuenta.Usuario.Id, false, null);
+
+        Assert.Equal("solo-clientes", numero.Error!.Clave);
+        Assert.Equal("solo-clientes", consentimiento.Error!.Clave);
+        Assert.Null(cuenta.Whatsapp.Numero);
+    }
+
     // ---------------------------------------------------------------- contraseña
 
     [Fact]
