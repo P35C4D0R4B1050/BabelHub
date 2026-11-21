@@ -34,6 +34,7 @@ public sealed class MiBibliotecaVista : ModeloBaseDePagina
 /// (<c>POST /biblioteca/{id}/descargar</c>): esta página lleva el formulario, por eso abre <c>form-action</c> al almacén solo aquí (WEB-40). Toda respuesta es <c>no-store</c>.
 /// </summary>
 [Area("Tienda")]
+[RequestSizeLimit(4096)]
 public sealed class MiBibliotecaController(IBibliotecaDelCliente biblioteca, IAyudaDeLaBiblioteca ayuda, ContextoDePagina pagina, OpcionesDeErrores errores) : Controller
 {
     private const int TamanoPorOmision = 12;
@@ -81,6 +82,7 @@ public sealed class MiBibliotecaController(IBibliotecaDelCliente biblioteca, IAy
             "Mi biblioteca",
             AreaDeLaPagina.Tienda,
             cancelacion);
+        modelo.HaySesion = true; // la ruta exige sesión: la cabecera muestra «Mi cuenta» y «Cerrar sesión»
         if (modelo.Libros.Count == 0)
         {
             modelo.Estado = EstadoVista.Vacio("Aún no tienes libros digitales", "Cuando compres uno, aparecerá aquí al instante.", "Ver libros digitales", "/catalogo?formato=digital");

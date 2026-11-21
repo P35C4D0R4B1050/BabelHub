@@ -101,6 +101,12 @@ test.describe('Biblioteca digital (compra, mi biblioteca, descarga y ayuda)', ()
     await expect(libro.getByRole('button', { name: 'Descargar' })).toBeVisible();
     await page.screenshot({ path: info.outputPath('mi-biblioteca.png'), fullPage: true });
     await sinViolacionesDeAccesibilidad(page);
+    // Tema oscuro: mismo contraste AA (ui-review) y captura para la revisión visual.
+    await page.evaluate(() => document.documentElement.setAttribute("data-theme", "babelhub-dark"));
+    await page.waitForTimeout(600); // fin de la transición de color del tema
+    await page.screenshot({ path: info.outputPath("mi-biblioteca-oscuro.png"), fullPage: true });
+    await sinViolacionesDeAccesibilidad(page);
+    await page.evaluate(() => document.documentElement.setAttribute("data-theme", "babelhub"));
   });
 
   test('AC-BIB-04, AC-BIB-12: descargar redirige al almacén sin pasar el archivo por el servidor y cuenta una descarga; se opera por teclado', async ({ page }, info) => {
@@ -112,14 +118,28 @@ test.describe('Biblioteca digital (compra, mi biblioteca, descarga y ayuda)', ()
     // Por teclado: el botón recibe el foco y se activa con Enter.
     await boton.focus();
     await expect(boton).toBeFocused();
-    const respuestaDelPost = page.waitForResponse((r) => r.url().includes('/descargar') && r.request().method() === 'POST');
+    // Lo que el formulario enviará: la acción, el token y la clave de un solo uso de este render.
+    const formulario = page.locator('form[action$="/descargar"]').first();
+    const accion = (await formulario.getAttribute('action'))!;
+    const claveDeUnSoloUso = (await formulario.locator('input[name=clave]').inputValue());
+    const token = (await formulario.locator('input[name=__RequestVerificationToken]').inputValue());
+
+    // El navegador envía el POST con Enter. El almacén de desarrollo es inválido a propósito y la CSP real no abre `form-action` fuera del propio sitio: Chromium puede cancelar el
+    // seguimiento de la redirección, así que se comprueba que el POST salió y, después, la respuesta del servidor con la misma petición sin seguir la redirección.
+    const peticionDelPost = page.waitForRequest((r) => r.url().includes('/descargar') && r.method() === 'POST');
     await page.keyboard.press('Enter');
-    const respuesta = await respuestaDelPost;
+    await peticionDelPost;
+
+    // La misma clave dentro de su vigencia da el mismo enlace sin contar otra descarga (BIB-05) y la respuesta es 302 al almacén, sin cuerpo y sin caché (BIB-14).
+    const respuesta = await page.request.post(accion, {
+      form: { clave: claveDeUnSoloUso, __RequestVerificationToken: token },
+      headers: { Origin: new URL(page.url()).origin },
+      maxRedirects: 0,
+    });
     expect([302, 303]).toContain(respuesta.status());
     expect(respuesta.headers()['cache-control']).toContain('no-store');
     expect(respuesta.headers()['location']).toMatch(/^https:\/\//);
-    // Nunca se transmite el archivo: la respuesta no lleva cuerpo ni tipo de contenido.
-    expect((await respuesta.body().catch(() => Buffer.alloc(0))).length).toBe(0);
+    expect((await respuesta.body()).length).toBe(0);
 
     // La descarga se cuenta al entregar el enlace, aunque el navegador no llegue a usarlo (el almacén de desarrollo es inválido a propósito).
     await page.goto('/biblioteca');

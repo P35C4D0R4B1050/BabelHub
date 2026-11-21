@@ -307,6 +307,7 @@ public sealed class SalidaDeTrasladosTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-TRA-08")]
     public void LasAlertasDeLaSalidaUsanSoloMotivosDelCatalogoCerrado()
     {
         var catalogo = BabelHub.Inventario.Application.Auditoria.Interno.CatalogoDeAlertasDeAuditoria.Crear();

@@ -13,6 +13,25 @@ public interface IPendientesDeCuenta
     Task<int> Contar(Guid usuarioId, CancellationToken cancelacion = default);
 }
 
+/// <summary>
+/// Los dos números que informa Pedidos para una cuenta (PED-31): pedidos con alguna línea impresa sin entregar ni anular (incluidas las no recogidas) y reembolsos pendientes de anulación y de cancelación del cliente.
+/// Solo números de esa cuenta; nunca datos de otra ni de los pedidos.
+/// </summary>
+public readonly record struct PendientesDeCuentaPorTipo(int PedidosSinCerrar, int ReembolsosPendientes)
+{
+    /// <summary>La suma que cuenta <see cref="IPendientesDeCuenta.Contar"/>.</summary>
+    public int Total => checked(PedidosSinCerrar + ReembolsosPendientes);
+}
+
+/// <summary>
+/// Los pendientes de una cuenta <b>separados por tipo</b> (PED-31, AC-PED-26): extiende <see cref="IPendientesDeCuenta"/> sin cambiarlo (<see cref="IPendientesDeCuenta.Contar"/> sigue devolviendo la suma, y la suma es
+/// <see cref="PendientesDeCuentaPorTipo.Total"/>). Lo implementa Pedidos; mismas reglas: falla cerrado con <see cref="PendientesNoDisponiblesException"/> y nunca asume cero.
+/// </summary>
+public interface IPendientesDeCuentaPorTipo : IPendientesDeCuenta
+{
+    Task<PendientesDeCuentaPorTipo> ContarPorTipo(Guid usuarioId, CancellationToken cancelacion = default);
+}
+
 /// <summary>No se pudo contar los pendientes de una cuenta: la cancelación o el reemplazo fallan cerrados (IDE-27, IDE-84).</summary>
 public sealed class PendientesNoDisponiblesException : InvalidOperationException
 {

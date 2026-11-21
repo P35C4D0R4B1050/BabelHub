@@ -87,7 +87,7 @@ public static class PresentadorDeAuditoria
         ["traslado-vinculado-sin-aprobar"] = "Un traslado vinculado sigue sin aprobar a las 48 horas",
         ["aviso-de-traslado-no-entregado"] = "Un aviso de traslado no se entregó en 24 horas",
         ["estado-de-traslado-sin-entregar"] = "El estado de un traslado de pedido lleva 24 horas sin entregarse",
-        ["entrega-de-traslado-con-error-permanente"] = "El E-commerce rechazó un mensaje de traslado sin posibilidad de reintento",
+        ["entrega-de-traslado-con-error-permanente"] = "Un mensaje de traslado no se pudo entregar y no se reintentará",
         ["credencial-del-ecommerce-rechazada"] = "El E-commerce rechazó la credencial de servicio del Inventario",
         ["lectura-de-alertas-del-inventario-no-disponible"] = "No se pudieron leer las alertas del Inventario",
         ["alcance-de-datos-sin-actor"] = "Una lectura de datos llegó sin actor",

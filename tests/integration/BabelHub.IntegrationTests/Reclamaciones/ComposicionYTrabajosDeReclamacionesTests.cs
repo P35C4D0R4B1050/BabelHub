@@ -106,7 +106,7 @@ public sealed class ComposicionYTrabajosDeReclamacionesTests
     }
 
     [Fact]
-    public async Task Si_Identidad_no_entrega_la_cuenta_o_lanza_falla_cerrado_en_vez_de_decir_sin_correo()
+    public async Task Las_fallas_de_Identidad_se_propagan_y_nunca_se_convierten_en_sin_correo_verificado()
     {
         var lanza = Adaptador(_ => throw new HttpRequestException("Identidad cayó"));
         var sinCuenta = Adaptador(_ => throw new InvalidOperationException("Identidad no entregó la cuenta."));
