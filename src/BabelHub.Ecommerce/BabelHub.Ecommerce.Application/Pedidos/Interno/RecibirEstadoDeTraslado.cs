@@ -91,6 +91,7 @@ public sealed class RecibirEstadoDeTraslado(
 
         var ahora = reloj.Ahora;
         string? alerta = null;
+        var lineaCambio = false;
         var anterior = pedido.Estado;
         if (linea.EstadoImpreso == EstadoDeLineaImpresa.Anulado)
         {
@@ -105,13 +106,19 @@ public sealed class RecibirEstadoDeTraslado(
         {
             var destino = estado.Estado == EstadoDelTrasladoInformado.EnTransito ? EstadoDeLineaImpresa.EnTransito : EstadoDeLineaImpresa.Recibido;
             pedido.RegistrarTraslado(linea.Id, destino, estado.FechaEstimadaDeLlegada, ahora);
+            lineaCambio = true;
             await pedidos.Actualizar(pedido, cancelacion).ConfigureAwait(false);
         }
 
         await pedidos.GuardarEstadoDeTraslado(new EstadoDeTrasladoRegistrado(estado.EventoId, estado.TrasladoId, estado.PedidoId, NombreDelEstado(estado.Estado), huella, ahora), cancelacion).ConfigureAwait(false);
+        // PED-05: se avisa cuando cambia el estado del pedido o el de una de sus líneas (el evento ya es determinista); la auditoría solo lo registra el cambio del estado del pedido.
         if (pedido.Estado != anterior)
         {
             await Auditar(pedido, anterior, cancelacion).ConfigureAwait(false);
+        }
+
+        if (lineaCambio)
+        {
             await new AvisosDePedidos(notificador).Solicitar(pedido, AvisosDePedidos.NombreDelEstado(pedido.Estado), estado.EventoId.Replace(':', '-'), AvisosDePedidos.SucursalesResponsables(pedido, [linea.Id]), cancelacion).ConfigureAwait(false);
         }
 

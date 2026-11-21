@@ -88,6 +88,24 @@ public sealed class RecibirEstadoDeTrasladoTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PED-04")]
+    public async Task Un_traslado_que_mueve_una_linea_sin_cambiar_el_estado_del_pedido_tambien_avisa_al_cliente_y_a_la_sucursal()
+    {
+        var entorno = new Entorno();
+        var (pedido, con, _) = PedidoConTraslado();
+        entorno.Repositorio.Poner(pedido);
+        var estadoAntes = pedido.Estado;
+
+        var resultado = await entorno.Caso.Recibir(Cuerpo(pedido, con, EstadoDelTrasladoInformado.EnTransito, "en-transito", new DateOnly(2026, 11, 25)));
+
+        // PED-05: «cambia el estado de un pedido o de una de sus líneas»: la línea pasó a en tránsito y el aviso sale aunque el pedido siga en el mismo estado, uno al cliente y uno a la sucursal de recojo.
+        Assert.True(resultado.EsExito);
+        Assert.Equal(EstadoDeLineaImpresa.EnTransito, con.EstadoImpreso);
+        Assert.Equal(estadoAntes, pedido.Estado);
+        Assert.Equal(2, entorno.Notificador.Solicitudes.Count);
+    }
+
+    [Fact]
     public async Task Un_recibido_sin_transito_previo_recorre_ambos_estados()
     {
         var entorno = new Entorno();
