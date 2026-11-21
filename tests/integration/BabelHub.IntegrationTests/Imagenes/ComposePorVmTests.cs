@@ -47,7 +47,7 @@ public sealed class ComposePorVmTests : IDisposable
         foreach (var vm in ComposeDeVms.Vms)
         {
             using var documento = JsonDocument.Parse(ComposeDeVms.ComposeResuelto(vm, _carpeta));
-            if (documento.RootElement.TryGetProperty("x-excepciones", out var excepciones))
+            if (documento.RootElement.TryGetProperty("x-excepciones", out var excepciones) && excepciones.ValueKind == JsonValueKind.Array)
             {
                 registradas.AddRange(excepciones.EnumerateArray().Select(x => $"{x.GetProperty("servicio").GetString()}:{x.GetProperty("regla").GetString()}"));
             }

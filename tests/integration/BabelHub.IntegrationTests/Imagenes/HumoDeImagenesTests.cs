@@ -94,11 +94,14 @@ public sealed class HumoDeImagenesTests : IDisposable
         return nombre;
     }
 
-    private static async Task<(string Vivo, string Listo)> EsperarSalud(string contenedor)
+    /// <summary>Espera la salud del contenedor. La arquitectura que no es la del equipo corre en emulación (QEMU), donde un servicio .NET tarda varios minutos en arrancar: se le da un plazo mayor, sin cambiar lo que se exige.</summary>
+    private static async Task<(string Vivo, string Listo)> EsperarSalud(string contenedor, string arquitectura)
     {
+        var nativa = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture == System.Runtime.InteropServices.Architecture.Arm64 ? "arm64" : "amd64";
+        var plazo = arquitectura == nativa ? TimeSpan.FromMinutes(3) : TimeSpan.FromMinutes(12);
         var puerto = Exigir(Docker(TimeSpan.FromSeconds(30), "port", contenedor, "8080/tcp"), "No se pudo leer el puerto").Split('\n')[0].Split(':')[^1];
         using var cliente = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-        var limite = DateTime.UtcNow.AddMinutes(3);
+        var limite = DateTime.UtcNow.Add(plazo);
         Exception? ultimo = null;
         while (DateTime.UtcNow < limite)
         {
@@ -119,7 +122,9 @@ public sealed class HumoDeImagenesTests : IDisposable
             await Task.Delay(TimeSpan.FromSeconds(2));
         }
 
-        throw new TimeoutException($"El contenedor {contenedor} no respondió su salud: {ultimo?.Message}");
+        var estado = Docker(TimeSpan.FromSeconds(30), "inspect", "--format", "{{.State.Status}} (código {{.State.ExitCode}})", contenedor).Salida;
+        var registro = Docker(TimeSpan.FromSeconds(30), "logs", "--tail", "40", contenedor).Salida;
+        throw new TimeoutException($"El contenedor {contenedor} ({arquitectura}) no respondió su salud en {plazo.TotalMinutes:0} min: {ultimo?.Message}. Estado: {estado}. Últimas líneas del registro: {registro}");
     }
 
     [Theory]
@@ -135,7 +140,7 @@ public sealed class HumoDeImagenesTests : IDisposable
         {
             var imagen = Construir(".", $"src/BabelHub.{servicio}/BabelHub.{servicio}.Api/Dockerfile", arquitectura, servicio.ToLowerInvariant());
             var contenedor = Arrancar(imagen, arquitectura, "--publish", "127.0.0.1::8080", "--env", "BABELHUB__Web__Host=tienda", "--env", "BABELHUB__Web__HostsPermitidos=www.babelhub.example");
-            resultados[arquitectura] = await EsperarSalud(contenedor);
+            resultados[arquitectura] = await EsperarSalud(contenedor, arquitectura);
 
             // La arquitectura del contenedor es la pedida y no corre como root.
             var maquina = Exigir(Docker(TimeSpan.FromSeconds(60), "exec", contenedor, "uname", "-m"), "uname");

@@ -82,8 +82,8 @@ internal sealed class EntornoDeVmAux : IDisposable
         Directory.CreateDirectory(Almacen);
         Directory.CreateDirectory(Correos);
         Directory.CreateDirectory(Estado);
-        File.WriteAllText(Path.Combine(Carpeta, "rclone-doble.sh"), DobleDeRclone.ReplaceLineEndings("\n"));
-        File.WriteAllText(Path.Combine(Carpeta, "curl-doble.sh"), DobleDeCurl.ReplaceLineEndings("\n"));
+        ArchivosDeDoble.Escribir(Path.Combine(Carpeta, "rclone-doble.sh"), DobleDeRclone.ReplaceLineEndings("\n"));
+        ArchivosDeDoble.Escribir(Path.Combine(Carpeta, "curl-doble.sh"), DobleDeCurl.ReplaceLineEndings("\n"));
         foreach (var contenedor in PoliticasDelAlmacenNombres())
         {
             Directory.CreateDirectory(Path.Combine(Almacen, contenedor));
