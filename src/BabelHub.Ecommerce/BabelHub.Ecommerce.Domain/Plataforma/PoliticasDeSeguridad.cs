@@ -120,6 +120,14 @@ public static class PoliticasDeSeguridad
     public static PoliticaDeLimite LecturasDelContactoDePedidosPorPersona { get; } = new(
         "lecturas-del-contacto-de-pedidos-por-persona", 200, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Usuario);
 
+    /// <summary>Las consultas de devoluciones (el cliente por las suyas, el personal por la lista y el detalle): 60 por usuario y minuto (plan de devoluciones §6, SEG-05).</summary>
+    public static PoliticaDeLimite ConsultasDeDevolucionesPorUsuario { get; } = new(
+        "consultas-de-devoluciones-por-usuario", 60, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
+
+    /// <summary>Las operaciones de devoluciones (solicitar, aprobar, rechazar, registrar la recepción y el reporte): 30 por usuario y minuto (SEG-07).</summary>
+    public static PoliticaDeLimite OperacionesDeDevolucionesPorUsuario { get; } = new(
+        "operaciones-de-devoluciones-por-usuario", 30, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Usuario, respaldoLocal: true);
+
     /// <summary>La ráfaga de avisos de la pasarela de pagos (PAG-05, SEG-05): 120 por origen y minuto, antes de verificar la firma, para que una entrada pública no pueda agotar el cómputo. Con el almacén caído cae al límite local (SEG-26); el aviso legítimo se reintenta.</summary>
     public static PoliticaDeLimite AvisosDeLaPasarelaPorOrigen { get; } = new(
         "avisos-de-la-pasarela-por-origen", 120, TimeSpan.FromMinutes(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true);
@@ -159,7 +167,8 @@ public static class PoliticasDeSeguridad
     public static IReadOnlyList<PoliticaDeLimite> Generales { get; } =
         [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen, ConsultasDeHojasPorUsuario,
          CarritosDeVisitantePorOrigen, EdicionDeLineasPorCuenta, EdicionDeLineasPorOrigen, RevisionDelCheckoutPorCuenta, VolverOReiniciarPorCuenta,
-         ConsultasDeEnviosPorUsuario, OperacionesDeEnviosPorUsuario, GuiasAlOperador, AvisosDeLaPasarelaPorOrigen, ConsultasDePedidosPorUsuario, GestionDePedidosPorUsuario];
+         ConsultasDeEnviosPorUsuario, OperacionesDeEnviosPorUsuario, GuiasAlOperador, AvisosDeLaPasarelaPorOrigen, ConsultasDePedidosPorUsuario, GestionDePedidosPorUsuario,
+         ConsultasDeDevolucionesPorUsuario, OperacionesDeDevolucionesPorUsuario];
 
     public static IReadOnlyList<PoliticaDeLimite> Todas { get; } =
     [

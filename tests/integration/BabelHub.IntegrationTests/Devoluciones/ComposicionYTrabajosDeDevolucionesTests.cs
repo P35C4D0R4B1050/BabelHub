@@ -130,6 +130,7 @@ public sealed class ComposicionYTrabajosDeDevolucionesTests
         Assert.Equal(2, pendientes.Count);
         Assert.Equal(2, aplicadores.Count);
         Assert.Single(pendientes, p => p is ContarPendientesDeCuenta);
+        Assert.IsType<ContarPendientesDeCuenta>(alcance.ServiceProvider.GetRequiredService<IPendientesDeDevolucionesDeCuenta>());
         Assert.Single(aplicadores, a => a is RedactarDevolucionesDeUnaCuenta);
         Assert.Contains(aplicadores, a => a is RedactarDevolucionesDeUnaCuenta { Modulo: "devoluciones" });
     }

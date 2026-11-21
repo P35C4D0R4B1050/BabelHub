@@ -118,3 +118,13 @@ export async function sinViolacionesDeAccesibilidad(page: Page) {
   const resultado = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
   expect(resultado.violations.map((v) => `${v.id}: ${v.nodes.map((n) => `${n.target.join(' ')} :: ${n.any[0]?.message ?? ''}`).join(' | ')}`)).toEqual([]);
 }
+
+// Carrito solo digital → checkout sin entrega → pago aprobado del simulador (CAR-07; AC-CAR-06). Termina en la pantalla de estado del pago.
+export async function comprarSoloDigital(page: Page) {
+  await agregarAlCarrito(page, EDICION_DIGITAL_DEL_ZORRO, 1);
+  await page.goto('/carrito');
+  await page.getByRole('button', { name: 'Continuar con la compra' }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+  await expect(page.getByText('Compra 100 % digital: sin entrega.').first()).toBeVisible();
+  await aceptarLosTextosYPagar(page);
+}

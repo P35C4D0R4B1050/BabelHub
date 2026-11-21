@@ -273,12 +273,12 @@ internal sealed class AutorizadorDeDevoluciones(IActorActual actores, IDenegacio
         denegaciones.Registrar(new DenegacionDeAcceso(motivo, ruta: null) { CodigoDeError = codigoDeError }, cancelacion);
 }
 
-/// <summary>Los límites de uso de Devoluciones (plan §6; SEG-05, SEG-07): consultas (60 por usuario y minuto) y operaciones (30 por usuario y minuto). Las claves están pendientes de su alta en el catálogo de Plataforma (hallazgo para el carril A): mientras no existan, falla cerrado.</summary>
+/// <summary>Los límites de uso de Devoluciones (plan §6; SEG-05, SEG-07): consultas (60 por usuario y minuto) y operaciones (30 por usuario y minuto). Las claves y sus valores están en el catálogo de Plataforma (<see cref="PoliticasDeLimite"/>); si el almacén de límites falla, la operación falla cerrada.</summary>
 internal sealed class LimitesDeDevoluciones(IControlDeLimites limites, IActorActual actores)
 {
-    public static readonly ClaveDePolitica ConsultasPorUsuario = new("consultas-de-devoluciones-por-usuario");
+    public static readonly ClaveDePolitica ConsultasPorUsuario = PoliticasDeLimite.ConsultasDeDevolucionesPorUsuario;
 
-    public static readonly ClaveDePolitica OperacionesPorUsuario = new("operaciones-de-devoluciones-por-usuario");
+    public static readonly ClaveDePolitica OperacionesPorUsuario = PoliticasDeLimite.OperacionesDeDevolucionesPorUsuario;
 
     public Task<ErrorDeAplicacion?> Consulta(CancellationToken cancelacion) => Reservar(ConsultasPorUsuario, cancelacion);
 

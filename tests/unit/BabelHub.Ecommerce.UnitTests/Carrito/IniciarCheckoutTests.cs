@@ -353,4 +353,21 @@ public sealed class IniciarCheckoutTests
         Assert.Null(vista.Contacto);
         Assert.Equal([TextoLegalDeCompra.Terminos, TextoLegalDeCompra.Privacidad], vista.TextosPorAceptar);
     }
+
+    [Fact]
+    public async Task Cambiar_de_sucursal_preferida_y_volver_a_iniciar_mantiene_el_carrito_intacto()
+    {
+        var edicion = Guid.Empty;
+        var (e, _, carrito) = await ConCarrito((x => edicion = x.Impreso(5), 2));
+        var antes = carrito.Lineas.Select(l => (l.EdicionId, l.Cantidad.Valor)).ToList();
+
+        var primero = await Iniciar(e, "sede-central");
+        var segundo = await Iniciar(e, "cusco");
+
+        // Caso límite de la sección 6 de la spec: elegir otra sucursal no toca el carrito (el carrito no guarda sucursal).
+        Assert.True(primero.EsExito);
+        Assert.True(segundo.EsExito);
+        Assert.Equal(antes, e.Carritos.Todos.Single().Lineas.Select(l => (l.EdicionId, l.Cantidad.Valor)).ToList());
+        Assert.Equal((edicion, 2), (antes.Single().EdicionId, antes.Single().Valor));
+    }
 }

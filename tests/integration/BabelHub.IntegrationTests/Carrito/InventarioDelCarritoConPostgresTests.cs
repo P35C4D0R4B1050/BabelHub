@@ -125,7 +125,7 @@ public sealed class InventarioDelCarritoConPostgresTests(PostgresDelCarritoFixtu
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAR-12")]
+    [Trait("Criterio", "AC-CAR-24")]
     public async Task Sin_stock_al_reservar_se_rechaza_con_las_lineas_se_conserva_el_carrito_y_el_checkout_vuelve_a_edicion()
     {
         var impreso = Impreso(stock: 10);
@@ -159,7 +159,7 @@ public sealed class InventarioDelCarritoConPostgresTests(PostgresDelCarritoFixtu
     // ---------- Expiración y liberación ----------
 
     [Fact]
-    [Trait("Criterio", "AC-CAR-24")]
+    [Trait("Criterio", "AC-CAR-10")]
     public async Task La_reserva_expira_a_los_15_minutos_con_reloj_controlado_y_repetir_el_pago_vuelve_a_reservar_con_un_pedido_nuevo()
     {
         var (impreso, cuenta) = (Impreso(), EntornoDelCarritoConPostgres.NuevaCuenta());
@@ -208,6 +208,7 @@ public sealed class InventarioDelCarritoConPostgresTests(PostgresDelCarritoFixtu
     // ---------- Pago aprobado ----------
 
     [Fact]
+    [Trait("Criterio", "AC-CAR-12")]
     public async Task Con_el_pago_pendiente_y_la_licencia_vencida_despues_PagoAprobado_concede_la_compra_y_deja_el_carrito_vacio()
     {
         var (impreso, digital) = (Impreso(), _e.Catalogo.Poner(FormatoDeEdicion.Digital, 20m));

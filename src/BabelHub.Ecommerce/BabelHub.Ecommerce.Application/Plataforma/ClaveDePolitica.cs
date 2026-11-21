@@ -91,6 +91,11 @@ public static class PoliticasDeLimite
 
     public static ClaveDePolitica GuiasAlOperador { get; } = new("guias-al-operador");
 
+    /// <summary>Los límites de uso de Devoluciones (plan de devoluciones §6): consultas y operaciones por usuario.</summary>
+    public static ClaveDePolitica ConsultasDeDevolucionesPorUsuario { get; } = new("consultas-de-devoluciones-por-usuario");
+
+    public static ClaveDePolitica OperacionesDeDevolucionesPorUsuario { get; } = new("operaciones-de-devoluciones-por-usuario");
+
     public static ClaveDePolitica ConsultasDePedidosPorUsuario { get; } = new("consultas-de-pedidos-por-usuario");
 
     public static ClaveDePolitica GestionDePedidosPorUsuario { get; } = new("gestion-de-pedidos-por-usuario");
@@ -120,7 +125,8 @@ public static class PoliticasDeLimite
     public static IReadOnlyList<ClaveDePolitica> Generales { get; } =
         [SolicitudesPreviasPorOrigen, SolicitudesDelOrigenDesconocido, SolicitudesSinSesionPorOrigen, SolicitudesPorUsuario, SolicitudesPorHuellaDirecta, HojasPorOrigen, ConsultasDeHojasPorUsuario,
          CarritosDeVisitantePorOrigen, EdicionDeLineasPorCuenta, EdicionDeLineasPorOrigen, RevisionDelCheckoutPorCuenta, VolverOReiniciarPorCuenta,
-         ConsultasDeEnviosPorUsuario, OperacionesDeEnviosPorUsuario, GuiasAlOperador, AvisosDeLaPasarelaPorOrigen, ConsultasDePedidosPorUsuario, GestionDePedidosPorUsuario];
+         ConsultasDeEnviosPorUsuario, OperacionesDeEnviosPorUsuario, GuiasAlOperador, AvisosDeLaPasarelaPorOrigen, ConsultasDePedidosPorUsuario, GestionDePedidosPorUsuario,
+         ConsultasDeDevolucionesPorUsuario, OperacionesDeDevolucionesPorUsuario];
 
     public static IReadOnlyList<ClaveDePolitica> Todas { get; } =
     [
