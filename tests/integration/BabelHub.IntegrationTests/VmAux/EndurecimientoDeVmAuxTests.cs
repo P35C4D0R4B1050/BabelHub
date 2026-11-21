@@ -88,9 +88,9 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
             File.WriteAllText(Path.Combine(_scripts, nombre), "#\n");
         }
 
-        File.WriteAllText(Path.Combine(_raiz, "stat-doble.sh"), DobleDeStat.ReplaceLineEndings("\n"));
-        File.WriteAllText(Path.Combine(_raiz, "sshd-doble.sh"), DobleDeSshd.ReplaceLineEndings("\n"));
-        File.WriteAllText(Path.Combine(_raiz, "ps-doble.sh"), DobleDePs.ReplaceLineEndings("\n"));
+        ArchivosDeDoble.Escribir(Path.Combine(_raiz, "stat-doble.sh"), DobleDeStat.ReplaceLineEndings("\n"));
+        ArchivosDeDoble.Escribir(Path.Combine(_raiz, "sshd-doble.sh"), DobleDeSshd.ReplaceLineEndings("\n"));
+        ArchivosDeDoble.Escribir(Path.Combine(_raiz, "ps-doble.sh"), DobleDePs.ReplaceLineEndings("\n"));
         File.WriteAllText(_sshdConfig, SshdConforme.ReplaceLineEndings("\n") + "\n");
         File.WriteAllText(Path.Combine(_raiz, "pam-sshd"), "@include common-auth\nsession optional pam_exec.so quiet /opt/babelhub/scripts/vm-aux/avisar-ingreso-ssh.sh\n");
         File.WriteAllText(_clienteSsh, "Host *\n    ForwardAgent no\n");
@@ -404,7 +404,7 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
             + "AUX_CORREO_DE=vm-aux@ejemplo.interno\nAUX_CORREO_PARA=responsable@ejemplo.interno\nAUX_SMTP_URL=smtps://smtp.ejemplo.interno:465\n"
             + $"PS={EntornoDeVmAux.EnLinux(marcador)}\nCURL={EntornoDeVmAux.EnLinux(marcador)}\nAUX_ESTADO={EntornoDeVmAux.EnLinux(_raiz)}/otro-estado\nSSHD_T=touch\n");
         var comando = Path.Combine(_raiz, "imprime.sh");
-        File.WriteAllText(comando, "#!/usr/bin/env bash\necho \"PS=${PS:-vacio} ESTADO=${AUX_ESTADO}\"\nexit 1\n");
+        ArchivosDeDoble.Escribir(comando, "#!/usr/bin/env bash\necho \"PS=${PS:-vacio} ESTADO=${AUX_ESTADO}\"\nexit 1\n");
 
         var resultado = _entorno.Ejecutar(
             "alertar.sh",
@@ -436,7 +436,7 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
     private string Comando(string texto, int codigo)
     {
         var ruta = Path.Combine(_raiz, $"cmd-{Guid.NewGuid():N}.sh");
-        File.WriteAllText(ruta, $"#!/usr/bin/env bash\ncat <<'FIN'\n{texto}\nFIN\nexit {codigo}\n");
+        ArchivosDeDoble.Escribir(ruta, $"#!/usr/bin/env bash\ncat <<'FIN'\n{texto}\nFIN\nexit {codigo}\n");
         return EntornoDeVmAux.EnLinux(ruta);
     }
 
@@ -622,7 +622,7 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
     public void SiPamLoLanzaComoRoot_SeRelanzaConElUsuarioSinPrivilegios()
     {
         var doble = Path.Combine(_raiz, "runuser-doble.sh");
-        File.WriteAllText(doble, "#!/usr/bin/env bash\necho \"$*\" >>\"$DOBLE_RUNUSER\"\n");
+        ArchivosDeDoble.Escribir(doble, "#!/usr/bin/env bash\necho \"$*\" >>\"$DOBLE_RUNUSER\"\n");
         var registro = Path.Combine(_raiz, "runuser.log");
 
         var (codigo, _, _) = Ingreso("open_session", "salto", "198.51.100.23", e =>

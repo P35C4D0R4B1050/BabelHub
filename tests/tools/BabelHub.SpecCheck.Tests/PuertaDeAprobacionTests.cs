@@ -21,6 +21,8 @@ public sealed class PuertaDeAprobacionTests : IDisposable
             CopiarCarpeta(Path.Combine(_raiz, carpeta), Path.Combine(_copia, carpeta));
         }
 
+        CopiarLosEnlacesQueSalenDeLaCopia();
+
         // Ninguna tarea hecha en la copia: el avance real del repositorio no debe decidir qué criterios exigen prueba (la huella del
         // plan ignora las casillas); cada prueba marca las suyas.
         foreach (var tareas in Directory.GetFiles(Path.Combine(_copia, "specs"), "tasks.md", SearchOption.AllDirectories))
@@ -381,6 +383,43 @@ public sealed class PuertaDeAprobacionTests : IDisposable
         }
 
         return d?.FullName ?? throw new InvalidOperationException("No se encontró BabelHub.sln");
+    }
+
+    /// <summary>
+    /// La copia solo trae <c>docs</c>, <c>specs</c> y <c>progress</c>, pero un documento puede enlazar a otro lugar del repositorio (<c>AGENTS.md</c>, <c>.github/workflows</c>, <c>tests/load</c>…): SpecCheck valida esos enlaces y la copia debe resolverlos
+    /// como el repositorio real. Se copia lo que cada enlace relativo apunta y falta en la copia, sin depender de qué documento lo escriba.
+    /// </summary>
+    private void CopiarLosEnlacesQueSalenDeLaCopia()
+    {
+        var enlace = new System.Text.RegularExpressions.Regex(@"\]\(([^)\s#]+)(?:#[^)]*)?\)", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5));
+        foreach (var documento in Directory.GetFiles(_copia, "*.md", SearchOption.AllDirectories))
+        {
+            foreach (System.Text.RegularExpressions.Match m in enlace.Matches(File.ReadAllText(documento)))
+            {
+                var destino = m.Groups[1].Value;
+                if (destino.Contains("://", StringComparison.Ordinal) || destino.StartsWith("mailto:", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var enLaCopia = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(documento)!, destino));
+                if (!enLaCopia.StartsWith(_copia, StringComparison.Ordinal) || File.Exists(enLaCopia) || Directory.Exists(enLaCopia))
+                {
+                    continue;
+                }
+
+                var real = Path.Combine(_raiz, Path.GetRelativePath(_copia, enLaCopia));
+                if (File.Exists(real))
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(enLaCopia)!);
+                    File.Copy(real, enLaCopia, overwrite: true);
+                }
+                else if (Directory.Exists(real))
+                {
+                    CopiarCarpeta(real, enLaCopia);
+                }
+            }
+        }
     }
 
     private static void CopiarCarpeta(string origen, string destino)

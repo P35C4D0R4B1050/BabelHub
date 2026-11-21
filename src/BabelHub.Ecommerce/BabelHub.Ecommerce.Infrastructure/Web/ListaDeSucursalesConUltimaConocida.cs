@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using BabelHub.Ecommerce.Application.Web;
 using BabelHub.Ecommerce.Application.Web.Interno;
+using BabelHub.Ecommerce.Application.Web.Indice;
 
 namespace BabelHub.Ecommerce.Infrastructure.Web;
 
@@ -117,6 +118,9 @@ public static class ModuloWebExtensiones
         servicios.AddScoped<ITextosLegales, ConsultarTextoLegal>();
         servicios.AddSingleton<IAreasDeInterfaz, AreasDeInterfaz>();
         servicios.AddSingleton<IMenuDeNavegacion, ResolverMenu>();
+        // El índice infinito (web-indice-infinito T06): una función pura sin base de datos ni caché; solo necesita los bytes aleatorios criptográficos (AgregarSesionWeb ya los registra: TryAdd evita duplicarlos si el módulo se compone solo).
+        servicios.TryAddSingleton<IAleatoriosSeguros, AleatoriosSeguros>();
+        servicios.AddSingleton<IIndiceInfinito, ConsultarIndiceInfinito>();
         servicios.TryAddSingleton<IDesafioDelIngreso, DesafioDelIngresoSinIdentidad>();
         // La política de textos pendientes (T36): el estado y la aceptación los informa Identidad (provisionales y fallando cerrado hasta entonces); el tope de consultas es uno por proceso.
         servicios.TryAddSingleton<IEstadoDeCuentaDeLaWeb, EstadoDeCuentaSinIdentidad>();

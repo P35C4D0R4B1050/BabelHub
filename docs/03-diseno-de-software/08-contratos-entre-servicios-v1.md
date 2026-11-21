@@ -160,7 +160,7 @@ Cada una resuelve un vacío que ninguna spec cerraba. Los carriles que planifica
 - El contenido de los cursores (opacos y firmados; los cuerpos de la auditoría y de las alertas se congelaron en D18).
 - Los nombres de las plantillas de aviso y sus campos (`transversal-notificaciones`): el contrato solo fija el sobre.
 - Los endpoints de Identidad y la forma del token (`identidad-seguridad`): el contrato solo exige que el Inventario reciba el del usuario y lo valide.
-- Los esquemas de base de datos y las reglas de selección de fuente (SEL-10). Los valores de `LimitesDeContrato` (50 ediciones o líneas, 500, 80, 300 y 60 caracteres) son **valores iniciales asumidos** que cada plan confirma o ajusta con su validación; los de las specs son 5 000 (ingreso), 30 días y la paginación.
+- Los esquemas de base de datos y las reglas de selección de fuente (SEL-10). Los valores de `LimitesDeContrato` (30 líneas por reserva desde DD-16 y SEL-40, 50 ediciones, 500, 80, 300 y 60 caracteres) son **valores iniciales asumidos** que cada plan confirma o ajusta con su validación; los de las specs son 5 000 (ingreso), 30 días y la paginación.
 - El «usuario actual de prueba» no es un contrato: es un doble de pruebas por servicio (`tests/unit/*/Soporte/ActorDePrueba.cs`) que implementa el puerto `IActorActual` de `Application/Plataforma` hasta que Identidad emita credenciales. Ninguna Api lo registra (lo comprueba una prueba de arquitectura) y una cabecera de actor nunca lo reemplaza.
 
 ## 12. Cómo lo usan los planes

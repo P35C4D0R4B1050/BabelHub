@@ -129,6 +129,17 @@ Los demás escenarios con 0,6 / 0,4 / 512 MB **cumplen**: `checkout-confirmacion
 4. **Techo medido con el dimensionamiento declarado:** con 50 usuarios, p95 de 0,9 s (en la rampa, 1,4 s); con 2 000 usuarios, p95 de 16,9 s y el 51 % de las solicitudes fallan (503 y plazos vencidos; sin 500 ni sobreventa). Con 1 / 1 se cumple RNF02 en la rampa a 50 usuarios (425 ms) pero ya no a 100 (603 ms).
 5. **Qué haría falta para cumplir RNF02 con una OCPU:** que cada solicitud cueste menos CPU (hallazgos Importantes abiertos en `progress/hallazgos.md`: fusionar el cambio de rol, mover los contadores de límites fuera de PostgreSQL, caché de disponibilidad por decisión de la persona) o aceptar que la prueba de 50 usuarios con 0,5 s de pausa (≈ 80 solicitudes por segundo) es más exigente que 50 personas reales (que piden cada 5 a 10 s: 5 a 10 solicitudes por segundo); esa lectura **no se midió** en esta serie y no se afirma que se cumpla.
 
+**Qué recursos hacen falta para 2 000 sesiones de personas (perfil realista, no el de estrés de arriba; detalle y reservas en §6d-bis):**
+
+| Inventario + PostgreSQL (CPU) | ¿Cumple a 2 000 sesiones (disponibilidad p95 < 500 ms, reserva + confirmación p95 < 3 s, errores < 1 %)? |
+| :--- | :--- |
+| 0,6 + 0,4 (declarada, DD-17; no cambia) | **No** (1,6 s y 4,4 s) |
+| 1,0 + 0,5 | **No** (1,5 s y 5,6 s) |
+| 1,5 + 0,75 | **No** (560 ms y 1,2 s; falla por 60 ms) |
+| **2 + 1 (dimensionamiento recomendado para 2 000)** | **Sí** (201 y 313 ms de disponibilidad en dos corridas; curva de 1 000 a 2 000 sesiones también) |
+
+Solo se midió el Inventario; la ruta del E-commerce no se midió.
+
 ## 6c. Reducción de idas a la base por consulta (K6-1, capacidad)
 
 La conclusión 2 de la sección 6b (el costo está en las idas, no en las lecturas) se atendió así. **Medición por conteo de sentencias** con PostgreSQL real y el rol real de la aplicación (`CostoPorSolicitudDeDisponibilidadTests`, que cuenta lo que Npgsql envía a la base):
@@ -191,8 +202,34 @@ Las secciones 6b y 6b-bis usan un **perfil de estrés** (pausa de 0,5 s entre so
 1. **Con el dimensionamiento de DD-17 y el perfil realista, el sistema sostiene 1 000 sesiones concurrentes con p95 < 500 ms** (en las dos corridas: 23 y 136 ms, 0 y 0,72 % de errores); **1 500 está en el límite** (cumple en una corrida, falla en la otra, con latencias de varios segundos) y **2 000 no se sostiene**: p95 de 1,2 s con 6,4 % de errores en una corrida y de 13,9 s en la otra. Con la mayor carga la latencia ya no es estable: **dos corridas con la misma configuración dan resultados muy distintos**, y una sola no basta para fijar el punto exacto.
 2. **El orden de magnitud lo fija la CPU de PostgreSQL**, igual que en 6b: a ≈ 39 solicitudes por segundo el entorno ya está en saturación. Cuando se satura la latencia no crece de forma gradual: en la repetición a 2 000 sesiones el checkout llegó a un p95 de 42 s.
 3. **Los errores son tiempos de conexión agotados** (`dial: i/o timeout`), no 500 ni respuestas de negocio, y llegan en ráfagas cortas; no hubo sobreventa ni 500.
-4. **La curva «sesiones sostenibles con p95 < 500 ms en VM-INVENTARIO de 1 OCPU» es ≈ 1 000 (hasta 1 500 en la mejor corrida)**, es decir, ≈ 20 a 30 solicitudes por segundo al Inventario. Para sostener 2 000 sesiones (≈ 39 solicitudes por segundo) con holgura **hace falta más capacidad que la declarada**: no se midió con el perfil realista, pero la rampa de estrés de 6b indica que con 1 CPU para el Inventario y 1 para PostgreSQL el entorno atiende más de 100 solicitudes por segundo (ley de Little de 6b, punto 4), unas 3 veces la necesidad; esa configuración (o separar PostgreSQL de la VM) es la que haría falta confirmar con una corrida del mismo perfil.
+4. **La curva «sesiones sostenibles con p95 < 500 ms en VM-INVENTARIO de 1 OCPU» es ≈ 1 000 (hasta 1 500 en la mejor corrida)**, es decir, ≈ 20 a 30 solicitudes por segundo al Inventario. Para sostener 2 000 sesiones (≈ 39 solicitudes por segundo) **hace falta más capacidad que la declarada**: §6d-bis la midió con el mismo perfil y fija la configuración mínima probada que lo cumple (Inventario 2 CPU y PostgreSQL 1 CPU).
 5. **Límites de esta medición:** una sola corrida completa y una repetición parcial; máquina de desarrollo compartida; solo el Inventario; la pasarela simulada; el tamaño de los datos es el de una prueba (20 ediciones).
+6. **Corrección de validez (2026-11-21, al preparar §6d-bis):** las credenciales de cliente que emite el servidor de claves de carga duran 14 minutos (el Inventario rechaza vigencias de más de 15, `CredencialDeAcceso.VigenciaDeLaCredencialEnMinutos`) y **la corrida completa duró 17,9 minutos**: los niveles de 1 500 (desde el minuto ≈ 11,5) y sobre todo el de 2 000 (desde el minuto ≈ 14) hicieron sus reservas con credenciales vencidas, de modo que parte de los errores y de los tiempos de ese tramo (6,4 % de errores a 2 000) **no son de capacidad**. La repetición (tres niveles, ≈ 11 minutos) no tuvo ese problema, y su resultado (2 000 sesiones sin sostenerse) se confirmó de nuevo en §6d-bis con credenciales vigentes (1,6 s de p95 de disponibilidad y 4,4 s de reserva + confirmación con 0,6/0,4 CPU). Por eso la cifra de la corrida completa a 1 500 y 2 000 sesiones debe leerse con esta reserva; las corridas de §6d-bis duran menos de 14 minutos.
+
+## 6d-bis. Qué recursos hacen falta para sostener 2 000 sesiones (perfil realista)
+
+Pedido de la persona (2026-11-21): ejecutar el **mismo perfil realista** de §6d a **2 000 sesiones concurrentes** con el dimensionamiento que **sí** las sostenga, y dejar la configuración **mínima** que cumple. La configuración declarada de la VM de 1 OCPU (Inventario 0,6 CPU, PostgreSQL 0,4 CPU, 512 MB; DD-17) **no cambia**: queda como la configuración declarada; la de abajo es el dimensionamiento **recomendado para 2 000 sesiones**. Solo se mide el **Inventario**: **la ruta del E-commerce (catálogo, búsqueda, carrito, pedido) no se midió**.
+
+**Método.** Una corrida por configuración, solo el nivel de 2 000 sesiones (sube en 30 s, se sostiene 240 s, baja en 30 s; ≈ 5 minutos, dentro de la vigencia de las credenciales), del menor al mayor tamaño sobre el mismo perfil (`NIVELES=2000 SEGUNDOS_FINAL=240`), memoria del Inventario fija en 512 MB, tope de 16 conexiones. Umbrales de RNF02 sin cambios: disponibilidad p95 < 500 ms, reservar + confirmar p95 < 3 s y menos de 1 % de solicitudes con error. Evidencias (panel HTML, JSON y resumen por corrida) en `progress/evidencias/k6/2026-11-21-perfil-realista-2000/`. El host de medición tiene 12 CPU lógicas y 16 GB; k6 corre en el mismo host, y la máquina es de desarrollo compartida.
+
+| Inventario + PostgreSQL (CPU) | Disponibilidad p95 | Reservar + confirmar p95 | Errores | Veredicto a 2 000 sesiones |
+| :--- | :--- | :--- | :--- | :--- |
+| **0,6 + 0,4** (DD-17, declarada) | 1 576 ms | 4 401 ms | 0,01 % | **No** (falla los dos tiempos) |
+| 1,0 + 0,5 | 1 481 ms | 5 600 ms | 0,02 % | **No** |
+| 1,5 + 0,75 | 560 ms | 1 169 ms | 0,11 % | **No** (disponibilidad por 60 ms) |
+| **2,0 + 1,0** | **201 ms** | 286 ms | 0,07 % | **Sí** |
+| 2,0 + 1,0 (repetición) | **313 ms** | 710 ms | 0,04 % | **Sí** |
+| 2,0 + 1,0 (curva: 1 000 / 1 500 / 2 000 sesiones, una sola corrida de 10,6 min) | 56 / 366 / 147 ms | 141 / 737 / 346 ms | 0,13 / 0,30 / 0,15 % | **Sí** en los tres niveles |
+| 4 + 2 | no se midió | | | La búsqueda se detuvo en la primera configuración que cumple |
+
+**Lo que se mide, sin maquillar**
+
+1. **La configuración mínima probada que sostiene 2 000 sesiones con los umbrales de RNF02 es Inventario 2 CPU + PostgreSQL 1 CPU (3 CPU en total, ≈ 3 veces el dimensionamiento declarado de 1 OCPU compartida)**: cumplió en las tres corridas que la incluyen (la búsqueda, su repetición y la curva). No es una medida fina: entre 1,5 + 0,75 (560 ms, por 60 ms) y 2 + 1 no se probaron valores intermedios (por ejemplo 1,5 + 1,0), así que «mínima» significa la menor de la escalera probada.
+2. **Con el dimensionamiento declarado (0,6 + 0,4) las 2 000 sesiones no se sostienen** (disponibilidad p95 de 1,6 s y reserva + confirmación de 4,4 s), con el mismo método y el mismo día; coincide con §6d. La diferencia de cifra con la repetición de §6d (13,9 s) se debe a que aquella corrida llegó a 2 000 sesiones tras otros dos niveles ya saturados (acumulaba cola); aquí cada corrida parte en frío. Ambas lecturas dicen lo mismo: no se sostienen.
+3. **El margen de 2 + 1 no es grande en 1 500 sesiones** (disponibilidad p95 de 366 ms en la curva, por debajo de 500 pero sin holgura) y la repetición a 2 000 subió de 201 a 313 ms: es el ruido normal de una máquina compartida. La recomendación para 2 000 sesiones sostenidas es 2 + 1 como **mínimo**, no como valor con holgura amplia.
+4. **El cuello de botella es la CPU del Inventario y de PostgreSQL**, igual que en 6b: los errores de las configuraciones pequeñas son tiempos de conexión agotados y colas, no 500 ni sobreventa; con 2 + 1 los errores quedan en 0,04 a 0,30 %.
+5. **Qué significa para la VM real.** Una VM de 1 OCPU compartida no alcanza: para 2 000 sesiones concurrentes (≈ 39 solicitudes por segundo al Inventario) se necesita del orden de 3 CPU para el Inventario y su base, es decir, otra forma de despliegue (más OCPU, o separar PostgreSQL de la VM del Inventario). Esa decisión de despliegue es de la persona responsable; aquí solo se registra qué recursos hacen falta según la medición.
+6. **Límites:** solo el Inventario; la pasarela simulada; 20 ediciones de prueba; una corrida por configuración salvo 2 + 1 (tres); host de desarrollo compartido con k6 en la misma máquina; corridas de un solo nivel (partida en frío) además de la curva; la latencia de extremo a extremo y la capacidad de VM-VENTAS **no se midieron**.
 
 ## 7. Qué cubre y qué no
 

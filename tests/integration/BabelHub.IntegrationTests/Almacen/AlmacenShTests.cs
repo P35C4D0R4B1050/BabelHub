@@ -23,7 +23,7 @@ public sealed class AlmacenShTests : IDisposable
         _estado = Path.Combine(_carpeta, "estado");
         Directory.CreateDirectory(_estado);
         _doble = Path.Combine(_carpeta, "oci-doble.sh");
-        File.WriteAllText(_doble, DobleDeOci.ReplaceLineEndings("\n"));
+        ArchivosDeDoble.Escribir(_doble, DobleDeOci.ReplaceLineEndings("\n"));
     }
 
     public void Dispose()

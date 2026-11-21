@@ -14,6 +14,10 @@ public sealed class HumoDeImagenesTests : IDisposable
     private static readonly string[] Arquitecturas = ["amd64", "arm64"];
     private readonly List<string> _contenedores = [];
     private readonly List<string> _imagenes = [];
+    private readonly List<string> _redes = [];
+
+    // El mismo PostgreSQL (con su digest) que base la imagen de infra/postgres: el servicio solo necesita conectarse y responder SELECT 1.
+    private const string ImagenDePostgres = "postgres:17-alpine@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065";
 
     public void Dispose()
     {
@@ -26,6 +30,11 @@ public sealed class HumoDeImagenesTests : IDisposable
         foreach (var imagen in _imagenes)
         {
             Docker(TimeSpan.FromSeconds(60), "rmi", "--force", imagen);
+        }
+
+        foreach (var red in _redes)
+        {
+            Docker(TimeSpan.FromSeconds(30), "network", "rm", red);
         }
     }
 
@@ -69,10 +78,22 @@ public sealed class HumoDeImagenesTests : IDisposable
 
     private static void ExigirEmulacionDeArm64()
     {
-        var salida = Exigir(Docker(TimeSpan.FromSeconds(30), "buildx", "ls"), "No se pudo listar los constructores de Docker");
+        // La lista de plataformas de buildx puede tardar en reflejar la emulación (se vio vacía de arm64 en una de varias corridas seguidas): se reintenta antes de dar el entorno por no apto.
+        var salida = string.Empty;
+        for (var intento = 0; intento < 4; intento++)
+        {
+            salida = Exigir(Docker(TimeSpan.FromSeconds(30), "buildx", "ls"), "No se pudo listar los constructores de Docker");
+            if (salida.Contains("linux/arm64", StringComparison.Ordinal))
+            {
+                break;
+            }
+
+            Thread.Sleep(TimeSpan.FromSeconds(10));
+        }
+
         Assert.True(
             salida.Contains("linux/arm64", StringComparison.Ordinal),
-            "Docker no puede construir para linux/arm64: instala la emulación (QEMU de Docker Desktop o docker/setup-qemu-action).");
+            $"Docker no puede construir para linux/arm64: instala la emulación (QEMU de Docker Desktop o docker/setup-qemu-action). Salida de buildx ls: {salida}");
     }
 
     private string Construir(string contexto, string? dockerfile, string arquitectura, string nombre)
@@ -94,11 +115,49 @@ public sealed class HumoDeImagenesTests : IDisposable
         return nombre;
     }
 
-    private static async Task<(string Vivo, string Listo)> EsperarSalud(string contenedor)
+    private string CrearRed()
     {
+        var red = "babelhub-humo-red-" + Guid.NewGuid().ToString("N")[..12];
+        Exigir(Docker(TimeSpan.FromSeconds(30), "network", "create", red), "No se pudo crear la red de la prueba");
+        _redes.Add(red);
+        return red;
+    }
+
+    /// <summary>
+    /// Un PostgreSQL desechable de la misma arquitectura que el servicio, con las bases y las cuentas del entorno ya dadas de alta. Espera por TCP (no por el socket): durante la inicialización la imagen oficial solo escucha en el socket y luego se reinicia.
+    /// La arquitectura que no es la del equipo corre en emulación y se le da un plazo mayor.
+    /// </summary>
+    private void ArrancarPostgresDesechable(string red, string arquitectura, EntornoDeHumo entorno)
+    {
+        var nombre = "babelhub-humo-pg-" + Guid.NewGuid().ToString("N")[..12];
+        var claveDelAdministrador = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24)).Replace('/', 'a').Replace('+', 'b').Replace('=', 'c');
+        Exigir(
+            Docker(TimeSpan.FromMinutes(2), "run", "--detach", "--name", nombre, "--network", red, "--network-alias", "pg", "--platform", $"linux/{arquitectura}", "--env", "POSTGRES_PASSWORD=" + claveDelAdministrador, ImagenDePostgres),
+            "No se pudo arrancar PostgreSQL");
+        _contenedores.Add(nombre);
+
+        var nativa = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture == System.Runtime.InteropServices.Architecture.Arm64 ? "arm64" : "amd64";
+        var limite = DateTime.UtcNow.Add(arquitectura == nativa ? TimeSpan.FromMinutes(3) : TimeSpan.FromMinutes(12));
+        while (Docker(TimeSpan.FromSeconds(30), "exec", nombre, "pg_isready", "-q", "-h", "127.0.0.1", "-U", "postgres").Codigo != 0)
+        {
+            Assert.True(DateTime.UtcNow < limite, $"PostgreSQL no quedó listo en {arquitectura}.");
+            Thread.Sleep(TimeSpan.FromSeconds(2));
+        }
+
+        foreach (var sentencia in entorno.SentenciasDeAlta())
+        {
+            Exigir(Docker(TimeSpan.FromSeconds(60), "exec", nombre, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", sentencia), "No se pudo dar de alta la base o la cuenta de la prueba");
+        }
+    }
+
+    /// <summary>Espera la salud del contenedor. La arquitectura que no es la del equipo corre en emulación (QEMU), donde un servicio .NET tarda varios minutos en arrancar: se le da un plazo mayor, sin cambiar lo que se exige.</summary>
+    private static async Task<(string Vivo, string Listo)> EsperarSalud(string contenedor, string arquitectura)
+    {
+        var nativa = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture == System.Runtime.InteropServices.Architecture.Arm64 ? "arm64" : "amd64";
+        var plazo = arquitectura == nativa ? TimeSpan.FromMinutes(3) : TimeSpan.FromMinutes(12);
         var puerto = Exigir(Docker(TimeSpan.FromSeconds(30), "port", contenedor, "8080/tcp"), "No se pudo leer el puerto").Split('\n')[0].Split(':')[^1];
         using var cliente = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-        var limite = DateTime.UtcNow.AddMinutes(3);
+        var limite = DateTime.UtcNow.Add(plazo);
         Exception? ultimo = null;
         while (DateTime.UtcNow < limite)
         {
@@ -119,7 +178,9 @@ public sealed class HumoDeImagenesTests : IDisposable
             await Task.Delay(TimeSpan.FromSeconds(2));
         }
 
-        throw new TimeoutException($"El contenedor {contenedor} no respondió su salud: {ultimo?.Message}");
+        var estado = Docker(TimeSpan.FromSeconds(30), "inspect", "--format", "{{.State.Status}} (código {{.State.ExitCode}})", contenedor).Salida;
+        var registro = Docker(TimeSpan.FromSeconds(30), "logs", "--tail", "40", contenedor).Salida;
+        throw new TimeoutException($"El contenedor {contenedor} ({arquitectura}) no respondió su salud en {plazo.TotalMinutes:0} min: {ultimo?.Message}. Estado: {estado}. Últimas líneas del registro: {registro}");
     }
 
     [Theory]
@@ -134,8 +195,12 @@ public sealed class HumoDeImagenesTests : IDisposable
         foreach (var arquitectura in Arquitecturas)
         {
             var imagen = Construir(".", $"src/BabelHub.{servicio}/BabelHub.{servicio}.Api/Dockerfile", arquitectura, servicio.ToLowerInvariant());
-            var contenedor = Arrancar(imagen, arquitectura, "--publish", "127.0.0.1::8080", "--env", "BABELHUB__Web__Host=tienda", "--env", "BABELHUB__Web__HostsPermitidos=www.babelhub.example");
-            resultados[arquitectura] = await EsperarSalud(contenedor);
+            // La imagen valida sus secretos al arrancar: se le entrega la configuración completa (valores aleatorios) y un PostgreSQL desechable de su arquitectura al que conectarse.
+            var entorno = EntornoDeHumo.Para(servicio, "pg");
+            var red = CrearRed();
+            ArrancarPostgresDesechable(red, arquitectura, entorno);
+            var contenedor = Arrancar(imagen, arquitectura, ["--publish", "127.0.0.1::8080", "--network", red, .. entorno.Argumentos]);
+            resultados[arquitectura] = await EsperarSalud(contenedor, arquitectura);
 
             // La arquitectura del contenedor es la pedida y no corre como root.
             var maquina = Exigir(Docker(TimeSpan.FromSeconds(60), "exec", contenedor, "uname", "-m"), "uname");
