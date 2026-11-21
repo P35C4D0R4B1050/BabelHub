@@ -86,9 +86,14 @@ internal sealed class LocalizadorDeDevolucionesDeUnaCuenta(IPedidosParaDevolucio
 /// <c>ContarPendientesDeCuenta</c> de Devoluciones (T15; DEV-23, IDE-27; AC-DEV-25): lo que la cuenta tiene pendiente en el módulo, en <b>tres números que no cuentan un caso en dos</b> y solo de los pedidos de esa cuenta: (1) las devoluciones <b>abiertas de impresos</b> (con alguna línea solicitada o aprobada), (2) los
 /// <b>reportes sin decidir</b> (con una línea solicitada) y (3) los <b>reembolsos pendientes</b>: cada línea recibida de un impreso o aprobada de un digital hasta que la pasarela confirma. Corre dentro de la transacción de Identidad; no devuelve motivo, texto ni importes. Si no puede contar, lanza: nunca se asume cero.
 /// </summary>
-internal sealed class ContarPendientesDeCuenta(LocalizadorDeDevolucionesDeUnaCuenta localizador) : IPendientesDeCuenta
+internal sealed class ContarPendientesDeCuenta(LocalizadorDeDevolucionesDeUnaCuenta localizador) : IPendientesDeDevolucionesDeCuenta
 {
+    /// <summary>La suma de los tres números (lo que usa Identidad para la cancelación y el reemplazo).</summary>
     public async Task<int> Contar(Guid usuarioId, CancellationToken cancelacion = default)
+        => (await ContarEnTres(usuarioId, cancelacion).ConfigureAwait(false)).Total;
+
+    /// <summary>Los tres números de DEV-23 por separado.</summary>
+    public async Task<PendientesDeDevolucionesDeCuenta> ContarEnTres(Guid usuarioId, CancellationToken cancelacion = default)
     {
         if (usuarioId == Guid.Empty)
         {
@@ -100,23 +105,23 @@ internal sealed class ContarPendientesDeCuenta(LocalizadorDeDevolucionesDeUnaCue
     }
 
     /// <summary>Las tres clases son disjuntas: un impreso abierto tiene líneas solicitada o aprobada (nunca recibida a la vez), un reporte sin decidir está solicitado y un reembolso pendiente es una línea recibida o aprobada de un digital.</summary>
-    public static int Pendientes(IEnumerable<Devolucion> devoluciones)
+    public static PendientesDeDevolucionesDeCuenta Pendientes(IEnumerable<Devolucion> devoluciones)
     {
-        var total = 0;
+        int abiertas = 0, reportes = 0, reembolsos = 0;
         foreach (var devolucion in devoluciones)
         {
             if (devolucion.Tipo == TipoDeDevolucion.Impreso)
             {
-                total += devolucion.Lineas.Any(l => l.Estado is EstadoDeLineaDeDevolucion.Solicitada or EstadoDeLineaDeDevolucion.Aprobada) ? 1 : 0;
-                total += devolucion.Lineas.Count(l => l.Estado == EstadoDeLineaDeDevolucion.Recibida);
+                abiertas += devolucion.Lineas.Any(l => l.Estado is EstadoDeLineaDeDevolucion.Solicitada or EstadoDeLineaDeDevolucion.Aprobada) ? 1 : 0;
+                reembolsos += devolucion.Lineas.Count(l => l.Estado == EstadoDeLineaDeDevolucion.Recibida);
                 continue;
             }
 
-            total += devolucion.Origen == OrigenDeDevolucion.Reporte && devolucion.Lineas.Any(l => l.Estado == EstadoDeLineaDeDevolucion.Solicitada) ? 1 : 0;
-            total += devolucion.Lineas.Count(l => l.Estado == EstadoDeLineaDeDevolucion.Aprobada);
+            reportes += devolucion.Origen == OrigenDeDevolucion.Reporte && devolucion.Lineas.Any(l => l.Estado == EstadoDeLineaDeDevolucion.Solicitada) ? 1 : 0;
+            reembolsos += devolucion.Lineas.Count(l => l.Estado == EstadoDeLineaDeDevolucion.Aprobada);
         }
 
-        return total;
+        return new PendientesDeDevolucionesDeCuenta(abiertas, reportes, reembolsos);
     }
 }
 
