@@ -55,6 +55,20 @@ public class ReglasDeCredencialesEnLaApiTests
         Assert.True(resultado.IsSuccessful, $"Un tipo de la Api usa el contexto de lectura: {string.Join(", ", resultado.FailingTypeNames ?? [])}.");
     }
 
+
+    [Fact]
+    public void Ningun_tipo_de_la_Api_lee_el_correo_ni_el_contacto_de_una_cuenta_por_los_contratos_de_sistema()
+    {
+        // Los contratos de sistema de Identidad entregan un dato personal (el correo verificado, el número de WhatsApp) a partir de un identificador, sin comprobar titularidad: solo los consumen los módulos en proceso
+        // (Reclamaciones y Notificaciones). Un controlador o un endpoint con un identificador de la ruta que los inyecte sería una fuga de datos personales (Ley 29733).
+        var resultado = Types.InAssembly(Cargar("BabelHub.Ecommerce.Api"))
+            .ShouldNot().HaveDependencyOnAny(
+                "BabelHub.Ecommerce.Application.Identidad.ICorreoVerificadoDeSistema",
+                "BabelHub.Ecommerce.Application.Identidad.IContactoDeAvisosDelCliente")
+            .GetResult();
+
+        Assert.True(resultado.IsSuccessful, $"Un tipo de la Api usa un contrato de sistema de Identidad: {string.Join(", ", resultado.FailingTypeNames ?? [])}.");
+    }
     [Fact]
     public void Los_endpoints_de_Identidad_en_la_Api_no_dependen_de_ningun_contrato_que_emita_o_maneje_credenciales()
     {

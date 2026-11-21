@@ -199,9 +199,9 @@ public sealed class MotivosDeAlertaDePedidosTests
         Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.PedidoOperacionFallida, CompletarOperacionesEnCurso.AlertaOperacionFallida);
         Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.PedidoEstadoDeTrasladoInexistente, RecibirEstadoDeTraslado.AlertaPedidoInexistente);
         Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.PedidoEstadoDeTrasladoDeLineaAnulada, RecibirEstadoDeTraslado.AlertaLineaAnulada);
-        // Los motivos de los trabajos de privacidad y revisión: existen en el catálogo (el texto propio de cada uno está pendiente, ver hallazgos).
-        Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.TrabajoDeFondoDetenido, AnonimizarContactosVencidos.AlertaSinCorrida);
-        Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.TrabajoDeFondoDetenido, LiberarContactoDeIntenciones.AlertaSinLiberar);
+        // Los motivos propios de los trabajos de privacidad: la depuración y la liberación del contacto ya no usan el motivo genérico.
+        Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.DepuracionDePedidosSinExito, AnonimizarContactosVencidos.AlertaSinCorrida);
+        Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.ContactoDePedidoSinLiberar, LiberarContactoDeIntenciones.AlertaSinLiberar);
         Assert.Equal(BabelHub.Ecommerce.Application.Auditoria.Interno.MotivosDeAlerta.PedidoOperacionFallida, RevisarPedidosSinEstadoFinal.AlertaOperacionPendiente);
     }
 }

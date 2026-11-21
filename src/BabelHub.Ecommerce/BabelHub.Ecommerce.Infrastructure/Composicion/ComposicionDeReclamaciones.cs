@@ -13,7 +13,7 @@ namespace BabelHub.Ecommerce.Infrastructure.Composicion;
 /// los casos de uso por alcance de solicitud, las implementaciones públicas (<see cref="IReclamaciones"/>, <see cref="IAdministracionDeReclamaciones"/> e <see cref="IHojasDelConsumidor"/>) y las partes de Reclamaciones de <see cref="IPendientesDeCuenta"/> y <see cref="IAplicadorDeCancelacion"/>.
 /// <b>No registra dobles provisionales</b>: todo lo que necesita ya existe (el correo, la verificación de persona, los límites, la auditoría y la unidad de trabajo los entregan Plataforma, Auditoría e Identidad), y si falta algo el contenedor falla al resolverlo. Los trabajos de fondo los registra
 /// <see cref="ComposicionDeLosTrabajosDeReclamaciones"/>. Necesita ya registrados: <see cref="IUnidadDeTrabajo"/>, <see cref="IConexionDeLaUnidadDeTrabajo"/>, <see cref="IActorActual"/>, <see cref="IDenegacionDeAcceso"/>, <see cref="IReloj"/>, <see cref="IControlDeLimites"/>,
-/// <see cref="IExigenciaDeVerificacionDePersona"/>, <see cref="ICalculadorDeHuella"/>, <see cref="IEnviadorDeCorreo"/>, el auditor y el publicador de alertas técnicas de Auditoría, e <see cref="ICuentaDelCliente"/> de Identidad.
+/// <see cref="IExigenciaDeVerificacionDePersona"/>, <see cref="ICalculadorDeHuella"/>, <see cref="IEnviadorDeCorreo"/>, el auditor y el publicador de alertas técnicas de Auditoría, e <see cref="ICorreoVerificadoDeSistema"/> de Identidad (el correo verificado, contrato de sistema).
 /// </summary>
 public static class ComposicionDeReclamaciones
 {

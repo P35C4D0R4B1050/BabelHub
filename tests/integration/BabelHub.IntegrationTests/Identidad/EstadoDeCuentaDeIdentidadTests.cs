@@ -234,4 +234,29 @@ public sealed class EstadoDeCuentaDeIdentidadTests : IClassFixture<PostgresDeIde
         Assert.Equal(ResultadoDeLaAceptacion.VersionCambiada, await _estado.AceptarLosTextos(Guid.Empty, Conjunto));
         Assert.Equal(ResultadoDeLaAceptacion.VersionCambiada, await _estado.AceptarLosTextos(Guid.NewGuid(), new string('x', 201)));
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-12")]
+    public async Task ElCorreoDelTitular_LoLeeElSistemaSinRegistrarDenegaciones()
+    {
+        var id = await Cuenta();
+        var correo = (await _cuentas.PorId(id))!.Usuario.Correo;
+        _actor.Actual = ActorActual.DelSistema();
+
+        var leido = await new CorreoVerificadoDeSistemaDeIdentidad(_cuentas).Consultar(id);
+
+        Assert.Equal(correo, leido);
+        Assert.Equal(0, _denegaciones.Cantidad);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-12")]
+    public async Task ElCorreoVerificado_NoSale_SiLaCuentaNoExisteOEstaSinVerificar()
+    {
+        var puerto = new CorreoVerificadoDeSistemaDeIdentidad(_cuentas);
+
+        Assert.Null(await puerto.Consultar(Guid.NewGuid()));
+        await Assert.ThrowsAsync<ArgumentException>(() => puerto.Consultar(Guid.Empty));
+        Assert.Null(await puerto.Consultar(await Cuenta(correoVerificado: false)));
+    }
 }

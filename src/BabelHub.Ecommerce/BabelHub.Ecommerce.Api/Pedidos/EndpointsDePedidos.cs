@@ -1,5 +1,4 @@
 using System.Text.Json;
-using BabelHub.Ecommerce.Api.Notificaciones;
 using BabelHub.Ecommerce.Api.Plataforma;
 using BabelHub.Ecommerce.Application.Pedidos;
 using BabelHub.Ecommerce.Application.Plataforma;
@@ -41,20 +40,26 @@ public static class EndpointsDePedidos
         return rutas;
     }
 
+    /// <summary>Solo <c>application/json</c> exacto (con <c>charset</c> utf-8 o sin él): <c>application/jsonp</c> o <c>application/json-x</c> no son JSON de esta entrada.</summary>
+    private static bool EsJsonEstricto(string? tipo) =>
+        Microsoft.Net.Http.Headers.MediaTypeHeaderValue.TryParse(tipo, out var medio)
+        && string.Equals(medio.MediaType.Value, "application/json", StringComparison.OrdinalIgnoreCase)
+        && (medio.Charset.Length == 0 || string.Equals(medio.Charset.Value, "utf-8", StringComparison.OrdinalIgnoreCase));
+
     private static async Task<IResult> EstadoDeTraslado(HttpContext contexto, OpcionesDeErrores errores, IReceptorDeEstadosDeTraslado receptor, IEstablecedorDeActor actor)
     {
-        if (contexto.Request.ContentType is not { } tipo || !tipo.StartsWith("application/json", StringComparison.OrdinalIgnoreCase))
+        if (!EsJsonEstricto(contexto.Request.ContentType))
         {
-            return await Falla(contexto, errores, EstadosDeEntregaDeN8nEnLaApi.Validacion("cuerpo", "invalido")).ConfigureAwait(false);
+            return await Falla(contexto, errores, Validacion("cuerpo", "invalido")).ConfigureAwait(false);
         }
 
         var cuerpo = await Leer(contexto).ConfigureAwait(false);
         if (cuerpo is null || cuerpo.EventoId is null || cuerpo.Estado is null || !EstadoConocido(cuerpo.Estado, out var estado))
         {
-            return await Falla(contexto, errores, EstadosDeEntregaDeN8nEnLaApi.Validacion("cuerpo", "invalido")).ConfigureAwait(false);
+            return await Falla(contexto, errores, Validacion("cuerpo", "invalido")).ConfigureAwait(false);
         }
 
-        actor.Establecer(ActorActual.DeIntegracion("inventario"));
+        actor.Establecer(ActorActual.DeIntegracion(IntegracionesDeServicio.Inventario));
         try
         {
             var resultado = await receptor.Recibir(
@@ -100,7 +105,7 @@ public static class EndpointsDePedidos
             return null;
         }
 
-        var bytes = await EstadosDeEntregaDeN8nEnLaApi.LeerElCuerpo(contexto.Request.Body, TopeDelEstadoDeTraslado, contexto.RequestAborted).ConfigureAwait(false);
+        var bytes = await LeerElCuerpo(contexto.Request.Body, TopeDelEstadoDeTraslado, contexto.RequestAborted).ConfigureAwait(false);
         if (bytes is null || bytes.Length == 0)
         {
             return null;
@@ -115,6 +120,27 @@ public static class EndpointsDePedidos
             return null;
         }
     }
+
+    /// <summary>Lee a lo más <paramref name="tope"/> bytes; <see langword="null"/> si el cuerpo lo supera.</summary>
+    private static async Task<byte[]?> LeerElCuerpo(Stream flujo, int tope, CancellationToken cancelacion)
+    {
+        using var memoria = new MemoryStream();
+        var bufer = new byte[2048];
+        int leidos;
+        while ((leidos = await flujo.ReadAsync(bufer, cancelacion).ConfigureAwait(false)) > 0)
+        {
+            if (memoria.Length + leidos > tope)
+            {
+                return null;
+            }
+
+            memoria.Write(bufer, 0, leidos);
+        }
+
+        return memoria.ToArray();
+    }
+
+    private static ErrorDeAplicacion Validacion(string campo, string clave) => new(CategoriaDeError.Validacion, "validacion-fallida", [new ErrorDeCampo(campo, clave)]);
 
     private static async Task<IResult> Falla(HttpContext contexto, OpcionesDeErrores errores, ErrorDeAplicacion error)
     {

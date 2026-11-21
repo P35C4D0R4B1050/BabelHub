@@ -1,6 +1,5 @@
 using System.Globalization;
 using BabelHub.Ecommerce.Api.Controllers;
-using BabelHub.Ecommerce.Api.Envios;
 using BabelHub.Ecommerce.Api.Plataforma;
 using BabelHub.Ecommerce.Api.Web;
 using BabelHub.Ecommerce.Api.Web.Errores;
@@ -10,6 +9,7 @@ using BabelHub.Ecommerce.Application.Pedidos;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Shared.Errores;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 
 namespace BabelHub.Ecommerce.Api.Pedidos;
 
@@ -40,7 +40,11 @@ public sealed class ListaDePedidosVista : ModeloBaseDePagina
 
     public IReadOnlyList<(string Clave, string Texto)> Filtros => TextosDePedidos.Filtros;
 
-    public string RutaDeLaPagina(int pagina) => RutaDeLaLista + "?" + string.Join('&', new[] { Filtro is { Length: > 0 } f ? "estado=" + f : null, pagina > 1 ? $"pagina={pagina}" : null }.Where(x => x is not null));
+    public string RutaDeLaPagina(int pagina)
+    {
+        var consulta = string.Join('&', new[] { Filtro is { Length: > 0 } f ? "estado=" + f : null, pagina > 1 ? $"pagina={pagina}" : null }.Where(x => x is not null));
+        return consulta.Length == 0 ? RutaDeLaLista : RutaDeLaLista + "?" + consulta;
+    }
 }
 
 /// <summary>Una línea de un pedido lista para pintar: precios en soles, el estado con texto e icono, el traslado con su fecha y si se puede marcar en una operación.</summary>
@@ -102,6 +106,9 @@ public sealed class DetalleDePedidoVista : ModeloBaseDePagina
     public bool ContactoOculto { get; set; }
 
     public bool ContactoAnonimizado { get; set; }
+
+    /// <summary>El pedido es a domicilio (lo dice el tipo de entrega del contrato, no la región): solo entonces tiene seguimiento de envío.</summary>
+    public bool EsADomicilio { get; set; }
 
     /// <summary>Se muestra la sucursal de origen de cada línea: solo al personal y al encargado, no al titular (minimización de datos).</summary>
     public bool MostrarLaFuente { get; set; } = true;
@@ -255,7 +262,11 @@ public static class PantallasDePedidos
     };
 
     /// <summary>Un navegador pide una página: <c>Accept</c> incluye <c>text/html</c>. Una prueba o una integración (sin ese tipo) recibe el problema en JSON.</summary>
-    public static bool PrefiereHtml(HttpRequest solicitud) => PantallasDeEnvios.PrefiereHtml(solicitud);
+    public static bool PrefiereHtml(HttpRequest solicitud)
+    {
+        ArgumentNullException.ThrowIfNull(solicitud);
+        return solicitud.GetTypedHeaders().Accept.Any(a => a.MediaType.HasValue && string.Equals(a.MediaType.Value, "text/html", StringComparison.OrdinalIgnoreCase));
+    }
 
     public static RespuestaDePantalla Traducir(ProblemaDto problema, ErrorDeAplicacion error, string rutaDeReintento)
     {
@@ -283,7 +294,7 @@ public static class PantallasDePedidos
 
         var respuesta = TraductorDeErrores.Traducir(problema, rutaDeReintento: rutaDeReintento, parteAfectada: "No podemos mostrar los pedidos ahora. Inténtalo de nuevo en unos minutos.");
         return error.Categoria == CategoriaDeError.Limite
-            ? respuesta with { Vista = respuesta.Vista with { EsperaSugeridaSegundos = ProblemasDeEnvios.EsperaEnSegundos(error) } }
+            ? respuesta with { Vista = respuesta.Vista with { EsperaSugeridaSegundos = ProblemasDePedidos.EsperaEnSegundos(error) } }
             : respuesta;
     }
 
@@ -303,7 +314,7 @@ public static class PantallasDePedidos
         var modelo = await pagina.Completar(new PantallaDeEstadoVista { Estado = respuesta.Vista }, respuesta.Vista.Titulo, area, cancelacion).ConfigureAwait(false);
         if (error.Categoria == CategoriaDeError.Limite)
         {
-            controlador.Response.Headers["Retry-After"] = ProblemasDeEnvios.EsperaEnSegundos(error).ToString(CultureInfo.InvariantCulture);
+            controlador.Response.Headers["Retry-After"] = ProblemasDePedidos.EsperaEnSegundos(error).ToString(CultureInfo.InvariantCulture);
         }
 
         controlador.Response.StatusCode = controlador.Request.EsHtmx() ? StatusCodes.Status200OK : respuesta.EstadoHttp;
@@ -322,6 +333,9 @@ public abstract class ControladorDePedidos(ContextoDePagina pagina, OpcionesDeEr
     protected const int TopeDeLineasPorOperacion = 30;
 
     protected const int TamanoDePagina = 20;
+
+    /// <summary>La página más lejana que se pide (20 por página: 10 000 filas): un offset mayor no lo necesita ninguna pantalla y lo acota también el límite de consultas por usuario.</summary>
+    protected const int PaginaMaxima = FiltroDePedidos.PaginaMaxima;
 
     private static readonly Dictionary<string, string> AvisoPorAccion = new(StringComparer.Ordinal)
     {
@@ -374,7 +388,7 @@ public abstract class ControladorDePedidos(ContextoDePagina pagina, OpcionesDeEr
         }
 
         var numero = 1;
-        if (solicitud.Query["pagina"].ToString() is { Length: > 0 } p && (!int.TryParse(p, NumberStyles.None, CultureInfo.InvariantCulture, out numero) || numero is < 1 or > 10_000))
+        if (solicitud.Query["pagina"].ToString() is { Length: > 0 } p && (!int.TryParse(p, NumberStyles.None, CultureInfo.InvariantCulture, out numero) || numero is < 1 or > PaginaMaxima))
         {
             return Invalido("pagina");
         }
@@ -548,6 +562,7 @@ public abstract class ControladorDePedidos(ContextoDePagina pagina, OpcionesDeEr
         vista.EstadoTexto = estado;
         vista.EstadoIcono = icono;
         vista.TipoTexto = TextosDePedidos.Tipo(resumen.TipoDeEntrega);
+        vista.EsADomicilio = resumen.TipoDeEntrega == TipoDeEntregaVisible.Domicilio;
         vista.Sucursal = resumen.CodigoDeSucursalDeRecojo;
         vista.TotalTexto = FormatoPeruano.Soles(resumen.Total);
         vista.Lineas = LineasComoVista(lineas);
@@ -566,7 +581,7 @@ public abstract class ControladorDePedidos(ContextoDePagina pagina, OpcionesDeEr
         vista.Region = detalle.RegionDeEntrega;
         vista.Contacto = ContactoComoVista(detalle.Contacto);
         vista.ContactoOculto = detalle.ContactoOculto;
-        vista.ContactoAnonimizado = detalle.Resumen.TipoDeEntrega == TipoDeEntregaVisible.Domicilio && detalle.Contacto is null && !detalle.ContactoOculto;
+        vista.ContactoAnonimizado = detalle.ContactoAnonimizado;
         vista.ReembolsoPendienteTexto = ReembolsoPendienteComoTexto(detalle.ReembolsoPendiente);
         return vista;
     }
@@ -596,7 +611,7 @@ public abstract class ControladorDePedidos(ContextoDePagina pagina, OpcionesDeEr
                 l.ListoEn is { } listo ? FormatoPeruano.FechaYHora(listo) : null,
                 l.EntregadaEn is { } entregada ? FormatoPeruano.FechaYHora(entregada) : null,
                 l.AnuladaEn is { } anulada ? FormatoPeruano.FechaYHora(anulada) : null,
-                !l.EsDigital && l.Estado is not (EstadoVisibleDeLaLinea.Entregado or EstadoVisibleDeLaLinea.Anulado or EstadoVisibleDeLaLinea.NoRecogido));
+                l.Operable);
         }),
     ];
 

@@ -1,6 +1,6 @@
 @model BabelHub.Ecommerce.Api.Pedidos.DetalleDePedidoVista
 <partial name="~/Views/Shared/Pedidos/_DetalleDePedido.cshtml" model="Model" />
-@if (Model.Region is not null)
+@if (Model.EsADomicilio)
 {
     @* El seguimiento del envío lo compone Envíos como fragmento (Pedidos no depende de Envíos): solo para pedidos a domicilio. *@
     <div class="mt-6" id="envios-del-pedido" hx-get="/cuenta/pedidos/@Model.PedidoId.ToString("D")/envios" hx-trigger="load" hx-swap="innerHTML" aria-live="polite"></div>

@@ -130,6 +130,15 @@ public static class MotivosDeAlertaDeAuditoria
     /// <summary>El archivo de una edición digital falta en el almacén de objetos al pedir una descarga (BIB-13).</summary>
     public const string BibliotecaArchivoFaltante = "biblioteca-archivo-faltante";
 
+    /// <summary>Un trabajo de fondo de Pedidos falló varias veces seguidas o dejó de correr.</summary>
+    public const string TrabajoDePedidosSinCorrer = "trabajo-de-pedidos-sin-correr";
+
+    /// <summary>Pasaron 24 horas sin una depuración de contactos de pedidos con éxito (PED-39).</summary>
+    public const string DepuracionDePedidosSinExito = "depuracion-de-pedidos-sin-exito";
+
+    /// <summary>Pasaron 24 horas sin liberar el contacto de una intención de pago que Pedidos ya guardó (PED-35).</summary>
+    public const string ContactoDePedidoSinLiberar = "contacto-de-pedido-sin-liberar";
+
     /// <summary>Una anulación o una entrega de pedido quedó fallida: su reanudación no pudo completarla y alguien debe revisarla.</summary>
     public const string PedidoOperacionFallida = "pedido-operacion-fallida";
 
@@ -215,6 +224,9 @@ public static class MotivosDeAlertaDeAuditoria
         EnvioProgresoSinInformar,
         EnvioGuiaSinUso,
         BibliotecaArchivoFaltante,
+        TrabajoDePedidosSinCorrer,
+        DepuracionDePedidosSinExito,
+        ContactoDePedidoSinLiberar,
         PedidoOperacionFallida,
         PedidoLiberacionNoRecogidoYaCerrada,
         PedidoLiberacionDeAnulacionYaCerrada,

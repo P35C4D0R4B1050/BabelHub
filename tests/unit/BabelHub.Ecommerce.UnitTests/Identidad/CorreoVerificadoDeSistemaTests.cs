@@ -41,6 +41,17 @@ public sealed class CorreoVerificadoDeSistemaTests
 
     [Fact]
     [Trait("Criterio", "AC-IDE-63")]
+    public async Task UnaCuentaCancelada_NoEntregaSuCorreo_AunqueSigaMarcadaComoVerificada()
+    {
+        var e = new EntornoDeIdentidad();
+        var cuenta = e.Cuenta("ana@example.com");
+        cuenta.CanceladaEn = e.Reloj.Ahora;
+
+        Assert.Null(await new CorreoVerificadoDeSistemaDeIdentidad(e.Cuentas).Consultar(cuenta.Usuario.Id));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-63")]
     public async Task SinLaCuenta_SeRechazaLaConsulta_YSoloLee()
     {
         var e = new EntornoDeIdentidad();
@@ -52,5 +63,20 @@ public sealed class CorreoVerificadoDeSistemaTests
         await puerto.Consultar(cuenta.Usuario.Id);
 
         Assert.Equal(antes, e.Bd.Cuentas[cuenta.Usuario.Id].Usuario.Correo);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-63")]
+    public async Task SiElRepositorioNoPuedeLeer_LaExcepcionSube_YNuncaSeDiceSinCorreo()
+    {
+        var repositorio = System.Reflection.DispatchProxy.Create<IRepositorioDeCuentas, RepositorioQueFalla>();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new CorreoVerificadoDeSistemaDeIdentidad(repositorio).Consultar(Guid.NewGuid()));
+    }
+
+    /// <summary>Un repositorio caído: cualquier lectura lanza.</summary>
+    public class RepositorioQueFalla : System.Reflection.DispatchProxy
+    {
+        protected override object? Invoke(System.Reflection.MethodInfo? targetMethod, object?[]? args) => throw new InvalidOperationException("La base no responde.");
     }
 }

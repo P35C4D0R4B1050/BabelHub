@@ -45,7 +45,8 @@ public sealed class RecuperacionDeAcceso(
             return Resultado<RespuestaUniforme>.Fallo(rechazo);
         }
 
-        await solicitudesDeCodigo.Registrar(huellas.DeSujeto(normalizado, Proposito).Valor, PropositoDeCodigo.RecuperacionDeAcceso, reloj.Ahora, cancelacion).ConfigureAwait(false);
+        // La columna guarda 64 hexadecimales: el resumen de la huella con clave del correo.
+        await solicitudesDeCodigo.Registrar(huellasDeIdentidad.DeValorOpaco(huellas.DeSujeto(normalizado, Proposito).Valor), PropositoDeCodigo.RecuperacionDeAcceso, reloj.Ahora, cancelacion).ConfigureAwait(false);
         if (!cola.Encolar(new SolicitudDeCodigoEnSegundoPlano(normalizado, PropositoDeCodigo.RecuperacionDeAcceso)))
         {
             // El canal está lleno: se descarta en silencio, la respuesta es la misma y queda una alerta técnica (IDE-65).

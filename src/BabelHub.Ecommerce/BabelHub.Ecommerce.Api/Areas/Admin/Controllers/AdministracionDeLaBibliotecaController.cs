@@ -56,6 +56,7 @@ public sealed class AyudasDeBibliotecaVista : ModeloBaseDePagina
 /// Las ayudas no traen datos de la cuenta. Toda respuesta es <c>no-store</c>.
 /// </summary>
 [Area("Admin")]
+[RequestSizeLimit(4096)]
 public sealed class AdministracionDeLaBibliotecaController(IAdministracionDeLaBiblioteca administracion, ContextoDePagina pagina, OpcionesDeErrores errores) : Controller
 {
     private const int TamanoPorOmision = 20;
