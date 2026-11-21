@@ -48,7 +48,13 @@ internal sealed class AuditoriaDeDevolucionesNula : IAuditoria
 
 internal sealed class NotificadorDeDevolucionesNulo : INotificador
 {
-    public Task<ResultadoDeLaSolicitudDeAviso> Solicitar(SolicitudDeAviso solicitud, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeLaSolicitudDeAviso.Creado);
+    public ConcurrentBag<SolicitudDeAviso> Solicitudes { get; } = [];
+
+    public Task<ResultadoDeLaSolicitudDeAviso> Solicitar(SolicitudDeAviso solicitud, CancellationToken cancelacion = default)
+    {
+        Solicitudes.Add(solicitud);
+        return Task.FromResult(ResultadoDeLaSolicitudDeAviso.Creado);
+    }
 }
 
 internal sealed class AlertasDeDevolucionesNulas : IPublicadorDeAlertasTecnicas
@@ -214,7 +220,8 @@ internal sealed class EscenarioDeDevolucionesConPostgres(PostgresDeDevolucionesF
 
     public AlertasDeDevolucionesNulas Alertas { get; } = new();
 
-    private readonly NotificadorDeDevolucionesNulo _notificador = new();
+    public NotificadorDeDevolucionesNulo Notificador { get; } = new();
+    private NotificadorDeDevolucionesNulo _notificador => Notificador;
     private readonly LimitesPermisivos _limites = new();
     private readonly CuentasAlDia _cuentas = new();
     private readonly MarcaLibre _marca = new();
@@ -236,11 +243,11 @@ internal sealed class EscenarioDeDevolucionesConPostgres(PostgresDeDevolucionesF
 
     private ProcesarReembolsoDeLinea Procesador() => new(Reembolsos, fixture.Devoluciones, fixture.Unidad, Auditoria, Avisos(), Reloj);
 
-    public Task<Resultado<DevolucionVista>> Solicitar(Guid cliente, Guid pedidoId, Guid lineaId, int cantidad, string sucursal = "lima-central")
+    public Task<Resultado<DevolucionVista>> Solicitar(Guid cliente, Guid pedidoId, Guid lineaId, int cantidad, string sucursal = "lima-central", string motivo = "No era lo que esperaba")
     {
         var actor = ActorActual.DeUsuario(cliente, RolesDeUsuario.Cliente);
         var caso = new SolicitarDevolucionDeImpreso(Autorizador(actor), new LimitesDeDevoluciones(_limites, new ActorFijo(actor)), Pedidos, Inventario, _marca, fixture.Devoluciones, fixture.Unidad, Auditoria, Reloj);
-        return caso.Ejecutar(new SolicitarDevolucionDeImpresoEntrada(pedidoId, [new LineaPedidaParaDevolver(lineaId, cantidad)], new TextoLibre("No era lo que esperaba"), sucursal));
+        return caso.Ejecutar(new SolicitarDevolucionDeImpresoEntrada(pedidoId, [new LineaPedidaParaDevolver(lineaId, cantidad)], new TextoLibre(motivo), sucursal));
     }
 
     private (AutorizadorDeDevoluciones Autorizador, LimitesDeDevoluciones Limites) ComoEncargado()
@@ -266,6 +273,20 @@ internal sealed class EscenarioDeDevolucionesConPostgres(PostgresDeDevolucionesF
 
     public Task<Resultado<DevolucionVista>> RecibirComo(ActorActual actor, Guid devolucionId) =>
         new ConfirmarRecepcion(Autorizador(actor), new LimitesDeDevoluciones(_limites, new ActorFijo(actor)), Inventario, Reembolsos, fixture.Devoluciones, fixture.Unidad, Auditoria, Avisos(), Alertas, Procesador(), Reloj).Ejecutar(devolucionId);
+
+    public Task Redactar(Guid cliente) =>
+        fixture.Unidad.Ejecutar(async ct =>
+        {
+            var localizador = new LocalizadorDeDevolucionesDeUnaCuenta(Pedidos, fixture.Devoluciones);
+            await new RedactarDevolucionesDeUnaCuenta(localizador, fixture.Devoluciones, Auditoria, Reloj).Aplicar(cliente, Guid.NewGuid(), ct);
+            return 0;
+        });
+
+    public Task<Resultado<int>> Depurar()
+    {
+        var actor = ActorActual.DelSistema();
+        return new RedactarDevolucionesVencidas(Autorizador(actor), fixture.Devoluciones, fixture.Unidad, Auditoria, new ControlDeLaDepuracionDeDevoluciones(Reloj), Reloj).Ejecutar();
+    }
 
     public Task<Resultado<int>> Conciliar()
     {
