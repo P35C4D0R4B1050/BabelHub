@@ -119,6 +119,7 @@ internal sealed class PagosApiHost : IAsyncDisposable
                 servicios.AddSingleton<IActorActual>(actor);
                 servicios.AddSingleton<IEstablecedorDeActor>(actor);
                 servicios.AddSingleton<IPagos>(Pagos);
+                servicios.AddSingleton<BabelHub.Ecommerce.Application.Plataforma.IReloj>(new BabelHub.Ecommerce.Infrastructure.Plataforma.RelojDelSistema());
                 servicios.AddSingleton<IReembolsos>(Reembolsos);
                 servicios.AddSingleton<ICheckoutDelCliente>(Checkout);
                 servicios.AddSingleton<IRegistradorDeDenegacionesHttp>(Denegaciones);

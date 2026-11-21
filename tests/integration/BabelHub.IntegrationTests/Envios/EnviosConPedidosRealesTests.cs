@@ -188,6 +188,7 @@ public sealed class EnviosConPedidosRealesTests(PostgresDePedidosYEnviosFixture 
 
     [Fact]
     [Trait("Criterio", "AC-ENV-07")]
+    [Trait("Criterio", "AC-PED-20")]
     public async Task Anular_el_pedido_con_un_envio_en_reparto_y_otro_pendiente_cancela_solo_el_pendiente_y_nunca_un_cancelado_con_el_fisico_descontado()
     {
         var (e, reservas, _) = Crear();

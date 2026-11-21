@@ -30,7 +30,7 @@ TRUNCATE auditoria.acumulado_de_limites;
 SQL
   psql_en inventario <<'SQL'
 TRUNCATE reservas.reserva_lineas, reservas.reservas, reservas.operaciones_idempotentes CASCADE;
-UPDATE fuentes.stock SET reservado = 0;
+DELETE FROM fuentes.stock; -- se vuelve a sembrar abajo: las entregas descuentan el físico y sin esto el stock de Ayacucho se agota entre corridas
 TRUNCATE auditoria.acumulado_de_limites, plataforma.eventos_limite;
 SQL
   echo "estado transaccional del entorno E2E reiniciado"
