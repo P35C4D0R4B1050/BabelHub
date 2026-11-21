@@ -487,4 +487,32 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
         Assert.Equal("no-autenticado", solicitud.Error!.Clave);
         Assert.Equal(0, await bd.Consultar<int>("SELECT count(*) FROM devoluciones.devoluciones WHERE pedido_id = @p", ("p", pedido)));
     }
+
+    [Theory]
+    [InlineData("sin-cancelacion", true)]
+    [InlineData("cancelacion-diferida", true)]
+    [InlineData("ejecucion-en-curso", false)]
+    [Trait("Criterio", "AC-DEV-28")]
+    public async Task Con_la_marca_real_de_Identidad_solo_se_rechaza_sin_escribir_nada_a_la_cuenta_cuya_cancelacion_ya_esta_en_ejecucion(string estadoDeLaCancelacion, bool seAcepta)
+    {
+        await using var anfitrion = Anfitrion();
+        var (pedido, cuenta, digital, impresa) = await ComprarMixtoConImpreso(anfitrion);
+        await EntregarElImpreso(pedido, impresa);
+        if (estadoDeLaCancelacion != "sin-cancelacion")
+        {
+            var enCurso = estadoDeLaCancelacion == "ejecucion-en-curso" ? "true" : "false";
+            await bd.Ejecutar($"INSERT INTO identidad.solicitudes_de_cancelacion (id, usuario_id, estado, solicitada_en, ejecucion_en_curso) VALUES ('{Guid.NewGuid():D}', '{cuenta:D}', 'diferida', now(), {enCurso})");
+        }
+
+        var impreso = await SolicitarImpreso(anfitrion, cuenta, pedido, impresa);
+        var reporte = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<IDevolucionesDelCliente>().ReportarArchivoDefectuoso(new ReportarArchivoDefectuosoEntrada(pedido, digital, new TextoLibre(Sembrado), new TextoLibre("No abre"))));
+
+        Assert.Equal(seAcepta, impreso.EsExito);
+        Assert.Equal(seAcepta, reporte.EsExito);
+        Assert.Equal(seAcepta ? 2L : 0L, await bd.Consultar<long>("SELECT count(*) FROM devoluciones.devoluciones WHERE pedido_id = @p", ("p", pedido)));
+        if (!seAcepta)
+        {
+            Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM devoluciones.devoluciones WHERE motivo = @m AND pedido_id = @p", ("m", Sembrado), ("p", pedido)));
+        }
+    }
 }
