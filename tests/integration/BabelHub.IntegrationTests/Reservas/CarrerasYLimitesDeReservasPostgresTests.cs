@@ -269,6 +269,16 @@ public sealed class CarrerasYLimitesDeReservasPostgresTests(PostgresDeReservasFi
 
         Assert.Null(resultados[0]);
         Assert.Equal("reserva-estado-invalido", resultados[1]);
+
+        // Quien expira no espera el bloqueo del pedido (`IntentarPedido`): si la entrega ya lo tenía, esa pasada no expira nada y lo recoge la siguiente (el trabajo corre cada minuto; lo cubren las unitarias de `ExpirarReservasVencidasTests`). Según quién llegó primero el estado es uno de dos y nunca
+        // un intermedio: el físico no se toca y lo reservado y la línea van juntos (libre y expirada, o reservada y pendiente).
+        var estado = await bd.Consultar<string>($"SELECT estado FROM reservas.reserva_lineas WHERE pedido_id = '{entrada.PedidoId}'");
+        var stock = await bd.StockDe(lima, libro);
+        Assert.True((stock, estado) is ((9, 0), "expirada") or ((9, 1), "pendiente"), $"Estado intermedio tras la carrera: stock {stock}, línea {estado}.");
+
+        // La siguiente pasada del expirador (sin competencia) siempre la libera, y la entrega sigue rechazada.
+        Assert.Null((await pila.Ejecutar<ExpirarReservasEntrada, ExpiracionDelPedido>(ActorActual.DelSistema(), new ExpirarReservasEntrada(entrada.PedidoId))).Error?.Clave);
+        Assert.Equal("reserva-estado-invalido", (await Entregar(pila, Encargado(lima), entrada.PedidoId, entrada.Lineas[0].LineaId)).Error?.Clave);
         Assert.Equal((9, 0), await bd.StockDe(lima, libro));
         Assert.Equal("expirada", await bd.Consultar<string>($"SELECT estado FROM reservas.reserva_lineas WHERE pedido_id = '{entrada.PedidoId}'"));
     }
