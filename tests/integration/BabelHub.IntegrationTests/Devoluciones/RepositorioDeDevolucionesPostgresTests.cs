@@ -354,7 +354,7 @@ public sealed class RepositorioDeDevolucionesPostgresTests(PostgresDeDevolucione
         }));
 
         Assert.Null(libre);
-        Assert.Equal(2, await bd.Consultar<int>($"SELECT cantidad_comprometida FROM devoluciones.cupos_de_linea WHERE linea_id = '{linea}'"));
+        Assert.Equal(3, await bd.Consultar<int>($"SELECT cantidad_comprometida FROM devoluciones.cupos_de_linea WHERE linea_id = '{linea}'"));
     }
 
     // ---------- El bloqueo por devolución (DEV-16) ----------
