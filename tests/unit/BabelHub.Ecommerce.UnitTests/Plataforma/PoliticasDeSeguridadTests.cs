@@ -124,6 +124,18 @@ public sealed class PoliticasDeSeguridadTests
     }
 
     [Fact]
+    public void HojasPorOrigen_Es3PorHora_PorOrigen_LiberableYConRespaldoLocal()
+    {
+        var p = PoliticasDeSeguridad.HojasPorOrigen;
+
+        Assert.Equal(3, p.Maximo);
+        Assert.Equal(TimeSpan.FromHours(1), p.Ventana);
+        Assert.Equal(TipoDeSujetoDeLimite.Origen, p.Tipo);
+        Assert.True(p.Liberable);
+        Assert.True(p.RespaldoLocal);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-SEG-17")]
     public void Codigos_ParaUnCorreoQueExisteYOtroQueNo_DaLaMismaRespuestaDeLimite()
     {
