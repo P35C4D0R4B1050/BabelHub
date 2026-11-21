@@ -408,7 +408,7 @@ public sealed class CambioDeCorreo(
         {
             try
             {
-                await alertas.Publicar(new AlertaTecnica("dependencia-no-necesaria-fallida", reloj.Ahora)).ConfigureAwait(false);
+                await alertas.Publicar(new AlertaTecnica(EmisionDeCodigos.MotivoDeFallaDelCorreo, reloj.Ahora)).ConfigureAwait(false);
             }
             catch (Exception) when (!cancelacion.IsCancellationRequested)
             {

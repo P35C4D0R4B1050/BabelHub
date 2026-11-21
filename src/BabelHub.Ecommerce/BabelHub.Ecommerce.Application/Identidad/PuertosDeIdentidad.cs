@@ -181,11 +181,7 @@ public sealed class ReceptoresDeCambiosDeCuentaCompuestos(IReadOnlyList<IRecepto
             throw new CambiosDeCuentaNoAplicablesException("No hay ningún módulo receptor de los cambios de cuenta.");
         }
 
-        foreach (var receptor in receptores
-            .Select((receptor, posicion) => (receptor, posicion, rango: Array.IndexOf(Interno.EjecutorDeLaCancelacion.OrdenDeLosReceptores, receptor.Modulo)))
-            .OrderBy(r => r.rango < 0 ? int.MaxValue : r.rango)
-            .ThenBy(r => r.posicion)
-            .Select(r => r.receptor))
+        foreach (var receptor in Interno.EjecutorDeLaCancelacion.EnElOrden(receptores, r => r.Modulo))
         {
             try
             {

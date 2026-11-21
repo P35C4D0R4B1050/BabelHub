@@ -943,7 +943,7 @@ public sealed class CambioDeCorreoTests
         Assert.Empty(e.Bd.Avisos);
         Assert.Equal(correosAntes, e.Correo.Correos.Count);
         Assert.True((await e.Gestor().Renovar(propia.Renovacion)).EsExito);
-        Assert.Equal(1, e.Alertas.Alertas.Count(a => a.Motivo == "dependencia-no-necesaria-fallida"));
+        Assert.Equal(1, e.Alertas.Alertas.Count(a => a.Motivo == EmisionDeCodigos.MotivoDeFallaDelCorreo));
 // Con el código aún vigente, al volver el receptor el mismo código aplica el cambio.        e.Receptor.Falla = false;        e.SinReceptores = false;        Assert.True((await e.CambioDeCorreo().VerificarElCorreoNuevo(cuenta.Usuario.Id, S(codigo), propia.Renovacion)).EsExito);        Assert.Equal(Nuevo, cuenta.Usuario.Correo);
     }
 
@@ -965,5 +965,19 @@ public sealed class CambioDeCorreoTests
         Assert.DoesNotContain(Antiguo, excepcion.Message, StringComparison.Ordinal);
         Assert.Null(excepcion.InnerException);
         Assert.Equal("reclamaciones", excepcion.Modulo);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-71")]
+    public async Task ElPersonal_CambiaSuCorreo_AunqueNoHayaNingunReceptor()
+    {
+        var (e, cuenta, cambio, marca) = EscenarioDelPersonal();
+        e.SinReceptores = true;
+        await Pedir(cambio, cuenta, marca);
+
+        var verificado = await e.CambioDeCorreo().VerificarElCorreoNuevo(cuenta.Usuario.Id, S(e.UltimoCodigoEnviado()));
+
+        Assert.True(verificado.EsExito);
+        Assert.Equal(Nuevo, cuenta.Usuario.Correo);
     }
 }
