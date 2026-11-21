@@ -19,6 +19,9 @@ public interface IPurgaDeVencidos
 
     /// <summary>Los cambios de correo cuyo vencimiento es anterior al instante (IDE-54).</summary>
     Task<int> CambiosDeCorreoVencidos(DateTimeOffset ahora, CancellationToken cancelacion = default);
+
+    /// <summary>Las cuentas con un cambio de correo desde un dispositivo o región no reconocidos que sigue esperando la confirmación del titular y cuyo plazo venció (AUD-33): se leen <b>antes</b> de purgar.</summary>
+    Task<IReadOnlyList<Guid>> CuentasConCambioNoReconocidoVencido(DateTimeOffset ahora, CancellationToken cancelacion = default) => Task.FromResult<IReadOnlyList<Guid>>([]);
 }
 
 /// <summary>Lo que quitó una pasada de purga.</summary>
@@ -32,7 +35,7 @@ public sealed record ResultadoDeLaPurga(int Desafios, int Codigos, int Renovacio
 /// solicitud de código a los <b>10 minutos</b> y el cambio de correo pendiente a las <b>24 horas</b>. Cada paso va por separado: si uno falla, los demás igual corren y la pasada falla al final (el trabajo registra el
 /// fallo y avisa tras varios seguidos). Corre con el actor del sistema.
 /// </summary>
-public sealed class PurgarVencidosDeIdentidad(IPurgaDeVencidos purga, IReloj reloj)
+public sealed class PurgarVencidosDeIdentidad(IPurgaDeVencidos purga, IReloj reloj, EventosDeSeguridadDeIdentidad? eventos = null)
 {
     /// <summary>Un desafío solo vale 5 minutos: una hora después de vencer ya no sirve ni para el registro.</summary>
     public static readonly TimeSpan RetencionDeLosDesafios = TimeSpan.FromHours(1);
@@ -51,13 +54,32 @@ public sealed class PurgarVencidosDeIdentidad(IPurgaDeVencidos purga, IReloj rel
         var codigos = await Paso(() => purga.CodigosDeUnSoloUsoVencidos(ahora - RetencionDeCodigosYRenovaciones, cancelacion), errores, cancelacion).ConfigureAwait(false);
         var renovaciones = await Paso(() => purga.RenovacionesVencidas(ahora - RetencionDeCodigosYRenovaciones, cancelacion), errores, cancelacion).ConfigureAwait(false);
         var solicitudes = await Paso(() => purga.SolicitudesDeCodigo(ahora - RetencionDeLasSolicitudesDeCodigo, cancelacion), errores, cancelacion).ConfigureAwait(false);
-        var cambios = await Paso(() => purga.CambiosDeCorreoVencidos(ahora, cancelacion), errores, cancelacion).ConfigureAwait(false);
+        // El vencimiento de un cambio no reconocido es un evento de seguridad (AUD-33): se registra antes de borrar la fila y, si no se pudo registrar, la fila se conserva para la siguiente pasada en vez de perder el evento.
+        var erroresAntes = errores.Count;
+        await Paso(() => RegistrarLosCambiosNoReconocidosVencidos(ahora, cancelacion), errores, cancelacion).ConfigureAwait(false);
+        var cambios = errores.Count > erroresAntes ? 0 : await Paso(() => purga.CambiosDeCorreoVencidos(ahora, cancelacion), errores, cancelacion).ConfigureAwait(false);
         if (errores.Count > 0)
         {
             throw new AggregateException("La purga de lo vencido no se completó.", errores);
         }
 
         return new ResultadoDeLaPurga(desafios, codigos, renovaciones, solicitudes, cambios);
+    }
+
+    private async Task<int> RegistrarLosCambiosNoReconocidosVencidos(DateTimeOffset ahora, CancellationToken cancelacion)
+    {
+        if (eventos is null)
+        {
+            return 0;
+        }
+
+        var cuentas = await purga.CuentasConCambioNoReconocidoVencido(ahora, cancelacion).ConfigureAwait(false);
+        foreach (var cuenta in cuentas)
+        {
+            await eventos.CambioDeCorreoVencido(cuenta, cancelacion).ConfigureAwait(false);
+        }
+
+        return cuentas.Count;
     }
 
     private static async Task<int> Paso(Func<Task<int>> paso, List<Exception> errores, CancellationToken cancelacion)
