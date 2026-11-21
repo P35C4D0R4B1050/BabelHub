@@ -1,0 +1,3 @@
+# El índice infinito es un espacio infinito de páginas generadas: no es contenido que deba rastrearse (web-indice-infinito D06).
+User-agent: *
+Disallow: /indice-infinito

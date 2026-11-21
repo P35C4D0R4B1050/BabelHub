@@ -171,7 +171,7 @@ Cada módulo es una carpeta dentro de las capas del servicio (no un proyecto apa
 | **Libro de Reclamaciones** | Hoja de reclamación, su respuesta y su conservación. | `ecommerce-libro-reclamaciones` | Identidad |
 | **Identidad** | Registro, sesión, segundo factor, usuarios y roles, derechos ARCO y firma de las credenciales; esquema aislado por rol. | `identidad-seguridad` | Ninguno (todos usan su contexto de actor) |
 | **Asistente** | Recomendaciones y consulta del estado de pedidos con un LLM externo; solo lectura. | `asistente-compra-ia` | Catálogo, Pedidos, Identidad, cliente del Inventario |
-| **Interfaz web** | Áreas Tienda, Sucursal y Admin, sesión del servidor (módulo `Web`), estados estándar e índice infinito; la Presentación sin reglas de negocio y el módulo `Web` solo con las de la sesión. | `web-base`, `web-indice-infinito` | Todos los módulos, cliente del Inventario |
+| **Interfaz web** | Áreas Tienda, Sucursal y Admin, sesión del servidor (módulo `Web`), estados estándar e índice infinito; la Presentación sin reglas de negocio y el módulo `Web` con las reglas de la sesión y el generador puro del índice infinito (`Web/Indice`, sin estado ni base de datos; contrato público `IIndiceInfinito`). | `web-base`, `web-indice-infinito` | Todos los módulos, cliente del Inventario |
 
 **Servicio Inventario (4 módulos)**
 

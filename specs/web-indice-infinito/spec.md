@@ -1,7 +1,7 @@
 ---
 id: web-indice-infinito
 titulo: El índice infinito (experimento opcional)
-estado: Planned
+estado: Done
 servicio: E-commerce
 prefijo: IND
 origen: [RF29, NN17]
