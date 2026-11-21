@@ -44,7 +44,7 @@ public sealed class DocumentacionOpenApiInventarioTests
         ((IEndpointRouteBuilder)app).DataSources.SelectMany(d => d.Endpoints).OfType<RouteEndpoint>()
             .Where(e => e.Metadata.GetMetadata<ControllerActionDescriptor>() is null)
             .Select(e => (Ruta: DocumentacionOpenApi.Normalizar(e.RoutePattern.RawText ?? string.Empty), Metodos: e.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? []))
-            .Where(r => r.Ruta != DocumentacionOpenApi.RutaDelDocumento)
+            .Where(r => r.Ruta != DocumentacionOpenApi.RutaDelDocumento && !DocumentacionOpenApi.EsDeLaInterfaz(r.Ruta))
             .SelectMany(r => r.Metodos.Select(m => (m, r.Ruta)));
 
     /// <summary>Lo que falta o está mal en el documento respecto de las rutas mapeadas; vacío si todo está documentado.</summary>
