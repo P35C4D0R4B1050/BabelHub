@@ -280,7 +280,7 @@ public sealed class PantallasDeErrorDeReclamacionesTests : IAsyncLifetime
     }
 
     [Fact]
-    [Trait("Criterio", "AC-REC-29")]
+    [Trait("Criterio", "AC-REC-30")]
     public async Task El_rechazo_de_la_auditoria_al_registrar_con_sesion_ofrece_registrar_sin_sesion_sin_repetir_ningun_dato()
     {
         _host.Reclamaciones.Respuesta = Resultado<ConstanciaDeHoja>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible", [new ErrorDeCampo("rec-registrar-sin-sesion", "disponible")]));
@@ -302,7 +302,7 @@ public sealed class PantallasDeErrorDeReclamacionesTests : IAsyncLifetime
     }
 
     [Fact]
-    [Trait("Criterio", "AC-REC-29")]
+    [Trait("Criterio", "AC-REC-30")]
     public async Task Un_servicio_no_disponible_sin_el_campo_de_la_guia_no_ofrece_registrar_sin_sesion()
     {
         _host.Reclamaciones.Respuesta = Resultado<ConstanciaDeHoja>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible"));

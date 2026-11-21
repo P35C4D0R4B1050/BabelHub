@@ -59,7 +59,7 @@ public sealed class TopeDeHojasPorOrigenConLaPoliticaRealTests(PostgresDelEcomme
     }
 
     [Fact]
-    [Trait("Criterio", "AC-REC-29")]
+    [Trait("Criterio", "AC-REC-30")]
     public async Task Tres_rechazos_por_no_poder_auditar_el_registro_con_sesion_devuelven_el_cupo_y_despues_se_registran_tres_hojas_sin_sesion_del_mismo_origen()
     {
         var marca = Guid.NewGuid().ToString("N")[..12];

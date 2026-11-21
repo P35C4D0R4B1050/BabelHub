@@ -168,6 +168,7 @@ public sealed class AdministracionDeHojasTests
 
     [Fact]
     [Trait("Criterio", "AC-REC-14")]
+    [Trait("Criterio", "AC-REC-28")]
     public async Task Una_hoja_respondida_o_descartada_no_se_vuelve_a_responder_y_no_hay_otro_correo_ni_otra_auditoria()
     {
         var e = Entorno();

@@ -39,7 +39,8 @@ public sealed class VinculoDeHojasTests
     // ---------- Registro con sesión (T26, REC-21, REC-29, REC-33) ----------
 
     [Fact]
-    [Trait("Criterio", "AC-REC-29")]
+    [Trait("Criterio", "AC-REC-20")]
+    [Trait("Criterio", "AC-REC-26")]
     public async Task Un_cliente_con_sesion_registra_la_hoja_vinculada_a_su_cuenta_y_se_audita_sin_el_correo_ni_el_numero()
     {
         var e = new EntornoDeReclamaciones(ActorDePrueba.DeCliente(Ana));
@@ -68,7 +69,7 @@ public sealed class VinculoDeHojasTests
     }
 
     [Theory]
-    [Trait("Criterio", "AC-REC-20")]
+    [Trait("Criterio", "AC-REC-29")]
     [InlineData("visitante")]
     [InlineData("personal")]
     [InlineData("sistema")]
@@ -90,7 +91,8 @@ public sealed class VinculoDeHojasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-REC-29")]
+    [Trait("Criterio", "AC-REC-26")]
+    [Trait("Criterio", "AC-REC-30")]
     public async Task Sin_poder_auditar_la_hoja_no_se_guarda_se_devuelve_el_cupo_se_suelta_la_clave_y_se_ofrece_registrar_sin_sesion()
     {
         var e = new EntornoDeReclamaciones(ActorDePrueba.DeCliente(Ana));
@@ -112,7 +114,7 @@ public sealed class VinculoDeHojasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-REC-29")]
+    [Trait("Criterio", "AC-REC-30")]
     public async Task Tres_rechazos_de_auditoria_no_agotan_el_cupo_del_origen_y_se_registran_tres_hojas_sin_sesion()
     {
         var e = new EntornoDeReclamaciones(ActorDePrueba.DeCliente(Ana));
@@ -134,7 +136,7 @@ public sealed class VinculoDeHojasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-REC-29")]
+    [Trait("Criterio", "AC-REC-30")]
     public async Task Si_devolver_el_cupo_falla_el_rechazo_sigue_siendo_servicio_no_disponible_y_la_clave_se_suelta()
     {
         var e = new EntornoDeReclamaciones(ActorDePrueba.DeCliente(Ana));
@@ -149,7 +151,7 @@ public sealed class VinculoDeHojasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-REC-29")]
+    [Trait("Criterio", "AC-REC-30")]
     public async Task Otro_fallo_de_la_base_gasta_el_cupo_como_antes_y_no_devuelve_nada()
     {
         var e = new EntornoDeReclamaciones(ActorDePrueba.DeCliente(Ana));
@@ -165,6 +167,7 @@ public sealed class VinculoDeHojasTests
 
     [Fact]
     [Trait("Criterio", "AC-REC-21")]
+    [Trait("Criterio", "AC-REC-26")]
     public async Task Listar_con_correo_verificado_vincula_las_hojas_del_correo_y_las_audita_una_sola_vez()
     {
         var e = EntornoDeConsumidor.Nuevo(Ana, CorreoDeAna);
@@ -216,7 +219,7 @@ public sealed class VinculoDeHojasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-REC-22")]
+    [Trait("Criterio", "AC-REC-20")]
     public async Task Una_hoja_vinculada_se_ve_por_cuenta_aunque_su_correo_de_contacto_sea_otro()
     {
         var e = EntornoDeConsumidor.Nuevo(Ana, CorreoDeAna);
@@ -263,7 +266,7 @@ public sealed class VinculoDeHojasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-REC-22")]
+    [Trait("Criterio", "AC-REC-21")]
     public async Task Las_hojas_de_una_cuenta_cancelada_o_anonimizadas_no_se_reclaman()
     {
         var e = EntornoDeConsumidor.Nuevo(Ana, CorreoDeAna);
@@ -282,7 +285,7 @@ public sealed class VinculoDeHojasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-REC-22")]
+    [Trait("Criterio", "AC-REC-21")]
     public async Task Una_sesion_de_personal_no_lista_mis_hojas_ni_reclama_nada()
     {
         var e = new EntornoDeReclamaciones(ActorDePrueba.DeAdministradorCentral());
@@ -300,7 +303,8 @@ public sealed class VinculoDeHojasTests
     // ---------- Conteo de Identidad (T27, REC-19) ----------
 
     [Fact]
-    [Trait("Criterio", "AC-REC-21")]
+    [Trait("Criterio", "AC-REC-22")]
+    [Trait("Criterio", "AC-REC-26")]
     public async Task El_conteo_de_pendientes_vincula_con_el_disparador_pendientes()
     {
         var e = EntornoDeConsumidor.Nuevo(Ana, CorreoDeAna);
@@ -313,7 +317,7 @@ public sealed class VinculoDeHojasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-REC-21")]
+    [Trait("Criterio", "AC-REC-22")]
     public async Task Si_no_se_puede_auditar_el_conteo_lanza_y_nunca_devuelve_un_conteo_parcial()
     {
         var e = EntornoDeConsumidor.Nuevo(Ana, CorreoDeAna);
@@ -325,7 +329,7 @@ public sealed class VinculoDeHojasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-REC-31")]
+    [Trait("Criterio", "AC-REC-27")]
     public async Task Una_cuenta_sin_correo_verificado_cuenta_cero_aunque_tenga_hojas_vinculadas_y_no_reclama_las_del_correo_de_otra_persona()
     {
         var e = EntornoDeConsumidor.Nuevo(Ana, null);
@@ -341,7 +345,7 @@ public sealed class VinculoDeHojasTests
     // ---------- Cancelación (T27, REC-20, REC-24, REC-31) ----------
 
     [Fact]
-    [Trait("Criterio", "AC-REC-31")]
+    [Trait("Criterio", "AC-REC-19")]
     public async Task La_cancelacion_marca_y_desvincula_las_hojas_vinculadas_y_las_sin_cuenta_del_correo_verificado()
     {
         var e = EntornoDeConsumidor.Nuevo(Ana, CorreoDeAna);
@@ -383,6 +387,7 @@ public sealed class VinculoDeHojasTests
 
     [Fact]
     [Trait("Criterio", "AC-REC-23")]
+    [Trait("Criterio", "AC-REC-26")]
     public async Task Al_cambiar_el_correo_vincula_las_hojas_del_correo_anterior_con_el_disparador_cambio_de_correo()
     {
         var e = new EntornoDeReclamaciones(ActorDePrueba.DeCliente(Ana));
@@ -410,7 +415,7 @@ public sealed class VinculoDeHojasTests
     }
 
     [Theory]
-    [Trait("Criterio", "AC-REC-27")]
+    [Trait("Criterio", "AC-REC-23")]
     [InlineData("auditar")]
     [InlineData("base")]
     public async Task Si_no_puede_vincular_o_auditar_el_receptor_lanza_para_que_el_cambio_de_correo_no_se_aplique(string falla)
@@ -431,7 +436,7 @@ public sealed class VinculoDeHojasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-REC-30")]
+    [Trait("Criterio", "AC-REC-27")]
     public async Task Al_reemplazar_una_cuenta_sin_verificar_sus_hojas_quedan_sin_cuenta_y_otra_cuenta_las_puede_reclamar()
     {
         var e = new EntornoDeReclamaciones(ActorDePrueba.DeCliente(Ana));
@@ -446,7 +451,7 @@ public sealed class VinculoDeHojasTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-REC-30")]
+    [Trait("Criterio", "AC-REC-27")]
     public async Task Una_cuenta_vacia_se_rechaza_en_el_receptor()
     {
         var e = new EntornoDeReclamaciones(ActorDePrueba.DeCliente(Ana));
@@ -481,6 +486,7 @@ public sealed class VinculoDeHojasTests
 
     [Fact]
     [Trait("Criterio", "AC-REC-24")]
+    [Trait("Criterio", "AC-REC-26")]
     public async Task La_vinculacion_inicial_vincula_solo_los_correos_con_una_cuenta_de_cliente_verificada_y_termina_una_sola_vez()
     {
         var e = new EntornoDeReclamaciones(ActorDePrueba.DelSistema());

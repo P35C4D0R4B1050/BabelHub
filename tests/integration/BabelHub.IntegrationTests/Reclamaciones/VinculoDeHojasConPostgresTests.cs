@@ -71,7 +71,7 @@ public sealed class VinculoDeHojasConPostgresTests(PostgresDeReclamacionesFixtur
 
     [Fact]
     [Trait("Criterio", "AC-REC-21")]
-    [Trait("Criterio", "AC-REC-22")]
+    [Trait("Criterio", "AC-REC-26")]
     public async Task Reclamar_vincula_las_hojas_sin_cuenta_del_correo_y_las_audita_una_vez_sin_el_correo_ni_el_numero()
     {
         var e = Entorno();
@@ -150,8 +150,35 @@ public sealed class VinculoDeHojasConPostgresTests(PostgresDeReclamacionesFixtur
         Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM reclamaciones.hojas_reclamacion WHERE cuenta_id IS NOT NULL AND de_cuenta_cancelada"));
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-REC-25")]
+    public async Task El_rol_de_la_aplicacion_no_puede_pasar_el_vinculo_de_una_cuenta_a_otra_ni_borrar_el_recorrido_de_la_vinculacion_inicial()
+    {
+        var e = Entorno();
+        var numero = await RegistrarComoVisitante(e, CorreoDeAna);
+        await e.Vinculador.Reclamar(Ana, CorreoDeAna, DisparadoresDeVinculo.Consulta);
+        var esquema = new BabelHub.Ecommerce.Infrastructure.Reclamaciones.AccesoAlEsquemaDeReclamaciones(bd.Unidad, bd.Unidad);
+
+        async Task Ejecutar(string sql) => await esquema.Ejecutar(
+            async (conexion, transaccion, token) =>
+            {
+                await using var comando = new NpgsqlCommand(sql, conexion, transaccion);
+                return await comando.ExecuteNonQueryAsync(token);
+            },
+            CancellationToken.None);
+
+        var cambio = await Assert.ThrowsAsync<BabelHub.Ecommerce.Infrastructure.Reclamaciones.FallaDeLaBaseDeReclamacionesException>(
+            () => Ejecutar($"UPDATE reclamaciones.hojas_reclamacion SET cuenta_id = '{Beto}' WHERE numero = '{numero}'"));
+        var borrado = await Assert.ThrowsAsync<BabelHub.Ecommerce.Infrastructure.Reclamaciones.FallaDeLaBaseDeReclamacionesException>(
+            () => Ejecutar("DELETE FROM reclamaciones.vinculacion_inicial"));
+
+        Assert.Equal("23000", cambio.CodigoDeEstado);
+        Assert.NotNull(borrado.CodigoDeEstado);
+        Assert.Equal(Ana, await CuentaDe(numero));
+    }
+
     [Theory]
-    [Trait("Criterio", "AC-REC-21")]
+    [Trait("Criterio", "AC-REC-22")]
     [InlineData("auditoria")]
     [InlineData("correo")]
     public async Task Si_no_se_puede_auditar_o_leer_el_correo_no_se_vincula_nada_y_la_consulta_falla_cerrada(string falla)
@@ -211,7 +238,8 @@ public sealed class VinculoDeHojasConPostgresTests(PostgresDeReclamacionesFixtur
     }
 
     [Fact]
-    [Trait("Criterio", "AC-REC-29")]
+    [Trait("Criterio", "AC-REC-26")]
+    [Trait("Criterio", "AC-REC-30")]
     public async Task Con_la_auditoria_caida_el_registro_con_sesion_no_guarda_la_hoja_revierte_la_secuencia_y_el_mismo_envio_sin_sesion_se_registra()
     {
         var e = Entorno();
@@ -238,6 +266,7 @@ public sealed class VinculoDeHojasConPostgresTests(PostgresDeReclamacionesFixtur
 
     [Fact]
     [Trait("Criterio", "AC-REC-23")]
+    [Trait("Criterio", "AC-REC-26")]
     public async Task El_cambio_de_correo_vincula_las_hojas_del_correo_anterior_sin_las_de_una_cuenta_cancelada()
     {
         var e = Entorno();
@@ -258,7 +287,7 @@ public sealed class VinculoDeHojasConPostgresTests(PostgresDeReclamacionesFixtur
     }
 
     [Fact]
-    [Trait("Criterio", "AC-REC-27")]
+    [Trait("Criterio", "AC-REC-23")]
     public async Task Si_el_receptor_no_puede_auditar_el_cambio_de_correo_no_se_aplica_y_no_queda_nada_vinculado()
     {
         var e = Entorno();
@@ -276,7 +305,7 @@ public sealed class VinculoDeHojasConPostgresTests(PostgresDeReclamacionesFixtur
     }
 
     [Fact]
-    [Trait("Criterio", "AC-REC-30")]
+    [Trait("Criterio", "AC-REC-27")]
     public async Task Al_reemplazar_una_cuenta_sin_verificar_sus_hojas_quedan_sin_cuenta_y_otra_cuenta_las_reclama()
     {
         var e = Entorno();

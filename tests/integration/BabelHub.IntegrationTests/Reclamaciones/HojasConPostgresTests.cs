@@ -94,6 +94,7 @@ public sealed class HojasConPostgresTests(PostgresDeReclamacionesFixture bd) : I
     [InlineData("responder")]
     [InlineData("descartar")]
     [Trait("Criterio", "AC-REC-05")]
+    [Trait("Criterio", "AC-REC-28")]
     public async Task Veinte_pares_de_responder_contra_responder_o_contra_descartar_dejan_un_solo_ganador_por_hoja(string contra)
     {
         var e = Entorno();
