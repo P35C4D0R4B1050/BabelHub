@@ -57,9 +57,9 @@ public static class PoliticasDeSeguridad
     public static PoliticaDeLimite RegistrosPorOrigen { get; } = new(
         "registros-por-origen", 3, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Origen);
 
-    /// <summary>3 hojas de reclamación por hora y por origen, con una ventana deslizante (REC-11). No falla cerrada: con el almacén de contadores caído cae al límite local por instancia (SEG-26).</summary>
+    /// <summary>3 hojas de reclamación por hora y por origen, con una ventana deslizante (REC-11). No falla cerrada: con el almacén de contadores caído cae al límite local por instancia (SEG-26). Liberable solo para devolver el cupo cuando la hoja no llega a quedar registrada porque falla la auditoría de su vinculación a la cuenta (REC-33): el llamador hace <c>Fallar</c> y luego <c>Liberar</c>; un rechazo del límite, de validación o de la persona no devuelve cupo.</summary>
     public static PoliticaDeLimite HojasPorOrigen { get; } = new(
-        "hojas-por-origen", 3, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Origen, respaldoLocal: true);
+        "hojas-por-origen", 3, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Origen, liberable: true, respaldoLocal: true);
 
     /// <summary>Un consumidor con sesión consultando sus hojas de reclamación: 60 por minuto (plan de reclamaciones, REC-10), valor inicial configurable.</summary>
     public static PoliticaDeLimite ConsultasDeHojasPorUsuario { get; } = new(
