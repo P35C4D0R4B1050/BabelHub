@@ -127,7 +127,7 @@ test.describe('Cliente con sesión: Mis hojas', () => {
 
     await page.goto('/reclamaciones/mis-hojas');
     await expect(page.getByRole('heading', { level: 1, name: 'Mis hojas de reclamación' })).toBeVisible();
-    await expect(page.locator('body')).toContainText('No tienes hojas registradas con tu correo verificado.');
+    await expect(page.locator('body')).toContainText('No tienes hojas vinculadas a tu cuenta.');
     await sinDesplazamientoHorizontal(page);
     await sinViolacionesAA(page);
   });

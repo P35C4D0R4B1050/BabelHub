@@ -3,15 +3,23 @@
 @model MisHojasVista
 <h1 class="font-display text-4xl leading-tight sm:text-5xl">Mis hojas de reclamación</h1>
 
+@if (Model.Pagina.CorreoSinVerificar)
+{
+    <div class="alert alert-info my-6" role="status">
+        <bh-icono nombre="info" />
+        <p>Verifica tu correo para ver también las hojas que registraste sin sesión. Aquí solo ves las que registraste con tu cuenta; las demás siguen registradas.</p>
+    </div>
+}
+
 @if (Model.Pagina.Hojas.Count == 0)
 {
-    <p class="my-6">No tienes hojas registradas con tu correo verificado.</p>
+    <p class="my-6">No tienes hojas vinculadas a tu cuenta.</p>
 }
 else
 {
     <div class="my-6 overflow-x-auto">
         <table class="table">
-            <caption class="sr-only">Hojas de reclamación de tu correo verificado</caption>
+            <caption class="sr-only">Hojas de reclamación de tu cuenta</caption>
             <thead><tr><th scope="col">Número</th><th scope="col">Fecha</th><th scope="col">Tipo</th><th scope="col">Estado</th></tr></thead>
             <tbody>
                 @foreach (var hoja in Model.Pagina.Hojas)

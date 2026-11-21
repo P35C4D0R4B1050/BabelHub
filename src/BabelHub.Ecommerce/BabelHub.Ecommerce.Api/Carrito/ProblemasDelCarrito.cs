@@ -15,6 +15,9 @@ public static class ProblemasDelCarrito
     /// <summary>Lo que la Api publica de una clave: el sufijo del código (<c>ECO-…</c>), un estado que reemplaza al de la categoría y si se exponen los campos del error.</summary>
     private sealed record Publicada(string Sufijo, int? Estado = null, bool ExponeCampos = false);
 
+    /// <summary>El campo estable con el que el módulo avisa de que la hoja no se guardó con la sesión (REC-33) y puede registrarse sin sesión.</summary>
+    public const string CampoRegistrarSinSesion = "rec-registrar-sin-sesion";
+
     private static readonly Dictionary<string, Publicada> PorClave = new(StringComparer.Ordinal)
     {
         ["no-encontrado"] = new("NO-ENCONTRADO"),
@@ -55,7 +58,6 @@ public static class ProblemasDelCarrito
         ["reembolso-distinto"] = new("REEMBOLSO-DISTINTO", StatusCodes.Status409Conflict),
         ["reembolso-supera-el-tope"] = new("REEMBOLSO-SUPERA-EL-TOPE", StatusCodes.Status422UnprocessableEntity),
         ["reembolso-no-reintentable"] = new("REEMBOLSO-NO-REINTENTABLE", StatusCodes.Status409Conflict),
-        ["correo-no-verificado"] = new("REC-CORREO-NO-VERIFICADO", StatusCodes.Status403Forbidden),
         ["rec-estado-invalido"] = new("REC-ESTADO-INVALIDO", StatusCodes.Status409Conflict),
         ["rec-conflicto"] = new("CONFLICTO", StatusCodes.Status409Conflict),
         ["hoja-no-encontrada"] = new("NO-ENCONTRADO"),
@@ -68,6 +70,12 @@ public static class ProblemasDelCarrito
         ArgumentNullException.ThrowIfNull(error);
 
         var generico = ProblemasHttp.Crear(contexto, opciones, error.Categoria, error.Clave, error.Errores);
+        if (error.Categoria == CategoriaDeError.NoDisponible && error.Errores.Any(e => e.Campo == CampoRegistrarSinSesion))
+        {
+            // REC-33: el rechazo del registro con sesión que no pudo auditar la vinculación. Se publica solo este campo fijo (sin causa ni datos) para que la pantalla muestre la guía de registrar sin sesión.
+            return generico with { Errores = [new ErrorDeCampoDto(CampoRegistrarSinSesion, "disponible")] };
+        }
+
         if (!PorClave.TryGetValue(error.Clave, out var publicada))
         {
             return generico;
