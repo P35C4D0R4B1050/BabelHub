@@ -16,6 +16,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
         yield return AuditadaAislada(nameof(AccionesAuditables.UsuarioDadoDeAlta), true, Clave("rolAsignado"));
         yield return AuditadaAislada(nameof(AccionesAuditables.UsuarioDesactivado), true);
         yield return AuditadaAislada(nameof(AccionesAuditables.UsuarioReactivado), true);
+        yield return AuditadaAislada(nameof(AccionesAuditables.UsuarioActualizado), true);
         yield return AuditadaYSeguridadAislada(nameof(AccionesAuditables.CambioDeRol), true, ["asignacion-de-administracion"], Clave("rolAnterior"), Clave("rolNuevo"));
         yield return AuditadaAislada(nameof(AccionesAuditables.ContrasenaRestablecidaPorAdministracion), true);
         yield return AuditadaAislada(nameof(AccionesAuditables.SegundoFactorRestablecidoPorAdministracion), true);

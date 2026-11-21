@@ -41,6 +41,10 @@ public static class PoliticasDeSeguridad
     public static PoliticaDeLimite AlertasCriticasPorTipoYCuenta { get; } = new(
         "alertas-criticas-por-tipo-y-cuenta", 1, TimeSpan.FromHours(24), TipoDeSujetoDeLimite.Usuario, liberable: true);
 
+    /// <summary>5 correcciones de nombre por hora y cuenta (IDE-98, valor inicial del agente a confirmar con la persona responsable, configurable): acota el inflado de la auditoría que cada corrección deja (AUD-45).</summary>
+    public static PoliticaDeLimite CorreccionesDeNombrePorCuenta { get; } = new(
+        "correcciones-de-nombre-por-cuenta", 5, TimeSpan.FromHours(1), TipoDeSujetoDeLimite.Usuario);
+
     /// <summary>Tope diario por origen de las alertas críticas de cuenta que salen por correo (IDE-86): 20 al día por defecto, configurable (valor inicial a confirmar con la persona responsable).</summary>
     public static PoliticaDeLimite AlertasCriticasPorOrigen { get; } = new(
         "alertas-criticas-por-origen", 20, TimeSpan.FromHours(24), TipoDeSujetoDeLimite.Origen, liberable: true);
@@ -179,6 +183,7 @@ public static class PoliticasDeSeguridad
         SegundoFactorPorCuenta,
         RegistrosPorOrigen,
         AvisosNoCriticosPorCuenta,
+        CorreccionesDeNombrePorCuenta,
         AlertasCriticasPorTipoYCuenta,
         AlertasCriticasPorOrigen,
         CupoDeCodigosPorOrigen,

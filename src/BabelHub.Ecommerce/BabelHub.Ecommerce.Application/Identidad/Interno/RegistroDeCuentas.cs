@@ -50,6 +50,13 @@ public static class EntradasDeIdentidad
     };
 
     public static bool NombreValido(string? nombre) => !string.IsNullOrWhiteSpace(nombre) && nombre.Trim().Length <= LargoMaximoDelNombre && !nombre.Any(char.IsControl);
+
+    /// <summary>
+    /// El nombre que un usuario corrige en su cuenta (IDE-90): no vacío, hasta 100 caracteres ya recortados y sin caracteres de control ni de formato (por ejemplo, los que invierten el sentido del texto). Es un validador
+    /// propio de la corrección: el del registro y el alta (<see cref="NombreValido"/>) no cambia.
+    /// </summary>
+    public static bool NombreCorregidoValido(string? nombre) =>
+        !string.IsNullOrWhiteSpace(nombre) && nombre.Trim().Length <= LargoMaximoDelNombre && nombre.All(c => !char.IsControl(c) && System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.Format);
 }
 
 /// <summary>
