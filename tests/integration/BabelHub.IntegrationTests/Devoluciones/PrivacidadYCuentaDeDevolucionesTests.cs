@@ -101,4 +101,76 @@ public sealed class PrivacidadYCuentaDeDevolucionesTests(PostgresDeDevolucionesF
         Assert.Equal(TextoLibre.Redactado, await bd.Consultar<string>($"SELECT motivo FROM devoluciones.devoluciones WHERE id = '{cerrada:D}'"));
         Assert.Equal(Sembrado, await bd.Consultar<string>($"SELECT motivo FROM devoluciones.devoluciones WHERE id = '{abierta:D}'"));
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-26")]
+    public async Task Si_la_redaccion_de_la_cuenta_falla_en_la_segunda_devolucion_no_queda_ninguna_redactada_y_el_reintento_redacta_las_tres()
+    {
+        var e = new EscenarioDeDevolucionesConPostgres(bd);
+        var (cliente, pedido, linea) = e.SembrarPedidoDeImpresos(cantidad: 3);
+        var ids = new List<Guid>();
+        for (var i = 0; i < 3; i++)
+        {
+            var solicitada = await e.Solicitar(cliente, pedido.PedidoId, linea.LineaId, 1, motivo: Sembrado);
+            Assert.True(solicitada.EsExito, solicitada.Error?.Clave);
+            ids.Add(solicitada.Valor.DevolucionId);
+        }
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => e.RedactarConFallaAlGuardar(cliente, numeroQueFalla: 2));
+
+        foreach (var id in ids)
+        {
+            Assert.Equal(Sembrado, await bd.Consultar<string>($"SELECT motivo FROM devoluciones.devoluciones WHERE id = '{id:D}'"));
+        }
+
+        await e.Redactar(cliente);
+
+        foreach (var id in ids)
+        {
+            Assert.Equal(TextoLibre.Redactado, await bd.Consultar<string>($"SELECT motivo FROM devoluciones.devoluciones WHERE id = '{id:D}'"));
+        }
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-26")]
+    public async Task Con_la_auditoria_caida_la_redaccion_de_la_cuenta_se_revierte_completa_y_al_volver_se_redacta()
+    {
+        var e = new EscenarioDeDevolucionesConPostgres(bd);
+        var (cliente, pedido, linea) = e.SembrarPedidoDeImpresos();
+        var devolucionId = (await e.Solicitar(cliente, pedido.PedidoId, linea.LineaId, 1, motivo: Sembrado)).Valor.DevolucionId;
+
+        e.Auditoria.Caida = true;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => e.Redactar(cliente));
+
+        Assert.Equal(Sembrado, await bd.Consultar<string>($"SELECT motivo FROM devoluciones.devoluciones WHERE id = '{devolucionId:D}'"));
+
+        e.Auditoria.Caida = false;
+        await e.Redactar(cliente);
+
+        Assert.Equal(TextoLibre.Redactado, await bd.Consultar<string>($"SELECT motivo FROM devoluciones.devoluciones WHERE id = '{devolucionId:D}'"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-32")]
+    public async Task Con_la_auditoria_caida_la_depuracion_a_los_dos_anos_no_redacta_nada_y_al_volver_lo_hace()
+    {
+        var e = new EscenarioDeDevolucionesConPostgres(bd);
+        var (cliente, pedido, linea) = e.SembrarPedidoDeImpresos();
+        var cerrada = (await e.Solicitar(cliente, pedido.PedidoId, linea.LineaId, 1, motivo: Sembrado)).Valor.DevolucionId;
+        Assert.True((await e.Aprobar(cerrada)).EsExito);
+        Assert.True((await e.Recibir(cerrada)).EsExito);
+        e.Reloj.Ahora = e.Reloj.Ahora.AddDays(731);
+
+        e.Auditoria.Caida = true;
+        var caida = await e.Depurar();
+
+        Assert.False(caida.EsExito);
+        Assert.Equal(Sembrado, await bd.Consultar<string>($"SELECT motivo FROM devoluciones.devoluciones WHERE id = '{cerrada:D}'"));
+
+        e.Auditoria.Caida = false;
+        var recuperada = await e.Depurar();
+
+        Assert.True(recuperada.EsExito, recuperada.Error?.Clave);
+        Assert.Equal(TextoLibre.Redactado, await bd.Consultar<string>($"SELECT motivo FROM devoluciones.devoluciones WHERE id = '{cerrada:D}'"));
+    }
 }
