@@ -13,7 +13,7 @@ internal static class LimitesDeReservas
 
     public const int MinimoDeCantidad = 1;
 
-    /// <summary>Tope de unidades por línea: 20 (decisión de la persona, 2026-11-19; la spec no lo fija, consta en `progress/hallazgos.md`). Con 30 líneas, una cuenta retiene a lo más 600 unidades (residual de AM01).</summary>
+    /// <summary>Tope de unidades por línea: 20 (decisión de la persona, 2026-11-19, DD-16; SEL-40 y AC-SEL-41). Con 30 líneas, una cuenta retiene a lo más 600 unidades (residual de AM01).</summary>
     public const int MaximoDeCantidad = 20;
 }
 

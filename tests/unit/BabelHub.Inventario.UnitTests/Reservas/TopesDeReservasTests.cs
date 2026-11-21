@@ -1,4 +1,8 @@
+using BabelHub.Inventario.Application.Plataforma;
+using BabelHub.Inventario.Application.Reservas;
 using BabelHub.Inventario.Application.Reservas.Interno;
+using BabelHub.Inventario.Domain.Reservas;
+using BabelHub.Inventario.UnitTests.Soporte;
 using static BabelHub.Inventario.UnitTests.Reservas.EntornoDeReservas;
 
 namespace BabelHub.Inventario.UnitTests.Reservas;
@@ -9,6 +13,7 @@ namespace BabelHub.Inventario.UnitTests.Reservas;
 public sealed class TopesDeReservasTests
 {
     [Fact]
+    [Trait("Criterio", "AC-SEL-41")]
     public async Task Una_linea_de_20_unidades_se_reserva_y_una_de_21_se_rechaza_en_su_campo()
     {
         var entorno = new EntornoDeReservas();
@@ -24,6 +29,7 @@ public sealed class TopesDeReservasTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-SEL-41")]
     public async Task Una_reserva_de_30_lineas_se_acepta_y_una_de_31_se_rechaza_sin_apartar_nada()
     {
         var entorno = new EntornoDeReservas();
@@ -39,6 +45,27 @@ public sealed class TopesDeReservasTests
         Assert.True(treinta.EsExito, treinta.Error?.Clave);
         Assert.Contains(treintaYUna.Error!.Errores!, e => e.Campo == "lineas");
         Assert.Equal((5, 0), entorno.FilaDe(entorno.Base.Lima, libros[30]));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-41")]
+    public async Task La_consulta_previa_aplica_los_mismos_topes_y_no_toca_el_stock()
+    {
+        var entorno = new EntornoDeReservas(ActorDePrueba.DeIntegracion("lectura-de-disponibilidad"));
+        var libros = Enumerable.Range(0, 31).Select(_ => entorno.Impresa()).ToList();
+        foreach (var libro in libros)
+        {
+            entorno.Base.Existencias.Poner(entorno.Base.Lima.Id, libro, 100, 0);
+        }
+
+        var valida = await entorno.ConsultarSeleccion().Ejecutar(new ConsultarSeleccionEntrada(TipoDeEntregaDeReserva.Recojo, "lima", null, [.. libros.Take(30).Select(l => Linea(l, 20))]));
+        var demasiadasLineas = await entorno.ConsultarSeleccion().Ejecutar(new ConsultarSeleccionEntrada(TipoDeEntregaDeReserva.Recojo, "lima", null, [.. libros.Select(l => Linea(l))]));
+        var demasiadasUnidades = await entorno.ConsultarSeleccion().Ejecutar(new ConsultarSeleccionEntrada(TipoDeEntregaDeReserva.Recojo, "lima", null, [Linea(libros[0], 21)]));
+
+        Assert.True(valida.EsExito, valida.Error?.Clave);
+        Assert.Contains(demasiadasLineas.Error!.Errores!, e => e.Campo == "lineas");
+        Assert.Contains(demasiadasUnidades.Error!.Errores!, e => e.Campo == "lineas.cantidad");
+        Assert.Equal((100, 0), entorno.FilaDe(entorno.Base.Lima, libros[0]));
     }
 
     [Fact]
