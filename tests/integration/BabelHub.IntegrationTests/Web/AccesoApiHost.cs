@@ -183,6 +183,12 @@ internal sealed class AccesoApiHost : IAsyncDisposable
 
     public List<string> Revocaciones { get; } = [];
 
+    /// <summary>Identidad no puede registrar el dispositivo (la base no responde): el ingreso debe abrirse igual, sin marca.</summary>
+    public bool DispositivosFallan { get; set; }
+
+    /// <summary>Lo que la web informó a Identidad al cerrar cada ingreso: la cuenta, la marca que traía la cookie, la región del borde y el actor que estaba fijado en ese instante.</summary>
+    public List<(Guid Usuario, string? Marca, string? Region, Guid? Actor)> RegistrosDeDispositivo { get; } = [];
+
     public HostWeb Host { get; private set; }
 
     public static async Task<AccesoApiHost> Crear(HostWeb host = HostWeb.Tienda)
@@ -204,6 +210,20 @@ internal sealed class AccesoApiHost : IAsyncDisposable
                 return Task.FromResult(IniciarRechaza
                     ? Resultado<SesionIniciada>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Prohibido, "prohibido"))
                     : Resultado<SesionIniciada>.Exito(new SesionIniciada("valor-opaco-de-la-sesion-0123456789abcdef", "marca-nueva-de-dispositivo-0123456789abcdefghijk")));
+            });
+        // La marca de dispositivo la emite Identidad (IDE-55): la web la guarda en su cookie y le informa el ingreso completo con la marca que traía la cookie, la región del borde y el titular como actor.
+        var dispositivos = DobleDeMetodos.Crear<IDispositivosDeLaCuenta>(out var dobleDispositivos);
+        dobleDispositivos.Con(
+            nameof(IDispositivosDeLaCuenta.RegistrarElIngresoCompleto),
+            argumentos =>
+            {
+                RegistrosDeDispositivo.Add((Usuario: (Guid)argumentos[0]!, Marca: (argumentos[1] as ValorSecreto)?.Revelar(), Region: (string?)argumentos[2], Actor: actor.Actual?.UsuarioId));
+                if (DispositivosFallan)
+                {
+                    return Task.FromException<Resultado<MarcaDeDispositivoEmitida>>(new InvalidOperationException("La base no responde."));
+                }
+
+                return Task.FromResult(Resultado<MarcaDeDispositivoEmitida>.Exito(new MarcaDeDispositivoEmitida(argumentos[1] is null ? new ValorSecreto("marca-nueva-de-dispositivo-0123456789abcdefghijk") : null)));
             });
         var isesiones = DobleDeMetodos.Crear<ISesiones>(out var dobleSesiones);
         dobleSesiones.Con(nameof(ISesiones.Cerrar), _ => { Revocaciones.Add("cerrar"); return Task.FromResult(Resultado<RespuestaUniforme>.Exito(new RespuestaUniforme())); });
@@ -229,6 +249,7 @@ internal sealed class AccesoApiHost : IAsyncDisposable
                 servicios.AddSingleton(sesiones);
                 servicios.AddSingleton(isesiones);
                 servicios.AddSingleton(carrito);
+                servicios.AddSingleton(dispositivos);
                 servicios.AddSingleton(new OpcionesDelHostWeb(Host, []));
                 servicios.AddSingleton(new OpcionesDeVerificacionWeb("clave-de-sitio-de-prueba"));
                 servicios.AgregarIngresoWeb();

@@ -61,7 +61,8 @@ internal sealed class AnfitrionWeb : IAsyncDisposable
             sp.GetService<BabelHub.Ecommerce.Application.Identidad.ISesiones>() ?? DobleDeMetodos.Crear<BabelHub.Ecommerce.Application.Identidad.ISesiones>(out _),
             sp.GetService<OpcionesDelHostWeb>() ?? new OpcionesDelHostWeb(BabelHub.Ecommerce.Application.Web.HostWeb.Tienda, []),
             sp.GetService<BabelHub.Ecommerce.Application.Plataforma.IEstablecedorDeActor>() ?? DobleDeMetodos.Crear<BabelHub.Ecommerce.Application.Plataforma.IEstablecedorDeActor>(out _),
-            sp.GetRequiredService<BabelHub.Ecommerce.Application.Carrito.ICarritoDelCliente>()));
+            sp.GetRequiredService<BabelHub.Ecommerce.Application.Carrito.ICarritoDelCliente>(),
+            sp.GetService<BabelHub.Ecommerce.Application.Identidad.IDispositivosDeLaCuenta>() ?? DobleDeMetodos.Crear<BabelHub.Ecommerce.Application.Identidad.IDispositivosDeLaCuenta>(out _)));
 
 
         var app = builder.Build();
