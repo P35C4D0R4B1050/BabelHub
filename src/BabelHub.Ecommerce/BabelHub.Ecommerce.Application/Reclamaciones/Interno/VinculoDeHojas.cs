@@ -173,6 +173,18 @@ internal sealed class VincularHojasExistentes(AutorizadorDeReclamaciones autoriz
                 return Resultado<int>.Exito(0);
             }
 
+            if (estado.IniciadaEn is null)
+            {
+                // «Empezó» significa «se intentó»: se guarda el inicio antes del primer lote para que, si Identidad o la auditoría fallan siempre desde el primero, la revisión alerte a los 7 días (REC-34).
+                await unidad.Ejecutar(
+                    async token =>
+                    {
+                        await vinculos.GuardarElAvanceDeLaVinculacionInicial(null, completada: false, reloj.Ahora, token).ConfigureAwait(false);
+                        return true;
+                    },
+                    cancelacion).ConfigureAwait(false);
+            }
+
             var cursor = estado.UltimoCorreo;
             for (var lote = 0; lote < LotesPorEjecucion; lote++)
             {

@@ -557,6 +557,27 @@ public sealed class VinculoDeHojasTests
 
     [Fact]
     [Trait("Criterio", "AC-REC-24")]
+    public async Task Si_el_primer_lote_falla_siempre_el_inicio_queda_guardado_y_a_los_siete_dias_se_alerta()
+    {
+        var e = new EntornoDeReclamaciones(ActorDePrueba.DelSistema());
+        await e.RegistrarUna();
+        var (paso, clientes) = ArmarVinculacionInicial(e);
+        clientes.Falla = true;
+        var inicio = e.Reloj.Ahora;
+
+        Assert.False((await paso.Ejecutar()).EsExito);
+
+        Assert.Equal(inicio, e.Hojas.EstadoInicial.IniciadaEn);
+        Assert.Null(e.Hojas.EstadoInicial.CompletadaEn);
+        var alertas = new AlertasTecnicasEspia();
+        var revision = new RevisarVinculacionInicial(e.Hojas, e.Unidad, alertas, e.Reloj);
+        e.Reloj.Ahora = inicio.AddDays(7);
+        Assert.True((await revision.Ejecutar()).Valor);
+        Assert.Single(alertas.Alertas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-REC-24")]
     public async Task La_vinculacion_inicial_recorre_por_lotes_ordenados_y_guarda_el_cursor_del_ultimo_lote_completo()
     {
         var e = new EntornoDeReclamaciones(ActorDePrueba.DelSistema());

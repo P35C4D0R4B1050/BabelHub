@@ -19,8 +19,11 @@ internal sealed class VinculosDeHojasPostgres(AccesoAlEsquemaDeReclamaciones acc
         return acceso.Ejecutar(
             async (conexion, transaccion, token) =>
             {
+                // Una sola sentencia que toma las filas en orden (DD-26 impl. 13): dos operaciones multifila con planes distintos no forman interbloqueos. Bajo READ COMMITTED, FOR UPDATE reevalúa la condición tras esperar: la fila ya vinculada por otra se omite.
+                await AccesoAlEsquemaDeReclamaciones.FijarEsperaDelBloqueo(conexion, transaccion, token).ConfigureAwait(false);
                 await using var comando = new NpgsqlCommand(
-                    "UPDATE reclamaciones.hojas_reclamacion SET cuenta_id = @cuenta WHERE cuenta_id IS NULL AND correo_normalizado = @correo AND NOT de_cuenta_cancelada AND anonimizada_en IS NULL",
+                    "WITH tomadas AS (SELECT id FROM reclamaciones.hojas_reclamacion WHERE cuenta_id IS NULL AND correo_normalizado = @correo AND NOT de_cuenta_cancelada AND anonimizada_en IS NULL ORDER BY id FOR UPDATE) "
+                    + "UPDATE reclamaciones.hojas_reclamacion h SET cuenta_id = @cuenta FROM tomadas t WHERE h.id = t.id",
                     conexion,
                     transaccion);
                 comando.Parameters.Add(new NpgsqlParameter("cuenta", NpgsqlDbType.Uuid) { Value = cuentaId });
@@ -61,8 +64,10 @@ internal sealed class VinculosDeHojasPostgres(AccesoAlEsquemaDeReclamaciones acc
             async (conexion, transaccion, token) =>
             {
                 // Una sola sentencia: las vinculadas a la cuenta y, solo con correo verificado, las aún sin cuenta de ese correo. El CHECK exige cuenta_id nulo con la marca puesta.
+                await AccesoAlEsquemaDeReclamaciones.FijarEsperaDelBloqueo(conexion, transaccion, token).ConfigureAwait(false);
                 await using var comando = new NpgsqlCommand(
-                    "UPDATE reclamaciones.hojas_reclamacion SET de_cuenta_cancelada = true, cuenta_id = NULL WHERE NOT de_cuenta_cancelada AND (cuenta_id = @cuenta OR (cuenta_id IS NULL AND @correo::text IS NOT NULL AND correo_normalizado = @correo))",
+                    "WITH tomadas AS (SELECT id FROM reclamaciones.hojas_reclamacion WHERE NOT de_cuenta_cancelada AND (cuenta_id = @cuenta OR (cuenta_id IS NULL AND @correo::text IS NOT NULL AND correo_normalizado = @correo)) ORDER BY id FOR UPDATE) "
+                    + "UPDATE reclamaciones.hojas_reclamacion h SET de_cuenta_cancelada = true, cuenta_id = NULL FROM tomadas t WHERE h.id = t.id",
                     conexion,
                     transaccion);
                 comando.Parameters.Add(new NpgsqlParameter("cuenta", NpgsqlDbType.Uuid) { Value = cuentaId });
@@ -75,7 +80,11 @@ internal sealed class VinculosDeHojasPostgres(AccesoAlEsquemaDeReclamaciones acc
         acceso.Ejecutar(
             async (conexion, transaccion, token) =>
             {
-                await using var comando = new NpgsqlCommand("UPDATE reclamaciones.hojas_reclamacion SET cuenta_id = NULL WHERE cuenta_id = @cuenta", conexion, transaccion);
+                await AccesoAlEsquemaDeReclamaciones.FijarEsperaDelBloqueo(conexion, transaccion, token).ConfigureAwait(false);
+                await using var comando = new NpgsqlCommand(
+                    "WITH tomadas AS (SELECT id FROM reclamaciones.hojas_reclamacion WHERE cuenta_id = @cuenta ORDER BY id FOR UPDATE) UPDATE reclamaciones.hojas_reclamacion h SET cuenta_id = NULL FROM tomadas t WHERE h.id = t.id",
+                    conexion,
+                    transaccion);
                 comando.Parameters.Add(new NpgsqlParameter("cuenta", NpgsqlDbType.Uuid) { Value = cuentaId });
                 return await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);
             },

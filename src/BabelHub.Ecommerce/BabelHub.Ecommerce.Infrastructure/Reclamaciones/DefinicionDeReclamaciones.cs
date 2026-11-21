@@ -235,6 +235,9 @@ public static class DefinicionDeReclamaciones
             FROM vencidas v
             WHERE h.id = v.id;
             GET DIAGNOSTICS lote = ROW_COUNT;
+            -- El cursor de la vinculación inicial es un correo en claro: si el recorrido no completó en dos años desde que empezó, se pone en nulo (REC-26, privacidad).
+            UPDATE reclamaciones.vinculacion_inicial SET ultimo_correo = NULL
+            WHERE ultimo_correo IS NOT NULL AND completada_en IS NULL AND iniciada_en + interval '2 years' <= pg_catalog.now();
             IF lote < 5000 THEN
                 INSERT INTO reclamaciones.corridas_de_anonimizacion (id, ultima_en) VALUES (1, pg_catalog.now())
                 ON CONFLICT (id) DO UPDATE SET ultima_en = EXCLUDED.ultima_en;

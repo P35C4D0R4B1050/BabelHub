@@ -128,6 +128,28 @@ public sealed class VinculoDeHojasConPostgresTests(PostgresDeReclamacionesFixtur
         Assert.Equal(Ana, await CuentaDe(vinculada));
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-REC-25")]
+    public async Task Reclamo_cancelacion_y_desvinculacion_simultaneos_sobre_las_mismas_hojas_no_forman_interbloqueos()
+    {
+        var e = Entorno();
+        for (var i = 0; i < 20; i++)
+        {
+            await RegistrarComoVisitante(e, CorreoDeAna);
+        }
+
+        var tareas = Enumerable.Range(0, 30).Select(i => (i % 3) switch
+        {
+            0 => e.Vinculador.Reclamar(Ana, CorreoDeAna, DisparadoresDeVinculo.Consulta),
+            1 => bd.Unidad.Ejecutar(token => e.Vinculos.MarcarYDesvincularDeLaCuenta(Ana, CorreoDeAna, token)),
+            _ => bd.Unidad.Ejecutar(token => e.Vinculos.DesvincularDeLaCuenta(Ana, token)),
+        });
+
+        // Ninguna falla por interbloqueo (40P01) ni por tiempo de espera: todas terminan.
+        await Task.WhenAll(tareas);
+        Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM reclamaciones.hojas_reclamacion WHERE cuenta_id IS NOT NULL AND de_cuenta_cancelada"));
+    }
+
     [Theory]
     [Trait("Criterio", "AC-REC-21")]
     [InlineData("auditoria")]
