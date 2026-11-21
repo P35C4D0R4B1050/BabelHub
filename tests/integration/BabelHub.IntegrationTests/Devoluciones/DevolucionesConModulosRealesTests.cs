@@ -379,4 +379,53 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
         Assert.Equal("linea-no-devolvible", aprobado.Error!.Clave);
         Assert.True(rechazado.EsExito, rechazado.Error?.Clave);
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-23")]
+    public async Task Un_encargado_no_ve_ni_decide_los_reportes_y_un_cliente_ajeno_recibe_lo_mismo_que_por_una_devolucion_inexistente()
+    {
+        await using var anfitrion = Anfitrion();
+        var (pedido, cuenta, linea) = await ComprarMixto(anfitrion);
+        var reportado = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<IDevolucionesDelCliente>().ReportarArchivoDefectuoso(new ReportarArchivoDefectuosoEntrada(pedido, linea, new TextoLibre(Sembrado), new TextoLibre("No abre"))));
+        Assert.True(reportado.EsExito, reportado.Error?.Clave);
+        var id = reportado.Valor.DevolucionId;
+
+        var listaDelEncargado = await anfitrion.Como(DelEncargadoT30(), sp => sp.GetRequiredService<IGestionDeDevoluciones>().ListarDeLaAdministracion(new ListarDevolucionesDeLaAdministracionEntrada(SoloReportes: true)));
+        var aprobaElEncargado = await anfitrion.Como(DelEncargadoT30(), sp => sp.GetRequiredService<IGestionDeDevoluciones>().AprobarReporte(id));
+        var rechazaElEncargado = await anfitrion.Como(DelEncargadoT30(), sp => sp.GetRequiredService<IGestionDeDevoluciones>().RechazarReporte(id));
+        var ajeno = ActorActual.DeUsuario(await SembrarCuenta(), RolesDeUsuario.Cliente);
+        var ajenoSobreLaSuya = await anfitrion.Como(ajeno, sp => sp.GetRequiredService<IDevolucionesDelCliente>().ObtenerMia(id));
+        var ajenoSobreUnaInexistente = await anfitrion.Como(ajeno, sp => sp.GetRequiredService<IDevolucionesDelCliente>().ObtenerMia(Guid.NewGuid()));
+
+        Assert.False(listaDelEncargado.EsExito);
+        Assert.Equal("prohibido", listaDelEncargado.Error!.Clave);
+        Assert.Equal("prohibido", aprobaElEncargado.Error!.Clave);
+        Assert.Equal("prohibido", rechazaElEncargado.Error!.Clave);
+        Assert.Equal(ajenoSobreUnaInexistente.Error!.Clave, ajenoSobreLaSuya.Error!.Clave);
+        Assert.Equal(ajenoSobreUnaInexistente.Error.Categoria, ajenoSobreLaSuya.Error.Categoria);
+        Assert.Equal("suspendido", await bd.Consultar<string>("SELECT estado FROM biblioteca.accesos WHERE pedido_id = @p", ("p", pedido)));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-21")]
+    public async Task Con_los_limites_reales_la_operacion_numero_treinta_y_uno_del_minuto_responde_limite_excedido_y_otro_usuario_no_se_afecta()
+    {
+        await using var anfitrion = Anfitrion();
+        var cuenta = await SembrarCuenta();
+        var otra = await SembrarCuenta();
+
+        var resultados = new List<Resultado<DevolucionVista>>();
+        for (var i = 0; i < 31; i++)
+        {
+            resultados.Add(await PedirReembolso(anfitrion, cuenta, Guid.NewGuid(), Guid.NewGuid()));
+        }
+
+        Assert.All(resultados.Take(30), r => Assert.NotEqual(CategoriaDeError.Limite, r.Error!.Categoria));
+        var excedida = resultados[30];
+        Assert.Equal(CategoriaDeError.Limite, excedida.Error!.Categoria);
+        Assert.Equal("limite-excedido", excedida.Error.Clave);
+        Assert.Contains(excedida.Error.Errores, c => c.Campo == "espera-en-segundos");
+        var otraCuenta = await PedirReembolso(anfitrion, otra, Guid.NewGuid(), Guid.NewGuid());
+        Assert.NotEqual(CategoriaDeError.Limite, otraCuenta.Error!.Categoria);
+    }
 }
