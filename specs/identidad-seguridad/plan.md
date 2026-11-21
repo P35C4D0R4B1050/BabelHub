@@ -65,7 +65,7 @@ Rutas bajo `/api/ecommerce/v1/identidad`; errores y límites según `transversal
 | Cambio de correo pendiente | `POST /cuenta/correo/pendiente/confirmar`, `/rechazar` | IDE-54 desde un dispositivo reconocido y con contraseña (WEB-37) |
 | Derechos | `POST /cuenta/solicitudes`, `GET /admin/solicitudes`, `GET /admin/solicitudes/{id}`, `POST /admin/solicitudes/{id}/respuesta` | IDE-12, 26, 32, 63 |
 | Cancelación | `POST /cuenta/cancelacion`, `GET /cuenta/cancelacion` (estado, pendientes y plazos, WEB-38), `/cancelacion/reconfirmar`, `/cancelacion/desistir` | IDE-27, 28, 68, 71 |
-| Administración | `/admin/usuarios` (crear, actualizar, desactivar, reactivar, rol), `/admin/usuarios/{id}/contrasena`, `/segundo-factor/restablecer` | IDE-07, 23, 38, 49, 87 |
+| Administración | `/admin/usuarios` (crear, desactivar, reactivar, rol), `/admin/usuarios/{id}/contrasena`, `/segundo-factor/restablecer` | IDE-07, 23, 38, 49, 87 |
 | Claves | `GET /.well-known/jwks.json`, `GET /.well-known/revocaciones`, `POST /admin/claves/rotar`, `/admin/claves/comprometida` | IDE-35, 36, 61, 85 |
 | Contexto del asistente | contrato interno `IContextoDeLectura` (capa web) | IDE-33; token firmado con `aud=pedidos` y `typ=lectura-asistente` |
 | Baja al Inventario | `POST /api/inventario/v1/bajas-de-titular` (alcance `baja-de-titular`) | IDE-64, 72 |
