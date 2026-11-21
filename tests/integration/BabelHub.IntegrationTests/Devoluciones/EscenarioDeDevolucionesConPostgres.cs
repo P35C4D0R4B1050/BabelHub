@@ -255,6 +255,9 @@ internal sealed class EscenarioDeDevolucionesConPostgres(PostgresDeDevolucionesF
         return new AprobarYRechazarDevolucion(autorizador, limites, fixture.Devoluciones, fixture.Unidad, Auditoria, Avisos(), Reloj).Aprobar(devolucionId);
     }
 
+    public Task<Resultado<DevolucionVista>> AprobarComo(ActorActual actor, Guid devolucionId) =>
+        new AprobarYRechazarDevolucion(Autorizador(actor), new LimitesDeDevoluciones(_limites, new ActorFijo(actor)), fixture.Devoluciones, fixture.Unidad, Auditoria, Avisos(), Reloj).Aprobar(devolucionId);
+
     public Task<Resultado<DevolucionVista>> Recibir(Guid devolucionId)
     {
         var (autorizador, limites) = ComoEncargado();
