@@ -21,8 +21,6 @@ internal static class MotivosDeDenegacionDeReclamaciones
     public const string SinSesion = "sin-sesion";
 
     public const string RecursoAjeno = "recurso-ajeno";
-
-    public const string CorreoNoVerificado = "correo-no-verificado";
 }
 
 /// <summary>Las claves simbólicas de los fallos del módulo; la Api las traduce a los códigos <c>ECO-…</c> y <c>ECO-REC-…</c> (plan §4).</summary>
@@ -51,8 +49,8 @@ internal static class ClavesDeReclamaciones
 
     public const string NoAutenticado = "no-autenticado";
 
-    /// <summary><c>ECO-REC-CORREO-NO-VERIFICADO</c> (403): la sesión no tiene un correo verificado.</summary>
-    public const string CorreoNoVerificado = "correo-no-verificado";
+    /// <summary>El campo estable del rechazo de REC-33 (el registro con sesión no pudo auditar la vinculación): la pantalla muestra la guía de registrar sin sesión. No revela la causa.</summary>
+    public const string RegistrarSinSesion = "rec-registrar-sin-sesion";
 }
 
 internal static class FallosDeReclamaciones
@@ -132,13 +130,6 @@ internal sealed class AutorizadorDeReclamaciones(IActorActual actores, IDenegaci
     {
         await Denegar(MotivosDeDenegacionDeReclamaciones.RecursoAjeno, "ECO-NO-ENCONTRADO", cancelacion).ConfigureAwait(false);
         return new ErrorDeAplicacion(CategoriaDeError.NoEncontrado, ClavesDeReclamaciones.HojaNoEncontrada);
-    }
-
-    /// <summary>La lista de una sesión sin correo verificado: <c>ECO-REC-CORREO-NO-VERIFICADO</c> (403) sin datos y con un acceso denegado.</summary>
-    public async Task<ErrorDeAplicacion> RechazarCorreoNoVerificado(CancellationToken cancelacion)
-    {
-        await Denegar(MotivosDeDenegacionDeReclamaciones.CorreoNoVerificado, "ECO-REC-CORREO-NO-VERIFICADO", cancelacion).ConfigureAwait(false);
-        return new ErrorDeAplicacion(CategoriaDeError.Prohibido, ClavesDeReclamaciones.CorreoNoVerificado);
     }
 
     /// <summary>

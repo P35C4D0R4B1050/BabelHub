@@ -11,7 +11,7 @@ using ActorDePrueba = BabelHub.Ecommerce.UnitTests.Soporte.ActorDePrueba;
 namespace BabelHub.Ecommerce.UnitTests.Reclamaciones;
 
 /// <summary>El repositorio de hojas en memoria: guarda copias (como una base de datos), numera por año, respeta el índice único de la clave y se restaura al revertir la unidad de trabajo.</summary>
-internal sealed class RepositorioDeHojasEnMemoria : IRepositorioDeHojas, IInstantanea
+internal sealed class RepositorioDeHojasEnMemoria : IRepositorioDeHojas, IVinculosDeHojas, IInstantanea
 {
     private Dictionary<Guid, HojaDeReclamacion> _hojas = [];
     private Dictionary<int, int> _secuencias = [];
@@ -58,7 +58,8 @@ internal sealed class RepositorioDeHojasEnMemoria : IRepositorioDeHojas, IInstan
             h.AvisoEnCursoHasta,
             h.DescartadaEn,
             h.DeCuentaCancelada,
-            h.AnonimizadaEn);
+            h.AnonimizadaEn,
+            h.CuentaId);
 
     public void Sembrar(HojaDeReclamacion hoja) => _hojas[hoja.Id] = Clonar(hoja);
 
@@ -145,28 +146,62 @@ internal sealed class RepositorioDeHojasEnMemoria : IRepositorioDeHojas, IInstan
         return Task.FromResult(_hojas.Values.FirstOrDefault(h => h.Numero == numero) is { } h ? Clonar(h) : null);
     }
 
-    public Task<ListadoDeHojas> ListarDelCorreo(string correoNormalizado, int pagina, int tamano, CancellationToken cancelacion = default)
+    // ---------- IVinculosDeHojas: el vínculo por cuenta (DD-26) ----------
+
+    /// <summary>El reclamo falla antes de vincular (la base no responde): la operación que lo llama debe fallar cerrada.</summary>
+    public bool FallaAlVincular { get; set; }
+
+    /// <summary>Cuántas veces se pidió reclamar (para comprobar que una sesión sin correo verificado no reclama nada).</summary>
+    public int Reclamos { get; private set; }
+
+    public EstadoDeLaVinculacionInicial EstadoInicial { get; set; } = new(null, null, null);
+
+    /// <summary>Guardar el avance de la vinculación inicial falla (la base no responde).</summary>
+    public bool FallaAlGuardarElAvance { get; set; }
+
+    public Task<int> ReclamarDelCorreo(Guid cuentaId, string correoNormalizado, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        Reclamos++;
+        if (FallaAlVincular)
+        {
+            throw new InvalidOperationException("La base falló al vincular.");
+        }
+
+        var vinculadas = 0;
+        foreach (var hoja in _hojas.Values.Where(h => h.Datos.CorreoNormalizado == correoNormalizado).ToList())
+        {
+            if (hoja.Vincular(cuentaId))
+            {
+                vinculadas++;
+            }
+        }
+
+        return Task.FromResult(vinculadas);
+    }
+
+    public Task<ListadoDeHojas> ListarDeLaCuenta(Guid cuentaId, int pagina, int tamano, CancellationToken cancelacion = default)
     {
         Operaciones++;
         var filtradas = _hojas.Values
-            .Where(h => h.Datos.CorreoNormalizado == correoNormalizado && !h.DeCuentaCancelada)
+            .Where(h => h.CuentaId == cuentaId && !h.DeCuentaCancelada)
             .OrderByDescending(h => h.FechaRegistro)
             .ThenByDescending(h => h.Numero.Secuencia)
             .ToList();
         return Task.FromResult(new ListadoDeHojas(filtradas.Skip((pagina - 1) * tamano).Take(tamano).Select(Clonar).ToList(), filtradas.Count));
     }
 
-    public Task<int> ContarPendientesDelCorreo(string correoNormalizado, CancellationToken cancelacion = default)
+    public Task<int> ContarPendientesDeLaCuenta(Guid cuentaId, CancellationToken cancelacion = default)
     {
         Operaciones++;
-        return Task.FromResult(_hojas.Values.Count(h => h.Datos.CorreoNormalizado == correoNormalizado && h.Estado == EstadoDeHoja.Pendiente && !h.DeCuentaCancelada));
+        return Task.FromResult(_hojas.Values.Count(h => h.CuentaId == cuentaId && h.Estado == EstadoDeHoja.Pendiente && !h.DeCuentaCancelada));
     }
 
-    public Task<int> MarcarDeCuentaCancelada(string correoNormalizado, CancellationToken cancelacion = default)
+    public Task<int> MarcarYDesvincularDeLaCuenta(Guid cuentaId, string? correoVerificadoNormalizado, CancellationToken cancelacion = default)
     {
         Operaciones++;
         var cambiadas = 0;
-        foreach (var hoja in _hojas.Values.Where(h => h.Datos.CorreoNormalizado == correoNormalizado).ToList())
+        foreach (var hoja in _hojas.Values.Where(h => !h.DeCuentaCancelada && (h.CuentaId == cuentaId || (h.CuentaId is null && correoVerificadoNormalizado is not null && h.Datos.CorreoNormalizado == correoVerificadoNormalizado))).ToList())
         {
             if (FallaAlMarcar && cambiadas >= 1)
             {
@@ -180,6 +215,46 @@ internal sealed class RepositorioDeHojasEnMemoria : IRepositorioDeHojas, IInstan
         }
 
         return Task.FromResult(cambiadas);
+    }
+
+    public Task<int> DesvincularDeLaCuenta(Guid cuentaId, CancellationToken cancelacion = default)
+    {
+        Operaciones++;
+        var cambiadas = 0;
+        foreach (var hoja in _hojas.Values.Where(h => h.CuentaId == cuentaId).ToList())
+        {
+            if (hoja.Desvincular())
+            {
+                cambiadas++;
+            }
+        }
+
+        return Task.FromResult(cambiadas);
+    }
+
+    public Task<EstadoDeLaVinculacionInicial> EstadoDeLaVinculacionInicial(CancellationToken cancelacion = default) => Task.FromResult(EstadoInicial);
+
+    public Task<IReadOnlyList<string>> CorreosSinVincularDespuesDe(string? cursor, int maximo, CancellationToken cancelacion = default)
+    {
+        IReadOnlyList<string> correos = _hojas.Values
+            .Where(h => h.CuentaId is null && !h.DeCuentaCancelada && !h.EstaAnonimizada && h.Datos.CorreoNormalizado is { } c && (cursor is null || string.CompareOrdinal(c, cursor) > 0))
+            .Select(h => h.Datos.CorreoNormalizado!)
+            .Distinct()
+            .Order(StringComparer.Ordinal)
+            .Take(maximo)
+            .ToList();
+        return Task.FromResult(correos);
+    }
+
+    public Task GuardarElAvanceDeLaVinculacionInicial(string? ultimoCorreo, bool completada, DateTimeOffset ahora, CancellationToken cancelacion = default)
+    {
+        if (FallaAlGuardarElAvance)
+        {
+            throw new InvalidOperationException("La base falló al guardar el avance.");
+        }
+
+        EstadoInicial = new EstadoDeLaVinculacionInicial(completada ? null : ultimoCorreo, EstadoInicial.IniciadaEn ?? ahora, completada ? ahora : null);
+        return Task.CompletedTask;
     }
 
     public object Capturar() => (_hojas.ToDictionary(p => p.Key, p => Clonar(p.Value)), new Dictionary<int, int>(_secuencias));
@@ -285,7 +360,26 @@ internal sealed class LimitesDeHojasDoble : IControlDeLimites
         return Task.FromResult(ResultadoDeLimite.Permitido(new ReservaDeLimite(politica.Valor, "origen", Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, null, idempotencia?.ClaveDelCliente)));
     }
 
-    public Task Liberar(ReservaDeLimite reserva, CancellationToken cancelacion = default) => Task.CompletedTask;
+    /// <summary>Cuántas veces se liberó un cupo de las hojas (REC-33) y si el almacén no responde al liberar.</summary>
+    public List<ReservaDeLimite> Liberadas { get; } = [];
+
+    public bool LiberarFalla { get; set; }
+
+    public Task Liberar(ReservaDeLimite reserva, CancellationToken cancelacion = default)
+    {
+        if (LiberarFalla)
+        {
+            return Task.FromException(new InvalidOperationException("Los límites no responden."));
+        }
+
+        Liberadas.Add(reserva);
+        if (Usadas > 0)
+        {
+            Usadas--;
+        }
+
+        return Task.CompletedTask;
+    }
 
     public Task Completar(ReservaDeLimite reserva, ResultadoMinimo resultado, CancellationToken cancelacion = default)
     {
@@ -374,7 +468,8 @@ internal sealed class EntornoDeReclamaciones
 
         var autorizador = new AutorizadorDeReclamaciones(Actor, Denegaciones);
         var envio = new EnvioDelAvisoDeRespuesta(Correo, Hojas, Unidad, Reloj);
-        Reclamaciones = new ReclamacionesDeLaAplicacion(new RegistrarHoja(Verificacion, new CalculadorDeHuellaNormalizante(), Limites, Hojas, Unidad, Reloj));
+        Vinculador = new VinculadorDeHojas(Hojas, Unidad, Auditoria);
+        Reclamaciones = new ReclamacionesDeLaAplicacion(new RegistrarHoja(Verificacion, new CalculadorDeHuellaNormalizante(), Limites, Hojas, Unidad, Reloj, Actor, Vinculador));
         Administracion = new AdministracionDeReclamacionesDeLaAplicacion(
             new ListarHojas(autorizador, Hojas, Unidad),
             new ObtenerHojaParaAdministracion(autorizador, Hojas, Unidad, Auditoria),
@@ -400,6 +495,8 @@ internal sealed class EntornoDeReclamaciones
     public AuditoriaDelCatalogoEspia Auditoria { get; }
 
     public DenegacionesDelCatalogoEspia Denegaciones { get; }
+
+    public VinculadorDeHojas Vinculador { get; }
 
     public IReclamaciones Reclamaciones { get; }
 

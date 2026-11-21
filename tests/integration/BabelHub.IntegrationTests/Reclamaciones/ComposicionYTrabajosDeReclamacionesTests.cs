@@ -51,6 +51,7 @@ public sealed class ComposicionYTrabajosDeReclamacionesTests
         servicios.AddSingleton(Falso<IPublicadorDeAlertasTecnicas>());
         servicios.AddSingleton(Falso<IRegistroDeTrabajosDeFondo>());
         servicios.AddSingleton(Falso<ICorreoVerificadoDeSistema>());
+        servicios.AddSingleton(Falso<IClientePorCorreoVerificadoDeSistema>());
         return servicios;
     }
 
@@ -70,13 +71,19 @@ public sealed class ComposicionYTrabajosDeReclamacionesTests
         Assert.IsType<CorreoVerificadoDeLaCuenta>(sp.GetRequiredService<ICorreoVerificadoDeLaCuenta>());
         Assert.IsType<RepositorioDeHojasPostgres>(sp.GetRequiredService<IRepositorioDeHojas>());
         Assert.IsType<AnonimizadorDeHojasPostgres>(sp.GetRequiredService<IAnonimizadorDeHojas>());
+        Assert.IsType<VinculosDeHojasPostgres>(sp.GetRequiredService<IVinculosDeHojas>());
+        Assert.NotNull(sp.GetRequiredService<VinculadorDeHojas>());
+        Assert.NotNull(sp.GetRequiredService<VincularHojasExistentes>());
+        Assert.NotNull(sp.GetRequiredService<RevisarVinculacionInicial>());
+        // El receptor real de los cambios de cuenta (REC-25, T32): sin él el compuesto de Identidad falla cerrado y el host rechaza el cambio de correo y el reemplazo.
+        Assert.Contains(sp.GetServices<IReceptorDeCambiosDeCuenta>(), p => p is ReceptorDeCambiosDeCuentaDeReclamaciones);
         Assert.NotNull(sp.GetRequiredService<AnonimizarHojasVencidas>());
         Assert.NotNull(sp.GetRequiredService<RevisarHojasSinAnonimizar>());
         Assert.NotNull(sp.GetRequiredService<ResponderHoja>());
     }
 
     [Fact]
-    public void Los_dos_trabajos_se_registran_con_nombres_unicos_y_el_servicio_hospedado_los_recibe_completos()
+    public void Los_cuatro_trabajos_se_registran_con_nombres_unicos_y_el_servicio_hospedado_los_recibe_completos()
     {
         var servicios = ConExternos().AgregarReclamaciones();
         servicios.AgregarTrabajosDeFondoDeReclamaciones(_ => (corrida, cancelacion) => corrida(cancelacion));
@@ -85,7 +92,9 @@ public sealed class ComposicionYTrabajosDeReclamacionesTests
 
         var servicio = Assert.IsType<ServicioDeTrabajosDeReclamaciones>(proveedor.GetRequiredService<IEnumerable<Microsoft.Extensions.Hosting.IHostedService>>().Single());
 
-        Assert.Equal(["reclamaciones-anonimizacion-diaria", "reclamaciones-revision-de-la-anonimizacion"], servicio.Trabajos.Select(t => t.Nombre));
+        Assert.Equal(
+            ["reclamaciones-anonimizacion-diaria", "reclamaciones-revision-de-la-anonimizacion", "reclamaciones-vinculacion-inicial", "reclamaciones-revision-de-la-vinculacion-inicial"],
+            servicio.Trabajos.Select(t => t.Nombre));
     }
 
     // ---------- Correo verificado ----------

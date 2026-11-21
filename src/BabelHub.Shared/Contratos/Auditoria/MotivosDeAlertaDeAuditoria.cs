@@ -90,6 +90,8 @@ public static class MotivosDeAlertaDeAuditoria
 
     public const string AnonimizacionDeHojasSinCorrer = "anonimizacion-de-hojas-sin-correr";
 
+    public const string VinculacionInicialDeHojasSinCompletar = "vinculacion-inicial-de-hojas-sin-completar";
+
     public const string LecturaDeAlertasDelInventarioNoDisponible = "lectura-de-alertas-del-inventario-no-disponible";
 
     public const string AlcanceDeDatosSinActor = "alcance-de-datos-sin-actor";
@@ -210,6 +212,7 @@ public static class MotivosDeAlertaDeAuditoria
         AvisoACarritoFallido,
         CompraAprobadaSinPedidoALos30Dias,
         AnonimizacionDeHojasSinCorrer,
+        VinculacionInicialDeHojasSinCompletar,
         LecturaDeAlertasDelInventarioNoDisponible,
         AlcanceDeDatosSinActor,
         ConfirmacionesDeReservasAnomalas,

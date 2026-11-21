@@ -30,6 +30,8 @@ public sealed class PostgresDeReclamacionesFixture : IAsyncLifetime
 
     internal AnonimizadorDeHojasPostgres Anonimizador { get; private set; } = null!;
 
+    internal VinculosDeHojasPostgres Vinculos { get; private set; } = null!;
+
     public async Task InitializeAsync()
     {
         await _contenedor.StartAsync();
@@ -55,6 +57,7 @@ public sealed class PostgresDeReclamacionesFixture : IAsyncLifetime
         var esquema = new AccesoAlEsquemaDeReclamaciones(Unidad, Unidad);
         Hojas = new RepositorioDeHojasPostgres(esquema);
         Anonimizador = new AnonimizadorDeHojasPostgres(esquema);
+        Vinculos = new VinculosDeHojasPostgres(esquema);
     }
 
     public async Task DisposeAsync()
@@ -90,9 +93,12 @@ public sealed class PostgresDeReclamacionesFixture : IAsyncLifetime
         """
         ALTER TABLE reclamaciones.hojas_reclamacion DISABLE TRIGGER USER;
         ALTER TABLE reclamaciones.secuencias_de_hoja DISABLE TRIGGER USER;
+        ALTER TABLE reclamaciones.vinculacion_inicial DISABLE TRIGGER USER;
         DELETE FROM reclamaciones.hojas_reclamacion;
         DELETE FROM reclamaciones.secuencias_de_hoja;
         DELETE FROM reclamaciones.corridas_de_anonimizacion;
+        DELETE FROM reclamaciones.vinculacion_inicial;
+        ALTER TABLE reclamaciones.vinculacion_inicial ENABLE TRIGGER USER;
         ALTER TABLE reclamaciones.hojas_reclamacion ENABLE TRIGGER USER;
         ALTER TABLE reclamaciones.secuencias_de_hoja ENABLE TRIGGER USER;
         """);

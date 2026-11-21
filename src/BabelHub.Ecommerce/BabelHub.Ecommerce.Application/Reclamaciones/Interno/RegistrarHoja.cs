@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Reclamaciones;
 
@@ -79,7 +80,9 @@ internal static class MapeoDeHojas
 
 /// <summary>
 /// Registrar una hoja (REC-02, REC-03, REC-04, REC-05, REC-11, REC-18; D08, D09, D10). El orden es fijo: verificación de persona, validación estructural, cupo del origen con la clave del
-/// formulario, y una transacción corta que toma el número y guarda la hoja. No exige sesión ni consulta a Identidad. Un fallo después de reservar el cupo suelta la clave (no queda en curso), pero el cupo ya contado se pierde: la política no es liberable.
+/// formulario, y una transacción corta que toma el número y guarda la hoja. No exige sesión ni consulta a Identidad. Si quien registra es un <b>cliente con sesión</b>, la hoja se vincula a la cuenta <b>de la sesión</b> (nunca a un valor del formulario, REC-21) y la
+/// vinculación se audita en la misma transacción del <c>INSERT</c>: si no se puede auditar, la hoja no se guarda, <b>se devuelve el cupo</b> (<c>Liberar</c>) y se suelta la clave (<c>Fallar</c>) y se responde «servicio no disponible» con el campo estable <c>rec-registrar-sin-sesion</c> (REC-33,
+/// DD-28 y DD-29). Cualquier otro fallo después de reservar el cupo suelta la clave (no queda en curso), pero el cupo ya contado se pierde: es lo conservador frente al abuso (T04).
 /// </summary>
 internal sealed partial class RegistrarHoja(
     IExigenciaDeVerificacionDePersona verificacion,
@@ -87,7 +90,9 @@ internal sealed partial class RegistrarHoja(
     IControlDeLimites limites,
     IRepositorioDeHojas hojas,
     IUnidadDeTrabajo unidad,
-    IReloj reloj) : ICasoDeUso<RegistrarHojaEntrada, ConstanciaDeHoja>
+    IReloj reloj,
+    IActorActual actores,
+    VinculadorDeHojas vinculador) : ICasoDeUso<RegistrarHojaEntrada, ConstanciaDeHoja>
 {
     public const string Ruta = "/reclamaciones/nueva";
 
@@ -146,9 +151,10 @@ internal sealed partial class RegistrarHoja(
                 return FallosDeReclamaciones.De<ConstanciaDeHoja>(CategoriaDeError.NoDisponible, ClavesDeReclamaciones.ServicioNoDisponible);
         }
 
-        // (3) Transacción corta: el siguiente número del año de Lima y la hoja.
+        // (3) Transacción corta: el siguiente número del año de Lima y la hoja (y, con sesión de cliente, su vínculo con la cuenta y la auditoría de la vinculación).
         var reserva = limite.Reserva;
         var ahora = reloj.Ahora;
+        Guid? cuentaDeLaSesion = actores.Actual is { Tipo: TipoDeActor.Usuario, UsuarioId: { } usuario, Rol: RolesDeReclamaciones.Cliente } ? usuario : null;
         try
         {
             var hoja = await unidad.Ejecutar(
@@ -165,10 +171,17 @@ internal sealed partial class RegistrarHoja(
                         entrada.PedidoReferencia,
                         contenidoHash,
                         claveHash,
-                        ahora);
+                        ahora,
+                        cuentaDeLaSesion);
                     if (await hojas.Agregar(nueva, token).ConfigureAwait(false) == ResultadoDeAgregado.ClaveRepetida)
                     {
                         throw new ClaveDeHojaRepetidaException();
+                    }
+
+                    if (cuentaDeLaSesion is { } cuenta)
+                    {
+                        // REC-29 y REC-33: sin auditar no se guarda la hoja.
+                        await vinculador.Auditar(cuenta, DisparadoresDeVinculo.Registro, 1, token).ConfigureAwait(false);
                     }
 
                     return nueva;
@@ -184,6 +197,12 @@ internal sealed partial class RegistrarHoja(
             var existente = await ConstanciaYaCreada(clavesPosibles, contenidosPosibles, cancelacion).ConfigureAwait(false);
             await (existente.EsExito ? CompletarElCupo(reserva, null, cancelacion) : Devolver(reserva, cancelacion)).ConfigureAwait(false);
             return existente;
+        }
+        catch (AuditoriaNoDisponibleException)
+        {
+            // REC-33: la hoja no se guardó; el cupo se devuelve y la clave se suelta para que el mismo envío sin sesión se registre de inmediato.
+            await DevolverElCupo(reserva, CancellationToken.None).ConfigureAwait(false);
+            return FallosDeReclamaciones.De<ConstanciaDeHoja>(CategoriaDeError.NoDisponible, ClavesDeReclamaciones.ServicioNoDisponible, [new ErrorDeCampo(ClavesDeReclamaciones.RegistrarSinSesion, "disponible")]);
         }
         catch (HojasNoDisponiblesException)
         {
@@ -278,6 +297,29 @@ internal sealed partial class RegistrarHoja(
         {
             // La hoja ya está guardada y el índice único de la clave garantiza la idempotencia: un fallo del almacén de contadores no deshace el registro.
         }
+    }
+
+    /// <summary>
+    /// La rama de REC-33: devuelve el cupo con <c>Liberar</c> (la política <c>hojas-por-origen</c> es liberable, DD-29) y suelta la clave con <c>Fallar</c> (<c>Liberar</c> no la suelta). Cada una se protege por separado: que falle una no impide la otra
+    /// ni convierte el rechazo en un error 500. Sin reserva (el motor de límites no contó) no hay nada que devolver.
+    /// </summary>
+    private async Task DevolverElCupo(ReservaDeLimite? reserva, CancellationToken cancelacion)
+    {
+        if (reserva is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await limites.Liberar(reserva, cancelacion).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // Si el almacén no responde, el cupo se queda contado (residual aceptado) y la clave vence sola.
+        }
+
+        await Devolver(reserva, cancelacion).ConfigureAwait(false);
     }
 
     private async Task Devolver(ReservaDeLimite? reserva, CancellationToken cancelacion)

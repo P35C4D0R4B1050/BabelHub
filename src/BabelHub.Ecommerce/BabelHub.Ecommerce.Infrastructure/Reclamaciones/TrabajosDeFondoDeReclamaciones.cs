@@ -9,7 +9,7 @@ namespace BabelHub.Ecommerce.Infrastructure.Reclamaciones;
 public delegate Task AlcanceDeSistemaDeReclamaciones(Func<CancellationToken, Task> corrida, CancellationToken cancelacion);
 
 /// <summary>
-/// Los trabajos de fondo de Reclamaciones (T14, REC-17): sus nombres estables en <c>plataforma.trabajos_de_fondo</c>, su programación y su construcción sobre los casos de uso de T12. La anonimización corre <b>cada día a las 04:00 de Lima</b> (y una vez al arrancar, para no alertar el día del
+/// Los trabajos de fondo de Reclamaciones (T14 y T31, REC-17, REC-26): sus nombres estables en <c>plataforma.trabajos_de_fondo</c>, su programación y su construcción sobre los casos de uso de T12. La anonimización corre <b>cada día a las 04:00 de Lima</b> (y una vez al arrancar, para no alertar el día del
 /// despliegue); la revisión de que corrió, cada hora y sin correr al arrancar (alerta si pasaron 24 horas sin una corrida completa).
 /// </summary>
 public static class TrabajosDeFondoDeReclamaciones
@@ -17,6 +17,12 @@ public static class TrabajosDeFondoDeReclamaciones
     public const string AnonimizacionDiaria = "reclamaciones-anonimizacion-diaria";
 
     public const string RevisionDeLaAnonimizacion = "reclamaciones-revision-de-la-anonimizacion";
+
+    /// <summary>El recorrido único de la vinculación inicial (REC-26, T31): corre cada día y una vez al arrancar hasta completarse; después no hace nada.</summary>
+    public const string VinculacionInicial = "reclamaciones-vinculacion-inicial";
+
+    /// <summary>La alerta técnica si el recorrido no se completó 7 días después de empezar (REC-34).</summary>
+    public const string RevisionDeLaVinculacionInicial = "reclamaciones-revision-de-la-vinculacion-inicial";
 
     /// <summary>La hora de Lima de la anonimización diaria.</summary>
     public static readonly TimeSpan HoraDeLima = TimeSpan.FromHours(4);
@@ -54,6 +60,8 @@ public static class TrabajosDeFondoDeReclamaciones
         [
             Crear<AnonimizarHojasVencidas>(AnonimizacionDiaria, EsperaHastaLaProximaAnonimizacion, alIniciar: true, async (caso, ct) => ExigirExito(await caso.Ejecutar(ct).ConfigureAwait(false))),
             Crear<RevisarHojasSinAnonimizar>(RevisionDeLaAnonimizacion, _ => TimeSpan.FromHours(1), alIniciar: false, async (caso, ct) => ExigirExito(await caso.Ejecutar(ct).ConfigureAwait(false))),
+            Crear<VincularHojasExistentes>(VinculacionInicial, EsperaHastaLaProximaAnonimizacion, alIniciar: true, async (caso, ct) => ExigirExito(await caso.Ejecutar(ct).ConfigureAwait(false))),
+            Crear<RevisarVinculacionInicial>(RevisionDeLaVinculacionInicial, _ => TimeSpan.FromHours(24), alIniciar: false, async (caso, ct) => ExigirExito(await caso.Ejecutar(ct).ConfigureAwait(false))),
         ];
     }
 

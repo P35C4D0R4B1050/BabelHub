@@ -67,7 +67,7 @@ public sealed class AutorizacionYAlcanceDeHojasTests
         var limitador = new LimiteDeConsultaDeHojas(admin.Limites);
         var correos = new CorreoVerificadoDoble();
         correos.Fijar(Usuario, "ana.perez@correo.com");
-        var mis = new HojasDelConsumidorDeLaAplicacion(new ListarMisHojas(autorizador, correos, admin.Hojas, admin.Unidad, limitador), new ObtenerMiHoja(autorizador, correos, admin.Hojas, admin.Unidad, limitador));
+        var mis = new HojasDelConsumidorDeLaAplicacion(new ListarMisHojas(autorizador, correos, admin.Vinculador, admin.Hojas, admin.Unidad, limitador), new ObtenerMiHoja(autorizador, correos, admin.Vinculador, admin.Hojas, admin.Unidad, limitador));
         return new Mundo { Consumidor = consumidor, Administracion = admin, HojaId = id, Denegaciones = admin.Denegaciones, Mis = mis };
     }
 

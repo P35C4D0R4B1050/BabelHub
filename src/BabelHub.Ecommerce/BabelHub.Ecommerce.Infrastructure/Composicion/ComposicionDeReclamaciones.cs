@@ -10,10 +10,10 @@ namespace BabelHub.Ecommerce.Infrastructure.Composicion;
 
 /// <summary>
 /// La composición del módulo Libro de Reclamaciones (T14; <c>ecommerce-libro-reclamaciones</c>): los repositorios de PostgreSQL bajo <c>EjecutarComo(reclamaciones)</c>, el anonimizador sobre la función de base de datos, <b>el correo verificado de la cuenta sobre el contrato público de Identidad</b>,
-/// los casos de uso por alcance de solicitud, las implementaciones públicas (<see cref="IReclamaciones"/>, <see cref="IAdministracionDeReclamaciones"/> e <see cref="IHojasDelConsumidor"/>) y las partes de Reclamaciones de <see cref="IPendientesDeCuenta"/> y <see cref="IAplicadorDeCancelacion"/>.
+/// los casos de uso por alcance de solicitud, las implementaciones públicas (<see cref="IReclamaciones"/>, <see cref="IAdministracionDeReclamaciones"/> e <see cref="IHojasDelConsumidor"/>) y las partes de Reclamaciones de <see cref="IPendientesDeCuenta"/> y <see cref="IAplicadorDeCancelacion"/> y <b>el receptor real de los cambios de cuenta</b> (<see cref="IReceptorDeCambiosDeCuenta"/>, T32): sin él el compuesto de Identidad falla cerrado y el host rechaza el cambio de correo y el reemplazo de una cuenta.
 /// <b>No registra dobles provisionales</b>: todo lo que necesita ya existe (el correo, la verificación de persona, los límites, la auditoría y la unidad de trabajo los entregan Plataforma, Auditoría e Identidad), y si falta algo el contenedor falla al resolverlo. Los trabajos de fondo los registra
 /// <see cref="ComposicionDeLosTrabajosDeReclamaciones"/>. Necesita ya registrados: <see cref="IUnidadDeTrabajo"/>, <see cref="IConexionDeLaUnidadDeTrabajo"/>, <see cref="IActorActual"/>, <see cref="IDenegacionDeAcceso"/>, <see cref="IReloj"/>, <see cref="IControlDeLimites"/>,
-/// <see cref="IExigenciaDeVerificacionDePersona"/>, <see cref="ICalculadorDeHuella"/>, <see cref="IEnviadorDeCorreo"/>, el auditor y el publicador de alertas técnicas de Auditoría, e <see cref="ICorreoVerificadoDeSistema"/> de Identidad (el correo verificado, contrato de sistema).
+/// <see cref="IExigenciaDeVerificacionDePersona"/>, <see cref="ICalculadorDeHuella"/>, <see cref="IEnviadorDeCorreo"/>, el auditor y el publicador de alertas técnicas de Auditoría, <see cref="ICorreoVerificadoDeSistema"/> y <see cref="IClientePorCorreoVerificadoDeSistema"/> de Identidad (el correo verificado y la cuenta de cliente de un correo, contratos de sistema).
 /// </summary>
 public static class ComposicionDeReclamaciones
 {
@@ -24,11 +24,13 @@ public static class ComposicionDeReclamaciones
         // ---------- Infraestructura (por solicitud: usa la transacción en curso) ----------
         servicios.TryAddScoped<AccesoAlEsquemaDeReclamaciones>();
         servicios.TryAddScoped<IRepositorioDeHojas, RepositorioDeHojasPostgres>();
+        servicios.TryAddScoped<IVinculosDeHojas, VinculosDeHojasPostgres>();
         servicios.TryAddScoped<IAnonimizadorDeHojas, AnonimizadorDeHojasPostgres>();
         servicios.TryAddScoped<ICorreoVerificadoDeLaCuenta, CorreoVerificadoDeLaCuenta>();
 
         // ---------- Aplicación ----------
         servicios.TryAddScoped<AutorizadorDeReclamaciones>();
+        servicios.TryAddScoped<VinculadorDeHojas>();
         servicios.TryAddScoped<LimiteDeConsultaDeHojas>();
         servicios.TryAddScoped<EnvioDelAvisoDeRespuesta>();
         servicios.TryAddScoped<RegistrarHoja>();
@@ -54,10 +56,13 @@ public static class ComposicionDeReclamaciones
         servicios.TryAddScoped<IHojasDelConsumidor, HojasDelConsumidorDeLaAplicacion>();
         servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IPendientesDeCuenta, ContarHojasPendientesDeUnCorreo>());
         servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IAplicadorDeCancelacion, MarcarHojasDeUnaCuentaCancelada>());
+        servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IReceptorDeCambiosDeCuenta, ReceptorDeCambiosDeCuentaDeReclamaciones>());
 
         // ---------- Casos de uso de los trabajos de fondo (los corre ComposicionDeLosTrabajosDeReclamaciones) ----------
         servicios.TryAddScoped<AnonimizarHojasVencidas>();
         servicios.TryAddScoped<RevisarHojasSinAnonimizar>();
+        servicios.TryAddScoped<VincularHojasExistentes>();
+        servicios.TryAddScoped<RevisarVinculacionInicial>();
         return servicios;
     }
 }

@@ -101,6 +101,8 @@ public static class MotivosDeAlerta
 
     public const string AnonimizacionDeHojasSinCorrer = "anonimizacion-de-hojas-sin-correr";
 
+    public const string VinculacionInicialDeHojasSinCompletar = "vinculacion-inicial-de-hojas-sin-completar";
+
     /// <summary>Las alertas del Inventario no se pudieron leer (AUD-38): el E-commerce sigue y lo reintenta.</summary>
     public const string LecturaDeAlertasDelInventarioNoDisponible = "lectura-de-alertas-del-inventario-no-disponible";
 
@@ -227,6 +229,7 @@ public static class CatalogoDeAlertasDeAuditoria
         new(MotivosDeAlerta.AvisoACarritoFallido, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.CompraAprobadaSinPedidoALos30Dias, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.AnonimizacionDeHojasSinCorrer, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.VinculacionInicialDeHojasSinCompletar, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.LecturaDeAlertasDelInventarioNoDisponible, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.AlcanceDeDatosSinActor, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.ConfirmacionesDeReservasAnomalas, ClaseDeAlerta.Tecnica),

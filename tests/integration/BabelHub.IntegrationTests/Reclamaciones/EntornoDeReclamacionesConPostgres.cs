@@ -198,10 +198,12 @@ internal sealed class EntornoDeReclamacionesConPostgres
         var reloj = new RelojReal();
         Hojas = bd.Hojas;
         Anonimizador = bd.Anonimizador;
+        Vinculos = bd.Vinculos;
         Unidad = bd.Unidad;
+        Vinculador = new VinculadorDeHojas(bd.Vinculos, bd.Unidad, Auditoria);
         var autorizador = new AutorizadorDeReclamaciones(Actor, Denegaciones);
         var envio = new EnvioDelAvisoDeRespuesta(Correo, bd.Hojas, bd.Unidad, reloj);
-        Reclamaciones = new ReclamacionesDeLaAplicacion(new RegistrarHoja(new VerificacionNoExigida(), new HuellasNormalizantes(), Limites, bd.Hojas, bd.Unidad, reloj));
+        Reclamaciones = new ReclamacionesDeLaAplicacion(new RegistrarHoja(new VerificacionNoExigida(), new HuellasNormalizantes(), Limites, bd.Hojas, bd.Unidad, reloj, Actor, Vinculador));
         Administracion = new AdministracionDeReclamacionesDeLaAplicacion(
             new ListarHojas(autorizador, bd.Hojas, bd.Unidad),
             new ObtenerHojaParaAdministracion(autorizador, bd.Hojas, bd.Unidad, Auditoria),
@@ -224,6 +226,10 @@ internal sealed class EntornoDeReclamacionesConPostgres
     internal RepositorioDeHojasPostgres Hojas { get; }
 
     internal AnonimizadorDeHojasPostgres Anonimizador { get; }
+
+    internal VinculosDeHojasPostgres Vinculos { get; }
+
+    internal VinculadorDeHojas Vinculador { get; }
 
     public UnidadDeTrabajoPostgres Unidad { get; }
 

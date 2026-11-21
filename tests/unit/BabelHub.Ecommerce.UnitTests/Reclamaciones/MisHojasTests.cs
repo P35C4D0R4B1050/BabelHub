@@ -65,15 +65,17 @@ public sealed class MisHojasTests
 
     [Fact]
     [Trait("Criterio", "AC-REC-12")]
-    public async Task Una_sesion_sin_correo_verificado_recibe_correo_no_verificado_en_la_lista_y_sin_datos()
+    public async Task Una_sesion_sin_correo_verificado_ve_una_lista_vacia_con_el_aviso_y_no_reclama_nada()
     {
         var (e, _) = await ConUnaHoja(correoVerificado: null);
 
         var resultado = await e.Consumidor.Listar(new ListarMisHojasEntrada());
 
-        Assert.Equal(ClavesDeReclamaciones.CorreoNoVerificado, resultado.Error!.Clave);
-        Assert.Equal(CategoriaDeError.Prohibido, resultado.Error.Categoria);
-        Assert.Single(e.Denegaciones.Eventos);
+        Assert.True(resultado.EsExito);
+        Assert.True(resultado.Valor.CorreoSinVerificar);
+        Assert.Empty(resultado.Valor.Hojas);
+        Assert.Equal(0, e.Hojas.Reclamos);
+        Assert.Empty(e.Denegaciones.Eventos);
     }
 
     [Fact]

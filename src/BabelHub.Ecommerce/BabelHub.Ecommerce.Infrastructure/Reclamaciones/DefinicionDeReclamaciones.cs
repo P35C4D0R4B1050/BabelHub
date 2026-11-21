@@ -50,6 +50,16 @@ public static class DefinicionDeReclamaciones
             CONSTRAINT hojas_correo_normalizado_salvo_anonimizada CHECK ((correo_normalizado IS NULL) = (anonimizada_en IS NOT NULL)),
             CONSTRAINT hojas_contenido_hash_salvo_anonimizada CHECK (contenido_hash IS NOT NULL OR anonimizada_en IS NOT NULL)
         );
+        -- El vínculo con la cuenta del titular (REC-21, REC-22, D14): un uuid opaco, sin clave foránea ni lectura del esquema de Identidad; nulo en la hoja de un visitante o del personal, en la de una cuenta cancelada y en la anonimizada.
+        ALTER TABLE reclamaciones.hojas_reclamacion ADD COLUMN IF NOT EXISTS cuenta_id uuid;
+        DO $vinculo$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conname = 'hojas_cuenta_solo_si_vigente' AND conrelid = 'reclamaciones.hojas_reclamacion'::regclass) THEN
+                ALTER TABLE reclamaciones.hojas_reclamacion ADD CONSTRAINT hojas_cuenta_solo_si_vigente CHECK (cuenta_id IS NULL OR (NOT de_cuenta_cancelada AND anonimizada_en IS NULL));
+            END IF;
+        END
+        $vinculo$;
+        CREATE INDEX IF NOT EXISTS hojas_por_cuenta ON reclamaciones.hojas_reclamacion (cuenta_id) WHERE cuenta_id IS NOT NULL;
         CREATE INDEX IF NOT EXISTS hojas_por_correo ON reclamaciones.hojas_reclamacion (correo_normalizado) WHERE correo_normalizado IS NOT NULL;
         CREATE INDEX IF NOT EXISTS hojas_por_estado ON reclamaciones.hojas_reclamacion (estado, fecha_registro);
         CREATE INDEX IF NOT EXISTS hojas_por_fecha ON reclamaciones.hojas_reclamacion (fecha_registro);
@@ -59,6 +69,15 @@ public static class DefinicionDeReclamaciones
         CREATE TABLE IF NOT EXISTS reclamaciones.secuencias_de_hoja (
             anio integer PRIMARY KEY CHECK (anio BETWEEN 2000 AND 9999),
             ultimo integer NOT NULL CHECK (ultimo >= 0)
+        );
+
+        -- El recorrido único de la vinculación inicial (REC-26, D17): una fila con el cursor (un correo normalizado: dato personal, nulo al completar) y las fechas de inicio y término.
+        CREATE TABLE IF NOT EXISTS reclamaciones.vinculacion_inicial (
+            id smallint PRIMARY KEY CHECK (id = 1),
+            ultimo_correo text CHECK (char_length(ultimo_correo) BETWEEN 1 AND 254),
+            iniciada_en timestamptz NOT NULL,
+            completada_en timestamptz,
+            CONSTRAINT vinculacion_sin_cursor_al_completar CHECK (completada_en IS NULL OR ultimo_correo IS NULL)
         );
 
         -- La última corrida completa de la anonimización: la lee la revisión de hojas sin anonimizar.
@@ -105,6 +124,10 @@ public static class DefinicionDeReclamaciones
             IF OLD.descartada_en IS NOT NULL AND NEW.descartada_en IS DISTINCT FROM OLD.descartada_en THEN
                 RAISE EXCEPTION 'La fecha de descarte no se modifica' USING ERRCODE = '23000';
             END IF;
+            -- El vínculo con la cuenta solo pasa de nulo a una cuenta o de una cuenta a nulo, nunca de una cuenta a otra (REC-28). La garantía contra dos reclamos simultáneos es la sentencia atómica de la aplicación (cuenta_id IS NULL); esto cubre el cambio directo.
+            IF OLD.cuenta_id IS NOT NULL AND NEW.cuenta_id IS NOT NULL AND NEW.cuenta_id IS DISTINCT FROM OLD.cuenta_id THEN
+                RAISE EXCEPTION 'El vínculo con la cuenta no pasa de una cuenta a otra' USING ERRCODE = '23000';
+            END IF;
             IF OLD.de_cuenta_cancelada AND NOT NEW.de_cuenta_cancelada THEN
                 RAISE EXCEPTION 'La marca de cuenta cancelada solo pasa a verdadero' USING ERRCODE = '23000';
             END IF;
@@ -135,6 +158,25 @@ public static class DefinicionDeReclamaciones
         DROP TRIGGER IF EXISTS secuencias_sin_vaciar ON reclamaciones.secuencias_de_hoja;
         CREATE TRIGGER secuencias_sin_vaciar BEFORE TRUNCATE ON reclamaciones.secuencias_de_hoja FOR EACH STATEMENT EXECUTE FUNCTION reclamaciones.prohibir_borrado();
 
+        -- La tabla de la vinculación inicial no se borra ni se vacía, la fecha de inicio no cambia y un recorrido completado no se reabre.
+        DROP TRIGGER IF EXISTS vinculacion_sin_borrar ON reclamaciones.vinculacion_inicial;
+        CREATE TRIGGER vinculacion_sin_borrar BEFORE DELETE ON reclamaciones.vinculacion_inicial FOR EACH ROW EXECUTE FUNCTION reclamaciones.prohibir_borrado();
+        DROP TRIGGER IF EXISTS vinculacion_sin_vaciar ON reclamaciones.vinculacion_inicial;
+        CREATE TRIGGER vinculacion_sin_vaciar BEFORE TRUNCATE ON reclamaciones.vinculacion_inicial FOR EACH STATEMENT EXECUTE FUNCTION reclamaciones.prohibir_borrado();
+        CREATE OR REPLACE FUNCTION reclamaciones.vinculacion_solo_avanza() RETURNS trigger
+        LANGUAGE plpgsql
+        SET search_path = pg_catalog
+        AS $avanza$
+        BEGIN
+            IF NEW.iniciada_en IS DISTINCT FROM OLD.iniciada_en OR (OLD.completada_en IS NOT NULL AND NEW.completada_en IS DISTINCT FROM OLD.completada_en) THEN
+                RAISE EXCEPTION 'La vinculación inicial no se reabre ni cambia su inicio' USING ERRCODE = '23000';
+            END IF;
+            RETURN NEW;
+        END
+        $avanza$;
+        DROP TRIGGER IF EXISTS vinculacion_avanza ON reclamaciones.vinculacion_inicial;
+        CREATE TRIGGER vinculacion_avanza BEFORE UPDATE ON reclamaciones.vinculacion_inicial FOR EACH ROW EXECUTE FUNCTION reclamaciones.vinculacion_solo_avanza();
+
         -- La secuencia nunca retrocede: un número no se reutiliza.
         CREATE OR REPLACE FUNCTION reclamaciones.secuencia_solo_crece() RETURNS trigger
         LANGUAGE plpgsql
@@ -157,6 +199,8 @@ public static class DefinicionDeReclamaciones
         ALTER TABLE reclamaciones.hojas_reclamacion OWNER TO reclamaciones_dueno;
         ALTER TABLE reclamaciones.secuencias_de_hoja OWNER TO reclamaciones_dueno;
         ALTER TABLE reclamaciones.corridas_de_anonimizacion OWNER TO reclamaciones_dueno;
+        ALTER TABLE reclamaciones.vinculacion_inicial OWNER TO reclamaciones_dueno;
+        ALTER FUNCTION reclamaciones.vinculacion_solo_avanza() OWNER TO reclamaciones_dueno;
         ALTER FUNCTION reclamaciones.guardar_hoja() OWNER TO reclamaciones_dueno;
         ALTER FUNCTION reclamaciones.prohibir_borrado() OWNER TO reclamaciones_dueno;
         ALTER FUNCTION reclamaciones.secuencia_solo_crece() OWNER TO reclamaciones_dueno;
@@ -187,7 +231,7 @@ public static class DefinicionDeReclamaciones
             )
             UPDATE reclamaciones.hojas_reclamacion h
             SET nombre = '[anonimizado]', documento = '[anonimizado]', domicilio = '[anonimizado]', correo = '[anonimizado]', correo_normalizado = NULL, contenido_hash = NULL,
-                detalle = '[redactado]', respuesta = CASE WHEN h.respuesta IS NULL THEN NULL ELSE '[redactado]' END, anonimizada_en = pg_catalog.now()
+                detalle = '[redactado]', respuesta = CASE WHEN h.respuesta IS NULL THEN NULL ELSE '[redactado]' END, cuenta_id = NULL, anonimizada_en = pg_catalog.now()
             FROM vencidas v
             WHERE h.id = v.id;
             GET DIAGNOSTICS lote = ROW_COUNT;
@@ -210,9 +254,11 @@ public static class DefinicionDeReclamaciones
     public const string Permisos = """
         GRANT USAGE ON SCHEMA reclamaciones TO rol_reclamaciones;
         GRANT SELECT, INSERT ON reclamaciones.hojas_reclamacion TO rol_reclamaciones;
-        GRANT UPDATE (estado, respuesta, respondida_en, respondida_por, aviso_estado, aviso_enviado_en, aviso_en_curso_hasta, descartada_en, de_cuenta_cancelada) ON reclamaciones.hojas_reclamacion TO rol_reclamaciones;
+        GRANT UPDATE (estado, respuesta, respondida_en, respondida_por, aviso_estado, aviso_enviado_en, aviso_en_curso_hasta, descartada_en, de_cuenta_cancelada, cuenta_id) ON reclamaciones.hojas_reclamacion TO rol_reclamaciones;
         GRANT SELECT, INSERT ON reclamaciones.secuencias_de_hoja TO rol_reclamaciones;
         GRANT UPDATE (ultimo) ON reclamaciones.secuencias_de_hoja TO rol_reclamaciones;
         GRANT SELECT ON reclamaciones.corridas_de_anonimizacion TO rol_reclamaciones;
+        GRANT SELECT, INSERT ON reclamaciones.vinculacion_inicial TO rol_reclamaciones;
+        GRANT UPDATE (ultimo_correo, completada_en) ON reclamaciones.vinculacion_inicial TO rol_reclamaciones;
         """;
 }

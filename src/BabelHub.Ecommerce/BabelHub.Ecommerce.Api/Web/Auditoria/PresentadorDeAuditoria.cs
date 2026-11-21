@@ -116,6 +116,7 @@ public static class PresentadorDeAuditoria
         ["carrito-clave-de-reserva-en-conflicto"] = "La clave de reserva de un checkout chocó con otra reserva distinta",
         ["carrito-liberacion-de-un-pedido-confirmado"] = "Carrito intentó liberar la reserva de un pedido ya confirmado",
         ["anonimizacion-de-hojas-sin-correr"] = "La anonimización de hojas de reclamación no corrió en 24 horas",
+        ["vinculacion-inicial-de-hojas-sin-completar"] = "La vinculación inicial de las hojas de reclamación con las cuentas no se completó en 7 días",
         ["compra-aprobada-sin-pedido-a-los-30-dias"] = "Una compra aprobada sigue sin pedido a los 30 días",
         ["aviso-a-carrito-fallido"] = "No se pudo avisar a Carrito el estado de un pago",
         ["aviso-de-pago-fallido"] = "No se pudo enviar un aviso del estado de un pago",

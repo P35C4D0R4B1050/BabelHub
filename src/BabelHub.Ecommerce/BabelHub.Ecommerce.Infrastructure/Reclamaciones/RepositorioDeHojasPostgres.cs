@@ -14,7 +14,7 @@ internal sealed class RepositorioDeHojasPostgres(AccesoAlEsquemaDeReclamaciones 
 {
     private const string Columnas =
         "id, numero, tipo, nombre, documento, domicilio, correo, bien_contratado, monto_reclamado, detalle, pedido_referencia, contenido_hash, fecha_registro, clave_hash, estado, respuesta, respondida_en, respondida_por, "
-        + "aviso_estado, aviso_enviado_en, aviso_en_curso_hasta, descartada_en, de_cuenta_cancelada, anonimizada_en";
+        + "aviso_estado, aviso_enviado_en, aviso_en_curso_hasta, descartada_en, de_cuenta_cancelada, anonimizada_en, cuenta_id";
 
     public Task<int> SiguienteSecuencia(int anio, CancellationToken cancelacion = default) =>
         acceso.Ejecutar(
@@ -41,8 +41,8 @@ internal sealed class RepositorioDeHojasPostgres(AccesoAlEsquemaDeReclamaciones 
             {
                 // ON CONFLICT (clave_hash) DO NOTHING: la clave repetida no aborta la transacción y es la autoridad final de la idempotencia (REC-18); un número repetido sí falla.
                 await using var comando = new NpgsqlCommand(
-                    "INSERT INTO reclamaciones.hojas_reclamacion (id, numero, anio, tipo, nombre, documento, domicilio, correo, correo_normalizado, bien_contratado, monto_reclamado, detalle, pedido_referencia, contenido_hash, fecha_registro, clave_hash, estado) "
-                    + "VALUES (@id, @numero, @anio, @tipo, @nombre, @documento, @domicilio, @correo, @correoNormalizado, @bien, @monto, @detalle, @pedido, @contenido, @fecha, @clave, 'pendiente') ON CONFLICT (clave_hash) DO NOTHING",
+                    "INSERT INTO reclamaciones.hojas_reclamacion (id, numero, anio, tipo, nombre, documento, domicilio, correo, correo_normalizado, bien_contratado, monto_reclamado, detalle, pedido_referencia, contenido_hash, fecha_registro, clave_hash, estado, cuenta_id) "
+                    + "VALUES (@id, @numero, @anio, @tipo, @nombre, @documento, @domicilio, @correo, @correoNormalizado, @bien, @monto, @detalle, @pedido, @contenido, @fecha, @clave, 'pendiente', @cuenta) ON CONFLICT (clave_hash) DO NOTHING",
                     conexion,
                     transaccion);
                 Parametro(comando, "id", NpgsqlDbType.Uuid, hoja.Id);
@@ -61,6 +61,7 @@ internal sealed class RepositorioDeHojasPostgres(AccesoAlEsquemaDeReclamaciones 
                 Parametro(comando, "contenido", NpgsqlDbType.Text, hoja.ContenidoHash);
                 Parametro(comando, "fecha", NpgsqlDbType.TimestampTz, AccesoAlEsquemaDeReclamaciones.UtcONulo(hoja.FechaRegistro));
                 Parametro(comando, "clave", NpgsqlDbType.Text, hoja.ClaveHash);
+                Parametro(comando, "cuenta", NpgsqlDbType.Uuid, hoja.CuentaId);
                 return await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false) == 1 ? ResultadoDeAgregado.Agregada : ResultadoDeAgregado.ClaveRepetida;
             },
             cancelacion);
@@ -143,41 +144,6 @@ internal sealed class RepositorioDeHojasPostgres(AccesoAlEsquemaDeReclamaciones 
             async (conexion, transaccion, token) => (await Leer(conexion, transaccion, "numero = @numero", [new NpgsqlParameter("numero", numero.ToString())], string.Empty, token).ConfigureAwait(false)).FirstOrDefault(),
             cancelacion);
 
-    public Task<ListadoDeHojas> ListarDelCorreo(string correoNormalizado, int pagina, int tamano, CancellationToken cancelacion = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(correoNormalizado);
-        return acceso.Ejecutar(
-            async (conexion, transaccion, token) =>
-                await Paginar(conexion, transaccion, "correo_normalizado = @correo AND NOT de_cuenta_cancelada", [new NpgsqlParameter("correo", correoNormalizado)], pagina, tamano, token).ConfigureAwait(false),
-            cancelacion);
-    }
-
-    public Task<int> ContarPendientesDelCorreo(string correoNormalizado, CancellationToken cancelacion = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(correoNormalizado);
-        return acceso.Ejecutar(
-            async (conexion, transaccion, token) =>
-            {
-                await using var comando = new NpgsqlCommand("SELECT count(*) FROM reclamaciones.hojas_reclamacion WHERE correo_normalizado = @correo AND estado = 'pendiente' AND NOT de_cuenta_cancelada", conexion, transaccion);
-                comando.Parameters.AddWithValue("correo", correoNormalizado);
-                return Convert.ToInt32(await comando.ExecuteScalarAsync(token).ConfigureAwait(false), System.Globalization.CultureInfo.InvariantCulture);
-            },
-            cancelacion);
-    }
-
-    public Task<int> MarcarDeCuentaCancelada(string correoNormalizado, CancellationToken cancelacion = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(correoNormalizado);
-        return acceso.Ejecutar(
-            async (conexion, transaccion, token) =>
-            {
-                await using var comando = new NpgsqlCommand("UPDATE reclamaciones.hojas_reclamacion SET de_cuenta_cancelada = true WHERE correo_normalizado = @correo AND NOT de_cuenta_cancelada", conexion, transaccion);
-                comando.Parameters.AddWithValue("correo", correoNormalizado);
-                return await comando.ExecuteNonQueryAsync(token).ConfigureAwait(false);
-            },
-            cancelacion);
-    }
-
     // ---------- Piezas ----------
 
     internal static string EstadoATexto(EstadoDeHoja estado) => estado switch
@@ -198,7 +164,7 @@ internal sealed class RepositorioDeHojasPostgres(AccesoAlEsquemaDeReclamaciones 
     private static void Parametro(NpgsqlCommand comando, string nombre, NpgsqlDbType tipo, object? valor) =>
         comando.Parameters.Add(new NpgsqlParameter(nombre, tipo) { Value = valor ?? DBNull.Value });
 
-    private static async Task<ListadoDeHojas> Paginar(NpgsqlConnection conexion, NpgsqlTransaction transaccion, string filtro, NpgsqlParameter[] parametros, int pagina, int tamano, CancellationToken token)
+    internal static async Task<ListadoDeHojas> Paginar(NpgsqlConnection conexion, NpgsqlTransaction transaccion, string filtro, NpgsqlParameter[] parametros, int pagina, int tamano, CancellationToken token)
     {
         int total;
         await using (var contar = new NpgsqlCommand($"SELECT count(*) FROM reclamaciones.hojas_reclamacion WHERE {filtro}", conexion, transaccion))
@@ -263,7 +229,8 @@ internal sealed class RepositorioDeHojasPostgres(AccesoAlEsquemaDeReclamaciones 
                 AccesoAlEsquemaDeReclamaciones.LeerInstante(f, 20),
                 AccesoAlEsquemaDeReclamaciones.LeerInstante(f, 21),
                 f.GetBoolean(22),
-                AccesoAlEsquemaDeReclamaciones.LeerInstante(f, 23)));
+                AccesoAlEsquemaDeReclamaciones.LeerInstante(f, 23),
+                f.IsDBNull(24) ? null : f.GetGuid(24)));
         }
 
         return hojas;
