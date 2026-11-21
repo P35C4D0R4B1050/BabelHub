@@ -147,8 +147,10 @@ public sealed class IngresosReingresosEHistorialTests
     public async Task LaAdministracionVeLosTresIngresosConEdicionCantidadReferenciaNotaUsuarioYFecha_YUnEncargadoNoPuedeAbrirLaLista()
     {
         var libro = _e.Impresa();
+        var inicio = _e.Base.Reloj.Ahora;
         for (var i = 1; i <= 3; i++)
         {
+            _e.Base.Reloj.Ahora = inicio.AddMinutes(i);
             Assert.True((await _e.Ingreso().Ejecutar(Ingreso(libro, i, referencia: $"GR-00{i}", nota: $"n{i}"))).EsExito);
         }
 
@@ -158,8 +160,12 @@ public sealed class IngresosReingresosEHistorialTests
 
         Assert.Equal(3, lista.Valor.Ingresos.Count);
         Assert.All(lista.Valor.Ingresos, i => Assert.Equal((libro, "lima"), (i.EdicionId, i.CodigoDeFuente)));
-        Assert.Equal(["GR-001", "GR-002", "GR-003"], lista.Valor.Ingresos.Select(i => i.Referencia).Order());
-        Assert.NotNull(lista.Valor.Ingresos[0].UsuarioId);
+        // Cada ingreso con su cantidad, su nota y su fecha, del más reciente al más antiguo (AJU-20).
+        Assert.Equal(["GR-003", "GR-002", "GR-001"], lista.Valor.Ingresos.Select(i => i.Referencia));
+        Assert.Equal([3, 2, 1], lista.Valor.Ingresos.Select(i => i.Cantidad));
+        Assert.Equal(["n3", "n2", "n1"], lista.Valor.Ingresos.Select(i => i.Nota));
+        Assert.Equal([inicio.AddMinutes(3), inicio.AddMinutes(2), inicio.AddMinutes(1)], lista.Valor.Ingresos.Select(i => i.Instante));
+        Assert.All(lista.Valor.Ingresos, i => Assert.NotNull(i.UsuarioId));
         Assert.Equal(CategoriaDeError.Prohibido, deEncargado.Error!.Categoria);
     }
 
@@ -341,9 +347,12 @@ public sealed class IngresosReingresosEHistorialTests
         var libro = _e.Impresa();
         _e.Poner(_e.Ayacucho, libro, 20, 0);
         _e.Poner(_e.Cusco, libro, 20, 0);
+        var primero = _e.Base.Reloj.Ahora;
         _e.ComoEncargadoDe(_e.Ayacucho);
         Assert.True((await _e.AjusteManual().Ejecutar(new("ayacucho", libro, "merma", 1, null, null, EntornoDeAjustes.Clave()))).EsExito);
+        _e.Base.Reloj.Ahora = primero.AddMinutes(5);
         Assert.True((await _e.AjusteManual().Ejecutar(new("ayacucho", libro, "danio", 2, null, "n", EntornoDeAjustes.Clave()))).EsExito);
+        _e.Base.Reloj.Ahora = primero.AddMinutes(10);
         _e.Como(RolesDeUsuario.AdministradorCentral);
         Assert.True((await _e.AjusteManual().Ejecutar(new("cusco", libro, "merma", 3, null, null, EntornoDeAjustes.Clave()))).EsExito);
         _e.ComoEncargadoDe(_e.Ayacucho);
@@ -356,7 +365,10 @@ public sealed class IngresosReingresosEHistorialTests
         Assert.All(historial.Valor.Elementos, a => Assert.NotNull(a.UsuarioId));
         // AJU-17 no incluye la nota: es texto libre y el encargado no debe ver la de otro usuario.
         Assert.All(historial.Valor.Elementos, a => Assert.Null(a.Nota));
-        Assert.Equal(["merma", "danio"], historial.Valor.Elementos.Select(a => a.Motivo).Order(StringComparer.Ordinal).Reverse());
+        // Orden descendente por fecha: el más reciente primero, con la fecha y las cantidades de cada ajuste (AJU-17).
+        Assert.Equal(["danio", "merma"], historial.Valor.Elementos.Select(a => a.Motivo));
+        Assert.Equal([primero.AddMinutes(5), primero], historial.Valor.Elementos.Select(a => a.Instante));
+        Assert.Equal([(19, 17), (20, 19)], historial.Valor.Elementos.Select(a => (a.FisicoAnterior, a.FisicoPosterior)));
     }
 
     [Fact]

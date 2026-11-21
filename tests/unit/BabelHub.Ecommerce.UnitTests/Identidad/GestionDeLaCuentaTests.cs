@@ -531,6 +531,32 @@ public sealed class GestionDeLaCuentaTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-AUD-03")]
+    public async Task DesactivarElSegundoFactor_SiLaAuditoriaFalla_LaOperacionFallaYNoQuedaNingunRegistro()
+    {
+        var (e, cuenta, gestion) = Titular();
+        var (secreto, _) = e.ConSegundoFactor(cuenta);
+        e.Auditoria.Falla = true;
+
+        await Assert.ThrowsAsync<AuditoriaNoDisponibleException>(() => gestion.DesactivarElSegundoFactor(cuenta.Usuario.Id, S(EntornoDeIdentidad.ContrasenaSegura), S(e.Totp(secreto))));
+
+        Assert.Empty(e.Auditoria.Registradas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-03")]
+    public async Task RegenerarLosCodigosDeRespaldo_SiLaAuditoriaFalla_LaOperacionFallaYNoQuedaNingunRegistro()
+    {
+        var (e, cuenta, gestion) = Titular();
+        var (secreto, _) = e.ConSegundoFactor(cuenta);
+        e.Auditoria.Falla = true;
+
+        await Assert.ThrowsAsync<AuditoriaNoDisponibleException>(() => gestion.RegenerarLosCodigosDeRespaldo(cuenta.Usuario.Id, S(EntornoDeIdentidad.ContrasenaSegura), S(e.Totp(secreto))));
+
+        Assert.Empty(e.Auditoria.Registradas);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-IDE-34")]
     public async Task DesactivarElSegundoFactor_PideLaContrasenaYUnCodigoVigente()
     {

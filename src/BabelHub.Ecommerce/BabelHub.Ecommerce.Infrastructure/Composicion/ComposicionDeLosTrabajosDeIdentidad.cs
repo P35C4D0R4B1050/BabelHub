@@ -1,6 +1,7 @@
 using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Infrastructure.Identidad;
+using BabelHub.Ecommerce.Infrastructure.Plataforma;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BabelHub.Ecommerce.Infrastructure.Composicion;
@@ -29,14 +30,22 @@ public static class ComposicionDeLosTrabajosDeIdentidad
             var actor = alcanceDeSistema(sp);
             var alertas = new AlertasPorCorridaDeIdentidad(fabrica);
             var reloj = sp.GetRequiredService<IReloj>();
-            return new ServicioDeTrabajosDeIdentidad(
+            List<TrabajoDeFondoDeIdentidad> trabajos =
             [
                 TrabajosDeIdentidad.Purga(fabrica, registro, actor, alertas, reloj),
                 TrabajosDeIdentidad.Descarte(fabrica, registro, actor, alertas, reloj),
                 TrabajosDeIdentidad.Rotacion(fabrica, registro, actor, alertas, reloj),
                 TrabajosDeIdentidad.RenovacionDeClaves(sp.GetRequiredService<CacheDeClavesDeVerificacion>(), registro, actor, alertas, reloj),
                 TrabajosDeIdentidad.Bajas(fabrica, registro, actor, alertas, reloj),
-            ]);
+                // El correo de la cuenta de envío (IDE-66, IDE-78, IDE-80): el reintento de lo pendiente y, con IMAP configurado, el vaciado de Enviados.
+                TrabajosDelCorreo.Reintento(fabrica, registro, actor, alertas, reloj),
+            ];
+            if (sp.GetService<LimpiezaDeEnviadosImap>() is { } limpieza)
+            {
+                trabajos.Add(TrabajosDelCorreo.Vaciado(limpieza, registro, actor, alertas, reloj));
+            }
+
+            return new ServicioDeTrabajosDeIdentidad(trabajos);
         });
         return servicios;
     }

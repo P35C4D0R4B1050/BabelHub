@@ -180,8 +180,26 @@ public sealed class RegistroDeCuentas(
             return Resultado<RespuestaUniforme>.Fallo(FallosDeIdentidad.CorreoEnUso);
         }
 
-        EncolarElCodigo(correo, PropositoDeCodigo.VerificacionDeCorreo);
+        // El cupo de códigos de 10 al día por origen (IDE-83) se reserva aquí, donde existe el origen: el trabajo en segundo plano no lo tiene y lo da por reservado. Superado el tope, o sin el almacén de contadores (falla cerrada), el código
+        // no se encola y la respuesta es la misma: la cuenta queda creada y la persona puede pedir otro código más tarde (el origen que agota su cupo no agota el de los demás).
+        if (await ReservarElCupoDeCodigosDelOrigen(cancelacion).ConfigureAwait(false))
+        {
+            EncolarElCodigo(correo, PropositoDeCodigo.VerificacionDeCorreo);
+        }
+
         return Resultado<RespuestaUniforme>.Exito(new RespuestaUniforme());
+    }
+
+    private async Task<bool> ReservarElCupoDeCodigosDelOrigen(CancellationToken cancelacion)
+    {
+        try
+        {
+            return (await limites.Reservar(PoliticasDeLimite.CupoDeCodigosPorOrigen, cancelacion: cancelacion).ConfigureAwait(false)).EsPermitido;
+        }
+        catch (Exception) when (!cancelacion.IsCancellationRequested)
+        {
+            return false;
+        }
     }
 
     public async Task<Resultado<ResultadoDelIngreso>> VerificarCorreo(string correo, ValorSecreto codigo, CancellationToken cancelacion = default)

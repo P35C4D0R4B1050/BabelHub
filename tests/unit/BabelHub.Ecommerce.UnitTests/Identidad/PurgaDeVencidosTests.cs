@@ -1,3 +1,4 @@
+using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Identidad.Interno;
 using BabelHub.Ecommerce.UnitTests.Plataforma;
 
@@ -32,6 +33,78 @@ public sealed class PurgaDeVencidosTests
         public Task<int> SolicitudesDeCodigo(DateTimeOffset limite, CancellationToken cancelacion = default) => Paso("solicitudes", limite, 4);
 
         public Task<int> CambiosDeCorreoVencidos(DateTimeOffset ahora, CancellationToken cancelacion = default) => Paso("cambios", ahora, 5);
+    }
+
+    private sealed class PurgaConCambiosNoReconocidos(params Guid[] cuentas) : IPurgaDeVencidos
+    {
+        public bool Borro { get; private set; }
+
+        public Task<int> DesafiosVencidos(DateTimeOffset limite, CancellationToken cancelacion = default) => Task.FromResult(0);
+
+        public Task<int> CodigosDeUnSoloUsoVencidos(DateTimeOffset limite, CancellationToken cancelacion = default) => Task.FromResult(0);
+
+        public Task<int> RenovacionesVencidas(DateTimeOffset limite, CancellationToken cancelacion = default) => Task.FromResult(0);
+
+        public Task<int> SolicitudesDeCodigo(DateTimeOffset limite, CancellationToken cancelacion = default) => Task.FromResult(0);
+
+        public Task<int> CambiosDeCorreoVencidos(DateTimeOffset ahora, CancellationToken cancelacion = default)
+        {
+            Borro = true;
+            return Task.FromResult(cuentas.Length);
+        }
+
+        public Task<IReadOnlyList<Guid>> CuentasConCambioNoReconocidoVencido(DateTimeOffset ahora, CancellationToken cancelacion = default) => Task.FromResult<IReadOnlyList<Guid>>(cuentas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-08")]
+    public async Task UnCambioDeCorreoNoReconocidoQueVence_QuedaComoEventoDeSeguridadDeSuCuenta_AntesDeBorrarLaFila()
+    {
+        var e = new EntornoDeIdentidad();
+        var cuenta = Guid.NewGuid();
+        var purga = new PurgaConCambiosNoReconocidos(cuenta);
+
+        var resultado = await new PurgarVencidosDeIdentidad(purga, new RelojFijo(Ahora), e.Eventos).Ejecutar();
+
+        var evento = Assert.Single(e.Seguridad.Eventos);
+        Assert.Equal(AccionesAuditables.CambioDeCorreoNoReconocidoVencido, evento.Accion);
+        Assert.Equal("vencido-sin-confirmar", evento.Motivo);
+        Assert.Equal(cuenta.ToString("D"), evento.ObjetoId);
+        Assert.True(purga.Borro);
+        Assert.Equal(1, resultado.CambiosDeCorreo);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-AUD-08")]
+    public async Task SiElEventoNoSePuedeLeer_LaFilaSeConserva_YLaPasadaFalla_ParaNoPerderElEvento()
+    {
+        var e = new EntornoDeIdentidad();
+        var purga = new PurgaQueNoLee();
+
+        await Assert.ThrowsAsync<AggregateException>(() => new PurgarVencidosDeIdentidad(purga, new RelojFijo(Ahora), e.Eventos).Ejecutar());
+
+        Assert.False(purga.Borro);
+    }
+
+    private sealed class PurgaQueNoLee : IPurgaDeVencidos
+    {
+        public bool Borro { get; private set; }
+
+        public Task<int> DesafiosVencidos(DateTimeOffset limite, CancellationToken cancelacion = default) => Task.FromResult(0);
+
+        public Task<int> CodigosDeUnSoloUsoVencidos(DateTimeOffset limite, CancellationToken cancelacion = default) => Task.FromResult(0);
+
+        public Task<int> RenovacionesVencidas(DateTimeOffset limite, CancellationToken cancelacion = default) => Task.FromResult(0);
+
+        public Task<int> SolicitudesDeCodigo(DateTimeOffset limite, CancellationToken cancelacion = default) => Task.FromResult(0);
+
+        public Task<int> CambiosDeCorreoVencidos(DateTimeOffset ahora, CancellationToken cancelacion = default)
+        {
+            Borro = true;
+            return Task.FromResult(1);
+        }
+
+        public Task<IReadOnlyList<Guid>> CuentasConCambioNoReconocidoVencido(DateTimeOffset ahora, CancellationToken cancelacion = default) => throw new InvalidOperationException("La base no responde.");
     }
 
     [Fact]

@@ -25,6 +25,22 @@ public sealed class PostgresPurgaDeVencidos(AccesoAlEsquemaDeIdentidad acceso) :
     public Task<int> CambiosDeCorreoVencidos(DateTimeOffset ahora, CancellationToken cancelacion = default) =>
         Borrar("DELETE FROM identidad.cambios_de_correo_pendientes WHERE vence_en < @limite", ahora, cancelacion);
 
+    public Task<IReadOnlyList<Guid>> CuentasConCambioNoReconocidoVencido(DateTimeOffset ahora, CancellationToken cancelacion = default) =>
+        acceso.Ejecutar<IReadOnlyList<Guid>>(
+            async (c, t, ct) =>
+            {
+                await using var comando = AccesoAlEsquemaDeIdentidad.Comando(c, t, "SELECT usuario_id FROM identidad.cambios_de_correo_pendientes WHERE vence_en < @limite AND estado = 'pendiente-de-confirmacion'", ("limite", ahora));
+                await using var filas = await comando.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                var cuentas = new List<Guid>();
+                while (await filas.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    cuentas.Add(filas.GetGuid(0));
+                }
+
+                return cuentas;
+            },
+            cancelacion);
+
     private Task<int> Borrar(string sql, DateTimeOffset limite, CancellationToken cancelacion) =>
         acceso.Ejecutar(
             async (c, t, ct) =>
@@ -255,6 +271,11 @@ public static class TrabajosDeIdentidad
 /// <summary>El servicio en segundo plano que corre los trabajos de Identidad en paralelo hasta el apagado.</summary>
 public sealed class ServicioDeTrabajosDeIdentidad(IEnumerable<TrabajoDeFondoDeIdentidad> trabajos) : BackgroundService
 {
+    private readonly IReadOnlyList<TrabajoDeFondoDeIdentidad> _trabajos = [.. trabajos];
+
+    /// <summary>Los nombres de los trabajos que corre este servicio (para comprobar la composición).</summary>
+    public IReadOnlyList<string> Nombres => [.. _trabajos.Select(t => t.Nombre)];
+
     protected override Task ExecuteAsync(CancellationToken cancelacion) =>
-        Task.WhenAll(trabajos.Select(trabajo => trabajo.Correr(cancelacion)));
+        Task.WhenAll(_trabajos.Select(trabajo => trabajo.Correr(cancelacion)));
 }
