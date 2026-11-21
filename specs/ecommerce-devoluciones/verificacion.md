@@ -142,3 +142,42 @@ Resultado: **No converge, por T31 (parcial) y por dos decisiones de la persona r
 **Hallazgo nuevo de esta ronda (corregido):** Identidad llamaba a los receptores de la cancelación como carrito, pagos, reclamaciones, pedidos, biblioteca, devoluciones, en contra de D04 y del orden global de bloqueo (riesgo de interbloqueo entre `AprobarDevolucion` y la cancelación). `EjecutorDeLaCancelacion` ahora los ordena explícitamente (commit `953173c7`, con prueba unitaria y de integración). Además, `Lista.cshtml` de logística usaba `opacity-60` y fallaba AA (4.02:1) una vez compilados los estilos; corregido a `opacity-70`.
 
 Para pasar a `Done` falta: cerrar T31, las dos decisiones de la persona (D5, D9) y repetir esta verificación.
+
+## 7. Matriz vigente (carril V, 2026-11-20, tras la última ejecución en PostgreSQL real)
+
+Esta sección **reemplaza** el estado por requisito de la sección 2 y las diferencias de las secciones 3, 5 y 6 donde difieran. Ejecutado ahora: integración filtrada `Devoluciones|Envios` con PostgreSQL real, **282 de 282 verdes**; las 15 pruebas de `PrivacidadYCuentaDeDevoluciones` y `EnviosConPedidosReales` incluidas; Playwright de Devoluciones 3 de 3 en escritorio y teléfono (ejecución anterior, sin cambios de la interfaz desde entonces); SpecCheck 0 avisos; tareas T01 a T34 todas `[x]`.
+
+Resultado: **No converge**, solo por lo que no es del código de este carril: (1) tres requisitos siguen **Parciales** porque Pagos real no entra en las pruebas de Devoluciones (el doble `ReembolsosFalsos` registra y procesa) o porque falta la prueba simultánea de solicitud × cancelación real; (2) las decisiones de la persona responsable D5 y D9.
+
+**Recuento: Cumple 28, Parcial 3, No cumple 0.**
+
+| Requisito | Estado | Prueba que falla si se rompe la regla (integración real salvo que se diga) |
+| :--- | :--- | :--- |
+| DEV-01, 02, 03 | Cumple | `ConcurrenciaYReintentosDeDevolucionesTests` (20 pares sobre la misma unidad), `DevolucionesApiTests`, E2E del impreso |
+| DEV-04 | Cumple | `DevolucionesConModulosRealesTests.El_reembolso_de_un_digital_a_los_catorce_dias_exactos…` (Pedidos y Biblioteca reales: 14 días sí, 15 no) |
+| DEV-05 | Cumple | `…Con_un_enlace_ya_entregado_el_reembolso_se_rechaza_por_politica…` |
+| DEV-06 | Cumple | `…Un_reporte_suspende_las_descargas_el_rechazo_las_reanuda_y_el_aprobado_revoca…`; `…Aprobar_un_reporte_cuya_linea_una_anulacion_ya_revoco…` |
+| DEV-07 | Cumple | `ConcurrenciaYReintentosDeDevolucionesTests` (Inventario caído, respuesta perdida; simulado fiel a v1) |
+| DEV-08 | **Parcial** | `…El_impreso_se_reembolsa_solo_al_confirmar_la_recepcion_por_su_precio_sin_el_envio…` con `IReembolsos` doble; el tope «sin superar lo cobrado» es de Pagos real y no entra en estas pruebas |
+| DEV-09 | Cumple | `…El_reembolso_de_un_digital…` (el acceso se revoca antes del reembolso con Biblioteca real) |
+| DEV-10, 11, 12, 15 | Cumple | pruebas unitarias de avisos y auditoría; E2E de la recepción (DEV-11 sin Notificador real; la solicitud no avisa, D9) |
+| DEV-13 | Cumple | `MatrizDeRolesDeDevolucionesTests` (Aprobar, Rechazar y Recibir × 8 roles) y E2E de la sucursal |
+| DEV-14 | Cumple | `…Veinte_pares_recepcion_por_vencimiento…` y unitarias (con la salvedad D07 del plan, D9) |
+| DEV-16 | Cumple | `ConcurrenciaYReintentosDeDevolucionesTests` (20 recepciones simultáneas y 20 pares recepción × vencimiento) |
+| DEV-17 | Cumple | `ConciliarReembolsosDeDevoluciones` con PostgreSQL real; que la pasarela cobre una vez lo garantiza Pagos |
+| DEV-18 | Cumple | `…La_anulacion_del_pedido_mixto_tras_el_reembolso_digital_excluye_la_linea_ya_reembolsada` |
+| DEV-19 | Cumple | `…Cincuenta_pares_de_descarga_por_reembolso_automatico…` (solo gana uno; Biblioteca real) |
+| DEV-20 | Cumple | idem y `…Aprobar_un_reporte_cuya_linea…` |
+| DEV-21 | **Parcial** | `…Con_la_pasarela_caida_el_impreso_queda_con_el_reembolso_pendiente…` y la conciliación una sola vez, contra `IReembolsos` doble |
+| DEV-22 | Cumple | `ReporteDeArchivoDefectuosoTests` y `…Un_encargado_no_ve_ni_decide_los_reportes…` |
+| DEV-23 | Cumple (confirmar D5) | `…Los_pendientes_se_cuentan_en_tres_numeros_por_cuenta…` con `ContarEnTres` real |
+| DEV-24 | Cumple | `DevolucionesDeUnaCuentaTests` y `PrivacidadYCuentaDeDevolucionesTests` |
+| DEV-25 | Cumple | `PrivacidadYCuentaDeDevolucionesTests.Si_la_redaccion_de_la_cuenta_falla_en_la_segunda…` y `…Con_la_auditoria_caida_la_redaccion…` (PostgreSQL real) |
+| DEV-26 | **Parcial** | `…La_cancelacion_de_la_cuenta_aplica_Pedidos_Devoluciones_y_Pagos_en_ese_orden…`, `…Una_cuenta_cancelada_no_puede_solicitar…` y la prueba unitaria del ejecutor; falta la solicitud **simultánea** con una cancelación en curso sobre la marca real de Identidad |
+| DEV-27 | Cumple | `PrivacidadYCuentaDeDevolucionesTests.La_depuracion_a_los_dos_anos…` |
+| DEV-28 | Cumple | matriz de roles, uniformidad ajeno/inexistente, 429 real (`…Con_los_limites_reales_la_operacion_numero_treinta_y_uno…`) |
+| DEV-29 | Cumple | `…El_motivo_sembrado_no_llega_a_la_auditoria…`; el módulo no usa EF Core ni `ILogger` |
+| DEV-30 | Cumple | `…Con_la_auditoria_caida_la_depuracion_a_los_dos_anos_no_redacta_nada…` |
+| DEV-31 | Cumple | `DevolucionesApiTests` (adjuntos y campos no declarados) |
+
+Diferencias abiertas: **D5** (confirmar que Identidad usa la suma para IDE-27; `ContarEnTres` ya se usa en la prueba), **D9** (cinco supuestos del plan sin ratificar), los tres Parciales de arriba, y los Menores de `progress/hallazgos.md` (D10 a D13 y los de las revisiones de esta ronda). Para pasar a `Done` hace falta: la ratificación de D5 y D9, una prueba con Pagos real (o con la pasarela de Culqi cuando exista, T37/T38 de Pagos) para DEV-08 y DEV-21, y la prueba simultánea de DEV-26.
