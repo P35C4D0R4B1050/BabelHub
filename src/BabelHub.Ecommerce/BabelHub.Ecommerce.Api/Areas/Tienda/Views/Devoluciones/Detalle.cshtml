@@ -1,0 +1,68 @@
+@model BabelHub.Ecommerce.Api.Devoluciones.DetalleDeDevolucionVista
+@{
+    var d = Model.Devolucion!;
+}
+<div class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+        <h1 class="bh-display">Devolución <span class="font-mono">@d.IdCorto</span></h1>
+        <p class="mt-2 opacity-80">@d.Tipo@(d.EsReporte ? " · reporte de archivo defectuoso" : string.Empty) · Pedido <span class="font-mono">@d.PedidoCorto</span> · @d.CreadaTexto (hora de Lima)@(d.Sucursal is not null ? " · Sucursal receptora: " + d.Sucursal : string.Empty)</p>
+    </div>
+    <a class="btn btn-sm btn-ghost" href="@Model.RutaDeLaLista">Volver a la lista</a>
+</div>
+
+@if (Model.Aviso is not null)
+{
+    <div class="alert alert-success mt-4" role="status"><bh-icono nombre="exito" /><span>@Model.Aviso</span></div>
+}
+
+<section class="mt-6 rounded-box border border-base-300 bg-base-100 p-4" aria-labelledby="dev-motivo">
+    <h2 id="dev-motivo" class="text-lg font-semibold">Motivo</h2>
+    @if (d.Redactada)
+    {
+        <p class="mt-2 text-sm opacity-80">El motivo se eliminó por la política de privacidad (pasaron dos años o la cuenta se canceló).</p>
+    }
+    else
+    {
+        @* El texto de la persona se imprime siempre con la codificación de Razor. *@
+        <p class="mt-2 whitespace-pre-wrap break-words">@d.Motivo.Valor</p>
+        @if (d.Texto is not null)
+        {
+            <h3 class="mt-4 font-semibold">Descripción del defecto</h3>
+            <p class="mt-1 whitespace-pre-wrap break-words">@d.Texto.Valor</p>
+        }
+    }
+</section>
+
+<section class="mt-4" aria-labelledby="dev-lineas">
+    <h2 id="dev-lineas" class="text-lg font-semibold">Libros</h2>
+    <ul class="mt-2 grid gap-3">
+        @foreach (var l in d.Lineas)
+        {
+            <li class="rounded-box border border-base-300 bg-base-100 p-4">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <span class="bh-chip"><bh-icono nombre="@l.EstadoIcono" clase="size-3.5" />@l.EstadoTexto</span>
+                    <span class="text-sm">@l.Cantidad × @l.MontoTexto</span>
+                </div>
+                @if (l.ReembolsoPendiente)
+                {
+                    <p class="mt-2 text-sm">El reembolso está pendiente de la confirmación de la pasarela de pago. Se reintentará solo.</p>
+                }
+            </li>
+        }
+    </ul>
+</section>
+
+@if (Model.Acciones.Count > 0)
+{
+    <div class="mt-6 flex flex-wrap gap-3">
+        @foreach (var accion in Model.Acciones)
+        {
+            <bh-accion-de-cambio>
+            <form method="post" action="@accion.Ruta">
+                <partial name="_TokenAntifalsificacion" />
+                <button type="submit" class="btn btn-sm @(accion.Principal ? "btn-primary" : "btn-outline")"><bh-icono nombre="@accion.Icono" clase="size-4" />@accion.Texto</button>
+            </form>
+            </bh-accion-de-cambio>
+        }
+    </div>
+}

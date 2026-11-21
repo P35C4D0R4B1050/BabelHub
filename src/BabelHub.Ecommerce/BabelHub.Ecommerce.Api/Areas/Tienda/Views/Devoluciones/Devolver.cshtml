@@ -1,0 +1,89 @@
+@model BabelHub.Ecommerce.Api.Areas.Tienda.Controllers.DevolverUnPedidoVista
+<div class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+        <h1 class="bh-display">Devolver un pedido</h1>
+        <p class="mt-2 max-w-2xl opacity-80">Elige qué libros devolver y cuéntanos el motivo. No escribas datos innecesarios (teléfonos, direcciones, documentos): el motivo solo se usa para atender tu devolución. No se pueden adjuntar archivos.</p>
+    </div>
+    <a class="btn btn-sm btn-ghost" href="@Model.RutaDelPedido">Volver al pedido</a>
+</div>
+
+<div class="mt-6" aria-live="polite">
+    @if (Model.Estado is not null)
+    {
+        <vc:bh-estado modelo="@Model.Estado" />
+    }
+    else
+    {
+        @if (Model.Impresos.Count > 0)
+        {
+            <section aria-labelledby="dev-impresos" class="rounded-box border border-base-300 bg-base-100 p-4">
+                <h2 id="dev-impresos" class="text-lg font-semibold">Libros impresos</h2>
+                <p class="mt-1 text-sm opacity-80">Los llevas a la sucursal que elijas. El plazo es de 15 días desde la entrega.</p>
+                <bh-accion-de-cambio>
+                <form method="post" action="/cuenta/pedidos/@Model.PedidoId.ToString("D")/devoluciones" class="mt-4 grid gap-4">
+                    <partial name="_TokenAntifalsificacion" />
+                    <fieldset class="grid gap-3">
+                        <legend class="font-semibold">Cantidad a devolver de cada libro</legend>
+                        @foreach (var l in Model.Impresos)
+                        {
+                            <label class="form-control">
+                                <span class="label-text">@l.Titulo <span class="text-xs opacity-70">(hasta @l.Cantidad; plazo hasta el @l.PlazoTexto, hora de Lima)</span></span>
+                                <input type="number" inputmode="numeric" name="cantidad.@l.LineaId.ToString("D")" class="input input-bordered w-28" min="0" max="@l.Cantidad" value="0" />
+                            </label>
+                        }
+                    </fieldset>
+                    <label class="form-control">
+                        <span class="label-text">Sucursal donde entregarás los libros</span>
+                        <select name="sucursalReceptora" class="select select-bordered" required>
+                            @foreach (var s in Model.Sucursales)
+                            {
+                                <option value="@s.Codigo" selected="@(s.Codigo == Model.SucursalPreferida)">@s.Nombre</option>
+                            }
+                        </select>
+                    </label>
+                    <label class="form-control">
+                        <span class="label-text">Motivo (hasta 300 caracteres)</span>
+                        <textarea name="motivo" class="textarea textarea-bordered" rows="3" required maxlength="300"></textarea>
+                    </label>
+                    <div><button type="submit" class="btn btn-primary">Solicitar la devolución</button></div>
+                </form>
+                </bh-accion-de-cambio>
+            </section>
+        }
+
+        @if (Model.Digitales.Count > 0)
+        {
+            <section aria-labelledby="dev-digitales" class="mt-6 rounded-box border border-base-300 bg-base-100 p-4">
+                <h2 id="dev-digitales" class="text-lg font-semibold">Libros digitales</h2>
+                <p class="mt-1 text-sm opacity-80">Puedes pedir el reembolso dentro de los 14 días de la compra si aún no descargaste el libro. Si el archivo no se abre o está dañado, repórtalo dentro de los 30 días: lo revisamos y, si procede, te lo reembolsamos.</p>
+                @foreach (var l in Model.Digitales)
+                {
+                    <article class="mt-4 rounded-box border border-base-300 p-4" aria-label="@l.Titulo">
+                        <h3 class="font-semibold">@l.Titulo</h3>
+                        <div class="mt-3 grid gap-6 md:grid-cols-2">
+                            <bh-accion-de-cambio>
+                            <form method="post" action="/cuenta/pedidos/@Model.PedidoId.ToString("D")/devoluciones/digital" class="grid gap-3">
+                                <partial name="_TokenAntifalsificacion" />
+                                <input type="hidden" name="lineaId" value="@l.LineaId.ToString("D")" />
+                                <p class="text-xs opacity-70">Reembolso (hasta el @l.PlazoDelReembolsoTexto, hora de Lima)</p>
+                                <label class="form-control"><span class="label-text">Motivo</span><textarea name="motivo" class="textarea textarea-bordered" rows="2" required maxlength="300"></textarea></label>
+                                <div><button type="submit" class="btn btn-sm btn-outline">Pedir el reembolso</button></div>
+                            </form>
+                            </bh-accion-de-cambio>
+                            <bh-accion-de-cambio>
+                            <form method="post" action="/cuenta/pedidos/@Model.PedidoId.ToString("D")/devoluciones/reporte" class="grid gap-3">
+                                <partial name="_TokenAntifalsificacion" />
+                                <input type="hidden" name="lineaId" value="@l.LineaId.ToString("D")" />
+                                <p class="text-xs opacity-70">Archivo defectuoso (hasta el @l.PlazoDelReporteTexto, hora de Lima)</p>
+                                <label class="form-control"><span class="label-text">Motivo</span><input type="text" name="motivo" class="input input-bordered" required maxlength="300" /></label>
+                                <label class="form-control"><span class="label-text">Qué le pasa al archivo (hasta 2000 caracteres)</span><textarea name="texto" class="textarea textarea-bordered" rows="3" required maxlength="2000"></textarea></label>
+                                <div><button type="submit" class="btn btn-sm btn-outline">Reportar el archivo</button></div>
+                            </form>
+                            </bh-accion-de-cambio>
+                        </div>
+                    </article>
+                }
+            </section>
+        }
+    }
+</div>

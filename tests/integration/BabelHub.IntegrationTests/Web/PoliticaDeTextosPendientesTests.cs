@@ -32,6 +32,26 @@ public sealed class PoliticaDeTextosPendientesTests
 
     // ---- Traducción de la decisión a HTTP ----
 
+    [Fact]
+    [Trait("Criterio", "AC-WEB-37")]
+    public async Task UnEncargadoConElCodigoDeSuSucursalEnLaRuta_PasaYConOtroCodigo_VeSinPermiso()
+    {
+        // La ruta lleva el código (`ayacucho`) y el token el identificador derivado de ese código (D20): se comparan por la equivalencia canónica.
+        var propia = BabelHub.Ecommerce.Application.Plataforma.IdentificadorDeSucursal.DesdeCodigo("ayacucho")!.Value;
+        var sesiones = new SesionesWebDePrueba().ConSesionValida(RolWeb.Encargado, propia);
+        var (a, _, _, _, denegaciones, _, _) = await AnfitrionConPolitica.Iniciar(HostWeb.Gestion, sesiones);
+        await using var _ = a;
+
+        var suya = await Pedir(a, "/prueba/politica/sucursal/ayacucho", Cookie(HostWeb.Gestion));
+        var suyaConOtraCapitalizacion = await Pedir(a, "/prueba/politica/sucursal/Ayacucho", Cookie(HostWeb.Gestion));
+        var ajena = await Pedir(a, "/prueba/politica/sucursal/cusco", Cookie(HostWeb.Gestion));
+
+        Assert.Equal(HttpStatusCode.OK, suya.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, suyaConOtraCapitalizacion.StatusCode);
+        Assert.Equal("/sin-permiso", ajena.Headers.Location!.OriginalString);
+        Assert.Equal(["fuera-de-sucursal"], denegaciones.Registradas.Select(d => d.Motivo).ToArray());
+    }
+
     [Theory]
     [Trait("Criterio", "AC-WEB-34")]
     [InlineData("/prueba/politica/catalogo")]

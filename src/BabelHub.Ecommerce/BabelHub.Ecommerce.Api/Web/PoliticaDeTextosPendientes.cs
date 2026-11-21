@@ -197,7 +197,9 @@ public sealed class PoliticaDeTextosPendientesMiddleware(RequestDelegate siguien
         if (metadatos?.GetMetadata<ParametroDeSucursalAttribute>() is { } parametro)
         {
             // Un valor presente que no es una sucursal válida no coincide con ninguna: se trata como una sucursal ajena.
-            sucursal = contexto.Request.RouteValues.TryGetValue(parametro.NombreDelParametro, out var valor) && Guid.TryParse(valor?.ToString(), out var id) ? id : Guid.Empty;
+            // La ruta lleva el código de la sucursal (`ayacucho`); su identificador es el derivado canónico (D20), el mismo que lleva el token del encargado. Un identificador ya en forma de Guid también se admite.
+            var texto = contexto.Request.RouteValues.TryGetValue(parametro.NombreDelParametro, out var valor) ? valor?.ToString() : null;
+            sucursal = Guid.TryParse(texto, out var id) ? id : BabelHub.Ecommerce.Application.Plataforma.IdentificadorDeSucursal.DesdeCodigo(texto) ?? Guid.Empty;
         }
 
         var esGet = HttpMethods.IsGet(contexto.Request.Method);
