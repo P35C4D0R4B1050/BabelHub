@@ -1,7 +1,7 @@
 ---
 id: inventario-traslados
 titulo: Traslados entre sucursales
-estado: Planned
+estado: Done
 servicio: Inventario
 prefijo: TRA
 origen: [RF16, RF15, RF07, RF20, NN07]
