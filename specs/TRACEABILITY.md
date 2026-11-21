@@ -53,7 +53,7 @@
 | inventario-ajustes | Inventario | Planned | 22 | 18 | inventario-fuentes, identidad-seguridad, transversal-auditoria |
 | inventario-fuentes | Inventario | Planned | 22 | 18 | identidad-seguridad, transversal-auditoria |
 | inventario-seleccion-fuente | Inventario | Planned | 39 | 40 | inventario-fuentes, identidad-seguridad, transversal-auditoria, transversal-seguridad |
-| inventario-traslados | Inventario | Planned | 23 | 24 | inventario-fuentes, inventario-seleccion-fuente, identidad-seguridad, transversal-auditoria, transversal-notificaciones |
+| inventario-traslados | Inventario | Done | 23 | 24 | inventario-fuentes, inventario-seleccion-fuente, identidad-seguridad, transversal-auditoria, transversal-notificaciones |
 | transversal-auditoria | Transversal | Planned | 44 | 32 | — |
 | transversal-notificaciones | Transversal | Planned | 16 | 16 | identidad-seguridad, transversal-seguridad, transversal-auditoria |
 | transversal-plataforma | Transversal | InProgress | 42 | 37 | — |
