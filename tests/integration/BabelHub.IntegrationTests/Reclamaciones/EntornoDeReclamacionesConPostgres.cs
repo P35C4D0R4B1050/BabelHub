@@ -101,7 +101,18 @@ internal sealed class LimitesDeHojasEnMemoria : IControlDeLimites
         }
     }
 
-    public Task Liberar(ReservaDeLimite reserva, CancellationToken cancelacion = default) => Task.CompletedTask;
+    public Task Liberar(ReservaDeLimite reserva, CancellationToken cancelacion = default)
+    {
+        lock (_candado)
+        {
+            if (_usadas > 0)
+            {
+                _usadas--;
+            }
+        }
+
+        return Task.CompletedTask;
+    }
 
     public Task Completar(ReservaDeLimite reserva, ResultadoMinimo resultado, CancellationToken cancelacion = default)
     {
