@@ -3,7 +3,7 @@ using BabelHub.Ecommerce.Domain.Carrito;
 namespace BabelHub.Ecommerce.UnitTests.Carrito;
 
 /// <summary>
-/// T01: el agregado <see cref="Domain.Carrito.Carrito"/> (propietario cuenta o visitante, una línea por edición, impresa de 1 a 99 unidades y digital siempre una, tope de 50 líneas, total, estado y caducidad de 30 días desde la
+/// T01: el agregado <see cref="Domain.Carrito.Carrito"/> (propietario cuenta o visitante, una línea por edición, impresa de 1 a 20 unidades y digital siempre una, tope de 30 líneas, total, estado y caducidad de 30 días desde la
 /// última acción de la persona solo del visitante).
 /// </summary>
 public sealed class CarritoTests
@@ -95,6 +95,7 @@ public sealed class CarritoTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-CAR-32")]
     public void Sumar_mas_de_20_unidades_de_un_impreso_se_rechaza_y_deja_la_linea_como_estaba()
     {
         var carrito = DeCuenta();
@@ -107,7 +108,7 @@ public sealed class CarritoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAR-25")]
+    [Trait("Criterio", "AC-CAR-32")]
     public void La_linea_treinta_y_una_se_rechaza_con_su_motivo_y_las_treinta_primeras_se_aceptan()
     {
         var carrito = DeVisitante();
@@ -190,7 +191,7 @@ public sealed class CarritoTests
 
     [Fact]
     [Trait("Criterio", "AC-CAR-25")]
-    public void El_carrito_de_un_visitante_caduca_a_los_30_dias_de_su_ultima_accion_y_a_los_31_ya_caduco()
+    public void El_carrito_de_un_visitante_sigue_vigente_a_los_29_dias_y_23_horas_de_su_ultima_modificacion_y_a_los_30_dias_ya_caduco()
     {
         var carrito = DeVisitante();
         carrito.Agregar(Libro, esDigital: false, cantidad: 1, Ahora);

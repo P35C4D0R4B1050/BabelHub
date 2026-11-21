@@ -123,7 +123,6 @@ public sealed class TrabajosYServiciosDePedidosTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PED-13")]
     public async Task Un_tick_sin_trabajo_debido_no_se_registra_como_exito_ni_reinicia_los_fallos_y_los_cinco_trabajos_tienen_nombre_estable()
     {
         var registro = new RegistroEspia();

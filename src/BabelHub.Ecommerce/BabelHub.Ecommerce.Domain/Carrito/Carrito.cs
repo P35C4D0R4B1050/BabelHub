@@ -66,7 +66,7 @@ public sealed class ResultadoDeLinea
 }
 
 /// <summary>
-/// El carrito de una cuenta o de un visitante (CAR-01, CAR-29, D01, D02): una línea por edición, un impreso de 1 a 20 unidades y una digital siempre una, hasta 50 líneas (D14), con su total. El de un visitante caduca a los 30 días
+/// El carrito de una cuenta o de un visitante (CAR-01, CAR-29, D01, D02): una línea por edición, un impreso de 1 a 20 unidades y una digital siempre una, hasta 30 líneas (D14, CAR-38), con su total. El de un visitante caduca a los 30 días
 /// de la última acción <b>de la persona</b> (un <c>GET</c> no la mueve: aquí solo la mueve una operación que cambia el carrito). No lleva precios (los lee el servidor del Catálogo): el total los recibe. Los instantes llegan como parámetros.
 /// </summary>
 public sealed class Carrito

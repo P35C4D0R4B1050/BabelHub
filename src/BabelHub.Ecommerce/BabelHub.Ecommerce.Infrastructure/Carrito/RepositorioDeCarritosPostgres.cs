@@ -9,7 +9,7 @@ namespace BabelHub.Ecommerce.Infrastructure.Carrito;
 /// <summary>
 /// El repositorio de carritos sobre el esquema <c>carrito</c> (T24): cada lectura <c>conBloqueo</c> es <c>SELECT … FOR UPDATE</c> parametrizado dentro de la transacción activa y entrega una entidad <b>nueva</b> leída bajo ese bloqueo (nunca una instancia
 /// leída antes sin él); la violación del índice único de un carrito de cuenta o de visitante se traduce a <see cref="CarritoYaExisteException"/> para que la Aplicación rehaga la transacción (con PostgreSQL una unicidad aborta la transacción y no se puede
-/// seguir dentro de ella). Las líneas se reemplazan enteras al guardar (a lo más 50) con su <c>posicion</c>, y la versión solo avanza: guardar sobre una versión más nueva falla.
+/// seguir dentro de ella). Las líneas se reemplazan enteras al guardar (a lo más 30) con su <c>posicion</c>, y la versión solo avanza: guardar sobre una versión más nueva falla.
 /// </summary>
 public sealed class RepositorioDeCarritosPostgres(AccesoAlEsquemaDelCarrito acceso) : IRepositorioDeCarritos
 {

@@ -122,3 +122,11 @@ Ningún requisito queda en «No cumple»; las diferencias siguientes explican lo
 ## 4. Conclusión
 
 No converge: la spec está implementada de punta a punta con 31 requisitos «Cumple», 10 «Parcial» y ninguno «No cumple», pero faltan cerrar T33 a T36 y T41 (PED-21, 27, 35, 36, 38 y 40 sin sus pruebas con módulos reales), la consulta de no recogidos sin prueba con PostgreSQL (PED-15), y dos diferencias con la spec que piden una decisión (aviso por línea en PED-05 y un número frente a dos en PED-31).
+
+## Actualización (2026-11-20, ronda 2 de ECO-6g)
+
+- **D1 (PED-05) cerrada:** `RecibirEstadoDeTraslado` avisa también cuando solo cambia una línea (prueba `Un_traslado_que_mueve_una_linea_sin_cambiar_el_estado_del_pedido_tambien_avisa…`, AC-PED-04; ajuste en `progress/ajustes-al-implementar.md`).
+- **D3 (PED-31) cerrada en el contrato:** Identidad entrega `IPendientesDeCuentaPorTipo.ContarPorTipo` (dos números) y Pedidos lo implementa; la prueba con módulos reales (`ContarPorTipo_informa_los_dos_numeros_de_la_cuenta`) corre en el turno de Docker. «Un número frente a dos» ya no es una diferencia.
+- **Trazas corregidas:** `AC-PED-09` (entrega), `AC-PED-11` solo en la anulación con digital, `AC-PED-34`, y se quitaron las trazas de las pruebas que no las probaban; la aserción con `||` de la depuración ya no puede pasar sin el conteo.
+- **D2 (PED-15):** prueba PostgreSQL escrita (`La_consulta_de_recojo_vencido_trae_solo…`), pendiente de correr.
+- **Siguen abiertas (turno de Docker):** D4 (T35, Pagos real), D5 (T33, pares con traslado y envío), D6 (T34, Envíos real), D7 (registros sin contacto) y D8 (PED-06, Notificador real); T41 reabierta (AC-PED-10 y AC-PED-12). Resultado: **No converge** hasta cerrarlas.

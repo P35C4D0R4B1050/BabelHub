@@ -37,7 +37,7 @@ public sealed record AjusteDeFusion(Guid EdicionId, MotivoDeAjusteDeFusion Motiv
 public sealed record ResultadoDeFusion(IReadOnlyList<LineaFusionada> Lineas, IReadOnlyList<AjusteDeFusion> Ajustes);
 
 /// <summary>
-/// La regla de fusión del carrito de un visitante con el de la cuenta (CAR-24, AC-CAR-22) como <b>función pura</b>: suma las cantidades de una misma edición hasta el máximo disponible (y 99), deja las digitales en una unidad,
+/// La regla de fusión del carrito de un visitante con el de la cuenta (CAR-24, AC-CAR-22) como <b>función pura</b>: suma las cantidades de una misma edición hasta el máximo disponible (y 20), deja las digitales en una unidad,
 /// descarta las que la cuenta ya posee o dejaron de venderse, aplica el tope de 30 líneas y devuelve los ajustes con su motivo. <b>Nunca quita ni reduce lo que la cuenta ya tenía</b>: solo limita lo que aporta el visitante.
 /// Las líneas de la cuenta conservan su orden y las nuevas del visitante van después, en su orden; una edición que el Catálogo no conoce se trata como no vendible.
 /// </summary>
@@ -78,7 +78,7 @@ public static class Fusion
             FusionarImpresa(aporte, edicion, yaEnLaCuenta, indice, lineas, ajustes);
         }
 
-        // El tope de líneas: las de la cuenta ya estaban (no pasan de 50) y las nuevas del visitante entran en su orden hasta completarlo.
+        // El tope de líneas: las de la cuenta ya estaban (no pasan de 30) y las nuevas del visitante entran en su orden hasta completarlo.
         var lineasDeLaCuenta = deLaCuenta.Count;
         var conTope = new List<LineaFusionada>(lineas.Count);
         var ajustesDeTope = new List<AjusteDeFusion>();

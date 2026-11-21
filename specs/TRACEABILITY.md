@@ -8,7 +8,7 @@
 | :--- | :--- | :--- | :--- |
 | RF01 | ecommerce-catalogo | CAT-09 | AC-CAT-06 |
 | RF02 | ecommerce-catalogo, inventario-fuentes | CAT-10, FUE-05 | AC-CAT-07, AC-FUE-03 |
-| RF03 | ecommerce-carrito-checkout | CAR-01, CAR-02, CAR-03, CAR-04, CAR-16, CAR-24, CAR-29 | AC-CAR-01, AC-CAR-02, AC-CAR-03, AC-CAR-13, AC-CAR-22, AC-CAR-25 |
+| RF03 | ecommerce-carrito-checkout | CAR-01, CAR-02, CAR-03, CAR-04, CAR-16, CAR-24, CAR-29, CAR-38 | AC-CAR-01, AC-CAR-02, AC-CAR-03, AC-CAR-13, AC-CAR-22, AC-CAR-25, AC-CAR-32, AC-CAR-33 |
 | RF04 | ecommerce-carrito-checkout, ecommerce-pedidos, inventario-seleccion-fuente | CAR-05, CAR-07, CAR-08, CAR-09, CAR-10, CAR-11, CAR-19, CAR-23, CAR-25, CAR-26, CAR-27, CAR-30, CAR-31, CAR-32, CAR-33, CAR-34, CAR-35, CAR-36, CAR-37, PED-32, PED-35, PED-36, SEL-20 | AC-CAR-04, AC-CAR-06, AC-CAR-07, AC-CAR-08, AC-CAR-09, AC-CAR-10, AC-CAR-17, AC-CAR-21, AC-CAR-23, AC-CAR-24, AC-CAR-26, AC-CAR-27, AC-CAR-28, AC-CAR-29, AC-CAR-30, AC-CAR-31, AC-PED-27, AC-PED-30, AC-SEL-20 |
 | RF05 | ecommerce-pagos | PAG-01, PAG-03, PAG-04, PAG-05, PAG-06, PAG-07, PAG-08, PAG-09, PAG-10, PAG-13, PAG-14, PAG-15, PAG-16, PAG-17, PAG-18, PAG-19, PAG-20, PAG-21, PAG-24, PAG-25, PAG-26, PAG-27, PAG-28, PAG-29, PAG-30, PAG-31, PAG-32 | AC-PAG-01, AC-PAG-03, AC-PAG-04, AC-PAG-05, AC-PAG-06, AC-PAG-07, AC-PAG-08, AC-PAG-11, AC-PAG-12, AC-PAG-13, AC-PAG-14, AC-PAG-15, AC-PAG-16, AC-PAG-17, AC-PAG-18, AC-PAG-20, AC-PAG-21, AC-PAG-22, AC-PAG-23, AC-PAG-24, AC-PAG-25, AC-PAG-26, AC-PAG-27, AC-PAG-28 |
 | RF06 | ecommerce-pedidos | PED-01, PED-02, PED-03, PED-04, PED-09, PED-10, PED-11, PED-12, PED-15, PED-16, PED-17, PED-18, PED-19, PED-20, PED-21, PED-23, PED-24, PED-25, PED-27, PED-28, PED-29, PED-30, PED-31, PED-32, PED-33, PED-34, PED-36 | AC-PED-01, AC-PED-02, AC-PED-03, AC-PED-07, AC-PED-08, AC-PED-09, AC-PED-10, AC-PED-12, AC-PED-13, AC-PED-14, AC-PED-15, AC-PED-16, AC-PED-17, AC-PED-18, AC-PED-19, AC-PED-20, AC-PED-21, AC-PED-22, AC-PED-23, AC-PED-24, AC-PED-25, AC-PED-26, AC-PED-27, AC-PED-28, AC-PED-29, AC-PED-30 |
@@ -42,7 +42,7 @@
 | :--- | :--- | :--- | ---: | ---: | :--- |
 | asistente-compra-ia | E-commerce | Planned | 20 | 19 | ecommerce-catalogo, ecommerce-pedidos, identidad-seguridad, transversal-seguridad |
 | ecommerce-biblioteca-digital | E-commerce | InProgress | 29 | 26 | ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-pagos, identidad-seguridad, transversal-auditoria, transversal-seguridad |
-| ecommerce-carrito-checkout | E-commerce | Planned | 37 | 31 | ecommerce-catalogo, inventario-seleccion-fuente, identidad-seguridad, transversal-seguridad |
+| ecommerce-carrito-checkout | E-commerce | Planned | 38 | 33 | ecommerce-catalogo, inventario-seleccion-fuente, identidad-seguridad, transversal-seguridad |
 | ecommerce-catalogo | E-commerce | Planned | 23 | 19 | inventario-fuentes, inventario-ajustes, transversal-auditoria |
 | ecommerce-devoluciones | E-commerce | Planned | 31 | 32 | ecommerce-pedidos, ecommerce-pagos, ecommerce-biblioteca-digital, inventario-ajustes, transversal-auditoria, transversal-notificaciones, identidad-seguridad, transversal-seguridad |
 | ecommerce-envios | E-commerce | InProgress | 18 | 18 | ecommerce-pedidos, inventario-seleccion-fuente, identidad-seguridad, transversal-notificaciones, transversal-auditoria, transversal-seguridad |

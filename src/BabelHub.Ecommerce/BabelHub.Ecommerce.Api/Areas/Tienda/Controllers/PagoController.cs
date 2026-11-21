@@ -19,7 +19,7 @@ namespace BabelHub.Ecommerce.Api.Areas.Tienda.Controllers;
 [Area("Tienda")]
 [RequestSizeLimit(EntradasHttpDelCarrito.TopeDelCuerpo)]
 [RequiereSesion]
-public sealed class PagoController(IPagos pagos, ICheckoutDelCliente checkout, ContextoDePagina pagina, OpcionesDeErrores errores) : Controller
+public sealed class PagoController(IPagos pagos, ICheckoutDelCliente checkout, ContextoDePagina pagina, OpcionesDeErrores errores, IReloj reloj) : Controller
 {
     public const string RutaDelEstado = "/checkout/pago/estado";
 
@@ -72,7 +72,7 @@ public sealed class PagoController(IPagos pagos, ICheckoutDelCliente checkout, C
             return await Falla(estado.Error!, cancelacion);
         }
 
-        var vista = await pagina.Completar(new PagoVista { PedidoId = pedido, Estado = estado.Valor }, "Pagar", cancelacion: cancelacion);
+        var vista = await pagina.Completar(new PagoVista { PedidoId = pedido, Estado = estado.Valor, Ahora = reloj.Ahora }, "Pagar", cancelacion: cancelacion);
         Response.Headers.CacheControl = "no-store";
         if (estado.Valor.Estado != EstadoDelPagoDeLaCompra.ListoParaPagar || !estado.Valor.PuedeReintentar)
         {
@@ -177,7 +177,7 @@ public sealed class PagoController(IPagos pagos, ICheckoutDelCliente checkout, C
             return await Falla(estado.Error!, cancelacion);
         }
 
-        var vista = await pagina.Completar(new PagoVista { PedidoId = pedido, Estado = estado.Valor }, "Estado de tu pago", cancelacion: cancelacion);
+        var vista = await pagina.Completar(new PagoVista { PedidoId = pedido, Estado = estado.Valor, Ahora = reloj.Ahora }, "Estado de tu pago", cancelacion: cancelacion);
         Response.Headers.CacheControl = "no-store";
         return Request.EsHtmx() ? PartialView("_Estado", vista) : View("Estado", vista);
     }

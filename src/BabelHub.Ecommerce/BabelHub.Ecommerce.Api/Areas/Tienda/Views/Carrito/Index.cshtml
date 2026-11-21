@@ -138,6 +138,10 @@ else
                 <bh-accion-de-cambio>
                     <form method="post" action="/checkout/iniciar">
                         <partial name="_TokenAntifalsificacion" />
+                        @if (Model.SucursalPreferida is { Length: > 0 } sucursalPreferida)
+                        {
+                            <input type="hidden" name="sucursalPreferida" value="@sucursalPreferida" />
+                        }
                         <button type="submit" class="btn btn-primary w-full">Continuar con la compra</button>
                     </form>
                 </bh-accion-de-cambio>

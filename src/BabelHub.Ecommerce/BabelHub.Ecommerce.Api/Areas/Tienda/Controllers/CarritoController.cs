@@ -240,7 +240,7 @@ public sealed class CarritoController(ICarritoDelCliente carrito, IActorActual a
             MotivoDeAjusteDeAviso.NoVendible => $"Quitamos «{a.Titulo}» de tu carrito porque ya no está a la venta.",
             MotivoDeAjusteDeAviso.RecortadaAlMaximo => $"Ajustamos «{a.Titulo}» a {a.CantidadFinal} unidades, el máximo disponible.",
             MotivoDeAjusteDeAviso.DigitalAUnaUnidad => $"«{a.Titulo}» es digital: dejamos una sola licencia en tu carrito.",
-            MotivoDeAjusteDeAviso.TopeDeLineas => $"No pudimos pasar «{a.Titulo}» a tu carrito: llegó al máximo de 50 libros distintos.",
+            MotivoDeAjusteDeAviso.TopeDeLineas => $"No pudimos pasar «{a.Titulo}» a tu carrito: llegó al máximo de 30 libros distintos.",
             MotivoDeAjusteDeAviso.TopeDeUnidades => $"Ajustamos «{a.Titulo}»: llegaste al máximo de unidades por libro.",
             _ => $"Ajustamos «{a.Titulo}» en tu carrito.",
         };

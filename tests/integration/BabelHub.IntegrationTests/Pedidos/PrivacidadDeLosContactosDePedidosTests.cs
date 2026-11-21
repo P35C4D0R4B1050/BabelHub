@@ -81,7 +81,7 @@ public sealed class PrivacidadDeLosContactosDePedidosTests(PostgresDePedidosFixt
         // Lo demás del pedido se conserva (total, líneas, cuenta opaca) y la auditoría de la corrida lleva solo el conteo.
         var conservado = (await bd.Pedidos.Obtener(viejo.Id, conBloqueo: false))!;
         Assert.Equal((viejo.Total, viejo.Lineas.Count, viejo.CuentaId), (conservado.Total, conservado.Lineas.Count, conservado.CuentaId));
-        Assert.Contains(escenario.Auditoria.Solicitudes, s => s.Accion.Identificador.Contains("pedidos-depurados", StringComparison.OrdinalIgnoreCase) || s.Detalle.ContainsKey("cantidad"));
+        Assert.Contains(escenario.Auditoria.Solicitudes, s => s.Detalle.ContainsKey("cantidad"));
     }
 
     [Fact]
@@ -145,7 +145,6 @@ public sealed class PrivacidadDeLosContactosDePedidosTests(PostgresDePedidosFixt
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PED-26")]
     [Trait("Criterio", "AC-PED-34")]
     public async Task El_contacto_no_aparece_en_los_avisos_ni_en_el_detalle_de_la_auditoria()
     {

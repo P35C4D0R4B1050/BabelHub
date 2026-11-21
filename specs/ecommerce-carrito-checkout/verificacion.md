@@ -99,3 +99,9 @@ Orden: lo que impide converger primero. «Cierra» indica la tarea o la prueba q
 ## 4. Conclusión
 
 No converge (provisional): el código implementa los 37 requisitos y 33 tienen prueba que fallaría si se rompieran, pero CAR-29 contradice la spec (30 líneas frente a 50, D-01), CAR-24 y CAR-25 y CAR-05 tienen una brecha concreta (D-02, D-06, D-07), T25 y T36 siguen sin marcar y la sección 1 no se ha ejecutado. Para converger: resolver D-01 (spec o código), cerrar T36 con el ingreso real y la compra real a domicilio y digital (D-02, D-05), corregir D-06 y D-07 o ajustar la spec con nueva aprobación, re-etiquetar las trazas (D-04) y correr las cinco comprobaciones.
+
+## Actualización (2026-11-20, ronda 2 de ECO-6g)
+
+- **D-01 cerrada:** la spec se enmendó (CAR-29 solo retención; CAR-38 y AC-CAR-32 y 33 para los topes de 30 líneas y 20 unidades) y está **Planned** (filas de `progress/aprobaciones.md` del 2026-11-20; excepción DD-17). El código y las pruebas ya nombran AC-CAR-32 y 33.
+- **D-03 cerrada:** T25 marcada. **D-04:** trazas `AC-CAR` corregidas en lo tocado por esta ronda (el resto de las trazas de `InventarioDelCarritoConPostgresTests` sigue por revisar). **D-06 y D-07 cerradas** (campo oculto `sucursalPreferida`; «Te quedan N min.» con prueba).
+- **Siguen abiertas:** D-02 y D-05 (E2E de fusión, de compra a domicilio y solo digital con las cadenas reales, y `ui-review`; turno de Docker) y D-08 (prueba de «cambia de sucursal preferida y mantiene su carrito»). Resultado: **No converge** hasta cerrarlas.

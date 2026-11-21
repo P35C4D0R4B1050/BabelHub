@@ -347,4 +347,31 @@ public sealed class RepositorioDePedidosPostgresTests(PostgresDePedidosFixture b
         Assert.Equal(0, await bd.Pedidos.ContarNoRecogidasSinAnularDesde(Ahora.AddDays(1)));
         Assert.Equal(4, await bd.Pedidos.ContarImpresasSinEstadoFinalDesde(Ahora.AddDays(1)));
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-PED-13")]
+    public async Task La_consulta_de_recojo_vencido_trae_solo_las_listas_de_recojo_con_mas_de_15_dias_y_no_las_de_14_ni_las_de_domicilio()
+    {
+        var plazo = TimeSpan.FromHours(PoliticaDeNoRecogido.PlazoEnHoras);
+        var vencido = Recojo();
+        var justoAntes = Recojo();
+        var reciente = Recojo();
+        var sinListo = Recojo();
+        var aDomicilio = Domicilio();
+        foreach (var pedido in new[] { vencido, justoAntes, reciente, sinListo, aDomicilio })
+        {
+            Assert.True(await bd.Pedidos.Agregar(pedido));
+        }
+
+        string Listo(Pedido pedido, DateTimeOffset listoEn) =>
+            $"UPDATE pedidos.lineas_de_pedido SET estado = 'listo_para_recojo', listo_en = '{listoEn.UtcDateTime:O}' WHERE pedido_id = '{pedido.Id}' AND NOT es_digital";
+        await bd.Ejecutar(Listo(vencido, Ahora - plazo - TimeSpan.FromHours(1)));
+        await bd.Ejecutar(Listo(justoAntes, Ahora - plazo + TimeSpan.FromMinutes(1)));
+        await bd.Ejecutar(Listo(reciente, Ahora - TimeSpan.FromDays(14)));
+        await bd.Ejecutar(Listo(aDomicilio, Ahora - plazo - TimeSpan.FromDays(2)));
+
+        var candidatos = await bd.Pedidos.PedidosConRecojoVencido(Ahora, 100);
+
+        Assert.Equal([vencido.Id], candidatos);
+    }
 }

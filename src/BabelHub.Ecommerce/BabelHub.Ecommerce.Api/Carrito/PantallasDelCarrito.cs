@@ -22,8 +22,8 @@ public static class PantallasDelCarrito
     private static readonly Dictionary<string, Texto> PorCodigo = new(StringComparer.Ordinal)
     {
         ["ECO-CARRITO-SIN-STOCK"] = new("No hay stock suficiente", "Ajusta la cantidad: de este libro quedan menos unidades de las que pediste. No se hizo ningún cobro."),
-        ["ECO-CARRITO-LIMITE-DE-LINEAS"] = new("Tu carrito está lleno", "Un carrito admite hasta 50 libros distintos. Quita alguno para agregar otro."),
-        ["ECO-CARRITO-LIMITE-DE-UNIDADES"] = new("Llegaste al máximo de unidades", "Puedes comprar hasta 99 unidades de un mismo libro."),
+        ["ECO-CARRITO-LIMITE-DE-LINEAS"] = new("Tu carrito está lleno", "Un carrito admite hasta 30 libros distintos. Quita alguno para agregar otro."),
+        ["ECO-CARRITO-LIMITE-DE-UNIDADES"] = new("Llegaste al máximo de unidades", "Puedes comprar hasta 20 unidades de un mismo libro."),
         ["ECO-DIGITAL-YA-POSEIDA"] = new("Ya tienes este libro", "Está en tu biblioteca: no hace falta comprarlo otra vez."),
         ["ECO-EDICION-NO-DISPONIBLE"] = new("Este libro ya no está disponible", "Lo retiraron de la venta. Puedes elegir otra edición en el catálogo."),
         ["ECO-CHECKOUT-PAGO-PENDIENTE"] = new("Tu pago está en proceso", "Espera a que se confirme antes de cambiar tu compra."),
