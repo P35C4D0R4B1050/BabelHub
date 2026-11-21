@@ -1,4 +1,5 @@
 using System.Reflection;
+using BabelHub.Ecommerce.Application.Identidad;
 using BabelHub.Ecommerce.Application.Web;
 using BabelHub.Ecommerce.Application.Web.Interno;
 
@@ -95,6 +96,26 @@ public sealed class VersionesDeTextosProvisionales : IVersionesDeTextosLegales
 
     public Task<VersionVigenteDeTexto?> ObtenerVigente(TipoDeTextoLegal tipo, CancellationToken cancelacion = default) =>
         Task.FromResult<VersionVigenteDeTexto?>(Version);
+}
+
+/// <summary>
+/// La versión vigente de cada texto tal como la guarda Identidad (IDE-57): la web muestra y envía <b>la misma</b> versión que Identidad compara al registrar la aceptación. Si Identidad no puede leerla, la excepción sube
+/// y <c>ConsultarTextoLegal</c> responde «no disponible»; nunca se inventa una versión.
+/// </summary>
+public sealed class VersionesDeTextosDeIdentidad(IVersionesVigentesDeLosTextos identidad) : IVersionesDeTextosLegales
+{
+    public async Task<VersionVigenteDeTexto?> ObtenerVigente(TipoDeTextoLegal tipo, CancellationToken cancelacion = default)
+    {
+        var vigentes = await identidad.Consultar(cancelacion).ConfigureAwait(false);
+        var version = tipo switch
+        {
+            TipoDeTextoLegal.Terminos => vigentes.Terminos,
+            TipoDeTextoLegal.Privacidad => vigentes.Privacidad,
+            TipoDeTextoLegal.Reembolso => vigentes.Reembolso,
+            _ => null,
+        };
+        return version is null ? null : new VersionVigenteDeTexto(version, vigentes.VigenteDesde);
+    }
 }
 
 /// <summary>Sin el contrato de Identidad que informa la versión vigente, en producción los textos legales no están disponibles: no se inventa una versión.</summary>

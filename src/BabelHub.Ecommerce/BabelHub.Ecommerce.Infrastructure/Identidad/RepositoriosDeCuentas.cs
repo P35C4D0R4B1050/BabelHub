@@ -330,14 +330,17 @@ public sealed class PostgresRepositorioDeCuentas(AccesoAlEsquemaDeIdentidad acce
 /// <summary>Las versiones vigentes de los textos legales (<c>identidad.versiones_de_textos</c>, una sola fila): la siembra la hace la migración de datos del despliegue.</summary>
 public sealed class PostgresVersionesDeTextosVigentes(AccesoAlEsquemaDeIdentidad acceso) : IVersionesDeTextosVigentes
 {
-    public Task<VersionesDeTextos> Obtener(CancellationToken cancelacion = default) =>
+    public async Task<VersionesDeTextos> Obtener(CancellationToken cancelacion = default) =>
+        (await ObtenerConVigencia(cancelacion).ConfigureAwait(false)).Versiones;
+
+    public Task<(VersionesDeTextos Versiones, DateOnly VigenteDesde)> ObtenerConVigencia(CancellationToken cancelacion = default) =>
         acceso.Ejecutar(
             async (c, t, ct) =>
             {
-                await using var comando = AccesoAlEsquemaDeIdentidad.Comando(c, t, "SELECT terminos, privacidad, reembolso FROM identidad.versiones_de_textos WHERE id = 1");
+                await using var comando = AccesoAlEsquemaDeIdentidad.Comando(c, t, "SELECT terminos, privacidad, reembolso, vigente_desde FROM identidad.versiones_de_textos WHERE id = 1");
                 await using var filas = await comando.ExecuteReaderAsync(ct).ConfigureAwait(false);
                 return await filas.ReadAsync(ct).ConfigureAwait(false)
-                    ? new VersionesDeTextos(filas.GetString(0), filas.GetString(1), filas.GetString(2))
+                    ? (new VersionesDeTextos(filas.GetString(0), filas.GetString(1), filas.GetString(2)), filas.GetFieldValue<DateOnly>(3))
                     : throw new InvalidOperationException("No hay versiones de textos vigentes: falta sembrarlas.");
             },
             cancelacion);

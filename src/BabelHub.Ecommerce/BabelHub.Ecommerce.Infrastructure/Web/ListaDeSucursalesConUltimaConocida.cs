@@ -107,14 +107,12 @@ public static class ModuloWebExtensiones
     {
         ArgumentNullException.ThrowIfNull(servicios);
         servicios.AddSingleton<IContenidoDeTextosLegales, ContenidoDeTextosEmbebido>();
-        if (permitirVersionesProvisionales)
-        {
-            servicios.AddSingleton<IVersionesDeTextosLegales, VersionesDeTextosProvisionales>();
-        }
-        else
-        {
-            servicios.AddSingleton<IVersionesDeTextosLegales, VersionesDeTextosNoDisponibles>();
-        }
+        // La versión vigente es la de Identidad (la misma fila con la que Identidad compara lo que la web envía al aceptar: IDE-57). Solo si Identidad no está compuesta (una prueba de la interfaz sola)
+        // se cae a la provisional —y solo fuera de producción— o a «no disponible»; en el servicio compuesto la provisional nunca se usa.
+        servicios.AddScoped<IVersionesDeTextosLegales>(sp =>
+            sp.GetService<BabelHub.Ecommerce.Application.Identidad.IVersionesVigentesDeLosTextos>() is { } identidad
+                ? new VersionesDeTextosDeIdentidad(identidad)
+                : permitirVersionesProvisionales ? new VersionesDeTextosProvisionales() : new VersionesDeTextosNoDisponibles());
 
         servicios.AddScoped<ITextosLegales, ConsultarTextoLegal>();
         servicios.AddSingleton<IAreasDeInterfaz, AreasDeInterfaz>();

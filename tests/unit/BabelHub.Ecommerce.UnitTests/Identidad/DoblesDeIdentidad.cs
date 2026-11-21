@@ -343,7 +343,11 @@ internal sealed class VersionesDePrueba(VersionesDeTextos vigentes) : IVersiones
 {
     public VersionesDeTextos Vigentes { get; set; } = vigentes;
 
+    public DateOnly VigenteDesde { get; set; } = new(2026, 11, 14);
+
     public Task<VersionesDeTextos> Obtener(CancellationToken cancelacion = default) => Task.FromResult(Vigentes);
+
+    public Task<(VersionesDeTextos Versiones, DateOnly VigenteDesde)> ObtenerConVigencia(CancellationToken cancelacion = default) => Task.FromResult((Vigentes, VigenteDesde));
 }
 
 internal sealed class CalculadorDeHuellaDePrueba : ICalculadorDeHuella
