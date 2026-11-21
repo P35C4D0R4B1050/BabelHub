@@ -255,6 +255,11 @@ public static class TrabajosDeIdentidad
 /// <summary>El servicio en segundo plano que corre los trabajos de Identidad en paralelo hasta el apagado.</summary>
 public sealed class ServicioDeTrabajosDeIdentidad(IEnumerable<TrabajoDeFondoDeIdentidad> trabajos) : BackgroundService
 {
+    private readonly IReadOnlyList<TrabajoDeFondoDeIdentidad> _trabajos = [.. trabajos];
+
+    /// <summary>Los nombres de los trabajos que corre este servicio (para comprobar la composición).</summary>
+    public IReadOnlyList<string> Nombres => [.. _trabajos.Select(t => t.Nombre)];
+
     protected override Task ExecuteAsync(CancellationToken cancelacion) =>
-        Task.WhenAll(trabajos.Select(trabajo => trabajo.Correr(cancelacion)));
+        Task.WhenAll(_trabajos.Select(trabajo => trabajo.Correr(cancelacion)));
 }
