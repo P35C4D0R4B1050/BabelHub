@@ -28,6 +28,7 @@ public static class PlantillasDeBorrador
         "/reclamaciones/nueva",
         "/cuenta/datos",
         "/checkout/datos",
+        "/checkout/entrega",
     };
 
     public static bool EsConservable(string? plantilla) => plantilla is not null && Conservables.Contains(plantilla);
