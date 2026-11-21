@@ -124,6 +124,8 @@ public sealed class CambioDeCorreo(
     AvisosDeCuenta avisos,
     IRepositorioDeRenovaciones renovaciones,
     RevocacionDeSesiones revocacion,
+    ReceptoresDeCambiosDeCuentaCompuestos receptores,
+    IPublicadorDeAlertasTecnicas alertas,
     EventosDeSeguridadDeIdentidad eventos,
     IUnidadDeTrabajo unidad,
     IAuditoria auditoria,
@@ -306,7 +308,7 @@ public sealed class CambioDeCorreo(
         Usuario? conElCorreoAnterior = null;
 
         // El intento, el consumo del código, el cambio del correo, el aviso en la cuenta y la auditoría son UNA transacción (AUD-04): si no se puede auditar, no se cambia.
-        var resultado = await unidad.Ejecutar(
+        var resultado = await ProtegerLosReceptores(() => unidad.Ejecutar(
             async ct =>
             {
                 var verificacion = await codigos.Verificar(usuarioId, DominioProposito.VerificacionDeCorreo, huella, reloj.Ahora, ct).ConfigureAwait(false);
@@ -339,6 +341,14 @@ public sealed class CambioDeCorreo(
 
                 // El correo anterior se captura antes de aplicar el cambio: es el destino del aviso de IDE-94 (verificado y vigente hasta ahora).
                 conElCorreoAnterior = Usuario.Restaurar(cuenta.Usuario.Id, cuenta.Usuario.Correo, cuenta.Usuario.Rol, cuenta.Usuario.Sucursal, correoVerificado: true, cuenta.Usuario.Activo);
+
+                // Los módulos receptores (Reclamaciones vincula las hojas del correo anterior a la cuenta) se avisan ANTES de liberar el correo anterior y en esta misma transacción: si uno falla, o no hay ninguno, no
+                // se aplica nada (IDE-99). El correo anterior viaja solo en memoria; el personal no vincula hojas.
+                if (cuenta.Usuario.Rol == RolDeUsuario.Cliente)
+                {
+                    await receptores.AlCambiarElCorreo(usuarioId, cuenta.Usuario.Correo, ct).ConfigureAwait(false);
+                }
+
                 cuenta.Usuario.CambiarElCorreo(cambio.CorreoNuevo);
                 await cuentas.Guardar(cuenta, ct).ConfigureAwait(false);
                 await cambios.Guardar(cambio, ct).ConfigureAwait(false);
@@ -363,7 +373,7 @@ public sealed class CambioDeCorreo(
                 conElCorreoNuevo = cuenta.Usuario;
                 return Resultado<RespuestaUniforme>.Exito(new RespuestaUniforme());
             },
-            cancelacion).ConfigureAwait(false);
+            cancelacion), cancelacion).ConfigureAwait(false);
 
         if (rechazado is { } motivo)
         {
@@ -383,6 +393,31 @@ public sealed class CambioDeCorreo(
         return resultado;
     }
 
+
+    /// <summary>
+    /// Ejecuta la transacción del cambio y, si un módulo receptor no pudo aplicar su parte o no hay ninguno (IDE-99), la deja revertida (la excepción ya deshizo todo) y responde servicio no disponible con una alerta técnica
+    /// genérica: ni el correo anterior ni la causa del receptor salen de aquí.
+    /// </summary>
+    private async Task<Resultado<RespuestaUniforme>> ProtegerLosReceptores(Func<Task<Resultado<RespuestaUniforme>>> transaccion, CancellationToken cancelacion)
+    {
+        try
+        {
+            return await transaccion().ConfigureAwait(false);
+        }
+        catch (CambiosDeCuentaNoAplicablesException)
+        {
+            try
+            {
+                await alertas.Publicar(new AlertaTecnica(EmisionDeCodigos.MotivoDeFallaDelCorreo, reloj.Ahora)).ConfigureAwait(false);
+            }
+            catch (Exception) when (!cancelacion.IsCancellationRequested)
+            {
+                // Sin a dónde mandar la alerta: el cambio ya no se aplicó y la respuesta es la misma.
+            }
+
+            return Resultado<RespuestaUniforme>.Fallo(FallosDeIdentidad.NoDisponible);
+        }
+    }
     /// <summary>La familia de la sesión desde la que se verifica, solo si es de este usuario: si no se puede identificar, se revocan todas (lo más seguro).</summary>
     private async Task<Guid?> FamiliaDeLaSesion(Guid usuarioId, ValorSecreto? renovacion, CancellationToken cancelacion)
     {

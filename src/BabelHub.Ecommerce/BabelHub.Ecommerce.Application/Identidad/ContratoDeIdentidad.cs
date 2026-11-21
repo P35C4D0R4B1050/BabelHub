@@ -131,6 +131,17 @@ public interface ICorreoVerificadoDeSistema
     Task<string?> Consultar(Guid usuarioId, CancellationToken cancelacion = default);
 }
 
+/// <summary>
+/// La cuenta de un <b>cliente</b> a partir de su correo verificado, para el Libro de Reclamaciones (IDE-99, DD-26; vinculación inicial de las hojas, REC-26): un contrato <b>de sistema</b>, en proceso y sin actor,
+/// que <b>no se expone por HTTP</b> y solo lee. Devuelve el identificador de la cuenta de <b>cliente</b> activa, no cancelada ni desactivada, cuyo correo <b>verificado</b> coincide, o <see langword="null"/> si el
+/// correo es del personal, no está verificado o no tiene cuenta. No registra ni audita el correo y <b>lanza</b> si no puede leer (nunca se confunde «no se pudo saber» con «sin cuenta»). Su único llamador previsto es
+/// Reclamaciones, que no debe usar el resultado para revelar a un visitante si un correo tiene cuenta.
+/// </summary>
+public interface IClientePorCorreoVerificadoDeSistema
+{
+    Task<Guid?> Consultar(string correoNormalizado, CancellationToken cancelacion = default);
+}
+
 /// <summary>La versión vigente de cada texto legal y la fecha desde la que rige el conjunto, tal como la guarda Identidad (IDE-34, IDE-43, IDE-57).</summary>
 public sealed record VersionesVigentesDeLosTextos(string Terminos, string Privacidad, string Reembolso, DateOnly VigenteDesde);
 

@@ -113,6 +113,8 @@ public static class AccionesDeAuditoria
 
     public const string HojaDeReclamacionAnonimizada = "HojaDeReclamacionAnonimizada";
 
+    public const string HojaDeReclamacionVinculada = "HojaDeReclamacionVinculada";
+
     public const string HojaDeReclamacionConsultada = "HojaDeReclamacionConsultada";
 
     public const string HojaDeReclamacionDescartada = "HojaDeReclamacionDescartada";
@@ -304,6 +306,7 @@ public static class AccionesDeAuditoria
         FuenteRegistrada,
         GuiaDeTrasladoRegistrada,
         HojaDeReclamacionAnonimizada,
+        HojaDeReclamacionVinculada,
         HojaDeReclamacionConsultada,
         HojaDeReclamacionDescartada,
         HojaDeReclamacionRespondida,

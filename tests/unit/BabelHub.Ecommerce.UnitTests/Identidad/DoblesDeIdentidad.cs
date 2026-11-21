@@ -1011,3 +1011,33 @@ internal sealed class PorAnonimizarEnMemoria(BdIdentidad bd) : IPorAnonimizar
     public Task<IReadOnlyList<Guid>> Listar(int maximo, CancellationToken cancelacion = default) =>
         Task.FromResult<IReadOnlyList<Guid>>([.. bd.PorAnonimizar.Take(maximo)]);
 }
+
+/// <summary>El receptor de los cambios de cuenta de prueba (IDE-99): registra el correo que recibe y el correo vigente al recibirlo, y puede fallar con una excepción que lleva el correo en el mensaje.</summary>
+internal sealed class ReceptorDeCambiosDeCuentaDePrueba : IReceptorDeCambiosDeCuenta
+{
+    public string Modulo => "reclamaciones";
+
+    public List<(Guid UsuarioId, string CorreoAnterior)> AlCambiarElCorreoLlamadas { get; } = [];
+
+    public List<Guid> AlReemplazarLaCuentaLlamadas { get; } = [];
+
+    /// <summary>Lo que ve el receptor al llamarlo: por ejemplo, el correo de la cuenta en ese instante (la prueba de que el correo anterior sigue vigente).</summary>
+    public Func<Guid, string?>? CorreoVigenteDe { get; set; }
+
+    public List<string?> CorreosVigentesAlLlamar { get; } = [];
+
+    public bool Falla { get; set; }
+
+    public Task AlCambiarElCorreo(Guid usuarioId, string correoAnteriorNormalizado, CancellationToken cancelacion = default)
+    {
+        AlCambiarElCorreoLlamadas.Add((usuarioId, correoAnteriorNormalizado));
+        CorreosVigentesAlLlamar.Add(CorreoVigenteDe?.Invoke(usuarioId));
+        return Falla ? throw new InvalidOperationException($"No se pudo vincular las hojas de {correoAnteriorNormalizado}.") : Task.CompletedTask;
+    }
+
+    public Task AlReemplazarLaCuenta(Guid usuarioId, CancellationToken cancelacion = default)
+    {
+        AlReemplazarLaCuentaLlamadas.Add(usuarioId);
+        return Falla ? throw new InvalidOperationException("No se pudo desvincular las hojas.") : Task.CompletedTask;
+    }
+}

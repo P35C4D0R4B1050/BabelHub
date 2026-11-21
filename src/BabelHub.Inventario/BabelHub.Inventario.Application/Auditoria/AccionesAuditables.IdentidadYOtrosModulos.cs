@@ -67,6 +67,9 @@ public static partial class AccionesAuditables
 
     public static readonly AccionAuditable HojaDeReclamacionAnonimizada = new(nameof(HojaDeReclamacionAnonimizada));
 
+    /// <summary>Una operación vinculó una o más hojas de reclamación a la cuenta de un cliente (AUD-46, DD-26): objeto personal, detalle solo con el disparador y el conteo, sin el correo ni el número de ninguna hoja.</summary>
+    public static readonly AccionAuditable HojaDeReclamacionVinculada = new(nameof(HojaDeReclamacionVinculada));
+
     /// <summary>La administración consultó una hoja de reclamación (AUD-21).</summary>
     public static readonly AccionAuditable HojaDeReclamacionConsultada = new(nameof(HojaDeReclamacionConsultada));
 

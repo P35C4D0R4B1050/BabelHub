@@ -163,6 +163,9 @@ public static class ComposicionDeIdentidad
 
         // Los pendientes de la cuenta suman todos los módulos y el Inventario; el compuesto se construye por fábrica con la lista explícita para no recursar (nunca se registra como IPendientesDeCuenta).
         servicios.TryAddScoped(sp => new PendientesDeCuentaCompuestos([.. sp.GetServices<IPendientesDeCuenta>().Where(m => m is not PendientesDeCuentaCompuestos)]));
+
+        // Los módulos receptores de los cambios de cuenta (IDE-99): el compuesto falla cerrado si no hay ninguno y descarta el mensaje de los que fallan.
+        servicios.TryAddScoped(sp => new ReceptoresDeCambiosDeCuentaCompuestos([.. sp.GetServices<IReceptorDeCambiosDeCuenta>()]));
         servicios.TryAddScoped(sp => ActivatorUtilities.CreateInstance<EjecutorDeLaCancelacion>(sp));
         servicios.TryAddScoped<IEjecutorDeLaCancelacion>(sp => sp.GetRequiredService<EjecutorDeLaCancelacion>());
 
@@ -186,6 +189,7 @@ public static class ComposicionDeIdentidad
         servicios.TryAddScoped<IContextoDeLectura, ContextoDeLecturaDelAsistente>();
         servicios.TryAddScoped<IContactoDeAvisosDelCliente, ContactoDeAvisosDeIdentidad>();
         servicios.TryAddScoped<ICorreoVerificadoDeSistema, CorreoVerificadoDeSistemaDeIdentidad>();
+        servicios.TryAddScoped<IClientePorCorreoVerificadoDeSistema, ClientePorCorreoVerificadoDeSistemaDeIdentidad>();
         servicios.TryAddScoped<IVersionesVigentesDeLosTextos, VersionesVigentesDeLosTextosDeIdentidad>();
 
         // ---------- Puertos que Identidad implementa para otros módulos (los de Auditoría, aparte: solo Identidad y Auditoría pueden depender de ellos) ----------

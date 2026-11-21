@@ -217,6 +217,21 @@ public sealed class RegistroDeCuentasTests
         Assert.NotNull(sesion);
     }
 
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-71")]
+    public async Task AlReemplazarUnaCuentaSinVerificar_SeAvisaAlReceptor_ConLaCuentaViejaAntesDeEliminarla()
+    {
+        var e = new EntornoDeIdentidad();
+        var vieja = e.Cuenta("ana@example.com", verificada: false);
+        e.Receptor.CorreoVigenteDe = id => e.Bd.Cuentas.TryGetValue(id, out var cuenta) ? cuenta.Usuario.Correo : null;
+
+        var resultado = await e.Registro().Registrar(e.Alta("ana@example.com"));
+
+        Assert.True(resultado.EsExito);
+        Assert.Equal([vieja.Usuario.Id], e.Receptor.AlReemplazarLaCuentaLlamadas);
+        Assert.Empty(e.Receptor.AlCambiarElCorreoLlamadas);
+    }
     [Fact]
     [Trait("Criterio", "AC-IDE-63")]
     public async Task UnaCuentaSinVerificarConPendientes_NoSeReemplaza_ComoUnCorreoEnUso()
@@ -238,6 +253,8 @@ public sealed class RegistroDeCuentasTests
     [InlineData("pendientes")]
     [InlineData("carrito")]
     [InlineData("auditoria")]
+    [InlineData("receptor")]
+    [InlineData("sin-receptor")]
     public async Task SiUnPuertoDelReemplazoFalla_NoSeReemplazaNada_YElRechazoEsIndistinguibleDeIde13(string quienFalla)
     {
         var e = new EntornoDeIdentidad();
@@ -247,6 +264,8 @@ public sealed class RegistroDeCuentasTests
         e.Pendientes.Falla = quienFalla == "pendientes";
         e.Carrito.Falla = quienFalla == "carrito";
         e.Auditoria.Falla = quienFalla == "auditoria";
+        e.Receptor.Falla = quienFalla == "receptor";
+        e.SinReceptores = quienFalla == "sin-receptor";
 
         var fallido = await e.Registro().Registrar(e.Alta("ana@example.com"));
         var enUso = await e.Registro().Registrar(e.Alta("otra@example.com"));
