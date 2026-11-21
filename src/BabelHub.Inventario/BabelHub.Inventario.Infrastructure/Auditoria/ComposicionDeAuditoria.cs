@@ -91,7 +91,9 @@ public static class ComposicionDeAuditoria
             sp.GetRequiredService<IEstadoDeLaDepuracion>(), sp.GetRequiredService<IBloqueoDeLaDepuracion>(), sp.GetRequiredService<IAlertas>(), sp.GetRequiredService<IActorActual>(),
             sp.GetRequiredService<IUnidadDeTrabajo>(), sp.GetRequiredService<IReloj>()));
         // El último paso de la restauración (AUD-31): vuelve a llenar por_anonimizar y depura antes de abrir al público.
-        servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IPasoDeRestauracion, PasoDeRestauracionDeDepuracion>());
+        // El ejecutor de pasos es un singleton y la depuración es por alcance: el paso que ve el ejecutor crea su alcance y fija el actor «sistema».
+        servicios.TryAddScoped<PasoDeRestauracionDeDepuracion>();
+        servicios.TryAddEnumerable(ServiceDescriptor.Singleton<IPasoDeRestauracion, PasoDeRestauracionDeDepuracionEnAlcance>());
         return servicios;
     }
 

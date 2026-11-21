@@ -598,8 +598,10 @@ public sealed class ArranqueSeguroInventarioTests : IDisposable
         var primera = Arrancar("Production", "Restauracion", marca);
         var segunda = Arrancar("Production", "Restauracion", marca);
 
-        Assert.True(primera.Codigo == 0, primera.Salida);
-        Assert.Contains("restauracion: puede abrirse", primera.Salida, StringComparison.Ordinal);
+        // Con la composición real el paso de depuración de Auditoría (AUD-31) habla con la base: sin ella la restauración no se abre, nombrando el paso, pero la marca válida sí se aceptó (llegó a los pasos) y se consumió.
+        Assert.NotEqual(0, primera.Codigo);
+        Assert.Contains("paso: auditoria-depurar", primera.Salida, StringComparison.Ordinal);
+        Assert.Contains("restauracion: no se abre, falló el paso auditoria-depurar", primera.Salida, StringComparison.Ordinal);
         Assert.NotEqual(0, segunda.Codigo);
         Assert.Contains("Reutilizada", segunda.Salida, StringComparison.Ordinal);
         Assert.DoesNotContain(marca, segunda.Salida, StringComparison.Ordinal);
@@ -618,12 +620,15 @@ public sealed class ArranqueSeguroInventarioTests : IDisposable
     }
 
     [Fact]
-    public void FueraDeProduccion_LaRestauracionSinPasosPuedeAbrirYUnModoInvalidoNoArranca()
+    public void FueraDeProduccion_LaRestauracionCorreSusPasosSinMarcaYSinBaseNoSeAbre_YUnModoInvalidoNoArranca()
     {
-        var sinPasos = Arrancar("Development", "Restauracion", marca: null);
+        var sinBase = Arrancar("Development", "Restauracion", marca: null);
         var invalido = Arrancar("Development", "Cualquiera", marca: null);
 
-        Assert.True(sinPasos.Codigo == 0, sinPasos.Salida);
+        // El contenedor se valida con alcances (el ejecutor es un singleton y la depuración es por alcance): el paso corre y, sin base de datos, falla nombrándose.
+        Assert.NotEqual(0, sinBase.Codigo);
+        Assert.DoesNotContain("Cannot consume scoped service", sinBase.Salida, StringComparison.Ordinal);
+        Assert.Contains("restauracion: no se abre, falló el paso auditoria-depurar", sinBase.Salida, StringComparison.Ordinal);
         Assert.NotEqual(0, invalido.Codigo);
         Assert.Contains("BABELHUB__Modo", invalido.Salida, StringComparison.Ordinal);
     }

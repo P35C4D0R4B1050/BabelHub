@@ -31,8 +31,15 @@ public static class TrabajosDelCorreo
             async ct =>
             {
                 using var servicios = fabrica.CreateScope();
-                await servicios.ServiceProvider.GetRequiredService<ReintentoDeCorreosPendientes>().Procesar(ct).ConfigureAwait(false);
-                await servicios.ServiceProvider.GetRequiredService<PostgresColaDeCorreosPendientes>().PurgarCaducados(reloj.Ahora, ct).ConfigureAwait(false);
+                // La purga corre aunque el reintento falle: lo caducado (con la dirección cifrada) no debe quedarse por un fallo del transporte.
+                try
+                {
+                    await servicios.ServiceProvider.GetRequiredService<ReintentoDeCorreosPendientes>().Procesar(ct).ConfigureAwait(false);
+                }
+                finally
+                {
+                    await servicios.ServiceProvider.GetRequiredService<PostgresColaDeCorreosPendientes>().PurgarCaducados(reloj.Ahora, CancellationToken.None).ConfigureAwait(false);
+                }
             },
             registro,
             alcance,

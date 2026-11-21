@@ -61,8 +61,7 @@ public sealed class ComposicionDeLaAuditoriaYElCorreoEnElHostTests
         Assert.NotNull(depurar);
         Assert.NotNull(servicios.GetRequiredService<ICuentasCanceladasPendientes>());
         Assert.NotNull(servicios.GetRequiredService<IDepuradorDeRegistrosAislados>());
-        Assert.Contains(PasoDeRestauracionDeDepuracion.NombreDelPaso, pasos);
-    }
+        Assert.Contains(PasoDeRestauracionDeDepuracion.NombreDelPaso, pasos);    }
 
     [Fact]
     [Trait("Criterio", "AC-IDE-60")]

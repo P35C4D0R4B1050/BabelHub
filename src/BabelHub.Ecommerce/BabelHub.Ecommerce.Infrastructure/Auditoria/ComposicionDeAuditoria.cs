@@ -103,7 +103,9 @@ public static class ComposicionDeAuditoria
             sp.GetRequiredService<IAuditoria>(), sp.GetRequiredService<IEstadoDeLaDepuracion>(), sp.GetRequiredService<IBloqueoDeLaDepuracion>(),
             sp.GetRequiredService<IAlertas>(), sp.GetRequiredService<IActorActual>(), sp.GetRequiredService<IUnidadDeTrabajo>(), sp.GetRequiredService<IReloj>()));
         // El último paso de la restauración (AUD-31): vuelve a llenar por_anonimizar y depura antes de abrir al público.
-        servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IPasoDeRestauracion, PasoDeRestauracionDeDepuracion>());
+        // El paso que ve el ejecutor crea su alcance y fija el actor «sistema»: la depuración es por alcance y exige ese actor (como en el Inventario, donde el ejecutor es un singleton).
+        servicios.TryAddScoped<PasoDeRestauracionDeDepuracion>();
+        servicios.TryAddEnumerable(ServiceDescriptor.Singleton<IPasoDeRestauracion, PasoDeRestauracionDeDepuracionEnAlcance>());
         servicios.TryAddScoped<AgruparYEnviarAlertas>(sp => new AgruparYEnviarAlertas(
             sp.GetRequiredService<IAlmacenDeAlertas>(), sp.GetRequiredService<IAlmacenDeCorreoDeAlertas>(), sp.GetRequiredService<IAlertasYaEnviadas>(), sp.GetRequiredService<IMarcaDeLecturaDeAlertas>(),
             sp.GetRequiredService<IClienteDeAuditoriaDelInventario>(), sp.GetRequiredService<IDestinatariosDeAlertas>(), sp.GetRequiredService<IEnvioDeCorreoDeAlertas>(), sp.GetRequiredService<IAlertas>(),
