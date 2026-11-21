@@ -17,7 +17,7 @@ namespace BabelHub.Ecommerce.Api.Devoluciones;
 public sealed record LineaDeDevolucionPantalla(Guid EdicionId, int Cantidad, string MontoTexto, string EstadoTexto, string EstadoIcono, bool ReembolsoPendiente);
 
 /// <summary>
-/// Una devolución lista para pintar. El motivo y el texto de la persona llegan como <see cref="TextoLibre"/> y <b>solo se imprimen codificados</b> (Razor los codifica; nunca <c>Html.Raw</c>); no viajan a ningún mensaje, registro ni error (DEV-29, DEV-31).
+/// Una devolución lista para pintar. El motivo y el texto de la persona llegan como <see cref="TextoLibre"/> y <b>solo se imprimen codificados</b> (Razor los codifica siempre); no viajan a ningún mensaje, registro ni error (DEV-29, DEV-31).
 /// </summary>
 public sealed record DevolucionPantalla(
     Guid Id,
