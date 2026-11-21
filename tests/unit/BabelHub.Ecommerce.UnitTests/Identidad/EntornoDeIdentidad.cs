@@ -28,6 +28,13 @@ internal sealed class EntornoDeIdentidad
 
     public CarritoDePrueba Carrito { get; }
 
+    /// <summary>El receptor de prueba de los cambios de cuenta (Reclamaciones, IDE-99); <see cref="Receptores"/> es el compuesto con él, o vacío si <see cref="SinReceptores"/>.</summary>
+    public ReceptorDeCambiosDeCuentaDePrueba Receptor { get; } = new();
+
+    public bool SinReceptores { get; set; }
+
+    public ReceptoresDeCambiosDeCuentaCompuestos Receptores => new(SinReceptores ? [] : [Receptor]);
+
     public SeguridadDePrueba Seguridad { get; } = new();
 
     public CodigosEnMemoria Codigos { get; } = new();
@@ -143,7 +150,7 @@ internal sealed class EntornoDeIdentidad
     }
 
     public RegistroDeCuentas Registro() => new(
-        Cuentas, Hasher, new ListaDeContrasenasDePrueba(), Versiones, Limites, Huellas, Unidad, Pendientes, Carrito, Renovaciones, SegundoFactor, Auditoria, Codigos, HuellasDeIdentidad, Solicitudes, Cola, Sesiones, Eventos, Alertas, Secretos, Reloj);
+        Cuentas, Hasher, new ListaDeContrasenasDePrueba(), Versiones, Limites, Huellas, Unidad, Pendientes, Carrito, Receptores, Renovaciones, SegundoFactor, Auditoria, Codigos, HuellasDeIdentidad, Solicitudes, Cola, Sesiones, Eventos, Alertas, Secretos, Reloj);
 
     public SolicitudDeAltaDeCuenta Alta(string correo = "ana@example.com", string nombre = "Ana", string frase = ContrasenaSegura, string? terminos = "t1", string? privacidad = "p1", bool mayor = true) =>
         new(nombre, correo, new ValorSecreto(frase), terminos, privacidad, mayor);
@@ -285,6 +292,8 @@ internal static class EntornoDelCambioDeCorreoExtensiones
         e.Avisos,
         e.Renovaciones,
         e.Revocacion,
+        e.Receptores,
+        e.Alertas,
         e.Eventos,
         e.Unidad,
         e.Auditoria,

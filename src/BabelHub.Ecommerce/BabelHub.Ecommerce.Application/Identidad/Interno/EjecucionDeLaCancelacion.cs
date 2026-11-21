@@ -67,9 +67,12 @@ public sealed class EjecutorDeLaCancelacion(
         return Aplicar(cuenta, conBaja, cancelacion);
     }
 
-    internal static IEnumerable<IAplicadorDeCancelacion> EnElOrdenDeLosReceptores(IEnumerable<IAplicadorDeCancelacion> receptores) =>
+    internal static IEnumerable<IAplicadorDeCancelacion> EnElOrdenDeLosReceptores(IEnumerable<IAplicadorDeCancelacion> receptores) => EnElOrden(receptores, receptor => receptor.Modulo);
+
+    /// <summary>El orden de llamada de los módulos receptores (cancelación y cambios de cuenta): el de <see cref="OrdenDeLosReceptores"/>, los desconocidos al final y, entre iguales, el de registro.</summary>
+    internal static IEnumerable<T> EnElOrden<T>(IEnumerable<T> receptores, Func<T, string> modulo) =>
         receptores
-            .Select((receptor, posicion) => (receptor, posicion, rango: Array.IndexOf(OrdenDeLosReceptores, receptor.Modulo)))
+            .Select((receptor, posicion) => (receptor, posicion, rango: Array.IndexOf(OrdenDeLosReceptores, modulo(receptor))))
             .OrderBy(r => r.rango < 0 ? int.MaxValue : r.rango)
             .ThenBy(r => r.posicion)
             .Select(r => r.receptor);

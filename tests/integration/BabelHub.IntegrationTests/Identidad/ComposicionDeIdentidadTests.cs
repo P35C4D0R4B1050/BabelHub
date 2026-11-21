@@ -108,6 +108,8 @@ public sealed class ComposicionDeIdentidadTests
         Assert.Single(s.GetServices<IEstadoDeCuenta>());
         Assert.IsType<GestionDeLaCuenta>(s.GetRequiredService<ICuentaDelCliente>());
         Assert.IsType<CorreoVerificadoDeSistemaDeIdentidad>(s.GetRequiredService<ICorreoVerificadoDeSistema>());
+        Assert.IsType<ClientePorCorreoVerificadoDeSistemaDeIdentidad>(s.GetRequiredService<IClientePorCorreoVerificadoDeSistema>());
+        Assert.NotNull(s.GetRequiredService<ReceptoresDeCambiosDeCuentaCompuestos>());
         Assert.IsType<VersionesVigentesDeLosTextosDeIdentidad>(s.GetRequiredService<IVersionesVigentesDeLosTextos>());
         Assert.IsType<CambioDeCorreo>(s.GetRequiredService<ICambioDeCorreo>());
         Assert.IsType<DispositivosDeLaCuenta>(s.GetRequiredService<IDispositivosDeLaCuenta>());

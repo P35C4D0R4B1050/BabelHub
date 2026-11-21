@@ -873,4 +873,111 @@ public sealed class CambioDeCorreoTests
         Assert.True(numeroCon.EsExito);
         Assert.NotEqual(ConfianzaDelDispositivo.DispositivoCongelado, desistir.Error);
     }
+
+    // ---------------------------------------------------------------- los módulos receptores (IDE-99, DD-26, AC-IDE-70 a AC-IDE-72)
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-71")]
+    public async Task AlVerificarElCorreoNuevo_ElReceptorSeLlamaConElCorreoAnterior_MientrasSigueSiendoElCorreo_YSoloDespuesQuedaLibre()
+    {
+        var (e, cuenta, cambio, marca) = Escenario();
+        e.Receptor.CorreoVigenteDe = id => e.Bd.Cuentas.TryGetValue(id, out var c) ? c.Usuario.Correo : null;
+        await Pedir(cambio, cuenta, marca);
+
+        var verificado = await cambio.VerificarElCorreoNuevo(cuenta.Usuario.Id, S(e.UltimoCodigoEnviado()));
+
+        Assert.True(verificado.EsExito);
+        var llamada = Assert.Single(e.Receptor.AlCambiarElCorreoLlamadas);
+        Assert.Equal((cuenta.Usuario.Id, Antiguo), llamada);
+        Assert.Equal([Antiguo], e.Receptor.CorreosVigentesAlLlamar);
+        Assert.Equal(Nuevo, cuenta.Usuario.Correo);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-71")]
+    public async Task ElCambioDeCorreoDelPersonal_NoLlamaAlReceptor()
+    {
+        var (e, cuenta, cambio, marca) = EscenarioDelPersonal();
+        await Pedir(cambio, cuenta, marca);
+
+        var verificado = await cambio.VerificarElCorreoNuevo(cuenta.Usuario.Id, S(e.UltimoCodigoEnviado()));
+
+        Assert.True(verificado.EsExito);
+        Assert.Empty(e.Receptor.AlCambiarElCorreoLlamadas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-71")]
+    public async Task AlConfirmarUnCambioNoReconocidoYVerificarlo_ElReceptorSeLlamaUnaSolaVez()
+    {
+        var (e, cuenta, cambio, marca) = Escenario();
+        var otraMarca = e.DispositivoReconocido(cuenta, "PE");
+        await Pedir(cambio, cuenta, marca, region: "BR");
+        await cambio.ConfirmarElCambioPendiente(cuenta.Usuario.Id, S(EntornoDeIdentidad.ContrasenaSegura), otraMarca, "PE");
+
+        var verificado = await cambio.VerificarElCorreoNuevo(cuenta.Usuario.Id, S(e.UltimoCodigoEnviado()));
+
+        Assert.True(verificado.EsExito);
+        Assert.Single(e.Receptor.AlCambiarElCorreoLlamadas);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-IDE-72")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SiUnReceptorFallaOSiNoHayNinguno_ElCambioNoSeAplica_SinFilasNiAvisosNiSesionesRevocadas_ConServicioNoDisponible(bool sinReceptores)
+    {
+        var (e, cuenta, cambio, marca) = Escenario();
+        var propia = await e.Sesiones.Nueva(cuenta.Usuario, e.Reloj.Ahora, default);
+        e.Receptor.Falla = !sinReceptores;
+        e.SinReceptores = sinReceptores;
+        await Pedir(cambio, cuenta, marca);
+        var codigo = e.UltimoCodigoEnviado();
+        var correosAntes = e.Correo.Correos.Count;
+
+        var verificado = await e.CambioDeCorreo().VerificarElCorreoNuevo(cuenta.Usuario.Id, S(codigo), propia.Renovacion);
+
+        Assert.Equal(FallosDeIdentidad.NoDisponible, verificado.Error);
+        Assert.Equal(Antiguo, cuenta.Usuario.Correo);
+        Assert.Empty(e.Auditoria.Registradas);
+        Assert.Empty(e.Bd.Avisos);
+        Assert.Equal(correosAntes, e.Correo.Correos.Count);
+        Assert.True((await e.Gestor().Renovar(propia.Renovacion)).EsExito);
+        Assert.Equal(1, e.Alertas.Alertas.Count(a => a.Motivo == EmisionDeCodigos.MotivoDeFallaDelCorreo));
+// Con el código aún vigente, al volver el receptor el mismo código aplica el cambio.        e.Receptor.Falla = false;        e.SinReceptores = false;        Assert.True((await e.CambioDeCorreo().VerificarElCorreoNuevo(cuenta.Usuario.Id, S(codigo), propia.Renovacion)).EsExito);        Assert.Equal(Nuevo, cuenta.Usuario.Correo);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-70")]
+    public async Task LaFallaDelReceptor_NoDejaElCorreoAnteriorEnLaAuditoria_NiEnLaAlerta_NiEnLaExcepcion()
+    {
+        var (e, cuenta, cambio, marca) = Escenario();
+        e.Receptor.Falla = true;
+        await Pedir(cambio, cuenta, marca);
+
+        await cambio.VerificarElCorreoNuevo(cuenta.Usuario.Id, S(e.UltimoCodigoEnviado()));
+
+        Assert.All(e.Auditoria.Registradas, r => Assert.DoesNotContain(Antiguo, r.Motivo ?? string.Empty, StringComparison.Ordinal));
+        Assert.All(e.Alertas.Alertas, a => Assert.DoesNotContain(Antiguo, a.Motivo, StringComparison.Ordinal));
+        Assert.All(e.Seguridad.Eventos, s => Assert.DoesNotContain(Antiguo, s.Motivo ?? string.Empty, StringComparison.Ordinal));
+        Assert.Empty(e.Bd.Avisos);
+        var excepcion = await Assert.ThrowsAsync<CambiosDeCuentaNoAplicablesException>(() => e.Receptores.AlCambiarElCorreo(cuenta.Usuario.Id, Antiguo));
+        Assert.DoesNotContain(Antiguo, excepcion.Message, StringComparison.Ordinal);
+        Assert.Null(excepcion.InnerException);
+        Assert.Equal("reclamaciones", excepcion.Modulo);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-71")]
+    public async Task ElPersonal_CambiaSuCorreo_AunqueNoHayaNingunReceptor()
+    {
+        var (e, cuenta, cambio, marca) = EscenarioDelPersonal();
+        e.SinReceptores = true;
+        await Pedir(cambio, cuenta, marca);
+
+        var verificado = await e.CambioDeCorreo().VerificarElCorreoNuevo(cuenta.Usuario.Id, S(e.UltimoCodigoEnviado()));
+
+        Assert.True(verificado.EsExito);
+        Assert.Equal(Nuevo, cuenta.Usuario.Correo);
+    }
 }
