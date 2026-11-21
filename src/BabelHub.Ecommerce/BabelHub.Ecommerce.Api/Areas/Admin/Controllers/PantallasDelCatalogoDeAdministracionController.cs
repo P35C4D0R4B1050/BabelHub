@@ -6,6 +6,7 @@ using BabelHub.Ecommerce.Api.Web.Errores;
 using BabelHub.Ecommerce.Api.Web.Estados;
 using BabelHub.Ecommerce.Api.Web.Formato;
 using BabelHub.Ecommerce.Application.Catalogo;
+using BabelHub.Ecommerce.Application.Identidad;
 using BabelHub.Ecommerce.Application.Plataforma;
 using Microsoft.AspNetCore.Mvc;
 using EstadoDelCatalogo = BabelHub.Ecommerce.Application.Catalogo.EstadoDeDisponibilidad;
@@ -110,7 +111,8 @@ public sealed class PantallasDelCatalogoDeAdministracionController(
     IConsultaDeCatalogo catalogo,
     IDisponibilidadDeEdiciones disponibilidad,
     ContextoDePagina pagina,
-    OpcionesDeErrores opciones) : Controller
+    OpcionesDeErrores opciones,
+    IAdministracionDeUsuarios? usuarios = null) : Controller
 {
     private const int TamanoDePagina = 20;
 
@@ -232,6 +234,7 @@ public sealed class PantallasDelCatalogoDeAdministracionController(
         var disp = await disponibilidad.Consultar([edicionId], cancelacion);
         var estado = disp.EsExito ? disp.Valor.FirstOrDefault() : null;
         var ahora = DateTimeOffset.UtcNow;
+        var nombres = await NombresDeLosAutores(historial.Valor.Ingresos.Select(i => i.UsuarioId), cancelacion);
         var vista = await pagina.Completar(
             new IngresosDeLaEdicionVista
             {
@@ -245,7 +248,7 @@ public sealed class PantallasDelCatalogoDeAdministracionController(
                 VendibleEnLaRed = estado?.VendibleEnLaRed,
                 InventarioNoRespondio = historial.Valor.InventarioNoRespondio,
                 HayPendiente = historial.Valor.Ingresos.Any(i => i.Estado == EstadoDeIngresoSolicitado.Pendiente),
-                Ingresos = [.. historial.Valor.Ingresos.Select(i => AFila(i, ahora))],
+                Ingresos = [.. historial.Valor.Ingresos.Select(i => AFila(i, ahora, nombres))],
             },
             $"Ingresos de {datos.Titulo}",
             AreaDeLaPagina.Admin,
@@ -314,7 +317,51 @@ public sealed class PantallasDelCatalogoDeAdministracionController(
             e.Archivo is null ? null : $"{e.Archivo.Tipo.ToUpperInvariant()} · {Tamano(e.Archivo.TamanoEnBytes)} · huella {e.Archivo.HuellaCorta}");
     }
 
-    private static FilaDeIngresoVista AFila(IngresoDeLaLista i, DateTimeOffset ahora)
+    /// <summary>
+    /// Los nombres de quienes registraron los ingresos (CAT-22), por el contrato público de Identidad: se recorren hasta cuatro páginas de usuarios del personal (200) hasta encontrar a todos. Es un favor a la pantalla: si Identidad no responde o
+    /// falta alguien, esa fila muestra el identificador abreviado y el ingreso se ve igual.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<Guid, string>> NombresDeLosAutores(IEnumerable<Guid?> ids, CancellationToken cancelacion)
+    {
+        var buscados = ids.Where(i => i is { } id && id != Guid.Empty).Select(i => i!.Value).ToHashSet();
+        var nombres = new Dictionary<Guid, string>();
+        if (usuarios is null || buscados.Count == 0 || HttpContext.ActorDeLaSolicitud() is not { } actor)
+        {
+            return nombres;
+        }
+
+        try
+        {
+            string? despues = null;
+            for (var pagina = 0; pagina < 4 && nombres.Count < buscados.Count; pagina++)
+            {
+                var lista = await usuarios.Listar(actor.UsuarioId, new FiltroDeUsuarios(Despues: despues, Tamano: FiltroDeUsuarios.TamanoMaximo), cancelacion);
+                if (!lista.EsExito)
+                {
+                    break;
+                }
+
+                foreach (var usuario in lista.Valor.Usuarios.Where(u => buscados.Contains(u.UsuarioId)))
+                {
+                    nombres[usuario.UsuarioId] = usuario.Nombre;
+                }
+
+                despues = lista.Valor.Siguiente;
+                if (despues is null)
+                {
+                    break;
+                }
+            }
+        }
+        catch (Exception) when (!cancelacion.IsCancellationRequested)
+        {
+            // Sin Identidad los nombres no se muestran: el identificador abreviado basta.
+        }
+
+        return nombres;
+    }
+
+    private static FilaDeIngresoVista AFila(IngresoDeLaLista i, DateTimeOffset ahora, IReadOnlyDictionary<Guid, string> nombres)
     {
         var estado = i.Estado switch
         {
@@ -322,7 +369,8 @@ public sealed class PantallasDelCatalogoDeAdministracionController(
             EstadoDeIngresoSolicitado.Fallido => ("Fallido", "error"),
             _ => ("Registrado", "exito"),
         };
-        var usuario = i.UsuarioId is { } id && id != Guid.Empty ? "Usuario " + id.ToString("N")[..8] : "Sin autor";
+        // El nombre del autor lo resuelve Identidad (CAT-22); sin él, el identificador abreviado.
+        var usuario = i.UsuarioId is { } id && id != Guid.Empty ? (nombres.TryGetValue(id, out var nombre) ? nombre : "Usuario " + id.ToString("N")[..8]) : "Sin autor";
         return new FilaDeIngresoVista(i.IngresoSolicitadoId, i.Cantidad.ToString(CultureInfo.InvariantCulture), i.Referencia, FormatoPeruano.FechaYHora(i.Instante), usuario, estado.Item1, estado.Item2, i.Estado == EstadoDeIngresoSolicitado.Pendiente, ahora - i.Instante > TimeSpan.FromHours(24));
     }
 
