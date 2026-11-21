@@ -1,5 +1,5 @@
 import { createHmac, randomBytes } from 'node:crypto';
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Browser, type Page } from '@playwright/test';
 import { clave, conOrigenPropio, ingresarComoPersonal, sinViolacionesDeAccesibilidad, urlDeLaGestion } from '../pedidos/ayudas';
 
 // El ingreso del personal en el host de la gestión (web-base T28; AC-WEB-19, AC-WEB-24, AC-WEB-28, AC-WEB-29): un encargado de sucursal recién creado por la administración entra con su contraseña temporal, la cambia sobre el desafío en
@@ -39,24 +39,50 @@ async function cookiesDeLaGestion(page: Page) {
   return (await page.context().cookies(urlDeLaGestion)).filter((c) => c.name.startsWith('__Host-bh-'));
 }
 
+// Cada sucursal admite un solo encargado activo: cada recorrido crea el suyo en una sucursal distinta y lo desactiva al terminar para poder repetir la corrida.
+async function crearEncargado(browser: Browser, nombre: string, sucursal: string) {
+  const correo = `e2e-encargado-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
+  const contexto = await browser.newContext({ ignoreHTTPSErrors: true });
+  const admin = await contexto.newPage();
+  await ingresarComoPersonal(admin, 'administrador');
+  await admin.goto(`${urlDeLaGestion}/administracion/usuarios`);
+  const formularioDeCreacion = admin.locator('form[action$="/administracion/usuarios/crear"]');
+  await formularioDeCreacion.getByLabel('Nombre completo').fill(nombre);
+  await formularioDeCreacion.getByLabel('Correo electrónico').fill(correo);
+  await formularioDeCreacion.getByLabel('Rol').selectOption('EncargadoDeSucursal');
+  await formularioDeCreacion.getByLabel(/^Sucursal \(código/).fill(sucursal);
+  await admin.getByRole('button', { name: 'Crear y mostrar la contraseña temporal' }).click();
+  await expect(admin.getByRole('status')).toContainText('Creamos el usuario.');
+  const temporal = (await admin.getByRole('alert').filter({ hasText: 'Contraseña temporal' }).locator('strong').textContent())!.trim();
+  const usuarioId = (await admin.getByRole('region', { name: 'Resultado' }).locator('dt:has-text("Identificador") + dd').textContent())!.trim();
+  await contexto.close();
+  return { correo, temporal, usuarioId };
+}
+
+async function desactivar(browser: Browser, usuarioId: string) {
+  const contexto = await browser.newContext({ ignoreHTTPSErrors: true });
+  const admin = await contexto.newPage();
+  await ingresarComoPersonal(admin, 'administrador');
+  await admin.goto(`${urlDeLaGestion}/administracion/usuarios`);
+  const formulario = admin.locator('form').filter({ has: admin.getByRole('button', { name: 'Desactivar' }) });
+  await formulario.getByLabel('Identificador del usuario').fill(usuarioId);
+  await formulario.getByRole('button', { name: 'Desactivar' }).click();
+  await contexto.close();
+}
+
+const creados: string[] = [];
+
+test.afterEach(async ({ browser }) => {
+  for (const id of creados.splice(0)) await desactivar(browser, id).catch(() => undefined);
+});
+
 test.describe('Ingreso del personal con contraseña temporal y segundo factor', () => {
   test.skip(!clave, 'Falta BABELHUB__Sembrador__Clave (entorno E2E local con el sembrador de sesiones)');
 
   test('el encargado nuevo cambia la temporal, configura su segundo factor y solo entonces recibe su sesión (AC-WEB-19, AC-WEB-24, AC-WEB-28)', async ({ page, browser }) => {
-    // La administración crea al encargado de la sucursal de Ayacucho y ve su contraseña temporal una sola vez.
-    const correo = `e2e-encargado-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
-    const contexto = await browser.newContext({ ignoreHTTPSErrors: true });
-    const admin = await contexto.newPage();
-    await ingresarComoPersonal(admin, 'administrador');
-    await admin.goto(`${urlDeLaGestion}/administracion/usuarios`);
-    await admin.getByLabel('Nombre completo').fill('Elena Encargada Ficticia');
-    await admin.getByLabel('Correo electrónico').fill(correo);
-    await admin.locator('form[action$="/administracion/usuarios/crear"]').getByLabel('Rol').selectOption('EncargadoDeSucursal');
-    await admin.getByLabel(/^Sucursal \(código/).fill('ayacucho');
-    await admin.getByRole('button', { name: 'Crear y mostrar la contraseña temporal' }).click();
-    await expect(admin.getByRole('status')).toContainText('Creamos el usuario.');
-    const temporal = (await admin.getByRole('alert').filter({ hasText: 'Contraseña temporal' }).locator('strong').textContent())!.trim();
-    await contexto.close();
+    // La administración crea al encargado de la sucursal de Lima y ve su contraseña temporal una sola vez.
+    const { correo, temporal, usuarioId } = await crearEncargado(browser, 'Elena Encargada Ficticia', 'lima');
+    creados.push(usuarioId);
 
     // 1. Ingreso con la temporal: el desafío viaja en una cookie de solo HTTP y todavía no hay sesión.
     await conOrigenPropio(page);
@@ -74,7 +100,7 @@ test.describe('Ingreso del personal con contraseña temporal y segundo factor', 
 
     // 2. La contraseña nueva se puede pegar (sin bloquear el pegado) y se pide dos veces.
     const nueva = `Nueva-${randomBytes(12).toString('hex')}`;
-    await page.getByLabel('Contraseña nueva').fill(nueva);
+    await page.getByLabel('Contraseña nueva', { exact: true }).fill(nueva);
     await page.getByLabel('Repite la contraseña nueva').fill(nueva);
     await page.getByRole('button', { name: 'Cambiar contraseña' }).click();
 
@@ -98,9 +124,15 @@ test.describe('Ingreso del personal con contraseña temporal y segundo factor', 
     await expect(page.getByRole('listitem')).not.toHaveCount(0);
     await sinViolacionesDeAccesibilidad(page);
     await page.getByRole('link', { name: 'Ya los guardé, continuar' }).click();
-    await expect(page).toHaveURL(/\/logistica\/envios/);
 
-    // 5. Un ingreso posterior pide la contraseña nueva y el código de la aplicación (un paso posterior al ya aceptado).
+    // Una cuenta nueva tiene los textos legales pendientes: la política lleva a aceptarlos, también si intenta entrar a otra parte (AC-WEB-34). Aceptarlos en el host compuesto hoy no avanza: ver `progress/hallazgos.md` (versión de los textos de la Web frente a la de Identidad) y la prueba marcada como pendiente al final.
+    await expect(page).toHaveURL(/\/textos\/aceptar/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Actualizamos nuestros textos legales' })).toBeVisible();
+    await sinViolacionesDeAccesibilidad(page);
+    await page.goto(`${urlDeLaGestion}/logistica/envios`);
+    await expect(page).toHaveURL(/\/textos\/aceptar/);
+
+    // 5. Un ingreso posterior pide la contraseña nueva y el código de la aplicación (un paso posterior al ya aceptado); sigue con los textos pendientes.
     await page.context().clearCookies();
     await conOrigenPropio(page);
     await page.goto(`${urlDeLaGestion}/ingreso`);
@@ -108,26 +140,16 @@ test.describe('Ingreso del personal con contraseña temporal y segundo factor', 
     await page.getByLabel('Contraseña', { exact: true }).fill(nueva);
     await page.getByRole('button', { name: 'Ingresar' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Tu código de verificación' })).toBeVisible();
-    await expect(page.getByLabel('Código')).toHaveAttribute('autocomplete', 'one-time-code');
+    await expect(page.getByRole('textbox', { name: 'Código' })).toHaveAttribute('autocomplete', 'one-time-code');
     await sinViolacionesDeAccesibilidad(page);
-    await page.getByLabel('Código').fill(codigoTotp(secreto, 1));
+    await page.getByRole('textbox', { name: 'Código' }).fill(codigoTotp(secreto, 1));
     await page.getByRole('button', { name: 'Verificar' }).click();
-    await expect(page).toHaveURL(/\/logistica\/envios/);
+    await expect(page).toHaveURL(/\/textos\/aceptar/);
   });
 
   test('un código de verificación incorrecto no abre la sesión y el mensaje no delata nada (AC-WEB-19)', async ({ page, browser }) => {
-    const correo = `e2e-encargado-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
-    const contexto = await browser.newContext({ ignoreHTTPSErrors: true });
-    const admin = await contexto.newPage();
-    await ingresarComoPersonal(admin, 'administrador');
-    await admin.goto(`${urlDeLaGestion}/administracion/usuarios`);
-    await admin.getByLabel('Nombre completo').fill('Eduardo Encargado Ficticio');
-    await admin.getByLabel('Correo electrónico').fill(correo);
-    await admin.locator('form[action$="/administracion/usuarios/crear"]').getByLabel('Rol').selectOption('EncargadoDeSucursal');
-    await admin.getByLabel(/^Sucursal \(código/).fill('ayacucho');
-    await admin.getByRole('button', { name: 'Crear y mostrar la contraseña temporal' }).click();
-    const temporal = (await admin.getByRole('alert').filter({ hasText: 'Contraseña temporal' }).locator('strong').textContent())!.trim();
-    await contexto.close();
+    const { correo, temporal, usuarioId } = await crearEncargado(browser, 'Eduardo Encargado Ficticio', 'lima');
+    creados.push(usuarioId);
 
     await conOrigenPropio(page);
     await page.goto(`${urlDeLaGestion}/ingreso`);
@@ -135,7 +157,7 @@ test.describe('Ingreso del personal con contraseña temporal y segundo factor', 
     await page.getByLabel('Contraseña', { exact: true }).fill(temporal);
     await page.getByRole('button', { name: 'Ingresar' }).click();
     const nueva = `Nueva-${randomBytes(12).toString('hex')}`;
-    await page.getByLabel('Contraseña nueva').fill(nueva);
+    await page.getByLabel('Contraseña nueva', { exact: true }).fill(nueva);
     await page.getByLabel('Repite la contraseña nueva').fill(nueva);
     await page.getByRole('button', { name: 'Cambiar contraseña' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Configura tu segundo factor' })).toBeVisible();
@@ -148,4 +170,10 @@ test.describe('Ingreso del personal con contraseña temporal y segundo factor', 
     await expect(page.locator('body')).not.toContainText(nueva);
     expect((await cookiesDeLaGestion(page)).some((c) => c.name === '__Host-bh-gestion')).toBe(false);
   });
+});
+
+test.describe('Textos legales pendientes de una cuenta nueva del personal', () => {
+  // Hallazgo abierto (progress/hallazgos.md, 2026-11-21): el identificador de versión que la Web muestra y envía («terminos:0.1-provisional|…», del proveedor provisional) nunca coincide con el conjunto vigente de Identidad
+  // (`identidad.versiones_de_textos`), así que aceptar responde siempre «Los textos cambiaron» y una cuenta nueva no sale de /textos/aceptar. Cuando exista el proveedor de versiones sobre Identidad, quitar `fixme`.
+  test.fixme('al aceptar los textos vigentes la persona recupera su destino (AC-WEB-34)', async () => {});
 });

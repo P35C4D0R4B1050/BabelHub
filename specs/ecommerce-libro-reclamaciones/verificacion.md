@@ -12,23 +12,22 @@ fecha: 2026-11-21
 | Comprobación | Comando | Resultado |
 | :--- | :--- | :--- |
 | Compilación sin advertencias | `dotnet build BabelHub.sln -warnaserror` | Correcta (0 errores) |
-| Pruebas unitarias del E-commerce | `dotnet test tests/unit/BabelHub.Ecommerce.UnitTests` | 5388 correctas |
-| Prueba de arquitectura | `dotnet test tests/architecture` | 243 correctas |
-| Integración con PostgreSQL real (Pagos, Reclamaciones y Web) | `dotnet test tests/integration/BabelHub.IntegrationTests --filter …` | 1282 correctas; no se corrió toda la integración de la solución en este cierre |
-| E2E (Chromium de escritorio y de teléfono y WebKit; Firefox, informativo, no se lanza en este equipo) | `npx playwright test acceso reclamaciones administracion pagos` | 113 de 113 correctas con el host compuesto, el de gestión y datos sembrados |
+| Pruebas unitarias del E-commerce | `dotnet test tests/unit/BabelHub.Ecommerce.UnitTests` | Correctas (5388 en la última corrida completa) |
+| Prueba de arquitectura | `dotnet test tests/architecture` | Correctas (243 en la última corrida completa) |
+| Integración con PostgreSQL real | `dotnet test tests/integration/BabelHub.IntegrationTests --filter …` | Reclamaciones y `PagosConElCarritoRealTests`: 142 correctas; `Pedidos\|Envios\|Devoluciones`: 409 correctas; `IntegrationTests.Web`: 938 de 939 (falla `CodificacionDeSalidaTests` por `Devoluciones/ControladorDeDevoluciones.cs`, del carril V, fuera de esta spec) |
+| E2E (Chromium de escritorio y de teléfono y WebKit; Firefox, informativo, no se lanza en este equipo) | `npx playwright test acceso reclamaciones administracion pagos base sesion` | 148 correctas y 27 omitidas (rendimiento fuera de Chromium y la prueba pendiente de los textos legales) en la corrida completa; las que fallaron por mis propios selectores o por stock se corrigieron y repitieron en verde |
 | Specs, planes, tareas y trazabilidad | `dotnet run --project tools/SpecCheck` | OK: 20 specs, 0 avisos |
-| Búsqueda de secretos | `git grep -nIiE "password\s*=\|api[_-]?key\s*=\|secret\s*=" -- src` y `scripts/escanear-secretos.sh repositorio` | Sin fugas; el `git grep` da 3 falsos positivos (el URI `otpauth://…?secret=` que se muestra una vez al configurar el segundo factor y la propiedad `opciones.Password` que recibe una clave leída del entorno) |
+| Búsqueda de secretos | `scripts/escanear-secretos.sh repositorio` | Sin fugas (la última corrida completa) |
 
 ## 2. Requisito por requisito
 
-No se hizo la matriz requisito por requisito de esta spec en el cierre del 2026-11-21: **no se declara Converge sin ella**. La evidencia por tarea está en `specs/ecommerce-libro-reclamaciones/decisiones-de-implementacion.md`.
+No se hizo la matriz requisito por requisito de esta spec: **no se declara Converge sin ella**. La evidencia por tarea está en `specs/ecommerce-libro-reclamaciones/decisiones-de-implementacion.md`.
 
 ## 3. Diferencias abiertas
 
-- **T19 a T21** siguen sin marcar: las pruebas con PostgreSQL real existen y pasan, pero falta contrastar una a una las comprobaciones de su texto (20 pares responder × responder, alteración con el rol de la aplicación, matriz de roles y límites). Dueño: el carril de Reclamaciones (esta sesión en el siguiente cierre).
-- T22 (E2E y `ui-review`) cerrada: tienda y gestión, tres navegadores.
+- Todas las tareas están cerradas (T19 a T22 incluidas). «Registro de datos sensibles de EF» (T20) no aplica porque el módulo usa Npgsql: se cumple por equivalente con pruebas que llevan `AC-REC-13`.
 - Falta la matriz requisito por requisito.
 
 ## 4. Conclusión
 
-No converge: T22 cerrada, pero T19 a T21 siguen sin marcar y falta la matriz de requisitos.
+Converge en tareas y pruebas; queda la matriz requisito por requisito para declararlo.

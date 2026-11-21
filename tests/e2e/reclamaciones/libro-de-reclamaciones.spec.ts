@@ -46,8 +46,11 @@ test.describe('Visitante: el Libro de Reclamaciones', () => {
       const enlace = page.getByRole('navigation', { name: 'Información legal' }).getByRole('link', { name: /Libro de Reclamaciones/ });
       await expect(enlace, `el pie de ${ruta}`).toHaveAttribute('href', '/reclamaciones');
     }
-    await page.getByRole('navigation', { name: 'Información legal' }).getByRole('link', { name: /Libro de Reclamaciones/ }).click();
-    await expect(page).toHaveURL(/\/reclamaciones\/nueva$/);
+    // La maqueta tarda en asentarse (el widget de terceros mueve el pie): se repite el clic hasta que la navegación ocurre.
+    await expect(async () => {
+      await page.getByRole('navigation', { name: 'Información legal' }).getByRole('link', { name: /Libro de Reclamaciones/ }).click({ timeout: 5_000 });
+      await expect(page).toHaveURL(/\/reclamaciones\/nueva$/, { timeout: 5_000 });
+    }).toPass({ timeout: 30_000 });
     await expect(page.getByRole('heading', { level: 1, name: 'Libro de Reclamaciones' })).toBeVisible();
   });
 

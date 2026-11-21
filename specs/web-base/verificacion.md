@@ -12,23 +12,23 @@ fecha: 2026-11-21
 | Comprobación | Comando | Resultado |
 | :--- | :--- | :--- |
 | Compilación sin advertencias | `dotnet build BabelHub.sln -warnaserror` | Correcta (0 errores) |
-| Pruebas unitarias del E-commerce | `dotnet test tests/unit/BabelHub.Ecommerce.UnitTests` | 5388 correctas |
-| Prueba de arquitectura | `dotnet test tests/architecture` | 243 correctas |
-| Integración con PostgreSQL real (Pagos, Reclamaciones y Web) | `dotnet test tests/integration/BabelHub.IntegrationTests --filter …` | 1282 correctas; no se corrió toda la integración de la solución en este cierre |
-| E2E (Chromium de escritorio y de teléfono y WebKit; Firefox, informativo, no se lanza en este equipo) | `npx playwright test acceso reclamaciones administracion pagos` | 113 de 113 correctas con el host compuesto, el de gestión y datos sembrados |
+| Pruebas unitarias del E-commerce | `dotnet test tests/unit/BabelHub.Ecommerce.UnitTests` | Correctas (5388 en la última corrida completa) |
+| Prueba de arquitectura | `dotnet test tests/architecture` | Correctas (243 en la última corrida completa) |
+| Integración con PostgreSQL real | `dotnet test tests/integration/BabelHub.IntegrationTests --filter …` | Reclamaciones y `PagosConElCarritoRealTests`: 142 correctas; `Pedidos\|Envios\|Devoluciones`: 409 correctas; `IntegrationTests.Web`: 938 de 939 (falla `CodificacionDeSalidaTests` por `Devoluciones/ControladorDeDevoluciones.cs`, del carril V, fuera de esta spec) |
+| E2E (Chromium de escritorio y de teléfono y WebKit; Firefox, informativo, no se lanza en este equipo) | `npx playwright test acceso reclamaciones administracion pagos base sesion` | 148 correctas y 27 omitidas (rendimiento fuera de Chromium y la prueba pendiente de los textos legales) en la corrida completa; las que fallaron por mis propios selectores o por stock se corrigieron y repitieron en verde |
 | Specs, planes, tareas y trazabilidad | `dotnet run --project tools/SpecCheck` | OK: 20 specs, 0 avisos |
-| Búsqueda de secretos | `git grep -nIiE "password\s*=\|api[_-]?key\s*=\|secret\s*=" -- src` y `scripts/escanear-secretos.sh repositorio` | Sin fugas; el `git grep` da 3 falsos positivos (el URI `otpauth://…?secret=` que se muestra una vez al configurar el segundo factor y la propiedad `opciones.Password` que recibe una clave leída del entorno) |
+| Búsqueda de secretos | `scripts/escanear-secretos.sh repositorio` | Sin fugas (la última corrida completa) |
 
 ## 2. Requisito por requisito
 
-No se hizo la matriz requisito por requisito de esta spec en el cierre del 2026-11-21: **no se declara Converge sin ella**. La evidencia por tarea está en `specs/web-base/decisiones-de-implementacion.md`.
+No se hizo la matriz requisito por requisito de esta spec: **no se declara Converge sin ella**. La evidencia por tarea está en `specs/web-base/decisiones-de-implementacion.md`.
 
 ## 3. Diferencias abiertas
 
-- **T28** sin marcar: falta el E2E del ingreso del personal (segundo factor, contraseña temporal sobre el desafío en cookie y encargado sin segundo factor). T29 a T31 cerradas (E2E de cuenta y de administración, tres navegadores). Dueño: esta sesión en el siguiente cierre.
-- **T32 a T35** abiertas (E2E transversales, axe del recorrido de compra, presupuesto de rendimiento LCP/INP/CLS y sesión tras el ingreso real).
+- **T28** y **T35** sin marcar por un defecto real abierto (hallazgo Importante, dueño: carril A con la Web): aceptar los textos legales no avanza porque la versión de la Web (provisional) nunca coincide con la de Identidad; la prueba «al aceptar los textos vigentes…» está como `fixme`.
+- **T32, T33 y T34**: las partes automáticas (T32a, T33a, T34a) pasan; las partes humanas (navegadores y móviles reales, lista manual con lector de pantalla, dos rondas de usabilidad con personas) siguen abiertas, dueño: la persona; fase: posterior al Sprint 2. Entregables listos: `docs/06-experiencia-de-usuario/10-lista-manual-de-accesibilidad.md` y `progress/usabilidad/rondas.md`.
 - Falta la matriz requisito por requisito.
 
 ## 4. Conclusión
 
-No converge: faltan T28 y T32 a T35 y la matriz de requisitos.
+No converge: T28 y T35 dependen de cerrar el hallazgo de las versiones de los textos legales; T32 a T34 esperan sus partes humanas; falta la matriz de requisitos.

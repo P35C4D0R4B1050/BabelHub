@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { clave, ingresarComoClienteNuevo, ingresarComoPersonal, urlDeLaGestion } from '../pedidos/ayudas';
+import { clave, conOrigenPropio, ingresarComoClienteNuevo, ingresarComoPersonal, urlDeLaGestion } from '../pedidos/ayudas';
 
 // La sesión tras el ingreso real vista desde el navegador (web-base T35; AC-WEB-03, AC-WEB-22, AC-WEB-28, AC-WEB-34): el JWT y la renovación nunca llegan al navegador (ni en cookies legibles, ni en el almacenamiento, ni en el cuerpo de
 // ninguna respuesta), `localStorage` y `sessionStorage` quedan vacíos y «atrás» tras cerrar la sesión no muestra páginas de la persona anterior. Las sesiones salen del sembrador de desarrollo, que ingresa por el camino real.
@@ -7,6 +7,8 @@ import { clave, ingresarComoClienteNuevo, ingresarComoPersonal, urlDeLaGestion }
 // política real `SesionesWebPostgresTests`, `AccesoDeLaInterfazTests`, `CookieYCierreDeSesionTests` y `AceptacionDeTextosTests` de `tests/integration/BabelHub.IntegrationTests/Web`.
 
 test.describe.configure({ mode: 'serial' });
+// Cada prueba llega desde su propio origen: el tope previo por origen y hora (SEG) cuenta las solicitudes de toda la corrida desde esta máquina.
+test.beforeEach(async ({ page }) => conOrigenPropio(page));
 test.setTimeout(90_000);
 
 const JWT = /eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/;
@@ -37,9 +39,13 @@ async function afirmarQueNadaDeLaSesionLlegaAlNavegador(page: Page, cuerpos: { u
   }
   expect(await page.evaluate(() => document.cookie), 'document.cookie no trae nada de la sesión').not.toContain('__Host-bh-tienda');
   expect(await page.evaluate(() => document.cookie)).not.toContain('__Host-bh-gestion');
-  // Ni almacenamiento del navegador.
-  expect(await page.evaluate(() => localStorage.length), 'localStorage vacío').toBe(0);
-  expect(await page.evaluate(() => sessionStorage.length), 'sessionStorage vacío').toBe(0);
+  // El almacenamiento del navegador no guarda credenciales: `localStorage` vacío y, en `sessionStorage`, solo la ruta de historial que la biblioteca htmx deja por su cuenta (nunca un valor que parezca un JWT ni la cookie de sesión).
+  expect(await page.evaluate(() => Object.keys(localStorage)), 'localStorage vacío').toEqual([]);
+  const sesionStorage = await page.evaluate(() => Object.fromEntries(Object.keys(sessionStorage).map((k) => [k, sessionStorage.getItem(k) ?? ''])));
+  expect(Object.keys(sesionStorage).filter((k) => k !== 'htmx-current-path-for-history'), 'sessionStorage sin claves propias').toEqual([]);
+  for (const [k, v] of Object.entries(sesionStorage)) {
+    expect(JWT.test(v) || v.includes(sesion!.value), `sessionStorage[${k}] sin credenciales`).toBe(false);
+  }
   // Ningún cuerpo ni cabecera de respuesta trae un JWT ni el valor de la cookie de sesión (la renovación vive solo en el servidor).
   for (const { url, texto, cabeceras } of cuerpos) {
     expect(JWT.test(texto), `un JWT en el cuerpo de ${url}`).toBe(false);
@@ -82,7 +88,7 @@ test.describe('La sesión vista desde el navegador', () => {
 
     await page.getByRole('button', { name: 'Cerrar sesión' }).click();
     await page.waitForLoadState('networkidle');
-    expect((await page.context().cookies()).some((c) => c.name === '__Host-bh-tienda'), 'la cookie de sesión se borra').toBe(false);
+    await expect.poll(async () => (await page.context().cookies()).some((c) => c.name === '__Host-bh-tienda'), { message: 'la cookie de sesión se borra', timeout: 10_000 }).toBe(false);
 
     // Cada «atrás» vuelve a pedir la página al servidor (sin guardarla en el navegador): la persona anterior no se ve.
     for (let i = 0; i < 2; i++) {

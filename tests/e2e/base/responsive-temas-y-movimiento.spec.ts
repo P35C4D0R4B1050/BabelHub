@@ -1,9 +1,13 @@
 import { test, expect, type Page } from '@playwright/test';
+import { conOrigenPropio } from '../pedidos/ayudas';
 
 // El diseño responsivo, los temas y el movimiento reducido de `web-base` (T32; AC-WEB-01, AC-WEB-18): las pantallas públicas no se desplazan en horizontal en 320, 375, 768 y 1280 px, los dos temas se aplican por la cookie `bh-tema` y
 // `prefers-reduced-motion: reduce` apaga las animaciones y transiciones. El recorrido en las dos últimas versiones de Chrome, Edge, Firefox y Safari y en móviles lo cubren los proyectos de Playwright (Chromium de escritorio y de teléfono y WebKit
 // como Safari; Firefox, informativo, si el equipo lo lanza); Edge y las versiones concretas de cada navegador las verifica la persona con la lista manual de `docs/06-experiencia-de-usuario/10-lista-manual-de-accesibilidad.md`.
 // Mismo entorno que los demás recorridos (host de la tienda con datos sembrados).
+
+// Cada prueba llega desde su propio origen: el tope previo por origen y hora (SEG) cuenta las solicitudes de toda la corrida desde esta máquina.
+test.beforeEach(async ({ page }) => conOrigenPropio(page));
 
 const PANTALLAS_PUBLICAS = ['/', '/catalogo', '/carrito', '/ingreso', '/registro', '/recuperacion', '/reclamaciones/nueva', '/legal/terminos', '/legal/privacidad', '/legal/reembolso'];
 

@@ -1,12 +1,14 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { agregarAlCarrito, clave, EDICION_IMPRESA_DEL_ZORRO, ingresarComoClienteNuevo } from '../pedidos/ayudas';
+import { agregarAlCarrito, clave, conOrigenPropio, EDICION_IMPRESA_DEL_ZORRO, ingresarComoClienteNuevo } from '../pedidos/ayudas';
 
 // La revisión automática de accesibilidad con axe en el recorrido de compra y en las pantallas base (web-base T33; AC-WEB-07, AC-WEB-15): 0 incumplimientos de nivel A y AA (WCAG 2.0, 2.1 y 2.2 AA) en cada paso,
 // en los dos temas, y el foco por teclado visible en el recorrido. La lista manual de teclado y lector de pantalla está en `docs/06-experiencia-de-usuario/10-lista-manual-de-accesibilidad.md` (la ejecuta una persona).
 // Mismo entorno que `pedidos/compra-y-pedido.spec.ts` (host de la tienda por HTTPS y `entorno/sembrar-datos.sh --limpiar` antes de cada corrida).
 
 test.describe.configure({ mode: 'serial' });
+// Cada prueba llega desde su propio origen: el tope previo por origen y hora (SEG) cuenta las solicitudes de toda la corrida desde esta máquina.
+test.beforeEach(async ({ page }) => conOrigenPropio(page));
 test.setTimeout(120_000);
 
 const ETIQUETAS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];

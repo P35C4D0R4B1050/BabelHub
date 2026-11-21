@@ -1,11 +1,14 @@
 import { test, expect, type Page } from '@playwright/test';
+import { conOrigenPropio } from '../pedidos/ayudas';
 
 // El presupuesto de rendimiento de `web-base` (T34; AC-WEB-16; WEB-21; docs/06-experiencia-de-usuario/07-rendimiento-y-movil.md): inicio, catálogo y detalle de una obra con una conexión 4G simulada (1,6 Mb/s de bajada, 750 kb/s de subida y
 // 150 ms de latencia) y el procesador 4 veces más lento, midiendo LCP ≤ 2,5 s, CLS ≤ 0,1 e INP ≤ 200 ms (el peor evento de interacción de la visita). La medición es de laboratorio (Chromium, una máquina de desarrollo con el servidor local):
 // el percentil 75 con usuarios reales y la prueba de carga en el servidor de 1 OCPU se miden aparte (K6). La meta no se relaja para que pase: un incumplimiento se corrige o se registra como riesgo.
-// Solo Chromium (usa CDP). Mismo entorno que los demás recorridos (host de la tienda con datos sembrados).
+// Solo Chromium (usa CDP). Se corre solo o con un trabajador (con otros recorridos en paralelo el equipo carga la medición y el LCP sube). Mismo entorno que los demás recorridos (host de la tienda con datos sembrados).
 
 test.describe.configure({ mode: 'serial' });
+// Cada prueba llega desde su propio origen: el tope previo por origen y hora (SEG) cuenta las solicitudes de toda la corrida desde esta máquina.
+test.beforeEach(async ({ page }) => conOrigenPropio(page));
 test.setTimeout(120_000);
 
 const PRESUPUESTO = { lcpMs: 2_500, cls: 0.1, inpMs: 200 };
