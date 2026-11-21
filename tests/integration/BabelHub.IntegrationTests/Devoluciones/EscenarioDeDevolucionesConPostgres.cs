@@ -1,3 +1,4 @@
+using BabelHub.Ecommerce.Domain.Devoluciones;
 using System.Collections.Concurrent;
 using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Devoluciones;
@@ -39,8 +40,16 @@ internal sealed class AuditoriaDeDevolucionesNula : IAuditoria
 {
     public ConcurrentBag<SolicitudDeRegistro> Solicitudes { get; } = [];
 
+    /// <summary>Verdadero: la auditoría no puede registrar (lanza), y la operación debe fallar y revertirse.</summary>
+    public bool Caida { get; set; }
+
     public Task Registrar(SolicitudDeRegistro solicitud, CancellationToken cancelacion = default)
     {
+        if (Caida)
+        {
+            throw new InvalidOperationException("Auditoría caída.");
+        }
+
         Solicitudes.Add(solicitud);
         return Task.CompletedTask;
     }
@@ -285,6 +294,16 @@ internal sealed class EscenarioDeDevolucionesConPostgres(PostgresDeDevolucionesF
             return 0;
         });
 
+    /// <summary>Redacta las devoluciones de la cuenta con un repositorio que falla al guardar la n-ésima (la unidad de trabajo real revierte todo).</summary>
+    public Task RedactarConFallaAlGuardar(Guid cliente, int numeroQueFalla) =>
+        fixture.Unidad.Ejecutar(async ct =>
+        {
+            var repositorio = new RepositorioQueFallaAlGuardar(fixture.Devoluciones, numeroQueFalla);
+            var localizador = new LocalizadorDeDevolucionesDeUnaCuenta(Pedidos, fixture.Devoluciones);
+            await new RedactarDevolucionesDeUnaCuenta(localizador, repositorio, Auditoria, Reloj).Aplicar(cliente, Guid.NewGuid(), ct);
+            return 0;
+        });
+
     public Task<Resultado<int>> Depurar()
     {
         var actor = ActorActual.DelSistema();
@@ -302,4 +321,37 @@ internal sealed class EscenarioDeDevolucionesConPostgres(PostgresDeDevolucionesF
         var actor = ActorActual.DelSistema();
         return new ConciliarReembolsosDeDevoluciones(Autorizador(actor), fixture.Devoluciones, Reembolsos, fixture.Unidad, Procesador(), Reloj).Ejecutar(100);
     }
+}
+
+/// <summary>El repositorio real, salvo que la n-ésima llamada a <c>Guardar</c> lanza (para probar el todo o nada de una operación con varias devoluciones).</summary>
+internal sealed class RepositorioQueFallaAlGuardar(IRepositorioDeDevoluciones interno, int numeroQueFalla) : IRepositorioDeDevoluciones
+{
+    private int _guardadas;
+
+    public Task<Devolucion?> Obtener(Guid devolucionId, bool paraActualizar, CancellationToken cancelacion = default) => interno.Obtener(devolucionId, paraActualizar, cancelacion);
+
+    public Task Agregar(Devolucion devolucion, CancellationToken cancelacion = default) => interno.Agregar(devolucion, cancelacion);
+
+    public Task Guardar(Devolucion devolucion, CancellationToken cancelacion = default) =>
+        Interlocked.Increment(ref _guardadas) == numeroQueFalla ? throw new InvalidOperationException("Falla forzada al guardar.") : interno.Guardar(devolucion, cancelacion);
+
+    public Task<Guid?> TomarCupos(IReadOnlyList<CupoPedido> cupos, CancellationToken cancelacion = default) => interno.TomarCupos(cupos, cancelacion);
+
+    public Task DevolverCupos(IReadOnlyList<(Guid LineaId, int Unidades)> cupos, CancellationToken cancelacion = default) => interno.DevolverCupos(cupos, cancelacion);
+
+    public Task<PaginaDeDevolucionesDelDominio> ListarDePedidos(IReadOnlyCollection<Guid> pedidoIds, int pagina, int tamano, CancellationToken cancelacion = default) => interno.ListarDePedidos(pedidoIds, pagina, tamano, cancelacion);
+
+    public Task<PaginaDeDevolucionesDelDominio> ListarDeLaSucursal(string codigoDeSucursal, int pagina, int tamano, CancellationToken cancelacion = default) => interno.ListarDeLaSucursal(codigoDeSucursal, pagina, tamano, cancelacion);
+
+    public Task<PaginaDeDevolucionesDelDominio> ListarDeLaAdministracion(FiltroDeLaAdministracion filtro, int pagina, int tamano, CancellationToken cancelacion = default) => interno.ListarDeLaAdministracion(filtro, pagina, tamano, cancelacion);
+
+    public Task<IReadOnlyList<(Guid DevolucionId, Guid LineaDePedidoId)>> ObtenerConReembolsoPendiente(int maximo, CancellationToken cancelacion = default) => interno.ObtenerConReembolsoPendiente(maximo, cancelacion);
+
+    public Task<Devolucion?> ObtenerParaActualizarSinEsperar(Guid devolucionId, CancellationToken cancelacion = default) => interno.ObtenerParaActualizarSinEsperar(devolucionId, cancelacion);
+
+    public Task<IReadOnlyList<Guid>> ObtenerConRecepcionVencida(DateTimeOffset aprobadasAntesDe, int maximo, CancellationToken cancelacion = default) => interno.ObtenerConRecepcionVencida(aprobadasAntesDe, maximo, cancelacion);
+
+    public Task<IReadOnlyList<Guid>> ObtenerConReingresoEstancado(DateTimeOffset iniciadoAntesDe, int maximo, CancellationToken cancelacion = default) => interno.ObtenerConReingresoEstancado(iniciadoAntesDe, maximo, cancelacion);
+
+    public Task<IReadOnlyList<Guid>> ObtenerVencidasParaDepurar(DateTimeOffset ultimoCambioAntesDe, int maximo, CancellationToken cancelacion = default) => interno.ObtenerVencidasParaDepurar(ultimoCambioAntesDe, maximo, cancelacion);
 }

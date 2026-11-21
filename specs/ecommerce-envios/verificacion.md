@@ -112,3 +112,18 @@ Resultado: **No converge**. No es «converge salvo T14b»: además del operador 
 | D-6, D-7, D-10, D-11 | Abiertas (persona / agente) | Sin cambios. |
 
 Para pasar a `Done` falta: T14b (operador), cerrar T20 y T22 y el resto de T21b, y las decisiones D-6, D-7 y D-10 de la persona responsable.
+
+## Matriz vigente (carril V, 2026-11-20, tras la última ejecución en PostgreSQL real)
+
+Reemplaza el estado por requisito de la sección 2 y las diferencias de la sección 3 donde difieran. Ejecutado ahora: integración filtrada `Devoluciones|Envios` con PostgreSQL real, **282 de 282 verdes**; Playwright de Envíos 2 de 2 en escritorio y teléfono (ejecución anterior); SpecCheck 0 avisos. Tareas: T22 y T24 `[x]`; abiertas T14b, T20 (parcial) y T21 (parcial, T21b).
+
+Resultado: **No converge**. **Recuento: Cumple 12, Parcial 6, No cumple 0.** ENV-19 pasa a Cumple (los 20 pares `PasarAEnReparto` × `Anular` con el Pedidos real: nunca un cancelado con el físico descontado) y ENV-07 queda cubierto también con Pedidos caído (la entrega marcada antes del reparto informado se reintenta en orden, una sola vez). Siguen Parciales:
+
+| Requisito | Por qué | Quién lo cierra |
+| :--- | :--- | :--- |
+| ENV-02, ENV-04 | Sin operador real (T14b): el plazo de 10 s, la validación de la respuesta y los registros del adaptador real | Persona responsable (D02), luego el agente |
+| ENV-06 | El aviso se pierde si el Notificador falla (D-7): la spec dice «queda pendiente» | Persona responsable (spec) o agente |
+| ENV-15, ENV-17 | AC-ENV-17 literal ya probado con el Pedidos real (`La_cancelacion_de_la_cuenta_conserva_los_envios…`); falta el registro de datos sensibles de EF activado, los registros del adaptador real (T14b) y el redactor de datos prohibidos sin `nombre`, `direccion`, `telefono` | Agente y carril de seguridad |
+| ENV-18 | La prueba de 20 pares de guía acepta `GuiasCreadas >= 20` (D-3) | Agente: cota por igualdad y rechazo del segundo par (cierra T20) |
+
+Diferencias abiertas: D-1 (operador, T14b), D-3, D-5 parcial (T21b), D-6, D-7, D-10 y D-11. Cerradas: D-4 (T22) y D-9 (T24, con el Menor de la tabla de logística en 375 px) y D-8. Para pasar a `Done` hace falta: el operador elegido y T14b, cerrar T20 y T21b, y las decisiones D-6, D-7 y D-10.
