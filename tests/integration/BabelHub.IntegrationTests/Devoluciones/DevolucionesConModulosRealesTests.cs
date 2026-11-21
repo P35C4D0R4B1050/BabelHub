@@ -1,3 +1,4 @@
+using BabelHub.Ecommerce.Application.Identidad;
 using BabelHub.Ecommerce.Application.Biblioteca;
 using BabelHub.Ecommerce.Application.Carrito;
 using BabelHub.Ecommerce.Application.Pedidos.Interno;
@@ -427,5 +428,50 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
         Assert.Contains(excedida.Error.Errores, c => c.Campo == "espera-en-segundos");
         var otraCuenta = await PedirReembolso(anfitrion, otra, Guid.NewGuid(), Guid.NewGuid());
         Assert.NotEqual(CategoriaDeError.Limite, otraCuenta.Error!.Categoria);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-25")]
+    public async Task Los_pendientes_se_cuentan_en_tres_numeros_por_cuenta_sin_contar_un_caso_en_dos_ni_los_de_otra_cuenta()
+    {
+        await using var anfitrion = Anfitrion();
+        var (pedidoA, cuentaA, _, impresaA) = await ComprarMixtoConImpreso(anfitrion);
+        await EntregarElImpreso(pedidoA, impresaA);
+        Assert.True((await SolicitarImpreso(anfitrion, cuentaA, pedidoA, impresaA)).EsExito);
+        var (pedidoB, cuentaB, lineaB) = await ComprarMixto(anfitrion);
+        Assert.True((await anfitrion.Como(DelCliente(cuentaB), sp => sp.GetRequiredService<IDevolucionesDelCliente>().ReportarArchivoDefectuoso(new ReportarArchivoDefectuosoEntrada(pedidoB, lineaB, new TextoLibre(Sembrado), new TextoLibre("No abre"))))).EsExito);
+        _reembolsos.EstadoAlProcesar = null;
+        var (pedidoC, cuentaC, lineaC) = await ComprarMixto(anfitrion);
+        Assert.True((await PedirReembolso(anfitrion, cuentaC, pedidoC, lineaC)).EsExito);
+        var cuentaD = await SembrarCuenta();
+
+        async Task<(int Abiertas, int Reportes, int Reembolsos)> Pendientes(Guid cuenta) =>
+            await anfitrion.Como(ActorActual.DelSistema(), async sp =>
+            {
+                var p = await sp.GetRequiredService<IPendientesDeDevolucionesDeCuenta>().ContarEnTres(cuenta);
+                return (p.DevolucionesAbiertas, p.ReportesSinDecidir, p.ReembolsosPendientes);
+            });
+
+        Assert.Equal((1, 0, 0), await Pendientes(cuentaA));
+        Assert.Equal((0, 1, 0), await Pendientes(cuentaB));
+        Assert.Equal((0, 0, 1), await Pendientes(cuentaC));
+        Assert.Equal((0, 0, 0), await Pendientes(cuentaD));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-26")]
+    public async Task Una_cuenta_cancelada_no_puede_solicitar_una_devolucion_y_no_se_crea_nada()
+    {
+        await using var anfitrion = Anfitrion();
+        var (pedido, cuenta, _, impresa) = await ComprarMixtoConImpreso(anfitrion);
+        await EntregarElImpreso(pedido, impresa);
+        await anfitrion.Como(ActorActual.DelSistema(), sp => AplicarLosReceptores(sp, cuenta).ContinueWith(_ => true, TaskScheduler.Default));
+        await bd.Ejecutar($"UPDATE identidad.usuarios SET activo = false WHERE id = '{cuenta:D}'");
+
+        var solicitud = await SolicitarImpreso(anfitrion, cuenta, pedido, impresa);
+
+        Assert.False(solicitud.EsExito);
+        Assert.Equal("no-autenticado", solicitud.Error!.Clave);
+        Assert.Equal(0, await bd.Consultar<int>("SELECT count(*) FROM devoluciones.devoluciones WHERE pedido_id = @p", ("p", pedido)));
     }
 }
