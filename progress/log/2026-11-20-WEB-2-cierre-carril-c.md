@@ -8,3 +8,10 @@
 - **Abierto:** E2E de la administración (T18 de Reclamaciones, T30 y T31 de web-base) y del ingreso del personal; T31 de Pagos con el Carrito real; T36 (E2E de Pagos); T37 y T38 esperan B05. Ninguna tarea nueva se marcó. `verificacion.md` de las cuatro specs: **No converge**, con lo que falta.
 - Ajustes de E2E posteriores a la corrida (filtro de Turnstile, `baseURL`, contenedor vacío) comprobados solo con `--list`: correrlos en la próxima ventana.
 - Rama `claude/keen-ishizaka-8f8cfa`; nada se subió.
+
+## Segundo turno de Docker (2026-11-21)
+
+- `PagosConElCarritoRealTests` (T31 de Pagos, anfitrión real): 8 de 8. E2E de administración, de reclamaciones de la administración y de pago: junto con los anteriores, 113 de 113 en Chromium de escritorio y de teléfono y WebKit. Integración de Pagos, Reclamaciones y Web: 1282 verdes.
+- **Defectos reales corregidos:** `<br>` dentro de `<dl>` en el detalle de la auditoría; regiones desplazables de las tablas de administración sin foco de teclado (teléfono); la pantalla de estado del pago no avisaba del rechazo; los E2E fijaban versiones de textos distintas de las vigentes de Identidad (en el test de integración).
+- **Marcadas:** Pagos T31 y T36, Reclamaciones T22, web-base T29, T30 y T31. **Abiertas:** Pagos T37 y T38 (B05), Reclamaciones T19 a T21 (contrastar el texto), web-base T28 (E2E del ingreso del personal) y T32 a T35. `verificacion.md` de las cuatro specs: No converge, con lo pendiente y su dueño.
+- Nota de entorno: los E2E de pago consumen stock sembrado; reponerlo con `sembrar-datos.sh --limpiar` antes de cada corrida (si no, «Ir al pago» vuelve a `/checkout`).
