@@ -70,6 +70,8 @@ Estos mensajes **no deben revelar** si una cuenta existe, qué dato falló ni de
 | Pago aprobado tarde | «Tu pago llegó cuando tus libros ya no estaban apartados» | «Te devolvimos el dinero automáticamente. Puedes volver a intentar la compra.» | Volver al carrito |
 | Traslado sin plazo | «Plazo por confirmar» | «Tu libro vendrá de otra sucursal; te avisaremos la fecha.» | Continuar |
 | Pedido no recogido | «No recogiste tu pedido a tiempo» | «Liberamos tus libros. Escríbenos y revisamos tu caso.» | Ayuda |
+| Índice infinito: aviso (toda página) | «Texto generado» | «Este texto se genera con un algoritmo, puede carecer de sentido y no son libros reales ni están a la venta.» | Volver al catálogo real |
+| Índice infinito: dirección no válida | «Esa dirección no existe en este laberinto» | «Usa de 1 a 64 letras minúsculas sin tilde, números o guiones. Mientras tanto, te mostramos una página al azar.» | Otra página al azar |
 
 ## 5. Contenido legal y de privacidad
 

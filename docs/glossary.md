@@ -95,3 +95,10 @@ Lenguaje común del dominio. El código, las specs y la interfaz usan estos tér
 | **Módulo** | Agrupación de casos de uso y reglas de una spec dentro de un servicio (por ejemplo Pagos o Traslados). Es una carpeta y un espacio de nombres, no un proyecto ni un proceso. | Servicio. |
 | **Contrato público (de un módulo)** | Interfaces y DTOs en la raíz del espacio de nombres del módulo; lo único que otros módulos pueden usar. El interior va en `Interno`. | Contrato REST entre servicios. |
 | **Convergencia** | Estado en que la spec, el código y las pruebas coinciden y la verificación no encuentra diferencias. |
+
+## Índice infinito
+
+| Término | Definición | No confundir con |
+| :--- | :--- | :--- |
+| **Dirección del índice** | Texto de 1 a 64 caracteres (letras a-z sin tilde, números y guiones) que identifica una página del índice infinito; la misma dirección genera siempre la misma página. Viaja en la ruta `/indice-infinito/{dirección}`. | Dirección de entrega. |
+| **Página generada** | Texto de 20 líneas de 70 símbolos que el índice infinito calcula a partir de una dirección, sin guardarlo; no es un libro real ni está a la venta. | Ficha de un libro. |
