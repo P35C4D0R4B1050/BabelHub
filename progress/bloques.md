@@ -77,7 +77,7 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **ECO-10** | `ecommerce-devoluciones` | E | ECO-9 | ☐ (ECO-10a a 10f, T01–T34) |
 | **ECO-11** | `ecommerce-libro-reclamaciones` | E | ECO-7 | ☑ (T01–T23 salvo el E2E T22, que espera Node y COMP-1; integración PostgreSQL 114 de 114) |
 | **ECO-12** | `asistente-compra-ia` | C | ECO-6; B06 (persona) | ⏸ DIFERIDO por decisión de la persona (2026-11-19): plan aprobado, sin código en el Sprint 2 |
-| **ECO-13** | `web-indice-infinito` | B | WEB-1d | ⏸ DIFERIDO por decisión de la persona (2026-11-19): plan aprobado, sin código en el Sprint 2 |
+| **ECO-13** | `web-indice-infinito` | B | WEB-1d | ✅ HECHO (2026-11-21): retomado por decisión de la persona; spec en Done, 15/15, E2E 17/17 |
 
 ## Cierre (todos los carriles)
 
@@ -123,7 +123,7 @@ Tercera ola fundida (merges `22df391` de A, `claude/festive-feynman-2c4bef` de B
 
 ## Estado de cierre (2026-11-21)
 
-Tareas: **547 de 611** (89 %). `main`: compilación sin advertencias, SpecCheck 0 avisos, unitarias 5437 y 2380, arquitectura 244, integración **7601 de 7603** (los 2 fallos son `HumoDeImagenes`, que depende de Docker/arquitecturas), escáner de secretos limpio, cobertura 94–95 % (`progress/evidencias/cobertura/`), k6 y análisis en `progress/evidencias/` y `docs/03/09`.
+Tareas: **588 de 638** (92 %) al 2026-11-21 (noche). `main` (`f3233be8`): compilación sin advertencias, SpecCheck 0 avisos, unitarias 5662 y 2386, arquitectura 259, integración sin fallos en GitHub (CI verde), escáner de secretos limpio, cobertura 94–95 % (`progress/evidencias/cobertura/`), k6 y análisis en `progress/evidencias/` y `docs/03/09`.
 
 | Spec | Estado | Tareas | Verificación |
 | :--- | :---: | :---: | :--- |
@@ -131,22 +131,22 @@ Tareas: **547 de 611** (89 %). `main`: compilación sin advertencias, SpecCheck 
 | ecommerce-carrito-checkout | **Done** | 37/37 | Converge |
 | ecommerce-catalogo | **Done** | 28/28 | Converge |
 | ecommerce-devoluciones | **Done** | 34/34 | Converge |
-| ecommerce-libro-reclamaciones | **Done** | 23/23 | Converge |
+| ecommerce-libro-reclamaciones | **Done** | 36/36 | Converge (vínculo por cuenta, DD-26 a DD-29) |
 | ecommerce-pedidos | **Done** | 42/42 | Converge |
 | inventario-traslados | **Done** | 26/26 | Converge |
 | ecommerce-envios | InProgress | 23/25 | Converge salvo T14b/T21b (operador real fuera de alcance, DD-22) |
 | ecommerce-pagos | Planned | 36/38 | Converge salvo T37/T38 (llaves Culqi B05) y WhatsApp real (Evolution/n8n/Meta) |
 | web-base | Planned | 36/39 | Converge salvo partes humanas de T32–T34 y WEB-25 en `/reclamaciones/nueva` (REC-04) |
-| identidad-seguridad | Planned | 50/50 | Converge salvo AC-IDE-70 (entre módulos) y D5 (Menor); nombre y correo de todo rol verificados con PostgreSQL (DD-25) |
+| identidad-seguridad | Planned | 61/62 | Converge salvo D5 (Menor) y AC-IDE-70 con un pedido real (Menor); nombre y correo de todo usuario implementados (DD-25, DD-26) |
 | inventario-ajustes | Planned | 18/18 | Converge salvo AJU-22 (redacción; persona) |
 | inventario-fuentes | Planned | 25/25 | Converge salvo FUE-09/FUE-11 (diferidas) y FUE-10 (DD-18) |
 | inventario-seleccion-fuente | Planned | 33/33 | Converge salvo S2 (k6 previo a producción) |
-| transversal-auditoria | Planned | 31/31 | No converge hasta AUD-45 (T32, junto con identidad T51) salvo la comprobación de enrutamiento real (cubierta en la integración final) |
-| transversal-notificaciones | Planned | 25/25 | Converge salvo NOT-02 (dos avisos sin emisor) |
+| transversal-auditoria | Planned | 33/33 | Converge (AUD-45 y AUD-46 añadidos por DD-25 y DD-26) |
+| transversal-notificaciones | Planned | 25/25 | NOT-02 implementado; converge salvo S1 a S3 y los Menores D4 a D6 (de la persona) y el riesgo NOT-14 |
 | transversal-seguridad | InProgress | 30/30 | Converge salvo SEG-17/23 del Inventario (Menor) y SEG-31 del asistente (diferido) |
 | transversal-plataforma | InProgress | 24/42 | Sin verificación: fuera del Sprint 2 (despliegue, spikes, PLA-R2 a R4) |
 | asistente-compra-ia | Planned | 0/24 | Diferida (ECO-12) |
-| web-indice-infinito | Planned | 0/15 | Diferida (ECO-13) |
+| web-indice-infinito | **Done** | 15/15 | Converge |
 
 Criterio estricto de aceptación (persona): a `Done` pasan solo las specs que convergen sin reservas; las demás quedan con la reserva declarada en su `verificacion.md` y en `progress/hallazgos.md`.
 
