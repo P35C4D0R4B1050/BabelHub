@@ -887,6 +887,9 @@ internal sealed class AplicadorDePrueba(string modulo) : IAplicadorDeCancelacion
 
     public List<(Guid UsuarioId, Guid Opaco)> Aplicados { get; } = [];
 
+    /// <summary>El orden global de llamada (para comprobar el orden de los receptores).</summary>
+    public static List<string> OrdenDeLlamada { get; } = [];
+
     public bool Falla { get; set; }
 
     public Task Aplicar(Guid usuarioId, Guid identificadorOpaco, CancellationToken cancelacion = default)
@@ -897,6 +900,11 @@ internal sealed class AplicadorDePrueba(string modulo) : IAplicadorDeCancelacion
         }
 
         Aplicados.Add((usuarioId, identificadorOpaco));
+        lock (OrdenDeLlamada)
+        {
+            OrdenDeLlamada.Add(modulo);
+        }
+
         return Task.CompletedTask;
     }
 }

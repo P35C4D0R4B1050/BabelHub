@@ -245,7 +245,11 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
         Assert.True(devolucion.EsExito, devolucion.Error?.Clave);
 
         var orden = await anfitrion.Como(ActorActual.DelSistema(), sp => Task.FromResult(BabelHub.Ecommerce.Application.Identidad.Interno.EjecutorDeLaCancelacion.EnElOrdenDeLosReceptores(sp.GetServices<BabelHub.Ecommerce.Application.Identidad.IAplicadorDeCancelacion>()).Select(a => a.Modulo).ToList()));
-        await anfitrion.Como(ActorActual.DelSistema(), sp => AplicarLosReceptores(sp, cuenta).ContinueWith(_ => true, TaskScheduler.Default));
+        await anfitrion.Como(ActorActual.DelSistema(), async sp =>
+            {
+                await AplicarLosReceptores(sp, cuenta);
+                return true;
+            });
 
         Assert.True(orden.IndexOf("pedidos") < orden.IndexOf("devoluciones"), string.Join(",", orden));
         Assert.True(orden.IndexOf("devoluciones") < orden.IndexOf("pagos"), string.Join(",", orden));
@@ -470,7 +474,11 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
         await using var anfitrion = Anfitrion();
         var (pedido, cuenta, _, impresa) = await ComprarMixtoConImpreso(anfitrion);
         await EntregarElImpreso(pedido, impresa);
-        await anfitrion.Como(ActorActual.DelSistema(), sp => AplicarLosReceptores(sp, cuenta).ContinueWith(_ => true, TaskScheduler.Default));
+        await anfitrion.Como(ActorActual.DelSistema(), async sp =>
+            {
+                await AplicarLosReceptores(sp, cuenta);
+                return true;
+            });
         await bd.Ejecutar($"UPDATE identidad.usuarios SET activo = false WHERE id = '{cuenta:D}'");
 
         var solicitud = await SolicitarImpreso(anfitrion, cuenta, pedido, impresa);
