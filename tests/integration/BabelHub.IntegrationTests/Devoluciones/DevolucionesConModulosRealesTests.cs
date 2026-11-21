@@ -29,7 +29,7 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
 
     private readonly InventarioSimulado _inventario = new();
 
-    private readonly RelojDeDevoluciones _reloj = new(DateTimeOffset.UtcNow);
+    private readonly RelojDeDevoluciones _reloj = new(new DateTimeOffset(DateTimeOffset.UtcNow.UtcDateTime.Date.AddSeconds(Math.Floor(DateTimeOffset.UtcNow.TimeOfDay.TotalSeconds)), TimeSpan.Zero));
 
     public async Task InitializeAsync() =>
         await bd.Ejecutar(
@@ -46,6 +46,10 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
               ON CONFLICT DO NOTHING;
             INSERT INTO catalogo.archivos_digitales (edicion_id, clave_en_almacen, tipo_detectado, tamano, huella_sha256, subido_en, subido_por)
               VALUES ('b0000000-0000-0000-0000-0000000000d1', 'f2e000000000000000000000000000d1', 'epub', 1024, decode(repeat('d2', 32), 'hex'), now(), '00000000-0000-0000-0000-000000000000')
+              ON CONFLICT DO NOTHING;
+            INSERT INTO identidad.versiones_de_textos (id, terminos, privacidad, reembolso) VALUES (1, 'v1', 'v1', 'v1') ON CONFLICT (id) DO UPDATE SET terminos = 'v1', privacidad = 'v1', reembolso = 'v1';
+            INSERT INTO identidad.usuarios (id, nombre, correo, correo_verificado, rol, activo, creada_en, acepto_terminos_version, acepto_terminos_en, acepto_privacidad_version, acepto_privacidad_en, acepto_reembolso_version, acepto_reembolso_en)
+              VALUES ('44444444-4444-4444-4444-444444444444', 'Admin de prueba', 'admin-t30@example.test', true, 'administrador-central', true, now(), 'v1', now(), 'v1', now(), 'v1', now())
               ON CONFLICT DO NOTHING;
             COMMIT;
             """);
@@ -180,12 +184,65 @@ public sealed class DevolucionesConModulosRealesTests(PostgresDelEcommerceComple
         var (pedido, cuenta, linea) = await ComprarMixto(anfitrion);
         Assert.True((await PedirReembolso(anfitrion, cuenta, pedido, linea)).EsExito);
         var registradosAntes = _reembolsos.Registrados.Count;
+        Assert.Equal(1, registradosAntes);
 
         var anulacion = await anfitrion.Como(DelAdministrador(), sp => sp.GetRequiredService<IAdministracionDePedidos>().Anular(new AnularPedidoEntrada(pedido, "otro")));
 
         Assert.True(anulacion.EsExito, anulacion.Error?.Clave);
-        var deLaAnulacion = _reembolsos.Registrados.Skip(registradosAntes).Single();
+        var deLaAnulacion = _reembolsos.Registrados.Single(r => r.Origen == OrigenDelReembolso.Anulacion);
         Assert.Single(deLaAnulacion.Lineas);
         Assert.Equal(50m, deLaAnulacion.Lineas.Sum(l => l.Monto));
+    }
+
+    private sealed class AplicadorQueFalla : BabelHub.Ecommerce.Application.Identidad.IAplicadorDeCancelacion
+    {
+        public string Modulo => "falla-al-final";
+
+        public Task Aplicar(Guid usuarioId, Guid identificadorOpaco, CancellationToken cancelacion = default) => throw new InvalidOperationException("falla simulada");
+    }
+
+    private static Task AplicarLosReceptores(IServiceProvider sp, Guid cuenta, params BabelHub.Ecommerce.Application.Identidad.IAplicadorDeCancelacion[] extra) =>
+        sp.GetRequiredService<IUnidadDeTrabajo>().Ejecutar<bool>(
+            async token =>
+            {
+                foreach (var receptor in BabelHub.Ecommerce.Application.Identidad.Interno.EjecutorDeLaCancelacion.EnElOrdenDeLosReceptores(sp.GetServices<BabelHub.Ecommerce.Application.Identidad.IAplicadorDeCancelacion>().Concat(extra)))
+                {
+                    await receptor.Aplicar(cuenta, cuenta, token);
+                }
+
+                return true;
+            });
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-26")]
+    [Trait("Criterio", "AC-DEV-27")]
+    public async Task La_cancelacion_de_la_cuenta_aplica_Pedidos_Devoluciones_y_Pagos_en_ese_orden_y_redacta_el_motivo_sin_tocar_lo_demas()
+    {
+        await using var anfitrion = Anfitrion();
+        var (pedido, cuenta, linea) = await ComprarMixto(anfitrion);
+        var devolucion = await PedirReembolso(anfitrion, cuenta, pedido, linea);
+        Assert.True(devolucion.EsExito, devolucion.Error?.Clave);
+
+        var orden = await anfitrion.Como(ActorActual.DelSistema(), sp => Task.FromResult(BabelHub.Ecommerce.Application.Identidad.Interno.EjecutorDeLaCancelacion.EnElOrdenDeLosReceptores(sp.GetServices<BabelHub.Ecommerce.Application.Identidad.IAplicadorDeCancelacion>()).Select(a => a.Modulo).ToList()));
+        await anfitrion.Como(ActorActual.DelSistema(), sp => AplicarLosReceptores(sp, cuenta).ContinueWith(_ => true, TaskScheduler.Default));
+
+        Assert.True(orden.IndexOf("pedidos") < orden.IndexOf("devoluciones"), string.Join(",", orden));
+        Assert.True(orden.IndexOf("devoluciones") < orden.IndexOf("pagos"), string.Join(",", orden));
+        Assert.Equal(TextoLibre.Redactado, await bd.Consultar<string>("SELECT motivo FROM devoluciones.devoluciones WHERE pedido_id = @p", ("p", pedido)));
+        Assert.Equal(1, await bd.Consultar<int>("SELECT count(*) FROM devoluciones.lineas_de_devolucion l JOIN devoluciones.devoluciones d ON d.id = l.devolucion_id WHERE d.pedido_id = @p", ("p", pedido)));
+        Assert.Equal(30m, await bd.Consultar<decimal>("SELECT sum(monto) FROM devoluciones.lineas_de_devolucion l JOIN devoluciones.devoluciones d ON d.id = l.devolucion_id WHERE d.pedido_id = @p", ("p", pedido)));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-26")]
+    public async Task Si_un_receptor_posterior_falla_la_redaccion_de_Devoluciones_se_revierte_con_el_resto()
+    {
+        await using var anfitrion = Anfitrion();
+        var (pedido, cuenta, linea) = await ComprarMixto(anfitrion);
+        Assert.True((await PedirReembolso(anfitrion, cuenta, pedido, linea)).EsExito);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => anfitrion.Como(ActorActual.DelSistema(), sp => AplicarLosReceptores(sp, cuenta, new AplicadorQueFalla()).ContinueWith(t => t.IsFaulted ? throw t.Exception!.InnerException! : true, TaskScheduler.Default)));
+
+        Assert.Equal(Sembrado, await bd.Consultar<string>("SELECT motivo FROM devoluciones.devoluciones WHERE pedido_id = @p", ("p", pedido)));
     }
 }
