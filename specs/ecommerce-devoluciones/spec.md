@@ -1,7 +1,7 @@
 ---
 id: ecommerce-devoluciones
 titulo: Devoluciones y reembolsos
-estado: Planned
+estado: Done
 aprobado_por: Claude (delegado por Diego Amiquero)
 aprobado_en: 2026-11-13
 plan_aprobado_por: Claude (delegado por Diego Amiquero)
