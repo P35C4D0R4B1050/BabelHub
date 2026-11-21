@@ -32,6 +32,9 @@ public sealed class GestionDeLaCuenta(
     IAuditoria auditoria,
     IReloj reloj) : ICuentaDelCliente
 {
+    /// <summary>El número de WhatsApp y su consentimiento son del cliente (AGENTS.md §5): el personal no los tiene.</summary>
+    private static ErrorDeAplicacion SoloClientes { get; } = new(CategoriaDeError.Prohibido, "solo-clientes");
+
     public async Task<Resultado<CuentaDelCliente>> Consultar(Guid usuarioId, CancellationToken cancelacion = default)
     {
         if (await alcance.Comprobar(usuarioId, cancelacion).ConfigureAwait(false) is { } prohibido)
@@ -52,11 +55,19 @@ public sealed class GestionDeLaCuenta(
             return Resultado<CuentaDelCliente>.Fallo(prohibido);
         }
 
-        if (!EntradasDeIdentidad.NombreValido(nombre))
+        if (!EntradasDeIdentidad.NombreCorregidoValido(nombre))
         {
             return Resultado<CuentaDelCliente>.Fallo(FallosDeIdentidad.Validacion("nombre", "invalido"));
         }
 
+        // El tope por cuenta (IDE-98) cuenta toda corrección válida de forma, cambie o no el valor: acota el inflado de la auditoría (AUD-45).
+        var reserva = await limites.Reservar(PoliticasDeLimite.CorreccionesDeNombrePorCuenta, usuarioId.ToString("N"), cancelacion: cancelacion).ConfigureAwait(false);
+        if (LimitesDeIdentidad.Rechazo(reserva) is { } limite)
+        {
+            return Resultado<CuentaDelCliente>.Fallo(limite);
+        }
+
+        var nuevo = nombre.Trim();
         return await unidad.Ejecutar(
             async ct =>
             {
@@ -66,8 +77,16 @@ public sealed class GestionDeLaCuenta(
                     return Resultado<CuentaDelCliente>.Fallo(AlcanceDeLaCuenta.CuentaNoEncontrada);
                 }
 
-                cuenta.Nombre = nombre.Trim();
-                await cuentas.Guardar(cuenta, ct).ConfigureAwait(false);
+                // Solo la corrección que cambia el valor se guarda y se audita, en la misma transacción y sin ningún nombre en el detalle (AUD-04, AUD-45).
+                if (!string.Equals(cuenta.Nombre, nuevo, StringComparison.Ordinal))
+                {
+                    cuenta.Nombre = nuevo;
+                    await cuentas.Guardar(cuenta, ct).ConfigureAwait(false);
+                    await auditoria.Registrar(
+                        new SolicitudDeRegistro(AccionesAuditables.UsuarioActualizado) { ObjetoTipo = "usuario", ObjetoId = usuarioId.ToString("D") },
+                        ct).ConfigureAwait(false);
+                }
+
                 return Resultado<CuentaDelCliente>.Exito(await Modelo(cuenta, ct).ConfigureAwait(false));
             },
             cancelacion).ConfigureAwait(false);
@@ -143,11 +162,17 @@ public sealed class GestionDeLaCuenta(
         return Resultado<RespuestaUniforme>.Exito(new RespuestaUniforme());
     }
 
-    public async Task<Resultado<CuentaDelCliente>> GuardarElNumeroDeWhatsApp(Guid usuarioId, string? numero, CancellationToken cancelacion = default)
+    public async Task<Resultado<CuentaDelCliente>> GuardarElNumeroDeWhatsApp(Guid usuarioId, string? numero, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default)
     {
         if (await alcance.Comprobar(usuarioId, cancelacion).ConfigureAwait(false) is { } prohibido)
         {
             return Resultado<CuentaDelCliente>.Fallo(prohibido);
+        }
+
+        // Con un cambio de correo no reconocido pendiente, los cambios sensibles piden un dispositivo reconocido (IDE-96).
+        if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)
+        {
+            return Resultado<CuentaDelCliente>.Fallo(congelado);
         }
 
         return await unidad.Ejecutar(
@@ -157,6 +182,11 @@ public sealed class GestionDeLaCuenta(
                 if (cuenta is null)
                 {
                     return Resultado<CuentaDelCliente>.Fallo(AlcanceDeLaCuenta.CuentaNoEncontrada);
+                }
+
+                if (cuenta.Usuario.Rol != RolDeUsuario.Cliente)
+                {
+                    return Resultado<CuentaDelCliente>.Fallo(SoloClientes);
                 }
 
                 var antes = cuenta.Whatsapp.Numero?.Valor;
@@ -182,11 +212,17 @@ public sealed class GestionDeLaCuenta(
             cancelacion).ConfigureAwait(false);
     }
 
-    public async Task<Resultado<CuentaDelCliente>> CambiarElConsentimientoDeWhatsApp(Guid usuarioId, bool consiente, string? numeroConfirmado, CancellationToken cancelacion = default)
+    public async Task<Resultado<CuentaDelCliente>> CambiarElConsentimientoDeWhatsApp(Guid usuarioId, bool consiente, string? numeroConfirmado, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default)
     {
         if (await alcance.Comprobar(usuarioId, cancelacion).ConfigureAwait(false) is { } prohibido)
         {
             return Resultado<CuentaDelCliente>.Fallo(prohibido);
+        }
+
+        // Con un cambio de correo no reconocido pendiente, los cambios sensibles piden un dispositivo reconocido (IDE-96).
+        if (await confianza.ComprobarQueNoEsteCongelado(usuarioId, marcaDeDispositivo, cancelacion).ConfigureAwait(false) is { } congelado)
+        {
+            return Resultado<CuentaDelCliente>.Fallo(congelado);
         }
 
         return await unidad.Ejecutar(
@@ -196,6 +232,11 @@ public sealed class GestionDeLaCuenta(
                 if (cuenta is null)
                 {
                     return Resultado<CuentaDelCliente>.Fallo(AlcanceDeLaCuenta.CuentaNoEncontrada);
+                }
+
+                if (cuenta.Usuario.Rol != RolDeUsuario.Cliente)
+                {
+                    return Resultado<CuentaDelCliente>.Fallo(SoloClientes);
                 }
 
                 if (consiente)
@@ -256,6 +297,11 @@ public sealed class GestionDeLaCuenta(
                 if (cuenta is null)
                 {
                     return Resultado<RespuestaUniforme>.Fallo(AlcanceDeLaCuenta.CuentaNoEncontrada);
+                }
+
+                if (cuenta.Usuario.Rol != RolDeUsuario.Cliente)
+                {
+                    return Resultado<RespuestaUniforme>.Fallo(SoloClientes);
                 }
 
                 // Si el número cambió entre la oferta y el guardado, la huella ya no coincide y no se guarda nada (CAR-18).

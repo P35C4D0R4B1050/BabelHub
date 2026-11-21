@@ -5,6 +5,7 @@
 @{
     var c = Model.Cuenta;
     var acciones = Model.ConAcciones;
+    var personal = Model.EsDelPersonal;
     string Activa(PantallaDeLaCuenta p) => Model.Pantalla == p ? "tab tab-active" : "tab";
     string? Actual(PantallaDeLaCuenta p) => Model.Pantalla == p ? "page" : null;
 }
@@ -14,11 +15,17 @@
     <nav class="tabs tabs-border mt-4 flex-wrap" aria-label="Secciones de tu cuenta">
         <a class="@Activa(PantallaDeLaCuenta.Resumen)" href="/cuenta" aria-current="@Actual(PantallaDeLaCuenta.Resumen)">Resumen</a>
         <a class="@Activa(PantallaDeLaCuenta.Datos)" href="/cuenta/datos" aria-current="@Actual(PantallaDeLaCuenta.Datos)">Mis datos</a>
+        @if (!personal)
+        {
         <a class="@Activa(PantallaDeLaCuenta.SegundoFactor)" href="/cuenta/segundo-factor" aria-current="@Actual(PantallaDeLaCuenta.SegundoFactor)">Segundo factor</a>
+        }
         <a class="@Activa(PantallaDeLaCuenta.Correo)" href="/cuenta/correo" aria-current="@Actual(PantallaDeLaCuenta.Correo)">Correo</a>
         <a class="@Activa(PantallaDeLaCuenta.Avisos)" href="/cuenta/avisos" aria-current="@Actual(PantallaDeLaCuenta.Avisos)">Avisos</a>
+        @if (!personal)
+        {
         <a class="@Activa(PantallaDeLaCuenta.Solicitudes)" href="/cuenta/solicitudes" aria-current="@Actual(PantallaDeLaCuenta.Solicitudes)">Mis datos personales</a>
         <a class="@Activa(PantallaDeLaCuenta.Cancelacion)" href="/cuenta/cancelacion" aria-current="@Actual(PantallaDeLaCuenta.Cancelacion)">Cancelar mi cuenta</a>
+        }
     </nav>
 
     @if (Model.TextosPendientes)
@@ -49,8 +56,11 @@
                 <dl class="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-[12rem_1fr]">
                     <dt class="font-semibold">Nombre</dt><dd>@c!.Nombre</dd>
                     <dt class="font-semibold">Correo</dt><dd>@c.Correo @(c.CorreoVerificado ? "(verificado)" : "(sin verificar)")</dd>
+                    @if (!personal)
+                    {
                     <dt class="font-semibold">Segundo factor</dt><dd>@(c.SegundoFactorActivo ? "Activado" : "No activado")</dd>
                     <dt class="font-semibold">WhatsApp</dt><dd>@(c.ConsentimientoDeWhatsApp ? "Recibes avisos de tus pedidos" : "Sin avisos por WhatsApp")</dd>
+                    }
                 </dl>
                 @if (Model.Cancelacion is { Estado: not EstadoDeLaCancelacion.SinSolicitud and not EstadoDeLaCancelacion.Descartada } cancelacion)
                 {
@@ -79,6 +89,8 @@
                         <button type="submit" class="btn btn-primary">Guardar mi nombre</button>
                     }
                 </form>
+                @if (!personal)
+                {
                 <h2 class="mt-10 font-display text-2xl">Avisos por WhatsApp</h2>
                 <form method="post" action="/cuenta/whatsapp" class="mt-3 flex max-w-md flex-col gap-4">
                     <partial name="_TokenAntifalsificacion" />
@@ -100,6 +112,7 @@
                         <button type="submit" class="btn btn-primary">Cambiar contraseña</button>
                     }
                 </form>
+                }
                 break;
 
             case PantallaDeLaCuenta.SegundoFactor:
@@ -161,6 +174,10 @@
                         <partial name="_TokenAntifalsificacion" />
                         <label class="form-control"><span class="label-text">Correo nuevo</span><input type="email" name="correoNuevo" class="input input-bordered w-full" required maxlength="254" autocomplete="email" /></label>
                         <label class="form-control"><span class="label-text">Contraseña actual</span><input type="password" name="actual" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
+                        @if (c!.SegundoFactorActivo)
+                        {
+                            <label class="form-control"><span class="label-text">Código de tu aplicación de autenticación o de respaldo</span><input type="text" name="codigo" class="input input-bordered w-full" required maxlength="64" autocomplete="one-time-code" /></label>
+                        }
                         <button type="submit" class="btn btn-primary">Pedir el cambio</button>
                     </form>
                     <form method="post" action="/cuenta/correo/verificar" class="mt-8 flex max-w-md flex-col gap-4">

@@ -50,7 +50,7 @@ public sealed class PantallasDeLaCuentaTests : IAsyncLifetime
         var dispositivos = DobleDeMetodos.Crear<IDispositivosDeLaCuenta>(out var dDispositivos);
         dDispositivos.Con(nameof(IDispositivosDeLaCuenta.Reconoce), a => { _llamadas.Add("reconoce"); _argumentos["marca"] = (a[1] as ValorSecreto)?.Revelar(); _argumentos["region"] = a[2]; return Task.FromResult(De(_reconocida)); });
         var correo = DobleDeMetodos.Crear<ICambioDeCorreo>(out var dCorreo);
-        dCorreo.Con(nameof(ICambioDeCorreo.Solicitar), a => { _llamadas.Add("correo"); _argumentos["correoNuevo"] = a[1]; return Task.FromResult(De(new RespuestaUniforme())); });
+        dCorreo.Con(nameof(ICambioDeCorreo.Solicitar), a => { _llamadas.Add("correo"); _argumentos["correoNuevo"] = a[1]; _argumentos["codigoDelSegundoFactor"] = (a[5] as ValorSecreto)?.Revelar(); return Task.FromResult(De(new RespuestaUniforme())); });
         dCorreo.Con(nameof(ICambioDeCorreo.ConfirmarElCambioPendiente), a => { _llamadas.Add("confirmar-correo"); return Task.FromResult(De(new RespuestaUniforme())); });
         dCorreo.Con(nameof(ICambioDeCorreo.RechazarElCambioPendiente), a => { _llamadas.Add("rechazar-correo"); return Task.FromResult(De(new RespuestaUniforme())); });
         var cancelaciones = DobleDeMetodos.Crear<ICancelacionDeCuenta>(out var dCancelacion);
@@ -342,10 +342,89 @@ public sealed class PantallasDeLaCuentaTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Found, anonimo.StatusCode);
         Assert.Equal("/ingreso", anonimo.Headers.Location?.OriginalString);
         await using var personal = await Armar(RolWeb.Logistica);
-        using var solicitud = await AnfitrionConSesion.Post(personal, "/cuenta/datos", AnfitrionConSesion.Cookie());
-        solicitud.Content = new FormUrlEncodedContent([new KeyValuePair<string, string>("nombre", "x")]);
+        using var solicitud = await AnfitrionConSesion.Post(personal, "/cuenta/whatsapp", AnfitrionConSesion.Cookie());
+        solicitud.Content = new FormUrlEncodedContent([new KeyValuePair<string, string>("numero", "987654321")]);
         using var accion = await personal.Cliente.SendAsync(solicitud);
         Assert.Equal("/sin-permiso", accion.Headers.Location?.OriginalString);
         Assert.Empty(_llamadas);
+    }
+
+    // ---------------------------------------------------------------- la cuenta del personal (DD-25, IDE-90, IDE-93, AC-IDE-67 a AC-IDE-69)
+
+    [Theory]
+    [Trait("Criterio", "AC-IDE-67")]
+    [InlineData(RolWeb.Encargado)]
+    [InlineData(RolWeb.Logistica)]
+    [InlineData(RolWeb.AdministradorCentral)]
+    public async Task El_personal_ve_su_nombre_su_correo_y_sus_avisos_y_no_las_secciones_del_cliente(RolWeb rol)
+    {
+        await using var personal = await Armar(rol);
+
+        foreach (var ruta in new[] { "/cuenta", "/cuenta/datos", "/cuenta/correo", "/cuenta/avisos" })
+        {
+            var solicitud = new HttpRequestMessage(HttpMethod.Get, ruta);
+            solicitud.Headers.TryAddWithoutValidation("Accept", "text/html");
+            solicitud.Headers.TryAddWithoutValidation("Cookie", AnfitrionConSesion.Cookie());
+            using var respuesta = await personal.Cliente.SendAsync(solicitud);
+            Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
+            var html = await respuesta.Content.ReadAsStringAsync();
+            Assert.DoesNotContain("Cancelar mi cuenta", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("WhatsApp", html, StringComparison.Ordinal);
+        }
+
+        foreach (var ruta in new[] { "/cuenta/segundo-factor", "/cuenta/cancelacion", "/cuenta/solicitudes" })
+        {
+            var solicitud = new HttpRequestMessage(HttpMethod.Get, ruta);
+            solicitud.Headers.TryAddWithoutValidation("Accept", "text/html");
+            solicitud.Headers.TryAddWithoutValidation("Cookie", AnfitrionConSesion.Cookie());
+            using var respuesta = await personal.Cliente.SendAsync(solicitud);
+            Assert.Equal("/sin-permiso", respuesta.Headers.Location?.OriginalString);
+        }
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-IDE-67")]
+    [Trait("Criterio", "AC-IDE-69")]
+    [InlineData(RolWeb.Encargado)]
+    [InlineData(RolWeb.AdministradorCentral)]
+    public async Task El_personal_corrige_su_nombre_y_pide_cambiar_su_correo_con_el_codigo_del_segundo_factor(RolWeb rol)
+    {
+        await using var personal = await Armar(rol);
+
+        using var nombre = await AnfitrionConSesion.Post(personal, "/cuenta/datos", AnfitrionConSesion.Cookie());
+        nombre.Content = new FormUrlEncodedContent([new KeyValuePair<string, string>("nombre", "Nombre nuevo")]);
+        using var guardado = await personal.Cliente.SendAsync(nombre);
+        using var correoSolicitado = await AnfitrionConSesion.Post(personal, "/cuenta/correo/solicitar", AnfitrionConSesion.Cookie());
+        correoSolicitado.Content = new FormUrlEncodedContent([new("correoNuevo", "nuevo@correo.example"), new("actual", "la actual"), new("codigo", "123456")]);
+        using var correo = await personal.Cliente.SendAsync(correoSolicitado);
+
+        Assert.Equal("/cuenta/datos?aviso=nombre-guardado", guardado.Headers.Location?.OriginalString);
+        Assert.Equal("/cuenta/correo?aviso=correo-solicitado", correo.Headers.Location?.OriginalString);
+        Assert.Equal(["nombre", "correo"], _llamadas);
+        Assert.Equal("Nombre nuevo", _argumentos["nombre"]);
+        Assert.Equal("123456", _argumentos["codigoDelSegundoFactor"]);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-IDE-68")]
+    [InlineData("/cuenta/segundo-factor")]
+    [InlineData("/cuenta/correo")]
+    [InlineData("/cuenta/cancelacion")]
+    public async Task Ningun_formulario_de_la_cuenta_repite_un_campo_y_solo_el_de_pedir_el_correo_lleva_el_codigo_del_segundo_factor(string ruta)
+    {
+        using var respuesta = await Pedir(ruta);
+        var html = await respuesta.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
+        foreach (System.Text.RegularExpressions.Match formulario in System.Text.RegularExpressions.Regex.Matches(html, "<form[^>]*>.*?</form>", System.Text.RegularExpressions.RegexOptions.Singleline))
+        {
+            var campos = System.Text.RegularExpressions.Regex.Matches(formulario.Value, "<input[^>]*name=\"([^\"]+)\"")
+                .Select(m => m.Groups[1].Value).Where(n => n != "__RequestVerificationToken").ToList();
+            Assert.Equal(campos.Distinct().Count(), campos.Count);
+            if (formulario.Value.Contains("/cuenta/correo/confirmar", StringComparison.Ordinal) || formulario.Value.Contains("/cuenta/correo/rechazar", StringComparison.Ordinal))
+            {
+                Assert.DoesNotContain("codigo", campos);
+            }
+        }
     }
 }

@@ -283,6 +283,8 @@ internal static class EntornoDelCambioDeCorreoExtensiones
         e.Huellas,
         e.AvisosGuardados,
         e.Avisos,
+        e.Renovaciones,
+        e.Revocacion,
         e.Eventos,
         e.Unidad,
         e.Auditoria,
@@ -320,6 +322,7 @@ internal static class EntornoDeLaCancelacionExtensiones
     public static CancelacionDeCuenta Cancelacion(this EntornoDeIdentidad e) => new(
         e.Cuentas,
         new AlcanceDeLaCuenta(e.Actor, e.Denegaciones),
+        e.Confianza(),
         e.Reautenticacion(),
         e.CancelacionesGuardadas,
         e.Pendientes,
@@ -362,6 +365,7 @@ internal static class EntornoDeLaEjecucionExtensiones
     public static CancelacionDeCuenta CancelacionReal(this EntornoDeIdentidad e) => new(
         e.Cuentas,
         new AlcanceDeLaCuenta(e.Actor, e.Denegaciones),
+        e.Confianza(),
         e.Reautenticacion(),
         e.CancelacionesGuardadas,
         e.Pendientes,

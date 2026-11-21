@@ -89,6 +89,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
         [nameof(AccionesAuditables.UsuarioDadoDeAlta)] = ["usuario", "cuenta"],
         [nameof(AccionesAuditables.UsuarioDesactivado)] = ["usuario", "cuenta"],
         [nameof(AccionesAuditables.UsuarioReactivado)] = ["usuario", "cuenta"],
+        [nameof(AccionesAuditables.UsuarioActualizado)] = ["usuario"],
         [nameof(AccionesAuditables.CambioDeRol)] = ["usuario"],
         [nameof(AccionesAuditables.ContrasenaRestablecidaPorAdministracion)] = ["usuario"],
         [nameof(AccionesAuditables.SegundoFactorRestablecidoPorAdministracion)] = ["usuario"],

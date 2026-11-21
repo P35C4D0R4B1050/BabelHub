@@ -44,6 +44,9 @@ public static class PoliticasDeLimite
     /// <summary>3 avisos de seguridad no críticos por correo por cuenta y 24 horas (IDE-74).</summary>
     public static ClaveDePolitica AvisosNoCriticosPorCuenta { get; } = new("avisos-no-criticos-por-cuenta");
 
+    /// <summary>5 correcciones de nombre por hora y cuenta (IDE-98).</summary>
+    public static ClaveDePolitica CorreccionesDeNombrePorCuenta { get; } = new("correcciones-de-nombre-por-cuenta");
+
     /// <summary>La primera alerta crítica de cada tipo por cuenta en 24 horas (IDE-74).</summary>
     public static ClaveDePolitica AlertasCriticasPorTipoYCuenta { get; } = new("alertas-criticas-por-tipo-y-cuenta");
 
@@ -137,6 +140,7 @@ public static class PoliticasDeLimite
         SegundoFactorPorCuenta,
         RegistrosPorOrigen,
         AvisosNoCriticosPorCuenta,
+        CorreccionesDeNombrePorCuenta,
         AlertasCriticasPorTipoYCuenta,
         AlertasCriticasPorOrigen,
         CupoDeCodigosPorOrigen,

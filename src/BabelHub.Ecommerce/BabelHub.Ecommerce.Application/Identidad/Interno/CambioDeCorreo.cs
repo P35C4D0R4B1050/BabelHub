@@ -101,8 +101,8 @@ public sealed class DispositivosDeLaCuenta(
 }
 
 /// <summary>
-/// El cambio de correo de un cliente (T20; IDE-25, IDE-53, IDE-54, IDE-55, AC-IDE-47, AC-IDE-48). Pide la contraseña actual (con el límite de ingresos fallidos) y evalúa la confianza de la solicitud. <b>Dispositivo
-/// reconocido y región habitual:</b> se envía un código al correo <b>nuevo</b> y el cambio se aplica al verificarlo, con aviso en la cuenta y al correo nuevo y nada al anterior. <b>Otro caso:</b> no se aplica, queda
+/// El cambio de correo de un usuario de cualquier rol (T20, T53 y T54; IDE-97, IDE-53, IDE-54, IDE-55, IDE-94, AC-IDE-47, AC-IDE-48, AC-IDE-68, AC-IDE-69). Pide la contraseña actual (con el límite de ingresos fallidos) y, si tiene el segundo factor activo, un código y evalúa la confianza de la solicitud. <b>Dispositivo
+/// reconocido y región habitual:</b> se envía un código al correo <b>nuevo</b> y el cambio se aplica al verificarlo, con aviso en la cuenta, al correo nuevo y al anterior (alerta crítica sin el correo nuevo); al aplicarse revoca las demás sesiones e invalida los códigos pendientes. <b>Otro caso:</b> no se aplica, queda
 /// pendiente 24 horas, se congelan los cambios sensibles del dispositivo, se alerta al correo anterior y en la cuenta, y el titular lo confirma o rechaza desde un dispositivo reconocido y con su contraseña; si
 /// confirma, se envía el código al correo nuevo; vencido el plazo, se descarta. Un correo ya usado por otra cuenta no se distingue: la respuesta es la misma y no sale ningún código (sin enumeración de cuentas).
 /// El código sale solo al correo nuevo guardado en el cambio en curso (SEG-28) y con los límites por correo y por origen de SEG-19.
@@ -122,6 +122,8 @@ public sealed class CambioDeCorreo(
     ICalculadorDeHuella huellas,
     IAvisosDeCuentaAlmacen avisosDeCuenta,
     AvisosDeCuenta avisos,
+    IRepositorioDeRenovaciones renovaciones,
+    RevocacionDeSesiones revocacion,
     EventosDeSeguridadDeIdentidad eventos,
     IUnidadDeTrabajo unidad,
     IAuditoria auditoria,
@@ -141,7 +143,7 @@ public sealed class CambioDeCorreo(
 
     private static ErrorDeAplicacion DispositivoNoReconocido { get; } = new(CategoriaDeError.Prohibido, "dispositivo-no-reconocido");
 
-    public async Task<Resultado<RespuestaUniforme>> Solicitar(Guid usuarioId, string correoNuevo, ValorSecreto contrasenaActual, ValorSecreto? marcaDeDispositivo, string? region, CancellationToken cancelacion = default)
+    public async Task<Resultado<RespuestaUniforme>> Solicitar(Guid usuarioId, string correoNuevo, ValorSecreto contrasenaActual, ValorSecreto? marcaDeDispositivo, string? region, ValorSecreto? codigoDelSegundoFactor = null, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(contrasenaActual);
         if (await alcance.Comprobar(usuarioId, cancelacion).ConfigureAwait(false) is { } prohibido)
@@ -155,12 +157,7 @@ public sealed class CambioDeCorreo(
             return Resultado<RespuestaUniforme>.Fallo(AlcanceDeLaCuenta.CuentaNoEncontrada);
         }
 
-        // El correo del personal lo asigna la administración; y cambiar el correo de una cuenta sin verificar es registrarse de nuevo.
-        if (cuenta.Usuario.Rol != RolDeUsuario.Cliente)
-        {
-            return Resultado<RespuestaUniforme>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Prohibido, "solo-clientes"));
-        }
-
+        // Cualquier rol cambia su correo (DD-25); cambiar el correo de una cuenta sin verificar es registrarse de nuevo.
         if (!cuenta.Usuario.CorreoVerificado)
         {
             return Resultado<RespuestaUniforme>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Conflicto, "correo-sin-verificar"));
@@ -181,9 +178,12 @@ public sealed class CambioDeCorreo(
             return Resultado<RespuestaUniforme>.Fallo(FallosDeIdentidad.Validacion("correoNuevo", "igual-al-actual"));
         }
 
-        if (await reautenticacion.ContrasenaActual(cuenta, contrasenaActual, cancelacion).ConfigureAwait(false) is { } rechazo)
+        // La contraseña actual y, si tiene el segundo factor activo, un código vigente o de respaldo (IDE-97), con sus límites, ANTES de reservar el cupo de códigos del correo nuevo: una contraseña o un código
+        // equivocados no gastan ese cupo. El código se acepta de forma atómica dentro de la transacción de más abajo.
+        var verificacion = await reautenticacion.ContrasenaYCodigoSiLoTiene(cuenta, contrasenaActual, codigoDelSegundoFactor, cancelacion).ConfigureAwait(false);
+        if (verificacion.Error is not null)
         {
-            return Resultado<RespuestaUniforme>.Fallo(rechazo);
+            return Resultado<RespuestaUniforme>.Fallo(verificacion.Error);
         }
 
         var ahora = reloj.Ahora;
@@ -191,6 +191,7 @@ public sealed class CambioDeCorreo(
         // Los límites de SEG-19 se reservan ANTES de saber si el correo ya es de otra cuenta y en todas las ramas: exista o no, cuesta lo mismo y responde lo mismo (sin oráculo de enumeración).
         if (await SolicitudDeCodigos.Reservar(limites, huellas, nuevo, PropositoDeLosLimites, cancelacion).ConfigureAwait(false) is { } limite)
         {
+            await reautenticacion.DevolverLosCupos(verificacion.Reservas, cancelacion).ConfigureAwait(false);
             return Resultado<RespuestaUniforme>.Fallo(limite);
         }
 
@@ -199,6 +200,7 @@ public sealed class CambioDeCorreo(
         var cambio = CambioDeCorreoPendiente.Pedir(secretos.NuevoIdentificador(), usuarioId, nuevo, evaluada, ahora);
         var seEnviaElCodigo = cambio.Estado == EstadoDelCambioDeCorreo.EsperandoVerificacion;
         var guardado = false;
+        var perdioLaCarrera = false;
 
         var resultado = await unidad.Ejecutar(
             async ct =>
@@ -216,9 +218,18 @@ public sealed class CambioDeCorreo(
                     return Resultado<RespuestaUniforme>.Fallo(CambioPendiente);
                 }
 
+                // El código del segundo factor se acepta con la actualización condicional atómica, también cuando el correo ya es de otra cuenta (la respuesta no distingue el caso). Si otra solicitud lo aceptó antes, es inválido.
+                if (verificacion.Codigo is not null && !await reautenticacion.Aceptar(usuarioId, verificacion.Codigo, ct).ConfigureAwait(false))
+                {
+                    perdioLaCarrera = true;
+                    return Resultado<RespuestaUniforme>.Fallo(FallosDeIdentidad.CodigoInvalido);
+                }
+
                 // Un correo que ya es de otra cuenta responde igual y no manda nada: quien lo prueba no aprende qué correos existen.
                 if (yaEsDeOtraCuenta)
                 {
+                    // Igual que si el correo estuviera libre, el código de un cambio anterior deja de servir: así el efecto sobre un cambio en curso tampoco delata la cuenta (el costo del envío, que es síncrono, queda como residual de IDE-95).
+                    await codigos.Invalidar(usuarioId, DominioProposito.VerificacionDeCorreo, ct).ConfigureAwait(false);
                     return Resultado<RespuestaUniforme>.Exito(new RespuestaUniforme());
                 }
 
@@ -241,6 +252,17 @@ public sealed class CambioDeCorreo(
             },
             cancelacion).ConfigureAwait(false);
 
+        if (perdioLaCarrera)
+        {
+            await reautenticacion.CodigoIncorrecto(usuarioId, cancelacion).ConfigureAwait(false);
+        }
+
+        if (!perdioLaCarrera)
+        {
+            // Los límites del segundo factor cuentan los códigos incorrectos: al acertar (o si la solicitud falla por otra causa) se devuelven; solo un código que perdió la carrera cuenta como incorrecto.
+            await reautenticacion.DevolverLosCupos(verificacion.Reservas, cancelacion).ConfigureAwait(false);
+        }
+
         if (!resultado.EsExito || !guardado)
         {
             return resultado;
@@ -258,7 +280,7 @@ public sealed class CambioDeCorreo(
         return Resultado<RespuestaUniforme>.Exito(new RespuestaUniforme());
     }
 
-    public async Task<Resultado<RespuestaUniforme>> VerificarElCorreoNuevo(Guid usuarioId, ValorSecreto codigo, CancellationToken cancelacion = default)
+    public async Task<Resultado<RespuestaUniforme>> VerificarElCorreoNuevo(Guid usuarioId, ValorSecreto codigo, ValorSecreto? renovacionDeLaSesion = null, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(codigo);
         if (await alcance.Comprobar(usuarioId, cancelacion).ConfigureAwait(false) is { } prohibido)
@@ -278,8 +300,10 @@ public sealed class CambioDeCorreo(
         }
 
         var huella = huellasDeIdentidad.DeCodigo(usuarioId, DominioProposito.VerificacionDeCorreo, codigo.Revelar());
+        var familiaConservada = await FamiliaDeLaSesion(usuarioId, renovacionDeLaSesion, cancelacion).ConfigureAwait(false);
         ResultadoDelCodigo? rechazado = null;
         Usuario? conElCorreoNuevo = null;
+        Usuario? conElCorreoAnterior = null;
 
         // El intento, el consumo del código, el cambio del correo, el aviso en la cuenta y la auditoría son UNA transacción (AUD-04): si no se puede auditar, no se cambia.
         var resultado = await unidad.Ejecutar(
@@ -313,10 +337,26 @@ public sealed class CambioDeCorreo(
                     return Resultado<RespuestaUniforme>.Fallo(FallosDeIdentidad.CodigoInvalido);
                 }
 
+                // El correo anterior se captura antes de aplicar el cambio: es el destino del aviso de IDE-94 (verificado y vigente hasta ahora).
+                conElCorreoAnterior = Usuario.Restaurar(cuenta.Usuario.Id, cuenta.Usuario.Correo, cuenta.Usuario.Rol, cuenta.Usuario.Sucursal, correoVerificado: true, cuenta.Usuario.Activo);
                 cuenta.Usuario.CambiarElCorreo(cambio.CorreoNuevo);
                 await cuentas.Guardar(cuenta, ct).ConfigureAwait(false);
                 await cambios.Guardar(cambio, ct).ConfigureAwait(false);
                 await avisosDeCuenta.Agregar(usuarioId, AvisoDeCorreoCambiado, reloj.Ahora, ct).ConfigureAwait(false);
+
+                // Las demás sesiones dejan de renovarse (la de quien verifica sigue; sin una sesión conocida, ninguna) y ningún código pendiente de verificación o de recuperación sirve ya (IDE-44, IDE-91):
+                // todo dentro de la transacción que bloquea la fila del usuario. Los códigos de respaldo del segundo factor no se tocan.
+                if (familiaConservada is { } conservada)
+                {
+                    await revocacion.LasDemas(cuenta, conservada, ct).ConfigureAwait(false);
+                }
+                else
+                {
+                    await revocacion.Todas(cuenta, ct).ConfigureAwait(false);
+                }
+
+                await codigos.Invalidar(usuarioId, DominioProposito.VerificacionDeCorreo, ct).ConfigureAwait(false);
+                await codigos.Invalidar(usuarioId, DominioProposito.RecuperacionDeAcceso, ct).ConfigureAwait(false);
                 await auditoria.Registrar(
                     new SolicitudDeRegistro(AccionesAuditables.CorreoCambiado) { ObjetoTipo = "cuenta", ObjetoId = usuarioId.ToString("D"), Motivo = "cambio-por-el-titular" },
                     ct).ConfigureAwait(false);
@@ -332,11 +372,27 @@ public sealed class CambioDeCorreo(
 
         if (conElCorreoNuevo is not null)
         {
-            // Solo al correo nuevo: al anterior no sale nada (IDE-53).
+            // Al correo nuevo y, como alerta crítica sin el correo nuevo, al anterior (IDE-94); ninguno interrumpe el cambio ya aplicado.
             await avisos.CorreoCambiado(conElCorreoNuevo, cancelacion).ConfigureAwait(false);
+            if (conElCorreoAnterior is not null)
+            {
+                await avisos.CorreoCambiadoAlAnterior(conElCorreoAnterior, cancelacion).ConfigureAwait(false);
+            }
         }
 
         return resultado;
+    }
+
+    /// <summary>La familia de la sesión desde la que se verifica, solo si es de este usuario: si no se puede identificar, se revocan todas (lo más seguro).</summary>
+    private async Task<Guid?> FamiliaDeLaSesion(Guid usuarioId, ValorSecreto? renovacion, CancellationToken cancelacion)
+    {
+        if (renovacion is null)
+        {
+            return null;
+        }
+
+        var actual = await renovaciones.PorHuella(huellasDeIdentidad.DeValorOpaco(renovacion.Revelar()), cancelacion).ConfigureAwait(false);
+        return actual is not null && actual.UsuarioId == usuarioId ? actual.Familia : null;
     }
 
     public async Task<Resultado<RespuestaUniforme>> ConfirmarElCambioPendiente(Guid usuarioId, ValorSecreto contrasenaActual, ValorSecreto? marcaDeDispositivo, string? region, CancellationToken cancelacion = default)
@@ -382,7 +438,7 @@ public sealed class CambioDeCorreo(
         var confirmado = await unidad.Ejecutar(
             async ct =>
             {
-                // Bajo el bloqueo de la fila del usuario: si otra solicitud sustituyó el cambio mientras tanto, no se confirma ni se envía nada al correo anterior (SEG-28).
+                // Bajo el bloqueo de la fila del usuario: si otra solicitud sustituyó el cambio mientras tanto, no se confirma ni se envía el código (SEG-28).
                 if (await Cargar(usuarioId, true, ct).ConfigureAwait(false) is null)
                 {
                     return false;

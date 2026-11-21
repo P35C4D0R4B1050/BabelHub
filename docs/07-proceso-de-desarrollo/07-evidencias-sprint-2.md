@@ -14,7 +14,7 @@ Esta hoja recorre la rúbrica del Sprint 2 punto por punto, con la **métrica**,
 | 4. REST con OpenAPI | Cumple | `docs/03-diseno-de-software/openapi/` (generado del código) |
 | 5. Base de datos y caché | Cumple, con hallazgos medidos | `docs/03/09` |
 | 6. SOLID y patrones | Cumple | `docs/03/03` + ejemplos de este documento |
-| 7. Pruebas, cobertura y CI/CD | Cumple en local; **CI en GitHub sin ejecutar** (depende del `push`) | `progress/evidencias/cobertura/index.html`, `.github/workflows/` |
+| 7. Pruebas, cobertura y CI/CD | Cumple en local y **en GitHub: corrida verde** de `ci` y `secretos` en el commit `e0bc86df` ([ci](https://github.com/P35C4D0R4B1050/BabelHub/actions/runs/44932437329), [secretos](https://github.com/P35C4D0R4B1050/BabelHub/actions/runs/44932437399)); el reporte de cobertura queda como artefacto | `progress/evidencias/cobertura/index.html`, `.github/workflows/` |
 | 8. Atributos de calidad con k6 hasta 2 000 usuarios | **Parcial**: RNF02 a 50 usuarios con DD-17 y los 2 000 usuarios del perfil de estrés **no cumplen**; con el perfil realista, 2 000 sesiones **no** se sostienen con la configuración declarada (0,6 + 0,4 CPU, sostiene ≈ 1 000) y **sí** con Inventario 2 CPU + PostgreSQL 1 CPU (sección 2.3; se declara y se explica) | `progress/evidencias/k6/`, `docs/03/09` |
 
 ## 2. Métricas de los atributos de calidad
@@ -151,7 +151,7 @@ bash tests/load/entorno/bajar-carga.sh
 
 ## 4. Qué no se demuestra (declarado)
 
-- **CI en GitHub:** sin corrida real hasta el `push`.
+- **CI en GitHub:** `ci` y `secretos` en verde sobre `e0bc86df` (compilación sin advertencias, pruebas sin red, pruebas con cobertura y umbrales, escaneo de secretos del historial y de las imágenes). La primera corrida (`4ba37f6a`, 135 pruebas fallidas en Linux) y la segunda (7) se corrigieron por causa raíz: permisos de ejecución de los dobles y de los scripts, una prueba de tiempos, enlaces fuera de `docs/` en la copia de SpecCheck, y la prueba de arranque de imágenes, que no entregaba los secretos que la validación exige. Los 19 PRs de Dependabot siguen abiertos sin fundir.
 - **RNF02 y 2 000 usuarios** con el dimensionamiento declarado: no cumplen (secciones 2 y 2.2; con el perfil realista se sostienen ≈ 1 000 sesiones); con Inventario 2 CPU + PostgreSQL 1 CPU, 2 000 sesiones **sí** se sostienen (sección 2.3; solo el Inventario). Decisión DD-18.
 - **Perfil realista sin el E-commerce:** el catálogo, el carrito y el pedido (VM-VENTAS) y la latencia de extremo a extremo no se midieron; una sola corrida completa y una repetición parcial.
 - **Medición en la VM ARM real**, despliegue, restauración con carga y llaves reales de pasarela y asistente: fuera del Sprint 2.

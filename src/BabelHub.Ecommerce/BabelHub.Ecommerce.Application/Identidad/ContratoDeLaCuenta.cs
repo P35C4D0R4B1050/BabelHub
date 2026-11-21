@@ -4,7 +4,7 @@ namespace BabelHub.Ecommerce.Application.Identidad;
 
 // Las operaciones de las tareas T18 a T25 (IDE-4): sus modelos se declaran aquí para que la Api y la web dependan solo de esta raíz y se afinan al implementarlas.
 
-/// <summary>La cuenta del cliente tal como se muestra y se corrige (IDE-24, IDE-25, IDE-31, IDE-37, IDE-52): nunca el resumen de la contraseña, el secreto del segundo factor ni los códigos.</summary>
+/// <summary>La cuenta tal como se muestra y se corrige (IDE-24, IDE-31, IDE-37, IDE-52, IDE-90; la consulta y el nombre sirven también al personal, DD-25, aunque el nombre del tipo siga siendo el del cliente): nunca el resumen de la contraseña, el secreto del segundo factor ni los códigos.</summary>
 public sealed record CuentaDelCliente(
     Guid UsuarioId,
     string Nombre,
@@ -38,10 +38,10 @@ public interface ICuentaDelCliente
     Task<Resultado<RespuestaUniforme>> CambiarLaContrasena(Guid usuarioId, ValorSecreto actual, ValorSecreto nueva, ValorSecreto? renovacionDeLaSesion = null, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default);
 
     /// <summary>Guarda el número de WhatsApp (E.164) o lo quita con <see langword="null"/>: deja sin efecto el consentimiento hasta confirmarlo para ese número y cancela los avisos pendientes (IDE-31).</summary>
-    Task<Resultado<CuentaDelCliente>> GuardarElNumeroDeWhatsApp(Guid usuarioId, string? numero, CancellationToken cancelacion = default);
+    Task<Resultado<CuentaDelCliente>> GuardarElNumeroDeWhatsApp(Guid usuarioId, string? numero, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default);
 
     /// <summary>Concede o revoca el consentimiento de avisos citando el número al que se refiere (IDE-11, IDE-31); revocarlo cancela los avisos pendientes.</summary>
-    Task<Resultado<CuentaDelCliente>> CambiarElConsentimientoDeWhatsApp(Guid usuarioId, bool consiente, string? numeroConfirmado, CancellationToken cancelacion = default);
+    Task<Resultado<CuentaDelCliente>> CambiarElConsentimientoDeWhatsApp(Guid usuarioId, bool consiente, string? numeroConfirmado, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default);
 
     /// <summary>Si se ofrece el consentimiento a Carrito y la huella enmascarada del número (CAR-18); sin número, no se ofrece.</summary>
     Task<Resultado<OfertaDeConsentimientoDeAvisos>> ConsultarLaOfertaDeConsentimiento(Guid usuarioId, CancellationToken cancelacion = default);
@@ -67,17 +67,20 @@ public interface ICuentaDelCliente
     Task<Resultado<RespuestaUniforme>> MarcarElAvisoComoVisto(Guid usuarioId, Guid avisoId, bool desdeUnaSesionReconocida, CancellationToken cancelacion = default);
 }
 
-/// <summary>El cambio de correo con verificación del nuevo y la confianza en el dispositivo y la región (IDE-25, IDE-53 a IDE-55): T20.</summary>
+/// <summary>El cambio de correo de un usuario de cualquier rol con verificación del nuevo y la confianza en el dispositivo y la región (IDE-97, IDE-53 a IDE-55, IDE-94, IDE-96): T20, T53 y T54.</summary>
 public interface ICambioDeCorreo
 {
     /// <summary>
-    /// Pide el cambio de correo con la contraseña actual. Desde un <b>dispositivo reconocido y una región habitual</b> espera el código del correo nuevo y se aplica; desde otro, no se aplica, queda 24 horas pendiente, se alerta
+    /// Pide el cambio de correo con la contraseña actual y, si el usuario tiene el segundo factor activo, un código vigente o de respaldo (IDE-97). Desde un <b>dispositivo reconocido y una región habitual</b> espera el código del correo nuevo y se aplica; desde otro, no se aplica, queda 24 horas pendiente, se alerta
     /// por el correo anterior y en la cuenta y el dispositivo queda congelado (IDE-54).
     /// </summary>
-    Task<Resultado<RespuestaUniforme>> Solicitar(Guid usuarioId, string correoNuevo, ValorSecreto contrasenaActual, ValorSecreto? marcaDeDispositivo, string? region, CancellationToken cancelacion = default);
+    Task<Resultado<RespuestaUniforme>> Solicitar(Guid usuarioId, string correoNuevo, ValorSecreto contrasenaActual, ValorSecreto? marcaDeDispositivo, string? region, ValorSecreto? codigoDelSegundoFactor = null, CancellationToken cancelacion = default);
 
-    /// <summary>Confirma el correo nuevo con el código que llegó a él (IDE-53); si el cambio estaba pendiente de confirmación del titular, falla hasta que lo confirme.</summary>
-    Task<Resultado<RespuestaUniforme>> VerificarElCorreoNuevo(Guid usuarioId, ValorSecreto codigo, CancellationToken cancelacion = default);
+    /// <summary>
+    /// Confirma el correo nuevo con el código que llegó a él (IDE-53); si el cambio estaba pendiente de confirmación del titular, falla hasta que lo confirme. Al aplicarlo revoca las demás renovaciones conservando la de
+    /// la sesión desde la que se verifica (<paramref name="renovacionDeLaSesion"/>; sin ella, todas), invalida los códigos de verificación y de recuperación pendientes y avisa al correo nuevo y al anterior (IDE-44, IDE-91, IDE-94).
+    /// </summary>
+    Task<Resultado<RespuestaUniforme>> VerificarElCorreoNuevo(Guid usuarioId, ValorSecreto codigo, ValorSecreto? renovacionDeLaSesion = null, CancellationToken cancelacion = default);
 
     /// <summary>El titular confirma un cambio pendiente desde un dispositivo reconocido, con su contraseña (IDE-54).</summary>
     Task<Resultado<RespuestaUniforme>> ConfirmarElCambioPendiente(Guid usuarioId, ValorSecreto contrasenaActual, ValorSecreto? marcaDeDispositivo, string? region, CancellationToken cancelacion = default);
@@ -173,12 +176,12 @@ public sealed record EstadoDeLaCancelacionDeCuenta(EstadoDeLaCancelacion Estado,
 /// </summary>
 public interface ICancelacionDeCuenta
 {
-    Task<Resultado<EstadoDeLaCancelacionDeCuenta>> Solicitar(Guid usuarioId, ValorSecreto contrasena, ValorSecreto? codigoDelSegundoFactor, CancellationToken cancelacion = default);
+    Task<Resultado<EstadoDeLaCancelacionDeCuenta>> Solicitar(Guid usuarioId, ValorSecreto contrasena, ValorSecreto? codigoDelSegundoFactor, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default);
 
     /// <summary>El estado y los plazos de la solicitud más reciente del titular; <see cref="EstadoDeLaCancelacion.SinSolicitud"/> si no hay.</summary>
     Task<Resultado<EstadoDeLaCancelacionDeCuenta>> Consultar(Guid usuarioId, CancellationToken cancelacion = default);
 
-    Task<Resultado<EstadoDeLaCancelacionDeCuenta>> Reconfirmar(Guid usuarioId, ValorSecreto contrasena, ValorSecreto? codigoDelSegundoFactor, CancellationToken cancelacion = default);
+    Task<Resultado<EstadoDeLaCancelacionDeCuenta>> Reconfirmar(Guid usuarioId, ValorSecreto contrasena, ValorSecreto? codigoDelSegundoFactor, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default);
 
     Task<Resultado<EstadoDeLaCancelacionDeCuenta>> Desistir(Guid usuarioId, CancellationToken cancelacion = default);
 

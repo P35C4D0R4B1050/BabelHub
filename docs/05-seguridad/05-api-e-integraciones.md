@@ -55,6 +55,7 @@ Cómo se protegen las interfaces entre servicios, la que expone la Web y las que
 | Cobro (`POST /checkout/pago`) | 5 intentos por intención y hora, 10 por cuenta y hora y 20 por origen y hora (valores iniciales y configurables; el intento repetido con la misma clave no consume cupo); **falla cerrada** si el almacén de contadores no está disponible: una operación de dinero no depende de un contador local | Aplicación | PAG-17, SEG-05, SEG-07, SEG-26 (AM38) |
 | Avisos de la pasarela (`POST /api/ecommerce/v1/integraciones/pasarela/avisos`) | 120 por origen y minuto, **antes** de verificar la firma; cuerpo de hasta 16 KiB; la entrada no existe mientras no haya un esquema de firma verificable | Aplicación y borde | PAG-19, SEG-05 |
 | Registro de cuentas | 3 cuentas nuevas por hora por origen | Aplicación | SEG-24 |
+| Corrección del nombre | 5 por hora y cuenta, de cualquier rol (confirmado por la persona el 2026-11-21, configurable; acota el inflado de la auditoría) | Aplicación | IDE-98 |
 | Origen no determinable | Un «origen desconocido» único con los mismos límites por origen | Aplicación | SEG-23 |
 | Caída del almacén de contadores | Ingreso, registro, códigos, reservas y descargas se rechazan; las demás operaciones usan un límite local | Aplicación | SEG-26 (los límites de Envíos tienen respaldo local: con el almacén caído caen al límite local y solo fallan cerrado con «no disponible» si tampoco responde) |
 

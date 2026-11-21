@@ -10,6 +10,9 @@ public static partial class AccionesAuditables
 
     public static readonly AccionAuditable UsuarioReactivado = new(nameof(UsuarioReactivado), aislada: true);
 
+    /// <summary>Un usuario corrigió su nombre (IDE-90, AUD-45): auditoría de Identidad sin ningún dato personal en el detalle.</summary>
+    public static readonly AccionAuditable UsuarioActualizado = new(nameof(UsuarioActualizado), aislada: true);
+
     /// <summary>Un cambio de rol: un único registro con las marcas de auditoría y de seguridad (AUD-20).</summary>
     public static readonly AccionAuditable CambioDeRol = new(nameof(CambioDeRol), aislada: true);
 

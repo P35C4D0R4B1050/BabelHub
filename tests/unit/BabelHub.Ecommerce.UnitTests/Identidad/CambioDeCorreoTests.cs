@@ -51,7 +51,7 @@ public sealed class CambioDeCorreoTests
 
     [Fact]
     [Trait("Criterio", "AC-IDE-47")]
-    public async Task AlVerificarElCorreoNuevo_ElCambioSeAplica_AvisaEnLaCuentaYAlNuevo_Audita_YNoEnviaNadaAlAnterior()
+    public async Task AlVerificarElCorreoNuevo_ElCambioSeAplica_AvisaEnLaCuentaAlNuevoYAlAnterior_YAudita()
     {
         var (e, cuenta, cambio, marca) = Escenario();
         await Pedir(cambio, cuenta, marca);
@@ -64,10 +64,11 @@ public sealed class CambioDeCorreoTests
         Assert.True(cuenta.Usuario.CorreoVerificado);
         Assert.Equal(EstadoDelCambioDeCorreo.Aplicado, e.Bd.Cambios.Single().Estado);
         Assert.Equal("correo-cambiado", Assert.Single(e.Bd.Avisos).Aviso.Tipo);
-        var aviso = Assert.Single(e.Correo.Correos);
-        Assert.Equal(Nuevo, aviso.Destinatario);
-        Assert.Equal(AvisosDeCuenta.PlantillaDeCorreoCambiado, aviso.Plantilla);
-        Assert.DoesNotContain(e.Correo.Correos, c => c.Destinatario == Antiguo);
+        var alNuevo = Assert.Single(e.Correo.Correos, c => c.Destinatario == Nuevo);
+        Assert.Equal(AvisosDeCuenta.PlantillaDeCorreoCambiado, alNuevo.Plantilla);
+        var alAnterior = Assert.Single(e.Correo.Correos, c => c.Destinatario == Antiguo);
+        Assert.Equal(AvisosDeCuenta.PlantillaDeCorreoCambiadoAlAnterior, alAnterior.Plantilla);
+        Assert.Equal(2, e.Correo.Correos.Count);
         Assert.DoesNotContain(e.Correo.Codigos, c => c.Destinatario == Antiguo);
         Assert.Equal(AccionesAuditables.CorreoCambiado, Assert.Single(e.Auditoria.Registradas).Accion);
 
@@ -203,19 +204,15 @@ public sealed class CambioDeCorreoTests
     }
 
     [Fact]
-    public async Task UnaCuentaConElCorreoSinVerificar_OUnaDelPersonal_NoCambiaElCorreo()
+    public async Task UnaCuentaConElCorreoSinVerificar_NoCambiaElCorreo()
     {
         var e = new EntornoDeIdentidad();
         var sinVerificar = e.Cuenta("sin@example.com", verificada: false);
-        var personal = e.Cuenta("personal@example.com", RolDeUsuario.Logistica);
-
         e.ActuarComo(sinVerificar);
+
         var a = await e.CambioDeCorreo().Solicitar(sinVerificar.Usuario.Id, Nuevo, S(EntornoDeIdentidad.ContrasenaSegura), null, "PE");
-        e.Actor.Actual = ActorActual.DeUsuario(personal.Usuario.Id, "logistica");
-        var b = await e.CambioDeCorreo().Solicitar(personal.Usuario.Id, Nuevo, S(EntornoDeIdentidad.ContrasenaSegura), null, "PE");
 
         Assert.Equal("correo-sin-verificar", a.Error!.Clave);
-        Assert.Equal("solo-clientes", b.Error!.Clave);
         Assert.Empty(e.Bd.Cambios);
     }
 
@@ -661,5 +658,219 @@ public sealed class CambioDeCorreoTests
 
         Assert.Equal(FallosDeIdentidad.LimiteExcedido, resultado.Error);
         Assert.Equal(EstadoDelCambioDeCorreo.PendienteDeConfirmacion, e.Bd.Cambios.Single().Estado);
+    }
+
+    // ---------------------------------------------------------------- cualquier rol y segundo factor (IDE-97, AC-IDE-68)
+
+    private static (EntornoDeIdentidad E, CuentaDeIdentidad Cuenta, CambioDeCorreo Cambio, ValorSecreto Marca) EscenarioDelPersonal(RolDeUsuario rol = RolDeUsuario.EncargadoDeSucursal, string actor = "encargado-de-sucursal")
+    {
+        var e = new EntornoDeIdentidad();
+        var cuenta = e.Cuenta(Antiguo, rol);
+        e.Actor.Actual = ActorActual.DeUsuario(cuenta.Usuario.Id, actor);
+        var marca = e.DispositivoReconocido(cuenta, "PE");
+        return (e, cuenta, e.CambioDeCorreo(), marca);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-IDE-68")]
+    [InlineData(RolDeUsuario.EncargadoDeSucursal, "encargado-de-sucursal")]
+    [InlineData(RolDeUsuario.Logistica, "logistica")]
+    [InlineData(RolDeUsuario.AdministradorCentral, "administrador-central")]
+    public async Task ElPersonal_CambiaSuCorreo_ConLaMismaVerificacionDelNuevo_YElAnteriorSigueVigenteHastaEntonces(RolDeUsuario rol, string actor)
+    {
+        var (e, cuenta, cambio, marca) = EscenarioDelPersonal(rol, actor);
+
+        var pedido = await Pedir(cambio, cuenta, marca);
+
+        Assert.True(pedido.EsExito);
+        Assert.Equal(Antiguo, cuenta.Usuario.Correo);
+        Assert.True(cuenta.Usuario.CorreoVerificado);
+        Assert.Equal(Nuevo, Assert.Single(e.Correo.Codigos).Destinatario);
+        Assert.True((await cambio.VerificarElCorreoNuevo(cuenta.Usuario.Id, S(e.UltimoCodigoEnviado()))).EsExito);
+        Assert.Equal(Nuevo, cuenta.Usuario.Correo);
+        Assert.True(cuenta.Usuario.CorreoVerificado);
+        Assert.Equal(rol, cuenta.Usuario.Rol);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-68")]
+    public async Task ConElSegundoFactorActivo_SinCodigoOConUnoEquivocado_NoCambiaNada_YNoGastaElCupoDeCodigos()
+    {
+        var (e, cuenta, cambio, marca) = EscenarioDelPersonal();
+        e.ConSegundoFactor(cuenta);
+
+        var sin = await cambio.Solicitar(cuenta.Usuario.Id, Nuevo, S(EntornoDeIdentidad.ContrasenaSegura), marca, "PE");
+        var mal = await cambio.Solicitar(cuenta.Usuario.Id, Nuevo, S(EntornoDeIdentidad.ContrasenaSegura), marca, "PE", S("000000"));
+        var contrasenaMal = await cambio.Solicitar(cuenta.Usuario.Id, Nuevo, S("otra contraseña distinta"), marca, "PE", S("000000"));
+
+        Assert.Equal(FallosDeIdentidad.CodigoInvalido, sin.Error);
+        Assert.Equal(FallosDeIdentidad.CodigoInvalido, mal.Error);
+        Assert.Equal(Reautenticacion.ContrasenaActualIncorrecta, contrasenaMal.Error);
+        Assert.Empty(e.Bd.Cambios);
+        Assert.Empty(e.Correo.Codigos);
+        Assert.DoesNotContain(e.Limites.Reservas, r => r.Politica is "codigos-por-correo" or "codigos-por-origen" or "cupo-de-codigos-por-origen");
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-68")]
+    public async Task ConElSegundoFactorActivo_ElCodigoCorrecto_Aplica_PeroNoSirveDosVeces_YElDeRespaldoSeConsume()
+    {
+        var (e, cuenta, cambio, marca) = EscenarioDelPersonal();
+        var (secreto, respaldo) = e.ConSegundoFactor(cuenta);
+        var totp = e.Totp(secreto);
+
+        var primero = await cambio.Solicitar(cuenta.Usuario.Id, Nuevo, S(EntornoDeIdentidad.ContrasenaSegura), marca, "PE", S(totp));
+        var repetido = await cambio.Solicitar(cuenta.Usuario.Id, Nuevo, S(EntornoDeIdentidad.ContrasenaSegura), marca, "PE", S(totp));
+        var conRespaldo = await cambio.Solicitar(cuenta.Usuario.Id, Nuevo, S(EntornoDeIdentidad.ContrasenaSegura), marca, "PE", S(respaldo[0]));
+        var respaldoRepetido = await cambio.Solicitar(cuenta.Usuario.Id, Nuevo, S(EntornoDeIdentidad.ContrasenaSegura), marca, "PE", S(respaldo[0]));
+
+        Assert.True(primero.EsExito);
+        Assert.Equal(FallosDeIdentidad.CodigoInvalido, repetido.Error);
+        Assert.True(conRespaldo.EsExito);
+        Assert.Equal(FallosDeIdentidad.CodigoInvalido, respaldoRepetido.Error);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-68")]
+    public async Task ConElSegundoFactorActivo_ElCorreoQueYaEsDeOtraCuenta_RespondeIgual_ConElCodigoCorrecto_YNoSaleNingunCodigo()
+    {
+        var (e, cuenta, cambio, marca) = EscenarioDelPersonal();
+        var (secreto, _) = e.ConSegundoFactor(cuenta);
+        e.Cuenta("ocupado@example.com");
+
+        var resultado = await cambio.Solicitar(cuenta.Usuario.Id, "ocupado@example.com", S(EntornoDeIdentidad.ContrasenaSegura), marca, "PE", S(e.Totp(secreto)));
+        var sinCodigo = await cambio.Solicitar(cuenta.Usuario.Id, "ocupado@example.com", S(EntornoDeIdentidad.ContrasenaSegura), marca, "PE");
+
+        Assert.True(resultado.EsExito);
+        Assert.Equal(FallosDeIdentidad.CodigoInvalido, sinCodigo.Error);
+        Assert.Empty(e.Correo.Codigos);
+        Assert.Empty(e.Bd.Cambios);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-68")]
+    public async Task ElCodigoDelSegundoFactorEquivocado_RepetidoHastaElLimite_BloqueaLosSiguientes()
+    {
+        var (e, cuenta, cambio, marca) = EscenarioDelPersonal();
+        e.ConSegundoFactor(cuenta);
+        Resultado<RespuestaUniforme> ultimo = default!;
+        for (var i = 0; i < 7; i++)
+        {
+            ultimo = await cambio.Solicitar(cuenta.Usuario.Id, Nuevo, S(EntornoDeIdentidad.ContrasenaSegura), marca, "PE", S("000000"));
+        }
+
+        Assert.Equal(FallosDeIdentidad.LimiteExcedido, ultimo.Error);
+        Assert.Empty(e.Bd.Cambios);
+    }
+
+    // ---------------------------------------------------------------- al aplicar el cambio (IDE-44, IDE-91, IDE-94, AC-IDE-69)
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-69")]
+    public async Task AlAplicarElCambio_RevocaLasDemasSesiones_ConservaLaDeQuienVerifica_YInvalidaLosCodigosPendientes()
+    {
+        var (e, cuenta, cambio, marca) = Escenario();
+        var propia = await e.Sesiones.Nueva(cuenta.Usuario, e.Reloj.Ahora, default);
+        var otra = await e.Sesiones.Nueva(cuenta.Usuario, e.Reloj.Ahora, default);
+        await e.Codigos.Emitir(CodigoDeUnSoloUso.Emitir(cuenta.Usuario.Id, BabelHub.Ecommerce.Domain.Identidad.PropositoDeCodigo.RecuperacionDeAcceso, "huella-de-recuperacion", e.Reloj.Ahora));
+        await Pedir(cambio, cuenta, marca);
+
+        var verificado = await cambio.VerificarElCorreoNuevo(cuenta.Usuario.Id, S(e.UltimoCodigoEnviado()), propia.Renovacion);
+
+        Assert.True(verificado.EsExito);
+        var gestor = e.Gestor();
+        Assert.Equal(FallosDeIdentidad.SesionNoRenovable, (await gestor.Renovar(otra.Renovacion)).Error);
+        Assert.True((await gestor.Renovar(propia.Renovacion)).EsExito);
+        Assert.All(e.Codigos.Codigos.Where(c => c.Proposito == BabelHub.Ecommerce.Domain.Identidad.PropositoDeCodigo.RecuperacionDeAcceso), c => Assert.True(c.Invalidado));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-69")]
+    public async Task AlAplicarElCambio_SinUnaSesionConocida_SeRevocanTodas()
+    {
+        var (e, cuenta, cambio, marca) = Escenario();
+        var propia = await e.Sesiones.Nueva(cuenta.Usuario, e.Reloj.Ahora, default);
+        await Pedir(cambio, cuenta, marca);
+
+        await cambio.VerificarElCorreoNuevo(cuenta.Usuario.Id, S(e.UltimoCodigoEnviado()));
+
+        Assert.Equal(FallosDeIdentidad.SesionNoRenovable, (await e.Gestor().Renovar(propia.Renovacion)).Error);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-69")]
+    public async Task ElAvisoAlCorreoAnterior_EsUnaAlertaCritica_ElDelNuevoNo_YLaAuditoriaNoLlevaNingunCorreo()
+    {
+        var (e, cuenta, cambio, marca) = Escenario();
+        await Pedir(cambio, cuenta, marca);
+
+        await cambio.VerificarElCorreoNuevo(cuenta.Usuario.Id, S(e.UltimoCodigoEnviado()));
+
+        var alAnterior = Assert.Single(e.Correo.Correos, c => c.Destinatario == Antiguo);
+        var alNuevo = Assert.Single(e.Correo.Correos, c => c.Destinatario == Nuevo);
+        Assert.Equal(CategoriaDeCorreo.AlertaCriticaDeCuenta, alAnterior.Categoria);
+        Assert.Equal(CategoriaDeCorreo.AvisoDeSeguridad, alNuevo.Categoria);
+        var registro = Assert.Single(e.Auditoria.Registradas);
+        Assert.Empty(registro.Detalle);
+        Assert.DoesNotContain(Antiguo, registro.Motivo ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain(Nuevo, registro.Motivo ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-69")]
+    public async Task ElAvisoAlCorreoAnterior_NoLoSuprimeElTopeDiarioPorOrigen()
+    {
+        var (e, cuenta, cambio, marca) = Escenario();
+        e.Limites.Maximos["alertas-criticas-por-origen"] = 0;
+        await Pedir(cambio, cuenta, marca);
+
+        await cambio.VerificarElCorreoNuevo(cuenta.Usuario.Id, S(e.UltimoCodigoEnviado()));
+
+        Assert.Single(e.Correo.Correos, c => c.Destinatario == Antiguo && c.Plantilla == AvisosDeCuenta.PlantillaDeCorreoCambiadoAlAnterior);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-69")]
+    public async Task UnSegundoCambioEnLas24Horas_NoAvisaPorCorreoAlAnterior_PeroDejaElAvisoEnLaCuenta()
+    {
+        var (e, cuenta, cambio, marca) = Escenario();
+        await Pedir(cambio, cuenta, marca);
+        await cambio.VerificarElCorreoNuevo(cuenta.Usuario.Id, S(e.UltimoCodigoEnviado()));
+        var antes = e.Correo.Correos.Count(c => c.Plantilla == AvisosDeCuenta.PlantillaDeCorreoCambiadoAlAnterior);
+
+        await Pedir(cambio, cuenta, marca, correo: "tercero@example.com");
+        await cambio.VerificarElCorreoNuevo(cuenta.Usuario.Id, S(e.UltimoCodigoEnviado()));
+
+        Assert.Equal(1, antes);
+        Assert.Equal(1, e.Correo.Correos.Count(c => c.Plantilla == AvisosDeCuenta.PlantillaDeCorreoCambiadoAlAnterior));
+        Assert.Equal(2, e.Bd.Avisos.Count(a => a.Aviso.Tipo == "correo-cambiado"));
+    }
+
+    // ---------------------------------------------------------------- el congelamiento por un cambio pendiente (IDE-96, AC-IDE-48)
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-48")]
+    public async Task MientrasHayUnCambioNoReconocidoPendiente_ElWhatsAppYLaCancelacion_PidenUnDispositivoReconocido_YDesistirSigueSiendoPosible()
+    {
+        var (e, cuenta, cambio, marca) = Escenario();
+        var otraMarca = e.DispositivoReconocido(cuenta, "PE");
+        await Pedir(cambio, cuenta, marca, region: "BR");
+        var id = cuenta.Usuario.Id;
+        var gestion = e.Gestion();
+        var cancelacion = e.Cancelacion();
+
+        var numeroSin = await gestion.GuardarElNumeroDeWhatsApp(id, "+51999111222");
+        var consentimientoSin = await gestion.CambiarElConsentimientoDeWhatsApp(id, false, null);
+        var cancelarSin = await cancelacion.Solicitar(id, S(EntornoDeIdentidad.ContrasenaSegura), null);
+        var reconfirmarSin = await cancelacion.Reconfirmar(id, S(EntornoDeIdentidad.ContrasenaSegura), null);
+        var numeroCon = await gestion.GuardarElNumeroDeWhatsApp(id, "+51999111222", otraMarca);
+        var desistir = await cancelacion.Desistir(id);
+
+        Assert.Equal(ConfianzaDelDispositivo.DispositivoCongelado, numeroSin.Error);
+        Assert.Equal(ConfianzaDelDispositivo.DispositivoCongelado, consentimientoSin.Error);
+        Assert.Equal(ConfianzaDelDispositivo.DispositivoCongelado, cancelarSin.Error);
+        Assert.Equal(ConfianzaDelDispositivo.DispositivoCongelado, reconfirmarSin.Error);
+        Assert.True(numeroCon.EsExito);
+        Assert.NotEqual(ConfianzaDelDispositivo.DispositivoCongelado, desistir.Error);
     }
 }
