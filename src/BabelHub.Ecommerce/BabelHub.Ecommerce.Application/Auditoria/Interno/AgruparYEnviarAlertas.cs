@@ -4,7 +4,7 @@ using AlertaAgrupada = BabelHub.Ecommerce.Domain.Auditoria.AlertaDeSeguridad;
 
 namespace BabelHub.Ecommerce.Application.Auditoria.Interno;
 
-/// <summary>Lo que el puerto de correo hizo con un aviso: lo envió, lo dejó en su cola o lo suprimió por el tope diario de IDE-82 (24 por motivo y servicio, AUD-42).</summary>
+/// <summary>Lo que el puerto de correo hizo con un aviso: lo envió, no lo envió por falta de cupo (<see cref="Encolado"/>: sigue pendiente en Auditoría, que lo reintenta con esperas crecientes) o lo suprimió por el tope diario de IDE-82 (24 por motivo y servicio, AUD-42).</summary>
 public enum ResultadoDeEnvioDeAlerta
 {
     Enviado,
@@ -144,8 +144,15 @@ public sealed class AgruparYEnviarAlertas(
             try
             {
                 var resultado = await correo.Enviar(ADelCorreo(alerta), await DestinatariosDe(alerta.Motivo, activos, contadores, cancelacion).ConfigureAwait(false), cancelacion).ConfigureAwait(false);
-                await Anotar(() => Marcar(alerta, cancelacion)).ConfigureAwait(false);
                 contadores.Sumar(resultado);
+                if (resultado == ResultadoDeEnvioDeAlerta.Encolado)
+                {
+                    // Sin cupo de correo el puerto no la guardó ni la envió: la alerta sigue pendiente y se reintenta con espera creciente (no es un correo caído, no se publica esa alerta).
+                    await RegistrarFallo(alerta.Id, pendiente.Intentos + 1, ahora, cancelacion).ConfigureAwait(false);
+                    continue;
+                }
+
+                await Anotar(() => Marcar(alerta, cancelacion)).ConfigureAwait(false);
             }
             catch (Exception falla) when (falla is not OperationCanceledException)
             {
@@ -187,8 +194,15 @@ public sealed class AgruparYEnviarAlertas(
             try
             {
                 var resultado = await correo.Enviar(new CorreoDeAlerta(alerta.Servicio, alerta.Motivo, alerta.Clase, alerta.PrimeraOcurrencia, alerta.Ocurrencias), await DestinatariosDe(alerta.Motivo.Valor, activos, contadores, cancelacion).ConfigureAwait(false), cancelacion).ConfigureAwait(false);
-                await Anotar(() => yaEnviadas.Marcar(alerta.Id, cancelacion)).ConfigureAwait(false);
                 contadores.Sumar(resultado);
+                if (resultado == ResultadoDeEnvioDeAlerta.Encolado)
+                {
+                    // Sin cupo de correo no salió: no se marca como enviada y la marca de lectura no avanza, así que la siguiente corrida la vuelve a ver.
+                    todasAtendidas = false;
+                    continue;
+                }
+
+                await Anotar(() => yaEnviadas.Marcar(alerta.Id, cancelacion)).ConfigureAwait(false);
             }
             catch (Exception falla) when (falla is not OperationCanceledException)
             {
