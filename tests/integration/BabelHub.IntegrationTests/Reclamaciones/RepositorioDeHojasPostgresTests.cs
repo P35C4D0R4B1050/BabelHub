@@ -152,6 +152,7 @@ public sealed class RepositorioDeHojasPostgresTests(PostgresDeReclamacionesFixtu
     }
 
     [Fact]
+    [Trait("Criterio", "AC-REC-13")]
     public async Task Un_numero_repetido_falla_sin_repetir_datos_personales()
     {
         await Agregar(Hoja(1, "clave-a"));
@@ -337,6 +338,7 @@ public sealed class RepositorioDeHojasPostgresTests(PostgresDeReclamacionesFixtu
     }
 
     [Fact]
+    [Trait("Criterio", "AC-REC-13")]
     public async Task Un_check_fallido_no_deja_los_datos_personales_en_el_error()
     {
         var invalida = Hoja(1, "clave-a", documento: new string('9', 25));

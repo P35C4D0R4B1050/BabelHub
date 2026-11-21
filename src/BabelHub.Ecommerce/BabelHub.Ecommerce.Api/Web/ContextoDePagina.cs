@@ -39,6 +39,8 @@ public sealed class ContextoDePagina(IHttpContextAccessor acceso, IPreferenciaDe
         modelo.Tema = Temas.Validar(acceso.HttpContext?.Request.Cookies[Temas.Cookie]);
         modelo.Menu = MenuProvisional(area);
         modelo.TextosPendientes = acceso.HttpContext?.Items[ClaveTextosPendientes] is true;
+        // La cabecera ofrece «Mi cuenta» y «Cerrar sesión» en toda página de quien tiene sesión, no solo en las que lo piden a mano (hallazgo del E2E de la sesión).
+        modelo.HaySesion |= acceso.HttpContext?.ActorDeLaSolicitud() is not null;
         if (area == AreaDeLaPagina.Tienda)
         {
             // La sucursal preferida solo se usa si está en la lista de sucursales; sin lista conocida no hay selector (WEB-16, D16).
