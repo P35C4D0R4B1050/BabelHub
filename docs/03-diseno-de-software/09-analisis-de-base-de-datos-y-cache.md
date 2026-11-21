@@ -156,6 +156,44 @@ La conclusión 2 de la sección 6b (el costo está en las idas, no en las lectur
 
 **Lo que se mide, sin maquillar:** el conteo de sentencias bajó un 40 % (y un 60 % con la memoria), pero **el rendimiento medido con k6 no mejoró de forma consistente**: con 1 / 1 el p95 con 50 usuarios bajó de 242 a 113 ms (RNF02 se sigue cumpliendo con margen), pero con 250 usuarios y en las iteraciones totales las corridas «después» no superan a las «antes» (dentro del ruido de la máquina). Con 0,3 CPU para el Inventario **RNF02 sigue sin cumplirse** (≈ 1,3 s con 50 usuarios, con o sin memoria): ahí el cuello es la CPU del propio servicio (autenticación, serialización, 3 a 4 transacciones por solicitud y el trabajo de Npgsql por sentencia), no el conteo de sentencias, y una sentencia fusionada cuesta lo mismo en el servidor y en Npgsql que la misma sentencia suelta: solo se ahorra la espera de la ida. Lo conseguido es **menos viajes de red y menos trabajo de la base por solicitud** (útil en la VM real, con la red entre contenedores), no una capacidad medible mayor en esta máquina. Las palancas que quedan (hallazgo Importante abierto): un comando por lote que fusione el cambio de rol con la primera sentencia del bloque, menos bloques de rol por consulta (hoy tres), contadores de límites fuera de PostgreSQL y, sobre todo, la CPU declarada del Inventario (0,6 como mínimo, sección 6b).
 
+## 6d. Perfil realista de 2 000 sesiones (VM de 1 OCPU, dimensionamiento de DD-17)
+
+Las secciones 6b y 6b-bis usan un **perfil de estrés** (pausa de 0,5 s entre solicitudes, 2 000 usuarios ≈ 4 000 solicitudes por segundo): es evidencia del **límite** y de la degradación controlada, y se conserva sin reinterpretar. Esta sección mide lo que pidió la persona el 2026-11-21: **2 000 sesiones concurrentes de personas** sobre el dimensionamiento fijo de producción (Inventario 0,6 CPU y 512 MB, PostgreSQL 0,4 CPU; sin cambiar CPU para «aprobar»).
+
+**Perfil y su justificación** (`tests/load/escenarios/perfil-realista.js`; docs de calidad del Sprint 1: AC02 y ESC-AC02-01 «decenas de clientes consultan la disponibilidad y agregan libros al carrito durante una feria», RNF02 «p95 < 500 ms con hasta 50 usuarios concurrentes; checkout p95 < 3 s»; la rúbrica pide 2 000 usuarios virtuales). Cada usuario virtual es **una sesión de un lector** de una librería independiente con varias sucursales: hace una acción, piensa de 5 a 30 s (media de 15 s) y repite.
+
+| Acción | Parte | Qué llega al Inventario | Solicitudes por acción |
+| :--- | :--- | :--- | :--- |
+| Catálogo y búsqueda | 75 % | Nada (la atiende el E-commerce con su propio catálogo) | 0 |
+| Detalle de una edición con disponibilidad | 18 % | 1 consulta de disponibilidad | 1 |
+| Carrito | 5 % | 1 consulta de disponibilidad de la línea (cota superior de AC02; la validación fuerte ocurre al iniciar el checkout, CAR-05) | 1 |
+| Checkout con reserva | 2 % | consulta de disponibilidad + reservar + confirmar tras el pago (la pasarela no entra y se simula con 1 a 3 s) | 3 |
+
+**Cifras** con 2 000 sesiones: acciones por segundo = 2 000 / 15 s ≈ **133**; solicitudes al Inventario por acción = 0,18 + 0,05 + 0,02 × 3 = **0,29**, es decir ≈ **39 por segundo** (33 de disponibilidad y 2,7 reservas y 2,7 confirmaciones). Cumple lo propuesto (≈ 130 acciones/s y 35 a 40 solicitudes/s). **Medido** en la corrida: mezcla de 75,0 % / 18,0 % / 5,1 % / 1,9 % (40 412, 9 709, 2 734 y 1 030 acciones) y 0,27 solicitudes por acción (≈ 36 por segundo en la meseta de 2 000 sesiones, con los fallos incluidos); la pausa media resultante fue de ≈ 15 s (sesiones-segundo entre acciones).
+
+**Niveles:** 100, 250, 500, 1 000, 1 500 y 2 000 sesiones; cada uno sube en 30 s y se sostiene 100 s (el de 2 000, 180 s); el último baja en 30 s. Umbrales de RNF02, sin cambiarlos, **por nivel**: p95 < 500 ms en la consulta de disponibilidad, p95 < 3 s en reservar + confirmar y menos de 1 % de solicitudes con error.
+
+**Alcance:** se mide el **Inventario** con el tráfico que el E-commerce le enviaría. El 75 % de catálogo y búsqueda, el carrito y el pedido del E-commerce **no se ejercitaron** (el E-commerce no corre en este entorno y, en producción, vive en otra VM: VM-VENTAS; `docs/02/05` y `07`), de modo que **no se midió la latencia de extremo a extremo ni la capacidad de VM-VENTAS**; la capacidad de VM-INVENTARIO sí.
+
+**Resultado** (corrida completa, `progress/evidencias/k6/2026-11-21-perfil-realista/`, con panel HTML; y repetición de los tres niveles altos, `…-perfil-realista-repeticion/`). Disponibilidad p95 / reservar + confirmar p95 / errores:
+
+| Sesiones concurrentes | Solicitudes/s al Inventario (≈) | Corrida completa | Repetición | ¿Sostenible con p95 < 500 ms? |
+| :--- | :--- | :--- | :--- | :--- |
+| 100 | 1,9 | 82 ms / 190 ms / 0 % | — | **Sí** |
+| 250 | 4,8 | 114 ms / 198 ms / 0 % | — | **Sí** |
+| 500 | 9,7 | 29 ms / 92 ms / 0 % | — | **Sí** |
+| 1 000 | 19 | 23 ms / 83 ms / 0,72 % | 136 ms / 581 ms / 0 % | **Sí** (las dos corridas) |
+| 1 500 | 29 | **3,3 s** / **11,2 s** / 0,37 % (no cumple) | 375 ms / 703 ms / 0,24 % (cumple) | **En el límite**: cumplió en una corrida y falló en la otra |
+| 2 000 | 39 | **1,2 s** / 2,9 s / **6,4 %** (no cumple) | **13,9 s** / **42,3 s** / 0,29 % (no cumple) | **No** |
+
+**Lo que se mide, sin maquillar**
+
+1. **Con el dimensionamiento de DD-17 y el perfil realista, el sistema sostiene 1 000 sesiones concurrentes con p95 < 500 ms** (en las dos corridas: 23 y 136 ms, 0 y 0,72 % de errores); **1 500 está en el límite** (cumple en una corrida, falla en la otra, con latencias de varios segundos) y **2 000 no se sostiene**: p95 de 1,2 s con 6,4 % de errores en una corrida y de 13,9 s en la otra. Con la mayor carga la latencia ya no es estable: **dos corridas con la misma configuración dan resultados muy distintos**, y una sola no basta para fijar el punto exacto.
+2. **El orden de magnitud lo fija la CPU de PostgreSQL**, igual que en 6b: a ≈ 39 solicitudes por segundo el entorno ya está en saturación. Cuando se satura la latencia no crece de forma gradual: en la repetición a 2 000 sesiones el checkout llegó a un p95 de 42 s.
+3. **Los errores son tiempos de conexión agotados** (`dial: i/o timeout`), no 500 ni respuestas de negocio, y llegan en ráfagas cortas; no hubo sobreventa ni 500.
+4. **La curva «sesiones sostenibles con p95 < 500 ms en VM-INVENTARIO de 1 OCPU» es ≈ 1 000 (hasta 1 500 en la mejor corrida)**, es decir, ≈ 20 a 30 solicitudes por segundo al Inventario. Para sostener 2 000 sesiones (≈ 39 solicitudes por segundo) con holgura **hace falta más capacidad que la declarada**: no se midió con el perfil realista, pero la rampa de estrés de 6b indica que con 1 CPU para el Inventario y 1 para PostgreSQL el entorno atiende más de 100 solicitudes por segundo (ley de Little de 6b, punto 4), unas 3 veces la necesidad; esa configuración (o separar PostgreSQL de la VM) es la que haría falta confirmar con una corrida del mismo perfil.
+5. **Límites de esta medición:** una sola corrida completa y una repetición parcial; máquina de desarrollo compartida; solo el Inventario; la pasarela simulada; el tamaño de los datos es el de una prueba (20 ediciones).
+
 ## 7. Qué cubre y qué no
 
 - Cubre el Inventario (el servicio que concentra la concurrencia de stock) con datos de carga, en una máquina de desarrollo con los límites declarados de contenedor.

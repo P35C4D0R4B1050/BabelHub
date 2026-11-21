@@ -15,7 +15,7 @@ Esta hoja recorre la rúbrica del Sprint 2 punto por punto, con la **métrica**,
 | 5. Base de datos y caché | Cumple, con hallazgos medidos | `docs/03/09` |
 | 6. SOLID y patrones | Cumple | `docs/03/03` + ejemplos de este documento |
 | 7. Pruebas, cobertura y CI/CD | Cumple en local; **CI en GitHub sin ejecutar** (depende del `push`) | `progress/evidencias/cobertura/index.html`, `.github/workflows/` |
-| 8. Atributos de calidad con k6 hasta 2 000 usuarios | **Parcial**: RNF02 a 50 usuarios con DD-17/DD-18 y los 2 000 usuarios **no cumplen** (se declara y se explica) | `progress/evidencias/k6/`, `docs/03/09` |
+| 8. Atributos de calidad con k6 hasta 2 000 usuarios | **Parcial**: RNF02 a 50 usuarios con DD-17 y los 2 000 usuarios (también con el perfil realista) **no cumplen**; el perfil realista sostiene ≈ 1 000 sesiones (se declara y se explica) | `progress/evidencias/k6/`, `docs/03/09` |
 
 ## 2. Métricas de los atributos de calidad
 
@@ -29,15 +29,31 @@ Todas medidas con k6 (imagen oficial `grafana/k6` v2.4.0 fijada por huella) cont
 | Concurrencia sin sobreventa (AC01) | [`sobreventa`](../../progress/evidencias/k6/2026-11-20-final-escenarios/sobreventa.md): 100 usuarios por 10 unidades | exactamente 10 reservas, 90 rechazos, vendible final 0 | 10 reservas, 90 rechazos `INV-STOCK-INSUFICIENTE`, sin respuestas inesperadas | **Sí** |
 | Seguridad: límites de uso (API4) | [`limites-de-uso`](../../progress/evidencias/k6/2026-11-20-final-escenarios/limites-de-uso.md) | más de 100 solicitudes/min de un usuario: 429 con `Retry-After`; el vecino no se ve afectado | 100 permitidas, el resto 429; el vecino sin limitar | **Sí** |
 | Disponibilidad ante caída (RNF03) | [`resiliencia`](../../progress/evidencias/k6/2026-11-20-final-escenarios/resiliencia.md): PostgreSQL pausado 25 s | proceso vivo, 503 uniforme (nunca 500), recuperación sola | 503 uniforme, 0 respuestas inesperadas, recuperación sola | **Sí** |
-| Escalabilidad: 50 → 2 000 usuarios | [`rampa`](../../progress/evidencias/k6/2026-11-20-final/inventario-0.6cpu_postgres-0.4cpu_pool-16/rampa-de-usuarios.md), declarado por DD-17 | p95 < 500 ms y < 1 % de errores por nivel | 50 usuarios: p95 1,4 s; 100: 1,9 s; 500: 7,4 s; 1 000: 16,4 s (11,5 % de errores); **2 000: 16,9 s y 51 % de errores** | **No** |
+| Capacidad realista: 2 000 sesiones con pausa de persona (≈ 39 solicitudes/s al Inventario), dimensionamiento de DD-17 | [`perfil-realista`](../../progress/evidencias/k6/2026-11-21-perfil-realista/perfil-realista.md) | p95 < 500 ms (disponibilidad), p95 < 3 s (reservar + confirmar), < 1 % de errores, por nivel | Cumple hasta **1 000 sesiones** (2 corridas); **1 500 en el límite**; **2 000 no** (sección 2.2) | **Hasta 1 000**; 2 000 **no** |
+| Escalabilidad, perfil de estrés: 50 → 2 000 usuarios con pausa de 0,5 s (límite y degradación) | [`rampa`](../../progress/evidencias/k6/2026-11-20-final/inventario-0.6cpu_postgres-0.4cpu_pool-16/rampa-de-usuarios.md), declarado por DD-17 | p95 < 500 ms y < 1 % de errores por nivel | 50 usuarios: p95 1,4 s; 100: 1,9 s; 500: 7,4 s; 1 000: 16,4 s (11,5 % de errores); **2 000: 16,9 s y 51 % de errores** | **No** |
 | Escalabilidad, mejor configuración medida (4 CPU + 2 CPU) | [`rampa`](../../progress/evidencias/k6/2026-11-20-final/inventario-4cpu_postgres-2cpu_pool-16/rampa-de-usuarios.md) | p95 < 500 ms por nivel | 100 usuarios: 47 ms; 250: 937 ms; **2 000: 10,1 s sin errores (cifra vigente)** | Hasta 100 usuarios; **2 000 no** |
 
 **Lectura honesta.**
 
 - **RNF02 con el dimensionamiento declarado no se cumple.** 50 usuarios con 0,5 s de pausa piden unas 80 solicitudes por segundo; con 0,6 CPU para el Inventario y 0,4 para PostgreSQL el entorno atiende unas 44. El cuello es la CPU (PostgreSQL y servicio). La decisión de la persona (**DD-18, opción A**) es demostrar RNF02 con el entorno de prueba sin el tope de CPU de la VM y **declarar** que en la VM de 1 OCPU compartida con PostgreSQL y la réplica de gestión no se sostiene (p95 ≈ 900 ms; 1,4 s en rampa). Palancas medidas o identificadas: memoria de referencias (apagada por la decisión D05), separar PostgreSQL, ARM con más OCPU.
-- **2 000 usuarios no se sostienen** con p95 < 500 ms en ninguna configuración: el mejor resultado es 10,1 s sin errores con 4 + 2 CPU, que es **la cifra vigente** (una primera serie anterior midió 7,2 s con el código previo a la reducción de idas a la base y no se reprodujo; ver `docs/03/09` §6b-bis, punto 3). Con 2 000 usuarios y 0,5 s de pausa se piden ≈ 4 000 solicitudes por segundo, inalcanzables en 1 OCPU; con pausas de persona (5 a 10 s) serían 200 a 400 por segundo, lo que sostiene la configuración de 4 + 2 CPU con latencia degradada.
+- **2 000 usuarios del perfil de estrés no se sostienen** con p95 < 500 ms en ninguna configuración (y 2 000 sesiones del perfil realista tampoco con el dimensionamiento de DD-17; sección 2.2): el mejor resultado es 10,1 s sin errores con 4 + 2 CPU, que es **la cifra vigente** (una primera serie anterior midió 7,2 s con el código previo a la reducción de idas a la base y no se reprodujo; ver `docs/03/09` §6b-bis, punto 3). Con 2 000 usuarios y 0,5 s de pausa se piden ≈ 4 000 solicitudes por segundo, inalcanzables en 1 OCPU; con pausas de persona (5 a 10 s) serían 200 a 400 por segundo, lo que sostiene la configuración de 4 + 2 CPU con latencia degradada.
 - **Lo que sí es sólido:** no hay sobreventa (AC01), los límites responden 429 uniforme, la caída de la base responde 503 (nunca 500) y el servicio se recupera sola. Bajo sobrecarga el sistema se degrada de forma controlada.
 - Las cifras absolutas son de esta máquina (k6 comparte CPU con el entorno) y varían entre corridas; entre dos mediciones del mismo límite se vio hasta 3 veces de diferencia. El orden entre configuraciones es lo reproducible.
+
+### 2.2 Perfil realista de 2 000 sesiones (la prueba representativa)
+
+La rampa de la sección 2 es un **perfil de estrés** (pausa de 0,5 s entre solicitudes: 2 000 usuarios ≈ 4 000 solicitudes por segundo) y se conserva como evidencia del **límite** y de la degradación controlada. La prueba **representativa** de uso real es el [`perfil-realista`](../../tests/load/escenarios/perfil-realista.js): 2 000 sesiones concurrentes de lectores de una librería con varias sucursales, con pausa de persona de 5 a 30 s (media de 15 s) y mezcla del 75 % catálogo y búsqueda, 18 % detalle con disponibilidad, 5 % carrito y 2 % checkout con reserva. Eso son ≈ 133 acciones por segundo y **≈ 39 solicitudes por segundo** al Inventario; la justificación de cada cifra está en [`docs/03/09` §6d](../03-diseno-de-software/09-analisis-de-base-de-datos-y-cache.md). Dimensionamiento fijo de producción (DD-17: Inventario 0,6 CPU y 512 MB, PostgreSQL 0,4 CPU); umbrales de RNF02 por nivel. Corrida completa: [`k6/2026-11-21-perfil-realista/`](../../progress/evidencias/k6/2026-11-21-perfil-realista/) ([panel](../../progress/evidencias/k6/2026-11-21-perfil-realista/perfil-realista-panel.html)); repetición de los niveles altos: [`k6/2026-11-21-perfil-realista-repeticion/`](../../progress/evidencias/k6/2026-11-21-perfil-realista-repeticion/) ([panel](../../progress/evidencias/k6/2026-11-21-perfil-realista-repeticion/perfil-realista-panel.html)).
+
+| Sesiones concurrentes | Disponibilidad p95 (umbral 500 ms) | Reservar + confirmar p95 (umbral 3 s) | Errores (umbral 1 %) | ¿Cumple? |
+| :--- | :--- | :--- | :--- | :--- |
+| 100 | 82 ms | 190 ms | 0 % | **Sí** |
+| 250 | 114 ms | 198 ms | 0 % | **Sí** |
+| 500 | 29 ms | 92 ms | 0 % | **Sí** |
+| 1 000 | 23 ms (repetición: 136 ms) | 83 ms (581 ms) | 0,72 % (0 %) | **Sí**, en las dos corridas |
+| 1 500 | 3,3 s (repetición: 375 ms) | 11,2 s (703 ms) | 0,37 % (0,24 %) | **En el límite**: una corrida cumple y la otra no |
+| 2 000 | 1,2 s (repetición: 13,9 s) | 2,9 s (42,3 s) | 6,4 % (0,29 %) | **No** |
+
+**Lectura honesta:** con el dimensionamiento declarado, **VM-INVENTARIO sostiene ≈ 1 000 sesiones concurrentes con p95 < 500 ms** (≈ 20 solicitudes por segundo al Inventario), **1 500 está en el límite y 2 000 sesiones no se sostienen**. Para 2 000 con holgura hace falta más capacidad que 1 OCPU compartida con PostgreSQL: la rampa de estrés indica que 1 CPU para el Inventario y 1 para PostgreSQL atiende más de 100 solicitudes por segundo (≈ 3 veces lo necesario), pero **no se midió con este perfil**; separar PostgreSQL o una ARM con más OCPU son las palancas (DD-18). **Alcance:** se mide el Inventario con el tráfico que el E-commerce le enviaría; el catálogo, el carrito y el pedido del E-commerce (VM-VENTAS) y la latencia de extremo a extremo **no se midieron**. Una sola corrida completa y una repetición parcial: con la mayor carga dos corridas con la misma configuración dan resultados muy distintos.
 
 ### 2.1 Paneles interactivos de k6
 
@@ -77,7 +93,7 @@ Cada escenario, ejecutado de nuevo con el panel web integrado de k6 y exportado 
 ### 3.4 Endpoints REST con OpenAPI
 
 - **Qué:** un documento OpenAPI 3 por servicio, **generado desde el código**: [`inventario.v1.json`](../03-diseno-de-software/openapi/inventario.v1.json) y [`ecommerce.v1.json`](../03-diseno-de-software/openapi/ecommerce.v1.json), con rutas, esquemas de los DTO de `BabelHub.Shared`, errores `application/problem+json`, alcance de la credencial y esquemas de seguridad. [README de la carpeta](../03-diseno-de-software/openapi/README.md). Cada servicio lo sirve en `/openapi/v1.json` en `Development`.
-- **Visor interactivo (Scalar):** lo prepara el carril de contratos y se enlazará aquí cuando esté en `main`; hasta entonces, los JSON se abren en cualquier visor OpenAPI.
+- **Visor interactivo (Scalar):** cada servicio sirve una interfaz en `/documentacion` solo en `Development`, sin CDN (los recursos van en el paquete) y sobre el mismo `/openapi/v1.json`; cómo abrirla en [el README de la carpeta `openapi`](../03-diseno-de-software/openapi/README.md) (`dotnet run --project src/BabelHub.Inventario/BabelHub.Inventario.Api` en `http://localhost:5081/documentacion`; E-commerce en `http://localhost:5080/documentacion`). Prueba automática: `InterfazDeLaDocumentacionOpenApiTests`. **Comprobación en navegador real (Chromium): pendiente** (se anota aquí al hacerla).
 - **Prueba:** `DocumentacionOpenApiInventarioTests` y `DocumentacionOpenApiEcommerceTests` **fallan si una ruta pública no está documentada** y comparan los archivos publicados con el generado.
 - **Reproducir:** `dotnet test tests/integration/BabelHub.IntegrationTests --filter "FullyQualifiedName~DocumentacionOpenApi"`.
 
@@ -121,7 +137,8 @@ bash tests/load/entorno/bajar-carga.sh
 ## 4. Qué no se demuestra (declarado)
 
 - **CI en GitHub:** sin corrida real hasta el `push`.
-- **RNF02 y 2 000 usuarios** con el dimensionamiento declarado: no cumplen (sección 2). Decisión DD-18.
+- **RNF02 y 2 000 usuarios** con el dimensionamiento declarado: no cumplen (secciones 2 y 2.2; con el perfil realista se sostienen ≈ 1 000 sesiones). Decisión DD-18.
+- **Perfil realista sin el E-commerce:** el catálogo, el carrito y el pedido (VM-VENTAS) y la latencia de extremo a extremo no se midieron; una sola corrida completa y una repetición parcial.
 - **Medición en la VM ARM real**, despliegue, restauración con carga y llaves reales de pasarela y asistente: fuera del Sprint 2.
 - **E-commerce bajo k6:** se midió el Inventario (donde se concentra la concurrencia de stock); el tramo del E-commerce del checkout no se midió con k6.
 - **Hallazgos abiertos** de otros carriles: [`progress/hallazgos.md`](../../progress/hallazgos.md).
