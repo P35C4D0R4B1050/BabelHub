@@ -112,3 +112,12 @@ Estado de las tareas: T01 a T29 y T34 hechas; **pendientes T30, T31, T33 y T32 (
 ## 4. Conclusión
 
 No converge: la lógica de los 31 requisitos está implementada y probada con dobles y con PostgreSQL real, pero falta cerrar T30, T31, T33 y T32, completar T29 (par recepción × vencimiento), dar de alta los límites en Plataforma (D1), excluir de la anulación la línea digital ya reembolsada (D2) y decidir el contrato de DEV-23 (D5) y los supuestos del plan (D9); con todo eso resuelto y esta verificación repetida, la spec podrá pasar a `Done`.
+
+## 5. Actualización (carril V, segundo turno de Docker, 2026-11-20)
+
+Resultado: **No converge** (sin cambios de fondo). Con `main` fundido (políticas de límites de Devoluciones en el catálogo de Plataforma por el carril A, `ContarEnTres`, exclusión de la digital reembolsada en la anulación por el carril B) la integración filtrada de Pedidos, Envíos y Devoluciones con PostgreSQL real da **474 verdes, 0 rojas**, y `CodificacionDeSalidaTests` vuelve a pasar (se quitó una mención de marcado sin codificar en un comentario de `ControladorDeDevoluciones.cs`).
+
+- **D1 (límites en el catálogo): cerrada** por el carril A (commit `763a80a2`); las pruebas de mi carril siguen usando límites permisivos, de modo que **falta una prueba de integración con el límite real** (T32).
+- **D6 / T31: parcial → más cubierto.** `PrivacidadYCuentaDeDevolucionesTests` (PostgreSQL real, Aplicación real): el motivo sembrado no llega a la auditoría, los avisos, las alertas, las denegaciones ni a un error en todo el recorrido solicitar–aprobar–recibir (AC-DEV-29, AC-DEV-31); la redacción por cuenta reemplaza solo lo de esa cuenta y conserva pedido, línea, importe y estado (AC-DEV-25, AC-DEV-28); la depuración a los dos años redacta solo lo cerrado, no antes y no lo abierto (AC-DEV-27). **Sigue pendiente:** la cancelación real de Identidad (orden de receptores, reversión todo o nada), la solicitud frente a la cancelación y el registro de datos sensibles de un ORM (el módulo usa Npgsql, no EF).
+- **D7 / T32:** igual que antes (matriz de `Aprobar`; faltan recibir, listar, reportes y el 429).
+- **D3 / T30, D4 / T29, D8 / T33:** sin cambios (T29 sigue reabierta).

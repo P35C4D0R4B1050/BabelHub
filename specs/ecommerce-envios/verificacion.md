@@ -93,3 +93,7 @@ Nota de tareas: T14 y T21 se dividieron (T14a hecha y T14b pendiente; T21a hecha
 ## 4. Conclusión
 
 No converge: los 18 requisitos tienen código y pruebas y 11 cumplen, pero 7 son parciales porque falta el operador logístico real (decisión de negocio D02), las pruebas de integración T20, T21 y T22, el E2E de T24, y hay dos diferencias de redacción de la spec (auditoría de la guía y aviso pendiente) que decide la persona responsable.
+
+## Actualización (carril V, segundo turno de Docker, 2026-11-20)
+
+Resultado: **No converge** (sin cambios de fondo). Con `main` fundido, la integración filtrada de Pedidos, Envíos y Devoluciones con PostgreSQL real da **474 verdes, 0 rojas**. Siguen abiertos T14b (esperando el operador real, D02), T20 y T22 completos, T21b y T24 (E2E y `ui-review`, que esperan el host compuesto); las diferencias D-1 a D-10 de este informe no cambian. Las etiquetas `Criterio` de `EnviosConPedidosRealesTests` (D-8) ya están corregidas.
