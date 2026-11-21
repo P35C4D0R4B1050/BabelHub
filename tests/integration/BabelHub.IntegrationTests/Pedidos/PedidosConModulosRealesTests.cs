@@ -1,4 +1,5 @@
 using BabelHub.Ecommerce.Application.Carrito;
+using BabelHub.Ecommerce.Application.Identidad;
 using BabelHub.Ecommerce.Application.Pagos;
 using BabelHub.Ecommerce.Application.Pedidos;
 using BabelHub.Ecommerce.Application.Pedidos.Interno;
@@ -126,6 +127,27 @@ public sealed class PedidosConModulosRealesTests(PostgresDelEcommerceCompletoFix
         // La creación queda auditada en la misma transacción, una sola vez, y el registro persistido no lleva el contacto.
         Assert.Equal(1, await bd.Consultar<int>("SELECT count(*) FROM auditoria.registros WHERE objeto_id = @o AND accion = 'EstadoDePedidoCambiado'", ("o", pedido.ToString("D"))));
         Assert.Equal(0, await bd.Consultar<int>("SELECT count(*) FROM auditoria.registros WHERE detalle::text ILIKE ANY (ARRAY['%Ana P%', '%987654321%', '%Jr. Lima%'])"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PED-26")]
+    public async Task ContarPorTipo_informa_los_dos_numeros_de_la_cuenta_con_PostgreSQL_real_y_Contar_devuelve_su_suma_sin_contar_los_de_otra()
+    {
+        await using var anfitrion = Anfitrion();
+        var cuenta = await SembrarCuenta();
+        var ajena = await SembrarCuenta();
+        Assert.Equal(ResultadoDeConfirmarCompra.Creado, await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<IConfirmacionDeCompra>().Confirmar(Compra(Guid.NewGuid(), cuenta, conDigital: false))));
+        Assert.Equal(ResultadoDeConfirmarCompra.Creado, await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<IConfirmacionDeCompra>().Confirmar(Compra(Guid.NewGuid(), cuenta, conDigital: true))));
+        Assert.Equal(ResultadoDeConfirmarCompra.Creado, await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<IConfirmacionDeCompra>().Confirmar(Compra(Guid.NewGuid(), ajena, conDigital: false))));
+        _reembolsos.PendientesPorCuenta[(cuenta, OrigenDelReembolso.Anulacion)] = 1;
+        _reembolsos.PendientesPorCuenta[(cuenta, OrigenDelReembolso.CancelacionDelCliente)] = 2;
+        _reembolsos.PendientesPorCuenta[(ajena, OrigenDelReembolso.Anulacion)] = 7;
+
+        var porTipo = await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<IPendientesDeCuentaPorTipo>().ContarPorTipo(cuenta));
+        var suma = await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetServices<IPendientesDeCuenta>().OfType<IPendientesDeCuentaPorTipo>().Single().Contar(cuenta));
+
+        Assert.Equal(new PendientesDeCuentaPorTipo(PedidosSinCerrar: 2, ReembolsosPendientes: 3), porTipo);
+        Assert.Equal(5, suma);
     }
 
     [Fact]

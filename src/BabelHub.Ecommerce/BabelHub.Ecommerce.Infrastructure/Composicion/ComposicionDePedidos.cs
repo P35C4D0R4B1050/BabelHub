@@ -80,6 +80,7 @@ public static class ComposicionDePedidos
 
         servicios.TryAddScoped<IConfirmacionDeCompra, ConfirmarCompra>();
         servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IPendientesDeCuenta, ContarPendientesDePedidos>());
+        servicios.TryAddScoped<IPendientesDeCuentaPorTipo, ContarPendientesDePedidos>();
         servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IAplicadorDeCancelacion, AnonimizarContactoDeUnaCuenta>());
 
         return servicios.AgregarDoblesProvisionalesDePedidos(esProduccion);
