@@ -42,6 +42,11 @@ export MSYS_NO_PATHCONV=1
 win() { cygpath -w "$1"; }
 extra=()
 for v in DURACION RITMO UNIDADES COMPETIDORES NIVELES SEGUNDOS_POR_NIVEL PENSAR_S; do [ -n "${!v:-}" ] && { export "$v"; extra+=(-e "$v"); }; done
+# Panel web integrado de k6 (PANEL=1): exporta un HTML autocontenido por escenario junto a los demás resultados (<escenario>-panel.html).
+if [ "${PANEL:-}" = 1 ]; then
+  export K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_PERIOD=1s K6_WEB_DASHBOARD_EXPORT="/resultados/$escenario-panel.html"
+  extra+=(-e K6_WEB_DASHBOARD -e K6_WEB_DASHBOARD_PERIOD -e K6_WEB_DASHBOARD_EXPORT)
+fi
 
 estadisticas() { bash tests/load/entorno/estadisticas-de-base.sh "$@" || true; }
 # Un solo cliente k6 a la vez: se elimina cualquier residuo del anterior, el contenedor lleva nombre fijo (un duplicado falla en vez de competir por la máquina) y un tope de tiempo
