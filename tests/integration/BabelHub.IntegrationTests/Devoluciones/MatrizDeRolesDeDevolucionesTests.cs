@@ -83,4 +83,74 @@ public sealed class MatrizDeRolesDeDevolucionesTests(PostgresDeDevolucionesFixtu
         Assert.Equal(deOtraSucursal.Error.Categoria, inexistente.Error.Categoria);
         Assert.Equal(2, e.Denegaciones.Registradas.Count);
     }
+
+    private static ActorActual Actor(string quien, Guid cliente) => quien switch
+    {
+        "cliente-duenio" => ActorActual.DeUsuario(cliente, RolesDeUsuario.Cliente),
+        "cliente-ajeno" => ActorActual.DeUsuario(Guid.NewGuid(), RolesDeUsuario.Cliente),
+        "encargado-de-otra-sucursal" => Encargado("arequipa"),
+        "encargado-sin-sucursal" => ActorActual.DeUsuario(Guid.NewGuid(), RolesDeUsuario.EncargadoDeSucursal, null),
+        "logistica" => ActorActual.DeUsuario(Guid.NewGuid(), RolesDeUsuario.PersonalDeLogistica),
+        "anonimo" => ActorActual.Anonimo(),
+        "encargado-de-la-sucursal-receptora" => Encargado("lima-central"),
+        _ => ActorActual.DeUsuario(Guid.NewGuid(), RolesDeUsuario.AdministradorCentral),
+    };
+
+    [Theory]
+    [MemberData(nameof(Casos))]
+    [Trait("Criterio", "AC-DEV-12")]
+    [Trait("Criterio", "AC-DEV-30")]
+    public async Task Rechazar_un_impreso_responde_segun_el_rol_y_el_alcance_y_registra_una_denegacion_por_intento(string quien, string? errorEsperado)
+    {
+        var e = new EscenarioDeDevolucionesConPostgres(bd);
+        var (cliente, pedido, linea) = e.SembrarPedidoDeImpresos();
+        var devolucionId = (await e.Solicitar(cliente, pedido.PedidoId, linea.LineaId, 1)).Valor.DevolucionId;
+
+        var resultado = await e.RechazarComo(Actor(quien, cliente), devolucionId);
+
+        if (errorEsperado is null)
+        {
+            Assert.True(resultado.EsExito, resultado.Error?.Clave);
+            Assert.Empty(e.Denegaciones.Registradas);
+            return;
+        }
+
+        Assert.False(resultado.EsExito);
+        Assert.Equal(errorEsperado, resultado.Error!.Clave);
+        Assert.Equal("solicitada", await bd.Consultar<string>($"SELECT estado FROM devoluciones.lineas_de_devolucion WHERE devolucion_id = '{devolucionId:D}'"));
+        if (errorEsperado == "no-encontrado")
+        {
+            Assert.Single(e.Denegaciones.Registradas);
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Casos))]
+    [Trait("Criterio", "AC-DEV-12")]
+    [Trait("Criterio", "AC-DEV-30")]
+    public async Task Confirmar_la_recepcion_de_un_impreso_responde_segun_el_rol_y_el_alcance_y_no_reingresa_ni_reembolsa_si_se_rechaza(string quien, string? errorEsperado)
+    {
+        var e = new EscenarioDeDevolucionesConPostgres(bd);
+        var (cliente, pedido, linea) = e.SembrarPedidoDeImpresos();
+        var devolucionId = (await e.Solicitar(cliente, pedido.PedidoId, linea.LineaId, 1)).Valor.DevolucionId;
+        Assert.True((await e.Aprobar(devolucionId)).EsExito);
+
+        var resultado = await e.RecibirComo(Actor(quien, cliente), devolucionId);
+
+        if (errorEsperado is null)
+        {
+            Assert.True(resultado.EsExito, resultado.Error?.Clave);
+            return;
+        }
+
+        Assert.False(resultado.EsExito);
+        Assert.Equal(errorEsperado, resultado.Error!.Clave);
+        Assert.Equal("aprobada", await bd.Consultar<string>($"SELECT estado FROM devoluciones.lineas_de_devolucion WHERE devolucion_id = '{devolucionId:D}'"));
+        Assert.Equal(0, e.Inventario.Aplicaciones(devolucionId));
+        Assert.Equal(0, e.Reembolsos.Registrados);
+        if (errorEsperado == "no-encontrado")
+        {
+            Assert.Single(e.Denegaciones.Registradas);
+        }
+    }
 }
