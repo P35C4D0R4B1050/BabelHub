@@ -255,15 +255,18 @@ public sealed class EnviosConPedidosRealesTests(PostgresDePedidosYEnviosFixture 
 
             var guias = await Task.WhenAll(Task.Run(() => Logistica(e, l => l.SolicitarGuia(envio))), Task.Run(() => Logistica(e, l => l.SolicitarGuia(envio))));
             Assert.Contains(guias, r => r.EsExito);
+            // La simultánea o repite la misma guía (idempotente) o recibe `guia-en-curso`: nunca otro error ni otra guía.
+            Assert.All(guias.Where(r => !r.EsExito), r => Assert.Equal(ClavesDeEnvios.GuiaEnCurso, r.Error!.Clave));
 
             var antes = reservas.Cierres.Count;
             var pasos = await Task.WhenAll(Task.Run(() => Logistica(e, l => l.PasarAEnReparto(envio))), Task.Run(() => Logistica(e, l => l.PasarAEnReparto(envio))));
             Assert.Contains(pasos, r => r.EsExito);
+            Assert.All(pasos.Where(r => !r.EsExito), r => Assert.Contains(r.Error!.Clave, new[] { ClavesDeEnvios.EstadoInvalido, ClavesDeEnvios.GuiaEnCurso, "operacion-en-curso" }));
             Assert.Equal(antes + 1, reservas.Cierres.Count(c => c == envio) + antes);
         }
 
         Assert.Equal(20, reservas.Cierres.Distinct().Count());
-        Assert.True(operador.GuiasCreadas >= 20);
+        Assert.Equal(20, operador.GuiasCreadas);
     }
 
     [Fact]
