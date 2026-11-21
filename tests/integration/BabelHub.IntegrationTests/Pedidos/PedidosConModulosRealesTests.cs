@@ -193,6 +193,7 @@ public sealed class PedidosConModulosRealesTests(PostgresDelEcommerceCompletoFix
         // El reembolso lleva solo el impreso y el envío: pedir también el digital superaría el tope de Pagos y dejaría la anulación fallida.
         var reembolso = Assert.Single(_reembolsos.Registrados);
         Assert.Single(reembolso.Lineas);
+        Assert.Equal(62m, resultado.Valor.Reembolso);
         Assert.Equal("anulado", await Consultar<string>("SELECT estado FROM pedidos.pedidos WHERE id = @p", pedido));
     }
 

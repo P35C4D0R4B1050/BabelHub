@@ -346,7 +346,7 @@ internal sealed class OrquestadorDeAnulaciones(
         }
 
         var registrado = await RegistrarElReembolso(pedido, anulacion, aReembolsar, cancelacion).ConfigureAwait(false);
-        anulacion.RegistrarReembolso(registrado, ahora);
+        anulacion.RegistrarReembolso(registrado.ReembolsoId, ahora);
 
         // 2. Los accesos digitales se revocan aunque se hayan descargado.
         foreach (var digital in lineas.Where(l => l.EsDigital))
@@ -378,10 +378,10 @@ internal sealed class OrquestadorDeAnulaciones(
         await pedidos.ActualizarAnulacion(anulacion, cancelacion).ConfigureAwait(false);
         await AuditarLaCompleccion(pedido, anulacion, anterior, reanudacion, cancelacion).ConfigureAwait(false);
         await new AvisosDePedidos(notificador).Solicitar(pedido, "anulado", anulacion.Id.ToString("N"), AvisosDePedidos.SucursalesResponsables(pedido, anulacion.LineaIds), cancelacion).ConfigureAwait(false);
-        return Resultado<AnulacionAplicada>.Exito(new AnulacionAplicada(pedido.Id, pedido.Estado, anulacion.Monto, ReembolsoPendiente: false));
+        return Resultado<AnulacionAplicada>.Exito(new AnulacionAplicada(pedido.Id, pedido.Estado, registrado.Monto, ReembolsoPendiente: false));
     }
 
-    private async Task<Guid> RegistrarElReembolso(Pedido pedido, Anulacion anulacion, IReadOnlyList<LineaDePedido> lineas, CancellationToken cancelacion)
+    private async Task<ReembolsoRegistrado> RegistrarElReembolso(Pedido pedido, Anulacion anulacion, IReadOnlyList<LineaDePedido> lineas, CancellationToken cancelacion)
     {
         Resultado<ReembolsoRegistrado> registrado;
         try
@@ -405,7 +405,7 @@ internal sealed class OrquestadorDeAnulaciones(
             throw new OperacionRechazadaException(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDePedidos.ServicioNoDisponible));
         }
 
-        return registrado.Valor.ReembolsoId;
+        return registrado.Valor;
     }
 
     private async Task<bool> YaReembolsadaPorDevolucion(Pedido pedido, LineaDePedido digital, CancellationToken cancelacion)

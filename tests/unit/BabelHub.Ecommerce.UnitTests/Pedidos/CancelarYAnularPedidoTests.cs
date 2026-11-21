@@ -277,6 +277,8 @@ public sealed class CancelarYAnularPedidoTests
         Assert.Equal(pedido.Lineas.Single(l => !l.EsDigital).Id, Assert.Single(reembolso.Lineas).LineaId);
         Assert.Equal(EstadoVisibleDelPedido.Anulado, resultado.Valor.Estado);
         Assert.Equal(EstadoDeLineaDigital.Anulado, digital.EstadoDigital);
+        // El monto informado es el realmente reembolsado (impreso y envío), no el del plan con la digital ya devuelta.
+        Assert.Equal(62m, resultado.Valor.Reembolso);
     }
 
     [Fact]
