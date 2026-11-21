@@ -156,6 +156,30 @@ public sealed class TrasladosConReservasRealesTests(PostgresDeReservasFixture bd
         Assert.Equal(await bd.ReservadoDeLaRed(escenario.Libro), await bd.UnidadesDeLineasActivas(escenario.Libro));
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-TRA-13")]
+    [Trait("Criterio", "AC-TRA-16")]
+    public async Task AnularElPedidoDespuesDeRecibirSusUnidades_LiberaLaLineaConfirmadaDelDestino_ElTrasladoSigueRecibido_YElStockQuedaLibre()
+    {
+        using var escenario = await new EscenarioDeTraslados(bd).Preparar(stockDeLima: 0, stockDeCusco: 1);
+        var (pedido, traslado) = await escenario.VinculadoAprobado();
+        Assert.True((await escenario.Ejecutar(Encargado(escenario.Cusco), new DespacharTrasladoEntrada(traslado))).EsExito);
+        Assert.True((await escenario.Ejecutar(Encargado(escenario.Lima), new RecibirTrasladoEntrada(traslado))).EsExito);
+        Assert.Equal((1, 1), await bd.StockDe(escenario.Lima, escenario.Libro));
+        Assert.Equal(1L, await bd.Consultar<long>($"SELECT count(*) FROM reservas.reserva_lineas WHERE pedido_id = '{pedido}' AND fuente_id = '{escenario.Lima}' AND estado = 'confirmada' AND creada_por_traslado"));
+
+        var anulado = await escenario.AnularElPedido(pedido);
+
+        Assert.True(anulado.EsExito, anulado.Error?.Clave);
+        // La línea que recreó el destino se libera como cualquier reserva confirmada (SEL-07): el físico llegó y ya nadie lo retiene.
+        Assert.Equal((1, 0), await bd.StockDe(escenario.Lima, escenario.Libro));
+        Assert.Equal(0L, await bd.Consultar<long>($"SELECT count(*) FROM reservas.reserva_lineas WHERE pedido_id = '{pedido}' AND fuente_id = '{escenario.Lima}' AND estado = 'confirmada'"));
+        Assert.Equal(1L, await bd.Consultar<long>($"SELECT count(*) FROM reservas.reserva_lineas WHERE pedido_id = '{pedido}' AND fuente_id = '{escenario.Lima}' AND estado = 'liberada'"));
+        Assert.Equal("recibido", await escenario.EstadoDe(traslado));
+        Assert.Equal((0, 0), await bd.StockDe(escenario.Cusco, escenario.Libro));
+        Assert.Equal(await bd.ReservadoDeLaRed(escenario.Libro), await bd.UnidadesDeLineasActivas(escenario.Libro));
+    }
+
     [Theory]
     [Trait("Criterio", "AC-TRA-15")]
     [InlineData(MotivoDeLiberacionDeReserva.CanceladoPorElCliente)]

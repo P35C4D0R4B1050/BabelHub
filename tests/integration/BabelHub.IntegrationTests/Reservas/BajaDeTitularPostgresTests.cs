@@ -260,4 +260,41 @@ public sealed class BajaDeTitularPostgresTests(PostgresDeReservasFixture bd) : I
         Assert.Equal(titulares.Except(pendientes), resto);
         Assert.Equal(2L, await bd.Consultar<long>("SELECT count(*) FROM reservas.bajas_recibidas WHERE entregada_a_auditoria_en IS NOT NULL"));
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEL-36")]
+    public async Task DosTitularesConLaMismaClaveDeIdempotencia_SeDanDeBaja_SinViolarLaUnicidadPorCliente_YLaClaveSigueSiendoUnicaPorCliente()
+    {
+        const string claveCompartida = "clave-compartida-de-dos-titulares";
+        var lima = await bd.AgregarFuente("lima", recepcion: true);
+        var libro = await bd.AgregarEdicion();
+        await bd.PonerStock(lima, libro, 20, 0);
+        using var pila = new PilaDeReservas(bd);
+        var primero = Guid.NewGuid();
+        var segundo = Guid.NewGuid();
+
+        // La clave es única por cliente (uq_reservas_cliente_clave), no global: dos titulares pueden usar la misma.
+        Assert.True((await pila.Reservar(Cliente(primero), ARecojo("lima", [Linea(libro, 1)]) with { ClaveDeIdempotencia = claveCompartida })).EsExito);
+        Assert.True((await pila.Reservar(Cliente(segundo), ARecojo("lima", [Linea(libro, 1)]) with { ClaveDeIdempotencia = claveCompartida })).EsExito);
+        Assert.Equal(2L, await bd.Consultar<long>($"SELECT count(*) FROM reservas.reservas WHERE clave_idempotencia = '{claveCompartida}'"));
+
+        var bajaDelPrimero = await Baja(pila, primero);
+        var bajaDelSegundo = await Baja(pila, segundo);
+
+        // Cada titular pasa a su propio identificador anónimo (distintos entre sí): la sustitución no choca con la unicidad.
+        Assert.True(bajaDelPrimero.EsExito, bajaDelPrimero.Error?.Clave);
+        Assert.True(bajaDelSegundo.EsExito, bajaDelSegundo.Error?.Clave);
+        Assert.NotEqual(Anonimo(pila, primero), Anonimo(pila, segundo));
+        Assert.Equal(2L, await bd.Consultar<long>($"SELECT count(DISTINCT cliente_id) FROM reservas.reservas WHERE clave_idempotencia = '{claveCompartida}'"));
+        Assert.Equal(0L, await bd.Consultar<long>($"SELECT count(*) FROM reservas.reservas WHERE cliente_id IN ('{primero}', '{segundo}')"));
+
+        // Otro cliente puede seguir usando la misma clave, y repetirla con el mismo pedido devuelve la original sin crear otra fila.
+        var tercero = Cliente();
+        var entrada = ARecojo("lima", [Linea(libro, 1)]) with { ClaveDeIdempotencia = claveCompartida };
+        var original = await pila.Reservar(tercero, entrada);
+        var repetida = await pila.Reservar(tercero, entrada);
+        Assert.True(original.EsExito, original.Error?.Clave);
+        Assert.True(repetida.EsExito, repetida.Error?.Clave);
+        Assert.Equal(1L, await bd.Consultar<long>($"SELECT count(*) FROM reservas.reservas WHERE cliente_id = '{tercero.UsuarioId}' AND clave_idempotencia = '{claveCompartida}'"));
+    }
 }
