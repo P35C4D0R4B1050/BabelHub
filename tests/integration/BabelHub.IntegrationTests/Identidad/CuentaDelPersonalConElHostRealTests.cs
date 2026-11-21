@@ -107,7 +107,7 @@ public sealed class CuentaDelPersonalConElHostRealTests(PostgresDelEcommerceComp
     [Fact]
     [Trait("Criterio", "AC-IDE-68")]
     [Trait("Criterio", "AC-IDE-69")]
-    public async Task El_personal_cambia_su_correo_el_anterior_sigue_vigente_hasta_verificar_y_al_aplicarlo_se_audita_y_se_avisa_a_los_dos()
+    public async Task El_personal_pide_cambiar_su_correo_y_el_anterior_sigue_vigente_hasta_verificar_el_nuevo()
     {
         var reloj = new RelojMovil(Inicio);
         await using var anfitrion = bd.Anfitrion(s => s.AddSingleton<IReloj>(reloj));

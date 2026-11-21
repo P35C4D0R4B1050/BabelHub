@@ -137,7 +137,7 @@ Tareas: **547 de 611** (89 %). `main`: compilación sin advertencias, SpecCheck 
 | ecommerce-envios | InProgress | 23/25 | Converge salvo T14b/T21b (operador real fuera de alcance, DD-22) |
 | ecommerce-pagos | Planned | 36/38 | Converge salvo T37/T38 (llaves Culqi B05) y WhatsApp real (Evolution/n8n/Meta) |
 | web-base | Planned | 36/39 | Converge salvo partes humanas de T32–T34 y WEB-25 en `/reclamaciones/nueva` (REC-04) |
-| identidad-seguridad | Planned | 50/50 | No converge hasta implementar IDE-90 a IDE-98 (nombre y correo de todo rol, DD-25); D5 (Menor) |
+| identidad-seguridad | Planned | 50/50 | Converge salvo T57 (integración PG de nombre y correo de todo rol, DD-25, sin ejecutar) y D5 (Menor) |
 | inventario-ajustes | Planned | 18/18 | Converge salvo AJU-22 (redacción; persona) |
 | inventario-fuentes | Planned | 25/25 | Converge salvo FUE-09/FUE-11 (diferidas) y FUE-10 (DD-18) |
 | inventario-seleccion-fuente | Planned | 33/33 | Converge salvo S2 (k6 previo a producción) |

@@ -382,10 +382,11 @@ public sealed class CuentaController(
 
         return (actor, campos, null);
     }
-    /// <summary>La renovación de la sesión de este navegador, solo en proceso, para que Identidad la conserve al revocar las demás; sin una sesión legible es <see langword="null"/> (se revocan todas, que es lo seguro).</summary>
+
     /// <summary>La marca de dispositivo de la cookie de esta solicitud, solo en proceso: Identidad decide si el dispositivo es reconocido (IDE-55, IDE-96).</summary>
     private ValorSecreto? MarcaDelBorde() => DatosDelBorde.Leer(Request).Marca is { } marca ? new ValorSecreto(marca) : null;
 
+    /// <summary>La renovación de la sesión de este navegador, solo en proceso, para que Identidad la conserve al revocar las demás; sin una sesión legible es <see langword="null"/> (se revocan todas, que es lo seguro).</summary>
     private async Task<ValorSecreto?> RenovacionActual(CancellationToken cancelacionDeLaSolicitud) =>
         CookieDeSesionWeb.Leer(Request, host.Host) is { } cookie ? await sesiones.RenovacionDeLaSesion(cookie, host.Host, cancelacionDeLaSolicitud) : null;
 

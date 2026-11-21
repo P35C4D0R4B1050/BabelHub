@@ -159,11 +159,25 @@ public sealed class GestionDeLaCuentaTests
     [InlineData("Ana\u0007")]
     [InlineData("Ana\u202EBorrada")]
     [InlineData("Ana\u200BLarga")]
+    [InlineData("Ana\U000E0041Etiqueta")]
     public async Task CorregirElNombre_Invalido_SeRechaza_SinGuardarNiAuditar(string nombre)
     {
         var (e, cuenta, gestion) = Titular();
 
         var resultado = await gestion.CorregirElNombre(cuenta.Usuario.Id, nombre);
+
+        Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
+        Assert.Equal("Persona", cuenta.Nombre);
+        Assert.Empty(e.Auditoria.Registradas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-67")]
+    public async Task CorregirElNombre_ConUnSustitutoSuelto_SeRechaza()
+    {
+        var (e, cuenta, gestion) = Titular();
+
+        var resultado = await gestion.CorregirElNombre(cuenta.Usuario.Id, "Ana" + (char)0xD800 + "Suelto");
 
         Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
         Assert.Equal("Persona", cuenta.Nombre);

@@ -4,7 +4,7 @@ namespace BabelHub.Ecommerce.Application.Identidad;
 
 // Las operaciones de las tareas T18 a T25 (IDE-4): sus modelos se declaran aquí para que la Api y la web dependan solo de esta raíz y se afinan al implementarlas.
 
-/// <summary>La cuenta del cliente tal como se muestra y se corrige (IDE-24, IDE-25, IDE-31, IDE-37, IDE-52): nunca el resumen de la contraseña, el secreto del segundo factor ni los códigos.</summary>
+/// <summary>La cuenta tal como se muestra y se corrige (IDE-24, IDE-31, IDE-37, IDE-52, IDE-90; la consulta y el nombre sirven también al personal, DD-25, aunque el nombre del tipo siga siendo el del cliente): nunca el resumen de la contraseña, el secreto del segundo factor ni los códigos.</summary>
 public sealed record CuentaDelCliente(
     Guid UsuarioId,
     string Nombre,

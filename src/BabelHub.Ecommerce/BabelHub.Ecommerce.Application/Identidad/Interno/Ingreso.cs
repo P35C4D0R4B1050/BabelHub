@@ -130,7 +130,8 @@ public sealed class AvisosDeCuenta(
 
     /// <summary>El aviso al correo <b>nuevo</b> ya aplicado el cambio (IDE-53, IDE-94).</summary>
     public Task CorreoCambiado(Usuario usuarioConElCorreoNuevo, CancellationToken cancelacion) => Avisar(usuarioConElCorreoNuevo, PlantillaDeCorreoCambiado, cancelacion);
-/// <summary>El aviso al correo <b>anterior</b> ya aplicado el cambio (IDE-94): una alerta crítica sin enlaces ni el correo nuevo; no la suprime el tope diario por origen de IDE-86, solo la primera de su tipo por cuenta.</summary>    public Task CorreoCambiadoAlAnterior(Usuario usuarioConElCorreoAnterior, CancellationToken cancelacion) => Avisar(usuarioConElCorreoAnterior, PlantillaDeCorreoCambiadoAlAnterior, cancelacion);
+
+    /// <summary>El aviso al correo <b>anterior</b> ya aplicado el cambio (IDE-94): una alerta crítica sin enlaces ni el correo nuevo; no la suprime el tope diario por origen de IDE-86, solo la primera de su tipo por cuenta.</summary>    public Task CorreoCambiadoAlAnterior(Usuario usuarioConElCorreoAnterior, CancellationToken cancelacion) => Avisar(usuarioConElCorreoAnterior, PlantillaDeCorreoCambiadoAlAnterior, cancelacion);
     public Task CorreoCambiadoAlAnterior(Usuario usuarioConElCorreoAnterior, CancellationToken cancelacion) => Avisar(usuarioConElCorreoAnterior, PlantillaDeCorreoCambiadoAlAnterior, cancelacion);
 
     /// <summary>El aviso al titular cuando la administración restablece su segundo factor (IDE-38): sin enlaces ni códigos.</summary>
@@ -176,7 +177,7 @@ public sealed class AvisosDeCuenta(
     }
 
     /// <summary>
-    /// Reserva los topes de la categoría y devuelve el motivo del evento si alguno se superó, o <see langword="null"/> si el aviso puede salir. Un aviso no crítico cuenta contra el tope de la cuenta (falla cerrada); una
+    /// Reserva los topes de la categoría (el aviso al correo anterior de un cambio de correo, IDE-94, solo cuenta contra la primera de su tipo por cuenta) y devuelve el motivo del evento si alguno se superó, o <see langword="null"/> si el aviso puede salir. Un aviso no crítico cuenta contra el tope de la cuenta (falla cerrada); una
     /// alerta crítica contra «la primera de su tipo» de la cuenta y contra el tope diario del origen (si el almacén no responde, sale igual). Los cupos tomados quedan en <paramref name="reservas"/> para devolverlos si el
     /// aviso no sale.
     /// </summary>

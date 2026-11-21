@@ -404,4 +404,27 @@ public sealed class PantallasDeLaCuentaTests : IAsyncLifetime
         Assert.Equal("Nombre nuevo", _argumentos["nombre"]);
         Assert.Equal("123456", _argumentos["codigoDelSegundoFactor"]);
     }
+
+    [Theory]
+    [Trait("Criterio", "AC-IDE-68")]
+    [InlineData("/cuenta/segundo-factor")]
+    [InlineData("/cuenta/correo")]
+    [InlineData("/cuenta/cancelacion")]
+    public async Task Ningun_formulario_de_la_cuenta_repite_un_campo_y_solo_el_de_pedir_el_correo_lleva_el_codigo_del_segundo_factor(string ruta)
+    {
+        using var respuesta = await Pedir(ruta);
+        var html = await respuesta.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
+        foreach (System.Text.RegularExpressions.Match formulario in System.Text.RegularExpressions.Regex.Matches(html, "<form[^>]*>.*?</form>", System.Text.RegularExpressions.RegexOptions.Singleline))
+        {
+            var campos = System.Text.RegularExpressions.Regex.Matches(formulario.Value, "<input[^>]*name=\"([^\"]+)\"")
+                .Select(m => m.Groups[1].Value).Where(n => n != "__RequestVerificationToken").ToList();
+            Assert.Equal(campos.Distinct().Count(), campos.Count);
+            if (formulario.Value.Contains("/cuenta/correo/confirmar", StringComparison.Ordinal) || formulario.Value.Contains("/cuenta/correo/rechazar", StringComparison.Ordinal))
+            {
+                Assert.DoesNotContain("codigo", campos);
+            }
+        }
+    }
 }

@@ -55,8 +55,28 @@ public static class EntradasDeIdentidad
     /// El nombre que un usuario corrige en su cuenta (IDE-90): no vacío, hasta 100 caracteres ya recortados y sin caracteres de control ni de formato (por ejemplo, los que invierten el sentido del texto). Es un validador
     /// propio de la corrección: el del registro y el alta (<see cref="NombreValido"/>) no cambia.
     /// </summary>
-    public static bool NombreCorregidoValido(string? nombre) =>
-        !string.IsNullOrWhiteSpace(nombre) && nombre.Trim().Length <= LargoMaximoDelNombre && nombre.All(c => !char.IsControl(c) && System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.Format);
+    public static bool NombreCorregidoValido(string? nombre)
+    {
+        if (string.IsNullOrWhiteSpace(nombre) || nombre.Trim().Length > LargoMaximoDelNombre)
+        {
+            return false;
+        }
+
+        // Por runas, no por unidades UTF-16: los caracteres de etiqueta (U+E0000 a U+E007F, formato) son pares sustitutos y un sustituto suelto no es texto válido.
+        for (var i = 0; i < nombre.Length;)
+        {
+            if (!System.Text.Rune.TryGetRuneAt(nombre, i, out var runa)
+                || System.Text.Rune.IsControl(runa)
+                || System.Text.Rune.GetUnicodeCategory(runa) == System.Globalization.UnicodeCategory.Format)
+            {
+                return false;
+            }
+
+            i += runa.Utf16SequenceLength;
+        }
+
+        return true;
+    }
 }
 
 /// <summary>

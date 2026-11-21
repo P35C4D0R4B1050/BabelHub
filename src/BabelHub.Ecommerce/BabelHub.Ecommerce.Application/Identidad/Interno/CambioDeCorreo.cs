@@ -228,6 +228,8 @@ public sealed class CambioDeCorreo(
                 // Un correo que ya es de otra cuenta responde igual y no manda nada: quien lo prueba no aprende qué correos existen.
                 if (yaEsDeOtraCuenta)
                 {
+                    // Igual que si el correo estuviera libre, el código de un cambio anterior deja de servir: así el efecto sobre un cambio en curso tampoco delata la cuenta (el costo del envío, que es síncrono, queda como residual de IDE-95).
+                    await codigos.Invalidar(usuarioId, DominioProposito.VerificacionDeCorreo, ct).ConfigureAwait(false);
                     return Resultado<RespuestaUniforme>.Exito(new RespuestaUniforme());
                 }
 
@@ -255,9 +257,9 @@ public sealed class CambioDeCorreo(
             await reautenticacion.CodigoIncorrecto(usuarioId, cancelacion).ConfigureAwait(false);
         }
 
-        if (resultado.EsExito)
+        if (!perdioLaCarrera)
         {
-            // Los límites del segundo factor cuentan los códigos incorrectos: al acertar se devuelven.
+            // Los límites del segundo factor cuentan los códigos incorrectos: al acertar (o si la solicitud falla por otra causa) se devuelven; solo un código que perdió la carrera cuenta como incorrecto.
             await reautenticacion.DevolverLosCupos(verificacion.Reservas, cancelacion).ConfigureAwait(false);
         }
 
