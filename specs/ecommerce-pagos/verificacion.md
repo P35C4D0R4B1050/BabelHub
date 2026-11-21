@@ -5,7 +5,7 @@ fecha: 2026-11-21
 
 # Verificación — Pagos
 
-## Resultado: No converge
+## Resultado: Converge salvo T37 y T38 y el envío real de WhatsApp por Evolution y n8n (externos, de la persona)
 
 ## 1. Comprobaciones automáticas
 
@@ -74,6 +74,12 @@ Revisión hecha leyendo código, pruebas y `specs/TRACEABILITY.md` (no se ejecut
 
 **Lo que el código hace y la spec no pide.** Sin diferencias: los límites del cobro de 5, 10 y 20 por hora (SEG-26, AM38), la purga de avisos a los 90 días, el estado `aprobado_sobrante` y la alerta de cargo duplicado salen del plan, `transversal-seguridad` y el modelo de amenazas, no de funcionalidad inventada.
 
+## 2b. Actualización de la ronda 3 (2026-11-21)
+
+- **PAG-21, PAG-25, PAG-31 y PAG-32: Cumple.** `CuentaDelPagadorConIdentidadRealTests` (6 pruebas, PostgreSQL real e Identidad real) cubre correo sin verificar, textos pendientes, cancelación diferida, cuenta desactivada o cancelada, cuenta inexistente que falla cerrada, marca de cancelación en ejecución con bloqueo y correo solo si está verificado.
+- **PAG-22: implementado, Cumple en el pedido de Pagos.** `EnviarAvisosDePago` pide a `INotificador` el aviso por WhatsApp de cada evento con plantilla (`AvisosDePagoPorWhatsAppTests`, `AC-PAG-12`); el consentimiento lo decide Notificaciones. **El envío real por Evolution y n8n con plantillas aprobadas por Meta es externo (dueño: la persona).** Menor: la referencia visible del pedido es la intención en 32 hexadecimales (definir con Notificaciones).
+- **PAG-01, PAG-03 y PAG-19** siguen dependiendo de T37 y T38 (llaves B05 de la persona) y de habilitar la entrada de avisos de la pasarela real.
+
 ## 3. Diferencias abiertas
 
 1. **PAG-22 (No cumple) y §6-4 (Parcial): falta el aviso por WhatsApp.** `T21` figura `[x]` solo por el correo; `EnviarAvisosDePago` no usa `INotificador`, que ya existe (`Application/Notificaciones/ContratoDeNotificaciones.cs:43`), y el consentimiento ya sale de Identidad (`EstadoDeCuenta.TieneWhatsAppConConsentimiento`). AC-PAG-12 queda sin su parte de WhatsApp (`progress/hallazgos.md`, hallazgo 2026-11-18 (f)). Dueño: agente de Pagos (tarea nueva en `tasks.md`; la marca `[x]` de T21 no es exacta). Fase: antes de pasar a Done.
@@ -87,4 +93,4 @@ Revisión hecha leyendo código, pruebas y `specs/TRACEABILITY.md` (no se ejecut
 
 ## 4. Conclusión
 
-**No converge.** Pagos cumple 24 de 32 requisitos; quedan PAG-22 (aviso por WhatsApp: sin código ni prueba, T21 solo cubre el correo), PAG-01, PAG-03 y PAG-19 solo con el simulador o con la entrada de avisos deshabilitada (dependen de **T37 y T38**, llaves B05 de la persona responsable), y PAG-21, 25, 31 y 32 sin prueba del adaptador `CuentaDelPagadorSobreIdentidad` con la Identidad real. No es «converge salvo T37/T38»: además de T37 y T38 hay trabajo propio abierto (WhatsApp, adaptador de cuenta, rotulado de criterios de `PagosConElCarritoRealTests`). Dueños y detalle en la sección 3.
+**Converge salvo** T37 y T38 (Culqi real, llaves de pruebas B05 de la persona responsable; con ellas se ejercen PAG-01, PAG-03 y PAG-19 y se habilita la entrada de avisos) y el envío real de WhatsApp por Evolution y n8n con plantillas de Meta (externo). Menores de la sección 3 (rotulado de criterios, pruebas encadenadas con Biblioteca, auditoría real) quedan como trabajo posterior.

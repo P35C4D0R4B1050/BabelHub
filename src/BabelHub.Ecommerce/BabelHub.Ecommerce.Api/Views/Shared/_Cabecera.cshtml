@@ -28,8 +28,8 @@
                 <span class="badge badge-outline">@nombreDelArea</span>
             }
         </div>
-        <nav aria-label="Principal" class="navbar-center hidden lg:flex">
-            <ul class="menu menu-horizontal gap-1">
+        <nav aria-label="Principal" class="navbar-center hidden min-w-0 max-w-full lg:flex">
+            <ul class="menu menu-horizontal flex-wrap gap-1">
                 @foreach (var item in Model.Menu)
                 {
                     <li><a href="@item.Ruta" aria-current="@(item.Activo ? "page" : null)" class="@(item.Activo ? "menu-active" : null)"><bh-icono nombre="@item.Icono" />@item.Texto</a></li>

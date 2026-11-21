@@ -5,7 +5,7 @@ fecha: 2026-11-21
 
 # Verificación — Libro de Reclamaciones
 
-## Resultado: No converge
+## Resultado: Converge salvo la paridad visual con el prototipo (ui-review), Menor
 
 ## 1. Comprobaciones automáticas
 
@@ -63,6 +63,11 @@ Abreviaturas de ruta: `App/` = `src/BabelHub.Ecommerce/BabelHub.Ecommerce.Applic
 | Una hoja descartada se conserva y se anonimiza igual (§5) | `Inf/DefinicionDeReclamaciones.cs:171-203` (no filtra por estado) | `U/ConservacionDeHojasTests.cs:229` (cuenta cancelada); `I/RepositorioDeHojasPostgresTests.cs:414`; no hay una prueba específica de una hoja descartada vencida | Cumple (observación 4) |
 | Riesgo aceptado de REC-19 (cualquiera registra una hoja con el correo de otra persona) | el conteo es por correo, sin filtro adicional (`Inf/RepositorioDeHojasPostgres.cs:161`) | `I/CuentaYMatrizDeHojasConPostgresTests.cs:58` | Cumple (decisión del 2026-11-13) |
 
+## 2b. Actualización de la ronda 3 (2026-11-21)
+
+- **REC-11 (AC-REC-09): Cumple.** `TopeDeHojasPorOrigenConLaPoliticaRealTests` (2 pruebas, anfitrión real con el control de límites real y la política `HojasPorOrigen`): la cuarta hoja del origen recibe el límite con su espera, las tres anteriores quedan registradas y repetir una hoja con su clave no gasta cupo; si el 3 de la política cambiara, la prueba fallaría.
+- Los 20 requisitos quedan **Cumple**; los Menores de la sección 3 (plantilla duplicada sin prueba que la una al renderizador, rollback real de responder y descartar solo con auditoría espía, hoja descartada que cumple dos años, paridad con `prototype/ui-v2/tienda/reclamos.html`) no cambian ningún estado.
+
 ## 3. Diferencias abiertas
 
 Resultado de la matriz: 19 Cumple, 1 Parcial, 0 No cumple (REC-01 a REC-20).
@@ -83,4 +88,4 @@ Resultado de la matriz: 19 Cumple, 1 Parcial, 0 No cumple (REC-01 a REC-20).
 
 ## 4. Conclusión
 
-**No converge por un solo Parcial:** REC-11 (AC-REC-09), cuyo tope de 3 hojas por hora y origen solo se prueba contra motores de límites en memoria, sin la política real `HojasPorOrigen` ni el evento de seguridad. Los otros 19 requisitos cumplen y todas las tareas (T01 a T23) están cerradas. Cierra con una prueba del motor real en el host compuesto (dueño: carril de Reclamaciones con Plataforma).
+**Converge** en requisitos, tareas (T01 a T23) y pruebas. Queda como Menor, sin bloquear, el registro de la paridad visual con el prototipo (`ui-review`) y los demás Menores de la sección 3. Pasar la spec a Done lo decide quien cierra la verificación.

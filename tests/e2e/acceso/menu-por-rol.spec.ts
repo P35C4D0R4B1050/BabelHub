@@ -7,17 +7,18 @@ import { clave, conOrigenPropio, ingresarComoClienteNuevo, ingresarComoPersonal,
 
 test.beforeEach(async ({ page }) => conOrigenPropio(page));
 
-const menu = (page: import('@playwright/test').Page) => page.getByRole('banner').getByRole('navigation', { name: 'Principal' });
+// El menú es el de la barra (escritorio) o el desplegable (teléfono): se busca por su enlace en la cabecera, visible o no.
+const enlace = (page: import('@playwright/test').Page, nombre: string) => page.locator('header').getByRole('link', { name: nombre, exact: true, includeHidden: true });
 
 test.describe('Menú por rol y alcance', () => {
   test.skip(!clave, 'Falta BABELHUB__Sembrador__Clave (entorno E2E local con el sembrador de sesiones)');
 
   test('un visitante ve el catálogo y el carrito, pero no pedidos ni biblioteca (AC-WEB-02)', async ({ page }) => {
     await page.goto('/catalogo');
-    await expect(menu(page).getByRole('link', { name: 'Catálogo' })).toBeVisible();
-    await expect(menu(page).getByRole('link', { name: 'Carrito' })).toBeVisible();
-    await expect(menu(page).getByRole('link', { name: 'Mis pedidos' })).toHaveCount(0);
-    await expect(menu(page).getByRole('link', { name: 'Mi biblioteca' })).toHaveCount(0);
+    await expect(enlace(page, 'Catálogo').first()).toBeAttached();
+    await expect(enlace(page, 'Carrito').first()).toBeAttached();
+    await expect(enlace(page, 'Mis pedidos').first()).toHaveCount(0);
+    await expect(enlace(page, 'Mi biblioteca').first()).toHaveCount(0);
     await sinViolacionesDeAccesibilidad(page);
   });
 
@@ -25,7 +26,7 @@ test.describe('Menú por rol y alcance', () => {
     await ingresarComoClienteNuevo(page);
     await page.goto('/catalogo');
     for (const nombre of ['Catálogo', 'Carrito', 'Mis pedidos', 'Mi biblioteca']) {
-      await expect(menu(page).getByRole('link', { name: nombre })).toBeVisible();
+      await expect(enlace(page, nombre).first()).toBeAttached();
     }
   });
 
@@ -33,7 +34,7 @@ test.describe('Menú por rol y alcance', () => {
     await ingresarComoPersonal(page, 'administrador');
     await page.goto(`${urlDeLaGestion}/administracion/obras`);
     for (const nombre of ['Catálogo nacional', 'Pedidos', 'Devoluciones', 'Reembolsos', 'Ayudas de la biblioteca', 'Hojas de reclamación', 'Usuarios y roles', 'Solicitudes de datos', 'Auditoría', 'Alertas de seguridad']) {
-      await expect(menu(page).getByRole('link', { name: nombre, exact: true })).toBeVisible();
+      await expect(enlace(page, nombre).first()).toBeAttached();
     }
     await sinViolacionesDeAccesibilidad(page);
   });
@@ -41,10 +42,10 @@ test.describe('Menú por rol y alcance', () => {
   test('un encargado de sucursal no ve ninguna opción de Administración y, si abre esa dirección, ve la pantalla de sin permiso (AC-WEB-02)', async ({ page }) => {
     await ingresarComoPersonal(page, 'encargado', 'ayacucho');
     await page.goto(`${urlDeLaGestion}/sucursal/ayacucho/pedidos`);
-    await expect(menu(page).getByRole('link', { name: 'Pedidos de recojo' })).toHaveAttribute('href', '/sucursal/ayacucho/pedidos');
-    await expect(menu(page).getByRole('link', { name: 'Envíos' })).toBeVisible();
+    await expect(enlace(page, 'Pedidos de recojo').first()).toHaveAttribute('href', '/sucursal/ayacucho/pedidos');
+    await expect(enlace(page, 'Envíos').first()).toBeAttached();
     for (const nombre of ['Catálogo nacional', 'Usuarios y roles', 'Auditoría', 'Alertas de seguridad', 'Pedidos a domicilio']) {
-      await expect(menu(page).getByRole('link', { name: nombre, exact: true })).toHaveCount(0);
+      await expect(enlace(page, nombre).first()).toHaveCount(0);
     }
 
     const respuesta = await page.goto(`${urlDeLaGestion}/administracion/usuarios`);

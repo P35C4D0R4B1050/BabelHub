@@ -67,6 +67,8 @@ async function desactivar(browser: Browser, usuarioId: string) {
   const formulario = admin.locator('form').filter({ has: admin.getByRole('button', { name: 'Desactivar' }) });
   await formulario.getByLabel('Identificador del usuario').fill(usuarioId);
   await formulario.getByRole('button', { name: 'Desactivar' }).click();
+  // Se espera la respuesta antes de cerrar el contexto: si no, la desactivación puede quedar a medias y el siguiente recorrido choca con el encargado de la sucursal.
+  await expect(admin.getByRole('status')).toContainText('Desactivamos el usuario');
   await contexto.close();
 }
 
