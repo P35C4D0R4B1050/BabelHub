@@ -62,6 +62,19 @@ public sealed class AvisosYAuditoriaDeDevolucionesTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-NOT-01")]
+    public async Task Los_avisos_de_aprobada_recibida_y_reembolsada_cumplen_el_validador_real_del_catalogo()
+    {
+        var e = await ConSolicitada();
+        var admin = Como(ActorDePrueba.DeAdministradorCentral(), e);
+        await admin.Gestion.Aprobar(e.DevolucionId);
+        await admin.Recepcion.Ejecutar(e.DevolucionId);
+
+        Assert.Equal(4, Avisos(admin).Count);
+        BabelHub.Ecommerce.UnitTests.Notificaciones.AvisosContraElCatalogo.Comprobar(Avisos(admin));
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-DEV-10")]
     public async Task Rechazar_avisa_con_el_estado_rechazada_y_la_solicitud_no_avisa()
     {

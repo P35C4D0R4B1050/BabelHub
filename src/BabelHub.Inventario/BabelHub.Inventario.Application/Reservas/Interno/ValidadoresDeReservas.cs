@@ -6,7 +6,7 @@ using BabelHub.Inventario.Application.Plataforma;
 
 namespace BabelHub.Inventario.Application.Reservas.Interno;
 
-/// <summary>Los topes de entrada de las operaciones de reservas (plan §6): las líneas del carrito (CAR-29) y la cantidad por línea.</summary>
+/// <summary>Los topes de entrada de las operaciones de reservas (plan §6): las líneas del carrito (CAR-38) y la cantidad por línea.</summary>
 internal static class LimitesDeReservas
 {
     public const int MaximoDeLineas = 30;

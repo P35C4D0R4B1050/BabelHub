@@ -26,8 +26,8 @@ public sealed class DesplegarShTests : IDisposable
         _cron = Path.Combine(_carpeta, "cron");
         Directory.CreateDirectory(_secretos);
         Directory.CreateDirectory(_cron);
-        File.WriteAllText(Path.Combine(_carpeta, "docker-doble.sh"), DobleDeDocker.ReplaceLineEndings("\n"));
-        File.WriteAllText(Path.Combine(_carpeta, "stat-doble.sh"), DobleDeStat.ReplaceLineEndings("\n"));
+        ArchivosDeDoble.Escribir(Path.Combine(_carpeta, "docker-doble.sh"), DobleDeDocker.ReplaceLineEndings("\n"));
+        ArchivosDeDoble.Escribir(Path.Combine(_carpeta, "stat-doble.sh"), DobleDeStat.ReplaceLineEndings("\n"));
     }
 
     public void Dispose()

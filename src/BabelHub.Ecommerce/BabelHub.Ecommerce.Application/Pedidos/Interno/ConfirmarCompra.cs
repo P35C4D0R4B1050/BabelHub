@@ -2,6 +2,7 @@ using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Biblioteca;
 using BabelHub.Ecommerce.Application.Carrito;
 using BabelHub.Ecommerce.Application.Identidad;
+using BabelHub.Ecommerce.Application.Notificaciones;
 using BabelHub.Ecommerce.Application.Pagos;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Pedidos;
@@ -13,7 +14,7 @@ namespace BabelHub.Ecommerce.Application.Pedidos.Interno;
 /// La implementación de <see cref="IConfirmacionDeCompra"/> (T11; PED-01, PED-03, PED-12, PED-32, PED-35, PED-36, PED-38): crea el pedido desde <see cref="CompraAprobada"/> <b>dentro de la transacción de Pagos</b> (no abre otra) y pide los accesos digitales a Biblioteca en la misma, de modo que una falla
 /// revierte ambos y Pagos compensa. Orden: (a) <b>sin bloqueo</b>, si el pedido ya existe por <c>id</c> devuelve <c>Creado</c> (una repetición nunca produce <c>CuentaEnCancelacion</c>: Pagos compensaría un pedido que sí existe); (b) si no existe, lee con bloqueo la marca de cancelación y, si la cuenta se
 /// está cancelando, responde <c>CuentaEnCancelacion</c> sin crear nada (PED-38); (c) arma el pedido (el contacto de una compra a domicilio es obligatorio: sin él, <c>Fallo</c> y nada se crea, PED-36); (d) lo inserta con <c>ON CONFLICT DO NOTHING</c> (una colisión de <c>numero</c> se reintenta con un
-/// número nuevo y una de <c>id</c> es <c>Creado</c>); (e) concede los accesos de las líneas digitales (<c>YaPoseidoPorOtraCompra</c> responde <c>DigitalYaPoseida</c>); (f) registra la liberación del contacto pendiente (PED-35) y (g) audita la creación en la misma transacción. No solicita avisos: Pagos ya crea el de «aprobado».
+/// número nuevo y una de <c>id</c> es <c>Creado</c>); (e) concede los accesos de las líneas digitales (<c>YaPoseidoPorOtraCompra</c> responde <c>DigitalYaPoseida</c>); (f) registra la liberación del contacto pendiente (PED-35) y (g) audita la creación en la misma transacción. Pide los avisos de la compra (h; NOT-02): <c>pedido-confirmado</c> y, con un digital, <c>libro-digital-disponible</c>, al final y en la misma transacción; el de «aprobado» lo crea Pagos.
 /// </summary>
 public sealed class ConfirmarCompra(
     IRepositorioDePedidos pedidos,
@@ -21,6 +22,7 @@ public sealed class ConfirmarCompra(
     IAccesosDeBiblioteca accesos,
     IGeneradorDeNumerosDePedido numeros,
     IAuditoria auditoria,
+    INotificador notificador,
     IReloj reloj) : IConfirmacionDeCompra
 {
     public const int IntentosDeNumero = 5;
@@ -112,6 +114,9 @@ public sealed class ConfirmarCompra(
         {
             return ResultadoDeConfirmarCompra.Fallo;
         }
+
+        // (h) Los avisos de la compra (NOT-02), al final y en la misma transacción: si algo anterior falló, la transacción se revierte y no queda ningún aviso.
+        await new AvisosDePedidos(notificador).SolicitarLaConfirmacion(pedido, cancelacion).ConfigureAwait(false);
 
         return ResultadoDeConfirmarCompra.Creado;
     }

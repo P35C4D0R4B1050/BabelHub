@@ -42,7 +42,7 @@ public sealed class CifradoDeDiscoTests : IDisposable
     public CifradoDeDiscoTests()
     {
         Directory.CreateDirectory(_carpeta);
-        File.WriteAllText(Path.Combine(_carpeta, "oci-doble.sh"), DobleDeOci.ReplaceLineEndings("\n"));
+        ArchivosDeDoble.Escribir(Path.Combine(_carpeta, "oci-doble.sh"), DobleDeOci.ReplaceLineEndings("\n"));
     }
 
     public void Dispose()

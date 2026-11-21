@@ -33,6 +33,17 @@ public sealed class EnviarAvisosDePagoTests
         public Task<ResultadoDeEnvio> EnviarCodigo(CorreoDeCodigo correo, CancellationToken cancelacion = default) => throw new NotSupportedException();
     }
 
+    private sealed class NotificadorEspia : INotificador
+    {
+        public List<SolicitudDeAviso> Solicitudes { get; } = [];
+
+        public Task<ResultadoDeLaSolicitudDeAviso> Solicitar(SolicitudDeAviso solicitud, CancellationToken cancelacion = default)
+        {
+            Solicitudes.Add(solicitud);
+            return Task.FromResult(ResultadoDeLaSolicitudDeAviso.Creado);
+        }
+    }
+
     private sealed class Entorno
     {
         public required EntornoDeConfirmacion Base { get; init; }
@@ -55,6 +66,27 @@ public sealed class EnviarAvisosDePagoTests
         var correo = new CorreoDoble();
         var p = b.Entorno;
         return new Entorno { Base = b, Correo = correo, Enviar = new EnviarAvisosDePago(p.Repositorio, p.Unidad, p.Cuenta, correo, p.Alertas, p.Reloj) };
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-01")]
+    public async Task Los_avisos_de_WhatsApp_del_pago_cumplen_el_validador_real_del_catalogo()
+    {
+        var b = await EntornoDeConfirmacion.ConIntentoIniciado();
+        var p = b.Entorno;
+        var notificador = new NotificadorEspia();
+        var enviar = new EnviarAvisosDePago(p.Repositorio, p.Unidad, p.Cuenta, new CorreoDoble(), p.Alertas, p.Reloj, notificador);
+        foreach (var evento in new[] { EventoDeAvisoDePago.Pendiente, EventoDeAvisoDePago.Aprobado, EventoDeAvisoDePago.Rechazado, EventoDeAvisoDePago.ReembolsoAutomatico })
+        {
+            await p.Repositorio.AgregarAvisoDePago(AvisoDePago.Crear(Pedido, b.IntentoId, evento, p.Reloj.Ahora));
+        }
+
+        await enviar.Ejecutar(10);
+
+        Assert.Equal(4, notificador.Solicitudes.Count);
+        // La intención de la prueba tiene un identificador de solo dígitos (que el catálogo rechaza a propósito por parecer una tarjeta); uno real es un GUID con letras: se valida con uno realista.
+        const string intencionRealista = "3f2a9c1e5b7d4a60b8e1d2c3a4f50617";
+        BabelHub.Ecommerce.UnitTests.Notificaciones.AvisosContraElCatalogo.Comprobar(notificador.Solicitudes.Select(s => s with { Campos = s.Campos.ToDictionary(c => c.Key, c => c.Key == "numeroDePedido" ? intencionRealista : c.Value) }));
     }
 
     [Theory]

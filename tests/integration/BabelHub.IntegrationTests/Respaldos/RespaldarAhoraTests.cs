@@ -51,7 +51,7 @@ public sealed class RespaldarAhoraTests : IDisposable
     {
         var doble = Path.Combine(_carpeta, "ssh-doble.sh");
         var registro = Path.Combine(_carpeta, "llamada.txt");
-        File.WriteAllText(doble, $"#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" > '{EnLinux(registro)}'\nexit {codigoRemoto}\n");
+        ArchivosDeDoble.Escribir(doble, $"#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" > '{EnLinux(registro)}'\nexit {codigoRemoto}\n");
         var informacion = new ProcessStartInfo(Bash()) { RedirectStandardOutput = true, RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8 };
         informacion.ArgumentList.Add(EnLinux(Path.Combine(ComposeDeVms.Raiz(), "scripts", "respaldar-ahora.sh")));
         foreach (var argumento in argumentos)

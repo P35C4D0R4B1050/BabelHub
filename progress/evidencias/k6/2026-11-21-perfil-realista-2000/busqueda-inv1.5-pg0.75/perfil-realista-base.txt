@@ -1,0 +1,70 @@
+== Consultas más costosas (tiempo total) ==
+ calls | total_ms | media_ms | max_ms |  rows  |                                                                        consulta                                                                        
+-------+----------+----------+--------+--------+--------------------------------------------------------------------------------------------------------------------------------------------------------
+   733 |   2039.5 |    2.782 |   95.2 |   1380 | INSERT INTO fuentes.stock (fuente_id, edicion_id, formato, fisico, reservado, version) SELECT f.id, e.edicion_id, $2, $3, $4, $5 FROM fuentes.edicione
+  8958 |   1942.5 |    0.217 |  412.8 | 618102 | SELECT fuente_id, edicion_id, fisico, reservado FROM fuentes.stock WHERE edicion_id = ANY($1) ORDER BY edicion_id, fuente_id
+ 11118 |   1161.1 |    0.104 |   82.5 | 767142 | SELECT id, codigo, nombre, region, contacto_aviso, es_recepcion FROM fuentes.fuentes ORDER BY codigo
+  9711 |    918.1 |    0.095 |  117.6 |   9691 | SELECT edicion_id, formato FROM fuentes.ediciones WHERE edicion_id = ANY($1) ORDER BY edicion_id
+ 51925 |    736.0 |    0.014 |  198.7 |      0 | SET LOCAL ROLE "inventario_acceso"
+   713 |    534.8 |    0.750 |  195.1 |    713 | INSERT INTO reservas.reserva_lineas (id, linea_id, reserva_id, pedido_id, edicion_id, fuente_id, cantidad, estado, cerrada_por, traslado_id, creada_po
+   733 |    459.2 |    0.626 |  196.2 |  50577 | SELECT fuente_id, edicion_id, fisico, reservado FROM fuentes.stock WHERE edicion_id = ANY($1) ORDER BY edicion_id, fuente_id FOR UPDATE
+   735 |    455.6 |    0.620 |   47.2 |    735 | INSERT INTO auditoria.registros (id, servicio, tipo, actor_tipo, actor_id, rol, instante_utc, accion, objeto_tipo, objeto_id, sucursal_origen, sucursa
+   713 |    392.5 |    0.550 |   94.9 |    713 | WITH candidatas AS ( SELECT l.id FROM reservas.reserva_lineas l JOIN reservas.reservas r ON r.id = l.reserva_id WHERE l.pedido_id = $1 AND l.estado = 
+  8958 |    312.7 |    0.035 |    3.3 |      0 | SELECT l.fuente_id, l.edicion_id, sum(l.cantidad)::integer FROM reservas.reserva_lineas l JOIN reservas.reservas r ON r.id = l.reserva_id WHERE l.esta
+ 33455 |    289.2 |    0.009 |    1.8 |      0 | SET LOCAL ROLE "rol_fuentes"
+  2139 |    221.2 |    0.103 |   83.3 |   1426 | SELECT id, pedido_id, cliente_id, tipo_entrega, sucursal_recojo_id, region_entrega, iniciada_en, fecha_expiracion, extendida, reemplazos, huella_de_ca
+   713 |    192.4 |    0.270 |    7.4 |    713 | UPDATE reservas.reservas SET fecha_expiracion = $2 WHERE id = ANY($1)
+   733 |    180.9 |    0.247 |   90.9 |    733 | UPDATE fuentes.stock AS s SET fisico = s.fisico + $1, reservado = s.reservado + $2, version = s.version + $5 FROM (SELECT fuente_id, edicion_id, fisic
+   713 |    180.8 |    0.254 |    8.0 |    713 | INSERT INTO reservas.reservas (id, pedido_id, cliente_id, huella_origen, clave_idempotencia, huella_de_carga, tipo_entrega, sucursal_recojo_id, region
+(15 rows)
+
+== Uso de índices por tabla (lecturas por índice frente a secuenciales) ==
+              tabla               | seq_scan | idx_scan | filas 
+----------------------------------+----------+----------+-------
+ fuentes.stock                    |        0 |    63203 |  1380
+ reservas.reserva_lineas          |        0 |    44801 |  5773
+ reservas.reservas                |        1 |    32598 |  5773
+ fuentes.fuentes                  |    11852 |     1402 |     1
+ fuentes.ediciones                |        0 |    12597 |    20
+ plataforma.eventos_limite        |        0 |     2201 |  2202
+ reservas.bajas_recibidas         |        0 |      714 |     0
+ fuentes.rutas                    |        0 |      713 |     0
+ plataforma.trabajos_de_fondo     |        0 |       40 |     0
+ auditoria.acumulado_de_limites   |       24 |        0 |     0
+ ajustes.operaciones_idempotentes |        0 |       22 |    20
+ traslados.mensajes_salientes     |        1 |       12 |     0
+ ajustes.ingresos                 |        0 |        4 |    20
+ ajustes.ajustes                  |        0 |        3 |    20
+ auditoria.alertas                |        1 |        1 |     0
+(15 rows)
+
+== Índices más usados ==
+                   indice                    | idx_scan 
+---------------------------------------------+----------
+ fuentes.pk_stock                            |    52046
+ reservas.ix_reserva_lineas_reserva          |    27500
+ reservas.uq_reservas_id_pedido              |    27291
+ fuentes.uq_ediciones_id_formato             |    12577
+ fuentes.ix_stock_edicion                    |    11157
+ reservas.ix_reserva_lineas_pendientes       |     9702
+ reservas.ix_reserva_lineas_pedido           |     5774
+ reservas.ix_reservas_pedido                 |     2854
+ plataforma.ix_eventos_limite_clave_instante |     2201
+ reservas.reserva_lineas_pkey                |     1825
+ fuentes.fuentes_pkey                        |     1401
+ reservas.ix_reservas_vencimiento            |     1339
+(12 rows)
+
+== Bloqueos e interbloqueos de la base ==
+ deadlocks | conflicts | temp_files | xact_commit | xact_rollback | acierto_de_cache_pct 
+-----------+-----------+------------+-------------+---------------+----------------------
+         0 |         0 |          0 |       11401 |             0 |                99.67
+(1 row)
+
+== Conexiones por cuenta (límite 20 por cuenta) ==
+      usename      | conexiones 
+-------------------+------------
+ inventario_acceso |          4
+ postgres          |          1
+(2 rows)
+
