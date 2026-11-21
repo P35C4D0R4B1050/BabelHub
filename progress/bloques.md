@@ -72,7 +72,7 @@ Estado: ☐ pendiente · ▶ en curso · ☑ hecho (fundido a `main`).
 | **ECO-5** | `ecommerce-pagos` (pasarela de pruebas de Culqi) | C | ECO-4; B05 (persona) | ▶ (ECO-5a a ECO-5d hechos y fundidos (T01–T29); subbloques ECO-5a a 5f, T01–T38; 5f condicionado a B05) |
 | **ECO-6** | `ecommerce-pedidos` | E | ECO-5 | ▶ (ECO-6a a ECO-6c y T23 hechos (T01–T23); ECO-6d a 6f, T24–T42) |
 | **ECO-7** | Planificar biblioteca digital, envíos, devoluciones y libro de reclamaciones | C | ECO-6 | ☑ (planes aprobados el 2026-11-18) |
-| **ECO-8** | `ecommerce-biblioteca-digital` (archivos y URLs firmadas) | C | ECO-7 | ▶ (ECO-8a a 8d y parte de 8e fundidos, T01–T24; T25 E2E espera el host compuesto; fallos de integración en corrección) |
+| **ECO-8** | `ecommerce-biblioteca-digital` (archivos y URLs firmadas) | C | ECO-7 | ☑ (26/26, spec Done, 2026-11-21) |
 | **ECO-9** | `ecommerce-envios` | E | ECO-7 | ▶ (ECO-9a a ECO-9d y parte de 9e hechos, T01–T19, T21a, T23, T25 y T13; esperan T14b, T20, T21b, T22 y T24) |
 | **ECO-10** | `ecommerce-devoluciones` | E | ECO-9 | ☐ (ECO-10a a 10f, T01–T34) |
 | **ECO-11** | `ecommerce-libro-reclamaciones` | E | ECO-7 | ☑ (T01–T23 salvo el E2E T22, que espera Node y COMP-1; integración PostgreSQL 114 de 114) |
@@ -120,6 +120,35 @@ Tercera ola fundida (merges `22df391` de A, `claude/festive-feynman-2c4bef` de B
 | **K6-1** | Escenarios k6 por atributo de calidad, entorno local limitado en Docker, estadísticas de PostgreSQL por corrida y corrida oficial (`progress/evidencias/k6/2026-11-20/`); correcciones de pool Npgsql y 503 con la base caída | E | ☑ (incluye rampa de capacidad a 0,3/1/2/4 CPU) |
 | **DOC-1** | Análisis de base de datos y caché (`docs/03-diseno-de-software/09-analisis-de-base-de-datos-y-cache.md`) | E | ☑ (con tabla de capacidad §6b) |
 | **COV-1** | Reporte HTML de cobertura desde `tools/CoverageCheck` archivado en el CI; corrida completa | E | ☑ (cobertura 94–95 %) |
+
+## Estado de cierre (2026-11-21)
+
+Tareas: **547 de 611** (89 %). `main`: compilación sin advertencias, SpecCheck 0 avisos, unitarias 5437 y 2380, arquitectura 244, integración **7601 de 7603** (los 2 fallos son `HumoDeImagenes`, que depende de Docker/arquitecturas), escáner de secretos limpio, cobertura 94–95 % (`progress/evidencias/cobertura/`), k6 y análisis en `progress/evidencias/` y `docs/03/09`.
+
+| Spec | Estado | Tareas | Verificación |
+| :--- | :---: | :---: | :--- |
+| ecommerce-biblioteca-digital | **Done** | 26/26 | Converge |
+| ecommerce-carrito-checkout | **Done** | 37/37 | Converge |
+| ecommerce-catalogo | **Done** | 28/28 | Converge |
+| ecommerce-devoluciones | **Done** | 34/34 | Converge |
+| ecommerce-libro-reclamaciones | **Done** | 23/23 | Converge |
+| ecommerce-pedidos | **Done** | 42/42 | Converge |
+| inventario-traslados | **Done** | 26/26 | Converge |
+| ecommerce-envios | InProgress | 23/25 | Converge salvo T14b/T21b (operador real fuera de alcance, DD-22) |
+| ecommerce-pagos | Planned | 36/38 | Converge salvo T37/T38 (llaves Culqi B05) y WhatsApp real (Evolution/n8n/Meta) |
+| web-base | Planned | 36/39 | Converge salvo partes humanas de T32–T34 y WEB-25 en `/reclamaciones/nueva` (REC-04) |
+| identidad-seguridad | Planned | 50/50 | Converge salvo D5 (Menor) y D6 (persona) |
+| inventario-ajustes | Planned | 18/18 | Converge salvo AJU-22 (redacción; persona) |
+| inventario-fuentes | Planned | 25/25 | Converge salvo FUE-09/FUE-11 (diferidas) y FUE-10 (DD-18) |
+| inventario-seleccion-fuente | Planned | 33/33 | Converge salvo S2 (k6 previo a producción) |
+| transversal-auditoria | Planned | 31/31 | Converge salvo la comprobación de enrutamiento real (cubierta en la integración final) |
+| transversal-notificaciones | Planned | 25/25 | Converge salvo NOT-02 (dos avisos sin emisor) |
+| transversal-seguridad | InProgress | 30/30 | Converge salvo SEG-17/23 del Inventario (Menor) y SEG-31 del asistente (diferido) |
+| transversal-plataforma | InProgress | 24/42 | Sin verificación: fuera del Sprint 2 (despliegue, spikes, PLA-R2 a R4) |
+| asistente-compra-ia | Planned | 0/24 | Diferida (ECO-12) |
+| web-indice-infinito | Planned | 0/15 | Diferida (ECO-13) |
+
+Criterio estricto de aceptación (persona): a `Done` pasan solo las specs que convergen sin reservas; las demás quedan con la reserva declarada en su `verificacion.md` y en `progress/hallazgos.md`.
 
 ## Acordado y pendiente de la persona
 

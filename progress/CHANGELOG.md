@@ -10,6 +10,14 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 - **Carril A:** `/health/ready` detecta la caída de la base en los dos servicios. **Carril B:** fachadas y lecturas de Pedidos (ECO-6f).
 - Validación de `main`: compilación sin advertencias, SpecCheck 0 avisos, unitarias 5376 y 2368, arquitectura 243, integración 6954 de 6966; 12 fallos: 2 flaky que pasan sueltos, 2 de imágenes por contención de Docker, y 8 reales repartidos a sus dueños (4 pruebas por fixtures con contraseña o clave literal, composición de la biblioteca, Dockerfiles distintos, prueba de reservas con el tope nuevo).
 
+## 2026-11-21 (cierre) — Integración final de `main` y estado de las specs
+
+### Cubierto
+- **Integración completa final:** 7601 de 7603 en 20 min (solo `HumoDeImagenes` ×2, conocido); escáner de secretos limpio; build `-warnaserror` 0 avisos; SpecCheck 0 avisos; unitarias 5437 y 2380; arquitectura 244. Tareas 547 de 611.
+- **Specs en `Done` (7):** biblioteca, carrito, catálogo, devoluciones, reclamaciones, pedidos y traslados. Las demás quedan «Converge salvo …» con la reserva declarada (detalle en `progress/bloques.md`, «Estado de cierre»).
+- **Decisiones de la persona registradas:** DD-16 (topes 20/30), DD-17 (dimensionamiento VM-INVENTARIO y memoria apagada), DD-18 (RNF02: demostrar con el entorno sin tope de CPU y declarar el techo de la VM), DD-19 (ronda extra única), DD-20 (un no recogido no se entrega; 360 h), DD-21 (D5 y D9 de Devoluciones), DD-22 (sin operador logístico real: simulador).
+- **Cambios de fondo de las últimas rondas:** adaptador real de textos legales, marcas de dispositivo en el ingreso web (D1), orden global de receptores de la cancelación, línea digital reembolsada fuera de la anulación, enmiendas de spec del Carrito y de selección de fuente, menú por rol, WhatsApp de Pagos vía `INotificador`.
+
 ## 2026-11-21 (madrugada) — Cuarta integración completa de `main` y convergencia de specs
 
 ### Cubierto

@@ -1,6 +1,6 @@
 # Tablero de coordinación de los carriles
 
-Lo mantiene **el coordinador** (la sesión raíz «BabelHub documentación y specs»); los carriles lo **leen al empezar cada turno** y no lo editan: lo que necesiten de otro carril lo dejan en su informe de bloque y en `progress/hallazgos.md`, y el coordinador lo traslada aquí. Complementa `progress/bloques.md` (qué bloques hay) con **quién hace qué ahora, qué espera a quién y cómo se integra**. Última actualización: 2026-11-20 (mediodía).
+Lo mantiene **el coordinador** (la sesión raíz «BabelHub documentación y specs»); los carriles lo **leen al empezar cada turno** y no lo editan: lo que necesiten de otro carril lo dejan en su informe de bloque y en `progress/hallazgos.md`, y el coordinador lo traslada aquí. Complementa `progress/bloques.md` (qué bloques hay) con **quién hace qué ahora, qué espera a quién y cómo se integra**. Última actualización: 2026-11-21 (cierre).
 
 ## 1. Protocolo (obligatorio para todos los carriles)
 
@@ -24,7 +24,7 @@ Lo mantiene **el coordinador** (la sesión raíz «BabelHub documentación y spe
 | **Evidencias** | carril-evidencias | OAS-1, K6-1, cobertura y DOC-1 hechos; rampa final 50→2000 con 0,6/0,4/512m (espera Docker) e informe final de la rúbrica | — |
 | **Rendimiento** | reducir-el-costo-por-sol | Cerrado: ~31 → ~18 sentencias por solicitud; memoria opt-in apagada (DD-17) | — |
 
-**Turnos de máquina (Docker):** evidencias (rampa) → B → C → biblioteca; V y A, filtrados y cortos; integración completa final del coordinador al cierre. **Docker Desktop caído** desde la rampa colgada: espera a la persona.
+**Estado de cierre (2026-11-21):** todos los carriles cerrados; ver `progress/bloques.md` («Estado de cierre») y `progress/relevos/coordinador.md`.
 
 ## 3. Qué espera a quién
 
