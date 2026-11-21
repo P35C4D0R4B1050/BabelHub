@@ -133,7 +133,6 @@ public sealed class AnulacionYCancelacionDePedidosTests(PostgresDePedidosFixture
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PED-20")]
     public async Task Con_la_auditoria_caida_antes_del_primer_tiempo_no_queda_fila_ni_hay_llamada_al_Inventario()
     {
         await using var escenario = EscenarioDePedidos.Crear(bd.Unidad);
@@ -151,7 +150,6 @@ public sealed class AnulacionYCancelacionDePedidosTests(PostgresDePedidosFixture
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PED-20")]
     public async Task Si_la_auditoria_cae_tras_el_REST_la_reanudacion_termina_la_anulacion_como_sistema_con_una_llamada_por_linea()
     {
         await using var escenario = EscenarioDePedidos.Crear(bd.Unidad);

@@ -176,7 +176,7 @@ public sealed class InventarioSimuladoDelCarrito(IReloj reloj) : IInventarioDelC
             return Task.FromResult(ResultadoDeReservar.De(TipoDeResultadoDeReservar.NoDisponible));
         }
 
-        if (!EntregaValida(entrega) || lineas.Count == 0 || lineas.Any(l => l.Cantidad is < 1 or > 99))
+        if (!EntregaValida(entrega) || lineas.Count == 0 || lineas.Any(l => l.Cantidad is < 1 or > 20))
         {
             return Task.FromResult(ResultadoDeReservar.De(TipoDeResultadoDeReservar.Rechazada, "INV-VALIDACION-INVALIDA"));
         }

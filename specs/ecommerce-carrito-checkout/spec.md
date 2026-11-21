@@ -1,7 +1,7 @@
 ---
 id: ecommerce-carrito-checkout
 titulo: Carrito y checkout
-estado: Planned
+estado: Draft
 aprobado_por: Claude (delegado por Diego Amiquero)
 aprobado_en: 2026-11-13
 plan_aprobado_por: Claude (delegado por Diego Amiquero)
@@ -54,12 +54,12 @@ Que el cliente arme un carrito que se conserva entre sesiones y dispositivos, me
 | CAR-21 | No deseado | Si el correo de la cuenta del cliente no está verificado, entonces el sistema deberá impedir iniciar el pago, invitarlo a verificarlo y conservar su carrito. | RF28, AC04 |
 | CAR-22 | Evento | Cuando el cliente acepta los términos, el tratamiento de datos o la política de reembolso digital antes de pagar, el sistema deberá guardar en la intención de pago la versión y la fecha de cada texto aceptado y pasarlas al pedido al crearse. | NN15 |
 | CAR-23 | Evento | Cuando el carrito incluye impresos con despacho a domicilio, el sistema deberá sumar al total un costo de envío fijo en soles, configurable sin modificar el código, mostrarlo antes del pago, congelarlo al crear la intención de pago y guardarlo en el pedido. | RF04 |
-| CAR-24 | Evento | Cuando un visitante arma un carrito y luego ingresa o se registra, el sistema deberá fusionarlo con el carrito de su cuenta, sumando las cantidades de una misma edición hasta el máximo disponible, limitando las digitales a una unidad, descartando las que ya posee o dejaron de venderse, y avisando cuáles ajustó; la fusión no debe aplicarse dos veces. | RF03 |
+| CAR-24 | Evento | Cuando un visitante arma un carrito y luego ingresa o se registra, el sistema deberá fusionarlo con el carrito de su cuenta, sumando las cantidades de una misma edición hasta el máximo disponible, limitando las digitales a una unidad, recortando lo que exceda los topes de CAR-38, descartando las que ya posee o dejaron de venderse, y avisando cuáles ajustó; la fusión no debe aplicarse dos veces. | RF03 |
 | CAR-25 | Estado | Mientras el pago está pendiente de confirmación, el sistema deberá mostrar el estado «estamos confirmando tu pago» y el tiempo restante hasta los 30 minutos desde el inicio del pago. | RF04 |
 | CAR-26 | No deseado | Si el pago está pendiente de confirmación, entonces el sistema deberá impedir volver al carrito para editarlo y cancelar el checkout hasta que se resuelva. | RF04, AC01 |
 | CAR-27 | No deseado | Si al reservar se rechaza una línea por falta de stock o la fuente asignada cambia el plazo informado, entonces el sistema deberá volver a la revisión del carrito, mostrar el cambio o el nuevo plazo y conservar el carrito. | RF04, AC01 |
 | CAR-28 | Evento | Cuando cambia la versión vigente de un texto legal durante el checkout, el sistema deberá volver a pedir su aceptación antes de pagar. | NN15 |
-| CAR-29 | Ubicuo | El sistema deberá conservar el carrito de un visitante en su navegador por 30 días, con un máximo de 50 líneas. | RF03, AC04 |
+| CAR-29 | Ubicuo | El sistema deberá conservar el carrito de un visitante en su navegador hasta que se cumplan 30 días desde su última modificación (abrir el carrito no renueva el plazo), momento en que caduca. | RF03, AC04 |
 | CAR-30 | Evento | Cuando el carrito contiene impresos con despacho a domicilio, el sistema deberá exigir, además de la dirección, el nombre y un teléfono válido de contacto de la entrega, no permitir continuar sin ellos, guardarlos en el checkout y pasarlos con la intención de pago al pedido (PED-32), y no enviarlos a la pasarela, al notificador ni al asistente. | RF04, NN15 |
 | CAR-31 | Estado | Mientras la cuenta del cliente tiene una cancelación diferida (IDE-27), el sistema deberá impedir iniciar el pago, indicar el motivo y conservar el carrito. | RF04, RF27 |
 | CAR-32 | Evento | Cuando Identidad pide eliminar el carrito y los datos de entrega de una cuenta de cliente cuyo correo no está verificado y que va a reemplazar (IDE-84), el sistema deberá eliminarlos y, si no puede, informarlo para que no se reemplace la cuenta; la cuenta nueva parte sin carrito heredado. | RF04, RF18 |
@@ -68,6 +68,7 @@ Que el cliente arme un carrito que se conserva entre sesiones y dispositivos, me
 | CAR-35 | No deseado | Si una solicitud pide un carrito o un checkout que no es de la cuenta de su credencial, entonces el sistema deberá rechazarla sin revelar si existe y registrarla como evento de seguridad. | RF04, AC04 |
 | CAR-36 | Estado | Mientras la cuenta del cliente no aceptó la versión vigente de los textos legales (IDE-58), el sistema deberá impedir iniciar el pago, invitarlo a aceptarla y conservar el carrito. | RF04, NN15 |
 | CAR-37 | Evento | Cuando el cliente inicia el pago, el sistema deberá consultar en el servidor el estado de su cuenta (IDE-27, IDE-58) por el contrato público de Identidad, antes de reservar o crear la intención de pago, y no iniciar el pago si no puede consultarlo. | RF04, RF27, AC04 |
+| CAR-38 | Ubicuo | El sistema deberá admitir en el carrito de cualquier cliente o visitante, como máximo, 30 líneas y 20 unidades por línea impresa y rechazar lo que los exceda con `ECO-CARRITO-LIMITE-DE-LINEAS`, `ECO-CARRITO-LIMITE-DE-UNIDADES` o `ECO-VALIDACION-INVALIDA`; el máximo de la red manda si es menor (CAR-04) y la fusión (CAR-24) recorta en lugar de rechazar. | RF03, AC04 |
 
 ## 4. Criterios de aceptación
 
@@ -97,13 +98,15 @@ Que el cliente arme un carrito que se conserva entre sesiones y dispositivos, me
 | AC-CAR-22 | CAR-24 | **Dado** un visitante con un impreso en su carrito y una cuenta con ese mismo impreso (1 unidad), un digital que el cliente ya posee y solo 1 unidad disponible en total, **cuando** ingresa, **entonces** el impreso queda con la cantidad máxima disponible, se descarta el digital poseído y se avisa de ambos ajustes; y ingresar en dos dispositivos a la vez no duplica las líneas. |
 | AC-CAR-23 | CAR-25, CAR-26 | **Dado** un pago pendiente de confirmación, **cuando** el cliente mira su checkout y trata de volver al carrito, **entonces** ve «estamos confirmando tu pago» con el tiempo restante hasta los 30 minutos y no puede editar el carrito hasta que se resuelva. |
 | AC-CAR-24 | CAR-27 | **Dado** un checkout cuya reserva es rechazada por falta de stock, o reasignada a una fuente con otro plazo, **cuando** el cliente intenta pagar, **entonces** vuelve a la revisión con el cambio explicado y su carrito conservado. |
-| AC-CAR-25 | CAR-29 | **Dado** un visitante que lleva 31 días sin volver, o que intenta agregar la línea 51, **cuando** abre su carrito o agrega la línea, **entonces** el carrito caducó o se rechaza la línea con el motivo. |
+| AC-CAR-25 | CAR-29 | **Dado** un visitante que vuelve a los 29 días de su última modificación y otro que vuelve a los 30 días o más, **cuando** abren su carrito, **entonces** el primero conserva el suyo y el segundo encuentra el carrito caducado y uno nuevo vacío. |
 | AC-CAR-26 | CAR-30 | **Dado** un carrito con impresos y despacho a domicilio, **cuando** el cliente llega al paso de entrega, **entonces** se le piden la dirección, el nombre y el teléfono de contacto, no puede continuar sin alguno de ellos ni con un teléfono inválido, el pedido recibe el nombre, el teléfono y la dirección, y la pasarela, el notificador y el asistente no los reciben; y para el recojo en sucursal no se piden. |
 | AC-CAR-27 | CAR-31, CAR-36, CAR-37 | **Dado** un cliente con una cancelación diferida, otro que no aceptó la versión vigente de los términos y otro cuya cuenta cambia de estado entre la revisión del carrito y el pago, **cuando** intentan iniciar el pago, **entonces** se les impide con el motivo, no se crea ninguna reserva ni intención de pago y su carrito se conserva; y si Identidad no responde, el pago no se inicia. |
 | AC-CAR-28 | CAR-32 | **Dado** una cuenta de cliente sin verificar con un carrito y datos de entrega, **cuando** Identidad pide eliminarlos para reemplazarla, **entonces** ambos se eliminan y la cuenta nueva parte sin carrito heredado; y si no se pueden eliminar, se informa para que la cuenta no se reemplace. |
 | AC-CAR-29 | CAR-33 | **Dado** un cliente con un carrito, datos de entrega y un checkout abierto, **cuando** se ejecuta la cancelación de su cuenta, **entonces** el carrito y esos datos dejan de existir; y si no se pueden eliminar, se informa para que la cancelación no se ejecute y no queda ningún efecto parcial. |
 | AC-CAR-30 | CAR-34 | **Dado** un checkout con nombre, teléfono y dirección de entrega, **cuando** Pagos informa que el pago se aprobó, o el cliente cancela o reinicia el checkout, o pasan 30 días desde su última modificación, **entonces** esos datos dejan de existir en el checkout. |
 | AC-CAR-31 | CAR-35 | **Dado** un cliente A que pide el carrito o el checkout de un cliente B, **cuando** envía la solicitud, **entonces** se rechaza sin revelar si existe, no se devuelve ningún dato de entrega y queda un evento de seguridad. |
+| AC-CAR-32 | CAR-38 | **Dado** un carrito con 29 líneas, **cuando** el cliente agrega la línea 30 y luego la 31, **entonces** la 30 se acepta, la 31 se rechaza con `ECO-CARRITO-LIMITE-DE-LINEAS` y el carrito queda intacto; y **dado** una línea impresa con 20 unidades, **cuando** agrega una más a esa línea, **entonces** se rechaza con `ECO-CARRITO-LIMITE-DE-UNIDADES`, y si pide 21 de una edición nueva se rechaza con `ECO-VALIDACION-INVALIDA`; en ambos casos el carrito queda intacto. |
+| AC-CAR-33 | CAR-24, CAR-38 | **Dado** un visitante y una cuenta cuya fusión superaría 30 líneas o 20 unidades en una línea impresa, **cuando** el visitante ingresa, **entonces** la fusión se recorta a 30 líneas y 20 unidades por línea, descarta las últimas líneas del visitante, en el orden en que las agregó, avisa con el motivo `tope_de_lineas` o `tope_de_unidades` y no quita nada de lo que la cuenta ya tenía. |
 
 ## 5. Reglas e invariantes
 
@@ -123,5 +126,5 @@ Que el cliente arme un carrito que se conserva entre sesiones y dispositivos, me
 
 ## 7. Preguntas abiertas
 
-- [x] ¿Un visitante puede armar un carrito antes de iniciar sesión? Resuelto el 2026-10-16 (confirmado por el responsable): sí, y se fusiona con el de su cuenta al ingresar (CAR-24). Si el stock no alcanza para la suma, la cantidad se ajusta al máximo con aviso; el carrito de visitante dura 30 días y 50 líneas como máximo (CAR-29, valores a confirmar).
+- [x] ¿Un visitante puede armar un carrito antes de iniciar sesión? Resuelto el 2026-10-16 (confirmado por el responsable): sí, y se fusiona con el de su cuenta al ingresar (CAR-24). Si el stock no alcanza para la suma, la cantidad se ajusta al máximo con aviso; el carrito de visitante dura 30 días (CAR-29) y todo carrito admite 30 líneas y 20 unidades por línea (CAR-38; topes confirmados por la persona el 2026-11-19, DD-16, en lugar de los 50 y 99 de esta respuesta).
 - [x] ¿Cuál es el costo del despacho a domicilio? Resuelto el 2026-10-16: fijo de S/ 12,00, configurable sin modificar el código (CAR-23).

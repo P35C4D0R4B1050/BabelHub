@@ -201,7 +201,7 @@ public sealed class OrquestadoresDelCarritoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-CAR-25")]
+    [Trait("Criterio", "AC-CAR-32")]
     public async Task La_linea_31_se_rechaza_con_su_motivo()
     {
         var e = EntornoDelCarrito.DeCliente();
@@ -218,10 +218,12 @@ public sealed class OrquestadoresDelCarritoTests
     }
 
     [Theory]
+    [Trait("Criterio", "AC-CAR-32")]
     [InlineData(0)]
     [InlineData(-1)]
+    [InlineData(21)]
     [InlineData(100)]
-    public async Task Una_cantidad_fuera_de_1_a_99_es_una_validacion_que_no_repite_el_valor(int cantidad)
+    public async Task Una_cantidad_fuera_de_1_a_20_es_una_validacion_que_no_repite_el_valor(int cantidad)
     {
         var e = EntornoDelCarrito.DeCliente();
 

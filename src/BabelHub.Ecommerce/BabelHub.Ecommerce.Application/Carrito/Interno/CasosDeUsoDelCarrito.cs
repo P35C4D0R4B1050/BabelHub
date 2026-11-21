@@ -502,7 +502,7 @@ internal abstract class EdicionDeLineaDelCarrito<TEntrada>(ServiciosDelCarrito s
 }
 
 /// <summary>
-/// <c>AgregarLinea</c> (CAR-02, CAR-03, CAR-04, CAR-20; AC-CAR-02, AC-CAR-03, AC-CAR-18, AC-CAR-25): suma una edición de 1 a 99 (la digital queda en una), rechaza la que el Catálogo no ofrece, la digital que la cuenta ya posee
+/// <c>AgregarLinea</c> (CAR-02, CAR-03, CAR-04, CAR-20; AC-CAR-02, AC-CAR-03, AC-CAR-18, AC-CAR-25, AC-CAR-32): suma una edición de 1 a 20 (la digital queda en una), rechaza la que el Catálogo no ofrece, la digital que la cuenta ya posee
 /// (solo con sesión) y más unidades de un impreso que el stock vendible de la red indicando el máximo; si no se puede confirmar el stock o la posesión, la línea se acepta (D03). Crea el carrito del visitante con su cookie.
 /// </summary>
 internal sealed class AgregarLinea(ServiciosDelCarrito servicios) : EdicionDeLineaDelCarrito<AgregarLineaEntrada>(servicios)
@@ -677,7 +677,7 @@ internal sealed class EliminarLinea(ServiciosDelCarrito servicios) : EdicionDeLi
     }
 }
 
-/// <summary>La validación de la entrada de una línea (SEG-01): la edición no puede ser vacía y la cantidad va de 1 a 99. Los errores llevan el campo y una clave, nunca el valor recibido.</summary>
+/// <summary>La validación de la entrada de una línea (SEG-01): la edición no puede ser vacía y la cantidad va de 1 a 20. Los errores llevan el campo y una clave, nunca el valor recibido.</summary>
 internal static class ValidadorDeLineas
 {
     public static ResultadoDeValidacion Validar(Guid edicionId, int? cantidad)

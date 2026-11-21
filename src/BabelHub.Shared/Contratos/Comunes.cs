@@ -56,8 +56,8 @@ public static class LimitesDeContrato
     /// <summary>Ediciones por consulta de disponibilidad o de existencias.</summary>
     public const int MaximoDeEdicionesPorConsulta = 50;
 
-    /// <summary>Líneas de una reserva o de una consulta previa (el tope del carrito, CAR-29).</summary>
-    public const int MaximoDeLineasPorReserva = 50;
+    /// <summary>Líneas de una reserva o de una consulta previa (el tope del carrito, CAR-38, y el del Inventario: DD-16).</summary>
+    public const int MaximoDeLineasPorReserva = 30;
 
     /// <summary>Cantidad de un ingreso de mercadería: entero entre 1 y 5 000 (AJU-19, CAT-23).</summary>
     public const int IngresoMinimo = 1;

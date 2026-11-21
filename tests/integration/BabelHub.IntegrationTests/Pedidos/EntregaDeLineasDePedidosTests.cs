@@ -47,7 +47,7 @@ public sealed class EntregaDeLineasDePedidosTests(PostgresDePedidosFixture bd) :
     private async Task<IReadOnlyList<EstadoDeLineaImpresa?>> Estados(Guid pedidoId) => [.. (await bd.Pedidos.Obtener(pedidoId, conBloqueo: false))!.Lineas.Select(l => l.EstadoImpreso)];
 
     [Fact]
-    [Trait("Criterio", "AC-PED-08")]
+    [Trait("Criterio", "AC-PED-09")]
     public async Task Entregar_descuenta_y_cierra_la_reserva_una_vez_por_linea_y_repetirlo_no_vuelve_a_cerrar()
     {
         await using var escenario = EscenarioDePedidos.Crear(bd.Unidad);
