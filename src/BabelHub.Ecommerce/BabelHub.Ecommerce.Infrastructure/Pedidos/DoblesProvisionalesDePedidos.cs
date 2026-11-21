@@ -67,6 +67,9 @@ internal sealed class AccesosDeBibliotecaProvisional : IAccesosDeBiblioteca
 
     public Task<Resultado<ResultadoDeRevocarAcceso>> Revocar(RevocarAccesoEntrada entrada, CancellationToken cancelacion = default) =>
         Task.FromResult(Resultado<ResultadoDeRevocarAcceso>.Fallo(FalloDeEnviosProvisional.NoDisponible()));
+
+    public Task<Resultado<bool>> EstaRevocadoPorReembolso(Guid cuentaId, Guid pedidoId, Guid edicionId, CancellationToken cancelacion = default) =>
+        Task.FromResult(Resultado<bool>.Fallo(FalloDeEnviosProvisional.NoDisponible()));
 }
 
 /// <summary>Las reservas del pedido sin el adaptador real del Inventario (hace falta <c>cerrar</c> en el cliente de Plataforma): cerrar es incierto y liberar «no se pudo», así que no se entrega ni se anula nada contra el stock.</summary>

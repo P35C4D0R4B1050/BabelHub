@@ -151,8 +151,7 @@ public sealed class PedidosConModulosRealesTests(PostgresDelEcommerceCompletoFix
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PED-17")]
-    [Trait("Criterio", "AC-PED-20")]
+    [Trait("Criterio", "AC-PED-11")]
     public async Task Anular_un_pedido_con_un_libro_digital_ya_descargado_revoca_el_acceso_real_y_audita_la_operacion_en_PostgreSQL()
     {
         await using var anfitrion = Anfitrion();
@@ -174,6 +173,27 @@ public sealed class PedidosConModulosRealesTests(PostgresDelEcommerceCompletoFix
         Assert.Equal(1, await bd.Consultar<int>("SELECT count(*) FROM auditoria.registros WHERE objeto_id = @o AND accion = 'PedidoAnulado' AND actor_tipo = 'usuario'", ("o", pedido.ToString("D"))));
         // La anulación auditada tampoco lleva el contacto del cliente.
         Assert.Equal(0, await bd.Consultar<int>("SELECT count(*) FROM auditoria.registros WHERE objeto_id = @o AND detalle::text ILIKE ANY (ARRAY['%Ana P%', '%987654321%', '%Jr. Lima%'])", ("o", pedido.ToString("D"))));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PED-11")]
+    public async Task Anular_un_pedido_cuya_digital_Devoluciones_ya_reembolso_no_vuelve_a_reembolsarla_y_la_anulacion_termina()
+    {
+        await using var anfitrion = Anfitrion();
+        var pedido = Guid.NewGuid();
+        var cuenta = await SembrarCuenta();
+        Assert.Equal(ResultadoDeConfirmarCompra.Creado, await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<IConfirmacionDeCompra>().Confirmar(Compra(pedido, cuenta, conDigital: true))));
+        // Devoluciones reembolsó el libro digital y Biblioteca revocó su acceso por reembolso (BIB-24).
+        await bd.Ejecutar($"UPDATE biblioteca.accesos SET estado = 'revocado', revocado_en = now(), motivo_de_revocacion = 'reembolso' WHERE pedido_id = '{pedido:D}'");
+
+        var resultado = await anfitrion.Como(DelAdministrador(), sp => sp.GetRequiredService<IAdministracionDePedidos>().Anular(new AnularPedidoEntrada(pedido, "otro")));
+
+        Assert.True(resultado.EsExito, resultado.Error?.Clave);
+        Assert.Equal(EstadoVisibleDelPedido.Anulado, resultado.Valor.Estado);
+        // El reembolso lleva solo el impreso y el envío: pedir también el digital superaría el tope de Pagos y dejaría la anulación fallida.
+        var reembolso = Assert.Single(_reembolsos.Registrados);
+        Assert.Single(reembolso.Lineas);
+        Assert.Equal("anulado", await Consultar<string>("SELECT estado FROM pedidos.pedidos WHERE id = @p", pedido));
     }
 
     [Fact]

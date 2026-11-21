@@ -41,4 +41,7 @@ public interface IAccesosDeBiblioteca
     Task<Resultado<ResultadoDeConcederAcceso>> Conceder(ConcederAccesoEntrada entrada, CancellationToken cancelacion = default);
 
     Task<Resultado<ResultadoDeRevocarAcceso>> Revocar(RevocarAccesoEntrada entrada, CancellationToken cancelacion = default);
+
+    /// <summary>Si el acceso de esa compra ya se revocó por un reembolso (aprobado o automático) o por el reporte aprobado de un archivo defectuoso: Pedidos no vuelve a reembolsar esa línea al anular el pedido (el tope de Pagos la rechazaría). Solo lee.</summary>
+    Task<Resultado<bool>> EstaRevocadoPorReembolso(Guid cuentaId, Guid pedidoId, Guid edicionId, CancellationToken cancelacion = default);
 }

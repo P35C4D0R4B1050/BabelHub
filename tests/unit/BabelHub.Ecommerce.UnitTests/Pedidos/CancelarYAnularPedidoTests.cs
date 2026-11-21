@@ -259,6 +259,41 @@ public sealed class CancelarYAnularPedidoTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PED-11")]
+    public async Task Una_digital_que_Devoluciones_ya_reembolso_no_se_reembolsa_otra_vez_al_anular_el_pedido()
+    {
+        var entorno = ComoAdministracion();
+        var pedido = Crear(TipoDeEntregaDelPedido.Domicilio, 12m, Impresa("Impreso"), Digital("Digital"));
+        entorno.Repositorio.Poner(pedido);
+        var digital = pedido.Lineas.Single(l => l.EsDigital);
+        entorno.Accesos.ReembolsadasPorDevolucion.Add(digital.EdicionId);
+
+        var resultado = await entorno.Anular.Anular(new AnularPedidoEntrada(pedido.Id, "pago-duplicado"), default);
+
+        // El tope de Pagos dejaría fallida una anulación que vuelve a pedir lo ya devuelto: el reembolso lleva solo el impreso y el envío.
+        Assert.True(resultado.EsExito, resultado.Error?.Clave);
+        var reembolso = Assert.Single(entorno.Reembolsos.Registrados);
+        Assert.Equal(12m, reembolso.Envio);
+        Assert.Equal(pedido.Lineas.Single(l => !l.EsDigital).Id, Assert.Single(reembolso.Lineas).LineaId);
+        Assert.Equal(EstadoVisibleDelPedido.Anulado, resultado.Valor.Estado);
+        Assert.Equal(EstadoDeLineaDigital.Anulado, digital.EstadoDigital);
+    }
+
+    [Fact]
+    public async Task Si_Biblioteca_no_responde_no_se_sabe_si_la_digital_ya_se_reembolso_y_no_se_reembolsa_nada()
+    {
+        var entorno = ComoAdministracion();
+        var pedido = Crear(TipoDeEntregaDelPedido.Domicilio, 12m, Impresa("Impreso"), Digital("Digital"));
+        entorno.Repositorio.Poner(pedido);
+        entorno.Accesos.Falla = true;
+
+        var resultado = await entorno.Anular.Anular(new AnularPedidoEntrada(pedido.Id, "pago-duplicado"), default);
+
+        Assert.Empty(entorno.Reembolsos.Registrados);
+        Assert.NotEqual(EstadoVisibleDelPedido.Anulado, resultado.EsExito ? resultado.Valor.Estado : EstadoVisibleDelPedido.Confirmado);
+    }
+
+    [Fact]
     public async Task El_motivo_es_obligatorio_de_la_lista_cerrada_y_el_de_la_cancelacion_del_cliente_no_le_corresponde_a_la_administracion()
     {
         var entorno = ComoAdministracion();

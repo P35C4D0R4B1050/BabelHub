@@ -144,6 +144,8 @@ public class DoblesProvisionalesDePedidosTests
 
     private sealed class AccesosReales : IAccesosDeBiblioteca
     {
+        public Task<Resultado<bool>> EstaRevocadoPorReembolso(Guid cuentaId, Guid pedidoId, Guid edicionId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+
         public Task<Resultado<ResultadoDeConcederAcceso>> Conceder(ConcederAccesoEntrada entrada, CancellationToken cancelacion = default) => throw new NotSupportedException();
 
         public Task<Resultado<ResultadoDeRevocarAcceso>> Revocar(RevocarAccesoEntrada entrada, CancellationToken cancelacion = default) => throw new NotSupportedException();
