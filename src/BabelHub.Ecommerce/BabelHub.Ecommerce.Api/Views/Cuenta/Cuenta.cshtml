@@ -252,7 +252,7 @@
 
             case PantallaDeLaCuenta.Cancelacion:
                 var estado = Model.Cancelacion;
-                <p class="mt-6">Al cancelar tu cuenta se anonimizan tus datos personales y se cierran todas tus sesiones. Si tienes pedidos, envíos o reembolsos por cerrar, la cancelación queda <strong>diferida</strong> hasta que se cierren: tienes 7 días para reconfirmarla desde que lo ves y 30 días en total antes de que se descarte.</p>
+                <p class="mt-6">Al cancelar tu cuenta se anonimizan tus datos personales y se cierran todas tus sesiones. <strong>Perderás el acceso a tu biblioteca digital</strong> y a los libros que compraste en formato digital. Si tienes pedidos, envíos o reembolsos por cerrar, la cancelación queda <strong>diferida</strong> hasta que se cierren: tienes 7 días para reconfirmarla desde que lo ves y 30 días en total antes de que se descarte.</p>
                 @switch (estado?.Estado)
                 {
                     case EstadoDeLaCancelacion.Diferida:

@@ -245,6 +245,17 @@ public sealed class PantallasDeLaCuentaTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Criterio", "AC-IDE-25")]
+    public async Task La_pantalla_de_cancelacion_advierte_que_se_pierde_la_biblioteca_digital()
+    {
+        _cancelacion = Resultado<EstadoDeLaCancelacionDeCuenta>.Exito(new EstadoDeLaCancelacionDeCuenta(EstadoDeLaCancelacion.Descartada, 0, null, null, true));
+
+        using var respuesta = await Pedir("/cuenta/cancelacion");
+
+        Assert.Contains("Perderás el acceso a tu biblioteca digital", await Html(respuesta), StringComparison.Ordinal);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-WEB-32")]
     public async Task Una_cancelacion_diferida_muestra_que_falta_cerrar_y_pide_contrasena_y_segundo_factor_para_reconfirmar()
     {
