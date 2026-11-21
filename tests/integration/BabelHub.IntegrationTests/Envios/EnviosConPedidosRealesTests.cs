@@ -282,7 +282,7 @@ public sealed class EnviosConPedidosRealesTests(PostgresDePedidosYEnviosFixture 
         Assert.True((await Logistica(e, l => l.SolicitarGuia(lima))).EsExito);
         Assert.True((await Logistica(e, l => l.PasarAEnReparto(lima))).EsExito);
         Assert.True((await Logistica(e, l => l.MarcarEntregado(lima))).EsExito);
-        Assert.NotNull(await e.Como(EscenarioDePedidos.DeLaAdministracion(), sp => sp.GetRequiredService<IAdministracionDePedidos>().Anular(new AnularPedidoEntrada(primero.Id, "otro"))));
+        Assert.True((await e.Como(EscenarioDePedidos.DeLaAdministracion(), sp => sp.GetRequiredService<IAdministracionDePedidos>().Anular(new AnularPedidoEntrada(primero.Id, "otro")))).EsExito);
 
         // Pedido 2: una fuente en reparto (la otra queda pendiente).
         var segundo = await SembrarADomicilio();
