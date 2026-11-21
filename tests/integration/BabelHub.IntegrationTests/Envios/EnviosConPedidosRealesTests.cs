@@ -265,4 +265,63 @@ public sealed class EnviosConPedidosRealesTests(PostgresDePedidosYEnviosFixture 
         Assert.Equal(20, reservas.Cierres.Distinct().Count());
         Assert.True(operador.GuiasCreadas >= 20);
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-ENV-17")]
+    public async Task La_cancelacion_de_la_cuenta_conserva_los_envios_entregado_en_reparto_y_cancelado_sin_nombre_direccion_ni_telefono()
+    {
+        var (e, _, _) = Crear();
+        await using var _ = e;
+
+        // Pedido 1: la fuente de LIM llega a entregada; el pedido se anula y la de ARE (pendiente de guía) se cancela.
+        var primero = await SembrarADomicilio();
+        Assert.True((await MarcarListas(e, primero)).EsExito);
+        var enviosDelPrimero = await EnviosDe(primero.Id);
+        var fuentes = await ConsultarFuentes(primero.Id);
+        var lima = enviosDelPrimero[fuentes.ToList().IndexOf("LIM")];
+        Assert.True((await Logistica(e, l => l.SolicitarGuia(lima))).EsExito);
+        Assert.True((await Logistica(e, l => l.PasarAEnReparto(lima))).EsExito);
+        Assert.True((await Logistica(e, l => l.MarcarEntregado(lima))).EsExito);
+        Assert.NotNull(await e.Como(EscenarioDePedidos.DeLaAdministracion(), sp => sp.GetRequiredService<IAdministracionDePedidos>().Anular(new AnularPedidoEntrada(primero.Id, "otro"))));
+
+        // Pedido 2: una fuente en reparto (la otra queda pendiente).
+        var segundo = await SembrarADomicilio();
+        Assert.True((await MarcarListas(e, segundo)).EsExito);
+        var enviosDelSegundo = await EnviosDe(segundo.Id);
+        Assert.True((await Logistica(e, l => l.SolicitarGuia(enviosDelSegundo[0]))).EsExito);
+        Assert.True((await Logistica(e, l => l.PasarAEnReparto(enviosDelSegundo[0]))).EsExito);
+
+        var antes = await bd.Consultar<string>("SELECT string_agg(id::text || estado || coalesce(numero_de_guia, '') || coalesce(operador, ''), '|' ORDER BY id) FROM envios.envios");
+
+        await e.Como(
+            ActorActual.DelSistema(),
+            sp => sp.GetRequiredService<IUnidadDeTrabajo>().Ejecutar<bool>(
+                async token =>
+                {
+                    foreach (var receptor in sp.GetServices<BabelHub.Ecommerce.Application.Identidad.IAplicadorDeCancelacion>())
+                    {
+                        await receptor.Aplicar(EscenarioDePedidos.Titular, EscenarioDePedidos.Titular, token);
+                    }
+
+                    return true;
+                }));
+
+        var estados = new List<string>();
+        await using (var comando = bd.Administracion.CreateCommand("SELECT estado FROM envios.envios ORDER BY id"))
+        await using (var lector = await comando.ExecuteReaderAsync())
+        {
+            while (await lector.ReadAsync())
+            {
+                estados.Add(lector.GetString(0));
+            }
+        }
+
+        Assert.Contains("entregado", estados);
+        Assert.Contains("en_reparto", estados);
+        Assert.Contains("cancelado", estados);
+        Assert.Equal(antes, await bd.Consultar<string>("SELECT string_agg(id::text || estado || coalesce(numero_de_guia, '') || coalesce(operador, ''), '|' ORDER BY id) FROM envios.envios"));
+        Assert.Equal(0, await bd.Consultar<int>("SELECT count(*) FROM envios.envios x WHERE row_to_json(x)::text ~* '(Ana P|987654321|Jr\\. Lima)'"));
+        Assert.Equal(0, await bd.Consultar<int>("SELECT count(*) FROM envios.envio_lineas x WHERE row_to_json(x)::text ~* '(Ana P|987654321|Jr\\. Lima)'"));
+        Assert.Equal(0, await bd.Consultar<int>("SELECT count(*) FROM pedidos.pedidos WHERE contacto_nombre IS NOT NULL OR contacto_telefono IS NOT NULL OR contacto_direccion IS NOT NULL"));
+    }
 }
