@@ -55,7 +55,7 @@ no_recogida --> anulada : anulación de la administración
 en_preparacion --> listo_para_recojo
 en_preparacion --> despachada : domicilio
 listo_para_recojo --> entregada
-listo_para_recojo --> no_recogida : 15 días sin recoger
+listo_para_recojo --> no_recogida : más de 360 horas sin recoger
 despachada --> entregada
 entregada --> [*]
 anulada --> [*]

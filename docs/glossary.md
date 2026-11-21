@@ -46,7 +46,7 @@ Lenguaje común del dominio. El código, las specs y la interfaz usan estos tér
 | **Reserva temporal** | Reserva de impresos con vencimiento (15 minutos) desde que se inicia el pago; si el pago queda pendiente de confirmación se extiende una vez, hasta 30 minutos. | Reserva confirmada. |
 | **Intención de pago** | Registro que se crea al pasar al paso de pago; agrupa los intentos de cobro (uno por medio de pago probado), congela el costo de envío y las versiones de textos aceptadas, y admite un solo cobro pendiente o aprobado. El pedido nace al aprobarse. | Pedido. |
 | **Pago pendiente de confirmación** | Pago cuyo resultado la pasarela aún no confirma. No se cobra de nuevo; se consulta después y se avisa al cliente por todos sus medios. | Pago rechazado. |
-| **No recogido** | Estado de un pedido de recojo que lleva más de 15 días calendario listo para recojo: libera sus reservas y queda a revisión de la administración. | Pedido entregado. |
+| **No recogido** | Estado de un pedido de recojo que lleva más de 360 horas (15 días corridos) listo para recojo: libera sus reservas y queda a revisión de la administración. | Pedido entregado. |
 | **Cancelación por el cliente** | Anulación que hace el propio cliente de un pedido de impresos aún confirmado (antes de su preparación). | Devolución, que se pide tras la entrega. |
 | **Clave de idempotencia** | Valor que hace que repetir una operación no la duplique (cobros y reservas). | Número de pedido. |
 
