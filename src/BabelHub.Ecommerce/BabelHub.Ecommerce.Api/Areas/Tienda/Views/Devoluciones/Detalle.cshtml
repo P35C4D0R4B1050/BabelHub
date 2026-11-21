@@ -23,7 +23,7 @@
     }
     else
     {
-        @* El texto de la persona se imprime siempre codificado (nunca Html.Raw). *@
+        @* El texto de la persona se imprime siempre con la codificación de Razor. *@
         <p class="mt-2 whitespace-pre-wrap break-words">@d.Motivo.Valor</p>
         @if (d.Texto is not null)
         {

@@ -191,4 +191,17 @@ public sealed class DevolucionesApiTests
         Assert.Equal(HttpStatusCode.ServiceUnavailable, caido.StatusCode);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, rechazado.StatusCode);
     }
+
+    [Fact]
+    [Trait("Criterio", "AC-DEV-30")]
+    public async Task Un_codigo_de_sucursal_en_la_ruta_sin_la_forma_de_un_codigo_se_rechaza_antes_de_reflejarlo_ni_llamar_a_la_aplicacion()
+    {
+        await using var host = await DevolucionesApiHost.Crear();
+
+        using var respuesta = await host.Enviar($"/sucursal/lima_central%22%3E/devoluciones/{Devolucion:D}/recibir");
+
+        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
+        Assert.Empty(host.Devoluciones.Llamadas);
+        Assert.DoesNotContain("lima_central", await respuesta.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
 }

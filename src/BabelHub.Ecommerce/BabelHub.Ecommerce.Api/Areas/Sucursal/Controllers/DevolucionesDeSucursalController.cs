@@ -19,6 +19,9 @@ public sealed class DevolucionesDeSucursalController(IGestionDeDevoluciones gest
 {
     private const string Plantilla = "/sucursal/{codigo:minlength(1):maxlength(40)}/devoluciones";
 
+    /// <summary>El código de la ruta que no tiene la forma de un código de sucursal se rechaza antes de reflejarlo en un enlace; el alcance real lo comprueba la Aplicación con la sucursal del actor y la de la devolución.</summary>
+    private static bool CodigoInvalido(string codigo) => IdentificadorDeSucursal.DesdeCodigo(codigo) is null;
+
     private static string Lista(string codigo) => $"/sucursal/{codigo}/devoluciones";
 
     [HttpGet(Plantilla)]
@@ -56,6 +59,11 @@ public sealed class DevolucionesDeSucursalController(IGestionDeDevoluciones gest
     {
         Response.Headers.CacheControl = "no-store";
         var lista = Lista(codigo);
+        if (CodigoInvalido(codigo))
+        {
+            return await Falla(Invalido("codigo"), "/", cancelacion);
+        }
+
         if (LeerLaConsulta(Request, ["hecho"], out _, out var hecho) is { } invalida)
         {
             return await Falla(invalida, lista, cancelacion);
@@ -95,6 +103,11 @@ public sealed class DevolucionesDeSucursalController(IGestionDeDevoluciones gest
     {
         Response.Headers.CacheControl = "no-store";
         var ruta = $"{Lista(codigo)}/{devolucionId:D}";
+        if (CodigoInvalido(codigo))
+        {
+            return await Falla(Invalido("codigo"), "/", cancelacion);
+        }
+
         var (_, error) = await LeerFormulario(_ => false);
         if (error is not null)
         {
