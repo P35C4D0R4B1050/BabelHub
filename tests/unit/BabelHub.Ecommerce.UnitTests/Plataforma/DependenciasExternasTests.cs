@@ -132,8 +132,10 @@ public sealed class DependenciasExternasTests
             return new Cotizacion(3m, "PEN");
         }
 
-        var normal = await _dependencias.Consultar("cotizador", ClaseDeDependencia.Normal, Responde, _validador);
-        var llm = await _dependencias.Consultar("llm", ClaseDeDependencia.ProveedorDeLlm, Responde, _validador);
+        // Margen amplio para el proveedor: en un ejecutor lento 400 ms no alcanzaban (falló en el CI).
+        var dependencias = new DependenciasExternas(new OpcionesDeDependencias(TimeSpan.FromMilliseconds(80), TimeSpan.FromSeconds(5)));
+        var normal = await dependencias.Consultar("cotizador", ClaseDeDependencia.Normal, Responde, _validador);
+        var llm = await dependencias.Consultar("llm", ClaseDeDependencia.ProveedorDeLlm, Responde, _validador);
 
         Assert.Equal(MotivoDeSinRespuesta.TiempoAgotado, normal.Motivo);
         Assert.True(llm.HayRespuesta);
