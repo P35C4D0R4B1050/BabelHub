@@ -230,7 +230,7 @@ public sealed class CuentaYMatrizDeHojasConPostgresTests(PostgresDeReclamaciones
 
     [Fact]
     [Trait("Criterio", "AC-REC-08")]
-    public async Task El_visitante_recibe_no_autenticado_en_cada_operacion_sin_evento_de_denegacion()
+    public async Task El_visitante_recibe_no_autenticado_en_cada_operacion_con_un_evento_sin_sesion_y_ninguno_por_el_numero_de_la_hoja()
     {
         var e = Entorno();
         var hoja = await Registrar(e, CorreoDeAna);
@@ -243,7 +243,15 @@ public sealed class CuentaYMatrizDeHojasConPostgresTests(PostgresDeReclamaciones
             Assert.Equal(CategoriaDeError.NoAutenticado, resultado.Categoria);
         }
 
-        Assert.Empty(e.Denegaciones.Eventos);
+        // Un evento genérico «sin sesión» por intento (ECO-NO-AUTENTICADO): ninguno nombra la hoja ni su número, que el visitante no debe poder sondear.
+        Assert.Equal(Operaciones().Count, e.Denegaciones.Eventos.Count);
+        Assert.All(e.Denegaciones.Eventos, ev =>
+        {
+            Assert.Equal("sin-sesion", ev.Motivo);
+            Assert.Equal("ECO-NO-AUTENTICADO", ev.CodigoDeError);
+            Assert.DoesNotContain(hoja.ToString(), ev.ToString(), StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("-0000", ev.ToString(), StringComparison.Ordinal);
+        });
     }
 
     [Fact]
