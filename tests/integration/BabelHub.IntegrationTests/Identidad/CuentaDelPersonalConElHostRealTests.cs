@@ -104,13 +104,45 @@ public sealed class CuentaDelPersonalConElHostRealTests(PostgresDelEcommerceComp
         Assert.Equal("Persona Original", await bd.Consultar<string>($"SELECT nombre FROM identidad.usuarios WHERE id = '{objetivo}'"));
     }
 
+    private sealed class CapturadorDeCorreo : IEnviadorDeCorreo
+    {
+        public List<CorreoDeCodigo> Codigos { get; } = [];
+
+        public List<CorreoSaliente> Correos { get; } = [];
+
+        public Task<ResultadoDeEnvio> Enviar(CorreoSaliente correo, CancellationToken cancelacion = default)
+        {
+            lock (Correos)
+            {
+                Correos.Add(correo);
+            }
+
+            return Task.FromResult(ResultadoDeEnvio.Enviado);
+        }
+
+        public Task<ResultadoDeEnvio> EnviarCodigo(CorreoDeCodigo correo, CancellationToken cancelacion = default)
+        {
+            lock (Codigos)
+            {
+                Codigos.Add(correo);
+            }
+
+            return Task.FromResult(ResultadoDeEnvio.Enviado);
+        }
+    }
+
     [Fact]
     [Trait("Criterio", "AC-IDE-68")]
     [Trait("Criterio", "AC-IDE-69")]
-    public async Task El_personal_pide_cambiar_su_correo_y_el_anterior_sigue_vigente_hasta_verificar_el_nuevo()
+    public async Task El_personal_cambia_su_correo_el_anterior_sigue_vigente_hasta_verificar_y_al_aplicarlo_se_audita_y_se_avisa_a_los_dos()
     {
         var reloj = new RelojMovil(Inicio);
-        await using var anfitrion = bd.Anfitrion(s => s.AddSingleton<IReloj>(reloj));
+        var correo = new CapturadorDeCorreo();
+        await using var anfitrion = bd.Anfitrion(s =>
+        {
+            s.AddSingleton<IReloj>(reloj);
+            s.AddSingleton<IEnviadorDeCorreo>(correo);
+        });
         var anterior = $"p{Guid.NewGuid():N}@example.test";
         var nuevo = $"nuevo-p{Guid.NewGuid():N}@example.test";
         var id = await Sembrar(anfitrion, anterior, "personal-de-logistica");
@@ -124,5 +156,16 @@ public sealed class CuentaDelPersonalConElHostRealTests(PostgresDelEcommerceComp
         Assert.Equal(anterior, await bd.Consultar<string>($"SELECT correo FROM identidad.usuarios WHERE id = '{id}'"));
         Assert.Equal("esperando-verificacion", await bd.Consultar<string>($"SELECT estado FROM identidad.cambios_de_correo_pendientes WHERE usuario_id = '{id}'"));
         Assert.Equal(0, await bd.Consultar<long>($"SELECT count(*) FROM identidad.registros WHERE accion = 'CorreoCambiado' AND objeto_id = '{id}'"));
+        var codigo = Assert.Single(correo.Codigos, c => c.Destinatario == nuevo).Codigo.Revelar();
+
+        var verificado = await anfitrion.Como(actor, sp => sp.GetRequiredService<ICambioDeCorreo>().VerificarElCorreoNuevo(id, S(codigo)));
+
+        Assert.True(verificado.EsExito, verificado.Error?.Clave);
+        Assert.Equal(nuevo, await bd.Consultar<string>($"SELECT correo FROM identidad.usuarios WHERE id = '{id}'"));
+        Assert.Equal(1, await bd.Consultar<long>($"SELECT count(*) FROM identidad.registros WHERE accion = 'CorreoCambiado' AND objeto_id = '{id}'"));
+        Assert.Equal("{}", await bd.Consultar<string>($"SELECT detalle::text FROM identidad.registros WHERE accion = 'CorreoCambiado' AND objeto_id = '{id}'"));
+        Assert.Contains(correo.Correos, c => c.Destinatario == nuevo && c.Plantilla == "correo-cambiado");
+        Assert.Contains(correo.Correos, c => c.Destinatario == anterior && c.Plantilla == "correo-anterior-cambiado" && c.Categoria == CategoriaDeCorreo.AlertaCriticaDeCuenta);
+        Assert.Equal(1, await bd.Consultar<long>($"SELECT count(*) FROM identidad.avisos_de_cuenta WHERE usuario_id = '{id}' AND tipo = 'correo-cambiado'"));
     }
 }
