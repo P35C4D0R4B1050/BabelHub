@@ -15,7 +15,26 @@ OpenAPI 3.0, **generados desde el código**, no escritos a mano:
 
 ## Dónde se sirve
 
-En `Development`, cada servicio sirve su documento en `/openapi/v1.json`. En producción no se expone.
+En `Development`, cada servicio sirve su documento en `/openapi/v1.json` y, sobre él, una **interfaz interactiva (Scalar)** en `/documentacion`. En producción no se expone ni el documento ni la interfaz.
+
+### Cómo abrir la interfaz interactiva
+
+Levanta el servicio en `Development` (con la configuración y los secretos del entorno local que ya exige: `infra/README.md` y `infra/secretos-requeridos.txt`) y abre su ruta `/documentacion` en el navegador. Cada servicio la sirve en su propio puerto:
+
+```powershell
+$env:ASPNETCORE_ENVIRONMENT = "Development"
+$env:ASPNETCORE_URLS = "http://localhost:5081"
+dotnet run --project src/BabelHub.Inventario/BabelHub.Inventario.Api      # http://localhost:5081/documentacion
+
+$env:ASPNETCORE_URLS = "http://localhost:5080"
+dotnet run --project src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api        # http://localhost:5080/documentacion
+```
+
+(`/documentacion` lleva a `/documentacion/` y, con el documento `v1`, también se abre en `/documentacion/v1`.) La interfaz lee el mismo `/openapi/v1.json` del servicio, lista las operaciones con su alcance, su cuerpo y sus errores `problem+json` y permite probarlas; las rutas protegidas piden la credencial de servicio (`X-Credencial-De-Servicio`) o el token de usuario según su declaración de seguridad.
+
+- **Funciona sin internet:** los recursos de la interfaz (el script, el adaptador y el ícono) vienen **embebidos en el paquete** `Scalar.AspNetCore` y los sirve el propio servicio bajo `/documentacion/`; ninguna etiqueta de la página apunta a un CDN (lo comprueba `InterfazDeLaDocumentacionOpenApiTests`).
+- **Solo en `Development`:** la misma puerta (`MapearDocumentacionOpenApi`) que sirve el documento monta la interfaz; en cualquier otro entorno la ruta no existe (404, también probado).
+- **Dependencia:** `Scalar.AspNetCore` 2.19.0 (publicada el 2026-11-05, con más de dos semanas al adoptarla), sin dependencias transitivas, con versión fija en `Directory.Packages.props` y su `packages.lock.json` en cada Api (PLA-26). La verificación de las rutas documentadas (`TodaRutaPublica_EstaDocumentada…`) ignora solo las rutas de la interfaz (`/documentacion/...`), no las de la API.
 
 ## Cómo se mantiene al día
 

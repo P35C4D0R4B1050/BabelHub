@@ -424,7 +424,8 @@
           "BabelHub.Ecommerce.Application": "[1.0.0, )",
           "BabelHub.Ecommerce.Infrastructure": "[1.0.0, )",
           "BabelHub.Shared": "[1.0.0, )",
-          "Microsoft.AspNetCore.OpenApi": "[10.0.14, )"
+          "Microsoft.AspNetCore.OpenApi": "[10.0.14, )",
+          "Scalar.AspNetCore": "[2.19.0, )"
         }
       },
       "babelhub.ecommerce.application": {
@@ -455,7 +456,8 @@
           "BabelHub.Inventario.Application": "[1.0.0, )",
           "BabelHub.Inventario.Infrastructure": "[1.0.0, )",
           "BabelHub.Shared": "[1.0.0, )",
-          "Microsoft.AspNetCore.OpenApi": "[10.0.14, )"
+          "Microsoft.AspNetCore.OpenApi": "[10.0.14, )",
+          "Scalar.AspNetCore": "[2.19.0, )"
         }
       },
       "babelhub.inventario.application": {
@@ -534,6 +536,12 @@
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "10.0.0"
         }
+      },
+      "Scalar.AspNetCore": {
+        "type": "CentralTransitive",
+        "requested": "[2.19.0, )",
+        "resolved": "2.19.0",
+        "contentHash": "nTXL9wsg6UhQ27KPUhuMr3/BE02H3zjuii2I5x7vbx7myPHkJzvzGDj7hfd1lKZBmJgUcKI+W7wcIzDdV/N/Dg=="
       },
       "StackExchange.Redis": {
         "type": "CentralTransitive",
