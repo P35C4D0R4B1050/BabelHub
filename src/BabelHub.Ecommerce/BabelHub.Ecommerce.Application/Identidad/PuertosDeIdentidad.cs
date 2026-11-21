@@ -191,7 +191,7 @@ public sealed class ReceptoresDeCambiosDeCuentaCompuestos(IReadOnlyList<IRecepto
             {
                 await llamada(receptor).ConfigureAwait(false);
             }
-            catch (Exception) when (!cancelacion.IsCancellationRequested)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 // Sin el mensaje ni la causa del receptor (podrían llevar el correo anterior): solo el módulo que falló.
                 throw new CambiosDeCuentaNoAplicablesException { Modulo = receptor.Modulo };

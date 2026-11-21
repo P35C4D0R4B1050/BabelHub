@@ -944,6 +944,7 @@ public sealed class CambioDeCorreoTests
         Assert.Equal(correosAntes, e.Correo.Correos.Count);
         Assert.True((await e.Gestor().Renovar(propia.Renovacion)).EsExito);
         Assert.Equal(1, e.Alertas.Alertas.Count(a => a.Motivo == "dependencia-no-necesaria-fallida"));
+// Con el código aún vigente, al volver el receptor el mismo código aplica el cambio.        e.Receptor.Falla = false;        e.SinReceptores = false;        Assert.True((await e.CambioDeCorreo().VerificarElCorreoNuevo(cuenta.Usuario.Id, S(codigo), propia.Renovacion)).EsExito);        Assert.Equal(Nuevo, cuenta.Usuario.Correo);
     }
 
     [Fact]
@@ -958,6 +959,8 @@ public sealed class CambioDeCorreoTests
 
         Assert.All(e.Auditoria.Registradas, r => Assert.DoesNotContain(Antiguo, r.Motivo ?? string.Empty, StringComparison.Ordinal));
         Assert.All(e.Alertas.Alertas, a => Assert.DoesNotContain(Antiguo, a.Motivo, StringComparison.Ordinal));
+        Assert.All(e.Seguridad.Eventos, s => Assert.DoesNotContain(Antiguo, s.Motivo ?? string.Empty, StringComparison.Ordinal));
+        Assert.Empty(e.Bd.Avisos);
         var excepcion = await Assert.ThrowsAsync<CambiosDeCuentaNoAplicablesException>(() => e.Receptores.AlCambiarElCorreo(cuenta.Usuario.Id, Antiguo));
         Assert.DoesNotContain(Antiguo, excepcion.Message, StringComparison.Ordinal);
         Assert.Null(excepcion.InnerException);

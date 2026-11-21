@@ -71,7 +71,7 @@ public class ReglasDeCredencialesEnLaApiTests
         var enLaInfraestructura = Types.InAssembly(Cargar("BabelHub.Ecommerce.Infrastructure"))
             .That().HaveDependencyOn(Contrato)
             .And().DoNotResideInNamespaceStartingWith("BabelHub.Ecommerce.Infrastructure.Reclamaciones")
-            .And().DoNotResideInNamespaceStartingWith("BabelHub.Ecommerce.Infrastructure.Composicion")
+            .And().DoNotHaveName("ComposicionDeIdentidad")
             .GetTypes();
 
         Assert.Empty(enLaAplicacion);
