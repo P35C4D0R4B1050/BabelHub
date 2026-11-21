@@ -54,7 +54,7 @@ public sealed class PurgarVencidosDeIdentidad(IPurgaDeVencidos purga, IReloj rel
         var codigos = await Paso(() => purga.CodigosDeUnSoloUsoVencidos(ahora - RetencionDeCodigosYRenovaciones, cancelacion), errores, cancelacion).ConfigureAwait(false);
         var renovaciones = await Paso(() => purga.RenovacionesVencidas(ahora - RetencionDeCodigosYRenovaciones, cancelacion), errores, cancelacion).ConfigureAwait(false);
         var solicitudes = await Paso(() => purga.SolicitudesDeCodigo(ahora - RetencionDeLasSolicitudesDeCodigo, cancelacion), errores, cancelacion).ConfigureAwait(false);
-        // El vencimiento de un cambio no reconocido es un evento de seguridad (AUD-33): se registra antes de borrar la fila y, si no se pudo registrar, la fila se conserva para la siguiente pasada en vez de perder el evento.
+        // El vencimiento de un cambio no reconocido es un evento de seguridad (AUD-33): se registra antes de borrar la fila. Si no se pudo <b>leer</b> la lista, la fila se conserva para la siguiente pasada; si el registro de seguridad no puede escribir, nunca interrumpe (deja su alerta técnica) y el evento puede perderse; si el borrado falla, la pasada siguiente repite el evento de las mismas cuentas.
         var erroresAntes = errores.Count;
         await Paso(() => RegistrarLosCambiosNoReconocidosVencidos(ahora, cancelacion), errores, cancelacion).ConfigureAwait(false);
         var cambios = errores.Count > erroresAntes ? 0 : await Paso(() => purga.CambiosDeCorreoVencidos(ahora, cancelacion), errores, cancelacion).ConfigureAwait(false);
