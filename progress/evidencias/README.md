@@ -117,7 +117,7 @@ Catálogo y criterios en [`docs/03/03`](../../docs/03-diseno-de-software/03-prin
 
 ## Qué falta o se demuestra a medias
 
-- **CI en GitHub:** el flujo (`ci.yml`, `secretos.yml`) aún **no se ha ejecutado** en GitHub porque depende del `push` de la persona; no hay corrida que mostrar. Todo lo del flujo se ejecuta y pasa en local.
+- **CI en GitHub:** `ci` y `secretos` en verde sobre `e0bc86df` tras dos rondas de correcciones por causa raíz (primera corrida: 135 pruebas fallidas en Linux; segunda: 7); enlaces y detalle en la fila 7 de `docs/07-proceso-de-desarrollo/07-evidencias-sprint-2.md`.
 - **Specs sin cierre completo:** 7 en `Done`; las demás convergen salvo las excepciones listadas en el punto 3 (operador de envíos real, llaves de Culqi, partes humanas de la interfaz, etc.); `transversal-plataforma` queda fuera del Sprint 2.
 - **RNF02 con el dimensionamiento declarado (0,6 / 0,4)**: medido y no cumplido en la serie final (p95 ≈ 900 ms a 50 usuarios). **Decisión de la persona (DD-18, 2026-11-20, opción A):** se demuestra con el entorno de prueba sin el tope de CPU de la VM (1/1 CPU, p95 < 500 ms a 50 usuarios) y se declara con honestidad que en la VM de 1 OCPU compartida no se sostiene; palancas: memoria de referencias (apagada por D05), separar PostgreSQL, ARM con más OCPU.
 - **2 000 usuarios virtuales:** no se sostienen con p95 < 500 ms en ninguna configuración medida. La cifra vigente es la de la serie final sobre `main`: con el dimensionamiento declarado, p95 de 16,9 s y 51 % de errores; con la mejor configuración (4 / 2 CPU), 10,1 s sin errores. Es la capacidad medida con su dimensionamiento.

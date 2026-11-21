@@ -2,6 +2,12 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-21 (noche) — Primer CI de GitHub en verde
+
+### Cubierto
+- `push` de `main` y tres corridas de `ci` y `secretos`: 135 fallos en Linux, luego 7, luego **verde** (`e0bc86df`, [ci](https://github.com/P35C4D0R4B1050/BabelHub/actions/runs/44932437329)). Causas raíz: permisos de ejecución de dobles y scripts, prueba de tiempos del LLM, enlaces de la hoja maestra en SpecCheck, prueba de arranque de imágenes con todos los secretos (opción 1, PostgreSQL desechable por arquitectura), semillas falsas del historial en `.gitleaksignore`.
+- Entregado en la misma tanda: NOT-02 (`pedido-confirmado` y `libro-digital-disponible`), índice infinito (Done), perfil realista a 2 000 sesiones (2+1 CPU las sostiene), y decisiones DD-24 y DD-25 (nombre y correo de todo usuario).
+
 ## 2026-11-21 (tarde) — Paquete de evidencias del Sprint 2: OpenAPI interactivo, hoja maestra, paneles k6 y perfil realista
 
 ### Cubierto
