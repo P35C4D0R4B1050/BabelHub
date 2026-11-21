@@ -79,6 +79,47 @@ public sealed class PantallasDeAccesoTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Criterio", "AC-IDE-47")]
+    public async Task Un_ingreso_completo_informa_a_Identidad_el_dispositivo_como_el_titular_y_guarda_en_la_cookie_la_marca_que_Identidad_emite()
+    {
+        _host.Ingreso.Resultado = Completo();
+
+        using var respuesta = await _host.Enviar("/ingreso", Datos);
+
+        var registro = Assert.Single(_host.RegistrosDeDispositivo);
+        Assert.Equal((Usuario, (string?)null, (Guid?)Usuario), (registro.Usuario, registro.Marca, registro.Actor));
+        Assert.Contains(Galletas(respuesta), g => g.StartsWith("__Host-bh-dispositivo=marca-nueva-de-dispositivo-0123456789abcdefghijk", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-47")]
+    public async Task Un_ingreso_con_la_marca_de_un_dispositivo_la_presenta_a_Identidad_y_no_emite_otra_cookie()
+    {
+        _host.Ingreso.Resultado = Completo();
+        const string Marca = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ";
+
+        using var respuesta = await _host.Enviar("/ingreso", Datos, cookies: $"__Host-bh-dispositivo={Marca}");
+
+        Assert.Equal(Marca, Assert.Single(_host.RegistrosDeDispositivo).Marca);
+        Assert.DoesNotContain(Galletas(respuesta), g => g.StartsWith("__Host-bh-dispositivo=", StringComparison.Ordinal));
+        Assert.Equal(HttpStatusCode.SeeOther, respuesta.StatusCode);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-47")]
+    public async Task Si_Identidad_no_puede_registrar_el_dispositivo_el_ingreso_igual_se_abre_sin_marca()
+    {
+        _host.Ingreso.Resultado = Completo();
+        _host.DispositivosFallan = true;
+
+        using var respuesta = await _host.Enviar("/ingreso", Datos);
+
+        Assert.Equal(HttpStatusCode.SeeOther, respuesta.StatusCode);
+        Assert.Single(_host.Sesiones);
+        Assert.DoesNotContain(Galletas(respuesta), g => g.StartsWith("__Host-bh-dispositivo=", StringComparison.Ordinal));
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-WEB-19")]
     public async Task Un_ingreso_incorrecto_responde_lo_mismo_exista_o_no_la_cuenta_y_no_repite_lo_escrito()
     {

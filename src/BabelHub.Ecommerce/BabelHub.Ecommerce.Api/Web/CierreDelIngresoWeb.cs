@@ -20,7 +20,7 @@ public sealed record ResultadoDelCierreDelIngreso(bool Iniciada, string Destino,
 /// El final de un ingreso, de un registro verificado o de una recuperación con credencial (T28; WEB-19, WEB-20, WEB-31, WEB-37): entrega la credencial que Identidad emitió <b>solo</b> a la sesión del servidor (<see cref="ISesionesWeb.Iniciar"/>, que acepta o rechaza la pareja de rol y host), escribe la cookie
 /// de sesión, borra la del desafío, emite la marca de dispositivo si hace falta y, para un cliente, <b>fusiona el carrito del visitante</b> con el de su cuenta (idempotente; si falla se reintenta en el siguiente <c>POST</c> del carrito y nunca impide el ingreso). El navegador nunca ve la credencial ni la renovación.
 /// </summary>
-public sealed class CierreDelIngresoWeb(ISesionesWeb sesiones, ISesiones identidad, OpcionesDelHostWeb host, IEstablecedorDeActor actor, ICarritoDelCliente carrito)
+public sealed class CierreDelIngresoWeb(ISesionesWeb sesiones, ISesiones identidad, OpcionesDelHostWeb host, IEstablecedorDeActor actor, ICarritoDelCliente carrito, IDispositivosDeLaCuenta dispositivos)
 {
     private const string Portada = "/";
 
@@ -55,10 +55,8 @@ public sealed class CierreDelIngresoWeb(ISesionesWeb sesiones, ISesiones identid
         }
 
         CookieDeSesionWeb.Escribir(contexto.Response, host.Host, iniciada.Valor.ValorDeLaCookie);
-        if (iniciada.Valor.MarcaDeDispositivoNueva is { } marca)
-        {
-            CookieDeDispositivo.Escribir(contexto.Response, marca);
-        }
+        // La marca de dispositivo la emite y la reconoce Identidad (IDE-55, IDE-76): la web solo la guarda en su cookie. Una marca que la web inventara nunca sería «reconocida».
+        await RegistrarElDispositivo(contexto, credencial, dispositivo, cancelacion).ConfigureAwait(false);
 
         CookieDelDesafio.Borrar(contexto.Response);
         if (rol == RolWeb.Cliente)
@@ -96,6 +94,28 @@ public sealed class CierreDelIngresoWeb(ISesionesWeb sesiones, ISesiones identid
         catch (Exception)
         {
             // Mejor esfuerzo: la renovación descartada nadie la tiene y vence sola.
+        }
+    }
+
+    private async Task RegistrarElDispositivo(HttpContext contexto, CredencialDeSesion credencial, DatosDelDispositivo dispositivo, CancellationToken cancelacion)
+    {
+        try
+        {
+            // La sesión nueva todavía no es el actor de esta solicitud: la cuenta que acaba de ingresar lo es solo mientras dura el registro, porque Identidad solo lo registra para el propio titular.
+            actor.Establecer(ActorActual.DeUsuario(credencial.UsuarioId, RolesDeUsuario(credencial.Rol), credencial.Sucursal));
+            var registro = await dispositivos.RegistrarElIngresoCompleto(credencial.UsuarioId, dispositivo.Marca is null ? null : new ValorSecreto(dispositivo.Marca), dispositivo.Region, cancelacion).ConfigureAwait(false);
+            if (registro.EsExito && registro.Valor.MarcaNueva is { } marca)
+            {
+                CookieDeDispositivo.Escribir(contexto.Response, marca.Revelar());
+            }
+        }
+        catch (Exception) when (!cancelacion.IsCancellationRequested)
+        {
+            // Registrar el dispositivo nunca impide el ingreso: sin marca guardada el dispositivo no se reconoce y los cambios sensibles piden confirmación (falla cerrado).
+        }
+        finally
+        {
+            actor.Establecer(ActorActual.Anonimo());
         }
     }
 

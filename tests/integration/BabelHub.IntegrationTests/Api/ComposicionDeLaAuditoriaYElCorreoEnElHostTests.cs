@@ -1,6 +1,7 @@
 using BabelHub.Ecommerce.Api.Plataforma;
 using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Auditoria.Interno;
+using BabelHub.Ecommerce.Application.Identidad;
 using BabelHub.Ecommerce.Application.Identidad.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Application.Plataforma.Interno;
@@ -62,6 +63,20 @@ public sealed class ComposicionDeLaAuditoriaYElCorreoEnElHostTests
         Assert.NotNull(servicios.GetRequiredService<ICuentasCanceladasPendientes>());
         Assert.NotNull(servicios.GetRequiredService<IDepuradorDeRegistrosAislados>());
         Assert.Contains(PasoDeRestauracionDeDepuracion.NombreDelPaso, pasos);    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-47")]
+    public async Task ElCierreDelIngresoWeb_SeResuelveEnElHost_ConElRegistroDeDispositivosDeIdentidad()
+    {
+        await using var app = AnfitrionDelEcommerceTests.Compuesto();
+        await using var alcance = app.Services.CreateAsyncScope();
+
+        var cierre = alcance.ServiceProvider.GetRequiredService<BabelHub.Ecommerce.Api.Web.CierreDelIngresoWeb>();
+        var dispositivos = alcance.ServiceProvider.GetRequiredService<IDispositivosDeLaCuenta>();
+
+        Assert.NotNull(cierre);
+        Assert.IsType<DispositivosDeLaCuenta>(dispositivos);
+    }
 
     [Fact]
     [Trait("Criterio", "AC-IDE-60")]
