@@ -116,6 +116,7 @@ public static class ModuloWebExtensiones
 
         servicios.AddScoped<ITextosLegales, ConsultarTextoLegal>();
         servicios.AddSingleton<IAreasDeInterfaz, AreasDeInterfaz>();
+        servicios.AddSingleton<IMenuDeNavegacion, ResolverMenu>();
         servicios.TryAddSingleton<IDesafioDelIngreso, DesafioDelIngresoSinIdentidad>();
         // La política de textos pendientes (T36): el estado y la aceptación los informa Identidad (provisionales y fallando cerrado hasta entonces); el tope de consultas es uno por proceso.
         servicios.TryAddSingleton<IEstadoDeCuentaDeLaWeb, EstadoDeCuentaSinIdentidad>();
