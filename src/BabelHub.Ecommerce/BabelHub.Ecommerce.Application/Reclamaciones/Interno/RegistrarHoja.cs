@@ -211,7 +211,7 @@ internal sealed partial class RegistrarHoja(
         }
         catch (Exception) when (reserva is not null)
         {
-            // Un fallo de la base no deja la clave en curso 60 s. El cupo ya contado no se devuelve (la política no es liberable): es lo conservador frente al abuso.
+            // Un fallo de la base no deja la clave en curso 60 s. El cupo ya contado no se devuelve en este caso: solo la rama de REC-33 (hoja y auditoría revertidas juntas) llama a <c>Liberar</c>; devolverlo tras otro fallo o tras confirmar permitiría evadir el tope (DD-29).
             await Devolver(reserva, CancellationToken.None).ConfigureAwait(false);
             throw;
         }
