@@ -4,7 +4,7 @@
 # Las imágenes base van fijadas por etiqueta y por digest del índice multi-arquitectura (PLA-26); un cambio de versión es un cambio revisado.
 
 # La compilación corre en la arquitectura de quien construye (sin emulación) y publica un resultado independiente de la arquitectura.
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0@sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb AS publicar
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:11.0@sha256:65f3c7c6a25a239ab3e6719f2896147e7b68242ff2d8818dd70498bde6ef8bea AS publicar
 WORKDIR /fuentes
 
 # Primero lo que decide las dependencias (propiedades, versiones centralizadas y bloqueos), para aprovechar la caché de capas.
