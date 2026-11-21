@@ -81,11 +81,13 @@ public sealed class ConcurrenciaYReintentosDeDevolucionesTests(PostgresDeDevoluc
 
         e.Inventario.PierdeLaRespuesta = true;
         var perdida = await e.Recibir(devolucionId);
-        e.Inventario.PierdeLaRespuesta = false;
-        var reintento = await e.Recibir(devolucionId);
 
         Assert.False(perdida.EsExito);
         Assert.Equal("aprobada", await EstadoDeLaLinea(devolucionId));
+
+        e.Inventario.PierdeLaRespuesta = false;
+        var reintento = await e.Recibir(devolucionId);
+
         Assert.True(reintento.EsExito, reintento.Error?.Clave);
         Assert.Equal(1, e.Inventario.Aplicaciones(devolucionId));
         Assert.Equal(1, e.Reembolsos.Registrados);
