@@ -67,6 +67,25 @@ public sealed class EntregaDeLineasDePedidosTests(PostgresDePedidosFixture bd) :
 
     [Fact]
     [Trait("Criterio", "AC-PED-09")]
+    public async Task Una_linea_no_recogida_no_se_entrega_se_rechaza_sin_llamar_al_Inventario_y_el_pedido_no_cambia()
+    {
+        await using var escenario = EscenarioDePedidos.Crear(bd.Unidad);
+        var listo = await SembrarListo();
+        var cargado = (await bd.Pedidos.Obtener(listo.Id, conBloqueo: true))!;
+        Assert.NotEmpty(cargado.MarcarNoRecogidas(EscenarioDePedidos.InicioDelDia.AddHours(361), new HashSet<Guid>()));
+        await bd.Pedidos.Actualizar(cargado);
+
+        var resultado = await Entregar(escenario, listo);
+
+        Assert.False(resultado.EsExito);
+        Assert.Equal("pedido-estado-invalido", resultado.Error!.Clave);
+        Assert.Empty(escenario.Reservas.Cierres);
+        Assert.All(await Estados(listo.Id), e => Assert.Equal(EstadoDeLineaImpresa.NoRecogido, e));
+        Assert.Empty(await escenario.Como(EscenarioDePedidos.DeLaAdministracion(), sp => sp.GetRequiredService<IRepositorioDePedidos>().EntregasEnCurso(listo.Id)));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PED-09")]
     public async Task Con_el_Inventario_caido_las_lineas_no_cambian_la_entrega_queda_fallida_y_repetirla_la_completa()
     {
         await using var escenario = EscenarioDePedidos.Crear(bd.Unidad);

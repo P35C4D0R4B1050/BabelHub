@@ -481,7 +481,7 @@ public sealed partial class Pedido
         Aplicar(lineaIds, ahora, (linea, instante) => Resultado(linea.PasarA(EstadoDeLineaImpresa.Despachado, instante)));
 
     /// <summary>
-    /// Entrega las líneas en <paramref name="fecha"/> (PED-11, PED-29): en recojo desde listo para recojo (o no recogido), a domicilio desde despachado con la fecha de entrega del envío. El que el Inventario haya descontado el físico lo decide la Aplicación antes de llamarlo.
+    /// Entrega las líneas en <paramref name="fecha"/> (PED-11, PED-29): en recojo desde listo para recojo (un no recogido no se entrega: DD-20), a domicilio desde despachado con la fecha de entrega del envío. El que el Inventario haya descontado el físico lo decide la Aplicación antes de llamarlo.
     /// </summary>
     public IReadOnlyList<ResultadoPorLinea> EntregarLineas(IReadOnlyCollection<Guid> lineaIds, DateTimeOffset fecha) =>
         Aplicar(lineaIds, fecha, (linea, instante) => Resultado(linea.PasarA(EstadoDeLineaImpresa.Entregado, instante)));
