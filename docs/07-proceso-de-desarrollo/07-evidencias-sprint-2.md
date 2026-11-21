@@ -15,7 +15,7 @@ Esta hoja recorre la rúbrica del Sprint 2 punto por punto, con la **métrica**,
 | 5. Base de datos y caché | Cumple, con hallazgos medidos | `docs/03/09` |
 | 6. SOLID y patrones | Cumple | `docs/03/03` + ejemplos de este documento |
 | 7. Pruebas, cobertura y CI/CD | Cumple en local; **CI en GitHub sin ejecutar** (depende del `push`) | `progress/evidencias/cobertura/index.html`, `.github/workflows/` |
-| 8. Atributos de calidad con k6 hasta 2 000 usuarios | **Parcial**: RNF02 a 50 usuarios con DD-17 y los 2 000 usuarios (también con el perfil realista) **no cumplen**; el perfil realista sostiene ≈ 1 000 sesiones (se declara y se explica) | `progress/evidencias/k6/`, `docs/03/09` |
+| 8. Atributos de calidad con k6 hasta 2 000 usuarios | **Parcial**: RNF02 a 50 usuarios con DD-17 y los 2 000 usuarios del perfil de estrés **no cumplen**; con el perfil realista, 2 000 sesiones **no** se sostienen con la configuración declarada (0,6 + 0,4 CPU, sostiene ≈ 1 000) y **sí** con Inventario 2 CPU + PostgreSQL 1 CPU (sección 2.3; se declara y se explica) | `progress/evidencias/k6/`, `docs/03/09` |
 
 ## 2. Métricas de los atributos de calidad
 
@@ -29,7 +29,7 @@ Todas medidas con k6 (imagen oficial `grafana/k6` v2.4.0 fijada por huella) cont
 | Concurrencia sin sobreventa (AC01) | [`sobreventa`](../../progress/evidencias/k6/2026-11-20-final-escenarios/sobreventa.md): 100 usuarios por 10 unidades | exactamente 10 reservas, 90 rechazos, vendible final 0 | 10 reservas, 90 rechazos `INV-STOCK-INSUFICIENTE`, sin respuestas inesperadas | **Sí** |
 | Seguridad: límites de uso (API4) | [`limites-de-uso`](../../progress/evidencias/k6/2026-11-20-final-escenarios/limites-de-uso.md) | más de 100 solicitudes/min de un usuario: 429 con `Retry-After`; el vecino no se ve afectado | 100 permitidas, el resto 429; el vecino sin limitar | **Sí** |
 | Disponibilidad ante caída (RNF03) | [`resiliencia`](../../progress/evidencias/k6/2026-11-20-final-escenarios/resiliencia.md): PostgreSQL pausado 25 s | proceso vivo, 503 uniforme (nunca 500), recuperación sola | 503 uniforme, 0 respuestas inesperadas, recuperación sola | **Sí** |
-| Capacidad realista: 2 000 sesiones con pausa de persona (≈ 39 solicitudes/s al Inventario), dimensionamiento de DD-17 | [`perfil-realista`](../../progress/evidencias/k6/2026-11-21-perfil-realista/perfil-realista.md) | p95 < 500 ms (disponibilidad), p95 < 3 s (reservar + confirmar), < 1 % de errores, por nivel | Cumple hasta **1 000 sesiones** (2 corridas); **1 500 en el límite**; **2 000 no** (sección 2.2) | **Hasta 1 000**; 2 000 **no** |
+| Capacidad realista: 2 000 sesiones con pausa de persona (≈ 39 solicitudes/s al Inventario), dimensionamiento de DD-17 | [`perfil-realista`](../../progress/evidencias/k6/2026-11-21-perfil-realista/perfil-realista.md) | p95 < 500 ms (disponibilidad), p95 < 3 s (reservar + confirmar), < 1 % de errores, por nivel | Cumple hasta **1 000 sesiones** (2 corridas); **1 500 en el límite**; **2 000 no** (sección 2.2) | **Hasta 1 000**; 2 000 **no** con el dimensionamiento declarado (con 2 + 1 CPU **sí**, sección 2.3) |
 | Escalabilidad, perfil de estrés: 50 → 2 000 usuarios con pausa de 0,5 s (límite y degradación) | [`rampa`](../../progress/evidencias/k6/2026-11-20-final/inventario-0.6cpu_postgres-0.4cpu_pool-16/rampa-de-usuarios.md), declarado por DD-17 | p95 < 500 ms y < 1 % de errores por nivel | 50 usuarios: p95 1,4 s; 100: 1,9 s; 500: 7,4 s; 1 000: 16,4 s (11,5 % de errores); **2 000: 16,9 s y 51 % de errores** | **No** |
 | Escalabilidad, mejor configuración medida (4 CPU + 2 CPU) | [`rampa`](../../progress/evidencias/k6/2026-11-20-final/inventario-4cpu_postgres-2cpu_pool-16/rampa-de-usuarios.md) | p95 < 500 ms por nivel | 100 usuarios: 47 ms; 250: 937 ms; **2 000: 10,1 s sin errores (cifra vigente)** | Hasta 100 usuarios; **2 000 no** |
 
@@ -53,7 +53,22 @@ La rampa de la sección 2 es un **perfil de estrés** (pausa de 0,5 s entre soli
 | 1 500 | 3,3 s (repetición: 375 ms) | 11,2 s (703 ms) | 0,37 % (0,24 %) | **En el límite**: una corrida cumple y la otra no |
 | 2 000 | 1,2 s (repetición: 13,9 s) | 2,9 s (42,3 s) | 6,4 % (0,29 %) | **No** |
 
-**Lectura honesta:** con el dimensionamiento declarado, **VM-INVENTARIO sostiene ≈ 1 000 sesiones concurrentes con p95 < 500 ms** (≈ 20 solicitudes por segundo al Inventario), **1 500 está en el límite y 2 000 sesiones no se sostienen**. Para 2 000 con holgura hace falta más capacidad que 1 OCPU compartida con PostgreSQL: la rampa de estrés indica que 1 CPU para el Inventario y 1 para PostgreSQL atiende más de 100 solicitudes por segundo (≈ 3 veces lo necesario), pero **no se midió con este perfil**; separar PostgreSQL o una ARM con más OCPU son las palancas (DD-18). **Alcance:** se mide el Inventario con el tráfico que el E-commerce le enviaría; el catálogo, el carrito y el pedido del E-commerce (VM-VENTAS) y la latencia de extremo a extremo **no se midieron**. Una sola corrida completa y una repetición parcial: con la mayor carga dos corridas con la misma configuración dan resultados muy distintos.
+**Lectura honesta:** con el dimensionamiento declarado, **VM-INVENTARIO sostiene ≈ 1 000 sesiones concurrentes con p95 < 500 ms** (≈ 20 solicitudes por segundo al Inventario), **1 500 está en el límite y 2 000 sesiones no se sostienen**. Para 2 000 hace falta más capacidad que 1 OCPU compartida con PostgreSQL: **se midió en 2.3** (Inventario 2 CPU + PostgreSQL 1 CPU sí cumple); separar PostgreSQL o una ARM con más OCPU son las palancas (DD-18). **Alcance:** se mide el Inventario con el tráfico que el E-commerce le enviaría; el catálogo, el carrito y el pedido del E-commerce (VM-VENTAS) y la latencia de extremo a extremo **no se midieron**. Una sola corrida completa y una repetición parcial: con la mayor carga dos corridas con la misma configuración dan resultados muy distintos.
+
+### 2.3 Qué recursos hacen falta para 2 000 sesiones (perfil realista)
+
+Encargo de la persona (2026-11-21): el mismo perfil de 2.2, a **2 000 sesiones concurrentes**, con el dimensionamiento que **sí** las sostenga, del menor al mayor tamaño. La configuración declarada de la VM de 1 OCPU (**0,6 + 0,4 CPU, DD-17**) **no cambia**; la de abajo es el **dimensionamiento recomendado para 2 000 sesiones**. Método: una corrida por configuración, solo el nivel de 2 000 sesiones (30 s de subida, 240 s sostenidos), 512 MB, tope de 16 conexiones, umbrales de RNF02 sin cambios. Evidencia (panel HTML, JSON y resumen por corrida): [`k6/2026-11-21-perfil-realista-2000/`](../../progress/evidencias/k6/2026-11-21-perfil-realista-2000/).
+
+| Inventario + PostgreSQL (CPU) | Disponibilidad p95 (< 500 ms) | Reservar + confirmar p95 (< 3 s) | Errores (< 1 %) | ¿Sostiene 2 000 sesiones? |
+| :--- | :--- | :--- | :--- | :--- |
+| 0,6 + 0,4 (declarada, DD-17; **no cambia**) | 1 576 ms | 4 401 ms | 0,01 % | **No** |
+| 1,0 + 0,5 | 1 481 ms | 5 600 ms | 0,02 % | **No** |
+| 1,5 + 0,75 | 560 ms | 1 169 ms | 0,11 % | **No** (por 60 ms) |
+| **2 + 1 (mínima probada que cumple; recomendada para 2 000)** | **201 ms** (repetición 313 ms) | 286 ms (710 ms) | 0,07 % (0,04 %) | **Sí**, en las dos corridas; en la curva de 1 000 / 1 500 / 2 000 sesiones también (56 / 366 / 147 ms) |
+
+**Lectura honesta.** La configuración mínima **probada** que cumple los tres umbrales a 2 000 sesiones es **Inventario 2 CPU + PostgreSQL 1 CPU** (3 CPU en total, ≈ 3 veces el dimensionamiento declarado de 1 OCPU compartida): cumplió en las tres corridas que la incluyen (búsqueda, repetición y curva; [panel de la curva](../../progress/evidencias/k6/2026-11-21-perfil-realista-2000/curva-inv2-pg1/perfil-realista-panel.html)). «Mínima» es la menor de la escalera probada: no se midieron valores intermedios (por ejemplo 1,5 + 1,0), la configuración 4 + 2 no hizo falta y la búsqueda se detuvo al primer cumplimiento. A 1 500 sesiones con 2 + 1 la disponibilidad quedó en 366 ms (sin holgura amplia). **Alcance:** solo el Inventario; **la ruta del E-commerce (catálogo, búsqueda, carrito, pedido) y la latencia de extremo a extremo no se midieron**; la capacidad de VM-VENTAS tampoco; 20 ediciones de prueba, pasarela simulada, máquina de desarrollo compartida con k6.
+
+**Corrección de validez de 2.2.** Las credenciales de la carga duran 14 minutos (el Inventario no admite más de 15) y la corrida completa de 2.2 duró 17,9 minutos: sus niveles de 1 500 y, sobre todo, de 2 000 sesiones hicieron las reservas con credenciales vencidas, por lo que parte de sus errores (6,4 % a 2 000) y tiempos **no son de capacidad**. Las corridas de 2.3 duran menos de 14 minutos. La conclusión de 2.2 para 0,6 + 0,4 se confirmó con credenciales vigentes (1,6 s y 4,4 s a 2 000 sesiones).
 
 ### 2.1 Paneles interactivos de k6
 
@@ -137,7 +152,7 @@ bash tests/load/entorno/bajar-carga.sh
 ## 4. Qué no se demuestra (declarado)
 
 - **CI en GitHub:** sin corrida real hasta el `push`.
-- **RNF02 y 2 000 usuarios** con el dimensionamiento declarado: no cumplen (secciones 2 y 2.2; con el perfil realista se sostienen ≈ 1 000 sesiones). Decisión DD-18.
+- **RNF02 y 2 000 usuarios** con el dimensionamiento declarado: no cumplen (secciones 2 y 2.2; con el perfil realista se sostienen ≈ 1 000 sesiones); con Inventario 2 CPU + PostgreSQL 1 CPU, 2 000 sesiones **sí** se sostienen (sección 2.3; solo el Inventario). Decisión DD-18.
 - **Perfil realista sin el E-commerce:** el catálogo, el carrito y el pedido (VM-VENTAS) y la latencia de extremo a extremo no se midieron; una sola corrida completa y una repetición parcial.
 - **Medición en la VM ARM real**, despliegue, restauración con carga y llaves reales de pasarela y asistente: fuera del Sprint 2.
 - **E-commerce bajo k6:** se midió el Inventario (donde se concentra la concurrencia de stock); el tramo del E-commerce del checkout no se midió con k6.
