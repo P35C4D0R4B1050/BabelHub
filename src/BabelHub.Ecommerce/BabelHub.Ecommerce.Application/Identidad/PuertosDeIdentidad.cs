@@ -32,6 +32,25 @@ public interface IPendientesDeCuentaPorTipo : IPendientesDeCuenta
     Task<PendientesDeCuentaPorTipo> ContarPorTipo(Guid usuarioId, CancellationToken cancelacion = default);
 }
 
+/// <summary>
+/// Los tres números que informa Devoluciones para una cuenta (DEV-23), sin contar un mismo caso en dos: devoluciones abiertas de impresos (alguna línea solicitada o aprobada), reportes de archivo defectuoso sin decidir y
+/// reembolsos pendientes (línea recibida de un impreso o aprobada de un digital, hasta que la pasarela confirma). Solo números de esa cuenta; nunca motivos, textos ni importes.
+/// </summary>
+public readonly record struct PendientesDeDevolucionesDeCuenta(int DevolucionesAbiertas, int ReportesSinDecidir, int ReembolsosPendientes)
+{
+    /// <summary>La suma que cuenta <see cref="IPendientesDeCuenta.Contar"/>.</summary>
+    public int Total => checked(DevolucionesAbiertas + ReportesSinDecidir + ReembolsosPendientes);
+}
+
+/// <summary>
+/// Los pendientes de Devoluciones de una cuenta <b>en sus tres números</b> (DEV-23, AC-DEV-25): extiende <see cref="IPendientesDeCuenta"/> sin cambiarlo (<see cref="IPendientesDeCuenta.Contar"/> sigue devolviendo la suma, que es
+/// <see cref="PendientesDeDevolucionesDeCuenta.Total"/>). Lo implementa Devoluciones; mismas reglas: falla cerrado con <see cref="PendientesNoDisponiblesException"/> y nunca asume cero.
+/// </summary>
+public interface IPendientesDeDevolucionesDeCuenta : IPendientesDeCuenta
+{
+    Task<PendientesDeDevolucionesDeCuenta> ContarEnTres(Guid usuarioId, CancellationToken cancelacion = default);
+}
+
 /// <summary>No se pudo contar los pendientes de una cuenta: la cancelación o el reemplazo fallan cerrados (IDE-27, IDE-84).</summary>
 public sealed class PendientesNoDisponiblesException : InvalidOperationException
 {

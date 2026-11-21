@@ -57,6 +57,7 @@ public static class ComposicionDeDevoluciones
 
         // La parte de Devoluciones de la cancelación de la cuenta: se suma a la enumeración que Identidad recorre (no se reemplaza a nadie).
         servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IPendientesDeCuenta, ContarPendientesDeCuenta>());
+        servicios.TryAddScoped<IPendientesDeDevolucionesDeCuenta, ContarPendientesDeCuenta>();
         servicios.TryAddEnumerable(ServiceDescriptor.Scoped<IAplicadorDeCancelacion, RedactarDevolucionesDeUnaCuenta>());
 
         // ---------- Lo que aún no existe, con su guarda de producción ----------

@@ -72,6 +72,8 @@ public static partial class CatalogoDeAccionesDeAuditoria
         "avisos-de-la-pasarela-por-origen",
         "consultas-de-pedidos-por-usuario",
         "gestion-de-pedidos-por-usuario",
+        "consultas-de-devoluciones-por-usuario",
+        "operaciones-de-devoluciones-por-usuario",
         "lecturas-del-contacto-de-pedidos-por-persona",
         "avisos-por-numero-por-hora",
         "avisos-por-numero-en-24-horas",
