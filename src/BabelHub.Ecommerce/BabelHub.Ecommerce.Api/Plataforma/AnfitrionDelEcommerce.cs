@@ -485,6 +485,7 @@ public static class AnfitrionDelEcommerce
         ArgumentNullException.ThrowIfNull(app);
         app.UseForwardedHeaders();
         app.UsarCabecerasDeSeguridad();
+        app.UsarCabecerasDelIndiceInfinito();
         app.UsarManejoDeErrores();
         app.UseStaticFiles();
         app.UsarOrigenDelBorde();
