@@ -1,0 +1,14 @@
+# Huellas de hallazgos del historial: semillas falsas de pruebas (datos prohibidos, JWT y claves de ejemplo) en commits ya superados.
+# Cada línea fija un commit, un archivo, una regla y una línea concretos: un secreto real nuevo, o la misma regla en otra línea, sigue detectándose.
+49e3d04524283dba72cf33b7d6802e6699e4876b:tests/integration/BabelHub.IntegrationTests/Web/SesionDeExtremoAExtremoTests.cs:generic-api-key:385
+49e3d04524283dba72cf33b7d6802e6699e4876b:tests/integration/BabelHub.IntegrationTests/Web/SesionDeExtremoAExtremoTests.cs:jwt:384
+6c941d7395f57e6673688e1ee3f4189e89e9e67b:tests/unit/BabelHub.Ecommerce.UnitTests/Pagos/IniciarCobroTests.cs:generic-api-key:16
+70962a6b831bfb27209fbbfce6ca1d8f5dfd7b6f:tests/unit/BabelHub.Ecommerce.UnitTests/Auditoria/DetalleSeguroTests.cs:age-secret-key:117
+70962a6b831bfb27209fbbfce6ca1d8f5dfd7b6f:tests/unit/BabelHub.Ecommerce.UnitTests/Auditoria/DetalleSeguroTests.cs:jwt:113
+70962a6b831bfb27209fbbfce6ca1d8f5dfd7b6f:tests/unit/BabelHub.Inventario.UnitTests/Auditoria/DetalleSeguroTests.cs:age-secret-key:117
+70962a6b831bfb27209fbbfce6ca1d8f5dfd7b6f:tests/unit/BabelHub.Inventario.UnitTests/Auditoria/DetalleSeguroTests.cs:jwt:113
+8860d6894f43c24f3a3a05c3a119f2b744a3f9a9:tests/unit/Compartido/CorpusDeDatosProhibidos.cs:generic-api-key:18
+98da965b3caf99d935d13d68aa03e8f2ac8390ad:tests/integration/BabelHub.IntegrationTests/Plataforma/LimiteDeConexionesDeLaBaseTests.cs:generic-api-key:14
+99ca581a13c63e96b37d93f8501718dafec495b7:tests/integration/BabelHub.IntegrationTests/Fuentes/ComposicionDeFuentesTests.cs:generic-api-key:34
+c88cc68f2d6834898e2c51f9eda5ddf21166fcd7:tests/unit/Compartido/CorpusDeDatosProhibidos.cs:generic-api-key:18
+c88cc68f2d6834898e2c51f9eda5ddf21166fcd7:tests/unit/Compartido/CorpusDeDatosProhibidos.cs:generic-api-key:19
