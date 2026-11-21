@@ -102,6 +102,6 @@ No converge (provisional): el código implementa los 37 requisitos y 33 tienen p
 
 ## Actualización (2026-11-20, ronda 2 de ECO-6g)
 
-- **D-01 cerrada:** la spec se enmendó (CAR-29 solo retención; CAR-38 y AC-CAR-32 y 33 para los topes de 30 líneas y 20 unidades) y está **Planned** (filas de `progress/aprobaciones.md` del 2026-11-20; excepción DD-17). El código y las pruebas ya nombran AC-CAR-32 y 33.
+- **D-01 cerrada:** la spec se enmendó (CAR-29 solo retención; CAR-38 y AC-CAR-32 y 33 para los topes de 30 líneas y 20 unidades) y está **Planned** (filas de `progress/aprobaciones.md` del 2026-11-20; excepción DD-19). El código y las pruebas ya nombran AC-CAR-32 y 33.
 - **D-03 cerrada:** T25 marcada. **D-04:** trazas `AC-CAR` corregidas en lo tocado por esta ronda (el resto de las trazas de `InventarioDelCarritoConPostgresTests` sigue por revisar). **D-06 y D-07 cerradas** (campo oculto `sucursalPreferida`; «Te quedan N min.» con prueba).
 - **Siguen abiertas:** D-02 y D-05 (E2E de fusión, de compra a domicilio y solo digital con las cadenas reales, y `ui-review`; turno de Docker) y D-08 (prueba de «cambia de sucursal preferida y mantiene su carrito»). Resultado: **No converge** hasta cerrarlas.
