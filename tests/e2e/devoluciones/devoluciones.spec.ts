@@ -40,13 +40,15 @@ test.describe('Devoluciones', () => {
     await page.goto(`/cuenta/pedidos/${id}`);
     await page.getByRole('link', { name: 'Devolver libros' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Devolver un pedido' })).toBeVisible();
-    await page.getByLabel(/^El zorro y el cóndor del Ande/).fill('1');
+    await page.getByRole('spinbutton').first().fill('1');
     await page.getByLabel('Sucursal donde entregarás los libros').selectOption({ index: 0 });
-    await page.getByLabel(/^Motivo/).fill('No era el libro que buscaba');
+    await page.getByRole('textbox', { name: /^Motivo/ }).fill('No era el libro que buscaba');
     await sinViolacionesDeAccesibilidad(page);
     await page.screenshot({ path: info.outputPath('devolver-un-pedido.png'), fullPage: true });
     await page.getByRole('button', { name: 'Solicitar la devolución' }).click();
     await expect(page.getByText('Tu solicitud quedó registrada. Te avisaremos cuando cambie de estado.')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: /^Devolución / })).toBeVisible();
+    await page.goto('/cuenta/devoluciones');
     await expect(page.getByRole('heading', { level: 1, name: 'Mis devoluciones' })).toBeVisible();
     await expect(page.getByRole('row').filter({ hasText: 'Solicitada' })).toHaveCount(1);
     await sinViolacionesDeAccesibilidad(page);
@@ -79,6 +81,8 @@ test.describe('Devoluciones', () => {
     await page.getByLabel('Motivo').first().fill('Lo compré por error');
     await page.getByRole('button', { name: 'Pedir el reembolso' }).click();
 
+    await expect(page.getByRole('heading', { level: 1, name: /^Devolución / })).toBeVisible();
+    await page.goto('/cuenta/devoluciones');
     await expect(page.getByRole('heading', { level: 1, name: 'Mis devoluciones' })).toBeVisible();
     await expect(page.getByRole('row').filter({ hasText: /Reembolsada|Aprobada|Solicitada/ })).toHaveCount(1);
     await sinViolacionesDeAccesibilidad(page);
@@ -96,7 +100,7 @@ test.describe('Devoluciones', () => {
     await formulario.getByLabel('Motivo').fill('El archivo no abre');
     await formulario.getByLabel(/^Qué le pasa al archivo/).fill('Al abrirlo en el lector aparece una pantalla en blanco desde el capítulo 2.');
     await formulario.getByRole('button', { name: 'Reportar el archivo' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Mis devoluciones' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: /^Devolución / })).toBeVisible();
 
     // Un encargado no ve los reportes: responde lo mismo que ante cualquier recurso fuera de su alcance.
     await ingresarComoPersonal(page, 'encargado', 'ayacucho');
