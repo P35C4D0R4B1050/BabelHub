@@ -6,7 +6,7 @@ namespace BabelHub.Ecommerce.Domain.Web.Indice;
 /// El generador del índice infinito (IND-01, IND-02, IND-06; D02): una <b>función pura</b> de una dirección a una página de 20 líneas de 70 símbolos de un alfabeto fijo de 30 (26 letras sin tilde, ñ, espacio, coma y punto), unidas por
 /// <c>\n</c> sin salto final. La dirección (UTF-8) se resume con <b>FNV-1a de 64 bits</b>, que siembra un <b>SplitMix64</b>; cada símbolo es <c>(salida &gt;&gt; 32) % 30</c>. Son algoritmos publicados, escritos desde cero: no usa
 /// <c>string.GetHashCode</c> (aleatorizado por proceso), <c>System.Random</c> (su secuencia no está garantizada entre versiones) ni código de terceros. Sin cultura, reloj ni estado: cambiar el algoritmo cambiaría todas las páginas ya
-/// compartidas (R01) y vuelve la spec a Draft.
+/// compartidas (R01) y vuelve la spec a Draft. <b>No es criptográfico</b>: FNV-1a y SplitMix64 son predecibles y reversibles; no se debe usar para tokens, identificadores ni secretos.
 /// </summary>
 public static class GeneradorDePaginasDelIndice
 {

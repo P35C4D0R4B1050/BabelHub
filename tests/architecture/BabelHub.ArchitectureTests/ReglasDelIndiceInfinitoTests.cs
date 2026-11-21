@@ -24,10 +24,15 @@ public class ReglasDelIndiceInfinitoTests
         "BabelHub.Ecommerce.Infrastructure",
     ];
 
-    private static readonly string[] ModulosDeNegocio =
-    [
-        "Catalogo", "Carrito", "Pagos", "Pedidos", "Envios", "Devoluciones", "Biblioteca", "Reclamaciones", "Identidad", "Asistente", "Auditoria", "Notificaciones",
-    ];
+    /// <summary>Todos los módulos de la Aplicación salvo `Web` y `Plataforma` (derivados del ensamblado: un módulo nuevo queda cubierto sin tocar esta prueba).</summary>
+    private static readonly string[] ModulosDeNegocio = typeof(IIndiceInfinito).Assembly.GetTypes()
+        .Select(t => t.Namespace?.Split('.'))
+        .Where(p => p is { Length: >= 4 } && p[0] == "BabelHub" && p[1] == "Ecommerce" && p[2] == "Application")
+        .Select(p => p![3])
+        .Where(m => m is not ("Web" or "Plataforma"))
+        .Distinct()
+        .Order()
+        .ToArray();
 
     private static readonly string[] Prohibidos =
     [
@@ -46,6 +51,7 @@ public class ReglasDelIndiceInfinitoTests
         ModulosDeNegocio.SelectMany(m => new[] { $"BabelHub.Ecommerce.{capa}.{m}" });
 
     [Fact]
+    [Trait("Criterio", "AC-IND-05")]
     public void Los_tipos_del_Dominio_del_indice_no_referencian_persistencia_la_aplicacion_ni_otros_modulos()
     {
         var resultado = Types.InAssembly(Dominio).That().ResideInNamespaceStartingWith(DominioDelIndice)
@@ -56,6 +62,7 @@ public class ReglasDelIndiceInfinitoTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-IND-05")]
     public void El_dominio_del_indice_existe_y_tiene_los_tipos_del_plan()
     {
         var nombres = Types.InAssembly(Dominio).That().ResideInNamespace(DominioDelIndice).GetTypes().Select(t => t.Name).ToHashSet();
@@ -66,19 +73,21 @@ public class ReglasDelIndiceInfinitoTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-IND-05")]
     public void Los_tipos_de_la_Aplicacion_del_indice_no_referencian_persistencia_ni_otros_modulos_ni_Plataforma()
     {
         var tipos = Types.InAssembly(Aplicacion).That().ResideInNamespaceStartingWith(AplicacionDelIndice);
         Assert.NotEmpty(tipos.GetTypes());
 
         var resultado = tipos
-            .ShouldNot().HaveDependencyOnAny([.. Persistencia, "BabelHub.Ecommerce.Infrastructure", .. DependenciasProhibidasDeLosModulos("Application")])
+            .ShouldNot().HaveDependencyOnAny([.. Persistencia, "BabelHub.Ecommerce.Infrastructure", .. DependenciasProhibidasDeLosModulos("Application"), .. DependenciasProhibidasDeLosModulos("Domain")])
             .GetResult();
 
         Assert.True(resultado.IsSuccessful, $"La Aplicación del índice depende de algo que no debe: {string.Join(", ", resultado.FailingTypeNames ?? [])}.");
     }
 
     [Fact]
+    [Trait("Criterio", "AC-IND-05")]
     public void La_unica_dependencia_del_caso_de_uso_del_indice_en_el_interior_de_Web_es_el_puerto_de_bytes_aleatorios()
     {
         var caso = Aplicacion.GetTypes().Single(t => t.Namespace == AplicacionDelIndice && t.Name == "ConsultarIndiceInfinito");
@@ -91,6 +100,7 @@ public class ReglasDelIndiceInfinitoTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-IND-05")]
     public void El_contrato_publico_del_indice_no_expone_tipos_del_dominio_de_la_infraestructura_de_Shared_ni_del_interior()
     {
         var tipos = ContratoDelIndice().ToList();
@@ -102,6 +112,7 @@ public class ReglasDelIndiceInfinitoTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-IND-05")]
     public void El_contrato_publico_del_indice_solo_tiene_interfaces_y_modelos_inmutables()
     {
         var mutables = ContratoDelIndice()
@@ -115,6 +126,7 @@ public class ReglasDelIndiceInfinitoTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-IND-05")]
     public void La_Presentacion_usa_el_contrato_del_indice_y_nunca_su_caso_de_uso_ni_el_Dominio()
     {
         var api = typeof(BabelHub.Ecommerce.Api.AssemblyMarker).Assembly;
@@ -127,6 +139,7 @@ public class ReglasDelIndiceInfinitoTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-IND-05")]
     public void Ningun_otro_modulo_depende_del_indice()
     {
         foreach (var capa in new[] { "Domain", "Application", "Infrastructure" })

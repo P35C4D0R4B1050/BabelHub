@@ -64,6 +64,6 @@ public static partial class DireccionAlAzar
         return valores;
     }
 
-    [GeneratedRegex(@"^s([1-9][0-9]{0,2})-p([1-9][0-9]{0,2})-e([1-9][0-9]{0,2})-v([1-9][0-9]{0,2})-pg([1-9][0-9]{0,2})$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 100)]
+    [GeneratedRegex(@"^s([1-9][0-9]{0,2})-p([1-9][0-9]{0,2})-e([1-9][0-9]{0,2})-v([1-9][0-9]{0,2})-pg([1-9][0-9]{0,2})\z", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 100)]
     private static partial Regex Forma();
 }

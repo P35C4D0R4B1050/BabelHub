@@ -38,6 +38,7 @@ public sealed class DireccionDelIndiceTests
     [InlineData("..")]
     [InlineData("a_b")]
     [InlineData("<script>")]
+    [InlineData("!")]
     [InlineData("a%2fb")]
     [InlineData("a\nb")]
     [InlineData("a\r\n")]

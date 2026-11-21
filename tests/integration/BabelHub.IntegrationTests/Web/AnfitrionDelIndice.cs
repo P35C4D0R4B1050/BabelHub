@@ -16,7 +16,7 @@ namespace BabelHub.IntegrationTests.Web;
 internal static partial class AnfitrionDelIndice
 {
     /// <summary>La forma exacta de lo que el índice pone en <c>Location</c> (plan §1).</summary>
-    [GeneratedRegex("^/indice-infinito/[a-z0-9-]{1,64}$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex(@"^/indice-infinito/[a-z0-9-]{1,64}\z", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
     public static partial Regex FormaDeLaUbicacion();
 
     [GeneratedRegex("<pre[^>]*>(?<texto>.*?)</pre>", RegexOptions.Singleline | RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]

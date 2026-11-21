@@ -118,7 +118,7 @@ public static class ModuloWebExtensiones
         servicios.AddScoped<ITextosLegales, ConsultarTextoLegal>();
         servicios.AddSingleton<IAreasDeInterfaz, AreasDeInterfaz>();
         servicios.AddSingleton<IMenuDeNavegacion, ResolverMenu>();
-        // El índice infinito (web-indice-infinito T06): una función pura sin base de datos ni caché; solo necesita los bytes aleatorios criptográficos, que hasta ahora solo instanciaban las pruebas.
+        // El índice infinito (web-indice-infinito T06): una función pura sin base de datos ni caché; solo necesita los bytes aleatorios criptográficos (AgregarSesionWeb ya los registra: TryAdd evita duplicarlos si el módulo se compone solo).
         servicios.TryAddSingleton<IAleatoriosSeguros, AleatoriosSeguros>();
         servicios.AddSingleton<IIndiceInfinito, ConsultarIndiceInfinito>();
         servicios.TryAddSingleton<IDesafioDelIngreso, DesafioDelIngresoSinIdentidad>();

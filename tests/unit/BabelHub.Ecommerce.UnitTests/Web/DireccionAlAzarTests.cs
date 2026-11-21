@@ -87,6 +87,8 @@ public sealed class DireccionAlAzarTests
     [InlineData("s41-p1-e1-v1-pg1")]
     [InlineData("s1-p1-e1-v1")]
     [InlineData("s1-p1-e1-v1-pg01")]
+    [InlineData("s1-p1-e1-v1-pg1\n")]
+    [InlineData("s1-p1-e1-v1-pg1\r\n")]
     public void Solo_una_direccion_de_la_forma_se_puede_avanzar_y_las_demas_nunca_coinciden_con_una_al_azar(string direccion)
     {
         Assert.False(DireccionAlAzar.TieneLaForma(direccion));

@@ -2,7 +2,7 @@
 @model IndiceInfinitoVista
 <section class="bh-laberinto rounded-box bg-base-200 px-4 py-8 sm:px-8 sm:py-10">
     <p class="text-sm font-semibold uppercase tracking-wider text-accent">Experimento literario</p>
-    <h1 class="bh-display">El índice infinito</h1>
+    <h1 class="bh-display mt-3">El índice infinito</h1>
     <p class="mt-3 max-w-2xl">Inspirado en <i>La biblioteca de Babel</i>, de Borges. Cada dirección genera siempre la misma página de texto al azar. El texto se calcula con un algoritmo y no se guarda en ninguna parte.</p>
 
     <div class="alert alert-info mt-6" role="note">
@@ -23,7 +23,7 @@
 
     <div class="mt-8 border border-base-300 bg-base-100">
         <div class="flex flex-wrap items-center gap-2 border-b border-base-300 p-3 text-sm">
-            <label class="flex min-w-0 flex-1 flex-wrap items-center gap-2" for="direccion-de-la-pagina">
+            <label class="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-1" for="direccion-de-la-pagina">
                 <span>Dirección</span>
                 <input id="direccion-de-la-pagina" class="input input-sm min-w-0 flex-1 font-mono" type="text" readonly value="@Model.Direccion" />
             </label>

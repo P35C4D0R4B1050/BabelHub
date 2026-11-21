@@ -22,7 +22,7 @@ public sealed partial class IndiceInfinitoController(IIndiceInfinito indice, Con
     private const string EntradaNoValida = "!";
 
     /// <summary>La forma exacta de lo que se pone en <c>Location</c>: solo una ruta propia con una dirección ya validada.</summary>
-    [GeneratedRegex("^/indice-infinito/[a-z0-9-]{1,64}$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 100)]
+    [GeneratedRegex(@"^/indice-infinito/[a-z0-9-]{1,64}\z", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 100)]
     private static partial Regex FormaDeLaRutaCanonica();
 
     /// <summary>La página de una dirección, la entrada del índice (<c>/indice-infinito</c>, con o sin barra final) y el formulario «Ir a una dirección» (<c>?direccion=</c>): una sola acción para evitar rutas ambiguas.</summary>
