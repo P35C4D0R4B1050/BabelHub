@@ -93,7 +93,7 @@ public sealed record ContactoDeSucursalDto(
     public override string ToString() => $"[contacto de {Codigo}]";
 }
 
-/// <summary>Pregunta cuántas reservas activas tiene un titular (IDE-27, SEL-33). El identificador viaja en el cuerpo, nunca en la ruta.</summary>
+/// <summary>Pregunta cuántos pedidos de un titular tienen una reserva activa, también la que viaja por un traslado vinculado (IDE-27, SEL-33; el nombre del campo se conserva). El identificador viaja en el cuerpo, nunca en la ruta.</summary>
 public sealed record ConsultaDePendientesDto(
     [property: JsonPropertyName("titularId")] Guid TitularId);
 

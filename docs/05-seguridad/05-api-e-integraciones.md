@@ -44,7 +44,7 @@ Cómo se protegen las interfaces entre servicios, la que expone la Web y las que
 | :--- | :--- | :--- | :--- |
 | API en general | 100 solicitudes por minuto por usuario | Borde y Aplicación | SEG-05 |
 | Ingreso | 5 fallos en 15 minutos por combinación de cuenta y origen; bloqueo de 15 minutos | Aplicación | SEG-06 |
-| Reservas | 1 temporal pendiente y 5 por hora por cliente; 10 por hora por origen | Aplicación | SEL-13, SEL-14, SEL-19 |
+| Reservas | 1 temporal pendiente y 5 por hora por cliente; 10 por hora por origen; 30 líneas y 20 unidades por línea | Aplicación | SEL-13, SEL-14, SEL-19, SEL-40 |
 | Descargas | 10 solicitudes de enlace por hora | Aplicación | BIB-15 |
 | Asistente | 10 consultas por minuto | Aplicación | ASI-09 |
 | Códigos de un solo uso | 3 solicitudes por hora por correo y por origen; 5 intentos por código | Aplicación | SEG-19, IDE-19 |
