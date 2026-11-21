@@ -9,6 +9,7 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 - **Hoja maestra del Sprint 2:** `docs/07-proceso-de-desarrollo/07-evidencias-sprint-2.md` (rúbrica → métrica, umbral, resultado y enlace a cada evidencia); `progress/evidencias/README.md` corregido y con una sola cifra vigente a 2 000 usuarios (10,1 s con 4+2 CPU).
 - **k6:** panel HTML por escenario (`progress/evidencias/k6/2026-11-21-paneles/` y `-paneles-1cpu/`) y **perfil realista** de 2 000 sesiones con tiempo de reflexión (`tests/load/escenarios/perfil-realista.js`; series `-perfil-realista` y `-repeticion`). Resultado con el dimensionamiento de 1 OCPU (DD-17): ≈ 1 000 sesiones sostenidas, 1 500 en el límite, 2 000 no sostenidas. Solo se midió el Inventario; la ruta del E-commerce no entró.
 - **README** corregido («Qué falta» y verificaciones). Estado de `main`: `50b8c880`, sin `push`.
+- **Perfil realista a 2 000 sesiones con más recursos (fundido en `e0978d42`):** 0,6+0,4 CPU (DD-17, sin cambio), 1,0+0,5 y 1,5+0,75 no cumplen; **2+1 CPU sí** (201 y 313 ms en dos corridas, mínima probada). La corrida completa previa usó credenciales de 14 min (el Inventario no admite más de 15): corregido en DOC-1 §6d. Solo Inventario medido.
 
 ## 2026-11-20 — Biblioteca digital (ECO-8a a 8d), evidencias OAS-1, K6-1 y DOC-1, y `/health/ready`
 
