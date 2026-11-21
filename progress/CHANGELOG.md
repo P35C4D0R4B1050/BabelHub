@@ -2,6 +2,14 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-21 (tarde) — Paquete de evidencias del Sprint 2: OpenAPI interactivo, hoja maestra, paneles k6 y perfil realista
+
+### Cubierto
+- **Interfaz interactiva de OpenAPI (Scalar):** `/documentacion` en cada Api (solo `Development`, recursos embebidos, sin CDN); verificada en navegador real. Paquete `Scalar.AspNetCore` 2.19.0 autorizado por la persona (DD-23, confirmación directa «Sí, autoricé»).
+- **Hoja maestra del Sprint 2:** `docs/07-proceso-de-desarrollo/07-evidencias-sprint-2.md` (rúbrica → métrica, umbral, resultado y enlace a cada evidencia); `progress/evidencias/README.md` corregido y con una sola cifra vigente a 2 000 usuarios (10,1 s con 4+2 CPU).
+- **k6:** panel HTML por escenario (`progress/evidencias/k6/2026-11-21-paneles/` y `-paneles-1cpu/`) y **perfil realista** de 2 000 sesiones con tiempo de reflexión (`tests/load/escenarios/perfil-realista.js`; series `-perfil-realista` y `-repeticion`). Resultado con el dimensionamiento de 1 OCPU (DD-17): ≈ 1 000 sesiones sostenidas, 1 500 en el límite, 2 000 no sostenidas. Solo se midió el Inventario; la ruta del E-commerce no entró.
+- **README** corregido («Qué falta» y verificaciones). Estado de `main`: `50b8c880`, sin `push`.
+
 ## 2026-11-20 — Biblioteca digital (ECO-8a a 8d), evidencias OAS-1, K6-1 y DOC-1, y `/health/ready`
 
 ### Cubierto
