@@ -1,0 +1,48 @@
+== Consultas más costosas (tiempo total) ==
+ calls | total_ms | media_ms | max_ms | rows | consulta 
+-------+----------+----------+--------+------+----------
+(0 rows)
+
+== Uso de índices por tabla (lecturas por índice frente a secuenciales) ==
+              tabla               | seq_scan | idx_scan | filas 
+----------------------------------+----------+----------+-------
+ reservas.reserva_lineas          |        0 |    11377 |     0
+ plataforma.trabajos_de_fondo     |        0 |        6 |     0
+ reservas.reservas                |        1 |        3 |     0
+ ajustes.ingresos                 |        0 |        4 |     0
+ ajustes.ajustes                  |        0 |        3 |     0
+ ajustes.operaciones_idempotentes |        0 |        2 |     0
+ traslados.traslados              |        1 |        1 |     0
+ traslados.mensajes_salientes     |        1 |        0 |     0
+ auditoria.acumulado_de_limites   |        1 |        0 |     0
+(9 rows)
+
+== Índices más usados ==
+                    indice                     | idx_scan 
+-----------------------------------------------+----------
+ reservas.ix_reserva_lineas_pedido             |    11377
+ plataforma.trabajos_de_fondo_pkey             |        6
+ ajustes.ix_ajustes_operaciones_creada         |        2
+ reservas.ix_reservas_pedido                   |        2
+ ajustes.ajustes_pkey                          |        2
+ ajustes.ingresos_pkey                         |        2
+ ajustes.ix_ingresos_fecha                     |        2
+ reservas.ix_reservas_huella_de_origen         |        1
+ traslados.ix_traslados_vinculados_sin_aprobar |        1
+ ajustes.ix_ajustes_historial                  |        1
+(10 rows)
+
+== Bloqueos e interbloqueos de la base ==
+ deadlocks | conflicts | temp_files | xact_commit | xact_rollback | acierto_de_cache_pct 
+-----------+-----------+------------+-------------+---------------+----------------------
+         0 |         0 |          0 |          23 |             0 |               100.00
+(1 row)
+
+== Conexiones por cuenta (límite 20 por cuenta) ==
+           usename            | conexiones 
+------------------------------+------------
+ inventario_acceso            |         16
+ inventario_depurador_ajustes |          1
+ postgres                     |          1
+(3 rows)
+

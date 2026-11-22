@@ -1,0 +1,7 @@
+ref=0 carpeta=2026-11-21-palancas-3-4-ab-ref0-18781 inv_usec=34613454 pg_usec=24400242
+ref=5 carpeta=2026-11-21-palancas-3-4-ab-ref5-12650 inv_usec=28587376 pg_usec=25163675
+ref=0 carpeta=2026-11-21-palancas-3-4-ab-ref0-20965 inv_usec=35851718 pg_usec=24709621
+ref=5 carpeta=2026-11-21-palancas-3-4-ab-ref5-6474 inv_usec=28070137 pg_usec=25321327
+ref=0 carpeta=2026-11-21-palancas-3-4-ab-ref0-17417 inv_usec=39094298 pg_usec=20745410
+ref=5 carpeta=2026-11-21-palancas-3-4-ab-ref5-27760 inv_usec=29160218 pg_usec=25321088
+FIN

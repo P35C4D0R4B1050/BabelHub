@@ -86,6 +86,15 @@ Cada escenario, ejecutado de nuevo con el panel web integrado de k6 y exportado 
 
 **La serie de paneles confirma la serie final** (mismos veredictos); las cifras absolutas varían entre corridas por el ruido de una máquina compartida. **RNF02 se demuestra sin el tope de CPU de la VM (p95 207 ms con 50 usuarios, Inventario 1 CPU y PostgreSQL 1 CPU) y no se cumple con el dimensionamiento declarado (p95 802 a 908 ms).**
 
+### 2.4 Palancas 3 y 4 del rendimiento (2026-11-21, antes y después)
+
+La persona autorizó las dos palancas pospuestas (DD-50 a DD-54, pendientes de ratificar); detalle y método en [`docs/03/09` §6e](../03-diseno-de-software/09-analisis-de-base-de-datos-y-cache.md). Resultados en `progress/evidencias/k6/2026-11-21-palancas-3-4-*` (con paneles HTML).
+
+- **Palanca 4 (caché de disponibilidad): ya existía** en el catálogo del E-commerce (30 s por edición, con invalidación y respaldo de 10 minutos). Simulada con el resolutor real, quita el 97,8 % de las consultas con 20 ediciones y el 56,8 % con 5 000 de popularidad tipo Zipf; el stock nunca se inventa y reservar no la usa. Se corrigió la documentación, que decía «no implementado».
+- **Palanca 3 (menos idas a la base):** se enciende la memoria de referencias de 5 s del Inventario. Medición alternada en el peor caso (50 usuarios sin pausa, tres pares): **+45 % de solicitudes atendidas** (4 615 a 4 873 frente a 2 772 a 3 425) y mediana de 0,6 s frente a 0,9 a 1,1 s. En la rampa consecutiva baja el p95 de 1,4 a 0,8 s con 50 usuarios y de 7,1 a 4,7 s con 250.
+- **Lo que no cambia:** ningún nivel de la rampa cumple RNF02 con 0,6 + 0,4 CPU, y a 1 000 y 2 000 usuarios la saturación iguala las dos configuraciones. Se descartó mover los límites generales a memoria (sin efecto medible: la consulta de servicio no los evalúa).
+- **Honestidad de la medición:** el perfil realista de 2 000 sesiones cumplió al empezar la tarde (p95 70 ms) y falló horas después con el mismo build (15 s); el entorno derivó (otros carriles en la misma máquina o la base de la carga muy usada; no se aisló la causa), por eso solo se acepta la comparación alternada. Las dos corridas con el modelo de la caché del E-commerce (`FALLOS_DE_CACHE`) cumplen los umbrales (183 y 130 ms), pero son un **modelo del tráfico**, no una medición de VM-VENTAS. AC01 intacto: `sobreventa` dio 10 reservas y 90 rechazos.
+
 ## 3. Rúbrica punto por punto
 
 ### 3.1 Estilo arquitectónico

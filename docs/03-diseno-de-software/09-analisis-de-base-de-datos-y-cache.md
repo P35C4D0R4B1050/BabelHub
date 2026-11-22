@@ -44,12 +44,13 @@ Cada transacción asume un rol de base de datos por módulo (`SET LOCAL ROLE "ro
 | :--- | :--- | :--- | :--- |
 | Contadores de límites de uso del E-commerce | Redis dedicado (`noeviction`, 100 MB, ACL y TLS) | La de cada ventana de la política (por ejemplo, 1 min por usuario) | Implementado (`MotorDeLimitesRedis`); el Inventario guarda sus contadores en PostgreSQL (`plataforma.eventos_limite`), por diseño |
 | Claves públicas y revocaciones de Identidad | En memoria del Inventario | Se renuevan cada 5 minutos como máximo; sin renovación, se rechaza toda credencial (IDE-61) | Implementado (`CacheDeClavesDelInventario`) |
-| **Disponibilidad de ediciones** | Redis de caché del E-commerce (AD06) | Expiración corta (propuesta: 5 a 15 s) | **No implementado.** El código no cachea la disponibilidad: cada consulta va a la base |
+| **Disponibilidad de ediciones** | Memoria por instancia del catálogo del E-commerce (D03 de `ecommerce-catalogo`; AD06 la sitúa en el E-commerce) | 30 s por edición, con invalidación al registrar un ingreso y respaldo de 10 minutos si el Inventario falla | **Implementada** (`ResolutorDeDisponibilidad`, `MemoriaDeDisponibilidadEnMemoria`); esta sección decía «no implementado» por error, corregido en DD-50. Solo la usa la lectura consultiva; el checkout consulta sin memoria (CAR-06). Sin Redis ni caché en el Inventario (DD-50) |
+| Referencias de la consulta pública (lista de fuentes y formato de las ediciones) | Memoria del Inventario (`CacheDeReferencias`) | 5 s (`Inventario:ReferenciasEnMemoriaSegundos`) | **Encendida** por DD-51 (antes apagada por DD-17); nunca guarda stock, reservado ni vencidas |
 | Catálogo | Redis de caché | Expiración mayor (propuesta: minutos) | No implementado en el Inventario; el catálogo es del E-commerce |
 
 **Qué no se cachea y por qué:** la decisión de reservar **nunca** usa la caché (se valida contra la base con bloqueo; `06-tacticas-arquitectonicas.md`), el stock exacto ni los datos de reserva, ni nada que dependa del alcance del usuario.
 
-**Con y sin caché:** el plan pedía comparar el p95 con y sin caché de disponibilidad. Como esa caché no existe en el código, **no hay medición con caché**; la línea base sin caché es la de la sección 6. Como la CPU de PostgreSQL es parte del cuello de botella (sección 6b), una caché de disponibilidad en el E-commerce quitaría solicitudes enteras al **Inventario y a PostgreSQL** (la VM de 1 OCPU). Decidirla es de la persona responsable (alcance del Sprint 2).
+**Con y sin caché:** la caché de disponibilidad del E-commerce sí existe (corrección de DD-50); su efecto sobre lo que le llega al Inventario se mide en §6e. Lo que sigue es el texto original sobre la línea base sin caché (sección 6). Como la CPU de PostgreSQL es parte del cuello de botella (sección 6b), una caché de disponibilidad en el E-commerce quitaría solicitudes enteras al **Inventario y a PostgreSQL** (la VM de 1 OCPU). Decidirla es de la persona responsable (alcance del Sprint 2).
 
 ## 6. Techo medido de la consulta de disponibilidad
 
@@ -153,7 +154,7 @@ La conclusión 2 de la sección 6b (el costo está en las idas, no en las lectur
 
 - **Seguridad por filas y alcance intactos:** el rol y el alcance que rigen en la base son los mismos de antes; el espejo en memoria solo sustituye a la pregunta («¿hay alcance?») que el acceso hacía a la base, y el cierre en falla (sin actor o sin alcance → rechazo y alerta) se mantiene. Las políticas de filas siguen siendo la autoridad. Cubierto con las pruebas de existencias, alcance de datos y las nuevas: la elevación fusionada restaura rol y alcance (también si el bloque falla), y un actor sin alcance tras un encargado sobre **la misma conexión física** sigue rechazado.
 - **Sin `DISCARD ALL`:** ver la conclusión 4 de la sección 2 y su invariante. Prueba: tras una transacción, la conexión reutilizada tiene el rol de la aplicación, ningún alcance, `lock_timeout` 0 y escritura habilitada. Hallazgo de la revisión de seguridad, corregido: los bloqueos asesores de sesión (instancia única de trabajos y depuración) ahora cierran la conexión física si no se pueden soltar, porque ya nada los liberaría al devolverla.
-- **La memoria de referencias queda apagada por omisión** (`Inventario:ReferenciasEnMemoriaSegundos`, de 1 a 30; 0 la apaga). Motivo: la decisión D05 de `inventario-fuentes` dice que no hay caché de disponibilidad en el Inventario, y cambiarla es de la persona responsable (AGENTS.md §2). Solo guarda tablas sin seguridad por filas, con la proyección mínima (id, código, nombre; formato), nunca stock, reservado ni vencidas, y nunca la usan los casos que deciden (reservar, traslados, ajustes). No guarda ausencias y se vacía a las 10 000 entradas. Desfase máximo: el plazo configurado, y solo en nombres de fuente y formato mostrados.
+- **La memoria de referencias queda apagada por omisión en el código** (`Inventario:ReferenciasEnMemoriaSegundos`, de 1 a 30; 0 la apaga); **DD-51 (2026-11-21) la enciende en 5 s en el despliegue y en el entorno de carga** (§6e). Motivo: la decisión D05 de `inventario-fuentes` dice que no hay caché de disponibilidad en el Inventario, y cambiarla es de la persona responsable (AGENTS.md §2). Solo guarda tablas sin seguridad por filas, con la proyección mínima (id, código, nombre; formato), nunca stock, reservado ni vencidas, y nunca la usan los casos que deciden (reservar, traslados, ajustes). No guarda ausencias y se vacía a las 10 000 entradas. Desfase máximo: el plazo configurado, y solo en nombres de fuente y formato mostrados.
 
 **Rampa antes y después** (`tests/load/escenarios/rampa.js`, pausa de 0,5 s; resultados en `progress/evidencias/k6/2026-11-20-costo-despues/`; la «antes» es la de la sección 6b, mismo código de carga, **una corrida por fila, en una máquina compartida**: las diferencias de ±20 % entre corridas son ruido):
 
@@ -231,8 +232,52 @@ Pedido de la persona (2026-11-21): ejecutar el **mismo perfil realista** de §6d
 5. **Qué significa para la VM real.** Una VM de 1 OCPU compartida no alcanza: para 2 000 sesiones concurrentes (≈ 39 solicitudes por segundo al Inventario) se necesita del orden de 3 CPU para el Inventario y su base, es decir, otra forma de despliegue (más OCPU, o separar PostgreSQL de la VM del Inventario). Esa decisión de despliegue es de la persona responsable; aquí solo se registra qué recursos hacen falta según la medición.
 6. **Límites:** solo el Inventario; la pasarela simulada; 20 ediciones de prueba; una corrida por configuración salvo 2 + 1 (tres); host de desarrollo compartido con k6 en la misma máquina; corridas de un solo nivel (partida en frío) además de la curva; la latencia de extremo a extremo y la capacidad de VM-VENTAS **no se midieron**.
 
+## 6e. Palancas 3 y 4 (2026-11-21): menos idas a la base y caché de disponibilidad
+
+La persona autorizó las dos palancas que había pospuesto. Decisiones DD-50 a DD-54 (pendientes de ratificar). Evidencias en `progress/evidencias/k6/2026-11-21-palancas-3-4-*`.
+
+**Qué se hizo**
+
+- **Palanca 4, caché de disponibilidad: ya existía.** El catálogo del E-commerce la implementa desde `ecommerce-catalogo` (D03: memoria por edición, 30 s, invalidación al registrar un ingreso, respaldo de 10 minutos) y es el único consumidor consultivo; la corrección de §5 es de documentación. No se agregó Redis ni caché en el Inventario (DD-50). La atomicidad de las reservas (AC01) y la validación definitiva contra la base al reservar no cambian, y un dato vencido o invalidado se vuelve a pedir, nunca se inventa (`CacheDeDisponibilidadDeCargaTests`).
+- **Palanca 3, menos idas a la base:** se **enciende** la memoria de referencias de 5 s (DD-51). La consulta pública pasa de ≈ 10 sentencias a 4 en la segunda consulta (medido por conteo, §6c). El cambio de rol fusionado con la primera sentencia **no se hizo**: exige un comando por lote en cada repositorio de los módulos que otro carril está tocando.
+- **Descartado (DD-52):** mover los límites generales a memoria. Se implementó y se revirtió: la consulta de servicio a servicio no evalúa ningún límite por usuario (0 inserciones en `plataforma.eventos_limite` por solicitud, medido), así que no había nada que ahorrar.
+
+**Cuánto de la carga quita la caché del E-commerce** (simulación con el resolutor real, reloj simulado, 300 s con 31 consultas por segundo, la mezcla del perfil realista de 2 000 sesiones):
+
+| Catálogo | Consultas al Inventario por segundo | Acierto de la caché |
+| :--- | :--- | :--- |
+| 20 ediciones, popularidad uniforme (las del perfil de carga) | 0,67 de 31 | 97,8 % |
+| 5 000 ediciones, popularidad tipo Zipf(1) | 13,4 de 31 | 56,8 % |
+
+Un catálogo real, con popularidad desigual, quita del orden de la mitad de las consultas; con pocas ediciones calientes, casi todas. Es el efecto de una caché que **ya estaba**: el perfil de 2 000 sesiones de §6d la ignoraba (cada detalle y cada carrito iba al Inventario) y por eso era un peor caso.
+
+**Medición de la palanca 3** (peor caso: 50 usuarios, `PENSAR_S=0`, 60 s, memoria de referencias 0 s frente a 5 s, mismo build, **alternados** en tres pares tras 25 s de calentamiento descartado; k6 y el entorno en la misma máquina):
+
+| Memoria de referencias | Solicitudes en 60 s (3 corridas) | Mediana | p95 |
+| :--- | :--- | :--- | :--- |
+| 0 s (antes) | 2 772 / 3 316 / 3 425 | 1 098 / 900 / 863 ms | 1 401 / 1 244 / 1 216 ms |
+| **5 s (después)** | **4 615 / 4 865 / 4 873** | **616 / 601 / 602 ms** | **892 / 827 / 805 ms** |
+
+Rampa consecutiva (`rampa.js`, pausa de 0,5 s; p95 por nivel de usuarios): 50 → 1,4 s frente a 0,8 s; 100 → 2,8 frente a 2,0 s; 250 → 7,1 frente a 4,7 s; 500 → 11,9 frente a 9,6 s; con 1 000 y 2 000 usuarios la saturación iguala ambas (≈ 17 a 20 s). **Ninguna cumple RNF02 (< 500 ms) con el reparto declarado de 0,6 + 0,4 CPU en estas corridas**: la palanca da ≈ +45 % de rendimiento y baja la latencia en los niveles medios, pero **no cambia el veredicto** del perfil de estrés.
+
+**Perfil realista de 2 000 sesiones (§6d), con las dos palancas, `NIVELES=2000`:**
+
+| Condición (misma configuración 0,6 + 0,4) | Disponibilidad p95 | Reservar + confirmar p95 | Errores | Cumple |
+| :--- | :--- | :--- | :--- | :--- |
+| Referencia de la mañana, sin palancas (corrida 1) | 70 ms | 356 ms | 0,04 % | Sí |
+| Palanca 3 sola, horas después | 15,6 s | 48,6 s | 4,8 % | No |
+| Palancas 3 y 4, catálogo de 5 000 ediciones (`FALLOS_DE_CACHE=0,43`) | 183 ms | 1 109 ms | 0,02 % | Sí |
+| Palancas 3 y 4, 20 ediciones (`FALLOS_DE_CACHE=0,022`) | 130 ms | 2 022 ms | 0,14 % | Sí |
+
+**Cómo leerlo, sin maquillar**
+
+1. **Esta tabla no sirve para atribuir el efecto de las palancas.** La referencia de la mañana (la misma configuración que dio 1,6 s en la serie de §6d-bis el mismo día) y la fila de «palanca 3 sola», horas después y con otros carriles corriendo pruebas de integración y de extremo a extremo en la misma máquina, difieren por una **deriva del entorno**, no demostrablemente por el código (DD-53): el mismo build con la misma configuración pasó de 70 ms a 15 s. No se aisló la causa: pudo ser la carga de otros carriles en la máquina o el tamaño acumulado de la base de la carga (decenas de miles de filas de reservas tras muchas corridas); tras recrear el volumen de la base, `checkout-confirmacion` volvió a cumplir (ver el punto 3). La única comparación válida es la **alternada** de la tabla anterior, que dio +45 % de rendimiento con tres pares consistentes.
+2. Las dos filas con la caché son un **modelo del tráfico que llega al Inventario** (DD-54), no una medición de extremo a extremo ni de VM-VENTAS; el E-commerce no corre en este entorno. Muestran que, con el tráfico que de verdad le llega al Inventario cuando la caché del catálogo funciona, el Inventario cumple los umbrales de RNF02 con el reparto declarado incluso en una hora de host cargado. No se afirma que la caché por sí sola cumpla 2 000 sesiones en producción: depende de la popularidad real del catálogo (entre 0,43 y 0,022 de fallos) y de que el E-commerce esté en una VM aparte (VM-VENTAS).
+3. **Reservas (AC01):** con la memoria encendida, `sobreventa` dio exactamente 10 reservas (201) y 90 rechazos (409 `INV-STOCK-INSUFICIENTE`), sin sobreventa; ningún cambio toca la ruta de reserva ni el bloqueo `FOR UPDATE`, y el stock exacto, el reservado y las vencidas nunca pasan por la memoria. `checkout-confirmacion` (reservar y confirmar, p95 < 3 s) con la base ya muy usada falló en tres de cuatro corridas con **ambos** valores de la memoria (2,8 a 9,3 s, sin relación con ella); con la base recreada cumplió en las cuatro, alternando 0 y 5 s (118 y 1 559 ms con 0 s; 2 263 y 638 ms con 5 s): la dispersión es del entorno, no se ve efecto de la memoria sobre las reservas.
+4. **Límites de esta medición:** una máquina de desarrollo compartida y ruidosa (su carga cambió varias veces durante la tarde); tres pares alternados en el A/B y una corrida por fila en las demás; el modelo de caché es una cota derivada de una simulación, no tráfico real.
+
 ## 7. Qué cubre y qué no
 
 - Cubre el Inventario (el servicio que concentra la concurrencia de stock) con datos de carga, en una máquina de desarrollo con los límites declarados de contenedor.
-- **No** cubre el E-commerce (carrito, pedido, pasarela) ni la VM-BORDE, ni la restauración con carga (PLA-R3), ni medidas en la VM real (despliegue fuera del Sprint 2).
+- La caché de disponibilidad del E-commerce se evalúa con simulación y un modelo de tráfico (§6e), no con el E-commerce corriendo. **No** cubre el E-commerce (carrito, pedido, pasarela) ni la VM-BORDE, ni la restauración con carga (PLA-R3), ni medidas en la VM real (despliegue fuera del Sprint 2).
 - Las cifras de tiempo dependen de la máquina y de que esté en reposo; los umbrales, la ausencia de sobreventa y el comportamiento ante la caída son lo reproducible (`bash tests/load/ejecutar.sh <escenario>`, ver `tests/load/README.md`).

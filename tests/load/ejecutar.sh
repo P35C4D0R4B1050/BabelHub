@@ -41,7 +41,7 @@ export DESPLAZO_DE_ORIGEN="$(( ((RANDOM << 9) ^ RANDOM) % 15000000 ))"
 export MSYS_NO_PATHCONV=1
 win() { cygpath -w "$1"; }
 extra=()
-for v in DURACION RITMO UNIDADES COMPETIDORES NIVELES SEGUNDOS_POR_NIVEL SEGUNDOS_FINAL PENSAR_S ORIGENES INTENTOS; do [ -n "${!v:-}" ] && { export "$v"; extra+=(-e "$v"); }; done
+for v in DURACION RITMO UNIDADES COMPETIDORES NIVELES SEGUNDOS_POR_NIVEL SEGUNDOS_FINAL PENSAR_S ORIGENES INTENTOS FALLOS_DE_CACHE; do [ -n "${!v:-}" ] && { export "$v"; extra+=(-e "$v"); }; done
 # Panel web integrado de k6 (PANEL=1): exporta un HTML autocontenido por escenario junto a los demás resultados (<escenario>-panel.html).
 if [ "${PANEL:-}" = 1 ]; then
   export K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_PERIOD=1s K6_WEB_DASHBOARD_EXPORT="/resultados/$escenario-panel.html"

@@ -29,6 +29,10 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 - `identidad-seguridad` **Done**: D5 (la cancelación diferida indica qué falta por grupo, DD-35) y AC-IDE-70 con un pedido real por el flujo real del E-commerce.
 - `transversal-seguridad`: SEG-17/23 del Inventario corregidos (origen desconocido con evento, espejado en ambos servicios, DD-36); SEG-31 del asistente queda diferido y declarado (DD-37), la spec sigue InProgress.
 - Revisiones de seguridad y arquitectura sin Bloqueantes ni Importantes. Detalle: `progress/log/2026-11-21-cierre-seguridad.md`.
+## 2026-11-21 (noche) — Palancas de rendimiento 3 y 4 (DD-50 a DD-54)
+
+### Cubierto
+- Caché de disponibilidad: ya existía en el E-commerce; documentada y medida. Memoria de referencias del Inventario encendida en 5 s (+45 % en medición alternada). Límites generales en memoria descartado. Detalle en `docs/03/09` §6e.
 
 ## 2026-11-21 (noche) — Libro de Reclamaciones: vínculo de las hojas con la cuenta (DD-26), Done
 
