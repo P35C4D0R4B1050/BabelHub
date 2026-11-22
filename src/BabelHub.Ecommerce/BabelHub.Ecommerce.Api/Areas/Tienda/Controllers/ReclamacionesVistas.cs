@@ -36,6 +36,11 @@ public sealed class ReclamacionNuevaVista : ModeloBaseDePagina
     public string ClaveDelFormulario { get; set; } = string.Empty;
 
     public IReadOnlyList<string> CamposConProblema { get; set; } = [];
+
+    /// <summary>Lo que la persona tenía escrito cuando venció su sesión (WEB-25): solo los campos conservables, una sola vez; vacío en cualquier otro caso.</summary>
+    public IReadOnlyDictionary<string, string> Valores { get; set; } = new Dictionary<string, string>();
+
+    public string Valor(string campo) => Valores.TryGetValue(campo, out var v) ? v : string.Empty;
 }
 
 /// <summary>La constancia de una hoja registrada (REC-05), imprimible: número, fecha, tipo, lo que el consumidor acaba de escribir y el plazo de respuesta.</summary>
@@ -56,4 +61,26 @@ public sealed class MisHojasVista : ModeloBaseDePagina
 public sealed class MiHojaVista : ModeloBaseDePagina
 {
     public MiHoja Hoja { get; set; } = null!;
+}
+
+/// <summary>
+/// Lo que se conserva de la hoja si la sesión de quien la escribe vence a mitad de la acción (WEB-25, D06): solo lo que no identifica a la persona. <b>Nunca</b> el nombre, el documento, el domicilio ni el correo
+/// (REC-04: la hoja no devuelve los datos personales escritos), ni la clave de un solo uso ni el token de verificación. El modelo solo declara qué campos se conservan; la acción sigue leyendo el cuerpo con su lector estricto.
+/// </summary>
+public sealed class FormularioDeLaHojaDeReclamacion
+{
+    [Conservar]
+    public string? BienContratado { get; set; }
+
+    [Conservar]
+    public string? MontoReclamado { get; set; }
+
+    [Conservar]
+    public string? PedidoReferencia { get; set; }
+
+    [Conservar]
+    public string? Tipo { get; set; }
+
+    [Conservar]
+    public string? Detalle { get; set; }
 }

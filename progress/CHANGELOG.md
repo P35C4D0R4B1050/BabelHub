@@ -15,6 +15,14 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 ### Cubierto
 - `transversal-notificaciones`: D4 (auditoría real en PostgreSQL de la desactivación de números), D5 (DD-46), D6 (la reactivación entra en NOT-13; spec reaprobada con la puerta delegada) y la redacción de NOT-15 y AC-NOT-15 y AC-NOT-16; NOT-14 en la compra mixta aceptado (DD-45). Pruebas nuevas de AC-NOT-13 y AC-NOT-16.
 - Queda como reserva externa S1 (n8n y Evolution reales con un número de WhatsApp real); DD-45 a DD-49 esperan ratificación.
+## 2026-11-21 (noche) — Web base: WEB-25 en el Libro de Reclamaciones y evidencia automática de T32 a T34
+
+### Cubierto
+- `/reclamaciones/nueva` conserva y recupera, tras una sesión vencida, bien, monto, referencia, tipo y detalle (nunca documento, domicilio, nombre ni correo; DD-30 pendiente de ratificar). 8 pruebas de integración nuevas (AC-WEB-20).
+- Corrida automática de T32 a T34 en Chromium de escritorio y teléfono y WebKit: responsivo, temas, movimiento reducido, axe y teclado pasan; evidencia en `progress/evidencias/web-base/`.
+
+### Pendiente
+- Partes humanas (navegadores reales, lector de pantalla, dos rondas de usabilidad): `protocolo-manual.md`. Reserva de medición de AC-WEB-16 con TLS. `web-base` sigue en `Planned`.
 
 ## 2026-11-21 (noche) — Libro de Reclamaciones: vínculo de las hojas con la cuenta (DD-26), Done
 
