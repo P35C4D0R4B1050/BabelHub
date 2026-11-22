@@ -1,7 +1,7 @@
 ---
 id: inventario-ajustes
 titulo: Ajustes de inventario
-estado: Planned
+estado: Done
 servicio: Inventario
 prefijo: AJU
 origen: [RF17, RF09, NN06]

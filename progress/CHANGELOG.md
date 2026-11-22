@@ -2,6 +2,14 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+
+## 2026-11-21 (noche) — Cierre de Inventario: ajustes y selección de fuente a Done
+
+### Cubierto
+- `inventario-ajustes` vuelve a **Done**: AJU-22 se redactó como lo que el código ya hace (la repetición con la primera en curso espera y recibe el original o el conflicto; 503 uniforme si vence el bloqueo), se reaprobó spec y plan con la puerta (ronda 2 sin Bloqueantes ni Importantes) y se añadieron dos pruebas de AC-AJU-18. Decisiones DD-40 a DD-42, pendientes de ratificar.
+- `inventario-seleccion-fuente` pasa a **Done**: S2 cerrada con el escenario k6 `tope-por-origen` (10 reservas exactas por origen con 12 cuentas por origen a la vez; el resto 429; sin 500 ni 503), evidencia en `progress/evidencias/k6/2026-11-21-tope-por-origen/` (DD-44).
+- `inventario-fuentes` sigue «Converge salvo FUE-09/FUE-11 (diferidas) y FUE-10 (DD-18)»: FUE-09 y FUE-11 dependen del Catálogo y de Identidad (E-commerce) y de `web-base`; no se construyen en el Inventario.
+- Verificado: build sin advertencias, unitarias del Inventario 2387, arquitectura 259, integración de Reservas/Ajustes/Fuentes/Traslados/Existencias 627 de 627, SpecCheck 0 avisos.
 ## 2026-11-21 (noche) — Libro de Reclamaciones: vínculo de las hojas con la cuenta (DD-26), Done
 
 ### Cubierto

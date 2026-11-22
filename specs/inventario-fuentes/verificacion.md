@@ -127,3 +127,8 @@ Observaciones **Menores** sin bloqueo, ya registradas en `progress/hallazgos.md`
 ## 4. Conclusión
 
 El módulo `Fuentes` cumple 18 de los 22 requisitos con pruebas que fallan si se rompe la regla, y el código respeta las reglas de arquitectura, alcance, auditoría y concurrencia de `AGENTS.md`; **no converge todavía** porque a FUE-21 le falta una prueba de PostgreSQL de la exclusión de pedidos anulados (D-03, trabajo mínimo del coordinador con Docker). Añadida esa prueba, converge **salvo FUE-09/FUE-11** (diferidos por decisión del coordinador, dueño la persona responsable: se construyen con `web-base` o la spec vuelve a Draft) **y FUE-10** (RNF02 cumplido solo sin el tope de CPU de la VM, DD-18; medición en la VM real en FIN-2). No se cambia el estado de la spec (sigue **Planned**).
+
+## Actualización final del 2026-11-21 (carril de cierre): FUE-09 y FUE-11 siguen diferidas
+
+- Se reevaluó construir FUE-09 y FUE-11 en esta fase y **no es posible dentro del alcance y de las reglas**: la búsqueda por título, autor o ISBN necesita los datos del Catálogo (módulo del E-commerce; el Inventario no los tiene y no puede referenciarlo: `AGENTS.md` §3.5) y el encargado asignado lo compone Identidad (ECO-0 D16); ambas son pantallas de `web-base`, que no tiene requisito ni criterio para ellas (D-01) y queda fuera de este carril. Un requisito del servicio que las implemente exigiría reabrir `web-base` o devolver esta spec a Draft para acotarlas, decisión de la persona.
+- **Resultado: Converge salvo FUE-09/FUE-11 (diferidas) y FUE-10 (DD-18).** La spec no pasa a `Done`. Comprobaciones de la sesión: integración del Inventario (627 de 627) y unitarias (2387) en verde.
