@@ -210,3 +210,9 @@ Lo que cambió o se aclaró al implementar (el detalle está en `specs/ecommerce
 ## 15. `ecommerce-libro-reclamaciones` (reapertura DD-26, aprobada el 2026-11-21)
 
 - [ ] **Antes de implementar T24 a T36 lee `specs/ecommerce-libro-reclamaciones/decisiones-de-implementacion.md`, fila «DD-26 (implementación, ronda 6)»:** corrige el texto del plan y de las tareas (cupo de REC-33, sin puerto propio de Identidad, `Guardar` sin `cuenta_id`, bloques ECO-11e = T24 a T32 y ECO-11f = T33 a T36, campo `rec-registrar-sin-sesion`, prerrequisito del carril A de `hojas-por-origen` liberable). Prevalece sobre el texto aprobado.
+
+## 16. `transversal-notificaciones` (cierre, 2026-11-21)
+
+- [x] **T09 del plan pedía una acción propia de auditoría para la omisión por tope; se reutiliza `LimiteExcedido` con la cuenta opaca como sujeto (DD-46).** El texto del plan sobre la acción nueva no se aplica. El reinicio de la ventana de 24 h se prueba solo con el motor simulado.
+- [x] **`Reactivar` de un número (T07) queda amparado por NOT-13 y AC-NOT-13 tras la enmienda de la spec (DD-47).**
+- [x] **T24 (auditoría sin el número en integración):** `DesactivacionDeNumerosConAuditoriaRealTests` usa la auditoría real sobre PostgreSQL (D4).

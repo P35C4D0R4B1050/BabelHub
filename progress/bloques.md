@@ -142,7 +142,7 @@ Tareas: **588 de 638** (92 %) al 2026-11-21 (noche). `main` (`f3233be8`): compil
 | inventario-fuentes | Planned | 25/25 | Converge salvo FUE-09/FUE-11 (diferidas) y FUE-10 (DD-18) |
 | inventario-seleccion-fuente | Done | 33/33 | Converge (S2 cerrada con k6, DD-44) |
 | transversal-auditoria | Planned | 33/33 | Converge (AUD-45 y AUD-46 añadidos por DD-25 y DD-26) |
-| transversal-notificaciones | Planned | 25/25 | NOT-02 implementado; converge salvo S1 a S3 y los Menores D4 a D6 (de la persona) y el riesgo NOT-14 |
+| transversal-notificaciones | Planned | 25/25 | Converge salvo S1 (WhatsApp real, externa) y la ratificación de DD-45 a DD-49; D4 a D6 cerradas, spec reaprobada |
 | transversal-seguridad | InProgress | 30/30 | Converge salvo SEG-17/23 del Inventario (Menor) y SEG-31 del asistente (diferido) |
 | transversal-plataforma | InProgress | 24/42 | Sin verificación: fuera del Sprint 2 (despliegue, spikes, PLA-R2 a R4) |
 | asistente-compra-ia | Planned | 0/24 | Diferida (ECO-12) |

@@ -10,6 +10,12 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 - `inventario-seleccion-fuente` pasa a **Done**: S2 cerrada con el escenario k6 `tope-por-origen` (10 reservas exactas por origen con 12 cuentas por origen a la vez; el resto 429; sin 500 ni 503), evidencia en `progress/evidencias/k6/2026-11-21-tope-por-origen/` (DD-44).
 - `inventario-fuentes` sigue «Converge salvo FUE-09/FUE-11 (diferidas) y FUE-10 (DD-18)»: FUE-09 y FUE-11 dependen del Catálogo y de Identidad (E-commerce) y de `web-base`; no se construyen en el Inventario.
 - Verificado: build sin advertencias, unitarias del Inventario 2387, arquitectura 259, integración de Reservas/Ajustes/Fuentes/Traslados/Existencias 627 de 627, SpecCheck 0 avisos.
+## 2026-11-21 (noche) — Avisos por WhatsApp: cierre de las reservas internas (DD-45 a DD-49)
+
+### Cubierto
+- `transversal-notificaciones`: D4 (auditoría real en PostgreSQL de la desactivación de números), D5 (DD-46), D6 (la reactivación entra en NOT-13; spec reaprobada con la puerta delegada) y la redacción de NOT-15 y AC-NOT-15 y AC-NOT-16; NOT-14 en la compra mixta aceptado (DD-45). Pruebas nuevas de AC-NOT-13 y AC-NOT-16.
+- Queda como reserva externa S1 (n8n y Evolution reales con un número de WhatsApp real); DD-45 a DD-49 esperan ratificación.
+
 ## 2026-11-21 (noche) — Libro de Reclamaciones: vínculo de las hojas con la cuenta (DD-26), Done
 
 ### Cubierto

@@ -267,6 +267,44 @@ public sealed class EnvioDeAvisosTests
         Assert.Empty(m.Envio.Enviados);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-NOT-16")]
+    public async Task SiSeDesactivaUnNumeroConMasDeCincoAvisos_TodosQuedanCancelados_SinCupoNiOmisionPorTopeNiEvento()
+    {
+        var m = new Mundo();
+        var cuenta = Guid.NewGuid();
+        m.Clientes.Contactos[cuenta] = new ContactoDeAvisosDelCliente(false, true, NumeroDeLaClienta);
+        var avisos = Enumerable.Range(1, 7).Select(i => m.Pendiente(cuenta, $"pedido:{i}:listo-para-recojo")).ToList();
+        Assert.True(NumeroDeDestino.TryNormalizar(NumeroDeLaClienta, out var numero));
+        await m.Base.Desactivados.Agregar(new NumeroDesactivado(m.Base.Huellas.Actual(numero), m.Ahora, "a pedido del titular"));
+
+        await m.Enviar();
+
+        Assert.All(avisos, a => Assert.Equal(EstadoDelAviso.Cancelado, a.Estado));
+        Assert.Empty(m.Envio.Enviados);
+        Assert.Empty(m.Base.Motor.ContadoresUsados);
+        Assert.Empty(m.Base.EventosAutomaticos.Eventos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-NOT-13")]
+    public async Task TrasReactivarElNumero_UnAvisoPosteriorSiSale()
+    {
+        var m = new Mundo();
+        Assert.True(NumeroDeDestino.TryNormalizar(NumeroDeLaClienta, out var numero));
+        await m.Base.Desactivados.Agregar(new NumeroDesactivado(m.Base.Huellas.Actual(numero), m.Ahora, "a pedido del titular"));
+        var (_, cancelado) = m.ClienteConAviso(evento: "pedido:1:listo-para-recojo");
+        await m.Enviar();
+        Assert.Equal(EstadoDelAviso.Cancelado, cancelado.Estado);
+
+        await m.Base.Desactivados.Eliminar(m.Base.Huellas.Vigentes(numero));
+        var (_, posterior) = m.ClienteConAviso(evento: "pedido:2:listo-para-recojo");
+        await m.Enviar();
+
+        Assert.Equal(EstadoDelAviso.Cancelado, cancelado.Estado);
+        Assert.Contains(m.Envio.Enviados, e => e.AvisoId == posterior.Id);
+    }
+
     // ---------------------------------------------------------------- reintentos (NOT-04, AC-NOT-12)
 
     [Fact]

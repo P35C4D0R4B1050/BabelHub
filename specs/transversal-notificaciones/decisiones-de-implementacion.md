@@ -75,3 +75,9 @@ Revisión de arquitectura («Cumple con observaciones», 4 Importantes) y de seg
 - Arrendamiento de 6 minutos, lotes de 10 y plazo de corrida de 10 minutos (el de 2 minutos con lotes de 25 en serie podía vencer a mitad de lote); la alerta de la purga salta al primer fallo; `lock_timeout` se restaura tras las lecturas con bloqueo que corren dentro de la transacción de Identidad; pruebas unitarias del adaptador `ContactoDeAvisosDeIdentidad`.
 
 **Riesgos residuales aceptados (también para `docs/05-seguridad`, AM32):** entre la comprobación condicional y la respuesta de n8n (hasta 10 s) una revocación o un cambio de número no detiene un mensaje ya en vuelo; `N8N_BLOCK_ENV_ACCESS_IN_NODE=false` expone el entorno de n8n a cualquier nodo de código (solo los administradores editan flujos); un nombre de pila de 30 letras escrito por quien registra el número de un tercero llega al mensaje (AM32).
+
+## Cierre del 2026-11-21
+
+- **La reactivación de un número comparte la acción de auditoría `AvisosDeNumeroDesactivados`** y se distingue por la causa (`reactivado-a-pedido-del-titular`); no hay una acción propia (mismo criterio que DD-46: espejarla en los dos servicios, `Shared` y el presentador no aporta nada). Un filtro por acción mostrará reactivaciones y desactivaciones juntas; se separan por `causa`.
+- **El evento de seguridad del tope** (`LimiteExcedido`) lleva la cuenta opaca y no una dirección de origen.
+- Al reactivar, el registro lleva la huella parcial de la versión actual de la clave; tras una rotación puede no coincidir con la de la desactivación (Menor aceptado).
