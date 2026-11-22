@@ -118,8 +118,16 @@ internal sealed class RepositorioDeOperacionesEnMemoria : IRepositorioDeOperacio
 
     public int Cantidad => _guardadas.Count;
 
+    /// <summary>Simula que la clave ya la tiene tomada otra transacción y la espera agota el plazo de bloqueo.</summary>
+    public bool EsperaAgotada { get; set; }
+
     public Task<OperacionIdempotenteGuardada?> Registrar(Guid usuarioId, string operacion, string clave, string huellaDeLaCarga, string resultado, CancellationToken cancelacion = default)
     {
+        if (EsperaAgotada)
+        {
+            return Task.FromException<OperacionIdempotenteGuardada?>(new EsperaDeBloqueoAgotadaException());
+        }
+
         if (_guardadas.TryGetValue((usuarioId, operacion, clave), out var existente))
         {
             return Task.FromResult<OperacionIdempotenteGuardada?>(existente);

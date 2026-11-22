@@ -352,6 +352,21 @@ public sealed class AjusteManualTests
         Assert.Single(_e.Base.Auditoria.Solicitudes);
     }
 
+
+    [Fact]
+    [Trait("Criterio", "AC-AJU-18")]
+    public async Task LaRepeticionConLaPrimeraEnCursoSiSeAgotaLaEsperaResponde503SinAplicarNada()
+    {
+        var libro = _e.Impresa();
+        _e.Poner(_e.Lima, libro, 9, 0);
+        _e.Operaciones.EsperaAgotada = true;
+
+        var resultado = await _e.AjusteManual().Ejecutar(Merma("lima", libro, 2, "n", EntornoDeAjustes.Clave()));
+
+        Assert.Equal((CategoriaDeError.NoDisponible, "bloqueo-ocupado"), (resultado.Error!.Categoria, resultado.Error.Clave));
+        Assert.Equal((9, 0), _e.Stock(_e.Lima, libro));
+        Assert.Empty(_e.Ajustes.Guardados);
+    }
     [Fact]
     [Trait("Criterio", "AC-AJU-18")]
     public async Task QuienRepiteLaClaveSinAlcanceSobreLaFuenteSeRechazaSinRecibirElResultado_YOtroUsuarioConAlcanceHaceUnaOperacionIndependiente()

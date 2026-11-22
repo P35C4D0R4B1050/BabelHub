@@ -459,6 +459,34 @@ public sealed class AjustesPostgresTests(PostgresDeReservasFixture bd) : IClassF
         Assert.Equal(1L, await bd.Consultar<long>("SELECT count(*) FROM ajustes.ajustes"));
     }
 
+
+    [Fact]
+    [Trait("Criterio", "AC-AJU-18")]
+    public async Task LaMismaClaveEnParaleloConCargasDistintas_SeAplicaUnaSolaYLasDemasRecibenElOriginalOElConflicto()
+    {
+        var (lima, _, _) = await Fuentes();
+        var libro = await bd.AgregarEdicion();
+        await bd.PonerStock(lima, libro, 20, 0);
+        using var pila = new PilaDeReservas(bd);
+        var usuario = Admin();
+        var clave = Clave();
+        var dos = Merma("lima", libro, 2, "n", clave);
+        var tres = Merma("lima", libro, 3, "n", clave);
+
+        var resultados = await Simultaneas(
+            () => Ajustar(pila, usuario, dos),
+            () => Ajustar(pila, usuario, tres),
+            () => Ajustar(pila, usuario, dos),
+            () => Ajustar(pila, usuario, tres));
+
+        var exitos = resultados.Where(r => r.EsExito).ToList();
+        Assert.NotEmpty(exitos);
+        Assert.Single(exitos.Select(r => r.Valor.AjusteId).Distinct());
+        Assert.All(resultados.Where(r => !r.EsExito), r => Assert.Equal("idempotencia-en-conflicto", r.Error!.Clave));
+        Assert.Equal(1L, await bd.Consultar<long>("SELECT count(*) FROM ajustes.ajustes"));
+        var fisico = (await bd.StockDe(lima, libro))!.Value.Fisico;
+        Assert.True(fisico is 18 or 17, $"físico {fisico}");
+    }
     [Fact]
     [Trait("Criterio", "AC-AJU-18")]
     public async Task LaClaveSeGuardaPorUsuarioYOperacion_ElIngresoYElAjusteConLaMismaClaveSonIndependientes()

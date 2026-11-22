@@ -1,0 +1,29 @@
+== Consultas más costosas (tiempo total) ==
+ calls | total_ms | media_ms | max_ms | rows | consulta 
+-------+----------+----------+--------+------+----------
+(0 rows)
+
+== Uso de índices por tabla (lecturas por índice frente a secuenciales) ==
+ tabla | seq_scan | idx_scan | filas 
+-------+----------+----------+-------
+(0 rows)
+
+== Índices más usados ==
+ indice | idx_scan 
+--------+----------
+(0 rows)
+
+== Bloqueos e interbloqueos de la base ==
+ deadlocks | conflicts | temp_files | xact_commit | xact_rollback | acierto_de_cache_pct 
+-----------+-----------+------------+-------------+---------------+----------------------
+         0 |         0 |          0 |           2 |             0 |               100.00
+(1 row)
+
+== Conexiones por cuenta (límite 20 por cuenta) ==
+           usename            | conexiones 
+------------------------------+------------
+ inventario_acceso            |         16
+ inventario_depurador_ajustes |          1
+ postgres                     |          1
+(3 rows)
+
