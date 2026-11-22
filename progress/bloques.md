@@ -138,9 +138,9 @@ Tareas: **588 de 638** (92 %) al 2026-11-21 (noche). `main` (`f3233be8`): compil
 | ecommerce-pagos | Planned | 36/38 | Converge salvo T37/T38 (llaves Culqi B05) y WhatsApp real (Evolution/n8n/Meta) |
 | web-base | Planned | 36/39 | Converge salvo partes humanas de T32–T34 y WEB-25 en `/reclamaciones/nueva` (REC-04) |
 | identidad-seguridad | Planned | 61/62 | Converge salvo D5 (Menor) y AC-IDE-70 con un pedido real (Menor); nombre y correo de todo usuario implementados (DD-25, DD-26) |
-| inventario-ajustes | Planned | 18/18 | Converge salvo AJU-22 (redacción; persona) |
+| inventario-ajustes | Done | 18/18 | Converge (AJU-22 reaprobado, DD-40 a DD-42) |
 | inventario-fuentes | Planned | 25/25 | Converge salvo FUE-09/FUE-11 (diferidas) y FUE-10 (DD-18) |
-| inventario-seleccion-fuente | Planned | 33/33 | Converge salvo S2 (k6 previo a producción) |
+| inventario-seleccion-fuente | Done | 33/33 | Converge (S2 cerrada con k6, DD-44) |
 | transversal-auditoria | Planned | 33/33 | Converge (AUD-45 y AUD-46 añadidos por DD-25 y DD-26) |
 | transversal-notificaciones | Planned | 25/25 | NOT-02 implementado; converge salvo S1 a S3 y los Menores D4 a D6 (de la persona) y el riesgo NOT-14 |
 | transversal-seguridad | InProgress | 30/30 | Converge salvo SEG-17/23 del Inventario (Menor) y SEG-31 del asistente (diferido) |

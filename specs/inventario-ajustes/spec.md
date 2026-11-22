@@ -1,16 +1,16 @@
 ---
 id: inventario-ajustes
 titulo: Ajustes de inventario
-estado: Planned
+estado: Done
 servicio: Inventario
 prefijo: AJU
 origen: [RF17, RF09, NN06]
 calidad: [AC01, RNF01, RNF05, RNF08]
 depende: [inventario-fuentes, identidad-seguridad, transversal-auditoria]
 aprobado_por: Claude (delegado por Diego Amiquero)
-aprobado_en: 2026-11-14
+aprobado_en: 2026-11-21
 plan_aprobado_por: Claude (delegado por Diego Amiquero)
-plan_aprobado_en: 2026-11-14
+plan_aprobado_en: 2026-11-21
 ---
 
 # Spec — Ajustes de inventario
@@ -52,7 +52,7 @@ Permitir que cada sucursal corrija su stock físico con un motivo y un responsab
 | AJU-19 | No deseado | Si se intenta registrar un ingreso de mercadería en una fuente que no es la de recepción, o con una cantidad que no sea un entero entre 1 y 5 000, entonces el sistema deberá rechazarlo indicando el motivo. | RF17, RNF04 |
 | AJU-20 | Evento | Cuando la administración central consulta los ingresos de mercadería, el sistema deberá mostrar los últimos con edición, cantidad, referencia, nota, usuario y fecha, y rechazar la consulta de cualquier otro usuario. | RF17, RNF05 |
 | AJU-21 | Evento | Cuando corre la depuración diaria, el sistema deberá anonimizar el usuario responsable y vaciar la nota de los ajustes e ingresos de más de 2 años, conservando el movimiento y sus cantidades; solo esa depuración, con un rol distinto del de la aplicación, puede modificar esas dos columnas, y deja registro de su ejecución. | RNF08, RNF23 |
-| AJU-22 | Evento | Cuando se repite con la misma clave un ajuste manual o un ingreso de mercadería, el sistema deberá comprobar el alcance de quien repite (si no lo tiene, rechazarlo sin revelar el resultado guardado); con la misma carga, devolver el resultado original sin reaplicarlo; con otra, o con la primera en curso, rechazarlo como conflicto. La clave se acota por usuario y operación y se conserva 30 días. | RF17, AC01 |
+| AJU-22 | Evento | Cuando se repite con la misma clave un ajuste manual o un ingreso, el sistema deberá comprobar primero el alcance de quien repite (sin él, rechazarlo como a cualquier solicitud sin alcance, sin revelar la clave ni el resultado guardado); con la misma carga, devolver el original sin reaplicarlo; con otra, rechazarlo como conflicto. La clave se acota por usuario y operación y se conserva 30 días. | RF17, AC01 |
 
 ## 4. Criterios de aceptación
 
@@ -75,7 +75,7 @@ Permitir que cada sucursal corrija su stock físico con un motivo y un responsab
 | AC-AJU-15 | AJU-19 | **Dado** la fuente de recepción Lima y la sucursal Cusco, **cuando** la administración intenta un ingreso de 5 unidades en Cusco, y otro de 0 y otro de 6 000 en Lima, **entonces** los tres se rechazan con su motivo y el stock no cambia. |
 | AC-AJU-16 | AJU-20 | **Dado** tres ingresos registrados, **cuando** la administración abre la lista, **entonces** ve los tres con edición, cantidad, referencia, nota, usuario y fecha, y un encargado no puede abrirla. |
 | AC-AJU-17 | AJU-21 | **Dado** un ajuste con usuario y nota de hace 2 años y un día y otro de hace 1 año, **cuando** corre la depuración, **entonces** el primero queda sin usuario ni nota con su movimiento y sus cantidades intactos, el segundo no cambia, y repetir la depuración no cambia nada; y la cuenta con la que la aplicación escribe ajustes no puede modificar esas columnas. |
-| AC-AJU-18 | AJU-22 | **Dado** un ajuste de merma registrado con una clave, **cuando** se repite con la misma clave y carga, **entonces** se devuelve el resultado original y el físico no baja otra vez; con otra carga se rechaza como conflicto; si quien repite la clave ya no tiene alcance sobre esa fuente se rechaza sin revelar el resultado guardado, y otro usuario con alcance que usa la misma clave hace una operación independiente; dos solicitudes simultáneas con la misma clave se aplican una sola vez; pasados 30 días, repetirla es una operación nueva; y lo mismo vale para la repetición y el conflicto de un ingreso de mercadería. |
+| AC-AJU-18 | AJU-22 | **Dado** un ajuste de merma registrado con una clave, **cuando** se repite con la misma clave y carga, **entonces** se devuelve el resultado original y el físico no baja otra vez; con otra carga se rechaza como conflicto; si quien repite la clave ya no tiene alcance sobre esa fuente se rechaza sin revelar que la clave existe ni el resultado guardado, y otro usuario con alcance que usa la misma clave hace una operación independiente; dos solicitudes simultáneas con la misma clave se aplican una sola vez (la segunda espera a la primera y recibe el original, o el conflicto si su carga es otra; si la espera agota el plazo de bloqueo, se rechaza como servicio no disponible sin aplicar nada); pasados 30 días y ejecutada la depuración diaria, repetirla es una operación nueva; y lo mismo vale para la repetición y el conflicto de un ingreso de mercadería. |
 
 ## 5. Reglas e invariantes
 
@@ -91,6 +91,7 @@ Permitir que cada sucursal corrija su stock físico con un motivo y un responsab
 - Dos ajustes simultáneos sobre la misma edición se resuelven de forma ordenada; el segundo se valida contra el stock ya actualizado.
 - Si el vendible es 0, no se puede registrar merma ni daño; el usuario recibe el motivo (todo lo restante está reservado).
 - Un conteo mayor al físico con la nota vacía es válido; la nota es opcional.
+- Si la repetición (AJU-22) llega mientras la primera solicitud con esa clave sigue en curso, espera a que termine y recibe entonces el original (misma carga) o el conflicto (otra carga); si la espera agota el plazo de bloqueo, se rechaza con la respuesta uniforme de servicio no disponible y no se aplica nada. El rechazo por falta de alcance de la repetición deja el registro de acceso denegado por alcance de sucursal, igual que cualquier otra solicitud fuera de su sucursal.
 
 ## 7. Preguntas abiertas
 

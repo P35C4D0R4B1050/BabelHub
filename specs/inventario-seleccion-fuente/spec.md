@@ -1,7 +1,7 @@
 ---
 id: inventario-seleccion-fuente
 titulo: Reservas y selección de fuente
-estado: Planned
+estado: Done
 servicio: Inventario
 prefijo: SEL
 origen: [RF04, RF14, RF15, RF27, RF28, NN02, NN06, NN07, NN18]

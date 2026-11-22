@@ -7,7 +7,7 @@ fecha: 2026-11-21
 
 > La produce la skill `spec-verify` al terminar las tareas. Una spec solo pasa a `Done` si el resultado es **Converge**.
 
-## Resultado: Converge salvo AJU-22 (redacción del texto de la spec; dueño: la persona responsable)
+## Resultado: Converge
 
 **Estado final (cierre del 2026-11-21, carril A).** Las dos diferencias de prueba de la pasada inicial (D1 y D2) se cerraron en `0dc7ca1e` y en el commit de `ApiDeAjustesTests`: el historial afirma ahora el orden descendente real (con el reloj de la prueba avanzando), la fecha y los físicos anterior y posterior de cada ajuste (AJU-17); la lista de ingresos afirma cantidad, nota y fecha, y la prueba de la Api compara el elemento de la lista con el DTO del alta, campo a campo (AJU-20). `Criterio~AC-AJU-` en unitarias: 96 de 96. Con ello los 22 requisitos cumplen con prueba sustantiva; queda solo la **salvedad S1** (AJU-22: el texto dice «rechazar como conflicto» y el código espera a la primera y devuelve el original; AC-AJU-18 sí se cumple y está probado): cambiarla exige volver la spec a `Draft`, decisión de la persona responsable (ya en `progress/hallazgos.md`). Los Menores M1 a M8 siguen registrados con dueño y fase; ninguno cambia el resultado. La prueba de la Api (`ApiDeAjustesTests`, Docker) la cubre la próxima corrida completa de `main`.
 
@@ -93,7 +93,7 @@ Viene de los planes y de otras specs, no es un desvío silencioso:
 
 | ID | Salvedad | Motivo y dueño |
 | :--- | :--- | :--- |
-| S1 | AJU-22 dice que la repetición «con la primera en curso» se rechaza como conflicto; el código **espera** a que la primera confirme (índice único) y luego devuelve el original (misma carga) o el conflicto (otra carga); `idempotencia-en-curso` solo aparece en el reingreso por unicidad (REH `:97-100`) y, si vence `lock_timeout`, `bloqueo-ocupado` 503. AC-AJU-18 («dos solicitudes simultáneas con la misma clave se aplican una sola vez») sí se cumple y está probado (IP `:440`, I). | Ya registrado en `progress/hallazgos.md:161` (Menor, abierto, 2026-11-14): alinear el texto de AJU-22 con el comportamiento. Cambiar la redacción de una spec Approved exige volver a Draft y reaprobar. Dueño: persona responsable / coordinación (decisión de redacción; el código no cambia). |
+| S1 | **Cerrada (2026-11-21, DD-40 a DD-42):** el texto de AJU-22, AC-AJU-18 y §6 describe ahora lo que el código hace (la repetición con la primera en curso espera y recibe el original o el conflicto; 503 uniforme si vence el bloqueo; alcance antes de la clave, sin oráculo). La spec volvió a Draft y se reaprobó con la puerta (ronda 2 limpia: 0 Bloqueantes y 0 Importantes). | Carril de cierre | Cerrada |
 
 ### Hallazgos de la primera pasada que se cierran
 
@@ -133,3 +133,9 @@ Viene de los planes y de otras specs, no es un desvío silencioso:
 ## 5. Conclusión
 
 Se confirma lo esencial de la primera pasada (22 requisitos con evidencia vigente, 20 con prueba sustantiva, código de `Ajustes` sin cambios, H1 y H2 ya cerrados por COMP-1 y por Devoluciones), pero se refuta que la spec esté lista para `Done`: AJU-17 y AJU-20 solo tienen pruebas que no afirman fecha, cantidades ni nota (D1, D2). Con esas aserciones añadidas en las dos pruebas unitarias y el filtro `Criterio~AC-AJU-` en verde, el resultado pasa a Converge, con la salvedad de redacción S1 (dueño: persona responsable) y los menores registrados.
+
+## Actualización final del 2026-11-21 (carril de cierre): S1 cerrada, **Converge**
+
+- **AJU-22 (S1) cerrada:** spec y plan reaprobados el 2026-11-21 (`progress/aprobaciones.md`, huellas `4b617c7fea9f9b2f` y `abd8889ce97ea35c`; DD-40 a DD-42, pendientes de ratificar). El código no cambió. Se añadieron dos pruebas de AC-AJU-18: `AjusteManualTests.LaRepeticionConLaPrimeraEnCursoSiSeAgotaLaEsperaResponde503SinAplicarNada` (unitaria, doble `EsperaAgotada` de `RepositorioDeOperacionesEnMemoria`) y `AjustesPostgresTests.LaMismaClaveEnParaleloConCargasDistintas_SeAplicaUnaSolaYLasDemasRecibenElOriginalOElConflicto` (PostgreSQL, cuatro solicitudes simultáneas con dos cargas). El 503 por plazo vencido solo tiene prueba unitaria (Menor, `progress/hallazgos.md`).
+- **Comprobaciones de esta pasada:** `dotnet build BabelHub.sln -warnaserror` sin advertencias; `Criterio~AC-AJU-` 97 de 97 (unitarias); unitarias del Inventario 2387 verdes; arquitectura 259 verdes; integración de Reservas, Ajustes, Fuentes, Traslados y Existencias 627 de 627 (PostgreSQL real); `SpecCheck` OK, 20 specs, 0 avisos.
+- Quedan solo los Menores M1 a M8 y los de la reaprobación, ya registrados con dueño y fase: no impiden `Done`. **Resultado: Converge; la spec pasa a `Done`.**

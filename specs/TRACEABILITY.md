@@ -50,9 +50,9 @@
 | ecommerce-pagos | E-commerce | Planned | 32 | 28 | ecommerce-carrito-checkout, identidad-seguridad, inventario-seleccion-fuente, transversal-auditoria |
 | ecommerce-pedidos | E-commerce | Done | 41 | 35 | ecommerce-pagos, ecommerce-biblioteca-digital, inventario-seleccion-fuente, identidad-seguridad, transversal-notificaciones, transversal-auditoria |
 | identidad-seguridad | E-commerce | Planned | 99 | 73 | transversal-auditoria, transversal-plataforma, transversal-seguridad |
-| inventario-ajustes | Inventario | Planned | 22 | 18 | inventario-fuentes, identidad-seguridad, transversal-auditoria |
+| inventario-ajustes | Inventario | Done | 22 | 18 | inventario-fuentes, identidad-seguridad, transversal-auditoria |
 | inventario-fuentes | Inventario | Planned | 22 | 18 | identidad-seguridad, transversal-auditoria |
-| inventario-seleccion-fuente | Inventario | Planned | 40 | 41 | inventario-fuentes, identidad-seguridad, transversal-auditoria, transversal-seguridad |
+| inventario-seleccion-fuente | Inventario | Done | 40 | 41 | inventario-fuentes, identidad-seguridad, transversal-auditoria, transversal-seguridad |
 | inventario-traslados | Inventario | Done | 23 | 24 | inventario-fuentes, inventario-seleccion-fuente, identidad-seguridad, transversal-auditoria, transversal-notificaciones |
 | transversal-auditoria | Transversal | Planned | 46 | 34 | — |
 | transversal-notificaciones | Transversal | Planned | 16 | 16 | identidad-seguridad, transversal-seguridad, transversal-auditoria |
