@@ -15,12 +15,12 @@ namespace BabelHub.Ecommerce.Api.Areas.Tienda.Controllers;
 /// <summary>
 /// El Libro de Reclamaciones del consumidor (plan §4, REC-02, REC-04, REC-05, REC-10, REC-11, REC-14; T15): <c>GET</c> y <c>POST /reclamaciones/nueva</c> (sin sesión, con la clave de un solo uso del servidor y la constancia con <c>no-store</c>) y las hojas de quien la escribió
 /// (<c>GET /reclamaciones/mis-hojas</c> y <c>GET /reclamaciones/{numero}</c>, el número con formato <c>AAAA-NNNNNN</c> en la ruta). <b>Presentación pura</b>: lee el cuerpo con esquema estricto (un campo desconocido es validación), llama a <see cref="IReclamaciones"/> y a
-/// <see cref="IHojasDelConsumidor"/> y traduce el resultado: una pantalla o un <c>application/problem+json</c> con los códigos <c>ECO-REC-…</c> y <c>ECO-…</c>, <b>la lista de campos que faltan sin el valor escrito</b>, el 403 de verificación requerida y el 429 con <c>Retry-After</c>. Los datos
+/// <see cref="IHojasDelConsumidor"/> y traduce el resultado: una pantalla o un <c>application/problem+json</c> con los códigos <c>ECO-REC-…</c> y <c>ECO-…</c>, <b>la lista de campos que faltan sin el valor escrito</b> (solo tras una sesión vencida el formulario recupera, una vez y para la misma persona, lo que no la identifica: WEB-25), el 403 de verificación requerida y el 429 con <c>Retry-After</c>. Los datos
 /// de la hoja solo se pintan en la constancia de la respuesta del registro; ningún error ni registro los repite. Las rutas se permiten con los textos pendientes (WEB-41).
 /// </summary>
 [Area("Tienda")]
 [RequestSizeLimit(EntradasHttpDelCarrito.TopeDelCuerpo)]
-public sealed partial class ReclamacionesController(IReclamaciones reclamaciones, IHojasDelConsumidor consumidor, ContextoDePagina pantalla, OpcionesDeErrores errores) : Controller
+public sealed partial class ReclamacionesController(IReclamaciones reclamaciones, IHojasDelConsumidor consumidor, ContextoDePagina pantalla, OpcionesDeErrores errores, IBorradoresDePantalla? borradores = null) : Controller
 {
     public const string RutaDelFormulario = "/reclamaciones/nueva";
 
@@ -54,13 +54,14 @@ public sealed partial class ReclamacionesController(IReclamaciones reclamaciones
             return await Falla(consulta, cancelacion);
         }
 
-        return await Formulario([], StatusCodes.Status200OK, cancelacion);
+        return await Formulario([], StatusCodes.Status200OK, cancelacion, recuperarElBorrador: true);
     }
 
     [HttpPost(RutaDelFormulario)]
     [PermitidaConTextosPendientes(CapacidadWeb.EnviarHoja)]
     [VerificacionDePersona(AccionProtegida.HojaDeReclamacion)]
-    public async Task<IActionResult> Registrar(CancellationToken cancelacion)
+    /* El parámetro no se usa: solo declara los campos [Conservar] que el filtro de antifalsificación descubre por reflexión (WEB-25). No quitarlo. */
+    public async Task<IActionResult> Registrar([FromForm] FormularioDeLaHojaDeReclamacion? formulario, CancellationToken cancelacion)
     {
         var (campos, error) = await EntradasHttpDelCarrito.Leer(HttpContext, CamposDelRegistro, cancelacion);
         if (campos is null)
@@ -180,11 +181,37 @@ public sealed partial class ReclamacionesController(IReclamaciones reclamaciones
         return texto is null || (texto.Length is > 0 and <= 9 && texto.All(char.IsAsciiDigit) && int.TryParse(texto, NumberStyles.None, CultureInfo.InvariantCulture, out valor));
     }
 
+    /// <summary>
+    /// Lo que la persona tenía escrito en la hoja cuando venció su sesión (WEB-25): una sola vez, solo para ella y por 30 minutos como máximo, y solo los campos que no la identifican (<see cref="FormularioDeLaHojaDeReclamacion"/>).
+    /// Quien no tiene sesión no recupera nada. Recuperarlo es un favor: si falla, el formulario sale vacío. Las claves se leen sin distinguir mayúsculas.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, string>> RecuperarElBorrador(CancellationToken cancelacion)
+    {
+        if (borradores is null || HttpContext.ActorDeLaSolicitud() is not { } actor)
+        {
+            return new Dictionary<string, string>();
+        }
+
+        try
+        {
+            if (await borradores.Recuperar(actor.UsuarioId, RutaDelFormulario, cancelacion) is { Count: > 0 } recuperado)
+            {
+                return new Dictionary<string, string>(recuperado, StringComparer.OrdinalIgnoreCase);
+            }
+        }
+        catch (Exception) when (!cancelacion.IsCancellationRequested)
+        {
+            // Sin el borrador el formulario sale vacío.
+        }
+
+        return new Dictionary<string, string>();
+    }
+
     /// <summary>El formulario con una clave de un solo uso nueva y los campos con problema, <b>sin lo que la persona escribió</b> (REC-04).</summary>
-    private async Task<IActionResult> Formulario(IReadOnlyList<string> camposConProblema, int estado, CancellationToken cancelacion)
+    private async Task<IActionResult> Formulario(IReadOnlyList<string> camposConProblema, int estado, CancellationToken cancelacion, bool recuperarElBorrador = false)
     {
         var vista = await pantalla.Completar(
-            new ReclamacionNuevaVista { ClaveDelFormulario = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlEncode(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)), CamposConProblema = camposConProblema },
+            new ReclamacionNuevaVista { ClaveDelFormulario = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlEncode(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)), CamposConProblema = camposConProblema, Valores = recuperarElBorrador ? await RecuperarElBorrador(cancelacion) : new Dictionary<string, string>() },
             "Libro de Reclamaciones",
             cancelacion: cancelacion);
         Response.Headers.CacheControl = "no-store";

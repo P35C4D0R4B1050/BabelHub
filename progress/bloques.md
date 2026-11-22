@@ -136,7 +136,7 @@ Tareas: **588 de 638** (92 %) al 2026-11-21 (noche). `main` (`f3233be8`): compil
 | inventario-traslados | **Done** | 26/26 | Converge |
 | ecommerce-envios | InProgress | 23/25 | Converge salvo T14b/T21b (operador real fuera de alcance, DD-22) |
 | ecommerce-pagos | Planned | 36/38 | Converge salvo T37/T38 (llaves Culqi B05) y WhatsApp real (Evolution/n8n/Meta) |
-| web-base | Planned | 36/39 | Converge salvo partes humanas de T32–T34 y WEB-25 en `/reclamaciones/nueva` (REC-04) |
+| web-base | Planned | 36/39 | Converge salvo partes humanas de T32–T34 y reserva de medición de AC-WEB-16 con TLS (WEB-25 cerrado, DD-30); protocolo en `progress/evidencias/web-base/` |
 | identidad-seguridad | Planned | 61/62 | Converge salvo D5 (Menor) y AC-IDE-70 con un pedido real (Menor); nombre y correo de todo usuario implementados (DD-25, DD-26) |
 | inventario-ajustes | Planned | 18/18 | Converge salvo AJU-22 (redacción; persona) |
 | inventario-fuentes | Planned | 25/25 | Converge salvo FUE-09/FUE-11 (diferidas) y FUE-10 (DD-18) |

@@ -2,6 +2,15 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-21 (noche) — Web base: WEB-25 en el Libro de Reclamaciones y evidencia automática de T32 a T34
+
+### Cubierto
+- `/reclamaciones/nueva` conserva y recupera, tras una sesión vencida, bien, monto, referencia, tipo y detalle (nunca documento, domicilio, nombre ni correo; DD-30 pendiente de ratificar). 8 pruebas de integración nuevas (AC-WEB-20).
+- Corrida automática de T32 a T34 en Chromium de escritorio y teléfono y WebKit: responsivo, temas, movimiento reducido, axe y teclado pasan; evidencia en `progress/evidencias/web-base/`.
+
+### Pendiente
+- Partes humanas (navegadores reales, lector de pantalla, dos rondas de usabilidad): `protocolo-manual.md`. Reserva de medición de AC-WEB-16 con TLS. `web-base` sigue en `Planned`.
+
 ## 2026-11-21 (noche) — Libro de Reclamaciones: vínculo de las hojas con la cuenta (DD-26), Done
 
 ### Cubierto
