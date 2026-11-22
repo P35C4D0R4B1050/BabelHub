@@ -3,7 +3,7 @@ id: transversal-notificaciones
 titulo: Avisos por WhatsApp
 estado: Planned
 aprobado_por: Claude (delegado por Diego Amiquero)
-aprobado_en: 2026-11-13
+aprobado_en: 2026-11-21
 plan_aprobado_por: Claude (delegado por Diego Amiquero)
 plan_aprobado_en: 2026-11-13
 servicio: Transversal
@@ -43,9 +43,9 @@ Avisar al cliente y a las sucursales de cada cambio importante sin que el aviso 
 | NOT-10 | Ubicuo | El sistema deberá permitir cambiar el texto de los mensajes sin modificar el código de los servicios. | RF07 |
 | NOT-11 | Estado | Mientras el entorno es de desarrollo, el sistema deberá usar un notificador simulado que registre los avisos sin enviarlos. | RF07 |
 | NOT-12 | Ubicuo | El sistema deberá autenticar las llamadas hacia el servicio de envío y las respuestas o estados que este devuelva, y descartar y registrar las que no se puedan verificar. | RNF21 |
-| NOT-13 | Evento | Cuando la administración desactiva los avisos de un número a solicitud de su titular, el sistema deberá no enviar más avisos a ese número y registrarlo en la auditoría. | RNF07, RNF08 |
+| NOT-13 | Evento | Cuando la administración desactiva los avisos de un número a solicitud de su titular, el sistema deberá no enviar más avisos a ese número y registrarlo en la auditoría; y cuando la administración los reactiva a solicitud del titular, deberá volver a enviarlos y registrarlo también en la auditoría. | RNF07, RNF08 |
 | NOT-14 | Estado | Mientras un número de cliente destino acumula 5 avisos que pasaron la comprobación de envío en una ventana deslizante de una hora o 20 en una ventana deslizante de 24 horas, el sistema deberá omitir los avisos siguientes a ese número, marcarlos como omitidos por tope (estado final que no se reenvía) y registrar un evento de seguridad sin el número. | RNF07, RNF17 |
-| NOT-15 | No deseado | Si el servicio de límites o el Inventario no responden al enviar un aviso, entonces el sistema deberá dejar el aviso pendiente sin enviarlo, reintentarlo con espera sin contarlo dos veces contra el tope, y pasarlo a fallido con motivo de vencido si pasan 24 horas desde su creación. | RNF17, AC03 |
+| NOT-15 | No deseado | Si el servicio de límites o el Inventario no responden al enviar un aviso, entonces el sistema deberá dejar el aviso pendiente sin enviarlo, reintentarlo con espera sin consumir más de un cupo del tope por aviso, y pasarlo a fallido con motivo de vencido si pasan 24 horas desde su creación. | RNF17, AC03 |
 | NOT-16 | Ubicuo | El sistema deberá aplicar el tope de NOT-14 por tipo de destinatario, con el contacto de una sucursal exento, y no contar contra el tope ni marcar por tope un aviso omitido por falta de consentimiento o cancelado por NOT-08 o NOT-13. | RNF07, RNF17 |
 
 ## 4. Criterios de aceptación
@@ -64,10 +64,10 @@ Avisar al cliente y a las sucursales de cada cambio importante sin que el aviso 
 | AC-NOT-10 | NOT-11 | **Dado** el entorno de desarrollo, **cuando** ocurre un evento notificable, **entonces** el aviso se registra sin enviarse a ningún número real. |
 | AC-NOT-11 | NOT-12 | **Dado** una respuesta del servicio de envío sin firma o con firma inválida, **cuando** llega, **entonces** se descarta y se registra, y el aviso no se marca como enviado. |
 | AC-NOT-12 | NOT-04, NOT-05 | **Dado** un aviso que falla, **cuando** se reintenta, **entonces** se intenta una vez y se reintenta hasta 5 veces con esperas crecientes de hasta 1 hora y luego queda fallido; y el mismo evento para el mismo destinatario y plantilla no genera dos avisos. |
-| AC-NOT-13 | NOT-13 | **Dado** un número ajeno que recibió avisos por error, **cuando** la administración desactiva sus avisos a pedido de su titular, **entonces** no recibe más avisos y queda una entrada de auditoría. |
+| AC-NOT-13 | NOT-13 | **Dado** un número ajeno que recibió avisos por error, **cuando** la administración desactiva sus avisos a pedido de su titular, **entonces** no recibe más avisos y queda una entrada de auditoría; y, **cuando** la administración los reactiva a pedido del titular, vuelve a recibirlos y queda otra entrada de auditoría. |
 | AC-NOT-14 | NOT-14, NOT-06 | **Dado** un número de cliente que recibió 5 avisos en la última hora y otro que recibió 20 en las últimas 24 horas, **cuando** llega el momento de enviar un aviso más a cada uno, **entonces** no se envía, queda marcado como omitido por tope con su fecha, no se reenvía después y queda un evento de seguridad sin el número; los avisos solicitados pasada la ventana se envían con normalidad; y seis avisos solicitados a la vez a un mismo número dejan cinco enviados y uno omitido. |
-| AC-NOT-15 | NOT-15 | **Dado** que el servicio de límites o el Inventario no responden, **cuando** se intenta enviar un aviso, **entonces** queda pendiente sin enviarse, se reintenta con espera sin contar dos veces contra el tope y, pasadas 24 horas desde su creación, queda fallido por vencido. |
-| AC-NOT-16 | NOT-16, NOT-14 | **Dado** el contacto de una sucursal que recibe más de 5 avisos en una hora, otro número de cliente sin avisos y un aviso omitido por falta de consentimiento, **cuando** se envían, **entonces** los de la sucursal se envían todos, el otro número no se ve afectado y el aviso sin consentimiento no cuenta contra el tope ni queda marcado por tope. |
+| AC-NOT-15 | NOT-15 | **Dado** que el servicio de límites o el Inventario no responden, **cuando** se intenta enviar un aviso, **entonces** queda pendiente sin enviarse, se reintenta con espera sin consumir más de un cupo del tope por aviso y, pasadas 24 horas desde su creación, queda fallido por vencido. |
+| AC-NOT-16 | NOT-16, NOT-14 | **Dado** el contacto de una sucursal que recibe más de 5 avisos en una hora, otro número de cliente sin avisos, un aviso omitido por falta de consentimiento y otro cancelado por NOT-08 o NOT-13, **cuando** se envían, **entonces** los de la sucursal se envían todos, el otro número no se ve afectado y ni el aviso sin consentimiento ni el cancelado cuentan contra el tope ni quedan marcados por tope. |
 
 ## 5. Reglas e invariantes
 
@@ -79,6 +79,8 @@ Avisar al cliente y a las sucursales de cada cambio importante sin que el aviso 
 ## 6. Casos límite y errores
 
 - Un cliente con consentimiento pero sin número registrado no recibe avisos.
+- Una compra puede pedir hasta tres avisos al mismo número (pago aprobado, pedido confirmado y, con un libro digital, libro digital disponible) y después los de cada cambio de estado; con el tope de NOT-14, un cliente con dos compras seguidas en una hora puede no recibir algún aviso posterior (omitido por tope). Se acepta (decisión delegada DD-45): el tope trata igual todos los eventos, el estado siempre se consulta en la tienda y la administración ve los omitidos.
+- La administración central puede reactivar los avisos de un número que desactivó (NOT-13), también a pedido del titular y con auditoría; reactivar un número que no está desactivado no tiene efecto ni genera auditoría.
 - Un número ingresado por error puede enviar avisos a un tercero; no se verifica la propiedad del número (riesgo aceptado), el mensaje no contiene datos sensibles y la administración puede desactivar los avisos de ese número a solicitud de su titular (NOT-13).
 - Un cambio de número deja sin efecto el consentimiento hasta que el cliente lo confirme para el número nuevo (`identidad-seguridad`, IDE-31).
 - Un número inválido marca el aviso como fallido tras agotar los reintentos y lo deja visible a la administración.

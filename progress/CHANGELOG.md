@@ -2,6 +2,12 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-21 (noche) — Avisos por WhatsApp: cierre de las reservas internas (DD-45 a DD-49)
+
+### Cubierto
+- `transversal-notificaciones`: D4 (auditoría real en PostgreSQL de la desactivación de números), D5 (DD-46), D6 (la reactivación entra en NOT-13; spec reaprobada con la puerta delegada) y la redacción de NOT-15 y AC-NOT-15 y AC-NOT-16; NOT-14 en la compra mixta aceptado (DD-45). Pruebas nuevas de AC-NOT-13 y AC-NOT-16.
+- Queda como reserva externa S1 (n8n y Evolution reales con un número de WhatsApp real); DD-45 a DD-49 esperan ratificación.
+
 ## 2026-11-21 (noche) — Libro de Reclamaciones: vínculo de las hojas con la cuenta (DD-26), Done
 
 ### Cubierto
