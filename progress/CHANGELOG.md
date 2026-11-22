@@ -2,6 +2,11 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-21 (noche) — Palancas de rendimiento 3 y 4 (DD-50 a DD-54)
+
+### Cubierto
+- Caché de disponibilidad: ya existía en el E-commerce; documentada y medida. Memoria de referencias del Inventario encendida en 5 s (+45 % en medición alternada). Límites generales en memoria descartado. Detalle en `docs/03/09` §6e.
+
 ## 2026-11-21 (noche) — Libro de Reclamaciones: vínculo de las hojas con la cuenta (DD-26), Done
 
 ### Cubierto

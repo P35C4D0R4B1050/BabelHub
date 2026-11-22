@@ -23,7 +23,7 @@ bash tests/load/entorno/ajustar-limites.sh 0.6 0.4 # opcional: otros límites de
 bash tests/load/entorno/bajar-carga.sh             # apagar (con -v borra la base)
 ```
 
-Variables opcionales de `ejecutar.sh`: `PANEL=1` (exporta además el panel web integrado de k6 como `<escenario>-panel.html`), `DURACION`, `RITMO` (compras por segundo), `UNIDADES`, `COMPETIDORES`, `NIVELES`, `SEGUNDOS_POR_NIVEL`, `PENSAR_S` (pausa de cada usuario entre solicitudes; 0,5 s por omisión, `0` mide el peor caso) y `CARGA_FECHA` (carpeta de resultados).
+Variables opcionales de `ejecutar.sh`: `FALLOS_DE_CACHE` (solo `perfil-realista`: fracción de las consultas consultivas que llega al Inventario, modelo de la caché del E-commerce, DD-54; 1 = sin caché), `PANEL=1` (exporta además el panel web integrado de k6 como `<escenario>-panel.html`), `DURACION`, `RITMO` (compras por segundo), `UNIDADES`, `COMPETIDORES`, `NIVELES`, `SEGUNDOS_POR_NIVEL`, `PENSAR_S` (pausa de cada usuario entre solicitudes; 0,5 s por omisión, `0` mide el peor caso) y `CARGA_FECHA` (carpeta de resultados) y, al levantar el entorno, `CARGA_REFERENCIAS_S` (memoria de referencias del Inventario, 5 s por omisión, DD-51; 0 la apaga).
 
 **Requisitos:** Windows con Docker Desktop y Git Bash (los scripts usan `cygpath` y `docker`), Node (para emitir las credenciales de prueba) y .NET (migrar la base). En Linux o macOS habría que cambiar `cygpath -m` por la ruta directa.
 

@@ -24,6 +24,9 @@ const SOSTENIDO = Number(__ENV.SEGUNDOS_POR_NIVEL || 100);
 const SOSTENIDO_FINAL = Number(__ENV.SEGUNDOS_FINAL || 180);
 const BAJADA = 30;
 const HOLGURA = 35; // un usuario que sale termina su pausa (hasta 30 s) antes de que empiece el nivel siguiente
+// Modelo de la caché de disponibilidad del E-commerce (DD-50, D03 de ecommerce-catalogo: 30 s por edición): fracción de las consultas consultivas (detalle y carrito) que NO la acierta y llega al Inventario. 1 (por omisión) = sin caché, el peor caso
+// de siempre; el resto lo deciden CacheDeDisponibilidadDeCargaTests (0,022 con 20 ediciones; 0,43 con 5 000 de popularidad tipo Zipf). El checkout nunca usa la caché (CAR-06).
+const FALLOS_DE_CACHE = Number(__ENV.FALLOS_DE_CACHE || 1);
 
 const acciones = new Counter('acciones');
 const checkoutTramo = new Trend('checkout_tramo', true);
@@ -66,10 +69,10 @@ export default function (datos) {
     acciones.add(1, { tipo: 'catalogo' });
   } else if (x < 0.93) {
     acciones.add(1, { tipo: 'detalle' });
-    check(disponibilidad(edicion, vu), { 'disponibilidad 200': (r) => r.status === 200 });
+    if (Math.random() < FALLOS_DE_CACHE) check(disponibilidad(edicion, vu), { 'disponibilidad 200': (r) => r.status === 200 });
   } else if (x < 0.98) {
     acciones.add(1, { tipo: 'carrito' });
-    check(disponibilidad(edicion, vu), { 'disponibilidad 200': (r) => r.status === 200 });
+    if (Math.random() < FALLOS_DE_CACHE) check(disponibilidad(edicion, vu), { 'disponibilidad 200': (r) => r.status === 200 });
   } else {
     acciones.add(1, { tipo: 'checkout' });
     check(disponibilidad(edicion, vu), { 'disponibilidad 200': (r) => r.status === 200 });

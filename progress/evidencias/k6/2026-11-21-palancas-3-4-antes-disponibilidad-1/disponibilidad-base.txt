@@ -1,0 +1,65 @@
+== Consultas más costosas (tiempo total) ==
+ calls | total_ms | media_ms | max_ms |  rows  |                                                                        consulta                                                                        
+-------+----------+----------+--------+--------+--------------------------------------------------------------------------------------------------------------------------------------------------------
+  8458 |    911.3 |    0.108 |   38.9 | 651266 | SELECT fuente_id, edicion_id, fisico, reservado FROM fuentes.stock WHERE edicion_id = ANY($1) ORDER BY edicion_id, fuente_id
+  8479 |    745.7 |    0.088 |   35.4 | 652883 | SELECT id, codigo, nombre, region, contacto_aviso, es_recepcion FROM fuentes.fuentes ORDER BY codigo
+  8498 |    515.3 |    0.061 |   59.0 |   8478 | SELECT edicion_id, formato FROM fuentes.ediciones WHERE edicion_id = ANY($1) ORDER BY edicion_id
+  8458 |    396.7 |    0.047 |   91.0 |      0 | SELECT l.fuente_id, l.edicion_id, sum(l.cantidad)::integer FROM reservas.reserva_lineas l JOIN reservas.reservas r ON r.id = l.reserva_id WHERE l.esta
+ 34190 |    350.9 |    0.010 |   74.8 |      0 | SET LOCAL ROLE "inventario_acceso"
+    20 |    269.5 |   13.474 |   41.1 |   1540 | INSERT INTO fuentes.stock (fuente_id, edicion_id, formato, fisico, reservado, version) SELECT f.id, e.edicion_id, $2, $3, $4, $5 FROM fuentes.edicione
+ 25538 |    191.0 |    0.007 |   22.7 |      0 | SET LOCAL ROLE "rol_fuentes"
+ 16996 |    143.3 |    0.008 |   51.6 |  16996 | SELECT set_config($1, $2, $3)
+  8592 |    100.3 |    0.012 |    0.6 |   8592 | SELECT current_user, set_config($4, $1, $5), set_config($2, $3, $6)
+  8462 |     76.4 |    0.009 |    1.0 |      0 | BEGIN ISOLATION LEVEL REPEATABLE READ
+  8482 |     56.8 |    0.007 |    0.2 |      0 | SET LOCAL ROLE "rol_reservas"
+    20 |     54.2 |    2.712 |   36.5 |     20 | INSERT INTO ajustes.ajustes (id, fuente_id, edicion_id, motivo, cantidad_anterior, cantidad_posterior, conteo_real, nota, usuario_id, fecha, devolucio
+  8462 |     52.3 |    0.006 |    0.3 |      0 | SET TRANSACTION READ ONLY
+  1560 |     39.7 |    0.025 |   11.4 |   1560 | SELECT $2 FROM ONLY "fuentes"."fuentes" x WHERE "id" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x
+  1560 |     26.1 |    0.017 |    1.3 |   1560 | SELECT $3 FROM ONLY "fuentes"."ediciones" x WHERE "edicion_id" OPERATOR(pg_catalog.=) $1 AND "formato" OPERATOR(pg_catalog.=) $2 FOR KEY SHARE OF x
+(15 rows)
+
+== Uso de índices por tabla (lecturas por índice frente a secuenciales) ==
+              tabla               | seq_scan | idx_scan | filas 
+----------------------------------+----------+----------+-------
+ reservas.reserva_lineas          |        0 |    25994 |     0
+ reservas.reservas                |        0 |    16968 |     0
+ fuentes.ediciones                |        0 |    10118 |    20
+ fuentes.stock                    |        0 |    10098 |  1540
+ fuentes.fuentes                  |     8500 |     1562 |     1
+ plataforma.eventos_limite        |        0 |       62 |    62
+ ajustes.operaciones_idempotentes |        0 |       20 |    20
+ plataforma.trabajos_de_fondo     |        0 |       13 |     0
+ auditoria.acumulado_de_limites   |        8 |        0 |     0
+ traslados.mensajes_salientes     |        0 |        4 |     0
+ auditoria.estado_de_depuracion   |        0 |        1 |     0
+(11 rows)
+
+== Índices más usados ==
+                   indice                    | idx_scan 
+---------------------------------------------+----------
+ reservas.ix_reserva_lineas_reserva          |    17516
+ reservas.uq_reservas_id_pedido              |    16964
+ fuentes.uq_ediciones_id_formato             |    10098
+ fuentes.ix_stock_edicion                    |     8518
+ reservas.ix_reserva_lineas_pendientes       |     8478
+ fuentes.pk_stock                            |     1580
+ fuentes.fuentes_pkey                        |     1561
+ plataforma.ix_eventos_limite_clave_instante |       62
+ ajustes.pk_ajustes_operaciones_idempotentes |       20
+ fuentes.ediciones_pkey                      |       20
+ plataforma.trabajos_de_fondo_pkey           |       13
+ traslados.ix_mensajes_salientes_pendientes  |        4
+(12 rows)
+
+== Bloqueos e interbloqueos de la base ==
+ deadlocks | conflicts | temp_files | xact_commit | xact_rollback | acierto_de_cache_pct 
+-----------+-----------+------------+-------------+---------------+----------------------
+         0 |         0 |          0 |        8617 |             0 |                99.99
+(1 row)
+
+== Conexiones por cuenta (límite 20 por cuenta) ==
+ usename  | conexiones 
+----------+------------
+ postgres |          1
+(1 row)
+

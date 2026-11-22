@@ -32,6 +32,8 @@ services:
     env_file: ["${CARGA_ENV_CONTENEDOR:?}"]
     environment:
       ASPNETCORE_ENVIRONMENT: Development
+      # DD-51: la memoria de referencias de 5 s está encendida como en producción; CARGA_REFERENCIAS_S=0 la apaga para medir el efecto.
+      BABELHUB__Inventario__ReferenciasEnMemoriaSegundos: ${CARGA_REFERENCIAS_S:-5}
       ASPNETCORE_URLS: https://+:8443
       ASPNETCORE_Kestrel__Certificates__Default__Path: /certificado/carga.pfx
       ASPNETCORE_Kestrel__Certificates__Default__Password: ${CARGA_CLAVE_PFX:?}

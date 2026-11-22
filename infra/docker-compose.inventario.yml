@@ -68,6 +68,8 @@ services:
     security_opt: ["no-new-privileges:true"]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      # DD-51: memoria de 5 s de la lista de fuentes y del formato de las ediciones, solo para la consulta pública de disponibilidad (nunca stock ni reservas).
+      BABELHUB__Inventario__ReferenciasEnMemoriaSegundos: "5"
     env_file:
       - "${BABELHUB_SECRETOS:?}/inventario.env"
     ports:
