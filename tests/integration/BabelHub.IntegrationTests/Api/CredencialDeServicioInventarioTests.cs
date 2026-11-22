@@ -278,7 +278,7 @@ public sealed class CredencialDeServicioInventarioTests : IAsyncLifetime
     [Trait("Criterio", "AC-SEG-14")]
     public async Task UnaLlamadaConLaCredencialDelAlcanceCorrecto_SeEjecuta()
     {
-        var respuesta = await Llamar("/servicio/disponibilidad", ("X-Credencial-De-Servicio", CredencialDeDisponibilidad));
+        var respuesta = await Llamar("/servicio/disponibilidad", ("X-Credencial-De-Servicio", CredencialDeDisponibilidad), ("X-Origen-Reenviado", "203.0.113.7"), ("X-Credencial-De-Origen", CredencialDeOrigen));
 
         Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
         Assert.Equal(1, _ejecuciones);
@@ -305,8 +305,8 @@ public sealed class CredencialDeServicioInventarioTests : IAsyncLifetime
     [Trait("Criterio", "AC-SEG-14")]
     public async Task UnaOperacionDeUsuarioSinElContextoDeUnUsuario_SeRechazaDespuesDeAutenticarYUnaCabeceraDeActorNoLoReemplaza()
     {
-        var sinUsuario = await Llamar("/servicio/reservas", ("X-Credencial-De-Servicio", CredencialDeUsuario), ("X-Actor", "administrador-central"));
-        var conUsuario = await Llamar("/servicio/reservas", ("X-Credencial-De-Servicio", CredencialDeUsuario), ("X-Prueba-Token", "usuario-1"));
+        var sinUsuario = await Llamar("/servicio/reservas", ("X-Credencial-De-Servicio", CredencialDeUsuario), ("X-Actor", "administrador-central"), ("X-Origen-Reenviado", "203.0.113.7"), ("X-Credencial-De-Origen", CredencialDeOrigen));
+        var conUsuario = await Llamar("/servicio/reservas", ("X-Credencial-De-Servicio", CredencialDeUsuario), ("X-Prueba-Token", "usuario-1"), ("X-Origen-Reenviado", "203.0.113.7"), ("X-Credencial-De-Origen", CredencialDeOrigen));
 
         Assert.Equal(HttpStatusCode.Unauthorized, sinUsuario.StatusCode);
         Assert.Equal("sin-contexto-de-usuario", Assert.Single(Eventos()).Motivo);
@@ -336,6 +336,43 @@ public sealed class CredencialDeServicioInventarioTests : IAsyncLifetime
         {
             Assert.Equal(2, _alertas.Alertas.Count);
         }
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-15")]
+    [Trait("Criterio", "AC-SEG-20")]
+    public async Task UnaLlamadaDeClienteSinDireccionReenviada_NoUsaLaDireccionDelEcommerceSeCuentaEnElOrigenDesconocidoYDejaElEvento()
+    {
+        var cuerpoDeLaLlamada = await Cuerpo(await Llamar(
+            "/servicio/disponibilidad",
+            ("X-Credencial-De-Servicio", CredencialDeDisponibilidad)));
+
+        Assert.Equal(JsonValueKind.Null, cuerpoDeLaLlamada.GetProperty("direccion").ValueKind);
+        Assert.True(cuerpoDeLaLlamada.GetProperty("aplicaLimitesPorOrigen").GetBoolean());
+        var evento = Assert.Single(Eventos());
+        Assert.Equal(TipoDeEventoDeSeguridad.OrigenIndeterminable, evento.Tipo);
+        Assert.Equal("origen-no-determinable", evento.Motivo);
+        Assert.Null(evento.DireccionCompleta);
+
+        // Los límites por origen siguen aplicando, con un contador compartido del origen desconocido: la tercera llamada excede el máximo de 2 (SEG-23).
+        var permitidas = new List<bool>();
+        for (var i = 0; i < 4; i++)
+        {
+            var reserva = await Cuerpo(await Llamar("/servicio/reservar-por-origen", ("X-Credencial-De-Servicio", CredencialDeDisponibilidad), ("X-Prueba-Conexion", $"10.1.0.{20 + i}")));
+            permitidas.Add(reserva.GetProperty("permitido").GetBoolean());
+        }
+
+        Assert.Equal([true, true, false, false], permitidas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-15")]
+    public async Task UnaLlamadaDeSistemaSinDireccionReenviada_SigueUsandoLaDireccionDeLaConexionSinEvento()
+    {
+        var cuerpoDeLaLlamada = await Cuerpo(await Llamar("/servicio/expirar", ("X-Credencial-De-Servicio", CredencialDeExpiracion)));
+
+        Assert.Equal("10.1.0.7", cuerpoDeLaLlamada.GetProperty("direccion").GetString());
+        Assert.Empty(Eventos());
     }
 
     [Fact]

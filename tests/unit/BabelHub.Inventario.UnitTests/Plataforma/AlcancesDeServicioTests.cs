@@ -219,7 +219,7 @@ public sealed class AlcancesDeServicioTests
 
     [Fact]
     [Trait("Criterio", "AC-SEG-15")]
-    public async Task Resolver_SinDireccionReenviada_UsaLaDirecta()
+    public async Task Resolver_SinDireccionReenviadaEnUnaLlamadaDeSistema_UsaLaDirecta()
     {
         var resolutor = new ResolverOrigenDeLlamadaDeServicio(new CalculadorDeHuellaFalso(), _eventos, _reloj);
 
@@ -227,6 +227,37 @@ public sealed class AlcancesDeServicioTests
 
         Assert.Equal("10.0.0.5", resuelto.Origen.Direccion);
         Assert.True(resuelto.AplicaLimitesPorOrigen);
+        Assert.Empty(_eventos.Eventos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-15")]
+    [Trait("Criterio", "AC-SEG-20")]
+    public async Task Resolver_SinDireccionReenviadaEnUnaLlamadaDeCliente_NoUsaLaDireccionDelComponenteInternoYCuentaEnElOrigenDesconocidoConEvento()
+    {
+        var resolutor = new ResolverOrigenDeLlamadaDeServicio(new CalculadorDeHuellaFalso(), _eventos, _reloj);
+
+        var resuelto = await resolutor.Resolver("10.0.0.5", null, credencialDeOrigenValida: false, llamadaDeCliente: true);
+
+        Assert.True(resuelto.Origen.Huella.EsDesconocido);
+        Assert.Null(resuelto.Origen.Direccion);
+        Assert.True(resuelto.AplicaLimitesPorOrigen);
+        Assert.False(resuelto.ReenvioIgnorado);
+        var evento = Assert.Single(_eventos.Eventos);
+        Assert.Equal(TipoDeEventoDeSeguridad.OrigenIndeterminable, evento.Tipo);
+        Assert.Equal("origen-no-determinable", evento.Motivo);
+        Assert.Null(evento.DireccionCompleta);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-15")]
+    public async Task Resolver_ConLaDireccionReenviadaYLaCredencialEnUnaLlamadaDeCliente_UsaLaDelClienteSinEvento()
+    {
+        var resolutor = new ResolverOrigenDeLlamadaDeServicio(new CalculadorDeHuellaFalso(), _eventos, _reloj);
+
+        var resuelto = await resolutor.Resolver("10.0.0.5", "203.0.113.7", credencialDeOrigenValida: true, llamadaDeCliente: true);
+
+        Assert.Equal("203.0.113.7", resuelto.Origen.Direccion);
         Assert.Empty(_eventos.Eventos);
     }
 

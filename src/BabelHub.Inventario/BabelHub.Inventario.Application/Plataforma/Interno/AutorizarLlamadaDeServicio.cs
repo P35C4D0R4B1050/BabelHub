@@ -107,6 +107,7 @@ public sealed class ResolverOrigenDeLlamadaDeServicio(
         string? direccionDirecta,
         string? direccionReenviada,
         bool credencialDeOrigenValida,
+        bool llamadaDeCliente = false,
         CancellationToken cancelacion = default)
     {
         var directo = string.IsNullOrWhiteSpace(direccionDirecta)
@@ -115,6 +116,16 @@ public sealed class ResolverOrigenDeLlamadaDeServicio(
 
         if (string.IsNullOrWhiteSpace(direccionReenviada))
         {
+            if (llamadaDeCliente)
+            {
+                // Una llamada de cliente final sin la dirección que el E-commerce no pudo determinar: la dirección directa es la del componente interno y no sirve de origen (SEG-17). Cuenta en el origen desconocido, con los
+                // límites por origen activos (SEG-23), y deja el evento una vez por llamada sin ninguna dirección.
+                await eventos.Publicar(
+                    new EventoDeSeguridad(TipoDeEventoDeSeguridad.OrigenIndeterminable, reloj.Ahora, motivo: "origen-no-determinable"),
+                    cancelacion).ConfigureAwait(false);
+                return new OrigenResuelto(OrigenDeSolicitud.Desconocido, AplicaLimitesPorOrigen: true, ReenvioIgnorado: false);
+            }
+
             return new OrigenResuelto(directo, AplicaLimitesPorOrigen: true, ReenvioIgnorado: false);
         }
 

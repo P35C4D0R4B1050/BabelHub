@@ -273,7 +273,16 @@
                 @switch (estado?.Estado)
                 {
                     case EstadoDeLaCancelacion.Diferida:
-                        <div class="alert alert-info my-4" role="status"><bh-icono nombre="info" /><span>Tu cancelación está diferida: faltan cerrar <strong>@estado.PendientesAbiertos</strong> pendiente(s) (pedidos, envíos, devoluciones o reembolsos).@(estado.SeDescartaEl is { } descarte ? $" Si no se cierran, se descartará el {FormatoPeruano.Fecha(DateOnly.FromDateTime(descarte.UtcDateTime))}." : string.Empty)</span></div>
+                        <div class="alert alert-info my-4" role="status"><bh-icono nombre="info" /><span>Tu cancelación está diferida: faltan cerrar <strong>@estado.PendientesAbiertos</strong> pendiente(s).@(estado.SeDescartaEl is { } descarte ? $" Si no se cierran, se descartará el {FormatoPeruano.Fecha(DateOnly.FromDateTime(descarte.UtcDateTime))}." : string.Empty)</span></div>
+                        @if (estado.Desglose is { } faltan)
+                        {
+                            <ul class="list-disc ms-6 my-2" data-pendientes-de-la-cancelacion>
+                                @if (faltan.PedidosSinCerrar > 0) { <li>Pedidos con libros impresos sin entregar: @faltan.PedidosSinCerrar</li> }
+                                @if (faltan.Reembolsos > 0) { <li>Reembolsos por confirmar: @faltan.Reembolsos</li> }
+                                @if (faltan.Devoluciones > 0) { <li>Devoluciones y reportes abiertos: @faltan.Devoluciones</li> }
+                                @if (faltan.Otros > 0) { <li>Reservas, pagos o reclamos abiertos: @faltan.Otros</li> }
+                            </ul>
+                        }
                         @if (acciones)
                         {
                             <form method="post" action="/cuenta/cancelacion/desistir" class="mt-2"><partial name="_TokenAntifalsificacion" /><button type="submit" class="btn btn-ghost">Desistir de cancelar mi cuenta</button></form>

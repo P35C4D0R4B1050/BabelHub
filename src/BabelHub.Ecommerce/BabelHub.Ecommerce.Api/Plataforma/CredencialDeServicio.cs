@@ -95,7 +95,7 @@ public sealed class CredencialDeServicioMiddleware(
         var directa = DireccionDirecta(contexto);
 
         // El origen provisional es la dirección directa: así un rechazo deja su evento con quién llamó.
-        var provisional = await resolutor.Resolver(directa, null, false, contexto.RequestAborted).ConfigureAwait(false);
+        var provisional = await resolutor.Resolver(directa, null, false, cancelacion: contexto.RequestAborted).ConfigureAwait(false);
         OrigenDeLaSolicitudHttp.Establecer(contexto, provisional.Origen);
 
         var (alcance, esAnterior) = credenciales.Identificar(UnicoValor(contexto, CabeceraDeCredencial));
@@ -114,7 +114,7 @@ public sealed class CredencialDeServicioMiddleware(
 
         var reenviada = UnicoValor(contexto, CabeceraDeOrigenReenviado);
         var credencialDeOrigenValida = credenciales.Comprobar(AlcanceDeServicio.OrigenReenviado, UnicoValor(contexto, CabeceraDeCredencialDeOrigen)) != ResultadoDeCredencialDeEntrada.Invalida;
-        var resuelto = await resolutor.Resolver(directa, reenviada, credencialDeOrigenValida, contexto.RequestAborted).ConfigureAwait(false);
+        var resuelto = await resolutor.Resolver(directa, reenviada, credencialDeOrigenValida, EsLlamadaDeCliente(alcance), contexto.RequestAborted).ConfigureAwait(false);
         OrigenDeLaSolicitudHttp.Establecer(contexto, resuelto.Origen);
         contexto.Request.Headers.Remove(CabeceraDeOrigenReenviado);
         contexto.Request.Headers.Remove(CabeceraDeCredencialDeOrigen);
@@ -132,6 +132,9 @@ public sealed class CredencialDeServicioMiddleware(
 
         await siguiente(contexto).ConfigureAwait(false);
     }
+
+    /// <summary>Las llamadas que actúan por un cliente final (operación de usuario y lectura de disponibilidad) llevan su origen reenviado; las de sistema no.</summary>
+    private static bool EsLlamadaDeCliente(AlcanceDeServicio? alcance) => alcance is AlcanceDeServicio.OperacionDeUsuario or AlcanceDeServicio.LecturaDeDisponibilidad;
 
     private static string? DireccionDirecta(HttpContext contexto)
     {

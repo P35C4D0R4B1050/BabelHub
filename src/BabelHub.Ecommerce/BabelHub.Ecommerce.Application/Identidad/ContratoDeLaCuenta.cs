@@ -166,7 +166,7 @@ public enum EstadoDeLaCancelacion
 }
 
 /// <summary>El estado y los plazos de la cancelación de una cuenta (IDE-27, IDE-68, IDE-71, IDE-76, IDE-81): pendientes como números, sin detalle de otros módulos.</summary>
-public sealed record EstadoDeLaCancelacionDeCuenta(EstadoDeLaCancelacion Estado, int PendientesAbiertos, DateTimeOffset? ReconfirmarHasta, DateTimeOffset? SeDescartaEl, bool AvisoMostrado);
+public sealed record EstadoDeLaCancelacionDeCuenta(EstadoDeLaCancelacion Estado, int PendientesAbiertos, DateTimeOffset? ReconfirmarHasta, DateTimeOffset? SeDescartaEl, bool AvisoMostrado, DesgloseDePendientes? Desglose = null);
 
 /// <summary>
 /// Cancelación de la cuenta de un cliente (IDE-27, IDE-28, IDE-47, IDE-62, IDE-68 a IDE-71, IDE-75, IDE-76, IDE-81). Solo el titular la pide, la reconfirma, desiste y la consulta; la <b>advertencia</b> de que perderá su

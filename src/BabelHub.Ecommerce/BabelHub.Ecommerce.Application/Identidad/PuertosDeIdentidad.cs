@@ -75,24 +75,72 @@ public sealed class PendientesNoDisponiblesException : InvalidOperationException
 /// explícita de las implementaciones (Pagos, Reclamaciones, Inventario…), sin registrarlo como <see cref="IPendientesDeCuenta"/> de la enumeración, para no recursar. Falla cerrado: <b>sin ningún módulo, con un
 /// conteo negativo o si uno solo no puede contar, lanza</b>; nunca se asume cero.
 /// </summary>
-public sealed class PendientesDeCuentaCompuestos(IReadOnlyList<IPendientesDeCuenta> modulos) : IPendientesDeCuenta
+public sealed class PendientesDeCuentaCompuestos(IReadOnlyList<IPendientesDeCuenta> modulos) : IDesgloseDePendientesDeCuenta
 {
     public async Task<int> Contar(Guid usuarioId, CancellationToken cancelacion = default)
+        => (await Desglosar(usuarioId, cancelacion).ConfigureAwait(false)).Total;
+
+    /// <summary>
+    /// Los mismos pendientes en cuatro grupos para decirle al cliente cuáles faltan (IDE-27, D5): usa los contratos por tipo de Pedidos (PED-31) y de Devoluciones (DEV-23) cuando el módulo los ofrece y deja en «otros»
+    /// lo que cuenta cada uno de los demás (reservas del Inventario, pagos, reclamos). Una sola llamada por módulo; mismas reglas de falla cerrada que <see cref="Contar"/>.
+    /// </summary>
+    public async Task<DesgloseDePendientes> Desglosar(Guid usuarioId, CancellationToken cancelacion = default)
     {
         if (modulos.Count == 0)
         {
             throw new PendientesNoDisponiblesException("No hay ningún módulo que cuente los pendientes.");
         }
 
-        var total = 0;
+        int pedidos = 0, reembolsos = 0, devoluciones = 0, otros = 0;
         foreach (var modulo in modulos)
         {
-            var cuenta = await modulo.Contar(usuarioId, cancelacion).ConfigureAwait(false);
-            total = cuenta < 0 ? throw new PendientesNoDisponiblesException("Un módulo devolvió un conteo inválido de pendientes.") : checked(total + cuenta);
+            switch (modulo)
+            {
+                case IPendientesDeCuentaPorTipo porTipo:
+                    var deLosPedidos = await porTipo.ContarPorTipo(usuarioId, cancelacion).ConfigureAwait(false);
+                    Validar(deLosPedidos.PedidosSinCerrar, deLosPedidos.ReembolsosPendientes);
+                    pedidos = checked(pedidos + deLosPedidos.PedidosSinCerrar);
+                    reembolsos = checked(reembolsos + deLosPedidos.ReembolsosPendientes);
+                    break;
+                case IPendientesDeDevolucionesDeCuenta enTres:
+                    var deLasDevoluciones = await enTres.ContarEnTres(usuarioId, cancelacion).ConfigureAwait(false);
+                    Validar(deLasDevoluciones.DevolucionesAbiertas, deLasDevoluciones.ReportesSinDecidir, deLasDevoluciones.ReembolsosPendientes);
+                    devoluciones = checked(devoluciones + deLasDevoluciones.DevolucionesAbiertas + deLasDevoluciones.ReportesSinDecidir);
+                    reembolsos = checked(reembolsos + deLasDevoluciones.ReembolsosPendientes);
+                    break;
+                default:
+                    var cuenta = await modulo.Contar(usuarioId, cancelacion).ConfigureAwait(false);
+                    Validar(cuenta);
+                    otros = checked(otros + cuenta);
+                    break;
+            }
         }
 
-        return total;
+        return new DesgloseDePendientes(pedidos, reembolsos, devoluciones, otros);
     }
+
+    private static void Validar(params int[] cuentas)
+    {
+        if (cuentas.Any(c => c < 0))
+        {
+            throw new PendientesNoDisponiblesException("Un módulo devolvió un conteo inválido de pendientes.");
+        }
+    }
+}
+
+/// <summary>
+/// Lo que le falta cerrar a una cuenta para poder cancelarse, en grupos (IDE-27, D5): pedidos con una impresa sin cerrar, reembolsos pendientes (de Pedidos y de Devoluciones), devoluciones y reportes abiertos, y «otros»
+/// (reservas del Inventario, pagos y reclamos). Solo números de esa cuenta; nunca datos de otro módulo.
+/// </summary>
+public readonly record struct DesgloseDePendientes(int PedidosSinCerrar, int Reembolsos, int Devoluciones, int Otros)
+{
+    public int Total => checked(PedidosSinCerrar + Reembolsos + Devoluciones + Otros);
+}
+
+/// <summary>Un conjunto de pendientes que además sabe separarse en grupos (D5): lo implementa el compuesto de Identidad; <see cref="IPendientesDeCuenta.Contar"/> sigue siendo la suma.</summary>
+public interface IDesgloseDePendientesDeCuenta : IPendientesDeCuenta
+{
+    Task<DesgloseDePendientes> Desglosar(Guid usuarioId, CancellationToken cancelacion = default);
 }
 
 /// <summary>Lo que Carrito implementa para que Identidad elimine el carrito de una cuenta de cliente sin verificar que se reemplaza (IDE-84, IDE-88): si no puede, lanza y el reemplazo no se hace.</summary>

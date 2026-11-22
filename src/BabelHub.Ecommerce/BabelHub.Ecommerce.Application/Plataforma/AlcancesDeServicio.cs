@@ -136,9 +136,9 @@ public sealed record OrigenResuelto(OrigenDeSolicitud Origen, bool AplicaLimites
 /// <summary>
 /// Decide qué dirección vale como origen de una llamada entre servicios (SEG-17, SEG-32): la reenviada solo con la credencial
 /// de alcance «origen reenviado»; sin ella se ignora, se registra y solo rigen los límites por usuario y el tope general de la
-/// dirección directa.
+/// dirección directa. Una llamada que actúa por un cliente final (<c>llamadaDeCliente</c>) sin dirección reenviada es de origen no determinable (SEG-17, SEG-23): nunca se usa la dirección del componente interno.
 /// </summary>
 public interface IResolutorDeOrigenDeServicio
 {
-    Task<OrigenResuelto> Resolver(string? direccionDirecta, string? direccionReenviada, bool credencialDeOrigenValida, CancellationToken cancelacion = default);
+    Task<OrigenResuelto> Resolver(string? direccionDirecta, string? direccionReenviada, bool credencialDeOrigenValida, bool llamadaDeCliente = false, CancellationToken cancelacion = default);
 }
