@@ -121,9 +121,9 @@ Tercera ola fundida (merges `22df391` de A, `claude/festive-feynman-2c4bef` de B
 | **DOC-1** | Análisis de base de datos y caché (`docs/03-diseno-de-software/09-analisis-de-base-de-datos-y-cache.md`) | E | ☑ (con tabla de capacidad §6b) |
 | **COV-1** | Reporte HTML de cobertura desde `tools/CoverageCheck` archivado en el CI; corrida completa | E | ☑ (cobertura 94–95 %) |
 
-## Estado de cierre (2026-11-21)
+## Estado de cierre (2026-11-22)
 
-Tareas: **588 de 638** (92 %) al 2026-11-21 (noche). `main` (`f3233be8`): compilación sin advertencias, SpecCheck 0 avisos, unitarias 5662 y 2386, arquitectura 259, integración sin fallos en GitHub (CI verde), escáner de secretos limpio, cobertura 94–95 % (`progress/evidencias/cobertura/`), k6 y análisis en `progress/evidencias/` y `docs/03/09`.
+Tareas: **589 de 639** (92 %) al 2026-11-22, tras fundir las cinco ramas de cierre. `main`: compilación sin advertencias, SpecCheck 0 avisos, unitarias 5673 y 2389, arquitectura 259, integración 7965 sin fallos (CI de GitHub pendiente de ejecutar sobre estos commits), escáner de secretos limpio, cobertura 94–95 % (`progress/evidencias/cobertura/`), k6 y análisis en `progress/evidencias/` y `docs/03/09`.
 
 | Spec | Estado | Tareas | Verificación |
 | :--- | :---: | :---: | :--- |
