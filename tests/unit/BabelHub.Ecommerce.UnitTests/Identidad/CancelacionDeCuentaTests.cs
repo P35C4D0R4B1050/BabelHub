@@ -205,6 +205,43 @@ public sealed class CancelacionDeCuentaTests
         Assert.NotNull(cliente.CanceladaEn);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-IDE-24")]
+    public async Task ConPendientes_LaSolicitudYLaConsulta_IndicanCualesFaltanPorGrupo()
+    {
+        var (e, cliente, cancelacion) = Escenario();
+        var faltan = new DesgloseDePendientes(PedidosSinCerrar: 1, Reembolsos: 2, Devoluciones: 0, Otros: 1);
+        e.Pendientes.Desglose = faltan;
+
+        var solicitada = await cancelacion.Solicitar(cliente.Usuario.Id, Contrasena, null);
+        e.Pendientes.Desglose = faltan with { PedidosSinCerrar = 0 };
+        var consultada = await cancelacion.Consultar(cliente.Usuario.Id);
+
+        Assert.Equal(faltan, solicitada.Valor.Desglose);
+        Assert.Equal(4, solicitada.Valor.PendientesAbiertos);
+        Assert.Equal(new DesgloseDePendientes(0, 2, 0, 1), consultada.Valor.Desglose);
+        Assert.Equal(3, consultada.Valor.PendientesAbiertos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-IDE-24")]
+    public async Task SinPendientes_NoHayDesglose_YLaReconfirmacionConUnPendienteNuevoLoInforma()
+    {
+        var (e, cliente, cancelacion) = Escenario();
+        var sinPendientes = await cancelacion.Solicitar(cliente.Usuario.Id, Contrasena, null);
+        Assert.Equal(EstadoDeLaCancelacion.Ejecutada, sinPendientes.Valor.Estado);
+        Assert.Null(sinPendientes.Valor.Desglose);
+
+        var (e2, cliente2, cancelacion2) = Escenario();
+        await EsperandoReconfirmacion(e2, cliente2, cancelacion2);
+        e2.Pendientes.Desglose = new DesgloseDePendientes(0, 0, 1, 0);
+
+        var reconfirmada = await cancelacion2.Reconfirmar(cliente2.Usuario.Id, Contrasena, null);
+
+        Assert.Equal(EstadoDeLaCancelacion.Diferida, reconfirmada.Valor.Estado);
+        Assert.Equal(new DesgloseDePendientes(0, 0, 1, 0), reconfirmada.Valor.Desglose);
+    }
+
     // ---------------------------------------------------------------- consultar
 
     [Fact]

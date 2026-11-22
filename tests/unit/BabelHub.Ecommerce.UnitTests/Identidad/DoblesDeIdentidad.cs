@@ -414,14 +414,20 @@ internal sealed class LimitesEnMemoria : IControlDeLimites
     public Task Fallar(ReservaDeLimite reserva, CancellationToken cancelacion = default) => Task.CompletedTask;
 }
 
-internal sealed class PendientesDePrueba : IPendientesDeCuenta
+internal sealed class PendientesDePrueba : IDesgloseDePendientesDeCuenta
 {
     public int Cantidad { get; set; }
 
     public bool Falla { get; set; }
 
+    /// <summary>El desglose que devuelve el doble; si no se fija, todo cuenta como «otros» (el total sigue siendo <see cref="Cantidad"/>).</summary>
+    public DesgloseDePendientes? Desglose { get; set; }
+
+    public Task<DesgloseDePendientes> Desglosar(Guid usuarioId, CancellationToken cancelacion = default) =>
+        Falla ? throw new InvalidOperationException("El Inventario no responde.") : Task.FromResult(Desglose ?? new DesgloseDePendientes(0, 0, 0, Cantidad));
+
     public Task<int> Contar(Guid usuarioId, CancellationToken cancelacion = default) =>
-        Falla ? throw new InvalidOperationException("El Inventario no responde.") : Task.FromResult(Cantidad);
+        Falla ? throw new InvalidOperationException("El Inventario no responde.") : Task.FromResult(Desglose?.Total ?? Cantidad);
 }
 
 internal sealed class CarritoDePrueba(BdIdentidad bd) : ICarritoDeCuentaReemplazada

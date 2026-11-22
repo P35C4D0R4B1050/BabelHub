@@ -137,13 +137,13 @@ Tareas: **588 de 638** (92 %) al 2026-11-21 (noche). `main` (`f3233be8`): compil
 | ecommerce-envios | InProgress | 23/25 | Converge salvo T14b/T21b (operador real fuera de alcance, DD-22) |
 | ecommerce-pagos | Planned | 36/38 | Converge salvo T37/T38 (llaves Culqi B05) y WhatsApp real (Evolution/n8n/Meta) |
 | web-base | Planned | 36/39 | Converge salvo partes humanas de T32–T34 y reserva de medición de AC-WEB-16 con TLS (WEB-25 cerrado, DD-30); protocolo en `progress/evidencias/web-base/` |
-| identidad-seguridad | Planned | 61/62 | Converge salvo D5 (Menor) y AC-IDE-70 con un pedido real (Menor); nombre y correo de todo usuario implementados (DD-25, DD-26) |
 | inventario-ajustes | Done | 18/18 | Converge (AJU-22 reaprobado, DD-40 a DD-42) |
+| identidad-seguridad | Done | 62/62 | Converge sin reservas (D5 y AC-IDE-70 con un pedido real cerrados; DD-35) |
 | inventario-fuentes | Planned | 25/25 | Converge salvo FUE-09/FUE-11 (diferidas) y FUE-10 (DD-18) |
 | inventario-seleccion-fuente | Done | 33/33 | Converge (S2 cerrada con k6, DD-44) |
 | transversal-auditoria | Planned | 33/33 | Converge (AUD-45 y AUD-46 añadidos por DD-25 y DD-26) |
 | transversal-notificaciones | Planned | 25/25 | Converge salvo S1 (WhatsApp real, externa) y la ratificación de DD-45 a DD-49; D4 a D6 cerradas, spec reaprobada |
-| transversal-seguridad | InProgress | 30/30 | Converge salvo SEG-17/23 del Inventario (Menor) y SEG-31 del asistente (diferido) |
+| transversal-seguridad | InProgress | 30/30 | Converge; SEG-17/23 del Inventario cerrados (DD-36); reserva declarada: SEG-31 del asistente, diferido (DD-37) |
 | transversal-plataforma | InProgress | 24/42 | Sin verificación: fuera del Sprint 2 (despliegue, spikes, PLA-R2 a R4) |
 | asistente-compra-ia | Planned | 0/24 | Diferida (ECO-12) |
 | web-indice-infinito | **Done** | 15/15 | Converge |

@@ -23,6 +23,12 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 
 ### Pendiente
 - Partes humanas (navegadores reales, lector de pantalla, dos rondas de usabilidad): `protocolo-manual.md`. Reserva de medición de AC-WEB-16 con TLS. `web-base` sigue en `Planned`.
+## 2026-11-21 (noche) — Cierre de seguridad: identidad-seguridad a Done y SEG-17/23 del Inventario
+
+### Cubierto
+- `identidad-seguridad` **Done**: D5 (la cancelación diferida indica qué falta por grupo, DD-35) y AC-IDE-70 con un pedido real por el flujo real del E-commerce.
+- `transversal-seguridad`: SEG-17/23 del Inventario corregidos (origen desconocido con evento, espejado en ambos servicios, DD-36); SEG-31 del asistente queda diferido y declarado (DD-37), la spec sigue InProgress.
+- Revisiones de seguridad y arquitectura sin Bloqueantes ni Importantes. Detalle: `progress/log/2026-11-21-cierre-seguridad.md`.
 
 ## 2026-11-21 (noche) — Libro de Reclamaciones: vínculo de las hojas con la cuenta (DD-26), Done
 

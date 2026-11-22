@@ -98,7 +98,7 @@ public sealed class CancelacionDeCuenta(
                     return Resultado<EstadoDeLaCancelacionDeCuenta>.Fallo(FallosDeIdentidad.CodigoInvalido);
                 }
 
-                var abiertos = await pendientes.Contar(usuarioId, ct).ConfigureAwait(false);
+                var (abiertos, desglose) = await ContarYDesglosar(usuarioId, ct).ConfigureAwait(false);
                 if (abiertos == 0)
                 {
                     await ejecutor.Ejecutar(bloqueada, ct).ConfigureAwait(false);
@@ -110,7 +110,7 @@ public sealed class CancelacionDeCuenta(
                 await cancelaciones.Guardar(solicitud, ct).ConfigureAwait(false);
                 await avisosDeCuenta.Agregar(usuarioId, AvisoDeCancelacionDiferida, ahora, ct).ConfigureAwait(false);
                 avisado = bloqueada.Usuario;
-                return Resultado<EstadoDeLaCancelacionDeCuenta>.Exito(Estado(solicitud, abiertos));
+                return Resultado<EstadoDeLaCancelacionDeCuenta>.Exito(Estado(solicitud, abiertos, desglose));
             },
             cancelacion).ConfigureAwait(false);
 
@@ -152,8 +152,8 @@ public sealed class CancelacionDeCuenta(
         }
 
         // Cuántos faltan solo se pregunta mientras la solicitud está diferida; si el puerto no responde, la consulta falla (no se inventa un número).
-        var abiertos = solicitud.Estado == DominioEstado.Diferida ? await pendientes.Contar(usuarioId, cancelacion).ConfigureAwait(false) : 0;
-        return Resultado<EstadoDeLaCancelacionDeCuenta>.Exito(Estado(solicitud, abiertos));
+        var (abiertos, desglose) = solicitud.Estado == DominioEstado.Diferida ? await ContarYDesglosar(usuarioId, cancelacion).ConfigureAwait(false) : (0, (DesgloseDePendientes?)null);
+        return Resultado<EstadoDeLaCancelacionDeCuenta>.Exito(Estado(solicitud, abiertos, desglose));
     }
 
     public async Task<Resultado<EstadoDeLaCancelacionDeCuenta>> Reconfirmar(Guid usuarioId, ValorSecreto contrasena, ValorSecreto? codigoDelSegundoFactor, ValorSecreto? marcaDeDispositivo = null, CancellationToken cancelacion = default)
@@ -209,7 +209,7 @@ public sealed class CancelacionDeCuenta(
                         return Resultado<EstadoDeLaCancelacionDeCuenta>.Fallo(FallosDeIdentidad.CodigoInvalido);
                     }
 
-                    var abiertos = await pendientes.Contar(usuarioId, ct).ConfigureAwait(false);
+                    var (abiertos, desglose) = await ContarYDesglosar(usuarioId, ct).ConfigureAwait(false);
                     var ahora = reloj.Ahora;
                     switch (solicitud.Reconfirmar(ahora, hayPendientes: abiertos > 0))
                     {
@@ -222,7 +222,7 @@ public sealed class CancelacionDeCuenta(
                         case ResultadoDeReconfirmacion.MantenerDiferida:
                             // Apareció un pendiente: no se ejecuta, se le dice cuántos son y sigue diferida (IDE-71).
                             await cancelaciones.Guardar(solicitud, ct).ConfigureAwait(false);
-                            return Resultado<EstadoDeLaCancelacionDeCuenta>.Exito(Estado(solicitud, abiertos));
+                            return Resultado<EstadoDeLaCancelacionDeCuenta>.Exito(Estado(solicitud, abiertos, desglose));
 
                         case ResultadoDeReconfirmacion.FueraDePlazo:
                             await DescartarAsync(solicitud, ct).ConfigureAwait(false);
@@ -383,6 +383,18 @@ public sealed class CancelacionDeCuenta(
         }
     }
 
+    /// <summary>Cuenta los pendientes y, si el puerto sabe separarlos en grupos (D5), también el desglose; una sola consulta, y el total manda aunque no haya desglose.</summary>
+    private async Task<(int Total, DesgloseDePendientes? Desglose)> ContarYDesglosar(Guid usuarioId, CancellationToken cancelacion)
+    {
+        if (pendientes is IDesgloseDePendientesDeCuenta separable)
+        {
+            var desglose = await separable.Desglosar(usuarioId, cancelacion).ConfigureAwait(false);
+            return (desglose.Total, desglose);
+        }
+
+        return (await pendientes.Contar(usuarioId, cancelacion).ConfigureAwait(false), null);
+    }
+
     private Task Auditar(Guid usuarioId, CancellationToken cancelacion) =>
         auditoria.Registrar(new SolicitudDeRegistro(AccionesAuditables.CancelacionDiferidaDescartada) { ObjetoTipo = "cuenta", ObjetoId = usuarioId.ToString("D") }, cancelacion);
 
@@ -392,7 +404,7 @@ public sealed class CancelacionDeCuenta(
         return cuenta is { CanceladaEn: null, Usuario.Activo: true } ? cuenta : null;
     }
 
-    internal static EstadoDeLaCancelacionDeCuenta Estado(SolicitudDeCancelacion solicitud, int pendientesAbiertos) => new(
+    internal static EstadoDeLaCancelacionDeCuenta Estado(SolicitudDeCancelacion solicitud, int pendientesAbiertos, DesgloseDePendientes? desglose = null) => new(
         solicitud.Estado switch
         {
             DominioEstado.Diferida => EstadoDeLaCancelacion.Diferida,
@@ -403,7 +415,8 @@ public sealed class CancelacionDeCuenta(
         pendientesAbiertos,
         solicitud.ReconfirmarHasta,
         solicitud.ImpideComprar ? solicitud.FechaTope : null,
-        solicitud.AvisoVistoEn is not null);
+        solicitud.AvisoVistoEn is not null,
+        desglose);
 }
 
 /// <summary>
