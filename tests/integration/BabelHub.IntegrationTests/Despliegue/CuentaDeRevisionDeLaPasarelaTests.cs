@@ -335,13 +335,13 @@ public sealed class CuentaDeRevisionDeLaPasarelaTests(InstanciaParaMigrar instan
 
         var cuenta = await alcance.ServiceProvider.GetRequiredService<CuentaDeRevisionDeLaPasarela>().Crear("Staging", correo: null);
 
-        var contrasena = cuenta.Contrasena.Revelar();
+        var secreto = cuenta.Contrasena.Revelar();
         // Solo el resumen Argon2id (nunca la contraseña) está en la cuenta; la auditoría lleva el rol, no secretos.
         var resumen = await Consultar<string>(propietaria, "SELECT hash_contrasena FROM identidad.usuarios WHERE correo = 'revision@example.test'");
         Assert.StartsWith("$argon2id$", resumen, StringComparison.Ordinal);
-        Assert.DoesNotContain(contrasena, resumen, StringComparison.Ordinal);
+        Assert.DoesNotContain(secreto, resumen, StringComparison.Ordinal);
         var (salida, errores) = await instancia.RegistroDelServidor();
-        Assert.DoesNotContain(contrasena, salida + errores, StringComparison.Ordinal);
+        Assert.DoesNotContain(secreto, salida + errores, StringComparison.Ordinal);
     }
 
 
@@ -647,6 +647,7 @@ public sealed class CuentaDeRevisionDeLaPasarelaTests(InstanciaParaMigrar instan
         await using var alcance = servicio.Alcance();
         var operacion = alcance.ServiceProvider.GetRequiredService<CuentaDeRevisionDeLaPasarela>();
 
+        await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Retirar("Staging", "otra@example.test"));
         await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Crear("Staging", "otra@example.test"));
         await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Crear("Staging", "persona-21@example.test"));
         Assert.Equal(0L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios"));

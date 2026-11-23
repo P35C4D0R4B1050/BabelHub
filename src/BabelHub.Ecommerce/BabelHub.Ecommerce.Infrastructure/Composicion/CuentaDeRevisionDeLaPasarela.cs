@@ -145,6 +145,11 @@ public sealed class CuentaDeRevisionDeLaPasarela(
         }
 
         var correoNormalizado = CorreoValido(correo);
+        if (!CorreosDeTodasLasCuentas().Contains(correoNormalizado, StringComparer.Ordinal))
+        {
+            throw new CuentaDeRevisionNoPermitidaException($"El retiro solo admite los correos propios de la operación ({CorreoPorDefecto} y persona-01 a persona-{MaximoDeCuentasParaPersonas:00}@example.test). No se tocó nada.");
+        }
+
         return await unidad.Ejecutar(
             async ct =>
             {

@@ -138,5 +138,13 @@ MSYS_NO_PATHCONV=1 docker run --rm --network babelhub-ventas_default -v "$ca:/ca
 # El comando de consola de la cuenta de prueba corre dentro de la imagen del servicio, con su entorno (el mismo que usarás en la VM); la contraseña se oculta aquí (en la VM se muestra una sola vez).
 salida_cuenta="$(BABELHUB_SECRETOS="$TRABAJO/secretos/ventas" IP_PRIVADA=127.0.0.1 docker compose -p babelhub-ventas --project-directory "$RAIZ/infra" -f "$RAIZ/infra/docker-compose.ventas.yml" -f "$TRABAJO/ventas.override.yml" run --rm --no-deps --no-TTY ecommerce cuenta-de-prueba 2>&1)" || { echo "$salida_cuenta" >&2; echo "Error: cuenta-de-prueba falló." >&2; exit 1; }
 printf '%s\n' "$salida_cuenta" | sed -E 's/^(  contraseña: ).*/\1[oculta en el ensayo]/' | sed 's/^/    /'
+echo -n "    Aviso «Los envíos son simulados» en la portada: "
+MSYS_NO_PATHCONV=1 docker run --rm --network babelhub-ventas_default -v "$ca:/ca.pem:ro" "$CURL_IMAGE" -sS --max-time 20 --cacert /ca.pem -H "Host: localhost" -H "X-Forwarded-Proto: https" "https://ecommerce:8443/" | grep -c "data-bh-envios-simulados" || true
+# Los demás comandos de consola (PAG-43 a PAG-47), también con la imagen real; las contraseñas se ocultan aquí (en la VM se muestran una sola vez).
+consola() { BABELHUB_SECRETOS="$TRABAJO/secretos/ventas" IP_PRIVADA=127.0.0.1 docker compose -p babelhub-ventas --project-directory "$RAIZ/infra" -f "$RAIZ/infra/docker-compose.ventas.yml" -f "$TRABAJO/ventas.override.yml" run --rm --no-deps --no-TTY ecommerce "$@" 2>&1 | sed -E 's/^(  contraseña[^:]*: ).*/\1[oculta en el ensayo]/' | sed 's/^/    /'; }
+echo "    crear-administrador:"; consola crear-administrador --correo administracion@ensayo.example.test
+echo "    cuenta-de-prueba --cantidad 2:"; consola cuenta-de-prueba --cantidad 2
+echo "    cuenta-de-prueba --retirar --todas:"; consola cuenta-de-prueba --retirar --todas
+echo "    cuenta-de-prueba --purgar:"; consola cuenta-de-prueba --purgar
 paso "7/7 Listo. Los dos servicios respondieron «listo» (200) y los certificados se validaron."
 echo "    Para borrar todo: bash scripts/ensayo-local.sh --limpiar"
