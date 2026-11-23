@@ -134,6 +134,12 @@ public sealed class SesionWebHandler(RequestDelegate siguiente, OpcionesDelHostW
 
     private static Decision Autenticar(HttpContext contexto, ActorVerificado verificado)
     {
+        // La identidad de operación «carga inicial» no es una cuenta: ninguna sesión puede presentarla, ni con una credencial de firma válida (transversal-carga-inicial, CIN-06). Se trata como anónima.
+        if (verificado.UsuarioId == Guid.Parse(IdentidadesDeOperacion.CargaInicial))
+        {
+            return Anonimo(contexto, EstadoDeLaSesionEnLaSolicitud.RenovacionRechazada);
+        }
+
         var rol = RolComoTexto(verificado.Rol);
         contexto.User = PrincipalDe(verificado.UsuarioId, rol, verificado.SucursalId);
         contexto.EstablecerEstadoDeLaSesion(EstadoDeLaSesionEnLaSolicitud.Asegurada);

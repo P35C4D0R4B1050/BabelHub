@@ -15,6 +15,9 @@ public enum ModoDeArranque
     Normal,
     Restauracion,
     Ensayo,
+
+    /// <summary>Solo lo fijan las órdenes de operación del servicio (<c>cargar-catalogo</c>, <c>cargar-stock</c>) en su propio código: como el ensayo, adaptadores salientes nulos y ningún trabajo de fondo, pero con las credenciales reales del entorno; <see cref="ArranqueSeguro.Resolver"/> lo rechaza desde la configuración, porque el servidor nunca arranca así.</summary>
+    Operacion,
 }
 
 /// <summary>Se rechaza el arranque: el mensaje nombra la variable y el motivo (enumerado), nunca un valor secreto.</summary>
@@ -164,6 +167,11 @@ public static class ArranqueSeguro
         ArgumentNullException.ThrowIfNull(almacen);
 
         var texto = configuracion["Modo"];
+        if (string.Equals(texto, nameof(ModoDeArranque.Operacion), StringComparison.Ordinal))
+        {
+            throw new ArranqueRechazadoException($"{VariableDelModo}: el modo Operacion solo lo fijan las órdenes de operación y no arranca el servidor.");
+        }
+
         var modo = string.IsNullOrWhiteSpace(texto)
             ? ModoDeArranque.Normal
             : Enum.GetNames<ModoDeArranque>().Contains(texto, StringComparer.Ordinal)

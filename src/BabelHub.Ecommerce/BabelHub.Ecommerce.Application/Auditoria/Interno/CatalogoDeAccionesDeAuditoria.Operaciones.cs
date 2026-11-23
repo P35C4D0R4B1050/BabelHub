@@ -16,6 +16,7 @@ public static partial class CatalogoDeAccionesDeAuditoria
         yield return Auditada(nameof(AccionesAuditables.PedidoAnulado), false, false, Clave("estadoAnterior", 32), Clave("causa", 40), ClavePersonal("iniciadaPor"), Clave("rolDelIniciador", 32), ClavePersonal("sucursalDelIniciador"));
         yield return Auditada(nameof(AccionesAuditables.IngresoPendienteConciliado), false, false, Clave("edicionId", 40), Clave("cantidad", 12), Clave("intentos", 12), new ClaveDeDetalle("resolucion", personal: false) { Valores = ["registrado", "fallido", "discrepancia"] });
         yield return Auditada(nameof(AccionesAuditables.IngresosSolicitadosAnonimizados), false, false, Clave("cantidad", 12));
+        yield return Auditada(nameof(AccionesAuditables.CargaInicialEjecutada), false, false, Clave("corridaId", 40), Clave("huellaSha256", 64), Clave("cargadas", 12), Clave("yaCargadas", 12), Clave("rechazadas", 12));
         yield return Auditada(nameof(AccionesAuditables.IntencionesDePagoDesvinculadas), false, false, Clave("cantidad", 12));
         yield return Auditada(nameof(AccionesAuditables.ReembolsoResuelto), false, false, new ClaveDeDetalle("resultado", personal: false) { Valores = ["reembolsado", "pendiente"] }, Clave("motivo", 40));
         yield return Auditada(nameof(AccionesAuditables.PasoDeCompensacionHecho), false, false, new ClaveDeDetalle("paso", personal: false) { Valores = ["abrir", "liberar-reservas", "registrar-reembolso", "cerrar-checkout"] }, Clave("motivo", 40));
