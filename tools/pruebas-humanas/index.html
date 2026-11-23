@@ -1,0 +1,1173 @@
+<!doctype html>
+<html lang="es-PE" data-theme="babelhub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<!-- Sin red: la página no puede abrir ninguna conexión (connect-src 'none'), cargar nada externo ni enviar formularios. Los datos viven solo en este dispositivo. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-HpZXrcgzXAxpLkewcojtdRVKl0wTDlV9OQdqZgi72L8='; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Pruebas humanas de BabelHub</title>
+<link rel="icon" href="data:,">
+<style>
+:root { --fs: 17px; }
+html[data-theme="babelhub"] {
+  --bg: #FBF5E8; --card: #FFFDF7; --surf: #F5EBD8; --text: #172554; --muted: #4B5675; --line: #D9C9A8; --line2: #7A6A48;
+  --pri: #FF665A; --pri-h: #FF8479; --on-pri: #172554; --link: #1A6F80; --focus: #1A6F80;
+  --hdr: #172554; --on-hdr: #F5EBD8;
+  --ok-bg: #E3F4CC; --ok-ln: #3F6B12; --err-bg: #FBDDD8; --err-ln: #B5352A; --warn-bg: #FCEFC7; --warn-ln: #8A5A00; --info-bg: #DCEFF2; --info-ln: #1A6F80;
+  --ok-sel: #3F6B12; --on-ok-sel: #FFFFFF; --crit-sel: #B5352A; --on-crit-sel: #FFFFFF; --warn-sel: #8A5A00; --on-warn-sel: #FFFFFF; --sel: #172554; --on-sel: #F5EBD8;
+  color-scheme: light;
+}
+html[data-theme="babelhub-dark"] {
+  --bg: #0F1A3D; --card: #14214A; --surf: #1B2A57; --text: #F5EBD8; --muted: #B9C2E0; --line: #2C3D73; --line2: #8E9CCB;
+  --pri: #FF665A; --pri-h: #FF8479; --on-pri: #172554; --link: #36C8D4; --focus: #36C8D4;
+  --hdr: #14214A; --on-hdr: #F5EBD8;
+  --ok-bg: #1F3A2B; --ok-ln: #A9E85E; --err-bg: #4A2030; --err-ln: #FF9C93; --warn-bg: #47381A; --warn-ln: #F3C660; --info-bg: #173B4F; --info-ln: #36C8D4;
+  --ok-sel: #A9E85E; --on-ok-sel: #172554; --crit-sel: #FF9C93; --on-crit-sel: #172554; --warn-sel: #F3C660; --on-warn-sel: #172554; --sel: #F5EBD8; --on-sel: #172554;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-bottom: 96px; scroll-padding-top: 12px; }
+body { margin: 0; background: var(--bg); color: var(--text); font: var(--fs)/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+h1, h2, h3 { font-family: "DM Serif Display", Georgia, "Times New Roman", serif; font-weight: 400; line-height: 1.2; margin: 0 0 .5rem; }
+h1 { font-size: 1.7rem; } h2 { font-size: 1.35rem; margin-top: 1.4rem; } h3 { font-size: 1.1rem; margin-top: 1rem; }
+p { margin: .4rem 0 .8rem; }
+a { color: var(--link); text-underline-offset: 2px; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+main:focus, h1:focus { outline: none; }
+.sr { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.skip { position: absolute; left: .5rem; top: -4rem; background: var(--pri); color: var(--on-pri); padding: .6rem 1rem; border-radius: .5rem; z-index: 50; font-weight: 600; }
+.skip:focus { top: .5rem; }
+header.app { background: var(--hdr); color: var(--on-hdr); padding: calc(.6rem + env(safe-area-inset-top)) 1rem .6rem; display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+header.app .marca { font: 1.1rem/1.2 "DM Serif Display", Georgia, serif; flex: 1 1 auto; margin: 0; min-width: 0; }
+header.app .estado { font-size: .8rem; flex-basis: 100%; }
+header.app .btn { color: var(--on-hdr); border-color: var(--on-hdr); background: transparent; min-height: 40px; padding: .3rem .7rem; font-size: .85rem; flex: 0 0 auto; }
+main { max-width: 780px; margin: 0 auto; padding: 1rem; }
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; background: var(--hdr); display: flex; justify-content: center; padding-bottom: env(safe-area-inset-bottom); z-index: 20; border-top: 1px solid var(--line2); }
+nav.tabs a { flex: 1 1 0; max-width: 150px; color: var(--on-hdr); text-decoration: none; text-align: center; padding: .45rem .15rem; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: .72rem; line-height: 1.15; border-top: 4px solid transparent; }
+nav.tabs a b { font-size: 1.05rem; display: block; }
+nav.tabs a[aria-current="page"] { border-top-color: var(--pri); background: rgba(255,255,255,.1); font-weight: 700; }
+nav.tabs a:focus-visible { outline-color: var(--on-hdr); outline-offset: -4px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: .8rem; padding: .9rem 1rem; margin: .7rem 0; }
+.card.tight { padding: .6rem .8rem; }
+.grid { display: grid; gap: .6rem; grid-template-columns: 1fr; }
+@media (min-width: 640px) { .grid.dos { grid-template-columns: 1fr 1fr; } }
+.row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+.row.sep { justify-content: space-between; }
+.btn { appearance: none; font: inherit; font-weight: 600; min-height: 44px; padding: .5rem 1rem; border-radius: .6rem; border: 2px solid var(--line2); background: transparent; color: var(--text); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: .4rem; text-align: center; }
+.btn:hover { background: var(--surf); }
+.btn.pri { background: var(--pri); border-color: var(--pri); color: var(--on-pri); } .btn.pri:hover { background: var(--pri-h); }
+.btn.peligro { background: var(--crit-sel); border-color: var(--crit-sel); color: var(--on-crit-sel); }
+.btn.grande { min-height: 56px; font-size: 1.1rem; padding: .7rem 1.2rem; }
+.btn.chico { min-height: 40px; padding: .3rem .7rem; font-size: .9rem; }
+.btn[disabled] { opacity: .55; cursor: not-allowed; }
+.chip { display: inline-flex; align-items: center; gap: .3rem; border: 1.5px solid var(--line2); border-radius: 999px; padding: .1rem .6rem; font-size: .82rem; font-weight: 600; background: var(--surf); color: var(--text); white-space: nowrap; }
+.chip.ok { background: var(--ok-bg); border-color: var(--ok-ln); } .chip.err { background: var(--err-bg); border-color: var(--err-ln); }
+.chip.warn { background: var(--warn-bg); border-color: var(--warn-ln); } .chip.info { background: var(--info-bg); border-color: var(--info-ln); }
+.alerta { border-left: 6px solid var(--info-ln); background: var(--info-bg); border-radius: .5rem; padding: .6rem .8rem; margin: .7rem 0; }
+.alerta.ok { border-color: var(--ok-ln); background: var(--ok-bg); } .alerta.err { border-color: var(--err-ln); background: var(--err-bg); } .alerta.warn { border-color: var(--warn-ln); background: var(--warn-bg); }
+.alerta > :first-child { margin-top: 0; } .alerta > :last-child { margin-bottom: 0; }
+.campo { display: block; margin: .6rem 0; }
+.campo > .et { display: block; font-weight: 600; margin-bottom: .2rem; }
+.campo small, .ayuda { display: block; color: var(--muted); font-size: .88rem; }
+input[type=text], input[type=date], input[type=number], input[type=url], select, textarea { width: 100%; font: inherit; font-size: 16px; min-height: 44px; padding: .5rem .65rem; border: 2px solid var(--line2); border-radius: .5rem; background: var(--card); color: var(--text); }
+textarea { min-height: 5.5rem; resize: vertical; }
+input[type=checkbox], input[type=radio] { width: 1.4rem; height: 1.4rem; accent-color: var(--link); margin: 0; flex: 0 0 auto; }
+label.check { display: flex; gap: .6rem; align-items: flex-start; margin: .5rem 0; min-height: 40px; }
+fieldset { border: 0; margin: .6rem 0; padding: 0; min-width: 0; }
+legend { font-weight: 600; padding: 0; margin-bottom: .3rem; }
+.seg { display: flex; flex-wrap: wrap; gap: .4rem; }
+.seg label { flex: 1 1 5.2rem; position: relative; }
+.seg.cuatro label { flex: 1 1 calc(50% - .4rem); }
+@media (min-width: 560px) { .seg.cuatro label { flex: 1 1 0; } }
+.seg input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; left: 0; top: 0; }
+.seg span { display: flex; align-items: center; justify-content: center; text-align: center; min-height: 44px; padding: .25rem .4rem; border: 2px solid var(--line2); border-radius: .5rem; background: var(--card); font-size: .92rem; font-weight: 600; line-height: 1.15; }
+.seg input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
+.seg input:checked + span { background: var(--sel); color: var(--on-sel); border-color: var(--sel); }
+.seg .s-ok input:checked + span { background: var(--ok-sel); color: var(--on-ok-sel); border-color: var(--ok-sel); }
+.seg .s-crit input:checked + span { background: var(--crit-sel); color: var(--on-crit-sel); border-color: var(--crit-sel); }
+.seg .s-warn input:checked + span { background: var(--warn-sel); color: var(--on-warn-sel); border-color: var(--warn-sel); }
+.escala { display: flex; gap: .35rem; } .escala label { flex: 1 1 0; } .escala span { min-height: 48px; font-size: 1.1rem; }
+.escala-ext { display: flex; justify-content: space-between; font-size: .82rem; color: var(--muted); margin-top: .15rem; }
+details { border: 1px solid var(--line); border-radius: .7rem; background: var(--card); margin: .5rem 0; }
+details > summary { cursor: pointer; padding: .7rem .9rem; font-weight: 600; min-height: 44px; display: flex; gap: .5rem; align-items: center; justify-content: space-between; flex-wrap: wrap; list-style-position: inside; }
+details > .cuerpo { padding: 0 .9rem .9rem; }
+table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+caption { text-align: left; font-weight: 600; padding: .3rem 0; }
+th, td { border: 1px solid var(--line); padding: .35rem .5rem; text-align: left; vertical-align: top; }
+th { background: var(--surf); }
+.tabla-scroll { overflow-x: auto; }
+.item { border-top: 1px solid var(--line); padding: .6rem 0; }
+.item:first-child { border-top: 0; }
+.item .tit { font-weight: 600; margin: 0 0 .3rem; }
+.crono { font: 700 3rem/1 ui-monospace, "SF Mono", Consolas, monospace; text-align: center; padding: .6rem 0; letter-spacing: .03em; }
+.pasos { list-style: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .3rem; padding: 0; margin: .5rem 0; }
+.pasos .btn { width: 100%; min-height: 48px; font-size: .74rem; padding: .2rem 0; flex-direction: column; gap: 0; line-height: 1.15; }
+.pasos .btn[aria-current="step"] { background: var(--sel); color: var(--on-sel); border-color: var(--sel); }
+.lectura { background: var(--surf); border-left: 6px solid var(--pri); padding: .7rem 1rem; border-radius: .4rem; font-size: 1.05rem; }
+.lectura p { margin: .5rem 0; }
+.kbd { font-family: ui-monospace, Consolas, monospace; background: var(--surf); border: 1px solid var(--line2); border-radius: .3rem; padding: 0 .3rem; font-size: .9em; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.volver { display: inline-block; margin: .2rem 0 .6rem; min-height: 40px; padding-top: .4rem; }
+dialog { border: 2px solid var(--line2); border-radius: .8rem; background: var(--card); color: var(--text); max-width: min(32rem, 92vw); padding: 1rem 1.2rem; }
+dialog::backdrop { background: rgba(10, 16, 40, .6); }
+textarea.mono { font: .8rem/1.35 ui-monospace, Consolas, monospace; min-height: 9rem; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+@media print { nav.tabs, header.app .btn { display: none; } }
+</style>
+</head>
+<body>
+<a class="skip" href="#contenido">Saltar al contenido</a>
+<header class="app">
+  <p class="marca" role="presentation">BabelHub · pruebas</p>
+  <button type="button" class="btn" data-accion="tema" id="btn-tema" aria-label="Cambiar tema">Tema</button>
+  <div class="estado" id="estado-guardado" role="status" aria-live="polite"></div>
+</header>
+<main id="contenido" tabindex="-1">
+  <noscript><p class="alerta err">Esta herramienta necesita JavaScript. Actívalo en tu navegador y vuelve a abrir la página.</p></noscript>
+</main>
+<nav class="tabs" aria-label="Secciones">
+  <a href="#/" data-ruta=""><b aria-hidden="true">⌂</b>Inicio</a>
+  <a href="#/a" data-ruta="a"><b aria-hidden="true">A</b>Navegadores</a>
+  <a href="#/b" data-ruta="b"><b aria-hidden="true">B</b>Lector</a>
+  <a href="#/c" data-ruta="c"><b aria-hidden="true">C</b>Usabilidad</a>
+  <a href="#/datos" data-ruta="datos"><b aria-hidden="true">⇅</b>Datos</a>
+</nav>
+<div id="aviso" class="sr" role="status" aria-live="polite"></div>
+<dialog id="dlg" aria-labelledby="dlg-t"></dialog>
+
+<script>
+'use strict';
+(() => {
+/* ============================== Constantes ============================== */
+const APP = { nombre: 'Pruebas humanas de BabelHub', version: '1.0.0', esquema: 'babelhub-pruebas-humanas', esquemaVersion: 1 };
+const LS_DATOS = 'babelhub-pruebas-humanas:datos:v1';
+const LS_TEMA = 'babelhub-pruebas-humanas:tema:v1';
+const MAX_IMPORT = 5 * 1024 * 1024;
+
+const COMBOS = [
+  { id: 'chrome-escritorio', nombre: 'Chrome', sistema: 'Escritorio', esc: true },
+  { id: 'edge-escritorio', nombre: 'Edge', sistema: 'Escritorio', esc: true },
+  { id: 'firefox-escritorio', nombre: 'Firefox', sistema: 'Escritorio', esc: true },
+  { id: 'safari-macos', nombre: 'Safari', sistema: 'macOS', esc: true },
+  { id: 'chrome-android', nombre: 'Chrome', sistema: 'Android real', esc: false },
+  { id: 'safari-iphone', nombre: 'Safari', sistema: 'iPhone real', esc: false },
+];
+const PASOS_A = [
+  { id: 'inicio', t: '1. Inicio', d: 'Abre la tienda de pruebas: la página carga sin errores.' },
+  { id: 'catalogo', t: '2. Catálogo', d: 'Entra al catálogo; busca o filtra.' },
+  { id: 'ficha', t: '3. Ficha del libro', d: 'Abre la ficha de «El zorro y el cóndor del Ande» (o la que indique la persona responsable): la disponibilidad se ve con texto e icono.' },
+  { id: 'carrito', t: '4. Agregar al carrito', d: 'Agrega el libro impreso y abre el carrito.' },
+  { id: 'ingreso', t: '5. Ingreso o registro', d: 'Ingresa o crea una cuenta de cliente nueva (datos ficticios).' },
+  { id: 'checkout', t: '6. Checkout con recojo', d: 'Elige recojo en sucursal, acepta los textos y sigue al pago.' },
+  { id: 'pago', t: '7. Pago con el simulador', d: 'Paga con el simulador de la pasarela (medio de prueba, nada se cobra).' },
+  { id: 'estado', t: '8. Estado del pedido', d: 'Se muestra el pedido y su estado.' },
+];
+const GENERALES_A = [
+  { id: 'consola', t: 'Sin errores en la consola', d: 'En escritorio, abre las herramientas de desarrollo (F12) y mira la pestaña Consola durante todo el recorrido. En un móvil donde no puedas verla, marca «No aplica».' },
+  { id: 'h375', t: 'Sin desplazamiento horizontal a 375 px', d: 'En escritorio, reduce la ventana a 375 px de ancho (o usa el modo de dispositivo). En un móvil, comprueba en cada paso que la página no se desliza hacia los lados.' },
+  { id: 'temas', t: 'Los dos temas se ven bien', d: 'Repite el recorrido (o al menos cada pantalla) en tema claro y oscuro, con el selector de tema de la tienda: texto legible, controles visibles, nada cortado.' },
+  { id: 'atras', t: '«Atrás» tras cerrar sesión no muestra páginas de la persona anterior', d: 'Cierra sesión y pulsa «Atrás» varias veces: no debe aparecer ninguna página de la cuenta (pedidos, datos) de la persona anterior.' },
+];
+const PANTALLAS_B = [
+  ['inicio', 'Inicio'], ['catalogo', 'Catálogo'], ['ficha', 'Ficha del libro'], ['carrito', 'Carrito'], ['checkout', 'Checkout'], ['pago', 'Pago'],
+  ['estado', 'Estado del pedido'], ['ingreso', 'Ingreso'], ['registro', 'Registro'], ['cuenta', 'Mi cuenta'], ['pedidos', 'Mis pedidos'],
+  ['biblioteca', 'Biblioteca digital'], ['reclamaciones', 'Libro de Reclamaciones'],
+];
+const NVDA = 'nvda', VO = 'voiceover';
+const ITEMS_B = [
+  { id: 'K1', g: 'Teclado', ap: [NVDA], t: 'Con Tab desde el principio, el primer destino es «Saltar al contenido» y lleva al contenido principal.' },
+  { id: 'K2', g: 'Teclado', ap: [NVDA, VO], t: 'El orden de foco sigue el orden visual, sin trampas, y todo control muestra un foco visible.', vo: 'Deslizar a la derecha recorre la pantalla en el orden visual, sin quedar atrapado, y el cursor de VoiceOver encuadra cada control.' },
+  { id: 'K3', g: 'Teclado', ap: [NVDA, VO], t: 'Los controles se operan con Enter o Espacio; los grupos de opción (medio de pago) con las flechas.', vo: 'Cada control se activa con doble toque; los grupos de opción (medio de pago) se eligen y quedan anunciados como seleccionados.' },
+  { id: 'K4', g: 'Teclado', ap: [NVDA, VO], t: 'Los diálogos y avisos con foco inicial lo reciben, Esc los cierra cuando corresponde y al cerrar el foco vuelve al control que los abrió.', vo: 'Los diálogos y avisos reciben el foco de VoiceOver, se pueden cerrar (gesto de escape: dos dedos en Z) y al cerrar el foco vuelve al control que los abrió.' },
+  { id: 'K5', g: 'Teclado', ap: [NVDA, VO], t: 'Los errores de un formulario llevan el foco al aviso, que dice qué corregir sin repetir lo escrito.', vo: 'Los errores de un formulario se anuncian y dicen qué corregir sin repetir lo escrito.' },
+  { id: 'K6', g: 'Teclado', ap: [NVDA, VO], t: 'Con «reducir movimiento» activo en el sistema no hay animaciones.' },
+  { id: 'K7', g: 'Teclado', ap: [NVDA, VO], t: 'Con zoom al 200 % y a 320 px de ancho no hay pérdida de contenido ni desplazamiento horizontal.', vo: 'Con el texto más grande (Ajustes › Accesibilidad › Pantalla y tamaño del texto) no hay pérdida de contenido ni desplazamiento horizontal.' },
+  { id: 'L1', g: 'Lector', ap: [NVDA, VO], t: 'Título y encabezados: un único nivel 1, encabezados en orden, y el título de la pestaña dice la pantalla.' },
+  { id: 'L2', g: 'Lector', ap: [NVDA, VO], t: 'Regiones: hay banner, navegación con nombre, contenido principal y pie (contentinfo).' },
+  { id: 'L3', g: 'Lector', ap: [NVDA, VO], t: 'Formularios: cada campo se anuncia con su etiqueta, su ayuda y si es obligatorio; los errores se anuncian al aparecer.' },
+  { id: 'L4', g: 'Lector', ap: [NVDA, VO], t: 'Estado: nunca depende solo del color; se anuncia con texto («Pago pendiente», «Hay stock en la red»).' },
+  { id: 'L5', g: 'Lector', ap: [NVDA, VO], t: 'Tablas: tienen título, cabeceras con alcance y las regiones desplazables se anuncian con su nombre.' },
+  { id: 'L6', g: 'Lector', ap: [NVDA, VO], t: 'Cambios dinámicos: el estado del pago y los avisos se anuncian sin mover el foco.' },
+  { id: 'L7', g: 'Lector', ap: [NVDA, VO], t: 'Imágenes: las portadas tienen texto alternativo útil; las decorativas, vacío.' },
+  { id: 'L8', g: 'Lector', ap: [NVDA, VO], t: 'Enlaces y botones: el nombre dice la acción («Ver el pedido», no «Aquí»).' },
+];
+const LECTORES = { nvda: { nombre: 'NVDA', detalle: 'Windows, con Firefox o Chrome' }, voiceover: { nombre: 'VoiceOver', detalle: 'iPhone, con Safari' } };
+const TEMAS = { babelhub: 'claro (babelhub)', 'babelhub-dark': 'oscuro (babelhub-dark)' };
+
+const CRITERIO_CRITICO = [
+  'La persona no puede continuar o terminar la tarea de la pantalla (trampa de teclado, control inalcanzable, foco perdido o invisible).',
+  'Un control (botón, enlace, campo) sin nombre, o con un nombre que no dice qué hace.',
+  'Un error o un cambio de estado importante que no se anuncia (por ejemplo, no se entera de que el pago falló o de que un campo es inválido).',
+  'Contenido esencial para comprar que solo se entiende por color o por imagen, sin texto alternativo.',
+];
+const PERFILES = [['', 'Elige…'], ['lectora-provincia', 'Lectora o lector de provincia'], ['estudiante', 'Estudiante'], ['otro', 'Otro perfil de cliente']];
+const ERRORES_TIPO = [['clic', 'Clic equivocado'], ['mensaje', 'Mensaje no entendido'], ['retroceso', 'Retroceso'], ['otro', 'Otro']];
+const SUS_ITEMS = [
+  'Creo que me gustaría usar esta tienda con frecuencia.',
+  'Encontré la tienda innecesariamente compleja.',
+  'Pensé que la tienda era fácil de usar.',
+  'Creo que necesitaría el apoyo de una persona con conocimientos técnicos para poder usar esta tienda.',
+  'Encontré que las diversas funciones de la tienda estaban bien integradas.',
+  'Pensé que había demasiada inconsistencia en la tienda.',
+  'Imagino que la mayoría de las personas aprenderían a usar esta tienda muy rápidamente.',
+  'Encontré la tienda muy incómoda de usar.',
+  'Me sentí muy segura o seguro usando la tienda.',
+  'Necesité aprender muchas cosas antes de poder empezar a usar la tienda.',
+];
+const GRAVEDADES = [['', 'Elige…'], ['0', '0 · Cosmético'], ['1', '1 · Menor'], ['2', '2 · Moderado'], ['3', '3 · Grave (bloquea Done)'], ['4', '4 · Catastrófico (bloquea Done)']];
+const CONSENTIMIENTO = [
+  'Gracias por ayudarnos. Estamos probando una tienda de libros en línea de un proyecto académico llamado BabelHub. Lo que se prueba es la tienda, no a ti: no hay respuestas buenas ni malas.',
+  'Te pediré hacer una compra de prueba (no se cobra nada y los datos son ficticios) y después responder 10 preguntas cortas. Dura entre 20 y 30 minutos.',
+  'Participar es voluntario. Puedes parar o retirarte cuando quieras, sin dar explicaciones y sin ninguna consecuencia; si te retiras, se borra lo que anotamos de ti.',
+  'No te pedimos tu nombre ni otros datos personales. En los registros solo aparece un código (por ejemplo, P3) y no se anota nada que te identifique.',
+  'Anotaremos lo que haces, cuánto demoras, tus tropiezos y tus respuestas, y de ti solo tu tipo de perfil (por ejemplo, estudiante), si usas el celular o la computadora y si usas tecnología de apoyo como lector de pantalla. Si lo permites, también grabaremos la pantalla y tu voz mientras piensas en voz alta; la grabación se guarda fuera del repositorio del proyecto, solo la ve el equipo y se borra al terminar el análisis. Puedes decir que no a la grabación y participar igual.',
+  'Usaremos los resultados únicamente para mejorar la tienda y para el informe del proyecto, sin identificarte, conforme a la Ley N.º 29733, de Protección de Datos Personales.',
+  'Puedes preguntar lo que quieras antes, durante y después.',
+];
+const GUION_BIENVENIDA = [
+  'Vas a usar una tienda de libros en línea que todavía está en prueba. Quiero ver cómo la usas tal como lo harías en tu casa.',
+  'Mientras lo haces, piensa en voz alta: dime qué buscas, qué esperas que pase y qué te confunde. Si algo te parece raro, dilo; eso nos ayuda más que cualquier elogio.',
+  'No voy a poder ayudarte mientras lo hagas, y no es porque lo estés haciendo mal: necesito ver qué haría una persona sin mí. Si quieres dejar la tarea, dímelo y paramos.',
+];
+const GUION_TAREA = [
+  'Imagina que vives en Ayacucho y quieres comprar el libro «El zorro y el cóndor del Ande», impreso, para recogerlo tú misma o tú mismo en una sucursal.',
+  'Compra ese libro en esta tienda para recogerlo en la sucursal que te quede más cómoda, y paga. Cuando creas que terminaste, dímelo.',
+  'Para crear tu cuenta y para pagar usa los datos de esta tarjeta (le entregas la tarjeta de datos de prueba). La tienda es de prueba: no se cobra nada.',
+];
+const SUGERENCIAS_NEUTRAS = ['«¿Qué estás pensando?»', '«¿Qué esperabas que pasara?»', '«Cuéntame qué estás buscando.»', '«¿Qué harías si yo no estuviera aquí?»'];
+
+/* ============================== Utilidades ============================== */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ahora = () => new Date().toISOString();
+const hoy = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const mmss = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const fmt = (x, d = 1) => (x === null || x === undefined || Number.isNaN(x) ? '—' : (Math.round(x * 10 ** d) / 10 ** d).toString().replace('.', ','));
+const media = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+const mediana = (xs) => { if (!xs.length) return null; const o = [...xs].sort((a, b) => a - b); const m = o.length >> 1; return o.length % 2 ? o[m] : (o[m - 1] + o[m]) / 2; };
+function nuevoId(pref) {
+  const b = new Uint8Array(6);
+  if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(b); else for (let i = 0; i < b.length; i++) b[i] = Math.floor(Math.random() * 256);
+  return pref + '-' + Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+}
+const plural = (n, u, p) => `${n} ${n === 1 ? u : p}`;
+
+/* ============================== Estado y persistencia ============================== */
+let soloMemoria = false;
+let temporizadorGuardado = null;
+function dbVacia() {
+  return {
+    esquema: APP.esquema, version: APP.esquemaVersion, creadoEn: ahora(), actualizadoEn: ahora(), ultimaExportacion: '',
+    dispositivo: { id: nuevoId('disp'), evaluador: '', etiqueta: '' },
+    prueba: { versionProbada: '', urlTienda: '' },
+    importados: [],
+    a: { corridas: [] },
+    b: { sesiones: [] },
+    c: { rondas: [rondaVacia(1), rondaVacia(2)], personas: [] },
+  };
+}
+function rondaVacia(n) { return { id: 'r' + n, ronda: n, act: '', resumen: '', cambios: '' }; }
+let db = null; // se carga tras definir los normalizadores (más abajo)
+function cargar() {
+  let crudo = null;
+  try { crudo = localStorage.getItem(LS_DATOS); } catch (e) { soloMemoria = true; }
+  if (!crudo) return dbVacia();
+  try { return normalizarDb(JSON.parse(crudo)) || dbVacia(); } catch (e) { return dbVacia(); }
+}
+function guardarYa() {
+  clearTimeout(temporizadorGuardado); temporizadorGuardado = null;
+  try { localStorage.setItem(LS_DATOS, JSON.stringify(db)); } catch (e) { soloMemoria = true; }
+  pintarEstado();
+}
+function guardar() { db.actualizadoEn = ahora(); clearTimeout(temporizadorGuardado); temporizadorGuardado = setTimeout(guardarYa, 250); }
+function tocar(rec) { rec.act = ahora(); guardar(); }
+window.addEventListener('pagehide', () => { if (temporizadorGuardado) guardarYa(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && temporizadorGuardado) guardarYa(); });
+function sinExportar() { return !db.ultimaExportacion || db.actualizadoEn > db.ultimaExportacion; }
+function hayDatos() { return db.a.corridas.length + db.b.sesiones.length + db.c.personas.length > 0 || db.c.rondas.some((r) => r.resumen || r.cambios); }
+function pintarEstado() {
+  const e = $('#estado-guardado');
+  if (!e) return;
+  const antes = e.textContent;
+  const partes = [];
+  partes.push(soloMemoria ? 'Atención: este navegador no deja guardar datos; exporta antes de cerrar.' : 'Guardado en este dispositivo.');
+  if (hayDatos()) partes.push(sinExportar() ? 'Sin exportar desde el último cambio.' : 'Exportado.');
+  if (antes !== partes.join(' ')) e.textContent = partes.join(' ');
+}
+let ultimoAviso = 0;
+function avisar(texto) { const a = $('#aviso'); a.textContent = ''; setTimeout(() => { a.textContent = texto; }, 30); ultimoAviso = Date.now(); }
+
+/* ---------- Normalizadores (import y carga: todo dato externo se trata como no confiable) ---------- */
+const S = (v, max = 2000) => (typeof v === 'string' ? v.slice(0, max) : '');
+const N = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+const EN = (v, lista, def = '') => (lista.includes(v) ? v : def);
+const ISO = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T[\d:.]+Z?$/.test(v) ? v.slice(0, 30) : '');
+const FECHA = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '');
+const IDV = (v) => (typeof v === 'string' && /^[A-Za-z0-9_-]{3,48}$/.test(v) ? v : null);
+const LISTA = (v, max) => (Array.isArray(v) ? v.slice(0, max) : []);
+const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+const normRes = (x) => ({ r: EN(obj(x).r, ['ok', 'falla', 'na']), n: S(obj(x).n, 500) });
+function normCorrida(o) {
+  o = obj(o); const id = IDV(o.id); if (!id || !COMBOS.some((c) => c.id === o.combo)) return null;
+  const r = { id, act: ISO(o.act), creada: ISO(o.creada), combo: o.combo, evaluador: S(o.evaluador, 40), dispositivoId: S(o.dispositivoId, 48), navegador: S(o.navegador, 60), version: S(o.version, 40), sistema: S(o.sistema, 100), fecha: FECHA(o.fecha), viewport: S(o.viewport, 24), ua: S(o.ua, 300), pasos: {}, generales: {}, completo: EN(o.completo, ['si', 'no']), defectos: [], notas: S(o.notas, 2000) };
+  PASOS_A.forEach((p) => { r.pasos[p.id] = normRes(obj(o.pasos)[p.id]); });
+  GENERALES_A.forEach((g) => { r.generales[g.id] = normRes(obj(o.generales)[g.id]); });
+  r.defectos = LISTA(o.defectos, 100).map((d) => { d = obj(d); return { id: IDV(d.id) || nuevoId('def'), paso: EN(d.paso, [...PASOS_A.map((p) => p.id), ...GENERALES_A.map((g) => g.id), 'otro'], 'otro'), desc: S(d.desc, 1500), captura: S(d.captura, 200), gravedad: EN(d.gravedad, ['bloqueante', 'mayor', 'menor'], 'mayor') }; });
+  return r;
+}
+function normSesion(o) {
+  o = obj(o); const id = IDV(o.id); if (!id || !LECTORES[o.lector] || !TEMAS[o.tema]) return null;
+  const r = { id, act: ISO(o.act), creada: ISO(o.creada), lector: o.lector, tema: o.tema, evaluador: S(o.evaluador, 40), dispositivoId: S(o.dispositivoId, 48), navegador: S(o.navegador, 80), versionLector: S(o.versionLector, 60), sistema: S(o.sistema, 100), fecha: FECHA(o.fecha), pantallas: {}, notas: S(o.notas, 2000) };
+  PANTALLAS_B.forEach(([pid]) => {
+    const p = obj(obj(o.pantallas)[pid]); const items = {};
+    ITEMS_B.forEach((it) => { const x = obj(obj(p.items)[it.id]); items[it.id] = { e: EN(x.e, ['ok', 'critico', 'menor', 'na']), n: S(x.n, 600) }; });
+    r.pantallas[pid] = { items, nota: S(p.nota, 800) };
+  });
+  return r;
+}
+function normPersona(o) {
+  o = obj(o); const id = IDV(o.id); if (!id) return null;
+  const c = obj(o.consentimiento), t = obj(o.tarea), cr = obj(t.cron), po = obj(o.post);
+  const sus = Array.from({ length: 10 }, (_, i) => { const v = Array.isArray(o.sus) ? N(o.sus[i]) : null; return v !== null && v >= 1 && v <= 5 ? Math.round(v) : null; });
+  const evento = (e, tipos) => { e = obj(e); return { t: Math.max(0, Math.round(N(e.t) || 0)), tipo: EN(e.tipo, tipos, 'otro'), nota: S(e.nota, 400) }; };
+  return {
+    id, act: ISO(o.act), creada: ISO(o.creada), ronda: o.ronda === 2 ? 2 : 1, codigo: S(o.codigo, 12), evaluador: S(o.evaluador, 40), dispositivoId: S(o.dispositivoId, 48),
+    excluida: o.excluida === true, motivoExclusion: S(o.motivoExclusion, 300),
+    perfil: EN(o.perfil, PERFILES.map((p) => p[0])), dispositivo: EN(o.dispositivo, ['celular', 'computadora']), tecApoyo: EN(o.tecApoyo, ['si', 'no']), noConoce: o.noConoce === true,
+    consentimiento: { leido: c.leido === true, acepta: c.acepta === true, pantalla: c.pantalla === true, retiro: c.retiro === true, fecha: ISO(c.fecha) },
+    tarea: {
+      resultado: EN(t.resultado, ['sin-ayuda', 'con-ayuda', 'no-completa']), tiempoSeg: N(t.tiempoSeg),
+      ayudas: LISTA(t.ayudas, 50).map((e) => evento(e, ['ayuda'])), errores: LISTA(t.errores, 100).map((e) => evento(e, ERRORES_TIPO.map((x) => x[0]))),
+      cron: { corriendo: cr.corriendo === true, inicio: N(cr.inicio), acumMs: Math.max(0, N(cr.acumMs) || 0), bloqueoInicio: N(cr.bloqueoInicio) },
+    },
+    seq: N(o.seq) !== null && o.seq >= 1 && o.seq <= 7 ? Math.round(o.seq) : null,
+    post: { dificil: S(po.dificil, 600), facil: S(po.facil, 600), cambiaria: S(po.cambiaria, 600) },
+    sus, problema: S(o.problema, 800), pantallaProblema: S(o.pantallaProblema, 80), gravedad: N(o.gravedad) !== null && o.gravedad >= 0 && o.gravedad <= 4 ? Math.round(o.gravedad) : null, observaciones: S(o.observaciones, 1500),
+  };
+}
+function normRonda(o) { o = obj(o); const n = o.ronda === 2 ? 2 : 1; return { id: 'r' + n, ronda: n, act: ISO(o.act), resumen: S(o.resumen, 3000), cambios: S(o.cambios, 3000) }; }
+function normalizarDb(o) {
+  o = obj(o); if (o.esquema !== APP.esquema) return null;
+  const base = dbVacia(); const d = obj(o.dispositivo);
+  base.creadoEn = ISO(o.creadoEn) || base.creadoEn; base.actualizadoEn = ISO(o.actualizadoEn) || base.actualizadoEn; base.ultimaExportacion = ISO(o.ultimaExportacion);
+  base.dispositivo = { id: IDV(d.id) || base.dispositivo.id, evaluador: S(d.evaluador, 40), etiqueta: S(d.etiqueta, 120) };
+  base.prueba = { versionProbada: S(obj(o.prueba).versionProbada, 120), urlTienda: S(obj(o.prueba).urlTienda, 200) };
+  base.importados = LISTA(o.importados, 100).map((i) => ({ dispositivoId: S(obj(i).dispositivoId, 48), evaluador: S(obj(i).evaluador, 40), exportadoEn: ISO(obj(i).exportadoEn), importadoEn: ISO(obj(i).importadoEn) }));
+  const datos = obj(o.datos); const a = obj(datos.a || o.a), b = obj(datos.b || o.b), c = obj(datos.c || o.c);
+  base.a.corridas = LISTA(a.corridas, 500).map(normCorrida).filter(Boolean);
+  base.b.sesiones = LISTA(b.sesiones, 500).map(normSesion).filter(Boolean);
+  base.c.personas = LISTA(c.personas, 500).map(normPersona).filter(Boolean);
+  LISTA(c.rondas, 4).map(normRonda).forEach((r) => { base.c.rondas[r.ronda - 1] = r; });
+  return base;
+}
+
+db = cargar();
+
+/* ============================== Detección del entorno ============================== */
+function detectar() {
+  const ua = navigator.userAgent || ''; let m; let nav = '', ver = '', sis = '';
+  if ((m = ua.match(/Edg(?:e|A|iOS)?\/([\d.]+)/))) { nav = 'Edge'; ver = m[1]; }
+  else if ((m = ua.match(/(?:Firefox|FxiOS)\/([\d.]+)/))) { nav = 'Firefox'; ver = m[1]; }
+  else if ((m = ua.match(/(?:Chrome|CriOS)\/([\d.]+)/))) { nav = 'Chrome'; ver = m[1]; }
+  else if ((m = ua.match(/Version\/([\d.]+).*Safari/))) { nav = 'Safari'; ver = m[1]; }
+  if ((m = ua.match(/Android ([\d.]+)/))) sis = 'Android ' + m[1];
+  else if ((m = ua.match(/(?:iPhone|CPU) OS ([\d_]+)/))) sis = 'iOS ' + m[1].replace(/_/g, '.');
+  else if (/Windows/.test(ua)) sis = 'Windows';
+  else if (/Mac OS X/.test(ua)) sis = 'macOS';
+  else if (/Linux/.test(ua)) sis = 'Linux';
+  return { ua, nav, ver, sis, vp: `${window.innerWidth}×${window.innerHeight}` };
+}
+
+/* ============================== Cálculo (ayuda; el veredicto lo emite quien lee los datos) ============================== */
+function puntajeSUS(sus) {
+  if (!Array.isArray(sus) || sus.length !== 10 || sus.some((v) => !(v >= 1 && v <= 5))) return null;
+  let t = 0; sus.forEach((v, i) => { t += i % 2 === 0 ? v - 1 : 5 - v; });
+  return t * 2.5;
+}
+const mayor = (v) => { const m = parseInt(String(v), 10); return Number.isNaN(m) ? String(v).trim().toLowerCase() : String(m); };
+function runCompleta(r) { return PASOS_A.every((p) => r.pasos[p.id].r) && GENERALES_A.every((g) => r.generales[g.id].r) && !!r.completo; }
+function estadoCorrida(r) {
+  const tocada = r.completo || PASOS_A.some((p) => r.pasos[p.id].r) || GENERALES_A.some((g) => r.generales[g.id].r) || r.defectos.length;
+  if (!tocada) return 'pendiente';
+  if (!runCompleta(r)) return 'en-curso';
+  return r.completo === 'si' ? 'cumple' : 'falla';
+}
+function calcA() {
+  const combos = COMBOS.map((c) => {
+    const runs = db.a.corridas.filter((r) => r.combo === c.id);
+    const completas = runs.filter(runCompleta).sort((x, y) => (x.act < y.act ? 1 : -1));
+    const ultima = completas[0];
+    const versiones = [...new Set(completas.filter((r) => r.completo === 'si' && r.version).map((r) => mayor(r.version)))];
+    let estado = 'pendiente';
+    if (ultima) estado = ultima.completo === 'si' ? 'cumple' : 'falla'; else if (runs.some((r) => estadoCorrida(r) !== 'pendiente')) estado = 'en-curso';
+    if (estado === 'cumple' && c.esc && versiones.length < 2) estado = 'cumple-reserva';
+    return { combo: c.id, nombre: `${c.nombre} · ${c.sistema}`, corridas: runs.length, completas: completas.length, versiones, estado };
+  });
+  let veredicto = 'incompleto';
+  if (combos.some((c) => c.estado === 'falla')) veredicto = 'no-cumple';
+  else if (combos.every((c) => c.estado === 'cumple' || c.estado === 'cumple-reserva')) veredicto = combos.some((c) => c.estado === 'cumple-reserva') ? 'cumple-reserva' : 'cumple';
+  return { combos, veredicto, defectos: db.a.corridas.reduce((n, r) => n + r.defectos.length, 0) };
+}
+function itemsDe(lector) { return ITEMS_B.filter((i) => i.ap.includes(lector)); }
+function calcPantalla(ses, pid) {
+  const aplic = itemsDe(ses.lector); const p = ses.pantallas[pid]; const c = { ok: 0, critico: 0, menor: 0, na: 0, pendiente: 0, sinNota: 0, total: aplic.length };
+  aplic.forEach((i) => { const x = p.items[i.id]; if (!x.e) c.pendiente++; else { c[x.e]++; if ((x.e === 'critico' || x.e === 'menor') && !x.n.trim()) c.sinNota++; } });
+  return c;
+}
+function calcSesion(ses) {
+  const t = { ok: 0, critico: 0, menor: 0, na: 0, pendiente: 0, sinNota: 0, pantallasCompletas: 0 };
+  PANTALLAS_B.forEach(([pid]) => { const c = calcPantalla(ses, pid); ['ok', 'critico', 'menor', 'na', 'pendiente', 'sinNota'].forEach((k) => { t[k] += c[k]; }); if (c.pendiente === 0) t.pantallasCompletas++; });
+  t.completa = t.pantallasCompletas === PANTALLAS_B.length;
+  return t;
+}
+function calcB() {
+  const sesiones = db.b.sesiones.map((s) => ({ id: s.id, lector: s.lector, tema: s.tema, ...calcSesion(s) }));
+  const combos = [];
+  Object.keys(LECTORES).forEach((l) => Object.keys(TEMAS).forEach((t) => combos.push({ lector: l, tema: t, completa: sesiones.some((s) => s.lector === l && s.tema === t && s.completa) })));
+  const criticos = sesiones.reduce((n, s) => n + s.critico, 0), menores = sesiones.reduce((n, s) => n + s.menor, 0);
+  let veredicto = 'incompleto';
+  if (criticos > 0) veredicto = 'no-cumple'; else if (combos.every((c) => c.completa)) veredicto = 'cumple';
+  return { sesiones, combos, criticos, noCriticos: menores, veredicto };
+}
+const sinAyuda = (p) => p.tarea.resultado === 'sin-ayuda' && p.tarea.ayudas.length === 0;
+function calcRonda(n) {
+  const todas = db.c.personas.filter((p) => p.ronda === n);
+  const validas = todas.filter((p) => !p.excluida && p.tarea.resultado);
+  const conSus = validas.map((p) => puntajeSUS(p.sus)).filter((x) => x !== null);
+  const errores = validas.map((p) => p.tarea.errores.length);
+  return {
+    ronda: n, registradas: todas.length, excluidas: todas.filter((p) => p.excluida).length, validas: validas.length, sinAyuda: validas.filter(sinAyuda).length,
+    sus: conSus.length ? media(conSus) : null, susN: conSus.length, erroresMedia: errores.length ? media(errores) : null, tiempoMediana: mediana(validas.map((p) => p.tarea.tiempoSeg).filter((x) => x !== null)),
+    conTecApoyo: validas.filter((p) => p.tecApoyo === 'si').length, graves: todas.filter((p) => !p.excluida && p.gravedad !== null && p.gravedad >= 3).length,
+    // referencia por ronda: la meta formal es el acumulado de las dos rondas
+    cumpleSUS: conSus.length ? media(conSus) >= 68 : null, cumpleErrores: errores.length ? media(errores) < 1 : null,
+  };
+}
+function calcC() {
+  const r1 = calcRonda(1), r2 = calcRonda(2);
+  const val = db.c.personas.filter((p) => !p.excluida && p.tarea.resultado);
+  const n = val.length, ok = val.filter(sinAyuda).length;
+  const sus = val.map((p) => puntajeSUS(p.sus)).filter((x) => x !== null);
+  const err = val.map((p) => p.tarea.errores.length);
+  const acum = { personas: n, sinAyuda: ok, sus: sus.length ? media(sus) : null, susN: sus.length, erroresMedia: err.length ? media(err) : null };
+  acum.cumpleExito = n >= 10 ? ok / n >= 0.9 : null; acum.cumpleSUS = sus.length >= 10 ? acum.sus >= 68 : null; acum.cumpleErrores = n >= 10 ? acum.erroresMedia < 1 : null;
+  acum.imposibleExito = n < 10 && ok + (10 - n) < 9;
+  const completo = r1.validas >= 5 && r2.validas >= 5 && n >= 10 && sus.length >= 10;
+  let veredicto = 'incompleto';
+  if (completo) veredicto = acum.cumpleExito && acum.cumpleSUS && acum.cumpleErrores ? 'cumple' : 'no-cumple';
+  else if (acum.imposibleExito) veredicto = 'no-cumple';
+  return { rondas: { 1: r1, 2: r2 }, acumulado: acum, veredicto };
+}
+function calcular() {
+  const a = calcA(), b = calcB(), c = calcC(); const vs = [a.veredicto, b.veredicto, c.veredicto];
+  let todo = 'incompleto';
+  if (vs.includes('no-cumple')) todo = 'no-cumple'; else if (vs.every((v) => v === 'cumple' || v === 'cumple-reserva')) todo = vs.includes('cumple-reserva') ? 'cumple-reserva' : 'cumple';
+  return { a, b, c, veredictoApp: todo };
+}
+const VER = { cumple: ['ok', '✔', 'Cumple'], 'cumple-reserva': ['warn', '⚠', 'Cumple con reserva'], 'no-cumple': ['err', '✖', 'No cumple'], incompleto: ['info', '…', 'Incompleto'], pendiente: ['info', '…', 'Pendiente'], 'en-curso': ['warn', '…', 'En curso'], falla: ['err', '✖', 'No completó la compra'] };
+const chip = (k, extra = '') => { const [c, i, t] = VER[k] || VER.incompleto; return `<span class="chip ${c}"><span aria-hidden="true">${i}</span> ${esc(extra || t)}</span>`; };
+
+/* ============================== Privacidad: búsqueda de posibles datos personales ============================== */
+const SIN_ESCANEAR = new Set(['id', 'act', 'creada', 'ua', 'fecha', 'dispositivoId', 'viewport', 'combo', 'exportadoEn', 'importadoEn', 'ultimaExportacion', 'actualizadoEn', 'creadoEn']);
+function buscarDatosPersonales(raiz) {
+  const hallazgos = [];
+  (function ir(v, ruta) {
+    if (typeof v === 'string') {
+      if (/[\w.+-]+@[\w-]+\.[\w.-]+/.test(v)) hallazgos.push({ ruta, motivo: 'parece un correo electrónico' });
+      else if (/\d[\d\s-]{6,}\d/.test(v)) hallazgos.push({ ruta, motivo: 'tiene una secuencia larga de dígitos (¿teléfono o documento?)' });
+    } else if (Array.isArray(v)) v.forEach((x, i) => ir(x, `${ruta}[${i}]`));
+    else if (v && typeof v === 'object') Object.keys(v).forEach((k) => { if (!SIN_ESCANEAR.has(k)) ir(v[k], ruta ? `${ruta}.${k}` : k); });
+  })(raiz, '');
+  return hallazgos;
+}
+
+/* ============================== Exportación ============================== */
+function entorno() { const d = detectar(); return { userAgent: d.ua, pantalla: { ancho: screen.width, alto: screen.height, ratio: window.devicePixelRatio || 1 } }; }
+function construirExport() {
+  const calc = calcular();
+  const datos = JSON.parse(JSON.stringify({ a: db.a, b: db.b, c: db.c }));
+  datos.c.personas.forEach((p) => { p.susPuntaje = puntajeSUS(p.sus); p.sinAyudaCalculado = p.tarea.resultado ? sinAyuda(p) : null; p.erroresN = p.tarea.errores.length; delete p.tarea.cron; });
+  return {
+    esquema: APP.esquema, version: APP.esquemaVersion, app: { nombre: APP.nombre, version: APP.version }, exportadoEn: ahora(),
+    dispositivo: { id: db.dispositivo.id, evaluador: db.dispositivo.evaluador, etiqueta: db.dispositivo.etiqueta }, versionProbada: db.prueba.versionProbada,
+    entorno: entorno(), procedencia: db.importados, datos,
+    calculado: { nota: 'Lo calcula la app como ayuda. El veredicto definitivo lo emite quien lee los datos crudos de `datos`.', ...calc, avisos: avisos() },
+  };
+}
+function avisos() {
+  const l = [];
+  db.a.corridas.forEach((r) => { PASOS_A.concat(GENERALES_A).forEach((p) => { const x = r.pasos[p.id] || r.generales[p.id]; if (x.r === 'falla' && !r.defectos.some((d) => d.paso === p.id)) l.push(`A: ${nomCorrida(r)} marca falla en «${p.t}» sin un defecto descrito.`); }); });
+  db.b.sesiones.forEach((s) => PANTALLAS_B.forEach(([pid, nom]) => { const c = calcPantalla(s, pid); if (c.sinNota) l.push(`B: ${nomSesion(s)} · ${nom}: ${plural(c.sinNota, 'falla sin descripción', 'fallas sin descripción')}.`); }));
+  db.c.personas.forEach((p) => { if (p.tarea.resultado === 'sin-ayuda' && p.tarea.ayudas.length) l.push(`C: ${p.codigo} está «sin ayuda» pero tiene ${p.tarea.ayudas.length} ayuda(s) registradas (se cuenta como con ayuda).`); if (!p.excluida && !p.consentimiento.acepta) l.push(`C: ${p.codigo} no tiene consentimiento aceptado.`); });
+  const dup = new Map(); db.c.personas.forEach((p) => { dup.set(p.codigo, (dup.get(p.codigo) || 0) + 1); });
+  dup.forEach((n, k) => { if (n > 1) l.push(`C: el código ${k} se repite en ${n} registros (¿dos evaluadores usaron el mismo código?).`); });
+  [1, 2].forEach((n) => { const r = calcRonda(n); if (r.registradas && r.validas < 5) l.push(`C: la ronda ${n} tiene ${r.validas} de 5 personas válidas con resultado.`); if (r.registradas && r.conTecApoyo < 1) l.push(`C: la ronda ${n} no tiene a nadie con tecnología de apoyo.`); });
+  return l;
+}
+const nomCorrida = (r) => { const c = COMBOS.find((x) => x.id === r.combo); return `${c.nombre} · ${c.sistema}${r.version ? ' ' + r.version : ''}`; };
+const nomSesion = (s) => `${LECTORES[s.lector].nombre} · ${s.tema === 'babelhub' ? 'claro' : 'oscuro'}`;
+const celda = (s) => String(s ?? '').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').trim() || '—';
+function construirMarkdown(ex) {
+  const L = []; const c = ex.calculado; const f = (t) => VER[t][2];
+  L.push('# Resultados de las pruebas humanas de BabelHub', '');
+  L.push(`Exportado: ${ex.exportadoEn} · Dispositivo: ${celda(ex.dispositivo.etiqueta)} (${ex.dispositivo.id}) · Evaluador: ${celda(ex.dispositivo.evaluador)} · Versión probada: ${celda(ex.versionProbada)} · App ${ex.app.version}`, '');
+  L.push('> Resumen generado por la app como ayuda. El veredicto definitivo lo emite quien lee el JSON (`tools/pruebas-humanas/veredicto.md`).', '');
+  L.push(`**Veredicto de la app (referencial): ${f(c.veredictoApp)}** · A: ${f(c.a.veredicto)} · B: ${f(c.b.veredicto)} · C: ${f(c.c.veredicto)}`, '');
+  L.push('## A. Navegadores y móviles reales (T32b, AC-WEB-18)', '');
+  L.push('| Fecha | Persona | Navegador y versión | Sistema o dispositivo | Completó la compra (sí/no) | Defectos |', '| :--- | :--- | :--- | :--- | :--- | :--- |');
+  ex.datos.a.corridas.forEach((r) => {
+    const fallas = PASOS_A.concat(GENERALES_A).filter((p) => (r.pasos[p.id] || r.generales[p.id]).r === 'falla').map((p) => p.t);
+    const defs = r.defectos.map((d) => `[${d.gravedad}] ${d.desc}${d.captura ? ` (captura: ${d.captura})` : ''}`).join('; ');
+    L.push(`| ${celda(r.fecha)} | ${celda(r.evaluador)} | ${celda(`${r.navegador} ${r.version}`)} | ${celda(`${r.sistema}${r.viewport ? ' · ' + r.viewport : ''}`)} | ${r.completo === 'si' ? 'sí' : r.completo === 'no' ? 'no' : '—'} | ${celda((fallas.length ? 'Pasos con falla: ' + fallas.join(', ') + '. ' : '') + defs)} |`);
+  });
+  if (!ex.datos.a.corridas.length) L.push('| — | | | | | |');
+  L.push('', 'Cobertura: ' + c.a.combos.map((x) => `${x.nombre}: ${f(x.estado)}${x.versiones.length ? ` (versiones: ${x.versiones.join(', ')})` : ''}`).join(' · '), '');
+  L.push('## B. Teclado y lector de pantalla (T33b, AC-WEB-15)', '');
+  L.push(`Incumplimientos críticos de nivel AA: **${c.b.criticos}** · no críticos: ${c.b.noCriticos}.`, '');
+  L.push('| Fecha | Persona | Lector y navegador | Pantalla | Tema | Resultado (cumple/falla) | Observación |', '| :--- | :--- | :--- | :--- | :--- | :--- | :--- |');
+  ex.datos.b.sesiones.forEach((s) => PANTALLAS_B.forEach(([pid, nom]) => {
+    const cp = calcPantalla(s, pid); const fallas = itemsDe(s.lector).filter((i) => ['critico', 'menor'].includes(s.pantallas[pid].items[i.id].e));
+    const res = cp.pendiente === cp.total ? 'pendiente' : cp.critico ? 'falla (crítica)' : cp.menor ? 'cumple con fallas no críticas' : cp.pendiente ? 'parcial' : 'cumple';
+    const obs = fallas.map((i) => `${i.id} ${s.pantallas[pid].items[i.id].e === 'critico' ? '[crítico]' : '[no crítico]'}: ${s.pantallas[pid].items[i.id].n}`).join('; ') + (s.pantallas[pid].nota ? ' ' + s.pantallas[pid].nota : '');
+    L.push(`| ${celda(s.fecha)} | ${celda(s.evaluador)} | ${celda(`${LECTORES[s.lector].nombre} ${s.versionLector} · ${s.navegador}`)} | ${nom} | ${s.tema} | ${res} | ${celda(obs)} |`);
+  }));
+  if (!ex.datos.b.sesiones.length) L.push('| — | | | | | | |');
+  L.push('', '## C. Usabilidad (T34b, AC-WEB-17)', '');
+  [1, 2].forEach((n) => {
+    const r = c.c.rondas[n]; const rr = ex.datos.c.rondas[n - 1];
+    L.push(`### Ronda ${n}`, '', '| Ronda | Persona (código) | Éxito sin ayuda | Errores | Tiempo (min) | SUS (0–100) | Problema principal |', '| :--- | :--- | :--- | :--- | :--- | :--- | :--- |');
+    ex.datos.c.personas.filter((p) => p.ronda === n).forEach((p) => {
+      const res = p.excluida ? `excluida (${p.motivoExclusion || 'sin motivo'})` : !p.tarea.resultado ? '—' : p.sinAyudaCalculado ? 'sí' : p.tarea.resultado === 'no-completa' ? 'no (no completó)' : 'no (con ayuda)';
+      L.push(`| ${n} | ${celda(p.codigo)} | ${res} | ${p.tarea.resultado ? p.erroresN : '—'} | ${p.tarea.tiempoSeg === null ? '—' : fmt(p.tarea.tiempoSeg / 60)} | ${p.susPuntaje === null ? '—' : fmt(p.susPuntaje)} | ${celda(p.problema + (p.gravedad !== null ? ` (gravedad ${p.gravedad})` : ''))} |`);
+    });
+    L.push('', `**Resumen de la ronda ${n}:** ${r.validas} personas válidas · sin ayuda ${r.sinAyuda} de ${r.validas} · SUS promedio ${fmt(r.sus)} (${r.susN} cuestionarios) · errores por tarea ${fmt(r.erroresMedia, 2)} · tiempo mediano ${r.tiempoMediana === null ? '—' : mmss(r.tiempoMediana)} · con tecnología de apoyo ${r.conTecApoyo}.`, '');
+    L.push(`**Resumen y decisiones (texto de la persona):** ${celda(rr.resumen)}`, '');
+    if (n === 1) L.push(`**Cambios hechos entre rondas:** ${celda(rr.cambios)}`, '');
+  });
+  const a = c.c.acumulado;
+  L.push('### Resultado acumulado (AC-WEB-17)', '', '| Meta | Valor | Resultado |', '| :--- | :---: | :---: |',
+    `| Éxito sin ayuda | ≥ 9 de 10 | ${a.sinAyuda} de ${a.personas} (${a.cumpleExito === null ? 'pendiente' : a.cumpleExito ? 'cumple' : 'no cumple'}) |`,
+    `| SUS promedio | ≥ 68 | ${fmt(a.sus)} (${a.cumpleSUS === null ? 'pendiente' : a.cumpleSUS ? 'cumple' : 'no cumple'}) |`,
+    `| Errores por tarea | < 1 | ${fmt(a.erroresMedia, 2)} (${a.cumpleErrores === null ? 'pendiente' : a.cumpleErrores ? 'cumple' : 'no cumple'}) |`, '');
+  if (c.avisos.length) { L.push('## Avisos de la app', ''); c.avisos.forEach((x) => L.push(`- ${x}`)); L.push(''); }
+  return L.join('\n');
+}
+function nombreArchivo(ext) {
+  const d = new Date(); const p = (x) => String(x).padStart(2, '0');
+  const ev = (db.dispositivo.evaluador || 'sin-codigo').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').slice(0, 20) || 'sin-codigo';
+  return `babelhub-pruebas-humanas_${ev}_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.${ext}`;
+}
+function descargar(texto, nombre, tipo) {
+  const url = URL.createObjectURL(new Blob([texto], { type: tipo }));
+  const a = document.createElement('a'); a.href = url; a.download = nombre; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+async function copiar(texto) {
+  try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(texto); return true; } } catch (e) { /* cae al plan B */ }
+  const t = document.createElement('textarea'); t.value = texto; t.setAttribute('readonly', ''); t.style.cssText = 'position:fixed;left:-9999px;top:0'; document.body.appendChild(t); t.select();
+  let ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; } t.remove(); return ok;
+}
+function marcarExportado() { db.ultimaExportacion = ahora(); db.actualizadoEn = db.ultimaExportacion; guardarYa(); }
+async function exportar(modo) {
+  const ex = construirExport();
+  const hall = buscarDatosPersonales({ dispositivo: ex.dispositivo, versionProbada: ex.versionProbada, procedencia: ex.procedencia, datos: ex.datos });
+  ui.exportAviso = hall;
+  const esJson = modo.startsWith('json'); const texto = esJson ? JSON.stringify(ex, null, 2) : construirMarkdown(ex);
+  const nombre = nombreArchivo(esJson ? 'json' : 'md'); const tipo = esJson ? 'application/json' : 'text/markdown';
+  if (modo.endsWith('descargar')) { descargar(texto, nombre, tipo); avisar(`Archivo ${nombre} generado. Revisa tus descargas.`); marcarExportado(); }
+  else if (modo.endsWith('copiar')) { const ok = await copiar(texto); avisar(ok ? 'Copiado al portapapeles.' : 'No se pudo copiar: usa «Ver el texto» y cópialo a mano.'); if (ok) marcarExportado(); }
+  else if (modo.endsWith('compartir')) {
+    try { const archivo = new File([texto], nombre, { type: tipo }); await navigator.share({ files: [archivo], title: nombre }); marcarExportado(); avisar('Compartido.'); }
+    catch (e) { if (e && e.name !== 'AbortError') avisar('No se pudo compartir; usa «Descargar».'); }
+  } else if (modo.endsWith('ver')) { ui.verTexto = ui.verTexto === modo ? '' : modo; ui.textoVista = texto; }
+  render();
+}
+
+/* ============================== Importación y fusión ============================== */
+function fusionar(entrante, informe) {
+  const mezclar = (lista, nuevos) => nuevos.forEach((n) => {
+    const i = lista.findIndex((x) => x.id === n.id);
+    if (i < 0) { lista.push(n); informe.agregados++; } else if (n.act > lista[i].act) { lista[i] = n; informe.actualizados++; } else informe.conservados++;
+  });
+  mezclar(db.a.corridas, entrante.a.corridas); mezclar(db.b.sesiones, entrante.b.sesiones); mezclar(db.c.personas, entrante.c.personas);
+  entrante.c.rondas.forEach((r) => { const loc = db.c.rondas[r.ronda - 1]; if (r.act > loc.act) { db.c.rondas[r.ronda - 1] = r; informe.actualizados++; } });
+}
+function importarTexto(texto, nombre, informe) {
+  if (texto.length > MAX_IMPORT) { informe.errores.push(`${nombre}: pesa más de 5 MB.`); return; }
+  let o; try { o = JSON.parse(texto); } catch (e) { informe.errores.push(`${nombre}: no es un JSON válido.`); return; }
+  if (!o || o.esquema !== APP.esquema) { informe.errores.push(`${nombre}: no es un archivo de esta herramienta (esquema «${APP.esquema}»).`); return; }
+  if (o.version > APP.esquemaVersion) { informe.errores.push(`${nombre}: es de una versión más nueva del esquema (${o.version}); actualiza esta herramienta.`); return; }
+  const e = normalizarDb(o);
+  if (!e) { informe.errores.push(`${nombre}: contenido no reconocido.`); return; }
+  if (e.dispositivo.id === db.dispositivo.id) informe.avisos.push(`${nombre}: viene de este mismo dispositivo; solo se aplican los cambios más recientes.`);
+  fusionar(e, informe); informe.archivos++;
+  if (!db.importados.some((i) => i.dispositivoId === e.dispositivo.id && i.exportadoEn === ISO(o.exportadoEn))) db.importados.push({ dispositivoId: e.dispositivo.id, evaluador: e.dispositivo.evaluador, exportadoEn: ISO(o.exportadoEn), importadoEn: ahora() });
+}
+async function importarArchivos(archivos) {
+  const informe = { archivos: 0, agregados: 0, actualizados: 0, conservados: 0, errores: [], avisos: [] };
+  for (const f of archivos) { if (f.size > MAX_IMPORT) { informe.errores.push(`${f.name}: pesa más de 5 MB.`); continue; } try { importarTexto(await f.text(), f.name, informe); } catch (e) { informe.errores.push(`${f.name}: no se pudo leer.`); } }
+  db.actualizadoEn = ahora(); guardarYa(); ui.informeImport = informe; avisar(`Importación terminada: ${informe.agregados} agregados, ${informe.actualizados} actualizados.`); render();
+}
+
+/* ============================== Interfaz: estado efímero ============================== */
+const ui = { abiertos: new Set(), pasoC: {}, rondaC: 1, informeImport: null, verTexto: '', textoVista: '', exportAviso: [], pegar: false };
+const main = $('#contenido');
+
+function buscar(col, id) {
+  if (col === 'a') return db.a.corridas.find((r) => r.id === id);
+  if (col === 'b') return db.b.sesiones.find((r) => r.id === id);
+  if (col === 'c') return db.c.personas.find((r) => r.id === id);
+  if (col === 'r') return db.c.rondas.find((r) => r.id === id);
+  if (col === 'd') return db.dispositivo;
+  if (col === 'p') return db.prueba;
+  return null;
+}
+function ponerRuta(rec, ruta, v) {
+  const k = ruta.split('.'); let o = rec;
+  if (k.some((x) => x === '__proto__' || x === 'constructor' || x === 'prototype')) return;
+  for (let i = 0; i < k.length - 1; i++) { if (o[k[i]] === undefined || o[k[i]] === null) o[k[i]] = {}; o = o[k[i]]; }
+  o[k[k.length - 1]] = v;
+}
+
+/* ---------- Componentes ---------- */
+function seg(col, id, campo, actual, opciones, etiqueta, extra = '') {
+  const nombre = `${col}-${id}-${campo}`;
+  return `<fieldset><legend class="sr">${esc(etiqueta)}</legend><div class="seg ${extra}">` + opciones.map(([v, t, cl]) =>
+    `<label class="${cl || ''}"><input type="radio" name="${esc(nombre)}" value="${esc(v)}" data-col="${col}" data-rec="${esc(id)}" data-campo="${esc(campo)}" ${actual === v ? 'checked' : ''}><span>${t}</span></label>`).join('') + '</div></fieldset>';
+}
+const idCampo = (col, id, campo) => `f-${col}-${id}-${campo}`.replace(/[^A-Za-z0-9_-]/g, '_');
+function campoTexto(col, id, campo, valor, etiqueta, { tipo = 'text', ayuda = '', area = false, ph = '', max = 500 } = {}) {
+  const fid = idCampo(col, id, campo); const desc = ayuda ? ` aria-describedby="${fid}-ay"` : '';
+  const ctl = area ? `<textarea id="${fid}"${desc} data-col="${col}" data-rec="${esc(id)}" data-campo="${esc(campo)}" maxlength="${max}" placeholder="${esc(ph)}">${esc(valor)}</textarea>`
+    : `<input id="${fid}"${desc} type="${tipo}" data-col="${col}" data-rec="${esc(id)}" data-campo="${esc(campo)}" value="${esc(valor)}" maxlength="${max}" placeholder="${esc(ph)}" ${tipo === 'text' ? 'autocomplete="off" autocapitalize="off" spellcheck="false"' : ''}>`;
+  return `<div class="campo"><label class="et" for="${fid}">${esc(etiqueta)}</label>${ctl}${ayuda ? `<small id="${fid}-ay">${esc(ayuda)}</small>` : ''}</div>`;
+}
+function selector(col, id, campo, valor, etiqueta, opciones) {
+  const fid = idCampo(col, id, campo);
+  return `<div class="campo"><label class="et" for="${fid}">${esc(etiqueta)}</label><select id="${fid}" data-col="${col}" data-rec="${esc(id)}" data-campo="${esc(campo)}">${opciones.map(([v, t]) => `<option value="${esc(v)}" ${String(valor ?? '') === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>`;
+}
+function detalle(clave, titulo, cuerpo, { abierto = false, resumenExtra = '' } = {}) {
+  const open = ui.abiertos.has(clave) || (abierto && !ui.abiertos.has('~' + clave));
+  return `<details data-k="${esc(clave)}" ${open ? 'open' : ''}><summary><span>${titulo}</span>${resumenExtra}</summary><div class="cuerpo">${cuerpo}</div></details>`;
+}
+// Región desplazable de una tabla con un nombre propio y único (landmark-unique) y alcanzable con el teclado.
+const tabla = (nombre, html) => `<div class="tabla-scroll" tabindex="0" role="region" aria-label="${esc(nombre)}">${html}</div>`;
+const aviso = (tipo, html) => `<div class="alerta ${tipo}">${html}</div>`;
+const volver = (href, texto) => `<a class="volver" href="${href}">← ${esc(texto)}</a>`;
+const evalor = () => db.dispositivo.evaluador;
+
+/* ============================== Vistas ============================== */
+function vistaInicio() {
+  const c = calcular();
+  const pa = c.a.combos.filter((x) => x.estado === 'cumple' || x.estado === 'cumple-reserva').length;
+  const pb = c.b.combos.filter((x) => x.completa).length;
+  const pc = c.c.acumulado.personas;
+  const d = detectar();
+  return { titulo: 'Inicio', html: `
+<h1 tabindex="-1">Pruebas humanas de BabelHub</h1>
+<p>Esta herramienta te guía en tres bloques de pruebas que solo pueden hacer personas y guarda lo que anotas. <strong>Todo se guarda solo en este dispositivo</strong>: la página no envía nada a ningún servidor y funciona sin conexión.</p>
+${aviso('info', '<p><strong>Al terminar:</strong> ve a «Datos», exporta el JSON y devuélvelo a quien emite el veredicto. Exporta también al final de cada sesión: si el navegador borra sus datos, solo te queda tu archivo.</p>')}
+<h2>Tu dispositivo</h2>
+<div class="card">
+  ${campoTexto('d', 'x', 'evaluador', db.dispositivo.evaluador, 'Código de quien evalúa', { ph: 'EV1', max: 40, ayuda: 'Un código corto (EV1, EV2…), nunca tu nombre.' })}
+  ${campoTexto('d', 'x', 'etiqueta', db.dispositivo.etiqueta, 'Dispositivo', { ph: 'iPhone 13, iOS 17.5', max: 120, ayuda: 'Modelo y sistema, para distinguir los archivos de cada dispositivo.' })}
+  ${campoTexto('p', 'x', 'versionProbada', db.prueba.versionProbada, 'Versión probada de la tienda', { ph: 'Fecha o commit del despliegue de pruebas', max: 120 })}
+  ${campoTexto('p', 'x', 'urlTienda', db.prueba.urlTienda, 'Dirección de la tienda de pruebas (opcional)', { tipo: 'url', ph: 'https://…', max: 200, ayuda: 'Solo para abrirla desde aquí; no se exporta.' })}
+  ${db.prueba.urlTienda && /^https?:\/\//i.test(db.prueba.urlTienda) ? `<p><a href="${esc(db.prueba.urlTienda)}" target="_blank" rel="noopener noreferrer">Abrir la tienda de pruebas en otra pestaña</a></p>` : ''}
+  <p class="ayuda">Detectado: ${esc(d.nav || 'navegador no reconocido')} ${esc(d.ver)} · ${esc(d.sis || 'sistema no reconocido')} · ventana ${esc(d.vp)}. Verifícalo; la persona que prueba es quien decide qué anotar.</p>
+</div>
+<h2>Los tres bloques</h2>
+<div class="grid">
+  <a class="card" href="#/a" style="text-decoration:none;color:inherit"><h3>A · Navegadores y móviles</h3><p>Recorrido de compra de 8 pasos en 6 combinaciones.</p><p>${chip(c.a.veredicto)} <span class="num">${pa} de 6 completas</span></p></a>
+  <a class="card" href="#/b" style="text-decoration:none;color:inherit"><h3>B · Teclado y lector de pantalla</h3><p>NVDA y VoiceOver, 13 pantallas, tema claro y oscuro.</p><p>${chip(c.b.veredicto)} <span class="num">${pb} de 4 sesiones completas · ${c.b.criticos} críticos</span></p></a>
+  <a class="card" href="#/c" style="text-decoration:none;color:inherit"><h3>C · Usabilidad (moderador)</h3><p>Dos rondas de 5 personas: compra con recojo y SUS.</p><p>${chip(c.c.veredicto)} <span class="num">${pc} de 10 personas con resultado</span></p></a>
+</div>
+${aviso('warn', '<p><strong>Esto no es el veredicto.</strong> Los resultados de esta pantalla son una ayuda; el veredicto definitivo lo emite quien lee los datos exportados.</p>')}
+<h2>Tema</h2>
+<p>Ahora: <strong>${esc(preferenciaTema() === 'sistema' ? 'el del sistema' : preferenciaTema() === 'claro' ? 'claro' : 'oscuro')}</strong>. Usa el botón «Tema» de arriba para cambiarlo.</p>
+` };
+}
+
+/* ---------- A ---------- */
+function vistaA() {
+  const c = calcA();
+  const tarjetas = COMBOS.map((cb) => {
+    const e = c.combos.find((x) => x.combo === cb.id); const runs = db.a.corridas.filter((r) => r.combo === cb.id);
+    return `<div class="card" role="group" aria-labelledby="cb-${cb.id}">
+      <div class="row sep"><h2 id="cb-${cb.id}" style="margin:0;font-size:1.15rem">${esc(cb.nombre)} · ${esc(cb.sistema)}</h2>${chip(e.estado)}</div>
+      ${cb.esc ? `<p class="ayuda">Debe probarse en las dos últimas versiones estables. Versiones con la compra completada: <strong>${e.versiones.length}</strong> de 2${e.versiones.length ? ` (${esc(e.versiones.join(', '))})` : ''}.</p>` : '<p class="ayuda">En el dispositivo real, con el navegador indicado.</p>'}
+      ${runs.length ? `<ul>${runs.map((r) => `<li><a href="#/a/${r.id}">${esc(r.fecha || 'sin fecha')} · ${esc(r.navegador)} ${esc(r.version)}${r.evaluador ? ' · ' + esc(r.evaluador) : ''}</a> ${chip(estadoCorrida(r))}</li>`).join('')}</ul>` : ''}
+      <button type="button" class="btn pri" data-accion="nuevaCorrida" data-id="${cb.id}">Nueva corrida en ${esc(cb.nombre)} · ${esc(cb.sistema)}</button>
+    </div>`;
+  }).join('');
+  return { titulo: 'A · Navegadores y móviles', html: `
+<h1 tabindex="-1">A · Navegadores y móviles reales</h1>
+<p>Sirve para <strong>T32b (AC-WEB-18)</strong>. En cada combinación, haz el recorrido: inicio → catálogo → ficha → agregar al carrito → ingreso o registro → checkout con recojo → pago con el simulador → estado del pedido. <strong>Criterio:</strong> la compra se completa en todas; cualquier fallo se registra con captura y pasos.</p>
+${aviso('info', '<p><strong>Preparación común (15 min):</strong> entorno de pruebas con datos ficticios, una cuenta de cliente nueva por corrida, y anota la versión del navegador y del sistema. Guarda las capturas fuera del repositorio y anota aquí solo su nombre.</p>')}
+<p>${chip(c.veredicto)} <span class="muted">Veredicto de la app (referencial) · defectos anotados: ${c.defectos}</span></p>
+${tarjetas}` };
+}
+function vistaCorrida(id) {
+  const r = db.a.corridas.find((x) => x.id === id); if (!r) return null;
+  const cb = COMBOS.find((x) => x.id === r.combo);
+  const opc = [['ok', 'Cumple', 's-ok'], ['falla', 'Falla', 's-crit'], ['na', 'No aplica']];
+  const paso = (p, grupo) => `<div class="item"><p class="tit">${esc(p.t)}</p><p class="ayuda">${esc(p.d)}</p>${seg('a', r.id, `${grupo}.${p.id}.r`, (r[grupo][p.id] || {}).r, opc, p.t)}${campoTexto('a', r.id, `${grupo}.${p.id}.n`, r[grupo][p.id].n, 'Nota (opcional)', { max: 500 })}</div>`;
+  const estado = estadoCorrida(r);
+  const defectos = r.defectos.map((d, i) => `<div class="card tight"><div class="row sep"><strong>Defecto ${i + 1}</strong><button type="button" class="btn chico" data-accion="quitarDefecto" data-id="${r.id}" data-p="${d.id}">Quitar</button></div>
+    ${selector('a', r.id, `defectos.${i}.paso`, d.paso, 'En qué paso', [...PASOS_A.map((p) => [p.id, p.t]), ...GENERALES_A.map((g) => [g.id, 'General: ' + g.t]), ['otro', 'Otro']])}
+    ${campoTexto('a', r.id, `defectos.${i}.desc`, d.desc, 'Qué pasó (pasos para repetirlo)', { area: true, max: 1500 })}
+    ${campoTexto('a', r.id, `defectos.${i}.captura`, d.captura, 'Nombre del archivo de la captura', { max: 200, ph: 'p3-safari-iphone-ficha.png' })}
+    ${selector('a', r.id, `defectos.${i}.gravedad`, d.gravedad, 'Gravedad', [['bloqueante', 'Bloqueante: no se puede completar la compra'], ['mayor', 'Mayor: se completa con dificultad'], ['menor', 'Menor: molesta pero no estorba']])}</div>`).join('');
+  return { titulo: `Corrida · ${cb.nombre} ${cb.sistema}`, html: `
+${volver('#/a', 'Volver a navegadores')}
+<h1 tabindex="-1">${esc(cb.nombre)} · ${esc(cb.sistema)}</h1>
+<p>${chip(estado)}</p>
+<div class="card">
+  ${campoTexto('a', r.id, 'fecha', r.fecha, 'Fecha', { tipo: 'date', max: 10 })}
+  ${campoTexto('a', r.id, 'evaluador', r.evaluador, 'Quién evalúa (código)', { max: 40 })}
+  ${campoTexto('a', r.id, 'navegador', r.navegador, 'Navegador', { max: 60 })}
+  ${campoTexto('a', r.id, 'version', r.version, 'Versión del navegador', { max: 40, ayuda: 'Cópiala de «Acerca de». Una por corrida; si pruebas otra versión, crea otra corrida.' })}
+  ${campoTexto('a', r.id, 'sistema', r.sistema, 'Sistema o dispositivo', { max: 100, ph: 'Windows 11 · Galaxy A54, Android 14…' })}
+  ${campoTexto('a', r.id, 'viewport', r.viewport, 'Tamaño de la ventana', { max: 24 })}
+</div>
+<h2>Recorrido de compra</h2>
+${aviso('info', '<p>En cada paso comprueba que no hay errores en pantalla y mira el paso en tema claro y oscuro. «Falla» exige anotar un defecto abajo.</p>')}
+<div class="card">${PASOS_A.map((p) => paso(p, 'pasos')).join('')}</div>
+<h2>Comprobaciones generales</h2>
+<div class="card">${GENERALES_A.map((g) => paso(g, 'generales')).join('')}</div>
+<h2>Resultado</h2>
+<div class="card"><p class="tit"><strong>¿Se completó la compra de principio a fin?</strong></p>${seg('a', r.id, 'completo', r.completo, [['si', 'Sí', 's-ok'], ['no', 'No', 's-crit']], '¿Se completó la compra?')}
+${campoTexto('a', r.id, 'notas', r.notas, 'Notas de la corrida', { area: true, max: 2000 })}</div>
+<h2>Defectos</h2>
+${defectos || '<p class="muted">Sin defectos anotados.</p>'}
+<button type="button" class="btn" data-accion="nuevoDefecto" data-id="${r.id}">Agregar defecto</button>
+<hr>
+<button type="button" class="btn peligro" data-accion="borrarRegistro" data-id="a:${r.id}">Borrar esta corrida</button>` };
+}
+
+/* ---------- B ---------- */
+function vistaB() {
+  const c = calcB();
+  const nuevos = Object.keys(LECTORES).flatMap((l) => Object.keys(TEMAS).map((t) => `<button type="button" class="btn" data-accion="nuevaSesion" data-id="${l}" data-p="${t}">Nueva sesión: ${LECTORES[l].nombre} · ${t === 'babelhub' ? 'claro' : 'oscuro'}</button>`)).join('');
+  const lista = db.b.sesiones.map((s) => { const t = calcSesion(s); return `<li><a href="#/b/${s.id}">${esc(nomSesion(s))}${s.fecha ? ' · ' + esc(s.fecha) : ''}${s.evaluador ? ' · ' + esc(s.evaluador) : ''}</a> ${t.completa ? chip('cumple', 'Completa') : chip('en-curso', `${t.pantallasCompletas} de ${PANTALLAS_B.length} pantallas`)} ${t.critico ? `<span class="chip err"><span aria-hidden="true">✖</span> ${plural(t.critico, 'crítico', 'críticos')}</span>` : ''}</li>`; }).join('');
+  return { titulo: 'B · Teclado y lector de pantalla', html: `
+<h1 tabindex="-1">B · Teclado y lector de pantalla</h1>
+<p>Sirve para <strong>T33b (AC-WEB-15)</strong>. Recorre las pantallas con <strong>NVDA</strong> (Windows, Firefox o Chrome) y <strong>VoiceOver</strong> (iPhone, Safari), en tema claro y oscuro. Guía completa, con cómo activar cada lector: <span class="kbd">docs/06-experiencia-de-usuario/10-lista-manual-de-accesibilidad.md</span>.</p>
+<h2>Qué cuenta como «crítico AA»</h2>
+${aviso('err', `<p>Marca <strong>«Crítico AA»</strong> cuando se cumpla <strong>cualquiera</strong> de estas:</p><ul>${CRITERIO_CRITICO.map((x) => `<li>${esc(x)}</li>`).join('')}</ul><p>Todo lo demás que falle (orden mejorable, texto alternativo pobre pero presente, encabezado fuera de orden…) es <strong>«No crítico»</strong>: se anota, pero no impide cumplir. <strong>Meta: 0 críticos.</strong></p>`)}
+<p>${chip(c.veredicto)} <span class="muted">Veredicto de la app (referencial) · críticos: ${c.criticos} · no críticos: ${c.noCriticos}</span></p>
+<h2>Sesiones (lector × tema)</h2>
+<p>Hacen falta 4: NVDA y VoiceOver, cada uno en tema claro y oscuro. Cada sesión recorre las 13 pantallas.</p>
+<div class="grid dos">${nuevos}</div>
+${lista ? `<ul>${lista}</ul>` : '<p class="muted">Todavía no hay sesiones.</p>'}
+${detalle('atajos', 'Cómo activar los lectores y atajos mínimos', atajos())}` };
+}
+function atajos() {
+  return `<h3>NVDA (Windows)</h3><ul>
+<li>Iniciar: <span class="kbd">Ctrl+Alt+N</span> (si está instalado) o desde el menú Inicio. Cerrar: <span class="kbd">NVDA+Q</span>.</li>
+<li>La «tecla NVDA» es <span class="kbd">Insertar</span> (o <span class="kbd">Bloq Mayús</span>).</li>
+<li>Callar la voz: <span class="kbd">Ctrl</span>. Leer todo desde aquí: <span class="kbd">NVDA+↓</span>.</li>
+<li>Saltar por encabezados <span class="kbd">H</span>, regiones <span class="kbd">D</span>, enlaces <span class="kbd">K</span>, botones <span class="kbd">B</span>, campos <span class="kbd">F</span>, tablas <span class="kbd">T</span>; con <span class="kbd">Mayús</span> va hacia atrás.</li>
+<li>Lista de elementos: <span class="kbd">NVDA+F7</span>. Cambiar entre modo exploración y modo formulario: <span class="kbd">NVDA+Espacio</span>.</li></ul>
+<h3>VoiceOver (iPhone)</h3><ul>
+<li>Activar: Ajustes › Accesibilidad › VoiceOver (o triple clic del botón lateral si lo tienes configurado).</li>
+<li>Tocar una vez: selecciona y lee. <strong>Doble toque</strong>: activa. Deslizar a la derecha o izquierda: siguiente o anterior.</li>
+<li>Rotor: gira dos dedos como una perilla y elige Encabezados, Enlaces o Controles de formulario; desliza arriba o abajo para saltar.</li>
+<li>Leer desde arriba: dos dedos hacia arriba. Pausar la lectura: un toque con dos dedos. Desplazar la página: tres dedos.</li>
+<li>Escape (cerrar un diálogo): dos dedos dibujando una «Z».</li></ul>`;
+}
+function vistaSesion(id) {
+  const s = db.b.sesiones.find((x) => x.id === id); if (!s) return null;
+  const aplic = itemsDe(s.lector); const t = calcSesion(s);
+  const opc = [['ok', 'Cumple', 's-ok'], ['critico', 'Crítico AA', 's-crit'], ['menor', 'No crítico', 's-warn'], ['na', 'N/A']];
+  const pantallas = PANTALLAS_B.map(([pid, nom]) => {
+    const cp = calcPantalla(s, pid); const p = s.pantallas[pid];
+    const items = aplic.map((it) => { const x = p.items[it.id]; const txt = s.lector === VO && it.vo ? it.vo : it.t;
+      return `<div class="item"><p class="tit"><span class="kbd">${it.id}</span> ${esc(txt)}</p>${seg('b', s.id, `pantallas.${pid}.items.${it.id}.e`, x.e, opc, `${it.id} en ${nom}`, 'cuatro')}${x.e === 'critico' || x.e === 'menor' ? campoTexto('b', s.id, `pantallas.${pid}.items.${it.id}.n`, x.n, 'Qué pasó (obligatorio al fallar)', { max: 600, ph: 'Qué se anunció o no, y nombre de la captura' }) : ''}</div>`; }).join('');
+    const estado = cp.critico ? `<span class="chip err"><span aria-hidden="true">✖</span> ${plural(cp.critico, 'crítico', 'críticos')}</span>` : cp.pendiente === 0 ? chip('cumple', cp.menor ? 'Completa, con no críticos' : 'Completa') : `<span class="chip info"><span aria-hidden="true">…</span> ${cp.total - cp.pendiente} de ${cp.total}</span>`;
+    return detalle(`b:${s.id}:${pid}`, esc(nom), `<button type="button" class="btn chico" data-accion="todoCumple" data-id="${s.id}" data-p="${pid}">Marcar lo pendiente como «Cumple»</button>${items}${campoTexto('b', s.id, `pantallas.${pid}.nota`, p.nota, 'Nota de la pantalla (opcional)', { max: 800 })}`, { resumenExtra: estado });
+  }).join('');
+  return { titulo: `Sesión · ${nomSesion(s)}`, html: `
+${volver('#/b', 'Volver a lector de pantalla')}
+<h1 tabindex="-1">${esc(LECTORES[s.lector].nombre)} · tema ${s.tema === 'babelhub' ? 'claro' : 'oscuro'}</h1>
+<p>${t.completa ? chip('cumple', 'Sesión completa') : chip('en-curso', `${t.pantallasCompletas} de ${PANTALLAS_B.length} pantallas completas`)} ${t.critico ? `<span class="chip err"><span aria-hidden="true">✖</span> ${plural(t.critico, 'crítico', 'críticos')}</span>` : ''}</p>
+${aviso('err', `<p><strong>Crítico AA</strong> = no se puede continuar, control sin nombre, error o estado que no se anuncia, o contenido esencial solo por color o imagen. Lo demás es «No crítico».</p>`)}
+<div class="card">
+  ${campoTexto('b', s.id, 'fecha', s.fecha, 'Fecha', { tipo: 'date', max: 10 })}
+  ${campoTexto('b', s.id, 'evaluador', s.evaluador, 'Quién evalúa (código)', { max: 40 })}
+  ${campoTexto('b', s.id, 'navegador', s.navegador, 'Navegador y versión', { max: 80, ph: s.lector === NVDA ? 'Firefox 133' : 'Safari (iOS 17.5)' })}
+  ${campoTexto('b', s.id, 'versionLector', s.versionLector, `Versión de ${LECTORES[s.lector].nombre}`, { max: 60, ph: s.lector === NVDA ? '2024.4' : 'la de iOS' })}
+  ${campoTexto('b', s.id, 'sistema', s.sistema, 'Sistema o dispositivo', { max: 100 })}
+</div>
+<p>Recorre cada pantalla de la tienda con el lector y ${s.lector === NVDA ? 'solo con el teclado' : 'sin mirar la pantalla si puedes'}. Abre una pantalla y marca cada punto. ${s.lector === VO ? 'Los puntos de teclado se adaptan a los gestos de VoiceOver.' : ''}</p>
+<h2>Pantallas</h2>
+${pantallas}
+${campoTexto('b', s.id, 'notas', s.notas, 'Notas de la sesión', { area: true, max: 2000 })}
+${detalle('atajos', 'Atajos mínimos del lector', atajos())}
+<hr>
+<button type="button" class="btn peligro" data-accion="borrarRegistro" data-id="b:${s.id}">Borrar esta sesión</button>` };
+}
+
+/* ---------- C ---------- */
+function estadoPersona(p) {
+  if (p.excluida) return 'excluida';
+  const algo = p.consentimiento.acepta || p.tarea.resultado || p.sus.some((v) => v !== null) || p.tarea.cron.acumMs || p.tarea.cron.corriendo;
+  if (!algo) return 'nueva';
+  return p.consentimiento.acepta && p.tarea.resultado && puntajeSUS(p.sus) !== null && p.tarea.tiempoSeg !== null ? 'completa' : 'en-curso';
+}
+function chipPersona(p) {
+  const e = estadoPersona(p);
+  return e === 'excluida' ? '<span class="chip warn"><span aria-hidden="true">⚠</span> Excluida</span>' : e === 'completa' ? chip('cumple', 'Completa') : e === 'nueva' ? chip('pendiente', 'Sin empezar') : chip('en-curso');
+}
+function resumenCriterios(r) {
+  return tabla(`Resumen de la ronda ${r.ronda}`, `<table><caption>Resumen de la ronda ${r.ronda} (referencia: la meta formal es el acumulado de las dos rondas)</caption><thead><tr><th scope="col">Indicador</th><th scope="col">Ronda</th><th scope="col">Meta</th></tr></thead><tbody>
+<tr><th scope="row">Personas válidas con resultado</th><td class="num">${r.validas} de 5${r.excluidas ? ` (${r.excluidas} excluidas)` : ''}</td><td>5</td></tr>
+<tr><th scope="row">Éxito sin ayuda</th><td class="num">${r.sinAyuda} de ${r.validas}</td><td>≥ 9 de 10 en total</td></tr>
+<tr><th scope="row">SUS promedio</th><td class="num">${fmt(r.sus)} (${r.susN} cuestionarios) ${r.cumpleSUS === null ? '' : r.cumpleSUS ? chip('cumple') : chip('no-cumple')}</td><td>≥ 68</td></tr>
+<tr><th scope="row">Errores por tarea</th><td class="num">${fmt(r.erroresMedia, 2)} ${r.cumpleErrores === null ? '' : r.cumpleErrores ? chip('cumple') : chip('no-cumple')}</td><td>&lt; 1</td></tr>
+<tr><th scope="row">Tiempo mediano</th><td class="num">${r.tiempoMediana === null ? '—' : mmss(r.tiempoMediana)}</td><td>—</td></tr>
+<tr><th scope="row">Con tecnología de apoyo</th><td class="num">${r.conTecApoyo}</td><td>al menos 1</td></tr>
+<tr><th scope="row">Problemas de gravedad 3 o 4</th><td class="num">${r.graves}</td><td>bloquean «Done»</td></tr></tbody></table>`);
+}
+function vistaC() {
+  const c = calcC(); const n = ui.rondaC; const r = c.rondas[n]; const reg = db.c.rondas[n - 1];
+  const personas = db.c.personas.filter((p) => p.ronda === n);
+  const a = c.acumulado;
+  const ac = (v) => (v === null ? chip('incompleto', 'Pendiente') : v ? chip('cumple') : chip('no-cumple'));
+  const prob = db.c.personas.filter((p) => !p.excluida && p.problema.trim()).sort((x, y) => (y.gravedad ?? -1) - (x.gravedad ?? -1));
+  return { titulo: 'C · Usabilidad', html: `
+<h1 tabindex="-1">C · Modo moderador de usabilidad</h1>
+<p>Sirve para <strong>T34b (AC-WEB-17)</strong>: dos rondas de 5 personas distintas que no conocen el sistema; tarea única: <strong>«compra un libro con recojo»</strong> sin ayuda. Una persona modera y otra anota (o tú haces las dos cosas con esta pantalla). Guion y reglas completas: <span class="kbd">docs/06-experiencia-de-usuario/09-pruebas-de-usabilidad.md</span>.</p>
+${aviso('info', '<p><strong>Meta (acumulada, 10 personas):</strong> al menos 9 de 10 sin ayuda, SUS promedio ≥ 68 y menos de 1 error por tarea en promedio. Entre las rondas se corrigen los problemas más graves; la ronda 2 comprueba la corrección.</p>')}
+<h2>Resultado acumulado</h2>
+${tabla('Acumulado de las dos rondas', `<table><caption>Acumulado de las dos rondas (${a.personas} personas válidas con resultado) ${chip(c.veredicto)}</caption><thead><tr><th scope="col">Meta</th><th scope="col">Valor</th><th scope="col">Resultado</th></tr></thead><tbody>
+<tr><th scope="row">Éxito sin ayuda ≥ 9 de 10</th><td class="num">${a.sinAyuda} de ${a.personas}</td><td>${a.imposibleExito ? chip('no-cumple', 'Ya no alcanza') : ac(a.cumpleExito)}</td></tr>
+<tr><th scope="row">SUS promedio ≥ 68</th><td class="num">${fmt(a.sus)} (${a.susN} cuestionarios)</td><td>${ac(a.cumpleSUS)}</td></tr>
+<tr><th scope="row">Errores por tarea &lt; 1</th><td class="num">${fmt(a.erroresMedia, 2)}</td><td>${ac(a.cumpleErrores)}</td></tr></tbody></table>`)}
+<h2>Rondas</h2>
+${seg('x', 'ronda', 'ronda', String(n), [['1', 'Ronda 1'], ['2', 'Ronda 2']], 'Ronda que ves', 'rondas')}
+<h3>Ronda ${n}</h3>
+${personas.length ? `<ul>${personas.map((p) => `<li><a href="#/c/${p.id}">${esc(p.codigo || 'sin código')}</a> ${chipPersona(p)} ${p.tarea.resultado ? esc({ 'sin-ayuda': 'sin ayuda', 'con-ayuda': 'con ayuda', 'no-completa': 'no completó' }[p.tarea.resultado]) : ''}${p.tarea.resultado ? ` · ${p.tarea.errores.length} errores` : ''}${puntajeSUS(p.sus) !== null ? ` · SUS ${fmt(puntajeSUS(p.sus))}` : ''}</li>`).join('')}</ul>` : '<p class="muted">Todavía no hay personas en esta ronda.</p>'}
+<button type="button" class="btn pri" data-accion="nuevaPersona" data-id="${n}">Agregar persona a la ronda ${n}</button>
+<h3>Resumen de la ronda ${n}</h3>
+${resumenCriterios(r)}
+${campoTexto('r', reg.id, 'resumen', reg.resumen, `Resumen y decisiones de la ronda ${n}`, { area: true, max: 3000, ayuda: 'Qué problemas fueron los más graves y qué se decidió. Sin nombres.' })}
+${n === 1 ? campoTexto('r', reg.id, 'cambios', reg.cambios, 'Cambios hechos entre las rondas', { area: true, max: 3000, ayuda: 'Qué se corrigió antes de la ronda 2, para poder comprobar la corrección.' }) : ''}
+<h2>Problemas principales observados</h2>
+${prob.length ? tabla('Problemas principales por gravedad', `<table><caption>Por gravedad</caption><thead><tr><th scope="col">Persona</th><th scope="col">Gravedad</th><th scope="col">Problema</th></tr></thead><tbody>${prob.map((p) => `<tr><td>${esc(p.codigo)} (ronda ${p.ronda})</td><td>${p.gravedad === null ? '—' : p.gravedad}</td><td>${esc(p.problema)}</td></tr>`).join('')}</tbody></table>`) : '<p class="muted">Aún no hay problemas anotados.</p>'}` };
+}
+function cronoSeg(p) { const c = p.tarea.cron; return Math.floor((c.acumMs + (c.corriendo ? Date.now() - c.inicio : 0)) / 1000); }
+function vistaPersona(id) {
+  const p = db.c.personas.find((x) => x.id === id); if (!p) return null;
+  const paso = ui.pasoC[id] || 1;
+  const nombres = ['Antes', 'Tarea', 'Resultado', 'SUS', 'Cierre'];
+  const stepper = `<ol class="pasos" aria-label="Pasos de la sesión">${nombres.map((t, i) => `<li><button type="button" class="btn" data-accion="pasoC" data-id="${p.id}" data-p="${i + 1}" ${paso === i + 1 ? 'aria-current="step"' : ''}><span aria-hidden="true">${i + 1}</span><span>${t}</span></button></li>`).join('')}</ol>`;
+  const nav = `<div class="row sep" style="margin-top:1rem">${paso > 1 ? `<button type="button" class="btn" data-accion="pasoC" data-id="${p.id}" data-p="${paso - 1}">← ${nombres[paso - 2]}</button>` : '<span></span>'}${paso < 5 ? `<button type="button" class="btn pri" data-accion="pasoC" data-id="${p.id}" data-p="${paso + 1}">${nombres[paso]} →</button>` : '<a class="btn pri" href="#/c">Terminar y volver</a>'}</div>`;
+  let cuerpo = '';
+  if (paso === 1) cuerpo = pasoAntes(p); else if (paso === 2) cuerpo = pasoTarea(p); else if (paso === 3) cuerpo = pasoResultado(p); else if (paso === 4) cuerpo = pasoSUS(p); else cuerpo = pasoCierre(p);
+  return { titulo: `Persona ${p.codigo}`, html: `
+${volver('#/c', 'Volver a usabilidad')}
+<h1 tabindex="-1">Persona ${esc(p.codigo || 'sin código')} · ronda ${p.ronda}</h1>
+<p>${chipPersona(p)}</p>
+${p.excluida ? aviso('warn', `<p>Esta persona está <strong>excluida</strong> de los resultados${p.motivoExclusion ? ': ' + esc(p.motivoExclusion) : ''}.</p>`) : ''}
+${stepper}
+${cuerpo}
+${nav}` };
+}
+function pasoAntes(p) {
+  const okConsent = p.consentimiento.leido && p.consentimiento.acepta && p.consentimiento.retiro;
+  return `<h2>1. Antes de empezar</h2>
+<div class="card">
+  ${campoTexto('c', p.id, 'codigo', p.codigo, 'Código de la persona', { max: 12, ayuda: 'Solo el código (P1, P2…). Nunca su nombre.' })}
+  ${campoTexto('c', p.id, 'evaluador', p.evaluador, 'Quién modera (código)', { max: 40 })}
+  ${selector('c', p.id, 'perfil', p.perfil, 'Perfil', PERFILES)}
+  ${selector('c', p.id, 'dispositivo', p.dispositivo, 'Dispositivo que usa en la prueba', [['', 'Elige…'], ['celular', 'Celular'], ['computadora', 'Computadora']])}
+  <fieldset><legend>¿Usa tecnología de apoyo (lector de pantalla, ampliación, teclado)?</legend>${seg('c', p.id, 'tecApoyo', p.tecApoyo, [['si', 'Sí'], ['no', 'No']], '¿Usa tecnología de apoyo?')}</fieldset>
+  <label class="check"><input type="checkbox" data-col="c" data-rec="${p.id}" data-campo="noConoce" ${p.noConoce ? 'checked' : ''}><span>No conoce el sistema (no participó en su desarrollo ni vio el prototipo) y no estuvo en la otra ronda.</span></label>
+</div>
+<h2>Consentimiento informado</h2>
+${aviso('info', '<p>Lee el texto en voz alta, tal cual. <strong>No anotes su nombre.</strong> Aquí solo se marca que se leyó y que aceptó.</p>')}
+<div class="lectura">${CONSENTIMIENTO.map((t) => `<p>${esc(t)}</p>`).join('')}</div>
+<div class="card">
+  <label class="check"><input type="checkbox" data-col="c" data-rec="${p.id}" data-campo="consentimiento.leido" ${p.consentimiento.leido ? 'checked' : ''}><span>Leí el texto en voz alta y respondí sus preguntas.</span></label>
+  <label class="check"><input type="checkbox" data-col="c" data-rec="${p.id}" data-campo="consentimiento.retiro" ${p.consentimiento.retiro ? 'checked' : ''}><span>Dijo que entiende que puede parar o retirarse cuando quiera.</span></label>
+  <label class="check"><input type="checkbox" data-col="c" data-rec="${p.id}" data-campo="consentimiento.acepta" ${p.consentimiento.acepta ? 'checked' : ''}><span><strong>Acepta participar.</strong></span></label>
+  <label class="check"><input type="checkbox" data-col="c" data-rec="${p.id}" data-campo="consentimiento.pantalla" ${p.consentimiento.pantalla ? 'checked' : ''}><span>Permite grabar la pantalla y la voz (opcional; sin permiso no se graba).</span></label>
+</div>
+${okConsent ? aviso('ok', '<p>Consentimiento registrado. Puedes seguir a la tarea.</p>') : aviso('warn', '<p>No empieces la tarea hasta marcar las tres primeras casillas.</p>')}
+<div class="card"><h3>Si no acepta o se retira</h3>
+  <label class="check"><input type="checkbox" data-col="c" data-rec="${p.id}" data-campo="excluida" ${p.excluida ? 'checked' : ''}><span>Excluir a esta persona de los resultados (no acepta, no cumple el perfil, abandonó o la sesión falló).</span></label>
+  ${p.excluida ? campoTexto('c', p.id, 'motivoExclusion', p.motivoExclusion, 'Motivo (sin datos personales)', { max: 300 }) : ''}
+  <button type="button" class="btn peligro" data-accion="borrarRegistro" data-id="c:${p.id}">Borrar todo lo anotado de esta persona</button>
+</div>`;
+}
+function pasoTarea(p) {
+  const t = p.tarea; const c = t.cron; const seg_ = cronoSeg(p);
+  const bloq = c.bloqueoInicio ? Math.floor((Date.now() - c.bloqueoInicio) / 1000) : 0;
+  const ev = (lista, nombreCol) => lista.map((e, i) => `<li>${mmss(e.t)} · ${nombreCol === 'errores' ? esc((ERRORES_TIPO.find((x) => x[0] === e.tipo) || [0, 'Otro'])[1]) : 'Ayuda'}<label class="campo"><span class="sr">Nota del evento ${i + 1}</span><input type="text" data-col="c" data-rec="${p.id}" data-campo="tarea.${nombreCol}.${i}.nota" value="${esc(e.nota)}" maxlength="400" placeholder="Qué pasó (opcional)" autocomplete="off"></label></li>`).join('');
+  return `<h2>2. Tarea: compra un libro con recojo</h2>
+${detalle('prep', 'Lista de preparación', `<ul><li>Entorno de pruebas con datos ficticios, la tienda abierta en la pantalla de inicio y <strong>una cuenta de cliente nueva</strong> (o el registro listo) para esta persona.</li><li>Tarjeta de datos de prueba impresa lista para entregar.</li><li>Grabación de pantalla y voz encendida solo si dio permiso.</li><li>La persona en el dispositivo que usará (celular o computadora) y el cronómetro en cero.</li></ul>`)}
+<h3>Léelo en voz alta</h3>
+<div class="lectura">${GUION_BIENVENIDA.concat(GUION_TAREA).map((x) => `<p>${esc(x)}</p>`).join('')}</div>
+<p class="ayuda">Mientras tanto puedes decir: ${SUGERENCIAS_NEUTRAS.join(' · ')}. No digas dónde hacer clic ni qué significa algo.</p>
+<div class="card">
+  <p class="crono num" id="crono" role="timer" aria-label="Cronómetro de la tarea">${mmss(seg_)}</p>
+  <div class="row" style="justify-content:center">
+    ${c.corriendo ? `<button type="button" class="btn pri grande" data-accion="cronoDetener" data-id="${p.id}">Detener (terminó)</button>` : `<button type="button" class="btn pri grande" data-accion="cronoIniciar" data-id="${p.id}">${c.acumMs ? 'Reanudar' : 'Iniciar'}</button>`}
+    ${(c.acumMs || c.corriendo) ? `<button type="button" class="btn chico" data-accion="cronoReiniciar" data-id="${p.id}">Poner en cero</button>` : ''}
+  </div>
+  ${t.tiempoSeg !== null && !c.corriendo ? `<p>Tiempo registrado: <strong class="num">${mmss(t.tiempoSeg)}</strong></p>` : ''}
+</div>
+<h3>Si se bloquea</h3>
+<div class="card" id="bloqueo-caja">
+  <p>Cuenta el bloqueo desde que la persona deja de avanzar. A los <strong>2 minutos</strong> puedes ayudar, y <strong>cuenta como «con ayuda»</strong>.</p>
+  <p class="crono num" id="bloqueo" style="font-size:1.6rem;padding:0" aria-label="Tiempo bloqueada">${c.bloqueoInicio ? mmss(bloq) : '—'}</p>
+  <p id="bloqueo-msg" class="alerta warn" style="${bloq >= 120 ? '' : 'display:none'}">Ya pasaron 2 minutos: puedes ayudar. Regístralo abajo.</p>
+  <div class="row">${c.bloqueoInicio ? `<button type="button" class="btn" data-accion="bloqueoFin" data-id="${p.id}">Ya avanzó</button>` : `<button type="button" class="btn" data-accion="bloqueoIni" data-id="${p.id}">Se bloqueó</button>`}
+  <button type="button" class="btn" data-accion="ayuda" data-id="${p.id}">Registrar una ayuda (${t.ayudas.length})</button></div>
+  ${t.ayudas.length ? `<ul>${ev(t.ayudas, 'ayudas')}</ul>` : ''}
+</div>
+<h3>Errores <span class="chip num" id="n-errores">${t.errores.length}</span></h3>
+<div class="card"><p class="ayuda">Un error es un clic equivocado, un mensaje que no entendió o un retroceso. Toca el tipo cada vez que ocurra.</p>
+  <div class="row">${ERRORES_TIPO.map(([v, tx]) => `<button type="button" class="btn" data-accion="error" data-id="${p.id}" data-p="${v}">+ ${tx}</button>`).join('')}</div>
+  ${t.errores.length ? `<ul>${ev(t.errores, 'errores')}</ul><button type="button" class="btn chico" data-accion="deshacerError" data-id="${p.id}">Deshacer el último</button>` : ''}
+</div>`;
+}
+function pasoResultado(p) {
+  const t = p.tarea; const inc = t.resultado === 'sin-ayuda' && t.ayudas.length;
+  return `<h2>3. Resultado y preguntas</h2>
+<div class="card"><p class="tit"><strong>¿La persona completó la compra?</strong></p>
+${seg('c', p.id, 'tarea.resultado', t.resultado, [['sin-ayuda', 'Sin ayuda', 's-ok'], ['con-ayuda', 'Con ayuda', 's-warn'], ['no-completa', 'No la completó', 's-crit']], 'Resultado de la tarea')}
+<p class="ayuda">«Con ayuda» incluye cualquier pista o ayuda dada, también tras el bloqueo de 2 minutos.</p>
+${inc ? aviso('warn', `<p>Registraste ${t.ayudas.length} ayuda(s) y marcaste «Sin ayuda»: se cuenta como <strong>con ayuda</strong>. Corrige el resultado si fue un error.</p>`) : ''}
+${campoTexto('c', p.id, 'tarea.tiempoSeg', t.tiempoSeg === null ? '' : String(t.tiempoSeg), 'Tiempo total, en segundos', { tipo: 'number', max: 6, ayuda: 'Se llena al detener el cronómetro; puedes corregirlo.' })}
+</div>
+<div class="card"><fieldset><legend>En general, ¿qué tan fácil o difícil fue completar esta tarea? (1 = muy difícil, 7 = muy fácil)</legend>
+<div class="seg escala">${[1, 2, 3, 4, 5, 6, 7].map((v) => `<label><input type="radio" name="seq-${p.id}" value="${v}" data-tipo="num" data-col="c" data-rec="${p.id}" data-campo="seq" ${p.seq === v ? 'checked' : ''}><span>${v}</span></label>`).join('')}</div>
+<div class="escala-ext"><span>Muy difícil</span><span>Muy fácil</span></div></fieldset></div>
+<h3>Preguntas abiertas</h3>
+<p class="ayuda">Pregúntalas tal cual y anota frases textuales, sin nombres.</p>
+${campoTexto('c', p.id, 'post.dificil', p.post.dificil, '¿Qué fue lo más difícil o confuso?', { area: true, max: 600 })}
+${campoTexto('c', p.id, 'post.facil', p.post.facil, '¿Qué fue lo más fácil?', { area: true, max: 600 })}
+${campoTexto('c', p.id, 'post.cambiaria', p.post.cambiaria, 'Si pudieras cambiar una cosa, ¿cuál sería?', { area: true, max: 600 })}`;
+}
+function pasoSUS(p) {
+  const pts = puntajeSUS(p.sus); const resp = p.sus.filter((v) => v !== null).length;
+  return `<h2>4. Cuestionario SUS</h2>
+<p>Dile: «Te leo 10 frases. Dime qué tan de acuerdo estás con cada una, de 1 (muy en desacuerdo) a 5 (muy de acuerdo). Responde lo primero que pienses».</p>
+${SUS_ITEMS.map((txt, i) => `<div class="card tight"><fieldset><legend>${i + 1}. ${esc(txt)}</legend><div class="seg escala">${[1, 2, 3, 4, 5].map((v) => `<label><input type="radio" name="sus-${p.id}-${i}" value="${v}" data-tipo="num" data-col="c" data-rec="${p.id}" data-campo="sus.${i}" ${p.sus[i] === v ? 'checked' : ''}><span>${v}</span></label>`).join('')}</div><div class="escala-ext"><span>Muy en desacuerdo</span><span>Muy de acuerdo</span></div></fieldset></div>`).join('')}
+${pts === null ? aviso('info', `<p>${resp} de 10 respondidas. El puntaje aparece cuando respondas las 10.</p>`) : aviso('ok', `<p>Puntaje SUS: <strong class="num">${fmt(pts)}</strong> de 100 (fórmula estándar: en las frases impares se resta 1 a la respuesta, en las pares se resta la respuesta de 5, y la suma se multiplica por 2,5).</p>`)}`;
+}
+function pasoCierre(p) {
+  return `<h2>5. Cierre</h2>
+<p>Agradece a la persona y entrégale la compensación acordada, si la hay. Anota ahora lo más grave que observaste.</p>
+${campoTexto('c', p.id, 'problema', p.problema, 'Problema principal', { area: true, max: 800, ayuda: 'Una o dos frases. Frase textual de la persona entre comillas, si la hay. Sin nombres.' })}
+${campoTexto('c', p.id, 'pantallaProblema', p.pantallaProblema, 'Pantalla donde ocurrió', { max: 80, ph: 'Checkout, ficha, carrito…' })}
+${selector('c', p.id, 'gravedad', p.gravedad === null ? '' : String(p.gravedad), 'Gravedad (0 cosmético a 4 catastrófico)', GRAVEDADES)}
+${campoTexto('c', p.id, 'observaciones', p.observaciones, 'Otras observaciones', { area: true, max: 1500, ayuda: 'Dudas, gestos de frustración, cosas que dijo en voz alta.' })}
+${aviso(estadoPersona(p) === 'completa' ? 'ok' : 'warn', estadoPersona(p) === 'completa' ? '<p>Esta persona tiene todo lo necesario: consentimiento, resultado, tiempo y SUS.</p>' : '<p>Aún falta consentimiento, resultado, tiempo o el SUS completo.</p>')}`;
+}
+
+/* ---------- Datos ---------- */
+function vistaDatos() {
+  const tamano = new Blob([JSON.stringify(db)]).size;
+  const inf = ui.informeImport;
+  const hall = ui.exportAviso || [];
+  const av = avisos();
+  const puedeCompartir = typeof navigator.canShare === 'function' && typeof File === 'function' && (() => { try { return navigator.canShare({ files: [new File(['x'], 'x.json', { type: 'application/json' })] }); } catch (e) { return false; } })();
+  return { titulo: 'Datos', html: `
+<h1 tabindex="-1">Datos: exportar, importar y borrar</h1>
+<p>Aquí tienes: ${plural(db.a.corridas.length, 'corrida', 'corridas')} de navegadores, ${plural(db.b.sesiones.length, 'sesión', 'sesiones')} de lector y ${plural(db.c.personas.length, 'persona', 'personas')} de usabilidad (${(tamano / 1024).toFixed(1).replace('.', ',')} KB). ${db.ultimaExportacion ? `Última exportación: ${esc(db.ultimaExportacion.slice(0, 16).replace('T', ' '))} (UTC).` : 'Todavía no exportas.'}</p>
+${soloMemoria ? aviso('err', '<p>Este navegador no deja guardar datos (¿modo privado?). Lo que anotes se pierde al cerrar la pestaña: exporta antes.</p>') : ''}
+<h2>Exportar</h2>
+${aviso('warn', '<p><strong>Esto es lo que devuelves:</strong> el archivo <strong>JSON</strong>. El resumen en Markdown es para leer rápido y pegarlo en el repositorio. Antes de enviar, comprueba que no hay nombres, correos ni teléfonos.</p>')}
+<div class="card"><h3>JSON (para devolver)</h3><div class="row">
+  <button type="button" class="btn pri" data-accion="exportar" data-id="json-descargar">Descargar JSON</button>
+  ${puedeCompartir ? '<button type="button" class="btn" data-accion="exportar" data-id="json-compartir">Compartir JSON</button>' : ''}
+  <button type="button" class="btn" data-accion="exportar" data-id="json-copiar">Copiar JSON</button>
+  <button type="button" class="btn" data-accion="exportar" data-id="json-ver">${ui.verTexto === 'json-ver' ? 'Ocultar texto' : 'Ver el texto'}</button></div>
+  <h3>Resumen en Markdown</h3><div class="row">
+  <button type="button" class="btn" data-accion="exportar" data-id="md-descargar">Descargar resumen</button>
+  <button type="button" class="btn" data-accion="exportar" data-id="md-copiar">Copiar resumen</button>
+  <button type="button" class="btn" data-accion="exportar" data-id="md-ver">${ui.verTexto === 'md-ver' ? 'Ocultar texto' : 'Ver el texto'}</button></div>
+  ${ui.verTexto ? `<label class="campo"><span class="et">Texto exportado (selecciona y copia)</span><textarea class="mono" readonly rows="10">${esc(ui.textoVista)}</textarea></label>` : ''}
+  ${hall.length ? aviso('err', `<p><strong>Posibles datos personales.</strong> Revisa y corrige antes de enviar:</p><ul>${hall.slice(0, 20).map((h) => `<li><span class="kbd">${esc(h.ruta)}</span>: ${esc(h.motivo)}</li>`).join('')}</ul>`) : ''}
+</div>
+${av.length ? aviso('warn', `<p><strong>Avisos de la app</strong> (se incluyen en el archivo):</p><ul>${av.slice(0, 30).map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`) : ''}
+<h2>Importar y combinar</h2>
+<p>Une los archivos JSON de otros dispositivos o evaluadores. Cada registro se identifica por su id: si ya existe, gana el más reciente; nada se borra.</p>
+<div class="card">
+  <label class="campo"><span class="et">Archivos JSON exportados por esta herramienta</span><input type="file" id="archivo-json" accept=".json,application/json" multiple></label>
+  <button type="button" class="btn" data-accion="togglePegar">${ui.pegar ? 'Ocultar el cuadro de pegar' : 'Pegar JSON en vez de elegir un archivo'}</button>
+  ${ui.pegar ? `<label class="campo"><span class="et">JSON pegado</span><textarea class="mono" id="pegado" rows="6"></textarea></label><button type="button" class="btn pri" data-accion="importarPegado">Importar el texto pegado</button>` : ''}
+  ${inf ? `<div class="alerta ${inf.errores.length ? 'err' : 'ok'}" role="status"><p><strong>Importación:</strong> ${plural(inf.archivos, 'archivo leído', 'archivos leídos')} · ${inf.agregados} registros agregados · ${inf.actualizados} actualizados · ${inf.conservados} conservados (los locales eran más recientes).</p>${inf.errores.length ? `<ul>${inf.errores.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}${inf.avisos.length ? `<ul>${inf.avisos.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</div>` : ''}
+  ${db.importados.length ? `<p class="ayuda">Procedencia de lo importado: ${db.importados.map((i) => esc(`${i.evaluador || 'sin código'} (${i.dispositivoId})`)).join(', ')}.</p>` : ''}
+</div>
+<h2>Borrar los datos locales</h2>
+<div class="card"><p>Borra <strong>todo</strong> lo guardado en este navegador (no los archivos que ya exportaste). Sin exportar antes, no se puede recuperar.</p>
+<button type="button" class="btn peligro" data-accion="borrarTodo">Borrar los datos locales…</button></div>
+<h2>Sobre esta herramienta</h2>
+<p class="muted">Versión ${APP.version} · esquema ${APP.esquema} v${APP.esquemaVersion} · dispositivo ${esc(db.dispositivo.id)}. Sin red, sin telemetría: la página no puede conectarse a ningún servidor.</p>` };
+}
+
+/* ============================== Enrutamiento y render ============================== */
+function rutaActual() { return location.hash.replace(/^#\/?/, '').split('/').filter(Boolean); }
+function vista() {
+  const [s, id] = rutaActual();
+  let v = null;
+  if (!s) v = vistaInicio(); else if (s === 'a') v = id ? vistaCorrida(id) : vistaA(); else if (s === 'b') v = id ? vistaSesion(id) : vistaB(); else if (s === 'c') v = id ? vistaPersona(id) : vistaC(); else if (s === 'datos') v = vistaDatos();
+  return v || { redirigir: s ? '#/' + s : '#/' };
+}
+function huellaFoco(el) {
+  if (!el || el === document.body || !main.contains(el)) return null;
+  const partes = [el.tagName.toLowerCase()];
+  ['col', 'rec', 'campo', 'accion', 'id', 'p'].forEach((k) => { if (el.dataset[k] !== undefined) partes.push(`[data-${k}="${CSS.escape(el.dataset[k])}"]`); });
+  if (partes.length === 1 && !el.id) return null;
+  if (el.type === 'radio' || el.type === 'checkbox') partes.push(`[value="${CSS.escape(el.value)}"]`);
+  return partes.join('');
+}
+function render(opciones = {}) {
+  const foco = opciones.enfocarTitulo ? null : huellaFoco(document.activeElement);
+  const y = window.scrollY;
+  const v = vista();
+  if (v.redirigir) { location.hash = v.redirigir; return; }
+  main.innerHTML = v.html; document.title = `${v.titulo} · Pruebas humanas de BabelHub`;
+  const [s] = rutaActual();
+  document.querySelectorAll('nav.tabs a').forEach((a) => { if (a.dataset.ruta === (s || '')) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  pintarEstado(); pintarBotonTema();
+  if (opciones.enfocarTitulo) { const h = $('h1', main); if (h) h.focus({ preventScroll: true }); window.scrollTo(0, 0); }
+  else { if (foco) { try { const el = main.querySelector(foco); if (el) el.focus({ preventScroll: true }); } catch (e) { /* sin foco previo */ } } window.scrollTo(0, y); }
+}
+window.addEventListener('hashchange', () => render({ enfocarTitulo: true }));
+document.addEventListener('toggle', (e) => { const d = e.target; if (d && d.tagName === 'DETAILS' && d.dataset.k) { if (d.open) { ui.abiertos.add(d.dataset.k); ui.abiertos.delete('~' + d.dataset.k); } else { ui.abiertos.delete(d.dataset.k); ui.abiertos.add('~' + d.dataset.k); } } }, true);
+
+/* ============================== Eventos ============================== */
+function valorDe(t) {
+  if (t.type === 'checkbox') return t.checked;
+  if (t.dataset.tipo === 'num' || t.type === 'number') return t.value === '' ? null : Number(t.value);
+  return t.value;
+}
+function aplicarCampo(t) {
+  const { col, rec, campo } = t.dataset;
+  if (col === 'x') { ui.rondaC = Number(t.value) === 2 ? 2 : 1; return true; }
+  const r = buscar(col, rec); if (!r) return false;
+  let v = valorDe(t);
+  if (campo === 'tarea.tiempoSeg' && v !== null) v = Math.max(0, Math.round(v));
+  if (campo === 'gravedad') v = v === '' ? null : Number(v);
+  ponerRuta(r, campo, v);
+  if (col === 'c' && campo === 'consentimiento.acepta') r.consentimiento.fecha = v ? ahora() : '';
+  if (col === 'd' || col === 'p') guardar(); else tocar(r);
+  return true;
+}
+document.addEventListener('input', (e) => { const t = e.target; if (t.dataset && t.dataset.campo && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && !['radio', 'checkbox'].includes(t.type)))) aplicarCampo(t); });
+document.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.id === 'archivo-json' && t.files && t.files.length) { importarArchivos(Array.from(t.files)); t.value = ''; return; }
+  if (!t.dataset || !t.dataset.campo) return;
+  const esDiscreto = t.type === 'radio' || t.type === 'checkbox' || t.tagName === 'SELECT';
+  if (!esDiscreto) { aplicarCampo(t); if (t.dataset.campo === 'urlTienda') render(); return; }
+  if (aplicarCampo(t)) render();
+});
+
+function dialogo({ titulo, cuerpo, aceptar, peligro = false, alAceptar }) {
+  const d = $('#dlg');
+  d.innerHTML = `<h2 id="dlg-t" style="margin-top:0">${esc(titulo)}</h2>${cuerpo}<div class="row sep" style="margin-top:1rem"><button type="button" class="btn" data-accion="dlgCancelar" autofocus>Cancelar</button><button type="button" class="btn ${peligro ? 'peligro' : 'pri'}" data-accion="dlgAceptar">${esc(aceptar)}</button></div>`;
+  ui.dlgAceptar = alAceptar;
+  if (typeof d.showModal === 'function') d.showModal(); else d.setAttribute('open', '');
+}
+const cerrarDialogo = () => { const d = $('#dlg'); if (d.close) d.close(); else d.removeAttribute('open'); };
+
+function nuevaCorrida(comboId) {
+  const cb = COMBOS.find((c) => c.id === comboId); const d = detectar();
+  const coincide = d.nav === cb.nombre;
+  const r = normCorrida({ id: nuevoId('run'), act: ahora(), creada: ahora(), combo: comboId, evaluador: evalor(), dispositivoId: db.dispositivo.id, navegador: cb.nombre, version: coincide ? d.ver : '', sistema: coincide ? d.sis : '', fecha: hoy(), viewport: coincide ? d.vp : '', ua: coincide ? d.ua : '' });
+  db.a.corridas.push(r); guardar(); location.hash = '#/a/' + r.id;
+}
+function nuevaSesion(lector, tema) {
+  const d = detectar();
+  const s = normSesion({ id: nuevoId('ses'), act: ahora(), creada: ahora(), lector, tema, evaluador: evalor(), dispositivoId: db.dispositivo.id, fecha: hoy(), sistema: d.sis, navegador: d.nav ? `${d.nav} ${d.ver}` : '' });
+  db.b.sesiones.push(s); guardar(); location.hash = '#/b/' + s.id;
+}
+function nuevaPersona(ronda) {
+  const maxN = db.c.personas.reduce((m, p) => { const x = /^P(\d+)$/.exec(p.codigo); return x ? Math.max(m, Number(x[1])) : m; }, 0);
+  const d = detectar();
+  const p = normPersona({ id: nuevoId('per'), act: ahora(), creada: ahora(), ronda, codigo: 'P' + (maxN + 1), evaluador: evalor(), dispositivoId: db.dispositivo.id, dispositivo: /Mobi|Android|iPhone/.test(d.ua) ? 'celular' : 'computadora' });
+  db.c.personas.push(p); guardar(); ui.pasoC[p.id] = 1; location.hash = '#/c/' + p.id;
+}
+function borrarRegistro(clave) {
+  const [col, id] = [clave.slice(0, 1), clave.slice(2)];
+  const nombre = col === 'a' ? 'esta corrida' : col === 'b' ? 'esta sesión' : 'a esta persona';
+  dialogo({ titulo: 'Borrar el registro', cuerpo: `<p>Se borra ${esc(nombre)} y todo lo anotado en ella. No se puede deshacer.</p>`, aceptar: 'Borrar', peligro: true, alAceptar: () => {
+    if (col === 'a') db.a.corridas = db.a.corridas.filter((x) => x.id !== id); else if (col === 'b') db.b.sesiones = db.b.sesiones.filter((x) => x.id !== id); else db.c.personas = db.c.personas.filter((x) => x.id !== id);
+    guardarYa(); location.hash = '#/' + col; avisar('Registro borrado.');
+  } });
+}
+function borrarTodo() {
+  dialogo({ titulo: 'Borrar los datos locales', cuerpo: `<p>Se borrará <strong>todo</strong> lo guardado en este navegador: corridas, sesiones, personas y ajustes.${sinExportar() && hayDatos() ? ' <strong>Hay cambios sin exportar.</strong>' : ''}</p><p>Los archivos que ya exportaste no se tocan. Esto no se puede deshacer.</p>`, aceptar: 'Sí, borrar todo', peligro: true, alAceptar: () => {
+    try { localStorage.removeItem(LS_DATOS); } catch (e) { /* sin almacenamiento */ }
+    db = dbVacia(); ui.informeImport = null; ui.exportAviso = []; ui.verTexto = ''; guardarYa(); location.hash = '#/datos'; render({ enfocarTitulo: true }); avisar('Datos locales borrados.');
+  } });
+}
+const enfocar = (sel) => { const el = main.querySelector(sel); if (el) el.focus({ preventScroll: true }); };
+const persona = (id) => db.c.personas.find((p) => p.id === id);
+function tickCrono() {
+  const cr = $('#crono');
+  if (cr) { const p = persona((location.hash.match(/#\/c\/([^/]+)/) || [])[1]); if (p) { cr.textContent = mmss(cronoSeg(p)); const b = $('#bloqueo'); if (b && p.tarea.cron.bloqueoInicio) { const s = Math.floor((Date.now() - p.tarea.cron.bloqueoInicio) / 1000); b.textContent = mmss(s); const m = $('#bloqueo-msg'); if (m && s >= 120 && m.style.display === 'none') { m.style.display = ''; avisar('Ya pasaron 2 minutos de bloqueo: puedes ayudar y cuenta como con ayuda.'); } } } }
+}
+setInterval(tickCrono, 500);
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.skip')) { e.preventDefault(); main.focus(); main.scrollIntoView(); return; } // el enlace no cambia la ruta (#/…)
+  const b = e.target.closest('[data-accion]'); if (!b || b.tagName === 'INPUT' || b.tagName === 'SELECT' || b.tagName === 'TEXTAREA') return;
+  const { accion, id, p } = b.dataset;
+  switch (accion) {
+    case 'tema': ciclarTema(); break;
+    case 'nuevaCorrida': nuevaCorrida(id); break;
+    case 'nuevoDefecto': { const r = buscar('a', id); r.defectos.push({ id: nuevoId('def'), paso: 'otro', desc: '', captura: '', gravedad: 'mayor' }); tocar(r); render(); break; }
+    case 'quitarDefecto': { const r = buscar('a', id); r.defectos = r.defectos.filter((d) => d.id !== p); tocar(r); render(); break; }
+    case 'nuevaSesion': nuevaSesion(id, p); break;
+    case 'todoCumple': { const s = buscar('b', id); itemsDe(s.lector).forEach((it) => { const x = s.pantallas[p].items[it.id]; if (!x.e) x.e = 'ok'; }); tocar(s); render(); avisar('Lo pendiente se marcó como cumple.'); break; }
+    case 'borrarRegistro': borrarRegistro(id); break;
+    case 'borrarTodo': borrarTodo(); break;
+    case 'nuevaPersona': nuevaPersona(Number(id)); break;
+    case 'pasoC': ui.pasoC[id] = Number(p); render({ enfocarTitulo: true }); break;
+    case 'cronoIniciar': { const x = persona(id); x.tarea.cron.corriendo = true; x.tarea.cron.inicio = Date.now(); tocar(x); render(); enfocar('[data-accion="cronoDetener"]'); break; }
+    case 'cronoDetener': { const x = persona(id); const c = x.tarea.cron; c.acumMs += Date.now() - c.inicio; c.corriendo = false; c.inicio = null; c.bloqueoInicio = null; x.tarea.tiempoSeg = Math.round(c.acumMs / 1000); tocar(x); render(); enfocar('[data-accion="cronoIniciar"]'); avisar(`Tiempo registrado: ${mmss(x.tarea.tiempoSeg)}.`); break; }
+    case 'cronoReiniciar': dialogo({ titulo: 'Poner el cronómetro en cero', cuerpo: '<p>Se pierde el tiempo medido. Los errores y ayudas anotados no se borran.</p>', aceptar: 'Poner en cero', peligro: true, alAceptar: () => { const x = persona(id); x.tarea.cron = { corriendo: false, inicio: null, acumMs: 0, bloqueoInicio: null }; x.tarea.tiempoSeg = null; tocar(x); render(); } }); break;
+    case 'bloqueoIni': { const x = persona(id); x.tarea.cron.bloqueoInicio = Date.now(); tocar(x); render(); break; }
+    case 'bloqueoFin': { const x = persona(id); x.tarea.cron.bloqueoInicio = null; tocar(x); render(); break; }
+    case 'ayuda': { const x = persona(id); x.tarea.ayudas.push({ t: cronoSeg(x), tipo: 'ayuda', nota: '' }); x.tarea.cron.bloqueoInicio = null; tocar(x); render(); avisar('Ayuda registrada: cuenta como con ayuda.'); break; }
+    case 'error': { const x = persona(id); x.tarea.errores.push({ t: cronoSeg(x), tipo: p, nota: '' }); tocar(x); render(); avisar(`Error registrado. Total: ${x.tarea.errores.length}.`); break; }
+    case 'deshacerError': { const x = persona(id); x.tarea.errores.pop(); tocar(x); render(); break; }
+    case 'exportar': exportar(id); break;
+    case 'togglePegar': ui.pegar = !ui.pegar; render(); break;
+    case 'importarPegado': { const t = $('#pegado'); const informe = { archivos: 0, agregados: 0, actualizados: 0, conservados: 0, errores: [], avisos: [] }; importarTexto(t ? t.value : '', 'texto pegado', informe); db.actualizadoEn = ahora(); guardarYa(); ui.informeImport = informe; render(); break; }
+    case 'dlgCancelar': cerrarDialogo(); break;
+    case 'dlgAceptar': { const f = ui.dlgAceptar; cerrarDialogo(); if (f) f(); break; }
+    default: break;
+  }
+});
+
+/* ============================== Tema ============================== */
+function preferenciaTema() { try { return localStorage.getItem(LS_TEMA) || 'sistema'; } catch (e) { return 'sistema'; } }
+function aplicarTema() {
+  const pref = preferenciaTema();
+  const oscuro = pref === 'oscuro' || (pref === 'sistema' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.setAttribute('data-theme', oscuro ? 'babelhub-dark' : 'babelhub');
+}
+function pintarBotonTema() { const b = $('#btn-tema'); if (!b) return; const p = preferenciaTema(); b.textContent = `Tema: ${p === 'sistema' ? 'sistema' : p}`; b.setAttribute('aria-label', `Cambiar tema. Ahora: ${p === 'sistema' ? 'el del sistema' : p}`); }
+function ciclarTema() { const orden = ['sistema', 'claro', 'oscuro']; const n = orden[(orden.indexOf(preferenciaTema()) + 1) % 3]; try { localStorage.setItem(LS_TEMA, n); } catch (e) { /* sin almacenamiento */ } aplicarTema(); pintarBotonTema(); avisar(`Tema ${n === 'sistema' ? 'del sistema' : n}.`); }
+if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', aplicarTema);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#dlg').open) cerrarDialogo(); });
+
+aplicarTema();
+render();
+pintarEstado();
+window.__babelhubPruebasHumanas = { puntajeSUS, calcular, construirExport, construirMarkdown, fusionar, normalizarDb, buscarDatosPersonales };
+})();
+</script>
+</body>
+</html>
