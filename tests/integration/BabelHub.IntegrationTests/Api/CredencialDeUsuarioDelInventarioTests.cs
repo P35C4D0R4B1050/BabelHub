@@ -182,6 +182,25 @@ public sealed class CredencialDeUsuarioDelInventarioTests : IAsyncDisposable
     }
 
     [Fact]
+    [Trait("Criterio", "AC-CIN-13")]
+    public async Task UnaCredencialValidaConLaIdentidadDeOperacionDeLaCarga_NoVale_YDejaLaSolicitudSinActor()
+    {
+        // CIN-06: la identidad «carga inicial» no es una cuenta; ni una credencial de firma válida con ese sub y el rol de administración central la hace actor.
+        await using var e = await Crear();
+        var token = e.Token(r =>
+        {
+            r["sub"] = IdentidadesDeOperacion.CargaInicial;
+            r["rol"] = RolesDeUsuario.AdministradorCentral;
+            return r;
+        });
+
+        var (estado, cuerpo) = await e.Quien("Bearer " + token);
+
+        Assert.Equal(HttpStatusCode.OK, estado);
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, cuerpo.GetProperty("actor").ValueKind);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-IDE-32")]
     public async Task UnaCabeceraDeActor_NuncaVale_ConOSinCredencial()
     {
