@@ -140,10 +140,11 @@ public sealed class DesplegarShTests : IDisposable
                         // PAG-34: el entorno y la pasarela del E-commerce deben ser coherentes (Staging con el simulador).
                         "ASPNETCORE_ENVIRONMENT" => "Staging",
                         "BABELHUB__Pagos__Pasarela" => "simulador",
+                        "BABELHUB__Envios__Operador" => "simulador",
                         _ => Aleatorio(Math.Max(fila.Length > 2 ? int.Parse(fila[2], System.Globalization.CultureInfo.InvariantCulture) : 0, 12) + 8),
                     };
                     // Lo que no es un secreto (el tipo del almacén, el entorno y la pasarela) no se vigila en la salida del script: sus mensajes lo nombran.
-                    if (fila[1] is not ("RCLONE_CONFIG_ALMACEN_TYPE" or "ASPNETCORE_ENVIRONMENT" or "BABELHUB__Pagos__Pasarela"))
+                    if (fila[1] is not ("RCLONE_CONFIG_ALMACEN_TYPE" or "ASPNETCORE_ENVIRONMENT" or "BABELHUB__Pagos__Pasarela" or "BABELHUB__Envios__Operador"))
                     {
                         _valoresSecretos.Add(valor);
                     }
@@ -435,6 +436,20 @@ public sealed class DesplegarShTests : IDisposable
         Assert.Contains(mensaje, errores, StringComparison.Ordinal);
         Assert.DoesNotContain(LlamadasADocker, l => l.Contains(" up ", StringComparison.Ordinal));
         SinSecretosEnLaSalida(salida, errores);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-37")]
+    public void UnOperadorLogisticoQueNoEsElSimulado_NoSeDespliega_PorqueNoHayOperadorReal()
+    {
+        PrepararSecretos("ventas");
+        File.AppendAllText(Path.Combine(_secretos, "ecommerce.env"), "BABELHUB__Envios__Operador=nulo\n");
+
+        var (codigo, _, errores) = Desplegar("ventas");
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("BABELHUB__Envios__Operador debe ser simulador", errores, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
     }
 
     [Theory]

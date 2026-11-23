@@ -142,6 +142,39 @@ public sealed class EntornoStagingTests
         Assert.False(appEnsayo.Services.GetRequiredService<ModoDePagosDeLaWeb>().Simulado);
     }
 
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-37")]
+    [InlineData("Staging")]
+    [InlineData("Production")]
+    public void Con_el_operador_logistico_simulado_Staging_y_Production_arrancan_y_la_tienda_lo_anuncia(string entorno)
+    {
+        // No hay operador logístico real y no lo habrá (DD-22): se opera con el simulado y se dice (PAG-42). La pasarela real sigue sin existir: en Production, con el simulador de pagos, no arranca.
+        var configuracion = ConfiguracionDeUnEntornoDeTipoProduccion();
+        configuracion["Envios:Operador"] = "simulador";
+        var builder = Constructor(configuracion, entorno);
+
+        if (entorno == "Production")
+        {
+            Assert.Throws<ConfiguracionDePagosInvalidaException>(() => builder.AgregarEcommerce(ModoDeArranque.Normal));
+            return;
+        }
+
+        builder.AgregarEcommerce(ModoDeArranque.Normal);
+        using var app = builder.Build();
+        Assert.True(app.Services.GetRequiredService<ModoDeEnviosDeLaWeb>().Simulado);
+        ArranqueSeguro.ExigirCoherencia(ModoDeArranque.Normal, esProduccion: true, app.Services.GetServices<IAdaptadorSaliente>());
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-37")]
+    public void Sin_operador_logistico_en_un_entorno_de_tipo_produccion_el_arranque_se_niega_y_con_la_pasarela_real_nula_tambien()
+    {
+        IAdaptadorSaliente[] sinOperador = [new AdaptadorDePrueba("pasarela-de-pago", esNulo: false), new AdaptadorDePrueba("operador-logistico", esNulo: true)];
+
+        Assert.Throws<ArranqueRechazadoException>(() => ArranqueSeguro.ExigirCoherencia(ModoDeArranque.Normal, esProduccion: true, sinOperador));
+    }
+
     private sealed class AdaptadorDePrueba(string nombre, bool esNulo) : IAdaptadorSaliente
     {
         public string Nombre { get; } = nombre;
@@ -149,21 +182,6 @@ public sealed class EntornoStagingTests
         public bool EsHaciaProveedor => true;
 
         public bool EsNulo { get; } = esNulo;
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-PAG-34")]
-    public void Solo_en_Staging_el_operador_logistico_puede_ser_nulo_y_ningun_otro_adaptador_hacia_un_proveedor()
-    {
-        IAdaptadorSaliente[] sinOperador = [new AdaptadorDePrueba("pasarela-de-pago", esNulo: false), new AdaptadorDePrueba(ArranqueSeguro.OperadorLogistico, esNulo: true)];
-        IAdaptadorSaliente[] sinPasarela = [new AdaptadorDePrueba("pasarela-de-pago", esNulo: true), new AdaptadorDePrueba(ArranqueSeguro.OperadorLogistico, esNulo: false)];
-
-        // Production sigue exigiendo el operador real; Staging admite solo ese nulo.
-        Assert.Throws<ArranqueRechazadoException>(() => ArranqueSeguro.ExigirCoherencia(ModoDeArranque.Normal, esProduccion: true, sinOperador));
-        ArranqueSeguro.ExigirCoherencia(ModoDeArranque.Normal, esProduccion: true, sinOperador, admiteOperadorLogisticoNulo: true);
-        Assert.Throws<ArranqueRechazadoException>(() => ArranqueSeguro.ExigirCoherencia(ModoDeArranque.Normal, esProduccion: true, sinPasarela, admiteOperadorLogisticoNulo: true));
-        // En el modo de ensayo o restauración el operador nulo sigue siendo el único admitido.
-        Assert.Throws<ArranqueRechazadoException>(() => ArranqueSeguro.ExigirCoherencia(ModoDeArranque.Ensayo, esProduccion: true, sinPasarela, admiteOperadorLogisticoNulo: true));
     }
 
     private sealed class EntornoDePrueba(string nombre) : IHostEnvironment

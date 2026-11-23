@@ -42,7 +42,7 @@ public sealed partial class AvisoDePagosSimuladosTests
         return WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync());
     }
 
-    private static Task<AnfitrionWeb> ConCheckout(ModoDePagosDeLaWeb? modo)
+    private static Task<AnfitrionWeb> ConCheckout(ModoDePagosDeLaWeb? modo, ModoDeEnviosDeLaWeb? envios = null)
     {
         var linea = new LineaDeRevision(Guid.NewGuid(), Guid.NewGuid(), "Estructuras de datos", FormatoDeEdicion.Impresa, 1, 60m, 60m, DisponibilidadDeLineaDeCheckout.Disponible, null, false, false);
         var vista = new VistaDelCheckout(EstadoVisibleDelCheckout.EnEdicion, 1, 5, [linea], null, null, null, 60m, null, 60m, null, [], [], null, null, false);
@@ -61,6 +61,11 @@ public sealed partial class AvisoDePagosSimuladosTests
             if (modo is not null)
             {
                 servicios.AddSingleton(modo);
+            }
+
+            if (envios is not null)
+            {
+                servicios.AddSingleton(envios);
             }
         });
     }
@@ -139,6 +144,25 @@ public sealed partial class AvisoDePagosSimuladosTests
         await using var anfitrion = await ConCheckout(new ModoDePagosDeLaWeb(Simulado: false));
 
         Assert.DoesNotContain("data-bh-pagos-simulados", await Pagina(anfitrion, "/checkout"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-37")]
+    public async Task Con_el_operador_logistico_simulado_la_tienda_dice_que_los_envios_son_simulados_y_con_otro_no()
+    {
+        await using var simulado = await AnfitrionWeb.Iniciar(servicios => servicios.AddSingleton(new ModoDeEnviosDeLaWeb(Simulado: true)));
+        await using var checkout = await ConCheckout(new ModoDePagosDeLaWeb(Simulado: false), new ModoDeEnviosDeLaWeb(Simulado: true));
+        await using var otro = await AnfitrionWeb.Iniciar(servicios => servicios.AddSingleton(new ModoDeEnviosDeLaWeb(Simulado: false)));
+
+        var portada = await Pagina(simulado, "/");
+        var enCheckout = await Pagina(checkout, "/checkout");
+
+        Assert.Equal("Los envíos son simulados: proyecto académico", ModoDeEnviosDeLaWeb.Texto);
+        Assert.Contains(ModoDeEnviosDeLaWeb.Texto, portada, StringComparison.Ordinal);
+        Assert.Contains("aria-label=\"Aviso: envíos simulados\"", portada, StringComparison.Ordinal);
+        Assert.True(portada.IndexOf("data-bh-envios-simulados", StringComparison.Ordinal) < portada.IndexOf("<footer", StringComparison.Ordinal));
+        Assert.Contains(ModoDeEnviosDeLaWeb.Explicacion, enCheckout, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-bh-envios-simulados", await Pagina(otro, "/"), StringComparison.Ordinal);
     }
 
     [Fact]

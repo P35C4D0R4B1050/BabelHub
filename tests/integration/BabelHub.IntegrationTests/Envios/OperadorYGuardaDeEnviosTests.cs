@@ -62,6 +62,25 @@ public sealed class OperadorYGuardaDeEnviosTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PAG-37")]
+    public async Task El_numero_de_guia_del_simulador_no_se_repite_tras_un_reinicio_ni_entre_instancias_y_es_idempotente()
+    {
+        var uno = new SimuladorOperadorLogistico();
+        var otraInstancia = new SimuladorOperadorLogistico();
+        var clave = Guid.NewGuid();
+
+        var primero = Assert.IsType<ResultadoDelOperador.GuiaCreada>(await uno.CrearOObtenerGuia(clave, Destinatario()));
+        var repetido = Assert.IsType<ResultadoDelOperador.GuiaCreada>(await uno.CrearOObtenerGuia(clave, Destinatario()));
+        var tras = Assert.IsType<ResultadoDelOperador.GuiaCreada>(await otraInstancia.CrearOObtenerGuia(clave, Destinatario()));
+        var distinta = Assert.IsType<ResultadoDelOperador.GuiaCreada>(await otraInstancia.CrearOObtenerGuia(Guid.NewGuid(), Destinatario()));
+
+        Assert.Equal(primero.Numero, repetido.Numero);
+        Assert.Equal(primero.Numero, tras.Numero);
+        Assert.NotEqual(primero.Numero, distinta.Numero);
+        Assert.Matches("^SIM-[0-9A-F]{12}$", primero.Numero.Valor);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-ENV-15")]
     public async Task Con_la_respuesta_perdida_el_reintento_con_la_misma_clave_recupera_la_misma_guia()
     {
@@ -89,18 +108,19 @@ public sealed class OperadorYGuardaDeEnviosTests
     [Trait("Criterio", "AC-ENV-04")]
     [InlineData("Development")]
     [InlineData("Test")]
-    public void El_simulador_se_acepta_en_desarrollo_y_en_pruebas(string entorno)
+    [InlineData("Staging")]
+    [InlineData("Production")]
+    [Trait("Criterio", "AC-PAG-37")]
+    public void El_simulador_se_acepta_en_desarrollo_pruebas_staging_y_produccion_porque_no_habra_operador_real(string entorno)
     {
         Assert.Equal("simulador", GuardaDeArranqueDeEnvios.Exigir(Opciones(entorno: entorno)));
     }
 
     [Theory]
     [Trait("Criterio", "AC-ENV-04")]
-    [InlineData("Production")]
-    [InlineData("Staging")]
     [InlineData("")]
     [InlineData("Qa")]
-    public void El_simulador_se_rechaza_en_produccion_y_en_cualquier_otro_entorno(string entorno)
+    public void El_simulador_se_rechaza_en_cualquier_otro_entorno_distinto_de_los_cuatro(string entorno)
     {
         var error = Assert.Throws<ConfiguracionDeEnviosInvalidaException>(() => GuardaDeArranqueDeEnvios.Exigir(Opciones(entorno: entorno)));
 
@@ -146,6 +166,8 @@ public sealed class OperadorYGuardaDeEnviosTests
 
         Assert.IsType<NuloOperadorLogistico>(nulo.GetRequiredService<IOperadorLogistico>());
         Assert.IsType<SimuladorOperadorLogistico>(simulador.GetRequiredService<IOperadorLogistico>());
-        Assert.Throws<ConfiguracionDeEnviosInvalidaException>(() => new ServiceCollection().AgregarOperadorLogisticoDeEnvios(Opciones(entorno: "Production")));
+        // El simulador también corre en Production (no hay operador real, DD-22, DD-88); un entorno que no es ninguno de los cuatro sigue rechazándolo.
+        Assert.IsType<SimuladorOperadorLogistico>(new ServiceCollection().AgregarOperadorLogisticoDeEnvios(Opciones(entorno: "Production")).BuildServiceProvider().GetRequiredService<IOperadorLogistico>());
+        Assert.Throws<ConfiguracionDeEnviosInvalidaException>(() => new ServiceCollection().AgregarOperadorLogisticoDeEnvios(Opciones(entorno: "Qa")));
     }
 }

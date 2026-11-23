@@ -108,6 +108,8 @@ inicio() { : > "$1"; chmod 600 "$1"; { echo "# Generado por scripts/generar-secr
 entorno_y_pagos() {
   linea "$1" ASPNETCORE_ENVIRONMENT "$ENTORNO_ASPNET"
   linea "$1" BABELHUB__Pagos__Pasarela "$PASARELA"
+  # No hay operador logístico real ni lo habrá (DD-22): los envíos se operan con el simulador, también en Production, y la tienda lo anuncia («Los envíos son simulados: proyecto académico», PAG-42).
+  linea "$1" BABELHUB__Envios__Operador simulador
   if [[ "$ENTORNO" == production ]]; then pendiente "$1" BABELHUB__Pagos__LlavePrivada "la llave privada de producción de Culqi (sk_live_…); solo en este archivo y en el de la otra VM del E-commerce"; fi
   pendiente "$1" BABELHUB__Contacto__Telefono "el teléfono de contacto que mostrará la tienda (dato personal: no va al repositorio)"
   pendiente "$1" BABELHUB__Contacto__Correo "el correo de contacto que mostrará la tienda (dato personal: no va al repositorio)"

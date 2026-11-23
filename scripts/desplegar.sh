@@ -197,6 +197,8 @@ if [[ -n "$SECRETOS" ]]; then
       "") ;;   # la falta de la clave ya la anotó la tabla de secretos requeridos
       *) anotar "$archivo: ASPNETCORE_ENVIRONMENT debe ser Staging o Production (no «$entorno»)" ;;
     esac
+    # El operador logístico es el simulado (DD-22, PAG-42): no existe uno real y sin operador el E-commerce no arranca en un entorno de tipo producción.
+    [[ -z "$entorno" || "$(leer_valor "$SECRETOS/$archivo" BABELHUB__Envios__Operador)" == simulador ]] || anotar "$archivo: BABELHUB__Envios__Operador debe ser simulador (no hay operador logístico real, DD-22)"
     # Una llave de Culqi solo sirve en Production: en Staging no hay adaptador real, y una llave suelta en un entorno que no cobra es un secreto sin uso.
     if [[ "$entorno" == Staging && -n "$(leer_valor "$SECRETOS/$archivo" BABELHUB__Pagos__LlavePrivada)" ]]; then
       anotar "$archivo: ASPNETCORE_ENVIRONMENT=Staging no debe llevar BABELHUB__Pagos__LlavePrivada (la llave de Culqi va solo en Production)"

@@ -245,7 +245,7 @@ public sealed class CuentaDeRevisionDeLaPasarelaTests(InstanciaParaMigrar instan
         var enProduccionSinConfiguracion = await ModoCuentaDeRevision.Ejecutar(["--retirar"], new StringWriter(), new StringWriter(), "Production");
 
         Assert.Equal(1, enDesarrollo);
-        Assert.Contains("retirarla también se permite en Production", error.ToString(), StringComparison.Ordinal);
+        Assert.Contains("solo existe en Staging y Production", error.ToString(), StringComparison.Ordinal);
         // En Production sí llega a construir el servicio (y falla aquí porque no hay configuración), no se niega por el entorno.
         Assert.Equal(1, enProduccionSinConfiguracion);
     }
@@ -380,6 +380,261 @@ public sealed class CuentaDeRevisionDeLaPasarelaTests(InstanciaParaMigrar instan
 
         Assert.Equal(0L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios"));
         Assert.Equal(0L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.claves_de_firma"));
+    }
+
+    // ---------- Varias cuentas, purga y el primer administrador (PAG-43, PAG-44, PAG-45) ----------
+
+    private sealed class RegistroDeSupresionesEnMemoria : IRegistroDeSupresiones
+    {
+        public Task<EntradaDeSupresionDto> Agregar(string identificadorOpaco, ClaseDeSupresion clase, EtapaDeSupresion etapa, DateTimeOffset fecha, CancellationToken cancelacion = default) =>
+            Task.FromResult(new EntradaDeSupresionDto(identificadorOpaco, clase, etapa, fecha, "suma", false));
+
+        public Task<EntradaDeSupresionDto?> Obtener(string identificadorOpaco, ClaseDeSupresion clase, EtapaDeSupresion etapa, CancellationToken cancelacion = default) => Task.FromResult<EntradaDeSupresionDto?>(null);
+
+        public Task<IReadOnlyList<EntradaLeidaDto>> LeerConMetadatos(CancellationToken cancelacion = default) => Task.FromResult<IReadOnlyList<EntradaLeidaDto>>([]);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-38")]
+    public async Task Crear_varias_cuentas_da_a_cada_una_su_contrasena_y_todas_ingresan_y_el_limite_es_de_20()
+    {
+        var (propietaria, configuracion) = await MigrarUnaBase("0.1-provisional");
+        await using var servicio = Levantar(propietaria, configuracion);
+        await using var alcance = servicio.Alcance();
+        var operacion = alcance.ServiceProvider.GetRequiredService<CuentaDeRevisionDeLaPasarela>();
+
+        var cuentas = await operacion.CrearVarias("Staging", 3);
+
+        Assert.Equal(["persona-01@example.test", "persona-02@example.test", "persona-03@example.test"], cuentas.Select(c => c.Correo));
+        Assert.Equal(3, cuentas.Select(c => c.Contrasena.Revelar()).Distinct().Count());
+        var ingreso = alcance.ServiceProvider.GetRequiredService<IIngreso>();
+        foreach (var c in cuentas)
+        {
+            Assert.True((await ingreso.Ingresar(new SolicitudDeIngreso(c.Correo, c.Contrasena))).EsExito);
+        }
+
+        await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.CrearVarias("Staging", 21));
+        await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.CrearVarias("Staging", 0));
+        await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.CrearVarias("Production", 2));
+        Assert.Equal(3L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios"));
+        // «Retirar todas» las desactiva (incluida, si existe, la de la revisión) y repetirlo no cambia nada.
+        Assert.Equal(3, await operacion.RetirarTodas("Production"));
+        Assert.Equal(0, await operacion.RetirarTodas("Production"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-40")]
+    public async Task Purgar_cancela_las_cuentas_de_prueba_por_la_cancelacion_de_cuenta_y_no_toca_a_las_reales_y_es_idempotente()
+    {
+        var (propietaria, configuracion) = await MigrarUnaBase("0.1-provisional");
+        await using var servicio = Levantar(propietaria, configuracion, servicios => servicios.AddSingleton<IRegistroDeSupresiones>(new RegistroDeSupresionesEnMemoria()));
+        await using var alcance = servicio.Alcance();
+        var operacion = alcance.ServiceProvider.GetRequiredService<CuentaDeRevisionDeLaPasarela>();
+        var revision = await operacion.Crear("Staging", correo: null);
+        await operacion.CrearVarias("Staging", 2);
+        // Una cuenta real (con el nombre de una persona) con un correo de la misma forma: no se toca.
+        await operacion.Crear("Staging", "persona-05@example.test");
+        await using (var origen = NpgsqlDataSource.Create(propietaria))
+        {
+            await using var cambio = origen.CreateCommand("UPDATE identidad.usuarios SET nombre = 'Una persona real' WHERE correo = 'persona-05@example.test'");
+            await cambio.ExecuteNonQueryAsync();
+        }
+
+        Assert.Equal(3, await operacion.Purgar("Staging"));
+        Assert.Equal(0, await operacion.Purgar("Production"));
+
+        Assert.Equal(3L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios WHERE cancelada_en IS NOT NULL"));
+        Assert.Equal(1L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios WHERE cancelada_en IS NULL AND nombre = 'Una persona real'"));
+        Assert.Equal(3L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.registros WHERE accion = 'CuentaCancelada'"));
+        Assert.False((await alcance.ServiceProvider.GetRequiredService<IIngreso>().Ingresar(new SolicitudDeIngreso(revision.Correo, revision.Contrasena))).EsExito);
+        // El correo quedó libre: la cuenta de la revisión puede volver a crearse.
+        Assert.False((await operacion.Crear("Staging", correo: null)).ContrasenaRotada);
+        await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Purgar("Development"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-38")]
+    public async Task El_modo_de_consola_valida_la_cantidad_y_las_combinaciones_sin_construir_el_servicio()
+    {
+        foreach (var argumentos in new[] { new[] { "--cantidad", "x" }, ["--cantidad", "3", "--correo", "a@example.test"], ["--purgar", "--retirar"], ["--todas"], ["--purgar", "--correo", "a@example.test"] })
+        {
+            var error = new StringWriter();
+
+            Assert.Equal(1, await ModoCuentaDeRevision.Ejecutar(argumentos, new StringWriter(), error, "Staging"));
+            Assert.Contains("cuenta-de-prueba:", error.ToString(), StringComparison.Ordinal);
+        }
+
+        var enProduccion = new StringWriter();
+        Assert.Equal(1, await ModoCuentaDeRevision.Ejecutar(["--cantidad", "2"], new StringWriter(), enProduccion, "Production"));
+        Assert.Contains("solo existe en Staging", enProduccion.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-39")]
+    public async Task Crear_el_primer_administrador_da_una_contrasena_temporal_y_exige_cambiarla_y_configurar_el_segundo_factor()
+    {
+        var (propietaria, configuracion) = await MigrarUnaBase("0.1-provisional");
+        await using var servicio = Levantar(propietaria, configuracion);
+        await using var alcance = servicio.Alcance();
+        var operacion = alcance.ServiceProvider.GetRequiredService<PrimerAdministradorDeLaInstalacion>();
+
+        var r = await operacion.Crear("Production", "admin.inicial@ejemplo.pe", nombre: null);
+
+        Assert.Equal(ResultadoDelPrimerAdministrador.Creado, r.Resultado);
+        Assert.DoesNotContain(r.ContrasenaTemporal!.Revelar(), r.ToString(), StringComparison.Ordinal);
+        Assert.Equal(1L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios WHERE correo = 'admin.inicial@ejemplo.pe' AND rol = 'administrador-central' AND correo_verificado AND activo AND debe_cambiar"));
+        // La temporal vence a las 24 horas (como la de todo el personal, IDE-23).
+        Assert.Equal(1L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios WHERE correo = 'admin.inicial@ejemplo.pe' AND contrasena_temporal_hasta BETWEEN now() + interval '23 hours' AND now() + interval '25 hours'"));
+        var ingreso = alcance.ServiceProvider.GetRequiredService<IIngreso>();
+        var primero = await ingreso.Ingresar(new SolicitudDeIngreso(r.Correo, r.ContrasenaTemporal));
+        // Sin credencial: primero cambia la contraseña temporal; después, el segundo factor es obligatorio antes de recibir una credencial.
+        Assert.True(primero.EsExito);
+        Assert.Null(primero.Valor.Credencial);
+        Assert.Equal(PasoPendienteDelIngreso.CambiarContrasenaTemporal, primero.Valor.Desafio!.Paso);
+        var nueva = new ValorSecreto("Una-contrasena-nueva-9#xZ" + Guid.NewGuid().ToString("N")[..6]);
+        var segundo = await ingreso.CambiarLaContrasenaTemporal(primero.Valor.Desafio.Identificador, nueva);
+        Assert.True(segundo.EsExito, segundo.Error?.Clave);
+        Assert.Null(segundo.Valor.Credencial);
+        Assert.Equal(PasoPendienteDelIngreso.ConfigurarSegundoFactor, segundo.Valor.Desafio!.Paso);
+        Assert.Equal(1L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.registros WHERE accion = 'UsuarioDadoDeAlta'"));
+        var hash = await Consultar<string>(propietaria, "SELECT hash_contrasena FROM identidad.usuarios WHERE correo = 'admin.inicial@ejemplo.pe'");
+        Assert.DoesNotContain(r.ContrasenaTemporal.Revelar(), hash, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-39")]
+    public async Task No_crea_un_segundo_administrador_y_repetirla_no_duplica_y_solo_regenera_la_temporal_si_no_hubo_primer_ingreso()
+    {
+        var (propietaria, configuracion) = await MigrarUnaBase("0.1-provisional");
+        await using var servicio = Levantar(propietaria, configuracion);
+        await using var alcance = servicio.Alcance();
+        var operacion = alcance.ServiceProvider.GetRequiredService<PrimerAdministradorDeLaInstalacion>();
+        var primera = await operacion.Crear("Staging", "admin.inicial@ejemplo.pe", "Ana Pérez");
+
+        var otro = await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Crear("Staging", "otro.admin@ejemplo.pe", nombre: null));
+        var repetida = await operacion.Crear("Staging", "admin.inicial@ejemplo.pe", nombre: null);
+
+        Assert.Contains("Ya existe un administrador central", otro.Message, StringComparison.Ordinal);
+        Assert.Equal(ResultadoDelPrimerAdministrador.ContrasenaTemporalRegenerada, repetida.Resultado);
+        Assert.Equal(primera.UsuarioId, repetida.UsuarioId);
+        Assert.NotEqual(primera.ContrasenaTemporal!.Revelar(), repetida.ContrasenaTemporal!.Revelar());
+        Assert.Equal(1L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios"));
+        var ingreso = alcance.ServiceProvider.GetRequiredService<IIngreso>();
+        Assert.False((await ingreso.Ingresar(new SolicitudDeIngreso(primera.Correo, primera.ContrasenaTemporal))).EsExito);
+        // Tras completar el primer ingreso (cambiar la contraseña), repetir no cambia nada.
+        var desafio = (await ingreso.Ingresar(new SolicitudDeIngreso(repetida.Correo, repetida.ContrasenaTemporal!))).Valor.Desafio!;
+        await ingreso.CambiarLaContrasenaTemporal(desafio.Identificador, new ValorSecreto("Otra-contrasena-nueva-7#kQ" + Guid.NewGuid().ToString("N")[..6]));
+        var tercera = await operacion.Crear("Staging", "admin.inicial@ejemplo.pe", nombre: null);
+        Assert.Equal(ResultadoDelPrimerAdministrador.YaExiste, tercera.Resultado);
+        Assert.Null(tercera.ContrasenaTemporal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-39")]
+    public async Task Con_otro_administrador_activo_no_se_regenera_la_temporal_de_uno_que_aun_no_ingreso_ni_se_audita()
+    {
+        var (propietaria, configuracion) = await MigrarUnaBase("0.1-provisional");
+        await using var servicio = Levantar(propietaria, configuracion);
+        await using var alcance = servicio.Alcance();
+        var operacion = alcance.ServiceProvider.GetRequiredService<PrimerAdministradorDeLaInstalacion>();
+        var primero = await operacion.Crear("Staging", "admin.inicial@ejemplo.pe", nombre: null);
+        // Otro administrador central dado de alta después por la administración, que aún no ingresó.
+        await using (var origen = NpgsqlDataSource.Create(propietaria))
+        {
+            await using var alta = origen.CreateCommand("INSERT INTO identidad.usuarios (id, nombre, correo, correo_verificado, rol, activo, creada_en, debe_cambiar) VALUES (gen_random_uuid(), 'Otro administrador', 'otro.admin@ejemplo.pe', true, 'administrador-central', true, now(), true)");
+            await alta.ExecuteNonQueryAsync();
+        }
+
+        var hashAntes = await Consultar<string>(propietaria, "SELECT hash_contrasena FROM identidad.usuarios WHERE correo = 'admin.inicial@ejemplo.pe'");
+        var falla = await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Crear("Staging", "admin.inicial@ejemplo.pe", nombre: null));
+        await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Crear("Staging", "otro.admin@ejemplo.pe", nombre: null));
+
+        Assert.Contains("Ya existe otro administrador central", falla.Message, StringComparison.Ordinal);
+        Assert.Equal(hashAntes, await Consultar<string>(propietaria, "SELECT hash_contrasena FROM identidad.usuarios WHERE correo = 'admin.inicial@ejemplo.pe'"));
+        Assert.Equal(1L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.registros WHERE accion = 'UsuarioDadoDeAlta'"));
+        Assert.NotNull(primero.ContrasenaTemporal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-36")]
+    public async Task Retirar_y_despues_purgar_cancela_la_cuenta_ya_retirada_y_libera_su_correo()
+    {
+        var (propietaria, configuracion) = await MigrarUnaBase("0.1-provisional");
+        await using var servicio = Levantar(propietaria, configuracion, servicios => servicios.AddSingleton<IRegistroDeSupresiones>(new RegistroDeSupresionesEnMemoria()));
+        await using var alcance = servicio.Alcance();
+        var operacion = alcance.ServiceProvider.GetRequiredService<CuentaDeRevisionDeLaPasarela>();
+        await operacion.Crear("Staging", correo: null);
+
+        Assert.Equal(1, await operacion.RetirarTodas("Production"));
+        Assert.Equal(1, await operacion.Purgar("Production"));
+
+        Assert.Equal(1L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios WHERE cancelada_en IS NOT NULL"));
+        Assert.False((await operacion.Crear("Staging", correo: null)).ContrasenaRotada);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-38")]
+    public async Task Crear_varias_entrega_cada_contrasena_al_crearla_aunque_una_posterior_falle()
+    {
+        var (propietaria, configuracion) = await MigrarUnaBase("0.1-provisional");
+        await using var servicio = Levantar(propietaria, configuracion);
+        await using var alcance = servicio.Alcance();
+        var operacion = alcance.ServiceProvider.GetRequiredService<CuentaDeRevisionDeLaPasarela>();
+        var entregadas = new List<string>();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => operacion.CrearVarias("Staging", 5, cuenta =>
+        {
+            entregadas.Add(cuenta.Correo);
+            return entregadas.Count == 3 ? throw new InvalidOperationException("falla de prueba") : Task.CompletedTask;
+        }));
+
+        Assert.Equal(["persona-01@example.test", "persona-02@example.test", "persona-03@example.test"], entregadas);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-39")]
+    [InlineData("Development")]
+    [InlineData("Test")]
+    [InlineData("Qa")]
+    public async Task El_primer_administrador_solo_se_crea_en_Staging_y_Production_y_pide_un_correo_valido(string entorno)
+    {
+        var (propietaria, configuracion) = await MigrarUnaBase("0.1-provisional");
+        await using var servicio = Levantar(propietaria, configuracion);
+        await using var alcance = servicio.Alcance();
+        var operacion = alcance.ServiceProvider.GetRequiredService<PrimerAdministradorDeLaInstalacion>();
+
+        await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Crear(entorno, "admin@ejemplo.pe", nombre: null));
+        await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Crear("Production", null, nombre: null));
+        await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Crear("Production", "sin-arroba", nombre: null));
+
+        Assert.Equal(0L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-35")]
+    public async Task Si_no_se_puede_auditar_no_se_crea_el_primer_administrador()
+    {
+        var (propietaria, configuracion) = await MigrarUnaBase("0.1-provisional");
+        await using var servicio = Levantar(propietaria, configuracion, servicios => servicios.AddScoped<BabelHub.Ecommerce.Application.Auditoria.IAuditoria, AuditoriaQueFalla>());
+        await using var alcance = servicio.Alcance();
+
+        await Assert.ThrowsAsync<BabelHub.Ecommerce.Application.Auditoria.AuditoriaNoDisponibleException>(() => alcance.ServiceProvider.GetRequiredService<PrimerAdministradorDeLaInstalacion>().Crear("Production", "admin@ejemplo.pe", nombre: null));
+
+        Assert.Equal(0L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-39")]
+    public async Task El_modo_de_consola_crear_administrador_se_niega_fuera_de_Staging_y_Production_y_valida_sus_opciones()
+    {
+        var error = new StringWriter();
+        var salida = new StringWriter();
+
+        Assert.Equal(1, await ModoCrearAdministrador.Ejecutar(["--correo", "a@ejemplo.pe"], salida, error, "Development"));
+        Assert.Contains("solo existe en Staging y Production", error.ToString(), StringComparison.Ordinal);
+        Assert.Equal(1, await ModoCrearAdministrador.Ejecutar(["--contrasena", "valor-que-no-debe-repetirse"], salida, error, "Production"));
+        Assert.DoesNotContain("valor-que-no-debe-repetirse", error.ToString(), StringComparison.Ordinal);
+        Assert.Equal(string.Empty, salida.ToString());
     }
 
     // ---------- La siembra de los textos legales vigentes (migrar) ----------
