@@ -101,21 +101,27 @@ internal sealed class PagosApiHost : IAsyncDisposable
 
     public DenegacionesEspia Denegaciones { get; } = new();
 
-    public static async Task<PagosApiHost> Crear()
+    /// <param name="pagosSimulados">Compone el aviso «Pagos simulados» (PAG-33) como lo hace el anfitrión con la pasarela simulada.</param>
+    public static async Task<PagosApiHost> Crear(bool pagosSimulados = false)
     {
         var host = new PagosApiHost();
-        await host.Iniciar();
+        await host.Iniciar(pagosSimulados);
         return host;
     }
 
     private AnfitrionWeb _anfitrion = null!;
 
-    private async Task Iniciar()
+    private async Task Iniciar(bool pagosSimulados)
     {
         var actor = new ActorDelFlujo();
         _anfitrion = await AnfitrionWeb.Iniciar(
             servicios =>
             {
+                if (pagosSimulados)
+                {
+                    servicios.AddSingleton(new BabelHub.Ecommerce.Api.Pagos.ModoDePagosDeLaWeb(Simulado: true));
+                }
+
                 servicios.AddSingleton<IActorActual>(actor);
                 servicios.AddSingleton<IEstablecedorDeActor>(actor);
                 servicios.AddSingleton<IPagos>(Pagos);

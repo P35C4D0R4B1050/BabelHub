@@ -122,6 +122,23 @@ public sealed class PagoApiTests : IAsyncLifetime
     // ---------- Mostrar ----------
 
     [Fact]
+    [Trait("Criterio", "AC-PAG-29")]
+    public async Task Con_la_pasarela_simulada_la_pantalla_del_pago_avisa_que_no_se_cobra_nada_y_con_la_real_no()
+    {
+        await using var simulado = await PagosApiHost.Crear(pagosSimulados: true);
+
+        using var conAviso = await simulado.Cliente.SendAsync(simulado.Pedir($"/checkout/pago?pedidoId={Pedido:D}", html: true));
+        using var sinAviso = await _host.Cliente.SendAsync(_host.Pedir($"/checkout/pago?pedidoId={Pedido:D}", html: true));
+
+        var html = WebUtility.HtmlDecode(await conAviso.Content.ReadAsStringAsync());
+        Assert.Contains("Pagos simulados: no se realiza ningún cobro", html, StringComparison.Ordinal);
+        Assert.Contains("ningún medio de pago es real", html, StringComparison.Ordinal);
+        // El aviso va dentro del contenido, antes del formulario de pago.
+        Assert.True(html.IndexOf("data-bh-pagos-simulados", StringComparison.Ordinal) < html.IndexOf("formulario-de-pago", StringComparison.Ordinal));
+        Assert.DoesNotContain("Pagos simulados", await sinAviso.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-PAG-07")]
     public async Task Mostrar_el_pago_con_el_pedidoId_emite_la_clave_y_pinta_el_formulario_sin_conservar_nada()
     {

@@ -31,24 +31,53 @@ public sealed class GuardaYDoblesDePagosTests
 
     [Theory]
     [Trait("Criterio", "AC-PAG-10")]
+    [Trait("Criterio", "AC-PAG-30")]
     [InlineData("Development")]
     [InlineData("Test")]
-    public void El_simulador_se_acepta_en_desarrollo_y_en_pruebas(string entorno)
+    [InlineData("Staging")]
+    [InlineData("staging")]
+    public void El_simulador_se_acepta_en_desarrollo_en_pruebas_y_en_staging(string entorno)
     {
         GuardaDeArranqueDePagos.Exigir(Opciones(entorno: entorno));
+        Assert.True(GuardaDeArranqueDePagos.AdmiteElSimulador(entorno));
     }
 
     [Theory]
     [Trait("Criterio", "AC-PAG-10")]
+    [Trait("Criterio", "AC-PAG-30")]
     [InlineData("Production")]
-    [InlineData("Staging")]
+    [InlineData("production")]
     [InlineData("")]
     [InlineData("Qa")]
+    [InlineData("Staging2")]
     public void El_simulador_se_rechaza_en_produccion_y_en_cualquier_otro_entorno(string entorno)
     {
         var error = Rechaza(Opciones(entorno: entorno));
 
         Assert.Contains("simulador", error.Message, StringComparison.Ordinal);
+        Assert.False(GuardaDeArranqueDePagos.AdmiteElSimulador(entorno));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-30")]
+    public void Staging_nunca_cobra_a_ciegas_sin_pasarela_ni_con_culqi_ni_con_una_llave()
+    {
+        // Sin pasarela declarada o con una desconocida, también en Staging: no hay valor por defecto que cobre.
+        Assert.Contains(GuardaDeArranqueDePagos.VariablePasarela, Rechaza(Opciones(pasarela: null, entorno: "Staging")).Message, StringComparison.Ordinal);
+        Assert.Contains(GuardaDeArranqueDePagos.VariablePasarela, Rechaza(Opciones(pasarela: "stripe", entorno: "Staging")).Message, StringComparison.Ordinal);
+        // Con «culqi», Staging no tiene adaptador real en revisión: rechaza la llave de pruebas y la de producción.
+        Assert.Contains(GuardaDeArranqueDePagos.VariableLlavePrivada, Rechaza(Opciones(pasarela: "culqi", entorno: "Staging", llave: LlaveDePruebas)).Message, StringComparison.Ordinal);
+        Assert.Contains(GuardaDeArranqueDePagos.VariableLlavePrivada, Rechaza(Opciones(pasarela: "culqi", entorno: "Staging", llave: LlaveDeProduccion)).Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-30")]
+    public void Produccion_solo_acepta_la_pasarela_real_con_su_llave_de_produccion()
+    {
+        Assert.Contains("simulador", Rechaza(Opciones(entorno: "Production")).Message, StringComparison.Ordinal);
+        Assert.Contains(GuardaDeArranqueDePagos.VariableLlavePrivada, Rechaza(Opciones(pasarela: "culqi", entorno: "Production", llave: LlaveDePruebas)).Message, StringComparison.Ordinal);
+        Assert.Contains(GuardaDeArranqueDePagos.VariableLlavePrivada, Rechaza(Opciones(pasarela: "culqi", entorno: "Production", llave: null)).Message, StringComparison.Ordinal);
+        GuardaDeArranqueDePagos.Exigir(Opciones(pasarela: "culqi", entorno: "Production", llave: LlaveDeProduccion));
     }
 
     [Theory]
