@@ -1,7 +1,11 @@
 ---
 id: web-informacion-del-comercio
 titulo: Información del comercio, contacto y política de cambios y devoluciones
-estado: Draft
+estado: Planned
+aprobado_por: Claude (delegado por Diego Amiquero)
+aprobado_en: 2026-11-23
+plan_aprobado_por: Claude (delegado por Diego Amiquero)
+plan_aprobado_en: 2026-11-23
 servicio: E-commerce
 prefijo: COM
 origen: [RF25, NN15, RNF25]
@@ -98,8 +102,8 @@ Los datos de contacto son del comercio y la persona responsable decidió (2026-1
 ## 7. Preguntas abiertas
 
 - [x] ¿Qué datos de contacto debe mostrar la tienda y de dónde salen? Resuelto el 2026-11-23 (indicación de la persona responsable al orquestador, motivada por la revisión de la pasarela): teléfono, correo y dirección, leídos de variables de entorno y nunca escritos en el repositorio; sin iconos de redes sociales mientras no existan cuentas reales.
-- [x] ¿La «política de cambios y/o devoluciones» es un texto nuevo o la política de reembolso renombrada? Resuelto el 2026-11-23 (DD-75, registrada en `progress/decisiones-delegadas.md`): se renombra y amplía el texto existente, con el mismo identificador y versión de Identidad, porque un cuarto texto cambiaría los contratos de Identidad, del pago y de las aceptaciones ya guardadas.
-- [x] ¿El comercio acepta cambios directos de un libro por otro? Resuelto el 2026-11-23 (DD-76, registrada en `progress/decisiones-delegadas.md`): el sistema solo implementa devoluciones con reembolso (`ecommerce-devoluciones`); el texto dice que no hay cambios directos y que la persona devuelve el libro y compra el que prefiera.
-- [x] ¿Esta entrega cambia las versiones de los tres textos? Resuelto el 2026-11-23 (DD-77, registrada en `progress/decisiones-delegadas.md`): sí, porque cambian los tres cuerpos; el despliegue fija las versiones nuevas y los clientes las aceptan donde ya se les pide hoy.
-- [x] ¿La compra de solo impresos acepta «Cambios y devoluciones»? Resuelto el 2026-11-23 (DD-78, registrada en `progress/decisiones-delegadas.md`): no cambia; CAR-13 se mantiene.
-- [x] ¿La página de contacto debe verse con textos pendientes? Resuelto el 2026-11-23 (DD-79, registrada en `progress/decisiones-delegadas.md`): no se declara permitida, para no modificar `web-base`; los datos están en el pie, que sí se ve. El horario de atención no se agrega (no se pidió).
+- [x] ¿La «política de cambios y/o devoluciones» es un texto nuevo o la política de reembolso renombrada? Resuelto el 2026-11-23 (DD-75, ratificada por la persona el 2026-11-23 y registrada en `progress/decisiones-delegadas.md`): se renombra y amplía el texto existente, con el mismo identificador y versión de Identidad, porque un cuarto texto cambiaría los contratos de Identidad, del pago y de las aceptaciones ya guardadas.
+- [x] ¿El comercio acepta cambios directos de un libro por otro? Resuelto el 2026-11-23 (DD-76, ratificada por la persona el 2026-11-23 y registrada en `progress/decisiones-delegadas.md`): el sistema solo implementa devoluciones con reembolso (`ecommerce-devoluciones`); el texto dice que no hay cambios directos y que la persona devuelve el libro y compra el que prefiera.
+- [x] ¿Esta entrega cambia las versiones de los tres textos? Resuelto el 2026-11-23 (DD-77, ratificada por la persona el 2026-11-23 y registrada en `progress/decisiones-delegadas.md`): sí, porque cambian los tres cuerpos; el despliegue fija las versiones nuevas y los clientes las aceptan donde ya se les pide hoy.
+- [x] ¿La compra de solo impresos acepta «Cambios y devoluciones»? Resuelto el 2026-11-23 (DD-78, ratificada por la persona el 2026-11-23 y registrada en `progress/decisiones-delegadas.md`): no cambia; CAR-13 se mantiene.
+- [x] ¿La página de contacto debe verse con textos pendientes? Resuelto el 2026-11-23 (DD-79, ratificada por la persona el 2026-11-23 y registrada en `progress/decisiones-delegadas.md`): no se declara permitida, para no modificar `web-base`; los datos están en el pie, que sí se ve. El horario de atención no se agrega (no se pidió).
