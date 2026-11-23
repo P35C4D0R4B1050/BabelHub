@@ -5,6 +5,7 @@
 #   scripts/pruebas-sin-red.sh                  compila y ejecuta las pruebas unitarias de los dos servicios
 #   scripts/pruebas-sin-red.sh <ensamblado>...  ejecuta los ensamblados de pruebas indicados (.dll ya compilados)
 #
+# Las pruebas marcadas [Trait("Entorno", "ConRepositorio")] leen archivos versionados del repositorio (tools/carga-inicial): no caben en este contenedor, que solo monta los binarios, y corren en el paso de cobertura de dotnet test BabelHub.sln.
 # Las pruebas unitarias de cada servicio referencian solo su Dominio y su Aplicación (lo vigila la prueba de arquitectura), así que
 # este contenedor no necesita nada más. La imagen del SDK está fijada por «digest» (PLA-26).
 # Códigos de salida: 0 todas pasan, 1 alguna prueba falla (también por intentar usar la red), 2 error de uso o de ejecución.
@@ -44,7 +45,7 @@ for ensamblado in "${ensamblados[@]}"; do
   docker run --rm --network none \
     -e DOTNET_CLI_HOME=/tmp -e DOTNET_NOLOGO=1 -e DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 -e DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     -v "$montaje:/pruebas:ro" -w /pruebas "$SDK_IMAGE" \
-    dotnet test "/pruebas/$archivo" --nologo --results-directory /tmp/resultados && estado=0 || estado=$?
+    dotnet test "/pruebas/$archivo" --nologo --filter "Entorno!=ConRepositorio" --results-directory /tmp/resultados && estado=0 || estado=$?
   if [[ "$estado" -ne 0 ]]; then
     estado_total=1
   fi

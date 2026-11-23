@@ -10,6 +10,7 @@ namespace BabelHub.Ecommerce.UnitTests.Catalogo.CargaInicial;
 /// Los datos versionados de la carga (T09; CIN-15, CIN-16; AC-CIN-12): el <c>catalogo.csv</c> real del repositorio cumple las reglas del lector y es reproducible por la regla determinista de <c>completar-datos.ps1</c> (FNV-1a de la
 /// semilla fija); y el plan de inventario v1 que escribe el catálogo es el contrato que lee el Inventario (<c>plan-de-referencia.json</c>, el mismo archivo que lee la prueba del Inventario).
 /// </summary>
+[Trait("Entorno", "ConRepositorio")]
 public sealed class DatosVersionadosDeLaCargaTests
 {
     private const string Semilla = "babelhub-carga-inicial-2026-11";

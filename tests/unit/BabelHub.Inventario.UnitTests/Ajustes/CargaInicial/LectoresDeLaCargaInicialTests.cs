@@ -29,6 +29,7 @@ public sealed class LectoresDeLaCargaInicialTests
 
     [Fact]
     [Trait("Criterio", "AC-CIN-08")]
+    [Trait("Entorno", "ConRepositorio")]
     public void El_plan_de_referencia_compartido_con_el_ecommerce_se_lee_completo()
     {
         var texto = File.ReadAllText(Path.Combine(RaizDelRepositorio(), "tools", "carga-inicial", "plan-de-referencia.json"), Encoding.UTF8);
@@ -158,6 +159,7 @@ public sealed class LectoresDeLaCargaInicialTests
 
     [Fact]
     [Trait("Criterio", "AC-CIN-04")]
+    [Trait("Entorno", "ConRepositorio")]
     public void Los_archivos_versionados_del_repositorio_son_validos()
     {
         var carpeta = Path.Combine(RaizDelRepositorio(), "tools", "carga-inicial");
