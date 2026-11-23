@@ -454,3 +454,11 @@ Informe en `progress/R5-reformulacion-a-dos-servicios.md`.
 
 ### Esqueleto técnico
 - Solución `BabelHub.sln` con los proyectos por servicio, proyectos de prueba, prueba de arquitectura e infraestructura local en `infra/`.
+
+## 2026-11-23 — Contacto, descripción del comercio y «Cambios y devoluciones» (spec en Draft)
+
+### Cubierto
+- Spec nueva `web-informacion-del-comercio` (Draft) tras tres rondas de la puerta delegada; DD-75 a DD-79 registradas; borrador de plan y tareas en `progress/borradores/`.
+
+### Pendiente
+- Ratificación de la persona de DD-75 a DD-79 (la puerta no aprobó por ese único Importante procedimental); después, aprobación, plan e implementación (T01 a T13).
