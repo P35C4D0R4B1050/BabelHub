@@ -10,6 +10,7 @@
     string Campo(string nombre, string? guardado) => Model.Valores.ContainsKey(nombre) ? Model.Valor(nombre) : guardado ?? string.Empty;
 }
 <h1 class="font-display text-4xl leading-tight sm:text-5xl">Finalizar compra</h1>
+<vc:bh-aviso-de-pagos-simulados en-contexto="true" />
 
 <ol class="steps my-6 w-full text-xs sm:text-sm" aria-label="Progreso de la compra">
     @foreach (var paso in Model.Pasos)

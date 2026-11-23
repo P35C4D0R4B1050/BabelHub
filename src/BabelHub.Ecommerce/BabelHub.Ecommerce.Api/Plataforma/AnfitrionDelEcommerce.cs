@@ -211,7 +211,7 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
         var host = Capturar(extra, () => OpcionesDelHostWeb.Leer(configuracion, esProduccion));
         var sesiones = host is null ? null : Capturar(extra, () => ConfiguracionDeSesionesWeb.Leer(configuracion, host.Host == HostWeb.Tienda ? HostDeSesion.Tienda : HostDeSesion.Gestion));
         var verificacion = Capturar(extra, () => new OpcionesDeVerificacionWeb(configuracion["Seguridad:Turnstile:ClaveDeSitio"] ?? string.Empty));
-        // Pagos: la pasarela se declara siempre (el simulador solo vale en Development y Test; «culqi» aún no tiene adaptador) y la clave de los intentos es un secreto; el resto lo valida su guarda de arranque nombrando la variable.
+        // Pagos: la pasarela se declara siempre (el simulador solo vale en Development, Test y Staging; «culqi» aún no tiene adaptador) y la clave de los intentos es un secreto; el resto lo valida su guarda de arranque nombrando la variable.
         _ = lector.Obligatorio("Pagos:Pasarela");
         if (lector.Obligatorio("Pagos:ClaveDeIntentos") is { } claveDeIntentos)
         {
@@ -355,7 +355,8 @@ public static class AnfitrionDelEcommerce
     public static OpcionesDelAnfitrionDelEcommerce AgregarEcommerce(this WebApplicationBuilder builder, ModoDeArranque modo)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        var esProduccion = builder.Environment.IsProduction();
+        // Producción y Staging se endurecen igual (PAG-34): lo único que Staging afloja es el cobro, con la pasarela simulada.
+        var esProduccion = builder.Environment.EsDeTipoProduccion();
         var soloEnModoNormal = modo == ModoDeArranque.Normal;
         var opciones = OpcionesDelAnfitrionDelEcommerce.Leer(builder.Configuration, esProduccion, soloEnModoNormal);
         var servicios = builder.Services;
@@ -459,7 +460,9 @@ public static class AnfitrionDelEcommerce
         servicios.AgregarTrabajosDeEnviosEnLaApi(soloEnModoNormal);
         // Los dos adaptadores hacia un proveedor declaran su estado real (leído de las mismas opciones con las que se compuso, no de una suposición aparte): ExigirCoherencia lo comprueba en el ensayo y al restaurar.
         servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDeLaInstancia("pasarela-de-pago", esNulo: opcionesDePagos.PasarelaEsNula));
-        servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDeLaInstancia("operador-logistico", esNulo: GuardaDeArranqueDeEnvios.Exigir(opcionesDeEnvios) == GuardaDeArranqueDeEnvios.Nulo));
+        // El aviso «Pagos simulados» (PAG-33) sale de las mismas opciones con las que se compuso la pasarela: nunca dice una cosa y hace otra.
+        servicios.AddSingleton(new ModoDePagosDeLaWeb(Simulado: opcionesDePagos is { Pasarela: GuardaDeArranqueDePagos.Simulador, PasarelaEsNula: false }));
+        servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDeLaInstancia(ArranqueSeguro.OperadorLogistico, esNulo: GuardaDeArranqueDeEnvios.Exigir(opcionesDeEnvios) == GuardaDeArranqueDeEnvios.Nulo));
         servicios.AgregarReclamaciones();
         servicios.AgregarTrabajosDeReclamacionesEnLaApi(soloEnModoNormal);
         servicios.AgregarPedidos(esProduccion: false);
@@ -484,6 +487,12 @@ public static class AnfitrionDelEcommerce
     {
         ArgumentNullException.ThrowIfNull(app);
         app.UseForwardedHeaders();
+        // Detrás de Cloudflare, lo que el borde declara HTTP se redirige a HTTPS aunque la regla del borde no esté activa; en Development y Test no (los recorridos locales van por HTTP).
+        if (app.Environment.EsDeTipoProduccion())
+        {
+            app.UsarRedireccionAHttps();
+        }
+
         app.UsarCabecerasDeSeguridad();
         app.UsarCabecerasDelIndiceInfinito();
         app.UsarManejoDeErrores();

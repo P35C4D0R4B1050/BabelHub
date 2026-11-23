@@ -12,7 +12,7 @@ namespace BabelHub.Ecommerce.Infrastructure.Composicion;
 
 /// <summary>
 /// La composición del módulo Pagos (T27; <c>ecommerce-pagos</c>): primero la guarda de arranque (<see cref="GuardaDeArranqueDePagos"/>: la lista blanca de pasarela y llave por entorno, los secretos y el adaptador nulo en los modos sin llamadas reales), luego los
-/// repositorios de PostgreSQL bajo <c>EjecutarComo(pagos)</c>, la pasarela elegida (el simulador solo en <c>Development</c> y <c>Test</c>, el nulo si el modo no permite llamadas reales; <b>el adaptador de Culqi aún no existe y su elección falla el arranque</b>, T37 y T38),
+/// repositorios de PostgreSQL bajo <c>EjecutarComo(pagos)</c>, la pasarela elegida (el simulador solo en <c>Development</c>, <c>Test</c> y <c>Staging</c>, el nulo si el modo no permite llamadas reales; <b>el adaptador de Culqi aún no existe y su elección falla el arranque</b>, T37 y T38),
 /// las reservas del Inventario sobre <see cref="IClienteDelInventario"/>, los casos de uso por alcance de solicitud, las implementaciones públicas (<see cref="IPagos"/>, <see cref="IReembolsos"/>, <see cref="ILiberacionDeContactoDePago"/>, <see cref="IAvisosDeLaPasarela"/>,
 /// <see cref="ICreadorDeIntencionesDePago"/> y las partes de Pagos de <see cref="IPendientesDeCuenta"/> y <see cref="IAplicadorDeCancelacion"/>) y los trabajos de fondo (los registra <see cref="ComposicionDeLosTrabajosDePagos"/>). Lo que otros módulos aún no entregan (Identidad
 /// para la cuenta del pagador y Pedidos para la confirmación de la compra) se registra al final con sus dobles provisionales, que en producción <b>fallan el arranque</b>. Necesita ya registrados: <see cref="IUnidadDeTrabajo"/>, <see cref="IConexionDeLaUnidadDeTrabajo"/>,

@@ -35,6 +35,8 @@ else
         }
         @RenderBody()
     </main>
+    @* PAG-33: con la pasarela simulada, el aviso va justo encima del pie de toda página (no dibuja nada con la pasarela real). *@
+    <vc:bh-aviso-de-pagos-simulados />
     @await Html.PartialAsync("_Pie", Model)
     @await RenderSectionAsync("Scripts", required: false)
 </body>
