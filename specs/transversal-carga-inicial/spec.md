@@ -1,7 +1,7 @@
 ---
 id: transversal-carga-inicial
 titulo: Carga inicial del catálogo y del inventario
-estado: Planned
+estado: InProgress
 servicio: Transversal
 prefijo: CIN
 origen: [RF10, RF17, RF24, RNF05, RNF08, RNF16]

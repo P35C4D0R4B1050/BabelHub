@@ -1,6 +1,6 @@
 ---
 spec: ecommerce-catalogo
-fecha: 2026-11-21
+fecha: 2026-11-23
 ---
 
 # Verificación — Catálogo
@@ -83,3 +83,7 @@ Todas las tareas de `tasks.md` figuran marcadas. Primero lo que impide converger
 ## 4. Conclusión
 
 **Converge.** Los 23 requisitos tienen prueba que falla si se rompe la regla: CAT-12 (`AgregarAlCarritoConElInventarioCaidoTests`: el catálogo dice «no se puede confirmar» y agregar al carrito sigue permitido), CAT-18 (`BajaDeEdicionConElCarritoRealTests`) y CAT-22 (el historial muestra el nombre de quien registró el ingreso, resuelto por Identidad; la suma en la fuente de recepción es del Inventario, AJU-13). Quedan solo Menores que no cambian ningún estado: D-04 (los E2E de AC-CAT-07, AC-CAT-17 y de la administración se omiten sin sus variables `E2E_*` y falta registrar el `ui-review` visual de la ficha y la administración), D-05 (el ISBN de AC-CAT-02 es inválido en la spec: la persona responsable la corrige y vuelve a aprobarla) y D-07 (informativo). Pasar la spec a Done lo decide quien cierra la verificación.
+
+## 5. Enmienda del 2026-11-23: descripción opcional de la obra (CAT-01, CAT-14, CAT-24, CAT-25, AC-CAT-20; DD-71)
+
+Resultado: **Converge.** T29 a T33 hechas (`tasks.md`). Evidencia: `dotnet build BabelHub.sln -warnaserror` sin advertencias; unitarias del E-commerce correctas (incluidas las de `DescripcionDeObra` y de `RegistrarObra`/`EditarObra`); arquitectura 261 correctas; integración con PostgreSQL y almacén real del catálogo y de la web (`DescripcionDeLaObraEnLaFichaTests` y las clases de `Catalogo`: 600 válido, 601 rechazado, control rechazado, `<script>` y `&lt;` sin transformar, edición, quitar la descripción, encargado rechazado con acceso denegado, GRANT de la columna, migración idempotente y `CHECK`, la ficha con y sin descripción, una digital que no se ofrece sin precio); la carga real de 40 obras mostró la descripción en la ficha (captura en el entorno local). Reservas: no se corrió Playwright ni `ui-review`; el Menor AM13 (el Asistente) sigue abierto en `progress/hallazgos.md`.

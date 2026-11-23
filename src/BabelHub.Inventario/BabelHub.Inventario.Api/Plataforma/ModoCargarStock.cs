@@ -129,7 +129,12 @@ public static class ModoCargarStock
             await error.WriteLineAsync("cargar-stock: el arranque de la orden fue rechazado (modo o adaptadores incoherentes).").ConfigureAwait(false);
             return 1;
         }
-        catch (Exception e) when (e is not OperationCanceledException)
+        catch (OperationCanceledException)
+        {
+            await error.WriteLineAsync("cargar-stock: la orden fue cancelada; repítela, lo ya cargado no se duplica.").ConfigureAwait(false);
+            return 1;
+        }
+        catch (Exception e)
         {
             // Solo el tipo y el SQLSTATE: el mensaje de las bibliotecas puede traer cadenas de conexión, endpoints o nombres de objetos (CIN-20).
             var codigo = e is Npgsql.PostgresException pg ? " (SQLSTATE " + pg.SqlState + ")" : string.Empty;

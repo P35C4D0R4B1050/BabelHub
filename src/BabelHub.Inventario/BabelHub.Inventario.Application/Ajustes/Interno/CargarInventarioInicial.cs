@@ -27,7 +27,7 @@ internal sealed class RegistrarCorridaDeCargaInicial(AutorizadorDeAjustes autori
                 Detalle = new Dictionary<string, string?>
                 {
                     ["corridaId"] = entrada.CorridaId.ToString("D"),
-                    ["huellaSha256"] = entrada.HuellaSha256,
+                    ["huellaSha256"] = entrada.HuellaSha256.Length > 16 ? entrada.HuellaSha256[..16] : entrada.HuellaSha256, // AUD-06 redacta un hexadecimal de 64: se guardan los primeros 16
                     ["cargadas"] = entrada.Cargadas.ToString(CultureInfo.InvariantCulture),
                     ["yaCargadas"] = entrada.YaCargadas.ToString(CultureInfo.InvariantCulture),
                     ["rechazadas"] = entrada.Rechazadas.ToString(CultureInfo.InvariantCulture),

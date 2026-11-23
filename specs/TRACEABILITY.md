@@ -43,7 +43,7 @@
 | asistente-compra-ia | E-commerce | Planned | 20 | 19 | ecommerce-catalogo, ecommerce-pedidos, identidad-seguridad, transversal-seguridad |
 | ecommerce-biblioteca-digital | E-commerce | Done | 29 | 26 | ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-pagos, identidad-seguridad, transversal-auditoria, transversal-seguridad |
 | ecommerce-carrito-checkout | E-commerce | Done | 38 | 33 | ecommerce-catalogo, inventario-seleccion-fuente, identidad-seguridad, transversal-seguridad |
-| ecommerce-catalogo | E-commerce | Planned | 25 | 20 | inventario-fuentes, inventario-ajustes, transversal-auditoria, transversal-seguridad |
+| ecommerce-catalogo | E-commerce | Done | 25 | 20 | inventario-fuentes, inventario-ajustes, transversal-auditoria, transversal-seguridad |
 | ecommerce-devoluciones | E-commerce | Done | 31 | 32 | ecommerce-pedidos, ecommerce-pagos, ecommerce-biblioteca-digital, inventario-ajustes, transversal-auditoria, transversal-notificaciones, identidad-seguridad, transversal-seguridad |
 | ecommerce-envios | E-commerce | InProgress | 18 | 18 | ecommerce-pedidos, inventario-seleccion-fuente, identidad-seguridad, transversal-notificaciones, transversal-auditoria, transversal-seguridad |
 | ecommerce-libro-reclamaciones | E-commerce | Done | 34 | 31 | identidad-seguridad, transversal-notificaciones, transversal-auditoria, transversal-seguridad |
@@ -55,7 +55,7 @@
 | inventario-seleccion-fuente | Inventario | Done | 40 | 41 | inventario-fuentes, identidad-seguridad, transversal-auditoria, transversal-seguridad |
 | inventario-traslados | Inventario | Done | 23 | 24 | inventario-fuentes, inventario-seleccion-fuente, identidad-seguridad, transversal-auditoria, transversal-notificaciones |
 | transversal-auditoria | Transversal | Planned | 46 | 34 | — |
-| transversal-carga-inicial | Transversal | Planned | 20 | 13 | ecommerce-catalogo, inventario-fuentes, inventario-ajustes, transversal-plataforma, transversal-auditoria, transversal-seguridad |
+| transversal-carga-inicial | Transversal | InProgress | 20 | 13 | ecommerce-catalogo, inventario-fuentes, inventario-ajustes, transversal-plataforma, transversal-auditoria, transversal-seguridad |
 | transversal-notificaciones | Transversal | Planned | 16 | 16 | identidad-seguridad, transversal-seguridad, transversal-auditoria |
 | transversal-plataforma | Transversal | InProgress | 42 | 37 | — |
 | transversal-seguridad | Transversal | InProgress | 32 | 29 | transversal-auditoria |

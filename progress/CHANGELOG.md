@@ -2,6 +2,13 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-23 — Catálogo inicial y carga inicial (catálogo e inventario)
+
+### Cubierto
+- Descripción opcional de la obra (`ecommerce-catalogo` T29 a T33, DD-71): spec reaprobada y en `Done`.
+- Spec `transversal-carga-inicial` (DD-70, DD-72 a DD-74): órdenes `cargar-catalogo` (E-commerce) y `cargar-stock` (Inventario), 40 obras con portada, descripción, precio y stock por sucursal en `tools/carga-inicial/`; guía de despliegue §14b. Probadas de punta a punta contra un entorno local real.
+- Pendiente: T08 parcial (guardias de credencial), `ui-review`, la carga completa con `--esperar` y la ratificación de DD-70 a DD-74.
+
 ## 2026-11-23 — Preparación del primer despliegue en Oracle
 
 ### Cubierto

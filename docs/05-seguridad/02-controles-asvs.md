@@ -65,7 +65,7 @@ Traduce el **OWASP Application Security Verification Standard 5.0** a controles 
 | :--- | :--- | :---: | :--- | :--- | :---: |
 | **CTL-24** | El alcance por sucursal se comprueba en la Aplicación de cada caso de uso, no solo en el controlador. | L1 | RNF05, AUD-05 | Pruebas unitarias y de integración | Especificado |
 | **CTL-25** | Un recurso ajeno responde igual que uno inexistente cuando revelar su existencia sería una fuga. | L2 | Plan de cada servicio | Pruebas de integración | Pendiente |
-| **CTL-26** | Las funciones administrativas exigen rol y segundo factor. | L1 | IDE-20, WEB-02 | Pruebas de integración | Especificado |
+| **CTL-26** | Las funciones administrativas exigen rol y segundo factor. | L1 | IDE-20, WEB-02 | Pruebas de integración | Especificado. **Excepción acotada (DD-72, `transversal-carga-inicial`):** las órdenes de operación `cargar-catalogo` y `cargar-stock` actúan con la identidad de operación «carga inicial» (rol de administración central, sin sesión ni segundo factor); solo la construyen esas dos órdenes, que exigen el acceso a las cuentas de base del servicio, y las Api la rechazan si llega en una credencial. |
 
 ## 8. Criptografía y comunicación segura
 

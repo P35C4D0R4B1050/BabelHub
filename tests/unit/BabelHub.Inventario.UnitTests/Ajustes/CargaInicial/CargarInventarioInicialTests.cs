@@ -173,7 +173,7 @@ public sealed class CargarInventarioInicialTests
         var registro = Assert.Single(entorno.Auditoria.Solicitudes);
         Assert.Equal(AccionesAuditables.CargaInicialEjecutada, registro.Accion);
         Assert.Equal(resultado.Valor.CorridaId.ToString("D"), registro.Detalle["corridaId"]);
-        Assert.Equal(resultado.Valor.HuellaDelPlan, registro.Detalle["huellaSha256"]);
+        Assert.Equal(resultado.Valor.HuellaDelPlan[..16], registro.Detalle["huellaSha256"]);
         Assert.Equal("4", registro.Detalle["cargadas"]);
         Assert.Equal("0", registro.Detalle["rechazadas"]);
         Assert.False(resultado.Valor.RegistroDeLaCorridaFallo);
