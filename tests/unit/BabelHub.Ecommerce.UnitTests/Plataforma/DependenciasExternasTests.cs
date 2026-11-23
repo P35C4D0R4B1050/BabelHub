@@ -132,9 +132,17 @@ public sealed class DependenciasExternasTests
             return new Cotizacion(3m, "PEN");
         }
 
+        // La dependencia normal nunca responde por sí sola: solo termina cuando su límite la cancela. Así la prueba no depende de cuál de dos temporizadores
+        // cercanos (80 ms contra 200 ms) se dispare primero en un ejecutor cargado, que es lo que la hacía fallar de forma intermitente en el CI.
+        static async Task<Cotizacion> NuncaResponde(CancellationToken token)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            return new Cotizacion(3m, "PEN");
+        }
+
         // Margen amplio para el proveedor: en un ejecutor lento 400 ms no alcanzaban (falló en el CI).
         var dependencias = new DependenciasExternas(new OpcionesDeDependencias(TimeSpan.FromMilliseconds(80), TimeSpan.FromSeconds(5)));
-        var normal = await dependencias.Consultar("cotizador", ClaseDeDependencia.Normal, Responde, _validador);
+        var normal = await dependencias.Consultar("cotizador", ClaseDeDependencia.Normal, NuncaResponde, _validador);
         var llm = await dependencias.Consultar("llm", ClaseDeDependencia.ProveedorDeLlm, Responde, _validador);
 
         Assert.Equal(MotivoDeSinRespuesta.TiempoAgotado, normal.Motivo);
