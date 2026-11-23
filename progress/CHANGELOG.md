@@ -2,6 +2,13 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-23 — Entorno `Staging` para la revisión de Culqi (carril `staging-culqi`)
+
+### Cubierto
+- `ecommerce-pagos` reabierta (PAG-33 a PAG-41, AC-PAG-29 a AC-PAG-36, D25; DD-65 a DD-69): `Staging` de tipo producción con el simulador de pagos y su aviso «Pagos simulados: no se realiza ningún cobro», `Production` sigue fallando cerrado; cuenta de prueba por consola (`cuenta-de-prueba`, `--retirar`), siembra de textos legales vigentes en `migrar`, HTTPS detrás de Cloudflare (redirección `308`, HSTS, sin contenido mixto), entorno y pasarela desde el archivo de secretos, datos de contacto por `BABELHUB__Contacto__*`.
+- Guía del primer despliegue con `babel-hub.shop`, el flujo de dos fases con Culqi y la lista de requisitos. Comprobado con las imágenes reales (ensayo local).
+- Abiertos: primer administrador inexistente, operador logístico real para `Production`, `n8n` en el ensayo. Sin push.
+
 ## 2026-11-23 — Preparación del primer despliegue en Oracle
 
 ### Cubierto

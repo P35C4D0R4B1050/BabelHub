@@ -252,6 +252,12 @@ Lo siguiente se acepta de forma consciente y debe figurar en el informe y en la 
 
 Complementos: firewall del sistema operativo con las mismas reglas, secretos como variables de entorno fuera del repositorio y SSH sin contraseña.
 
+### 7.1 Entornos del E-commerce y transporte seguro (2026-11-23)
+
+Las VMs corren el E-commerce en uno de dos entornos **de tipo producción**, que se endurecen igual (HTTPS entre servicios, Redis con TLS, correo y almacén reales, hosts permitidos, proxies conocidos): **`Staging`**, para que la pasarela de pago revise la tienda con la pasarela **simulada** (no se cobra y la pantalla lo dice), y **`Production`**, con la pasarela real y su llave de producción (`ecommerce-pagos` PAG-34, D25). Se elige en el archivo de secretos de cada servicio y `scripts/desplegar.sh` comprueba que el entorno y la pasarela sean coherentes; ver `docs/07-proceso-de-desarrollo/08-guia-primer-despliegue.md` §15.1.
+
+Entre el público y la aplicación, **Cloudflare termina TLS** (Universal SSL, Always Use HTTPS, Full strict) y el túnel y Nginx entregan HTTP **dentro** de la red privada: la aplicación toma solo `X-Forwarded-Proto` para ver el esquema real, redirige con `308` lo que el borde declare HTTP (menos la salud), envía HSTS y cookies `Secure` y no pide nada por HTTP (PAG-36). El tráfico **entre servicios** va por HTTPS con la CA privada (DD-55).
+
 ## 8. Sistema operativo
 
 **Decisión (2026-10-16):** **Ubuntu Server LTS mínimo sin entorno gráfico** en las VMs ARM y AMD de Oracle, por ser la imagen oficial para Ampere A1 (misma familia, mismo `apt` y mismo Docker que Debian); en local se puede usar Debian. El criterio se mantiene: instalación mínima y sin interfaz gráfica para ahorrar memoria.

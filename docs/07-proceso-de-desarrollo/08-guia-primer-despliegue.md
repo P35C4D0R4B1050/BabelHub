@@ -10,7 +10,9 @@ Esta guía deja listo **todo lo que es infraestructura**. Pero hay cosas del có
 
 | # | Qué pasa | Por qué | Qué decidir |
 | :--- | :--- | :--- | :--- |
-| **1** | **El servicio E-commerce NO arranca en modo `Production`** y, con él, tampoco la réplica de gestión de VM-INVENTARIO. | `BABELHUB__Pagos__Pasarela=simulador` solo vale en `Development` y `Test`, y `culqi` aún no tiene adaptador (T37 y T38 de `ecommerce-pagos`, a la espera de las llaves de Culqi, B05): el arranque falla a propósito para que nunca se cobre «a ciegas». Se verificó con la imagen real el 2026-11-23. | Implementar T37/T38 de `ecommerce-pagos` con tus llaves de pruebas **antes** del primer arranque real de la tienda (y entonces `sk_live_…`, ver §13); o aceptar que la primera vez solo se despliega la **infraestructura** y el **Inventario**. Los pasos de VM-INVENTARIO y VM-VENTAS te dicen qué esperar. |
+| **1** | **RESUELTO con el entorno `Staging` (2026-11-23).** El E-commerce no arrancaba en `Production` sin el adaptador de Culqi (T37 y T38, a la espera de las llaves, B05): el simulador solo valía en `Development` y `Test`. | Ahora el simulador también vale en **`Staging`**, un entorno que se endurece **igual que `Production`** (HTTPS entre servicios, Redis con TLS, correo y almacén reales, hosts permitidos…) y que solo afloja el cobro: la pantalla dice «Pagos simulados: no se realiza ningún cobro» y a nadie se le cobra. `Production` **sigue fallando cerrado** sin la pasarela real y su llave `sk_live_…`. | Nada que decidir: despliega en **`Staging`** (el generador de secretos lo hace por defecto) para que **Culqi revise la tienda** (§15.1, fase 1) y pasa a `Production` cuando lleguen las llaves (§15.1, fase 2). |
+| **1 ter** | **`Production` tampoco arrancará aunque lleguen las llaves de Culqi** (hallazgo Importante abierto). | `Production` exige también el operador logístico **real** y no existe (DD-22: solo hay simulador). En `Staging` el operador es el nulo: las guías de envío a domicilio responden «no disponible» (falla cerrado; el recojo en sucursal y los libros digitales no se ven afectados). | Decisión de la persona antes de pasar a `Production` (§15.1, fase 2): cuál será el operador o cómo se admite su ausencia. Ver `progress/hallazgos.md`. |
+| **1 bis** | **Falta crear el primer administrador** (hallazgo Importante abierto). | No existe una operación que cree la primera cuenta de administración: sin ella nadie entra a `gestion.<dominio>`, ni carga el catálogo (Culqi exige **al menos 5 productos** con foto, descripción y precio) ni administra pedidos. La cuenta de **cliente** de prueba (§15.1) sí se crea con un comando. | Decisión de la persona con el carril que corresponda (un modo de consola análogo a `cuenta-de-prueba`, con contraseña temporal y el segundo factor real). **Hasta entonces la revisión de Culqi no puede completarse** con productos reales: el resto del despliegue sí funciona. Ver `progress/hallazgos.md`. |
 | **2** | PostgreSQL va **sin TLS** entre VM-VENTAS y VM-INVENTARIO. | La imagen no tiene TLS configurado todavía; la contraseña de la cuenta viaja por la red privada de Oracle (aislada de Internet). | Riesgo residual registrado (`progress/hallazgos.md`). Aceptable para pruebas; resolver antes de operar con clientes reales. |
 | **3** | Los clientes de seguridad exigen **HTTPS entre servicios** en producción. | Es una regla de la aplicación (SEG-15). | Ya está resuelto aquí: `scripts/generar-secretos.sh` crea una **CA privada** y los certificados de cada VM, y los Compose abren el puerto 8443. No hay que hacer nada, solo entenderlo (reglas de red en el paso 3). |
 
@@ -53,6 +55,18 @@ Internet ──► Cloudflare (DNS, TLS, WAF, Access) ──túnel saliente─�
 | **VM-BORDE** | AMD `VM.Standard.E2.1.Micro` | `10.0.0.30` | nginx y cloudflared |
 | **VM-AUX** | AMD `VM.Standard.E2.1.Micro` | `10.0.0.40` | Salto SSH y vigilancia de respaldos |
 
+### 2.1 Tu dominio: `babel-hub.shop`
+
+El dominio ya está en Cloudflare, con SSL. En esta guía el dominio es **`babel-hub.shop`** y sus nombres son estos:
+
+| Nombre | Para qué | Dónde llega |
+| :--- | :--- | :--- |
+| `babel-hub.shop` (el «apex») | **La tienda**, el nombre canónico que ve el público (y Culqi) | Túnel → Nginx de VM-BORDE → E-commerce (host `tienda`) |
+| `www.babel-hub.shop` | Redirige al apex con una regla de Cloudflare (§13.2); la aplicación también lo acepta | ídem |
+| `gestion.babel-hub.shop` | **La gestión** (sucursales y administración), protegida por Cloudflare Access (§13.4) | Túnel → Nginx → réplica de gestión (host `gestion`) |
+
+Nginx (`infra/nginx/nginx.conf`) ya enruta así: el servidor por defecto atiende la tienda y `server_name gestion.*` la gestión; el generador de secretos escribe los hosts permitidos de cada servicio (`babel-hub.shop,www.babel-hub.shop` y `gestion.babel-hub.shop`) y los de Turnstile. No hay nada que cambiar en los archivos del repositorio por el dominio.
+
 **El orden de la guía** (cada etapa termina con una comprobación; no pases a la siguiente si falla):
 
 1. Ensayo en tu equipo (paso 4) → 2. Publicar las imágenes (paso 5) → 3. Cuenta, red y las 4 VMs de Oracle (pasos 6–7) → 4. Almacén de objetos y secretos (pasos 8–9) → 5. **VM-INVENTARIO** (paso 11) → 6. **VM-VENTAS** (paso 12) → 7. Cloudflare y **VM-BORDE** (paso 13) → 8. **VM-AUX** y respaldos (paso 14) → 9. Después del despliegue (paso 15).
@@ -85,7 +99,7 @@ bash scripts/ensayo-local.sh
 ==> 1/6 Registro local y construcción de las tres imágenes ...
 ==> 3/6 VM-INVENTARIO: PostgreSQL, migraciones, Inventario y réplica de gestión
 migracion: inventario al día (...)
-migracion: ecommerce al día (14 pasos, 3 cuentas)
+migracion: ecommerce al día (15 pasos, 3 cuentas)
 ok postgres
 ok ecommerce-gestion
 ok inventario
@@ -429,9 +443,11 @@ Qué credencial va a qué archivo (§10): `respaldos-escritor` → `postgres.env
 ```bash
 cd ~/BabelHub
 bash scripts/generar-secretos.sh --destino ~/babelhub-secretos \
-  --dominio <tu-dominio.com> \
+  --dominio babel-hub.shop --entorno staging \
   --ip-ventas 10.0.0.10 --ip-inventario 10.0.0.20 --ip-borde 10.0.0.30
 ```
+
+`--entorno staging` (el valor por defecto) deja el E-commerce en **`Staging` con la pasarela simulada** (fase 1 de Culqi, §15.1); `--entorno production` (cuando tengas las llaves) lo deja en `Production` con `culqi` y te pide la llave `sk_live_…`. El dominio es `babel-hub.shop`: la tienda atiende `babel-hub.shop` y `www.babel-hub.shop`, y la gestión `gestion.babel-hub.shop` (§2.1).
 
 **Qué debes ver:** «Listo. Se generaron los secretos de las tres VMs» y «Falta completar N valores «CAMBIAR»». Se crean `inventario/`, `ventas/`, `borde/`, `custodia/` y `PENDIENTES.txt`. Si la carpeta ya existe con archivos, el script **se niega** (no pisa secretos).
 
@@ -458,7 +474,11 @@ nano ~/babelhub-secretos/inventario/ecommerce-gestion.env
 | `…Web__OrigenDelAlmacen` (ventas) | El origen `https://<espacio>.compat.objectstorage.sa-santiago-1.oraclecloud.com` (igual al host del endpoint de `biblioteca-lector`). |
 | `postgres.env`: `RCLONE_CONFIG_ALMACEN_ENDPOINT`, `…ACCESS_KEY_ID`, `…SECRET_ACCESS_KEY` | La credencial `respaldos-escritor` (§9). |
 | `aviso.env` (inventario) | Un correo propio de esa VM para el aviso del espacio reservado: `AUX_SMTP_URL=smtps://smtp.gmail.com:465` (**`smtps://`**, con TLS), usuario, contraseña de aplicación, remitente y destinatario (tú). |
+| `…Contacto__Telefono`, `…Contacto__Correo`, `…Contacto__Direccion` (`ecommerce.env` y `ecommerce-gestion.env`) | **El teléfono, el correo y la dirección de contacto que mostrará la tienda** (Culqi exige contacto visible). Son **datos personales tuyos: nunca los escribas en el repositorio**; solo van aquí. `desplegar.sh` no continúa mientras digan `CAMBIAR`. |
+| `…Pagos__LlavePrivada` | **Solo con `--entorno production`:** tu llave `sk_live_…` de Culqi. En `Staging` **no** lleva llave (el script se niega si la hay). |
 | `cloudflared.env` (ventas y borde) | El token del túnel (paso 13). |
+
+**El entorno y la pasarela (`ASPNETCORE_ENVIRONMENT` y `BABELHUB__Pagos__Pasarela`) ya vienen escritos** por el generador en `ecommerce.env` y `ecommerce-gestion.env` y son lo único que cambia al pasar de `Staging` a `Production` (§15.1, fase 2). `desplegar.sh` se niega si faltan, si no son coherentes (`Staging` con `simulador`; `Production` con `culqi` y una llave `sk_live_…`) o si el entorno no es ninguno de los dos.
 
 Edita con `nano`, guarda con `Ctrl+O`, `Enter`, y sal con `Ctrl+X`. No dejes comillas ni espacios alrededor del `=`.
 
@@ -502,16 +522,16 @@ sudo env \
   IMAGEN_POSTGRES=ghcr.io/<propietario>/babelhub-postgres@sha256:<64> \
   IMAGEN_INVENTARIO=ghcr.io/<propietario>/babelhub-inventario@sha256:<64> \
   IMAGEN_ECOMMERCE=ghcr.io/<propietario>/babelhub-ecommerce@sha256:<64> \
-  scripts/desplegar.sh inventario --sin ecommerce-gestion
+  scripts/desplegar.sh inventario
 ```
 
-(`--sin ecommerce-gestion` mientras exista el bloqueo #1 de §0: la réplica de gestión no arrancaría. Cuando lo resuelvas, repites **sin** `--sin`.)
+(La réplica de gestión del E-commerce corre en **`Staging`**, igual que la tienda: ya arranca sin el adaptador de Culqi, §0. Si prefieres desplegar primero solo PostgreSQL y el Inventario, agrega `--sin ecommerce-gestion`; la migración de la base del E-commerce corre igual, porque la hace el script.)
 
 **Qué debes ver, en este orden:**
 
 1. Descarga de las imágenes (`Pulling…`).
-2. `Migrando las bases (esquemas y roles)...` y líneas `paso: roles`, `paso: plataforma`… hasta `migracion: inventario al día (… pasos, … cuentas)`. (Con la réplica de gestión: también `migracion: ecommerce al día (14 pasos, 3 cuentas)`; si usas `--sin ecommerce-gestion` **la migración del E-commerce igual corre**, porque la hace el script.)
-3. `ok postgres`, `ok inventario`, `ok tarea diaria de respaldo (/etc/cron.d/babelhub-respaldo)` y `VM inventario desplegada y sana.`
+2. `Migrando las bases (esquemas y roles)...` y líneas `paso: roles`, `paso: plataforma`… hasta `migracion: inventario al día (… pasos, … cuentas)` y `migracion: ecommerce al día (15 pasos, 3 cuentas)` (el paso 15 es `textos-vigentes`: siembra, **una sola vez y sin pisar nada**, la versión de los textos legales de `migrador.env`; sin esa fila nadie podría aceptar los textos ni comprar).
+3. `ok postgres`, `ok inventario`, `ok ecommerce-gestion`, `ok tarea diaria de respaldo (/etc/cron.d/babelhub-respaldo)` y `VM inventario desplegada y sana.`
 
 **Si falla:** el script **nombra** cada cosa que falta («falta la clave X en postgres.env», «aviso.env es de … debe ser de root», «CAMBIAR sin completar»). Corrige y vuelve a ejecutar: **es idempotente** (repetirlo no rompe nada). Si dice «no es una imagen publicada con su digest», copiaste mal una línea del paso 5.
 
@@ -554,7 +574,7 @@ sudo env \
 
 (`cloudflared` espera el túnel del paso 13; `evolution-api` espera el número de WhatsApp, §15.3.)
 
-**Qué debes ver:** `ok redis`, `ok redis-contadores`, `ok n8n` y, **si resolviste el bloqueo #1**, `ok ecommerce`. Si el E-commerce no arranca por el bloqueo #1, verás su registro con `culqi … aún no tiene adaptador` o `simulador solo se acepta en Development y Test`: **es lo esperado hoy**; el resto de la VM sí queda sana y puedes validar Redis con TLS:
+**Qué debes ver:** `ok redis`, `ok redis-contadores`, `ok n8n` y `ok ecommerce` (en `Staging`, con la pasarela simulada). Si el E-commerce no arranca, `sudo docker logs --tail 50 babelhub-ventas-ecommerce-1` nombra la variable que falla (nunca su valor): lo típico es un `CAMBIAR` sin completar, `BABELHUB__Pagos__Pasarela` incoherente con el entorno o el simulador en `Production`. Puedes validar Redis con TLS:
 
 ```bash
 sudo docker run --rm --network babelhub-ventas_default -v /etc/babelhub/secretos/redis-contadores-ca.pem:/ca.pem:ro \
@@ -570,6 +590,8 @@ sudo docker run --rm --network babelhub-ventas_default -v /etc/babelhub/secretos
 
 ### 13.1 Pasar el dominio de Spaceship a Cloudflare
 
+> **Tu dominio ya está en Cloudflare, con SSL** (2026-11-23): si ves «Great news! Cloudflare is now protecting your site» en el *Overview* de `babel-hub.shop`, **salta este apartado** y sigue en §13.2.
+
 1. Cloudflare → *Add a domain* → tu dominio → plan **Free** → *Continue*. Importará los registros DNS que ya tengas; revísalos.
 2. Cloudflare te muestra **dos nameservers** (por ejemplo `xxx.ns.cloudflare.com` y `yyy.ns.cloudflare.com`).
 3. **Spaceship** → *Domains* → tu dominio → *Nameservers* → *Custom nameservers* → pega los dos de Cloudflare → guardar. Si tienes **DNSSEC** activo en Spaceship, desactívalo primero (si no, el dominio deja de resolver).
@@ -579,7 +601,27 @@ sudo docker run --rm --network babelhub-ventas_default -v /etc/babelhub/secretos
 
 ### 13.2 TLS y seguridad básica (certificado válido: requisito de Culqi)
 
-En *SSL/TLS*: modo **Full (strict)**; *Edge Certificates*: **Always Use HTTPS = On**, **Minimum TLS Version = 1.2**, **Automatic HTTPS Rewrites = On**. El certificado del borde es **Universal SSL** (gratuito y válido) y se emite solo cuando el dominio está activo. *Security → Settings*: **Bot Fight Mode = On**. *Security → WAF → Managed rules*: activa el conjunto gratuito de Cloudflare. Culqi exige que la URL de sus avisos tenga un certificado válido: lo da este paso; compruébalo después con `curl -sI https://<tu-dominio>/` (sin `-k`) sin errores de certificado.
+En *SSL/TLS → Overview*: modo **Full (strict)**; *SSL/TLS → Edge Certificates*: **Always Use HTTPS = On**, **Minimum TLS Version = 1.2**, **Automatic HTTPS Rewrites = On**. El certificado del borde es **Universal SSL** (gratuito y válido) y se emite solo cuando el dominio está activo. *Security → Settings*: **Bot Fight Mode = On**. *Security → WAF → Managed rules*: activa el conjunto gratuito de Cloudflare. Culqi exige **SSL en todas las URLs** y que la URL de sus avisos tenga un certificado válido: lo da este paso.
+
+**Qué hace cada ajuste y qué hace la aplicación por su cuenta** (revisado en el código el 2026-11-23, con pruebas):
+
+| Pieza | Qué ocurre |
+| :--- | :--- |
+| **Always Use HTTPS** | Cloudflare responde `301` a todo `http://` **antes** de que llegue al túnel: es la regla que ve el público. |
+| **Full (strict)** | Cloudflare exige un certificado válido en el origen. Con un **túnel** la conexión Cloudflare ↔ origen ya va cifrada por el propio túnel, así que este modo no cambia nada en esta arquitectura; se deja en *strict* por si algún día se publica un origen sin túnel. |
+| **Nginx y el túnel** | Reciben HTTPS en Cloudflare y entregan HTTP **dentro** de la red privada; Nginx pasa tal cual la cabecera `X-Forwarded-Proto` que fija Cloudflare (la aplicación nunca ve la conexión del usuario). |
+| **La aplicación** | Toma **solo** `X-Forwarded-Proto` para ver `https` (así las cookies `__Host-…` y el antiforgery funcionan); **redirige con `308` a `https://` lo que el borde declare `http`** aunque Always Use HTTPS no estuviera activo (defensa en profundidad; la salud no se redirige); envía **HSTS** (`max-age=31536000`) en toda respuesta; marca las cookies de sesión `Secure` y `HttpOnly`; y ninguna vista ni recurso propio pide nada por `http://` (no hay contenido mixto; lo verifica una prueba que barre las vistas y los recursos). |
+| **HSTS de Cloudflare** | **No lo actives:** lo envía la aplicación (con dos hosts distintos, un `includeSubDomains` desde Cloudflare afectaría también a la gestión sin que lo decidas). |
+
+**Redirigir `www` al apex** (para que la tienda tenga un solo nombre): *Rules → Redirect Rules → Create rule* → nombre `www-al-apex`; *When incoming requests match*: **Hostname equals `www.babel-hub.shop`**; *Then*: **Dynamic**, expresión `concat("https://babel-hub.shop", http.request.uri.path)`, código **301**, **Preserve query string**. (Se hace en Cloudflare y no en Nginx porque el segundo conector del túnel, en VM-VENTAS, no pasa por Nginx.)
+
+**Compruébalo** desde tu equipo (sin `-k`: no debe haber errores de certificado):
+
+```bash
+curl -sI http://babel-hub.shop/       | head -3     # 301 → https://babel-hub.shop/
+curl -sI https://babel-hub.shop/      | head -5     # 200 y la cabecera strict-transport-security
+curl -sI https://www.babel-hub.shop/  | head -3     # 301 → https://babel-hub.shop/
+```
 
 ### 13.3 El túnel
 
@@ -589,15 +631,15 @@ En *SSL/TLS*: modo **Full (strict)**; *Edge Certificates*: **Always Use HTTPS = 
 
 | Hostname | Servicio |
 | :--- | :--- |
-| `<tu-dominio.com>` | `HTTP` → `nginx:8080` |
-| `www.<tu-dominio.com>` | `HTTP` → `nginx:8080` |
-| `gestion.<tu-dominio.com>` | `HTTP` → `nginx:8080` |
+| `babel-hub.shop` | `HTTP` → `nginx:8080` |
+| `www.babel-hub.shop` | `HTTP` → `nginx:8080` |
+| `gestion.babel-hub.shop` | `HTTP` → `nginx:8080` |
 
 Los tres apuntan a `nginx:8080`: nginx de VM-BORDE enruta por el nombre de host. En VM-VENTAS, el nombre `nginx` apunta directo al E-commerce (así el segundo conector sigue sirviendo la tienda si cae VM-BORDE; sin la gestión). Cloudflare crea solo los registros DNS (`CNAME`) de cada hostname.
 
 ### 13.4 Cloudflare Access para la gestión (obligatorio)
 
-*Zero Trust → Access → Applications → Add an application → Self-hosted*: nombre `gestion`, dominio `gestion.<tu-dominio.com>`. *Policy*: acción **Allow**, regla *Emails* = los correos del personal autorizado. En el plan gratuito el método es el **código de un solo uso por correo**. Para exigir un segundo factor real, añade en *Settings → Authentication* un proveedor de identidad (Google o GitHub) con verificación en dos pasos y haz que la política lo **requiera**. Sin esto, **cualquiera podría llegar a la pantalla de ingreso del personal**.
+*Zero Trust → Access → Applications → Add an application → Self-hosted*: nombre `gestion`, dominio `gestion.babel-hub.shop`. *Policy*: acción **Allow**, regla *Emails* = los correos del personal autorizado. En el plan gratuito el método es el **código de un solo uso por correo**. Para exigir un segundo factor real, añade en *Settings → Authentication* un proveedor de identidad (Google o GitHub) con verificación en dos pasos y haz que la política lo **requiera**. Sin esto, **cualquiera podría llegar a la pantalla de ingreso del personal**.
 
 ### 13.5 Desplegar VM-BORDE y volver a VM-VENTAS
 
@@ -623,9 +665,10 @@ sudo env BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.10 IMAGEN_EC
 **[Tu equipo]**
 
 ```bash
-curl -s  https://<tu-dominio.com>/health              # «ok» (lo responde nginx)
-curl -sI https://<tu-dominio.com>/ | head -3          # «HTTP/2 200» si el E-commerce arrancó (bloqueo #1); sin errores de certificado
-curl -sI https://gestion.<tu-dominio.com>/ | head -3  # redirige a la pantalla de Cloudflare Access (no a la app)
+curl -s  https://babel-hub.shop/health              # «ok» (lo responde nginx)
+curl -sI https://babel-hub.shop/ | head -3          # «HTTP/2 200» (E-commerce en Staging); sin errores de certificado
+curl -sI https://gestion.babel-hub.shop/ | head -3  # redirige a la pantalla de Cloudflare Access (no a la app)
+curl -s  https://babel-hub.shop/ | grep -c "data-bh-pagos-simulados"   # 1 = el aviso «Pagos simulados» de Staging está en la página (el navegador lo muestra encima del pie)
 ```
 
 **Si falla:** `502` = nginx no alcanza al E-commerce (revisa `ufw` y la Security List, §7.1 y §8.1); error de certificado = el dominio aún no está activo en Cloudflare; `1033`/`530` = el túnel no está conectado (token mal copiado).
@@ -649,7 +692,61 @@ VM-AUX vigila **desde fuera** de la VM de datos: si esa VM cae, nadie dentro pue
 
 ### 15.1 Culqi (B05)
 
-Con tus llaves de **pruebas** entras al panel de Culqi. Hoy el adaptador de Culqi **no existe** (bloqueo #1): primero se implementa T37/T38 de `ecommerce-pagos` en el repositorio (otra sesión de trabajo, con tus llaves de pruebas solo como variables de entorno locales). Cuando exista: `BABELHUB__Pagos__Pasarela=culqi` y `BABELHUB__Pagos__LlavePrivada=sk_live_…` **solo** en `ventas/ecommerce.env` y `inventario/ecommerce-gestion.env` (en producción la guarda **solo acepta `sk_live_`**; con `sk_test_` el arranque se niega: para probar con llaves de pruebas hace falta un entorno `Development`/`Test`, nunca la VM de producción). En el panel de Culqi registra el **webhook** `https://<tu-dominio.com>/api/ecommerce/v1/integraciones/pasarela/avisos` (certificado válido: §13.2) y contrasta a mano los reembolsos y cobros dudosos con el panel (`docs/05-seguridad/07-operacion-segura.md` §3.2.1). **Nunca** pegues una llave en el chat ni en el repositorio.
+Culqi se integra en **dos fases**: primero **revisa tu web** (no necesita todavía integrar la pasarela) y, cuando la aprueba y te da las llaves, **se integra el cobro real**. La tienda está lista para las dos.
+
+#### Fase 1: Culqi revisa la web (entorno `Staging`, pagos simulados)
+
+Es lo que despliega esta guía por defecto. En `Staging` la tienda está en Internet con SSL, **no cobra nada** (la pasarela es un simulador) y lo dice en pantalla: «Pagos simulados: no se realiza ningún cobro», en el pie de toda página, en el checkout y en el pago. Los requisitos que Culqi revisa y dónde se cumple cada uno:
+
+| Requisito de Culqi | Dónde está en BabelHub | Qué debes hacer tú |
+| :--- | :--- | :--- |
+| **Contacto visible** (teléfono, correo, dirección) | Los muestra la tienda desde `BABELHUB__Contacto__Telefono`, `…__Correo` y `…__Direccion` (otro carril de trabajo implementa su lectura y su lugar en el pie y en la página de contacto) | Completar esas tres variables en `ecommerce.env` y `ecommerce-gestion.env` (§10.2). **Son datos personales: no van al repositorio.** |
+| **Términos y condiciones** | `/legal/terminos` (enlace en el pie) | Revisar el texto con la persona responsable (hoy es de trabajo). |
+| **Política de cambios y devoluciones** | `/legal/reembolso` («Política de reembolso», enlace en el pie) y el flujo de devoluciones | Confirmar que el texto cubre cambios **y** devoluciones, como lo pide Culqi (otro carril trabaja en los textos legales). |
+| **Libro de Reclamaciones** | `/reclamaciones` (enlace en el pie) | Nada: ya funciona. |
+| **Al menos 5 productos con foto, descripción y precio** | El catálogo público | Cargarlos desde la administración del catálogo. **En `Staging` solo van obras y archivos digitales de MUESTRA, sin valor comercial** (el simulador «cobra» cualquier compra con un código público y entrega accesos con enlace firmado, reservas y avisos reales), **y los pedidos de `Staging` no se atienden**; el aviso «Pagos simulados» debe estar visible. **Hoy falta crear el primer administrador** (§0, fila 1 bis): hasta entonces no hay quien los cargue. |
+| **Carrito o botón «Comprar»** | Ficha de cada obra y `/carrito` → `/checkout` | Nada: ya funciona (con el simulador el último paso no cobra). |
+| **Usuario y contraseña de prueba** para el revisor | El comando `cuenta-de-prueba` (abajo) | Ejecutarlo y pasar el correo y la contraseña a Culqi por un canal seguro (no por el chat público ni el repositorio). |
+| **SSL en todas las URLs** | Cloudflare: Universal SSL + Always Use HTTPS (§13.2); la aplicación redirige y envía HSTS | Verificar con los `curl` de §13.2 y recorrer la tienda en el navegador buscando avisos de «contenido no seguro» (no debe haber). |
+
+**Crear el usuario y la contraseña de prueba** (crear y cambiar la contraseña solo existe en `Staging`; en `Production` el comando se niega, salvo `--retirar`). **[VM-VENTAS]**, con el entorno del propio servicio y **una sola vez** (la contraseña se muestra una vez, por la consola, y no queda en ningún archivo ni registro; si la pierdes, vuelves a ejecutar el comando y se **cambia** la contraseña de esa misma cuenta):
+
+```bash
+cd /opt/babelhub
+sudo env BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.10 \
+  IMAGEN_ECOMMERCE=ghcr.io/<propietario>/babelhub-ecommerce@sha256:<64> \
+  docker compose --project-directory infra -f infra/docker-compose.ventas.yml \
+  run --rm --no-deps --no-TTY ecommerce cuenta-de-prueba
+```
+
+**Qué debes ver:** `cuenta-de-prueba: cuenta creada (correo verificado, textos vigentes aceptados).`, el correo (por defecto `revision@example.test`; con `--correo <dirección>` al final del comando eliges otro, pero solo de un dominio reservado para pruebas: `.test`, `.invalid`, `.example` o `example.com/org/net`) y la **contraseña**. **Anótala ahora** en tu gestor de contraseñas. La cuenta nace con el correo **verificado** y con los textos legales aceptados, de modo que puede ingresar y comprar sin recibir ningún correo. El comando también crea, si faltaba, la **primera clave de firma** de las credenciales (sin ella nadie podría ingresar) y deja todo registrado en la auditoría.
+
+**Si falla**, el mensaje dice qué falta: «solo existe en Staging» (el archivo de secretos dice `Production`), «Faltan los textos legales vigentes» (la migración de VM-INVENTARIO no sembró los textos: revisa `BABELHUB__Migrador__Ecommerce__VersionDeTextos` en `migrador.env` y vuelve a ejecutar `desplegar.sh inventario`) o una variable del servicio sin completar.
+
+**Cómo paga el revisor en `Staging`:** la pantalla de pago pide un «identificador del medio de pago» (con la pasarela real lo genera el script de Culqi; BabelHub nunca ve la tarjeta). Con el simulador, `tok_aprobado` aprueba el pago; `tok_tarjeta_rechazada`, `tok_yape_rechazado` y `tok_fondos_insuficientes` lo rechazan con su motivo. Dile a Culqi que el pago es simulado y que el último paso no cobra.
+
+**El correo de verificación** (para quien se registre solo, como cualquier cliente): el E-commerce ya trae un **transporte SMTP real** (`TransporteDeCorreoSmtp`, con STARTTLS obligatorio). Funciona cuando completas `BABELHUB__Correo__Smtp__Servidor`, `…__Puerto` (587 por defecto), `…__Cuenta`, `…__Credencial` y `…__Remitente` (§10.2: Gmail con contraseña de aplicación). Sin esos datos el servicio **no arranca** en `Staging` ni en `Production` (SMTP es obligatorio), así que el envío real queda configurado de todos modos; lo que no se ha probado de verdad es el envío contra Gmail (queda como pendiente de tu cuenta). Cuotas: Gmail limita unos 500 correos al día, y la cola de BabelHub aplica su propio tope por cuenta y hora. La cuenta de revisión **no depende de ese correo**; las demás personas sí.
+
+#### Fase 2: integrar el cobro real (entorno `Production`)
+
+Cuando Culqi apruebe la web y te dé las llaves:
+
+1. **El adaptador de Culqi no existe todavía** (T37 y T38 de `ecommerce-pagos`): se implementa en el repositorio con tus llaves de **pruebas** solo como variables de entorno locales (otra sesión de trabajo). No se activa hasta que el spike T38 lo valide.
+1 bis. **Retira la cuenta de prueba antes de abrir al público** (es una credencial que conoce un tercero y las dos fases comparten base): en **[VM-VENTAS]**, el mismo comando de la fase 1 con `--retirar` al final (`… ecommerce cuenta-de-prueba --retirar`). Se permite en `Staging` y en `Production`, solo actúa sobre esa cuenta (la desactiva, cierra sus sesiones y lo deja en la auditoría) y repetirlo no cambia nada. Mientras Culqi siga revisando, **no la retires**. Además, antes de operar con clientes decide qué hacer con lo que se «compró» en `Staging` (pedidos, reservas y accesos digitales simulados: el simulador entrega lo que «cobra»).
+2. **Pasar de `Staging` a `Production`** son **tres líneas** en `ecommerce.env` (VM-VENTAS) y las mismas en `ecommerce-gestion.env` (VM-INVENTARIO), en **tu equipo** (carpeta `~/babelhub-secretos`) y copiadas a cada VM como en §10.3:
+
+   ```
+   ASPNETCORE_ENVIRONMENT="Production"
+   BABELHUB__Pagos__Pasarela="culqi"
+   BABELHUB__Pagos__LlavePrivada="sk_live_…"        # añade esta línea: solo en estos dos archivos
+   ```
+
+   (Con `scripts/generar-secretos.sh --entorno production` en una carpeta nueva obtienes los mismos archivos con esas tres claves ya puestas, pero **no** vuelvas a generar todo: rotarías todos los secretos.)
+3. Vuelve a ejecutar `scripts/desplegar.sh ventas` y `scripts/desplegar.sh inventario`. `desplegar.sh` **se niega** si el entorno y la pasarela no son coherentes o si la llave no empieza con `sk_live_`; y la aplicación se niega a arrancar si, aun así, algo no cuadra: **nunca cobra «a ciegas»**. Con `Production` el aviso «Pagos simulados» desaparece solo.
+4. En el panel de Culqi registra el **webhook** `https://babel-hub.shop/api/ecommerce/v1/integraciones/pasarela/avisos` (certificado válido: §13.2) y contrasta a mano los reembolsos y cobros dudosos con el panel (`docs/05-seguridad/07-operacion-segura.md` §3.2.1).
+5. Las llaves **de pruebas** de Culqi (`sk_test_…`) no valen en la VM: la aplicación las rechaza fuera de `Development` y `Test`. **Nunca** pegues una llave en el chat ni en el repositorio.
+
+**Para volver atrás** (por ejemplo, si algo falla en `Production`): vuelve a poner las tres líneas de `Staging` (`ASPNETCORE_ENVIRONMENT="Staging"`, `BABELHUB__Pagos__Pasarela="simulador"` y **borra** la línea de la llave) y repite `desplegar.sh`.
 
 ### 15.2 LLM del asistente (B06)
 
@@ -705,4 +802,5 @@ Son mediciones que cierran decisiones de la spec. Ninguna bloquea el despliegue,
 | Almacén de objetos | `scripts/almacen.sh` e `infra/almacen/` |
 | VM-AUX | `scripts/vm-aux/` e `infra/vm-aux/` |
 | Respaldos y custodia | `infra/respaldos/`, `scripts/comprobar-custodia.sh` |
-| Decisiones de esta guía | `progress/decisiones-delegadas.md` (DD-55 a DD-59) |
+| Decisiones de esta guía | `progress/decisiones-delegadas.md` (DD-55 a DD-59 y, para el entorno `Staging`, la cuenta de prueba, el dominio y HTTPS, DD-65 a DD-69) |
+| Entorno `Staging`, aviso de pagos simulados y cuenta de prueba | `specs/ecommerce-pagos/` (PAG-33 a PAG-41, D25), `EntornoDelServicio`, `ModoCuentaDeRevision` y `CuentaDeRevisionDeLaPasarela` |

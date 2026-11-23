@@ -1,15 +1,15 @@
 ---
 id: ecommerce-pagos
 titulo: Pagos con Yape y tarjeta
-estado: Planned
+estado: Draft
 aprobado_por: Claude (delegado por Diego Amiquero)
 aprobado_en: 2026-11-13
 plan_aprobado_por: Claude (delegado por Diego Amiquero)
 plan_aprobado_en: 2026-11-18
 servicio: E-commerce
 prefijo: PAG
-origen: [RF05, RF07, NN02]
-calidad: [AC01, AC03, AC04, RNF06, RNF07, RNF08, RNF21]
+origen: [RF05, RF07, NN02, NN15]
+calidad: [AC01, AC03, AC04, RNF06, RNF07, RNF08, RNF16, RNF21]
 depende: [ecommerce-carrito-checkout, identidad-seguridad, inventario-seleccion-fuente, transversal-auditoria]
 ---
 
@@ -17,7 +17,7 @@ depende: [ecommerce-carrito-checkout, identidad-seguridad, inventario-seleccion-
 
 ## 1. Propósito
 
-Cobrar el pedido una sola vez y con seguridad, con Yape o tarjeta, sin que el sistema vea ni guarde datos de tarjeta. El cobro confirma las reservas y concede los accesos digitales.
+Cobrar el pedido una sola vez y con seguridad, con Yape o tarjeta, sin que el sistema vea ni guarde datos de tarjeta. El cobro confirma las reservas y concede los accesos digitales. Antes de tener las llaves de la pasarela, permitir que esta revise la tienda en un entorno de revisión donde **nunca se cobra** y así se dice en pantalla (PAG-33 a PAG-41).
 
 ## 2. Alcance
 
@@ -26,6 +26,7 @@ Cobrar el pedido una sola vez y con seguridad, con Yape o tarjeta, sin que el si
 | Cobro único por pedido, idempotencia, rechazos, reintentos y reembolsos solicitados. | El carrito y la reserva previa (`ecommerce-carrito-checkout`). |
 | Confirmación del pedido al aprobarse el pago. | Emisión de comprobantes electrónicos (descartada, proyecto académico). |
 | Conciliación ante respuestas dudosas de la pasarela. | Decidir cuándo corresponde un reembolso (`ecommerce-devoluciones`, `ecommerce-pedidos`). |
+| Entorno de revisión de la tienda por la pasarela: pasarela simulada con su aviso, cuenta de prueba, textos legales vigentes sembrados y transporte HTTPS detrás del borde (PAG-33 a PAG-41). | El adaptador real de la pasarela y sus llaves (T37 y T38, de la persona responsable). |
 
 ## 3. Requisitos (EARS)
 
@@ -63,6 +64,15 @@ Cobrar el pedido una sola vez y con seguridad, con Yape o tarjeta, sin que el si
 | PAG-30 | Ubicuo | El sistema deberá enviar a la pasarela solo el importe, la moneda, una referencia opaca de la intención y el correo del titular si la pasarela lo exige, y nunca el nombre, el teléfono ni la dirección de entrega, ni guardarlos en el registro de intentos ni en los correos. | RF05, RNF08, RNF23 |
 | PAG-31 | No deseado | Si la cuenta del cliente no aceptó la versión vigente de los textos legales (IDE-58), entonces el sistema deberá negarse a iniciar un cobro nuevo e indicar el motivo. | RF05, NN15 |
 | PAG-32 | No deseado | Si el pago se aprueba después de que se consultaron los pendientes de la cuenta para ejecutar su cancelación (IDE-70, IDE-71) y antes de que PAG-26 desvincule su intención, entonces el sistema deberá hacer prevalecer la cancelación: compensarlo como en PAG-20 sin crear el pedido, sin avisar al cliente ni leer su correo, y sin que el reembolso resultante difiera la cancelación en curso. | RF05, RF27, AC01 |
+| PAG-33 | Estado | Mientras la pasarela que cobra es la simulada, el sistema deberá mostrar el aviso «Pagos simulados: no se realiza ningún cobro», con texto e icono, encima del pie de toda página y en las pantallas del checkout y del pago, y no deberá mostrarlo con la pasarela real ni en el modo de ensayo o de restauración. | RF05, RNF06 |
+| PAG-34 | No deseado | Si el servicio arranca sin pasarela, con una pasarela que no existe, en producción con la pasarela simulada o con la real sin su llave de producción, o en el entorno de revisión (`Staging`) con la real, entonces el sistema deberá negarse a arrancar; el simulador solo se admite en desarrollo, pruebas y revisión, y con la pasarela real cada entorno admite solo su propia llave. | RF05, RNF06 |
+| PAG-35 | Evento | Cuando la persona responsable ejecuta por consola la operación de la cuenta de prueba en el entorno de revisión, el sistema deberá crear una cuenta de cliente con el correo verificado y los textos vigentes aceptados, con una contraseña aleatoria que muestra una sola vez y no guarda en ningún archivo ni registro, o, si la cuenta ya existe, cambiar solo su contraseña y cerrar sus sesiones. | RF05, RNF06 |
+| PAG-36 | Ubicuo | El sistema deberá atender como seguras las solicitudes que la red de entrega que lo precede declara seguras y redirigir a la dirección segura las que declara inseguras, salvo las comprobaciones de salud, sin tomar el esquema de ninguna otra fuente; la cabecera de transporte seguro y las cookies seguras son las de WEB-18 y WEB-19. | RNF06, RNF16 |
+| PAG-37 | Evento | Cuando el despliegue migra la base con una versión de textos legales y la base aún no tiene textos vigentes, el sistema deberá sembrar con esa versión los términos, la privacidad y el reembolso vigentes, sin cambiar nunca los que ya existen, y rechazar una versión que no sea una etiqueta de hasta 40 letras, números, puntos, guiones o guiones bajos, nombrando la variable. | RF05, NN15 |
+| PAG-38 | Evento | Cuando la operación de la cuenta de prueba crea la cuenta, cambia su contraseña, la retira o crea la primera clave de firma de las credenciales, el sistema deberá registrarlo en la auditoría en la misma operación y no aplicar el cambio si no puede registrarlo. | RNF08 |
+| PAG-39 | Ubicuo | El entorno de revisión deberá exigir la misma configuración y aplicar las mismas protecciones que producción, salvo la pasarela, que es la simulada, y el operador logístico, que puede faltar mientras no exista uno real (las guías de envío responden que no están disponibles). | RF05, RNF06 |
+| PAG-40 | Evento | Cuando la persona responsable ejecuta por consola el retiro de la cuenta de prueba, en el entorno de revisión o en producción, el sistema deberá desactivar solo esa cuenta, cerrar sus sesiones y registrarlo en la auditoría, y no hacer nada si ya está desactivada. | RF05, RNF08 |
+| PAG-41 | No deseado | Si la operación de la cuenta de prueba se ejecuta en otro entorno, o con un correo de otra cuenta, de una cuenta sin verificar o de un dominio que no es de pruebas, entonces el sistema deberá negarse sin tocar nada. | RF05, RNF06 |
 
 ## 4. Criterios de aceptación
 
@@ -96,6 +106,14 @@ Cobrar el pedido una sola vez y con seguridad, con Yape o tarjeta, sin que el si
 | AC-PAG-26 | PAG-30 | **Dado** una compra a domicilio con nombre, teléfono y dirección de entrega, **cuando** se cobra, **entonces** la pasarela recibe solo importe, moneda, referencia opaca y, si lo exige, el correo; y el registro de intentos y los correos no llevan el contacto de entrega. |
 | AC-PAG-27 | PAG-24 | **Dado** un cliente con un cobro enviado a la pasarela y sin respuesta, **cuando** pide cancelar su cuenta, **entonces** el intento figura como pendiente, la cancelación queda diferida (IDE-27, IDE-71) y no se desvincula ningún dato hasta que se resuelva. |
 | AC-PAG-28 | PAG-32 | **Dado** una cancelación, directa o reconfirmada tras diferirse, cuya consulta de pendientes ya pasó sin pendientes y un pago que se aprueba antes de que PAG-26 desvincule la intención, **cuando** ambos se procesan, **entonces** prevalece la cancelación: no se crea el pedido, se liberan las reservas, se revocan los accesos concedidos, el cobro se reembolsa sin avisar al cliente, el reembolso queda pendiente y reintentable si falla, y la cancelación no se difiere. |
+| AC-PAG-29 | PAG-33 | **Dado** el servicio con la pasarela simulada, **cuando** se abre cualquier página, el checkout y el pago, **entonces** el aviso «Pagos simulados: no se realiza ningún cobro» está visible, con icono y texto, encima del pie de cada página y en el checkout y el pago; y con la pasarela real, o en el modo de ensayo o restauración, no aparece en ninguna. |
+| AC-PAG-30 | PAG-34 | **Dado** cada entorno (`Development`, `Test`, `Staging`, `Production` y uno desconocido) con la pasarela simulada, con la real y sin pasarela, **cuando** arranca el servicio, **entonces** el simulador solo arranca en `Development`, `Test` y `Staging`; la pasarela real solo arranca con la llave de su entorno (de pruebas en `Development` y `Test`, de producción en `Production`) y nunca en `Staging`; y `Production` con el simulador, con otra pasarela o sin ella no arranca. |
+| AC-PAG-31 | PAG-36 | **Dado** una solicitud que la red de entrega declara insegura y otra que la declara segura, **cuando** llegan al servicio, **entonces** la primera se redirige a la misma dirección segura (la comprobación de salud y lo que no pasó por la red de entrega no) y la segunda se atiende como segura, sin que otra cabecera cambie el destino; y ninguna vista ni recurso propio pide nada por un canal inseguro. |
+| AC-PAG-32 | PAG-35, PAG-41 | **Dado** el entorno de revisión con la base migrada y los textos vigentes sembrados, **cuando** la persona responsable ejecuta la operación de la cuenta de prueba, **entonces** existe una cuenta de cliente con el correo verificado y los textos aceptados que ingresa con la contraseña mostrada una sola vez; repetir la operación cambia solo esa contraseña, la anterior deja de servir y las sesiones abiertas se cierran; no toca una cuenta ajena ni una sin verificar con el mismo correo ni acepta un correo de un dominio que no es de pruebas; la contraseña no queda en ninguna tabla ni en el registro del servidor de base de datos; y en cualquier otro entorno se niega sin tocar la base. |
+| AC-PAG-33 | PAG-37 | **Dado** una base recién migrada, **cuando** el despliegue migra con una versión de textos, **entonces** quedan sembrados los tres textos vigentes con esa versión, sin ella no se siembra nada, una migración posterior no cambia lo ya vigente y una versión inválida falla nombrando la variable y sin repetir su valor. |
+| AC-PAG-34 | PAG-39 | **Dado** el servicio en `Staging`, **cuando** arranca, **entonces** arranca con el simulador y el operador logístico ausente, y rechaza, nombrando la variable y no su valor, todo lo que rechaza `Production` (salida al Inventario sin transporte seguro, Redis de contadores sin cifrado, proxies conocidos, correo, almacén de libros y envío de avisos por el servicio real); mientras que en `Production` el operador logístico ausente no arranca. |
+| AC-PAG-35 | PAG-38 | **Dado** la operación de la cuenta de prueba, **cuando** crea la cuenta, la primera clave de firma, cambia la contraseña o retira la cuenta, **entonces** cada cambio queda en la auditoría y, si la auditoría falla, no se crea ni la cuenta ni la clave. |
+| AC-PAG-36 | PAG-40 | **Dado** la cuenta de prueba con una sesión abierta, **cuando** la persona responsable ejecuta el retiro en el entorno de revisión o en producción, **entonces** la cuenta queda desactivada, no ingresa ni renueva su sesión, queda en la auditoría y repetirlo no cambia nada; y en otro entorno, o sobre una cuenta que no es la de prueba, se niega sin tocar nada. |
 
 ## 5. Reglas e invariantes
 
@@ -104,6 +122,9 @@ Cobrar el pedido una sola vez y con seguridad, con Yape o tarjeta, sin que el si
 - Cada intento de cobro lleva su propia clave de idempotencia, generada por el sistema; un reintento con otro medio es un intento nuevo de la misma intención.
 - «Inicio del pago» es el momento en que el cliente pasa al paso de pago y se crea la intención; desde ahí corren los 15 y 30 minutos.
 - Las comisiones de la pasarela no forman parte del precio al cliente.
+- En el entorno de revisión (`Staging`) nunca se cobra: el único medio que admite es la pasarela simulada y la pantalla lo dice (PAG-33, PAG-34); la pasarela real se prueba con sus llaves en `Production`.
+- La contraseña de la cuenta de prueba solo existe en la consola de quien ejecuta la operación (PAG-35): no se escribe en el repositorio, en un archivo de entorno ni en un registro.
+- El entorno de revisión solo debe contener catálogo y archivos digitales de muestra y sus pedidos no se atienden: el simulador entrega lo que «cobra» (accesos digitales, reservas y avisos), por eso el aviso de PAG-33 es visible y los datos de revisión no deben ser comerciales. La cuenta de prueba se retira antes de operar con clientes (PAG-40). La versión de los textos legales sembrada es provisional y lo dice; la persona responsable publica los definitivos (decisiones DD-65 y DD-67 de `progress/decisiones-delegadas.md`).
 
 ## 6. Casos límite y errores
 
