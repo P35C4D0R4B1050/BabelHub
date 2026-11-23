@@ -87,7 +87,7 @@ public sealed class AdministracionDelCatalogoController(
             ediciones.Add(nueva);
         }
 
-        var resultado = await catalogo.RegistrarObra(new RegistrarObraEntrada(cuerpo.Titulo, cuerpo.Autor, cuerpo.Editorial, cuerpo.Categoria, cuerpo.PortadaRef, cuerpo.Ediciones is null ? null : ediciones), cancelacion);
+        var resultado = await catalogo.RegistrarObra(new RegistrarObraEntrada(cuerpo.Titulo, cuerpo.Autor, cuerpo.Editorial, cuerpo.Categoria, cuerpo.PortadaRef, cuerpo.Ediciones is null ? null : ediciones, cuerpo.Descripcion), cancelacion);
         return resultado.EsExito ? Respuesta(StatusCodes.Status201Created, resultado.Valor) : await Falla(resultado.Error!);
     }
 
@@ -104,7 +104,7 @@ public sealed class AdministracionDelCatalogoController(
             return await Falla(CuerpoDelCatalogo.Falta("version"));
         }
 
-        var resultado = await catalogo.EditarObra(new EditarObraEntrada(obraId, version, cuerpo.Titulo, cuerpo.Autor, cuerpo.Editorial, cuerpo.Categoria, cuerpo.PortadaRef), cancelacion);
+        var resultado = await catalogo.EditarObra(new EditarObraEntrada(obraId, version, cuerpo.Titulo, cuerpo.Autor, cuerpo.Editorial, cuerpo.Categoria, cuerpo.PortadaRef, cuerpo.Descripcion), cancelacion);
         return resultado.EsExito ? Respuesta(StatusCodes.Status200OK, resultado.Valor) : await Falla(resultado.Error!);
     }
 

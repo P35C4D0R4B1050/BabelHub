@@ -9,7 +9,7 @@
 
   // Los motivos estables de los errores de campo, en español (docs/06/08). Lo no listado se dice de forma genérica, sin mostrar lo recibido.
   var CAMPOS = {
-    titulo: 'El título', autor: 'El autor', editorial: 'La editorial', categoria: 'La categoría', portadaRef: 'La portada', ediciones: 'Las ediciones', version: 'La versión',
+    titulo: 'El título', autor: 'El autor', editorial: 'La editorial', categoria: 'La categoría', descripcion: 'La descripción', portadaRef: 'La portada', ediciones: 'Las ediciones', version: 'La versión',
     isbn: 'El ISBN', precio: 'El precio', formato: 'El formato', 'licencia.titular': 'El titular', 'licencia.territorios': 'Los territorios', 'licencia.vigenteHasta': 'La vigencia',
     archivoRef: 'El archivo', stockInicial: 'El stock inicial', cantidad: 'La cantidad', referencia: 'La referencia', nota: 'La nota', token: 'El formulario', motivo: 'El motivo', cuerpo: 'Los datos'
   };
@@ -136,7 +136,7 @@
     'alta-obra': async function (form) {
       var portada = await archivoDe(form, 'portada', 'portada');
       if (!portada.ok) { return { ok: false, problema: portada.problema }; }
-      var cuerpo = { titulo: valor(form, 'titulo'), autor: valor(form, 'autor'), editorial: valor(form, 'editorial'), categoria: valor(form, 'categoria'), ediciones: [] };
+      var cuerpo = { titulo: valor(form, 'titulo'), autor: valor(form, 'autor'), editorial: valor(form, 'editorial'), categoria: valor(form, 'categoria'), descripcion: valor(form, 'descripcion'), ediciones: [] };
       if (portada.ref) { cuerpo.portadaRef = portada.ref; }
       var tipos = [];
       if (marcado(form, 'impresa-on')) { tipos.push('impresa'); }
@@ -152,7 +152,7 @@
     'editar-obra': async function (form) {
       var portada = await archivoDe(form, 'portada', 'portada');
       if (!portada.ok) { return { ok: false, problema: portada.problema }; }
-      var cuerpo = { version: Number(form.dataset.version), titulo: valor(form, 'titulo'), autor: valor(form, 'autor'), editorial: valor(form, 'editorial'), categoria: valor(form, 'categoria') };
+      var cuerpo = { version: Number(form.dataset.version), titulo: valor(form, 'titulo'), autor: valor(form, 'autor'), editorial: valor(form, 'editorial'), categoria: valor(form, 'categoria'), descripcion: valor(form, 'descripcion') };
       if (portada.ref) { cuerpo.portadaRef = portada.ref; }
       var r = await enviar('PUT', form.dataset.url, cuerpo);
       return r.ok ? { ok: true, recargar: true } : r;

@@ -27,6 +27,11 @@
             <label class="block text-sm font-semibold" for="o-categoria">Categoría *</label>
             <input id="o-categoria" name="categoria" class="input w-full" maxlength="60" required />
         </div>
+        <div class="sm:col-span-2">
+            <label class="block text-sm font-semibold" for="o-descripcion">Descripción (opcional, hasta 600 caracteres, texto plano)</label>
+            <textarea id="o-descripcion" name="descripcion" class="textarea w-full" rows="4" maxlength="600" aria-describedby="o-descripcion-ayuda"></textarea>
+            <p id="o-descripcion-ayuda" class="mt-1 text-xs text-base-content/70">Una o dos frases que ayuden a elegir el libro. Se muestra en su ficha tal como se escribe: no admite formato.</p>
+        </div>
         <div>
             <label class="block text-sm font-semibold" for="o-portada">Portada (JPEG, PNG o WebP, hasta 2 MB) *</label>
             <input id="o-portada" name="portada" type="file" accept="image/jpeg,image/png,image/webp" class="file-input w-full" required />

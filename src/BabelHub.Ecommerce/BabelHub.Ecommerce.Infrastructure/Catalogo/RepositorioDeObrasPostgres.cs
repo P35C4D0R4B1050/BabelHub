@@ -10,7 +10,7 @@ namespace BabelHub.Ecommerce.Infrastructure.Catalogo;
 /// </summary>
 public sealed class RepositorioDeObrasPostgres(AccesoAlEsquemaDelCatalogo acceso) : IRepositorioDeObras
 {
-    internal const string ColumnasDeObra = "id, titulo, autor, editorial, categoria, portada_clave, portada_huella, portada_tipo, estado, dada_de_baja_en, version, creada_en";
+    internal const string ColumnasDeObra = "id, titulo, autor, editorial, categoria, portada_clave, portada_huella, portada_tipo, estado, dada_de_baja_en, version, creada_en, descripcion";
 
     internal const string ColumnasDeEdicion = """
         e.id, e.tipo, e.isbn_ingresado, e.precio, e.estado, e.motivo_de_retiro, e.retirada_en, e.dada_de_baja_en,
@@ -35,8 +35,8 @@ public sealed class RepositorioDeObrasPostgres(AccesoAlEsquemaDelCatalogo acceso
             {
                 await using (var comando = new NpgsqlCommand(
                     """
-                    INSERT INTO catalogo.obras (id, titulo, autor, editorial, categoria, portada_clave, portada_huella, portada_tipo, estado, dada_de_baja_en, version, creada_en)
-                    VALUES (@id, @titulo, @autor, @editorial, @categoria, @clave, @huella, @tipo, @estado, @baja, @version, @creada)
+                    INSERT INTO catalogo.obras (id, titulo, autor, editorial, categoria, portada_clave, portada_huella, portada_tipo, estado, dada_de_baja_en, version, creada_en, descripcion)
+                    VALUES (@id, @titulo, @autor, @editorial, @categoria, @clave, @huella, @tipo, @estado, @baja, @version, @creada, @descripcion)
                     """,
                     conexion,
                     transaccion))
@@ -69,7 +69,7 @@ public sealed class RepositorioDeObrasPostgres(AccesoAlEsquemaDelCatalogo acceso
                     """
                     UPDATE catalogo.obras
                     SET titulo = @titulo, autor = @autor, editorial = @editorial, categoria = @categoria, portada_clave = @clave, portada_huella = @huella, portada_tipo = @tipo,
-                        estado = @estado, dada_de_baja_en = @baja, version = @version
+                        estado = @estado, dada_de_baja_en = @baja, version = @version, descripcion = @descripcion
                     WHERE id = @id AND version = @leida
                     """,
                     conexion,
@@ -140,7 +140,7 @@ public sealed class RepositorioDeObrasPostgres(AccesoAlEsquemaDelCatalogo acceso
                 TiposDeArchivo.TryDesdeNombre(filas.GetString(7), out var tipoDePortada);
                 cabeceras.Add((
                     filas.GetGuid(0),
-                    new DatosDeObra(filas.GetString(1), filas.GetString(2), filas.GetString(3), filas.GetString(4)),
+                    new DatosDeObra(filas.GetString(1), filas.GetString(2), filas.GetString(3), filas.GetString(4), filas.IsDBNull(12) ? null : filas.GetString(12)),
                     new PortadaDeObra(filas.GetString(5), tipoDePortada, HuellaDeArchivo.Desde(filas.GetFieldValue<byte[]>(6))),
                     filas.GetInt64(10),
                     filas.GetString(8) == "baja" ? EstadoDeObra.Baja : EstadoDeObra.Activa,
@@ -234,6 +234,7 @@ public sealed class RepositorioDeObrasPostgres(AccesoAlEsquemaDelCatalogo acceso
         comando.Parameters.AddWithValue("autor", obra.Autor);
         comando.Parameters.AddWithValue("editorial", obra.Editorial);
         comando.Parameters.AddWithValue("categoria", obra.Categoria);
+        comando.Parameters.AddWithValue("descripcion", (object?)obra.Descripcion ?? DBNull.Value);
         comando.Parameters.AddWithValue("clave", obra.Portada.ClaveDelAlmacen);
         comando.Parameters.AddWithValue("huella", obra.Portada.Huella.ComoBytes());
         comando.Parameters.AddWithValue("tipo", TiposDeArchivo.Nombre(obra.Portada.TipoDetectado));

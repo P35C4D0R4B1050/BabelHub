@@ -60,6 +60,11 @@ else
                     <label class="block text-sm font-semibold" for="o-categoria">Categoría *</label>
                     <input id="o-categoria" name="categoria" class="input w-full" maxlength="60" value="@obra.Categoria" />
                 </div>
+                <div class="sm:col-span-2">
+                    <label class="block text-sm font-semibold" for="o-descripcion">Descripción (opcional, hasta 600 caracteres, texto plano)</label>
+                    <textarea id="o-descripcion" name="descripcion" class="textarea w-full" rows="4" maxlength="600" aria-describedby="o-descripcion-ayuda">@obra.Descripcion</textarea>
+                    <p id="o-descripcion-ayuda" class="mt-1 text-xs text-base-content/70">Se muestra en la ficha tal como se escribe. Vacía, la obra queda sin descripción.</p>
+                </div>
                 <div>
                     <label class="block text-sm font-semibold" for="o-portada">Reemplazar la portada (opcional)</label>
                     <input id="o-portada" name="portada" type="file" accept="image/jpeg,image/png,image/webp" class="file-input w-full" />
