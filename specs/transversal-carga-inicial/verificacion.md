@@ -7,7 +7,7 @@ fecha: 2026-11-23
 
 ## Resultado: Converge con reserva declarada
 
-La reserva y lo que falta para `Done` están en la sección 3.
+La reserva y lo que falta para `Done` están en la sección 3; la spec sigue en `InProgress`.
 
 ## 1. Comprobaciones automáticas
 
@@ -35,6 +35,13 @@ La reserva y lo que falta para `Done` están en la sección 3.
 | CIN-16 | Cumple | `DatosVersionadosDeLaCargaTests` reproduce la regla FNV-1a de `completar-datos.ps1` y compara el archivo |
 | CIN-17, CIN-18, CIN-20 | Cumple | `ModoCargarStockTests`, pruebas del modo `Operacion`, ninguna ruta mapeada; resumen sin cadenas de conexión, claves ni rutas |
 
-## 3. Reserva y hallazgos
+## 3. Reservas y hallazgos
 
-Ver `progress/hallazgos.md` (Menores de la revisión del código) y `progress/ajustes-al-implementar.md` §12.
+**Verificado de verdad (2026-11-23, entorno local aislado: PostgreSQL y almacén S3 propios en Docker, servicios en Development).**
+- `cargar-catalogo` cargó las 40 obras con sus portadas; repetida dio 40 «ya cargadas» y el mismo plan byte a byte.
+- `cargar-stock --esperar` terminó con salida `0`: 6 sucursales y 10 rutas nuevas, 40 ediciones registradas y **120 operaciones de stock** (la recepción y dos sucursales por edición), con el presupuesto de 60 por hora respetado (la segunda tanda esperó la ventana); repetida, no cambia nada.
+- Revisión visual (`ui-review`) de la lista y de la ficha de una obra con descripción y de otra digital, en móvil, tablet y escritorio, en tema claro y oscuro: cada producto muestra portada, precio y disponibilidad real por sucursal, y la ficha su descripción; sin defectos. Capturas en la carpeta de evidencias de la sesión (fuera del repositorio). Defecto hallado y corregido: las portadas genéricas dibujaban el motivo sobre el título (`generar-portadas-genericas.ps1`, commit `aee83fbd`).
+
+**Reserva declarada (la spec queda en `InProgress`).** No se midió: el contraste con una herramienta (solo a ojo sobre las capturas), los estados vacío, error y servicio no disponible de la lista y la ficha, el recorrido con el teclado y el lector de pantalla, la ejecución de `tests/e2e/catalogo/catalogo-publico.spec.ts` con Playwright (las capturas se tomaron con un navegador sin los specs) ni WebKit. Tampoco se probó la carga en las VMs reales de Oracle: los comandos de las órdenes se ensayaron en local, pero no el `docker compose run` de producción de la guía §14b. Pasa a `Done` cuando se cierre esa reserva en el entorno real o la persona la acepte.
+
+**Hallazgos Menores** en `progress/hallazgos.md` (revisión del código) y en `progress/ajustes-al-implementar.md` §12: enlaces duros de las portadas, ruta del plan temporal, `idempotencia-en-conflicto` contada como «ya cargado» y solo EPUB de muestra.

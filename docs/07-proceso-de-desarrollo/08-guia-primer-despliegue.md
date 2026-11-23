@@ -655,7 +655,7 @@ La revisión de la pasarela pide **al menos cinco productos con foto, descripci�
 - **Aviso sobre el ISBN.** El catálogo exige un ISBN con dígito de control y **no se puede cambiar después**. Para no inventar el de una edición real, cada edición lleva un identificador provisional del rango `979-0` (que no se asigna a libros). La tienda lo muestra como ISBN. Si conoces el ISBN real de una edición, escríbelo en la columna `isbn_impreso` de `catalogo.csv` **antes** de cargar.
 - **Aviso sobre las digitales.** Solo las 5 obras genéricas del prototipo tienen edición digital y su archivo es un **EPUB de muestra** que dice que no es el libro: no las vendas con pagos reales sin reemplazar el archivo desde la administración.
 
-**1. Las portadas (solo viajan a VM-VENTAS y de ahí al almacén de objetos; nunca al repositorio).** Las 40 imágenes están en tu equipo (`D:\Trabajo\BHPortadas`; las cinco genéricas se regeneran con `powershell -File tools/carga-inicial/generar-portadas-genericas.ps1 -Salida <carpeta>`). Cada una pesa menos de 2 MB (el tope del catálogo, CAT-16) y se verifica por su contenido al subirla. Cópialas a una carpeta **temporal** de VM-VENTAS, con el mismo salto SSH del paso 3 (§7.4):
+**1. Las portadas (solo viajan a VM-VENTAS y de ahí al almacén de objetos; nunca al repositorio).** Las 40 imágenes están en tu equipo (`D:\Trabajo\BHPortadas`; las cinco genéricas se regeneran en PowerShell de Windows con `powershell -ExecutionPolicy Bypass -File tools/carga-inicial/generar-portadas-genericas.ps1 -Salida <carpeta>`: `-ExecutionPolicy Bypass` solo vale para esa ejecución, porque Windows no deja correr scripts sin firmar por defecto). Cada una pesa menos de 2 MB (el tope del catálogo, CAT-16) y se verifica por su contenido al subirla. Cópialas a una carpeta **temporal** de VM-VENTAS, con el mismo salto SSH del paso 3 (§7.4):
 
 ```bash
 # [Tu equipo, en WSL] (D:\ se ve como /mnt/d)
@@ -700,6 +700,8 @@ sudo env BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.20 IMAGEN_IN
 ```
 
 **Qué debes ver:** las 6 sucursales (la primera, Lima Centro, es la fuente de **recepción**), las 10 rutas, la edición de cada impresa registrada y el stock (Lima y dos sucursales más por edición: unas 120 operaciones). El Inventario limita los ajustes del personal a **60 por hora** (SEG-30) y la orden **no lo rodea**: con `--esperar` espera la siguiente ventana (hasta 2 horas) y continúa, así que **la orden puede tardar más de una hora**; sin `--esperar` se detiene al llegar a 60, escribe a partir de cuándo puede continuar y sale con código `2`: repítela pasado ese plazo. Repetir la orden nunca duplica ni toca una sucursal que ya tiene movimientos de esa edición (código `0` y «ya cargada»). Si se corta una conexión, **vuelve a ejecutarla**.
+
+**Aviso sobre las ráfagas.** Los límites de uso por origen del servicio responden **429** (demasiadas solicitudes) o **503** (el almacén o la base no dan abasto) si lanzas muchas solicitudes seguidas, por ejemplo al comprobar la tienda con un script o al recargar el catálogo sin parar justo después de la carga. No es un fallo de la carga: espera uno o dos minutos y repite. Las órdenes de carga trabajan en serie para no provocarlo.
 
 **5. Comprobar.** En la tienda, `/catalogo` debe mostrar las 40 obras con portada y precio, y la ficha de cualquiera, su descripción y su disponibilidad por sucursal (Lima, Arequipa, Trujillo, Cusco, Piura y Ayacucho según el stock cargado).
 
