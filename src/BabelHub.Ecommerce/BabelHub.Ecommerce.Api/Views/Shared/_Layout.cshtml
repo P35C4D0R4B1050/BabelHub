@@ -37,6 +37,8 @@ else
     </main>
     @* PAG-33: con la pasarela simulada, el aviso va justo encima del pie de toda página (no dibuja nada con la pasarela real). *@
     <vc:bh-aviso-de-pagos-simulados />
+    @* PAG-42: con el operador logístico simulado (no habrá uno real), la tienda lo dice con honestidad, también en producción. *@
+    <vc:bh-aviso-de-envios-simulados />
     @await Html.PartialAsync("_Pie", Model)
     @await RenderSectionAsync("Scripts", required: false)
 </body>

@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BabelHub.Ecommerce.Infrastructure.Envios;
 
-/// <summary>Cómo responde el simulador del operador (solo en <c>Development</c> y <c>Test</c>).</summary>
+/// <summary>Cómo responde el simulador del operador (los modos distintos de <c>Guion</c> solo los usan las pruebas).</summary>
 internal enum ModoDelSimuladorDeOperador
 {
     /// <summary>Crea la guía y la devuelve; repetir la clave devuelve la misma.</summary>
@@ -27,13 +27,12 @@ internal enum ModoDelSimuladorDeOperador
 
 /// <summary>
 /// El operador logístico simulado (D02): <b>idempotente por clave de solicitud</b> (la misma clave devuelve la misma guía, incluso con peticiones simultáneas), con los modos de no respuesta, rechazo, respuesta inválida y
-/// respuesta perdida. Solo existe en <c>Development</c> y <c>Test</c>: la guarda de arranque lo rechaza en cualquier otro entorno. <b>No guarda ni imprime el contacto</b> que recibe.
+/// respuesta perdida. Corre en <c>Development</c>, <c>Test</c>, <c>Staging</c> y <c>Production</c> (DD-88): el número de guía sale de la clave de solicitud, no de un contador del proceso, para no repetirse tras un reinicio ni entre las dos instancias del E-commerce. <b>No guarda ni imprime el contacto</b> que recibe.
 /// </summary>
 internal sealed class SimuladorOperadorLogistico : IOperadorLogistico
 {
     private readonly ConcurrentDictionary<Guid, NumeroDeGuia> _guias = new();
     private readonly ConcurrentDictionary<Guid, bool> _perdidas = new();
-    private int _secuencia;
 
     public string Nombre => "simulador";
 
@@ -55,7 +54,7 @@ internal sealed class SimuladorOperadorLogistico : IOperadorLogistico
                 return Task.FromResult<ResultadoDelOperador>(new ResultadoDelOperador.RespuestaInvalida());
         }
 
-        var numero = _guias.GetOrAdd(claveDeSolicitud, _ => NumeroDeGuia.Crear($"SIM-{Interlocked.Increment(ref _secuencia):D8}"));
+        var numero = _guias.GetOrAdd(claveDeSolicitud, _ => NumeroDeGuia.Crear($"SIM-{claveDeSolicitud:N}"[..16].ToUpperInvariant()));
         if (Modo == ModoDelSimuladorDeOperador.RespuestaPerdida && _perdidas.TryAdd(claveDeSolicitud, true))
         {
             return Task.FromResult<ResultadoDelOperador>(new ResultadoDelOperador.NoDisponible());
@@ -66,8 +65,8 @@ internal sealed class SimuladorOperadorLogistico : IOperadorLogistico
 }
 
 /// <summary>
-/// El operador nulo (D02): <b>falla cerrado</b> con «no disponible». Es el valor por defecto en <c>Normal</c> y en producción mientras no exista un operador real (no impide arrancar el E-commerce) y el único
-/// permitido en los modos <c>Restauracion</c> y <c>Ensayo</c>.
+/// El operador nulo (D02): <b>falla cerrado</b> con «no disponible». Es el único permitido en los modos <c>Restauracion</c> y <c>Ensayo</c>; en un entorno de tipo producción en modo normal no se admite (hay que elegir el simulador, DD-88,
+/// porque no habrá un operador real, DD-22).
 /// </summary>
 internal sealed class NuloOperadorLogistico : IOperadorLogistico
 {
@@ -99,7 +98,7 @@ public sealed class ConfiguracionDeEnviosInvalidaException : InvalidOperationExc
 public sealed record OpcionesDeArranqueDeEnvios(string? Operador, string Entorno, bool SinLlamadasReales);
 
 /// <summary>
-/// La guarda de arranque de Envíos (D02): <c>Envios:Operador</c> vale <c>nulo</c> (por defecto) o <c>simulador</c>. El simulador solo corre en <c>Development</c> y <c>Test</c> (lista permitida, no «no producción») y
+/// La guarda de arranque de Envíos (D02): <c>Envios:Operador</c> vale <c>nulo</c> (por defecto) o <c>simulador</c>. El simulador corre en <c>Development</c>, <c>Test</c>, <c>Staging</c> y <c>Production</c> (lista permitida; DD-22, PAG-42) y
 /// con un modo que prohíbe llamadas reales solo se admite el nulo. <b>Un valor desconocido, o un operador real que todavía no existe, rechaza el arranque</b>: nunca cae en silencio al nulo ni al simulador.
 /// </summary>
 public static class GuardaDeArranqueDeEnvios
@@ -110,7 +109,8 @@ public static class GuardaDeArranqueDeEnvios
 
     public const string Simulador = "simulador";
 
-    private static readonly string[] EntornosDelSimulador = ["Development", "Test"];
+    // No existe un operador logístico real y no lo habrá (DD-22): el simulador también corre en Staging y en Production, donde la tienda lo anuncia (PAG-42).
+    private static readonly string[] EntornosDelSimulador = ["Development", "Test", "Staging", "Production"];
 
     public static string Exigir(OpcionesDeArranqueDeEnvios opciones)
     {
@@ -128,7 +128,7 @@ public static class GuardaDeArranqueDeEnvios
 
                 if (!EntornosDelSimulador.Contains(opciones.Entorno, StringComparer.Ordinal))
                 {
-                    throw new ConfiguracionDeEnviosInvalidaException($"{VariableOperador}: el simulador solo corre en Development y Test, no en {opciones.Entorno}.");
+                    throw new ConfiguracionDeEnviosInvalidaException($"{VariableOperador}: el simulador solo corre en Development, Test, Staging y Production, no en {opciones.Entorno}.");
                 }
 
                 return Simulador;

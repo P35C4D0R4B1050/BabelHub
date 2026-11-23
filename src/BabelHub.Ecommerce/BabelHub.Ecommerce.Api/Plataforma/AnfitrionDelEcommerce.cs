@@ -462,7 +462,10 @@ public static class AnfitrionDelEcommerce
         servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDeLaInstancia("pasarela-de-pago", esNulo: opcionesDePagos.PasarelaEsNula));
         // El aviso «Pagos simulados» (PAG-33) sale de las mismas opciones con las que se compuso la pasarela: nunca dice una cosa y hace otra.
         servicios.AddSingleton(new ModoDePagosDeLaWeb(Simulado: opcionesDePagos is { Pasarela: GuardaDeArranqueDePagos.Simulador, PasarelaEsNula: false }));
-        servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDeLaInstancia(ArranqueSeguro.OperadorLogistico, esNulo: GuardaDeArranqueDeEnvios.Exigir(opcionesDeEnvios) == GuardaDeArranqueDeEnvios.Nulo));
+        var operadorElegido = GuardaDeArranqueDeEnvios.Exigir(opcionesDeEnvios);
+        servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDeLaInstancia("operador-logistico", esNulo: operadorElegido == GuardaDeArranqueDeEnvios.Nulo));
+        // El aviso «Los envíos son simulados» (PAG-42) sale de la misma elección: mientras el operador es el simulador (no hay uno real, DD-22) la tienda lo dice, en cualquier entorno.
+        servicios.AddSingleton(new ModoDeEnviosDeLaWeb(Simulado: operadorElegido == GuardaDeArranqueDeEnvios.Simulador && soloEnModoNormal));
         servicios.AgregarReclamaciones();
         servicios.AgregarTrabajosDeReclamacionesEnLaApi(soloEnModoNormal);
         servicios.AgregarPedidos(esProduccion: false);

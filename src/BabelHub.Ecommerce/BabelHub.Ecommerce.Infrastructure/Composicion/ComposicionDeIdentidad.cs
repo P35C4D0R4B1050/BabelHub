@@ -137,6 +137,8 @@ public static class ComposicionDeIdentidad
         servicios.TryAddScoped<IGeneradorDeClavesDeFirma, Es256GeneradorDeClavesDeFirma>();
         // La cuenta de revisión de la pasarela (PAG-35): una operación de consola de Staging; solo la crea el modo «cuenta-de-prueba», que se niega fuera de Staging.
         servicios.TryAddScoped<CuentaDeRevisionDeLaPasarela>();
+        // La semilla del primer administrador central (PAG-44): modo de consola «crear-administrador», en Staging y Production.
+        servicios.TryAddScoped<PrimerAdministradorDeLaInstalacion>();
         servicios.TryAddSingleton(sp => new CacheDeClavesDeVerificacion(new ClavesPublicadasPorAlcance(sp.GetRequiredService<IServiceScopeFactory>())));
         servicios.TryAddSingleton<IFuenteDeClavesDeVerificacion>(sp => sp.GetRequiredService<CacheDeClavesDeVerificacion>());
         servicios.TryAddSingleton<Es256VerificadorDeCredenciales>(sp => new Es256VerificadorDeCredenciales(sp.GetRequiredService<IFuenteDeClavesDeVerificacion>()));

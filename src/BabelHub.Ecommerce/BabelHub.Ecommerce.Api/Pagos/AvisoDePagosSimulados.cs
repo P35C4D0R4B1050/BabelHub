@@ -15,6 +15,28 @@ public sealed record ModoDePagosDeLaWeb(bool Simulado)
     public const string Explicacion = "Esta tienda está en revisión: puedes recorrer la compra completa, pero ningún medio de pago es real y a nadie se le cobra.";
 }
 
+/// <summary>
+/// Si el operador logístico es el simulado (PAG-42): no existe un operador real y no lo habrá (DD-22), así que la tienda lo dice con honestidad, también en producción. Lo compone el anfitrión con la misma elección con la que
+/// compuso el operador. Es solo presentación.
+/// </summary>
+public sealed record ModoDeEnviosDeLaWeb(bool Simulado)
+{
+    /// <summary>El texto del aviso (PAG-42).</summary>
+    public const string Texto = "Los envíos son simulados: proyecto académico";
+
+    /// <summary>La explicación que acompaña al aviso en el checkout.</summary>
+    public const string Explicacion = "Esta tienda es un proyecto académico: las guías de envío a domicilio las genera un operador simulado y ningún paquete sale realmente.";
+}
+
+/// <summary>
+/// <c>&lt;vc:bh-aviso-de-envios-simulados /&gt;</c>: el aviso «Los envíos son simulados: proyecto académico» (PAG-42), con icono y texto y sin región viva, como el de los pagos. No dibuja nada si el operador no es el simulado.
+/// </summary>
+public sealed class BhAvisoDeEnviosSimuladosViewComponent(ModoDeEnviosDeLaWeb? modo = null) : ViewComponent
+{
+    public IViewComponentResult Invoke(bool enContexto = false) =>
+        modo is { Simulado: true } ? View(new AvisoDePagosSimuladosVista(enContexto)) : Content(string.Empty);
+}
+
 /// <summary>Lo que dibuja <see cref="BhAvisoDePagosSimuladosViewComponent"/>.</summary>
 public sealed record AvisoDePagosSimuladosVista(bool EnContexto);
 

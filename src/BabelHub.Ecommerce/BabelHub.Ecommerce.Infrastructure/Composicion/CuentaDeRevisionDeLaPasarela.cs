@@ -47,6 +47,7 @@ public sealed class CuentaDeRevisionDeLaPasarela(
     BabelHub.Ecommerce.Infrastructure.Identidad.CacheDeClavesDeVerificacion cacheDeVerificacion,
     IAuditoria auditoria,
     RevocacionDeSesiones revocacion,
+    IEjecutorDeLaCancelacion ejecutorDeCancelacion,
     IReloj reloj)
 {
     /// <summary>El único entorno donde existe esta operación.</summary>
@@ -168,6 +169,124 @@ public sealed class CuentaDeRevisionDeLaPasarela(
             cancelacion).ConfigureAwait(false);
     }
 
+    /// <summary>El tope de cuentas de prueba para las personas (PAG-43): una por participante, hasta este número.</summary>
+    public const int MaximoDeCuentasParaPersonas = 20;
+
+    /// <summary>Los correos de las cuentas para las pruebas con personas: <c>persona-01@example.test</c>, <c>persona-02@…</c> (PAG-43). Siempre los mismos, de modo que repetir la operación las rota y retirarlas o purgarlas las encuentra.</summary>
+    public static string CorreoDeLaPersona(int numero) => $"persona-{numero:00}@example.test";
+
+    /// <summary>
+    /// Crea (o rota) varias cuentas de prueba para las pruebas con personas, solo en <c>Staging</c>, con una contraseña aleatoria cada una (PAG-43). Entre 1 y <see cref="MaximoDeCuentasParaPersonas"/>; un número fuera de ese rango se rechaza
+    /// sin tocar nada. Cada cuenta se comporta como la de la revisión (verificada, textos aceptados, auditada, retirable y purgable).
+    /// </summary>
+    public async Task<IReadOnlyList<CuentaDeRevisionCreada>> CrearVarias(string entorno, int cantidad, Func<CuentaDeRevisionCreada, Task>? alCrearCada = null, CancellationToken cancelacion = default)
+    {
+        if (cantidad is < 1 or > MaximoDeCuentasParaPersonas)
+        {
+            throw new CuentaDeRevisionNoPermitidaException($"La cantidad de cuentas de prueba va de 1 a {MaximoDeCuentasParaPersonas}; no se hizo nada.");
+        }
+
+        var creadas = new List<CuentaDeRevisionCreada>();
+        for (var i = 1; i <= cantidad; i++)
+        {
+            var cuenta = await Crear(entorno, CorreoDeLaPersona(i), cancelacion).ConfigureAwait(false);
+            creadas.Add(cuenta);
+            // Cada contraseña se entrega en cuanto existe: si una cuenta posterior falla, las anteriores (ya rotadas) no quedan sin mostrar.
+            if (alCrearCada is not null)
+            {
+                await alCrearCada(cuenta).ConfigureAwait(false);
+            }
+        }
+
+        return creadas;
+    }
+
+    /// <summary>Retira (desactiva) todas las cuentas de prueba: la de la revisión y las de las personas (PAG-40). Devuelve cuántas se retiraron.</summary>
+    public async Task<int> RetirarTodas(string entorno, CancellationToken cancelacion = default)
+    {
+        var retiradas = 0;
+        foreach (var correo in CorreosDeTodasLasCuentas())
+        {
+            if (await RetirarSiExiste(entorno, correo, cancelacion).ConfigureAwait(false))
+            {
+                retiradas++;
+            }
+        }
+
+        return retiradas;
+    }
+
+    /// <summary>
+    /// <b>Purga lo de prueba antes de operar con clientes</b> (PAG-45; Staging y Production): cancela con la cancelación de cuenta de Identidad (IDE-47, IDE-70) cada cuenta de prueba que exista, lo que hace que <b>cada módulo desvincule o anonimice lo suyo
+    /// por su propio contrato</b> (pedidos, pagos, devoluciones, carritos, biblioteca y reclamaciones; los avisos pendientes se cancelan y la baja de las reservas del Inventario la entrega el trabajo de bajas por su contrato REST) y la cuenta queda anonimizada y
+    /// sin ingreso. No toca el catálogo ni a ningún usuario real (solo las cuentas con el nombre y los correos propios) y no hace SQL sobre el esquema de otro módulo ni del otro servicio. <b>Las filas transaccionales se conservan anonimizadas</b> (la cancelación
+    /// no las borra: lo exige la retención legal); la cancelación audita cada cuenta (<c>CuentaCancelada</c>). Idempotente: sin cuentas de prueba no hace nada. Devuelve cuántas se cancelaron.
+    /// </summary>
+    public async Task<int> Purgar(string entorno, CancellationToken cancelacion = default)
+    {
+        ExigirStagingOProduccion(entorno);
+        var canceladas = 0;
+        foreach (var correo in CorreosDeTodasLasCuentas())
+        {
+            var cancelada = await unidad.Ejecutar(
+                async ct =>
+                {
+                    var existente = await cuentas.PorCorreo(correo, ct).ConfigureAwait(false);
+                    if (existente is null)
+                    {
+                        return false;
+                    }
+
+                    var cuenta = await cuentas.PorId(existente.Usuario.Id, paraActualizar: true, ct).ConfigureAwait(false);
+                    if (cuenta is null || cuenta.Nombre != NombreDeLaCuenta || cuenta.Usuario.Rol != RolDeUsuario.Cliente || cuenta.CanceladaEn is not null)
+                    {
+                        return false;
+                    }
+
+                    await ejecutorDeCancelacion.Ejecutar(cuenta, ct).ConfigureAwait(false);
+                    return true;
+                },
+                cancelacion).ConfigureAwait(false);
+            if (cancelada)
+            {
+                canceladas++;
+            }
+        }
+
+        return canceladas;
+    }
+
+    private async Task<bool> RetirarSiExiste(string entorno, string correo, CancellationToken cancelacion)
+    {
+        ExigirStagingOProduccion(entorno);
+        try
+        {
+            return await Retirar(entorno, correo, cancelacion).ConfigureAwait(false);
+        }
+        catch (CuentaDeRevisionNoPermitidaException)
+        {
+            // Una cuenta con ese correo que no es de prueba (de una persona) no se toca: se omite.
+            return false;
+        }
+    }
+
+    private static IEnumerable<string> CorreosDeTodasLasCuentas()
+    {
+        yield return CorreoPorDefecto;
+        for (var i = 1; i <= MaximoDeCuentasParaPersonas; i++)
+        {
+            yield return CorreoDeLaPersona(i);
+        }
+    }
+
+    private static void ExigirStagingOProduccion(string entorno)
+    {
+        if (!string.Equals(entorno, EntornoPermitido, StringComparison.OrdinalIgnoreCase) && !string.Equals(entorno, "Production", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new CuentaDeRevisionNoPermitidaException($"Esta operación solo se hace en {EntornoPermitido} o Production; este entorno es «{entorno}» y no se toca la base.");
+        }
+    }
+
     /// <summary>Es la cuenta que creó esta operación y sigue siendo suya: cliente, con el nombre propio, el correo verificado, activa y no cancelada. Cualquier otra (por ejemplo, un registro sin verificar con el mismo correo) no se toca.</summary>
     private static bool EsLaCuentaDeRevision(CuentaDeIdentidad? cuenta) =>
         cuenta is { CanceladaEn: null, Usuario: { Rol: RolDeUsuario.Cliente, Activo: true, CorreoVerificado: true } } && cuenta.Nombre == NombreDeLaCuenta;
@@ -207,7 +326,7 @@ public sealed class CuentaDeRevisionDeLaPasarela(
     }
 
     /// <summary>Una instalación nueva no tiene clave de firma activa y sin ella nadie ingresa: se crea la primera, con su auditoría (la unicidad de la clave activa la sostiene el índice único parcial de la base: dos operaciones simultáneas no pueden crear dos).</summary>
-    private async Task AsegurarLaPrimeraClaveDeFirma(CancellationToken cancelacion)
+    internal async Task AsegurarLaPrimeraClaveDeFirma(CancellationToken cancelacion)
     {
         var hayActiva = false;
         try
@@ -240,7 +359,7 @@ public sealed class CuentaDeRevisionDeLaPasarela(
         await cacheDeVerificacion.Renovar(cancelacion).ConfigureAwait(false);
     }
 
-    private static string ContrasenaAleatoria()
+    internal static string ContrasenaAleatoria()
     {
         var texto = new char[28];
         for (var i = 0; i < texto.Length; i++)

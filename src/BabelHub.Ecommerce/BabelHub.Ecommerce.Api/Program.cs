@@ -14,6 +14,12 @@ if (args.Length > 0 && args[0] == ModoCuentaDeRevision.Argumento)
     return await ModoCuentaDeRevision.Ejecutar(args[1..], Console.Out, Console.Error);
 }
 
+// El modo crear-administrador (PAG-44): siembra el primer administrador central con una contraseña temporal mostrada una sola vez; en Staging y Production.
+if (args.Length > 0 && args[0] == ModoCrearAdministrador.Argumento)
+{
+    return await ModoCrearAdministrador.Ejecutar(args[1..], Console.Out, Console.Error);
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Las variables BABELHUB__… son la configuración del servicio (SEG-11): BABELHUB__Modo se lee como «Modo».
@@ -37,8 +43,7 @@ builder.Services.AgregarEsquemaDelBorde();
 builder.AgregarEcommerce(modo);
 
 var app = builder.Build();
-// En Staging (PAG-34) el operador logístico puede ser el nulo: todavía no existe uno real (DD-22) y las guías responden «no disponible».
-ArranqueSeguro.ExigirCoherencia(modo, builder.Environment.EsDeTipoProduccion(), app.Services.GetServices<IAdaptadorSaliente>(), admiteOperadorLogisticoNulo: builder.Environment.IsEnvironment(EntornoDelServicio.Staging));
+ArranqueSeguro.ExigirCoherencia(modo, builder.Environment.EsDeTipoProduccion(), app.Services.GetServices<IAdaptadorSaliente>());
 
 if (modo == ModoDeArranque.Restauracion)
 {
