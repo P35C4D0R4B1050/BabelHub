@@ -221,7 +221,7 @@ public sealed class CuentaDeRevisionDeLaPasarelaTests(InstanciaParaMigrar instan
         await using var servicio = Levantar(propietaria, configuracion);
         await using var alcance = servicio.Alcance();
         var operacion = alcance.ServiceProvider.GetRequiredService<CuentaDeRevisionDeLaPasarela>();
-        await operacion.Crear("Staging", correo: "persona@example.test");
+        await operacion.Crear("Staging", correo: "persona-07@example.test");
         await using (var origen = NpgsqlDataSource.Create(propietaria))
         {
             await using var cambio = origen.CreateCommand("UPDATE identidad.usuarios SET nombre = 'Una persona real'");
@@ -229,7 +229,7 @@ public sealed class CuentaDeRevisionDeLaPasarelaTests(InstanciaParaMigrar instan
         }
 
         await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Retirar(entorno, correo: null));
-        await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Retirar("Staging", correo: "persona@example.test"));
+        await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Retirar("Staging", correo: "persona-07@example.test"));
 
         Assert.Equal(1L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios WHERE activo"));
     }
@@ -293,15 +293,15 @@ public sealed class CuentaDeRevisionDeLaPasarelaTests(InstanciaParaMigrar instan
         await using var servicio = Levantar(propietaria, configuracion);
         await using var alcance = servicio.Alcance();
         var operacion = alcance.ServiceProvider.GetRequiredService<CuentaDeRevisionDeLaPasarela>();
-        var creada = await operacion.Crear("Staging", correo: "persona@example.test");
+        var creada = await operacion.Crear("Staging", correo: "persona-07@example.test");
         // La cuenta pasa a ser «de una persona»: ya no es la que esta operación creó.
         await using (var origen = NpgsqlDataSource.Create(propietaria))
         {
-            await using var cambio = origen.CreateCommand("UPDATE identidad.usuarios SET nombre = 'Una persona real' WHERE correo = 'persona@example.test'");
+            await using var cambio = origen.CreateCommand("UPDATE identidad.usuarios SET nombre = 'Una persona real' WHERE correo = 'persona-07@example.test'");
             await cambio.ExecuteNonQueryAsync();
         }
 
-        var falla = await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Crear("Staging", correo: "persona@example.test"));
+        var falla = await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Crear("Staging", correo: "persona-07@example.test"));
 
         Assert.Contains("otra cuenta", falla.Message, StringComparison.Ordinal);
         // Su contraseña sigue siendo la que tenía (la operación no la rotó).
@@ -482,6 +482,8 @@ public sealed class CuentaDeRevisionDeLaPasarelaTests(InstanciaParaMigrar instan
 
         Assert.Equal(ResultadoDelPrimerAdministrador.Creado, r.Resultado);
         Assert.DoesNotContain(r.ContrasenaTemporal!.Revelar(), r.ToString(), StringComparison.Ordinal);
+        // PAG-46: en una instalación sin la primera clave de firma, la operación la crea.
+        Assert.Equal(1L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.claves_de_firma"));
         Assert.Equal(1L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios WHERE correo = 'admin.inicial@ejemplo.pe' AND rol = 'administrador-central' AND correo_verificado AND activo AND debe_cambiar"));
         // La temporal vence a las 24 horas (como la de todo el personal, IDE-23).
         Assert.Equal(1L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios WHERE correo = 'admin.inicial@ejemplo.pe' AND contrasena_temporal_hasta BETWEEN now() + interval '23 hours' AND now() + interval '25 hours'"));
@@ -608,6 +610,47 @@ public sealed class CuentaDeRevisionDeLaPasarelaTests(InstanciaParaMigrar instan
         await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Crear("Production", "sin-arroba", nombre: null));
 
         Assert.Equal(0L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-41")]
+    public async Task El_primer_administrador_se_niega_con_el_correo_de_un_cliente_o_de_un_administrador_desactivado_sin_tocar_nada()
+    {
+        var (propietaria, configuracion) = await MigrarUnaBase("0.1-provisional");
+        await using var servicio = Levantar(propietaria, configuracion);
+        await using var alcance = servicio.Alcance();
+        var cuentaDePrueba = alcance.ServiceProvider.GetRequiredService<CuentaDeRevisionDeLaPasarela>();
+        var operacion = alcance.ServiceProvider.GetRequiredService<PrimerAdministradorDeLaInstalacion>();
+        await cuentaDePrueba.Crear("Staging", "persona-05@example.test");
+        await operacion.Crear("Staging", "admin.inicial@ejemplo.pe", nombre: null);
+        await using (var origen = NpgsqlDataSource.Create(propietaria))
+        {
+            await using var desactivar = origen.CreateCommand("UPDATE identidad.usuarios SET activo = false WHERE correo = 'admin.inicial@ejemplo.pe'");
+            await desactivar.ExecuteNonQueryAsync();
+        }
+
+        var cliente = await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Crear("Production", "persona-05@example.test", nombre: null));
+        var desactivado = await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Crear("Production", "admin.inicial@ejemplo.pe", nombre: null));
+
+        Assert.Contains("otra cuenta", cliente.Message, StringComparison.Ordinal);
+        Assert.Contains("otra cuenta", desactivado.Message, StringComparison.Ordinal);
+        Assert.Equal(0L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios WHERE rol = 'administrador-central' AND activo"));
+        Assert.Equal(1L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios WHERE correo = 'persona-05@example.test' AND rol <> 'administrador-central'"));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-32")]
+    public async Task Crear_una_cuenta_de_prueba_solo_admite_el_correo_de_la_revision_o_los_de_las_personas()
+    {
+        var (propietaria, configuracion) = await MigrarUnaBase("0.1-provisional");
+        await using var servicio = Levantar(propietaria, configuracion);
+        await using var alcance = servicio.Alcance();
+        var operacion = alcance.ServiceProvider.GetRequiredService<CuentaDeRevisionDeLaPasarela>();
+
+        await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Crear("Staging", "otra@example.test"));
+        await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Crear("Staging", "persona-21@example.test"));
+        Assert.Equal(0L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios"));
+        Assert.False((await operacion.Crear("Staging", "persona-20@example.test")).ContrasenaRotada);
     }
 
     [Fact]

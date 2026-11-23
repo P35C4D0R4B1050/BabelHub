@@ -69,6 +69,11 @@ public sealed class CuentaDeRevisionDeLaPasarela(
         }
 
         var correoNormalizado = CorreoValido(correo);
+        if (!CorreosDeTodasLasCuentas().Contains(correoNormalizado, StringComparer.Ordinal))
+        {
+            // El retiro y la purga solo buscan los correos propios de la operación (PAG-35, PAG-40, PAG-45): crear otro dejaría una cuenta que ellos no alcanzan.
+            throw new CuentaDeRevisionNoPermitidaException($"El correo de una cuenta de prueba es el de la revisión ({CorreoPorDefecto}) o uno de los de las personas (persona-01 a persona-{MaximoDeCuentasParaPersonas:00}@example.test). No se tocó nada.");
+        }
 
         var vigentes = await LeerLosTextosVigentes(cancelacion).ConfigureAwait(false);
         await AsegurarLaPrimeraClaveDeFirma(cancelacion).ConfigureAwait(false);
