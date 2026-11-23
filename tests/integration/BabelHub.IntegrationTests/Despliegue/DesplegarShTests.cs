@@ -34,9 +34,15 @@ public sealed class DesplegarShTests : IDisposable
     {
         try
         {
+            // El script deja las llaves TLS en solo lectura (400): en Windows eso impide borrarlas.
+            foreach (var archivo in Directory.EnumerateFiles(_carpeta, "*", SearchOption.AllDirectories))
+            {
+                File.SetAttributes(archivo, FileAttributes.Normal);
+            }
+
             Directory.Delete(_carpeta, recursive: true);
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Carpeta temporal.
         }
@@ -147,7 +153,13 @@ public sealed class DesplegarShTests : IDisposable
                 }
             }
 
-            File.WriteAllText(Path.Combine(_secretos, archivo), contenido.ToString().ReplaceLineEndings("\n"));
+            var destinoDelArchivo = Path.Combine(_secretos, archivo);
+            if (File.Exists(destinoDelArchivo))
+            {
+                File.SetAttributes(destinoDelArchivo, FileAttributes.Normal); // un despliegue anterior lo dejó en 400
+            }
+
+            File.WriteAllText(destinoDelArchivo, contenido.ToString().ReplaceLineEndings("\n"));
         }
 
         if (vm == "inventario")
@@ -195,6 +207,8 @@ public sealed class DesplegarShTests : IDisposable
             informacion.ArgumentList.Add(argumento);
         }
 
+        // Las pruebas no corren como root: la entrega de las llaves TLS a sus usuarios de contenedor (chown) se sustituye por un doble inocuo.
+        informacion.Environment["CHOWN"] = "true";
         foreach (var (clave, valor) in entorno ?? EntornoDe(vm))
         {
             informacion.Environment[clave] = valor;
@@ -371,6 +385,226 @@ public sealed class DesplegarShTests : IDisposable
         Assert.True(codigo == 0, salida + errores);
         Assert.Empty(Directory.GetFiles(_cron));
         Assert.DoesNotContain("aviso.env", salida + errores, StringComparison.Ordinal);
+    }
+
+    // ---------- Valores «CAMBIAR» y --sin (primer despliegue, guía 08) ----------
+
+    [Theory]
+    [InlineData("ecommerce.env")]
+    [InlineData("cloudflared.env")]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void UnValorCambiarSinCompletar_NoSeDespliega_NombrandoElArchivo_SinLlamarADocker(string archivo)
+    {
+        PrepararSecretos("ventas");
+        File.AppendAllText(Path.Combine(_secretos, archivo), "BABELHUB__Correo__Smtp__Credencial=CAMBIAR\n");
+
+        var (codigo, salida, errores) = Desplegar("ventas");
+
+        Assert.Equal(1, codigo);
+        Assert.Contains($"el archivo de secretos {archivo} tiene valores «CAMBIAR» sin completar", errores, StringComparison.Ordinal);
+        Assert.DoesNotContain(LlamadasADocker, l => l.Contains(" up ", StringComparison.Ordinal));
+        SinSecretosEnLaSalida(salida, errores);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void ConSin_SoloSeLevantanLosServiciosQueQuedan_YSeEsperaLaSaludDeEsos()
+    {
+        PrepararSecretos("ventas");
+
+        var (codigo, salida, errores) = Desplegar("ventas", null, "--secretos", EnLinux(_secretos), "--cron", EnLinux(_cron), "--sin", "dos");
+
+        Assert.True(codigo == 0, salida + errores);
+        Assert.Contains("Se deja sin levantar: dos", salida, StringComparison.Ordinal);
+        Assert.Contains("ok uno", salida, StringComparison.Ordinal);
+        Assert.DoesNotContain("ok dos", salida, StringComparison.Ordinal);
+        Assert.Contains(LlamadasADocker, l => l.EndsWith("up -d --wait --wait-timeout 300 uno", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void ConSinDeUnServicioQueNoExiste_NoSeDespliega_PorUnErrorDeEscritura()
+    {
+        PrepararSecretos("ventas");
+
+        var (codigo, _, errores) = Desplegar("ventas", null, "--secretos", EnLinux(_secretos), "--cron", EnLinux(_cron), "--sin", "evolucion-api");
+
+        Assert.Equal(2, codigo);
+        Assert.Contains("--sin: ventas no tiene el servicio «evolucion-api»", errores, StringComparison.Ordinal);
+        Assert.DoesNotContain(LlamadasADocker, l => l.Contains(" up ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void ElComposeExtra_SoloSeAceptaEnUnEnsayo()
+    {
+        PrepararSecretos("ventas");
+
+        var (codigo, _, errores) = Desplegar("ventas", null, "--secretos", EnLinux(_secretos), "--cron", EnLinux(_cron), "--extra", EnLinux(Path.Combine(_carpeta, "otro.yml")));
+
+        Assert.Equal(2, codigo);
+        Assert.Contains("Uso:", errores, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void ElPaqueteDeRaices_SeArmaConLasDeLaVmMasLaCaPrivada()
+    {
+        PrepararSecretos("ventas");
+        var raices = Path.Combine(_carpeta, "raices.crt");
+        File.WriteAllText(raices, "-----BEGIN CERTIFICATE-----\nRAIZ-PUBLICA\n-----END CERTIFICATE-----\n");
+        File.WriteAllText(Path.Combine(_secretos, "tls-ca.pem"), "-----BEGIN CERTIFICATE-----\nCA-PRIVADA\n-----END CERTIFICATE-----\n");
+
+        var (codigo, salida, errores) = Desplegar("ventas", new Dictionary<string, string>(EntornoDe("ventas")) { ["BABELHUB_RAICES_PUBLICAS"] = EnLinux(raices) });
+
+        Assert.True(codigo == 0, salida + errores);
+        var paquete = File.ReadAllText(Path.Combine(_secretos, "ca-bundle.pem"));
+        Assert.Contains("RAIZ-PUBLICA", paquete, StringComparison.Ordinal);
+        Assert.Contains("CA-PRIVADA", paquete, StringComparison.Ordinal);
+    }
+
+    // ---------- scripts/generar-secretos.sh: lo que genera pasa lo que exige desplegar.sh ----------
+
+    private const string DobleDeAgeKeygen = """
+        #!/usr/bin/env bash
+        # -o <archivo>: escribe un par de claves de mentira con el formato de age-keygen.
+        archivo="$2"
+        printf '# created: 2026-11-23T00:00:00Z\n# public key: age1%s\nAGE-SECRET-%s\n' "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq" "KEY-1DOBLEDEPRUEBA" > "$archivo"
+        """;
+
+    private (int Codigo, string Salida, string Errores) Generar(string destino, params string[] extra)
+    {
+        ArchivosDeDoble.Escribir(Path.Combine(_carpeta, "age-keygen-doble.sh"), DobleDeAgeKeygen.ReplaceLineEndings("\n"));
+        var informacion = new ProcessStartInfo(Bash()) { RedirectStandardOutput = true, RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8 };
+        informacion.ArgumentList.Add(EnLinux(Path.Combine(ComposeDeVms.Raiz(), "scripts", "generar-secretos.sh")));
+        foreach (var argumento in new[] { "--destino", EnLinux(destino), "--dominio", "ejemplo.pe", "--ip-ventas", "10.0.0.10", "--ip-inventario", "10.0.1.10", "--ip-borde", "10.0.2.10" }.Concat(extra))
+        {
+            informacion.ArgumentList.Add(argumento);
+        }
+
+        informacion.Environment["AGE_KEYGEN"] = EnLinux(Path.Combine(_carpeta, "age-keygen-doble.sh"));
+        using var proceso = Process.Start(informacion)!;
+        var salida = proceso.StandardOutput.ReadToEndAsync();
+        var errores = proceso.StandardError.ReadToEndAsync();
+        Assert.True(proceso.WaitForExit(TimeSpan.FromMinutes(2)), "El generador no terminó a tiempo.");
+        proceso.WaitForExit();
+        return (proceso.ExitCode, salida.Result, errores.Result);
+    }
+
+    private static string Valor(string carpeta, string archivo, string clave)
+    {
+        var linea = File.ReadAllLines(Path.Combine(carpeta, archivo)).Single(l => l.StartsWith(clave + "=", StringComparison.Ordinal));
+        return linea[(clave.Length + 1)..].Trim('"');
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void ElGenerador_CreaTodasLasClavesDeLaTabla_ComparteLoQueDebeCompartir_YDejaLaClavePrivadaFueraDeLasVms()
+    {
+        var destino = Path.Combine(_carpeta, "generados");
+
+        var (codigo, salida, errores) = Generar(destino);
+
+        Assert.True(codigo == 0, salida + errores);
+        // Cada clave de la tabla está en el archivo de su VM (cloudflared.env, en las dos que lo usan) y las que genera el sistema tienen su largo mínimo.
+        foreach (var fila in File.ReadAllLines(Path.Combine(ComposeDeVms.Raiz(), "infra", "secretos-requeridos.txt")).Where(l => !l.TrimStart().StartsWith('#') && l.Trim().Length > 0).Select(l => l.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)))
+        {
+            var carpetas = fila[0] switch
+            {
+                "postgres.env" or "inventario.env" or "ecommerce-gestion.env" => new[] { "inventario" },
+                "cloudflared.env" => ["ventas", "borde"],
+                _ => ["ventas"],
+            };
+            foreach (var carpeta in carpetas)
+            {
+                var valor = Valor(Path.Combine(destino, carpeta), fila[0], fila[1]);
+                Assert.True(valor.Length > 0, $"{carpeta}/{fila[0]}: {fila[1]} está vacía");
+                if (fila.Length > 2 && valor != "CAMBIAR")
+                {
+                    Assert.True(valor.Length >= int.Parse(fila[2], System.Globalization.CultureInfo.InvariantCulture), $"{carpeta}/{fila[0]}: {fila[1]} es más corta que {fila[2]}");
+                }
+            }
+        }
+
+        // Lo que dos archivos tienen que compartir lo comparten: la credencial de cada alcance entre servicios, la clave de Identidad y las cuentas de las bases.
+        var inventario = Path.Combine(destino, "inventario");
+        var ventas = Path.Combine(destino, "ventas");
+        const string Alcance = "BABELHUB__Seguridad__Credenciales__SolicitarAviso";
+        Assert.Equal(Valor(inventario, "inventario.env", Alcance), Valor(ventas, "ecommerce.env", Alcance));
+        Assert.Equal(Valor(inventario, "ecommerce-gestion.env", Alcance), Valor(ventas, "ecommerce.env", Alcance));
+        Assert.Equal(Valor(inventario, "ecommerce-gestion.env", "BABELHUB__Identidad__Pimienta"), Valor(ventas, "ecommerce.env", "BABELHUB__Identidad__Pimienta"));
+        Assert.Equal(Valor(inventario, "ecommerce-gestion.env", "BABELHUB__Notificaciones__N8n__ClaveSaliente"), Valor(ventas, "n8n.env", "BABELHUB_FIRMA_DE_AVISOS"));
+        Assert.Equal(Valor(inventario, "ecommerce-gestion.env", "BABELHUB__Integraciones__n8n__Secreto"), Valor(ventas, "n8n.env", "BABELHUB_FIRMA_DE_ESTADOS"));
+        Assert.Equal(Valor(inventario, "ecommerce-gestion.env", "BABELHUB__Seguridad__ClaveDeRedisDeLimites"), Valor(ventas, "redis-contadores.env", "BABELHUB__Seguridad__ClaveDeRedisDeLimites"));
+        Assert.EndsWith("Password=" + Valor(inventario, "postgres.env", "POSTGRES_PASSWORD"), Valor(inventario, "migrador.env", "BABELHUB__Migrador__Inventario__Propietaria"), StringComparison.Ordinal);
+        static string Clave(string conexion) => conexion[(conexion.LastIndexOf("Password=", StringComparison.Ordinal) + 9)..];
+        Assert.Equal(Clave(Valor(inventario, "ecommerce-gestion.env", "BABELHUB__Ecommerce__Base__Aplicacion")), Clave(Valor(ventas, "ecommerce.env", "BABELHUB__Ecommerce__Base__Aplicacion")));
+        Assert.Contains("Host=10.0.1.10;", Valor(ventas, "ecommerce.env", "BABELHUB__Ecommerce__Base__Aplicacion"), StringComparison.Ordinal);
+        // Cada servicio es distinto de los demás (cursor de auditoría, sesiones): nada se repite entre servicios que no lo comparten.
+        Assert.NotEqual(Valor(inventario, "inventario.env", "BABELHUB__Auditoria__ClaveDeCursor"), Valor(inventario, "ecommerce-gestion.env", "BABELHUB__Auditoria__ClaveDeCursor"));
+        Assert.NotEqual(Valor(ventas, "ecommerce.env", "BABELHUB__Web__ClaveDeSesionesTienda"), Valor(inventario, "ecommerce-gestion.env", "BABELHUB__Web__ClaveDeSesionesGestion"));
+
+        // La clave privada de age y la CA se quedan en custodia/, nunca en una carpeta de VM; migrador.env solo en VM-INVENTARIO; ningún valor por la salida.
+        foreach (var carpeta in new[] { "inventario", "ventas", "borde" })
+        {
+            foreach (var archivo in Directory.EnumerateFiles(Path.Combine(destino, carpeta)))
+            {
+                Assert.DoesNotContain("AGE-SECRET-KEY-", File.ReadAllText(archivo), StringComparison.Ordinal);
+            }
+        }
+
+        Assert.Contains("AGE-SECRET-KEY-", File.ReadAllText(Path.Combine(destino, "custodia", "age-clave-privada.txt")), StringComparison.Ordinal);
+        Assert.True(File.Exists(Path.Combine(destino, "custodia", "ca-clave.pem")));
+        Assert.False(File.Exists(Path.Combine(ventas, "migrador.env")));
+        Assert.StartsWith("age1", Valor(inventario, "postgres.env", "BABELHUB_AGE_DESTINATARIO"), StringComparison.Ordinal);
+        Assert.DoesNotContain(Valor(inventario, "postgres.env", "POSTGRES_PASSWORD"), salida + errores, StringComparison.Ordinal);
+        Assert.Contains("ventas/cloudflared.env  TUNNEL_TOKEN", File.ReadAllText(Path.Combine(destino, "PENDIENTES.txt")), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void ElGenerador_NoPisaUnaCarpetaConArchivos_NiAceptaDatosInvalidos()
+    {
+        var destino = Path.Combine(_carpeta, "ocupada");
+        Directory.CreateDirectory(destino);
+        File.WriteAllText(Path.Combine(destino, "algo.env"), "A=1\n");
+
+        var (codigo, _, errores) = Generar(destino);
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("no pisa secretos", errores, StringComparison.Ordinal);
+        Assert.Equal("A=1\n", File.ReadAllText(Path.Combine(destino, "algo.env")));
+        Assert.Equal(2, Generar(Path.Combine(_carpeta, "otra"), "--region", "Sa Santiago").Codigo);
+    }
+
+    [Theory]
+    [MemberData(nameof(Vms))]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void LosSecretosGenerados_YCompletados_PasanTodasLasComprobacionesDeDesplegar(string vm)
+    {
+        var destino = Path.Combine(_carpeta, "generados");
+        var (codigoDeGenerar, salidaDeGenerar, erroresDeGenerar) = Generar(destino);
+        Assert.True(codigoDeGenerar == 0, salidaDeGenerar + erroresDeGenerar);
+        var carpeta = Path.Combine(destino, vm);
+        foreach (var archivo in Directory.EnumerateFiles(carpeta, "*.env"))
+        {
+            File.WriteAllText(archivo, System.Text.RegularExpressions.Regex.Replace(File.ReadAllText(archivo), "=CAMBIAR\r?$", "=" + Aleatorio(40), System.Text.RegularExpressions.RegexOptions.Multiline, TimeSpan.FromSeconds(2)));
+        }
+
+        // Los archivos que el Compose de cada VM pide y que no genera el script (por ejemplo ca-bundle.pem, que arma desplegar) se rellenan como en las otras pruebas.
+        foreach (var archivo in ComposeDeVms.ArchivosDeSecretos(vm).Where(a => !File.Exists(Path.Combine(carpeta, a))))
+        {
+            File.WriteAllText(Path.Combine(carpeta, archivo), Aleatorio(60) + "\n");
+        }
+
+        var raices = Path.Combine(_carpeta, "raices.crt");
+        File.WriteAllText(raices, "-----BEGIN CERTIFICATE-----\nRAIZ\n-----END CERTIFICATE-----\n");
+        var entorno = new Dictionary<string, string>(EntornoDe(vm)) { ["BABELHUB_RAICES_PUBLICAS"] = EnLinux(raices) };
+
+        var (codigo, salida, errores) = Desplegar(vm, entorno, "--secretos", EnLinux(carpeta), "--cron", EnLinux(_cron));
+
+        Assert.True(codigo == 0, salida + errores);
+        Assert.Contains($"VM {vm} desplegada y sana.", salida, StringComparison.Ordinal);
     }
 
     // ---------- La migración de las bases (COMP-2) ----------

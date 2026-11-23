@@ -246,7 +246,44 @@ public sealed partial class EscanerDeSecretosTests : IDisposable
 
         Assert.DoesNotContain("pull_request_target", texto, StringComparison.Ordinal);
         Assert.Matches(PermisosAlNivelSuperior(), texto);
+        if (flujo == FlujoDeLanzamiento)
+        {
+            // Solo el flujo que publica las imágenes en GHCR escribe, y solo lo mínimo para eso (ver la prueba siguiente).
+            Assert.DoesNotMatch(PermisoDeEscrituraAjenoAlLanzamiento(), texto);
+            return;
+        }
+
         Assert.DoesNotMatch(PermisoDeEscritura(), texto);
+    }
+
+    private const string FlujoDeLanzamiento = "lanzamiento.yml";
+
+    /// <summary>
+    /// <c>lanzamiento.yml</c> es el único flujo que escribe (publica las imágenes en GHCR con el token efímero del propio flujo, sin secretos del
+    /// repositorio). Se acota: solo lo dispara una etiqueta de versión o la persona responsable a mano (nunca un pull request, una rama ni un
+    /// calendario), el nivel superior sigue en solo lectura, y los únicos permisos de escritura son <c>packages</c>, <c>id-token</c> y
+    /// <c>attestations</c> (para firmar la procedencia), nunca <c>contents</c> ni nada sobre pull requests, incidencias o despliegues.
+    /// </summary>
+    [Fact]
+    [Trait("Criterio", "AC-PLA-26")]
+    public void ElFlujoDeLanzamiento_SoloEscribePaquetesYLoDisparaUnaEtiquetaOLaPersona()
+    {
+        var texto = Regex.Replace(File.ReadAllText(Path.Combine(RutaDelRepositorio(), ".github", "workflows", FlujoDeLanzamiento)), @"(?m)^\s*#.*$", string.Empty, RegexOptions.None, TimeSpan.FromSeconds(2));
+
+        Assert.Matches(PermisosAlNivelSuperior(), texto);
+        Assert.DoesNotContain("secrets.", texto, StringComparison.Ordinal);
+        Assert.DoesNotContain("pull_request", texto, StringComparison.Ordinal);
+        Assert.DoesNotContain("schedule:", texto, StringComparison.Ordinal);
+        Assert.DoesNotContain("branches:", texto, StringComparison.Ordinal);
+        Assert.Matches(DisparadorPorEtiqueta(), texto);
+        Assert.Contains("workflow_dispatch:", texto, StringComparison.Ordinal);
+        Assert.DoesNotMatch(PermisoDeEscrituraAjenoAlLanzamiento(), texto);
+        // Escribe paquetes solo en los trabajos que publican, y la imagen publicada se revisa antes de etiquetarla.
+        Assert.Contains("packages: write", texto, StringComparison.Ordinal);
+        Assert.Contains("escanear-secretos.sh imagen", texto, StringComparison.Ordinal);
+        Assert.Equal(Regex.Matches(texto, "persist-credentials: false", RegexOptions.None, TimeSpan.FromSeconds(2)).Count, Regex.Matches(texto, "actions/checkout@", RegexOptions.None, TimeSpan.FromSeconds(2)).Count);
+        // Nunca una etiqueta flotante: la versión es la etiqueta y lo que se despliega es el digest.
+        Assert.DoesNotContain(":latest", texto, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -274,6 +311,13 @@ public sealed partial class EscanerDeSecretosTests : IDisposable
     [GeneratedRegex(@"(?m)^permissions:\s*\n\s+contents: read\s*$", RegexOptions.None, 2000)]
     private static partial Regex PermisosAlNivelSuperior();
 
-    [GeneratedRegex(@"(?m)^\s+(contents|packages|pull-requests|issues|actions|id-token|statuses|checks|deployments): write", RegexOptions.None, 2000)]
+    [GeneratedRegex(@"(?m)^\s+(contents|packages|pull-requests|issues|actions|id-token|statuses|checks|deployments|attestations|security-events|pages): write", RegexOptions.None, 2000)]
     private static partial Regex PermisoDeEscritura();
+
+    // Lo único que el flujo de lanzamiento puede escribir es packages, id-token y attestations; cualquier otro permiso de escritura (incluido `write-all`) lo rechaza.
+    [GeneratedRegex(@"(?m)^\s+(contents|pull-requests|issues|actions|statuses|checks|deployments|security-events|pages|repository-projects|discussions): write|write-all", RegexOptions.None, 2000)]
+    private static partial Regex PermisoDeEscrituraAjenoAlLanzamiento();
+
+    [GeneratedRegex(@"(?m)^on:\s*\n\s+push:\s*\n\s+tags:\s*\[""v\*""\]\s*\n\s+workflow_dispatch:", RegexOptions.None, 2000)]
+    private static partial Regex DisparadorPorEtiqueta();
 }

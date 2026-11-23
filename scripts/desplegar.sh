@@ -3,7 +3,7 @@
 # de salud. Es idempotente (`docker compose up -d --wait`): repetirlo no cambia lo que ya está sano. Se ejecuta EN la VM, con sus secretos.
 #
 #   BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.10 IMAGEN_ECOMMERCE=<imagen@sha256:…> \
-#       scripts/desplegar.sh <borde|ventas|inventario> [--secretos <carpeta>] [--infra <carpeta>] [--espera <segundos>] [--cron <carpeta>]
+#       scripts/desplegar.sh <borde|ventas|inventario> [--secretos <carpeta>] [--infra <carpeta>] [--espera <segundos>] [--cron <carpeta>] [--sin <servicio[,servicio]>]
 #
 # Antes de tocar nada comprueba, y no continúa si falla (sin imprimir nunca un valor secreto):
 #   - que estén definidas todas las variables obligatorias del Compose de la VM (BABELHUB_SECRETOS, las direcciones privadas, las imágenes);
@@ -17,20 +17,23 @@
 # local reservado (PLA-21: exige aviso.env, la credencial de correo propia de esa VM) y, tras levantar, comprueba que cada
 # componente esté «healthy» y lo informa.
 #
-# Variables opcionales: DOCKER (comando de docker, por defecto `docker`), STAT (por defecto `stat`).
+# Variables opcionales: DOCKER (comando de docker, por defecto `docker`), STAT (por defecto `stat`), CHOWN (por defecto `chown`), BABELHUB_RAICES_PUBLICAS.
 # Códigos de salida: 0 desplegado y sano, 1 falta algo o algún componente no quedó sano, 2 uso inválido.
 set -euo pipefail
 
 DOCKER="${DOCKER:-docker}"
 STAT="${STAT:-stat}"
+CHOWN="${CHOWN:-chown}"
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INFRA="$RAIZ/infra"
 ESPERA=300
 CARPETA_CRON="/etc/cron.d"
+SIN=()
+EXTRA=""
 VM=""
 
 uso() {
-  echo "Uso: $0 <borde|ventas|inventario> [--secretos <carpeta>] [--infra <carpeta>] [--espera <segundos>] [--cron <carpeta>]" >&2
+  echo "Uso: $0 <borde|ventas|inventario> [--secretos <carpeta>] [--infra <carpeta>] [--espera <segundos>] [--cron <carpeta>] [--sin <servicio[,servicio]>]" >&2
   exit 2
 }
 
@@ -47,6 +50,10 @@ while [[ $# -gt 0 ]]; do
     --infra) [[ $# -ge 2 ]] || uso; INFRA="$2"; shift 2 ;;
     --espera) [[ $# -ge 2 && "$2" =~ ^[0-9]+$ ]] || uso; ESPERA="$2"; shift 2 ;;
     --cron) [[ $# -ge 2 ]] || uso; CARPETA_CRON="$2"; shift 2 ;;
+    # Deja sin levantar algunos servicios (por ejemplo n8n y evolution-api hasta tener el número de WhatsApp, B07). Solo lo que se nombra; el resto se despliega y se espera igual.
+    --sin) [[ $# -ge 2 ]] || uso; IFS=, read -r -a SIN <<<"$2"; shift 2 ;;
+    # Solo para el ensayo local (BABELHUB_ENSAYO=1): un Compose adicional que, por ejemplo, cambia los puertos del equipo. Nunca en una VM de verdad.
+    --extra) [[ $# -ge 2 && "${BABELHUB_ENSAYO:-0}" == 1 ]] || uso; EXTRA="$2"; shift 2 ;;
     *) uso ;;
   esac
 done
@@ -97,6 +104,27 @@ leer_valor() { # archivo clave -> el valor (vacío si no está); nunca se imprim
 }
 
 if [[ -n "$SECRETOS" ]]; then
+  # La raíz de confianza de los procesos (SSL_CERT_FILE, DD-55): las autoridades públicas de ESTA VM más la CA privada de la cuenta, para que el HTTPS entre servicios y el TLS
+  # del Redis de contadores se verifiquen sin desactivar ninguna comprobación. Lo arma la propia VM cada vez (si se actualizan sus autoridades, el paquete las sigue); nunca viaja.
+  if [[ "$VM" != borde && -s "$SECRETOS/tls-ca.pem" ]]; then
+    raices="${BABELHUB_RAICES_PUBLICAS:-/etc/ssl/certs/ca-certificates.crt}"
+    if [[ -s "$raices" ]]; then
+      paquete="$(mktemp "$SECRETOS/.ca-bundle.XXXXXX")"
+      { cat "$raices"; echo; cat "$SECRETOS/tls-ca.pem"; } >"$paquete"
+      chmod 0644 "$paquete"
+      mv -f "$paquete" "$SECRETOS/ca-bundle.pem"
+    else
+      anotar "no existe $raices (las autoridades de certificación públicas de la VM): instala ca-certificates"
+    fi
+  fi
+  # Cada contenedor corre con un usuario sin privilegios (los servicios .NET, 1654; Redis, 999:1000) y un secreto montado conserva el dueño y los permisos del archivo de la VM:
+  # sin esto un archivo de root con permisos 600 no lo podría leer su proceso. Se entrega a quien lo lee y queda en 400 (solo lectura, y de nadie más).
+  entregar() { # archivo dueño:grupo
+    [[ -e "$SECRETOS/$1" && " ${ARCHIVOS[*]} " == *" $1 "* ]] || return 0
+    "$CHOWN" "$2" "$SECRETOS/$1" 2>/dev/null && chmod 0400 "$SECRETOS/$1" || anotar "no se pudo entregar $1 a su usuario del contenedor ($2): ejecuta scripts/desplegar.sh con sudo"
+  }
+  for archivo in tls-ecommerce-cert.pem tls-ecommerce-key.pem tls-inventario-cert.pem tls-inventario-key.pem tls-gestion-cert.pem tls-gestion-key.pem ca-bundle.pem; do entregar "$archivo" 1654:1654; done
+  for archivo in redis-contadores-cert.pem redis-contadores-key.pem redis-contadores-ca.pem; do entregar "$archivo" 999:1000; done
   for archivo in "${ARCHIVOS[@]}"; do
     ruta="$SECRETOS/$archivo"
     if [[ ! -f "$ruta" ]]; then
@@ -114,12 +142,25 @@ if [[ -n "$SECRETOS" ]]; then
     if grep -q 'AGE-SECRET-KEY-' "$ruta" 2>/dev/null; then
       anotar "el archivo $archivo contiene una clave privada de age: no puede estar en la VM"
     fi
+    # Un valor «CAMBIAR» es lo que dejó scripts/generar-secretos.sh para lo que solo puede dar un tercero (la cuenta de correo, las llaves del almacén, el token del túnel…).
+    if grep -qE '^[A-Za-z0-9_]+="?CAMBIAR"?[[:space:]]*$' "$ruta" 2>/dev/null; then
+      anotar "el archivo de secretos $archivo tiene valores «CAMBIAR» sin completar (los lista PENDIENTES.txt de la carpeta que generó scripts/generar-secretos.sh)"
+    fi
     # La cuenta propietaria de las bases (administración, COMP-2) solo puede estar en migrador.env: un servicio con ella en su entorno la tendría en un proceso expuesto.
     if grep -q 'BABELHUB__Migrador__' "$ruta" 2>/dev/null; then
       anotar "el archivo $archivo lleva claves BABELHUB__Migrador__*: la cuenta propietaria de las bases solo puede estar en migrador.env"
     fi
   done
 
+  # Ninguna clave privada que no use el Compose de esta VM puede estar en su carpeta de secretos (la CA privada y la clave de age se quedan en la carpeta custodia/ del equipo de la persona responsable).
+  for ruta in "$SECRETOS"/* "$SECRETOS"/.[!.]*; do
+    [[ -f "$ruta" ]] || continue
+    nombre="$(basename "$ruta")"
+    [[ " ${ARCHIVOS[*]} " == *" $nombre "* ]] && continue
+    if [[ "$nombre" == ca-clave.pem || "$nombre" == age-clave-privada* ]] || grep -qE 'PRIVATE KEY|AGE-SECRET-KEY-' "$ruta" 2>/dev/null; then
+      anotar "$nombre es una clave privada que no usa esta VM: no debe estar en su carpeta de secretos (¿copiaste la carpeta entera? copia solo la de esta VM)"
+    fi
+  done
   tabla="$INFRA/secretos-requeridos.txt"
   if [[ -f "$tabla" ]]; then
     while read -r archivo clave minimo resto; do
@@ -158,6 +199,9 @@ if [[ "$VM" == inventario && -n "$SECRETOS" ]]; then
     # Lo carga alertar.sh como root desde el cron: debe ser de root y no escribible ni legible por otros (se lee sin ejecutarlo, pero no se confía).
     lectura="$("$STAT" -c '%U %a' "$AVISOS" 2>/dev/null || echo '? 777')"
     [[ "${lectura% *}" == root && "${lectura#* }" =~ ^[0-7]?[46]00$ ]] || anotar "el archivo de secretos aviso.env es de ${lectura% *} con permisos ${lectura#* }: debe ser de root y 600 o 400 (lo carga el cron como root); además lo pueden leer otros usuarios si los permisos no son 600 o 400"
+    if grep -qE '^[A-Za-z0-9_]+="?CAMBIAR"?[[:space:]]*$' "$AVISOS" 2>/dev/null; then
+      anotar "el archivo de secretos aviso.env tiene valores «CAMBIAR» sin completar"
+    fi
     for clave in AUX_SMTP_URL AUX_SMTP_USUARIO AUX_SMTP_CLAVE AUX_CORREO_DE AUX_CORREO_PARA; do
       [[ -n "$(leer_valor "$AVISOS" "$clave")" ]] || anotar "falta la clave $clave en aviso.env"
     done
@@ -213,10 +257,21 @@ fi
 
 # ---------- 4. Levantar y esperar la salud ----------
 
-compose() { "$DOCKER" compose --project-directory "$INFRA" -f "$COMPOSE" "$@"; }
+compose() { "$DOCKER" compose --project-directory "$INFRA" -f "$COMPOSE" ${EXTRA:+-f "$EXTRA"} "$@"; }
 
 echo "Desplegando $VM..."
 compose config --quiet || { echo "El Compose de $VM no es válido." >&2; exit 1; }
+# Los servicios que se levantan: todos los del Compose menos los de --sin (que deben existir: un error de escritura no se pasa por alto).
+mapfile -t SERVICIOS_DEL_COMPOSE < <(compose config --services)
+SERVICIOS=()
+for servicio in "${SERVICIOS_DEL_COMPOSE[@]}"; do
+  [[ " ${SIN[*]:-} " == *" $servicio "* ]] || SERVICIOS+=("$servicio")
+done
+for omitido in "${SIN[@]:-}"; do
+  [[ -z "$omitido" || " ${SERVICIOS_DEL_COMPOSE[*]} " == *" $omitido "* ]] || { echo "--sin: $VM no tiene el servicio «$omitido» (tiene: ${SERVICIOS_DEL_COMPOSE[*]})." >&2; exit 2; }
+done
+[[ ${#SIN[@]} -eq 0 ]] || echo "Se deja sin levantar: ${SIN[*]}"
+[[ ${#SIN[@]} -eq 0 || ${#SERVICIOS[@]} -gt 0 ]] || { echo "--sin deja $VM sin ningún servicio." >&2; exit 2; }
 # La migración de las bases antes de levantar los servicios (COMP-2): primero PostgreSQL sano, después los esquemas y roles de cada servicio con la
 # cuenta propietaria de migrador.env, que solo vive en el entorno de ese proceso (nunca en un argumento ni en un archivo de los servicios). Es idempotente.
 if [[ "$VM" == inventario ]]; then
@@ -236,17 +291,24 @@ if [[ "$VM" == inventario ]]; then
   migrar ecommerce-gestion BABELHUB__Migrador__Ecommerce__Propietaria
 fi
 
-if ! compose up -d --wait --wait-timeout "$ESPERA"; then
+# Sin --sin se levanta todo el Compose (el comando de siempre); con --sin, solo los servicios que quedan.
+SELECCION=()
+[[ ${#SIN[@]} -eq 0 ]] || SELECCION=("${SERVICIOS[@]}")
+if ! compose up -d --wait --wait-timeout "$ESPERA" ${SELECCION[@]+"${SELECCION[@]}"}; then
   echo "Algún componente de $VM no quedó sano en $ESPERA segundos." >&2
   compose ps >&2 || true
   exit 1
 fi
 
-mapfile -t SERVICIOS < <(compose config --services)
 no_sanos=0
 for servicio in "${SERVICIOS[@]}"; do
   id="$(compose ps -q "$servicio" | head -n 1)"
-  estado="$([[ -n "$id" ]] && "$DOCKER" inspect --format '{{.State.Health.Status}}' "$id" 2>/dev/null || echo ausente)"
+  # Un componente con tiempo de arranque propio (n8n, Evolution) puede seguir en «starting» un instante tras el `up --wait`: se le dan hasta 60 s antes de darlo por no sano.
+  for _ in $(seq 1 30); do
+    estado="$([[ -n "$id" ]] && "$DOCKER" inspect --format '{{.State.Health.Status}}' "$id" 2>/dev/null || echo ausente)"
+    [[ "$estado" == starting ]] || break
+    sleep 2
+  done
   if [[ "$estado" == healthy ]]; then
     echo "ok $servicio"
   else
