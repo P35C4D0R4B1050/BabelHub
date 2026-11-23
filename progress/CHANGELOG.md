@@ -2,6 +2,17 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-23 — Web base: la herramienta de pruebas humanas se rehízo para personas comunes, sin moderador (T32b, T33b y T34b)
+
+### Cubierto
+- `tools/pruebas-humanas/index.html` v2: asistente de una pantalla activa (bienvenida → 3 tareas → gracias) con «Tu progreso: X de 3 tareas», lenguaje llano, dibujos de teclas en SVG, guardado automático y retomar otro día; datos automáticos (navegador y versión con detección de Edge, Brave, Opera, Firefox, Safari y los de iOS, sistema, aparato, pantalla, código aleatorio) con confirmación; tienda y versión leídas del enlace; compra paso a paso (AC-WEB-18), teclado para cualquier persona y lector de pantalla opcional (AC-WEB-15) y compra de un libro sin moderador con cronómetro y SUS automático (AC-WEB-17); un solo botón «Descargar mi resultado» (JSON + Markdown); reunir y combinar archivos con la cobertura por navegador y lo que falta.
+- `README.md`, `veredicto.md` (esquema JSON v2), `protocolo-manual.md`, `09` §17, `10` e inventario de privacidad actualizados; DD-80 a DD-84 pendientes de ratificar.
+- Pruebas de Playwright reescritas (`tests/e2e/pruebas-humanas/`): detección con UA simulados, flujo de la persona, SUS y cobertura, exportación e importación, privacidad y sin red, y accesibilidad (axe en cada paso y ambos temas).
+
+### Pendiente
+- Ninguna prueba con personas se ejecutó ni se inventó: T32b, T33b y T34b siguen en manos de la persona responsable (`web-base` sigue en `Planned`). La ayuda y los errores de usabilidad serán autodeclarados: se recomienda observar 2 de las 10 sesiones.
+
+
 ## 2026-11-23 — Preparación del primer despliegue en Oracle
 
 ### Cubierto
