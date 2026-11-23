@@ -1,6 +1,8 @@
 # Web base: protocolo manual de T32b, T33b y T34b
 
-Lo ejecutan **personas**; el agente no lo simula ni inventa resultados. Tres bloques independientes, cada uno con su registro. Guías completas: `docs/06-experiencia-de-usuario/09-pruebas-de-usabilidad.md` (usabilidad) y `docs/06-experiencia-de-usuario/10-lista-manual-de-accesibilidad.md` (teclado y lector). Evidencia automática ya hecha: `2026-11-21-corrida-automatica.md`.
+Lo ejecutan **personas**; el agente no lo simula ni inventa resultados. Tres bloques independientes, cada uno con su registro.
+
+> **Herramienta de apoyo (2026-11-23).** En vez de llenar a mano las tablas de abajo, la persona puede usar la app [`tools/pruebas-humanas/index.html`](../../../tools/pruebas-humanas/README.md): un solo archivo sin red ni telemetría, pensado para un celular, con los tres bloques (A navegadores y móviles, B teclado y lector, C moderador de usabilidad con consentimiento, cronómetro y SUS), que exporta a JSON y a un resumen en Markdown con **estas mismas tablas**. El archivo JSON es lo que se devuelve y lo lee quien emite el veredicto siguiendo [`veredicto.md`](../../../tools/pruebas-humanas/veredicto.md). Las tablas de este protocolo siguen siendo el registro de resultados en el repositorio. Guías completas: `docs/06-experiencia-de-usuario/09-pruebas-de-usabilidad.md` (usabilidad) y `docs/06-experiencia-de-usuario/10-lista-manual-de-accesibilidad.md` (teclado y lector). Evidencia automática ya hecha: `2026-11-21-corrida-automatica.md`.
 
 **Preparación común (15 min).** Entorno local de `tests/e2e/entorno/` (`preparar-entorno.sh`, host de la tienda, Inventario y `sembrar-datos.sh --limpiar`) o la URL de pruebas que indique la persona responsable; datos ficticios; una cuenta de cliente nueva por persona de prueba. Registrar versión del navegador y del sistema.
 
@@ -21,7 +23,7 @@ Lo ejecutan **personas**; el agente no lo simula ni inventa resultados. Tres blo
 
 ## B. Teclado y lector de pantalla (T33b, AC-WEB-15; ~2 h)
 
-1. Seguir los apartados 2 (teclado) y 3 (lector) de `10-lista-manual-de-accesibilidad.md` en las pantallas del recorrido de compra, mi cuenta, mis pedidos, biblioteca y el Libro de Reclamaciones, con NVDA (Windows, Firefox o Chrome) y VoiceOver (iPhone, Safari), en `babelhub` y `babelhub-dark`.
+1. Seguir los apartados 4.1 (teclado) y 4.2 (lector) de `10-lista-manual-de-accesibilidad.md` (en la app, el bloque B) en las pantallas del recorrido de compra, mi cuenta, mis pedidos, biblioteca y el Libro de Reclamaciones, con NVDA (Windows, Firefox o Chrome) y VoiceOver (iPhone, Safari), en `babelhub` y `babelhub-dark`.
 2. Criterio: **0 incumplimientos críticos de nivel AA** (cualquier paso donde la persona no pueda continuar, o un control sin nombre, o un error que no se anuncia).
 
 | Fecha | Persona | Lector y navegador | Pantalla | Tema | Resultado (cumple/falla) | Observación |

@@ -10,6 +10,16 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 - Hallazgo mayor: el E-commerce no arranca en `Production` hasta el adaptador de Culqi (DD-58). Sin push ni etiquetas.
 
 
+## 2026-11-23 — Web base: herramienta de apoyo para las pruebas humanas (T32b, T33b y T34b)
+
+### Cubierto
+- Nueva herramienta `tools/pruebas-humanas/` (`index.html` en un solo archivo, sin red ni telemetría, con `servir.mjs` para abrirla desde móviles reales): bloque A (navegadores y móviles), B (teclado y lector, con la definición de «crítico AA») y C (moderador de usabilidad con consentimiento, cronómetro, SUS 0 a 100 y resumen por ronda contra AC-WEB-17); exporta a JSON y Markdown, importa y combina archivos de varios dispositivos y borra los datos locales. Guías reforzadas (`09` y `10`), `README.md`, `veredicto.md` con el esquema JSON y los criterios para leer los resultados, e inventario de privacidad ampliado.
+- 165 pruebas de Playwright propias (162 pasan y 3, de Tab, se omiten en WebKit) (`tests/e2e/pruebas-humanas/`: Chromium de escritorio y teléfono y WebKit de iPhone): SUS, resumen y criterio, exportación e importación, flujos, ausencia de red, política de contenido con hash y axe en ambos temas. Revisión de seguridad aplicada (DD-60 a DD-64, pendientes de ratificar).
+
+### Pendiente
+- Ninguna prueba con personas se ejecutó ni se inventó: T32b, T33b y T34b siguen en manos de la persona responsable; `web-base` sigue en `Planned`.
+
+
 ## 2026-11-21 (noche) — Cierre de Inventario: ajustes y selección de fuente a Done
 
 ### Cubierto

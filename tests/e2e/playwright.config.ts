@@ -56,6 +56,8 @@ for (const [nombre, ejecutable, dispositivo] of [
 export default defineConfig({
   testDir: '.',
   testMatch: '**/*.spec.ts',
+  // La herramienta de apoyo `tools/pruebas-humanas` tiene su propia configuración y no necesita este entorno: `playwright test --config pruebas-humanas/playwright.config.ts`.
+  testIgnore: ['pruebas-humanas/**'],
   fullyParallel: true,
   retries: 0,
   reporter: [['list']],
