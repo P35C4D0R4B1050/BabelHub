@@ -32,7 +32,8 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     environment:
-      ASPNETCORE_ENVIRONMENT: Production
+      # PAG-34: ASPNETCORE_ENVIRONMENT NO se fija aquí: lo define ecommerce.env (Staging mientras Culqi revisa la tienda, con la pasarela simulada; Production con las llaves de Culqi). Es el único lugar que cambia al pasar
+      # de uno a otro, y desplegar.sh se niega si falta, si no es Staging o Production o si no es coherente con BABELHUB__Pagos__Pasarela. Sin valor, la imagen arranca como Production y la guarda exige la pasarela real.
       # El rol del proceso (web-base, D03). BABELHUB__Web__HostsPermitidos (los hosts que acepta el servidor) va en ecommerce.env: sin él el servicio no arranca.
       BABELHUB__Web__Host: tienda
       # DD-55: HTTPS entre servicios en Production (guardas de arranque y docs/05): el Inventario llama a este servicio por https://<IP privada>:8443 (avisos de traslado). Kestrel escucha también en 8443 con el

@@ -57,6 +57,15 @@ public sealed class SembradorDeSesionesTests(InstanciaParaMigrar instancia) : IC
             configuracion[ruta] = instancia.Cadena(baseDeDatos, usuario, clave);
         }
 
+        if (entorno == "Staging")
+        {
+            // Staging es de tipo producción (PAG-34): exige lo mismo que Production (Redis con TLS, proxies, correo…).
+            foreach (var (ruta, valor) in AnfitrionDelEcommerceTests.ConfiguracionDeProduccion())
+            {
+                configuracion[ruta] = valor;
+            }
+        }
+
         configuracion["Web:Host"] = host;
         configuracion["Web:ClaveDeSesionesGestion"] = Secreto();
         if (conClave)

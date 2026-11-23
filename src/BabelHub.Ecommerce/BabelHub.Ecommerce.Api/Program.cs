@@ -1,10 +1,23 @@
 using BabelHub.Ecommerce.Api.Plataforma;
+using BabelHub.Ecommerce.Api.Web;
 using BabelHub.Ecommerce.Application.Plataforma;
 
 // El modo migrar (COMP-2): aplica los esquemas y los roles de la base con la cuenta propietaria y termina; no arranca el servidor.
 if (args.Length > 0 && args[0] == ModoMigrar.Argumento)
 {
     return await ModoMigrar.Ejecutar(new ConfigurationBuilder().AddEnvironmentVariables(prefix: "BABELHUB__").Build(), Console.Out, Console.Error);
+}
+
+// El modo cuenta-de-prueba (PAG-35): crea la cuenta con la que la pasarela revisa la tienda y muestra su contraseña una sola vez; solo existe en Staging y no arranca el servidor.
+if (args.Length > 0 && args[0] == ModoCuentaDeRevision.Argumento)
+{
+    return await ModoCuentaDeRevision.Ejecutar(args[1..], Console.Out, Console.Error);
+}
+
+// El modo crear-administrador (PAG-44): siembra el primer administrador central con una contraseña temporal mostrada una sola vez; en Staging y Production.
+if (args.Length > 0 && args[0] == ModoCrearAdministrador.Argumento)
+{
+    return await ModoCrearAdministrador.Ejecutar(args[1..], Console.Out, Console.Error);
 }
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,7 +28,7 @@ builder.Configuration.AddEnvironmentVariables(prefix: "BABELHUB__");
 // El modo de arranque (PLA-19, PLA-43): en producción, Restauracion y Ensayo solo arrancan con la marca de un solo uso de restaurar.sh.
 var modo = ArranqueSeguro.Resolver(
     builder.Configuration,
-    builder.Environment.IsProduction(),
+    builder.Environment.EsDeTipoProduccion(),
     TimeProvider.System.GetUtcNow(),
     new AlmacenDeNoncesEnArchivos(builder.Configuration["Restauracion:CarpetaDeMarcas"] ?? "/var/lib/babelhub/marcas"));
 builder.Services.AddSingleton(typeof(ModoDeArranque), modo);
@@ -23,19 +36,14 @@ builder.Services.AddScoped<EjecutorDePasosDeRestauracion>();
 builder.Services.AddControllersWithViews();
 // Detrás del borde la aplicación recibe HTTP: solo se toma el esquema (X-Forwarded-Proto) para que las cookies __Host- y el antiforgery vean HTTPS. El Api solo es alcanzable desde la red del borde (SEG-17); el origen del cliente lo fija
 // OrigenDelBorde con la lista de proxies conocidos (BABELHUB__Ecommerce__ProxiesConocidos).
-builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(o =>
-{
-    o.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
-    o.KnownIPNetworks.Clear();
-    o.KnownProxies.Clear();
-});
+builder.Services.AgregarEsquemaDelBorde();
 
 // La composición real del servicio (COMP-1): plataforma, Auditoría, Identidad, Catálogo, Carrito, la sesión de la web y los trabajos de fondo.
 // Falta una variable obligatoria o es débil: el arranque falla nombrando la variable (nunca su valor).
 builder.AgregarEcommerce(modo);
 
 var app = builder.Build();
-ArranqueSeguro.ExigirCoherencia(modo, builder.Environment.IsProduction(), app.Services.GetServices<IAdaptadorSaliente>());
+ArranqueSeguro.ExigirCoherencia(modo, builder.Environment.EsDeTipoProduccion(), app.Services.GetServices<IAdaptadorSaliente>());
 
 if (modo == ModoDeArranque.Restauracion)
 {

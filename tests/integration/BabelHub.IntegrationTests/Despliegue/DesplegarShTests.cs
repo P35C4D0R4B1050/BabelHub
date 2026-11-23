@@ -137,9 +137,14 @@ public sealed class DesplegarShTests : IDisposable
                         "BABELHUB_AGE_DESTINATARIO" => "age1" + Aleatorio(58),
                         "RCLONE_CONFIG_ALMACEN_TYPE" => "s3",
                         "RCLONE_CONFIG_ALMACEN_ENDPOINT" => "https://almacen.ejemplo.interno",
+                        // PAG-34: el entorno y la pasarela del E-commerce deben ser coherentes (Staging con el simulador).
+                        "ASPNETCORE_ENVIRONMENT" => "Staging",
+                        "BABELHUB__Pagos__Pasarela" => "simulador",
+                        "BABELHUB__Envios__Operador" => "simulador",
                         _ => Aleatorio(Math.Max(fila.Length > 2 ? int.Parse(fila[2], System.Globalization.CultureInfo.InvariantCulture) : 0, 12) + 8),
                     };
-                    if (fila[1] != "RCLONE_CONFIG_ALMACEN_TYPE")
+                    // Lo que no es un secreto (el tipo del almacén, el entorno y la pasarela) no se vigila en la salida del script: sus mensajes lo nombran.
+                    if (fila[1] is not ("RCLONE_CONFIG_ALMACEN_TYPE" or "ASPNETCORE_ENVIRONMENT" or "BABELHUB__Pagos__Pasarela" or "BABELHUB__Envios__Operador"))
                     {
                         _valoresSecretos.Add(valor);
                     }
@@ -404,6 +409,157 @@ public sealed class DesplegarShTests : IDisposable
         Assert.Contains($"el archivo de secretos {archivo} tiene valores «CAMBIAR» sin completar", errores, StringComparison.Ordinal);
         Assert.DoesNotContain(LlamadasADocker, l => l.Contains(" up ", StringComparison.Ordinal));
         SinSecretosEnLaSalida(salida, errores);
+    }
+
+    // ---------- El entorno del E-commerce y su pasarela (PAG-34; AC-PAG-30): nunca se cobra «a ciegas» ----------
+
+    private static string LlaveDeCulqi(string prefijo) => prefijo + Guid.NewGuid().ToString("N");
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-30")]
+    [InlineData("ventas", "ecommerce.env", "BABELHUB__Pagos__Pasarela=culqi", "Staging solo admite BABELHUB__Pagos__Pasarela=simulador")]
+    [InlineData("inventario", "ecommerce-gestion.env", "BABELHUB__Pagos__Pasarela=culqi", "Staging solo admite BABELHUB__Pagos__Pasarela=simulador")]
+    [InlineData("ventas", "ecommerce.env", "ASPNETCORE_ENVIRONMENT=Production", "Production exige BABELHUB__Pagos__Pasarela=culqi")]
+    [InlineData("inventario", "ecommerce-gestion.env", "ASPNETCORE_ENVIRONMENT=Production", "Production exige BABELHUB__Pagos__Pasarela=culqi")]
+    [InlineData("ventas", "ecommerce.env", "ASPNETCORE_ENVIRONMENT=Qa", "debe ser Staging o Production")]
+    [InlineData("ventas", "ecommerce.env", "ASPNETCORE_ENVIRONMENT=Development", "debe ser Staging o Production")]
+    [InlineData("ventas", "ecommerce.env", "ASPNETCORE_ENVIRONMENT=production", "debe ser Staging o Production")]
+    public void UnEntornoDelEcommerceIncoherenteConSuPasarela_NoSeDespliega_NombrandoElArchivo_SinLlamarADocker(string vm, string archivo, string linea, string mensaje)
+    {
+        PrepararSecretos(vm);
+        File.AppendAllText(Path.Combine(_secretos, archivo), linea + "\n");
+
+        var (codigo, salida, errores) = Desplegar(vm);
+
+        Assert.Equal(1, codigo);
+        Assert.Contains(archivo + ": ASPNETCORE_ENVIRONMENT", errores, StringComparison.Ordinal);
+        Assert.Contains(mensaje, errores, StringComparison.Ordinal);
+        Assert.DoesNotContain(LlamadasADocker, l => l.Contains(" up ", StringComparison.Ordinal));
+        SinSecretosEnLaSalida(salida, errores);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-37")]
+    public void UnOperadorLogisticoQueNoEsElSimulado_NoSeDespliega_PorqueNoHayOperadorReal()
+    {
+        PrepararSecretos("ventas");
+        File.AppendAllText(Path.Combine(_secretos, "ecommerce.env"), "BABELHUB__Envios__Operador=nulo\n");
+
+        var (codigo, _, errores) = Desplegar("ventas");
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("BABELHUB__Envios__Operador debe ser simulador", errores, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-30")]
+    [InlineData(null)]
+    [InlineData("sk_test_")]
+    [InlineData("sk_live_")]
+    public void ProductionConCulqi_ExigeLaLlaveDeProduccion_YNuncaImprimeLaLlave(string? prefijoDeLaLlave)
+    {
+        PrepararSecretos("ventas");
+        var archivo = Path.Combine(_secretos, "ecommerce.env");
+        File.AppendAllText(archivo, "ASPNETCORE_ENVIRONMENT=Production\nBABELHUB__Pagos__Pasarela=culqi\n");
+        if (prefijoDeLaLlave is not null)
+        {
+            var llave = LlaveDeCulqi(prefijoDeLaLlave);
+            _valoresSecretos.Add(llave);
+            File.AppendAllText(archivo, "BABELHUB__Pagos__LlavePrivada=" + llave + "\n");
+        }
+
+        var (codigo, salida, errores) = Desplegar("ventas");
+
+        if (prefijoDeLaLlave == "sk_live_")
+        {
+            Assert.True(codigo == 0, salida + errores);
+        }
+        else
+        {
+            Assert.Equal(1, codigo);
+            Assert.Contains("ecommerce.env: ASPNETCORE_ENVIRONMENT=Production exige BABELHUB__Pagos__LlavePrivada con la llave de producción de Culqi (sk_live_…)", errores, StringComparison.Ordinal);
+            Assert.DoesNotContain(LlamadasADocker, l => l.Contains(" up ", StringComparison.Ordinal));
+        }
+
+        SinSecretosEnLaSalida(salida, errores);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-30")]
+    public void StagingNoLlevaLlaveDeCulqi_NiLaDeProduccionNiLaDePruebas()
+    {
+        PrepararSecretos("ventas");
+        var llave = LlaveDeCulqi("sk_live_");
+        _valoresSecretos.Add(llave);
+        File.AppendAllText(Path.Combine(_secretos, "ecommerce.env"), "BABELHUB__Pagos__LlavePrivada=" + llave + "\n");
+
+        var (codigo, salida, errores) = Desplegar("ventas");
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("ASPNETCORE_ENVIRONMENT=Staging no debe llevar BABELHUB__Pagos__LlavePrivada", errores, StringComparison.Ordinal);
+        SinSecretosEnLaSalida(salida, errores);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-30")]
+    public void SinASPNETCORE_ENVIRONMENT_NoSeDespliegaElEcommerce_NombrandoLaClave()
+    {
+        PrepararSecretos("ventas");
+        var ruta = Path.Combine(_secretos, "ecommerce.env");
+        File.WriteAllLines(ruta, File.ReadAllLines(ruta).Where(l => !l.StartsWith("ASPNETCORE_ENVIRONMENT=", StringComparison.Ordinal)));
+
+        var (codigo, _, errores) = Desplegar("ventas");
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("falta la clave ASPNETCORE_ENVIRONMENT en ecommerce.env", errores, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-30")]
+    public void ElComposeNoFijaElEntornoDelEcommerce_QueSalgaDeSuArchivoDeSecretos()
+    {
+        foreach (var compose in new[] { "docker-compose.ventas.yml", "docker-compose.inventario.yml" })
+        {
+            var texto = File.ReadAllText(Path.Combine(ComposeDeVms.Raiz(), "infra", compose));
+            var servicioDelEcommerce = compose.Contains("ventas", StringComparison.Ordinal) ? "ecommerce" : "ecommerce-gestion";
+            var bloque = texto[texto.IndexOf($"\n  {servicioDelEcommerce}:\n", StringComparison.Ordinal)..];
+            bloque = bloque[..bloque.IndexOf("\n    env_file:", StringComparison.Ordinal)];
+            var lineasQueFijanElEntorno = bloque.Split('\n').Where(l => !l.TrimStart().StartsWith('#') && l.Contains("ASPNETCORE_ENVIRONMENT", StringComparison.Ordinal));
+
+            Assert.Empty(lineasQueFijanElEntorno);
+        }
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-33")]
+    public void LaVersionDeLosTextosViajaSoloALaMigracionDelEcommerce_ComoNombre_YNuncaEnLosArgumentos()
+    {
+        PrepararSecretos("inventario");
+        var version = "0.1-provisional-" + Aleatorio(8);
+        File.AppendAllText(Path.Combine(_secretos, "migrador.env"), "BABELHUB__Migrador__Ecommerce__VersionDeTextos=" + version + "\n");
+
+        var (codigo, salida, errores) = Desplegar("inventario");
+
+        Assert.True(codigo == 0, salida + errores);
+        var corridas = LlamadasADocker.Where(l => l.Contains(" run --rm ", StringComparison.Ordinal)).ToList();
+        Assert.Equal(2, corridas.Count);
+        Assert.DoesNotContain("VersionDeTextos", corridas.Single(l => l.EndsWith(" inventario migrar", StringComparison.Ordinal)), StringComparison.Ordinal);
+        Assert.Contains("-e BABELHUB__Migrador__Ecommerce__VersionDeTextos", corridas.Single(l => l.EndsWith(" ecommerce-gestion migrar", StringComparison.Ordinal)), StringComparison.Ordinal);
+        Assert.DoesNotContain(version, string.Join("\n", LlamadasADocker) + salida + errores, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-33")]
+    public void SinLaVersionDeLosTextos_LaMigracionNoLlevaLaVariable()
+    {
+        PrepararSecretos("inventario");
+
+        var (codigo, salida, errores) = Desplegar("inventario");
+
+        Assert.True(codigo == 0, salida + errores);
+        Assert.DoesNotContain(LlamadasADocker, l => l.Contains("VersionDeTextos", StringComparison.Ordinal));
     }
 
     [Fact]

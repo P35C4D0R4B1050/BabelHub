@@ -26,6 +26,12 @@ public static class PlanDeMigracionDelEcommerce
     public const string Servicio = "ecommerce";
     public const string VariableDeLaCuentaPropietaria = "Migrador:Ecommerce:Propietaria";
 
+    /// <summary>
+    /// La versión con la que se siembran los textos legales vigentes (términos, privacidad y reembolso) si la base aún no los tiene (<c>BABELHUB__Migrador__Ecommerce__VersionDeTextos</c>, solo de la migración). Es opcional: sin ella no se siembra nada.
+    /// La aplicación solo lee esa fila (su rol no puede escribirla), y sin ella nadie acepta los textos ni compra: el despliegue la siembra una vez y no la pisa nunca (<c>ON CONFLICT DO NOTHING</c>); cambiar la versión es una decisión de la persona responsable.
+    /// </summary>
+    public const string VariableDeLaVersionDeTextos = "Migrador:Ecommerce:VersionDeTextos";
+
     /// <summary>Los roles de esquema de los que la aplicación es miembro (<c>NOINHERIT</c>): lo único que puede hacer con <c>SET LOCAL ROLE</c> (AD18).</summary>
     public static IReadOnlyList<string> RolesDeLaAplicacion { get; } =
     [
@@ -138,6 +144,22 @@ public static class PlanDeMigracionDelEcommerce
             throw new MigracionFallidaException("La configuración de la migración no es válida: " + string.Join("; ", problemas));
         }
 
-        return new PlanDeMigracion(Servicio, Pasos(), Esquemas, cuentas);
+        var pasos = Pasos();
+        if (configuracion[VariableDeLaVersionDeTextos] is { Length: > 0 } version)
+        {
+            // La versión va como literal en el paso (la migración es SQL fijo): solo se admiten letras, números, punto, guion y guion bajo, hasta 40 caracteres (el límite de la columna).
+            if (!System.Text.RegularExpressions.Regex.IsMatch(version, "^[A-Za-z0-9][A-Za-z0-9._-]{0,39}\\z", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1)))
+            {
+                throw new MigracionFallidaException(LectorDeSecretos.Variable(VariableDeLaVersionDeTextos) + ": solo letras, números, punto, guion y guion bajo (hasta 40 caracteres).");
+            }
+
+            pasos =
+            [
+                .. pasos,
+                new PasoDeMigracion("textos-vigentes", $"INSERT INTO identidad.versiones_de_textos (id, terminos, privacidad, reembolso) VALUES (1, '{version}', '{version}', '{version}') ON CONFLICT (id) DO NOTHING;"),
+            ];
+        }
+
+        return new PlanDeMigracion(Servicio, pasos, Esquemas, cuentas);
     }
 }

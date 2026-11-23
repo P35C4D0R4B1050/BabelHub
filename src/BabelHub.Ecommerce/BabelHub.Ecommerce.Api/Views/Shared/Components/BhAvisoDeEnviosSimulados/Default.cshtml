@@ -1,0 +1,13 @@
+@using BabelHub.Ecommerce.Api.Pagos
+@model AvisoDePagosSimuladosVista
+@* El aviso de que los envíos son simulados (PAG-42). Icono y texto, sin depender del color; es permanente, así que no es una región viva. Los textos son constantes y Razor los codifica. *@
+<aside class="@(Model.EnContexto ? "alert alert-info my-4" : "alert alert-info rounded-none justify-center")" aria-label="Aviso: envíos simulados" data-bh-envios-simulados>
+    <bh-icono nombre="aviso" />
+    <div>
+        <p class="font-semibold">@ModoDeEnviosDeLaWeb.Texto</p>
+        @if (Model.EnContexto)
+        {
+            <p class="text-sm">@ModoDeEnviosDeLaWeb.Explicacion</p>
+        }
+    </div>
+</aside>

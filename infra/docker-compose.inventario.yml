@@ -111,7 +111,7 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     environment:
-      ASPNETCORE_ENVIRONMENT: Production
+      # PAG-34: ASPNETCORE_ENVIRONMENT NO se fija aquí: lo define ecommerce-gestion.env, igual que en ecommerce.env de VM-VENTAS (los dos procesos del E-commerce corren en el mismo entorno). Ver docker-compose.ventas.yml.
       BABELHUB__Perfil: Gestion
       # El rol del proceso (web-base, D03); BABELHUB__Web__HostsPermitidos va en ecommerce-gestion.env: sin él el servicio no arranca.
       BABELHUB__Web__Host: gestion

@@ -1,6 +1,7 @@
 @using BabelHub.Ecommerce.Api.Web.Formato
 @model BabelHub.Ecommerce.Api.Areas.Tienda.Controllers.PagoVista
 <h1 class="font-display text-4xl leading-tight sm:text-5xl">Pagar tu compra</h1>
+<vc:bh-aviso-de-pagos-simulados en-contexto="true" />
 
 @if (Model.MotivoTexto is not null)
 {

@@ -1,0 +1,13 @@
+@using BabelHub.Ecommerce.Api.Pagos
+@model AvisoDePagosSimuladosVista
+@* El aviso de que ningún cobro es real (PAG-33). Icono y texto, sin depender del color; es permanente, así que no es una región viva. Los textos son constantes y Razor los codifica. *@
+<aside class="@(Model.EnContexto ? "alert alert-warning my-4" : "alert alert-warning rounded-none justify-center")" aria-label="Aviso: pagos simulados" data-bh-pagos-simulados>
+    <bh-icono nombre="aviso" />
+    <div>
+        <p class="font-semibold">@ModoDePagosDeLaWeb.Texto</p>
+        @if (Model.EnContexto)
+        {
+            <p class="text-sm">@ModoDePagosDeLaWeb.Explicacion</p>
+        }
+    </div>
+</aside>

@@ -9,9 +9,9 @@
 # Necesita Docker (con Compose v2.24 o más) y bash en Linux, macOS o WSL (en Windows con Git Bash también funciona). No usa tu dominio, ni Oracle,
 # ni ningún secreto real: todo vive en una carpeta temporal fuera del repositorio y los puertos son locales (127.0.0.1:5xxxx).
 #
-# Lo que NO prueba: Cloudflare, el túnel, Evolution API (WhatsApp), el almacén de objetos de Oracle ni los cobros reales. Y, hoy, los dos
-# servicios del E-commerce se arrancan en modo «Development» solo en este ensayo (con pasarela simulada): en «Production» el E-commerce se niega a
-# arrancar mientras no exista el adaptador de Culqi (ver la guía, «Antes de empezar: lo que hoy impide el primer arranque real»).
+# Lo que NO prueba: Cloudflare, el túnel, Evolution API (WhatsApp), el almacén de objetos de Oracle ni los cobros reales. Los dos servicios del
+# E-commerce corren en «Staging» (el entorno de revisión de la tienda por Culqi: se endurece como «Production» y solo afloja el cobro, con la
+# pasarela simulada) y, al final, el ensayo ejecuta el comando «cuenta-de-prueba» con la imagen real (guía, §15.1).
 set -euo pipefail
 
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -40,7 +40,7 @@ mkdir -p "$TRABAJO"
 paso() { echo; echo "==> $*"; }
 
 # ---------- 1. Registro local y las tres imágenes ----------
-paso "1/6 Registro local y construcción de las tres imágenes (la primera vez tarda varios minutos)"
+paso "1/7 Registro local y construcción de las tres imágenes (la primera vez tarda varios minutos)"
 docker run -d --name babelhub-registro-ensayo -p 127.0.0.1:5055:5000 "$REGISTRO_IMAGE" >/dev/null
 sleep 2
 declare -A DIGEST=()
@@ -55,7 +55,7 @@ publicar inventario "$RAIZ/src/BabelHub.Inventario/BabelHub.Inventario.Api/Docke
 publicar postgres "$RAIZ/infra/postgres/Dockerfile" "$RAIZ/infra/postgres"
 
 # ---------- 2. Secretos de mentira ----------
-paso "2/6 Secretos de mentira (mismo generador que usarás de verdad)"
+paso "2/7 Secretos de mentira (mismo generador que usarás de verdad)"
 bash "$RAIZ/scripts/generar-secretos.sh" --destino "$TRABAJO/secretos" --ensayo --imagen-postgres "${DIGEST[postgres]}" >/dev/null
 # Lo que en la realidad da un tercero (Gmail, Turnstile, el almacén, el túnel) se rellena con valores sin sentido de la forma correcta.
 alea() { head -c $(( $1 * 3 )) /dev/urandom | base64 | tr -d '/+=\n' | head -c "$1"; }
@@ -71,6 +71,10 @@ for archivo in "$TRABAJO"/secretos/*/*.env; do
         *Smtp__Servidor) valor="smtp.invalido.local" ;;
         *Smtp__Cuenta | *Smtp__Remitente | AUX_SMTP_USUARIO | AUX_CORREO_DE | AUX_CORREO_PARA) valor="ensayo@invalido.local" ;;
         AUX_SMTP_URL) valor="smtps://smtp.invalido.local:465" ;;
+        # Datos de contacto INVENTADOS para el ensayo (los reales son de la persona responsable y nunca van al repositorio).
+        *Contacto__Telefono) valor="+51 900 000 000" ;;
+        *Contacto__Correo) valor="contacto@invalido.local" ;;
+        *Contacto__Direccion) valor="Calle de Ensayo 123, Lima" ;;
         *) valor="$(alea 40)" ;;
       esac
       echo "$clave=$valor" >>"$salida"
@@ -79,10 +83,6 @@ for archivo in "$TRABAJO"/secretos/*/*.env; do
     fi
   done <"$archivo"
   cat "$salida" >"$archivo"; rm -f "$salida"
-done
-# En el ensayo los dos servicios del E-commerce corren en «Development» con pasarela y avisos simulados (ver el encabezado).
-for archivo in "$TRABAJO/secretos/inventario/ecommerce-gestion.env" "$TRABAJO/secretos/ventas/ecommerce.env"; do
-  sed -i.bak 's/^BABELHUB__Pagos__Pasarela=.*/BABELHUB__Pagos__Pasarela="simulador"/; s/^BABELHUB__Notificaciones__Envio=.*/BABELHUB__Notificaciones__Envio="simulado"/' "$archivo" && rm -f "$archivo.bak"
 done
 # En el ensayo el E-commerce de VM-VENTAS llega a la base por el puerto local de VM-INVENTARIO.
 sed -i.bak 's/Host=127.0.0.1;Port=5432/Host=host.docker.internal;Port=55432/' "$TRABAJO/secretos/ventas/ecommerce.env" && rm -f "$TRABAJO/secretos/ventas/ecommerce.env.bak"
@@ -98,15 +98,11 @@ services:
     ports: !override ["127.0.0.1:58082:8443"]
   ecommerce-gestion:
     ports: !override ["127.0.0.1:58081:8080"]
-    environment:
-      ASPNETCORE_ENVIRONMENT: Development
 EOF
 cat >"$TRABAJO/ventas.override.yml" <<'EOF'
 services:
   ecommerce:
     ports: !override ["127.0.0.1:58080:8080", "127.0.0.1:58443:8443"]
-    environment:
-      ASPNETCORE_ENVIRONMENT: Development
   redis-contadores:
     ports: !override ["127.0.0.1:56380:6380"]
   n8n:
@@ -119,20 +115,37 @@ export BABELHUB_ENSAYO=1 STAT="$TRABAJO/stat-ensayo.sh" CHOWN=true BABELHUB_RAIC
 export IP_PRIVADA=127.0.0.1 IMAGEN_ECOMMERCE="${DIGEST[ecommerce]}" IMAGEN_INVENTARIO="${DIGEST[inventario]}" IMAGEN_POSTGRES="${DIGEST[postgres]}"
 
 # ---------- 4 y 5. Despliegue de las dos VMs ----------
-paso "3/6 VM-INVENTARIO: PostgreSQL, migraciones, Inventario y réplica de gestión"
+paso "3/7 VM-INVENTARIO: PostgreSQL, migraciones, Inventario y réplica de gestión"
 mkdir -p "$TRABAJO/cron"
 bash "$RAIZ/scripts/desplegar.sh" inventario --secretos "$TRABAJO/secretos/inventario" --cron "$TRABAJO/cron" --extra "$TRABAJO/inventario.override.yml" --espera 240
 
-paso "4/6 VM-VENTAS: E-commerce, Redis (caché y contadores con TLS) y n8n (sin Evolution ni el túnel, que necesitan datos reales)"
+paso "4/7 VM-VENTAS: E-commerce, Redis (caché y contadores con TLS) y n8n (sin Evolution ni el túnel, que necesitan datos reales)"
 bash "$RAIZ/scripts/desplegar.sh" ventas --secretos "$TRABAJO/secretos/ventas" --cron "$TRABAJO/cron" --extra "$TRABAJO/ventas.override.yml" --espera 240 --sin evolution-api,cloudflared
 
 # ---------- 6. Humo ----------
-paso "5/6 Humo: la salud de cada servicio por su puerto HTTPS, validando el certificado con la CA privada"
+paso "5/7 Humo: la salud de cada servicio por su puerto HTTPS, validando el certificado con la CA privada"
 ca="$TRABAJO/secretos/ventas/tls-ca.pem"
 humo() { # red servicio puerto host-de-la-peticion
   MSYS_NO_PATHCONV=1 docker run --rm --network "$1" -v "$ca:/ca.pem:ro" "$CURL_IMAGE" -sS --max-time 20 --cacert /ca.pem ${4:+-H "Host: $4"} "https://$2:$3/health/ready" -w '  [HTTP %{http_code}]\n'
 }
 echo -n "    Inventario (https://inventario:8443): ";  humo babelhub-inventario_default inventario 8443
 echo -n "    E-commerce (https://ecommerce:8443):  ";  humo babelhub-ventas_default ecommerce 8443 localhost
-paso "6/6 Listo. Los dos servicios respondieron «listo» (200) y los certificados se validaron."
+paso "6/7 La tienda en Staging: el aviso de pagos simulados y la cuenta de prueba (con la imagen real)"
+echo -n "    Aviso «Pagos simulados» en la portada: "
+MSYS_NO_PATHCONV=1 docker run --rm --network babelhub-ventas_default -v "$ca:/ca.pem:ro" "$CURL_IMAGE" -sS --max-time 20 --cacert /ca.pem -H "Host: localhost" -H "X-Forwarded-Proto: https" "https://ecommerce:8443/" | grep -c "data-bh-pagos-simulados" || true
+echo -n "    Redirección a HTTPS de lo que el borde declara HTTP: "
+MSYS_NO_PATHCONV=1 docker run --rm --network babelhub-ventas_default -v "$ca:/ca.pem:ro" "$CURL_IMAGE" -sS --max-time 20 --cacert /ca.pem -H "Host: localhost" -H "X-Forwarded-Proto: http" -o /dev/null -w '[HTTP %{http_code}] -> %{redirect_url}\n' "https://ecommerce:8443/catalogo"
+# El comando de consola de la cuenta de prueba corre dentro de la imagen del servicio, con su entorno (el mismo que usarás en la VM); la contraseña se oculta aquí (en la VM se muestra una sola vez).
+salida_cuenta="$(BABELHUB_SECRETOS="$TRABAJO/secretos/ventas" IP_PRIVADA=127.0.0.1 docker compose -p babelhub-ventas --project-directory "$RAIZ/infra" -f "$RAIZ/infra/docker-compose.ventas.yml" -f "$TRABAJO/ventas.override.yml" run --rm --no-deps --no-TTY ecommerce cuenta-de-prueba 2>&1)" || { echo "$salida_cuenta" >&2; echo "Error: cuenta-de-prueba falló." >&2; exit 1; }
+printf '%s\n' "$salida_cuenta" | sed -E 's/^(  contraseña: ).*/\1[oculta en el ensayo]/' | sed 's/^/    /'
+echo -n "    Aviso «Los envíos son simulados» en la portada: "
+MSYS_NO_PATHCONV=1 docker run --rm --network babelhub-ventas_default -v "$ca:/ca.pem:ro" "$CURL_IMAGE" -sS --max-time 20 --cacert /ca.pem -H "Host: localhost" -H "X-Forwarded-Proto: https" "https://ecommerce:8443/" | grep -c "data-bh-envios-simulados" || true
+# Los demás comandos de consola (PAG-43 a PAG-47), también con la imagen real; las contraseñas se ocultan aquí (en la VM se muestran una sola vez).
+consola() { BABELHUB_SECRETOS="$TRABAJO/secretos/ventas" IP_PRIVADA=127.0.0.1 docker compose -p babelhub-ventas --project-directory "$RAIZ/infra" -f "$RAIZ/infra/docker-compose.ventas.yml" -f "$TRABAJO/ventas.override.yml" run --rm --no-deps --no-TTY ecommerce "$@" 2>&1 | sed -E 's/^(  contraseña[^:]*: ).*/\1[oculta en el ensayo]/' | sed 's/^/    /'; }
+echo "    crear-administrador:"; consola crear-administrador --correo administracion@ensayo.example.test
+echo "    cuenta-de-prueba --cantidad 2:"; consola cuenta-de-prueba --cantidad 2
+echo "    cuenta-de-prueba --retirar --todas:"; consola cuenta-de-prueba --retirar --todas
+# --purgar cancela cuentas y necesita el almacén de objetos del registro de supresiones (IDE-70), que este ensayo no levanta: aquí debe negarse con RegistroDeSupresionesNoDisponibleException y sin tocar nada.
+echo "    cuenta-de-prueba --purgar (sin almacén de objetos en el ensayo: debe negarse sin tocar nada):"; consola cuenta-de-prueba --purgar
+paso "7/7 Listo. Los dos servicios respondieron «listo» (200) y los certificados se validaron."
 echo "    Para borrar todo: bash scripts/ensayo-local.sh --limpiar"

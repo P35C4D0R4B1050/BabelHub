@@ -23,11 +23,11 @@ export MSYS_NO_PATHCONV=1   # en Git Bash para Windows, openssl no debe converti
 
 uso() {
   sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//' >&2
-  echo "Opciones: --destino <carpeta> --dominio <dominio> --ip-ventas <ip> --ip-inventario <ip> --ip-borde <ip> [--region sa-santiago-1] [--ensayo] [--imagen-postgres <imagen>]" >&2
+  echo "Opciones: --destino <carpeta> --dominio <dominio> --ip-ventas <ip> --ip-inventario <ip> --ip-borde <ip> [--entorno staging|production] [--region sa-santiago-1] [--ensayo] [--imagen-postgres <imagen>]" >&2
   exit 2
 }
 
-DESTINO="" DOMINIO="" IP_VENTAS="" IP_INVENTARIO="" IP_BORDE="" REGION="sa-santiago-1" ENSAYO=0 IMAGEN_POSTGRES_PARA_AGE=""
+DESTINO="" DOMINIO="" IP_VENTAS="" IP_INVENTARIO="" IP_BORDE="" REGION="sa-santiago-1" ENSAYO=0 IMAGEN_POSTGRES_PARA_AGE="" ENTORNO="staging"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --destino) [[ $# -ge 2 ]] || uso; DESTINO="$2"; shift 2 ;;
@@ -36,6 +36,7 @@ while [[ $# -gt 0 ]]; do
     --ip-inventario) [[ $# -ge 2 ]] || uso; IP_INVENTARIO="$2"; shift 2 ;;
     --ip-borde) [[ $# -ge 2 ]] || uso; IP_BORDE="$2"; shift 2 ;;
     --region) [[ $# -ge 2 ]] || uso; REGION="$2"; shift 2 ;;
+    --entorno) [[ $# -ge 2 ]] || uso; ENTORNO="$2"; shift 2 ;;
     --imagen-postgres) [[ $# -ge 2 ]] || uso; IMAGEN_POSTGRES_PARA_AGE="$2"; shift 2 ;;
     --ensayo) ENSAYO=1; shift ;;
     *) uso ;;
@@ -57,6 +58,13 @@ ip_valida() {
 ip_valida "$IP_VENTAS" && ip_valida "$IP_INVENTARIO" && ip_valida "$IP_BORDE" || { echo "Error: las direcciones deben ser IPv4 privadas (10.x.x.x, 172.16-31.x.x o 192.168.x.x), por ejemplo 10.0.0.10." >&2; exit 2; }
 [[ "$DOMINIO" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] || { echo "Error: el dominio debe ir en minúsculas, sin https:// ni barras (ejemplo.pe)." >&2; exit 2; }
 [[ "$REGION" =~ ^[a-z0-9-]+$ ]] || { echo "Error: región inválida." >&2; exit 2; }
+# El entorno de los dos servicios del E-commerce (PAG-34): «staging» (revisión de la tienda por Culqi: pasarela SIMULADA, nunca cobra) o «production» (pasarela real; exige las llaves de Culqi).
+# Staging se endurece igual que Production: lo único que afloja es el cobro. Pasar de uno a otro es cambiar tres líneas de ecommerce.env y ecommerce-gestion.env (guía, §«De Staging a Production»).
+case "$ENTORNO" in
+  staging) ENTORNO_ASPNET="Staging"; PASARELA="simulador" ;;
+  production) ENTORNO_ASPNET="Production"; PASARELA="culqi" ;;
+  *) echo "Error: --entorno es «staging» o «production»." >&2; exit 2 ;;
+esac
 command -v openssl >/dev/null || { echo "Error: falta openssl." >&2; exit 2; }
 if [[ -d "$DESTINO" ]] && [[ -n "$(ls -A "$DESTINO" 2>/dev/null)" ]]; then
   echo "Error: $DESTINO ya tiene archivos; este script no pisa secretos. Usa una carpeta nueva." >&2
@@ -94,6 +102,19 @@ pendiente() {
   PENDIENTES+=("${1#"$DESTINO"/}  $2  — $3")
 }
 inicio() { : > "$1"; chmod 600 "$1"; { echo "# Generado por scripts/generar-secretos.sh. Solo para esta VM. Fuera del repositorio. Permisos 600."; } >> "$1"; }
+
+# El entorno y la pasarela del E-commerce (PAG-34) y lo que la web muestra de la tienda: el teléfono, el correo y la dirección de contacto (Culqi exige contacto visible) son DATOS PERSONALES de la persona responsable y NO se
+# escriben en el repositorio: quedan como «CAMBIAR» y los completa ella (BABELHUB__Contacto__*). En producción, además, la llave privada de Culqi (sk_live_…).
+entorno_y_pagos() {
+  linea "$1" ASPNETCORE_ENVIRONMENT "$ENTORNO_ASPNET"
+  linea "$1" BABELHUB__Pagos__Pasarela "$PASARELA"
+  # No hay operador logístico real ni lo habrá (DD-22): los envíos se operan con el simulador, también en Production, y la tienda lo anuncia («Los envíos son simulados: proyecto académico», PAG-42).
+  linea "$1" BABELHUB__Envios__Operador simulador
+  if [[ "$ENTORNO" == production ]]; then pendiente "$1" BABELHUB__Pagos__LlavePrivada "la llave privada de producción de Culqi (sk_live_…); solo en este archivo y en el de la otra VM del E-commerce"; fi
+  pendiente "$1" BABELHUB__Contacto__Telefono "el teléfono de contacto que mostrará la tienda (dato personal: no va al repositorio)"
+  pendiente "$1" BABELHUB__Contacto__Correo "el correo de contacto que mostrará la tienda (dato personal: no va al repositorio)"
+  pendiente "$1" BABELHUB__Contacto__Direccion "la dirección de contacto que mostrará la tienda (dato personal: no va al repositorio)"
+}
 
 ALCANCES=(LecturaDeDisponibilidad OperacionDeUsuario LecturaDeContacto ExpiracionDeReservas ConsultaDePendientes BajaDeTitular OrigenReenviado ConsultaDeAuditoria LecturaDeAlertas MarcarAlerta Historial SolicitarAviso)
 credenciales_de_servicio() { for a in "${ALCANCES[@]}"; do linea "$1" "BABELHUB__Seguridad__Credenciales__$a" "$(valor "cred-$a" 40)"; done; }
@@ -157,7 +178,7 @@ linea "$f" BABELHUB__Catalogo__ClaveDeIngresos "$(valor ingresos 40)"
 linea "$f" BABELHUB__Correo__ClaveDeLaCola "$(valor cola-correo 40)"
 linea "$f" BABELHUB__Identidad__ClaveDeCifradoDeClaves "$(valor cifrado-claves 0 versionada)"
 linea "$f" BABELHUB__Identidad__Pimienta "$(valor pimienta 0 versionada)"
-linea "$f" BABELHUB__Pagos__Pasarela culqi
+entorno_y_pagos "$f"
 linea "$f" BABELHUB__Pagos__ClaveDeIntentos "$(valor intentos 40)"
 linea "$f" BABELHUB__Notificaciones__Envio n8n
 linea "$f" BABELHUB__Notificaciones__N8n__Webhook "http://$IP_VENTAS:5678/webhook/babelhub-avisos"
@@ -187,6 +208,9 @@ credenciales_de_servicio "$f"
 f="$d/migrador.env"; inicio "$f"
 linea "$f" BABELHUB__Migrador__Inventario__Propietaria "Host=postgres;Port=5432;Database=inventario;Username=postgres;Password=$(valor pg-admin 40)"
 linea "$f" BABELHUB__Migrador__Ecommerce__Propietaria "Host=postgres;Port=5432;Database=ecommerce;Username=postgres;Password=$(valor pg-admin 40)"
+# La versión con la que la migración siembra, solo si faltan, los textos legales vigentes (términos, privacidad y reembolso). La aplicación solo los lee y sin ellos nadie acepta los textos ni compra. Es PROVISIONAL: mientras los textos
+# legales sean de trabajo, la versión lo dice; al aprobar los definitivos la persona responsable cambia la fila (todas las cuentas deberán aceptarlos de nuevo). Nunca se pisa lo ya sembrado.
+linea "$f" BABELHUB__Migrador__Ecommerce__VersionDeTextos "0.1-provisional"
 
 # La credencial de correo propia de esta VM para el aviso del espacio reservado (PLA-21): solo envía avisos.
 f="$d/aviso.env"; inicio "$f"
@@ -218,7 +242,7 @@ linea "$f" BABELHUB__Catalogo__ClaveDeIngresos "$(valor ingresos 40)"
 linea "$f" BABELHUB__Correo__ClaveDeLaCola "$(valor cola-correo 40)"
 linea "$f" BABELHUB__Identidad__ClaveDeCifradoDeClaves "$(valor cifrado-claves 0 versionada)"
 linea "$f" BABELHUB__Identidad__Pimienta "$(valor pimienta 0 versionada)"
-linea "$f" BABELHUB__Pagos__Pasarela culqi
+entorno_y_pagos "$f"
 linea "$f" BABELHUB__Pagos__ClaveDeIntentos "$(valor intentos 40)"
 linea "$f" BABELHUB__Notificaciones__Envio n8n
 linea "$f" BABELHUB__Notificaciones__N8n__Webhook "http://n8n:5678/webhook/babelhub-avisos"
