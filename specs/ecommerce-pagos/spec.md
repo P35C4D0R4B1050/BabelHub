@@ -1,11 +1,11 @@
 ---
 id: ecommerce-pagos
 titulo: Pagos con Yape y tarjeta
-estado: Draft
+estado: Planned
 aprobado_por: Claude (delegado por Diego Amiquero)
-aprobado_en: 2026-11-13
+aprobado_en: 2026-11-23
 plan_aprobado_por: Claude (delegado por Diego Amiquero)
-plan_aprobado_en: 2026-11-18
+plan_aprobado_en: 2026-11-23
 servicio: E-commerce
 prefijo: PAG
 origen: [RF05, RF07, NN02, NN15]

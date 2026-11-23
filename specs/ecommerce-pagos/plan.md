@@ -1,6 +1,6 @@
 ---
 spec: ecommerce-pagos
-estado: Draft
+estado: Planned
 ---
 
 # Plan — Pagos con Yape y tarjeta

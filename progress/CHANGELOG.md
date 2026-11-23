@@ -9,7 +9,7 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 - Guía del primer despliegue con `babel-hub.shop`, el flujo de dos fases con Culqi y la lista de requisitos. Comprobado con las imágenes reales (ensayo local).
 - Ampliación (DD-85 a DD-88, ratificadas): operador logístico simulado también en `Production` con el aviso «Los envíos son simulados: proyecto académico» (PAG-42), `crear-administrador` (PAG-44, PAG-47), `cuenta-de-prueba --cantidad N`, `--retirar --todas` y `--purgar` (PAG-43, PAG-45), primera clave de firma en la misma transacción (PAG-46); 52 pruebas de integración de la operación sobre PostgreSQL.
 - La spec sigue en `Draft` (no se aprobó): DD-89 ya está ratificada; falta cerrar la puerta de revisión (ver hallazgos). Abiertos: adaptador real de Culqi para `Production` (T37 y T38), `n8n` en el ensayo. Sin push.
-
+- **Spec y plan de `ecommerce-pagos` aprobados el 2026-11-23** (por delegación, puerta sin Bloqueantes ni Importantes; filas en `progress/aprobaciones.md`; estado `Planned`); T39 a T47 pasaron a `tasks.md` (ECO-5g). DD-65 a DD-69 y DD-85 a DD-89 ratificadas. Aviso de pagos y de envíos verificados con Playwright (Chromium escritorio y teléfono) y la imagen real; `--purgar` pendiente de probar con el almacén de objetos real. Abiertos: adaptador real de Culqi para `Production` (T37 y T38), `n8n` en el ensayo. Sin push.
 ## 2026-11-23 — Preparación del primer despliegue en Oracle
 
 ### Cubierto
