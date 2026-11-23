@@ -180,6 +180,28 @@ if [[ -n "$SECRETOS" ]]; then
   else
     anotar "falta la tabla de secretos requeridos $tabla"
   fi
+  # El entorno del E-commerce y su pasarela de pago (PAG-34), en cada archivo del E-commerce de esta VM. Nunca se cobra «a ciegas»: Staging (la revisión de la tienda por Culqi) solo con la pasarela SIMULADA, que no
+  # cobra nada; Production solo con la real (culqi) y su llave de producción (sk_live_…). Cualquier otro entorno, o una mezcla (por ejemplo Production con el simulador), no se despliega.
+  for archivo in ecommerce.env ecommerce-gestion.env; do
+    [[ " ${ARCHIVOS[*]} " == *" $archivo "* && -s "$SECRETOS/$archivo" ]] || continue
+    entorno="$(leer_valor "$SECRETOS/$archivo" ASPNETCORE_ENVIRONMENT)"
+    pasarela="$(leer_valor "$SECRETOS/$archivo" BABELHUB__Pagos__Pasarela)"
+    case "$entorno" in
+      Staging)
+        [[ "$pasarela" == simulador ]] || anotar "$archivo: ASPNETCORE_ENVIRONMENT=Staging solo admite BABELHUB__Pagos__Pasarela=simulador (la pasarela real se prueba con llaves en Production)"
+        ;;
+      Production)
+        [[ "$pasarela" == culqi ]] || anotar "$archivo: ASPNETCORE_ENVIRONMENT=Production exige BABELHUB__Pagos__Pasarela=culqi; el simulador no cobra y no se acepta en Production"
+        [[ "$(leer_valor "$SECRETOS/$archivo" BABELHUB__Pagos__LlavePrivada)" == sk_live_* ]] || anotar "$archivo: ASPNETCORE_ENVIRONMENT=Production exige BABELHUB__Pagos__LlavePrivada con la llave de producción de Culqi (sk_live_…)"
+        ;;
+      "") ;;   # la falta de la clave ya la anotó la tabla de secretos requeridos
+      *) anotar "$archivo: ASPNETCORE_ENVIRONMENT debe ser Staging o Production (no «$entorno»)" ;;
+    esac
+    # Una llave de Culqi solo sirve en Production: en Staging no hay adaptador real, y una llave suelta en un entorno que no cobra es un secreto sin uso.
+    if [[ "$entorno" == Staging && -n "$(leer_valor "$SECRETOS/$archivo" BABELHUB__Pagos__LlavePrivada)" ]]; then
+      anotar "$archivo: ASPNETCORE_ENVIRONMENT=Staging no debe llevar BABELHUB__Pagos__LlavePrivada (la llave de Culqi va solo en Production)"
+    fi
+  done
 fi
 
 # ---------- 3. Tarea de respaldo de la VM de datos ----------
@@ -280,15 +302,25 @@ if [[ "$VM" == inventario ]]; then
     echo "PostgreSQL de $VM no quedó sano en $ESPERA segundos: no se migra." >&2
     exit 1
   fi
-  migrar() { # servicio variable-de-la-cuenta-propietaria
-    local servicio="$1" variable="$2"
+  migrar() { # servicio variable-de-la-cuenta-propietaria [variable-opcional-de-migrador.env ...]
+    local servicio="$1" variable="$2" opcional valor
+    shift 2
     (
       export "$variable=$(leer_valor "$MIGRADOR" "$variable")"
-      compose run --rm --no-deps -e "$variable" "$servicio" migrar
+      adicionales=()
+      # Lo opcional de migrador.env (por ejemplo, la versión con la que se siembran los textos legales vigentes) solo viaja si está: sin la variable la migración no siembra nada.
+      for opcional in "$@"; do
+        valor="$(leer_valor "$MIGRADOR" "$opcional")"
+        if [[ -n "$valor" ]]; then
+          export "$opcional=$valor"
+          adicionales+=(-e "$opcional")
+        fi
+      done
+      compose run --rm --no-deps -e "$variable" ${adicionales[@]+"${adicionales[@]}"} "$servicio" migrar
     ) || { echo "La migración de la base de $servicio falló: no se despliega $VM." >&2; exit 1; }
   }
   migrar inventario BABELHUB__Migrador__Inventario__Propietaria
-  migrar ecommerce-gestion BABELHUB__Migrador__Ecommerce__Propietaria
+  migrar ecommerce-gestion BABELHUB__Migrador__Ecommerce__Propietaria BABELHUB__Migrador__Ecommerce__VersionDeTextos
 fi
 
 # Sin --sin se levanta todo el Compose (el comando de siempre); con --sin, solo los servicios que quedan.
