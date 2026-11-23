@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "ediciones": [
+    {
+      "edicionId": "3f2b8c1e-5a47-4d0e-9b6a-0c1d2e3f4a51",
+      "isbn": "9790000000018",
+      "stock": { "lima": 12, "ayacucho": 8, "cusco": 5 }
+    },
+    {
+      "edicionId": "7a9d4e20-1c3b-4f58-8e2d-6b5a4c3d2e12",
+      "isbn": "9790000000025",
+      "stock": { "lima": 25, "piura": 3 }
+    }
+  ]
+}

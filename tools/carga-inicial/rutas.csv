@@ -1,0 +1,11 @@
+origen;destino;dias
+lima;arequipa;2
+lima;trujillo;2
+lima;cusco;2
+lima;piura;2
+lima;ayacucho;3
+arequipa;lima;2
+trujillo;lima;2
+cusco;lima;2
+piura;lima;2
+ayacucho;lima;3
