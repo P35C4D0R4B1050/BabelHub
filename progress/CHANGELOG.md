@@ -7,7 +7,8 @@ Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progres
 ### Cubierto
 - `ecommerce-pagos` reabierta (PAG-33 a PAG-41, AC-PAG-29 a AC-PAG-36, D25; DD-65 a DD-69): `Staging` de tipo producción con el simulador de pagos y su aviso «Pagos simulados: no se realiza ningún cobro», `Production` sigue fallando cerrado; cuenta de prueba por consola (`cuenta-de-prueba`, `--retirar`), siembra de textos legales vigentes en `migrar`, HTTPS detrás de Cloudflare (redirección `308`, HSTS, sin contenido mixto), entorno y pasarela desde el archivo de secretos, datos de contacto por `BABELHUB__Contacto__*`.
 - Guía del primer despliegue con `babel-hub.shop`, el flujo de dos fases con Culqi y la lista de requisitos. Comprobado con las imágenes reales (ensayo local).
-- Abiertos: primer administrador inexistente, operador logístico real para `Production`, `n8n` en el ensayo. Sin push.
+- Ampliación (DD-85 a DD-88, ratificadas): operador logístico simulado también en `Production` con el aviso «Los envíos son simulados: proyecto académico» (PAG-42), `crear-administrador` (PAG-44, PAG-47), `cuenta-de-prueba --cantidad N`, `--retirar --todas` y `--purgar` (PAG-43, PAG-45), primera clave de firma en la misma transacción (PAG-46); 52 pruebas de integración de la operación sobre PostgreSQL.
+- La spec sigue en `Draft` (no se aprobó): falta la decisión de negocio DD-89 y una revisión del auditor sobre los textos corregidos. Abiertos: adaptador real de Culqi para `Production` (T37 y T38), `n8n` en el ensayo. Sin push.
 
 ## 2026-11-23 — Preparación del primer despliegue en Oracle
 

@@ -19,3 +19,5 @@ Encargo: publicar la tienda en `babel-hub.shop` para que Culqi la revise **antes
 
 ## Proceso
 El código se redactó en paralelo a la reapertura de la spec (antes de la reaprobación); la puerta (spec-auditor, arch-reviewer, security-reviewer) revisó spec y código y se repitió tras corregir. Ver `progress/aprobaciones.md`.
+
+Resultado: la spec **no se aprobó** (sigue en `Draft`). Tras la ratificación de DD-65 a DD-69 y DD-85 a DD-88 y una ronda extra, arquitectura y seguridad quedaron sin Bloqueantes ni Importantes; el auditor dejó 3 Importantes que se corrigieron en la spec (definición de cuenta de prueba, PAG-47 y «primer ingreso», alcance de la purga) y queda la decisión de negocio **DD-89** (compras simuladas de usuarios reales y pedidos no terminales en la purga). Hace falta una nueva revisión del auditor antes de aprobar spec y plan.

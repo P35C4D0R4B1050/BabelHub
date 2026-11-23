@@ -188,15 +188,8 @@ public static class ArranqueSeguro
         return modo;
     }
 
-    /// <summary>El nombre con el que el anfitrión del E-commerce registra al operador logístico como adaptador saliente.</summary>
-    public const string OperadorLogistico = "operador-logistico";
-
     /// <summary>Los adaptadores salientes deben corresponder al modo (la negativa a arrancar si el modo no coincide con el notificador).</summary>
-    /// <param name="admiteOperadorLogisticoNulo">
-    /// Solo el entorno de revisión (<c>Staging</c>, PAG-34): aún no existe un operador logístico real (DD-22), así que ahí el operador puede ser el nulo (las guías de envío responden «no disponible», fallando cerrado) sin que el
-    /// arranque se niegue. Ningún otro adaptador hacia un proveedor puede ser nulo en un entorno de tipo producción.
-    /// </param>
-    public static void ExigirCoherencia(ModoDeArranque modo, bool esProduccion, IEnumerable<IAdaptadorSaliente> adaptadores, bool admiteOperadorLogisticoNulo = false)
+    public static void ExigirCoherencia(ModoDeArranque modo, bool esProduccion, IEnumerable<IAdaptadorSaliente> adaptadores)
     {
         ArgumentNullException.ThrowIfNull(adaptadores);
         foreach (var adaptador in adaptadores.Where(a => a.EsHaciaProveedor))
@@ -206,7 +199,7 @@ public static class ArranqueSeguro
                 throw new ArranqueRechazadoException($"El adaptador «{adaptador.Nombre}» no es nulo y el modo {modo} no admite comunicarse con proveedores.");
             }
 
-            if (modo == ModoDeArranque.Normal && esProduccion && adaptador.EsNulo && !(admiteOperadorLogisticoNulo && adaptador.Nombre == OperadorLogistico))
+            if (modo == ModoDeArranque.Normal && esProduccion && adaptador.EsNulo)
             {
                 throw new ArranqueRechazadoException($"El adaptador «{adaptador.Nombre}» es nulo y el modo Normal de producción necesita el real.");
             }
