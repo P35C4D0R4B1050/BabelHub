@@ -87,7 +87,8 @@ internal sealed class LecturasDeAdministracion(
             obra.Portada.Huella.Hex,
             obra.Version,
             obra.EstaDadaDeBaja,
-            obra.Ediciones.Select(e => Mapear(e, sinRegistrar)).ToList());
+            obra.Ediciones.Select(e => Mapear(e, sinRegistrar)).ToList(),
+            obra.Descripcion);
 
     private EdicionDeAdministracion Mapear(Edicion edicion, IReadOnlySet<Guid>? sinRegistrar) =>
         new(

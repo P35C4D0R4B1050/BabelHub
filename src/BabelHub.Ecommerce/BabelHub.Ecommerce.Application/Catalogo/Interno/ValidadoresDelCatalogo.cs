@@ -66,6 +66,18 @@ internal static class ReglasDeEntradaDelCatalogo
         }
     }
 
+    /// <summary>
+    /// La descripción opcional de la obra (CAT-01, CAT-25): la regla es la del Dominio (<see cref="DescripcionDeObra"/>: 600 puntos de código, solo el salto de línea como control). El error lleva el campo y la clave, nunca el texto.
+    /// </summary>
+    public static void Descripcion(List<ErrorDeCampo> errores, string? valor)
+    {
+        DescripcionDeObra.Normalizar(valor, out var motivo);
+        if (motivo is { } rechazo)
+        {
+            errores.Add(new ErrorDeCampo("descripcion", rechazo == MotivoDeDescripcionInvalida.DemasiadoLarga ? ConstructorDeValidacion.DemasiadoLargo : ConstructorDeValidacion.FormatoInvalido));
+        }
+    }
+
     /// <summary>Texto libre (referencia, nota, motivo): además de lo anterior, no puede llevar un dato que SEG-10 prohíbe en los registros (una tarjeta, un token, una credencial).</summary>
     public static void TextoLibre(List<ErrorDeCampo> errores, string campo, string? valor, int maximo, bool obligatorio, bool permiteSaltos = false)
     {
@@ -244,6 +256,7 @@ internal sealed class ValidadorDeRegistrarObra : IValidador<RegistrarObraEntrada
         ReglasDeEntradaDelCatalogo.Texto(errores, "autor", entrada.Autor, LimitesDelCatalogo.LargoMaximoDeTexto);
         ReglasDeEntradaDelCatalogo.Texto(errores, "editorial", entrada.Editorial, LimitesDelCatalogo.LargoMaximoDeTexto);
         ReglasDeEntradaDelCatalogo.Texto(errores, "categoria", entrada.Categoria, LimitesDelCatalogo.LargoMaximoDeCategoria);
+        ReglasDeEntradaDelCatalogo.Descripcion(errores, entrada.Descripcion);
         ReglasDeEntradaDelCatalogo.Identificador(errores, "portadaRef", entrada.PortadaRef);
 
         if (entrada.Ediciones is null || entrada.Ediciones.Count == 0)
@@ -279,6 +292,7 @@ internal sealed class ValidadorDeEditarObra : IValidador<EditarObraEntrada>
         ReglasDeEntradaDelCatalogo.Texto(errores, "autor", entrada.Autor, LimitesDelCatalogo.LargoMaximoDeTexto);
         ReglasDeEntradaDelCatalogo.Texto(errores, "editorial", entrada.Editorial, LimitesDelCatalogo.LargoMaximoDeTexto);
         ReglasDeEntradaDelCatalogo.Texto(errores, "categoria", entrada.Categoria, LimitesDelCatalogo.LargoMaximoDeCategoria);
+        ReglasDeEntradaDelCatalogo.Descripcion(errores, entrada.Descripcion);
         ReglasDeEntradaDelCatalogo.Identificador(errores, "portadaRef", entrada.PortadaRef, obligatorio: false);
         return errores.Count == 0 ? ResultadoDeValidacion.Valido : ResultadoDeValidacion.Invalido(errores);
     }

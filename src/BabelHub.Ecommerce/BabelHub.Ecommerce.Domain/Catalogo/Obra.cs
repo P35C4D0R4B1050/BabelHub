@@ -67,7 +67,7 @@ public sealed class ResultadoDeObra<T>
 }
 
 /// <summary>Los datos de texto de una obra (CAT-01). Se recortan los espacios de los extremos y se validan largo y obligatoriedad al crear o editar la obra.</summary>
-public sealed record DatosDeObra(string? Titulo, string? Autor, string? Editorial, string? Categoria);
+public sealed record DatosDeObra(string? Titulo, string? Autor, string? Editorial, string? Categoria, string? Descripcion = null);
 
 /// <summary>Lo que cambió al editar los datos de una obra, para la auditoría (<c>camposCambiados</c>, sin los valores).</summary>
 public sealed record CambiosDeObra(IReadOnlyList<string> CamposCambiados);
@@ -129,6 +129,7 @@ public sealed class Obra
         Autor = datos.Autor!;
         Editorial = datos.Editorial!;
         Categoria = datos.Categoria!;
+        Descripcion = datos.Descripcion;
         Portada = portada;
         Version = version;
         Estado = estado;
@@ -146,6 +147,9 @@ public sealed class Obra
     public string Editorial { get; private set; }
 
     public string Categoria { get; private set; }
+
+    /// <summary>La descripción opcional (CAT-01): texto plano de hasta 600 puntos de código, o <see langword="null"/> si no tiene (<see cref="DescripcionDeObra"/>).</summary>
+    public string? Descripcion { get; private set; }
 
     public PortadaDeObra Portada { get; private set; }
 
@@ -271,10 +275,16 @@ public sealed class Obra
             cambiados.Add("categoria");
         }
 
+        if (!string.Equals(Descripcion, limpios.Descripcion, StringComparison.Ordinal))
+        {
+            cambiados.Add("descripcion");
+        }
+
         Titulo = limpios.Titulo!;
         Autor = limpios.Autor!;
         Editorial = limpios.Editorial!;
         Categoria = limpios.Categoria!;
+        Descripcion = limpios.Descripcion;
         Version++;
         return ResultadoDeObra<CambiosDeObra>.Exito(new CambiosDeObra(cambiados));
     }
@@ -469,13 +479,15 @@ public sealed class Obra
         var autor = datos.Autor?.Trim();
         var editorial = datos.Editorial?.Trim();
         var categoria = datos.Categoria?.Trim();
+        var descripcion = DescripcionDeObra.Normalizar(datos.Descripcion, out var motivoDeLaDescripcion);
 
         campoInvalido = EsInvalido(titulo, LongitudMaximaDelTexto) ? "titulo"
             : EsInvalido(autor, LongitudMaximaDelTexto) ? "autor"
             : EsInvalido(editorial, LongitudMaximaDelTexto) ? "editorial"
             : EsInvalido(categoria, LongitudMaximaDeLaCategoria) ? "categoria"
+            : motivoDeLaDescripcion is not null ? "descripcion"
             : null;
-        return new DatosDeObra(titulo, autor, editorial, categoria);
+        return new DatosDeObra(titulo, autor, editorial, categoria, descripcion);
     }
 
     private static bool EsInvalido(string? texto, int maximo) => string.IsNullOrEmpty(texto) || texto.Length > maximo;

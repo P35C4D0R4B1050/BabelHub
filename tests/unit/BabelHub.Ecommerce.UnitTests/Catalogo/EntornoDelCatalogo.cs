@@ -62,7 +62,7 @@ internal sealed class RepositorioDeObrasEnMemoria : IRepositorioDeObras, IInstan
     public static Obra Clonar(Obra o) =>
         Obra.Rehidratar(
             o.Id,
-            new DatosDeObra(o.Titulo, o.Autor, o.Editorial, o.Categoria),
+            new DatosDeObra(o.Titulo, o.Autor, o.Editorial, o.Categoria, o.Descripcion),
             o.Portada,
             o.Version,
             o.Estado,
