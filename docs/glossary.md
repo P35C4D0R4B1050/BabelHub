@@ -26,7 +26,7 @@ Lenguaje común del dominio. El código, las specs y la interfaz usan estos tér
 
 | Término | Definición | No confundir con |
 | :--- | :--- | :--- |
-| **Obra** | Título abstracto: nombre, autor, editorial, categoría. | Edición. |
+| **Obra** | Título abstracto: nombre, autor, editorial, categoría y, si la tiene, una descripción de hasta 600 caracteres en texto plano. | Edición. |
 | **Edición** | Presentación concreta de una obra, impresa o digital, con su propio ISBN y precio. | Obra. |
 | **ISBN** | Identificador de una edición. Es único en todo el catálogo. | Identificador interno. |
 | **Libro digital** | Edición en formato EPUB o PDF, sin stock ni sucursal. | Libro impreso. |
