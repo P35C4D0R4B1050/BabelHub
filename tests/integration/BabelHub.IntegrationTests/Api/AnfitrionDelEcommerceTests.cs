@@ -49,6 +49,10 @@ public sealed class AnfitrionDelEcommerceTests
             ["Web:HostsPermitidos"] = "tienda.example.org",
             ["Web:ClaveDeSesionesTienda"] = Secreto(),
             ["Carrito:CostoDeEnvio"] = "12.00",
+            // El contacto del comercio (COM-02): valores de prueba claramente ficticios con dominio reservado.
+            ["Contacto:Telefono"] = "+51 987 654 321",
+            ["Contacto:Correo"] = "atencion@tienda.example",
+            ["Contacto:Direccion"] = "Jr. Ejemplo 123, Ayacucho (prueba)",
             ["Pagos:Pasarela"] = "simulador",
             ["Pagos:ClaveDeIntentos"] = Secreto(),
         };
@@ -227,7 +231,7 @@ public sealed class AnfitrionDelEcommerceTests
         var valoresDeLasDemas = configuracion.Where(p => p.Key != ruta && p.Value!.Length >= 30).Select(p => p.Value!).ToList();
         configuracion.Remove(ruta);
 
-        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: true));
+        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: true, permitirContactoDeEjemplo: false));
 
         Assert.Contains(LectorDeSecretos.Variable(ruta), falla.Message, StringComparison.Ordinal);
         Assert.All(valoresDeLasDemas, v => Assert.DoesNotContain(v, falla.Message, StringComparison.Ordinal));
@@ -241,7 +245,7 @@ public sealed class AnfitrionDelEcommerceTests
         configuracion[OpcionesDelAnfitrionDelEcommerce.RutaDeLaClaveDelCursor] = configuracion["Seguridad:Credenciales:Historial"];
         configuracion[OpcionesDelAnfitrionDelEcommerce.RutaDeLaBaseDeDepuracionDeRegistros] = configuracion[OpcionesDelAnfitrionDelEcommerce.RutaDeLaBaseDeLaAplicacion] + ";Application Name=depurador";
 
-        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: true));
+        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: true, permitirContactoDeEjemplo: false));
 
         Assert.Contains("BABELHUB__Auditoria__ClaveDeCursor", falla.Message, StringComparison.Ordinal);
         Assert.Contains("BABELHUB__Ecommerce__Base__DepuracionDeRegistros", falla.Message, StringComparison.Ordinal);
@@ -312,7 +316,7 @@ public sealed class AnfitrionDelEcommerceTests
             var repetido = valor(configuracion)!;
             configuracion[ruta] = ruta == "Identidad:Pimienta" ? "v1:" + repetido : repetido;
 
-            var excepcion = Record.Exception(() => OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: false));
+            var excepcion = Record.Exception(() => OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: false, permitirContactoDeEjemplo: false));
             Assert.True(excepcion is ConfiguracionDeSecretosInvalidaException, "Sin fallo para " + ruta + ": " + excepcion?.GetType().Name + " " + excepcion?.Message);
             var falla = (ConfiguracionDeSecretosInvalidaException)excepcion!;
 
@@ -362,7 +366,7 @@ public sealed class AnfitrionDelEcommerceTests
         configuracion.Remove("Ecommerce:Redis:Tls");
         configuracion[OpcionesDelAnfitrionDelEcommerce.RutaDeLaBaseDeLaAplicacion] = new NpgsqlConnectionStringBuilder { Host = "localhost", Database = "ecommerce", Username = "acceso" }.ConnectionString;
 
-        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: true));
+        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: true, permitirContactoDeEjemplo: false));
 
         Assert.Contains("BABELHUB__Ecommerce__Redis__Tls", falla.Message, StringComparison.Ordinal);
         Assert.Contains("BABELHUB__Ecommerce__Base__Aplicacion", falla.Message, StringComparison.Ordinal);
@@ -496,8 +500,8 @@ public sealed class AnfitrionDelEcommerceTests
     {
         var configuracion = ConfiguracionCompleta();
 
-        var enDesarrollo = OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: false);
-        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: true));
+        var enDesarrollo = OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: false, permitirContactoDeEjemplo: false);
+        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: true, permitirContactoDeEjemplo: false));
 
         Assert.NotNull(enDesarrollo);
         Assert.Contains("BABELHUB__Ecommerce__Redis__Direccion", falla.Message, StringComparison.Ordinal);
@@ -513,7 +517,7 @@ public sealed class AnfitrionDelEcommerceTests
         var cuenta = Cuenta("postgres");
         configuracion["Migrador:Ecommerce:Propietaria"] = cuenta;
 
-        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: false));
+        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: false, permitirContactoDeEjemplo: false));
 
         Assert.Contains("BABELHUB__Migrador", falla.Message, StringComparison.Ordinal);
         Assert.DoesNotContain(cuenta, falla.Message, StringComparison.Ordinal);
@@ -522,9 +526,92 @@ public sealed class AnfitrionDelEcommerceTests
     [Fact]
     public void LasOpciones_NoImprimenNingunValor()
     {
-        var opciones = OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(ConfiguracionCompleta()).Build(), esProduccion: false);
+        var opciones = OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(ConfiguracionCompleta()).Build(), esProduccion: false, permitirContactoDeEjemplo: false);
 
         Assert.Equal("[configuración del anfitrión del E-commerce]", opciones.ToString());
+    }
+
+    // ---------------------------------------------------------------- Contacto del comercio (web-informacion-del-comercio, COM-02 a COM-05)
+
+    private static OpcionesDelAnfitrionDelEcommerce AgregarSinContacto(string entorno)
+    {
+        var configuracion = ConfiguracionCompleta();
+        foreach (var clave in new[] { "Contacto:Telefono", "Contacto:Correo", "Contacto:Direccion" })
+        {
+            configuracion.Remove(clave);
+        }
+
+        var builder = Constructor(configuracion, entorno);
+        builder.Services.AddSingleton(typeof(ModoDeArranque), ModoDeArranque.Normal);
+        builder.Services.AddScoped<EjecutorDePasosDeRestauracion>();
+        return builder.AgregarEcommerce(ModoDeArranque.Normal);
+    }
+
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Test")]
+    [InlineData("development")]
+    [InlineData("TEST")]
+    [Trait("Criterio", "AC-COM-04")]
+    public void EnDesarrolloYPrueba_SinContacto_ArrancaConLosValoresFicticios(string entorno)
+    {
+        var opciones = AgregarSinContacto(entorno);
+
+        Assert.True(opciones.Contacto.EsDeEjemplo);
+        Assert.Equal("tel:+51999000000", opciones.Contacto.EnlaceDeLlamada);
+    }
+
+    [Theory]
+    [InlineData("Staging")]
+    [InlineData("Production")]
+    [InlineData("Ensayo")]
+    [InlineData("Restauracion")]
+    [InlineData("")]
+    [Trait("Criterio", "AC-COM-03")]
+    public void FueraDeDesarrolloYPrueba_SinContacto_NoArranca_NombrandoLasTresVariables(string entorno)
+    {
+        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => AgregarSinContacto(entorno));
+
+        Assert.Contains("BABELHUB__Contacto__Telefono", falla.Message, StringComparison.Ordinal);
+        Assert.Contains("BABELHUB__Contacto__Correo", falla.Message, StringComparison.Ordinal);
+        Assert.Contains("BABELHUB__Contacto__Direccion", falla.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-COM-03")]
+    public void UnContactoInvalido_NoArranca_EnDesarrolloTambien_SinMostrarSuValor()
+    {
+        var configuracion = ConfiguracionCompleta();
+        configuracion["Contacto:Correo"] = "esto no es un correo SECRETO-VALOR";
+
+        var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => OpcionesDelAnfitrionDelEcommerce.Leer(new ConfigurationBuilder().AddInMemoryCollection(configuracion).Build(), esProduccion: false, permitirContactoDeEjemplo: true));
+
+        Assert.Contains("BABELHUB__Contacto__Correo", falla.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("SECRETO-VALOR", falla.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-COM-03")]
+    public async Task LaComposicion_RegistraElContacto_ParaQueElPieNuncaLoPierdaEnProduccion()
+    {
+        await using var app = Compuesto();
+
+        var contacto = app.Services.GetRequiredService<BabelHub.Ecommerce.Api.Web.Contacto.DatosDeContacto>();
+
+        Assert.Equal("+51 987 654 321", contacto.Telefono);
+        Assert.False(contacto.EsDeEjemplo);
+    }
+
+    [Theory]
+    [InlineData("docker-compose.ventas.yml")]
+    [InlineData("docker-compose.inventario.yml")]
+    [Trait("Criterio", "AC-COM-03")]
+    public void LosComposeDeDespliegue_FijanProduccion_ParaQueNuncaValganLosFicticios(string archivo)
+    {
+        var texto = File.ReadAllText(Path.Combine(BabelHub.IntegrationTests.Web.RaizDelRepositorio.Raiz, "infra", archivo));
+
+        Assert.Contains("ASPNETCORE_ENVIRONMENT: Production", texto, StringComparison.Ordinal);
+        Assert.DoesNotContain("ASPNETCORE_ENVIRONMENT: Development", texto, StringComparison.Ordinal);
     }
 
     // ---------------------------------------------------------------- Notificaciones (T14, T15; NOT-11, NOT-12)

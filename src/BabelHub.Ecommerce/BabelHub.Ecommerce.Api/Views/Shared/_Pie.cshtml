@@ -1,16 +1,30 @@
+@using BabelHub.Ecommerce.Application.Web
 @model ModeloBaseDePagina
 <footer class="bh-laberinto bg-neutral text-neutral-content">
-    <div class="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 sm:flex-row sm:items-start sm:justify-between">
+    <div class="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:grid-cols-2 lg:grid-cols-3">
         <div>
             <p class="font-display text-2xl">BabelHub</p>
-            <p class="mt-1 max-w-sm text-sm">Libros impresos y digitales con el stock real de tu sucursal.</p>
+            <p class="mt-1 max-w-sm text-sm">Vendemos libros impresos y libros digitales, con el stock real de tu sucursal.</p>
         </div>
-        <nav aria-label="Información legal">
+        @* El contacto del comercio sale de la configuración del entorno (COM-01, COM-02); sin él (hosts de prueba) el pie omite el bloque. *@
+        @if (Model.ContactoDelComercio is { } contacto)
+        {
+            <section aria-labelledby="pie-contacto">
+                <h2 id="pie-contacto" class="text-sm font-semibold">Contacto</h2>
+                <address class="mt-2 space-y-1 text-sm not-italic">
+                    <p>Teléfono: <a class="link" href="@contacto.EnlaceDeLlamada" aria-label="Llamar al @contacto.Telefono">@contacto.Telefono</a></p>
+                    <p>Correo: <a class="link" href="@contacto.EnlaceDeCorreo" aria-label="Escribir a @contacto.Correo">@contacto.Correo</a></p>
+                    <p>Dirección: @contacto.Direccion</p>
+                </address>
+            </section>
+        }
+        <nav aria-label="Información legal y de contacto">
             <ul class="flex flex-col gap-2 text-sm sm:items-end">
+                <li><a class="link link-hover" href="/contacto">Contacto</a></li>
                 <li><a class="link link-hover" href="/reclamaciones"><bh-icono nombre="libro" clase="size-4 inline" /> Libro de Reclamaciones</a></li>
-                <li><a class="link link-hover" href="/legal/terminos">Términos y condiciones</a></li>
-                <li><a class="link link-hover" href="/legal/privacidad">Política de privacidad</a></li>
-                <li><a class="link link-hover" href="/legal/reembolso">Política de reembolso</a></li>
+                <li><a class="link link-hover" href="/legal/@TiposDeTextoLegal.Ruta(TipoDeTextoLegal.Terminos)">Términos y condiciones</a></li>
+                <li><a class="link link-hover" href="/legal/@TiposDeTextoLegal.Ruta(TipoDeTextoLegal.Privacidad)">Política de privacidad</a></li>
+                <li><a class="link link-hover" href="/legal/@TiposDeTextoLegal.Ruta(TipoDeTextoLegal.Reembolso)">Cambios y devoluciones</a></li>
             </ul>
         </nav>
     </div>

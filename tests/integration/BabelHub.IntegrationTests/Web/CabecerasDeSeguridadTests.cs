@@ -36,10 +36,13 @@ public sealed class CabecerasDeSeguridadTests
 
     [Theory]
     [Trait("Criterio", "AC-WEB-14")]
+    [Trait("Criterio", "AC-COM-05")]
     [InlineData("/prueba/cabeceras/pagina", HttpStatusCode.OK)]
     [InlineData("/prueba/cabeceras/json", HttpStatusCode.OK)]
     [InlineData("/prueba/cabeceras/prohibido", HttpStatusCode.Forbidden)]
     [InlineData("/prueba/cabeceras/error", HttpStatusCode.InternalServerError)]
+    [InlineData("/contacto", HttpStatusCode.OK)]
+    [InlineData("/legal/reembolso", HttpStatusCode.MovedPermanently)]
     [InlineData("/no/existe", HttpStatusCode.NotFound)]
     [InlineData("/js/bh.js", HttpStatusCode.OK)]
     [InlineData("/error", HttpStatusCode.InternalServerError)]

@@ -1,17 +1,23 @@
 PROVISIONAL
 TITULO: Términos y condiciones
-RESUMEN: Reglas básicas para usar BabelHub: tu cuenta, tus compras de libros impresos y digitales, el recojo en sucursal y lo que esperamos de ti. Este es un texto de trabajo: la persona responsable del proyecto aún no redactó la versión legal definitiva.
-## 1. Qué es BabelHub
-BabelHub es una tienda de libros impresos y digitales con inventario en varias sucursales. Al crear una cuenta o comprar aceptas estos términos.
+RESUMEN: Reglas básicas para usar BabelHub: quién vende, tu cuenta, tus compras de libros impresos y digitales, el recojo y la entrega, los cambios y devoluciones y la ley que se aplica. Este es un texto de trabajo: la persona responsable del proyecto aún no redactó la versión legal definitiva.
+## 1. Quién vende y qué vende
+BabelHub es una tienda de libros impresos y de libros digitales, con inventario en varias sucursales. BabelHub es el comercio que te vende: al crear una cuenta o comprar aceptas estos términos. Los datos de contacto del comercio (teléfono, correo y dirección) están en el pie de cada página y en la página de Contacto.
 ## 2. Tu cuenta
 Debes ser mayor de 18 años. Eres responsable de guardar tu contraseña y de lo que se haga con tu cuenta. Puedes pedir la cancelación de tu cuenta en cualquier momento desde «Mi cuenta».
 ## 3. Compras y pagos
-Los precios se muestran en soles e incluyen los impuestos que correspondan. Los libros impresos se reservan por un tiempo limitado mientras completas el pago. No guardamos los datos de tu tarjeta: los procesa la pasarela de pago.
+Los precios se muestran en soles. Los libros impresos se reservan por un tiempo limitado mientras completas el pago. No guardamos los datos de tu tarjeta: los procesa la pasarela de pago. Antes de pagar ves el total, el costo de envío si lo hay y las condiciones de tu compra.
 ## 4. Entrega y recojo
 Los libros impresos se recogen en la sucursal elegida o se envían a domicilio. Si el libro viene de otra sucursal, te avisamos el plazo. Los libros digitales se entregan en «Mi biblioteca» al aprobarse el pago.
 ## 5. Libros digitales
 Cada libro digital tiene una licencia personal y un máximo de descargas. No puedes compartir ni revender los archivos.
-## 6. Libro de Reclamaciones
+## 6. Cambios y devoluciones
+Cómo devolver un libro y cuándo te reembolsamos está en la política «Cambios y devoluciones», que forma parte de estos términos.
+## 7. Libro de Reclamaciones
 Puedes presentar un reclamo o una queja en el Libro de Reclamaciones, que está siempre enlazado al pie de la tienda. Respondemos por correo dentro de los plazos de la ley.
-## 7. Cambios en estos términos
+## 8. Consultas y datos personales
+Para consultas generales sobre una compra o sobre la tienda usa los datos de contacto del pie. Las solicitudes sobre tus datos personales (acceder, rectificar, cancelar u oponerte) se presentan desde tu cuenta, no por el correo de contacto, que es solo para consultas generales.
+## 9. Ley aplicable
+Estos términos se rigen por las leyes del Perú, en especial la Ley N.° 29571, Código de Protección y Defensa del Consumidor, y la Ley N.° 29733, de Protección de Datos Personales. Si no estás conforme con nuestra respuesta, puedes acudir al Indecopi, la autoridad de protección al consumidor.
+## 10. Cambios en estos términos
 Si cambiamos estos términos publicaremos una nueva versión con su fecha de vigencia y te pediremos aceptarla.

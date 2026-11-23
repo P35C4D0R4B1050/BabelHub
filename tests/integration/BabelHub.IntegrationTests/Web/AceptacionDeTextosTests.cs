@@ -57,7 +57,7 @@ public sealed class AceptacionDeTextosTests
 
         Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
         Assert.True(respuesta.Headers.CacheControl!.NoStore);
-        foreach (var texto in new[] { "terminos", "privacidad", "reembolso" })
+        foreach (var texto in new[] { "terminos", "privacidad", "cambios-y-devoluciones" })
         {
             Assert.Contains($"href=\"/legal/{texto}\"", html, StringComparison.Ordinal);
         }

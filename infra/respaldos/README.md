@@ -77,3 +77,5 @@ scripts/descifrar-respaldo.sh --entrada <respaldo>.tar.age < /ruta/al/dispositiv
 - (Hecho en T27) Vigilar el espacio local reservado y declarar roto el archivado si se agota: ver la sección anterior.
 - Restaurar: `scripts/restaurar.sh` (T29) elige entre candidatos por continuidad de línea de tiempo y LSN, y extrae el `tar` sin rutas absolutas ni propietarios.
 - Compresión: el respaldo no se comprime (el nombre es `.tar.age`); si la medición de cuota (T03) la exige, se añade aquí.
+
+**Restauración y ensayo con el E-commerce (web-informacion-del-comercio).** El E-commerce que se abre sobre una base restaurada o en un ensayo arranca como producción: reutiliza el mismo `ecommerce.env` (o `ecommerce-gestion.env`) y por eso necesita `BABELHUB__Contacto__Telefono`, `…Correo` y `…Direccion` (no son secretos); sin ellos se niega a arrancar y el error nombra la variable. Ver `infra/README.md`.

@@ -9,7 +9,7 @@ public sealed class ContenidoDeTextosTests
     [Theory]
     [InlineData(TipoDeTextoLegal.Terminos, "Términos y condiciones")]
     [InlineData(TipoDeTextoLegal.Privacidad, "Política de privacidad")]
-    [InlineData(TipoDeTextoLegal.Reembolso, "Política de reembolso")]
+    [InlineData(TipoDeTextoLegal.Reembolso, "Cambios y devoluciones")]
     [Trait("Criterio", "AC-WEB-24")]
     public async Task Los_tres_textos_existen_con_titulo_resumen_secciones_y_marca_de_provisional(TipoDeTextoLegal tipo, string titulo)
     {

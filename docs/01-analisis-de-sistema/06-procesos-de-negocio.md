@@ -31,7 +31,7 @@ L --> T["15 días sin recoger: pedido no recogido, se liberan las reservas"]
 
 ```mermaid
 flowchart LR
-A["Cliente agrega la edición digital"] --> B["Acepta política de reembolso digital"]
+A["Cliente agrega la edición digital"] --> B["Acepta Cambios y devoluciones (reembolso digital)"]
 B --> C["Paga"]
 C --> D{"¿Pago aprobado?"}
 D -- No --> X["No hay acceso"]

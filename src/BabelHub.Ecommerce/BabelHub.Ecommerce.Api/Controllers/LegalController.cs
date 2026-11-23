@@ -24,6 +24,13 @@ public sealed class LegalController(ITextosLegales textos, ContextoDePagina pagi
     [PermitidaConTextosPendientes(CapacidadWeb.TextosLegales)]
     public async Task<IActionResult> Ver(string texto, CancellationToken cancelacion)
     {
+        // La dirección anterior de la «política de reembolso» redirige de forma permanente a «Cambios y devoluciones» (COM-11): destino constante, sin copiar la consulta y antes de pedir
+        // el texto, de modo que funciona también con Identidad caída; la comparación es ordinal.
+        if (string.Equals(texto, TiposDeTextoLegal.Clave(TipoDeTextoLegal.Reembolso), StringComparison.Ordinal))
+        {
+            return LocalRedirectPermanent("/legal/" + TiposDeTextoLegal.Ruta(TipoDeTextoLegal.Reembolso));
+        }
+
         if (!TiposDeTextoLegal.TryParse(texto, out var tipo))
         {
             return await Estado(EstadoVista.Vacio("No encontramos ese texto", "Revisa el enlace o vuelve al inicio.", "Ir al inicio", "/"), "No encontrado", StatusCodes.Status404NotFound, cancelacion);

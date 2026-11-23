@@ -45,7 +45,7 @@ public sealed partial class PantallasBaseTests
     [Theory]
     [InlineData("terminos", "Términos y condiciones")]
     [InlineData("privacidad", "Política de privacidad")]
-    [InlineData("reembolso", "Política de reembolso")]
+    [InlineData("cambios-y-devoluciones", "Cambios y devoluciones")]
     [Trait("Criterio", "AC-WEB-24")]
     public async Task Cada_texto_legal_muestra_su_version_su_vigencia_y_la_marca_de_provisional(string clave, string titulo)
     {

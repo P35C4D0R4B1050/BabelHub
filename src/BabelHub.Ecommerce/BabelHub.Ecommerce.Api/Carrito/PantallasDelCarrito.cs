@@ -37,7 +37,7 @@ public static class PantallasDelCarrito
         ["ECO-CHECKOUT-CUENTA-NO-PUEDE-COMPRAR"] = new("Tu cuenta no puede comprar ahora", "Revisa el estado de tu cuenta e inténtalo de nuevo."),
         ["ECO-CHECKOUT-CORREO-SIN-VERIFICAR"] = new("Verifica tu correo para pagar", "Confirma tu correo con el enlace que te enviamos. Tu carrito sigue intacto."),
         ["ECO-CHECKOUT-TEXTOS-PENDIENTES"] = new("Acepta los textos legales vigentes", "Necesitas aceptar los términos y la privacidad actualizados para pagar."),
-        ["ECO-CHECKOUT-ACEPTACION-REQUERIDA"] = new("Falta aceptar los textos", "Marca los términos y la privacidad (y la política de reembolso si llevas libros digitales) para pagar."),
+        ["ECO-CHECKOUT-ACEPTACION-REQUERIDA"] = new("Falta aceptar los textos", "Marca los términos y la privacidad (y la política de cambios y devoluciones si llevas libros digitales) para pagar."),
         ["ECO-CHECKOUT-DATOS-DE-ENTREGA-INCOMPLETOS"] = new("Completa los datos de entrega", "Faltan datos para despachar tu pedido a domicilio."),
         ["ECO-CHECKOUT-PEDIDO-OBSOLETO"] = new("Esta pantalla quedó desactualizada", "Tu compra cambió en otra pestaña. Vuelve a revisarla."),
         ["ECO-VERIFICACION-REQUERIDA"] = new("Confirma que eres una persona", "Completa la verificación e inténtalo de nuevo."),

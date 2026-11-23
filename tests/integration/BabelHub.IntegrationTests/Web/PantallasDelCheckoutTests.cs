@@ -349,7 +349,7 @@ public sealed class PantallasDelCheckoutTests
 
         Assert.DoesNotContain("Tus datos y aceptaciones", antes, StringComparison.Ordinal);
         Assert.Contains("Tus datos y aceptaciones", conDigital, StringComparison.Ordinal);
-        Assert.Contains("la política de reembolso de libros digitales", conDigital, StringComparison.Ordinal);
+        Assert.Contains("la política de cambios y devoluciones (reembolso de libros digitales)", conDigital, StringComparison.Ordinal);
     }
 
     [Fact]

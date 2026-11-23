@@ -654,6 +654,24 @@ public sealed class DesplegarShTests : IDisposable
     }
 
     [Fact]
+    [Trait("Criterio", "AC-COM-03")]
+    public void ElGenerador_DejaElContactoDelComercioComoCAMBIAR_ParaQueDesplegarSeNieguePorOlvido()
+    {
+        var destino = Path.Combine(_carpeta, "generados-contacto");
+
+        var (codigo, salida, errores) = Generar(destino);
+
+        Assert.True(codigo == 0, salida + errores);
+        foreach (var (carpeta, archivo) in new[] { ("ventas", "ecommerce.env"), ("inventario", "ecommerce-gestion.env") })
+        {
+            foreach (var clave in new[] { "BABELHUB__Contacto__Telefono", "BABELHUB__Contacto__Correo", "BABELHUB__Contacto__Direccion" })
+            {
+                Assert.Equal("CAMBIAR", Valor(Path.Combine(destino, carpeta), archivo, clave));
+            }
+        }
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-PLA-04")]
     public void ElGenerador_CreaTodasLasClavesDeLaTabla_ComparteLoQueDebeCompartir_YDejaLaClavePrivadaFueraDeLasVms()
     {

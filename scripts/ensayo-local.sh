@@ -69,12 +69,12 @@ for archivo in "$TRABAJO"/secretos/*/*.env; do
         *OrigenDelAlmacen) valor="https://almacen.invalido.local" ;;
         *Turnstile__ClaveDeSitio) valor="0x4AAAAAAAdeSitioLocal" ;;
         *Smtp__Servidor) valor="smtp.invalido.local" ;;
-        *Smtp__Cuenta | *Smtp__Remitente | AUX_SMTP_USUARIO | AUX_CORREO_DE | AUX_CORREO_PARA) valor="ensayo@invalido.local" ;;
+        *Smtp__Cuenta | *Smtp__Remitente | AUX_SMTP_USUARIO | AUX_CORREO_DE | AUX_CORREO_PARA) valor="ensayo@invalido.invalid" ;;
         AUX_SMTP_URL) valor="smtps://smtp.invalido.local:465" ;;
-        # Datos de contacto INVENTADOS para el ensayo (los reales son de la persona responsable y nunca van al repositorio).
-        *Contacto__Telefono) valor="+51 900 000 000" ;;
-        *Contacto__Correo) valor="contacto@invalido.local" ;;
-        *Contacto__Direccion) valor="Calle de Ensayo 123, Lima" ;;
+        # El contacto del comercio (COM-02): ficticios claramente falsos y entre comillas; un valor aleatorio no pasaría la validación de formato y el servicio no arrancaría.
+        *Contacto__Telefono) valor='"999 000 000"' ;;
+        *Contacto__Correo) valor="contacto@ejemplo.test" ;;
+        *Contacto__Direccion) valor='"Jr. Ejemplo 123, Ayacucho (dato de ejemplo)"' ;;
         *) valor="$(alea 40)" ;;
       esac
       echo "$clave=$valor" >>"$salida"

@@ -1,15 +1,17 @@
 PROVISIONAL
 TITULO: Política de privacidad
-RESUMEN: Qué datos tuyos tratamos, para qué, por cuánto tiempo y qué cookies usa el sitio, conforme a la Ley N.° 29733. Este es un texto de trabajo: la persona responsable del proyecto aún no redactó la versión legal definitiva.
-## 1. Qué datos tratamos
+RESUMEN: Qué datos tuyos trata BabelHub, para qué, por cuánto tiempo y qué cookies usa el sitio, conforme a la Ley N.° 29733. Este es un texto de trabajo: la persona responsable del proyecto aún no redactó la versión legal definitiva.
+## 1. Quién trata tus datos
+BabelHub es el comercio que trata tus datos personales. Los datos de contacto del comercio (teléfono, correo y dirección) están en el pie de cada página y en la página de Contacto.
+## 2. Qué datos tratamos
 Tratamos tu nombre y correo (verificado), tu contraseña (solo un resumen que nadie puede leer), tus pedidos y tu biblioteca digital, y, si lo activas, tu número de WhatsApp para avisarte del estado de tus pedidos. No guardamos datos de tarjeta.
-## 2. Para qué los usamos
+## 3. Para qué los usamos
 Para crear y proteger tu cuenta, procesar tus compras, entregar tus libros, avisarte del estado de tu pedido y atender tus reclamos. No usamos tus datos para publicidad ni los compartimos con editoriales.
-## 3. Cuánto tiempo los conservamos
+## 4. Cuánto tiempo los conservamos
 Mientras tu cuenta esté activa. Los registros de auditoría y las hojas de reclamación se conservan al menos dos años por obligación legal y luego se anonimizan.
-## 4. Tus derechos
-Puedes acceder, rectificar, cancelar y oponerte al tratamiento de tus datos desde «Mi cuenta». Respondemos tus solicitudes dentro de los plazos de la ley.
-## 5. Cookies que usa el sitio
+## 5. Tus derechos
+Puedes acceder, rectificar, cancelar y oponerte al tratamiento de tus datos desde tu cuenta, en «Mi cuenta». Las solicitudes sobre datos personales se presentan desde tu cuenta; el correo de contacto del pie es solo para consultas generales y no sirve para ejercer estos derechos. Respondemos tus solicitudes dentro de los plazos de la ley.
+## 6. Cookies que usa el sitio
 Todas las cookies llevan la marca de seguridad y ninguna contiene datos personales: son identificadores opacos o preferencias.
 - __Host-bh-tienda y __Host-bh-gestion: identifican tu sesión en la tienda o en la gestión del personal. Son necesarias. Duran lo que dure tu sesión (se cierra a los 30 minutos sin actividad).
 - __Host-bh-desafio: mantiene el paso pendiente del ingreso del personal (segundo factor o contraseña temporal). Es necesaria. Dura 5 minutos.
@@ -17,5 +19,7 @@ Todas las cookies llevan la marca de seguridad y ninguna contiene datos personal
 - Cookie de protección de formularios (empieza con __Host-): evita solicitudes falsificadas. Es necesaria. Dura lo que dure tu sesión.
 - bh-tema: recuerda si prefieres el tema claro o el oscuro. Dura un año.
 - bh-sucursal: recuerda tu sucursal preferida. Dura un año.
-## 6. Cambios en esta política
+## 7. Ley aplicable
+Esta política se rige por las leyes del Perú, en especial la Ley N.° 29733, de Protección de Datos Personales, y la Ley N.° 29571, Código de Protección y Defensa del Consumidor. Si no estás conforme con nuestra respuesta, puedes acudir al Indecopi.
+## 8. Cambios en esta política
 Si cambiamos esta política publicaremos una nueva versión con su fecha de vigencia y te pediremos aceptarla.

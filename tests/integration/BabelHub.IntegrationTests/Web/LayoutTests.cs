@@ -35,7 +35,7 @@ public sealed partial class LayoutTests
         Assert.Contains("Libro de Reclamaciones", pie, StringComparison.Ordinal);
         Assert.Contains("href=\"/legal/terminos\"", pie, StringComparison.Ordinal);
         Assert.Contains("href=\"/legal/privacidad\"", pie, StringComparison.Ordinal);
-        Assert.Contains("href=\"/legal/reembolso\"", pie, StringComparison.Ordinal);
+        Assert.Contains("href=\"/legal/cambios-y-devoluciones\"", pie, StringComparison.Ordinal);
     }
 
     [Fact]

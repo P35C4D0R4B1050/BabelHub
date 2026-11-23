@@ -1,11 +1,20 @@
 PROVISIONAL
-TITULO: Política de reembolso
-RESUMEN: Cuándo y cómo te devolvemos el dinero de un libro impreso o digital. Este es un texto de trabajo: la persona responsable del proyecto aún no redactó la versión legal definitiva.
-## 1. Libros impresos
-Puedes pedir una devolución de un libro impreso que ya recibiste. Evaluamos tu solicitud y, si procede, te devolvemos el importe por el mismo medio de pago.
-## 2. Libros digitales
-Un libro digital no se reembolsa una vez que te entregamos el enlace de descarga. Si el archivo no abre o está defectuoso, repórtalo y lo revisamos: si es un defecto del archivo, puedes pedir el reembolso dentro de los 14 días desde tu pago.
-## 3. Cómo pedirlo
-Desde «Mis pedidos» eliges el libro y la razón. Te respondemos por correo.
-## 4. Cambios en esta política
+TITULO: Cambios y devoluciones
+RESUMEN: Cuándo y cómo puedes devolver un libro impreso o digital y cuándo te devolvemos el dinero, con los plazos y los estados de una devolución. Este es un texto de trabajo: la persona responsable del proyecto aún no redactó la versión legal definitiva.
+## 1. Cambios
+BabelHub no hace cambios directos de un libro por otro. Si prefieres otro libro, devuelves el que compraste según esta política y compras el que quieras.
+## 2. Libros impresos
+Puedes pedir la devolución de un libro impreso que ya recibiste, dentro de los 15 días calendario desde su entrega. Eliges la sucursal que lo recibirá. Si aprobamos tu solicitud, debes llevar el libro a esa sucursal dentro de los 10 días calendario desde la aprobación: pasado ese plazo la devolución se rechaza sin reembolso, y si aún estás dentro de los 15 días de la entrega puedes pedirla otra vez. El reembolso llega tras la recepción del libro en la sucursal, por el precio de los libros devueltos y sin el costo de envío, por el mismo medio de pago.
+## 3. Libros digitales
+Un libro digital se reembolsa solo si no te entregamos ningún enlace de descarga (aunque no lo hayas usado) y dentro de los 14 días calendario desde la aprobación de tu pago. Al reembolsarlo pierdes el acceso a ese libro. Si el archivo no abre o está defectuoso, repórtalo dentro de los 30 días calendario desde tu pago: suspendemos las descargas de ese libro mientras la administración decide si lo reembolsa.
+## 4. Estados de una devolución
+- solicitada: registramos tu pedido de devolución.
+- aprobada: aceptamos tu solicitud.
+- rechazada: no procede, y te explicamos el motivo.
+- recibida: la sucursal recibió tu libro impreso.
+- reembolsada: te devolvimos el dinero.
+Te avisamos cuando cambia el estado.
+## 5. Cómo pedirlo
+Desde «Mis pedidos» eliges el libro y escribes el motivo. Si no estás conforme con nuestra respuesta, puedes presentar un reclamo en el Libro de Reclamaciones o acudir al Indecopi. Los datos de contacto del comercio están en el pie de cada página y en la página de Contacto.
+## 6. Cambios en esta política
 Si cambiamos esta política publicaremos una nueva versión con su fecha de vigencia y te pediremos aceptarla.

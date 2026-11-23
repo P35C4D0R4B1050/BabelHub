@@ -9,7 +9,7 @@ import { conOrigenPropio } from '../pedidos/ayudas';
 // Cada prueba llega desde su propio origen: el tope previo por origen y hora (SEG) cuenta las solicitudes de toda la corrida desde esta máquina.
 test.beforeEach(async ({ page }) => conOrigenPropio(page));
 
-const PANTALLAS_PUBLICAS = ['/', '/catalogo', '/carrito', '/ingreso', '/registro', '/recuperacion', '/reclamaciones/nueva', '/legal/terminos', '/legal/privacidad', '/legal/reembolso'];
+const PANTALLAS_PUBLICAS = ['/', '/catalogo', '/carrito', '/ingreso', '/registro', '/recuperacion', '/reclamaciones/nueva', '/legal/terminos', '/legal/privacidad', '/legal/cambios-y-devoluciones'];
 
 async function sinDesplazamientoHorizontal(page: Page, ruta: string) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), `${ruta} no se desplaza en horizontal`).toBe(false);
