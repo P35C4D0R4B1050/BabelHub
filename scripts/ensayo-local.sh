@@ -145,6 +145,7 @@ consola() { BABELHUB_SECRETOS="$TRABAJO/secretos/ventas" IP_PRIVADA=127.0.0.1 do
 echo "    crear-administrador:"; consola crear-administrador --correo administracion@ensayo.example.test
 echo "    cuenta-de-prueba --cantidad 2:"; consola cuenta-de-prueba --cantidad 2
 echo "    cuenta-de-prueba --retirar --todas:"; consola cuenta-de-prueba --retirar --todas
-echo "    cuenta-de-prueba --purgar:"; consola cuenta-de-prueba --purgar
+# --purgar cancela cuentas y necesita el almacén de objetos del registro de supresiones (IDE-70), que este ensayo no levanta: aquí debe negarse con RegistroDeSupresionesNoDisponibleException y sin tocar nada.
+echo "    cuenta-de-prueba --purgar (sin almacén de objetos en el ensayo: debe negarse sin tocar nada):"; consola cuenta-de-prueba --purgar
 paso "7/7 Listo. Los dos servicios respondieron «listo» (200) y los certificados se validaron."
 echo "    Para borrar todo: bash scripts/ensayo-local.sh --limpiar"
