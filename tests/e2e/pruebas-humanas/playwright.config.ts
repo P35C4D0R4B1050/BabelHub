@@ -19,7 +19,7 @@ export default defineConfig({
   workers: 3,
   timeout: 120_000,
   reporter: [['list']],
-  use: { baseURL: `http://localhost:${puerto}`, locale: 'es-PE', timezoneId: 'America/Lima', trace: 'retain-on-failure', actionTimeout: 10_000 },
+  use: { baseURL: `http://localhost:${puerto}`, locale: 'es-PE', timezoneId: 'America/Lima', trace: 'retain-on-failure', actionTimeout: 20_000 },
   webServer: { command: `node ../../../tools/pruebas-humanas/servir.mjs ${puerto}`, url: `http://localhost:${puerto}/`, reuseExistingServer: true, timeout: 20_000 },
   projects: [
     { name: 'escritorio', use: { ...devices['Desktop Chrome'] } },

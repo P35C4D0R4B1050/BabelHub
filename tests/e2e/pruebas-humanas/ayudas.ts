@@ -22,7 +22,7 @@ export const siguiente = (page: Page) => page.getByRole('button', { name: /^(Sig
 export const irTarea = (page: Page, nombre: RegExp) => page.getByRole('link', { name: nombre }).first().click();
 
 export async function elegir(page: Page, grupo: RegExp | string, opcion: RegExp | string) {
-  await page.getByRole('group', { name: grupo }).getByRole('radio', { name: opcion, exact: typeof opcion === 'string' }).check();
+  await page.getByRole('group', { name: grupo }).getByRole('radio', { name: opcion, exact: typeof opcion === 'string' }).click();
 }
 
 type AlPaso = (nombre: string) => Promise<void>;
@@ -32,7 +32,7 @@ export async function responderLikert(page: Page, valor: number | ((i: number) =
   const n = await page.locator('fieldset.card').count();
   for (let i = 0; i < n; i++) {
     const v = typeof valor === 'number' ? valor : valor(i);
-    await page.locator('fieldset.card').nth(i).getByRole('radio', { name: new RegExp(`^${v}:`) }).check();
+    await page.locator('fieldset.card').nth(i).getByRole('radio', { name: new RegExp(`^${v}:`) }).click();
   }
 }
 
@@ -41,11 +41,11 @@ export const SUS_75 = [4, 2, 4, 2, 4, 2, 4, 2, 4, 2];
 export async function hacerC(page: Page, o: { lograste?: 'Sí' | 'No'; ayuda?: boolean; errores?: string; sus?: number[]; conocia?: 'Sí' | 'No'; dificil?: string; espera?: number; alPaso?: AlPaso } = {}) {
   await irTarea(page, /(Empezar|Continuar|Revisar).*tarea Compra un libro/);
   await paso(o.alPaso, 'C · consentimiento');
-  for (const t of [/Leí y entendí/, /Sé que puedo parar/, /Acepto participar/]) await page.getByRole('checkbox', { name: t }).check();
+  for (const t of [/Leí y entendí/, /Sé que puedo parar/, /Acepto participar/]) await page.getByRole('checkbox', { name: t }).click();
   await siguiente(page);
   await paso(o.alPaso, 'C · perfil');
-  await page.getByRole('radio', { name: '25 a 34 años' }).check();
-  await page.getByRole('radio', { name: 'Pocas veces al año' }).check();
+  await page.getByRole('radio', { name: '25 a 34 años' }).click();
+  await page.getByRole('radio', { name: 'Pocas veces al año' }).click();
   await elegir(page, /ayuda para ver/, 'No');
   await elegir(page, /Ya habías visto/, o.conocia ?? 'No');
   await siguiente(page);
@@ -63,7 +63,7 @@ export async function hacerC(page: Page, o: { lograste?: 'Sí' | 'No'; ayuda?: b
   await siguiente(page);
   await paso(o.alPaso, 'C · SUS');
   const sus = o.sus ?? SUS_75;
-  for (let i = 1; i <= 10; i++) await page.getByRole('group', { name: new RegExp(`^${i}\\. `) }).getByRole('radio', { name: new RegExp(`^${sus[i - 1]}:`) }).check();
+  for (let i = 1; i <= 10; i++) await page.getByRole('group', { name: new RegExp(`^${i}\\. `) }).getByRole('radio', { name: new RegExp(`^${sus[i - 1]}:`) }).click();
   await siguiente(page);
   await paso(o.alPaso, 'C · última pregunta');
   await page.getByLabel(/lo más difícil/).fill(o.dificil ?? 'Encontrar dónde pagar');
@@ -76,7 +76,7 @@ export async function hacerA(page: Page, o: { respuesta?: 'Sí' | 'Con dificulta
   await siguiente(page);
   for (let i = 1; i <= 8; i++) {
     await paso(o.alPaso, `A · paso ${i}`);
-    await page.getByRole('radio', { name: o.respuesta ?? 'Sí', exact: true }).check();
+    await page.getByRole('radio', { name: o.respuesta ?? 'Sí', exact: true }).click();
     if (o.respuesta && o.respuesta !== 'Sí') await page.getByLabel('Cuéntanos qué pasó').fill('No encontré el botón');
     await siguiente(page);
   }

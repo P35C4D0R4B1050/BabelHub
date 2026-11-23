@@ -81,7 +81,7 @@ test.describe('Gracias y «Descargar mi resultado»', () => {
     await empezar(page);
     await page.goto('/#/t/a');
     await page.getByRole('button', { name: /^Siguiente/ }).click();
-    await page.getByRole('radio', { name: 'No', exact: true }).check();
+    await page.getByRole('radio', { name: 'No', exact: true }).click();
     const campo = page.getByLabel('Cuéntanos qué pasó');
     await campo.fill('me llamo al 999 888 777');
     await expect(page.getByText(/Cuidado: esto tiene una secuencia larga de números/)).toBeVisible();

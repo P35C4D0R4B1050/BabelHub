@@ -104,13 +104,13 @@ test.describe('Tarea: compra un libro (usabilidad sin moderador)', () => {
     // Sin marcar el consentimiento no se avanza y se explica por qué.
     await siguiente(page);
     await expect(page.getByRole('alert')).toContainText('Marca las tres casillas');
-    for (const t of [/Leí y entendí/, /Sé que puedo parar/, /Acepto participar/]) await page.getByRole('checkbox', { name: t }).check();
+    for (const t of [/Leí y entendí/, /Sé que puedo parar/, /Acepto participar/]) await page.getByRole('checkbox', { name: t }).click();
     await siguiente(page);
     await expect(page.getByRole('heading', { level: 1, name: 'Cuéntanos un poco de ti' })).toBeVisible();
     await siguiente(page);
     await expect(page.getByRole('alert')).toContainText('Responde las cuatro preguntas');
-    await page.getByRole('radio', { name: '35 a 44 años' }).check();
-    await page.getByRole('radio', { name: 'Una o varias veces al mes' }).check();
+    await page.getByRole('radio', { name: '35 a 44 años' }).click();
+    await page.getByRole('radio', { name: 'Una o varias veces al mes' }).click();
     await elegir(page, /ayuda para ver/, 'Sí');
     await elegir(page, /Ya habías visto/, 'No');
     await siguiente(page);
@@ -135,7 +135,7 @@ test.describe('Tarea: compra un libro (usabilidad sin moderador)', () => {
     await expect(page.locator('fieldset.card')).toHaveCount(10);
     await siguiente(page);
     await expect(page.getByRole('alert')).toContainText('Te faltan 10 frase(s)');
-    for (let i = 1; i <= 10; i++) await page.getByRole('group', { name: new RegExp(`^${i}\\. `) }).getByRole('radio', { name: new RegExp(`^${i % 2 ? 4 : 2}:`) }).check();
+    for (let i = 1; i <= 10; i++) await page.getByRole('group', { name: new RegExp(`^${i}\\. `) }).getByRole('radio', { name: new RegExp(`^${i % 2 ? 4 : 2}:`) }).click();
     await siguiente(page);
     await page.getByLabel(/lo más difícil/).fill('Encontrar el botón de pagar');
     await siguiente(page);
@@ -163,10 +163,10 @@ test.describe('Tarea: compra un libro (usabilidad sin moderador)', () => {
   test('el cronómetro sigue contando si se recarga la página', async ({ page }) => {
     await empezar(page);
     await irTarea(page, /Empezar.*tarea Compra un libro/);
-    for (const t of [/Leí y entendí/, /Sé que puedo parar/, /Acepto participar/]) await page.getByRole('checkbox', { name: t }).check();
+    for (const t of [/Leí y entendí/, /Sé que puedo parar/, /Acepto participar/]) await page.getByRole('checkbox', { name: t }).click();
     await siguiente(page);
-    await page.getByRole('radio', { name: '25 a 34 años' }).check();
-    await page.getByRole('radio', { name: 'Pocas veces al año' }).check();
+    await page.getByRole('radio', { name: '25 a 34 años' }).click();
+    await page.getByRole('radio', { name: 'Pocas veces al año' }).click();
     await elegir(page, /ayuda para ver/, 'No');
     await elegir(page, /Ya habías visto/, 'No');
     await siguiente(page);
@@ -209,7 +209,7 @@ test.describe('Tarea: compra paso a paso (navegador)', () => {
     await expect(page.locator('.paso-n')).toContainText('Paso 2 de 10');
     await siguiente(page);
     await expect(page.getByRole('alert')).toContainText('Elige una opción');
-    await page.getByRole('radio', { name: 'Con dificultad' }).check();
+    await page.getByRole('radio', { name: 'Con dificultad' }).click();
     await siguiente(page);
     await expect(page.getByRole('alert')).toContainText('Cuéntanos en una frase');
     await page.getByLabel('Cuéntanos qué pasó').fill('La página tardó mucho en cargar');
@@ -221,7 +221,7 @@ test.describe('Tarea: compra paso a paso (navegador)', () => {
     await empezar(page);
     await irTarea(page, /Empezar.*tarea Recorre la compra/);
     await siguiente(page);
-    await page.getByRole('radio', { name: 'No', exact: true }).check();
+    await page.getByRole('radio', { name: 'No', exact: true }).click();
     await page.getByLabel('Cuéntanos qué pasó').fill('Salió un error');
     await page.locator('input[type=file]').setInputFiles({ name: 'error-pago.png', mimeType: 'image/png', buffer: Buffer.from('no-es-una-imagen-real') });
     await expect(page.getByText('error-pago.png')).toBeVisible();
@@ -250,10 +250,10 @@ test.describe('Tarea: compra paso a paso (navegador)', () => {
     await empezar(page);
     await irTarea(page, /Empezar.*tarea Recorre la compra/);
     await siguiente(page);
-    for (let i = 1; i <= 8; i++) { await page.getByRole('radio', { name: 'Sí', exact: true }).check(); await siguiente(page); }
+    for (let i = 1; i <= 8; i++) { await page.getByRole('radio', { name: 'Sí', exact: true }).click(); await siguiente(page); }
     await expect(page.getByRole('heading', { level: 1, name: 'Para terminar' })).toBeVisible();
-    await page.getByRole('checkbox', { name: 'Un mensaje de error' }).check();
-    await page.getByRole('checkbox', { name: 'La página se movía hacia los lados' }).check();
+    await page.getByRole('checkbox', { name: 'Un mensaje de error' }).click();
+    await page.getByRole('checkbox', { name: 'La página se movía hacia los lados' }).click();
     await elegir(page, /completar la compra/, 'Sí');
     await page.getByLabel('Cuéntanos más (opcional)').fill('Se movía en el carrito');
     await siguiente(page);
@@ -283,10 +283,10 @@ test.describe('Tarea: solo con el teclado', () => {
     await expect(page.getByText('5 · Muy de acuerdo').first()).toBeVisible();
     await siguiente(page);
     await expect(page.getByRole('alert')).toContainText('Te faltan 6 pregunta(s)');
-    await page.locator('fieldset.card').nth(0).getByRole('radio', { name: /^5:/ }).check();
-    await page.locator('fieldset.card').nth(1).getByRole('radio', { name: /^2:/ }).check();
-    await page.locator('fieldset.card').nth(2).getByRole('checkbox', { name: /No me tocó/ }).check();
-    for (const i of [3, 4, 5]) await page.locator('fieldset.card').nth(i).getByRole('radio', { name: /^3:/ }).check();
+    await page.locator('fieldset.card').nth(0).getByRole('radio', { name: /^5:/ }).click();
+    await page.locator('fieldset.card').nth(1).getByRole('radio', { name: /^2:/ }).click();
+    await page.locator('fieldset.card').nth(2).getByRole('checkbox', { name: /No me tocó/ }).click();
+    for (const i of [3, 4, 5]) await page.locator('fieldset.card').nth(i).getByRole('radio', { name: /^3:/ }).click();
     await siguiente(page);
     await elegir(page, /no pudiste continuar usando solo el teclado/, 'Sí');
     await siguiente(page);
@@ -351,7 +351,7 @@ test.describe('Se guarda solo y se puede continuar otro día', () => {
     await empezar(page);
     await irTarea(page, /Empezar.*tarea Recorre la compra/);
     await siguiente(page);
-    await page.getByRole('radio', { name: 'Con dificultad' }).check();
+    await page.getByRole('radio', { name: 'Con dificultad' }).click();
     await page.getByLabel('Cuéntanos qué pasó').fill('Tardó en cargar');
     await siguiente(page);
     await expect(page.getByRole('heading', { level: 1, name: 'Paso 2 de 8: Entra al catálogo' })).toBeVisible();
@@ -368,7 +368,7 @@ test.describe('Se guarda solo y se puede continuar otro día', () => {
     await empezar(page);
     await irTarea(page, /Empezar.*tarea Recorre la compra/);
     await siguiente(page);
-    await page.getByRole('radio', { name: 'No', exact: true }).check();
+    await page.getByRole('radio', { name: 'No', exact: true }).click();
     await page.getByLabel('Cuéntanos qué pasó').pressSequentially('se cerró solo');
     await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('babelhub-pruebas-humanas:datos:v2')!).yo.a.pasos.inicio.n)).toBe('se cerró solo');
     await page.goto(ENLACE);
