@@ -1,0 +1,291 @@
+name: lanzamiento
+
+# Publica las imágenes propias de BabelHub en el registro de contenedores de GitHub (GHCR) y deja a la vista el «digest» de cada una
+# para pegarlo en IMAGEN_ECOMMERCE, IMAGEN_INVENTARIO e IMAGEN_POSTGRES de los Compose de las VMs (PLA-03, PLA-26, PLA-28; guía:
+# docs/07-proceso-de-desarrollo/08-guia-primer-despliegue.md). Solo lo dispara una etiqueta de versión (`v1.0.0`) o la persona responsable
+# a mano; nunca un pull request ni una rama. No usa ningún secreto del repositorio: el único permiso de escritura es el token efímero del
+# propio flujo (`github.token`), limitado a los paquetes de este repositorio y solo en los dos trabajos que publican.
+#
+# Cada imagen se construye de forma nativa en su arquitectura (linux/amd64 en un ejecutor x86 y linux/arm64 en uno ARM, que es el de las
+# VM-VENTAS y VM-INVENTARIO de Oracle), se revisa EN LOCAL ANTES de subirla (arquitectura, usuario sin
+# privilegios y secretos en las capas con scripts/escanear-secretos.sh, la misma puerta que secretos.yml) y solo entonces se sube por digest. Solo si todas pasan se arma el
+# índice multi-arquitectura con la etiqueta de la versión (nunca «latest»), se firma su procedencia y se imprime el digest del índice.
+# Alcance: es la publicación de PLA-03, PLA-26 y PLA-28. NO cubre todavía las puertas de T34 (ensayo de restauración vigente, PLA-11), T35 (Trivy como puerta) ni T37
+# (compilación, pruebas, carga y análisis dentro del propio flujo, PLA-31 y PLA-32): hoy se exige que ci.yml y secretos.yml estén en verde para el commit.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lanzamiento-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verificar:
+    name: Origen del lanzamiento
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      version: ${{ steps.origen.outputs.version }}
+      propietario: ${{ steps.origen.outputs.propietario }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # El historial completo: se comprueba que el commit pertenece a la rama principal.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Comprobar versión, rama principal y verificación en verde
+        id: origen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TIPO_DE_REFERENCIA: ${{ github.ref_type }}
+          NOMBRE_DE_REFERENCIA: ${{ github.ref_name }}
+          REPOSITORIO: ${{ github.repository }}
+          PROPIETARIO: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          if [[ "$TIPO_DE_REFERENCIA" == tag ]]; then
+            [[ "$NOMBRE_DE_REFERENCIA" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] \
+              || { echo "La etiqueta «$NOMBRE_DE_REFERENCIA» no es una versión válida (vMAYOR.MENOR.PARCHE, por ejemplo v1.0.0)." >&2; exit 1; }
+            version="$NOMBRE_DE_REFERENCIA"
+          else
+            version="manual-${GITHUB_SHA::7}"
+          fi
+          # Solo se publica lo que está en la rama principal: una etiqueta puesta sobre una rama sin revisar no sale a producción.
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
+            || { echo "El commit $GITHUB_SHA no está en la rama principal: no se publica." >&2; exit 1; }
+          # Y solo lo que ya pasó la verificación: compilación, pruebas, arquitectura, cobertura y escáner de secretos (PLA-31).
+          for flujo in ci.yml secretos.yml; do
+            conclusion="$(gh run list --repo "$REPOSITORIO" --workflow "$flujo" --commit "$GITHUB_SHA" --status completed --json conclusion --jq '[.[].conclusion] | join(",")')"
+            [[ ",$conclusion," == *",success,"* ]] \
+              || { echo "El flujo $flujo no terminó en verde para el commit $GITHUB_SHA (resultado: «${conclusion:-sin ejecuciones}»): espera a que pase o corrígelo." >&2; exit 1; }
+          done
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "propietario=${PROPIETARIO,,}" >> "$GITHUB_OUTPUT"
+          echo "Se publica la versión $version del commit $GITHUB_SHA."
+
+  construir:
+    name: Construir ${{ matrix.imagen }} (${{ matrix.plataforma }})
+    needs: verificar
+    runs-on: ${{ matrix.ejecutor }}
+    timeout-minutes: 45
+    # El entorno «lanzamiento» (Settings → Environments) lleva como revisora obligatoria a la persona responsable: nada se construye ni se publica sin su aprobación (guía 08, paso 1).
+    environment: lanzamiento
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        imagen: [ecommerce, inventario, postgres]
+        plataforma: [amd64, arm64]
+        include:
+          - plataforma: amd64
+            ejecutor: ubuntu-24.04
+          - plataforma: arm64
+            ejecutor: ubuntu-24.04-arm
+          - imagen: ecommerce
+            dockerfile: src/BabelHub.Ecommerce/BabelHub.Ecommerce.Api/Dockerfile
+            contexto: .
+          - imagen: inventario
+            dockerfile: src/BabelHub.Inventario/BabelHub.Inventario.Api/Dockerfile
+            contexto: .
+          # La imagen de PostgreSQL se construye con su propia carpeta, como en el despliegue y en secretos.yml.
+          - imagen: postgres
+            dockerfile: infra/postgres/Dockerfile
+            contexto: infra/postgres
+    env:
+      IMAGEN: ghcr.io/${{ needs.verificar.outputs.propietario }}/babelhub-${{ matrix.imagen }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      # PLA-28: primero se construye y se revisa EN LOCAL; solo si pasa, se sube. Sin caché remota: el lanzamiento es hermético (nada envenenado de otra corrida entra a la imagen).
+      - name: Construir en local (todavía sin subir nada)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.contexto }}
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/${{ matrix.plataforma }}
+          provenance: false
+          sbom: false
+          load: true
+          tags: babelhub-lanzamiento/${{ matrix.imagen }}:local
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.verificar.outputs.version }}
+      - name: Comprobar su arquitectura y su usuario
+        env:
+          PLATAFORMA: ${{ matrix.plataforma }}
+        run: |
+          set -euo pipefail
+          local_="babelhub-lanzamiento/${{ matrix.imagen }}:local"
+          arquitectura="$(docker image inspect --format '{{.Architecture}}' "$local_")"
+          usuario="$(docker image inspect --format '{{.Config.User}}' "$local_")"
+          [[ "$arquitectura" == "$PLATAFORMA" ]] || { echo "La imagen es $arquitectura y se esperaba $PLATAFORMA." >&2; exit 1; }
+          # Ninguna imagen propia corre como administrador (PLA-27): sin usuario declarado, o «root» o «0», se rechaza.
+          case "$usuario" in ""|root|0|0:*|root:*) echo "La imagen corre como administrador («${usuario:-sin usuario}»)." >&2; exit 1 ;; esac
+          echo "$local_: $arquitectura, usuario $usuario"
+      - name: Buscar secretos en las capas de la imagen (PLA-28; salida enmascarada)
+        run: bash scripts/escanear-secretos.sh imagen "babelhub-lanzamiento/${{ matrix.imagen }}:local"
+      - name: Vulnerabilidades conocidas (informativo hasta que T35 lo vuelva puerta)
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          trabajo="$(mktemp -d)"
+          docker save -o "$trabajo/imagen.tar" "babelhub-lanzamiento/${{ matrix.imagen }}:local"
+          # La misma versión y huella de Trivy que scripts/escanear-secretos.sh; aquí con red, para bajar la base de vulnerabilidades.
+          docker run --rm -v "$trabajo:/work:ro" "aquasec/trivy:0.58.1@sha256:ab70a02200597efa04748f210f793936eb647cbcdb0ea69cc30b226d6f5a22c7" \
+            image --input /work/imagen.tar --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --no-progress \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+      # Pasó todo: se sube por digest (sin etiqueta todavía). La capa de la construcción anterior sale de la caché local del propio ejecutor.
+      - name: Subir por digest
+        id: construccion
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.contexto }}
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/${{ matrix.plataforma }}
+          provenance: false
+          sbom: false
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.verificar.outputs.version }}
+          outputs: type=image,name=${{ env.IMAGEN }},push-by-digest=true,name-canonical=true,push=true
+      - name: Guardar el digest de esta arquitectura
+        env:
+          DIGEST: ${{ steps.construccion.outputs.digest }}
+        run: |
+          set -euo pipefail
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "La construcción no devolvió un digest válido." >&2; exit 1; }
+          mkdir -p digests
+          echo "$DIGEST" > "digests/${{ matrix.imagen }}-${{ matrix.plataforma }}.txt"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: digest-${{ matrix.imagen }}-${{ matrix.plataforma }}
+          path: digests/
+          if-no-files-found: error
+          retention-days: 7
+
+  publicar:
+    name: Publicar ${{ matrix.imagen }}
+    needs: [verificar, construir]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: lanzamiento
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        imagen: [ecommerce, inventario, postgres]
+    env:
+      IMAGEN: ghcr.io/${{ needs.verificar.outputs.propietario }}/babelhub-${{ matrix.imagen }}
+      VERSION: ${{ needs.verificar.outputs.version }}
+    steps:
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: digest-${{ matrix.imagen }}-*
+          path: digests
+          merge-multiple: true
+      - name: Armar el índice multi-arquitectura con la etiqueta de la versión
+        id: indice
+        run: |
+          set -euo pipefail
+          for plataforma in amd64 arm64; do
+            [[ -s "digests/${{ matrix.imagen }}-$plataforma.txt" ]] || { echo "Falta el digest de $plataforma: no se publica una imagen incompleta." >&2; exit 1; }
+          done
+          # Una versión ya publicada no se sobrescribe: si la etiqueta existe, se corrige subiendo otra versión.
+          if docker buildx imagetools inspect "$IMAGEN:$VERSION" >/dev/null 2>&1; then
+            echo "La etiqueta $IMAGEN:$VERSION ya existe: una versión publicada no se sobrescribe (crea una versión nueva)." >&2
+            exit 1
+          fi
+          for archivo in digests/${{ matrix.imagen }}-amd64.txt digests/${{ matrix.imagen }}-arm64.txt; do
+            [[ "$(cat "$archivo")" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "El digest de $archivo no es válido." >&2; exit 1; }
+          done
+          docker buildx imagetools create --tag "$IMAGEN:$VERSION" \
+            "$IMAGEN@$(cat "digests/${{ matrix.imagen }}-amd64.txt")" \
+            "$IMAGEN@$(cat "digests/${{ matrix.imagen }}-arm64.txt")"
+          digest="$(docker buildx imagetools inspect "$IMAGEN:$VERSION" --format '{{json .Manifest}}' | jq -r .digest)"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "No se pudo leer el digest del índice." >&2; exit 1; }
+          # AC-PLA-03: el índice publicado existe para x86_64 y para ARM64.
+          plataformas="$(docker buildx imagetools inspect --raw "$IMAGEN@$digest" | jq -r '.manifests[] | "\(.platform.os)/\(.platform.architecture)"' | tr '\n' ' ')"
+          [[ "$plataformas" == *linux/amd64* && "$plataformas" == *linux/arm64* ]] || { echo "El índice no trae las dos arquitecturas: $plataformas" >&2; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - name: Firmar la procedencia de la imagen (quién, desde qué commit y con qué flujo la construyó)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGEN }}
+          subject-digest: ${{ steps.indice.outputs.digest }}
+          push-to-registry: true
+      - name: Guardar la línea para los Compose
+        env:
+          DIGEST: ${{ steps.indice.outputs.digest }}
+        run: |
+          mkdir -p imagenes
+          variable="IMAGEN_$(echo "${{ matrix.imagen }}" | tr '[:lower:]' '[:upper:]')"
+          echo "$variable=$IMAGEN@$DIGEST" > "imagenes/${{ matrix.imagen }}.env"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: imagen-${{ matrix.imagen }}
+          path: imagenes/
+          if-no-files-found: error
+          retention-days: 90
+
+  resumen:
+    name: Digests para los Compose
+    needs: [verificar, publicar]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: imagen-*
+          path: imagenes
+          merge-multiple: true
+      - name: Imprimir y guardar las tres líneas
+        env:
+          VERSION: ${{ needs.verificar.outputs.version }}
+        run: |
+          set -euo pipefail
+          sort imagenes/*.env > imagenes-publicadas.env
+          [[ "$(wc -l < imagenes-publicadas.env)" -eq 3 ]] || { echo "Se esperaban tres imágenes publicadas." >&2; exit 1; }
+          {
+            echo "## Imágenes publicadas: $VERSION"
+            echo
+            echo "Pega estas tres líneas en la VM antes de \`scripts/desplegar.sh\` (VM-INVENTARIO usa las tres; VM-VENTAS solo \`IMAGEN_ECOMMERCE\`):"
+            echo
+            echo '```'
+            cat imagenes-publicadas.env
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: imagenes-publicadas
+          path: imagenes-publicadas.env
+          if-no-files-found: error
+          retention-days: 90

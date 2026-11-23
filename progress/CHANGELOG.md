@@ -2,6 +2,13 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-23 — Preparación del primer despliegue en Oracle
+
+### Cubierto
+- Flujo `lanzamiento.yml` (imágenes `amd64` y `arm64` en GHCR por digest, con escaneo previo y procedencia firmada), `scripts/generar-secretos.sh`, `scripts/ensayo-local.sh` y la guía `08-guia-primer-despliegue.md`; `desplegar.sh` con `--sin`, `CAMBIAR`, `ca-bundle.pem` y entrega de llaves TLS.
+- Ensayo con las imágenes reales: VM-INVENTARIO completa (Inventario en `Production`, HTTPS validado) y VM-VENTAS sin Evolution ni túnel. Corregidos Compose y tabla de secretos (HTTPS entre servicios, Biblioteca en la réplica, SMTP, alias del segundo conector). DD-55 a DD-59 pendientes de ratificar.
+- Hallazgo mayor: el E-commerce no arranca en `Production` hasta el adaptador de Culqi (DD-58). Sin push ni etiquetas.
+
 
 ## 2026-11-21 (noche) — Cierre de Inventario: ajustes y selección de fuente a Done
 

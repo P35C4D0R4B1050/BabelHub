@@ -236,8 +236,8 @@ Lo siguiente se acepta de forma consciente y debe figurar en el informe y en la 
 | VM-AUX | Las demás VMs | 22 | Permitido |
 | VM-BORDE | VM-VENTAS | 8080 (E-commerce) | Permitido |
 | VM-BORDE | VM-INVENTARIO | 8081 (réplica de gestión, solo como respaldo) | Permitido |
-| VM-VENTAS, VM-INVENTARIO (réplica) | VM-INVENTARIO | 8082 (API del Inventario) | Permitido |
-| VM-INVENTARIO (Inventario) | VM-VENTAS | 8080 (aviso de traslado recibido y solicitud de avisos de traslado, alcance `solicitar-aviso`) | Permitido |
+| VM-VENTAS, VM-INVENTARIO (réplica) | VM-INVENTARIO | 8082 (API del Inventario, por HTTPS: el contenedor escucha en 8443 y se publica como 8082; DD-55) | Permitido |
+| VM-INVENTARIO (Inventario) | VM-VENTAS | 8443, por HTTPS con el certificado de la CA privada de la cuenta (aviso de traslado recibido y solicitud de avisos de traslado, alcance `solicitar-aviso`; antes 8080, DD-55) | Permitido |
 | VM-INVENTARIO | VM-VENTAS | 5678 (webhook de n8n) | Cerrado: el Inventario ya no llama a n8n (pide los avisos al E-commerce, `transversal-notificaciones` D10) |
 | VM-VENTAS | VM-INVENTARIO | 5432 (PostgreSQL, rol ecommerce) | Permitido |
 | Cualquier otro origen | VM-INVENTARIO | todos | **Denegado** |
