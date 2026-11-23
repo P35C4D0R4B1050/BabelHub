@@ -22,7 +22,7 @@
 
         @if (!string.IsNullOrWhiteSpace(Model.Descripcion))
         {
-            @* Texto plano: el escape de Razor lo muestra tal como se escribió (CAT-25), nunca con Html.Raw; sin descripción no hay bloque. *@
+            @* Texto plano: el escape de Razor lo muestra tal como se escribió (CAT-25), nunca con marcado sin codificar; sin descripción no hay bloque. *@
             <section aria-labelledby="h-descripcion">
                 <h2 id="h-descripcion" class="sr-only">Descripción</h2>
                 <p class="bh-descripcion text-base leading-relaxed">@Model.Descripcion</p>

@@ -610,7 +610,17 @@ public sealed class AnfitrionDelEcommerceTests
     {
         var texto = File.ReadAllText(Path.Combine(BabelHub.IntegrationTests.Web.RaizDelRepositorio.Raiz, "infra", archivo));
 
-        Assert.Contains("ASPNETCORE_ENVIRONMENT: Production", texto, StringComparison.Ordinal);
+        // PAG-34: el Compose del E-commerce (ventas) ya no fija el entorno: lo define ecommerce.env (Staging o Production) y desplegar.sh lo comprueba.
+        // El del Inventario sigue fijando Production. En ningún caso un Compose de despliegue puede fijar Development.
+        if (archivo == "docker-compose.ventas.yml")
+        {
+            Assert.DoesNotContain("ASPNETCORE_ENVIRONMENT: ", texto.Replace("# PAG-34: ASPNETCORE_ENVIRONMENT NO", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.Contains("ASPNETCORE_ENVIRONMENT: Production", texto, StringComparison.Ordinal);
+        }
+
         Assert.DoesNotContain("ASPNETCORE_ENVIRONMENT: Development", texto, StringComparison.Ordinal);
     }
 

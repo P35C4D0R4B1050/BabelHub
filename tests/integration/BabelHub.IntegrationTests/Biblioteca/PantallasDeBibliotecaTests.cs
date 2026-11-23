@@ -380,7 +380,9 @@ public sealed class PantallasDeBibliotecaTests
         Assert.Contains($"name=\"ayudaId\" value=\"{abierta.AyudaId:D}\"", html, StringComparison.Ordinal);
         Assert.Contains($"action=\"/administracion/biblioteca/ayudas/{abierta.AyudaId:D}/cerrar\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain($"/ayudas/{cerrada.AyudaId:D}/cerrar", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("correo", html, StringComparison.OrdinalIgnoreCase);
+        // El pie de toda página lleva ahora el correo de contacto del comercio (COM-02); lo que no debe aparecer es el correo de una cuenta en el contenido.
+        var contenido = html[..html.IndexOf("<footer", StringComparison.OrdinalIgnoreCase)];
+        Assert.DoesNotContain("correo", contenido, StringComparison.OrdinalIgnoreCase);
 
         await Pedir(anfitrion, "/administracion/biblioteca/ayudas", HostWeb.Gestion);
         Assert.Equal(EstadoDeLaAyudaDeBiblioteca.Abierta, administracion.UltimoFiltro);
