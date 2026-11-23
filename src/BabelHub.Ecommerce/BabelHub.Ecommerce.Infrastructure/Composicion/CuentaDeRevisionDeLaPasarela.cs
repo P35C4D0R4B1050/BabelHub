@@ -76,7 +76,6 @@ public sealed class CuentaDeRevisionDeLaPasarela(
         }
 
         var vigentes = await LeerLosTextosVigentes(cancelacion).ConfigureAwait(false);
-        await AsegurarLaPrimeraClaveDeFirma(cancelacion).ConfigureAwait(false);
 
         var texto = ContrasenaAleatoria();
         var (contrasena, _) = Contrasena.Crear(texto, comunes.EsComun);
@@ -85,12 +84,15 @@ public sealed class CuentaDeRevisionDeLaPasarela(
             : await hasher.Resumir(contrasena, cancelacion).ConfigureAwait(false);
 
         var ahora = reloj.Ahora;
+        var claveCreada = false;
         var (id, rotada) = await unidad.Ejecutar(
             async ct =>
             {
+                claveCreada = false;
                 var existente = await cuentas.PorCorreo(correoNormalizado, ct).ConfigureAwait(false);
                 if (existente is null)
                 {
+                    claveCreada = await AsegurarLaPrimeraClaveDeFirma(ct).ConfigureAwait(false);
                     var cuenta = new CuentaDeIdentidad
                     {
                         Usuario = Usuario.Restaurar(Guid.NewGuid(), correoNormalizado, RolDeUsuario.Cliente, null, correoVerificado: true, activo: true),
@@ -119,6 +121,7 @@ public sealed class CuentaDeRevisionDeLaPasarela(
                     throw new CuentaDeRevisionNoPermitidaException("Ese correo ya pertenece a otra cuenta, a una sin verificar o a la cuenta de revisión ya retirada: elige otro con --correo. No se tocó nada.");
                 }
 
+                claveCreada = await AsegurarLaPrimeraClaveDeFirma(ct).ConfigureAwait(false);
                 previa!.ResumenDeAcceso = resumen;
                 previa.ContrasenaTemporalHasta = null;
                 previa.DebeCambiarLaTemporal = false;
@@ -129,6 +132,10 @@ public sealed class CuentaDeRevisionDeLaPasarela(
                 return (previa.Usuario.Id, true);
             },
             cancelacion).ConfigureAwait(false);
+        if (claveCreada)
+        {
+            await RenovarElVerificador(cancelacion).ConfigureAwait(false);
+        }
 
         return new CuentaDeRevisionCreada(id, correoNormalizado, new ValorSecreto(texto), rotada);
     }
@@ -336,7 +343,11 @@ public sealed class CuentaDeRevisionDeLaPasarela(
     }
 
     /// <summary>Una instalación nueva no tiene clave de firma activa y sin ella nadie ingresa: se crea la primera, con su auditoría (la unicidad de la clave activa la sostiene el índice único parcial de la base: dos operaciones simultáneas no pueden crear dos).</summary>
-    internal async Task AsegurarLaPrimeraClaveDeFirma(CancellationToken cancelacion)
+    /// <summary>
+    /// Crea la primera clave de firma si no hay ninguna activa (PAG-46) <b>dentro de la transacción de quien la llama</b>, después de que este haya comprobado todo lo que puede negarse:
+    /// así una negativa no la deja creada y, si falla la auditoría de la cuenta, la clave tampoco queda. Devuelve si la creó (entonces, tras confirmar, hay que llamar a <see cref="RenovarElVerificador"/>).
+    /// </summary>
+    internal async Task<bool> AsegurarLaPrimeraClaveDeFirma(CancellationToken cancelacion)
     {
         var hayActiva = false;
         try
@@ -350,24 +361,20 @@ public sealed class CuentaDeRevisionDeLaPasarela(
 
         if (hayActiva)
         {
-            return;
+            return false;
         }
 
-        await unidad.Ejecutar(
-            async ct =>
-            {
-                // Generar inserta la privada cifrada: va dentro de la misma transacción que activarla y auditarla (como en la rotación), para que una falla no deje una clave huérfana.
-                var primera = (await generadorDeClaves.Generar(reloj.Ahora, ct).ConfigureAwait(false)).Clave;
-                await almacenDeClaves.Guardar(JuegoDeClavesDeFirma.Iniciar(primera), ct).ConfigureAwait(false);
-                await auditoria.Registrar(
-                    new SolicitudDeRegistro(AccionesAuditables.ClaveDeFirmaRotada) { ObjetoTipo = "clave-de-firma", ObjetoId = primera.Kid, Detalle = new Dictionary<string, string?> { ["versionNueva"] = primera.Kid } },
-                    ct).ConfigureAwait(false);
-                return 0;
-            },
+        // Generar inserta la privada cifrada: va en la misma transacción que activarla y auditarla (como en la rotación), para que una falla no deje una clave huérfana.
+        var primera = (await generadorDeClaves.Generar(reloj.Ahora, cancelacion).ConfigureAwait(false)).Clave;
+        await almacenDeClaves.Guardar(JuegoDeClavesDeFirma.Iniciar(primera), cancelacion).ConfigureAwait(false);
+        await auditoria.Registrar(
+            new SolicitudDeRegistro(AccionesAuditables.ClaveDeFirmaRotada) { ObjetoTipo = "clave-de-firma", ObjetoId = primera.Kid, Detalle = new Dictionary<string, string?> { ["versionNueva"] = primera.Kid } },
             cancelacion).ConfigureAwait(false);
-        // El verificador de credenciales guarda una foto de las claves publicadas: se renueva para que la primera credencial emitida ya se verifique.
-        await cacheDeVerificacion.Renovar(cancelacion).ConfigureAwait(false);
+        return true;
     }
+
+    /// <summary>El verificador de credenciales guarda una foto de las claves publicadas: se renueva tras confirmar la transacción para que la primera credencial emitida ya se verifique.</summary>
+    internal Task RenovarElVerificador(CancellationToken cancelacion) => cacheDeVerificacion.Renovar(cancelacion);
 
     internal static string ContrasenaAleatoria()
     {

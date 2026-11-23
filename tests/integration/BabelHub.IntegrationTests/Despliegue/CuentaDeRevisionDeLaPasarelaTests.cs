@@ -627,6 +627,9 @@ public sealed class CuentaDeRevisionDeLaPasarelaTests(InstanciaParaMigrar instan
         {
             await using var desactivar = origen.CreateCommand("UPDATE identidad.usuarios SET activo = false WHERE correo = 'admin.inicial@ejemplo.pe'");
             await desactivar.ExecuteNonQueryAsync();
+            // Una instalación sin ninguna clave de firma: una negativa no debe crear la primera (PAG-46, PAG-48).
+            await using var sinClaves = origen.CreateCommand("DELETE FROM identidad.claves_de_firma");
+            await sinClaves.ExecuteNonQueryAsync();
         }
 
         var cliente = await Assert.ThrowsAsync<CuentaDeRevisionNoPermitidaException>(() => operacion.Crear("Production", "persona-05@example.test", nombre: null));
@@ -634,6 +637,7 @@ public sealed class CuentaDeRevisionDeLaPasarelaTests(InstanciaParaMigrar instan
 
         Assert.Contains("otra cuenta", cliente.Message, StringComparison.Ordinal);
         Assert.Contains("otra cuenta", desactivado.Message, StringComparison.Ordinal);
+        Assert.Equal(0L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.claves_de_firma"));
         Assert.Equal(0L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios WHERE rol = 'administrador-central' AND activo"));
         Assert.Equal(1L, await Consultar<long>(propietaria, "SELECT count(*) FROM identidad.usuarios WHERE correo = 'persona-05@example.test' AND rol <> 'administrador-central'"));
     }

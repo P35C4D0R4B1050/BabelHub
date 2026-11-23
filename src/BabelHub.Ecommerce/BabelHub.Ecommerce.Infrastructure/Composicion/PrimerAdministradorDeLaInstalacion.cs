@@ -64,18 +64,18 @@ public sealed class PrimerAdministradorDeLaInstalacion(
             throw new CuentaDeRevisionNoPermitidaException("El nombre del administrador no es válido (hasta 100 caracteres, sin caracteres de control).");
         }
 
-        await claveInicial.AsegurarLaPrimeraClaveDeFirma(cancelacion).ConfigureAwait(false);
-
         var temporal = CuentaDeRevisionDeLaPasarela.ContrasenaAleatoria();
         var (contrasena, _) = Contrasena.Crear(temporal, comunes.EsComun);
         var resumen = contrasena is null
             ? throw new InvalidOperationException("La contraseña generada no cumplió la política de contraseñas.")
             : await hasher.Resumir(contrasena, cancelacion).ConfigureAwait(false);
         var ahora = reloj.Ahora;
+        var claveCreada = false;
 
-        return await unidad.Ejecutar(
+        var resultado = await unidad.Ejecutar(
             async ct =>
             {
+                claveCreada = false;
                 var existente = await cuentas.PorCorreo(correoNormalizado, ct).ConfigureAwait(false);
                 if (existente is null)
                 {
@@ -85,6 +85,8 @@ public sealed class PrimerAdministradorDeLaInstalacion(
                         throw new CuentaDeRevisionNoPermitidaException("Ya existe un administrador central: esta operación solo crea el primero. Los demás los da de alta la administración. No se tocó nada.");
                     }
 
+                    // La primera clave de firma, solo cuando ya pasaron todas las negativas y en esta misma transacción (PAG-46).
+                    claveCreada = await claveInicial.AsegurarLaPrimeraClaveDeFirma(ct).ConfigureAwait(false);
                     var cuenta = new CuentaDeIdentidad
                     {
                         Usuario = Usuario.Restaurar(Guid.NewGuid(), correoNormalizado, RolDeUsuario.AdministradorCentral, null, correoVerificado: true, activo: true),
@@ -124,6 +126,7 @@ public sealed class PrimerAdministradorDeLaInstalacion(
                     throw new CuentaDeRevisionNoPermitidaException("Ya existe otro administrador central: esta operación solo regenera la contraseña del único administrador que aún no ingresó. No se tocó nada.");
                 }
 
+                claveCreada = await claveInicial.AsegurarLaPrimeraClaveDeFirma(ct).ConfigureAwait(false);
                 previa.ResumenDeAcceso = resumen;
                 previa.ContrasenaTemporalHasta = ahora + VigenciaDeLaTemporal;
                 previa.DebeCambiarLaTemporal = true;
@@ -133,5 +136,11 @@ public sealed class PrimerAdministradorDeLaInstalacion(
                 return new PrimerAdministradorCreado(previa.Usuario.Id, correoNormalizado, ResultadoDelPrimerAdministrador.ContrasenaTemporalRegenerada, new ValorSecreto(temporal));
             },
             cancelacion).ConfigureAwait(false);
+        if (claveCreada)
+        {
+            await claveInicial.RenovarElVerificador(cancelacion).ConfigureAwait(false);
+        }
+
+        return resultado;
     }
 }
