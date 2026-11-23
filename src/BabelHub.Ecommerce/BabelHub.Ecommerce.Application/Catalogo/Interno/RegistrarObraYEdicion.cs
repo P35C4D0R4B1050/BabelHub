@@ -79,7 +79,7 @@ internal sealed class RegistrarObra(
             construidas.Add(edicion.Valor);
         }
 
-        var registro = Obra.Registrar(Guid.NewGuid(), new DatosDeObra(entrada.Titulo, entrada.Autor, entrada.Editorial, entrada.Categoria), portada.Valor.ComoPortada(), construidas.Select(e => e.Edicion), reloj.Ahora);
+        var registro = Obra.Registrar(Guid.NewGuid(), new DatosDeObra(entrada.Titulo, entrada.Autor, entrada.Editorial, entrada.Categoria, entrada.Descripcion), portada.Valor.ComoPortada(), construidas.Select(e => e.Edicion), reloj.Ahora);
         if (!registro.EsExito)
         {
             return FallosDelCatalogo.Fallo<ResultadoDeAlta>(TraductorDeRechazos.De(registro.Rechazo!, entrada.Titulo?.Trim()));

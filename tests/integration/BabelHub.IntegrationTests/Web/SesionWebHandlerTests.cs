@@ -37,6 +37,24 @@ public sealed class SesionWebHandlerTests
             : null;
 
     [Fact]
+    [Trait("Criterio", "AC-CIN-13")]
+    public async Task UnaCredencialConLaIdentidadDeOperacionDeLaCarga_NoVale_LaSolicitudEsAnonima()
+    {
+        // CIN-06: la identidad «carga inicial» no es una cuenta; ni una credencial de firma válida con ese sub y el rol de administración central la hace actor.
+        var sesiones = new SesionesWebDePrueba().ConSesionValida(RolWeb.AdministradorCentral);
+        sesiones.Credencial = (_, _) => new ResultadoDeCredencial(
+            EstadoDeCredencial.Asegurada,
+            new ActorVerificado(Guid.Parse(BabelHub.Shared.Contratos.IdentidadesDeOperacion.CargaInicial), RolWeb.AdministradorCentral, null),
+            new CredencialEnMemoria("eyJ.token-de-prueba.firma"));
+        await using var anfitrion = await AnfitrionConSesion.Iniciar(sesiones, HostWeb.Gestion);
+
+        var yo = await Yo(anfitrion, AnfitrionConSesion.Cookie(HostWeb.Gestion));
+
+        Assert.False(yo.GetProperty("autenticada").GetBoolean());
+        Assert.Equal("Anonimo", yo.GetProperty("actorTipo").GetString());
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-WEB-03")]
     public async Task SinCookie_LaSolicitudEsAnonima_YNoSeConsultaLaSesion()
     {

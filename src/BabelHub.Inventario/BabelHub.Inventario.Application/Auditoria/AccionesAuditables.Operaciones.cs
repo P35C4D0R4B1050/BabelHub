@@ -27,6 +27,7 @@ public static partial class AccionesAuditables
 
     /// <summary>El Catálogo concilió un ingreso de mercadería pendiente con los ingresos del Inventario (registrado, fallido o discrepancia; sin la nota ni la referencia, CAT-22).</summary>
     public static readonly AccionAuditable IngresoPendienteConciliado = new(nameof(IngresoPendienteConciliado));
+    public static readonly AccionAuditable CargaInicialEjecutada = new(nameof(CargaInicialEjecutada));
 
     /// <summary>El trabajo de fondo anonimizó los ingresos solicitados de más de 2 años (cantidad, sin datos personales).</summary>
     public static readonly AccionAuditable IngresosSolicitadosAnonimizados = new(nameof(IngresosSolicitadosAnonimizados));

@@ -58,7 +58,7 @@ internal sealed class EditarObra(
             portadaNueva = consumida.Valor;
         }
 
-        var datos = obra.EditarDatos(new DatosDeObra(entrada.Titulo, entrada.Autor, entrada.Editorial, entrada.Categoria));
+        var datos = obra.EditarDatos(new DatosDeObra(entrada.Titulo, entrada.Autor, entrada.Editorial, entrada.Categoria, entrada.Descripcion));
         if (!datos.EsExito)
         {
             return FallosDelCatalogo.Fallo<ResultadoDeEscritura>(TraductorDeRechazos.De(datos.Rechazo!));

@@ -111,3 +111,7 @@ Contiene solo contratos: DTOs de solicitud y respuesta, constantes (códigos de 
 Al publicar una `v2`, se añade aquí la fila con la fecha de retiro; las pruebas de contrato corren `v1` y `v2` hasta esa fecha y después ya no exigen la anterior.
 
 Todos los módulos usan además los contratos de Plataforma, Auditoría y Notificaciones; esas flechas se omiten de la tabla para no repetirlas en cada fila. Plataforma no depende de nadie y Auditoría y Notificaciones no dependen de ningún módulo de negocio salvo Identidad en el sentido indicado (Identidad implementa los puertos de Auditoría; Notificaciones consulta el contrato de Identidad).
+
+## 7. Órdenes de operación del servicio
+
+Además de `migrar` (COMP-2), cada servicio tiene una orden de carga que **no abre puertos ni mapea rutas**: `cargar-catalogo` (E-commerce) llama a los contratos públicos del módulo `Catalogo` (`ICargaInicialDelCatalogo`) y `cargar-stock` (Inventario) a los de `Ajustes` (`ICargaInicialDelInventario`), que a su vez inyecta los casos de uso públicos de `Fuentes` (la raíz de su módulo, regla 13; no hay otro precedente de un módulo que resuelva el `ICasoDeUso` de otro). Se componen en el modo `Operacion` de `ModoDeArranque` (adaptadores nulos, sin trabajos de fondo, con las credenciales reales; `ArranqueSeguro.Resolver` lo rechaza desde la configuración). Los servicios no se llaman entre sí: el catálogo deja un plan JSON v1 (`tools/carga-inicial/plan-de-referencia.json` fija su forma) que lee la orden del Inventario. Spec `transversal-carga-inicial`.

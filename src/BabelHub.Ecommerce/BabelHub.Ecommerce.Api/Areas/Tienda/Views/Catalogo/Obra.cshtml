@@ -20,6 +20,15 @@
             <p class="text-lg opacity-80">@Model.Autor · @Model.Editorial</p>
         </div>
 
+        @if (!string.IsNullOrWhiteSpace(Model.Descripcion))
+        {
+            @* Texto plano: el escape de Razor lo muestra tal como se escribió (CAT-25), nunca con Html.Raw; sin descripción no hay bloque. *@
+            <section aria-labelledby="h-descripcion">
+                <h2 id="h-descripcion" class="sr-only">Descripción</h2>
+                <p class="bh-descripcion text-base leading-relaxed">@Model.Descripcion</p>
+            </section>
+        }
+
         @if (Model.DisponibilidadDudosa)
         {
             <div class="alert alert-warning" role="status">
@@ -97,11 +106,15 @@
         {
             <section aria-labelledby="h-digital" class="space-y-4">
                 <h2 id="h-digital" class="sr-only">Edición digital</h2>
-                <div class="flex flex-wrap items-baseline gap-4">
-                    <span class="font-display text-4xl">@digital.PrecioTexto</span>
-                    <vc:bh-disponibilidad modelo="@digital.Disponibilidad" />
-                    <span class="text-xs opacity-80">Sin IGV: los libros digitales descargables están exonerados (precio referencial).</span>
-                </div>
+                @if (digital.Aviso is null)
+                {
+                    @* CAT-24: solo una edición que se ofrece a la venta muestra su precio; si no se ofrece (CAT-07), solo se explica el motivo. *@
+                    <div class="flex flex-wrap items-baseline gap-4">
+                        <span class="font-display text-4xl">@digital.PrecioTexto</span>
+                        <vc:bh-disponibilidad modelo="@digital.Disponibilidad" />
+                        <span class="text-xs opacity-80">Sin IGV: los libros digitales descargables están exonerados (precio referencial).</span>
+                    </div>
+                }
                 <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
                     <dt class="opacity-70">ISBN</dt><dd>@digital.Isbn</dd>
                     <dt class="opacity-70">Idioma</dt><dd>Español</dd>

@@ -89,6 +89,9 @@ public sealed class FichaVista : ModeloBaseDePagina
 
     public string Categoria { get; set; } = string.Empty;
 
+    /// <summary>La descripción de la obra (CAT-24): texto plano o nulo si no tiene; la vista la escapa y no muestra un bloque vacío.</summary>
+    public string? Descripcion { get; set; }
+
     public string PortadaHuella { get; set; } = string.Empty;
 
     public string ObraTitulo { get; set; } = string.Empty;
@@ -179,6 +182,7 @@ public sealed class CatalogoController(IConsultaDeCatalogo catalogo, ContextoDeP
         vista.Autor = obra.Autor;
         vista.Editorial = obra.Editorial;
         vista.Categoria = obra.Categoria;
+        vista.Descripcion = obra.Descripcion;
         vista.PortadaHuella = obra.PortadaHuella;
         vista.Impresa = obra.Ediciones.Where(e => e.Formato == FormatoDeEdicion.Impresa).Select(e => AEdicion(e, vista.SucursalPreferida)).FirstOrDefault();
         vista.Digital = obra.Ediciones.Where(e => e.Formato == FormatoDeEdicion.Digital).Select(e => AEdicion(e, vista.SucursalPreferida)).FirstOrDefault();

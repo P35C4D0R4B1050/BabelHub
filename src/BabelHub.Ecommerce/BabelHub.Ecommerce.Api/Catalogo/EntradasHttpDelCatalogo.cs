@@ -12,9 +12,9 @@ public sealed record LicenciaHttp(TipoDeLicenciaDeEdicion? Tipo, string? Titular
 
 public sealed record EdicionHttp(FormatoDeEdicion? Formato, string? Isbn, decimal? Precio, LicenciaHttp? Licencia, Guid? ArchivoRef, int? StockInicial);
 
-public sealed record RegistrarObraHttp(string? Titulo, string? Autor, string? Editorial, string? Categoria, Guid? PortadaRef, EdicionHttp[]? Ediciones);
+public sealed record RegistrarObraHttp(string? Titulo, string? Autor, string? Editorial, string? Categoria, Guid? PortadaRef, EdicionHttp[]? Ediciones, string? Descripcion = null);
 
-public sealed record EditarObraHttp(long? Version, string? Titulo, string? Autor, string? Editorial, string? Categoria, Guid? PortadaRef);
+public sealed record EditarObraHttp(long? Version, string? Titulo, string? Autor, string? Editorial, string? Categoria, Guid? PortadaRef, string? Descripcion = null);
 
 public sealed record VersionHttp(long? Version);
 

@@ -192,5 +192,6 @@ internal sealed class ConsultaDeCatalogoDeLaAplicacion(
                     e.Isbn.Isbn13,
                     e.Precio.Valor,
                     disponibilidad.TryGetValue(e.Id, out var d) ? d : new DisponibilidadDeEdicion(e.Id, EstadoDeDisponibilidad.NoSePuedeConfirmar, null, [], FrescuraDeLaDisponibilidad.NoSePuedeConfirmar, null, null)))
-                .ToList());
+                .ToList(),
+            obra.Descripcion);
 }

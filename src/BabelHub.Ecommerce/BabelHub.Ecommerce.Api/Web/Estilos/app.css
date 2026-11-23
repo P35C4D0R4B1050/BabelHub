@@ -237,6 +237,13 @@ body {
   box-shadow: 0 6px 18px var(--bh-sombra);
 }
 
+/* Descripción de la obra (CAT-24, CAT-25): texto plano, con los saltos de línea del original y sin desbordar */
+.bh-descripcion {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  max-width: 65ch;
+}
+
 /* Esqueleto de carga con la forma del contenido (sin saltos de diseño) */
 .bh-esqueleto {
   background-color: var(--color-base-300);

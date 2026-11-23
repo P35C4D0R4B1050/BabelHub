@@ -114,7 +114,8 @@ public sealed record ResumenDeObra(
     string Editorial,
     string Categoria,
     string PortadaHuella,
-    IReadOnlyList<EdicionDeObra> Ediciones);
+    IReadOnlyList<EdicionDeObra> Ediciones,
+    string? Descripcion = null);
 
 /// <summary>Una página de la búsqueda. <see cref="Total"/> es el de las obras que cumplen los filtros.</summary>
 public sealed record PaginaDeObras(IReadOnlyList<ResumenDeObra> Obras, int Pagina, int Tamano, int Total);
@@ -165,10 +166,10 @@ public sealed record NuevaEdicionEntrada(
     int? StockInicial);
 
 /// <summary>Registra una obra con su portada (ya subida, <see cref="PortadaRef"/>) y al menos una edición (a lo más una impresa y una digital).</summary>
-public sealed record RegistrarObraEntrada(string? Titulo, string? Autor, string? Editorial, string? Categoria, Guid? PortadaRef, IReadOnlyList<NuevaEdicionEntrada>? Ediciones);
+public sealed record RegistrarObraEntrada(string? Titulo, string? Autor, string? Editorial, string? Categoria, Guid? PortadaRef, IReadOnlyList<NuevaEdicionEntrada>? Ediciones, string? Descripcion = null);
 
 /// <summary>Edita los datos de la obra y, si trae <see cref="PortadaRef"/>, reemplaza su portada; <see cref="Version"/> es la que leyó quien edita (concurrencia optimista).</summary>
-public sealed record EditarObraEntrada(Guid ObraId, long Version, string? Titulo, string? Autor, string? Editorial, string? Categoria, Guid? PortadaRef);
+public sealed record EditarObraEntrada(Guid ObraId, long Version, string? Titulo, string? Autor, string? Editorial, string? Categoria, Guid? PortadaRef, string? Descripcion = null);
 
 public sealed record DarDeBajaObraEntrada(Guid ObraId, long Version);
 
@@ -237,7 +238,8 @@ public sealed record ObraDeAdministracion(
     string PortadaHuella,
     long Version,
     bool DadaDeBaja,
-    IReadOnlyList<EdicionDeAdministracion> Ediciones);
+    IReadOnlyList<EdicionDeAdministracion> Ediciones,
+    string? Descripcion = null);
 
 public sealed record ListarObrasDeAdministracionEntrada(string? Texto = null, bool IncluirDadasDeBaja = false, int Pagina = 1, int Tamano = 20);
 

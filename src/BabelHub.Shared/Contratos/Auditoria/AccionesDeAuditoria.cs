@@ -134,6 +134,9 @@ public static class AccionesDeAuditoria
 
     public const string IngresosSolicitadosAnonimizados = "IngresosSolicitadosAnonimizados";
 
+    /// <summary>Una corrida de la carga inicial del catálogo o del inventario terminó (CIN-07): el identificador de la corrida, la huella SHA-256 del archivo de datos o del plan y los conteos; el autor es la identidad de operación «carga inicial», sin datos personales.</summary>
+    public const string CargaInicialEjecutada = "CargaInicialEjecutada";
+
     /// <summary>El trabajo de fondo desvinculó las intenciones de pago cerradas hace más de 2 años (cantidad, sin datos personales, PAG-26).</summary>
     public const string IntencionesDePagoDesvinculadas = "IntencionesDePagoDesvinculadas";
 
@@ -314,6 +317,7 @@ public static class AccionesDeAuditoria
         IngresoFallido,
         IngresoPendienteConciliado,
         IngresosSolicitadosAnonimizados,
+        CargaInicialEjecutada,
         IntencionesDePagoDesvinculadas,
         ReembolsoResuelto,
         PasoDeCompensacionHecho,

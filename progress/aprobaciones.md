@@ -71,3 +71,7 @@ Una fila por cada spec o plan que el agente aprobó por delegación de la person
 | 2026-11-23 | plan | ecommerce-pagos | Claude (delegado) | 0/0 | Lista para aprobar | Cumple con observaciones | Cumple con observaciones | 0 | 16 | 6f8d7d0e0202157e |
 | 2026-11-23 | spec | web-informacion-del-comercio | Claude (delegado) | 0/0 | Lista para aprobar | Cumple con observaciones | Cumple con observaciones | 0 | 7 | 4b3dd067b6aa9b8f |
 | 2026-11-23 | plan | web-informacion-del-comercio | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple | 0 | 8 | 1937f79bd9cd52dd |
+| 2026-11-23 | spec | ecommerce-catalogo | Claude (delegado) | 0/0 | Lista para aprobar | Cumple | Cumple | 0 | 6 | b6253e1b2bb8acb0 |
+| 2026-11-23 | spec | transversal-carga-inicial | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 7 | f0ad37014b4caeb3 |
+| 2026-11-23 | plan | ecommerce-catalogo | Claude (delegado) | 0/0 | Lista para aprobar | Cumple | Cumple con observaciones | 0 | 4 | d4795568baa077ff |
+| 2026-11-23 | plan | transversal-carga-inicial | Claude (delegado) | 0/0 | Lista para aprobar | Cumple | Cumple con observaciones | 0 | 7 | c30567ef1315346d |

@@ -58,6 +58,10 @@ public static class ComposicionDeAjustes
         servicios.Escritura<ReingresarPorDevolucionEntrada, ReingresoRegistrado, ReingresarPorDevolucion>(opcionesDeReintento);
         servicios.Escritura<DepurarAjustesEntrada, ResultadoDeDepuracionDeAjustes, DepurarAjustes>(opcionesDeReintento);
 
+        // La carga inicial (transversal-carga-inicial): el orquestador no abre transacciones propias (cada caso de uso que llama tiene la suya); solo el registro de la corrida en la auditoría es un caso de uso transaccional.
+        servicios.Escritura<CorridaDeCargaInicial, bool, RegistrarCorridaDeCargaInicial>(opcionesDeReintento);
+        servicios.AddScoped<ICargaInicialDelInventario, CargarInventarioInicial>();
+
         // Las consultas son de solo lectura: una instantánea coherente (REPEATABLE READ), nunca una transacción de escritura.
         servicios.Lectura<ConsultarIngresosEntrada, IngresosConsultados, ConsultarIngresos>();
         servicios.Lectura<ConsultarHistorialDeAjustesEntrada, PaginaDeAjustes, ConsultarHistorialDeAjustes>();

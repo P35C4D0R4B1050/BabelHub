@@ -32,6 +32,8 @@ public static class DefinicionDelCatalogo
             creada_en timestamptz NOT NULL,
             CONSTRAINT obras_baja_con_fecha CHECK ((estado = 'baja') = (dada_de_baja_en IS NOT NULL))
         );
+        -- La descripción opcional (CAT-01, D18): nula cuando falta, nunca una cadena vacía; la agrega una migración idempotente sin reescribir filas.
+        ALTER TABLE catalogo.obras ADD COLUMN IF NOT EXISTS descripcion text CHECK (char_length(descripcion) BETWEEN 1 AND 600);
         CREATE UNIQUE INDEX IF NOT EXISTS obras_portada_clave ON catalogo.obras (portada_clave);
         CREATE INDEX IF NOT EXISTS obras_portada_huella ON catalogo.obras (portada_huella);
         CREATE INDEX IF NOT EXISTS obras_por_categoria ON catalogo.obras (categoria);
@@ -174,7 +176,7 @@ public static class DefinicionDelCatalogo
         GRANT USAGE ON SCHEMA catalogo TO rol_catalogo;
         GRANT EXECUTE ON FUNCTION catalogo.normalizar(text) TO rol_catalogo;
         GRANT SELECT, INSERT ON catalogo.obras TO rol_catalogo;
-        GRANT UPDATE (titulo, autor, editorial, categoria, portada_clave, portada_huella, portada_tipo, estado, dada_de_baja_en, version) ON catalogo.obras TO rol_catalogo;
+        GRANT UPDATE (titulo, autor, editorial, categoria, descripcion, portada_clave, portada_huella, portada_tipo, estado, dada_de_baja_en, version) ON catalogo.obras TO rol_catalogo;
         GRANT SELECT, INSERT ON catalogo.ediciones TO rol_catalogo;
         GRANT UPDATE (precio, estado, motivo_de_retiro, retirada_en, dada_de_baja_en) ON catalogo.ediciones TO rol_catalogo;
         GRANT SELECT, INSERT ON catalogo.licencias TO rol_catalogo;

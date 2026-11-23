@@ -5,12 +5,12 @@ estado: Done
 servicio: E-commerce
 prefijo: CAT
 origen: [RF01, RF02, RF10, RF24, NN01, NN08, NN13, NN14]
-calidad: [AC02, AC03, RNF03, RNF09]
-depende: [inventario-fuentes, inventario-ajustes, transversal-auditoria]
-aprobado_por: Diego Amiquero
-aprobado_en: 2026-11-06
+calidad: [AC02, AC03, RNF03, RNF09, RNF16]
+depende: [inventario-fuentes, inventario-ajustes, transversal-auditoria, transversal-seguridad]
+aprobado_por: Claude (delegado por Diego Amiquero)
+aprobado_en: 2026-11-23
 plan_aprobado_por: Claude (delegado por Diego Amiquero)
-plan_aprobado_en: 2026-11-14
+plan_aprobado_en: 2026-11-23
 ---
 
 # Spec — Catálogo de obras y ediciones
@@ -31,7 +31,7 @@ Un único catálogo nacional para toda la red. Una **obra** puede tener una edic
 
 | ID | Patrón | Requisito | Origen |
 | :--- | :--- | :--- | :--- |
-| CAT-01 | Ubicuo | El sistema deberá permitir a la administración central registrar una obra con título, autor, editorial, categoría e imagen de portada. | RF10 |
+| CAT-01 | Ubicuo | El sistema deberá permitir a la administración central registrar y editar una obra con título, autor, editorial, categoría, imagen de portada y, de forma opcional, una descripción de hasta 600 caracteres, que se recorta, sin caracteres de control salvo el salto de línea, y que, vacía o con solo espacios, equivale a no tenerla. | RF10 |
 | CAT-02 | Ubicuo | El sistema deberá permitir registrar ediciones impresas y digitales de una obra, cada una con su ISBN y su precio. | RF10 |
 | CAT-03 | No deseado | Si se registra una edición con un ISBN que ya existe en cualquier edición del catálogo, entonces el sistema deberá rechazarla indicando el título que ya lo usa. | RF10 |
 | CAT-04 | Ubicuo | El sistema deberá exigir que toda obra tenga al menos una edición. | RF10 |
@@ -44,7 +44,7 @@ Un único catálogo nacional para toda la red. Una **obra** puede tener una edic
 | CAT-11 | Evento | Cuando cambia el precio de una edición, el sistema deberá registrarlo en la auditoría. | RF10 |
 | CAT-12 | No deseado | Si el servicio de inventario no responde, entonces el sistema deberá seguir mostrando el catálogo con la última disponibilidad conocida, si tiene menos de 10 minutos, avisando que puede estar desactualizada, o indicando que no se puede confirmar si es más antigua; agregar al carrito sigue permitido y la disponibilidad real se valida al iniciar el checkout. | AC03, RNF03 |
 | CAT-13 | Evento | Cuando la administración da de baja una obra, el sistema deberá dejar de mostrarla en el catálogo y conservar sus datos en los pedidos históricos. | RF10 |
-| CAT-14 | Ubicuo | El sistema deberá permitir publicar, editar y dar de baja ediciones solo a la administración central. | NN08 |
+| CAT-14 | Ubicuo | El sistema deberá permitir publicar, editar y dar de baja obras y ediciones solo a la administración central. | NN08 |
 | CAT-15 | Evento | Cuando la administración retira una edición digital de la venta, el sistema deberá registrarlo en la auditoría. | RF24 |
 | CAT-16 | Evento | Cuando la administración sube el archivo de una edición digital o una portada, el sistema deberá verificar su tipo según su contenido (EPUB o PDF para libros; JPEG, PNG o WebP para portadas), rechazar los que superen 50 MB (libros) o 2 MB (portadas) y guardar su huella SHA-256 antes de publicarlos, rechazando la subida si el almacén no responde. | RF10, RF24 |
 | CAT-17 | No deseado | Si el ISBN de una edición no tiene 10 o 13 dígitos con un dígito de control válido, entonces el sistema deberá rechazarla; y ante registros simultáneos con el mismo ISBN, deberá aceptar solo uno. | RF10 |
@@ -54,6 +54,8 @@ Un único catálogo nacional para toda la red. Una **obra** puede tener una edic
 | CAT-21 | Ubicuo | El sistema deberá mostrar como agotada una edición impresa sin stock vendible en toda la red y no darla de baja ni quitarla de la venta por esa causa. | RF10, RF13 |
 | CAT-22 | Evento | Cuando la administración registra desde el catálogo un ingreso de mercadería de una edición impresa existente, el sistema deberá pedirlo al Inventario con la cantidad, la referencia y la nota, y mostrar los últimos ingresos con su fecha y usuario. | RF10, RF17 |
 | CAT-23 | No deseado | Si el stock inicial o la cantidad de un ingreso no es un entero entre 1 y 5 000, o si quien lo registra no es la administración central, entonces el sistema deberá rechazarlo sin crear ni cambiar nada. | RF17, RNF05 |
+| CAT-24 | Ubicuo | El sistema deberá mostrar en la ficha de una obra su portada, su descripción cuando la tenga y el precio de cada edición que se ofrece a la venta, y no deberá mostrar un texto vacío ni inventado cuando falta la descripción. | RF01, RF02 |
+| CAT-25 | Ubicuo | El sistema deberá mostrar la descripción de una obra como texto plano: ningún carácter de ella deberá interpretarse como marcado ni como código ejecutable. | RF02, RNF16 |
 
 ## 4. Criterios de aceptación
 
@@ -78,6 +80,7 @@ Un único catálogo nacional para toda la red. Una **obra** puede tener una edic
 | AC-CAT-17 | CAT-21 | **Dado** una edición cuyo vendible en toda la red llega a 0, **cuando** un cliente abre el catálogo, **entonces** la ve como agotada, sigue disponible en digital si lo tiene y no se quita de ningún carrito ni de la venta. |
 | AC-CAT-18 | CAT-22 | **Dado** una edición impresa agotada en toda la red, **cuando** la administración registra desde el catálogo un ingreso de 30 unidades con la referencia «GR-001», **entonces** el Inventario suma 30 en la fuente de recepción, el catálogo deja de mostrarla como agotada y el ingreso figura en la lista con su fecha y usuario. |
 | AC-CAT-19 | CAT-23 | **Dado** un stock inicial de 6 000, otro de -3, y un encargado de sucursal que intenta registrar un ingreso, **cuando** se envían, **entonces** los tres se rechazan, no se crea ni cambia nada y el tercero queda como acceso denegado. |
+| AC-CAT-20 | CAT-01, CAT-14, CAT-24, CAT-25 | **Dado** un administrador que registra una obra con una descripción de 600 caracteres, otra de 601, otra con solo espacios y una cuarta sin descripción, **cuando** las guarda, **entonces** la primera, la tercera y la cuarta se aceptan (la tercera queda sin descripción) y la segunda y una con un carácter de control se rechazan indicando el campo, los saltos de línea se conservan y 600 caracteres con espacios finales se aceptan; y **cuando** edita la primera con 601 caracteres se rechaza, con una descripción vacía queda sin ella, y un encargado de sucursal que intenta editarla es rechazado y queda como acceso denegado; y **cuando** un cliente abre la ficha, **entonces** ve de la primera su portada, su descripción y el precio de cada edición que se ofrece a la venta (sin precio de una digital que no se ofrece), y de la cuarta su portada y sus precios sin texto de descripción; y una descripción con `<script>` o con `&lt;` se ve tal como se escribió, sin ejecutarse ni transformarse. |
 
 ## 5. Reglas e invariantes
 
@@ -87,6 +90,7 @@ Un único catálogo nacional para toda la red. Una **obra** puede tener una edic
 - Una licencia vencida o que no incluye Perú retira la oferta pero no el acceso ya concedido.
 - Los precios de los libros digitales se muestran sin IGV (referencial, ver `docs/01-analisis-de-sistema/03-marco-legal.md`).
 - Un título agotado se muestra como tal y sigue en la venta; solo la administración lo da de baja (CAT-21).
+- La descripción de una obra es opcional, de texto plano y nula cuando falta; no interviene en los filtros de CAT-09. Los 600 caracteres se cuentan como caracteres de texto, tras quitar los espacios de los extremos.
 - Nota para el plan: el ingreso pedido desde el alta o desde el catálogo lleva una clave de idempotencia para que un reintento no duplique el lote.
 
 ## 6. Casos límite y errores
@@ -94,8 +98,10 @@ Un único catálogo nacional para toda la red. Una **obra** puede tener una edic
 - Una obra con una edición impresa agotada y una digital vigente sigue visible y compra solo la digital.
 - Una búsqueda sin resultados muestra un estado vacío con acción de limpiar filtros.
 - La disponibilidad por sucursal solo se muestra para impresos.
+- Una obra sin descripción se muestra solo con su portada y sus precios, sin un bloque vacío; una descripción con caracteres de control (salvo el salto de línea) se rechaza; la lista y las tarjetas del catálogo no muestran la descripción.
 
 ## 7. Preguntas abiertas
 
 - [x] ¿Cómo se determina el territorio del comprador? Resuelto el 2026-10-16 (confirmado por el responsable): el territorio se registra en la licencia y se asume Perú; no se valida el del comprador en esta versión.
 - [x] ¿La imagen de portada se sube al almacén de objetos o se enlaza una URL externa? Resuelto el 2026-10-16: se sube al almacén de objetos y se valida (CAT-16).
+- [x] ¿Es obligatoria la descripción y cuál es su tope? Resuelto el 2026-11-23 con la decisión delegada DD-71 (`progress/decisiones-delegadas.md`): opcional (para no romper las obras ya registradas) y de hasta 600 caracteres; la tienda la muestra en la ficha, porque la revisión de la pasarela de pagos exige una descripción clara por producto.

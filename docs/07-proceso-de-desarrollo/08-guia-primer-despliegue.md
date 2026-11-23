@@ -690,6 +690,68 @@ VM-AUX vigila **desde fuera** de la VM de datos: si esa VM cae, nadie dentro pue
 7. **[Tu equipo]** `bash scripts/respaldar-ahora.sh --salto salto@<IP pública de vm-aux> --destino ubuntu@10.0.0.20` prueba el respaldo bajo demanda por el salto.
 8. Latido externo (`AUX_LATIDO_URL`): crea un monitor gratuito de «heartbeat» (por ejemplo en healthchecks.io) y pega su URL en `aux.env`.
 
+## 14b. Carga inicial del catálogo y del inventario (antes de pedir la revisión de Culqi)
+
+La revisión de la pasarela pide **al menos cinco productos con foto, descripción y precio visibles**. El repositorio trae 40 obras listas (`tools/carga-inicial/catalogo.csv`, selección en `docs/07-proceso-de-desarrollo/09-seleccion-del-catalogo-inicial.md`, spec `transversal-carga-inicial`). La carga son **dos órdenes del propio servicio** (como `migrar`): no abren puertos ni son una pantalla, usan las mismas reglas y la misma auditoría que la administración y son **repetibles** (repetirlas no duplica nada).
+
+**Antes de empezar.**
+- Las dos VMs ya están desplegadas (pasos 7 y 8) y **migradas**, y su `/health/ready` responde.
+- Las órdenes componen el servicio completo y **leen la misma configuración** que él (`ecommerce.env`, `inventario.env`): el almacén de objetos, la base, las claves. No necesitan variables nuevas, pero sí todas las que el servicio ya exige (incluida `BABELHUB__Pagos__Pasarela`: en la orden la pasarela es siempre la nula y no llama a nadie). Si el servicio no arranca por falta de una variable, la orden termina **nombrándola** (nunca su valor) antes de escribir nada.
+- **Aviso sobre el ISBN.** El catálogo exige un ISBN con dígito de control y **no se puede cambiar después**. Para no inventar el de una edición real, cada edición lleva un identificador provisional del rango `979-0` (que no se asigna a libros). La tienda lo muestra como ISBN. Si conoces el ISBN real de una edición, escríbelo en la columna `isbn_impreso` de `catalogo.csv` **antes** de cargar.
+- **Aviso sobre las digitales.** Solo las 5 obras genéricas del prototipo tienen edición digital y su archivo es un **EPUB de muestra** que dice que no es el libro: no las vendas con pagos reales sin reemplazar el archivo desde la administración.
+
+**1. Las portadas (solo viajan a VM-VENTAS y de ahí al almacén de objetos; nunca al repositorio).** Las 40 imágenes están en tu equipo (`D:\Trabajo\BHPortadas`; las cinco genéricas se regeneran en PowerShell de Windows con `powershell -ExecutionPolicy Bypass -File tools/carga-inicial/generar-portadas-genericas.ps1 -Salida <carpeta>`: `-ExecutionPolicy Bypass` solo vale para esa ejecución, porque Windows no deja correr scripts sin firmar por defecto). Cada una pesa menos de 2 MB (el tope del catálogo, CAT-16) y se verifica por su contenido al subirla. Cópialas a una carpeta **temporal** de VM-VENTAS, con el mismo salto SSH del paso 3 (§7.4):
+
+```bash
+# [Tu equipo, en WSL] (D:\ se ve como /mnt/d)
+scp -r -o ProxyJump=<salto> /mnt/d/Trabajo/BHPortadas ubuntu@10.0.0.10:/tmp/portadas
+```
+
+**2. El catálogo en VM-VENTAS.**
+
+```bash
+# [VM-VENTAS] carpeta de salida del plan de inventario (fuera del repositorio), legible por el usuario del contenedor
+sudo install -d -o 1654 -g 1654 /var/lib/babelhub/carga
+sudo chmod -R a+rX /tmp/portadas
+cd /opt/babelhub
+sudo env BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.10 IMAGEN_ECOMMERCE=<digest-de-la-imagen> \
+  docker compose --project-directory infra -f infra/docker-compose.ventas.yml run --rm --no-deps \
+    -v /opt/babelhub/tools/carga-inicial:/carga:ro -v /tmp/portadas:/portadas:ro -v /var/lib/babelhub/carga:/salida \
+    ecommerce cargar-catalogo --archivo /carga/catalogo.csv --portadas /portadas --plan /salida/plan-de-inventario.json
+```
+
+**Qué debes ver:** una línea por obra no cargada con su número de fila y el campo, y los totales (`cargadas`, `ya cargadas`, `rechazadas`); el código de salida (`echo $?`) es `0` (todo cargado o ya cargado), `2` (alguna fila rechazada o sin cargar: léela, corrige el archivo o el almacén y **repite la orden**) o `1` (error: configuración o archivo inválido). Se crea `/var/lib/babelhub/carga/plan-de-inventario.json` (sin datos personales). **Repetirla** debe dar «40 ya cargadas». Las portadas y los archivos de muestra quedan **solo en el almacén de objetos**; borra la copia temporal: `rm -rf /tmp/portadas`.
+
+**3. El plan viaja a VM-INVENTARIO** (es un archivo pequeño de identificadores y cantidades):
+
+```bash
+# [Tu equipo]
+scp -o ProxyJump=<salto> ubuntu@10.0.0.10:/var/lib/babelhub/carga/plan-de-inventario.json /tmp/plan-de-inventario.json
+scp -o ProxyJump=<salto> /tmp/plan-de-inventario.json ubuntu@10.0.0.20:/tmp/plan-de-inventario.json
+```
+
+**4. Las sucursales, las rutas y el stock en VM-INVENTARIO.**
+
+Los tres `<digest>` son los mismos con los que desplegaste (Compose los exige aunque la orden use solo uno).
+
+```bash
+# [VM-INVENTARIO]
+sudo install -d -o 1654 -g 1654 /var/lib/babelhub/carga && sudo mv /tmp/plan-de-inventario.json /var/lib/babelhub/carga/
+cd /opt/babelhub
+sudo env BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.20 IMAGEN_INVENTARIO=<digest> IMAGEN_ECOMMERCE=<digest> IMAGEN_POSTGRES=<digest> \
+  docker compose --project-directory infra -f infra/docker-compose.inventario.yml run --rm --no-deps \
+    -v /opt/babelhub/tools/carga-inicial:/carga:ro -v /var/lib/babelhub/carga:/salida:ro \
+    inventario cargar-stock --plan /salida/plan-de-inventario.json --sucursales /carga/sucursales.csv --rutas /carga/rutas.csv --esperar
+```
+
+**Qué debes ver:** las 6 sucursales (la primera, Lima Centro, es la fuente de **recepción**), las 10 rutas, la edición de cada impresa registrada y el stock (Lima y dos sucursales más por edición: unas 120 operaciones). El Inventario limita los ajustes del personal a **60 por hora** (SEG-30) y la orden **no lo rodea**: con `--esperar` espera la siguiente ventana (hasta 2 horas) y continúa, así que **la orden puede tardar más de una hora**; sin `--esperar` se detiene al llegar a 60, escribe a partir de cuándo puede continuar y sale con código `2`: repítela pasado ese plazo. Repetir la orden nunca duplica ni toca una sucursal que ya tiene movimientos de esa edición (código `0` y «ya cargada»). Si se corta una conexión, **vuelve a ejecutarla**.
+
+**Aviso sobre las ráfagas.** Los límites de uso por origen del servicio responden **429** (demasiadas solicitudes) o **503** (el almacén o la base no dan abasto) si lanzas muchas solicitudes seguidas, por ejemplo al comprobar la tienda con un script o al recargar el catálogo sin parar justo después de la carga. No es un fallo de la carga: espera uno o dos minutos y repite. Las órdenes de carga trabajan en serie para no provocarlo.
+
+**5. Comprobar.** En la tienda, `/catalogo` debe mostrar las 40 obras con portada y precio, y la ficha de cualquiera, su descripción y su disponibilidad por sucursal (Lima, Arequipa, Trujillo, Cusco, Piura y Ayacucho según el stock cargado).
+
+**Cómo deshacerlo.** La carga solo agrega. Para quitar una obra usa la baja de la administración del catálogo (la obra deja de mostrarse y conserva sus datos); el ISBN dado de baja sigue reservado. Una carga que no te convence se corrige editando `catalogo.csv` **antes** de repetirla: una fila ya cargada no se modifica.
+
 ## 15. Después del despliegue
 
 ### 15.1 Culqi (B05)

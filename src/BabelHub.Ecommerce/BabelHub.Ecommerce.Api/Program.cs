@@ -20,6 +20,12 @@ if (args.Length > 0 && args[0] == ModoCrearAdministrador.Argumento)
     return await ModoCrearAdministrador.Ejecutar(args[1..], Console.Out, Console.Error);
 }
 
+// La orden de operación cargar-catalogo (transversal-carga-inicial): carga obras, ediciones, descripciones, precios y portadas por los casos de uso del Catálogo con el modo Operacion; no abre puertos ni arranca el servidor.
+if (args.Length > 0 && args[0] == ModoCargarCatalogo.Argumento)
+{
+    return await ModoCargarCatalogo.Ejecutar(args, Console.Out, Console.Error);
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Las variables BABELHUB__… son la configuración del servicio (SEG-11): BABELHUB__Modo se lee como «Modo».

@@ -439,7 +439,8 @@ public static class AnfitrionDelEcommerce
         servicios.AgregarTrabajosDeIdentidad(soloEnModoNormal, AlcanceDelSistemaDeIdentidad);
 
         // ---------- Catálogo ----------
-        servicios.AgregarCatalogo(new OpcionesDelCatalogo(ClienteDelAlmacenDeObjetos.Crear(opciones.AlmacenDelCatalogo), opciones.ClaveDeIngresos, ContenedorDeLibros: opciones.AlmacenDelCatalogo.Contenedor));
+        // Los libros y las portadas del catálogo van a sus contenedores («libros» y «portadas», infra/almacen/contenedores.txt): el contenedor del registro de supresiones (el valor por omisión de las opciones del almacén) no es el de los libros.
+        servicios.AgregarCatalogo(new OpcionesDelCatalogo(ClienteDelAlmacenDeObjetos.Crear(opciones.AlmacenDelCatalogo), opciones.ClaveDeIngresos));
         servicios.AgregarTrabajosDelCatalogo(soloEnModoNormal);
 
         // ---------- La web: textos legales, sesión, Carrito y verificación de persona ----------
