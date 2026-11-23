@@ -80,8 +80,8 @@ public sealed class ComposePorVmTests : IDisposable
     private static readonly Dictionary<string, string[]> SecretosPermitidos = new(StringComparer.Ordinal)
     {
         ["borde"] = ["cloudflared.env"],
-        ["ventas"] = ["cloudflared.env", "ecommerce.env", "evolution.env", "n8n.env", "redis-contadores-ca.pem", "redis-contadores-cert.pem", "redis-contadores-key.pem", "redis-contadores.env", "redis.env"],
-        ["inventario"] = ["ecommerce-gestion.env", "inventario.env", "postgres.env"],
+        ["ventas"] = ["ca-bundle.pem", "cloudflared.env", "ecommerce.env", "evolution.env", "n8n.env", "tls-ecommerce-cert.pem", "tls-ecommerce-key.pem", "redis-contadores-ca.pem", "redis-contadores-cert.pem", "redis-contadores-key.pem", "redis-contadores.env", "redis.env"],
+        ["inventario"] = ["ca-bundle.pem", "ecommerce-gestion.env", "inventario.env", "postgres.env", "tls-gestion-cert.pem", "tls-gestion-key.pem", "tls-inventario-cert.pem", "tls-inventario-key.pem"],
     };
 
     [Theory]
