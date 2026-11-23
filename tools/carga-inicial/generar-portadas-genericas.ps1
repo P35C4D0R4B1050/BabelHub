@@ -25,10 +25,10 @@ foreach ($p in $portadas) {
   $acento = New-Object System.Drawing.Pen ((Color $p[5]), 6)
   switch ($p[6]) {
     'rejilla' { for ($i = 0; $i -le 600; $i += 60) { $g.DrawLine($acento, $i, 0, $i, 520); $g.DrawLine($acento, 0, $i * 0.86, 600, $i * 0.86) } }
-    'ondas'   { for ($i = 0; $i -lt 8; $i++) { $g.DrawArc($acento, -100 + $i * 20, 40 + $i * 55, 800 - $i * 40, 220, 0, 180) } }
-    'lineas'  { for ($i = 0; $i -lt 12; $i++) { $g.DrawLine($acento, 0, 40 + $i * 40, 600, 200 + $i * 40) } }
+    'ondas'   { for ($i = 0; $i -lt 6; $i++) { $g.DrawArc($acento, -100 + $i * 20, 40 + $i * 55, 800 - $i * 40, 220, 0, 180) } }
+    'lineas'  { for ($i = 0; $i -lt 9; $i++) { $g.DrawLine($acento, 0, 40 + $i * 40, 600, 200 + $i * 40) } }
     'arcos'   { for ($i = 0; $i -lt 6; $i++) { $g.DrawArc($acento, 60 + $i * 40, 40 + $i * 40, 480 - $i * 80, 480 - $i * 80, 180, 180) } }
-    'orbita'  { for ($i = 1; $i -le 5; $i++) { $g.DrawEllipse($acento, 300 - $i * 55, 280 - $i * 55, $i * 110, $i * 110) }; $g.FillEllipse((New-Object System.Drawing.SolidBrush (Color $p[5])), 285, 265, 30, 30) }
+    'orbita'  { for ($i = 1; $i -le 4; $i++) { $g.DrawEllipse($acento, 300 - $i * 55, 280 - $i * 55, $i * 110, $i * 110) }; $g.FillEllipse((New-Object System.Drawing.SolidBrush (Color $p[5])), 285, 265, 30, 30) }
   }
   $pincel = New-Object System.Drawing.SolidBrush (Color $p[4])
   $titulo = New-Object System.Drawing.Font 'Georgia', 44, ([System.Drawing.FontStyle]::Bold)
