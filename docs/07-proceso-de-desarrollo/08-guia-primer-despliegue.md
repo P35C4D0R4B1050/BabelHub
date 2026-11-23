@@ -709,7 +709,7 @@ Es lo que despliega esta guía por defecto. En `Staging` la tienda está en Inte
 | **Usuario y contraseña de prueba** para el revisor | El comando `cuenta-de-prueba` (abajo) | Ejecutarlo y pasar el correo y la contraseña a Culqi por un canal seguro (no por el chat público ni el repositorio). |
 | **SSL en todas las URLs** | Cloudflare: Universal SSL + Always Use HTTPS (§13.2); la aplicación redirige y envía HSTS | Verificar con los `curl` de §13.2 y recorrer la tienda en el navegador buscando avisos de «contenido no seguro» (no debe haber). |
 
-**Crear el usuario y la contraseña de prueba** (crear y cambiar la contraseña solo existe en `Staging`; en `Production` el comando se niega, salvo `--retirar`). **[VM-VENTAS]**, con el entorno del propio servicio y **una sola vez** (la contraseña se muestra una vez, por la consola, y no queda en ningún archivo ni registro; si la pierdes, vuelves a ejecutar el comando y se **cambia** la contraseña de esa misma cuenta):
+**Crear el usuario y la contraseña de prueba** (crear y cambiar la contraseña solo existe en `Staging`; en `Production` el comando se niega, salvo `--retirar` y `--purgar`). **[VM-VENTAS]**, con el entorno del propio servicio y **una sola vez** (la contraseña se muestra una vez, por la consola, y no queda en ningún archivo ni registro; si la pierdes, vuelves a ejecutar el comando y se **cambia** la contraseña de esa misma cuenta):
 
 ```bash
 cd /opt/babelhub

@@ -342,10 +342,9 @@ public sealed class CuentaDeRevisionDeLaPasarela(
         }
     }
 
-    /// <summary>Una instalación nueva no tiene clave de firma activa y sin ella nadie ingresa: se crea la primera, con su auditoría (la unicidad de la clave activa la sostiene el índice único parcial de la base: dos operaciones simultáneas no pueden crear dos).</summary>
     /// <summary>
     /// Crea la primera clave de firma si no hay ninguna activa (PAG-46) <b>dentro de la transacción de quien la llama</b>, después de que este haya comprobado todo lo que puede negarse:
-    /// así una negativa no la deja creada y, si falla la auditoría de la cuenta, la clave tampoco queda. Devuelve si la creó (entonces, tras confirmar, hay que llamar a <see cref="RenovarElVerificador"/>).
+    /// así una negativa no la deja creada y, si falla la auditoría de la cuenta, la clave tampoco queda. Devuelve si la creó (entonces, tras confirmar, hay que llamar a <see cref="RenovarElVerificador"/>). La unicidad de la clave activa la sostiene el índice único parcial de la base: dos operaciones simultáneas no pueden crear dos.
     /// </summary>
     internal async Task<bool> AsegurarLaPrimeraClaveDeFirma(CancellationToken cancelacion)
     {
