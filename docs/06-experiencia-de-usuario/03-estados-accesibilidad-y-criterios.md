@@ -34,7 +34,7 @@ Una pieza de marca separada del flujo de compra, a la que se llega desde el inic
 
 ## 4. Cumplimiento visible
 
-Pie de todas las páginas de la Tienda: enlace permanente al **Libro de Reclamaciones** (RF25), términos y condiciones, política de privacidad y política de reembolso de libros digitales. El consentimiento de WhatsApp es opcional: se ofrece en el registro, en la cuenta y en el checkout, sin exigirlo para comprar. Detalle legal y su estado en [marco legal](../01-analisis-de-sistema/03-marco-legal.md).
+Pie de todas las páginas de la Tienda: enlace permanente al **Libro de Reclamaciones** (RF25), los **datos de contacto del comercio** (teléfono, correo y dirección, de la configuración del entorno, nunca del repositorio) con el enlace a la página de **Contacto**, términos y condiciones, política de privacidad y **Cambios y devoluciones** (la antigua política de reembolso, con la misma versión; `/legal/reembolso` redirige a `/legal/cambios-y-devoluciones`), y una frase que dice que el comercio vende libros impresos y libros digitales (`web-informacion-del-comercio`). No hay iconos de redes sociales mientras el comercio no tenga cuentas. El consentimiento de WhatsApp es opcional: se ofrece en el registro, en la cuenta y en el checkout, sin exigirlo para comprar. Detalle legal y su estado en [marco legal](../01-analisis-de-sistema/03-marco-legal.md).
 
 ## 5. Criterios de aceptación visual
 

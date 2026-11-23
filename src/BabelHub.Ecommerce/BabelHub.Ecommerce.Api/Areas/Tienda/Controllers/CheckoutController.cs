@@ -365,12 +365,12 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
     {
         var pedidos = new List<(TipoDeTextoLegal Tipo, TextoLegalDeCompra Texto, string Campo, string Titulo, string Ruta)>
         {
-            (TipoDeTextoLegal.Terminos, TextoLegalDeCompra.Terminos, "terminosVersion", "los términos y condiciones", "/legal/terminos"),
-            (TipoDeTextoLegal.Privacidad, TextoLegalDeCompra.Privacidad, "privacidadVersion", "la política de privacidad y el tratamiento de mis datos personales", "/legal/privacidad"),
+            (TipoDeTextoLegal.Terminos, TextoLegalDeCompra.Terminos, "terminosVersion", "los términos y condiciones", "/legal/" + TiposDeTextoLegal.Ruta(TipoDeTextoLegal.Terminos)),
+            (TipoDeTextoLegal.Privacidad, TextoLegalDeCompra.Privacidad, "privacidadVersion", "la política de privacidad y el tratamiento de mis datos personales", "/legal/" + TiposDeTextoLegal.Ruta(TipoDeTextoLegal.Privacidad)),
         };
         if (hayDigitales)
         {
-            pedidos.Add((TipoDeTextoLegal.Reembolso, TextoLegalDeCompra.ReembolsoDigital, "reembolsoDigitalVersion", "la política de reembolso de libros digitales", "/legal/reembolso"));
+            pedidos.Add((TipoDeTextoLegal.Reembolso, TextoLegalDeCompra.ReembolsoDigital, "reembolsoDigitalVersion", "la política de cambios y devoluciones (reembolso de libros digitales)", "/legal/" + TiposDeTextoLegal.Ruta(TipoDeTextoLegal.Reembolso)));
         }
 
         var lista = new List<TextoParaAceptar>();

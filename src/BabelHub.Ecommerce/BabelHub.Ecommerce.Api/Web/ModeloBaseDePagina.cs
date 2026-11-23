@@ -1,3 +1,5 @@
+using BabelHub.Ecommerce.Api.Web.Contacto;
+
 namespace BabelHub.Ecommerce.Api.Web;
 
 /// <summary>El área de la interfaz a la que pertenece una página (WEB-02). La Presentación solo la usa para pintar; qué ve cada rol lo decide el módulo <c>Web</c>.</summary>
@@ -37,4 +39,7 @@ public class ModeloBaseDePagina
     public IReadOnlyList<SucursalElegible> Sucursales { get; set; } = [];
 
     public string? SucursalPreferida { get; set; }
+
+    /// <summary>El contacto del comercio que pinta el pie (COM-01); nulo si el anfitrión no lo registró (hosts de prueba): el pie entonces omite el bloque.</summary>
+    public DatosDeContacto? ContactoDelComercio { get; set; }
 }

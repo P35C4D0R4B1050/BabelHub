@@ -30,6 +30,7 @@ public sealed class AceptacionDeTextosConElHostRealTests(PostgresDelEcommerceCom
 
     [Fact]
     [Trait("Criterio", "AC-IDE-39")]
+    [Trait("Criterio", "AC-COM-13")]
     public async Task La_web_muestra_la_version_de_Identidad_la_persona_acepta_y_puede_continuar()
     {
         await using var anfitrion = bd.Anfitrion(_ => { });

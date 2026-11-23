@@ -59,6 +59,8 @@ Internet ──► Cloudflare (DNS, TLS, WAF, Access) ──túnel saliente─�
 
 *Por qué el almacén y los secretos van antes que las VMs (y no al final):* los secretos de VM-INVENTARIO y de VM-VENTAS incluyen las llaves del almacén de objetos; sin ellas el despliegue se niega a continuar a propósito.
 
+*Contacto del comercio y versión de los textos legales (mínimo, `web-informacion-del-comercio`):* el `ecommerce.env` de VM-VENTAS y el `ecommerce-gestion.env` de VM-INVENTARIO llevan además `BABELHUB__Contacto__Telefono`, `…Correo` y `…Direccion` como `CAMBIAR` (no son secretos): escribe los reales entre comillas dobles antes de desplegar, y tras `desplegar inventario` fija la versión de los textos legales como indica `infra/README.md` (sección «Contacto del comercio y versión de los textos legales»).
+
 ## 3. Reglas de oro (para no perder dinero ni datos)
 
 - **El cupo gratuito** (verifícalo en la consola al crear la cuenta; las cifras de esta guía vienen de fuentes secundarias del 2026-11-06): **2 VMs ARM con 2 OCPU y 12 GB en total, 2 VMs AMD micro, 200 GB de disco en total**. Crear una tercera VM ARM, una VM más grande, un balanceador o un volumen extra **sí cobra**. Crea exactamente lo de esta guía.

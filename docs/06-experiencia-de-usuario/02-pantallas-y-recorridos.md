@@ -60,7 +60,7 @@ style F fill:#222,stroke:#fff,color:#fff
 | Solo impreso | 5 | Elección de sucursal con aviso de traslado si falta stock; reserva temporal de 15 minutos visible (AD08). |
 | Mixto | 5 | Un solo cobro; en la confirmación, las líneas impresas siguen su seguimiento y las digitales se descargan al instante. |
 
-Para iniciar el pago, la cuenta debe tener el correo verificado (CAR-21); el costo del despacho a domicilio es fijo (CAR-23). Antes de pagar, el cliente acepta los términos, el tratamiento de sus datos personales (Ley N.° 29733) y, si compra libros digitales, la política de reembolso. Los avisos por WhatsApp son una opción que no se exige para pagar. Si el Inventario no responde, el checkout informa que no puede validar el stock y **no cobra** (AC03); los libros digitales siguen comprándose.
+Para iniciar el pago, la cuenta debe tener el correo verificado (CAR-21); el costo del despacho a domicilio es fijo (CAR-23). Antes de pagar, el cliente acepta los términos, el tratamiento de sus datos personales (Ley N.° 29733) y, si compra libros digitales, «Cambios y devoluciones» (antes «política de reembolso»). Los avisos por WhatsApp son una opción que no se exige para pagar. Si el Inventario no responde, el checkout informa que no puede validar el stock y **no cobra** (AC03); los libros digitales siguen comprándose.
 
 ### 2.1 Tarjeta de libro
 

@@ -82,6 +82,8 @@ Todas las cookies llevan `Secure`; las de sesión, desafío, dispositivo y antif
 4. Los registros técnicos, de auditoría y de seguridad no contienen contraseñas, credenciales, datos de tarjeta ni enlaces (AUD-06, SEG-10).
 5. La biblioteca revela hábitos de lectura: se muestra solo a su titular y no se comparte con editoriales ni con terceros.
 
+**Datos de contacto del comercio (no son datos de clientes).** El teléfono, el correo y la dirección que muestran el pie y `/contacto` son del comercio y públicos por diseño: salen de la configuración del entorno (`BABELHUB__Contacto__*`), no se guardan en la base de datos, no entran a logs, errores ni auditoría y se suprimen cambiando la variable y reiniciando. Si el comercio publicara un celular o un domicilio personal, es decisión de su titular; la captura por rastreadores, el spam o la suplantación telefónica es un riesgo residual aceptado, sin ofuscación (`web-informacion-del-comercio` §5). El correo de contacto es un buzón de **consultas generales**: las solicitudes sobre datos personales se presentan desde la cuenta, y ese buzón no entra al registro de solicitudes con plazos; un mensaje que lleve datos personales se trata como cualquier correo recibido por el comercio.
+
 ## 3. Derechos del titular (ARCO)
 
 | Derecho | Cómo se ejerce | Spec |

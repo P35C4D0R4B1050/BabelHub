@@ -41,6 +41,7 @@ public sealed class RegistrarAceptacionesTests
 
     [Fact]
     [Trait("Criterio", "AC-CAR-20")]
+    [Trait("Criterio", "AC-COM-13")]
     public async Task Aceptar_los_tres_textos_guarda_la_version_y_la_fecha_de_cada_uno()
     {
         var (e, checkout) = await ConCheckout(conDigital: true);

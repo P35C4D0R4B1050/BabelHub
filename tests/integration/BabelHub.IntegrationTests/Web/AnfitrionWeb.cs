@@ -38,6 +38,8 @@ internal sealed class AnfitrionWeb : IAsyncDisposable
         builder.WebHost.UseTestServer();
         builder.Services.AgregarManejoDeErrores(new OpcionesDeErrores("ECO"));
         builder.Services.AgregarInterfazWeb();
+        // El contacto del comercio (COM-01): el ficticio de desarrollo, para que el pie lo pinte como en la composición real; una prueba lo quita para ver el pie sin él.
+        builder.Services.TryAddSingleton(BabelHub.Ecommerce.Api.Web.Contacto.DatosDeContacto.DeEjemplo);
         builder.Services.AgregarModuloWeb(permitirVersionesProvisionales: true);
         builder.Services.AgregarCatalogoPendiente();
         builder.Services.AgregarRetiroNuloDeCarritos();

@@ -236,7 +236,7 @@ public static class TextosDePedidos
     public static string Alternativa(AlternativaDeCancelacion alternativa) => alternativa switch
     {
         AlternativaDeCancelacion.Devolucion => "Este pedido ya no se puede cancelar. Si ya lo recibiste, puedes pedir una devolución.",
-        AlternativaDeCancelacion.PoliticaDeReembolsoDigital => "Un libro digital no se cancela una vez comprado. Revisa la política de reembolso de libros digitales.",
+        AlternativaDeCancelacion.PoliticaDeReembolsoDigital => "Un libro digital no se cancela una vez comprado. Revisa la política de cambios y devoluciones.",
         _ => string.Empty,
     };
 }

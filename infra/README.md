@@ -36,3 +36,21 @@ Es idempotente (repetirlo es seguro y solo rota las contraseñas), falla cerrado
 cp .env.example .env
 docker compose -f infra/docker-compose.local.yml --env-file .env up -d
 ```
+
+## Contacto del comercio y versión de los textos legales (web-informacion-del-comercio)
+
+**Contacto.** El teléfono, el correo y la dirección que muestra la tienda (el pie de toda página y `/contacto`) **no están en el repositorio**: salen de `BABELHUB__Contacto__Telefono`, `BABELHUB__Contacto__Correo` y `BABELHUB__Contacto__Direccion` en `ecommerce.env` y `ecommerce-gestion.env` (no son secretos). `scripts/generar-secretos.sh` los deja como `CAMBIAR` y `scripts/desplegar.sh` se niega a desplegar con un `CAMBIAR`: quien despliega escribe los valores reales **entre comillas dobles** y sin `$` (Compose lo interpola aun entre comillas), `"`, `#` (Compose lo toma como comentario sin comillas) ni barra invertida. El correo debe ser una dirección de atención al cliente, no la cuenta que envía los avisos. Si falta uno, o su formato no es válido, el servicio **no arranca** y el error nombra la variable (nunca el valor); solo `Development` y `Test` usan valores ficticios. La restauración y el ensayo reutilizan el mismo `ecommerce.env`, así que ya llevan las tres variables. **Comprobación del nombre del entorno:** los Compose de despliegue fijan `ASPNETCORE_ENVIRONMENT: Production`; un servicio de producción que mostrara `999 000 000` o `contacto@ejemplo.test` estaría mal nombrado.
+
+**Versión de los textos legales.** El cuerpo de los términos, la privacidad y «Cambios y devoluciones» vive en el repositorio y su versión en la base (`identidad.versiones_de_textos`, una fila, `id = 1`), que **ningún arranque siembra** y que la cuenta de la aplicación solo lee. Cada vez que cambia un cuerpo hay que fijar su versión nueva, y la versión de referencia de cada texto está en `tests/integration/BabelHub.IntegrationTests/Web/versiones-de-referencia-de-textos.json` (la forma es `AAAA-MM-DD-<8 hex de la huella del cuerpo>`; una prueba falla si el cuerpo cambia sin cambiar esa versión). Orden en un despliegue: `desplegar inventario` (migra y levanta), este paso con la cuenta propietaria de la base del E-commerce (la del modo migrar, nunca la de la aplicación; sin pasar la contraseña por la línea de comandos), `desplegar ventas` y `desplegar borde`. En una actualización hay una ventana corta con el cuerpo nuevo y la versión vieja, riesgo aceptado (COM-15). Quien lo ejecuta anota en la bitácora de despliegue quién y cuándo, porque obliga a todos a aceptar los textos de nuevo:
+
+```sql
+BEGIN;
+INSERT INTO identidad.versiones_de_textos (id, terminos, privacidad, reembolso, vigente_desde)
+VALUES (1, '<versión de terminos del archivo de referencia>', '<versión de privacidad>', '<versión de reembolso>', '<AAAA-MM-DD>')
+ON CONFLICT (id) DO UPDATE SET terminos = EXCLUDED.terminos, privacidad = EXCLUDED.privacidad,
+  reembolso = EXCLUDED.reembolso, vigente_desde = EXCLUDED.vigente_desde;
+SELECT terminos, privacidad, reembolso, vigente_desde FROM identidad.versiones_de_textos;  -- exactamente una fila
+COMMIT;
+```
+
+Ejecutar con `psql -v ON_ERROR_STOP=1` y comprobar que afecta exactamente una fila.

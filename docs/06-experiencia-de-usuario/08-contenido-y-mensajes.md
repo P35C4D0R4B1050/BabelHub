@@ -75,7 +75,7 @@ Estos mensajes **no deben revelar** si una cuenta existe, qué dato falló ni de
 
 ## 5. Contenido legal y de privacidad
 
-- Los términos, la política de privacidad (que informa las cookies necesarias) y la de reembolso digital usan lenguaje claro y resumen al inicio lo esencial. Cada uno muestra su versión y fecha de vigencia.
+- Los términos, la política de privacidad (que informa las cookies necesarias) y «Cambios y devoluciones» (antes política de reembolso) usan lenguaje claro y resumen al inicio lo esencial. Cada uno muestra su versión y fecha de vigencia.
 - La constancia del Libro de Reclamaciones indica el plazo de respuesta (15 días calendario) y que la respuesta llega por correo.
 - El consentimiento de WhatsApp se explica en una frase («Te avisaremos del estado de tu pedido; no enviamos publicidad») y se ofrece como opción.
 - El Libro de Reclamaciones se enlaza siempre desde el pie y se explica qué es un reclamo y qué una queja.

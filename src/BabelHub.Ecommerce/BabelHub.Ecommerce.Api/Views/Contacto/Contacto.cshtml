@@ -1,0 +1,30 @@
+@using BabelHub.Ecommerce.Api.Controllers
+@model ContactoVista
+@{
+    var contacto = Model.ContactoDelComercio!;
+}
+<article class="mx-auto max-w-2xl" aria-labelledby="titulo-contacto">
+    <h1 id="titulo-contacto" class="font-display text-4xl">Contacto</h1>
+    <p class="mt-3 text-lg">BabelHub vende libros impresos y libros digitales. Si tienes una consulta general sobre la tienda o sobre una compra, escríbenos o llámanos.</p>
+    <div class="card card-border mt-6 bg-base-100">
+        <div class="card-body">
+            <address class="not-italic">
+                <dl class="space-y-4">
+                    <div>
+                        <dt class="font-semibold">Teléfono</dt>
+                        <dd><a class="link" href="@contacto.EnlaceDeLlamada" aria-label="Llamar al @contacto.Telefono">@contacto.Telefono</a></dd>
+                    </div>
+                    <div>
+                        <dt class="font-semibold">Correo</dt>
+                        <dd><a class="link" href="@contacto.EnlaceDeCorreo" aria-label="Escribir a @contacto.Correo">@contacto.Correo</a></dd>
+                    </div>
+                    <div>
+                        <dt class="font-semibold">Dirección</dt>
+                        <dd>@contacto.Direccion</dd>
+                    </div>
+                </dl>
+            </address>
+        </div>
+    </div>
+    <p class="mt-6 text-sm">Las solicitudes sobre tus datos personales se presentan desde tu cuenta, en «Mi cuenta»; este correo es solo para consultas generales. Para un reclamo usa el Libro de Reclamaciones del pie de página.</p>
+</article>

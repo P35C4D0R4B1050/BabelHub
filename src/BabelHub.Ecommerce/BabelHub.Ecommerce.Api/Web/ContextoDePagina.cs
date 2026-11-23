@@ -1,3 +1,4 @@
+using BabelHub.Ecommerce.Api.Web.Contacto;
 using BabelHub.Ecommerce.Application.Web;
 
 namespace BabelHub.Ecommerce.Api.Web;
@@ -22,7 +23,7 @@ public static class Temas
 /// Arma la parte común del modelo de cada página: el tema recordado y el menú. El menú es provisional hasta que la sesión (WEB-1b) y el
 /// módulo <c>Web</c> (<c>IMenuDeNavegacion</c>) lo entreguen ya filtrado por el rol y el alcance de quien mira (T15, T18).
 /// </summary>
-public sealed class ContextoDePagina(IHttpContextAccessor acceso, IPreferenciaDeSucursal sucursales, IMenuDeNavegacion? menu = null)
+public sealed class ContextoDePagina(IHttpContextAccessor acceso, IPreferenciaDeSucursal sucursales, IMenuDeNavegacion? menu = null, DatosDeContacto? contacto = null)
 {
     /// <summary>
     /// Clave de <c>HttpContext.Items</c> con la que la política de textos pendientes (T37) avisa a la página de que la persona debe aceptar
@@ -38,6 +39,7 @@ public sealed class ContextoDePagina(IHttpContextAccessor acceso, IPreferenciaDe
         modelo.Area = area;
         modelo.Tema = Temas.Validar(acceso.HttpContext?.Request.Cookies[Temas.Cookie]);
         modelo.Menu = MenuDe(area);
+        modelo.ContactoDelComercio = contacto;
         modelo.TextosPendientes = acceso.HttpContext?.Items[ClaveTextosPendientes] is true;
         // La cabecera ofrece «Mi cuenta» y «Cerrar sesión» en toda página de quien tiene sesión, no solo en las que lo piden a mano (hallazgo del E2E de la sesión).
         modelo.HaySesion |= acceso.HttpContext?.ActorDeLaSolicitud() is not null;

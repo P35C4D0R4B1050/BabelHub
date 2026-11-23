@@ -269,6 +269,69 @@ public sealed class PoliticaDeTextosPendientesTests
         Assert.Equal("/no-disponible", cuenta.Headers.Location!.OriginalString);
     }
 
+    // ---- La página de contacto y la redirección de «Cambios y devoluciones» (web-informacion-del-comercio) ----
+
+    [Fact]
+    [Trait("Criterio", "AC-COM-06")]
+    public async Task LaPaginaDeContacto_ConTextosPendientes_RecibeElDesvioComunDeUnaPantallaNoDeclarada()
+    {
+        var (a, _, _, _, _, _, _) = await AnfitrionConPolitica.Iniciar();
+        await using var _ = a;
+
+        var respuesta = await Pedir(a, "/contacto", Cookie());
+
+        Assert.Equal(HttpStatusCode.Found, respuesta.StatusCode);
+        Assert.Equal("/textos/aceptar", respuesta.Headers.Location!.OriginalString);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-COM-06")]
+    public async Task LaPaginaDeContacto_ConIdentidadCaida_VaAServicioNoDisponible_YUnVisitanteLaVe()
+    {
+        var (a, _, estado, _, _, _, _) = await AnfitrionConPolitica.Iniciar();
+        await using var _ = a;
+        estado.Comportamiento = _ => throw new InvalidOperationException("Identidad cayó");
+
+        var conSesion = await Pedir(a, "/contacto", Cookie());
+        var visitante = await Pedir(a, "/contacto");
+
+        Assert.Equal("/no-disponible", conSesion.Headers.Location!.OriginalString);
+        Assert.Equal(HttpStatusCode.OK, visitante.StatusCode);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-COM-09")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LaDireccionAnteriorDelReembolso_RedirigeDeFormaPermanente_ConTextosPendientesYConIdentidadCaida(bool identidadCaida)
+    {
+        var (a, _, estado, _, _, _, _) = await AnfitrionConPolitica.Iniciar();
+        await using var _ = a;
+        if (identidadCaida)
+        {
+            estado.Comportamiento = _ => throw new InvalidOperationException("Identidad cayó");
+        }
+
+        var respuesta = await Pedir(a, "/legal/reembolso?destino=//otro.example", Cookie());
+
+        Assert.Equal(HttpStatusCode.MovedPermanently, respuesta.StatusCode);
+        Assert.Equal("/legal/cambios-y-devoluciones", respuesta.Headers.Location!.OriginalString);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-COM-09")]
+    [InlineData("POST")]
+    [InlineData("PUT")]
+    public async Task LaDireccionAnteriorDelReembolso_SoloSeAtiendeConGet_ConTextosPendientes(string metodo)
+    {
+        var (a, _, _, _, _, _, _) = await AnfitrionConPolitica.Iniciar();
+        await using var _ = a;
+
+        var respuesta = await Pedir(a, "/legal/reembolso", Cookie(), metodo);
+
+        Assert.NotEqual(HttpStatusCode.MovedPermanently, respuesta.StatusCode);
+    }
+
     [Theory]
     [Trait("Criterio", "AC-WEB-38")]
     [InlineData("/error")]

@@ -19,7 +19,7 @@ public static class TiposDeTextoLegal
         {
             "terminos" => (true, TipoDeTextoLegal.Terminos),
             "privacidad" => (true, TipoDeTextoLegal.Privacidad),
-            "reembolso" => (true, TipoDeTextoLegal.Reembolso),
+            "reembolso" or "cambios-y-devoluciones" => (true, TipoDeTextoLegal.Reembolso),
             _ => (false, default(TipoDeTextoLegal)),
         };
         return encontrado;
@@ -30,6 +30,18 @@ public static class TiposDeTextoLegal
         TipoDeTextoLegal.Terminos => "terminos",
         TipoDeTextoLegal.Privacidad => "privacidad",
         TipoDeTextoLegal.Reembolso => "reembolso",
+        _ => throw new ArgumentOutOfRangeException(nameof(tipo)),
+    };
+
+    /// <summary>
+    /// El segmento de la dirección del texto (<c>/legal/{ruta}</c>), aparte de <see cref="Clave"/>: la clave arma el identificador del conjunto de textos que compara Identidad
+    /// (<c>terminos:V|privacidad:V|reembolso:V</c>) y no cambia; la política de reembolso se publica como «Cambios y devoluciones» (COM-10).
+    /// </summary>
+    public static string Ruta(TipoDeTextoLegal tipo) => tipo switch
+    {
+        TipoDeTextoLegal.Terminos => "terminos",
+        TipoDeTextoLegal.Privacidad => "privacidad",
+        TipoDeTextoLegal.Reembolso => "cambios-y-devoluciones",
         _ => throw new ArgumentOutOfRangeException(nameof(tipo)),
     };
 }

@@ -10,6 +10,7 @@ using BabelHub.Ecommerce.Api.Pedidos;
 using BabelHub.Ecommerce.Api.Pagos;
 using BabelHub.Ecommerce.Api.Reclamaciones;
 using BabelHub.Ecommerce.Api.Web;
+using BabelHub.Ecommerce.Api.Web.Contacto;
 using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Carrito;
 using BabelHub.Ecommerce.Application.Web;
@@ -116,10 +117,16 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
 
     internal IReadOnlyList<string> Proxies { get; private init; } = [];
 
+    /// <summary>El contacto del comercio que muestran el pie y <c>/contacto</c> (COM-01 a COM-05).</summary>
+    internal DatosDeContacto Contacto { get; private init; } = null!;
+
     public override string ToString() => "[configuración del anfitrión del E-commerce]";
 
-    /// <summary>Lee y valida todo junto: junta todos los problemas y falla una sola vez con el nombre de cada variable (nunca su valor).</summary>
-    public static OpcionesDelAnfitrionDelEcommerce Leer(IConfiguration configuracion, bool esProduccion, bool soloEnModoNormal = true)
+    /// <summary>
+    /// Lee y valida todo junto: junta todos los problemas y falla una sola vez con el nombre de cada variable (nunca su valor). <paramref name="permitirContactoDeEjemplo"/> es verdadero solo en
+    /// <c>Development</c> y <c>Test</c>: allí un dato de contacto ausente se sustituye por el ficticio; en cualquier otro entorno es obligatorio (COM-03, COM-05).
+    /// </summary>
+    public static OpcionesDelAnfitrionDelEcommerce Leer(IConfiguration configuracion, bool esProduccion, bool permitirContactoDeEjemplo, bool soloEnModoNormal = true)
     {
         ArgumentNullException.ThrowIfNull(configuracion);
         var lector = new LectorDeSecretos(configuracion);
@@ -220,6 +227,8 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
 
         var costo = Capturar(extra, () => AppSettingsOpcionesDeEnvio.Cargar(configuracion));
         var smtp = LeerSmtp(configuracion, esProduccion, extra);
+        // Los problemas del contacto salen por el lector (nombran la variable, nunca el valor).
+        var contacto = DatosDeContacto.Leer(lector, permitirContactoDeEjemplo);
 
         if (lector.Problemas.Count > 0 || extra.Count > 0)
         {
@@ -249,6 +258,7 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
             Smtp = smtp,
             CostoDeEnvio = costo!,
             Proxies = proxies,
+            Contacto = contacto!,
         };
     }
 
@@ -357,8 +367,11 @@ public static class AnfitrionDelEcommerce
         ArgumentNullException.ThrowIfNull(builder);
         var esProduccion = builder.Environment.IsProduction();
         var soloEnModoNormal = modo == ModoDeArranque.Normal;
-        var opciones = OpcionesDelAnfitrionDelEcommerce.Leer(builder.Configuration, esProduccion, soloEnModoNormal);
+        // Los valores ficticios del contacto solo valen en Development y Test; cualquier otro nombre de entorno (Staging, Production, ensayo…) exige las tres variables (COM-03, COM-05).
+        var permitirContactoDeEjemplo = builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Test");
+        var opciones = OpcionesDelAnfitrionDelEcommerce.Leer(builder.Configuration, esProduccion, permitirContactoDeEjemplo, soloEnModoNormal);
         var servicios = builder.Services;
+        servicios.AddSingleton(opciones.Contacto);
 
         // ---------- Plataforma ----------
         servicios.AgregarManejoDeErrores(new OpcionesDeErrores("ECO"));

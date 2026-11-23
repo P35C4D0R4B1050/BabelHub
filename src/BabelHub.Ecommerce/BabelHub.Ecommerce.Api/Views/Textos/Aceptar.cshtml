@@ -4,7 +4,7 @@
 @model AceptarTextosVista
 <section class="mx-auto max-w-2xl" aria-labelledby="titulo-aceptar">
     <h1 id="titulo-aceptar" class="font-display text-4xl">Actualizamos nuestros textos legales</h1>
-    <p class="mt-3 text-lg">Para seguir usando BabelHub, lee y acepta la versión vigente de nuestros términos, la política de privacidad y la de reembolso.</p>
+    <p class="mt-3 text-lg">Para seguir usando BabelHub, lee y acepta la versión vigente de nuestros términos, la política de privacidad y la política de cambios y devoluciones.</p>
     @if (Model.LaVersionCambio)
     {
         <div class="alert alert-warning mt-4" role="status">
@@ -16,7 +16,7 @@
         @foreach (var texto in Model.Version.Textos)
         {
             <li class="rounded-box border border-base-300 p-4">
-                <a class="link font-semibold" href="/legal/@TiposDeTextoLegal.Clave(texto.Tipo)">@texto.Titulo</a>
+                <a class="link font-semibold" href="/legal/@TiposDeTextoLegal.Ruta(texto.Tipo)">@texto.Titulo</a>
                 <p class="mt-1 text-sm">Versión <strong>@texto.Version</strong> · Vigente desde <time datetime="@texto.VigenteDesde.ToString("yyyy-MM-dd")">@FormatoPeruano.Fecha(texto.VigenteDesde)</time></p>
                 @if (texto.Provisional)
                 {

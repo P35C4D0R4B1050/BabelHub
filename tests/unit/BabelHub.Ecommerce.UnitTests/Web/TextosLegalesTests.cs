@@ -116,6 +116,23 @@ public sealed class TextosLegalesTests
     [Trait("Criterio", "AC-WEB-24")]
     public void Un_nombre_desconocido_no_es_un_texto_legal(string clave) =>
         Assert.False(TiposDeTextoLegal.TryParse(clave, out _));
+
+    [Theory]
+    [InlineData(TipoDeTextoLegal.Terminos, "terminos")]
+    [InlineData(TipoDeTextoLegal.Privacidad, "privacidad")]
+    [InlineData(TipoDeTextoLegal.Reembolso, "cambios-y-devoluciones")]
+    [Trait("Criterio", "AC-COM-08")]
+    public void La_ruta_del_texto_es_aparte_de_la_clave_del_identificador_y_se_resuelve_de_vuelta(TipoDeTextoLegal tipo, string ruta)
+    {
+        Assert.Equal(ruta, TiposDeTextoLegal.Ruta(tipo));
+        Assert.True(TiposDeTextoLegal.TryParse(ruta, out var resuelto));
+        Assert.Equal(tipo, resuelto);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-COM-08")]
+    public void La_clave_del_reembolso_no_cambia_porque_arma_el_identificador_del_conjunto_que_compara_Identidad() =>
+        Assert.Equal("reembolso", TiposDeTextoLegal.Clave(TipoDeTextoLegal.Reembolso));
 }
 
 /// <summary>El enlace firmado nunca aparece en el texto de un registro (SEG-10).</summary>
