@@ -472,10 +472,11 @@ Informe en `progress/R5-reformulacion-a-dos-servicios.md`.
 ### Esqueleto técnico
 - Solución `BabelHub.sln` con los proyectos por servicio, proyectos de prueba, prueba de arquitectura e infraestructura local en `infra/`.
 
-## 2026-11-23 — Contacto, descripción del comercio y «Cambios y devoluciones» (spec en Draft)
+## 2026-11-23 — Contacto del comercio, página de contacto y «Cambios y devoluciones» (web-informacion-del-comercio, T01 a T14)
 
 ### Cubierto
-- Spec nueva `web-informacion-del-comercio` (Draft) tras tres rondas de la puerta delegada; DD-75 a DD-79 registradas; borrador de plan y tareas en `progress/borradores/`.
+- Spec `web-informacion-del-comercio` aprobada y plan `Planned` (DD-75 a DD-79 ratificadas por la persona el 2026-11-23); teléfono, correo y dirección por `BABELHUB__Contacto__Telefono`, `…Correo` y `…Direccion` (obligatorios fuera de Development y Test, validados al arrancar sin imprimir valores, nada en el repositorio), pie con `tel:` y `mailto:`, `/contacto`, frase del comercio, «Cambios y devoluciones» en `/legal/cambios-y-devoluciones` (con redirección permanente de `/legal/reembolso`) y los tres cuerpos legales reescritos con una versión de referencia que lleva la huella SHA-256 de su cuerpo.
+- **Nombre público:** las pruebas que fijaban «Política de reembolso», `/legal/reembolso` o «la política de reembolso de libros digitales» (AC-WEB-05, AC-WEB-24, AC-CAR-11) se actualizaron al nombre y a la ruta nuevos: es una actualización del nombre público, no un debilitamiento. `TiposDeTextoLegal.Clave` no cambia (arma el identificador de aceptación de Identidad); la ruta sale de `Ruta`.
 
 ### Pendiente
-- Ratificación de la persona de DD-75 a DD-79 (la puerta no aprobó por ese único Importante procedimental); después, aprobación, plan e implementación (T01 a T13).
+- De la persona: fijar en `identidad.versiones_de_textos` las versiones de `tests/integration/BabelHub.IntegrationTests/Web/versiones-de-referencia-de-textos.json` en el despliegue (`infra/README.md`), escribir los datos reales de contacto en los `.env` y revisar los textos provisionales.

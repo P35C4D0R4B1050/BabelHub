@@ -1,10 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { conOrigenPropio } from '../pedidos/ayudas';
 
 // El pie con el contacto del comercio, la página de contacto y «Cambios y devoluciones» (web-informacion-del-comercio; AC-COM-01, AC-COM-05, AC-COM-07, AC-COM-08, AC-COM-09 y AC-COM-14).
-// Entorno E2E local en `Development`: el contacto es el ficticio (999 000 000, contacto@ejemplo.test), que sale de la configuración del entorno y nunca del repositorio.
-test.beforeEach(async ({ page }) => conOrigenPropio(page));
+// Entorno E2E local en `Development` (host HTTP con `E2E_FORWARDED_PROTO=https`, sin `conOrigenPropio`, que reemplaza las cabeceras extra): el contacto es el ficticio (999 000 000, contacto@ejemplo.test), que sale de la configuración del entorno y nunca del repositorio.
 
 const ETIQUETAS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
