@@ -38,7 +38,7 @@ public sealed record EdicionDeAdministracionVista(
 /// <summary>Los campos de la licencia de una edición digital con su prefijo de nombre, para pintar el formulario (alta y edición).</summary>
 public sealed record CamposDeLicenciaVista(string Prefijo, string Tipo, string Formato, string? Titular, string? Territorios, string? Vigencia);
 
-public sealed record ObraDeAdministracionVista(Guid ObraId, string Titulo, string Autor, string Editorial, string Categoria, string PortadaHuella, long Version, bool DadaDeBaja, EdicionDeAdministracionVista? Impresa, EdicionDeAdministracionVista? Digital);
+public sealed record ObraDeAdministracionVista(Guid ObraId, string Titulo, string Autor, string Editorial, string Categoria, string PortadaHuella, long Version, bool DadaDeBaja, EdicionDeAdministracionVista? Impresa, EdicionDeAdministracionVista? Digital, string? Descripcion = null);
 
 /// <summary>La lista de obras de la administración: búsqueda, páginas y el estado que reemplaza a la tabla si hace falta.</summary>
 public sealed class ListaDeObrasVista : ModeloBaseDePagina
@@ -283,7 +283,7 @@ public sealed class PantallasDelCatalogoDeAdministracionController(
     {
         var vigentes = obra.Ediciones.Where(e => e.Estado != EstadoDeEdicionConsultado.DadaDeBaja).ToList();
         EdicionDeAdministracionVista? Una(FormatoDeEdicion formato) => vigentes.Where(e => e.Formato == formato).Select(e => AEdicion(e, agotadas.Contains(e.EdicionId))).FirstOrDefault();
-        return new ObraDeAdministracionVista(obra.ObraId, obra.Titulo, obra.Autor, obra.Editorial, obra.Categoria, obra.PortadaHuella, obra.Version, obra.DadaDeBaja, Una(FormatoDeEdicion.Impresa), Una(FormatoDeEdicion.Digital));
+        return new ObraDeAdministracionVista(obra.ObraId, obra.Titulo, obra.Autor, obra.Editorial, obra.Categoria, obra.PortadaHuella, obra.Version, obra.DadaDeBaja, Una(FormatoDeEdicion.Impresa), Una(FormatoDeEdicion.Digital), obra.Descripcion);
     }
 
     internal static EdicionDeAdministracionVista AEdicion(EdicionDeAdministracion e, bool agotada)
