@@ -7,6 +7,12 @@ if (args.Length > 0 && args[0] == ModoMigrar.Argumento)
     return await ModoMigrar.Ejecutar(new ConfigurationBuilder().AddEnvironmentVariables(prefix: "BABELHUB__").Build(), Console.Out, Console.Error);
 }
 
+// La orden de operación cargar-stock (transversal-carga-inicial): carga las sucursales, las rutas y el stock inicial por los casos de uso del Inventario con el modo Operacion; no abre puertos ni arranca el servidor.
+if (args.Length > 0 && args[0] == ModoCargarStock.Argumento)
+{
+    return await ModoCargarStock.Ejecutar(args, Console.Out, Console.Error);
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Las variables BABELHUB__… son la configuración del servicio (SEG-11): BABELHUB__Modo se lee como «Modo».

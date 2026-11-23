@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using BabelHub.Shared.Contratos;
 using BabelHub.Inventario.Application.Plataforma;
 using BabelHub.Inventario.Infrastructure.Plataforma;
 using Microsoft.Extensions.Hosting;
@@ -22,7 +23,8 @@ public sealed class CredencialDeUsuarioMiddleware(RequestDelegate siguiente)
         if (cabeceras.Count == 1 && cabeceras[0] is { } valor && valor.StartsWith(Esquema, StringComparison.Ordinal))
         {
             var leida = verificador.Verificar(valor[Esquema.Length..].Trim(), reloj.Ahora);
-            if (leida is { EsValida: true, UsuarioId: { } usuario, Rol: { } rol })
+            // La identidad de operación «carga inicial» no es una cuenta: ninguna credencial puede presentarla, ni siquiera con una firma válida (transversal-carga-inicial, CIN-06). Se trata como anónima.
+            if (leida is { EsValida: true, UsuarioId: { } usuario, Rol: { } rol } && usuario != Guid.Parse(IdentidadesDeOperacion.CargaInicial))
             {
                 actor.Establecer(ActorActual.DeUsuario(usuario, rol, leida.SucursalId));
 
