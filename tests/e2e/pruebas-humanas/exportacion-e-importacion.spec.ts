@@ -1,218 +1,255 @@
-import { test, expect, type Page } from '@playwright/test';
-import { abrir, archivo, corridaCompleta, importarJson, ir, leerDescarga, sesionCompleta, CLAVE_LS } from './ayudas';
+import { test, expect, type Download, type Page } from '@playwright/test';
+import { CLAVE_LS, abrir, archivo, empezar, exportacion, hacerA, hacerB1, hacerC, importarJson, leerDescarga, part } from './ayudas';
 
-// Exportar a JSON y a Markdown, importar y combinar archivos de varios dispositivos, y borrar los datos locales (T32b a T34b).
-// Los datos son de ejemplo y solo viven en estas pruebas.
+// Cierre: un solo botón «Descargar mi resultado» (JSON + resumen Markdown), instrucciones simples, importación y combinación para quien reúne,
+// privacidad (solo códigos; aviso si el texto libre parece un correo o un teléfono) y borrado.
 
-async function descargar(page: Page, boton: string) {
-  const [d] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: boton }).click()]);
-  return { nombre: d.suggestedFilename(), texto: await leerDescarga(d) };
+test.setTimeout(180_000);
+
+async function terminarTodo(page: Page, dificil = 'Encontrar el botón de pagar') {
+  await empezar(page);
+  await hacerC(page, { dificil });
+  await hacerA(page);
+  await hacerB1(page);
+  await expect(page.getByRole('heading', { level: 1, name: '¡Muchas gracias!' })).toBeVisible();
 }
 
-// Crea por la interfaz una corrida con un paso fallido, una sesión de NVDA con un crítico y una persona con SUS, tal como lo haría la persona evaluadora.
-async function cargarDatosDeEjemplo(page: Page) {
-  await abrir(page);
-  await page.getByLabel('Código de quien evalúa').fill('EV1');
-  await page.getByLabel('Dispositivo', { exact: true }).fill('Equipo de ejemplo');
-  await page.getByLabel('Versión probada de la tienda').fill('commit de ejemplo');
-
-  await ir(page, 'Navegadores');
-  await page.getByRole('button', { name: 'Nueva corrida en Chrome · Escritorio' }).click();
-  await page.getByLabel('Versión del navegador').fill('126.0');
-  for (const paso of ['1. Inicio', '2. Catálogo', '4. Agregar al carrito']) await page.getByRole('group', { name: paso }).getByRole('radio', { name: 'Cumple', exact: true }).click();
-  await page.getByRole('group', { name: '3. Ficha del libro' }).getByRole('radio', { name: 'Falla', exact: true }).click();
-  await page.getByRole('group', { name: '¿Se completó la compra?' }).getByRole('radio', { name: 'Sí', exact: true }).click();
-  await page.getByRole('button', { name: 'Agregar defecto' }).click();
-  await page.getByLabel('Qué pasó (pasos para repetirlo)').fill('La disponibilidad no muestra icono en la ficha.');
-  await page.getByLabel('Nombre del archivo de la captura').fill('ficha-chrome-126.png');
-
-  await ir(page, 'Lector');
-  await page.getByRole('button', { name: 'Nueva sesión: NVDA · claro' }).click();
-  await page.getByText('Checkout', { exact: true }).click();
-  await page.getByRole('group', { name: 'K2 en Checkout' }).getByRole('radio', { name: 'Crítico AA', exact: true }).click();
-  await page.getByLabel('Qué pasó (obligatorio al fallar)').fill('El foco desaparece al abrir el selector de sucursal.');
-
-  await ir(page, 'Usabilidad');
-  await page.getByRole('button', { name: /Agregar persona a la ronda 1/ }).click();
-  await page.getByLabel('Quién modera (código)').fill('EV1');
-  await page.getByLabel('Leí el texto en voz alta').check();
-  await page.getByLabel('Dijo que entiende que puede parar').check();
-  await page.getByLabel('Acepta participar').check();
-  await page.getByRole('button', { name: 'Resultado', exact: true }).click();
-  await page.getByRole('group', { name: 'Resultado de la tarea' }).getByRole('radio', { name: 'Sin ayuda', exact: true }).click();
-  await page.getByLabel('Tiempo total, en segundos').fill('250');
-  await page.getByRole('button', { name: 'SUS', exact: true }).click();
-  for (const [i, v] of [5, 3, 4, 2, 5, 1, 4, 2, 5, 3].entries()) await page.getByRole('group', { name: new RegExp(`^${i + 1}\\. `) }).getByRole('radio', { name: String(v), exact: true }).click();
-  await page.getByRole('button', { name: 'Cierre', exact: true }).click();
-  await page.getByLabel('Problema principal').fill('No encontró el botón de recojo en sucursal.');
+async function descargarDos(page: Page, boton: () => Promise<void>): Promise<Download[]> {
+  const descargas: Download[] = [];
+  page.on('download', (d) => descargas.push(d));
+  await boton();
+  await expect.poll(() => descargas.length, { timeout: 10_000 }).toBe(2);
+  return descargas;
 }
 
-test.describe('Exportar', () => {
-  test('el JSON trae el esquema, los datos crudos y lo calculado; el Markdown trae las tablas del protocolo', async ({ page }) => {
-    await cargarDatosDeEjemplo(page);
-    await ir(page, 'Datos');
-    const json = await descargar(page, 'Descargar JSON');
-    expect(json.nombre).toMatch(/^babelhub-pruebas-humanas_ev1_\d{8}-\d{4}\.json$/);
-    const ex = JSON.parse(json.texto);
-    expect(ex.esquema).toBe('babelhub-pruebas-humanas');
-    expect(ex.version).toBe(1);
-    expect(ex.dispositivo).toMatchObject({ evaluador: 'EV1', etiqueta: 'Equipo de ejemplo' });
-    expect(ex.versionProbada).toBe('commit de ejemplo');
-    expect(ex.datos.a.corridas).toHaveLength(1);
-    expect(ex.datos.a.corridas[0]).toMatchObject({ combo: 'chrome-escritorio', version: '126.0', completo: 'si' });
-    expect(ex.datos.a.corridas[0].pasos.ficha.r).toBe('falla');
-    expect(ex.datos.a.corridas[0].defectos[0]).toMatchObject({ captura: 'ficha-chrome-126.png', gravedad: 'mayor' });
-    expect(ex.datos.b.sesiones[0].pantallas.checkout.items.K2.e).toBe('critico');
-    expect(ex.calculado.b.criticos).toBe(1);
-    expect(ex.calculado.b.veredicto).toBe('no-cumple');
-    const persona = ex.datos.c.personas[0];
-    expect(persona).toMatchObject({ codigo: 'P1', ronda: 1, susPuntaje: 80, sinAyudaCalculado: true, erroresN: 0 });
-    expect(persona.problema).toContain('botón de recojo');
-    expect(ex.calculado.veredictoApp).toBe('no-cumple');
+test.describe('Gracias y «Descargar mi resultado»', () => {
+  test('un solo botón baja el JSON y el resumen en Markdown, con instrucciones para enviarlos', async ({ page }) => {
+    await terminarTodo(page);
+    await expect(page.getByRole('button', { name: 'Descargar mi resultado' })).toHaveCount(1);
+    await expect(page.getByRole('heading', { level: 2, name: 'Cómo enviarlo' })).toBeVisible();
+    await expect(page.getByText(/WhatsApp/).first()).toBeVisible();
+    await expect(page.getByText(/Descargas/).first()).toBeVisible();
+    const [json, md] = await descargarDos(page, () => page.getByRole('button', { name: 'Descargar mi resultado' }).click());
+    expect(json.suggestedFilename()).toMatch(/^babelhub-resultado_ev-[a-z0-9]{4}_\d{8}-\d{4}\.json$/);
+    expect(md.suggestedFilename()).toMatch(/^babelhub-resultado_ev-[a-z0-9]{4}_\d{8}-\d{4}\.md$/);
+    const ex = JSON.parse(await leerDescarga(json));
+    expect(ex).toMatchObject({ esquema: 'babelhub-pruebas-humanas', version: 2 });
+    expect(ex.participantes).toHaveLength(1);
+    const p = ex.participantes[0];
+    expect(p).toMatchObject({ bienvenida: true, combo: expect.any(String) });
+    expect([p.a.estado, p.b1.estado, p.c.estado]).toEqual(['hecha', 'hecha', 'hecha']);
+    expect(p.c).toMatchObject({ susPuntaje: 75, resultado: 'sin-ayuda', valida: true });
+    expect(p.entorno).toMatchObject({ confirmado: true, pantalla: { ancho: expect.any(Number), alto: expect.any(Number) } });
+    expect(p.entorno.ua).toContain('Mozilla');
     expect(ex.calculado.nota).toContain('veredicto definitivo');
-    // El estado interno del cronómetro no sale en el archivo.
-    expect(persona.tarea.cron).toBeUndefined();
-    expect(Date.parse(ex.exportadoEn)).not.toBeNaN();
-
-    const md = await descargar(page, 'Descargar resumen');
-    expect(md.nombre).toMatch(/\.md$/);
-    expect(md.texto).toContain('# Resultados de las pruebas humanas de BabelHub');
-    expect(md.texto).toContain('| Fecha | Persona | Navegador y versión | Sistema o dispositivo | Completó la compra (sí/no) | Defectos |');
-    expect(md.texto).toContain('ficha-chrome-126.png');
-    expect(md.texto).toContain('| Fecha | Persona | Lector y navegador | Pantalla | Tema | Resultado (cumple/falla) | Observación |');
-    expect(md.texto).toContain('falla (crítica)');
-    expect(md.texto).toContain('| Ronda | Persona (código) | Éxito sin ayuda | Errores | Tiempo (min) | SUS (0–100) | Problema principal |');
-    expect(md.texto).toContain('| 1 | P1 | sí | 0 | 4,2 | 80 |');
-    expect(md.texto).toContain('El veredicto definitivo lo emite quien lee el JSON');
+    const texto = await leerDescarga(md);
+    expect(texto).toBe(ex.resumenMarkdown);
+    expect(texto).toContain('# Resultado de la prueba de BabelHub');
+    expect(texto).toContain('autodeclarados');
+    expect(texto).toContain('| Paso | ¿Pudo? | Nota | Captura (nombre) |');
+    expect(texto).toContain('Pude llegar a todos los botones y enlaces solo con la tecla Tab.');
+    expect(texto).toContain('SUS (0–100)');
+    await expect(page.getByText(/se descargaron dos archivos/)).toBeVisible();
   });
 
-  test('avisa de posibles datos personales (correo, teléfono) antes de devolver el archivo', async ({ page }) => {
-    await cargarDatosDeEjemplo(page);
-    await page.getByLabel('Problema principal').fill('Escribió su correo ana@example.com y su teléfono 987654321.');
-    await ir(page, 'Datos');
-    await page.getByRole('button', { name: 'Copiar JSON' }).click();
-    await expect(page.getByText('Posibles datos personales')).toBeVisible();
-    await expect(page.getByText('parece un correo electrónico')).toBeVisible();
+  test('el archivo no trae nombres ni claves: solo código, entorno, respuestas y la dirección de la tienda sin datos de la persona', async ({ page }) => {
+    await terminarTodo(page);
+    const ex = await exportacion(page);
+    const texto = JSON.stringify(ex);
+    expect(texto).not.toMatch(/@[\w-]+\.\w/); // ningún correo (el de prueba de la tarjeta no se guarda)
+    expect(Object.keys(ex.participantes[0]).sort()).toEqual(['a', 'act', 'apodo', 'b1', 'b2', 'bienvenida', 'c', 'codigo', 'combo', 'creada', 'entorno', 'id', 'tienda'].sort());
+    expect(ex.participantes[0].tienda).toEqual({ url: 'https://tienda.ejemplo.test/', version: '2026-11-23' });
+    const guardado = JSON.parse(await page.evaluate((k) => localStorage.getItem(k)!, CLAVE_LS));
+    expect(Object.keys(guardado.yo.c.tarea)).toContain('inicio'); // lo crudo vive solo en el dispositivo
+    expect(Object.keys(ex.participantes[0].c.tarea)).not.toContain('inicio');
   });
 
-  test('«Ver el texto» muestra el JSON para copiarlo a mano (iPhone sin portapapeles)', async ({ page }) => {
-    await cargarDatosDeEjemplo(page);
-    await ir(page, 'Datos');
-    await page.getByRole('button', { name: 'Ver el texto' }).first().click();
-    await expect(page.getByLabel('Texto exportado (selecciona y copia)')).toHaveValue(/"esquema": "babelhub-pruebas-humanas"/);
+  test('avisa en el momento y antes de enviar si el texto libre parece un correo o un teléfono', async ({ page }) => {
+    await empezar(page);
+    await hacerC(page, { dificil: 'escríbeme a maria@correo.com o al 987 654 321' });
+    await hacerA(page);
+    await hacerB1(page);
+    await expect(page.getByText(/Revisa antes de enviar/)).toBeVisible();
+    await expect(page.getByText(/parece un correo electrónico/)).toBeVisible();
+    // En el momento de escribir:
+    await page.getByRole('link', { name: /Volver al inicio/ }).click();
+    await page.getByRole('link', { name: /Revisar.*tarea Compra un libro/ }).click();
+    for (let i = 0; i < 5; i++) await page.getByRole('button', { name: /^Siguiente/ }).click().catch(() => {});
+  });
+
+  test('mientras se escribe, el aviso sobre correos y teléfonos aparece solo y se va al quitarlo', async ({ page }) => {
+    await empezar(page);
+    await page.goto('/#/t/a');
+    await page.getByRole('button', { name: /^Siguiente/ }).click();
+    await page.getByRole('radio', { name: 'No', exact: true }).click();
+    const campo = page.getByLabel('Cuéntanos qué pasó');
+    await campo.fill('me llamo al 999 888 777');
+    await expect(page.getByText(/Cuidado: esto tiene una secuencia larga de números/)).toBeVisible();
+    await campo.fill('salió un error');
+    await expect(page.getByText(/Cuidado: esto/)).toHaveCount(0);
+    await campo.fill('mi correo es a@b.co');
+    await expect(page.getByText(/Cuidado: esto parece un correo/)).toBeVisible();
+  });
+
+  test('si faltan tareas, se avisa pero se puede enviar lo que hay', async ({ page }) => {
+    await empezar(page);
+    await hacerB1(page);
+    await page.goto('/#/gracias');
+    await expect(page.getByRole('heading', { level: 1, name: 'Antes de enviar tu resultado' })).toBeVisible();
+    await expect(page.getByText(/Todavía te faltan 2 tareas/)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Descargar mi resultado' })).toBeEnabled();
+  });
+
+  test('«Ver lo que se enviará» muestra el resumen para leerlo antes de enviarlo', async ({ page }) => {
+    await terminarTodo(page);
+    await page.getByText('Ver lo que se enviará').click();
+    await expect(page.getByRole('textbox', { name: 'Resumen de tu resultado' })).toHaveValue(/# Resultado de la prueba de BabelHub/);
+  });
+
+  test('«Borrar mis datos» vacía el dispositivo y vuelve a la bienvenida', async ({ page }) => {
+    await terminarTodo(page);
+    await page.getByRole('button', { name: 'Borrar mis datos' }).click();
+    await expect(page.getByRole('dialog')).toContainText('Todavía no descargaste tu resultado');
+    await page.getByRole('button', { name: 'Sí, borrar' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Ayúdanos a probar BabelHub' })).toBeVisible();
+    const guardado = JSON.parse(await page.evaluate((k) => localStorage.getItem(k)!, CLAVE_LS));
+    expect(guardado.yo.bienvenida).toBe(false);
+    expect(guardado.yo.c.estado).toBe('pendiente');
+    expect((await exportacion(page)).participantes).toEqual([]);
+  });
+
+  test('tras descargar, ya no figura «sin descargar» en el aviso de borrado', async ({ page }) => {
+    await terminarTodo(page);
+    await descargarDos(page, () => page.getByRole('button', { name: 'Descargar mi resultado' }).click());
+    await page.getByRole('button', { name: 'Borrar mis datos' }).click();
+    await expect(page.getByRole('dialog')).not.toContainText('Todavía no descargaste');
   });
 });
 
-test.describe('Importar, combinar y borrar', () => {
-  test('exportar, borrar los datos locales e importar devuelve lo mismo; importarlo otra vez no duplica nada', async ({ page }) => {
-    await cargarDatosDeEjemplo(page);
-    await ir(page, 'Datos');
-    const json = await descargar(page, 'Descargar JSON');
-    const original = JSON.parse(json.texto);
-
-    await page.getByRole('button', { name: 'Borrar los datos locales…' }).click();
-    await expect(page.getByRole('dialog')).toContainText('Se borrará todo');
-    await page.getByRole('button', { name: 'Sí, borrar todo' }).click();
-    await expect(page.getByText('0 corridas de navegadores, 0 sesiones de lector y 0 personas')).toBeVisible();
-    expect(await page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? '{}').a.corridas.length, CLAVE_LS)).toBe(0);
-
-    await importarJson(page, json.texto, 'exportado.json');
-    await expect(page.getByText(/3 registros agregados · 0 actualizados · 0 conservados/)).toBeVisible();
-    await ir(page, 'Datos');
-    const otra = await descargar(page, 'Descargar JSON');
-    const vuelto = JSON.parse(otra.texto);
-    expect(vuelto.datos.a.corridas).toEqual(original.datos.a.corridas);
-    expect(vuelto.datos.b.sesiones).toEqual(original.datos.b.sesiones);
-    expect(vuelto.datos.c.personas).toEqual(original.datos.c.personas);
-
-    await importarJson(page, json.texto, 'otra-vez.json');
-    await expect(page.getByText(/0 registros agregados · 0 actualizados · 3 conservados/)).toBeVisible();
+test.describe('Importar y combinar (para quien reúne los resultados)', () => {
+  test('combina archivos de varias personas: suma lo distinto, gana el más reciente y no duplica al repetir', async ({ page }) => {
+    await abrir(page);
+    const a = part({ id: 'per-persona00001', codigo: 'EV-AAAA', a: 'si' });
+    const b = part({ id: 'per-persona00002', codigo: 'EV-BBBB', nav: 'Firefox', ver: '133.0', a: 'si' });
+    await importarJson(page, archivo([a, b]));
+    await expect(page.getByRole('main').getByText(/1 archivo leído · 2 personas agregadas · 0 actualizadas · 0 conservadas/)).toBeVisible();
+    // El mismo archivo otra vez: nada se duplica.
+    await page.locator('#archivo-json').setInputFiles({ name: 'otra-vez.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(archivo([a, b]))) });
+    await expect(page.getByRole('main').getByText(/0 personas agregadas · 0 actualizadas · 2 conservadas/)).toBeVisible();
+    // Una versión más reciente de la persona A gana; una más vieja se ignora.
+    const nuevaA = { ...a, act: '2026-11-25T10:00:00.000Z', apodo: 'nueva' };
+    const viejaB = { ...b, act: '2026-11-01T10:00:00.000Z', apodo: 'vieja' };
+    await page.locator('#archivo-json').setInputFiles({ name: 'cambios.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(archivo([nuevaA, viejaB, part({ id: 'per-persona00003', codigo: 'EV-CCCC', a: 'si' })]))) });
+    await expect(page.getByRole('main').getByText(/1 personas agregadas · 1 actualizadas · 1 conservadas/)).toBeVisible();
+    const guardado = JSON.parse(await page.evaluate((k) => localStorage.getItem(k)!, CLAVE_LS));
+    expect(guardado.otros.map((p: any) => [p.codigo, p.apodo])).toEqual([['EV-AAAA', 'nueva'], ['EV-BBBB', ''], ['EV-CCCC', '']]);
+    await expect(page.getByRole('table', { name: 'Personas reunidas' }).getByRole('row')).toHaveCount(4);
   });
 
-  test('combina archivos de varios dispositivos: suma lo distinto y deja el registro más reciente cuando coincide', async ({ page }) => {
+  test('«Descargar todo» incluye lo reunido y lo de esta persona', async ({ page }) => {
+    await empezar(page);
+    await hacerB1(page);
+    await importarJson(page, archivo([part({ id: 'per-persona00001', codigo: 'EV-AAAA', a: 'si' })]));
+    const [json] = await descargarDos(page, () => page.getByRole('button', { name: /Descargar todo/ }).click());
+    const ex = JSON.parse(await leerDescarga(json));
+    expect(ex.participantes).toHaveLength(2);
+    expect(json.suggestedFilename()).toContain('reunido');
+    // El archivo reunido se puede volver a importar sin duplicar a nadie (una vacía lo recibe).
+    await page.evaluate(() => localStorage.clear());
     await abrir(page);
-    const a = archivo({ dispositivoId: 'disp-iphone01', evaluador: 'EV2', corridas: [corridaCompleta({ id: 'run-iphone01', combo: 'safari-iphone', navegador: 'Safari', version: '17.5' })], sesiones: [sesionCompleta({ id: 'ses-iphone01', lector: 'voiceover', tema: 'babelhub' })] });
-    const b = archivo({ dispositivoId: 'disp-android1', evaluador: 'EV3', corridas: [corridaCompleta({ id: 'run-android1', combo: 'chrome-android', navegador: 'Chrome', version: '126' })] });
-    await importarJson(page, a, 'iphone.json');
-    await expect(page.getByText(/2 registros agregados/)).toBeVisible();
-    await importarJson(page, b, 'android.json');
-    await expect(page.getByText(/1 registros agregados/)).toBeVisible();
-    await expect(page.getByText(/Procedencia de lo importado: EV2 \(disp-iphone01\), EV3 \(disp-android1\)/)).toBeVisible();
+    await importarJson(page, ex);
+    await expect(page.getByRole('main').getByText(/2 personas agregadas/)).toBeVisible();
+  });
 
-    // La misma corrida del iPhone, corregida más tarde (act mayor): gana la nueva. Con act menor: se conserva la local.
-    const mas = corridaCompleta({ id: 'run-iphone01', combo: 'safari-iphone', navegador: 'Safari', version: '17.6', act: '2026-11-23T15:00:00.000Z' });
-    await importarJson(page, archivo({ dispositivoId: 'disp-iphone01', evaluador: 'EV2', corridas: [mas], exportadoEn: '2026-11-23T15:00:00.000Z' }), 'iphone-nuevo.json');
-    await expect(page.getByText(/0 registros agregados · 1 actualizados · 0 conservados/)).toBeVisible();
-    const menos = corridaCompleta({ id: 'run-iphone01', combo: 'safari-iphone', navegador: 'Safari', version: '17.0', act: '2026-11-23T08:00:00.000Z' });
-    await importarJson(page, archivo({ dispositivoId: 'disp-iphone01', evaluador: 'EV2', corridas: [menos], exportadoEn: '2026-11-23T16:00:00.000Z' }), 'iphone-viejo.json');
-    await expect(page.getByText(/0 registros agregados · 0 actualizados · 1 conservados/)).toBeVisible();
-    const guardado = await page.evaluate((k) => JSON.parse(localStorage.getItem(k)!).a.corridas.map((r: any) => `${r.id}:${r.version}`).sort(), CLAVE_LS);
-    expect(guardado).toEqual(['run-android1:126', 'run-iphone01:17.6']);
+  test('se puede pegar el JSON en vez de elegir un archivo', async ({ page }) => {
+    await abrir(page);
+    await page.goto('/#/avanzado');
+    await page.getByRole('button', { name: /Pegar el JSON/ }).click();
+    await page.getByLabel('JSON pegado').fill(JSON.stringify(archivo([part({ id: 'per-pegado000001', codigo: 'EV-PPPP', a: 'si' })])));
+    await page.getByRole('button', { name: 'Importar el texto pegado' }).click();
+    await expect(page.getByRole('main').getByText(/1 personas agregadas/)).toBeVisible();
+  });
+
+  test('un archivo de la versión 1 de la herramienta se rechaza con un mensaje claro', async ({ page }) => {
+    await abrir(page);
+    await importarJson(page, { esquema: 'babelhub-pruebas-humanas', version: 1, datos: { a: { corridas: [] }, b: { sesiones: [] }, c: { personas: [] } } }, 'viejo.json');
+    await expect(page.getByRole('main').getByText(/viejo\.json: es de la versión 1 de la herramienta/)).toBeVisible();
+    await importarJson(page, { esquema: 'babelhub-pruebas-humanas', version: 9, participantes: [] }, 'nuevo.json');
+    await expect(page.getByRole('main').getByText(/nuevo\.json: es de una versión más nueva/)).toBeVisible();
+  });
+
+  test('el resumen en Markdown no deja pasar imágenes, enlaces ni HTML de textos importados', async ({ page }) => {
+    await abrir(page);
+    const p: any = part({ id: 'per-markdown00001', codigo: 'EV-MMMM', a: 'si', b1: 'si' });
+    p.a.pasos.inicio = { r: 'falla', n: '![x](https://malo.example/p.png) [clic](https://malo.example) <img src=x onerror=1>', captura: '' };
+    p.b1.nota = '# titulo falso\n- punto';
+    await importarJson(page, archivo([p]));
+    const md: string = await page.evaluate(() => (window as any).__babelhubPruebasHumanas.construirExport().resumenMarkdown);
+    expect(md).not.toMatch(/(?<!\\)!\[/);
+    expect(md).not.toMatch(/(?<!\\)\[clic\]/);
+    expect(md).not.toMatch(/(?<!\\)<img/);
+    expect(md.split('\n').filter((l) => l.startsWith('# titulo'))).toEqual([]);
+  });
+
+  test('hay un tope de personas reunidas y se avisa al alcanzarlo', async ({ page }) => {
+    await abrir(page);
+    const muchas = Array.from({ length: 300 }, (_, i) => part({ id: `per-tope${String(i).padStart(6, '0')}`, a: 'si' }));
+    await importarJson(page, archivo(muchas));
+    await importarJson(page, archivo([part({ id: 'per-tope-extra001', a: 'si' })]));
+    await expect(page.getByRole('main').getByText(/Se alcanzó el tope de 300 personas/)).toBeVisible();
   });
 
   test('rechaza lo que no es de la herramienta y no cambia los datos', async ({ page }) => {
     await abrir(page);
+    await importarJson(page, { hola: 'mundo' }, 'ajeno.json');
+    await expect(page.getByRole('main').getByText(/ajeno\.json: no es un archivo de esta herramienta/)).toBeVisible();
     await importarJson(page, 'esto no es json', 'roto.json');
-    await expect(page.getByText('roto.json: no es un JSON válido.')).toBeVisible();
-    await importarJson(page, JSON.stringify({ esquema: 'otra-cosa', version: 1 }), 'ajeno.json');
-    await expect(page.getByText(/ajeno\.json: no es un archivo de esta herramienta/)).toBeVisible();
-    await importarJson(page, JSON.stringify({ ...archivo({ dispositivoId: 'disp-futuro1', evaluador: 'EV9' }), version: 2 }), 'futuro.json');
-    await expect(page.getByText(/futuro\.json: es de una versión más nueva/)).toBeVisible();
-    await expect(page.getByText(/0 registros agregados · 0 actualizados · 0 conservados/)).toBeVisible();
+    await expect(page.getByRole('main').getByText(/roto\.json: no es un JSON válido/)).toBeVisible();
+    await importarJson(page, archivo([]), 'vacio.json');
+    await expect(page.getByRole('main').getByText(/vacio\.json: no trae ninguna persona/)).toBeVisible();
+    await expect(page.getByRole('main').getByText(/Todavía no hay resultados/)).toBeVisible();
   });
 
-  test('un archivo hostil se muestra como texto y no ejecuta nada (los datos importados no son de confianza)', async ({ page }) => {
+  test('un archivo hostil se muestra como texto y no ejecuta nada', async ({ page }) => {
     await abrir(page);
-    const malo = archivo({ dispositivoId: 'disp-malo001', evaluador: '<b>EV</b>', personas: [{ id: 'per-malo0001', ronda: 1, codigo: '"><script>window.__xss=2</script>', resultado: 'sin-ayuda', problema: '<img src=x onerror="window.__xss=1">Texto', gravedad: 3 }] });
-    await importarJson(page, malo, 'hostil.json');
-    await ir(page, 'Usabilidad');
-    await expect(page.getByRole('cell', { name: /<img src=x onerror=/ })).toBeVisible();
-    await expect(page.locator('img[src="x"]')).toHaveCount(0);
-    expect(await page.evaluate(() => (window as any).__xss)).toBeUndefined();
+    const malo = part({ id: 'per-hostil000001', codigo: '<img src=x onerror="window.__x=1">', a: 'si' });
+    (malo.entorno as any).navegador = '<script>window.__x=2</script>';
+    await importarJson(page, archivo([malo]));
+    await expect(page.getByRole('table', { name: 'Personas reunidas' })).toContainText('<img src=x onerr');
+    expect(await page.evaluate(() => (window as any).__x)).toBeUndefined();
+    await expect(page.locator('main img, main script')).toHaveCount(0);
   });
 
-  test('códigos como «__proto__» o «constructor» no rompen la vista de datos ni la exportación', async ({ page }) => {
+  test('códigos como «__proto__» o «constructor» no rompen la vista ni la exportación', async ({ page }) => {
     await abrir(page);
-    const personas = ['__proto__', 'constructor', 'toString', 'constructor'].map((codigo, i) => ({ id: `per-proto000${i}`, ronda: 1 as const, codigo, resultado: 'sin-ayuda' as const }));
-    await importarJson(page, archivo({ dispositivoId: 'disp-proto001', evaluador: 'EV1', personas }));
-    await expect(page.getByText(/4 registros agregados/)).toBeVisible();
-    await expect(page.getByText(/el código constructor se repite en 2 registros/)).toBeVisible();
-    await page.getByRole('button', { name: 'Ver el texto' }).first().click();
-    await expect(page.getByLabel('Texto exportado (selecciona y copia)')).toHaveValue(/"codigo": "__proto__"/);
+    await importarJson(page, archivo([part({ id: 'per-proto0000001', codigo: '__proto__', a: 'si' }), part({ id: 'per-proto0000002', codigo: '__proto__', a: 'si' }), part({ id: 'per-proto0000003', codigo: 'constructor', a: 'si' })]));
+    await expect(page.getByRole('table', { name: 'Personas reunidas' })).toBeVisible();
+    const c = await page.evaluate(() => (window as any).__babelhubPruebasHumanas.calcular());
+    expect(c.avisos.join(' ')).toContain('El código __proto__ se repite en 2 personas');
+    expect(Object.keys(Object.prototype)).toEqual([]);
   });
 
-  test('ignora campos desconocidos, recorta lo largo y descarta ids inválidos', async ({ page }) => {
+  test('ignora campos desconocidos, recorta lo largo, descarta ids inválidos y valores fuera de lo permitido', async ({ page }) => {
     await abrir(page);
-    const extra: any = archivo({ dispositivoId: 'disp-extra001', evaluador: 'EV1', personas: [{ id: 'per-extra0001', ronda: 1, codigo: 'P1', resultado: 'sin-ayuda', problema: 'x'.repeat(5000) }, { id: 'id con espacios', ronda: 1, codigo: 'P2', resultado: 'sin-ayuda' }] });
-    extra.datos.c.personas[0].campoInventado = 'no debe guardarse';
-    await importarJson(page, extra, 'extra.json');
-    await expect(page.getByText(/1 registros agregados/)).toBeVisible();
-    const guardado = await page.evaluate((k) => JSON.parse(localStorage.getItem(k)!).c.personas, CLAVE_LS);
-    expect(guardado).toHaveLength(1);
-    expect(guardado[0].campoInventado).toBeUndefined();
-    expect(guardado[0].problema).toHaveLength(800);
+    const p: any = part({ id: 'per-recorte000001', codigo: 'EV-RRRR', a: 'si' });
+    p.campoRaro = 'x'; p.entorno.sistema = 'S'.repeat(500); p.a.completo = 'quizás'; p.c = { ...p.c, ronda: '7' };
+    await importarJson(page, archivo([p, part({ id: 'no valido!', a: 'si' }), { sin: 'id' }]));
+    await expect(page.getByRole('main').getByText(/1 personas agregadas/)).toBeVisible();
+    const guardado = JSON.parse(await page.evaluate((k) => localStorage.getItem(k)!, CLAVE_LS));
+    expect(guardado.otros).toHaveLength(1);
+    expect(guardado.otros[0].campoRaro).toBeUndefined();
+    expect(guardado.otros[0].entorno.sistema.length).toBeLessThanOrEqual(30);
+    expect(guardado.otros[0].a.completo).toBe('');
+    expect(guardado.otros[0].c.ronda).toBe('');
   });
 
-  test('los datos sobreviven a recargar la página y «borrar» los quita también del almacenamiento', async ({ page }) => {
+  test('lo importado y lo propio sobreviven a recargar; «Borrar los datos locales» lo quita todo', async ({ page }) => {
     await abrir(page);
-    await page.getByLabel('Código de quien evalúa').fill('EV7');
-    await ir(page, 'Navegadores');
-    await page.getByRole('button', { name: 'Nueva corrida en Safari · iPhone real' }).click();
-    await page.getByLabel('Versión del navegador').fill('17.5');
+    await importarJson(page, archivo([part({ id: 'per-persona00001', codigo: 'EV-AAAA', a: 'si' })]));
     await page.reload();
-    await expect(page.getByLabel('Versión del navegador')).toHaveValue('17.5');
-    await ir(page, 'Inicio');
-    await expect(page.getByLabel('Código de quien evalúa')).toHaveValue('EV7');
-    await ir(page, 'Datos');
-    await page.getByRole('button', { name: 'Borrar los datos locales…' }).click();
-    await page.getByRole('button', { name: 'Cancelar' }).click();
-    expect(await page.evaluate((k) => localStorage.getItem(k) !== null, CLAVE_LS)).toBe(true);
+    await expect(page.getByRole('table', { name: 'Personas reunidas' })).toContainText('EV-AAAA');
     await page.getByRole('button', { name: 'Borrar los datos locales…' }).click();
     await page.getByRole('button', { name: 'Sí, borrar todo' }).click();
-    await page.reload();
-    await ir(page, 'Inicio');
-    await expect(page.getByLabel('Código de quien evalúa')).toHaveValue('');
-    await ir(page, 'Navegadores');
-    await expect(page.getByRole('link', { name: /Safari/ })).toHaveCount(0);
+    expect(await page.evaluate((k) => JSON.parse(localStorage.getItem(k)!).otros.length, CLAVE_LS)).toBe(0);
   });
 });

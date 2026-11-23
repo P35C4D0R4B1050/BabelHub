@@ -74,7 +74,7 @@ Con pocas personas, los porcentajes son indicativos: 9 de 10 equivale a 90 %, pe
 
 # Guía operativa de las dos rondas de `web-base` (T34b, AC-WEB-17)
 
-Las secciones 1 a 7 son el plan; lo que sigue es lo que hace falta para **ejecutarlo**: quién participa, qué se dice, qué se anota y cómo se cierra cada ronda. La persona que modera puede llevar el registro en la herramienta [`tools/pruebas-humanas`](../../tools/pruebas-humanas/README.md) (sección «C · Usabilidad»), que sigue esta guía paso a paso, o en papel con la plantilla de la sección 6. En ambos casos el resultado se devuelve como JSON y lo lee quien emite el veredicto ([`veredicto.md`](../../tools/pruebas-humanas/veredicto.md)).
+Las secciones 1 a 7 son el plan; lo que sigue es lo que hace falta para **ejecutarlo**: quién participa, qué se dice, qué se anota y cómo se cierra cada ronda. Las secciones 8 a 16 describen la sesión **moderada** (presencial o por videollamada), que se lleva en papel con la plantilla de la sección 6. **La herramienta [`tools/pruebas-humanas`](../../tools/pruebas-humanas/README.md) (versión 2) las ejecuta sin moderador**: la persona la completa sola y el resultado se devuelve como JSON, que lee quien emite el veredicto ([`veredicto.md`](../../tools/pruebas-humanas/veredicto.md)). Las diferencias, qué medidas son autodeclaradas y cómo contrastarlas están en la **sección 17**.
 
 ## 8. Reclutamiento
 
@@ -246,3 +246,26 @@ Se leen en este orden y la persona responde de 1 (muy en desacuerdo) a 5 (muy de
 3. **Ronda 1:** corrige los problemas de gravedad 3 y 4 antes de la ronda 2 (sección 4) y anota en «Cambios hechos entre las rondas» qué se cambió, para que la ronda 2 **compruebe la corrección**.
 4. **Exporta el JSON** (herramienta, sección «Datos») y guárdalo; así hay una copia aunque el navegador borre sus datos. Al terminar las dos rondas, devuelve el JSON como indica el [README](../../tools/pruebas-humanas/README.md).
 5. Quien emite el veredicto lee el JSON y lo copia a [`progress/usabilidad/rondas.md`](../../progress/usabilidad/rondas.md) y a `specs/web-base/verificacion.md` (procedimiento en [`veredicto.md`](../../tools/pruebas-humanas/veredicto.md)).
+
+## 17. Versión sin moderador (herramienta `tools/pruebas-humanas`, versión 2)
+
+La persona responsable pidió que cualquier persona pueda completar la prueba **sola**, desde un enlace o un archivo, con acompañamiento mínimo. La herramienta v2 sustituye al «modo moderador» de la v1: **donde las secciones 9 a 16 mencionan botones o pasos de la herramienta del moderador («Agregar persona a la ronda N», «Se bloqueó», «Registrar una ayuda»), esos controles ya no existen**; la guía sigue valiendo para las sesiones en papel o con moderador.
+
+| Aspecto | Sesión moderada (§8 a §16) | Versión sin moderador (herramienta v2) |
+| :--- | :--- | :--- |
+| Consentimiento | Se lee en voz alta (§13) y quien modera marca casillas | Texto breve en lenguaje llano en pantalla y **tres casillas** que marca la propia persona («Leí y entendí», «Sé que puedo parar», «Acepto participar»); no se graba pantalla ni voz |
+| Perfil | Perfil (`lectora-provincia`, `estudiante`, `otro`), dispositivo, tecnología de apoyo | **Rangos**: edad (18–24 … 65 o más, o «prefiero no decirlo») y frecuencia de compra por internet; el dispositivo se detecta; tecnología de apoyo opcional; «¿ya habías visto esta tienda?» como filtro |
+| Tarea | Se lee el escenario (§10) | Se muestra el mismo escenario; **«Empezar tarea» / «Terminé»** con cronómetro automático y botón «No pude terminarla»; datos de prueba (correo `<código>@prueba.invalid`, medio «Tarjeta», `tok_aprobado`) en un cuadro plegable |
+| Éxito | Quien modera decide (reglas de los 2 minutos, §14) | **Autodeclarado**: «¿Lograste comprar el libro?» y «¿Pediste ayuda a alguien (una persona, un buscador, un asistente…)?» |
+| Errores | Quien anota cuenta cada tropiezo (§12) | **Autodeclarado**: «¿Cuántas veces te perdiste o te equivocaste?» (0, 1, 2 o 3 o más; «3 o más» se cuenta como 3, un mínimo) |
+| SUS | 10 frases leídas o marcadas (§15) | 10 frases en **español llano** con 5 puntos y puntaje 0–100 automático con la **misma fórmula estándar** y la misma polaridad (impares positivas, pares negativas); las frases 2 a 10 se reformularon ligeramente con palabras más simples (por ejemplo, «Necesité aprender muchas cosas antes de poder usar la tienda»); la 1 queda igual; queda como decisión DD-83 |
+| Preguntas abiertas | SEQ y tres preguntas (§11.8) | Solo «¿Qué fue lo más difícil o lo que más te confundió?» |
+| Gravedad 0 a 4 | La asigna quien modera (§12) | La asigna quien lee los resultados al agrupar las respuestas de «lo más difícil» (§4) |
+
+**Limitaciones que hay que decir al informar el resultado:**
+
+1. **La ayuda y los errores son autodeclarados.** Sin alguien que observe, una persona puede olvidar que pidió ayuda o restarle importancia a un tropiezo, y el cronómetro mide también el tiempo que la persona se tomó para leer o para detenerse (se pide corregirlo si pasó de 15 minutos).
+2. **Se recomienda observar 2 de las 10 sesiones** (presencial o por videollamada, con permiso) y comparar lo visto con lo declarado. Si difieren, **manda lo observado** y se anota la diferencia; si en esas dos sesiones hay una discrepancia, se revisa con mayor cuidado el resto.
+3. **Es la primera vez.** La tarea de usabilidad se ofrece **antes** de la compra guiada (la guía facilitaría la compra y ya no mediría la primera vez). La herramienta marca la sesión si no se respetó el orden (`despuesDeA`) o si la persona ya conocía la tienda; esas personas **no cuentan** para AC-WEB-17.
+4. **El criterio de AC-WEB-17 no cambia:** al menos 9 de cada 10 sin ayuda, SUS promedio ≥ 68 y menos de 1 error por tarea, en dos rondas de cinco personas. El cálculo sobre lo autodeclarado se informa **como autodeclarado**.
+5. **Quién la completa:** perfiles de las [personas](05-personas-y-tareas.md) (§8), sin quienes hayan trabajado en BabelHub, y en cada ronda al menos una persona con tecnología de apoyo (la herramienta lo avisa al reunir). El enlace lleva la tienda de la ronda (`?tienda=…&v=…&ronda=1`); **no se cambia la tienda durante una ronda**.
