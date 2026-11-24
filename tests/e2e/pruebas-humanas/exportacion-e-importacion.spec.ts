@@ -124,6 +124,28 @@ test.describe('Gracias y «Descargar mi resultado»', () => {
     await page.getByRole('button', { name: 'Borrar mis datos' }).click();
     await expect(page.getByRole('dialog')).not.toContainText('Todavía no descargaste');
   });
+
+  test('«Reiniciar todo» de la cabecera está en toda pantalla, pide confirmación y devuelve a la bienvenida', async ({ page }) => {
+    await terminarTodo(page);
+    const reiniciar = page.getByRole('button', { name: /Reiniciar todo/ });
+    await expect(reiniciar).toBeVisible();
+
+    // «Cancelar» no borra nada.
+    await reiniciar.click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.getByRole('button', { name: 'Cancelar' }).click();
+    const conservado = JSON.parse(await page.evaluate((k) => localStorage.getItem(k)!, CLAVE_LS));
+    expect(conservado.yo.bienvenida).toBe(true);
+
+    // Confirmar vuelve al inicio, con todo en blanco.
+    await reiniciar.click();
+    await page.getByRole('button', { name: 'Sí, borrar' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Ayúdanos a probar BabelHub' })).toBeVisible();
+    await expect(reiniciar).toBeVisible();
+    const guardado = JSON.parse(await page.evaluate((k) => localStorage.getItem(k)!, CLAVE_LS));
+    expect(guardado.yo.bienvenida).toBe(false);
+    expect(guardado.yo.c.estado).toBe('pendiente');
+  });
 });
 
 test.describe('Importar y combinar (para quien reúne los resultados)', () => {

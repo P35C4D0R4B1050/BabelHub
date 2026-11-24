@@ -2,6 +2,11 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-23 (tarde) — App de pruebas: botón «Reiniciar todo»
+
+### Cubierto
+- `tools/pruebas-humanas/index.html`: botón «Reiniciar todo» en la cabecera (toda pantalla), con confirmación; borra lo guardado en el navegador y vuelve a la bienvenida. Prueba E2E nueva en `exportacion-e-importacion.spec.ts`; 355 pruebas pasan y 11 se omiten por diseño. También: la prueba de `DependenciasExternasTests` del proveedor del modelo de lenguaje se hizo determinista (inestable en el CI).
+
 ## 2026-11-23 — Entorno `Staging` para la revisión de Culqi (carril `staging-culqi`)
 
 ### Cubierto

@@ -81,7 +81,7 @@ En el equipo donde quieras juntar todo: pie de la página › **«Para quien re�
 
 ## Borrar los datos locales
 
-«Borrar mis datos» (pantalla final) o «Borrar los datos locales…» (pantalla de reunir) borran todo lo guardado en ese navegador. Hazlo en un dispositivo prestado. Los archivos ya descargados no se tocan.
+«Reiniciar todo» (botón de la cabecera, visible en toda pantalla, con confirmación; vuelve al inicio), «Borrar mis datos» (pantalla final) o «Borrar los datos locales…» (pantalla de reunir) borran todo lo guardado en ese navegador. Hazlo en un dispositivo prestado. Los archivos ya descargados no se tocan.
 
 ## Si modificas `index.html`
 
