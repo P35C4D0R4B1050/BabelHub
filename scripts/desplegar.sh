@@ -17,6 +17,8 @@
 # local reservado (PLA-21: exige aviso.env, la credencial de correo propia de esa VM) y, tras levantar, comprueba que cada
 # componente esté «healthy» y lo informa.
 #
+# TLS hacia PostgreSQL (AM24): además rechaza una cadena de conexión sin «SSL Mode=VerifyFull» (o la URI de Evolution sin sslmode=require + sslaccept=strict + sslcert), por nombre de clave y sin imprimir valores.
+#
 # Variables opcionales: DOCKER (comando de docker, por defecto `docker`), STAT (por defecto `stat`), CHOWN (por defecto `chown`), BABELHUB_RAICES_PUBLICAS.
 # Códigos de salida: 0 desplegado y sano, 1 falta algo o algún componente no quedó sano, 2 uso inválido.
 set -euo pipefail
@@ -103,6 +105,65 @@ leer_valor() { # archivo clave -> el valor (vacío si no está); nunca se imprim
   printf '%s' "$valor"
 }
 
+# TLS hacia PostgreSQL (AM24, docs/02-arquitectura-de-software/05-despliegue.md §4): ninguna cadena de conexión a la base puede ir sin TLS ni sin verificar al servidor, porque la contraseña de la cuenta viajaría en claro por la red
+# privada o a quien se haga pasar por la base. Se lee cada archivo .env sin ejecutarlo y se anota (por NOMBRE de clave, nunca con el valor) lo que no cumpla:
+#   - una cadena de Npgsql (las cuentas de los servicios BABELHUB__{Ecommerce,Inventario}__Base__*, las propietarias BABELHUB__Migrador__*__Propietaria o cualquier valor con forma de cadena: Host=…;Username=…) exige `SSL Mode=VerifyFull`
+#     (todas las veces que aparezca: gana la última) y no admite `Trust Server Certificate=true`;
+#   - una URI postgres:// (la de Evolution API, que usa Prisma) exige `sslmode=require` con `sslaccept=strict` y `sslcert=` (la CA privada). Prisma NO soporta `sslmode=verify-full`/`verify-ca`: los ignora y vuelve a «prefer» (cifra pero
+#     no verifica al servidor), de modo que aquí se rechazan en vez de dar una falsa seguridad; tampoco `sslaccept=accept_invalid_certs`, `disable`, `allow` ni `prefer`.
+comprobar_tls_de_postgres() { # archivo ruta
+  local archivo="$1" ruta="$2" linea clave valor modo parametros parametro modo_uri="" aceptar="" certificado="" resto repetidos
+  local -a modos partes
+  [[ "$archivo" == *.env ]] || return 0
+  local nocase_antes; nocase_antes="$(shopt -p nocasematch || true)"   # «shopt -p» sale con 1 si la opción está apagada
+  while IFS= read -r linea || [[ -n "$linea" ]]; do
+    linea="${linea//$'\r'/}"
+    [[ "$linea" =~ ^[[:space:]]*# || "$linea" != *=* ]] && continue
+    # Se lee como lo lee Docker Compose (env_file): sin «export», con espacios recortados y con un par de comillas, dobles o simples, quitado.
+    clave="${linea%%=*}"; clave="${clave#"${clave%%[![:space:]]*}"}"; clave="${clave%"${clave##*[![:space:]]}"}"; clave="${clave#export }"
+    valor="${linea#*=}"; valor="${valor#"${valor%%[![:space:]]*}"}"; valor="${valor%"${valor##*[![:space:]]}"}"
+    if [[ "$valor" =~ ^\"(.*)\"$ || "$valor" =~ ^\'(.*)\'$ ]]; then valor="${BASH_REMATCH[1]}"; fi
+    [[ "$valor" == CAMBIAR ]] && continue   # ya lo anota la comprobación de «CAMBIAR»
+    shopt -s nocasematch   # Npgsql no distingue mayúsculas en las palabras clave ni en los valores
+    if [[ "$clave" =~ ^BABELHUB__(Ecommerce|Inventario)__Base__ || "$clave" =~ ^BABELHUB__Migrador__.*__Propietaria$ ]] \
+      || [[ "$valor" =~ (^|\;)[[:space:]]*(Host|Server|Hostname)[[:space:]]*= && "$valor" =~ (Username|User[[:space:]]?Name|User[[:space:]]?ID|UID)[[:space:]]*= ]]; then
+      eval "$nocase_antes"
+      mapfile -t modos < <(grep -oiE 'ssl[ _]?mode[[:space:]]*=[[:space:]]*[A-Za-z-]*' <<<"$valor" | sed -E 's/^[^=]*=[[:space:]]*//' | tr '[:upper:]' '[:lower:]')
+      if [[ ${#modos[@]} -eq 0 ]]; then
+        anotar "$archivo: $clave no pide TLS a PostgreSQL (falta «SSL Mode=VerifyFull»): la contraseña de la cuenta viajaría sin cifrar por la red privada (AM24)"
+      else
+        for modo in "${modos[@]}"; do
+          [[ "$modo" == verifyfull ]] || anotar "$archivo: $clave usa «SSL Mode=$modo»: debe ser «SSL Mode=VerifyFull» (cifrado y servidor verificado con la CA privada, AM24)"
+        done
+      fi
+      # Npgsql lee como verdadero true, t, yes, y, on y 1 (cualquier mayúscula).
+      if grep -qiE 'trust[ _]?server[ _]?certificate[[:space:]]*=[[:space:]]*(true|t|yes|y|1|on)([^A-Za-z0-9]|$)' <<<"$valor"; then
+        anotar "$archivo: $clave lleva «Trust Server Certificate» activo: no se verificaría al servidor de PostgreSQL (AM24)"
+      fi
+    elif [[ "$valor" =~ ^postgres(ql)?:// ]]; then
+      eval "$nocase_antes"
+      modo_uri="" aceptar="" certificado=""
+      # Los parámetros van tras el último «@» (una contraseña puede llevar «?» o «@»): sin «?» no hay ninguno.
+      resto="${valor#*://}"; resto="${resto##*@}"
+      parametros=""; [[ "$resto" == *\?* ]] && parametros="${resto#*\?}"
+      IFS='&' read -r -a partes <<<"$parametros"
+      repetidos="$(printf '%s\n' "${partes[@]:-}" | { grep -iE '^ssl' || true; } | cut -d= -f1 | tr '[:upper:]' '[:lower:]' | sort | uniq -d | tr '\n' ' ')"
+      [[ -z "$repetidos" ]] || anotar "$archivo: $clave repite parámetros de TLS ($repetidos): no se sabe cuál valdría (AM24)"
+      for parametro in "${partes[@]:-}"; do
+        case "${parametro%%=*}" in
+          sslmode) modo_uri="${parametro#*=}" ;;
+          sslaccept) aceptar="${parametro#*=}" ;;
+          sslcert) certificado="${parametro#*=}" ;;
+        esac
+      done
+      [[ "$modo_uri" == require ]] || anotar "$archivo: $clave usa «sslmode=${modo_uri:-(ausente)}»: debe ser «sslmode=require» con «sslaccept=strict» y «sslcert=» (Prisma ignora verify-full y verify-ca y no verificaría al servidor, AM24)"
+      [[ "$aceptar" == strict ]] || anotar "$archivo: $clave usa «sslaccept=${aceptar:-(ausente)}»: debe ser «sslaccept=strict» (valida la cadena y el nombre del servidor de PostgreSQL, AM24)"
+      [[ -n "$certificado" ]] || anotar "$archivo: $clave no lleva «sslcert=» con la CA privada: el servidor de PostgreSQL no se podría verificar (AM24)"
+    fi
+    eval "$nocase_antes"
+  done <"$ruta"
+}
+
 if [[ -n "$SECRETOS" ]]; then
   # La raíz de confianza de los procesos (SSL_CERT_FILE, DD-55): las autoridades públicas de ESTA VM más la CA privada de la cuenta, para que el HTTPS entre servicios y el TLS
   # del Redis de contadores se verifiquen sin desactivar ninguna comprobación. Lo arma la propia VM cada vez (si se actualizan sus autoridades, el paquete las sigue); nunca viaja.
@@ -125,6 +186,10 @@ if [[ -n "$SECRETOS" ]]; then
   }
   for archivo in tls-ecommerce-cert.pem tls-ecommerce-key.pem tls-inventario-cert.pem tls-inventario-key.pem tls-gestion-cert.pem tls-gestion-key.pem ca-bundle.pem; do entregar "$archivo" 1654:1654; done
   for archivo in redis-contadores-cert.pem redis-contadores-key.pem redis-contadores-ca.pem; do entregar "$archivo" 999:1000; done
+  # PostgreSQL (alpine) corre como «postgres» (70:70): su arranque copia el certificado y la clave a memoria con los permisos que exige el servidor (infra/postgres/servidor/iniciar.sh).
+  for archivo in tls-postgres-cert.pem tls-postgres-key.pem; do entregar "$archivo" 70:70; done
+  # La CA privada que lee Evolution API (VM-VENTAS): corre como root con las capacidades descartadas, así que solo lee lo que es suyo; se entrega a root y queda en 400.
+  entregar tls-ca.pem 0:0
   for archivo in "${ARCHIVOS[@]}"; do
     ruta="$SECRETOS/$archivo"
     if [[ ! -f "$ruta" ]]; then
@@ -146,6 +211,7 @@ if [[ -n "$SECRETOS" ]]; then
     if grep -qE '^[A-Za-z0-9_]+="?CAMBIAR"?[[:space:]]*$' "$ruta" 2>/dev/null; then
       anotar "el archivo de secretos $archivo tiene valores «CAMBIAR» sin completar (los lista PENDIENTES.txt de la carpeta que generó scripts/generar-secretos.sh)"
     fi
+    comprobar_tls_de_postgres "$archivo" "$ruta"
     # La cuenta propietaria de las bases (administración, COMP-2) solo puede estar en migrador.env: un servicio con ella en su entorno la tendría en un proceso expuesto.
     if grep -q 'BABELHUB__Migrador__' "$ruta" 2>/dev/null; then
       anotar "el archivo $archivo lleva claves BABELHUB__Migrador__*: la cuenta propietaria de las bases solo puede estar en migrador.env"
@@ -267,6 +333,7 @@ if [[ "$VM" == inventario && -n "$SECRETOS" ]]; then
     for clave in BABELHUB__Migrador__Inventario__Propietaria BABELHUB__Migrador__Ecommerce__Propietaria; do
       [[ -n "$(leer_valor "$MIGRADOR" "$clave")" ]] || anotar "falta la clave $clave en migrador.env"
     done
+    comprobar_tls_de_postgres migrador.env "$MIGRADOR"   # las cuentas propietarias también se conectan por TLS verificado (AM24)
     if grep -q 'AGE-SECRET-KEY-' "$MIGRADOR" 2>/dev/null; then
       anotar "el archivo migrador.env contiene una clave privada de age: no puede estar en la VM"
     fi

@@ -2,6 +2,14 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-25 — TLS de PostgreSQL entre las VMs (carril `tls-postgres`)
+
+### Cubierto
+- Hallazgo Importante del 2026-11-23 cerrado (AM24; DD-90 a DD-94, pendientes de ratificar): PostgreSQL arranca con `ssl=on` (TLS 1.3, certificado de la CA privada) y `pg_hba.conf` solo admite `hostssl`; todas las cadenas de Npgsql llevan `SSL Mode=VerifyFull;GSS Encryption Mode=Disable` y Evolution API (Prisma, que ignora `verify-full`) `sslmode=require&sslaccept=strict&sslcert=`. `desplegar.sh` se niega a desplegar sin ello; `generar-secretos.sh` emite el certificado del servidor. Los dos Menores del aviso `libgssapi_krb5` también quedan cerrados.
+- Pruebas: `DesplegarShTests` (guardas y generador), `ComposePorVmTests`, `ComposeEnEjecucionTests` (PostgreSQL real con el Compose de producción) y el paso 6b del ensayo local (rechazo sin TLS, con otra CA y con otro nombre; todas las conexiones de red cifradas; respaldo por el socket).
+- Ajuste en `progress/ajustes-al-implementar.md` §19; guía 08 al día (y el paso 1 de §15.3, que fallaba). Carpetas de secretos generadas antes se regeneran.
+- Pendiente: guarda de arranque en los servicios (DD-93), rotación y alerta de vencimiento del certificado, y probar Oracle real.
+
 ## 2026-11-25 — Carrera real en la conciliación de ingresos y arreglos del ensayo local en Windows
 
 ### Cubierto

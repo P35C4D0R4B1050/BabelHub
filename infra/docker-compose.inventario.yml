@@ -37,7 +37,10 @@ services:
     # Archivado continuo de WAL cifrado hacia el almacén (PLA-15, D10): archive_timeout=300 y el latido de la base garantizan segmentos nuevos
     # aunque no haya actividad. archivar-wal.sh y respaldar.sh vienen en la imagen (infra/postgres/respaldos); las variables de age y del
     # almacén (credencial respaldos-escritor, que solo crea) llegan en postgres.env. /config es la configuración de la VM, sin secretos.
-    command: ["postgres", "-c", "shared_buffers=768MB", "-c", "max_connections=100", "-c", "archive_timeout=300", "-c", "archive_mode=on", "-c", "archive_command=/opt/babelhub/archivar-wal.sh %p %f"]
+    # TLS (AM24): el entrypoint de la imagen copia el certificado y la clave (secretos) a memoria con los permisos que exige PostgreSQL y arranca el servidor; `pg_hba.conf` (en la imagen) solo admite `hostssl`
+    # y rechaza lo demás, así que una conexión sin cifrar o de un cliente que no confía en la CA privada nunca llega a pedir la contraseña. TLS 1.3 como mínimo.
+    entrypoint: ["/opt/babelhub/iniciar.sh"]
+    command: ["postgres", "-c", "ssl=on", "-c", "ssl_cert_file=/run/postgresql/tls/server.crt", "-c", "ssl_key_file=/run/postgresql/tls/server.key", "-c", "ssl_min_protocol_version=TLSv1.3", "-c", "hba_file=/opt/babelhub/pg_hba.conf", "-c", "shared_buffers=768MB", "-c", "max_connections=100", "-c", "archive_timeout=300", "-c", "archive_mode=on", "-c", "archive_command=/opt/babelhub/archivar-wal.sh %p %f"]
     ports:
       - "${IP_PRIVADA:?Define IP_PRIVADA con la dirección privada de esta VM}:5432:5432"
     volumes:
@@ -45,6 +48,11 @@ services:
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
       - respaldo-espera:/var/respaldos
       - ./:/config:ro
+    secrets:
+      - source: tls-postgres-cert.pem
+        target: tls-cert.pem
+      - source: tls-postgres-key.pem
+        target: tls-key.pem
     mem_limit: 2g
     cpus: 0.4
     pids_limit: 300
@@ -146,6 +154,10 @@ services:
     restart: unless-stopped
 
 secrets:
+  tls-postgres-cert.pem:
+    file: ${BABELHUB_SECRETOS:?}/tls-postgres-cert.pem
+  tls-postgres-key.pem:
+    file: ${BABELHUB_SECRETOS:?}/tls-postgres-key.pem
   tls-inventario-cert.pem:
     file: ${BABELHUB_SECRETOS:?}/tls-inventario-cert.pem
   tls-inventario-key.pem:

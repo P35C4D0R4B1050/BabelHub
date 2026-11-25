@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 
 namespace BabelHub.IntegrationTests.Imagenes;
@@ -130,13 +132,35 @@ public sealed class ComposeEnEjecucionTests : IDisposable
             _sustituciones["IP_PRIVADA"] = "127.0.0.1";
             _sinPuertos.Add("postgres");
             Directory.CreateDirectory(_carpeta);
+            var contrasenaDeEcommerce = Guid.NewGuid().ToString("N");
             File.WriteAllText(
                 Path.Combine(_carpeta, "postgres.env"),
-                $"POSTGRES_PASSWORD={Guid.NewGuid():N}\nPOSTGRES_ECOMMERCE_PASSWORD={Guid.NewGuid():N}\nPOSTGRES_INVENTARIO_PASSWORD={Guid.NewGuid():N}\n");
+                $"POSTGRES_PASSWORD={Guid.NewGuid():N}\nPOSTGRES_ECOMMERCE_PASSWORD={contrasenaDeEcommerce}\nPOSTGRES_INVENTARIO_PASSWORD={Guid.NewGuid():N}\n");
+            // El certificado y la clave del servidor (AM24): en una VM los emite la CA privada; aquí, uno autofirmado desechable, solo para que el servidor arranque con TLS.
+            using (var rsa = RSA.Create(2048))
+            {
+                var solicitud = new CertificateRequest("CN=postgres", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                using var certificado = solicitud.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddDays(1));
+                File.WriteAllText(Path.Combine(_carpeta, "tls-postgres-cert.pem"), certificado.ExportCertificatePem());
+                File.WriteAllText(Path.Combine(_carpeta, "tls-postgres-key.pem"), rsa.ExportPkcs8PrivateKeyPem());
+            }
 
             Levantar("inventario", "postgres");
 
-            AfirmarContenedorEndurecido(Inspeccionar("inventario", "postgres"), "postgres", 2048L * 1024 * 1024);
+            var contenedor = Inspeccionar("inventario", "postgres");
+            AfirmarContenedorEndurecido(contenedor, "postgres", 2048L * 1024 * 1024);
+
+            // TLS de verdad (AM24): por la red (127.0.0.1 dentro del contenedor) una conexión con TLS entra y una sin TLS se rechaza antes de pedir la contraseña.
+            var id = contenedor.GetProperty("Id").GetString()!;
+            var (conTls, salidaConTls, erroresConTls) = ComposeDeVms.Docker(TimeSpan.FromMinutes(1), null, "exec", "-e", "PGPASSWORD=" + contrasenaDeEcommerce, id, "psql", "-At", "postgresql://ecommerce@127.0.0.1/ecommerce?sslmode=require", "-c", "select ssl::text || ' ' || version from pg_stat_ssl where pid = pg_backend_pid()");
+            Assert.True(conTls == 0, erroresConTls + salidaConTls);
+            Assert.Equal("true TLSv1.3", salidaConTls.Trim());
+            var (sinTls, _, erroresSinTls) = ComposeDeVms.Docker(TimeSpan.FromMinutes(1), null, "exec", "-e", "PGPASSWORD=" + contrasenaDeEcommerce, id, "psql", "-At", "postgresql://ecommerce@127.0.0.1/ecommerce?sslmode=disable", "-c", "select 1");
+            Assert.NotEqual(0, sinTls);
+            Assert.Contains("no encryption", erroresSinTls, StringComparison.Ordinal);
+            // El socket local sigue sirviendo a la comprobación de salud, al respaldo y al archivado (sin red).
+            var (porSocket, _, erroresPorSocket) = ComposeDeVms.Docker(TimeSpan.FromMinutes(1), null, "exec", id, "psql", "-U", "postgres", "-At", "-c", "select 1");
+            Assert.True(porSocket == 0, erroresPorSocket);
         }
         finally
         {

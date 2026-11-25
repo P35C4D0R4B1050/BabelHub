@@ -112,6 +112,10 @@ public sealed class DesplegarShTests : IDisposable
         return texto.ToString()[..largo];
     }
 
+    private static string CadenaDeBase(string clave) => $"Host=10.0.1.10;Port=5432;Database=base;Username=cuenta;Pass{"word"}={clave};SSL Mode=VerifyFull;GSS Encryption Mode=Disable";
+
+    private static string UriDeEvolution(string clave) => $"postgresql://evolution:{clave}@10.0.1.10:5432/evolution?schema=public&sslmode=require&sslaccept=strict&sslcert=/run/secrets/tls-ca.pem";
+
     /// <summary>Los secretos de la VM tal como deben estar: un archivo por cada uno que el Compose pide, con las claves de la tabla.</summary>
     private void PrepararSecretos(string vm)
     {
@@ -141,6 +145,9 @@ public sealed class DesplegarShTests : IDisposable
                         "ASPNETCORE_ENVIRONMENT" => "Staging",
                         "BABELHUB__Pagos__Pasarela" => "simulador",
                         "BABELHUB__Envios__Operador" => "simulador",
+                        // AM24: las cadenas de conexión a PostgreSQL piden TLS verificado (si no, desplegar se niega).
+                        var cadena when cadena.StartsWith("BABELHUB__Inventario__Base__", StringComparison.Ordinal) || cadena.StartsWith("BABELHUB__Ecommerce__Base__", StringComparison.Ordinal) => CadenaDeBase(Aleatorio(32)),
+                        "DATABASE_CONNECTION_URI" => UriDeEvolution(Aleatorio(32)),
                         _ => Aleatorio(Math.Max(fila.Length > 2 ? int.Parse(fila[2], System.Globalization.CultureInfo.InvariantCulture) : 0, 12) + 8),
                     };
                     // Lo que no es un secreto (el tipo del almacén, el entorno y la pasarela) no se vigila en la salida del script: sus mensajes lo nombran.
@@ -176,7 +183,7 @@ public sealed class DesplegarShTests : IDisposable
             _valoresSecretos.Add(claveEcommerce);
             File.WriteAllText(
                 Path.Combine(_secretos, "migrador.env"),
-                $"BABELHUB__Migrador__Inventario__Propietaria=Host=postgres;Username=postgres;Pass{"word"}={claveInventario}\nBABELHUB__Migrador__Ecommerce__Propietaria=Host=postgres;Username=postgres;Pass{"word"}={claveEcommerce}\n");
+                $"BABELHUB__Migrador__Inventario__Propietaria=Host=postgres;Username=postgres;Pass{"word"}={claveInventario};SSL Mode=VerifyFull\nBABELHUB__Migrador__Ecommerce__Propietaria=Host=postgres;Username=postgres;Pass{"word"}={claveEcommerce};SSL Mode=VerifyFull\n");
 
             // La credencial de correo propia de la VM de datos (PLA-21): sirve solo para avisar del espacio reservado.
             var claveDeCorreo = Aleatorio(24);
@@ -199,6 +206,10 @@ public sealed class DesplegarShTests : IDisposable
         entorno["STAT"] = EnLinux(Path.Combine(_carpeta, "stat-doble.sh"));
         entorno["DOBLE_REGISTRO"] = EnLinux(Registro);
         entorno["DOBLE_SERVICIOS"] = "uno dos";
+        // Evolution API monta la CA privada (tls-ca.pem, AM24): con ella desplegar arma el paquete de raíces y necesita las públicas de la VM, que un equipo de desarrollo (Windows) no tiene en /etc/ssl.
+        var raices = Path.Combine(_carpeta, "raices-publicas-doble.crt");
+        File.WriteAllText(raices, "-----BEGIN CERTIFICATE-----\nRAIZ-PUBLICA-DE-PRUEBA\n-----END CERTIFICATE-----\n");
+        entorno["BABELHUB_RAICES_PUBLICAS"] = EnLinux(raices);
         return entorno;
     }
 
@@ -585,7 +596,7 @@ public sealed class DesplegarShTests : IDisposable
 
         var (codigo, _, errores) = Desplegar("ventas", null, "--secretos", EnLinux(_secretos), "--cron", EnLinux(_cron), "--sin", "evolucion-api");
 
-        Assert.Equal(2, codigo);
+        Assert.True(codigo == 2, errores);
         Assert.Contains("--sin: ventas no tiene el servicio «evolucion-api»", errores, StringComparison.Ordinal);
         Assert.DoesNotContain(LlamadasADocker, l => l.Contains(" up ", StringComparison.Ordinal));
     }
@@ -710,8 +721,8 @@ public sealed class DesplegarShTests : IDisposable
         Assert.Equal(Valor(inventario, "ecommerce-gestion.env", "BABELHUB__Notificaciones__N8n__ClaveSaliente"), Valor(ventas, "n8n.env", "BABELHUB_FIRMA_DE_AVISOS"));
         Assert.Equal(Valor(inventario, "ecommerce-gestion.env", "BABELHUB__Integraciones__n8n__Secreto"), Valor(ventas, "n8n.env", "BABELHUB_FIRMA_DE_ESTADOS"));
         Assert.Equal(Valor(inventario, "ecommerce-gestion.env", "BABELHUB__Seguridad__ClaveDeRedisDeLimites"), Valor(ventas, "redis-contadores.env", "BABELHUB__Seguridad__ClaveDeRedisDeLimites"));
-        Assert.EndsWith("Password=" + Valor(inventario, "postgres.env", "POSTGRES_PASSWORD"), Valor(inventario, "migrador.env", "BABELHUB__Migrador__Inventario__Propietaria"), StringComparison.Ordinal);
-        static string Clave(string conexion) => conexion[(conexion.LastIndexOf("Password=", StringComparison.Ordinal) + 9)..];
+        Assert.Contains("Password=" + Valor(inventario, "postgres.env", "POSTGRES_PASSWORD") + ";", Valor(inventario, "migrador.env", "BABELHUB__Migrador__Inventario__Propietaria"), StringComparison.Ordinal);
+        static string Clave(string conexion) => conexion[(conexion.LastIndexOf("Password=", StringComparison.Ordinal) + 9)..].Split(';')[0];
         Assert.Equal(Clave(Valor(inventario, "ecommerce-gestion.env", "BABELHUB__Ecommerce__Base__Aplicacion")), Clave(Valor(ventas, "ecommerce.env", "BABELHUB__Ecommerce__Base__Aplicacion")));
         Assert.Contains("Host=10.0.1.10;", Valor(ventas, "ecommerce.env", "BABELHUB__Ecommerce__Base__Aplicacion"), StringComparison.Ordinal);
         // Cada servicio es distinto de los demás (cursor de auditoría, sesiones): nada se repite entre servicios que no lo comparten.
@@ -779,6 +790,250 @@ public sealed class DesplegarShTests : IDisposable
 
         Assert.True(codigo == 0, salida + errores);
         Assert.Contains($"VM {vm} desplegada y sana.", salida, StringComparison.Ordinal);
+    }
+
+    // ---------- TLS hacia PostgreSQL (AM24): nadie despliega con una conexión sin cifrar ni sin verificar al servidor ----------
+
+    /// <summary>Cambia el valor de una clave de un archivo de secretos por otro (para fabricar el incumplimiento).</summary>
+    private void CambiarValor(string archivo, string clave, string nuevo)
+    {
+        var ruta = Path.Combine(_secretos, archivo);
+        var lineas = File.ReadAllLines(ruta).Select(l => l.StartsWith(clave + "=", StringComparison.Ordinal) ? $"{clave}={nuevo}" : l);
+        File.WriteAllLines(ruta, lineas);
+    }
+
+    private static string ConClave(string cadena, string clave) => cadena.Replace("CLAVE", clave, StringComparison.Ordinal);
+
+    [Theory]
+    [InlineData("inventario", "inventario.env", "BABELHUB__Inventario__Base__Aplicacion", "Host=10.0.1.10;Port=5432;Database=b;Username=u;Pass{word}=CLAVE;SSL Mode=Disable", "SSL Mode=disable")]
+    [InlineData("inventario", "ecommerce-gestion.env", "BABELHUB__Ecommerce__Base__DepuracionDeAuditoria", "Host=postgres;Port=5432;Database=b;Username=u;Pass{word}=CLAVE;SSL Mode=Require", "SSL Mode=require")]
+    [InlineData("inventario", "inventario.env", "BABELHUB__Inventario__Base__DepuracionDeAjustes", "Host=postgres;Port=5432;Database=b;Username=u;Pass{word}=CLAVE;SSL Mode=VerifyCA", "SSL Mode=verifyca")]
+    [InlineData("ventas", "ecommerce.env", "BABELHUB__Ecommerce__Base__Aplicacion", "Host=10.0.1.10;Port=5432;Database=b;Username=u;Pass{word}=CLAVE;SSL Mode=Prefer", "SSL Mode=prefer")]
+    [InlineData("ventas", "ecommerce.env", "BABELHUB__Ecommerce__Base__DepuracionDeRegistros", "Host=10.0.1.10;Port=5432;Database=b;Username=u;Pass{word}=CLAVE", "falta «SSL Mode=VerifyFull»")]
+    [InlineData("ventas", "ecommerce.env", "BABELHUB__Ecommerce__Base__DepuracionDeAuditoria", "Host=10.0.1.10;Port=5432;Database=b;Username=u;Pass{word}=CLAVE;SSL Mode=VerifyFull;SSL Mode=Disable", "SSL Mode=disable")]
+    [InlineData("ventas", "ecommerce.env", "BABELHUB__Ecommerce__Base__Aplicacion", "Host=10.0.1.10;Port=5432;Database=b;Username=u;Pass{word}=CLAVE;SslMode=Allow", "SSL Mode=allow")]
+    [InlineData("ventas", "ecommerce.env", "BABELHUB__Ecommerce__Base__Aplicacion", "Host=10.0.1.10;Port=5432;Database=b;Username=u;Pass{word}=CLAVE;SSL Mode=VerifyFull;Trust Server Certificate=true", "Trust Server Certificate")]
+    [InlineData("ventas", "ecommerce.env", "BABELHUB__Ecommerce__Base__Aplicacion", "Host=10.0.1.10;Port=5432;Database=b;Username=u;Pass{word}=CLAVE;SSL Mode=VerifyFull;trust server certificate=T", "Trust Server Certificate")]
+    [InlineData("ventas", "ecommerce.env", "BABELHUB__Ecommerce__Base__Aplicacion", "'Host=10.0.1.10;Port=5432;Database=b;Username=u;Pass{word}=CLAVE;sslmode=disable'", "SSL Mode=disable")]
+    [InlineData("ventas", "ecommerce.env", "BABELHUB__Ecommerce__Base__Aplicacion", "  Host=10.0.1.10;Port=5432;Database=b;Username=u;Pass{word}=CLAVE", "falta «SSL Mode=VerifyFull»")]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void UnaCadenaDeConexionAPostgreSqlSinTlsVerificado_NoSeDespliega_NombrandoLaClave_SinImprimirElValor_NiLlamarADocker(string vm, string archivo, string clave, string cadena, string motivo)
+    {
+        PrepararSecretos(vm);
+        var contrasena = Aleatorio(32);
+        _valoresSecretos.Add(contrasena);
+        CambiarValor(archivo, clave, ConClave(cadena, contrasena).Replace("Pass{word}", "Password", StringComparison.Ordinal));
+
+        var (codigo, salida, errores) = Desplegar(vm);
+
+        Assert.Equal(1, codigo);
+        Assert.Contains($"{archivo}: {clave}", errores, StringComparison.Ordinal);
+        Assert.Contains(motivo, errores, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(LlamadasADocker);
+        SinSecretosEnLaSalida(salida, errores);
+    }
+
+    [Theory]
+    [InlineData("Host=postgres;Database=b;Username=u;Pass{word}=CLAVE;SSL Mode=VerifyFull")]
+    [InlineData("Host=postgres;Database=b;Username=u;Pass{word}=CLAVE;ssl mode=verifyfull;GSS Encryption Mode=Disable")]
+    [InlineData("Host=10.0.1.10;Port=5432;Database=b;Username=u;Pass{word}=CLAVE;SslMode=VerifyFull;Trust Server Certificate=false")]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void UnaCadenaConVerifyFull_EnCualquierEscrituraDeNpgsql_SiSeDespliega(string cadena)
+    {
+        PrepararSecretos("inventario");
+        CambiarValor("inventario.env", "BABELHUB__Inventario__Base__Aplicacion", ConClave(cadena, Aleatorio(32)).Replace("Pass{word}", "Password", StringComparison.Ordinal));
+
+        var (codigo, salida, errores) = Desplegar("inventario");
+
+        Assert.True(codigo == 0, salida + errores);
+    }
+
+    [Theory]
+    [InlineData("BABELHUB__Migrador__Inventario__Propietaria", "Host=postgres;Port=5432;Database=inventario;Username=postgres;Pass{word}=CLAVE", "falta «SSL Mode=VerifyFull»")]
+    [InlineData("BABELHUB__Migrador__Ecommerce__Propietaria", "Host=postgres;Port=5432;Database=ecommerce;Username=postgres;Pass{word}=CLAVE;SSL Mode=Require", "SSL Mode=require")]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void LaCuentaPropietariaDeLaMigracion_TambienExigeTlsVerificado(string clave, string cadena, string motivo)
+    {
+        PrepararSecretos("inventario");
+        CambiarValor("migrador.env", clave, ConClave(cadena, Aleatorio(32)).Replace("Pass{word}", "Password", StringComparison.Ordinal));
+
+        var (codigo, _, errores) = Desplegar("inventario");
+
+        Assert.Equal(1, codigo);
+        Assert.Contains($"migrador.env: {clave}", errores, StringComparison.Ordinal);
+        Assert.Contains(motivo, errores, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(LlamadasADocker);
+    }
+
+    [Theory]
+    [InlineData("postgresql://evolution:CLAVE@10.0.1.10:5432/evolution?schema=public", "sslmode=(ausente)")]
+    [InlineData("postgresql://evolution:CLAVE@10.0.1.10:5432/evolution?schema=public&sslmode=disable", "sslmode=disable")]
+    [InlineData("postgresql://evolution:CLAVE@10.0.1.10:5432/evolution?schema=public&sslmode=prefer&sslaccept=strict&sslcert=/run/secrets/tls-ca.pem", "sslmode=prefer")]
+    // Prisma ignora verify-full y verify-ca (los trata como «prefer»: cifra pero no verifica): aceptarlos daría una falsa seguridad.
+    [InlineData("postgresql://evolution:CLAVE@10.0.1.10:5432/evolution?schema=public&sslmode=verify-full&sslcert=/run/secrets/tls-ca.pem", "sslmode=verify-full")]
+    [InlineData("postgresql://evolution:CLAVE@10.0.1.10:5432/evolution?schema=public&sslmode=require&sslaccept=accept_invalid_certs&sslcert=/run/secrets/tls-ca.pem", "sslaccept=accept_invalid_certs")]
+    [InlineData("postgresql://evolution:CLAVE@10.0.1.10:5432/evolution?schema=public&sslmode=require&sslcert=/run/secrets/tls-ca.pem", "sslaccept=(ausente)")]
+    [InlineData("'postgresql://evolution:CLAVE@10.0.1.10:5432/evolution?schema=public&sslmode=disable'", "sslmode=disable")]
+    [InlineData(" postgresql://evolution:CLAVE@10.0.1.10:5432/evolution?schema=public&sslmode=disable", "sslmode=disable")]
+    [InlineData("postgresql://evolution:CLAVE@10.0.1.10:5432/evolution?schema=public&sslmode=disable&sslmode=require&sslaccept=strict&sslcert=/run/secrets/tls-ca.pem", "repite parámetros de TLS")]
+    [InlineData("postgresql://evolution:CLAVE@10.0.1.10:5432/evolution?schema=public&sslmode=require&sslaccept=strict", "no lleva «sslcert=»")]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void LaUriDeEvolutionSinTlsVerificado_NoSeDespliega_SinImprimirLaClave(string uri, string motivo)
+    {
+        PrepararSecretos("ventas");
+        var clave = Aleatorio(32);
+        _valoresSecretos.Add(clave);
+        CambiarValor("evolution.env", "DATABASE_CONNECTION_URI", ConClave(uri, clave));
+
+        var (codigo, salida, errores) = Desplegar("ventas");
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("evolution.env: DATABASE_CONNECTION_URI", errores, StringComparison.Ordinal);
+        Assert.Contains(motivo, errores, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
+        SinSecretosEnLaSalida(salida, errores);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void LaUriDeEvolutionConLaFormaQueSiVerificaEnPrisma_SiSeDespliega()
+    {
+        PrepararSecretos("ventas");
+        CambiarValor("evolution.env", "DATABASE_CONNECTION_URI", UriDeEvolution(Aleatorio(32)));
+
+        var (codigo, salida, errores) = Desplegar("ventas");
+
+        Assert.True(codigo == 0, salida + errores);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void UnaContrasenaConArrobaOInterrogacion_EnLaUriDeEvolution_NoEnganaALaGuarda()
+    {
+        PrepararSecretos("ventas");
+        CambiarValor("evolution.env", "DATABASE_CONNECTION_URI", "postgresql://evolution:" + Aleatorio(8) + "?@" + Aleatorio(8) + "@10.0.1.10:5432/evolution?schema=public&sslmode=require&sslaccept=strict&sslcert=/run/secrets/tls-ca.pem");
+
+        var (codigo, salida, errores) = Desplegar("ventas");
+
+        Assert.True(codigo == 0, salida + errores);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void UnaCadenaDeNpgsqlEnCualquierOtraClave_EscritaEnMinusculas_SinTls_NoSeDespliega()
+    {
+        PrepararSecretos("ventas");
+        File.AppendAllText(Path.Combine(_secretos, "ecommerce.env"), $"BABELHUB__Otra__Conexion=host=10.0.1.10;username=u;Pass{"word"}={Aleatorio(32)};sslmode=disable\n");
+
+        var (codigo, _, errores) = Desplegar("ventas");
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("ecommerce.env: BABELHUB__Otra__Conexion usa «SSL Mode=disable»", errores, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void LaCaPrivadaQueLeeEvolution_SeEntregaARoot()
+    {
+        PrepararSecretos("ventas");
+        var entregas = Path.Combine(_carpeta, "entregas-ca.log");
+        ArchivosDeDoble.Escribir(Path.Combine(_carpeta, "chown-ca-doble.sh"), $"#!/usr/bin/env bash\necho \"$@\" >> \"{EnLinux(entregas)}\"\n");
+        var entorno = new Dictionary<string, string>(EntornoDe("ventas")) { ["CHOWN"] = EnLinux(Path.Combine(_carpeta, "chown-ca-doble.sh")) };
+
+        var (codigo, salida, errores) = Desplegar("ventas", entorno);
+
+        Assert.True(codigo == 0, salida + errores);
+        Assert.Matches(@"0:0 \S*tls-ca\.pem", File.ReadAllText(entregas));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void LaLlaveDelServidorDePostgreSql_SeEntregaASuUsuarioDelContenedor()
+    {
+        PrepararSecretos("inventario");
+        var entregas = Path.Combine(_carpeta, "entregas.log");
+        ArchivosDeDoble.Escribir(Path.Combine(_carpeta, "chown-doble.sh"), $"#!/usr/bin/env bash\necho \"$@\" >> \"{EnLinux(entregas)}\"\n");
+        var entorno = new Dictionary<string, string>(EntornoDe("inventario")) { ["CHOWN"] = EnLinux(Path.Combine(_carpeta, "chown-doble.sh")) };
+
+        var (codigo, salida, errores) = Desplegar("inventario", entorno);
+
+        Assert.True(codigo == 0, salida + errores);
+        var registro = File.ReadAllText(entregas);
+        Assert.Matches(@"70:70 \S*tls-postgres-key\.pem", registro);
+        Assert.Matches(@"70:70 \S*tls-postgres-cert\.pem", registro);
+        Assert.Matches(@"1654:1654 \S*tls-inventario-key\.pem", registro);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void ElGenerador_PideTlsVerificadoEnTodasLasCadenasDePostgreSql_YEmiteElCertificadoDelServidorConSusNombres()
+    {
+        var destino = Path.Combine(_carpeta, "generados-tls");
+
+        var (codigo, salida, errores) = Generar(destino);
+
+        Assert.True(codigo == 0, salida + errores);
+        var inventario = Path.Combine(destino, "inventario");
+        var ventas = Path.Combine(destino, "ventas");
+        foreach (var (carpeta, archivo, clave) in new[]
+        {
+            (inventario, "inventario.env", "BABELHUB__Inventario__Base__Aplicacion"),
+            (inventario, "inventario.env", "BABELHUB__Inventario__Base__DepuracionDeAjustes"),
+            (inventario, "inventario.env", "BABELHUB__Inventario__Base__DepuracionDeAuditoria"),
+            (inventario, "ecommerce-gestion.env", "BABELHUB__Ecommerce__Base__Aplicacion"),
+            (inventario, "ecommerce-gestion.env", "BABELHUB__Ecommerce__Base__DepuracionDeAuditoria"),
+            (inventario, "ecommerce-gestion.env", "BABELHUB__Ecommerce__Base__DepuracionDeRegistros"),
+            (inventario, "migrador.env", "BABELHUB__Migrador__Inventario__Propietaria"),
+            (inventario, "migrador.env", "BABELHUB__Migrador__Ecommerce__Propietaria"),
+            (ventas, "ecommerce.env", "BABELHUB__Ecommerce__Base__Aplicacion"),
+            (ventas, "ecommerce.env", "BABELHUB__Ecommerce__Base__DepuracionDeAuditoria"),
+            (ventas, "ecommerce.env", "BABELHUB__Ecommerce__Base__DepuracionDeRegistros"),
+        })
+        {
+            var cadena = Valor(carpeta, archivo, clave);
+            Assert.Contains(";SSL Mode=VerifyFull", cadena, StringComparison.Ordinal);
+            Assert.Contains(";GSS Encryption Mode=Disable", cadena, StringComparison.Ordinal);
+            Assert.DoesNotContain("Trust Server Certificate", cadena, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Los servicios de la propia VM llegan por el nombre «postgres» (SAN del certificado); VM-VENTAS, por la IP privada de VM-INVENTARIO.
+        Assert.Contains("Host=postgres;", Valor(inventario, "inventario.env", "BABELHUB__Inventario__Base__Aplicacion"), StringComparison.Ordinal);
+        Assert.Contains("Host=10.0.1.10;", Valor(ventas, "ecommerce.env", "BABELHUB__Ecommerce__Base__Aplicacion"), StringComparison.Ordinal);
+        var uri = Valor(ventas, "evolution.env", "DATABASE_CONNECTION_URI");
+        Assert.Contains("@10.0.1.10:5432/", uri, StringComparison.Ordinal);
+        Assert.Contains("sslmode=require&sslaccept=strict&sslcert=/run/secrets/tls-ca.pem", uri, StringComparison.Ordinal);
+        Assert.DoesNotContain("verify-full", uri, StringComparison.Ordinal);
+
+        // El certificado del servidor: lo firma la CA privada y nombra la IP de VM-INVENTARIO y «postgres»; su clave solo la tiene VM-INVENTARIO.
+        Assert.Contains("PRIVATE KEY", File.ReadAllText(Path.Combine(inventario, "tls-postgres-key.pem")), StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(ventas, "tls-postgres-key.pem")));
+        Assert.Equal(File.ReadAllText(Path.Combine(inventario, "tls-ca.pem")), File.ReadAllText(Path.Combine(ventas, "tls-ca.pem")));
+        var (verifica, textoDeVerificar) = Openssl(destino, "verify", "-CAfile", "inventario/tls-ca.pem", "inventario/tls-postgres-cert.pem");
+        Assert.True(verifica == 0, textoDeVerificar);
+        var (_, nombres) = Openssl(destino, "x509", "-in", "inventario/tls-postgres-cert.pem", "-noout", "-ext", "subjectAltName");
+        Assert.Contains("DNS:postgres", nombres, StringComparison.Ordinal);
+        Assert.Contains("IP Address:10.0.1.10", nombres, StringComparison.Ordinal);
+        // La CA tiene restricción de nombres: debe permitir «postgres» y no el nombre que solo usa el ensayo local.
+        var (_, restricciones) = Openssl(destino, "x509", "-in", "inventario/tls-ca.pem", "-noout", "-ext", "nameConstraints");
+        Assert.Contains("DNS:postgres", restricciones, StringComparison.Ordinal);
+        Assert.DoesNotContain("host.docker.internal", restricciones, StringComparison.Ordinal);
+    }
+
+    private static (int Codigo, string Texto) Openssl(string carpeta, params string[] argumentos)
+    {
+        var informacion = new ProcessStartInfo("openssl") { RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = carpeta };
+        foreach (var argumento in argumentos)
+        {
+            informacion.ArgumentList.Add(argumento);
+        }
+
+        using var proceso = Process.Start(informacion)!;
+        var salida = proceso.StandardOutput.ReadToEndAsync();
+        var errores = proceso.StandardError.ReadToEndAsync();
+        Assert.True(proceso.WaitForExit(TimeSpan.FromMinutes(1)), "openssl no terminó a tiempo.");
+        proceso.WaitForExit();
+        return (proceso.ExitCode, salida.Result + errores.Result);
     }
 
     // ---------- La migración de las bases (COMP-2) ----------

@@ -11,6 +11,9 @@ RUN apk add --no-cache age=1.3.2-r1 rclone=1.75.2-r0
 
 # Los scripts de archivado y respaldo (infra/postgres/respaldos, POSIX sh) y el volumen local donde espera lo cifrado antes de su subida.
 COPY respaldos/ /opt/babelhub/
-RUN chmod 0555 /opt/babelhub /opt/babelhub/*.sh && chmod 0444 /opt/babelhub/comun.sh \
+# TLS del servidor (AM24): el control de acceso (`pg_hba.conf`: solo `hostssl`, lo demás se rechaza) y el arranque que prepara el certificado y la clave con los permisos que exige PostgreSQL.
+# El Compose fija `entrypoint: /opt/babelhub/iniciar.sh` y `-c hba_file=/opt/babelhub/pg_hba.conf`; ambos viven en la imagen, de solo lectura.
+COPY servidor/ /opt/babelhub/
+RUN chmod 0555 /opt/babelhub /opt/babelhub/*.sh && chmod 0444 /opt/babelhub/comun.sh /opt/babelhub/pg_hba.conf \
     && mkdir -p /var/respaldos && chown postgres:postgres /var/respaldos && chmod 0700 /var/respaldos
 USER postgres

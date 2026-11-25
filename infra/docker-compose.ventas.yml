@@ -189,6 +189,9 @@ services:
       - "127.0.0.1:8081:8080"
     volumes:
       - evolution-instancias:/evolution/instances
+    # TLS hacia PostgreSQL de VM-INVENTARIO (AM24): la CA privada para verificar al servidor (DATABASE_CONNECTION_URI lleva sslcert=/run/secrets/tls-ca.pem; ver generar-secretos.sh).
+    secrets:
+      - tls-ca.pem
     depends_on:
       redis:
         condition: service_healthy
@@ -230,6 +233,8 @@ services:
     restart: unless-stopped
 
 secrets:
+  tls-ca.pem:
+    file: ${BABELHUB_SECRETOS:?}/tls-ca.pem
   tls-ecommerce-cert.pem:
     file: ${BABELHUB_SECRETOS:?}/tls-ecommerce-cert.pem
   tls-ecommerce-key.pem:
