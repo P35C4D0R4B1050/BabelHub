@@ -136,8 +136,10 @@ services:
     image: n8nio/n8n:1.121.3@sha256:4f717fcf41f5ea596757173a60ce038707e4edf2c686e9934ae75cd5f5918d73
     user: node
     read_only: true
+    # n8n crea /home/node/.cache al arrancar (ENOENT con el sistema de archivos de solo lectura y bucle de reinicios): se le da un tmpfs, sin quitar el solo lectura.
     tmpfs:
       - /tmp
+      - /home/node/.cache
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     env_file:

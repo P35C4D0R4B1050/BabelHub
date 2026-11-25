@@ -2,6 +2,12 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-25 — Carrera real en la conciliación de ingresos y arreglos del ensayo local en Windows
+
+### Cubierto
+- `ConciliarIngresoPendiente`: la conciliación simultánea de una misma fila devuelve 409 a la perdedora (antes, 422 de forma intermitente; falló dos veces en el CI de GitHub). Prueba unitaria determinista nueva.
+- Ensayo local en Windows (`scripts/ensayo-local.sh`): ruta del certificado para Docker con Git Bash, puertos 3xxxx por debajo del rango dinámico de Windows, y la negación esperada de `--purgar` ya no aborta antes del paso 7. `n8n` (Compose de ventas): `tmpfs` para `/home/node/.cache`, con lo que deja de reiniciarse con el sistema de archivos de solo lectura. Nota para Windows en la guía 08.
+
 ## 2026-11-23 (tarde) — App de pruebas: botón «Reiniciar todo»
 
 ### Cubierto

@@ -95,6 +95,15 @@ cd ~/BabelHub
 bash scripts/ensayo-local.sh
 ```
 
+> **En Windows (PowerShell):** no escribas `bash scripts/ensayo-local.sh` a secas. En PowerShell, `bash` abre el *bash de WSL*, que falla con «execvpe(/bin/bash) failed» si no tienes una distribución de Linux instalada. Usa **Git Bash**, que ya trae Git para Windows, y **abre antes Docker Desktop** (espera a que diga «Engine running»):
+>
+> ```powershell
+> cd D:\Trabajo\BabelHub
+> & "C:\Program Files\Git\bin\bash.exe" scripts/ensayo-local.sh
+> ```
+>
+> O abre la aplicación **Git Bash** desde el menú de inicio y ejecuta allí `cd /d/Trabajo/BabelHub && bash scripts/ensayo-local.sh`. Para limpiar el ensayo, lo mismo con `--limpiar`.
+
 **Qué debes ver** (la primera vez tarda 10–20 minutos construyendo las imágenes; las siguientes, 2–3):
 
 ```
@@ -116,7 +125,7 @@ VM ventas desplegada y sana.
 
 Verás también una línea `Cannot load library libgssapi_krb5.so.2` al migrar: **es un aviso inofensivo** de .NET (busca autenticación Kerberos que no usamos).
 
-**Si falla:** el mensaje nombra qué falta. Los fallos típicos: *Docker no está corriendo* (ábrelo), *puerto ocupado* (cierra lo que use 5055, 55432, 58080…), *poca memoria* (cierra programas; necesita ~6 GB libres).
+**Si falla:** el mensaje nombra qué falta. Los fallos típicos: *Docker no está corriendo* (ábrelo), *puerto ocupado* (cierra lo que use 5055, 35432, 38080…; en Windows, si dice «address already in use» en un puerto 5xxxx de una versión anterior, es que ese puerto cayó en el rango dinámico del sistema: usa la versión actual del script, que usa puertos 3xxxx), *poca memoria* (cierra programas; necesita ~6 GB libres).
 
 **Cómo deshacer** (siempre que quieras repetirlo desde cero):
 

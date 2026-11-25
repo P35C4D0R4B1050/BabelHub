@@ -7,7 +7,7 @@
 #   bash scripts/ensayo-local.sh [--limpiar]        --limpiar: al terminar (o si ya hay un ensayo), borra contenedores, volúmenes y archivos del ensayo
 #
 # Necesita Docker (con Compose v2.24 o más) y bash en Linux, macOS o WSL (en Windows con Git Bash también funciona). No usa tu dominio, ni Oracle,
-# ni ningún secreto real: todo vive en una carpeta temporal fuera del repositorio y los puertos son locales (127.0.0.1:5xxxx).
+# ni ningún secreto real: todo vive en una carpeta temporal fuera del repositorio y los puertos son locales (127.0.0.1:3xxxx, por debajo del rango dinámico de Windows).
 #
 # Lo que NO prueba: Cloudflare, el túnel, Evolution API (WhatsApp), el almacén de objetos de Oracle ni los cobros reales. Los dos servicios del
 # E-commerce corren en «Staging» (el entorno de revisión de la tienda por Culqi: se endurece como «Production» y solo afloja el cobro, con la
@@ -85,7 +85,7 @@ for archivo in "$TRABAJO"/secretos/*/*.env; do
   cat "$salida" >"$archivo"; rm -f "$salida"
 done
 # En el ensayo el E-commerce de VM-VENTAS llega a la base por el puerto local de VM-INVENTARIO.
-sed -i.bak 's/Host=127.0.0.1;Port=5432/Host=host.docker.internal;Port=55432/' "$TRABAJO/secretos/ventas/ecommerce.env" && rm -f "$TRABAJO/secretos/ventas/ecommerce.env.bak"
+sed -i.bak 's/Host=127.0.0.1;Port=5432/Host=host.docker.internal;Port=35432/' "$TRABAJO/secretos/ventas/ecommerce.env" && rm -f "$TRABAJO/secretos/ventas/ecommerce.env.bak"
 sed -i.bak 's/^BABELHUB__Web__HostsPermitidos=.*/BABELHUB__Web__HostsPermitidos="gestion.localhost,ecommerce-gestion,localhost"/' "$TRABAJO/secretos/inventario/ecommerce-gestion.env" && rm -f "$TRABAJO/secretos/inventario/ecommerce-gestion.env.bak"
 
 # ---------- 3. Lo que hace diferente a un equipo cualquiera de una VM de Oracle ----------
@@ -93,16 +93,16 @@ sed -i.bak 's/^BABELHUB__Web__HostsPermitidos=.*/BABELHUB__Web__HostsPermitidos=
 cat >"$TRABAJO/inventario.override.yml" <<'EOF'
 services:
   postgres:
-    ports: !override ["127.0.0.1:55432:5432"]
+    ports: !override ["127.0.0.1:35432:5432"]
   inventario:
-    ports: !override ["127.0.0.1:58082:8443"]
+    ports: !override ["127.0.0.1:38082:8443"]
   ecommerce-gestion:
-    ports: !override ["127.0.0.1:58081:8080"]
+    ports: !override ["127.0.0.1:38081:8080"]
 EOF
 cat >"$TRABAJO/ventas.override.yml" <<'EOF'
 services:
   ecommerce:
-    ports: !override ["127.0.0.1:58080:8080", "127.0.0.1:58443:8443"]
+    ports: !override ["127.0.0.1:38080:8080", "127.0.0.1:38443:8443"]
   redis-contadores:
     ports: !override ["127.0.0.1:56380:6380"]
   n8n:
@@ -125,27 +125,33 @@ bash "$RAIZ/scripts/desplegar.sh" ventas --secretos "$TRABAJO/secretos/ventas" -
 # ---------- 6. Humo ----------
 paso "5/7 Humo: la salud de cada servicio por su puerto HTTPS, validando el certificado con la CA privada"
 ca="$TRABAJO/secretos/ventas/tls-ca.pem"
+# En Git Bash para Windows, Docker necesita la ruta de Windows (C:/…): con MSYS_NO_PATHCONV=1 una ruta como /tmp/… se montaría vacía y curl diría «error adding trust anchors from file: /ca.pem».
+ca_docker="$ca"; if [[ "$(uname -s)" == MINGW* || "$(uname -s)" == MSYS* ]]; then ca_docker="$(cygpath -m "$ca")"; fi
 humo() { # red servicio puerto host-de-la-peticion
-  MSYS_NO_PATHCONV=1 docker run --rm --network "$1" -v "$ca:/ca.pem:ro" "$CURL_IMAGE" -sS --max-time 20 --cacert /ca.pem ${4:+-H "Host: $4"} "https://$2:$3/health/ready" -w '  [HTTP %{http_code}]\n'
+  MSYS_NO_PATHCONV=1 docker run --rm --network "$1" -v "$ca_docker:/ca.pem:ro" "$CURL_IMAGE" -sS --max-time 20 --cacert /ca.pem ${4:+-H "Host: $4"} "https://$2:$3/health/ready" -w '  [HTTP %{http_code}]\n'
 }
 echo -n "    Inventario (https://inventario:8443): ";  humo babelhub-inventario_default inventario 8443
 echo -n "    E-commerce (https://ecommerce:8443):  ";  humo babelhub-ventas_default ecommerce 8443 localhost
 paso "6/7 La tienda en Staging: el aviso de pagos simulados y la cuenta de prueba (con la imagen real)"
 echo -n "    Aviso «Pagos simulados» en la portada: "
-MSYS_NO_PATHCONV=1 docker run --rm --network babelhub-ventas_default -v "$ca:/ca.pem:ro" "$CURL_IMAGE" -sS --max-time 20 --cacert /ca.pem -H "Host: localhost" -H "X-Forwarded-Proto: https" "https://ecommerce:8443/" | grep -c "data-bh-pagos-simulados" || true
+MSYS_NO_PATHCONV=1 docker run --rm --network babelhub-ventas_default -v "$ca_docker:/ca.pem:ro" "$CURL_IMAGE" -sS --max-time 20 --cacert /ca.pem -H "Host: localhost" -H "X-Forwarded-Proto: https" "https://ecommerce:8443/" | grep -c "data-bh-pagos-simulados" || true
 echo -n "    Redirección a HTTPS de lo que el borde declara HTTP: "
-MSYS_NO_PATHCONV=1 docker run --rm --network babelhub-ventas_default -v "$ca:/ca.pem:ro" "$CURL_IMAGE" -sS --max-time 20 --cacert /ca.pem -H "Host: localhost" -H "X-Forwarded-Proto: http" -o /dev/null -w '[HTTP %{http_code}] -> %{redirect_url}\n' "https://ecommerce:8443/catalogo"
+MSYS_NO_PATHCONV=1 docker run --rm --network babelhub-ventas_default -v "$ca_docker:/ca.pem:ro" "$CURL_IMAGE" -sS --max-time 20 --cacert /ca.pem -H "Host: localhost" -H "X-Forwarded-Proto: http" -o /dev/null -w '[HTTP %{http_code}] -> %{redirect_url}\n' "https://ecommerce:8443/catalogo"
 # El comando de consola de la cuenta de prueba corre dentro de la imagen del servicio, con su entorno (el mismo que usarás en la VM); la contraseña se oculta aquí (en la VM se muestra una sola vez).
 salida_cuenta="$(BABELHUB_SECRETOS="$TRABAJO/secretos/ventas" IP_PRIVADA=127.0.0.1 docker compose -p babelhub-ventas --project-directory "$RAIZ/infra" -f "$RAIZ/infra/docker-compose.ventas.yml" -f "$TRABAJO/ventas.override.yml" run --rm --no-deps --no-TTY ecommerce cuenta-de-prueba 2>&1)" || { echo "$salida_cuenta" >&2; echo "Error: cuenta-de-prueba falló." >&2; exit 1; }
 printf '%s\n' "$salida_cuenta" | sed -E 's/^(  contraseña: ).*/\1[oculta en el ensayo]/' | sed 's/^/    /'
 echo -n "    Aviso «Los envíos son simulados» en la portada: "
-MSYS_NO_PATHCONV=1 docker run --rm --network babelhub-ventas_default -v "$ca:/ca.pem:ro" "$CURL_IMAGE" -sS --max-time 20 --cacert /ca.pem -H "Host: localhost" -H "X-Forwarded-Proto: https" "https://ecommerce:8443/" | grep -c "data-bh-envios-simulados" || true
+MSYS_NO_PATHCONV=1 docker run --rm --network babelhub-ventas_default -v "$ca_docker:/ca.pem:ro" "$CURL_IMAGE" -sS --max-time 20 --cacert /ca.pem -H "Host: localhost" -H "X-Forwarded-Proto: https" "https://ecommerce:8443/" | grep -c "data-bh-envios-simulados" || true
 # Los demás comandos de consola (PAG-43 a PAG-47), también con la imagen real; las contraseñas se ocultan aquí (en la VM se muestran una sola vez).
 consola() { BABELHUB_SECRETOS="$TRABAJO/secretos/ventas" IP_PRIVADA=127.0.0.1 docker compose -p babelhub-ventas --project-directory "$RAIZ/infra" -f "$RAIZ/infra/docker-compose.ventas.yml" -f "$TRABAJO/ventas.override.yml" run --rm --no-deps --no-TTY ecommerce "$@" 2>&1 | sed -E 's/^(  contraseña[^:]*: ).*/\1[oculta en el ensayo]/' | sed 's/^/    /'; }
 echo "    crear-administrador:"; consola crear-administrador --correo administracion@ensayo.example.test
 echo "    cuenta-de-prueba --cantidad 2:"; consola cuenta-de-prueba --cantidad 2
 echo "    cuenta-de-prueba --retirar --todas:"; consola cuenta-de-prueba --retirar --todas
 # --purgar cancela cuentas y necesita el almacén de objetos del registro de supresiones (IDE-70), que este ensayo no levanta: aquí debe negarse con RegistroDeSupresionesNoDisponibleException y sin tocar nada.
-echo "    cuenta-de-prueba --purgar (sin almacén de objetos en el ensayo: debe negarse sin tocar nada):"; consola cuenta-de-prueba --purgar
+echo "    cuenta-de-prueba --purgar (sin almacén de objetos en el ensayo: debe negarse sin tocar nada):"
+# Con «pipefail», la negación esperada (salida distinta de 0) abortaría el script antes del paso 7: se captura y se comprueba el motivo.
+salida_purga="$(consola cuenta-de-prueba --purgar || true)"
+echo "$salida_purga"
+if grep -q "RegistroDeSupresionesNoDisponibleException" <<<"$salida_purga"; then echo "    (negación esperada: correcto)"; else echo "    ERROR: --purgar no se negó por el motivo esperado." >&2; exit 1; fi
 paso "7/7 Listo. Los dos servicios respondieron «listo» (200) y los certificados se validaron."
 echo "    Para borrar todo: bash scripts/ensayo-local.sh --limpiar"
