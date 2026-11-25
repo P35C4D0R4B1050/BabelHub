@@ -206,7 +206,7 @@ Oracle recupera las VMs gratuitas con uso muy bajo y las cuentas gratuitas falla
 
 ### 6.3 Presupuesto y alerta de 1 USD (hazlo ya)
 
-*Billing & Cost Management → Budgets → Create Budget*: monto mensual **1 USD**, alerta al **100 %** del gasto *real* a tu correo. Si te llega un correo, **entra y busca qué recurso se pasó del cupo**.
+*Billing & Cost Management → Budgets → Create Budget*: monto mensual **1 USD**, alerta al **100 %** del gasto *real* a tu correo. Si te llega un correo, **entra y busca qué recurso se pasó del cupo**. La consola puede mostrar los montos en tu moneda (por ejemplo soles): entonces el «1» es 1 sol, un aviso más estricto, que sirve igual. **Revisa dos veces la dirección de correo.** Al crear una VM, el estimador puede mostrar un costo mensual por el volumen de inicio: es el precio de lista, sin descontar el cupo gratuito; compruébalo después en *Cost Analysis*.
 
 **Cómo deshacer todo lo de Oracle:** *Compute → Instances → cada una → Terminate (marca «delete boot volume»)*, y luego la red (§7). Con eso no queda nada que cobre.
 
@@ -214,7 +214,9 @@ Oracle recupera las VMs gratuitas con uso muy bajo y las cuentas gratuitas falla
 
 ### 7.1 La red (VCN)
 
-*Menú → Networking → Virtual Cloud Networks → Start VCN Wizard → Create VCN with Internet Connectivity* → nombre `babelhub`, CIDR `10.0.0.0/16`, subred pública `10.0.0.0/24`.
+**Crea la red antes de abrir el formulario de una VM** (sin ella no puedes elegir subred). *Menú → Networking → Virtual Cloud Networks → Start VCN Wizard → Create VCN with Internet Connectivity* → nombre `babelhub`, CIDR `10.0.0.0/16`, subred pública `10.0.0.0/24`. El asistente crea además una subred privada (`10.0.1.0/24`): déjala vacía.
+
+La pantalla de resumen del asistente es **de solo lectura**. Las reglas se editan en la VCN `babelhub` → pestaña **Seguridad** → **Default Security List for babelhub** (la de la subred pública) → *Reglas de seguridad*.
 
 Las VMs necesitan **salida** a Internet (bajar imágenes de Docker y conectarse a Cloudflare), pero **ningún puerto de entrada abierto a Internet** salvo SSH hacia VM-AUX desde tu IP. Edita la **Security List** de la subred pública así:
 
@@ -222,7 +224,7 @@ Las VMs necesitan **salida** a Internet (bajar imágenes de Docker y conectarse 
 
 | Origen | Protocolo / puerto destino | Para qué |
 | :--- | :--- | :--- |
-| `<tu IP pública>/32` (búscala en <https://ifconfig.me>) | TCP 22 | Tú → VM-AUX (después restringimos a ella en el sistema operativo) |
+| `<tu IP pública>/32` (búscala en <https://ifconfig.me>) | TCP 22 | Tú → VM-AUX (la regla vale para toda la subred: también te deja entrar directo a las demás) |
 | `10.0.0.40/32` (VM-AUX) | TCP 22 | VM-AUX → las demás VMs |
 | `10.0.0.30/32` (VM-BORDE) | TCP 8080 | nginx → E-commerce (VM-VENTAS) |
 | `10.0.0.30/32` | TCP 8081 | nginx → réplica de gestión (VM-INVENTARIO) |
@@ -232,7 +234,7 @@ Las VMs necesitan **salida** a Internet (bajar imágenes de Docker y conectarse 
 | `10.0.0.20/32` | TCP 6380 | Réplica de gestión → Redis de contadores (VM-VENTAS, TLS) |
 | `10.0.0.0/24` | ICMP tipo 3 código 4 | Obligatoria para que no se corten conexiones grandes |
 
-*Egress:* deja la regla `0.0.0.0/0` todos los protocolos (salida libre).
+*Egress:* deja la regla `0.0.0.0/0` todos los protocolos (salida libre). **No la borres** al limpiar las de entrada: sin ella las VMs no salen a Internet.
 
 Aunque la lista de seguridad pone estas reglas a nivel de red, **cada VM tendrá su propio cortafuegos** (paso 8.1): doble barrera. **No abras nunca 80, 443 ni 5678 a `0.0.0.0/0`.**
 
@@ -247,6 +249,14 @@ ssh-keygen -t ed25519 -f ~/.ssh/babelhub_oracle -C "babelhub-oracle"
 ```
 
 Te pide una **frase de paso**: ponla (protege la llave si te roban el equipo). **Qué debes ver:** dos archivos, `~/.ssh/babelhub_oracle` (**privada: jamás la copies, envíes ni subas**) y `~/.ssh/babelhub_oracle.pub` (pública: esta sí se pega en Oracle). `cat ~/.ssh/babelhub_oracle.pub` imprime una línea `ssh-ed25519 AAAA… babelhub-oracle`.
+
+En Windows basta PowerShell (no hace falta WSL):
+
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.ssh" | Out-Null
+ssh-keygen -t ed25519 -f "$env:USERPROFILE\.ssh\babelhub_oracle" -C "babelhub-oracle"
+Get-Content "$env:USERPROFILE\.ssh\babelhub_oracle.pub"
+```
 
 ### 7.3 Crear las cuatro VMs
 
@@ -265,7 +275,16 @@ Te pide una **frase de paso**: ponla (protege la llave si te roban el equipo). *
 
 (Las VMs sin servicio público también llevan IP pública solo para que *salgan* a Internet; la lista de seguridad impide que alguien entre.)
 
-**«Out of host capacity» / «Out of capacity for shape»** es muy común en ARM. No es un error tuyo. Pruebas: otro *Availability Domain* (AD-1, AD-2, AD-3) en el mismo formulario; reintentar cada pocos minutos, de madrugada o en fines de semana; subir a PAYG (§6.2). Puede tardar horas o días. Si prefieres automatizar los reintentos, la CLI `oci` (`oci compute instance launch …`) lo permite; no dejes una VM a medio crear.
+**Detalles del formulario** (vistos en la consola el 2026-11-25):
+
+- Elige **Ubuntu 24.04**, no 26.04. En ARM debe ser la versión `aarch64` (compruébalo luego con `uname -m`); en ARM la «instancia blindada» no existe y su interruptor se deja apagado.
+- En *Claves SSH* la opción marcada por defecto genera una llave nueva: cámbiala a **«Pegar clave pública»**.
+- El *nombre de VNIC* queda como nombre del equipo (`vnic-ventas` aparece en el prompt). Pon el que quieras ver ahí.
+- Para los 47 GB deja **apagado** el tamaño personalizado del volumen de inicio: usa 46,6 GB.
+
+**«Out of host capacity» / «Out of capacity for shape»** es muy común en ARM. No es un error tuyo. Pruebas: otro *Availability Domain* (AD-1, AD-2, AD-3) en el mismo formulario; reintentar cada pocos minutos, de madrugada o en fines de semana; subir a PAYG (§6.2). Puede tardar horas o días. También ocurre con las **AMD micro**; Santiago tiene un solo *Availability Domain*, así que prueba los *dominios de errores* (FD-1 a FD-3). No cambies a una forma de pago sin decidirlo.
+
+Para automatizar los reintentos usa **Cloud Shell** (icono `>_` de la consola, con la CLI ya autenticada) y repite `oci --no-retry compute instance launch …` con una pausa de 30 s hasta que termine bien. `--no-retry` hace que cada intento muestre enseguida su error. **No pases `--boot-volume-size-in-gbs`**: por la CLI el mínimo es 50 GB y, sin la opción, se usa el tamaño de la imagen. Si el error no es de capacidad, detén el bucle (`Ctrl+C`).
 
 **Qué debes ver:** las cuatro instancias en estado **Running** con su IP privada y su IP pública. Anota las **IP públicas** (solo para entrar por SSH).
 
@@ -309,7 +328,7 @@ chmod 600 ~/.ssh/config
 ssh babelhub-aux      # primera vez: escribe «yes» a la huella; después pide tu frase de paso
 ```
 
-**Qué debes ver:** `ubuntu@vm-aux:~$`. Sal con `exit`. Repite con `ssh babelhub-ventas` (pasa por VM-AUX sin que tengas que hacer nada). **Si no entra:** revisa que la IP pública sea la de la VM, la regla de entrada TCP 22 con *tu* IP actual (cambia si tu proveedor cambia tu IP) y que la llave pública sea la correcta.
+**Qué debes ver:** `ubuntu@vm-aux:~$`. Sal con `exit`. Repite con `ssh babelhub-ventas` (pasa por VM-AUX sin que tengas que hacer nada). **Si no entra:** revisa que la IP pública sea la de la VM (no la de tu casa), la regla de entrada TCP 22 con *tu* IP actual (cambia si tu proveedor cambia tu IP; en PowerShell, tu IPv4 es `(Invoke-RestMethod https://api.ipify.org).Trim()`) y que la llave pública sea la correcta. Cambiar la regla no afecta a la llave.
 
 ## 8. Paso 4 — Preparar cada VM (Ubuntu, cortafuegos, Docker)
 
@@ -321,47 +340,23 @@ Hazlo **en las cuatro VMs** (`ssh babelhub-<nombre>`). Cada bloque se pega compl
 
 ```bash
 sudo apt-get update && sudo apt-get -y full-upgrade
-sudo apt-get install -y unattended-upgrades chrony ufw ca-certificates curl git
+sudo apt-get install -y unattended-upgrades chrony ca-certificates curl git
 sudo dpkg-reconfigure -plow unattended-upgrades     # responde «Yes»: parches de seguridad automáticos
 sudo systemctl enable --now chrony                  # reloj sincronizado: las credenciales duran 15 minutos
-chronyc tracking | head -3                          # «Leap status: Normal»
+chronyc tracking                                    # «Leap status: Normal»
+sudo reboot                                         # espera 2 o 3 minutos y vuelve a entrar
 ```
 
-**Cortafuegos del sistema (`ufw`).** Las imágenes de Ubuntu de Oracle traen reglas de `iptables` que bloquean casi todo; las reemplazamos por `ufw`:
+Si la actualización pregunta por un archivo de configuración modificado, **conserva la versión local**. Aunque se anuncie una versión nueva de Ubuntu, **no ejecutes `do-release-upgrade`**.
+
+**Cortafuegos del sistema: deja el de Oracle. No instales `ufw` ni borres `iptables-persistent`.** [Oracle indica gestionar estas imágenes con `iptables`](https://blogs.oracle.com/developers/post/enabling-network-traffic-to-ubuntu-images-in-oracle-cloud-infrastructure) y hay un [fallo registrado de `ufw` que impide arrancar](https://bugs.launchpad.net/ufw/+bug/1946804) con el disco de arranque en red. Comprueba (solo lee):
 
 ```bash
-sudo apt-get purge -y iptables-persistent netfilter-persistent 2>/dev/null || true
-sudo ufw --force reset
-sudo ufw default deny incoming
-sudo ufw default allow outgoing
-# SSH: en VM-AUX desde tu IP; en las demás solo desde VM-AUX.
-sudo ufw allow from 10.0.0.40 to any port 22 proto tcp      # en VM-AUX: usa  sudo ufw allow from <tu IP>/32 to any port 22 proto tcp
+sudo iptables -S INPUT
+sudo systemctl is-enabled netfilter-persistent
 ```
 
-Luego, **según la VM**, abre solo lo que le toca:
-
-```bash
-# VM-INVENTARIO (10.0.0.20)
-sudo ufw allow from 10.0.0.30 to any port 8081 proto tcp   # nginx → réplica de gestión
-sudo ufw allow from 10.0.0.10 to any port 8082 proto tcp   # E-commerce → Inventario (HTTPS)
-sudo ufw allow from 10.0.0.10 to any port 5432 proto tcp   # E-commerce → PostgreSQL
-
-# VM-VENTAS (10.0.0.10)
-sudo ufw allow from 10.0.0.30 to any port 8080 proto tcp   # nginx → E-commerce
-sudo ufw allow from 10.0.0.20 to any port 8443 proto tcp   # Inventario → E-commerce (HTTPS)
-sudo ufw allow from 10.0.0.20 to any port 6380 proto tcp   # réplica de gestión → Redis de contadores (TLS)
-
-# VM-BORDE y VM-AUX: nada más (solo el SSH de arriba)
-```
-
-```bash
-sudo ufw --force enable
-sudo ufw status numbered
-```
-
-**Qué debes ver:** `Status: active` y solo esas reglas. **Importante:** si en VM-AUX pones una IP equivocada para tu SSH, **te quedas fuera**; en ese caso *Instance → Console connection* de Oracle te da una consola de rescate. Docker publica sus puertos saltándose `ufw`; por eso los Compose publican cada puerto **solo en la IP privada** de la VM y la Security List de Oracle es la segunda barrera.
-
-**Cómo deshacer:** `sudo ufw disable`.
+**Qué debes ver:** aceptar conexiones ya establecidas, ICMP, `lo` y TCP 22, terminar en `-j REJECT` y `enabled`. **No ejecutes `netfilter-persistent save`** (guardaría las reglas temporales de Docker). Los puertos que publica Docker no pasan por `INPUT`: los protegen que los Compose publiquen **solo en la IP privada** de la VM (o en `127.0.0.1`) y la Security List de Oracle (§7.1), que también es la que limita desde dónde se entra por SSH.
 
 ### 8.2 Endurecer SSH y comprobar el disco
 
@@ -397,7 +392,7 @@ sudo docker compose version
 sudo docker run --rm hello-world | head -3
 ```
 
-**Qué debes ver:** una versión de Docker 28 o más y `arm64` (en las ARM) o `amd64`; `Docker Compose version v2.…`; y `Hello from Docker!`. **No** te agregues al grupo `docker` (equivale a ser administrador): usa `sudo`.
+**Qué debes ver:** una versión de Docker 28 o más y `arm64` (en las ARM) o `amd64`; `Docker Compose version v2…` o posterior (el 2026-11-25 se instaló la v5.8.0); y `Hello from Docker!`. **No** te agregues al grupo `docker` (equivale a ser administrador): usa `sudo`.
 
 ### 8.4 Traer el código de los scripts
 
@@ -424,6 +419,8 @@ Guarda los **respaldos cifrados**, los **libros digitales**, las **portadas** y 
    cd ~/BabelHub
    bash scripts/almacen.sh plan --compartimento-id <ocid> --compartimento-nombre babelhub --espacio <espacio-de-nombres>
    ```
+
+   > ⛔ **No apliques todavía (2026-11-25).** El archivo de cambios sube un segmento de 16 MB sin comprimir cada 5 minutos (~4,6 GB al día) y `respaldos-wal` lo bloquea 100 días: unos 460 GB (cálculo a partir de la configuración, sin medir), muy por encima del cupo gratuito. Espera a que se corrija y se mida.
 
 3. Aplica (crea los 9 contenedores privados, la retención con bloqueo y el ciclo de vida):
 
@@ -682,7 +679,7 @@ curl -sI https://gestion.babel-hub.shop/ | head -3  # redirige a la pantalla de 
 curl -s  https://babel-hub.shop/ | grep -c "data-bh-pagos-simulados"   # 1 = el aviso «Pagos simulados» de Staging está en la página (el navegador lo muestra encima del pie)
 ```
 
-**Si falla:** `502` = nginx no alcanza al E-commerce (revisa `ufw` y la Security List, §7.1 y §8.1); error de certificado = el dominio aún no está activo en Cloudflare; `1033`/`530` = el túnel no está conectado (token mal copiado).
+**Si falla:** `502` = nginx no alcanza al E-commerce (revisa la Security List, §7.1); error de certificado = el dominio aún no está activo en Cloudflare; `1033`/`530` = el túnel no está conectado (token mal copiado).
 
 **Cómo deshacer:** `down` del Compose de VM-BORDE; en Cloudflare, borra el túnel y sus hostnames; para devolver el dominio a Spaceship, cambia los nameservers de vuelta.
 
