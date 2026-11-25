@@ -1,6 +1,6 @@
 # VM-INVENTARIO (ARM, 1 OCPU y 6 GB): Inventario, réplica de gestión del E-commerce y PostgreSQL (AD11, AD31).
 # Se levanta con un solo comando y sus secretos (PLA-04):
-#   BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.1.10 \
+#   BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.20 IP_VENTAS=10.0.0.10 \
 #   IMAGEN_INVENTARIO=<imagen@sha256:…> IMAGEN_ECOMMERCE=<imagen@sha256:…> IMAGEN_POSTGRES=<imagen@sha256:…> \
 #   docker compose -f infra/docker-compose.inventario.yml up -d
 # Reglas de PLA-26 y PLA-27 (las verifica una inspección automática de este archivo):
@@ -121,6 +121,9 @@ services:
     environment:
       # PAG-34: ASPNETCORE_ENVIRONMENT NO se fija aquí: lo define ecommerce-gestion.env, igual que en ecommerce.env de VM-VENTAS (los dos procesos del E-commerce corren en el mismo entorno). Ver docker-compose.ventas.yml.
       BABELHUB__Perfil: Gestion
+      # La réplica solo cree el origen del cliente (X-Origen-Cliente) que le llega desde la dirección privada de VM-VENTAS, donde corre Nginx (SEG-17,
+      # DD-102 y DD-104; allí una regla deja llegar a este puerto solo a su contenedor). Es un dato de la topología: va aquí y manda sobre el archivo de secretos.
+      BABELHUB__Ecommerce__ProxiesConocidos: "${IP_VENTAS:?Define IP_VENTAS con la dirección privada de VM-VENTAS}"
       # El rol del proceso (web-base, D03); BABELHUB__Web__HostsPermitidos va en ecommerce-gestion.env: sin él el servicio no arranca.
       BABELHUB__Web__Host: gestion
       # DD-55: el mismo HTTPS y la misma raíz de confianza que el Inventario (el Inventario le pide las claves de verificación por https://ecommerce-gestion:8443).

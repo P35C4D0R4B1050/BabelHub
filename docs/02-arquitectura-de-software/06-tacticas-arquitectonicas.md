@@ -20,8 +20,8 @@ Una **táctica** es una decisión de diseño que mejora un atributo de calidad c
 | **AC03 Disponibilidad y recuperabilidad** | Reinicio automático de contenedores y `healthcheck` | Todos | RNF03, AD10 |
 | | Degradación controlada: el catálogo se sirve desde la caché si Inventario cae; el checkout informa en vez de cobrar a ciegas | E-commerce | CAR-06, CAT-12 |
 | | Aislamiento de fallas: una falla del Notificador nunca interrumpe un caso de uso | Notificaciones | AGENTS 10, NOT-04 |
-| | Réplica de gestión: el mismo contenedor del E-commerce en perfil «solo gestión» en la VM de Inventario, como servidor de respaldo de Nginx; el personal sigue operando el inventario si cae la VM de ventas | Despliegue | AD11, [despliegue](05-despliegue.md) §6 |
-| | Segundo conector de Cloudflare Tunnel en la VM de ventas, para no depender solo de la VM de borde | Despliegue | AD13, [despliegue](05-despliegue.md) §6 |
+| | Réplica de gestión: el mismo contenedor del E-commerce en perfil «solo gestión» en la VM de Inventario, como servidor de respaldo de Nginx; el personal sigue operando el inventario si cae la VM de ventas. **Desde el 2026-11-25 (dos VMs, DD-100 a DD-102):** la réplica es el único proceso que sirve la gestión y, si cae la VM de ventas, no se puede llegar a ella desde Internet | Despliegue | AD11, [despliegue](05-despliegue.md) §6 |
+| | Un solo conector de Cloudflare Tunnel, delante de Nginx. **Desde el 2026-11-25 (dos VMs, DD-100 a DD-102):** ya no hay segundo conector (uno que salte Nginx permitiría falsificar la IP del cliente) | Despliegue | AD13, [despliegue](05-despliegue.md) §6 |
 | | Sesiones web en la base `ecommerce` (no en memoria ni en Redis): sobreviven al cambio de réplica | Web | WEB-04, AD15 |
 | | Tiempos de espera y corte de dependencias | Llamadas externas y entre sistemas | SEG-14, AD25 |
 | | Reintento con esperas crecientes | Avisos, consulta de pagos | NOT-04, PAG-07 |

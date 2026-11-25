@@ -222,7 +222,7 @@ Cada módulo es una carpeta dentro de las capas del servicio (no un proyecto apa
 | Ventajas | Limitaciones |
 | :--- | :--- |
 | Aísla el inventario, la parte más crítica, de la tienda pública y de su ciclo de despliegue. | La comunicación síncrona hace que el E-commerce dependa de la disponibilidad del Inventario para vender impresos. |
-| Dos aplicaciones .NET en lugar de cinco: menos memoria, menos latencia y menos piezas que operar. | La interfaz de gestión vive en el E-commerce: si cae su VM, el personal pierde la pantalla (se mitiga con la réplica de gestión). |
+| Dos aplicaciones .NET en lugar de cinco: menos memoria, menos latencia y menos piezas que operar. | La interfaz de gestión vive en el E-commerce: si cae su VM, el personal pierde la pantalla (se mitiga con la réplica de gestión). **Desde el 2026-11-25 (dos VMs, DD-100 a DD-102):** esa mitigación no alcanza si cae la VM de ventas entera, porque la entrada vive en ella. |
 | Transacciones ACID dentro de cada servicio: pedido, pago y auditoría en una sola transacción. | Los límites entre módulos solo se sostienen con pruebas de arquitectura; sin ellas el monolito se degrada. |
 | Reglas de negocio aisladas por módulo y fáciles de probar. | Identidad y Asistente comparten proceso con la venta: se compensa con base y rol aparte, límites de concurrencia y tiempos de espera. |
 | Se adapta a recursos gratuitos limitados. | Clean Architecture agrega interfaces y proyectos, lo que implica más código base para un sistema pequeño. |

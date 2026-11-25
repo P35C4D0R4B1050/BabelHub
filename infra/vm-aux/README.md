@@ -1,5 +1,7 @@
 # VM-AUX: vigilancia y sellos
 
+> **Aplazada desde el 2026-11-25** (sin capacidad para la AMD micro; DD-100). Estos scripts no corren en ninguna VM todavía; lo que se pierde mientras tanto está en `docs/02-arquitectura-de-software/05-despliegue.md` §6.2. No instalarlos en VM-VENTAS ni en VM-INVENTARIO: sus credenciales quedarían junto al servicio que vigilan (PLA-38).
+
 VM-AUX (AMD micro) es el salto SSH hacia las demás VMs y, desde T25, quien **vigila desde fuera de la VM de datos**: si esa VM cae o su respaldo falla, nadie dentro de ella puede avisarlo. Sus scripts están en `scripts/vm-aux/` y no guardan ninguna clave privada ni credencial de borrado. El endurecimiento de la propia VM-AUX (acceso, correo propio, disco cifrado, alerta de ingreso SSH) está en la sección «Endurecimiento» (T26).
 
 | Tarea programada (`babelhub-aux.cron`) | Cada | Qué hace | Credencial del almacén |

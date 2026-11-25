@@ -10,7 +10,7 @@ Cómo se respalda la base de VM-INVENTARIO (PLA-09, PLA-15, PLA-16, PLA-17; deci
 | `respaldar.sh` | Respaldo diario: `pg_basebackup` toma todo el clúster (las dos bases de negocio y las demás, en un mismo instante), cifra al vuelo con `age` (el claro no toca el disco) y sube dos objetos a `respaldos-diarios`: `AAAA-MM-DD/<hora UTC>-<sha256>.tar.age` (el clúster) y `AAAA-MM-DD/<hora>-config-<sha256>.tar.age` (la configuración de la VM, sin `*.env`, `*.pem`, `*.key` ni `*.pfx`). El domingo deja además los mismos objetos en `respaldos-semanales` y el último día del mes en `respaldos-mensuales` (días UTC). Si algo falla, termina con 1 y no deja nada local. |
 | `respaldar.sh --bajo-demanda` | Un respaldo adicional tras una corrección urgente con migración: solo a `respaldos-diarios`, con la misma retención, sin copias semanales ni mensuales. |
 | `vigilar-espacio.sh` | Cada minuto: mide lo pendiente contra el espacio reservado, avisa al 80 % y declara roto el archivo de cambios al agotarse (ver más abajo). |
-| `scripts/respaldar-ahora.sh` | Lanza el anterior desde el equipo de la persona responsable, por `ProxyJump` a través de VM-AUX y sin reenvío de agente. No lleva ni recibe secretos. |
+| `scripts/respaldar-ahora.sh` | Lanza el anterior desde el equipo de la persona responsable, por SSH directo (o por `ProxyJump` con `--salto` cuando exista VM-AUX) y sin reenvío de agente. No lleva ni recibe secretos. |
 
 La retención no la ejecuta ningún script: la hace el ciclo de vida del propio almacén, con retención bloqueada (ver [`../almacen/politicas.md`](../almacen/politicas.md)). Por eso la credencial de esta VM, `respaldos-escritor`, solo puede **crear** objetos: no lee, no lista, no sobrescribe y no borra.
 

@@ -3,8 +3,7 @@
 # docs/07-proceso-de-desarrollo/08-guia-primer-despliegue.md). Cada archivo lleva SOLO lo que su VM necesita (mínimo privilegio, AGENTS §5):
 #
 #   <destino>/inventario/   postgres.env inventario.env ecommerce-gestion.env migrador.env aviso.env   -> /etc/babelhub/secretos de VM-INVENTARIO
-#   <destino>/ventas/       ecommerce.env redis.env redis-contadores.env n8n.env evolution.env cloudflared.env y los .pem de Redis -> VM-VENTAS
-#   <destino>/borde/        cloudflared.env                                                          -> VM-BORDE
+#   <destino>/ventas/       ecommerce.env redis.env redis-contadores.env n8n.env evolution.env cloudflared.env (la entrada: DD-100) y los .pem -> VM-VENTAS
 #   <destino>/custodia/     la clave PRIVADA de age y la CA privada: se quedan en tu equipo y en la copia fuera de línea; NUNCA en una VM
 #
 # Lo que se puede inventar (contraseñas, claves HMAC, credenciales entre servicios, certificados de la red privada, el par de claves de age)
@@ -12,7 +11,7 @@
 # el token del túnel de Cloudflare, Culqi, WhatsApp) queda como «CAMBIAR» y se anota en PENDIENTES.txt: `scripts/desplegar.sh` se niega a
 # desplegar una VM con algún «CAMBIAR» sin completar, así que no se puede olvidar uno.
 #
-#   scripts/generar-secretos.sh --destino ~/babelhub-secretos --dominio ejemplo.pe --ip-ventas 10.0.0.10 --ip-inventario 10.0.1.10 --ip-borde 10.0.2.10
+#   scripts/generar-secretos.sh --destino ~/babelhub-secretos --dominio ejemplo.pe --ip-ventas 10.0.0.10 --ip-inventario 10.0.0.20
 #   scripts/generar-secretos.sh --destino /tmp/ensayo --ensayo        (ensayo local: dominio «localhost» y todo en 127.0.0.1)
 #
 # Se niega a escribir sobre una carpeta que ya tiene archivos (nunca pisa un secreto). Los archivos quedan con permisos 600 y la salida
@@ -23,18 +22,17 @@ export MSYS_NO_PATHCONV=1   # en Git Bash para Windows, openssl no debe converti
 
 uso() {
   sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//' >&2
-  echo "Opciones: --destino <carpeta> --dominio <dominio> --ip-ventas <ip> --ip-inventario <ip> --ip-borde <ip> [--entorno staging|production] [--region sa-santiago-1] [--ensayo] [--imagen-postgres <imagen>]" >&2
+  echo "Opciones: --destino <carpeta> --dominio <dominio> --ip-ventas <ip> --ip-inventario <ip> [--entorno staging|production] [--region sa-santiago-1] [--ensayo] [--imagen-postgres <imagen>]" >&2
   exit 2
 }
 
-DESTINO="" DOMINIO="" IP_VENTAS="" IP_INVENTARIO="" IP_BORDE="" REGION="sa-santiago-1" ENSAYO=0 IMAGEN_POSTGRES_PARA_AGE="" ENTORNO="staging"
+DESTINO="" DOMINIO="" IP_VENTAS="" IP_INVENTARIO="" REGION="sa-santiago-1" ENSAYO=0 IMAGEN_POSTGRES_PARA_AGE="" ENTORNO="staging"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --destino) [[ $# -ge 2 ]] || uso; DESTINO="$2"; shift 2 ;;
     --dominio) [[ $# -ge 2 ]] || uso; DOMINIO="$2"; shift 2 ;;
     --ip-ventas) [[ $# -ge 2 ]] || uso; IP_VENTAS="$2"; shift 2 ;;
     --ip-inventario) [[ $# -ge 2 ]] || uso; IP_INVENTARIO="$2"; shift 2 ;;
-    --ip-borde) [[ $# -ge 2 ]] || uso; IP_BORDE="$2"; shift 2 ;;
     --region) [[ $# -ge 2 ]] || uso; REGION="$2"; shift 2 ;;
     --entorno) [[ $# -ge 2 ]] || uso; ENTORNO="$2"; shift 2 ;;
     --imagen-postgres) [[ $# -ge 2 ]] || uso; IMAGEN_POSTGRES_PARA_AGE="$2"; shift 2 ;;
@@ -44,9 +42,9 @@ while [[ $# -gt 0 ]]; do
 done
 [[ -n "$DESTINO" ]] || uso
 if [[ "$ENSAYO" -eq 1 ]]; then
-  DOMINIO="${DOMINIO:-localhost}" IP_VENTAS="${IP_VENTAS:-127.0.0.1}" IP_INVENTARIO="${IP_INVENTARIO:-127.0.0.1}" IP_BORDE="${IP_BORDE:-127.0.0.1}"
+  DOMINIO="${DOMINIO:-localhost}" IP_VENTAS="${IP_VENTAS:-127.0.0.1}" IP_INVENTARIO="${IP_INVENTARIO:-127.0.0.1}"
 fi
-[[ -n "$DOMINIO" && -n "$IP_VENTAS" && -n "$IP_INVENTARIO" && -n "$IP_BORDE" ]] || uso
+[[ -n "$DOMINIO" && -n "$IP_VENTAS" && -n "$IP_INVENTARIO" ]] || uso
 # Solo direcciones privadas (RFC 1918) o de la propia máquina (el ensayo): 10/8, 172.16/12, 192.168/16 y 127/8, con cada octeto de 0 a 255.
 ip_valida() {
   local a b c d
@@ -55,7 +53,7 @@ ip_valida() {
   (( a <= 255 && b <= 255 && c <= 255 && d <= 255 )) || return 1
   (( a == 10 || a == 127 || (a == 172 && b >= 16 && b <= 31) || (a == 192 && b == 168) ))
 }
-ip_valida "$IP_VENTAS" && ip_valida "$IP_INVENTARIO" && ip_valida "$IP_BORDE" || { echo "Error: las direcciones deben ser IPv4 privadas (10.x.x.x, 172.16-31.x.x o 192.168.x.x), por ejemplo 10.0.0.10." >&2; exit 2; }
+ip_valida "$IP_VENTAS" && ip_valida "$IP_INVENTARIO" || { echo "Error: las direcciones deben ser IPv4 privadas (10.x.x.x, 172.16-31.x.x o 192.168.x.x), por ejemplo 10.0.0.10." >&2; exit 2; }
 [[ "$DOMINIO" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] || { echo "Error: el dominio debe ir en minúsculas, sin https:// ni barras (ejemplo.pe)." >&2; exit 2; }
 [[ "$REGION" =~ ^[a-z0-9-]+$ ]] || { echo "Error: región inválida." >&2; exit 2; }
 # El entorno de los dos servicios del E-commerce (PAG-34): «staging» (revisión de la tienda por Culqi: pasarela SIMULADA, nunca cobra) o «production» (pasarela real; exige las llaves de Culqi).
@@ -70,8 +68,8 @@ if [[ -d "$DESTINO" ]] && [[ -n "$(ls -A "$DESTINO" 2>/dev/null)" ]]; then
   echo "Error: $DESTINO ya tiene archivos; este script no pisa secretos. Usa una carpeta nueva." >&2
   exit 1
 fi
-mkdir -p "$DESTINO"/{inventario,ventas,borde,custodia}
-chmod 700 "$DESTINO" "$DESTINO"/{inventario,ventas,borde,custodia}
+mkdir -p "$DESTINO"/{inventario,ventas,custodia}
+chmod 700 "$DESTINO" "$DESTINO"/{inventario,ventas,custodia}
 
 # ---------- Valores aleatorios ----------
 alea() { head -c $(( $1 * 3 )) /dev/urandom | base64 | tr -d '/+=\n' | head -c "$1"; }
@@ -164,8 +162,6 @@ linea "$f" BABELHUB__Ecommerce__Base__DepuracionDeRegistros "$(cuenta ecommerce 
 linea "$f" BABELHUB__Ecommerce__Inventario__Direccion "https://inventario:8443/"
 linea "$f" BABELHUB__Ecommerce__Redis__Direccion "$IP_VENTAS:6380"
 linea "$f" BABELHUB__Ecommerce__Redis__Tls true
-# El origen del cliente solo se acepta del borde: la VM-BORDE (Nginx) llega por su dirección privada.
-linea "$f" BABELHUB__Ecommerce__ProxiesConocidos "$IP_BORDE"
 linea "$f" BABELHUB__Web__Host gestion
 # Además del dominio, el servidor acepta el nombre y la dirección privada con los que lo llaman los otros servicios (https://<IP>:8443): un Host que no esté en la lista se rechaza con 400.
 linea "$f" BABELHUB__Web__HostsPermitidos "$HOST_GESTION,$IP_INVENTARIO,ecommerce-gestion"
@@ -232,8 +228,7 @@ linea "$f" BABELHUB__Ecommerce__Base__DepuracionDeRegistros "$(cuenta ecommerce 
 linea "$f" BABELHUB__Ecommerce__Inventario__Direccion "https://$IP_INVENTARIO:8082/"
 linea "$f" BABELHUB__Ecommerce__Redis__Direccion "redis-contadores:6380"
 linea "$f" BABELHUB__Ecommerce__Redis__Tls true
-# El origen del cliente solo se acepta del borde: Nginx de VM-BORDE por su dirección privada y el segundo conector de cloudflared, que llega desde la red de Compose de esta VM.
-linea "$f" BABELHUB__Ecommerce__ProxiesConocidos "$IP_BORDE,172.16.0.0/12"
+# En quién confía la tienda para el origen del cliente (BABELHUB__Ecommerce__ProxiesConocidos) NO va aquí ni en ecommerce-gestion.env: lo fijan los Compose (DD-101, DD-104).
 linea "$f" BABELHUB__Web__Host tienda
 linea "$f" BABELHUB__Web__HostsPermitidos "$HOSTS_TIENDA,$IP_VENTAS,ecommerce"
 linea "$f" BABELHUB__Web__ClaveDeSesionesTienda "$(valor sesiones-tienda 40)"
@@ -294,9 +289,8 @@ linea "$f" DATABASE_CONNECTION_URI "postgresql://evolution:$(valor pg-evolution 
 linea "$f" CACHE_REDIS_ENABLED true
 linea "$f" CACHE_REDIS_URI "redis://:$(valor redis-cache 40)@redis:6379/6"
 linea "$f" CACHE_LOCAL_ENABLED false
-# El mismo túnel tiene dos conectores (VM-BORDE y VM-VENTAS) y comparten el token.
+# El único conector del túnel corre en VM-VENTAS (DD-100).
 f="$d/cloudflared.env"; inicio "$f"; pendiente "$f" TUNNEL_TOKEN "el token del túnel (Cloudflare Zero Trust → Networks → Tunnels)"
-f="$DESTINO/borde/cloudflared.env"; inicio "$f"; pendiente "$f" TUNNEL_TOKEN "el mismo token del túnel"
 
 # ---------- Certificados de la red privada (Redis de contadores y HTTPS entre servicios) ----------
 # Una CA privada de la cuenta firma el certificado de cada VM. La clave de la CA se queda en custodia/ (tu equipo); a las VMs solo llegan
@@ -360,6 +354,6 @@ linea "$AGE_DESTINATARIO_LINEA" BABELHUB_AGE_DESTINATARIO "$destinatario"
 } > "$DESTINO/PENDIENTES.txt"
 chmod 600 "$DESTINO/PENDIENTES.txt"
 
-echo "Listo. Se generaron los secretos de las tres VMs en $DESTINO."
+echo "Listo. Se generaron los secretos de las dos VMs en $DESTINO."
 echo "  - Falta completar ${#PENDIENTES[@]} valores «CAMBIAR» (ver $DESTINO/PENDIENTES.txt); nada se despliega mientras haya alguno."
 echo "  - $DESTINO/custodia/ (clave privada de age y CA) NO va a ninguna VM: haz ahora una copia fuera de línea (infra/respaldos/custodia.md)."

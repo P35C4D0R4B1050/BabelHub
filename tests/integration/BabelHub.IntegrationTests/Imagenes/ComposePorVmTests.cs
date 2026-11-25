@@ -79,7 +79,6 @@ public sealed class ComposePorVmTests : IDisposable
     /// <summary>Los archivos de secretos que cada VM puede pedir: nunca los de otra (credenciales mínimas por VM).</summary>
     private static readonly Dictionary<string, string[]> SecretosPermitidos = new(StringComparer.Ordinal)
     {
-        ["borde"] = ["cloudflared.env"],
         ["ventas"] = ["ca-bundle.pem", "cloudflared.env", "ecommerce.env", "evolution.env", "n8n.env", "tls-ca.pem", "tls-ecommerce-cert.pem", "tls-ecommerce-key.pem", "redis-contadores-ca.pem", "redis-contadores-cert.pem", "redis-contadores-key.pem", "redis-contadores.env", "redis.env"],
         ["inventario"] = ["ca-bundle.pem", "ecommerce-gestion.env", "inventario.env", "postgres.env", "tls-gestion-cert.pem", "tls-gestion-key.pem", "tls-inventario-cert.pem", "tls-inventario-key.pem", "tls-postgres-cert.pem", "tls-postgres-key.pem"],
     };
@@ -100,7 +99,6 @@ public sealed class ComposePorVmTests : IDisposable
     public void LaBaseYSuContrasenaSoloEstanEnLaVmDelInventario_YLosSecretosDelEcommerceNoSalenDeVentasYLaReplica()
     {
         Assert.DoesNotContain("postgres.env", ComposeDeVms.ArchivosDeSecretos("ventas"));
-        Assert.DoesNotContain("postgres.env", ComposeDeVms.ArchivosDeSecretos("borde"));
         Assert.DoesNotContain("ecommerce.env", ComposeDeVms.ArchivosDeSecretos("inventario"));
         Assert.DoesNotContain("evolution.env", ComposeDeVms.ArchivosDeSecretos("inventario"));
         Assert.DoesNotContain("inventario.env", ComposeDeVms.ArchivosDeSecretos("ventas"));
@@ -183,6 +181,92 @@ public sealed class ComposePorVmTests : IDisposable
         Assert.Contains("COPY servidor/ /opt/babelhub/", dockerfile, StringComparison.Ordinal);
         Assert.Contains("/opt/babelhub/pg_hba.conf", dockerfile, StringComparison.Ordinal);
         Assert.True(File.Exists(Path.Combine(ComposeDeVms.Raiz(), "infra", "postgres", "servidor", "iniciar.sh")));
+    }
+
+    // ---------- La entrada pública en VM-VENTAS: quién puede decir cuál es la IP del cliente (SEG-17, SEG-23; DD-101) ----------
+
+    private static string[] Redes(JsonElement servicio) => [.. servicio.GetProperty("networks").EnumerateObject().Select(r => r.Name).Order(StringComparer.Ordinal)];
+
+    private static string DireccionFija(JsonElement servicio, string red) => servicio.GetProperty("networks").GetProperty(red).GetProperty("ipv4_address").GetString()!;
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-15")]
+    public void LaEntradaPublica_VaPorDosRedesPropias_DondeSoloEstanLosDosExtremosDeCadaSalto()
+    {
+        using var documento = JsonDocument.Parse(ComposeDeVms.ComposeResuelto("ventas", _carpeta));
+        var servicios = documento.RootElement.GetProperty("services").EnumerateObject().ToDictionary(s => s.Name, s => s.Value, StringComparer.Ordinal);
+        string[] En(string red) => [.. servicios.Where(s => Redes(s.Value).Contains(red)).Select(s => s.Key).Order(StringComparer.Ordinal)];
+
+        Assert.Equal(["cloudflared", "nginx"], En("tunel"));
+        Assert.Equal(["ecommerce", "nginx"], En("entrada"));
+        // Ni cloudflared ni Nginx están en la red general (donde viven Redis, n8n y Evolution API), y el segundo conector que saltaba Nginx no vuelve.
+        Assert.Equal(["tunel"], Redes(servicios["cloudflared"]));
+        Assert.Equal(["entrada", "tunel"], Redes(servicios["nginx"]));
+        Assert.True(documento.RootElement.GetProperty("networks").GetProperty("entrada").GetProperty("internal").GetBoolean());
+        Assert.DoesNotContain("aliases", servicios["ecommerce"].GetProperty("networks").GetRawText(), StringComparison.Ordinal);
+        // Nada de la entrada publica un puerto en la VM.
+        Assert.False(servicios["nginx"].TryGetProperty("ports", out _));
+        Assert.False(servicios["cloudflared"].TryGetProperty("ports", out _));
+        // Y del E-commerce solo sale el HTTPS entre servicios: su puerto HTTP no se publica en la VM.
+        Assert.Equal([8443], servicios["ecommerce"].GetProperty("ports").EnumerateArray().Select(p => p.GetProperty("target").GetInt32()));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-15")]
+    public void NginxSoloCreeACloudflared_YElEcommerceSoloCreeANginx_PorSusDireccionesFijas()
+    {
+        using var documento = JsonDocument.Parse(ComposeDeVms.ComposeResuelto("ventas", _carpeta));
+        var servicios = documento.RootElement.GetProperty("services");
+        var nginx = File.ReadAllText(Path.Combine(ComposeDeVms.Raiz(), "infra", "nginx", "nginx.conf"));
+        var deCloudflared = DireccionFija(servicios.GetProperty("cloudflared"), "tunel");
+        var deNginx = DireccionFija(servicios.GetProperty("nginx"), "entrada");
+
+        var confiados = System.Text.RegularExpressions.Regex.Matches(nginx, @"(?m)^\s*set_real_ip_from\s+(\S+);").Select(m => m.Groups[1].Value);
+        Assert.Equal([deCloudflared], confiados);
+        var delGeo = System.Text.RegularExpressions.Regex.Matches(nginx, @"(?m)^\s*(\d+\.\d+\.\d+\.\d+(?:/\d+)?)\s+1;").Select(m => m.Groups[1].Value);
+        Assert.Equal([deCloudflared + "/32"], delGeo);
+        Assert.Equal(deNginx, servicios.GetProperty("ecommerce").GetProperty("environment").GetProperty("BABELHUB__Ecommerce__ProxiesConocidos").GetString());
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-15")]
+    public void LaReplicaDeGestionSoloCreeALaVmDeVentas_YLaReglaDeVentasDejaPasarSoloALaDireccionDeNginx()
+    {
+        using var ventas = JsonDocument.Parse(ComposeDeVms.ComposeResuelto("ventas", _carpeta));
+        using var inventario = JsonDocument.Parse(ComposeDeVms.ComposeResuelto("inventario", _carpeta));
+        var replica = inventario.RootElement.GetProperty("services").GetProperty("ecommerce-gestion");
+        var regla = File.ReadAllText(Path.Combine(ComposeDeVms.Raiz(), "scripts", "proteger-gestion.sh"));
+        var nginx = File.ReadAllText(Path.Combine(ComposeDeVms.Raiz(), "infra", "nginx", "nginx.conf"));
+
+        // El Compose exige IP_VENTAS (en la muestra, 10.0.0.10) y manda sobre el archivo de secretos.
+        Assert.Equal("10.0.0.10", replica.GetProperty("environment").GetProperty("BABELHUB__Ecommerce__ProxiesConocidos").GetString());
+        Assert.Contains("BABELHUB__Ecommerce__ProxiesConocidos: \"${IP_VENTAS:?", ComposeDeVms.Texto("inventario"), StringComparison.Ordinal);
+        // La regla y Nginx hablan de la misma dirección (la de Nginx por la que sale a Internet y a la otra VM) y del mismo puerto.
+        Assert.Contains("\nNGINX=" + DireccionFija(ventas.RootElement.GetProperty("services").GetProperty("nginx"), "tunel") + "\n", regla.ReplaceLineEndings("\n"), StringComparison.Ordinal);
+        Assert.Contains("--dport 8081 ", regla, StringComparison.Ordinal);
+        Assert.Contains("server ecommerce-gestion:8081;", nginx, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void LasDireccionesFijasNoSalenDelRangoDinamico_NiElEcommerceLlevaUna_ParaQueLosComandosDeConsolaSigan()
+    {
+        using var documento = JsonDocument.Parse(ComposeDeVms.ComposeResuelto("ventas", _carpeta));
+        var redes = documento.RootElement.GetProperty("networks");
+        var servicios = documento.RootElement.GetProperty("services");
+        foreach (var red in new[] { "tunel", "entrada" })
+        {
+            var configuracion = redes.GetProperty(red).GetProperty("ipam").GetProperty("config")[0];
+            var dinamicas = System.Net.IPNetwork.Parse(configuracion.GetProperty("ip_range").GetString()!);
+            foreach (var servicio in servicios.EnumerateObject())
+            {
+                if (servicio.Value.GetProperty("networks").TryGetProperty(red, out var enLaRed) && enLaRed.ValueKind == JsonValueKind.Object && enLaRed.TryGetProperty("ipv4_address", out var fija))
+                {
+                    Assert.False(dinamicas.Contains(System.Net.IPAddress.Parse(fija.GetString()!)), $"{servicio.Name} tiene en «{red}» una dirección fija dentro del rango dinámico.");
+                    Assert.NotEqual("ecommerce", servicio.Name);
+                }
+            }
+        }
     }
 
     // ---------- Las reglas con incumplimientos a propósito ----------

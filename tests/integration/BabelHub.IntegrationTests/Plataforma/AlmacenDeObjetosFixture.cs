@@ -6,13 +6,13 @@ using DotNet.Testcontainers.Containers;
 namespace BabelHub.IntegrationTests.Plataforma;
 
 /// <summary>
-/// Un almacén de objetos compatible con S3 real (en un contenedor) con el contenedor lógico <c>supresiones</c>. No reproduce las
+/// Un almacén de objetos compatible con S3 real (en un contenedor) con el contenedor lógico del registro de supresiones. No reproduce las
 /// políticas de Oracle (permisos por prefijo, retención con bloqueo: son de T21 y se verifican contra el almacén real con el spike T02),
 /// pero sí la semántica que el registro necesita: «crear solo si no existe» atómico, lectura y listado.
 /// </summary>
 public sealed class AlmacenDeObjetosFixture : IAsyncLifetime
 {
-    public const string Contenedor = "supresiones";
+    public const string Contenedor = OpcionesDelAlmacenDeObjetos.ContenedorDeSupresiones;
     public const string ClaveDeAcceso = "acceso-de-pruebas-del-almacen-0123456789";
     public const string ClaveSecreta = "secreta-de-pruebas-del-almacen-9876543210-abcdefgh";
 

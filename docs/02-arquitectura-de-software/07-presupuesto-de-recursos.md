@@ -4,21 +4,20 @@ Los recursos gratuitos son el límite más estricto del proyecto (RC07, NN12). E
 
 ## 1. Marco
 
-Cuatro VMs de una sola cuenta: dos ARM de **1 OCPU y 6 GB** y dos AMD micro de **1/8 OCPU y 1 GB**. Objetivo de RNF12: uso sostenido de memoria y CPU **menor al 70 %** por VM, es decir, unos **4,2 GB** en las ARM y **0,7 GB** en las micro.
+Desde el 2026-11-25 (DD-100) son **dos VMs** de una sola cuenta, las ARM de **1 OCPU y 6 GB**: no hubo capacidad para las AMD micro, la entrada (cloudflared y Nginx) corre en VM-VENTAS y VM-AUX está aplazada. Objetivo de RNF12: uso sostenido de memoria y CPU **menor al 70 %** por VM, unos **4,2 GB**.
 
 | VM | Recursos | Contenido |
 | :--- | :--- | :--- |
-| **VM-BORDE** | AMD micro | cloudflared y Nginx. |
-| **VM-VENTAS** | ARM, 1 OCPU y 6 GB | Servicio E-commerce, Redis, n8n, Evolution API y un segundo conector de cloudflared. |
+| **VM-VENTAS** | ARM, 1 OCPU y 6 GB | cloudflared, Nginx, servicio E-commerce, Redis, n8n y Evolution API. |
 | **VM-INVENTARIO** | ARM, 1 OCPU y 6 GB | Servicio Inventario, réplica de gestión del E-commerce y PostgreSQL. |
-| **VM-AUX** | AMD micro | Salto SSH y monitoreo ligero. |
+| VM-AUX (**aplazada**) | AMD micro | Salto SSH y monitoreo ligero ([despliegue](05-despliegue.md) §6.2). |
 
 ## 2. Presupuesto de memoria por contenedor
 
 | Contenedor | Límite (`mem_limit`) | Reserva esperada | VM | Nota |
 | :--- | :---: | :---: | :--- | :--- |
-| Nginx | 64 MB | 20–40 MB | VM-BORDE | |
-| cloudflared | 64 MB | 20–40 MB | VM-BORDE y VM-VENTAS | Dos conectores del mismo túnel. |
+| Nginx | 64 MB | 20–40 MB | VM-VENTAS | 0,2 CPU. |
+| cloudflared | 128 MB | 20–60 MB | VM-VENTAS | Único conector del túnel: 0,25 CPU (con 0,05, el tope de cuando era un segundo conector, limitaría toda la entrada). |
 | BabelHub.Ecommerce | 600 MB | 250–450 MB | VM-VENTAS | Monolito modular con la interfaz web, Identidad y Asistente. |
 | Redis (caché y Evolution) | 128 MB | 30–80 MB | VM-VENTAS | `maxmemory` con política de expulsión `allkeys-lru`; caché de disponibilidad y del catálogo y datos de Evolution. |
 | Redis (contadores de límites) | 100 MB | 10–40 MB | VM-VENTAS | Instancia dedicada con `noeviction`, tope de claves, ACL y TLS (`transversal-seguridad` D17); alerta al 70 %. |
@@ -32,21 +31,19 @@ Cuatro VMs de una sola cuenta: dos ARM de **1 OCPU y 6 GB** y dos AMD micro de *
 
 | VM | Suma de límites | Reserva esperada (con el sistema) | Evaluación |
 | :--- | :---: | :---: | :--- |
-| VM-BORDE | ~0,13 GB + sistema | ~0,5 GB | Dentro del 70 % (0,7 GB); es la más justa. |
-| VM-VENTAS | ~2,1 GB + sistema | ~1,5–2,3 GB | Dentro del 70 % (4,2 GB), con holgura para picos. |
+| VM-VENTAS | ~2,3 GB + sistema | ~1,5–2,4 GB | Dentro del 70 % (4,2 GB): los límites suman 2 220 MB (600 + 128 + 100 + 600 + 600 + 64 + 128) más 0,3–0,5 GB de sistema; queda margen para los comandos de consola puntuales (hasta 600 MB). Los topes de CPU suman 2,05 sobre 1 OCPU: son topes, no reservas, y la entrada compite con la venta. |
 | VM-INVENTARIO | ~3,2 GB + sistema | ~2,1–2,9 GB | **La VM ARM más justa en memoria:** la suma de límites (512 + 450 + 2000 + 256 MB = ~3,2 GB) más el sistema (0,3–0,5 GB) llega a unos 3,5–3,7 GB, con 0,5–0,7 GB de margen bajo el 70 % (4,2 GB); el respaldo y el archivado de WAL corren dentro de esa suma (PLA-05). Orden de recorte si supera el 70 %: bajar `shared_buffers` de PostgreSQL (768 MB), reducir el límite de la réplica de gestión (450 MB), correr el respaldo solo fuera de horas pico y, al final, mover la réplica a otro lugar. Se mide en B11. |
-| VM-AUX | — | ~0,3 GB | Amplia. |
 
 ## 3. CPU, concurrencia y red
 
-La CPU es el cuello de botella previsto. VM-VENTAS tiene un .NET y dos de Node; VM-INVENTARIO tiene dos .NET y PostgreSQL; VM-BORDE tiene solo 1/8 de OCPU.
+La CPU es el cuello de botella previsto. VM-VENTAS tiene un .NET, dos de Node y ahora la entrada (cloudflared y Nginx); VM-INVENTARIO tiene dos .NET y PostgreSQL.
 
 | Medida | Meta | Cómo se verifica |
 | :--- | :--- | :--- |
 | Disponibilidad p95 | < 500 ms con 50 usuarios concurrentes (RNF02) | k6 con cada VM limitada a su OCPU, incluidas las llamadas entre VMs |
 | Checkout p95 | < 3 s sin contar la pasarela | k6 |
 | CPU sostenida por VM | < 70 % en la prueba de carga | `docker stats` o métricas del sistema |
-| VM-BORDE bajo carga | Sin cola de solicitudes ni errores 5xx con 50 usuarios | k6; si falla, cloudflared y Nginx pasan a VM-VENTAS |
+| Entrada en VM-VENTAS bajo carga | Sin cola de solicitudes ni errores 5xx con 50 usuarios, y CPU de la VM < 70 % | k6 en la VM real (pendiente); si falla, se ajustan los topes o se vuelve a una VM aparte para la entrada cuando haya capacidad |
 | Latencia entre VMs | A medir: cada llamada E-commerce → Inventario y cada consulta a la base suma un salto de red | k6 |
 | Hilos y conexiones | Límite de conexiones por rol a la base; sin crecimiento sin tope | Revisión de configuración |
 | Trabajos de fondo | Expiración de reservas y reintentos de avisos espaciados para no competir con el pico | Revisión del plan |
@@ -55,7 +52,7 @@ La CPU es el cuello de botella previsto. VM-VENTAS tiene un .NET y dos de Node; 
 
 | Elemento | Presupuesto | Nota |
 | :--- | :---: | :--- |
-| Volúmenes de arranque | ~47 GB por VM | Mínimo de Oracle; 4 VMs = 188 GB de los 200 GB gratuitos. |
+| Volúmenes de arranque | ~47 GB por VM | Mínimo de Oracle; 2 VMs = 94 GB de los 200 GB gratuitos. |
 | Bases de datos | < 10 GB al inicio | Crecimiento vigilado. |
 | Registros de contenedores | Rotación (por ejemplo, 3 archivos de 10 MB por contenedor) | Evita llenar el disco. |
 | Respaldos y WAL locales temporales | < 5 GB | Se suben cifrados al almacén de objetos y se borran. |
@@ -76,5 +73,5 @@ La CPU es el cuello de botella previsto. VM-VENTAS tiene un .NET y dos de Node; 
 - Cada contenedor en el Compose de su VM declara `mem_limit` y, cuando corresponde, `cpus`.
 - Un incumplimiento de las metas en la prueba de carga se registra como riesgo en [drivers](01-drivers-arquitectonicos.md) y se mitiga antes del despliegue.
 - Si el uso de memoria supera el 70 % sostenido, se reduce el consumo (por ejemplo, desactivar el modo desarrollo o ajustar la caché) antes de agregar recursos de pago.
-- Si la VM-BORDE no rinde, cloudflared y Nginx pasan a VM-VENTAS. Si la latencia entre VMs hace incumplir RNF02, se ajustan las cachés antes de tocar el código.
+- Si la entrada en VM-VENTAS no rinde, se mide qué contenedor consume (cloudflared y Nginx tienen su propio tope) y se aplica el orden de recorte antes de pedir recursos de pago. Si la latencia entre VMs hace incumplir RNF02, se ajustan las cachés antes de tocar el código.
 - Si hubiera presupuesto, la mejora natural es una tercera VM ARM para PostgreSQL (≈ 7 USD al mes, a verificar), con un cambio de Compose.

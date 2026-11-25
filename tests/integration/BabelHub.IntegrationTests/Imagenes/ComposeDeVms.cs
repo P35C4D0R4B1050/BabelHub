@@ -7,7 +7,7 @@ namespace BabelHub.IntegrationTests.Imagenes;
 /// <summary>Lo que comparten las pruebas de los archivos de Compose por VM: resolverlos con un entorno de muestra y ejecutar <c>docker compose</c>.</summary>
 internal static partial class ComposeDeVms
 {
-    public static readonly string[] Vms = ["borde", "ventas", "inventario"];
+    public static readonly string[] Vms = ["ventas", "inventario"];
 
     public const string DigestDeMuestra = "sha256:0000000000000000000000000000000000000000000000000000000000000000";
 

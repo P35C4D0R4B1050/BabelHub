@@ -44,7 +44,7 @@ Además: [glosario](docs/glossary.md), [índice de specs](specs/README.md) y [ma
 - PostgreSQL con una base por servicio (`ecommerce`, con un esquema por módulo, e `inventario`) en una instancia, un rol por esquema y seguridad por filas en Inventario; Redis como caché y Nginx como puerta de entrada.
 - Pagos con Culqi (Yape y tarjetas) y avisos por WhatsApp con n8n y Evolution API, autoalojados.
 - Libros digitales (EPUB y PDF) en un almacén de objetos externo, con descarga por URL firmada; no pasan por el Inventario. El marco legal, aplicado con rigurosidad laxa por ser un proyecto académico, está en [`docs/01-analisis-de-sistema/03-marco-legal.md`](docs/01-analisis-de-sistema/03-marco-legal.md).
-- Despliegue con Docker Compose, un Compose por VM, **solo con recursos gratuitos de una cuenta de Oracle**: dos VMs AMD micro (borde de red; salto SSH y monitoreo) y dos VMs ARM de 1 OCPU y 6 GB (ventas; inventario con la base y una réplica de gestión).
+- Despliegue con Docker Compose, un Compose por VM, **solo con recursos gratuitos de una cuenta de Oracle**: dos VMs ARM de 1 OCPU y 6 GB (ventas, con la entrada pública; inventario con la base y la réplica de gestión). Las dos VMs AMD micro previstas (entrada; salto SSH y monitoreo) no tuvieron capacidad (2026-11-25): VM-AUX queda aplazada.
 - Cloudflare gratuito en el borde (DDoS, WAF, límites, Turnstile y Access en el host de gestión), con Cloudflare Tunnel de dos conectores, para no abrir puertos en Oracle.
 - Pruebas con xUnit, Testcontainers, Playwright y k6. Desarrollo posterior bajo Spec-Driven Development.
 

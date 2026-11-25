@@ -7,7 +7,7 @@ namespace BabelHub.IntegrationTests.Respaldos;
 
 /// <summary>
 /// El respaldo bajo demanda tras una corrección urgente con migración (PLA-09, PLA-16): <c>scripts/respaldar-ahora.sh</c> lo lanza la persona
-/// responsable desde su equipo por ProxyJump, sin reenvío de agente, sin llevar ni imprimir secretos, y devuelve el código del respaldo remoto.
+/// responsable desde su equipo por SSH (directo mientras VM-AUX esté aplazada, o por ProxyJump), sin reenvío de agente, sin llevar ni imprimir secretos, y devuelve el código del respaldo remoto.
 /// Y los archivos que lo hacen posible: la imagen de PostgreSQL trae los scripts, el Compose archiva los cambios y todo está en POSIX sh.
 /// </summary>
 [Collection(ProcesosPesadosCollection.Nombre)]
@@ -79,8 +79,23 @@ public sealed class RespaldarAhoraTests : IDisposable
         Assert.Contains("ForwardAgent=no", lineas);
         Assert.Contains("BatchMode=yes", lineas);
         Assert.Equal("operador@aux.interno", lineas[Array.IndexOf(lineas, "-J") + 1]);
-        Assert.Equal(["operador@inventario.interno", "docker", "exec", "babelhub-inventario-postgres-1", "/opt/babelhub/respaldar.sh", "--bajo-demanda"], lineas[(Array.IndexOf(lineas, "operador@inventario.interno"))..]);
+        Assert.Equal(["operador@inventario.interno", "sudo", "-n", "docker", "exec", "babelhub-inventario-postgres-1", "/opt/babelhub/respaldar.sh", "--bajo-demanda"], lineas[(Array.IndexOf(lineas, "operador@inventario.interno"))..]);
         Assert.DoesNotContain("-A", lineas);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-16")]
+    public void SinSalto_PorqueNoHayVmAux_ConectaDirectoConLasMismasOpciones()
+    {
+        var (codigo, _, _, llamada) = Ejecutar(0, "--destino", "operador@inventario.interno");
+
+        Assert.Equal(0, codigo);
+        var lineas = llamada.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Contains("ForwardAgent=no", lineas);
+        Assert.Contains("BatchMode=yes", lineas);
+        Assert.DoesNotContain("-J", lineas);
+        Assert.DoesNotContain("-A", lineas);
+        Assert.Equal(["operador@inventario.interno", "sudo", "-n", "docker", "exec", "babelhub-inventario-postgres-1", "/opt/babelhub/respaldar.sh", "--bajo-demanda"], lineas[(Array.IndexOf(lineas, "operador@inventario.interno"))..]);
     }
 
     [Theory]
@@ -96,8 +111,8 @@ public sealed class RespaldarAhoraTests : IDisposable
     }
 
     [Theory]
-    [InlineData("--destino", "operador@inventario.interno")]
     [InlineData("--salto", "operador@aux.interno")]
+    [InlineData("--salto", "", "--destino", "operador@inventario.interno")]
     [InlineData("--salto", "x;rm -rf /", "--destino", "operador@inventario.interno")]
     [InlineData("--salto", "operador@aux.interno", "--destino", "operador@inv$(id)")]
     [InlineData("--salto", "operador@aux.interno", "--destino", "operador@inventario.interno", "--contenedor", "a b;c")]

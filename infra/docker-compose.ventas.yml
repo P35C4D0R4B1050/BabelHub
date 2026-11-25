@@ -1,9 +1,17 @@
-# VM-VENTAS (ARM, 1 OCPU y 6 GB): E-commerce, Redis (caché y contadores), n8n, Evolution API y un segundo conector de cloudflared (AD11).
+# VM-VENTAS (ARM, 1 OCPU y 6 GB): la entrada pública (cloudflared y Nginx), E-commerce, Redis (caché y contadores), n8n y Evolution API (AD11).
+# Topología de DOS VMs (DD-100): no hay VM-BORDE; es el respaldo previsto en B11, aquí por falta de capacidad AMD micro en la región.
 # Se levanta con un solo comando y sus secretos (PLA-04):
-#   BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.10 IMAGEN_ECOMMERCE=<imagen@sha256:…> \
+#   BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.10 IP_INVENTARIO=10.0.0.20 IMAGEN_ECOMMERCE=<imagen@sha256:…> \
 #   docker compose -f infra/docker-compose.ventas.yml up -d
 # Reglas de PLA-26 y PLA-27: ver docker-compose.inventario.yml. Los paneles de n8n y Evolution API solo se alcanzan por túnel SSH
 # (se publican en 127.0.0.1); Redis no se publica salvo el de contadores, por TLS y en la dirección privada, para la réplica de gestión.
+#
+# La IP del cliente no se puede falsificar (SEG-17, SEG-23, DD-101): el camino público es cloudflared -> Nginx -> E-commerce, cada salto en una
+# red propia donde solo están sus dos extremos. Nginx cree CF-Connecting-IP SOLO de la dirección fija de cloudflared (infra/nginx/nginx.conf) y
+# el E-commerce cree X-Origen-Cliente SOLO de la dirección fija de Nginx (BABELHUB__Ecommerce__ProxiesConocidos, aquí abajo). Ni n8n ni
+# Evolution API están en esas redes. Nada de este camino publica un puerto: tampoco pasa por la dirección privada de la propia VM.
+# Las direcciones fijas son de cloudflared y Nginx; el E-commerce NO lleva una (con ella, `docker compose run` fallaría con «Address already in
+# use» mientras el servicio corre: así se ejecutan cuenta-de-prueba, crear-administrador y cargar-catalogo), y `ip_range` reserva las fijas.
 name: babelhub-ventas
 
 x-excepciones:
@@ -23,6 +31,40 @@ x-registro: &registro
     max-file: "3"
 
 services:
+  nginx:
+    # nginx-unprivileged: la variante oficial que corre como un usuario sin privilegios en el puerto 8080. No publica ningún puerto: solo lo
+    # alcanza cloudflared por la red `tunel`. Llega al E-commerce por la red `entrada` y a la réplica de gestión por la dirección privada de
+    # VM-INVENTARIO (puerto 8081 de la lista de seguridad).
+    image: nginxinc/nginx-unprivileged:1.27-alpine@sha256:65e3e85dbaed8ba248841d9d58a899b6197106c23cb0ff1a132b7bfe0547e4c0
+    user: "101:101"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx:uid=101,gid=101,mode=0755
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    # El upstream «ecommerce» de nginx.conf es el servicio de este mismo Compose; «ecommerce-gestion» es la réplica en VM-INVENTARIO (8081).
+    extra_hosts:
+      - "ecommerce-gestion:${IP_INVENTARIO:?Define IP_INVENTARIO con la dirección privada de VM-INVENTARIO}"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      tunel:
+        ipv4_address: 10.213.10.3
+      entrada:
+        ipv4_address: 10.213.11.2
+    mem_limit: 64m
+    cpus: 0.2
+    pids_limit: 50
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    logging: *registro
+    restart: unless-stopped
+
   ecommerce:
     image: ${IMAGEN_ECOMMERCE:?Define IMAGEN_ECOMMERCE con el digest de la imagen publicada}
     user: "1654:1654"
@@ -38,15 +80,18 @@ services:
       BABELHUB__Web__Host: tienda
       # DD-55: HTTPS entre servicios en Production (guardas de arranque y docs/05): el Inventario llama a este servicio por https://<IP privada>:8443 (avisos de traslado). Kestrel escucha también en 8443 con el
       # certificado de la red privada y la raíz de confianza es la de la VM más la CA privada (ca-bundle.pem, que arma desplegar.sh). Nginx sigue entrando por el 8080.
+      # El origen del cliente (X-Origen-Cliente) solo se acepta de la dirección fija de Nginx en la red `entrada` (SEG-17, DD-101). Es un dato de la
+      # topología, no un secreto: va aquí y manda sobre lo que diga ecommerce.env (una carpeta de secretos antigua no puede ampliar la confianza).
+      BABELHUB__Ecommerce__ProxiesConocidos: "10.213.11.2"
       ASPNETCORE_HTTPS_PORTS: "8443"
       Kestrel__Certificates__Default__Path: /run/secrets/tls-cert.pem
       Kestrel__Certificates__Default__KeyPath: /run/secrets/tls-key.pem
       SSL_CERT_FILE: /run/secrets/ca-bundle.pem
     env_file:
       - "${BABELHUB_SECRETOS:?Define BABELHUB_SECRETOS con la carpeta de los secretos de esta VM}/ecommerce.env"
+    # Solo el HTTPS entre servicios se publica (el Inventario pide avisos). El 8080 no: Nginx entra por la red `entrada` y n8n por la general.
     ports:
-      - "${IP_PRIVADA:?Define IP_PRIVADA con la dirección privada de esta VM}:8080:8080"
-      - "${IP_PRIVADA:?}:8443:8443"
+      - "${IP_PRIVADA:?Define IP_PRIVADA con la dirección privada de esta VM}:8443:8443"
     secrets:
       - source: tls-ecommerce-cert.pem
         target: tls-cert.pem
@@ -62,11 +107,10 @@ services:
       timeout: 5s
       retries: 3
       start_period: 40s
-    # DD-56: un túnel de Cloudflare administrado en remoto tiene UNA sola configuración de destino para todos sus conectores (http://nginx:8080). En VM-BORDE ese nombre es
-    # Nginx; aquí, en el segundo conector, resuelve a este servicio: si cae VM-BORDE, la tienda sigue entrando directo por aquí (sin Nginx, sin la gestión).
+    # `default`: Redis, n8n y la salida hacia VM-INVENTARIO e Internet. `entrada`: solo Nginx.
     networks:
       default:
-        aliases: [nginx]
+      entrada:
     depends_on:
       redis:
         condition: service_healthy
@@ -208,7 +252,8 @@ services:
     restart: unless-stopped
 
   cloudflared:
-    # Segundo conector del mismo túnel (el primero está en VM-BORDE): si cae VM-BORDE, la entrada sigue por aquí.
+    # El ÚNICO conector del túnel: entrega todo a http://nginx:8080 (el destino configurado en Cloudflare). No hay un segundo conector que
+    # salte Nginx: por ese camino un cliente podría escribir su propia cabecera X-Origen-Cliente (DD-101). El token es un secreto de esta VM.
     image: cloudflare/cloudflared:2025.11.1@sha256:89ee50efb1e9cb2ae30281a8a404fed95eb8f02f0a972617526f8c5b417acae2
     user: "65532:65532"
     read_only: true
@@ -217,8 +262,11 @@ services:
     env_file:
       - "${BABELHUB_SECRETOS:?}/cloudflared.env"
     command: ["tunnel", "--no-autoupdate", "--metrics", "127.0.0.1:2000", "run"]
-    mem_limit: 64m
-    cpus: 0.05
+    networks:
+      tunel:
+        ipv4_address: 10.213.10.2
+    mem_limit: 128m
+    cpus: 0.25
     pids_limit: 50
     healthcheck:
       test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:2000", "ready"]
@@ -227,10 +275,26 @@ services:
       retries: 3
       start_period: 15s
     depends_on:
-      ecommerce:
+      nginx:
         condition: service_healthy
     logging: *registro
     restart: unless-stopped
+
+# Las redes de la entrada pública (DD-101). Los rangos quedan fuera de los que Docker reparte solo (172.16/12 y 192.168/16) y de la red privada
+# de la nube (10.0.0.0/16). `ip_range` es de donde salen las direcciones dinámicas, de modo que nunca ocupen una fija.
+networks:
+  default:
+  tunel:
+    ipam:
+      config:
+        - subnet: 10.213.10.0/28
+          ip_range: 10.213.10.8/29
+  entrada:
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.213.11.0/28
+          ip_range: 10.213.11.8/29
 
 secrets:
   tls-ca.pem:

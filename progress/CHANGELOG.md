@@ -2,6 +2,17 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-25 — Topología de dos VMs: la entrada pública dentro de VM-VENTAS (carril `dos-vms-y-r2`, entrega 1)
+
+### Cubierto
+- `cloudflared` y Nginx se despliegan con VM-VENTAS en redes propias y con la IP del cliente imposible de falsificar (DD-100, DD-101); corregidos dos defectos de `main`: origen falsificable por el segundo conector y gestión enviada al proceso de la tienda (DD-102).
+- `desplegar.sh`, `generar-secretos.sh`, ensayo local (nuevo paso 6c), pruebas de infraestructura, despliegue, presupuesto y guía 08 al día; `respaldar-ahora.sh` sin salto obligatorio y con `sudo` (DD-103).
+- Tras las revisiones de arquitectura y seguridad: solo Nginx llega a la réplica de gestión (DD-104); el registro de supresiones usa el contenedor que su credencial puede escribir (antes ninguna cancelación de cuenta habría funcionado en el despliegue); guía corregida (orden de Turnstile, comprobaciones, puertos desde fuera, puerta antes de cobrar).
+
+### Pendiente
+- VM-AUX aplazada: PLA-20 y parte de PLA-38 sin cumplir (hallazgos). Verificar en la VM el camino con el cortafuegos de Oracle (guía §13.2).
+- Respaldos (compresión y R2): entrega 2. Hasta entonces no activar el archivado ni ejecutar `almacen.sh aplicar`.
+
 ## 2026-11-25 — TLS de PostgreSQL entre las VMs (carril `tls-postgres`)
 
 ### Cubierto
