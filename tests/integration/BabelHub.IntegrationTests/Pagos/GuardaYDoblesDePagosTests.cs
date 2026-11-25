@@ -223,7 +223,7 @@ public sealed class GuardaYDoblesDePagosTests
     {
         public Task<ResultadoDeCobro> Cobrar(SolicitudDeCobroEnPasarela solicitud, CancellationToken cancelacion = default) => throw new NotSupportedException();
 
-        public Task<ResultadoDeCobro> ConsultarEstado(Guid referenciaOpaca, CancellationToken cancelacion = default) => throw new NotSupportedException();
+        public Task<ResultadoDeCobro> ConsultarEstado(Guid referenciaOpaca, CancellationToken cancelacion = default, DateTimeOffset? iniciadoEn = null) => throw new NotSupportedException();
 
         public Task<ResultadoDeReembolsoEnPasarela> Reembolsar(Guid reembolsoId, string referenciaDelCargo, Importe monto, CancellationToken cancelacion = default) => throw new NotSupportedException();
 

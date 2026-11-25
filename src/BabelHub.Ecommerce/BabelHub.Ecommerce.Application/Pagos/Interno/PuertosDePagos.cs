@@ -55,8 +55,8 @@ internal interface IPasarelaDePago
     /// <summary>Cobra con el token del medio; sin respuesta o con una respuesta que no se entiende es <see cref="ResultadoDeCobro.SinRespuesta"/>.</summary>
     Task<ResultadoDeCobro> Cobrar(SolicitudDeCobroEnPasarela solicitud, CancellationToken cancelacion = default);
 
-    /// <summary>Consulta el cargo por su referencia opaca (los metadatos), sin cobrar.</summary>
-    Task<ResultadoDeCobro> ConsultarEstado(Guid referenciaOpaca, CancellationToken cancelacion = default);
+    /// <summary>Consulta el cargo por su referencia opaca (los metadatos), sin cobrar. <paramref name="iniciadoEn"/> es el inicio del intento: acota dónde buscar el cargo en una pasarela que no filtra por metadatos (Culqi, DD-95); el simulador lo ignora.</summary>
+    Task<ResultadoDeCobro> ConsultarEstado(Guid referenciaOpaca, CancellationToken cancelacion = default, DateTimeOffset? iniciadoEn = null);
 
     Task<ResultadoDeReembolsoEnPasarela> Reembolsar(Guid reembolsoId, string referenciaDelCargo, Importe monto, CancellationToken cancelacion = default);
 

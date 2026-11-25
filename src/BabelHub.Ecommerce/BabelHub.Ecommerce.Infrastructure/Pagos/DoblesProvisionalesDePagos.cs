@@ -52,7 +52,7 @@ internal sealed class PasarelaDePagoSinProveedor : IPasarelaDePago
 {
     public Task<ResultadoDeCobro> Cobrar(SolicitudDeCobroEnPasarela solicitud, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeCobro.SinRespuesta());
 
-    public Task<ResultadoDeCobro> ConsultarEstado(Guid referenciaOpaca, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeCobro.SinRespuesta());
+    public Task<ResultadoDeCobro> ConsultarEstado(Guid referenciaOpaca, CancellationToken cancelacion = default, DateTimeOffset? iniciadoEn = null) => Task.FromResult(ResultadoDeCobro.SinRespuesta());
 
     public Task<ResultadoDeReembolsoEnPasarela> Reembolsar(Guid reembolsoId, string referenciaDelCargo, Importe monto, CancellationToken cancelacion = default) =>
         Task.FromResult(ResultadoDeReembolsoEnPasarela.SinRespuesta);

@@ -229,7 +229,7 @@ internal sealed class ConsultarPagosPendientes(
     /// <summary>Consulta un intento ya resuelto: solo un aprobado válido hace algo (entra por el único punto de entrada del estado aprobado y sigue la variante de cobro sobrante); lo demás no cambia nada.</summary>
     private async Task ConsultarUnCobroYaResuelto(IntentoDeCobro intento, CancellationToken cancelacion)
     {
-        var validado = (await Consultar(intento.ReferenciaOpaca).ConfigureAwait(false)).Validar(intento);
+        var validado = (await Consultar(intento.ReferenciaOpaca, intento.IniciadoEn).ConfigureAwait(false)).Validar(intento);
         await unidad.Ejecutar(token => AnotarLaConsulta(intento.Id, token), cancelacion).ConfigureAwait(false);
         if (validado.EsDudoso)
         {
@@ -245,7 +245,7 @@ internal sealed class ConsultarPagosPendientes(
     /// <summary>Consulta, valida y actúa. Devuelve si el intento quedó resuelto (aprobado o rechazado).</summary>
     private async Task<bool> ConsultarElEstado(IntentoDeCobro intento, IntencionDePago intencion, CancellationToken cancelacion)
     {
-        var resultado = await Consultar(intento.ReferenciaOpaca).ConfigureAwait(false);
+        var resultado = await Consultar(intento.ReferenciaOpaca, intento.IniciadoEn).ConfigureAwait(false);
         var validado = resultado.Validar(intento);
         await unidad.Ejecutar(token => AnotarLaConsulta(intento.Id, token), cancelacion).ConfigureAwait(false);
         if (validado.EsDudoso)
@@ -272,12 +272,12 @@ internal sealed class ConsultarPagosPendientes(
         return false;
     }
 
-    private async Task<ResultadoDeCobro> Consultar(Guid referenciaOpaca)
+    private async Task<ResultadoDeCobro> Consultar(Guid referenciaOpaca, DateTimeOffset iniciadoEn)
     {
         using var plazo = new CancellationTokenSource(opciones.TiempoDeRespuesta);
         try
         {
-            return await pasarela.ConsultarEstado(referenciaOpaca, plazo.Token).ConfigureAwait(false);
+            return await pasarela.ConsultarEstado(referenciaOpaca, plazo.Token, iniciadoEn).ConfigureAwait(false);
         }
         catch (Exception)
         {

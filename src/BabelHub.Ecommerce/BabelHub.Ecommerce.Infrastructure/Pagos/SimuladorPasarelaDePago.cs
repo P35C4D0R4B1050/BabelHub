@@ -133,7 +133,7 @@ internal sealed class SimuladorPasarelaDePago(IReloj reloj, Func<TimeSpan, Cance
         }
     }
 
-    public Task<ResultadoDeCobro> ConsultarEstado(Guid referenciaOpaca, CancellationToken cancelacion = default)
+    public Task<ResultadoDeCobro> ConsultarEstado(Guid referenciaOpaca, CancellationToken cancelacion = default, DateTimeOffset? iniciadoEn = null)
     {
         lock (_candado)
         {
@@ -259,7 +259,7 @@ internal sealed class NuloPasarelaDePago : IPasarelaDePago
 {
     public Task<ResultadoDeCobro> Cobrar(SolicitudDeCobroEnPasarela solicitud, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeCobro.SinRespuesta());
 
-    public Task<ResultadoDeCobro> ConsultarEstado(Guid referenciaOpaca, CancellationToken cancelacion = default) => Task.FromResult(ResultadoDeCobro.SinRespuesta());
+    public Task<ResultadoDeCobro> ConsultarEstado(Guid referenciaOpaca, CancellationToken cancelacion = default, DateTimeOffset? iniciadoEn = null) => Task.FromResult(ResultadoDeCobro.SinRespuesta());
 
     public Task<ResultadoDeReembolsoEnPasarela> Reembolsar(Guid reembolsoId, string referenciaDelCargo, Importe monto, CancellationToken cancelacion = default) =>
         Task.FromResult(ResultadoDeReembolsoEnPasarela.SinRespuesta);

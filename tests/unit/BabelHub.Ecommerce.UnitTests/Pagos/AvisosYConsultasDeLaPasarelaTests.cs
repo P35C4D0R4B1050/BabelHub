@@ -245,6 +245,7 @@ public sealed class ConsultarPagosPendientesTests
         var llamada = Assert.Single(e.Pagos.Confirmador.Llamadas);
         Assert.Equal((InstantaneasDeCompraDePrueba.Pedido, e.Base.IntentoId, "ch_1"), llamada);
         Assert.Equal(1, e.Intento.Consultas);
+        Assert.Equal(e.Intento.IniciadoEn, Assert.Single(e.Pagos.Pasarela.InicioDeLasConsultas));
         Assert.Equal(0, e.Pagos.Pasarela.ConsultasDentroDeUnaTransaccion);
         Assert.Equal(0, e.Pagos.Confirmador.LlamadasDentroDeUnaTransaccion);
     }
