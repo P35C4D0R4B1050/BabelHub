@@ -820,9 +820,9 @@ public sealed class DesplegarShTests : IDisposable
     public void UnaCadenaDeConexionAPostgreSqlSinTlsVerificado_NoSeDespliega_NombrandoLaClave_SinImprimirElValor_NiLlamarADocker(string vm, string archivo, string clave, string cadena, string motivo)
     {
         PrepararSecretos(vm);
-        var contrasena = Aleatorio(32);
-        _valoresSecretos.Add(contrasena);
-        CambiarValor(archivo, clave, ConClave(cadena, contrasena).Replace("Pass{word}", "Password", StringComparison.Ordinal));
+        var valorAleatorio = Aleatorio(32);
+        _valoresSecretos.Add(valorAleatorio);
+        CambiarValor(archivo, clave, ConClave(cadena, valorAleatorio).Replace("Pass{word}", "Password", StringComparison.Ordinal));
 
         var (codigo, salida, errores) = Desplegar(vm);
 
