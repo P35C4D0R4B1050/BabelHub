@@ -112,18 +112,53 @@ public sealed class EntornoStagingTests
 
     [Theory]
     [Trait("Criterio", "AC-PAG-30")]
-    [InlineData("Staging")]
-    [InlineData("Production")]
-    public void Con_culqi_sin_adaptador_ni_llave_valida_el_arranque_falla_en_Staging_y_en_Production(string entorno)
+    [InlineData("Staging", "sk_" + "test_llave-de-pruebas-0123456789")]
+    [InlineData("Staging", "sk_" + "live_llave-de-produccion-0123456789")]
+    [InlineData("Production", "sk_" + "test_llave-de-pruebas-0123456789")]
+    public void Con_culqi_y_una_llave_que_no_es_de_su_entorno_el_arranque_falla_en_Staging_y_en_Production(string entorno, string llave)
     {
         var configuracion = ConfiguracionDeUnEntornoDeTipoProduccion();
         configuracion["Pagos:Pasarela"] = "culqi";
-        configuracion["Pagos:LlavePrivada"] = "sk_test_llave-de-pruebas-0123456789";
+        configuracion["Pagos:LlavePrivada"] = llave;
         var builder = Constructor(configuracion, entorno);
 
         var falla = Assert.Throws<ConfiguracionDePagosInvalidaException>(() => builder.AgregarEcommerce(ModoDeArranque.Normal));
 
-        Assert.DoesNotContain("sk_test_llave-de-pruebas", falla.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(llave, falla.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-30")]
+    public void En_Production_con_culqi_y_la_llave_de_produccion_arranca_con_el_adaptador_real_y_sin_el_aviso_de_pagos_simulados()
+    {
+        var llave = "sk_" + "live_llave-de-produccion-0123456789";
+        var configuracion = ConfiguracionDeUnEntornoDeTipoProduccion();
+        configuracion["Pagos:Pasarela"] = "culqi";
+        configuracion["Pagos:LlavePrivada"] = llave;
+        var builder = Constructor(configuracion, "Production");
+
+        builder.AgregarEcommerce(ModoDeArranque.Normal);
+        using var app = builder.Build();
+
+        Assert.IsType<CulqiPasarelaDePago>(app.Services.GetRequiredService<BabelHub.Ecommerce.Application.Pagos.Interno.IPasarelaDePago>());
+        Assert.False(app.Services.GetRequiredService<ModoDePagosDeLaWeb>().Simulado);
+        Assert.Contains(app.Services.GetServices<IAdaptadorSaliente>(), a => a.Nombre == "pasarela-de-pago" && !a.EsNulo);
+        var rutas = ((Microsoft.AspNetCore.Routing.IEndpointRouteBuilder)app).DataSources.SelectMany(d => d.Endpoints).OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>();
+        Assert.DoesNotContain(rutas, e => (e.RoutePattern.RawText ?? string.Empty).Contains("integraciones/pasarela", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-30")]
+    public void En_Production_con_culqi_sin_llave_el_arranque_falla_nombrando_la_variable()
+    {
+        var configuracion = ConfiguracionDeUnEntornoDeTipoProduccion();
+        configuracion["Pagos:Pasarela"] = "culqi";
+        configuracion.Remove("Pagos:LlavePrivada");
+        var builder = Constructor(configuracion, "Production");
+
+        var falla = Assert.Throws<ConfiguracionDePagosInvalidaException>(() => builder.AgregarEcommerce(ModoDeArranque.Normal));
+
+        Assert.Contains("BABELHUB__Pagos__LlavePrivada", falla.Message, StringComparison.Ordinal);
     }
 
     [Fact]

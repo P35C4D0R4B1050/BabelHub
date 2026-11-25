@@ -461,10 +461,9 @@ public sealed class AnfitrionDelEcommerceTests
     }
 
     [Theory]
-    [InlineData("culqi")]
     [InlineData("otra-pasarela")]
     [Trait("Criterio", "AC-PAG-10")]
-    public void UnaPasarelaSinAdaptadorODesconocida_FallaElArranque_NombrandoLaVariable_SinLasClaves(string pasarela)
+    public void UnaPasarelaDesconocida_FallaElArranque_NombrandoLaVariable_SinLasClaves(string pasarela)
     {
         var configuracion = ConfiguracionCompleta();
         configuracion["Pagos:Pasarela"] = pasarela;

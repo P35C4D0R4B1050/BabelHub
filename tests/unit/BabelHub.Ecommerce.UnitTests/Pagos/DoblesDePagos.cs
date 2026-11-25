@@ -220,6 +220,9 @@ internal sealed class PasarelaDePagoDoble(UnidadDeTrabajoReversible unidad) : IP
     public bool ConsultaLanza { get; set; }
 
     public List<Guid> Consultas { get; } = [];
+    /// <summary>El inicio del intento con el que se consultó cada vez (Culqi lo usa para acotar la búsqueda del cargo, DD-95).</summary>
+    public List<DateTimeOffset?> InicioDeLasConsultas { get; } = [];
+
 
     public int ConsultasDentroDeUnaTransaccion { get; private set; }
 
@@ -228,9 +231,10 @@ internal sealed class PasarelaDePagoDoble(UnidadDeTrabajoReversible unidad) : IP
 
     public AvisoDeLaPasarela? InterpretarAviso(ReadOnlyMemory<byte> cuerpo) => Interprete?.Invoke(cuerpo);
 
-    public Task<ResultadoDeCobro> ConsultarEstado(Guid referenciaOpaca, CancellationToken cancelacion = default)
+    public Task<ResultadoDeCobro> ConsultarEstado(Guid referenciaOpaca, CancellationToken cancelacion = default, DateTimeOffset? iniciadoEn = null)
     {
         Consultas.Add(referenciaOpaca);
+        InicioDeLasConsultas.Add(iniciadoEn);
         if (unidad.EnCurso)
         {
             ConsultasDentroDeUnaTransaccion++;

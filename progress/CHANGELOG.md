@@ -2,6 +2,15 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-25 (noche) — Adaptador real de Culqi (T37) listo para conectarse, sin llaves
+
+### Cubierto
+- `ecommerce-pagos` T37: `CulqiPasarelaDePago` (cobro, consulta por la referencia opaca, reembolso y su reconocimiento, lectura del aviso) con `ClienteHttpDeCulqi` (10 s, cortacircuito, un reintento solo de lecturas, nunca del cobro ni del reembolso); se activa con `BABELHUB__Pagos__Pasarela=culqi` y `BABELHUB__Pagos__LlavePrivada` (la guarda de PAG-12 y PAG-34 no cambió) y pide el correo del titular. La entrada de avisos sigue deshabilitada: la documentación pública de Culqi no describe firma (DD-95).
+- Pruebas: HTTP simulado con la forma de la especificación OpenAPI de Culqi, el flujo completo sobre PostgreSQL real con un Culqi simulado con estado (aprobado, rechazado, 3DS, respuesta perdida, red caída, otro importe, 20 cobros simultáneos, pago tardío con reembolso, reembolso perdido o rechazado, aviso duplicado) y la guarda por entorno. Revisión de seguridad y de arquitectura pasadas.
+- Investigación citada de la API de Culqi y DD-95 a DD-99 (pendientes de ratificar); guía del spike T38 y prueba de humo `CulqiRealTests` (se omite sin llaves).
+
+### Pendiente
+- T38 (la persona, con sus llaves de integración): nada se probó contra Culqi real. T38b: la pantalla de pago aún no genera el token de Culqi (DD-99a).
 ## 2026-11-25 — Carrera real en la conciliación de ingresos y arreglos del ensayo local en Windows
 
 ### Cubierto

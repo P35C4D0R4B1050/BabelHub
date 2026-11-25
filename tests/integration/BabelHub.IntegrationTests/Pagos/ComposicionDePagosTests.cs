@@ -13,7 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace BabelHub.IntegrationTests.Pagos;
 
 /// <summary>
-/// T27: la composición de Pagos sin base de datos (AC-PAG-10, PAG-12): la guarda de arranque corre antes de registrar nada, el simulador y la pasarela nula se eligen como corresponde, Culqi falla el arranque hasta que exista su adaptador, los contratos públicos y
+/// T27: la composición de Pagos sin base de datos (AC-PAG-10, PAG-12): la guarda de arranque corre antes de registrar nada, el simulador y la pasarela nula se eligen como corresponde, Culqi compone su adaptador solo con la llave de su entorno, los contratos públicos y
 /// los nueve trabajos de fondo se resuelven con sus casos de uso, Pagos reemplaza al creador de intenciones provisional de Carrito y en producción un doble provisional de Identidad o de Pedidos falla el arranque nombrándolo.
 /// </summary>
 public sealed class ComposicionDePagosTests
@@ -60,6 +60,7 @@ public sealed class ComposicionDePagosTests
         using var alcance = proveedor.CreateScope();
 
         Assert.IsType<SimuladorPasarelaDePago>(proveedor.GetRequiredService<IPasarelaDePago>());
+        Assert.False(proveedor.GetRequiredService<OpcionesDelCobro>().EnviarElCorreoDelTitular);
         Assert.NotNull(alcance.ServiceProvider.GetRequiredService<IPagos>());
         Assert.NotNull(alcance.ServiceProvider.GetRequiredService<IReembolsos>());
         Assert.NotNull(alcance.ServiceProvider.GetRequiredService<IAvisosDeLaPasarela>());
@@ -113,15 +114,41 @@ public sealed class ComposicionDePagosTests
         Assert.Throws<ConfiguracionDePagosInvalidaException>(() => ConExternos().AgregarPagos(Opciones(sinLlamadasReales: true, nula: false), esProduccion: false));
     }
 
-    [Fact]
-    public void Culqi_falla_el_arranque_hasta_que_exista_su_adaptador_sin_repetir_la_llave()
+    [Theory]
+    [Trait("Criterio", "AC-PAG-30")]
+    [InlineData("Test", "sk_" + "test_llave-de-integracion-0123456789")]
+    [InlineData("Development", "sk_" + "test_llave-de-integracion-0123456789")]
+    [InlineData("Production", "sk_" + "live_llave-de-produccion-0123456789")]
+    public void Culqi_con_la_llave_de_su_entorno_compone_el_adaptador_real_con_su_cliente_resiliente(string entorno, string llave)
     {
-        var llave = "sk_test_llave-de-pruebas-0123456789";
+        var servicios = ConExternos().AgregarPagos(Opciones("culqi", entorno, llave: llave), esProduccion: false);
+        using var proveedor = servicios.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = false });
 
-        var falla = Assert.Throws<ConfiguracionDePagosInvalidaException>(() => ConExternos().AgregarPagos(Opciones("culqi", llave: llave), esProduccion: false));
+        Assert.IsType<CulqiPasarelaDePago>(proveedor.GetRequiredService<IPasarelaDePago>());
+        using var cliente = proveedor.GetRequiredService<IHttpClientFactory>().CreateClient(OpcionesDeCulqi.NombreDelCliente);
+        Assert.Equal("https://api.culqi.com/v2/", cliente.BaseAddress!.ToString());
+        Assert.DoesNotContain(llave, proveedor.GetRequiredService<OpcionesDeCulqi>().ToString(), StringComparison.Ordinal);
+        Assert.True(proveedor.GetRequiredService<OpcionesDelCobro>().EnviarElCorreoDelTitular);
+    }
 
-        Assert.Contains("T37", falla.Message, StringComparison.Ordinal);
+    [Theory]
+    [Trait("Criterio", "AC-PAG-10")]
+    [Trait("Criterio", "AC-PAG-30")]
+    [InlineData("Production", "sk_" + "test_llave-de-integracion-0123456789")]
+    [InlineData("Staging", "sk_" + "live_llave-de-produccion-0123456789")]
+    [InlineData("Staging", "sk_" + "test_llave-de-integracion-0123456789")]
+    [InlineData("Test", "sk_" + "live_llave-de-produccion-0123456789")]
+    [InlineData("Production", "llave-sin-prefijo-de-culqi-0123456789")]
+    public void Culqi_con_la_llave_de_otro_entorno_o_sin_prefijo_falla_el_arranque_sin_repetir_la_llave_y_sin_registrar_nada(string entorno, string llave)
+    {
+        var servicios = ConExternos();
+        var antes = servicios.Count;
+
+        var falla = Assert.Throws<ConfiguracionDePagosInvalidaException>(() => servicios.AgregarPagos(Opciones("culqi", entorno, llave: llave), esProduccion: false));
+
+        Assert.Contains(GuardaDeArranqueDePagos.VariableLlavePrivada, falla.Message, StringComparison.Ordinal);
         Assert.DoesNotContain(llave, falla.Message, StringComparison.Ordinal);
+        Assert.Equal(antes, servicios.Count);
     }
 
     [Fact]

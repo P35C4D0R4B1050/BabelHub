@@ -218,7 +218,7 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
         var host = Capturar(extra, () => OpcionesDelHostWeb.Leer(configuracion, esProduccion));
         var sesiones = host is null ? null : Capturar(extra, () => ConfiguracionDeSesionesWeb.Leer(configuracion, host.Host == HostWeb.Tienda ? HostDeSesion.Tienda : HostDeSesion.Gestion));
         var verificacion = Capturar(extra, () => new OpcionesDeVerificacionWeb(configuracion["Seguridad:Turnstile:ClaveDeSitio"] ?? string.Empty));
-        // Pagos: la pasarela se declara siempre (el simulador solo vale en Development, Test y Staging; «culqi» aún no tiene adaptador) y la clave de los intentos es un secreto; el resto lo valida su guarda de arranque nombrando la variable.
+        // Pagos: la pasarela se declara siempre (el simulador solo vale en Development, Test y Staging; «culqi» compone el adaptador real de Culqi, T37) y la clave de los intentos es un secreto; el resto lo valida su guarda de arranque nombrando la variable.
         _ = lector.Obligatorio("Pagos:Pasarela");
         if (lector.Obligatorio("Pagos:ClaveDeIntentos") is { } claveDeIntentos)
         {
@@ -461,7 +461,7 @@ public static class AnfitrionDelEcommerce
         servicios.AgregarTrabajosDelCarritoEnLaApi(soloEnModoNormal);
 
         // ---------- Pagos, Envíos, Reclamaciones y Pedidos ----------
-        // Pagos reemplaza al creador de intenciones provisional de Carrito; en el ensayo y al restaurar la pasarela es siempre la nula (nunca una llamada a un proveedor). «culqi» aún no tiene adaptador: su guarda lo rechaza nombrando la variable.
+        // Pagos reemplaza al creador de intenciones provisional de Carrito; en el ensayo y al restaurar la pasarela es siempre la nula (nunca una llamada a un proveedor). «culqi» compone el adaptador real (T37): su guarda exige la llave de su entorno y la rechaza nombrando la variable.
         var guardarProduccion = esProduccion && soloEnModoNormal;
         var opcionesDePagos = LectorDeOpcionesDePagos.Leer(builder.Configuration, builder.Environment.EnvironmentName, sinLlamadasReales: !soloEnModoNormal, pedidosDisponible: true);
         servicios.AgregarPagos(opcionesDePagos, esProduccion: false);
@@ -525,7 +525,7 @@ public static class AnfitrionDelEcommerce
         app.UsarLimiteDeCuerpoDelCarrito();
         app.UsarPoliticaDeTextosPendientes();
         app.MapearSalud();
-        // La entrada de avisos de la pasarela solo se mapea con un esquema de firma verificable (hoy ninguno: «culqi» no tiene adaptador), así que responde 404.
+        // La entrada de avisos de la pasarela solo se mapea con un esquema de firma verificable (hoy ninguno: la especificación pública de Culqi no documenta firma ni autenticación de sus webhooks, DD-95), así que responde 404 y rige solo la consulta de cada minuto.
         app.MapearAvisosDeLaPasarela(habilitada: false);
         // Notificaciones: la solicitud del Inventario y la administración (desactivar, reactivar y consultar); los estados de entrega de n8n solo existen si el envío es por n8n (con su firma verificable) y son de la red interna.
         app.MapearNotificaciones();
