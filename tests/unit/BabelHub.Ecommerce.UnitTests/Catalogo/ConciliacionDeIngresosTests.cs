@@ -239,6 +239,39 @@ public sealed class ConciliacionDeIngresosTests
         Assert.Equal(EstadoDeIngreso.Fallido, s.Entorno.Ingresos.Todos.Single().Estado);
     }
 
+    [Theory]
+    [InlineData(ResolucionDeIngreso.Registrado)]
+    [InlineData(ResolucionDeIngreso.Fallido)]
+    [Trait("Criterio", "AC-CAT-18")]
+    public async Task La_perdedora_de_dos_conciliaciones_simultaneas_recibe_el_conflicto_y_no_una_regla_de_negocio_cuando_la_ganadora_ya_constato_el_ingreso(ResolucionDeIngreso resolucion)
+    {
+        // Antes del arreglo, la perdedora leía la fila como pendiente y, al consultar al Inventario, el ingreso ya lo había constatado la ganadora:
+        // veía «0 coincidencias» y respondía 422 en lugar del 409 que exige AC-CAT-18 (falló de forma intermitente en el CI).
+        var s = await ConPendiente();
+        var remoto = IngresoRemoto(s);
+        s.Entorno.Inventario.Ingresos.Add(remoto);
+        var ganadoraTermino = false;
+        s.Entorno.Inventario.AlListarIngresos = () =>
+        {
+            if (ganadoraTermino)
+            {
+                return;
+            }
+
+            ganadoraTermino = true;
+            var fila = RepositorioDeIngresosEnMemoria.Clonar(s.Fila);
+            fila.MarcarRegistrado(remoto.IngresoId, s.Entorno.Reloj.Ahora);
+            s.Entorno.Ingresos.GuardarTransicion(fila).GetAwaiter().GetResult();
+        };
+
+        var resultado = await Conciliar(s, resolucion, confirma: true);
+
+        Assert.Equal(CategoriaDeError.Conflicto, resultado.Error!.Categoria);
+        Assert.Equal(ClavesDelCatalogo.IngresoYaResuelto, resultado.Error.Clave);
+        Assert.Equal(EstadoDeIngreso.Registrado, s.Entorno.Ingresos.Todos.Single().Estado);
+        Assert.Equal(remoto.IngresoId, s.Entorno.Ingresos.Todos.Single().IngresoId);
+    }
+
     [Fact]
     [Trait("Criterio", "AC-CAT-18")]
     public async Task Una_fila_ya_resuelta_inexistente_o_de_otra_edicion_se_rechaza_antes_de_llamar_al_inventario()

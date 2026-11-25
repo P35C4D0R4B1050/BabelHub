@@ -68,6 +68,17 @@ if (entrada.Resolucion == ResolucionDeIngreso.Fallido && reloj.Ahora - fila.Ulti
         var constatados = await unidad.Ejecutar(token => ingresos.IngresosYaConstatados(remotos.Select(i => i.IngresoId).ToList(), token), cancelacion).ConfigureAwait(false);
         var coincidencias = remotos.Where(i => !constatados.Contains(i.IngresoId) && Coincide(fila, i)).ToList();
 
+        // Una conciliación simultánea pudo resolver la fila entre la lectura y esta consulta: su ingreso ya consta como constatado y aquí no coincide con nada.
+        // La perdedora recibe el conflicto (AC-CAT-18), no una regla de negocio sobre una coincidencia que dejó de existir por culpa de la carrera.
+        if (coincidencias.Count != 1 || entrada.Resolucion == ResolucionDeIngreso.Fallido)
+        {
+            var actual = await unidad.Ejecutar(token => ingresos.Obtener(fila.Id, paraActualizar: false, token), cancelacion).ConfigureAwait(false);
+            if (actual is not null && !actual.EstaPendiente)
+            {
+                return FallosDelCatalogo.De<ResultadoDeIngreso>(CategoriaDeError.Conflicto, ClavesDelCatalogo.IngresoYaResuelto);
+            }
+        }
+
         if (entrada.Resolucion == ResolucionDeIngreso.Registrado && coincidencias.Count != 1)
         {
             return FallosDelCatalogo.De<ResultadoDeIngreso>(CategoriaDeError.ReglaDeNegocio, ClavesDelCatalogo.ReglaDeNegocio, [new ErrorDeCampo("resolucion", "sin-coincidencia-unica")]);
