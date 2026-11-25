@@ -9,6 +9,8 @@
 # Necesita Docker (con Compose v2.24 o más) y bash en Linux, macOS o WSL (en Windows con Git Bash también funciona). No usa tu dominio, ni Oracle,
 # ni ningún secreto real: todo vive en una carpeta temporal fuera del repositorio y los puertos son locales (127.0.0.1:3xxxx, por debajo del rango dinámico de Windows).
 #
+# Prueba también el TLS de PostgreSQL (AM24, paso 6b): rechazo sin TLS, con otra CA y con otro nombre; conexiones de red todas cifradas; respaldo por el socket local; y Evolution API (Prisma) si su imagen está en el equipo (ENSAYO_EVOLUTION=1 la descarga).
+#
 # Lo que NO prueba: Cloudflare, el túnel, Evolution API (WhatsApp), el almacén de objetos de Oracle ni los cobros reales. Los dos servicios del
 # E-commerce corren en «Staging» (el entorno de revisión de la tienda por Culqi: se endurece como «Production» y solo afloja el cobro, con la
 # pasarela simulada) y, al final, el ensayo ejecuta el comando «cuenta-de-prueba» con la imagen real (guía, §15.1).
@@ -153,5 +155,80 @@ echo "    cuenta-de-prueba --purgar (sin almacén de objetos en el ensayo: debe 
 salida_purga="$(consola cuenta-de-prueba --purgar || true)"
 echo "$salida_purga"
 if grep -q "RegistroDeSupresionesNoDisponibleException" <<<"$salida_purga"; then echo "    (negación esperada: correcto)"; else echo "    ERROR: --purgar no se negó por el motivo esperado." >&2; exit 1; fi
-paso "7/7 Listo. Los dos servicios respondieron «listo» (200) y los certificados se validaron."
+
+# ---------- TLS de PostgreSQL (AM24): lo que debe RECHAZARSE y lo que debe funcionar ----------
+paso "6b/7 TLS de PostgreSQL: una conexión sin TLS, con otra CA o con el nombre equivocado se rechaza; con la CA y el nombre correctos, funciona"
+MAL=0
+esperar_rechazo() { # descripción salida-de-psql patrón: debe haber fallado con ese motivo
+  if grep -qiE "$3" <<<"$2"; then echo "    ok   $1: rechazada ($(grep -oiE "$3" <<<"$2" | head -n 1))"; else echo "    ERROR $1: no se rechazó por el motivo esperado. Salida: $(head -c 300 <<<"$2")" >&2; MAL=1; fi
+}
+valor_de() { # archivo clave -> valor sin comillas (los secretos del ensayo son de mentira; igual no se imprimen)
+  local linea; linea="$(grep -m1 "^$2=" "$1")" || return 1; linea="${linea#*=}"; linea="${linea#\"}"; printf '%s' "${linea%\"}"
+}
+cadena_de_la_cuenta="$(valor_de "$TRABAJO/secretos/ventas/ecommerce.env" BABELHUB__Ecommerce__Base__Aplicacion)"
+export PGPASSWORD="$(sed -E 's/.*Password=([^;]*).*/\1/' <<<"$cadena_de_la_cuenta")"
+# Otra CA (de mentira), para comprobar que no basta con «una CA cualquiera».
+(cd "$TRABAJO" && MSYS_NO_PATHCONV=1 openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=Otra CA de ensayo" -keyout otra-ca-clave.pem -out otra-ca.pem 2>/dev/null) || { echo "Error: no se pudo crear la CA ajena del ensayo (falta openssl)." >&2; exit 1; }
+otra_ca_docker="$TRABAJO/otra-ca.pem"; ca_pg_docker="$ca"
+if [[ "$(uname -s)" == MINGW* || "$(uname -s)" == MSYS* ]]; then otra_ca_docker="$(cygpath -m "$otra_ca_docker")"; ca_pg_docker="$(cygpath -m "$ca")"; fi
+# El cliente es psql de la propia imagen de PostgreSQL, en una red aparte, hacia el puerto local de VM-INVENTARIO (35432); el nombre «host.docker.internal» es el que lleva el certificado en el ensayo.
+cliente() { # cadena-de-conexión [consulta]
+  MSYS_NO_PATHCONV=1 docker run --rm --add-host host.docker.internal:host-gateway --add-host nombre-equivocado.invalido:host-gateway -e PGPASSWORD -e PGCONNECT_TIMEOUT=10 \
+    -v "$ca_pg_docker:/ca.pem:ro" -v "$otra_ca_docker:/otra-ca.pem:ro" --entrypoint psql "${DIGEST[postgres]}" "$1" -At -c "${2:-select 1}" 2>&1 || true
+}
+BASE="host=host.docker.internal port=35432 dbname=ecommerce user=ecommerce_acceso"
+esperar_rechazo "sin TLS (sslmode=disable)" "$(cliente "$BASE sslmode=disable")" "no encryption|rejects connection"
+esperar_rechazo "con TLS pero una CA que no es la de la cuenta (verify-full)" "$(cliente "$BASE sslmode=verify-full sslrootcert=/otra-ca.pem")" "certificate verify failed"
+esperar_rechazo "con la CA correcta pero un nombre que el certificado no tiene (verify-full)" \
+  "$(cliente "host=nombre-equivocado.invalido port=35432 dbname=ecommerce user=ecommerce_acceso sslmode=verify-full sslrootcert=/ca.pem")" "does not match host name|certificate verify failed"
+esperar_rechazo "otra base distinta de las de la plataforma, aun con TLS correcto" "$(cliente "host=host.docker.internal port=35432 dbname=postgres user=ecommerce_acceso sslmode=verify-full sslrootcert=/ca.pem")" "pg_hba.conf rejects"
+correcta="$(cliente "$BASE sslmode=verify-full sslrootcert=/ca.pem" "select 'tls=' || ssl || ' version=' || version from pg_stat_ssl where pid = pg_backend_pid()")"
+if grep -q "^tls=true version=TLSv1.3$" <<<"$correcta"; then echo "    ok   con la CA y el nombre correctos (verify-full): conecta ($correcta)"; else echo "    ERROR: la conexión correcta no funcionó con TLS 1.3: $(head -c 300 <<<"$correcta")" >&2; MAL=1; fi
+unset PGPASSWORD
+# Ninguna conexión de red a la base va sin TLS (las de los servicios y las del migrador ya pasaron por aquí al desplegar).
+ids_pg="$(docker ps -q --filter "label=com.docker.compose.project=babelhub-inventario" --filter "label=com.docker.compose.service=postgres")"
+sin_tls="$(docker exec "$ids_pg" psql -U postgres -At -c "select count(*) from pg_stat_activity a join pg_stat_ssl s using (pid) where a.client_addr is not null and not s.ssl")"
+con_tls="$(docker exec "$ids_pg" psql -U postgres -At -c "select count(*) from pg_stat_activity a join pg_stat_ssl s using (pid) where a.client_addr is not null and s.ssl")"
+if [[ "$sin_tls" == 0 && "$con_tls" -gt 0 ]]; then echo "    ok   PostgreSQL ve $con_tls conexiones de red, todas con TLS (y $sin_tls sin TLS)"; else echo "    ERROR: conexiones de red sin TLS: $sin_tls (con TLS: $con_tls)" >&2; MAL=1; fi
+# El respaldo y el archivado siguen operando por el socket local (sin red): la copia base y la rotación de un segmento de WAL.
+bytes="$(docker exec "$ids_pg" sh -c 'pg_basebackup -D - -Ft -X fetch -c fast | wc -c')"
+if [[ "$bytes" -gt 1000000 ]]; then echo "    ok   pg_basebackup (lo que usa respaldar.sh) por el socket local: $bytes bytes"; else echo "    ERROR: pg_basebackup no produjo una copia ($bytes bytes)" >&2; MAL=1; fi
+docker exec "$ids_pg" psql -U postgres -At -c "select pg_switch_wal() is not null" >/dev/null && echo "    ok   cambio de segmento de WAL (lo que dispara archivar-wal.sh)"
+# Los clientes .NET: con la raíz de confianza de la VM funcionan (ya lo hicieron al migrar); sin la CA privada, o pidiendo SSL Mode=Disable, deben FALLAR (VerifyFull no es decorativo).
+ventas_run() { BABELHUB_SECRETOS="$TRABAJO/secretos/ventas" IP_PRIVADA=127.0.0.1 docker compose -p babelhub-ventas --project-directory "$RAIZ/infra" -f "$RAIZ/infra/docker-compose.ventas.yml" -f "$TRABAJO/ventas.override.yml" run --rm --no-deps --no-TTY "$@" 2>&1 || true; }
+sin_ca="$(ventas_run -e SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt ecommerce cuenta-de-prueba --cantidad 1 | sed -E 's/^(  contraseña[^:]*: ).*/\1[oculta]/')"
+if grep -q "no se pudo completar" <<<"$sin_ca" && ! grep -q "cuenta creada" <<<"$sin_ca"; then echo "    ok   Npgsql con VerifyFull sin la CA privada en su raíz de confianza: rechazado (la misma orden con el entorno normal sí conecta, paso anterior)"; else echo "    ERROR: Npgsql se conectó sin confiar en la CA privada: $(head -c 400 <<<"$sin_ca")" >&2; MAL=1; fi
+export CADENA_DE_ENSAYO_SIN_TLS="${cadena_de_la_cuenta//SSL Mode=VerifyFull/SSL Mode=Disable}"
+sin_tls_net="$(ventas_run -e CADENA_DE_ENSAYO_SIN_TLS -e "BABELHUB__Ecommerce__Base__Aplicacion=$CADENA_DE_ENSAYO_SIN_TLS" ecommerce cuenta-de-prueba --cantidad 1 | sed -E 's/^(  contraseña[^:]*: ).*/\1[oculta]/')"
+unset CADENA_DE_ENSAYO_SIN_TLS
+if grep -q "no se pudo completar" <<<"$sin_tls_net" && ! grep -q "cuenta creada" <<<"$sin_tls_net"; then echo "    ok   Npgsql con SSL Mode=Disable: la base lo rechaza (pg_hba.conf; el mismo comando con la cadena normal sí conecta)"; else echo "    ERROR: una cadena sin TLS no fue rechazada: $(head -c 400 <<<"$sin_tls_net")" >&2; MAL=1; fi
+# Evolution API (Prisma): se prueba con su imagen fijada, si ya está en el equipo (pesa unos 2 GB; ENSAYO_EVOLUTION=1 la descarga).
+imagen_evolution="$(grep -oE 'evoapicloud/evolution-api:[^ ]+' "$RAIZ/infra/docker-compose.ventas.yml" | head -n 1)"
+if [[ "${ENSAYO_EVOLUTION:-0}" == 1 ]] || docker image inspect "$imagen_evolution" >/dev/null 2>&1; then
+  uri="$(valor_de "$TRABAJO/secretos/ventas/evolution.env" DATABASE_CONNECTION_URI)"
+  clave_evolution="$(sed -E 's#^postgresql://evolution:([^@]*)@.*#\1#' <<<"$uri")"
+  # La base técnica se crea una vez, como en la guía (§15.3); la contraseña no viaja en la línea de comandos del anfitrión sino por la entrada de psql.
+  docker exec -i "$ids_pg" psql -U postgres -v ON_ERROR_STOP=1 <<SQL >/dev/null || true
+CREATE ROLE evolution LOGIN PASSWORD '$clave_evolution';
+SQL
+  docker exec "$ids_pg" psql -U postgres -c "CREATE DATABASE evolution OWNER evolution" -c "REVOKE CONNECT ON DATABASE evolution FROM PUBLIC" >/dev/null || true
+  # Se prueba con la URI de ventas/evolution.env tal cual, cambiando solo el host por el del ensayo y la ruta de la CA por la del contenedor de prueba.
+  uri_ensayo="${uri//@127.0.0.1:5432/@host.docker.internal:35432}"
+  evolution_prueba() { # uri
+    MSYS_NO_PATHCONV=1 docker run --rm --add-host host.docker.internal:host-gateway --add-host nombre-equivocado.invalido:host-gateway -v "$ca_pg_docker:/ca.pem:ro" -v "$otra_ca_docker:/otra-ca.pem:ro" --entrypoint sh "$imagen_evolution" \
+      -c 'echo "select 1 as ok" | ./node_modules/.bin/prisma db execute --url "$0" --stdin 2>&1 | tail -n 8' "$1" || true
+  }
+  salida_evo="$(evolution_prueba "${uri_ensayo/\/run\/secrets\/tls-ca.pem//ca.pem}")"
+  if grep -q "Script executed successfully" <<<"$salida_evo"; then echo "    ok   Evolution API (Prisma) con la URI de evolution.env, la CA y el nombre correctos: conecta con TLS verificado"; else echo "    ERROR: Evolution (Prisma) no conectó: $(head -c 300 <<<"$salida_evo")" >&2; MAL=1; fi
+  salida_evo="$(evolution_prueba "${uri_ensayo/\/run\/secrets\/tls-ca.pem//otra-ca.pem}")"
+  if ! grep -q "Script executed successfully" <<<"$salida_evo" && grep -qE "P10[0-9][0-9]" <<<"$salida_evo"; then echo "    ok   Evolution API (Prisma) con otra CA: rechazada ($(grep -oE "P10[0-9][0-9]" <<<"$salida_evo" | head -n 1); con la CA correcta, la misma ruta conecta)"; else echo "    ERROR: Evolution (Prisma) aceptó otra CA: $(head -c 300 <<<"$salida_evo")" >&2; MAL=1; fi
+  uri_nombre="${uri_ensayo/@host.docker.internal:/@nombre-equivocado.invalido:}"
+  salida_evo="$(evolution_prueba "${uri_nombre/\/run\/secrets\/tls-ca.pem//ca.pem}")"
+  if ! grep -q "Script executed successfully" <<<"$salida_evo" && grep -qE "P10[0-9][0-9]" <<<"$salida_evo"; then echo "    ok   Evolution API (Prisma) con la CA correcta pero otro nombre: rechazada ($(grep -oE "P10[0-9][0-9]" <<<"$salida_evo" | head -n 1))"; else echo "    ERROR: Evolution (Prisma) aceptó un nombre que el certificado no tiene: $(head -c 300 <<<"$salida_evo")" >&2; MAL=1; fi
+  echo "    (Prisma ignora «sslmode=verify-full» y cae en «prefer» sin verificar: por eso la URI usa sslmode=require + sslaccept=strict + sslcert; desplegar.sh rechaza verify-full; DD-91)"
+else
+  echo "    -    Evolution API: omitido (su imagen no está en el equipo; con ENSAYO_EVOLUTION=1 el ensayo la descarga y la prueba)"
+fi
+[[ "$MAL" -eq 0 ]] || { echo "Error: el TLS de PostgreSQL no se comportó como debe (ver arriba)." >&2; exit 1; }
+paso "7/7 Listo. Los dos servicios respondieron «listo» (200), los certificados se validaron y PostgreSQL solo habla TLS verificado."
 echo "    Para borrar todo: bash scripts/ensayo-local.sh --limpiar"

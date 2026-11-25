@@ -80,8 +80,8 @@ public sealed class ComposePorVmTests : IDisposable
     private static readonly Dictionary<string, string[]> SecretosPermitidos = new(StringComparer.Ordinal)
     {
         ["borde"] = ["cloudflared.env"],
-        ["ventas"] = ["ca-bundle.pem", "cloudflared.env", "ecommerce.env", "evolution.env", "n8n.env", "tls-ecommerce-cert.pem", "tls-ecommerce-key.pem", "redis-contadores-ca.pem", "redis-contadores-cert.pem", "redis-contadores-key.pem", "redis-contadores.env", "redis.env"],
-        ["inventario"] = ["ca-bundle.pem", "ecommerce-gestion.env", "inventario.env", "postgres.env", "tls-gestion-cert.pem", "tls-gestion-key.pem", "tls-inventario-cert.pem", "tls-inventario-key.pem"],
+        ["ventas"] = ["ca-bundle.pem", "cloudflared.env", "ecommerce.env", "evolution.env", "n8n.env", "tls-ca.pem", "tls-ecommerce-cert.pem", "tls-ecommerce-key.pem", "redis-contadores-ca.pem", "redis-contadores-cert.pem", "redis-contadores-key.pem", "redis-contadores.env", "redis.env"],
+        ["inventario"] = ["ca-bundle.pem", "ecommerce-gestion.env", "inventario.env", "postgres.env", "tls-gestion-cert.pem", "tls-gestion-key.pem", "tls-inventario-cert.pem", "tls-inventario-key.pem", "tls-postgres-cert.pem", "tls-postgres-key.pem"],
     };
 
     [Theory]
@@ -115,6 +115,74 @@ public sealed class ComposePorVmTests : IDisposable
         Assert.DoesNotMatch(@"(?mi)^[ \t]*[\w_]*(password|secret|clave|token)[\w_]*[ \t]*[:=][ \t]*[^\s$\x22'].{6,}$", texto);
         // Solo el bucle local (127.0.0.1) puede ir escrito; las direcciones privadas vienen de IP_PRIVADA.
         Assert.DoesNotMatch(@"(?m)^[ \t]*-[ \t]*""?(?!127\.0\.0\.1:)\d{1,3}(\.\d{1,3}){3}:\d+:\d+""?[ \t]*$", texto);
+    }
+
+    // ---------- TLS de PostgreSQL (AM24) ----------
+
+    private JsonElement ServicioDelCompose(string vm, string servicio)
+    {
+        var documento = JsonDocument.Parse(ComposeDeVms.ComposeResuelto(vm, _carpeta));
+        return documento.RootElement.GetProperty("services").GetProperty(servicio).Clone();
+    }
+
+    private static string[] Lista(JsonElement elemento, string propiedad) =>
+        elemento.TryGetProperty(propiedad, out var valores) && valores.ValueKind == JsonValueKind.Array ? [.. valores.EnumerateArray().Select(v => v.GetString() ?? string.Empty)] : [];
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void PostgreSqlDeLaVmDeDatos_ArrancaConTlsPorSuEntrypoint_ConElControlDeAccesoDeLaImagen_YSinRomperElSoloLecturaNiLasCapacidades()
+    {
+        var postgres = ServicioDelCompose("inventario", "postgres");
+        var orden = Lista(postgres, "command");
+        string Opcion(string nombre) => orden.SingleOrDefault(a => a.StartsWith(nombre + "=", StringComparison.Ordinal)) ?? string.Empty;
+
+        Assert.Equal(["/opt/babelhub/iniciar.sh"], Lista(postgres, "entrypoint"));
+        Assert.Equal("ssl=on", Opcion("ssl"));
+        Assert.Equal("ssl_cert_file=/run/postgresql/tls/server.crt", Opcion("ssl_cert_file"));
+        Assert.Equal("ssl_key_file=/run/postgresql/tls/server.key", Opcion("ssl_key_file"));
+        Assert.Equal("hba_file=/opt/babelhub/pg_hba.conf", Opcion("hba_file"));
+        Assert.Equal("ssl_min_protocol_version=TLSv1.3", Opcion("ssl_min_protocol_version"));
+        // Los secretos del servidor se montan de solo lectura como archivos de /run/secrets y el contenedor conserva sus restricciones.
+        Assert.Equal(["tls-cert.pem", "tls-key.pem"], [.. postgres.GetProperty("secrets").EnumerateArray().Select(s => s.GetProperty("target").GetString()!).Order(StringComparer.Ordinal)]);
+        Assert.True(postgres.GetProperty("read_only").GetBoolean());
+        Assert.Equal(["ALL"], Lista(postgres, "cap_drop"));
+        Assert.Equal("postgres", postgres.GetProperty("user").GetString());
+        Assert.Contains(postgres.GetProperty("tmpfs").EnumerateArray().Select(t => t.GetString()), t => t == "/run/postgresql");
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void ElControlDeAccesoDePostgreSql_SoloAdmiteConexionesDeRedPorTls_YRechazaLoDemas()
+    {
+        var reglas = File.ReadAllLines(Path.Combine(ComposeDeVms.Raiz(), "infra", "postgres", "servidor", "pg_hba.conf"))
+            .Select(l => l.Trim())
+            .Where(l => l.Length > 0 && !l.StartsWith('#'))
+            .Select(l => l.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+            .ToList();
+
+        // Por la red: solo `hostssl` con contraseña cifrada (scram) y solo a las bases de la plataforma; nunca `host` ni `hostnossl` admitidos, ni `trust` por la red.
+        Assert.All(reglas.Where(r => r[0] is "host" or "hostssl" or "hostnossl" or "hostgssenc" or "hostnogssenc"), r =>
+        {
+            Assert.True(r[0] == "hostssl" || r[^1] == "reject", $"Una regla de red admite conexiones sin TLS: {string.Join(' ', r)}");
+            Assert.True(r[^1] is "scram-sha-256" or "reject", $"Una regla de red no usa scram-sha-256: {string.Join(' ', r)}");
+        });
+        Assert.All(reglas.Where(r => r[0] == "hostssl"), r => Assert.Contains(r[1], new[] { "ecommerce", "inventario", "evolution" }));
+        // El socket de Unix (dentro del contenedor) sigue sirviendo a la comprobación de salud, al respaldo y al archivado.
+        Assert.Contains(reglas, r => r[0] == "local" && r[1] == "all");
+        Assert.Contains(reglas, r => r[0] == "local" && r[1] == "replication");
+        // La última regla rechaza todo lo que no coincidió antes (incluida cualquier conexión de red sin TLS).
+        Assert.Equal(["host", "all", "all", "all", "reject"], reglas[^1]);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void LaImagenDePostgreSql_LlevaElControlDeAccesoYElArranqueConTls()
+    {
+        var dockerfile = File.ReadAllText(Path.Combine(ComposeDeVms.Raiz(), "infra", "postgres", "Dockerfile"));
+
+        Assert.Contains("COPY servidor/ /opt/babelhub/", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("/opt/babelhub/pg_hba.conf", dockerfile, StringComparison.Ordinal);
+        Assert.True(File.Exists(Path.Combine(ComposeDeVms.Raiz(), "infra", "postgres", "servidor", "iniciar.sh")));
     }
 
     // ---------- Las reglas con incumplimientos a propósito ----------

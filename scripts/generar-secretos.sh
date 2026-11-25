@@ -122,8 +122,11 @@ HOSTS_TIENDA="$DOMINIO,www.$DOMINIO"
 [[ "$ENSAYO" -eq 1 ]] && HOSTS_TIENDA="localhost" && HOST_GESTION="gestion.localhost"
 TURNSTILE_HOSTS="$HOSTS_TIENDA,$HOST_GESTION"
 
+# TLS hacia PostgreSQL (AM24): toda cadena que llega a la base exige TLS Y verifica al servidor con la CA privada (la raíz de confianza del proceso, ca-bundle.pem de desplegar.sh): `SSL Mode=VerifyFull` valida la cadena de
+# certificados y que el nombre o la IP de `Host` esté en el certificado. `GSS Encryption Mode=Disable` evita que el controlador sondee Kerberos (no hay) e imprima «Cannot load library libgssapi_krb5.so.2».
+TLS_NPGSQL=";SSL Mode=VerifyFull;GSS Encryption Mode=Disable"
 cuenta() { # base usuario ruta-del-host : la cadena de conexión de una cuenta de servicio
-  printf 'Host=%s;Port=5432;Database=%s;Username=%s;Password=%s' "$3" "$1" "$2" "$(valor "pg-$2" 32)"
+  printf 'Host=%s;Port=5432;Database=%s;Username=%s;Password=%s%s' "$3" "$1" "$2" "$(valor "pg-$2" 32)" "$TLS_NPGSQL"
 }
 
 # ---------- VM-INVENTARIO: postgres.env, inventario.env, ecommerce-gestion.env, migrador.env, aviso.env ----------
@@ -206,8 +209,8 @@ credenciales_de_servicio "$f"
 
 # Las cuentas propietarias (administración) solo para migrar: nunca en los archivos de los servicios (COMP-2).
 f="$d/migrador.env"; inicio "$f"
-linea "$f" BABELHUB__Migrador__Inventario__Propietaria "Host=postgres;Port=5432;Database=inventario;Username=postgres;Password=$(valor pg-admin 40)"
-linea "$f" BABELHUB__Migrador__Ecommerce__Propietaria "Host=postgres;Port=5432;Database=ecommerce;Username=postgres;Password=$(valor pg-admin 40)"
+linea "$f" BABELHUB__Migrador__Inventario__Propietaria "Host=postgres;Port=5432;Database=inventario;Username=postgres;Password=$(valor pg-admin 40)$TLS_NPGSQL"
+linea "$f" BABELHUB__Migrador__Ecommerce__Propietaria "Host=postgres;Port=5432;Database=ecommerce;Username=postgres;Password=$(valor pg-admin 40)$TLS_NPGSQL"
 # La versión con la que la migración siembra, solo si faltan, los textos legales vigentes (términos, privacidad y reembolso). La aplicación solo los lee y sin ellos nadie acepta los textos ni compra. Es PROVISIONAL: mientras los textos
 # legales sean de trabajo, la versión lo dice; al aprobar los definitivos la persona responsable cambia la fila (todas las cuentas deberán aceptarlos de nuevo). Nunca se pisa lo ya sembrado.
 linea "$f" BABELHUB__Migrador__Ecommerce__VersionDeTextos "0.1-provisional"
@@ -285,7 +288,9 @@ f="$d/evolution.env"; inicio "$f"
 linea "$f" AUTHENTICATION_API_KEY "$(valor evolution-api 40)"
 linea "$f" SERVER_URL "http://127.0.0.1:8081"
 linea "$f" DATABASE_PROVIDER postgresql
-linea "$f" DATABASE_CONNECTION_URI "postgresql://evolution:$(valor pg-evolution 32)@$IP_INVENTARIO:5432/evolution?schema=public"
+# TLS (AM24): Prisma NO entiende `sslmode=verify-full` (lo trata como desconocido y cae en «prefer»: cifra pero no verifica a quién), así que la verificación se pide con la forma que sí cumple: `sslmode=require` + `sslaccept=strict`
+# (valida la cadena y que el nombre o la IP del servidor esté en el certificado) + `sslcert=` con la CA privada (tls-ca.pem, montada como secreto en el contenedor de Evolution). Se probó contra la imagen fijada de Evolution (DD-91).
+linea "$f" DATABASE_CONNECTION_URI "postgresql://evolution:$(valor pg-evolution 32)@$IP_INVENTARIO:5432/evolution?schema=public&sslmode=require&sslaccept=strict&sslcert=/run/secrets/tls-ca.pem"
 linea "$f" CACHE_REDIS_ENABLED true
 linea "$f" CACHE_REDIS_URI "redis://:$(valor redis-cache 40)@redis:6379/6"
 linea "$f" CACHE_LOCAL_ENABLED false
@@ -299,9 +304,11 @@ f="$DESTINO/borde/cloudflared.env"; inicio "$f"; pendiente "$f" TUNNEL_TOKEN "el
 c="$DESTINO/custodia"
 # openssl recibe nombres relativos dentro de custodia/ (en Git Bash para Windows no entiende las rutas /c/…).
 # La CA solo puede firmar lo de la red privada (restricción de nombres) y ningún intermedio: si su clave se filtrara, no serviría para suplantar a Culqi, al almacén ni al correo.
+# El ensayo local llega a PostgreSQL desde otra red de Docker por «host.docker.internal» (no hay una IP privada de VM); solo la CA de un ensayo (se tira al terminar) admite ese nombre.
+NOMBRES_DEL_ENSAYO=""; [[ "$ENSAYO" -eq 1 ]] && NOMBRES_DEL_ENSAYO=",permitted;DNS:host.docker.internal"
 (cd "$c" && openssl req -x509 -newkey rsa:3072 -nodes -days 1825 -subj "/CN=BabelHub CA privada" -keyout ca-clave.pem -out ca.pem \
   -addext "basicConstraints=critical,CA:TRUE,pathlen:0" \
-  -addext "nameConstraints=critical,permitted;IP:10.0.0.0/255.0.0.0,permitted;IP:172.16.0.0/255.240.0.0,permitted;IP:192.168.0.0/255.255.0.0,permitted;IP:127.0.0.0/255.0.0.0,permitted;DNS:localhost,permitted;DNS:ecommerce,permitted;DNS:inventario,permitted;DNS:ecommerce-gestion,permitted;DNS:redis-contadores" 2>/dev/null)
+  -addext "nameConstraints=critical,permitted;IP:10.0.0.0/255.0.0.0,permitted;IP:172.16.0.0/255.240.0.0,permitted;IP:192.168.0.0/255.255.0.0,permitted;IP:127.0.0.0/255.0.0.0,permitted;DNS:localhost,permitted;DNS:ecommerce,permitted;DNS:inventario,permitted;DNS:ecommerce-gestion,permitted;DNS:redis-contadores,permitted;DNS:postgres${NOMBRES_DEL_ENSAYO}" 2>/dev/null)
 emitir() { # carpeta-de-la-VM prefijo ip nombre-alterno... : certificado de servidor con esos nombres y direcciones
   local carpeta="$1" prefijo="$2" ip="$3"; shift 3
   local san="IP:$ip,IP:127.0.0.1,DNS:localhost" nombre
@@ -321,6 +328,9 @@ emitir "$DESTINO/ventas" tls-ecommerce "$IP_VENTAS" ecommerce
 # Un certificado y una llave por servicio: el que atiende al administrador (la réplica de gestión) no puede hacerse pasar por el Inventario.
 emitir "$DESTINO/inventario" tls-inventario "$IP_INVENTARIO" inventario
 emitir "$DESTINO/inventario" tls-gestion "$IP_INVENTARIO" ecommerce-gestion
+# PostgreSQL (AM24): el servidor presenta este certificado (IP privada de VM-INVENTARIO para VM-VENTAS, «postgres» para los servicios de la propia VM); los clientes lo verifican con SSL Mode=VerifyFull.
+NOMBRES_DE_POSTGRES=(postgres); [[ "$ENSAYO" -eq 1 ]] && NOMBRES_DE_POSTGRES+=(host.docker.internal)
+emitir "$DESTINO/inventario" tls-postgres "$IP_INVENTARIO" "${NOMBRES_DE_POSTGRES[@]}"
 cp "$c/ca.pem" "$DESTINO/ventas/tls-ca.pem"
 cp "$c/ca.pem" "$DESTINO/inventario/tls-ca.pem"
 chmod 600 "$DESTINO"/ventas/*.pem "$DESTINO"/inventario/*.pem
