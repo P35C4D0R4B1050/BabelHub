@@ -329,7 +329,8 @@ PROTEGER_GESTION=0
 [[ "$VM" == ventas && -n "${IP_INVENTARIO:-}" ]] && PROTEGER_GESTION=1
 if [[ "$PROTEGER_GESTION" -eq 1 ]]; then
   [[ -d "$CARPETA_CRON" ]] || anotar "no existe $CARPETA_CRON: VM-VENTAS necesita cron para reponer la protección de la réplica de gestión"
-  for ruta in "$RAIZ/scripts" "$RAIZ/scripts/proteger-gestion.sh"; do
+  # También la raíz del repositorio: quien pueda escribir en ella podría renombrar la carpeta y poner la suya.
+  for ruta in "$RAIZ" "$RAIZ/scripts" "$RAIZ/scripts/proteger-gestion.sh"; do
     lectura="$("$STAT" -c '%U %a' "$ruta" 2>/dev/null || echo '? ?')"
     if [[ "${lectura% *}" != root ]] || [[ ! "${lectura#* }" =~ ^[0-7]?[0-7][0145][0145]$ ]]; then
       anotar "${ruta#"$RAIZ"/} es de ${lectura% *} con permisos ${lectura#* }: debe ser de root y sin escritura para otros (lo ejecuta el cron como root)"

@@ -17,10 +17,13 @@
 
 Arquitectura y seguridad (agentes en contexto aislado): «No cumple» en la primera pasada (un Bloqueante en la guía y varios Importantes). Corregidos: orden de la guía, referencias a la topología anterior en `docs/`, regresión de confianza de la réplica de gestión (DD-104), contenedor del registro de supresiones (heredado), declaración de que no hay respaldos y avisos de la guía. Quedan abiertos en `progress/hallazgos.md` los que son decisión de la persona.
 
+Segunda pasada de seguridad sobre las correcciones: «Cumple con observaciones», cinco Menores, corregidos (control positivo de la regla y de los puertos en la guía, raíz del repositorio en la comprobación de dueño, gestión cerrada a lo que no venga del túnel y aviso de datos reales sin respaldo en `Staging`).
+
 ## Qué se probó
 
+- `dotnet build -warnaserror`, SpecCheck, unitarias de los dos servicios (5764 y 2454), arquitectura (261) e integración afectada (685 de 685), y de nuevo las de la entrada tras los retoques finales.
 - `scripts/ensayo-local.sh` completo (pasos 1 a 7, con el 6c): las dos «VMs» en Docker Desktop con las imágenes construidas localmente.
-- Pruebas de integración de despliegue, Compose, Nginx y respaldo bajo demanda.
+- Escáner de secretos del repositorio.
 
 ## No probado
 

@@ -84,6 +84,7 @@ public sealed class DesplegarShTests : IDisposable
           case "$3" in
             *aviso.env) case "$3" in *"${STAT_ABIERTO:-__ninguno__}"*) echo "${STAT_DUENO_AVISO:-root} 644" ;; *) echo "${STAT_DUENO_AVISO:-root} 600" ;; esac ;;
             */scripts/vm-aux) echo "${STAT_DUENO_CARPETA:-root} ${STAT_MODO_CARPETA:-755}" ;;
+            "${DOBLE_RAIZ:-__ninguna__}") echo "${STAT_DUENO_RAIZ:-root} 755" ;;
             *) echo "${STAT_DUENO:-root} ${STAT_MODO_SCRIPTS:-755}" ;;
           esac
           exit 0
@@ -1501,6 +1502,36 @@ public sealed class DesplegarShTests : IDisposable
         Assert.Equal(1, codigo);
         Assert.Contains("scripts/proteger-gestion.sh es de", errores, StringComparison.Ordinal);
         Assert.Empty(LlamadasADocker);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-15")]
+    public void SiLaRaizDelRepositorioNoEsDeRoot_VentasNoSeDespliega()
+    {
+        PrepararSecretos("ventas");
+        var entorno = EntornoDe("ventas");
+        // La raíz tal como la calcula el script: la del propio guion, resuelta por bash.
+        entorno["DOBLE_RAIZ"] = RaizSegunBash();
+        entorno["STAT_DUENO_RAIZ"] = "ubuntu";
+
+        var (codigo, _, errores) = Desplegar("ventas", entorno);
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("es de ubuntu con permisos 755: debe ser de root", errores, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
+    }
+
+    private static string RaizSegunBash()
+    {
+        var informacion = new ProcessStartInfo(Bash()) { RedirectStandardOutput = true };
+        informacion.ArgumentList.Add("-c");
+        informacion.ArgumentList.Add("cd \"$(dirname \"$1\")/..\" && pwd");
+        informacion.ArgumentList.Add("--");
+        informacion.ArgumentList.Add(EnLinux(Path.Combine(ComposeDeVms.Raiz(), "scripts", "desplegar.sh")));
+        using var proceso = Process.Start(informacion)!;
+        var salida = proceso.StandardOutput.ReadToEnd();
+        proceso.WaitForExit();
+        return salida.Trim();
     }
 
     [Fact]

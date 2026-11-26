@@ -641,11 +641,12 @@ Y comprueba que **solo Nginx** llega a la réplica de gestión (la regla la inst
 ```bash
 # 5. Desde cualquier otro contenedor no se puede llegar:
 sudo docker run --rm --network babelhub-ventas_default redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe \
-  sh -c 'nc -z -w 5 10.0.0.20 8081 && echo "MAL: llega" || echo "correcto: bloqueado"'
+  sh -c 'nc -z -w 5 10.0.0.20 8082 && echo "control: llega al 8082" || echo "ATENCION: la prueba no sirve, no llega ni al 8082";
+         nc -z -w 5 10.0.0.20 8081 && echo "MAL: llega al 8081" || echo "correcto: 8081 bloqueado"'
 sudo iptables -S DOCKER-USER      # debe aparecer la regla que descarta 10.0.0.20:8081 salvo desde 10.213.10.3
 ```
 
-**Debes ver** «correcto: bloqueado» en 5. Si dice «MAL: llega», no sigas: repite `desplegar.sh ventas` y revisa `/etc/cron.d/babelhub-gestion`.
+**Debes ver** en 5 las dos líneas «control: llega al 8082» y «correcto: 8081 bloqueado» (sin la primera la prueba no demuestra nada). Si dice «MAL: llega», no sigas: repite `desplegar.sh ventas`, comprueba `systemctl is-active cron` y revisa `/etc/cron.d/babelhub-gestion`. **La primera vez, reinicia VM-VENTAS (`sudo reboot`), espera dos minutos y repite la comprobación 5**: confirma que la regla vuelve sola.
 
 **Debes ver** una respuesta de salud en 1 y 2, al menos una línea en 3 y «sin puertos publicados» en 4. Si 1 falla con las dos VMs sanas, el cortafuegos de Oracle está cortando el tráfico entre contenedores: guarda la salida de `sudo iptables -S FORWARD` y avisa (no borres reglas). Si falla solo 2, revisa la regla TCP 8081 desde `10.0.0.10/32` (§7.1).
 
@@ -675,14 +676,14 @@ curl -sI https://babel-hub.shop/      | grep -i strict-transport-security
 curl -sI https://www.babel-hub.shop/  | head -3     # 301 → https://babel-hub.shop/
 ```
 
-**Desde tu equipo, comprueba que Internet no llega a ningún puerto interno** (pon las IP **públicas** de las dos VMs; todas las líneas deben decir «cerrado»):
+**Desde tu equipo, comprueba que Internet no llega a ningún puerto interno** (pon las IP **públicas** de las dos VMs; el puerto 22 debe salir **ABIERTO**, que demuestra que la prueba llega a la VM, y todos los demás «cerrado»):
 
 ```bash
-for ip in <IP pública de vm-ventas> <IP pública de vm-inventario>; do for p in 80 443 5432 5678 6380 8080 8081 8082 8443; do
+for ip in <IP pública de vm-ventas> <IP pública de vm-inventario>; do for p in 22 80 443 5432 5678 6380 8080 8081 8082 8443; do
   timeout 5 bash -c "</dev/tcp/$ip/$p" 2>/dev/null && echo "ABIERTO $ip:$p" || echo "cerrado $ip:$p"; done; done
 ```
 
-Si alguno dice «ABIERTO», quita de la Security List la regla que lo permite **antes de seguir**.
+Si algún puerto distinto del 22 dice «ABIERTO», quita de la Security List la regla que lo permite **antes de seguir**; si el 22 sale «cerrado», revisa la IP o prueba desde otra red: la prueba no vale.
 
 **Si falla:** `502` = Nginx no alcanza al E-commerce (tienda: `sudo docker logs --tail 50 babelhub-ventas-nginx-1`; gestión: regla 8081, §7.1); error de certificado = el dominio aún no está activo en Cloudflare; `1033`/`530` = el túnel no está conectado (token mal copiado); `400` en la gestión = falta `gestion.babel-hub.shop` en los hosts permitidos de `ecommerce-gestion.env`.
 
@@ -770,6 +771,8 @@ sudo env BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.20 IP_VENTAS
 Culqi se integra en **dos fases**: primero **revisa tu web** (no necesita todavía integrar la pasarela) y, cuando la aprueba y te da las llaves, **se integra el cobro real**. La tienda está lista para las dos.
 
 #### Fase 1: Culqi revisa la web (entorno `Staging`, pagos simulados)
+
+> ⚠️ **La tienda en `Staging` es pública y todavía no hay respaldos** (§0, fila 5): el registro de cuentas y el Libro de Reclamaciones aceptan datos reales de cualquiera, y una falla de la VM de datos los perdería. Usa solo datos de prueba, activa los respaldos cuanto antes y decide si mientras tanto limitas quién puede entrar (por ejemplo, con una regla de Cloudflare que solo deje pasar a Culqi y a ti).
 
 Es lo que despliega esta guía por defecto. En `Staging` la tienda está en Internet con SSL, **no cobra nada** (la pasarela es un simulador) y lo dice en pantalla: «Pagos simulados: no se realiza ningún cobro», en el pie de toda página, en el checkout y en el pago. Los requisitos que Culqi revisa y dónde se cumple cada uno:
 

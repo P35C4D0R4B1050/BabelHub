@@ -1,8 +1,9 @@
 # VM-VENTAS (ARM, 1 OCPU y 6 GB): la entrada pública (cloudflared y Nginx), E-commerce, Redis (caché y contadores), n8n y Evolution API (AD11).
 # Topología de DOS VMs (DD-100): no hay VM-BORDE; es el respaldo previsto en B11, aquí por falta de capacidad AMD micro en la región.
-# Se levanta con un solo comando y sus secretos (PLA-04):
+# Se levanta con un solo comando y sus secretos (PLA-04). En la VM, siempre con el script (no con `docker compose up` a mano: además pone la regla
+# que deja llegar a la réplica de gestión solo a Nginx, DD-104):
 #   BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.10 IP_INVENTARIO=10.0.0.20 IMAGEN_ECOMMERCE=<imagen@sha256:…> \
-#   docker compose -f infra/docker-compose.ventas.yml up -d
+#   scripts/desplegar.sh ventas
 # Reglas de PLA-26 y PLA-27: ver docker-compose.inventario.yml. Los paneles de n8n y Evolution API solo se alcanzan por túnel SSH
 # (se publican en 127.0.0.1); Redis no se publica salvo el de contadores, por TLS y en la dirección privada, para la réplica de gestión.
 #

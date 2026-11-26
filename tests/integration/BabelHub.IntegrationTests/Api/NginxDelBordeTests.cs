@@ -121,6 +121,16 @@ public sealed class NginxDelBordeTests : IAsyncLifetime
         return coincidencia.Success ? coincidencia.Groups[1].Value : resultado.Stdout.Replace('\n', ' ') + "|" + resultado.ExitCode;
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-SEG-15")]
+    public async Task LaGestion_SoloSeSirveALoQueLlegaPorElTunel()
+    {
+        var resultado = await _eco!.ExecAsync(["sh", "-c", "wget -S -O /dev/null -T 5 --header='Host: gestion.example.org' http://borde:8080/ingreso 2>&1"]);
+
+        Assert.Contains("403", resultado.Stdout + resultado.Stderr, StringComparison.Ordinal);
+        Assert.Equal("200", await EstadoDe("gestion.example.org", "/ingreso"));
+    }
+
     [Theory]
     [InlineData("tienda.example.org", "8080")]
     [InlineData("gestion.example.org", "8081")]
