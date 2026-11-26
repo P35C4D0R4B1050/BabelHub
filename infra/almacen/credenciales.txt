@@ -1,36 +1,21 @@
-# Credenciales del almacén (mínimo privilegio, una por tarea; D08, D24) y lo que cada una puede hacer en cada contenedor.
+# Credenciales del almacén de Oracle (mínimo privilegio, una por tarea; D08, D24) y lo que cada una puede hacer en cada contenedor.
 # Acciones: crear (OBJECT_CREATE: agrega, nunca sobrescribe), leer (OBJECT_READ), listar (OBJECT_INSPECT), uso (BUCKET_READ: tamaño del
 # contenedor), sobrescribir (OBJECT_OVERWRITE) y borrar (OBJECT_DELETE). Lo que no consta aquí está prohibido. Ninguna credencial de
-# respaldos o de supresiones puede sobrescribir o borrar: el retiro de vencidos lo hace el ciclo de vida del propio almacén (D07). Solo el catálogo
+# supresiones puede sobrescribir o borrar: el retiro de vencidos lo hace el ciclo de vida del propio almacén (D07). Solo el catálogo
 # borra (sus archivos y portadas, de claves aleatorias que nunca se sobrescriben: sin sobrescribir) y la biblioteca solo lee los libros.
+# Las credenciales de los respaldos son de Cloudflare R2: ver r2/credenciales.txt.
 # credencial                 contenedor             acciones
 catalogo-archivos             libros                 crear,leer,borrar
 catalogo-archivos             portadas               crear,leer,borrar
 biblioteca-lector             libros                 leer
-respaldos-escritor           respaldos-diarios      crear
-respaldos-escritor           respaldos-semanales    crear
-respaldos-escritor           respaldos-mensuales    crear
-respaldos-escritor           respaldos-wal          crear
-respaldos-lector             respaldos-diarios      leer,listar
-respaldos-lector             respaldos-semanales    leer,listar
-respaldos-lector             respaldos-mensuales    leer,listar
-respaldos-lector             respaldos-wal          leer,listar
-respaldos-lector             supresiones-copia      leer,listar
-respaldos-vigilante          respaldos-diarios      listar
-respaldos-vigilante          respaldos-semanales    listar
-respaldos-vigilante          respaldos-mensuales    listar
-respaldos-vigilante          respaldos-wal          listar
-respaldos-vigilante          supresiones-copia      listar
-supresiones-registro         supresiones-entradas   crear,leer,listar
-supresiones-sello            supresiones-sellos     crear
-supresiones-sello            supresiones-entradas   leer,listar
-respaldos-copia-registro     supresiones-copia      crear
-cuota-lectura                libros                 uso
-cuota-lectura                portadas               uso
-cuota-lectura                respaldos-diarios      uso
-cuota-lectura                respaldos-semanales    uso
-cuota-lectura                respaldos-mensuales    uso
-cuota-lectura                respaldos-wal          uso
-cuota-lectura                supresiones-entradas   uso
-cuota-lectura                supresiones-sellos     uso
-cuota-lectura                supresiones-copia      uso
+registro-lector               supresiones-copia      leer,listar
+registro-vigilante            supresiones-copia      listar
+supresiones-registro          supresiones-entradas   crear,leer,listar
+supresiones-sello             supresiones-sellos     crear
+supresiones-sello             supresiones-entradas   leer,listar
+respaldos-copia-registro      supresiones-copia      crear
+cuota-lectura                 libros                 uso
+cuota-lectura                 portadas               uso
+cuota-lectura                 supresiones-entradas   uso
+cuota-lectura                 supresiones-sellos     uso
+cuota-lectura                 supresiones-copia      uso

@@ -57,7 +57,7 @@
 | transversal-auditoria | Transversal | Planned | 46 | 34 | — |
 | transversal-carga-inicial | Transversal | InProgress | 20 | 13 | ecommerce-catalogo, inventario-fuentes, inventario-ajustes, transversal-plataforma, transversal-auditoria, transversal-seguridad |
 | transversal-notificaciones | Transversal | Planned | 16 | 16 | identidad-seguridad, transversal-seguridad, transversal-auditoria |
-| transversal-plataforma | Transversal | InProgress | 42 | 37 | — |
+| transversal-plataforma | Transversal | InProgress | 43 | 38 | — |
 | transversal-seguridad | Transversal | InProgress | 32 | 29 | transversal-auditoria |
 | web-base | E-commerce | Planned | 49 | 42 | identidad-seguridad, ecommerce-libro-reclamaciones, ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-biblioteca-digital, transversal-auditoria, transversal-seguridad, ecommerce-pagos, ecommerce-pedidos, ecommerce-devoluciones, asistente-compra-ia |
 | web-indice-infinito | E-commerce | Done | 9 | 7 | web-base, transversal-seguridad |

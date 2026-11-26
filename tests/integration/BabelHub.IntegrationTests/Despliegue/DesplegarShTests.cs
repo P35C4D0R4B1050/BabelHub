@@ -28,6 +28,7 @@ public sealed class DesplegarShTests : IDisposable
         Directory.CreateDirectory(_cron);
         ArchivosDeDoble.Escribir(Path.Combine(_carpeta, "docker-doble.sh"), DobleDeDocker.ReplaceLineEndings("\n"));
         ArchivosDeDoble.Escribir(Path.Combine(_carpeta, "stat-doble.sh"), DobleDeStat.ReplaceLineEndings("\n"));
+        ArchivosDeDoble.Escribir(Path.Combine(_carpeta, "iptables-doble.sh"), DobleDeIptables.ReplaceLineEndings("\n"));
     }
 
     public void Dispose()
@@ -66,12 +67,24 @@ public sealed class DesplegarShTests : IDisposable
         exit 0
         """;
 
+    // El doble de iptables anota la llamada en el mismo registro que docker (para comprobar el orden): `-C` dice si la regla ya está.
+    private const string DobleDeIptables = """
+        #!/usr/bin/env bash
+        echo "iptables $*" >>"$DOBLE_REGISTRO"
+        case "$*" in
+          *" -C "*) [[ "${DOBLE_REGLA_PUESTA:-0}" == 1 ]] && exit 0; exit 1 ;;
+          *" -I "*) [[ "${DOBLE_IPTABLES_FALLA:-0}" == 1 ]] && exit 1; exit 0 ;;
+        esac
+        exit 0
+        """;
+
     private const string DobleDeStat = """
         #!/usr/bin/env bash
         if [[ "$2" == '%U %a' ]]; then
           case "$3" in
             *aviso.env) case "$3" in *"${STAT_ABIERTO:-__ninguno__}"*) echo "${STAT_DUENO_AVISO:-root} 644" ;; *) echo "${STAT_DUENO_AVISO:-root} 600" ;; esac ;;
             */scripts/vm-aux) echo "${STAT_DUENO_CARPETA:-root} ${STAT_MODO_CARPETA:-755}" ;;
+            "${DOBLE_RAIZ:-__ninguna__}") echo "${STAT_DUENO_RAIZ:-root} 755" ;;
             *) echo "${STAT_DUENO:-root} ${STAT_MODO_SCRIPTS:-755}" ;;
           esac
           exit 0
@@ -204,6 +217,7 @@ public sealed class DesplegarShTests : IDisposable
 
         entorno["DOCKER"] = EnLinux(Path.Combine(_carpeta, "docker-doble.sh"));
         entorno["STAT"] = EnLinux(Path.Combine(_carpeta, "stat-doble.sh"));
+        entorno["IPTABLES"] = EnLinux(Path.Combine(_carpeta, "iptables-doble.sh"));
         entorno["DOBLE_REGISTRO"] = EnLinux(Registro);
         entorno["DOBLE_SERVICIOS"] = "uno dos";
         // Evolution API monta la CA privada (tls-ca.pem, AM24): con ella desplegar arma el paquete de raíces y necesita las públicas de la VM, que un equipo de desarrollo (Windows) no tiene en /etc/ssl.
@@ -399,7 +413,8 @@ public sealed class DesplegarShTests : IDisposable
         var (codigo, salida, errores) = Desplegar("ventas");
 
         Assert.True(codigo == 0, salida + errores);
-        Assert.Empty(Directory.GetFiles(_cron));
+        Assert.Equal(["babelhub-gestion"], Directory.GetFiles(_cron).Select(Path.GetFileName));
+        Assert.DoesNotContain("vigilar-espacio.sh", File.ReadAllText(Path.Combine(_cron, "babelhub-gestion")), StringComparison.Ordinal);
         Assert.DoesNotContain("aviso.env", salida + errores, StringComparison.Ordinal);
     }
 
@@ -644,7 +659,7 @@ public sealed class DesplegarShTests : IDisposable
         ArchivosDeDoble.Escribir(Path.Combine(_carpeta, "age-keygen-doble.sh"), DobleDeAgeKeygen.ReplaceLineEndings("\n"));
         var informacion = new ProcessStartInfo(Bash()) { RedirectStandardOutput = true, RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8 };
         informacion.ArgumentList.Add(EnLinux(Path.Combine(ComposeDeVms.Raiz(), "scripts", "generar-secretos.sh")));
-        foreach (var argumento in new[] { "--destino", EnLinux(destino), "--dominio", "ejemplo.pe", "--ip-ventas", "10.0.0.10", "--ip-inventario", "10.0.1.10", "--ip-borde", "10.0.2.10" }.Concat(extra))
+        foreach (var argumento in new[] { "--destino", EnLinux(destino), "--dominio", "ejemplo.pe", "--ip-ventas", "10.0.0.10", "--ip-inventario", "10.0.1.10" }.Concat(extra))
         {
             informacion.ArgumentList.Add(argumento);
         }
@@ -691,13 +706,12 @@ public sealed class DesplegarShTests : IDisposable
         var (codigo, salida, errores) = Generar(destino);
 
         Assert.True(codigo == 0, salida + errores);
-        // Cada clave de la tabla está en el archivo de su VM (cloudflared.env, en las dos que lo usan) y las que genera el sistema tienen su largo mínimo.
+        // Cada clave de la tabla está en el archivo de su VM y las que genera el sistema tienen su largo mínimo.
         foreach (var fila in File.ReadAllLines(Path.Combine(ComposeDeVms.Raiz(), "infra", "secretos-requeridos.txt")).Where(l => !l.TrimStart().StartsWith('#') && l.Trim().Length > 0).Select(l => l.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)))
         {
             var carpetas = fila[0] switch
             {
                 "postgres.env" or "inventario.env" or "ecommerce-gestion.env" => new[] { "inventario" },
-                "cloudflared.env" => ["ventas", "borde"],
                 _ => ["ventas"],
             };
             foreach (var carpeta in carpetas)
@@ -730,7 +744,8 @@ public sealed class DesplegarShTests : IDisposable
         Assert.NotEqual(Valor(ventas, "ecommerce.env", "BABELHUB__Web__ClaveDeSesionesTienda"), Valor(inventario, "ecommerce-gestion.env", "BABELHUB__Web__ClaveDeSesionesGestion"));
 
         // La clave privada de age y la CA se quedan en custodia/, nunca en una carpeta de VM; migrador.env solo en VM-INVENTARIO; ningún valor por la salida.
-        foreach (var carpeta in new[] { "inventario", "ventas", "borde" })
+        Assert.False(Directory.Exists(Path.Combine(destino, "borde")), "No hay VM-BORDE (DD-100): el generador no crea su carpeta.");
+        foreach (var carpeta in new[] { "inventario", "ventas" })
         {
             foreach (var archivo in Directory.EnumerateFiles(Path.Combine(destino, carpeta)))
             {
@@ -742,6 +757,10 @@ public sealed class DesplegarShTests : IDisposable
         Assert.True(File.Exists(Path.Combine(destino, "custodia", "ca-clave.pem")));
         Assert.False(File.Exists(Path.Combine(ventas, "migrador.env")));
         Assert.StartsWith("age1", Valor(inventario, "postgres.env", "BABELHUB_AGE_DESTINATARIO"), StringComparison.Ordinal);
+        // Los respaldos van a Cloudflare R2 (D26).
+        Assert.Equal("Cloudflare", Valor(inventario, "postgres.env", "RCLONE_CONFIG_ALMACEN_PROVIDER"));
+        Assert.Equal("auto", Valor(inventario, "postgres.env", "RCLONE_CONFIG_ALMACEN_REGION"));
+        Assert.Contains("r2.cloudflarestorage.com", File.ReadAllText(Path.Combine(destino, "PENDIENTES.txt")), StringComparison.Ordinal);
         Assert.DoesNotContain(Valor(inventario, "postgres.env", "POSTGRES_PASSWORD"), salida + errores, StringComparison.Ordinal);
         Assert.Contains("ventas/cloudflared.env  TUNNEL_TOKEN", File.ReadAllText(Path.Combine(destino, "PENDIENTES.txt")), StringComparison.Ordinal);
     }
@@ -790,6 +809,72 @@ public sealed class DesplegarShTests : IDisposable
 
         Assert.True(codigo == 0, salida + errores);
         Assert.Contains($"VM {vm} desplegada y sana.", salida, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-44")]
+    public void UnArchivoSueltoConLaAdministracionDeR2EnLaCarpetaDeSecretos_NoSeDespliega()
+    {
+        PrepararSecretos("inventario");
+        var valor = Aleatorio(40);
+        _valoresSecretos.Add(valor);
+        File.WriteAllText(Path.Combine(_secretos, "r2.env"), $"CLOUDFLARE_API_TOKEN={valor}\n");
+
+        var (codigo, salida, errores) = Desplegar("inventario");
+
+        Assert.NotEqual(0, codigo);
+        Assert.Contains("r2.env lleva un token", salida + errores, StringComparison.Ordinal);
+        SinSecretosEnLaSalida(salida, errores);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void ConElEndpointDeR2YElProveedorAnterior_NoSeDespliega()
+    {
+        PrepararSecretos("inventario");
+        CambiarValor("postgres.env", "RCLONE_CONFIG_ALMACEN_ENDPOINT", "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com");
+        File.AppendAllText(Path.Combine(_secretos, "postgres.env"), "RCLONE_CONFIG_ALMACEN_PROVIDER=Other\nRCLONE_CONFIG_ALMACEN_REGION=sa-santiago-1\n");
+
+        var (codigo, salida, errores) = Desplegar("inventario");
+
+        Assert.NotEqual(0, codigo);
+        Assert.Contains("PROVIDER=Cloudflare", salida + errores, StringComparison.Ordinal);
+        SinSecretosEnLaSalida(salida, errores);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void UnPostgresEnvQueTodaviaApuntaElRespaldoAOracle_NoSeDespliega()
+    {
+        PrepararSecretos("inventario");
+        CambiarValor("postgres.env", "RCLONE_CONFIG_ALMACEN_ENDPOINT", "https://espacio.compat.objectstorage.sa-santiago-1.oraclecloud.com");
+
+        var (codigo, salida, errores) = Desplegar("inventario");
+
+        Assert.NotEqual(0, codigo);
+        Assert.Contains("los respaldos van a Cloudflare R2", salida + errores, StringComparison.Ordinal);
+        Assert.DoesNotContain(LlamadasADocker, l => l.Contains(" up -d", StringComparison.Ordinal));
+        SinSecretosEnLaSalida(salida, errores);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PLA-44")]
+    [InlineData("inventario", "postgres.env", "CLOUDFLARE_API_TOKEN")]
+    [InlineData("ventas", "ecommerce.env", "export CF_API_KEY")]
+    public void UnSecretoConLaAdministracionDeR2_NoSeDespliega(string vm, string archivo, string clave)
+    {
+        PrepararSecretos(vm);
+        var valor = Aleatorio(40);
+        _valoresSecretos.Add(valor);
+        var ruta = Path.Combine(_secretos, archivo);
+        File.AppendAllText(ruta, $"{clave}={valor}\n");
+
+        var (codigo, salida, errores) = Desplegar(vm);
+
+        Assert.NotEqual(0, codigo);
+        Assert.Contains("la administración de R2 no puede estar en una VM", salida + errores, StringComparison.Ordinal);
+        Assert.DoesNotContain(LlamadasADocker, l => l.Contains(" up -d", StringComparison.Ordinal));
+        SinSecretosEnLaSalida(salida, errores);
     }
 
     // ---------- TLS hacia PostgreSQL (AM24): nadie despliega con una conexión sin cifrar ni sin verificar al servidor ----------
@@ -1058,7 +1143,6 @@ public sealed class DesplegarShTests : IDisposable
     }
 
     [Theory]
-    [InlineData("borde")]
     [InlineData("ventas")]
     [Trait("Criterio", "AC-PLA-04")]
     public void LasOtrasVms_NoMigran_NiPidenMigradorEnv(string vm)
@@ -1149,7 +1233,7 @@ public sealed class DesplegarShTests : IDisposable
     [Trait("Criterio", "AC-PLA-04")]
     public void SiNoSeIndicaLaCarpetaDeSecretos_NoSeDespliega()
     {
-        var (codigo, _, errores) = Desplegar("borde", null, "--cron", EnLinux(_cron));
+        var (codigo, _, errores) = Desplegar("ventas", null, "--cron", EnLinux(_cron));
 
         Assert.Equal(1, codigo);
         Assert.Contains("falta la variable BABELHUB_SECRETOS", errores, StringComparison.Ordinal);
@@ -1192,7 +1276,7 @@ public sealed class DesplegarShTests : IDisposable
     [Theory]
     [InlineData("inventario", "postgres.env")]
     [InlineData("ventas", "ecommerce.env")]
-    [InlineData("borde", "cloudflared.env")]
+    [InlineData("ventas", "cloudflared.env")]
     public void SiFaltaUnArchivoDeSecretos_NoSeDespliega(string vm, string archivo)
     {
         PrepararSecretos(vm);
@@ -1209,10 +1293,10 @@ public sealed class DesplegarShTests : IDisposable
     [Trait("Criterio", "AC-PLA-04")]
     public void SiUnArchivoDeSecretosEstaVacio_NoSeDespliega()
     {
-        PrepararSecretos("borde");
+        PrepararSecretos("ventas");
         File.WriteAllText(Path.Combine(_secretos, "cloudflared.env"), string.Empty);
 
-        var (codigo, _, errores) = Desplegar("borde");
+        var (codigo, _, errores) = Desplegar("ventas");
 
         Assert.Equal(1, codigo);
         Assert.Contains("el archivo de secretos cloudflared.env está vacío", errores, StringComparison.Ordinal);
@@ -1222,11 +1306,11 @@ public sealed class DesplegarShTests : IDisposable
     [Trait("Criterio", "AC-PLA-04")]
     public void SiUnArchivoDeSecretosLoPuedenLeerOtrosUsuarios_NoSeDespliega()
     {
-        PrepararSecretos("borde");
-        var entorno = EntornoDe("borde");
+        PrepararSecretos("ventas");
+        var entorno = EntornoDe("ventas");
         entorno["STAT_ABIERTO"] = "cloudflared.env";
 
-        var (codigo, salida, errores) = Desplegar("borde", entorno);
+        var (codigo, salida, errores) = Desplegar("ventas", entorno);
 
         Assert.Equal(1, codigo);
         Assert.Contains("cloudflared.env lo pueden leer otros usuarios (permisos 644)", errores, StringComparison.Ordinal);
@@ -1360,8 +1444,8 @@ public sealed class DesplegarShTests : IDisposable
     [Theory]
     [InlineData]
     [InlineData("nube")]
-    [InlineData("borde", "--espera", "abc")]
-    [InlineData("borde", "--desconocida")]
+    [InlineData("ventas", "--espera", "abc")]
+    [InlineData("ventas", "--desconocida")]
     public async Task UnUsoInvalido_SeRechazaConCodigo2(params string[] argumentos)
     {
         var informacion = new ProcessStartInfo(Bash()) { RedirectStandardOutput = true, RedirectStandardError = true };
@@ -1380,6 +1464,167 @@ public sealed class DesplegarShTests : IDisposable
         Assert.Contains("Uso:", await errores, StringComparison.Ordinal);
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void LaVmDeBordeYaNoExiste_ElScriptLoDiceYNoHaceNada()
+    {
+        var (codigo, _, errores) = Desplegar("borde", EntornoDe("ventas"));
+
+        Assert.Equal(2, codigo);
+        Assert.Contains("VM-BORDE ya no existe: cloudflared y Nginx se despliegan con «ventas»", errores, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-15")]
+    public void ElGenerador_NoEscribeEnLosSecretosQuienPuedeFijarElOrigen_PorqueLoFijanLosCompose()
+    {
+        var destino = Path.Combine(_carpeta, "generados-proxies");
+
+        var (codigo, salida, errores) = Generar(destino);
+
+        Assert.True(codigo == 0, salida + errores);
+        Assert.DoesNotContain("ProxiesConocidos=", File.ReadAllText(Path.Combine(destino, "inventario", "ecommerce-gestion.env")), StringComparison.Ordinal);
+        Assert.DoesNotContain("ProxiesConocidos=", File.ReadAllText(Path.Combine(destino, "ventas", "ecommerce.env")), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void LaVmDeVentas_ExigeLaDireccionDelInventario_PorqueNginxLlevaAlliLaGestion()
+    {
+        PrepararSecretos("ventas");
+        var entorno = EntornoDe("ventas");
+        entorno.Remove("IP_INVENTARIO");
+
+        var (codigo, _, errores) = Desplegar("ventas", entorno);
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("falta la variable IP_INVENTARIO", errores, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
+    }
+
+    // ---------- La réplica de gestión solo la alcanza Nginx (DD-104) ----------
+
+    private const string Regla = "DOCKER-USER -d 10.0.0.10 -p tcp --dport 8081 ! -s 10.213.10.3 -j DROP";
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-15")]
+    public void EnVentas_PoneLaReglaAntesDeLevantarNada_YDejaLaTareaQueLaRepone()
+    {
+        PrepararSecretos("ventas");
+
+        var (codigo, salida, errores) = Desplegar("ventas");
+
+        Assert.True(codigo == 0, salida + errores);
+        var llamadas = LlamadasADocker.ToList();
+        var insercion = llamadas.IndexOf("iptables -w -I " + Regla);
+        var levantar = llamadas.FindIndex(l => l.Contains(" up -d --wait", StringComparison.Ordinal));
+        Assert.True(insercion >= 0 && insercion < levantar, string.Join("\n", llamadas));
+        var tarea = File.ReadAllText(Path.Combine(_cron, "babelhub-gestion"));
+        Assert.Matches(@"(?m)^\* \* \* \* \* root /bin/bash \S+/scripts/proteger-gestion\.sh 10\.0\.0\.10 >> ", tarea);
+        Assert.Contains("PATH=", tarea, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-15")]
+    public void ConLaReglaYaPuesta_RepetirElDespliegue_NoLaDuplica()
+    {
+        PrepararSecretos("ventas");
+        var entorno = EntornoDe("ventas");
+        entorno["DOBLE_REGLA_PUESTA"] = "1";
+
+        var (codigo, salida, errores) = Desplegar("ventas", entorno);
+
+        Assert.True(codigo == 0, salida + errores);
+        Assert.Contains("iptables -w -C " + Regla, LlamadasADocker);
+        Assert.DoesNotContain(LlamadasADocker, l => l.StartsWith("iptables -w -I ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-15")]
+    public void SiLaReglaNoSePuedePoner_VentasNoSeDespliega()
+    {
+        PrepararSecretos("ventas");
+        var entorno = EntornoDe("ventas");
+        entorno["DOBLE_IPTABLES_FALLA"] = "1";
+
+        var (codigo, _, errores) = Desplegar("ventas", entorno);
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("No se despliega ventas: sin la regla", errores, StringComparison.Ordinal);
+        Assert.DoesNotContain(LlamadasADocker, l => l.Contains(" up -d", StringComparison.Ordinal));
+        Assert.False(File.Exists(Path.Combine(_cron, "babelhub-gestion")));
+    }
+
+    [Theory]
+    [InlineData("babelhub-aux", "755")]
+    [InlineData("root", "775")]
+    [Trait("Criterio", "AC-SEG-15")]
+    public void SiElGuionDeLaReglaLoPuedeModificarOtro_VentasNoSeDespliega(string dueno, string modo)
+    {
+        PrepararSecretos("ventas");
+        var entorno = EntornoDe("ventas");
+        entorno["STAT_DUENO"] = dueno;
+        entorno["STAT_MODO_SCRIPTS"] = modo;
+
+        var (codigo, _, errores) = Desplegar("ventas", entorno);
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("scripts/proteger-gestion.sh es de", errores, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-SEG-15")]
+    public void SiLaRaizDelRepositorioNoEsDeRoot_VentasNoSeDespliega()
+    {
+        PrepararSecretos("ventas");
+        var entorno = EntornoDe("ventas");
+        // La raíz tal como la calcula el script: la del propio guion, resuelta por bash.
+        entorno["DOBLE_RAIZ"] = RaizSegunBash();
+        entorno["STAT_DUENO_RAIZ"] = "ubuntu";
+
+        var (codigo, _, errores) = Desplegar("ventas", entorno);
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("es de ubuntu con permisos 755: debe ser de root", errores, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
+    }
+
+    private static string RaizSegunBash()
+    {
+        var informacion = new ProcessStartInfo(Bash()) { RedirectStandardOutput = true };
+        informacion.ArgumentList.Add("-c");
+        informacion.ArgumentList.Add("cd \"$(dirname \"$1\")/..\" && pwd");
+        informacion.ArgumentList.Add("--");
+        informacion.ArgumentList.Add(EnLinux(Path.Combine(ComposeDeVms.Raiz(), "scripts", "desplegar.sh")));
+        using var proceso = Process.Start(informacion)!;
+        var salida = proceso.StandardOutput.ReadToEnd();
+        proceso.WaitForExit();
+        return salida.Trim();
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void LaVmDeDatos_NoTocaElCortafuegos_YExigeLaDireccionDeVentas()
+    {
+        PrepararSecretos("inventario");
+
+        var (codigo, salida, errores) = Desplegar("inventario");
+
+        Assert.True(codigo == 0, salida + errores);
+        Assert.DoesNotContain(LlamadasADocker, l => l.StartsWith("iptables ", StringComparison.Ordinal));
+
+        File.Delete(Registro);
+        var entorno = EntornoDe("inventario");
+        entorno.Remove("IP_VENTAS");
+        var (sinVentas, _, erroresSinVentas) = Desplegar("inventario", entorno);
+
+        Assert.Equal(1, sinVentas);
+        Assert.Contains("falta la variable IP_VENTAS", erroresSinVentas, StringComparison.Ordinal);
+        Assert.Empty(LlamadasADocker);
+    }
+
     // ---------- Con docker de verdad, sobre una VM mínima ----------
 
     private string VmMinima(string saludable)
@@ -1387,7 +1632,7 @@ public sealed class DesplegarShTests : IDisposable
         var infra = Path.Combine(_carpeta, "infra");
         Directory.CreateDirectory(infra);
         File.WriteAllText(
-            Path.Combine(infra, "docker-compose.borde.yml"),
+            Path.Combine(infra, "docker-compose.ventas.yml"),
             $$"""
             name: bhdesp{{Guid.NewGuid().ToString("N")[..8]}}
             services:
@@ -1410,12 +1655,12 @@ public sealed class DesplegarShTests : IDisposable
     private (int Codigo, string Salida, string Errores) DesplegarMinima(string infra, string espera)
     {
         var entorno = new Dictionary<string, string> { ["STAT"] = EnLinux(Path.Combine(_carpeta, "stat-doble.sh")) };
-        return Desplegar("borde", entorno, "--secretos", EnLinux(_secretos), "--infra", EnLinux(infra), "--espera", espera);
+        return Desplegar("ventas", entorno, "--secretos", EnLinux(_secretos), "--infra", EnLinux(infra), "--espera", espera);
     }
 
     private void Retirar(string infra)
     {
-        var compose = Path.Combine(infra, "docker-compose.borde.yml");
+        var compose = Path.Combine(infra, "docker-compose.ventas.yml");
         ComposeDeVms.Docker(TimeSpan.FromMinutes(2), new Dictionary<string, string> { ["BABELHUB_SECRETOS"] = EnLinux(_secretos) }, "compose", "--project-directory", EnLinux(infra), "-f", EnLinux(compose), "down", "-v", "--remove-orphans");
     }
 

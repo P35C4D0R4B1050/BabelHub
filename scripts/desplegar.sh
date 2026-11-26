@@ -2,8 +2,9 @@
 # Despliega una VM con un solo comando (PLA-04, AC-PLA-04): levanta todos sus componentes y espera a que cada uno responda su comprobación
 # de salud. Es idempotente (`docker compose up -d --wait`): repetirlo no cambia lo que ya está sano. Se ejecuta EN la VM, con sus secretos.
 #
-#   BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.10 IMAGEN_ECOMMERCE=<imagen@sha256:…> \
-#       scripts/desplegar.sh <borde|ventas|inventario> [--secretos <carpeta>] [--infra <carpeta>] [--espera <segundos>] [--cron <carpeta>] [--sin <servicio[,servicio]>]
+#   BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.10 IP_INVENTARIO=10.0.0.20 IMAGEN_ECOMMERCE=<imagen@sha256:…> \
+#       scripts/desplegar.sh <ventas|inventario> [--secretos <carpeta>] [--infra <carpeta>] [--espera <segundos>] [--cron <carpeta>] [--sin <servicio[,servicio]>]
+#   Topología de dos VMs (DD-100): la entrada pública (cloudflared y Nginx) forma parte de «ventas»; no hay VM-BORDE.
 #
 # Antes de tocar nada comprueba, y no continúa si falla (sin imprimir nunca un valor secreto):
 #   - que estén definidas todas las variables obligatorias del Compose de la VM (BABELHUB_SECRETOS, las direcciones privadas, las imágenes);
@@ -19,7 +20,10 @@
 #
 # TLS hacia PostgreSQL (AM24): además rechaza una cadena de conexión sin «SSL Mode=VerifyFull» (o la URI de Evolution sin sslmode=require + sslaccept=strict + sslcert), por nombre de clave y sin imprimir valores.
 #
-# Variables opcionales: DOCKER (comando de docker, por defecto `docker`), STAT (por defecto `stat`), CHOWN (por defecto `chown`), BABELHUB_RAICES_PUBLICAS.
+# En VM-VENTAS, antes de levantar nada, deja que solo Nginx llegue desde los contenedores a la réplica de gestión (scripts/proteger-gestion.sh, DD-104) e instala
+# la tarea de cron que repone esa regla cada minuto.
+#
+# Variables opcionales: DOCKER (comando de docker, por defecto `docker`), STAT (por defecto `stat`), CHOWN (por defecto `chown`), IPTABLES (por defecto `iptables`), BABELHUB_RAICES_PUBLICAS.
 # Códigos de salida: 0 desplegado y sano, 1 falta algo o algún componente no quedó sano, 2 uso inválido.
 set -euo pipefail
 
@@ -35,7 +39,7 @@ EXTRA=""
 VM=""
 
 uso() {
-  echo "Uso: $0 <borde|ventas|inventario> [--secretos <carpeta>] [--infra <carpeta>] [--espera <segundos>] [--cron <carpeta>] [--sin <servicio[,servicio]>]" >&2
+  echo "Uso: $0 <ventas|inventario> [--secretos <carpeta>] [--infra <carpeta>] [--espera <segundos>] [--cron <carpeta>] [--sin <servicio[,servicio]>]" >&2
   exit 2
 }
 
@@ -45,7 +49,11 @@ anotar() { falta+=("$1"); }
 [[ $# -ge 1 ]] || uso
 VM="$1"
 shift
-case "$VM" in borde | ventas | inventario) ;; *) uso ;; esac
+case "$VM" in
+  ventas | inventario) ;;
+  borde) echo "Error: VM-BORDE ya no existe: cloudflared y Nginx se despliegan con «ventas» (docs/07-proceso-de-desarrollo/08-guia-primer-despliegue.md)." >&2; exit 2 ;;
+  *) uso ;;
+esac
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --secretos) [[ $# -ge 2 ]] || uso; export BABELHUB_SECRETOS="$2"; shift 2 ;;
@@ -167,7 +175,7 @@ comprobar_tls_de_postgres() { # archivo ruta
 if [[ -n "$SECRETOS" ]]; then
   # La raíz de confianza de los procesos (SSL_CERT_FILE, DD-55): las autoridades públicas de ESTA VM más la CA privada de la cuenta, para que el HTTPS entre servicios y el TLS
   # del Redis de contadores se verifiquen sin desactivar ninguna comprobación. Lo arma la propia VM cada vez (si se actualizan sus autoridades, el paquete las sigue); nunca viaja.
-  if [[ "$VM" != borde && -s "$SECRETOS/tls-ca.pem" ]]; then
+  if [[ -s "$SECRETOS/tls-ca.pem" ]]; then
     raices="${BABELHUB_RAICES_PUBLICAS:-/etc/ssl/certs/ca-certificates.crt}"
     if [[ -s "$raices" ]]; then
       paquete="$(mktemp "$SECRETOS/.ca-bundle.XXXXXX")"
@@ -212,6 +220,19 @@ if [[ -n "$SECRETOS" ]]; then
       anotar "el archivo de secretos $archivo tiene valores «CAMBIAR» sin completar (los lista PENDIENTES.txt de la carpeta que generó scripts/generar-secretos.sh)"
     fi
     comprobar_tls_de_postgres "$archivo" "$ruta"
+    # Ninguna credencial que pueda cambiar las reglas de retención o de ciclo de vida de R2 puede estar en una VM (PLA-44): el token de la API de
+    # Cloudflare solo existe, y temporalmente, en el equipo de la persona responsable.
+    if grep -qE '^[[:space:]]*(export[[:space:]]+)?(CLOUDFLARE|CF)_(API_)?(TOKEN|KEY)=' "$ruta" 2>/dev/null; then
+      anotar "el archivo $archivo lleva un token o una clave de la API de Cloudflare: la administración de R2 no puede estar en una VM (PLA-44); quítalo y revócalo en el panel"
+    fi
+    # Los respaldos van a Cloudflare R2 (D26): un archivo generado antes apunta todavía a Oracle y no respaldaría nada.
+    if [[ "$archivo" == postgres.env && "$(leer_valor "$ruta" RCLONE_CONFIG_ALMACEN_ENDPOINT)" == *oraclecloud.com* ]]; then
+      anotar "postgres.env: RCLONE_CONFIG_ALMACEN_ENDPOINT apunta a Oracle: los respaldos van a Cloudflare R2 (https://<account-id>.r2.cloudflarestorage.com, con RCLONE_CONFIG_ALMACEN_PROVIDER=Cloudflare y RCLONE_CONFIG_ALMACEN_REGION=auto); ver la guía de despliegue, §9b"
+    fi
+    if [[ "$archivo" == postgres.env && "$(leer_valor "$ruta" RCLONE_CONFIG_ALMACEN_ENDPOINT)" == *r2.cloudflarestorage.com* ]]; then
+      [[ "$(leer_valor "$ruta" RCLONE_CONFIG_ALMACEN_PROVIDER)" == Cloudflare && "$(leer_valor "$ruta" RCLONE_CONFIG_ALMACEN_REGION)" == auto ]] \
+        || anotar "postgres.env: con Cloudflare R2 van RCLONE_CONFIG_ALMACEN_PROVIDER=Cloudflare y RCLONE_CONFIG_ALMACEN_REGION=auto (guía de despliegue, §9b)"
+    fi
     # La cuenta propietaria de las bases (administración, COMP-2) solo puede estar en migrador.env: un servicio con ella en su entorno la tendría en un proceso expuesto.
     if grep -q 'BABELHUB__Migrador__' "$ruta" 2>/dev/null; then
       anotar "el archivo $archivo lleva claves BABELHUB__Migrador__*: la cuenta propietaria de las bases solo puede estar en migrador.env"
@@ -223,6 +244,9 @@ if [[ -n "$SECRETOS" ]]; then
     [[ -f "$ruta" ]] || continue
     nombre="$(basename "$ruta")"
     [[ " ${ARCHIVOS[*]} " == *" $nombre "* ]] && continue
+    if grep -qE '^[[:space:]]*(export[[:space:]]+)?(CLOUDFLARE|CF)_(API_)?(TOKEN|KEY)=' "$ruta" 2>/dev/null; then
+      anotar "el archivo $nombre lleva un token o una clave de la API de Cloudflare: la administración de R2 no puede estar en una VM (PLA-44); quítalo y revócalo en el panel"
+    fi
     if [[ "$nombre" == ca-clave.pem || "$nombre" == age-clave-privada* ]] || grep -qE 'PRIVATE KEY|AGE-SECRET-KEY-' "$ruta" 2>/dev/null; then
       anotar "$nombre es una clave privada que no usa esta VM: no debe estar en su carpeta de secretos (¿copiaste la carpeta entera? copia solo la de esta VM)"
     fi
@@ -316,6 +340,21 @@ if [[ "$VM" == inventario && -n "$SECRETOS" ]]; then
   [[ "$RAIZ" =~ ^[A-Za-z0-9._:/-]+$ && "$SECRETOS" =~ ^[A-Za-z0-9._:/-]+$ ]] || anotar "las rutas del repositorio y de los secretos solo pueden tener letras, números y . _ : / - (se escriben en la tarea de cron)"
 fi
 
+# La protección de la réplica de gestión (DD-104) la ejecuta cron como root cada minuto: su script y la carpeta deben ser de root y sin escritura para otros.
+PROTEGER_GESTION=0
+[[ "$VM" == ventas && -n "${IP_INVENTARIO:-}" ]] && PROTEGER_GESTION=1
+if [[ "$PROTEGER_GESTION" -eq 1 ]]; then
+  [[ -d "$CARPETA_CRON" ]] || anotar "no existe $CARPETA_CRON: VM-VENTAS necesita cron para reponer la protección de la réplica de gestión"
+  # También la raíz del repositorio: quien pueda escribir en ella podría renombrar la carpeta y poner la suya.
+  for ruta in "$RAIZ" "$RAIZ/scripts" "$RAIZ/scripts/proteger-gestion.sh"; do
+    lectura="$("$STAT" -c '%U %a' "$ruta" 2>/dev/null || echo '? ?')"
+    if [[ "${lectura% *}" != root ]] || [[ ! "${lectura#* }" =~ ^[0-7]?[0-7][0145][0145]$ ]]; then
+      anotar "${ruta#"$RAIZ"/} es de ${lectura% *} con permisos ${lectura#* }: debe ser de root y sin escritura para otros (lo ejecuta el cron como root)"
+    fi
+  done
+  [[ "$RAIZ" =~ ^[A-Za-z0-9._:/-]+$ ]] || anotar "la ruta del repositorio solo puede tener letras, números y . _ : / - (se escribe en la tarea de cron)"
+fi
+
 # migrador.env solo existe en la VM de datos: en cualquier otra sería una credencial de administración sin uso.
 if [[ "$VM" != inventario && -n "$SECRETOS" && -e "$SECRETOS/migrador.env" ]]; then
   anotar "existe migrador.env en la VM $VM: la cuenta propietaria de las bases solo puede estar en la VM de datos"
@@ -363,6 +402,23 @@ for omitido in "${SIN[@]:-}"; do
 done
 [[ ${#SIN[@]} -eq 0 ]] || echo "Se deja sin levantar: ${SIN[*]}"
 [[ ${#SIN[@]} -eq 0 || ${#SERVICIOS[@]} -gt 0 ]] || { echo "--sin deja $VM sin ningún servicio." >&2; exit 2; }
+# Antes de levantar ningún contenedor de VM-VENTAS: la regla que deja llegar a la réplica de gestión solo a Nginx, y su reposición (DD-104).
+if [[ "$PROTEGER_GESTION" -eq 1 ]]; then
+  if ! bash "$RAIZ/scripts/proteger-gestion.sh" "$IP_INVENTARIO"; then
+    echo "No se despliega $VM: sin la regla, cualquier contenedor de esta VM podría inventar el origen del cliente ante la réplica de gestión." >&2
+    exit 1
+  fi
+  temporal="$(mktemp "$CARPETA_CRON/.babelhub-gestion.XXXXXX")"
+  cat >"$temporal" <<EOF
+# Instalado por scripts/desplegar.sh: de los contenedores de esta VM, solo Nginx llega a la réplica de gestión (DD-104). Se repone cada minuto.
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+* * * * * root /bin/bash $RAIZ/scripts/proteger-gestion.sh $IP_INVENTARIO >> /var/log/babelhub-gestion.log 2>&1
+EOF
+  chmod 0644 "$temporal"
+  mv -f "$temporal" "$CARPETA_CRON/babelhub-gestion"
+  echo "ok protección de la réplica de gestión ($CARPETA_CRON/babelhub-gestion)"
+fi
+
 # La migración de las bases antes de levantar los servicios (COMP-2): primero PostgreSQL sano, después los esquemas y roles de cada servicio con la
 # cuenta propietaria de migrador.env, que solo vive en el entorno de ese proceso (nunca en un argumento ni en un archivo de los servicios). Es idempotente.
 if [[ "$VM" == inventario ]]; then

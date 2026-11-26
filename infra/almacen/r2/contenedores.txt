@@ -1,0 +1,9 @@
+# Contenedores de respaldos en Cloudflare R2 (PLA-16, PLA-18; D26). Fuente de verdad de `scripts/almacen.sh r2-…` y de las pruebas.
+# Una línea por contenedor: nombre, días de bloqueo de retención (impide borrar y sobrescribir) y días tras los cuales el ciclo de vida retira
+# el objeto. El bloqueo manda sobre el ciclo de vida y el almacén retira lo vencido en un día como mucho. A diferencia de Oracle, quien
+# administre la cuenta puede quitar el bloqueo (riesgo aceptado, spec §5).
+# nombre                 bloqueo_dias  expira_dias
+respaldos-diarios        7             7
+respaldos-semanales      28            28
+respaldos-mensuales      92            92
+respaldos-wal            7             7

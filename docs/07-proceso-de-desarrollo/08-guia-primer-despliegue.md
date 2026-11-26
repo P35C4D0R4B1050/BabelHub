@@ -6,7 +6,7 @@ Para una persona que **nunca** usó Docker, Oracle Cloud, máquinas virtuales ni
 
 ## 0. Antes de empezar: el estado real de BabelHub (léelo primero)
 
-Esta guía deja listo **todo lo que es infraestructura**. Pero hay cosas del código que hoy impiden que la tienda arranque en producción, y debes saberlas antes de gastar tiempo:
+Esta guía deja listo **todo lo que es infraestructura** con **dos máquinas virtuales** (topología vigente desde el 2026-11-25: no hubo capacidad para las AMD micro). Pero hay cosas que debes saber antes de gastar tiempo:
 
 | # | Qué pasa | Por qué | Qué decidir |
 | :--- | :--- | :--- | :--- |
@@ -15,8 +15,10 @@ Esta guía deja listo **todo lo que es infraestructura**. Pero hay cosas del có
 | **1 ter** | **RESUELTO: los envíos se operan con el simulador, también en `Production`** (DD-22, DD-88). | No existe un operador logístico real ni lo habrá. Los archivos de secretos llevan `BABELHUB__Envios__Operador="simulador"` (el generador lo escribe y `desplegar.sh` lo exige) y la tienda muestra «Los envíos son simulados: proyecto académico» encima del pie y en el checkout. | Nada que decidir. Las guías de envío a domicilio las genera el simulador y ningún paquete sale. |
 | **2** | **RESUELTO (2026-11-25): PostgreSQL habla solo TLS verificado** entre VM-VENTAS, los servicios de VM-INVENTARIO y Evolution API (AM24, DD-90 a DD-94). | El servidor usa un certificado de la CA privada (`tls-postgres-*.pem`, que `generar-secretos.sh` crea con los demás), `pg_hba.conf` rechaza toda conexión de red sin TLS y las cadenas de conexión llevan `SSL Mode=VerifyFull`; `desplegar.sh` se niega a desplegar si alguna no lo pide. | Nada que decidir. **Si ya generaste tu carpeta de secretos con una versión anterior del generador, regenérala** (la CA anterior no permite el nombre `postgres`): usa una carpeta nueva y vuelve a copiar los valores «CAMBIAR» que completaste; no se puede parchear a mano. |
 | **3** | Los clientes de seguridad exigen **HTTPS entre servicios** en producción. | Es una regla de la aplicación (SEG-15). | Ya está resuelto aquí: `scripts/generar-secretos.sh` crea una **CA privada** y los certificados de cada VM, y los Compose abren el puerto 8443. No hay que hacer nada, solo entenderlo (reglas de red en el paso 3). |
+| **4** | **Solo dos VMs** (DD-100). `cloudflared` y Nginx corren dentro de VM-VENTAS; **no hay VM-BORDE** y **VM-AUX queda aplazada**. | Sin capacidad para las AMD micro en `sa-santiago-1`. | Nada que decidir. Lee en §14 lo que **no** tienes mientras no haya VM-AUX (entre otras cosas, nadie te avisa si fallan los respaldos). |
+| **5** | **Los respaldos van comprimidos y cifrados a Cloudflare R2** (2026-11-25, **provisional**); los libros, las portadas y el registro de supresiones siguen en Oracle. | R2 no ofrece una credencial de «solo crear» ni un bloqueo irreversible: la VM de datos no puede borrar un respaldo dentro de su plazo, pero **quien entre a tu cuenta de Cloudflare sí podría** quitar el bloqueo y borrarlo todo (riesgo aceptado, spec `transversal-plataforma` §5). El archivo de cambios se guarda solo **7 días**. | Activa el segundo factor en Cloudflare, sigue §9b y **no pongas datos reales** hasta que la prueba de tu cuenta (§9b.5) salga bien. Antes de operar con clientes reales se vuelve a decidir (B09, B13). |
 
-Lo que sí **funciona hoy y se probó de verdad** (en tu equipo, con las imágenes reales y los mismos scripts): construir las tres imágenes, PostgreSQL con sus migraciones, el **Inventario en `Production`** respondiendo `/health/ready` por HTTPS con el certificado validado, la réplica de gestión y el E-commerce (estos dos en `Development`), Redis con TLS, n8n y los scripts de despliegue. Lo que **no** se pudo probar sin Oracle y sin dominio: Cloudflare, el túnel, el almacén de objetos, el cobro con Culqi, WhatsApp y la capacidad ARM real.
+Lo que sí **funciona hoy y se probó de verdad** (en tu equipo, con las imágenes reales y los mismos scripts): construir las tres imágenes, PostgreSQL con sus migraciones, el **Inventario en `Production`** respondiendo `/health/ready` por HTTPS con el certificado validado, la réplica de gestión y el E-commerce (estos dos en `Development`), Redis con TLS, n8n y los scripts de despliegue. Lo que **no** se pudo probar sin Oracle y sin dominio: Cloudflare, el túnel, el almacén de objetos de Oracle, tu cuenta de R2 (los respaldos se probaron contra un almacén compatible local), el cobro con Culqi, WhatsApp y la capacidad ARM real.
 
 ## 1. Qué necesito tener a mano
 
@@ -26,34 +28,32 @@ Marca cada uno antes de empezar:
 - [ ] Una tarjeta de crédito o débito **internacional** (Oracle la pide para verificar la cuenta; no te cobra mientras te quedes en el cupo gratuito). Anota que Oracle hace un cargo temporal de verificación (~1 USD) y lo devuelve.
 - [ ] Un correo que revises a diario y un teléfono para el SMS de verificación.
 - [ ] La cuenta de **GitHub** dueña del repositorio.
-- [ ] Una cuenta de **Cloudflare** (gratuita) y el **dominio comprado en Spaceship** con acceso a su panel.
+- [ ] Una cuenta de **Cloudflare** (gratuita) y el **dominio comprado en Spaceship** con acceso a su panel. Para los respaldos se activa **R2** en esa cuenta: tiene 10 GB al mes gratis y puede pedirte un medio de pago (lo que pase del cupo se cobra).
 - [ ] Una cuenta de **Gmail sencilla** (no institucional) con verificación en dos pasos y una **contraseña de aplicación** (Cuenta de Google → Seguridad → Contraseñas de aplicaciones). Es para los correos del sistema. Otra contraseña de aplicación (o la misma cuenta con otra contraseña) para los avisos del espacio reservado.
 - [ ] Más adelante: llaves de Culqi (B05), tu API key de Anthropic (B06), un número de WhatsApp dedicado (B07). **No las necesitas para empezar.**
 
 **En tu equipo**
 - [ ] Windows 11 con **WSL** (Ubuntu) o una Linux/macOS. En Windows, abre la app «Ubuntu» (si no la tienes: PowerShell como administrador → `wsl --install -d Ubuntu`, reinicia). Todos los comandos marcados **[Tu equipo]** se ejecutan ahí.
 - [ ] **Docker Desktop** (con la integración WSL activada) o Docker Engine en tu Linux.
-- [ ] `git`, `openssl`, `curl`, `ssh`. En Ubuntu: `sudo apt update && sudo apt install -y git openssl curl openssh-client age`.
+- [ ] `git`, `openssl`, `curl`, `ssh`, y para los respaldos `age`, `zstd` y `rclone`. En Ubuntu: `sudo apt update && sudo apt install -y git openssl curl openssh-client age zstd rclone`.
 - [ ] El **repositorio clonado**: `git clone https://github.com/<propietario>/BabelHub.git ~/BabelHub && cd ~/BabelHub`.
-- [ ] La **CLI de Oracle** (`oci`) para el almacén de objetos (paso 8): <https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm>.
-- [ ] Un **gestor de contraseñas** o un cuaderno **fuera de línea** y **dos lugares distintos** para guardar la clave de respaldos (paso 9).
+- [ ] La **CLI de Oracle** (`oci`) para el almacén de objetos (§9): <https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm>.
+- [ ] Un **gestor de contraseñas** o un cuaderno **fuera de línea** y **dos lugares distintos** para guardar la clave de respaldos (§10.1).
 
 **Convenciones.** `[Tu equipo]` = tu WSL/Linux. `[VM-X]` = dentro de esa VM por SSH. Lo que va entre `<ángulos>` lo reemplazas tú. **Nunca pegues un secreto en un chat, un correo ni el repositorio.** Si un comando imprime algo que parece secreto, no lo copies a ningún lado.
 
 ## 2. El mapa
 
 ```
-Internet ──► Cloudflare (DNS, TLS, WAF, Access) ──túnel saliente──► VM-BORDE (nginx + cloudflared) ──► VM-VENTAS ──► VM-INVENTARIO
-                                                                       └ (segundo conector) ─────────────────► (E-commerce)   (Inventario + PostgreSQL)
-                                  tu equipo ──SSH──► VM-AUX (salto) ──SSH──► las otras tres
+Internet ──► Cloudflare (DNS, TLS, WAF, Access) ──túnel saliente──► VM-VENTAS [cloudflared → Nginx → E-commerce] ──► VM-INVENTARIO (Inventario + PostgreSQL)
+                                                                                        └── gestión ──────────────► VM-INVENTARIO (réplica de gestión)
+                                  tu equipo ──SSH (solo desde tu IP)──► las dos VMs
 ```
 
 | VM | Tipo en Oracle | IP privada (la que usaremos) | Qué corre |
 | :--- | :--- | :--- | :--- |
 | **VM-INVENTARIO** | ARM `VM.Standard.A1.Flex`, 1 OCPU, 6 GB | `10.0.0.20` | PostgreSQL, Inventario, réplica de gestión del E-commerce |
-| **VM-VENTAS** | ARM `VM.Standard.A1.Flex`, 1 OCPU, 6 GB | `10.0.0.10` | E-commerce, Redis (caché y contadores), n8n, Evolution API, 2.º conector de cloudflared |
-| **VM-BORDE** | AMD `VM.Standard.E2.1.Micro` | `10.0.0.30` | nginx y cloudflared |
-| **VM-AUX** | AMD `VM.Standard.E2.1.Micro` | `10.0.0.40` | Salto SSH y vigilancia de respaldos |
+| **VM-VENTAS** | ARM `VM.Standard.A1.Flex`, 1 OCPU, 6 GB | `10.0.0.10` | `cloudflared`, Nginx, E-commerce, Redis (caché y contadores), n8n, Evolution API |
 
 ### 2.1 Tu dominio: `babel-hub.shop`
 
@@ -61,17 +61,17 @@ El dominio ya está en Cloudflare, con SSL. En esta guía el dominio es **`babel
 
 | Nombre | Para qué | Dónde llega |
 | :--- | :--- | :--- |
-| `babel-hub.shop` (el «apex») | **La tienda**, el nombre canónico que ve el público (y Culqi) | Túnel → Nginx de VM-BORDE → E-commerce (host `tienda`) |
-| `www.babel-hub.shop` | Redirige al apex con una regla de Cloudflare (§13.2); la aplicación también lo acepta | ídem |
-| `gestion.babel-hub.shop` | **La gestión** (sucursales y administración), protegida por Cloudflare Access (§13.4) | Túnel → Nginx → réplica de gestión (host `gestion`) |
+| `babel-hub.shop` (el «apex») | **La tienda**, el nombre canónico que ve el público (y Culqi) | Túnel → Nginx (VM-VENTAS) → E-commerce (rol `tienda`) |
+| `www.babel-hub.shop` | Redirige al apex con una regla de Cloudflare (§12.2); la aplicación también lo acepta | ídem |
+| `gestion.babel-hub.shop` | **La gestión** (sucursales y administración), protegida por Cloudflare Access (§12.4) | Túnel → Nginx (VM-VENTAS) → réplica de gestión en VM-INVENTARIO (rol `gestion`) |
 
 Nginx (`infra/nginx/nginx.conf`) ya enruta así: el servidor por defecto atiende la tienda y `server_name gestion.*` la gestión; el generador de secretos escribe los hosts permitidos de cada servicio (`babel-hub.shop,www.babel-hub.shop` y `gestion.babel-hub.shop`) y los de Turnstile. No hay nada que cambiar en los archivos del repositorio por el dominio.
 
 **El orden de la guía** (cada etapa termina con una comprobación; no pases a la siguiente si falla):
 
-1. Ensayo en tu equipo (paso 4) → 2. Publicar las imágenes (paso 5) → 3. Cuenta, red y las 4 VMs de Oracle (pasos 6–7) → 4. Almacén de objetos y secretos (pasos 8–9) → 5. **VM-INVENTARIO** (paso 11) → 6. **VM-VENTAS** (paso 12) → 7. Cloudflare y **VM-BORDE** (paso 13) → 8. **VM-AUX** y respaldos (paso 14) → 9. Después del despliegue (paso 15).
+1. Ensayo en tu equipo (paso 4) → 2. Publicar las imágenes (paso 5) → 3. Cuenta, red y las 2 VMs de Oracle (pasos 6–8) → 4. Almacenes (Oracle y Cloudflare R2) y secretos (pasos 9–10) → 5. **VM-INVENTARIO** (§11) → 6. **Cloudflare** (§12) → 7. **VM-VENTAS** con la entrada (§13) → 8. Lo que falta sin VM-AUX (§14) → 9. Después del despliegue (§15).
 
-*Por qué el almacén y los secretos van antes que las VMs (y no al final):* los secretos de VM-INVENTARIO y de VM-VENTAS incluyen las llaves del almacén de objetos; sin ellas el despliegue se niega a continuar a propósito.
+*Por qué ese orden:* los secretos llevan las llaves de los dos almacenes y las claves de Turnstile (que se crean al completar los secretos, §10.2), y los de VM-VENTAS además el token del túnel (§12.3); sin ellas el despliegue se niega a continuar a propósito.
 
 *Contacto del comercio y versión de los textos legales (mínimo, `web-informacion-del-comercio`):* el `ecommerce.env` de VM-VENTAS y el `ecommerce-gestion.env` de VM-INVENTARIO llevan además `BABELHUB__Contacto__Telefono`, `…Correo` y `…Direccion` como `CAMBIAR` (no son secretos): escribe los reales entre comillas dobles antes de desplegar, y tras `desplegar inventario` fija la versión de los textos legales como indica `infra/README.md` (sección «Contacto del comercio y versión de los textos legales»).
 
@@ -210,7 +210,7 @@ Oracle recupera las VMs gratuitas con uso muy bajo y las cuentas gratuitas falla
 
 **Cómo deshacer todo lo de Oracle:** *Compute → Instances → cada una → Terminate (marca «delete boot volume»)*, y luego la red (§7). Con eso no queda nada que cobre.
 
-## 7. Paso 3 — Red privada y las cuatro VMs
+## 7. Paso 3 — Red privada y las dos VMs
 
 ### 7.1 La red (VCN)
 
@@ -218,27 +218,27 @@ Oracle recupera las VMs gratuitas con uso muy bajo y las cuentas gratuitas falla
 
 La pantalla de resumen del asistente es **de solo lectura**. Las reglas se editan en la VCN `babelhub` → pestaña **Seguridad** → **Default Security List for babelhub** (la de la subred pública) → *Reglas de seguridad*.
 
-Las VMs necesitan **salida** a Internet (bajar imágenes de Docker y conectarse a Cloudflare), pero **ningún puerto de entrada abierto a Internet** salvo SSH hacia VM-AUX desde tu IP. Edita la **Security List** de la subred pública así:
+Las VMs necesitan **salida** a Internet (bajar imágenes de Docker y conectarse a Cloudflare), pero **ningún puerto de entrada abierto a Internet** salvo SSH **desde tu IP**. Edita la **Security List** de la subred pública así:
 
 *Ingress rules* (borra todas las que traiga el asistente y deja **solo** estas; «Source CIDR» = quién puede entrar):
 
 | Origen | Protocolo / puerto destino | Para qué |
 | :--- | :--- | :--- |
-| `<tu IP pública>/32` (búscala en <https://ifconfig.me>) | TCP 22 | Tú → VM-AUX (la regla vale para toda la subred: también te deja entrar directo a las demás) |
-| `10.0.0.40/32` (VM-AUX) | TCP 22 | VM-AUX → las demás VMs |
-| `10.0.0.30/32` (VM-BORDE) | TCP 8080 | nginx → E-commerce (VM-VENTAS) |
-| `10.0.0.30/32` | TCP 8081 | nginx → réplica de gestión (VM-INVENTARIO) |
-| `10.0.0.10/32` (VM-VENTAS) | TCP 8082 | E-commerce → Inventario (VM-INVENTARIO, por HTTPS) |
-| `10.0.0.10/32` | TCP 5432 | E-commerce → PostgreSQL (VM-INVENTARIO) |
+| `<tu IP pública>/32` (búscala en <https://ifconfig.me>) | TCP 22 | Tú → las dos VMs (la regla vale para toda la subred) |
+| `10.0.0.10/32` (VM-VENTAS) | TCP 8081 | Nginx → réplica de gestión (VM-INVENTARIO) |
+| `10.0.0.10/32` | TCP 8082 | E-commerce → Inventario (VM-INVENTARIO, por HTTPS) |
+| `10.0.0.10/32` | TCP 5432 | E-commerce y Evolution API → PostgreSQL (VM-INVENTARIO, con TLS) |
 | `10.0.0.20/32` (VM-INVENTARIO) | TCP 8443 | Inventario → E-commerce (VM-VENTAS, por HTTPS) |
 | `10.0.0.20/32` | TCP 6380 | Réplica de gestión → Redis de contadores (VM-VENTAS, TLS) |
-| `10.0.0.0/24` | ICMP tipo 3 código 4 | Obligatoria para que no se corten conexiones grandes |
+| `0.0.0.0/0` | ICMP tipo 3 código 4 | Avisos de tamaño de paquete: sin ellos se cortan conexiones grandes (es una regla que Oracle trae por defecto) |
+
+**Si ya habías creado las reglas de la versión anterior:** borra **solo** las que tengan origen `10.0.0.30/32` o `10.0.0.40/32` y añade la de `10.0.0.10/32` al puerto 8081. No borres la de tu IP (TCP 22).
 
 *Egress:* deja la regla `0.0.0.0/0` todos los protocolos (salida libre). **No la borres** al limpiar las de entrada: sin ella las VMs no salen a Internet.
 
-Aunque la lista de seguridad pone estas reglas a nivel de red, **cada VM tendrá su propio cortafuegos** (paso 8.1): doble barrera. **No abras nunca 80, 443 ni 5678 a `0.0.0.0/0`.**
+⚠️ **Esta lista de seguridad es la única barrera desde Internet.** El cortafuegos de la imagen de Oracle (paso 8.1) protege el SSH del propio sistema, pero **los puertos que publica Docker no pasan por él**, y publicar solo en la IP privada tampoco basta: Oracle entrega a esa IP lo que llega a la pública. **No abras nunca 80, 443, 5432, 5678, 6380, 8081, 8082 ni 8443 a `0.0.0.0/0`**, ni «un momento» para probar.
 
-> **Cambio respecto a `05-despliegue.md` §7:** el aviso de traslado del Inventario al E-commerce entra ahora por el puerto **8443 por HTTPS** (antes decía 8080) porque la aplicación exige HTTPS entre servicios. El 8080 de VM-VENTAS solo lo usa nginx.
+> **Nota:** la entrada pública no necesita ninguna regla: `cloudflared` abre el túnel **hacia fuera**, y de él a Nginx y al E-commerce se va por redes internas de Docker, sin publicar puertos en la VM.
 
 ### 7.2 Las llaves SSH (en tu equipo)
 
@@ -258,22 +258,22 @@ ssh-keygen -t ed25519 -f "$env:USERPROFILE\.ssh\babelhub_oracle" -C "babelhub-or
 Get-Content "$env:USERPROFILE\.ssh\babelhub_oracle.pub"
 ```
 
-### 7.3 Crear las cuatro VMs
+### 7.3 Crear las dos VMs
 
-*Menú → Compute → Instances → Create instance* (repite cuatro veces):
+*Menú → Compute → Instances → Create instance* (repite dos veces):
 
-| Campo | VM-INVENTARIO | VM-VENTAS | VM-BORDE | VM-AUX |
-| :--- | :--- | :--- | :--- | :--- |
-| Name | `vm-inventario` | `vm-ventas` | `vm-borde` | `vm-aux` |
-| Image | Canonical **Ubuntu 24.04** (aarch64) | Ubuntu 24.04 (aarch64) | Ubuntu 24.04 (x86_64) | Ubuntu 24.04 (x86_64) |
-| Shape | *Ampere* → `VM.Standard.A1.Flex`, **1 OCPU, 6 GB** | ídem | *AMD* → `VM.Standard.E2.1.Micro` | ídem |
-| Subred | `babelhub` pública | ídem | ídem | ídem |
-| IP pública | *Assign a public IPv4* | ídem | ídem | ídem |
-| IP privada | *Show advanced options → Networking → Private IPv4 address*: `10.0.0.20` | `10.0.0.10` | `10.0.0.30` | `10.0.0.40` |
-| SSH keys | *Paste public keys* → pega `babelhub_oracle.pub` | ídem | ídem | ídem |
-| Boot volume | **47 GB** (el mínimo; no marques volumen extra) | ídem | ídem | ídem |
+| Campo | VM-INVENTARIO | VM-VENTAS |
+| :--- | :--- | :--- |
+| Name | `vm-inventario` | `vm-ventas` |
+| Image | Canonical **Ubuntu 24.04** (aarch64) | Ubuntu 24.04 (aarch64) |
+| Shape | *Ampere* → `VM.Standard.A1.Flex`, **1 OCPU, 6 GB** | ídem |
+| Subred | `babelhub` pública | ídem |
+| IP pública | *Assign a public IPv4* | ídem |
+| IP privada | *Show advanced options → Networking → Private IPv4 address*: `10.0.0.20` | `10.0.0.10` |
+| SSH keys | *Paste public keys* → pega `babelhub_oracle.pub` | ídem |
+| Boot volume | **47 GB** (el mínimo; no marques volumen extra) | ídem |
 
-(Las VMs sin servicio público también llevan IP pública solo para que *salgan* a Internet; la lista de seguridad impide que alguien entre.)
+(La IP pública sirve para tu SSH y para que las VMs *salgan* a Internet; la lista de seguridad impide que entre nadie más.)
 
 **Detalles del formulario** (vistos en la consola el 2026-11-25):
 
@@ -282,11 +282,11 @@ Get-Content "$env:USERPROFILE\.ssh\babelhub_oracle.pub"
 - El *nombre de VNIC* queda como nombre del equipo (`vnic-ventas` aparece en el prompt). Pon el que quieras ver ahí.
 - Para los 47 GB deja **apagado** el tamaño personalizado del volumen de inicio: usa 46,6 GB.
 
-**«Out of host capacity» / «Out of capacity for shape»** es muy común en ARM. No es un error tuyo. Pruebas: otro *Availability Domain* (AD-1, AD-2, AD-3) en el mismo formulario; reintentar cada pocos minutos, de madrugada o en fines de semana; subir a PAYG (§6.2). Puede tardar horas o días. También ocurre con las **AMD micro**; Santiago tiene un solo *Availability Domain*, así que prueba los *dominios de errores* (FD-1 a FD-3). No cambies a una forma de pago sin decidirlo.
+**«Out of host capacity» / «Out of capacity for shape»** es muy común en ARM. No es un error tuyo. Pruebas: otro *Availability Domain* (AD-1, AD-2, AD-3) en el mismo formulario; reintentar cada pocos minutos, de madrugada o en fines de semana; subir a PAYG (§6.2). Puede tardar horas o días. Las **AMD micro** tampoco tenían capacidad en Santiago el 2026-11-25: por eso la guía usa solo las dos ARM. Santiago tiene un solo *Availability Domain*, así que prueba los *dominios de errores* (FD-1 a FD-3). No cambies a una forma de pago sin decidirlo.
 
 Para automatizar los reintentos usa **Cloud Shell** (icono `>_` de la consola, con la CLI ya autenticada) y repite `oci --no-retry compute instance launch …` con una pausa de 30 s hasta que termine bien. `--no-retry` hace que cada intento muestre enseguida su error. **No pases `--boot-volume-size-in-gbs`**: por la CLI el mínimo es 50 GB y, sin la opción, se usa el tamaño de la imagen. Si el error no es de capacidad, detén el bucle (`Ctrl+C`).
 
-**Qué debes ver:** las cuatro instancias en estado **Running** con su IP privada y su IP pública. Anota las **IP públicas** (solo para entrar por SSH).
+**Qué debes ver:** las dos instancias en estado **Running** con su IP privada y su IP pública. Anota las **IP públicas** (solo para entrar por SSH).
 
 **Cómo deshacer:** *Instance → More actions → Terminate* y marca «Permanently delete the attached boot volume».
 
@@ -295,44 +295,29 @@ Para automatizar los reintentos usa **Cloud Shell** (icono `>_` de la consola, c
 Edita `~/.ssh/config` en **[Tu equipo]** (créalo si no existe: `nano ~/.ssh/config`):
 
 ```
-Host babelhub-aux
-    HostName <IP pública de vm-aux>
-    User ubuntu
-    IdentityFile ~/.ssh/babelhub_oracle
-    ForwardAgent no
-
 Host babelhub-inventario
-    HostName 10.0.0.20
+    HostName <IP pública de vm-inventario>
     User ubuntu
     IdentityFile ~/.ssh/babelhub_oracle
-    ProxyJump babelhub-aux
     ForwardAgent no
 
 Host babelhub-ventas
-    HostName 10.0.0.10
+    HostName <IP pública de vm-ventas>
     User ubuntu
     IdentityFile ~/.ssh/babelhub_oracle
-    ProxyJump babelhub-aux
-    ForwardAgent no
-
-Host babelhub-borde
-    HostName 10.0.0.30
-    User ubuntu
-    IdentityFile ~/.ssh/babelhub_oracle
-    ProxyJump babelhub-aux
     ForwardAgent no
 ```
 
 ```bash
 chmod 600 ~/.ssh/config
-ssh babelhub-aux      # primera vez: escribe «yes» a la huella; después pide tu frase de paso
+ssh babelhub-ventas      # primera vez: escribe «yes» a la huella; después pide tu frase de paso
 ```
 
-**Qué debes ver:** `ubuntu@vm-aux:~$`. Sal con `exit`. Repite con `ssh babelhub-ventas` (pasa por VM-AUX sin que tengas que hacer nada). **Si no entra:** revisa que la IP pública sea la de la VM (no la de tu casa), la regla de entrada TCP 22 con *tu* IP actual (cambia si tu proveedor cambia tu IP; en PowerShell, tu IPv4 es `(Invoke-RestMethod https://api.ipify.org).Trim()`) y que la llave pública sea la correcta. Cambiar la regla no afecta a la llave.
+**Qué debes ver:** `ubuntu@vm-ventas:~$`. Sal con `exit`. Repite con `ssh babelhub-inventario`. **Si no entra:** revisa que la IP pública sea la de la VM (no la de tu casa), la regla de entrada TCP 22 con *tu* IP actual (cambia si tu proveedor cambia tu IP; en PowerShell, tu IPv4 es `(Invoke-RestMethod https://api.ipify.org).Trim()`) y que la llave pública sea la correcta. Cambiar la regla no afecta a la llave.
 
 ## 8. Paso 4 — Preparar cada VM (Ubuntu, cortafuegos, Docker)
 
-Hazlo **en las cuatro VMs** (`ssh babelhub-<nombre>`). Cada bloque se pega completo.
+Hazlo **en las dos VMs** (`ssh babelhub-<nombre>`). Cada bloque se pega completo.
 
 ### 8.1 Actualizar, tiempo y cortafuegos
 
@@ -356,7 +341,7 @@ sudo iptables -S INPUT
 sudo systemctl is-enabled netfilter-persistent
 ```
 
-**Qué debes ver:** aceptar conexiones ya establecidas, ICMP, `lo` y TCP 22, terminar en `-j REJECT` y `enabled`. **No ejecutes `netfilter-persistent save`** (guardaría las reglas temporales de Docker). Los puertos que publica Docker no pasan por `INPUT`: los protegen que los Compose publiquen **solo en la IP privada** de la VM (o en `127.0.0.1`) y la Security List de Oracle (§7.1), que también es la que limita desde dónde se entra por SSH.
+**Qué debes ver:** aceptar conexiones ya establecidas, ICMP, `lo` y TCP 22, terminar en `-j REJECT` y `enabled`. **No ejecutes `netfilter-persistent save`** (guardaría las reglas temporales de Docker). Los puertos que publica Docker **no pasan por `INPUT`**: desde Internet solo los protege la Security List de Oracle (§7.1), que también es la que limita desde dónde se entra por SSH (los Compose publican solo en la IP privada o en `127.0.0.1`, lo que evita otras interfaces pero no sustituye a la lista).
 
 ### 8.2 Endurecer SSH y comprobar el disco
 
@@ -379,7 +364,7 @@ El cifrado en reposo de los discos de Oracle está siempre activo y no se ve des
 
 ### 8.3 Instalar Docker
 
-Solo en **VM-INVENTARIO, VM-VENTAS y VM-BORDE** (VM-AUX no usa Docker):
+En **las dos VMs**:
 
 ```bash
 sudo install -m 0755 -d /etc/apt/keyrings
@@ -408,7 +393,7 @@ sudo git log -1 --format='%H %s'        # debe ser el commit de tu etiqueta
 
 ## 9. Paso 5 — El almacén de objetos de Oracle
 
-Guarda los **respaldos cifrados**, los **libros digitales**, las **portadas** y el **registro de supresiones**. Cada tarea tiene su propia credencial con permisos mínimos (`infra/almacen/politicas.md`).
+Guarda los **libros digitales**, las **portadas** y el **registro de supresiones**. Los **respaldos cifrados** van a Cloudflare R2 (§9b). Cada tarea tiene su propia credencial con permisos mínimos (`infra/almacen/politicas.md`).
 
 **[Tu equipo]** — configura la CLI una vez: `oci setup config` (te pide el OCID de tu usuario y tenancy, que están en *Perfil → Tenancy/User settings*, y crea una llave de API que subes en *User settings → API keys*). Comprueba con `oci iam region list`.
 
@@ -420,27 +405,108 @@ Guarda los **respaldos cifrados**, los **libros digitales**, las **portadas** y 
    bash scripts/almacen.sh plan --compartimento-id <ocid> --compartimento-nombre babelhub --espacio <espacio-de-nombres>
    ```
 
-   > ⛔ **No apliques todavía (2026-11-25).** El archivo de cambios sube un segmento de 16 MB sin comprimir cada 5 minutos (~4,6 GB al día) y `respaldos-wal` lo bloquea 100 días: unos 460 GB (cálculo a partir de la configuración, sin medir), muy por encima del cupo gratuito. Espera a que se corrija y se mida.
-
-3. Aplica (crea los 9 contenedores privados, la retención con bloqueo y el ciclo de vida):
+3. Aplícala (la retención de los tres contenedores `supresiones-*` lleva bloqueo de 100 días, **irreversible** a los 15 días: revisa antes el plan):
 
    ```bash
    bash scripts/almacen.sh aplicar --compartimento-id <ocid> --compartimento-nombre babelhub --espacio <espacio-de-nombres>
    ```
 
-   > ⚠️ **La retención con bloqueo es irreversible**: Oracle la hace efectiva 15 días después. Durante ese plazo puedes corregir; después, nunca. `comprobar` te dice «bloqueo pendiente» o «bloqueado».
-4. Las políticas de acceso: `bash scripts/almacen.sh politicas-iam --compartimento-nombre babelhub` imprime las sentencias; créalas en *Identity → Policies*. Cada credencial de `infra/almacen/credenciales.txt` es un **usuario de IAM** propio (por ejemplo `bh-respaldos-escritor`) dentro de un grupo con esa política; para cada usuario crea una **Customer Secret Key** (*Usuario → Customer secret keys → Generate*): te da una **clave de acceso** y una **clave secreta** (la secreta se muestra **una sola vez**: cópiala a tu gestor de contraseñas en el acto).
-5. Comprueba:
+   **Debes ver** los cinco contenedores creados: `libros`, `portadas` y `supresiones-entradas`, `-sellos` y `-copia`. No crees ningún `respaldos-*` en Oracle. Si habías creado a mano alguno de los cinco, el script lo respeta y solo le añade lo que falta.
+4. Las políticas de acceso: `bash scripts/almacen.sh politicas-iam --compartimento-nombre babelhub` imprime las sentencias; créalas en *Identity → Policies*. Cada credencial de `infra/almacen/credenciales.txt` es un **usuario de IAM** propio (por ejemplo `bh-biblioteca-lector`) dentro de un grupo con esa política; para cada usuario crea una **Customer Secret Key** (*Usuario → Customer secret keys → Generate*): te da una **clave de acceso** y una **clave secreta** (la secreta se muestra **una sola vez**: cópiala a tu gestor de contraseñas en el acto).
+5. Comprueba: `bash scripts/almacen.sh comprobar --espacio <espacio-de-nombres>`. Durante los primeros 15 días termina con **código 3** («bloqueo pendiente»): es lo esperado; repítelo pasada la fecha que mostró `aplicar`. El endpoint S3 de las credenciales es `https://<espacio-de-nombres>.compat.objectstorage.sa-santiago-1.oraclecloud.com`.
 
-   ```bash
-   bash scripts/almacen.sh comprobar --espacio <espacio-de-nombres> --aceptar-bloqueo-pendiente
-   ```
-
-   **Debes ver** todos los contenedores «conformes». El endpoint S3 de todas las credenciales es `https://<espacio-de-nombres>.compat.objectstorage.sa-santiago-1.oraclecloud.com`.
-
-Qué credencial va a qué archivo (§10): `respaldos-escritor` → `postgres.env`; `catalogo-archivos`, `biblioteca-lector` y `supresiones-registro` → `ecommerce.env` y `ecommerce-gestion.env`; `respaldos-vigilante`, `supresiones-sello`, `respaldos-copia-registro` y `cuota-lectura` → VM-AUX (paso 14); `respaldos-lector` → solo tu equipo (restaurar).
+Qué credencial va a qué archivo (§10): `catalogo-archivos`, `biblioteca-lector` y `supresiones-registro` → `ecommerce.env` y `ecommerce-gestion.env`; `registro-lector` → solo tu equipo (verificar la copia del registro al restaurar). Las credenciales de vigilancia (`registro-vigilante`, `supresiones-sello`, `respaldos-copia-registro` y `cuota-lectura`) son de VM-AUX: **no las crees mientras esté aplazada**.
 
 **Cómo deshacer:** los contenedores con bloqueo ya aplicado no se pueden vaciar antes de su fecha; por eso la regla de oro de no «probar» con esta etapa fuera de la guía.
+
+## 9b. Paso 5 bis — Los respaldos en Cloudflare R2
+
+Cuatro contenedores en R2 reciben la copia diaria del clúster y el archivo de cambios, **comprimidos y cifrados** en VM-INVENTARIO antes de salir: `respaldos-diarios` (7 días), `-semanales` (28), `-mensuales` (92) y `respaldos-wal` (7). Cada uno impide borrar o sobrescribir durante su plazo y retira solo lo vencido (puede tardar hasta un día más). Medición local: unos 1,9 de los 10 GB gratuitos con venta ligera (`progress/ensayos/medicion-respaldos-comprimidos-2026-11-25.md`).
+
+**Qué pierdes frente a Oracle** (riesgo aceptado y provisional): no hay credencial de «solo crear» (la de la VM puede leer, listar y subir objetos nuevos en esos cuatro contenedores) y el bloqueo lo puede **quitar quien administre tu cuenta de Cloudflare**. Esa misma cuenta lleva el dominio y el túnel: protégela como la clave de respaldos.
+
+### 9b.1 Protege la cuenta antes de nada
+
+1. **Segundo factor:** Cloudflare → *My Profile → Authentication → Two-Factor Authentication* → actívalo y guarda los códigos de recuperación fuera de línea. Usa para la cuenta un correo **distinto** del que recibe los avisos del sistema.
+2. Activa **R2** (*R2 Object Storage* en el panel). Si pide un medio de pago, léelo: el cupo gratuito es de 10 GB al mes y lo que pase **se cobra**.
+3. **Aviso de facturación:** *Notifications → Add* → elige una alerta de facturación o de uso (por ejemplo, de facturación por uso) con **tu correo** como destinatario y un umbral bajo. **Si tu cuenta no ofrece ninguna, para y avisa**: la spec la exige (PLA-06) y habría que decidir otra cosa.
+4. Anota el **Account ID** (aparece en la portada de R2; 32 caracteres). No es un secreto.
+
+### 9b.2 Crea los contenedores y sus reglas
+
+1. Crea un **token temporal de administración**: *My Profile → API Tokens → Create Token → Custom token*: permiso **Account → Workers R2 Storage → Edit**, solo tu cuenta, con fecha de fin **hoy o mañana**. Se muestra una vez; no lo guardes.
+2. **[Tu equipo, en tu propia terminal]** (el script se niega si detecta un agente o una integración continua):
+
+   ```bash
+   cd ~/BabelHub
+   bash scripts/almacen.sh r2-plan                                                  # lo que se va a enviar; no llama a nadie
+   CLOUDFLARE_ACCOUNT_ID=<account-id> bash scripts/almacen.sh r2-aplicar --ubicacion enam
+   ```
+
+   Pega el token cuando lo pida (no se muestra). `--ubicacion` es opcional (`enam` es el este de Norteamérica; R2 no ofrece Sudamérica) y solo cuenta al crear.
+3. **Debes ver** `ok respaldos-diarios`, `ok respaldos-semanales`, `ok respaldos-mensuales`, `ok respaldos-wal` y «R2 coincide con la definición».
+4. **Revoca el token** (*API Tokens → … → Delete*). Para comprobar más adelante crea otro de **solo lectura** (*Workers R2 Storage → Read*), ejecuta `r2-comprobar` y revócalo.
+
+**Si falla:** «estado 403» = el token no tiene el permiso o no es de esa cuenta; «ya tiene un bloqueo distinto» = alguien lo cambió: revísalo en el panel (el script no lo toca). **Cómo deshacer:** un contenedor con objetos bloqueados no se puede vaciar hasta que venzan (o hasta que quites la regla en el panel).
+
+### 9b.3 Las credenciales de objetos
+
+*R2 → Manage R2 API Tokens → Create API token*. En cada una, **«Apply to specific buckets only»** con **los cuatro contenedores `respaldos-*`**, y nunca un permiso «Admin»:
+
+| Token | Permiso | Dónde va |
+| :--- | :--- | :--- |
+| `respaldos-escritor` | *Object Read & Write* | `postgres.env` de VM-INVENTARIO (§10.2) |
+| `respaldos-lector` | *Object Read only* | Solo tu equipo: la comprobación diaria (§14) y restaurar. Rótalo después de cada ensayo con datos reales. |
+
+(`respaldos-vigilante` es de VM-AUX: no lo crees mientras esté aplazada.) De cada uno copia **Access Key ID** y **Secret Access Key** a tu gestor de contraseñas, y del escritor también el **Token value** (solo lo usa la prueba de §9b.5); el endpoint es `https://<account-id>.r2.cloudflarestorage.com`.
+
+### 9b.4 Revisa quién puede tocar R2
+
+En *My Profile → API Tokens* (y *Manage Account → Account API Tokens*) no debe quedar **ningún** token con permiso de edición de R2, ni haber uno en las VMs, el repositorio o GitHub. Anótalo con la fecha en `progress/ensayos/AAAA-MM-DD-cuenta-r2.md` junto con el segundo factor y el aviso de facturación (sin valores secretos).
+
+### 9b.5 Prueba tu cuenta antes de poner datos que importen (obligatorio, T47)
+
+**[Tu equipo]**, con las claves de `respaldos-escritor` (usa `respaldos-wal`: lo que dejes allí se retira solo a los 7 días):
+
+```bash
+export RCLONE_CONFIG_PRUEBA_TYPE=s3 RCLONE_CONFIG_PRUEBA_PROVIDER=Cloudflare RCLONE_CONFIG_PRUEBA_REGION=auto
+export RCLONE_CONFIG_PRUEBA_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+read -r -p "Access Key ID: " RCLONE_CONFIG_PRUEBA_ACCESS_KEY_ID; read -r -s -p "Secret Access Key: " RCLONE_CONFIG_PRUEBA_SECRET_ACCESS_KEY; echo
+export RCLONE_CONFIG_PRUEBA_ACCESS_KEY_ID RCLONE_CONFIG_PRUEBA_SECRET_ACCESS_KEY
+echo uno > /tmp/uno.txt && echo "este es el segundo contenido" > /tmp/dos.txt
+o="--s3-no-check-bucket --ignore-times --retries 1 -v"     # --ignore-times: sin él rclone puede no intentar la subida
+a=prueba:respaldos-wal/prueba-t47-a; b=prueba:respaldos-wal/prueba-t47-b
+rclone copyto $o /tmp/uno.txt $a && echo "bien: subió" || echo "MAL"
+rclone copyto $o /tmp/dos.txt $b && echo "bien: subió" || echo "MAL"
+rclone deletefile --retries 1 -v $a && echo "MAL: se pudo borrar" || echo "rechazado"
+rclone copyto $o /tmp/dos.txt $a && echo "MAL: se sobrescribió" || echo "rechazado"
+rclone copyto $o --s3-upload-cutoff 0 /tmp/dos.txt $a && echo "MAL: se sobrescribió en varias partes" || echo "rechazado"
+rclone copyto $o $b $a && echo "MAL: se sobrescribió copiando" || echo "rechazado"
+rclone cat $a                                              # DEBE decir «uno»
+rclone lsd prueba:                                         # no debe mostrar contenedores ajenos a respaldos-*
+```
+
+**En cada «rechazado» debe verse encima el motivo `ObjectLockedByBucketPolicy` o un error 409**; un rechazo por otra causa (clave mal pegada, 403, red) no prueba el bloqueo.
+
+**Ese token no lee ni cambia las reglas.** Con el *Token value* de `respaldos-escritor`, sin que quede en el historial (lo que se envía en los `PUT` es la regla que ya hay: si se aceptara, no cambiaría nada):
+
+```bash
+read -r -s -p "Token value del escritor: " v; echo
+api=https://api.cloudflare.com/client/v4; cuenta=<account-id>
+printf 'header = "Authorization: Bearer %s"\n' "$v" | curl --disable -s --config - $api/user/tokens/verify; echo
+pedir() { printf 'header = "Authorization: Bearer %s"\n' "$v" | curl --disable -s -o /dev/null -w "$1 $2 -> %{http_code}\n" --config - -X "$1" ${3:+-H "Content-Type: application/json" --data "$3"} "$api/accounts/$cuenta/r2/buckets/respaldos-wal$2"; }
+pedir GET /lock
+pedir GET /lifecycle
+pedir PUT /lock '{"rules":[{"id":"retencion-7-dias","enabled":true,"condition":{"type":"Age","maxAgeSeconds":604800}}]}'
+pedir PUT /lifecycle '{"rules":[{"id":"retiro-a-los-7-dias","enabled":true,"conditions":{"prefix":""},"deleteObjectsTransition":{"condition":{"type":"Age","maxAge":604800}},"abortMultipartUploadsTransition":{"condition":{"type":"Age","maxAge":86400}}}]}'
+unset v pedir
+```
+
+La primera respuesta debe decir `"status":"active"` (si el panel lo creó como token de cuenta, usa `…/accounts/<account-id>/tokens/verify`) y las cuatro líneas siguientes deben terminar en **403**: un 200 es un fallo grave; un 400 o un 401 no prueban nada.
+
+**No alcanza otro contenedor.** Crea en el panel un contenedor vacío `t47-ajeno` y comprueba que `rclone lsf prueba:t47-ajeno` y `rclone copyto $o /tmp/uno.txt prueba:t47-ajeno/x` **fallan** (403 / `AccessDenied`); bórralo al terminar. Y que las claves de `catalogo-archivos` (Oracle) no abren R2 ni las de R2 abren Oracle: define otro remoto con las claves de unas y el endpoint del otro y `rclone lsd` debe fallar.
+
+Anota cada resultado en `progress/ensayos/AAAA-MM-DD-T47-r2.md` (sin pegar claves). **Si algo que debía fallar funcionó, no actives los respaldos y avisa.** Cierra la terminal al terminar.
 
 ## 10. Paso 6 — Los secretos (en tu equipo, nunca en el repositorio)
 
@@ -452,14 +518,14 @@ Qué credencial va a qué archivo (§10): `respaldos-escritor` → `postgres.env
 cd ~/BabelHub
 bash scripts/generar-secretos.sh --destino ~/babelhub-secretos \
   --dominio babel-hub.shop --entorno staging \
-  --ip-ventas 10.0.0.10 --ip-inventario 10.0.0.20 --ip-borde 10.0.0.30
+  --ip-ventas 10.0.0.10 --ip-inventario 10.0.0.20
 ```
 
 **TLS de PostgreSQL (AM24):** el generador también emite `tls-postgres-cert.pem` y `tls-postgres-key.pem` (solo en la carpeta de VM-INVENTARIO) y deja todas las cadenas de conexión con `SSL Mode=VerifyFull` y la de Evolution con `sslmode=require&sslaccept=strict&sslcert=/run/secrets/tls-ca.pem` (Prisma, el cliente de Evolution, ignora `verify-full`). No tienes que editar nada; `desplegar.sh` se niega a desplegar si alguna cadena no pide TLS verificado.
 
 `--entorno staging` (el valor por defecto) deja el E-commerce en **`Staging` con la pasarela simulada** (fase 1 de Culqi, §15.1); `--entorno production` (cuando tengas las llaves) lo deja en `Production` con `culqi` y te pide la llave `sk_live_…`. El dominio es `babel-hub.shop`: la tienda atiende `babel-hub.shop` y `www.babel-hub.shop`, y la gestión `gestion.babel-hub.shop` (§2.1).
 
-**Qué debes ver:** «Listo. Se generaron los secretos de las tres VMs» y «Falta completar N valores «CAMBIAR»». Se crean `inventario/`, `ventas/`, `borde/`, `custodia/` y `PENDIENTES.txt`. Si la carpeta ya existe con archivos, el script **se niega** (no pisa secretos).
+**Qué debes ver:** «Listo. Se generaron los secretos de las dos VMs» y «Falta completar N valores «CAMBIAR»». Se crean `inventario/`, `ventas/`, `custodia/` y `PENDIENTES.txt`. Si la carpeta ya existe con archivos, el script **se niega** (no pisa secretos). **Si generaste tus secretos con una versión anterior** (la que creaba una carpeta `borde/` y pedía `--ip-borde`), vuelve a generarlos en una carpeta nueva: cambió en quién confía cada servicio.
 
 ### 10.1 Custodia: lo más importante de toda la guía
 
@@ -479,14 +545,14 @@ nano ~/babelhub-secretos/inventario/ecommerce-gestion.env
 | Qué | De dónde sale |
 | :--- | :--- |
 | `…Smtp__Servidor`, `…Smtp__Cuenta`, `…Smtp__Remitente`, `…Smtp__Credencial` | Gmail: servidor `smtp.gmail.com`; cuenta y remitente tu Gmail; credencial = la **contraseña de aplicación** (16 letras; escríbela sin espacios). |
-| `…Turnstile__ClaveDeSitio` y `…Secreto` | Cloudflare → *Turnstile → Add site* (hostnames: tu dominio y `gestion.<dominio>`); clave de sitio (`0x4…`, pública) y clave secreta. **Hazlo después de activar Cloudflare (paso 13)**; mientras tanto déjalos en `CAMBIAR` y no despliegues el E-commerce. |
+| `…Turnstile__ClaveDeSitio` y `…Secreto` | **Créalo ahora, antes de copiar las carpetas** (VM-INVENTARIO ya lo exige y no necesita el túnel): Cloudflare → *Turnstile → Add site*, hostnames `babel-hub.shop`, `www.babel-hub.shop` y `gestion.babel-hub.shop`; clave de sitio (`0x4…`, pública) y clave secreta, en `ecommerce.env` y `ecommerce-gestion.env`. |
 | `…Almacen__Catalogo__*`, `…Biblioteca__*`, `…Supresiones__*` | §9: las claves de cada credencial; `Endpoint` = `https://<espacio>.compat.objectstorage.sa-santiago-1.oraclecloud.com`. |
 | `…Web__OrigenDelAlmacen` (ventas) | El origen `https://<espacio>.compat.objectstorage.sa-santiago-1.oraclecloud.com` (igual al host del endpoint de `biblioteca-lector`). |
-| `postgres.env`: `RCLONE_CONFIG_ALMACEN_ENDPOINT`, `…ACCESS_KEY_ID`, `…SECRET_ACCESS_KEY` | La credencial `respaldos-escritor` (§9). |
+| `postgres.env`: `RCLONE_CONFIG_ALMACEN_ENDPOINT`, `…ACCESS_KEY_ID`, `…SECRET_ACCESS_KEY` | §9b.3: el endpoint de R2 y las claves de **`respaldos-escritor`** (el proveedor `Cloudflare` y la región `auto` ya vienen escritos). Nunca el token de administración. |
 | `aviso.env` (inventario) | Un correo propio de esa VM para el aviso del espacio reservado: `AUX_SMTP_URL=smtps://smtp.gmail.com:465` (**`smtps://`**, con TLS), usuario, contraseña de aplicación, remitente y destinatario (tú). |
 | `…Contacto__Telefono`, `…Contacto__Correo`, `…Contacto__Direccion` (`ecommerce.env` y `ecommerce-gestion.env`) | **El teléfono, el correo y la dirección de contacto que mostrará la tienda** (Culqi exige contacto visible). Son **datos personales tuyos: nunca los escribas en el repositorio**; solo van aquí. `desplegar.sh` no continúa mientras digan `CAMBIAR`. |
 | `…Pagos__LlavePrivada` | **Solo con `--entorno production`:** tu llave `sk_live_…` de Culqi. En `Staging` **no** lleva llave (el script se niega si la hay). |
-| `cloudflared.env` (ventas y borde) | El token del túnel (paso 13). |
+| `cloudflared.env` (ventas) | El token del túnel (§12.3). |
 
 **El entorno y la pasarela (`ASPNETCORE_ENVIRONMENT` y `BABELHUB__Pagos__Pasarela`) ya vienen escritos** por el generador en `ecommerce.env` y `ecommerce-gestion.env` y son lo único que cambia al pasar de `Staging` a `Production` (§15.1, fase 2). `desplegar.sh` se niega si faltan, si no son coherentes (`Staging` con `simulador`; `Production` con `culqi` y una llave `sk_live_…`) o si el entorno no es ninguno de los dos.
 
@@ -498,12 +564,11 @@ Edita con `nano`, guarda con `Ctrl+O`, `Enter`, y sal con `Ctrl+X`. No dejes com
 cd ~/babelhub-secretos
 scp -r inventario babelhub-inventario:/tmp/secretos-inventario
 scp -r ventas     babelhub-ventas:/tmp/secretos-ventas
-scp -r borde      babelhub-borde:/tmp/secretos-borde
 ```
 
 **Nunca** copies la carpeta `~/babelhub-secretos` entera ni `custodia/`: `desplegar.sh` se niega a desplegar si ve una clave privada ajena en la carpeta de la VM. En cada VM, deja los secretos fuera del repositorio y solo legibles por root:
 
-**[VM-X]** (cambia `inventario` por `ventas` o `borde`)
+**[VM-X]** (cambia `inventario` por `ventas`)
 
 ```bash
 sudo mkdir -p /etc/babelhub
@@ -529,11 +594,14 @@ cd /opt/babelhub
 sudo env \
   BABELHUB_SECRETOS=/etc/babelhub/secretos \
   IP_PRIVADA=10.0.0.20 \
+  IP_VENTAS=10.0.0.10 \
   IMAGEN_POSTGRES=ghcr.io/<propietario>/babelhub-postgres@sha256:<64> \
   IMAGEN_INVENTARIO=ghcr.io/<propietario>/babelhub-inventario@sha256:<64> \
   IMAGEN_ECOMMERCE=ghcr.io/<propietario>/babelhub-ecommerce@sha256:<64> \
   scripts/desplegar.sh inventario
 ```
+
+(`IP_VENTAS` es la dirección de VM-VENTAS: la réplica de gestión solo cree la IP del cliente que le llega desde ella.)
 
 (La réplica de gestión del E-commerce corre en **`Staging`**, igual que la tienda: ya arranca sin el adaptador de Culqi, §0. Si prefieres desplegar primero solo PostgreSQL y el Inventario, agrega `--sin ecommerce-gestion`; la migración de la base del E-commerce corre igual, porque la hace el script.)
 
@@ -557,50 +625,23 @@ sudo docker run --rm --network babelhub-inventario_default -v /etc/babelhub/secr
   -sS --cacert /ca.pem https://inventario:8443/health/ready
 ```
 
-**Debes ver** `{"estado":"listo","componentes":[{"nombre":"base-de-datos","estado":"ok"}]}`. En PostgreSQL pueden verse avisos del **archivado de cambios** si el almacén aún no responde: revisa que `postgres.env` tenga las claves de `respaldos-escritor` y espera 5 minutos (`archive_timeout=300`).
+**Debes ver** `{"estado":"listo","componentes":[{"nombre":"base-de-datos","estado":"ok"}]}`. En los registros de PostgreSQL **no** debe haber errores de `respaldos:`; si los hay, revisa las claves de R2 en `postgres.env` (mientras falle, los cambios se acumulan en la VM hasta unos 4 GB y recibirás avisos del espacio reservado).
 
-**Primer respaldo y su comprobación** (hazlo una vez):
+**Primer respaldo y su comprobación:**
 
 ```bash
 sudo docker exec babelhub-inventario-postgres-1 /opt/babelhub/respaldar.sh --bajo-demanda
 ```
 
-Debe terminar sin error; en la consola de Oracle, el contenedor `respaldos-diarios` tendrá un objeto `AAAA-MM-DD/…tar.age`. **Un respaldo que nunca se restauró no es un respaldo**: el spike T01 (§15.4) lo comprueba.
+Debe terminar sin error y decir `respaldos: subido respaldos-diarios/AAAA-MM-DD/…tar.zst.age` (dos veces: el clúster y la configuración). En el panel de R2, `respaldos-wal` recibe un objeto `…zst.age` cada pocos minutos. **Un respaldo que nunca se restauró no es un respaldo**: el spike T01 (§15.4) lo comprueba.
 
-**Cómo deshacer** (sin perder datos): `cd /opt/babelhub/infra && sudo env BABELHUB_SECRETOS=… IP_PRIVADA=… IMAGEN_…=… docker compose -f docker-compose.inventario.yml down` (**sin `-v`**).
+**Cómo deshacer** (sin perder datos): `cd /opt/babelhub/infra && sudo env BABELHUB_SECRETOS=… IP_PRIVADA=… IP_VENTAS=… IMAGEN_…=… docker compose -f docker-compose.inventario.yml down` (**sin `-v`**).
 
-## 12. Paso 8 — Etapa 2: VM-VENTAS
+## 12. Paso 8 — Etapa 2: Cloudflare, el dominio, el túnel y Access (antes de VM-VENTAS)
 
-**[VM-VENTAS]**
+### 12.1 Pasar el dominio de Spaceship a Cloudflare
 
-```bash
-cd /opt/babelhub
-sudo env \
-  BABELHUB_SECRETOS=/etc/babelhub/secretos \
-  IP_PRIVADA=10.0.0.10 \
-  IMAGEN_ECOMMERCE=ghcr.io/<propietario>/babelhub-ecommerce@sha256:<64> \
-  scripts/desplegar.sh ventas --sin cloudflared,evolution-api
-```
-
-(`cloudflared` espera el túnel del paso 13; `evolution-api` espera el número de WhatsApp, §15.3.)
-
-**Qué debes ver:** `ok redis`, `ok redis-contadores`, `ok n8n` y `ok ecommerce` (en `Staging`, con la pasarela simulada). Si el E-commerce no arranca, `sudo docker logs --tail 50 babelhub-ventas-ecommerce-1` nombra la variable que falla (nunca su valor): lo típico es un `CAMBIAR` sin completar, `BABELHUB__Pagos__Pasarela` incoherente con el entorno o el simulador en `Production`. Puedes validar Redis con TLS:
-
-```bash
-sudo docker run --rm --network babelhub-ventas_default -v /etc/babelhub/secretos/redis-contadores-ca.pem:/ca.pem:ro \
-  redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe \
-  redis-cli --tls --cacert /ca.pem -h redis-contadores -p 6380 ping
-```
-
-(Debe responder `NOAUTH` o `NOPERM`: significa que el TLS funciona y exige credenciales.)
-
-**Paneles de n8n y Evolution:** no están en Internet. Se alcanzan con un túnel SSH desde tu equipo: `ssh -L 5678:127.0.0.1:5678 babelhub-ventas` y abres <http://localhost:5678>.
-
-## 13. Paso 9 — Etapa 3: Cloudflare, el dominio y VM-BORDE
-
-### 13.1 Pasar el dominio de Spaceship a Cloudflare
-
-> **Tu dominio ya está en Cloudflare, con SSL** (2026-11-23): si ves «Great news! Cloudflare is now protecting your site» en el *Overview* de `babel-hub.shop`, **salta este apartado** y sigue en §13.2.
+> **Tu dominio ya está en Cloudflare, con SSL** (2026-11-23): si ves «Great news! Cloudflare is now protecting your site» en el *Overview* de `babel-hub.shop`, **salta este apartado** y sigue en §12.2.
 
 1. Cloudflare → *Add a domain* → tu dominio → plan **Free** → *Continue*. Importará los registros DNS que ya tengas; revísalos.
 2. Cloudflare te muestra **dos nameservers** (por ejemplo `xxx.ns.cloudflare.com` y `yyy.ns.cloudflare.com`).
@@ -609,7 +650,7 @@ sudo docker run --rm --network babelhub-ventas_default -v /etc/babelhub/secretos
 
 **Qué debes ver:** en Cloudflare, *Overview* del dominio con «Great news! Cloudflare is now protecting your site».
 
-### 13.2 TLS y seguridad básica (certificado válido: requisito de Culqi)
+### 12.2 TLS y seguridad básica (certificado válido: requisito de Culqi)
 
 En *SSL/TLS → Overview*: modo **Full (strict)**; *SSL/TLS → Edge Certificates*: **Always Use HTTPS = On**, **Minimum TLS Version = 1.2**, **Automatic HTTPS Rewrites = On**. El certificado del borde es **Universal SSL** (gratuito y válido) y se emite solo cuando el dominio está activo. *Security → Settings*: **Bot Fight Mode = On**. *Security → WAF → Managed rules*: activa el conjunto gratuito de Cloudflare. Culqi exige **SSL en todas las URLs** y que la URL de sus avisos tenga un certificado válido: lo da este paso.
 
@@ -619,23 +660,17 @@ En *SSL/TLS → Overview*: modo **Full (strict)**; *SSL/TLS → Edge Certificate
 | :--- | :--- |
 | **Always Use HTTPS** | Cloudflare responde `301` a todo `http://` **antes** de que llegue al túnel: es la regla que ve el público. |
 | **Full (strict)** | Cloudflare exige un certificado válido en el origen. Con un **túnel** la conexión Cloudflare ↔ origen ya va cifrada por el propio túnel, así que este modo no cambia nada en esta arquitectura; se deja en *strict* por si algún día se publica un origen sin túnel. |
-| **Nginx y el túnel** | Reciben HTTPS en Cloudflare y entregan HTTP **dentro** de la red privada; Nginx pasa tal cual la cabecera `X-Forwarded-Proto` que fija Cloudflare (la aplicación nunca ve la conexión del usuario). |
+| **El túnel y Nginx** | Reciben HTTPS en Cloudflare y entregan HTTP **dentro** de VM-VENTAS (y, para la gestión, hacia VM-INVENTARIO por la red privada); Nginx pasa tal cual la cabecera `X-Forwarded-Proto` que fija Cloudflare (la aplicación nunca ve la conexión del usuario). |
 | **La aplicación** | Toma **solo** `X-Forwarded-Proto` para ver `https` (así las cookies `__Host-…` y el antiforgery funcionan); **redirige con `308` a `https://` lo que el borde declare `http`** aunque Always Use HTTPS no estuviera activo (defensa en profundidad; la salud no se redirige); envía **HSTS** (`max-age=31536000`) en toda respuesta; marca las cookies de sesión `Secure` y `HttpOnly`; y ninguna vista ni recurso propio pide nada por `http://` (no hay contenido mixto; lo verifica una prueba que barre las vistas y los recursos). |
 | **HSTS de Cloudflare** | **No lo actives:** lo envía la aplicación (con dos hosts distintos, un `includeSubDomains` desde Cloudflare afectaría también a la gestión sin que lo decidas). |
 
-**Redirigir `www` al apex** (para que la tienda tenga un solo nombre): *Rules → Redirect Rules → Create rule* → nombre `www-al-apex`; *When incoming requests match*: **Hostname equals `www.babel-hub.shop`**; *Then*: **Dynamic**, expresión `concat("https://babel-hub.shop", http.request.uri.path)`, código **301**, **Preserve query string**. (Se hace en Cloudflare y no en Nginx porque el segundo conector del túnel, en VM-VENTAS, no pasa por Nginx.)
+**Redirigir `www` al apex** (para que la tienda tenga un solo nombre): *Rules → Redirect Rules → Create rule* → nombre `www-al-apex`; *When incoming requests match*: **Hostname equals `www.babel-hub.shop`**; *Then*: **Dynamic**, expresión `concat("https://babel-hub.shop", http.request.uri.path)`, código **301**, **Preserve query string**. (Se hace en Cloudflare y no en Nginx para que todo el que llegue vea una sola redirección en el borde.)
 
-**Compruébalo** desde tu equipo (sin `-k`: no debe haber errores de certificado):
+(Las comprobaciones con `curl` se hacen cuando la tienda ya responde: §13.3.)
 
-```bash
-curl -sI http://babel-hub.shop/       | head -3     # 301 → https://babel-hub.shop/
-curl -sI https://babel-hub.shop/      | head -5     # 200 y la cabecera strict-transport-security
-curl -sI https://www.babel-hub.shop/  | head -3     # 301 → https://babel-hub.shop/
-```
+### 12.3 El túnel
 
-### 13.3 El túnel
-
-*Zero Trust* (primera vez: elige el plan gratis) → *Networks → Tunnels → Create a tunnel → Cloudflared* → nombre `babelhub` → en «Install and run connectors» **no ejecutes lo que te muestra**: solo copia el **token** (la cadena larga después de `--token`). Ese token es un secreto: ponlo en `cloudflared.env` de **ventas y borde** (`TUNNEL_TOKEN=…`) y vuelve a copiar esos archivos a las VMs (§10.3).
+*Zero Trust* (primera vez: elige el plan gratis) → *Networks → Tunnels → Create a tunnel → Cloudflared* → nombre `babelhub` → en «Install and run connectors» **no ejecutes lo que te muestra**: solo copia el **token** (la cadena larga después de `--token`). Ese token es un secreto: ponlo en `ventas/cloudflared.env` (`TUNNEL_TOKEN=…`) y copia ese archivo a VM-VENTAS (§10.3).
 
 *Public Hostnames* (agrega tres):
 
@@ -645,74 +680,143 @@ curl -sI https://www.babel-hub.shop/  | head -3     # 301 → https://babel-hub.
 | `www.babel-hub.shop` | `HTTP` → `nginx:8080` |
 | `gestion.babel-hub.shop` | `HTTP` → `nginx:8080` |
 
-Los tres apuntan a `nginx:8080`: nginx de VM-BORDE enruta por el nombre de host. En VM-VENTAS, el nombre `nginx` apunta directo al E-commerce (así el segundo conector sigue sirviendo la tienda si cae VM-BORDE; sin la gestión). Cloudflare crea solo los registros DNS (`CNAME`) de cada hostname.
+Los tres apuntan a `nginx:8080`: el Nginx de VM-VENTAS enruta por el nombre de host (la tienda al E-commerce de la misma VM; `gestion.` a la réplica de VM-INVENTARIO). Usa **un solo conector** (el que despliega la guía): no arranques `cloudflared` en ningún otro sitio con este token. Cloudflare crea solo los registros DNS (`CNAME`) de cada hostname.
 
-### 13.4 Cloudflare Access para la gestión (obligatorio)
+### 12.4 Cloudflare Access para la gestión (obligatorio)
 
 *Zero Trust → Access → Applications → Add an application → Self-hosted*: nombre `gestion`, dominio `gestion.babel-hub.shop`. *Policy*: acción **Allow**, regla *Emails* = los correos del personal autorizado. En el plan gratuito el método es el **código de un solo uso por correo**. Para exigir un segundo factor real, añade en *Settings → Authentication* un proveedor de identidad (Google o GitHub) con verificación en dos pasos y haz que la política lo **requiera**. Sin esto, **cualquiera podría llegar a la pantalla de ingreso del personal**.
 
-### 13.5 Desplegar VM-BORDE y volver a VM-VENTAS
+### 12.5 Copiar el token a VM-VENTAS
 
-**[VM-BORDE]**
+Con `TUNNEL_TOKEN` ya en `ventas/cloudflared.env`, copia la carpeta `ventas` actualizada a VM-VENTAS como en §10.3 (Turnstile ya lo completaste en §10.2).
+
+## 13. Paso 9 — Etapa 3: VM-VENTAS (tienda y entrada pública)
+
+Aquí corren `cloudflared` y Nginx junto al E-commerce, en dos redes de Docker propias: `cloudflared` solo habla con Nginx, y el E-commerce solo cree la IP del cliente que le entrega Nginx. Ninguno de los dos publica puertos.
+
+### 13.1 Desplegar
+
+**[VM-VENTAS]**
 
 ```bash
 cd /opt/babelhub
-sudo env BABELHUB_SECRETOS=/etc/babelhub/secretos IP_VENTAS=10.0.0.10 IP_INVENTARIO=10.0.0.20 scripts/desplegar.sh borde
-```
-
-**Debes ver** `ok nginx`, `ok cloudflared`, `VM borde desplegada y sana.` Y en el registro de cloudflared: `sudo docker logs babelhub-borde-cloudflared-1 2>&1 | grep -i "registered tunnel connection"` (cuatro líneas).
-
-**[VM-VENTAS]** — ahora sí con el túnel (omite `--sin cloudflared`):
-
-```bash
-cd /opt/babelhub
-sudo env BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.10 IMAGEN_ECOMMERCE=ghcr.io/<propietario>/babelhub-ecommerce@sha256:<64> \
+sudo env \
+  BABELHUB_SECRETOS=/etc/babelhub/secretos \
+  IP_PRIVADA=10.0.0.10 \
+  IP_INVENTARIO=10.0.0.20 \
+  IMAGEN_ECOMMERCE=ghcr.io/<propietario>/babelhub-ecommerce@sha256:<64> \
   scripts/desplegar.sh ventas --sin evolution-api
 ```
 
-### 13.6 Humo de punta a punta
+(`evolution-api` espera el número de WhatsApp, §15.3. `IP_INVENTARIO` es la dirección a la que Nginx envía la gestión.)
+
+**Qué debes ver:** `ok nginx`, `ok ecommerce`, `ok redis`, `ok redis-contadores`, `ok n8n`, `ok cloudflared` y `VM ventas desplegada y sana.` Si el E-commerce no arranca, `sudo docker logs --tail 50 babelhub-ventas-ecommerce-1` nombra la variable que falla (nunca su valor): lo típico es un `CAMBIAR` sin completar, `BABELHUB__Pagos__Pasarela` incoherente con el entorno o el simulador en `Production`.
+
+**Si falla con «Pool overlaps with other one on this address space»:** alguna red de Docker de la VM ya usa `10.213.10.0/28` o `10.213.11.0/28`. `sudo docker network ls` y borra la que no sea de BabelHub.
+
+### 13.2 Comprobaciones dentro de la VM (obligatorias la primera vez)
+
+En tu equipo se probó el camino de la entrada con las imágenes reales, pero **no** con el cortafuegos (`iptables`) de la imagen de Oracle. Compruébalo en la VM; no cambia nada:
+
+```bash
+# 1. Nginx llega al E-commerce por la red interna de Docker:
+sudo docker exec babelhub-ventas-nginx-1 wget -qO- -T 5 --header='Host: babel-hub.shop' http://ecommerce:8080/health/live
+# 2. Nginx llega a la réplica de gestión en VM-INVENTARIO (lista de seguridad y cortafuegos de la otra VM):
+sudo docker exec babelhub-ventas-nginx-1 wget -qO- -T 5 --header='Host: gestion.babel-hub.shop' http://ecommerce-gestion:8081/health/live
+# 3. El túnel salió a Internet (deben salir líneas):
+sudo docker logs babelhub-ventas-cloudflared-1 2>&1 | grep -i "registered tunnel connection"
+# 4. Nada de la entrada quedó publicado en la VM (no debe salir ninguna línea con nginx ni cloudflared):
+sudo docker ps --format '{{.Names}} {{.Ports}}' | grep -E 'nginx|cloudflared' | grep -- '->' || echo "sin puertos publicados: correcto"
+```
+
+Y comprueba que **solo Nginx** llega a la réplica de gestión (la regla la instala `desplegar.sh ventas` y se repone cada minuto):
+
+```bash
+# 5. Desde cualquier otro contenedor no se puede llegar:
+sudo docker run --rm --network babelhub-ventas_default redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe \
+  sh -c 'nc -z -w 5 10.0.0.20 8082 && echo "control: llega al 8082" || echo "ATENCION: la prueba no sirve, no llega ni al 8082";
+         nc -z -w 5 10.0.0.20 8081 && echo "MAL: llega al 8081" || echo "correcto: 8081 bloqueado"'
+sudo iptables -S DOCKER-USER      # debe aparecer la regla que descarta 10.0.0.20:8081 salvo desde 10.213.10.3
+```
+
+**Debes ver** en 5 las dos líneas «control: llega al 8082» y «correcto: 8081 bloqueado» (sin la primera la prueba no demuestra nada). Si dice «MAL: llega», no sigas: repite `desplegar.sh ventas`, comprueba `systemctl is-active cron` y revisa `/etc/cron.d/babelhub-gestion`. **La primera vez, reinicia VM-VENTAS (`sudo reboot`), espera dos minutos y repite la comprobación 5**: confirma que la regla vuelve sola.
+
+**Debes ver** una respuesta de salud en 1 y 2, al menos una línea en 3 y «sin puertos publicados» en 4. Si 1 falla con las dos VMs sanas, el cortafuegos de Oracle está cortando el tráfico entre contenedores: guarda la salida de `sudo iptables -S FORWARD` y avisa (no borres reglas). Si falla solo 2, revisa la regla TCP 8081 desde `10.0.0.10/32` (§7.1).
+
+*(Comprobación opcional: un contenedor hacia un puerto publicado en la dirección privada de **su propia** VM. El diseño no lo necesita; solo importaría si algún día se separa Nginx en otro Compose. `sudo docker run --rm redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe sh -c 'nc -z -w 5 10.0.0.10 6380 && echo llega || echo "no llega"'`.)*
+
+**Paneles de n8n y Evolution:** no están en Internet. Se alcanzan con un túnel SSH desde tu equipo: `ssh -L 5678:127.0.0.1:5678 babelhub-ventas` y abres <http://localhost:5678>.
+
+### 13.3 Humo de punta a punta
 
 **[Tu equipo]**
 
 ```bash
-curl -s  https://babel-hub.shop/health              # «ok» (lo responde nginx)
+curl -s  https://babel-hub.shop/health              # «ok» (lo responde Nginx)
+curl -s  https://babel-hub.shop/health/live          # respuesta del E-commerce
 curl -sI https://babel-hub.shop/ | head -3          # «HTTP/2 200» (E-commerce en Staging); sin errores de certificado
 curl -sI https://gestion.babel-hub.shop/ | head -3  # redirige a la pantalla de Cloudflare Access (no a la app)
 curl -s  https://babel-hub.shop/ | grep -c "data-bh-pagos-simulados"   # 1 = el aviso «Pagos simulados» de Staging está en la página (el navegador lo muestra encima del pie)
 ```
 
-**Si falla:** `502` = nginx no alcanza al E-commerce (revisa la Security List, §7.1); error de certificado = el dominio aún no está activo en Cloudflare; `1033`/`530` = el túnel no está conectado (token mal copiado).
+Entra además a `https://gestion.babel-hub.shop` en el navegador, pasa Access y comprueba que aparece el ingreso del personal.
 
-**Cómo deshacer:** `down` del Compose de VM-BORDE; en Cloudflare, borra el túnel y sus hostnames; para devolver el dominio a Spaceship, cambia los nameservers de vuelta.
+Y la redirección a HTTPS (sin `-k`: no debe haber errores de certificado):
 
-## 14. Paso 10 — Etapa 4: VM-AUX y la vigilancia
+```bash
+curl -sI http://babel-hub.shop/       | head -3     # 301 → https://babel-hub.shop/
+curl -sI https://babel-hub.shop/      | grep -i strict-transport-security
+curl -sI https://www.babel-hub.shop/  | head -3     # 301 → https://babel-hub.shop/
+```
 
-VM-AUX vigila **desde fuera** de la VM de datos: si esa VM cae, nadie dentro puede avisarlo. Sus scripts (`scripts/vm-aux/`) **no guardan ninguna llave privada ni credencial de borrado**. Sigue **exactamente** `infra/vm-aux/README.md` (secciones «Instalación» y «Endurecimiento»). Resumen en orden:
+**Desde tu equipo, comprueba que Internet no llega a ningún puerto interno** (pon las IP **públicas** de las dos VMs; el puerto 22 debe salir **ABIERTO**, que demuestra que la prueba llega a la VM, y todos los demás «cerrado»):
 
-1. **[VM-AUX]** `sudo git clone https://github.com/<propietario>/BabelHub.git /opt/babelhub && cd /opt/babelhub && sudo git checkout v0.1.0` (la carpeta `scripts/vm-aux` debe ser de **root**).
-2. Usuario sin privilegios `babelhub-aux`; `/etc/babelhub-aux/aux.env` (de root, grupo `babelhub-aux`, `0640`) con las credenciales de `respaldos-vigilante`, `supresiones-sello`, `respaldos-copia-registro` y el correo propio (§10.2, §9).
-3. `sudo cp infra/vm-aux/babelhub-aux.cron /etc/cron.d/babelhub-aux` y `sudo cp infra/vm-aux/babelhub-aux-endurecimiento.cron /etc/cron.d/`.
-4. SSH: `infra/vm-aux/sshd-babelhub-aux.conf` → `/etc/ssh/sshd_config.d/50-babelhub-aux.conf`, usuario `salto` con su `authorized_keys` (la llave **pública**), `sudo sshd -t`, recargar. **Con una segunda terminal abierta** para no quedarte fuera.
-5. Comprueba: `sudo /opt/babelhub/scripts/vm-aux/verificar-endurecimiento.sh` (debe terminar en 0) y `/opt/babelhub/scripts/vm-aux/comprobar-respaldos.sh` (en 0 cuando haya un respaldo de las últimas 24 horas).
-6. **[Tu equipo]** Disco cifrado de las VMs de datos (T38): `bash scripts/verificar-cifrado-de-disco.sh --instancia <ocid de la VM> --compartimento <ocid> --dominio <AD>` para `vm-inventario` y `vm-ventas`. Debe decir que el volumen está `AVAILABLE` con clave de Oracle. Guarda la salida.
-7. **[Tu equipo]** `bash scripts/respaldar-ahora.sh --salto salto@<IP pública de vm-aux> --destino ubuntu@10.0.0.20` prueba el respaldo bajo demanda por el salto.
-8. Latido externo (`AUX_LATIDO_URL`): crea un monitor gratuito de «heartbeat» (por ejemplo en healthchecks.io) y pega su URL en `aux.env`.
+```bash
+for ip in <IP pública de vm-ventas> <IP pública de vm-inventario>; do for p in 22 80 443 5432 5678 6380 8080 8081 8082 8443; do
+  timeout 5 bash -c "</dev/tcp/$ip/$p" 2>/dev/null && echo "ABIERTO $ip:$p" || echo "cerrado $ip:$p"; done; done
+```
+
+Si algún puerto distinto del 22 dice «ABIERTO», quita de la Security List la regla que lo permite **antes de seguir**; si el 22 sale «cerrado», revisa la IP o prueba desde otra red: la prueba no vale.
+
+**Si falla:** `502` = Nginx no alcanza al E-commerce (tienda: `sudo docker logs --tail 50 babelhub-ventas-nginx-1`; gestión: regla 8081, §7.1); error de certificado = el dominio aún no está activo en Cloudflare; `1033`/`530` = el túnel no está conectado (token mal copiado); `400` en la gestión = falta `gestion.babel-hub.shop` en los hosts permitidos de `ecommerce-gestion.env`.
+
+**Cómo deshacer:** `down` del Compose de VM-VENTAS; en Cloudflare, borra el túnel y sus hostnames; para devolver el dominio a Spaceship, cambia los nameservers de vuelta.
+
+## 14. Paso 10 — Etapa 4: sin VM-AUX (lo que haces tú mientras tanto)
+
+VM-AUX (la vigilancia **desde fuera** de la VM de datos) está **aplazada**. No instales sus scripts (`scripts/vm-aux/`) en ninguna de las dos VMs: sus credenciales quedarían junto a lo que vigilan. Mientras tanto **no tienes** (detalle en `docs/02-arquitectura-de-software/05-despliegue.md` §6.2): aviso externo si fallan los respaldos o cae VM-INVENTARIO, sellos horarios y copia diaria del registro de supresiones, vigilancia de la retención, latido externo, alertas de ingreso SSH ni un punto único de salto. Y si cae VM-VENTAS tampoco puedes entrar a la gestión.
+
+Haz esto:
+
+1. **Monitor externo** gratuito (por ejemplo en healthchecks.io o UptimeRobot) que pida `https://babel-hub.shop/health/live` cada pocos minutos y te avise por correo.
+2. **[Tu equipo]** Disco cifrado de las dos VMs (T38): `bash scripts/verificar-cifrado-de-disco.sh --instancia <ocid de la VM> --compartimento <ocid> --dominio <AD>` para `vm-inventario` y `vm-ventas`. Debe decir que el volumen está `AVAILABLE` con clave de Oracle. Guarda la salida.
+3. Una vez por semana, en cada VM: `last -20` y `sudo journalctl -u ssh --since "7 days ago" | grep -i accepted` (solo tus ingresos).
+4. **Cada día, comprueba el respaldo** (nadie te avisará si falla, y el archivo de cambios solo dura 7 días). **[Tu equipo]**, con las claves de `respaldos-lector` guardadas fuera del repositorio en un archivo tuyo con permisos 600 (`~/.config/babelhub/r2-lector.env`, con las líneas `export RCLONE_CONFIG_LECTOR_TYPE=s3`, `…_PROVIDER=Cloudflare`, `…_REGION=auto`, `…_ENDPOINT=…`, `…_ACCESS_KEY_ID=…` y `…_SECRET_ACCESS_KEY=…`):
+
+   ```bash
+   . ~/.config/babelhub/r2-lector.env && echo "== copias de las ultimas 24 horas" && TZ=UTC rclone lsf -R --files-only --use-server-modtime --max-age 24h --format tp --separator ' ' lector:respaldos-diarios | sort && echo "== ultimo cambio archivado" && TZ=UTC rclone lsf -R --files-only --use-server-modtime --max-age 24h --format tp --separator ' ' lector:respaldos-wal | sort | tail -n 1
+   ```
+
+   **Debes ver exactamente dos objetos** `…tar.zst.age` (el clúster y `-config-`), subidos **a la hora programada (02:30 UTC)**, más una pareja por cada respaldo bajo demanda que tú hayas lanzado, y un segmento de **los últimos 15 minutos**. **Cualquier otro objeto es una alerta**: quien tenga la VM puede subir copias falsas (no anotes ninguna hasta aclararlo). **Anota en tu hoja el nombre completo de la copia del clúster** de cada día: al restaurar se elige **por ese nombre**, nunca «la más reciente». Si falta: en la VM, `sudo tail -20 /var/log/babelhub-respaldo.log` y `sudo docker logs --tail 50 babelhub-inventario-postgres-1`; respaldo bajo demanda: `ssh babelhub-inventario sudo docker exec babelhub-inventario-postgres-1 /opt/babelhub/respaldar.sh --bajo-demanda`.
+5. **Cada semana, revisa el uso de R2** (panel de R2, o `rclone size lector:respaldos-diarios` y lo mismo con los otros tres) y anótalo. La primera semana compáralo con la medición local; **si la suma pasa de unos 7 GB, avisa** antes de que se acabe el cupo.
+
+**Antes de operar con clientes o datos reales** hace falta VM-AUX o un vigilante equivalente fuera de las dos VMs.
 
 ## 14b. Carga inicial del catálogo y del inventario (antes de pedir la revisión de Culqi)
 
 La revisión de la pasarela pide **al menos cinco productos con foto, descripción y precio visibles**. El repositorio trae 40 obras listas (`tools/carga-inicial/catalogo.csv`, selección en `docs/07-proceso-de-desarrollo/09-seleccion-del-catalogo-inicial.md`, spec `transversal-carga-inicial`). La carga son **dos órdenes del propio servicio** (como `migrar`): no abren puertos ni son una pantalla, usan las mismas reglas y la misma auditoría que la administración y son **repetibles** (repetirlas no duplica nada).
 
 **Antes de empezar.**
-- Las dos VMs ya están desplegadas (pasos 7 y 8) y **migradas**, y su `/health/ready` responde.
+- Las dos VMs ya están desplegadas (§11 y §13) y **migradas**, y su `/health/ready` responde.
 - Las órdenes componen el servicio completo y **leen la misma configuración** que él (`ecommerce.env`, `inventario.env`): el almacén de objetos, la base, las claves. No necesitan variables nuevas, pero sí todas las que el servicio ya exige (incluida `BABELHUB__Pagos__Pasarela`: en la orden la pasarela es siempre la nula y no llama a nadie). Si el servicio no arranca por falta de una variable, la orden termina **nombrándola** (nunca su valor) antes de escribir nada.
 - **Aviso sobre el ISBN.** El catálogo exige un ISBN con dígito de control y **no se puede cambiar después**. Para no inventar el de una edición real, cada edición lleva un identificador provisional del rango `979-0` (que no se asigna a libros). La tienda lo muestra como ISBN. Si conoces el ISBN real de una edición, escríbelo en la columna `isbn_impreso` de `catalogo.csv` **antes** de cargar.
 - **Aviso sobre las digitales.** Solo las 5 obras genéricas del prototipo tienen edición digital y su archivo es un **EPUB de muestra** que dice que no es el libro: no las vendas con pagos reales sin reemplazar el archivo desde la administración.
 
-**1. Las portadas (solo viajan a VM-VENTAS y de ahí al almacén de objetos; nunca al repositorio).** Las 40 imágenes están en tu equipo (`D:\Trabajo\BHPortadas`; las cinco genéricas se regeneran en PowerShell de Windows con `powershell -ExecutionPolicy Bypass -File tools/carga-inicial/generar-portadas-genericas.ps1 -Salida <carpeta>`: `-ExecutionPolicy Bypass` solo vale para esa ejecución, porque Windows no deja correr scripts sin firmar por defecto). Cada una pesa menos de 2 MB (el tope del catálogo, CAT-16) y se verifica por su contenido al subirla. Cópialas a una carpeta **temporal** de VM-VENTAS, con el mismo salto SSH del paso 3 (§7.4):
+**1. Las portadas (solo viajan a VM-VENTAS y de ahí al almacén de objetos; nunca al repositorio).** Las 40 imágenes están en tu equipo (`D:\Trabajo\BHPortadas`; las cinco genéricas se regeneran en PowerShell de Windows con `powershell -ExecutionPolicy Bypass -File tools/carga-inicial/generar-portadas-genericas.ps1 -Salida <carpeta>`: `-ExecutionPolicy Bypass` solo vale para esa ejecución, porque Windows no deja correr scripts sin firmar por defecto). Cada una pesa menos de 2 MB (el tope del catálogo, CAT-16) y se verifica por su contenido al subirla. Cópialas a una carpeta **temporal** de VM-VENTAS (con la configuración SSH de §7.4):
 
 ```bash
 # [Tu equipo, en WSL] (D:\ se ve como /mnt/d)
-scp -r -o ProxyJump=<salto> /mnt/d/Trabajo/BHPortadas ubuntu@10.0.0.10:/tmp/portadas
+scp -r /mnt/d/Trabajo/BHPortadas babelhub-ventas:/tmp/portadas
 ```
 
 **2. El catálogo en VM-VENTAS.**
@@ -722,7 +826,7 @@ scp -r -o ProxyJump=<salto> /mnt/d/Trabajo/BHPortadas ubuntu@10.0.0.10:/tmp/port
 sudo install -d -o 1654 -g 1654 /var/lib/babelhub/carga
 sudo chmod -R a+rX /tmp/portadas
 cd /opt/babelhub
-sudo env BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.10 IMAGEN_ECOMMERCE=<digest-de-la-imagen> \
+sudo env BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.10 IP_INVENTARIO=10.0.0.20 IMAGEN_ECOMMERCE=<digest-de-la-imagen> \
   docker compose --project-directory infra -f infra/docker-compose.ventas.yml run --rm --no-deps \
     -v /opt/babelhub/tools/carga-inicial:/carga:ro -v /tmp/portadas:/portadas:ro -v /var/lib/babelhub/carga:/salida \
     ecommerce cargar-catalogo --archivo /carga/catalogo.csv --portadas /portadas --plan /salida/plan-de-inventario.json
@@ -734,8 +838,8 @@ sudo env BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.10 IMAGEN_EC
 
 ```bash
 # [Tu equipo]
-scp -o ProxyJump=<salto> ubuntu@10.0.0.10:/var/lib/babelhub/carga/plan-de-inventario.json /tmp/plan-de-inventario.json
-scp -o ProxyJump=<salto> /tmp/plan-de-inventario.json ubuntu@10.0.0.20:/tmp/plan-de-inventario.json
+scp babelhub-ventas:/var/lib/babelhub/carga/plan-de-inventario.json /tmp/plan-de-inventario.json
+scp /tmp/plan-de-inventario.json babelhub-inventario:/tmp/plan-de-inventario.json
 ```
 
 **4. Las sucursales, las rutas y el stock en VM-INVENTARIO.**
@@ -746,7 +850,7 @@ Los tres `<digest>` son los mismos con los que desplegaste (Compose los exige au
 # [VM-INVENTARIO]
 sudo install -d -o 1654 -g 1654 /var/lib/babelhub/carga && sudo mv /tmp/plan-de-inventario.json /var/lib/babelhub/carga/
 cd /opt/babelhub
-sudo env BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.20 IMAGEN_INVENTARIO=<digest> IMAGEN_ECOMMERCE=<digest> IMAGEN_POSTGRES=<digest> \
+sudo env BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.20 IP_VENTAS=10.0.0.10 IMAGEN_INVENTARIO=<digest> IMAGEN_ECOMMERCE=<digest> IMAGEN_POSTGRES=<digest> \
   docker compose --project-directory infra -f infra/docker-compose.inventario.yml run --rm --no-deps \
     -v /opt/babelhub/tools/carga-inicial:/carga:ro -v /var/lib/babelhub/carga:/salida:ro \
     inventario cargar-stock --plan /salida/plan-de-inventario.json --sucursales /carga/sucursales.csv --rutas /carga/rutas.csv --esperar
@@ -768,6 +872,8 @@ Culqi se integra en **dos fases**: primero **revisa tu web** (no necesita todav�
 
 #### Fase 1: Culqi revisa la web (entorno `Staging`, pagos simulados)
 
+> ⚠️ **La tienda en `Staging` es pública**: el registro de cuentas y el Libro de Reclamaciones aceptan datos reales de cualquiera. Los respaldos (§9b, §11.1) deben estar activos y comprobados, y **todavía no hay una restauración probada en la VM**. Usa solo datos de prueba y decide si mientras tanto limitas quién puede entrar (por ejemplo, con una regla de Cloudflare que solo deje pasar a Culqi y a ti).
+
 Es lo que despliega esta guía por defecto. En `Staging` la tienda está en Internet con SSL, **no cobra nada** (la pasarela es un simulador) y lo dice en pantalla: «Pagos simulados: no se realiza ningún cobro», en el pie de toda página, en el checkout y en el pago. Los requisitos que Culqi revisa y dónde se cumple cada uno:
 
 | Requisito de Culqi | Dónde está en BabelHub | Qué debes hacer tú |
@@ -779,13 +885,13 @@ Es lo que despliega esta guía por defecto. En `Staging` la tienda está en Inte
 | **Al menos 5 productos con foto, descripción y precio** | El catálogo público | Cargarlos desde la administración del catálogo. **En `Staging` solo van obras y archivos digitales de MUESTRA, sin valor comercial** (el simulador «cobra» cualquier compra con un código público y entrega accesos con enlace firmado, reservas y avisos reales), **y los pedidos de `Staging` no se atienden**; el aviso «Pagos simulados» debe estar visible. Los carga el administrador que creas con `crear-administrador` (§0, fila 1 bis). |
 | **Carrito o botón «Comprar»** | Ficha de cada obra y `/carrito` → `/checkout` | Nada: ya funciona (con el simulador el último paso no cobra). |
 | **Usuario y contraseña de prueba** para el revisor | El comando `cuenta-de-prueba` (abajo) | Ejecutarlo y pasar el correo y la contraseña a Culqi por un canal seguro (no por el chat público ni el repositorio). |
-| **SSL en todas las URLs** | Cloudflare: Universal SSL + Always Use HTTPS (§13.2); la aplicación redirige y envía HSTS | Verificar con los `curl` de §13.2 y recorrer la tienda en el navegador buscando avisos de «contenido no seguro» (no debe haber). |
+| **SSL en todas las URLs** | Cloudflare: Universal SSL + Always Use HTTPS (§12.2); la aplicación redirige y envía HSTS | Verificar con los `curl` de §13.3 y recorrer la tienda en el navegador buscando avisos de «contenido no seguro» (no debe haber). |
 
 **Crear el usuario y la contraseña de prueba** (crear y cambiar la contraseña solo existe en `Staging`; en `Production` el comando se niega, salvo `--retirar` y `--purgar`). **[VM-VENTAS]**, con el entorno del propio servicio y **una sola vez** (la contraseña se muestra una vez, por la consola, y no queda en ningún archivo ni registro; si la pierdes, vuelves a ejecutar el comando y se **cambia** la contraseña de esa misma cuenta):
 
 ```bash
 cd /opt/babelhub
-sudo env BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.10 \
+sudo env BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.10 IP_INVENTARIO=10.0.0.20 \
   IMAGEN_ECOMMERCE=ghcr.io/<propietario>/babelhub-ecommerce@sha256:<64> \
   docker compose --project-directory infra -f infra/docker-compose.ventas.yml \
   run --rm --no-deps --no-TTY ecommerce cuenta-de-prueba
@@ -818,6 +924,8 @@ Todos son comandos de consola de la imagen del E-commerce, con el mismo `docker 
 
 #### Fase 2: integrar el cobro real (entorno `Production`)
 
+> ⛔ **Antes de cobrar dinero real** debe cumplirse, como mínimo: respaldos activos y **una restauración probada** (T01, §15.4), un vigilante fuera de las dos VMs (§14), la revisión del almacén de respaldos provisional (§0 fila 5, B13) y la revisión legal pendiente (B09). Pasar a `Production` sin eso arriesga perder pedidos y pagos ya cobrados.
+
 Cuando Culqi apruebe la web y te dé las llaves:
 
 1. **El adaptador de Culqi ya está hecho (T37 de `ecommerce-pagos`) y probado contra un Culqi simulado, pero nunca contra Culqi real.** Antes de pasar a `Production`, con tus llaves de **integración** (`pk_test_…`, `sk_test_…`), haz el **spike T38** en tu equipo siguiendo `specs/ecommerce-pagos/guia-del-spike-culqi.md` (20 minutos, sin dinero real). **No pases a `Production` hasta que esté en verde.** Además, la pantalla de pago todavía pide pegar el identificador del medio de pago: integrar el formulario de Culqi que lo genera en el navegador es una tarea pendiente (DD-99, T38b) y sin ella un cliente real no puede pagar.
@@ -831,7 +939,7 @@ Cuando Culqi apruebe la web y te dé las llaves:
    ```
 
    (Con `scripts/generar-secretos.sh --entorno production` en una carpeta nueva obtienes los mismos archivos con esas tres claves ya puestas, pero **no** vuelvas a generar todo: rotarías todos los secretos.)
-3. Vuelve a ejecutar `scripts/desplegar.sh ventas` y `scripts/desplegar.sh inventario`. `desplegar.sh` **se niega** si el entorno y la pasarela no son coherentes o si la llave no empieza con `sk_live_`; y la aplicación se niega a arrancar si, aun así, algo no cuadra: **nunca cobra «a ciegas»**. Con `Production` el aviso «Pagos simulados» desaparece solo.
+3. Vuelve a ejecutar `scripts/desplegar.sh ventas` y `scripts/desplegar.sh inventario` (con las mismas variables y opciones de §13.1, incluido `--sin evolution-api` mientras no haya WhatsApp, y de §11). `desplegar.sh` **se niega** si el entorno y la pasarela no son coherentes o si la llave no empieza con `sk_live_`; y la aplicación se niega a arrancar si, aun así, algo no cuadra: **nunca cobra «a ciegas»**. Con `Production` el aviso «Pagos simulados» desaparece solo.
 4. **No registres todavía el webhook en el panel de Culqi:** su documentación pública no describe una firma ni una autenticación de los avisos y la entrada `…/integraciones/pasarela/avisos` está deshabilitada a propósito (responde 404; DD-95); el estado de un pago pendiente lo confirma la consulta de cada minuto. Contrasta a mano los reembolsos y cobros dudosos con el panel (`docs/05-seguridad/07-operacion-segura.md` §3.2.1).
 5. Las llaves **de integración** de Culqi (`sk_test_…`) no valen en la VM: la aplicación las rechaza fuera de `Development` y `Test` (se usan solo en el spike, en tu equipo). **Nunca** pegues una llave en el chat ni en el repositorio.
 
@@ -845,7 +953,7 @@ Tienes una API key de Anthropic. El asistente (ECO-12) está **diferido** y su v
 
 Necesitas un **número dedicado y descartable** (no el personal). Pasos (detalle en `infra/n8n/README.md`):
 
-1. Crea la base técnica de Evolution **una vez** en VM-INVENTARIO: `sudo docker exec -i babelhub-inventario-postgres-1 psql -U postgres -c "CREATE ROLE evolution LOGIN PASSWORD '<la contraseña de DATABASE_CONNECTION_URI de ventas/evolution.env>'" -c "CREATE DATABASE evolution OWNER evolution" -c "REVOKE CONNECT ON DATABASE evolution FROM PUBLIC" -c "GRANT CONNECT ON DATABASE evolution TO evolution"` (cada orden va en su propio `-c`: `CREATE DATABASE` no corre dentro de otra orden). Entra por el socket local del contenedor, que no usa la red; Evolution, desde VM-VENTAS, llega por TLS verificado con la CA de `tls-ca.pem`.
+1. Crea la base técnica de Evolution **una vez** en VM-INVENTARIO, **sin escribir la contraseña en la línea de órdenes** (quedaría en el historial y en el registro de `sudo`): abre `sudo docker exec -it babelhub-inventario-postgres-1 psql -U postgres` y escribe, una por una: `CREATE ROLE evolution LOGIN;`, `\password evolution` (pega la contraseña de `DATABASE_CONNECTION_URI` de `ventas/evolution.env` cuando la pida), `CREATE DATABASE evolution OWNER evolution;`, `REVOKE CONNECT ON DATABASE evolution FROM PUBLIC;`, `GRANT CONNECT ON DATABASE evolution TO evolution;` y `\q`. Entra por el socket local del contenedor, que no usa la red; Evolution, desde VM-VENTAS, llega por TLS verificado con la CA de `tls-ca.pem`.
 2. Despliega VM-VENTAS **sin** `--sin evolution-api`.
 3. Por túnel SSH (`ssh -L 8081:127.0.0.1:8081 babelhub-ventas`) abre <http://localhost:8081> y empareja el número (QR).
 4. Por otro túnel (`-L 5678:127.0.0.1:5678`) importa `infra/n8n/flujo-de-avisos.json` en n8n, crea la credencial `Evolution API (apikey)` (la de `evolution.env`) y activa el flujo.
@@ -854,13 +962,13 @@ Necesitas un **número dedicado y descartable** (no el personal). Pasos (detalle
 
 ### 15.4 Spikes opcionales T01–T05 (`specs/transversal-plataforma/tasks.md`)
 
-Son mediciones que cierran decisiones de la spec. Ninguna bloquea el despliegue, pero **T01 es la única prueba de que tus respaldos sirven**. Registra cada resultado en `progress/ensayos/AAAA-MM-DD-<spike>.md` (fecha, qué hiciste, el número medido, la decisión) y avisa para actualizar `specs/transversal-plataforma/decisions.md`.
+Son mediciones que cierran decisiones de la spec. Ninguna bloquea el despliegue, pero **T01 es la única prueba de que tus respaldos sirven** (y la prueba de la cuenta de R2, §9b.5, va antes de poner datos que importen). Registra cada resultado en `progress/ensayos/AAAA-MM-DD-<spike>.md` (fecha, qué hiciste, el número medido, la decisión) y avisa para actualizar `specs/transversal-plataforma/decisions.md`.
 
 | Spike | Qué hacer (ejecutable) | Qué registrar |
 | :--- | :--- | :--- |
-| **T01** Restaurar una copia hecha en ARM | En tu equipo: baja el respaldo más reciente de `respaldos-diarios` con `respaldos-lector`; `bash scripts/descifrar-respaldo.sh --entrada <respaldo>.tar.age < <tu clave de age> \| bash scripts/extraer-respaldo.sh --destino ~/restauracion-ensayo`; arranca `postgres:17-alpine` (la imagen de `infra/postgres` con `--platform linux/arm64`, en emulación) montando esa carpeta y comprueba `select count(*) from …` de pedidos y reservas. Hazlo en un **volumen cifrado efímero**, con swap apagado, sin red hacia proveedores. | Duración total, contadores, si arrancó sin errores en ARM emulado, y la decisión D12. |
+| **T01** Restaurar una copia hecha en ARM | En tu equipo, **dentro de un volumen cifrado efímero** (T05) y nunca en tu carpeta personal: baja con `respaldos-lector` la copia del clúster **cuyo nombre anotaste** (§14), comprueba que `sha256sum <archivo>` coincide con la suma que lleva el nombre y entonces `bash scripts/descifrar-respaldo.sh --entrada <respaldo>.tar.zst.age < <tu clave de age> \| bash scripts/extraer-respaldo.sh --destino <volumen-cifrado>/restaurada` (necesita `zstd`); configura la recuperación como dice `infra/respaldos/README.md` (con o sin archivo de cambios); arranca `postgres:17-alpine` (la imagen de `infra/postgres` con `--platform linux/arm64`, en emulación) montando esa carpeta y comprueba `select count(*) from …` de pedidos y reservas. Hazlo en un **volumen cifrado efímero**, con swap apagado, sin red hacia proveedores. | Duración total, contadores, si arrancó sin errores en ARM emulado, y la decisión D12. |
 | **T02** Almacén de Oracle | `bash scripts/almacen.sh comprobar --espacio <ns>`; sube dos veces la misma clave con la credencial `supresiones-registro` y comprueba que la segunda **falla** (no sobrescribe); confirma si la retención es por contenedor y **cuándo** ejecuta el ciclo de vida (los objetos de prueba vencen a los días que dice `contenedores.txt`). | Error exacto al repetir, si la retención es por contenedor o por prefijo (decide D23), fecha en que corrió el ciclo de vida. |
-| **T03** Tamaño y cuota | En VM-INVENTARIO: `sudo docker exec babelhub-inventario-postgres-1 psql -U postgres -c "select pg_size_pretty(sum(pg_database_size(datname))) from pg_database"`; en la consola de Oracle, *Object Storage → cuota* y el tamaño de cada contenedor. Estima 17 copias × (tamaño comprimido) + WAL + libros. | Tamaño de la base, tamaño por contenedor, cuota gratuita vigente y la proyección contra ella. |
+| **T03** Tamaño y cuota | En VM-INVENTARIO: `sudo docker exec babelhub-inventario-postgres-1 psql -U postgres -c "select pg_size_pretty(sum(pg_database_size(datname))) from pg_database"`; en R2, el tamaño de los cuatro contenedores (§14, paso 5), y en Oracle, *Object Storage → cuota* con libros y registro. Compara con `progress/ensayos/medicion-respaldos-comprimidos-2026-11-25.md`. | Tamaño de la base, tamaño por contenedor, cuotas gratuitas vigentes y la proyección contra ellas. |
 | **T04** Memoria y CPU de VM-INVENTARIO | Con la VM bajo uso normal **y** un respaldo en curso (`respaldar.sh --bajo-demanda`): `free -m` (usa «available», sin caché), `sudo docker stats --no-stream`, `uptime`. Durante 15 minutos, cada minuto. | Memoria usada (sin caché recuperable), CPU, pico durante el respaldo; compara con el 70 % de RNF12 (~4,2 GB). |
 | **T05** Volumen cifrado efímero | Una VM o distro de ensayo **aparte** con `swapon --show` vacío; crea un volumen LUKS (`cryptsetup`), restaura ahí, destrúyelo (`cryptsetup luksClose` y borra la llave) y comprueba que no quedan datos en `/tmp`, el historial de la shell ni los registros de Docker (`docker system prune -af --volumes`). | Qué quedó fuera del volumen (residual) y la constancia de destrucción. |
 
@@ -887,9 +995,10 @@ Son mediciones que cierran decisiones de la spec. Ninguna bloquea el despliegue,
 | Flujo de publicación | `.github/workflows/lanzamiento.yml` |
 | Ensayo local | `scripts/ensayo-local.sh` |
 | Generador de secretos | `scripts/generar-secretos.sh` y `infra/secretos-requeridos.txt` |
-| Despliegue de una VM | `scripts/desplegar.sh` y `infra/docker-compose.<vm>.yml` |
-| Almacén de objetos | `scripts/almacen.sh` e `infra/almacen/` |
-| VM-AUX | `scripts/vm-aux/` e `infra/vm-aux/` |
+| Despliegue de una VM | `scripts/desplegar.sh <ventas\|inventario>` e `infra/docker-compose.<vm>.yml` |
+| Almacenes (Oracle y R2) | `scripts/almacen.sh` (`r2-…`: `scripts/almacen-r2.sh`), `infra/almacen/` e `infra/almacen/r2/` |
+| Restauración manual | `scripts/descifrar-respaldo.sh`, `extraer-respaldo.sh` y `descifrar-wal.sh` (`infra/respaldos/README.md`) |
+| VM-AUX (aplazada) | `scripts/vm-aux/` e `infra/vm-aux/` |
 | Respaldos y custodia | `infra/respaldos/`, `scripts/comprobar-custodia.sh` |
-| Decisiones de esta guía | `progress/decisiones-delegadas.md` (DD-55 a DD-59 y, para el entorno `Staging`, la cuenta de prueba, el dominio y HTTPS, DD-65 a DD-69) |
+| Decisiones de esta guía | `progress/decisiones-delegadas.md` (DD-55 a DD-59; para `Staging`, la cuenta de prueba, el dominio y HTTPS, DD-65 a DD-69; para las dos VMs, DD-100 a DD-104; respaldos en R2, DD-105 a DD-109) |
 | Entorno `Staging`, aviso de pagos simulados y cuenta de prueba | `specs/ecommerce-pagos/` (PAG-33 a PAG-49, D25), `EntornoDelServicio`, `ModoCuentaDeRevision` y `CuentaDeRevisionDeLaPasarela` |

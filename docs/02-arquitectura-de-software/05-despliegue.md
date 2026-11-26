@@ -1,6 +1,8 @@
 # Despliegue en Oracle Cloud Free Tier
 
-Este documento reparte los servicios en máquinas virtuales (VMs) **usando solo recursos gratuitos de una sola cuenta de Oracle**. La **estructura** del sistema (dos servicios, módulos, bases) está en el [estilo arquitectónico](03-estilo-arquitectonico.md) y no cambia con el reparto: lo que se decide aquí es **en qué host corre cada unidad de despliegue**.
+Este documento reparte los servicios en máquinas virtuales (VMs) **usando solo recursos gratuitos de una sola cuenta de Oracle** (desde el 2026-11-25, los respaldos usan además el cupo gratuito de Cloudflare R2). La **estructura** del sistema (dos servicios, módulos, bases) está en el [estilo arquitectónico](03-estilo-arquitectonico.md) y no cambia con el reparto: lo que se decide aquí es **en qué host corre cada unidad de despliegue**.
+
+> **Topología vigente desde el 2026-11-25: DOS VMs** (decisión de la persona responsable; DD-100). No hubo capacidad para las AMD micro en `sa-santiago-1`: `cloudflared` y Nginx corren **dentro de VM-VENTAS** (el respaldo previsto en B11), **VM-BORDE no existe** y **VM-AUX queda aplazada**. Lo que se pierde mientras tanto está en §6.2. La topología de cuatro VMs sigue siendo el objetivo si aparece capacidad: volver a ella exige recuperar el Compose del borde del historial y no cambia el código de los servicios.
 
 ## 1. Recursos disponibles
 
@@ -8,12 +10,12 @@ Las condiciones del Free Tier cambiaron en 2026. Las cifras se contrastaron con 
 
 | Recurso | Disponible gratis | Uso en BabelHub |
 | :--- | :--- | :--- |
-| VMs ARM (Ampere A1) | **2 OCPU y 12 GB de RAM en total**, repartibles en 1 a 4 instancias (antes 4 OCPU y 24 GB). | **2 VMs de 1 OCPU y 6 GB**: la venta y el inventario con su base. |
-| VMs x86 (AMD micro) | **2 instancias** de 1/8 OCPU y 1 GB de RAM. | Borde de red y salto SSH con monitoreo. No sirven para .NET ni PostgreSQL. |
-| Almacenamiento en bloque | 200 GB en total; el volumen de arranque mínimo es de 47 GB. | 4 × 47 GB = 188 GB; sin volúmenes extra. Los respaldos van al almacén de objetos. |
-| Total de VMs | **4**: 2 ARM y 2 AMD micro. | Las cuatro, en **una sola cuenta**. |
+| VMs ARM (Ampere A1) | **2 OCPU y 12 GB de RAM en total**, repartibles en 1 a 4 instancias (antes 4 OCPU y 24 GB). | **2 VMs de 1 OCPU y 6 GB**: la venta con la entrada pública, y el inventario con su base. |
+| VMs x86 (AMD micro) | **2 instancias** de 1/8 OCPU y 1 GB de RAM. | **Sin usar** (2026-11-25: sin capacidad en la región). Previstas para la entrada y para el salto SSH con monitoreo (VM-AUX, aplazada). |
+| Almacenamiento en bloque | 200 GB en total; el volumen de arranque mínimo es de 47 GB. | 2 × 47 GB = 94 GB; sin volúmenes extra. Los respaldos van al almacén de objetos. |
+| Total de VMs | **4** posibles: 2 ARM y 2 AMD micro. | Hoy **2** (las ARM), en **una sola cuenta**. |
 
-**Cuenta de pago por uso (PAYG).** Actualizarla **no amplía el cupo gratuito**: los recursos Always Free siguen siendo gratis y todo lo que supere el cupo se cobra. Se recomienda actualizar para evitar que Oracle recupere instancias con uso muy bajo (fuentes secundarias; a verificar) y reducir los fallos de capacidad al crear VMs ARM. Se activa con un **presupuesto y una alerta de costo de 1 USD** para detectar a tiempo cualquier recurso fuera del cupo. **Decisión (2026-11-06):** se usa una sola cuenta, sin segunda cuenta ni VMs de pago.
+**Cuenta de pago por uso (PAYG).** Actualizarla **no amplía el cupo gratuito**: los recursos Always Free siguen siendo gratis y todo lo que supere el cupo se cobra. Se recomienda actualizar para evitar que Oracle recupere instancias con uso muy bajo (fuentes secundarias; a verificar) y reducir los fallos de capacidad al crear VMs ARM. Se activa con un **presupuesto y una alerta de costo de 1 USD** para detectar a tiempo cualquier recurso fuera del cupo. **Decisión (2026-11-06):** se usa una sola cuenta de Oracle, sin segunda cuenta de Oracle ni VMs de pago. **2026-11-25:** los respaldos van a Cloudflare R2 (cupo gratuito de 10 GB-mes, cifra a verificar; cobra el excedente), con aviso de facturación en esa cuenta y revisión diaria del uso (PLA-06).
 
 Condiciones a tener en cuenta:
 - Superar el cupo ARM inhabilita las instancias o genera cargos, según el tipo de cuenta.
@@ -26,7 +28,7 @@ Un **servicio** es una unidad de despliegue independiente: tiene su propio códi
 
 | Criterio | Regla |
 | :--- | :--- |
-| Lo expuesto es liviano y va aparte | cloudflared y Nginx solo reenvían tráfico y caben en una AMD micro. |
+| Lo expuesto es liviano | cloudflared y Nginx solo reenvían tráfico. Lo ideal es que vayan en una VM aparte; sin capacidad para ella comparten VM-VENTAS, en redes de Docker propias y sin publicar puertos (§4). |
 | La venta y el inventario no comparten CPU | Cada servicio corre en su propia VM ARM de 1 OCPU. |
 | El estado va junto al sistema más crítico | La base de datos vive en la VM del Inventario y no tiene acceso desde Internet. |
 | Lo periférico tolera fallos | Las notificaciones (n8n y Evolution API) van con la venta: su caída no bloquea la compra (AD16). |
@@ -44,24 +46,18 @@ CFE["DNS + proxy + TLS + WAF + límites + mitigación DDoS + Access"]
 end
 
 subgraph OCI["ORACLE CLOUD - una cuenta - red privada única"]
-subgraph BOR["VM-BORDE - AMD micro - 1/8 OCPU / 1 GB"]
+subgraph VEN["VM-VENTAS - ARM - 1 OCPU / 6 GB"]
 CFD["cloudflared<br/>túnel saliente"]
 NGX["Nginx<br/>enrutamiento por host"]
-end
-subgraph VEN["VM-VENTAS - ARM - 1 OCPU / 6 GB"]
 ECO["Servicio E-commerce<br/>monolito modular"]
 RED[("Redis<br/>caché y contadores")]
 N8N["n8n"]
 EVO["Evolution API"]
-CFD2["cloudflared<br/>conector de respaldo"]
 end
 subgraph INVM["VM-INVENTARIO - ARM - 1 OCPU / 6 GB"]
 INV["Servicio Inventario<br/>monolito modular"]
 GES["E-commerce en perfil gestión<br/>réplica de respaldo"]
 PG[("PostgreSQL<br/>bases de negocio ecommerce e inventario<br/>y la técnica de evolution")]
-end
-subgraph AUX["VM-AUX - AMD micro - 1/8 OCPU / 1 GB"]
-BAS["Salto SSH<br/>monitoreo ligero"]
 end
 end
 
@@ -70,16 +66,15 @@ PAG["Culqi"]
 ENV["Operador logístico"]
 LLM["Proveedor de LLM"]
 WA["WhatsApp"]
-ALM[("Almacén de archivos y respaldos<br/>Oracle Object Storage")]
+ALM[("Almacén de archivos<br/>Oracle Object Storage")]
+R2[("Respaldos cifrados<br/>Cloudflare R2")]
 end
 
 USR -->|"HTTPS"| CFE
 CFE -->|"túnel cifrado"| CFD
-CFE -.->|"túnel de respaldo"| CFD2
 CFD --> NGX
-NGX --> ECO
-NGX -.->|"servidor de respaldo"| GES
-CFD2 -.-> ECO
+NGX -->|"tienda"| ECO
+NGX -->|"gestión, 8081"| GES
 ECO -->|"REST + credencial"| INV
 GES -->|"REST"| INV
 INV -.->|"aviso: traslado recibido"| ECO
@@ -92,26 +87,20 @@ ECO -->|"webhook"| N8N
 N8N --> EVO
 EVO --> WA
 ECO -->|"sube y firma URLs"| ALM
-PG -->|"respaldo y WAL cifrados"| ALM
+PG -->|"respaldo y WAL cifrados"| R2
 USR -.->|"descarga con URL firmada"| ALM
 ECO --> PAG
 ECO --> ENV
 ECO --> LLM
-BAS -.->|"SSH"| BOR
-BAS -.->|"SSH"| VEN
-BAS -.->|"SSH"| INVM
 
 style CF fill:#222,stroke:#fff,stroke-width:2px,color:#fff
 style OCI fill:#222,stroke:#fff,stroke-width:2px,color:#fff
-style BOR fill:#222,stroke:#fff,stroke-width:2px,color:#fff
 style VEN fill:#222,stroke:#fff,stroke-width:2px,color:#fff
 style INVM fill:#222,stroke:#fff,stroke-width:2px,color:#fff
-style AUX fill:#222,stroke:#fff,stroke-width:2px,color:#fff
 style EXT fill:#222,stroke:#fff,stroke-width:2px,color:#fff
 style USR fill:#222,stroke:#fff,color:#fff
 style CFE fill:#222,stroke:#fff,color:#fff
 style CFD fill:#222,stroke:#fff,color:#fff
-style CFD2 fill:#222,stroke:#fff,color:#fff
 style NGX fill:#222,stroke:#fff,color:#fff
 style ECO fill:#222,stroke:#fff,color:#fff
 style GES fill:#222,stroke:#fff,color:#fff
@@ -120,9 +109,9 @@ style N8N fill:#222,stroke:#fff,color:#fff
 style EVO fill:#222,stroke:#fff,color:#fff
 style WA fill:#222,stroke:#fff,color:#fff
 style ALM fill:#222,stroke:#fff,color:#fff
+style R2 fill:#222,stroke:#fff,color:#fff
 style RED fill:#222,stroke:#fff,color:#fff
 style PG fill:#222,stroke:#fff,color:#fff
-style BAS fill:#222,stroke:#fff,color:#fff
 style PAG fill:#222,stroke:#fff,color:#fff
 style ENV fill:#222,stroke:#fff,color:#fff
 style LLM fill:#222,stroke:#fff,color:#fff
@@ -130,23 +119,20 @@ style LLM fill:#222,stroke:#fff,color:#fff
 
 | VM | Tipo | Contenedores | Justificación |
 | :--- | :--- | :--- | :--- |
-| **VM-BORDE** | AMD micro (1/8 OCPU, 1 GB) | cloudflared y Nginx. | Entrada pública. Solo reenvían tráfico (menos de 150 MB). Si no rinde en k6, pasan a VM-VENTAS sin tocar nada más. |
-| **VM-VENTAS** | ARM, 1 OCPU y 6 GB | Servicio E-commerce (con todos sus módulos y la interfaz web), Redis, n8n, Evolution API y un segundo conector de cloudflared. | La venta y lo periférico. Las notificaciones no bloquean la compra aunque se degraden. Redis vive aquí para que la caché de disponibilidad sobreviva a una caída del Inventario. |
-| **VM-INVENTARIO** | ARM, 1 OCPU y 6 GB | Servicio Inventario, **réplica de gestión** del E-commerce, PostgreSQL (dos bases de negocio, `ecommerce` e `inventario`, y la base técnica `evolution`). | El sistema más crítico con su base. La base **no tiene acceso desde Internet**. La réplica de gestión es la misma imagen del E-commerce con el perfil «solo gestión» (Sucursal y Admin). |
-| **VM-AUX** | AMD micro | Salto SSH y monitoreo ligero. | Aprovecha una VM gratuita sin consumir cupo ARM. Ver §4. |
+| **VM-VENTAS** | ARM, 1 OCPU y 6 GB | cloudflared y Nginx (la entrada pública), servicio E-commerce (con todos sus módulos y la interfaz web, rol `tienda`), Redis, n8n y Evolution API. | La entrada, la venta y lo periférico. Las notificaciones no bloquean la compra aunque se degraden. Redis vive aquí para que la caché de disponibilidad sobreviva a una caída del Inventario. |
+| **VM-INVENTARIO** | ARM, 1 OCPU y 6 GB | Servicio Inventario, **réplica de gestión** del E-commerce (rol `gestion`: la única que sirve la gestión), PostgreSQL (dos bases de negocio, `ecommerce` e `inventario`, y la base técnica `evolution`). | El sistema más crítico con su base. La base **no tiene acceso desde Internet**. La réplica de gestión es la misma imagen del E-commerce con el perfil «solo gestión» (Sucursal y Admin). |
+| VM-AUX (**aplazada**) | AMD micro | Salto SSH y monitoreo ligero. | No se creó por falta de capacidad; ver §6.2. |
 
 **Compromiso aceptado:** la base de datos comparte VM con el Inventario, por lo que deja de ser una VM «solo de datos». Es el precio de usar solo recursos gratuitos. Se compensa con red privada, un rol por esquema, seguridad por filas, contenedores sin privilegios y respaldo en el almacén de objetos (§4 y §5). Si hubiera presupuesto, mover PostgreSQL a una tercera VM ARM (≈ 7 USD al mes, a verificar) es un cambio de Compose, no de código.
 
 ### Estimación de memoria (a validar con mediciones reales)
 
-El detalle por contenedor está en el [presupuesto de recursos](07-presupuesto-de-recursos.md). Objetivo de RNF12: menos del 70 % por VM (unos 4,2 GB en las ARM y 0,7 GB en las micro).
+El detalle por contenedor está en el [presupuesto de recursos](07-presupuesto-de-recursos.md). Objetivo de RNF12: menos del 70 % por VM (unos 4,2 GB en las ARM).
 
 | VM | Consumo estimado | Holgura |
 | :--- | :--- | :--- |
-| VM-BORDE | Sistema y Docker ~0,4 GB; Nginx y cloudflared < 0,1 GB. Total ~0,5 GB. | Justa pero suficiente; solo hay un proceso de enrutamiento. |
-| VM-VENTAS | Sistema ~0,5 GB; E-commerce ~0,25–0,45 GB; n8n ~0,3–0,5 GB; Evolution API ~0,3–0,5 GB; Redis ~0,1–0,25 GB; cloudflared < 0,05 GB. Total ~1,5–2,3 GB. | Buena. La CPU (un .NET y dos de Node sobre 1 OCPU) es el límite real. |
+| VM-VENTAS | Sistema ~0,5 GB; E-commerce ~0,25–0,45 GB; n8n ~0,3–0,5 GB; Evolution API ~0,3–0,5 GB; Redis ~0,1–0,25 GB; Nginx y cloudflared < 0,15 GB. Total ~1,5–2,4 GB. | Buena. La CPU (un .NET, dos de Node y la entrada sobre 1 OCPU) es el límite real. |
 | VM-INVENTARIO | Sistema ~0,5 GB; Inventario ~0,15–0,25 GB; réplica de gestión ~0,2–0,35 GB; PostgreSQL ~1,2–1,8 GB. Total ~2,1–2,9 GB. | Buena; la memoria sobrante la usa el sistema como caché de disco. |
-| VM-AUX | Sistema ~0,3 GB y monitoreo. | Amplia. |
 
 ## 4. Red y seguridad de las VMs
 
@@ -155,6 +141,8 @@ Todas las VMs comparten la **red privada de la misma cuenta**; no hay tráfico e
 | Tema | Regla |
 | :--- | :--- |
 | Entrada | Solo Cloudflare Tunnel llega a la aplicación; los puertos 80 y 443 de Oracle están **cerrados**. El Inventario no tiene entrada pública: solo acepta llamadas de la VM-VENTAS y de la réplica de gestión. |
+| Entrada dentro de VM-VENTAS (DD-101) | Un solo conector: `cloudflared` → Nginx (red de Docker `tunel`, solo ellos dos) → E-commerce (red `entrada`, interna, solo Nginx y el E-commerce). Nginx y `cloudflared` **no publican ningún puerto** y no están en la red donde viven Redis, n8n y Evolution API. Nginx cree `CF-Connecting-IP` solo de la dirección fija de `cloudflared`; el E-commerce cree `X-Origen-Cliente` solo de la dirección fija de Nginx (`BABELHUB__Ecommerce__ProxiesConocidos`, fijada en el Compose). Ningún contenedor necesita llegar a un puerto publicado en la dirección privada de su propia VM. |
+| Gestión (DD-102) | `gestion.<dominio>` va de Nginx a la réplica de gestión (`http://<VM-INVENTARIO>:8081`, el único proceso con el rol `gestion`; el de la tienda rechaza ese host). La réplica cree `X-Origen-Cliente` solo de la dirección privada de VM-VENTAS (`IP_VENTAS`, que fija su Compose). Como cualquier contenedor de esa VM saldría con la misma dirección, en VM-VENTAS una regla `DOCKER-USER` (`scripts/proteger-gestion.sh`, que `desplegar.sh` pone y cron repone cada minuto) deja llegar a ese puerto **solo a Nginx** (DD-104). **Residual:** hasta un minuto tras reiniciar la VM y quien ya sea administrador de ella; la regla se verifica en la VM (guía 08 §13.2), no se probó en local. |
 | Escucha | Cada servicio publica su puerto **solo en la dirección privada de su VM**, nunca en `0.0.0.0`. |
 | Direcciones | Las direcciones de los servicios y de la base son variables de entorno por VM (por ejemplo `BABELHUB__INVENTARIO__URL`); no hay nombres de Docker entre VMs. |
 | Autenticación | Las llamadas entre el E-commerce y el Inventario llevan **credencial de servicio** (SEG-15): estar en la red no basta para ser atendido (AM24). |
@@ -162,10 +150,10 @@ Todas las VMs comparten la **red privada de la misma cuenta**; no hay tráfico e
 | Redis | Contraseña y usuarios con ACL; prefijos por tipo de clave; solo la VM-VENTAS. El **Redis de contadores** es una instancia aparte de la de caché (`infra/redis-contadores/`): `noeviction`, 100 MB, AOF cada segundo, sin instantáneas, el usuario por defecto desactivado y un único usuario `limites` con la contraseña de `BABELHUB__Seguridad__ClaveDeRedisDeLimites`, limitado a las claves `lim:*`, `blq:*`, `idem:*`, `rech:*` y `rsv:*` y a estos comandos: `EVAL`, `EVALSHA`, `SCRIPT LOAD`, `TIME`, `DBSIZE`, `PTTL`, `EXISTS`, `ZADD`, `ZREMRANGEBYSCORE`, `ZCARD`, `ZCOUNT`, `ZRANGE`, `ZREM`, `SET`, `GET`, `PEXPIRE`, `DEL`, `PING`, `HELLO`, `CLIENT SETINFO`, `CLIENT SETNAME`, `ECHO` e `INFO` (este último para el vigilante de memoria, alerta al 70 %). Solo TLS en el puerto 6380 con certificados montados como secretos; esa configuración está escrita y aún no se probó contra un Redis real con TLS. |
 | Reloj | Sincronización de hora (`chrony`) en todas las VMs: las credenciales duran 15 minutos y la validación debe tolerar una desviación pequeña (propuesta: ±60 s). |
 | Arranque | No hay orden de arranque entre VMs: cada servicio reintenta la conexión a su base y a sus dependencias con esperas crecientes y expone un `healthcheck` que Docker y el monitoreo consultan. |
-| Acceso administrativo | SSH solo con llave pública, desde la IP del administrador o desde **VM-AUX**, el único punto de salto. Ninguna VM acepta SSH desde Internet. |
+| Acceso administrativo | SSH solo con llave pública y **solo desde la IP del administrador** (lista de seguridad), directo a cada VM mientras VM-AUX esté aplazada (sería el único punto de salto). Ninguna VM acepta SSH desde cualquier origen de Internet. |
 | Contenedores | Sin privilegios, con sistema de archivos de solo lectura cuando se pueda, sin el socket de Docker y con límites de memoria y CPU. |
-| Host | Actualizaciones automáticas de seguridad, paquetes mínimos, discos y respaldos cifrados, y alertas de ingreso por SSH, procesos o puertos nuevos. |
-| Monitoreo | VM-AUX comprueba cada pocos minutos, **desde fuera de las VMs de aplicaciones**, que la puerta pública y la salud de cada servicio respondan, y avisa por correo. No reemplaza las alertas de seguridad (RNF20), que salen de los registros de cada servicio. |
+| Host | Actualizaciones automáticas de seguridad, paquetes mínimos, discos y respaldos cifrados, y alertas de ingreso por SSH, procesos o puertos nuevos (aplazadas con VM-AUX: §6.2). |
+| Monitoreo | **Aplazado con VM-AUX** (§6.2): era la comprobación, desde fuera de las VMs de aplicaciones, de la puerta pública, la salud y los respaldos. Las alertas de seguridad (RNF20) siguen saliendo de los registros de cada servicio. |
 
 **Límites y protección de entrada (AD24).** Cuatro niveles: Cloudflare (protección DDoS, reglas WAF, *Bot Fight Mode*, Turnstile en inicio de sesión, registro, reclamos, reservas y asistente, y Cloudflare Access con MFA en el host de gestión), Nginx (`limit_req` y `limit_conn` por la IP real del cliente), la Aplicación (presupuestos por actor y por rol, también para el personal) y la base (`CONNECTION LIMIT` por rol y `statement_timeout`). Ver [operación segura](../05-seguridad/07-operacion-segura.md).
 
@@ -209,34 +197,59 @@ Sin redundancia, **cada VM es un punto de falla**. La arquitectura aísla el efe
 | Cae | Efecto | Mitigación y recuperación |
 | :--- | :--- | :--- |
 | **El contenedor de Inventario** | **No cae todo.** El catálogo se sigue mostrando con la última disponibilidad conocida y el checkout informa que no puede validar el stock, sin cobrar a ciegas (CAT-12, CAR-06). | Reinicio automático y `healthcheck`. La caché de disponibilidad vive en Redis de la VM-VENTAS, no en la que cae. |
-| **VM-VENTAS** | Sin tienda, catálogo ni compras. El Inventario y su base siguen vivos, y el personal sigue operando con sus sesiones ya abiertas (hasta 8 horas) gracias a la **réplica de gestión**, que no puede iniciar sesiones nuevas porque SEG-26 exige Redis (decisión del 2026-11-12), y que sirve al Inventario la clave de verificación y las revocaciones (IDE-85). Sin avisos de WhatsApp. | Nginx pasa el host de gestión al servidor de respaldo (la réplica en VM-INVENTARIO, misma imagen del E-commerce en perfil «solo gestión»). Las sesiones están en la base, así que el cambio no cierra sesiones. Recrear la VM-VENTAS desde las imágenes (RTO ≤ 4 h); los avisos pendientes se reintentan (NOT-04). |
-| **VM-INVENTARIO** | **Cae todo**: ahí están también las bases `ecommerce` e `inventario`, así que no hay inicio de sesión, ni catálogo, ni inventario. Es el costo del compromiso. | Respaldo diario cifrado y archivado continuo de WAL **en el almacén de objetos (Oracle Object Storage)**; restaurar en la misma VM o en otra (RPO de minutos con WAL y ≤ 24 h solo si el archivo de cambios está roto; RTO ≤ 4 h). Mejora opcional y gratuita: una **réplica de PostgreSQL en caliente en VM-VENTAS** (~1 GB) con promoción manual, que baja el RTO a minutos. |
-| **VM-BORDE** | Sin entrada por Nginx. | El **segundo conector de cloudflared** en VM-VENTAS apunta directo a la aplicación; Cloudflare reparte entre ambos. Recrear la VM. |
-| **VM-AUX** | Sin salto SSH ni monitoreo; el sistema sigue funcionando. | Acceder desde la IP del administrador. |
-| **La cuenta de Oracle** | Se pierde todo, **también los respaldos y los libros digitales** (están en el almacén de la misma cuenta). | Sin copia externa por ahora (riesgo aceptado, B13); una copia fuera de Oracle es una mejora posterior. Si la cuenta sigue activa, restaurar los respaldos cifrados del almacén de objetos en otra máquina con el mismo Compose (ver [operación segura](../05-seguridad/07-operacion-segura.md) §5). |
+| **VM-VENTAS** | Sin tienda, catálogo ni compras, y **sin entrada pública de ningún tipo, tampoco la gestión** (Nginx y `cloudflared` viven aquí). El Inventario y su base siguen vivos y la réplica de gestión sigue sirviendo al Inventario la clave de verificación y las revocaciones (IDE-85), pero el personal no puede llegar a ella desde Internet. Sin avisos de WhatsApp. | Recrear la VM-VENTAS desde las imágenes (RTO ≤ 4 h); los avisos pendientes se reintentan (NOT-04). Las sesiones están en la base, así que al volver la entrada siguen abiertas. El escenario ESC-AC03-03 (operar la gestión con VM-VENTAS caída) **no se cumple** con esta topología. |
+| **VM-INVENTARIO** | **Cae todo**: ahí están también las bases `ecommerce` e `inventario`, así que no hay inicio de sesión, ni catálogo, ni inventario. Es el costo del compromiso. | Respaldo diario cifrado y archivado continuo de WAL **en Cloudflare R2** (comprimidos y cifrados; archivo de cambios de 7 días); restaurar en la misma VM o en otra (RPO de minutos con WAL y ≤ 24 h solo si el archivo de cambios está roto; RTO ≤ 4 h). Mejora opcional y gratuita: una **réplica de PostgreSQL en caliente en VM-VENTAS** (~1 GB) con promoción manual, que baja el RTO a minutos. |
+| **El contenedor de Nginx o el de cloudflared** | Sin entrada pública (tienda y gestión). | Reinicio automático y `healthcheck`. No hay segundo conector: uno que saltara Nginx permitiría falsificar la IP del cliente (DD-101). |
+| **VM-AUX** (aplazada) | No existe todavía: ver §6.2. | Acceso desde la IP del administrador. |
+| **La cuenta de Oracle** | Se pierden las VMs, los libros digitales, las portadas y el registro de supresiones. Los respaldos de las bases, en Cloudflare R2, sobreviven. | Sin segunda copia de libros ni registro (riesgo aceptado, B13). Los respaldos de R2 permiten recuperar las bases en otra máquina con el mismo Compose (ver [operación segura](../05-seguridad/07-operacion-segura.md) §5), pero sin el registro de supresiones el sistema **no se abre al público** (PLA-19). |
+| **La cuenta de Cloudflare** | Se pierden los respaldos (y, con ella, la entrada pública, el DNS y el túnel). El sistema en marcha conserva sus datos. | Segundo factor en la cuenta; sin segunda copia (B13). |
 
-**Compromiso de la VM-INVENTARIO.** Concentra la base, el Inventario y la réplica de gestión. Si alguien toma el control de ese servidor, la base queda comprometida y la seguridad por filas no ayuda. Por eso la defensa es en profundidad (AD31): contenedores sin privilegios y en redes separadas, `pg_hba` por base y origen, SSH solo por la VM-AUX, discos y respaldos cifrados, detección de cambios y, sobre todo, **recuperación**: respaldo y WAL cifrados en el almacén de objetos.
+**Compromiso de la VM-INVENTARIO.** Concentra la base, el Inventario y la réplica de gestión. Si alguien toma el control de ese servidor, la base queda comprometida y la seguridad por filas no ayuda. Por eso la defensa es en profundidad (AD31): contenedores sin privilegios y en redes separadas, `pg_hba` por base y origen, SSH solo desde la IP del administrador (por la VM-AUX cuando exista), discos y respaldos cifrados, detección de cambios y, sobre todo, **recuperación**: respaldo y WAL cifrados en el almacén de objetos.
 
 ### 6.1 Limitaciones declaradas
 
 Lo siguiente se acepta de forma consciente y debe figurar en el informe y en la exposición como limitación, no como omisión:
 
 - **Punto único de falla de datos:** si cae VM-INVENTARIO caen las dos bases y, con ellas, el inicio de sesión, el catálogo y el inventario (AD31); la réplica de gestión solo mantiene al personal si la base sigue viva. No hay redundancia ni SLA (DA03).
-- **Sin copia fuera de Oracle (B13):** los respaldos, el archivado de WAL y los libros digitales están en el almacén de objetos de la misma cuenta; si se pierde la cuenta, se pierde todo. Se acepta por falta de recursos y se implementará más adelante si el presupuesto lo permite.
-- **Entrada con poca CPU:** VM-BORDE tiene 1/8 de OCPU; si no rinde, cloudflared y Nginx pasan a VM-VENTAS (B11).
+- **Sin segunda copia (B13):** los respaldos y el archivo de cambios están en Cloudflare R2 y los libros, las portadas y el registro de supresiones en Oracle; cada cosa tiene una sola copia en su proveedor. Se acepta por falta de recursos.
+- **Archivo de cambios de 7 días (aceptado, 2026-11-25):** si el respaldo diario falla más de 7 días seguidos se pierde la recuperación reciente y nadie avisa desde fuera: la persona responsable comprueba cada día que el respaldo se hizo (guía 08).
+- **Registro de supresiones solo en Oracle (aceptado, 2026-11-25):** sin él el sistema no se reabre al público (PLA-19).
+- **Respaldos en un tercero, provisional (2026-11-25):** la credencial de la VM puede leer, listar y borrar lo vencido; el bloqueo de retención de R2 lo puede quitar el administrador de la cuenta; sin recuperación a un instante intermedio anterior a 7 días (spec `transversal-plataforma` §5; AM47).
+- **La entrada comparte VM y CPU con la venta** (DD-100): `cloudflared` y Nginx compiten con el E-commerce, n8n y Evolution API por 1 OCPU; no está medido en la VM real (T39). Además, si cae VM-VENTAS se pierde también el acceso del personal.
+- **Sin VM-AUX** (aplazada): ver §6.2.
 - **Memoria casi al límite en VM-INVENTARIO** (ver el [presupuesto de recursos](07-presupuesto-de-recursos.md)).
 - **Aspectos legales sin consulta experta** (B09): el marco legal usa valores propuestos; imprescindible revisarlo antes de operar con clientes reales.
 - **Cifras del Free Tier de fuentes secundarias:** se confirman en la consola al crear la cuenta (sección 9) y se anota la fecha de verificación.
+
+### 6.2 Lo que se pierde mientras VM-AUX esté aplazada (2026-11-25)
+
+Decisión de la persona responsable: no juntar VM-AUX con VM-VENTAS (sus credenciales de sello y de avisos quedarían junto al servicio que vigilan, PLA-38) y aplazarla. Mientras tanto **no se cumplen** estas partes de `transversal-plataforma`; los scripts de `scripts/vm-aux/` se conservan y se instalan cuando exista la VM (registro en `progress/hallazgos.md`).
+
+| Falta | Consecuencia | Paliativo manual (no cumple el requisito) |
+| :--- | :--- | :--- |
+| Salto SSH único | SSH directo a cada VM desde la IP del administrador; no hay un único punto que endurecer y vigilar. | Regla TCP 22 solo con la IP actual; llave con frase de paso. |
+| Aviso, originado **fuera** de la VM de datos, de respaldo diario ausente o de archivado con más de 15 minutos de atraso (PLA-20) | Si VM-INVENTARIO cae o el respaldo falla, **nadie avisa**. Solo queda el aviso del espacio local reservado, que sale de la propia VM de datos (PLA-21). | Revisar a diario el contenedor de respaldos y `/var/log/babelhub-respaldo.log`. |
+| Vigilancia de la retención (PLA-18) | Nadie avisa si el almacén retiene más de lo esperado. | Revisión manual del almacén. |
+| Sellos horarios del registro de supresiones y su ancla semanal (PLA-38) | Al restaurar, el registro no se puede contrastar con un sello: la verificación del sello que fija el plan de plataforma (§3) exige entonces su vía de excepción, con la decisión explícita de la persona responsable, y una entrada falsificada podría pasar sin detectarse. | Ninguno automático. La credencial del servicio no puede sobrescribir ni borrar entradas, pero **hasta que se aplique la retención con bloqueo** (guía 08 §9, aplazada) una credencial de administración sí podría. |
+| Copia diaria del registro a `supresiones-copia` (PLA-38) | El registro queda con **una sola copia**. | Ninguno. |
+| Latido externo y comprobación de la puerta pública | Una caída solo se nota si alguien la mira. | Un monitor HTTP externo gratuito sobre `https://<dominio>/health/live` (llega al E-commerce; `/health` lo responde Nginx). |
+| Alerta de ingreso SSH y de procesos nuevos (AM29, AD31) | Sin aviso de un acceso indebido. | Revisar `last` y `journalctl -u ssh`. |
+| Alerta de cuota del almacén (PLA-29, PLA-30) | Ya estaba pendiente (T40). | Presupuesto de 1 USD (Oracle), aviso de facturación de Cloudflare y revisión diaria del uso. |
+
+**Antes de operar con clientes o datos reales** (junto con B09) hace falta VM-AUX o un vigilante equivalente fuera de las VMs de aplicaciones.
+
+### 6.3 Sin respaldos hasta el cambio a Cloudflare R2 (2026-11-25)
+
+Mientras el código de compresión y R2 no esté en `main`, la guía no lo describa y los contenedores de R2 no estén creados con sus reglas y comprobados, **no hay ningún respaldo**: el archivado y el respaldo diario no deben activarse (guía 08 §9 y §10.2). Lo que este documento y la operación segura describen de R2 y la compresión es el objetivo. Perder VM-INVENTARIO o su disco **pierde las dos bases**: RNF24, PLA-09, PLA-15 y PLA-18 no se cumplen y las filas de recuperación de §6 describen el objetivo, no el estado. **Condición para salir:** respaldos activos y una restauración probada, antes de cualquier dato o cobro real.
 
 ## 7. Reglas de red
 
 | Origen | Destino | Puerto | Estado |
 | :--- | :--- | :--- | :--- |
 | Internet | Cualquier VM | 80 y 443 | **Cerrados** (el tráfico entra por el túnel saliente) |
-| IP del administrador | VM-AUX | 22 (SSH, solo con llave pública) | Permitido |
-| VM-AUX | Las demás VMs | 22 | Permitido |
-| VM-BORDE | VM-VENTAS | 8080 (E-commerce) | Permitido |
-| VM-BORDE | VM-INVENTARIO | 8081 (réplica de gestión, solo como respaldo) | Permitido |
+| IP del administrador | VM-VENTAS y VM-INVENTARIO | 22 (SSH, solo con llave pública) | Permitido (directo mientras VM-AUX esté aplazada) |
+| Contenedor de Nginx | Contenedor del E-commerce | 8080, por la red de Docker `entrada` de VM-VENTAS | Interno de la VM: no pasa por la dirección privada ni por la lista de seguridad |
+| VM-VENTAS (Nginx) | VM-INVENTARIO | 8081 (réplica de gestión) | Permitido |
 | VM-VENTAS, VM-INVENTARIO (réplica) | VM-INVENTARIO | 8082 (API del Inventario, por HTTPS: el contenedor escucha en 8443 y se publica como 8082; DD-55) | Permitido |
 | VM-INVENTARIO (Inventario) | VM-VENTAS | 8443, por HTTPS con el certificado de la CA privada de la cuenta (aviso de traslado recibido y solicitud de avisos de traslado, alcance `solicitar-aviso`; antes 8080, DD-55) | Permitido |
 | VM-INVENTARIO | VM-VENTAS | 5678 (webhook de n8n) | Cerrado: el Inventario ya no llama a n8n (pide los avisos al E-commerce, `transversal-notificaciones` D10) |
@@ -246,18 +259,17 @@ Lo siguiente se acepta de forma consciente y debe figurar en el informe y en la 
 | Internet | n8n y Evolution API | todos | **Sin publicar** (paneles por túnel SSH) |
 | Evolution API | WhatsApp | HTTPS saliente | Permitido |
 | VM-VENTAS | Almacén de archivos | HTTPS saliente | Permitido (subir archivos y firmar URLs) |
-| VM-INVENTARIO | Almacén de archivos | HTTPS saliente | Permitido (respaldos y WAL cifrados) |
-| VM-AUX | Almacén de archivos | HTTPS saliente | Permitido (sellos del registro de supresiones, vigilancia de respaldos, copia del registro y lectura de la cuota; credenciales mínimas por tarea) |
-| VM-AUX | Servidor de correo (SMTP) | TLS saliente | Permitido (correo semanal del sello y alertas de respaldo) |
+| VM-INVENTARIO | Cloudflare R2 | HTTPS saliente | Permitido (respaldos y WAL cifrados) |
+| VM-AUX (aplazada) | Almacén de archivos y servidor de correo | HTTPS y TLS salientes | Sin uso hasta que exista (§6.2) |
 | Internet | Almacén de archivos | HTTPS | Solo con URL firmada vigente; bucket privado |
 
-Complementos: firewall del sistema operativo con las mismas reglas, secretos como variables de entorno fuera del repositorio y SSH sin contraseña.
+Complementos: en las VMs se conserva el cortafuegos de la imagen de Oracle, pero **los puertos que publica Docker no pasan por él**: la barrera de entrada es la lista de seguridad de la subred (y en VM-VENTAS, además, una regla `DOCKER-USER` limita quién llega a la réplica de gestión, DD-104); secretos como variables de entorno fuera del repositorio y SSH sin contraseña.
 
 ### 7.1 Entornos del E-commerce y transporte seguro (2026-11-23)
 
 Las VMs corren el E-commerce en uno de dos entornos **de tipo producción**, que se endurecen igual (HTTPS entre servicios, Redis con TLS, correo y almacén reales, hosts permitidos, proxies conocidos): **`Staging`**, para que la pasarela de pago revise la tienda con la pasarela **simulada** (no se cobra y la pantalla lo dice), y **`Production`**, con la pasarela real y su llave de producción (`ecommerce-pagos` PAG-34, D25). Se elige en el archivo de secretos de cada servicio y `scripts/desplegar.sh` comprueba que el entorno y la pasarela sean coherentes; ver `docs/07-proceso-de-desarrollo/08-guia-primer-despliegue.md` §15.1.
 
-Entre el público y la aplicación, **Cloudflare termina TLS** (Universal SSL, Always Use HTTPS, Full strict) y el túnel y Nginx entregan HTTP **dentro** de la red privada: la aplicación toma solo `X-Forwarded-Proto` para ver el esquema real, redirige con `308` lo que el borde declare HTTP (menos la salud), envía HSTS y cookies `Secure` y no pide nada por HTTP (PAG-36). El tráfico **entre servicios** va por HTTPS con la CA privada (DD-55).
+Entre el público y la aplicación, **Cloudflare termina TLS** (Universal SSL, Always Use HTTPS, Full strict) y el túnel y Nginx entregan HTTP **dentro** de VM-VENTAS (y, para la gestión, hacia VM-INVENTARIO por la red privada): la aplicación toma solo `X-Forwarded-Proto` para ver el esquema real, redirige con `308` lo que el borde declare HTTP (menos la salud), envía HSTS y cookies `Secure` y no pide nada por HTTP (PAG-36). El tráfico **entre servicios** va por HTTPS con la CA privada (DD-55).
 
 ## 8. Sistema operativo
 
@@ -267,7 +279,8 @@ Entre el público y la aplicación, **Cloudflare termina TLS** (Universal SSL, A
 
 - Cupo ARM, número de instancias y condiciones del Free Tier en la cuenta, y si la actualización a PAYG evita la recuperación por inactividad.
 - Capacidad ARM en la región elegida; las más cercanas a Perú son las de Sudamérica, pero la disponibilidad varía.
-- **Rendimiento de la VM-BORDE (1/8 de OCPU)** con k6; si no rinde, cloudflared y Nginx pasan a VM-VENTAS.
+- **Rendimiento de la entrada en VM-VENTAS** (`cloudflared` y Nginx junto al resto, 1 OCPU) con k6; volver a una VM aparte si aparece capacidad (DD-100).
+- **Comprobación en la VM del camino de la entrada con el cortafuegos de Oracle** (guía 08 §13.2): en local no se reprodujeron las reglas `iptables` de la imagen de Oracle.
 - **Latencia entre VMs** y CPU de cada VM de 1 OCPU con k6, incluida la réplica de gestión y PostgreSQL en la VM-INVENTARIO.
 - Disponibilidad de subred privada sin costo.
 - Registro de imágenes para recrear VMs sin depender de una cuenta de Oracle (por ejemplo, el registro de contenedores del repositorio).

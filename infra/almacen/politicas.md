@@ -1,69 +1,89 @@
-# Almacén de objetos: contenedores, credenciales y retención
+# Almacenes de objetos: contenedores, credenciales y retención
 
-Define qué contenedores existen en el almacén de Oracle, quién puede hacer qué en cada uno y cuánto se conserva lo que contienen (PLA-16, PLA-35, PLA-38; decisiones D07, D08, D23 y D24 de `specs/transversal-plataforma/`). La definición vive en dos archivos de texto que leen `scripts/almacen.sh` y las pruebas: [`contenedores.txt`](contenedores.txt) y [`credenciales.txt`](credenciales.txt). [`ciclo-de-vida.json`](ciclo-de-vida.json) se genera de ellos (`scripts/almacen.sh ciclo-de-vida`) y una prueba comprueba que no se desfasa.
+Define qué contenedores existen, quién puede hacer qué en cada uno y cuánto se conserva lo que contienen (PLA-16, PLA-18, PLA-35, PLA-38, PLA-44; decisiones D07, D08, D23, D24, D26 y D27 de `specs/transversal-plataforma/`). Hay dos almacenes:
+
+- **Oracle Object Storage** (libros, portadas y registro de supresiones): [`contenedores.txt`](contenedores.txt) y [`credenciales.txt`](credenciales.txt); [`ciclo-de-vida.json`](ciclo-de-vida.json) se genera de ellos (`scripts/almacen.sh ciclo-de-vida`) y una prueba comprueba que no se desfasa.
+- **Cloudflare R2** (los respaldos; provisional): [`r2/contenedores.txt`](r2/contenedores.txt) y [`r2/credenciales.txt`](r2/credenciales.txt).
+
+`scripts/almacen.sh` y las pruebas leen las mismas definiciones.
 
 ## Contenedores
 
-| Contenedor | Contiene | Retención con bloqueo | Ciclo de vida |
-| :--- | :--- | :--- | :--- |
-| `libros` | Archivos digitales (AD19) | ninguna | no expira; aborta las subidas multipart incompletas al día |
-| `portadas` | Portadas de las obras del catálogo (imágenes que la web sirve por huella, D06 de `ecommerce-catalogo`) | ninguna | no expira; aborta las subidas multipart incompletas al día |
-| `respaldos-diarios` | Copia consistente diaria del clúster, cifrada con `age` | 7 días, bloqueada | retira a los 7 días |
-| `respaldos-semanales` | Copia dominical | 28 días, bloqueada | retira a los 28 días |
-| `respaldos-mensuales` | Copia del último día del mes | 92 días, bloqueada | retira a los 92 días |
-| `respaldos-wal` | Archivo de cambios (WAL) cifrado | 100 días, bloqueada | retira a los 100 días |
-| `supresiones-entradas` | Registro de supresiones, `entradas/<identificador>/<tipo>-<fase>.json` | 100 días, bloqueada | no expira |
-| `supresiones-sellos` | Sellos horarios de VM-AUX, `sellos/AAAA-MM-DD-HHmm.json` | 100 días, bloqueada | no expira |
-| `supresiones-copia` | Copia diaria del registro, hecha por VM-AUX | 100 días, bloqueada | retira a los 100 días |
+| Almacén | Contenedor | Contiene | Retención con bloqueo | Ciclo de vida |
+| :--- | :--- | :--- | :--- | :--- |
+| Oracle | `libros` | Archivos digitales (AD19) | ninguna | no expira; aborta las subidas multipart incompletas al día |
+| Oracle | `portadas` | Portadas de las obras del catálogo (imágenes que la web sirve por huella, D06 de `ecommerce-catalogo`) | ninguna | no expira; aborta las subidas multipart incompletas al día |
+| Oracle | `supresiones-entradas` | Registro de supresiones, `entradas/<identificador>/<tipo>-<fase>.json` | 100 días, irreversible | no expira |
+| Oracle | `supresiones-sellos` | Sellos horarios de VM-AUX, `sellos/AAAA-MM-DD-HHmm.json` | 100 días, irreversible | no expira |
+| Oracle | `supresiones-copia` | Copia diaria del registro, hecha por VM-AUX | 100 días, irreversible | retira a los 100 días |
+| R2 | `respaldos-diarios` | Copia consistente diaria del clúster y la configuración, comprimidas y cifradas | 7 días | retira a los 7 días |
+| R2 | `respaldos-semanales` | Copia dominical | 28 días | retira a los 28 días |
+| R2 | `respaldos-mensuales` | Copia del último día del mes | 92 días | retira a los 92 días |
+| R2 | `respaldos-wal` | Archivo de cambios (WAL) comprimido y cifrado | 7 días | retira a los 7 días |
 
-La retención con bloqueo de Oracle es **por contenedor**, no por prefijo (D23): una regla de 90 días sobre todos los respaldos rompería los 7 diarios de PLA-18, por eso hay un contenedor por clase. Los de más de 100 días (`respaldos-wal` y los tres de supresiones) cubren más que el respaldo más antiguo retenido (90 días) con margen (PLA-38). El registro de supresiones y sus sellos no expiran: son identificadores opacos sin datos personales y el sello cubre un conjunto estable.
+En R2 el bloqueo manda sobre el ciclo de vida y lo vencido se retira en un día como mucho. El registro de supresiones se retiene 100 días, más de lo que dura el respaldo más antiguo (92) (PLA-38), y son identificadores opacos sin datos personales. **Por qué el mensual es de 92 días y no de 90:** los meses no miden lo mismo; la simulación de `RetencionTests` (más de dos años, con un febrero bisiesto) muestra que con 90 hay días con solo 2 fines de mes, y con 92 quedan siempre 3 o, algunos días, 4.
 
-**Por qué el mensual es de 92 días y no de 90.** Los meses no miden lo mismo, así que ningún plazo en días deja siempre exactamente tres fines de mes: la simulación de `RetencionTests` (más de dos años de respaldos, con un febrero bisiesto) muestra que con 90 días hay días en que solo quedan 2 (p. ej. el 28 de septiembre), lo que dejaría sin su tercer mes más reciente a PLA-18; con 92 quedan siempre 3 o, algunos días, 4 (el cuarto se retira a los pocos días). Entre no tener un mes y guardar uno de más, se guarda el de más. Los diarios (7 días) dejan siempre 7 y los semanales (28), siempre 4 domingos.
-
-**Diferencia con el plan.** El plan habla de un contenedor `supresiones` con los prefijos `entradas/` y `sellos/`. Las políticas de Oracle que se emiten aquí son por contenedor (`target.bucket.name`), y no se asumió que admitan una condición por prefijo; para que «el servicio no pueda pre-crear sellos futuros» no dependa de eso, el registro y los sellos son **dos contenedores** y las claves conservan sus prefijos. Si el spike T02 demuestra que el permiso por prefijo funciona, se pueden unificar sin cambiar el código: el contenedor es una opción de configuración. Está anotado en `progress/hallazgos.md`.
+**Diferencia con el plan.** El plan habla de un contenedor `supresiones` con los prefijos `entradas/` y `sellos/`. Las políticas de Oracle que se emiten aquí son por contenedor (`target.bucket.name`), y no se asumió que admitan una condición por prefijo; para que «el servicio no pueda pre-crear sellos futuros» no dependa de eso, el registro y los sellos son **dos contenedores** y las claves conservan sus prefijos. Si el spike T02 demuestra que el permiso por prefijo funciona, se pueden unificar sin cambiar el código. Está anotado en `progress/hallazgos.md`.
 
 ## Credenciales (mínimo privilegio, una por tarea)
+
+### Oracle
 
 Las acciones son `crear` (`OBJECT_CREATE`: agrega y no sobrescribe), `leer`, `listar` (`OBJECT_INSPECT`), `uso` (`BUCKET_READ`: el tamaño del contenedor), `sobrescribir` y `borrar`. **Lo que no consta está prohibido.**
 
 | Credencial | Dónde vive | Qué puede |
 | :--- | :--- | :--- |
-| `respaldos-escritor` | VM de datos | Solo `crear` en `respaldos-diarios`, `-semanales`, `-mensuales` y `-wal`. No lee, no sobrescribe, no borra: si se compromete la VM de datos no se puede alterar ni leer un respaldo existente. |
-| `respaldos-lector` | Equipo de la persona responsable y máquina de ensayo; se rota tras cada ensayo con datos reales | `leer` y `listar` en los respaldos y en `supresiones-copia`. |
-| `respaldos-vigilante` | VM-AUX | Solo `listar` (metadatos) en los respaldos y en `supresiones-copia`. |
+| `registro-lector` | Equipo de la persona responsable | `leer` y `listar` en `supresiones-copia` (verificación al restaurar sin sellos). |
+| `registro-vigilante` | VM-AUX | Solo `listar` en `supresiones-copia`. |
 | `supresiones-registro` | El servicio (Identidad) | `crear`, `leer` y `listar` solo en `supresiones-entradas`. No toca `supresiones-sellos`. |
 | `supresiones-sello` | VM-AUX | `crear` solo en `supresiones-sellos`; `leer` y `listar` en `supresiones-entradas`. |
 | `respaldos-copia-registro` | VM-AUX | `crear` solo en `supresiones-copia`. |
 | `cuota-lectura` | VM-AUX | `uso` de cada contenedor. |
-| `catalogo-archivos` | E-commerce (módulo Catálogo) | `crear`, `leer` y `borrar` en `libros` y en `portadas`. No sobrescribe (las claves son aleatorias y un reemplazo crea un objeto nuevo y borra el anterior) y no lista (el Catálogo conoce sus claves por su esquema y verifica con lecturas por rango). |
+| `catalogo-archivos` | E-commerce (módulo Catálogo) | `crear`, `leer` y `borrar` en `libros` y en `portadas`. No sobrescribe (las claves son aleatorias y un reemplazo crea un objeto nuevo y borra el anterior) y no lista. |
 | `biblioteca-lector` | E-commerce (módulo Biblioteca) | Solo `leer` en `libros`: firma las URL de descarga de corta duración (D13 de `ecommerce-catalogo`). No toca `portadas`. |
 
-**Solo `catalogo-archivos` borra (sus archivos y portadas) y ninguna sobrescribe; ninguna credencial de respaldos o de supresiones puede borrar o sobrescribir.** El retiro de lo vencido lo hace el ciclo de vida del propio almacén, que no es una credencial que esté en una VM (D07): así se lee AC-PLA-16 («una credencial distinta que retira»), anotado en `progress/hallazgos.md` para reformularla.
+**Solo `catalogo-archivos` borra (sus archivos y portadas) y ninguna sobrescribe; ninguna credencial de supresiones puede borrar o sobrescribir.** El retiro de lo vencido lo hace el ciclo de vida del propio almacén (D07).
+
+### Cloudflare R2
+
+R2 solo ofrece «lectura y escritura de objetos», «solo lectura» o administración, acotables por contenedor: **no hay permiso de solo crear ni de solo listar**.
+
+| Token | Dónde vive | Qué puede |
+| :--- | :--- | :--- |
+| `respaldos-escritor` | VM de datos | Lectura y escritura de objetos en los cuatro `respaldos-*`. El bloqueo impide borrar o sobrescribir dentro del plazo; puede leer lo subido (va cifrado) y subir objetos nuevos. No cambia reglas. |
+| `respaldos-lector` | Equipo de la persona responsable y máquina de ensayo; se rota tras cada ensayo con datos reales | Solo lectura en los cuatro. |
+| `respaldos-vigilante` | VM-AUX (aplazada) | Solo lectura en los cuatro (puede descargar los respaldos cifrados: R2 no ofrece solo listar). |
+
+La **administración** (un token de API con edición de R2) existe solo mientras la persona responsable aplica o comprueba las reglas, en su equipo, y se revoca al terminar; la cuenta exige segundo factor (PLA-44).
 
 ## Retención con bloqueo efectivo
 
-Una regla de retención **sin bloqueo** puede quitarse; una **con bloqueo** (`time-rule-locked`) ya no. Oracle exige que la fecha de bloqueo esté a 14 días o más de crearla y la regla sigue modificable hasta esa fecha. Por eso:
+**Oracle.** Una regla de retención **sin bloqueo** puede quitarse; una **con bloqueo** (`time-rule-locked`) ya no. Oracle exige que la fecha de bloqueo esté a 14 días o más de crearla y la regla sigue modificable hasta esa fecha. Por eso `scripts/almacen.sh aplicar` crea la regla con el bloqueo a 15 días, `comprobar` distingue **bloqueo pendiente** (código 3) de **bloqueado** (código 0), `plan` muestra los comandos sin ejecutarlos y `aplicar` no cambia una regla que ya existe. El bloqueo es **irreversible**.
 
-1. `scripts/almacen.sh aplicar` crea la regla con el bloqueo a 15 días.
-2. `scripts/almacen.sh comprobar` distingue **bloqueo pendiente** (código 3: todavía se podría quitar la regla) de **bloqueado** (código 0). El despliegue no da por cumplida la retención mientras esté pendiente.
-3. El bloqueo es **irreversible**: una duración mal elegida no se corrige y hay que dejar vencer o crear otro contenedor. Por eso `plan` muestra los comandos sin ejecutarlos y `aplicar` no cambia una regla que ya existe.
+**R2.** Las reglas de bloqueo impiden borrar y sobrescribir durante su plazo, pero **se pueden quitar** con la administración de la cuenta: no hay modo irreversible (riesgo aceptado y provisional, spec §5). `r2-aplicar` no cambia un bloqueo que ya existe y difiere.
 
 ## Cómo se usa
 
-Lo ejecuta la persona responsable, en su equipo, con su credencial de administración de Oracle (`oci` configurado): nunca en una VM ni en CI.
+Lo ejecuta la persona responsable, en su equipo: nunca en una VM, en CI ni desde un agente.
 
 ```bash
+# Oracle (con `oci` configurado con su credencial de administración):
 scripts/almacen.sh plan --compartimento-id <ocid> --compartimento-nombre <nombre> --espacio <espacio-de-nombres>
 scripts/almacen.sh aplicar --compartimento-id <ocid> --compartimento-nombre <nombre> --espacio <espacio-de-nombres>
 scripts/almacen.sh comprobar --espacio <espacio-de-nombres>
+
+# Cloudflare R2 (token de API temporal, que se pide sin mostrarse o llega en CLOUDFLARE_API_TOKEN):
+scripts/almacen.sh r2-plan
+CLOUDFLARE_ACCOUNT_ID=<account-id> scripts/almacen.sh r2-aplicar
+CLOUDFLARE_ACCOUNT_ID=<account-id> scripts/almacen.sh r2-comprobar
 ```
 
-`aplicar` también imprime las sentencias de política IAM (una por credencial y contenedor); se aplican con la consola o con `oci iam policy create`. Cada credencial es un usuario de IAM con su clave secreta de cliente (la API compatible con S3); las claves se guardan fuera del repositorio.
+`aplicar` también imprime las sentencias de política IAM (una por credencial y contenedor); se aplican con la consola o con `oci iam policy create`. Cada credencial de Oracle es un usuario de IAM con su clave secreta de cliente (la API compatible con S3). Los tokens de objetos de R2 se crean en el panel, acotados a sus contenedores (guía de despliegue §9b). Las claves se guardan fuera del repositorio.
 
 ## Qué está comprobado y qué no
 
-- **Comprobado con pruebas:** la definición cumple las reglas (cada credencial solo hace lo que consta y se rechaza lo ajeno, incluidos los libros y los respaldos, el registro frente a los sellos y todo intento de borrar o sobrescribir; la retención y el bloqueo de cada contenedor; el ciclo de vida nunca antes que la retención), el script genera los comandos y las sentencias esperados, rechaza definiciones inválidas y `comprobar` detecta cada diferencia con un doble del CLI.
-- **No comprobado aquí (spike T02):** que el almacén de Oracle acepte la sintaxis de las sentencias IAM tal como se emiten, que la retención sea por contenedor, que `crear` rechace una clave repetida y cuándo ejecuta el almacén el ciclo de vida. La forma de las respuestas del CLI que usa `comprobar` (`time-amount`, `time-unit`, `time-rule-locked`, `is-enabled`) se contrastará con el compartimento de prueba del spike.
+- **Comprobado con pruebas:** las definiciones cumplen las reglas (cada credencial solo tiene lo que consta; la retención de cada contenedor; el ciclo de vida nunca antes que la retención; R2 y Oracle sin contenedores ni credenciales compartidos); el script genera los comandos, las sentencias y las llamadas esperadas, rechaza definiciones inválidas, no expone el token de R2, y `comprobar` y `r2-comprobar` detectan cada diferencia con dobles del CLI y de la API.
+- **No comprobado aquí:** que el almacén de Oracle acepte la sintaxis IAM y las reglas tal como se emiten (spike T02), y que R2 se comporte como su documentación (forma de las respuestas de la API, bloqueo, alcance de cada token y retiro del ciclo de vida): constancia T47 en la cuenta antes de poner datos que importen.
 
 ## Almacén del catálogo (portadas y libros)
 

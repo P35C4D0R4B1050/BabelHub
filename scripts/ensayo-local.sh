@@ -2,7 +2,8 @@
 # Ensayo del despliegue en tu propio equipo, ANTES de tocar Oracle (guía: docs/07-proceso-de-desarrollo/08-guia-primer-despliegue.md, paso 0).
 # Reproduce lo que harás en las VMs con los mismos scripts y los mismos Compose: construye las tres imágenes, las publica en un registro local
 # (así el despliegue usa un «digest» de verdad, como con GHCR), genera secretos de mentira con scripts/generar-secretos.sh, y despliega
-# VM-INVENTARIO y VM-VENTAS con scripts/desplegar.sh (migraciones, TLS entre servicios, Redis con TLS, salud de cada componente).
+# VM-INVENTARIO y VM-VENTAS con scripts/desplegar.sh (migraciones, TLS entre servicios, Redis con TLS, Nginx de entrada, salud de cada componente).
+# El paso 6c comprueba la entrada: Nginx sirve tienda y gestión y la IP del cliente no se puede falsificar (DD-101).
 #
 #   bash scripts/ensayo-local.sh [--limpiar]        --limpiar: al terminar (o si ya hay un ensayo), borra contenedores, volúmenes y archivos del ensayo
 #
@@ -11,7 +12,7 @@
 #
 # Prueba también el TLS de PostgreSQL (AM24, paso 6b): rechazo sin TLS, con otra CA y con otro nombre; conexiones de red todas cifradas; respaldo por el socket local; y Evolution API (Prisma) si su imagen está en el equipo (ENSAYO_EVOLUTION=1 la descarga).
 #
-# Lo que NO prueba: Cloudflare, el túnel, Evolution API (WhatsApp), el almacén de objetos de Oracle ni los cobros reales. Los dos servicios del
+# Lo que NO prueba: Cloudflare, el túnel (cloudflared se simula con un contenedor en su dirección), el cortafuegos de Oracle, Evolution API (WhatsApp), el almacén de objetos de Oracle, Cloudflare R2 (los respaldos) ni los cobros reales. Los dos servicios del
 # E-commerce corren en «Staging» (el entorno de revisión de la tienda por Culqi: se endurece como «Production» y solo afloja el cobro, con la
 # pasarela simulada) y, al final, el ensayo ejecuta el comando «cuenta-de-prueba» con la imagen real (guía, §15.1).
 set -euo pipefail
@@ -100,9 +101,20 @@ services:
     ports: !override ["127.0.0.1:38082:8443"]
   ecommerce-gestion:
     ports: !override ["127.0.0.1:38081:8080"]
+    # En el ensayo Nginx llega a la réplica a través del equipo, así que la dirección de origen es la de Docker y no 127.0.0.1.
+    environment:
+      BABELHUB__Ecommerce__ProxiesConocidos: "172.16.0.0/12,192.168.0.0/16"
 EOF
-cat >"$TRABAJO/ventas.override.yml" <<'EOF'
+# Nginx (en «VM-VENTAS») llega a la réplica de gestión («VM-INVENTARIO») por el puerto local del equipo: 38081 en vez del 8081 de la VM. Es lo único que cambia de nginx.conf en el ensayo.
+sed 's/server ecommerce-gestion:8081;/server ecommerce-gestion:38081;/' "$RAIZ/infra/nginx/nginx.conf" >"$TRABAJO/nginx.conf"
+grep -q 'server ecommerce-gestion:38081;' "$TRABAJO/nginx.conf" || { echo "Error: nginx.conf ya no tiene el upstream de gestión que el ensayo espera." >&2; exit 1; }
+chmod 0644 "$TRABAJO/nginx.conf"
+nginx_conf="$TRABAJO/nginx.conf"; if [[ "$(uname -s)" == MINGW* || "$(uname -s)" == MSYS* ]]; then nginx_conf="$(cygpath -m "$nginx_conf")"; fi
+cat >"$TRABAJO/ventas.override.yml" <<EOF
 services:
+  nginx:
+    extra_hosts: !override ["ecommerce-gestion:host-gateway"]
+    volumes: !override ["$nginx_conf:/etc/nginx/nginx.conf:ro"]
   ecommerce:
     ports: !override ["127.0.0.1:38080:8080", "127.0.0.1:38443:8443"]
   redis-contadores:
@@ -113,15 +125,16 @@ EOF
 MSYS_NO_PATHCONV=1 docker run --rm --entrypoint cat "${DIGEST[ecommerce]}" /etc/ssl/certs/ca-certificates.crt >"$TRABAJO/raices-publicas.crt"
 printf '#!/usr/bin/env bash\nif [[ "$2" == "%%U %%a" ]]; then case "$3" in *aviso.env) echo "root 600" ;; *) echo "root 755" ;; esac; else echo 600; fi\n' >"$TRABAJO/stat-ensayo.sh"
 chmod +x "$TRABAJO/stat-ensayo.sh"
-export BABELHUB_ENSAYO=1 STAT="$TRABAJO/stat-ensayo.sh" CHOWN=true BABELHUB_RAICES_PUBLICAS="$TRABAJO/raices-publicas.crt"
-export IP_PRIVADA=127.0.0.1 IMAGEN_ECOMMERCE="${DIGEST[ecommerce]}" IMAGEN_INVENTARIO="${DIGEST[inventario]}" IMAGEN_POSTGRES="${DIGEST[postgres]}"
+# IPTABLES=true: el ensayo no toca el cortafuegos del equipo (la regla de la réplica de gestión, DD-104, se comprueba en la VM).
+export BABELHUB_ENSAYO=1 STAT="$TRABAJO/stat-ensayo.sh" CHOWN=true IPTABLES=true BABELHUB_RAICES_PUBLICAS="$TRABAJO/raices-publicas.crt"
+export IP_PRIVADA=127.0.0.1 IP_INVENTARIO=127.0.0.1 IP_VENTAS=127.0.0.1 IMAGEN_ECOMMERCE="${DIGEST[ecommerce]}" IMAGEN_INVENTARIO="${DIGEST[inventario]}" IMAGEN_POSTGRES="${DIGEST[postgres]}"
 
 # ---------- 4 y 5. Despliegue de las dos VMs ----------
 paso "3/7 VM-INVENTARIO: PostgreSQL, migraciones, Inventario y réplica de gestión"
 mkdir -p "$TRABAJO/cron"
 bash "$RAIZ/scripts/desplegar.sh" inventario --secretos "$TRABAJO/secretos/inventario" --cron "$TRABAJO/cron" --extra "$TRABAJO/inventario.override.yml" --espera 240
 
-paso "4/7 VM-VENTAS: E-commerce, Redis (caché y contadores con TLS) y n8n (sin Evolution ni el túnel, que necesitan datos reales)"
+paso "4/7 VM-VENTAS: Nginx, E-commerce, Redis (caché y contadores con TLS) y n8n (sin Evolution ni cloudflared, que necesitan datos reales)"
 bash "$RAIZ/scripts/desplegar.sh" ventas --secretos "$TRABAJO/secretos/ventas" --cron "$TRABAJO/cron" --extra "$TRABAJO/ventas.override.yml" --espera 240 --sin evolution-api,cloudflared
 
 # ---------- 6. Humo ----------
@@ -230,5 +243,43 @@ else
   echo "    -    Evolution API: omitido (su imagen no está en el equipo; con ENSAYO_EVOLUTION=1 el ensayo la descarga y la prueba)"
 fi
 [[ "$MAL" -eq 0 ]] || { echo "Error: el TLS de PostgreSQL no se comportó como debe (ver arriba)." >&2; exit 1; }
+
+# ---------- La entrada pública (DD-101, DD-102): Nginx real, gestión e IP del cliente que no se puede falsificar ----------
+paso "6c/7 Entrada pública: Nginx sirve la tienda y la gestión, y la IP del cliente no se puede falsificar (SEG-17, SEG-23)"
+# «cloudflared» no corre en el ensayo (necesita un token real): un contenedor toma su dirección fija en la red `tunel` y hace lo mismo que él (HTTP a nginx:8080 con CF-Connecting-IP).
+pedir() { # red ip-fija-o-vacía host url cabeceras... : imprime un código HTTP por solicitud
+  local red="$1" ip="$2" anfitrion="$3" url="$4"; shift 4
+  local cabeceras=() c
+  for c in "$@"; do cabeceras+=(-H "$c"); done
+  MSYS_NO_PATHCONV=1 docker run --rm --network "$red" ${ip:+--ip "$ip"} "$CURL_IMAGE" -s --max-time 8 --rate 15/s -o /dev/null -w '%{http_code}\n' -H "Host: $anfitrion" -H "X-Forwarded-Proto: https" ${cabeceras[@]+"${cabeceras[@]}"} "$url" 2>/dev/null || true
+}
+como_cloudflared() { pedir babelhub-ventas_tunel 10.213.10.2 "$@"; }
+comprobar() { # descripción esperado obtenido
+  if [[ "$3" == "$2" ]]; then echo "    ok   $1 ($3)"; else echo "    ERROR $1: se esperaba $2 y se obtuvo $3" >&2; MAL=1; fi
+}
+comprobar "la tienda por Nginx" 200 "$(como_cloudflared localhost http://nginx:8080/health/live "CF-Connecting-IP: 203.0.113.5")"
+comprobar "la gestión por Nginx llega a la réplica de VM-INVENTARIO" 200 "$(como_cloudflared gestion.localhost http://nginx:8080/health/live "CF-Connecting-IP: 203.0.113.5")"
+comprobar "la pantalla de ingreso de la gestión por Nginx" 200 "$(como_cloudflared gestion.localhost http://nginx:8080/ingreso "CF-Connecting-IP: 203.0.113.5")"
+comprobar "el proceso de la tienda rechaza el host de gestión (por eso Nginx no lo manda allí)" 400 "$(pedir babelhub-ventas_default "" gestion.localhost http://ecommerce:8080/ingreso)"
+# El límite «solicitudes sin sesión por origen» son 60 por minuto: sirve para ver qué origen cuenta el E-commerce.
+rafaga="$(como_cloudflared localhost 'http://nginx:8080/catalogo?n=[1-70]' "CF-Connecting-IP: 203.0.113.10" | sort | uniq -c | tr -s ' ' | tr '\n' ';')"
+if grep -q ' 200;' <<<"$rafaga" && grep -q ' 429;' <<<"$rafaga"; then echo "    ok   70 solicitudes de un cliente (CF-Connecting-IP): el E-commerce las cuenta por esa IP y corta al pasar el límite ($rafaga)"; else echo "    ERROR: la ráfaga de un cliente no se limitó por su IP: $rafaga" >&2; MAL=1; fi
+comprobar "otro cliente no queda limitado por el primero" 200 "$(como_cloudflared localhost http://nginx:8080/catalogo "CF-Connecting-IP: 203.0.113.20")"
+comprobar "el cliente limitado NO escapa escribiendo X-Origen-Cliente (Nginx la sobrescribe)" 429 "$(como_cloudflared localhost http://nginx:8080/catalogo "CF-Connecting-IP: 203.0.113.10" "X-Origen-Cliente: 203.0.113.21" "X-Forwarded-For: 203.0.113.21" "True-Client-IP: 203.0.113.21")"
+# Otro contenedor de la red del túnel (no cloudflared) que se inventa CF-Connecting-IP: Nginx no le cree.
+pedir babelhub-ventas_tunel 10.213.10.7 localhost 'http://nginx:8080/catalogo?n=[1-70]' "CF-Connecting-IP: 203.0.113.30" >/dev/null
+comprobar "quien no es cloudflared no puede fijar CF-Connecting-IP: sus 70 solicitudes no cuentan para esa IP" 200 "$(como_cloudflared localhost http://nginx:8080/catalogo "CF-Connecting-IP: 203.0.113.30")"
+# Un contenedor de la red general (donde viven n8n y Evolution API) que llama directo al E-commerce con X-Origen-Cliente: no se le cree.
+pedir babelhub-ventas_default "" localhost 'http://ecommerce:8080/catalogo?n=[1-70]' "X-Origen-Cliente: 203.0.113.40" >/dev/null
+comprobar "un contenedor que no es Nginx no puede fijar X-Origen-Cliente: sus 70 solicitudes no cuentan para esa IP" 200 "$(como_cloudflared localhost http://nginx:8080/catalogo "CF-Connecting-IP: 203.0.113.40")"
+for destino in 10.213.10.3 10.213.11.2; do
+  comprobar "desde la red general no se alcanza a Nginx en $destino" 000 "$(pedir babelhub-ventas_default "" localhost "http://$destino:8080/health" | tail -n 1)"
+done
+comprobar "las integraciones internas no existen en el borde" 404 "$(como_cloudflared localhost http://nginx:8080/api/ecommerce/v1/integraciones/n8n/estados "CF-Connecting-IP: 203.0.113.50")"
+# La tienda recreada (un despliegue nuevo): Nginx la vuelve a resolver sin reiniciarse.
+BABELHUB_SECRETOS="$TRABAJO/secretos/ventas" docker compose -p babelhub-ventas --project-directory "$RAIZ/infra" -f "$RAIZ/infra/docker-compose.ventas.yml" -f "$TRABAJO/ventas.override.yml" up -d --wait --wait-timeout 120 --no-deps --force-recreate ecommerce >/dev/null 2>&1
+sleep 12   # más que la validez de la resolución en Nginx (10 s)
+comprobar "tras recrear el E-commerce, Nginx sigue llegando sin reiniciarse" 200 "$(como_cloudflared localhost http://nginx:8080/health/live "CF-Connecting-IP: 203.0.113.60")"
+[[ "$MAL" -eq 0 ]] || { echo "Error: la entrada pública no se comportó como debe (ver arriba)." >&2; exit 1; }
 paso "7/7 Listo. Los dos servicios respondieron «listo» (200), los certificados se validaron y PostgreSQL solo habla TLS verificado."
 echo "    Para borrar todo: bash scripts/ensayo-local.sh --limpiar"

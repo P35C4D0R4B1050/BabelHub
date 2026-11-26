@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.Json;
 using BabelHub.IntegrationTests.Almacen;
 
 namespace BabelHub.IntegrationTests.Respaldos;
@@ -7,27 +6,16 @@ namespace BabelHub.IntegrationTests.Respaldos;
 internal sealed record ObjetoSimulado(string Contenedor, string Clave, DateTime Creado);
 
 /// <summary>
-/// El almacén de objetos simulado para la prueba de retención (PLA-18): recibe los respaldos tal como los sube <c>respaldar.sh</c> y el
-/// archivado de cambios, y aplica el ciclo de vida <b>publicado</b> en <c>infra/almacen/ciclo-de-vida.json</c> (retira un objeto cuando
+/// El almacén de respaldos simulado para la prueba de retención (PLA-18): recibe los respaldos tal como los sube <c>respaldar.sh</c> y el
+/// archivado de cambios, y aplica los plazos de retiro <b>publicados</b> en <c>infra/almacen/r2/contenedores.txt</c> (retira un objeto cuando
 /// tiene tantos días como dice su contenedor). Nada de las reglas está escrito aquí: salen de la definición.
 /// </summary>
 internal sealed class AlmacenSimulado
 {
     private readonly Dictionary<string, int> _dias;
 
-    public AlmacenSimulado(string? carpeta = null)
-    {
-        using var documento = JsonDocument.Parse(File.ReadAllText(Path.Combine(carpeta ?? PoliticasDelAlmacen.Carpeta(), "ciclo-de-vida.json")));
-        _dias = [];
-        foreach (var contenedor in documento.RootElement.GetProperty("contenedores").EnumerateObject())
-        {
-            foreach (var regla in contenedor.Value.EnumerateArray().Where(r => r.GetProperty("action").GetString() == "DELETE" && r.GetProperty("isEnabled").GetBoolean()))
-            {
-                Assert.Equal("DAYS", regla.GetProperty("timeUnit").GetString());
-                _dias[contenedor.Name] = regla.GetProperty("timeAmount").GetInt32();
-            }
-        }
-    }
+    public AlmacenSimulado(string? carpeta = null) =>
+        _dias = PoliticasDeR2.Cargar(carpeta ?? PoliticasDeR2.Carpeta()).Contenedores.ToDictionary(c => c.Nombre, c => c.ExpiraDias);
 
     public List<ObjetoSimulado> Objetos { get; } = [];
 
@@ -42,7 +30,7 @@ internal sealed class AlmacenSimulado
         var dia = instante.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var hora = instante.ToString("HHmmss", CultureInfo.InvariantCulture);
         var (semanal, mensual) = Clases(instante);
-        foreach (var nombre in new[] { $"{dia}/{hora}-{Guid.NewGuid():N}.tar.age", $"{dia}/{hora}-config-{Guid.NewGuid():N}.tar.age" })
+        foreach (var nombre in new[] { $"{dia}/{hora}-{Guid.NewGuid():N}.tar.zst.age", $"{dia}/{hora}-config-{Guid.NewGuid():N}.tar.zst.age" })
         {
             Objetos.Add(new ObjetoSimulado("respaldos-diarios", nombre, instante));
             if (semanal)
@@ -62,7 +50,7 @@ internal sealed class AlmacenSimulado
     {
         for (var hora = desde; hora < hasta; hora = hora.AddHours(1))
         {
-            Objetos.Add(new ObjetoSimulado("respaldos-wal", $"{hora:yyyyMMddHH}-{Guid.NewGuid():N}.age", hora));
+            Objetos.Add(new ObjetoSimulado("respaldos-wal", $"{hora:yyyyMMddHH}-{Guid.NewGuid():N}.zst.age", hora));
         }
     }
 

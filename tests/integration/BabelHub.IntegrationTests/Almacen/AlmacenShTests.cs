@@ -190,20 +190,19 @@ public sealed class AlmacenShTests : IDisposable
 
     [Fact]
     [Trait("Criterio", "AC-PLA-16")]
-    public void LasSentenciasDePolitica_DanASoloCrearALaCredencialDeRespaldo_YNuncaBorrarFueraDelCatalogo()
+    public void LasSentenciasDePolitica_DanSoloLoQueConsta_YNuncaBorrarFueraDelCatalogo()
     {
         var (codigo, salida, errores) = Ejecutar(null, "politicas-iam", "--compartimento-nombre", "babelhub");
 
         Assert.True(codigo == 0, errores);
         var sentencias = salida.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal(PoliticasDelAlmacen.Cargar().Concesiones.Count, sentencias.Length);
-        Assert.All(sentencias.Where(s => s.StartsWith("Allow group respaldos-escritor ", StringComparison.Ordinal)), s =>
+        Assert.All(sentencias.Where(s => s.StartsWith("Allow group respaldos-copia-registro ", StringComparison.Ordinal)), s =>
         {
             Assert.Contains("request.permission='OBJECT_CREATE'", s, StringComparison.Ordinal);
             Assert.DoesNotContain("OBJECT_READ", s, StringComparison.Ordinal);
-            Assert.DoesNotContain("OBJECT_DELETE", s, StringComparison.Ordinal);
-            Assert.DoesNotContain("OBJECT_OVERWRITE", s, StringComparison.Ordinal);
         });
+        Assert.DoesNotContain(sentencias, s => s.Contains("target.bucket.name='respaldos-", StringComparison.Ordinal));
         Assert.All(
             sentencias.Where(s => !s.StartsWith("Allow group catalogo-archivos ", StringComparison.Ordinal)),
             s =>
@@ -229,10 +228,10 @@ public sealed class AlmacenShTests : IDisposable
 
         Assert.True(codigo == 0, errores);
         Assert.False(File.Exists(Path.Combine(_estado, "cambios.log")), "plan no debe ejecutar nada");
-        Assert.Equal(9, salida.Split('\n').Count(l => l.Contains(" os bucket create ", StringComparison.Ordinal)));
-        Assert.Equal(7, salida.Split('\n').Count(l => l.Contains(" os retention-rule create ", StringComparison.Ordinal)));
-        Assert.Equal(7, salida.Split('\n').Count(l => l.Contains("--time-rule-locked", StringComparison.Ordinal)));
-        Assert.Equal(7, salida.Split('\n').Count(l => l.Contains(" os object-lifecycle-policy put ", StringComparison.Ordinal)));
+        Assert.Equal(5, salida.Split('\n').Count(l => l.Contains(" os bucket create ", StringComparison.Ordinal)));
+        Assert.Equal(3, salida.Split('\n').Count(l => l.Contains(" os retention-rule create ", StringComparison.Ordinal)));
+        Assert.Equal(3, salida.Split('\n').Count(l => l.Contains("--time-rule-locked", StringComparison.Ordinal)));
+        Assert.Equal(3, salida.Split('\n').Count(l => l.Contains(" os object-lifecycle-policy put ", StringComparison.Ordinal)));
         Assert.All(salida.Split('\n').Where(l => l.Contains(" os bucket create ", StringComparison.Ordinal)), l => Assert.Contains("--public-access-type NoPublicAccess", l, StringComparison.Ordinal));
         Assert.Matches(@"--time-rule-locked 20\d\d-\d\d-\d\dT\d\d:\d\d:\d\dZ", salida);
     }
@@ -244,10 +243,10 @@ public sealed class AlmacenShTests : IDisposable
 
         Assert.True(codigo == 0, errores);
         var cambios = File.ReadAllLines(Path.Combine(_estado, "cambios.log"));
-        Assert.Equal(9, cambios.Count(c => c.StartsWith("os bucket create", StringComparison.Ordinal)));
-        Assert.Equal(7, cambios.Count(c => c.StartsWith("os retention-rule create", StringComparison.Ordinal)));
-        Assert.Equal(7, cambios.Count(c => c.StartsWith("os object-lifecycle-policy put", StringComparison.Ordinal)));
-        Assert.Contains("Allow group respaldos-escritor", salida, StringComparison.Ordinal);
+        Assert.Equal(5, cambios.Count(c => c.StartsWith("os bucket create", StringComparison.Ordinal)));
+        Assert.Equal(3, cambios.Count(c => c.StartsWith("os retention-rule create", StringComparison.Ordinal)));
+        Assert.Equal(3, cambios.Count(c => c.StartsWith("os object-lifecycle-policy put", StringComparison.Ordinal)));
+        Assert.Contains("Allow group supresiones-registro", salida, StringComparison.Ordinal);
         Assert.Contains("queda efectivo el", salida, StringComparison.Ordinal);
     }
 
@@ -322,7 +321,7 @@ public sealed class AlmacenShTests : IDisposable
         var (codigo, salida, errores) = Ejecutar(null, "comprobar", "--espacio", "espacio");
 
         Assert.True(codigo == 0, salida + errores);
-        Assert.Equal(9, salida.Split('\n').Count(l => l.StartsWith("ok ", StringComparison.Ordinal)));
+        Assert.Equal(5, salida.Split('\n').Count(l => l.StartsWith("ok ", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -344,21 +343,21 @@ public sealed class AlmacenShTests : IDisposable
     public void Comprobar_SiUnaRetencionNoTieneBloqueo_Falla()
     {
         EstadoConforme();
-        Estado("respaldos-wal", retencion: "100", ciclo: "100");
+        Estado("supresiones-copia", retencion: "100", ciclo: "100");
 
         var (codigo, salida, _) = Ejecutar(null, "comprobar", "--espacio", "espacio");
 
         Assert.Equal(1, codigo);
-        Assert.Contains("x respaldos-wal: la retención no tiene bloqueo", salida, StringComparison.Ordinal);
+        Assert.Contains("x supresiones-copia: la retención no tiene bloqueo", salida, StringComparison.Ordinal);
     }
 
     [Theory]
     [Trait("Criterio", "AC-PLA-16")]
-    [InlineData("respaldos-diarios", "PublicRead", "no es privado")]
+    [InlineData("supresiones-copia", "PublicRead", "no es privado")]
     public void Comprobar_SiUnContenedorEsPublico_Falla(string contenedor, string acceso, string mensaje)
     {
         EstadoConforme();
-        Estado(contenedor, acceso: acceso, retencion: "7", bloqueo: Pasado, ciclo: "7");
+        Estado(contenedor, acceso: acceso, retencion: "100", bloqueo: Pasado, ciclo: "100");
 
         var (codigo, salida, _) = Ejecutar(null, "comprobar", "--espacio", "espacio");
 
@@ -384,30 +383,30 @@ public sealed class AlmacenShTests : IDisposable
     public void Comprobar_SiFaltaLaReglaDeRetencion_OElContenedorNoExiste_Falla()
     {
         EstadoConforme();
-        Estado("respaldos-semanales", ciclo: "28");
+        Estado("supresiones-sellos");
         File.Delete(Path.Combine(_estado, "supresiones-copia.env"));
 
         var (codigo, salida, _) = Ejecutar(null, "comprobar", "--espacio", "espacio");
 
         Assert.Equal(1, codigo);
-        Assert.Contains("x respaldos-semanales: no tiene regla de retención", salida, StringComparison.Ordinal);
+        Assert.Contains("x supresiones-sellos: no tiene regla de retención", salida, StringComparison.Ordinal);
         Assert.Contains("x supresiones-copia: no existe", salida, StringComparison.Ordinal);
     }
 
     [Theory]
     [Trait("Criterio", "AC-PLA-16")]
-    [InlineData("14", "DELETE", "true")]
-    [InlineData("7", "ARCHIVE", "true")]
-    [InlineData("7", "DELETE", "false")]
+    [InlineData("200", "DELETE", "true")]
+    [InlineData("100", "ARCHIVE", "true")]
+    [InlineData("100", "DELETE", "false")]
     public void Comprobar_SiElCicloDeVidaNoCoincide_Falla(string dias, string accion, string habilitada)
     {
         EstadoConforme();
-        Estado("respaldos-diarios", retencion: "7", bloqueo: Pasado, ciclo: dias, accion: accion, habilitada: habilitada);
+        Estado("supresiones-copia", retencion: "100", bloqueo: Pasado, ciclo: dias, accion: accion, habilitada: habilitada);
 
         var (codigo, salida, _) = Ejecutar(null, "comprobar", "--espacio", "espacio");
 
         Assert.Equal(1, codigo);
-        Assert.Contains("x respaldos-diarios: el ciclo de vida debe retirar a los 7 días", salida, StringComparison.Ordinal);
+        Assert.Contains("x supresiones-copia: el ciclo de vida debe retirar a los 100 días", salida, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -487,7 +486,7 @@ public sealed class AlmacenShTests : IDisposable
     public void Comprobar_SiLaFechaDeBloqueoNoSeEntiende_Falla()
     {
         EstadoConforme();
-        Estado("respaldos-mensuales", retencion: "92", bloqueo: "pronto", ciclo: "92");
+        Estado("supresiones-copia", retencion: "100", bloqueo: "pronto", ciclo: "100");
 
         var (codigo, salida, _) = Ejecutar(null, "comprobar", "--espacio", "espacio");
 

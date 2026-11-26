@@ -94,7 +94,7 @@ Si el Inventario no responde al dar de alta una edición con stock inicial, la e
 | Situación | Qué ocurre |
 | :--- | :--- |
 | Cae el contenedor de Inventario | El catálogo sigue mostrando la última disponibilidad y el checkout informa que no puede validar el stock, sin cobrar (CAR-06, CAT-12). |
-| Cae la VM de ventas | El personal sigue operando el inventario por la réplica de gestión; no hay tienda ni avisos. |
+| Cae la VM de ventas | No hay tienda, avisos ni acceso público a la gestión. **Desde el 2026-11-25 (dos VMs, DD-100 a DD-102):** la entrada vive en esa VM; la réplica sigue sirviendo claves y revocaciones al Inventario. |
 | Cae la VM del Inventario | Cae todo el sistema (la base está ahí); se restaura desde el respaldo y el archivado de WAL. |
 
 El detalle y las mitigaciones están en [despliegue](05-despliegue.md) §6.

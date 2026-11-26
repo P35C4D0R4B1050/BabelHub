@@ -20,9 +20,15 @@ public sealed record OpcionesDelAlmacenDeObjetos(
     string Region,
     string ClaveDeAcceso,
     ValorSecreto ClaveSecreta,
-    string Contenedor = "supresiones",
+    string Contenedor = OpcionesDelAlmacenDeObjetos.ContenedorDeSupresiones,
     bool RutaEnLaUrl = true)
 {
+    /// <summary>
+    /// El contenedor de las entradas del registro de supresiones, el único donde la credencial <c>supresiones-registro</c> tiene permiso
+    /// (<c>infra/almacen/contenedores.txt</c> y <c>credenciales.txt</c>, D23) y el que leen los sellos y la copia del registro.
+    /// </summary>
+    public const string ContenedorDeSupresiones = "supresiones-entradas";
+
     /// <summary>
     /// Lee <c>BABELHUB__Almacen__Supresiones__Endpoint</c> (una URL https; http solo para un almacén local de desarrollo),
     /// <c>…__Region</c>, <c>…__ClaveDeAcceso</c> y <c>…__ClaveSecreta</c>, todas obligatorias. Las claves siguen las reglas de los demás
@@ -87,7 +93,7 @@ public static class ClienteDelAlmacenDeObjetos
 /// ya existe. Un duplicado (también el simultáneo) devuelve la entrada original como éxito, sin cambiarla. Si el almacén no responde
 /// lanza <see cref="RegistroDeSupresionesNoDisponibleException"/> y la supresión no se completa.
 /// </summary>
-public sealed class RegistroDeSupresionesEnObjetos(IAmazonS3 almacen, string contenedor = "supresiones") : IRegistroDeSupresiones
+public sealed class RegistroDeSupresionesEnObjetos(IAmazonS3 almacen, string contenedor = OpcionesDelAlmacenDeObjetos.ContenedorDeSupresiones) : IRegistroDeSupresiones
 {
     private const string Prefijo = "entradas/";
     private const int ReintentosDeLectura = 3;

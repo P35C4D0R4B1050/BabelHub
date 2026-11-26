@@ -1,15 +1,12 @@
-# Contenedores del almacén de objetos (Oracle Object Storage) y su retención. Fuente de verdad de scripts/almacen.sh y de las pruebas.
+# Contenedores del almacén de objetos de Oracle (libros, portadas y registro de supresiones) y su retención. Fuente de verdad de
+# scripts/almacen.sh y de las pruebas. Los respaldos están en Cloudflare R2: ver r2/ (D26).
 # Una línea por contenedor: nombre, días de retención con bloqueo de tiempo, si el bloqueo es irreversible (si/no) y días tras los cuales
 # el ciclo de vida retira el objeto (o «nunca»), y —opcional— los días tras los cuales el ciclo de vida aborta una subida multipart incompleta
-# (sin la columna, «nunca»). La retención con bloqueo de Oracle es por contenedor, no por prefijo (D23): por eso un
-# contenedor por clase. El plazo del ciclo de vida nunca es menor que el de la retención.
+# (sin la columna, «nunca»). La retención con bloqueo de Oracle es por contenedor, no por prefijo (D23). El plazo del ciclo de vida nunca es
+# menor que el de la retención.
 # nombre                 retencion_dias  bloqueada  expira_dias  subidas_dias (opcional)
 libros                   0               no         nunca        1
 portadas                 0               no         nunca        1
-respaldos-diarios        7               si         7
-respaldos-semanales      28              si         28
-respaldos-mensuales      92              si         92
-respaldos-wal            100             si         100
 supresiones-entradas     100             si         nunca
 supresiones-sellos       100             si         nunca
 supresiones-copia        100             si         100

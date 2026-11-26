@@ -284,8 +284,24 @@ public sealed class RegistroDeSupresionesEnObjetosTests(AlmacenDeObjetosFixture 
 
         Assert.Equal(new Uri("https://almacen.ejemplo.pe"), opciones.Endpoint);
         Assert.Equal("sa-lima-1", opciones.Region);
-        Assert.Equal("supresiones", opciones.Contenedor);
+        Assert.Equal("supresiones-entradas", opciones.Contenedor);
         Assert.DoesNotContain("secreta-", opciones.ClaveSecreta.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-37")]
+    public void ElContenedorDelRegistro_EsElUnicoQueLaDefinicionDelAlmacenAutorizaASuCredencial()
+    {
+        var raiz = BabelHub.IntegrationTests.Imagenes.ComposeDeVms.Raiz();
+        string[][] Filas(string archivo) => [.. File.ReadAllLines(Path.Combine(raiz, "infra", "almacen", archivo))
+            .Select(l => l.Split('#')[0].Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+            .Where(f => f.Length > 0)];
+
+        var autorizados = Filas("credenciales.txt").Where(f => f[0] == "supresiones-registro").Select(f => f[1]).ToList();
+        var opciones = OpcionesDelAlmacenDeObjetos.Cargar(Configuracion(Completa));
+
+        Assert.Equal([opciones.Contenedor], autorizados);
+        Assert.Contains(Filas("contenedores.txt"), f => f[0] == opciones.Contenedor);
     }
 
     [Fact]

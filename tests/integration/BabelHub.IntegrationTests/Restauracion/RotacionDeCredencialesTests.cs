@@ -257,13 +257,19 @@ public sealed class RotacionDeCredencialesTests : IAsyncLifetime
     {
         var almacen = Secreto();
         var pasarela = Secreto();
+        var respaldos = Secreto();
         var e = DosEntornos(
             $"BABELHUB__Almacen__Supresiones__ClaveSecreta={almacen}",
-            $"BABELHUB__Integraciones__Culqi__Secreto={pasarela}");
+            $"BABELHUB__Integraciones__Culqi__Secreto={pasarela}",
+            $"RCLONE_CONFIG_ALMACEN_SECRET_ACCESS_KEY={respaldos}");
 
         var (codigo, salida) = Rotar(null, "--entorno", $"ecommerce={EnLinux(e.Ecommerce)}", "--entorno", $"inventario={EnLinux(e.Inventario)}");
 
         Assert.True(codigo == 0, salida);
+        // El token de respaldos de R2 lo emite el proveedor: se lista para rotarlo a mano (D28) y no se toca.
+        Assert.Contains("pendiente: RCLONE_CONFIG_ALMACEN_SECRET_ACCESS_KEY (ecommerce)", salida, StringComparison.Ordinal);
+        Assert.Equal(respaldos, Variables(e.Ecommerce)["RCLONE_CONFIG_ALMACEN_SECRET_ACCESS_KEY"]);
+        Assert.DoesNotContain(respaldos, salida, StringComparison.Ordinal);
         var despues = Variables(e.Ecommerce);
         Assert.Equal(almacen, despues["BABELHUB__Almacen__Supresiones__ClaveSecreta"]);
         Assert.Equal(pasarela, despues["BABELHUB__Integraciones__Culqi__Secreto"]);

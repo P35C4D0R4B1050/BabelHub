@@ -1,6 +1,6 @@
 # VM-INVENTARIO (ARM, 1 OCPU y 6 GB): Inventario, réplica de gestión del E-commerce y PostgreSQL (AD11, AD31).
 # Se levanta con un solo comando y sus secretos (PLA-04):
-#   BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.1.10 \
+#   BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.20 IP_VENTAS=10.0.0.10 \
 #   IMAGEN_INVENTARIO=<imagen@sha256:…> IMAGEN_ECOMMERCE=<imagen@sha256:…> IMAGEN_POSTGRES=<imagen@sha256:…> \
 #   docker compose -f infra/docker-compose.inventario.yml up -d
 # Reglas de PLA-26 y PLA-27 (las verifica una inspección automática de este archivo):
@@ -36,7 +36,7 @@ services:
       - "${BABELHUB_SECRETOS:?Define BABELHUB_SECRETOS con la carpeta de los secretos de esta VM}/postgres.env"
     # Archivado continuo de WAL cifrado hacia el almacén (PLA-15, D10): archive_timeout=300 y el latido de la base garantizan segmentos nuevos
     # aunque no haya actividad. archivar-wal.sh y respaldar.sh vienen en la imagen (infra/postgres/respaldos); las variables de age y del
-    # almacén (credencial respaldos-escritor, que solo crea) llegan en postgres.env. /config es la configuración de la VM, sin secretos.
+    # almacén (token respaldos-escritor de Cloudflare R2, limitado a los contenedores de respaldos) llegan en postgres.env. /config es la configuración de la VM, sin secretos.
     # TLS (AM24): el entrypoint de la imagen copia el certificado y la clave (secretos) a memoria con los permisos que exige PostgreSQL y arranca el servidor; `pg_hba.conf` (en la imagen) solo admite `hostssl`
     # y rechaza lo demás, así que una conexión sin cifrar o de un cliente que no confía en la CA privada nunca llega a pedir la contraseña. TLS 1.3 como mínimo.
     entrypoint: ["/opt/babelhub/iniciar.sh"]
@@ -121,6 +121,9 @@ services:
     environment:
       # PAG-34: ASPNETCORE_ENVIRONMENT NO se fija aquí: lo define ecommerce-gestion.env, igual que en ecommerce.env de VM-VENTAS (los dos procesos del E-commerce corren en el mismo entorno). Ver docker-compose.ventas.yml.
       BABELHUB__Perfil: Gestion
+      # La réplica solo cree el origen del cliente (X-Origen-Cliente) que le llega desde la dirección privada de VM-VENTAS, donde corre Nginx (SEG-17,
+      # DD-102 y DD-104; allí una regla deja llegar a este puerto solo a su contenedor). Es un dato de la topología: va aquí y manda sobre el archivo de secretos.
+      BABELHUB__Ecommerce__ProxiesConocidos: "${IP_VENTAS:?Define IP_VENTAS con la dirección privada de VM-VENTAS}"
       # El rol del proceso (web-base, D03); BABELHUB__Web__HostsPermitidos va en ecommerce-gestion.env: sin él el servicio no arranca.
       BABELHUB__Web__Host: gestion
       # DD-55: el mismo HTTPS y la misma raíz de confianza que el Inventario (el Inventario le pide las claves de verificación por https://ecommerce-gestion:8443).

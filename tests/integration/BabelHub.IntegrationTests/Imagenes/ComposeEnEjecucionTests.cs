@@ -5,7 +5,7 @@ using System.Text.Json;
 namespace BabelHub.IntegrationTests.Imagenes;
 
 /// <summary>
-/// PLA-26 y PLA-27 en ejecución: los servicios de imágenes públicas fijadas por digest (Nginx del borde y la caché Redis de ventas) arrancan
+/// PLA-26 y PLA-27 en ejecución: los servicios de imágenes públicas fijadas por digest (Nginx de la entrada y la caché Redis de ventas) arrancan
 /// de verdad con el usuario sin privilegios, el sistema de archivos de solo lectura, los límites y la comprobación de salud declarados.
 /// Los de imagen propia se prueban en <c>ImagenesDeContenedorTests</c> y se resuelven con <c>ComposePorVmTests</c>.
 /// </summary>
@@ -100,11 +100,11 @@ public sealed class ComposeEnEjecucionTests : IDisposable
 
     [Fact]
     [Trait("Criterio", "AC-PLA-27")]
-    public void NginxDelBorde_ArrancaSinPrivilegiosConElSistemaDeArchivosDeSoloLecturaYSano()
+    public void NginxDeLaEntrada_ArrancaSinPrivilegiosConElSistemaDeArchivosDeSoloLecturaYSano()
     {
-        Levantar("borde", "nginx");
+        Levantar("ventas", "nginx");
 
-        AfirmarContenedorEndurecido(Inspeccionar("borde", "nginx"), "101:101", 64L * 1024 * 1024);
+        AfirmarContenedorEndurecido(Inspeccionar("ventas", "nginx"), "101:101", 64L * 1024 * 1024);
     }
 
     [Fact]

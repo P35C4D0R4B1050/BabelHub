@@ -3,8 +3,9 @@
 #
 # Variables (las pone el Compose desde el archivo de secretos de VM-INVENTARIO; ninguna se imprime):
 #   BABELHUB_AGE_DESTINATARIO              la clave PÚBLICA de age: en esta VM solo se puede cifrar, nunca descifrar
-#   RCLONE_CONFIG_ALMACEN_TYPE=s3 y las demás RCLONE_CONFIG_ALMACEN_* (endpoint, región, clave de acceso y clave secreta de la credencial
-#                                          `respaldos-escritor`, que solo puede CREAR objetos)
+#   RCLONE_CONFIG_ALMACEN_TYPE=s3 y las demás RCLONE_CONFIG_ALMACEN_* (en producción Cloudflare R2: proveedor Cloudflare, región auto,
+#                                          endpoint de la cuenta y las claves del token de objetos `respaldos-escritor`, limitado a los
+#                                          contenedores de respaldos; D26)
 #   BABELHUB_ESPERA (por defecto /var/respaldos)   volumen local y reservado para lo que espera su subida
 #   BABELHUB_CONFIG (por defecto /config)           la carpeta de configuración de la VM, sin secretos
 
@@ -37,8 +38,8 @@ verificar_entorno() {
   [ -d "$ESPERA" ] && [ -w "$ESPERA" ] || fallo "no se puede escribir en $ESPERA"
 }
 
-# Sube un archivo ya cifrado a un contenedor sin comprobar ni sobrescribir nada del destino: la credencial solo puede crear (PLA-16), así
-# que ni lista ni pide metadatos. El nombre lleva la suma del contenido cifrado, de modo que repetir una subida nunca pisa otro contenido.
+# Sube un archivo ya cifrado a un contenedor sin comprobar nada del destino. El nombre lleva la suma del contenido cifrado, de modo que repetir
+# una subida nunca pisa otro contenido, y la retención con bloqueo del almacén impide que esta VM borre o sobrescriba dentro del plazo (PLA-16).
 subir() {
   rclone copyto "$1" "almacen:$2/$3" \
     --no-check-dest --s3-no-check-bucket --s3-no-head \
@@ -48,6 +49,30 @@ subir() {
 
 suma_de() {
   sha256sum "$1" | cut -d' ' -f1
+}
+
+# comprimir_y_cifrar <salida> <archivo-de-estado> <orden...>: lo que la orden escribe pasa por zstd y de ahí a age (D25), sin archivo
+# intermedio. En POSIX sh el código de una tubería es solo el de su último tramo: los dos primeros se anotan en <archivo-de-estado>.orden y
+# <archivo-de-estado>.zstd. Devuelve 0 solo si los tres terminaron bien.
+comprimir_y_cifrar() {
+  _salida="$1"
+  _estado="$2"
+  shift 2
+  rm -f "$_estado.orden" "$_estado.zstd"
+  _cifrado=0
+  {
+    _codigo=0
+    "$@" || _codigo=$?
+    echo "$_codigo" >"$_estado.orden"
+  } | {
+    _codigo=0
+    zstd -q -3 -c || _codigo=$?
+    echo "$_codigo" >"$_estado.zstd"
+  } | age -r "$BABELHUB_AGE_DESTINATARIO" -o "$_salida" || _cifrado=$?
+  _orden="$(cat "$_estado.orden" 2>/dev/null || true)"
+  _zstd="$(cat "$_estado.zstd" 2>/dev/null || true)"
+  rm -f "$_estado.orden" "$_estado.zstd"
+  [ "$_cifrado" = 0 ] && [ "$_orden" = 0 ] && [ "$_zstd" = 0 ]
 }
 
 # Las copias de más duración que se hacen además del respaldo diario, según el día UTC de la fecha dada (segundos desde 1970):
