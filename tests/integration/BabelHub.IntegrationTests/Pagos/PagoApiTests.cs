@@ -296,6 +296,10 @@ public sealed class PagoApiTests : IAsyncLifetime
 
         var html = WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync());
         Assert.Contains("El pago en línea estará disponible pronto", html, StringComparison.Ordinal);
+        Assert.Contains("No se te cobró nada", html, StringComparison.Ordinal);
+        Assert.Contains("action=\"/checkout/volver\"", html, StringComparison.Ordinal);
+        Assert.Contains("Volver al carrito", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Listo para pagar", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Lo confirmaremos antes", html, StringComparison.Ordinal);
         Assert.DoesNotContain("href=\"/checkout/pago?", html, StringComparison.Ordinal);
@@ -317,7 +321,7 @@ public sealed class PagoApiTests : IAsyncLifetime
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-42")]
+    [Trait("Criterio", "AC-PAG-43")]
     public async Task Sin_pasarela_un_POST_directo_al_cobro_se_rechaza_en_el_servidor_sin_tocar_nada()
     {
         // El módulo Pagos real, compuesto con «ninguna», y con la base, el Inventario, la auditoría y los límites doblados para fallar si alguien los llama.

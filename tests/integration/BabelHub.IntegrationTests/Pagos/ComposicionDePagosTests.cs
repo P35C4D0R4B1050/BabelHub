@@ -108,7 +108,7 @@ public sealed class ComposicionDePagosTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-42")]
+    [Trait("Criterio", "AC-PAG-43")]
     public void Sin_pasarela_la_composicion_usa_el_adaptador_nulo_y_cierra_el_cobro_y_con_las_otras_lo_deja_abierto()
     {
         using var sinPasarela = ConExternos().AgregarPagos(Opciones("ninguna", "Staging", nula: true), esProduccion: false).BuildServiceProvider();

@@ -72,12 +72,16 @@ public sealed class EntornoStagingTests
         Assert.Contains(app.Services.GetServices<IAdaptadorSaliente>(), a => a.Nombre == "pasarela-de-pago" && !a.EsNulo);
     }
 
-    [Fact]
+    [Theory]
     [Trait("Criterio", "AC-PAG-34")]
-    public void En_Staging_se_exige_todo_lo_de_produccion_y_cada_falta_se_nombra_sin_su_valor()
+    [InlineData("simulador")]
+    [InlineData("ninguna")]
+    public void En_Staging_se_exige_todo_lo_de_produccion_y_cada_falta_se_nombra_sin_su_valor(string pasarela)
     {
         // Solo la configuración de desarrollo: sin Redis con TLS, proxies, correo, almacén de libros ni envío por n8n. Un entorno de revisión no afloja nada salvo el cobro.
-        var builder = Constructor(AnfitrionDelEcommerceTests.ConfiguracionCompleta(), "Staging");
+        var configuracion = AnfitrionDelEcommerceTests.ConfiguracionCompleta();
+        configuracion["Pagos:Pasarela"] = pasarela;
+        var builder = Constructor(configuracion, "Staging");
 
         var falla = Assert.Throws<ConfiguracionDeSecretosInvalidaException>(() => builder.AgregarEcommerce(ModoDeArranque.Normal));
 
@@ -163,7 +167,10 @@ public sealed class EntornoStagingTests
 
     [Theory]
     [Trait("Criterio", "AC-PAG-30")]
-    [Trait("Criterio", "AC-PAG-42")]
+    [Trait("Criterio", "AC-PAG-29")]
+    [Trait("Criterio", "AC-PAG-34")]
+    [Trait("Criterio", "AC-PAG-37")]
+    [Trait("Criterio", "AC-PAG-43")]
     [InlineData("Staging")]
     [InlineData("Development")]
     public void Sin_pasarela_el_servicio_arranca_sin_ningun_aviso_de_simulacion_y_con_el_cobro_cerrado(string entorno)

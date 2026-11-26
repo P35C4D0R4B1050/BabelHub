@@ -101,7 +101,7 @@ Cada ronda se prepara una vez; cada persona necesita unos 10 minutos de preparac
    > Correo: `p01@prueba.invalid` · Contraseña: la que figura en la tarjeta (de ejemplo, solo para la prueba)
    > Pago: medio **Tarjeta** · «Identificador del medio de pago»: `tok_aprobado`
 
-   El identificador `tok_aprobado` es el del simulador de la pasarela: el cobro se aprueba sin datos de tarjeta reales. Si el simulador cambia, la persona responsable actualiza la tarjeta.
+   El identificador `tok_aprobado` es el del simulador de la pasarela: el cobro se aprueba sin datos de tarjeta reales. En una tienda publicada el simulador hay que activarlo (`BABELHUB__Pagos__Pasarela="simulador"`, guía del primer despliegue §15.1): por defecto va sin ninguna pasarela y no se puede pagar. Si el simulador cambia, la persona responsable actualiza la tarjeta.
 4. **Dispositivo de la persona** con el navegador abierto en la pantalla de inicio de la tienda de pruebas y sin sesión iniciada (ni de otra cuenta ni de la participante anterior).
 5. **Grabación** de pantalla y voz solo si la persona la permitió; se guarda **fuera del repositorio** y se borra al terminar el análisis. No se graba el rostro.
 6. **Herramienta del moderador** abierta en otro dispositivo (o en el mismo si es un solo evaluador): sección «C · Usabilidad» → «Agregar persona a la ronda N». Si hay dos evaluadores (uno modera y otro anota), cada uno puede llevar su dispositivo y luego se **combinan** los JSON (importación).
