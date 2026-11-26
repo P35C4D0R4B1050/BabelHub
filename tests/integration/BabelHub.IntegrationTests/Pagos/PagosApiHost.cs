@@ -102,16 +102,17 @@ internal sealed class PagosApiHost : IAsyncDisposable
     public DenegacionesEspia Denegaciones { get; } = new();
 
     /// <param name="pagosSimulados">Compone el aviso «Pagos simulados» (PAG-33) como lo hace el anfitrión con la pasarela simulada.</param>
-    public static async Task<PagosApiHost> Crear(bool pagosSimulados = false)
+    /// <param name="sinPasarela">En lugar del doble de <c>IPagos</c>, compone el módulo Pagos real sin pasarela (<c>ninguna</c>, DD-110) con dependencias que fallan si se las llama: lo que responda lo decidió la Aplicación sin tocar nada.</param>
+    public static async Task<PagosApiHost> Crear(bool pagosSimulados = false, bool sinPasarela = false)
     {
         var host = new PagosApiHost();
-        await host.Iniciar(pagosSimulados);
+        await host.Iniciar(pagosSimulados, sinPasarela);
         return host;
     }
 
     private AnfitrionWeb _anfitrion = null!;
 
-    private async Task Iniciar(bool pagosSimulados)
+    private async Task Iniciar(bool pagosSimulados, bool sinPasarela)
     {
         var actor = new ActorDelFlujo();
         _anfitrion = await AnfitrionWeb.Iniciar(
@@ -124,7 +125,11 @@ internal sealed class PagosApiHost : IAsyncDisposable
 
                 servicios.AddSingleton<IActorActual>(actor);
                 servicios.AddSingleton<IEstablecedorDeActor>(actor);
-                servicios.AddSingleton<IPagos>(Pagos);
+                if (!sinPasarela)
+                {
+                    servicios.AddSingleton<IPagos>(Pagos);
+                }
+
                 servicios.AddSingleton<BabelHub.Ecommerce.Application.Plataforma.IReloj>(new BabelHub.Ecommerce.Infrastructure.Plataforma.RelojDelSistema());
                 servicios.AddSingleton<IReembolsos>(Reembolsos);
                 servicios.AddSingleton<ICheckoutDelCliente>(Checkout);
@@ -132,6 +137,10 @@ internal sealed class PagosApiHost : IAsyncDisposable
                 servicios.AddSingleton<IListaDeSucursales>(new ListaVacia());
                 servicios.AddSingleton(new OpcionesDelHostWeb(HostWeb.Tienda, []));
                 servicios.AgregarProteccionContraFalsificacion();
+                if (sinPasarela)
+                {
+                    ComposicionDePagosTests.ComponerSinPasarela(servicios);
+                }
             },
             antesDeLasRutas: app => app.Use(async (contexto, siguiente) =>
             {

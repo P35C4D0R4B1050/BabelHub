@@ -3,6 +3,7 @@ using BabelHub.Ecommerce.Application.Pagos.Interno;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Domain.Pagos;
 using BabelHub.Ecommerce.Infrastructure.Pagos;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BabelHub.IntegrationTests.Pagos;
@@ -194,6 +195,84 @@ public sealed class GuardaYDoblesDePagosTests
         }
 
         Assert.DoesNotContain("sk_test", Opciones(pasarela: "culqi", llave: LlaveDePruebas).ToString(), StringComparison.Ordinal);
+    }
+
+    // ---------- Sin pasarela (DD-110) ----------
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-30")]
+    [InlineData("Development")]
+    [InlineData("Test")]
+    [InlineData("Staging")]
+    [InlineData("staging")]
+    public void Sin_pasarela_se_acepta_en_desarrollo_en_pruebas_y_en_staging_sin_llave_y_sin_pedidos(string entorno)
+    {
+        GuardaDeArranqueDePagos.Exigir(Opciones(pasarela: "ninguna", entorno: entorno, nula: true, pedidos: false));
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-30")]
+    [InlineData("Production")]
+    [InlineData("production")]
+    [InlineData("")]
+    [InlineData("Qa")]
+    [InlineData("Staging2")]
+    public void Sin_pasarela_se_rechaza_en_produccion_y_en_cualquier_otro_entorno(string entorno)
+    {
+        var error = Rechaza(Opciones(pasarela: "ninguna", entorno: entorno, nula: true));
+
+        Assert.Contains(GuardaDeArranqueDePagos.VariablePasarela, error.Message, StringComparison.Ordinal);
+        Assert.Contains("ninguna", error.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-30")]
+    [InlineData("Staging", LlaveDeProduccion)]
+    [InlineData("Staging", LlaveDePruebas)]
+    [InlineData("Development", LlaveDePruebas)]
+    [InlineData("Test", "llave-sin-prefijo-pero-larga-de-sobra")]
+    public void Sin_pasarela_no_admite_ninguna_llave_privada_y_no_la_repite_en_el_mensaje(string entorno, string llave)
+    {
+        var error = Rechaza(Opciones(pasarela: "ninguna", entorno: entorno, nula: true, llave: llave));
+
+        Assert.Contains(GuardaDeArranqueDePagos.VariableLlavePrivada, error.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(llave, error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-30")]
+    public void Sin_pasarela_el_adaptador_tiene_que_ser_el_nulo_y_la_clave_de_intentos_se_sigue_exigiendo()
+    {
+        Assert.Contains("nulo", Rechaza(Opciones(pasarela: "ninguna", entorno: "Staging", nula: false)).Message, StringComparison.Ordinal);
+        Assert.Contains(GuardaDeArranqueDePagos.VariableClaveDeIntentos, Rechaza(Opciones(pasarela: "ninguna", entorno: "Staging", nula: true, clave: null)).Message, StringComparison.Ordinal);
+        // Al restaurar o ensayar, con la configuración de una tienda sin pasarela, el adaptador nulo basta.
+        GuardaDeArranqueDePagos.Exigir(Opciones(pasarela: "ninguna", entorno: "Staging", sinLlamadasReales: true, nula: true));
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-30")]
+    [InlineData("Ninguna")]
+    [InlineData("NINGUNA")]
+    [InlineData("ninguno")]
+    public void El_nombre_de_sin_pasarela_es_exacto(string pasarela)
+    {
+        Assert.Contains(GuardaDeArranqueDePagos.VariablePasarela, Rechaza(Opciones(pasarela: pasarela, entorno: "Staging", nula: true)).Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-30")]
+    [InlineData("ninguna", false, true)]
+    [InlineData("simulador", false, false)]
+    [InlineData("culqi", false, false)]
+    [InlineData("simulador", true, true)]
+    [InlineData("ninguna", true, true)]
+    public void El_lector_pide_el_adaptador_nulo_sin_pasarela_y_en_los_modos_sin_llamadas_reales(string pasarela, bool sinLlamadasReales, bool nula)
+    {
+        var configuracion = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Pagos:Pasarela"] = pasarela, ["Pagos:ClaveDeIntentos"] = ClaveDeIntentos }).Build();
+
+        var opciones = LectorDeOpcionesDePagos.Leer(configuracion, "Staging", sinLlamadasReales, pedidosDisponible: true);
+
+        Assert.Equal(nula, opciones.PasarelaEsNula);
     }
 
     // ---------- Dobles provisionales ----------

@@ -20,7 +20,12 @@
         </div>
     }
     <p class="text-lg font-semibold">@Model.EstadoTexto</p>
-    @if (Model.Estado.LimiteEn is { } limite)
+    @if (Model.SinPagoEnLinea)
+    {
+        <p class="mt-2 text-sm">No se te cobró nada y no se creó ningún pedido.</p>
+        <partial name="_SalirSinPagar" model="Model" />
+    }
+    else if (Model.Estado.LimiteEn is { } limite)
     {
         <p class="text-sm">Lo confirmaremos antes de las @FormatoPeruano.Hora(limite).@if (Model.RestanteTexto is { } restante) { <text> @restante</text> }</p>
     }

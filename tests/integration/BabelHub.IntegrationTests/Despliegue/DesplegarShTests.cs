@@ -443,10 +443,80 @@ public sealed class DesplegarShTests : IDisposable
 
     [Theory]
     [Trait("Criterio", "AC-PAG-30")]
-    [InlineData("ventas", "ecommerce.env", "BABELHUB__Pagos__Pasarela=culqi", "Staging solo admite BABELHUB__Pagos__Pasarela=simulador")]
-    [InlineData("inventario", "ecommerce-gestion.env", "BABELHUB__Pagos__Pasarela=culqi", "Staging solo admite BABELHUB__Pagos__Pasarela=simulador")]
+    [InlineData("ventas", "ecommerce.env", "ninguna")]
+    [InlineData("inventario", "ecommerce-gestion.env", "ninguna")]
+    [InlineData("ventas", "ecommerce.env", "simulador")]
+    [InlineData("inventario", "ecommerce-gestion.env", "simulador")]
+    public void StagingSeDespliegaSinPasarelaOConElSimulador(string vm, string archivo, string pasarela)
+    {
+        PrepararSecretos(vm);
+        File.AppendAllText(Path.Combine(_secretos, archivo), "BABELHUB__Pagos__Pasarela=" + pasarela + "\n");
+
+        var (codigo, salida, errores) = Desplegar(vm);
+
+        Assert.True(codigo == 0, salida + errores);
+        SinSecretosEnLaSalida(salida, errores);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-30")]
+    public void ElGenerador_EnStaging_EscribeSinPasarelaPorDefecto_EnLosDosArchivosDelEcommerce()
+    {
+        var destino = Path.Combine(_carpeta, "generados-sin-pasarela");
+
+        var (codigo, salida, errores) = Generar(destino);
+
+        Assert.True(codigo == 0, salida + errores);
+        foreach (var (carpeta, archivo) in new[] { ("ventas", "ecommerce.env"), ("inventario", "ecommerce-gestion.env") })
+        {
+            Assert.Equal("Staging", Valor(Path.Combine(destino, carpeta), archivo, "ASPNETCORE_ENVIRONMENT"));
+            Assert.Equal("ninguna", Valor(Path.Combine(destino, carpeta), archivo, "BABELHUB__Pagos__Pasarela"));
+            Assert.DoesNotContain("BABELHUB__Pagos__LlavePrivada", File.ReadAllText(Path.Combine(destino, carpeta, archivo)), StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-30")]
+    [InlineData("simulador")]
+    [InlineData("ninguna")]
+    public void ElGenerador_EnStaging_EscribeLaPasarelaPedida(string pasarela)
+    {
+        var destino = Path.Combine(_carpeta, "generados-con-pasarela");
+
+        var (codigo, salida, errores) = Generar(destino, "--pasarela", pasarela);
+
+        Assert.True(codigo == 0, salida + errores);
+        Assert.Equal(pasarela, Valor(Path.Combine(destino, "ventas"), "ecommerce.env", "BABELHUB__Pagos__Pasarela"));
+        Assert.Equal(pasarela, Valor(Path.Combine(destino, "inventario"), "ecommerce-gestion.env", "BABELHUB__Pagos__Pasarela"));
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-30")]
+    [InlineData("staging", "culqi")]
+    [InlineData("staging", "stripe")]
+    [InlineData("production", "ninguna")]
+    [InlineData("production", "simulador")]
+    public void ElGenerador_RechazaUnaPasarelaQueNoEsDelEntorno_SinEscribirNada(string entorno, string pasarela)
+    {
+        var destino = Path.Combine(_carpeta, "generados-rechazados");
+
+        var (codigo, _, errores) = Generar(destino, "--entorno", entorno, "--pasarela", pasarela);
+
+        Assert.Equal(2, codigo);
+        Assert.Contains("--pasarela", errores, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(destino));
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-30")]
+    [InlineData("ventas", "ecommerce.env", "BABELHUB__Pagos__Pasarela=culqi", "Staging solo admite BABELHUB__Pagos__Pasarela=ninguna o simulador")]
+    [InlineData("inventario", "ecommerce-gestion.env", "BABELHUB__Pagos__Pasarela=culqi", "Staging solo admite BABELHUB__Pagos__Pasarela=ninguna o simulador")]
     [InlineData("ventas", "ecommerce.env", "ASPNETCORE_ENVIRONMENT=Production", "Production exige BABELHUB__Pagos__Pasarela=culqi")]
     [InlineData("inventario", "ecommerce-gestion.env", "ASPNETCORE_ENVIRONMENT=Production", "Production exige BABELHUB__Pagos__Pasarela=culqi")]
+    [InlineData("ventas", "ecommerce.env", "BABELHUB__Pagos__Pasarela=Ninguna", "Staging solo admite BABELHUB__Pagos__Pasarela=ninguna o simulador")]
+    [InlineData("ventas", "ecommerce.env", "BABELHUB__Pagos__Pasarela=ninguno", "Staging solo admite BABELHUB__Pagos__Pasarela=ninguna o simulador")]
+    [InlineData("ventas", "ecommerce.env", "ASPNETCORE_ENVIRONMENT=Production\nBABELHUB__Pagos__Pasarela=ninguna", "Production exige BABELHUB__Pagos__Pasarela=culqi")]
+    [InlineData("inventario", "ecommerce-gestion.env", "ASPNETCORE_ENVIRONMENT=Production\nBABELHUB__Pagos__Pasarela=ninguna", "Production exige BABELHUB__Pagos__Pasarela=culqi")]
     [InlineData("ventas", "ecommerce.env", "ASPNETCORE_ENVIRONMENT=Qa", "debe ser Staging o Production")]
     [InlineData("ventas", "ecommerce.env", "ASPNETCORE_ENVIRONMENT=Development", "debe ser Staging o Production")]
     [InlineData("ventas", "ecommerce.env", "ASPNETCORE_ENVIRONMENT=production", "debe ser Staging o Production")]

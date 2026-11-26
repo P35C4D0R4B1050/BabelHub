@@ -36,7 +36,8 @@ public sealed record OpcionesDeArranqueDePagos(
 }
 
 /// <summary>
-/// La guarda de arranque de Pagos (PAG-12, PAG-34, AC-PAG-10, AC-PAG-30; D05, D14): la lista blanca por entorno decide qué pasarela y qué llave se aceptan. <c>simulador</c> solo en <c>Development</c>, <c>Test</c> y
+/// La guarda de arranque de Pagos (PAG-12, PAG-34, AC-PAG-10, AC-PAG-30; D05, D14): la lista blanca por entorno decide qué pasarela y qué llave se aceptan. <c>ninguna</c> (sin pasarela: no se cobra nada y la pantalla dice que el pago en
+/// línea estará disponible pronto, DD-110) solo en <c>Development</c>, <c>Test</c> y <c>Staging</c>, sin llave y con el adaptador nulo. <c>simulador</c> solo en <c>Development</c>, <c>Test</c> y
 /// <c>Staging</c> (el entorno de revisión de la tienda, que no cobra nada); <c>sk_test_</c> solo en <c>Development</c> y <c>Test</c>; <c>sk_live_</c> solo en <c>Production</c>; cualquier otro entorno rechaza el
 /// simulador y las dos llaves, y <c>Staging</c> rechaza además toda llave (no hay un adaptador real en revisión). <c>culqi</c> exige Pedidos, la llave privada y la clave de intentos; los secretos no pueden faltar, ser
 /// cortos ni repetirse, y con un modo que prohíbe llamadas reales el adaptador es el nulo. Una variable ausente falla el arranque: no hay valor por defecto que cobre.
@@ -51,13 +52,16 @@ public static class GuardaDeArranqueDePagos
     public const string Simulador = "simulador";
     public const string Culqi = "culqi";
 
+    /// <summary>Sin pasarela (DD-110): el cobro está cerrado.</summary>
+    public const string Ninguna = "ninguna";
+
     public const int LargoMinimoDeLaClaveDeIntentos = 32;
     public const int LargoMinimoDeLaLlavePrivada = 16;
 
     private const string PrefijoDePruebas = "sk_test_";
     private const string PrefijoDeProduccion = "sk_live_";
 
-    /// <summary>Los entornos donde la pasarela simulada puede correr: los de desarrollo y pruebas y <c>Staging</c>, el entorno de revisión de la tienda (PAG-34). <c>Production</c> y cualquier otro nombre quedan fuera.</summary>
+    /// <summary>Los entornos donde la pasarela simulada (o ninguna, DD-110) puede correr: los de desarrollo y pruebas y <c>Staging</c>, el entorno de revisión de la tienda (PAG-34). <c>Production</c> y cualquier otro nombre quedan fuera.</summary>
     public static bool AdmiteElSimulador(string? entorno) =>
         entorno is not null && (entorno.Equals("Development", StringComparison.OrdinalIgnoreCase) || entorno.Equals("Test", StringComparison.OrdinalIgnoreCase) || entorno.Equals("Staging", StringComparison.OrdinalIgnoreCase));
 
@@ -65,9 +69,9 @@ public static class GuardaDeArranqueDePagos
     {
         ArgumentNullException.ThrowIfNull(opciones);
 
-        if (opciones.Pasarela is not (Simulador or Culqi))
+        if (opciones.Pasarela is not (Ninguna or Simulador or Culqi))
         {
-            throw Rechazo(VariablePasarela, "ausente o desconocida: solo «simulador» o «culqi»");
+            throw Rechazo(VariablePasarela, "ausente o desconocida: solo «ninguna», «simulador» o «culqi»");
         }
 
         var entorno = opciones.Entorno ?? string.Empty;
@@ -91,7 +95,11 @@ public static class GuardaDeArranqueDePagos
             return;
         }
 
-        if (opciones.Pasarela == Simulador)
+        if (opciones.Pasarela == Ninguna)
+        {
+            SinPasarela(opciones, entorno);
+        }
+        else if (opciones.Pasarela == Simulador)
         {
             if (!AdmiteElSimulador(entorno))
             {
@@ -122,6 +130,25 @@ public static class GuardaDeArranqueDePagos
         if (opciones.SinLlamadasReales && !opciones.PasarelaEsNula)
         {
             throw Rechazo(VariablePasarela, "en Restauracion y Ensayo solo se acepta el adaptador nulo de la pasarela");
+        }
+    }
+
+    /// <summary>Sin pasarela: los mismos entornos que el simulador, sin ninguna llave (sería un secreto sin uso) y con el adaptador nulo (ninguna llamada a un proveedor).</summary>
+    private static void SinPasarela(OpcionesDeArranqueDePagos opciones, string entorno)
+    {
+        if (!AdmiteElSimulador(entorno))
+        {
+            throw Rechazo(VariablePasarela, "«ninguna» solo se acepta en Development, Test y Staging");
+        }
+
+        if (opciones.LlavePrivada is not null)
+        {
+            throw Rechazo(VariableLlavePrivada, "sin pasarela («ninguna») no se admite ninguna llave");
+        }
+
+        if (!opciones.PasarelaEsNula)
+        {
+            throw Rechazo(VariablePasarela, "«ninguna» solo admite el adaptador nulo de la pasarela");
         }
     }
 

@@ -1,9 +1,10 @@
 @using BabelHub.Ecommerce.Api.Web.Formato
-@model BabelHub.Ecommerce.Api.Areas.Tienda.Controllers.PagoVista
-<h1 class="font-display text-4xl leading-tight sm:text-5xl">Pagar tu compra</h1>
+@using BabelHub.Ecommerce.Api.Areas.Tienda.Controllers
+@model PagoVista
+<h1 class="font-display text-4xl leading-tight sm:text-5xl">@(Model.SinPagoEnLinea ? "El pago de tu compra" : "Pagar tu compra")</h1>
 <vc:bh-aviso-de-pagos-simulados en-contexto="true" />
 
-@if (Model.MotivoTexto is not null)
+@if (Model.MotivoTexto is not null && !Model.SinPagoEnLinea)
 {
     <div class="alert alert-error alert-soft my-6" role="alert" tabindex="-1" data-bh-foco-inicial>
         <bh-icono nombre="error" />
@@ -14,7 +15,23 @@
     </div>
 }
 
-@if (Model.Clave is { } clave)
+@if (Model.SinPagoEnLinea)
+{
+    @* Sin ninguna pasarela (DD-110): ni formulario, ni campo del medio de pago, ni botón de pagar. El servidor además rechaza cualquier cobro. *@
+    <div class="alert alert-info alert-soft my-6" role="status" data-bh-pago-no-disponible>
+        <bh-icono nombre="info" />
+        <div>
+            <h2 class="font-semibold">@TextosDelPago.TituloSinPasarela</h2>
+            <p>Todavía no recibimos pagos en la tienda. No se te cobró nada y no se creó ningún pedido; tus libros siguen en tu carrito.</p>
+            @if (Model.Estado.ReservaExpiraEn is { } separados && separados > Model.Ahora)
+            {
+                <p class="text-sm">Tus libros impresos quedan separados hasta las @FormatoPeruano.Hora(separados); al volver al carrito se liberan antes.</p>
+            }
+        </div>
+    </div>
+    <partial name="_SalirSinPagar" model="Model" />
+}
+else if (Model.Clave is { } clave)
 {
     <p class="my-4 text-lg">Total a pagar: <strong>@FormatoPeruano.Soles(clave.Total)</strong></p>
     <p class="text-sm" role="timer" data-bh-cuenta-regresiva="@clave.VenceEn.UtcDateTime.ToString("O")">

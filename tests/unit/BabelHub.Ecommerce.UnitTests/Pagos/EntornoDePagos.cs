@@ -345,7 +345,7 @@ internal sealed class EntornoDePagos
         Checkout = new CheckoutDeCarritoDoble();
         Firmador = new FirmadorDeClavesDeIntento(new OpcionesDeClavesDeIntento(System.Text.Encoding.UTF8.GetBytes("clave-de-intentos-de-prueba-de-32-bytes-o-mas")));
         Autorizador = new AutorizadorDePagos(Actor, Denegaciones);
-        EmitirClave = new EmitirClaveDeIntento(Autorizador, Repositorio, Unidad, Checkout, Firmador, Reloj);
+        EmitirClave = new EmitirClaveDeIntento(Autorizador, Repositorio, Unidad, Checkout, Firmador, Reloj, OpcionesDelCobro.PorDefecto);
         Orden = [];
         Repositorio.Orden = Orden;
         Cuenta = new CuentaDelPagadorDoble(Unidad, Orden);

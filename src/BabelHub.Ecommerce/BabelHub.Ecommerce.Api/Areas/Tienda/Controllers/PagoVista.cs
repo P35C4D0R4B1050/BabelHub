@@ -6,6 +6,9 @@ namespace BabelHub.Ecommerce.Api.Areas.Tienda.Controllers;
 /// <summary>El motivo de un rechazo en palabras de la persona: nunca el texto de la pasarela (D13).</summary>
 public static class TextosDelPago
 {
+    /// <summary>El título cuando la tienda no tiene ninguna pasarela (DD-110): lo repiten la pantalla del pago, la del estado y el rechazo de un cobro.</summary>
+    public const string TituloSinPasarela = "El pago en línea estará disponible pronto";
+
     /// <summary>«Te quedan N min»: minutos enteros hacia arriba, al menos uno (CAR-25, AC-CAR-23).</summary>
     public static string Restante(TimeSpan restante) => $"Te quedan {Math.Max(1, (int)Math.Ceiling(restante.TotalMinutes))} min.";
 
@@ -40,7 +43,10 @@ public sealed class PagoVista : ModeloBaseDePagina
 
     public EstadoDelPagoVista Estado { get; set; } = null!;
 
-    public string EstadoTexto => TextosDelPago.Estado(Estado.Estado);
+    /// <summary>Sin ninguna pasarela (DD-110) una compra que estaría lista para pagar no se puede pagar: la pantalla lo dice en lugar de ofrecerlo. Un pago de cuando sí la había conserva su estado.</summary>
+    public bool SinPagoEnLinea => !Estado.CobroDisponible && Estado.Estado == EstadoDelPagoDeLaCompra.ListoParaPagar;
+
+    public string EstadoTexto => SinPagoEnLinea ? TextosDelPago.TituloSinPasarela : TextosDelPago.Estado(Estado.Estado);
 
     /// <summary>El instante en que se armó la pantalla (el reloj del servidor): con él se calcula el tiempo restante hasta la hora límite de la confirmación (CAR-25).</summary>
     public DateTimeOffset Ahora { get; set; }

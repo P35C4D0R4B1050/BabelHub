@@ -6,6 +6,7 @@
 # El paso 6c comprueba la entrada: Nginx sirve tienda y gestión y la IP del cliente no se puede falsificar (DD-101).
 #
 #   bash scripts/ensayo-local.sh [--limpiar]        --limpiar: al terminar (o si ya hay un ensayo), borra contenedores, volúmenes y archivos del ensayo
+#   ENSAYO_PASARELA=simulador bash scripts/ensayo-local.sh   ensaya con la pasarela simulada; por defecto «ninguna» (la tienda que revisa Culqi: sin avisos y con el pago cerrado, DD-110)
 #
 # Necesita Docker (con Compose v2.24 o más) y bash en Linux, macOS o WSL (en Windows con Git Bash también funciona). No usa tu dominio, ni Oracle,
 # ni ningún secreto real: todo vive en una carpeta temporal fuera del repositorio y los puertos son locales (127.0.0.1:3xxxx, por debajo del rango dinámico de Windows).
@@ -13,8 +14,8 @@
 # Prueba también el TLS de PostgreSQL (AM24, paso 6b): rechazo sin TLS, con otra CA y con otro nombre; conexiones de red todas cifradas; respaldo por el socket local; y Evolution API (Prisma) si su imagen está en el equipo (ENSAYO_EVOLUTION=1 la descarga).
 #
 # Lo que NO prueba: Cloudflare, el túnel (cloudflared se simula con un contenedor en su dirección), el cortafuegos de Oracle, Evolution API (WhatsApp), el almacén de objetos de Oracle, Cloudflare R2 (los respaldos) ni los cobros reales. Los dos servicios del
-# E-commerce corren en «Staging» (el entorno de revisión de la tienda por Culqi: se endurece como «Production» y solo afloja el cobro, con la
-# pasarela simulada) y, al final, el ensayo ejecuta el comando «cuenta-de-prueba» con la imagen real (guía, §15.1).
+# E-commerce corren en «Staging» (el entorno de revisión de la tienda por Culqi: se endurece como «Production» y solo afloja el cobro, sin
+# pasarela o con la simulada) y, al final, el ensayo ejecuta el comando «cuenta-de-prueba» con la imagen real (guía, §15.1).
 set -euo pipefail
 
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -23,6 +24,8 @@ REGISTRO_IMAGE="${REGISTRO_IMAGE:-registry@sha256:a3d8aaa63ed8681a604f1dea0aa03f
 CURL_IMAGE="${CURL_IMAGE:-curlimages/curl@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93}"
 REGISTRO="localhost:5055"
 LIMPIAR=0
+PASARELA="${ENSAYO_PASARELA:-ninguna}"
+[[ "$PASARELA" == ninguna || "$PASARELA" == simulador ]] || { echo "Error: ENSAYO_PASARELA es «ninguna» o «simulador»." >&2; exit 2; }
 [[ "${1:-}" == --limpiar ]] && LIMPIAR=1
 
 limpiar() {
@@ -59,7 +62,7 @@ publicar postgres "$RAIZ/infra/postgres/Dockerfile" "$RAIZ/infra/postgres"
 
 # ---------- 2. Secretos de mentira ----------
 paso "2/7 Secretos de mentira (mismo generador que usarás de verdad)"
-bash "$RAIZ/scripts/generar-secretos.sh" --destino "$TRABAJO/secretos" --ensayo --imagen-postgres "${DIGEST[postgres]}" >/dev/null
+bash "$RAIZ/scripts/generar-secretos.sh" --destino "$TRABAJO/secretos" --ensayo --pasarela "$PASARELA" --imagen-postgres "${DIGEST[postgres]}" >/dev/null
 # Lo que en la realidad da un tercero (Gmail, Turnstile, el almacén, el túnel) se rellena con valores sin sentido de la forma correcta.
 alea() { head -c $(( $1 * 3 )) /dev/urandom | base64 | tr -d '/+=\n' | head -c "$1"; }
 for archivo in "$TRABAJO"/secretos/*/*.env; do
@@ -147,16 +150,55 @@ humo() { # red servicio puerto host-de-la-peticion
 }
 echo -n "    Inventario (https://inventario:8443): ";  humo babelhub-inventario_default inventario 8443
 echo -n "    E-commerce (https://ecommerce:8443):  ";  humo babelhub-ventas_default ecommerce 8443 localhost
-paso "6/7 La tienda en Staging: el aviso de pagos simulados y la cuenta de prueba (con la imagen real)"
-echo -n "    Aviso «Pagos simulados» en la portada: "
-MSYS_NO_PATHCONV=1 docker run --rm --network babelhub-ventas_default -v "$ca_docker:/ca.pem:ro" "$CURL_IMAGE" -sS --max-time 20 --cacert /ca.pem -H "Host: localhost" -H "X-Forwarded-Proto: https" "https://ecommerce:8443/" | grep -c "data-bh-pagos-simulados" || true
+paso "6/7 La tienda en Staging con la pasarela «$PASARELA»: los avisos, el pago y la cuenta de prueba (con la imagen real)"
+for archivo in ventas/ecommerce.env inventario/ecommerce-gestion.env; do
+  grep -qx "BABELHUB__Pagos__Pasarela=\"$PASARELA\"" "$TRABAJO/secretos/$archivo" || { echo "    ERROR: $archivo no declara la pasarela «$PASARELA»." >&2; exit 1; }
+done
+MAL=0
+pagina() { MSYS_NO_PATHCONV=1 docker run --rm --network babelhub-ventas_default -v "$ca_docker:/ca.pem:ro" "$CURL_IMAGE" -sS --max-time 20 --cacert /ca.pem -H "Host: localhost" -H "X-Forwarded-Proto: https" -H "Accept: text/html" -w '\n[HTTP %{http_code}]' "https://ecommerce:8443$1"; }
+# Sin pasarela, ninguna página dice «simulado», «demostración» ni «proyecto académico» ni dibuja un aviso; con el simulador, los dos avisos están en el pie.
+for ruta in / /catalogo /contacto /reclamaciones/nueva /legal/terminos /legal/privacidad /legal/cambios-y-devoluciones /ingreso; do
+  html="$(pagina "$ruta")"
+  estado="$(tail -n 1 <<<"$html")"
+  if [[ "$estado" != "[HTTP 200]" ]]; then echo "    ERROR $ruta: $estado" >&2; MAL=1; continue; fi
+  pagos="$(grep -c "data-bh-pagos-simulados" <<<"$html" || true)"; envios="$(grep -c "data-bh-envios-simulados" <<<"$html" || true)"
+  if [[ "$PASARELA" == ninguna ]]; then
+    menciones="$(grep -ciE 'simulad|demostraci|acad(é|&#xE9;)mic' <<<"$html" || true)"
+    if [[ "$pagos" == 0 && "$envios" == 0 && "$menciones" == 0 ]]; then echo "    ok   $ruta: sin avisos ni menciones de simulación"; else echo "    ERROR $ruta: avisos de pagos=$pagos, de envíos=$envios, líneas que mencionan la simulación=$menciones" >&2; MAL=1; fi
+  else
+    if [[ "$pagos" -ge 1 && "$envios" -ge 1 ]]; then echo "    ok   $ruta: con los avisos de pagos y envíos simulados"; else echo "    ERROR $ruta: faltan avisos (pagos=$pagos, envíos=$envios)" >&2; MAL=1; fi
+  fi
+done
 echo -n "    Redirección a HTTPS de lo que el borde declara HTTP: "
 MSYS_NO_PATHCONV=1 docker run --rm --network babelhub-ventas_default -v "$ca_docker:/ca.pem:ro" "$CURL_IMAGE" -sS --max-time 20 --cacert /ca.pem -H "Host: localhost" -H "X-Forwarded-Proto: http" -o /dev/null -w '[HTTP %{http_code}] -> %{redirect_url}\n' "https://ecommerce:8443/catalogo"
 # El comando de consola de la cuenta de prueba corre dentro de la imagen del servicio, con su entorno (el mismo que usarás en la VM); la contraseña se oculta aquí (en la VM se muestra una sola vez).
 salida_cuenta="$(BABELHUB_SECRETOS="$TRABAJO/secretos/ventas" IP_PRIVADA=127.0.0.1 docker compose -p babelhub-ventas --project-directory "$RAIZ/infra" -f "$RAIZ/infra/docker-compose.ventas.yml" -f "$TRABAJO/ventas.override.yml" run --rm --no-deps --no-TTY ecommerce cuenta-de-prueba 2>&1)" || { echo "$salida_cuenta" >&2; echo "Error: cuenta-de-prueba falló." >&2; exit 1; }
 printf '%s\n' "$salida_cuenta" | sed -E 's/^(  contraseña: ).*/\1[oculta en el ensayo]/' | sed 's/^/    /'
-echo -n "    Aviso «Los envíos son simulados» en la portada: "
-MSYS_NO_PATHCONV=1 docker run --rm --network babelhub-ventas_default -v "$ca_docker:/ca.pem:ro" "$CURL_IMAGE" -sS --max-time 20 --cacert /ca.pem -H "Host: localhost" -H "X-Forwarded-Proto: https" "https://ecommerce:8443/" | grep -c "data-bh-envios-simulados" || true
+# Sin pasarela, el pago está cerrado en el servidor: con la cuenta de prueba dentro, una solicitud de cobro hecha a mano se rechaza (503) sin cobrar. La contraseña viaja en una variable de entorno, nunca en un argumento.
+if [[ "$PASARELA" == ninguna ]]; then
+  cat >"$TRABAJO/cobro-a-mano.sh" <<'SH'
+set -eu
+base=https://ecommerce:8443
+pedir() { curl -sS --max-time 20 --cacert /ca.pem -H "Host: localhost" -H "X-Forwarded-Proto: https" -b /tmp/galletas -c /tmp/galletas "$@"; }
+token() { pedir -H "Accept: text/html" "$base$1" | sed -n 's/.*<meta name="csrf-token" content="\([^"]*\)".*/\1/p' | head -n 1; }
+t="$(token /ingreso)"
+pedir -o /dev/null -w 'ingreso=%{http_code}\n' -H "Accept: text/html" -H "RequestVerificationToken: $t" --data-urlencode "correo=revision@example.test" --data-urlencode "contrasena=$CONTRASENA_DE_ENSAYO" "$base/ingreso"
+# La primera cuenta de una instalación crea la primera clave de firma y el servicio la ve en menos de un minuto: hasta entonces la sesión responde «servicio no disponible». Se reintenta un número acotado de veces.
+for intento in 1 2 3 4 5 6 7 8 9; do
+  t="$(token /)"
+  cobro="$(pedir -w '\ncobro=%{http_code}\n' -H "Accept: application/json" -H "RequestVerificationToken: $t" --data "pedidoId=00000000-0000-4000-8000-000000000001&claveDeIntento=ensayo&medio=yape&tokenDelMedio=tkn_ensayo" "$base/checkout/pago")"
+  case "$cobro" in *ECO-SERVICIO-NO-DISPONIBLE*) sleep 10 ;; *) break ;; esac
+done
+printf '%s\n' "$cobro"
+SH
+  chmod 0644 "$TRABAJO/cobro-a-mano.sh"
+  guion_docker="$TRABAJO/cobro-a-mano.sh"; if [[ "$(uname -s)" == MINGW* || "$(uname -s)" == MSYS* ]]; then guion_docker="$(cygpath -m "$guion_docker")"; fi
+  export CONTRASENA_DE_ENSAYO="$(sed -n 's/^  contraseña: //p' <<<"$salida_cuenta" | tr -d '\r' | head -n 1)"
+  cobro="$(MSYS_NO_PATHCONV=1 docker run --rm --network babelhub-ventas_default -e CONTRASENA_DE_ENSAYO -v "$ca_docker:/ca.pem:ro" -v "$guion_docker:/cobro.sh:ro" --entrypoint sh "$CURL_IMAGE" /cobro.sh 2>&1 || true)"
+  unset CONTRASENA_DE_ENSAYO
+  if grep -qE '^ingreso=30[23]$' <<<"$cobro" && grep -q 'ECO-PAGO-NO-DISPONIBLE' <<<"$cobro" && grep -q '^cobro=503$' <<<"$cobro"; then echo "    ok   cobro hecho a mano con la sesión de la cuenta de prueba: rechazado (503 ECO-PAGO-NO-DISPONIBLE)"; else echo "    ERROR: el cobro no quedó cerrado: $(head -c 400 <<<"$cobro")" >&2; MAL=1; fi
+fi
+[[ "$MAL" -eq 0 ]] || { echo "Error: la tienda no se comportó como debe con la pasarela «$PASARELA» (ver arriba)." >&2; exit 1; }
 # Los demás comandos de consola (PAG-43 a PAG-47), también con la imagen real; las contraseñas se ocultan aquí (en la VM se muestran una sola vez).
 consola() { BABELHUB_SECRETOS="$TRABAJO/secretos/ventas" IP_PRIVADA=127.0.0.1 docker compose -p babelhub-ventas --project-directory "$RAIZ/infra" -f "$RAIZ/infra/docker-compose.ventas.yml" -f "$TRABAJO/ventas.override.yml" run --rm --no-deps --no-TTY ecommerce "$@" 2>&1 | sed -E 's/^(  contraseña[^:]*: ).*/\1[oculta en el ensayo]/' | sed 's/^/    /'; }
 echo "    crear-administrador:"; consola crear-administrador --correo administracion@ensayo.example.test

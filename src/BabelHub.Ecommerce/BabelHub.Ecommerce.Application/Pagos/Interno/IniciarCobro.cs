@@ -13,8 +13,11 @@ internal interface IConfirmadorDeCompraAprobada
     Task<ResultadoDelCobroDelCliente> Confirmar(Guid pedidoId, Guid intentoId, string referenciaDePasarela, CancellationToken cancelacion = default);
 }
 
-/// <summary>Los valores del cobro que la configuración ajusta: el tiempo de respuesta de la pasarela (10 segundos, PAG-07) y si la pasarela exige el correo del titular (PAG-30).</summary>
-internal sealed record OpcionesDelCobro(TimeSpan TiempoDeRespuesta, bool EnviarElCorreoDelTitular = false)
+/// <summary>
+/// Los valores del cobro que la configuración ajusta: el tiempo de respuesta de la pasarela (10 segundos, PAG-07), si la pasarela exige el correo del titular (PAG-30) y si el cobro está <see cref="Cerrado"/> porque la tienda no tiene ninguna pasarela
+/// (<c>ninguna</c>, DD-110): entonces no se emite ninguna clave de intento ni se cobra nada.
+/// </summary>
+internal sealed record OpcionesDelCobro(TimeSpan TiempoDeRespuesta, bool EnviarElCorreoDelTitular = false, bool Cerrado = false)
 {
     public static OpcionesDelCobro PorDefecto { get; } = new(PlazosDelPago.TiempoDeRespuesta);
 }
@@ -51,6 +54,12 @@ internal sealed class IniciarCobro(
         if (await autorizador.ExigirSesion(cancelacion).ConfigureAwait(false) is { } sinSesion)
         {
             return Resultado<ResultadoDelCobroDelCliente>.Fallo(sinSesion);
+        }
+
+        // Sin pasarela no se cobra (DD-110): se rechaza antes de leer, registrar, consultar la reserva o llamar a nadie, venga de la pantalla o de una solicitud hecha a mano.
+        if (opciones.Cerrado)
+        {
+            return FallosDePagos.De<ResultadoDelCobroDelCliente>(CategoriaDeError.NoDisponible, ClavesDePagos.PagoNoDisponible);
         }
 
         // La forma de la entrada se valida antes de gastar nada: un token del medio ausente o un medio fuera de la lista no llegan a la pasarela.
