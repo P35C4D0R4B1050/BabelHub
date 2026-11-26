@@ -77,3 +77,5 @@ Una fila por cada spec o plan que el agente aprobó por delegación de la person
 | 2026-11-23 | plan | transversal-carga-inicial | Claude (delegado) | 0/0 | Lista para aprobar | Cumple | Cumple con observaciones | 0 | 7 | c30567ef1315346d |
 | 2026-11-25 | spec | transversal-plataforma | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 11 | 14b7853e8ddcbb0a |
 | 2026-11-25 | plan | transversal-plataforma | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 9 | f131182d9e99c899 |
+| 2026-11-26 | spec | ecommerce-pagos | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 5 | 88f72448a11782d7 |
+| 2026-11-26 | plan | ecommerce-pagos | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 11 | c13fd6669be6a1af |
