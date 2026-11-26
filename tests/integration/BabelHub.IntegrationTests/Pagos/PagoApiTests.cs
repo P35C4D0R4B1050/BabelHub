@@ -320,6 +320,23 @@ public sealed class PagoApiTests : IAsyncLifetime
         Assert.DoesNotContain("estará disponible pronto", html, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [Trait("Criterio", "AC-PAG-42")]
+    [InlineData("/checkout/pago")]
+    [InlineData("/checkout/pago/estado")]
+    public async Task Sin_pasarela_una_compra_ya_cerrada_con_un_rechazo_anterior_conserva_su_estado_sin_invitar_a_reintentar(string ruta)
+    {
+        // Resto de cuando había pasarela: el último intento se rechazó y la compra ya no admite pagos.
+        _host.Pagos.EstadoDelPago = Resultado<EstadoDelPagoVista>.Exito(SinCobro(EstadoDelPagoDeLaCompra.Cerrado) with { UltimoMotivo = MotivoDeRechazoDePago.TarjetaVencida });
+
+        using var respuesta = await _host.Cliente.SendAsync(_host.Pedir($"{ruta}?pedidoId={Pedido:D}", html: true));
+
+        var html = WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync());
+        Assert.Contains("Esta compra ya no admite pagos", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("intentarlo de nuevo", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("estará disponible pronto", html, StringComparison.Ordinal);
+    }
+
     [Fact]
     [Trait("Criterio", "AC-PAG-43")]
     public async Task Sin_pasarela_un_POST_directo_al_cobro_se_rechaza_en_el_servidor_sin_tocar_nada()
