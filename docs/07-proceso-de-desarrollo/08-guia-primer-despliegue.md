@@ -142,7 +142,7 @@ Las VMs no construyen nada: **bajan imágenes ya construidas** del registro de c
 ### 5.1 Preparación única en GitHub (10 minutos)
 
 1. **Protege las etiquetas de versión.** GitHub → tu repositorio → *Settings → Rules → Rulesets → New ruleset → New tag ruleset*. *Target:* etiquetas `v*`. Reglas: *Restrict creations*, *Restrict updates*, *Restrict deletions*. *Bypass list:* solo tú. Así nadie más puede crear la versión que se publica.
-2. **Crea el entorno `lanzamiento`.** *Settings → Environments → New environment* → nombre `lanzamiento` → *Required reviewers*: tú. Así cada publicación te pide aprobación (un botón verde) antes de construir.
+2. **Crea el entorno `lanzamiento`.** *Settings → Environments → New environment* → nombre `lanzamiento` → *Required reviewers*: tú. Así cada publicación te pide aprobación (un botón verde) antes de construir. Como la revisora eres tú, **desmarca *Prevent self-review*** (si no, no podrías aprobar tus propias publicaciones) y desmarca *Allow administrators to bypass*; **pulsa *Save protection rules*** (sin ese botón no se guarda nada). En el paso 1, *Enforcement status* nace en *Disabled*: ponlo en **Active**.
 3. Confirma que el flujo `ci` y el de `secretos` están **en verde** en `main` (pestaña *Actions*). El flujo de lanzamiento se niega a publicar si el commit no pasó ambos.
 
 ### 5.2 Lanzar
@@ -545,7 +545,7 @@ nano ~/babelhub-secretos/inventario/ecommerce-gestion.env
 | Qué | De dónde sale |
 | :--- | :--- |
 | `…Smtp__Servidor`, `…Smtp__Cuenta`, `…Smtp__Remitente`, `…Smtp__Credencial` | Gmail: servidor `smtp.gmail.com`; cuenta y remitente tu Gmail; credencial = la **contraseña de aplicación** (16 letras; escríbela sin espacios). |
-| `…Turnstile__ClaveDeSitio` y `…Secreto` | **Créalo ahora, antes de copiar las carpetas** (VM-INVENTARIO ya lo exige y no necesita el túnel): Cloudflare → *Turnstile → Add site*, hostnames `babel-hub.shop`, `www.babel-hub.shop` y `gestion.babel-hub.shop`; clave de sitio (`0x4…`, pública) y clave secreta, en `ecommerce.env` y `ecommerce-gestion.env`. |
+| `…Turnstile__ClaveDeSitio` y `…Secreto` | **Créalo ahora, antes de copiar las carpetas** (VM-INVENTARIO ya lo exige y no necesita el túnel): Cloudflare → *Turnstile → Add site* (está en el menú de la cuenta, no dentro del dominio; modo **Managed** y *pre-clearance* apagado), hostnames `babel-hub.shop`, `www.babel-hub.shop` y `gestion.babel-hub.shop`; clave de sitio (`0x4…`, pública) y clave secreta, en `ecommerce.env` y `ecommerce-gestion.env`. |
 | `…Almacen__Catalogo__*`, `…Biblioteca__*`, `…Supresiones__*` | §9: las claves de cada credencial; `Endpoint` = `https://<espacio>.compat.objectstorage.sa-santiago-1.oraclecloud.com`. |
 | `…Web__OrigenDelAlmacen` (ventas) | El origen `https://<espacio>.compat.objectstorage.sa-santiago-1.oraclecloud.com` (igual al host del endpoint de `biblioteca-lector`). |
 | `postgres.env`: `RCLONE_CONFIG_ALMACEN_ENDPOINT`, `…ACCESS_KEY_ID`, `…SECRET_ACCESS_KEY` | §9b.3: el endpoint de R2 y las claves de **`respaldos-escritor`** (el proveedor `Cloudflare` y la región `auto` ya vienen escritos). Nunca el token de administración. |
@@ -664,6 +664,12 @@ En *SSL/TLS → Overview*: modo **Full (strict)**; *SSL/TLS → Edge Certificate
 | **La aplicación** | Toma **solo** `X-Forwarded-Proto` para ver `https` (así las cookies `__Host-…` y el antiforgery funcionan); **redirige con `308` a `https://` lo que el borde declare `http`** aunque Always Use HTTPS no estuviera activo (defensa en profundidad; la salud no se redirige); envía **HSTS** (`max-age=31536000`) en toda respuesta; marca las cookies de sesión `Secure` y `HttpOnly`; y ninguna vista ni recurso propio pide nada por `http://` (no hay contenido mixto; lo verifica una prueba que barre las vistas y los recursos). |
 | **HSTS de Cloudflare** | **No lo actives:** lo envía la aplicación (con dos hosts distintos, un `includeSubDomains` desde Cloudflare afectaría también a la gestión sin que lo decidas). |
 
+**Apaga *Email Address Obfuscation*** (*Scrape Shield*): reescribe el correo de contacto visible de la tienda. El *Bot Fight Mode* gratuito **no admite excepciones**: si fallaran los avisos de Culqi, revísalo.
+
+**Limpia el DNS antes del túnel:** borra los registros `A` aparcados del apex que importó Cloudflare (chocan con los `CNAME` del túnel). Si el dominio no envía correo, añade los `TXT` SPF `v=spf1 -all` en el apex y DMARC `v=DMARC1; p=reject` en `_dmarc`, para que nadie suplante tu dominio.
+
+En la regla siguiente, usa la condición **equals**; si Cloudflare avisa de que falta un registro DNS para `www`, elige *Ignore and deploy rule anyway* (el registro lo crea el túnel).
+
 **Redirigir `www` al apex** (para que la tienda tenga un solo nombre): *Rules → Redirect Rules → Create rule* → nombre `www-al-apex`; *When incoming requests match*: **Hostname equals `www.babel-hub.shop`**; *Then*: **Dynamic**, expresión `concat("https://babel-hub.shop", http.request.uri.path)`, código **301**, **Preserve query string**. (Se hace en Cloudflare y no en Nginx para que todo el que llegue vea una sola redirección en el borde.)
 
 (Las comprobaciones con `curl` se hacen cuando la tienda ya responde: §13.3.)
@@ -684,7 +690,7 @@ Los tres apuntan a `nginx:8080`: el Nginx de VM-VENTAS enruta por el nombre de h
 
 ### 12.4 Cloudflare Access para la gestión (obligatorio)
 
-*Zero Trust → Access → Applications → Add an application → Self-hosted*: nombre `gestion`, dominio `gestion.babel-hub.shop`. *Policy*: acción **Allow**, regla *Emails* = los correos del personal autorizado. En el plan gratuito el método es el **código de un solo uso por correo**. Para exigir un segundo factor real, añade en *Settings → Authentication* un proveedor de identidad (Google o GitHub) con verificación en dos pasos y haz que la política lo **requiera**. Sin esto, **cualquiera podría llegar a la pantalla de ingreso del personal**.
+En la consola actual, **primero crea la política**: *Zero Trust → Access → Policies → Add a policy*, nombre `personal`, acción **Allow**, regla *Emails* = los correos del personal autorizado. **Después la aplicación**: *Access → Applications → Add an application → Self-hosted*, dominio `gestion.babel-hub.shop`, *Add existing policy* → `personal`; el nombre (`gestion`) y la duración de la sesión se piden al final. Comprueba que la política diga *Used by applications: 1* y que en *Identity providers* esté *One-time PIN*. En el plan gratuito el método es el **código de un solo uso por correo**. Para exigir un segundo factor real, añade en *Settings → Authentication* un proveedor de identidad (Google o GitHub) con verificación en dos pasos y haz que la política lo **requiera**. Sin esto, **cualquiera podría llegar a la pantalla de ingreso del personal**.
 
 ### 12.5 Copiar el token a VM-VENTAS
 
