@@ -218,7 +218,7 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
         var host = Capturar(extra, () => OpcionesDelHostWeb.Leer(configuracion, esProduccion));
         var sesiones = host is null ? null : Capturar(extra, () => ConfiguracionDeSesionesWeb.Leer(configuracion, host.Host == HostWeb.Tienda ? HostDeSesion.Tienda : HostDeSesion.Gestion));
         var verificacion = Capturar(extra, () => new OpcionesDeVerificacionWeb(configuracion["Seguridad:Turnstile:ClaveDeSitio"] ?? string.Empty));
-        // Pagos: la pasarela se declara siempre (el simulador solo vale en Development, Test y Staging; «culqi» compone el adaptador real de Culqi, T37) y la clave de los intentos es un secreto; el resto lo valida su guarda de arranque nombrando la variable.
+        // Pagos: la pasarela se declara siempre («ninguna» y el simulador solo valen en Development, Test y Staging; «culqi» compone el adaptador real de Culqi, T37) y la clave de los intentos es un secreto; el resto lo valida su guarda de arranque nombrando la variable.
         _ = lector.Obligatorio("Pagos:Pasarela");
         if (lector.Obligatorio("Pagos:ClaveDeIntentos") is { } claveDeIntentos)
         {
@@ -365,7 +365,7 @@ public static class AnfitrionDelEcommerce
     public static OpcionesDelAnfitrionDelEcommerce AgregarEcommerce(this WebApplicationBuilder builder, ModoDeArranque modo)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        // Producción y Staging se endurecen igual (PAG-34): lo único que Staging afloja es el cobro, con la pasarela simulada.
+        // Producción y Staging se endurecen igual (PAG-34): lo único que Staging afloja es el cobro, sin pasarela o con la simulada.
         var esProduccion = builder.Environment.EsDeTipoProduccion();
         var soloEnModoNormal = modo == ModoDeArranque.Normal;
         // Los valores ficticios del contacto solo valen en Development y Test; cualquier otro nombre de entorno (Staging, Production, ensayo…) exige las tres variables (COM-03, COM-05).
@@ -473,13 +473,15 @@ public static class AnfitrionDelEcommerce
         servicios.AgregarOperadorLogisticoDeEnvios(opcionesDeEnvios);
         servicios.AgregarTrabajosDeEnviosEnLaApi(soloEnModoNormal);
         // Los dos adaptadores hacia un proveedor declaran su estado real (leído de las mismas opciones con las que se compuso, no de una suposición aparte): ExigirCoherencia lo comprueba en el ensayo y al restaurar.
-        servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDeLaInstancia("pasarela-de-pago", esNulo: opcionesDePagos.PasarelaEsNula));
+        // Sin pasarela («ninguna», DD-110) no hay ningún proveedor de pago con el que hablar: en modo normal no se declara como uno (si no, el arranque de tipo producción lo tomaría por el adaptador real que falta); en ensayo y restauración sigue declarado nulo.
+        var sinPasarela = opcionesDePagos.Pasarela == GuardaDeArranqueDePagos.Ninguna;
+        servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDeLaInstancia("pasarela-de-pago", esNulo: opcionesDePagos.PasarelaEsNula, esHaciaProveedor: !(sinPasarela && soloEnModoNormal)));
         // El aviso «Pagos simulados» (PAG-33) sale de las mismas opciones con las que se compuso la pasarela: nunca dice una cosa y hace otra.
         servicios.AddSingleton(new ModoDePagosDeLaWeb(Simulado: opcionesDePagos is { Pasarela: GuardaDeArranqueDePagos.Simulador, PasarelaEsNula: false }));
         var operadorElegido = GuardaDeArranqueDeEnvios.Exigir(opcionesDeEnvios);
         servicios.AddSingleton<IAdaptadorSaliente>(new AdaptadorSalienteDeLaInstancia("operador-logistico", esNulo: operadorElegido == GuardaDeArranqueDeEnvios.Nulo));
-        // El aviso «Los envíos son simulados» (PAG-42) sale de la misma elección: mientras el operador es el simulador (no hay uno real, DD-22) la tienda lo dice, en cualquier entorno.
-        servicios.AddSingleton(new ModoDeEnviosDeLaWeb(Simulado: operadorElegido == GuardaDeArranqueDeEnvios.Simulador && soloEnModoNormal));
+        // El aviso «Los envíos son simulados» (PAG-42) sale de la misma elección: mientras el operador es el simulador (no hay uno real, DD-22) la tienda lo dice, en cualquier entorno. Sin pasarela no se puede comprar y no se envía nada: no se muestra (DD-111).
+        servicios.AddSingleton(new ModoDeEnviosDeLaWeb(Simulado: operadorElegido == GuardaDeArranqueDeEnvios.Simulador && soloEnModoNormal && !sinPasarela));
         servicios.AgregarReclamaciones();
         servicios.AgregarTrabajosDeReclamacionesEnLaApi(soloEnModoNormal);
         servicios.AgregarPedidos(esProduccion: false);
@@ -603,11 +605,11 @@ internal sealed class AdaptadorSalienteDelProveedor(string nombre, bool esNulo) 
 }
 
 /// <summary>Un adaptador saliente cuyo estado sale de las opciones con las que se compuso el adaptador real.</summary>
-internal sealed class AdaptadorSalienteDeLaInstancia(string nombre, bool esNulo) : IAdaptadorSaliente
+internal sealed class AdaptadorSalienteDeLaInstancia(string nombre, bool esNulo, bool esHaciaProveedor = true) : IAdaptadorSaliente
 {
     public string Nombre => nombre;
 
-    public bool EsHaciaProveedor => true;
+    public bool EsHaciaProveedor => esHaciaProveedor;
 
     public bool EsNulo => esNulo;
 }

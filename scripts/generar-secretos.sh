@@ -22,11 +22,11 @@ export MSYS_NO_PATHCONV=1   # en Git Bash para Windows, openssl no debe converti
 
 uso() {
   sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//' >&2
-  echo "Opciones: --destino <carpeta> --dominio <dominio> --ip-ventas <ip> --ip-inventario <ip> [--entorno staging|production] [--region sa-santiago-1] [--ensayo] [--imagen-postgres <imagen>]" >&2
+  echo "Opciones: --destino <carpeta> --dominio <dominio> --ip-ventas <ip> --ip-inventario <ip> [--entorno staging|production] [--pasarela ninguna|simulador (solo staging)] [--region sa-santiago-1] [--ensayo] [--imagen-postgres <imagen>]" >&2
   exit 2
 }
 
-DESTINO="" DOMINIO="" IP_VENTAS="" IP_INVENTARIO="" REGION="sa-santiago-1" ENSAYO=0 IMAGEN_POSTGRES_PARA_AGE="" ENTORNO="staging"
+DESTINO="" DOMINIO="" IP_VENTAS="" IP_INVENTARIO="" REGION="sa-santiago-1" ENSAYO=0 IMAGEN_POSTGRES_PARA_AGE="" ENTORNO="staging" PASARELA_PEDIDA=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --destino) [[ $# -ge 2 ]] || uso; DESTINO="$2"; shift 2 ;;
@@ -35,6 +35,7 @@ while [[ $# -gt 0 ]]; do
     --ip-inventario) [[ $# -ge 2 ]] || uso; IP_INVENTARIO="$2"; shift 2 ;;
     --region) [[ $# -ge 2 ]] || uso; REGION="$2"; shift 2 ;;
     --entorno) [[ $# -ge 2 ]] || uso; ENTORNO="$2"; shift 2 ;;
+    --pasarela) [[ $# -ge 2 && -n "$2" ]] || uso; PASARELA_PEDIDA="$2"; shift 2 ;;
     --imagen-postgres) [[ $# -ge 2 ]] || uso; IMAGEN_POSTGRES_PARA_AGE="$2"; shift 2 ;;
     --ensayo) ENSAYO=1; shift ;;
     *) uso ;;
@@ -56,11 +57,18 @@ ip_valida() {
 ip_valida "$IP_VENTAS" && ip_valida "$IP_INVENTARIO" || { echo "Error: las direcciones deben ser IPv4 privadas (10.x.x.x, 172.16-31.x.x o 192.168.x.x), por ejemplo 10.0.0.10." >&2; exit 2; }
 [[ "$DOMINIO" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] || { echo "Error: el dominio debe ir en minúsculas, sin https:// ni barras (ejemplo.pe)." >&2; exit 2; }
 [[ "$REGION" =~ ^[a-z0-9-]+$ ]] || { echo "Error: región inválida." >&2; exit 2; }
-# El entorno de los dos servicios del E-commerce (PAG-34): «staging» (revisión de la tienda por Culqi: pasarela SIMULADA, nunca cobra) o «production» (pasarela real; exige las llaves de Culqi).
-# Staging se endurece igual que Production: lo único que afloja es el cobro. Pasar de uno a otro es cambiar tres líneas de ecommerce.env y ecommerce-gestion.env (guía, §«De Staging a Production»).
+# El entorno de los dos servicios del E-commerce (PAG-34, DD-110): «staging» (revisión de la tienda por Culqi: por defecto SIN pasarela, con el pago cerrado; con --pasarela simulador, la simulada para las pruebas con
+# personas, que tampoco cobra) o «production» (pasarela real; exige las llaves de Culqi). Staging se endurece igual que Production: lo único que afloja es el cobro. Pasar de «ninguna» a «simulador» es cambiar una línea de
+# ecommerce.env y de ecommerce-gestion.env (guía, §«Alternar la pasarela en Staging»); pasar a Production, ver la guía, §«De Staging a Production».
 case "$ENTORNO" in
-  staging) ENTORNO_ASPNET="Staging"; PASARELA="simulador" ;;
-  production) ENTORNO_ASPNET="Production"; PASARELA="culqi" ;;
+  staging)
+    ENTORNO_ASPNET="Staging"; PASARELA="${PASARELA_PEDIDA:-ninguna}"
+    [[ "$PASARELA" == ninguna || "$PASARELA" == simulador ]] || { echo "Error: --pasarela en staging es «ninguna» o «simulador»." >&2; exit 2; }
+    ;;
+  production)
+    ENTORNO_ASPNET="Production"; PASARELA="culqi"
+    [[ -z "$PASARELA_PEDIDA" ]] || { echo "Error: --pasarela solo vale en staging; production usa siempre culqi." >&2; exit 2; }
+    ;;
   *) echo "Error: --entorno es «staging» o «production»." >&2; exit 2 ;;
 esac
 command -v openssl >/dev/null || { echo "Error: falta openssl." >&2; exit 2; }

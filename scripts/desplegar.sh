@@ -270,18 +270,18 @@ if [[ -n "$SECRETOS" ]]; then
   else
     anotar "falta la tabla de secretos requeridos $tabla"
   fi
-  # El entorno del E-commerce y su pasarela de pago (PAG-34), en cada archivo del E-commerce de esta VM. Nunca se cobra «a ciegas»: Staging (la revisión de la tienda por Culqi) solo con la pasarela SIMULADA, que no
-  # cobra nada; Production solo con la real (culqi) y su llave de producción (sk_live_…). Cualquier otro entorno, o una mezcla (por ejemplo Production con el simulador), no se despliega.
+  # El entorno del E-commerce y su pasarela de pago (PAG-34, DD-110), en cada archivo del E-commerce de esta VM. Nunca se cobra «a ciegas»: Staging solo sin pasarela («ninguna»: la tienda que revisa Culqi, con el pago
+  # cerrado) o con la SIMULADA (pruebas con personas), que tampoco cobra; Production solo con la real (culqi) y su llave de producción (sk_live_…). Cualquier otro entorno o mezcla (p. ej. Production con el simulador) no se despliega.
   for archivo in ecommerce.env ecommerce-gestion.env; do
     [[ " ${ARCHIVOS[*]} " == *" $archivo "* && -s "$SECRETOS/$archivo" ]] || continue
     entorno="$(leer_valor "$SECRETOS/$archivo" ASPNETCORE_ENVIRONMENT)"
     pasarela="$(leer_valor "$SECRETOS/$archivo" BABELHUB__Pagos__Pasarela)"
     case "$entorno" in
       Staging)
-        [[ "$pasarela" == simulador ]] || anotar "$archivo: ASPNETCORE_ENVIRONMENT=Staging solo admite BABELHUB__Pagos__Pasarela=simulador (la pasarela real se prueba con llaves en Production)"
+        [[ "$pasarela" == ninguna || "$pasarela" == simulador ]] || anotar "$archivo: ASPNETCORE_ENVIRONMENT=Staging solo admite BABELHUB__Pagos__Pasarela=ninguna o simulador (la pasarela real se prueba con llaves en Production)"
         ;;
       Production)
-        [[ "$pasarela" == culqi ]] || anotar "$archivo: ASPNETCORE_ENVIRONMENT=Production exige BABELHUB__Pagos__Pasarela=culqi; el simulador no cobra y no se acepta en Production"
+        [[ "$pasarela" == culqi ]] || anotar "$archivo: ASPNETCORE_ENVIRONMENT=Production exige BABELHUB__Pagos__Pasarela=culqi; ni «ninguna» ni el simulador cobran y no se aceptan en Production"
         [[ "$(leer_valor "$SECRETOS/$archivo" BABELHUB__Pagos__LlavePrivada)" == sk_live_* ]] || anotar "$archivo: ASPNETCORE_ENVIRONMENT=Production exige BABELHUB__Pagos__LlavePrivada con la llave de producción de Culqi (sk_live_…)"
         ;;
       "") ;;   # la falta de la clave ya la anotó la tabla de secretos requeridos

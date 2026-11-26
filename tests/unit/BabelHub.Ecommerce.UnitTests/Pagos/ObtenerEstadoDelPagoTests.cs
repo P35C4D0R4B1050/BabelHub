@@ -20,7 +20,7 @@ public sealed class ObtenerEstadoDelPagoTests
     {
         var e = new EntornoDePagos();
         await e.CrearMixta();
-        return (e, new ObtenerEstadoDelPago(e.Autorizador, e.Repositorio, e.Unidad, e.Reloj));
+        return (e, new ObtenerEstadoDelPago(e.Autorizador, e.Repositorio, e.Unidad, e.Reloj, OpcionesDelCobro.PorDefecto));
     }
 
     private static async Task<IntentoDeCobro> SembrarIntento(EntornoDePagos e, Action<IntentoDeCobro> alterar)
@@ -100,7 +100,7 @@ public sealed class ObtenerEstadoDelPagoTests
     public async Task Con_un_cobro_sin_resolver_se_espera_la_confirmacion_hasta_el_limite_del_pendiente()
     {
         var e = await EntornoDePagosExtensiones.ConIntencionLista();
-        var estado = new ObtenerEstadoDelPago(e.Autorizador, e.Repositorio, e.Unidad, e.Reloj);
+        var estado = new ObtenerEstadoDelPago(e.Autorizador, e.Repositorio, e.Unidad, e.Reloj, OpcionesDelCobro.PorDefecto);
         var intencion = await e.Unidad.Ejecutar(token => e.Repositorio.ObtenerIntencion(Pedido, false, token));
         Assert.Equal(ValidacionDelCobro.Permitido, intencion!.IniciarCobro(e.Reloj.Ahora));
         await e.Unidad.Ejecutar(async token =>
@@ -122,7 +122,7 @@ public sealed class ObtenerEstadoDelPagoTests
     {
         var e = new EntornoDePagos();
         e.Repositorio.Sembrar(IntencionesDePrueba.Aprobada());
-        var estado = new ObtenerEstadoDelPago(e.Autorizador, e.Repositorio, e.Unidad, e.Reloj);
+        var estado = new ObtenerEstadoDelPago(e.Autorizador, e.Repositorio, e.Unidad, e.Reloj, OpcionesDelCobro.PorDefecto);
         Assert.Equal(EstadoDelPagoDeLaCompra.Aprobado, (await estado.Ejecutar(Pedido)).Valor.Estado);
 
         var completada = IntencionesDePrueba.Aprobada();
@@ -187,7 +187,7 @@ public sealed class ObtenerEstadoDelPagoTests
     public async Task La_fachada_publica_delega_en_la_clave_el_cobro_y_el_estado()
     {
         var e = await EntornoDePagosExtensiones.ConIntencionLista();
-        var pagos = new PagosDelCliente(e.EmitirClave, e.Cobrar, new ObtenerEstadoDelPago(e.Autorizador, e.Repositorio, e.Unidad, e.Reloj));
+        var pagos = new PagosDelCliente(e.EmitirClave, e.Cobrar, new ObtenerEstadoDelPago(e.Autorizador, e.Repositorio, e.Unidad, e.Reloj, OpcionesDelCobro.PorDefecto));
 
         var clave = await pagos.EmitirClaveDeIntento(new EmitirClaveDeIntentoEntrada(Pedido));
         var estado = await pagos.ObtenerEstado(Pedido);

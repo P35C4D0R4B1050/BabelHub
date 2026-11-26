@@ -6,9 +6,9 @@ namespace BabelHub.Ecommerce.Application.Pagos.Interno;
 /// <summary>
 /// El estado del pago de una compra para la web (PAG-07, PAG-14): lo que el cliente puede esperar o hacer. Solo lee, sin bloquear ni escribir (una lectura de la pantalla de estado no compite con el cobro): la cuenta sale del actor; un pedido ajeno o
 /// inexistente responde igual y deja un acceso denegado (SEG-09). Responde también cuando el checkout ya está <c>pagado</c> o <c>cancelado</c>, porque se apoya en la intención y no en Carrito. <c>PuedeReintentar</c> solo si se puede pagar ahora
-/// (<see cref="IntencionDePago.ValidarCobro"/> lo permite); <c>UltimoMotivo</c> es el del intento más reciente si fue rechazado.
+/// (<see cref="IntencionDePago.ValidarCobro"/> lo permite y el cobro no está cerrado); <c>CobroDisponible</c> es falso sin ninguna pasarela (DD-110); <c>UltimoMotivo</c> es el del intento más reciente si fue rechazado.
 /// </summary>
-internal sealed class ObtenerEstadoDelPago(AutorizadorDePagos autorizador, IRepositorioDePagos repositorio, IUnidadDeTrabajo unidad, IReloj reloj) : ICasoDeUso<Guid, EstadoDelPagoVista>
+internal sealed class ObtenerEstadoDelPago(AutorizadorDePagos autorizador, IRepositorioDePagos repositorio, IUnidadDeTrabajo unidad, IReloj reloj, OpcionesDelCobro opciones) : ICasoDeUso<Guid, EstadoDelPagoVista>
 {
     public async Task<Resultado<EstadoDelPagoVista>> Ejecutar(Guid pedidoId, CancellationToken cancelacion = default)
     {
@@ -54,10 +54,10 @@ internal sealed class ObtenerEstadoDelPago(AutorizadorDePagos autorizador, IRepo
             EstadoDeIntencion.ConCobro => intencion.LimitePendienteEn,
             _ => (DateTimeOffset?)null,
         };
-        var puedeReintentar = intencion.Estado == EstadoDeIntencion.Abierta && intencion.ValidarCobro(reloj.Ahora) == ValidacionDelCobro.Permitido;
+        var puedeReintentar = !opciones.Cerrado && intencion.Estado == EstadoDeIntencion.Abierta && intencion.ValidarCobro(reloj.Ahora) == ValidacionDelCobro.Permitido;
         MotivoDeRechazoDePago? motivo = ultimo is { Estado: EstadoDeIntento.Rechazado, MotivoDeRechazo: { } m } ? MapeoDeMotivos.APublico(m) : null;
 
-        return Resultado<EstadoDelPagoVista>.Exito(new EstadoDelPagoVista(estado, limite, intencion.ReservaExpiraEn, motivo, puedeReintentar));
+        return Resultado<EstadoDelPagoVista>.Exito(new EstadoDelPagoVista(estado, limite, intencion.ReservaExpiraEn, motivo, puedeReintentar, CobroDisponible: !opciones.Cerrado));
     }
 }
 

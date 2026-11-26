@@ -1,0 +1,12 @@
+@model BabelHub.Ecommerce.Api.Areas.Tienda.Controllers.PagoVista
+@* Sin ninguna pasarela (DD-110) la única salida es volver: «Volver al carrito» deja la compra por el contrato de Carrito (libera lo que el checkout hubiera reservado) y el catálogo queda a un clic. *@
+<div class="mt-4 flex flex-wrap items-center gap-3">
+    <bh-accion-de-cambio>
+        <form method="post" action="/checkout/volver">
+            <partial name="_TokenAntifalsificacion" />
+            <input type="hidden" name="pedidoId" value="@Model.PedidoId.ToString("D")" />
+            <button type="submit" class="btn btn-primary">Volver al carrito</button>
+        </form>
+    </bh-accion-de-cambio>
+    <a class="btn btn-ghost" href="/">Seguir mirando el catálogo</a>
+</div>

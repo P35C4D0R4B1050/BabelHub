@@ -44,6 +44,8 @@ public static class PantallasDelCarrito
         ["ECO-VERIFICACION-FALLIDA"] = new("No pudimos verificarte", "Completa la verificación de nuevo e inténtalo otra vez."),
         ["ECO-REC-ESTADO-INVALIDO"] = new("Esta hoja ya no admite esa acción", "Otra persona la respondió o la descartó, o ya pasó su plazo de conservación. Vuelve al listado para ver su estado."),
         ["ECO-CONFLICTO"] = new("No pudimos completar la solicitud", "Otra solicitud igual sigue en curso o la información cambió. Espera unos segundos y revisa el estado antes de repetirla."),
+        // Sin ninguna pasarela (DD-110): una solicitud de cobro hecha a mano o desde una pestaña vieja.
+        ["ECO-PAGO-NO-DISPONIBLE"] = new(Areas.Tienda.Controllers.TextosDelPago.TituloSinPasarela, "Todavía no recibimos pagos en la tienda. No se te cobró nada y tu carrito se conservó."),
     };
 
     private static readonly Dictionary<string, string> CampoDelFormulario = new(StringComparer.Ordinal)

@@ -53,6 +53,7 @@ public static class ProblemasDelCarrito
         ["instantanea-obsoleta"] = new("PAGO-INSTANTANEA-OBSOLETA", StatusCodes.Status409Conflict),
         ["total-cambio"] = new("PAGO-TOTAL-CAMBIO", StatusCodes.Status409Conflict),
         ["pago-en-curso"] = new("PAGO-EN-CURSO", StatusCodes.Status409Conflict),
+        ["pago-no-disponible"] = new("PAGO-NO-DISPONIBLE", StatusCodes.Status503ServiceUnavailable),
         ["clave-invalida"] = new("PAGO-CLAVE-INVALIDA", StatusCodes.Status409Conflict),
         ["sin-cargo-que-reembolsar"] = new("REEMBOLSO-SIN-CARGO", StatusCodes.Status409Conflict),
         ["reembolso-distinto"] = new("REEMBOLSO-DISTINTO", StatusCodes.Status409Conflict),

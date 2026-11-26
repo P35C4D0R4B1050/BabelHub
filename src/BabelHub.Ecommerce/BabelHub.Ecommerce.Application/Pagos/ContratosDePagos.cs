@@ -62,7 +62,8 @@ public sealed record CobrarEntrada(Guid PedidoId, [property: JsonIgnore] string 
 
 public sealed record ResultadoDelCobroDelCliente(EstadoDelCobro Estado, MotivoDeRechazoDePago? Motivo, Guid IntentoId);
 
-public sealed record EstadoDelPagoVista(EstadoDelPagoDeLaCompra Estado, DateTimeOffset? LimiteEn, DateTimeOffset? ReservaExpiraEn, MotivoDeRechazoDePago? UltimoMotivo, bool PuedeReintentar);
+/// <summary>El pago de una compra para la pantalla (PAG-14). <see cref="CobroDisponible"/> es falso cuando la tienda no tiene ninguna pasarela (DD-110): se dice que el pago en línea estará disponible pronto y no se ofrece pagar.</summary>
+public sealed record EstadoDelPagoVista(EstadoDelPagoDeLaCompra Estado, DateTimeOffset? LimiteEn, DateTimeOffset? ReservaExpiraEn, MotivoDeRechazoDePago? UltimoMotivo, bool PuedeReintentar, bool CobroDisponible = true);
 
 /// <summary>
 /// El pago de una compra para la web (PAG-01 a PAG-09): solo el cliente dueño. Cada operación comprueba el alcance en la Aplicación y audita en la misma transacción; ninguna llamada de red va dentro de una

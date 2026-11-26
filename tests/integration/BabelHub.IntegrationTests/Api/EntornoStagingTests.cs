@@ -161,6 +161,59 @@ public sealed class EntornoStagingTests
         Assert.Contains("BABELHUB__Pagos__LlavePrivada", falla.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [Trait("Criterio", "AC-PAG-30")]
+    [Trait("Criterio", "AC-PAG-42")]
+    [InlineData("Staging")]
+    [InlineData("Development")]
+    public void Sin_pasarela_el_servicio_arranca_sin_ningun_aviso_de_simulacion_y_con_el_cobro_cerrado(string entorno)
+    {
+        var configuracion = entorno == "Staging" ? ConfiguracionDeUnEntornoDeTipoProduccion() : AnfitrionDelEcommerceTests.ConfiguracionCompleta();
+        configuracion["Pagos:Pasarela"] = "ninguna";
+        // El operador logístico sigue siendo el simulado (no hay uno real): como no se puede comprar, tampoco se anuncia.
+        configuracion["Envios:Operador"] = "simulador";
+        var builder = Constructor(configuracion, entorno);
+
+        builder.AgregarEcommerce(ModoDeArranque.Normal);
+        using var app = builder.Build();
+
+        Assert.False(app.Services.GetRequiredService<ModoDePagosDeLaWeb>().Simulado);
+        Assert.False(app.Services.GetRequiredService<ModoDeEnviosDeLaWeb>().Simulado);
+        Assert.Equal("NuloPasarelaDePago", app.Services.GetRequiredService<BabelHub.Ecommerce.Application.Pagos.Interno.IPasarelaDePago>().GetType().Name);
+        Assert.True(app.Services.GetRequiredService<BabelHub.Ecommerce.Application.Pagos.Interno.OpcionesDelCobro>().Cerrado);
+        // No hay proveedor de pago con el que hablar: la coherencia del arranque de un entorno de tipo producción no lo toma por un adaptador real que falta.
+        ArranqueSeguro.ExigirCoherencia(ModoDeArranque.Normal, builder.Environment.EsDeTipoProduccion(), app.Services.GetServices<IAdaptadorSaliente>());
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-30")]
+    public void En_Production_sin_pasarela_el_arranque_se_niega()
+    {
+        var configuracion = ConfiguracionDeUnEntornoDeTipoProduccion();
+        configuracion["Pagos:Pasarela"] = "ninguna";
+        var builder = Constructor(configuracion, "Production");
+
+        var falla = Assert.Throws<ConfiguracionDePagosInvalidaException>(() => builder.AgregarEcommerce(ModoDeArranque.Normal));
+
+        Assert.Contains("ninguna", falla.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-30")]
+    public void Sin_pasarela_al_restaurar_el_adaptador_se_declara_nulo()
+    {
+        var configuracion = ConfiguracionDeUnEntornoDeTipoProduccion();
+        configuracion["Pagos:Pasarela"] = "ninguna";
+        var builder = Constructor(configuracion, "Staging");
+        builder.Services.AddSingleton(typeof(ModoDeArranque), ModoDeArranque.Ensayo);
+
+        builder.AgregarEcommerce(ModoDeArranque.Ensayo);
+        using var app = builder.Build();
+
+        Assert.Contains(app.Services.GetServices<IAdaptadorSaliente>(), a => a.Nombre == "pasarela-de-pago" && a.EsNulo && a.EsHaciaProveedor);
+        ArranqueSeguro.ExigirCoherencia(ModoDeArranque.Ensayo, esProduccion: true, app.Services.GetServices<IAdaptadorSaliente>());
+    }
+
     [Fact]
     [Trait("Criterio", "AC-PAG-29")]
     public void En_Development_el_simulador_tambien_se_anuncia_y_con_un_modo_sin_llamadas_reales_no()

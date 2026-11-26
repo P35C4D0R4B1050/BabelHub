@@ -3,9 +3,10 @@ using Microsoft.Extensions.Configuration;
 namespace BabelHub.Ecommerce.Infrastructure.Pagos;
 
 /// <summary>
-/// Lee de la configuración lo que decide el arranque de Pagos (PAG-12, T27): <c>Pagos:Pasarela</c> (<c>simulador</c> o <c>culqi</c>) y los secretos <c>BABELHUB__Pagos__LlavePrivada</c>, <c>BABELHUB__Pagos__ClaveDeIntentos</c> y <c>BABELHUB__Pagos__ClaveDeIntentosAnterior</c>
+/// Lee de la configuración lo que decide el arranque de Pagos (PAG-12, T27): <c>Pagos:Pasarela</c> (<c>ninguna</c>, <c>simulador</c> o <c>culqi</c>) y los secretos <c>BABELHUB__Pagos__LlavePrivada</c>, <c>BABELHUB__Pagos__ClaveDeIntentos</c> y <c>BABELHUB__Pagos__ClaveDeIntentosAnterior</c>
 /// (el valor anterior sirve para rotar la clave: los tokens emitidos con él siguen valiendo hasta que vencen). Solo lee y entrega las opciones; <see cref="GuardaDeArranqueDePagos"/> decide si son válidas para el entorno y el modo. <b>En un modo que prohíbe llamadas
-/// reales (<c>Restauracion</c> y <c>Ensayo</c>) el adaptador de la pasarela es siempre el nulo</b> y no se pide la llave privada: nunca se llama a un proveedor.
+/// reales (<c>Restauracion</c> y <c>Ensayo</c>) el adaptador de la pasarela es siempre el nulo</b> y no se pide la llave privada: nunca se llama a un proveedor. Sin pasarela (<c>ninguna</c>, DD-110) el adaptador también es el nulo; una llave
+/// puesta por error sí se lee, para que la guarda la rechace.
 /// </summary>
 public static class LectorDeOpcionesDePagos
 {
@@ -18,7 +19,7 @@ public static class LectorDeOpcionesDePagos
             pasarela,
             entorno ?? string.Empty,
             sinLlamadasReales,
-            PasarelaEsNula: sinLlamadasReales,
+            PasarelaEsNula: sinLlamadasReales || pasarela == GuardaDeArranqueDePagos.Ninguna,
             pedidosDisponible,
             llave,
             Texto(configuracion, "Pagos:ClaveDeIntentos"),

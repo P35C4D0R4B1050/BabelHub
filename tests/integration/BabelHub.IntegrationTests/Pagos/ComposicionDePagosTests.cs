@@ -47,6 +47,20 @@ public sealed class ComposicionDePagosTests
     private static T Falso<T>()
         where T : class => DispatchProxy.Create<T, ProxyQueNoHaceNada>();
 
+    /// <summary>
+    /// Compone Pagos sin pasarela (<c>ninguna</c>) sobre lo que el anfitrión de la prueba ya registró; todo lo que falte es un doble que falla si se lo llama (el actor, las denegaciones, el reloj y Carrito ya los puso el anfitrión).
+    /// </summary>
+    internal static void ComponerSinPasarela(IServiceCollection servicios)
+    {
+        var yaPuestos = servicios.Select(d => d.ServiceType).ToHashSet();
+        foreach (var descriptor in ConExternos().Where(d => !yaPuestos.Contains(d.ServiceType)))
+        {
+            servicios.Add(descriptor);
+        }
+
+        servicios.AgregarPagos(Opciones("ninguna", "Staging", nula: true), esProduccion: false);
+    }
+
     public class ProxyQueNoHaceNada : DispatchProxy
     {
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args) => throw new NotSupportedException("Un doble de composición no se llama.");
@@ -91,6 +105,20 @@ public sealed class ComposicionDePagosTests
         using var proveedor = servicios.BuildServiceProvider();
 
         Assert.IsType<NuloPasarelaDePago>(proveedor.GetRequiredService<IPasarelaDePago>());
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-42")]
+    public void Sin_pasarela_la_composicion_usa_el_adaptador_nulo_y_cierra_el_cobro_y_con_las_otras_lo_deja_abierto()
+    {
+        using var sinPasarela = ConExternos().AgregarPagos(Opciones("ninguna", "Staging", nula: true), esProduccion: false).BuildServiceProvider();
+        using var simulado = ConExternos().AgregarPagos(Opciones(entorno: "Staging"), esProduccion: false).BuildServiceProvider();
+        using var alRestaurar = ConExternos().AgregarPagos(Opciones(sinLlamadasReales: true, nula: true), esProduccion: false).BuildServiceProvider();
+
+        Assert.IsType<NuloPasarelaDePago>(sinPasarela.GetRequiredService<IPasarelaDePago>());
+        Assert.True(sinPasarela.GetRequiredService<OpcionesDelCobro>().Cerrado);
+        Assert.False(simulado.GetRequiredService<OpcionesDelCobro>().Cerrado);
+        Assert.False(alRestaurar.GetRequiredService<OpcionesDelCobro>().Cerrado);
     }
 
     [Fact]

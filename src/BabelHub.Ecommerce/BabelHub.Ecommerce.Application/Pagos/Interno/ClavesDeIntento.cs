@@ -55,6 +55,9 @@ internal static class ClavesDePagos
     public const string LimiteExcedido = "limite-excedido";
     public const string EsperaEnSegundos = "espera-en-segundos";
     public const string ServicioNoDisponible = "servicio-no-disponible";
+
+    /// <summary><c>ECO-PAGO-NO-DISPONIBLE</c> (503): la tienda no tiene ninguna pasarela y no cobra (DD-110).</summary>
+    public const string PagoNoDisponible = "pago-no-disponible";
 }
 
 internal static class FallosDePagos
@@ -243,7 +246,8 @@ internal sealed class EmitirClaveDeIntento(
     IUnidadDeTrabajo unidad,
     ICheckoutDelCliente checkout,
     FirmadorDeClavesDeIntento firmador,
-    IReloj reloj) : ICasoDeUso<EmitirClaveDeIntentoEntrada, ClaveDeIntentoEmitida>
+    IReloj reloj,
+    OpcionesDelCobro opciones) : ICasoDeUso<EmitirClaveDeIntentoEntrada, ClaveDeIntentoEmitida>
 {
     public async Task<Resultado<ClaveDeIntentoEmitida>> Ejecutar(EmitirClaveDeIntentoEntrada entrada, CancellationToken cancelacion = default)
     {
@@ -251,6 +255,12 @@ internal sealed class EmitirClaveDeIntento(
         if (await autorizador.ExigirSesion(cancelacion).ConfigureAwait(false) is { } sinSesion)
         {
             return Resultado<ClaveDeIntentoEmitida>.Fallo(sinSesion);
+        }
+
+        // Sin pasarela no hay nada que cobrar (DD-110): no se emite ninguna clave.
+        if (opciones.Cerrado)
+        {
+            return FallosDePagos.De<ClaveDeIntentoEmitida>(CategoriaDeError.NoDisponible, ClavesDePagos.PagoNoDisponible);
         }
 
         var cuentaId = autorizador.CuentaId!.Value;

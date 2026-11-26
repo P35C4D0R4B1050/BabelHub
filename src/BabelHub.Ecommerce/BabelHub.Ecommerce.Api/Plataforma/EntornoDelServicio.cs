@@ -3,7 +3,7 @@ namespace BabelHub.Ecommerce.Api.Plataforma;
 /// <summary>
 /// Los entornos con los que corre el E-commerce y qué endurece cada uno (PAG-34, D14 de <c>ecommerce-pagos</c>). <c>Production</c> y <c>Staging</c> son entornos <b>de tipo producción</b>: TLS entre servicios, Redis con TLS,
 /// SMTP y almacenes reales, proxies conocidos, hosts permitidos y sin versiones provisionales ni dobles. La <b>única</b> diferencia es el cobro: <c>Staging</c> (el entorno de revisión de la tienda por la pasarela de pago, antes de
-/// tener sus llaves) admite la pasarela simulada, que no cobra nada y se anuncia en pantalla; <c>Production</c> exige la pasarela real y falla cerrado sin ella. <c>Development</c> y <c>Test</c> relajan el endurecimiento.
+/// tener sus llaves) admite que no haya pasarela (el pago en línea se anuncia como disponible pronto, DD-110) o la simulada, que no cobra nada y se anuncia en pantalla; <c>Production</c> exige la pasarela real y falla cerrado sin ella. <c>Development</c> y <c>Test</c> relajan el endurecimiento.
 /// </summary>
 public static class EntornoDelServicio
 {

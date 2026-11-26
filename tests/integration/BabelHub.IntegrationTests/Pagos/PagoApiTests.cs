@@ -250,6 +250,90 @@ public sealed class PagoApiTests : IAsyncLifetime
         Assert.Equal(["estado"], _host.Pagos.Llamadas);
     }
 
+    // ---------- Sin pasarela (DD-110) ----------
+
+    private static EstadoDelPagoVista SinCobro(EstadoDelPagoDeLaCompra estado = EstadoDelPagoDeLaCompra.ListoParaPagar) =>
+        new(estado, DateTimeOffset.UtcNow.AddMinutes(15), DateTimeOffset.UtcNow.AddMinutes(15), null, false, CobroDisponible: false);
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-42")]
+    public async Task Sin_pasarela_la_pantalla_del_pago_no_tiene_formulario_ni_boton_de_pagar_y_ofrece_volver()
+    {
+        // Incluso con un rechazo anterior (de cuando había pasarela) no se invita a intentarlo de nuevo.
+        _host.Pagos.EstadoDelPago = Resultado<EstadoDelPagoVista>.Exito(SinCobro() with { UltimoMotivo = MotivoDeRechazoDePago.FondosInsuficientes });
+
+        using var respuesta = await _host.Cliente.SendAsync(_host.Pedir($"/checkout/pago?pedidoId={Pedido:D}", html: true));
+
+        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
+        var html = WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync());
+        var principal = html[html.IndexOf("<main", StringComparison.Ordinal)..html.IndexOf("</main>", StringComparison.Ordinal)];
+        Assert.Contains("El pago en línea estará disponible pronto", principal, StringComparison.Ordinal);
+        Assert.Contains("No se te cobró nada", principal, StringComparison.Ordinal);
+        foreach (var prohibido in new[] { "formulario-de-pago", "intentarlo de nuevo", "tokenDelMedio", "claveDeIntento", "Identificador del medio de pago", "name=\"medio\"", "action=\"/checkout/pago\"", "href=\"/checkout/pago", ">Pagar", "data-bh-cuenta-regresiva" })
+        {
+            Assert.DoesNotContain(prohibido, principal, StringComparison.Ordinal);
+        }
+
+        // Volver al carrito libera la compra por el contrato de Carrito; el catálogo está a un clic.
+        Assert.Contains("action=\"/checkout/volver\"", principal, StringComparison.Ordinal);
+        Assert.Contains($"name=\"pedidoId\" value=\"{Pedido:D}\"", principal, StringComparison.Ordinal);
+        Assert.Contains("Volver al carrito", principal, StringComparison.Ordinal);
+        Assert.Contains("href=\"/\"", principal, StringComparison.Ordinal);
+        Assert.DoesNotContain("simulad", html, StringComparison.OrdinalIgnoreCase);
+        // No se pide ninguna clave de intento: no hay nada que cobrar.
+        Assert.Equal(["estado"], _host.Pagos.Llamadas);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PAG-42")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Sin_pasarela_el_estado_del_pago_no_invita_a_pagar(bool htmx)
+    {
+        _host.Pagos.EstadoDelPago = Resultado<EstadoDelPagoVista>.Exito(SinCobro());
+
+        using var respuesta = await _host.Cliente.SendAsync(_host.Pedir($"/checkout/pago/estado?pedidoId={Pedido:D}", htmx: htmx, html: true));
+
+        var html = WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync());
+        Assert.Contains("El pago en línea estará disponible pronto", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Listo para pagar", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Lo confirmaremos antes", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("href=\"/checkout/pago?", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("hx-trigger", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-42")]
+    public async Task Sin_pasarela_un_pago_que_ya_no_admite_cobro_se_sigue_contando_como_esta()
+    {
+        // Un pago que quedó de cuando había pasarela conserva su estado: no se le dice que «estará disponible pronto».
+        _host.Pagos.EstadoDelPago = Resultado<EstadoDelPagoVista>.Exito(SinCobro(EstadoDelPagoDeLaCompra.ConfirmandoElPago));
+
+        using var respuesta = await _host.Cliente.SendAsync(_host.Pedir($"/checkout/pago/estado?pedidoId={Pedido:D}", html: true));
+
+        var html = WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync());
+        Assert.Contains("Estamos confirmando tu pago", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("estará disponible pronto", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-42")]
+    public async Task Sin_pasarela_un_POST_directo_al_cobro_se_rechaza_en_el_servidor_sin_tocar_nada()
+    {
+        // El módulo Pagos real, compuesto con «ninguna», y con la base, el Inventario, la auditoría y los límites doblados para fallar si alguien los llama.
+        await using var cerrado = await PagosApiHost.Crear(sinPasarela: true);
+
+        using var respuesta = await cerrado.Enviar("/checkout/pago", Cobro());
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, respuesta.StatusCode);
+        var texto = await respuesta.Content.ReadAsStringAsync();
+        Assert.Contains("\"ECO-PAGO-NO-DISPONIBLE\"", texto, StringComparison.Ordinal);
+        Assert.DoesNotContain("tkn_test_abc123", texto, StringComparison.Ordinal);
+        Assert.Null(respuesta.Headers.Location);
+        Assert.Equal(0, cerrado.Checkout.Consultas);
+        Assert.Contains("no-store", respuesta.Headers.CacheControl?.ToString(), StringComparison.Ordinal);
+    }
+
     // ---------- Estado y retorno ----------
 
     [Fact]
