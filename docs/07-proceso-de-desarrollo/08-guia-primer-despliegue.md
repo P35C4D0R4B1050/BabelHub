@@ -609,6 +609,8 @@ sudo env \
 
 1. Descarga de las imágenes (`Pulling…`).
 2. `Migrando las bases (esquemas y roles)...` y líneas `paso: roles`, `paso: plataforma`… hasta `migracion: inventario al día (… pasos, … cuentas)` y `migracion: ecommerce al día (15 pasos, 3 cuentas)` (el paso 15 es `textos-vigentes`: siembra, **una sola vez y sin pisar nada**, la versión de los textos legales de `migrador.env`; sin esa fila nadie podría aceptar los textos ni comprar).
+
+   **Textos legales definitivos (desde el 2026-11-26):** `migrador.env` siembra la versión `1.0`. Si ya habías migrado con `0.1-provisional` (carpeta de secretos o base anteriores), la siembra **no la pisa**: tras desplegar la imagen nueva, fija la versión con la sentencia de [`infra/README.md`](../../infra/README.md) («Versión de los textos legales») usando las de `versiones-de-referencia-de-textos.json`, **antes** de crear la cuenta de prueba. Si tu carpeta de secretos dice `0.1-provisional` y aún no desplegaste, cambia ese valor a `1.0` en `inventario/migrador.env`.
 3. `ok postgres`, `ok inventario`, `ok ecommerce-gestion`, `ok tarea diaria de respaldo (/etc/cron.d/babelhub-respaldo)` y `VM inventario desplegada y sana.`
 
 **Si falla:** el script **nombra** cada cosa que falta («falta la clave X en postgres.env», «aviso.env es de … debe ser de root», «CAMBIAR sin completar»). Corrige y vuelve a ejecutar: **es idempotente** (repetirlo no rompe nada). Si dice «no es una imagen publicada con su digest», copiaste mal una línea del paso 5.
@@ -886,7 +888,7 @@ Es lo que despliega esta guía por defecto (`BABELHUB__Pagos__Pasarela="ninguna"
 | :--- | :--- | :--- |
 | **Contacto visible** (teléfono, correo, dirección) | Los muestra la tienda desde `BABELHUB__Contacto__Telefono`, `…__Correo` y `…__Direccion` (otro carril de trabajo implementa su lectura y su lugar en el pie y en la página de contacto) | Completar esas tres variables en `ecommerce.env` y `ecommerce-gestion.env` (§10.2). **Son datos personales: no van al repositorio.** |
 | **Términos y condiciones** | `/legal/terminos` (enlace en el pie) | Revisar el texto con la persona responsable (hoy es de trabajo). |
-| **Política de cambios y devoluciones** | `/legal/reembolso` («Política de reembolso», enlace en el pie) y el flujo de devoluciones | Confirmar que el texto cubre cambios **y** devoluciones, como lo pide Culqi (otro carril trabaja en los textos legales). |
+| **Política de cambios y devoluciones** | `/legal/cambios-y-devoluciones` («Cambios y devoluciones», enlace en el pie; `/legal/reembolso` redirige) y el flujo de devoluciones | Nada más: el texto definitivo se publicó el 2026-11-26 (versión de los textos en `identidad.versiones_de_textos`). |
 | **Libro de Reclamaciones** | `/reclamaciones` (enlace en el pie) | Nada: ya funciona. |
 | **Al menos 5 productos con foto, descripción y precio** | El catálogo público | Cargarlos desde la administración del catálogo. **En `Staging` solo van obras y archivos digitales de MUESTRA, sin valor comercial** (así, si después activas el simulador para las pruebas con personas, nada de valor se entrega), **y los pedidos de `Staging` no se atienden**. Los carga el administrador que creas con `crear-administrador` (§0, fila 1 bis). |
 | **Carrito o botón «Comprar»** | Ficha de cada obra y `/carrito` → `/checkout` | Nada: ya funciona (el último paso dice que el pago en línea estará disponible pronto). |

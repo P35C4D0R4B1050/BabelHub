@@ -2,6 +2,11 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-26 — Textos legales definitivos
+
+### Cubierto
+- Términos, privacidad y «Cambios y devoluciones» sin la marca «provisional», con nueva versión de referencia y siembra `1.0` (DD-115, aprobados por la persona).
+
 ## 2026-11-25 (noche) — Respaldos comprimidos en Cloudflare R2 (carril `dos-vms-y-r2`, entrega 2)
 
 ### Cubierto

@@ -218,7 +218,7 @@ linea "$f" BABELHUB__Migrador__Inventario__Propietaria "Host=postgres;Port=5432;
 linea "$f" BABELHUB__Migrador__Ecommerce__Propietaria "Host=postgres;Port=5432;Database=ecommerce;Username=postgres;Password=$(valor pg-admin 40)$TLS_NPGSQL"
 # La versión con la que la migración siembra, solo si faltan, los textos legales vigentes (términos, privacidad y reembolso). La aplicación solo los lee y sin ellos nadie acepta los textos ni compra. Es PROVISIONAL: mientras los textos
 # legales sean de trabajo, la versión lo dice; al aprobar los definitivos la persona responsable cambia la fila (todas las cuentas deberán aceptarlos de nuevo). Nunca se pisa lo ya sembrado.
-linea "$f" BABELHUB__Migrador__Ecommerce__VersionDeTextos "0.1-provisional"
+linea "$f" BABELHUB__Migrador__Ecommerce__VersionDeTextos "1.0"
 
 # La credencial de correo propia de esta VM para el aviso del espacio reservado (PLA-21): solo envía avisos.
 f="$d/aviso.env"; inicio "$f"
