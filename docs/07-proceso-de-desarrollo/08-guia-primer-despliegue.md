@@ -10,9 +10,9 @@ Esta guía deja listo **todo lo que es infraestructura** con **dos máquinas vir
 
 | # | Qué pasa | Por qué | Qué decidir |
 | :--- | :--- | :--- | :--- |
-| **1** | **RESUELTO con el entorno `Staging` (2026-11-23).** El E-commerce no arrancaba en `Production` sin el adaptador de Culqi (T37 y T38, a la espera de las llaves, B05): el simulador solo valía en `Development` y `Test`. | Ahora el simulador también vale en **`Staging`**, un entorno que se endurece **igual que `Production`** (HTTPS entre servicios, Redis con TLS, correo y almacén reales, hosts permitidos…) y que solo afloja el cobro: la pantalla dice «Pagos simulados: no se realiza ningún cobro» y a nadie se le cobra. `Production` **sigue fallando cerrado** sin la pasarela real y su llave `sk_live_…`. | Nada que decidir: despliega en **`Staging`** (el generador de secretos lo hace por defecto) para que **Culqi revise la tienda** (§15.1, fase 1) y pasa a `Production` cuando lleguen las llaves (§15.1, fase 2). |
+| **1** | **RESUELTO con el entorno `Staging` (2026-11-23).** El E-commerce no arrancaba en `Production` sin el adaptador de Culqi (T37 y T38, a la espera de las llaves, B05): el simulador solo valía en `Development` y `Test`. | Ahora el simulador también vale en **`Staging`**, un entorno que se endurece **igual que `Production`** (HTTPS entre servicios, Redis con TLS, correo y almacén reales, hosts permitidos…) y que solo afloja el cobro: a nadie se le cobra, porque no hay pasarela (`ninguna`, el valor por defecto desde el 2026-11-26: el pago en línea se anuncia como «disponible pronto», DD-110) o porque es la simulada, que lo dice en pantalla. `Production` **sigue fallando cerrado** sin la pasarela real y su llave `sk_live_…`. | Nada que decidir: despliega en **`Staging`** (el generador de secretos lo hace por defecto, con `ninguna`) para que **Culqi revise la tienda** (§15.1, fase 1) y pasa a `Production` cuando lleguen las llaves (§15.1, fase 2). |
 | **1 bis** | **RESUELTO: el primer administrador se crea con un comando** (`crear-administrador`, §15.1). | Sin una primera cuenta de administración nadie entra a `gestion.babel-hub.shop`, ni carga el catálogo (Culqi exige **al menos 5 productos**) ni administra pedidos. | Ejecutar `crear-administrador --correo <tu correo>` (§15.1); en el primer ingreso cambias la contraseña y configuras el segundo factor (TOTP). |
-| **1 ter** | **RESUELTO: los envíos se operan con el simulador, también en `Production`** (DD-22, DD-88). | No existe un operador logístico real ni lo habrá. Los archivos de secretos llevan `BABELHUB__Envios__Operador="simulador"` (el generador lo escribe y `desplegar.sh` lo exige) y la tienda muestra «Los envíos son simulados: proyecto académico» encima del pie y en el checkout. | Nada que decidir. Las guías de envío a domicilio las genera el simulador y ningún paquete sale. |
+| **1 ter** | **RESUELTO: los envíos se operan con el simulador, también en `Production`** (DD-22, DD-88). | No existe un operador logístico real ni lo habrá. Los archivos de secretos llevan `BABELHUB__Envios__Operador="simulador"` (el generador lo escribe y `desplegar.sh` lo exige) y la tienda muestra «Los envíos son simulados: proyecto académico» encima del pie y en el checkout, **salvo con la pasarela `ninguna`**, en la que no se puede comprar y no se muestra (DD-111). | Nada que decidir. Las guías de envío a domicilio las genera el simulador y ningún paquete sale. |
 | **2** | **RESUELTO (2026-11-25): PostgreSQL habla solo TLS verificado** entre VM-VENTAS, los servicios de VM-INVENTARIO y Evolution API (AM24, DD-90 a DD-94). | El servidor usa un certificado de la CA privada (`tls-postgres-*.pem`, que `generar-secretos.sh` crea con los demás), `pg_hba.conf` rechaza toda conexión de red sin TLS y las cadenas de conexión llevan `SSL Mode=VerifyFull`; `desplegar.sh` se niega a desplegar si alguna no lo pide. | Nada que decidir. **Si ya generaste tu carpeta de secretos con una versión anterior del generador, regenérala** (la CA anterior no permite el nombre `postgres`): usa una carpeta nueva y vuelve a copiar los valores «CAMBIAR» que completaste; no se puede parchear a mano. |
 | **3** | Los clientes de seguridad exigen **HTTPS entre servicios** en producción. | Es una regla de la aplicación (SEG-15). | Ya está resuelto aquí: `scripts/generar-secretos.sh` crea una **CA privada** y los certificados de cada VM, y los Compose abren el puerto 8443. No hay que hacer nada, solo entenderlo (reglas de red en el paso 3). |
 | **4** | **Solo dos VMs** (DD-100). `cloudflared` y Nginx corren dentro de VM-VENTAS; **no hay VM-BORDE** y **VM-AUX queda aplazada**. | Sin capacidad para las AMD micro en `sa-santiago-1`. | Nada que decidir. Lee en §14 lo que **no** tienes mientras no haya VM-AUX (entre otras cosas, nadie te avisa si fallan los respaldos). |
@@ -523,7 +523,7 @@ bash scripts/generar-secretos.sh --destino ~/babelhub-secretos \
 
 **TLS de PostgreSQL (AM24):** el generador también emite `tls-postgres-cert.pem` y `tls-postgres-key.pem` (solo en la carpeta de VM-INVENTARIO) y deja todas las cadenas de conexión con `SSL Mode=VerifyFull` y la de Evolution con `sslmode=require&sslaccept=strict&sslcert=/run/secrets/tls-ca.pem` (Prisma, el cliente de Evolution, ignora `verify-full`). No tienes que editar nada; `desplegar.sh` se niega a desplegar si alguna cadena no pide TLS verificado.
 
-`--entorno staging` (el valor por defecto) deja el E-commerce en **`Staging` con la pasarela simulada** (fase 1 de Culqi, §15.1); `--entorno production` (cuando tengas las llaves) lo deja en `Production` con `culqi` y te pide la llave `sk_live_…`. El dominio es `babel-hub.shop`: la tienda atiende `babel-hub.shop` y `www.babel-hub.shop`, y la gestión `gestion.babel-hub.shop` (§2.1).
+`--entorno staging` (el valor por defecto) deja el E-commerce en **`Staging` sin pasarela (`ninguna`)**, la tienda que revisa Culqi (fase 1, §15.1); añade `--pasarela simulador` solo si quieres la pasarela simulada (§15.1, «Alternar la pasarela en Staging»); `--entorno production` (cuando tengas las llaves) lo deja en `Production` con `culqi` y te pide la llave `sk_live_…`. El dominio es `babel-hub.shop`: la tienda atiende `babel-hub.shop` y `www.babel-hub.shop`, y la gestión `gestion.babel-hub.shop` (§2.1).
 
 **Qué debes ver:** «Listo. Se generaron los secretos de las dos VMs» y «Falta completar N valores «CAMBIAR»». Se crean `inventario/`, `ventas/`, `custodia/` y `PENDIENTES.txt`. Si la carpeta ya existe con archivos, el script **se niega** (no pisa secretos). **Si generaste tus secretos con una versión anterior** (la que creaba una carpeta `borde/` y pedía `--ip-borde`), vuelve a generarlos en una carpeta nueva: cambió en quién confía cada servicio.
 
@@ -554,7 +554,7 @@ nano ~/babelhub-secretos/inventario/ecommerce-gestion.env
 | `…Pagos__LlavePrivada` | **Solo con `--entorno production`:** tu llave `sk_live_…` de Culqi. En `Staging` **no** lleva llave (el script se niega si la hay). |
 | `cloudflared.env` (ventas) | El token del túnel (§12.3). |
 
-**El entorno y la pasarela (`ASPNETCORE_ENVIRONMENT` y `BABELHUB__Pagos__Pasarela`) ya vienen escritos** por el generador en `ecommerce.env` y `ecommerce-gestion.env` y son lo único que cambia al pasar de `Staging` a `Production` (§15.1, fase 2). `desplegar.sh` se niega si faltan, si no son coherentes (`Staging` con `simulador`; `Production` con `culqi` y una llave `sk_live_…`) o si el entorno no es ninguno de los dos.
+**El entorno y la pasarela (`ASPNETCORE_ENVIRONMENT` y `BABELHUB__Pagos__Pasarela`) ya vienen escritos** por el generador en `ecommerce.env` y `ecommerce-gestion.env` y son lo único que cambia al pasar de `Staging` a `Production` (§15.1, fase 2). `desplegar.sh` se niega si faltan, si no son coherentes (`Staging` con `ninguna` o `simulador`; `Production` con `culqi` y una llave `sk_live_…`) o si el entorno no es ninguno de los dos. **Si generaste tu carpeta antes del 2026-11-26, dice `simulador`:** para la revisión de Culqi cámbiala a `ninguna` en los dos archivos (§15.1, «Alternar la pasarela en Staging»).
 
 Edita con `nano`, guarda con `Ctrl+O`, `Enter`, y sal con `Ctrl+X`. No dejes comillas ni espacios alrededor del `=`.
 
@@ -716,7 +716,7 @@ sudo env \
 
 (`evolution-api` espera el número de WhatsApp, §15.3. `IP_INVENTARIO` es la dirección a la que Nginx envía la gestión.)
 
-**Qué debes ver:** `ok nginx`, `ok ecommerce`, `ok redis`, `ok redis-contadores`, `ok n8n`, `ok cloudflared` y `VM ventas desplegada y sana.` Si el E-commerce no arranca, `sudo docker logs --tail 50 babelhub-ventas-ecommerce-1` nombra la variable que falla (nunca su valor): lo típico es un `CAMBIAR` sin completar, `BABELHUB__Pagos__Pasarela` incoherente con el entorno o el simulador en `Production`.
+**Qué debes ver:** `ok nginx`, `ok ecommerce`, `ok redis`, `ok redis-contadores`, `ok n8n`, `ok cloudflared` y `VM ventas desplegada y sana.` Si el E-commerce no arranca, `sudo docker logs --tail 50 babelhub-ventas-ecommerce-1` nombra la variable que falla (nunca su valor): lo típico es un `CAMBIAR` sin completar, `BABELHUB__Pagos__Pasarela` incoherente con el entorno, o `ninguna` o el simulador en `Production`.
 
 **Si falla con «Pool overlaps with other one on this address space»:** alguna red de Docker de la VM ya usa `10.213.10.0/28` o `10.213.11.0/28`. `sudo docker network ls` y borra la que no sea de BabelHub.
 
@@ -762,7 +762,7 @@ curl -s  https://babel-hub.shop/health              # «ok» (lo responde Nginx)
 curl -s  https://babel-hub.shop/health/live          # respuesta del E-commerce
 curl -sI https://babel-hub.shop/ | head -3          # «HTTP/2 200» (E-commerce en Staging); sin errores de certificado
 curl -sI https://gestion.babel-hub.shop/ | head -3  # redirige a la pantalla de Cloudflare Access (no a la app)
-curl -s  https://babel-hub.shop/ | grep -c "data-bh-pagos-simulados"   # 1 = el aviso «Pagos simulados» de Staging está en la página (el navegador lo muestra encima del pie)
+curl -s  https://babel-hub.shop/ | grep -c "data-bh-pagos-simulados"   # 0 con la pasarela «ninguna» (no debe haber avisos); 1 con «simulador»
 ```
 
 Entra además a `https://gestion.babel-hub.shop` en el navegador, pasa Access y comprueba que aparece el ingreso del personal.
@@ -876,11 +876,11 @@ sudo env BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.20 IP_VENTAS
 
 Culqi se integra en **dos fases**: primero **revisa tu web** (no necesita todavía integrar la pasarela) y, cuando la aprueba y te da las llaves, **se integra el cobro real**. La tienda está lista para las dos.
 
-#### Fase 1: Culqi revisa la web (entorno `Staging`, pagos simulados)
+#### Fase 1: Culqi revisa la web (entorno `Staging`, sin pasarela)
 
 > ⚠️ **La tienda en `Staging` es pública**: el registro de cuentas y el Libro de Reclamaciones aceptan datos reales de cualquiera. Los respaldos (§9b, §11.1) deben estar activos y comprobados, y **todavía no hay una restauración probada en la VM**. Usa solo datos de prueba y decide si mientras tanto limitas quién puede entrar (por ejemplo, con una regla de Cloudflare que solo deje pasar a Culqi y a ti).
 
-Es lo que despliega esta guía por defecto. En `Staging` la tienda está en Internet con SSL, **no cobra nada** (la pasarela es un simulador) y lo dice en pantalla: «Pagos simulados: no se realiza ningún cobro», en el pie de toda página, en el checkout y en el pago. Los requisitos que Culqi revisa y dónde se cumple cada uno:
+Es lo que despliega esta guía por defecto (`BABELHUB__Pagos__Pasarela="ninguna"`, DD-110: Culqi suele rechazar una web con una pasarela falsa). En `Staging` la tienda está en Internet con SSL y **no cobra nada porque no hay pasarela**: el catálogo, el carrito y el checkout (revisión de libros, entrega, contacto y totales) funcionan, y el paso de pago solo dice «El pago en línea estará disponible pronto», con la vuelta al carrito y al catálogo. No hay formulario, campo de identificador ni botón de pagar, el servidor rechaza cualquier cobro (también hecho a mano) y no aparece ningún aviso de pagos ni de envíos simulados. Los requisitos que Culqi revisa y dónde se cumple cada uno:
 
 | Requisito de Culqi | Dónde está en BabelHub | Qué debes hacer tú |
 | :--- | :--- | :--- |
@@ -888,8 +888,8 @@ Es lo que despliega esta guía por defecto. En `Staging` la tienda está en Inte
 | **Términos y condiciones** | `/legal/terminos` (enlace en el pie) | Revisar el texto con la persona responsable (hoy es de trabajo). |
 | **Política de cambios y devoluciones** | `/legal/reembolso` («Política de reembolso», enlace en el pie) y el flujo de devoluciones | Confirmar que el texto cubre cambios **y** devoluciones, como lo pide Culqi (otro carril trabaja en los textos legales). |
 | **Libro de Reclamaciones** | `/reclamaciones` (enlace en el pie) | Nada: ya funciona. |
-| **Al menos 5 productos con foto, descripción y precio** | El catálogo público | Cargarlos desde la administración del catálogo. **En `Staging` solo van obras y archivos digitales de MUESTRA, sin valor comercial** (el simulador «cobra» cualquier compra con un código público y entrega accesos con enlace firmado, reservas y avisos reales), **y los pedidos de `Staging` no se atienden**; el aviso «Pagos simulados» debe estar visible. Los carga el administrador que creas con `crear-administrador` (§0, fila 1 bis). |
-| **Carrito o botón «Comprar»** | Ficha de cada obra y `/carrito` → `/checkout` | Nada: ya funciona (con el simulador el último paso no cobra). |
+| **Al menos 5 productos con foto, descripción y precio** | El catálogo público | Cargarlos desde la administración del catálogo. **En `Staging` solo van obras y archivos digitales de MUESTRA, sin valor comercial** (así, si después activas el simulador para las pruebas con personas, nada de valor se entrega), **y los pedidos de `Staging` no se atienden**. Los carga el administrador que creas con `crear-administrador` (§0, fila 1 bis). |
+| **Carrito o botón «Comprar»** | Ficha de cada obra y `/carrito` → `/checkout` | Nada: ya funciona (el último paso dice que el pago en línea estará disponible pronto). |
 | **Usuario y contraseña de prueba** para el revisor | El comando `cuenta-de-prueba` (abajo) | Ejecutarlo y pasar el correo y la contraseña a Culqi por un canal seguro (no por el chat público ni el repositorio). |
 | **SSL en todas las URLs** | Cloudflare: Universal SSL + Always Use HTTPS (§12.2); la aplicación redirige y envía HSTS | Verificar con los `curl` de §13.3 y recorrer la tienda en el navegador buscando avisos de «contenido no seguro» (no debe haber). |
 
@@ -903,11 +903,28 @@ sudo env BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.10 IP_INVENT
   run --rm --no-deps --no-TTY ecommerce cuenta-de-prueba
 ```
 
-**Qué debes ver:** `cuenta-de-prueba: cuenta creada (correo verificado, textos vigentes aceptados).`, el correo (por defecto `revision@example.test`; con `--correo <dirección>` solo puedes elegir `persona-01@example.test` a `persona-20@example.test`; cualquier otro correo se niega sin tocar nada) y la **contraseña**. **Anótala ahora** en tu gestor de contraseñas. La cuenta nace con el correo **verificado** y con los textos legales aceptados, de modo que puede ingresar y comprar sin recibir ningún correo. El comando también crea, si faltaba, la **primera clave de firma** de las credenciales (sin ella nadie podría ingresar) y deja todo registrado en la auditoría.
+**Qué debes ver:** `cuenta-de-prueba: cuenta creada (correo verificado, textos vigentes aceptados).`, el correo (por defecto `revision@example.test`; con `--correo <dirección>` solo puedes elegir `persona-01@example.test` a `persona-20@example.test`; cualquier otro correo se niega sin tocar nada) y la **contraseña**. **Anótala ahora** en tu gestor de contraseñas. La cuenta nace con el correo **verificado** y con los textos legales aceptados, de modo que puede ingresar y comprar sin recibir ningún correo. El comando también crea, si faltaba, la **primera clave de firma** de las credenciales (sin ella nadie podría ingresar) y deja todo registrado en la auditoría. **Si era la primera vez**, espera **un minuto** antes de ingresar: el servicio ya encendido tarda eso en ver la clave nueva y, mientras tanto, responde «no podemos mostrar esto ahora».
 
 **Si falla**, el mensaje dice qué falta: «solo existe en Staging» (el archivo de secretos dice `Production`), «Faltan los textos legales vigentes» (la migración de VM-INVENTARIO no sembró los textos: revisa `BABELHUB__Migrador__Ecommerce__VersionDeTextos` en `migrador.env` y vuelve a ejecutar `desplegar.sh inventario`) o una variable del servicio sin completar.
 
-**Cómo paga el revisor en `Staging`:** la pantalla de pago pide un «identificador del medio de pago» (con la pasarela real lo genera el script de Culqi; BabelHub nunca ve la tarjeta). Con el simulador, `tok_aprobado` aprueba el pago; `tok_tarjeta_rechazada`, `tok_yape_rechazado` y `tok_fondos_insuficientes` lo rechazan con su motivo. Dile a Culqi que el pago es simulado y que el último paso no cobra.
+**Qué ve el revisor en el paso de pago (`ninguna`):** «El pago en línea estará disponible pronto», que no se le cobró nada ni se creó ningún pedido, «Volver al carrito» y «Seguir mirando el catálogo». Los libros impresos que el checkout separó al pasar al pago se liberan al volver al carrito (o solos, a los 15 minutos). Dile a Culqi que la tienda todavía no cobra y que integrarás su pasarela cuando la apruebe.
+
+##### Alternar la pasarela en `Staging` (`ninguna` ↔ `simulador`)
+
+El simulador **se conserva** para las pruebas con personas: recorren la compra completa sin que se cobre nada. Cambiar de modo es **una línea en dos archivos** (el entorno sigue siendo `Staging` y no lleva llave), y **los dos deben decir lo mismo**: la tienda y la gestión corren en VMs distintas y cada `desplegar.sh` solo ve su archivo.
+
+| Archivo | VM | Línea |
+| :--- | :--- | :--- |
+| `ecommerce.env` | VM-VENTAS | `BABELHUB__Pagos__Pasarela="ninguna"` o `"simulador"` |
+| `ecommerce-gestion.env` | VM-INVENTARIO | la misma |
+
+1. **[Tu equipo]** Cambia la línea en `~/babelhub-secretos/ventas/ecommerce.env` y en `~/babelhub-secretos/inventario/ecommerce-gestion.env` (no vuelvas a generar los secretos: rotarías todos) y copia cada archivo a su VM como en §10.3. Si prefieres editarlo en la VM, el archivo está en `/etc/babelhub/secretos/`.
+2. Vuelve a ejecutar `desplegar.sh ventas` (VM-VENTAS) y `desplegar.sh inventario` (VM-INVENTARIO) con las mismas variables y opciones de §11 y §13.1: Compose recrea el servicio que cambió.
+3. Comprueba desde tu equipo: `curl -s https://babel-hub.shop/ | grep -c "data-bh-pagos-simulados"` da `0` con `ninguna` y `1` con `simulador`.
+
+**Con `simulador`** la tienda dice «Pagos simulados: no se realiza ningún cobro» en el pie de toda página, en el checkout y en el pago, y vuelve a mostrar el aviso de envíos simulados. La pantalla de pago pide un «identificador del medio de pago»: `tok_aprobado` aprueba; `tok_tarjeta_rechazada`, `tok_yape_rechazado` y `tok_fondos_insuficientes` rechazan con su motivo. Úsalo solo con las personas de la prueba y **vuelve a `ninguna`** antes de que Culqi revise la tienda.
+
+**Antes de pasar de `simulador` a `ninguna`** no dejes un pago a medias: con `ninguna` nadie consulta a ninguna pasarela, así que un pago pendiente de confirmación vence solo y un reembolso pendiente queda pendiente en la administración. Los pedidos ya creados con el simulador siguen en la base y en las pantallas (purga lo de prueba con `cuenta-de-prueba --purgar` si estorban).
 
 **El correo de verificación** (para quien se registre solo, como cualquier cliente): el E-commerce ya trae un **transporte SMTP real** (`TransporteDeCorreoSmtp`, con STARTTLS obligatorio). Funciona cuando completas `BABELHUB__Correo__Smtp__Servidor`, `…__Puerto` (587 por defecto), `…__Cuenta`, `…__Credencial` y `…__Remitente` (§10.2: Gmail con contraseña de aplicación). Sin esos datos el servicio **no arranca** en `Staging` ni en `Production` (SMTP es obligatorio), así que el envío real queda configurado de todos modos; lo que no se ha probado de verdad es el envío contra Gmail (queda como pendiente de tu cuenta). Cuotas: Gmail limita unos 500 correos al día, y la cola de BabelHub aplica su propio tope por cuenta y hora. La cuenta de revisión **no depende de ese correo**; las demás personas sí.
 
@@ -945,11 +962,11 @@ Cuando Culqi apruebe la web y te dé las llaves:
    ```
 
    (Con `scripts/generar-secretos.sh --entorno production` en una carpeta nueva obtienes los mismos archivos con esas tres claves ya puestas, pero **no** vuelvas a generar todo: rotarías todos los secretos.)
-3. Vuelve a ejecutar `scripts/desplegar.sh ventas` y `scripts/desplegar.sh inventario` (con las mismas variables y opciones de §13.1, incluido `--sin evolution-api` mientras no haya WhatsApp, y de §11). `desplegar.sh` **se niega** si el entorno y la pasarela no son coherentes o si la llave no empieza con `sk_live_`; y la aplicación se niega a arrancar si, aun así, algo no cuadra: **nunca cobra «a ciegas»**. Con `Production` el aviso «Pagos simulados» desaparece solo.
+3. Vuelve a ejecutar `scripts/desplegar.sh ventas` y `scripts/desplegar.sh inventario` (con las mismas variables y opciones de §13.1, incluido `--sin evolution-api` mientras no haya WhatsApp, y de §11). `desplegar.sh` **se niega** si el entorno y la pasarela no son coherentes o si la llave no empieza con `sk_live_`; y la aplicación se niega a arrancar si, aun así, algo no cuadra: **nunca cobra «a ciegas»**. Con `Production` no aparece el aviso «Pagos simulados».
 4. **No registres todavía el webhook en el panel de Culqi:** su documentación pública no describe una firma ni una autenticación de los avisos y la entrada `…/integraciones/pasarela/avisos` está deshabilitada a propósito (responde 404; DD-95); el estado de un pago pendiente lo confirma la consulta de cada minuto. Contrasta a mano los reembolsos y cobros dudosos con el panel (`docs/05-seguridad/07-operacion-segura.md` §3.2.1).
 5. Las llaves **de integración** de Culqi (`sk_test_…`) no valen en la VM: la aplicación las rechaza fuera de `Development` y `Test` (se usan solo en el spike, en tu equipo). **Nunca** pegues una llave en el chat ni en el repositorio.
 
-**Para volver atrás** (por ejemplo, si algo falla en `Production`): vuelve a poner las tres líneas de `Staging` (`ASPNETCORE_ENVIRONMENT="Staging"`, `BABELHUB__Pagos__Pasarela="simulador"` y **borra** la línea de la llave) y repite `desplegar.sh`.
+**Para volver atrás** (por ejemplo, si algo falla en `Production`): vuelve a poner las tres líneas de `Staging` (`ASPNETCORE_ENVIRONMENT="Staging"`, `BABELHUB__Pagos__Pasarela="ninguna"` y **borra** la línea de la llave) y repite `desplegar.sh`.
 
 ### 15.2 LLM del asistente (B06)
 
@@ -1006,5 +1023,5 @@ Son mediciones que cierran decisiones de la spec. Ninguna bloquea el despliegue,
 | Restauración manual | `scripts/descifrar-respaldo.sh`, `extraer-respaldo.sh` y `descifrar-wal.sh` (`infra/respaldos/README.md`) |
 | VM-AUX (aplazada) | `scripts/vm-aux/` e `infra/vm-aux/` |
 | Respaldos y custodia | `infra/respaldos/`, `scripts/comprobar-custodia.sh` |
-| Decisiones de esta guía | `progress/decisiones-delegadas.md` (DD-55 a DD-59; para `Staging`, la cuenta de prueba, el dominio y HTTPS, DD-65 a DD-69; para las dos VMs, DD-100 a DD-104; respaldos en R2, DD-105 a DD-109) |
-| Entorno `Staging`, aviso de pagos simulados y cuenta de prueba | `specs/ecommerce-pagos/` (PAG-33 a PAG-49, D25), `EntornoDelServicio`, `ModoCuentaDeRevision` y `CuentaDeRevisionDeLaPasarela` |
+| Decisiones de esta guía | `progress/decisiones-delegadas.md` (DD-55 a DD-59; para `Staging`, la cuenta de prueba, el dominio y HTTPS, DD-65 a DD-69; para las dos VMs, DD-100 a DD-104; respaldos en R2, DD-105 a DD-109; la tienda sin pasarela, DD-110 a DD-114) |
+| Entorno `Staging`, sin pasarela o con la simulada y su aviso, y cuenta de prueba | `specs/ecommerce-pagos/` (PAG-33 a PAG-49, D25 y D26), `EntornoDelServicio`, `ModoCuentaDeRevision` y `CuentaDeRevisionDeLaPasarela` |
