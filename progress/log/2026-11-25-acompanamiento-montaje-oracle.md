@@ -28,6 +28,24 @@ Sesión de guía en vivo: la persona responsable hace cada paso en su cuenta; el
 - La guía 08 **no** describe todavía la topología de dos VMs ni R2.
 - No ejecutar `scripts/almacen.sh aplicar` hasta corregir el tamaño del archivo de cambios.
 
+## Segunda parte: GitHub, Cloudflare y correo
+
+Hecho por la persona responsable, sin túnel ni despliegue:
+
+- GitHub: regla de etiquetas `versiones` (activa, `v*`) y entorno `lanzamiento` con revisión obligatoria, comprobados por la API. Sin etiquetas.
+- Cloudflare: SSL/TLS *Full (strict)*, TLS 1.2 mínimo, *Always Use HTTPS*, sin HSTS, *Bot Fight Mode*, redirección de `www` al apex, SPF `-all` y DMARC `p=reject`, widget de Turnstile y Access para la gestión con política por correo y *One-time PIN*.
+- Cuenta de correo dedicada para la tienda, con verificación en dos pasos y contraseñas de aplicación (guardadas fuera del repositorio).
+
+| Problema | Resolución |
+| :--- | :--- |
+| La regla de etiquetas se iba a crear en *Disabled* | Cambiar a *Active* antes de crearla. |
+| El entorno quedaba con *Prevent self-review* y sin guardar | Desmarcarlo, desmarcar el salto por administrador y pulsar *Save protection rules*. |
+| Dos registros `A` aparcados en el apex impedirían el túnel | Borrados. |
+| La ofuscación de correos de Cloudflare reescribe el contacto visible | Recomendado apagarla (sin confirmación de que se hizo). |
+| La consola de Access cambió de diseño y la primera política quedó sin aplicación | Se creó otra y se asignó; borrar la sobrante (sin confirmar). |
+
+Estas observaciones de la guía (§5.1, §10.2 y §13) **no** se aplicaron en la guía 08: la rama `claude/dos-vms-y-r2-0105cd` la está reescribiendo. Se incorporan allí o después de fusionarla.
+
 ## No comprobado
 
 - El tamaño real de las copias y del WAL.
