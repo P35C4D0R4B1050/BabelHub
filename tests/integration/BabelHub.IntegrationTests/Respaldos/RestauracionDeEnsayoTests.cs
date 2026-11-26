@@ -21,20 +21,25 @@ public sealed class RestauracionDeEnsayoTests(RespaldosFixture entorno) : IAsync
 
     private static string Raiz => EntornoDeVmAux.RaizDelRepositorio();
 
-    public async Task InitializeAsync()
+    /// <summary>La custodia real con el destinatario de esta ejecución registrado.</summary>
+    internal static string CustodiaDePrueba(string destinatario)
     {
-        // La custodia real con el destinatario de esta ejecución registrado.
         var texto = File.ReadAllText(Path.Combine(Raiz, "infra", "respaldos", "custodia.md"));
         foreach (var (campo, valor) in new[]
         {
-            ("Titular de la clave", "Titular de prueba"), ("Destinatario público (age)", entorno.Destinatario), ("Ubicación de la copia fuera de línea", "caja fuerte"),
+            ("Titular de la clave", "Titular de prueba"), ("Destinatario público (age)", destinatario), ("Ubicación de la copia fuera de línea", "caja fuerte"),
             ("Ubicación de la segunda copia (obligatoria, en otro lugar)", "casa"), ("Última prueba de descifrado", "2026-01-01"),
         })
         {
             texto = Regex.Replace(texto, $@"(?m)^\| {Regex.Escape(campo)} \| .* \|$", _ => $"| {campo} | {valor} |", RegexOptions.None, TimeSpan.FromSeconds(2));
         }
 
-        _custodia = texto;
+        return texto;
+    }
+
+    public async Task InitializeAsync()
+    {
+        _custodia = CustodiaDePrueba(entorno.Destinatario);
         var builder = new ContainerBuilder(entorno.Etiqueta)
             .WithEntrypoint("sleep", "3600")
             .WithCreateParameterModifier(p => p.User = "root")
@@ -60,9 +65,9 @@ public sealed class RestauracionDeEnsayoTests(RespaldosFixture entorno) : IAsync
     private async Task<string> SubirRespaldo()
     {
         var respaldo = await entorno.PrimerRespaldo();
-        var clave = respaldo.Diarios.Single(k => Regex.IsMatch(k, @"^\d{4}-\d{2}-\d{2}/\d{6}-[0-9a-f]{64}\.tar\.age$"));
-        await _maquina.CopyAsync(await entorno.Descargar(RespaldosFixture.Diarios, clave), "/tmp/respaldo.tar.age");
-        return "/tmp/respaldo.tar.age";
+        var clave = respaldo.Diarios.Single(k => Regex.IsMatch(k, @"^\d{4}-\d{2}-\d{2}/\d{6}-[0-9a-f]{64}\.tar\.zst\.age$"));
+        await _maquina.CopyAsync(await entorno.Descargar(RespaldosFixture.Diarios, clave), "/tmp/respaldo.tar.zst.age");
+        return "/tmp/respaldo.tar.zst.age";
     }
 
     private string Identidad => entorno.Identidad;
@@ -250,6 +255,35 @@ public sealed class RestauracionDeEnsayoTests(RespaldosFixture entorno) : IAsync
         Assert.DoesNotContain("standby.signal", destino, StringComparison.Ordinal);
         Assert.DoesNotContain("recovery.signal", destino, StringComparison.Ordinal);
         Assert.DoesNotContain("postmaster.pid", destino, StringComparison.Ordinal);
+    }
+
+    // ---------- Respaldo comprimido (D25) ----------
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-17")]
+    public async Task UnRespaldoComprimido_SeDescomprimeYSeExtrae_SinDejarTemporalesNiBorrarElOriginal()
+    {
+        var resultado = await Root("rm -rf /tmp/c /tmp/cd && mkdir -p /tmp/c && echo 17 > /tmp/c/PG_VERSION && tar -cf - -C /tmp/c . | zstd -q -c > /tmp/c.tar.zst && /opt/scripts/extraer-respaldo.sh --destino /tmp/cd --tar /tmp/c.tar.zst; echo \"codigo=$? temporales=$(ls -A /tmp/cd | grep -cE '^[.](descomprimido|respaldo)') original=$(test -f /tmp/c.tar.zst && echo si) version=$(cat /tmp/cd/PG_VERSION)\"");
+
+        Assert.Contains("codigo=0 temporales=0 original=si version=17", resultado.Stdout, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PLA-17")]
+    [InlineData("head -c 4000000 /dev/zero > a && tar -cf - a | zstd -q -c > /tmp/malo.zst", "--tope-bytes 100000", "supera el tope")]
+    [InlineData("head -c 4000000 /dev/urandom > a && tar -cf - a | zstd -q -c | head -c 1000000 > /tmp/malo.zst", "", "no se pudo descomprimir")]
+    [InlineData("echo x > a && tar -cf - a | zstd -q --long=28 -c > /tmp/malo.zst", "", "no se pudo descomprimir")]
+    [InlineData("echo x > a && ln a b && tar -cf - a b | zstd -q -c > /tmp/malo.zst", "", "enlace duro")]
+    // Lo que se saltaría los topes si llegara a tar: otra compresión, un zstd dentro de otro o precedido de una trama que se salta.
+    [InlineData("head -c 4000000 /dev/zero > a && tar -cf - a | gzip -c > /tmp/malo.zst", "--tope-bytes 100000", "no es un tar válido")]
+    [InlineData("echo x > a && tar -cf - a | zstd -q -c | zstd -q -c > /tmp/malo.zst", "", "no es un tar válido")]
+    [InlineData("echo x > a && { printf '\\120\\052\\115\\030\\000\\000\\000\\000'; tar -cf - a | zstd -q -c; } > /tmp/malo.zst", "", "no es un tar válido")]
+    public async Task UnRespaldoComprimidoPeligrosoCortadoOExcesivo_SeRechazaEntero(string armado, string opciones, string motivo)
+    {
+        var resultado = await Root($"rm -rf /tmp/z /tmp/zd /tmp/malo.zst && mkdir -p /tmp/z && cd /tmp/z && {armado} && /opt/scripts/extraer-respaldo.sh --destino /tmp/zd --tar /tmp/malo.zst {opciones}; echo \"codigo=$? destino=[$(ls -A /tmp/zd 2>/dev/null | tr '\\n' ' ')]\"");
+
+        Assert.Contains("codigo=1 destino=[]", resultado.Stdout, StringComparison.Ordinal);
+        Assert.Contains(motivo, resultado.Stderr, StringComparison.Ordinal);
     }
 
     [Fact]

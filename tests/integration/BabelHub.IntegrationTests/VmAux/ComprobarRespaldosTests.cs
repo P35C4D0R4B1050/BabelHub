@@ -4,8 +4,8 @@ namespace BabelHub.IntegrationTests.VmAux;
 
 /// <summary>
 /// PLA-20 y AC-PLA-20: VM-AUX comprueba desde fuera de la VM de datos que hay un respaldo completado en las últimas 24 horas y que el archivado
-/// de cambios no tiene más de 15 minutos de atraso, y avisa por correo si no es así; con todo al día no hay aviso. Solo usa la credencial
-/// <c>respaldos-vigilante</c>, que únicamente lista.
+/// de cambios no tiene más de 15 minutos de atraso, y avisa por correo si no es así; con todo al día no hay aviso. Solo lista, con
+/// <c>respaldos-vigilante</c> (R2) y, para la copia del registro, <c>registro-vigilante</c> (Oracle).
 /// </summary>
 [Collection(ProcesosPesadosCollection.Nombre)]
 public sealed class ComprobarRespaldosTests : IDisposable
@@ -14,9 +14,9 @@ public sealed class ComprobarRespaldosTests : IDisposable
 
     public void Dispose() => _entorno.Dispose();
 
-    private static string Base(DateTime dia) => $"{dia:yyyy-MM-dd}/{dia:HHmmss}-{new string('a', 64)}.tar.age";
+    private static string Base(DateTime dia) => $"{dia:yyyy-MM-dd}/{dia:HHmmss}-{new string('a', 64)}.tar.zst.age";
 
-    private static string Config(DateTime dia) => $"{dia:yyyy-MM-dd}/{dia:HHmmss}-config-{new string('b', 64)}.tar.age";
+    private static string Config(DateTime dia) => $"{dia:yyyy-MM-dd}/{dia:HHmmss}-config-{new string('b', 64)}.tar.zst.age";
 
     [Fact]
     [Trait("Criterio", "AC-PLA-20")]
@@ -73,7 +73,7 @@ public sealed class ComprobarRespaldosTests : IDisposable
         // La VM de datos cayó hace 30 horas: nada nuevo desde entonces.
         _entorno.Publicar("respaldos-diarios", Base(ahora.AddHours(-30)), "x", ahora.AddHours(-30));
         _entorno.Publicar("respaldos-diarios", Config(ahora.AddHours(-30)), "x", ahora.AddHours(-30));
-        _entorno.Publicar("respaldos-wal", $"000000010000000000000007-{new string('c', 64)}.age", "x", ahora.AddHours(-30));
+        _entorno.Publicar("respaldos-wal", $"000000010000000000000007-{new string('c', 64)}.zst.age", "x", ahora.AddHours(-30));
         _entorno.Publicar("supresiones-copia", $"2026-01-01/000000-{new string('d', 64)}.tar", "x", ahora.AddHours(-30));
 
         var (codigo, _, _) = _entorno.Ejecutar("alertar.sh", ["respaldos", EntornoDeVmAux.EnLinux(Path.Combine(EntornoDeVmAux.RaizDelRepositorio(), "scripts", "vm-aux", "comprobar-respaldos.sh"))]);
@@ -96,9 +96,9 @@ public sealed class ComprobarRespaldosTests : IDisposable
         var ahora = DateTime.UtcNow;
         _entorno.PublicarElEstadoAlDia(ahora);
         File.WriteAllText(Path.Combine(_entorno.Almacen, "respaldos-wal.tiempos"), string.Empty);
-        _entorno.Publicar("respaldos-wal", $"000000010000000000000009-{new string('c', 64)}.age", "x", ahora.AddMinutes(-minutos));
+        _entorno.Publicar("respaldos-wal", $"000000010000000000000009-{new string('c', 64)}.zst.age", "x", ahora.AddMinutes(-minutos));
         // Segmentos anteriores más viejos: lo que cuenta es el último archivado.
-        _entorno.Publicar("respaldos-wal", $"000000010000000000000001-{new string('e', 64)}.age", "x", ahora.AddHours(-5));
+        _entorno.Publicar("respaldos-wal", $"000000010000000000000001-{new string('e', 64)}.zst.age", "x", ahora.AddHours(-5));
 
         var (codigo, salida, _) = _entorno.Ejecutar("comprobar-respaldos.sh");
 
@@ -157,7 +157,7 @@ public sealed class ComprobarRespaldosTests : IDisposable
         Assert.True(codigo == 0, salida + errores);
         Assert.NotEmpty(_entorno.Llamadas);
         Assert.All(_entorno.Llamadas, l => Assert.StartsWith("lsf ", l, StringComparison.Ordinal));
-        Assert.All(_entorno.Llamadas, l => Assert.Contains("vigilante:", l, StringComparison.Ordinal));
+        Assert.All(_entorno.Llamadas, l => Assert.True(l.Contains(" vigilante:respaldos-", StringComparison.Ordinal) || l.Contains(" registro:supresiones-copia", StringComparison.Ordinal), l));
         Assert.DoesNotContain("AccessDenied", errores, StringComparison.Ordinal);
     }
 
@@ -168,7 +168,7 @@ public sealed class ComprobarRespaldosTests : IDisposable
         var ahora = DateTime.UtcNow;
         _entorno.PublicarElEstadoAlDia(ahora);
         File.WriteAllText(Path.Combine(_entorno.Almacen, "respaldos-wal.tiempos"), string.Empty);
-        _entorno.Publicar("respaldos-wal", $"000000010000000000000009-{new string('c', 64)}.age", "x", ahora.AddMinutes(-20));
+        _entorno.Publicar("respaldos-wal", $"000000010000000000000009-{new string('c', 64)}.zst.age", "x", ahora.AddMinutes(-20));
 
         var (conDefecto, _, _) = _entorno.Ejecutar("comprobar-respaldos.sh");
         var (ajustado, _, _) = _entorno.Ejecutar("comprobar-respaldos.sh", null, new Dictionary<string, string> { ["AUX_MAX_MINUTOS_ATRASO"] = "30" });

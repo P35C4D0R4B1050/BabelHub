@@ -40,7 +40,7 @@ style EST fill:#222,stroke:#fff,color:#fff
 | **DA13** | Superficie pública con flujos de negocio abusables (reservas, descargas, asistente). | Calidad | RF28, RNF17, AC04 | Límites de uso en el borde y en la Aplicación; registro y alertas. | AD13, AD22, AD24, AD25, AD30, AD31 |
 | **DA14** | Experiencia móvil accesible con conexión variable. | Calidad | NN16, RNF25, RNF26, AC06 | Interfaz móvil primero, presupuesto de rendimiento y pruebas de accesibilidad. | AD26, AD29 |
 | **DA15** | Privacidad y transferencias de datos fuera del país. | Restricción legal | RNF23, RC17, AC04 | Minimización, retención y qué datos reciben los proveedores. | AD27 |
-| **DA16** | Recuperación con recursos mínimos. | Calidad | RNF24, AC03 | Respaldos fuera de la VM de datos (en el almacén de objetos de la misma cuenta; copia externa pospuesta, B13) y pruebas de restauración. | AD27, AD31 |
+| **DA16** | Recuperación con recursos mínimos. | Calidad | RNF24, AC03 | Respaldos fuera de la VM de datos (desde el 2026-11-25 en Cloudflare R2, fuera de Oracle y sin segunda copia, B13) y pruebas de restauración. | AD27, AD31 |
 | **DA17** | Contenido generado por un LLM no es confiable. | Calidad | RNF22 | Aislamiento del asistente, solo lectura y salida como texto. | AD28 |
 
 ## 3. Riesgos y compromisos
@@ -69,5 +69,5 @@ style EST fill:#222,stroke:#fff,color:#fff
 | Fuga de datos personales hacia proveedores fuera del país (DA15). | Datos mínimos por proveedor, inventario de transferencias documentado (RC17) y retención definida (AD27). |
 | Dependencias o imágenes con vulnerabilidades conocidas (DA05). | Versiones fijas, escaneo en CI, SBOM y contenedores sin privilegios (RNF19). |
 | Pérdida de datos o de los respaldos por una falla de la VM del Inventario (DA16). | Respaldo diario cifrado y archivado de WAL en el almacén de objetos, restauración probada y objetivos RPO ≤ 24 h (minutos con WAL) y RTO ≤ 4 h (AD27). |
-| Pérdida de la cuenta de Oracle: se pierden las VMs, los respaldos y los libros digitales a la vez (DA16). | **Riesgo aceptado el 2026-11-12 (B13):** por ahora no hay recursos para otro proveedor; la copia fuera de Oracle se implementa más adelante si el presupuesto lo permite (un cambio del destino de respaldo, no de código de negocio). |
+| Pérdida de una cuenta de la nube (DA16): perder la de Oracle pierde las VMs, los libros y el registro de supresiones (los respaldos, en Cloudflare, sobreviven, pero sin el registro no se reabre al público); perder la de Cloudflare pierde los respaldos. | **Riesgo aceptado (B13, acotado el 2026-11-25):** no hay segunda copia en otro proveedor; segundo factor en la cuenta de los respaldos (PLA-44). |
 | El proveedor gratuito de correo limita el volumen o marca los mensajes como no deseados, y se pierde la recuperación de cuentas (DA05, DA13). | Cuenta de Gmail sencilla con MailKit (sin dominio propio por ahora), límite de solicitudes de código (SEG-19), restablecimiento asistido para el personal y alternativa de otro proveedor detrás del puerto `EnviadorDeCorreo` (AD30). |

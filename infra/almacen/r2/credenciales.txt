@@ -1,0 +1,16 @@
+# Tokens de R2 (uno por tarea; D26). R2 solo ofrece «lectura y escritura de objetos», «solo lectura» o administración, acotables por
+# contenedor: no hay permiso de solo crear ni de solo listar. Lo que no consta aquí está prohibido. Ningún token de la plataforma administra:
+# la administración es un token temporal que solo existe mientras la persona responsable aplica o comprueba las reglas (PLA-44).
+# credencial              contenedor             permiso
+respaldos-escritor        respaldos-diarios      lectura-escritura
+respaldos-escritor        respaldos-semanales    lectura-escritura
+respaldos-escritor        respaldos-mensuales    lectura-escritura
+respaldos-escritor        respaldos-wal          lectura-escritura
+respaldos-lector          respaldos-diarios      lectura
+respaldos-lector          respaldos-semanales    lectura
+respaldos-lector          respaldos-mensuales    lectura
+respaldos-lector          respaldos-wal          lectura
+respaldos-vigilante       respaldos-diarios      lectura
+respaldos-vigilante       respaldos-semanales    lectura
+respaldos-vigilante       respaldos-mensuales    lectura
+respaldos-vigilante       respaldos-wal          lectura

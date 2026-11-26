@@ -134,3 +134,15 @@ Decisiones menores tomadas al implementar que el plan no fija. No cambian el com
 ## Topología de dos VMs y VM-AUX aplazada (2026-11-25)
 
 Decisión de la persona responsable; detalle en `progress/decisiones-delegadas.md` (DD-100 a DD-104) y en `docs/02-arquitectura-de-software/05-despliegue.md` §3, §4 y §6.2. **No cambia requisitos.** `cloudflared` y Nginx se despliegan con VM-VENTAS; mientras VM-AUX esté aplazada **no se cumplen** PLA-20, los sellos, el ancla y la copia del registro de PLA-38 ni la vigilancia de retención de PLA-18, y al restaurar sin sellos PLA-19 pide la vía de excepción del plan §3. Se tiene que resolver antes de datos o clientes reales. Además, hasta que la compresión y Cloudflare R2 estén aplicados **no hay respaldos** (despliegue §6.3). En el código, el registro de supresiones usa el contenedor `supresiones-entradas` (D23), no `supresiones`.
+
+## Respaldos comprimidos en Cloudflare R2 (T43 a T46, 2026-11-25)
+
+Reemplaza lo que filas anteriores dicen de las credenciales de respaldo: ya no existe una de «solo crear» ni la vigilancia «solo lista» en los respaldos (DD-105 a DD-109).
+
+| Tarea | Decisión | Motivo |
+| :--- | :--- | :--- |
+| T43 | La tubería `orden \| zstd \| age` anota en archivos el código de los dos primeros tramos (`comprimir_y_cifrar`, POSIX sh sin `pipefail`). `extraer-respaldo.sh` solo entrega a `tar`, por la entrada estándar, un tar con marca `ustar`. | GNU tar descomprime solo lo que reconoce al leer un archivo y saltaría los topes. |
+| T43 | `descifrar-wal.sh` prepara una sola línea de tiempo (la de `--desde`), segmentos seguidos; su historia sale de la copia extraída (`--restaurada`); de las demás deja historias vacías para que el clúster recuperado no reutilice su número, y `--sin-cambios` hace solo eso. Se recupera con `recovery_target_timeline = 'current'`. | Con la clave pública cualquiera puede subir historias que desvíen la recuperación; un hueco pasaría por fin del archivo (D28). |
+| T44 | `almacen-r2.sh` lee las respuestas de la API sin `jq` (cuenta llaves); `r2-aplicar` reescribe siempre el ciclo de vida y nunca un bloqueo distinto. | Git Bash no trae `jq`. |
+| T45 | Los listados de vigilancia usan la hora del almacén (`--use-server-modtime`). | Quien sube no la elige y evita una operación por objeto. |
+| T46 | En el repositorio solo se comprueba que ni la integración continua, ni la infraestructura, ni el generador llevan credenciales de la API de Cloudflare, y `desplegar.sh` las rechaza en una VM; el resto de la constancia exige la cuenta real y T46 queda sin marcar. | AC-PLA-44 se revisa en la cuenta. |

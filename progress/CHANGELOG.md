@@ -2,6 +2,18 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-25 (noche) — Respaldos comprimidos en Cloudflare R2 (carril `dos-vms-y-r2`, entrega 2)
+
+### Cubierto
+- `transversal-plataforma` reabierta y reaprobada (spec y plan, delegado; PLA-44, PLA-16/18 reescritas): R2 provisional, archivo de cambios de 7 días, riesgos declarados (DD-105 a DD-109).
+- T43: copia y WAL con `zstd` antes de `age`; extracción con límites; `scripts/descifrar-wal.sh`; prueba de restauración real (sin archivo, a un instante intermedio y una segunda restauración desde el clúster recuperado).
+- T44 y T45: definición de R2 y `scripts/almacen.sh r2-plan|r2-aplicar|r2-comprobar`; Oracle sin respaldos; secretos, despliegue, rotación y vigilancia para dos proveedores; guía 08 (§9b, secretos, comprobación diaria).
+- Medición local: ~1,9 GB de 10 GB con 42 000 ventas y venta ligera (`progress/ensayos/`).
+
+### Pendiente
+- T46 y T47: constancias y prueba en la cuenta real de R2 (de la persona responsable). Hasta T47 no poner datos que importen.
+- T29 y T31 (restaurar y ensayo aislado) y T01 a T05. Repetir la medición en la VM la primera semana.
+
 ## 2026-11-25 — Topología de dos VMs: la entrada pública dentro de VM-VENTAS (carril `dos-vms-y-r2`, entrega 1)
 
 ### Cubierto

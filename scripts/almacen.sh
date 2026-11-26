@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Contenedores, políticas, retención con bloqueo de tiempo y ciclo de vida del almacén de objetos de Oracle (PLA-16, PLA-35, PLA-38; D07,
-# D08, D23, D24). La definición está en infra/almacen/ (contenedores.txt y credenciales.txt) y es la misma que leen las pruebas.
+# Contenedores, políticas, retención con bloqueo de tiempo y ciclo de vida de los almacenes de objetos (PLA-16, PLA-35, PLA-38; D07, D08,
+# D23, D24, D26, D27). En Oracle: los libros, las portadas y el registro de supresiones (infra/almacen/, la misma definición que leen las
+# pruebas). Los respaldos están en Cloudflare R2 (infra/almacen/r2/): `scripts/almacen.sh r2-plan|r2-aplicar|r2-comprobar` (scripts/almacen-r2.sh).
 #
 #   scripts/almacen.sh ciclo-de-vida                       el JSON de infra/almacen/ciclo-de-vida.json, desde contenedores.txt
 #   scripts/almacen.sh politicas-iam --compartimento-nombre <nombre>
@@ -26,6 +27,11 @@ RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEFINICION="${ALMACEN_DEFINICION:-$RAIZ/infra/almacen}"
 OCI="${OCI:-oci}"
 DIAS_DE_ESPERA_DEL_BLOQUEO=15
+
+# Las órdenes de Cloudflare R2 (los respaldos) usan otra definición y otra API.
+if [[ "${1:-}" == r2-* ]]; then
+  exec bash "$RAIZ/scripts/almacen-r2.sh" "$@"
+fi
 
 fallo_de_uso() {
   echo "Error: $1" >&2

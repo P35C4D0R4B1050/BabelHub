@@ -225,7 +225,8 @@ public sealed partial class RespaldosFixture : IAsyncLifetime
         return memoria.ToArray();
     }
 
-    /// <summary>Descifra en «otra máquina»: un contenedor aparte que solo tiene la copia de la clave privada y el objeto.</summary>
+    /// <summary>Descifra y descomprime (D25) en «otra máquina»: un contenedor aparte que solo tiene la copia de la clave privada y el objeto.
+    /// Falla si lo descifrado no es zstd.</summary>
     public async Task<byte[]> Descifrar(byte[] cifrado)
     {
         await using var otraMaquina = new ContainerBuilder(_etiqueta)
@@ -234,7 +235,7 @@ public sealed partial class RespaldosFixture : IAsyncLifetime
             .WithResourceMapping(cifrado, "/tmp/entrada.age")
             .Build();
         await otraMaquina.StartAsync();
-        var resultado = await otraMaquina.ExecAsync(["age", "-d", "-i", "/tmp/identidad.txt", "-o", "/tmp/salida", "/tmp/entrada.age"]);
+        var resultado = await otraMaquina.ExecAsync(["sh", "-c", "age -d -i /tmp/identidad.txt -o /tmp/salida.zst /tmp/entrada.age && zstd -q -d -o /tmp/salida /tmp/salida.zst"]);
         if (resultado.ExitCode != 0)
         {
             throw new InvalidOperationException("No se pudo descifrar: " + resultado.Stderr);

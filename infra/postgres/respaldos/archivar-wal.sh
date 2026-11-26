@@ -1,9 +1,10 @@
 #!/bin/sh
-# `archive_command` de PostgreSQL (PLA-15, PLA-17; D09, D10):  archive_command = '/opt/babelhub/archivar-wal.sh %p %f'
-# Cifra el segmento con la clave pública de age y lo sube a respaldos-wal con el nombre «<segmento>-<sha256 del cifrado>.age».
+# `archive_command` de PostgreSQL (PLA-15, PLA-17; D09, D10, D25):  archive_command = '/opt/babelhub/archivar-wal.sh %p %f'
+# Comprime el segmento con zstd, lo cifra con la clave pública de age (en una sola tubería: no hay archivo intermedio sin cifrar) y lo sube a
+# respaldos-wal con el nombre «<segmento>-<sha256 del cifrado>.zst.age». Si falla la compresión, el cifrado o la subida, sale con error.
 # PostgreSQL lo repite hasta que sale con código 0 y, mientras tanto, conserva el segmento en pg_wal: es el archivo de cambios pendiente,
 # protegido por el disco cifrado. Lo que se repite no pisa nada: otro intento cifra de nuevo (age usa una clave efímera) y el nombre cambia;
-# la restauración elige entre candidatos por continuidad de línea de tiempo y LSN (D09), así que un duplicado no daña.
+# al restaurar, dos candidatos con el mismo contenido no dañan y, si difieren, la recuperación se detiene antes de ese segmento (D28).
 set -eu
 . /opt/babelhub/comun.sh
 
@@ -25,7 +26,8 @@ fi
 verificar_entorno
 
 temporal="$ESPERA/wal.$$.tmp"
-trap 'rm -f "$temporal"' EXIT INT TERM
-age -r "$BABELHUB_AGE_DESTINATARIO" -o "$temporal" "$ruta"
+estado="$ESPERA/wal.$$.estado.tmp"
+trap 'rm -f "$temporal" "$estado.orden" "$estado.zstd"' EXIT INT TERM
+comprimir_y_cifrar "$temporal" "$estado" cat "$ruta" || fallo "no se pudo comprimir y cifrar el segmento $nombre"
 suma="$(suma_de "$temporal")"
-subir "$temporal" "$CONTENEDOR_WAL" "$nombre-$suma.age"
+subir "$temporal" "$CONTENEDOR_WAL" "$nombre-$suma.zst.age"

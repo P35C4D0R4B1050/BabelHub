@@ -293,6 +293,11 @@ Los planes aprobados no se pueden editar sin perder la aprobación: lo que cambi
 - [x] **Pruebas:** `CulqiPasarelaDePagoTests` (HTTP simulado con las respuestas y errores de la especificación de Culqi), `PagosConCulqiSimuladoTests` (PostgreSQL real y un Culqi simulado con estado), `ComposicionDePagosTests`, `EntornoStagingTests` y `GuardaYDoblesDePagosTests` (la guarda y el arranque por entorno, `Production` con `sk_live_` arranca y las demás combinaciones fallan sin repetir la llave) y `CulqiRealTests` (la prueba de humo del spike: **se omite sin las llaves de integración y no corrió nunca contra Culqi real**).
 - [ ] **Sigue pendiente de la persona responsable:** el spike T38 con las llaves de integración (guía en `specs/ecommerce-pagos/guia-del-spike-culqi.md`); ratificar DD-95 a DD-98; decidir DD-99 (la pantalla de pago aún no genera el token de Culqi en el navegador: tarea nueva T38b; y si se quiere ensayar con `sk_test_` en una VM, que cambia PAG-34); las llaves de producción para pasar de `Staging` a `Production`.
 
+## 21. `transversal-plataforma`: respaldos en R2 (2026-11-25)
+
+- [x] Donde este documento fije `respaldos-wal` a 100 días o los respaldos en Oracle, lo reemplazan la spec reaprobada y D25 a D28 del plan.
+- [x] **D28 y plan §5.1, archivos de historia (tras las revisiones de la implementación):** `descifrar-wal.sh` prepara una sola línea de tiempo y se recupera con `recovery_target_timeline = 'current'`. La historia de esa línea se toma de la copia extraída (`--restaurada`: `pg_basebackup` la incluye y el almacén retira la archivada a los 7 días); si además se descarga una distinta, se detiene. Las historias de otras líneas no se leen ni se comparan: quedan vacías para que su número no se reutilice. `restaurar.sh` (T29) sigue estas reglas.
+
 ## 20. `transversal-plataforma`: topología de dos VMs (2026-11-25, carril `dos-vms-y-r2`; DD-100 a DD-104)
 
 La spec no cambia: el reparto en VMs está fuera de su alcance (§2) y su §6 ya preveía mover la entrada a la VM de ventas (B11). Esto corrige el texto de `plan.md` y `tasks.md` mientras dure la topología:

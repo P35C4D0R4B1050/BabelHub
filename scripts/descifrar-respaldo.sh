@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Descifra un respaldo (`…tar.age`, `…-config-….tar.age` o un segmento `…age`) SOLO con la copia fuera de línea de la clave privada (PLA-17,
+# Descifra un respaldo (`…tar.zst.age`, `…-config-….tar.zst.age` o un segmento `…zst.age`; lo que sale sigue comprimido) SOLO con la copia fuera de línea de la clave privada (PLA-17,
 # AC-PLA-17). Corre en el equipo de la persona responsable o en la máquina de ensayo, nunca en una VM de la plataforma. El descifrado sale por
 # la salida estándar (para entubarlo a scripts/extraer-respaldo.sh); el claro no se escribe en disco aquí.
 #
 #   scripts/descifrar-respaldo.sh --entrada <archivo.age> [--custodia <custodia.md>] < clave-privada
 #   scripts/descifrar-respaldo.sh --entrada <archivo.age> --probar [--registrar] < clave-privada     (descifra a la nada y, con --registrar,
 #                                                                                         anota la fecha en la custodia)
+#   scripts/descifrar-respaldo.sh --comprobar-clave [--custodia <custodia.md>] < clave-privada     (solo comprueba la clave, la custodia y que
+#                                                                                         estén las herramientas)
 #
 # La clave privada entra por la **entrada estándar** y se guarda solo en memoria (nunca en un argumento, una variable exportada ni un archivo:
 # age la lee de un descriptor temporal). Antes de tocar el respaldo comprueba que **la clave presentada corresponde al destinatario público
@@ -23,6 +25,7 @@ CUSTODIA="$RAIZ/infra/respaldos/custodia.md"
 ENTRADA=""
 PROBAR=0
 REGISTRAR=0
+SOLO_CLAVE=0
 
 uso() {
   echo "Uso: $0 --entrada <archivo.age> [--custodia <custodia.md>] [--probar [--registrar]] < clave-privada" >&2
@@ -35,14 +38,15 @@ while [[ $# -gt 0 ]]; do
     --custodia) [[ $# -ge 2 ]] || uso; CUSTODIA="$2"; shift 2 ;;
     --probar) PROBAR=1; shift ;;
     --registrar) REGISTRAR=1; shift ;;
+    --comprobar-clave) SOLO_CLAVE=1; shift ;;
     *) uso ;;
   esac
 done
-[[ -n "$ENTRADA" ]] || uso
+[[ -n "$ENTRADA" || $SOLO_CLAVE -eq 1 ]] || uso
 [[ $REGISTRAR -eq 0 || $PROBAR -eq 1 ]] || { echo "Error: --registrar solo se usa con --probar" >&2; exit 2; }
-[[ -f "$ENTRADA" ]] || { echo "Error: no existe $ENTRADA" >&2; exit 2; }
+[[ $SOLO_CLAVE -eq 1 || -f "$ENTRADA" ]] || { echo "Error: no existe $ENTRADA" >&2; exit 2; }
 [[ -f "$CUSTODIA" ]] || { echo "Error: no existe $CUSTODIA" >&2; exit 2; }
-if [[ $PROBAR -eq 0 && -t 1 ]]; then
+if [[ $PROBAR -eq 0 && $SOLO_CLAVE -eq 0 && -t 1 ]]; then
   echo "Error: el descifrado es binario y saldría a la terminal: entúbalo (a scripts/extraer-respaldo.sh) o redirígelo" >&2
   exit 2
 fi
@@ -58,6 +62,10 @@ if [[ ! "$identidad" =~ AGE-SECRET-KEY-[0-9A-Z]{10,} ]]; then
   exit 1
 fi
 
+for herramienta in "$AGE" "$AGE_KEYGEN"; do
+  command -v "$herramienta" >/dev/null || { echo "Error: falta $herramienta en este equipo" >&2; exit 2; }
+done
+
 # El destinatario público de esa clave y el que registra la custodia.
 if ! presentada="$(printf '%s\n' "$identidad" | "$AGE_KEYGEN" -y 2>/dev/null)" || [[ ! "$presentada" =~ ^age1[0-9a-z]{58}$ ]]; then
   echo "Error: no se pudo derivar el destinatario público de la clave presentada" >&2
@@ -72,6 +80,8 @@ if [[ "$presentada" != "$registrado" ]]; then
   echo "Error: la clave presentada NO corresponde al destinatario registrado en la custodia: no se descifra" >&2
   exit 3
 fi
+
+[[ $SOLO_CLAVE -eq 0 ]] || exit 0
 
 if [[ $PROBAR -eq 1 ]]; then
   if ! "$AGE" -d -i <(printf '%s\n' "$identidad") -o /dev/null "$ENTRADA" 2>/dev/null; then

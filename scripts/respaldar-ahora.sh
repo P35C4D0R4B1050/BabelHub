@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Respaldo bajo demanda tras una corrección urgente con migración (PLA-09, PLA-16): lo lanza la persona responsable desde su equipo, por SSH
 # directo a VM-INVENTARIO (o con --salto, por ProxyJump a través de VM-AUX cuando exista; hoy está aplazada, DD-100), y corre dentro del contenedor de PostgreSQL de VM-INVENTARIO con la credencial `respaldos-escritor` que ese
-# contenedor ya tiene (solo puede crear objetos). Va a respaldos-diarios con la misma retención y no genera copias semanales ni mensuales.
+# contenedor ya tiene (limitada a los contenedores de respaldos; el bloqueo impide borrar o sobrescribir dentro del plazo). Va a respaldos-diarios con la misma retención y no genera copias semanales ni mensuales.
 #
 #   scripts/respaldar-ahora.sh --destino <usuario@vm-inventario> [--salto <usuario@vm-aux>] [--contenedor <nombre>]
 #

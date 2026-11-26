@@ -3,10 +3,12 @@
 # VM-AUX es el salto SSH y el vigilante: comprueba los respaldos desde FUERA de la VM de datos, sella el registro de supresiones y avisa por
 # correo. No guarda ninguna clave privada ni ninguna credencial de borrado. Cada script usa SU credencial del almacén, configurada como un
 # remoto de rclone en el archivo de entorno de VM-AUX (AUX_ENV, por defecto /etc/babelhub-aux/aux.env, de root, grupo babelhub-aux y 0640: el usuario lo lee pero no lo puede cambiar):
-#   RCLONE_CONFIG_VIGILANTE_*   respaldos-vigilante: solo lista
+#   RCLONE_CONFIG_VIGILANTE_*   respaldos-vigilante: solo lectura en los respaldos de Cloudflare R2
+#   RCLONE_CONFIG_REGISTRO_*    registro-vigilante: solo lista supresiones-copia en Oracle
 #   RCLONE_CONFIG_SELLO_*       supresiones-sello: crea sellos y lee las entradas del registro
 #   RCLONE_CONFIG_COPIA_*       respaldos-copia-registro: solo crea en supresiones-copia
-# (cada uno con _TYPE=s3, _PROVIDER, _ENDPOINT, _REGION, _ACCESS_KEY_ID y _SECRET_ACCESS_KEY), y para el correo y el latido:
+# (cada uno con _TYPE=s3, _PROVIDER, _ENDPOINT, _REGION, _ACCESS_KEY_ID y _SECRET_ACCESS_KEY; en R2, proveedor Cloudflare y región auto),
+# y para el correo y el latido:
 #   AUX_SMTP_URL (smtps://…), AUX_SMTP_USUARIO, AUX_SMTP_CLAVE, AUX_CORREO_DE, AUX_CORREO_PARA (la credencial de correo propia y mínima, T26)
 #   AUX_LATIDO_URL (la dirección de pulso de un servicio externo gratuito; es un secreto)
 #   AUX_ESTADO (por defecto /var/lib/babelhub-aux): el último sello y las alertas ya avisadas
@@ -35,7 +37,7 @@ cargar_entorno() {
     fi
     case "$nombre" in
       AUX_SMTP_URL | AUX_SMTP_USUARIO | AUX_SMTP_CLAVE | AUX_CORREO_DE | AUX_CORREO_PARA | AUX_LATIDO_URL | AUX_REAVISO_HORAS | AUX_MAX_HORAS_RESPALDO | AUX_MAX_MINUTOS_ATRASO | AUX_MAX_HORAS_COPIA_REGISTRO) ;;
-      RCLONE_CONFIG_VIGILANTE_* | RCLONE_CONFIG_SELLO_* | RCLONE_CONFIG_COPIA_* | RCLONE_CONFIG_CUOTA_*) [[ "$nombre" =~ ^RCLONE_CONFIG_[A-Z]+_[A-Z0-9_]+$ ]] || continue ;;
+      RCLONE_CONFIG_VIGILANTE_* | RCLONE_CONFIG_REGISTRO_* | RCLONE_CONFIG_SELLO_* | RCLONE_CONFIG_COPIA_* | RCLONE_CONFIG_CUOTA_*) [[ "$nombre" =~ ^RCLONE_CONFIG_[A-Z]+_[A-Z0-9_]+$ ]] || continue ;;
       *) continue ;;
     esac
     # El valor de un nombre ya fijado por el entorno del proceso (cron, pruebas) manda sobre el del archivo.
@@ -60,8 +62,9 @@ hora_texto() {
 }
 
 # «clave;hora» por objeto de un contenedor (remoto:contenedor), con la hora en UTC.
+# La hora es la que puso el almacén al recibir el objeto (--use-server-modtime): quien sube no la elige y no cuesta una consulta por objeto.
 listar() {
-  TZ=UTC "$RCLONE" lsf -R --files-only --format pt --separator ';' "$1"
+  TZ=UTC "$RCLONE" lsf -R --files-only --use-server-modtime --format pt --separator ';' "$1"
 }
 
 # Sube un archivo sin comprobar ni sobrescribir nada del destino: las credenciales de VM-AUX que escriben solo pueden crear.

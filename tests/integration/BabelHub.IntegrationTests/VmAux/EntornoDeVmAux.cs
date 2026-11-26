@@ -6,8 +6,8 @@ namespace BabelHub.IntegrationTests.VmAux;
 
 /// <summary>
 /// Un almacén y un servidor de correo de mentira para probar los scripts de VM-AUX. El <c>rclone</c> de prueba guarda cada contenedor en una
-/// carpeta y <b>aplica la matriz de credenciales de <c>infra/almacen/credenciales.txt</c></b>: cada remoto (<c>vigilante</c>, <c>sello</c>,
-/// <c>copia</c>) es una credencial y solo puede listar, leer o crear lo que esa matriz le da; crear sobre un objeto que existe falla, como con
+/// carpeta y <b>aplica las matrices de credenciales de <c>infra/almacen/credenciales.txt</c> (Oracle) y
+/// <c>infra/almacen/r2/credenciales.txt</c> (R2)</b>: cada remoto (<c>vigilante</c>, <c>registro</c>, <c>sello</c>, <c>copia</c>) es una credencial y solo puede listar, leer o crear lo que esa matriz le da; crear sobre un objeto que existe falla, como con
 /// <c>OBJECT_CREATE</c> sin <c>OBJECT_OVERWRITE</c>. Así una prueba que pasa demuestra que el script solo usa lo permitido a su credencial.
 /// El <c>curl</c> de prueba anota los argumentos, la configuración y el cuerpo de cada correo.
 /// </summary>
@@ -27,7 +27,11 @@ internal sealed class EntornoDeVmAux : IDisposable
         done
         permiso() { # remoto contenedor accion
           local credencial
-          case "$1" in vigilante) credencial=respaldos-vigilante ;; sello) credencial=supresiones-sello ;; copia) credencial=respaldos-copia-registro ;; *) return 1 ;; esac
+          if [[ "$1" == vigilante ]]; then # token de R2 de solo lectura: lista y lee; nunca crea
+            [[ "$3" == listar || "$3" == leer ]] && grep -qE "^respaldos-vigilante[[:space:]]+$2[[:space:]]+lectura([[:space:]]|$)" <(tr -d '\r' <"$DOBLE_CREDENCIALES_R2")
+            return
+          fi
+          case "$1" in registro) credencial=registro-vigilante ;; sello) credencial=supresiones-sello ;; copia) credencial=respaldos-copia-registro ;; *) return 1 ;; esac
           while read -r c b a _; do
             [[ "$c" == "$credencial" && "$b" == "$2" && ",$a," == *",$3,"* ]] && return 0
           done < <(grep -v '^[[:space:]]*#' "$DOBLE_CREDENCIALES")
@@ -107,6 +111,7 @@ internal sealed class EntornoDeVmAux : IDisposable
 
     private static IEnumerable<string> PoliticasDelAlmacenNombres() =>
         File.ReadAllLines(Path.Combine(RaizDelRepositorio(), "infra", "almacen", "contenedores.txt"))
+            .Concat(File.ReadAllLines(Path.Combine(RaizDelRepositorio(), "infra", "almacen", "r2", "contenedores.txt")))
             .Select(l => l.Split('#')[0].Trim())
             .Where(l => l.Length > 0)
             .Select(l => l.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)[0]);
@@ -198,6 +203,7 @@ internal sealed class EntornoDeVmAux : IDisposable
             ["DOBLE_ALMACEN"] = EnLinux(Almacen),
             ["DOBLE_CORREOS"] = EnLinux(Correos),
             ["DOBLE_CREDENCIALES"] = EnLinux(Path.Combine(RaizDelRepositorio(), "infra", "almacen", "credenciales.txt")),
+            ["DOBLE_CREDENCIALES_R2"] = EnLinux(Path.Combine(RaizDelRepositorio(), "infra", "almacen", "r2", "credenciales.txt")),
             ["AUX_ENV"] = EnLinux(Path.Combine(Carpeta, "no-existe.env")),
             ["AUX_ESTADO"] = EnLinux(Estado),
             ["AUX_SMTP_URL"] = "smtps://smtp.ejemplo.interno:465",
@@ -229,9 +235,9 @@ internal sealed class EntornoDeVmAux : IDisposable
     public void PublicarElEstadoAlDia(DateTime ahora)
     {
         var dia = ahora.AddHours(-3);
-        Publicar("respaldos-diarios", $"{dia:yyyy-MM-dd}/{dia:HHmmss}-{new string('a', 64)}.tar.age", "x", dia);
-        Publicar("respaldos-diarios", $"{dia:yyyy-MM-dd}/{dia:HHmmss}-config-{new string('b', 64)}.tar.age", "x", dia);
-        Publicar("respaldos-wal", $"000000010000000000000007-{new string('c', 64)}.age", "x", ahora.AddMinutes(-4));
+        Publicar("respaldos-diarios", $"{dia:yyyy-MM-dd}/{dia:HHmmss}-{new string('a', 64)}.tar.zst.age", "x", dia);
+        Publicar("respaldos-diarios", $"{dia:yyyy-MM-dd}/{dia:HHmmss}-config-{new string('b', 64)}.tar.zst.age", "x", dia);
+        Publicar("respaldos-wal", $"000000010000000000000007-{new string('c', 64)}.zst.age", "x", ahora.AddMinutes(-4));
         Publicar("supresiones-copia", $"{dia:yyyy-MM-dd}/{dia:HHmmss}-{new string('d', 64)}.tar", "x", dia);
     }
 }

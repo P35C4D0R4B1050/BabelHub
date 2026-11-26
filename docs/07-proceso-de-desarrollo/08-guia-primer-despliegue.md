@@ -16,9 +16,9 @@ Esta guía deja listo **todo lo que es infraestructura** con **dos máquinas vir
 | **2** | **RESUELTO (2026-11-25): PostgreSQL habla solo TLS verificado** entre VM-VENTAS, los servicios de VM-INVENTARIO y Evolution API (AM24, DD-90 a DD-94). | El servidor usa un certificado de la CA privada (`tls-postgres-*.pem`, que `generar-secretos.sh` crea con los demás), `pg_hba.conf` rechaza toda conexión de red sin TLS y las cadenas de conexión llevan `SSL Mode=VerifyFull`; `desplegar.sh` se niega a desplegar si alguna no lo pide. | Nada que decidir. **Si ya generaste tu carpeta de secretos con una versión anterior del generador, regenérala** (la CA anterior no permite el nombre `postgres`): usa una carpeta nueva y vuelve a copiar los valores «CAMBIAR» que completaste; no se puede parchear a mano. |
 | **3** | Los clientes de seguridad exigen **HTTPS entre servicios** en producción. | Es una regla de la aplicación (SEG-15). | Ya está resuelto aquí: `scripts/generar-secretos.sh` crea una **CA privada** y los certificados de cada VM, y los Compose abren el puerto 8443. No hay que hacer nada, solo entenderlo (reglas de red en el paso 3). |
 | **4** | **Solo dos VMs** (DD-100). `cloudflared` y Nginx corren dentro de VM-VENTAS; **no hay VM-BORDE** y **VM-AUX queda aplazada**. | Sin capacidad para las AMD micro en `sa-santiago-1`. | Nada que decidir. Lee en §14 lo que **no** tienes mientras no haya VM-AUX (entre otras cosas, nadie te avisa si fallan los respaldos). |
-| **5** | ⛔ **Los respaldos todavía NO están listos para activarse (2026-11-25).** El archivo de cambios actual no cabe en el almacén gratuito y el destino cambiará a Cloudflare R2. | Se corrige en un cambio aparte (compresión y R2), que aún no está en `main`. | **No ejecutes `scripts/almacen.sh aplicar`** y **no pongas credenciales reales del almacén de respaldos** (§10.2). Lo recomendable es **publicar las imágenes y desplegar después de ese cambio**, porque modifica la imagen de PostgreSQL. |
+| **5** | **Los respaldos van comprimidos y cifrados a Cloudflare R2** (2026-11-25, **provisional**); los libros, las portadas y el registro de supresiones siguen en Oracle. | R2 no ofrece una credencial de «solo crear» ni un bloqueo irreversible: la VM de datos no puede borrar un respaldo dentro de su plazo, pero **quien entre a tu cuenta de Cloudflare sí podría** quitar el bloqueo y borrarlo todo (riesgo aceptado, spec `transversal-plataforma` §5). El archivo de cambios se guarda solo **7 días**. | Activa el segundo factor en Cloudflare, sigue §9b y **no pongas datos reales** hasta que la prueba de tu cuenta (§9b.5) salga bien. Antes de operar con clientes reales se vuelve a decidir (B09, B13). |
 
-Lo que sí **funciona hoy y se probó de verdad** (en tu equipo, con las imágenes reales y los mismos scripts): construir las tres imágenes, PostgreSQL con sus migraciones, el **Inventario en `Production`** respondiendo `/health/ready` por HTTPS con el certificado validado, la réplica de gestión y el E-commerce (estos dos en `Development`), Redis con TLS, n8n y los scripts de despliegue. Lo que **no** se pudo probar sin Oracle y sin dominio: Cloudflare, el túnel, el almacén de objetos, el cobro con Culqi, WhatsApp y la capacidad ARM real.
+Lo que sí **funciona hoy y se probó de verdad** (en tu equipo, con las imágenes reales y los mismos scripts): construir las tres imágenes, PostgreSQL con sus migraciones, el **Inventario en `Production`** respondiendo `/health/ready` por HTTPS con el certificado validado, la réplica de gestión y el E-commerce (estos dos en `Development`), Redis con TLS, n8n y los scripts de despliegue. Lo que **no** se pudo probar sin Oracle y sin dominio: Cloudflare, el túnel, el almacén de objetos de Oracle, tu cuenta de R2 (los respaldos se probaron contra un almacén compatible local), el cobro con Culqi, WhatsApp y la capacidad ARM real.
 
 ## 1. Qué necesito tener a mano
 
@@ -28,14 +28,14 @@ Marca cada uno antes de empezar:
 - [ ] Una tarjeta de crédito o débito **internacional** (Oracle la pide para verificar la cuenta; no te cobra mientras te quedes en el cupo gratuito). Anota que Oracle hace un cargo temporal de verificación (~1 USD) y lo devuelve.
 - [ ] Un correo que revises a diario y un teléfono para el SMS de verificación.
 - [ ] La cuenta de **GitHub** dueña del repositorio.
-- [ ] Una cuenta de **Cloudflare** (gratuita) y el **dominio comprado en Spaceship** con acceso a su panel.
+- [ ] Una cuenta de **Cloudflare** (gratuita) y el **dominio comprado en Spaceship** con acceso a su panel. Para los respaldos se activa **R2** en esa cuenta: tiene 10 GB al mes gratis y puede pedirte un medio de pago (lo que pase del cupo se cobra).
 - [ ] Una cuenta de **Gmail sencilla** (no institucional) con verificación en dos pasos y una **contraseña de aplicación** (Cuenta de Google → Seguridad → Contraseñas de aplicaciones). Es para los correos del sistema. Otra contraseña de aplicación (o la misma cuenta con otra contraseña) para los avisos del espacio reservado.
 - [ ] Más adelante: llaves de Culqi (B05), tu API key de Anthropic (B06), un número de WhatsApp dedicado (B07). **No las necesitas para empezar.**
 
 **En tu equipo**
 - [ ] Windows 11 con **WSL** (Ubuntu) o una Linux/macOS. En Windows, abre la app «Ubuntu» (si no la tienes: PowerShell como administrador → `wsl --install -d Ubuntu`, reinicia). Todos los comandos marcados **[Tu equipo]** se ejecutan ahí.
 - [ ] **Docker Desktop** (con la integración WSL activada) o Docker Engine en tu Linux.
-- [ ] `git`, `openssl`, `curl`, `ssh`. En Ubuntu: `sudo apt update && sudo apt install -y git openssl curl openssh-client age`.
+- [ ] `git`, `openssl`, `curl`, `ssh`, y para los respaldos `age`, `zstd` y `rclone`. En Ubuntu: `sudo apt update && sudo apt install -y git openssl curl openssh-client age zstd rclone`.
 - [ ] El **repositorio clonado**: `git clone https://github.com/<propietario>/BabelHub.git ~/BabelHub && cd ~/BabelHub`.
 - [ ] La **CLI de Oracle** (`oci`) para el almacén de objetos (§9): <https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm>.
 - [ ] Un **gestor de contraseñas** o un cuaderno **fuera de línea** y **dos lugares distintos** para guardar la clave de respaldos (§10.1).
@@ -69,9 +69,9 @@ Nginx (`infra/nginx/nginx.conf`) ya enruta así: el servidor por defecto atiende
 
 **El orden de la guía** (cada etapa termina con una comprobación; no pases a la siguiente si falla):
 
-1. Ensayo en tu equipo (paso 4) → 2. Publicar las imágenes (paso 5) → 3. Cuenta, red y las 2 VMs de Oracle (pasos 6–8) → 4. Almacén de objetos y secretos (pasos 9–10) → 5. **VM-INVENTARIO** (§11) → 6. **Cloudflare** (§12) → 7. **VM-VENTAS** con la entrada (§13) → 8. Lo que falta sin VM-AUX (§14) → 9. Después del despliegue (§15).
+1. Ensayo en tu equipo (paso 4) → 2. Publicar las imágenes (paso 5) → 3. Cuenta, red y las 2 VMs de Oracle (pasos 6–8) → 4. Almacenes (Oracle y Cloudflare R2) y secretos (pasos 9–10) → 5. **VM-INVENTARIO** (§11) → 6. **Cloudflare** (§12) → 7. **VM-VENTAS** con la entrada (§13) → 8. Lo que falta sin VM-AUX (§14) → 9. Después del despliegue (§15).
 
-*Por qué ese orden:* los secretos llevan las llaves del almacén de objetos y las claves de Turnstile (que se crean al completar los secretos, §10.2), y los de VM-VENTAS además el token del túnel (§12.3); sin ellas el despliegue se niega a continuar a propósito.
+*Por qué ese orden:* los secretos llevan las llaves de los dos almacenes y las claves de Turnstile (que se crean al completar los secretos, §10.2), y los de VM-VENTAS además el token del túnel (§12.3); sin ellas el despliegue se niega a continuar a propósito.
 
 *Contacto del comercio y versión de los textos legales (mínimo, `web-informacion-del-comercio`):* el `ecommerce.env` de VM-VENTAS y el `ecommerce-gestion.env` de VM-INVENTARIO llevan además `BABELHUB__Contacto__Telefono`, `…Correo` y `…Direccion` como `CAMBIAR` (no son secretos): escribe los reales entre comillas dobles antes de desplegar, y tras `desplegar inventario` fija la versión de los textos legales como indica `infra/README.md` (sección «Contacto del comercio y versión de los textos legales»).
 
@@ -393,7 +393,7 @@ sudo git log -1 --format='%H %s'        # debe ser el commit de tu etiqueta
 
 ## 9. Paso 5 — El almacén de objetos de Oracle
 
-Guarda los **libros digitales**, las **portadas** y el **registro de supresiones**; los **respaldos cifrados** también están definidos aquí, pero van a pasar a Cloudflare R2 y **todavía no se activan**. Cada tarea tiene su propia credencial con permisos mínimos (`infra/almacen/politicas.md`).
+Guarda los **libros digitales**, las **portadas** y el **registro de supresiones**. Los **respaldos cifrados** van a Cloudflare R2 (§9b). Cada tarea tiene su propia credencial con permisos mínimos (`infra/almacen/politicas.md`).
 
 **[Tu equipo]** — configura la CLI una vez: `oci setup config` (te pide el OCID de tu usuario y tenancy, que están en *Perfil → Tenancy/User settings*, y crea una llave de API que subes en *User settings → API keys*). Comprueba con `oci iam region list`.
 
@@ -405,15 +405,108 @@ Guarda los **libros digitales**, las **portadas** y el **registro de supresiones
    bash scripts/almacen.sh plan --compartimento-id <ocid> --compartimento-nombre babelhub --espacio <espacio-de-nombres>
    ```
 
-   > ⛔ **No apliques todavía (2026-11-25) y no ejecutes el paso 3 ni crees los contenedores `respaldos-*`.** El archivo de cambios sube un segmento de 16 MB sin comprimir cada 5 minutos (~4,6 GB al día) y `respaldos-wal` lo bloquea 100 días: unos 460 GB (cálculo a partir de la configuración, sin medir), muy por encima del cupo gratuito. Además los respaldos pasarán a Cloudflare R2. Espera a que ese cambio esté en `main` y la guía lo describa. Mientras tanto, crea **a mano** en la consola solo los tres contenedores privados que la tienda necesita: `libros`, `portadas` y `supresiones-entradas` (sin acceso público), **sin reglas de retención con bloqueo**, y no crees ningún `respaldos-*`. La retención se aplicará después con el script.
+3. Aplícala (la retención de los tres contenedores `supresiones-*` lleva bloqueo de 100 días, **irreversible** a los 15 días: revisa antes el plan):
 
-3. ⛔ **Aplicar la definición: todavía no.** No ejecutes el modo `aplicar` del script. Cuando el cambio de respaldos esté en `main`, esta guía dirá qué contenedores se crean y cómo (la retención con bloqueo es **irreversible**).
-4. Las políticas de acceso: `bash scripts/almacen.sh politicas-iam --compartimento-nombre babelhub` imprime las sentencias; créalas en *Identity → Policies*. Cada credencial de `infra/almacen/credenciales.txt` es un **usuario de IAM** propio (por ejemplo `bh-respaldos-escritor`) dentro de un grupo con esa política; para cada usuario crea una **Customer Secret Key** (*Usuario → Customer secret keys → Generate*): te da una **clave de acceso** y una **clave secreta** (la secreta se muestra **una sola vez**: cópiala a tu gestor de contraseñas en el acto).
-5. La comprobación del script (`comprobar`) se hace después de aplicar: **todavía no**. El endpoint S3 de las credenciales es `https://<espacio-de-nombres>.compat.objectstorage.sa-santiago-1.oraclecloud.com`.
+   ```bash
+   bash scripts/almacen.sh aplicar --compartimento-id <ocid> --compartimento-nombre babelhub --espacio <espacio-de-nombres>
+   ```
 
-Qué credencial va a qué archivo (§10): `catalogo-archivos`, `biblioteca-lector` y `supresiones-registro` → `ecommerce.env` y `ecommerce-gestion.env`; `respaldos-escritor` → `postgres.env` (**todavía no**, §10.2); `respaldos-lector` → solo tu equipo (restaurar). Las credenciales de vigilancia (`respaldos-vigilante`, `supresiones-sello`, `respaldos-copia-registro` y `cuota-lectura`) son de VM-AUX: **no las crees mientras esté aplazada**.
+   **Debes ver** los cinco contenedores creados: `libros`, `portadas` y `supresiones-entradas`, `-sellos` y `-copia`. No crees ningún `respaldos-*` en Oracle. Si habías creado a mano alguno de los cinco, el script lo respeta y solo le añade lo que falta.
+4. Las políticas de acceso: `bash scripts/almacen.sh politicas-iam --compartimento-nombre babelhub` imprime las sentencias; créalas en *Identity → Policies*. Cada credencial de `infra/almacen/credenciales.txt` es un **usuario de IAM** propio (por ejemplo `bh-biblioteca-lector`) dentro de un grupo con esa política; para cada usuario crea una **Customer Secret Key** (*Usuario → Customer secret keys → Generate*): te da una **clave de acceso** y una **clave secreta** (la secreta se muestra **una sola vez**: cópiala a tu gestor de contraseñas en el acto).
+5. Comprueba: `bash scripts/almacen.sh comprobar --espacio <espacio-de-nombres>`. Durante los primeros 15 días termina con **código 3** («bloqueo pendiente»): es lo esperado; repítelo pasada la fecha que mostró `aplicar`. El endpoint S3 de las credenciales es `https://<espacio-de-nombres>.compat.objectstorage.sa-santiago-1.oraclecloud.com`.
+
+Qué credencial va a qué archivo (§10): `catalogo-archivos`, `biblioteca-lector` y `supresiones-registro` → `ecommerce.env` y `ecommerce-gestion.env`; `registro-lector` → solo tu equipo (verificar la copia del registro al restaurar). Las credenciales de vigilancia (`registro-vigilante`, `supresiones-sello`, `respaldos-copia-registro` y `cuota-lectura`) son de VM-AUX: **no las crees mientras esté aplazada**.
 
 **Cómo deshacer:** los contenedores con bloqueo ya aplicado no se pueden vaciar antes de su fecha; por eso la regla de oro de no «probar» con esta etapa fuera de la guía.
+
+## 9b. Paso 5 bis — Los respaldos en Cloudflare R2
+
+Cuatro contenedores en R2 reciben la copia diaria del clúster y el archivo de cambios, **comprimidos y cifrados** en VM-INVENTARIO antes de salir: `respaldos-diarios` (7 días), `-semanales` (28), `-mensuales` (92) y `respaldos-wal` (7). Cada uno impide borrar o sobrescribir durante su plazo y retira solo lo vencido (puede tardar hasta un día más). Medición local: unos 1,9 de los 10 GB gratuitos con venta ligera (`progress/ensayos/medicion-respaldos-comprimidos-2026-11-25.md`).
+
+**Qué pierdes frente a Oracle** (riesgo aceptado y provisional): no hay credencial de «solo crear» (la de la VM puede leer, listar y subir objetos nuevos en esos cuatro contenedores) y el bloqueo lo puede **quitar quien administre tu cuenta de Cloudflare**. Esa misma cuenta lleva el dominio y el túnel: protégela como la clave de respaldos.
+
+### 9b.1 Protege la cuenta antes de nada
+
+1. **Segundo factor:** Cloudflare → *My Profile → Authentication → Two-Factor Authentication* → actívalo y guarda los códigos de recuperación fuera de línea. Usa para la cuenta un correo **distinto** del que recibe los avisos del sistema.
+2. Activa **R2** (*R2 Object Storage* en el panel). Si pide un medio de pago, léelo: el cupo gratuito es de 10 GB al mes y lo que pase **se cobra**.
+3. **Aviso de facturación:** *Notifications → Add* → elige una alerta de facturación o de uso (por ejemplo, de facturación por uso) con **tu correo** como destinatario y un umbral bajo. **Si tu cuenta no ofrece ninguna, para y avisa**: la spec la exige (PLA-06) y habría que decidir otra cosa.
+4. Anota el **Account ID** (aparece en la portada de R2; 32 caracteres). No es un secreto.
+
+### 9b.2 Crea los contenedores y sus reglas
+
+1. Crea un **token temporal de administración**: *My Profile → API Tokens → Create Token → Custom token*: permiso **Account → Workers R2 Storage → Edit**, solo tu cuenta, con fecha de fin **hoy o mañana**. Se muestra una vez; no lo guardes.
+2. **[Tu equipo, en tu propia terminal]** (el script se niega si detecta un agente o una integración continua):
+
+   ```bash
+   cd ~/BabelHub
+   bash scripts/almacen.sh r2-plan                                                  # lo que se va a enviar; no llama a nadie
+   CLOUDFLARE_ACCOUNT_ID=<account-id> bash scripts/almacen.sh r2-aplicar --ubicacion enam
+   ```
+
+   Pega el token cuando lo pida (no se muestra). `--ubicacion` es opcional (`enam` es el este de Norteamérica; R2 no ofrece Sudamérica) y solo cuenta al crear.
+3. **Debes ver** `ok respaldos-diarios`, `ok respaldos-semanales`, `ok respaldos-mensuales`, `ok respaldos-wal` y «R2 coincide con la definición».
+4. **Revoca el token** (*API Tokens → … → Delete*). Para comprobar más adelante crea otro de **solo lectura** (*Workers R2 Storage → Read*), ejecuta `r2-comprobar` y revócalo.
+
+**Si falla:** «estado 403» = el token no tiene el permiso o no es de esa cuenta; «ya tiene un bloqueo distinto» = alguien lo cambió: revísalo en el panel (el script no lo toca). **Cómo deshacer:** un contenedor con objetos bloqueados no se puede vaciar hasta que venzan (o hasta que quites la regla en el panel).
+
+### 9b.3 Las credenciales de objetos
+
+*R2 → Manage R2 API Tokens → Create API token*. En cada una, **«Apply to specific buckets only»** con **los cuatro contenedores `respaldos-*`**, y nunca un permiso «Admin»:
+
+| Token | Permiso | Dónde va |
+| :--- | :--- | :--- |
+| `respaldos-escritor` | *Object Read & Write* | `postgres.env` de VM-INVENTARIO (§10.2) |
+| `respaldos-lector` | *Object Read only* | Solo tu equipo: la comprobación diaria (§14) y restaurar. Rótalo después de cada ensayo con datos reales. |
+
+(`respaldos-vigilante` es de VM-AUX: no lo crees mientras esté aplazada.) De cada uno copia **Access Key ID** y **Secret Access Key** a tu gestor de contraseñas, y del escritor también el **Token value** (solo lo usa la prueba de §9b.5); el endpoint es `https://<account-id>.r2.cloudflarestorage.com`.
+
+### 9b.4 Revisa quién puede tocar R2
+
+En *My Profile → API Tokens* (y *Manage Account → Account API Tokens*) no debe quedar **ningún** token con permiso de edición de R2, ni haber uno en las VMs, el repositorio o GitHub. Anótalo con la fecha en `progress/ensayos/AAAA-MM-DD-cuenta-r2.md` junto con el segundo factor y el aviso de facturación (sin valores secretos).
+
+### 9b.5 Prueba tu cuenta antes de poner datos que importen (obligatorio, T47)
+
+**[Tu equipo]**, con las claves de `respaldos-escritor` (usa `respaldos-wal`: lo que dejes allí se retira solo a los 7 días):
+
+```bash
+export RCLONE_CONFIG_PRUEBA_TYPE=s3 RCLONE_CONFIG_PRUEBA_PROVIDER=Cloudflare RCLONE_CONFIG_PRUEBA_REGION=auto
+export RCLONE_CONFIG_PRUEBA_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+read -r -p "Access Key ID: " RCLONE_CONFIG_PRUEBA_ACCESS_KEY_ID; read -r -s -p "Secret Access Key: " RCLONE_CONFIG_PRUEBA_SECRET_ACCESS_KEY; echo
+export RCLONE_CONFIG_PRUEBA_ACCESS_KEY_ID RCLONE_CONFIG_PRUEBA_SECRET_ACCESS_KEY
+echo uno > /tmp/uno.txt && echo "este es el segundo contenido" > /tmp/dos.txt
+o="--s3-no-check-bucket --ignore-times --retries 1 -v"     # --ignore-times: sin él rclone puede no intentar la subida
+a=prueba:respaldos-wal/prueba-t47-a; b=prueba:respaldos-wal/prueba-t47-b
+rclone copyto $o /tmp/uno.txt $a && echo "bien: subió" || echo "MAL"
+rclone copyto $o /tmp/dos.txt $b && echo "bien: subió" || echo "MAL"
+rclone deletefile --retries 1 -v $a && echo "MAL: se pudo borrar" || echo "rechazado"
+rclone copyto $o /tmp/dos.txt $a && echo "MAL: se sobrescribió" || echo "rechazado"
+rclone copyto $o --s3-upload-cutoff 0 /tmp/dos.txt $a && echo "MAL: se sobrescribió en varias partes" || echo "rechazado"
+rclone copyto $o $b $a && echo "MAL: se sobrescribió copiando" || echo "rechazado"
+rclone cat $a                                              # DEBE decir «uno»
+rclone lsd prueba:                                         # no debe mostrar contenedores ajenos a respaldos-*
+```
+
+**En cada «rechazado» debe verse encima el motivo `ObjectLockedByBucketPolicy` o un error 409**; un rechazo por otra causa (clave mal pegada, 403, red) no prueba el bloqueo.
+
+**Ese token no lee ni cambia las reglas.** Con el *Token value* de `respaldos-escritor`, sin que quede en el historial (lo que se envía en los `PUT` es la regla que ya hay: si se aceptara, no cambiaría nada):
+
+```bash
+read -r -s -p "Token value del escritor: " v; echo
+api=https://api.cloudflare.com/client/v4; cuenta=<account-id>
+printf 'header = "Authorization: Bearer %s"\n' "$v" | curl --disable -s --config - $api/user/tokens/verify; echo
+pedir() { printf 'header = "Authorization: Bearer %s"\n' "$v" | curl --disable -s -o /dev/null -w "$1 $2 -> %{http_code}\n" --config - -X "$1" ${3:+-H "Content-Type: application/json" --data "$3"} "$api/accounts/$cuenta/r2/buckets/respaldos-wal$2"; }
+pedir GET /lock
+pedir GET /lifecycle
+pedir PUT /lock '{"rules":[{"id":"retencion-7-dias","enabled":true,"condition":{"type":"Age","maxAgeSeconds":604800}}]}'
+pedir PUT /lifecycle '{"rules":[{"id":"retiro-a-los-7-dias","enabled":true,"conditions":{"prefix":""},"deleteObjectsTransition":{"condition":{"type":"Age","maxAge":604800}},"abortMultipartUploadsTransition":{"condition":{"type":"Age","maxAge":86400}}}]}'
+unset v pedir
+```
+
+La primera respuesta debe decir `"status":"active"` (si el panel lo creó como token de cuenta, usa `…/accounts/<account-id>/tokens/verify`) y las cuatro líneas siguientes deben terminar en **403**: un 200 es un fallo grave; un 400 o un 401 no prueban nada.
+
+**No alcanza otro contenedor.** Crea en el panel un contenedor vacío `t47-ajeno` y comprueba que `rclone lsf prueba:t47-ajeno` y `rclone copyto $o /tmp/uno.txt prueba:t47-ajeno/x` **fallan** (403 / `AccessDenied`); bórralo al terminar. Y que las claves de `catalogo-archivos` (Oracle) no abren R2 ni las de R2 abren Oracle: define otro remoto con las claves de unas y el endpoint del otro y `rclone lsd` debe fallar.
+
+Anota cada resultado en `progress/ensayos/AAAA-MM-DD-T47-r2.md` (sin pegar claves). **Si algo que debía fallar funcionó, no actives los respaldos y avisa.** Cierra la terminal al terminar.
 
 ## 10. Paso 6 — Los secretos (en tu equipo, nunca en el repositorio)
 
@@ -455,7 +548,7 @@ nano ~/babelhub-secretos/inventario/ecommerce-gestion.env
 | `…Turnstile__ClaveDeSitio` y `…Secreto` | **Créalo ahora, antes de copiar las carpetas** (VM-INVENTARIO ya lo exige y no necesita el túnel): Cloudflare → *Turnstile → Add site*, hostnames `babel-hub.shop`, `www.babel-hub.shop` y `gestion.babel-hub.shop`; clave de sitio (`0x4…`, pública) y clave secreta, en `ecommerce.env` y `ecommerce-gestion.env`. |
 | `…Almacen__Catalogo__*`, `…Biblioteca__*`, `…Supresiones__*` | §9: las claves de cada credencial; `Endpoint` = `https://<espacio>.compat.objectstorage.sa-santiago-1.oraclecloud.com`. |
 | `…Web__OrigenDelAlmacen` (ventas) | El origen `https://<espacio>.compat.objectstorage.sa-santiago-1.oraclecloud.com` (igual al host del endpoint de `biblioteca-lector`). |
-| `postgres.env`: `RCLONE_CONFIG_ALMACEN_ENDPOINT`, `…ACCESS_KEY_ID`, `…SECRET_ACCESS_KEY` | ⛔ **Hasta que el cambio de respaldos esté en `main`, no pongas credenciales reales.** Escribe `https://respaldos-pendientes.invalid` como dirección y un texto cualquiera como claves: nada sale de la VM, **no hay respaldos** (usa solo datos de prueba), PostgreSQL guarda los cambios sin subir hasta unos 4 GB y después los descarta sin llenar el disco, y recibirás correos de aviso del espacio reservado (al 80 % y cada pocas horas cuando se agote): es lo esperado. |
+| `postgres.env`: `RCLONE_CONFIG_ALMACEN_ENDPOINT`, `…ACCESS_KEY_ID`, `…SECRET_ACCESS_KEY` | §9b.3: el endpoint de R2 y las claves de **`respaldos-escritor`** (el proveedor `Cloudflare` y la región `auto` ya vienen escritos). Nunca el token de administración. |
 | `aviso.env` (inventario) | Un correo propio de esa VM para el aviso del espacio reservado: `AUX_SMTP_URL=smtps://smtp.gmail.com:465` (**`smtps://`**, con TLS), usuario, contraseña de aplicación, remitente y destinatario (tú). |
 | `…Contacto__Telefono`, `…Contacto__Correo`, `…Contacto__Direccion` (`ecommerce.env` y `ecommerce-gestion.env`) | **El teléfono, el correo y la dirección de contacto que mostrará la tienda** (Culqi exige contacto visible). Son **datos personales tuyos: nunca los escribas en el repositorio**; solo van aquí. `desplegar.sh` no continúa mientras digan `CAMBIAR`. |
 | `…Pagos__LlavePrivada` | **Solo con `--entorno production`:** tu llave `sk_live_…` de Culqi. En `Staging` **no** lleva llave (el script se niega si la hay). |
@@ -532,15 +625,15 @@ sudo docker run --rm --network babelhub-inventario_default -v /etc/babelhub/secr
   -sS --cacert /ca.pem https://inventario:8443/health/ready
 ```
 
-**Debes ver** `{"estado":"listo","componentes":[{"nombre":"base-de-datos","estado":"ok"}]}`. En PostgreSQL **verás errores del archivado de cambios**: son los esperados con los valores provisionales (§10.2). **No pongas credenciales reales para que desaparezcan.**
+**Debes ver** `{"estado":"listo","componentes":[{"nombre":"base-de-datos","estado":"ok"}]}`. En los registros de PostgreSQL **no** debe haber errores de `respaldos:`; si los hay, revisa las claves de R2 en `postgres.env` (mientras falle, los cambios se acumulan en la VM hasta unos 4 GB y recibirás avisos del espacio reservado).
 
-**Primer respaldo y su comprobación** (⛔ **sáltalo hasta que el cambio de respaldos esté en `main`**; entonces hazlo una vez):
+**Primer respaldo y su comprobación:**
 
 ```bash
 sudo docker exec babelhub-inventario-postgres-1 /opt/babelhub/respaldar.sh --bajo-demanda
 ```
 
-Debe terminar sin error; en la consola de Oracle, el contenedor `respaldos-diarios` tendrá un objeto `AAAA-MM-DD/…tar.age`. **Un respaldo que nunca se restauró no es un respaldo**: el spike T01 (§15.4) lo comprueba.
+Debe terminar sin error y decir `respaldos: subido respaldos-diarios/AAAA-MM-DD/…tar.zst.age` (dos veces: el clúster y la configuración). En el panel de R2, `respaldos-wal` recibe un objeto `…zst.age` cada pocos minutos. **Un respaldo que nunca se restauró no es un respaldo**: el spike T01 (§15.4) lo comprueba.
 
 **Cómo deshacer** (sin perder datos): `cd /opt/babelhub/infra && sudo env BABELHUB_SECRETOS=… IP_PRIVADA=… IP_VENTAS=… IMAGEN_…=… docker compose -f docker-compose.inventario.yml down` (**sin `-v`**).
 
@@ -698,7 +791,14 @@ Haz esto:
 1. **Monitor externo** gratuito (por ejemplo en healthchecks.io o UptimeRobot) que pida `https://babel-hub.shop/health/live` cada pocos minutos y te avise por correo.
 2. **[Tu equipo]** Disco cifrado de las dos VMs (T38): `bash scripts/verificar-cifrado-de-disco.sh --instancia <ocid de la VM> --compartimento <ocid> --dominio <AD>` para `vm-inventario` y `vm-ventas`. Debe decir que el volumen está `AVAILABLE` con clave de Oracle. Guarda la salida.
 3. Una vez por semana, en cada VM: `last -20` y `sudo journalctl -u ssh --since "7 days ago" | grep -i accepted` (solo tus ingresos).
-4. Cuando los respaldos estén activos (no antes): revisa cada día que haya un respaldo nuevo y `sudo tail -20 /var/log/babelhub-respaldo.log`. Para uno bajo demanda: `ssh babelhub-inventario sudo docker exec babelhub-inventario-postgres-1 /opt/babelhub/respaldar.sh --bajo-demanda`.
+4. **Cada día, comprueba el respaldo** (nadie te avisará si falla, y el archivo de cambios solo dura 7 días). **[Tu equipo]**, con las claves de `respaldos-lector` guardadas fuera del repositorio en un archivo tuyo con permisos 600 (`~/.config/babelhub/r2-lector.env`, con las líneas `export RCLONE_CONFIG_LECTOR_TYPE=s3`, `…_PROVIDER=Cloudflare`, `…_REGION=auto`, `…_ENDPOINT=…`, `…_ACCESS_KEY_ID=…` y `…_SECRET_ACCESS_KEY=…`):
+
+   ```bash
+   . ~/.config/babelhub/r2-lector.env && echo "== copias de las ultimas 24 horas" && TZ=UTC rclone lsf -R --files-only --use-server-modtime --max-age 24h --format tp --separator ' ' lector:respaldos-diarios | sort && echo "== ultimo cambio archivado" && TZ=UTC rclone lsf -R --files-only --use-server-modtime --max-age 24h --format tp --separator ' ' lector:respaldos-wal | sort | tail -n 1
+   ```
+
+   **Debes ver exactamente dos objetos** `…tar.zst.age` (el clúster y `-config-`), subidos **a la hora programada (02:30 UTC)**, más una pareja por cada respaldo bajo demanda que tú hayas lanzado, y un segmento de **los últimos 15 minutos**. **Cualquier otro objeto es una alerta**: quien tenga la VM puede subir copias falsas (no anotes ninguna hasta aclararlo). **Anota en tu hoja el nombre completo de la copia del clúster** de cada día: al restaurar se elige **por ese nombre**, nunca «la más reciente». Si falta: en la VM, `sudo tail -20 /var/log/babelhub-respaldo.log` y `sudo docker logs --tail 50 babelhub-inventario-postgres-1`; respaldo bajo demanda: `ssh babelhub-inventario sudo docker exec babelhub-inventario-postgres-1 /opt/babelhub/respaldar.sh --bajo-demanda`.
+5. **Cada semana, revisa el uso de R2** (panel de R2, o `rclone size lector:respaldos-diarios` y lo mismo con los otros tres) y anótalo. La primera semana compáralo con la medición local; **si la suma pasa de unos 7 GB, avisa** antes de que se acabe el cupo.
 
 **Antes de operar con clientes o datos reales** hace falta VM-AUX o un vigilante equivalente fuera de las dos VMs.
 
@@ -772,7 +872,7 @@ Culqi se integra en **dos fases**: primero **revisa tu web** (no necesita todav�
 
 #### Fase 1: Culqi revisa la web (entorno `Staging`, pagos simulados)
 
-> ⚠️ **La tienda en `Staging` es pública y todavía no hay respaldos** (§0, fila 5): el registro de cuentas y el Libro de Reclamaciones aceptan datos reales de cualquiera, y una falla de la VM de datos los perdería. Usa solo datos de prueba, activa los respaldos cuanto antes y decide si mientras tanto limitas quién puede entrar (por ejemplo, con una regla de Cloudflare que solo deje pasar a Culqi y a ti).
+> ⚠️ **La tienda en `Staging` es pública**: el registro de cuentas y el Libro de Reclamaciones aceptan datos reales de cualquiera. Los respaldos (§9b, §11.1) deben estar activos y comprobados, y **todavía no hay una restauración probada en la VM**. Usa solo datos de prueba y decide si mientras tanto limitas quién puede entrar (por ejemplo, con una regla de Cloudflare que solo deje pasar a Culqi y a ti).
 
 Es lo que despliega esta guía por defecto. En `Staging` la tienda está en Internet con SSL, **no cobra nada** (la pasarela es un simulador) y lo dice en pantalla: «Pagos simulados: no se realiza ningún cobro», en el pie de toda página, en el checkout y en el pago. Los requisitos que Culqi revisa y dónde se cumple cada uno:
 
@@ -824,7 +924,7 @@ Todos son comandos de consola de la imagen del E-commerce, con el mismo `docker 
 
 #### Fase 2: integrar el cobro real (entorno `Production`)
 
-> ⛔ **Antes de cobrar dinero real** debe cumplirse, como mínimo: respaldos activos y **una restauración probada** (hoy no hay ninguno, §0 fila 5), un vigilante fuera de las dos VMs (§14) y la revisión legal pendiente (B09). Pasar a `Production` sin eso significa que una falla de disco pierde pedidos y pagos ya cobrados.
+> ⛔ **Antes de cobrar dinero real** debe cumplirse, como mínimo: respaldos activos y **una restauración probada** (T01, §15.4), un vigilante fuera de las dos VMs (§14), la revisión del almacén de respaldos provisional (§0 fila 5, B13) y la revisión legal pendiente (B09). Pasar a `Production` sin eso arriesga perder pedidos y pagos ya cobrados.
 
 Cuando Culqi apruebe la web y te dé las llaves:
 
@@ -862,13 +962,13 @@ Necesitas un **número dedicado y descartable** (no el personal). Pasos (detalle
 
 ### 15.4 Spikes opcionales T01–T05 (`specs/transversal-plataforma/tasks.md`)
 
-Son mediciones que cierran decisiones de la spec. Ninguna bloquea el despliegue. ⛔ **T01, T02, T03 y T04 quedan en espera hasta que el cambio de respaldos (compresión y Cloudflare R2) esté en `main`:** hoy no hay respaldos, y T02 y T03 invitan a aplicar la retención o a dejar objetos de prueba que quedarían bloqueados. Cuando llegue, T01 es la única prueba de que tus respaldos sirven. Registra cada resultado en `progress/ensayos/AAAA-MM-DD-<spike>.md` (fecha, qué hiciste, el número medido, la decisión) y avisa para actualizar `specs/transversal-plataforma/decisions.md`.
+Son mediciones que cierran decisiones de la spec. Ninguna bloquea el despliegue, pero **T01 es la única prueba de que tus respaldos sirven** (y la prueba de la cuenta de R2, §9b.5, va antes de poner datos que importen). Registra cada resultado en `progress/ensayos/AAAA-MM-DD-<spike>.md` (fecha, qué hiciste, el número medido, la decisión) y avisa para actualizar `specs/transversal-plataforma/decisions.md`.
 
 | Spike | Qué hacer (ejecutable) | Qué registrar |
 | :--- | :--- | :--- |
-| **T01** Restaurar una copia hecha en ARM | En tu equipo: baja el respaldo más reciente de `respaldos-diarios` con `respaldos-lector`; `bash scripts/descifrar-respaldo.sh --entrada <respaldo>.tar.age < <tu clave de age> \| bash scripts/extraer-respaldo.sh --destino ~/restauracion-ensayo`; arranca `postgres:17-alpine` (la imagen de `infra/postgres` con `--platform linux/arm64`, en emulación) montando esa carpeta y comprueba `select count(*) from …` de pedidos y reservas. Hazlo en un **volumen cifrado efímero**, con swap apagado, sin red hacia proveedores. | Duración total, contadores, si arrancó sin errores en ARM emulado, y la decisión D12. |
+| **T01** Restaurar una copia hecha en ARM | En tu equipo, **dentro de un volumen cifrado efímero** (T05) y nunca en tu carpeta personal: baja con `respaldos-lector` la copia del clúster **cuyo nombre anotaste** (§14), comprueba que `sha256sum <archivo>` coincide con la suma que lleva el nombre y entonces `bash scripts/descifrar-respaldo.sh --entrada <respaldo>.tar.zst.age < <tu clave de age> \| bash scripts/extraer-respaldo.sh --destino <volumen-cifrado>/restaurada` (necesita `zstd`); configura la recuperación como dice `infra/respaldos/README.md` (con o sin archivo de cambios); arranca `postgres:17-alpine` (la imagen de `infra/postgres` con `--platform linux/arm64`, en emulación) montando esa carpeta y comprueba `select count(*) from …` de pedidos y reservas. Hazlo en un **volumen cifrado efímero**, con swap apagado, sin red hacia proveedores. | Duración total, contadores, si arrancó sin errores en ARM emulado, y la decisión D12. |
 | **T02** Almacén de Oracle | `bash scripts/almacen.sh comprobar --espacio <ns>`; sube dos veces la misma clave con la credencial `supresiones-registro` y comprueba que la segunda **falla** (no sobrescribe); confirma si la retención es por contenedor y **cuándo** ejecuta el ciclo de vida (los objetos de prueba vencen a los días que dice `contenedores.txt`). | Error exacto al repetir, si la retención es por contenedor o por prefijo (decide D23), fecha en que corrió el ciclo de vida. |
-| **T03** Tamaño y cuota | En VM-INVENTARIO: `sudo docker exec babelhub-inventario-postgres-1 psql -U postgres -c "select pg_size_pretty(sum(pg_database_size(datname))) from pg_database"`; en la consola de Oracle, *Object Storage → cuota* y el tamaño de cada contenedor. Estima 17 copias × (tamaño comprimido) + WAL + libros. | Tamaño de la base, tamaño por contenedor, cuota gratuita vigente y la proyección contra ella. |
+| **T03** Tamaño y cuota | En VM-INVENTARIO: `sudo docker exec babelhub-inventario-postgres-1 psql -U postgres -c "select pg_size_pretty(sum(pg_database_size(datname))) from pg_database"`; en R2, el tamaño de los cuatro contenedores (§14, paso 5), y en Oracle, *Object Storage → cuota* con libros y registro. Compara con `progress/ensayos/medicion-respaldos-comprimidos-2026-11-25.md`. | Tamaño de la base, tamaño por contenedor, cuotas gratuitas vigentes y la proyección contra ellas. |
 | **T04** Memoria y CPU de VM-INVENTARIO | Con la VM bajo uso normal **y** un respaldo en curso (`respaldar.sh --bajo-demanda`): `free -m` (usa «available», sin caché), `sudo docker stats --no-stream`, `uptime`. Durante 15 minutos, cada minuto. | Memoria usada (sin caché recuperable), CPU, pico durante el respaldo; compara con el 70 % de RNF12 (~4,2 GB). |
 | **T05** Volumen cifrado efímero | Una VM o distro de ensayo **aparte** con `swapon --show` vacío; crea un volumen LUKS (`cryptsetup`), restaura ahí, destrúyelo (`cryptsetup luksClose` y borra la llave) y comprueba que no quedan datos en `/tmp`, el historial de la shell ni los registros de Docker (`docker system prune -af --volumes`). | Qué quedó fuera del volumen (residual) y la constancia de destrucción. |
 
@@ -896,8 +996,9 @@ Son mediciones que cierran decisiones de la spec. Ninguna bloquea el despliegue.
 | Ensayo local | `scripts/ensayo-local.sh` |
 | Generador de secretos | `scripts/generar-secretos.sh` y `infra/secretos-requeridos.txt` |
 | Despliegue de una VM | `scripts/desplegar.sh <ventas\|inventario>` e `infra/docker-compose.<vm>.yml` |
-| Almacén de objetos | `scripts/almacen.sh` e `infra/almacen/` |
+| Almacenes (Oracle y R2) | `scripts/almacen.sh` (`r2-…`: `scripts/almacen-r2.sh`), `infra/almacen/` e `infra/almacen/r2/` |
+| Restauración manual | `scripts/descifrar-respaldo.sh`, `extraer-respaldo.sh` y `descifrar-wal.sh` (`infra/respaldos/README.md`) |
 | VM-AUX (aplazada) | `scripts/vm-aux/` e `infra/vm-aux/` |
 | Respaldos y custodia | `infra/respaldos/`, `scripts/comprobar-custodia.sh` |
-| Decisiones de esta guía | `progress/decisiones-delegadas.md` (DD-55 a DD-59; para `Staging`, la cuenta de prueba, el dominio y HTTPS, DD-65 a DD-69; para las dos VMs, DD-100 a DD-104) |
+| Decisiones de esta guía | `progress/decisiones-delegadas.md` (DD-55 a DD-59; para `Staging`, la cuenta de prueba, el dominio y HTTPS, DD-65 a DD-69; para las dos VMs, DD-100 a DD-104; respaldos en R2, DD-105 a DD-109) |
 | Entorno `Staging`, aviso de pagos simulados y cuenta de prueba | `specs/ecommerce-pagos/` (PAG-33 a PAG-49, D25), `EntornoDelServicio`, `ModoCuentaDeRevision` y `CuentaDeRevisionDeLaPasarela` |

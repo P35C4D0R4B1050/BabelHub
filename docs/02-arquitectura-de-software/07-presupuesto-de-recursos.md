@@ -55,7 +55,8 @@ La CPU es el cuello de botella previsto. VM-VENTAS tiene un .NET, dos de Node y 
 | Volúmenes de arranque | ~47 GB por VM | Mínimo de Oracle; 2 VMs = 94 GB de los 200 GB gratuitos. |
 | Bases de datos | < 10 GB al inicio | Crecimiento vigilado. |
 | Registros de contenedores | Rotación (por ejemplo, 3 archivos de 10 MB por contenedor) | Evita llenar el disco. |
-| Respaldos y WAL locales temporales | < 5 GB | Se suben cifrados al almacén de objetos y se borran. |
+| Respaldos y WAL locales temporales | < 5 GB | Se suben comprimidos y cifrados al almacén de respaldos y se borran. |
+| Respaldos en Cloudflare R2 | ≤ 7 GB de los 10 GB gratuitos | Medición local con datos inventados: ~1,9 GB con 42 000 ventas acumuladas y venta ligera ([medición](../../progress/ensayos/medicion-respaldos-comprimidos-2026-11-25.md)). Se repite en la VM la primera semana; al superar ~7 GB se proponen alternativas a la persona responsable. |
 | Archivos digitales | 0 en las VMs | Viven en el almacén de objetos (AD19); la administración los sube directamente. |
 
 ## 5. Presupuesto de la interfaz

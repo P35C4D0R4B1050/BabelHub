@@ -11,7 +11,8 @@
 #     credencial vieja se rechaza de inmediato (no es la rotación en dos pasos de una rotación normal).
 #   - Las contraseñas de los roles de base de datos indicados con --rol: ALTER ROLE por psql y la variable del archivo.
 #   - Los secretos de integraciones que genera el propio sistema (--integracion-interna), no los que emite un proveedor.
-# Lo que emite un proveedor (almacén de objetos, pasarela, Turnstile…) no se puede rotar desde aquí: se lista como pendiente a mano.
+# Lo que emite un proveedor (almacenes de objetos, entre ellos el token de respaldos de R2 en postgres.env, pasarela, Turnstile…) no se puede
+# rotar desde aquí: se lista como pendiente a mano. Tras restaurar, el token `respaldos-escritor` se rota siempre (D28).
 # La clave de firma y las sesiones las rota Identidad en el paso de restauración (IRestauracionDeIdentidad).
 #
 # Seguridad: los archivos de entorno son secretos del despliegue y NO están en el repositorio. Ningún valor sale por pantalla ni por
@@ -216,6 +217,7 @@ for nombre in $(printf '%s\n' "${!ARCHIVOS[@]}" | sort); do
   done < <(awk -F= '
     /^BABELHUB__Integraciones__/ && $1 !~ /Anterior$/ { print $1 }
     /^BABELHUB__Almacen__/ { print $1 }
+    /^RCLONE_CONFIG_ALMACEN_(ACCESS_KEY_ID|SECRET_ACCESS_KEY)=/ { print $1 }
     /^BABELHUB__Seguridad__Turnstile__Secreto=/ { print $1 }
     /^BABELHUB__Seguridad__ClaveDeRedisDeLimites=/ { print $1 }
     /^BABELHUB__Seguridad__ClaveDeHuella=/ { print $1 }

@@ -12,7 +12,7 @@
 #
 # Prueba también el TLS de PostgreSQL (AM24, paso 6b): rechazo sin TLS, con otra CA y con otro nombre; conexiones de red todas cifradas; respaldo por el socket local; y Evolution API (Prisma) si su imagen está en el equipo (ENSAYO_EVOLUTION=1 la descarga).
 #
-# Lo que NO prueba: Cloudflare, el túnel (cloudflared se simula con un contenedor en su dirección), el cortafuegos de Oracle, Evolution API (WhatsApp), el almacén de objetos de Oracle ni los cobros reales. Los dos servicios del
+# Lo que NO prueba: Cloudflare, el túnel (cloudflared se simula con un contenedor en su dirección), el cortafuegos de Oracle, Evolution API (WhatsApp), el almacén de objetos de Oracle, Cloudflare R2 (los respaldos) ni los cobros reales. Los dos servicios del
 # E-commerce corren en «Staging» (el entorno de revisión de la tienda por Culqi: se endurece como «Production» y solo afloja el cobro, con la
 # pasarela simulada) y, al final, el ensayo ejecuta el comando «cuenta-de-prueba» con la imagen real (guía, §15.1).
 set -euo pipefail

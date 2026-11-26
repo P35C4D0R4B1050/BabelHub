@@ -53,7 +53,7 @@ PAG["Culqi"]
 ENV["Operador logístico"]
 LLM["Proveedor de LLM"]
 NOT["n8n + Evolution API<br/>WhatsApp"]
-ALM[("Almacén de archivos<br/>libros digitales y respaldos")]
+ALM[("Almacén de archivos<br/>libros digitales (Oracle)<br/>respaldos (Cloudflare R2)")]
 end
 
 Nav -->|"HTTPS"| CF
@@ -150,7 +150,7 @@ La vista de despliegue sobre las VMs de Oracle está en [despliegue](05-desplieg
 | **Bases `ecommerce` e `inventario`** | Una base por servicio, con un esquema por módulo y un rol por esquema; Identidad queda aislada por rol. No hay llaves foráneas ni consultas entre bases. | AD03, AD12, AD18 |
 | **Cloudflare y Nginx** | Cloudflare protege, cifra y limita el acceso; Nginx enruta por host (tienda y gestión). | AD13, AD14 |
 | **Notificaciones (n8n + Evolution API)** | Reciben avisos por webhook de ambos servicios y los envían por WhatsApp; su falla no bloquea ninguna operación. | AD16 |
-| **Almacén de archivos** | Guarda los EPUB y PDF en un bucket privado y los respaldos cifrados; el cliente descarga con URL firmada de corta duración. | AD19, AD20, AD27 |
+| **Almacén de archivos** | Guarda los EPUB y PDF en un bucket privado (Oracle); el cliente descarga con URL firmada de corta duración. Los respaldos cifrados van a un almacén aparte (Cloudflare R2, desde el 2026-11-25). | AD19, AD20, AD27 |
 | **Caché Redis** | Disponibilidad (corta duración), catálogo (mayor duración) y contadores de límites; vive en la VM del E-commerce. | AD06 |
 
 ### 3.1 Módulos de cada servicio
@@ -200,7 +200,7 @@ Cada módulo es una carpeta dentro de las capas del servicio (no un proyecto apa
 | E-commerce | Culqi y operador logístico | API externa | Cobrar y gestionar entregas. |
 | E-commerce e Inventario | n8n | Webhook (asíncrono, tolerante a fallos) | Pedir el envío de un aviso por WhatsApp. |
 | n8n | Evolution API → WhatsApp | API interna y externa | Armar y enviar el mensaje. |
-| E-commerce | Almacén de archivos | API S3 (HTTPS) | Subir archivos digitales, firmar URLs de descarga y subir respaldos. |
+| E-commerce | Almacén de archivos | API S3 (HTTPS) | Subir archivos digitales y firmar URLs de descarga (los respaldos los sube PostgreSQL a su almacén, no el E-commerce). |
 | Navegador | Almacén de archivos | HTTPS con URL firmada | Descargar el libro; el servicio no transporta el archivo. |
 | Asistente | Proveedor de LLM | API externa | Generar respuestas. |
 

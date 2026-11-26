@@ -7,7 +7,7 @@
 #   <destino>/custodia/     la clave PRIVADA de age y la CA privada: se quedan en tu equipo y en la copia fuera de línea; NUNCA en una VM
 #
 # Lo que se puede inventar (contraseñas, claves HMAC, credenciales entre servicios, certificados de la red privada, el par de claves de age)
-# se genera aquí con valores aleatorios. Lo que solo puede dar un tercero (la cuenta de correo, Turnstile, las llaves del almacén de Oracle,
+# se genera aquí con valores aleatorios. Lo que solo puede dar un tercero (la cuenta de correo, Turnstile, las llaves de los almacenes de Oracle y de Cloudflare R2,
 # el token del túnel de Cloudflare, Culqi, WhatsApp) queda como «CAMBIAR» y se anota en PENDIENTES.txt: `scripts/desplegar.sh` se niega a
 # desplegar una VM con algún «CAMBIAR» sin completar, así que no se puede olvidar uno.
 #
@@ -136,11 +136,12 @@ linea "$f" POSTGRES_INVENTARIO_PASSWORD "$(valor pg-inventario 40)"
 # El destinatario de age (público) se completa al generar el par, más abajo.
 AGE_DESTINATARIO_LINEA="$f"
 linea "$f" RCLONE_CONFIG_ALMACEN_TYPE s3
-linea "$f" RCLONE_CONFIG_ALMACEN_PROVIDER Other
-pendiente "$f" RCLONE_CONFIG_ALMACEN_ENDPOINT "https://<espacio-de-nombres>.compat.objectstorage.$REGION.oraclecloud.com (credencial respaldos-escritor)"
-linea "$f" RCLONE_CONFIG_ALMACEN_REGION "$REGION"
-pendiente "$f" RCLONE_CONFIG_ALMACEN_ACCESS_KEY_ID "clave de acceso de la credencial respaldos-escritor"
-pendiente "$f" RCLONE_CONFIG_ALMACEN_SECRET_ACCESS_KEY "clave secreta de la credencial respaldos-escritor"
+# Los respaldos van a Cloudflare R2 (D26): su región es siempre «auto».
+linea "$f" RCLONE_CONFIG_ALMACEN_PROVIDER Cloudflare
+pendiente "$f" RCLONE_CONFIG_ALMACEN_ENDPOINT "https://<account-id>.r2.cloudflarestorage.com (Cloudflare R2; guía de despliegue §9b)"
+linea "$f" RCLONE_CONFIG_ALMACEN_REGION auto
+pendiente "$f" RCLONE_CONFIG_ALMACEN_ACCESS_KEY_ID "Access Key ID del token de objetos respaldos-escritor de R2"
+pendiente "$f" RCLONE_CONFIG_ALMACEN_SECRET_ACCESS_KEY "Secret Access Key del token de objetos respaldos-escritor de R2"
 
 f="$d/inventario.env"; inicio "$f"
 linea "$f" BABELHUB__Inventario__Base__Aplicacion "$(cuenta inventario inventario_acceso postgres)"

@@ -36,7 +36,7 @@ services:
       - "${BABELHUB_SECRETOS:?Define BABELHUB_SECRETOS con la carpeta de los secretos de esta VM}/postgres.env"
     # Archivado continuo de WAL cifrado hacia el almacén (PLA-15, D10): archive_timeout=300 y el latido de la base garantizan segmentos nuevos
     # aunque no haya actividad. archivar-wal.sh y respaldar.sh vienen en la imagen (infra/postgres/respaldos); las variables de age y del
-    # almacén (credencial respaldos-escritor, que solo crea) llegan en postgres.env. /config es la configuración de la VM, sin secretos.
+    # almacén (token respaldos-escritor de Cloudflare R2, limitado a los contenedores de respaldos) llegan en postgres.env. /config es la configuración de la VM, sin secretos.
     # TLS (AM24): el entrypoint de la imagen copia el certificado y la clave (secretos) a memoria con los permisos que exige PostgreSQL y arranca el servidor; `pg_hba.conf` (en la imagen) solo admite `hostssl`
     # y rechaza lo demás, así que una conexión sin cifrar o de un cliente que no confía en la CA privada nunca llega a pedir la contraseña. TLS 1.3 como mínimo.
     entrypoint: ["/opt/babelhub/iniciar.sh"]

@@ -282,11 +282,13 @@ public sealed partial class RespaldosTests(RespaldosFixture entorno)
 
         await latido;
         Assert.True(nuevos.Count >= 2, $"se esperaban al menos 2 segmentos nuevos y hubo {nuevos.Count}");
-        Assert.All(nuevos, k => Assert.Matches(@"^[0-9A-F]{24}-[0-9a-f]{64}\.age$", k));
+        Assert.All(nuevos, k => Assert.Matches(@"^[0-9A-F]{24}-[0-9a-f]{64}\.zst\.age$", k));
         var segmento = nuevos.First(k => !k.Contains(".history", StringComparison.Ordinal));
         var cifrado = await entorno.Descargar(RespaldosFixture.Wal, segmento);
         Assert.Equal(Regex.Match(segmento, "-([0-9a-f]{64})").Groups[1].Value, Sha256(cifrado));
         Assert.StartsWith("age-encryption.org/v1", Encoding.ASCII.GetString(cifrado, 0, 21), StringComparison.Ordinal);
+        // Se comprime antes de cifrar (D25): un segmento casi vacío de 16 MiB sube como una fracción y se descomprime entero.
+        Assert.True(cifrado.Length < 2 * 1024 * 1024, $"el segmento subido mide {cifrado.Length} bytes: no está comprimido");
         Assert.Equal(16 * 1024 * 1024, (await entorno.Descifrar(cifrado)).Length);
     }
 
@@ -313,9 +315,9 @@ public sealed partial class RespaldosTests(RespaldosFixture entorno)
         Assert.NotEqual(0, ejecucion.ExitCode);
     }
 
-    [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}/\d{6}-[0-9a-f]{64}\.tar\.age$", RegexOptions.None, 2000)]
+    [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}/\d{6}-[0-9a-f]{64}\.tar\.zst\.age$", RegexOptions.None, 2000)]
     private static partial Regex NombreDeBase();
 
-    [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}/\d{6}-config-[0-9a-f]{64}\.tar\.age$", RegexOptions.None, 2000)]
+    [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}/\d{6}-config-[0-9a-f]{64}\.tar\.zst\.age$", RegexOptions.None, 2000)]
     private static partial Regex NombreDeConfig();
 }

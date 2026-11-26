@@ -108,6 +108,7 @@ public sealed class EndurecimientoDeVmAuxTests : IDisposable
         + "AUX_CORREO_DE=vm-aux@ejemplo.interno\n"
         + "AUX_CORREO_PARA=responsable@ejemplo.interno\n"
         + $"RCLONE_CONFIG_VIGILANTE_SECRET_ACCESS_KEY={_valorSecreto}\n"
+        + $"RCLONE_CONFIG_REGISTRO_SECRET_ACCESS_KEY={_valorSecreto}\n"
         + $"RCLONE_CONFIG_SELLO_SECRET_ACCESS_KEY={_valorSecreto}\n"
         + $"RCLONE_CONFIG_COPIA_SECRET_ACCESS_KEY={_valorSecreto}\n";
 

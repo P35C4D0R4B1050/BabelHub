@@ -19,7 +19,8 @@ ENV["Operador logístico<br/>guías y seguimiento"]
 LLM["Proveedor de LLM<br/>respuestas del asistente"]
 WA["WhatsApp<br/>vía n8n y Evolution API"]
 COR["Proveedor de correo<br/>códigos, respuestas y alertas"]
-ALM["Almacén de archivos<br/>libros digitales y respaldos"]
+ALM["Almacén de archivos<br/>libros digitales (Oracle)"]
+RESP["Almacén de respaldos<br/>Cloudflare R2"]
 
 CLI --> BH
 VIS --> BH
@@ -32,11 +33,12 @@ BH --> LLM
 BH --> WA
 BH --> COR
 BH --> ALM
+BH --> RESP
 CLI -.->|"descarga con enlace firmado"| ALM
 
 classDef n fill:#222,stroke:#fff,color:#fff
 classDef s fill:#444,stroke:#fff,stroke-width:3px,color:#fff
-class CLI,VIS,ENC,LOG,ADM,PAG,ENV,LLM,WA,COR,ALM n
+class CLI,VIS,ENC,LOG,ADM,PAG,ENV,LLM,WA,COR,ALM,RESP n
 class BH s
 ```
 
@@ -49,7 +51,8 @@ class BH s
 | Proveedor de LLM | Genera las respuestas del asistente; recibe solo datos mínimos. | RC10, RC17 |
 | WhatsApp (n8n + Evolution API) | Avisos de pedidos y traslados con consentimiento. | AD16, RC12 |
 | Proveedor de correo | Códigos de seguridad, respuestas a reclamos y alertas a la administración. | AD30, RC18 |
-| Almacén de archivos | Guarda los EPUB y PDF y los respaldos cifrados; entrega con URL firmada. | AD19, AD27 |
+| Almacén de archivos | Guarda los EPUB y PDF (Oracle); entrega con URL firmada. | AD19 |
+| Almacén de respaldos | Copias y archivo de cambios cifrados de las bases (Cloudflare R2, provisional). | AD27 |
 
 ## 2. Nivel 2: contenedores
 
@@ -80,6 +83,7 @@ ENV["Operador logístico"]
 LLM["Proveedor de LLM"]
 COR["Proveedor de correo"]
 ALM[("Almacén de archivos")]
+RESP[("Almacén de respaldos<br/>Cloudflare R2")]
 WA["WhatsApp"]
 end
 
@@ -100,12 +104,14 @@ N8N --> WA
 ECO --> PAG
 ECO --> ENV
 ECO -->|"sube y firma URLs"| ALM
+BDE -->|"respaldo cifrado"| RESP
+BDI -->|"respaldo cifrado"| RESP
 ECO -->|"códigos, reclamos y alertas"| COR
 ECO --> LLM
 NAV -.->|"descarga con URL firmada"| ALM
 
 classDef n fill:#222,stroke:#fff,color:#fff
-class NAV,CF,NGX,ECO,INV,GES,RED,N8N,BDE,BDI,PAG,ENV,LLM,COR,ALM,WA n
+class NAV,CF,NGX,ECO,INV,GES,RED,N8N,BDE,BDI,PAG,ENV,LLM,COR,ALM,RESP,WA n
 ```
 
 | Contenedor | Tecnología | Responsabilidad | Specs principales |

@@ -3,10 +3,10 @@ using System.Globalization;
 namespace BabelHub.IntegrationTests.Respaldos;
 
 /// <summary>
-/// PLA-18 y AC-PLA-18: sobre respaldos simulados día tras día, el ciclo de vida publicado deja los 7 diarios más recientes, el último de cada
-/// una de las 4 semanas más recientes (la copia dominical), el último de cada uno de los 3 meses más recientes (la copia del último día del
-/// mes) y el archivo de cambios necesario para restaurar el más antiguo, y retira lo demás. Cada día se comprueba lo que queda justo después
-/// de correr el ciclo de vida, durante más de dos años que incluyen un febrero bisiesto.
+/// PLA-18 y AC-PLA-18: sobre respaldos simulados día tras día, los plazos publicados para R2 dejan los 7 diarios más recientes, el último de
+/// cada una de las 4 semanas más recientes (la copia dominical), el último de cada uno de los 3 meses más recientes (la copia del último día
+/// del mes) y el archivo de cambios de los últimos 7 días, sin ningún cambio de más de 8, y retiran lo demás. Cada día se comprueba lo que
+/// queda justo después de correr el ciclo de vida, durante más de dos años que incluyen un febrero bisiesto.
 /// </summary>
 public sealed class RetencionTests
 {
@@ -84,24 +84,21 @@ public sealed class RetencionTests
 
     [Fact]
     [Trait("Criterio", "AC-PLA-18")]
-    public void CadaDia_ElArchivoDeCambiosCubreDesdeElRespaldoMasAntiguoQueQuedaHastaHoy_YNoGuardaMas()
+    public void CadaDia_ElArchivoDeCambiosCubreLosUltimos7Dias_SinHuecos_YNingunCambioTieneMasDe8()
     {
-        foreach (var (dia, almacen) in Simular(500).Skip(120))
+        foreach (var (dia, almacen) in Simular(500).Skip(10))
         {
-            var masAntiguo = new[] { "respaldos-diarios", "respaldos-semanales", "respaldos-mensuales" }.SelectMany(almacen.De).Min(o => o.Creado);
+            var ahora = dia.AddHours(3);
             var cambios = almacen.De("respaldos-wal").Select(o => o.Creado).Order().ToList();
 
-            // Continuidad: ni un solo hueco de una hora entre el respaldo más antiguo y el último cambio archivado.
-            var necesarios = cambios.Where(c => c >= masAntiguo.AddHours(-1)).ToList();
-            Assert.True(necesarios.Count > 0, "no hay archivo de cambios desde el respaldo más antiguo");
-            Assert.True(cambios[0] <= masAntiguo, $"{Fecha(dia)}: el archivo de cambios empieza el {cambios[0]:u} y el respaldo más antiguo es del {masAntiguo:u}");
+            Assert.True(cambios[0] <= ahora.AddDays(-7).AddHours(1), $"{Fecha(dia)}: el archivo de cambios empieza el {cambios[0]:u}");
+            Assert.True(cambios[^1] >= ahora.AddHours(-1), $"{Fecha(dia)}: el archivo de cambios termina el {cambios[^1]:u}");
             for (var i = 1; i < cambios.Count; i++)
             {
                 Assert.Equal(TimeSpan.FromHours(1), cambios[i] - cambios[i - 1]);
             }
 
-            // Y no se acumula más de lo que dura la retención del archivo de cambios.
-            Assert.True((dia.AddHours(3) - cambios[0]).TotalDays < 100);
+            Assert.True((ahora - cambios[0]).TotalDays <= 8, $"{Fecha(dia)}: queda un cambio del {cambios[0]:u}");
         }
     }
 
@@ -111,7 +108,7 @@ public sealed class RetencionTests
     {
         var almacen = new AlmacenSimulado();
         var ahora = new DateTime(2027, 9, 15, 12, 0, 0, DateTimeKind.Utc);
-        almacen.Objetos.Add(new ObjetoSimulado("respaldos-diarios", "2027-09-15/120000-x.tar.age", ahora));
+        almacen.Objetos.Add(new ObjetoSimulado("respaldos-diarios", "2027-09-15/120000-x.tar.zst.age", ahora));
 
         almacen.EjecutarCicloDeVida(ahora.AddDays(7).AddMinutes(1));
 

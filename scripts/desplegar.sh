@@ -220,6 +220,19 @@ if [[ -n "$SECRETOS" ]]; then
       anotar "el archivo de secretos $archivo tiene valores «CAMBIAR» sin completar (los lista PENDIENTES.txt de la carpeta que generó scripts/generar-secretos.sh)"
     fi
     comprobar_tls_de_postgres "$archivo" "$ruta"
+    # Ninguna credencial que pueda cambiar las reglas de retención o de ciclo de vida de R2 puede estar en una VM (PLA-44): el token de la API de
+    # Cloudflare solo existe, y temporalmente, en el equipo de la persona responsable.
+    if grep -qE '^[[:space:]]*(export[[:space:]]+)?(CLOUDFLARE|CF)_(API_)?(TOKEN|KEY)=' "$ruta" 2>/dev/null; then
+      anotar "el archivo $archivo lleva un token o una clave de la API de Cloudflare: la administración de R2 no puede estar en una VM (PLA-44); quítalo y revócalo en el panel"
+    fi
+    # Los respaldos van a Cloudflare R2 (D26): un archivo generado antes apunta todavía a Oracle y no respaldaría nada.
+    if [[ "$archivo" == postgres.env && "$(leer_valor "$ruta" RCLONE_CONFIG_ALMACEN_ENDPOINT)" == *oraclecloud.com* ]]; then
+      anotar "postgres.env: RCLONE_CONFIG_ALMACEN_ENDPOINT apunta a Oracle: los respaldos van a Cloudflare R2 (https://<account-id>.r2.cloudflarestorage.com, con RCLONE_CONFIG_ALMACEN_PROVIDER=Cloudflare y RCLONE_CONFIG_ALMACEN_REGION=auto); ver la guía de despliegue, §9b"
+    fi
+    if [[ "$archivo" == postgres.env && "$(leer_valor "$ruta" RCLONE_CONFIG_ALMACEN_ENDPOINT)" == *r2.cloudflarestorage.com* ]]; then
+      [[ "$(leer_valor "$ruta" RCLONE_CONFIG_ALMACEN_PROVIDER)" == Cloudflare && "$(leer_valor "$ruta" RCLONE_CONFIG_ALMACEN_REGION)" == auto ]] \
+        || anotar "postgres.env: con Cloudflare R2 van RCLONE_CONFIG_ALMACEN_PROVIDER=Cloudflare y RCLONE_CONFIG_ALMACEN_REGION=auto (guía de despliegue, §9b)"
+    fi
     # La cuenta propietaria de las bases (administración, COMP-2) solo puede estar en migrador.env: un servicio con ella en su entorno la tendría en un proceso expuesto.
     if grep -q 'BABELHUB__Migrador__' "$ruta" 2>/dev/null; then
       anotar "el archivo $archivo lleva claves BABELHUB__Migrador__*: la cuenta propietaria de las bases solo puede estar en migrador.env"
@@ -231,6 +244,9 @@ if [[ -n "$SECRETOS" ]]; then
     [[ -f "$ruta" ]] || continue
     nombre="$(basename "$ruta")"
     [[ " ${ARCHIVOS[*]} " == *" $nombre "* ]] && continue
+    if grep -qE '^[[:space:]]*(export[[:space:]]+)?(CLOUDFLARE|CF)_(API_)?(TOKEN|KEY)=' "$ruta" 2>/dev/null; then
+      anotar "el archivo $nombre lleva un token o una clave de la API de Cloudflare: la administración de R2 no puede estar en una VM (PLA-44); quítalo y revócalo en el panel"
+    fi
     if [[ "$nombre" == ca-clave.pem || "$nombre" == age-clave-privada* ]] || grep -qE 'PRIVATE KEY|AGE-SECRET-KEY-' "$ruta" 2>/dev/null; then
       anotar "$nombre es una clave privada que no usa esta VM: no debe estar en su carpeta de secretos (¿copiaste la carpeta entera? copia solo la de esta VM)"
     fi

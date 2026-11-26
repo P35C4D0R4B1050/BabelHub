@@ -26,12 +26,12 @@ La persona responsable llena esta tabla al generar la clave (paso 2 del procedim
 
    ```bash
    # La clave privada entra por la entrada estándar, leída del dispositivo cifrado de la copia fuera de línea (montado solo para esto); nunca se copia a disco ni queda en el historial.
-   scripts/descifrar-respaldo.sh --entrada <respaldo>.tar.age --probar --registrar < /ruta/al/dispositivo/clave-respaldos.txt
+   scripts/descifrar-respaldo.sh --entrada <respaldo>.tar.zst.age --probar --registrar < /ruta/al/dispositivo/clave-respaldos.txt
    ```
 
    `--probar` descifra el respaldo completo a la nada y, si descifra, `--registrar` anota la fecha de hoy en «Última prueba de descifrado». Un cambio revisado en este archivo, como cualquier otro.
 5. **Cuando se restaura o se ensaya** (`scripts/restaurar.sh`, ensayo): se usa `scripts/descifrar-respaldo.sh` con la misma copia fuera de línea y se extrae con `scripts/extraer-respaldo.sh` (sin rutas absolutas, `..`, enlaces peligrosos ni propietarios; se ignoran `postgresql.auto.conf`, `restore_command` y `archive_command` del respaldo). Ambos comprueban que la clave que se presenta **corresponde al destinatario registrado aquí** antes de tocar el respaldo.
-6. **Rotación.** Se genera una clave nueva y se registra (paso 1 y 2) **antes** de retirar la anterior; los respaldos ya hechos solo los descifra la clave con que se cifraron, así que la anterior se conserva mientras exista un respaldo cifrado con ella (hasta que el ciclo de vida del almacén retire el último, 100 días como máximo para los respaldos y el archivo de cambios). Se agrega una fila a la tabla del apartado 3 por cada clave vigente.
+6. **Rotación.** Se genera una clave nueva y se registra (paso 1 y 2) **antes** de retirar la anterior; los respaldos ya hechos solo los descifra la clave con que se cifraron, así que la anterior se conserva mientras exista un respaldo cifrado con ella (hasta que el ciclo de vida del almacén retire el último: 92 días las copias mensuales y 7 el archivo de cambios, más hasta un día). Se agrega una fila a la tabla del apartado 3 por cada clave vigente.
 7. **Si se pierde o se compromete** la clave privada: se genera una nueva de inmediato, se cambia `BABELHUB_AGE_DESTINATARIO` en la VM de datos, se toma un respaldo completo nuevo (`scripts/respaldar-ahora.sh`) y se registra el incidente en `progress/hallazgos.md`. Los respaldos anteriores a ese punto solo se pueden descifrar con la clave anterior; si está perdida, esos respaldos están perdidos.
 
 ## 3. Otras claves custodiadas

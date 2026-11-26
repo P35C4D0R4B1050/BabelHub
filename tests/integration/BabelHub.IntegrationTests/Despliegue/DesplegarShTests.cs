@@ -757,6 +757,10 @@ public sealed class DesplegarShTests : IDisposable
         Assert.True(File.Exists(Path.Combine(destino, "custodia", "ca-clave.pem")));
         Assert.False(File.Exists(Path.Combine(ventas, "migrador.env")));
         Assert.StartsWith("age1", Valor(inventario, "postgres.env", "BABELHUB_AGE_DESTINATARIO"), StringComparison.Ordinal);
+        // Los respaldos van a Cloudflare R2 (D26).
+        Assert.Equal("Cloudflare", Valor(inventario, "postgres.env", "RCLONE_CONFIG_ALMACEN_PROVIDER"));
+        Assert.Equal("auto", Valor(inventario, "postgres.env", "RCLONE_CONFIG_ALMACEN_REGION"));
+        Assert.Contains("r2.cloudflarestorage.com", File.ReadAllText(Path.Combine(destino, "PENDIENTES.txt")), StringComparison.Ordinal);
         Assert.DoesNotContain(Valor(inventario, "postgres.env", "POSTGRES_PASSWORD"), salida + errores, StringComparison.Ordinal);
         Assert.Contains("ventas/cloudflared.env  TUNNEL_TOKEN", File.ReadAllText(Path.Combine(destino, "PENDIENTES.txt")), StringComparison.Ordinal);
     }
@@ -805,6 +809,72 @@ public sealed class DesplegarShTests : IDisposable
 
         Assert.True(codigo == 0, salida + errores);
         Assert.Contains($"VM {vm} desplegada y sana.", salida, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-44")]
+    public void UnArchivoSueltoConLaAdministracionDeR2EnLaCarpetaDeSecretos_NoSeDespliega()
+    {
+        PrepararSecretos("inventario");
+        var valor = Aleatorio(40);
+        _valoresSecretos.Add(valor);
+        File.WriteAllText(Path.Combine(_secretos, "r2.env"), $"CLOUDFLARE_API_TOKEN={valor}\n");
+
+        var (codigo, salida, errores) = Desplegar("inventario");
+
+        Assert.NotEqual(0, codigo);
+        Assert.Contains("r2.env lleva un token", salida + errores, StringComparison.Ordinal);
+        SinSecretosEnLaSalida(salida, errores);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void ConElEndpointDeR2YElProveedorAnterior_NoSeDespliega()
+    {
+        PrepararSecretos("inventario");
+        CambiarValor("postgres.env", "RCLONE_CONFIG_ALMACEN_ENDPOINT", "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com");
+        File.AppendAllText(Path.Combine(_secretos, "postgres.env"), "RCLONE_CONFIG_ALMACEN_PROVIDER=Other\nRCLONE_CONFIG_ALMACEN_REGION=sa-santiago-1\n");
+
+        var (codigo, salida, errores) = Desplegar("inventario");
+
+        Assert.NotEqual(0, codigo);
+        Assert.Contains("PROVIDER=Cloudflare", salida + errores, StringComparison.Ordinal);
+        SinSecretosEnLaSalida(salida, errores);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void UnPostgresEnvQueTodaviaApuntaElRespaldoAOracle_NoSeDespliega()
+    {
+        PrepararSecretos("inventario");
+        CambiarValor("postgres.env", "RCLONE_CONFIG_ALMACEN_ENDPOINT", "https://espacio.compat.objectstorage.sa-santiago-1.oraclecloud.com");
+
+        var (codigo, salida, errores) = Desplegar("inventario");
+
+        Assert.NotEqual(0, codigo);
+        Assert.Contains("los respaldos van a Cloudflare R2", salida + errores, StringComparison.Ordinal);
+        Assert.DoesNotContain(LlamadasADocker, l => l.Contains(" up -d", StringComparison.Ordinal));
+        SinSecretosEnLaSalida(salida, errores);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-PLA-44")]
+    [InlineData("inventario", "postgres.env", "CLOUDFLARE_API_TOKEN")]
+    [InlineData("ventas", "ecommerce.env", "export CF_API_KEY")]
+    public void UnSecretoConLaAdministracionDeR2_NoSeDespliega(string vm, string archivo, string clave)
+    {
+        PrepararSecretos(vm);
+        var valor = Aleatorio(40);
+        _valoresSecretos.Add(valor);
+        var ruta = Path.Combine(_secretos, archivo);
+        File.AppendAllText(ruta, $"{clave}={valor}\n");
+
+        var (codigo, salida, errores) = Desplegar(vm);
+
+        Assert.NotEqual(0, codigo);
+        Assert.Contains("la administración de R2 no puede estar en una VM", salida + errores, StringComparison.Ordinal);
+        Assert.DoesNotContain(LlamadasADocker, l => l.Contains(" up -d", StringComparison.Ordinal));
+        SinSecretosEnLaSalida(salida, errores);
     }
 
     // ---------- TLS hacia PostgreSQL (AM24): nadie despliega con una conexión sin cifrar ni sin verificar al servidor ----------

@@ -225,7 +225,7 @@ else
     nombre="${linea%%=*}"
     nombre="${nombre#export }"
     presentes+=" $nombre "
-    if [[ ! "$nombre" =~ ^(AUX_[A-Z0-9_]+|RCLONE_CONFIG_(VIGILANTE|SELLO|COPIA|CUOTA)_[A-Z0-9_]+)$ ]]; then
+    if [[ ! "$nombre" =~ ^(AUX_[A-Z0-9_]+|RCLONE_CONFIG_(VIGILANTE|REGISTRO|SELLO|COPIA|CUOTA)_[A-Z0-9_]+)$ ]]; then
       alerta "$AUX_ENV tiene una variable ajena a VM-AUX: $nombre (credencial de más)"
       ajenas=1
     fi

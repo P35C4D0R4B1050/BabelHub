@@ -55,7 +55,7 @@ pendiente="$(
 # borra al terminar, falle o no. Contarla declararía roto el archivo de cambios en cada respaldo diario de una base de varios GiB, aunque el almacén
 # funcione. Lo que sí se vigila siempre es lo que NO es transitorio: los cambios por archivar y cualquier otro archivo en espera.
 if [ -d "$ESPERA/respaldo.bloqueo" ]; then
-  en_espera="$(find "$ESPERA" -type f ! -name 'archivo-roto*' ! -name 'base.*.tmp' ! -name 'config.*.tmp' ! -name 'resultado.*.tmp' 2>/dev/null | sumar_tamanos)"
+  en_espera="$(find "$ESPERA" -type f ! -name 'archivo-roto*' ! -name 'base.*.tmp' ! -name 'config.*.tmp' ! -name 'resultado.*.tmp*' 2>/dev/null | sumar_tamanos)"
 else
   en_espera="$(find "$ESPERA" -type f ! -name 'archivo-roto*' 2>/dev/null | sumar_tamanos)"
 fi

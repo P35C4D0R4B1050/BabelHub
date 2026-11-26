@@ -6,8 +6,9 @@ using BabelHub.IntegrationTests.Imagenes;
 namespace BabelHub.IntegrationTests.Respaldos;
 
 /// <summary>
-/// VM-AUX alerta si el almacén retiene más de lo esperado (PLA-18): <c>scripts/vm-aux/vigilar-retencion.sh</c> lista cada contenedor con
-/// la credencial <c>respaldos-vigilante</c> (aquí, un doble de rclone con lo que «hay» en el almacén) y termina con 1 por cada exceso.
+/// VM-AUX alerta si el almacén retiene más de lo esperado (PLA-18): <c>scripts/vm-aux/vigilar-retencion.sh</c> lista los respaldos en R2 con
+/// <c>respaldos-vigilante</c> y la copia del registro en Oracle con <c>registro-vigilante</c> (aquí, un doble de rclone con lo que «hay» en
+/// cada almacén) y termina con 1 por cada exceso.
 /// Con el estado que deja el ciclo de vida sobre 100 días de respaldos simulados no hay alerta; con un ciclo de vida que no retira, sí.
 /// </summary>
 [Collection(ProcesosPesadosCollection.Nombre)]
@@ -24,7 +25,12 @@ public sealed class VigilarRetencionTests : IDisposable
             Path.Combine(_carpeta, "rclone-doble.sh"),
             """
             #!/usr/bin/env bash
-            destino="${@: -1}"; bucket="${destino#vigilante:}"
+            destino="${@: -1}"; bucket="${destino#*:}"
+            echo "$1 $destino" >>"$ALMACEN_FIXTURE/llamadas.log"
+            case "$destino" in
+              vigilante:respaldos-* | registro:supresiones-*) ;;
+              *) echo "AccessDenied: $destino" >&2; exit 1 ;;
+            esac
             archivo="$ALMACEN_FIXTURE/$bucket.txt"
             [[ -f "$archivo" ]] || { echo "error: no existe $bucket" >&2; exit 3; }
             cat "$archivo"
@@ -163,18 +169,34 @@ public sealed class VigilarRetencionTests : IDisposable
         Assert.Contains("el ciclo de vida no los retira", salida, StringComparison.Ordinal);
     }
 
+    private void Anadir(string contenedor, string clave, DateTime hora) =>
+        File.AppendAllLines(Path.Combine(_almacen, contenedor + ".txt"), [$"{clave};{hora.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)}"]);
+
     [Fact]
     [Trait("Criterio", "AC-PLA-18")]
-    public void UnSoloObjetoMuyViejoEnElArchivoDeCambios_BastaParaAlertar()
+    public void UnCambioArchivadoDeMasDe8Dias_BastaParaAlertar()
     {
         PublicarElEstadoSano();
-        File.AppendAllLines(Path.Combine(_almacen, "respaldos-wal.txt"), [$"0000000100000000000000AA-{new string('a', 64)}.age;{DateTime.UtcNow.AddDays(-130).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)}"]);
+        Anadir("respaldos-wal", $"0000000100000000000000AA-{new string('a', 64)}.zst.age", DateTime.UtcNow.AddDays(-8).AddHours(-1));
 
         var (codigo, salida, _) = Vigilar();
 
         Assert.Equal(1, codigo);
-        Assert.Contains("ALERTA respaldos-wal: 1 objetos con más de 102 días (el plazo es de 100)", salida, StringComparison.Ordinal);
+        Assert.Contains("ALERTA respaldos-wal: 1 objetos con más de 8 días (el plazo es de 7)", salida, StringComparison.Ordinal);
         Assert.Contains("ok respaldos-diarios", salida, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PLA-18")]
+    public void LaCopiaDelRegistroEnOracle_TambienSeVigila_ConSuPropioPlazo()
+    {
+        PublicarElEstadoSano();
+        Anadir("supresiones-copia", $"2026-01-01/000000-{new string('d', 64)}.tar", DateTime.UtcNow.AddDays(-130));
+
+        var (codigo, salida, _) = Vigilar();
+
+        Assert.Equal(1, codigo);
+        Assert.Contains("ALERTA supresiones-copia: 1 objetos con más de 102 días (el plazo es de 100)", salida, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -183,10 +205,10 @@ public sealed class VigilarRetencionTests : IDisposable
     {
         PublicarElEstadoSano();
         // Un día más de diarios (el que el almacén todavía no retiró): dentro del margen.
-        File.AppendAllLines(Path.Combine(_almacen, "respaldos-diarios.txt"), [$"2027-01-01/023000-{new string('b', 64)}.tar.age;{DateTime.UtcNow.AddDays(-7).AddHours(-1).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)}"]);
+        Anadir("respaldos-diarios", $"2027-01-01/023000-{new string('b', 64)}.tar.zst.age", DateTime.UtcNow.AddDays(-7).AddHours(-1));
 
         var (margen, _, _) = Vigilar();
-        File.AppendAllLines(Path.Combine(_almacen, "respaldos-diarios.txt"), [$"2027-01-02/023000-{new string('c', 64)}.tar.age;{DateTime.UtcNow.AddDays(-7).AddHours(-2).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)}"]);
+        Anadir("respaldos-diarios", $"2027-01-02/023000-{new string('c', 64)}.tar.zst.age", DateTime.UtcNow.AddDays(-7).AddHours(-2));
         var (exceso, salida, _) = Vigilar();
 
         Assert.Equal(0, margen);
@@ -225,8 +247,9 @@ public sealed class VigilarRetencionTests : IDisposable
     public void UnaDefinicionInvalida_SeRechazaConCodigo2()
     {
         var definicion = Path.Combine(_carpeta, "definicion");
-        Directory.CreateDirectory(definicion);
-        File.WriteAllText(Path.Combine(definicion, "contenedores.txt"), "uno 7 si pronto\n");
+        Directory.CreateDirectory(Path.Combine(definicion, "r2"));
+        File.WriteAllText(Path.Combine(definicion, "contenedores.txt"), "libros 0 no nunca\n");
+        File.WriteAllText(Path.Combine(definicion, "r2", "contenedores.txt"), "uno 7 pronto\n");
 
         var (codigo, _, errores) = Vigilar(definicion);
 
@@ -238,9 +261,13 @@ public sealed class VigilarRetencionTests : IDisposable
     [Trait("Criterio", "AC-PLA-18")]
     public void ElVigilanteSoloListaElAlmacen_NoEscribeNiBorraNiLeeObjetos()
     {
-        var texto = File.ReadAllText(Path.Combine(ComposeDeVms.Raiz(), "scripts", "vm-aux", "vigilar-retencion.sh"));
+        PublicarElEstadoSano();
 
-        var ordenesDeRclone = System.Text.RegularExpressions.Regex.Matches(texto, @"""\$RCLONE""\s+(\w+)", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(2)).Select(m => m.Groups[1].Value).Distinct().ToList();
-        Assert.Equal(["lsf"], ordenesDeRclone);
+        var (codigo, salida, errores) = Vigilar();
+
+        Assert.True(codigo == 0, salida + errores);
+        var llamadas = File.ReadAllLines(Path.Combine(_almacen, "llamadas.log"));
+        Assert.Equal(5, llamadas.Length);
+        Assert.All(llamadas, l => Assert.StartsWith("lsf ", l, StringComparison.Ordinal));
     }
 }

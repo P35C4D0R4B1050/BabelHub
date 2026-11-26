@@ -1,6 +1,6 @@
 # Despliegue en Oracle Cloud Free Tier
 
-Este documento reparte los servicios en máquinas virtuales (VMs) **usando solo recursos gratuitos de una sola cuenta de Oracle**. La **estructura** del sistema (dos servicios, módulos, bases) está en el [estilo arquitectónico](03-estilo-arquitectonico.md) y no cambia con el reparto: lo que se decide aquí es **en qué host corre cada unidad de despliegue**.
+Este documento reparte los servicios en máquinas virtuales (VMs) **usando solo recursos gratuitos de una sola cuenta de Oracle** (desde el 2026-11-25, los respaldos usan además el cupo gratuito de Cloudflare R2). La **estructura** del sistema (dos servicios, módulos, bases) está en el [estilo arquitectónico](03-estilo-arquitectonico.md) y no cambia con el reparto: lo que se decide aquí es **en qué host corre cada unidad de despliegue**.
 
 > **Topología vigente desde el 2026-11-25: DOS VMs** (decisión de la persona responsable; DD-100). No hubo capacidad para las AMD micro en `sa-santiago-1`: `cloudflared` y Nginx corren **dentro de VM-VENTAS** (el respaldo previsto en B11), **VM-BORDE no existe** y **VM-AUX queda aplazada**. Lo que se pierde mientras tanto está en §6.2. La topología de cuatro VMs sigue siendo el objetivo si aparece capacidad: volver a ella exige recuperar el Compose del borde del historial y no cambia el código de los servicios.
 
@@ -15,7 +15,7 @@ Las condiciones del Free Tier cambiaron en 2026. Las cifras se contrastaron con 
 | Almacenamiento en bloque | 200 GB en total; el volumen de arranque mínimo es de 47 GB. | 2 × 47 GB = 94 GB; sin volúmenes extra. Los respaldos van al almacén de objetos. |
 | Total de VMs | **4** posibles: 2 ARM y 2 AMD micro. | Hoy **2** (las ARM), en **una sola cuenta**. |
 
-**Cuenta de pago por uso (PAYG).** Actualizarla **no amplía el cupo gratuito**: los recursos Always Free siguen siendo gratis y todo lo que supere el cupo se cobra. Se recomienda actualizar para evitar que Oracle recupere instancias con uso muy bajo (fuentes secundarias; a verificar) y reducir los fallos de capacidad al crear VMs ARM. Se activa con un **presupuesto y una alerta de costo de 1 USD** para detectar a tiempo cualquier recurso fuera del cupo. **Decisión (2026-11-06):** se usa una sola cuenta, sin segunda cuenta ni VMs de pago.
+**Cuenta de pago por uso (PAYG).** Actualizarla **no amplía el cupo gratuito**: los recursos Always Free siguen siendo gratis y todo lo que supere el cupo se cobra. Se recomienda actualizar para evitar que Oracle recupere instancias con uso muy bajo (fuentes secundarias; a verificar) y reducir los fallos de capacidad al crear VMs ARM. Se activa con un **presupuesto y una alerta de costo de 1 USD** para detectar a tiempo cualquier recurso fuera del cupo. **Decisión (2026-11-06):** se usa una sola cuenta de Oracle, sin segunda cuenta de Oracle ni VMs de pago. **2026-11-25:** los respaldos van a Cloudflare R2 (cupo gratuito de 10 GB-mes, cifra a verificar; cobra el excedente), con aviso de facturación en esa cuenta y revisión diaria del uso (PLA-06).
 
 Condiciones a tener en cuenta:
 - Superar el cupo ARM inhabilita las instancias o genera cargos, según el tipo de cuenta.
@@ -66,7 +66,8 @@ PAG["Culqi"]
 ENV["Operador logístico"]
 LLM["Proveedor de LLM"]
 WA["WhatsApp"]
-ALM[("Almacén de archivos y respaldos<br/>Oracle Object Storage")]
+ALM[("Almacén de archivos<br/>Oracle Object Storage")]
+R2[("Respaldos cifrados<br/>Cloudflare R2")]
 end
 
 USR -->|"HTTPS"| CFE
@@ -86,7 +87,7 @@ ECO -->|"webhook"| N8N
 N8N --> EVO
 EVO --> WA
 ECO -->|"sube y firma URLs"| ALM
-PG -->|"respaldo y WAL cifrados"| ALM
+PG -->|"respaldo y WAL cifrados"| R2
 USR -.->|"descarga con URL firmada"| ALM
 ECO --> PAG
 ECO --> ENV
@@ -108,6 +109,7 @@ style N8N fill:#222,stroke:#fff,color:#fff
 style EVO fill:#222,stroke:#fff,color:#fff
 style WA fill:#222,stroke:#fff,color:#fff
 style ALM fill:#222,stroke:#fff,color:#fff
+style R2 fill:#222,stroke:#fff,color:#fff
 style RED fill:#222,stroke:#fff,color:#fff
 style PG fill:#222,stroke:#fff,color:#fff
 style PAG fill:#222,stroke:#fff,color:#fff
@@ -196,10 +198,11 @@ Sin redundancia, **cada VM es un punto de falla**. La arquitectura aísla el efe
 | :--- | :--- | :--- |
 | **El contenedor de Inventario** | **No cae todo.** El catálogo se sigue mostrando con la última disponibilidad conocida y el checkout informa que no puede validar el stock, sin cobrar a ciegas (CAT-12, CAR-06). | Reinicio automático y `healthcheck`. La caché de disponibilidad vive en Redis de la VM-VENTAS, no en la que cae. |
 | **VM-VENTAS** | Sin tienda, catálogo ni compras, y **sin entrada pública de ningún tipo, tampoco la gestión** (Nginx y `cloudflared` viven aquí). El Inventario y su base siguen vivos y la réplica de gestión sigue sirviendo al Inventario la clave de verificación y las revocaciones (IDE-85), pero el personal no puede llegar a ella desde Internet. Sin avisos de WhatsApp. | Recrear la VM-VENTAS desde las imágenes (RTO ≤ 4 h); los avisos pendientes se reintentan (NOT-04). Las sesiones están en la base, así que al volver la entrada siguen abiertas. El escenario ESC-AC03-03 (operar la gestión con VM-VENTAS caída) **no se cumple** con esta topología. |
-| **VM-INVENTARIO** | **Cae todo**: ahí están también las bases `ecommerce` e `inventario`, así que no hay inicio de sesión, ni catálogo, ni inventario. Es el costo del compromiso. | Respaldo diario cifrado y archivado continuo de WAL **en el almacén de objetos (Oracle Object Storage)**; restaurar en la misma VM o en otra (RPO de minutos con WAL y ≤ 24 h solo si el archivo de cambios está roto; RTO ≤ 4 h). Mejora opcional y gratuita: una **réplica de PostgreSQL en caliente en VM-VENTAS** (~1 GB) con promoción manual, que baja el RTO a minutos. |
+| **VM-INVENTARIO** | **Cae todo**: ahí están también las bases `ecommerce` e `inventario`, así que no hay inicio de sesión, ni catálogo, ni inventario. Es el costo del compromiso. | Respaldo diario cifrado y archivado continuo de WAL **en Cloudflare R2** (comprimidos y cifrados; archivo de cambios de 7 días); restaurar en la misma VM o en otra (RPO de minutos con WAL y ≤ 24 h solo si el archivo de cambios está roto; RTO ≤ 4 h). Mejora opcional y gratuita: una **réplica de PostgreSQL en caliente en VM-VENTAS** (~1 GB) con promoción manual, que baja el RTO a minutos. |
 | **El contenedor de Nginx o el de cloudflared** | Sin entrada pública (tienda y gestión). | Reinicio automático y `healthcheck`. No hay segundo conector: uno que saltara Nginx permitiría falsificar la IP del cliente (DD-101). |
 | **VM-AUX** (aplazada) | No existe todavía: ver §6.2. | Acceso desde la IP del administrador. |
-| **La cuenta de Oracle** | Se pierde todo, **también los respaldos y los libros digitales** (están en el almacén de la misma cuenta). | Sin copia externa por ahora (riesgo aceptado, B13); una copia fuera de Oracle es una mejora posterior. Si la cuenta sigue activa, restaurar los respaldos cifrados del almacén de objetos en otra máquina con el mismo Compose (ver [operación segura](../05-seguridad/07-operacion-segura.md) §5). |
+| **La cuenta de Oracle** | Se pierden las VMs, los libros digitales, las portadas y el registro de supresiones. Los respaldos de las bases, en Cloudflare R2, sobreviven. | Sin segunda copia de libros ni registro (riesgo aceptado, B13). Los respaldos de R2 permiten recuperar las bases en otra máquina con el mismo Compose (ver [operación segura](../05-seguridad/07-operacion-segura.md) §5), pero sin el registro de supresiones el sistema **no se abre al público** (PLA-19). |
+| **La cuenta de Cloudflare** | Se pierden los respaldos (y, con ella, la entrada pública, el DNS y el túnel). El sistema en marcha conserva sus datos. | Segundo factor en la cuenta; sin segunda copia (B13). |
 
 **Compromiso de la VM-INVENTARIO.** Concentra la base, el Inventario y la réplica de gestión. Si alguien toma el control de ese servidor, la base queda comprometida y la seguridad por filas no ayuda. Por eso la defensa es en profundidad (AD31): contenedores sin privilegios y en redes separadas, `pg_hba` por base y origen, SSH solo desde la IP del administrador (por la VM-AUX cuando exista), discos y respaldos cifrados, detección de cambios y, sobre todo, **recuperación**: respaldo y WAL cifrados en el almacén de objetos.
 
@@ -208,7 +211,10 @@ Sin redundancia, **cada VM es un punto de falla**. La arquitectura aísla el efe
 Lo siguiente se acepta de forma consciente y debe figurar en el informe y en la exposición como limitación, no como omisión:
 
 - **Punto único de falla de datos:** si cae VM-INVENTARIO caen las dos bases y, con ellas, el inicio de sesión, el catálogo y el inventario (AD31); la réplica de gestión solo mantiene al personal si la base sigue viva. No hay redundancia ni SLA (DA03).
-- **Sin copia fuera de Oracle (B13):** los respaldos, el archivado de WAL y los libros digitales están en el almacén de objetos de la misma cuenta; si se pierde la cuenta, se pierde todo. Se acepta por falta de recursos y se implementará más adelante si el presupuesto lo permite.
+- **Sin segunda copia (B13):** los respaldos y el archivo de cambios están en Cloudflare R2 y los libros, las portadas y el registro de supresiones en Oracle; cada cosa tiene una sola copia en su proveedor. Se acepta por falta de recursos.
+- **Archivo de cambios de 7 días (aceptado, 2026-11-25):** si el respaldo diario falla más de 7 días seguidos se pierde la recuperación reciente y nadie avisa desde fuera: la persona responsable comprueba cada día que el respaldo se hizo (guía 08).
+- **Registro de supresiones solo en Oracle (aceptado, 2026-11-25):** sin él el sistema no se reabre al público (PLA-19).
+- **Respaldos en un tercero, provisional (2026-11-25):** la credencial de la VM puede leer, listar y borrar lo vencido; el bloqueo de retención de R2 lo puede quitar el administrador de la cuenta; sin recuperación a un instante intermedio anterior a 7 días (spec `transversal-plataforma` §5; AM47).
 - **La entrada comparte VM y CPU con la venta** (DD-100): `cloudflared` y Nginx compiten con el E-commerce, n8n y Evolution API por 1 OCPU; no está medido en la VM real (T39). Además, si cae VM-VENTAS se pierde también el acceso del personal.
 - **Sin VM-AUX** (aplazada): ver §6.2.
 - **Memoria casi al límite en VM-INVENTARIO** (ver el [presupuesto de recursos](07-presupuesto-de-recursos.md)).
@@ -224,17 +230,17 @@ Decisión de la persona responsable: no juntar VM-AUX con VM-VENTAS (sus credenc
 | Salto SSH único | SSH directo a cada VM desde la IP del administrador; no hay un único punto que endurecer y vigilar. | Regla TCP 22 solo con la IP actual; llave con frase de paso. |
 | Aviso, originado **fuera** de la VM de datos, de respaldo diario ausente o de archivado con más de 15 minutos de atraso (PLA-20) | Si VM-INVENTARIO cae o el respaldo falla, **nadie avisa**. Solo queda el aviso del espacio local reservado, que sale de la propia VM de datos (PLA-21). | Revisar a diario el contenedor de respaldos y `/var/log/babelhub-respaldo.log`. |
 | Vigilancia de la retención (PLA-18) | Nadie avisa si el almacén retiene más de lo esperado. | Revisión manual del almacén. |
-| Sellos horarios del registro de supresiones y su ancla semanal (PLA-38) | Al restaurar, el registro no se puede contrastar con un sello: la restauración (PLA-19) exige entonces la vía de excepción con la decisión explícita de la persona responsable, y una entrada falsificada podría pasar sin detectarse. | Ninguno automático. La credencial del servicio no puede sobrescribir ni borrar entradas, pero **hasta que se aplique la retención con bloqueo** (guía 08 §9, aplazada) una credencial de administración sí podría. |
+| Sellos horarios del registro de supresiones y su ancla semanal (PLA-38) | Al restaurar, el registro no se puede contrastar con un sello: la verificación del sello que fija el plan de plataforma (§3) exige entonces su vía de excepción, con la decisión explícita de la persona responsable, y una entrada falsificada podría pasar sin detectarse. | Ninguno automático. La credencial del servicio no puede sobrescribir ni borrar entradas, pero **hasta que se aplique la retención con bloqueo** (guía 08 §9, aplazada) una credencial de administración sí podría. |
 | Copia diaria del registro a `supresiones-copia` (PLA-38) | El registro queda con **una sola copia**. | Ninguno. |
 | Latido externo y comprobación de la puerta pública | Una caída solo se nota si alguien la mira. | Un monitor HTTP externo gratuito sobre `https://<dominio>/health/live` (llega al E-commerce; `/health` lo responde Nginx). |
 | Alerta de ingreso SSH y de procesos nuevos (AM29, AD31) | Sin aviso de un acceso indebido. | Revisar `last` y `journalctl -u ssh`. |
-| Alerta de cuota del almacén (PLA-29, PLA-30) | Ya estaba pendiente (T40). | Presupuesto de 1 USD y revisión en la consola. |
+| Alerta de cuota del almacén (PLA-29, PLA-30) | Ya estaba pendiente (T40). | Presupuesto de 1 USD (Oracle), aviso de facturación de Cloudflare y revisión diaria del uso. |
 
 **Antes de operar con clientes o datos reales** (junto con B09) hace falta VM-AUX o un vigilante equivalente fuera de las VMs de aplicaciones.
 
 ### 6.3 Sin respaldos hasta el cambio a Cloudflare R2 (2026-11-25)
 
-Mientras la compresión del archivo de cambios y el destino en R2 no estén en `main` y aplicados, **no hay ningún respaldo**: el archivado y el respaldo diario no deben activarse (guía 08 §9 y §10.2). Perder VM-INVENTARIO o su disco **pierde las dos bases**: RNF24, PLA-09, PLA-15 y PLA-18 no se cumplen y las filas de recuperación de §6 describen el objetivo, no el estado. **Condición para salir:** respaldos activos y una restauración probada, antes de cualquier dato o cobro real.
+Mientras el código de compresión y R2 no esté en `main`, la guía no lo describa y los contenedores de R2 no estén creados con sus reglas y comprobados, **no hay ningún respaldo**: el archivado y el respaldo diario no deben activarse (guía 08 §9 y §10.2). Lo que este documento y la operación segura describen de R2 y la compresión es el objetivo. Perder VM-INVENTARIO o su disco **pierde las dos bases**: RNF24, PLA-09, PLA-15 y PLA-18 no se cumplen y las filas de recuperación de §6 describen el objetivo, no el estado. **Condición para salir:** respaldos activos y una restauración probada, antes de cualquier dato o cobro real.
 
 ## 7. Reglas de red
 
@@ -253,7 +259,7 @@ Mientras la compresión del archivo de cambios y el destino en R2 no estén en `
 | Internet | n8n y Evolution API | todos | **Sin publicar** (paneles por túnel SSH) |
 | Evolution API | WhatsApp | HTTPS saliente | Permitido |
 | VM-VENTAS | Almacén de archivos | HTTPS saliente | Permitido (subir archivos y firmar URLs) |
-| VM-INVENTARIO | Almacén de archivos | HTTPS saliente | Permitido (respaldos y WAL cifrados) |
+| VM-INVENTARIO | Cloudflare R2 | HTTPS saliente | Permitido (respaldos y WAL cifrados) |
 | VM-AUX (aplazada) | Almacén de archivos y servidor de correo | HTTPS y TLS salientes | Sin uso hasta que exista (§6.2) |
 | Internet | Almacén de archivos | HTTPS | Solo con URL firmada vigente; bucket privado |
 
