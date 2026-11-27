@@ -158,7 +158,8 @@ public sealed class PagosConPostgresAvisosYLimitesTests(PostgresDePagosFixture b
                 new ContactoDeCompra("Ana Pérez Quispe", "987654321", "Av. Los Olivos 123, Ayacucho", "AYA"),
                 [texto, texto with { Texto = TextoLegalDeCompra.Privacidad }, texto with { Texto = TextoLegalDeCompra.ReembolsoDigital }],
                 lineas,
-                "huella-b");
+                "huella-b",
+                [new EnvioDeSucursalDeCompra("ayacucho", "Sucursal Ayacucho", 15m)]);
             var creada = await creador.Crear(ComprasDePrueba.Cuenta, instantanea, "huella-b", _entorno.Reloj.Ahora + BabelHub.Ecommerce.Domain.Pagos.PlazosDelPago.VigenciaConImpresos);
             Assert.Equal(ResultadoDeCrearIntencion.Creada, creada);
         }

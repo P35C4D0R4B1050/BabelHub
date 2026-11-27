@@ -190,7 +190,8 @@ public sealed class PagosDeLaCuentaTests
             IntencionesDePrueba.Texto(),
             IntencionesDePrueba.Texto(),
             IntencionesDePrueba.Texto(),
-            IntencionesDePrueba.Contacto());
+            IntencionesDePrueba.Contacto(),
+            [new EnvioDeSucursalDeIntencion("ayacucho", Importe.De(15m))]);
 
     // ---------- Liberar el contacto ----------
 

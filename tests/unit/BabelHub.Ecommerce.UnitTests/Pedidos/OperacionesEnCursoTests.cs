@@ -11,7 +11,7 @@ public sealed class OperacionesEnCursoTests
     private static readonly IniciadorDeOperacion Admin = new(Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"), "administracion-central", null);
 
     private static PlanDeAnulacion Plan(bool conDigital = false, decimal monto = 50m) =>
-        new(OrigenDeLaAnulacion.Administracion, MotivoDeAnulacion.PagoDuplicado, [Linea], conDigital ? [Guid.NewGuid()] : [], false, monto, []);
+        new(OrigenDeLaAnulacion.Administracion, MotivoDeAnulacion.PagoDuplicado, [Linea], conDigital ? [Guid.NewGuid()] : [], 0m, monto, []);
 
     [Fact]
     public void La_clave_de_cierre_por_linea_es_determinista_corta_y_distinta_por_linea()
@@ -113,7 +113,7 @@ public sealed class OperacionesEnCursoTests
     [Fact]
     public void Tras_un_conflicto_la_anulacion_ajusta_sus_lineas_el_envio_y_el_monto_y_sin_lineas_se_descarta()
     {
-        var anulacion = Anulacion.Iniciar(Guid.NewGuid(), Pedido, Plan(conDigital: true, monto: 82m) with { IncluyeEnvio = true }, Admin, Inicio);
+        var anulacion = Anulacion.Iniciar(Guid.NewGuid(), Pedido, Plan(conDigital: true, monto: 82m) with { Envio = 12m }, Admin, Inicio);
 
         anulacion.AjustarAlPlan(Plan(monto: 50m), Inicio.AddSeconds(10));
 

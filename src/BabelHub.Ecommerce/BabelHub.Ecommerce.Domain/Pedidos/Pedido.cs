@@ -43,7 +43,11 @@ public sealed record DatosDePedidoNuevo(
     AceptacionDeTexto Privacidad,
     AceptacionDeTexto? ReembolsoDigital,
     IReadOnlyList<DatosDeLineaNueva> Lineas,
-    DateTimeOffset CreadoEn);
+    DateTimeOffset CreadoEn,
+    IReadOnlyList<EnvioDeSucursal>? EnviosPorSucursal = null);
+
+/// <summary>Lo que la compra cobró por el envío de una sucursal que atiende el pedido a domicilio (PED-44): se guarda tal como llega y no se recalcula con las tarifas vigentes.</summary>
+public sealed record EnvioDeSucursal(string CodigoDeSucursal, decimal Importe);
 
 /// <summary>Por qué no se crea un pedido: la Aplicación lo traduce a un fallo para que Pagos compense el cobro (PED-36). Ninguno repite el contacto.</summary>
 public enum RechazoDeCrearPedido
@@ -66,6 +70,9 @@ public enum RechazoDeCrearPedido
     /// <summary>Un pedido de recojo o digital que trae contacto: el contacto solo existe a domicilio (PED-32).</summary>
     ContactoNoCorresponde,
     TotalIncoherente,
+
+    /// <summary>El detalle del envío por sucursal no corresponde (fuera del domicilio), está vacío, repite o deja en blanco una sucursal, tiene un importe negativo o no suma el costo de envío (PED-44).</summary>
+    EnvioPorSucursalIncoherente,
 }
 
 public sealed class ResultadoDeCrearPedido
@@ -109,7 +116,7 @@ public static class PoliticaDeNoRecogido
 }
 
 /// <summary>
-/// Una línea de un pedido (una por edición, PED-01): la copia del título, el ISBN, el precio y la cantidad con su propio ciclo (PED-02). Una impresa nace <see cref="EstadoDeLineaImpresa.Confirmado"/> y una digital <see cref="EstadoDeLineaDigital.Disponible"/> (el acceso
+/// Una línea de un pedido (varias de una edición impresa en la venta por sucursal, una por edición digital; PED-01): la copia del título, el ISBN, el precio y la cantidad con su propio ciclo (PED-02). Una impresa nace <see cref="EstadoDeLineaImpresa.Confirmado"/> y una digital <see cref="EstadoDeLineaDigital.Disponible"/> (el acceso
 /// ya lo concedió la biblioteca, PED-03). Los cambios de estado pasan por <see cref="PasarA"/>, que solo aplica una transición que la máquina permite y fija la fecha que le corresponde (PED-29).
 /// </summary>
 [DebuggerDisplay("Linea {Id}")]
@@ -295,9 +302,10 @@ public sealed partial class Pedido
         Numero = numero;
         CuentaId = datos.CuentaId;
         Tipo = datos.Tipo;
-        CodigoDeSucursalDeRecojo = datos.CodigoDeSucursalDeRecojo?.Trim();
+        CodigoDeSucursalDeRecojo = string.IsNullOrWhiteSpace(datos.CodigoDeSucursalDeRecojo) ? null : datos.CodigoDeSucursalDeRecojo.Trim();
         RegionDeEntrega = datos.RegionDeEntrega?.Trim();
         CostoDeEnvio = datos.CostoDeEnvio;
+        EnviosPorSucursal = datos.EnviosPorSucursal?.ToArray();
         Total = datos.Total;
         Contacto = datos.Contacto;
         Terminos = datos.Terminos;
@@ -319,6 +327,7 @@ public sealed partial class Pedido
         CodigoDeSucursalDeRecojo = datos.CodigoDeSucursalDeRecojo;
         RegionDeEntrega = datos.RegionDeEntrega;
         CostoDeEnvio = datos.CostoDeEnvio;
+        EnviosPorSucursal = datos.EnviosPorSucursal?.ToArray();
         Total = datos.Total;
         Estado = datos.Estado;
         CreadoEn = datos.CreadoEn;
@@ -346,6 +355,9 @@ public sealed partial class Pedido
 
     public decimal CostoDeEnvio { get; }
 
+    /// <summary>El envío que cobró cada sucursal (PED-44), o <see langword="null"/> si la compra no lo trajo: recojo, digital o anterior a la venta por sucursal.</summary>
+    public IReadOnlyList<EnvioDeSucursal>? EnviosPorSucursal { get; }
+
     public decimal Total { get; }
 
     public EstadoDePedido Estado { get; private set; }
@@ -365,6 +377,20 @@ public sealed partial class Pedido
     public AceptacionDeTexto? ReembolsoDigital { get; }
 
     public IReadOnlyList<LineaDePedido> Lineas => _lineas.AsReadOnly();
+
+    /// <summary>
+    /// La sucursal que atiende una línea del pedido (PED-01, PED-43): la sucursal de recojo común si el pedido la tiene (nació antes de la venta por sucursal, aunque la mercadería venga por traslado) y, si no, la fuente de la línea. Una digital no tiene sucursal.
+    /// </summary>
+    public string? SucursalDeLaLinea(LineaDePedido linea)
+    {
+        ArgumentNullException.ThrowIfNull(linea);
+        if (linea.PedidoId != Id)
+        {
+            throw new ArgumentException("La línea no es de este pedido.", nameof(linea));
+        }
+
+        return linea.EsDigital ? null : CodigoDeSucursalDeRecojo ?? linea.CodigoDeFuente;
+    }
 
     /// <summary>
     /// Crea el pedido desde una compra aprobada si es coherente; si no, indica por qué sin repetir ningún dato personal (PED-36). Las comprobaciones van de lo más general a lo más particular: líneas, número, aceptaciones, cada línea, la entrega, el contacto y el total.
@@ -393,7 +419,7 @@ public sealed partial class Pedido
             return ResultadoDeCrearPedido.Rechazado(RechazoDeCrearPedido.AceptacionFaltante);
         }
 
-        if (datos.Lineas.Select(l => l.LineaId).Distinct().Count() != datos.Lineas.Count || datos.Lineas.Select(l => l.EdicionId).Distinct().Count() != datos.Lineas.Count)
+        if (datos.Lineas.Select(l => l.LineaId).Distinct().Count() != datos.Lineas.Count || RepiteUnaEdicionDigital(datos.Lineas))
         {
             return ResultadoDeCrearPedido.Rechazado(RechazoDeCrearPedido.LineaRepetida);
         }
@@ -419,6 +445,11 @@ public sealed partial class Pedido
         if (datos.Tipo != TipoDeEntregaDelPedido.Domicilio && datos.Contacto is not null)
         {
             return ResultadoDeCrearPedido.Rechazado(RechazoDeCrearPedido.ContactoNoCorresponde);
+        }
+
+        if (!DetalleDeEnviosEsCoherente(datos))
+        {
+            return ResultadoDeCrearPedido.Rechazado(RechazoDeCrearPedido.EnvioPorSucursalIncoherente);
         }
 
         if (datos.Total <= 0m || datos.Total != datos.Lineas.Sum(l => l.Importe) + datos.CostoDeEnvio)
@@ -584,9 +615,23 @@ public sealed partial class Pedido
 
     private static ResultadoDeOperacionDeLinea Resultado(bool aplicada) => aplicada ? ResultadoDeOperacionDeLinea.Aplicada : ResultadoDeOperacionDeLinea.EstadoInvalido;
 
-    private EstadoDePedido Derivar() => DerivacionDelEstadoDelPedido.Derivar(
-        [.. _lineas.Where(l => !l.EsDigital).Select(l => l.EstadoImpreso!.Value)],
-        [.. _lineas.Where(l => l.EsDigital).Select(l => l.EstadoDigital!.Value)]);
+    /// <summary>
+    /// El estado que derivan (PED-20) solo las líneas pedidas, que deben ser de este pedido: el que ve el encargado de las líneas de su sucursal (PED-08).
+    /// </summary>
+    public EstadoDePedido EstadoDeLasLineas(IReadOnlyCollection<LineaDePedido> lineas)
+    {
+        ArgumentNullException.ThrowIfNull(lineas);
+        if (lineas.Any(l => l.PedidoId != Id))
+        {
+            throw new ArgumentException("Hay líneas que no son de este pedido.", nameof(lineas));
+        }
+
+        return DerivacionDelEstadoDelPedido.Derivar(
+            [.. lineas.Where(l => !l.EsDigital).Select(l => l.EstadoImpreso!.Value)],
+            [.. lineas.Where(l => l.EsDigital).Select(l => l.EstadoDigital!.Value)]);
+    }
+
+    private EstadoDePedido Derivar() => EstadoDeLasLineas(_lineas);
 
     private static RechazoDeCrearPedido? RechazoDeLinea(DatosDeLineaNueva linea)
     {
@@ -613,6 +658,21 @@ public sealed partial class Pedido
             : null;
     }
 
+    /// <summary>La edición solo es única entre las digitales (una unidad por edición); una impresa puede repetirse, una línea por sucursal o lote.</summary>
+    private static bool RepiteUnaEdicionDigital(IReadOnlyList<DatosDeLineaNueva> lineas)
+    {
+        var digitales = lineas.Where(l => l.EsDigital).Select(l => l.EdicionId).ToList();
+        return digitales.Distinct().Count() != digitales.Count;
+    }
+
+    private static bool DetalleDeEnviosEsCoherente(DatosDePedidoNuevo datos) =>
+        datos.EnviosPorSucursal is not { } envios
+        || (datos.Tipo == TipoDeEntregaDelPedido.Domicilio
+            && envios.Count > 0
+            && envios.All(e => e is not null && !string.IsNullOrWhiteSpace(e.CodigoDeSucursal) && e.Importe >= 0m)
+            && envios.Select(e => e.CodigoDeSucursal).Distinct(StringComparer.Ordinal).Count() == envios.Count
+            && envios.Sum(e => e.Importe) == datos.CostoDeEnvio);
+
     private static bool EntregaEsCoherente(DatosDePedidoNuevo datos)
     {
         var hayImpresas = datos.Lineas.Any(l => !l.EsDigital);
@@ -621,7 +681,7 @@ public sealed partial class Pedido
         return datos.Tipo switch
         {
             TipoDeEntregaDelPedido.Digital => !hayImpresas && !haySucursal && !hayRegion && datos.CostoDeEnvio == 0m,
-            TipoDeEntregaDelPedido.Recojo => hayImpresas && haySucursal && !hayRegion && datos.CostoDeEnvio == 0m,
+            TipoDeEntregaDelPedido.Recojo => hayImpresas && !hayRegion && datos.CostoDeEnvio == 0m,
             TipoDeEntregaDelPedido.Domicilio => hayImpresas && hayRegion && !haySucursal && datos.CostoDeEnvio >= 0m,
             _ => false,
         };

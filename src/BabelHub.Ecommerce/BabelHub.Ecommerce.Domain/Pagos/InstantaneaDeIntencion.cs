@@ -20,6 +20,9 @@ public sealed record LineaDeIntencion(Guid LineaId, Guid? EdicionId, bool EsDigi
 /// <summary>La fuente y el traslado que el Inventario asignó a una línea impresa al confirmar su reserva (D02).</summary>
 public sealed record ReservaConfirmadaDeLinea(Guid LineaId, string CodigoDeFuente, bool RequiereTraslado, Guid? TrasladoId, DateOnly? FechaEstimadaDeLlegada);
 
+/// <summary>Lo que se cobra por el envío de una sucursal que atiende la compra a domicilio (PAG-53): Pagos lo conserva tal como llega para entregarlo con la compra aprobada.</summary>
+public sealed record EnvioDeSucursalDeIntencion(string CodigoDeSucursal, Importe Importe);
+
 /// <summary>La versión de un texto legal que la cuenta aceptó y cuándo.</summary>
 public sealed record TextoAceptado(string Version, DateTimeOffset AceptadoEn);
 
@@ -38,7 +41,7 @@ public sealed record ContactoDeEntrega(string Nombre, string Telefono, string Di
 
 /// <summary>
 /// Lo que Carrito congeló para cobrar (D02): las líneas con su importe, el envío, el total, la entrega, los textos aceptados y el contacto. Es inmutable y se valida al crearla:
-/// el total es la suma de las líneas más el envío, una compra con impresos necesita su entrega (a domicilio con contacto y región, o con recojo en una sucursal) y una solo digital
+/// el total es la suma de las líneas más el envío, una compra con impresos necesita su entrega (a domicilio con contacto y región, o con recojo, con sucursal común solo en una compra anterior a la venta por sucursal) y una solo digital
 /// no lleva entrega. La huella la calcula la Aplicación (<c>ICalculadorDeHuella</c>) sobre todo lo congelado.
 /// </summary>
 public sealed class InstantaneaDeIntencion
@@ -55,7 +58,8 @@ public sealed class InstantaneaDeIntencion
         TextoAceptado terminos,
         TextoAceptado privacidad,
         TextoAceptado? reembolsoDigital,
-        ContactoDeEntrega? contacto)
+        ContactoDeEntrega? contacto,
+        IReadOnlyList<EnvioDeSucursalDeIntencion>? enviosPorSucursal)
     {
         CuentaId = cuentaId;
         Entrega = entrega;
@@ -69,6 +73,7 @@ public sealed class InstantaneaDeIntencion
         Privacidad = privacidad;
         ReembolsoDigital = reembolsoDigital;
         Contacto = contacto;
+        EnviosPorSucursal = enviosPorSucursal;
     }
 
     public Guid CuentaId { get; }
@@ -96,6 +101,9 @@ public sealed class InstantaneaDeIntencion
 
     public ContactoDeEntrega? Contacto { get; }
 
+    /// <summary>El envío de cada sucursal en una compra a domicilio (PAG-53); <see langword="null"/> fuera de él.</summary>
+    public IReadOnlyList<EnvioDeSucursalDeIntencion>? EnviosPorSucursal { get; }
+
     public bool TieneImpresos => Lineas.Any(l => !l.EsDigital);
 
     public static InstantaneaDeIntencion Crear(
@@ -110,11 +118,18 @@ public sealed class InstantaneaDeIntencion
         TextoAceptado terminos,
         TextoAceptado privacidad,
         TextoAceptado? reembolsoDigital,
-        ContactoDeEntrega? contacto)
+        ContactoDeEntrega? contacto,
+        IReadOnlyList<EnvioDeSucursalDeIntencion>? enviosPorSucursal = null)
     {
         ArgumentNullException.ThrowIfNull(lineas);
         ArgumentNullException.ThrowIfNull(terminos);
         ArgumentNullException.ThrowIfNull(privacidad);
+
+        // En la venta por sucursal el recojo no tiene sucursal común: cada línea es de la sucursal de su reserva; en blanco equivale a ninguna.
+        if (entrega == TipoDeEntrega.Recojo && string.IsNullOrWhiteSpace(codigoDeSucursalDeRecojo))
+        {
+            codigoDeSucursalDeRecojo = null;
+        }
 
         if (cuentaId == Guid.Empty)
         {
@@ -177,15 +192,27 @@ public sealed class InstantaneaDeIntencion
         {
             case TipoDeEntrega.Domicilio when contacto is null || string.IsNullOrWhiteSpace(regionDeEntrega) || codigoDeSucursalDeRecojo is not null:
                 throw new ArgumentException("La entrega a domicilio exige el contacto y la región, y no lleva sucursal de recojo.");
-            case TipoDeEntrega.Recojo when string.IsNullOrWhiteSpace(codigoDeSucursalDeRecojo) || regionDeEntrega is not null || contacto is not null:
-                throw new ArgumentException("El recojo exige la sucursal y no lleva región ni contacto de entrega.");
+            case TipoDeEntrega.Recojo when regionDeEntrega is not null || contacto is not null:
+                throw new ArgumentException("El recojo no lleva región ni contacto de entrega.");
             case TipoDeEntrega.SinEntrega when contacto is not null || codigoDeSucursalDeRecojo is not null || regionDeEntrega is not null:
                 throw new ArgumentException("Una compra solo digital no lleva datos de entrega.");
         }
 
+        // La exigencia rige al crear una intención (PAG-54): una ya guardada se lee sin repetirla.
+        if (entrega == TipoDeEntrega.Domicilio ? !CuadraConElEnvio(enviosPorSucursal, envio) : enviosPorSucursal is not null)
+        {
+            throw new ArgumentException("El envío por sucursal va en toda compra a domicilio y en ninguna otra, con códigos válidos sin repetir que sumen el envío.", nameof(enviosPorSucursal));
+        }
+
         return new InstantaneaDeIntencion(
-            cuentaId, entrega, codigoDeSucursalDeRecojo, regionDeEntrega, lineas.ToArray(), envio, total, huella.Trim(), terminos, privacidad, reembolsoDigital, contacto);
+            cuentaId, entrega, codigoDeSucursalDeRecojo, regionDeEntrega, lineas.ToArray(), envio, total, huella.Trim(), terminos, privacidad, reembolsoDigital, contacto, enviosPorSucursal?.ToArray());
     }
+
+    private static bool CuadraConElEnvio(IReadOnlyList<EnvioDeSucursalDeIntencion>? envios, Importe envio) =>
+        envios is { Count: > 0 }
+        && envios.All(e => e?.CodigoDeSucursal is { Length: >= 2 and <= 20 } codigo && codigo.All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c == '-'))
+        && envios.Select(e => e.CodigoDeSucursal).Distinct(StringComparer.Ordinal).Count() == envios.Count
+        && envios.Aggregate(Importe.Cero, (suma, e) => suma + e.Importe) == envio;
 
     /// <summary>Sin el contacto, la dirección ni los títulos.</summary>
     public override string ToString() => $"InstantaneaDeIntencion {{ Lineas = {Lineas.Count}, Total = {Total}, Entrega = {Entrega} }}";

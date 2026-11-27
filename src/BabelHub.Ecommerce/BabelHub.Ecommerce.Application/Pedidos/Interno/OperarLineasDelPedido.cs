@@ -82,7 +82,7 @@ internal sealed class OperarLineasDelPedido(
             return Resultado<LineasOperadas>.Fallo(ajeno);
         }
 
-        if (await autorizador.ComprobarLineas(pedido!, lineaIds, cancelacion).ConfigureAwait(false) is { } lineaAjena)
+        if (await autorizador.ComprobarLineas(pedido!, solicitante, lineaIds, cancelacion).ConfigureAwait(false) is { } lineaAjena)
         {
             return Resultado<LineasOperadas>.Fallo(lineaAjena);
         }
@@ -123,9 +123,10 @@ internal sealed class OperarLineasDelPedido(
             await new AvisosDePedidos(notificador).Solicitar(pedido, destino, $"{destino}-{AvisosDePedidos.HuellaDeLineas(aplicadas)}", AvisosDePedidos.SucursalesResponsables(pedido, aplicadas), cancelacion).ConfigureAwait(false);
         }
 
+        var suyas = await autorizador.LineasDelAlcance(pedido, solicitante, cancelacion).ConfigureAwait(false);
         return Resultado<LineasOperadas>.Exito(new LineasOperadas(
             pedido.Id,
-            ProyeccionesDePedidos.AEstadoVisible(pedido.Estado),
+            ProyeccionesDePedidos.AEstadoVisible(pedido.EstadoDeLasLineas(suyas)),
             [.. resultados.Select(r => new ResultadoDeLineaOperada(r.LineaId, r.Resultado switch
             {
                 ResultadoDeOperacionDeLinea.Aplicada => ResultadoVisibleDeLinea.Aplicada,

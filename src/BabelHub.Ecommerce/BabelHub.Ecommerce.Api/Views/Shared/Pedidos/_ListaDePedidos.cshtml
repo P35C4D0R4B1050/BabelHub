@@ -46,9 +46,9 @@
                             <td class="align-top"><span class="bh-chip"><bh-icono nombre="@pedido.EstadoIcono" clase="size-3.5" />@pedido.EstadoTexto</span></td>
                             <td class="align-top text-sm">
                                 @pedido.TipoTexto
-                                @if (pedido.Sucursal is not null)
+                                @if (pedido.SucursalesTexto is not null)
                                 {
-                                    <div class="text-xs opacity-70">Sucursal @pedido.Sucursal</div>
+                                    <div class="text-xs opacity-70">Atiende: @pedido.SucursalesTexto</div>
                                 }
                             </td>
                             <td class="align-top text-right text-sm tabular-nums">@pedido.TotalTexto</td>

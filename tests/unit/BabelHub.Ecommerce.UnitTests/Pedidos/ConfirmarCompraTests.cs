@@ -72,6 +72,23 @@ public sealed class ConfirmarCompraTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-PED-36")]
+    public async Task Una_compra_con_recojo_por_sucursal_y_dos_lineas_de_una_edicion_crea_el_pedido_sin_sucursal_comun()
+    {
+        var entorno = new Entorno();
+        var deAyacucho = Impresa() with { CodigoDeFuente = "AYA" };
+        var deCusco = deAyacucho with { LineaId = Guid.NewGuid(), CodigoDeFuente = "CUS" };
+        var compra = Compra(TipoDeEntregaDeCompra.Recojo, deAyacucho, deCusco) with { CodigoDeSucursalDeRecojo = null };
+
+        var resultado = await entorno.Caso.Confirmar(compra);
+
+        Assert.Equal(ResultadoDeConfirmarCompra.Creado, resultado);
+        var pedido = Assert.Single(entorno.Repositorio.Pedidos);
+        Assert.Null(pedido.CodigoDeSucursalDeRecojo);
+        Assert.Equal(new[] { "AYA", "CUS" }, pedido.Lineas.Select(pedido.SucursalDeLaLinea));
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-PED-10")]
     public async Task Un_pedido_solo_digital_queda_entregado_y_no_se_pide_la_liberacion_del_contacto()
     {

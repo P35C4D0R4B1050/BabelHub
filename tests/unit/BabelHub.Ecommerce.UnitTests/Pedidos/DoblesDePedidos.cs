@@ -75,13 +75,16 @@ internal sealed class RepositorioDePedidosFalso : IRepositorioDePedidos
         Llamadas.Add("listar");
         var filtrados = _pedidos.Values
             .Where(p => criterio.CuentaId is null || p.CuentaId == criterio.CuentaId)
-            .Where(p => criterio.CodigoDeSucursalDeRecojo is null || (p.Tipo == TipoDeEntregaDelPedido.Recojo && p.CodigoDeSucursalDeRecojo == criterio.CodigoDeSucursalDeRecojo))
+            .Where(p => criterio.CodigoDeSucursalDelEncargado is not { } sucursal || (p.Tipo == TipoDeEntregaDelPedido.Recojo && LineasDe(p, sucursal).Count > 0))
             .Where(p => !criterio.SoloADomicilio || p.Tipo == TipoDeEntregaDelPedido.Domicilio)
-            .Where(p => criterio.Estado is null || p.Estado == criterio.Estado)
+            .Where(p => criterio.Estado is null || (criterio.CodigoDeSucursalDelEncargado is { } suya ? p.EstadoDeLasLineas(LineasDe(p, suya)) : p.Estado) == criterio.Estado)
             .OrderByDescending(p => p.CreadoEn)
             .ToList();
         return Task.FromResult(new PaginaDeDominio([.. filtrados.Skip((criterio.Pagina - 1) * criterio.Tamano).Take(criterio.Tamano)], filtrados.Count));
     }
+
+    /// <summary>Como la consulta real (plan §11.3): las líneas que atiende la sucursal del encargado.</summary>
+    private static List<LineaDePedido> LineasDe(Pedido pedido, string sucursal) => [.. pedido.Lineas.Where(l => pedido.SucursalDeLaLinea(l) == sucursal)];
 
     public Dictionary<string, EstadoDeTrasladoRegistrado> EstadosDeTraslado { get; } = [];
 
@@ -370,9 +373,10 @@ internal sealed class ResolucionDeSucursalFalsa : IResolucionDeSucursal
 {
     public static readonly Guid Lima = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
     public static readonly Guid Ayacucho = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000002");
+    public static readonly Guid Cusco = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000003");
 
     public Task<Guid?> IdentificadorDe(string codigoDeSucursal, CancellationToken cancelacion = default) =>
-        Task.FromResult<Guid?>(codigoDeSucursal switch { "LIM" => Lima, "AYA" => Ayacucho, _ => null });
+        Task.FromResult<Guid?>(codigoDeSucursal switch { "LIM" => Lima, "AYA" => Ayacucho, "CUS" => Cusco, _ => null });
 }
 
 /// <summary>Límites que dejan pasar todo y pueden negar el contacto o la gestión.</summary>

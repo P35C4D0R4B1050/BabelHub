@@ -72,7 +72,7 @@ internal sealed class CompletarCompra(IRepositorioDePagos repositorio, IUnidadDe
     }
 
     /// <summary>Lo que Pagos entrega a Pedidos (D02): las líneas con su importe, la fuente y los traslados que devolvió el Inventario, el envío, el total, el contacto y los textos aceptados.</summary>
-    private static CompraAprobada CompraAprobadaDe(IntencionDePago intencion)
+    internal static CompraAprobada CompraAprobadaDe(IntencionDePago intencion)
     {
         var cuentaId = intencion.CuentaId ?? throw new InvalidOperationException("Una compra aprobada sin cuenta no se puede completar.");
         if (intencion.TieneImpresos && intencion.ReservasConfirmadasEn is null)
@@ -128,7 +128,8 @@ internal sealed class CompletarCompra(IRepositorioDePagos repositorio, IUnidadDe
             intencion.Total.Valor,
             contacto,
             Aceptaciones(intencion),
-            lineas);
+            lineas,
+            intencion.EnviosPorSucursal?.Select(e => new EnvioDeSucursalDeLaCompra(e.CodigoDeSucursal, e.Importe.Valor)).ToArray());
     }
 
     private static List<AceptacionDeCompra> Aceptaciones(IntencionDePago intencion)

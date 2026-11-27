@@ -39,7 +39,7 @@ public static class DefinicionDePedidos
             CONSTRAINT pedidos_contacto_solo_a_domicilio CHECK (contacto_nombre IS NULL OR tipo_de_entrega = 'domicilio'),
             CONSTRAINT pedidos_contacto_anonimizado_sin_datos CHECK (contacto_anonimizado_en IS NULL OR contacto_nombre IS NULL),
             CONSTRAINT pedidos_domicilio_con_contacto CHECK (tipo_de_entrega <> 'domicilio' OR contacto_anonimizado_en IS NOT NULL OR contacto_nombre IS NOT NULL),
-            CONSTRAINT pedidos_recojo_con_sucursal CHECK ((tipo_de_entrega = 'recojo') = (codigo_de_sucursal_de_recojo IS NOT NULL)),
+            CONSTRAINT pedidos_recojo_con_sucursal CHECK (tipo_de_entrega = 'recojo' OR codigo_de_sucursal_de_recojo IS NULL),
             CONSTRAINT pedidos_domicilio_con_region CHECK ((tipo_de_entrega = 'domicilio') = (region_de_entrega IS NOT NULL)),
             CONSTRAINT pedidos_reembolso_digital_junto CHECK ((reembolso_digital_version IS NULL) = (reembolso_digital_aceptado_en IS NULL)),
             CONSTRAINT pedidos_fecha_final_con_estado_final CHECK ((estado IN ('entregado', 'anulado')) = (fecha_estado_final IS NOT NULL))
@@ -48,6 +48,9 @@ public static class DefinicionDePedidos
         CREATE INDEX IF NOT EXISTS pedidos_por_sucursal ON pedidos.pedidos (codigo_de_sucursal_de_recojo, estado);
         CREATE INDEX IF NOT EXISTS pedidos_por_tipo_y_estado ON pedidos.pedidos (tipo_de_entrega, estado);
         CREATE INDEX IF NOT EXISTS pedidos_por_estado ON pedidos.pedidos (estado, creado_en);
+        -- Venta por sucursal: un recojo puede no tener sucursal común (cada línea es de la sucursal de su fuente). Repetible sobre una base anterior, que exigía la sucursal en todo recojo.
+        ALTER TABLE pedidos.pedidos DROP CONSTRAINT IF EXISTS pedidos_recojo_con_sucursal;
+        ALTER TABLE pedidos.pedidos ADD CONSTRAINT pedidos_recojo_con_sucursal CHECK (tipo_de_entrega = 'recojo' OR codigo_de_sucursal_de_recojo IS NULL);
 
         -- El contacto se escribe una sola vez, al crear el pedido: después solo puede pasar a nulo (anonimizarse), nunca cambiar a otro valor.
         CREATE OR REPLACE FUNCTION pedidos.proteger_el_contacto() RETURNS trigger
@@ -87,7 +90,6 @@ public static class DefinicionDePedidos
             anulada_en timestamptz,
             envio_id uuid,
             version integer NOT NULL CHECK (version >= 1),
-            CONSTRAINT lineas_una_por_edicion UNIQUE (pedido_id, edicion_id),
             CONSTRAINT lineas_digital_sin_fuente CHECK (NOT es_digital OR (codigo_de_fuente IS NULL AND NOT requiere_traslado AND traslado_id IS NULL AND envio_id IS NULL)),
             CONSTRAINT lineas_impresa_con_fuente CHECK (es_digital OR codigo_de_fuente IS NOT NULL),
             CONSTRAINT lineas_estado_segun_tipo CHECK ((es_digital AND estado IN ('disponible', 'anulado')) OR (NOT es_digital AND estado <> 'disponible')),
@@ -99,6 +101,9 @@ public static class DefinicionDePedidos
         CREATE INDEX IF NOT EXISTS lineas_por_envio ON pedidos.lineas_de_pedido (envio_id) WHERE envio_id IS NOT NULL;
         CREATE INDEX IF NOT EXISTS lineas_por_traslado ON pedidos.lineas_de_pedido (traslado_id) WHERE traslado_id IS NOT NULL;
         CREATE INDEX IF NOT EXISTS lineas_por_estado ON pedidos.lineas_de_pedido (estado, no_recogida_en);
+        -- Venta por sucursal: una edición impresa puede tener varias líneas (una por sucursal o lote); una digital, solo una.
+        ALTER TABLE pedidos.lineas_de_pedido DROP CONSTRAINT IF EXISTS lineas_una_por_edicion;
+        CREATE UNIQUE INDEX IF NOT EXISTS lineas_una_digital_por_edicion ON pedidos.lineas_de_pedido (pedido_id, edicion_id) WHERE es_digital;
 
         -- Las operaciones en curso: la fila durable de cada anulación o entrega (D03). Guardan el iniciador (dato personal del personal) que se anonimiza a los dos años (PED-34).
         CREATE TABLE IF NOT EXISTS pedidos.anulaciones (
@@ -126,6 +131,11 @@ public static class DefinicionDePedidos
             CONSTRAINT anulaciones_completada_con_fecha CHECK (estado NOT IN ('completada') OR completada_en IS NOT NULL),
             CONSTRAINT anulaciones_en_curso_con_proximo_intento CHECK (estado <> 'en_curso' OR proximo_intento_en IS NOT NULL)
         );
+        -- El envío por sucursal (PED-44, PED-45): lo que cobró cada una, tal como llegó con la compra, y lo que devuelve cada anulación. Una fila anterior queda nula (sin relleno) y se lee como «todo el envío si lo incluía».
+        ALTER TABLE pedidos.pedidos ADD COLUMN IF NOT EXISTS envios_por_sucursal jsonb;
+        ALTER TABLE pedidos.anulaciones ADD COLUMN IF NOT EXISTS envio numeric(12, 2);
+        ALTER TABLE pedidos.anulaciones DROP CONSTRAINT IF EXISTS anulaciones_envio_coherente;
+        ALTER TABLE pedidos.anulaciones ADD CONSTRAINT anulaciones_envio_coherente CHECK (envio IS NULL OR (envio >= 0 AND envio <= monto AND incluye_envio = (envio > 0)));
         CREATE UNIQUE INDEX IF NOT EXISTS anulaciones_una_en_curso_por_pedido ON pedidos.anulaciones (pedido_id) WHERE estado = 'en_curso';
         CREATE INDEX IF NOT EXISTS anulaciones_por_pedido ON pedidos.anulaciones (pedido_id, creada_en);
         CREATE INDEX IF NOT EXISTS anulaciones_por_reanudar ON pedidos.anulaciones (proximo_intento_en) WHERE estado = 'en_curso';
@@ -212,7 +222,7 @@ public static class DefinicionDePedidos
         GRANT UPDATE (estado, fecha_estimada_de_llegada, listo_en, entregada_en, no_recogida_en, anulada_en, envio_id, version) ON pedidos.lineas_de_pedido TO rol_pedidos;
         GRANT SELECT, INSERT ON pedidos.anulaciones TO rol_pedidos;
         GRANT UPDATE (
-            incluye_envio, hay_digitales, monto, estado, reembolso_id, envios_cancelados_en, reservas_liberadas_en, reembolso_registrado_en, accesos_revocados_en, iniciada_por, rol_del_iniciador,
+            incluye_envio, envio, hay_digitales, monto, estado, reembolso_id, envios_cancelados_en, reservas_liberadas_en, reembolso_registrado_en, accesos_revocados_en, iniciada_por, rol_del_iniciador,
             sucursal_del_iniciador, proximo_intento_en, intentos, completada_en
         ) ON pedidos.anulaciones TO rol_pedidos;
         GRANT SELECT, INSERT, DELETE ON pedidos.anulacion_lineas TO rol_pedidos;

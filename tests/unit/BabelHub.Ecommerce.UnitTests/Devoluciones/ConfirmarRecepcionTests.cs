@@ -320,4 +320,33 @@ public sealed class ConfirmarRecepcionTests
         Assert.Equal("estado-invalido", resultado.Error!.Clave);
         Assert.Empty(admin.Inventario.Reingresos);
     }
+
+    // ---------- Venta por sucursal: dos líneas de una edición (T48) ----------
+
+    [Fact]
+    [Trait("Criterio", "AC-PED-41")]
+    public async Task Dos_lineas_de_una_edicion_reingresan_una_sola_vez_la_suma_y_cada_linea_se_reembolsa_por_lo_suyo()
+    {
+        var cliente = new EntornoDeDevoluciones();
+        var edicion = Guid.NewGuid();
+        var otra = EntornoDeDevoluciones.Entregada(Ahora.AddDays(-2), 2, 20m);
+        var a = EntornoDeDevoluciones.Entregada(Ahora.AddDays(-2), 3, 50m) with { EdicionId = edicion };
+        var b = EntornoDeDevoluciones.Entregada(Ahora.AddDays(-2), 6, 50m) with { EdicionId = edicion };
+        var pedido = cliente.SembrarPedido(a, otra, b);
+        var solicitada = await cliente.SolicitarImpreso.Ejecutar(new SolicitarDevolucionDeImpresoEntrada(
+            pedido.PedidoId, [new LineaPedidaParaDevolver(a.LineaId, 2), new LineaPedidaParaDevolver(otra.LineaId, 1), new LineaPedidaParaDevolver(b.LineaId, 5)], new TextoLibre("Defecto"), "lima-central"));
+        var entorno = new EntornoDeDevoluciones(ActorDePrueba.DeAdministradorCentral()).ConLosDatosDe(cliente);
+        Assert.True((await entorno.Gestion.Aprobar(solicitada.Valor.DevolucionId)).EsExito);
+        entorno.Inventario.Resultado = new ResultadoDelReingreso.Incierto();
+        Assert.False((await entorno.Recepcion.Ejecutar(solicitada.Valor.DevolucionId)).EsExito);
+        entorno.Inventario.Resultado = new ResultadoDelReingreso.Reingresado();
+
+        var resultado = await entorno.Recepcion.Ejecutar(solicitada.Valor.DevolucionId);
+        await entorno.Recepcion.Ejecutar(solicitada.Valor.DevolucionId);
+
+        Assert.True(resultado.EsExito, resultado.Error?.Clave);
+        Assert.Equal(2, entorno.Inventario.Reingresos.Count);
+        Assert.All(entorno.Inventario.Reingresos, r => Assert.Equal(new[] { new LineaDeReingreso(edicion, 7), new LineaDeReingreso(otra.EdicionId, 1) }, r.Lineas));
+        Assert.Equal([100m, 20m, 250m], entorno.Reembolsos.Registrados.Select(r => r.Lineas.Single().Monto));
+    }
 }

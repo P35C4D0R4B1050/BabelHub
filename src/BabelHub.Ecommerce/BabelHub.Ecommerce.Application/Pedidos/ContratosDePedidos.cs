@@ -59,7 +59,8 @@ public sealed record LineaVisibleDelPedido(
     DateTimeOffset? ListoEn,
     DateTimeOffset? EntregadaEn,
     DateTimeOffset? AnuladaEn,
-    bool Operable = false);
+    bool Operable = false,
+    string? CodigoDeSucursal = null);
 
 /// <summary>Una fila de un listado: nunca lleva contacto, cuenta ni identificador de usuario.</summary>
 public sealed record ResumenDePedido(
@@ -70,7 +71,8 @@ public sealed record ResumenDePedido(
     TipoDeEntregaVisible TipoDeEntrega,
     string? CodigoDeSucursalDeRecojo,
     decimal Total,
-    int CantidadDeLineas);
+    int CantidadDeLineas,
+    IReadOnlyList<string>? CodigosDeSucursales = null);
 
 /// <summary>El filtro y la paginación de un listado: el tamaño tiene un tope de 50 (PED-14).</summary>
 public sealed record FiltroDePedidos(EstadoVisibleDelPedido? Estado = null, int Pagina = 1, int Tamano = 20)

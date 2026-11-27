@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BabelHub.Ecommerce.Application.Pagos.Interno;
 using BabelHub.Ecommerce.Domain.Pagos;
 using Npgsql;
@@ -16,7 +17,9 @@ internal sealed class RepositorioDePagosPostgres(AccesoAlEsquemaDePagos acceso) 
     private const string Columnas =
         "id, cuenta_id, estado, motivo_de_cierre, tiene_impresos, tipo_de_entrega, codigo_de_sucursal_de_recojo, region_de_entrega, total, envio, huella_de_instantanea, instantanea_obsoleta, iniciada_en, aprobado_en, "
         + "confirmacion_iniciada_en, reservas_confirmadas_en, reclamada_hasta, vence_en, limite_pendiente_en, reserva_expira_en, reserva_extendida, terminos_version, terminos_aceptado_en, privacidad_version, "
-        + "privacidad_aceptado_en, reembolso_digital_version, reembolso_digital_aceptado_en, contacto_nombre, contacto_telefono, contacto_direccion, contacto_liberado_en, desvinculada_en, creada_en, cerrada_en";
+        + "privacidad_aceptado_en, reembolso_digital_version, reembolso_digital_aceptado_en, contacto_nombre, contacto_telefono, contacto_direccion, contacto_liberado_en, desvinculada_en, creada_en, cerrada_en, envios_por_sucursal";
+
+    private static readonly JsonSerializerOptions JsonDeLosEnvios = new(JsonSerializerDefaults.Web);
 
     private const string ColumnasDelIntento =
         "id, intencion_id, medio, estado, referencia_pasarela, consulta_inmediata, motivo_de_rechazo, importe, iniciado_en, enviado_en, resuelto_en, consultas, ultima_consulta_en";
@@ -451,6 +454,18 @@ internal sealed class RepositorioDePagosPostgres(AccesoAlEsquemaDePagos acceso) 
         Parametro(comando, "completada", NpgsqlDbType.TimestampTz, AccesoAlEsquemaDePagos.UtcONulo(c.CompletadaEn));
     }
 
+    /// <summary>El detalle del envío por sucursal como se guarda (<c>jsonb</c>): <c>[{"codigoDeSucursal":"…","importe":0.00}]</c>, o nulo.</summary>
+    private static string? TextoDeLosEnvios(IReadOnlyList<EnvioDeSucursalDeIntencion>? envios) =>
+        envios is null ? null : JsonSerializer.Serialize(envios.Select(e => new EnvioGuardado(e.CodigoDeSucursal, e.Importe.Valor)), JsonDeLosEnvios);
+
+    private static IReadOnlyList<EnvioDeSucursalDeIntencion>? EnviosDe(string? texto) =>
+        texto is null
+            ? null
+            : [.. (JsonSerializer.Deserialize<EnvioGuardado[]>(texto, JsonDeLosEnvios) ?? throw new InvalidOperationException("El detalle de envíos guardado de la intención no es válido."))
+                .Select(e => new EnvioDeSucursalDeIntencion(e.CodigoDeSucursal, Importe.De(e.Importe)))];
+
+    private sealed record EnvioGuardado(string CodigoDeSucursal, decimal Importe);
+
     private static void ParametrosDeIntencion(NpgsqlCommand comando, IntencionDePago i)
     {
         Parametro(comando, "id", NpgsqlDbType.Uuid, i.Id);
@@ -487,6 +502,7 @@ internal sealed class RepositorioDePagosPostgres(AccesoAlEsquemaDePagos acceso) 
         Parametro(comando, "desvinculada_en", NpgsqlDbType.TimestampTz, AccesoAlEsquemaDePagos.UtcONulo(i.DesvinculadaEn));
         Parametro(comando, "creada_en", NpgsqlDbType.TimestampTz, AccesoAlEsquemaDePagos.UtcONulo(i.CreadaEn));
         Parametro(comando, "cerrada_en", NpgsqlDbType.TimestampTz, AccesoAlEsquemaDePagos.UtcONulo(i.CerradaEn));
+        Parametro(comando, "envios_por_sucursal", NpgsqlDbType.Jsonb, TextoDeLosEnvios(i.EnviosPorSucursal));
     }
 
     private static async Task InsertarLineas(NpgsqlConnection conexion, NpgsqlTransaction transaccion, IntencionDePago intencion, CancellationToken token)
@@ -592,12 +608,13 @@ internal sealed class RepositorioDePagosPostgres(AccesoAlEsquemaDePagos acceso) 
         var desvinculada = AccesoAlEsquemaDePagos.LeerInstante(f, 31);
         var creada = AccesoAlEsquemaDePagos.LeerInstante(f, 32)!.Value;
         var cerrada = AccesoAlEsquemaDePagos.LeerInstante(f, 33);
+        var envios = EnviosDe(AccesoAlEsquemaDePagos.LeerTexto(f, 34));
 
         return (
             id,
             (lineas, reservas) => IntencionDePago.Rehidratar(
                 id, creada, cuenta, estado, motivoDeCierre, tieneImpresos, entrega, sucursal, region, total, envio, huella, obsoleta, lineas, terminos, privacidad, reembolsoDigital, contacto, contactoLiberado, desvinculada,
-                iniciada, vence, limite, reservaExpira, extendida, aprobado, confirmacion, confirmadas, reservas, reclamada, cerrada));
+                iniciada, vence, limite, reservaExpira, extendida, aprobado, confirmacion, confirmadas, reservas, reclamada, cerrada, envios));
     }
 
     private static TextoAceptado? Texto(NpgsqlDataReader f, int version, int fecha) =>

@@ -39,7 +39,7 @@ public sealed class RepositoriosDePagosPostgresTests(PostgresDePagosFixture bd) 
 
     /// <summary>Una compra mixta a domicilio: 2 impresos de S/ 50 + 1 digital de S/ 25 + envío S/ 15 = S/ 140.</summary>
     private static InstantaneaDeIntencion Mixta(Guid cuenta) =>
-        InstantaneaDeIntencion.Crear(cuenta, TipoDeEntrega.Domicilio, null, "AYA", [Impresa(), Digital()], Importe.De(15m), Importe.De(140m), "huella-a", Texto(), Texto(), Texto(), Contacto());
+        InstantaneaDeIntencion.Crear(cuenta, TipoDeEntrega.Domicilio, null, "AYA", [Impresa(), Digital()], Importe.De(15m), Importe.De(140m), "huella-a", Texto(), Texto(), Texto(), Contacto(), [new EnvioDeSucursalDeIntencion("ayacucho", Importe.De(15m))]);
 
     private static InstantaneaDeIntencion SoloDigital(Guid cuenta) =>
         InstantaneaDeIntencion.Crear(cuenta, TipoDeEntrega.SinEntrega, null, null, [Digital()], Importe.Cero, Importe.De(25m), "huella-d", Texto(), Texto(), Texto(), null);

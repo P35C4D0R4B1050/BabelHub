@@ -68,7 +68,7 @@ public enum RechazoDeAnulacion
 }
 
 /// <summary>
-/// Lo que se anula y se reembolsa: las líneas impresas que no salieron, las digitales (solo si ninguna impresa salió, D10), si el reembolso incluye el envío (solo si ninguna salió ni se anuló antes), el monto y, en la cancelación del cliente, los traslados vinculados que
+/// Lo que se anula y se reembolsa: las líneas impresas que no salieron, las digitales (solo si ninguna impresa salió, D10), el envío que se devuelve (todo si ninguna impresa salió ni se anuló antes y, si no, el de las sucursales que no llegaron a enviar, PED-45), el monto —que lo incluye— y, en la cancelación del cliente, los traslados vinculados que
 /// hay que cancelar (PED-17).
 /// </summary>
 public sealed record PlanDeAnulacion(
@@ -76,9 +76,12 @@ public sealed record PlanDeAnulacion(
     MotivoDeAnulacion Motivo,
     IReadOnlyList<Guid> LineasImpresas,
     IReadOnlyList<Guid> LineasDigitales,
-    bool IncluyeEnvio,
+    decimal Envio,
     decimal Monto,
-    IReadOnlyList<Guid> TrasladosACancelar);
+    IReadOnlyList<Guid> TrasladosACancelar)
+{
+    public bool IncluyeEnvio => Envio > 0m;
+}
 
 public sealed class ResultadoDePlanDeAnulacion
 {
@@ -128,10 +131,26 @@ public sealed partial class Pedido
 
         var algunaSalio = impresas.Any(l => Efectivo(l).Salio());
         var digitales = algunaSalio ? [] : _lineas.Where(l => l.EsDigital && l.EstadoDigital == EstadoDeLineaDigital.Disponible).ToList();
-        var incluyeEnvio = impresas.All(l => Efectivo(l).SeAnula()) && CostoDeEnvio > 0m;
-        var monto = porSalir.Sum(l => l.Importe) + digitales.Sum(l => l.Importe) + (incluyeEnvio ? CostoDeEnvio : 0m);
+        var envio = impresas.All(l => Efectivo(l).SeAnula())
+            ? CostoDeEnvio
+            : EnvioDeLasSucursalesQueNoEnviaron(impresas, Efectivo);
+        var monto = porSalir.Sum(l => l.Importe) + digitales.Sum(l => l.Importe) + envio;
         return ResultadoDePlanDeAnulacion.Con(new PlanDeAnulacion(
-            OrigenDeLaAnulacion.Administracion, motivo, [.. porSalir.Select(l => l.Id)], [.. digitales.Select(l => l.Id)], incluyeEnvio, monto, []));
+            OrigenDeLaAnulacion.Administracion, motivo, [.. porSalir.Select(l => l.Id)], [.. digitales.Select(l => l.Id)], envio, monto, []));
+    }
+
+    /// <summary>
+    /// PED-45: una sucursal <b>no llegó a enviar</b> si es la fuente de alguna línea impresa y ninguna de las suyas salió (contando las que Envíos mantuvo o el Inventario reveló cerradas, que <paramref name="efectivo"/> ya da por despachadas) ni la anuló una operación anterior, que ya habría devuelto su envío. El importe de una sucursal sin líneas no
+    /// se devuelve y un pedido sin detalle por sucursal no devuelve envío cuando algo salió.
+    /// </summary>
+    private decimal EnvioDeLasSucursalesQueNoEnviaron(IReadOnlyList<LineaDePedido> impresas, Func<LineaDePedido, EstadoDeLineaImpresa> efectivo)
+    {
+        var sinEnviar = impresas
+            .GroupBy(l => SucursalDeLaLinea(l)!, StringComparer.Ordinal)
+            .Where(g => g.All(l => efectivo(l).SeAnula()))
+            .Select(g => g.Key)
+            .ToHashSet(StringComparer.Ordinal);
+        return EnviosPorSucursal?.Where(e => sinEnviar.Contains(e.CodigoDeSucursal)).Sum(e => e.Importe) ?? 0m;
     }
 
     /// <summary>
@@ -160,7 +179,7 @@ public sealed partial class Pedido
             MotivoDeAnulacion.CanceladoPorElCliente,
             [.. _lineas.Select(l => l.Id)],
             [],
-            CostoDeEnvio > 0m,
+            CostoDeEnvio,
             Total,
             [.. _lineas.Where(l => l.TrasladoId is not null).Select(l => l.TrasladoId!.Value)]));
     }

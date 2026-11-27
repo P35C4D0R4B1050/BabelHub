@@ -14,7 +14,7 @@ using Microsoft.Net.Http.Headers;
 namespace BabelHub.Ecommerce.Api.Pedidos;
 
 /// <summary>Una fila de un listado de pedidos, lista para pintar: el estado con texto e icono (nunca solo con color) y <b>ningún dato de contacto, cuenta ni usuario</b> (PED-40).</summary>
-public sealed record FilaDePedidoVista(Guid Id, string Numero, string FechaTexto, string EstadoTexto, string EstadoIcono, string TipoTexto, string? Sucursal, string TotalTexto, int Lineas, string RutaDelDetalle);
+public sealed record FilaDePedidoVista(Guid Id, string Numero, string FechaTexto, string EstadoTexto, string EstadoIcono, string TipoTexto, string? SucursalesTexto, string TotalTexto, int Lineas, string RutaDelDetalle);
 
 /// <summary>Un listado de pedidos con su filtro por estado, sus páginas, el aviso de la última acción y el estado estándar que reemplaza a la tabla si hace falta.</summary>
 public sealed class ListaDePedidosVista : ModeloBaseDePagina
@@ -63,7 +63,8 @@ public sealed record LineaDePedidoVista(
     string? ListoTexto,
     string? EntregadaTexto,
     string? AnuladaTexto,
-    bool Operable);
+    bool Operable,
+    string? SucursalTexto = null);
 
 /// <summary>El contacto de entrega: solo lo ven el titular y el personal autorizado (la lectura del personal se audita); nunca se escribe en un registro ni en un aviso.</summary>
 public sealed record ContactoDelPedidoVista(string Nombre, string Telefono, string Direccion)
@@ -110,7 +111,7 @@ public sealed class DetalleDePedidoVista : ModeloBaseDePagina
     /// <summary>El pedido es a domicilio (lo dice el tipo de entrega del contrato, no la región): solo entonces tiene seguimiento de envío.</summary>
     public bool EsADomicilio { get; set; }
 
-    /// <summary>Se muestra la sucursal de origen de cada línea: solo al personal y al encargado, no al titular (minimización de datos).</summary>
+    /// <summary>Se muestra la sucursal de origen de una línea cuando no es la que la atiende (un traslado): solo al personal y al encargado, no al titular (minimización de datos).</summary>
     public bool MostrarLaFuente { get; set; } = true;
 
     public string RutaDeLaLista { get; set; } = string.Empty;
@@ -539,7 +540,9 @@ public abstract class ControladorDePedidos(ContextoDePagina pagina, OpcionesDeEr
         vista.Pedidos = [.. resultado.Pedidos.Select(p =>
         {
             var (estado, icono) = TextosDePedidos.Estado(p.Estado);
-            return new FilaDePedidoVista(p.PedidoId, p.Numero, FormatoPeruano.FechaYHora(p.CreadoEn), estado, icono, TextosDePedidos.Tipo(p.TipoDeEntrega), p.CodigoDeSucursalDeRecojo, FormatoPeruano.Soles(p.Total), p.CantidadDeLineas, rutaDelDetalle(p.PedidoId));
+            var codigos = p.CodigosDeSucursales is { Count: > 0 } suyas ? suyas : p.CodigoDeSucursalDeRecojo is { } comun ? [comun] : [];
+            var sucursales = codigos.Count == 0 ? null : string.Join(", ", codigos.Select(c => NombreDeSucursal(vista, c)));
+            return new FilaDePedidoVista(p.PedidoId, p.Numero, FormatoPeruano.FechaYHora(p.CreadoEn), estado, icono, TextosDePedidos.Tipo(p.TipoDeEntrega), sucursales, FormatoPeruano.Soles(p.Total), p.CantidadDeLineas, rutaDelDetalle(p.PedidoId));
         })];
         if (resultado.Total == 0 || resultado.Pedidos.Count == 0)
         {
@@ -563,9 +566,9 @@ public abstract class ControladorDePedidos(ContextoDePagina pagina, OpcionesDeEr
         vista.EstadoIcono = icono;
         vista.TipoTexto = TextosDePedidos.Tipo(resumen.TipoDeEntrega);
         vista.EsADomicilio = resumen.TipoDeEntrega == TipoDeEntregaVisible.Domicilio;
-        vista.Sucursal = resumen.CodigoDeSucursalDeRecojo;
+        vista.Sucursal = resumen.CodigoDeSucursalDeRecojo is { } comun ? NombreDeSucursal(vista, comun) : null;
         vista.TotalTexto = FormatoPeruano.Soles(resumen.Total);
-        vista.Lineas = LineasComoVista(lineas);
+        vista.Lineas = LineasComoVista(lineas, codigo => NombreDeSucursal(vista, codigo));
         vista.RutaDeLaLista = rutaDeLaLista;
         vista.RutaDelDetalle = rutaDelDetalle;
         // Un aviso de «cancelado» o «anulado» solo se muestra si el pedido lo está: un enlace con `?hecho=` no puede afirmar lo que no pasó.
@@ -586,7 +589,11 @@ public abstract class ControladorDePedidos(ContextoDePagina pagina, OpcionesDeEr
         return vista;
     }
 
-    protected static IReadOnlyList<LineaDePedidoVista> LineasComoVista(IReadOnlyList<LineaVisibleDelPedido> lineas) =>
+    /// <summary>El nombre de la sucursal si la página trae la lista de sucursales (la tienda); si no, o si ya no figura, su código.</summary>
+    private static string NombreDeSucursal(ModeloBaseDePagina vista, string codigo) =>
+        vista.Sucursales.FirstOrDefault(s => string.Equals(s.Codigo, codigo, StringComparison.Ordinal))?.Nombre ?? codigo;
+
+    protected static IReadOnlyList<LineaDePedidoVista> LineasComoVista(IReadOnlyList<LineaVisibleDelPedido> lineas, Func<string, string> nombreDeSucursal) =>
     [
         .. lineas.Select(l =>
         {
@@ -607,11 +614,12 @@ public abstract class ControladorDePedidos(ContextoDePagina pagina, OpcionesDeEr
                 estado,
                 icono,
                 traslado,
-                l.CodigoDeFuente,
+                l.CodigoDeFuente == l.CodigoDeSucursal ? null : l.CodigoDeFuente,
                 l.ListoEn is { } listo ? FormatoPeruano.FechaYHora(listo) : null,
                 l.EntregadaEn is { } entregada ? FormatoPeruano.FechaYHora(entregada) : null,
                 l.AnuladaEn is { } anulada ? FormatoPeruano.FechaYHora(anulada) : null,
-                l.Operable);
+                l.Operable,
+                l.CodigoDeSucursal is { } sucursal ? nombreDeSucursal(sucursal) : null);
         }),
     ];
 

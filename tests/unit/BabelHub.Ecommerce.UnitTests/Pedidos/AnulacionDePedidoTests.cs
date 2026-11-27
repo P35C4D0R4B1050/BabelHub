@@ -156,7 +156,7 @@ public sealed class AnulacionDePedidoTests
         pedido.MarcarListas([cusco.Id], Inicio);
         pedido.DespacharLineas([cusco.Id], Inicio);
         var digital = De(pedido, "Digital");
-        var plan = new PlanDeAnulacion(OrigenDeLaAnulacion.Administracion, MotivoDeAnulacion.Otro, [De(pedido, "Ayacucho").Id], [digital.Id], false, 70m, []);
+        var plan = new PlanDeAnulacion(OrigenDeLaAnulacion.Administracion, MotivoDeAnulacion.Otro, [De(pedido, "Ayacucho").Id], [digital.Id], 0m, 70m, []);
 
         pedido.AplicarAnulacion(plan, Inicio);
 

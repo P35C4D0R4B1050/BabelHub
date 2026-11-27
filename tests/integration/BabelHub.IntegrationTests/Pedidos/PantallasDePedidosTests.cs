@@ -196,6 +196,15 @@ public sealed class PantallasDePedidosTests
         public Task<ListaDeSucursales?> Obtener(CancellationToken cancelacion = default) => Task.FromResult<ListaDeSucursales?>(new ListaDeSucursales([], true));
     }
 
+    private sealed class ListaConSucursales : IListaDeSucursales
+    {
+        public Task<ListaDeSucursales?> Obtener(CancellationToken cancelacion = default) =>
+            Task.FromResult<ListaDeSucursales?>(new ListaDeSucursales([new("ayacucho", "Sucursal Ayacucho"), new("cusco", "Sucursal Cusco")], true));
+    }
+
+    private static LineaVisibleDelPedido DeSucursal(Guid id, string titulo, string sucursal, string? fuente = null) =>
+        Linea(id, titulo) with { CodigoDeSucursal = sucursal, CodigoDeFuente = fuente ?? sucursal };
+
     // ---------- Anfitriones y llamadas ----------
 
     private static async Task<AnfitrionWeb> Iniciar(RolWeb rol, HostWeb host, Action<IServiceCollection> servicios) =>
@@ -723,5 +732,53 @@ public sealed class PantallasDePedidosTests
         {
             Assert.Contains(texto, html, StringComparison.Ordinal);
         }
+    }
+
+    // ---------- La sucursal de cada línea (T47) ----------
+
+    private static ResumenDePedido PorSucursal(params string[] sucursales) => Resumen() with { CodigoDeSucursalDeRecojo = null, CodigosDeSucursales = sucursales };
+
+    [Fact]
+    [Trait("Criterio", "AC-PED-36")]
+    public async Task El_titular_ve_en_el_detalle_y_en_la_lista_la_sucursal_que_atiende_cada_linea_con_su_nombre()
+    {
+        var resumen = PorSucursal("cusco", "ayacucho");
+        var falso = new PedidosDelClienteFalso
+        {
+            Lista = Resultado<PaginaDePedidos>.Exito(new PaginaDePedidos([resumen], 1, 20, 1)),
+            Detalle = Resultado<DetalleDelPedidoDelCliente>.Exito(new DetalleDelPedidoDelCliente(
+                resumen, 0m, null, [DeSucursal(LineaA, "El de Cusco", "cusco"), DeSucursal(LineaB, "El de Ayacucho", "ayacucho")], null, false, AlternativaDeCancelacion.Ninguna, null)),
+        };
+        await using var anfitrion = await Iniciar(RolWeb.Cliente, HostWeb.Tienda, s =>
+        {
+            s.AddSingleton<IPedidosDelCliente>(falso);
+            s.AddSingleton<IListaDeSucursales>(new ListaConSucursales());
+        });
+
+        var (_, lista) = await Pedir(anfitrion, "/cuenta/pedidos", HostWeb.Tienda);
+        var (_, detalle) = await Pedir(anfitrion, $"/cuenta/pedidos/{Pedido:D}", HostWeb.Tienda);
+
+        Assert.Contains("Atiende: Sucursal Cusco, Sucursal Ayacucho", lista, StringComparison.Ordinal);
+        Assert.Matches(@"(?s)El de Cusco.*?Atiende: Sucursal Cusco.*?El de Ayacucho.*?Atiende: Sucursal Ayacucho", detalle);
+        Assert.DoesNotContain("Sucursal de origen", detalle, StringComparison.Ordinal);
+        Assert.DoesNotContain("Sucursal de recojo</dt>", detalle, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PED-37")]
+    public async Task El_encargado_ve_la_sucursal_de_sus_lineas_y_el_origen_solo_cuando_es_otra()
+    {
+        var falso = new GestionDeRecojoFalsa
+        {
+            Detalle = Resultado<DetalleDelPedidoDeSucursal>.Exito(new DetalleDelPedidoDeSucursal(
+                PorSucursal("ayacucho") with { CodigoDeSucursalDeRecojo = "ayacucho" },
+                [DeSucursal(LineaA, "El propio", "ayacucho"), DeSucursal(LineaB, "El trasladado", "ayacucho", fuente: "cusco")])),
+        };
+        await using var anfitrion = await ComoEncargado(falso);
+
+        var (_, detalle) = await Pedir(anfitrion, $"/sucursal/ayacucho/pedidos/{Pedido:D}", HostWeb.Gestion);
+
+        Assert.Matches(@"(?s)El propio.*?Atiende: ayacucho.*?El trasladado.*?Sucursal de origen cusco.*?Atiende: ayacucho", detalle);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(detalle, "Sucursal de origen"));
     }
 }

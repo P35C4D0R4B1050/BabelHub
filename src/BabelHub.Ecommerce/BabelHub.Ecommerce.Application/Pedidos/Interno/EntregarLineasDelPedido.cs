@@ -85,7 +85,7 @@ internal sealed class EntregarLineasDelPedido(
         // Tiempo 3.
         try
         {
-            return await unidad.Ejecutar(token => CompletarLaEntrega(entrega, token), cancelacion).ConfigureAwait(false);
+            return await unidad.Ejecutar(token => CompletarLaEntrega(entrega, quien.Valor, token), cancelacion).ConfigureAwait(false);
         }
         catch (Exception excepcion) when (excepcion is AuditoriaNoDisponibleException or EsperaDeBloqueoDeUnPedidoAgotadaException)
         {
@@ -103,7 +103,7 @@ internal sealed class EntregarLineasDelPedido(
         ArgumentNullException.ThrowIfNull(entrega);
         try
         {
-            var resultado = await unidad.Ejecutar(token => CompletarLaEntrega(entrega, token), cancelacion).ConfigureAwait(false);
+            var resultado = await unidad.Ejecutar(token => CompletarLaEntrega(entrega, null, token), cancelacion).ConfigureAwait(false);
             return resultado.EsExito ? ResultadoDeReanudarEntrega.Aplicada : resultado.Error!.Clave == ClavesDePedidos.OperacionYaResuelta ? ResultadoDeReanudarEntrega.YaResuelta : ResultadoDeReanudarEntrega.Reintentar;
         }
         catch (Exception excepcion) when (excepcion is not OperationCanceledException)
@@ -120,7 +120,7 @@ internal sealed class EntregarLineasDelPedido(
             return Resultado<Entrega>.Fallo(ajeno);
         }
 
-        if (await autorizador.ComprobarLineas(pedido!, lineaIds, cancelacion).ConfigureAwait(false) is { } lineaAjena)
+        if (await autorizador.ComprobarLineas(pedido!, solicitante, lineaIds, cancelacion).ConfigureAwait(false) is { } lineaAjena)
         {
             return Resultado<Entrega>.Fallo(lineaAjena);
         }
@@ -212,7 +212,7 @@ internal sealed class EntregarLineasDelPedido(
         return null;
     }
 
-    private async Task<Resultado<LineasOperadas>> CompletarLaEntrega(Entrega entrega, CancellationToken cancelacion)
+    private async Task<Resultado<LineasOperadas>> CompletarLaEntrega(Entrega entrega, SolicitanteDePedidos? solicitante, CancellationToken cancelacion)
     {
         var pedido = await pedidos.Obtener(entrega.PedidoId, conBloqueo: true, cancelacion).ConfigureAwait(false)
             ?? throw new InvalidOperationException("El pedido de una entrega en curso no existe.");
@@ -259,9 +259,11 @@ internal sealed class EntregarLineasDelPedido(
             await new AvisosDePedidos(notificador).Solicitar(pedido, "entregado", entrega.Id.ToString("N"), AvisosDePedidos.SucursalesResponsables(pedido, aplicadas), cancelacion).ConfigureAwait(false);
         }
 
+        // La respuesta lleva el estado de las líneas de quien pide (PED-08); la de la reanudación no se muestra a nadie.
+        var suyas = solicitante is null ? pedido.Lineas : await autorizador.LineasDelAlcance(pedido, solicitante, cancelacion).ConfigureAwait(false);
         return Resultado<LineasOperadas>.Exito(new LineasOperadas(
             pedido.Id,
-            ProyeccionesDePedidos.AEstadoVisible(pedido.Estado),
+            ProyeccionesDePedidos.AEstadoVisible(pedido.EstadoDeLasLineas(suyas)),
             [.. entrega.Lineas.Select(l => new ResultadoDeLineaOperada(l.LineaId, aplicadas.Contains(l.LineaId) ? ResultadoVisibleDeLinea.Aplicada : ResultadoVisibleDeLinea.EstadoInvalido))]));
     }
 }

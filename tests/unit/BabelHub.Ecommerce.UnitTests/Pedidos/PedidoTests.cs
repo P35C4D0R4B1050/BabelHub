@@ -193,11 +193,12 @@ public sealed class PedidoTests
     public void Una_edicion_o_una_linea_repetida_o_un_importe_o_total_incoherente_se_rechaza()
     {
         var uno = Impresa();
-        var igualEdicion = uno with { LineaId = Guid.NewGuid() };
+        var digital = Digital();
+        var igualEdicion = digital with { LineaId = Guid.NewGuid() };
         var igualLinea = Impresa() with { LineaId = uno.LineaId };
         var importeMal = uno with { Importe = uno.Importe + 1m };
 
-        Assert.Equal(RechazoDeCrearPedido.LineaRepetida, Pedido.Crear(Datos(TipoDeEntregaDelPedido.Recojo, [uno, igualEdicion], sucursal: "LIM")).Rechazo);
+        Assert.Equal(RechazoDeCrearPedido.LineaRepetida, Pedido.Crear(Datos(TipoDeEntregaDelPedido.Recojo, [uno, digital, igualEdicion], sucursal: "LIM", conReembolso: true)).Rechazo);
         Assert.Equal(RechazoDeCrearPedido.LineaRepetida, Pedido.Crear(Datos(TipoDeEntregaDelPedido.Recojo, [uno, igualLinea], sucursal: "LIM")).Rechazo);
         Assert.Equal(RechazoDeCrearPedido.LineaInvalida, Pedido.Crear(Datos(TipoDeEntregaDelPedido.Recojo, [importeMal], sucursal: "LIM")).Rechazo);
         Assert.Equal(RechazoDeCrearPedido.TotalIncoherente, Pedido.Crear(Datos(TipoDeEntregaDelPedido.Recojo, [uno], sucursal: "LIM", total: 1m)).Rechazo);
@@ -217,7 +218,7 @@ public sealed class PedidoTests
     [Fact]
     public void La_entrega_debe_ser_coherente_con_las_lineas_y_con_la_sucursal_o_la_region()
     {
-        Assert.Equal(RechazoDeCrearPedido.EntregaIncoherente, Pedido.Crear(Datos(TipoDeEntregaDelPedido.Recojo, [Impresa()], sucursal: null)).Rechazo);
+        Assert.Equal(RechazoDeCrearPedido.EntregaIncoherente, Pedido.Crear(Datos(TipoDeEntregaDelPedido.Recojo, [Impresa()], sucursal: "LIM", region: "ayacucho")).Rechazo);
         Assert.Equal(RechazoDeCrearPedido.EntregaIncoherente, Pedido.Crear(Datos(TipoDeEntregaDelPedido.Domicilio, [Impresa()], envio: 12m, contacto: Contacto(), region: null)).Rechazo);
         Assert.Equal(RechazoDeCrearPedido.EntregaIncoherente, Pedido.Crear(Datos(TipoDeEntregaDelPedido.Digital, [Impresa()], conReembolso: true)).Rechazo);
         Assert.Equal(RechazoDeCrearPedido.EntregaIncoherente, Pedido.Crear(Datos(TipoDeEntregaDelPedido.Recojo, [Digital()], sucursal: "LIM", conReembolso: true)).Rechazo);

@@ -44,7 +44,8 @@ public sealed record DatosPersistidosDePedido(
     AceptacionDeTexto Terminos,
     AceptacionDeTexto Privacidad,
     AceptacionDeTexto? ReembolsoDigital,
-    IReadOnlyList<DatosPersistidosDeLinea> Lineas)
+    IReadOnlyList<DatosPersistidosDeLinea> Lineas,
+    IReadOnlyList<EnvioDeSucursal>? EnviosPorSucursal = null)
 {
     public override string ToString() => $"DatosPersistidosDePedido {{ Id = {Id} }}";
 }
@@ -77,7 +78,7 @@ public sealed partial class Anulacion
         OrigenDeLaAnulacion origen,
         MotivoDeAnulacion motivo,
         IniciadorDeOperacion iniciador,
-        bool incluyeEnvio,
+        decimal envio,
         decimal monto,
         bool hayDigitales,
         IEnumerable<Guid> lineaIds,
@@ -94,7 +95,7 @@ public sealed partial class Anulacion
         Origen = origen;
         Motivo = motivo;
         Iniciador = iniciador;
-        IncluyeEnvio = incluyeEnvio;
+        Envio = envio;
         Monto = monto;
         HayDigitales = hayDigitales;
         _lineaIds = [.. lineaIds];
@@ -117,7 +118,7 @@ public sealed partial class Anulacion
         OrigenDeLaAnulacion origen,
         MotivoDeAnulacion motivo,
         IniciadorDeOperacion iniciador,
-        bool incluyeEnvio,
+        decimal envio,
         decimal monto,
         bool hayDigitales,
         IEnumerable<Guid> lineaIds,
@@ -128,7 +129,7 @@ public sealed partial class Anulacion
         int intentos,
         DateTimeOffset? proximoIntentoEn,
         IReadOnlyDictionary<PasoDeAnulacion, DateTimeOffset> pasos) =>
-        new(id, pedidoId, origen, motivo, iniciador, incluyeEnvio, monto, hayDigitales, lineaIds, estado, reembolsoId, creadaEn, completadaEn, intentos, proximoIntentoEn, pasos);
+        new(id, pedidoId, origen, motivo, iniciador, envio, monto, hayDigitales, lineaIds, estado, reembolsoId, creadaEn, completadaEn, intentos, proximoIntentoEn, pasos);
 }
 
 public sealed partial class Entrega

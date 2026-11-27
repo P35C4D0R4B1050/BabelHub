@@ -39,7 +39,8 @@ internal static class IntencionesDePrueba
             Texto(),
             Texto(),
             Texto(),
-            Contacto());
+            Contacto(),
+            [new EnvioDeSucursalDeIntencion("ayacucho", Importe.De(envio))]);
 
     /// <summary>Una compra solo digital de S/ 25, sin envío ni contacto.</summary>
     public static InstantaneaDeIntencion SoloDigital(string huella = "huella-d") =>

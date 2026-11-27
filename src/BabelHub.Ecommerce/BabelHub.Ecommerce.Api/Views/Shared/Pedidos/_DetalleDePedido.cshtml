@@ -78,6 +78,10 @@
                                         @if (linea.Isbn is not null) { <text> · ISBN @linea.Isbn</text> }
                                         @if (Model.MostrarLaFuente && linea.FuenteTexto is not null) { <text> · Sucursal de origen @linea.FuenteTexto</text> }
                                     </div>
+                                    @if (linea.SucursalTexto is not null)
+                                    {
+                                        <div class="mt-1 text-xs"><bh-icono nombre="sucursal" clase="size-3.5" /> Atiende: @linea.SucursalTexto</div>
+                                    }
                                 </th>
                                 <td class="align-top text-right tabular-nums">@linea.Cantidad</td>
                                 <td class="align-top text-right tabular-nums">

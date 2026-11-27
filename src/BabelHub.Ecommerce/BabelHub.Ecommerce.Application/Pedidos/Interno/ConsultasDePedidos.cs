@@ -54,7 +54,10 @@ internal sealed class ConsultasDePedidos(
         var tamano = Math.Clamp(filtro.Tamano, 1, FiltroDePedidos.TamanoMaximo);
         var criterio = alcance(quien.Valor) with { Estado = filtro.Estado is { } e ? ProyeccionesDePedidos.AEstadoDeDominio(e) : null, Pagina = pagina, Tamano = tamano };
         var resultado = await pedidos.Listar(criterio, cancelacion).ConfigureAwait(false);
-        return Resultado<PaginaDePedidos>.Exito(new PaginaDePedidos([.. resultado.Pedidos.Select(ProyeccionesDePedidos.Resumen)], pagina, tamano, resultado.Total));
+        var filas = resultado.Pedidos.Select(p => criterio.CodigoDeSucursalDelEncargado is { } suya
+            ? ProyeccionesDePedidos.ResumenDeLaSucursal(p, suya, [.. p.Lineas.Where(l => p.SucursalDeLaLinea(l) == suya)])
+            : ProyeccionesDePedidos.Resumen(p));
+        return Resultado<PaginaDePedidos>.Exito(new PaginaDePedidos([.. filas], pagina, tamano, resultado.Total));
     }
 
     // ---------- Detalles ----------
@@ -78,19 +81,26 @@ internal sealed class ConsultasDePedidos(
             ProyeccionesDePedidos.Resumen(pedido),
             pedido.CostoDeEnvio,
             pedido.RegionDeEntrega,
-            [.. pedido.Lineas.Select(ProyeccionesDePedidos.Linea)],
+            ProyeccionesDePedidos.Lineas(pedido, pedido.Lineas),
             ProyeccionesDePedidos.Contacto(pedido),
             plan.EsValido,
             alternativa,
             await ReembolsoPendiente(pedido, cancelacion).ConfigureAwait(false)));
     }
 
+    /// <summary>El detalle para el encargado (PED-08): solo las líneas de su sucursal, con el estado y el importe derivados de ellas y sin el envío.</summary>
     public async Task<Resultado<DetalleDelPedidoDeSucursal>> ObtenerParaLaSucursal(string codigoDeSucursal, Guid pedidoId, CancellationToken cancelacion)
     {
-        var (pedido, error) = await Cargar(OperacionDePedidos.GestionDeRecojo, pedidoId, codigoDeSucursal ?? string.Empty, cancelacion).ConfigureAwait(false);
-        return pedido is null
-            ? Resultado<DetalleDelPedidoDeSucursal>.Fallo(error!)
-            : Resultado<DetalleDelPedidoDeSucursal>.Exito(new DetalleDelPedidoDeSucursal(ProyeccionesDePedidos.Resumen(pedido), [.. pedido.Lineas.Select(ProyeccionesDePedidos.Linea)]));
+        var (pedido, error, solicitante) = await CargarConSolicitante(OperacionDePedidos.GestionDeRecojo, pedidoId, codigoDeSucursal ?? string.Empty, cancelacion).ConfigureAwait(false);
+        if (pedido is null)
+        {
+            return Resultado<DetalleDelPedidoDeSucursal>.Fallo(error!);
+        }
+
+        var suyas = await autorizador.LineasDelAlcance(pedido, solicitante!, cancelacion).ConfigureAwait(false);
+        return Resultado<DetalleDelPedidoDeSucursal>.Exito(new DetalleDelPedidoDeSucursal(
+            ProyeccionesDePedidos.ResumenDeLaSucursal(pedido, codigoDeSucursal!.Trim(), suyas),
+            ProyeccionesDePedidos.Lineas(pedido, suyas)));
     }
 
     /// <summary>El detalle de logística o de la administración central: con el contacto auditado, que falla cerrado (D09).</summary>
@@ -119,7 +129,7 @@ internal sealed class ConsultasDePedidos(
             ProyeccionesDePedidos.Resumen(pedido),
             pedido.CostoDeEnvio,
             pedido.RegionDeEntrega,
-            [.. pedido.Lineas.Select(ProyeccionesDePedidos.Linea)],
+            ProyeccionesDePedidos.Lineas(pedido, pedido.Lineas),
             contacto,
             oculto,
             await ReembolsoPendiente(pedido, cancelacion).ConfigureAwait(false),
@@ -227,14 +237,31 @@ internal static class ProyeccionesDePedidos
         Tipo(pedido.Tipo),
         pedido.CodigoDeSucursalDeRecojo,
         pedido.Total,
-        pedido.Lineas.Count);
+        pedido.Lineas.Count,
+        Sucursales(pedido, pedido.Lineas));
+
+    /// <summary>Las sucursales que atienden las líneas pedidas, en el orden en que aparecen; ninguna para las digitales.</summary>
+    private static IReadOnlyList<string> Sucursales(Pedido pedido, IReadOnlyList<LineaDePedido> lineas) =>
+        [.. lineas.Select(pedido.SucursalDeLaLinea).OfType<string>().Distinct(StringComparer.Ordinal)];
 
     public static EstadoVisibleDeLaLinea EstadoVisible(LineaDePedido linea) =>
         linea.EsDigital
             ? linea.EstadoDigital == EstadoDeLineaDigital.Disponible ? EstadoVisibleDeLaLinea.DisponibleEnLaBiblioteca : EstadoVisibleDeLaLinea.Anulado
             : Enum.Parse<EstadoVisibleDeLaLinea>(linea.EstadoImpreso!.Value.ToString());
 
-    public static LineaVisibleDelPedido Linea(LineaDePedido linea) => new(
+    /// <summary>La fila y la cabecera que ve el encargado (PED-08): el estado, el importe y la cantidad de las líneas de su sucursal, sin envío.</summary>
+    public static ResumenDePedido ResumenDeLaSucursal(Pedido pedido, string codigoDeSucursal, IReadOnlyList<LineaDePedido> suyas) => Resumen(pedido) with
+    {
+        Estado = AEstadoVisible(pedido.EstadoDeLasLineas(suyas)),
+        CodigoDeSucursalDeRecojo = codigoDeSucursal,
+        Total = suyas.Sum(l => l.Importe),
+        CantidadDeLineas = suyas.Count,
+        CodigosDeSucursales = Sucursales(pedido, suyas),
+    };
+
+    public static IReadOnlyList<LineaVisibleDelPedido> Lineas(Pedido pedido, IReadOnlyList<LineaDePedido> lineas) => [.. lineas.Select(l => Linea(pedido, l))];
+
+    private static LineaVisibleDelPedido Linea(Pedido pedido, LineaDePedido linea) => new(
         linea.Id,
         linea.Titulo,
         linea.Isbn,
@@ -248,7 +275,8 @@ internal static class ProyeccionesDePedidos
         linea.ListoEn,
         linea.EntregadaEn,
         linea.AnuladaEn,
-        Operable: !linea.EsDigital && linea.EstadoImpreso is EstadoDeLineaImpresa.Confirmado or EstadoDeLineaImpresa.EnTransito or EstadoDeLineaImpresa.Recibido or EstadoDeLineaImpresa.EnPreparacion or EstadoDeLineaImpresa.ListoParaRecojo);
+        Operable: !linea.EsDigital && linea.EstadoImpreso is EstadoDeLineaImpresa.Confirmado or EstadoDeLineaImpresa.EnTransito or EstadoDeLineaImpresa.Recibido or EstadoDeLineaImpresa.EnPreparacion or EstadoDeLineaImpresa.ListoParaRecojo,
+        CodigoDeSucursal: pedido.SucursalDeLaLinea(linea));
 
     /// <summary>El traslado mientras la línea lo espera: confirmada o en tránsito, con su fecha estimada («a confirmar» si no hay).</summary>
     private static TrasladoVisible? TrasladoEnCurso(LineaDePedido linea) =>

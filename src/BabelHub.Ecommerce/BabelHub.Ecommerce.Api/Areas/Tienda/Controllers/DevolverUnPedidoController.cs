@@ -9,8 +9,8 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BabelHub.Ecommerce.Api.Areas.Tienda.Controllers;
 
-/// <summary>Un libro impreso que se puede devolver desde el pedido: la cantidad máxima y el último día del plazo.</summary>
-public sealed record ImpresoParaDevolver(Guid LineaId, string Titulo, int Cantidad, string PlazoTexto);
+/// <summary>Una línea impresa que se puede devolver desde el pedido: la cantidad máxima, el último día del plazo y la sucursal que la atendió.</summary>
+public sealed record ImpresoParaDevolver(Guid LineaId, string Titulo, int Cantidad, string PlazoTexto, string? Sucursal = null);
 
 /// <summary>Un libro digital del pedido: el título y el último día de cada plazo (reembolso o reporte).</summary>
 public sealed record DigitalParaDevolver(Guid LineaId, string Titulo, string PlazoDelReembolsoTexto, string PlazoDelReporteTexto);
@@ -65,7 +65,7 @@ public sealed class DevolverUnPedidoController(IPedidosDelCliente pedidos, Conte
         [
             .. resultado.Valor.Lineas
                 .Where(l => !l.EsDigital && l.Estado == EstadoVisibleDeLaLinea.Entregado && l.EntregadaEn is not null)
-                .Select(l => new ImpresoParaDevolver(l.LineaId, l.Titulo, l.Cantidad, FormatoPeruano.FechaYHora(l.EntregadaEn!.Value + PlazoDelImpreso))),
+                .Select(l => new ImpresoParaDevolver(l.LineaId, l.Titulo, l.Cantidad, FormatoPeruano.FechaYHora(l.EntregadaEn!.Value + PlazoDelImpreso), NombreDeSucursal(vista, l.CodigoDeSucursal))),
         ];
         vista.Digitales =
         [
@@ -84,4 +84,8 @@ public sealed class DevolverUnPedidoController(IPedidosDelCliente pedidos, Conte
 
         return View("~/Areas/Tienda/Views/Devoluciones/Devolver.cshtml", vista);
     }
+
+    /// <summary>El nombre de la sucursal que atendió la línea (o su código si ya no figura en la lista): distingue dos líneas de un mismo libro.</summary>
+    private static string? NombreDeSucursal(ModeloBaseDePagina vista, string? codigo) =>
+        codigo is null ? null : vista.Sucursales.FirstOrDefault(s => string.Equals(s.Codigo, codigo, StringComparison.Ordinal))?.Nombre ?? codigo;
 }

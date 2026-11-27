@@ -54,20 +54,17 @@ internal sealed class AvisosDePedidos(INotificador notificador)
     }
 
     /// <summary>
-    /// La sucursal responsable: la de recojo o, a domicilio, la fuente de cada línea de la operación; un pedido solo digital no avisa a ninguna (solo al cliente, PED-05).
+    /// Las sucursales responsables de las líneas impresas de la operación (PED-05): la que atiende cada una (<see cref="Pedido.SucursalDeLaLinea"/>: la de recojo de la línea o, a domicilio, su fuente); un pedido solo digital no avisa a ninguna (solo al cliente).
     /// </summary>
     public static IReadOnlyList<string> SucursalesResponsables(Pedido pedido, IEnumerable<Guid>? lineaIds = null)
     {
         ArgumentNullException.ThrowIfNull(pedido);
-        return pedido.Tipo switch
-        {
-            TipoDeEntregaDelPedido.Recojo when pedido.CodigoDeSucursalDeRecojo is { } codigo => [codigo],
-            TipoDeEntregaDelPedido.Domicilio => [.. pedido.Lineas
-                .Where(l => !l.EsDigital && l.CodigoDeFuente is not null && (lineaIds is null || lineaIds.Contains(l.Id)))
-                .Select(l => l.CodigoDeFuente!)
-                .Distinct(StringComparer.Ordinal)],
-            _ => [],
-        };
+        var pedidas = lineaIds?.ToHashSet();
+        return [.. pedido.Lineas
+            .Where(l => pedidas is null || pedidas.Contains(l.Id))
+            .Select(pedido.SucursalDeLaLinea)
+            .OfType<string>()
+            .Distinct(StringComparer.Ordinal)];
     }
 
     /// <summary>El identificador de una operación sobre varias líneas: una huella estable de sus <c>lineaIds</c> (sin importar el orden).</summary>

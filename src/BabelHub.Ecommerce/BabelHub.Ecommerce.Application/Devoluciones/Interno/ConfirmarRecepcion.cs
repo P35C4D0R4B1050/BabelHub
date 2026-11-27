@@ -77,7 +77,8 @@ internal sealed class ConfirmarRecepcion(
                     }
 
                     reingresoYaConfirmado = devolucion.ReingresoConfirmadoEn is not null;
-                    carga = new ReingresoPorDevolucion(devolucion.Id, devolucion.PedidoId, devolucion.CodigoDeSucursalReceptora!, [.. devolucion.Lineas.Select(l => new LineaDeReingreso(l.EdicionId, l.Cantidad))]);
+                    // El Inventario reingresa por edición: dos líneas de una edición van sumadas, en el mismo orden en cada reintento (la carga es inmutable con su clave).
+                    carga = new ReingresoPorDevolucion(devolucion.Id, devolucion.PedidoId, devolucion.CodigoDeSucursalReceptora!, [.. devolucion.Lineas.GroupBy(l => l.EdicionId).Select(g => new LineaDeReingreso(g.Key, g.Sum(l => l.Cantidad)))]);
                     return true;
                 },
                 cancelacion).ConfigureAwait(false);
