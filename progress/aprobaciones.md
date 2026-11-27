@@ -80,3 +80,4 @@ Una fila por cada spec o plan que el agente aprobó por delegación de la person
 | 2026-11-26 | spec | ecommerce-pagos | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 5 | 88f72448a11782d7 |
 | 2026-11-26 | plan | ecommerce-pagos | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 11 | c13fd6669be6a1af |
 | 2026-11-27 | spec | web-acceso | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 7 | f53d47b4f5e17444 |
+| 2026-11-27 | plan | web-acceso | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 4 | 3a0aa06dd1e1a61b |

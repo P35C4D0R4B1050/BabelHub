@@ -1,9 +1,11 @@
 ---
 id: web-acceso
 titulo: Ayudas de contraseña, acceso del personal y código QR del segundo factor
-estado: Approved
+estado: Planned
 aprobado_por: Claude (delegado por Diego Amiquero)
 aprobado_en: 2026-11-27
+plan_aprobado_por: Claude (delegado por Diego Amiquero)
+plan_aprobado_en: 2026-11-27
 servicio: E-commerce
 prefijo: ACC
 origen: [RNF15, RNF13, RNF25, RF27]
