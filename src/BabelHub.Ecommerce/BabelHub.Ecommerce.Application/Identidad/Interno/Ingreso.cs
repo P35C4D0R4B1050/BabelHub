@@ -134,8 +134,8 @@ public sealed class AvisosDeCuenta(
     /// <summary>El aviso al correo <b>anterior</b> ya aplicado el cambio (IDE-94): una alerta crítica sin enlaces ni el correo nuevo; no la suprime el tope diario por origen de IDE-86, solo la primera de su tipo por cuenta.</summary>    public Task CorreoCambiadoAlAnterior(Usuario usuarioConElCorreoAnterior, CancellationToken cancelacion) => Avisar(usuarioConElCorreoAnterior, PlantillaDeCorreoCambiadoAlAnterior, cancelacion);
     public Task CorreoCambiadoAlAnterior(Usuario usuarioConElCorreoAnterior, CancellationToken cancelacion) => Avisar(usuarioConElCorreoAnterior, PlantillaDeCorreoCambiadoAlAnterior, cancelacion);
 
-    /// <summary>El aviso al titular cuando la administración restablece su segundo factor (IDE-38): sin enlaces ni códigos.</summary>
-    public Task SegundoFactorRestablecido(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeSegundoFactorRestablecido, cancelacion);
+    /// <summary>El aviso al titular cuando se restablece su segundo factor, por la administración (IDE-38) o desde el equipo del servicio (RSF-10): sin enlaces ni códigos. Devuelve si salió por correo en ese momento.</summary>
+    public Task<bool> SegundoFactorRestablecido(Usuario usuario, CancellationToken cancelacion) => Avisar(usuario, PlantillaDeSegundoFactorRestablecido, cancelacion);
 
     /// <summary>Envía el aviso; devuelve verdadero solo si <b>salió</b> (no si se encoló o se suprimió: el plazo de IDE-68 no empieza sin un aviso que el titular haya podido ver, IDE-76).</summary>
     private async Task<bool> Avisar(Usuario usuario, string plantilla, CancellationToken cancelacion)
@@ -329,7 +329,7 @@ public sealed class Ingreso(
         var cuenta = correoValido ? await cuentas.PorCorreo(correo, cancelacion).ConfigureAwait(false) : null;
         var coincide = presentada is not null && await hasher.Verificar(cuenta?.ResumenDeAcceso, presentada, cancelacion).ConfigureAwait(false);
         var ahora = reloj.Ahora;
-        var temporalVencida = cuenta is { DebeCambiarLaTemporal: true, ContrasenaTemporalHasta: { } hasta } && ahora >= hasta;
+        var temporalVencida = cuenta is not null && VigenciaDeLaContrasenaTemporal.Vencida(cuenta.DebeCambiarLaTemporal, cuenta.ContrasenaTemporalHasta, ahora);
         if (cuenta is null || !coincide || !cuenta.Usuario.Activo || cuenta.CanceladaEn is not null || temporalVencida)
         {
             await eventos.IngresoFallido(cuenta?.Usuario.Id, cancelacion).ConfigureAwait(false);
@@ -338,7 +338,27 @@ public sealed class Ingreso(
 
         // La contraseña es correcta: el cupo de ingresos fallidos se devuelve (el segundo factor tiene sus propios límites).
         await limites.Liberar(reserva.Reserva!, cancelacion).ConfigureAwait(false);
-        return Resultado<ResultadoDelIngreso>.Exito(await SiguientePaso(cuenta, creado: null, cancelacion).ConfigureAwait(false));
+
+        // El paso siguiente se decide y se guarda bajo el bloqueo de la cuenta: si las sesiones se cerraron mientras se comprobaba la contraseña (un restablecimiento, un cambio de rol, «cerrar todas») o la contraseña dejó de ser la comprobada (su titular la cambió
+        // conservando su sesión, IDE-44), este ingreso no continúa y ningún desafío calculado con datos anteriores sobrevive (identidad-recuperacion-del-segundo-factor RSF-08).
+        var corteVisto = cuenta.Usuario.SesionesValidasDesde;
+        var resumenVisto = cuenta.ResumenDeAcceso;
+        var siguiente = await unidad.Ejecutar(
+            async ct =>
+            {
+                var actual = await cuentas.PorId(cuenta.Usuario.Id, paraActualizar: true, ct).ConfigureAwait(false);
+                return actual is { CanceladaEn: null, Usuario.Activo: true } && actual.Usuario.SesionesValidasDesde == corteVisto && actual.ResumenDeAcceso == resumenVisto
+                    ? await SiguientePaso(actual, creado: null, ct).ConfigureAwait(false)
+                    : null;
+            },
+            cancelacion).ConfigureAwait(false);
+        if (siguiente is null)
+        {
+            await eventos.IngresoFallido(cuenta.Usuario.Id, cancelacion).ConfigureAwait(false);
+            return Resultado<ResultadoDelIngreso>.Fallo(FallosDeIdentidad.CredencialesInvalidas);
+        }
+
+        return Resultado<ResultadoDelIngreso>.Exito(siguiente);
     }
 
     public async Task<Resultado<ResultadoDelIngreso>> PresentarSegundoFactor(ValorSecreto desafio, ValorSecreto codigo, CancellationToken cancelacion = default)
@@ -464,23 +484,35 @@ public sealed class Ingreso(
             return Resultado<SecretoDelSegundoFactor>.Fallo(FallosDeIdentidad.DesafioInvalido);
         }
 
-        // Un desafío de configuración rezagado no puede reemplazar el secreto de un segundo factor que otro ingreso ya activó (IDE-21).
-        var existente = await segundoFactor.Obtener(cuenta.Usuario.Id, cancelacion).ConfigureAwait(false);
-        if (existente is { Factor.EstaActivo: true })
-        {
-            return Resultado<SecretoDelSegundoFactor>.Fallo(FallosDeIdentidad.DesafioInvalido);
-        }
+        // Bajo el bloqueo de la cuenta y con el desafío todavía vigente: un desafío anulado mientras tanto (un restablecimiento desde el equipo del servicio) no deja un secreto que luego se entregue a su titular (RSF-08).
+        return await unidad.Ejecutar(
+            async ct =>
+            {
+                var actual = await cuentas.PorId(cuenta.Usuario.Id, paraActualizar: true, ct).ConfigureAwait(false);
+                if (actual is not { CanceladaEn: null, Usuario.Activo: true } || await DesafioVigente(desafio, AccionConDesafio.ConfigurarSegundoFactor, ct).ConfigureAwait(false) is null)
+                {
+                    return Resultado<SecretoDelSegundoFactor>.Fallo(FallosDeIdentidad.DesafioInvalido);
+                }
 
-        // Idempotente: un secreto que todavía no se confirmó se entrega igual mientras la persona sigue configurando (una recarga, un código errado o un prefetch no la dejan con la aplicación en un secreto y la pantalla en otro).
-        if (existente is { Factor.Estado: EstadoDelSegundoFactor.SinConfirmar } pendiente)
-        {
-            var guardado = cifrador.Descifrar(pendiente.SecretoCifrado, cuenta.Usuario.Id);
-            return Resultado<SecretoDelSegundoFactor>.Exito(new SecretoDelSegundoFactor(new ValorSecreto(Base32.Codificar(guardado)), Emisor, cuenta.Usuario.Correo));
-        }
+                // Un desafío de configuración rezagado no puede reemplazar el secreto de un segundo factor que otro ingreso ya activó (IDE-21).
+                var existente = await segundoFactor.Obtener(actual.Usuario.Id, ct).ConfigureAwait(false);
+                if (existente is { Factor.EstaActivo: true })
+                {
+                    return Resultado<SecretoDelSegundoFactor>.Fallo(FallosDeIdentidad.DesafioInvalido);
+                }
 
-        var secreto = secretos.SecretoDelSegundoFactor();
-        await segundoFactor.GuardarSinConfirmar(cuenta.Usuario.Id, cifrador.Cifrar(secreto, cuenta.Usuario.Id), cancelacion).ConfigureAwait(false);
-        return Resultado<SecretoDelSegundoFactor>.Exito(new SecretoDelSegundoFactor(new ValorSecreto(Base32.Codificar(secreto)), Emisor, cuenta.Usuario.Correo));
+                // Idempotente: un secreto que todavía no se confirmó se entrega igual mientras la persona sigue configurando (una recarga, un código errado o un prefetch no la dejan con la aplicación en un secreto y la pantalla en otro).
+                if (existente is { Factor.Estado: EstadoDelSegundoFactor.SinConfirmar } pendiente)
+                {
+                    var guardado = cifrador.Descifrar(pendiente.SecretoCifrado, actual.Usuario.Id);
+                    return Resultado<SecretoDelSegundoFactor>.Exito(new SecretoDelSegundoFactor(new ValorSecreto(Base32.Codificar(guardado)), Emisor, actual.Usuario.Correo));
+                }
+
+                var secreto = secretos.SecretoDelSegundoFactor();
+                await segundoFactor.GuardarSinConfirmar(actual.Usuario.Id, cifrador.Cifrar(secreto, actual.Usuario.Id), ct).ConfigureAwait(false);
+                return Resultado<SecretoDelSegundoFactor>.Exito(new SecretoDelSegundoFactor(new ValorSecreto(Base32.Codificar(secreto)), Emisor, actual.Usuario.Correo));
+            },
+            cancelacion).ConfigureAwait(false);
     }
 
     public async Task<Resultado<ResultadoDelIngreso>> ConfirmarElSegundoFactor(ValorSecreto desafio, ValorSecreto codigo, CancellationToken cancelacion = default)
@@ -549,7 +581,7 @@ public sealed class Ingreso(
         var vigente = await DesafioVigente(desafio, AccionConDesafio.CambiarContrasenaTemporal, cancelacion).ConfigureAwait(false);
         var cuenta = vigente is null ? null : await cuentas.PorId(vigente.UsuarioId, cancelacion: cancelacion).ConfigureAwait(false);
         var ahora = reloj.Ahora;
-        if (cuenta is not { CanceladaEn: null, Usuario.Activo: true, DebeCambiarLaTemporal: true } || (cuenta.ContrasenaTemporalHasta is { } hasta && ahora >= hasta))
+        if (cuenta is not { CanceladaEn: null, Usuario.Activo: true, DebeCambiarLaTemporal: true } || VigenciaDeLaContrasenaTemporal.Vencida(cuenta.DebeCambiarLaTemporal, cuenta.ContrasenaTemporalHasta, ahora))
         {
             return Resultado<ResultadoDelIngreso>.Fallo(FallosDeIdentidad.DesafioInvalido);
         }

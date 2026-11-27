@@ -194,6 +194,9 @@ internal sealed class RepositorioDeCuentasEnMemoria(BdIdentidad bd) : IRepositor
         return Task.CompletedTask;
     }
 
+    public Task<IReadOnlyList<CuentaDeIdentidad>> BloquearLasAdministraciones(CancellationToken cancelacion = default) =>
+        Task.FromResult<IReadOnlyList<CuentaDeIdentidad>>([.. bd.Cuentas.Values.Where(c => c.Usuario.Rol == RolDeUsuario.AdministradorCentral).OrderBy(c => c.Usuario.Id)]);
+
     /// <summary>Si se fija, simula que la lectura bajo bloqueo ve ese número de administradores activos (una desactivación simultánea ya ocurrió).</summary>
     public int? ForzarAdministradoresActivos { get; set; }
 
@@ -294,6 +297,14 @@ internal sealed class DesafiosEnMemoria(BdIdentidad bd) : IRepositorioDeDesafios
         bd.Desafios.RemoveAll(d => d.Desafio.Id == desafioId);
         bd.Desafios.Add((DesafioDeIngreso.Restaurar(entrada.Desafio.Id, entrada.Desafio.UsuarioId, entrada.Desafio.Modo, entrada.Desafio.Creado, usado: true), entrada.Huella));
         return Task.FromResult(true);
+    }
+
+    public async Task AnularLosDelUsuario(Guid usuarioId, CancellationToken cancelacion = default)
+    {
+        foreach (var (desafio, _) in bd.Desafios.Where(d => d.Desafio.UsuarioId == usuarioId && !d.Desafio.Usado).ToList())
+        {
+            await MarcarUsado(desafio.Id, cancelacion);
+        }
     }
 }
 

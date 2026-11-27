@@ -15,7 +15,7 @@ public static class PlantillasDeCorreoDeSeguridad
     public static IReadOnlyDictionary<string, PlantillaDeCorreo> DeLaCuenta { get; } = new Dictionary<string, PlantillaDeCorreo>(StringComparer.Ordinal)
     {
         ["contrasena-cambiada"] = new("BabelHub: cambió la contraseña de tu cuenta", Cuerpo("La contraseña de tu cuenta se cambió hace un momento.")),
-        ["segundo-factor-restablecido"] = new("BabelHub: se restableció tu verificación en dos pasos", Cuerpo("La administración restableció la verificación en dos pasos de tu cuenta. Tendrás que configurarla de nuevo la próxima vez que ingreses.")),
+        ["segundo-factor-restablecido"] = new("BabelHub: se restableció tu verificación en dos pasos", Cuerpo("Se restableció la verificación en dos pasos de tu cuenta. Tendrás que configurarla de nuevo la próxima vez que ingreses. Si no pediste este cambio, ingresa cuanto antes, cambia tu contraseña y avisa a la administración de BabelHub o a quien opera la instalación.")),
         ["cambio-de-correo-no-reconocido"] = new("BabelHub: se pidió cambiar el correo de tu cuenta", Cuerpo("Se pidió cambiar el correo de tu cuenta desde un dispositivo o una región que no reconocemos. El cambio queda pendiente: puedes rechazarlo desde tu cuenta.")),
         ["correo-cambiado"] = new("BabelHub: este es ahora el correo de tu cuenta", Cuerpo("El correo de tu cuenta de BabelHub se cambió a esta dirección.")),
         ["correo-anterior-cambiado"] = new("BabelHub: se cambió el correo de tu cuenta", Cuerpo("El correo de tu cuenta de BabelHub se cambió y esta dirección ya no es la de tu cuenta. Si no fuiste tú, avisa a la administración de BabelHub cuanto antes.")),

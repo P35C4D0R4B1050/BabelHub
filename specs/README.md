@@ -46,6 +46,7 @@ dotnet run --project tools/SpecCheck -- --write-matrix  # regenera TRACEABILITY.
 | `inventario-traslados` | Inventario | TRA | `inventario-fuentes`, `inventario-seleccion-fuente`, `identidad-seguridad`, `transversal-auditoria`, `transversal-notificaciones` |
 | `identidad-seguridad` | E-commerce | IDE | `transversal-auditoria`, `transversal-seguridad` |
 | `transversal-notificaciones` | Transversal | NOT | `identidad-seguridad`, `transversal-seguridad` |
+| `identidad-recuperacion-del-segundo-factor` | E-commerce | RSF | `identidad-seguridad`, `transversal-auditoria`, `transversal-plataforma` |
 | `ecommerce-catalogo` | E-commerce | CAT | `inventario-fuentes`, `inventario-ajustes`, `transversal-auditoria` |
 | `ecommerce-carrito-checkout` | E-commerce | CAR | `ecommerce-catalogo`, `inventario-seleccion-fuente`, `identidad-seguridad`, `transversal-seguridad` |
 | `ecommerce-pagos` | E-commerce | PAG | `ecommerce-carrito-checkout`, `identidad-seguridad`, `inventario-seleccion-fuente`, `transversal-auditoria` |

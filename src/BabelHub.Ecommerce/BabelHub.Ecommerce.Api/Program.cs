@@ -20,6 +20,12 @@ if (args.Length > 0 && args[0] == ModoCrearAdministrador.Argumento)
     return await ModoCrearAdministrador.Ejecutar(args[1..], Console.Out, Console.Error);
 }
 
+// El modo restablecer-segundo-factor (identidad-recuperacion-del-segundo-factor): restablece el segundo factor de la única administración, sin tocar su contraseña; en Staging y Production.
+if (args.Length > 0 && args[0] == ModoRestablecerSegundoFactor.Argumento)
+{
+    return await ModoRestablecerSegundoFactor.Ejecutar(args[1..], Console.Out, Console.Error);
+}
+
 // La orden de operación cargar-catalogo (transversal-carga-inicial): carga obras, ediciones, descripciones, precios y portadas por los casos de uso del Catálogo con el modo Operacion; no abre puertos ni arranca el servidor.
 if (args.Length > 0 && args[0] == ModoCargarCatalogo.Argumento)
 {

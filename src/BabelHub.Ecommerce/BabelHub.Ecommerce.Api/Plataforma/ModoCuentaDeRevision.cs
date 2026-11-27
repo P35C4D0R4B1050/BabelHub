@@ -5,12 +5,12 @@ using BabelHub.Ecommerce.Infrastructure.Plataforma;
 namespace BabelHub.Ecommerce.Api.Plataforma;
 
 /// <summary>
-/// El anfitrión de los modos de consola de operación (<c>cuenta-de-prueba</c> y <c>crear-administrador</c>): comprueba el entorno <b>antes</b> de construir nada, construye el servicio con la configuración de su propio entorno (sin arrancar el servidor ni los
-/// trabajos de fondo), fija el actor «sistema» y ejecuta la operación. Nunca imprime un secreto ni una traza: una configuración incompleta nombra la variable; otra falla solo muestra el tipo.
+/// El anfitrión de los modos de consola de operación (<c>cuenta-de-prueba</c>, <c>crear-administrador</c> y <c>restablecer-segundo-factor</c>): comprueba el entorno <b>antes</b> de construir nada, construye el servicio con la configuración de su propio entorno (sin arrancar el servidor ni los
+/// trabajos de fondo), fija el actor «sistema» y ejecuta la operación. Nunca imprime un secreto ni una traza: una configuración incompleta nombra la variable; otra falla solo muestra el tipo. Con <c>silenciarRegistros</c>, ningún registro de la composición ni de la operación llega a la consola.
 /// </summary>
 internal static class AnfitrionDeConsola
 {
-    public static async Task<int> Ejecutar(string nombreDelModo, string? entorno, Func<string, bool> entornoPermitido, string dondeExiste, TextWriter error, Func<IServiceProvider, string, Task<int>> operacion)
+    public static async Task<int> Ejecutar(string nombreDelModo, string? entorno, Func<string, bool> entornoPermitido, string dondeExiste, TextWriter error, Func<IServiceProvider, string, Task<int>> operacion, bool silenciarRegistros = false)
     {
         var builder = WebApplication.CreateBuilder(entorno is null ? new WebApplicationOptions() : new WebApplicationOptions { EnvironmentName = entorno });
         var nombreDelEntorno = builder.Environment.EnvironmentName;
@@ -23,6 +23,11 @@ internal static class AnfitrionDeConsola
         try
         {
             builder.Configuration.AddEnvironmentVariables(prefix: "BABELHUB__");
+            if (silenciarRegistros)
+            {
+                builder.Logging.ClearProviders();
+            }
+
             builder.Services.AddControllersWithViews();
             builder.Services.AddSingleton(typeof(ModoDeArranque), ModoDeArranque.Normal);
             builder.AgregarEcommerce(ModoDeArranque.Normal);
@@ -37,9 +42,9 @@ internal static class AnfitrionDeConsola
             await error.WriteLineAsync($"{nombreDelModo}: " + e.Message).ConfigureAwait(false);
             return 1;
         }
-        catch (Exception e) when (e is not OperationCanceledException)
+        catch (Exception e)
         {
-            // La configuración incompleta nombra la variable (nunca su valor); otra falla (la red, la base) solo muestra el tipo: el mensaje puede traer nombres de objetos.
+            // También una cancelación por el plazo de una dependencia: nadie cancela una orden de consola con un testigo, y su traza no debe salir. La configuración incompleta nombra la variable (nunca su valor); otra falla (la red, la base) solo muestra el tipo: el mensaje puede traer nombres de objetos.
             var detalle = e is ConfiguracionDeSecretosInvalidaException cfg ? ": " + string.Join("; ", cfg.Problemas) : string.Empty;
             await error.WriteLineAsync($"{nombreDelModo}: no se pudo completar (" + e.GetType().Name + ")" + detalle).ConfigureAwait(false);
             return 1;

@@ -942,7 +942,7 @@ El simulador **se conserva** para las pruebas con personas: recorren la compra c
 
 #### El primer administrador, varias cuentas de prueba y la purga
 
-Todos son comandos de consola de la imagen del E-commerce, con el mismo `docker compose … run --rm --no-deps --no-TTY ecommerce <comando>` de arriba (en **[VM-VENTAS]**). Cada contraseña se muestra **una sola vez** y no queda en ningún archivo ni registro (cópiala al momento a tu gestor de contraseñas; el comando no lleva la contraseña, así que el historial del shell no la guarda, pero sí el correo). Si cortas el comando a medias y queda un contenedor, quítalo con `docker rm -f <nombre>` y repite.
+Todos son comandos de consola de la imagen del E-commerce, con el mismo `docker compose … run --rm --no-deps --no-TTY ecommerce <comando>` de arriba (en **[VM-VENTAS]**). Cada contraseña se muestra **una sola vez** y no queda en ningún archivo ni registro (cópiala al momento a tu gestor de contraseñas; el comando no lleva la contraseña, así que el historial del shell no la guarda, pero sí el correo, y `sudo` anota además la línea completa en el registro de autenticación de la VM). Si cortas el comando a medias y queda un contenedor, quítalo con `docker rm -f <nombre>` y repite.
 
 | Qué | Comando | Dónde vale |
 | :--- | :--- | :--- |
@@ -950,8 +950,21 @@ Todos son comandos de consola de la imagen del E-commerce, con el mismo `docker 
 | Varias cuentas de cliente **para las pruebas con personas** (de 1 a 20) | `cuenta-de-prueba --cantidad 5` → `persona-01@example.test` … `persona-05@example.test`, cada una con su contraseña | solo `Staging` |
 | Retirar una cuenta, o **todas** las de prueba | `cuenta-de-prueba --retirar --correo <dirección>` o `cuenta-de-prueba --retirar --todas` | `Staging` y `Production` |
 | **Purgar lo de prueba** al pasar a `Production` con la misma base | `cuenta-de-prueba --purgar` | `Staging` y `Production` |
+| **Recuperar el segundo factor de la única administración** (perdió el teléfono y los códigos de respaldo; desde `v0.1.3`, ver abajo) | `restablecer-segundo-factor --correo <tu correo>` | `Staging` y `Production` |
 
-**Primer administrador.** Muestra una **contraseña temporal de 24 horas**. En el primer ingreso (`https://gestion.babel-hub.shop`, detrás de Cloudflare Access) **cambias la contraseña y configuras el segundo factor (TOTP)** con tu app de autenticación: sin eso no recibes credencial. Solo crea **el primero**: si ya hay un administrador central, se niega (los demás los da de alta la administración); repetirlo con el mismo correo no duplica nada y, solo si aún no ingresaste, genera otra contraseña temporal (siempre que sea el único administrador). Si algún día no queda **ningún** administrador activo, el mismo comando sirve para recuperar el acceso. Tu correo va solo en el comando: no está en el repositorio. **Revísalo dos veces antes de ejecutar:** la cuenta nace con el correo verificado sin enviarle nada y ahí llegarán los avisos de seguridad de la administración. Con la gestión puedes cargar el catálogo (**en `Staging`, solo obras y archivos de muestra**).
+**Primer administrador.** Muestra una **contraseña temporal de 24 horas**. En el primer ingreso (`https://gestion.babel-hub.shop`, detrás de Cloudflare Access) **cambias la contraseña y configuras el segundo factor (TOTP)** con tu app de autenticación: sin eso no recibes credencial. Solo crea **el primero**: si ya hay un administrador central, se niega (los demás los da de alta la administración); repetirlo con el mismo correo no duplica nada y, solo si aún no ingresaste, genera otra contraseña temporal (siempre que sea el único administrador). Si algún día no queda **ningún** administrador activo, el mismo comando, con un correo que **no** tenga ya una cuenta, crea uno nuevo; si queda uno y solo perdió su segundo factor, no uses este comando: está «Si la única administración perdió su segundo factor», abajo. Tu correo va solo en el comando: no está en el repositorio. **Revísalo dos veces antes de ejecutar:** la cuenta nace con el correo verificado sin enviarle nada y ahí llegarán los avisos de seguridad de la administración. Con la gestión puedes cargar el catálogo (**en `Staging`, solo obras y archivos de muestra**).
+
+**Si la única administración perdió su segundo factor** (el teléfono y los códigos de respaldo), desde `v0.1.3` **no se tocan los datos a mano**. Ten a la persona titular **lista para ingresar** en ese momento, con su contraseña y su aplicación de autenticación: hasta que configure el factor nuevo, quien conozca la contraseña podría configurarlo en su lugar. En **[VM-VENTAS]**, con el mismo `docker compose … run --rm --no-deps --no-TTY ecommerce` de arriba y las imágenes de `v0.1.3`:
+
+```bash
+cd /opt/babelhub
+sudo env BABELHUB_SECRETOS=/etc/babelhub/secretos IP_PRIVADA=10.0.0.10 IP_INVENTARIO=10.0.0.20 \
+  IMAGEN_ECOMMERCE=ghcr.io/<propietario>/babelhub-ecommerce@sha256:<64> \
+  docker compose --project-directory infra -f infra/docker-compose.ventas.yml \
+  run --rm --no-deps --no-TTY ecommerce restablecer-segundo-factor --correo <tu correo>
+```
+
+**Qué debes ver:** «se restableció el segundo factor y se cerraron las sesiones de la cuenta. La contraseña no cambió», si el aviso por correo salió, y que ingreses ahora. Ingresa en `https://gestion.babel-hub.shop`: te pedirá configurar el segundo factor (código QR); **guarda los 8 códigos de respaldo** en tu gestor de contraseñas. Si crees que alguien conoce tu contraseña, cámbiala después. La orden deja una entrada en la auditoría (actor «sistema») y avisa al correo de la cuenta. **Si se niega**, no cambió nada y dice por qué: hay **otra administración que puede ingresar** (ella lo restablece desde la gestión, *Usuarios y roles*; una dada de alta hace menos de 24 horas cuenta aunque nadie tenga su contraseña temporal), la cuenta **no tiene un segundo factor activado** (ingresa con tu contraseña y configúralo), el correo no es el de una administración activa, o el entorno no es `Staging` ni `Production` en modo normal. «No se completó o no se pudo confirmar»: revisa que la base responda y repítela. **La orden no recupera la contraseña.** Si además la tuya es **temporal y ya venció** y eres la única administración activa, después de restablecer el factor ejecuta `crear-administrador --correo <tu correo>`, que genera otra temporal; en cualquier otro caso (olvidaste la contraseña, o hay varias administraciones y ninguna tiene acceso) queda el procedimiento con acceso a la infraestructura de `identidad-seguridad` §6: pide ayuda antes de tocar la base.
 
 **Cuentas para las pruebas con personas.** Reparte cada correo con **su** contraseña a una persona distinta **por un canal seguro** (mensajería cifrada o en persona; nunca por un chat público ni el repositorio) y anota quién tiene cuál en una hoja tuya fuera del repositorio. Repetir `--cantidad` **cambia** las contraseñas (y cierra las sesiones abiertas): sirve para reponer una perdida. Las cuentas entran verificadas y con los textos aceptados: no necesitan correo. Al terminar la ronda: `--retirar --todas`.
 
@@ -1011,7 +1024,7 @@ Son mediciones que cierran decisiones de la spec. Ninguna bloquea el despliegue,
 
 ### 15.5 Actualizar una tienda desplegada de `v0.1.2` a `v0.1.3`
 
-Qué trae: ayudas al escribir contraseñas, las diez letras de la política en las pantallas, el código QR del segundo factor y el enlace «Acceso del personal». No cambia la base de datos ni los secretos que ya tienes, salvo una línea nueva y opcional. Antes necesitas la etiqueta `v0.1.3` publicada y sus tres digests (§5).
+Qué trae: ayudas al escribir contraseñas, las diez letras de la política en las pantallas, el código QR del segundo factor, el enlace «Acceso del personal», la raíz de la gestión que lleva al ingreso, el regreso a la compra después de ingresar, los enlaces a «Mis devoluciones», «Mis hojas de reclamación» y los reportes de devoluciones, y la orden `restablecer-segundo-factor` (§15.1). No cambia la base de datos ni los secretos que ya tienes, salvo una línea nueva y opcional. Antes necesitas la etiqueta `v0.1.3` publicada y sus tres digests (§5).
 
 **1. [Cada VM] Traer el código.** Mira primero que la VM no tenga cambios hechos a mano:
 
@@ -1054,6 +1067,7 @@ La primera debe dar `200` y la segunda un número mayor que `0`. En el navegador
 | Síntoma | Causa probable | Qué hacer |
 | :--- | :--- | :--- |
 | No entras por SSH | Tu IP cambió o la regla de la Security List | Actualiza la regla TCP 22; o usa *Instance → Console connection* de Oracle. |
+| La única administración perdió el teléfono y los códigos de respaldo | El personal no tiene recuperación por correo (IDE-17) | `restablecer-segundo-factor --correo <tu correo>` (§15.1, desde `v0.1.3`). |
 | `desplegar.sh` dice «CAMBIAR sin completar» | Falta un dato externo | `cat PENDIENTES.txt`, complétalo, vuelve a copiar el archivo y repite. |
 | `desplegar.sh` dice «clave privada que no usa esta VM» | Copiaste una carpeta de más | Borra ese archivo de `/etc/babelhub/secretos` y copia solo la carpeta de la VM. |
 | Un contenedor sale «unhealthy» | Configuración o dependencia caída | `sudo docker logs --tail 50 <contenedor>`: el mensaje nombra la variable que falla (nunca su valor). |

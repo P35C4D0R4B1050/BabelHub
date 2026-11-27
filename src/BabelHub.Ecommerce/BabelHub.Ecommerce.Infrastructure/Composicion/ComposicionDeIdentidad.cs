@@ -188,6 +188,8 @@ public static class ComposicionDeIdentidad
         servicios.TryAddScoped<ICancelacionDeCuenta>(sp => sp.GetRequiredService<CancelacionDeCuenta>());
         servicios.TryAddScoped<IMarcaDeCancelacionDeCuenta>(sp => sp.GetRequiredService<CancelacionDeCuenta>());
         servicios.TryAddScoped<IAdministracionDeUsuarios, AdministracionDeUsuarios>();
+        // El segundo factor de la única administración: solo lo usa la orden de consola «restablecer-segundo-factor» (sin endpoint; exige el actor «sistema»).
+        servicios.TryAddScoped<IRestablecimientoDesdeLaInstalacion, RestablecimientoDelSegundoFactorDesdeLaInstalacion>();
         servicios.TryAddScoped<ClavesDeFirma>();
         servicios.TryAddScoped<IClavesDeFirma>(sp => sp.GetRequiredService<ClavesDeFirma>());
         servicios.TryAddScoped<IContextoDeLectura, ContextoDeLecturaDelAsistente>();

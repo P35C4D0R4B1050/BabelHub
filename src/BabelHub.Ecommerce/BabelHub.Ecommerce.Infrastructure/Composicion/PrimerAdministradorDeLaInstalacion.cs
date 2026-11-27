@@ -116,7 +116,8 @@ public sealed class PrimerAdministradorDeLaInstalacion(
 
                 if (!previa.DebeCambiarLaTemporal)
                 {
-                    // Ya completó su primer ingreso: idempotente, no hay nada que hacer (para otra contraseña, el administrador usa la recuperación de acceso).
+                    // Ya completó su primer ingreso: idempotente, no hay nada que hacer. El personal no tiene recuperación por correo (IDE-17): su contraseña la restablece otra administración (IDE-23); y si la única administración perdió su segundo factor,
+                    // existe la orden «restablecer-segundo-factor». La contraseña de la única administración no tiene vía en la aplicación (identidad-seguridad §6).
                     return new PrimerAdministradorCreado(previa.Usuario.Id, correoNormalizado, ResultadoDelPrimerAdministrador.YaExiste, null);
                 }
 
