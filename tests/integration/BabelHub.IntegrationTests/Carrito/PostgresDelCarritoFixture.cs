@@ -53,6 +53,7 @@ public sealed class PostgresDelCarritoFixture : IAsyncLifetime
             ALTER TABLE carrito.checkouts OWNER TO propietario;
             ALTER TABLE carrito.lineas_del_checkout OWNER TO propietario;
             ALTER TABLE carrito.fusiones_aplicadas OWNER TO propietario;
+            ALTER TABLE carrito.tarifas_de_envio OWNER TO propietario;
             ALTER FUNCTION carrito.rechazar_linea_en_carrito_fusionado() OWNER TO propietario;
             """
             + DefinicionDelCarrito.Permisos);
@@ -82,6 +83,9 @@ public sealed class PostgresDelCarritoFixture : IAsyncLifetime
         await _contenedor.DisposeAsync();
     }
 
+    /// <summary>La conexión del administrador del contenedor, para las pruebas que crean otra base.</summary>
+    public string CadenaDeAdministracion => _contenedor.GetConnectionString();
+
     public async Task Ejecutar(string sql)
     {
         await using var comando = Administracion.CreateCommand(sql);
@@ -96,7 +100,7 @@ public sealed class PostgresDelCarritoFixture : IAsyncLifetime
     }
 
     /// <summary>Vacía las tablas entre pruebas.</summary>
-    public Task Limpiar() => Ejecutar("TRUNCATE carrito.fusiones_aplicadas, carrito.lineas_del_checkout, carrito.checkouts, carrito.avisos_de_carrito, carrito.lineas_de_carrito, carrito.carritos CASCADE");
+    public Task Limpiar() => Ejecutar("TRUNCATE carrito.tarifas_de_envio, carrito.fusiones_aplicadas, carrito.lineas_del_checkout, carrito.checkouts, carrito.avisos_de_carrito, carrito.lineas_de_carrito, carrito.carritos CASCADE");
 }
 
 [CollectionDefinition(Nombre)]

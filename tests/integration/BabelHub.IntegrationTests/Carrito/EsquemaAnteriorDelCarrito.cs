@@ -1,0 +1,175 @@
+namespace BabelHub.IntegrationTests.Carrito;
+
+/// <summary>El esquema <c>carrito</c> tal como lo creaba la versión anterior (una línea por edición, sin sucursal ni tarifas): sirve para probar la migración sobre una base ya creada.</summary>
+internal static class EsquemaAnteriorDelCarrito
+{
+    public const string Sql = """
+        CREATE SCHEMA IF NOT EXISTS carrito;
+
+        -- El carrito de una cuenta (cuenta_id) o de un visitante (visitante_hash, el SHA-256 de su cookie): exactamente uno de los dos. Solo el de visitante vence (la última acción de la persona más 30 días).
+        CREATE TABLE IF NOT EXISTS carrito.carritos (
+            id uuid PRIMARY KEY,
+            cuenta_id uuid,
+            visitante_hash bytea,
+            estado text NOT NULL CHECK (estado IN ('abierto', 'fusionado')),
+            version integer NOT NULL CHECK (version >= 1),
+            creado_en timestamptz NOT NULL,
+            modificado_en timestamptz NOT NULL,
+            vence_en timestamptz,
+            CONSTRAINT carritos_un_propietario CHECK ((cuenta_id IS NOT NULL) <> (visitante_hash IS NOT NULL)),
+            CONSTRAINT carritos_huella_de_32 CHECK (visitante_hash IS NULL OR octet_length(visitante_hash) = 32),
+            CONSTRAINT carritos_vence_solo_visitante CHECK ((visitante_hash IS NOT NULL) = (vence_en IS NOT NULL)),
+            CONSTRAINT carritos_fusionado_solo_visitante CHECK (estado = 'abierto' OR visitante_hash IS NOT NULL)
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS carritos_cuenta_unica ON carrito.carritos (cuenta_id) WHERE cuenta_id IS NOT NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS carritos_visitante_unico ON carrito.carritos (visitante_hash) WHERE visitante_hash IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS carritos_por_vencimiento ON carrito.carritos (vence_en) WHERE vence_en IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS carritos_de_cuenta_por_movimiento ON carrito.carritos (modificado_en) WHERE cuenta_id IS NOT NULL;
+
+        CREATE TABLE IF NOT EXISTS carrito.lineas_de_carrito (
+            carrito_id uuid NOT NULL REFERENCES carrito.carritos (id) ON DELETE CASCADE,
+            edicion_id uuid NOT NULL,
+            posicion integer NOT NULL CHECK (posicion >= 0),
+            cantidad integer NOT NULL CHECK (cantidad BETWEEN 1 AND 20),
+            es_digital boolean NOT NULL,
+            agregada_en timestamptz NOT NULL,
+            retiro_pendiente boolean NOT NULL DEFAULT false,
+            PRIMARY KEY (carrito_id, edicion_id),
+            CONSTRAINT lineas_de_carrito_digital_una_unidad CHECK (NOT es_digital OR cantidad = 1)
+        );
+        CREATE INDEX IF NOT EXISTS lineas_de_carrito_por_edicion ON carrito.lineas_de_carrito (edicion_id);
+
+        -- Un carrito fusionado no admite líneas.
+        CREATE OR REPLACE FUNCTION carrito.rechazar_linea_en_carrito_fusionado() RETURNS trigger
+            LANGUAGE plpgsql SET search_path = pg_catalog, carrito
+            AS $$
+        BEGIN
+            IF EXISTS (SELECT 1 FROM carrito.carritos WHERE id = NEW.carrito_id AND estado = 'fusionado') THEN
+                RAISE EXCEPTION 'Un carrito fusionado no admite líneas.' USING ERRCODE = '23514';
+            END IF;
+            RETURN NEW;
+        END
+        $$;
+        DROP TRIGGER IF EXISTS lineas_de_carrito_no_fusionado ON carrito.lineas_de_carrito;
+        CREATE TRIGGER lineas_de_carrito_no_fusionado BEFORE INSERT ON carrito.lineas_de_carrito
+            FOR EACH ROW EXECUTE FUNCTION carrito.rechazar_linea_en_carrito_fusionado();
+
+        -- Avisos persistentes (edición retirada, línea ajustada por la fusión): sin datos personales; se purgan 30 días después de vistos o a los 90 días.
+        CREATE TABLE IF NOT EXISTS carrito.avisos_de_carrito (
+            id uuid PRIMARY KEY,
+            cuenta_id uuid NOT NULL,
+            tipo text NOT NULL CHECK (tipo IN ('edicion_retirada', 'fusion_ajustada')),
+            edicion_id uuid NOT NULL,
+            titulo text NOT NULL CHECK (char_length(titulo) BETWEEN 1 AND 200),
+            detalle text CHECK (detalle IN ('sin_stock', 'ya_poseida', 'no_vendible', 'recortada_al_maximo', 'digital_a_una_unidad', 'tope_de_lineas', 'tope_de_unidades')),
+            cantidad_final integer CHECK (cantidad_final BETWEEN 0 AND 20),
+            creado_en timestamptz NOT NULL,
+            visto_en timestamptz,
+            CONSTRAINT avisos_de_carrito_ajuste_con_detalle CHECK ((tipo = 'fusion_ajustada') = (detalle IS NOT NULL))
+        );
+        CREATE INDEX IF NOT EXISTS avisos_de_carrito_por_cuenta ON carrito.avisos_de_carrito (cuenta_id, creado_en DESC);
+        CREATE INDEX IF NOT EXISTS avisos_de_carrito_por_vencer ON carrito.avisos_de_carrito (creado_en);
+
+        -- La compra en curso de una cuenta. El CHECK del contacto: solo existe completo, con el checkout vivo y a domicilio (CAR-34). El estado vivo a lo más una vez por cuenta lo garantiza el índice único parcial.
+        CREATE TABLE IF NOT EXISTS carrito.checkouts (
+            id uuid PRIMARY KEY,
+            cuenta_id uuid NOT NULL,
+            carrito_id uuid NOT NULL REFERENCES carrito.carritos (id),
+            estado text NOT NULL CHECK (estado IN ('en_edicion', 'reservando', 'en_pago', 'pago_pendiente', 'pagado', 'cancelado', 'reiniciado')),
+            paso smallint NOT NULL CHECK (paso BETWEEN 1 AND 3),
+            version integer NOT NULL CHECK (version >= 1),
+            tipo_de_entrega text CHECK (tipo_de_entrega IN ('recojo', 'domicilio', 'digital')),
+            codigo_de_sucursal_de_recojo text CHECK (char_length(codigo_de_sucursal_de_recojo) BETWEEN 1 AND 40),
+            region_de_entrega text CHECK (char_length(region_de_entrega) BETWEEN 1 AND 60),
+            direccion text CHECK (char_length(direccion) BETWEEN 1 AND 200),
+            contacto_nombre text CHECK (char_length(contacto_nombre) BETWEEN 1 AND 80),
+            contacto_telefono text CHECK (contacto_telefono ~ '^[0-9]{9}$'),
+            envio_congelado numeric(12, 2) CHECK (envio_congelado >= 0),
+            total_congelado numeric(12, 2) CHECK (total_congelado >= 0),
+            pedido_id uuid,
+            reservando_desde timestamptz,
+            huella_de_reserva text CHECK (huella_de_reserva ~ '^[0-9a-f]{64}$'),
+            generacion_de_reserva integer NOT NULL DEFAULT 0 CHECK (generacion_de_reserva >= 0),
+            huella_de_instantanea text CHECK (char_length(huella_de_instantanea) BETWEEN 1 AND 100),
+            reserva_expira_en timestamptz,
+            pedido_descartado uuid,
+            reserva_a_liberar_desde timestamptz,
+            pedido_a_liberar uuid,
+            limite_pendiente_en timestamptz,
+            pago_pendiente_desde timestamptz,
+            terminos_version text CHECK (char_length(terminos_version) BETWEEN 1 AND 40),
+            terminos_aceptado_en timestamptz,
+            privacidad_version text CHECK (char_length(privacidad_version) BETWEEN 1 AND 40),
+            privacidad_aceptado_en timestamptz,
+            reembolso_digital_version text CHECK (char_length(reembolso_digital_version) BETWEEN 1 AND 40),
+            reembolso_digital_aceptado_en timestamptz,
+            creado_en timestamptz NOT NULL,
+            modificado_en timestamptz NOT NULL,
+            CONSTRAINT checkouts_contacto_completo CHECK ((direccion IS NULL) = (contacto_nombre IS NULL) AND (contacto_nombre IS NULL) = (contacto_telefono IS NULL)),
+            CONSTRAINT checkouts_contacto_solo_vivo_a_domicilio CHECK (
+                contacto_nombre IS NULL
+                OR (estado IN ('en_edicion', 'reservando', 'en_pago', 'pago_pendiente') AND tipo_de_entrega = 'domicilio' AND region_de_entrega IS NOT NULL)),
+            CONSTRAINT checkouts_liberacion_completa CHECK ((reserva_a_liberar_desde IS NULL) = (pedido_a_liberar IS NULL)),
+            CONSTRAINT checkouts_aceptacion_con_fecha_terminos CHECK ((terminos_version IS NULL) = (terminos_aceptado_en IS NULL)),
+            CONSTRAINT checkouts_aceptacion_con_fecha_privacidad CHECK ((privacidad_version IS NULL) = (privacidad_aceptado_en IS NULL)),
+            CONSTRAINT checkouts_aceptacion_con_fecha_reembolso CHECK ((reembolso_digital_version IS NULL) = (reembolso_digital_aceptado_en IS NULL))
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS checkouts_uno_vivo_por_cuenta ON carrito.checkouts (cuenta_id) WHERE estado IN ('en_edicion', 'reservando', 'en_pago', 'pago_pendiente');
+        CREATE UNIQUE INDEX IF NOT EXISTS checkouts_pedido_unico ON carrito.checkouts (pedido_id) WHERE pedido_id IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS checkouts_por_cuenta ON carrito.checkouts (cuenta_id);
+        CREATE INDEX IF NOT EXISTS checkouts_por_carrito ON carrito.checkouts (carrito_id);
+        CREATE INDEX IF NOT EXISTS checkouts_por_movimiento ON carrito.checkouts (estado, modificado_en);
+        CREATE INDEX IF NOT EXISTS checkouts_por_pedido_descartado ON carrito.checkouts (pedido_descartado) WHERE pedido_descartado IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS checkouts_por_liberacion ON carrito.checkouts (reserva_a_liberar_desde) WHERE reserva_a_liberar_desde IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS checkouts_por_pedido_a_liberar ON carrito.checkouts (pedido_a_liberar) WHERE pedido_a_liberar IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS checkouts_reservando ON carrito.checkouts (reservando_desde) WHERE estado = 'reservando';
+        CREATE INDEX IF NOT EXISTS checkouts_pago_pendiente ON carrito.checkouts (pago_pendiente_desde) WHERE estado = 'pago_pendiente';
+
+        -- Las líneas se reconstruyen al volver a en_edicion conservando el linea_id de las ediciones que siguen. Sin datos personales.
+        CREATE TABLE IF NOT EXISTS carrito.lineas_del_checkout (
+            checkout_id uuid NOT NULL REFERENCES carrito.checkouts (id) ON DELETE CASCADE,
+            edicion_id uuid NOT NULL,
+            posicion integer NOT NULL CHECK (posicion >= 0),
+            linea_id uuid NOT NULL,
+            es_digital boolean NOT NULL,
+            titulo text NOT NULL CHECK (char_length(titulo) BETWEEN 1 AND 200),
+            isbn text NOT NULL CHECK (char_length(isbn) BETWEEN 1 AND 40),
+            cantidad integer NOT NULL CHECK (cantidad BETWEEN 1 AND 20),
+            precio_unitario numeric(12, 2) NOT NULL CHECK (precio_unitario >= 0),
+            codigo_de_fuente_informado text CHECK (char_length(codigo_de_fuente_informado) BETWEEN 1 AND 40),
+            requiere_traslado_informado boolean,
+            plazo_informado_dias integer CHECK (plazo_informado_dias >= 0),
+            consultado_en timestamptz,
+            PRIMARY KEY (checkout_id, edicion_id),
+            CONSTRAINT lineas_del_checkout_linea_unica UNIQUE (linea_id),
+            CONSTRAINT lineas_del_checkout_digital_una_unidad CHECK (NOT es_digital OR cantidad = 1)
+        );
+
+        -- La constancia de una fusión aplicada: hace idempotente la fusión desde un segundo dispositivo. Se borra con el carrito de la cuenta (cascada) y se purga a los 30 días.
+        CREATE TABLE IF NOT EXISTS carrito.fusiones_aplicadas (
+            visitante_hash bytea PRIMARY KEY CHECK (octet_length(visitante_hash) = 32),
+            carrito_de_cuenta_id uuid NOT NULL REFERENCES carrito.carritos (id) ON DELETE CASCADE,
+            aplicada_en timestamptz NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS fusiones_aplicadas_por_fecha ON carrito.fusiones_aplicadas (aplicada_en);
+        """;
+
+    public const string Permisos = """
+        GRANT USAGE ON SCHEMA carrito TO rol_carrito;
+        GRANT SELECT, INSERT, DELETE ON carrito.carritos TO rol_carrito;
+        GRANT UPDATE (estado, version, modificado_en, vence_en) ON carrito.carritos TO rol_carrito;
+        GRANT SELECT, INSERT, DELETE ON carrito.lineas_de_carrito TO rol_carrito;
+        GRANT UPDATE (posicion, cantidad, es_digital, agregada_en, retiro_pendiente) ON carrito.lineas_de_carrito TO rol_carrito;
+        GRANT EXECUTE ON FUNCTION carrito.rechazar_linea_en_carrito_fusionado() TO rol_carrito;
+        GRANT SELECT, INSERT, DELETE ON carrito.avisos_de_carrito TO rol_carrito;
+        GRANT UPDATE (visto_en) ON carrito.avisos_de_carrito TO rol_carrito;
+        GRANT SELECT, INSERT, DELETE ON carrito.checkouts TO rol_carrito;
+        GRANT UPDATE (
+            estado, paso, version, tipo_de_entrega, codigo_de_sucursal_de_recojo, region_de_entrega, direccion, contacto_nombre, contacto_telefono, envio_congelado, total_congelado, pedido_id, reservando_desde,
+            huella_de_reserva, generacion_de_reserva, huella_de_instantanea, reserva_expira_en, pedido_descartado, reserva_a_liberar_desde, pedido_a_liberar, limite_pendiente_en, pago_pendiente_desde,
+            terminos_version, terminos_aceptado_en, privacidad_version, privacidad_aceptado_en, reembolso_digital_version, reembolso_digital_aceptado_en, modificado_en
+        ) ON carrito.checkouts TO rol_carrito;
+        GRANT SELECT, INSERT, DELETE ON carrito.lineas_del_checkout TO rol_carrito;
+        GRANT SELECT, INSERT, DELETE ON carrito.fusiones_aplicadas TO rol_carrito;
+        """;
+}
