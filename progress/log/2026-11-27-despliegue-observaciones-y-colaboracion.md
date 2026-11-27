@@ -54,3 +54,9 @@ El detalle y su estado vigente están en `progress/coordinacion-ui.md`.
 - Asignados O-5, O-11 y O-12 a un carril de accesos pendientes.
 - La rama de acceso se integra en `main` sin etiqueta; `web-acceso` queda en `InProgress`.
 - Toda la UI/UX pasa a Codex, también la de lo ya construido; se amplían sus rutas de JavaScript.
+
+## Evidencias del Sprint 2
+
+- La persona aclaró que el 28-nov es solo la entrega del Sprint 2; lo posterior es Sprint 3 y entrega final.
+- Hoja de evidencias e índice actualizados con las cifras del CI de `938a3306` (`v0.1.2`) y corregidas dos contradicciones (caché de disponibilidad y CI en GitHub). Las mediciones de carga no se repitieron.
+- Pedida la etiqueta `sprint-2` sobre la versión verificada, antes de integrar la venta por sucursal.
