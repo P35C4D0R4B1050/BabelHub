@@ -1,5 +1,6 @@
 using BabelHub.Inventario.Application.Auditoria;
 using BabelHub.Inventario.Application.Plataforma;
+using BabelHub.Inventario.Domain.Reservas;
 
 namespace BabelHub.Inventario.Application.Reservas.Interno;
 
@@ -78,10 +79,33 @@ internal sealed class AutorizadorDeReservas(IActorActual actores, IDenegacionDeA
     /// La entrega solo en la sucursal de recojo de la reserva (SEL-39): un encargado de otra sucursal, o que consulta una reserva que no es de recojo o que no existe, recibe «prohibido» con el evento
     /// <c>fuera-de-sucursal</c> y no se le revela si la reserva existe. La administración central pasa siempre.
     /// </summary>
-    public async Task<ErrorDeAplicacion?> ExigirSucursalDeRecojo(Guid? sucursalDeRecojoId, CancellationToken cancelacion)
+    public Task<ErrorDeAplicacion?> ExigirSucursalDeRecojo(Guid? sucursalDeRecojoId, CancellationToken cancelacion) =>
+        ExigirEnSucursal(actor => sucursalDeRecojoId is { } sucursal && actor.EsEncargadoDe(sucursal), cancelacion);
+
+    /// <summary>
+    /// La entrega de un recojo <b>por sucursal</b> (SEL-45): el encargado necesita una lista de líneas válida (de una a <see cref="LimitesDeReservas.MaximoDeLineas"/>, sin vacías ni repetidas) en la que cada una exista
+    /// en la reserva y salga de su sucursal, <b>en cualquier estado</b> (el estado se evalúa después). Si no, recibe el mismo «prohibido» con el evento, sin saber cuál falló. La administración central pasa siempre.
+    /// </summary>
+    public Task<ErrorDeAplicacion?> ExigirSucursalesDeLasLineas(ReservaDePedido reserva, IReadOnlyList<Guid>? lineaIds, CancellationToken cancelacion)
+    {
+        ArgumentNullException.ThrowIfNull(reserva);
+        return ExigirEnSucursal(
+            actor => lineaIds is { Count: > 0 and <= LimitesDeReservas.MaximoDeLineas }
+                && lineaIds.Distinct().Count() == lineaIds.Count
+                && lineaIds.All(lineaId => EsDeSuSucursal(actor, reserva, lineaId)),
+            cancelacion);
+    }
+
+    private static bool EsDeSuSucursal(ActorActual actor, ReservaDePedido reserva, Guid lineaId)
+    {
+        var delPedido = reserva.Lineas.Where(l => l.LineaId == lineaId).ToList();
+        return delPedido.Count > 0 && delPedido.All(l => actor.EsEncargadoDe(reserva.SucursalDeEntregaDe(l)));
+    }
+
+    private async Task<ErrorDeAplicacion?> ExigirEnSucursal(Func<ActorActual, bool> encargadoConAlcance, CancellationToken cancelacion)
     {
         var actor = Actor;
-        if (actor is not null && (actor.EsAdministracionCentral() || (sucursalDeRecojoId is { } sucursal && actor.EsEncargadoDe(sucursal))))
+        if (actor is not null && (actor.EsAdministracionCentral() || encargadoConAlcance(actor)))
         {
             return null;
         }
