@@ -42,6 +42,41 @@ public sealed class MigracionDeReservasTests(PostgresDeReservasFixture bd) : ICl
         Assert.Equal(1L, await bd.Consultar<long>("SELECT count(*) FROM reservas.reserva_lineas"));
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-SEL-48")]
+    public async Task UnaBaseCreadaConLaRestriccionAnterior_SeActualizaDosVeces_SinPerderDatos_YAdmiteElRecojoPorSucursal()
+    {
+        // La restricción tal como la creó la versión anterior: el recojo exigía la sucursal de cabecera.
+        await bd.Ejecutar(
+            """
+            ALTER TABLE reservas.reservas DROP CONSTRAINT ck_reservas_destino;
+            ALTER TABLE reservas.reservas ADD CONSTRAINT ck_reservas_destino CHECK (
+                (tipo_entrega = 'recojo' AND sucursal_recojo_id IS NOT NULL AND region_entrega IS NULL)
+                OR (tipo_entrega = 'domicilio' AND region_entrega IS NOT NULL AND sucursal_recojo_id IS NULL));
+            """);
+        var (pedido, reserva) = await bd.PedidoConReserva();
+        await bd.AgregarLinea(reserva, pedido);
+        Assert.Equal("23514", await FallaAlEjecutar(InsertarRecojoPorSucursal()));
+
+        for (var vez = 0; vez < 2; vez++)
+        {
+            await bd.Ejecutar(DefinicionDeReservas.Sql);
+            await bd.Ejecutar(DefinicionDeReservas.Permisos);
+        }
+
+        await bd.Ejecutar(InsertarRecojoPorSucursal());
+        Assert.Equal(2L, await bd.Consultar<long>("SELECT count(*) FROM reservas.reservas"));
+        Assert.Equal(1L, await bd.Consultar<long>($"SELECT count(*) FROM reservas.reservas WHERE pedido_id = '{pedido}' AND sucursal_recojo_id IS NOT NULL"));
+        Assert.Equal(1L, await bd.Consultar<long>("SELECT count(*) FROM reservas.reserva_lineas"));
+        Assert.Equal(1L, await bd.Consultar<long>("SELECT count(*) FROM pg_constraint WHERE conname = 'ck_reservas_destino' AND convalidated"));
+    }
+
+    private static string InsertarRecojoPorSucursal() =>
+        $"""
+        INSERT INTO reservas.reservas (id, pedido_id, cliente_id, clave_idempotencia, huella_de_carga, tipo_entrega, iniciada_en)
+        VALUES ('{Guid.NewGuid()}', '{Guid.NewGuid()}', '{Guid.NewGuid()}', '{Guid.NewGuid():N}', '{new string('b', 64)}', 'recojo', now())
+        """;
+
     // --- reservas (la cabecera) ---
 
     [Fact]
