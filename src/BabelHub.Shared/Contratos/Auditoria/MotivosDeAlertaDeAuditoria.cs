@@ -168,6 +168,9 @@ public static class MotivosDeAlertaDeAuditoria
     /// <summary>Carrito intentó liberar la reserva de un pedido que ya estaba confirmado (T26c).</summary>
     public const string CarritoLiberacionDeUnPedidoConfirmado = "carrito-liberacion-de-un-pedido-confirmado";
 
+    /// <summary>Muchas unidades de un libro apartadas en una sucursal en 15 minutos (SEL-47): solo avisa, la reserva no se rechaza.</summary>
+    public const string ConcentracionDeReservas = "concentracion-de-reservas";
+
     public static readonly IReadOnlyList<string> Todos =
     [
         AccesosDenegados,
@@ -239,5 +242,6 @@ public static class MotivosDeAlertaDeAuditoria
         CarritoCheckoutsConElPagoPendienteDemasiado,
         CarritoClaveDeReservaEnConflicto,
         CarritoLiberacionDeUnPedidoConfirmado,
+        ConcentracionDeReservas,
     ];
 }

@@ -13,9 +13,11 @@ public sealed class MotivosDeVolumenDeReservasTests
 {
     [Theory]
     [Trait("Criterio", "AC-SEL-06")]
+    [Trait("Criterio", "AC-SEL-53")]
     [InlineData(VolumenDeOperacionesDeReservas.MotivoDeConfirmaciones)]
     [InlineData(VolumenDeOperacionesDeReservas.MotivoDeLiberaciones)]
     [InlineData(VolumenDeBajasDeTitular.Motivo)]
+    [InlineData(ConcentracionDeReservas.MotivoDeLaAlerta)]
     public void ElMotivoDeVolumenAnomalo_ConstaEnElCatalogoComoAlertaTecnica_Y_EnElContrato(string motivo)
     {
         var catalogo = CatalogoDeAlertasDeAuditoria.Crear();

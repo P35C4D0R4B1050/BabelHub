@@ -93,6 +93,7 @@ public static class PresentadorDeAuditoria
         ["alcance-de-datos-sin-actor"] = "Una lectura de datos llegó sin actor",
         ["confirmaciones-de-reservas-anomalas"] = "Más de 200 confirmaciones de reservas en 5 minutos",
         ["liberaciones-de-reservas-anomalas"] = "Más de 200 liberaciones de reservas en 5 minutos",
+        ["concentracion-de-reservas"] = "Muchas unidades de un libro apartadas en una sucursal en 15 minutos",
         ["bajas-de-titular-anomalas"] = "Más de 20 bajas de titular en un minuto",
         ["bloqueos-por-textos-pendientes"] = "Muchas acciones bloqueadas por textos legales pendientes",
         ["cuota-de-correo-alta"] = "La cuota diaria de correo llegó al 80 %",

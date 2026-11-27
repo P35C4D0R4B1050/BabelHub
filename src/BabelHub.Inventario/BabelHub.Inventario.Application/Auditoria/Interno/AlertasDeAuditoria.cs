@@ -115,6 +115,9 @@ public static class MotivosDeAlerta
     /// <summary>Más de 200 liberaciones de reservas en 5 minutos (INV-2b): solo avisa.</summary>
     public const string LiberacionesDeReservasAnomalas = "liberaciones-de-reservas-anomalas";
 
+    /// <summary>Muchas unidades de un libro apartadas en una sucursal en 15 minutos (SEL-47): solo avisa.</summary>
+    public const string ConcentracionDeReservas = "concentracion-de-reservas";
+
     /// <summary>Más de 20 bajas de titular en un minuto (SEL-34, AM31): solo avisa, la baja nunca se rechaza.</summary>
     public const string BajasDeTitularAnomalas = "bajas-de-titular-anomalas";
 
@@ -234,6 +237,7 @@ public static class CatalogoDeAlertasDeAuditoria
         new(MotivosDeAlerta.AlcanceDeDatosSinActor, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.ConfirmacionesDeReservasAnomalas, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.LiberacionesDeReservasAnomalas, ClaseDeAlerta.Tecnica),
+        new(MotivosDeAlerta.ConcentracionDeReservas, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.BajasDeTitularAnomalas, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.BloqueosPorTextosPendientes, ClaseDeAlerta.Tecnica),
         new(MotivosDeAlerta.CuotaDeCorreoAlta, ClaseDeAlerta.Tecnica),
