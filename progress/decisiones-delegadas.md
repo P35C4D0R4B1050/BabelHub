@@ -176,3 +176,11 @@ La persona aprobó el 2026-11-27 el paquete de mejoras del acceso (ayudas de con
 | DD-119 | **Los campos de contraseña nueva ya no declaran `minlength`.** | El navegador cuenta unidades UTF-16 sin normalizar y el servidor caracteres Unicode normalizados: el atributo podía rechazar una contraseña válida (IDE-15, IDE-59). La ayuda dice el mínimo y el servidor decide. | AC-IDE-13, AC-ACC-01 |
 | DD-120 | **Dos dependencias nuevas:** `Net.Codecrete.QrCodeGenerator` 3.2.1 (MIT) en la Infraestructura del E-commerce para generar el código QR en el servidor, y `ZXing.Net` 0.16.11 (Apache-2.0) solo en las pruebas para leerlo. | Sin servicios de terceros y con una prueba que no se compara consigo misma. Versiones fijas, publicadas hace más de dos semanas. | `web-acceso` decisions D01 y D05 |
 | DD-121 | **Se acepta que el enlace «Acceso del personal» facilite encontrar el ingreso del personal.** Controles que ya existen: Cloudflare Access delante de `gestion.`, verificación de persona, límites de ingreso, rol y host, y segundo factor obligatorio. | Lo pidió la persona en el paquete; el nombre `gestion.` ya es público en el DNS y en la documentación. | `web-acceso` §5, modelo de amenazas |
+
+## Accesos pendientes (2026-11-27, carril `accesos-pendientes`, para la versión 0.1.3)
+
+El 2026-11-27 la persona responsable pidió desarrollar los pendientes señalados que no son solo apariencia y resolver las dudas con la alternativa recomendada, registrándolas aquí. La numeración salta a DD-140 para no chocar con los carriles paralelos. Todas **pendientes de ratificar**.
+
+| Id | Decisión | Motivo | Se hace cumplir en |
+| :--- | :--- | :--- | :--- |
+| DD-143 | **La raíz de la gestión lleva al ingreso o al destino del rol** (catálogo nacional para la administración; envíos para sucursal y logística). | La raíz respondía `ECO-NO-ENCONTRADO` y parecía una falla (O-5). | `InicioDeLaGestion`; guía 08 §13.3 |

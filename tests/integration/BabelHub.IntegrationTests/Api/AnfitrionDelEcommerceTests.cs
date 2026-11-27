@@ -165,6 +165,33 @@ public sealed class AnfitrionDelEcommerceTests
         Assert.Contains(BabelHub.Shared.Contratos.Ecommerce.RutasDeClavesDeFirma.Rotar, enGestion);
         Assert.Contains(BabelHub.Shared.Contratos.Ecommerce.RutasDeClavesDeFirma.Comprometida, enGestion);
     }
+
+    /// <summary>La raíz existe en los dos hosts y una sola vez en cada uno (O-5): la portada en la tienda y, en la gestión, la que lleva al ingreso. Con las vistas y los controladores reales de la Api.</summary>
+    [Theory]
+    [Trait("Criterio", "AC-WEB-29")]
+    [InlineData("tienda", true)]
+    [InlineData("gestion", false)]
+    public async Task LaRaiz_EsLaPortadaEnLaTienda_YEnLaGestionLaQueLlevaAlIngreso(string host, bool esLaPortada)
+    {
+        var configuracion = ConfiguracionCompleta();
+        configuracion["Web:Host"] = host;
+        configuracion["Web:ClaveDeSesionesGestion"] = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(36));
+        var constructor = Constructor(configuracion, "Development");
+        constructor.Services.AddControllersWithViews().AddApplicationPart(BabelHub.Ecommerce.Api.AssemblyMarker.Assembly);
+        constructor.Services.AddSingleton(typeof(ModoDeArranque), ModoDeArranque.Normal);
+        constructor.Services.AddScoped<EjecutorDePasosDeRestauracion>();
+        constructor.AgregarEcommerce(ModoDeArranque.Normal);
+        await using var app = constructor.Build();
+        app.UsarEcommerce();
+
+        var raiz = Assert.Single(
+            ((Microsoft.AspNetCore.Routing.IEndpointRouteBuilder)app).DataSources.SelectMany(d => d.Endpoints).OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>(),
+            e => e.RoutePattern.RawText is "/" or "" && (e.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.IHttpMethodMetadata>()?.HttpMethods.Contains("GET") ?? false));
+
+        Assert.Equal(esLaPortada, raiz.DisplayName!.Contains("InicioController", StringComparison.Ordinal));
+        app.ExigirComposicionDeProduccion();
+    }
+
     [Fact]
     [Trait("Criterio", "AC-PLA-19")]
     public async Task LaSalud_CompruebaLaBaseDeDatosSoloEnModoNormal()

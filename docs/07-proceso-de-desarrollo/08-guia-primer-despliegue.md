@@ -777,7 +777,7 @@ curl -s -o /dev/null -D - https://gestion.babel-hub.shop/ | head -3  # redirige 
 curl -s  https://babel-hub.shop/ | grep -c "data-bh-pagos-simulados"   # 0 con la pasarela «ninguna» (no debe haber avisos); 1 con «simulador»
 ```
 
-Entra además a `https://gestion.babel-hub.shop` en el navegador, pasa Access y comprueba que aparece el ingreso del personal.
+Entra además a `https://gestion.babel-hub.shop` en el navegador, pasa Access y comprueba que aparece el ingreso del personal. La raíz de la gestión lleva al ingreso (`/ingreso`) y, si ya habías ingresado, a la pantalla de tu rol (catálogo nacional para la administración, envíos para la sucursal y logística). Esto rige **desde `v0.1.3`**: en `v0.1.2` la raíz respondía `ECO-NO-ENCONTRADO` y había que abrir `https://gestion.babel-hub.shop/ingreso`.
 
 Y la redirección a HTTPS (sin `-k`: no debe haber errores de certificado):
 
@@ -1045,7 +1045,7 @@ curl -s -o /dev/null -w '%{http_code}\n' https://babel-hub.shop/
 curl -s https://babel-hub.shop/ingreso | grep -c "data-bh-acceso-del-personal"
 ```
 
-La primera debe dar `200` y la segunda un número mayor que `0`. En el navegador: en **Crear cuenta** la barra de seguridad responde al escribir y «Mostrar» enseña la contraseña; en el ingreso del personal, quien aún no configuró su segundo factor ve el código QR, que debe leer la cámara de su teléfono.
+La primera debe dar `200` y la segunda un número mayor que `0`. En el navegador: `https://gestion.babel-hub.shop/` (tras Access) muestra el ingreso del personal y no un error; en **Crear cuenta** la barra de seguridad responde al escribir y «Mostrar» enseña la contraseña; en el ingreso del personal, quien aún no configuró su segundo factor ve el código QR, que debe leer la cámara de su teléfono.
 
 **Para volver atrás:** `sudo git checkout v0.1.2` y los digests de esa versión. La línea de la dirección del personal se puede quedar (esa versión la ignora).
 
