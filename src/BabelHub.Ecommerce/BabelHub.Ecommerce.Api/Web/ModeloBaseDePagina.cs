@@ -42,4 +42,7 @@ public class ModeloBaseDePagina
 
     /// <summary>El contacto del comercio que pinta el pie (COM-01); nulo si el anfitrión no lo registró (hosts de prueba): el pie entonces omite el bloque.</summary>
     public DatosDeContacto? ContactoDelComercio { get; set; }
+
+    /// <summary>La dirección del host de gestión para el enlace «Acceso del personal» (web-acceso ACC-10): solo en la tienda y si está configurada; nulo en cualquier otro caso.</summary>
+    public string? AccesoDelPersonal { get; set; }
 }

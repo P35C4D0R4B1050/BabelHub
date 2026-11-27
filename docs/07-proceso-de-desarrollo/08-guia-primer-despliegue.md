@@ -1008,6 +1008,58 @@ Son mediciones que cierran decisiones de la spec. Ninguna bloquea el despliegue,
 
 (T29 y T31, los scripts de restauración y de ensayo aislado, **aún no están hechos**: esos spikes se hacen a mano como arriba.)
 
+### 15.5 Actualizar una tienda ya desplegada de `v0.1.1` a `v0.1.2`
+
+Qué trae: ayudas al escribir contraseñas, código QR del segundo factor, el enlace «Acceso del personal» y las correcciones del arranque de la réplica de gestión y de n8n. No cambia la base de datos. Antes necesitas la etiqueta `v0.1.2` publicada y sus tres digests (§5).
+
+**1. [Cada VM] Traer el código.** Mira primero si la VM tiene cambios hechos a mano sobre `v0.1.1`:
+
+```bash
+cd /opt/babelhub && sudo git status --short
+```
+
+En VM-VENTAS puede aparecer `infra/docker-compose.ventas.yml` (el arreglo de n8n que se aplicó a mano; ya viene en `v0.1.2`). Si es ese el único archivo, descártalo; si aparece otro, para y revisa antes de seguir.
+
+```bash
+sudo git checkout -- infra/docker-compose.ventas.yml
+```
+
+```bash
+sudo git fetch --tags && sudo git checkout v0.1.2 && sudo git log -1 --format='%h %s'
+```
+
+**2. [VM-VENTAS] Añadir la dirección del personal** (los secretos ya generados no la tienen; sin ella la tienda funciona igual, pero no muestra el enlace). El comando solo la agrega si falta y no imprime ningún secreto:
+
+```bash
+sudo sh -c 'f=/etc/babelhub/secretos/ecommerce.env; grep -q "^BABELHUB__Web__DireccionDeGestion=" "$f" || printf "\nBABELHUB__Web__DireccionDeGestion=\"https://gestion.babel-hub.shop\"\n" >> "$f"; grep "^BABELHUB__Web__DireccionDeGestion=" "$f"'
+```
+
+Debe mostrar `BABELHUB__Web__DireccionDeGestion="https://gestion.babel-hub.shop"`. Va solo en `ecommerce.env` (la tienda). Si la escribes mal (sin `https://`, con una ruta o con espacios), la tienda **no arranca** y el registro nombra esa variable.
+
+**3. [VM-INVENTARIO] Comprobar el webhook de la réplica de gestión** (en `v0.1.1` se generaba con una dirección IP y la réplica no arrancaba; se corrigió a mano):
+
+```bash
+sudo grep "^BABELHUB__Notificaciones__N8n__Webhook=" /etc/babelhub/secretos/ecommerce-gestion.env
+```
+
+Debe terminar en `http://n8n:5678/webhook/babelhub-avisos`. Si todavía dice una IP, cámbialo con `sudo nano` en ese archivo.
+
+**4. Desplegar con los digests de `v0.1.2`:** primero VM-INVENTARIO con el comando de §11 y después VM-VENTAS con el de §13.1 (con `--sin evolution-api` mientras no tengas el número de WhatsApp).
+
+**5. Comprobar** desde tu equipo:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://babel-hub.shop/
+```
+
+```bash
+curl -s https://babel-hub.shop/ingreso | grep -c "data-bh-acceso-del-personal"
+```
+
+La primera debe dar `200` y la segunda un número mayor que `0`. En el navegador: en **Crear cuenta** la barra de seguridad responde al escribir y «Mostrar» enseña la contraseña; en el ingreso del personal, quien aún no configuró su segundo factor ve el código QR. En VM-VENTAS, `sudo docker ps` debe mostrar `n8n` como `healthy`.
+
+**Para volver atrás:** `git checkout v0.1.1` y los digests anteriores. La línea de la dirección del personal se puede quedar (esa versión la ignora), pero el arreglo de n8n vuelve a faltar en VM-VENTAS: hay que reponer `:uid=1000,gid=1000,mode=0700` en el `tmpfs` de `/home/node/.cache`.
+
 ## 16. Si algo sale mal: tabla de rescate
 
 | Síntoma | Causa probable | Qué hacer |

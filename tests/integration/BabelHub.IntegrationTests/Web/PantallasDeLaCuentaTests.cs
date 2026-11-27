@@ -22,6 +22,7 @@ public sealed class PantallasDeLaCuentaTests : IAsyncLifetime
     private Resultado<EstadoDeLaCancelacionDeCuenta> _cancelacion = Resultado<EstadoDeLaCancelacionDeCuenta>.Exito(new EstadoDeLaCancelacionDeCuenta(EstadoDeLaCancelacion.SinSolicitud, 0, null, null, false));
     private bool _textosPendientes;
     private bool _reconocida;
+    private BabelHub.Ecommerce.Api.Web.Acceso.DireccionDelAccesoDelPersonal? _accesoDelPersonal;
     private ErrorDeAplicacion? _falla;
 
     private static readonly Guid Aviso = Guid.Parse("a1000000-0000-0000-0000-000000000001");
@@ -81,6 +82,10 @@ public sealed class PantallasDeLaCuentaTests : IAsyncLifetime
                 s.AddSingleton(cancelaciones);
                 s.AddSingleton(solicitudes);
                 s.AddSingleton(borradores);
+                if (_accesoDelPersonal is not null)
+                {
+                    s.AddSingleton(_accesoDelPersonal);
+                }
             },
             despuesDelHandler: app => app.Use(async (contexto, siguiente) =>
             {
@@ -156,6 +161,20 @@ public sealed class PantallasDeLaCuentaTests : IAsyncLifetime
         Assert.DoesNotContain("<script>", await inventado.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 [Fact]    [Trait("Criterio", "AC-WEB-33")]    public async Task Cambiar_la_contrasena_o_desactivar_el_segundo_factor_entrega_a_Identidad_la_renovacion_de_la_sesion_actual_para_conservarla()    {        using var contrasena = await Enviar("/cuenta/contrasena", ("actual", "la contraseña actual"), ("nueva", "una frase nueva y segura"), ("confirmacion", "una frase nueva y segura"));        Assert.Equal("renovacion-de-la-sesion-actual", _argumentos["renovacion"]);        _argumentos.Remove("renovacion");        using var desactivado = await Enviar("/cuenta/segundo-factor/desactivar", ("actual", "la contraseña actual"), ("codigo", "123456"));        Assert.Equal(HttpStatusCode.SeeOther, contrasena.StatusCode);        Assert.Equal(HttpStatusCode.SeeOther, desactivado.StatusCode);        Assert.Equal("renovacion-de-la-sesion-actual", _argumentos["renovacion"]);        _sesiones.Renovacion = null;        _argumentos.Remove("renovacion");        using var sinSesionLegible = await Enviar("/cuenta/contrasena", ("actual", "x"), ("nueva", "una frase nueva y segura"), ("confirmacion", "una frase nueva y segura"));        Assert.Null(_argumentos["renovacion"]);    }
+
+    [Fact]
+    [Trait("Criterio", "AC-ACC-09")]
+    public async Task Un_cliente_con_sesion_ve_el_mismo_enlace_del_personal_en_el_pie()
+    {
+        var configuracion = Microsoft.Extensions.Configuration.MemoryConfigurationBuilderExtensions.AddInMemoryCollection(new Microsoft.Extensions.Configuration.ConfigurationBuilder(), new Dictionary<string, string?> { ["Web:DireccionDeGestion"] = "https://gestion.example.org" }).Build();
+        _accesoDelPersonal = BabelHub.Ecommerce.Api.Web.Acceso.DireccionDelAccesoDelPersonal.Leer(configuracion, new BabelHub.Ecommerce.Infrastructure.Plataforma.LectorDeSecretos(configuracion), permitirHttpLocal: false);
+        await _anfitrion.DisposeAsync();
+        _anfitrion = await Armar();
+
+        using var respuesta = await Pedir("/cuenta");
+
+        Assert.Contains("href=\"https://gestion.example.org/\" data-bh-acceso-del-personal>Acceso del personal</a>", await respuesta.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
 
     [Fact]
     [Trait("Criterio", "AC-ACC-12")]

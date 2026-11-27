@@ -24,6 +24,10 @@
             {
                 <p class="mt-4 text-sm"><a class="link" href="/recuperacion">Olvidé mi contraseña</a></p>
             }
+            @if (Model.AccesoDelPersonal is { } personal)
+            {
+                <p class="mt-4 text-sm">¿Trabajas en la tienda o en una sucursal? <a class="link" href="@personal" data-bh-acceso-del-personal>Acceso del personal</a>.</p>
+            }
             break;
 
         case PantallaDelIngreso.SegundoFactor:

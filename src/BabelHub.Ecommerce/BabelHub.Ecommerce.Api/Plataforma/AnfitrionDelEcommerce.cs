@@ -10,6 +10,7 @@ using BabelHub.Ecommerce.Api.Pedidos;
 using BabelHub.Ecommerce.Api.Pagos;
 using BabelHub.Ecommerce.Api.Reclamaciones;
 using BabelHub.Ecommerce.Api.Web;
+using BabelHub.Ecommerce.Api.Web.Acceso;
 using BabelHub.Ecommerce.Api.Web.Contacto;
 using BabelHub.Ecommerce.Application.Auditoria;
 using BabelHub.Ecommerce.Application.Carrito;
@@ -120,6 +121,9 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
     /// <summary>El contacto del comercio que muestran el pie y <c>/contacto</c> (COM-01 a COM-05).</summary>
     internal DatosDeContacto Contacto { get; private init; } = null!;
 
+    /// <summary>La dirección del enlace «Acceso del personal» (web-acceso ACC-10, ACC-11): opcional; nula si no se configuró.</summary>
+    internal DireccionDelAccesoDelPersonal? AccesoDelPersonal { get; private init; }
+
     public override string ToString() => "[configuración del anfitrión del E-commerce]";
 
     /// <summary>
@@ -229,6 +233,8 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
         var smtp = LeerSmtp(configuracion, esProduccion, extra);
         // Los problemas del contacto salen por el lector (nombran la variable, nunca el valor).
         var contacto = DatosDeContacto.Leer(lector, permitirContactoDeEjemplo);
+        // El enlace del personal es opcional; si está, tiene que ser un origen seguro (http hacia la propia máquina solo en Development y Test, el mismo indicador que el contacto de ejemplo) (web-acceso ACC-12).
+        var accesoDelPersonal = DireccionDelAccesoDelPersonal.Leer(configuracion, lector, permitirContactoDeEjemplo);
 
         if (lector.Problemas.Count > 0 || extra.Count > 0)
         {
@@ -259,6 +265,7 @@ public sealed class OpcionesDelAnfitrionDelEcommerce
             CostoDeEnvio = costo!,
             Proxies = proxies,
             Contacto = contacto!,
+            AccesoDelPersonal = accesoDelPersonal,
         };
     }
 
@@ -373,6 +380,10 @@ public static class AnfitrionDelEcommerce
         var opciones = OpcionesDelAnfitrionDelEcommerce.Leer(builder.Configuration, esProduccion, permitirContactoDeEjemplo, soloEnModoNormal);
         var servicios = builder.Services;
         servicios.AddSingleton(opciones.Contacto);
+        if (opciones.AccesoDelPersonal is { } accesoDelPersonal)
+        {
+            servicios.AddSingleton(accesoDelPersonal);
+        }
 
         // ---------- Plataforma ----------
         servicios.AgregarManejoDeErrores(new OpcionesDeErrores("ECO"));
