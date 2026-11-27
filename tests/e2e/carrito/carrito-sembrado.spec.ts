@@ -3,8 +3,8 @@ import AxeBuilder from '@axe-core/playwright';
 import { agregarAlCarrito, clave, conOrigenPropio, EDICION_DIGITAL_DEL_ZORRO, EDICION_IMPRESA_DEL_ZORRO, ingresarComoClienteNuevo } from '../pedidos/ayudas';
 
 // Los recorridos del carrito y del checkout con el entorno sembrado (ecommerce-carrito-checkout T36): compra mixta en cinco pasos, compra solo digital en cuatro o menos, visitante que debe ingresar para pagar, el
-// bloqueo sin aceptar los textos y la accesibilidad de ambas pantallas en los dos temas. La sesión de cada recorrido sale del sembrador de desarrollo y el libro se agrega con la misma petición que enviará el botón de
-// la ficha (todavía sin botón). Complementa a `carrito-checkout.spec.ts`, que usa `storageState` ya sembrados; el recorrido de la fusión de carritos (AC-CAR-22) sigue necesitando el ingreso real de web-identidad.
+// bloqueo sin aceptar los textos y la accesibilidad de ambas pantallas en los dos temas. La sesión de cada recorrido sale del sembrador de desarrollo y el libro se agrega con el formulario de
+// la ficha. Complementa a `carrito-checkout.spec.ts`, que usa `storageState` ya sembrados; el recorrido de la fusión de carritos (AC-CAR-22) sigue necesitando el ingreso real de web-identidad.
 //   Datos: `entorno/sembrar-datos.sh --limpiar`; BABELHUB__Sembrador__Clave; E2E_BASE_URL=https://localhost:8443.
 
 const pasos = (page: Page) => page.getByRole('list', { name: 'Progreso de la compra' }).getByRole('listitem');

@@ -40,15 +40,22 @@ export async function ingresarComoPersonal(page: Page, rol: 'encargado' | 'logis
   await page.context().addCookies((await respuesta.json()).cookies);
 }
 
-// La ficha del catálogo aún no agrega al carrito (pantalla de web-catalogo): el libro se agrega con la misma petición que enviará su botón, desde el navegador (con su Origin y el token).
+// La obra sembrada de cada edición y su formato (`entorno/sembrar-datos.sh`).
+const FICHAS: Record<string, { obra: string; digital: boolean }> = {
+  [EDICION_IMPRESA_DEL_ZORRO]: { obra: 'a0000000-0000-0000-0000-000000000001', digital: false },
+  [EDICION_DIGITAL_DEL_ZORRO]: { obra: 'a0000000-0000-0000-0000-000000000001', digital: true },
+};
+
+// Agrega al carrito como lo hace una persona: abre la ficha y envía su formulario (nunca un POST armado a mano: si la ficha deja de ofrecer comprar, el recorrido falla). Termina en el carrito.
 export async function agregarAlCarrito(page: Page, edicionId: string, cantidad: number) {
-  await page.goto('/catalogo');
-  const token = await page.locator('meta[name=csrf-token]').getAttribute('content');
-  const estado = await page.evaluate(
-    async ([t, id, n]) => (await fetch('/carrito/lineas', { method: 'POST', headers: { RequestVerificationToken: t!, 'Content-Type': 'application/x-www-form-urlencoded' }, body: `edicionId=${id}&cantidad=${n}` })).status,
-    [token, edicionId, String(cantidad)] as const,
-  );
-  expect(estado, 'agregar al carrito').toBeLessThan(400);
+  const ficha = FICHAS[edicionId];
+  await page.goto(`/catalogo/obras/${ficha.obra}?edicion=${ficha.digital ? 'digital' : 'impresa'}`);
+  if (!ficha.digital) {
+    await page.getByLabel('Cantidad').fill(String(cantidad));
+  }
+  await page.getByRole('button', { name: ficha.digital ? 'Comprar digital' : 'Agregar impreso al carrito' }).click();
+  await expect(page, 'agregar al carrito lleva al carrito').toHaveURL(/\/carrito$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Tu carrito' })).toBeVisible();
 }
 
 async function aceptarLosTextosYPagar(page: Page) {
