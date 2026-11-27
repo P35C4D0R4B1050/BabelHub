@@ -198,8 +198,11 @@ internal static class EntornoDeIdentidadExtensiones
 
     public static RecuperacionDeAcceso Recuperacion(this EntornoDeIdentidad e) => new(e.Cuentas, e.Hasher, new ListaDeContrasenasDePrueba(), e.Limites, e.Huellas, e.Solicitudes, e.Cola, e.Codigos, e.HuellasDeIdentidad, e.Revocacion, e.Unidad, e.Auditoria, e.Eventos, e.Avisos, e.Alertas, e.Reloj);
 
-    public static Ingreso Ingreso(this EntornoDeIdentidad e) => new(
-        e.Cuentas, e.Hasher, new ListaDeContrasenasDePrueba(), e.Limites, e.Huellas, e.Desafios, e.HuellasDeIdentidad, e.Secretos, e.SegundoFactor, e.Cifrador, e.Sesiones, e.Renovaciones, e.Unidad, e.Auditoria, e.Eventos, e.Avisos, e.Reloj);
+    public static Ingreso Ingreso(this EntornoDeIdentidad e, IUnidadDeTrabajo? unidad = null) => new(
+        e.Cuentas, e.Hasher, new ListaDeContrasenasDePrueba(), e.Limites, e.Huellas, e.Desafios, e.HuellasDeIdentidad, e.Secretos, e.SegundoFactor, e.Cifrador, e.Sesiones, e.Renovaciones, unidad ?? e.Unidad, e.Auditoria, e.Eventos, e.Avisos, e.Reloj);
+
+    public static RestablecimientoDelSegundoFactorDesdeLaInstalacion Restablecimiento(this EntornoDeIdentidad e, IUnidadDeTrabajo? unidad = null) => new(
+        e.Cuentas, e.SegundoFactor, e.Desafios, e.Revocacion, e.Avisos, new AlcanceDeLaCuenta(e.Actor, e.Denegaciones), e.Actor, unidad ?? e.Unidad, e.Auditoria, e.Reloj);
 
     /// <summary>Deja activo el segundo factor de una cuenta con un secreto conocido y 8 códigos de respaldo; devuelve el secreto y los códigos en claro.</summary>
     public static (byte[] Secreto, IReadOnlyList<string> Respaldo) ConSegundoFactor(this EntornoDeIdentidad e, CuentaDeIdentidad cuenta)

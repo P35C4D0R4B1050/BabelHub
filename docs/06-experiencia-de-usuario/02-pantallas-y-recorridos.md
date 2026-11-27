@@ -23,15 +23,15 @@ La sucursal que atiende cada impreso se elige en la ficha del libro; la cabecera
 | `ecommerce-pedidos` | Mis pedidos, seguimiento con estados por línea, cancelación antes de la preparación. Admin: pedidos, anulación y no recogidos. |
 | `ecommerce-biblioteca-digital` | Mi biblioteca, descarga y sus estados. |
 | `ecommerce-envios` | Guía de envío y seguimiento (Sucursal › Logística). |
-| `ecommerce-devoluciones` | Solicitud de devolución con política distinta para impresos y digitales. |
-| `ecommerce-libro-reclamaciones` | Formulario (con documento, domicilio y monto), constancia imprimible con el plazo y listado de reclamos con filtro por estado y descarte (Admin). |
+| `ecommerce-devoluciones` | Solicitud de devolución con política distinta para impresos y digitales. «Mis devoluciones» se enlaza desde la cuenta del cliente y los reportes de archivos defectuosos desde las devoluciones de la administración. |
+| `ecommerce-libro-reclamaciones` | Formulario (con documento, domicilio y monto), constancia imprimible con el plazo, «Mis hojas» (enlazada desde la cuenta del cliente) y listado de reclamos con filtro por estado y descarte (Admin). |
 | `inventario-fuentes`, `inventario-ajustes` | Inventario de la sucursal con físico, reservado, vendible y **vendidos de los últimos 30 días**; ajustes con motivo e historial (el administrador puede ajustar cualquier sucursal). Admin: sucursales con sus vendidos y el total de la red, fuente de recepción y rutas con su plazo en días. |
 | `inventario-seleccion-fuente`, `inventario-traslados` | Pedidos de recojo, traslados (solicitar, aprobar, despachar, recibir). |
 | `identidad-seguridad` | Inicio de sesión (con código del segundo factor si corresponde), registro, verificación del correo, recuperación de acceso, cuenta con consentimiento de WhatsApp y segundo factor, usuarios y roles, solicitudes sobre datos personales (Admin). |
 | `web-acceso` | Ayudas en los campos de contraseña (ver u ocultar en todos; ayuda de reglas, barra de seguridad y aviso de coincidencia donde se define una nueva), código QR junto a la clave al configurar el segundo factor y enlace «Acceso del personal» en el pie y el ingreso de la tienda. |
 | `transversal-auditoria`, `transversal-seguridad` | Auditoría unificada de solo lectura con filtros y aviso si un servicio no responde; lista de alertas de seguridad con estado de revisión. |
 | `asistente-compra-ia` | Panel de chat que no tapa precios ni acciones en pantallas pequeñas. |
-| `web-base` | Estructura, sesión, errores, estados y pie con enlaces legales. |
+| `web-base` | Estructura, sesión, errores, estados y pie con enlaces legales. La raíz de la gestión lleva al ingreso o a la pantalla del rol; quien ingresa para continuar su compra vuelve al carrito. |
 | `web-indice-infinito` | Experimento aislado ([El índice infinito](03-estados-accesibilidad-y-criterios.md)). |
 
 ## 2. Recorrido de compra

@@ -82,7 +82,7 @@ Cualquier consumidor, con o sin sesión, registra una hoja (con nombre, document
 | Proceso | Pasos |
 | :--- | :--- |
 | **Registro** | La persona ingresa nombre, correo y contraseña (10 caracteres como mínimo), declara ser mayor de 18 años y acepta los términos y la privacidad (se guarda la versión y la fecha); recibe un código por correo y verifica el correo, necesario para pagar. Máximo 3 cuentas nuevas por hora por origen. El número de WhatsApp y el consentimiento para recibir avisos son opcionales y se registran aparte. |
-| **Segundo factor** | El personal lo configura en su primer ingreso y recibe 8 códigos de respaldo; el cliente puede activarlo en su cuenta. Si se pierde el dispositivo y los códigos, la administración lo restablece. |
+| **Segundo factor** | El personal lo configura en su primer ingreso y recibe 8 códigos de respaldo; el cliente puede activarlo en su cuenta. Si se pierde el dispositivo y los códigos, la administración lo restablece; si quien los perdió es la única administración que puede ingresar, quien opera la instalación lo restablece desde el equipo del servicio, con registro y aviso. |
 | **Recuperación** | La persona pide recuperar el acceso; recibe un código de un solo uso en su correo verificado; define una nueva contraseña y se revocan sus sesiones anteriores. El personal la recupera con el administrador central. La respuesta es la misma exista o no la cuenta. |
 | **Cancelación** | El cliente cancela su cuenta; se desactiva y se suprimen o anonimizan sus datos personales, salvo lo que una obligación legal exija. |
 

@@ -110,6 +110,10 @@ public sealed class AdministracionDeDevolucionesController(IGestionDeDevolucione
             hecho,
             "Las devoluciones y los reportes aparecerán aquí.",
             cancelacion);
+        // Los reportes de archivos defectuosos son una lista aparte que se decide desde aquí (DEV-06, DEV-13): se enlazan entre sí.
+        vista.OtraLista = ruta == RutaDeLosReportes
+            ? new EnlaceDeDevoluciones("Ver todas las devoluciones", RutaDeLaLista)
+            : new EnlaceDeDevoluciones("Ver los reportes de archivos defectuosos", RutaDeLosReportes);
         return View("~/Areas/Tienda/Views/Devoluciones/Lista.cshtml", vista);
     }
 

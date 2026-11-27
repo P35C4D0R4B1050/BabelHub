@@ -27,7 +27,8 @@ public static class RespuestasDeSesion
             contexto.Response.Headers.CacheControl = "no-store";
         }
 
-        return contexto.Request.EsHtmx() ? new HxRedirectResult(RutaDelIngreso) : new LocalRedirectResult(RutaDelIngreso);
+        var ingreso = ContinuacionDelIngreso.RutaDelIngresoPara(contexto);
+        return contexto.Request.EsHtmx() ? new HxRedirectResult(ingreso) : new LocalRedirectResult(ingreso);
     }
 
     /// <summary>Lo mismo que <see cref="RedirigirAlIngreso"/> pero escribiendo la respuesta directamente: para el middleware, que no ejecuta resultados de MVC.</summary>
@@ -44,15 +45,16 @@ public static class RespuestasDeSesion
             contexto.Response.Headers.CacheControl = "no-store";
         }
 
+        var ingreso = ContinuacionDelIngreso.RutaDelIngresoPara(contexto);
         if (contexto.Request.EsHtmx())
         {
             contexto.Response.StatusCode = StatusCodes.Status200OK;
-            contexto.Response.Headers["HX-Redirect"] = RutaDelIngreso;
+            contexto.Response.Headers["HX-Redirect"] = ingreso;
         }
         else
         {
             contexto.Response.StatusCode = StatusCodes.Status302Found;
-            contexto.Response.Headers.Location = RutaDelIngreso;
+            contexto.Response.Headers.Location = ingreso;
         }
     }
 }

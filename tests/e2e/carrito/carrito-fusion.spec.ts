@@ -61,12 +61,12 @@ test.describe('Fusión del carrito al ingresar (ingreso real)', () => {
     await page.goto('/carrito');
     await expect(page.getByText('Para pagar necesitas una cuenta.')).toBeVisible();
 
-    // 3. Ingresa por la pantalla real: ahí se fusiona el carrito del visitante con el de la cuenta.
-    await page.goto('/ingreso');
+    // 3. Pulsa pagar e ingresa por la pantalla real: ahí se fusiona el carrito del visitante con el de la cuenta y vuelve a su carrito (AC-CAR-13).
+    await page.getByRole('link', { name: 'Ingresar para continuar' }).click();
     await page.getByLabel('Correo electrónico').fill(cuenta.correo);
     await page.getByLabel('Contraseña').fill(contrasena);
-    await page.getByRole('button', { name: 'Ingresar' }).click();
-    await expect(page).not.toHaveURL(/\/ingreso/);
+    await page.locator('#formulario-de-ingreso').getByRole('button', { name: 'Ingresar' }).click();
+    await expect(page).toHaveURL(/\/carrito$/);
 
     // 4. El impreso queda con lo vendible de su sucursal (nunca la suma), el digital poseído se descarta y se avisa de ambos ajustes.
     await page.goto('/carrito');

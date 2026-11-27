@@ -125,6 +125,16 @@ public sealed class PostgresRepositorioDeDesafios(AccesoAlEsquemaDeIdentidad acc
             },
             cancelacion);
 
+    public Task AnularLosDelUsuario(Guid usuarioId, CancellationToken cancelacion = default) =>
+        acceso.Ejecutar(
+            async (c, t, ct) =>
+            {
+                await using var comando = AccesoAlEsquemaDeIdentidad.Comando(c, t, "UPDATE identidad.desafios_de_ingreso SET usado = true WHERE usuario_id = @u AND NOT usado", ("u", usuarioId));
+                await comando.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                return 0;
+            },
+            cancelacion);
+
     private static string Modo(ModoDelDesafio modo) => modo switch
     {
         ModoDelDesafio.PresentarSegundoFactor => "presentar-segundo-factor",

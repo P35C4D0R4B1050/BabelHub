@@ -175,6 +175,23 @@ public sealed class PostgresRepositorioDeCuentas(AccesoAlEsquemaDeIdentidad acce
             },
             cancelacion);
 
+    public Task<IReadOnlyList<CuentaDeIdentidad>> BloquearLasAdministraciones(CancellationToken cancelacion = default) =>
+        acceso.Ejecutar<IReadOnlyList<CuentaDeIdentidad>>(
+            async (c, t, ct) =>
+            {
+                // Sin filtrar por activa: una desactivada podría reactivarse mientras se decide (identidad-recuperacion-del-segundo-factor RSF-16). El orden fijo evita que dos órdenes se interbloqueen.
+                await using var comando = AccesoAlEsquemaDeIdentidad.Comando(c, t, $"SELECT {Columnas} FROM identidad.usuarios WHERE rol = 'administrador-central' ORDER BY id FOR UPDATE");
+                var cuentas = new List<CuentaDeIdentidad>();
+                await using var filas = await comando.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                while (await filas.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    cuentas.Add(Mapear(filas));
+                }
+
+                return cuentas;
+            },
+            cancelacion);
+
     public Task<IReadOnlyList<Guid>> IdsActivosConRol(IReadOnlyCollection<RolDeUsuario> roles, CancellationToken cancelacion = default)
     {
         ArgumentNullException.ThrowIfNull(roles);

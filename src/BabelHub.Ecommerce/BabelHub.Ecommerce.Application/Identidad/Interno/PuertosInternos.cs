@@ -53,6 +53,12 @@ public interface IRepositorioDeCuentas
     /// </summary>
     Task<int> ContarAdministradoresActivos(CancellationToken cancelacion = default);
 
+    /// <summary>
+    /// <b>Todas</b> las cuentas de administración central, activas o no, con el bloqueo de sus filas (<c>FOR UPDATE</c>) y en orden de identificador: el restablecimiento desde el equipo del servicio decide sobre ellas sin que una reactivación o un restablecimiento
+    /// simultáneo cambie lo comprobado (identidad-recuperacion-del-segundo-factor RSF-16). Se llama dentro de la transacción.
+    /// </summary>
+    Task<IReadOnlyList<CuentaDeIdentidad>> BloquearLasAdministraciones(CancellationToken cancelacion = default);
+
     /// <summary>Los identificadores de los usuarios activos con alguno de esos roles y no cancelados: los destinatarios de las alertas (administración central y, para algunos motivos, logística). Solo identificadores, nunca direcciones.</summary>
     Task<IReadOnlyList<Guid>> IdsActivosConRol(IReadOnlyCollection<RolDeUsuario> roles, CancellationToken cancelacion = default);
 
@@ -181,6 +187,9 @@ public interface IRepositorioDeDesafios
 
     /// <summary>Lo marca usado con un <c>UPDATE … WHERE NOT usado</c>: <see langword="false"/> si otra solicitud ya lo consumió (se consume una sola vez).</summary>
     Task<bool> MarcarUsado(Guid desafioId, CancellationToken cancelacion = default);
+
+    /// <summary>Deja sin efecto todos los desafíos pendientes de la cuenta, en cualquiera de sus pasos (identidad-recuperacion-del-segundo-factor RSF-08).</summary>
+    Task AnularLosDelUsuario(Guid usuarioId, CancellationToken cancelacion = default);
 }
 
 /// <summary>El segundo factor de un usuario guardado: el Dominio y el secreto cifrado (AES-GCM con el usuario en el AAD, T31).</summary>

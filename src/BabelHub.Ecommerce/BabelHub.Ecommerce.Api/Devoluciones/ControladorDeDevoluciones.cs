@@ -52,8 +52,14 @@ public sealed class ListaDeDevolucionesVista : ModeloBaseDePagina
 
     public string? Aviso { get; set; }
 
+    /// <summary>Un enlace a otra lista de devoluciones de la misma persona (en la administración, entre todas y los reportes); nulo si no hay.</summary>
+    public EnlaceDeDevoluciones? OtraLista { get; set; }
+
     public string RutaDeLaPagina(int pagina) => pagina > 1 ? $"{RutaDeLaLista}?pagina={pagina}" : RutaDeLaLista;
 }
+
+/// <summary>El texto y la ruta de un enlace entre listas de devoluciones.</summary>
+public sealed record EnlaceDeDevoluciones(string Texto, string Ruta);
 
 /// <summary>Una acción sobre una devolución: su texto, su ruta y su icono.</summary>
 public sealed record AccionDeDevolucionVista(string Texto, string Ruta, string Icono, bool Principal);

@@ -552,6 +552,12 @@ public static class AnfitrionDelEcommerce
         app.MapearSembradorDeSesiones();
 #endif
         app.MapearDocumentacionOpenApi();
+        // La raíz de la gestión lleva al ingreso o al destino del rol; la de la tienda es su portada (InicioController).
+        if (app.Services.GetRequiredService<OpcionesDelHostWeb>().Host == HostWeb.Gestion)
+        {
+            app.MapearElInicioDeLaGestion();
+        }
+
         app.MapDefaultControllerRoute();
         return app;
     }

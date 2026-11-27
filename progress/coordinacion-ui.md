@@ -61,3 +61,5 @@ Lista común para que ambos agentes partan de lo mismo. «Decide la persona» si
 
 | Fecha | Tarea | Respuesta o corrección pedida |
 | :--- | :--- | :--- |
+| 2026-11-27 | Accesos pendientes (aviso a Codex) | Cambios mínimos de interfaz del regreso a la compra, que UI-1 y UI-2 deben conservar: `Views/Ingreso/Ingreso.cshtml` (aviso «Al ingresar vuelves a tu carrito» y campo oculto `continuar` en los formularios de credenciales y de segundo factor) y `Carrito/Index.cshtml` (solo el `href` de «Ingresar para continuar»). No se tocó el menú ni los estilos. |
+| 2026-11-27 | Accesos pendientes (aviso a Codex) | Enlaces nuevos, que UI-1 y UI-4 deben conservar: `Views/Cuenta/Cuenta.cshtml` (lista «Tus trámites» en el resumen del cliente) y `Devoluciones/Lista.cshtml` (un enlace bajo la descripción). No se tocó el menú ni los estilos. |

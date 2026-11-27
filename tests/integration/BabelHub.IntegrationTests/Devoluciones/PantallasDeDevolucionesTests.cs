@@ -199,6 +199,23 @@ public sealed class PantallasDeDevolucionesTests
     }
 
     [Fact]
+    [Trait("Criterio", "AC-DEV-23")]
+    public async Task La_administracion_llega_a_los_reportes_desde_la_lista_y_vuelve_sin_escribir_direcciones()
+    {
+        await using var administracion = await Iniciar(RolWeb.AdministradorCentral, HostWeb.Gestion, new DevolucionesFalsas());
+        await using var cliente = await Iniciar(RolWeb.Cliente, HostWeb.Tienda, new DevolucionesFalsas());
+
+        // Con la lista vacía el enlace sigue: los reportes son otra lista.
+        var (_, todas) = await Pedir(administracion, "/administracion/devoluciones", HostWeb.Gestion);
+        var (_, reportes) = await Pedir(administracion, "/administracion/devoluciones/reportes", HostWeb.Gestion);
+        var (_, propias) = await Pedir(cliente, "/cuenta/devoluciones", HostWeb.Tienda);
+
+        Assert.Contains("href=\"/administracion/devoluciones/reportes\"", todas, StringComparison.Ordinal);
+        Assert.Contains("href=\"/administracion/devoluciones\">Ver todas las devoluciones</a>", reportes, StringComparison.Ordinal);
+        Assert.DoesNotContain("/devoluciones/reportes", propias, StringComparison.Ordinal);
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-DEV-04")]
     public async Task La_pantalla_de_devolver_ofrece_los_impresos_entregados_con_su_plazo_los_digitales_con_su_politica_y_el_aviso_de_privacidad()
     {

@@ -129,12 +129,18 @@ test.describe('Carrito y checkout con el entorno sembrado', () => {
     const titulos = await page.getByRole('region', { name: 'Libros en tu carrito' }).getByRole('listitem').count();
     expect(titulos).toBeGreaterThan(0);
     await expect(page.getByText('Para pagar necesitas una cuenta.')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Ingresar para continuar' })).toHaveAttribute('href', '/ingreso');
+    await expect(page.getByRole('link', { name: 'Ingresar para continuar' })).toHaveAttribute('href', '/ingreso?continuar=compra');
 
     // El carrito sigue igual después de recargar y no hay forma de pagar sin sesión.
     await page.reload();
     expect(await page.getByRole('region', { name: 'Libros en tu carrito' }).getByRole('listitem').count()).toBe(titulos);
     await expect(page.getByRole('button', { name: 'Continuar con la compra' })).toHaveCount(0);
+
+    // El ingreso de la compra recuerda que se volverá al carrito (la vuelta tras ingresar se prueba con el ingreso real en la fusión).
+    await page.getByRole('link', { name: 'Ingresar para continuar' }).click();
+    await expect(page).toHaveURL(/\/ingreso\?continuar=compra$/);
+    await expect(page.getByText('Al ingresar vuelves a tu carrito')).toBeVisible();
+    await expect(page.locator('#formulario-de-ingreso input[name="continuar"]')).toHaveValue('compra');
   });
 
   for (const [nombre, ruta] of [

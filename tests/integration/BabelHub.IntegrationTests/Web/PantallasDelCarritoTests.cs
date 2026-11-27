@@ -190,7 +190,7 @@ public sealed class PantallasDelCarritoTests
         Assert.Contains("action=\"/checkout/iniciar\"", logueado, StringComparison.Ordinal);
         Assert.Contains("Continuar con la compra", logueado, StringComparison.Ordinal);
         Assert.DoesNotContain("action=\"/checkout/iniciar\"", anonimo, StringComparison.Ordinal);
-        Assert.Contains("href=\"/ingreso\"", anonimo, StringComparison.Ordinal);
+        Assert.Contains("href=\"/ingreso?continuar=compra\"", anonimo, StringComparison.Ordinal);
         Assert.Contains("Tu carrito se conserva al ingresar", anonimo, StringComparison.Ordinal);
     }
 

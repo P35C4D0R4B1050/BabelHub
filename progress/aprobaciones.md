@@ -95,3 +95,5 @@ Una fila por cada spec o plan que el agente aprobó por delegación de la person
 | 2026-11-27 | spec | ecommerce-pedidos | Claude (delegado) | 0/0 | Con cambios menores | Cumple | Cumple | 0 | 1 | 147137c1d1bd74db |
 | 2026-11-27 | plan | ecommerce-pedidos | Claude (delegado) | 0/0 | Con cambios menores | Cumple | Cumple con observaciones | 0 | 2 | c7a04b8e19e956da |
 | 2026-11-27 | plan | ecommerce-carrito-checkout | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 1 | 62f8e508afb76074 |
+| 2026-11-27 | spec | identidad-recuperacion-del-segundo-factor | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 16 | e441b0b499c093a7 |
+| 2026-11-27 | plan | identidad-recuperacion-del-segundo-factor | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 12 | 8328a313a8d3d65f |
