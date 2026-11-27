@@ -2,6 +2,16 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-26 — La tienda sin pasarela para la revisión de Culqi (carril `sin-pasarela`)
+
+### Cubierto
+- `BABELHUB__Pagos__Pasarela=ninguna` (por defecto en `Staging`): sin avisos de pagos ni envíos simulados, «El pago en línea estará disponible pronto» y todo cobro rechazado en el servidor; el simulador se conserva para las pruebas con personas (guía 08 §15.1).
+- `ecommerce-pagos` reabierta y reaprobada, spec y plan (delegado; PAG-50 a PAG-52, D26, T48 a T52; DD-110 a DD-113 ratificadas por la persona).
+
+### Pendiente
+- Persona: cambiar la línea en los secretos ya generados y redesplegar; T38. Los textos legales definitivos llegaron aparte (DD-115).
+- Menores de la puerta en `hallazgos.md`; sin revisión visual ni E2E del modo sin pasarela.
+
 ## 2026-11-26 — Textos legales definitivos
 
 ### Cubierto

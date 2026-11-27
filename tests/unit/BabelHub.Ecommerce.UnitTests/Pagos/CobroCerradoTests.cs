@@ -25,7 +25,7 @@ public sealed class CobroCerradoTests
     }
 
     [Theory]
-    [Trait("Criterio", "AC-PAG-42")]
+    [Trait("Criterio", "AC-PAG-43")]
     [InlineData(AppMedioDePago.Tarjeta)]
     [InlineData(AppMedioDePago.Yape)]
     public async Task Con_el_cobro_cerrado_cobrar_se_rechaza_sin_registrar_el_intento_sin_tocar_la_reserva_y_sin_llamar_a_la_pasarela(AppMedioDePago medio)
@@ -51,7 +51,7 @@ public sealed class CobroCerradoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-42")]
+    [Trait("Criterio", "AC-PAG-43")]
     public async Task Con_el_cobro_cerrado_no_se_emite_la_clave_de_un_intento_ni_se_lee_nada()
     {
         var e = await EntornoDePagosExtensiones.ConIntencionLista();
@@ -67,7 +67,7 @@ public sealed class CobroCerradoTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-PAG-42")]
+    [Trait("Criterio", "AC-PAG-43")]
     public async Task Con_el_cobro_cerrado_sin_sesion_la_respuesta_sigue_siendo_no_autenticado()
     {
         var e = await EntornoDePagosExtensiones.ConIntencionLista();

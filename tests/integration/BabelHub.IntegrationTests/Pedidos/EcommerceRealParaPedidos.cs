@@ -105,8 +105,8 @@ public sealed class PostgresDelEcommerceCompletoFixture : IAsyncLifetime
         return resultado is null or DBNull ? default : (T)Convert.ChangeType(resultado, typeof(T));
     }
 
-    /// <summary>Un anfitrión real del E-commerce (tienda, <c>Development</c>) sobre esta base, sin arrancarlo: se usan sus servicios por alcance. <paramref name="ajustes"/> sustituye lo externo (el Inventario).</summary>
-    internal AnfitrionRealDelEcommerce Anfitrion(Action<IServiceCollection> ajustes) => AnfitrionRealDelEcommerce.Crear(this, ajustes);
+    /// <summary>Un anfitrión real del E-commerce (tienda, <c>Development</c>) sobre esta base, sin arrancarlo: se usan sus servicios por alcance. <paramref name="ajustes"/> sustituye lo externo (el Inventario); <paramref name="pasarela"/>, si se da, es el valor de <c>Pagos:Pasarela</c>.</summary>
+    internal AnfitrionRealDelEcommerce Anfitrion(Action<IServiceCollection> ajustes, string? pasarela = null) => AnfitrionRealDelEcommerce.Crear(this, ajustes, pasarela);
 
     internal IReadOnlyDictionary<string, string?> Configuracion()
     {
@@ -129,11 +129,16 @@ internal sealed class AnfitrionRealDelEcommerce : IAsyncDisposable
 
     public IServiceProvider Servicios => Aplicacion.Services;
 
-    public static AnfitrionRealDelEcommerce Crear(PostgresDelEcommerceCompletoFixture bd, Action<IServiceCollection> ajustes)
+    public static AnfitrionRealDelEcommerce Crear(PostgresDelEcommerceCompletoFixture bd, Action<IServiceCollection> ajustes, string? pasarela = null)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = Environments.Development });
         builder.Logging.ClearProviders();
         builder.Configuration.AddInMemoryCollection(bd.Configuracion());
+        if (pasarela is not null)
+        {
+            builder.Configuration.AddInMemoryCollection([new KeyValuePair<string, string?>("Pagos:Pasarela", pasarela)]);
+        }
+
         builder.Services.AddControllersWithViews();
         builder.Host.UseDefaultServiceProvider(o =>
         {

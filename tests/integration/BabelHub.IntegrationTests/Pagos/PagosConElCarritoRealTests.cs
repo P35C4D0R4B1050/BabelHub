@@ -30,7 +30,6 @@ public sealed class PagosConElCarritoRealTests(PostgresDelEcommerceCompletoFixtu
 
     private static readonly Guid EdicionImpresa = Guid.Parse("b0000000-0000-0000-0000-0000000000f1");
 
-
     private const decimal PrecioDeLaEdicion = 50m;
 
     private readonly RelojManualDePagos _reloj = new();
@@ -65,7 +64,7 @@ public sealed class PagosConElCarritoRealTests(PostgresDelEcommerceCompletoFixtu
 
     public Task DisposeAsync() => Task.CompletedTask;
 
-    private AnfitrionRealDelEcommerce Anfitrion() => bd.Anfitrion(servicios =>
+    private AnfitrionRealDelEcommerce Anfitrion(string? pasarela = null) => bd.Anfitrion(servicios =>
     {
         servicios.RemoveAll<IReloj>();
         servicios.AddSingleton<IReloj>(_reloj);
@@ -75,8 +74,12 @@ public sealed class PagosConElCarritoRealTests(PostgresDelEcommerceCompletoFixtu
         servicios.AddSingleton<IReservasDelPago>(new ReservasConRegistroDeLiberaciones(_reservasDelPago, _liberaciones));
         servicios.RemoveAll<IConfirmacionDeCompra>();
         servicios.AddSingleton<IConfirmacionDeCompra>(_pedidos);
-        servicios.RemoveAll<OpcionesDelCobro>();
-        servicios.AddSingleton(new OpcionesDelCobro(TimeSpan.FromMilliseconds(300)));
+        // Sin pasarela se dejan las opciones que compone el anfitrión (el cobro cerrado): sustituirlas lo reabriría.
+        if (pasarela is null)
+        {
+            servicios.RemoveAll<OpcionesDelCobro>();
+            servicios.AddSingleton(new OpcionesDelCobro(TimeSpan.FromMilliseconds(300)));
+        }
 
         // El Carrito real recibe los avisos de Pagos a través de un envoltorio que puede fallar a voluntad (los avisos son reintentables).
         var original = servicios.Last(d => d.ServiceType == typeof(IProgresoDelCheckout));
@@ -88,7 +91,7 @@ public sealed class PagosConElCarritoRealTests(PostgresDelEcommerceCompletoFixtu
                 : (IProgresoDelCheckout)ActivatorUtilities.CreateInstance(sp, original.ImplementationType!);
             return new ProgresoConElCarritoReal(interior, _fallasDeCarrito);
         });
-    });
+    }, pasarela);
 
     private static ActorActual DelCliente(Guid cuenta) => ActorActual.DeUsuario(cuenta, RolesDeUsuario.Cliente, null);
 
@@ -181,6 +184,41 @@ public sealed class PagosConElCarritoRealTests(PostgresDelEcommerceCompletoFixtu
 
     private Task<long> AvisosSinEnviar(Guid pedido) =>
         bd.Consultar<long>("SELECT count(*) FROM pagos.avisos_a_carrito WHERE intencion_id = @p AND estado IN ('retenido', 'pendiente')", ("p", pedido));
+
+    [Fact]
+    [Trait("Criterio", "AC-PAG-42")]
+    [Trait("Criterio", "AC-PAG-43")]
+    public async Task Sin_pasarela_la_compra_llega_al_paso_de_pago_no_admite_ningun_cobro_y_volver_al_carrito_libera_la_reserva()
+    {
+        await using var anfitrion = Anfitrion("ninguna");
+
+        var (cuenta, pedido) = await ComprarHastaElPago(anfitrion);
+
+        // El checkout hace lo de siempre: la intención de pago existe y los impresos quedan separados.
+        Assert.Equal("en_pago", await EstadoDelCheckout(cuenta));
+        Assert.Equal("abierta", await EstadoDeLaIntencion(pedido));
+        Assert.Equal(2, _inventarioDelCarrito.Reservado(EdicionImpresa));
+        var estado = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<IPagos>().ObtenerEstado(pedido));
+        Assert.Equal(EstadoDelPagoDeLaCompra.ListoParaPagar, estado.Valor.Estado);
+        Assert.False(estado.Valor.CobroDisponible);
+        Assert.False(estado.Valor.PuedeReintentar);
+
+        var clave = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<IPagos>().EmitirClaveDeIntento(new EmitirClaveDeIntentoEntrada(pedido)));
+        var cobro = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<IPagos>().Cobrar(
+            new CobrarEntrada(pedido, "clave-hecha-a-mano", MedioDelContrato.Tarjeta, TokenDelMedioDePago.Crear(EscenariosDelSimulador.Aprobado))));
+
+        Assert.Equal("pago-no-disponible", clave.Error?.Clave);
+        Assert.Equal("pago-no-disponible", cobro.Error?.Clave);
+        Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM pagos.intentos WHERE intencion_id = @p", ("p", pedido)));
+        Assert.Equal("abierta", await EstadoDeLaIntencion(pedido));
+        Assert.DoesNotContain(pedido, _pedidos.PedidosCreados);
+
+        var vuelta = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().VolverAlCarrito(new SalirDelCheckoutEntrada(pedido)));
+
+        Assert.True(vuelta.EsExito, vuelta.Error?.Clave);
+        Assert.Equal(0, _inventarioDelCarrito.Reservado(EdicionImpresa));
+        Assert.Equal(1L, await LineasDelCarrito(cuenta));
+    }
 
     [Fact]
     [Trait("Criterio", "AC-PAG-04")]
