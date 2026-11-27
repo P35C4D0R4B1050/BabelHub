@@ -41,6 +41,9 @@ public sealed class CuentaVista : ModeloBaseDePagina
 
     public string? UriDelSecreto { get; set; }
 
+    /// <summary>El código QR de esa misma dirección (web-acceso ACC-13); nulo si no se está configurando o si no se pudo generar.</summary>
+    public CodigoQr? Qr { get; set; }
+
     public IReadOnlyList<string> Codigos { get; set; } = [];
 
     public IReadOnlyDictionary<string, string> Borrador { get; set; } = new Dictionary<string, string>();
@@ -67,6 +70,7 @@ public sealed class CuentaController(
     ISesionesWeb sesiones,
     IBorradoresDePantalla borradores,
     ContextoDePagina pagina,
+    IGeneradorDeCodigoQr codigos,
     OpcionesDelHostWeb host) : Controller
 {
     public const string Datos = "/cuenta/datos";
@@ -182,7 +186,9 @@ public sealed class CuentaController(
         // El secreto se muestra esta única vez y no se guarda.
         var vista = await Armar(PantallaDeLaCuenta.SegundoFactor, actor, null, cancelacion);
         vista.SecretoBase32 = resultado.Valor.SecretoBase32.Revelar();
-        vista.UriDelSecreto = $"otpauth://totp/{Uri.EscapeDataString(resultado.Valor.Emisor)}:{Uri.EscapeDataString(resultado.Valor.Cuenta)}?secret={resultado.Valor.SecretoBase32.Revelar()}&issuer={Uri.EscapeDataString(resultado.Valor.Emisor)}";
+        vista.UriDelSecreto = ConfiguracionDelSegundoFactor.Direccion(resultado.Valor);
+        // El código QR dice lo mismo que el enlace (web-acceso ACC-13).
+        vista.Qr = codigos.Generar(new ValorSecreto(vista.UriDelSecreto));
         return Pintar(vista, StatusCodes.Status200OK);
     }
 

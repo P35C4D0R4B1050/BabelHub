@@ -49,6 +49,12 @@
   --noise: 0;
   --bh-coral-texto: #B5352A;
   --bh-foco: #1A6F80;
+  --bh-nivel-debil: #B5352A;
+  --bh-nivel-aceptable: #8F5A00;
+  --bh-nivel-buena: #5B6B00;
+  --bh-nivel-fuerte: #2E6B14;
+  --bh-qr-fondo: #FFFFFF;
+  --bh-qr-tinta: #000000;
 }
 
 /* Tema oscuro: «Archivo nocturno». Es el del dispositivo cuando la persona prefiere oscuro y no eligió. */
@@ -87,6 +93,12 @@
   --noise: 0;
   --bh-coral-texto: #FF7A6E;
   --bh-foco: #36C8D4;
+  --bh-nivel-debil: #FF8F86;
+  --bh-nivel-aceptable: #F5C451;
+  --bh-nivel-buena: #D3E85E;
+  --bh-nivel-fuerte: #7FDB5A;
+  --bh-qr-fondo: #FFFFFF;
+  --bh-qr-tinta: #000000;
 }
 
 /* Tipografía autoalojada (sin servidores externos): DM Serif Display para títulos e Inter para la interfaz. */
@@ -267,8 +279,86 @@ body {
   top: 0.5rem;
 }
 
+/* Ayudas de contraseña y código QR (web-acceso). El nivel se entiende sin color: por su texto y por cuántos tramos están llenos. */
+.bh-medidor[hidden],
+.bh-coincidencia[hidden] {
+  display: none;
+}
+
+.bh-medidor-barra {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25rem;
+}
+
+.bh-medidor-barra > span {
+  height: 0.5rem;
+  border-radius: var(--radius-selector);
+  border: 1px solid color-mix(in oklab, var(--color-base-content) 55%, transparent);
+}
+
+.bh-medidor[data-nivel="1"] .bh-medidor-barra > span:nth-child(-n + 1) {
+  background: var(--bh-nivel-debil);
+  border-color: var(--bh-nivel-debil);
+}
+
+.bh-medidor[data-nivel="2"] .bh-medidor-barra > span:nth-child(-n + 2) {
+  background: var(--bh-nivel-aceptable);
+  border-color: var(--bh-nivel-aceptable);
+}
+
+.bh-medidor[data-nivel="3"] .bh-medidor-barra > span:nth-child(-n + 3) {
+  background: var(--bh-nivel-buena);
+  border-color: var(--bh-nivel-buena);
+}
+
+.bh-medidor[data-nivel="4"] .bh-medidor-barra > span {
+  background: var(--bh-nivel-fuerte);
+  border-color: var(--bh-nivel-fuerte);
+}
+
+.bh-coincidencia {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.bh-coincidencia svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+}
+
+.bh-coincidencia[data-coincide="si"] svg {
+  color: var(--bh-nivel-fuerte);
+}
+
+.bh-coincidencia[data-coincide="no"] svg {
+  color: var(--bh-nivel-debil);
+}
+
+/* El código QR: oscuro sobre claro en los dos temas (un lector de cámara lo necesita), con su margen dentro del dibujo; 12 rem salvo que la pantalla sea más angosta. */
+.bh-qr {
+  display: block;
+  width: min(100%, 12rem);
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.bh-qr-fondo {
+  fill: var(--bh-qr-fondo);
+}
+
+.bh-qr-tinta {
+  fill: var(--bh-qr-tinta);
+}
+
 /* Movimiento: solo si la persona no pidió reducirlo (WEB-12) */
 @media (prefers-reduced-motion: no-preference) {
+  .bh-medidor-barra > span {
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+  }
+
   .bh-celda {
     transition: background-color 0.2s ease, color 0.2s ease;
   }

@@ -104,9 +104,9 @@
                 <h2 class="mt-10 font-display text-2xl">Cambiar mi contraseña</h2>
                 <form method="post" action="/cuenta/contrasena" class="mt-3 flex max-w-md flex-col gap-4">
                     <partial name="_TokenAntifalsificacion" />
-                    <label class="form-control"><span class="label-text">Contraseña actual</span><input type="password" name="actual" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
-                    <label class="form-control"><span class="label-text">Contraseña nueva (mínimo @ReglasDeContrasena.LongitudMinima caracteres)</span><input type="password" name="nueva" class="input input-bordered w-full" required maxlength="1024" autocomplete="new-password" /></label>
-                    <label class="form-control"><span class="label-text">Repite la contraseña nueva</span><input type="password" name="confirmacion" class="input input-bordered w-full" required maxlength="1024" autocomplete="new-password" /></label>
+                    <partial name="_CampoDeContrasena" model='CampoDeContrasena.Actual("actual")' />
+                    <partial name="_CampoDeContrasena" model='CampoDeContrasena.Nueva("nueva", $"Contraseña nueva (mínimo {BabelHub.Ecommerce.Application.Identidad.ReglasDeContrasena.LongitudMinima} caracteres)")' />
+                    <partial name="_CampoDeContrasena" model='CampoDeContrasena.Repeticion("confirmacion", "nueva")' />
                     @if (acciones)
                     {
                         <button type="submit" class="btn btn-primary">Cambiar contraseña</button>
@@ -120,6 +120,11 @@
                 @if (Model.SecretoBase32 is not null)
                 {
                     <div class="my-4 rounded-box border border-base-300 p-4">
+                        @if (Model.Qr is { } qr)
+                        {
+                            <p class="mb-3 text-sm">Escanea el código QR con tu aplicación de autenticación o escribe la clave.</p>
+                            <div class="mb-4 flex justify-center"><partial name="_CodigoQr" model="qr" /></div>
+                        }
                         <p class="text-sm font-semibold">Clave para tu aplicación (se muestra solo ahora)</p>
                         <p class="mt-1 break-all font-mono text-lg">@Model.SecretoBase32</p>
                         <p class="mt-2 text-sm"><a class="link" href="@Model.UriDelSecreto">Abrir en mi aplicación de autenticación</a></p>
@@ -134,7 +139,7 @@
                 {
                     <form method="post" action="/cuenta/segundo-factor/iniciar" class="mt-4 flex max-w-md flex-col gap-4">
                         <partial name="_TokenAntifalsificacion" />
-                        <label class="form-control"><span class="label-text">Contraseña actual</span><input type="password" name="actual" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
+                        <partial name="_CampoDeContrasena" model='CampoDeContrasena.Actual("actual")' />
                         <button type="submit" class="btn btn-primary">Activar el segundo factor</button>
                     </form>
                 }
@@ -142,13 +147,13 @@
                 {
                     <form method="post" action="/cuenta/segundo-factor/regenerar" class="mt-4 flex max-w-md flex-col gap-4">
                         <partial name="_TokenAntifalsificacion" />
-                        <label class="form-control"><span class="label-text">Contraseña actual</span><input type="password" name="actual" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
+                        <partial name="_CampoDeContrasena" model='CampoDeContrasena.Actual("actual")' />
                         <label class="form-control"><span class="label-text">Código de tu aplicación</span><input type="text" name="codigo" class="input input-bordered w-full" required maxlength="64" autocomplete="one-time-code" inputmode="numeric" /></label>
                         <button type="submit" class="btn btn-outline">Generar códigos de respaldo nuevos</button>
                     </form>
                     <form method="post" action="/cuenta/segundo-factor/desactivar" class="mt-8 flex max-w-md flex-col gap-4">
                         <partial name="_TokenAntifalsificacion" />
-                        <label class="form-control"><span class="label-text">Contraseña actual</span><input type="password" name="actual" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
+                        <partial name="_CampoDeContrasena" model='CampoDeContrasena.Actual("actual")' />
                         <label class="form-control"><span class="label-text">Código de tu aplicación</span><input type="text" name="codigo" class="input input-bordered w-full" required maxlength="64" autocomplete="one-time-code" inputmode="numeric" /></label>
                         <button type="submit" class="btn btn-error btn-outline">Desactivar el segundo factor</button>
                     </form>
@@ -173,7 +178,7 @@
                     <form method="post" action="/cuenta/correo/solicitar" class="mt-4 flex max-w-md flex-col gap-4">
                         <partial name="_TokenAntifalsificacion" />
                         <label class="form-control"><span class="label-text">Correo nuevo</span><input type="email" name="correoNuevo" class="input input-bordered w-full" required maxlength="254" autocomplete="email" /></label>
-                        <label class="form-control"><span class="label-text">Contraseña actual</span><input type="password" name="actual" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
+                        <partial name="_CampoDeContrasena" model='CampoDeContrasena.Actual("actual")' />
                         @if (c!.SegundoFactorActivo)
                         {
                             <label class="form-control"><span class="label-text">Código de tu aplicación de autenticación o de respaldo</span><input type="text" name="codigo" class="input input-bordered w-full" required maxlength="64" autocomplete="one-time-code" /></label>
@@ -189,7 +194,7 @@
                     <p class="mt-2 text-sm">Si pediste un cambio desde otro dispositivo, tienes 24 horas para confirmarlo o rechazarlo desde este con tu contraseña actual.</p>
                     <form method="post" class="mt-3 flex max-w-md flex-col gap-4" asp-antiforgery="false">
                         <partial name="_TokenAntifalsificacion" />
-                        <label class="form-control"><span class="label-text">Contraseña actual</span><input type="password" name="actual" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
+                        <partial name="_CampoDeContrasena" model='CampoDeContrasena.Actual("actual")' />
                         <div class="flex gap-3">
                             <button type="submit" class="btn btn-primary" formaction="/cuenta/correo/confirmar">Confirmar el cambio</button>
                             <button type="submit" class="btn btn-error btn-outline" formaction="/cuenta/correo/rechazar">Rechazarlo</button>
@@ -294,7 +299,7 @@
                         {
                             <form method="post" action="/cuenta/cancelacion/reconfirmar" class="mt-2 flex max-w-md flex-col gap-4">
                                 <partial name="_TokenAntifalsificacion" />
-                                <label class="form-control"><span class="label-text">Contraseña actual</span><input type="password" name="contrasena" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
+                                <partial name="_CampoDeContrasena" model='CampoDeContrasena.Actual("contrasena")' />
                                 @if (c.SegundoFactorActivo)
                                 {
                                     <label class="form-control"><span class="label-text">Código de tu aplicación</span><input type="text" name="codigo" class="input input-bordered w-full" required maxlength="64" autocomplete="one-time-code" inputmode="numeric" /></label>
@@ -312,7 +317,7 @@
                 {
                     <form method="post" action="/cuenta/cancelacion/solicitar" class="mt-4 flex max-w-md flex-col gap-4">
                         <partial name="_TokenAntifalsificacion" />
-                        <label class="form-control"><span class="label-text">Contraseña actual</span><input type="password" name="contrasena" class="input input-bordered w-full" required maxlength="1024" autocomplete="current-password" /></label>
+                        <partial name="_CampoDeContrasena" model='CampoDeContrasena.Actual("contrasena")' />
                         @if (c!.SegundoFactorActivo)
                         {
                             <label class="form-control"><span class="label-text">Código de tu aplicación</span><input type="text" name="codigo" class="input input-bordered w-full" required maxlength="64" autocomplete="one-time-code" inputmode="numeric" /></label>
