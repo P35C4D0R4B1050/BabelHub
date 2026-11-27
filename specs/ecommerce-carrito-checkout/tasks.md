@@ -64,4 +64,4 @@ Plan §11. Carril «Carrito y tienda», en este orden. T43 espera T34 de `invent
 - [x] T46 [Web/C] Ficha con sucursal, stock y máximo, preselección y sin dato vigente (cubre: AC-CAR-36, AC-CAR-37)
 - [x] T47 [Web/C] Carrito por tarjeta con sucursal y actualización al cambiar la cantidad, y checkout sin elegir sucursal con el desglose del envío (cubre: AC-CAR-38, AC-CAR-08, AC-CAR-39, AC-CAR-31)
 - [x] T48 [Web/C] Pantalla de gestión de costos de envío y su entrada de menú (cubre: AC-CAR-40, AC-CAR-41)
-- [ ] T49 [Pruebas/E] Secretos y entornos con 30.00, pruebas cruzadas y E2E de una compra de dos sucursales actualizados, guía de despliegue y datos existentes, y las entradas de amenazas (AM05, AM11, AM39) y controles (CTL-04, CTL-24, CTL-25, CTL-26) en `docs/05-seguridad` (cubre: AC-CAR-21, AC-CAR-39, AC-CAR-35)
+- [x] T49 [Pruebas/E] Secretos y entornos con 30.00, pruebas cruzadas y E2E de una compra de dos sucursales actualizados, guía de despliegue y datos existentes, y las entradas de amenazas (AM05, AM11, AM39) y controles (CTL-04, CTL-24, CTL-25, CTL-26) en `docs/05-seguridad` (cubre: AC-CAR-21, AC-CAR-39, AC-CAR-35)
