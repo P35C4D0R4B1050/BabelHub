@@ -303,9 +303,10 @@ public sealed class Devolucion
             throw new ArgumentException("Una devolución lleva de 1 a 20 líneas.", nameof(lineas));
         }
 
-        if (lineas.Select(l => l.EdicionId).Distinct().Count() != lineas.Count || lineas.Select(l => l.LineaDePedidoId).Distinct().Count() != lineas.Count)
+        // Un impreso admite dos líneas de una edición (una por sucursal o lote de la compra); un digital, una por edición.
+        if (lineas.Select(l => l.LineaDePedidoId).Distinct().Count() != lineas.Count || (tipo == TipoDeDevolucion.Digital && lineas.Select(l => l.EdicionId).Distinct().Count() != lineas.Count))
         {
-            throw new ArgumentException("Las líneas deben ser de ediciones distintas.", nameof(lineas));
+            throw new ArgumentException("Cada línea del pedido va una sola vez y los digitales son de ediciones distintas.", nameof(lineas));
         }
 
         if (origen == OrigenDeDevolucion.Reporte && (tipo != TipoDeDevolucion.Digital || lineas.Count != 1 || lineas[0].AccesoId is null))

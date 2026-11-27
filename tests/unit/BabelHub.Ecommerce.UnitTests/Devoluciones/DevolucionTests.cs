@@ -77,14 +77,16 @@ public sealed class DevolucionTests
 
     [Fact]
     [Trait("Criterio", "AC-DEV-01")]
-    public void Una_devolucion_lleva_de_1_a_20_lineas_de_ediciones_distintas()
+    public void Una_devolucion_lleva_de_1_a_20_lineas_de_pedido_distintas_y_un_impreso_admite_dos_de_una_edicion()
     {
         var yo = ResponsableDelCambio.Cliente(Cliente);
         var repetida = Linea();
 
         Assert.Throws<ArgumentException>(() => Devolucion.Solicitar(Guid.NewGuid(), TipoDeDevolucion.Impreso, OrigenDeDevolucion.Solicitud, "lima-central", Motivo(), null, [], Ahora, yo));
         Assert.Throws<ArgumentException>(() => Devolucion.Solicitar(Guid.NewGuid(), TipoDeDevolucion.Impreso, OrigenDeDevolucion.Solicitud, "lima-central", Motivo(), null, [.. Enumerable.Range(0, 21).Select(_ => Linea())], Ahora, yo));
-        Assert.Throws<ArgumentException>(() => Devolucion.Solicitar(Guid.NewGuid(), TipoDeDevolucion.Impreso, OrigenDeDevolucion.Solicitud, "lima-central", Motivo(), null, [repetida, repetida with { LineaDePedidoId = Guid.NewGuid() }], Ahora, yo));
+        Assert.Throws<ArgumentException>(() => Devolucion.Solicitar(Guid.NewGuid(), TipoDeDevolucion.Impreso, OrigenDeDevolucion.Solicitud, "lima-central", Motivo(), null, [repetida, repetida], Ahora, yo));
+        Assert.Equal(2, Devolucion.Solicitar(Guid.NewGuid(), TipoDeDevolucion.Impreso, OrigenDeDevolucion.Solicitud, "lima-central", Motivo(), null, [repetida, repetida with { LineaDePedidoId = Guid.NewGuid() }], Ahora, yo).Lineas.Count);
+        Assert.Throws<ArgumentException>(() => Devolucion.Solicitar(Guid.NewGuid(), TipoDeDevolucion.Digital, OrigenDeDevolucion.Solicitud, null, Motivo(), null, [repetida, repetida with { LineaDePedidoId = Guid.NewGuid() }], Ahora, yo));
         Assert.Equal(20, Devolucion.Solicitar(Guid.NewGuid(), TipoDeDevolucion.Impreso, OrigenDeDevolucion.Solicitud, "lima-central", Motivo(), null, [.. Enumerable.Range(0, 20).Select(_ => Linea())], Ahora, yo).Lineas.Count);
     }
 

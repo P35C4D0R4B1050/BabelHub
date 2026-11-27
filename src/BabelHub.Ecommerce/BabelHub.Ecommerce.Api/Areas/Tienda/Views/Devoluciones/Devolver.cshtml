@@ -27,7 +27,7 @@
                         @foreach (var l in Model.Impresos)
                         {
                             <label class="form-control">
-                                <span class="label-text">@l.Titulo <span class="text-xs opacity-70">(hasta @l.Cantidad; plazo hasta el @l.PlazoTexto, hora de Lima)</span></span>
+                                <span class="label-text">@l.Titulo@(l.Sucursal is null ? null : $" · Atiende: {l.Sucursal}") <span class="text-xs opacity-70">(hasta @l.Cantidad; plazo hasta el @l.PlazoTexto, hora de Lima)</span></span>
                                 <input type="number" inputmode="numeric" name="cantidad.@l.LineaId.ToString("D")" class="input input-bordered w-28" min="0" max="@l.Cantidad" value="0" />
                             </label>
                         }
@@ -35,9 +35,10 @@
                     <label class="form-control">
                         <span class="label-text">Sucursal donde entregarás los libros</span>
                         <select name="sucursalReceptora" class="select select-bordered" required>
+                            <option value="">Elige una sucursal</option>
                             @foreach (var s in Model.Sucursales)
                             {
-                                <option value="@s.Codigo" selected="@(s.Codigo == Model.SucursalPreferida)">@s.Nombre</option>
+                                <option value="@s.Codigo">@s.Nombre</option>
                             }
                         </select>
                     </label>

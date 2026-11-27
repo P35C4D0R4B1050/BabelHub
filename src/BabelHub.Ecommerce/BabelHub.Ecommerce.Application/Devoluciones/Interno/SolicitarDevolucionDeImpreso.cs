@@ -260,12 +260,6 @@ internal sealed class SolicitarDevolucionDeImpreso(
             evaluadas.Add(new LineaEvaluada(new NuevaLineaDeDevolucion(linea.LineaId, linea.EdicionId, pedida.Cantidad, linea.PrecioUnitario), new CupoPedido(linea.LineaId, pedido.PedidoId, linea.Cantidad, pedida.Cantidad)));
         }
 
-        // Dos líneas de la misma edición no caben en una devolución (de 1 a 20 con ediciones distintas).
-        if (evaluadas.Select(e => e.Nueva.EdicionId).Distinct().Count() != evaluadas.Count)
-        {
-            rechazo = MapeoDeDevoluciones.ValidacionDeCampo("lineas", "ediciones-repetidas");
-        }
-
         return evaluadas;
     }
 }

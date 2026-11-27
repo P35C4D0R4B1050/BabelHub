@@ -4,6 +4,7 @@ using BabelHub.Ecommerce.Application.Devoluciones;
 using BabelHub.Ecommerce.Application.Pedidos;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Ecommerce.Application.Web;
+using BabelHub.Ecommerce.Application.Web.Interno;
 using BabelHub.IntegrationTests.Web;
 using BabelHub.Shared.Errores;
 using Microsoft.Extensions.DependencyInjection;
@@ -230,5 +231,43 @@ public sealed class PantallasDeDevolucionesTests
         public Task<Resultado<DetalleDelPedidoDelCliente>> Obtener(Guid pedidoId, CancellationToken cancelacion = default) => Task.FromResult(detalle);
 
         public Task<Resultado<ResultadoDeCancelacionDePedido>> Cancelar(Guid pedidoId, CancellationToken cancelacion = default) => throw new NotSupportedException();
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PED-41")]
+    public async Task La_pantalla_de_devolver_rotula_cada_linea_con_su_sucursal_y_no_preselecciona_la_receptora_ni_con_la_preferida_guardada()
+    {
+        var entregada = new DateTimeOffset(2026, 11, 20, 15, 0, 0, TimeSpan.Zero);
+        LineaVisibleDelPedido Impresa(string sucursal) =>
+            new(Guid.NewGuid(), "Cien años de soledad", "9786123456789", false, 2, 42.75m, 85.50m, EstadoVisibleDeLaLinea.Entregado, sucursal, null, null, entregada, null, CodigoDeSucursal: sucursal);
+        var resumen = new ResumenDePedido(Pedido, "BH-2026-001", entregada, EstadoVisibleDelPedido.Entregado, TipoDeEntregaVisible.Recojo, null, 171m, 2);
+        var pedidos = new PedidosDelClienteDeDevolver(Resultado<DetalleDelPedidoDelCliente>.Exito(new DetalleDelPedidoDelCliente(resumen, 0m, null, [Impresa("cusco"), Impresa("ayacucho")], null, false, AlternativaDeCancelacion.Ninguna, null)));
+        await using var anfitrion = await AnfitrionConSesion.Iniciar(
+            new SesionesWebDePrueba().ConSesionValida(RolWeb.Cliente, null),
+            HostWeb.Tienda,
+            servicios: s =>
+            {
+                s.AddSingleton<IPedidosDelCliente>(pedidos);
+                s.AddSingleton<IListaDeSucursales>(new SucursalesParaDevolver());
+            });
+        using var solicitud = new HttpRequestMessage(HttpMethod.Get, $"/cuenta/pedidos/{Pedido:D}/devolver");
+        solicitud.Headers.TryAddWithoutValidation("Accept", "text/html");
+        solicitud.Headers.TryAddWithoutValidation("Cookie", AnfitrionConSesion.Cookie(HostWeb.Tienda) + "; bh-sucursal=cusco");
+
+        using var respuesta = await anfitrion.Cliente.SendAsync(solicitud);
+        var html = System.Net.WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
+        Assert.Matches(@"(?s)Cien años de soledad · Atiende: Sucursal Cusco.*?Cien años de soledad · Atiende: Sucursal Ayacucho", html);
+        var receptora = System.Text.RegularExpressions.Regex.Match(html, @"(?s)<select name=""sucursalReceptora"".*?</select>").Value;
+        Assert.Matches(@"<option value="""">Elige una sucursal</option>", receptora);
+        Assert.Contains("value=\"cusco\"", receptora, StringComparison.Ordinal);
+        Assert.DoesNotContain("selected", receptora, StringComparison.Ordinal);
+    }
+
+    private sealed class SucursalesParaDevolver : IListaDeSucursales
+    {
+        public Task<ListaDeSucursales?> Obtener(CancellationToken cancelacion = default) =>
+            Task.FromResult<ListaDeSucursales?>(new ListaDeSucursales([new("ayacucho", "Sucursal Ayacucho"), new("cusco", "Sucursal Cusco")], true));
     }
 }

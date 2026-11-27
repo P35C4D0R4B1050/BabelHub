@@ -6,7 +6,7 @@ using BabelHub.Ecommerce.UnitTests.Soporte;
 namespace BabelHub.Ecommerce.UnitTests.Devoluciones;
 
 /// <summary>
-/// La validación de entrada de las solicitudes, los reembolsos de un digital y los reportes (T18; DEV-29, DEV-31; AC-DEV-31): el largo acotado del motivo (300) y del texto (2000) sin caracteres de control ni de formato, de 1 a 20 líneas con ediciones distintas y cantidades válidas, y ningún error que repita lo escrito.
+/// La validación de entrada de las solicitudes, los reembolsos de un digital y los reportes (T18; DEV-29, DEV-31; AC-DEV-31): el largo acotado del motivo (300) y del texto (2000) sin caracteres de control ni de formato, de 1 a 20 líneas con cantidades válidas, y ningún error que repita lo escrito.
 /// El rechazo de un adjunto y la salida codificada son de la Presentación (T23, T24 y T28).
 /// </summary>
 public sealed class ValidacionDeEntradaDeDevolucionesTests
@@ -169,8 +169,8 @@ public sealed class ValidacionDeEntradaDeDevolucionesTests
     }
 
     [Fact]
-    [Trait("Criterio", "AC-DEV-31")]
-    public async Task Dos_lineas_de_la_misma_edicion_se_rechazan_porque_el_reingreso_exige_ediciones_distintas()
+    [Trait("Criterio", "AC-PED-41")]
+    public async Task Dos_lineas_de_la_misma_edicion_impresa_se_aceptan_en_una_devolucion()
     {
         var entorno = new EntornoDeDevoluciones();
         var edicion = Guid.NewGuid();
@@ -180,8 +180,7 @@ public sealed class ValidacionDeEntradaDeDevolucionesTests
 
         var resultado = await entorno.SolicitarImpreso.Ejecutar(Solicitud(pedido.PedidoId, [a.LineaId, b.LineaId], "defecto"));
 
-        Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
-        Assert.Equal("lineas", Assert.Single(resultado.Error.Errores).Campo);
-        Assert.Empty(entorno.Repositorio.Todas);
+        Assert.True(resultado.EsExito, resultado.Error?.Clave);
+        Assert.Equal(new[] { a.LineaId, b.LineaId }, Assert.Single(entorno.Repositorio.Todas).Lineas.Select(l => l.LineaDePedidoId));
     }
 }
