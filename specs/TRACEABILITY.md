@@ -59,7 +59,7 @@
 | transversal-notificaciones | Transversal | Planned | 16 | 16 | identidad-seguridad, transversal-seguridad, transversal-auditoria |
 | transversal-plataforma | Transversal | InProgress | 43 | 38 | — |
 | transversal-seguridad | Transversal | InProgress | 32 | 29 | transversal-auditoria |
-| web-acceso | E-commerce | Planned | 17 | 16 | web-base, identidad-seguridad, web-informacion-del-comercio, transversal-seguridad |
+| web-acceso | E-commerce | InProgress | 17 | 16 | web-base, identidad-seguridad, web-informacion-del-comercio, transversal-seguridad |
 | web-base | E-commerce | Planned | 49 | 42 | identidad-seguridad, ecommerce-libro-reclamaciones, ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-biblioteca-digital, transversal-auditoria, transversal-seguridad, ecommerce-pagos, ecommerce-pedidos, ecommerce-devoluciones, asistente-compra-ia |
 | web-indice-infinito | E-commerce | Done | 9 | 7 | web-base, transversal-seguridad |
 | web-informacion-del-comercio | E-commerce | Planned | 17 | 14 | web-base, ecommerce-devoluciones, identidad-seguridad, ecommerce-libro-reclamaciones, ecommerce-carrito-checkout |

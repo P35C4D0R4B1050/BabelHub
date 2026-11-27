@@ -1,7 +1,7 @@
 ---
 id: web-acceso
 titulo: Ayudas de contraseña, acceso del personal y código QR del segundo factor
-estado: Planned
+estado: InProgress
 aprobado_por: Claude (delegado por Diego Amiquero)
 aprobado_en: 2026-11-27
 plan_aprobado_por: Claude (delegado por Diego Amiquero)
