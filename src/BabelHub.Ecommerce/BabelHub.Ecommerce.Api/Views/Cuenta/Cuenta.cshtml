@@ -70,6 +70,16 @@
                 {
                     <p class="mt-6">Tienes <strong>@pendientes</strong> aviso(s) de seguridad sin ver. <a class="link" href="/cuenta/avisos">Verlos</a>.</p>
                 }
+                @if (!personal)
+                {
+                    <ul class="mt-6 flex flex-col gap-2" aria-label="Tus trámites">
+                        @if (!Model.TextosPendientes)
+                        {
+                            <li><a class="link" href="/cuenta/devoluciones">Mis devoluciones</a></li>
+                        }
+                        <li><a class="link" href="/reclamaciones/mis-hojas">Mis hojas de reclamación</a></li>
+                    </ul>
+                }
                 <form method="post" action="/sesion/cerrar-todas" class="mt-8">
                     <partial name="_TokenAntifalsificacion" />
                     <button type="submit" class="btn btn-ghost">Cerrar todas mis sesiones</button>

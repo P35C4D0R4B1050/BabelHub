@@ -382,6 +382,44 @@ public sealed class PantallasDeLaCuentaTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Criterio", "AC-REC-12")]
+    [Trait("Criterio", "AC-DEV-30")]
+    public async Task La_cuenta_del_cliente_enlaza_sus_devoluciones_y_sus_hojas_y_con_textos_pendientes_solo_las_hojas()
+    {
+        using var normal = await Pedir("/cuenta");
+        var conTodo = await Html(normal);
+        _textosPendientes = true;
+        using var pendiente = await Pedir("/cuenta");
+        var conPendientes = await Html(pendiente);
+
+        Assert.Contains("href=\"/cuenta/devoluciones\">Mis devoluciones</a>", conTodo, StringComparison.Ordinal);
+        Assert.Contains("href=\"/reclamaciones/mis-hojas\">Mis hojas de reclamación</a>", conTodo, StringComparison.Ordinal);
+        // Con los textos pendientes las devoluciones están bloqueadas y el Libro de Reclamaciones no (WEB-41): solo se ofrece lo que abre.
+        Assert.DoesNotContain("/cuenta/devoluciones", conPendientes, StringComparison.Ordinal);
+        Assert.Contains("href=\"/reclamaciones/mis-hojas\"", conPendientes, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [Trait("Criterio", "AC-WEB-02")]
+    [InlineData(RolWeb.Encargado)]
+    [InlineData(RolWeb.Logistica)]
+    [InlineData(RolWeb.AdministradorCentral)]
+    public async Task La_cuenta_del_personal_no_enlaza_los_tramites_del_cliente(RolWeb rol)
+    {
+        await using var personal = await Armar(rol);
+        using var solicitud = new HttpRequestMessage(HttpMethod.Get, "/cuenta");
+        solicitud.Headers.TryAddWithoutValidation("Accept", "text/html");
+        solicitud.Headers.TryAddWithoutValidation("Cookie", AnfitrionConSesion.Cookie());
+
+        using var respuesta = await personal.Cliente.SendAsync(solicitud);
+
+        var html = await respuesta.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
+        Assert.DoesNotContain("/cuenta/devoluciones", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("/reclamaciones/mis-hojas", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Un_error_de_Identidad_se_dice_sin_repetir_lo_que_respondio_y_una_caida_no_es_una_pagina_tecnica()
     {
         _falla = new ErrorDeAplicacion(CategoriaDeError.Limite, "limite-excedido");
