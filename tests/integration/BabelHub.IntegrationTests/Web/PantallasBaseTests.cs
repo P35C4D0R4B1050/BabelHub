@@ -47,7 +47,7 @@ public sealed partial class PantallasBaseTests
     [InlineData("privacidad", "Política de privacidad")]
     [InlineData("cambios-y-devoluciones", "Cambios y devoluciones")]
     [Trait("Criterio", "AC-WEB-24")]
-    public async Task Cada_texto_legal_muestra_su_version_su_vigencia_y_la_marca_de_provisional(string clave, string titulo)
+    public async Task Cada_texto_legal_muestra_su_version_y_su_vigencia_sin_marca_de_provisional(string clave, string titulo)
     {
         await using var anfitrion = await AnfitrionWeb.Iniciar();
 
@@ -58,7 +58,8 @@ public sealed partial class PantallasBaseTests
         Assert.Contains(titulo, html, StringComparison.Ordinal);
         Assert.Matches(@"Versión\s*<strong>0\.1-provisional</strong>", html);
         Assert.Matches(@"Vigente desde\s*<time datetime=""2026-11-14"">14/11/2026</time>", html);
-        Assert.Contains("Texto provisional", html, StringComparison.Ordinal);
+        // La persona responsable aprobó los textos definitivos (DD-115): la marca ya no debe verse (la versión de este anfitrión es la de desarrollo).
+        Assert.DoesNotContain("Texto provisional", html, StringComparison.Ordinal);
         Assert.Single(Regex.Matches(html, "<h1[ >]"));
     }
 
