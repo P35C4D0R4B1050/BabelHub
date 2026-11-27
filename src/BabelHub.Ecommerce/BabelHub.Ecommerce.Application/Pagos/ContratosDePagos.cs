@@ -205,7 +205,13 @@ public sealed record LineaDeCompraAprobada(
     Guid? TrasladoId,
     DateOnly? FechaEstimadaDeLlegada);
 
-/// <summary>Lo que Pagos entrega a Pedidos cuando se aprueba una compra (D02): todo lo necesario para crear el pedido y los accesos en una sola transacción. El texto no repite el contacto ni los títulos.</summary>
+/// <summary>Lo que se cobró por el envío de una sucursal que atiende una compra a domicilio (PAG-53): Pedidos lo guarda sin recalcularlo con las tarifas.</summary>
+public sealed record EnvioDeSucursalDeLaCompra(string CodigoDeSucursal, decimal Importe);
+
+/// <summary>
+/// Lo que Pagos entrega a Pedidos cuando se aprueba una compra (D02): todo lo necesario para crear el pedido y los accesos en una sola transacción. El texto no repite el contacto ni los títulos.
+/// <see cref="EnviosPorSucursal"/> es el de la intención guardada: nulo fuera del domicilio y en una compra anterior a la venta por sucursal.
+/// </summary>
 public sealed record CompraAprobada(
     Guid PedidoId,
     Guid CuentaId,
@@ -216,7 +222,8 @@ public sealed record CompraAprobada(
     decimal Total,
     ContactoDeLaCompra? Contacto,
     IReadOnlyList<AceptacionDeCompra> Aceptaciones,
-    IReadOnlyList<LineaDeCompraAprobada> Lineas)
+    IReadOnlyList<LineaDeCompraAprobada> Lineas,
+    IReadOnlyList<EnvioDeSucursalDeLaCompra>? EnviosPorSucursal = null)
 {
     public override string ToString() => $"CompraAprobada {{ PedidoId = {PedidoId}, Lineas = {Lineas.Count} }}";
 }

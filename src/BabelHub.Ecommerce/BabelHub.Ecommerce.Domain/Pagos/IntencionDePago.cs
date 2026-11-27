@@ -125,6 +125,9 @@ public sealed class IntencionDePago
 
     public ContactoDeEntrega? Contacto { get; private set; }
 
+    /// <summary>El envío de cada sucursal de una compra a domicilio (PAG-53), tal como llegó; nulo fuera de él, en una intención anterior y tras desvincular la cuenta.</summary>
+    public IReadOnlyList<EnvioDeSucursalDeIntencion>? EnviosPorSucursal { get; private set; }
+
     public DateTimeOffset? ContactoLiberadoEn { get; private set; }
 
     public DateTimeOffset? DesvinculadaEn { get; private set; }
@@ -210,7 +213,8 @@ public sealed class IntencionDePago
         DateTimeOffset? reservasConfirmadasEn,
         IReadOnlyList<ReservaConfirmadaDeLinea> lineasConfirmadas,
         DateTimeOffset? reclamadaHasta,
-        DateTimeOffset? cerradaEn) =>
+        DateTimeOffset? cerradaEn,
+        IReadOnlyList<EnvioDeSucursalDeIntencion>? enviosPorSucursal = null) =>
         new(id, creadaEn)
         {
             CuentaId = cuentaId,
@@ -242,6 +246,7 @@ public sealed class IntencionDePago
             LineasConfirmadas = lineasConfirmadas.ToArray(),
             ReclamadaHasta = reclamadaHasta,
             CerradaEn = cerradaEn,
+            EnviosPorSucursal = enviosPorSucursal?.ToArray(),
         };
 
     private IntencionDePago(Guid id, DateTimeOffset creadaEn)
@@ -564,7 +569,7 @@ public sealed class IntencionDePago
     public bool ContactoVencido(DateTimeOffset ahora) => Contacto is not null && ahora >= CreadaEn + PlazosDelPago.RetencionDelContacto;
 
     /// <summary>
-    /// Desvincula la intención de la cuenta (PAG-26): se anulan la cuenta, los textos aceptados, la entrega, la edición, el título y el ISBN de las líneas, el contacto y la huella;
+    /// Desvincula la intención de la cuenta (PAG-26): se anulan la cuenta, los textos aceptados, la entrega (con el envío por sucursal), la edición, el título y el ISBN de las líneas, el contacto y la huella;
     /// quedan los importes, las fechas y los estados. Idempotente: devuelve si hizo el cambio.
     /// </summary>
     public bool Desvincular(DateTimeOffset ahora)
@@ -582,6 +587,7 @@ public sealed class IntencionDePago
         TipoDeEntrega = null;
         RegionDeEntrega = null;
         CodigoDeSucursalDeRecojo = null;
+        EnviosPorSucursal = null;
         Lineas = Lineas.Select(l => l with { EdicionId = null, Titulo = null, Isbn = null }).ToArray();
         LineasConfirmadas = Array.Empty<ReservaConfirmadaDeLinea>();
         HuellaDeInstantanea = null;
@@ -616,6 +622,7 @@ public sealed class IntencionDePago
         Privacidad = instantanea.Privacidad;
         ReembolsoDigital = instantanea.ReembolsoDigital;
         Contacto = instantanea.Contacto;
+        EnviosPorSucursal = instantanea.EnviosPorSucursal;
         ContactoLiberadoEn = null;
         IniciadaEn = ahora;
         VenceEn = vence;
