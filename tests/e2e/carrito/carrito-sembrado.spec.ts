@@ -50,7 +50,7 @@ test.describe('Carrito y checkout con el entorno sembrado', () => {
     await expect(pasos(page).nth(0)).toContainText('Revisar');
     await expect(pasos(page).nth(1)).toContainText('Entrega');
     // Cada línea dice su disponibilidad con texto, no solo con color; el total sale del servidor en soles.
-    await expect(page.getByText(/disponibles? en su sucursal|Disponible en su sucursal/).first()).toBeVisible();
+    await expect(page.getByText(/Con stock; se confirma al pagar|Disponible en su sucursal/).first()).toBeVisible();
     await expect(page.getByRole('complementary', { name: 'Resumen de tu pedido' })).toContainText('S/');
 
     await page.getByRole('button', { name: 'Elegir recojo' }).click();

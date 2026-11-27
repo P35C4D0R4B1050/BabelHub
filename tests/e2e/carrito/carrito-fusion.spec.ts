@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { test, expect, type Browser, type Locator, type Page } from '@playwright/test';
-import { agregarAlCarrito, clave, comprarSoloDigital, conOrigenPropio, EDICION_DIGITAL_DEL_ZORRO, EDICION_IMPRESA_DEL_ZORRO } from '../pedidos/ayudas';
+import { agregarAlCarrito, clave, comprarSoloDigital, conOrigenPropio, EDICION_DIGITAL_DEL_ZORRO, EDICION_IMPRESA_DEL_ZORRO, LIMA } from '../pedidos/ayudas';
 
 // La fusión de carritos al ingresar (ecommerce-carrito-checkout T36; CAR-24, CAR-38; AC-CAR-22, AC-CAR-33) con el ingreso REAL de web-identidad: un visitante con un carrito ingresa por la pantalla `/ingreso` con el correo y
 // la contraseña de una cuenta que ya tiene su propio carrito y un libro digital comprado. La cuenta se siembra con el sembrador de desarrollo (que acepta una contraseña elegida por la prueba, generada al azar en cada
@@ -9,9 +9,10 @@ import { agregarAlCarrito, clave, comprarSoloDigital, conOrigenPropio, EDICION_D
 
 test.describe.configure({ mode: 'serial' });
 
-const UNIDADES_EN_LA_CUENTA = 15;
+const UNIDADES_EN_LA_CUENTA = 8;
 const UNIDADES_DEL_VISITANTE = 10;
-const TOPE_DE_UNIDADES = 20;
+// Lima tiene 12 vendibles sembrados: la fusión recorta al vendible de la sucursal de la línea.
+const VENDIBLE_EN_LIMA = 12;
 
 // Una contraseña larga y aleatoria que cumple la política (frase de 20 o más caracteres, sin patrones comunes).
 const contrasena = `e2e-${randomBytes(12).toString('hex')}-Fusion`;
@@ -38,8 +39,8 @@ test.describe('Fusión del carrito al ingresar (ingreso real)', () => {
   test.skip(!clave, 'Falta BABELHUB__Sembrador__Clave (entorno E2E local con el sembrador de sesiones)');
   test.setTimeout(180_000);
 
-  test('AC-CAR-22, AC-CAR-33: al ingresar se fusionan los carritos, se descarta el digital poseído, se recorta al tope y cada aviso se descarta al verlo', async ({ browser }) => {
-    // 1. La cuenta: compra el digital (queda en su biblioteca) y deja 15 unidades del impreso en su carrito.
+  test('AC-CAR-22, AC-CAR-33: al ingresar se fusionan los carritos, se descarta el digital poseído, se recorta al vendible de la sucursal y cada aviso se descarta al verlo', async ({ browser }) => {
+    // 1. La cuenta: compra el digital (queda en su biblioteca) y deja 8 unidades del impreso de Lima en su carrito.
     const cuenta = await sembrarClienteConContrasena(browser);
     await comprarSoloDigital(cuenta.page);
     await expect
@@ -48,14 +49,14 @@ test.describe('Fusión del carrito al ingresar (ingreso real)', () => {
         return await cuenta.page.getByText('El zorro y el cóndor del Ande').count();
       }, { timeout: 60_000, intervals: [1_000, 2_000, 3_000] })
       .toBeGreaterThan(0);
-    await agregarAlCarrito(cuenta.page, EDICION_IMPRESA_DEL_ZORRO, UNIDADES_EN_LA_CUENTA);
+    await agregarAlCarrito(cuenta.page, EDICION_IMPRESA_DEL_ZORRO, UNIDADES_EN_LA_CUENTA, LIMA);
     await cuenta.contexto.close();
 
-    // 2. El visitante (sin sesión): el mismo digital y 10 unidades del impreso; sumadas pasarían del tope de 20 por línea.
+    // 2. El visitante (sin sesión): el mismo digital y 10 unidades del impreso en la misma sucursal; sumadas pasarían de lo vendible allí.
     const contexto = await browser.newContext({ ignoreHTTPSErrors: true });
     const page = await contexto.newPage();
     await conOrigenPropio(page);
-    await agregarAlCarrito(page, EDICION_IMPRESA_DEL_ZORRO, UNIDADES_DEL_VISITANTE);
+    await agregarAlCarrito(page, EDICION_IMPRESA_DEL_ZORRO, UNIDADES_DEL_VISITANTE, LIMA);
     await agregarAlCarrito(page, EDICION_DIGITAL_DEL_ZORRO, 1);
     await page.goto('/carrito');
     await expect(page.getByText('Para pagar necesitas una cuenta.')).toBeVisible();
@@ -67,14 +68,12 @@ test.describe('Fusión del carrito al ingresar (ingreso real)', () => {
     await page.getByRole('button', { name: 'Ingresar' }).click();
     await expect(page).not.toHaveURL(/\/ingreso/);
 
-    // 4. El impreso queda con el máximo permitido (nunca la suma), el digital poseído se descarta y se avisa de ambos ajustes.
+    // 4. El impreso queda con lo vendible de su sucursal (nunca la suma), el digital poseído se descarta y se avisa de ambos ajustes.
     await page.goto('/carrito');
     const cantidad = page.getByRole('spinbutton', { name: /^Cantidad de / });
     await expect(cantidad).toHaveCount(1);
     const final = Number(await cantidad.inputValue());
-    expect(final).toBeGreaterThanOrEqual(UNIDADES_EN_LA_CUENTA);
-    expect(final).toBeLessThanOrEqual(TOPE_DE_UNIDADES);
-    expect(final).toBeLessThan(UNIDADES_EN_LA_CUENTA + UNIDADES_DEL_VISITANTE);
+    expect(final).toBe(VENDIBLE_EN_LIMA);
     await expect(page.getByText('Una licencia por cuenta.')).toHaveCount(0);
 
     const avisos = page.getByRole('region', { name: 'Avisos sobre tu carrito' });

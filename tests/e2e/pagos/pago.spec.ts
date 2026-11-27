@@ -15,7 +15,6 @@ async function llegarAlPago(page: Page) {
   await page.goto('/carrito');
   await page.getByRole('button', { name: 'Continuar con la compra' }).click();
   await expect(page).toHaveURL(/\/checkout$/);
-  await page.getByLabel('Sucursal de recojo').selectOption({ label: 'Sucursal Ayacucho (prueba)' });
   await page.getByRole('button', { name: 'Elegir recojo' }).click();
   await expect(page.getByRole('heading', { name: 'Tus datos y aceptaciones' })).toBeVisible();
   for (const casilla of await page.getByRole('group', { name: 'Para continuar, acepta:' }).getByRole('checkbox').all()) {
