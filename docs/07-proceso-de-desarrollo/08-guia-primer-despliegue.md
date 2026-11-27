@@ -901,7 +901,7 @@ Es lo que despliega esta guía por defecto (`BABELHUB__Pagos__Pasarela="ninguna"
 | **Política de cambios y devoluciones** | `/legal/cambios-y-devoluciones` («Cambios y devoluciones», enlace en el pie; `/legal/reembolso` redirige) y el flujo de devoluciones | Nada más: el texto definitivo se publicó el 2026-11-26 (versión de los textos en `identidad.versiones_de_textos`). |
 | **Libro de Reclamaciones** | `/reclamaciones` (enlace en el pie) | Nada: ya funciona. |
 | **Al menos 5 productos con foto, descripción y precio** | El catálogo público | Cargarlos desde la administración del catálogo. **En `Staging` solo van obras y archivos digitales de MUESTRA, sin valor comercial** (así, si después activas el simulador para las pruebas con personas, nada de valor se entrega), **y los pedidos de `Staging` no se atienden**. Los carga el administrador que creas con `crear-administrador` (§0, fila 1 bis). |
-| **Carrito o botón «Comprar»** | Ficha de cada obra y `/carrito` → `/checkout` | Nada: ya funciona (el último paso dice que el pago en línea estará disponible pronto). |
+| **Carrito o botón «Comprar»** | Ficha de cada obra («Agregar impreso al carrito» y «Comprar digital») → `/carrito` → `/checkout` | **Desplegar una versión posterior a `v0.1.1`**: en `v0.1.1` la ficha no tiene ningún botón y el carrito no se puede llenar desde la web. Con las imágenes nuevas, comprueba la ficha de una obra con stock (`curl -s https://babel-hub.shop/catalogo/obras/<id> \| grep -c 'action="/carrito/lineas"'` da `1`) y recorre con la cuenta de prueba: ficha → carrito → checkout → paso de pago (que dice que el pago en línea estará disponible pronto). Una obra sin stock ni edición digital a la venta no ofrece comprar. |
 | **Usuario y contraseña de prueba** para el revisor | El comando `cuenta-de-prueba` (abajo) | Ejecutarlo y pasar el correo y la contraseña a Culqi por un canal seguro (no por el chat público ni el repositorio). |
 | **SSL en todas las URLs** | Cloudflare: Universal SSL + Always Use HTTPS (§12.2); la aplicación redirige y envía HSTS | Verificar con los `curl` de §13.3 y recorrer la tienda en el navegador buscando avisos de «contenido no seguro» (no debe haber). |
 
@@ -1009,30 +1009,20 @@ Son mediciones que cierran decisiones de la spec. Ninguna bloquea el despliegue,
 
 (T29 y T31, los scripts de restauración y de ensayo aislado, **aún no están hechos**: esos spikes se hacen a mano como arriba.)
 
-### 15.5 Actualizar una tienda ya desplegada de `v0.1.1` a `v0.1.2`
+### 15.5 Actualizar una tienda desplegada de `v0.1.2` a `v0.1.3`
 
-Qué trae: ayudas al escribir contraseñas, código QR del segundo factor, el enlace «Acceso del personal» y las correcciones del arranque de la réplica de gestión y de n8n. No cambia la base de datos. Antes necesitas la etiqueta `v0.1.2` publicada y sus tres digests (§5).
+Qué trae: ayudas al escribir contraseñas, las diez letras de la política en las pantallas, el código QR del segundo factor y el enlace «Acceso del personal». No cambia la base de datos ni los secretos que ya tienes, salvo una línea nueva y opcional. Antes necesitas la etiqueta `v0.1.3` publicada y sus tres digests (§5).
 
-**1. [Cada VM] Traer el código.** Mira primero si la VM tiene cambios hechos a mano sobre `v0.1.1`:
+**1. [Cada VM] Traer el código.** Mira primero que la VM no tenga cambios hechos a mano:
 
 ```bash
 cd /opt/babelhub && sudo git status --short
 ```
 
-En VM-VENTAS puede aparecer `infra/docker-compose.ventas.yml` (el arreglo de n8n que se aplicó a mano; ya viene en `v0.1.2`). Si aparece otro archivo, para y revisa antes de seguir. Mira **qué** cambió en ese:
+No debe salir ningún archivo. Si en VM-VENTAS aparece `infra/docker-compose.ventas.yml`, la VM sigue con el arreglo de n8n aplicado a mano sobre `v0.1.1` (ya viene en las versiones siguientes): mira qué cambió con `sudo git diff infra/docker-compose.ventas.yml` y, solo si la única diferencia es el `tmpfs` de `/home/node/.cache`, descártala con `sudo git checkout -- infra/docker-compose.ventas.yml`. Si aparece otra cosa, para y revisa antes de seguir.
 
 ```bash
-sudo git diff infra/docker-compose.ventas.yml
-```
-
-Solo si la única diferencia es la línea del `tmpfs` de `/home/node/.cache`, descártala (si hay algo más, anótalo y avisa antes de seguir):
-
-```bash
-sudo git checkout -- infra/docker-compose.ventas.yml
-```
-
-```bash
-sudo git fetch --tags && sudo git checkout v0.1.2 && sudo git log -1 --format='%h %s'
+sudo git fetch --tags && sudo git checkout v0.1.3 && sudo git log -1 --format='%h %s'
 ```
 
 **2. [VM-VENTAS] Añadir la dirección del personal** (los secretos ya generados no la tienen; sin ella la tienda funciona igual, pero no muestra el enlace). El comando solo la agrega si falta y no imprime ningún secreto:
@@ -1043,17 +1033,9 @@ sudo sh -c 'f=/etc/babelhub/secretos/ecommerce.env; test -f "$f" || { echo "PARA
 
 Debe mostrar `BABELHUB__Web__DireccionDeGestion="https://gestion.babel-hub.shop"`. Va solo en `ecommerce.env` (la tienda). Si la escribes mal (sin `https://`, con una ruta o con espacios), la tienda **no arranca** y el registro nombra esa variable.
 
-**3. [VM-INVENTARIO] Comprobar el webhook de la réplica de gestión** (en `v0.1.1` se generaba con una dirección IP y la réplica no arrancaba; se corrigió a mano):
+**3. Desplegar con los digests de `v0.1.3`:** primero VM-INVENTARIO con el comando de §11 y después VM-VENTAS con el de §13.1 (con `--sin evolution-api` mientras no tengas el número de WhatsApp).
 
-```bash
-sudo grep "^BABELHUB__Notificaciones__N8n__Webhook=" /etc/babelhub/secretos/ecommerce-gestion.env
-```
-
-Debe terminar en `http://n8n:5678/webhook/babelhub-avisos`. Si todavía dice una IP, cámbialo con `sudo nano` en ese archivo.
-
-**4. Desplegar con los digests de `v0.1.2`:** primero VM-INVENTARIO con el comando de §11 y después VM-VENTAS con el de §13.1 (con `--sin evolution-api` mientras no tengas el número de WhatsApp).
-
-**5. Comprobar** desde tu equipo:
+**4. Comprobar** desde tu equipo:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' https://babel-hub.shop/
@@ -1063,9 +1045,9 @@ curl -s -o /dev/null -w '%{http_code}\n' https://babel-hub.shop/
 curl -s https://babel-hub.shop/ingreso | grep -c "data-bh-acceso-del-personal"
 ```
 
-La primera debe dar `200` y la segunda un número mayor que `0`. En el navegador: en **Crear cuenta** la barra de seguridad responde al escribir y «Mostrar» enseña la contraseña; en el ingreso del personal, quien aún no configuró su segundo factor ve el código QR. En VM-VENTAS, `sudo docker ps` debe mostrar `n8n` como `healthy`.
+La primera debe dar `200` y la segunda un número mayor que `0`. En el navegador: en **Crear cuenta** la barra de seguridad responde al escribir y «Mostrar» enseña la contraseña; en el ingreso del personal, quien aún no configuró su segundo factor ve el código QR, que debe leer la cámara de su teléfono.
 
-**Para volver atrás:** `git checkout v0.1.1` y los digests anteriores. La línea de la dirección del personal se puede quedar (esa versión la ignora), pero el arreglo de n8n vuelve a faltar en VM-VENTAS: hay que reponer `:uid=1000,gid=1000,mode=0700` en el `tmpfs` de `/home/node/.cache`.
+**Para volver atrás:** `sudo git checkout v0.1.2` y los digests de esa versión. La línea de la dirección del personal se puede quedar (esa versión la ignora).
 
 ## 16. Si algo sale mal: tabla de rescate
 

@@ -48,6 +48,21 @@ public static class PantallasDelCarrito
         ["ECO-PAGO-NO-DISPONIBLE"] = new(Areas.Tienda.Controllers.TextosDelPago.TituloSinPasarela, "Todavía no recibimos pagos en la tienda. No se te cobró nada y tu carrito se conservó."),
     };
 
+    /// <summary>CAR-04: el rechazo por falta de stock dice en pantalla la cantidad máxima disponible (cuenta lo que ya hay en el carrito); sin ese dato queda el texto general.</summary>
+    private static string ConElMaximo(ProblemaDto problema, string mensaje)
+    {
+        if (!problema.Code.EndsWith("-CARRITO-SIN-STOCK", StringComparison.Ordinal)
+            || problema.Errores.FirstOrDefault(e => e.Campo == "maximo") is not { } campo
+            || !int.TryParse(campo.Clave, NumberStyles.None, CultureInfo.InvariantCulture, out var maximo))
+        {
+            return mensaje;
+        }
+
+        return maximo == 0
+            ? "Ya no quedan unidades de este libro. No se hizo ningún cobro."
+            : $"El máximo disponible es de {maximo} {(maximo == 1 ? "unidad" : "unidades")}, contando las que ya estén en tu carrito. Elige una cantidad menor. No se hizo ningún cobro.";
+    }
+
     private static readonly Dictionary<string, string> CampoDelFormulario = new(StringComparer.Ordinal)
     {
         ["codigoDeSucursalDeRecojo"] = "sucursal",
@@ -82,7 +97,7 @@ public static class PantallasDelCarrito
         if (PorCodigo.TryGetValue(problema.Code, out var texto))
         {
             modelo.AlertaTitulo = texto.Titulo;
-            modelo.AlertaMensaje = texto.Mensaje;
+            modelo.AlertaMensaje = ConElMaximo(problema, texto.Mensaje);
         }
         else
         {
@@ -151,7 +166,7 @@ public static class PantallasDelCarrito
                 {
                     Estado = EstadoDePantalla.Error,
                     Titulo = texto.Titulo,
-                    Mensaje = texto.Mensaje,
+                    Mensaje = ConElMaximo(problema, texto.Mensaje),
                     RutaDeReintento = rutaDeReintento,
                     CodigoDeSoporte = problema.Code,
                     IdentificadorDeSeguimiento = problema.TraceId,

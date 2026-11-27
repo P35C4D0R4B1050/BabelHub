@@ -52,7 +52,7 @@ cd tests/e2e && E2E_FORWARDED_PROTO=https npx playwright test carrito/humo-del-e
 
 Navegadores (decisión de la persona, `progress/coordinacion.md` §6): **obligatorios** `escritorio` y `telefono` (Chromium) y `webkit` si la caché lo tiene; **Firefox es informativo**: un proyecto opcional que `playwright.config.ts` omite con un aviso si no está en la caché o si el sistema no deja lanzarlo (hoy `firefox.exe` responde «Permission denied»; no se toca la seguridad del sistema). Un fallo solo de Firefox se registra como hallazgo Menor y no reabre bloques cerrados, salvo un defecto real de estándares o accesibilidad que afecte también a los demás. WebKit está instalado en esta máquina (`webkit-2370`, autorizado por la persona) y corre; cada navegador opcional se sondea lanzándolo de verdad (el resultado se guarda en el entorno para los procesos de trabajo). `E2E_SIN_NAVEGADORES_OPCIONALES=1` los omite siempre.
 
-Requisitos previos de los recorridos del carrito: la composición del Carrito en `Program.cs` (`AgregarCarrito`, `AgregarTrabajosDelCarritoEnLaApi`, `UsarLimiteDeCuerpoDelCarrito`), el Inventario y Pagos reales o sus pantallas, y el carrito sembrado en cada `storageState` (la ficha aún no agrega al carrito).
+Requisitos previos de los recorridos del carrito: la composición del Carrito en `Program.cs` (`AgregarCarrito`, `AgregarTrabajosDelCarritoEnLaApi`, `UsarLimiteDeCuerpoDelCarrito`), el Inventario y Pagos reales o sus pantallas, y el carrito sembrado en cada `storageState`.
 
 Requisitos previos de los recorridos del catálogo: el CSS compilado (`scripts/construir-estilos.sh`) y la composición del Catálogo en `Program.cs`.
 
@@ -77,7 +77,7 @@ cd tests/e2e && source "$LOCALAPPDATA/babelhub-e2e/env" && E2E_BASE_URL=https://
 - `E2E_TLS=1` usa el certificado de desarrollo de .NET (`dotnet dev-certs https`); Playwright lo acepta con `ignoreHTTPSErrors`.
 - `BABELHUB__Seguridad__ServicioSinHttps=true` (solo `Development`; el archivo de entorno lo trae) deja que los dos servicios se llamen por HTTP local; nunca se enciende en producción.
 - `BABELHUB__Ecommerce__ProxiesConocidos=127.0.0.1,::1` hace que el host confíe en `X-Origen-Cliente` desde la propia máquina: cada recorrido llega desde su propio origen (el Inventario limita las reservas a 10 por hora por origen, SEL-19) y `sembrar-datos.sh --limpiar` vacía los contadores de límites y las reservas.
-- La ficha del catálogo aún no agrega al carrito: el recorrido agrega el libro con la misma petición que enviará su botón (`POST /carrito/lineas`, con el token y el `Origin` del navegador).
+- El libro se agrega como lo hace una persona: se abre la ficha y se envía su formulario (`agregarAlCarrito`, `pedidos/ayudas.ts`); ningún recorrido arma el `POST /carrito/lineas` a mano.
 
 ### Recorrido de la biblioteca digital (T25 de `ecommerce-biblioteca-digital`)
 

@@ -1,4 +1,5 @@
 @using BabelHub.Ecommerce.Api.Web.Estados
+@using BabelHub.Ecommerce.Application.Web
 @model BabelHub.Ecommerce.Api.Areas.Tienda.Controllers.FichaVista
 @{
     var activa = Model.EdicionActiva == "digital" ? Model.Digital : Model.Impresa;
@@ -71,6 +72,26 @@
                         <span>Impreso agotado en todas las sucursales.@(Model.Digital?.Disponibilidad.Estado == EstadoDeDisponibilidad.DisponibleAlInstante ? " Puedes verlo en digital." : string.Empty)</span>
                     </div>
                 }
+                @if (impresa.SePuedeAgregar)
+                {
+                    <bh-accion-de-cambio>
+                        <form method="post" action="/carrito/lineas" class="flex flex-wrap items-end gap-3">
+                            <partial name="_TokenAntifalsificacion" />
+                            <input type="hidden" name="edicionId" value="@impresa.EdicionId.ToString("D")" />
+                            <label class="flex flex-col gap-1 text-sm">
+                                <span>Cantidad</span>
+                                <input class="input w-24" type="number" name="cantidad" value="1" min="1" max="@impresa.CantidadMaxima" inputmode="numeric" required />
+                            </label>
+                            <button type="submit" class="btn btn-primary"><bh-icono nombre="carrito" />Agregar impreso al carrito</button>
+                        </form>
+                    </bh-accion-de-cambio>
+                }
+                else if (impresa.Disponibilidad.Estado == EstadoDeDisponibilidad.Agotado)
+                {
+                    <bh-accion-de-cambio>
+                        <button type="button" class="btn btn-primary" disabled><bh-icono nombre="carrito" />Agregar impreso al carrito</button>
+                    </bh-accion-de-cambio>
+                }
                 @if (impresa.Sucursales.Count > 0)
                 {
                     <details class="rounded-box border border-base-300" open>
@@ -129,6 +150,20 @@
                         <li class="flex gap-2"><bh-icono nombre="exito" clase="mt-0.5 size-4" />Disponible al instante en tu biblioteca</li>
                         <li class="flex gap-2"><bh-icono nombre="candado" clase="mt-0.5 size-4" />Para uso personal: no se puede copiar ni redistribuir</li>
                     </ul>
+                }
+                @if (digital.SePuedeAgregar)
+                {
+                    <div class="flex flex-wrap items-center gap-3">
+                        <bh-accion-de-cambio>
+                            <form method="post" action="/carrito/lineas">
+                                <partial name="_TokenAntifalsificacion" />
+                                <input type="hidden" name="edicionId" value="@digital.EdicionId.ToString("D")" />
+                                <input type="hidden" name="cantidad" value="1" />
+                                <button type="submit" class="btn btn-primary"><bh-icono nombre="carrito" />Comprar digital</button>
+                            </form>
+                        </bh-accion-de-cambio>
+                        <a class="link text-sm" href="/legal/@TiposDeTextoLegal.Ruta(TipoDeTextoLegal.Reembolso)">Política de reembolso de libros digitales</a>
+                    </div>
                 }
             </section>
         }

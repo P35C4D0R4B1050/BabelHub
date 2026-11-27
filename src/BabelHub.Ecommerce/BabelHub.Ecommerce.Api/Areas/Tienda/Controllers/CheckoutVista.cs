@@ -99,9 +99,11 @@ public static class ConstructorDeLaVistaDelCheckout
         modelo.TotalVisto = vista.Total.ToString("0.00", CultureInfo.InvariantCulture);
         modelo.EnvioTexto = !modelo.RequiereEntrega
             ? "No aplica (solo digitales)"
-            : vista.Envio is not { } envio
-                ? "Se calcula al elegir la entrega"
-                : envio == 0m ? "Gratis (recojo)" : FormatoPeruano.Soles(envio);
+            : vista.TipoDeEntrega == TipoDeEntregaDeCompra.Recojo
+                ? "Gratis (recojo)"
+                : vista.Envio is not { } envio
+                    ? "Se calcula al elegir la entrega"
+                    : FormatoPeruano.Soles(envio);
         modelo.Pasos = Pasos(vista, modelo.RequiereEntrega);
         return modelo;
     }

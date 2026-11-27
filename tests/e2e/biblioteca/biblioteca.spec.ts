@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { agregarAlCarrito } from '../pedidos/ayudas';
 
 // Recorrido de la biblioteca digital de punta a punta (ecommerce-biblioteca-digital T25; AC-BIB-01, AC-BIB-02, AC-BIB-04, AC-BIB-12, AC-BIB-14, BIB-12): un cliente recién sembrado compra el libro
 // digital de la obra ficticia «El zorro y el cóndor del Ande» (checkout 100 % digital, sin entrega), paga con el simulador, y el acceso aparece en «Mi biblioteca» con su formato y «0 de 5 descargas
@@ -25,16 +26,6 @@ async function ingresarComoClienteNuevo(page: Page) {
   expect(respuesta.ok(), 'el sembrador de sesiones responde').toBeTruthy();
   const estado = await respuesta.json();
   await page.context().addCookies(estado.cookies);
-}
-
-async function agregarAlCarrito(page: Page, edicionId: string, cantidad: number) {
-  await page.goto('/catalogo');
-  const token = await page.locator('meta[name=csrf-token]').getAttribute('content');
-  const estado = await page.evaluate(
-    async ([t, id, n]) => (await fetch('/carrito/lineas', { method: 'POST', headers: { RequestVerificationToken: t!, 'Content-Type': 'application/x-www-form-urlencoded' }, body: `edicionId=${id}&cantidad=${n}` })).status,
-    [token, edicionId, String(cantidad)] as const,
-  );
-  expect(estado, 'agregar al carrito').toBeLessThan(400);
 }
 
 const EDICION_DIGITAL_DEL_ZORRO = 'b0000000-0000-0000-0000-000000000012';

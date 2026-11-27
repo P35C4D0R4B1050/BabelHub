@@ -119,3 +119,10 @@ No converge (provisional): el código implementa los 37 requisitos y 33 tienen p
 - **T36 marcada** (mixto en cinco pasos, solo digital en cuatro o menos, visitante que ingresa y fusiona, y accesibilidad, teclado y teléfono de ambas pantallas; `ui-review` registrado el 2026-11-20 en `progress/hallazgos.md`).
 - **Regresión de la ronda:** `carrito-sembrado` 12 de 12 en escritorio y en teléfono, `compra-digital` 2/2, `compra-y-pedido` 3/3 y `gestion-de-pedidos` 4/4 en ambos; integración de Pedidos, Pagos y Envíos 574 de 574; unitarias de Ecommerce 5429 y de Inventario 2376; arquitectura 244 de 244; `dotnet build BabelHub.sln -warnaserror` sin advertencias; `SpecCheck` OK, 20 specs, 0 avisos.
 - **Resultado: Converge.**
+
+## Corrección del 2026-11-27 (T38): la ficha no permitía comprar
+
+- **Defecto hallado en producción de pruebas (`v0.1.1`):** `Catalogo/Obra.cshtml` no tenía ningún formulario y ninguna vista enviaba a `POST /carrito/lineas`; el carrito no se podía llenar desde la web (CAR-02, CAR-03, plan §4). La vista se escribió antes que el módulo Carrito y ninguna tarea la conectó.
+- **Por qué no se detectó:** las pruebas de integración mandaban el `POST` armado a mano, las de pantalla de la ficha solo comprobaban datos del Catálogo y los recorridos E2E agregaban con `fetch` (lo declaraba `tests/e2e/README.md`). La lectura requisito por requisito de arriba dio por cubiertos CAR-02 y CAR-03 sin una pantalla que los ejerciera desde la ficha.
+- **Corrección:** T38. `ComprarDesdeLaFichaTests` envía el formulario que ofrece la ficha (14 casos; 9 fallaban antes del arreglo) y `agregarAlCarrito` de los recorridos E2E usa los botones. De paso: el rechazo por falta de stock indica el máximo en pantalla (CAR-04, AC-CAR-03) y el resumen del checkout dice «Gratis (recojo)» en lugar de «Se calcula al elegir la entrega».
+- Ningún requisito, criterio ni plan cambia.

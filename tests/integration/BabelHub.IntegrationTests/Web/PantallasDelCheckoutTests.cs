@@ -172,6 +172,8 @@ public sealed class PantallasDelCheckoutTests
     [Theory]
     [InlineData(null, null, "Se calcula al elegir la entrega")]
     [InlineData(TipoDeEntregaDeCompra.Recojo, 0, "Gratis (recojo)")]
+    // La Aplicación no informa envío en un recojo (null): la pantalla igual dice que el recojo es gratis.
+    [InlineData(TipoDeEntregaDeCompra.Recojo, null, "Gratis (recojo)")]
     [InlineData(TipoDeEntregaDeCompra.Domicilio, 12, "domicilio")]
     [Trait("Criterio", "AC-CAR-21")]
     public async Task El_envio_y_el_total_salen_del_servidor_con_formato_peruano(TipoDeEntregaDeCompra? tipo, int? envio, string textoDelEnvio)

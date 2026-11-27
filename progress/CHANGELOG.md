@@ -2,15 +2,34 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
-## 2026-11-27 — Acceso para la versión 0.1.2 (carril `acceso-v012`)
+## 2026-11-27 — Acceso para la versión 0.1.3 (carril `acceso-v012`)
 
 ### Cubierto
-- La réplica de gestión y n8n arrancan con lo que genera el repositorio; la guía de despliegue corrige los comandos que fallaron en las VMs; las pantallas piden las 10 letras de IDE-15.
+- Las pantallas piden las 10 letras de IDE-15 (las otras tres correcciones del despliegue salieron antes en `v0.1.2`).
 - `web-acceso` nueva (aprobación delegada de spec y plan): ayudas de contraseña sin reglas de composición, ver u ocultar en todos los campos, enlace «Acceso del personal» y código QR del segundo factor (DD-116 a DD-121; guía 08 §15.5).
 
 ### Pendiente
-- Persona: publicar `v0.1.2`, seguir la guía 08 §15.5 y ratificar DD-116 a DD-121.
+- Persona: publicar `v0.1.3`, seguir la guía 08 §15.5 y ratificar DD-116 a DD-121.
 - Menores de la puerta y de la revisión en `hallazgos.md`; sin corrida contra el entorno completo ni en las VMs.
+
+## 2026-11-27 — La ficha del libro permite comprar
+
+### Cubierto
+- `ecommerce-carrito-checkout` T38: botones de compra en la ficha (ninguna pantalla enviaba a `POST /carrito/lineas` en `v0.1.1`), máximo de stock en el rechazo y «Gratis (recojo)» en el resumen; pruebas y E2E por el formulario real.
+- Tres errores del primer despliegue: webhook de n8n de la réplica de gestión, carpeta temporal de n8n y comandos de la guía 08.
+
+### Pendiente
+- Persona: publicar imágenes nuevas, actualizar las VMs y recorrer la tienda hasta el paso de pago. Pantallas sin enlace en `hallazgos.md`.
+
+## 2026-11-27 — Primera versión publicada y colaboración en la interfaz (coordinación)
+
+### Cubierto
+- `v0.1.1` publicada en GHCR y guía 08 §5 con las dos aprobaciones del lanzamiento (`37ced2df`).
+- Reglas, tablero y control de rutas para que Codex trabaje solo la interfaz (`docs/07-proceso-de-desarrollo/10-colaboracion-ui.md`, `progress/coordinacion-ui.md`, `scripts/guardia-ui.sh`).
+- Registrada la operación manual sobre el segundo factor de la administración (`log/2026-11-27-despliegue-observaciones-y-colaboracion.md`).
+
+### Pendiente
+- Publicar la compra desde la ficha y las mejoras de acceso, actualizar las VMs y enviar la tienda a Culqi (B14).
 
 ## 2026-11-26 — La tienda sin pasarela para la revisión de Culqi (carril `sin-pasarela`)
 
