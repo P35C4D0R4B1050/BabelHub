@@ -340,7 +340,7 @@ public static class ReglasDeReembolso
 
     /// <summary>
     /// El tope del nuevo reembolso: la suma de los reembolsos de un cargo (pendientes, solicitados y reembolsados) no supera su importe; el acumulado por línea no supera el importe de la
-    /// línea; y el envío se reembolsa a lo más una vez. Solo cuentan los reembolsos del mismo cargo: el de un cobro sobrante no consume el tope del cargo del pedido.
+    /// línea; y el envío acumulado no supera el cobrado (puede devolverse por partes, una por sucursal). Solo cuentan los reembolsos del mismo cargo: el de un cobro sobrante no consume el tope del cargo del pedido.
     /// </summary>
     public static ResultadoDeTope ValidarTope(
         Importe importeDelCargo,

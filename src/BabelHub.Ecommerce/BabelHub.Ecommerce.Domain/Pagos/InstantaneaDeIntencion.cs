@@ -20,6 +20,9 @@ public sealed record LineaDeIntencion(Guid LineaId, Guid? EdicionId, bool EsDigi
 /// <summary>La fuente y el traslado que el Inventario asignó a una línea impresa al confirmar su reserva (D02).</summary>
 public sealed record ReservaConfirmadaDeLinea(Guid LineaId, string CodigoDeFuente, bool RequiereTraslado, Guid? TrasladoId, DateOnly? FechaEstimadaDeLlegada);
 
+/// <summary>Lo que se cobra por el envío de una sucursal que atiende la compra a domicilio (PAG-53): Pagos lo conserva tal como llega para entregarlo con la compra aprobada.</summary>
+public sealed record EnvioDeSucursalDeIntencion(string CodigoDeSucursal, Importe Importe);
+
 /// <summary>La versión de un texto legal que la cuenta aceptó y cuándo.</summary>
 public sealed record TextoAceptado(string Version, DateTimeOffset AceptadoEn);
 
@@ -55,7 +58,8 @@ public sealed class InstantaneaDeIntencion
         TextoAceptado terminos,
         TextoAceptado privacidad,
         TextoAceptado? reembolsoDigital,
-        ContactoDeEntrega? contacto)
+        ContactoDeEntrega? contacto,
+        IReadOnlyList<EnvioDeSucursalDeIntencion>? enviosPorSucursal)
     {
         CuentaId = cuentaId;
         Entrega = entrega;
@@ -69,6 +73,7 @@ public sealed class InstantaneaDeIntencion
         Privacidad = privacidad;
         ReembolsoDigital = reembolsoDigital;
         Contacto = contacto;
+        EnviosPorSucursal = enviosPorSucursal;
     }
 
     public Guid CuentaId { get; }
@@ -96,6 +101,9 @@ public sealed class InstantaneaDeIntencion
 
     public ContactoDeEntrega? Contacto { get; }
 
+    /// <summary>El envío de cada sucursal en una compra a domicilio (PAG-53); <see langword="null"/> fuera de él.</summary>
+    public IReadOnlyList<EnvioDeSucursalDeIntencion>? EnviosPorSucursal { get; }
+
     public bool TieneImpresos => Lineas.Any(l => !l.EsDigital);
 
     public static InstantaneaDeIntencion Crear(
@@ -110,7 +118,8 @@ public sealed class InstantaneaDeIntencion
         TextoAceptado terminos,
         TextoAceptado privacidad,
         TextoAceptado? reembolsoDigital,
-        ContactoDeEntrega? contacto)
+        ContactoDeEntrega? contacto,
+        IReadOnlyList<EnvioDeSucursalDeIntencion>? enviosPorSucursal = null)
     {
         ArgumentNullException.ThrowIfNull(lineas);
         ArgumentNullException.ThrowIfNull(terminos);
@@ -189,9 +198,21 @@ public sealed class InstantaneaDeIntencion
                 throw new ArgumentException("Una compra solo digital no lleva datos de entrega.");
         }
 
+        // La exigencia rige al crear una intención (PAG-54): una ya guardada se lee sin repetirla.
+        if (entrega == TipoDeEntrega.Domicilio ? !CuadraConElEnvio(enviosPorSucursal, envio) : enviosPorSucursal is not null)
+        {
+            throw new ArgumentException("El envío por sucursal va en toda compra a domicilio y en ninguna otra, con códigos válidos sin repetir que sumen el envío.", nameof(enviosPorSucursal));
+        }
+
         return new InstantaneaDeIntencion(
-            cuentaId, entrega, codigoDeSucursalDeRecojo, regionDeEntrega, lineas.ToArray(), envio, total, huella.Trim(), terminos, privacidad, reembolsoDigital, contacto);
+            cuentaId, entrega, codigoDeSucursalDeRecojo, regionDeEntrega, lineas.ToArray(), envio, total, huella.Trim(), terminos, privacidad, reembolsoDigital, contacto, enviosPorSucursal?.ToArray());
     }
+
+    private static bool CuadraConElEnvio(IReadOnlyList<EnvioDeSucursalDeIntencion>? envios, Importe envio) =>
+        envios is { Count: > 0 }
+        && envios.All(e => e?.CodigoDeSucursal is { Length: >= 2 and <= 20 } codigo && codigo.All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c == '-'))
+        && envios.Select(e => e.CodigoDeSucursal).Distinct(StringComparer.Ordinal).Count() == envios.Count
+        && envios.Aggregate(Importe.Cero, (suma, e) => suma + e.Importe) == envio;
 
     /// <summary>Sin el contacto, la dirección ni los títulos.</summary>
     public override string ToString() => $"InstantaneaDeIntencion {{ Lineas = {Lineas.Count}, Total = {Total}, Entrega = {Entrega} }}";

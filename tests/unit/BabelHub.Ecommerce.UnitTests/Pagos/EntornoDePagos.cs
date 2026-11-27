@@ -303,7 +303,8 @@ internal static class InstantaneasDeCompraDePrueba
             new ContactoDeCompra("Ana Pérez Quispe", "987654321", "Av. Los Olivos 123, Ayacucho", "AYA"),
             Aceptaciones(),
             lineas,
-            huella);
+            huella,
+            [new EnvioDeSucursalDeCompra("ayacucho", "Sucursal Ayacucho", envio)]);
     }
 
     public static InstantaneaDeCompra SoloDigital(string huella = "huella-d", Guid? cuenta = null, Guid? pedido = null) =>

@@ -174,7 +174,8 @@ public sealed class CompraDeDosSucursalesTests(PostgresDelEcommerceCompletoFixtu
             aDomicilio ? new ContactoDeCompra("Rosa Quispe Ficticia", "987654321", "Jr. Ficticio 123, Ayacucho", Ayacucho) : null,
             [new(TextoLegalDeCompra.Terminos, "v1", ahora), new(TextoLegalDeCompra.Privacidad, "v1", ahora)],
             [.. lineas.Select(l => new LineaDeInstantanea(l.Id, _libro, false, "Ficciones", null, l.Cantidad, Precio, l.Cantidad * Precio, l.Sucursal, false, null))],
-            "huella-" + pedido.ToString("N"));
+            "huella-" + pedido.ToString("N"),
+            aDomicilio ? [.. lineas.Select(l => l.Sucursal).Distinct().Order(StringComparer.Ordinal).Select(s => new EnvioDeSucursalDeCompra(s, s, 30m))] : null);
         var intencion = await Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICreadorDeIntencionesDePago>().Crear(cuenta, instantanea, instantanea.HuellaDeInstantanea, ahora + PlazosDelPago.VigenciaConImpresos));
         Assert.Equal(ResultadoDeCrearIntencion.Creada, intencion);
 

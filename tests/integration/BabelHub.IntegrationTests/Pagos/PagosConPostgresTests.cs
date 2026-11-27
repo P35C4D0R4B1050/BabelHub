@@ -21,7 +21,7 @@ internal static class ComprasDePrueba
         var impresa = new LineaDeIntencion(LineaImpresa, Guid.Parse("44444444-4444-4444-4444-444444444441"), EsDigital: false, "La ciudad y los perros", "9780306406157", 2, Importe.De(50m), Importe.De(100m));
         var digital = new LineaDeIntencion(LineaDigital, Guid.Parse("44444444-4444-4444-4444-444444444442"), EsDigital: true, "Rayuela", "9780306406164", 1, Importe.De(25m), Importe.De(25m));
         var texto = new TextoAceptado("2026-11", ahora.AddMinutes(-5));
-        return InstantaneaDeIntencion.Crear(cuenta, TipoDeEntrega.Domicilio, null, "AYA", [impresa, digital], Importe.De(15m), Importe.De(140m), "huella-a", texto, texto, texto, new ContactoDeEntrega("Ana Pérez Quispe", "987654321", "Av. Los Olivos 123, Ayacucho"));
+        return InstantaneaDeIntencion.Crear(cuenta, TipoDeEntrega.Domicilio, null, "AYA", [impresa, digital], Importe.De(15m), Importe.De(140m), "huella-a", texto, texto, texto, new ContactoDeEntrega("Ana Pérez Quispe", "987654321", "Av. Los Olivos 123, Ayacucho"), [new EnvioDeSucursalDeIntencion("ayacucho", Importe.De(15m))]);
     }
 
     /// <summary>Una compra mixta de S/ 140 con la intención abierta, la reserva pendiente en el Inventario y Carrito en «en pago».</summary>

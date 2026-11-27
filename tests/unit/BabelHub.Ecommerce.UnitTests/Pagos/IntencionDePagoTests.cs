@@ -37,9 +37,9 @@ public sealed class IntencionDePagoTests
     public void La_entrega_a_domicilio_exige_contacto_y_region_y_las_demas_no_llevan_contacto()
     {
         Assert.Throws<ArgumentException>(() => InstantaneaDeIntencion.Crear(
-            Cuenta, TipoDeEntrega.Domicilio, null, "AYA", new[] { Impresa() }, Importe.Cero, Importe.De(100m), "h", Texto(), Texto(), null, contacto: null));
+            Cuenta, TipoDeEntrega.Domicilio, null, "AYA", new[] { Impresa() }, Importe.Cero, Importe.De(100m), "h", Texto(), Texto(), null, contacto: null, [new EnvioDeSucursalDeIntencion("ayacucho", Importe.Cero)]));
         Assert.Throws<ArgumentException>(() => InstantaneaDeIntencion.Crear(
-            Cuenta, TipoDeEntrega.Domicilio, null, regionDeEntrega: null, new[] { Impresa() }, Importe.Cero, Importe.De(100m), "h", Texto(), Texto(), null, Contacto()));
+            Cuenta, TipoDeEntrega.Domicilio, null, regionDeEntrega: null, new[] { Impresa() }, Importe.Cero, Importe.De(100m), "h", Texto(), Texto(), null, Contacto(), [new EnvioDeSucursalDeIntencion("ayacucho", Importe.Cero)]));
         Assert.Throws<ArgumentException>(() => InstantaneaDeIntencion.Crear(
             Cuenta, TipoDeEntrega.Recojo, "AYA-01", null, new[] { Impresa() }, Importe.Cero, Importe.De(100m), "h", Texto(), Texto(), null, Contacto()));
     }

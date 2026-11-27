@@ -34,7 +34,9 @@ internal static class MapeoDeInstantaneas
             Texto(instantanea, TextoLegalDeCompra.Terminos) ?? throw new ArgumentException("La instantánea no trae los términos aceptados.", nameof(instantanea)),
             Texto(instantanea, TextoLegalDeCompra.Privacidad) ?? throw new ArgumentException("La instantánea no trae la política de privacidad aceptada.", nameof(instantanea)),
             Texto(instantanea, TextoLegalDeCompra.ReembolsoDigital),
-            entrega == TipoDeEntrega.Domicilio && instantanea.Contacto is { } c ? new ContactoDeEntrega(c.Nombre, c.Telefono, c.Direccion) : null);
+            entrega == TipoDeEntrega.Domicilio && instantanea.Contacto is { } c ? new ContactoDeEntrega(c.Nombre, c.Telefono, c.Direccion) : null,
+            // Tal como llega (también donde no corresponde, para que el Dominio lo rechace): solo el código y el importe; un importe inválido no llega a serlo.
+            instantanea.EnviosPorSucursal?.Select(e => new EnvioDeSucursalDeIntencion(e.CodigoDeSucursal, Importe.De(e.Importe))).ToArray());
     }
 
     private static TextoAceptado? Texto(InstantaneaDeCompra instantanea, TextoLegalDeCompra texto) =>

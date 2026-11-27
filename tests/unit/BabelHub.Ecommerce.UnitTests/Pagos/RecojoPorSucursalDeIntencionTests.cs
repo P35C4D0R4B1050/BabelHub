@@ -61,7 +61,7 @@ public sealed class RecojoPorSucursalDeIntencionTests
     public void Fuera_del_recojo_la_sucursal_comun_sigue_prohibida()
     {
         Assert.Throws<ArgumentException>(() => InstantaneaDeIntencion.Crear(
-            Cuenta, TipoDeEntrega.Domicilio, "AYA-01", "AYA", new[] { Impresa() }, Importe.Cero, Importe.De(100m), "h", Texto(), Texto(), null, Contacto()));
+            Cuenta, TipoDeEntrega.Domicilio, "AYA-01", "AYA", new[] { Impresa() }, Importe.Cero, Importe.De(100m), "h", Texto(), Texto(), null, Contacto(), [new EnvioDeSucursalDeIntencion("ayacucho", Importe.Cero)]));
         Assert.Throws<ArgumentException>(() => InstantaneaDeIntencion.Crear(
             Cuenta, TipoDeEntrega.SinEntrega, "AYA-01", null, new[] { Digital() }, Importe.Cero, Importe.De(25m), "h", Texto(), Texto(), Texto(), null));
     }
