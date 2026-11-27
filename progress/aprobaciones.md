@@ -81,3 +81,11 @@ Una fila por cada spec o plan que el agente aprobó por delegación de la person
 | 2026-11-26 | plan | ecommerce-pagos | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 11 | c13fd6669be6a1af |
 | 2026-11-27 | spec | web-acceso | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 7 | f53d47b4f5e17444 |
 | 2026-11-27 | plan | web-acceso | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 4 | 3a0aa06dd1e1a61b |
+| 2026-11-27 | spec | inventario-seleccion-fuente | Claude (delegado) | 0/0 | Con cambios menores | Cumple | Cumple con observaciones | 0 | 4 | f1f44c48f2a7e3c4 |
+| 2026-11-27 | plan | inventario-seleccion-fuente | Claude (delegado) | 0/0 | Con cambios menores | Cumple | Cumple | 0 | 1 | e19c3bc3af2cb994 |
+| 2026-11-27 | spec | ecommerce-carrito-checkout | Claude (delegado) | 0/0 | Con cambios menores | Cumple | Cumple | 0 | 2 | f81e7f2e67f8392e |
+| 2026-11-27 | plan | ecommerce-carrito-checkout | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple con observaciones | 0 | 3 | a61984298836e622 |
+| 2026-11-27 | spec | ecommerce-pedidos | Claude (delegado) | 0/0 | Con cambios menores | Cumple | Cumple | 0 | 2 | fe0445e2c9c3e3bb |
+| 2026-11-27 | plan | ecommerce-pedidos | Claude (delegado) | 0/0 | Con cambios menores | Cumple con observaciones | Cumple | 0 | 1 | 26f37637c1f662bd |
+| 2026-11-27 | spec | web-base | Claude (delegado) | 0/0 | Lista para aprobar | Cumple | Cumple | 0 | 1 | b9162fd4ec4cd008 |
+| 2026-11-27 | plan | web-base | Claude (delegado) | 0/0 | Lista para aprobar | Cumple | Cumple | 0 | 0 | 056a363e84e1b3da |

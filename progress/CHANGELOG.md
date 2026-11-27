@@ -2,6 +2,15 @@
 
 Qué se completó, cuándo y en qué feature. Se actualiza con la skill `progress-log`. El detalle de cada sesión está en `log/`.
 
+## 2026-11-27 — Venta por sucursal: specs y planes aprobados (sin código)
+
+### Cubierto
+- `inventario-seleccion-fuente`, `ecommerce-carrito-checkout`, `ecommerce-pedidos` y `web-base`: spec y plan reaprobados por delegación; contrato aditivo descrito, alerta de acaparamiento (SEL-47) y reparto en tres carriles (`relevos/venta-por-sucursal-carriles.md`).
+- `SpecCheck` sin errores ni avisos y `dotnet test` en verde (17 333 superadas, 4 omitidas).
+
+### Pendiente
+- Programar los tres carriles; ratificar DD-130 a DD-138; Menores en `hallazgos.md`.
+
 ## 2026-11-27 — Acceso para la versión 0.1.3 (carril `acceso-v012`)
 
 ### Cubierto

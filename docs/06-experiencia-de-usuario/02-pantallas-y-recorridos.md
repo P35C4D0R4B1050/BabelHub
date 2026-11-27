@@ -9,7 +9,7 @@
 | **Sucursal** | Personal de logística | Traslados a nivel nacional, guías de envío y seguimiento de despachos, configuración del segundo factor. |
 | **Admin** | Administrador central | Resumen, catálogo (ediciones impresas y digitales con su licencia, ingreso de mercadería), sucursales y rutas entre ellas como datos, usuarios y roles (con restablecimiento de contraseña y de segundo factor), pedidos, anulaciones y no recogidos, reclamos (con descarte de spam), solicitudes sobre datos personales con fechas límite, auditoría unificada y alertas de seguridad, e indicadores. |
 
-El menú, el selector de sucursal y las acciones visibles dependen del rol y del alcance del token (RNF05): quien no tiene permiso no ve la acción, y si llega por URL recibe la pantalla de «sin permiso».
+La sucursal que atiende cada impreso se elige en la ficha del libro; la cabecera no tiene selector de sucursal (venta por sucursal, 2026-11-27). La administración central define el costo de envío de cada sucursal. El menú y las acciones visibles dependen del rol y del alcance del token (RNF05): quien no tiene permiso no ve la acción, y si llega por URL recibe la pantalla de «sin permiso».
 
 **Dos hosts.** La misma interfaz se sirve en la **tienda** (dominio principal: visitante y cliente) y en la **gestión** (subdominio, por ejemplo `gestion.`: encargados, logística y administración central). La gestión usa cookies propias y está protegida por Cloudflare Access con MFA; el personal también opera funciones del E-commerce (catálogo, envíos, devoluciones, reclamos), por eso es una sola interfaz para los dos servicios.
 
@@ -58,14 +58,14 @@ style F fill:#222,stroke:#fff,color:#fff
 | Tipo de carrito | Pasos | Particularidades |
 | :--- | :---: | :--- |
 | Solo digital | 4 | Sin entrega; al aprobar el pago se abre «Mi biblioteca». |
-| Solo impreso | 5 | Elección de sucursal con aviso de traslado si falta stock; reserva temporal de 15 minutos visible (AD08). |
+| Solo impreso | 5 | Sucursal de cada línea elegida en la ficha y visible en el carrito; recojo en esas sucursales o domicilio con un envío por sucursal; reserva temporal de 15 minutos visible (AD08). |
 | Mixto | 5 | Un solo cobro; en la confirmación, las líneas impresas siguen su seguimiento y las digitales se descargan al instante. |
 
-Para iniciar el pago, la cuenta debe tener el correo verificado (CAR-21); el costo del despacho a domicilio es fijo (CAR-23). Antes de pagar, el cliente acepta los términos, el tratamiento de sus datos personales (Ley N.° 29733) y, si compra libros digitales, «Cambios y devoluciones» (antes «política de reembolso»). Los avisos por WhatsApp son una opción que no se exige para pagar. Si el Inventario no responde, el checkout informa que no puede validar el stock y **no cobra** (AC03); los libros digitales siguen comprándose.
+Para iniciar el pago, la cuenta debe tener el correo verificado (CAR-21); el costo del despacho a domicilio es fijo por cada sucursal que atiende (CAR-23). Antes de pagar, el cliente acepta los términos, el tratamiento de sus datos personales (Ley N.° 29733) y, si compra libros digitales, «Cambios y devoluciones» (antes «política de reembolso»). Los avisos por WhatsApp son una opción que no se exige para pagar. Si el Inventario no responde, el checkout informa que no puede validar el stock y **no cobra** (AC03); los libros digitales siguen comprándose.
 
 ### 2.1 Tarjeta de libro
 
-Portada protagonista; título en serif; autor en sans; insignia de **formato** («Impreso» o «Digital»); disponibilidad con texto e icono («En tu sucursal», «En 3 sucursales más», «Disponible al instante», «Agotado»); y precio con jerarquía clara. Bordes discretos; el elevado y la sombra se reservan para el hover.
+Portada protagonista; título en serif; autor en sans; insignia de **formato** («Impreso» o «Digital»); disponibilidad con texto e icono («En 3 sucursales», «Disponible al instante», «Agotado»); y precio con jerarquía clara. Bordes discretos; el elevado y la sombra se reservan para el hover.
 
 ### 2.2 Libros digitales en la interfaz
 

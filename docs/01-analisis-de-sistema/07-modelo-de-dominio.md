@@ -88,12 +88,12 @@ Fuente "1" --> "*" UnidadesVendidas : atribuida
 
 1. El stock vendible nunca es negativo, ni siquiera ante solicitudes simultáneas (AC01).
 2. Una reserva no descuenta el stock físico; lo reduce el vendible. El físico baja al entregar un pedido de recojo, al pasar a en reparto un envío a domicilio y, en un traslado, al despacharse en el origen.
-3. La reserva de un pedido es atómica: todas las líneas impresas o ninguna.
+3. La reserva de un pedido es atómica: todas las líneas impresas o ninguna. Cada línea impresa declara la sucursal que la atiende, elegida por el cliente: no se divide ni se reasigna, un libro puede tener varias líneas y la suma por sucursal no supera su vendible (venta por sucursal, 2026-11-27).
 4. Un cliente tiene como máximo una reserva pendiente y hasta 5 reservas iniciadas por hora (RF28).
 5. La merma y el daño solo descuentan y nunca más que el vendible; la corrección de conteo se expresa como el conteo real y no puede quedar por debajo de lo reservado.
 6. Ciclo del traslado: solicitado → aprobado → en tránsito → recibido; solicitado → rechazado (no si está vinculado a un pedido); solicitado o aprobado → cancelado (al anularse el pedido vinculado, o por el origen o la administración si no está vinculado). El despacho descuenta del origen; la recepción suma al destino.
 7. Un libro digital nunca tiene stock, reserva ni traslado.
-8. Un traslado vinculado a un pedido mueve su reserva con las unidades: se consume en el origen al despachar y se recrea en el destino al recibir, en la misma transacción. Un pedido de recojo que supera 15 días en listo para recojo pasa a no recogido, libera sus reservas y ya no puede entregarse: solo se anula con reembolso.
+8. Las compras no generan traslados desde la venta por sucursal. Un traslado vinculado a un pedido anterior mueve su reserva con las unidades: se consume en el origen al despachar y se recrea en el destino al recibir, en la misma transacción. Un pedido de recojo que supera 15 días en listo para recojo pasa a no recogido, libera sus reservas y ya no puede entregarse: solo se anula con reembolso.
 9. Una reserva pendiente vencida no cuenta como activa aunque el trabajo de fondo no la haya procesado; si dos operaciones compiten por una misma reserva, gana la primera que confirma y la otra se rechaza por estado inválido.
 10. La mercadería nueva entra solo en la fuente de recepción, con el motivo ingreso de mercadería, que solo registra la administración central (AJU-19). El stock inicial de una edición nueva es su primer ingreso; las demás sucursales reciben stock por traslado o devolución. Un título sin stock en toda la red figura como agotado y no se da de baja (CAT-21).
 11. Hay exactamente una fuente de recepción y solo la administración central la cambia, con auditoría (FUE-19, FUE-20).
@@ -159,7 +159,7 @@ Pedido "1" --> "*" Linea
 Linea "*" --> "1" Edicion
 IntencionDePago "1" --> "*" Pago : intentos
 Pedido "1" --> "1" Pago
-Pedido "1" --> "0..1" Envio
+Pedido "1" --> "*" Envio : uno por sucursal
 Pedido "1" --> "*" Devolucion
 Linea "1" --> "0..1" AccesoDigital
 Pedido "0..*" <-- "1" HojaReclamacion

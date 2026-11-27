@@ -2,13 +2,13 @@
 id: web-base
 titulo: Estructura base de la interfaz web
 estado: Planned
-aprobado_por: Claude (delegado por Diego Amiquero)
-aprobado_en: 2026-11-14
 plan_aprobado_por: Claude (delegado por Diego Amiquero)
-plan_aprobado_en: 2026-11-14
+plan_aprobado_en: 2026-11-27
+aprobado_por: Claude (delegado por Diego Amiquero)
+aprobado_en: 2026-11-27
 servicio: E-commerce
 prefijo: WEB
-origen: [RC01, RNF13, RF25, RF29, NN15, NN16, NN18]
+origen: [RC01, RNF13, RF25, RF29, RF15, NN15, NN16, NN18]
 calidad: [AC03, AC04, AC06, RNF05, RNF06, RNF15, RNF16, RNF25, RNF26, RNF27]
 depende: [identidad-seguridad, ecommerce-libro-reclamaciones, ecommerce-catalogo, ecommerce-carrito-checkout, ecommerce-biblioteca-digital, transversal-auditoria, transversal-seguridad, ecommerce-pagos, ecommerce-pedidos, ecommerce-devoluciones, asistente-compra-ia]
 ---
@@ -46,7 +46,7 @@ La base común de la interfaz web del E-commerce: áreas por rol, sesión, estad
 | WEB-13 | Ubicuo | El sistema deberá indicar la disponibilidad y los estados con texto e icono, y nunca solo con color. | AC06 |
 | WEB-14 | Ubicuo | El sistema deberá mostrar importes en soles y fechas con formato peruano. | RNF13 |
 | WEB-15 | Evento | Cuando el cliente pulsa descargar un libro digital, el sistema deberá pedir la descarga al E-commerce y redirigir el navegador al enlace firmado recibido, sin transmitir el archivo. | RNF14 |
-| WEB-16 | Ubicuo | El sistema deberá recordar la sucursal preferida del cliente entre sesiones. | RNF13 |
+| WEB-16 | Ubicuo | El sistema deberá recordar entre sesiones la última sucursal con la que la persona agregó un impreso, usarla solo para preseleccionarla en la ficha y no ofrecer un selector de sucursal en la cabecera. | RNF13, RF15 |
 | WEB-17 | Evento | Cuando el visitante pulsa «Sorpréndeme», el sistema deberá elegir al azar un libro disponible y mostrar su ficha. | RF29, NN17 |
 | WEB-18 | Ubicuo | El sistema deberá enviar en cada respuesta las cabeceras de seguridad: política de contenido restrictiva, transporte seguro obligatorio, no adivinar el tipo de contenido y política de referencia limitada, y permitir en la política de contenido el script de la pasarela de pago solo en la página de pago. | RNF16, AC04 |
 | WEB-40 | Ubicuo | El sistema deberá permitir en la política de contenido el script y el marco de la verificación de persona solo en el ingreso, el registro, la nueva hoja de reclamación, el checkout y el asistente (SEG-31). | RNF16, AC04 |
@@ -96,7 +96,7 @@ La base común de la interfaz web del E-commerce: áreas por rol, sesión, estad
 | AC-WEB-09 | WEB-13 | **Dado** una edición agotada, **cuando** se muestra, **entonces** la etiqueta tiene texto e icono además del color. |
 | AC-WEB-10 | WEB-14 | **Dado** un importe de 1234,5, **cuando** se muestra, **entonces** aparece en soles con el formato peruano. |
 | AC-WEB-11 | WEB-15 | **Dado** un titular con descargas disponibles, **cuando** pulsa descargar, **entonces** el navegador es redirigido al enlace firmado y la capa web no recibe el archivo. |
-| AC-WEB-12 | WEB-16 | **Dado** un cliente que eligió Ayacucho, **cuando** vuelve otro día, **entonces** su sucursal sigue siendo Ayacucho. |
+| AC-WEB-12 | WEB-16 | **Dado** una persona que agregó un impreso eligiendo Ayacucho, **cuando** vuelve otro día a la ficha de un impreso, **entonces** Ayacucho aparece preseleccionada si tiene stock, ninguna otra pantalla (la devolución incluida) la usa ni muestra un selector en la cabecera, un alta rechazada no la cambia, una preferencia con un código desconocido no preselecciona nada y sin elección previa no hay ninguna preseleccionada. |
 | AC-WEB-13 | WEB-17 | **Dado** un catálogo con libros disponibles y agotados, **cuando** el visitante pulsa «Sorpréndeme», **entonces** se muestra la ficha de un libro disponible. |
 | AC-WEB-14 | WEB-18, WEB-19, WEB-40 | **Dado** cualquier página, **cuando** se inspeccionan sus respuestas, **entonces** llevan las cuatro cabeceras de seguridad y la cookie de sesión tiene los tres atributos exigidos; solo la página de pago permite el script de la pasarela; y al volver de la pasarela de pago el cliente conserva su sesión. La política de contenido permite el script y el marco de la verificación de persona solo en el ingreso, el registro, la nueva hoja de reclamación, el checkout y el asistente, y no en el catálogo ni en las demás páginas. |
 | AC-WEB-15 | WEB-20 | **Dado** el recorrido de compra, **cuando** se ejecuta la revisión automática de accesibilidad y la lista manual con teclado y lector de pantalla, **entonces** hay 0 incumplimientos críticos de nivel AA. |

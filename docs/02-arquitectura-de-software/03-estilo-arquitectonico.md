@@ -162,7 +162,7 @@ Cada módulo es una carpeta dentro de las capas del servicio (no un proyecto apa
 | Módulo | Responsabilidad | Spec | Depende de |
 | :--- | :--- | :--- | :--- |
 | **Catálogo** | Obras, ediciones impresas y digitales, licencias, portadas y archivos; muestra la disponibilidad y registra el stock inicial y el ingreso de mercadería en el Inventario. Un título agotado no se da de baja. | `ecommerce-catalogo` | Cliente del Inventario |
-| **Carrito y checkout** | Carrito del cliente, validación de la compra, costo de envío y reserva previa al cobro. | `ecommerce-carrito-checkout` | Catálogo, Identidad, cliente del Inventario |
+| **Carrito y checkout** | Carrito del cliente, validación de la compra, costo de envío y reserva previa al cobro. | `ecommerce-carrito-checkout` | Catálogo, Identidad, cliente del Inventario, interfaz web (contrato de la sucursal preferida) |
 | **Pagos** | Cobro con la pasarela (Yape y tarjeta), idempotencia, pago pendiente de confirmación y reembolsos. No guarda datos de tarjeta. | `ecommerce-pagos` | Carrito y checkout, Identidad, cliente del Inventario |
 | **Pedidos** | Ciclo de vida del pedido, sus líneas impresas y digitales, y su anulación o no recogido. | `ecommerce-pedidos` | Pagos, Biblioteca digital, Identidad, cliente del Inventario; define un puerto de despacho (crear y cancelar envíos) que implementa Envíos, sin depender de él |
 | **Envíos** | Despacho a domicilio con operador logístico, guía y estados; descuenta el stock al pasar a en reparto. | `ecommerce-envios` | Pedidos (y su puerto de despacho, que Envíos implementa), Identidad, cliente del Inventario |
@@ -178,7 +178,7 @@ Cada módulo es una carpeta dentro de las capas del servicio (no un proyecto apa
 | Módulo | Responsabilidad | Spec | Depende de |
 | :--- | :--- | :--- | :--- |
 | **Fuentes** | Sucursales como fuentes, stock físico, reservado y vendible, rutas entre fuentes, fuente de recepción y unidades vendidas. | `inventario-fuentes` | Ninguno |
-| **Selección y reservas** | Consulta previa, selección de la fuente de despacho y reservas con expiración, atómicas e idempotentes. | `inventario-seleccion-fuente` | Fuentes |
+| **Selección y reservas** | Consulta previa y reservas en la sucursal elegida por línea (la selección automática queda para solicitudes sin sucursal), con expiración, atómicas e idempotentes. | `inventario-seleccion-fuente` | Fuentes |
 | **Traslados** | Solicitud, aprobación, despacho y recepción de traslados entre sucursales, vinculados o no a un pedido. | `inventario-traslados` | Fuentes, Selección y reservas |
 | **Ajustes** | Merma, daño, corrección de conteo, ingreso de mercadería (solo en la fuente de recepción) y reingreso por devolución. | `inventario-ajustes` | Fuentes |
 

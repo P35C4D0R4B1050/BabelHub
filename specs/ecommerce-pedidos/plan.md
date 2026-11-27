@@ -5,6 +5,8 @@ estado: Draft
 
 # Plan — Pedidos y seguimiento
 
+> **Venta por sucursal (2026-11-27):** la spec volvió a Draft para agregar PED-42 y PED-43 y cambiar PED-01, 04, 05 y 08; lo nuevo y lo que cambia de este plan (incluidos los cambios necesarios en Pagos y Devoluciones) está en **§11 «Venta por sucursal»**, que prevalece sobre el texto anterior donde difieran. Tareas T43 a T49; decisión D21.
+>
 > **Cómo se construye.** Parte de la spec `ecommerce-pedidos` (41 requisitos, 35 criterios; spec Approved el 2026-11-13). El módulo `Pedidos` vive en el E-commerce (esquema `pedidos`), es dueño del **pedido**, de sus **líneas** (cada una con su ciclo), de la **única copia del contacto de entrega**, de la anulación y la cancelación, y de la gestión de recojo y despacho; implementa `IConfirmacionDeCompra` (que declara `Pagos`) y pide al Inventario cerrar y liberar reservas por los contratos v1 de `docs/03-diseno-de-software/08-contratos-entre-servicios-v1.md` a través de `IClienteDelInventario` de `Plataforma`. Los niveles de rigor (C, E, B) son los de `docs/07-proceso-de-desarrollo/05-desarrollo-por-bloques.md` §2: el bloque ECO-6 es estándar, pero **suben a crítico** las tareas que tocan datos personales (contacto), autorización por sucursal, stock y reembolsos.
 
 ## 1. Resumen técnico
@@ -175,3 +177,31 @@ Referencia: `prototype/ui-v2/tienda/pedidos.html`, `prototype/ui-v2/sucursal/rec
 - [x] Una falla del Notificador no interrumpe ningún caso de uso (regla 10).
 - [x] Un libro digital no consulta al Inventario ni genera reservas (regla 12): las líneas digitales no entran en `IReservasDelPedido`.
 - [x] `Shared` sin cambios y solo contratos.
+## 11. Venta por sucursal (v0.1.3)
+
+Prevalece sobre §1 a §8 donde difieran. No cambian la máquina de estados, el bloqueo por pedido, **las anulaciones, los importes ni los reembolsos** (PED-17, PED-22, PED-27 y la regla del envío siguen igual, ahora con un costo de envío que es la suma por sucursal), la entrega y el cierre **una línea por llamada** al Inventario, los avisos por `INotificador` ni la privacidad del contacto. `ecommerce-envios` ya crea un envío por fuente y no cambia; `inventario-traslados` y las entradas de estado de traslado se conservan para pedidos anteriores.
+
+### 11.1 Contratos entre carriles
+
+Ningún contrato público cambia de forma entre este carril y «Carrito y tienda»: la instantánea llega con un solo `Envio` y con `CodigoDeSucursalDeRecojo` nulo en un recojo por sucursal; la sucursal de cada línea es la fuente de la reserva confirmada que Pagos ya entrega en `CompraAprobada`. Los modelos de `Application/Pedidos` suman a la línea visible la sucursal que la atiende (aditivo).
+
+### 11.2 Pagos (sin cambio de su spec ni de su esquema)
+
+`InstantaneaDeIntencion` deja de exigir la sucursal común en un recojo (sigue prohibida fuera del recojo y la región sigue prohibida en él). La columna ya admite nulo. Varias líneas de una misma edición impresa son válidas (con su prueba). La huella y el token del intento de una intención anterior no cambian.
+
+### 11.3 Pedidos
+
+| Capa | Cambio |
+| :--- | :--- |
+| Dominio | Unicidad de línea por edición solo para las digitales. La sucursal que atiende una línea es la **sucursal de recojo común si el pedido la tiene (anterior, PED-43) y, si no, su fuente** (`SucursalDeLaLinea`); un recojo admite sucursal común nula si todas sus líneas impresas tienen fuente. |
+| Aplicación | `AlcanceDePedidos`: el pedido es del encargado si es de recojo y alguna línea es de su sucursal; **toda** línea pedida en preparar, listas o entregar debe ser suya, comprobado antes de tocar nada o llamar al Inventario, con el mismo rechazo y evento (PED-42). Al encargado, **toda salida** (lista, detalle y respuesta de las operaciones) lleva solo sus líneas, el estado derivado de ellas (PED-20), su importe y su cantidad de líneas, sin envío (PED-08). `AvisosDePedidos`: la sucursal de cada línea afectada. `ConfirmarCompra` admite el recojo sin sucursal común. |
+| Infraestructura | `pedidos`, repetible sobre una base ya creada: se reemplaza `lineas_una_por_edicion` por un índice único parcial de las digitales y se relaja `pedidos_recojo_con_sucursal` a «fuera del recojo no hay sucursal común»; sin columnas ni permisos nuevos. La lista del encargado selecciona por `EXISTS` de líneas de su sucursal (o la sucursal común) y el filtro por estado compara **el estado derivado de esas líneas, calculado en la consulta antes de paginar**, de modo que filtro y rótulo coincidan. |
+| Presentación | Detalle y lista con la sucursal de cada línea; la sucursal ve solo lo suyo. Sin rutas nuevas. |
+
+### 11.4 Devoluciones (corrección necesaria, sin cambio de su spec)
+
+DEV-01 pide líneas y cantidades, no ediciones distintas: se quita la restricción de edición única para impresos (`Devolucion` y `SolicitarDevolucionDeImpreso`), la pantalla rotula cada línea con su sucursal y `ConfirmarRecepcion` **agrupa por edición** las cantidades al pedir el reingreso, que el Inventario sigue recibiendo con ediciones distintas y la misma clave (AC-PED-41). La sucursal receptora la sigue eligiendo el cliente y `Devolver.cshtml` deja de preseleccionarla desde la cookie.
+
+### 11.5 Datos existentes, archivos, pruebas y despliegue
+
+Pedidos anteriores: sin relleno ni columnas; la derivación de §11.3 los conserva (AC-PED-39). **Archivos de este carril:** los módulos y vistas de Pagos (solo §11.2), Pedidos y Devoluciones y sus pruebas propias. Las pruebas de integración y E2E que cruzan módulos son del carril «Carrito y tienda» (plan de `ecommerce-carrito-checkout` §11.7); este carril no las edita y crea las suyas nuevas. Orden de integración: Inventario, luego este carril y el de carrito, y al final las pruebas cruzadas. Pruebas: Dominio y Aplicación primero (dos sucursales, lotes, alcance y salidas filtradas, instantánea sin sucursal común, agrupación del reingreso) y PostgreSQL (esquema anterior migrado dos veces, lista y filtro del encargado). Despliegue con el E-commerce; se corrige hacia adelante.

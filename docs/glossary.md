@@ -10,7 +10,9 @@ Lenguaje común del dominio. El código, las specs y la interfaz usan estos tér
 | **Stock físico** | Ejemplares impresos que realmente hay en una fuente. | Stock vendible. |
 | **Reserva** | Apartado de unidades para un pedido en curso. Estados: pendiente, confirmada, cerrada (al entregar, pasar a en reparto o despachar el traslado), liberada, expirada. Una pendiente vencida no cuenta como activa. | Venta: una reserva todavía no descuenta el stock físico. |
 | **Stock vendible** | *Stock físico − reservas activas*. Nunca es negativo. | Stock físico. |
-| **Selección de fuente** | Regla que decide desde qué fuente se atiende cada línea impresa de un pedido. | Elección de sucursal de recojo, que hace el cliente. |
+| **Selección de fuente** | Regla que decide desde qué fuente se atiende una línea impresa **sin sucursal declarada** (forma anterior a la venta por sucursal). | Sucursal de la línea, que elige el cliente. |
+| **Sucursal de la línea** | Sucursal que el cliente elige para que atienda una línea impresa: allí se aparta el stock, se recoge o sale su envío. | Selección de fuente; sucursal del encargado. |
+| **Lote** | Cada una de las líneas de un mismo libro en una misma sucursal, de hasta 20 unidades. | Ingreso de mercadería. |
 | **Traslado** | Movimiento de ejemplares de una fuente de origen a una de destino. Estados: solicitado, aprobado, en tránsito, recibido, rechazado, cancelado. Si nace de un pedido pagado está *vinculado* a él: no puede rechazarse y mueve la reserva con las unidades. | Envío a domicilio. |
 | **Ruta** | Plazo estimado, en días, del traslado de una fuente a otra. La administración la mantiene como dato; ordena las fuentes por cercanía y da el plazo que ve el cliente. | Guía de traslado. |
 | **Ajuste** | Cambio del stock físico de una fuente con motivo y responsable: merma, producto dañado, corrección de conteo o ingreso de mercadería (este solo lo registra la administración central, en la fuente de recepción). | Traslado. |

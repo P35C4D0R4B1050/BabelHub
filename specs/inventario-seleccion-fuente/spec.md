@@ -1,40 +1,41 @@
 ---
 id: inventario-seleccion-fuente
 titulo: Reservas y selección de fuente
-estado: Done
+estado: Planned
+plan_aprobado_por: Claude (delegado por Diego Amiquero)
+plan_aprobado_en: 2026-11-27
+aprobado_por: Claude (delegado por Diego Amiquero)
+aprobado_en: 2026-11-27
 servicio: Inventario
 prefijo: SEL
-origen: [RF04, RF14, RF15, RF27, RF28, NN02, NN06, NN07, NN18]
+origen: [RF04, RF12, RF14, RF15, RF27, RF28, NN02, NN06, NN07, NN18, RNF20]
 calidad: [AC01, AC05, AC04, RNF01, RNF05, RNF09, RNF23]
 depende: [inventario-fuentes, identidad-seguridad, transversal-auditoria, transversal-seguridad]
-aprobado_por: Claude (delegado por Diego Amiquero)
-aprobado_en: 2026-11-21
-plan_aprobado_por: Claude (delegado por Diego Amiquero)
-plan_aprobado_en: 2026-11-21
 ---
 
 # Spec — Reservas y selección de fuente
 
 ## 1. Propósito
 
-Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos; el Inventario crea reservas temporales, elige desde qué fuente se atiende cada línea y genera el traslado cuando la fuente no es la sucursal de recojo elegida (AD08 validada).
+Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos en la sucursal que la persona eligió para cada línea (venta por sucursal, decidida el 2026-11-27); el Inventario crea reservas temporales exactamente en esa sucursal, sin elegir otra fuente ni generar traslados. La selección automática de fuente y el traslado hacia la sucursal de recojo (AD08) se conservan solo para las solicitudes sin sucursal por línea, la forma anterior a la venta por sucursal.
 
 ## 2. Alcance
 
 | Dentro | Fuera |
 | :--- | :--- |
 | Reservas temporales con expiración, confirmación y liberación. | El ciclo de vida del traslado (`inventario-traslados`). |
-| Selección de la fuente de cada línea impresa y su consulta previa sin reservar. | El cobro y el pedido (`ecommerce-pagos`, `ecommerce-pedidos`). |
+| Reserva en la sucursal elegida para cada línea, selección de la fuente en las solicitudes sin sucursal por línea y consulta previa sin reservar. | El cobro y el pedido (`ecommerce-pagos`, `ecommerce-pedidos`) y la elección de la sucursal (`ecommerce-carrito-checkout`). |
 | Atomicidad ante solicitudes simultáneas. | Libros digitales: nunca se reservan. |
 | Límite de reservas temporales por cliente (una pendiente y 5 por hora), por origen (10 por hora) y de 3 reemplazos por reserva pendiente. | El formato de rechazo, el registro del evento y los demás límites de uso (`transversal-seguridad`). |
+| Alerta cuando se apartan demasiadas unidades de una edición en una sucursal. | El correo de las alertas técnicas, su agrupación y sus topes (`transversal-auditoria`). |
 
 ## 3. Requisitos (EARS)
 
 | ID | Patrón | Requisito | Origen |
 | :--- | :--- | :--- | :--- |
 | SEL-01 | Evento | Cuando el E-commerce solicita una reserva para un pedido, el sistema deberá crear una reserva temporal por cada línea impresa, con expiración a los 15 minutos desde que se inicia el pago. | RF14 |
-| SEL-02 | Evento | Cuando se reserva una línea impresa de un pedido de recojo, el sistema deberá seleccionar la sucursal de recojo elegida y, si no tiene stock vendible suficiente, la fuente con stock vendible de menor plazo de ruta hacia ella. | RF15 |
-| SEL-03 | Evento | Cuando se confirman las reservas de un pedido de recojo, el sistema deberá generar, en la misma transacción, una solicitud de traslado vinculada al pedido por cada fuente y edición cuya fuente no es la sucursal de recojo, desde esa fuente hacia la sucursal de recojo. | RF15, NN07 |
+| SEL-02 | Evento | Cuando se reserva una línea impresa sin sucursal declarada de un pedido de recojo, el sistema deberá seleccionar la sucursal de recojo elegida y, si no tiene stock vendible suficiente, la fuente con stock vendible de menor plazo de ruta hacia ella. | RF15 |
+| SEL-03 | Evento | Cuando se confirman las reservas de un pedido de recojo sin sucursal por línea, el sistema deberá generar, en la misma transacción, una solicitud de traslado vinculada al pedido por cada fuente y edición cuya fuente no es la sucursal de recojo, desde esa fuente hacia la sucursal de recojo. | RF15, NN07 |
 | SEL-04 | No deseado | Si dos solicitudes compiten por la última unidad de una edición en una fuente, entonces el sistema deberá conceder la reserva a una sola. | AC01, RNF01 |
 | SEL-05 | No deseado | Si ninguna fuente tiene stock vendible suficiente para una línea, entonces el sistema deberá rechazar la reserva indicando falta de stock y no reservar ninguna otra línea del pedido. | RF14 |
 | SEL-06 | Evento | Cuando el E-commerce confirma el pago de un pedido, el sistema deberá pasar sus reservas de pendientes a confirmadas. | RF14 |
@@ -54,10 +55,10 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 | SEL-20 | Evento | Cuando el E-commerce consulta la selección de fuentes de un carrito, el sistema deberá responder, por cada línea impresa, la fuente que se seleccionaría, si implica un traslado y su plazo estimado, o la falta de stock, sin crear reservas ni modificar el stock vendible, ignorando las líneas digitales y sujeto al límite general de solicitudes. | RF04, RF15 |
 | SEL-21 | Evento | Cuando logística o administración pasa a en reparto un envío a domicilio, el sistema deberá descontar el stock físico de la fuente de cada línea impresa del envío y cerrar sus reservas confirmadas; si esas líneas ya se cerraron por el mismo motivo y el mismo envío, deberá responder que ya estaban cerradas (`ya-cerrada`) sin descontar otra vez, aunque la clave de idempotencia sea nueva. | RF14 |
 | SEL-22 | Evento | Cuando el E-commerce informa que el pago de un pedido quedó pendiente de confirmación, el sistema deberá extender una sola vez la expiración de sus reservas pendientes hasta 30 minutos desde que se inició el pago, y solo una vez por pedido, incluidas las reservas que lo reemplazan. | RF14 |
-| SEL-23 | No deseado | Si la región de la dirección no tiene fuente, o dos fuentes tienen el mismo plazo de ruta, entonces el sistema deberá elegir la de mayor stock vendible y, si empatan, la de código menor. | RF15 |
-| SEL-24 | Evento | Cuando se reserva una línea impresa de un pedido a domicilio, el sistema deberá seleccionar la fuente de la región de la dirección y, si no tiene stock vendible suficiente, la de menor plazo de ruta hacia la sucursal de esa región, sin generar un traslado. | RF15 |
+| SEL-23 | No deseado | Si para una línea sin sucursal declarada la región de la dirección no tiene fuente o dos fuentes tienen el mismo plazo de ruta, entonces el sistema deberá elegir la de mayor stock vendible y, si empatan, la de código menor. | RF15 |
+| SEL-24 | Evento | Cuando se reserva una línea impresa sin sucursal declarada de un pedido a domicilio, el sistema deberá seleccionar la fuente de la región de la dirección y, si no tiene stock vendible suficiente, la de menor plazo de ruta hacia la sucursal de esa región, sin generar un traslado. | RF15 |
 | SEL-25 | Ubicuo | El sistema deberá tratar como la menos cercana a una fuente cuya ruta no está definida, y no dividir una línea entre varias fuentes. | RF15 |
-| SEL-26 | No deseado | Si una solicitud pierde la última unidad de una fuente pero otra fuente tiene stock vendible suficiente, entonces el sistema deberá reasignarla a esa fuente; y si ninguna lo tiene, rechazarla por falta de stock según SEL-05. | AC01, RF14 |
+| SEL-26 | No deseado | Si una línea sin sucursal declarada pierde la última unidad de una fuente pero otra fuente tiene stock vendible suficiente, entonces el sistema deberá reasignarla a esa fuente; y si ninguna lo tiene, rechazarla por falta de stock según SEL-05. | AC01, RF14 |
 | SEL-27 | Ubicuo | El sistema deberá excluir del stock vendible las reservas pendientes vencidas y liberar las vencidas de una edición, en la misma transacción, al reservar esa edición. | RF14, AC01 |
 | SEL-28 | No deseado | Si se intenta entregar, pasar a en reparto o despachar un pedido cuya reserva no está confirmada (liberada, expirada o cerrada por otra operación), entonces el sistema deberá rechazar la operación por estado inválido sin cambiar el stock. | RF14, AC01 |
 | SEL-29 | No deseado | Si dos operaciones compiten por la misma reserva (anulación, no recogido, entrega, reparto, despacho de traslado o expiración), entonces el sistema deberá aplicar la primera que confirma y rechazar las demás por estado inválido, sin efectos parciales. | AC01, RNF01 |
@@ -72,6 +73,13 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 | SEL-38 | Evento | Cuando se repite con la misma clave el cierre de una reserva por entrega o reparto, el sistema deberá comprobar primero el alcance de quien lo repite (si no lo tiene, rechazarlo como acceso denegado sin revelar el resultado guardado); con la misma carga, devolver el resultado original sin descontar otra vez; con otra, rechazarlo como conflicto (SEL-31). La clave se acota por reserva. | RF14, AC01, RNF05 |
 | SEL-39 | Ubicuo | El sistema deberá comprobar el alcance de quien cierra, libera o extiende una reserva antes de la clave, el estado o `ya-cerrada`: la entrega con la sucursal de recojo (o administración), el paso a en reparto con el rol de logística o administración, y liberar y extender con la credencial de su alcance; un usuario sin alcance recibe 403 y una credencial de otro alcance el 401 uniforme, con evento. | RF14, RNF05 |
 | SEL-40 | No deseado | Si una solicitud de reserva, o su consulta previa, trae más de 30 líneas, o más de 20 unidades en una línea, entonces el sistema deberá rechazarla indicando el campo (`lineas` o `lineas.cantidad`) sin apartar ni mover stock, de modo que una reserva retenga a lo más 600 unidades (residual de AM01). | RF28, AC04 |
+| SEL-41 | Evento | Cuando una reserva declara la sucursal de cada línea impresa, el sistema deberá apartar cada línea solo en esa sucursal, aunque otra fuente tenga stock, admitiendo varias líneas de una edición, sin dividirlas, reasignarlas ni generar traslados, y en recojo tratar esa sucursal como lugar de recojo de la línea. | RF04, RF14, RF15 |
+| SEL-42 | No deseado | Si una reserva o su consulta previa declara sucursal en unas líneas impresas y en otras no, nombra una sucursal que no existe o trae además una sucursal de recojo común, entonces el sistema deberá rechazarla indicando el campo, sin apartar ni mover stock. | RF14, RNF05 |
+| SEL-43 | No deseado | Si una línea declarada en una sucursal no cabe en el vendible que dejan las líneas anteriores cubiertas de la misma edición y sucursal, en el orden de la solicitud, entonces el sistema deberá rechazar la reserva entera, indicar esas líneas y el vendible de la sucursal y no apartar nada. | RF14, AC01 |
+| SEL-44 | Evento | Cuando la consulta previa declara la sucursal de cada línea impresa, el sistema deberá responder por línea, con la misma asignación en orden de SEL-43, si la sucursal la cubre, o la falta de stock con su vendible, sin traslado ni plazo y sin reservar. | RF04, RF15 |
+| SEL-45 | Estado | Mientras una reserva de recojo es por sucursal, el sistema deberá exigir al encargado que todas las líneas que pide entregar sean de su sucursal, rechazando el conjunto con la respuesta de SEL-39 si alguna es de otra o no existe, y permitirlo a la administración central. | RF14, RNF05 |
+| SEL-46 | Ubicuo | El sistema deberá contar como vendidas en cada sucursal las unidades de un pedido con la misma edición en varias, restando lo devuelto una sola vez por pedido y edición, con un reparto siempre igual para la cifra de una sucursal y la de la red, sin negativos. | RF12, RF15 |
+| SEL-47 | Evento | Cuando las reservas por sucursal nuevas apartan en 15 minutos más unidades de una edición en una sucursal que un máximo configurable, 100 por defecto, el sistema deberá generar una sola alerta técnica por edición, sucursal y ventana, sin datos personales y sin rechazar ni deshacer reservas, y anotar en su log la edición, la sucursal y las unidades. | RNF20, AC04 |
 
 ## 4. Criterios de aceptación
 
@@ -118,9 +126,26 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 | AC-SEL-39 | SEL-38, SEL-21, SEL-28 | **Dado** un envío a domicilio ya descontado con una clave, **cuando** se repite con la misma clave y carga, **entonces** se devuelve el resultado original y el físico no baja otra vez; con otra carga se rechaza como conflicto; sobre una reserva cerrada por otra operación se rechaza por estado inválido; y quien no tiene alcance sobre esa reserva recibe el rechazo de acceso denegado (403) con el evento de seguridad, y no el resultado guardado. |
 | AC-SEL-40 | SEL-39 | **Dado** una reserva confirmada para recojo en Ayacucho y un envío a domicilio de otra, **cuando** un encargado de Cusco intenta entregar la primera, o un usuario de otro rol intenta pasar a en reparto la segunda o una credencial de servicio de otro alcance intenta liberarla o extenderla, **entonces** los dos primeros se rechazan con acceso denegado (403) y el tercero con el 401 uniforme, todos con evento de seguridad antes de mirar la clave, el estado o `ya-cerrada`, y no se revela si la reserva existe, está cerrada o tiene un resultado guardado. |
 | AC-SEL-41 | SEL-40 | **Dado** una solicitud de reserva con una línea de 20 unidades y otra con una línea de 21, y otra de 30 líneas y otra de 31, **cuando** se envían (y se consultan antes con la consulta previa), **entonces** la de 20 unidades y la de 30 líneas se aceptan, la de 21 se rechaza en `lineas.cantidad` y la de 31 en `lineas`, y el stock no cambia. |
+| AC-SEL-42 | SEL-41, SEL-06 | **Dado** una edición con vendible 20 en Cusco y 6 en Ayacucho, **cuando** se reserva para recojo una línea de 18 en Cusco y otra de 6 en Ayacucho y luego se confirma, **entonces** el vendible baja 18 en Cusco y 6 en Ayacucho, la respuesta nombra esas sucursales sin traslado y no se crea ningún traslado; y una reserva a domicilio con dirección en la región de Lima y una línea declarada en Cusco se aparta en Cusco aunque Lima tenga stock. |
+| AC-SEL-43 | SEL-43, SEL-41 | **Dado** una edición con vendible 5 en Ayacucho y 30 en Cusco, **cuando** se reservan dos líneas de 3 unidades declaradas en Ayacucho, **entonces** la reserva se rechaza entera por falta de stock, indica la segunda línea y el vendible 5 de Ayacucho, nada queda apartado ni se reasigna a Cusco; dos líneas de 3 y 2 se aceptan; y con una línea de 6 seguida de otra de 3 se indica sin stock solo la de 6. |
+| AC-SEL-44 | SEL-42, SEL-31 | **Dado** una solicitud con sucursal solo en una de sus dos líneas, otra con una sucursal inexistente y otra con sucursal por línea y además una sucursal de recojo común, **cuando** se envían a la reserva y a la consulta previa, **entonces** todas se rechazan indicando el campo y el stock no cambia; y repetir una clave de idempotencia cambiando solo la sucursal de una línea se rechaza como conflicto. |
+| AC-SEL-45 | SEL-44 | **Dado** una edición con vendible 5 en Ayacucho y 30 en Cusco, **cuando** la consulta previa declara dos líneas de 3 en Ayacucho y una de 18 en Cusco, **entonces** la primera y la de Cusco figuran disponibles en su sucursal, la segunda sin stock con vendible 5, ninguna con traslado ni plazo, y no cambian el vendible ni las reservas. |
+| AC-SEL-46 | SEL-45, SEL-39, SEL-28 | **Dado** una reserva por sucursal confirmada para recojo con una línea en Ayacucho y otra en Cusco, **cuando** el encargado de Ayacucho entrega la suya, **entonces** el físico baja solo en Ayacucho y la de Cusco sigue confirmada; si pide la de Cusco, ambas juntas, una línea que no existe o entrega un pedido a domicilio, recibe el rechazo de acceso denegado (403) con el evento, antes de mirar la clave o el estado y sin cambios; si su línea está liberada o pendiente, recibe estado inválido; y la administración central puede entregar cualquiera. |
+| AC-SEL-47 | SEL-41, SEL-43, SEL-04 | **Dado** una edición con 20 unidades vendibles en una sucursal, **cuando** 50 clientes reservan a la vez una o dos líneas de 1 unidad declaradas en ella, **entonces** se aceptan solicitudes mientras caben, las unidades apartadas nunca superan 20 ni queda sin aceptar una solicitud que todavía cabía, el vendible nunca es negativo y cada reserva queda entera o no aparta nada. |
+| AC-SEL-48 | SEL-03, SEL-11, SEL-39 | **Dado** una base con una reserva sin sucursal por línea creada antes de esta versión, pendiente, con una fuente distinta de la sucursal de recojo, **cuando** el esquema se actualiza dos veces, se confirma la reserva y se recibe su traslado, **entonces** la actualización no falla, el traslado se genera y se recibe como antes y solo la sucursal de recojo o la administración puede entregarla. |
+| AC-SEL-49 | SEL-46 | **Dado** un pedido confirmado con 18 unidades de un libro en Cusco y 6 del mismo libro en Ayacucho, **cuando** se consultan las unidades vendidas de cada sucursal y de la red, **entonces** figuran 18, 6 y 24; con 20 devueltas de ese pedido y edición figuran 4 en la red, repartidas siempre igual entre las sucursales, y la consulta de una sola sucursal da la misma cifra que la de la red. |
+| AC-SEL-50 | SEL-41, SEL-16 | **Dado** un cliente con una reserva por sucursal de 6 unidades en Ayacucho, que tiene 6 de vendible en total, **cuando** la reemplaza por 4 en Ayacucho y 2 en Cusco, **entonces** se acepta contando lo que devuelve la anterior; y si el reemplazo pide más de lo que una sucursal tiene, se rechaza y la anterior se conserva. |
+| AC-SEL-51 | SEL-47 | **Dado** el máximo por defecto, **cuando** en 15 minutos las reservas por sucursal nuevas apartan 100 unidades de una edición en una sucursal, **entonces** no hay alerta; con una unidad más hay exactamente una, y la edición, la sucursal y las unidades quedan en el log sin datos personales; más unidades en la misma ventana no generan otra; otra sucursal u otra edición cuentan aparte; un reemplazo cuenta todo lo que aparta; una reserva rechazada o repetida con la misma clave no cuenta; y pasada la ventana se cuenta desde cero. |
+| AC-SEL-52 | SEL-47 | **Dado** un máximo configurado en 10, **cuando** una reserva aparta 11 unidades de una edición en una sucursal, **entonces** hay una alerta; y **dado** además que publicar la alerta falla, la reserva se acepta con la misma respuesta y se conserva. |
+| AC-SEL-53 | SEL-47 | **Dado** una alerta de concentración, **cuando** cada servicio la registra y la web describe su motivo, **entonces** el motivo consta en el catálogo de alertas técnicas de ambos servicios con su descripción en español y no figura como «motivo no catalogado». |
 
 ## 5. Reglas e invariantes
 
+- Una reserva es **por sucursal** cuando todas sus líneas impresas declaran la sucursal que las atiende. El E-commerce la declara siempre en las compras de cliente (`ecommerce-carrito-checkout`), así que ninguna compra nueva usa la selección automática ni genera traslados. La forma sin sucursal por línea queda por compatibilidad con las reservas ya creadas y con la versión anterior del E-commerce mientras se actualiza; solo la alcanza quien tiene una credencial de servicio del E-commerce (reservar exige además el token de la persona). Los criterios AC-SEL-02, 03, 20, 23, 25, 26, 33 y 34 usan esa forma.
+- La sucursal de cada línea forma parte de la carga de la solicitud (SEL-31). Una reserva por sucursal puede traer varias líneas de la misma edición y sucursal: el vendible limita la suma y los topes de SEL-40 no cambian, así que una reserva sigue reteniendo como máximo 600 unidades, que ahora pueden ser de una sola edición en una sola sucursal (consecuencia de la venta por lotes aprobada; riesgo residual de AM01, aceptado por la persona responsable el 2026-11-27 y vigilado por SEL-47).
+- La alerta de SEL-47 (la persona responsable pidió especificarla y fijó el 2026-11-27 más de 100 unidades en 15 minutos, por correo a los administradores centrales y sin bloquear ventas) cuenta lo que aparta cada reserva por sucursal nueva, incluidos los reemplazos y sin restar lo liberado o vencido, en una ventana fija de 15 minutos desde la primera unidad contada de esa edición y sucursal; el conteo se pierde al reiniciar el servicio. El correo es el de las alertas técnicas (AUD-29, AUD-42): lleva el motivo, no la edición ni la sucursal, que quedan en el log. No avisa de un acaparamiento que no supere el máximo en ninguna ventana.
+- En una reserva por sucursal no hay una sucursal de recojo común: donde SEL-39 la nombra para la entrega, rige la de cada línea (SEL-45).
+- La sucursal que declare una línea digital se ignora: la consulta previa descarta esas líneas (SEL-20) y la reserva las rechaza (SEL-12).
 - Reserva: pendiente → confirmada, o pendiente → liberada / expirada. Una reserva confirmada pasa a cerrada al entregar un pedido de recojo o al pasar a en reparto un envío a domicilio; se libera si el pedido se anula o se marca como no recogido; y, si su fuente despacha un traslado vinculado al pedido, se consume en el origen y se vuelve a crear en el destino al recibirlo (`inventario-traslados`).
 - Una reserva no descuenta el stock físico; lo reduce el vendible. El físico baja al entregar (recojo), al pasar a en reparto (domicilio) o al despachar el traslado (origen).
 - La consulta previa de selección (SEL-20) es de solo lectura: no cuenta para los límites de reservas ni para el vendible.
@@ -132,8 +157,9 @@ Evitar la sobreventa. Antes de cobrar, el E-commerce pide reservar los impresos;
 
 ## 6. Casos límite y errores
 
-- Un pedido con líneas de dos o más ediciones o fuentes distintas genera un traslado por cada fuente y edición distintas de la sucursal de recojo.
+- En un pedido de recojo sin sucursal por línea, las líneas de dos o más ediciones o fuentes distintas generan un traslado por cada fuente y edición distintas de la sucursal de recojo.
 - Una línea se atiende desde una sola fuente: nunca se divide (SEL-25).
+- En una reserva por sucursal, un encargado que intenta entregar líneas de otra sucursal, o líneas que no existen, recibe el mismo rechazo de acceso denegado (SEL-45).
 - Un pedido marcado como no recogido no puede entregarse después: solo se anula con reembolso (SEL-28).
 - Una confirmación de reserva ya expirada se rechaza y obliga a reiniciar el pago.
 - Una liberación repetida de la misma reserva no cambia el stock otra vez.

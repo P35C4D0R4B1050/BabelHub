@@ -5,6 +5,8 @@ estado: Draft
 
 # Plan — Carrito y checkout
 
+> **Venta por sucursal (2026-11-27):** la spec volvió a Draft para agregar CAR-39 a CAR-50 y cambiar CAR-04, 05, 08, 09, 23, 24 y 27; lo nuevo y lo que cambia de este plan está en **§11 «Venta por sucursal»**, que prevalece sobre el texto anterior donde difieran. Tareas T39 a T49; decisión D22.
+>
 > **Cómo se construye.** Parte de la spec `ecommerce-carrito-checkout` (38 requisitos, 33 criterios; spec Approved el 2026-11-13 y enmendada el 2026-11-20 por DD-16: CAR-38 y AC-CAR-32 y 33, a reaprobar). El módulo `Carrito` vive en el E-commerce (esquema `carrito`), es dueño del carrito, del **checkout** (la compra en curso: entrega, contacto, aceptaciones y estado), de la **instantánea de compra** que congela al pasar al pago y de la validación previa; **no cobra, no crea el pedido, no selecciona la fuente y no dibuja la pantalla de pago** (`/checkout/pago` es de `ecommerce-pagos`). Hacia el Inventario usa los contratos v1 de `docs/03-diseno-de-software/08-contratos-entre-servicios-v1.md` (disponibilidad, consulta previa, sucursales, reservar y liberar) por `IClienteDelInventario` de `Plataforma`; hacia Pagos, Biblioteca, Identidad y Catálogo, solo los contratos públicos de cada módulo (regla 13). Los niveles de rigor (C, E, B) son los de `docs/07-proceso-de-desarrollo/05-desarrollo-por-bloques.md` §2.
 
 ## 1. Resumen técnico
@@ -174,3 +176,51 @@ La pantalla de pago, la cuenta regresiva y «estamos confirmando tu pago» son d
 - [x] Una falla del Notificador no interrumpe nada (Carrito no lo llama).
 - [x] Un libro digital no consulta al Inventario ni genera reservas (regla 12).
 - [x] `Shared` sin cambios y solo contratos.
+## 11. Venta por sucursal (v0.1.3)
+
+Prevalece sobre §1 a §8 donde difieran: la línea deja de ser única por edición, la entrega de recojo no elige sucursal, la consulta del Inventario no informa traslados y el costo de envío es por sucursal. No cambian los bloqueos, la reserva única y atómica por checkout, los límites, las aceptaciones, la anonimización ni la fusión de una sola vez.
+
+### 11.1 Contratos entre carriles
+
+**No cambia ninguna firma pública que consuma otro módulo.** La instantánea de la compra sigue llevando un solo `Envio` (la suma de las sucursales) y `CodigoDeSucursalDeRecojo`, que ahora es **nulo** en un recojo por sucursal. La sucursal de cada línea llega a Pedidos desde la reserva confirmada (`codigoDeFuente`). Que Pagos admita el recojo sin sucursal común es la tarea T44 de `ecommerce-pedidos`; el recorrido completo se prueba al integrar los dos carriles.
+
+El Inventario entrega `codigoDeSucursal` y `disponibleEnLaSucursal` (plan de `inventario-seleccion-fuente` §11.1, T34); este carril los usa en `Application/Plataforma/ClienteDelInventario.cs` y `HttpClienteDelInventario` (T43), que no puede terminarse antes de integrar T34.
+
+### 11.2 Dominio
+
+- `LineaDeCarrito` gana identidad (`LineaId`) y `CodigoDeSucursal` (nulo en digital y en una línea anterior). `Carrito` agrega, modifica, quita y fusiona **por `LineaId`**; `Agregar` aplica CAR-40 (suma a una línea de la edición y sucursal que admita la cantidad entera hasta 20; si no, línea nueva; la digital sigue siendo una). Los topes de 30 y 20 no cambian. `RetirarEdicion` quita **todas** las líneas de la edición. La fusión agrega cada línea del visitante con la misma regla, recorta al vendible de su sucursal (suma de las líneas de esa pareja) y a 30 líneas, y conserva las líneas sin sucursal (CAR-45).
+- `Checkout`: cada `LineaDelCheckout` lleva su sucursal y la línea del carrito de la que sale; la unicidad es por línea, no por edición; `ElegirRecojo` ya no recibe sucursal; el envío a domicilio es la suma de la tarifa de cada sucursal distinta y `CalcularTotal` la recibe como el importe único `Envio` que ya congela `EnvioCongelado` (sin columna ni campo nuevo). Un checkout con una línea impresa sin sucursal no avanza (CAR-45). Las **huellas canónicas incluyen la sucursal de la línea solo cuando existe** y desempatan por línea, de modo que la huella de un checkout o de una intención anterior no cambia (CAR-50).
+
+### 11.3 Aplicación
+
+| Pieza | Cambio |
+| :--- | :--- |
+| Puertos | `StockDeEdicion` suma el vendible por sucursal; `LineaParaElInventario` lleva la sucursal y `EntregaParaElInventario` no lleva sucursal de recojo; `ICostoDeEnvioConfigurado` pasa a dar solo el valor predeterminado y `IRepositorioDeTarifasDeEnvio` (leer las propias, fijar una) se agrega porque hay persistencia. |
+| Validación de stock | Vendible por sucursal contra la **suma de las líneas de la pareja** (CAR-04, CAR-05): al agregar, al aumentar, al fusionar, al iniciar el checkout y al elegir la entrega; sin dato (CAT-12) se admite y decide el checkout. La sucursal se comprueba con el contrato público `IPreferenciaDeSucursal.Validar` de `Application/Web` (la lista conocida que no caduca, la misma que alimenta la ficha), no con la memoria de 10 minutos del carrito (CAR-39, CAR-43). |
+| Checkout | `IniciarCheckout` deja de leer la sucursal preferida; `ElegirEntrega` solo **muestra** el desglose por sucursal y la suma con las tarifas vigentes, sin congelar (CAR-09). `PrepararPasoAlPago` lee las tarifas **una sola vez dentro de la transacción** que congela, calcula el total, lo compara con el visto por la persona y, si difiere, termina en fallo sin intención ni reserva y devuelve el nuevo (CAR-46, CAR-49); al volver a edición el congelado se descarta como hoy. `ReservarYAbortar` informa por línea la falta de stock de la sucursal (CAR-27) y trata como falla (aborta) una fuente devuelta distinta de la declarada (CAR-41); `ProgresoDelCheckout` quita lo comprado por la línea de carrito y, si el checkout anterior no la tiene, por edición sin sucursal (CAR-50). `ObtenerCheckoutParaPagar` no entrega el `pedidoId` de un checkout `en_pago` con un impreso sin sucursal, y la siguiente solicitud autenticada que lo toca (también desde `reservando`) lo aborta con el caso de uso de D21 `AbortarElPasoAlPago`, no con `Reabrir` (que conserva el pedido y la reserva): desde `en_pago` llama primero a `Cancelar` y solo sigue con `Cancelada`, `Cerrada` o `NoExiste` (con `NoCancelable`, o sin respuesta de Pagos, no cambia nada y la intención sigue las reglas con que se inició); desde `reservando` hace el cambio local y después cancela la intención si existe; en ambos descarta el `pedidoId`, sube la generación y libera la reserva tras confirmar. `pago_pendiente` no cambia (CAR-45, CAR-50). La prueba de T42 comprueba la llamada de liberación. |
+| Tarifas | Contrato público `IAdministracionDeEnvios` (`Listar`, `Cambiar`; la lectura del importe anterior y la escritura van en la misma transacción con la fila bloqueada o un `upsert` que devuelve el anterior): solo la administración central, comprobado en la Aplicación con su evento de acceso denegado (CAR-48); `Cambiar` valida la sucursal registrada, el importe de 0,00 a 500,00 con dos decimales, y audita `TarifaDeEnvioCambiada` (sucursal, anterior, nuevo) en la misma transacción (CAR-46). Sin fila propia rige el predeterminado (CAR-47). |
+| Compras anteriores | Un pago pendiente conserva su instantánea, su huella y su costo único (CAR-50): no se recalcula. |
+
+### 11.4 Infraestructura
+
+- Esquema `carrito`, **repetible sobre una base ya creada** (`ADD COLUMN IF NOT EXISTS` y bloques `DO`): `lineas_de_carrito` gana `linea_id uuid` (rellenado con identificadores nuevos) y `codigo_de_sucursal text NULL`, y su clave primaria pasa a `(carrito_id, linea_id)`; `lineas_del_checkout` gana `codigo_de_sucursal` y `linea_de_carrito_id`, con clave `(checkout_id, linea_id)`; tabla nueva `tarifas_de_envio (codigo_de_sucursal text PK, importe numeric(8,2) CHECK (importe BETWEEN 0 AND 500), actualizada_en)` (quién la cambió queda solo en la auditoría) con `SELECT`, `INSERT` y `UPDATE (importe, actualizada_en)` para `rol_carrito`. `linea_id`, `codigo_de_sucursal` y `linea_de_carrito_id` se escriben solo al insertar: se comprueban los permisos por columna con ese rol sobre una base anterior migrada dos veces. `checkouts` no cambia. Las restricciones que impiden repetir una edición se quitan; la unicidad de la digital se mantiene.
+- `RestInventarioDelCarrito` conserva el vendible por sucursal, declara la sucursal por línea y no envía sucursal de recojo; repositorios, dobles y `ComposicionDelCarrito`.
+- `BABELHUB__Carrito__CostoDeEnvio` sigue siendo el predeterminado y pasa a **30.00** en `scripts/generar-secretos.sh`, el entorno E2E e `infra`; una instalación existente cambia la variable (§11.7).
+
+### 11.5 Presentación (interfaz funcional y sencilla)
+
+- Ficha (`Catalogo/Obra`): selector de sucursal con el stock de cada una; `max` = el menor entre 20 y el vendible de la elegida (el script de la página lo actualiza con atributos `data-bh-*`, sin código en línea; sin script, el servidor valida); preseleccionada la de `bh-sucursal` si tiene stock (CAR-42, CAR-43). Agregar guarda la elegida en `bh-sucursal` (WEB-16).
+- Carrito: tarjeta con su sucursal, rutas por `lineaId`, que se busca **solo dentro del carrito del actor** (cuenta o cookie): una línea que no está en él, ajena o inexistente, recibe la misma respuesta de no encontrada sin evento de acceso denegado (una pestaña vieja no es un ataque; el carrito ajeno sigue siendo CAR-35, AC-CAR-31); envío automático del formulario al confirmar el cambio de cantidad (evento `change`, `form.requestSubmit()`), con el aviso de que se actualiza solo, el resultado anunciado y el foco conservado, y el botón dentro de `<noscript>`; aviso de las líneas sin sucursal (CAR-44, CAR-45).
+- Checkout: sin selector de sucursal de recojo; sucursal por línea; desglose del envío y total (CAR-08, CAR-09). Con el total ya congelado se muestra la suma, y el desglose solo si las tarifas vigentes la reproducen.
+- Gestión: `Areas/Admin` «Costo de envío por sucursal» (lista y formulario por sucursal, antifalsificación, errores con el patrón de `Reembolsos`), entrada de menú solo de la administración central.
+- Rutas: `/carrito/lineas/{lineaId}`; `POST /carrito/lineas` suma el campo `sucursal`; sin endpoints JSON nuevos.
+
+### 11.6 Pruebas
+
+Dominio y Aplicación primero (topes, CAR-40, suma por sucursal, envío por sucursal, huellas anteriores intactas, tarifas, línea ajena); PostgreSQL (esquema anterior migrado dos veces, permisos por columna, restricciones, tarifas, auditoría que falla, el cambio de tarifa concurrente con el paso al pago de AC-CAR-42 y el pago anterior aprobado que quita lo comprado); integración web (ficha, carrito, checkout, pantalla de tarifas, permisos); E2E del recorrido con dos sucursales. Las pruebas que asumen una línea por edición o traslados se **actualizan** a la regla nueva, sin debilitarlas.
+
+### 11.7 Despliegue y datos existentes
+
+Orden: Inventario y después E-commerce (migración en el modo de migración, antes de levantar). En las dos VMs de ventas, `BABELHUB__Carrito__CostoDeEnvio=30.00` en `ecommerce.env` y `ecommerce-gestion.env`. **Dueño de los archivos compartidos:** este carril es dueño de `AccionesDeAuditoria` en `Shared` y de los catálogos de acciones de ambos servicios con sus pruebas, de las pruebas de integración y E2E que cruzan módulos (`PagosConElCarritoRealTests`, `PagosYPedidosRealesTests`, `DevolucionesConPagosRealTests`, `CuentaConUnPedidoRealTests`, toda la carpeta `tests/e2e/`) y de `ModeloBaseDePagina`. Esas pruebas pasan al integrar los tres carriles.
+
+Carritos existentes: las líneas impresas quedan sin sucursal y la persona las vuelve a agregar. Antes de desplegar se comprueba que no haya pagos pendientes de confirmación ni anulaciones a medias. Vuelta atrás: la versión anterior no entiende varias líneas por edición; se corrige hacia adelante y restaurar el respaldo previo es el último recurso (pierde compras posteriores y exige conciliar con la pasarela).

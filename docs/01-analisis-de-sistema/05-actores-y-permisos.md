@@ -34,6 +34,7 @@ Soporte (ayudas del cliente) lo cubre hoy el administrador central. Un rol de so
 | Ver stock de una fuente | — | — | ◐ | — | ● | `inventario-fuentes` |
 | Registrar fuentes (sucursales) | — | — | — | — | ● | `inventario-fuentes` |
 | Gestionar envíos y guías | — | — | — | ● | ● | `ecommerce-envios` |
+| Configurar el costo de envío por sucursal | — | — | — | — | ● | `ecommerce-carrito-checkout` |
 | Ajustar inventario | — | — | ◐ | — | ● | `inventario-ajustes` |
 | Registrar un ingreso de mercadería (solo en la fuente de recepción) | — | — | — | — | ● | `inventario-ajustes`, `ecommerce-catalogo` |
 | Designar la fuente de recepción | — | — | — | — | ● | `inventario-fuentes` |

@@ -54,3 +54,14 @@ Formato de cada línea: `- [ ] T01 [Capa · Nivel] Descripción (cubre: AC-XXX-0
 - [x] T40 [Web · C] Administración: todos los pedidos con filtro por estado, anulación con motivo de lista cerrada y el reembolso pendiente con enlace a la vista de Pagos y «Reintentar»; la lista de operaciones fallidas con su reintento (cubre: AC-PED-11, AC-PED-12, AC-PED-19)
 - [x] T41 [Pruebas · E] E2E con Playwright y revisión con `ui-review` de mis pedidos, la gestión de recojo y de despacho y la anulación (paridad con el prototipo, temas, teclado, contraste, estados) (cubre: AC-PED-04, AC-PED-10, AC-PED-12)
 - [x] T42 [Docs · B] Actualizar `docs/03-diseno-de-software/05-modelo-de-datos.md` §3 (tablas de `pedidos`), `04-modulos-y-contratos.md` §1.1 (los puertos de este plan y su dueño), `docs/05-seguridad/07-operacion-segura.md` (`log_error_verbosity = terse`), `docs/05-seguridad/04-privacidad-y-datos-personales.md` (contacto, `iniciada_por` de las anulaciones y entregas y retención de dos años) y `docs/02-arquitectura-de-software/03-estilo-arquitectonico.md` (las flechas `MPED --> MENV` y `MPED --> MDEV`, que son en realidad Envíos → Pedidos y Devoluciones → Pedidos) (cubre: PED-34, PED-40)
+## Venta por sucursal (v0.1.3)
+
+Plan §11. Carril «Pedidos, pagos y devoluciones», en este orden; no espera a otro carril para compilar. T49 usa el Inventario con T34 a T42 integrados.
+
+- [ ] T43 [Dominio/C] Varias líneas por edición impresa, sucursal de la línea y recojo sin sucursal común, con los pedidos anteriores intactos (cubre: AC-PED-36, AC-PED-39, PED-43)
+- [ ] T44 [Dominio/C] Pagos: instantánea con recojo sin sucursal común y líneas repetidas de una edición impresa, sin cambiar las intenciones anteriores (cubre: AC-PED-36, AC-PED-39)
+- [ ] T45 [Aplicación/C] Alcance del encargado por línea, todas sus salidas filtradas, avisos por sucursal, confirmación de la compra y reembolso con la suma de envíos (cubre: AC-PED-37, AC-PED-38, AC-PED-40, AC-PED-20)
+- [ ] T46 [Infra/C] Esquema `pedidos` migrado de forma repetible y lista y filtro del encargado por sus líneas (cubre: AC-PED-37, AC-PED-39)
+- [ ] T47 [Web/C] Detalle y lista con la sucursal por línea (cubre: AC-PED-36, AC-PED-37)
+- [ ] T48 [Aplicación/C] Devoluciones: dos líneas de una edición y reingreso agrupado por edición, con la pantalla rotulada por sucursal y sin preselección (cubre: AC-PED-41)
+- [ ] T49 [Pruebas/E] Pruebas propias de integración de una compra de dos sucursales: pedido, preparación y entrega por sucursal, anulación y devolución (cubre: AC-PED-38, AC-PED-40, AC-PED-41, AC-PED-20)

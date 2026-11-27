@@ -113,7 +113,7 @@ Para cada pantalla del recorrido:
 - **L1:** con NVDA pulsa `H` repetidamente y escucha: debe haber un solo «encabezado nivel 1» y los siguientes bajan de nivel de uno en uno. En VoiceOver, rotor «Encabezados».
 - **L2:** con `D` recorre las regiones: debes oír «banner», «navegación», «principal» y «pie de página» (o equivalentes). Falla si la página no tiene región principal.
 - **L3:** con `F` entra en cada campo: debes oír su nombre («Correo electrónico»), si es obligatorio y la ayuda. Provoca un error (deja un campo vacío y envía): debes oír el aviso **sin tocar nada**.
-- **L4:** busca estados (stock, estado del pedido, pago): el lector debe decir el texto («En tu sucursal», «Pago pendiente»), no solo «imagen» o nada.
+- **L4:** busca estados (stock, estado del pedido, pago): el lector debe decir el texto («En 3 sucursales», «Pago pendiente»), no solo «imagen» o nada.
 - **L6:** en el pago, el cambio de estado («Estamos confirmando tu pago») debe anunciarse solo, sin que se mueva el foco.
 - **L7:** pasa por una portada: debes oír algo útil («Portada de *El zorro y el cóndor del Ande*»). Falla si oyes el nombre del archivo.
 

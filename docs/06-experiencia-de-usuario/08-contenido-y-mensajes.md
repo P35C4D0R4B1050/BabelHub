@@ -67,9 +67,9 @@ Estos mensajes **no deben revelar** si una cuenta existe, qué dato falló ni de
 | Reserva por vencer | «Te quedan 2 minutos» | «Tus libros están apartados hasta las 15:42.» | Pagar ahora |
 | Pago pendiente | «Estamos confirmando tu pago» | «No vuelvas a pagar. Mantenemos tus libros apartados hasta las 15:42 y te avisaremos por correo (y por WhatsApp, si lo activaste) cuando se confirme.» | Ver mi pedido |
 | Carrito fusionado con ajustes | «Unimos tu carrito. Ajustamos la cantidad de ... al máximo disponible y quitamos ... porque ya lo tienes.» | Perder el carrito en silencio. |
-| Reserva cambió | «Cambió la disponibilidad de ... Revisa tu carrito: tu libro vendrá de ... y llegará en ... días.» | Perder el carrito. |
+| Reserva cambió | «En {sucursal} quedan {n} de {título}. Revisa tu carrito: no cambiamos tu sucursal.» | Perder el carrito. |
 | Pago aprobado tarde | «Tu pago llegó cuando tus libros ya no estaban apartados» | «Te devolvimos el dinero automáticamente. Puedes volver a intentar la compra.» | Volver al carrito |
-| Traslado sin plazo | «Plazo por confirmar» | «Tu libro vendrá de otra sucursal; te avisaremos la fecha.» | Continuar |
+| Traslado sin plazo | «Plazo por confirmar» | «Solo en pedidos anteriores a la venta por sucursal: tu libro vendrá de otra sucursal; te avisaremos la fecha.» | Continuar |
 | Pedido no recogido | «No recogiste tu pedido a tiempo» | «Liberamos tus libros. Escríbenos y revisamos tu caso.» | Ayuda |
 | Índice infinito: aviso (toda página) | «Texto generado» | «Puede carecer de sentido y no son libros reales ni están a la venta.» | Volver al catálogo real |
 | Índice infinito: dirección no válida | «Esa dirección no existe en este laberinto» | «Usa de 1 a 64 letras minúsculas sin tilde, números o guiones. Mientras tanto, te mostramos una página al azar.» | Otra página al azar |

@@ -5,6 +5,8 @@ estado: Draft
 
 # Plan — Estructura base de la interfaz web
 
+> **Venta por sucursal (2026-11-27):** la spec volvió a Draft para cambiar WEB-16 y AC-WEB-12; lo que cambia de este plan está en **§11**, que prevalece donde difiera. Tarea T40; decisión D19.
+>
 > **Cómo se construye.** Parte de la spec `web-base` (49 requisitos, 42 criterios; spec Approved el 2026-11-14). La interfaz web es la **Presentación del E-commerce** (`BabelHub.Ecommerce.Api`, MVC con Razor y htmx, AD15 y AD21): no tiene reglas de negocio, llama a los módulos por sus contratos públicos y al Inventario por REST solo desde el servidor, y la credencial del usuario nunca llega al navegador (AGENTS.md §3, reglas 9 y 13). Las reglas de la sesión (plazos, renovación, cierre, borrador, permisos de área) sí son reglas: viven en el módulo **`Web`** (Dominio, Aplicación e Infraestructura, esquema `web`), que la Api usa solo por su contrato público; `docs/03-diseno-de-software/04-modulos-y-contratos.md` §1 ya lo define como módulo y T21 corrige los documentos que lo describen como «sin dominio propio». Los niveles de rigor (C, E, B) son los de `docs/07-proceso-de-desarrollo/05-desarrollo-por-bloques.md` §2.
 
 ## 1. Resumen técnico
@@ -153,3 +155,6 @@ Referencia: `prototype/ui-v2/` (solo visual y de recorrido; las vistas Razor se 
 - [x] Sin reglas de negocio en la Presentación: los plazos de la sesión, el borrador y los permisos de área son del módulo `Web`; la política de textos pendientes la decide la Aplicación y la Api solo la declara y la traduce.
 - [x] Una falla del Notificador no interrumpe ningún caso de uso (esta spec no lo llama).
 - [x] `Shared` solo agrega el código `ECO-TEXTOS-PENDIENTES` y sigue siendo solo contratos.
+## 11. Sucursal preferida sin selector en la cabecera (v0.1.3)
+
+Prevalece sobre §2, §4, §7 y §8 donde nombran el selector de sucursal. La cabecera deja de mostrarlo y se retira `POST /preferencias/sucursal`. Se conservan `IPreferenciaDeSucursal`, la cookie `bh-sucursal` (mismo nombre, atributos, validación contra la lista de sucursales y vigencia) y la última lista conocida de sucursales, que usan la ficha, la validación del carrito y la lista de la devolución (la devolución deja de preseleccionar con la cookie: ese cambio de su vista es del plan de `ecommerce-pedidos` §11.4). La cookie solo la escribe el servidor cuando se acepta el alta de un impreso con su sucursal (`ecommerce-carrito-checkout` T46) y solo se lee para preseleccionar en la ficha; ninguna pantalla muestra «En tu sucursal». No cambia la política de cabeceras ni la antifalsificación; se actualiza la lista de rutas de la interfaz sin `POST /preferencias/sucursal`. Pruebas: unitaria de la preferencia, integración de que ninguna pantalla tiene el selector ni existe la ruta, y E2E del recorrido.

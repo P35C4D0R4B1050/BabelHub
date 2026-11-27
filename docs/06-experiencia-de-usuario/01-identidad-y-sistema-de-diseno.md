@@ -7,7 +7,7 @@ Este documento define cómo se ve y cómo se comporta la interfaz web del E-comm
 | Principio | Qué implica |
 | :--- | :--- |
 | **Stock real, a la vista** | La disponibilidad se muestra siempre con texto e icono, nunca solo con color, y refleja datos reales (OB01). No se finge infinito ni stock. |
-| **Conservar la estructura probada** | Cabecera, buscador, selector de sucursal, banner, filtros laterales, ordenamiento, cuadrícula de libros, carrito y perfil. Cambia la identidad, no el recorrido. |
+| **Conservar la estructura probada** | Cabecera, buscador (el selector de sucursal del prototipo se quitó con la venta por sucursal, 2026-11-27: la sucursal se elige en la ficha), banner, filtros laterales, ordenamiento, cuadrícula de libros, carrito y perfil. Cambia la identidad, no el recorrido. |
 | **Las portadas son las protagonistas** | La interfaz las enmarca; no compite con ellas. Sin fondos de color aleatorios por tarjeta. |
 | **Dos temas, una sola marca** | Claro («Papel y tinta») y oscuro («Archivo nocturno») comparten jerarquía, espaciado y estados; solo cambian los tokens. |
 | **Movimiento con propósito** | Cada animación comunica una respuesta del sistema. Todo funciona sin movimiento (`prefers-reduced-motion`). |
@@ -48,7 +48,7 @@ La paleta inicial no cumple en todos los pares. Estos son los valores calculados
 | Azul sobre verde | 10,1 | Insignias de stock positivo con texto azul. |
 | Cian oscuro `#1A6F80` sobre papel | 4,9 | Variante del cian para texto en el tema claro. |
 
-Regla general: **ningún color de marca es la única señal de un estado**. El stock se acompaña de texto («En tu sucursal», «En 3 sucursales más», «Agotado») y de icono.
+Regla general: **ningún color de marca es la única señal de un estado**. El stock se acompaña de texto («En 3 sucursales», «Agotado») y de icono.
 
 ### 2.3 Temas
 

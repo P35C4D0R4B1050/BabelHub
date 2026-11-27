@@ -1,14 +1,14 @@
 ---
 id: ecommerce-pedidos
 titulo: Pedidos y seguimiento
-estado: Done
-aprobado_por: Claude (delegado por Diego Amiquero)
-aprobado_en: 2026-11-21
+estado: Planned
 plan_aprobado_por: Claude (delegado por Diego Amiquero)
-plan_aprobado_en: 2026-11-21
+plan_aprobado_en: 2026-11-27
+aprobado_por: Claude (delegado por Diego Amiquero)
+aprobado_en: 2026-11-27
 servicio: E-commerce
 prefijo: PED
-origen: [RF04, RF06, RF07, RF27, NN03, NN13, NN09]
+origen: [RF04, RF06, RF07, RF15, RF27, NN03, NN13, NN09]
 calidad: [AC01, AC03, AC04, RNF05, RNF08, RNF23]
 depende: [ecommerce-pagos, ecommerce-biblioteca-digital, inventario-seleccion-fuente, identidad-seguridad, transversal-notificaciones, transversal-auditoria]
 ---
@@ -31,14 +31,14 @@ Que el cliente vea siempre en qué estado está su compra, incluso cuando viaja 
 
 | ID | Patrón | Requisito | Origen |
 | :--- | :--- | :--- | :--- |
-| PED-01 | Evento | Cuando se aprueba el pago de una compra, el sistema deberá crear un pedido confirmado con una línea por cada edición, con una copia de su título, ISBN, precio y cantidad, y su estado de cumplimiento. | RF06 |
+| PED-01 | Evento | Cuando se aprueba el pago de una compra, el sistema deberá crear un pedido confirmado con una línea por cada línea comprada, con copia de su título, ISBN, precio y cantidad, su estado de cumplimiento y, si es impresa, la sucursal que la atiende. | RF06, RF15 |
 | PED-02 | Ubicuo | El sistema deberá gestionar para las líneas impresas los estados confirmado, en tránsito entre sucursales (solo si hay traslado), recibido en la sucursal (tras el traslado), en preparación, listo para recojo o despachado, entregado, no recogido (en recojo) y anulado; una devolución posterior no cambia el estado de la línea. | RF06 |
 | PED-03 | Evento | Cuando la biblioteca concede el acceso a una línea digital, el sistema deberá marcarla como disponible en la biblioteca del cliente. | RF06, NN13 |
-| PED-04 | Evento | Cuando un cliente consulta sus pedidos, el sistema deberá mostrar el detalle y el estado de cada línea, incluido el traslado en curso y su fecha estimada. | RF06, NN03 |
-| PED-05 | Evento | Cuando cambia el estado de un pedido o de una de sus líneas, el sistema deberá notificar al cliente y a la sucursal responsable: la de recojo o, en domicilio, la fuente del envío; en un pedido solo digital, solo al cliente. | RF07 |
+| PED-04 | Evento | Cuando un cliente consulta sus pedidos, el sistema deberá mostrar el detalle y el estado de cada línea, la sucursal que atiende cada impresa y el traslado en curso, si lo hay, con su fecha estimada. | RF06, NN03 |
+| PED-05 | Evento | Cuando cambia el estado de un pedido o de una de sus líneas, el sistema deberá notificar al cliente y a la sucursal responsable de cada línea afectada: la de recojo de la línea o, en domicilio, la fuente del envío; en un pedido solo digital, solo al cliente. | RF07 |
 | PED-06 | No deseado | Si el envío de un aviso falla, entonces el sistema deberá mantener el nuevo estado del pedido y dejar el aviso pendiente de reintento. | RF07, AC03 |
 | PED-07 | Estado | Mientras un cliente consulta pedidos, el sistema deberá mostrarle únicamente los suyos y rechazar, registrando el acceso denegado, el pedido de otro cliente pedido por su identificador. | RNF05 |
-| PED-08 | Estado | Mientras un usuario es encargado de sucursal, el sistema deberá mostrarle únicamente los pedidos de recojo de su sucursal y rechazar, registrando el acceso denegado, los de otra por su identificador. | RNF05 |
+| PED-08 | Estado | Mientras un usuario es encargado de sucursal, el sistema deberá mostrarle solo los pedidos de recojo con alguna línea de su sucursal y, de ellos, solo esas líneas, con el estado e importe derivados de ellas, y rechazar los demás por su identificador registrando el acceso denegado. | RNF05 |
 | PED-09 | Evento | Cuando el encargado prepara las líneas de un pedido de recojo, el sistema deberá pasarlas a en preparación, y al marcarlas listas, a listo para recojo. | RF06 |
 | PED-10 | No deseado | Si una línea de recojo con traslado aún no recibido es llevada a preparación, entonces el sistema deberá impedirlo. | RF06 |
 | PED-11 | Evento | Cuando el encargado entrega las líneas listas de un pedido de recojo, el sistema deberá pedir al inventario que descuente el físico y cierre la reserva de cada línea y, solo si lo logra, pasarla a entregada; una línea no recogida no se entrega: se rechaza sin llamar al inventario y solo la administración la anula (PED-16). | RF06 |
@@ -72,6 +72,8 @@ Que el cliente vea siempre en qué estado está su compra, incluso cuando viaja 
 | PED-39 | Evento | Cuando corre la depuración de PED-34, el sistema deberá registrarla en la auditoría con actor «sistema» y conteo, sin datos personales, y reintentarla al día siguiente si no puede auditarla ni anonimizar. | RNF08, RNF23 |
 | PED-40 | Ubicuo | El sistema deberá mostrar el nombre, el teléfono y la dirección de entrega de un pedido solo a su titular, a logística y a la administración central, y no incluirlos en avisos, auditoría, registros técnicos ni consultas del asistente. | RNF05, RNF23 |
 | PED-41 | No deseado | Si un cliente o un encargado pide por su identificador un pedido que no le corresponde, entonces el sistema deberá rechazarlo con la misma respuesta exista o no el pedido y registrarlo como evento de seguridad de acceso denegado. | RNF05, AC04 |
+| PED-42 | No deseado | Si un encargado pide preparar, marcar lista o entregar alguna línea que no atiende su sucursal, entonces el sistema deberá rechazar la operación entera sin cambiar ninguna línea ni llamar al inventario y registrar el acceso denegado. | RNF05, AC04 |
+| PED-43 | Estado | Mientras un pedido nació de una compra con una sucursal de recojo común, anterior a la venta por sucursal, aunque se cree después, el sistema deberá tratar esa sucursal como la de todas sus líneas impresas. | RF06 |
 
 ## 4. Criterios de aceptación
 
@@ -112,6 +114,12 @@ Que el cliente vea siempre en qué estado está su compra, incluso cuando viaja 
 | AC-PED-33 | PED-39 | **Dado** una depuración con pedidos que anonimizar y otra con ninguno, **cuando** corre, **entonces** queda una entrada de auditoría con actor «sistema» y el conteo, sin datos personales; y si no se puede auditar, no se anonimiza y se reintenta al día siguiente. |
 | AC-PED-34 | PED-40 | **Dado** un pedido a domicilio, **cuando** lo ven su titular, logística, la administración central y un encargado de sucursal, **entonces** los tres primeros ven el nombre, el teléfono y la dirección, el encargado no, y el contacto no aparece en avisos, auditoría ni registros técnicos. |
 | AC-PED-35 | PED-41 | **Dado** un pedido existente de otro cliente y un identificador inexistente, **cuando** un cliente los pide, **entonces** recibe la misma respuesta de rechazo y queda un acceso denegado. |
+| AC-PED-36 | PED-01, PED-04 | **Dado** una compra a domicilio con 18 unidades de un libro en Cusco, 6 del mismo libro en Ayacucho y otra línea de 2 en Ayacucho, **cuando** se aprueba el pago, **entonces** el pedido se crea con tres líneas, cada una con su sucursal y cantidad, con el envío cobrado como un solo importe, y el cliente las ve en el detalle con su sucursal. |
+| AC-PED-37 | PED-08, PED-05 | **Dado** un pedido de recojo con una línea de Ayacucho lista y otra de Cusco confirmada, **cuando** el encargado de Ayacucho lista y abre sus pedidos, **entonces** lo ve como listo para recojo con solo su línea y su importe; el de Cusco lo ve como confirmado; uno de Lima recibe el rechazo registrado; y el aviso de la línea de Ayacucho va al cliente y a Ayacucho, no a Cusco. |
+| AC-PED-38 | PED-42, PED-09, PED-11 | **Dado** el mismo pedido, **cuando** el encargado de Ayacucho pide preparar, marcar listas o entregar juntas su línea y la de Cusco, o solo la de Cusco, **entonces** se rechaza todo, ninguna línea cambia, el inventario no recibe llamadas y queda un acceso denegado; y entrega la suya mientras la de Cusco sigue su curso. |
+| AC-PED-39 | PED-43 | **Dado** una base anterior con un pedido de recojo con sucursal común y una compra pendiente de ese tipo, **cuando** se actualiza el esquema dos veces y el pago pendiente se aprueba, **entonces** en ambos pedidos cada línea impresa es de aquella sucursal aunque su mercadería venga por traslado y su encargado las opera como antes. |
+| AC-PED-40 | PED-22, PED-17 | **Dado** un pedido a domicilio de dos sucursales sin nada salido, **cuando** el cliente lo cancela o la administración lo anula, **entonces** se reembolsa el total, incluida la suma de los dos envíos, una sola vez. |
+| AC-PED-41 | PED-01 | **Dado** un pedido entregado con dos líneas del mismo libro, **cuando** el cliente devuelve unidades de ambas y la sucursal receptora confirma la recepción, **entonces** la devolución se acepta y el inventario reingresa en esa sucursal, una sola vez, la suma de las unidades de ese libro. |
 
 ## 5. Reglas e invariantes
 
@@ -123,13 +131,16 @@ Que el cliente vea siempre en qué estado está su compra, incluso cuando viaja 
 
 ## 6. Casos límite y errores
 
-- Un pedido con dos impresos en distintas fuentes puede tener un traslado en tránsito y el otro listo.
+- Un pedido con dos impresos en distintas sucursales puede tener uno listo y otro sin preparar: cada sucursal prepara y entrega sus líneas de recojo, los envíos a domicilio los opera logística y el plazo de 15 días corre por línea.
+- Un pedido con traslados vinculados solo puede ser anterior a la venta por sucursal.
+- La anulación sigue siendo del pedido: anula todas las líneas que no salieron, de todas las sucursales, aunque la causa sea una sola.
 - Una entrega repetida del mismo pedido no descuenta el físico dos veces.
 - Anular un pedido con todas sus líneas impresas despachadas o entregadas no procede: corresponde una devolución (PED-23, `ecommerce-devoluciones`); si solo algunas salieron, se anulan las demás (PED-27).
 - El reembolso del envío solo corresponde al anular o cancelar el pedido completo antes de que salga; en una devolución posterior, parcial o no, no se reembolsa.
 
 ## 7. Preguntas abiertas
 
+- [x] ¿Cómo se recibe y entrega un pedido de varias sucursales y qué envío se reembolsa al anular una parte? Resuelto el 2026-11-27 por delegación, con la alternativa más acotada, registrado en `progress/decisiones-delegadas.md` (PED-08, PED-22, PED-42, PED-43): cada sucursal gestiona sus líneas; los envíos los sigue operando logística; el reembolso del envío no cambia.
 - [x] ¿Un pedido de recojo no recogido caduca después de cierto tiempo? Resuelto el 2026-10-16: a los 15 días calendario en listo para recojo pasa a no recogido, libera sus reservas y queda a revisión de la administración, que puede anularlo con reembolso (PED-15, PED-16).
 - [x] ¿Se cuentan los 15 días de forma calendario corrida o se excluyen feriados? Resuelto el 2026-10-16 (confirmado por el responsable): corrida.
 - [x] ¿Una línea no recogida puede entregarse después? Resuelto el 2026-11-21 (decisión de la persona): no; su reserva ya se liberó y solo se anula con reembolso (PED-11, PED-16; coherente con SEL-28 de `inventario-seleccion-fuente`).

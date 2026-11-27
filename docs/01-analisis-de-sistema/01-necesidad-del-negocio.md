@@ -15,7 +15,7 @@ El libro impreso sigue generando más del 91 % de los ingresos editoriales en el
 | ID | Objetivo | Justificación |
 | :--- | :--- | :--- |
 | **OB01** | Mostrar al cliente únicamente stock realmente disponible. | Evita la sobreventa, que es el principal riesgo de vender con varias tiendas. |
-| **OB02** | Atender pedidos desde la sucursal más conveniente y trasladar mercadería cuando sea necesario. | Aprovecha todo el stock de la red y mejora el servicio en provincias. |
+| **OB02** | Atender pedidos desde la sucursal más conveniente y trasladar mercadería cuando sea necesario. Desde el 2026-11-27 (venta por sucursal) la sucursal conveniente la elige el cliente al comprar y los traslados mueven mercadería entre sucursales sin que una compra los genere. | Aprovecha todo el stock de la red y mejora el servicio en provincias. |
 | **OB03** | Dar a cada sucursal control sobre su propio inventario, y a la administración central visibilidad nacional. | Responsabilidad local con supervisión central. |
 | **OB04** | Soportar una red inicial de 5 a 10 sucursales, con margen hasta unas 20, sin rediseñar. | MSI opera eficientemente de 1 a 20 fuentes (Adobe). |
 | **OB05** | Operar con costo mínimo de infraestructura, sin servicios administrados de pago. | El proyecto debe ser viable con recursos gratuitos o propios. |
@@ -65,7 +65,7 @@ Prioridad: **Alta** (núcleo del problema), **Media**, **Baja** (puede diferirse
 | **NN04** | Cliente | Recibir orientación de un asistente (recomendaciones y dudas frecuentes). | Media | Apoya la decisión de compra sin atención humana permanente. |
 | **NN05** | Cliente | Solicitar la devolución de un pedido y su reembolso. | Baja | Necesario en una operación completa, pero no es el núcleo. |
 | **NN06** | Encargado de sucursal | Conocer y mantener el stock exacto de su tienda (físico, reservado y vendible) con ajustes auditables. | Alta | El stock exacto es la base de todo el sistema (OB01, OB03). |
-| **NN07** | Encargado de sucursal / Logística | Abastecer pedidos desde otra sucursal mediante traslados trazables. | Alta | Es la respuesta al problema central (OB02). |
+| **NN07** | Encargado de sucursal / Logística | Abastecer pedidos desde otra sucursal mediante traslados trazables (desde el 2026-11-27 el traslado repone stock a pedido del personal; la compra del cliente no lo genera). | Alta | Es la respuesta al problema central (OB02). |
 | **NN08** | Administrador central | Mantener un catálogo único y consistente para toda la red. | Alta | Evita títulos duplicados o con datos distintos por tienda. |
 | **NN09** | Administrador central | Controlar quién accede a qué (usuarios, roles y sucursales) y auditar las operaciones sensibles. | Alta | Cada encargado solo debe ver su sucursal; se manejan datos personales y pagos. |
 | **NN10** | Administrador central | Consultar indicadores de venta, inventario y traslados por sucursal y región. | Baja | Aporta valor de gestión, pero puede venir en una fase posterior (OB03). |

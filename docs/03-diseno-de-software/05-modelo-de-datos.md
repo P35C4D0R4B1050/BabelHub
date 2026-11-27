@@ -102,6 +102,18 @@ Esquemas: `catalogo`, `carrito`, `pagos`, `pedidos`, `envios`, `devoluciones`, `
 | `entradas_procesadas` | como en Inventario | Esquema `plataforma`. La misma tabla para los avisos de la pasarela y de n8n (SEG-12): clave única «proveedor\|identificador», reclamación en la transacción del efecto y purga a los 30 días. |
 | `cuota_correo` | fecha, cupo (administración, críticas, códigos, resto), enviados | Esquema `plataforma`. Contador diario de la cuota de IDE-66, con el tope por origen de los códigos (IDE-83) y por motivo y servicio de las alertas a la administración (IDE-82); se purga a los 30 días. |
 
+### Venta por sucursal (v0.1.3, 2026-11-27)
+
+Cambios aditivos y repetibles que prevalecen sobre las tablas anteriores donde difieran (planes de `inventario-seleccion-fuente`, `ecommerce-carrito-checkout` y `ecommerce-pedidos`, §11):
+
+| Tabla | Cambio |
+| :--- | :--- |
+| `reservas.reservas` | Un recojo por sucursal deja nula `sucursal_recojo_id`: la sucursal de cada línea es su `fuente_id`. |
+| `carrito.lineas_de_carrito` | Suma `linea_id` y `codigo_de_sucursal` (nulo en digitales y líneas anteriores); la clave pasa a `(carrito_id, linea_id)`: una edición impresa puede tener varias líneas. |
+| `carrito.lineas_del_checkout` | Sucursal y línea de carrito de cada línea; clave por línea. |
+| `carrito.tarifas_de_envio` (nueva) | `codigo_de_sucursal` (PK), `importe` de 0 a 500, `actualizada_en`; sin fila rige el predeterminado. |
+| `pedidos.pedidos` y `lineas_de_pedido` | Recojo sin sucursal común; única por edición solo la línea digital. |
+
 ## 4. Identidad (esquema `identidad` de la base `ecommerce`)
 
 | Tabla | Columnas principales | Restricciones |

@@ -6,26 +6,23 @@ Resumen de los procesos principales de punta a punta, con los actores y las spec
 
 ```mermaid
 flowchart LR
-A["Cliente arma el carrito"] --> B["Inicia el checkout"]
-B --> C{"¿Hay stock vendible en la red?"}
+A["Cliente arma el carrito eligiendo la sucursal de cada impreso"] --> B["Inicia el checkout"]
+B --> C{"¿Cada sucursal elegida tiene stock vendible?"}
 C -- No --> X["Informa falta de stock"]
 C -- Sí --> D["Elige recojo o domicilio"]
-D --> E["Inventario crea reservas de 15 min y elige la fuente"]
+D --> E["Inventario crea reservas de 15 min en las sucursales elegidas"]
 E --> F["Cliente paga con Yape o tarjeta"]
 F --> G{"¿Pago aprobado?"}
 G -- No --> H["Se liberan las reservas"]
 G -- Sí --> I["Se confirman las reservas y se crea el pedido"]
-I --> J{"¿La fuente es la sucursal de recojo?"}
-J -- No --> K["Traslado vinculado al pedido: la reserva viaja con las unidades"]
-J -- Sí --> L["Preparación"]
-K --> L
+I --> L["Preparación en cada sucursal que atiende"]
 L --> M{"¿Recojo o domicilio?"}
-M -- Recojo --> R["Entrega en sucursal: baja el stock físico"]
-M -- Domicilio --> S["Envío en reparto: baja el stock físico"]
+M -- Recojo --> R["Entrega en la sucursal de cada línea: baja el stock físico"]
+M -- Domicilio --> S["Un envío por sucursal, en reparto: baja el stock físico"]
 L --> T["15 días sin recoger: pedido no recogido, se liberan las reservas"]
 ```
 
-**Actores:** cliente, Inventario, pasarela de pago, encargado de sucursal, logística. **Specs:** `ecommerce-carrito-checkout`, `inventario-seleccion-fuente`, `ecommerce-pagos`, `ecommerce-pedidos`, `inventario-traslados`, `ecommerce-envios`. **Puntos de control:** el correo de la cuenta debe estar verificado para iniciar el pago; límite de una reserva activa por cliente, 5 por hora y 10 por origen (RF28); si el pago queda pendiente la reserva se extiende hasta 30 minutos y se avisa al cliente por todos sus medios; el cliente puede cancelar mientras todas las líneas estén confirmadas (se anula, se libera y se reembolsa); el traslado de un pedido pagado no se rechaza y solo se cancela al anular el pedido; una falla del aviso por WhatsApp nunca interrumpe la compra.
+**Actores:** cliente, Inventario, pasarela de pago, encargado de sucursal, logística. **Specs:** `ecommerce-carrito-checkout`, `inventario-seleccion-fuente`, `ecommerce-pagos`, `ecommerce-pedidos`, `inventario-traslados`, `ecommerce-envios`. **Puntos de control:** el correo de la cuenta debe estar verificado para iniciar el pago; límite de una reserva activa por cliente, 5 por hora y 10 por origen (RF28); si el pago queda pendiente la reserva se extiende hasta 30 minutos y se avisa al cliente por todos sus medios; el cliente puede cancelar mientras todas las líneas estén confirmadas (se anula, se libera y se reembolsa); una compra no genera traslados (los vinculados a un pedido anterior a la venta por sucursal no se rechazan y solo se cancelan al anularlo); una falla del aviso por WhatsApp nunca interrumpe la compra.
 
 ## 2. Compra y descarga de un libro digital
 
@@ -55,7 +52,7 @@ I --> J["El navegador descarga del almacén"]
 | 4 | Destino | Recibe: el stock físico del destino sube. |
 | 5 | Sistema | Notifica a origen y destino en cada cambio de estado y audita cada cambio. |
 
-Si el traslado nace de un pedido pagado, el origen solo lo aprueba (no puede rechazarlo), el despacho consume la reserva del origen y la recepción la recrea en el destino; si el pedido se anula antes de despacharse, el traslado se cancela. El plazo estimado que ve el cliente sale de la ruta entre ambas sucursales. **Spec:** `inventario-traslados`.
+Desde la venta por sucursal (2026-11-27) las compras de clientes no generan traslados; si un traslado nació de un pedido pagado anterior, el origen solo lo aprueba (no puede rechazarlo), el despacho consume la reserva del origen y la recepción la recrea en el destino; si el pedido se anula antes de despacharse, el traslado se cancela. El plazo estimado que ve el cliente sale de la ruta entre ambas sucursales. **Spec:** `inventario-traslados`.
 
 ## 4. Ajuste de inventario
 
