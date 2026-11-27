@@ -104,7 +104,7 @@ Esquemas: `catalogo`, `carrito`, `pagos`, `pedidos`, `envios`, `devoluciones`, `
 
 ### Venta por sucursal (v0.1.3, 2026-11-27)
 
-Cambios aditivos y repetibles que prevalecen sobre las tablas anteriores donde difieran (planes de `inventario-seleccion-fuente`, `ecommerce-carrito-checkout` y `ecommerce-pedidos`, §11):
+Cambios aditivos y repetibles que prevalecen sobre las tablas anteriores donde difieran (planes de `inventario-seleccion-fuente`, `ecommerce-carrito-checkout`, `ecommerce-pagos` y `ecommerce-pedidos`, §11):
 
 | Tabla | Cambio |
 | :--- | :--- |
@@ -112,7 +112,10 @@ Cambios aditivos y repetibles que prevalecen sobre las tablas anteriores donde d
 | `carrito.lineas_de_carrito` | Suma `linea_id` y `codigo_de_sucursal` (nulo en digitales y líneas anteriores); la clave pasa a `(carrito_id, linea_id)`: una edición impresa puede tener varias líneas. |
 | `carrito.lineas_del_checkout` | Sucursal y línea de carrito de cada línea; clave por línea. |
 | `carrito.tarifas_de_envio` (nueva) | `codigo_de_sucursal` (PK), `importe` de 0 a 500, `actualizada_en`; sin fila rige el predeterminado. |
-| `pedidos.pedidos` y `lineas_de_pedido` | Recojo sin sucursal común; única por edición solo la línea digital. |
+| `pedidos.pedidos` y `lineas_de_pedido` | Recojo sin sucursal común; única por edición solo la línea digital; `pedidos.envios_por_sucursal` (opcional). |
+| `carrito.checkouts` | Suma `envios_congelados` (opcional): el envío de cada sucursal junto a la suma congelada. |
+| `pagos.intenciones` | Suma `envios_por_sucursal` (opcional), que se elimina al desvincular la cuenta. |
+| `pedidos.anulaciones` | Suma `envio` (opcional): el envío que devuelve esa anulación. |
 
 ## 4. Identidad (esquema `identidad` de la base `ecommerce`)
 
