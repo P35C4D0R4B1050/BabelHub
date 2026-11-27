@@ -41,8 +41,9 @@ public sealed class DireccionDelAccesoDelPersonal
 
     private static Uri? Valida(string valor, bool permitirHttpLocal)
     {
-        // Se mira el texto escrito y no solo lo que entiende Uri, que perdona espacios, barras invertidas y una «?» o un «#» vacíos.
-        if (valor.Any(c => char.IsWhiteSpace(c) || char.IsControl(c) || c is '\\' or '?' or '#' or '@' or '"' or '\'' or '<' or '>')
+        // Se mira el texto escrito y no solo lo que entiende Uri, que perdona espacios, barras invertidas y una «?» o un «#» vacíos. Solo ASCII y sin «%»: un homógrafo o un
+        // carácter invisible pegado en el nombre no pasa (un dominio con tildes se escribe en su forma punycode).
+        if (valor.Any(c => !char.IsAscii(c) || char.IsWhiteSpace(c) || char.IsControl(c) || c is '\\' or '%' or '?' or '#' or '@' or '"' or '\'' or '<' or '>')
             || !(valor.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || valor.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
             || !Uri.TryCreate(valor, UriKind.Absolute, out var direccion)
             || direccion.Host.Length == 0

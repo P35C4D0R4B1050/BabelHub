@@ -230,6 +230,16 @@ public sealed partial class GuionDeContrasenasTests : IAsyncLifetime
 
     [FactDelGuion]
     [Trait("Criterio", "AC-ACC-07")]
+    public async Task AlSalirDeLaPagina_UnaContrasenaVisibleVuelveAOcultarse()
+    {
+        var (estados, _) = await Recorrer(Escribir("contrasenaNueva", "mi gato come pescado"), Paso("pulsar"), Paso("salir"));
+
+        Assert.Equal("text", Texto(Campo(estados[2]), "tipo"));
+        Assert.Equal(("password", "mi gato come pescado"), (Texto(Campo(estados[3]), "tipo"), Texto(Campo(estados[3]), "valor")));
+    }
+
+    [FactDelGuion]
+    [Trait("Criterio", "AC-ACC-07")]
     public async Task UnaPantallaQueLlegaPorHtmx_SeMejoraUnaSolaVez()
     {
         var formulario = await FormularioDeRecuperacion();

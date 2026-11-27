@@ -352,12 +352,14 @@
   if (entorno.document) {
     var documento = entorno.document;
     mejorar(documento, documento, entorno);
-    // Una pantalla que llega por htmx se mejora igual; al volver desde el historial todo queda oculto (ACC-07).
+    // Una pantalla que llega por htmx se mejora igual; al salir de la página o volver desde el historial todo queda oculto (ACC-07): el navegador no conserva un campo visible.
     documento.addEventListener('htmx:load', function (evento) {
       mejorar(evento.detail.elt.parentNode || documento, documento, entorno);
     });
-    entorno.addEventListener('pageshow', function () {
-      ocultarTodo(documento);
+    ['pagehide', 'pageshow'].forEach(function (momento) {
+      entorno.addEventListener(momento, function () {
+        ocultarTodo(documento);
+      });
     });
   }
 })(typeof window !== 'undefined' ? window : globalThis);

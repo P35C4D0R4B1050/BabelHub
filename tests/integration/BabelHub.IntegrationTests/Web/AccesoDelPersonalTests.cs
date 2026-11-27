@@ -80,6 +80,9 @@ public sealed class AccesoDelPersonalTests
     [InlineData("https://gestion example.org")]
     [InlineData("https:\\\\gestion.example.org")]
     [InlineData("https://gestion.example.org/\n")]
+    [InlineData("https://gesti\u043En.example.org")]
+    [InlineData("https://gestion\u200B.example.org")]
+    [InlineData("https://gestion%2eexample.org")]
     public void UnaDireccionMalFormada_ImpideArrancar_NombrandoLaVariableSinSuValor(string valor)
     {
         foreach (var permitirContactoDeEjemplo in new[] { true, false })

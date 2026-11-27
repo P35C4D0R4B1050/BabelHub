@@ -200,6 +200,8 @@ for (const paso of entrada.pasos || []) {
     envios.push(campos[paso.campo].form.emitir('submit').defaultPrevented);
   } else if (paso.tipo === 'volver') {
     (oyentesDeLaVentana.pageshow || []).forEach((m) => m({ persisted: true }));
+  } else if (paso.tipo === 'salir') {
+    (oyentesDeLaVentana.pagehide || []).forEach((m) => m({ persisted: true }));
   } else if (paso.tipo === 'avanzar') {
     avanzar(paso.ms);
   } else if (paso.tipo === 'llegaPorHtmx') {
