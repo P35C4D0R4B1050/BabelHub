@@ -30,7 +30,7 @@ public sealed class MenuDeNavegacionTests
     {
         var textos = Textos(RolWeb.AdministradorCentral, AreaWeb.Administracion);
 
-        Assert.Equal(["Catálogo nacional", "Pedidos", "Devoluciones", "Reembolsos", "Ayudas de la biblioteca", "Hojas de reclamación", "Usuarios y roles", "Solicitudes de datos", "Auditoría", "Alertas de seguridad"], textos);
+        Assert.Equal(["Catálogo nacional", "Pedidos", "Devoluciones", "Reembolsos", "Costos de envío", "Ayudas de la biblioteca", "Hojas de reclamación", "Usuarios y roles", "Solicitudes de datos", "Auditoría", "Alertas de seguridad"], textos);
         Assert.All(Menu.Resolver(RolWeb.AdministradorCentral, AreaWeb.Administracion), o => Assert.StartsWith("/administracion/", o.Ruta, StringComparison.Ordinal));
     }
 

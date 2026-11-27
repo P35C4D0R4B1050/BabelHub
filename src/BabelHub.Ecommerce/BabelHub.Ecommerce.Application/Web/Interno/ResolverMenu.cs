@@ -35,6 +35,7 @@ internal sealed class ResolverMenu(IAreasDeInterfaz areas) : IMenuDeNavegacion
         (AreaWeb.Administracion, "Pedidos", "/administracion/pedidos", "bandeja", [RolWeb.AdministradorCentral]),
         (AreaWeb.Administracion, "Devoluciones", "/administracion/devoluciones", "bandeja", [RolWeb.AdministradorCentral]),
         (AreaWeb.Administracion, "Reembolsos", "/administracion/reembolsos", "bandeja", [RolWeb.AdministradorCentral]),
+        (AreaWeb.Administracion, "Costos de envío", "/administracion/costos-de-envio", "camion", [RolWeb.AdministradorCentral]),
         (AreaWeb.Administracion, "Ayudas de la biblioteca", "/administracion/biblioteca/ayudas", "bandeja", [RolWeb.AdministradorCentral]),
         (AreaWeb.Administracion, "Hojas de reclamación", "/administracion/reclamaciones", "bandeja", [RolWeb.AdministradorCentral]),
         (AreaWeb.Administracion, "Usuarios y roles", "/administracion/usuarios", "usuario", [RolWeb.AdministradorCentral]),

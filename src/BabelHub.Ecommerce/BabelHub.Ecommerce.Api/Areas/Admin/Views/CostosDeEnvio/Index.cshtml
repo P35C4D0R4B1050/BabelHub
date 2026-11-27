@@ -1,0 +1,43 @@
+@using BabelHub.Ecommerce.Api.Web.Formato
+@model BabelHub.Ecommerce.Api.Areas.Admin.Controllers.CostosDeEnvioVista
+<h1 class="font-display text-4xl leading-tight sm:text-5xl">Costo de envío por sucursal</h1>
+<p class="mt-2 max-w-2xl opacity-80">Una compra a domicilio suma el costo de cada sucursal que atiende sus libros. El recojo es gratis. Sin un costo propio rige el predeterminado, @FormatoPeruano.Soles(Model.Costos.Predeterminado). Los pagos ya iniciados conservan su total.</p>
+
+@if (Model.Guardada is { } guardada)
+{
+    <div class="alert alert-success mt-6" role="status" tabindex="-1" data-bh-foco-inicial>
+        <bh-icono nombre="exito" />
+        <span>Guardamos el costo de @guardada.Nombre: @FormatoPeruano.Soles(guardada.Importe).</span>
+    </div>
+}
+
+<div class="my-6 overflow-x-auto">
+    <table class="table">
+        <caption class="sr-only">Costo de envío vigente de cada sucursal</caption>
+        <thead>
+            <tr><th scope="col">Sucursal</th><th scope="col">Costo vigente</th><th scope="col">Cambiar (S/, de 0,00 a 500,00)</th></tr>
+        </thead>
+        <tbody>
+            @for (var i = 0; i < Model.Costos.Sucursales.Count; i++)
+            {
+                var s = Model.Costos.Sucursales[i];
+                <tr>
+                    <th scope="row">@s.Nombre</th>
+                    <td>
+                        <span class="font-semibold">@FormatoPeruano.Soles(s.Importe)</span>
+                        <span class="badge badge-ghost ml-2">@(s.EsPropio ? "Propio" : "Predeterminado")</span>
+                    </td>
+                    <td>
+                        <form method="post" action="/administracion/costos-de-envio" class="flex flex-wrap items-center gap-2">
+                            <partial name="_TokenAntifalsificacion" />
+                            <input type="hidden" name="sucursal" value="@s.CodigoDeSucursal" />
+                            <label class="sr-only" for="importe-@i">Costo de envío de @s.Nombre en soles</label>
+                            <input id="importe-@i" class="input input-sm w-32" type="number" name="importe" value="@BabelHub.Ecommerce.Api.Areas.Admin.Controllers.CostosDeEnvioVista.ParaElCampo(s.Importe)" min="0" max="500" step="0.01" inputmode="decimal" required />
+                            <button type="submit" class="btn btn-sm btn-primary" aria-label="Guardar el costo de @s.Nombre">Guardar</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
