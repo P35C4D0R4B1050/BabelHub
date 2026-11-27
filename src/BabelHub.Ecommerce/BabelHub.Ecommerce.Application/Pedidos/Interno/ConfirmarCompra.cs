@@ -163,7 +163,9 @@ public sealed class ConfirmarCompra(
             Aceptacion(TextoLegalDeCompra.Privacidad)!,
             Aceptacion(TextoLegalDeCompra.ReembolsoDigital),
             [.. compra.Lineas.Select(l => new DatosDeLineaNueva(l.LineaId, l.EdicionId, l.EsDigital, l.Titulo, l.Isbn, l.Cantidad, l.PrecioUnitario, l.Importe, l.CodigoDeFuente, l.RequiereTraslado, l.TrasladoId, l.FechaEstimadaDeLlegada))],
-            ahora);
+            ahora,
+            // El envío de cada sucursal se copia de la compra aprobada, nunca de las tarifas vigentes (PED-44); una repetición no llega hasta aquí.
+            compra.EnviosPorSucursal?.Select(e => new EnvioDeSucursal(e.CodigoDeSucursal, e.Importe)).ToArray());
     }
 
     private static string NombreDelEstado(EstadoDePedido estado) => estado switch
