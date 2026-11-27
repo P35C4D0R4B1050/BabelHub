@@ -89,7 +89,7 @@ public sealed partial class Anulacion
         CreadaEn = ahora;
         _lineaIds = [];
         Aplicar(plan);
-        IncluyeEnvio = plan.IncluyeEnvio;
+        Envio = plan.Envio;
         Monto = plan.Monto;
         HayDigitales = plan.LineasDigitales.Count > 0;
         ProximoIntentoEn = ahora + EsperaDeReintentos.Para(1);
@@ -105,7 +105,10 @@ public sealed partial class Anulacion
 
     public IniciadorDeOperacion Iniciador { get; private set; }
 
-    public bool IncluyeEnvio { get; private set; }
+    /// <summary>El envío que se devuelve (PED-45): se guarda con la anulación y es el que se pide a Pagos, también al reintentar.</summary>
+    public decimal Envio { get; private set; }
+
+    public bool IncluyeEnvio => Envio > 0m;
 
     public decimal Monto { get; private set; }
 
@@ -257,7 +260,7 @@ public sealed partial class Anulacion
 
         _lineaIds.Clear();
         Aplicar(plan);
-        IncluyeEnvio = plan.IncluyeEnvio;
+        Envio = plan.Envio;
         Monto = plan.Monto;
         HayDigitales = plan.LineasDigitales.Count > 0;
     }

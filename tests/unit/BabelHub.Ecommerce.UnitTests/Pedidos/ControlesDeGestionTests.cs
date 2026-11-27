@@ -123,7 +123,7 @@ public sealed class ControlesDeGestionTests
     }
 
     private static Anulacion AnulacionEnCurso(Guid linea) =>
-        Anulacion.Iniciar(Guid.NewGuid(), Pedido, new PlanDeAnulacion(OrigenDeLaAnulacion.Administracion, MotivoDeAnulacion.Otro, [linea], [], false, 50m, []), new IniciadorDeOperacion(Guid.NewGuid(), "administrador-central", null), Ahora);
+        Anulacion.Iniciar(Guid.NewGuid(), Pedido, new PlanDeAnulacion(OrigenDeLaAnulacion.Administracion, MotivoDeAnulacion.Otro, [linea], [], 0m, 50m, []), new IniciadorDeOperacion(Guid.NewGuid(), "administrador-central", null), Ahora);
 
     [Fact]
     [Trait("Criterio", "AC-PED-17")]

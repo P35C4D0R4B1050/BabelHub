@@ -737,7 +737,7 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
                 var cabeceras = new List<(Guid Id, Func<IReadOnlyList<Guid>, Anulacion> Crear)>();
                 await using (var comando = new NpgsqlCommand(
                     $"""
-                    SELECT id, pedido_id, origen, motivo, incluye_envio, hay_digitales, monto, estado, reembolso_id, envios_cancelados_en, reservas_liberadas_en, reembolso_registrado_en, accesos_revocados_en, iniciada_por,
+                    SELECT id, pedido_id, origen, motivo, CASE WHEN incluye_envio THEN (SELECT p.costo_de_envio FROM pedidos.pedidos p WHERE p.id = anulaciones.pedido_id) ELSE 0 END, hay_digitales, monto, estado, reembolso_id, envios_cancelados_en, reservas_liberadas_en, reembolso_registrado_en, accesos_revocados_en, iniciada_por,
                            rol_del_iniciador, sucursal_del_iniciador, proximo_intento_en, intentos, creada_en, completada_en
                     FROM pedidos.anulaciones WHERE {filtro}{orden}
                     """,
@@ -762,7 +762,7 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
                         Paso(PasoDeAnulacion.ReembolsoRegistrado, 11);
                         Paso(PasoDeAnulacion.AccesosRevocados, 12);
                         var (id, pedido, origen, motivo, envio, digitales, monto, estado, reembolso) =
-                            (lector.GetGuid(0), lector.GetGuid(1), CodigosDePedidos.A<OrigenDeLaAnulacion>(lector.GetString(2)), CodigosDePedidos.MotivoDe(lector.GetString(3)), lector.GetBoolean(4), lector.GetBoolean(5), lector.GetDecimal(6),
+                            (lector.GetGuid(0), lector.GetGuid(1), CodigosDePedidos.A<OrigenDeLaAnulacion>(lector.GetString(2)), CodigosDePedidos.MotivoDe(lector.GetString(3)), lector.GetDecimal(4), lector.GetBoolean(5), lector.GetDecimal(6),
                              CodigosDePedidos.A<EstadoDeOperacion>(lector.GetString(7)), AccesoAlEsquemaDePedidos.LeerGuid(lector, 8));
                         var iniciador = new IniciadorDeOperacion(lector.GetGuid(13), AccesoAlEsquemaDePedidos.LeerTexto(lector, 14), AccesoAlEsquemaDePedidos.LeerGuid(lector, 15));
                         var (proximo, intentos, creada, completada) = (AccesoAlEsquemaDePedidos.LeerInstante(lector, 16), lector.GetInt32(17), lector.GetFieldValue<DateTimeOffset>(18), AccesoAlEsquemaDePedidos.LeerInstante(lector, 19));

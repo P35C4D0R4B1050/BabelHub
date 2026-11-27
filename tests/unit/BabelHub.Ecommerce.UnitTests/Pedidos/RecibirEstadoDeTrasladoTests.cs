@@ -211,7 +211,7 @@ public sealed class RecibirEstadoDeTrasladoTests
         var entorno = new Entorno();
         var (pedido, con, _) = PedidoConTraslado();
         entorno.Repositorio.Poner(pedido);
-        entorno.Repositorio.Anulaciones.Add(Anulacion.Iniciar(Guid.NewGuid(), pedido.Id, new PlanDeAnulacion(OrigenDeLaAnulacion.Administracion, MotivoDeAnulacion.Otro, [con.Id], [], false, 100m, []), new IniciadorDeOperacion(Guid.NewGuid(), "administrador-central", null), Ahora));
+        entorno.Repositorio.Anulaciones.Add(Anulacion.Iniciar(Guid.NewGuid(), pedido.Id, new PlanDeAnulacion(OrigenDeLaAnulacion.Administracion, MotivoDeAnulacion.Otro, [con.Id], [], 0m, 100m, []), new IniciadorDeOperacion(Guid.NewGuid(), "administrador-central", null), Ahora));
 
         var resultado = await entorno.Caso.Recibir(Cuerpo(pedido, con, EstadoDelTrasladoInformado.EnTransito, "en-transito"));
 

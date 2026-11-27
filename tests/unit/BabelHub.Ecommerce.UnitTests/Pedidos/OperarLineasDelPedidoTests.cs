@@ -252,7 +252,7 @@ public sealed class OperarLineasDelPedidoTests
         var pedido = Crear(TipoDeEntregaDelPedido.Recojo, "LIM", Impresa("Uno"));
         entorno.Repositorio.Poner(pedido);
         var linea = pedido.Lineas[0];
-        entorno.Repositorio.Anulaciones.Add(Anulacion.Iniciar(Guid.NewGuid(), pedido.Id, new PlanDeAnulacion(OrigenDeLaAnulacion.Administracion, MotivoDeAnulacion.Otro, [linea.Id], [], false, 50m, []), new IniciadorDeOperacion(Guid.NewGuid(), "administrador-central", null), Ahora));
+        entorno.Repositorio.Anulaciones.Add(Anulacion.Iniciar(Guid.NewGuid(), pedido.Id, new PlanDeAnulacion(OrigenDeLaAnulacion.Administracion, MotivoDeAnulacion.Otro, [linea.Id], [], 0m, 50m, []), new IniciadorDeOperacion(Guid.NewGuid(), "administrador-central", null), Ahora));
 
         var enCurso = await entorno.Caso.PrepararDeRecojo("LIM", new OperarLineasEntrada(pedido.Id, [linea.Id]), default);
         entorno.Limites.Gestion = new ResultadoDeLimiteDePedidos(DecisionDeLimiteDePedidos.Excedido, Ahora);

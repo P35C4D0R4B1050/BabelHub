@@ -365,7 +365,7 @@ internal sealed class OrquestadorDeAnulaciones(
             anulacion.Motivo,
             [.. lineas.Where(l => !l.EsDigital).Select(l => l.Id)],
             [.. lineas.Where(l => l.EsDigital).Select(l => l.Id)],
-            anulacion.IncluyeEnvio,
+            anulacion.Envio,
             anulacion.Monto,
             []);
         pedido.AplicarAnulacion(plan, ahora);
@@ -392,7 +392,7 @@ internal sealed class OrquestadorDeAnulaciones(
                     anulacion.Origen == OrigenDeLaAnulacion.Cliente ? OrigenDelReembolso.CancelacionDelCliente : OrigenDelReembolso.Anulacion,
                     ClaveDelReembolso(anulacion.Origen, pedido.Id),
                     [.. lineas.Select(l => new LineaAReembolsar(l.Id, l.Importe))],
-                    anulacion.IncluyeEnvio ? pedido.CostoDeEnvio : 0m),
+                    anulacion.Envio),
                 cancelacion).ConfigureAwait(false);
         }
         catch (Exception excepcion) when (excepcion is not (OperationCanceledException or OperacionRechazadaException))
