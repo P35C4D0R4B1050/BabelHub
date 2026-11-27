@@ -70,4 +70,4 @@ Plan §11. Carril «Pedidos, pagos y devoluciones», en este orden; requiere T50
 
 - [x] T53 [Dominio · C] La instantánea con el envío por sucursal y sus rechazos, y el tope de envío acumulado con una parte (cubre: AC-PAG-45, AC-PAG-46, PAG-54)
 - [x] T54 [Aplicación · C] Conservación en la intención sin recalcular la huella recibida, reemplazo que sobrescribe la lista, entrega en `CompraAprobada` y eliminación al desvincular (cubre: AC-PAG-44, PAG-53)
-- [ ] T55 [Infra · C] Columna `envios_por_sucursal` repetible sobre una base anterior, su permiso y el repositorio, con PostgreSQL (cubre: AC-PAG-44, AC-PAG-46)
+- [x] T55 [Infra · C] Columna `envios_por_sucursal` repetible sobre una base anterior, su permiso y el repositorio, con PostgreSQL (cubre: AC-PAG-44, AC-PAG-46)

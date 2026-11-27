@@ -55,6 +55,8 @@ public static class DefinicionDePagos
             CONSTRAINT intenciones_aceptacion_con_fecha_privacidad CHECK ((privacidad_version IS NULL) = (privacidad_aceptado_en IS NULL)),
             CONSTRAINT intenciones_aceptacion_con_fecha_reembolso CHECK ((reembolso_digital_version IS NULL) = (reembolso_digital_aceptado_en IS NULL))
         );
+        -- Venta por sucursal (PAG-53): el envío de cada sucursal tal como llegó con la compra. Repetible sobre una base anterior, cuyas filas quedan nulas.
+        ALTER TABLE pagos.intenciones ADD COLUMN IF NOT EXISTS envios_por_sucursal jsonb;
         CREATE INDEX IF NOT EXISTS intenciones_por_cuenta ON pagos.intenciones (cuenta_id) WHERE cuenta_id IS NOT NULL;
         CREATE INDEX IF NOT EXISTS intenciones_abiertas_por_vencimiento ON pagos.intenciones (vence_en) WHERE estado = 'abierta';
         CREATE INDEX IF NOT EXISTS intenciones_aprobadas ON pagos.intenciones (aprobado_en) WHERE estado = 'aprobada';
@@ -205,7 +207,7 @@ public static class DefinicionDePagos
         GRANT UPDATE (
             cuenta_id, estado, motivo_de_cierre, tiene_impresos, tipo_de_entrega, codigo_de_sucursal_de_recojo, region_de_entrega, total, envio, huella_de_instantanea, instantanea_obsoleta, iniciada_en, aprobado_en,
             confirmacion_iniciada_en, reservas_confirmadas_en, reclamada_hasta, vence_en, limite_pendiente_en, reserva_expira_en, reserva_extendida, terminos_version, terminos_aceptado_en, privacidad_version,
-            privacidad_aceptado_en, reembolso_digital_version, reembolso_digital_aceptado_en, contacto_nombre, contacto_telefono, contacto_direccion, contacto_liberado_en, desvinculada_en, cerrada_en
+            privacidad_aceptado_en, reembolso_digital_version, reembolso_digital_aceptado_en, contacto_nombre, contacto_telefono, contacto_direccion, contacto_liberado_en, desvinculada_en, cerrada_en, envios_por_sucursal
         ) ON pagos.intenciones TO rol_pagos;
         GRANT SELECT, INSERT, DELETE ON pagos.intencion_lineas TO rol_pagos;
         GRANT SELECT, INSERT, DELETE ON pagos.intencion_reserva_lineas TO rol_pagos;
