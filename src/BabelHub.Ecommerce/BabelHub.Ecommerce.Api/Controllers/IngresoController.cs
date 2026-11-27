@@ -37,6 +37,9 @@ public sealed class IngresoVista : ModeloBaseDePagina
     public string Destino { get; set; } = "/";
 
     public bool EsGestion { get; set; }
+
+    /// <summary>La persona estaba comprando: los formularios llevan la marca para volver al carrito al terminar (<see cref="ContinuacionDelIngreso"/>).</summary>
+    public bool ContinuaLaCompra { get; set; }
 }
 
 /// <summary>
@@ -57,9 +60,12 @@ public sealed class IngresoController(
 {
     public const string Ruta = "/ingreso";
 
-    private static readonly string[] CamposDeLasCredenciales = ["correo", "contrasena", VerificacionDePersonaWeb.CampoDelToken];
-    private static readonly string[] CamposDelCodigo = ["codigo"];
+    private static readonly string[] CamposDeLasCredenciales = ["correo", "contrasena", VerificacionDePersonaWeb.CampoDelToken, ContinuacionDelIngreso.Campo];
+    private static readonly string[] CamposDelCodigo = ["codigo", ContinuacionDelIngreso.Campo];
     private static readonly string[] CamposDeLaContrasena = ["contrasenaNueva", "confirmacion"];
+    private static readonly string[] ConsultaAdmitida = [ContinuacionDelIngreso.Campo];
+
+    private bool _continuaLaCompra;
 
     // ---------- Credenciales ----------
 
@@ -67,14 +73,16 @@ public sealed class IngresoController(
     [VerificacionDePersona(AccionProtegida.Ingreso)]
     public async Task<IActionResult> Mostrar(CancellationToken cancelacion)
     {
-        if (await EntradasHttpDelCarrito.RechazarConsulta(HttpContext) is { } consulta)
+        if (await EntradasHttpDelCarrito.RechazarConsulta(HttpContext, ConsultaAdmitida) is { } consulta)
         {
             return await Falla(consulta, cancelacion);
         }
 
+        // La única consulta admitida es una marca de lista cerrada, nunca un destino: cualquier otro valor se ignora.
+        _continuaLaCompra = Request.Query.TryGetValue(ContinuacionDelIngreso.Campo, out var continuar) && continuar.Count == 1 && ContinuacionDelIngreso.EsLaCompra(continuar[0]);
         if (HttpContext.ActorDeLaSolicitud() is { } actor)
         {
-            return Redirigir(CierreDelIngresoWeb.DestinoPorRol(actor.Rol));
+            return Redirigir(Destino(actor.Rol, CierreDelIngresoWeb.DestinoPorRol(actor.Rol)));
         }
 
         if (CookieDelDesafio.Leer(Request) is not { } desafio)
@@ -110,6 +118,7 @@ public sealed class IngresoController(
             return await Falla(error!, cancelacion);
         }
 
+        Recordar(campos);
         var token = campos.GetValueOrDefault(VerificacionDePersonaWeb.CampoDelToken) ?? Request.Headers["X-Verificacion-De-Persona"].FirstOrDefault();
         switch (await verificacion.Exigir(AccionProtegida.Ingreso, token, cancelacion))
         {
@@ -141,9 +150,10 @@ public sealed class IngresoController(
             return await Falla(error!, cancelacion);
         }
 
+        Recordar(campos);
         if (CookieDelDesafio.Leer(Request) is not { } desafio)
         {
-            return Redirigir(Ruta);
+            return Redirigir(RutaDelPaso);
         }
 
         if (!campos.TryGetValue("codigo", out var codigo) || codigo.Length is 0 or > 64)
@@ -164,9 +174,10 @@ public sealed class IngresoController(
             return await Falla(error!, cancelacion);
         }
 
+        Recordar(campos);
         if (CookieDelDesafio.Leer(Request) is not { } desafio)
         {
-            return Redirigir(Ruta);
+            return Redirigir(RutaDelPaso);
         }
 
         if (!campos.TryGetValue("codigo", out var codigo) || codigo.Length is 0 or > 64)
@@ -240,6 +251,15 @@ public sealed class IngresoController(
     private const string TextoNoDisponible = "No podemos atenderte ahora. Inténtalo en unos minutos.";
     private const string TextoLimite = "Hiciste demasiados intentos. Espera unos minutos y vuelve a probar.";
 
+    /// <summary>El ingreso en el que sigue la persona: conserva la marca de la compra entre un paso y el siguiente.</summary>
+    private string RutaDelPaso => _continuaLaCompra ? ContinuacionDelIngreso.RutaDelIngresoDeLaCompra : Ruta;
+
+    private void Recordar(IReadOnlyDictionary<string, string> campos) =>
+        _continuaLaCompra = campos.TryGetValue(ContinuacionDelIngreso.Campo, out var valor) && ContinuacionDelIngreso.EsLaCompra(valor);
+
+    /// <summary>Quien compraba y es cliente vuelve a su carrito; cualquier otro caso va a donde ya iba.</summary>
+    private string Destino(RolWeb rol, string destinoDelRol) => _continuaLaCompra && rol == RolWeb.Cliente ? ContinuacionDelIngreso.DestinoDeLaCompra : destinoDelRol;
+
     private async Task<PasoDelIngresoWeb> PasoActual(string desafio, CancellationToken cancelacion)
     {
         try
@@ -300,13 +320,13 @@ public sealed class IngresoController(
                 return View("Ingreso", vista);
             }
 
-            return Redirigir(cerrado.Destino);
+            return Redirigir(Destino(CierreDelIngresoWeb.Rol(credencial.Rol), cerrado.Destino));
         }
 
         if (valor.Desafio is { } desafio)
         {
             CookieDelDesafio.Escribir(Response, desafio.Identificador.Revelar());
-            return Redirigir(Ruta);
+            return Redirigir(RutaDelPaso);
         }
 
         return await Rechazo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, "servicio-no-disponible"), pantallaActual, cancelacion);
@@ -402,7 +422,7 @@ public sealed class IngresoController(
             PantallaDelIngreso.ContrasenaTemporal => "Cambia tu contraseña temporal",
             _ => "Ingresar",
         };
-        var vista = await pagina.Completar(new IngresoVista { Pantalla = pantalla, Mensaje = mensaje, EsGestion = host.Host == HostWeb.Gestion }, titulo, cancelacion: cancelacion);
+        var vista = await pagina.Completar(new IngresoVista { Pantalla = pantalla, Mensaje = mensaje, EsGestion = host.Host == HostWeb.Gestion, ContinuaLaCompra = _continuaLaCompra }, titulo, cancelacion: cancelacion);
         Response.Headers.CacheControl = "no-store";
         Response.StatusCode = Request.EsHtmx() ? StatusCodes.Status200OK : estado;
         return View("Ingreso", vista);

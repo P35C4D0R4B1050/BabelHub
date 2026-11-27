@@ -184,3 +184,4 @@ El 2026-11-27 la persona responsable pidió desarrollar los pendientes señalado
 | Id | Decisión | Motivo | Se hace cumplir en |
 | :--- | :--- | :--- | :--- |
 | DD-143 | **La raíz de la gestión lleva al ingreso o al destino del rol** (catálogo nacional para la administración; envíos para sucursal y logística). | La raíz respondía `ECO-NO-ENCONTRADO` y parecía una falla (O-5). | `InicioDeLaGestion`; guía 08 §13.3 |
+| DD-144 | **Tras ingresar desde la compra se vuelve al carrito**, con una marca de lista cerrada (`continuar=compra`) y no con una dirección. El carrito conserva «Continuar con la compra»: no se reejecuta ninguna acción. Registrarse desde ese ingreso sigue terminando en la portada. | O-11; sin redirección abierta ni cookie nueva. | `ContinuacionDelIngreso`; CAR-16, AC-CAR-13 |

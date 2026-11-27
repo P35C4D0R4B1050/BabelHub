@@ -31,7 +31,7 @@ El menú, el selector de sucursal y las acciones visibles dependen del rol y del
 | `web-acceso` | Ayudas en los campos de contraseña (ver u ocultar en todos; ayuda de reglas, barra de seguridad y aviso de coincidencia donde se define una nueva), código QR junto a la clave al configurar el segundo factor y enlace «Acceso del personal» en el pie y el ingreso de la tienda. |
 | `transversal-auditoria`, `transversal-seguridad` | Auditoría unificada de solo lectura con filtros y aviso si un servicio no responde; lista de alertas de seguridad con estado de revisión. |
 | `asistente-compra-ia` | Panel de chat que no tapa precios ni acciones en pantallas pequeñas. |
-| `web-base` | Estructura, sesión, errores, estados y pie con enlaces legales. La raíz de la gestión lleva al ingreso o a la pantalla del rol. |
+| `web-base` | Estructura, sesión, errores, estados y pie con enlaces legales. La raíz de la gestión lleva al ingreso o a la pantalla del rol; quien ingresa para continuar su compra vuelve al carrito. |
 | `web-indice-infinito` | Experimento aislado ([El índice infinito](03-estados-accesibilidad-y-criterios.md)). |
 
 ## 2. Recorrido de compra

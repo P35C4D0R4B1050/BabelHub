@@ -98,7 +98,7 @@ test.describe('Carrito y checkout: visitante y fusión', () => {
     expect(titulos).toBeGreaterThan(0);
     await expect(page.getByText('Para pagar necesitas una cuenta.')).toBeVisible();
     const ingresar = page.getByRole('link', { name: 'Ingresar para continuar' });
-    await expect(ingresar).toHaveAttribute('href', '/ingreso');
+    await expect(ingresar).toHaveAttribute('href', '/ingreso?continuar=compra');
 
     // El carrito sigue igual después de recargar y no hay forma de pagar sin sesión.
     await page.reload();
