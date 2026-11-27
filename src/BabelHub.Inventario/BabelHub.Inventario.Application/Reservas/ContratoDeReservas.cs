@@ -39,8 +39,11 @@ public enum MotivoDeCierreDeReserva
     Reparto,
 }
 
-/// <summary>Una línea impresa que se pide reservar o consultar: su identificador (el que asigna el E-commerce), la edición y la cantidad.</summary>
-public sealed record LineaSolicitada(Guid LineaId, Guid EdicionId, int Cantidad);
+/// <summary>
+/// Una línea impresa que se pide reservar o consultar: su identificador (el que asigna el E-commerce), la edición, la cantidad y, en la venta por sucursal, la sucursal elegida para atenderla (SEL-41): se
+/// declara en todas las líneas impresas o en ninguna (SEL-42).
+/// </summary>
+public sealed record LineaSolicitada(Guid LineaId, Guid EdicionId, int Cantidad, string? CodigoDeSucursal = null);
 
 /// <summary>
 /// Reserva los impresos de un pedido (SEL-01): todas las líneas o ninguna. El cliente <b>no viaja aquí</b>: sale del actor verificado (un <c>clienteId</c> en el cuerpo se rechaza). Repetir el
@@ -77,12 +80,16 @@ public sealed record ReservaDelPedido(
     IReadOnlyList<TrasladoVinculadoAlPedido> Traslados,
     bool EsRepeticion = false);
 
-/// <summary>Una línea que no tiene stock vendible suficiente en ninguna fuente y lo máximo que hay en la red (CAR-04, CAR-27).</summary>
-public sealed record LineaSinStock(Guid LineaId, Guid EdicionId, int Solicitada, int DisponibleEnLaRed);
+/// <summary>
+/// Una línea sin stock vendible suficiente y lo máximo que hay en la red (CAR-04, CAR-27). Con sucursal declarada, <see cref="DisponibleEnLaSucursal"/> es el vendible que esa sucursal tenía de la edición antes de
+/// repartirlo entre las líneas de la solicitud (SEL-43); sin ella es nulo.
+/// </summary>
+public sealed record LineaSinStock(Guid LineaId, Guid EdicionId, int Solicitada, int DisponibleEnLaRed, int? DisponibleEnLaSucursal = null);
 
 /// <summary>
 /// Cómo viaja el detalle de una falta de stock dentro de <c>ErrorDeAplicacion.Errores</c> (el contrato de error solo conoce campo y clave): un <c>ErrorDeCampo</c> por línea, con el campo
-/// <c>lineas.{lineaId}</c> y una clave <c>sin-stock:{edicionId}:{solicitada}:{disponibleEnLaRed}</c>. La Api lo lee con <see cref="TryLeer"/> para armar el cuerpo del 409; ningún valor del cliente viaja aquí.
+/// <c>lineas.{lineaId}</c> y una clave <c>sin-stock:{edicionId}:{solicitada}:{disponibleEnLaRed}</c>, con una cuarta parte <c>:{disponibleEnLaSucursal}</c> en la venta por sucursal. La Api lo lee con
+/// <see cref="TryLeer"/> para armar el cuerpo del 409; ningún valor del cliente viaja aquí.
 /// </summary>
 public static class DetalleDeFaltaDeStock
 {
@@ -95,7 +102,8 @@ public static class DetalleDeFaltaDeStock
     public static Plataforma.ErrorDeCampo Codificar(LineaSinStock linea)
     {
         ArgumentNullException.ThrowIfNull(linea);
-        return new Plataforma.ErrorDeCampo($"{Prefijo}{linea.LineaId:D}", $"{PrefijoDeClave}{linea.EdicionId:D}:{linea.Solicitada}:{linea.DisponibleEnLaRed}");
+        var enLaSucursal = linea.DisponibleEnLaSucursal is { } disponible ? $":{disponible}" : string.Empty;
+        return new Plataforma.ErrorDeCampo($"{Prefijo}{linea.LineaId:D}", $"{PrefijoDeClave}{linea.EdicionId:D}:{linea.Solicitada}:{linea.DisponibleEnLaRed}{enLaSucursal}");
     }
 
     public static bool TryLeer(Plataforma.ErrorDeCampo campo, out LineaSinStock? linea)
@@ -110,23 +118,40 @@ public static class DetalleDeFaltaDeStock
         }
 
         var partes = campo.Clave[PrefijoDeClave.Length..].Split(':');
-        if (partes.Length != 3 || !Guid.TryParseExact(partes[0], "D", out var edicionId)
-            || !int.TryParse(partes[1], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var solicitada)
-            || !int.TryParse(partes[2], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var disponible))
+        if (partes.Length is not (3 or 4) || !Guid.TryParseExact(partes[0], "D", out var edicionId)
+            || !TryLeerCantidad(partes[1], out var solicitada)
+            || !TryLeerCantidad(partes[2], out var disponible))
         {
             return false;
         }
 
-        linea = new LineaSinStock(lineaId, edicionId, solicitada, disponible);
+        int? enLaSucursal = null;
+        if (partes.Length == 4)
+        {
+            if (!TryLeerCantidad(partes[3], out var cantidad))
+            {
+                return false;
+            }
+
+            enLaSucursal = cantidad;
+        }
+
+        linea = new LineaSinStock(lineaId, edicionId, solicitada, disponible, enLaSucursal);
         return true;
     }
+
+    private static bool TryLeerCantidad(string texto, out int cantidad) =>
+        int.TryParse(texto, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out cantidad);
 }
 
 /// <summary>Consulta previa de la selección de fuentes de un carrito, sin reservar (SEL-20).</summary>
 public sealed record ConsultarSeleccionEntrada(TipoDeEntregaDeReserva TipoDeEntrega, string? CodigoDeSucursalDeRecojo, string? RegionDeEntrega, IReadOnlyList<LineaSolicitada> Lineas);
 
-/// <summary>La fuente que se seleccionaría para una línea impresa (o la falta de stock y lo que hay en la red).</summary>
-public sealed record SeleccionDeLinea(Guid LineaId, Guid EdicionId, bool HayStock, string? CodigoDeFuente, bool RequiereTraslado, int? PlazoEstimadoEnDias, int DisponibleEnLaRed);
+/// <summary>
+/// La fuente que se seleccionaría para una línea impresa (o la falta de stock y lo que hay en la red). Con sucursal declarada no hay traslado ni plazo, y la falta de stock trae en
+/// <see cref="DisponibleEnLaSucursal"/> el vendible de esa sucursal (SEL-44).
+/// </summary>
+public sealed record SeleccionDeLinea(Guid LineaId, Guid EdicionId, bool HayStock, string? CodigoDeFuente, bool RequiereTraslado, int? PlazoEstimadoEnDias, int DisponibleEnLaRed, int? DisponibleEnLaSucursal = null);
 
 /// <summary>La respuesta de la consulta previa: una entrada por línea impresa (las digitales se ignoran) y cuándo se consultó.</summary>
 public sealed record SeleccionConsultada(IReadOnlyList<SeleccionDeLinea> Lineas, DateTimeOffset ConsultadaEn);
@@ -209,6 +234,15 @@ public interface IAlLiberarPedido
 public interface IGeneradorDeIdentificadorAnonimo
 {
     Guid Generar(Guid titularId);
+}
+
+/// <summary>
+/// Puerto que <b>declara</b> <c>Reservas</c> (la Aplicación no usa paquetes de registro): anota que las reservas de una edición en una sucursal superaron el máximo en la ventana (SEL-47). Recibe solo la edición, el
+/// código de la sucursal y las unidades: ni cliente, ni pedido, ni origen.
+/// </summary>
+public interface IRegistroDeConcentracion
+{
+    void Registrar(Guid edicionId, string codigoDeSucursal, int unidades);
 }
 
 // ---------- Para Traslados: consultar, consumir en el origen y recrear en el destino ----------

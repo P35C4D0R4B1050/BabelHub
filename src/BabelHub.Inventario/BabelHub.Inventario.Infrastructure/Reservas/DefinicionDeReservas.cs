@@ -54,7 +54,7 @@ public static class DefinicionDeReservas
             CONSTRAINT uq_reservas_id_pedido UNIQUE (id, pedido_id),
             CONSTRAINT ck_reservas_tipo_entrega CHECK (tipo_entrega IN ('recojo', 'domicilio')),
             CONSTRAINT ck_reservas_destino CHECK (
-                (tipo_entrega = 'recojo' AND sucursal_recojo_id IS NOT NULL AND region_entrega IS NULL)
+                (tipo_entrega = 'recojo' AND region_entrega IS NULL)
                 OR (tipo_entrega = 'domicilio' AND region_entrega IS NOT NULL AND sucursal_recojo_id IS NULL)),
             CONSTRAINT ck_reservas_reemplazos CHECK (reemplazos BETWEEN 0 AND 3),
             CONSTRAINT ck_reservas_huella_de_carga CHECK (huella_de_carga ~ '^[0-9a-f]{64}$'),
@@ -64,6 +64,14 @@ public static class DefinicionDeReservas
 
         -- Una base ya migrada gana la marca de «el cliente ya es anónimo» (la baja y la depuración de los 2 años la ponen: así un identificador anónimo no se vuelve a calcular y sigue estable, SEL-34).
         ALTER TABLE reservas.reservas ADD COLUMN IF NOT EXISTS cliente_anonimizado boolean NOT NULL DEFAULT false;
+
+        -- Una base ya migrada gana la restricción de destino de la venta por sucursal: un recojo puede no tener sucursal de cabecera porque cada línea se recoge en la suya (SEL-41). Se reemplaza en una sola
+        -- sentencia (atómica y repetible); las filas existentes ya la cumplen y se validan.
+        ALTER TABLE reservas.reservas
+            DROP CONSTRAINT IF EXISTS ck_reservas_destino,
+            ADD CONSTRAINT ck_reservas_destino CHECK (
+                (tipo_entrega = 'recojo' AND region_entrega IS NULL)
+                OR (tipo_entrega = 'domicilio' AND region_entrega IS NOT NULL AND sucursal_recojo_id IS NULL));
 
         CREATE INDEX IF NOT EXISTS ix_reservas_pedido ON reservas.reservas (pedido_id, iniciada_en DESC);
         CREATE INDEX IF NOT EXISTS ix_reservas_cliente ON reservas.reservas (cliente_id);

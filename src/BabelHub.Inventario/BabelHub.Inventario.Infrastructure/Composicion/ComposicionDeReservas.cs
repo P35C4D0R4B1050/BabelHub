@@ -80,7 +80,17 @@ public static class ComposicionDeReservas
         servicios.AddSingleton<IValidador<ConsultarPendientesEntrada>, ValidadorDeConsultarPendientes>();
         servicios.AddSingleton<IValidador<ProcesarBajaDeTitularEntrada>, ValidadorDeProcesarBajaDeTitular>();
 
-        servicios.Escritura<ReservarEntrada, ReservaDelPedido, ReservarUnidades>(opcionesDeReintento);
+        // Reservar lleva por fuera de la transacción y del reintento el contador de concentración (SEL-47): solo cuenta lo que quedó guardado. El máximo se lee aquí, así un valor inválido impide arrancar.
+        var maximoApartado = ConfiguracionDeLaConcentracion.Maximo(configuracion);
+        servicios.AddSingleton(sp => new ContadorDeConcentracion(sp.GetRequiredService<IReloj>(), maximoApartado));
+        servicios.AddSingleton<IRegistroDeConcentracion, LoggerRegistroDeConcentracion>();
+        servicios.AddScoped<ReservarUnidades>();
+        servicios.AddScoped<ICasoDeUso<ReservarEntrada, ReservaDelPedido>>(sp => new ConcentracionDeReservas(
+            Componer<ReservarEntrada, ReservaDelPedido, ReservarUnidades>(sp, opcionesDeReintento),
+            sp.GetRequiredService<ContadorDeConcentracion>(),
+            sp.GetRequiredService<IAlertas>(),
+            sp.GetRequiredService<IRegistroDeConcentracion>()));
+
         servicios.Escritura<ExpirarReservasEntrada, ExpiracionDelPedido, ExpirarReservasVencidas>(opcionesDeReintento);
         servicios.Escritura<ConfirmarReservasEntrada, ReservaDelPedido, ConfirmarReservas>(opcionesDeReintento);
         servicios.Escritura<ExtenderReservasEntrada, ExtensionDeReserva, ExtenderReservas>(opcionesDeReintento);
@@ -133,15 +143,18 @@ public static class ComposicionDeReservas
     private static void Escritura<TEntrada, TSalida, TCaso>(this IServiceCollection servicios, OpcionesDeReintentoPorInterbloqueo reintento)
         where TCaso : class, ICasoDeUso<TEntrada, TSalida>
     {
-        var idempotente = CasosDeUsoIdempotentes.Contains(typeof(TCaso));
         servicios.AddScoped<TCaso>();
-        servicios.AddScoped<ICasoDeUso<TEntrada, TSalida>>(sp =>
-        {
-            ICasoDeUso<TEntrada, TSalida> caso = new TransaccionPorCasoDeUso<TEntrada, TSalida>(sp.GetRequiredService<TCaso>(), sp.GetRequiredService<IUnidadDeTrabajo>());
-            return idempotente
-                ? new ReintentoPorInterbloqueo<TEntrada, TSalida>(caso, sp.GetRequiredService<IConexionDeLaUnidadDeTrabajo>(), reintento, esIdempotente: true)
-                : caso;
-        });
+        servicios.AddScoped(sp => Componer<TEntrada, TSalida, TCaso>(sp, reintento));
+    }
+
+    /// <summary>El caso de uso en su transacción y, si es idempotente, con el reintento por interbloqueo por fuera de ella.</summary>
+    private static ICasoDeUso<TEntrada, TSalida> Componer<TEntrada, TSalida, TCaso>(IServiceProvider sp, OpcionesDeReintentoPorInterbloqueo reintento)
+        where TCaso : class, ICasoDeUso<TEntrada, TSalida>
+    {
+        ICasoDeUso<TEntrada, TSalida> caso = new TransaccionPorCasoDeUso<TEntrada, TSalida>(sp.GetRequiredService<TCaso>(), sp.GetRequiredService<IUnidadDeTrabajo>());
+        return CasosDeUsoIdempotentes.Contains(typeof(TCaso))
+            ? new ReintentoPorInterbloqueo<TEntrada, TSalida>(caso, sp.GetRequiredService<IConexionDeLaUnidadDeTrabajo>(), reintento, esIdempotente: true)
+            : caso;
     }
 
     private static void Lectura<TEntrada, TSalida, TCaso>(this IServiceCollection servicios)

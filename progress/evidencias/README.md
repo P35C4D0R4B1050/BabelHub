@@ -2,11 +2,11 @@
 
 Punto por punto de la rúbrica de `docs/07-proceso-de-desarrollo/06-plan-sprint-2.md` §1. El criterio fundamental: la implementación respeta las decisiones arquitectónicas documentadas y se **demuestra con pruebas** que cumple los atributos de calidad. Cada punto indica **qué se demuestra, dónde se ve y cómo se reproduce**; lo que no se pudo demostrar (o se demuestra a medias) se dice en «Límites».
 
-Fechas: mediciones de carga y cobertura del 2026-11-20 y estado de cierre del 2026-11-21 (`progress/bloques.md`, «Estado de cierre»). Máquina de desarrollo con Docker Desktop; no es la VM ARM de despliegue. La hoja única para la entrega es [`docs/07-proceso-de-desarrollo/07-evidencias-sprint-2.md`](../../docs/07-proceso-de-desarrollo/07-evidencias-sprint-2.md); este informe es el detalle.
+Fechas: mediciones de carga y cobertura del 2026-11-20 y estado de cierre del 2026-11-21 (`progress/bloques.md`, «Estado de cierre»). Máquina de desarrollo con Docker Desktop; no es la VM ARM de despliegue. Actualizado el 2026-11-27 con las cifras de `main` en `938a3306` (`v0.1.2`). La hoja única para la entrega es [`docs/07-proceso-de-desarrollo/07-evidencias-sprint-2.md`](../../docs/07-proceso-de-desarrollo/07-evidencias-sprint-2.md); este informe es el detalle.
 
 | # | Punto de la rúbrica | Evidencia principal |
 | :-- | :--- | :--- |
-| 1 | Estilo arquitectónico | [`docs/02`](../../docs/02-arquitectura-de-software/03-estilo-arquitectonico.md) y 244 pruebas de arquitectura |
+| 1 | Estilo arquitectónico | [`docs/02`](../../docs/02-arquitectura-de-software/03-estilo-arquitectonico.md) y 261 pruebas de arquitectura |
 | 2 | Patrón (Clean Architecture, módulos) | [`docs/03/01`](../../docs/03-diseno-de-software/01-clean-architecture.md), [`docs/03/04`](../../docs/03-diseno-de-software/04-modulos-y-contratos.md), `tests/architecture` |
 | 3 | SDD: criterios de aceptación y tareas | `specs/<feature>/`, [`specs/TRACEABILITY.md`](../../specs/TRACEABILITY.md), `tools/SpecCheck` |
 | 4 | REST con OpenAPI | [`docs/03/openapi/`](../../docs/03-diseno-de-software/openapi/README.md) (generado del código) |
@@ -18,7 +18,7 @@ Fechas: mediciones de carga y cobertura del 2026-11-20 y estado de cierre del 20
 ## 1. Estilo arquitectónico
 
 - **Qué:** dos servicios (E-commerce e Inventario), cada uno un **monolito modular**, comunicados solo por REST; el estilo, sus tácticas y su presupuesto de recursos están decididos y justificados en `docs/02-arquitectura-de-software/` (drivers, decisiones AD, estilo, escenarios, despliegue, tácticas, presupuesto de recursos).
-- **Se demuestra:** las reglas 1, 2, 5, 6 y 13 de `AGENTS.md` (capas, referencias entre servicios, `Shared` solo contratos, módulos por contrato público) y parte de la 9 las hace cumplir `tests/architecture` (**244 pruebas**, verdes): si una referencia de proyecto o de tipo viola la regla, la compilación de pruebas falla.
+- **Se demuestra:** las reglas 1, 2, 5, 6 y 13 de `AGENTS.md` (capas, referencias entre servicios, `Shared` solo contratos, módulos por contrato público) y parte de la 9 las hace cumplir `tests/architecture` (**261 pruebas**, verdes): si una referencia de proyecto o de tipo viola la regla, la compilación de pruebas falla.
 - **Reproducir:** `dotnet test tests/architecture`.
 
 ## 2. Patrón: Clean Architecture con módulos
@@ -32,6 +32,7 @@ Fechas: mediciones de carga y cobertura del 2026-11-20 y estado de cierre del 20
 - **Qué:** nada se programa sin spec **Approved** (EARS, criterios `AC-XXX-NN`) y plan **Planned**; cada feature tiene `spec.md`, `plan.md`, `tasks.md`, `decisions.md` y, al cerrar, `verificacion.md`.
 - **Se demuestra:** `tools/SpecCheck` valida estructura, tareas y trazabilidad (23 pruebas propias) y regenera [`specs/TRACEABILITY.md`](../../specs/TRACEABILITY.md): cada criterio tiene al menos una prueba que lo nombra con `[Trait("Criterio", "AC-XXX-NN")]`. Las aprobaciones delegadas quedan en `progress/aprobaciones.md` y los hallazgos en `progress/hallazgos.md`.
 - **Estado de cierre (2026-11-21, `progress/bloques.md`):** 547 de 611 tareas (89 %). **Siete specs en `Done`** con `Resultado: Converge`: `ecommerce-biblioteca-digital`, `ecommerce-carrito-checkout`, `ecommerce-catalogo`, `ecommerce-devoluciones`, `ecommerce-libro-reclamaciones`, `ecommerce-pedidos` e `inventario-traslados`. Las demás con verificación convergen **salvo** excepciones registradas: `ecommerce-envios` (operador real, DD-22), `ecommerce-pagos` (llaves de Culqi y WhatsApp real), `web-base` (partes humanas y WEB-25), `identidad-seguridad` (D5 y D6), `inventario-ajustes` (AJU-22), `inventario-fuentes` (FUE-09/FUE-11 diferidas y FUE-10, DD-18), `inventario-seleccion-fuente` (S2, k6 previo a producción), `transversal-auditoria`, `transversal-notificaciones` (NOT-02) y `transversal-seguridad` (SEG-17/23 y SEG-31). `transversal-plataforma` (despliegue y spikes) queda sin verificación por estar fuera del Sprint 2; `asistente-compra-ia` y `web-indice-infinito` están diferidas (ECO-12 y ECO-13).
+- **Estado al 2026-11-27:** 11 specs en `Done`, 5 en `InProgress` y 7 en `Planned`; 650 de 700 tareas (93 %).
 - **Reproducir:** `dotnet run --project tools/SpecCheck`.
 
 ## 4. Endpoints REST con OpenAPI
@@ -45,7 +46,7 @@ Fechas: mediciones de carga y cobertura del 2026-11-20 y estado de cierre del 20
 
 - **Qué:** [`docs/03/09`](../../docs/03-diseno-de-software/09-analisis-de-base-de-datos-y-cache.md): consultas críticas con sus índices (plan de ejecución y `pg_stat_statements`), bloqueos y concurrencia (`SELECT … FOR UPDATE` ordenado, AC01), seguridad por filas, qué se cachea y qué no, y la **capacidad medida frente a recursos** (§6b) y el costo por solicitud antes y después de reducirlo (§6c).
 - **Hallazgos con arreglo y prueba:** el tope del grupo de conexiones superaba el límite de la cuenta (500 «too many connections»; ahora 16 por omisión, `LimiteDeConexionesDeLaBaseTests`); la base caída respondía 500 (ahora 503 uniforme, `BaseCaidaEs503Tests`); ≈ 31 → ≈ 18 idas a la base por solicitud (`CostoPorSolicitudDeDisponibilidadTests`).
-- **Se dice sin maquillar:** la caché de disponibilidad **no existe** (la regla de stock manda; D05 de `inventario-fuentes`); el análisis explica por qué y qué la reemplazaría. Hay caché implementada para los contadores de límites del E-commerce (Redis dedicado) y las claves públicas de Identidad (en memoria). La conclusión inicial «la base no es el cuello de botella» era errónea y se corrigió con `docker stats`: **el cuello es la CPU (la de PostgreSQL y la del servicio)**.
+- **Qué se cachea:** el catálogo del E-commerce guarda la disponibilidad por edición 30 s, con invalidación y respaldo de hasta 10 minutos (DD-50); el Inventario guarda 5 s referencias sin stock (DD-51); y hay caché de los contadores de límites (Redis dedicado) y de las claves públicas de Identidad. Reservar no usa caché de stock. La conclusión inicial «la base no es el cuello de botella» era errónea y se corrigió con `docker stats`: **el cuello es la CPU (la de PostgreSQL y la del servicio)**.
 
 ## 6. SOLID y patrones
 
@@ -61,9 +62,9 @@ Catálogo y criterios en [`docs/03/03`](../../docs/03-diseno-de-software/03-prin
 
 ## 7. Pruebas automatizadas, cobertura y CI/CD
 
-- **Qué:** xUnit (unitarias sin base ni red; integración con Testcontainers), pruebas de arquitectura, E2E con Playwright y carga con k6. Estado de `main` al 2026-11-21: 244 de arquitectura, 5 437 y 2 380 unitarias y **7 601 de 7 603 de integración** (los 2 fallos son `HumoDeImagenes`, que necesita Docker y arquitecturas que esta máquina no tiene); compilación sin advertencias y `SpecCheck` sin avisos. La corrida de cobertura del 2026-11-20 (el reporte archivado) fue de 243 de arquitectura, 2 368 y 5 376 unitarias y 6 960 de 6 973 de integración.
-- **Cobertura:** [`cobertura/index.html`](cobertura/index.html) (reporte HTML por servicio, capa y archivo) y su [resumen](cobertura/README.md): **E-commerce 95,5 % en Dominio y Aplicación y 94,6 % total; Inventario 95,7 % y 93,7 %**, contra los umbrales de 85 % y 70 %. Las 13 pruebas de integración que fallaron en esa corrida están listadas con su dueño en ese resumen (no son de esta evidencia).
-- **CI/CD:** `.github/workflows/ci.yml` (especificaciones y trazabilidad, compilación sin advertencias, pruebas sin red, pruebas con cobertura y umbrales; archiva el reporte HTML) y `secretos.yml` (escaneo de secretos); `dependabot.yml`. **El flujo todavía no se ha ejecutado en GitHub** (el `push` lo hace la persona): no hay corrida de CI que mostrar.
+- **Qué:** xUnit (unitarias sin base ni red; integración con Testcontainers), pruebas de arquitectura, E2E con Playwright y carga con k6. CI de `938a3306` (2026-11-27, [ejecución](https://github.com/P35C4D0R4B1050/BabelHub/actions/runs/45991774756)): 261 de arquitectura, 5 770 y 2 454 unitarias y **8 708 de integración correctas y 4 omitidas**, sin fallos; compilación sin advertencias y `SpecCheck` sin avisos. La corrida de cobertura del 2026-11-20 (el reporte archivado) fue de 243 de arquitectura, 2 368 y 5 376 unitarias y 6 960 de 6 973 de integración.
+- **Cobertura:** [`cobertura/index.html`](cobertura/index.html) (reporte HTML por servicio, capa y archivo) y su [resumen](cobertura/README.md): **E-commerce 95,6 % en Dominio y Aplicación y 95,2 % total; Inventario 95,4 % y 93,7 %** en ese CI, contra los umbrales de 85 % y 70 %. El HTML y el resumen guardados son de la corrida del 2026-11-20; el vigente es el artefacto `reporte-de-cobertura` de la ejecución.
+- **CI/CD:** `.github/workflows/ci.yml` (especificaciones y trazabilidad, compilación sin advertencias, pruebas sin red, pruebas con cobertura y umbrales; archiva el reporte HTML) y `secretos.yml` (escaneo de secretos); `dependabot.yml`. Se ejecuta en GitHub en cada PR y en cada cambio de `main`.
 - **Reproducir:** `dotnet build BabelHub.sln -warnaserror`, `dotnet test BabelHub.sln --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings` y `dotnet run --project tools/CoverageCheck -- --html`.
 
 ## 8. Atributos de calidad con k6 (50 hasta 2 000 usuarios virtuales)

@@ -10,7 +10,7 @@ set -a; source "$CARGA_CARPETA/env"; set +a
 export CARGA_CARPETA CARGA_ENV_CONTENEDOR="$CARGA_CARPETA/env-contenedor"
 export CARGA_CPUS_INVENTARIO="${1:-0.6}" CARGA_CPUS_POSTGRES="${2:-0.4}" CARGA_MEM_INVENTARIO="${3:-512m}"
 pool="${4:-}"
-compose() { docker compose -p bhcarga -f tests/load/entorno/docker-compose.carga.yml --env-file "$CARGA_CARPETA/env" "$@"; }
+compose() { docker compose -p "${CARGA_PROYECTO:-bhcarga}" -f tests/load/entorno/docker-compose.carga.yml --env-file "$CARGA_CARPETA/env" "$@"; }
 
 # El tope del grupo va en la cadena de la cuenta de la aplicación (sin tocar la del anfitrión); sin valor se quita y rige el de 16 por omisión.
 sed -i "s/;Maximum Pool Size=[0-9]*//" "$CARGA_ENV_CONTENEDOR"
@@ -24,5 +24,5 @@ limite=$(( ${pool:-16} + 4 ))
 compose exec -T postgres psql -U "$POSTGRES_ADMIN_USER" -d inventario -qc "ALTER ROLE inventario_acceso CONNECTION LIMIT $limite" >/dev/null
 compose up -d --force-recreate inventario claves
 for i in $(seq 1 40); do curl -fsk "https://localhost:$CARGA_PUERTO/health/live" >/dev/null 2>&1 && break; sleep 2; done
-docker inspect bhcarga-inventario-1 bhcarga-postgres-1 --format '{{.Name}} cpus={{.HostConfig.NanoCpus}} mem={{.HostConfig.Memory}}'
+docker inspect "${CARGA_PROYECTO:-bhcarga}-inventario-1" "${CARGA_PROYECTO:-bhcarga}-postgres-1" --format '{{.Name}} cpus={{.HostConfig.NanoCpus}} mem={{.HostConfig.Memory}}'
 echo "tope del grupo: ${pool:-16 (por omisión)}; límite de la cuenta: $limite"

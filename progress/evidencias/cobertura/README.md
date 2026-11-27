@@ -1,5 +1,7 @@
 # Cobertura de líneas (2026-11-20)
 
+> Foto del 2026-11-20. Cifras vigentes al 2026-11-27 ([CI de `938a3306`](https://github.com/P35C4D0R4B1050/BabelHub/actions/runs/45991774756)): E-commerce 95,6 % y 95,2 %; Inventario 95,4 % y 93,7 %.
+
 `index.html` es el reporte de `tools/CoverageCheck --html` (un solo archivo; por servicio, por capa y por archivo de peor a mejor), generado de `dotnet test BabelHub.sln --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings` (unitarias, integración, arquitectura y herramientas; una línea cuenta como cubierta si alguna prueba la ejecuta). El CI lo archiva como artefacto `reporte-de-cobertura`.
 
 | Servicio | Dominio y Aplicación (mínimo 85 %) | Total (mínimo 70 %) |

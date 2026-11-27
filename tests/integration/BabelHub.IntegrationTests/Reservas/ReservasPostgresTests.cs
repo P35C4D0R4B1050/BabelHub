@@ -64,12 +64,30 @@ public sealed class ReservasPostgresTests(PostgresDeReservasFixture bd) : IClass
         using var pila = new PilaDeReservas(bd);
         using var ambito = pila.Proveedor.CreateScope();
 
-        var reservar = ambito.ServiceProvider.GetRequiredService<ICasoDeUso<ReservarEntrada, ReservaDelPedido>>().GetType();
-        var expirar = ambito.ServiceProvider.GetRequiredService<ICasoDeUso<ExpirarReservasEntrada, ExpiracionDelPedido>>().GetType();
+        var reservar = Cadena<ReservarEntrada, ReservaDelPedido>(ambito.ServiceProvider);
+        var expirar = Cadena<ExpirarReservasEntrada, ExpiracionDelPedido>(ambito.ServiceProvider);
 
-        Assert.Equal("ReintentoPorInterbloqueo`2", reservar.Name);
-        Assert.Equal("ReintentoPorInterbloqueo`2", expirar.Name);
+        // Reservar lleva por fuera el contador de concentración (SEL-47): así solo cuenta lo que la transacción dejó guardado, y un reintento no cuenta dos veces.
+        Assert.Equal(["ConcentracionDeReservas", "ReintentoPorInterbloqueo`2", "TransaccionPorCasoDeUso`2", "ReservarUnidades"], reservar);
+        Assert.Equal(["ReintentoPorInterbloqueo`2", "TransaccionPorCasoDeUso`2", "ExpirarReservasVencidas"], expirar);
         Assert.Equal(["ReservarUnidades", "ExpirarReservasVencidas", "ConfirmarReservas", "ExtenderReservas", "LiberarReservas", "CerrarReservas", "ProcesarBajaDeTitular", "PurgarHuellasDeOrigen", "PurgarRegistrosCaducados", "DepurarReservasAntiguas"], ComposicionDeReservas.CasosDeUsoIdempotentes.Select(t => t.Name));
+    }
+
+    /// <summary>Los nombres de la cadena de decoradores, de fuera hacia dentro: cada uno guarda en un campo el caso de uso que envuelve.</summary>
+    private static List<string> Cadena<TEntrada, TSalida>(IServiceProvider servicios)
+    {
+        var nombres = new List<string>();
+        for (object? paso = servicios.GetRequiredService<ICasoDeUso<TEntrada, TSalida>>(); paso is not null;)
+        {
+            nombres.Add(paso.GetType().Name);
+            paso = paso.GetType()
+                .GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                .Select(campo => campo.GetValue(paso))
+                .OfType<ICasoDeUso<TEntrada, TSalida>>()
+                .SingleOrDefault();
+        }
+
+        return nombres;
     }
 
     // --- reservar ---

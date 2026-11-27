@@ -7,6 +7,7 @@ Un escenario por atributo de calidad, con su umbral como criterio de paso. Se ej
 | [`disponibilidad`](escenarios/disponibilidad.js) | Rendimiento — RNF02, AC-FUE-08 | 50 usuarios concurrentes consultan la disponibilidad: p95 < 500 ms, sin errores |
 | [`checkout-confirmacion`](escenarios/checkout-confirmacion.js) | Rendimiento del checkout | Tramo del Inventario (reservar y confirmar), hasta 50 usuarios y 5 compras/s: p95 < 3 s |
 | [`sobreventa`](escenarios/sobreventa.js) | Concurrencia — AC01 | 100 usuarios compiten por 10 unidades: exactamente 10 reservas, 90 rechazos `INV-STOCK-INSUFICIENTE` y vendible final 0 |
+| [`sobreventa-por-sucursal`](escenarios/sobreventa-por-sucursal.js) | Venta por sucursal — AC-SEL-47, SEL-04 | 100 clientes compiten por 20 unidades de **una** sucursal con 1 a 3 líneas de la misma edición cada uno, mientras otra tiene stock: lo apartado nunca supera el vendible, la otra no se toca, solo 201, 409 o 503 |
 | [`tope-por-origen`](escenarios/tope-por-origen.js) | Límite por origen — SEL-19, AC-SEL-19 (S2) | 10 orígenes × 12 cuentas reservan a la vez: exactamente 10 reservas por origen, el resto 429 `INV-LIMITE-EXCEDIDO` con `Retry-After`; un intento posterior del origen lleno sigue rechazado y un origen nuevo reserva. La latencia de la ráfaga se informa, no es umbral (`ORIGENES`, `INTENTOS`) |
 | [`limites`](escenarios/limites.js) | Seguridad — límites de uso (API4) | Más de 100 solicitudes/min de un usuario: 429 con `Retry-After`; otro usuario no se ve afectado |
 | [`resiliencia`](escenarios/resiliencia.js) | Disponibilidad — RNF03 | PostgreSQL pausado 25 s: el proceso sigue vivo, las operaciones fallan con 503 uniforme (nunca 500) y el servicio se recupera solo |
@@ -23,6 +24,8 @@ bash tests/load/ejecutar.sh disponibilidad         # o checkout-confirmacion | s
 bash tests/load/entorno/ajustar-limites.sh 0.6 0.4 # opcional: otros límites de CPU (Inventario, PostgreSQL) para medir su efecto
 bash tests/load/entorno/bajar-carga.sh             # apagar (con -v borra la base)
 ```
+
+Desde la venta por sucursal los escenarios que reservan declaran la sucursal en cada línea. Para medir en una máquina que ya tiene otro entorno de carga, usa un proyecto, una carpeta y unos puertos propios: `CARGA_PROYECTO` (nombre del proyecto de Docker y de sus contenedores, `bhcarga` por omisión), `CARGA_IMAGEN` (etiqueta de la imagen del Inventario), `CARGA_CARPETA` y, escritos de antemano en su archivo `env`, `POSTGRES_PORT` y `CARGA_PUERTO`.
 
 Variables opcionales de `ejecutar.sh`: `FALLOS_DE_CACHE` (solo `perfil-realista`: fracción de las consultas consultivas que llega al Inventario, modelo de la caché del E-commerce, DD-54; 1 = sin caché), `PANEL=1` (exporta además el panel web integrado de k6 como `<escenario>-panel.html`), `DURACION`, `RITMO` (compras por segundo), `UNIDADES`, `COMPETIDORES`, `NIVELES`, `SEGUNDOS_POR_NIVEL`, `PENSAR_S` (pausa de cada usuario entre solicitudes; 0,5 s por omisión, `0` mide el peor caso) y `CARGA_FECHA` (carpeta de resultados) y, al levantar el entorno, `CARGA_REFERENCIAS_S` (memoria de referencias del Inventario, 5 s por omisión, DD-51; 0 la apaga).
 

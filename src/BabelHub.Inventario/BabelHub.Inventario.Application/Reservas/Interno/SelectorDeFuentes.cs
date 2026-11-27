@@ -42,6 +42,13 @@ internal sealed class DestinoResuelto
 /// </summary>
 internal sealed class SelectorDeFuentes(IDirectorioDeFuentes directorio, IEstrategiaDeSeleccion estrategia)
 {
+    /// <summary>Las sucursales que declaran las líneas, por código; es <see langword="null"/> si alguna no existe (SEL-42). Lee el directorio sin bloquear nada.</summary>
+    public async Task<IReadOnlyDictionary<string, FuenteDeStock>?> Sucursales(IEnumerable<string> codigos, CancellationToken cancelacion)
+    {
+        var fuentes = (await directorio.Listar(cancelacion).ConfigureAwait(false)).ToDictionary(f => f.Codigo, StringComparer.Ordinal);
+        return codigos.All(fuentes.ContainsKey) ? fuentes : null;
+    }
+
     /// <summary>Resuelve el destino; es <see langword="null"/> si la sucursal de recojo no existe. Lee el directorio sin bloquear nada.</summary>
     public async Task<DestinoResuelto?> Resolver(TipoDeEntregaDeReserva tipo, string? codigoDeSucursal, string? region, CancellationToken cancelacion)
     {
@@ -87,6 +94,18 @@ internal sealed class SelectorDeFuentes(IDirectorioDeFuentes directorio, IEstrat
 
         return new DestinoResuelto(TipoDeEntrega.Domicilio, null, region, fuentes, plazos);
     }
+
+    /// <summary>
+    /// La venta por sucursal (SEL-41, SEL-43): la regla del Dominio sobre las filas de stock recibidas, en el orden de las líneas. No usa la estrategia. Una entrada por línea, en el mismo orden; cada línea
+    /// impresa trae su sucursal y <paramref name="sucursales"/> ya las contiene todas.
+    /// </summary>
+    public static IReadOnlyList<AsignacionDeLinea> AsignarPorSucursal(
+        IReadOnlyList<LineaSolicitada> lineas,
+        IReadOnlyDictionary<string, FuenteDeStock> sucursales,
+        IEnumerable<ExistenciaBloqueada> filas) =>
+        AsignacionPorSucursal.Asignar(
+            [.. lineas.Select(l => new LineaPorSucursal(l.LineaId, l.EdicionId, sucursales[l.CodigoDeSucursal!].Id, l.Cantidad))],
+            filas.ToDictionary(f => (f.FuenteId, f.EdicionId), f => Math.Max(0, f.Fisico - f.Reservado)));
 
     /// <summary>
     /// Selecciona la fuente de una línea. <paramref name="filas"/> son las filas bloqueadas de <b>esa edición</b> (todas las fuentes) y <paramref name="asignado"/> lo ya concedido a otras líneas en esta solicitud, por

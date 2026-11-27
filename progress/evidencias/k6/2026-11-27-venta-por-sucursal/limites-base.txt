@@ -1,0 +1,67 @@
+== Consultas más costosas (tiempo total) ==
+ calls | total_ms | media_ms | max_ms | rows |                                                                        consulta                                                                        
+-------+----------+----------+--------+------+--------------------------------------------------------------------------------------------------------------------------------------------------------
+   181 |     15.2 |    0.084 |    0.2 | 9770 | SELECT instante FROM plataforma.eventos_limite WHERE clave = $1 AND instante > $2 ORDER BY instante
+    41 |      8.8 |    0.214 |    0.5 |   39 | UPDATE auditoria.acumulado_de_limites SET rechazos = LEAST(rechazos + $5, $6), direccion_completa = COALESCE(direccion_completa, $1) WHERE huella = $2
+   141 |      6.8 |    0.048 |    0.3 |  141 | INSERT INTO plataforma.eventos_limite (id, clave, instante) VALUES ($1, $2, $3)
+   141 |      5.0 |    0.035 |    0.1 |    0 | SELECT id, pedido_id, cliente_id, tipo_entrega, sucursal_recojo_id, region_entrega, iniciada_en, fecha_expiracion, extendida, reemplazos, huella_de_ca
+   329 |      4.9 |    0.015 |    0.1 |  329 | SELECT current_user, set_config($4, $1, $5), set_config($2, $3, $6)
+   329 |      2.8 |    0.009 |    0.0 |    0 | SET LOCAL ROLE "inventario_acceso"
+   227 |      2.4 |    0.011 |    0.1 |    0 | BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED
+    41 |      2.1 |    0.052 |    0.2 |   41 | SELECT EXISTS (SELECT $2 FROM auditoria.acumulado_de_limites WHERE ventana_inicio = $1 AND cerrada_en IS NOT NULL)
+   184 |      1.5 |    0.008 |    0.0 |    0 | SET LOCAL ROLE "rol_plataforma"
+   142 |      1.4 |    0.010 |    0.1 |    0 | BEGIN ISOLATION LEVEL REPEATABLE READ
+   181 |      1.0 |    0.006 |    0.0 |  181 | SELECT pg_advisory_xact_lock(hashtextextended($1, $2))
+   142 |      1.0 |    0.007 |    0.1 |    0 | SET TRANSACTION READ ONLY
+   142 |      1.0 |    0.007 |    0.0 |    0 | SET LOCAL ROLE "rol_reservas"
+     3 |      0.8 |    0.270 |    0.4 |    3 | INSERT INTO plataforma.trabajos_de_fondo (nombre, ultima_corrida, resultado) VALUES ($1, $2, $3) ON CONFLICT (nombre) DO UPDATE SET ultima_corrida = E
+   181 |      0.4 |    0.002 |    0.0 |  181 | SELECT clock_timestamp()
+(15 rows)
+
+== Uso de índices por tabla (lecturas por índice frente a secuenciales) ==
+             tabla              | seq_scan | idx_scan | filas 
+--------------------------------+----------+----------+-------
+ reservas.reservas              |        0 |      197 |     1
+ plataforma.eventos_limite      |        0 |      193 |   144
+ auditoria.acumulado_de_limites |        2 |      102 |     1
+ fuentes.stock                  |        2 |       42 |     0
+ reservas.reserva_lineas        |        0 |       17 |     1
+ fuentes.ediciones              |        0 |        8 |     0
+ fuentes.fuentes                |        8 |        0 |     0
+ reservas.bajas_recibidas       |        0 |        6 |     0
+ plataforma.trabajos_de_fondo   |        0 |        3 |     0
+ traslados.mensajes_salientes   |        0 |        1 |     0
+(10 rows)
+
+== Índices más usados ==
+                   indice                    | idx_scan 
+---------------------------------------------+----------
+ plataforma.ix_eventos_limite_clave_instante |      193
+ reservas.ix_reservas_pedido                 |      148
+ auditoria.acumulado_de_limites_pkey         |       51
+ auditoria.acumulado_por_ventana             |       51
+ fuentes.pk_stock                            |       42
+ reservas.ix_reservas_vencimiento            |       21
+ reservas.ix_reserva_lineas_reserva          |       16
+ reservas.uq_reservas_id_pedido              |       16
+ reservas.ix_reservas_cliente                |       12
+ fuentes.uq_ediciones_id_formato             |        8
+ reservas.bajas_recibidas_pkey               |        6
+ plataforma.trabajos_de_fondo_pkey           |        3
+(12 rows)
+
+== Bloqueos e interbloqueos de la base ==
+ deadlocks | conflicts | temp_files | xact_commit | xact_rollback | acierto_de_cache_pct 
+-----------+-----------+------------+-------------+---------------+----------------------
+         0 |         0 |          0 |         388 |             5 |               100.00
+(1 row)
+
+== Conexiones por cuenta (límite 20 por cuenta) ==
+            usename             | conexiones 
+--------------------------------+------------
+ inventario_acceso              |         16
+ inventario_depurador_ajustes   |          1
+ inventario_depurador_auditoria |          1
+ postgres                       |          1
+(4 rows)
+
