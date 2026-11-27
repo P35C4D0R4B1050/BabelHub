@@ -184,4 +184,120 @@ public sealed class PedidosPorSucursalPostgresTests(PostgresDePedidosFixture bd)
 
         return pedido;
     }
+
+    // ---------- T52: el envío por sucursal del pedido y el de la anulación (AC-PED-42, AC-PED-43) ----------
+
+    private static Pedido ConEnvios()
+    {
+        var lineas = new[] { Impresa("ayacucho"), Impresa("cusco") };
+        var datos = new DatosDePedidoNuevo(
+            Guid.NewGuid(), NumeroDePedido.Generar(Random.Shared.Next).Valor, Guid.NewGuid(), TipoDeEntregaDelPedido.Domicilio, null, "ayacucho", 48.50m, 148.50m,
+            ContactoDeEntrega.Crear("Ana", "987654321", "Jr. Lima 123"), new("t-1", Ahora), new("p-1", Ahora), null, lineas, Ahora, [new("ayacucho", 30m), new("cusco", 18.50m)]);
+        return Pedido.Crear(datos).Pedido!;
+    }
+
+    private static Anulacion Anular(Pedido pedido) => Anulacion.Iniciar(
+        Guid.NewGuid(), pedido.Id, pedido.PlanearAnulacionDeLaAdministracion(MotivoDeAnulacion.Otro).Plan!, new IniciadorDeOperacion(Guid.NewGuid(), "administrador-central", null), Ahora);
+
+    [Fact]
+    [Trait("Criterio", "AC-PED-43")]
+    public async Task El_pedido_guarda_y_lee_el_envio_de_cada_sucursal_y_ninguno_donde_no_lo_hay()
+    {
+        var conDetalle = ConEnvios();
+        var sinDetalle = Crear(TipoDeEntregaDelPedido.Recojo, null, Impresa("cusco"));
+        await Guardar(conDetalle, sinDetalle);
+
+        var leido = (await bd.Pedidos.Obtener(conDetalle.Id, conBloqueo: true))!;
+
+        Assert.Equal(new EnvioDeSucursal[] { new("ayacucho", 30m), new("cusco", 18.50m) }, leido.EnviosPorSucursal);
+        Assert.Equal(48.50m, leido.CostoDeEnvio);
+        Assert.Null((await bd.Pedidos.Obtener(sinDetalle.Id, conBloqueo: false))!.EnviosPorSucursal);
+        Assert.Equal(1, await bd.Consultar<long>("SELECT count(*) FROM pedidos.pedidos WHERE envios_por_sucursal IS NULL"));
+        // Guardar un cambio de estado no toca el detalle, también leído desde un listado.
+        await bd.Pedidos.Actualizar((await bd.Pedidos.Listar(new CriterioDeListado(conDetalle.CuentaId, null, false, null, 1, 10))).Pedidos.Single());
+        Assert.Equal(2, (await bd.Pedidos.Obtener(conDetalle.Id, conBloqueo: false))!.EnviosPorSucursal!.Count);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PED-42")]
+    public async Task La_anulacion_guarda_el_envio_a_devolver_y_lo_actualiza_al_recalcular_el_plan()
+    {
+        var pedido = ConEnvios();
+        pedido.PrepararLineas([pedido.Lineas[1].Id], Ahora);
+        pedido.MarcarListas([pedido.Lineas[1].Id], Ahora);
+        pedido.DespacharLineas([pedido.Lineas[1].Id], Ahora);
+        await Guardar(pedido);
+        await bd.Pedidos.AgregarAnulacion(Anular(pedido));
+
+        var leida = Assert.Single(await bd.Pedidos.AnulacionesEnCurso(pedido.Id));
+        Assert.Equal((30m, true, 80m), (leida.Envio, leida.IncluyeEnvio, leida.Monto));
+
+        leida.AjustarAlPlan(new PlanDeAnulacion(leida.Origen, leida.Motivo, [pedido.Lineas[0].Id], [], 0m, 50m, []), Ahora);
+        await bd.Pedidos.ActualizarAnulacion(leida);
+
+        var ajustada = Assert.Single(await bd.Pedidos.AnulacionesEnCurso(pedido.Id));
+        Assert.Equal((0m, false, 50m), (ajustada.Envio, ajustada.IncluyeEnvio, ajustada.Monto));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PED-43")]
+    public async Task Las_columnas_del_envio_se_agregan_dos_veces_sobre_el_esquema_anterior_sin_rellenar_y_una_fila_anterior_se_lee_como_antes()
+    {
+        await bd.Ejecutar("ALTER TABLE pedidos.pedidos DROP COLUMN envios_por_sucursal; ALTER TABLE pedidos.anulaciones DROP COLUMN envio;");
+        var pedido = Crear(TipoDeEntregaDelPedido.Domicilio, null, Impresa("ayacucho"));
+        await bd.Ejecutar(
+            $"""
+            INSERT INTO pedidos.pedidos (id, numero, cuenta_id, tipo_de_entrega, region_de_entrega, costo_de_envio, total, estado, creado_en, contacto_nombre, contacto_telefono, contacto_direccion, terminos_version, terminos_aceptado_en, privacidad_version, privacidad_aceptado_en, version)
+            VALUES ('{pedido.Id}', 'ABCDEFGH23', gen_random_uuid(), 'domicilio', 'ayacucho', 12, 62, 'confirmado', now(), 'Ana', '987654321', 'Jr. Lima 123', 't-1', now(), 'p-1', now(), 1);
+            INSERT INTO pedidos.anulaciones (id, pedido_id, origen, motivo, incluye_envio, hay_digitales, monto, estado, iniciada_por, proximo_intento_en, intentos, creada_en)
+            VALUES (gen_random_uuid(), '{pedido.Id}', 'administracion', 'otro', true, false, 62, 'en_curso', gen_random_uuid(), now(), 0, now());
+            """);
+
+        for (var veces = 0; veces < 2; veces++)
+        {
+            await bd.Ejecutar(DefinicionDePedidos.Sql);
+            await bd.Ejecutar(DefinicionDePedidos.Permisos);
+        }
+
+        var anterior = Assert.Single(await bd.Pedidos.AnulacionesEnCurso(pedido.Id));
+        Assert.Equal((12m, true), (anterior.Envio, anterior.IncluyeEnvio));
+        Assert.Equal(1, await bd.Consultar<long>("SELECT count(*) FROM pedidos.anulaciones WHERE envio IS NULL"));
+        await bd.Pedidos.ActualizarAnulacion(anterior);
+        Assert.Equal(12m, await bd.Consultar<decimal>("SELECT envio FROM pedidos.anulaciones"));
+        await Guardar(ConEnvios());
+    }
+
+    [Theory]
+    [InlineData("envio = -1, incluye_envio = false")]
+    [InlineData("envio = 999, incluye_envio = true")]
+    [InlineData("envio = 5, incluye_envio = false")]
+    [InlineData("envio = 0, incluye_envio = true")]
+    [Trait("Criterio", "AC-PED-42")]
+    public async Task La_base_rechaza_un_envio_negativo_mayor_que_el_monto_o_incoherente_con_su_marca(string cambio)
+    {
+        var pedido = ConEnvios();
+        await Guardar(pedido);
+        await bd.Pedidos.AgregarAnulacion(Anular(pedido));
+
+        var error = await Assert.ThrowsAsync<PostgresException>(() => bd.Ejecutar($"UPDATE pedidos.anulaciones SET {cambio}"));
+
+        Assert.Equal(("anulaciones_envio_coherente", PostgresErrorCodes.CheckViolation), (error.ConstraintName, error.SqlState));
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-PED-43")]
+    public async Task El_rol_de_pedidos_actualiza_el_envio_de_la_anulacion_pero_no_el_detalle_guardado_con_el_pedido()
+    {
+        await Guardar(ConEnvios());
+        await using var conexion = await bd.Acceso.OpenConnectionAsync();
+        await using (var rol = new NpgsqlCommand("SET ROLE rol_pedidos; UPDATE pedidos.anulaciones SET envio = 0 WHERE false", conexion))
+        {
+            await rol.ExecuteNonQueryAsync();
+        }
+
+        await using var cambio = new NpgsqlCommand("UPDATE pedidos.pedidos SET envios_por_sucursal = NULL WHERE false", conexion);
+        var error = await Assert.ThrowsAsync<PostgresException>(() => cambio.ExecuteNonQueryAsync());
+
+        Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, error.SqlState);
+    }
 }

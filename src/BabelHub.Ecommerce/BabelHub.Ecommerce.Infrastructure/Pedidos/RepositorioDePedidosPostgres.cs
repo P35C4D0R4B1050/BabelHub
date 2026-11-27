@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BabelHub.Ecommerce.Application.Pedidos.Interno;
 using BabelHub.Ecommerce.Domain.Pedidos;
 using Npgsql;
@@ -15,7 +16,7 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
 
     private const string ColumnasDelPedido =
         "id, numero, cuenta_id, tipo_de_entrega, codigo_de_sucursal_de_recojo, region_de_entrega, costo_de_envio, total, estado, creado_en, fecha_estado_final, {0}, contacto_anonimizado_en, terminos_version, terminos_aceptado_en, "
-        + "privacidad_version, privacidad_aceptado_en, reembolso_digital_version, reembolso_digital_aceptado_en";
+        + "privacidad_version, privacidad_aceptado_en, reembolso_digital_version, reembolso_digital_aceptado_en, envios_por_sucursal";
 
     private const string ColumnasDeLaLinea =
         "pedido_id, id, edicion_id, es_digital, titulo, isbn, cantidad, precio_unitario, importe, estado, codigo_de_fuente, requiere_traslado, traslado_id, fecha_estimada_de_llegada, listo_en, entregada_en, no_recogida_en, anulada_en, envio_id";
@@ -23,6 +24,8 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
     private const string ConContacto = "contacto_nombre, contacto_telefono, contacto_direccion";
 
     private const string SinContacto = "NULL::text, NULL::text, NULL::text";
+
+    private static readonly JsonSerializerOptions JsonDeLosEnvios = new(JsonSerializerDefaults.Web);
 
     /// <summary>Las líneas impresas que atiende la sucursal <c>@sucursal</c> en el pedido de la consulta: la regla de <c>Pedido.SucursalDeLaLinea</c> (la sucursal de recojo común si la tiene y, si no, la fuente de la línea).</summary>
     private const string LineasDeLaSucursal =
@@ -122,9 +125,9 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
                     """
                     INSERT INTO pedidos.pedidos (
                         id, numero, cuenta_id, tipo_de_entrega, codigo_de_sucursal_de_recojo, region_de_entrega, costo_de_envio, total, estado, creado_en, fecha_estado_final, contacto_nombre, contacto_telefono, contacto_direccion,
-                        contacto_anonimizado_en, terminos_version, terminos_aceptado_en, privacidad_version, privacidad_aceptado_en, reembolso_digital_version, reembolso_digital_aceptado_en, version)
+                        contacto_anonimizado_en, terminos_version, terminos_aceptado_en, privacidad_version, privacidad_aceptado_en, reembolso_digital_version, reembolso_digital_aceptado_en, envios_por_sucursal, version)
                     VALUES (
-                        @id, @numero, @cuenta, @tipo, @sucursal, @region, @costo, @total, @estado, @creado, @final, @nombre, @telefono, @direccion, @anonimizado, @terminos, @terminosEn, @privacidad, @privacidadEn, @reembolso, @reembolsoEn, 1)
+                        @id, @numero, @cuenta, @tipo, @sucursal, @region, @costo, @total, @estado, @creado, @final, @nombre, @telefono, @direccion, @anonimizado, @terminos, @terminosEn, @privacidad, @privacidadEn, @reembolso, @reembolsoEn, @envios, 1)
                     ON CONFLICT DO NOTHING
                     """,
                     conexion,
@@ -151,6 +154,7 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
                     insertar.Parameters.AddWithValue("privacidadEn", pedido.Privacidad.AceptadoEn.ToUniversalTime());
                     insertar.Parameters.AddWithValue("reembolso", AccesoAlEsquemaDePedidos.ONulo(pedido.ReembolsoDigital?.Version));
                     insertar.Parameters.AddWithValue("reembolsoEn", AccesoAlEsquemaDePedidos.UtcONulo(pedido.ReembolsoDigital?.AceptadoEn));
+                    insertar.Parameters.Add(new NpgsqlParameter("envios", NpgsqlDbType.Jsonb) { Value = AccesoAlEsquemaDePedidos.ONulo(TextoDeLosEnvios(pedido.EnviosPorSucursal)) });
                     if (await insertar.ExecuteNonQueryAsync(token).ConfigureAwait(false) == 0)
                     {
                         return false;
@@ -445,8 +449,8 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
                     """
                     INSERT INTO pedidos.anulaciones (
                         id, pedido_id, origen, motivo, incluye_envio, hay_digitales, monto, estado, reembolso_id, envios_cancelados_en, reservas_liberadas_en, reembolso_registrado_en, accesos_revocados_en, iniciada_por, rol_del_iniciador,
-                        sucursal_del_iniciador, proximo_intento_en, intentos, creada_en, completada_en)
-                    VALUES (@id, @pedido, @origen, @motivo, @envio, @digitales, @monto, @estado, @reembolso, @envios, @reservas, @reembolsoEn, @accesos, @iniciador, @rol, @sucursal, @proximo, @intentos, @creada, @completada)
+                        sucursal_del_iniciador, proximo_intento_en, intentos, creada_en, completada_en, envio)
+                    VALUES (@id, @pedido, @origen, @motivo, @incluye, @digitales, @monto, @estado, @reembolso, @envios, @reservas, @reembolsoEn, @accesos, @iniciador, @rol, @sucursal, @proximo, @intentos, @creada, @completada, @envio)
                     """,
                     conexion,
                     transaccion))
@@ -475,7 +479,7 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
                 await using (var comando = new NpgsqlCommand(
                     """
                     UPDATE pedidos.anulaciones SET
-                        incluye_envio = @envio, hay_digitales = @digitales, monto = @monto, estado = @estado, reembolso_id = @reembolso, envios_cancelados_en = @envios, reservas_liberadas_en = @reservas,
+                        incluye_envio = @incluye, envio = @envio, hay_digitales = @digitales, monto = @monto, estado = @estado, reembolso_id = @reembolso, envios_cancelados_en = @envios, reservas_liberadas_en = @reservas,
                         reembolso_registrado_en = @reembolsoEn, accesos_revocados_en = @accesos, iniciada_por = @iniciador, rol_del_iniciador = @rol, sucursal_del_iniciador = @sucursal,
                         proximo_intento_en = @proximo, intentos = @intentos, completada_en = @completada
                     WHERE id = @id
@@ -724,7 +728,8 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
         DateTimeOffset? Anonimizado,
         AceptacionDeTexto Terminos,
         AceptacionDeTexto Privacidad,
-        AceptacionDeTexto? Reembolso)
+        AceptacionDeTexto? Reembolso,
+        IReadOnlyList<EnvioDeSucursal>? Envios)
     {
         public static DatosBasicosDelPedido Leer(NpgsqlDataReader f) =>
             new(
@@ -742,10 +747,11 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
                 AccesoAlEsquemaDePedidos.LeerInstante(f, 14),
                 new AceptacionDeTexto(f.GetString(15), f.GetFieldValue<DateTimeOffset>(16)),
                 new AceptacionDeTexto(f.GetString(17), f.GetFieldValue<DateTimeOffset>(18)),
-                f.IsDBNull(19) ? null : new AceptacionDeTexto(f.GetString(19), f.GetFieldValue<DateTimeOffset>(20)));
+                f.IsDBNull(19) ? null : new AceptacionDeTexto(f.GetString(19), f.GetFieldValue<DateTimeOffset>(20)),
+                EnviosDe(AccesoAlEsquemaDePedidos.LeerTexto(f, 21)));
 
         public Pedido Convertir(string? nombre, string? telefono, string? direccion, IReadOnlyList<DatosPersistidosDeLinea> lineas) =>
-            Pedido.Rehidratar(new DatosPersistidosDePedido(Id, Numero, CuentaId, Tipo, Sucursal, Region, Costo, Total, Estado, Creado, Final, nombre, telefono, direccion, Anonimizado, Terminos, Privacidad, Reembolso, lineas));
+            Pedido.Rehidratar(new DatosPersistidosDePedido(Id, Numero, CuentaId, Tipo, Sucursal, Region, Costo, Total, Estado, Creado, Final, nombre, telefono, direccion, Anonimizado, Terminos, Privacidad, Reembolso, lineas, Envios));
     }
 
     private Task<IReadOnlyList<Anulacion>> LeerAnulaciones(string filtro, IReadOnlyList<NpgsqlParameter> parametros, string orden, CancellationToken cancelacion) =>
@@ -756,7 +762,7 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
                 var cabeceras = new List<(Guid Id, Func<IReadOnlyList<Guid>, Anulacion> Crear)>();
                 await using (var comando = new NpgsqlCommand(
                     $"""
-                    SELECT id, pedido_id, origen, motivo, CASE WHEN incluye_envio THEN (SELECT p.costo_de_envio FROM pedidos.pedidos p WHERE p.id = anulaciones.pedido_id) ELSE 0 END, hay_digitales, monto, estado, reembolso_id, envios_cancelados_en, reservas_liberadas_en, reembolso_registrado_en, accesos_revocados_en, iniciada_por,
+                    SELECT id, pedido_id, origen, motivo, COALESCE(envio, CASE WHEN incluye_envio THEN (SELECT p.costo_de_envio FROM pedidos.pedidos p WHERE p.id = anulaciones.pedido_id) ELSE 0 END), hay_digitales, monto, estado, reembolso_id, envios_cancelados_en, reservas_liberadas_en, reembolso_registrado_en, accesos_revocados_en, iniciada_por,
                            rol_del_iniciador, sucursal_del_iniciador, proximo_intento_en, intentos, creada_en, completada_en
                     FROM pedidos.anulaciones WHERE {filtro}{orden}
                     """,
@@ -881,6 +887,12 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
 
     // ---------- Escritura ----------
 
+    /// <summary>El detalle del envío por sucursal como se guarda (<c>jsonb</c>): <c>[{"codigoDeSucursal":"…","importe":0.00}]</c>, o nulo.</summary>
+    private static string? TextoDeLosEnvios(IReadOnlyList<EnvioDeSucursal>? envios) => envios is null ? null : JsonSerializer.Serialize(envios, JsonDeLosEnvios);
+
+    private static IReadOnlyList<EnvioDeSucursal>? EnviosDe(string? texto) =>
+        texto is null ? null : JsonSerializer.Deserialize<EnvioDeSucursal[]>(texto, JsonDeLosEnvios) ?? throw new InvalidOperationException("El detalle de envíos guardado del pedido no es válido.");
+
     private static void ParametrosDeLaLinea(NpgsqlCommand comando, LineaDePedido linea)
     {
         comando.Parameters.AddWithValue("id", linea.Id);
@@ -895,7 +907,8 @@ internal sealed class RepositorioDePedidosPostgres(AccesoAlEsquemaDePedidos acce
 
     private static void ParametrosDeLaAnulacion(NpgsqlCommand comando, Anulacion a)
     {
-        comando.Parameters.AddWithValue("envio", a.IncluyeEnvio);
+        comando.Parameters.AddWithValue("incluye", a.IncluyeEnvio);
+        comando.Parameters.AddWithValue("envio", a.Envio);
         comando.Parameters.AddWithValue("digitales", a.HayDigitales);
         comando.Parameters.AddWithValue("monto", a.Monto);
         comando.Parameters.AddWithValue("estado", CodigosDePedidos.De(a.Estado));

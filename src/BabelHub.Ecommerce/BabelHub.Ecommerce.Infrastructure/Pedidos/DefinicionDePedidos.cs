@@ -131,6 +131,11 @@ public static class DefinicionDePedidos
             CONSTRAINT anulaciones_completada_con_fecha CHECK (estado NOT IN ('completada') OR completada_en IS NOT NULL),
             CONSTRAINT anulaciones_en_curso_con_proximo_intento CHECK (estado <> 'en_curso' OR proximo_intento_en IS NOT NULL)
         );
+        -- El envío por sucursal (PED-44, PED-45): lo que cobró cada una, tal como llegó con la compra, y lo que devuelve cada anulación. Una fila anterior queda nula (sin relleno) y se lee como «todo el envío si lo incluía».
+        ALTER TABLE pedidos.pedidos ADD COLUMN IF NOT EXISTS envios_por_sucursal jsonb;
+        ALTER TABLE pedidos.anulaciones ADD COLUMN IF NOT EXISTS envio numeric(12, 2);
+        ALTER TABLE pedidos.anulaciones DROP CONSTRAINT IF EXISTS anulaciones_envio_coherente;
+        ALTER TABLE pedidos.anulaciones ADD CONSTRAINT anulaciones_envio_coherente CHECK (envio IS NULL OR (envio >= 0 AND envio <= monto AND incluye_envio = (envio > 0)));
         CREATE UNIQUE INDEX IF NOT EXISTS anulaciones_una_en_curso_por_pedido ON pedidos.anulaciones (pedido_id) WHERE estado = 'en_curso';
         CREATE INDEX IF NOT EXISTS anulaciones_por_pedido ON pedidos.anulaciones (pedido_id, creada_en);
         CREATE INDEX IF NOT EXISTS anulaciones_por_reanudar ON pedidos.anulaciones (proximo_intento_en) WHERE estado = 'en_curso';
@@ -217,7 +222,7 @@ public static class DefinicionDePedidos
         GRANT UPDATE (estado, fecha_estimada_de_llegada, listo_en, entregada_en, no_recogida_en, anulada_en, envio_id, version) ON pedidos.lineas_de_pedido TO rol_pedidos;
         GRANT SELECT, INSERT ON pedidos.anulaciones TO rol_pedidos;
         GRANT UPDATE (
-            incluye_envio, hay_digitales, monto, estado, reembolso_id, envios_cancelados_en, reservas_liberadas_en, reembolso_registrado_en, accesos_revocados_en, iniciada_por, rol_del_iniciador,
+            incluye_envio, envio, hay_digitales, monto, estado, reembolso_id, envios_cancelados_en, reservas_liberadas_en, reembolso_registrado_en, accesos_revocados_en, iniciada_por, rol_del_iniciador,
             sucursal_del_iniciador, proximo_intento_en, intentos, completada_en
         ) ON pedidos.anulaciones TO rol_pedidos;
         GRANT SELECT, INSERT, DELETE ON pedidos.anulacion_lineas TO rol_pedidos;
