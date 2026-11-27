@@ -269,6 +269,18 @@ public sealed class ComposePorVmTests : IDisposable
         }
     }
 
+    [Fact]
+    [Trait("Criterio", "AC-PLA-04")]
+    public void LaCacheDeN8n_EsUnTmpfsDeSuUsuario_ParaQuePuedaEscribirConElSistemaDeArchivosDeSoloLectura()
+    {
+        var n8n = ServicioDelCompose("ventas", "n8n");
+
+        // Un tmpfs sin dueño queda de root: n8n (usuario «node», 1000) entra en bucle de reinicios con EACCES.
+        Assert.Equal("node", n8n.GetProperty("user").GetString());
+        Assert.True(n8n.GetProperty("read_only").GetBoolean());
+        Assert.Equal(["/tmp", "/home/node/.cache:uid=1000,gid=1000,mode=0700"], Lista(n8n, "tmpfs"));
+    }
+
     // ---------- Las reglas con incumplimientos a propósito ----------
 
     private static string Servicio(string cambios = "", bool completo = true) =>
