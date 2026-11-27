@@ -52,7 +52,7 @@
 | identidad-seguridad | E-commerce | Done | 99 | 73 | transversal-auditoria, transversal-plataforma, transversal-seguridad |
 | inventario-ajustes | Inventario | Done | 22 | 18 | inventario-fuentes, identidad-seguridad, transversal-auditoria |
 | inventario-fuentes | Inventario | Planned | 22 | 18 | identidad-seguridad, transversal-auditoria |
-| inventario-seleccion-fuente | Inventario | Planned | 47 | 53 | inventario-fuentes, identidad-seguridad, transversal-auditoria, transversal-seguridad |
+| inventario-seleccion-fuente | Inventario | InProgress | 47 | 53 | inventario-fuentes, identidad-seguridad, transversal-auditoria, transversal-seguridad |
 | inventario-traslados | Inventario | Done | 23 | 24 | inventario-fuentes, inventario-seleccion-fuente, identidad-seguridad, transversal-auditoria, transversal-notificaciones |
 | transversal-auditoria | Transversal | Planned | 46 | 34 | — |
 | transversal-carga-inicial | Transversal | InProgress | 20 | 13 | ecommerce-catalogo, inventario-fuentes, inventario-ajustes, transversal-plataforma, transversal-auditoria, transversal-seguridad |

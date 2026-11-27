@@ -24,7 +24,7 @@ internal static class FallosDeReservas
 /// Reserva los impresos de un pedido: todas las líneas o ninguna (SEL-01, SEL-05). En una sola transacción y en el orden de la jerarquía de bloqueos (<c>inventario-fuentes</c> D04): bloquea al cliente, resuelve la
 /// idempotencia (SEL-09, SEL-31) y la baja del titular (SEL-35), bloquea el pedido, comprueba la propiedad y, si ya hay una reserva pendiente vigente del mismo cliente, la <b>reemplaza</b> (SEL-16, tope de 3, SEL-36);
 /// si no, aplica los límites (SEL-13, SEL-14, SEL-19). Valida que toda edición exista y sea impresa (SEL-12), bloquea las líneas que devuelve el reemplazo y pide <c>Bloquear</c> las filas de <b>todas las fuentes</b> de
-/// las ediciones (que libera las vencidas), elige la fuente de cada línea con la estrategia sobre esas filas ya confirmadas y aplica <c>Aplicar(0, +cantidad)</c> agregado y ordenado por (edición, fuente). Si alguna línea
+/// las ediciones (que libera las vencidas), elige la fuente de cada línea con la estrategia —o, en la venta por sucursal, usa la que cada línea declara (SEL-41)— sobre esas filas ya confirmadas y aplica <c>Aplicar(0, +cantidad)</c> agregado y ordenado por (edición, fuente). Si alguna línea
 /// no tiene stock termina en fallo y <c>TransaccionPorCasoDeUso</c> deshace todo (contadores de límite y reemplazo incluidos): ninguna otra línea queda reservada (AC-SEL-05). El cliente sale del actor verificado:
 /// nunca del cuerpo (D16). Una última cabecera confirmada, expirada o liberada es <c>reserva-estado-invalido</c>.
 /// </summary>
@@ -126,10 +126,30 @@ internal sealed class ReservarUnidades(
             return falloDeEdicion;
         }
 
-        var destino = await selector.Resolver(entrada.TipoDeEntrega, entrada.CodigoDeSucursalDeRecojo, entrada.RegionDeEntrega, cancelacion).ConfigureAwait(false);
-        if (destino is null)
+        // Con las ediciones ya comprobadas, todas las líneas son impresas: se decide la forma de la solicitud antes de apartar nada (SEL-42).
+        if (FormaDeLaSolicitud.Comprobar(entrada.TipoDeEntrega, entrada.CodigoDeSucursalDeRecojo, entrada.Lineas, out var porSucursal) is { } errorDeForma)
         {
-            return FallosDeReservas.Validacion<ReservaDelPedido>(ResultadoDeValidacion.Invalido([new ErrorDeCampo("codigoDeSucursalDeRecojo", "inexistente")]));
+            return FallosDeReservas.Validacion<ReservaDelPedido>(ResultadoDeValidacion.Invalido([errorDeForma]));
+        }
+
+        // Por sucursal se atiende cada línea en la que declara; sin ella, la estrategia elige la fuente hacia el destino de la entrega.
+        IReadOnlyDictionary<string, FuenteDeStock>? sucursales = null;
+        DestinoResuelto? destino = null;
+        if (porSucursal)
+        {
+            sucursales = await selector.Sucursales(entrada.Lineas.Select(l => l.CodigoDeSucursal!), cancelacion).ConfigureAwait(false);
+            if (sucursales is null)
+            {
+                return FallosDeReservas.Validacion<ReservaDelPedido>(ResultadoDeValidacion.Invalido([FormaDeLaSolicitud.SucursalInexistente]));
+            }
+        }
+        else
+        {
+            destino = await selector.Resolver(entrada.TipoDeEntrega, entrada.CodigoDeSucursalDeRecojo, entrada.RegionDeEntrega, cancelacion).ConfigureAwait(false);
+            if (destino is null)
+            {
+                return FallosDeReservas.Validacion<ReservaDelPedido>(ResultadoDeValidacion.Invalido([new ErrorDeCampo("codigoDeSucursalDeRecojo", "inexistente")]));
+            }
         }
 
         // Los límites cuentan en esta transacción y bajo el bloqueo del cliente: un rechazo posterior (stock) los deshace con ella (SEL-14).
@@ -139,10 +159,8 @@ internal sealed class ReservarUnidades(
             return FallosDeReservas.Fallo<ReservaDelPedido>(rechazoPorLimite);
         }
 
-        var lineas = entrada.Lineas.OrderBy(l => l.EdicionId, OrdenDeBloqueo.DeIdentificadores).ToList();
-
         // Se bloquean las filas de stock de las ediciones nuevas y de las que devuelve la reserva reemplazada, todas en el orden único (edición, fuente).
-        var edicionesAfectadas = lineas.Select(l => l.EdicionId).Concat(reemplazada?.Lineas.Where(l => l.Estado == EstadoDeLinea.Pendiente).Select(l => l.EdicionId) ?? []).Distinct().ToList();
+        var edicionesAfectadas = entrada.Lineas.Select(l => l.EdicionId).Concat(reemplazada?.Lineas.Where(l => l.Estado == EstadoDeLinea.Pendiente).Select(l => l.EdicionId) ?? []).Distinct().ToList();
         // Jerarquía D04: las líneas de la reserva reemplazada por id antes que las filas de stock.
         if (reemplazada is not null)
         {
@@ -168,10 +186,47 @@ internal sealed class ReservarUnidades(
             bloqueo = ConLoDevuelto(bloqueo, liberadas);
         }
 
+        var (seleccionadas, sinStock) = sucursales is not null
+            ? AsignarPorSucursal(entrada.Lineas, sucursales, bloqueo)
+            : AsignarPorCercania(entrada.Lineas, destino!, bloqueo);
+
+        if (sinStock.Count > 0)
+        {
+            // Nada se aplicó todavía: el fallo basta para que la transacción deje todo como estaba (SEL-05).
+            return FallosDeReservas.StockInsuficiente<ReservaDelPedido>(sinStock);
+        }
+
+        if (await AplicarLosMovimientos(seleccionadas, bloqueo, porSucursal, cancelacion).ConfigureAwait(false) is { } falloDeAplicacion)
+        {
+            return falloDeAplicacion;
+        }
+
+        // La cuenta de reemplazos y la marca de «ya se extendió» se heredan: liberar la anterior por reemplazo no las reinicia (SEL-36, SEL-22).
+        var nuevas = seleccionadas.Select(s => LineaDeReserva.Pendiente(Guid.NewGuid(), s.Linea.LineaId, s.Linea.EdicionId, s.FuenteId, s.Linea.Cantidad, ahora));
+        var reemplazos = reemplazada is null ? 0 : ContadorDeReemplazos.Siguiente(reemplazada.Reemplazos);
+        var extendida = reemplazada?.Extendida ?? false;
+        var tipo = ConversionesDeReservas.ADominio(entrada.TipoDeEntrega);
+
+        // El recojo por sucursal no tiene sucursal de cabecera: cada línea se recoge en la suya (D17).
+        var reserva = porSucursal && tipo == TipoDeEntrega.Recojo
+            ? ReservaDePedido.IniciarPorSucursal(Guid.NewGuid(), entrada.PedidoId, clienteId, ahora, nuevas, reemplazos, extendida)
+            : ReservaDePedido.Iniciar(Guid.NewGuid(), entrada.PedidoId, clienteId, tipo, destino?.SucursalDeRecojo?.Id, entrada.RegionDeEntrega, ahora, nuevas, reemplazos, extendida);
+
+        await reservas.Insertar(reserva, new DatosDeLaSolicitud(entrada.ClaveDeIdempotencia, CargaCanonicaDeReservar.Huella(entrada), limites.HuellaDeOrigen), cancelacion).ConfigureAwait(false);
+        return Resultado<ReservaDelPedido>.Exito(await constructor.Construir(reserva, esRepeticion: false, cancelacion).ConfigureAwait(false));
+    }
+
+
+    /// <summary>La forma sin sucursal por línea: la estrategia elige la fuente de cada una, en el orden único de bloqueo, descontando lo ya asignado.</summary>
+    private (List<(LineaSolicitada Linea, Guid FuenteId)> Seleccionadas, List<LineaSinStock> SinStock) AsignarPorCercania(
+        IReadOnlyList<LineaSolicitada> lineas,
+        DestinoResuelto destino,
+        BloqueoDeStock bloqueo)
+    {
         var seleccionadas = new List<(LineaSolicitada Linea, Guid FuenteId)>(lineas.Count);
         var sinStock = new List<LineaSinStock>();
         var asignado = new Dictionary<(Guid FuenteId, Guid EdicionId), int>();
-        foreach (var linea in lineas)
+        foreach (var linea in lineas.OrderBy(l => l.EdicionId, OrdenDeBloqueo.DeIdentificadores))
         {
             var seleccion = selector.Seleccionar(destino, linea.Cantidad, bloqueo.Filas.Where(f => f.EdicionId == linea.EdicionId), asignado);
             if (seleccion.FuenteId is not { } fuenteId)
@@ -184,34 +239,33 @@ internal sealed class ReservarUnidades(
             seleccionadas.Add((linea, fuenteId));
         }
 
-        if (sinStock.Count > 0)
-        {
-            // Nada se aplicó todavía: el fallo basta para que la transacción deje todo como estaba (SEL-05).
-            return FallosDeReservas.StockInsuficiente<ReservaDelPedido>(sinStock);
-        }
-
-        if (await AplicarLosMovimientos(seleccionadas, bloqueo, cancelacion).ConfigureAwait(false) is { } falloDeAplicacion)
-        {
-            return falloDeAplicacion;
-        }
-
-        // La cuenta de reemplazos y la marca de «ya se extendió» se heredan: liberar la anterior por reemplazo no las reinicia (SEL-36, SEL-22).
-        var reserva = ReservaDePedido.Iniciar(
-            Guid.NewGuid(),
-            entrada.PedidoId,
-            clienteId,
-            ConversionesDeReservas.ADominio(entrada.TipoDeEntrega),
-            destino.SucursalDeRecojo?.Id,
-            entrada.RegionDeEntrega,
-            ahora,
-            seleccionadas.Select(s => LineaDeReserva.Pendiente(Guid.NewGuid(), s.Linea.LineaId, s.Linea.EdicionId, s.FuenteId, s.Linea.Cantidad, ahora)),
-            reemplazada is null ? 0 : ContadorDeReemplazos.Siguiente(reemplazada.Reemplazos),
-            reemplazada?.Extendida ?? false);
-
-        await reservas.Insertar(reserva, new DatosDeLaSolicitud(entrada.ClaveDeIdempotencia, CargaCanonicaDeReservar.Huella(entrada), limites.HuellaDeOrigen), cancelacion).ConfigureAwait(false);
-        return Resultado<ReservaDelPedido>.Exito(await constructor.Construir(reserva, esRepeticion: false, cancelacion).ConfigureAwait(false));
+        return (seleccionadas, sinStock);
     }
 
+    /// <summary>La venta por sucursal: cada línea en la que declara y en el orden de la solicitud (SEL-41, SEL-43); la falta de stock informa también lo que hay en la red.</summary>
+    private static (List<(LineaSolicitada Linea, Guid FuenteId)> Seleccionadas, List<LineaSinStock> SinStock) AsignarPorSucursal(
+        IReadOnlyList<LineaSolicitada> lineas,
+        IReadOnlyDictionary<string, FuenteDeStock> sucursales,
+        BloqueoDeStock bloqueo)
+    {
+        var seleccionadas = new List<(LineaSolicitada Linea, Guid FuenteId)>(lineas.Count);
+        var sinStock = new List<LineaSinStock>();
+        foreach (var (linea, asignacion) in lineas.Zip(SelectorDeFuentes.AsignarPorSucursal(lineas, sucursales, bloqueo.Filas)))
+        {
+            if (asignacion.Cubierta)
+            {
+                seleccionadas.Add((linea, asignacion.Linea.FuenteId));
+            }
+            else
+            {
+                sinStock.Add(new LineaSinStock(linea.LineaId, linea.EdicionId, linea.Cantidad, EnLaRed(bloqueo, linea.EdicionId), asignacion.VendibleEnLaSucursal));
+            }
+        }
+
+        return (seleccionadas, sinStock);
+    }
+
+    private static int EnLaRed(BloqueoDeStock bloqueo, Guid edicionId) => bloqueo.Filas.Where(f => f.EdicionId == edicionId).Sum(f => Math.Max(0, f.Fisico - f.Reservado));
 
     /// <summary>Las filas bloqueadas tal como quedaron tras devolver lo liberado: lo que la reserva reemplazada apartaba cuenta como vendible para elegir la fuente de la nueva.</summary>
     private static BloqueoDeStock ConLoDevuelto(BloqueoDeStock bloqueo, IReadOnlyList<LineaLiberada> liberadas)
@@ -244,6 +298,7 @@ internal sealed class ReservarUnidades(
     private async Task<Resultado<ReservaDelPedido>?> AplicarLosMovimientos(
         List<(LineaSolicitada Linea, Guid FuenteId)> seleccionadas,
         BloqueoDeStock bloqueo,
+        bool porSucursal,
         CancellationToken cancelacion)
     {
         var movimientos = MovimientosAgregados.Ordenados(seleccionadas.Select(s => (s.FuenteId, s.Linea.EdicionId, s.Linea.Cantidad)), 0, 1);
@@ -263,10 +318,13 @@ internal sealed class ReservarUnidades(
                     return FallosDeReservas.De<ReservaDelPedido>(CategoriaDeError.ReglaDeNegocio, ClavesDeReservas.EdicionNoImpresa);
 
                 default:
-                    // Con las filas bloqueadas no debería ocurrir; si ocurre, lo disponible es el de toda la red (CAR-04), no el de una fuente.
+                    // Con las filas bloqueadas no debería ocurrir; si ocurre, lo disponible es el de toda la red (CAR-04) y, por sucursal, además el de la fila.
                     var linea = seleccionadas.First(s => s.FuenteId == movimiento.FuenteId && s.Linea.EdicionId == movimiento.EdicionId).Linea;
-                    var enLaRed = bloqueo.Filas.Where(f => f.EdicionId == movimiento.EdicionId).Sum(f => Math.Max(0, f.Fisico - f.Reservado));
-                    return FallosDeReservas.StockInsuficiente<ReservaDelPedido>([new LineaSinStock(linea.LineaId, linea.EdicionId, linea.Cantidad, enLaRed)]);
+                    int? enLaSucursal = porSucursal
+                        ? bloqueo.Filas.Where(f => f.EdicionId == movimiento.EdicionId && f.FuenteId == movimiento.FuenteId).Sum(f => Math.Max(0, f.Fisico - f.Reservado))
+                        : null;
+                    return FallosDeReservas.StockInsuficiente<ReservaDelPedido>(
+                        [new LineaSinStock(linea.LineaId, linea.EdicionId, linea.Cantidad, EnLaRed(bloqueo, movimiento.EdicionId), enLaSucursal)]);
             }
         }
 

@@ -7,7 +7,9 @@ namespace BabelHub.Inventario.Application.Fuentes.Interno;
 /// Las unidades vendidas de los últimos 30 días (FUE-21, FUE-22): de una fuente (el encargado, la suya) o de toda la red (solo la administración central). No se guardan
 /// como un contador: salen de las ventas que entrega <see cref="IOrigenDeUnidadesVendidas"/> (las de pedidos pagados, sin anulados, atribuidas a una sola fuente: la que
 /// despacha el pedido a domicilio o la sucursal que lo entrega en recojo, aunque el libro llegue por traslado) menos lo que volvió por devolución
-/// (<see cref="IReingresosPorDevolucion"/>). Cada pedido y edición cuenta <b>una sola vez</b> y lo devuelto nunca deja un valor negativo.
+/// (<see cref="IReingresosPorDevolucion"/>). Cada pedido, edición y fuente cuenta <b>una sola vez</b> (en la venta por sucursal un pedido lleva la misma edición en varias, SEL-46); lo devuelto de un pedido y
+/// edición se resta una sola vez, repartido entre sus fuentes por identificador ascendente sin pasar de lo vendido en cada una, de modo que nunca queda un valor negativo. Las ventas se piden siempre de toda la red
+/// y se filtra después: así la cifra de una sucursal es la misma que la de la red.
 /// </summary>
 internal sealed class ConsultarUnidadesVendidas(
     AutorizadorDeFuentes autorizador,
@@ -61,17 +63,13 @@ internal sealed class ConsultarUnidadesVendidas(
 
         var hasta = reloj.Ahora;
         var desde = hasta.AddDays(-DiasDeLaVentana);
-        var ventas = await origen.Ventas(pedida?.Id, desde, hasta, cancelacion).ConfigureAwait(false);
+        var ventas = await origen.Ventas(null, desde, hasta, cancelacion).ConfigureAwait(false);
 
-        // Una vez por pedido y edición (FUE-22): si el puerto repite una pareja, se cuenta la primera, en un orden estable.
+        // Una vez por pedido, edición y fuente (FUE-22): si el puerto repite una terna, se cuenta la de más unidades.
         var unicas = ventas
             .Where(v => v.Unidades > 0)
-            .OrderBy(v => v.PedidoId, OrdenDeBloqueo.DeIdentificadores)
-            .ThenBy(v => v.EdicionId, OrdenDeBloqueo.DeIdentificadores)
-            .ThenBy(v => v.FuenteId, OrdenDeBloqueo.DeIdentificadores)
-            .ThenByDescending(v => v.Unidades)
-            .GroupBy(v => (v.PedidoId, v.EdicionId))
-            .Select(g => g.First())
+            .GroupBy(v => (v.PedidoId, v.EdicionId, v.FuenteId))
+            .Select(g => g.OrderByDescending(v => v.Unidades).First())
             .ToList();
 
         var devueltas = unicas.Count == 0
@@ -80,11 +78,17 @@ internal sealed class ConsultarUnidadesVendidas(
                 .GroupBy(r => (r.PedidoId, r.EdicionId))
                 .ToDictionary(g => g.Key, g => g.Sum(r => (long)Math.Max(0, r.Unidades)));
 
-        var porFuente = unicas
-            .GroupBy(v => v.FuenteId)
-            .ToDictionary(
-                g => g.Key,
-                g => g.Sum(v => Math.Max(0L, v.Unidades - devueltas.GetValueOrDefault((v.PedidoId, v.EdicionId)))));
+        var porFuente = new Dictionary<Guid, long>();
+        foreach (var delPedido in unicas.GroupBy(v => (v.PedidoId, v.EdicionId)))
+        {
+            var porRestar = devueltas.GetValueOrDefault(delPedido.Key);
+            foreach (var venta in delPedido.OrderBy(v => v.FuenteId, OrdenDeBloqueo.DeIdentificadores))
+            {
+                var restadas = Math.Min(porRestar, venta.Unidades);
+                porRestar -= restadas;
+                porFuente[venta.FuenteId] = porFuente.GetValueOrDefault(venta.FuenteId) + venta.Unidades - restadas;
+            }
+        }
 
         var fuentesDeLaConsulta = pedida is not null
             ? [pedida]

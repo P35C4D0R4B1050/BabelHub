@@ -41,6 +41,38 @@ public sealed class OrigenDeUnidadesVendidasPostgresTests(PostgresDeReservasFixt
     }
 
     [Fact]
+    [Trait("Criterio", "AC-SEL-49")]
+    public async Task EnUnRecojoPorSucursal_CadaLineaSeAtribuyeASuSucursal_YLasVariasDeUnaSeSuman()
+    {
+        var cusco = await bd.AgregarFuente("cusco");
+        var ayacucho = await bd.AgregarFuente("ayacucho");
+        var libro = await bd.AgregarEdicion();
+        await bd.PonerStock(cusco, libro, 30, 0);
+        await bd.PonerStock(ayacucho, libro, 30, 0);
+        using var pila = new PilaDeReservas(bd);
+        var pedido = Guid.NewGuid();
+        var entrada = new ReservarEntrada(
+            pedido,
+            TipoDeEntregaDeReserva.Recojo,
+            null,
+            null,
+            [
+                new LineaSolicitada(Guid.NewGuid(), libro, 10, "cusco"),
+                new LineaSolicitada(Guid.NewGuid(), libro, 8, "cusco"),
+                new LineaSolicitada(Guid.NewGuid(), libro, 6, "ayacucho"),
+            ],
+            Guid.NewGuid().ToString("N"));
+        var reservada = await pila.Reservar(Cliente(), entrada);
+        Assert.True(reservada.EsExito, reservada.Error?.Clave);
+        Assert.True((await Confirmar(pila, pedido)).EsExito);
+
+        Assert.Equal(
+            new[] { new VentaAtribuida(pedido, libro, ayacucho, 6), new VentaAtribuida(pedido, libro, cusco, 18) }.OrderBy(v => v.FuenteId),
+            (await Ventas(pila, null)).OrderBy(v => v.FuenteId));
+        Assert.Equal([new VentaAtribuida(pedido, libro, ayacucho, 6)], await Ventas(pila, ayacucho));
+    }
+
+    [Fact]
     [Trait("Criterio", "AC-FUE-17")]
     public async Task ElRecojoSeAtribuyeALaSucursal_ADomicilioALaFuente_ConLaVentanaYElFiltro()
     {

@@ -769,13 +769,14 @@ internal sealed class NpgsqlRepositorioDeReservas(AccesoAReservas acceso) : IRep
         acceso.Ejecutar<IReadOnlyList<VentaAtribuida>>(
             async (conexion, transaccion, token) =>
             {
-                // La sucursal de recojo recibe la venta aunque la línea siga en el origen o en tránsito; a domicilio, la fuente de la línea. Una línea creada por un traslado o anulada no es una venta.
+                // La sucursal de recojo recibe la venta aunque la línea siga en el origen o en tránsito; en un recojo por sucursal (sin sucursal de cabecera) y a domicilio, la fuente de la línea. Una línea creada
+                // por un traslado o anulada no es una venta.
                 await using var comando = new NpgsqlCommand(
                     """
                     SELECT pedido_id, edicion_id, fuente_atribuida, sum(cantidad)::integer
                     FROM (
                         SELECT l.pedido_id, l.edicion_id, l.cantidad,
-                               CASE WHEN r.tipo_entrega = 'recojo' THEN r.sucursal_recojo_id ELSE l.fuente_id END AS fuente_atribuida
+                               CASE WHEN r.tipo_entrega = 'recojo' THEN coalesce(r.sucursal_recojo_id, l.fuente_id) ELSE l.fuente_id END AS fuente_atribuida
                         FROM reservas.reserva_lineas l JOIN reservas.reservas r ON r.id = l.reserva_id
                         WHERE l.estado IN ('confirmada', 'cerrada') AND l.creada_por_traslado = false AND l.anulada_en IS NULL
                           AND l.confirmada_en >= @desde AND l.confirmada_en <= @hasta

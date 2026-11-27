@@ -61,7 +61,7 @@ public sealed class ConsultarUnidadesVendidasTests
 
     [Fact]
     [Trait("Criterio", "AC-FUE-17")]
-    public async Task LaVentanaSonLosUltimos30Dias_YElEncargadoPideSoloSuFuenteAlPuerto()
+    public async Task LaVentanaSonLosUltimos30Dias_YElPuertoSePideParaTodaLaRed()
     {
         var (entorno, ventas, reingresos, comoEncargado) = ComoEncargadoDeAyacucho();
 
@@ -69,7 +69,8 @@ public sealed class ConsultarUnidadesVendidasTests
         await Administracion(entorno, ventas, reingresos).Ejecutar(new ConsultarUnidadesVendidasEntrada(null));
 
         var (fuenteDelEncargado, desde, hasta) = ventas.Consultas[0];
-        Assert.Equal(entorno.Ayacucho.Id, fuenteDelEncargado);
+        // Aun el encargado pide la red: lo devuelto de un pedido se reparte entre sus sucursales y su cifra debe ser la de la red (SEL-46).
+        Assert.Null(fuenteDelEncargado);
         Assert.Equal(EntornoDeFuentes.Ahora, hasta);
         Assert.Equal(EntornoDeFuentes.Ahora.AddDays(-30), desde);
         Assert.Null(ventas.Consultas[1].FuenteId);
@@ -96,7 +97,7 @@ public sealed class ConsultarUnidadesVendidasTests
 
     [Fact]
     [Trait("Criterio", "AC-FUE-18")]
-    public async Task CadaPedidoYEdicionCuentaUnaSolaVez_AunqueElPuertoRepitaLaPareja()
+    public async Task CadaPedidoEdicionYFuenteCuentaUnaSolaVez_AunqueElPuertoRepitaLaTerna()
     {
         var (entorno, ventas, reingresos, _) = ComoEncargadoDeAyacucho();
         var pedido = Guid.NewGuid();
@@ -107,7 +108,9 @@ public sealed class ConsultarUnidadesVendidasTests
 
         var resultado = await Administracion(entorno, ventas, reingresos).Ejecutar(new ConsultarUnidadesVendidasEntrada(null));
 
-        Assert.Equal(2, resultado.Valor.Total);
+        // La misma edición en dos sucursales cuenta en cada una (SEL-46); la terna repetida, una sola vez.
+        Assert.Equal(4, resultado.Valor.Total);
+        Assert.Equal([("ayacucho", 2), ("cusco", 2), ("lima", 0)], resultado.Valor.PorFuente.Select(f => (f.CodigoDeFuente, f.Unidades)));
     }
 
     [Fact]

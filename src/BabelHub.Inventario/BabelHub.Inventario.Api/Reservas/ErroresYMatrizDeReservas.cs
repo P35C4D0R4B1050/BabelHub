@@ -62,7 +62,7 @@ public static class ErroresDeReservas
         {
             if (DetalleDeFaltaDeStock.TryLeer(campo, out var linea) && linea is not null)
             {
-                lineas.Add(new LineaSinStockDto(linea.LineaId, linea.EdicionId, linea.Solicitada, linea.DisponibleEnLaRed));
+                lineas.Add(new LineaSinStockDto(linea.LineaId, linea.EdicionId, linea.Solicitada, linea.DisponibleEnLaRed, linea.DisponibleEnLaSucursal));
             }
         }
 

@@ -96,10 +96,15 @@ export function disponibilidad(edicion, vu) {
   return contar(http.get(`${API}/disponibilidad/${edicion}`, { headers: cabeceras.lectura(vu), tags: { operacion: 'inventario.disponibilidad.consultar' } }));
 }
 
+/** Una línea de la venta por sucursal (SEL-41): la sucursal que la atiende viaja en la propia línea y el recojo no lleva sucursal común. */
+export function lineaEnSucursal(edicion, sucursal, cantidad) {
+  return { lineaId: uuid(), edicionId: edicion, cantidad, codigoDeSucursal: sucursal };
+}
+
 /** Reserva una unidad de `edicion` a nombre del usuario virtual y devuelve la respuesta. */
 export function reservar(edicion, sucursal, vu, pedidoId) {
   const u = usuarioDe(vu);
-  const cuerpo = { pedidoId, tipoDeEntrega: 'recojo', codigoDeSucursalDeRecojo: sucursal, regionDeEntrega: null, lineas: [{ lineaId: uuid(), edicionId: edicion, cantidad: 1 }] };
+  const cuerpo = { pedidoId, tipoDeEntrega: 'recojo', lineas: [lineaEnSucursal(edicion, sucursal, 1)] };
   return contar(post('/reservas', cuerpo, cabeceras.usuario(u.token, vu, true), 'inventario.reservas.crear'));
 }
 
@@ -121,3 +126,16 @@ export function contar(respuesta) {
   return respuesta;
 }
 export const UMBRALES_DE_ESTADOS = Object.fromEntries(['0', '200', '201', '409', '429', '500', '503'].map((e) => [`estados{estado:${e}}`, ['count>=0']]));
+
+/** Registra otra sucursal y le ingresa `unidades` de una edición ya sembrada: los ingresos van a la fuente de recepción, así que se designa antes de ingresar. */
+export function sembrarOtraSucursal(edicion, unidades) {
+  const admin = (conClave) => cabeceras.usuario(administrador.token, 1, conClave);
+  const codigo = `otra-${uuid().slice(0, 8)}`;
+  const f = http.post(`${API}/fuentes`, JSON.stringify({ codigo, nombre: `Sucursal de carga ${codigo}`, region: 'cusco', contactoDeNotificacion: null }), { headers: admin(false) });
+  if (f.status !== 201) throw new Error(`No se pudo registrar la sucursal: ${f.status} ${f.body}`);
+  const r = http.put(`${API}/fuentes-de-recepcion`, JSON.stringify({ codigo }), { headers: admin(false) });
+  if (r.status !== 204) throw new Error(`No se pudo designar la recepción: ${r.status} ${r.body}`);
+  const g = http.post(`${API}/ingresos-de-mercaderia`, JSON.stringify({ edicionId: edicion, codigoDeFuente: null, cantidad: unidades, referencia: 'carga', nota: null }), { headers: admin(true) });
+  if (g.status !== 201) throw new Error(`No se pudo ingresar mercadería: ${g.status} ${g.body}`);
+  return codigo;
+}

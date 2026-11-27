@@ -252,7 +252,7 @@ public sealed class ReservaDePedido
 
     public TipoDeEntrega TipoDeEntrega { get; }
 
-    /// <summary>La sucursal de recojo de la cabecera (solo en recojo): contra ella se autoriza la entrega (SEL-39).</summary>
+    /// <summary>La sucursal de recojo común (solo en un recojo sin sucursal por línea): contra ella se autoriza la entrega (SEL-39).</summary>
     public Guid? SucursalDeRecojoId { get; }
 
     public string? RegionDeEntrega { get; }
@@ -286,6 +286,45 @@ public sealed class ReservaDePedido
         int reemplazos = 0,
         bool extendida = false)
     {
+        if (tipoDeEntrega == TipoDeEntrega.Recojo && sucursalDeRecojoId is null)
+        {
+            throw new ArgumentException("El recojo necesita la sucursal.", nameof(sucursalDeRecojoId));
+        }
+
+        if (tipoDeEntrega == TipoDeEntrega.Domicilio && string.IsNullOrWhiteSpace(regionDeEntrega))
+        {
+            throw new ArgumentException("El domicilio necesita la región de la dirección.", nameof(regionDeEntrega));
+        }
+
+        return Nueva(id, pedidoId, clienteId, tipoDeEntrega, sucursalDeRecojoId, regionDeEntrega, iniciadaEn, lineas, reemplazos, extendida);
+    }
+
+    /// <summary>
+    /// Inicia una reserva de recojo por sucursal (SEL-41, D17): no hay una sucursal de recojo común porque cada línea se recoge en la suya, que es su fuente. El domicilio por sucursal usa
+    /// <see cref="Iniciar"/>, que ya no lleva sucursal.
+    /// </summary>
+    public static ReservaDePedido IniciarPorSucursal(
+        Guid id,
+        Guid pedidoId,
+        Guid clienteId,
+        DateTimeOffset iniciadaEn,
+        IEnumerable<LineaDeReserva> lineas,
+        int reemplazos = 0,
+        bool extendida = false) =>
+        Nueva(id, pedidoId, clienteId, TipoDeEntrega.Recojo, null, null, iniciadaEn, lineas, reemplazos, extendida);
+
+    private static ReservaDePedido Nueva(
+        Guid id,
+        Guid pedidoId,
+        Guid clienteId,
+        TipoDeEntrega tipoDeEntrega,
+        Guid? sucursalDeRecojoId,
+        string? regionDeEntrega,
+        DateTimeOffset iniciadaEn,
+        IEnumerable<LineaDeReserva> lineas,
+        int reemplazos,
+        bool extendida)
+    {
         ArgumentNullException.ThrowIfNull(lineas);
         var lista = lineas.ToList();
         if (id == Guid.Empty || pedidoId == Guid.Empty || clienteId == Guid.Empty)
@@ -296,16 +335,6 @@ public sealed class ReservaDePedido
         if (lista.Count == 0 || lista.Select(l => l.LineaId).Distinct().Count() != lista.Count)
         {
             throw new ArgumentException("La reserva necesita al menos una línea y no repite la línea del pedido.", nameof(lineas));
-        }
-
-        if (tipoDeEntrega == TipoDeEntrega.Recojo && sucursalDeRecojoId is null)
-        {
-            throw new ArgumentException("El recojo necesita la sucursal.", nameof(sucursalDeRecojoId));
-        }
-
-        if (tipoDeEntrega == TipoDeEntrega.Domicilio && string.IsNullOrWhiteSpace(regionDeEntrega))
-        {
-            throw new ArgumentException("El domicilio necesita la región de la dirección.", nameof(regionDeEntrega));
         }
 
         ArgumentOutOfRangeException.ThrowIfNegative(reemplazos);
@@ -330,6 +359,16 @@ public sealed class ReservaDePedido
     public bool EstaVencida(DateTimeOffset ahora) => ExpiracionDeReserva.EstaVencida(FechaDeExpiracion, ahora);
 
     public bool EsDeRecojo => TipoDeEntrega == TipoDeEntrega.Recojo;
+
+    /// <summary>Un recojo sin sucursal de cabecera: cada línea se recoge en la sucursal que la atiende (SEL-41, SEL-45).</summary>
+    public bool EsRecojoPorSucursal => EsDeRecojo && SucursalDeRecojoId is null;
+
+    /// <summary>Dónde se entrega una línea de un recojo: la sucursal de la cabecera o, si no la hay, la fuente de la línea.</summary>
+    public Guid SucursalDeEntregaDe(LineaDeReserva linea)
+    {
+        ArgumentNullException.ThrowIfNull(linea);
+        return SucursalDeRecojoId ?? linea.FuenteId;
+    }
 
     /// <summary>Las líneas que cuentan como reserva activa en este instante: las confirmadas y las pendientes no vencidas.</summary>
     public IEnumerable<LineaDeReserva> LineasActivas(DateTimeOffset ahora) => _lineas.Where(l => l.EstaActiva(FechaDeExpiracion, ahora));

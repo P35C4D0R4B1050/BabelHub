@@ -1,5 +1,5 @@
 # Entorno LOCAL de las pruebas de carga (K6-1): el Inventario y su PostgreSQL con los límites de CPU y memoria de infra/docker-compose.inventario.yml
-# (VM-INVENTARIO, docs/02-arquitectura-de-software/07). Proyecto propio (`bhcarga`) y puertos propios: no toca el entorno E2E de nadie más.
+# (VM-INVENTARIO, docs/02-arquitectura-de-software/07). Proyecto propio (`bhcarga`, o el de CARGA_PROYECTO para no pisar otro entorno de carga de esta máquina) y puertos propios: no toca el entorno E2E de nadie más.
 # Solo desarrollo: los secretos son aleatorios y viven fuera del repositorio (preparar-carga.sh).
 name: bhcarga
 
@@ -28,7 +28,7 @@ services:
     build:
       context: ../../..
       dockerfile: src/BabelHub.Inventario/BabelHub.Inventario.Api/Dockerfile
-    image: babelhub-carga-inventario:local
+    image: ${CARGA_IMAGEN:-babelhub-carga-inventario:local}
     env_file: ["${CARGA_ENV_CONTENEDOR:?}"]
     environment:
       ASPNETCORE_ENVIRONMENT: Development

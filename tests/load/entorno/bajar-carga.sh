@@ -5,4 +5,4 @@ cd "$(dirname "$0")/../../.."
 export CARGA_CARPETA="${CARGA_CARPETA:-$(cygpath -m "$(cd "$(git rev-parse --git-common-dir)/../.." && pwd)")/babelhub-carga}"
 set -a; source "$CARGA_CARPETA/env"; set +a
 export CARGA_ENV_CONTENEDOR="$CARGA_CARPETA/env-contenedor"
-docker compose -p bhcarga -f tests/load/entorno/docker-compose.carga.yml --env-file "$CARGA_CARPETA/env" down "$@"
+docker compose -p "${CARGA_PROYECTO:-bhcarga}" -f tests/load/entorno/docker-compose.carga.yml --env-file "$CARGA_CARPETA/env" down "$@"

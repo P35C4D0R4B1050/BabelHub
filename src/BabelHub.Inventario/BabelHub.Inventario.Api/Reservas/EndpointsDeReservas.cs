@@ -194,7 +194,10 @@ public static class EndpointsDeReservas
 
     private static readonly LiberarReservasEntrada EntradaInvalidaDeLiberar = new(Guid.Empty, MotivoDeLiberacionDeReserva.CheckoutCancelado, null);
 
-    /// <summary>Lleva el pedido de la ruta: la Aplicación lee su cabecera (sin bloquear ni escribir) para comprobar la sucursal de recojo, de modo que quien sí tiene alcance recibe el 400 de forma y no un 403 por un pedido vacío.</summary>
+    /// <summary>
+    /// Lleva el pedido de la ruta: la Aplicación lee su cabecera (sin bloquear ni escribir) para comprobar la sucursal de recojo, de modo que quien sí tiene alcance recibe el 400 de forma y no un 403 por un pedido vacío.
+    /// En un recojo por sucursal el alcance depende de las líneas pedidas, así que sin ellas el encargado recibe el 403 (SEL-45).
+    /// </summary>
     private static CerrarReservasEntrada EntradaInvalidaDeCerrar(Guid pedidoId) => new(pedidoId, MotivoDeCierreDeReserva.Entrega, [], null, string.Empty);
 
     /// <summary>
@@ -216,7 +219,7 @@ public static class EndpointsDeReservas
         c.Request.Headers.TryGetValue(CabecerasDeServicio.ClaveDeIdempotencia, out var valores) && valores.Count == 1 ? valores[0] ?? string.Empty : string.Empty;
 
     private static IReadOnlyList<LineaSolicitada> Lineas(IReadOnlyList<LineaDeSolicitudDto>? lineas) =>
-        [.. (lineas ?? []).Select(l => new LineaSolicitada(l.LineaId, l.EdicionId, l.Cantidad))];
+        [.. (lineas ?? []).Select(l => new LineaSolicitada(l.LineaId, l.EdicionId, l.Cantidad, l.CodigoDeSucursal))];
 
     private static bool TipoDeEntrega(string? texto, out TipoDeEntregaDeReserva tipo)
     {
@@ -262,7 +265,7 @@ public static class EndpointsDeReservas
     }
 
     private static SeleccionDeLineaDto ASeleccion(SeleccionDeLinea s) =>
-        new(s.LineaId, s.EdicionId, s.HayStock ? ResultadosDeSeleccion.Disponible : ResultadosDeSeleccion.SinStock, s.CodigoDeFuente, s.RequiereTraslado, s.PlazoEstimadoEnDias, s.DisponibleEnLaRed);
+        new(s.LineaId, s.EdicionId, s.HayStock ? ResultadosDeSeleccion.Disponible : ResultadosDeSeleccion.SinStock, s.CodigoDeFuente, s.RequiereTraslado, s.PlazoEstimadoEnDias, s.DisponibleEnLaRed, s.DisponibleEnLaSucursal);
 
     private static ReservaDto AReserva(ReservaDelPedido r) =>
         new(

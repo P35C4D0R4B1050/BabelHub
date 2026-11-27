@@ -7,7 +7,7 @@
 import { check } from 'k6';
 import exec from 'k6/execution';
 import { Counter } from 'k6/metrics';
-import { sembrar, uuid, usuarioDe, cabeceras, post, contar, UMBRALES_DE_ESTADOS } from '../lib/comun.js';
+import { sembrar, uuid, usuarioDe, cabeceras, post, contar, lineaEnSucursal, UMBRALES_DE_ESTADOS } from '../lib/comun.js';
 import { resumen } from '../lib/resumen.js';
 
 const ORIGENES = Number(__ENV.ORIGENES || 10);
@@ -52,7 +52,7 @@ export function setup() {
 // Los orígenes de este escenario se numeran aparte (de 1 000 en adelante) y cada corrida se desplaza (DESPLAZO_DE_ORIGEN): el tope sigue vigente entre corridas durante una hora.
 function intento(datos, numeroDeOrigen, numeroDeCuenta, edicion) {
   const u = usuarioDe(numeroDeCuenta);
-  const cuerpo = { pedidoId: uuid(), tipoDeEntrega: 'recojo', codigoDeSucursalDeRecojo: datos.codigo, regionDeEntrega: null, lineas: [{ lineaId: uuid(), edicionId: edicion, cantidad: 1 }] };
+  const cuerpo = { pedidoId: uuid(), tipoDeEntrega: 'recojo', lineas: [lineaEnSucursal(edicion, datos.codigo, 1)] };
   return contar(post('/reservas', cuerpo, cabeceras.usuario(u.token, 1000 + numeroDeOrigen, true), 'inventario.reservas.crear'));
 }
 

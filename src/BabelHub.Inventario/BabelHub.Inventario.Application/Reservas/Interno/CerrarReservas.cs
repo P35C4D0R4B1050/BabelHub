@@ -52,7 +52,7 @@ internal sealed class ValidadorDeCerrar : IValidador<CerrarReservasEntrada>
 
 /// <summary>
 /// Cerrar una reserva confirmada descontando el físico: la <b>entrega</b> en la sucursal de recojo o el paso a <b>en reparto</b> de un envío a domicilio (SEL-11, SEL-21, SEL-28, SEL-29, SEL-38, SEL-39). Orden fijo:
-/// (1) el <b>rol</b> antes de leer nada, (2) el bloqueo del pedido, (3) el <b>alcance sobre la reserva</b> (la sucursal de recojo de su cabecera; un encargado que consulta algo ajeno o inexistente recibe 403 sin pistas), (4) la
+/// (1) el <b>rol</b> antes de leer nada, (2) el bloqueo del pedido, (3) el <b>alcance sobre la reserva</b> (la sucursal de recojo de su cabecera o, en un recojo por sucursal, la de todas las líneas pedidas, SEL-45; un encargado que consulta algo ajeno o inexistente recibe 403 sin pistas), (4) la
 /// <b>clave</b> (su forma se valida después del alcance de sucursal en la entrega: una entrada mal formada de otra sucursal recibe el mismo 403) en <c>operaciones_idempotentes</c> (misma carga: el resultado original sin descontar otra vez; otra: conflicto), (5) el estado de cada línea y (6) el descuento: <c>Aplicar(−c, −c)</c> agregado y ordenado
 /// con las filas de stock ya bloqueadas, y las líneas pasan a cerradas con una sentencia condicional (<b>la primera operación que llega gana</b>: la otra recibe estado inválido sin cambios parciales). Una línea ya
 /// cerrada por esta misma causa responde <c>ya-cerrada</c> aunque la clave sea nueva y el físico no baja otra vez. Una línea liberada, expirada, pendiente, cerrada por otra causa o cuyas unidades siguen en la fuente
@@ -92,7 +92,7 @@ internal sealed class CerrarReservas(
             if (entrada.Motivo == MotivoDeCierreDeReserva.Entrega)
             {
                 var cabecera = entrada.PedidoId == Guid.Empty ? null : await reservas.UltimaDelPedido(entrada.PedidoId, cancelacion).ConfigureAwait(false);
-                if (await autorizador.ExigirSucursalDeRecojo(cabecera?.SucursalDeRecojoId, cancelacion).ConfigureAwait(false) is { } fueraDeAlcance)
+                if (await ExigirAlcanceDeEntrega(cabecera, entrada.LineaIds, cancelacion).ConfigureAwait(false) is { } fueraDeAlcance)
                 {
                     return FallosDeReservas.Fallo<CierreDeReserva>(fueraDeAlcance);
                 }
@@ -122,8 +122,8 @@ internal sealed class CerrarReservas(
         var reserva = await reservas.UltimaDelPedido(entrada.PedidoId, cancelacion).ConfigureAwait(false);
         var esEntrega = entrada.Motivo == MotivoDeCierreDeReserva.Entrega;
 
-        // El alcance sobre la reserva, antes de la clave y del estado. Entrega: la sucursal de recojo de la cabecera; reparto: el rol ya basta.
-        if (esEntrega && await autorizador.ExigirSucursalDeRecojo(reserva?.SucursalDeRecojoId, cancelacion).ConfigureAwait(false) is { } fueraDeSucursal)
+        // El alcance sobre la reserva, antes de la clave y del estado. Entrega: la sucursal de recojo; reparto: el rol ya basta.
+        if (esEntrega && await ExigirAlcanceDeEntrega(reserva, entrada.LineaIds, cancelacion).ConfigureAwait(false) is { } fueraDeSucursal)
         {
             return FallosDeReservas.Fallo<CierreDeReserva>(fueraDeSucursal);
         }
@@ -162,8 +162,8 @@ internal sealed class CerrarReservas(
             var activa = delPedido.FirstOrDefault(l => l.Estado == EstadoDeLinea.Confirmada);
             if (activa is not null)
             {
-                // En entrega las unidades deben estar ya en la sucursal de recojo: si siguen en el origen de un traslado, es estado inválido y no un acceso denegado.
-                if (esEntrega && activa.FuenteId != reserva.SucursalDeRecojoId)
+                // Con una sucursal de recojo común las unidades deben estar ya en ella: si siguen en el origen de un traslado, es estado inválido y no un acceso denegado. Por sucursal, cada línea se entrega en su fuente.
+                if (esEntrega && reserva.SucursalDeRecojoId is { } sucursalDeRecojo && activa.FuenteId != sucursalDeRecojo)
                 {
                     return FallosDeReservas.De<CierreDeReserva>(CategoriaDeError.Conflicto, ClavesDeReservas.ReservaEstadoInvalido);
                 }
@@ -208,6 +208,15 @@ internal sealed class CerrarReservas(
         await reservas.GuardarOperacion(entrada.PedidoId, TipoDeOperacion, entrada.ClaveDeIdempotencia, huella, Serializar(cierre), cancelacion).ConfigureAwait(false);
         return Resultado<CierreDeReserva>.Exito(cierre);
     }
+
+    /// <summary>
+    /// Quién puede entregar (SEL-39, SEL-45): en un recojo por sucursal, el encargado cuyas sean todas las líneas pedidas; en cualquier otro caso (sucursal de cabecera, domicilio o reserva inexistente), el de la sucursal
+    /// de recojo de la cabecera, que en los dos últimos no hay. La administración central, siempre.
+    /// </summary>
+    private Task<ErrorDeAplicacion?> ExigirAlcanceDeEntrega(ReservaDePedido? reserva, IReadOnlyList<Guid>? lineaIds, CancellationToken cancelacion) =>
+        reserva is { EsRecojoPorSucursal: true }
+            ? autorizador.ExigirSucursalesDeLasLineas(reserva, lineaIds, cancelacion)
+            : autorizador.ExigirSucursalDeRecojo(reserva?.SucursalDeRecojoId, cancelacion);
 
     /// <summary>Una línea ya cerrada por esta causa solo responde <c>ya-cerrada</c> si, en el reparto, se cerró con el mismo envío (SEL-38); un envío distinto es estado inválido. La entrega no lleva envío.</summary>
     private async Task<bool> MismoEnvio(LineaDeReserva cerrada, bool esEntrega, Guid? envioId, CancellationToken cancelacion)

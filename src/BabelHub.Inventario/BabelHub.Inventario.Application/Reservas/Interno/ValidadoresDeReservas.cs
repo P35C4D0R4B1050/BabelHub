@@ -26,7 +26,13 @@ internal static partial class ReglasDeEntradaDeReservas
     [GeneratedRegex(@"^[A-Za-z0-9_-]{16,80}\z", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
     private static partial Regex FormaDeLaClave();
 
-    public static void Entrega(List<ErrorDeCampo> errores, TipoDeEntregaDeReserva tipo, string? sucursal, string? region)
+    public const string Duplicadas = "duplicadas";
+
+    /// <summary>
+    /// <paramref name="porSucursal"/> (alguna línea declara sucursal) deja al caso de uso la obligación de la sucursal de recojo común, que solo rige si ninguna línea impresa la declara (SEL-42); su formato se
+    /// comprueba siempre que venga.
+    /// </summary>
+    public static void Entrega(List<ErrorDeCampo> errores, TipoDeEntregaDeReserva tipo, string? sucursal, string? region, bool porSucursal)
     {
         if (!Enum.IsDefined(tipo))
         {
@@ -36,11 +42,11 @@ internal static partial class ReglasDeEntradaDeReservas
 
         if (tipo == TipoDeEntregaDeReserva.Recojo)
         {
-            if (string.IsNullOrEmpty(sucursal))
+            if (string.IsNullOrEmpty(sucursal) && !(porSucursal && sucursal is null))
             {
                 errores.Add(new ErrorDeCampo("codigoDeSucursalDeRecojo", ConstructorDeValidacion.Obligatorio));
             }
-            else if (!FormaDelCodigo().IsMatch(sucursal))
+            else if (sucursal is not null && !FormaDelCodigo().IsMatch(sucursal))
             {
                 errores.Add(new ErrorDeCampo("codigoDeSucursalDeRecojo", ConstructorDeValidacion.FormatoInvalido));
             }
@@ -93,10 +99,17 @@ internal static partial class ReglasDeEntradaDeReservas
             errores.Add(new ErrorDeCampo("lineas.cantidad", ConstructorDeValidacion.FueraDeRango));
         }
 
-        // Una edición y una línea de pedido no se repiten (ediciones únicas, plan §6): evita reservar dos veces la misma línea o apartar de más.
-        if (lineas.Select(l => l.LineaId).Distinct().Count() != lineas.Count || lineas.Select(l => l.EdicionId).Distinct().Count() != lineas.Count)
+        // La cadena vacía no es «sin sucursal»: es un código mal formado. El error nombra el campo, nunca el valor.
+        if (lineas.Any(l => l.CodigoDeSucursal is { } codigo && !FormaDelCodigo().IsMatch(codigo)))
         {
-            errores.Add(new ErrorDeCampo("lineas", "duplicadas"));
+            errores.Add(new ErrorDeCampo("lineas.codigoDeSucursal", ConstructorDeValidacion.FormatoInvalido));
+        }
+
+        // Una línea de pedido no se repite nunca; una edición, solo si se declara la sucursal (la venta por lotes). Sin ella evita apartar de más (plan §6); con ella lo decide el caso de uso (SEL-42).
+        if (lineas.Select(l => l.LineaId).Distinct().Count() != lineas.Count
+            || (!FormaDeLaSolicitud.AlgunaDeclaraSucursal(lineas) && lineas.Select(l => l.EdicionId).Distinct().Count() != lineas.Count))
+        {
+            errores.Add(new ErrorDeCampo("lineas", Duplicadas));
         }
     }
 
@@ -126,7 +139,7 @@ internal sealed class ValidadorDeReservar : IValidador<ReservarEntrada>
             errores.Add(new ErrorDeCampo("pedidoId", ConstructorDeValidacion.Obligatorio));
         }
 
-        ReglasDeEntradaDeReservas.Entrega(errores, entrada.TipoDeEntrega, entrada.CodigoDeSucursalDeRecojo, entrada.RegionDeEntrega);
+        ReglasDeEntradaDeReservas.Entrega(errores, entrada.TipoDeEntrega, entrada.CodigoDeSucursalDeRecojo, entrada.RegionDeEntrega, FormaDeLaSolicitud.AlgunaDeclaraSucursal(entrada.Lineas));
         ReglasDeEntradaDeReservas.Lineas(errores, entrada.Lineas);
         ReglasDeEntradaDeReservas.Clave(errores, entrada.ClaveDeIdempotencia);
         return ReglasDeEntradaDeReservas.Resultado(errores);
@@ -143,9 +156,10 @@ internal static class CargaCanonicaDeReservar
     {
         ArgumentNullException.ThrowIfNull(entrada);
 
+        // La sucursal entra solo si se declara: una carga sin ella conserva la huella de antes (D17).
         var lineas = string.Join(
             ';',
-            entrada.Lineas.OrderBy(l => l.LineaId).Select(l => $"{l.LineaId:N}:{l.EdicionId:N}:{l.Cantidad}"));
+            entrada.Lineas.OrderBy(l => l.LineaId).Select(l => $"{l.LineaId:N}:{l.EdicionId:N}:{l.Cantidad}" + (l.CodigoDeSucursal is { } sucursal ? $":{sucursal}" : string.Empty)));
         var canonica = $"reservar|{entrada.PedidoId:N}|{(int)entrada.TipoDeEntrega}|{entrada.CodigoDeSucursalDeRecojo}|{entrada.RegionDeEntrega}|{lineas}";
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonica)));
     }
