@@ -42,8 +42,6 @@ public sealed class IntencionDePagoTests
             Cuenta, TipoDeEntrega.Domicilio, null, regionDeEntrega: null, new[] { Impresa() }, Importe.Cero, Importe.De(100m), "h", Texto(), Texto(), null, Contacto()));
         Assert.Throws<ArgumentException>(() => InstantaneaDeIntencion.Crear(
             Cuenta, TipoDeEntrega.Recojo, "AYA-01", null, new[] { Impresa() }, Importe.Cero, Importe.De(100m), "h", Texto(), Texto(), null, Contacto()));
-        Assert.Throws<ArgumentException>(() => InstantaneaDeIntencion.Crear(
-            Cuenta, TipoDeEntrega.Recojo, codigoDeSucursalDeRecojo: null, null, new[] { Impresa() }, Importe.Cero, Importe.De(100m), "h", Texto(), Texto(), null, null));
     }
 
     [Fact]

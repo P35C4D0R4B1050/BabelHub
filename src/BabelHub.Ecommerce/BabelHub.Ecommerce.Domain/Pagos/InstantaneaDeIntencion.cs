@@ -38,7 +38,7 @@ public sealed record ContactoDeEntrega(string Nombre, string Telefono, string Di
 
 /// <summary>
 /// Lo que Carrito congeló para cobrar (D02): las líneas con su importe, el envío, el total, la entrega, los textos aceptados y el contacto. Es inmutable y se valida al crearla:
-/// el total es la suma de las líneas más el envío, una compra con impresos necesita su entrega (a domicilio con contacto y región, o con recojo en una sucursal) y una solo digital
+/// el total es la suma de las líneas más el envío, una compra con impresos necesita su entrega (a domicilio con contacto y región, o con recojo, con sucursal común solo en una compra anterior a la venta por sucursal) y una solo digital
 /// no lleva entrega. La huella la calcula la Aplicación (<c>ICalculadorDeHuella</c>) sobre todo lo congelado.
 /// </summary>
 public sealed class InstantaneaDeIntencion
@@ -116,6 +116,12 @@ public sealed class InstantaneaDeIntencion
         ArgumentNullException.ThrowIfNull(terminos);
         ArgumentNullException.ThrowIfNull(privacidad);
 
+        // En la venta por sucursal el recojo no tiene sucursal común: cada línea es de la sucursal de su reserva; en blanco equivale a ninguna.
+        if (entrega == TipoDeEntrega.Recojo && string.IsNullOrWhiteSpace(codigoDeSucursalDeRecojo))
+        {
+            codigoDeSucursalDeRecojo = null;
+        }
+
         if (cuentaId == Guid.Empty)
         {
             throw new ArgumentException("La instantánea necesita la cuenta que paga.", nameof(cuentaId));
@@ -177,8 +183,8 @@ public sealed class InstantaneaDeIntencion
         {
             case TipoDeEntrega.Domicilio when contacto is null || string.IsNullOrWhiteSpace(regionDeEntrega) || codigoDeSucursalDeRecojo is not null:
                 throw new ArgumentException("La entrega a domicilio exige el contacto y la región, y no lleva sucursal de recojo.");
-            case TipoDeEntrega.Recojo when string.IsNullOrWhiteSpace(codigoDeSucursalDeRecojo) || regionDeEntrega is not null || contacto is not null:
-                throw new ArgumentException("El recojo exige la sucursal y no lleva región ni contacto de entrega.");
+            case TipoDeEntrega.Recojo when regionDeEntrega is not null || contacto is not null:
+                throw new ArgumentException("El recojo no lleva región ni contacto de entrega.");
             case TipoDeEntrega.SinEntrega when contacto is not null || codigoDeSucursalDeRecojo is not null || regionDeEntrega is not null:
                 throw new ArgumentException("Una compra solo digital no lleva datos de entrega.");
         }
