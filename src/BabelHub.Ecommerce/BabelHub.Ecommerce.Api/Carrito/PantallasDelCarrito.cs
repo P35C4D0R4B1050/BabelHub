@@ -197,6 +197,13 @@ public static class PantallasDelCarrito
         var contexto = controlador.HttpContext;
         var problema = ProblemasDelCarrito.Crear(contexto, errores, error);
         await DenegacionesHttp.Registrar(contexto, error.Categoria, error.Clave, problema.Code).ConfigureAwait(false);
+        // Un rechazo por falta de stock desde la ficha nombra la sucursal elegida aunque todavía no haya una línea suya en el carrito (CAR-04).
+        if (detalle is null && error.Errores.FirstOrDefault(e => e.Campo == "sucursal") is { } campo)
+        {
+            var conocidas = (await pagina.Completar(new ModeloBaseDePagina(), string.Empty, cancelacion: cancelacion).ConfigureAwait(false)).Sucursales;
+            detalle = conocidas.FirstOrDefault(s => s.Codigo == campo.Clave) is { } sucursal ? new DetalleDelStock(sucursal.Nombre, null) : null;
+        }
+
         var respuesta = Traducir(problema, rutaDeReintento, detalle);
         if (respuesta.RedirigirA is { } destino)
         {

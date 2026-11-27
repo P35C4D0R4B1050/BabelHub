@@ -92,7 +92,15 @@ public sealed partial class ComprarDesdeLaFichaTests
         {
             var apertura = AtributosDe(formulario.Groups["apertura"].Value);
             var cuerpo = formulario.Groups["cuerpo"].Value;
-            var controles = Entradas().Matches(cuerpo).Select(m => AtributosDe(m.Groups["atributos"].Value)).Where(a => a.ContainsKey("name")).ToList();
+            // Un desplegable envía la opción marcada, o vacío si ninguna lo está (como la que pide elegir).
+            var desplegables = Desplegables().Matches(cuerpo).Select(m =>
+            {
+                var atributos = new Dictionary<string, string>(AtributosDe(m.Groups["atributos"].Value), StringComparer.OrdinalIgnoreCase);
+                var marcada = Opciones().Matches(m.Groups["opciones"].Value).Select(o => AtributosDe(o.Groups["atributos"].Value)).FirstOrDefault(o => o.ContainsKey("selected"));
+                atributos["value"] = marcada?.GetValueOrDefault("value", string.Empty) ?? string.Empty;
+                return (IReadOnlyDictionary<string, string>)atributos;
+            });
+            var controles = Entradas().Matches(cuerpo).Select(m => AtributosDe(m.Groups["atributos"].Value)).Concat(desplegables).Where(a => a.ContainsKey("name")).ToList();
             return new Formulario(
                 apertura.GetValueOrDefault("action", string.Empty),
                 apertura.GetValueOrDefault("method", "get"),
@@ -111,12 +119,24 @@ public sealed partial class ComprarDesdeLaFichaTests
     [GeneratedRegex("<input(?<atributos>[^>]*?)/?>", RegexOptions.Singleline | RegexOptions.CultureInvariant)]
     private static partial Regex Entradas();
 
+    [GeneratedRegex("<select(?<atributos>[^>]*)>(?<opciones>.*?)</select>", RegexOptions.Singleline | RegexOptions.CultureInvariant)]
+    private static partial Regex Desplegables();
+
+    [GeneratedRegex("<option(?<atributos>[^>]*)>", RegexOptions.Singleline | RegexOptions.CultureInvariant)]
+    private static partial Regex Opciones();
+
     [GeneratedRegex("(?<nombre>[A-Za-z_:][A-Za-z0-9_:\\-]*)(?:\\s*=\\s*\"(?<valor>[^\"]*)\")?", RegexOptions.CultureInvariant)]
     private static partial Regex Atributo();
 
-    private static async Task<Ficha> Abrir(AnfitrionWeb anfitrion, string edicion = "impresa")
+    private static async Task<Ficha> Abrir(AnfitrionWeb anfitrion, string edicion = "impresa", string? sucursalRecordada = null)
     {
-        using var respuesta = await anfitrion.Cliente.GetAsync($"/catalogo/obras/{Obra:D}?edicion={edicion}");
+        using var pedido = new HttpRequestMessage(HttpMethod.Get, $"/catalogo/obras/{Obra:D}?edicion={edicion}");
+        if (sucursalRecordada is not null)
+        {
+            pedido.Headers.TryAddWithoutValidation("Cookie", "bh-sucursal=" + sucursalRecordada);
+        }
+
+        using var respuesta = await anfitrion.Cliente.SendAsync(pedido);
         Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
         var cookie = respuesta.Headers.TryGetValues("Set-Cookie", out var cookies)
             ? cookies.Single(c => c.StartsWith(ProteccionContraFalsificacion.NombreDeLaCookie + "=", StringComparison.Ordinal)).Split(';')[0]
@@ -154,13 +174,15 @@ public sealed partial class ComprarDesdeLaFichaTests
         var formulario = Assert.Single(ficha.FormulariosDeCompra);
         Assert.Contains("Agregar impreso al carrito", formulario.Cuerpo, StringComparison.Ordinal);
         Assert.Equal("1", formulario.Campos["cantidad"]);
-        using var respuesta = await Enviar(anfitrion, ficha, formulario, ("cantidad", "2"));
+        Assert.Equal(string.Empty, formulario.Campos["sucursal"]);
+        using var respuesta = await Enviar(anfitrion, ficha, formulario, ("sucursal", "AYA"), ("cantidad", "2"));
 
         Assert.Equal(HttpStatusCode.SeeOther, respuesta.StatusCode);
         Assert.Equal("/carrito", respuesta.Headers.Location?.OriginalString);
         var entrada = Assert.IsType<AgregarLineaEntrada>(Assert.Single(carrito.Entradas));
         Assert.Equal(Impresa, entrada.EdicionId);
         Assert.Equal(2, entrada.Cantidad);
+        Assert.Equal("AYA", entrada.CodigoDeSucursal);
     }
 
     [Fact]
@@ -187,12 +209,14 @@ public sealed partial class ComprarDesdeLaFichaTests
     [Trait("Criterio", "AC-CAR-32")]
     [InlineData(3, "3")]
     [InlineData(57, "20")]
-    public async Task La_cantidad_de_un_impreso_se_limita_a_lo_vendible_en_la_red_y_a_veinte(int vendible, string maximo)
+    public async Task La_cantidad_de_un_impreso_se_limita_a_lo_vendible_en_la_sucursal_elegida_y_a_veinte(int vendible, string maximo)
     {
         await using var anfitrion = await Iniciar(ObraDe(impresa: Disp(Impresa, EstadoDeDisponibilidad.Disponible, vendible)), new CarritoDelClienteFalso());
 
-        var formulario = Assert.Single((await Abrir(anfitrion)).FormulariosDeCompra);
+        var formulario = Assert.Single((await Abrir(anfitrion, sucursalRecordada: "AYA")).FormulariosDeCompra);
 
+        Assert.Equal("AYA", formulario.Campos["sucursal"]);
+        Assert.Matches($"<option value=\"AYA\"[^>]*data-bh-maximo=\"{maximo}\"", formulario.Cuerpo);
         var cantidad = formulario.Atributos["cantidad"];
         Assert.Equal("number", cantidad["type"]);
         Assert.Equal("1", cantidad["min"]);
@@ -261,19 +285,19 @@ public sealed partial class ComprarDesdeLaFichaTests
 
     [Theory]
     [Trait("Criterio", "AC-CAR-03")]
-    [InlineData("3", "El máximo disponible es de 3 unidades")]
-    [InlineData("1", "El máximo disponible es de 1 unidad,")]
-    [InlineData("0", "Ya no quedan unidades de este libro.")]
+    [InlineData("3", "El máximo disponible en Ayacucho es de 3 unidades")]
+    [InlineData("1", "El máximo disponible en Ayacucho es de 1 unidad,")]
+    [InlineData("0", "Ya no quedan unidades en Ayacucho.")]
     public async Task Pedir_mas_unidades_que_las_vendibles_se_rechaza_en_pantalla_indicando_el_maximo(string maximo, string texto)
     {
         var carrito = new CarritoDelClienteFalso
         {
-            Respuesta = Resultado<ResultadoDeCarrito>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Conflicto, "carrito-sin-stock", [new ErrorDeCampo("maximo", maximo)])),
+            Respuesta = Resultado<ResultadoDeCarrito>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Conflicto, "carrito-sin-stock", [new ErrorDeCampo("maximo", maximo), new ErrorDeCampo("sucursal", "AYA")])),
         };
         await using var anfitrion = await Iniciar(ObraDe(), carrito);
         var ficha = await Abrir(anfitrion);
 
-        using var respuesta = await Enviar(anfitrion, ficha, Assert.Single(ficha.FormulariosDeCompra), ("cantidad", "3"));
+        using var respuesta = await Enviar(anfitrion, ficha, Assert.Single(ficha.FormulariosDeCompra), ("sucursal", "AYA"), ("cantidad", "3"));
         var html = WebUtility.HtmlDecode(await respuesta.Content.ReadAsStringAsync());
 
         Assert.Equal(HttpStatusCode.Conflict, respuesta.StatusCode);

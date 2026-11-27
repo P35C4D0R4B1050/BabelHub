@@ -26,7 +26,7 @@ public sealed class ControladorDePruebas : Controller
     [HttpGet("disponibilidad/{clave}")]
     public IActionResult Disponibilidad(string clave) => ViewComponent("BhDisponibilidad", new { modelo = clave switch
     {
-        "en-tu-sucursal" => DisponibilidadVista.EnTuSucursal(),
+        "en-la-sucursal" => DisponibilidadVista.EnLaSucursal(3),
         "en-otras" => DisponibilidadVista.EnOtrasSucursales(3),
         "agotado" => DisponibilidadVista.Agotado(),
         "al-instante" => DisponibilidadVista.DisponibleAlInstante(),

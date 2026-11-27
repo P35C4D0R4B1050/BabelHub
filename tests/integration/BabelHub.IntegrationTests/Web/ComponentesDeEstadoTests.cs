@@ -106,7 +106,7 @@ public sealed partial class ComponentesDeEstadoTests
     }
 
     [Theory]
-    [InlineData("en-tu-sucursal", "En tu sucursal", "badge-success")]
+    [InlineData("en-la-sucursal", "3 disponibles en su sucursal", "badge-success")]
     [InlineData("en-otras", "En 3 sucursales más", "badge-info")]
     [InlineData("agotado", "Agotado", "badge-error")]
     [InlineData("al-instante", "Disponible al instante", "badge-success")]
