@@ -10,6 +10,7 @@ Estados: `Pendiente` (no empezar) → `Asignada` → `En curso` → `Entregada` 
 
 | N.º | Tarea | Responsable | Estado | Notas |
 | :--- | :--- | :--- | :--- | :--- |
+| UI-0 | **Propuesta de rediseño y animaciones** de la tienda y los paneles: solo en `prototype/ui-v2/` y en un documento nuevo, `docs/06-experiencia-de-usuario/11-propuesta-de-rediseno.md`. No toca la aplicación. | Codex | Asignada (2026-11-27) | Cubre O-6, O-7 y O-8; O-9 solo como alternativa marcada «requiere decisión». El documento separa lo que es solo apariencia de lo que cambia comportamiento (necesita spec) y dice cómo hacer cada cosa en la aplicación sin estilos ni scripts en línea, con movimiento reducido y contraste AA. El prototipo debe seguir funcionando. La persona aprueba la propuesta antes de trasladarla; no se publica en la aplicación antes de la entrega ni durante la revisión de Culqi. |
 | UI-1 | Títulos gigantes en los paneles: `.bh-display` ocupa media pantalla; comparar con `prototype/ui-v2` y revisar también la tienda. | Codex | Pendiente | Esperar a que se integren las ramas reservadas. |
 | UI-2 | Menú de los paneles: el prototipo usa menú lateral y la aplicación uno superior que se parte en dos filas. | Codex | Pendiente | Si cambia el recorrido, pedirlo antes. |
 | UI-3 | Animaciones (la persona ve la interfaz «muy estática»). | Codex | Pendiente | Falta que la persona detalle sus observaciones. |
@@ -18,7 +19,7 @@ Estados: `Pendiente` (no empezar) → `Asignada` → `En curso` → `Entregada` 
 
 | Rama | Responsable | Archivos de interfaz | Estado (2026-11-27) | Hasta |
 | :--- | :--- | :--- | :--- | :--- |
-| `claude/acceso-v012-7467d0` | Claude | Ingreso, registro, cuenta, segundo factor, pie y plantilla común; estilos y JavaScript que agregue. | En curso | Integrada en `main` |
+| `claude/acceso-v012-7467d0` | Claude | Ingreso, registro, cuenta, segundo factor, pie y plantilla común; estilos y JavaScript que agregue; `docs/06-experiencia-de-usuario/` 01, 02 y 08. | En curso | Integrada en `main` |
 | `claude/dazzling-lewin-3cbe83` | Claude | Ficha del libro, catálogo, carrito y checkout. | En `main` desde `v0.1.2`: **ya no está reservada**, salvo lo que cambie la rama de acceso | Liberada |
 
 ## Observaciones de la persona (2026-11-27)
