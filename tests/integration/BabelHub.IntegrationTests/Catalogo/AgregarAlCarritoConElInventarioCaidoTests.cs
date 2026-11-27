@@ -59,6 +59,8 @@ public sealed class AgregarAlCarritoConElInventarioCaidoTests(PostgresDelEcommer
         {
             servicios.RemoveAll<IInventarioDelCarrito>();
             servicios.AddSingleton<IInventarioDelCarrito>(inventario);
+            servicios.RemoveAll<BabelHub.Ecommerce.Application.Web.IPreferenciaDeSucursal>();
+            servicios.AddSingleton(BabelHub.IntegrationTests.Carrito.SucursalesDelCarrito.Preferencia());
         });
 
         // El catálogo no inventa stock: sin respuesta del Inventario y sin un dato reciente, «no se puede confirmar».
@@ -67,7 +69,7 @@ public sealed class AgregarAlCarritoConElInventarioCaidoTests(PostgresDelEcommer
         Assert.Equal(EstadoDeDisponibilidad.NoSePuedeConfirmar, Assert.Single(disponibilidad.Valor).Estado);
 
         // Agregar al carrito sigue permitido: la línea queda en el carrito del cliente.
-        var agregado = await anfitrion.Como(ActorActual.DeUsuario(cuenta, RolesDeUsuario.Cliente, null), sp => sp.GetRequiredService<ICarritoDelCliente>().AgregarLinea(new AgregarLineaEntrada(edicion, 1)));
+        var agregado = await anfitrion.Como(ActorActual.DeUsuario(cuenta, RolesDeUsuario.Cliente, null), sp => sp.GetRequiredService<ICarritoDelCliente>().AgregarLinea(new AgregarLineaEntrada(edicion, 1, CodigoDeSucursal: "sede-central")));
         Assert.True(agregado.EsExito, agregado.Error?.Clave);
         Assert.Contains(agregado.Valor.Carrito.Lineas, l => l.EdicionId == edicion);
     }

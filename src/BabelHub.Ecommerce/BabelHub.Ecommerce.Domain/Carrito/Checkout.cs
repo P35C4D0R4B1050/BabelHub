@@ -18,7 +18,7 @@ public sealed class Checkout
     public static readonly TimeSpan RetencionDelContacto = TimeSpan.FromDays(30);
 
     /// <summary>El tope del código de una sucursal (el de <c>sucursales.listar</c> es corto): se valida antes de que entre al texto canónico.</summary>
-    public const int LongitudMaximaDelCodigoDeSucursal = 40;
+    public const int LongitudMaximaDelCodigoDeSucursal = CodigosDeSucursal.LongitudMaxima;
 
     private readonly List<LineaDelCheckout> _lineas;
     private PasoDelCheckout _pasoDeEdicion = PasoDelCheckout.Revision;
@@ -188,8 +188,15 @@ public sealed class Checkout
     public static bool SostieneRetirosPendientes(EstadoDelCheckout estado) =>
         estado is EstadoDelCheckout.Reservando or EstadoDelCheckout.EnPago or EstadoDelCheckout.PagoPendiente;
 
+    /// <summary>Una línea impresa sin sucursal es de antes de la venta por sucursal: el checkout no avanza ni se paga (CAR-45).</summary>
+    public bool TieneImpresosSinSucursal => _lineas.Exists(l => l.EsImpresoSinSucursal);
+
+    /// <summary>Las sucursales que atienden alguna línea impresa, cada una una vez y en orden alfabético: a domicilio cada una cobra su envío (CAR-23).</summary>
+    public IReadOnlyList<string> SucursalesQueAtienden => [.. _lineas.Select(l => l.CodigoDeSucursal).OfType<string>().Distinct().Order(StringComparer.Ordinal)];
+
     /// <summary>
-    /// Arma el checkout de una cuenta a partir de las líneas del carrito (CAR-05): un <c>lineaId</c> propio por línea, el estado <c>en_edicion</c> y, si todas son digitales, la entrega <c>digital</c>. Una edición no puede repetirse.
+    /// Arma el checkout de una cuenta a partir de las líneas del carrito (CAR-05): un <c>lineaId</c> propio por línea, el estado <c>en_edicion</c> y, si todas son digitales, la entrega <c>digital</c>. Una línea del carrito no puede repetirse,
+    /// ni una digital; un libro impreso sí, en líneas distintas (CAR-40).
     /// </summary>
     public static Checkout Iniciar(Guid id, Guid cuentaId, Guid carritoId, IEnumerable<LineaParaCheckout> lineas, Func<Guid> nuevoLineaId, DateTimeOffset ahora)
     {
@@ -206,12 +213,31 @@ public sealed class Checkout
             throw new ArgumentException("Un checkout necesita al menos una línea.", nameof(lineas));
         }
 
-        if (armadas.Select(l => l.EdicionId).Distinct().Count() != armadas.Count)
+        if (RepiteUnaLinea(armadas))
         {
-            throw new ArgumentException("Una edición no puede repetirse en el checkout.", nameof(lineas));
+            throw new ArgumentException("Una línea no puede repetirse en el checkout.", nameof(lineas));
         }
 
         return new Checkout(id, cuentaId, carritoId, armadas, ahora);
+    }
+
+    /// <summary>Una digital repetida, o una línea del carrito (o, sin ella, una edición en su sucursal) repetida.</summary>
+    private static bool RepiteUnaLinea(List<LineaDelCheckout> lineas) =>
+        lineas.Where(l => l.EsDigital).Select(l => l.EdicionId).Distinct().Count() != lineas.Count(l => l.EsDigital)
+        || lineas.Select(l => l.LineaDeCarritoId is { } deCarrito ? (deCarrito, (string?)null) : (l.EdicionId, l.CodigoDeSucursal)).Distinct().Count() != lineas.Count;
+
+    /// <summary>La línea del checkout para una del carrito: la continuación de una anterior (conserva su <c>lineaId</c> y lo informado) o una nueva; cada anterior se usa una sola vez.</summary>
+    private static LineaDelCheckout Continuar(List<LineaDelCheckout> pendientes, LineaParaCheckout origen, Func<Guid> nuevoLineaId)
+    {
+        var indice = pendientes.FindIndex(l => l.SaleDe(origen));
+        if (indice < 0)
+        {
+            return LineaDelCheckout.Crear(nuevoLineaId(), origen);
+        }
+
+        var anterior = pendientes[indice];
+        pendientes.RemoveAt(indice);
+        return anterior.ConDatos(origen);
     }
 
     /// <summary>
@@ -238,8 +264,13 @@ public sealed class Checkout
             return ResultadoDeCheckout.SinCambios();
         }
 
-        var anteriores = _lineas.ToDictionary(l => l.EdicionId);
-        var armadas = lista.Select(l => anteriores.TryGetValue(l.EdicionId, out var anterior) ? anterior.ConDatos(l) : LineaDelCheckout.Crear(nuevoLineaId(), l)).ToList();
+        var pendientes = _lineas.ToList();
+        var armadas = lista.Select(l => Continuar(pendientes, l, nuevoLineaId)).ToList();
+        if (RepiteUnaLinea(armadas))
+        {
+            throw new ArgumentException("Una línea no puede repetirse en el checkout.", nameof(nuevas));
+        }
+
         _lineas.Clear();
         _lineas.AddRange(armadas);
 
@@ -314,6 +345,11 @@ public sealed class Checkout
             return ResultadoDeCheckout.Rechazar(rechazo);
         }
 
+        if (TieneImpresosSinSucursal)
+        {
+            return ResultadoDeCheckout.Rechazar(RechazoDeCheckout.LineaSinSucursal);
+        }
+
         var siguiente = EsSoloDigital ? PasoDelCheckout.DatosYAceptaciones : PasoDelCheckout.Entrega;
         if (_pasoDeEdicion >= siguiente)
         {
@@ -325,27 +361,21 @@ public sealed class Checkout
         return ResultadoDeCheckout.Aplicada();
     }
 
-    /// <summary>Recojo en una sucursal (CAR-08): quita el contacto y la región si antes era a domicilio. Un carrito solo digital no tiene entrega. Elegir lo mismo no cambia nada.</summary>
-    public ResultadoDeCheckout ElegirRecojo(string codigoDeSucursal, DateTimeOffset ahora)
+    /// <summary>Recojo gratuito, cada línea en la sucursal que la atiende (CAR-08): quita el contacto y la región si antes era a domicilio. Un carrito solo digital no tiene entrega. Elegir lo mismo no cambia nada.</summary>
+    public ResultadoDeCheckout ElegirRecojo(DateTimeOffset ahora)
     {
-        if (!TextoDeEntrega.TryNormalizar(codigoDeSucursal, LongitudMaximaDelCodigoDeSucursal, out var codigo))
-        {
-            throw new ArgumentException("El código de la sucursal de recojo es obligatorio, de hasta 40 caracteres y sin caracteres de control.", nameof(codigoDeSucursal));
-        }
-
         if (RechazarEntrega() is { } rechazo)
         {
             return rechazo;
         }
 
-        if (TipoDeEntrega == Tipo.Recojo && CodigoDeSucursalDeRecojo == codigo)
+        if (TipoDeEntrega == Tipo.Recojo && CodigoDeSucursalDeRecojo is null)
         {
             return ResultadoDeCheckout.SinCambios();
         }
 
         LimpiarEntrega();
         TipoDeEntrega = Tipo.Recojo;
-        CodigoDeSucursalDeRecojo = codigo;
         AvanzarADatos();
         Cambiar(porLaPersona: true, ahora);
         return ResultadoDeCheckout.Aplicada();
@@ -376,16 +406,16 @@ public sealed class Checkout
 
     /// <summary>
     /// Guarda lo que la consulta previa informó para un impreso: la fuente, si requiere traslado y el plazo en días (nulo si «a confirmar», CAR-09). Es lo que se compara al reservar (CAR-27); tras un aborto por cambio de plazo guarda lo
-    /// que devolvió <c>Reservar</c>. No es una acción de la persona. Una edición que no está en el checkout no cambia nada.
+    /// que devolvió <c>Reservar</c>. No es una acción de la persona. Una línea que no está en el checkout no cambia nada.
     /// </summary>
-    public ResultadoDeCheckout RegistrarLoInformado(Guid edicionId, string? codigoDeFuente, bool? requiereTraslado, int? plazoDias, DateTimeOffset consultadoEn)
+    public ResultadoDeCheckout RegistrarLoInformado(Guid lineaId, string? codigoDeFuente, bool? requiereTraslado, int? plazoDias, DateTimeOffset consultadoEn)
     {
         if (RechazoPorNoEstarEnEdicion() is { } rechazo)
         {
             return ResultadoDeCheckout.Rechazar(rechazo);
         }
 
-        var indice = _lineas.FindIndex(l => l.EdicionId == edicionId);
+        var indice = _lineas.FindIndex(l => l.LineaId == lineaId);
         if (indice < 0 || _lineas[indice].EsDigital)
         {
             return ResultadoDeCheckout.SinCambios();
@@ -396,32 +426,38 @@ public sealed class Checkout
         return ResultadoDeCheckout.Aplicada();
     }
 
-    /// <summary>El total de las líneas con el envío fijo solo si la entrega es a domicilio (CAR-23); sin entrega elegida no lleva envío.</summary>
-    public TotalDeCompra CalcularTotal(CostoDeEnvio costoConfigurado) =>
-        TotalDeCompra.Calcular(_lineas.Select(l => new ImporteDeLinea(l.PrecioUnitario, l.Cantidad.Valor)), TipoDeEntrega ?? Tipo.Recojo, costoConfigurado);
+    /// <summary>El total de las líneas con el envío solo si la entrega es a domicilio (CAR-23): <paramref name="costoDelEnvio"/> es la suma de las sucursales que atienden; sin entrega elegida no lleva envío.</summary>
+    public TotalDeCompra CalcularTotal(CostoDeEnvio costoDelEnvio) =>
+        TotalDeCompra.Calcular(_lineas.Select(l => new ImporteDeLinea(l.PrecioUnitario, l.Cantidad.Valor)), TipoDeEntrega ?? Tipo.Recojo, costoDelEnvio);
 
     // ------------------------------------------------------------------ pasar al pago
 
     /// <summary>
-    /// El paso 1 de pasar al pago (D18): con la entrega elegida y sin retiros pendientes, congela el envío y el total, calcula las dos huellas, asigna el <c>pedidoId</c> (conserva el que ya tiene tras editar con el pago abierto), sube la
+    /// El paso 1 de pasar al pago (D18): con la entrega elegida y sin retiros pendientes ni líneas sin sucursal (CAR-45), congela el envío (la suma que se recibe, CAR-23) y el total, calcula las dos huellas, asigna el <c>pedidoId</c> (conserva el que ya tiene tras editar con el pago abierto), sube la
     /// generación de reserva <b>solo si cambió la huella de reserva</b> y pasa a <c>reservando</c>. Una repetición con lo mismo continúa sin cambiar nada (<see cref="EfectoDeTransicion.SinCambios"/>: el doble clic y el atajo de «ya en
     /// pago»). Las comprobaciones de cuenta, licencia, posesión y aceptaciones las hace la Aplicación antes. Las huellas las calcula quien llama a partir del texto canónico que se le da: ese texto lleva datos personales y no se guarda ni se registra.
     /// </summary>
     public ResultadoDeCheckout PrepararPasoAlPago(
         Guid pedidoIdNuevo,
-        CostoDeEnvio costoConfigurado,
+        CostoDeEnvio costoDelEnvio,
         Func<string, string> calcularHuellaDeReserva,
         Func<string, string> calcularHuellaDeInstantanea,
         Carrito carrito,
         DateTimeOffset ahora)
     {
-        ArgumentNullException.ThrowIfNull(costoConfigurado);
+        ArgumentNullException.ThrowIfNull(costoDelEnvio);
         ArgumentNullException.ThrowIfNull(calcularHuellaDeReserva);
         ArgumentNullException.ThrowIfNull(calcularHuellaDeInstantanea);
         ExigirCarritoPropio(carrito);
         if (pedidoIdNuevo == Guid.Empty)
         {
             throw new ArgumentException("El pedido necesita su identificador.", nameof(pedidoIdNuevo));
+        }
+
+        // Un checkout anterior a la venta por sucursal sin pago pendiente (en edición, reservando o en pago) no se puede pagar (CAR-45).
+        if (EsVivo && Estado != EstadoDelCheckout.PagoPendiente && TieneImpresosSinSucursal)
+        {
+            return ResultadoDeCheckout.Rechazar(RechazoDeCheckout.LineaSinSucursal);
         }
 
         switch (Estado)
@@ -462,7 +498,7 @@ public sealed class Checkout
             return ResultadoDeCheckout.Rechazar(RechazoDeCheckout.FaltaElContacto);
         }
 
-        var total = CalcularTotal(costoConfigurado);
+        var total = CalcularTotal(costoDelEnvio);
         EnvioCongelado = total.Envio;
         TotalCongelado = total.Total;
 
@@ -952,6 +988,11 @@ public sealed class Checkout
             return ResultadoDeCheckout.Rechazar(rechazo);
         }
 
+        if (TieneImpresosSinSucursal)
+        {
+            return ResultadoDeCheckout.Rechazar(RechazoDeCheckout.LineaSinSucursal);
+        }
+
         return EsSoloDigital ? ResultadoDeCheckout.Rechazar(RechazoDeCheckout.EsSoloDigital) : null;
     }
 
@@ -1013,11 +1054,12 @@ public sealed class Checkout
         Campo(texto, TipoDeEntrega?.ToString());
         Campo(texto, CodigoDeSucursalDeRecojo);
         Campo(texto, RegionDeEntrega);
-        foreach (var l in _lineas.Where(l => !l.EsDigital).OrderBy(l => l.EdicionId))
+        foreach (var l in _lineas.Where(l => !l.EsDigital).OrderBy(l => l.EdicionId).ThenBy(l => l.LineaId))
         {
             Campo(texto, l.LineaId.ToString("N"));
             Campo(texto, l.EdicionId.ToString("N"));
             Campo(texto, l.Cantidad.Valor.ToString(CultureInfo.InvariantCulture));
+            CampoDeSucursal(texto, l.CodigoDeSucursal);
         }
 
         return texto.ToString();
@@ -1041,7 +1083,7 @@ public sealed class Checkout
 
         Campo(texto, envio.ToString("0.00", CultureInfo.InvariantCulture));
         Campo(texto, total.ToString("0.00", CultureInfo.InvariantCulture));
-        foreach (var l in _lineas.OrderBy(l => l.EdicionId))
+        foreach (var l in _lineas.OrderBy(l => l.EdicionId).ThenBy(l => l.LineaId))
         {
             Campo(texto, l.LineaId.ToString("N"));
             Campo(texto, l.EdicionId.ToString("N"));
@@ -1053,9 +1095,22 @@ public sealed class Checkout
             Campo(texto, l.CodigoDeFuenteInformado);
             Campo(texto, l.RequiereTrasladoInformado?.ToString());
             Campo(texto, l.PlazoInformadoDias?.ToString(CultureInfo.InvariantCulture));
+            CampoDeSucursal(texto, l.CodigoDeSucursal);
         }
 
         return texto.ToString();
+    }
+
+    /// <summary>
+    /// La sucursal de la línea entra en el texto canónico <b>solo cuando existe</b>, con una marca que ningún otro campo usa: así la huella de un checkout o de una intención anterior a la venta por sucursal no cambia (CAR-50).
+    /// </summary>
+    private static void CampoDeSucursal(StringBuilder texto, string? codigo)
+    {
+        if (codigo is not null)
+        {
+            texto.Append("|S");
+            Campo(texto, codigo);
+        }
     }
 
     /// <summary>Cada campo con su largo delante (o <c>~</c> si es nulo): ningún texto, por más separadores que lleve, se confunde con el campo vecino.</summary>

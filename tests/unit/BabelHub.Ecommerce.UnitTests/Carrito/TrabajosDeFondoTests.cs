@@ -33,7 +33,7 @@ public sealed class TrabajosDeFondoTests
         var cuenta = CarritoDeDominio.Crear(Guid.NewGuid(), PropietarioDelCarrito.DeCuenta(Guid.NewGuid()), Inicio);
         cuenta.Agregar(libro, false, 1, Inicio);
         e.Carritos.Sembrar(cuenta);
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(libro, 1));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(libro, 1, CodigoDeSucursal: Sucursal.Principal));
         e.Reloj.Ahora = Inicio.AddDays(29).AddHours(23);
         ComoSistema(e);
         var antes = await new PurgarCarritosDeVisitante(e.Servicios()).Ejecutar(new TrabajoDelCarritoEntrada());
@@ -70,9 +70,9 @@ public sealed class TrabajosDeFondoTests
     private static async Task<(EntornoDelCarrito Entorno, Checkout Checkout)> ConCheckout()
     {
         var e = EntornoDelCarrito.DeCliente();
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Impreso(10, 40m), 3));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Impreso(10, 40m), 3, CodigoDeSucursal: Sucursal.Principal));
         await new IniciarCheckout(e.ServiciosDelCheckout()).Ejecutar(new IniciarCheckoutEntrada());
-        await new ElegirEntrega(e.ServiciosDelCheckout()).Ejecutar(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, null, new ContactoDeCompra("Ana Pérez", "987654321", "Jr. Lima 123", "ayacucho")));
+        await new ElegirEntrega(e.ServiciosDelCheckout()).Ejecutar(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, new ContactoDeCompra("Ana Pérez", "987654321", "Jr. Lima 123", "ayacucho")));
         await new RegistrarAceptaciones(e.ServiciosDelCheckout()).Ejecutar(new RegistrarAceptacionesEntrada(Los2));
         return (e, e.Checkouts.Todos.Single());
     }

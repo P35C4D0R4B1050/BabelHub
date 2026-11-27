@@ -13,9 +13,9 @@ internal sealed record CheckoutDeQuienPide(Guid Cuenta, Checkout Checkout, Carri
 internal sealed record CheckoutOpcionalDeQuienPide(Guid Cuenta, Checkout? Checkout, CarritoDeDominio? Carrito);
 
 /// <summary>
-/// <c>ElegirEntrega</c> (CAR-08, CAR-09, CAR-23, CAR-30; AC-CAR-07, AC-CAR-08, AC-CAR-21, AC-CAR-26): recojo en una sucursal o domicilio con su contacto. Valida la forma antes de cualquier red (errores por campo que no repiten
-/// el valor), comprueba la sucursal o la región contra la lista del Inventario, hace la <b>consulta previa fuera de la transacción</b> (fuente, traslado y plazo por línea; «a confirmar» si no hay plazo) y guarda lo informado por
-/// línea; calcula el envío y el total; vacía el contacto al pasar a recojo. Con el checkout <c>en_pago</c> el cambio reabre la intención (edición común de T11); uno <b>sin variación de valores</b> es un no-op que no la reabre.
+/// <c>ElegirEntrega</c> (CAR-08, CAR-09, CAR-23, CAR-30; AC-CAR-07, AC-CAR-08, AC-CAR-21, AC-CAR-26): recojo gratuito, cada línea en su sucursal, o domicilio con su contacto. Valida la forma antes de cualquier red (errores por campo que no repiten
+/// el valor), comprueba la región contra la lista del Inventario, hace la <b>consulta previa fuera de la transacción</b> declarando la sucursal de cada línea (CAR-09) y guarda lo informado por
+/// línea; muestra el envío de cada sucursal y la suma con las tarifas vigentes <b>sin congelarlos</b>; vacía el contacto al pasar a recojo. Con el checkout <c>en_pago</c> el cambio reabre la intención (edición común de T11); uno <b>sin variación de valores</b> es un no-op que no la reabre.
 /// </summary>
 internal sealed class ElegirEntrega(ServiciosDelCheckout servicios) : ICasoDeUso<ElegirEntregaEntrada, VistaDelCheckout>
 {
@@ -38,31 +38,41 @@ internal sealed class ElegirEntrega(ServiciosDelCheckout servicios) : ICasoDeUso
             return Resultado<VistaDelCheckout>.Fallo(invalida);
         }
 
+        // Una compra anterior a la venta por sucursal no avanza; reservando o en pago, además se aborta y libera su reserva (CAR-45).
+        if (await servicios.ResolverCompraAnterior(cuenta, vivo, delCarrito, cancelacion).ConfigureAwait(false) is { } anterior)
+        {
+            return Resultado<VistaDelCheckout>.Fallo(anterior);
+        }
+
         if (ServiciosDelCheckout.ErrorDeEstado(vivo.Estado) is { } estado)
         {
             return Resultado<VistaDelCheckout>.Fallo(estado);
         }
 
-        // 2. La lista de sucursales y regiones (R05): con ella se valida la elección; sin lista no se continúa.
-        var lista = await servicios.Inventario.ListarSucursales(cancelacion).ConfigureAwait(false);
-        if (lista is null || lista.Sucursales.Count == 0)
+        // 2. A domicilio, la región se valida contra la lista del Inventario (R05); sin lista no se continúa.
+        if (forma.Contacto is { } contacto)
         {
-            return Resultado<VistaDelCheckout>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDelCarrito.EntregaNoValidable));
+            var lista = await servicios.Inventario.ListarSucursales(cancelacion).ConfigureAwait(false);
+            if (lista is null || lista.Sucursales.Count == 0)
+            {
+                return Resultado<VistaDelCheckout>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDelCarrito.EntregaNoValidable));
+            }
+
+            if (lista.Sucursales.All(s => s.Region != contacto.Direccion.Region))
+            {
+                return Resultado<VistaDelCheckout>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Validacion, ClavesDelCarrito.ValidacionFallida, [new ErrorDeCampo("region", ConstructorDeValidacion.FormatoInvalido)]));
+            }
         }
 
-        if (ValidarContraLaLista(entrada, forma, lista) is { } fueraDeLaLista)
-        {
-            return Resultado<VistaDelCheckout>.Fallo(fueraDeLaLista);
-        }
-
-        // 3. La consulta previa de los impresos para esa entrega (fuente, traslado y plazo), fuera de la transacción.
+        // 3. La consulta previa de los impresos para esa entrega, declarando la sucursal de cada línea, fuera de la transacción.
         var impresas = vivo.Lineas.Where(l => !l.EsDigital).ToList();
         var informacion = new Dictionary<Guid, InformacionDeLinea>();
         if (impresas.Count > 0)
         {
+            var aConsultar = impresas.Select(l => new LineaParaElInventario(l.LineaId, l.EdicionId, l.Cantidad.Valor, l.CodigoDeSucursal)).ToList();
             var previa = await servicios.ConsultaPrevia(
-                forma.Recojo is { } recojo ? new EntregaParaElInventario(Tipo.Recojo, recojo, null) : new EntregaParaElInventario(Tipo.Domicilio, null, forma.Contacto!.Direccion.Region),
-                [.. impresas.Select(l => new LineaParaElInventario(l.LineaId, l.EdicionId, l.Cantidad.Valor))],
+                forma.Recojo ? new EntregaParaElInventario(Tipo.Recojo, null) : new EntregaParaElInventario(Tipo.Domicilio, forma.Contacto!.Direccion.Region),
+                aConsultar,
                 cancelacion).ConfigureAwait(false);
             if (previa.Error is { } sinRespuesta)
             {
@@ -74,17 +84,16 @@ internal sealed class ElegirEntrega(ServiciosDelCheckout servicios) : ICasoDeUso
                 informacion[par.Key] = par.Value;
             }
 
-            var sinStock = previa.Selecciones.FirstOrDefault(s => !s.HayStock);
-            if (sinStock is not null)
+            if (ServiciosDelCheckout.PrimeraSinStock(aConsultar, previa.Selecciones) is { } sinStock)
             {
-                return Resultado<VistaDelCheckout>.Fallo(ServiciosDelCheckout.SinStock(sinStock.DisponibleEnLaRed));
+                return Resultado<VistaDelCheckout>.Fallo(sinStock);
             }
         }
 
         // 4. Un cambio sin variación de valores es un no-op: no reabre la intención ni abre la transacción.
         if (EsLoMismo(vivo, forma))
         {
-            return Resultado<VistaDelCheckout>.Exito(servicios.Vista(vivo, delCarrito, informacion));
+            return Resultado<VistaDelCheckout>.Exito(await servicios.VistaActual(vivo, delCarrito, informacion, cancelacion).ConfigureAwait(false));
         }
 
         // 5. La edición con el checkout vivo (T11): Reabrir fuera de la transacción y antes de bloquear.
@@ -97,7 +106,7 @@ internal sealed class ElegirEntrega(ServiciosDelCheckout servicios) : ICasoDeUso
         // 6. La transacción: el checkout primero y el carrito después (D10), sin red.
         var transaccion = await carrito.Unidad.Ejecutar(token => EnLaTransaccion(cuenta, forma, informacion, decidida.Valor, token), cancelacion).ConfigureAwait(false);
         return transaccion.Resultado.EsExito
-            ? Resultado<VistaDelCheckout>.Exito(servicios.Vista(transaccion.Resultado.Valor, transaccion.Carrito, informacion))
+            ? Resultado<VistaDelCheckout>.Exito(await servicios.VistaActual(transaccion.Resultado.Valor, transaccion.Carrito, informacion, cancelacion).ConfigureAwait(false))
             : Resultado<VistaDelCheckout>.Fallo(transaccion.Resultado.Error!);
     }
 
@@ -119,7 +128,7 @@ internal sealed class ElegirEntrega(ServiciosDelCheckout servicios) : ICasoDeUso
             return (Resultado<Checkout>.Fallo(cerrada), delCarrito);
         }
 
-        var efecto = forma.Recojo is { } recojo ? checkout.ElegirRecojo(recojo, ahora) : checkout.ElegirDomicilio(forma.Contacto!, ahora);
+        var efecto = forma.Recojo ? checkout.ElegirRecojo(ahora) : checkout.ElegirDomicilio(forma.Contacto!, ahora);
         if (!efecto.EsExito)
         {
             return (Resultado<Checkout>.Fallo(DeRechazo(efecto.Rechazo)), delCarrito);
@@ -127,9 +136,9 @@ internal sealed class ElegirEntrega(ServiciosDelCheckout servicios) : ICasoDeUso
 
         foreach (var linea in checkout.Lineas.Where(l => !l.EsDigital).ToList())
         {
-            if (informacion.TryGetValue(linea.EdicionId, out var i))
+            if (informacion.TryGetValue(linea.LineaId, out var i))
             {
-                checkout.RegistrarLoInformado(linea.EdicionId, i.CodigoDeFuente, i.RequiereTraslado, i.PlazoDias, ahora);
+                checkout.RegistrarLoInformado(linea.LineaId, i.CodigoDeFuente, i.RequiereTraslado, i.PlazoDias, ahora);
             }
         }
 
@@ -146,7 +155,7 @@ internal sealed class ElegirEntrega(ServiciosDelCheckout servicios) : ICasoDeUso
 
     // ---------- Forma de la entrada ----------
 
-    private sealed record FormaDeLaEntrega(string? Recojo, ContactoDeEntrega? Contacto, ErrorDeAplicacion? Error);
+    private sealed record FormaDeLaEntrega(bool Recojo, ContactoDeEntrega? Contacto, ErrorDeAplicacion? Error);
 
     private static FormaDeLaEntrega ValidarForma(ElegirEntregaEntrada entrada, Checkout vivo)
     {
@@ -158,9 +167,7 @@ internal sealed class ElegirEntrega(ServiciosDelCheckout servicios) : ICasoDeUso
 
         if (entrada.Tipo == TipoDeEntregaDeCompra.Recojo)
         {
-            return ServiciosDelCheckout.EsCodigoDeSucursalValido(entrada.CodigoDeSucursalDeRecojo)
-                ? new FormaDeLaEntrega(entrada.CodigoDeSucursalDeRecojo, null, null)
-                : Invalida("codigoDeSucursalDeRecojo", string.IsNullOrWhiteSpace(entrada.CodigoDeSucursalDeRecojo) ? ConstructorDeValidacion.Obligatorio : ConstructorDeValidacion.FormatoInvalido);
+            return new FormaDeLaEntrega(true, null, null);
         }
 
         if (entrada.Contacto is null)
@@ -196,42 +203,27 @@ internal sealed class ElegirEntrega(ServiciosDelCheckout servicios) : ICasoDeUso
 
         if (errores.Count > 0)
         {
-            return new FormaDeLaEntrega(null, null, new ErrorDeAplicacion(CategoriaDeError.Validacion, ClavesDelCarrito.ValidacionFallida, errores));
+            return new FormaDeLaEntrega(false, null, new ErrorDeAplicacion(CategoriaDeError.Validacion, ClavesDelCarrito.ValidacionFallida, errores));
         }
 
-        return new FormaDeLaEntrega(null, ContactoDeEntrega.Crear(nombre!, telefono!, DireccionDeEntrega.Crear(c.Direccion, c.Region)), null);
+        return new FormaDeLaEntrega(false, ContactoDeEntrega.Crear(nombre!, telefono!, DireccionDeEntrega.Crear(c.Direccion, c.Region)), null);
     }
 
     private static string Falta(string valor) => string.IsNullOrWhiteSpace(valor) ? ConstructorDeValidacion.Obligatorio : ConstructorDeValidacion.FormatoInvalido;
 
     private static FormaDeLaEntrega Invalida(string campo, string clave) =>
-        new(null, null, new ErrorDeAplicacion(CategoriaDeError.Validacion, ClavesDelCarrito.ValidacionFallida, [new ErrorDeCampo(campo, clave)]));
-
-    /// <summary>La sucursal de recojo o la región del domicilio deben estar en la lista del Inventario (R05); la región es el identificador de la lista, tal cual.</summary>
-    private static ErrorDeAplicacion? ValidarContraLaLista(ElegirEntregaEntrada entrada, FormaDeLaEntrega forma, ListaDeSucursales lista)
-    {
-        if (forma.Recojo is { } recojo && lista.Sucursales.All(s => s.Codigo != recojo))
-        {
-            return new ErrorDeAplicacion(CategoriaDeError.Validacion, ClavesDelCarrito.ValidacionFallida, [new ErrorDeCampo("codigoDeSucursalDeRecojo", ConstructorDeValidacion.FormatoInvalido)]);
-        }
-
-        if (forma.Contacto is { } contacto && lista.Sucursales.All(s => s.Region != contacto.Direccion.Region))
-        {
-            return new ErrorDeAplicacion(CategoriaDeError.Validacion, ClavesDelCarrito.ValidacionFallida, [new ErrorDeCampo("region", ConstructorDeValidacion.FormatoInvalido)]);
-        }
-
-        return null;
-    }
+        new(false, null, new ErrorDeAplicacion(CategoriaDeError.Validacion, ClavesDelCarrito.ValidacionFallida, [new ErrorDeCampo(campo, clave)]));
 
     private static bool EsLoMismo(Checkout vivo, FormaDeLaEntrega forma) =>
-        forma.Recojo is { } recojo
-            ? vivo.TipoDeEntrega == Tipo.Recojo && vivo.CodigoDeSucursalDeRecojo == recojo
+        forma.Recojo
+            ? vivo.TipoDeEntrega == Tipo.Recojo && vivo.CodigoDeSucursalDeRecojo is null
             : vivo.TipoDeEntrega == Tipo.Domicilio && forma.Contacto!.Equals(vivo.Contacto);
 
     private static ErrorDeAplicacion DeRechazo(RechazoDeCheckout? rechazo) => rechazo switch
     {
         RechazoDeCheckout.PagoPendiente => new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.PagoPendiente),
         RechazoDeCheckout.EnCurso or RechazoDeCheckout.EstadoNoPermite => new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.EnCurso),
+        RechazoDeCheckout.LineaSinSucursal => ServiciosDelCheckout.LineaSinSucursal(),
         RechazoDeCheckout.EsSoloDigital => new ErrorDeAplicacion(CategoriaDeError.Validacion, ClavesDelCarrito.ValidacionFallida, [new ErrorDeCampo("tipoDeEntrega", "solo-digital")]),
         _ => new ErrorDeAplicacion(CategoriaDeError.NoEncontrado, ClavesDelCarrito.CheckoutNoEncontrado),
     };

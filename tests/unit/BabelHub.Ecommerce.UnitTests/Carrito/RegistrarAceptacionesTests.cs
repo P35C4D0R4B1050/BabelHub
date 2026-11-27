@@ -19,10 +19,10 @@ public sealed class RegistrarAceptacionesTests
     private static async Task<(EntornoDelCarrito Entorno, Checkout Checkout)> ConCheckout(bool conDigital)
     {
         var e = EntornoDelCarrito.DeCliente();
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Impreso(10), 1));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Impreso(10), 1, CodigoDeSucursal: Sucursal.Principal));
         if (conDigital)
         {
-            await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Digital(), 1));
+            await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Digital(), 1, CodigoDeSucursal: Sucursal.Principal));
         }
 
         Assert.True((await new IniciarCheckout(e.ServiciosDelCheckout()).Ejecutar(new IniciarCheckoutEntrada())).EsExito);
@@ -272,7 +272,7 @@ public sealed class RegistrarAceptacionesTests
         var (e, checkout) = await ConCheckout(conDigital: false);
         await Registrar(e, Los2);
         var carrito = e.Carritos.Todos.Single();
-        checkout.ElegirRecojo("sede-central", Inicio);
+        checkout.ElegirRecojo(Inicio);
         Assert.Equal(EfectoDeTransicion.Aplicada, checkout.PrepararPasoAlPago(Guid.NewGuid(), CostoDeEnvio.Cero, s => s, s => s, carrito, Inicio).Efecto);
         Assert.Equal(EfectoDeTransicion.Aplicada, checkout.ConfirmarEnPago(checkout.PedidoId!.Value, checkout.GeneracionDeReserva, checkout.HuellaDeInstantanea!, Inicio.AddMinutes(15), carrito).Efecto);
         return (e, checkout);

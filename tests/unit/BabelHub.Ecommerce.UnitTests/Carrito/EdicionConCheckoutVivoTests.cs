@@ -23,10 +23,10 @@ public sealed class EdicionConCheckoutVivoTests
         var carrito = CarritoDeDominio.Crear(Guid.NewGuid(), PropietarioDelCarrito.DeCuenta(cuenta), Inicio);
         carrito.Agregar(libro, false, 2, Inicio);
         e.Carritos.Sembrar(carrito);
-        var checkout = Checkout.Iniciar(Guid.NewGuid(), cuenta, carrito.Id, [new LineaParaCheckout(libro, false, "Libro", "9780000000019", 2, 50m)], Guid.NewGuid, Inicio);
+        var checkout = Checkout.Iniciar(Guid.NewGuid(), cuenta, carrito.Id, [new LineaParaCheckout(libro, false, "Libro", "9780000000019", 2, 50m, libro, Sucursal.Principal)], Guid.NewGuid, Inicio);
         checkout.Aceptar(TextoLegal.Terminos, "t-1", Inicio);
         checkout.Aceptar(TextoLegal.Privacidad, "p-1", Inicio);
-        checkout.ElegirRecojo("lima", Inicio);
+        checkout.ElegirRecojo(Inicio);
         Assert.Equal(EfectoDeTransicion.Aplicada, checkout.PrepararPasoAlPago(Guid.NewGuid(), CostoDeEnvio.Cero, s => s, s => s, carrito, Inicio).Efecto);
         Assert.Equal(EfectoDeTransicion.Aplicada, checkout.ConfirmarEnPago(checkout.PedidoId!.Value, checkout.GeneracionDeReserva, checkout.HuellaDeInstantanea!, Inicio.AddMinutes(15), carrito).Efecto);
         e.Checkouts.Sembrar(checkout);
@@ -34,7 +34,7 @@ public sealed class EdicionConCheckoutVivoTests
     }
 
     private static Task<Resultado<ResultadoDeCarrito>> Modificar(EntornoDelCarrito e, Guid libro, int cantidad) =>
-        new ModificarLinea(e.Servicios()).Ejecutar(new ModificarLineaEntrada(libro, cantidad));
+        new ModificarLinea(e.Servicios()).Ejecutar(new ModificarLineaEntrada(e.LineaDe(libro), cantidad));
 
     [Fact]
     public async Task Editar_con_el_checkout_en_pago_reabre_la_intencion_antes_de_bloquear_y_deja_el_checkout_en_edicion_con_su_pedido()
@@ -133,7 +133,7 @@ public sealed class EdicionConCheckoutVivoTests
     {
         var e = EntornoDelCarrito.DeVisitante();
 
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Impreso(5), 1));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Impreso(5), 1, CodigoDeSucursal: Sucursal.Principal));
 
         Assert.Equal(0, e.Pagos.Reaperturas);
     }
@@ -188,7 +188,7 @@ public sealed class EdicionConCheckoutVivoTests
     {
         var (e, checkout, carrito, libro) = EnPago();
 
-        var resultado = await new EliminarLinea(e.Servicios()).Ejecutar(new EliminarLineaEntrada(libro));
+        var resultado = await new EliminarLinea(e.Servicios()).Ejecutar(new EliminarLineaEntrada(e.LineaDe(libro)));
 
         Assert.True(resultado.EsExito);
         Assert.Equal(1, e.Pagos.Reaperturas);

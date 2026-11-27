@@ -192,7 +192,7 @@ internal sealed class PasarAlPago(ServiciosDelCheckout servicios) : ICasoDeUso<P
             return Resultado<ResultadoDePasarAlPago>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.EnCurso));
         }
 
-        var vista = await carrito.Unidad.Ejecutar(
+        var revisado = await carrito.Unidad.Ejecutar(
             async token =>
             {
                 var ahora = carrito.Reloj.Ahora;
@@ -200,7 +200,7 @@ internal sealed class PasarAlPago(ServiciosDelCheckout servicios) : ICasoDeUso<P
                 var delCarrito = await carrito.Carritos.ObtenerDeCuenta(preparado.CuentaId, conBloqueo: true, token).ConfigureAwait(false);
                 if (checkout is null || delCarrito is null)
                 {
-                    return (VistaDelCheckout?)null;
+                    return ((Checkout Checkout, CarritoDeDominio Carrito)?)null;
                 }
 
                 var efecto = checkout.VolverALaEdicionPorRetiroPendiente(preparado.PedidoId!.Value, preparado.Generacion, delCarrito, ahora);
@@ -214,13 +214,18 @@ internal sealed class PasarAlPago(ServiciosDelCheckout servicios) : ICasoDeUso<P
                     }
                 }
 
-                return servicios.Vista(checkout, delCarrito, null) with { CarritoCambio = true };
+                return (checkout, delCarrito);
             },
             cancelacion).ConfigureAwait(false);
 
-        return vista is null
-            ? Resultado<ResultadoDePasarAlPago>.Fallo(carrito.Autorizador.NoEncontrado())
-            : Resultado<ResultadoDePasarAlPago>.Exito(new ResultadoDePasarAlPago(null, ServiciosDelCheckout.DeEstado(EstadoDelCheckout.EnEdicion), vista, false));
+        if (revisado is not var (vuelto, suCarrito))
+        {
+            return Resultado<ResultadoDePasarAlPago>.Fallo(carrito.Autorizador.NoEncontrado());
+        }
+
+        // La vista, fuera de la transacción.
+        var vista = await servicios.VistaActual(vuelto, suCarrito, null, cancelacion).ConfigureAwait(false) with { CarritoCambio = true };
+        return Resultado<ResultadoDePasarAlPago>.Exito(new ResultadoDePasarAlPago(null, ServiciosDelCheckout.DeEstado(EstadoDelCheckout.EnEdicion), vista, false));
     }
 
     /// <summary>Con un intento activo (<c>Conflicto</c>) se devuelve el estado actual del checkout, sin abortar.</summary>
@@ -234,6 +239,7 @@ internal sealed class PasarAlPago(ServiciosDelCheckout servicios) : ICasoDeUso<P
         }
 
         var delCarrito = await carrito.Carritos.ObtenerDeCuenta(preparado.CuentaId, conBloqueo: false, cancelacion).ConfigureAwait(false);
-        return Resultado<ResultadoDePasarAlPago>.Exito(new ResultadoDePasarAlPago(checkout.PedidoId, ServiciosDelCheckout.DeEstado(checkout.Estado), servicios.Vista(checkout, delCarrito, null), false));
+        var actual = await servicios.VistaActual(checkout, delCarrito, null, cancelacion).ConfigureAwait(false);
+        return Resultado<ResultadoDePasarAlPago>.Exito(new ResultadoDePasarAlPago(checkout.PedidoId, ServiciosDelCheckout.DeEstado(checkout.Estado), actual, false));
     }
 }

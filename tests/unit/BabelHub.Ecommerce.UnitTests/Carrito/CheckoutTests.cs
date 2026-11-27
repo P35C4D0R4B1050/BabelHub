@@ -17,7 +17,7 @@ public sealed class CheckoutTests
 
     private static Guid Edicion(int n) => new(n, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1);
 
-    private static LineaParaCheckout Impreso(int n, int cantidad = 1, decimal precio = 50m) => new(Edicion(n), false, $"Libro {n}", "9780000000019", cantidad, precio);
+    private static LineaParaCheckout Impreso(int n, int cantidad = 1, decimal precio = 50m) => new(Edicion(n), false, $"Libro {n}", "9780000000019", cantidad, precio, Edicion(n), Sucursal.Principal);
 
     private static LineaParaCheckout Digital(int n) => new(Edicion(n), true, $"Digital {n}", "9780000000026", 1, 20m);
 
@@ -61,7 +61,7 @@ public sealed class CheckoutTests
     private static (Checkout Checkout, CarritoDeDominio Carrito) Reservando()
     {
         var checkout = Nuevo(Impreso(1, 2), Digital(2));
-        checkout.ElegirRecojo("lima", Ahora);
+        checkout.ElegirRecojo(Ahora);
         var carrito = CarritoCon(Impreso(1, 2), Digital(2));
         Assert.Equal(EfectoDeTransicion.Aplicada, Preparar(checkout, carrito).Efecto);
         return (checkout, carrito);
@@ -117,7 +117,7 @@ public sealed class CheckoutTests
         Assert.False(checkout.RequiereReserva);
         Assert.Equal(TipoDeEntrega.Digital, checkout.TipoDeEntrega);
         Assert.Equal(4, checkout.TotalDePasos);
-        Assert.Equal(RechazoDeCheckout.EsSoloDigital, checkout.ElegirRecojo("lima", Ahora).Rechazo);
+        Assert.Equal(RechazoDeCheckout.EsSoloDigital, checkout.ElegirRecojo(Ahora).Rechazo);
         Assert.Equal(RechazoDeCheckout.EsSoloDigital, checkout.ElegirDomicilio(Contacto(), Ahora).Rechazo);
 
         Assert.Equal(EfectoDeTransicion.Aplicada, checkout.ConfirmarRevision(Ahora).Efecto);
@@ -136,13 +136,13 @@ public sealed class CheckoutTests
         Assert.True(checkout.RequiereReserva);
         checkout.ConfirmarRevision(Ahora);
         Assert.Equal(PasoDelCheckout.Entrega, checkout.Paso);
-        checkout.ElegirRecojo("lima", Ahora);
+        checkout.ElegirRecojo(Ahora);
         Assert.Equal(PasoDelCheckout.DatosYAceptaciones, checkout.Paso);
         Assert.Equal(3, checkout.NumeroDePaso);
     }
 
     [Fact]
-    public void Elegir_recojo_guarda_la_sucursal_y_elegir_domicilio_guarda_el_contacto_y_la_region_y_cambiar_a_recojo_los_quita()
+    public void Elegir_domicilio_guarda_el_contacto_y_la_region_y_cambiar_a_recojo_los_quita_sin_sucursal_comun()
     {
         var checkout = Nuevo(Impreso(1));
 
@@ -150,8 +150,8 @@ public sealed class CheckoutTests
         Assert.Equal((TipoDeEntrega.Domicilio, "Ayacucho", null), (checkout.TipoDeEntrega, checkout.RegionDeEntrega, checkout.CodigoDeSucursalDeRecojo));
         Assert.NotNull(checkout.Contacto);
 
-        checkout.ElegirRecojo("lima", Ahora.AddMinutes(1));
-        Assert.Equal((TipoDeEntrega.Recojo, null, "lima"), (checkout.TipoDeEntrega, checkout.RegionDeEntrega, checkout.CodigoDeSucursalDeRecojo));
+        checkout.ElegirRecojo(Ahora.AddMinutes(1));
+        Assert.Equal((TipoDeEntrega.Recojo, null, null), (checkout.TipoDeEntrega, checkout.RegionDeEntrega, checkout.CodigoDeSucursalDeRecojo));
         Assert.Null(checkout.Contacto);
     }
 
@@ -170,19 +170,11 @@ public sealed class CheckoutTests
     }
 
     [Fact]
-    public void Un_codigo_de_sucursal_vacio_se_rechaza()
-    {
-        var checkout = Nuevo(Impreso(1));
-
-        Assert.Throws<ArgumentException>(() => checkout.ElegirRecojo(" ", Ahora));
-    }
-
-    [Fact]
     public void Sincronizar_las_lineas_conserva_el_lineaid_de_las_ediciones_que_siguen_y_lo_informado_y_da_uno_nuevo_a_las_nuevas()
     {
         var checkout = Nuevo(Impreso(1, 1), Impreso(2, 1));
         var idUno = checkout.Lineas.Single(l => l.EdicionId == Edicion(1)).LineaId;
-        checkout.RegistrarLoInformado(Edicion(1), "lima", requiereTraslado: true, plazoDias: 3, Ahora);
+        checkout.RegistrarLoInformado(checkout.Lineas.Single(l => l.EdicionId == Edicion(1)).LineaId, "lima", requiereTraslado: true, plazoDias: 3, Ahora);
 
         var resultado = checkout.SincronizarLineas([Impreso(1, 4), Impreso(3, 1)], Guid.NewGuid, Ahora.AddMinutes(1));
 
@@ -226,7 +218,7 @@ public sealed class CheckoutTests
         checkout.ElegirDomicilio(Contacto(), Ahora);
         Assert.Equal(123.90m, checkout.CalcularTotal(Envio).Total);
 
-        checkout.ElegirRecojo("lima", Ahora);
+        checkout.ElegirRecojo(Ahora);
         Assert.Equal(111.90m, checkout.CalcularTotal(Envio).Total);
     }
 
@@ -261,7 +253,7 @@ public sealed class CheckoutTests
         Assert.Null(sinEntrega.PedidoId);
 
         var conRetiro = Nuevo(Impreso(1));
-        conRetiro.ElegirRecojo("lima", Ahora);
+        conRetiro.ElegirRecojo(Ahora);
         var carrito = CarritoCon(Impreso(1));
         carrito.RetirarEdicion(Edicion(1), diferir: true, Ahora);
         Assert.Equal(RechazoDeCheckout.HayRetiroPendiente, Preparar(conRetiro, carrito).Rechazo);
@@ -409,8 +401,8 @@ public sealed class CheckoutTests
         static string? Huella(string titulo)
         {
             string? h = null;
-            var checkout = Determinista(new LineaParaCheckout(Edicion(1), false, titulo, "9780000000019", 1, 50m));
-            checkout.ElegirRecojo("lima", Ahora);
+            var checkout = Determinista(new LineaParaCheckout(Edicion(1), false, titulo, "9780000000019", 1, 50m, Edicion(1), Sucursal.Principal));
+            checkout.ElegirRecojo(Ahora);
             checkout.PrepararPasoAlPago(Guid.NewGuid(), Envio, Identidad, s => h = s, CarritoCon(Impreso(1)), Ahora);
             return h;
         }
@@ -523,11 +515,11 @@ public sealed class CheckoutTests
     public void Con_el_checkout_reservando_o_en_pago_no_se_puede_cambiar_la_entrega_ni_las_lineas()
     {
         var (reservando, _) = Reservando();
-        Assert.Equal(RechazoDeCheckout.EnCurso, reservando.ElegirRecojo("cusco", Ahora).Rechazo);
+        Assert.Equal(RechazoDeCheckout.EnCurso, reservando.ElegirRecojo(Ahora).Rechazo);
         Assert.Equal(RechazoDeCheckout.EnCurso, reservando.SincronizarLineas([Impreso(1)], Guid.NewGuid, Ahora).Rechazo);
 
         var (enPago, _) = EnPago();
-        Assert.Equal(RechazoDeCheckout.EstadoNoPermite, enPago.ElegirRecojo("cusco", Ahora).Rechazo);
+        Assert.Equal(RechazoDeCheckout.EstadoNoPermite, enPago.ElegirRecojo(Ahora).Rechazo);
         Assert.Equal(RechazoDeCheckout.EstadoNoPermite, enPago.SincronizarLineas([Impreso(1)], Guid.NewGuid, Ahora).Rechazo);
     }
 

@@ -58,23 +58,44 @@ public sealed class PropietarioDelCarrito
 }
 
 /// <summary>
-/// Una línea del carrito: una edición con su cantidad (una por edición, CAR-02). <see cref="RetiroPendiente"/> la marca cuando Catálogo retiró la edición mientras había un checkout <c>reservando</c>, <c>en_pago</c> o <c>pago_pendiente</c>:
+/// El código de la sucursal que atiende un impreso (CAR-39): de 1 a 40 caracteres, sin espacios en los extremos ni caracteres de control. Que sea una sucursal registrada lo comprueba la Aplicación contra la lista del Inventario.
+/// </summary>
+public static class CodigosDeSucursal
+{
+    public const int LongitudMaxima = 40;
+
+    public static bool EsValido(string? codigo) =>
+        !string.IsNullOrEmpty(codigo) && codigo.Length <= LongitudMaxima && !codigo.Any(char.IsControl) && codigo.Trim() == codigo;
+}
+
+/// <summary>
+/// Una línea del carrito: un libro impreso en la sucursal que lo atiende, o una edición digital (CAR-39, CAR-40). Tiene identidad propia (<see cref="LineaId"/>): puede haber varias líneas del mismo libro y sucursal (lotes). Un impreso
+/// sin sucursal es una línea anterior a la venta por sucursal (CAR-45). <see cref="RetiroPendiente"/> la marca cuando Catálogo retiró la edición mientras había un checkout <c>reservando</c>, <c>en_pago</c> o <c>pago_pendiente</c>:
 /// para la persona ya está retirada (no se puede modificar ni pagar) y el retiro se aplica al salir de ese estado (D21).
 /// </summary>
 public sealed class LineaDeCarrito
 {
-    private LineaDeCarrito(Guid edicionId, bool esDigital, Cantidad cantidad, DateTimeOffset agregadaEn, bool retiroPendiente)
+    private LineaDeCarrito(Guid lineaId, Guid edicionId, bool esDigital, string? codigoDeSucursal, Cantidad cantidad, DateTimeOffset agregadaEn, bool retiroPendiente)
     {
+        LineaId = lineaId;
         EdicionId = edicionId;
         EsDigital = esDigital;
+        CodigoDeSucursal = codigoDeSucursal;
         Cantidad = cantidad;
         AgregadaEn = agregadaEn;
         RetiroPendiente = retiroPendiente;
     }
 
+    public Guid LineaId { get; }
+
     public Guid EdicionId { get; }
 
     public bool EsDigital { get; }
+
+    /// <summary>La sucursal que atiende un impreso; nulo en una digital y en una línea anterior a la venta por sucursal.</summary>
+    public string? CodigoDeSucursal { get; }
+
+    public bool EsImpresoSinSucursal => !EsDigital && CodigoDeSucursal is null;
 
     public Cantidad Cantidad { get; }
 
@@ -82,22 +103,27 @@ public sealed class LineaDeCarrito
 
     public bool RetiroPendiente { get; }
 
-    public static LineaDeCarrito Crear(Guid edicionId, bool esDigital, Cantidad cantidad, DateTimeOffset agregadaEn, bool retiroPendiente = false)
+    public static LineaDeCarrito Crear(Guid lineaId, Guid edicionId, bool esDigital, string? codigoDeSucursal, Cantidad cantidad, DateTimeOffset agregadaEn, bool retiroPendiente = false)
     {
         ArgumentNullException.ThrowIfNull(cantidad);
-        if (edicionId == Guid.Empty)
+        if (lineaId == Guid.Empty || edicionId == Guid.Empty)
         {
-            throw new ArgumentException("La línea necesita su edición.", nameof(edicionId));
+            throw new ArgumentException("La línea necesita su identificador y su edición.", nameof(lineaId));
+        }
+
+        if (codigoDeSucursal is not null && (esDigital || !CodigosDeSucursal.EsValido(codigoDeSucursal)))
+        {
+            throw new ArgumentException("La sucursal de la línea no es válida.", nameof(codigoDeSucursal));
         }
 
         return esDigital && cantidad.Valor != 1
             ? throw new ArgumentException("Una edición digital lleva siempre una unidad.", nameof(cantidad))
-            : new LineaDeCarrito(edicionId, esDigital, cantidad, agregadaEn, retiroPendiente);
+            : new LineaDeCarrito(lineaId, edicionId, esDigital, codigoDeSucursal, cantidad, agregadaEn, retiroPendiente);
     }
 
-    internal LineaDeCarrito ConCantidad(Cantidad cantidad) => new(EdicionId, EsDigital, cantidad, AgregadaEn, RetiroPendiente);
+    internal LineaDeCarrito ConCantidad(Cantidad cantidad) => new(LineaId, EdicionId, EsDigital, CodigoDeSucursal, cantidad, AgregadaEn, RetiroPendiente);
 
-    internal LineaDeCarrito ConRetiroPendiente() => new(EdicionId, EsDigital, Cantidad, AgregadaEn, retiroPendiente: true);
+    internal LineaDeCarrito ConRetiroPendiente() => new(LineaId, EdicionId, EsDigital, CodigoDeSucursal, Cantidad, AgregadaEn, retiroPendiente: true);
 }
 
 /// <summary>Los importes en soles (CAR-23, D17): <c>decimal</c> con dos decimales, redondeando <b>alejándose de cero</b> (el 5 siempre sube).</summary>

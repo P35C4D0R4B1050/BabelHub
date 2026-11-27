@@ -17,7 +17,7 @@ public sealed class RetencionDelContactoTests
 
     private static Guid Edicion(int n) => new(n, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1);
 
-    private static LineaParaCheckout Impreso(int n) => new(Edicion(n), false, $"Libro {n}", "9780000000019", 1, 50m);
+    private static LineaParaCheckout Impreso(int n) => new(Edicion(n), false, $"Libro {n}", "9780000000019", 1, 50m, Edicion(n), Sucursal.Principal);
 
     private static LineaParaCheckout Digital(int n) => new(Edicion(n), true, $"Digital {n}", "9780000000026", 1, 20m);
 
@@ -129,7 +129,7 @@ public sealed class RetencionDelContactoTests
         Assert.NotNull(aRecojo.Contacto);
         Assert.NotNull(aRecojo.HuellaDeInstantanea);
 
-        aRecojo.ElegirRecojo("lima", Ahora.AddMinutes(1));
+        aRecojo.ElegirRecojo(Ahora.AddMinutes(1));
         ExigirSinContacto(aRecojo);
         Assert.Equal(TipoDeEntrega.Recojo, aRecojo.TipoDeEntrega);
 
@@ -211,7 +211,7 @@ public sealed class RetencionDelContactoTests
         Assert.False(checkout.ContactoVencido(Ahora.AddDays(49)));
         Assert.True(checkout.ContactoVencido(Ahora.AddDays(50)));
 
-        checkout.RegistrarLoInformado(Edicion(1), "lima", requiereTraslado: false, plazoDias: null, Ahora.AddDays(40));
+        checkout.RegistrarLoInformado(checkout.Lineas.Single(l => l.EdicionId == Edicion(1)).LineaId, "lima", requiereTraslado: false, plazoDias: null, Ahora.AddDays(40));
         checkout.RevalidarTextos(new Dictionary<TextoLegal, string>(), Ahora.AddDays(41));
         Assert.True(checkout.ContactoVencido(Ahora.AddDays(50)));
     }

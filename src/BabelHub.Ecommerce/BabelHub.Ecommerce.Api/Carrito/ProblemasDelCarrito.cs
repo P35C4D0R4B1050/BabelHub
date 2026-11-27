@@ -37,6 +37,7 @@ public static class ProblemasDelCarrito
         ["entrega-no-validable"] = new("CHECKOUT-STOCK-NO-VALIDABLE", StatusCodes.Status503ServiceUnavailable),
         ["checkout-aceptacion-requerida"] = new("CHECKOUT-ACEPTACION-REQUERIDA", StatusCodes.Status422UnprocessableEntity, ExponeCampos: true),
         ["checkout-datos-de-entrega-incompletos"] = new("CHECKOUT-DATOS-DE-ENTREGA-INCOMPLETOS", StatusCodes.Status422UnprocessableEntity, ExponeCampos: true),
+        ["linea-sin-sucursal"] = new("CARRITO-LINEA-SIN-SUCURSAL", StatusCodes.Status422UnprocessableEntity),
         ["checkout-texto-cambio"] = new("CHECKOUT-TEXTO-CAMBIO", StatusCodes.Status409Conflict, ExponeCampos: true),
         ["checkout-total-cambio"] = new("CHECKOUT-TOTAL-CAMBIO", StatusCodes.Status409Conflict, ExponeCampos: true),
         ["checkout-licencia-no-vigente"] = new("CHECKOUT-LICENCIA-NO-VIGENTE", StatusCodes.Status409Conflict, ExponeCampos: true),

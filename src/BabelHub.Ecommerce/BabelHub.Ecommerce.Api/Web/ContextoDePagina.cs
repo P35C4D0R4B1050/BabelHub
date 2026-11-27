@@ -8,6 +8,19 @@ namespace BabelHub.Ecommerce.Api.Web;
 public static class PreferenciasDeLaPagina
 {
     public const string CookieDeSucursal = "bh-sucursal";
+
+    private static readonly TimeSpan UnAnio = TimeSpan.FromDays(365);
+
+    /// <summary>Las cookies de preferencia: de todo el sitio, solo por HTTPS, de un año y legibles por el script del tema.</summary>
+    public static CookieOptions OpcionesDeCookie(TimeSpan? duracion = null) => new()
+    {
+        Path = "/",
+        Secure = true,
+        HttpOnly = false,
+        SameSite = SameSiteMode.Lax,
+        MaxAge = duracion ?? UnAnio,
+        IsEssential = true,
+    };
 }
 
 /// <summary>Los temas que la interfaz conoce; cualquier otro valor de la cookie se ignora.</summary>
@@ -48,10 +61,9 @@ public sealed class ContextoDePagina(IHttpContextAccessor acceso, IPreferenciaDe
         modelo.HaySesion |= acceso.HttpContext?.ActorDeLaSolicitud() is not null;
         if (area == AreaDeLaPagina.Tienda)
         {
-            // La sucursal preferida solo se usa si está en la lista de sucursales; sin lista conocida no hay selector (WEB-16, D16).
-            var elegibles = await sucursales.Resolver(acceso.HttpContext?.Request.Cookies[PreferenciasDeLaPagina.CookieDeSucursal], cancelacion).ConfigureAwait(false);
+            // La lista de sucursales (la última conocida) para las pantallas que la ofrecen. La preferida ya no se lee aquí: solo preselecciona en la ficha (WEB-16).
+            var elegibles = await sucursales.Resolver(null, cancelacion).ConfigureAwait(false);
             modelo.Sucursales = [.. elegibles.Sucursales.Select(s => new SucursalElegible(s.Codigo, s.Nombre))];
-            modelo.SucursalPreferida = elegibles.CodigoElegido;
         }
 
         return modelo;

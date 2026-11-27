@@ -3,7 +3,8 @@ namespace BabelHub.Ecommerce.Infrastructure.Carrito;
 /// <summary>
 /// Definición de las tablas del esquema <c>carrito</c> (<c>plan.md</c> §3, T24) con el permiso mínimo de su rol <c>rol_carrito</c>; la migración las incorpora tal cual (como <c>DefinicionDelCatalogo</c>): un
 /// propietario aparte es dueño de las tablas y la aplicación entra con <c>EjecutarComo(carrito)</c> y solo hace lo que el módulo necesita. Alinea los nombres con el plan y añade lo que las revisiones de ECO-4c exigieron:
-/// <c>pedido_a_liberar</c> (el pedido cuya reserva falta liberar, explícito y nunca deducido del pedido vivo), <c>posicion</c> en las líneas (el orden del agregado) y la cascada de <c>fusiones_aplicadas</c> al eliminar el carrito de una
+/// <c>pedido_a_liberar</c> (el pedido cuya reserva falta liberar, explícito y nunca deducido del pedido vivo), <c>posicion</c> en las líneas (el orden del agregado), la identidad y la sucursal de cada línea con las tarifas de envío (venta por
+/// sucursal, repetible sobre una base ya creada: las líneas anteriores quedan sin sucursal) y la cascada de <c>fusiones_aplicadas</c> al eliminar el carrito de una
 /// cuenta (Ley N.° 29733: no queda el hash de la cookie ligado a un carrito borrado).
 /// </summary>
 public static class DefinicionDelCarrito
@@ -31,18 +32,40 @@ public static class DefinicionDelCarrito
         CREATE INDEX IF NOT EXISTS carritos_por_vencimiento ON carrito.carritos (vence_en) WHERE vence_en IS NOT NULL;
         CREATE INDEX IF NOT EXISTS carritos_de_cuenta_por_movimiento ON carrito.carritos (modificado_en) WHERE cuenta_id IS NOT NULL;
 
+        -- Una línea es un libro impreso en una sucursal (puede haber varias del mismo libro y sucursal) o una digital. Un impreso sin sucursal es anterior a la venta por sucursal.
         CREATE TABLE IF NOT EXISTS carrito.lineas_de_carrito (
             carrito_id uuid NOT NULL REFERENCES carrito.carritos (id) ON DELETE CASCADE,
+            linea_id uuid NOT NULL,
             edicion_id uuid NOT NULL,
+            codigo_de_sucursal text,
             posicion integer NOT NULL CHECK (posicion >= 0),
             cantidad integer NOT NULL CHECK (cantidad BETWEEN 1 AND 20),
             es_digital boolean NOT NULL,
             agregada_en timestamptz NOT NULL,
             retiro_pendiente boolean NOT NULL DEFAULT false,
-            PRIMARY KEY (carrito_id, edicion_id),
+            PRIMARY KEY (carrito_id, linea_id),
             CONSTRAINT lineas_de_carrito_digital_una_unidad CHECK (NOT es_digital OR cantidad = 1)
         );
+        -- Sobre una base anterior (una línea por edición): cada línea recibe su identidad y queda sin sucursal; no se asigna ninguna. Repetible.
+        ALTER TABLE carrito.lineas_de_carrito ADD COLUMN IF NOT EXISTS linea_id uuid;
+        ALTER TABLE carrito.lineas_de_carrito ADD COLUMN IF NOT EXISTS codigo_de_sucursal text;
+        UPDATE carrito.lineas_de_carrito SET linea_id = gen_random_uuid() WHERE linea_id IS NULL;
+        ALTER TABLE carrito.lineas_de_carrito ALTER COLUMN linea_id SET NOT NULL;
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
+                WHERE i.indrelid = 'carrito.lineas_de_carrito'::regclass AND i.indisprimary AND a.attname = 'linea_id') THEN
+                ALTER TABLE carrito.lineas_de_carrito DROP CONSTRAINT IF EXISTS lineas_de_carrito_pkey;
+                ALTER TABLE carrito.lineas_de_carrito ADD CONSTRAINT lineas_de_carrito_pkey PRIMARY KEY (carrito_id, linea_id);
+            END IF;
+        END
+        $$;
+        ALTER TABLE carrito.lineas_de_carrito DROP CONSTRAINT IF EXISTS lineas_de_carrito_sucursal;
+        ALTER TABLE carrito.lineas_de_carrito ADD CONSTRAINT lineas_de_carrito_sucursal
+            CHECK (codigo_de_sucursal IS NULL OR (NOT es_digital AND char_length(codigo_de_sucursal) BETWEEN 1 AND 40));
         CREATE INDEX IF NOT EXISTS lineas_de_carrito_por_edicion ON carrito.lineas_de_carrito (edicion_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS lineas_de_carrito_digital_unica ON carrito.lineas_de_carrito (carrito_id, edicion_id) WHERE es_digital;
 
         -- Un carrito fusionado no admite líneas.
         CREATE OR REPLACE FUNCTION carrito.rechazar_linea_en_carrito_fusionado() RETURNS trigger
@@ -67,11 +90,14 @@ public static class DefinicionDelCarrito
             edicion_id uuid NOT NULL,
             titulo text NOT NULL CHECK (char_length(titulo) BETWEEN 1 AND 200),
             detalle text CHECK (detalle IN ('sin_stock', 'ya_poseida', 'no_vendible', 'recortada_al_maximo', 'digital_a_una_unidad', 'tope_de_lineas', 'tope_de_unidades')),
-            cantidad_final integer CHECK (cantidad_final BETWEEN 0 AND 20),
+            cantidad_final integer CONSTRAINT avisos_de_carrito_cantidad_final_check CHECK (cantidad_final BETWEEN 0 AND 600),
             creado_en timestamptz NOT NULL,
             visto_en timestamptz,
             CONSTRAINT avisos_de_carrito_ajuste_con_detalle CHECK ((tipo = 'fusion_ajustada') = (detalle IS NOT NULL))
         );
+        -- Las líneas de un libro en una sucursal pueden sumar más de 20 (varias líneas): el aviso lleva esa suma.
+        ALTER TABLE carrito.avisos_de_carrito DROP CONSTRAINT IF EXISTS avisos_de_carrito_cantidad_final_check;
+        ALTER TABLE carrito.avisos_de_carrito ADD CONSTRAINT avisos_de_carrito_cantidad_final_check CHECK (cantidad_final BETWEEN 0 AND 600);
         CREATE INDEX IF NOT EXISTS avisos_de_carrito_por_cuenta ON carrito.avisos_de_carrito (cuenta_id, creado_en DESC);
         CREATE INDEX IF NOT EXISTS avisos_de_carrito_por_vencer ON carrito.avisos_de_carrito (creado_en);
 
@@ -130,12 +156,14 @@ public static class DefinicionDelCarrito
         CREATE INDEX IF NOT EXISTS checkouts_reservando ON carrito.checkouts (reservando_desde) WHERE estado = 'reservando';
         CREATE INDEX IF NOT EXISTS checkouts_pago_pendiente ON carrito.checkouts (pago_pendiente_desde) WHERE estado = 'pago_pendiente';
 
-        -- Las líneas se reconstruyen al volver a en_edicion conservando el linea_id de las ediciones que siguen. Sin datos personales.
+        -- Las líneas se reconstruyen al volver a en_edicion conservando el linea_id de las líneas del carrito que siguen. Sin datos personales.
         CREATE TABLE IF NOT EXISTS carrito.lineas_del_checkout (
             checkout_id uuid NOT NULL REFERENCES carrito.checkouts (id) ON DELETE CASCADE,
             edicion_id uuid NOT NULL,
             posicion integer NOT NULL CHECK (posicion >= 0),
             linea_id uuid NOT NULL,
+            linea_de_carrito_id uuid,
+            codigo_de_sucursal text,
             es_digital boolean NOT NULL,
             titulo text NOT NULL CHECK (char_length(titulo) BETWEEN 1 AND 200),
             isbn text NOT NULL CHECK (char_length(isbn) BETWEEN 1 AND 40),
@@ -145,9 +173,33 @@ public static class DefinicionDelCarrito
             requiere_traslado_informado boolean,
             plazo_informado_dias integer CHECK (plazo_informado_dias >= 0),
             consultado_en timestamptz,
-            PRIMARY KEY (checkout_id, edicion_id),
+            PRIMARY KEY (checkout_id, linea_id),
             CONSTRAINT lineas_del_checkout_linea_unica UNIQUE (linea_id),
             CONSTRAINT lineas_del_checkout_digital_una_unidad CHECK (NOT es_digital OR cantidad = 1)
+        );
+        -- Sobre una base anterior: sin línea de carrito ni sucursal (una compra anterior se completa como se inició). Repetible.
+        ALTER TABLE carrito.lineas_del_checkout ADD COLUMN IF NOT EXISTS linea_de_carrito_id uuid;
+        ALTER TABLE carrito.lineas_del_checkout ADD COLUMN IF NOT EXISTS codigo_de_sucursal text;
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
+                WHERE i.indrelid = 'carrito.lineas_del_checkout'::regclass AND i.indisprimary AND a.attname = 'linea_id') THEN
+                ALTER TABLE carrito.lineas_del_checkout DROP CONSTRAINT IF EXISTS lineas_del_checkout_pkey;
+                ALTER TABLE carrito.lineas_del_checkout ADD CONSTRAINT lineas_del_checkout_pkey PRIMARY KEY (checkout_id, linea_id);
+            END IF;
+        END
+        $$;
+        ALTER TABLE carrito.lineas_del_checkout DROP CONSTRAINT IF EXISTS lineas_del_checkout_sucursal;
+        ALTER TABLE carrito.lineas_del_checkout ADD CONSTRAINT lineas_del_checkout_sucursal
+            CHECK (codigo_de_sucursal IS NULL OR (NOT es_digital AND char_length(codigo_de_sucursal) BETWEEN 1 AND 40));
+        CREATE UNIQUE INDEX IF NOT EXISTS lineas_del_checkout_digital_unica ON carrito.lineas_del_checkout (checkout_id, edicion_id) WHERE es_digital;
+
+        -- El costo de envío propio de cada sucursal (CAR-46, CAR-47); sin fila rige el predeterminado. Quién lo cambió queda solo en la auditoría.
+        CREATE TABLE IF NOT EXISTS carrito.tarifas_de_envio (
+            codigo_de_sucursal text PRIMARY KEY CHECK (char_length(codigo_de_sucursal) BETWEEN 1 AND 40),
+            importe numeric(8, 2) NOT NULL CHECK (importe BETWEEN 0 AND 500),
+            actualizada_en timestamptz NOT NULL
         );
 
         -- La constancia de una fusión aplicada: hace idempotente la fusión desde un segundo dispositivo. Se borra con el carrito de la cuenta (cascada) y se purga a los 30 días.
@@ -180,5 +232,7 @@ public static class DefinicionDelCarrito
         ) ON carrito.checkouts TO rol_carrito;
         GRANT SELECT, INSERT, DELETE ON carrito.lineas_del_checkout TO rol_carrito;
         GRANT SELECT, INSERT, DELETE ON carrito.fusiones_aplicadas TO rol_carrito;
+        GRANT SELECT, INSERT ON carrito.tarifas_de_envio TO rol_carrito;
+        GRANT UPDATE (importe, actualizada_en) ON carrito.tarifas_de_envio TO rol_carrito;
         """;
 }

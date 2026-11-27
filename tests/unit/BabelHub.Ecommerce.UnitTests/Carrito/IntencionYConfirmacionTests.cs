@@ -20,12 +20,12 @@ public sealed class IntencionYConfirmacionTests
     private static async Task<Contexto> Preparado(bool soloDigital = false)
     {
         var e = EntornoDelCarrito.DeCliente();
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(soloDigital ? e.Digital(20m) : e.Impreso(10, 40m), soloDigital ? 1 : 3));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(soloDigital ? e.Digital(20m) : e.Impreso(10, 40m), soloDigital ? 1 : 3, CodigoDeSucursal: Sucursal.Principal));
         await new IniciarCheckout(e.ServiciosDelCheckout()).Ejecutar(new IniciarCheckoutEntrada());
         TextoVistoDeCompra[] textos = soloDigital ? [.. Los2, new TextoVistoDeCompra(TextoLegalDeCompra.ReembolsoDigital, "r-1")] : Los2;
         if (!soloDigital)
         {
-            await new ElegirEntrega(e.ServiciosDelCheckout()).Ejecutar(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, "sede-central", null));
+            await new ElegirEntrega(e.ServiciosDelCheckout()).Ejecutar(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo));
         }
 
         await new RegistrarAceptaciones(e.ServiciosDelCheckout()).Ejecutar(new RegistrarAceptacionesEntrada(textos));

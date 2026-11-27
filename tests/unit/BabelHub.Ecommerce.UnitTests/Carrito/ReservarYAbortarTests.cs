@@ -24,12 +24,12 @@ public sealed class ReservarYAbortarTests
     {
         var e = EntornoDelCarrito.DeCliente();
         var impreso = soloDigital ? Guid.Empty : e.Impreso(10, 40m, "Impreso");
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(soloDigital ? e.Digital(20m) : impreso, soloDigital ? 1 : 3));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(soloDigital ? e.Digital(20m) : impreso, soloDigital ? 1 : 3, CodigoDeSucursal: Sucursal.Principal));
         await new IniciarCheckout(e.ServiciosDelCheckout()).Ejecutar(new IniciarCheckoutEntrada());
         if (!soloDigital)
         {
             e.Inventario.FijarFuente(impreso, "sede-central", false, null);
-            await new ElegirEntrega(e.ServiciosDelCheckout()).Ejecutar(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, "sede-central", null));
+            await new ElegirEntrega(e.ServiciosDelCheckout()).Ejecutar(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo));
         }
 
         await new RegistrarAceptaciones(e.ServiciosDelCheckout()).Ejecutar(new RegistrarAceptacionesEntrada(soloDigital ? [.. Los2, new TextoVistoDeCompra(TextoLegalDeCompra.ReembolsoDigital, "r-1")] : Los2));
@@ -169,14 +169,14 @@ public sealed class ReservarYAbortarTests
     public async Task Un_cambio_de_plazo_respecto_de_lo_informado_aborta_con_el_plazo_nuevo_y_se_guarda_como_lo_nuevo_informado()
     {
         var c = await Preparado();
-        c.Entorno.Inventario.AlReservar = ResultadoDeReservar.Reservada(Reserva(c, fuente: "cusco", traslado: true, plazo: 5));
+        c.Entorno.Inventario.AlReservar = ResultadoDeReservar.Reservada(Reserva(c, traslado: true, plazo: 5));
 
         var resultado = await Reservar(c);
 
         Assert.Equal(TipoDeResultadoDelPaso.Abortar, resultado.Tipo);
         Assert.Equal("plazo-cambiado", resultado.MotivoDelAborto);
         Assert.Contains(new ErrorDeCampo("plazoDias", "5"), resultado.Error!.Errores);
-        Assert.Equal(resultado.NuevoInformado!.Single().EdicionId, c.Impreso);
+        Assert.Equal(c.Checkout.Lineas.Single(l => l.EdicionId == c.Impreso).LineaId, resultado.NuevoInformado!.Single().LineaId);
     }
 
     // ---------- El aborto ----------
@@ -232,16 +232,16 @@ public sealed class ReservarYAbortarTests
     public async Task Un_aborto_por_cambio_de_plazo_guarda_lo_devuelto_como_lo_nuevo_informado_y_un_segundo_intento_avanza()
     {
         var c = await Preparado();
-        c.Entorno.Inventario.AlReservar = ResultadoDeReservar.Reservada(Reserva(c, fuente: "cusco", traslado: true, plazo: 5));
+        c.Entorno.Inventario.AlReservar = ResultadoDeReservar.Reservada(Reserva(c, traslado: true, plazo: 5));
         var paso = await Reservar(c);
 
         await Abortar(c).Ejecutar(new SolicitudDeAborto(c.Preparado.CuentaId, EstadoDelCheckout.Reservando, c.Preparado.PedidoId!.Value, c.Preparado.Generacion, false, paso.MotivoDelAborto!, paso.NuevoInformado));
 
         var linea = Assert.Single(c.Checkout.Lineas);
-        Assert.Equal(("cusco", true, 5), (linea.CodigoDeFuenteInformado, linea.RequiereTrasladoInformado, linea.PlazoInformadoDias));
+        Assert.Equal((Sucursal.Principal, true, 5), (linea.CodigoDeFuenteInformado, linea.RequiereTrasladoInformado, linea.PlazoInformadoDias));
         var otra = await new PrepararPasoAlPago(c.Entorno.ServiciosDelCheckout()).Ejecutar(new PasarAlPagoEntrada(120m, Los2));
         Assert.True(otra.EsExito, otra.Error?.Clave);
-        c.Entorno.Inventario.AlReservar = ResultadoDeReservar.Reservada(new ReservaObtenida(otra.Valor.PedidoId!.Value, Inicio.AddMinutes(15), [.. otra.Valor.LineasImpresas.Select(l => new SeleccionDeLinea(l.LineaId, l.EdicionId, true, "cusco", true, 5, 10))], false));
+        c.Entorno.Inventario.AlReservar = ResultadoDeReservar.Reservada(new ReservaObtenida(otra.Valor.PedidoId!.Value, Inicio.AddMinutes(15), [.. otra.Valor.LineasImpresas.Select(l => new SeleccionDeLinea(l.LineaId, l.EdicionId, true, Sucursal.Principal, true, 5, 10))], false));
         var segundo = await new ReservarImpresos(c.Entorno.ServiciosDelCheckout()).Ejecutar(otra.Valor);
         Assert.Equal(TipoDeResultadoDelPaso.Reservada, segundo.Tipo);
     }

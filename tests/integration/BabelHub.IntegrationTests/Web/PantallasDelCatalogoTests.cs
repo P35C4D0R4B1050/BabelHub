@@ -95,7 +95,7 @@ public sealed class PantallasDelCatalogoTests
         Assert.Contains("alt=\"Portada de Estructuras de datos\"", html, StringComparison.Ordinal);
         Assert.Contains("Desde " + FormatoPeruano.Soles(49m), html, StringComparison.Ordinal);
         Assert.Contains("Disponible al instante", html, StringComparison.Ordinal);
-        Assert.Contains("En 2 sucursales más", html, StringComparison.Ordinal);
+        Assert.Contains("En 2 sucursales", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/catalogo/obras/" + Obra1.ToString("D") + "\"", html, StringComparison.Ordinal);
         Assert.Contains("Página 2 de 3", html, StringComparison.Ordinal);
         Assert.Contains("rel=\"prev\"", html, StringComparison.Ordinal);
@@ -268,8 +268,8 @@ public sealed class PantallasDelCatalogoTests
         Assert.Contains("Disponibilidad por sucursal", html, StringComparison.Ordinal);
         Assert.Contains("Ayacucho", html, StringComparison.Ordinal);
         Assert.Contains("Pocas unidades", html, StringComparison.Ordinal);
-        Assert.Contains("Tu sucursal", html, StringComparison.Ordinal);
-        Assert.Contains("En tu sucursal", html, StringComparison.Ordinal);
+        Assert.Contains("Sucursal que atenderá tu pedido", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("En tu sucursal", html, StringComparison.Ordinal);
         Assert.Contains("scope=\"col\"", html, StringComparison.Ordinal);
         Assert.Contains($"alt=\"Portada de Estructuras de datos\"", html, StringComparison.Ordinal);
     }
@@ -362,4 +362,64 @@ public sealed class PantallasDelCatalogoTests
         Assert.Contains("No podemos mostrar este libro ahora.", html, StringComparison.Ordinal);
         Assert.Contains("Reintentar", html, StringComparison.Ordinal);
     }
+    // ---------- La ficha por sucursal (CAR-42, CAR-43) ----------
+
+    private static async Task<string> Ficha(DisponibilidadDeEdicion disponibilidad, string? cookie = null)
+    {
+        var catalogo = new CatalogoDePrueba { Ficha = id => Resultado<ResumenDeObra>.Exito(new ResumenDeObra(id, "Estructuras de datos", "Ana Quispe", "Editorial Andina", "Técnico", Huella, [Impresa(disponibilidad.EdicionId, 129.90m, disponibilidad)])) };
+        await using var anfitrion = await Iniciar(catalogo);
+        using var solicitud = new HttpRequestMessage(HttpMethod.Get, $"/catalogo/obras/{Obra1}");
+        if (cookie is not null)
+        {
+            solicitud.Headers.Add("Cookie", "bh-sucursal=" + cookie);
+        }
+
+        using var respuesta = await anfitrion.Cliente.SendAsync(solicitud);
+        return await Texto(respuesta);
+    }
+
+    private static DisponibilidadDeEdicion ConStockEnAyacuchoYCusco(int ayacucho, int lima) =>
+        Disp(Guid.NewGuid(), EstadoDeDisponibilidad.Disponible, ayacucho + lima, fuentes: [new DisponibilidadPorFuente("AYA", "Ayacucho", ayacucho), new DisponibilidadPorFuente("LIM", "Lima", lima)]);
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-36")]
+    public async Task La_ficha_muestra_el_stock_de_cada_sucursal_preselecciona_la_preferida_con_stock_y_limita_la_cantidad_a_ella()
+    {
+        var html = await Ficha(ConStockEnAyacuchoYCusco(25, 4), cookie: "LIM");
+
+        Assert.Matches(@"<option value=""AYA""[^>]*data-bh-maximo=""20""[^>]*>Ayacucho — 25 disponibles</option>", html);
+        Assert.Matches(@"<option value=""LIM""\s+selected[^>]*data-bh-maximo=""4""[^>]*>Lima — 4 disponibles</option>", html);
+        Assert.Contains("name=\"cantidad\" value=\"1\" min=\"1\" max=\"4\"", html, StringComparison.Ordinal);
+        Assert.Contains("data-bh-sucursal-de-ficha", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Tu sucursal", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("En tu sucursal", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-36")]
+    public async Task Una_sucursal_sin_stock_no_se_puede_elegir_ni_se_preselecciona_y_hay_que_elegir_una()
+    {
+        var html = await Ficha(ConStockEnAyacuchoYCusco(25, 0), cookie: "LIM");
+
+        Assert.Matches(@"<option value=""LIM""[^>]*disabled[^>]*>Lima — sin stock</option>", html);
+        Assert.DoesNotMatch(@"<option value=""(AYA|LIM)""\s+selected", html);
+        Assert.Matches(@"<option value=""""\s+selected[^>]*>Elige una sucursal</option>", html);
+        Assert.Contains("name=\"sucursal\" class=\"select w-full min-w-64\" required", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-37")]
+    public async Task Sin_dato_de_stock_se_elige_entre_las_sucursales_conocidas_sin_cantidades_con_el_aviso()
+    {
+        var html = await Ficha(Disp(Guid.NewGuid(), EstadoDeDisponibilidad.NoSePuedeConfirmar, null, FrescuraDeLaDisponibilidad.NoSePuedeConfirmar), cookie: "LIM");
+
+        Assert.Contains("No podemos confirmar el stock ahora", html, StringComparison.Ordinal);
+        Assert.Matches(@"<option value=""AYA""[^>]*>Ayacucho</option>", html);
+        Assert.Matches(@"<option value=""LIM""[^>]*>Lima</option>", html);
+        Assert.DoesNotMatch(@"<option value=""(AYA|LIM)""\s+selected", html);
+        Assert.DoesNotContain("disponibles</option>", html, StringComparison.Ordinal);
+        Assert.Contains("Agregar impreso al carrito", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Disponibilidad por sucursal", html, StringComparison.Ordinal);
+    }
+
 }

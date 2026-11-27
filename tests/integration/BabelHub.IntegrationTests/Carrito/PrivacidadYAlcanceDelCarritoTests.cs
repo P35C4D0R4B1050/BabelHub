@@ -65,7 +65,7 @@ public sealed class PrivacidadYAlcanceDelCarritoTests(PostgresDelCarritoFixture 
             await _e.Como(b, sp => sp.GetRequiredService<ICheckoutDelCliente>().VolverAlCarrito(new SalirDelCheckoutEntrada(pedidoDeA))),
         };
         var reinicio = await _e.Como(b, sp => sp.GetRequiredService<ICheckoutDelCliente>().Reiniciar(new SalirDelCheckoutEntrada(pedidoDeA)));
-        var entrega = await _e.Como(b, sp => sp.GetRequiredService<ICheckoutDelCliente>().ElegirEntrega(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, "sede-central", null, pedidoDeA)));
+        var entrega = await _e.Como(b, sp => sp.GetRequiredService<ICheckoutDelCliente>().ElegirEntrega(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, null, pedidoDeA)));
         var aceptaciones = await _e.Como(b, sp => sp.GetRequiredService<ICheckoutDelCliente>().RegistrarAceptaciones(new RegistrarAceptacionesEntrada(EntornoDelCarritoConPostgres.LosDosTextos, PedidoId: pedidoDeA)));
         var otroPago = await _e.Pagar(b, 40m, pedidoId: pedidoDeA);
 
@@ -207,7 +207,7 @@ public sealed class PrivacidadYAlcanceDelCarritoTests(PostgresDelCarritoFixture 
         var cookie = (await _e.Agregar(null, Impreso(), 1)).Valor.CookieNueva!;
         var pago = await _e.Pagar(cuenta, 132m);
         var invalida = await _e.Como(cuenta, sp => sp.GetRequiredService<ICheckoutDelCliente>().ElegirEntrega(
-            new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, null, new ContactoDeCompra("Nombre Ajeno Único", "12345", "Dirección Secreta 999", "ayacucho"))));
+            new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, new ContactoDeCompra("Nombre Ajeno Único", "12345", "Dirección Secreta 999", "ayacucho"))));
 
         var instantanea = _e.Pagos.UltimaInstantanea!;
         var todo = string.Join('\n', _e.Auditoria.Eventos) + instantanea + instantanea.Contacto + invalida.Error + string.Join(',', invalida.Error!.Errores.Select(e => e.Campo + e.Clave));

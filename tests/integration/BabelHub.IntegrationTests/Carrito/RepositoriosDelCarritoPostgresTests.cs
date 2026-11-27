@@ -43,7 +43,7 @@ public sealed class RepositoriosDelCarritoPostgresTests(PostgresDelCarritoFixtur
             Guid.NewGuid(),
             cuenta,
             carrito.Id,
-            carrito.Lineas.Select(l => new LineaParaCheckout(l.EdicionId, l.EsDigital, "Cien años de soledad", "9780307474728", l.Cantidad.Valor, 40m)),
+            carrito.Lineas.Select(l => new LineaParaCheckout(l.EdicionId, l.EsDigital, "Cien años de soledad", "9780307474728", l.Cantidad.Valor, 40m, l.LineaId, l.CodigoDeSucursal)),
             Guid.NewGuid,
             Inicio);
         Assert.Equal(EfectoDeTransicion.Aplicada, checkout.ConfirmarRevision(Inicio).Efecto);
@@ -54,7 +54,7 @@ public sealed class RepositoriosDelCarritoPostgresTests(PostgresDelCarritoFixtur
         }
         else
         {
-            Assert.Equal(EfectoDeTransicion.Aplicada, checkout.ElegirRecojo("sede-central", Inicio).Efecto);
+            Assert.Equal(EfectoDeTransicion.Aplicada, checkout.ElegirRecojo(Inicio).Efecto);
         }
 
         checkout.Aceptar(TextoLegal.Terminos, "t-1", Inicio);
@@ -150,11 +150,11 @@ public sealed class RepositoriosDelCarritoPostgresTests(PostgresDelCarritoFixtur
         var nueva = await bd.Unidad.Ejecutar(token => bd.Carritos.ObtenerDeCuenta(cuenta, conBloqueo: true, token));
         var vieja = await bd.Unidad.Ejecutar(token => bd.Carritos.ObtenerDeCuenta(cuenta, conBloqueo: false, token));
         Assert.True(nueva!.Agregar(Guid.NewGuid(), false, 2, Inicio.AddMinutes(1)).EsExito);
-        Assert.True(nueva.Agregar(Guid.NewGuid(), false, 1, Inicio.AddMinutes(2)).EsExito);
-        await bd.Unidad.Ejecutar(async token => { await bd.Carritos.Guardar(nueva, token); return 0; });
+        Assert.True(nueva!.Agregar(Guid.NewGuid(), false, 1, Inicio.AddMinutes(2)).EsExito);
+        await bd.Unidad.Ejecutar(async token => { await bd.Carritos.Guardar(nueva!, token); return 0; });
         Assert.True(vieja!.Agregar(Guid.NewGuid(), false, 1, Inicio.AddMinutes(3)).EsExito);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => bd.Unidad.Ejecutar(async token => { await bd.Carritos.Guardar(vieja, token); return 0; }));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => bd.Unidad.Ejecutar(async token => { await bd.Carritos.Guardar(vieja!, token); return 0; }));
 
         Assert.Equal(3L, await bd.Consultar<long>($"SELECT count(*) FROM carrito.lineas_de_carrito WHERE carrito_id = '{carrito.Id}'"));
     }

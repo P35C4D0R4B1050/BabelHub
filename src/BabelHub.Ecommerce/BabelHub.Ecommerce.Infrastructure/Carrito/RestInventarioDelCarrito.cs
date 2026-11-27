@@ -61,7 +61,7 @@ public sealed class RestInventarioDelCarrito(IClienteDelInventario cliente, IRel
                 return RespuestaDelInventarioDelCarrito<StockDeVariasEdiciones>.SinRespuesta;
             }
 
-            ediciones.AddRange(resultado.Valor.Ediciones.Select(e => new StockDeEdicion(e.EdicionId, e.VendibleEnLaRed)));
+            ediciones.AddRange(resultado.Valor.Ediciones.Select(e => new StockDeEdicion(e.EdicionId, e.VendibleEnLaRed, e.Fuentes.ToDictionary(f => f.CodigoDeFuente, f => f.Vendible, StringComparer.Ordinal))));
             noRegistradas.AddRange(resultado.Valor.NoRegistradas);
             consultadaEn = resultado.Valor.Ediciones.Select(e => e.ConsultadaEn > reloj.Ahora ? reloj.Ahora : e.ConsultadaEn).Append(consultadaEn).Min();
         }
@@ -82,7 +82,7 @@ public sealed class RestInventarioDelCarrito(IClienteDelInventario cliente, IRel
         var vistas = new HashSet<Guid>();
         foreach (var edicion in respuesta.Ediciones)
         {
-            if (edicion is null || !pedidas.Contains(edicion.EdicionId) || !vistas.Add(edicion.EdicionId) || edicion.VendibleEnLaRed < 0)
+            if (edicion is null || !pedidas.Contains(edicion.EdicionId) || !vistas.Add(edicion.EdicionId) || edicion.VendibleEnLaRed < 0 || !SonValidas(edicion.Fuentes))
             {
                 return false;
             }
@@ -98,6 +98,10 @@ public sealed class RestInventarioDelCarrito(IClienteDelInventario cliente, IRel
 
         return vistas.Count == pedidas.Count;
     }
+    /// <summary>El desglose por sucursal debe venir, con cada sucursal una sola vez y sin cantidades negativas (SEG-13).</summary>
+    private static bool SonValidas(IReadOnlyList<FuenteConVendible>? fuentes) =>
+        fuentes is not null && fuentes.All(f => f is { CodigoDeFuente.Length: > 0, Vendible: >= 0 }) && fuentes.Select(f => f.CodigoDeFuente).Distinct(StringComparer.Ordinal).Count() == fuentes.Count;
+
 
     public async Task<ListaDeSucursales?> ListarSucursales(CancellationToken cancelacion = default)
     {
@@ -138,7 +142,7 @@ public sealed class RestInventarioDelCarrito(IClienteDelInventario cliente, IRel
         ResultadoDelInventario<RespuestaDeConsultaPrevia> resultado;
         try
         {
-            resultado = await cliente.ConsultarPrevia(new ConsultaPrevia(Tipo(entrega.Tipo), entrega.CodigoDeSucursalDeRecojo, entrega.RegionDeEntrega, [.. lineas.Select(l => new LineaDeSolicitud(l.LineaId, l.EdicionId, l.Cantidad))]), cancelacion).ConfigureAwait(false);
+            resultado = await cliente.ConsultarPrevia(new ConsultaPrevia(Tipo(entrega.Tipo), null, entrega.RegionDeEntrega, [.. lineas.Select(l => new LineaDeSolicitud(l.LineaId, l.EdicionId, l.Cantidad))]), cancelacion).ConfigureAwait(false);
         }
         catch (Exception excepcion) when (excepcion is not OperationCanceledException)
         {
@@ -178,7 +182,7 @@ public sealed class RestInventarioDelCarrito(IClienteDelInventario cliente, IRel
         ResultadoDelInventario<ReservaDelInventario> resultado;
         try
         {
-            var solicitud = new SolicitudDeReservaDeStock(pedidoId, Tipo(entrega.Tipo), entrega.CodigoDeSucursalDeRecojo, entrega.RegionDeEntrega, [.. lineas.Select(l => new LineaDeSolicitud(l.LineaId, l.EdicionId, l.Cantidad))]);
+            var solicitud = new SolicitudDeReservaDeStock(pedidoId, Tipo(entrega.Tipo), null, entrega.RegionDeEntrega, [.. lineas.Select(l => new LineaDeSolicitud(l.LineaId, l.EdicionId, l.Cantidad))]);
             resultado = await cliente.Reservar(solicitud, ClaveDeReserva.Para(pedidoId, generacionDeReserva), cancelacion).ConfigureAwait(false);
         }
         catch (Exception excepcion) when (excepcion is not OperationCanceledException)

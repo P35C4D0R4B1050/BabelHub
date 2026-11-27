@@ -75,6 +75,8 @@ public sealed class DevolucionesConPagosRealTests(PostgresDelEcommerceCompletoFi
         servicios.AddSingleton<IReloj>(_reloj);
         servicios.RemoveAll<IInventarioDelCarrito>();
         servicios.AddSingleton<IInventarioDelCarrito>(_inventarioDelCarrito);
+        servicios.RemoveAll<BabelHub.Ecommerce.Application.Web.IPreferenciaDeSucursal>();
+        servicios.AddSingleton(BabelHub.IntegrationTests.Carrito.SucursalesDelCarrito.Preferencia());
         servicios.RemoveAll<IReservasDelPago>();
         servicios.AddSingleton<IReservasDelPago>(_reservasDelPago);
         servicios.RemoveAll<IReservasDelPedido>();
@@ -108,9 +110,9 @@ public sealed class DevolucionesConPagosRealTests(PostgresDelEcommerceCompletoFi
         var privacidad = await anfitrion.Como(ActorActual.DelSistema(), sp => sp.GetRequiredService<ITextosLegales>().Obtener(TipoDeTextoLegal.Privacidad));
         Assert.True(terminos.EsExito && privacidad.EsExito);
         TextoVistoDeCompra[] textos = [new(TextoLegalDeCompra.Terminos, terminos.Valor.Version), new(TextoLegalDeCompra.Privacidad, privacidad.Valor.Version)];
-        Assert.True((await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICarritoDelCliente>().AgregarLinea(new AgregarLineaEntrada(EdicionImpresa, 1)))).EsExito);
+        Assert.True((await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICarritoDelCliente>().AgregarLinea(new AgregarLineaEntrada(EdicionImpresa, 1, CodigoDeSucursal: "sede-central")))).EsExito);
         Assert.True((await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().Iniciar(new IniciarCheckoutEntrada()))).EsExito);
-        var entrega = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().ElegirEntrega(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, null, new ContactoDeCompra("Rosa Quispe Ficticia", "987654321", "Jr. Ficticio 123, Ayacucho", "ayacucho"))));
+        var entrega = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().ElegirEntrega(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, new ContactoDeCompra("Rosa Quispe Ficticia", "987654321", "Jr. Ficticio 123, Ayacucho", "ayacucho"))));
         Assert.True(entrega.EsExito, entrega.Error?.Clave);
         Assert.True((await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().RegistrarAceptaciones(new RegistrarAceptacionesEntrada(textos)))).EsExito);
         var total = entrega.Valor.Total;

@@ -73,14 +73,14 @@ public sealed class RepositorioDeCarritosPostgres(AccesoAlEsquemaDelCarrito acce
     {
         var lineas = new List<LineaDeCarrito>();
         await using var comando = new NpgsqlCommand(
-            "SELECT edicion_id, es_digital, cantidad, agregada_en, retiro_pendiente FROM carrito.lineas_de_carrito WHERE carrito_id = @carrito ORDER BY posicion",
+            "SELECT linea_id, edicion_id, es_digital, codigo_de_sucursal, cantidad, agregada_en, retiro_pendiente FROM carrito.lineas_de_carrito WHERE carrito_id = @carrito ORDER BY posicion",
             conexion,
             transaccion);
         comando.Parameters.AddWithValue("carrito", carritoId);
         await using var filas = await comando.ExecuteReaderAsync(token).ConfigureAwait(false);
         while (await filas.ReadAsync(token).ConfigureAwait(false))
         {
-            lineas.Add(LineaDeCarrito.Crear(filas.GetGuid(0), filas.GetBoolean(1), Cantidad.Crear(filas.GetInt32(2)), AccesoAlEsquemaDelCarrito.LeerInstante(filas, 3)!.Value, filas.GetBoolean(4)));
+            lineas.Add(LineaDeCarrito.Crear(filas.GetGuid(0), filas.GetGuid(1), filas.GetBoolean(2), AccesoAlEsquemaDelCarrito.LeerTexto(filas, 3), Cantidad.Crear(filas.GetInt32(4)), AccesoAlEsquemaDelCarrito.LeerInstante(filas, 5)!.Value, filas.GetBoolean(6)));
         }
 
         return lineas;
@@ -166,11 +166,13 @@ public sealed class RepositorioDeCarritosPostgres(AccesoAlEsquemaDelCarrito acce
         foreach (var linea in carrito.Lineas)
         {
             await using var comando = new NpgsqlCommand(
-                "INSERT INTO carrito.lineas_de_carrito (carrito_id, edicion_id, posicion, cantidad, es_digital, agregada_en, retiro_pendiente) VALUES (@carrito, @edicion, @posicion, @cantidad, @digital, @agregada, @retiro)",
+                "INSERT INTO carrito.lineas_de_carrito (carrito_id, linea_id, edicion_id, codigo_de_sucursal, posicion, cantidad, es_digital, agregada_en, retiro_pendiente) VALUES (@carrito, @linea, @edicion, @sucursal, @posicion, @cantidad, @digital, @agregada, @retiro)",
                 conexion,
                 transaccion);
             comando.Parameters.AddWithValue("carrito", carrito.Id);
+            comando.Parameters.AddWithValue("linea", linea.LineaId);
             comando.Parameters.AddWithValue("edicion", linea.EdicionId);
+            comando.Parameters.AddWithValue("sucursal", NpgsqlTypes.NpgsqlDbType.Text, AccesoAlEsquemaDelCarrito.ONulo(linea.CodigoDeSucursal));
             comando.Parameters.AddWithValue("posicion", posicion++);
             comando.Parameters.AddWithValue("cantidad", linea.Cantidad.Valor);
             comando.Parameters.AddWithValue("digital", linea.EsDigital);

@@ -18,7 +18,7 @@ public sealed class AceptacionesTests
 
     private static Guid Edicion(int n) => new(n, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1);
 
-    private static LineaParaCheckout Impreso(int n) => new(Edicion(n), false, $"Libro {n}", "9780000000019", 1, 50m);
+    private static LineaParaCheckout Impreso(int n) => new(Edicion(n), false, $"Libro {n}", "9780000000019", 1, 50m, Edicion(n), Sucursal.Principal);
 
     private static LineaParaCheckout Digital(int n) => new(Edicion(n), true, $"Digital {n}", "9780000000026", 1, 20m);
 
@@ -27,7 +27,7 @@ public sealed class AceptacionesTests
         var checkout = Checkout.Iniciar(Guid.NewGuid(), Cuenta, CarritoId, lineas, () => LineaFija, Ahora);
         if (checkout.RequiereEntrega)
         {
-            checkout.ElegirRecojo("lima", Ahora);
+            checkout.ElegirRecojo(Ahora);
         }
 
         return checkout;

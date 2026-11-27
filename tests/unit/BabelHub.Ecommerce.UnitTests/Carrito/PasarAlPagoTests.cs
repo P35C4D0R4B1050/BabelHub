@@ -23,12 +23,12 @@ public sealed class PasarAlPagoTests
     {
         var e = EntornoDelCarrito.DeCliente();
         var impreso = soloDigital ? Guid.Empty : e.Impreso(10, 40m, "Impreso");
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(soloDigital ? e.Digital(20m) : impreso, soloDigital ? 1 : 3));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(soloDigital ? e.Digital(20m) : impreso, soloDigital ? 1 : 3, CodigoDeSucursal: Sucursal.Principal));
         await new IniciarCheckout(e.ServiciosDelCheckout()).Ejecutar(new IniciarCheckoutEntrada());
         if (!soloDigital)
         {
             e.Inventario.FijarFuente(impreso, "sede-central", false, null);
-            await new ElegirEntrega(e.ServiciosDelCheckout()).Ejecutar(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, "sede-central", null));
+            await new ElegirEntrega(e.ServiciosDelCheckout()).Ejecutar(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo));
         }
 
         var textos = soloDigital ? Los3 : Los2;

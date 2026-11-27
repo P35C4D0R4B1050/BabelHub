@@ -61,10 +61,24 @@ internal sealed class DisponibilidadDeCarritoFalsa : IDisponibilidadDeEdiciones
             edicionId,
             vendible > 0 ? EstadoDeDisponibilidad.Disponible : EstadoDeDisponibilidad.Agotada,
             vendible,
-            [],
+            vendible > 0 ? [new DisponibilidadPorFuente(Sucursal.Principal, "Sede central", vendible)] : [],
             frescura,
             DateTimeOffset.UnixEpoch,
             null);
+
+    /// <summary>Lo vendible de un impreso en cada sucursal indicada.</summary>
+    public void VendibleEn(Guid edicionId, params (string Sucursal, int Vendible)[] porSucursal)
+    {
+        var total = porSucursal.Sum(s => s.Vendible);
+        _datos[edicionId] = new DisponibilidadDeEdicion(
+            edicionId,
+            total > 0 ? EstadoDeDisponibilidad.Disponible : EstadoDeDisponibilidad.Agotada,
+            total,
+            [.. porSucursal.Where(s => s.Vendible > 0).Select(s => new DisponibilidadPorFuente(s.Sucursal, s.Sucursal, s.Vendible))],
+            FrescuraDeLaDisponibilidad.Reciente,
+            DateTimeOffset.UnixEpoch,
+            null);
+    }
 
     public void Digital(Guid edicionId) =>
         _datos[edicionId] = new DisponibilidadDeEdicion(edicionId, EstadoDeDisponibilidad.DisponibleAlInstante, null, [], FrescuraDeLaDisponibilidad.Reciente, null, null);
@@ -549,10 +563,14 @@ internal sealed class EntornoDelCarrito
 
     /// <summary>Los servicios compartidos de los casos de uso, armados con los dobles de este entorno.</summary>
     public ServiciosDelCarrito Servicios() =>
-        new(new AutorizadorDelCarrito(Actor, Denegaciones), Catalogo, Disponibilidad, Posesion, Cuenta, Limites, Carritos, Checkouts, Identificadores, Reloj, Unidad, new EdicionConCheckoutVivo(Pagos, Checkouts), Auditoria);
+        new(new AutorizadorDelCarrito(Actor, Denegaciones), Catalogo, Disponibilidad, Posesion, Cuenta, Limites, Carritos, Checkouts, Identificadores, Reloj, Unidad, new EdicionConCheckoutVivo(Pagos, Checkouts), Auditoria, Sucursales);
 
     /// <summary>Los servicios del checkout: los del carrito más el Inventario y el costo de envío.</summary>
-    public ServiciosDelCheckout ServiciosDelCheckout() => new(Servicios(), Inventario, Costo, Textos, Consentimiento, Marca, Huellas, Alertas);
+    public ServiciosDelCheckout ServiciosDelCheckout() => new(Servicios(), Inventario, Costo, Textos, Consentimiento, Marca, Huellas, Alertas, Tarifas);
+
+    public SucursalesDeCarritoFalsas Sucursales { get; } = new();
+
+    public TarifasDeEnvioEnMemoria Tarifas { get; } = new();
 
     public static EntornoDelCarrito DeCliente(Guid? cuenta = null) => new(ActorDePrueba.DeCliente(cuenta));
 
@@ -686,7 +704,7 @@ internal sealed class CostoDeEnvioFijo(decimal soles) : ICostoDeEnvioConfigurado
 /// <summary>El Inventario visto por Carrito: stock y fuente por edición configurables, con contadores de consultas y un interruptor de caído. Reservar y liberar se configuran con sus resultados (T18, T20).</summary>
 internal sealed class InventarioDelCarritoFalso : IInventarioDelCarrito
 {
-    private readonly Dictionary<Guid, int> _stock = [];
+    private readonly Dictionary<Guid, Dictionary<string, int>> _stock = [];
     private readonly Dictionary<Guid, (string Fuente, bool Traslado, int? Plazo)> _fuentes = [];
 
     public bool Caido { get; set; }
@@ -701,6 +719,10 @@ internal sealed class InventarioDelCarritoFalso : IInventarioDelCarrito
 
     public EntregaParaElInventario? UltimaEntregaPrevia { get; private set; }
 
+    public IReadOnlyList<LineaParaElInventario> UltimasLineasPrevias { get; private set; } = [];
+
+    public void ReiniciarContadores() => (ConsultasPrevias, ConsultasDeDisponibilidad) = (0, 0);
+
     public ResultadoDeReservar AlReservar { get; set; } = ResultadoDeReservar.De(TipoDeResultadoDeReservar.NoDisponible);
 
     public ResultadoDeLiberar AlLiberar { get; set; } = ResultadoDeLiberar.Liberada;
@@ -711,7 +733,15 @@ internal sealed class InventarioDelCarritoFalso : IInventarioDelCarrito
 
     public ListaDeSucursales? Sucursales { get; set; } = new([new("sede-central", "Sede central", "ayacucho"), new("cusco", "Cusco", "cusco")], EntornoDelCarrito.Inicio, false);
 
-    public void FijarStock(Guid edicionId, int vendible) => _stock[edicionId] = vendible;
+    public void FijarStock(Guid edicionId, int vendible, string sucursal = Sucursal.Principal)
+    {
+        if (!_stock.TryGetValue(edicionId, out var porSucursal))
+        {
+            _stock[edicionId] = porSucursal = [];
+        }
+
+        porSucursal[sucursal] = vendible;
+    }
 
     /// <summary>El Inventario no conoce la edición: sale en <c>noRegistradas</c>.</summary>
     public void Olvidar(Guid edicionId) => _stock.Remove(edicionId);
@@ -727,7 +757,7 @@ internal sealed class InventarioDelCarritoFalso : IInventarioDelCarrito
             return Task.FromResult(RespuestaDelInventarioDelCarrito<StockDeVariasEdiciones>.SinRespuesta);
         }
 
-        var conocidas = edicionIds.Where(_stock.ContainsKey).Select(id => new StockDeEdicion(id, _stock[id])).ToList();
+        var conocidas = edicionIds.Where(_stock.ContainsKey).Select(id => new StockDeEdicion(id, _stock[id].Values.Sum(), new Dictionary<string, int>(_stock[id]))).ToList();
         var noRegistradas = edicionIds.Where(id => !_stock.ContainsKey(id)).ToList();
         return Task.FromResult(RespuestaDelInventarioDelCarrito<StockDeVariasEdiciones>.ConValor(new StockDeVariasEdiciones(conocidas, noRegistradas, EntornoDelCarrito.Inicio)));
     }
@@ -736,17 +766,29 @@ internal sealed class InventarioDelCarritoFalso : IInventarioDelCarrito
     {
         ConsultasPrevias++;
         UltimaEntregaPrevia = entrega;
+        UltimasLineasPrevias = lineas;
         if (Caido || PreviaCaida)
         {
             return Task.FromResult(RespuestaDelInventarioDelCarrito<ConsultaPreviaDelInventario>.SinRespuesta);
         }
 
-        var selecciones = lineas.Select(l =>
+        var apartado = new Dictionary<(Guid, string), int>();
+        var selecciones = new List<SeleccionDeLinea>();
+        foreach (var l in lineas)
         {
-            var (fuente, traslado, plazo) = _fuentes.GetValueOrDefault(l.EdicionId, ("sede-central", false, (int?)null));
-            var hay = _stock.GetValueOrDefault(l.EdicionId) >= l.Cantidad;
-            return new SeleccionDeLinea(l.LineaId, l.EdicionId, hay, hay ? fuente : null, traslado, plazo, _stock.GetValueOrDefault(l.EdicionId));
-        }).ToList();
+            var fijada = _fuentes.GetValueOrDefault(l.EdicionId, (Sucursal.Principal, false, (int?)null));
+            var sucursal = l.CodigoDeSucursal ?? fijada.Item1;
+            var enLaSucursal = _stock.TryGetValue(l.EdicionId, out var porSucursal) ? porSucursal.GetValueOrDefault(sucursal) : 0;
+            var antes = apartado.GetValueOrDefault((l.EdicionId, sucursal));
+            var hay = antes + l.Cantidad <= enLaSucursal;
+            if (hay)
+            {
+                apartado[(l.EdicionId, sucursal)] = antes + l.Cantidad;
+            }
+
+            selecciones.Add(new SeleccionDeLinea(l.LineaId, l.EdicionId, hay, hay ? (_fuentes.ContainsKey(l.EdicionId) ? fijada.Item1 : sucursal) : null, fijada.Item2, fijada.Item3, porSucursal?.Values.Sum() ?? 0, enLaSucursal));
+        }
+
         return Task.FromResult(RespuestaDelInventarioDelCarrito<ConsultaPreviaDelInventario>.ConValor(new ConsultaPreviaDelInventario(selecciones, EntornoDelCarrito.Inicio)));
     }
 

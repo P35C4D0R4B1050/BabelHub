@@ -5,7 +5,6 @@
     var enEdicion = checkout.Estado == EstadoVisibleDelCheckout.EnEdicion;
     var tipo = checkout.TipoDeEntrega;
     var pedido = checkout.PedidoId?.ToString("D");
-    var sucursalElegida = checkout.CodigoDeSucursalDeRecojo ?? Model.SucursalPreferida;
     var contacto = checkout.Contacto;
     string Campo(string nombre, string? guardado) => Model.Valores.ContainsKey(nombre) ? Model.Valor(nombre) : guardado ?? string.Empty;
 }
@@ -28,6 +27,15 @@
             <h2 class="font-semibold">@Model.AlertaTitulo</h2>
             <p>@Model.AlertaMensaje</p>
         </div>
+    </div>
+}
+
+@if (checkout.TieneLineasSinSucursal)
+{
+    <div class="alert alert-warning alert-vertical sm:alert-horizontal mb-6" role="status">
+        <bh-icono nombre="aviso" />
+        <span>Tienes libros agregados antes de la venta por sucursal. Quítalos del carrito y agrégalos otra vez eligiendo la sucursal. No se hizo ningún cobro.</span>
+        <a class="btn btn-sm" href="/carrito">Ir al carrito</a>
     </div>
 }
 
@@ -62,6 +70,10 @@
                         <div class="min-w-0 space-y-1">
                             <p class="font-medium">@linea.Titulo</p>
                             <p class="text-sm opacity-80">@linea.FormatoTexto · @linea.Cantidad × @linea.PrecioTexto</p>
+                            @if (linea.Sucursal is not null)
+                            {
+                                <p class="flex items-center gap-1 text-sm"><bh-icono nombre="sucursal" clase="size-4" /><span>Lo atiende <strong>@linea.Sucursal</strong></span></p>
+                            }
                             <div class="flex flex-wrap items-center gap-2">
                                 <vc:bh-disponibilidad modelo="@linea.Disponibilidad" />
                                 @if (linea.Plazo is not null)
@@ -98,28 +110,14 @@
                         <input type="hidden" name="tipoDeEntrega" value="recojo" />
                         @if (pedido is not null) { <input type="hidden" name="pedidoId" value="@pedido" /> }
                         <h3 class="flex items-center gap-2 font-semibold">Recojo en sucursal @if (tipo == TipoDeEntregaDeCompra.Recojo) { <span class="badge badge-primary">Elegido</span> }</h3>
-                        <p class="text-sm opacity-80">Gratis · te avisamos cuando esté listo.</p>
-                        @if (Model.SucursalesDeRecojo.Count == 0)
-                        {
-                            <p class="text-sm" role="status">No pudimos cargar las sucursales ahora. <a class="link" href="/checkout">Reintentar</a></p>
-                        }
-                        else
-                        {
-                            <label class="flex flex-col gap-1 text-sm">
-                                <span>Sucursal de recojo</span>
-                                <select name="sucursal" class="select w-full" aria-invalid="@(Model.Error("sucursal") is null ? "false" : "true")" aria-describedby="@(Model.Error("sucursal") is null ? null : "error-sucursal")">
-                                    @foreach (var s in Model.SucursalesDeRecojo)
-                                    {
-                                        <option value="@s.Codigo" selected="@(s.Codigo == (Model.Valor("sucursal") is { Length: > 0 } v ? v : sucursalElegida))">@s.Nombre</option>
-                                    }
-                                </select>
-                            </label>
-                            @if (Model.Error("sucursal") is { } errorSucursal)
+                        <p class="text-sm opacity-80">Gratis: cada libro se recoge en la sucursal que lo atiende. Te avisamos cuando esté listo.</p>
+                        <ul class="space-y-1 text-sm">
+                            @foreach (var linea in Model.Lineas.Where(l => l.Sucursal is not null))
                             {
-                                <p id="error-sucursal" class="text-sm text-error">@errorSucursal</p>
+                                <li>@linea.Cantidad × @linea.Titulo — <strong>@linea.Sucursal</strong></li>
                             }
-                            <bh-accion-de-cambio><button type="submit" class="btn btn-primary btn-sm">Elegir recojo</button></bh-accion-de-cambio>
-                        }
+                        </ul>
+                        <bh-accion-de-cambio><button type="submit" class="btn btn-primary btn-sm">Elegir recojo</button></bh-accion-de-cambio>
                     </form>
 
                     <form method="post" action="/checkout/entrega" class="space-y-3 rounded-box border @(tipo == TipoDeEntregaDeCompra.Domicilio ? "border-primary" : "border-base-300") bg-base-100 p-4" novalidate>
@@ -127,7 +125,7 @@
                         <input type="hidden" name="tipoDeEntrega" value="domicilio" />
                         @if (pedido is not null) { <input type="hidden" name="pedidoId" value="@pedido" /> }
                         <h3 class="flex items-center gap-2 font-semibold">Despacho a domicilio @if (tipo == TipoDeEntregaDeCompra.Domicilio) { <span class="badge badge-primary">Elegido</span> }</h3>
-                        <p class="text-sm opacity-80">Con guía de envío. El costo se suma al total.</p>
+                        <p class="text-sm opacity-80">Con guía de envío. Cada sucursal que atiende tu pedido cobra su envío.</p>
                         @{
                             var campos = new (string Nombre, string Etiqueta, string Tipo, string Autocompletar, string? Ayuda, string Valor)[]
                             {
@@ -171,7 +169,7 @@
                 <h2 id="titulo-datos" class="font-display text-2xl">Tus datos y aceptaciones</h2>
                 @if (tipo == TipoDeEntregaDeCompra.Recojo)
                 {
-                    <p class="mt-1 text-sm opacity-80">Recogerás tus impresos en la sucursal que elegiste. Te avisamos cuando estén listos.</p>
+                    <p class="mt-1 text-sm opacity-80">Recogerás cada impreso en la sucursal que lo atiende. Te avisamos cuando estén listos.</p>
                 }
                 else if (tipo == TipoDeEntregaDeCompra.Domicilio)
                 {
@@ -278,6 +276,10 @@
         <dl class="mt-3 space-y-1 border-t border-base-300 pt-3 text-sm">
             <div class="flex justify-between"><dt>Subtotal</dt><dd>@Model.SubtotalTexto</dd></div>
             <div class="flex justify-between"><dt>Envío</dt><dd>@Model.EnvioTexto</dd></div>
+            @foreach (var envio in Model.Envios)
+            {
+                <div class="flex justify-between gap-2 pl-3 text-xs opacity-80"><dt>Envío de @envio.Sucursal</dt><dd>@envio.ImporteTexto</dd></div>
+            }
             <div class="flex justify-between pt-1 font-display text-xl"><dt>Total</dt><dd>@Model.TotalTexto</dd></div>
         </dl>
         <p class="mt-3 text-xs opacity-80">@(Model.HayDigitales && !Model.HayImpresos ? "Compra 100 % digital: sin entrega." : Model.HayDigitales ? "Un solo cobro por impresos y digitales." : "Reservamos tus impresos 15 minutos cuando inicias el pago.")</p>

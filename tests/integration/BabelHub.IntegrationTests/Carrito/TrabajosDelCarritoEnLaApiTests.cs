@@ -70,6 +70,7 @@ public sealed class TrabajosDelCarritoEnLaApiTests
         servicios.AddSingleton(Doble<IConexionDeLaUnidadDeTrabajo>());
         servicios.AddSingleton(Doble<IClienteDelInventario>());
         servicios.AddSingleton(Doble<ITextosLegales>());
+        servicios.AddSingleton(Doble<BabelHub.Ecommerce.Application.Web.IPreferenciaDeSucursal>());
         servicios.AddSingleton(Doble<ICalculadorDeHuella>());
         servicios.AgregarCarrito(AppSettingsOpcionesDeEnvio.Desde("12.00"), esProduccion: false);
         return (servicios, actor, registro, denegaciones);

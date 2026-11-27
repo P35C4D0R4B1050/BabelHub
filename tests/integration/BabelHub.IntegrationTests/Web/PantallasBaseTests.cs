@@ -287,55 +287,23 @@ public sealed partial class PantallasBaseTests
         Assert.False(respuesta.Headers.TryGetValues("Set-Cookie", out var cookies) && cookies.Any(c => c.StartsWith("bh-tema=", StringComparison.Ordinal)));
     }
 
+    // ---------- Sucursal preferida (WEB-16): sin selector en la cabecera ----------
+
     [Fact]
     [Trait("Criterio", "AC-WEB-12")]
-    public async Task Un_cliente_que_eligio_Ayacucho_la_conserva_cuando_vuelve_otro_dia()
+    public async Task La_cabecera_no_tiene_selector_de_sucursal_ni_existe_su_ruta()
     {
         await using var anfitrion = await AnfitrionWeb.Iniciar(s => s.AddSingleton<IListaDeSucursales>(new ListaDePrueba(AyacuchoYLima)));
+        using var conCookie = new HttpRequestMessage(HttpMethod.Get, "/");
+        conCookie.Headers.Add("Cookie", "bh-sucursal=AYA");
 
+        var html = await Texto(await anfitrion.Cliente.SendAsync(conCookie));
         using var eleccion = await Publicar(anfitrion, "/preferencias/sucursal", new() { ["sucursal"] = "AYA" });
-        var cookie = eleccion.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith("bh-sucursal=", StringComparison.Ordinal));
-        Assert.StartsWith("bh-sucursal=AYA", cookie, StringComparison.Ordinal);
-        Assert.Contains("max-age=31536000", cookie, StringComparison.OrdinalIgnoreCase);
 
-        using var vuelta = new HttpRequestMessage(HttpMethod.Get, "/");
-        vuelta.Headers.Add("Cookie", "bh-sucursal=AYA");
-        var html = await Texto(await anfitrion.Cliente.SendAsync(vuelta));
-
-        Assert.Matches(@"<option value=""AYA""\s+selected", html);
-        Assert.DoesNotMatch(@"<option value=""LIM""\s+selected", html);
-        Assert.Contains("for=\"bh-sucursal\"", html, StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData("XXX")]
-    [InlineData("")]
-    [InlineData("AYA; Path=/admin")]
-    [Trait("Criterio", "AC-WEB-12")]
-    public async Task Una_sucursal_que_no_esta_en_la_lista_no_se_guarda(string sucursal)
-    {
-        await using var anfitrion = await AnfitrionWeb.Iniciar(s => s.AddSingleton<IListaDeSucursales>(new ListaDePrueba(AyacuchoYLima)));
-
-        using var respuesta = await Publicar(anfitrion, "/preferencias/sucursal", new() { ["sucursal"] = sucursal });
-
-        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
-        Assert.False(respuesta.Headers.TryGetValues("Set-Cookie", out var cookies) && cookies.Any(c => c.StartsWith("bh-sucursal=", StringComparison.Ordinal)));
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-WEB-12")]
-    public async Task Una_cookie_de_sucursal_que_no_esta_en_la_lista_no_se_usa_y_sin_lista_no_hay_selector()
-    {
-        await using var anfitrion = await AnfitrionWeb.Iniciar(s => s.AddSingleton<IListaDeSucursales>(new ListaDePrueba(AyacuchoYLima)));
-        using var manipulada = new HttpRequestMessage(HttpMethod.Get, "/");
-        manipulada.Headers.Add("Cookie", "bh-sucursal=\"><script>alert(1)</script>");
-
-        var html = await Texto(await anfitrion.Cliente.SendAsync(manipulada));
-
-        Assert.DoesNotContain("<script>alert(1)", html, StringComparison.Ordinal);
-        Assert.DoesNotMatch(@"<option value=""[A-Z]+""\s+selected", html);
-
-        await using var sinLista = await AnfitrionWeb.Iniciar();
-        Assert.DoesNotContain("id=\"bh-sucursal\"", await Texto(await sinLista.Cliente.GetAsync("/")), StringComparison.Ordinal);
+        Assert.DoesNotContain("bh-sucursal", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("/preferencias/sucursal", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("En tu sucursal", html, StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.NotFound, eleccion.StatusCode);
+        Assert.False(eleccion.Headers.TryGetValues("Set-Cookie", out var cookies) && cookies.Any(c => c.StartsWith("bh-sucursal=", StringComparison.Ordinal)));
     }
 }

@@ -2,6 +2,7 @@ using System.Globalization;
 using BabelHub.Ecommerce.Application.Catalogo;
 using BabelHub.Ecommerce.Application.Identidad;
 using BabelHub.Ecommerce.Application.Plataforma;
+using BabelHub.Ecommerce.Application.Web;
 using BabelHub.Ecommerce.Domain.Carrito;
 using CarritoDeDominio = BabelHub.Ecommerce.Domain.Carrito.Carrito;
 
@@ -25,13 +26,35 @@ internal sealed class ServiciosDelCarrito(
     IReloj reloj,
     IUnidadDeTrabajo unidad,
     EdicionConCheckoutVivo edicionConCheckoutVivo,
-    IAuditoriaDelCarrito auditoria)
+    IAuditoriaDelCarrito auditoria,
+    IPreferenciaDeSucursal sucursales)
 {
     public IAuditoriaDelCarrito Auditoria => auditoria;
 
-    /// <summary>El máximo que dice el Inventario para un impreso con dato fresco: el de la red, o cero si está agotado. <see langword="null"/> si no se puede confirmar (la línea se acepta, D03).</summary>
-    public static int? MaximoConocido(DisponibilidadDeEdicion? disponibilidad) =>
-        disponibilidad is { Estado: EstadoDeDisponibilidad.Disponible or EstadoDeDisponibilidad.Agotada } ? Math.Max(0, disponibilidad.VendibleEnLaRed ?? 0) : null;
+    /// <summary>La lista de sucursales registradas que alimenta la ficha (la última conocida, que no caduca, CAR-43): contra ella se comprueba la sucursal de cada línea (CAR-39).</summary>
+    public IPreferenciaDeSucursal Sucursales => sucursales;
+
+    /// <summary>
+    /// Lo vendible de un impreso en una sucursal con dato (reciente o de hasta 10 minutos): cero si está agotado o la sucursal no aparece. <see langword="null"/> si no se puede confirmar (la línea se acepta y decide el checkout, D03,
+    /// CAR-43).
+    /// </summary>
+    public static int? MaximoConocido(DisponibilidadDeEdicion? disponibilidad, string codigoDeSucursal) =>
+        disponibilidad is { Estado: EstadoDeDisponibilidad.Disponible or EstadoDeDisponibilidad.Agotada }
+            ? Math.Max(0, disponibilidad.PorFuente.Where(f => f.CodigoDeFuente == codigoDeSucursal).Sum(f => f.Vendible))
+            : null;
+
+    /// <summary>Lo vendible de cada sucursal de una edición con dato; <see langword="null"/> si no se puede confirmar.</summary>
+    public static IReadOnlyDictionary<string, int>? VendiblePorSucursal(DisponibilidadDeEdicion? disponibilidad) =>
+        disponibilidad is { Estado: EstadoDeDisponibilidad.Disponible or EstadoDeDisponibilidad.Agotada }
+            ? disponibilidad.PorFuente.GroupBy(f => f.CodigoDeFuente).ToDictionary(g => g.Key, g => Math.Max(0, g.Sum(f => f.Vendible)))
+            : null;
+
+    /// <summary>Los nombres de las sucursales conocidas por su código; vacío si no hay ninguna lista.</summary>
+    public async Task<IReadOnlyDictionary<string, string>> NombresDeSucursales(CancellationToken cancelacion)
+    {
+        var lista = await sucursales.Resolver(null, cancelacion).ConfigureAwait(false);
+        return lista.Sucursales.GroupBy(s => s.Codigo).ToDictionary(g => g.Key, g => g.First().Nombre);
+    }
 
     public AutorizadorDelCarrito Autorizador => autorizador;
 
@@ -153,7 +176,7 @@ internal sealed class ServiciosDelCarrito(
             return new VistaDelCarrito([], 0m, avisosVacios, false);
         }
 
-        var ids = carrito.Lineas.Select(l => l.EdicionId).ToList();
+        var ids = carrito.Lineas.Select(l => l.EdicionId).Distinct().ToList();
         var ediciones = new Dictionary<Guid, EdicionConsultada>(conocidas ?? new Dictionary<Guid, EdicionConsultada>());
         var catalogoFallo = false;
         var faltan = ids.Where(id => !ediciones.ContainsKey(id)).ToList();
@@ -184,6 +207,7 @@ internal sealed class ServiciosDelCarrito(
         }
 
         var lineas = new List<LineaDelCarritoVista>();
+        var nombres = carrito.Lineas.Any(l => l.CodigoDeSucursal is not null) ? await NombresDeSucursales(cancelacion).ConfigureAwait(false) : new Dictionary<string, string>();
         foreach (var linea in carrito.Lineas)
         {
             ediciones.TryGetValue(linea.EdicionId, out var edicion);
@@ -191,7 +215,12 @@ internal sealed class ServiciosDelCarrito(
             // Una edición que el Catálogo no devolvió por un fallo no es una edición retirada: no se marca así, y los precios quedan sin confirmar.
             var retirada = linea.RetiroPendiente || (edicion is null ? !catalogoFallo : edicion.Estado != EstadoDeEdicionConsultado.Activa);
             var precio = edicion?.Precio ?? 0m;
+            var sucursal = linea.CodigoDeSucursal;
+            var vendible = sucursal is null ? null : MaximoConocido(dato, sucursal);
+            // Hasta dónde puede subir esta línea: lo vendible de su sucursal menos lo que ya piden las otras líneas de la pareja, entre 1 y 20 (CAR-04).
+            int? maximoEditable = vendible is { } hay ? Math.Clamp(hay - (carrito.Unidades(linea.EdicionId, sucursal!) - linea.Cantidad.Valor), Cantidad.Minima, Cantidad.Maxima) : null;
             lineas.Add(new LineaDelCarritoVista(
+                linea.LineaId,
                 linea.EdicionId,
                 edicion?.Titulo ?? "Edición no disponible",
                 edicion?.Isbn,
@@ -200,7 +229,12 @@ internal sealed class ServiciosDelCarrito(
                 precio,
                 Soles.Importe(precio, linea.Cantidad.Valor),
                 dato,
-                retirada));
+                retirada,
+                sucursal,
+                sucursal is null ? null : nombres.GetValueOrDefault(sucursal, sucursal),
+                vendible,
+                maximoEditable,
+                linea.EsImpresoSinSucursal));
         }
 
         var subtotal = Soles.Redondear(lineas.Where(l => !l.Retirada).Sum(l => l.Importe));
@@ -478,32 +512,39 @@ internal abstract class EdicionDeLineaDelCarrito<TEntrada>(ServiciosDelCarrito s
         RechazoDeCarrito.CantidadInvalida => new ErrorDeAplicacion(CategoriaDeError.Validacion, ClavesDelCarrito.ValidacionFallida, [new ErrorDeCampo("cantidad", ConstructorDeValidacion.FueraDeRango)]),
         RechazoDeCarrito.TopeDeLineas => new ErrorDeAplicacion(CategoriaDeError.ReglaDeNegocio, ClavesDelCarrito.LimiteDeLineas),
         RechazoDeCarrito.TopeDeUnidades => new ErrorDeAplicacion(CategoriaDeError.ReglaDeNegocio, ClavesDelCarrito.LimiteDeUnidades),
-        RechazoDeCarrito.EdicionNoEstaEnElCarrito => new ErrorDeAplicacion(CategoriaDeError.NoEncontrado, ClavesDelCarrito.LineaNoEncontrada),
+        RechazoDeCarrito.LineaNoEstaEnElCarrito => LineaNoEncontrada(),
         RechazoDeCarrito.EdicionRetirada => new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.EdicionNoDisponible),
+        RechazoDeCarrito.SucursalRequerida => SucursalInvalida(ConstructorDeValidacion.Obligatorio),
+        RechazoDeCarrito.LineaSinSucursal => new ErrorDeAplicacion(CategoriaDeError.Validacion, ClavesDelCarrito.LineaSinSucursal),
         _ => new ErrorDeAplicacion(CategoriaDeError.NoEncontrado, ClavesDelCarrito.NoEncontrado),
     };
 
-    protected static ErrorDeAplicacion SinStock(int maximo) =>
-        new(CategoriaDeError.Conflicto, ClavesDelCarrito.SinStock, [new ErrorDeCampo("maximo", maximo.ToString(CultureInfo.InvariantCulture))]);
+    /// <summary>Una línea que no está en el carrito de quien pide, ajena o inexistente: la misma respuesta y sin evento de seguridad (una pestaña vieja no es un ataque; el carrito ajeno es CAR-35).</summary>
+    protected static ErrorDeAplicacion LineaNoEncontrada() => new(CategoriaDeError.NoEncontrado, ClavesDelCarrito.LineaNoEncontrada);
 
-    protected static int? MaximoConocido(DisponibilidadDeEdicion? disponibilidad) => ServiciosDelCarrito.MaximoConocido(disponibilidad);
+    protected static ErrorDeAplicacion SucursalInvalida(string clave) => new(CategoriaDeError.Validacion, ClavesDelCarrito.ValidacionFallida, [new ErrorDeCampo("sucursal", clave)]);
 
-    protected async Task<IReadOnlyDictionary<Guid, EdicionConsultada>?> EdicionesDeLaVista(Guid edicionId, CarritoDeDominio? existente, CancellationToken cancelacion)
+    /// <summary>Más unidades que lo vendible en la sucursal (CAR-04): lleva el máximo disponible en ella y su código.</summary>
+    protected static ErrorDeAplicacion SinStock(int maximo, string codigoDeSucursal) =>
+        new(CategoriaDeError.Conflicto, ClavesDelCarrito.SinStock, [new ErrorDeCampo("maximo", maximo.ToString(CultureInfo.InvariantCulture)), new ErrorDeCampo("sucursal", codigoDeSucursal)]);
+
+    protected async Task<IReadOnlyDictionary<Guid, EdicionConsultada>> EdicionesDeLaVista(CarritoDeDominio? existente, CancellationToken cancelacion)
     {
-        var ids = new HashSet<Guid> { edicionId };
-        if (existente is not null)
+        var ids = existente?.Lineas.Select(l => l.EdicionId).ToHashSet() ?? [];
+        if (ids.Count == 0)
         {
-            ids.UnionWith(existente.Lineas.Select(l => l.EdicionId));
+            return new Dictionary<Guid, EdicionConsultada>();
         }
 
         var consulta = await servicios.Catalogo.ObtenerEdiciones(ids, cancelacion).ConfigureAwait(false);
-        return consulta.EsExito ? consulta.Valor.ToDictionary(e => e.EdicionId) : null;
+        return consulta.EsExito ? consulta.Valor.ToDictionary(e => e.EdicionId) : new Dictionary<Guid, EdicionConsultada>();
     }
 }
 
 /// <summary>
-/// <c>AgregarLinea</c> (CAR-02, CAR-03, CAR-04, CAR-20; AC-CAR-02, AC-CAR-03, AC-CAR-18, AC-CAR-25, AC-CAR-32): suma una edición de 1 a 20 (la digital queda en una), rechaza la que el Catálogo no ofrece, la digital que la cuenta ya posee
-/// (solo con sesión) y más unidades de un impreso que el stock vendible de la red indicando el máximo; si no se puede confirmar el stock o la posesión, la línea se acepta (D03). Crea el carrito del visitante con su cookie.
+/// <c>AgregarLinea</c> (CAR-02, CAR-03, CAR-04, CAR-20, CAR-39, CAR-40; AC-CAR-02, AC-CAR-03, AC-CAR-18, AC-CAR-25, AC-CAR-32, AC-CAR-34, AC-CAR-35): agrega de 1 a 20 unidades de un impreso en una sucursal registrada (sumando a una línea
+/// de esa edición y sucursal o abriendo otra) o una digital (siempre una, sin sucursal). Rechaza la edición que el Catálogo no ofrece, la digital que la cuenta ya posee (solo con sesión) y, de un impreso, que las líneas de la sucursal
+/// sumen más que su stock vendible, indicando el máximo; si no se puede confirmar el stock o la posesión, la línea se acepta (D03). Crea el carrito del visitante con su cookie.
 /// </summary>
 internal sealed class AgregarLinea(ServiciosDelCarrito servicios) : EdicionDeLineaDelCarrito<AgregarLineaEntrada>(servicios)
 {
@@ -511,7 +552,7 @@ internal sealed class AgregarLinea(ServiciosDelCarrito servicios) : EdicionDeLin
 
     protected override string? Cookie(AgregarLineaEntrada entrada) => entrada.CookieDelVisitante;
 
-    protected override ResultadoDeValidacion Validar(AgregarLineaEntrada entrada) => ValidadorDeLineas.Validar(entrada.EdicionId, entrada.Cantidad);
+    protected override ResultadoDeValidacion Validar(AgregarLineaEntrada entrada) => ValidadorDeLineas.ParaAgregar(entrada.EdicionId, entrada.Cantidad, entrada.CodigoDeSucursal);
 
     protected override Resultado<ResultadoDeCarrito> SinCarritoRespuesta(VistaDelCarrito vacio, SolicitanteDelCarrito solicitante, string? cookie, AgregarLineaEntrada entrada) =>
         throw new InvalidOperationException("Agregar siempre puede crear el carrito.");
@@ -526,9 +567,10 @@ internal sealed class AgregarLinea(ServiciosDelCarrito servicios) : EdicionDeLin
         }
 
         var ediciones = consulta.Valor.ToDictionary(e => e.EdicionId);
+        var terreno = new TerrenoDeLaEdicion(ediciones, null);
         if (!ediciones.TryGetValue(entrada.EdicionId, out var edicion) || edicion.Estado != EstadoDeEdicionConsultado.Activa || edicion.MotivoDeNoDisponible is not null)
         {
-            return (new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.EdicionNoDisponible), new TerrenoDeLaEdicion(ediciones, null));
+            return (new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.EdicionNoDisponible), terreno);
         }
 
         if (edicion.Formato == FormatoDeEdicion.Digital)
@@ -537,10 +579,24 @@ internal sealed class AgregarLinea(ServiciosDelCarrito servicios) : EdicionDeLin
                 && await Servicios.Posesion.Posee(solicitante.CuentaId!.Value, [entrada.EdicionId], cancelacion).ConfigureAwait(false) is { Estado: EstadoDePosesion.Posee } poseida
                 && poseida.Poseidas.Contains(entrada.EdicionId))
             {
-                return (new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.DigitalYaPoseida), new TerrenoDeLaEdicion(ediciones, null));
+                return (new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.DigitalYaPoseida), terreno);
             }
 
-            return (null, new TerrenoDeLaEdicion(ediciones, null));
+            return (null, terreno);
+        }
+
+        // Un impreso exige una sucursal registrada (CAR-39): contra la lista de la ficha, que se conserva sin caducidad; sin ninguna lista conocida no se puede comprobar.
+        if (entrada.CodigoDeSucursal is null)
+        {
+            return (SucursalInvalida(ConstructorDeValidacion.Obligatorio), terreno);
+        }
+
+        if (await Servicios.Sucursales.Validar(entrada.CodigoDeSucursal, cancelacion).ConfigureAwait(false) is null)
+        {
+            var lista = await Servicios.Sucursales.Resolver(null, cancelacion).ConfigureAwait(false);
+            return (
+                lista.ListaDisponible ? SucursalInvalida(ConstructorDeValidacion.FormatoInvalido) : new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDelCarrito.ServicioNoDisponible),
+                terreno);
         }
 
         var disponibilidad = await Servicios.Disponibilidad.Consultar([entrada.EdicionId], cancelacion).ConfigureAwait(false);
@@ -551,35 +607,36 @@ internal sealed class AgregarLinea(ServiciosDelCarrito servicios) : EdicionDeLin
     protected override bool EsNoOp(AgregarLineaEntrada entrada, CarritoDeDominio existente) =>
         existente.Lineas.Any(l => l.EdicionId == entrada.EdicionId && l.EsDigital && !l.RetiroPendiente);
 
-    protected override ErrorDeAplicacion? Prevalidar(AgregarLineaEntrada entrada, CarritoDeDominio? existente, TerrenoDeLaEdicion terreno)
+    protected override ErrorDeAplicacion? Prevalidar(AgregarLineaEntrada entrada, CarritoDeDominio? existente, TerrenoDeLaEdicion terreno) =>
+        EsDigital(entrada, terreno) ? null : ExcesoDeStock(entrada, existente, terreno);
+
+    protected override ErrorDeAplicacion? Aplicar(ContextoDeEdicion contexto)
     {
-        var esDigital = terreno.Ediciones.TryGetValue(entrada.EdicionId, out var edicion) && edicion.Formato == FormatoDeEdicion.Digital;
-        if (esDigital || MaximoConocido(terreno.Disponibilidad) is not { } maximo)
+        var esDigital = EsDigital(contexto.Entrada, contexto.Terreno);
+
+        // El máximo se revalida al bloquear, contra lo que ya hay en el carrito (otro dispositivo pudo sumar mientras tanto).
+        if (!esDigital && ExcesoDeStock(contexto.Entrada, contexto.Carrito, contexto.Terreno) is { } exceso)
+        {
+            return exceso;
+        }
+
+        var resultado = contexto.Carrito.Agregar(Servicios.Identificadores.NuevoId(), contexto.Entrada.EdicionId, esDigital, contexto.Entrada.CodigoDeSucursal, contexto.Entrada.Cantidad, contexto.Ahora);
+        return resultado.EsExito ? null : DeRechazo(resultado.Rechazo!.Value);
+    }
+
+    private static bool EsDigital(AgregarLineaEntrada entrada, TerrenoDeLaEdicion terreno) =>
+        terreno.Ediciones.TryGetValue(entrada.EdicionId, out var edicion) && edicion.Formato == FormatoDeEdicion.Digital;
+
+    /// <summary>Que las líneas del libro en esa sucursal, con lo que se agrega, pasen de su stock vendible (CAR-04).</summary>
+    private static ErrorDeAplicacion? ExcesoDeStock(AgregarLineaEntrada entrada, CarritoDeDominio? carrito, TerrenoDeLaEdicion terreno)
+    {
+        var sucursal = entrada.CodigoDeSucursal!;
+        if (ServiciosDelCarrito.MaximoConocido(terreno.Disponibilidad, sucursal) is not { } maximo)
         {
             return null;
         }
 
-        var yaHay = existente?.Lineas.FirstOrDefault(l => l.EdicionId == entrada.EdicionId)?.Cantidad.Valor ?? 0;
-        return yaHay + entrada.Cantidad > maximo ? SinStock(maximo) : null;
-    }
-
-    protected override ErrorDeAplicacion? Aplicar(ContextoDeEdicion contexto)
-    {
-        var ediciones = contexto.Terreno.Ediciones;
-        var esDigital = ediciones.TryGetValue(contexto.Entrada.EdicionId, out var edicion) && edicion.Formato == FormatoDeEdicion.Digital;
-
-        // El máximo se revalida al bloquear, contra lo que ya hay en el carrito (otro dispositivo pudo sumar mientras tanto).
-        if (!esDigital && MaximoConocido(contexto.Terreno.Disponibilidad) is { } maximo)
-        {
-            var yaHay = contexto.Carrito.Lineas.FirstOrDefault(l => l.EdicionId == contexto.Entrada.EdicionId)?.Cantidad.Valor ?? 0;
-            if (yaHay + contexto.Entrada.Cantidad > maximo)
-            {
-                return SinStock(maximo);
-            }
-        }
-
-        var resultado = contexto.Carrito.Agregar(contexto.Entrada.EdicionId, esDigital, contexto.Entrada.Cantidad, contexto.Ahora);
-        return resultado.EsExito ? null : DeRechazo(resultado.Rechazo!.Value);
+        return (carrito?.Unidades(entrada.EdicionId, sucursal) ?? 0) + entrada.Cantidad > maximo ? SinStock(maximo, sucursal) : null;
     }
 
     private static HashSet<Guid> Ids(Guid edicionId, CarritoDeDominio? existente)
@@ -595,8 +652,8 @@ internal sealed class AgregarLinea(ServiciosDelCarrito servicios) : EdicionDeLin
 }
 
 /// <summary>
-/// <c>ModificarLinea</c> (CAR-02, CAR-04): cambia la cantidad de una línea. Subir por encima del stock vendible se rechaza con el máximo; bajar siempre se puede. Una línea que no está es «no encontrada»; una línea con
-/// retiro pendiente no se puede cambiar (solo quitar).
+/// <c>ModificarLinea</c> (CAR-02, CAR-04, CAR-38, CAR-44, CAR-45): cambia la cantidad de una línea del carrito de quien pide. Subir hasta que las líneas de su sucursal pasen del stock vendible se rechaza con el máximo (bajar siempre se puede)
+/// y más de 20 con el tope de unidades. Una línea que no está es «no encontrada»; una con retiro pendiente o sin sucursal no se puede cambiar (solo quitar).
 /// </summary>
 internal sealed class ModificarLinea(ServiciosDelCarrito servicios) : EdicionDeLineaDelCarrito<ModificarLineaEntrada>(servicios)
 {
@@ -604,52 +661,78 @@ internal sealed class ModificarLinea(ServiciosDelCarrito servicios) : EdicionDeL
 
     protected override string? Cookie(ModificarLineaEntrada entrada) => entrada.CookieDelVisitante;
 
-    protected override ResultadoDeValidacion Validar(ModificarLineaEntrada entrada) => ValidadorDeLineas.Validar(entrada.EdicionId, entrada.Cantidad);
+    protected override ResultadoDeValidacion Validar(ModificarLineaEntrada entrada) => ValidadorDeLineas.ParaModificar(entrada.LineaId, entrada.Cantidad);
 
     protected override Resultado<ResultadoDeCarrito> SinCarritoRespuesta(VistaDelCarrito vacio, SolicitanteDelCarrito solicitante, string? cookie, ModificarLineaEntrada entrada) =>
-        ServiciosDelCarrito.Fallo<ResultadoDeCarrito>(CategoriaDeError.NoEncontrado, ClavesDelCarrito.LineaNoEncontrada);
+        Resultado<ResultadoDeCarrito>.Fallo(LineaNoEncontrada());
 
     protected override async Task<(ErrorDeAplicacion? Error, TerrenoDeLaEdicion Terreno)> Preparar(ModificarLineaEntrada entrada, SolicitanteDelCarrito solicitante, CarritoDeDominio? existente, CancellationToken cancelacion)
     {
-        var ediciones = await EdicionesDeLaVista(entrada.EdicionId, existente, cancelacion).ConfigureAwait(false) ?? new Dictionary<Guid, EdicionConsultada>();
-        var esImpresa = existente?.Lineas.Any(l => l.EdicionId == entrada.EdicionId && !l.EsDigital) ?? false;
-        if (!esImpresa)
+        var linea = Linea(existente, entrada.LineaId);
+        var ediciones = await EdicionesDeLaVista(existente, cancelacion).ConfigureAwait(false);
+        if (linea?.CodigoDeSucursal is null)
         {
             return (null, new TerrenoDeLaEdicion(ediciones, null));
         }
 
-        var disponibilidad = await Servicios.Disponibilidad.Consultar([entrada.EdicionId], cancelacion).ConfigureAwait(false);
-        var dato = disponibilidad.EsExito ? disponibilidad.Valor.FirstOrDefault(d => d.EdicionId == entrada.EdicionId) : null;
+        var disponibilidad = await Servicios.Disponibilidad.Consultar([linea.EdicionId], cancelacion).ConfigureAwait(false);
+        var dato = disponibilidad.EsExito ? disponibilidad.Valor.FirstOrDefault(d => d.EdicionId == linea.EdicionId) : null;
         return (null, new TerrenoDeLaEdicion(ediciones, dato));
     }
 
     protected override bool EsNoOp(ModificarLineaEntrada entrada, CarritoDeDominio existente) =>
-        existente.Lineas.FirstOrDefault(l => l.EdicionId == entrada.EdicionId) is { RetiroPendiente: false } linea
-        && linea.Cantidad.Valor == (linea.EsDigital ? 1 : entrada.Cantidad);
+        Linea(existente, entrada.LineaId) is { RetiroPendiente: false } linea && linea.Cantidad.Valor == (linea.EsDigital ? 1 : entrada.Cantidad);
 
-    protected override ErrorDeAplicacion? Prevalidar(ModificarLineaEntrada entrada, CarritoDeDominio? existente, TerrenoDeLaEdicion terreno) =>
-        existente?.Lineas.FirstOrDefault(l => l.EdicionId == entrada.EdicionId) is { EsDigital: false } linea
-        && entrada.Cantidad > linea.Cantidad.Valor
-        && MaximoConocido(terreno.Disponibilidad) is { } maximo
-        && entrada.Cantidad > maximo
-            ? SinStock(maximo)
-            : null;
+    protected override ErrorDeAplicacion? Prevalidar(ModificarLineaEntrada entrada, CarritoDeDominio? existente, TerrenoDeLaEdicion terreno)
+    {
+        // Lo que se sabe que se rechazará se decide antes de reabrir la intención de Pagos.
+        if (Linea(existente, entrada.LineaId) is not { } linea)
+        {
+            return LineaNoEncontrada();
+        }
+
+        if (linea.RetiroPendiente || linea.EsDigital)
+        {
+            return null;
+        }
+
+        if (linea.EsImpresoSinSucursal)
+        {
+            return DeRechazo(RechazoDeCarrito.LineaSinSucursal);
+        }
+
+        return entrada.Cantidad > Cantidad.Maxima ? DeRechazo(RechazoDeCarrito.TopeDeUnidades) : ExcesoDeStock(entrada, existente!, linea, terreno);
+    }
 
     protected override ErrorDeAplicacion? Aplicar(ContextoDeEdicion contexto)
     {
-        var linea = contexto.Carrito.Lineas.FirstOrDefault(l => l.EdicionId == contexto.Entrada.EdicionId);
-        if (linea is { EsDigital: false } && contexto.Entrada.Cantidad > linea.Cantidad.Valor && MaximoConocido(contexto.Terreno.Disponibilidad) is { } maximo && contexto.Entrada.Cantidad > maximo)
+        if (Linea(contexto.Carrito, contexto.Entrada.LineaId) is { CodigoDeSucursal: not null, RetiroPendiente: false } linea
+            && ExcesoDeStock(contexto.Entrada, contexto.Carrito, linea, contexto.Terreno) is { } exceso)
         {
-            return SinStock(maximo);
+            return exceso;
         }
 
-        var resultado = contexto.Carrito.Modificar(contexto.Entrada.EdicionId, contexto.Entrada.Cantidad, contexto.Ahora);
+        var resultado = contexto.Carrito.Modificar(contexto.Entrada.LineaId, contexto.Entrada.Cantidad, contexto.Ahora);
         return resultado.EsExito ? null : DeRechazo(resultado.Rechazo!.Value);
+    }
+
+    private static LineaDeCarrito? Linea(CarritoDeDominio? carrito, Guid lineaId) => carrito?.Lineas.FirstOrDefault(l => l.LineaId == lineaId);
+
+    /// <summary>Solo al subir: que las líneas del libro en la sucursal, con la nueva cantidad, pasen de su stock vendible.</summary>
+    private static ErrorDeAplicacion? ExcesoDeStock(ModificarLineaEntrada entrada, CarritoDeDominio carrito, LineaDeCarrito linea, TerrenoDeLaEdicion terreno)
+    {
+        var sucursal = linea.CodigoDeSucursal!;
+        if (entrada.Cantidad <= linea.Cantidad.Valor || ServiciosDelCarrito.MaximoConocido(terreno.Disponibilidad, sucursal) is not { } maximo)
+        {
+            return null;
+        }
+
+        return carrito.Unidades(linea.EdicionId, sucursal) - linea.Cantidad.Valor + entrada.Cantidad > maximo ? SinStock(maximo, sucursal) : null;
     }
 }
 
 /// <summary>
-/// <c>EliminarLinea</c> (CAR-02): quita una línea; repetirlo, o quitar sin carrito, es un éxito sin cambios (idempotente). Es la operación que se permite sobre una línea con retiro pendiente.
+/// <c>EliminarLinea</c> (CAR-02): quita una línea del carrito de quien pide; una que no está en él es «no encontrada». Es la operación que se permite sobre una línea con retiro pendiente o sin sucursal.
 /// </summary>
 internal sealed class EliminarLinea(ServiciosDelCarrito servicios) : EdicionDeLineaDelCarrito<EliminarLineaEntrada>(servicios)
 {
@@ -657,44 +740,74 @@ internal sealed class EliminarLinea(ServiciosDelCarrito servicios) : EdicionDeLi
 
     protected override string? Cookie(EliminarLineaEntrada entrada) => entrada.CookieDelVisitante;
 
-    protected override ResultadoDeValidacion Validar(EliminarLineaEntrada entrada) => ValidadorDeLineas.Validar(entrada.EdicionId, cantidad: null);
+    protected override ResultadoDeValidacion Validar(EliminarLineaEntrada entrada) => ValidadorDeLineas.ParaEliminar(entrada.LineaId);
 
     protected override Resultado<ResultadoDeCarrito> SinCarritoRespuesta(VistaDelCarrito vacio, SolicitanteDelCarrito solicitante, string? cookie, EliminarLineaEntrada entrada) =>
-        Resultado<ResultadoDeCarrito>.Exito(new ResultadoDeCarrito(vacio, null, solicitante.Tipo == TipoDeSolicitante.Visitante && cookie is not null));
+        Resultado<ResultadoDeCarrito>.Fallo(LineaNoEncontrada());
 
-    protected override async Task<(ErrorDeAplicacion? Error, TerrenoDeLaEdicion Terreno)> Preparar(EliminarLineaEntrada entrada, SolicitanteDelCarrito solicitante, CarritoDeDominio? existente, CancellationToken cancelacion)
-    {
-        var ediciones = await EdicionesDeLaVista(entrada.EdicionId, existente, cancelacion).ConfigureAwait(false) ?? new Dictionary<Guid, EdicionConsultada>();
-        return (null, new TerrenoDeLaEdicion(ediciones, null));
-    }
+    protected override async Task<(ErrorDeAplicacion? Error, TerrenoDeLaEdicion Terreno)> Preparar(EliminarLineaEntrada entrada, SolicitanteDelCarrito solicitante, CarritoDeDominio? existente, CancellationToken cancelacion) =>
+        (null, new TerrenoDeLaEdicion(await EdicionesDeLaVista(existente, cancelacion).ConfigureAwait(false), null));
 
-    protected override bool EsNoOp(EliminarLineaEntrada entrada, CarritoDeDominio existente) => existente.Lineas.All(l => l.EdicionId != entrada.EdicionId);
+    protected override ErrorDeAplicacion? Prevalidar(EliminarLineaEntrada entrada, CarritoDeDominio? existente, TerrenoDeLaEdicion terreno) =>
+        existente is null || existente.Lineas.All(l => l.LineaId != entrada.LineaId) ? LineaNoEncontrada() : null;
 
     protected override ErrorDeAplicacion? Aplicar(ContextoDeEdicion contexto)
     {
-        var resultado = contexto.Carrito.Eliminar(contexto.Entrada.EdicionId, contexto.Ahora);
-        return resultado.EsExito || resultado.Rechazo == RechazoDeCarrito.EdicionNoEstaEnElCarrito ? null : DeRechazo(resultado.Rechazo!.Value);
+        // Estaba al comprobarlo: si ya no está (un retiro pendiente que se acaba de aplicar, u otro dispositivo), lo pedido ya se cumple.
+        var resultado = contexto.Carrito.Eliminar(contexto.Entrada.LineaId, contexto.Ahora);
+        return resultado.EsExito || resultado.Rechazo == RechazoDeCarrito.LineaNoEstaEnElCarrito ? null : DeRechazo(resultado.Rechazo!.Value);
     }
 }
 
-/// <summary>La validación de la entrada de una línea (SEG-01): la edición no puede ser vacía y la cantidad va de 1 a 20. Los errores llevan el campo y una clave, nunca el valor recibido.</summary>
+/// <summary>La validación de la entrada de una línea (SEG-01): los identificadores no pueden ser vacíos, al agregar la cantidad va de 1 a 20 y la sucursal tiene la forma de un código. Los errores llevan el campo y una clave, nunca el valor recibido.</summary>
 internal static class ValidadorDeLineas
 {
-    public static ResultadoDeValidacion Validar(Guid edicionId, int? cantidad)
+    public static ResultadoDeValidacion ParaAgregar(Guid edicionId, int cantidad, string? codigoDeSucursal)
     {
         var errores = new List<ErrorDeCampo>();
-        if (edicionId == Guid.Empty)
-        {
-            errores.Add(new ErrorDeCampo("edicionId", ConstructorDeValidacion.Obligatorio));
-        }
-
-        if (cantidad is { } valor && valor is < Cantidad.Minima or > Cantidad.Maxima)
+        Identificador(errores, "edicionId", edicionId);
+        if (cantidad is < Cantidad.Minima or > Cantidad.Maxima)
         {
             errores.Add(new ErrorDeCampo("cantidad", ConstructorDeValidacion.FueraDeRango));
         }
 
-        return errores.Count == 0 ? ResultadoDeValidacion.Valido : ResultadoDeValidacion.Invalido(errores);
+        if (codigoDeSucursal is not null && !ServiciosDelCheckout.EsCodigoDeSucursalValido(codigoDeSucursal))
+        {
+            errores.Add(new ErrorDeCampo("sucursal", ConstructorDeValidacion.FormatoInvalido));
+        }
+
+        return De(errores);
     }
+
+    /// <summary>Más de 20 no es una entrada mal formada: lo rechaza el tope de unidades (CAR-38).</summary>
+    public static ResultadoDeValidacion ParaModificar(Guid lineaId, int cantidad)
+    {
+        var errores = new List<ErrorDeCampo>();
+        Identificador(errores, "lineaId", lineaId);
+        if (cantidad < Cantidad.Minima)
+        {
+            errores.Add(new ErrorDeCampo("cantidad", ConstructorDeValidacion.FueraDeRango));
+        }
+
+        return De(errores);
+    }
+
+    public static ResultadoDeValidacion ParaEliminar(Guid lineaId)
+    {
+        var errores = new List<ErrorDeCampo>();
+        Identificador(errores, "lineaId", lineaId);
+        return De(errores);
+    }
+
+    private static void Identificador(List<ErrorDeCampo> errores, string campo, Guid valor)
+    {
+        if (valor == Guid.Empty)
+        {
+            errores.Add(new ErrorDeCampo(campo, ConstructorDeValidacion.Obligatorio));
+        }
+    }
+
+    private static ResultadoDeValidacion De(List<ErrorDeCampo> errores) => errores.Count == 0 ? ResultadoDeValidacion.Valido : ResultadoDeValidacion.Invalido(errores);
 }
 
 /// <summary>Los avisos que la persona marca como vistos (CAT-18, D15): hasta 50 identificadores, solo de su cuenta (el repositorio los filtra por la cuenta del actor, nunca por una cuenta recibida).</summary>

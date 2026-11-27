@@ -23,10 +23,10 @@ public sealed class CorreccionesDeLaRevisionDeEco4bTests
         var carrito = CarritoDeDominio.Crear(Guid.NewGuid(), PropietarioDelCarrito.DeCuenta(cuenta), Inicio);
         carrito.Agregar(libro, false, cantidad, Inicio);
         e.Carritos.Sembrar(carrito);
-        var checkout = Checkout.Iniciar(Guid.NewGuid(), cuenta, carrito.Id, [new LineaParaCheckout(libro, false, "Libro", "9780000000019", cantidad, 50m)], Guid.NewGuid, Inicio);
+        var checkout = Checkout.Iniciar(Guid.NewGuid(), cuenta, carrito.Id, [new LineaParaCheckout(libro, false, "Libro", "9780000000019", cantidad, 50m, libro, Sucursal.Principal)], Guid.NewGuid, Inicio);
         checkout.Aceptar(TextoLegal.Terminos, "t-1", Inicio);
         checkout.Aceptar(TextoLegal.Privacidad, "p-1", Inicio);
-        checkout.ElegirRecojo("lima", Inicio);
+        checkout.ElegirRecojo(Inicio);
         Assert.Equal(EfectoDeTransicion.Aplicada, checkout.PrepararPasoAlPago(Guid.NewGuid(), CostoDeEnvio.Cero, s => s, s => s, carrito, Inicio).Efecto);
         Assert.Equal(EfectoDeTransicion.Aplicada, checkout.ConfirmarEnPago(checkout.PedidoId!.Value, checkout.GeneracionDeReserva, checkout.HuellaDeInstantanea!, Inicio.AddMinutes(15), carrito).Efecto);
         e.Checkouts.Sembrar(checkout);
@@ -40,7 +40,7 @@ public sealed class CorreccionesDeLaRevisionDeEco4bTests
     {
         var (e, checkout, _, libro) = EnPago();
 
-        var resultado = await new ModificarLinea(e.Servicios()).Ejecutar(new ModificarLineaEntrada(libro, 5));
+        var resultado = await new ModificarLinea(e.Servicios()).Ejecutar(new ModificarLineaEntrada(e.LineaDe(libro), 5));
 
         Assert.True(resultado.EsExito);
         Assert.Same(checkout, Assert.Single(e.Checkouts.Guardados));
@@ -52,7 +52,7 @@ public sealed class CorreccionesDeLaRevisionDeEco4bTests
         var (e, checkout, _, libro) = EnPago();
         e.Pagos.AlReabrir = ResultadoDeReabrirIntencion.Cerrada;
 
-        await new ModificarLinea(e.Servicios()).Ejecutar(new ModificarLineaEntrada(libro, 5));
+        await new ModificarLinea(e.Servicios()).Ejecutar(new ModificarLineaEntrada(e.LineaDe(libro), 5));
 
         var guardado = Assert.Single(e.Checkouts.Guardados);
         Assert.Same(checkout, guardado);
@@ -65,15 +65,20 @@ public sealed class CorreccionesDeLaRevisionDeEco4bTests
     {
         var (e, checkout, carrito, libro) = EnPago(cantidad: 18);
 
-        // Con el stock sin confirmar no se puede prevalidar: el rechazo de las 20 unidades lo da el Dominio ya con la intención reabierta.
-        e.Disponibilidad.Digital(libro);
-        var resultado = await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(libro, 5));
+        // El tope de 30 líneas no se puede prevalidar: lo rechaza el Dominio ya con la intención reabierta.
+        foreach (var _ in Enumerable.Range(1, 29))
+        {
+            carrito.Agregar(Guid.NewGuid(), false, 1, Inicio);
+        }
 
-        Assert.Equal(ClavesDelCarrito.LimiteDeUnidades, resultado.Error!.Clave);
+        var otro = e.Impreso(5);
+        var resultado = await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(otro, 1, CodigoDeSucursal: Sucursal.Principal));
+
+        Assert.Equal(ClavesDelCarrito.LimiteDeLineas, resultado.Error!.Clave);
         Assert.Equal(1, e.Pagos.Reaperturas);
         Assert.Equal(EstadoDelCheckout.EnEdicion, checkout.Estado);
         Assert.Same(checkout, Assert.Single(e.Checkouts.Guardados));
-        Assert.Equal(18, carrito.Lineas.Single().Cantidad.Valor);
+        Assert.Equal((30, 18), (carrito.Lineas.Count, carrito.Lineas.Single(l => l.EdicionId == libro).Cantidad.Valor));
     }
 
     [Fact]
@@ -81,10 +86,10 @@ public sealed class CorreccionesDeLaRevisionDeEco4bTests
     {
         var e = EntornoDelCarrito.DeCliente();
         var libro = e.Impreso(1);
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(libro, 1));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(libro, 1, CodigoDeSucursal: Sucursal.Principal));
         var guardados = e.Carritos.Guardados;
 
-        var resultado = await new ModificarLinea(e.Servicios()).Ejecutar(new ModificarLineaEntrada(libro, 5));
+        var resultado = await new ModificarLinea(e.Servicios()).Ejecutar(new ModificarLineaEntrada(e.LineaDe(libro), 5));
 
         Assert.False(resultado.EsExito);
         Assert.Equal(guardados, e.Carritos.Guardados);
@@ -99,7 +104,7 @@ public sealed class CorreccionesDeLaRevisionDeEco4bTests
         var (e, checkout, carrito, libro) = EnPago();
         e.Disponibilidad.Vendible(libro, 2);
 
-        var resultado = await new ModificarLinea(e.Servicios()).Ejecutar(new ModificarLineaEntrada(libro, 6));
+        var resultado = await new ModificarLinea(e.Servicios()).Ejecutar(new ModificarLineaEntrada(e.LineaDe(libro), 6));
 
         Assert.Equal(ClavesDelCarrito.SinStock, resultado.Error!.Clave);
         Assert.Equal(0, e.Pagos.Reaperturas);
@@ -112,11 +117,11 @@ public sealed class CorreccionesDeLaRevisionDeEco4bTests
     {
         var (e, checkout, carrito, libro) = EnPago();
 
-        var igual = await new ModificarLinea(e.Servicios()).Ejecutar(new ModificarLineaEntrada(libro, 2));
+        var igual = await new ModificarLinea(e.Servicios()).Ejecutar(new ModificarLineaEntrada(e.LineaDe(libro), 2));
         var inexistente = await new EliminarLinea(e.Servicios()).Ejecutar(new EliminarLineaEntrada(Guid.NewGuid()));
 
         Assert.True(igual.EsExito);
-        Assert.True(inexistente.EsExito);
+        Assert.Equal(ClavesDelCarrito.LineaNoEncontrada, inexistente.Error!.Clave);
         Assert.Equal(0, e.Pagos.Reaperturas);
         Assert.Equal(EstadoDelCheckout.EnPago, checkout.Estado);
         Assert.Equal(2, carrito.Lineas.Single().Cantidad.Valor);
@@ -128,10 +133,10 @@ public sealed class CorreccionesDeLaRevisionDeEco4bTests
     {
         var e = EntornoDelCarrito.DeCliente();
         var digital = e.Digital();
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(digital, 1));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(digital, 1, CodigoDeSucursal: Sucursal.Principal));
         var guardados = e.Carritos.Guardados;
 
-        var resultado = await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(digital, 1));
+        var resultado = await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(digital, 1, CodigoDeSucursal: Sucursal.Principal));
 
         Assert.True(resultado.EsExito);
         Assert.Equal(guardados, e.Carritos.Guardados);
@@ -154,7 +159,7 @@ public sealed class CorreccionesDeLaRevisionDeEco4bTests
             throw new CarritoYaExisteException();
         };
 
-        var resultado = await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(libro, 1));
+        var resultado = await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(libro, 1, CodigoDeSucursal: Sucursal.Principal));
 
         Assert.True(resultado.EsExito);
         var carrito = Assert.Single(e.Carritos.Todos);
@@ -213,7 +218,7 @@ public sealed class CorreccionesDeLaRevisionDeEco4bTests
     {
         var e = EntornoDelCarrito.DeCliente();
         var libro = e.Impreso(5);
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(libro, 2));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(libro, 2, CodigoDeSucursal: Sucursal.Principal));
         e.Catalogo.Caido = true;
 
         var vista = (await new ObtenerCarrito(e.Servicios()).Ejecutar(new SolicitudSobreElCarrito())).Valor.Carrito;
@@ -247,7 +252,7 @@ public sealed class CorreccionesDeLaRevisionDeEco4bTests
         var libro = Guid.NewGuid();
         object[] modelos =
         [
-            new AgregarLineaEntrada(libro, 1, cookie),
+            new AgregarLineaEntrada(libro, 1, cookie, CodigoDeSucursal: Sucursal.Principal),
             new ModificarLineaEntrada(libro, 1, cookie),
             new EliminarLineaEntrada(libro, cookie),
             new SolicitudSobreElCarrito(cookie),

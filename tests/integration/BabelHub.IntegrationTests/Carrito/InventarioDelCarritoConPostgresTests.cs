@@ -59,25 +59,28 @@ public sealed class InventarioDelCarritoConPostgresTests(PostgresDelCarritoFixtu
 
     [Fact]
     [Trait("Criterio", "AC-CAR-04")]
-    public async Task La_consulta_previa_informa_el_traslado_con_su_plazo_o_a_confirmar_y_un_Inventario_sin_respuesta_no_deja_avanzar()
+    public async Task La_consulta_previa_declara_la_sucursal_de_cada_linea_sin_traslados_y_un_Inventario_sin_respuesta_no_deja_avanzar()
     {
-        var (conPlazo, aConfirmar) = (Impreso(fuente: "sede-huanta", traslado: true, plazo: 3), Impreso(fuente: "sede-huanta", traslado: true, plazo: null));
+        // Aunque el libro tenga una fuente de traslado fijada, la compra del cliente no genera traslados: cada línea se atiende en su sucursal (CAR-05).
+        var (primera, segunda) = (Impreso(fuente: "sede-huanta", traslado: true, plazo: 3), Impreso(fuente: "sede-huanta", traslado: true, plazo: null));
         var cuenta = EntornoDelCarritoConPostgres.NuevaCuenta();
-        await _e.Agregar(cuenta, conPlazo, 1);
-        await _e.Agregar(cuenta, aConfirmar, 1);
+        await _e.Agregar(cuenta, primera, 1);
+        await _e.Agregar(cuenta, segunda, 1);
         await _e.Como(cuenta, sp => sp.GetRequiredService<ICheckoutDelCliente>().Iniciar(new IniciarCheckoutEntrada()));
 
-        var vista = await _e.Como(cuenta, sp => sp.GetRequiredService<ICheckoutDelCliente>().ElegirEntrega(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, "sede-central", null)));
+        var vista = await _e.Como(cuenta, sp => sp.GetRequiredService<ICheckoutDelCliente>().ElegirEntrega(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, null)));
 
         Assert.True(vista.EsExito, vista.Error?.Clave);
         var lineas = vista.Valor.Lineas;
-        Assert.Equal(DisponibilidadDeLineaDeCheckout.PorTraslado, lineas[0].Disponibilidad);
-        Assert.Equal(3, lineas[0].PlazoInformadoDias);
-        Assert.True(lineas[1].PlazoAConfirmar);
-        Assert.Null(lineas[1].PlazoInformadoDias);
+        Assert.All(lineas, l =>
+        {
+            Assert.Equal(DisponibilidadDeLineaDeCheckout.EnSuSucursal, l.Disponibilidad);
+            Assert.Null(l.PlazoInformadoDias);
+            Assert.False(l.PlazoAConfirmar);
+        });
 
         _e.InventarioDeLasPruebas.RespuestaDePrevia = () => RespuestaDelInventarioDelCarrito<ConsultaPreviaDelInventario>.SinRespuesta;
-        var sinRespuesta = await _e.Como(cuenta, sp => sp.GetRequiredService<ICheckoutDelCliente>().ElegirEntrega(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, "sede-central", null)));
+        var sinRespuesta = await _e.Como(cuenta, sp => sp.GetRequiredService<ICheckoutDelCliente>().ElegirEntrega(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, null)));
         Assert.False(sinRespuesta.EsExito);
         Assert.Equal("checkout-stock-no-validable", sinRespuesta.Error!.Clave);
     }
@@ -89,7 +92,7 @@ public sealed class InventarioDelCarritoConPostgresTests(PostgresDelCarritoFixtu
         var (buena, agotada) = (Impreso(), Impreso(stock: 5));
         var cuenta = EntornoDelCarritoConPostgres.NuevaCuenta();
         await _e.Agregar(cuenta, buena, 2);
-        await _e.Como(cuenta, sp => sp.GetRequiredService<ICarritoDelCliente>().AgregarLinea(new AgregarLineaEntrada(agotada, 1)));
+        await _e.Como(cuenta, sp => sp.GetRequiredService<ICarritoDelCliente>().AgregarLinea(new AgregarLineaEntrada(agotada, 1, CodigoDeSucursal: "sede-central")));
         _e.Inventario.FijarStock(agotada, 0);
 
         var inicio = await _e.Como(cuenta, sp => sp.GetRequiredService<ICheckoutDelCliente>().Iniciar(new IniciarCheckoutEntrada()));
@@ -97,7 +100,9 @@ public sealed class InventarioDelCarritoConPostgresTests(PostgresDelCarritoFixtu
         Assert.False(inicio.EsExito);
         Assert.Equal("carrito-sin-stock", inicio.Error!.Clave);
         Assert.Equal(0L, await bd.Consultar<long>("SELECT count(*) FROM carrito.checkouts"));
-        await _e.Como(cuenta, sp => sp.GetRequiredService<ICarritoDelCliente>().EliminarLinea(new EliminarLineaEntrada(agotada)));
+        var linea = await _e.LineaDe(cuenta, agotada);
+        var quitada = await _e.Como(cuenta, sp => sp.GetRequiredService<ICarritoDelCliente>().EliminarLinea(new EliminarLineaEntrada(linea)));
+        Assert.True(quitada.EsExito, quitada.Error?.Clave);
         var corregido = await _e.Como(cuenta, sp => sp.GetRequiredService<ICheckoutDelCliente>().Iniciar(new IniciarCheckoutEntrada()));
         Assert.True(corregido.EsExito, corregido.Error?.Clave);
         Assert.Equal(buena, Assert.Single(corregido.Valor.Lineas).EdicionId);

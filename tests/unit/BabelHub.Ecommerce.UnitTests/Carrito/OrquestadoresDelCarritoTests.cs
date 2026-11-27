@@ -15,13 +15,13 @@ namespace BabelHub.Ecommerce.UnitTests.Carrito;
 public sealed class OrquestadoresDelCarritoTests
 {
     private static async Task<Resultado<ResultadoDeCarrito>> Agregar(EntornoDelCarrito e, Guid edicion, int cantidad, string? cookie = null) =>
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(edicion, cantidad, cookie));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(edicion, cantidad, cookie, CodigoDeSucursal: Sucursal.Principal));
 
     private static async Task<Resultado<ResultadoDeCarrito>> Modificar(EntornoDelCarrito e, Guid edicion, int cantidad, string? cookie = null) =>
-        await new ModificarLinea(e.Servicios()).Ejecutar(new ModificarLineaEntrada(edicion, cantidad, cookie));
+        await new ModificarLinea(e.Servicios()).Ejecutar(new ModificarLineaEntrada(e.LineaDe(edicion), cantidad, cookie));
 
     private static async Task<Resultado<ResultadoDeCarrito>> Eliminar(EntornoDelCarrito e, Guid edicion, string? cookie = null) =>
-        await new EliminarLinea(e.Servicios()).Ejecutar(new EliminarLineaEntrada(edicion, cookie));
+        await new EliminarLinea(e.Servicios()).Ejecutar(new EliminarLineaEntrada(e.LineaDe(edicion), cookie));
 
     private static async Task<Resultado<ResultadoDeCarrito>> Obtener(EntornoDelCarrito e, string? cookie = null) =>
         await new ObtenerCarrito(e.Servicios()).Ejecutar(new SolicitudSobreElCarrito(cookie));
@@ -519,7 +519,7 @@ public sealed class OrquestadoresDelCarritoTests
     }
 
     [Fact]
-    public async Task Eliminar_quita_la_linea_y_repetirlo_es_un_exito_sin_cambios()
+    public async Task Eliminar_quita_la_linea_y_repetirlo_es_no_encontrada_sin_cambios()
     {
         var e = EntornoDelCarrito.DeCliente();
         var libro = e.Impreso(5, 10m);
@@ -527,22 +527,23 @@ public sealed class OrquestadoresDelCarritoTests
         await Agregar(e, libro, 1);
         await Agregar(e, otro, 1);
 
-        var uno = await Eliminar(e, libro);
-        var dos = await Eliminar(e, libro);
+        var linea = e.LineaDe(libro);
+        var uno = await new EliminarLinea(e.Servicios()).Ejecutar(new EliminarLineaEntrada(linea));
+        var dos = await new EliminarLinea(e.Servicios()).Ejecutar(new EliminarLineaEntrada(linea));
 
         Assert.Equal([otro], uno.Valor.Carrito.Lineas.Select(l => l.EdicionId));
-        Assert.True(dos.EsExito);
-        Assert.Equal(30m, dos.Valor.Carrito.Subtotal);
+        Assert.Equal(ClavesDelCarrito.LineaNoEncontrada, Clave(dos.Error));
+        Assert.Equal(30m, uno.Valor.Carrito.Subtotal);
     }
 
     [Fact]
-    public async Task Eliminar_sin_carrito_es_un_exito_con_el_carrito_vacio_y_no_crea_nada()
+    public async Task Eliminar_sin_carrito_es_no_encontrada_y_no_crea_nada()
     {
         var e = EntornoDelCarrito.DeVisitante();
 
         var resultado = await Eliminar(e, Guid.NewGuid());
 
-        Assert.True(resultado.EsExito);
+        Assert.Equal(ClavesDelCarrito.LineaNoEncontrada, Clave(resultado.Error));
         Assert.Empty(e.Carritos.Todos);
         Assert.Equal(0, e.Limites.CarritosCreados);
     }
@@ -568,7 +569,7 @@ public sealed class OrquestadoresDelCarritoTests
         var carrito = CarritoDeDominio.Crear(Guid.NewGuid(), PropietarioDelCarrito.DeCuenta(cuenta), EntornoDelCarrito.Inicio);
         carrito.Agregar(libro, false, 1, EntornoDelCarrito.Inicio);
         e.Carritos.Sembrar(carrito);
-        var checkout = Checkout.Iniciar(Guid.NewGuid(), cuenta, carrito.Id, [new LineaParaCheckout(libro, false, "Libro", "9780000000019", 1, 50m)], Guid.NewGuid, EntornoDelCarrito.Inicio);
+        var checkout = Checkout.Iniciar(Guid.NewGuid(), cuenta, carrito.Id, [new LineaParaCheckout(libro, false, "Libro", "9780000000019", 1, 50m, libro, Sucursal.Principal)], Guid.NewGuid, EntornoDelCarrito.Inicio);
         Assert.True(llevar(checkout, carrito));
         e.Checkouts.Sembrar(checkout);
         return (e, libro);
@@ -578,7 +579,7 @@ public sealed class OrquestadoresDelCarritoTests
     {
         c.Aceptar(TextoLegal.Terminos, "t-1", EntornoDelCarrito.Inicio);
         c.Aceptar(TextoLegal.Privacidad, "p-1", EntornoDelCarrito.Inicio);
-        c.ElegirRecojo("lima", EntornoDelCarrito.Inicio);
+        c.ElegirRecojo(EntornoDelCarrito.Inicio);
         return c.PrepararPasoAlPago(Guid.NewGuid(), CostoDeEnvio.Cero, s => s, s => s, k, EntornoDelCarrito.Inicio).Efecto == EfectoDeTransicion.Aplicada;
     }
 

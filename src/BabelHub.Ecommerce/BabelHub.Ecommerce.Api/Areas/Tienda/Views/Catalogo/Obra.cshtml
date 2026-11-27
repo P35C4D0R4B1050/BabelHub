@@ -1,3 +1,4 @@
+@using BabelHub.Ecommerce.Api.Areas.Tienda.Controllers
 @using BabelHub.Ecommerce.Api.Web.Estados
 @using BabelHub.Ecommerce.Application.Web
 @model BabelHub.Ecommerce.Api.Areas.Tienda.Controllers.FichaVista
@@ -72,19 +73,34 @@
                         <span>Impreso agotado en todas las sucursales.@(Model.Digital?.Disponibilidad.Estado == EstadoDeDisponibilidad.DisponibleAlInstante ? " Puedes verlo en digital." : string.Empty)</span>
                     </div>
                 }
-                @if (impresa.SePuedeAgregar)
+                @if (impresa.SePuedeAgregar && Model.Opciones.Any(o => o.SePuedeElegir))
                 {
+                    var elegida = Model.Opciones.FirstOrDefault(o => o.Elegida);
                     <bh-accion-de-cambio>
                         <form method="post" action="/carrito/lineas" class="flex flex-wrap items-end gap-3">
                             <partial name="_TokenAntifalsificacion" />
                             <input type="hidden" name="edicionId" value="@impresa.EdicionId.ToString("D")" />
                             <label class="flex flex-col gap-1 text-sm">
+                                <span>Sucursal que atenderá tu pedido</span>
+                                <select name="sucursal" class="select w-full min-w-64" required data-bh-sucursal-de-ficha>
+                                    @if (elegida is null)
+                                    {
+                                        <option value="" selected data-bh-maximo="@CarritoController.MaximoDeUnidades">Elige una sucursal</option>
+                                    }
+                                    @foreach (var opcion in Model.Opciones)
+                                    {
+                                        <option value="@opcion.Codigo" selected="@opcion.Elegida" disabled="@(!opcion.SePuedeElegir)" data-bh-maximo="@opcion.Maximo">@opcion.Texto</option>
+                                    }
+                                </select>
+                            </label>
+                            <label class="flex flex-col gap-1 text-sm">
                                 <span>Cantidad</span>
-                                <input class="input w-24" type="number" name="cantidad" value="1" min="1" max="@impresa.CantidadMaxima" inputmode="numeric" required />
+                                <input class="input w-24" type="number" name="cantidad" value="1" min="1" max="@(elegida?.Maximo ?? CarritoController.MaximoDeUnidades)" inputmode="numeric" required />
                             </label>
                             <button type="submit" class="btn btn-primary"><bh-icono nombre="carrito" />Agregar impreso al carrito</button>
                         </form>
                     </bh-accion-de-cambio>
+                    <p class="text-xs opacity-80">Cada sucursal atiende lo que pides de ella: hasta 20 unidades por línea del carrito.</p>
                 }
                 else if (impresa.Disponibilidad.Estado == EstadoDeDisponibilidad.Agotado)
                 {
@@ -92,7 +108,11 @@
                         <button type="button" class="btn btn-primary" disabled><bh-icono nombre="carrito" />Agregar impreso al carrito</button>
                     </bh-accion-de-cambio>
                 }
-                @if (impresa.Sucursales.Count > 0)
+                else if (impresa.SePuedeAgregar)
+                {
+                    <p class="flex gap-2 text-sm" role="status"><bh-icono nombre="aviso" clase="size-5 shrink-0" />No pudimos cargar las sucursales ahora, así que todavía no se puede agregar el impreso. <a class="link" href="">Reintentar</a></p>
+                }
+                @if (Model.Opciones.Any(o => o.Vendible is not null))
                 {
                     <details class="rounded-box border border-base-300" open>
                         <summary class="flex cursor-pointer items-center gap-2 p-3 font-semibold"><bh-icono nombre="sucursal" clase="size-5" />Disponibilidad por sucursal</summary>
@@ -101,16 +121,10 @@
                                 <caption class="sr-only">Stock vendible por sucursal</caption>
                                 <thead><tr><th scope="col">Sucursal</th><th scope="col" class="text-right">Vendible</th><th scope="col">Estado</th></tr></thead>
                                 <tbody>
-                                    @foreach (var fila in impresa.Sucursales)
+                                    @foreach (var fila in Model.Opciones)
                                     {
-                                        <tr class="@(fila.EsLaTuya ? "bg-base-200 font-medium" : null)">
-                                            <th scope="row" class="font-normal">
-                                                @fila.Nombre
-                                                @if (fila.EsLaTuya)
-                                                {
-                                                    <span class="bh-chip ml-2">Tu sucursal</span>
-                                                }
-                                            </th>
+                                        <tr>
+                                            <th scope="row" class="font-normal">@fila.Nombre</th>
                                             <td class="text-right tabular-nums">@fila.Vendible</td>
                                             <td><span class="bh-chip"><bh-icono nombre="@fila.Icono" clase="size-3.5" />@fila.Estado</span></td>
                                         </tr>

@@ -27,21 +27,19 @@ public sealed class CheckoutApiTests : IAsyncLifetime
     // ---------- Iniciar y ver ----------
 
     [Fact]
-    public async Task Iniciar_llama_a_la_Aplicacion_con_la_sucursal_preferida_y_redirige_a_checkout()
+    public async Task Iniciar_llama_a_la_Aplicacion_sin_campos_y_redirige_a_checkout()
     {
-        using var respuesta = await _host.Enviar("/checkout/iniciar", [C("sucursalPreferida", "sede-central")], conSesion: true);
+        using var respuesta = await _host.Enviar("/checkout/iniciar", [], conSesion: true);
 
         Assert.Equal(HttpStatusCode.SeeOther, respuesta.StatusCode);
         Assert.Equal("/checkout", respuesta.Headers.Location?.OriginalString);
-        Assert.Equal("sede-central", Assert.IsType<IniciarCheckoutEntrada>(Assert.Single(_host.Checkout.Entradas)).CodigoDeSucursalPreferida);
+        Assert.IsType<IniciarCheckoutEntrada>(Assert.Single(_host.Checkout.Entradas));
     }
 
-    [Theory]
-    [InlineData("")]
-    [InlineData("a\nb")]
-    public async Task Una_sucursal_preferida_invalida_es_validacion(string sucursal)
+    [Fact]
+    public async Task Iniciar_ya_no_admite_una_sucursal_porque_cada_linea_dice_la_suya()
     {
-        using var respuesta = await _host.Enviar("/checkout/iniciar", [C("sucursalPreferida", sucursal)], conSesion: true);
+        using var respuesta = await _host.Enviar("/checkout/iniciar", [C("sucursalPreferida", "sede-central")], conSesion: true);
 
         Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
         Assert.Empty(_host.Checkout.Llamadas);
@@ -71,13 +69,16 @@ public sealed class CheckoutApiTests : IAsyncLifetime
     // ---------- Entrega ----------
 
     [Fact]
-    public async Task Elegir_recojo_manda_el_tipo_y_la_sucursal_y_sin_contacto()
+    [Trait("Criterio", "AC-CAR-08")]
+    public async Task Elegir_recojo_manda_solo_el_tipo_sin_sucursal_ni_contacto_y_una_sucursal_es_validacion()
     {
-        using var respuesta = await _host.Enviar("/checkout/entrega", [C("tipoDeEntrega", "recojo"), C("sucursal", "sede-central"), C("pedidoId", Pedido.ToString("D"))], conSesion: true);
+        using var respuesta = await _host.Enviar("/checkout/entrega", [C("tipoDeEntrega", "recojo"), C("pedidoId", Pedido.ToString("D"))], conSesion: true);
+        using var conSucursal = await _host.Enviar("/checkout/entrega", [C("tipoDeEntrega", "recojo"), C("sucursal", "sede-central")], conSesion: true);
 
         Assert.Equal(HttpStatusCode.SeeOther, respuesta.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, conSucursal.StatusCode);
         var entrada = Assert.IsType<ElegirEntregaEntrada>(Assert.Single(_host.Checkout.Entradas));
-        Assert.Equal((TipoDeEntregaDeCompra.Recojo, "sede-central", Pedido), (entrada.Tipo, entrada.CodigoDeSucursalDeRecojo, entrada.PedidoId));
+        Assert.Equal((TipoDeEntregaDeCompra.Recojo, (Guid?)Pedido), (entrada.Tipo, entrada.PedidoId));
         Assert.Null(entrada.Contacto);
     }
 

@@ -16,7 +16,7 @@ namespace BabelHub.Ecommerce.Infrastructure.Composicion;
 /// implementaciones públicas <see cref="ICarritoDelCliente"/>, <see cref="ICheckoutDelCliente"/> e <see cref="IProgresoDelCheckout"/>, los receptores de Identidad (reemplazo y cancelación de cuenta), <b>el retiro de ediciones de Catálogo</b> (reemplaza al retiro
 /// nulo, esté o no ya registrado) y los seis trabajos de fondo con su ejecutor (que la Api hospeda en T29). Lo que otros módulos aún no entregan se registra al final con <c>AgregarDoblesProvisionalesDelCarrito</c>, que en producción <b>falla al arrancar</b> si algún
 /// puerto sigue con un doble provisional. Necesita ya registrados: <see cref="IConsultaDeCatalogo"/>, <see cref="IDisponibilidadDeEdiciones"/>, <see cref="IUnidadDeTrabajo"/>, <see cref="IConexionDeLaUnidadDeTrabajo"/>, <see cref="IActorActual"/>,
-/// <see cref="IDenegacionDeAcceso"/>, <see cref="IReloj"/>, <see cref="IClienteDelInventario"/>, <see cref="ITextosLegales"/>, <see cref="ICalculadorDeHuella"/>, <see cref="IRegistroDeTrabajosDeFondo"/> e <see cref="IEstablecedorDeActor"/>.
+/// <see cref="IDenegacionDeAcceso"/>, <see cref="IReloj"/>, <see cref="IClienteDelInventario"/>, <see cref="ITextosLegales"/>, <see cref="IPreferenciaDeSucursal"/>, <see cref="ICalculadorDeHuella"/>, <see cref="IRegistroDeTrabajosDeFondo"/> e <see cref="IEstablecedorDeActor"/>.
 /// </summary>
 public static class ComposicionDelCarrito
 {
@@ -34,6 +34,7 @@ public static class ComposicionDelCarrito
         servicios.TryAddScoped<AccesoAlEsquemaDelCarrito>();
         servicios.TryAddScoped<IRepositorioDeCarritos, RepositorioDeCarritosPostgres>();
         servicios.TryAddScoped<IRepositorioDeCheckouts, RepositorioDeCheckoutsPostgres>();
+        servicios.TryAddScoped<IRepositorioDeTarifasDeEnvio, RepositorioDeTarifasDeEnvioPostgres>();
         servicios.TryAddScoped<IInventarioDelCarrito, RestInventarioDelCarrito>();
 
         // T26c: los adaptadores reales de lo que entregaron Plataforma, Auditoría e Identidad, solo si ya está registrado lo que necesitan; si no, queda el doble provisional (que falla cerrado) y la guarda de producción lo nombra.
@@ -78,7 +79,8 @@ public static class ComposicionDelCarrito
             sp.GetRequiredService<IReloj>(),
             sp.GetRequiredService<IUnidadDeTrabajo>(),
             sp.GetRequiredService<EdicionConCheckoutVivo>(),
-            sp.GetRequiredService<IAuditoriaDelCarrito>()));
+            sp.GetRequiredService<IAuditoriaDelCarrito>(),
+            sp.GetRequiredService<IPreferenciaDeSucursal>()));
         servicios.TryAddScoped(sp => new ServiciosDelCheckout(
             sp.GetRequiredService<ServiciosDelCarrito>(),
             sp.GetRequiredService<IInventarioDelCarrito>(),
@@ -87,7 +89,8 @@ public static class ComposicionDelCarrito
             sp.GetRequiredService<IConsentimientoDeAvisos>(),
             sp.GetRequiredService<IMarcaDeCancelacion>(),
             sp.GetRequiredService<ICalculadorDeHuella>(),
-            sp.GetRequiredService<IAlertasDelCarrito>()));
+            sp.GetRequiredService<IAlertasDelCarrito>(),
+            sp.GetRequiredService<IRepositorioDeTarifasDeEnvio>()));
 
         // ---------- Contratos públicos y receptores ----------
         servicios.TryAddScoped<ICarritoDelCliente, CarritoDelCliente>();

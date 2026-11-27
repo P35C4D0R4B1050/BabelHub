@@ -64,6 +64,9 @@ internal static class ClavesDelCarrito
 
     public const string CheckoutNoEncontrado = "checkout-no-encontrado";
 
+    /// <summary>Una línea impresa anterior a la venta por sucursal impide iniciar, continuar o pagar el checkout: se quita y se vuelve a agregar eligiendo sucursal (422, CAR-45).</summary>
+    public const string LineaSinSucursal = "linea-sin-sucursal";
+
     /// <summary>Falta aceptar un texto requerido (422): los términos y la privacidad siempre y el reembolso digital si hay digitales (CAR-12, CAR-13).</summary>
     public const string AceptacionRequerida = "checkout-aceptacion-requerida";
 

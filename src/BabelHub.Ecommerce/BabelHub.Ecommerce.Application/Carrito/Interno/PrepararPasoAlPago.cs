@@ -78,6 +78,12 @@ internal sealed class PrepararPasoAlPago(ServiciosDelCheckout servicios) : ICaso
             return Resultado<PasoAlPagoPreparado>.Fallo(ServiciosDelCheckout.CheckoutVacio());
         }
 
+        // Una compra anterior a la venta por sucursal no se paga; reservando o en pago, además se aborta y libera su reserva (CAR-45).
+        if (await servicios.ResolverCompraAnterior(cuenta, vivo, delCarrito, cancelacion).ConfigureAwait(false) is { } anterior)
+        {
+            return Resultado<PasoAlPagoPreparado>.Fallo(anterior);
+        }
+
         // 2. Lo que es red, antes de la transacción (D19), en el orden de las comprobaciones.
         if (ServiciosDelCarrito.ErrorDeLimite(await carrito.Limites.PasarAlPago(cuenta, $"{vivo.Id}:{vivo.PedidoId}", cancelacion).ConfigureAwait(false)) is { } limite)
         {
@@ -96,7 +102,7 @@ internal sealed class PrepararPasoAlPago(ServiciosDelCheckout servicios) : ICaso
             return Resultado<PasoAlPagoPreparado>.Fallo(textoRechazado);
         }
 
-        var consulta = await carrito.Catalogo.ObtenerEdiciones([.. delCarrito.Lineas.Select(l => l.EdicionId)], cancelacion).ConfigureAwait(false);
+        var consulta = await carrito.Catalogo.ObtenerEdiciones([.. delCarrito.Lineas.Select(l => l.EdicionId).Distinct()], cancelacion).ConfigureAwait(false);
         if (!consulta.EsExito)
         {
             return Resultado<PasoAlPagoPreparado>.Fallo(new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDelCarrito.ServicioNoDisponible));
@@ -126,7 +132,8 @@ internal sealed class PrepararPasoAlPago(ServiciosDelCheckout servicios) : ICaso
             return Resultado<PasoAlPagoPreparado>.Fallo(ServiciosDelCheckout.CheckoutVacio());
         }
 
-        if (ComprobarElTotal(vivo, lineasVigentes, entrada.TotalVisto) is { } total)
+        // Lo ya congelado se compara antes de tocar a Pagos; en edición el total se calcula y se compara dentro de la transacción que lo congela (CAR-49).
+        if (vivo.Estado != EstadoDelCheckout.EnEdicion && ComprobarElTotal(vivo.TotalCongelado ?? 0m, entrada.TotalVisto) is { } total)
         {
             return Resultado<PasoAlPagoPreparado>.Fallo(total);
         }
@@ -146,10 +153,11 @@ internal sealed class PrepararPasoAlPago(ServiciosDelCheckout servicios) : ICaso
 
         // 4. La transacción corta: la marca de cancelación con bloqueo primero (D10), después el checkout y el carrito, sin red.
         var vigentes = textos.Vigentes;
+        var nombres = await carrito.NombresDeSucursales(cancelacion).ConfigureAwait(false);
         PasoAlPagoPreparado preparado;
         try
         {
-            preparado = await carrito.Unidad.Ejecutar(token => EnLaTransaccion(cuenta, vigentes, ediciones, lineasVigentes.Select(l => l.EdicionId).ToHashSet(), puerta, conRetiro, entrada, token), cancelacion).ConfigureAwait(false);
+            preparado = await carrito.Unidad.Ejecutar(token => EnLaTransaccion(cuenta, vigentes, ediciones, lineasVigentes.Select(l => l.LineaDeCarritoId!.Value).ToHashSet(), nombres, puerta, conRetiro, entrada, token), cancelacion).ConfigureAwait(false);
         }
         catch (RechazoDePasarAlPagoException rechazo)
         {
@@ -163,7 +171,8 @@ internal sealed class PrepararPasoAlPago(ServiciosDelCheckout servicios) : ICaso
         Guid cuenta,
         IReadOnlyDictionary<TextoLegal, string> vigentes,
         IReadOnlyDictionary<Guid, EdicionConsultada> ediciones,
-        IReadOnlySet<Guid> edicionesVigentes,
+        IReadOnlySet<Guid> lineasDelCarritoVigentes,
+        IReadOnlyDictionary<string, string> nombres,
         PuertaDeEdicion puerta,
         bool conRetiro,
         PasarAlPagoEntrada entrada,
@@ -204,12 +213,12 @@ internal sealed class PrepararPasoAlPago(ServiciosDelCheckout servicios) : ICaso
         {
             // Reabierta la intención y aplicado el retiro, se devuelve la revisión («tu carrito cambió»): no se sigue al pago.
             await GuardarTodo(cuenta, checkout, delCarrito, quitadas, cancelacion).ConfigureAwait(false);
-            return new PasoAlPagoPreparado(DesenlaceDePrepararPaso.RevisionPorRetiro, cuenta, checkout.PedidoId, checkout.GeneracionDeReserva, null, null, checkout.Estado, null, [], null, null, servicios.Vista(checkout, delCarrito, null) with { CarritoCambio = true });
+            return new PasoAlPagoPreparado(DesenlaceDePrepararPaso.RevisionPorRetiro, cuenta, checkout.PedidoId, checkout.GeneracionDeReserva, null, null, checkout.Estado, null, [], null, null, servicios.Vista(checkout, delCarrito, null, new DatosDeEnvio(nombres, null)) with { CarritoCambio = true });
         }
 
         // Se revalida lo precargado: el carrito no cambió de composición mientras tanto.
         var lineas = ServiciosDelCheckout.LineasParaElCheckout(delCarrito, ediciones);
-        if (lineas.Count == 0 || !lineas.Select(l => l.EdicionId).ToHashSet().SetEquals(edicionesVigentes))
+        if (lineas.Count == 0 || !lineas.Select(l => l.LineaDeCarritoId!.Value).ToHashSet().SetEquals(lineasDelCarritoVigentes))
         {
             throw new RechazoDePasarAlPagoException(new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.EnCurso));
         }
@@ -229,8 +238,20 @@ internal sealed class PrepararPasoAlPago(ServiciosDelCheckout servicios) : ICaso
             }
         }
 
-        var costo = servicios.CostoDeEnvio.Valor;
-        var efecto = checkout.PrepararPasoAlPago(carrito.Identificadores.NuevoId(), costo, HuellaDeLaReserva, servicios.HuellaDeLaInstantanea, delCarrito, ahora);
+        // El envío que se congela: en edición se leen las tarifas una sola vez, aquí, y el total que resulta se compara con el que la persona vio (CAR-46, CAR-49); reservando o en pago rige lo congelado.
+        IReadOnlyList<EnvioDeSucursal>? desglose = null;
+        var envio = CostoDeEnvio.Crear(checkout.EnvioCongelado ?? 0m);
+        if (checkout.Estado == EstadoDelCheckout.EnEdicion)
+        {
+            desglose = checkout.TipoDeEntrega == Tipo.Domicilio ? await servicios.DesgloseDelEnvio(checkout, cancelacion).ConfigureAwait(false) : null;
+            envio = desglose is null ? CostoDeEnvio.Cero : EnvioPorSucursales.Suma(desglose);
+            if (ComprobarElTotal(checkout.CalcularTotal(envio).Total, entrada.TotalVisto) is { } cambio)
+            {
+                throw new RechazoDePasarAlPagoException(cambio);
+            }
+        }
+
+        var efecto = checkout.PrepararPasoAlPago(carrito.Identificadores.NuevoId(), envio, HuellaDeLaReserva, servicios.HuellaDeLaInstantanea, delCarrito, ahora);
         if (!efecto.EsExito)
         {
             throw new RechazoDePasarAlPagoException(DeRechazo(efecto.Rechazo));
@@ -242,7 +263,7 @@ internal sealed class PrepararPasoAlPago(ServiciosDelCheckout servicios) : ICaso
         }
 
         var desenlace = efecto.Efecto == EfectoDeTransicion.Aplicada ? DesenlaceDePrepararPaso.Preparado : DesenlaceDePrepararPaso.YaPreparado;
-        return ConstruirPreparado(desenlace, cuenta, checkout, delCarrito, ahora);
+        return ConstruirPreparado(desenlace, cuenta, checkout, delCarrito, new DatosDeEnvio(nombres, desglose));
     }
 
     private async Task GuardarTodo(Guid cuenta, Checkout checkout, CarritoDeDominio delCarrito, IReadOnlyList<EdicionRetirada> quitadas, CancellationToken cancelacion)
@@ -386,16 +407,11 @@ internal sealed class PrepararPasoAlPago(ServiciosDelCheckout servicios) : ICaso
             ? new ErrorDeAplicacion(CategoriaDeError.Validacion, ClavesDelCarrito.DatosDeEntregaIncompletos)
             : null;
 
-    /// <summary>El total que la persona vio solo se compara con el calculado (D17): con el precio vigente del Catálogo y el envío configurado; ya congelado, con el congelado. Si difiere, no se crea nada.</summary>
-    private ErrorDeAplicacion? ComprobarElTotal(Checkout vivo, IReadOnlyList<LineaParaCheckout> lineas, decimal totalVisto)
-    {
-        var total = vivo.Estado is EstadoDelCheckout.Reservando or EstadoDelCheckout.EnPago && vivo.TotalCongelado is { } congelado
-            ? congelado
-            : TotalDeCompra.Calcular(lineas.Select(l => new ImporteDeLinea(l.PrecioUnitario, l.EsDigital ? 1 : l.Cantidad)), vivo.TipoDeEntrega ?? Tipo.Recojo, servicios.CostoDeEnvio.Valor).Total;
-        return Soles.Redondear(total) == Soles.Redondear(totalVisto)
+    /// <summary>El total que la persona vio solo se compara (D17) con el calculado (precio vigente y envío de las tarifas vigentes) o, ya congelado, con el congelado. Si difiere, no se crea nada y se devuelve el nuevo (CAR-49).</summary>
+    private static ErrorDeAplicacion? ComprobarElTotal(decimal total, decimal totalVisto) =>
+        Soles.Redondear(total) == Soles.Redondear(totalVisto)
             ? null
             : new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.TotalCambio, [new ErrorDeCampo("total", total.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture))]);
-    }
 
     private static ErrorDeAplicacion? ValidarForma(PasarAlPagoEntrada entrada)
     {
@@ -421,18 +437,19 @@ internal sealed class PrepararPasoAlPago(ServiciosDelCheckout servicios) : ICaso
         RechazoDeCheckout.AceptacionRequerida => new ErrorDeAplicacion(CategoriaDeError.Validacion, ClavesDelCarrito.AceptacionRequerida),
         RechazoDeCheckout.SinLineas => ServiciosDelCheckout.CheckoutVacio(),
         RechazoDeCheckout.PagoPendiente => new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.PagoPendiente),
+        RechazoDeCheckout.LineaSinSucursal => ServiciosDelCheckout.LineaSinSucursal(),
         _ => new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.EnCurso),
     };
 
     // ---------- Lo que queda para los pasos siguientes ----------
 
-    private PasoAlPagoPreparado ConstruirPreparado(DesenlaceDePrepararPaso desenlace, Guid cuenta, Checkout checkout, CarritoDeDominio delCarrito, DateTimeOffset ahora)
+    private PasoAlPagoPreparado ConstruirPreparado(DesenlaceDePrepararPaso desenlace, Guid cuenta, Checkout checkout, CarritoDeDominio delCarrito, DatosDeEnvio datos)
     {
-        var impresas = checkout.Lineas.Where(l => !l.EsDigital).Select(l => new LineaParaElInventario(l.LineaId, l.EdicionId, l.Cantidad.Valor)).ToList();
+        var impresas = checkout.Lineas.Where(l => !l.EsDigital).Select(l => new LineaParaElInventario(l.LineaId, l.EdicionId, l.Cantidad.Valor, l.CodigoDeSucursal)).ToList();
         EntregaParaElInventario? entrega = checkout.TipoDeEntrega switch
         {
-            Tipo.Recojo => new EntregaParaElInventario(Tipo.Recojo, checkout.CodigoDeSucursalDeRecojo, null),
-            Tipo.Domicilio => new EntregaParaElInventario(Tipo.Domicilio, null, checkout.RegionDeEntrega),
+            Tipo.Recojo => new EntregaParaElInventario(Tipo.Recojo, null),
+            Tipo.Domicilio => new EntregaParaElInventario(Tipo.Domicilio, checkout.RegionDeEntrega),
             _ => null,
         };
 
@@ -448,7 +465,7 @@ internal sealed class PrepararPasoAlPago(ServiciosDelCheckout servicios) : ICaso
             impresas,
             ConstruirLaInstantanea(cuenta, checkout),
             checkout.ReservaExpiraEn,
-            servicios.Vista(checkout, delCarrito, null));
+            servicios.Vista(checkout, delCarrito, null, datos));
     }
 
     private InstantaneaDeCompra ConstruirLaInstantanea(Guid cuenta, Checkout checkout)

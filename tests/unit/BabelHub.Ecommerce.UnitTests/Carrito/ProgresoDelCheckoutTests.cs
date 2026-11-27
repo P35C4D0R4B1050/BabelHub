@@ -22,10 +22,10 @@ public sealed class ProgresoDelCheckoutTests
         var e = EntornoDelCarrito.DeCliente();
         var impreso = e.Impreso(10, 40m, "Impreso");
         var digital = e.Digital(20m, "Digital");
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(impreso, 3));
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(digital, 1));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(impreso, 3, CodigoDeSucursal: Sucursal.Principal));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(digital, 1, CodigoDeSucursal: Sucursal.Principal));
         await new IniciarCheckout(e.ServiciosDelCheckout()).Ejecutar(new IniciarCheckoutEntrada());
-        await new ElegirEntrega(e.ServiciosDelCheckout()).Ejecutar(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, null, new ContactoDeCompra("Ana Pérez", "987654321", "Jr. Lima 123", "ayacucho")));
+        await new ElegirEntrega(e.ServiciosDelCheckout()).Ejecutar(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, new ContactoDeCompra("Ana Pérez", "987654321", "Jr. Lima 123", "ayacucho")));
         TextoVistoDeCompra[] textos = [.. Los2, new TextoVistoDeCompra(TextoLegalDeCompra.ReembolsoDigital, "r-1")];
         await new RegistrarAceptaciones(e.ServiciosDelCheckout()).Ejecutar(new RegistrarAceptacionesEntrada(textos));
         var checkout = e.Checkouts.Todos.Single();
@@ -86,9 +86,9 @@ public sealed class ProgresoDelCheckoutTests
         var s = await EnPago();
         var e = EntornoDelCarrito.DeCliente();
         var libro = e.Impreso(5, 10m);
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(libro, 1));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(libro, 1, CodigoDeSucursal: Sucursal.Principal));
         await new IniciarCheckout(e.ServiciosDelCheckout()).Ejecutar(new IniciarCheckoutEntrada());
-        await new ElegirEntrega(e.ServiciosDelCheckout()).Ejecutar(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, "sede-central", null));
+        await new ElegirEntrega(e.ServiciosDelCheckout()).Ejecutar(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo));
         await new RegistrarAceptaciones(e.ServiciosDelCheckout()).Ejecutar(new RegistrarAceptacionesEntrada(Los2));
         var prep = await new PrepararPasoAlPago(e.ServiciosDelCheckout()).Ejecutar(new PasarAlPagoEntrada(10m, Los2));
         var pedido = prep.Valor.PedidoId!.Value;
@@ -139,7 +139,7 @@ public sealed class ProgresoDelCheckoutTests
         var s = await Pendiente();
         var carrito = s.Entorno.Carritos.Todos.Single();
         // Mientras se pagaba, el cliente sumó dos unidades desde otro dispositivo al carrito (el checkout compró 3).
-        carrito.Modificar(s.Impreso, 5, Inicio);
+        carrito.Modificar(s.Entorno.LineaDe(s.Impreso), 5, Inicio);
 
         await Progreso(s).PagoAprobado(s.Pedido);
 

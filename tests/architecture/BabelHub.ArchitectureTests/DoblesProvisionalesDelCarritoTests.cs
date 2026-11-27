@@ -116,7 +116,7 @@ public class DoblesProvisionalesDelCarritoTests
         inventario.FijarStock(edicion, 10);
         var pedido = Guid.NewGuid();
         var lineas = new[] { new LineaParaElInventario(Guid.NewGuid(), edicion, 2) };
-        var entrega = new EntregaParaElInventario(TipoDeEntrega.Recojo, "sede-central", null);
+        var entrega = new EntregaParaElInventario(TipoDeEntrega.Recojo, null);
 
         var primera = (await inventario.Reservar(pedido, 1, entrega, lineas));
         reloj.Avanzar(TimeSpan.FromMinutes(16));
@@ -138,7 +138,7 @@ public class DoblesProvisionalesDelCarritoTests
         inventario.FijarStock(edicion, 10);
         var pedido = Guid.NewGuid();
         var linea = Guid.NewGuid();
-        var entrega = new EntregaParaElInventario(TipoDeEntrega.Recojo, "sede-central", null);
+        var entrega = new EntregaParaElInventario(TipoDeEntrega.Recojo, null);
 
         ResultadoDeReservar? ultima = null;
         for (var generacion = 1; generacion <= 4; generacion++)
@@ -162,7 +162,7 @@ public class DoblesProvisionalesDelCarritoTests
         var falta = Guid.NewGuid();
         inventario.FijarStock(hay, 5);
         inventario.FijarStock(falta, 1);
-        var entrega = new EntregaParaElInventario(TipoDeEntrega.Domicilio, null, "ayacucho");
+        var entrega = new EntregaParaElInventario(TipoDeEntrega.Domicilio, "ayacucho");
 
         var resultado = (await inventario.Reservar(Guid.NewGuid(), 1, entrega, [new LineaParaElInventario(Guid.NewGuid(), hay, 2), new LineaParaElInventario(Guid.NewGuid(), falta, 3)]));
 
@@ -179,7 +179,7 @@ public class DoblesProvisionalesDelCarritoTests
         var edicion = Guid.NewGuid();
         inventario.FijarStock(edicion, 3);
         var pedido = Guid.NewGuid();
-        var entrega = new EntregaParaElInventario(TipoDeEntrega.Recojo, "sede-central", null);
+        var entrega = new EntregaParaElInventario(TipoDeEntrega.Recojo, null);
         await inventario.Reservar(pedido, 1, entrega, [new LineaParaElInventario(Guid.NewGuid(), edicion, 2)]);
 
         Assert.Equal(ResultadoDeLiberar.NoExistia, (await inventario.Liberar(Guid.NewGuid(), "checkout-cancelado")));
@@ -198,7 +198,7 @@ public class DoblesProvisionalesDelCarritoTests
     {
         var inventario = Inventario(out _);
         inventario.Caido = true;
-        var entrega = new EntregaParaElInventario(TipoDeEntrega.Recojo, "sede-central", null);
+        var entrega = new EntregaParaElInventario(TipoDeEntrega.Recojo, null);
         var linea = new LineaParaElInventario(Guid.NewGuid(), Guid.NewGuid(), 1);
 
         Assert.Equal(EstadoDeRespuestaDelInventarioDelCarrito.NoDisponible, (await inventario.ConsultarDisponibilidad([linea.EdicionId])).Estado);

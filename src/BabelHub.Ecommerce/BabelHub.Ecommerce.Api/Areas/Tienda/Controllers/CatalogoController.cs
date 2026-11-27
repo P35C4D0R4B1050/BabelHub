@@ -6,6 +6,7 @@ using BabelHub.Ecommerce.Api.Web.Errores;
 using BabelHub.Ecommerce.Api.Web.Estados;
 using BabelHub.Ecommerce.Api.Web.Formato;
 using BabelHub.Ecommerce.Application.Catalogo;
+using BabelHub.Ecommerce.Application.Web;
 using Microsoft.AspNetCore.Mvc;
 using EstadoDeDisponibilidadDelCatalogo = BabelHub.Ecommerce.Application.Catalogo.EstadoDeDisponibilidad;
 using EstadoDeDisponibilidadWeb = BabelHub.Ecommerce.Api.Web.Estados.EstadoDeDisponibilidad;
@@ -18,11 +19,14 @@ public sealed record FiltrosDelCatalogo(string? Texto, string? Autor, string? Ed
     public bool HayFiltros => Texto is not null || Autor is not null || Editorial is not null || Categoria is not null || Formato is not null || PrecioMinimo is not null || PrecioMaximo is not null || SoloDisponibles;
 }
 
-/// <summary>Una edición de una tarjeta o de la ficha, ya lista para pintar: precio con formato peruano, la disponibilidad con texto, icono y color, y si la ficha ofrece agregarla al carrito y hasta cuántas unidades (CAR-04, CAT-12).</summary>
-public sealed record EdicionDeLaVista(Guid EdicionId, bool EsDigital, string Isbn, decimal Precio, string PrecioTexto, DisponibilidadVista Disponibilidad, string? Aviso, IReadOnlyList<FilaDeSucursal> Sucursales, bool SePuedeAgregar, int CantidadMaxima);
+/// <summary>Una edición de una tarjeta o de la ficha, ya lista para pintar: precio con formato peruano, la disponibilidad con texto, icono y color, y si la ficha ofrece agregarla al carrito (CAT-12).</summary>
+public sealed record EdicionDeLaVista(Guid EdicionId, bool EsDigital, string Isbn, decimal Precio, string PrecioTexto, DisponibilidadVista Disponibilidad, string? Aviso, bool SePuedeAgregar);
 
-/// <summary>El stock vendible de una sucursal (fuente) con su estado en texto: nunca solo con color.</summary>
-public sealed record FilaDeSucursal(string Codigo, string Nombre, int Vendible, string Estado, string Icono, bool EsLaTuya);
+/// <summary>
+/// Una sucursal de la ficha: lo vendible si se pudo confirmar (nulo si no), si se puede elegir, si va preseleccionada, hasta cuántas unidades admite una adición y su texto; el estado nunca va solo con color.
+/// </summary>
+public sealed record OpcionDeSucursal(string Codigo, string Nombre, int? Vendible, bool SePuedeElegir, bool Elegida, int Maximo, string Texto, string Estado, string Icono);
+
 
 public sealed record TarjetaDeObra(Guid ObraId, string Titulo, string Autor, string Categoria, string PortadaHuella, string DesdeTexto, IReadOnlyList<EdicionDeLaVista> Ediciones);
 
@@ -100,6 +104,9 @@ public sealed class FichaVista : ModeloBaseDePagina
 
     public EdicionDeLaVista? Digital { get; set; }
 
+    /// <summary>Las sucursales que se pueden elegir para el impreso, con su stock si se pudo confirmar (CAR-42, CAR-43).</summary>
+    public IReadOnlyList<OpcionDeSucursal> Opciones { get; set; } = [];
+
     /// <summary>La edición que se muestra: <c>impresa</c> o <c>digital</c>.</summary>
     public string EdicionActiva { get; set; } = "impresa";
 
@@ -111,7 +118,7 @@ public sealed class FichaVista : ModeloBaseDePagina
 /// texto e icono y los estados estándar de pantalla. Funciona sin JavaScript (un formulario <c>GET</c>); con htmx solo reemplaza los resultados. La ficha ofrece comprar con un formulario <c>POST /carrito/lineas</c>, que atiende <see cref="CarritoController"/>.
 /// </summary>
 [Area("Tienda")]
-public sealed class CatalogoController(IConsultaDeCatalogo catalogo, ContextoDePagina pagina, OpcionesDeErrores opciones) : Controller
+public sealed class CatalogoController(IConsultaDeCatalogo catalogo, ContextoDePagina pagina, OpcionesDeErrores opciones, IPreferenciaDeSucursal sucursales) : Controller
 {
     private const int TamanoDePagina = 12;
 
@@ -143,9 +150,9 @@ public sealed class CatalogoController(IConsultaDeCatalogo catalogo, ContextoDeP
             return Respuesta(vista, resultado.Error.Clave == "busqueda-demasiado-amplia" ? StatusCodes.Status422UnprocessableEntity : traduccion.EstadoHttp);
         }
 
-        var preferida = vista.SucursalPreferida;
+
         var pagina_ = resultado.Valor;
-        vista.Tarjetas = [.. pagina_.Obras.Select(o => ATarjeta(o, preferida))];
+        vista.Tarjetas = [.. pagina_.Obras.Select(ATarjeta)];
         vista.Total = pagina_.Total;
         vista.Pagina = pagina_.Pagina;
         vista.TotalDePaginas = Math.Max(1, (int)Math.Ceiling(pagina_.Total / (double)Math.Max(1, pagina_.Tamano)));
@@ -184,8 +191,12 @@ public sealed class CatalogoController(IConsultaDeCatalogo catalogo, ContextoDeP
         vista.Categoria = obra.Categoria;
         vista.Descripcion = obra.Descripcion;
         vista.PortadaHuella = obra.PortadaHuella;
-        vista.Impresa = obra.Ediciones.Where(e => e.Formato == FormatoDeEdicion.Impresa).Select(e => AEdicion(e, vista.SucursalPreferida)).FirstOrDefault();
-        vista.Digital = obra.Ediciones.Where(e => e.Formato == FormatoDeEdicion.Digital).Select(e => AEdicion(e, vista.SucursalPreferida)).FirstOrDefault();
+        var impresa = obra.Ediciones.FirstOrDefault(e => e.Formato == FormatoDeEdicion.Impresa);
+        vista.Impresa = impresa is null ? null : AEdicion(impresa);
+        // La última sucursal elegida solo preselecciona aquí, y solo si consta que tiene stock (CAR-42).
+        var conocidas = impresa is null ? null : await sucursales.Resolver(Request.Cookies[PreferenciasDeLaPagina.CookieDeSucursal], cancelacion);
+        vista.Opciones = impresa is null ? [] : Opciones(impresa.Disponibilidad, conocidas!);
+        vista.Digital = obra.Ediciones.Where(e => e.Formato == FormatoDeEdicion.Digital).Select(AEdicion).FirstOrDefault();
         vista.EdicionActiva = edicion switch
         {
             "digital" when vista.Digital is not null => "digital",
@@ -262,18 +273,54 @@ public sealed class CatalogoController(IConsultaDeCatalogo catalogo, ContextoDeP
 
     // ---------- Del contrato a la vista ----------
 
-    private static TarjetaDeObra ATarjeta(ResumenDeObra obra, string? sucursal)
+    private static TarjetaDeObra ATarjeta(ResumenDeObra obra)
     {
-        var ediciones = obra.Ediciones.Select(e => AEdicion(e, sucursal)).ToList();
+        var ediciones = obra.Ediciones.Select(AEdicion).ToList();
         var desde = ediciones.Count == 0 ? string.Empty : "Desde " + FormatoPeruano.Soles(ediciones.Min(e => e.Precio));
         return new TarjetaDeObra(obra.ObraId, obra.Titulo, obra.Autor, obra.Categoria, obra.PortadaHuella, desde, ediciones);
     }
 
-    internal static EdicionDeLaVista AEdicion(EdicionDeObra edicion, string? sucursal)
+    /// <summary>
+    /// Las sucursales de la ficha de un impreso (CAR-42, CAR-43): las de la última lista conocida y las que informa el stock. Con dato, cada una con su vendible, y solo se pueden elegir las que tienen unidades (como máximo la menor cantidad
+    /// entre 20 y lo vendible); sin dato, todas, sin cantidades, y el checkout valida el stock. Se preselecciona la última elegida solo si consta que tiene stock.
+    /// </summary>
+    internal static IReadOnlyList<OpcionDeSucursal> Opciones(DisponibilidadDeEdicion disponibilidad, SucursalesParaElegir conocidas)
+    {
+        var conDato = disponibilidad.Estado is EstadoDeDisponibilidadDelCatalogo.Disponible or EstadoDeDisponibilidadDelCatalogo.Agotada;
+        var nombres = conocidas.Sucursales.ToDictionary(s => s.Codigo, s => s.Nombre, StringComparer.Ordinal);
+        foreach (var fuente in disponibilidad.PorFuente)
+        {
+            nombres.TryAdd(fuente.CodigoDeFuente, fuente.NombreDeFuente);
+        }
+
+        return [.. nombres.Select(par =>
+        {
+            int? vendible = conDato ? Math.Max(0, disponibilidad.PorFuente.Where(f => f.CodigoDeFuente == par.Key).Sum(f => f.Vendible)) : null;
+            var sePuede = vendible is null or > 0;
+            var texto = vendible switch
+            {
+                null => par.Value,
+                0 => $"{par.Value} — sin stock",
+                1 => $"{par.Value} — 1 disponible",
+                { } n => $"{par.Value} — {n} disponibles",
+            };
+            return new OpcionDeSucursal(
+                par.Key,
+                par.Value,
+                vendible,
+                sePuede,
+                vendible > 0 && par.Key == conocidas.CodigoElegido,
+                Math.Min(vendible ?? CarritoController.MaximoDeUnidades, CarritoController.MaximoDeUnidades),
+                texto,
+                EstadoDeStock(vendible ?? 0),
+                IconoDeStock(vendible ?? 0));
+        })];
+    }
+
+    internal static EdicionDeLaVista AEdicion(EdicionDeObra edicion)
     {
         var d = edicion.Disponibilidad;
         var esDigital = edicion.Formato == FormatoDeEdicion.Digital;
-        var filas = d.PorFuente.Select(f => new FilaDeSucursal(f.CodigoDeFuente, f.NombreDeFuente, f.Vendible, EstadoDeStock(f.Vendible), IconoDeStock(f.Vendible), string.Equals(f.CodigoDeFuente, sucursal, StringComparison.Ordinal))).ToList();
         string? aviso = null;
         DisponibilidadVista vista;
         switch (d.Estado)
@@ -293,9 +340,7 @@ public sealed class CatalogoController(IConsultaDeCatalogo catalogo, ContextoDeP
                 vista = DisponibilidadVista.Agotado();
                 break;
             default:
-                var tuya = filas.FirstOrDefault(f => f.EsLaTuya && f.Vendible > 0);
-                var otras = filas.Count(f => !f.EsLaTuya && f.Vendible > 0);
-                vista = tuya is not null ? DisponibilidadVista.EnTuSucursal() : DisponibilidadVista.EnOtrasSucursales(Math.Max(1, otras));
+                vista = DisponibilidadVista.EnSucursales(Math.Max(1, d.PorFuente.Count(f => f.Vendible > 0)));
                 break;
         }
 
@@ -308,8 +353,7 @@ public sealed class CatalogoController(IConsultaDeCatalogo catalogo, ContextoDeP
         var sePuedeAgregar = esDigital
             ? d.Estado == EstadoDeDisponibilidadDelCatalogo.DisponibleAlInstante
             : d.Estado is EstadoDeDisponibilidadDelCatalogo.Disponible or EstadoDeDisponibilidadDelCatalogo.NoSePuedeConfirmar;
-        var maximo = esDigital ? 1 : Math.Clamp(d.VendibleEnLaRed ?? CarritoController.MaximoDeUnidades, 1, CarritoController.MaximoDeUnidades);
-        return new EdicionDeLaVista(edicion.EdicionId, esDigital, edicion.Isbn, edicion.Precio, FormatoPeruano.Soles(edicion.Precio), vista, aviso, filas, sePuedeAgregar, maximo);
+        return new EdicionDeLaVista(edicion.EdicionId, esDigital, edicion.Isbn, edicion.Precio, FormatoPeruano.Soles(edicion.Precio), vista, aviso, sePuedeAgregar);
     }
 
     private static string EstadoDeStock(int vendible) => vendible <= 0 ? "Sin stock" : vendible <= 2 ? "Pocas unidades" : "Disponible";

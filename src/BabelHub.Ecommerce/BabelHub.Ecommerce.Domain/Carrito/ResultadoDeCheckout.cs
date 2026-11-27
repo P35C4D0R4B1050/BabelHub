@@ -75,6 +75,9 @@ public enum RechazoDeCheckout
 
     /// <summary>Falta aceptar un texto legal requerido, o su versión cambió (CAR-12, CAR-13, CAR-28).</summary>
     AceptacionRequerida,
+
+    /// <summary>Una línea impresa es anterior a la venta por sucursal: se quita y se vuelve a agregar eligiendo sucursal antes de seguir (CAR-45).</summary>
+    LineaSinSucursal,
 }
 
 /// <summary>El resultado de una transición del checkout: su efecto, el rechazo si lo hubo y las ediciones que se quitaron del carrito por retiros pendientes (para dejar su aviso).</summary>

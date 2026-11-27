@@ -37,20 +37,6 @@
             </ul>
         </nav>
         <div class="navbar-end ml-auto w-auto flex-wrap justify-end gap-2">
-            @if (Model.Area == AreaDeLaPagina.Tienda && Model.Sucursales.Count > 0)
-            {
-                <form method="post" action="/preferencias/sucursal" asp-antiforgery="true" class="flex items-center gap-1">
-                    <label for="bh-sucursal" class="sr-only">Sucursal preferida</label>
-                    <bh-icono nombre="sucursal" />
-                    <select id="bh-sucursal" name="sucursal" class="select select-sm w-40" data-bh-sucursal>
-                        @foreach (var sucursal in Model.Sucursales)
-                        {
-                            <option value="@sucursal.Codigo" selected="@(sucursal.Codigo == Model.SucursalPreferida)">@sucursal.Nombre</option>
-                        }
-                    </select>
-                    <noscript><button type="submit" class="btn btn-sm">Elegir</button></noscript>
-                </form>
-            }
             <form method="post" action="/preferencias/tema" asp-antiforgery="true" class="flex items-center gap-1">
                 <label for="bh-tema" class="sr-only">Tema</label>
                 <select id="bh-tema" name="tema" class="select select-sm w-28" data-bh-tema>

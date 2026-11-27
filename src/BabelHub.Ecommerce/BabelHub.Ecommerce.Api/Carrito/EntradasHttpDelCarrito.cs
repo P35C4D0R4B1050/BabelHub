@@ -17,7 +17,7 @@ public static partial class EntradasHttpDelCarrito
 {
     private static readonly string[] Prohibidos = ["carritoId", "checkoutId", "cuentaId", "usuarioId", "visitanteId", "visitanteHash", "usuario", "cuenta"];
 
-    private static readonly string[] ClavesDeRutaPermitidas = ["area", "controller", "action", "edicionId"];
+    private static readonly string[] ClavesDeRutaPermitidas = ["area", "controller", "action", "lineaId"];
 
     public const int TopeDelCuerpo = 16 * 1024;
 

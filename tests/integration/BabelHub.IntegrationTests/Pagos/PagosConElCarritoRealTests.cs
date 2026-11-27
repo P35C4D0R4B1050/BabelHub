@@ -70,6 +70,8 @@ public sealed class PagosConElCarritoRealTests(PostgresDelEcommerceCompletoFixtu
         servicios.AddSingleton<IReloj>(_reloj);
         servicios.RemoveAll<IInventarioDelCarrito>();
         servicios.AddSingleton<IInventarioDelCarrito>(_inventarioDelCarrito);
+        servicios.RemoveAll<BabelHub.Ecommerce.Application.Web.IPreferenciaDeSucursal>();
+        servicios.AddSingleton(BabelHub.IntegrationTests.Carrito.SucursalesDelCarrito.Preferencia());
         servicios.RemoveAll<IReservasDelPago>();
         servicios.AddSingleton<IReservasDelPago>(new ReservasConRegistroDeLiberaciones(_reservasDelPago, _liberaciones));
         servicios.RemoveAll<IConfirmacionDeCompra>();
@@ -114,10 +116,10 @@ public sealed class PagosConElCarritoRealTests(PostgresDelEcommerceCompletoFixtu
     {
         var cuenta = await SembrarCuenta();
         var textos = await TextosVigentes(anfitrion);
-        var agregado = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICarritoDelCliente>().AgregarLinea(new AgregarLineaEntrada(EdicionImpresa, cantidad)));
+        var agregado = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICarritoDelCliente>().AgregarLinea(new AgregarLineaEntrada(EdicionImpresa, cantidad, CodigoDeSucursal: "sede-central")));
         Assert.True(agregado.EsExito, agregado.Error?.Clave);
         Assert.True((await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().Iniciar(new IniciarCheckoutEntrada()))).EsExito);
-        var entrega = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().ElegirEntrega(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, "sede-central", null)));
+        var entrega = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().ElegirEntrega(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, null)));
         Assert.True(entrega.EsExito, entrega.Error?.Clave);
         var aceptado = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().RegistrarAceptaciones(new RegistrarAceptacionesEntrada(textos)));
         // Si las versiones cambiaron entre la lectura y la aceptación, el mensaje dice cuáles eran (un defecto de aislamiento o de la fuente de versiones se vería aquí).

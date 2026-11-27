@@ -22,8 +22,9 @@ public static class PantallasDelCarrito
     private static readonly Dictionary<string, Texto> PorCodigo = new(StringComparer.Ordinal)
     {
         ["ECO-CARRITO-SIN-STOCK"] = new("No hay stock suficiente", "Ajusta la cantidad: de este libro quedan menos unidades de las que pediste. No se hizo ningún cobro."),
-        ["ECO-CARRITO-LIMITE-DE-LINEAS"] = new("Tu carrito está lleno", "Un carrito admite hasta 30 libros distintos. Quita alguno para agregar otro."),
-        ["ECO-CARRITO-LIMITE-DE-UNIDADES"] = new("Llegaste al máximo de unidades", "Puedes comprar hasta 20 unidades de un mismo libro."),
+        ["ECO-CARRITO-LIMITE-DE-LINEAS"] = new("Tu carrito está lleno", "Un carrito admite hasta 30 líneas. Quita alguna para agregar otra."),
+        ["ECO-CARRITO-LIMITE-DE-UNIDADES"] = new("Llegaste al máximo de unidades", "Cada línea admite hasta 20 unidades. Para más, agrega el libro otra vez desde su ficha: se abrirá otra línea."),
+        ["ECO-CARRITO-LINEA-SIN-SUCURSAL"] = new("Vuelve a elegir la sucursal", "Tienes libros agregados antes de la venta por sucursal. Quítalos del carrito y agrégalos otra vez eligiendo la sucursal. No se hizo ningún cobro."),
         ["ECO-DIGITAL-YA-POSEIDA"] = new("Ya tienes este libro", "Está en tu biblioteca: no hace falta comprarlo otra vez."),
         ["ECO-EDICION-NO-DISPONIBLE"] = new("Este libro ya no está disponible", "Lo retiraron de la venta. Puedes elegir otra edición en el catálogo."),
         ["ECO-CHECKOUT-PAGO-PENDIENTE"] = new("Tu pago está en proceso", "Espera a que se confirme antes de cambiar tu compra."),
@@ -48,24 +49,31 @@ public static class PantallasDelCarrito
         ["ECO-PAGO-NO-DISPONIBLE"] = new(Areas.Tienda.Controllers.TextosDelPago.TituloSinPasarela, "Todavía no recibimos pagos en la tienda. No se te cobró nada y tu carrito se conservó."),
     };
 
-    /// <summary>CAR-04: el rechazo por falta de stock dice en pantalla la cantidad máxima disponible (cuenta lo que ya hay en el carrito); sin ese dato queda el texto general.</summary>
-    private static string ConElMaximo(ProblemaDto problema, string mensaje)
+    /// <summary>
+    /// CAR-04 y CAR-27: el rechazo por falta de stock dice en pantalla la sucursal (y, en el checkout, el libro) y la cantidad máxima disponible en ella; sin ese dato queda el texto general.
+    /// </summary>
+    private static string ConElMaximo(ProblemaDto problema, string mensaje, DetalleDelStock? detalle)
     {
-        if (!problema.Code.EndsWith("-CARRITO-SIN-STOCK", StringComparison.Ordinal)
+        var enElCarrito = problema.Code.EndsWith("-CARRITO-SIN-STOCK", StringComparison.Ordinal);
+        if ((!enElCarrito && !problema.Code.EndsWith("-CHECKOUT-RESERVA-RECHAZADA", StringComparison.Ordinal))
             || problema.Errores.FirstOrDefault(e => e.Campo == "maximo") is not { } campo
             || !int.TryParse(campo.Clave, NumberStyles.None, CultureInfo.InvariantCulture, out var maximo))
         {
             return mensaje;
         }
 
-        return maximo == 0
-            ? "Ya no quedan unidades de este libro. No se hizo ningún cobro."
-            : $"El máximo disponible es de {maximo} {(maximo == 1 ? "unidad" : "unidades")}, contando las que ya estén en tu carrito. Elige una cantidad menor. No se hizo ningún cobro.";
+        var donde = detalle?.Sucursal is { } nombre ? $"en {nombre}" : "en la sucursal elegida";
+        var libro = detalle?.Libro is { } titulo ? $" de «{titulo}»" : string.Empty;
+        var hay = maximo == 0
+            ? $"Ya no quedan unidades{libro} {donde}."
+            : $"El máximo disponible{libro} {donde} es de {maximo} {(maximo == 1 ? "unidad" : "unidades")}, contando las que ya estén en tu carrito.";
+        return enElCarrito
+            ? $"{hay} {(maximo == 0 ? "Elige otra sucursal" : "Elige una cantidad menor u otra sucursal")}. No se hizo ningún cobro."
+            : $"{hay} Tu carrito se conservó y no se hizo ningún cobro.";
     }
 
     private static readonly Dictionary<string, string> CampoDelFormulario = new(StringComparer.Ordinal)
     {
-        ["codigoDeSucursalDeRecojo"] = "sucursal",
         ["terminos"] = "terminosVersion",
         ["privacidad"] = "privacidadVersion",
         ["reembolsoDigital"] = "reembolsoDigitalVersion",
@@ -78,7 +86,7 @@ public static class PantallasDelCarrito
         ("direccion", "obligatorio") => "Escribe tu dirección de entrega.",
         ("region", "obligatorio") => "Escribe la región de entrega.",
         ("region", _) => "Esa región no está en nuestra lista de despacho.",
-        ("sucursal", _) => "Elige una sucursal de la lista.",
+        ("sucursal", _) => "Elige una sucursal de la lista para agregar el libro impreso.",
         (_, "obligatorio") => "Completa este dato.",
         (_, "demasiado-largo") => "Es demasiado largo.",
         (_, "fuera-de-rango") => "Está fuera del rango permitido.",
@@ -88,7 +96,7 @@ public static class PantallasDelCarrito
     /// <summary>
     /// Aplica un fallo a la pantalla del checkout: el aviso del bloqueo con el texto de su código (o «Revisa los datos» en una validación), los errores junto a cada campo con el nombre del formulario y lo que la persona escribió (sin el token ni la verificación de persona).
     /// </summary>
-    public static void AplicarElFallo(Areas.Tienda.Controllers.CheckoutVista modelo, ProblemaDto problema, ErrorDeAplicacion error, IReadOnlyDictionary<string, string> campos)
+    public static void AplicarElFallo(Areas.Tienda.Controllers.CheckoutVista modelo, ProblemaDto problema, ErrorDeAplicacion error, IReadOnlyDictionary<string, string> campos, DetalleDelStock? detalle = null)
     {
         ArgumentNullException.ThrowIfNull(modelo);
         ArgumentNullException.ThrowIfNull(problema);
@@ -97,7 +105,7 @@ public static class PantallasDelCarrito
         if (PorCodigo.TryGetValue(problema.Code, out var texto))
         {
             modelo.AlertaTitulo = texto.Titulo;
-            modelo.AlertaMensaje = ConElMaximo(problema, texto.Mensaje);
+            modelo.AlertaMensaje = ConElMaximo(problema, texto.Mensaje, detalle);
         }
         else
         {
@@ -126,7 +134,7 @@ public static class PantallasDelCarrito
         modelo.Errores = porCampo;
         // Lista blanca de lo que la pantalla repinta: nada más de lo recibido vuelve a salir.
         modelo.Valores = campos
-            .Where(c => c.Key is "nombre" or "telefono" or "direccion" or "region" or "sucursal" or "consentimientoDeWhatsApp" or "terminosVersion" or "privacidadVersion" or "reembolsoDigitalVersion")
+            .Where(c => c.Key is "nombre" or "telefono" or "direccion" or "region" or "consentimientoDeWhatsApp" or "terminosVersion" or "privacidadVersion" or "reembolsoDigitalVersion")
             .ToDictionary(c => c.Key, c => c.Value, StringComparer.Ordinal);
     }
 
@@ -137,7 +145,7 @@ public static class PantallasDelCarrito
         return solicitud.GetTypedHeaders().Accept.Any(a => a.MediaType.HasValue && string.Equals(a.MediaType.Value, "text/html", StringComparison.OrdinalIgnoreCase));
     }
 
-    public static RespuestaDePantalla Traducir(ProblemaDto problema, string rutaDeReintento)
+    public static RespuestaDePantalla Traducir(ProblemaDto problema, string rutaDeReintento, DetalleDelStock? detalle = null)
     {
         ArgumentNullException.ThrowIfNull(problema);
         if (problema.Errores.Any(e => e.Campo == ProblemasDelCarrito.CampoRegistrarSinSesion))
@@ -166,7 +174,7 @@ public static class PantallasDelCarrito
                 {
                     Estado = EstadoDePantalla.Error,
                     Titulo = texto.Titulo,
-                    Mensaje = ConElMaximo(problema, texto.Mensaje),
+                    Mensaje = ConElMaximo(problema, texto.Mensaje, detalle),
                     RutaDeReintento = rutaDeReintento,
                     CodigoDeSoporte = problema.Code,
                     IdentificadorDeSeguimiento = problema.TraceId,
@@ -183,13 +191,13 @@ public static class PantallasDelCarrito
     /// <summary>
     /// Escribe el fallo como pantalla completa (el estado dentro del layout) con el código HTTP del módulo (<c>200</c> con htmx, que no reemplaza un fragmento con un 4xx), la cabecera <c>Retry-After</c> en un límite y <c>no-store</c>; una solicitud no autenticada va al ingreso.
     /// </summary>
-    public static async Task<IActionResult> Escribir(Controller controlador, ContextoDePagina pagina, OpcionesDeErrores errores, ErrorDeAplicacion error, string rutaDeReintento, CancellationToken cancelacion)
+    public static async Task<IActionResult> Escribir(Controller controlador, ContextoDePagina pagina, OpcionesDeErrores errores, ErrorDeAplicacion error, string rutaDeReintento, CancellationToken cancelacion, DetalleDelStock? detalle = null)
     {
         ArgumentNullException.ThrowIfNull(controlador);
         var contexto = controlador.HttpContext;
         var problema = ProblemasDelCarrito.Crear(contexto, errores, error);
         await DenegacionesHttp.Registrar(contexto, error.Categoria, error.Clave, problema.Code).ConfigureAwait(false);
-        var respuesta = Traducir(problema, rutaDeReintento);
+        var respuesta = Traducir(problema, rutaDeReintento, detalle);
         if (respuesta.RedirigirA is { } destino)
         {
             return controlador.Request.EsHtmx() ? new HxRedirectResult(destino) : new LocalRedirectResult(destino);
@@ -206,3 +214,6 @@ public static class PantallasDelCarrito
         return controlador.View("~/Views/Estados/Pantalla.cshtml", modelo);
     }
 }
+
+/// <summary>Lo que acompaña a un rechazo por falta de stock en pantalla: el nombre de la sucursal y, si se sabe, el título del libro.</summary>
+public sealed record DetalleDelStock(string? Sucursal, string? Libro);

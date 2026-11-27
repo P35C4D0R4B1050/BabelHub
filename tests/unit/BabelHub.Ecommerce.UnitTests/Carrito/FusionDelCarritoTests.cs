@@ -253,7 +253,7 @@ public sealed class FusionDelCarritoTests
         var a = e.Impreso(5);
         var delaCuenta = SembrarCuenta(e, cuenta, (a, false, 1));
         var visitante = SembrarVisitante(e, (a, false, 1));
-        var checkout = Checkout.Iniciar(Guid.NewGuid(), cuenta, delaCuenta.Id, [new LineaParaCheckout(a, false, "Libro", "9780000000019", 1, 50m)], Guid.NewGuid, Inicio);
+        var checkout = Checkout.Iniciar(Guid.NewGuid(), cuenta, delaCuenta.Id, [new LineaParaCheckout(a, false, "Libro", "9780000000019", 1, 50m, a, Sucursal.Principal)], Guid.NewGuid, Inicio);
         e.Checkouts.Sembrar(checkout);
 
         await Fusionar(e);
@@ -270,10 +270,10 @@ public sealed class FusionDelCarritoTests
         var a = e.Impreso(10);
         var delaCuenta = SembrarCuenta(e, cuenta, (a, false, 1));
         var visitante = SembrarVisitante(e, (a, false, 2));
-        var checkout = Checkout.Iniciar(Guid.NewGuid(), cuenta, delaCuenta.Id, [new LineaParaCheckout(a, false, "Libro", "9780000000019", 1, 50m)], Guid.NewGuid, Inicio);
+        var checkout = Checkout.Iniciar(Guid.NewGuid(), cuenta, delaCuenta.Id, [new LineaParaCheckout(a, false, "Libro", "9780000000019", 1, 50m, a, Sucursal.Principal)], Guid.NewGuid, Inicio);
         checkout.Aceptar(TextoLegal.Terminos, "t-1", Inicio);
         checkout.Aceptar(TextoLegal.Privacidad, "p-1", Inicio);
-        checkout.ElegirRecojo("lima", Inicio);
+        checkout.ElegirRecojo(Inicio);
         llevar?.Invoke(checkout, delaCuenta);
         e.Checkouts.Sembrar(checkout);
         return (e, checkout, delaCuenta, visitante);

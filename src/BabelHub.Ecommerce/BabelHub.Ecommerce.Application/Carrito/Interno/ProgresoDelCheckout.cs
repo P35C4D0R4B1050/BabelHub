@@ -25,7 +25,7 @@ internal sealed class ProgresoDelCheckout(ServiciosDelCheckout servicios) : IPro
             pedidoId,
             (checkout, carrito, ahora) =>
             {
-                var comprado = checkout.Lineas.Select(l => (l.EdicionId, l.Cantidad.Valor)).ToList();
+                var comprado = checkout.Lineas.Select(l => (l.LineaDeCarritoId, l.EdicionId, Cantidad: l.Cantidad.Valor)).ToList();
                 var efecto = checkout.PagoAprobado(pedidoId, carrito, ahora);
                 if (efecto.Efecto == EfectoDeTransicion.Aplicada)
                 {
@@ -134,26 +134,21 @@ internal sealed class ProgresoDelCheckout(ServiciosDelCheckout servicios) : IPro
             cancelacion).ConfigureAwait(false);
     }
 
-    /// <summary>Quita del carrito solo la cantidad comprada de cada línea pagada (D16): una línea que queda en cero se elimina y las no pagadas se conservan.</summary>
-    private static void QuitarLoComprado(CarritoDeDominio carrito, IReadOnlyList<(Guid EdicionId, int Cantidad)> comprado, DateTimeOffset ahora)
+    /// <summary>
+    /// Quita del carrito solo la cantidad comprada de cada línea pagada (D16), por la línea de carrito de la que salió; de un pago iniciado antes de la venta por sucursal, por la edición en una línea sin sucursal (CAR-50). Una línea que
+    /// queda en cero se elimina y las no pagadas se conservan.
+    /// </summary>
+    private static void QuitarLoComprado(CarritoDeDominio carrito, IReadOnlyList<(Guid? LineaDeCarritoId, Guid EdicionId, int Cantidad)> comprado, DateTimeOffset ahora)
     {
-        foreach (var (edicionId, cantidad) in comprado)
+        foreach (var (deCarrito, edicionId, cantidad) in comprado)
         {
-            var linea = carrito.Lineas.FirstOrDefault(l => l.EdicionId == edicionId);
-            if (linea is null)
+            var linea = deCarrito is { } id
+                ? carrito.Lineas.FirstOrDefault(l => l.LineaId == id)
+                : carrito.Lineas.FirstOrDefault(l => l.EdicionId == edicionId && l.CodigoDeSucursal is null);
+            if (linea is not null)
             {
-                continue;
-            }
-
-            if (linea.Cantidad.Valor <= cantidad)
-            {
-                carrito.Eliminar(edicionId, ahora);
-            }
-            else
-            {
-                carrito.Modificar(edicionId, linea.Cantidad.Valor - cantidad, ahora);
+                carrito.QuitarComprado(linea.LineaId, cantidad, ahora);
             }
         }
     }
 }
-

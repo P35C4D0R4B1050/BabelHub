@@ -7,7 +7,7 @@ public sealed record ObtenerCheckoutParaPagarEntrada;
 
 /// <summary>
 /// <c>ObtenerParaPagar</c> (D13, DD-07; <c>ICheckoutDelCliente</c>): el <c>pedidoId</c> del checkout vivo de quien pide <b>solo</b> en <c>en_pago</c> y <c>pago_pendiente</c>, y en <c>en_pago</c> <b>no</b> mientras el carrito tenga una línea con retiro
-/// pendiente (la edición ya no se puede pagar: el siguiente intento la quita). Es una lectura <b>sin bloqueo y sin efectos</b>; el alcance es el de la cuenta de quien pide (nunca recibe una cuenta), y cualquier otro estado, la falta de checkout vivo o
+/// pendiente (la edición ya no se puede pagar: el siguiente intento la quita) ni con un impreso sin sucursal, anterior a la venta por sucursal (CAR-45: la siguiente solicitud que lo toque lo aborta). Es una lectura <b>sin bloqueo y sin efectos</b>; el alcance es el de la cuenta de quien pide (nunca recibe una cuenta), y cualquier otro estado, la falta de checkout vivo o
 /// una cuenta sin carrito responden «no encontrado» uniforme, sin revelar el estado interno.
 /// </summary>
 internal sealed class ObtenerCheckoutParaPagar(ServiciosDelCheckout servicios) : ICasoDeUso<ObtenerCheckoutParaPagarEntrada, CheckoutVivoParaPagar>
@@ -23,7 +23,8 @@ internal sealed class ObtenerCheckoutParaPagar(ServiciosDelCheckout servicios) :
 
         var (_, vivo, delCarrito) = entro.Valor;
         var pagable = vivo.PedidoId is not null
-            && (vivo.Estado == EstadoDelCheckout.PagoPendiente || (vivo.Estado == EstadoDelCheckout.EnPago && delCarrito is { TieneRetirosPendientes: false }));
+            && (vivo.Estado == EstadoDelCheckout.PagoPendiente
+                || (vivo is { Estado: EstadoDelCheckout.EnPago, TieneImpresosSinSucursal: false } && delCarrito is { TieneRetirosPendientes: false }));
         return pagable
             ? Resultado<CheckoutVivoParaPagar>.Exito(new CheckoutVivoParaPagar(vivo.PedidoId!.Value, ServiciosDelCheckout.DeEstado(vivo.Estado)))
             : Resultado<CheckoutVivoParaPagar>.Fallo(servicios.Carrito.Autorizador.NoEncontrado());

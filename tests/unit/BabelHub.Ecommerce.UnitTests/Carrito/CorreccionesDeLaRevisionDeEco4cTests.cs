@@ -20,10 +20,10 @@ public sealed class CorreccionesDeLaRevisionDeEco4cTests
     {
         var e = EntornoDelCarrito.DeCliente();
         var impreso = e.Impreso(10, 40m, "Impreso");
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(impreso, 3));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(impreso, 3, CodigoDeSucursal: Sucursal.Principal));
         await new IniciarCheckout(e.ServiciosDelCheckout()).Ejecutar(new IniciarCheckoutEntrada());
         e.Inventario.FijarFuente(impreso, "sede-central", false, null);
-        await new ElegirEntrega(e.ServiciosDelCheckout()).Ejecutar(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, "sede-central", null));
+        await new ElegirEntrega(e.ServiciosDelCheckout()).Ejecutar(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo));
         await new RegistrarAceptaciones(e.ServiciosDelCheckout()).Ejecutar(new RegistrarAceptacionesEntrada(Los2));
         var checkout = e.Checkouts.Todos.Single();
         e.Inventario.AlReservar = ResultadoDeReservar.Reservada(new ReservaObtenida(

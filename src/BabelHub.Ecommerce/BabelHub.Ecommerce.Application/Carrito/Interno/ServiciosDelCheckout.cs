@@ -13,8 +13,11 @@ namespace BabelHub.Ecommerce.Application.Carrito.Interno;
 /// <summary>Lo que se informó de una línea impresa en esta solicitud: dónde está y, si viene por traslado, en cuántos días (<see langword="null"/> es «a confirmar», FUE-13).</summary>
 internal sealed record InformacionDeLinea(DisponibilidadDeLineaDeCheckout Disponibilidad, int? PlazoDias, bool PlazoAConfirmar, string? CodigoDeFuente, bool? RequiereTraslado);
 
+/// <summary>Los nombres de las sucursales por código y, a domicilio, el envío de cada sucursal con las tarifas vigentes.</summary>
+internal sealed record DatosDeEnvio(IReadOnlyDictionary<string, string> Nombres, IReadOnlyList<EnvioDeSucursal>? Desglose);
+
 /// <summary>
-/// Lo que comparten los casos de uso del checkout: los del carrito, el Inventario (disponibilidad real, consulta previa y, más adelante, reservar y liberar) y el costo de envío configurado, más las funciones que arman las
+/// Lo que comparten los casos de uso del checkout: los del carrito, el Inventario (disponibilidad real, consulta previa, reservar y liberar) y las tarifas de envío por sucursal, más las funciones que arman las
 /// líneas del checkout desde el carrito y el Catálogo y la <see cref="VistaDelCheckout"/>. El Inventario se consulta siempre <b>antes</b> de abrir una transacción y sin memoria (CAR-05); sin respuesta no se avanza (CAR-06).
 /// </summary>
 internal sealed partial class ServiciosDelCheckout(
@@ -25,7 +28,8 @@ internal sealed partial class ServiciosDelCheckout(
     IConsentimientoDeAvisos consentimiento,
     IMarcaDeCancelacion marcaDeCancelacion,
     ICalculadorDeHuella calculadorDeHuella,
-    IAlertasDelCarrito alertas)
+    IAlertasDelCarrito alertas,
+    IRepositorioDeTarifasDeEnvio tarifas)
 {
     public IAlertasDelCarrito Alertas => alertas;
 
@@ -44,8 +48,6 @@ internal sealed partial class ServiciosDelCheckout(
 
     public IInventarioDelCarrito Inventario => inventario;
 
-    public ICostoDeEnvioConfigurado CostoDeEnvio => costoDeEnvio;
-
     [GeneratedRegex("^[a-z0-9][a-z0-9-]{0,39}$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 100)]
     private static partial Regex FormaDelCodigoDeSucursal();
 
@@ -55,14 +57,15 @@ internal sealed partial class ServiciosDelCheckout(
 
     public static ErrorDeAplicacion CheckoutVacio() => new(CategoriaDeError.ReglaDeNegocio, ClavesDelCarrito.CheckoutVacio);
 
-    public static ErrorDeAplicacion SinStock(int maximo) =>
-        new(CategoriaDeError.Conflicto, ClavesDelCarrito.SinStock, [new ErrorDeCampo("maximo", maximo.ToString(CultureInfo.InvariantCulture))]);
+    /// <summary>Sin stock en una sucursal (CAR-04, CAR-27): el máximo disponible, la sucursal y la edición.</summary>
+    public static ErrorDeAplicacion SinStock(int maximo, string? codigoDeSucursal, Guid edicionId) =>
+        new(CategoriaDeError.Conflicto, ClavesDelCarrito.SinStock, [new ErrorDeCampo("maximo", maximo.ToString(CultureInfo.InvariantCulture)), new ErrorDeCampo("sucursal", codigoDeSucursal ?? string.Empty), new ErrorDeCampo("edicionId", edicionId.ToString("D"))]);
 
     // ---------- Las líneas del checkout ----------
 
     /// <summary>
-    /// Las líneas que entran al checkout: las del carrito que no tienen retiro pendiente y cuya edición el Catálogo ofrece (activa y sin motivo de no disponible), con el precio vigente. Una edición que no se conoce
-    /// no entra (se ve retirada en el carrito).
+    /// Las líneas que entran al checkout: las del carrito que no tienen retiro pendiente y cuya edición el Catálogo ofrece (activa y sin motivo de no disponible), con el precio vigente, la línea del carrito de la que salen y, de un
+    /// impreso, su sucursal. Una edición que no se conoce no entra (se ve retirada en el carrito).
     /// </summary>
     public static IReadOnlyList<LineaParaCheckout> LineasParaElCheckout(CarritoDeDominio carrito, IReadOnlyDictionary<Guid, EdicionConsultada> ediciones)
     {
@@ -74,59 +77,94 @@ internal sealed partial class ServiciosDelCheckout(
                 continue;
             }
 
-            lineas.Add(new LineaParaCheckout(linea.EdicionId, linea.EsDigital, edicion.Titulo, edicion.Isbn, linea.Cantidad.Valor, edicion.Precio));
+            lineas.Add(new LineaParaCheckout(linea.EdicionId, linea.EsDigital, edicion.Titulo, edicion.Isbn, linea.Cantidad.Valor, edicion.Precio, linea.LineaId, linea.CodigoDeSucursal));
         }
 
         return lineas;
     }
 
+    // ---------- Compras anteriores a la venta por sucursal ----------
+
+    /// <summary>El carrito tiene un impreso sin sucursal que aún cuenta (no retirado del catálogo).</summary>
+    public static bool TieneImpresosSinSucursal(CarritoDeDominio? delCarrito) => delCarrito?.Lineas.Any(l => l.EsImpresoSinSucursal && !l.RetiroPendiente) == true;
+
+    public static ErrorDeAplicacion LineaSinSucursal() => new(CategoriaDeError.Validacion, ClavesDelCarrito.LineaSinSucursal);
+
+    /// <summary>
+    /// Lo que hace con una compra anterior la primera solicitud autenticada que la toca (CAR-45, CAR-50): en edición, con un impreso sin sucursal en el carrito, no avanza; <c>reservando</c> o <c>en_pago</c> se aborta (D21: desde
+    /// <c>en_pago</c> solo si Pagos cancela la intención) y su reserva se libera; con el pago pendiente no cambia nada. <see langword="null"/> si no es anterior.
+    /// </summary>
+    public async Task<ErrorDeAplicacion?> ResolverCompraAnterior(Guid cuenta, Checkout vivo, CarritoDeDominio? delCarrito, CancellationToken cancelacion)
+    {
+        ArgumentNullException.ThrowIfNull(vivo);
+        switch (vivo.Estado)
+        {
+            case EstadoDelCheckout.EnEdicion:
+                return TieneImpresosSinSucursal(delCarrito) ? LineaSinSucursal() : null;
+            case EstadoDelCheckout.Reservando or EstadoDelCheckout.EnPago when vivo.TieneImpresosSinSucursal && vivo.PedidoId is { } pedido:
+                var desenlace = await new AbortarElPasoAlPago(this)
+                    .Ejecutar(new SolicitudDeAborto(cuenta, vivo.Estado, pedido, vivo.GeneracionDeReserva, IntencionCreada: true, "linea-sin-sucursal", null), cancelacion)
+                    .ConfigureAwait(false);
+                return desenlace switch
+                {
+                    DesenlaceDelAborto.NoCancelable => new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.PagoPendiente),
+                    DesenlaceDelAborto.PagosNoRespondio => new ErrorDeAplicacion(CategoriaDeError.NoDisponible, ClavesDelCarrito.ServicioNoDisponible),
+                    _ => LineaSinSucursal(),
+                };
+            default:
+                return null;
+        }
+    }
+
     // ---------- El Inventario (siempre fuera de una transacción) ----------
 
     /// <summary>
-    /// La disponibilidad real de los impresos (sin memoria, por lotes de a lo más 50): devuelve lo vendible por edición, con las <c>noRegistradas</c> en cero. Sin respuesta, con un límite o con algo inválido, el error es
-    /// «no se puede validar el stock» y no se avanza (CAR-06).
+    /// La disponibilidad real de los impresos (sin memoria, por lotes de a lo más 50): devuelve lo vendible por edición en la red y en cada sucursal, con las <c>noRegistradas</c> en cero. Sin respuesta, con un límite o con algo inválido, el
+    /// error es «no se puede validar el stock» y no se avanza (CAR-06).
     /// </summary>
-    public async Task<(ErrorDeAplicacion? Error, IReadOnlyDictionary<Guid, int> Vendible)> DisponibilidadReal(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion)
+    public async Task<(ErrorDeAplicacion? Error, IReadOnlyDictionary<Guid, StockDeEdicion> Stock)> DisponibilidadReal(IReadOnlyCollection<Guid> edicionIds, CancellationToken cancelacion)
     {
-        var vendible = new Dictionary<Guid, int>();
+        var stock = new Dictionary<Guid, StockDeEdicion>();
         foreach (var lote in edicionIds.Distinct().Chunk(50))
         {
             var respuesta = await inventario.ConsultarDisponibilidad(lote, cancelacion).ConfigureAwait(false);
             if (!respuesta.Exitosa)
             {
-                return (StockNoValidable(), vendible);
+                return (StockNoValidable(), stock);
             }
 
             foreach (var e in respuesta.Valor.Ediciones)
             {
-                vendible[e.EdicionId] = Math.Max(0, e.VendibleEnLaRed);
+                stock[e.EdicionId] = e;
             }
 
             foreach (var noRegistrada in respuesta.Valor.NoRegistradas)
             {
-                vendible[noRegistrada] = 0;
+                stock[noRegistrada] = new StockDeEdicion(noRegistrada, 0, new Dictionary<string, int>());
             }
         }
 
-        return (null, vendible);
+        return (null, stock);
     }
 
-    /// <summary>La primera línea impresa que pide más de lo vendible (la que no está en la respuesta cuenta como cero), con el máximo.</summary>
-    public static ErrorDeAplicacion? PrimerExcesoDeStock(IEnumerable<LineaParaCheckout> lineas, IReadOnlyDictionary<Guid, int> vendible)
+    /// <summary>
+    /// El primer libro cuyas líneas en una sucursal suman más que lo vendible en ella (CAR-04, CAR-05; la edición o la sucursal que no está en la respuesta cuentan como cero), con el máximo. Una línea sin sucursal no se mide aquí.
+    /// </summary>
+    public static ErrorDeAplicacion? PrimerExcesoDeStock(IEnumerable<LineaParaCheckout> lineas, IReadOnlyDictionary<Guid, StockDeEdicion> stock)
     {
-        foreach (var linea in lineas.Where(l => !l.EsDigital))
+        foreach (var pareja in lineas.Where(l => !l.EsDigital && l.CodigoDeSucursal is not null).GroupBy(l => (l.EdicionId, Sucursal: l.CodigoDeSucursal!)))
         {
-            var hay = vendible.GetValueOrDefault(linea.EdicionId);
-            if (linea.Cantidad > hay)
+            var hay = stock.TryGetValue(pareja.Key.EdicionId, out var e) ? Math.Max(0, e.VendiblePorSucursal.GetValueOrDefault(pareja.Key.Sucursal)) : 0;
+            if (pareja.Sum(l => l.Cantidad) > hay)
             {
-                return SinStock(hay);
+                return SinStock(hay, pareja.Key.Sucursal, pareja.Key.EdicionId);
             }
         }
 
         return null;
     }
 
-    /// <summary>La consulta previa de los impresos para una entrega (fuente, traslado y plazo por línea); sin respuesta no se avanza (CAR-06).</summary>
+    /// <summary>La consulta previa de los impresos para una entrega, declarando la sucursal de cada línea (fuente y disponibilidad por línea, sin reservar); sin respuesta no se avanza (CAR-06).</summary>
     public async Task<(ErrorDeAplicacion? Error, IReadOnlyDictionary<Guid, InformacionDeLinea> Informacion, IReadOnlyList<SeleccionDeLinea> Selecciones)> ConsultaPrevia(EntregaParaElInventario entrega, IReadOnlyList<LineaParaElInventario> lineas, CancellationToken cancelacion)
     {
         var informacion = new Dictionary<Guid, InformacionDeLinea>();
@@ -143,11 +181,47 @@ internal sealed partial class ServiciosDelCheckout(
 
         foreach (var s in respuesta.Valor.Lineas)
         {
-            informacion[s.EdicionId] = DeSeleccion(s);
+            informacion[s.LineaId] = DeSeleccion(s);
         }
 
         return (null, informacion, respuesta.Valor.Lineas);
     }
+
+    /// <summary>La primera línea que la consulta previa dice que su sucursal no cubre (CAR-05), con lo vendible en ella.</summary>
+    public static ErrorDeAplicacion? PrimeraSinStock(IReadOnlyList<LineaParaElInventario> lineas, IReadOnlyList<SeleccionDeLinea> selecciones)
+    {
+        if (selecciones.FirstOrDefault(s => !s.HayStock) is not { } sin)
+        {
+            return null;
+        }
+
+        var linea = lineas.FirstOrDefault(l => l.LineaId == sin.LineaId);
+        return SinStock(sin.DisponibleEnLaSucursal ?? sin.DisponibleEnLaRed, linea?.CodigoDeSucursal, sin.EdicionId);
+    }
+
+    // ---------- El envío ----------
+
+    /// <summary>El envío de cada sucursal que atiende alguna línea, con las tarifas vigentes leídas de una sola vez (CAR-09, CAR-23, CAR-47).</summary>
+    public async Task<IReadOnlyList<EnvioDeSucursal>> DesgloseDelEnvio(Checkout checkout, CancellationToken cancelacion)
+    {
+        ArgumentNullException.ThrowIfNull(checkout);
+        var sucursales = checkout.SucursalesQueAtienden;
+        var propias = sucursales.Count == 0 ? new Dictionary<string, CostoDeEnvio>() : await tarifas.Leer(cancelacion).ConfigureAwait(false);
+        return EnvioPorSucursales.Desglose(sucursales, propias, costoDeEnvio.Valor);
+    }
+
+    /// <summary>Lo que la vista necesita además del checkout: los nombres de sus sucursales y, a domicilio, el desglose vigente. <b>Fuera de una transacción</b>: los nombres pueden consultar la lista del Inventario.</summary>
+    public async Task<DatosDeEnvio> LeerDatosDeEnvio(Checkout checkout, CancellationToken cancelacion)
+    {
+        ArgumentNullException.ThrowIfNull(checkout);
+        var nombres = checkout.SucursalesQueAtienden.Count > 0 ? await carrito.NombresDeSucursales(cancelacion).ConfigureAwait(false) : new Dictionary<string, string>();
+        var desglose = checkout.TipoDeEntrega == Tipo.Domicilio ? await DesgloseDelEnvio(checkout, cancelacion).ConfigureAwait(false) : null;
+        return new DatosDeEnvio(nombres, desglose);
+    }
+
+    /// <summary>La vista del checkout con sus nombres y su desglose leídos ahora (fuera de una transacción).</summary>
+    public async Task<VistaDelCheckout> VistaActual(Checkout checkout, CarritoDeDominio? delCarrito, IReadOnlyDictionary<Guid, InformacionDeLinea>? informacion, CancellationToken cancelacion) =>
+        Vista(checkout, delCarrito, informacion, await LeerDatosDeEnvio(checkout, cancelacion).ConfigureAwait(false));
 
     /// <summary>
     /// El estado del checkout frente a una edición de la entrega, el contacto o las aceptaciones: con el pago pendiente se rechaza (CAR-26) y con <c>reservando</c> responde «en curso»; con <c>en_pago</c> la decide la edición
@@ -223,9 +297,13 @@ internal sealed partial class ServiciosDelCheckout(
 
     // ---------- La vista ----------
 
-    public VistaDelCheckout Vista(Checkout checkout, CarritoDeDominio? delCarrito, IReadOnlyDictionary<Guid, InformacionDeLinea>? informacion)
+    /// <summary>
+    /// La vista del checkout. El envío a domicilio es el congelado o, sin congelar, la suma de las tarifas de <paramref name="datos"/>; el desglose solo se muestra si esas tarifas reproducen el importe (CAR-09).
+    /// </summary>
+    public VistaDelCheckout Vista(Checkout checkout, CarritoDeDominio? delCarrito, IReadOnlyDictionary<Guid, InformacionDeLinea>? informacion, DatosDeEnvio datos)
     {
         ArgumentNullException.ThrowIfNull(checkout);
+        ArgumentNullException.ThrowIfNull(datos);
         var retiradas = delCarrito?.Lineas.Where(l => l.RetiroPendiente).Select(l => l.EdicionId).ToHashSet() ?? [];
         var lineas = checkout.Lineas.Select(l => new LineaDeRevision(
             l.LineaId,
@@ -238,16 +316,24 @@ internal sealed partial class ServiciosDelCheckout(
             DisponibilidadDe(l, informacion),
             PlazoDe(l, informacion),
             PlazoAConfirmarDe(l, informacion),
-            retiradas.Contains(l.EdicionId))).ToList();
+            retiradas.Contains(l.EdicionId),
+            l.CodigoDeSucursal,
+            l.CodigoDeSucursal is null ? null : datos.Nombres.GetValueOrDefault(l.CodigoDeSucursal, l.CodigoDeSucursal))).ToList();
 
         var subtotal = Soles.Redondear(lineas.Where(l => !l.Retirada).Sum(l => l.Importe));
-        var total = checkout.CalcularTotal(costoDeEnvio.Valor);
-        var envio = checkout.TipoDeEntrega == Tipo.Domicilio ? checkout.EnvioCongelado ?? total.Envio : (decimal?)null;
-        var totalAPagar = checkout.TotalCongelado ?? total.Total;
+        var vigente = datos.Desglose is { } d ? EnvioPorSucursales.Suma(d) : CostoDeEnvio.Cero;
+        // Lo congelado vale mientras no se vuelva a edición: allí rigen las tarifas vigentes.
+        var congelada = checkout.Estado != EstadoDelCheckout.EnEdicion;
+        var envio = checkout.TipoDeEntrega == Tipo.Domicilio ? (congelada ? checkout.EnvioCongelado : null) ?? vigente.Valor : (decimal?)null;
+        var totalAPagar = (congelada ? checkout.TotalCongelado : null) ?? checkout.CalcularTotal(vigente).Total;
+        IReadOnlyList<EnvioDeSucursalDeCompra>? desglose = envio is { } importe && datos.Desglose is { Count: > 0 } porSucursal && vigente.Valor == importe
+            ? [.. porSucursal.Select(e => new EnvioDeSucursalDeCompra(e.CodigoDeSucursal, datos.Nombres.GetValueOrDefault(e.CodigoDeSucursal, e.CodigoDeSucursal), e.Costo.Valor))]
+            : null;
 
         var estado = DeEstado(checkout.Estado);
         var conRetiro = delCarrito is { TieneRetirosPendientes: true };
-        Guid? pedido = checkout.Estado == EstadoDelCheckout.PagoPendiente || (checkout.Estado == EstadoDelCheckout.EnPago && !conRetiro) ? checkout.PedidoId : null;
+        var anterior = checkout.TieneImpresosSinSucursal || (checkout.Estado == EstadoDelCheckout.EnEdicion && TieneImpresosSinSucursal(delCarrito));
+        Guid? pedido = checkout.Estado == EstadoDelCheckout.PagoPendiente || (checkout.Estado == EstadoDelCheckout.EnPago && !conRetiro && !checkout.TieneImpresosSinSucursal) ? checkout.PedidoId : null;
 
         return new VistaDelCheckout(
             estado,
@@ -265,7 +351,9 @@ internal sealed partial class ServiciosDelCheckout(
             [.. checkout.TextosPorAceptar().Select(DeTexto)],
             checkout.ReservaExpiraEn,
             pedido,
-            conRetiro);
+            conRetiro,
+            DesgloseDelEnvio: desglose,
+            TieneLineasSinSucursal: anterior);
     }
 
     private static DisponibilidadDeLineaDeCheckout DisponibilidadDe(LineaDelCheckout l, IReadOnlyDictionary<Guid, InformacionDeLinea>? informacion)
@@ -275,7 +363,7 @@ internal sealed partial class ServiciosDelCheckout(
             return DisponibilidadDeLineaDeCheckout.DisponibleAlInstante;
         }
 
-        if (informacion is not null && informacion.TryGetValue(l.EdicionId, out var i))
+        if (informacion is not null && informacion.TryGetValue(l.LineaId, out var i))
         {
             return i.Disponibilidad;
         }
@@ -286,10 +374,10 @@ internal sealed partial class ServiciosDelCheckout(
     }
 
     private static int? PlazoDe(LineaDelCheckout l, IReadOnlyDictionary<Guid, InformacionDeLinea>? informacion) =>
-        informacion is not null && informacion.TryGetValue(l.EdicionId, out var i) ? i.PlazoDias : l.PlazoInformadoDias;
+        informacion is not null && informacion.TryGetValue(l.LineaId, out var i) ? i.PlazoDias : l.PlazoInformadoDias;
 
     private static bool PlazoAConfirmarDe(LineaDelCheckout l, IReadOnlyDictionary<Guid, InformacionDeLinea>? informacion) =>
-        informacion is not null && informacion.TryGetValue(l.EdicionId, out var i) ? i.PlazoAConfirmar : l.RequiereTrasladoInformado == true && l.PlazoInformadoDias is null;
+        informacion is not null && informacion.TryGetValue(l.LineaId, out var i) ? i.PlazoAConfirmar : l.RequiereTrasladoInformado == true && l.PlazoInformadoDias is null;
 
     public static EstadoVisibleDelCheckout DeEstado(EstadoDelCheckout estado) => estado switch
     {

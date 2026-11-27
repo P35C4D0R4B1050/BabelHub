@@ -225,12 +225,13 @@ public sealed class CarritoConPostgresTests(PostgresDelCarritoFixture bd) : IAsy
         Assert.True(primera.EsExito, primera.Error?.Clave);
         var generacionA = await bd.Consultar<int>($"SELECT generacion_de_reserva FROM carrito.checkouts WHERE cuenta_id = '{cuenta}'");
 
-        var aB = await _e.Como(cuenta, sp => sp.GetRequiredService<ICarritoDelCliente>().ModificarLinea(new ModificarLineaEntrada(impreso, 2)));
+        var linea = await _e.LineaDe(cuenta, impreso);
+        var aB = await _e.Como(cuenta, sp => sp.GetRequiredService<ICarritoDelCliente>().ModificarLinea(new ModificarLineaEntrada(linea, 2)));
         Assert.True(aB.EsExito, aB.Error?.Clave);
         await _e.Como(cuenta, sp => sp.GetRequiredService<ICheckoutDelCliente>().RegistrarAceptaciones(new RegistrarAceptacionesEntrada(EntornoDelCarritoConPostgres.LosDosTextos)));
         var pagoB = await _e.Pagar(cuenta, 80m);
         Assert.True(pagoB.EsExito, pagoB.Error?.Clave);
-        var aA = await _e.Como(cuenta, sp => sp.GetRequiredService<ICarritoDelCliente>().ModificarLinea(new ModificarLineaEntrada(impreso, 3)));
+        var aA = await _e.Como(cuenta, sp => sp.GetRequiredService<ICarritoDelCliente>().ModificarLinea(new ModificarLineaEntrada(linea, 3)));
         Assert.True(aA.EsExito, aA.Error?.Clave);
         await _e.Como(cuenta, sp => sp.GetRequiredService<ICheckoutDelCliente>().RegistrarAceptaciones(new RegistrarAceptacionesEntrada(EntornoDelCarritoConPostgres.LosDosTextos)));
         var pagoA = await _e.Pagar(cuenta, 120m);
@@ -252,7 +253,7 @@ public sealed class CarritoConPostgresTests(PostgresDelCarritoFixture bd) : IAsy
         Assert.True(pago.EsExito, pago.Error?.Clave);
 
         var cambio = await _e.Como(cuenta, sp => sp.GetRequiredService<ICheckoutDelCliente>().ElegirEntrega(
-            new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, null, new ContactoDeCompra("Ana Pérez Quispe", "912345678", "Jr. Lima 123", "ayacucho"))));
+            new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, new ContactoDeCompra("Ana Pérez Quispe", "912345678", "Jr. Lima 123", "ayacucho"))));
 
         Assert.True(cambio.EsExito, cambio.Error?.Clave);
         Assert.Equal("en_edicion", await EstadoDelCheckout(cuenta));

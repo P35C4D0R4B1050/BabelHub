@@ -26,18 +26,18 @@ public sealed class PrepararPasoAlPagoTests
     {
         var e = EntornoDelCarrito.DeCliente();
         var impreso = e.Impreso(10, 37.30m, "Impreso");
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(impreso, 3));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(impreso, 3, CodigoDeSucursal: Sucursal.Principal));
         Guid? digital = null;
         if (conDigital)
         {
             digital = e.Digital(20m, "Digital");
-            await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(digital.Value, 1));
+            await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(digital.Value, 1, CodigoDeSucursal: Sucursal.Principal));
         }
 
         Assert.True((await new IniciarCheckout(e.ServiciosDelCheckout()).Ejecutar(new IniciarCheckoutEntrada())).EsExito);
         var entrega = domicilio
-            ? new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, null, new ContactoDeCompra("Ana Pérez", "987654321", "Jr. Lima 123", "ayacucho"))
-            : new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, "sede-central", null);
+            ? new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, new ContactoDeCompra("Ana Pérez", "987654321", "Jr. Lima 123", "ayacucho"))
+            : new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo);
         Assert.True((await new ElegirEntrega(e.ServiciosDelCheckout()).Ejecutar(entrega)).EsExito);
         var registro = await new RegistrarAceptaciones(e.ServiciosDelCheckout()).Ejecutar(new RegistrarAceptacionesEntrada(conDigital && aceptarReembolso ? Los3 : Los2));
         Assert.True(registro.EsExito || !aceptarReembolso);
@@ -96,7 +96,7 @@ public sealed class PrepararPasoAlPagoTests
         Assert.Equal(domicilio.Checkout.Lineas.Single().LineaId, Assert.Single(conContacto.Lineas).LineaId);
         Assert.Equal(["t-1", "p-1"], conContacto.Aceptaciones.Select(a => a.Version));
         Assert.Null(sinContacto.Contacto);
-        Assert.Equal((TipoDeEntregaDeCompra.Recojo, "sede-central"), (sinContacto.TipoDeEntrega, sinContacto.CodigoDeSucursalDeRecojo));
+        Assert.Equal((TipoDeEntregaDeCompra.Recojo, (string?)null), (sinContacto.TipoDeEntrega, sinContacto.CodigoDeSucursalDeRecojo));
     }
 
     [Fact]
@@ -109,14 +109,15 @@ public sealed class PrepararPasoAlPagoTests
         var linea = Assert.Single(p.LineasImpresas);
         Assert.Equal((s.Impreso, 3), (linea.EdicionId, linea.Cantidad));
         Assert.Equal(s.Checkout.Lineas.Single(l => !l.EsDigital).LineaId, linea.LineaId);
-        Assert.Equal((TipoDeEntrega.Recojo, "sede-central"), (p.Entrega!.Tipo, p.Entrega.CodigoDeSucursalDeRecojo));
+        Assert.Equal((TipoDeEntrega.Recojo, (string?)null), (p.Entrega!.Tipo, p.Entrega.RegionDeEntrega));
+        Assert.Equal(Sucursal.Principal, linea.CodigoDeSucursal);
     }
 
     [Fact]
     public async Task Un_carrito_solo_digital_no_tiene_entrega_ni_reserva_ni_consulta_al_inventario()
     {
         var e = EntornoDelCarrito.DeCliente();
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Digital(20m), 1));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Digital(20m), 1, CodigoDeSucursal: Sucursal.Principal));
         await new IniciarCheckout(e.ServiciosDelCheckout()).Ejecutar(new IniciarCheckoutEntrada());
         await new RegistrarAceptaciones(e.ServiciosDelCheckout()).Ejecutar(new RegistrarAceptacionesEntrada(Los3));
         var s = new Escenario(e, e.Checkouts.Todos.Single(), Guid.Empty, null, 20m);
@@ -285,9 +286,9 @@ public sealed class PrepararPasoAlPagoTests
     public async Task Sin_aceptar_los_terminos_y_la_privacidad_no_se_puede_pagar()
     {
         var e = EntornoDelCarrito.DeCliente();
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Impreso(10, 37.30m), 3));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Impreso(10, 37.30m), 3, CodigoDeSucursal: Sucursal.Principal));
         await new IniciarCheckout(e.ServiciosDelCheckout()).Ejecutar(new IniciarCheckoutEntrada());
-        await new ElegirEntrega(e.ServiciosDelCheckout()).Ejecutar(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, "sede-central", null));
+        await new ElegirEntrega(e.ServiciosDelCheckout()).Ejecutar(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo));
         var s = new Escenario(e, e.Checkouts.Todos.Single(), Guid.Empty, null, 111.90m);
 
         var resultado = await Preparar(s, textos: []);
@@ -350,7 +351,7 @@ public sealed class PrepararPasoAlPagoTests
     public async Task Sin_entrega_elegida_o_a_domicilio_sin_contacto_los_datos_estan_incompletos()
     {
         var e = EntornoDelCarrito.DeCliente();
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Impreso(10, 37.30m), 3));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Impreso(10, 37.30m), 3, CodigoDeSucursal: Sucursal.Principal));
         await new IniciarCheckout(e.ServiciosDelCheckout()).Ejecutar(new IniciarCheckoutEntrada());
         await new RegistrarAceptaciones(e.ServiciosDelCheckout()).Ejecutar(new RegistrarAceptacionesEntrada(Los2));
         var s = new Escenario(e, e.Checkouts.Todos.Single(), Guid.Empty, null, 111.90m);

@@ -1,5 +1,6 @@
 using System.Net;
 using BabelHub.Ecommerce.Application.Carrito;
+using BabelHub.Ecommerce.Application.Catalogo;
 using BabelHub.Ecommerce.Application.Plataforma;
 using BabelHub.Shared.Errores;
 
@@ -22,6 +23,31 @@ public sealed class CarritoApiTests : IAsyncLifetime
     public async Task DisposeAsync() => await _host.DisposeAsync();
 
     private static KeyValuePair<string, string> C(string nombre, string valor) => new(nombre, valor);
+
+    // ---------- La sucursal recordada (WEB-16) ----------
+
+    [Fact]
+    [Trait("Criterio", "AC-WEB-12")]
+    public async Task Agregar_un_impreso_aceptado_recuerda_su_sucursal_y_un_digital_o_un_alta_rechazada_no()
+    {
+        var linea = new LineaDelCarritoVista(Guid.NewGuid(), Edicion, "Libro", null, FormatoDeEdicion.Impresa, 1, 10m, 10m, null, false, "AYA", "Ayacucho");
+        _host.Carrito.Respuesta = Resultado<ResultadoDeCarrito>.Exito(new ResultadoDeCarrito(new VistaDelCarrito([linea], 10m, [], false), null, false));
+
+        using var impreso = await _host.Enviar("/carrito/lineas", [C("edicionId", Edicion.ToString("D")), C("cantidad", "1"), C("sucursal", "AYA")]);
+        using var digital = await _host.Enviar("/carrito/lineas", [C("edicionId", Edicion.ToString("D")), C("cantidad", "1")]);
+        _host.Carrito.Respuesta = Resultado<ResultadoDeCarrito>.Fallo(new ErrorDeAplicacion(CategoriaDeError.Conflicto, "carrito-sin-stock"));
+        using var rechazado = await _host.Enviar("/carrito/lineas", [C("edicionId", Edicion.ToString("D")), C("cantidad", "1"), C("sucursal", "AYA")]);
+
+        var cookie = Assert.Single(impreso.Headers.GetValues("Set-Cookie"), c => c.StartsWith("bh-sucursal=", StringComparison.Ordinal));
+        var atributos = cookie.Split(';').Select(a => a.Trim()).ToList();
+        Assert.Equal("bh-sucursal=AYA", atributos[0]);
+        Assert.Contains("secure", atributos, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("samesite=lax", atributos, StringComparer.OrdinalIgnoreCase);
+        foreach (var respuesta in new[] { digital, rechazado })
+        {
+            Assert.False(respuesta.Headers.TryGetValues("Set-Cookie", out var cookies) && cookies.Any(c => c.StartsWith("bh-sucursal=", StringComparison.Ordinal)));
+        }
+    }
 
     // ---------- La cookie ----------
 
@@ -109,15 +135,15 @@ public sealed class CarritoApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Cambiar_y_quitar_llaman_a_la_Aplicacion_con_la_edicion_de_la_ruta()
+    public async Task Cambiar_y_quitar_llaman_a_la_Aplicacion_con_la_linea_de_la_ruta()
     {
         using var cambio = await _host.Enviar($"/carrito/lineas/{Edicion:D}", [C("cantidad", "5")]);
         using var quita = await _host.Enviar($"/carrito/lineas/{Edicion:D}/quitar");
 
         Assert.Equal([HttpStatusCode.SeeOther, HttpStatusCode.SeeOther], [cambio.StatusCode, quita.StatusCode]);
         Assert.Equal(["cambiar", "quitar"], _host.Carrito.Llamadas);
-        Assert.Equal((Edicion, 5), (((ModificarLineaEntrada)_host.Carrito.Entradas[0]).EdicionId, ((ModificarLineaEntrada)_host.Carrito.Entradas[0]).Cantidad));
-        Assert.Equal(Edicion, ((EliminarLineaEntrada)_host.Carrito.Entradas[1]).EdicionId);
+        Assert.Equal((Edicion, 5), (((ModificarLineaEntrada)_host.Carrito.Entradas[0]).LineaId, ((ModificarLineaEntrada)_host.Carrito.Entradas[0]).Cantidad));
+        Assert.Equal(Edicion, ((EliminarLineaEntrada)_host.Carrito.Entradas[1]).LineaId);
     }
 
     [Fact]

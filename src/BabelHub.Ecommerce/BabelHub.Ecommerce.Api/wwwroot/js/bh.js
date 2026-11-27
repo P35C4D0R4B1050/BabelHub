@@ -1,5 +1,5 @@
 // BabelHub: JavaScript propio mínimo (docs/06 §3). Sin dependencias, sin eval y sin scripts en línea (CSP, WEB-18).
-// Solo mejora lo que ya funciona sin JavaScript: los formularios de tema y de sucursal se envían igual con el botón de <noscript>.
+// Solo mejora lo que ya funciona sin JavaScript: los formularios de tema y de cantidad del carrito se envían igual con el botón de <noscript>.
 (function () {
   'use strict';
 
@@ -101,11 +101,67 @@
     });
   }
 
-  // Sucursal preferida (WEB-16): al elegir se envía el formulario, que la guarda en el servidor.
-  var selectorDeSucursal = document.querySelector('[data-bh-sucursal]');
-  if (selectorDeSucursal && selectorDeSucursal.form) {
-    selectorDeSucursal.addEventListener('change', function () {
-      selectorDeSucursal.form.requestSubmit();
+  // Sucursal de la ficha (CAR-42): al elegirla, el máximo de la cantidad es lo que se puede pedir en ella (el servidor lo vuelve a comprobar).
+  Array.prototype.forEach.call(document.querySelectorAll('[data-bh-sucursal-de-ficha]'), function (selector) {
+    var cantidad = selector.form ? selector.form.querySelector('input[name="cantidad"]') : null;
+    if (!cantidad) {
+      return;
+    }
+
+    selector.addEventListener('change', function () {
+      var opcion = selector.options[selector.selectedIndex];
+      var maximo = parseInt(opcion ? opcion.getAttribute('data-bh-maximo') : '', 10);
+      if (!isNaN(maximo)) {
+        cantidad.max = String(maximo);
+        if (parseInt(cantidad.value, 10) > maximo) {
+          cantidad.value = String(maximo);
+        }
+      }
     });
+  });
+
+  // Cantidad de una línea del carrito (CAR-44): al confirmar el cambio se envía su formulario; al volver, la línea recupera el foco y se anuncia el resultado.
+  var CLAVE_DE_LA_LINEA = 'bh-linea-cambiada';
+  Array.prototype.forEach.call(document.querySelectorAll('form[data-bh-cantidad]'), function (formulario) {
+    var cantidad = formulario.querySelector('input[name="cantidad"]');
+    var enviando = false;
+    formulario.addEventListener('submit', function (evento) {
+      if (enviando) {
+        evento.preventDefault();
+        return;
+      }
+
+      enviando = true;
+      try {
+        window.sessionStorage.setItem(CLAVE_DE_LA_LINEA, formulario.getAttribute('data-bh-cantidad'));
+      } catch (sinAlmacen) {
+        // Sin almacenamiento solo se pierde el foco al volver.
+      }
+    });
+    if (cantidad) {
+      cantidad.addEventListener('change', function () {
+        formulario.requestSubmit();
+      });
+    }
+  });
+
+  var anuncio = document.querySelector('[data-bh-anuncio]');
+  if (anuncio) {
+    var cambiada = null;
+    try {
+      cambiada = window.sessionStorage.getItem(CLAVE_DE_LA_LINEA);
+      window.sessionStorage.removeItem(CLAVE_DE_LA_LINEA);
+    } catch (sinAlmacen) {
+      cambiada = null;
+    }
+
+    var forma = cambiada && /^[0-9a-f-]{36}$/.test(cambiada) ? document.querySelector('form[data-bh-cantidad="' + cambiada + '"]') : null;
+    if (forma && !document.querySelector('[data-bh-foco-inicial]')) {
+      forma.querySelector('input[name="cantidad"]').focus();
+      // La región viva anuncia lo que cambia después de cargar la página.
+      window.setTimeout(function () {
+        anuncio.textContent = 'Cantidad actualizada.';
+      }, 100);
+    }
   }
 })();

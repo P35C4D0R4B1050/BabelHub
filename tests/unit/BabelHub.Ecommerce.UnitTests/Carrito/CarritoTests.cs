@@ -79,7 +79,7 @@ public sealed class CarritoTests
     [InlineData(0)]
     [InlineData(-1)]
     [InlineData(100)]
-    public void Una_cantidad_fuera_de_1_a_99_se_rechaza_sin_cambiar_el_carrito(int cantidad)
+    public void Una_cantidad_fuera_de_1_a_20_se_rechaza_sin_cambiar_el_carrito(int cantidad)
     {
         var carrito = DeCuenta();
         carrito.Agregar(Libro, esDigital: false, cantidad: 1, Ahora);
@@ -89,22 +89,9 @@ public sealed class CarritoTests
         var modificar = carrito.Modificar(Libro, cantidad, Ahora);
 
         Assert.Equal(RechazoDeCarrito.CantidadInvalida, agregar.Rechazo);
-        Assert.Equal(RechazoDeCarrito.CantidadInvalida, modificar.Rechazo);
+        Assert.Equal(cantidad > Cantidad.Maxima ? RechazoDeCarrito.TopeDeUnidades : RechazoDeCarrito.CantidadInvalida, modificar.Rechazo);
         Assert.Equal(version, carrito.Version);
         Assert.Equal(1, Assert.Single(carrito.Lineas).Cantidad.Valor);
-    }
-
-    [Fact]
-    [Trait("Criterio", "AC-CAR-32")]
-    public void Sumar_mas_de_20_unidades_de_un_impreso_se_rechaza_y_deja_la_linea_como_estaba()
-    {
-        var carrito = DeCuenta();
-        carrito.Agregar(Libro, esDigital: false, cantidad: 15, Ahora);
-
-        var resultado = carrito.Agregar(Libro, esDigital: false, cantidad: 6, Ahora);
-
-        Assert.Equal(RechazoDeCarrito.TopeDeUnidades, resultado.Rechazo);
-        Assert.Equal(15, Assert.Single(carrito.Lineas).Cantidad.Valor);
     }
 
     [Fact]
@@ -139,8 +126,8 @@ public sealed class CarritoTests
         Assert.Equal(7, modificada.CantidadFinal);
         Assert.True(eliminada.EsExito);
         Assert.Equal(Libro, Assert.Single(carrito.Lineas).EdicionId);
-        Assert.Equal(RechazoDeCarrito.EdicionNoEstaEnElCarrito, carrito.Modificar(Edicion(9), 1, Ahora).Rechazo);
-        Assert.Equal(RechazoDeCarrito.EdicionNoEstaEnElCarrito, carrito.Eliminar(Edicion(9), Ahora).Rechazo);
+        Assert.Equal(RechazoDeCarrito.LineaNoEstaEnElCarrito, carrito.Modificar(Edicion(9), 1, Ahora).Rechazo);
+        Assert.Equal(RechazoDeCarrito.LineaNoEstaEnElCarrito, carrito.Eliminar(Edicion(9), Ahora).Rechazo);
     }
 
     [Fact]

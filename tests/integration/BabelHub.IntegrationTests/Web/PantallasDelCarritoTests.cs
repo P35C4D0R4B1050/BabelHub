@@ -37,7 +37,7 @@ public sealed class PantallasDelCarritoTests
         new(edicion, estado, vendible, [], frescura, DateTimeOffset.UtcNow, null);
 
     private static LineaDelCarritoVista Linea(Guid edicion, string titulo, FormatoDeEdicion formato, int cantidad, decimal precio, DisponibilidadDeEdicion? disponibilidad, bool retirada = false) =>
-        new(edicion, titulo, "9780307474728", formato, cantidad, precio, precio * cantidad, disponibilidad, retirada);
+        new(edicion, edicion, titulo, "9780307474728", formato, cantidad, precio, precio * cantidad, disponibilidad, retirada, formato == FormatoDeEdicion.Digital ? null : "AYA", formato == FormatoDeEdicion.Digital ? null : "Ayacucho", disponibilidad?.VendibleEnLaRed, formato == FormatoDeEdicion.Digital || disponibilidad?.VendibleEnLaRed is not { } hay ? null : Math.Clamp(hay, 1, 20));
 
     private static ResultadoDeCarrito Carrito(IEnumerable<LineaDelCarritoVista> lineas, IEnumerable<AvisoDelCarrito>? avisos = null, bool compraEnCurso = false, bool sinPrecios = false)
     {
@@ -117,9 +117,10 @@ public sealed class PantallasDelCarritoTests
 
         Assert.Contains("Agotado", html, StringComparison.Ordinal);
         Assert.Contains("No se puede confirmar ahora", html, StringComparison.Ordinal);
-        Assert.Contains("Hay stock en la red", html, StringComparison.Ordinal);
+        Assert.Contains("4 disponibles en su sucursal", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Hay stock en la red", html, StringComparison.Ordinal);
         Assert.Contains("Este dato puede estar desactualizado.", html, StringComparison.Ordinal);
-        Assert.Contains("Ya no hay unidades: quita este libro", html, StringComparison.Ordinal);
+        Assert.Contains("Ya no hay unidades en Ayacucho: quita este libro", html, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -136,7 +137,7 @@ public sealed class PantallasDelCarritoTests
         Assert.DoesNotContain($"action=\"/carrito/lineas/{Digital:D}\"", html, StringComparison.Ordinal);
         Assert.Contains("name=\"cantidad\" value=\"3\" min=\"1\" max=\"7\"", html, StringComparison.Ordinal);
         Assert.Contains("Una licencia por cuenta.", html, StringComparison.Ordinal);
-        Assert.Contains("aria-label=\"Quitar «Estructuras de datos» del carrito\"", html, StringComparison.Ordinal);
+        Assert.Contains("aria-label=\"Quitar «Estructuras de datos» de Ayacucho del carrito\"", html, StringComparison.Ordinal);
         Assert.True(System.Text.RegularExpressions.Regex.Matches(html, "name=\"__RequestVerificationToken\"").Count >= 4);
     }
 
@@ -219,7 +220,7 @@ public sealed class PantallasDelCarritoTests
 
         Assert.Contains("aria-live=\"polite\"", html, StringComparison.Ordinal);
         Assert.Contains("«Libro retirado» fue retirada del catálogo y se quitó de tu carrito.", html, StringComparison.Ordinal);
-        Assert.Contains("Ajustamos «Libro ajustado» a 4 unidades, el máximo disponible.", html, StringComparison.Ordinal);
+        Assert.Contains("Ajustamos «Libro ajustado» a 4 unidades, el máximo disponible en su sucursal.", html, StringComparison.Ordinal);
         Assert.Contains("action=\"/carrito/avisos/a0000000-0000-0000-0000-000000000001/visto\"", html, StringComparison.Ordinal);
         Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(html, "Entendido").Count);
     }

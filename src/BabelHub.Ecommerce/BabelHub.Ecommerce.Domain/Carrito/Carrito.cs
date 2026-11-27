@@ -16,10 +16,16 @@ public enum RechazoDeCarrito
     /// <summary>El carrito ya tiene 30 líneas (CAR-29, D14).</summary>
     TopeDeLineas,
 
-    /// <summary>La suma de unidades de un impreso pasaría de 20 (D14).</summary>
+    /// <summary>Se pidió cambiar una línea a más de 20 unidades (D14, CAR-38).</summary>
     TopeDeUnidades,
 
-    EdicionNoEstaEnElCarrito,
+    LineaNoEstaEnElCarrito,
+
+    /// <summary>Un impreso se agrega con la sucursal que lo atiende (CAR-39).</summary>
+    SucursalRequerida,
+
+    /// <summary>Una línea anterior a la venta por sucursal no se puede cambiar: se quita y se vuelve a agregar eligiendo sucursal (CAR-45).</summary>
+    LineaSinSucursal,
 
     /// <summary>La edición se retiró del catálogo y la línea espera a que el checkout salga de su estado vivo: no se puede cambiar (solo quitar).</summary>
     EdicionRetirada,
@@ -47,9 +53,10 @@ public sealed record EdicionRetirada(Guid EdicionId, bool EsDigital);
 /// <summary>El resultado de agregar, cambiar o quitar una línea: el rechazo del Dominio o la cantidad con que quedó la línea (0 si se quitó).</summary>
 public sealed class ResultadoDeLinea
 {
-    private ResultadoDeLinea(RechazoDeCarrito? rechazo, int cantidadFinal)
+    private ResultadoDeLinea(RechazoDeCarrito? rechazo, Guid? lineaId, int cantidadFinal)
     {
         Rechazo = rechazo;
+        LineaId = lineaId;
         CantidadFinal = cantidadFinal;
     }
 
@@ -57,16 +64,19 @@ public sealed class ResultadoDeLinea
 
     public RechazoDeCarrito? Rechazo { get; }
 
+    /// <summary>La línea sobre la que quedó el cambio (nueva o ya existente); nulo si se rechazó.</summary>
+    public Guid? LineaId { get; }
+
     /// <summary>La cantidad con que quedó la línea; una digital siempre queda en 1 aunque se pidieran más.</summary>
     public int CantidadFinal { get; }
 
-    internal static ResultadoDeLinea Exito(int cantidadFinal) => new(null, cantidadFinal);
+    internal static ResultadoDeLinea Exito(Guid lineaId, int cantidadFinal) => new(null, lineaId, cantidadFinal);
 
-    internal static ResultadoDeLinea Rechazar(RechazoDeCarrito motivo) => new(motivo, 0);
+    internal static ResultadoDeLinea Rechazar(RechazoDeCarrito motivo) => new(motivo, null, 0);
 }
 
 /// <summary>
-/// El carrito de una cuenta o de un visitante (CAR-01, CAR-29, D01, D02): una línea por edición, un impreso de 1 a 20 unidades y una digital siempre una, hasta 30 líneas (D14, CAR-38), con su total. El de un visitante caduca a los 30 días
+/// El carrito de una cuenta o de un visitante (CAR-01, CAR-29, D01, D02): una línea por libro impreso y sucursal (o varias, en lotes, CAR-40) de 1 a 20 unidades, y una digital siempre de una, hasta 30 líneas (D14, CAR-38), con su total. El de un visitante caduca a los 30 días
 /// de la última acción <b>de la persona</b> (un <c>GET</c> no la mueve: aquí solo la mueve una operación que cambia el carrito). No lleva precios (los lee el servidor del Catálogo): el total los recibe. Los instantes llegan como parámetros.
 /// </summary>
 public sealed class Carrito
@@ -147,10 +157,11 @@ public sealed class Carrito
     public bool EstaCaducado(DateTimeOffset ahora) => VenceEn is { } vence && ahora >= vence;
 
     /// <summary>
-    /// Agrega una edición (CAR-02): un impreso nuevo crea su línea y uno que ya está suma las unidades (hasta 20); una digital queda siempre en una unidad aunque se pidan más (CAR-03, AC-CAR-02). Rechaza una cantidad
-    /// fuera de 1 a 20, la línea 31 y un carrito ya fusionado, sin cambiar nada.
+    /// Agrega una edición (CAR-02, CAR-39, CAR-40). Un impreso exige la sucursal que lo atiende: la cantidad se suma a la línea más antigua de esa edición y sucursal que la admita entera sin pasar de 20 y, si ninguna la admite, se abre
+    /// otra línea con la cantidad completa (la suma nunca se reparte ni se une una línea con otra, CAR-41). Una digital no lleva sucursal y queda siempre en una unidad (CAR-03, AC-CAR-02). Rechaza una cantidad fuera de 1 a 20, la línea 31 y un carrito
+    /// ya fusionado, sin cambiar nada. <paramref name="lineaIdNueva"/> es el identificador de la línea si hace falta abrir una.
     /// </summary>
-    public ResultadoDeLinea Agregar(Guid edicionId, bool esDigital, int cantidad, DateTimeOffset ahora)
+    public ResultadoDeLinea Agregar(Guid lineaIdNueva, Guid edicionId, bool esDigital, string? codigoDeSucursal, int cantidad, DateTimeOffset ahora)
     {
         if (Estado == EstadoDeCarrito.Fusionado)
         {
@@ -162,87 +173,143 @@ public sealed class Carrito
             return ResultadoDeLinea.Rechazar(RechazoDeCarrito.CantidadInvalida);
         }
 
-        var indice = _lineas.FindIndex(l => l.EdicionId == edicionId);
-        if (indice < 0)
+        if (!esDigital && !CodigosDeSucursal.EsValido(codigoDeSucursal))
         {
-            if (_lineas.Count >= MaximoDeLineas)
-            {
-                return ResultadoDeLinea.Rechazar(RechazoDeCarrito.TopeDeLineas);
-            }
-
-            var nueva = LineaDeCarrito.Crear(edicionId, esDigital, esDigital ? Cantidad.Uno : pedida, ahora);
-            _lineas.Add(nueva);
-            Tocar(ahora);
-            return ResultadoDeLinea.Exito(nueva.Cantidad.Valor);
+            return ResultadoDeLinea.Rechazar(RechazoDeCarrito.SucursalRequerida);
         }
 
-        var existente = _lineas[indice];
-        if (existente.RetiroPendiente)
+        if (_lineas.Exists(l => l.EdicionId == edicionId && l.RetiroPendiente))
         {
             return ResultadoDeLinea.Rechazar(RechazoDeCarrito.EdicionRetirada);
         }
 
-        if (existente.EsDigital)
+        if (esDigital)
         {
+            if (_lineas.Find(l => l.EdicionId == edicionId) is { } poseida)
+            {
+                Tocar(ahora);
+                return ResultadoDeLinea.Exito(poseida.LineaId, Cantidad.Uno.Valor);
+            }
+        }
+        else if (LineaQueAdmite(_lineas, edicionId, codigoDeSucursal!, pedida.Valor) is { } indice)
+        {
+            var existente = _lineas[indice];
+            var suma = Cantidad.Crear(existente.Cantidad.Valor + pedida.Valor);
+            _lineas[indice] = existente.ConCantidad(suma);
             Tocar(ahora);
-            return ResultadoDeLinea.Exito(Cantidad.Uno.Valor);
+            return ResultadoDeLinea.Exito(existente.LineaId, suma.Valor);
         }
 
-        if (!Cantidad.TryCrear(existente.Cantidad.Valor + pedida.Valor, out var suma))
+        if (_lineas.Count >= MaximoDeLineas)
         {
-            return ResultadoDeLinea.Rechazar(RechazoDeCarrito.TopeDeUnidades);
+            return ResultadoDeLinea.Rechazar(RechazoDeCarrito.TopeDeLineas);
         }
 
-        _lineas[indice] = existente.ConCantidad(suma);
+        var nueva = LineaDeCarrito.Crear(lineaIdNueva, edicionId, esDigital, esDigital ? null : codigoDeSucursal, esDigital ? Cantidad.Uno : pedida, ahora);
+        _lineas.Add(nueva);
         Tocar(ahora);
-        return ResultadoDeLinea.Exito(suma.Valor);
+        return ResultadoDeLinea.Exito(nueva.LineaId, nueva.Cantidad.Valor);
     }
 
-    /// <summary>Cambia la cantidad de una línea (CAR-02): una digital queda en una unidad.</summary>
-    public ResultadoDeLinea Modificar(Guid edicionId, int cantidad, DateTimeOffset ahora)
+    /// <summary>La posición de la línea más antigua de esa edición y sucursal (sin retiro pendiente) que admite <paramref name="cantidad"/> unidades enteras sin pasar de 20 (CAR-40); nulo si ninguna.</summary>
+    internal static int? LineaQueAdmite(IReadOnlyList<LineaDeCarrito> lineas, Guid edicionId, string codigoDeSucursal, int cantidad)
+    {
+        int? elegida = null;
+        for (var i = 0; i < lineas.Count; i++)
+        {
+            var l = lineas[i];
+            if (l.EdicionId == edicionId && !l.EsDigital && !l.RetiroPendiente && l.CodigoDeSucursal == codigoDeSucursal && l.Cantidad.Valor + cantidad <= Cantidad.Maxima
+                && (elegida is null || l.AgregadaEn < lineas[elegida.Value].AgregadaEn))
+            {
+                elegida = i;
+            }
+        }
+
+        return elegida;
+    }
+
+    /// <summary>Las unidades que suman las líneas de un libro en una sucursal (CAR-04), sin contar las retiradas del catálogo.</summary>
+    public int Unidades(Guid edicionId, string codigoDeSucursal) =>
+        _lineas.Where(l => l.EdicionId == edicionId && !l.RetiroPendiente && l.CodigoDeSucursal == codigoDeSucursal).Sum(l => l.Cantidad.Valor);
+
+    /// <summary>Cambia la cantidad de una línea (CAR-02, CAR-44): una digital queda en una unidad y una línea anterior sin sucursal solo se puede quitar (CAR-45).</summary>
+    public ResultadoDeLinea Modificar(Guid lineaId, int cantidad, DateTimeOffset ahora)
     {
         if (Estado == EstadoDeCarrito.Fusionado)
         {
             return ResultadoDeLinea.Rechazar(RechazoDeCarrito.CarritoFusionado);
         }
 
-        if (!Cantidad.TryCrear(cantidad, out var nueva))
+        if (cantidad < Cantidad.Minima)
         {
             return ResultadoDeLinea.Rechazar(RechazoDeCarrito.CantidadInvalida);
         }
 
-        var indice = _lineas.FindIndex(l => l.EdicionId == edicionId);
+        var indice = _lineas.FindIndex(l => l.LineaId == lineaId);
         if (indice < 0)
         {
-            return ResultadoDeLinea.Rechazar(RechazoDeCarrito.EdicionNoEstaEnElCarrito);
+            return ResultadoDeLinea.Rechazar(RechazoDeCarrito.LineaNoEstaEnElCarrito);
         }
 
-        if (_lineas[indice].RetiroPendiente)
+        var linea = _lineas[indice];
+        if (linea.RetiroPendiente)
         {
             return ResultadoDeLinea.Rechazar(RechazoDeCarrito.EdicionRetirada);
         }
 
-        var linea = _lineas[indice];
-        _lineas[indice] = linea.ConCantidad(linea.EsDigital ? Cantidad.Uno : nueva);
+        if (linea.EsImpresoSinSucursal)
+        {
+            return ResultadoDeLinea.Rechazar(RechazoDeCarrito.LineaSinSucursal);
+        }
+
+        if (!Cantidad.TryCrear(linea.EsDigital ? 1 : cantidad, out var nueva))
+        {
+            return ResultadoDeLinea.Rechazar(RechazoDeCarrito.TopeDeUnidades);
+        }
+
+        _lineas[indice] = linea.ConCantidad(nueva);
         Tocar(ahora);
-        return ResultadoDeLinea.Exito(_lineas[indice].Cantidad.Valor);
+        return ResultadoDeLinea.Exito(lineaId, nueva.Valor);
     }
 
-    /// <summary>Quita la línea de una edición (CAR-02).</summary>
-    public ResultadoDeLinea Eliminar(Guid edicionId, DateTimeOffset ahora)
+    /// <summary>Quita una línea (CAR-02).</summary>
+    public ResultadoDeLinea Eliminar(Guid lineaId, DateTimeOffset ahora)
     {
         if (Estado == EstadoDeCarrito.Fusionado)
         {
             return ResultadoDeLinea.Rechazar(RechazoDeCarrito.CarritoFusionado);
         }
 
-        if (_lineas.RemoveAll(l => l.EdicionId == edicionId) == 0)
+        if (_lineas.RemoveAll(l => l.LineaId == lineaId) == 0)
         {
-            return ResultadoDeLinea.Rechazar(RechazoDeCarrito.EdicionNoEstaEnElCarrito);
+            return ResultadoDeLinea.Rechazar(RechazoDeCarrito.LineaNoEstaEnElCarrito);
         }
 
         Tocar(ahora);
-        return ResultadoDeLinea.Exito(0);
+        return ResultadoDeLinea.Exito(lineaId, 0);
+    }
+
+    /// <summary>
+    /// Quita de una línea la cantidad que se acaba de comprar (D16), también de una anterior sin sucursal (CAR-50): sin unidades, la línea se elimina. No es una acción de la persona. Una línea que no está no cambia nada.
+    /// </summary>
+    public void QuitarComprado(Guid lineaId, int cantidad, DateTimeOffset ahora)
+    {
+        var indice = _lineas.FindIndex(l => l.LineaId == lineaId);
+        if (Estado == EstadoDeCarrito.Fusionado || indice < 0 || cantidad < 1)
+        {
+            return;
+        }
+
+        if (_lineas[indice].Cantidad.Valor <= cantidad)
+        {
+            _lineas.RemoveAt(indice);
+        }
+        else
+        {
+            _lineas[indice] = _lineas[indice].ConCantidad(Cantidad.Crear(_lineas[indice].Cantidad.Valor - cantidad));
+        }
+
+        Tocar(ahora, porLaPersona: false);
     }
 
     /// <summary>
@@ -256,13 +323,13 @@ public sealed class Carrito
             return false;
         }
 
-        var anteriores = _lineas.ToDictionary(l => l.EdicionId);
+        var anteriores = _lineas.ToDictionary(l => l.LineaId);
         _lineas.Clear();
         foreach (var fusionada in resultado.Lineas)
         {
-            _lineas.Add(anteriores.TryGetValue(fusionada.EdicionId, out var anterior)
+            _lineas.Add(anteriores.TryGetValue(fusionada.LineaId, out var anterior)
                 ? anterior.ConCantidad(fusionada.Cantidad)
-                : LineaDeCarrito.Crear(fusionada.EdicionId, fusionada.EsDigital, fusionada.Cantidad, ahora));
+                : LineaDeCarrito.Crear(fusionada.LineaId, fusionada.EdicionId, fusionada.EsDigital, fusionada.CodigoDeSucursal, fusionada.Cantidad, ahora));
         }
 
         Tocar(ahora);
@@ -301,28 +368,36 @@ public sealed class Carrito
     public bool TieneRetirosPendientes => _lineas.Exists(l => l.RetiroPendiente);
 
     /// <summary>
-    /// Catálogo retiró una edición (CAT-18, <c>IRetiroDeEdicionDeCarritos</c>): con <paramref name="diferir"/> falso (no hay checkout vivo que lo impida) quita la línea y devuelve <see cref="ResultadoDeRetiro.Quitada"/>; con
-    /// <paramref name="diferir"/> verdadero (el checkout está <c>reservando</c>, <c>en_pago</c> o <c>pago_pendiente</c>) solo la marca para quitarla después (<see cref="ResultadoDeRetiro.Anotada"/>, idempotente). Nunca falla ni mueve
+    /// Catálogo retiró una edición (CAT-18, <c>IRetiroDeEdicionDeCarritos</c>) y afecta a <b>todas</b> sus líneas: con <paramref name="diferir"/> falso (no hay checkout vivo que lo impida) las quita y devuelve <see cref="ResultadoDeRetiro.Quitada"/>; con
+    /// <paramref name="diferir"/> verdadero (el checkout está <c>reservando</c>, <c>en_pago</c> o <c>pago_pendiente</c>) solo las marca para quitarlas después (<see cref="ResultadoDeRetiro.Anotada"/>, idempotente). Nunca falla ni mueve
     /// la caducidad del visitante: no es una acción de la persona.
     /// </summary>
     public ResultadoDeRetiro RetirarEdicion(Guid edicionId, bool diferir, DateTimeOffset ahora)
     {
-        var indice = _lineas.FindIndex(l => l.EdicionId == edicionId);
-        if (indice < 0)
+        if (!_lineas.Exists(l => l.EdicionId == edicionId))
         {
             return ResultadoDeRetiro.NoEstaba;
         }
 
         if (!diferir)
         {
-            _lineas.RemoveAt(indice);
+            _lineas.RemoveAll(l => l.EdicionId == edicionId);
             Tocar(ahora, porLaPersona: false);
             return ResultadoDeRetiro.Quitada;
         }
 
-        if (!_lineas[indice].RetiroPendiente)
+        var cambio = false;
+        for (var i = 0; i < _lineas.Count; i++)
         {
-            _lineas[indice] = _lineas[indice].ConRetiroPendiente();
+            if (_lineas[i].EdicionId == edicionId && !_lineas[i].RetiroPendiente)
+            {
+                _lineas[i] = _lineas[i].ConRetiroPendiente();
+                cambio = true;
+            }
+        }
+
+        if (cambio)
+        {
             Tocar(ahora, porLaPersona: false);
         }
 
@@ -330,12 +405,12 @@ public sealed class Carrito
     }
 
     /// <summary>
-    /// Quita las líneas con retiro pendiente (<c>AplicarRetirosPendientes</c>, D21) y devuelve cuáles eran para dejar su aviso. Es lo que hace toda salida del checkout de un estado vivo hacia <c>en_edicion</c>, <c>cancelado</c>,
+    /// Quita las líneas con retiro pendiente (<c>AplicarRetirosPendientes</c>, D21) y devuelve las ediciones retiradas (una vez cada una) para dejar su aviso. Es lo que hace toda salida del checkout de un estado vivo hacia <c>en_edicion</c>, <c>cancelado</c>,
     /// <c>reiniciado</c> o <c>pagado</c>. Sin retiros pendientes no cambia nada.
     /// </summary>
     public IReadOnlyList<EdicionRetirada> AplicarRetirosPendientes(DateTimeOffset ahora)
     {
-        var retiradas = _lineas.Where(l => l.RetiroPendiente).Select(l => new EdicionRetirada(l.EdicionId, l.EsDigital)).ToList();
+        var retiradas = _lineas.Where(l => l.RetiroPendiente).Select(l => new EdicionRetirada(l.EdicionId, l.EsDigital)).Distinct().ToList();
         if (retiradas.Count == 0)
         {
             return retiradas;

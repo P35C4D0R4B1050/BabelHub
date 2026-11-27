@@ -33,10 +33,10 @@ public sealed class RetiroDeEdicionDelCarritoTests
     private static Checkout CheckoutDe(EntornoDelCarrito e, Guid cuenta, CarritoDeDominio carrito, Action<Checkout, CarritoDeDominio>? llevar = null)
     {
         var edicion = carrito.Lineas.First().EdicionId;
-        var checkout = Checkout.Iniciar(Guid.NewGuid(), cuenta, carrito.Id, [new LineaParaCheckout(edicion, false, "Libro", "9780000000019", 1, 50m)], Guid.NewGuid, Inicio);
+        var checkout = Checkout.Iniciar(Guid.NewGuid(), cuenta, carrito.Id, [new LineaParaCheckout(edicion, false, "Libro", "9780000000019", 1, 50m, edicion, Sucursal.Principal)], Guid.NewGuid, Inicio);
         checkout.Aceptar(TextoLegal.Terminos, "t-1", Inicio);
         checkout.Aceptar(TextoLegal.Privacidad, "p-1", Inicio);
-        checkout.ElegirRecojo("lima", Inicio);
+        checkout.ElegirRecojo(Inicio);
         llevar?.Invoke(checkout, carrito);
         e.Checkouts.Sembrar(checkout);
         return checkout;

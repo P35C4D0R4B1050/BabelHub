@@ -21,39 +21,42 @@ public sealed class ElegirEntregaTests
     {
         var e = EntornoDelCarrito.DeCliente();
         var libro = e.Impreso(10, precio, "Libro");
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(libro, cantidad));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(libro, cantidad, CodigoDeSucursal: Sucursal.Principal));
         var inicio = await new IniciarCheckout(e.ServiciosDelCheckout()).Ejecutar(new IniciarCheckoutEntrada());
         Assert.True(inicio.EsExito);
+        e.Inventario.ReiniciarContadores();
         return (e, e.Checkouts.Todos.Single(), libro);
     }
 
     private static Task<Resultado<VistaDelCheckout>> Elegir(EntornoDelCarrito e, ElegirEntregaEntrada entrada) =>
         new ElegirEntrega(e.ServiciosDelCheckout()).Ejecutar(entrada);
 
-    private static ElegirEntregaEntrada Recojo(string codigo = "sede-central", Guid? pedido = null) => new(TipoDeEntregaDeCompra.Recojo, codigo, null, pedido);
+    private static ElegirEntregaEntrada Recojo(Guid? pedido = null) => new(TipoDeEntregaDeCompra.Recojo, null, pedido);
 
-    private static ElegirEntregaEntrada Domicilio(ContactoDeCompra? contacto = null, Guid? pedido = null) => new(TipoDeEntregaDeCompra.Domicilio, null, contacto ?? Contacto(), pedido);
+    private static ElegirEntregaEntrada Domicilio(ContactoDeCompra? contacto = null, Guid? pedido = null) => new(TipoDeEntregaDeCompra.Domicilio, contacto ?? Contacto(), pedido);
 
     // ---------- Recojo ----------
 
     [Fact]
     [Trait("Criterio", "AC-CAR-08")]
-    public async Task El_recojo_avisa_del_traslado_y_su_plazo_estimado_sin_cambiar_el_vendible_y_lo_guarda_por_linea()
+    public async Task El_recojo_muestra_la_sucursal_de_cada_linea_sin_sucursal_comun_ni_traslado_y_la_guarda_por_linea()
     {
         var (e, checkout, libro) = await ConCheckout();
-        e.Inventario.FijarFuente(libro, "cusco", true, 3);
         var lineaId = checkout.Lineas.Single().LineaId;
 
         var resultado = await Elegir(e, Recojo());
 
         Assert.True(resultado.EsExito);
         var linea = Assert.Single(resultado.Valor.Lineas);
-        Assert.Equal((DisponibilidadDeLineaDeCheckout.PorTraslado, 3, false), (linea.Disponibilidad, linea.PlazoInformadoDias, linea.PlazoAConfirmar));
+        Assert.Equal((DisponibilidadDeLineaDeCheckout.EnSuSucursal, (int?)null, false), (linea.Disponibilidad, linea.PlazoInformadoDias, linea.PlazoAConfirmar));
+        Assert.Equal((Sucursal.Principal, "Sede central"), (linea.CodigoDeSucursal, linea.NombreDeSucursal));
+        Assert.Null(resultado.Valor.Envio);
         Assert.Equal(TipoDeEntregaDeCompra.Recojo, resultado.Valor.TipoDeEntrega);
-        Assert.Equal("sede-central", resultado.Valor.CodigoDeSucursalDeRecojo);
+        Assert.Null(resultado.Valor.CodigoDeSucursalDeRecojo);
         var guardada = Assert.Single(checkout.Lineas);
-        Assert.Equal((lineaId, "cusco", true, 3), (guardada.LineaId, guardada.CodigoDeFuenteInformado, guardada.RequiereTrasladoInformado, guardada.PlazoInformadoDias));
+        Assert.Equal((lineaId, Sucursal.Principal, false, (int?)null), (guardada.LineaId, guardada.CodigoDeFuenteInformado, guardada.RequiereTrasladoInformado, guardada.PlazoInformadoDias));
         Assert.Equal(TipoDeEntrega.Recojo, e.Inventario.UltimaEntregaPrevia!.Tipo);
+        Assert.Equal(Sucursal.Principal, Assert.Single(e.Inventario.UltimasLineasPrevias).CodigoDeSucursal);
     }
 
     [Fact]
@@ -71,25 +74,25 @@ public sealed class ElegirEntregaTests
     }
 
     [Fact]
-    public async Task Una_sucursal_que_no_esta_en_la_lista_es_una_validacion_y_no_consulta_el_inventario()
+    public async Task Una_region_que_no_esta_en_la_lista_es_una_validacion_y_no_consulta_el_inventario()
     {
         var (e, checkout, _) = await ConCheckout();
 
-        var resultado = await Elegir(e, Recojo("no-existe"));
+        var resultado = await Elegir(e, Domicilio(new ContactoDeCompra("Ana Pérez", "987654321", "Jr. Lima 123", "no-existe")));
 
         Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
-        Assert.Equal("codigoDeSucursalDeRecojo", Assert.Single(resultado.Error.Errores).Campo);
+        Assert.Equal("region", Assert.Single(resultado.Error.Errores).Campo);
         Assert.Equal(0, e.Inventario.ConsultasPrevias);
         Assert.Null(checkout.TipoDeEntrega);
     }
 
     [Fact]
-    public async Task Sin_lista_de_sucursales_no_se_puede_validar_la_entrega()
+    public async Task Sin_lista_de_sucursales_no_se_puede_validar_el_domicilio()
     {
         var (e, checkout, _) = await ConCheckout();
         e.Inventario.Sucursales = null;
 
-        var resultado = await Elegir(e, Recojo());
+        var resultado = await Elegir(e, Domicilio());
 
         Assert.Equal(ClavesDelCarrito.EntregaNoValidable, resultado.Error!.Clave);
         Assert.Equal(CategoriaDeError.NoDisponible, resultado.Error.Categoria);
@@ -101,7 +104,7 @@ public sealed class ElegirEntregaTests
     {
         var (e, checkout, _) = await ConCheckout();
 
-        var resultado = await Elegir(e, new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, "sede-central", Contacto()));
+        var resultado = await Elegir(e, new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, Contacto()));
 
         Assert.True(resultado.EsExito);
         Assert.Null(checkout.Contacto);
@@ -134,7 +137,7 @@ public sealed class ElegirEntregaTests
         Assert.True(resultado.EsExito);
         Assert.Equal("ayacucho", checkout.RegionDeEntrega);
         Assert.Equal("987654321", checkout.Contacto!.Telefono.Valor);
-        Assert.Equal((TipoDeEntrega.Domicilio, "ayacucho", null), (e.Inventario.UltimaEntregaPrevia!.Tipo, e.Inventario.UltimaEntregaPrevia.RegionDeEntrega, e.Inventario.UltimaEntregaPrevia.CodigoDeSucursalDeRecojo));
+        Assert.Equal((TipoDeEntrega.Domicilio, "ayacucho", null), (e.Inventario.UltimaEntregaPrevia!.Tipo, e.Inventario.UltimaEntregaPrevia.RegionDeEntrega, e.Checkouts.Todos.Single().CodigoDeSucursalDeRecojo));
         Assert.Equal("[redactado]", resultado.Valor.Contacto!.ToString());
     }
 
@@ -168,7 +171,7 @@ public sealed class ElegirEntregaTests
     {
         var (e, _, _) = await ConCheckout();
 
-        var resultado = await Elegir(e, new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, null, null));
+        var resultado = await Elegir(e, new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, null));
 
         Assert.Equal("contacto", Assert.Single(resultado.Error!.Errores).Campo);
     }
@@ -219,7 +222,7 @@ public sealed class ElegirEntregaTests
     public async Task Un_carrito_solo_digital_no_tiene_entrega_y_no_se_consulta_nada()
     {
         var e = EntornoDelCarrito.DeCliente();
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Digital(), 1));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(e.Digital(), 1, CodigoDeSucursal: Sucursal.Principal));
         await new IniciarCheckout(e.ServiciosDelCheckout()).Ejecutar(new IniciarCheckoutEntrada());
 
         var resultado = await Elegir(e, Recojo());

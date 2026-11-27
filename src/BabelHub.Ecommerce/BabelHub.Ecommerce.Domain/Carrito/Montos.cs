@@ -59,3 +59,26 @@ public sealed class TotalDeCompra
         return new TotalDeCompra(subtotal, entrega == TipoDeEntrega.Domicilio ? costoConfigurado.Valor : 0m);
     }
 }
+
+/// <summary>Lo que cobra de envío a domicilio una sucursal que atiende alguna línea (CAR-23).</summary>
+public sealed record EnvioDeSucursal(string CodigoDeSucursal, CostoDeEnvio Costo);
+
+/// <summary>
+/// El envío a domicilio (CAR-23, CAR-47): uno por cada sucursal que atiende alguna línea, incluida la primera, aunque tenga varias líneas; cada una cobra su costo propio o, sin él, el predeterminado. El envío de la compra es la suma.
+/// </summary>
+public static class EnvioPorSucursales
+{
+    public static IReadOnlyList<EnvioDeSucursal> Desglose(IEnumerable<string> sucursales, IReadOnlyDictionary<string, CostoDeEnvio> propias, CostoDeEnvio predeterminado)
+    {
+        ArgumentNullException.ThrowIfNull(sucursales);
+        ArgumentNullException.ThrowIfNull(propias);
+        ArgumentNullException.ThrowIfNull(predeterminado);
+        return [.. sucursales.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).Select(s => new EnvioDeSucursal(s, propias.TryGetValue(s, out var propio) ? propio : predeterminado))];
+    }
+
+    public static CostoDeEnvio Suma(IEnumerable<EnvioDeSucursal> desglose)
+    {
+        ArgumentNullException.ThrowIfNull(desglose);
+        return CostoDeEnvio.Crear(desglose.Sum(e => e.Costo.Valor));
+    }
+}

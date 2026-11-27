@@ -63,7 +63,7 @@ public sealed class InventarioSimuladoDelCarrito(IReloj reloj) : IInventarioDelC
     private static readonly TimeSpan DuracionDeLaReserva = TimeSpan.FromMinutes(15);
 
     private readonly Lock _candado = new();
-    private readonly Dictionary<Guid, int> _stock = [];
+    private readonly Dictionary<Guid, Dictionary<string, int>> _stock = [];
     private readonly Dictionary<Guid, ReservaSimulada> _reservas = [];
     private readonly Dictionary<Guid, (string Fuente, bool Traslado, int? Plazo)> _fuentes = [];
     private List<SucursalDeEntrega> _sucursales = [new("sede-central", "Sede central", "ayacucho")];
@@ -71,11 +71,17 @@ public sealed class InventarioSimuladoDelCarrito(IReloj reloj) : IInventarioDelC
     /// <summary>Mientras es verdadero, toda llamada responde «sin respuesta».</summary>
     public bool Caido { get; set; }
 
-    public void FijarStock(Guid edicionId, int vendible)
+    /// <summary>Fija lo vendible de una edición en una sucursal (por omisión, la sede central).</summary>
+    public void FijarStock(Guid edicionId, int vendible, string codigoDeSucursal = "sede-central")
     {
         lock (_candado)
         {
-            _stock[edicionId] = vendible;
+            if (!_stock.TryGetValue(edicionId, out var porSucursal))
+            {
+                _stock[edicionId] = porSucursal = new Dictionary<string, int>(StringComparer.Ordinal);
+            }
+
+            porSucursal[codigoDeSucursal] = vendible;
         }
     }
 
@@ -127,7 +133,7 @@ public sealed class InventarioSimuladoDelCarrito(IReloj reloj) : IInventarioDelC
 
         lock (_candado)
         {
-            var conocidas = edicionIds.Distinct().Where(_stock.ContainsKey).Select(id => new StockDeEdicion(id, Vendible(id, null))).ToList();
+            var conocidas = edicionIds.Distinct().Where(_stock.ContainsKey).Select(id => StockDe(id, null)).ToList();
             var noRegistradas = edicionIds.Distinct().Where(id => !_stock.ContainsKey(id)).ToList();
             return Task.FromResult(RespuestaDelInventarioDelCarrito<StockDeVariasEdiciones>.ConValor(new StockDeVariasEdiciones(conocidas, noRegistradas, reloj.Ahora)));
         }
@@ -149,7 +155,7 @@ public sealed class InventarioSimuladoDelCarrito(IReloj reloj) : IInventarioDelC
 
         lock (_candado)
         {
-            var selecciones = lineas.Select(l => Seleccionar(l, null)).ToList();
+            var selecciones = Seleccionar(lineas, null);
             return Task.FromResult(RespuestaDelInventarioDelCarrito<ConsultaPreviaDelInventario>.ConValor(new ConsultaPreviaDelInventario(selecciones, reloj.Ahora)));
         }
     }
@@ -209,9 +215,10 @@ public sealed class InventarioSimuladoDelCarrito(IReloj reloj) : IInventarioDelC
                 }
             }
 
-            var sinStock = lineas
-                .Where(l => !_stock.ContainsKey(l.EdicionId) || Vendible(l.EdicionId, pedidoId) < l.Cantidad)
-                .Select(l => new LineaSinStock(l.LineaId, l.EdicionId, l.Cantidad, _stock.ContainsKey(l.EdicionId) ? Vendible(l.EdicionId, pedidoId) : 0))
+            var asignadas = Seleccionar(lineas, pedidoId);
+            var sinStock = asignadas
+                .Where(s => !s.HayStock)
+                .Select(s => new LineaSinStock(s.LineaId, s.EdicionId, lineas.First(l => l.LineaId == s.LineaId).Cantidad, s.DisponibleEnLaRed, s.DisponibleEnLaSucursal))
                 .ToList();
             if (sinStock.Count > 0)
             {
@@ -223,7 +230,7 @@ public sealed class InventarioSimuladoDelCarrito(IReloj reloj) : IInventarioDelC
             nueva.Estado = EstadoSimulado.Pendiente;
             nueva.ExpiraEn = ahora + DuracionDeLaReserva;
             nueva.Lineas = [.. lineas];
-            nueva.Selecciones = [.. lineas.Select(l => Seleccionar(l, pedidoId))];
+            nueva.Selecciones = asignadas;
             nueva.Claves[clave] = carga;
             _reservas[pedidoId] = nueva;
             return Task.FromResult(ResultadoDeReservar.Reservada(new ReservaObtenida(pedidoId, nueva.ExpiraEn, nueva.Selecciones, EsRepeticion: false)));
@@ -257,29 +264,54 @@ public sealed class InventarioSimuladoDelCarrito(IReloj reloj) : IInventarioDelC
 
     private static bool EntregaValida(EntregaParaElInventario entrega) => entrega.Tipo switch
     {
-        TipoDeEntrega.Recojo => !string.IsNullOrWhiteSpace(entrega.CodigoDeSucursalDeRecojo) && entrega.RegionDeEntrega is null,
-        TipoDeEntrega.Domicilio => !string.IsNullOrWhiteSpace(entrega.RegionDeEntrega) && entrega.CodigoDeSucursalDeRecojo is null,
+        TipoDeEntrega.Recojo => entrega.RegionDeEntrega is null,
+        TipoDeEntrega.Domicilio => !string.IsNullOrWhiteSpace(entrega.RegionDeEntrega),
         _ => false,
     };
 
     private static string CargaCanonica(Guid pedidoId, EntregaParaElInventario entrega, IReadOnlyList<LineaParaElInventario> lineas) =>
-        $"{pedidoId:D}|{entrega.Tipo}|{entrega.CodigoDeSucursalDeRecojo}|{entrega.RegionDeEntrega}|{string.Join(",", lineas.OrderBy(l => l.LineaId).Select(l => $"{l.LineaId:D}:{l.EdicionId:D}:{l.Cantidad}"))}";
+        $"{pedidoId:D}|{entrega.Tipo}|{entrega.RegionDeEntrega}|{string.Join(",", lineas.OrderBy(l => l.LineaId).Select(l => $"{l.LineaId:D}:{l.EdicionId:D}:{l.Cantidad}:{l.CodigoDeSucursal}"))}";
 
-    /// <summary>Lo vendible de una edición: el stock menos lo reservado por los demás pedidos (los pendientes no vencidos y los confirmados).</summary>
-    private int Vendible(Guid edicionId, Guid? salvoElPedido)
+    private StockDeEdicion StockDe(Guid edicionId, Guid? salvoElPedido)
+    {
+        var porSucursal = _stock[edicionId].Keys.ToDictionary(s => s, s => Vendible(edicionId, s, salvoElPedido), StringComparer.Ordinal);
+        return new StockDeEdicion(edicionId, porSucursal.Values.Sum(), porSucursal);
+    }
+
+    /// <summary>Lo vendible de una edición en una sucursal: su stock menos lo reservado allí por los demás pedidos (los pendientes no vencidos y los confirmados).</summary>
+    private int Vendible(Guid edicionId, string codigoDeSucursal, Guid? salvoElPedido)
     {
         var ahora = reloj.Ahora;
         var reservado = _reservas
             .Where(r => r.Key != salvoElPedido && (r.Value.Estado == EstadoSimulado.Confirmada || (r.Value.Estado == EstadoSimulado.Pendiente && r.Value.ExpiraEn > ahora)))
-            .Sum(r => r.Value.Lineas.Where(l => l.EdicionId == edicionId).Sum(l => l.Cantidad));
-        return Math.Max(0, _stock.GetValueOrDefault(edicionId) - reservado);
+            .Sum(r => r.Value.Selecciones.Where(s => s.EdicionId == edicionId && s.CodigoDeFuente == codigoDeSucursal).Sum(s => r.Value.Lineas.First(l => l.LineaId == s.LineaId).Cantidad));
+        var hay = _stock.TryGetValue(edicionId, out var porSucursal) ? porSucursal.GetValueOrDefault(codigoDeSucursal) : 0;
+        return Math.Max(0, hay - reservado);
     }
 
-    private SeleccionDeLinea Seleccionar(LineaParaElInventario linea, Guid? salvoElPedido)
+    /// <summary>Cada línea en la sucursal que declara (sin dividirse), sumando las del mismo libro y sucursal en el orden pedido; una línea sin sucursal (la forma anterior) sale de la fuente fijada para su edición.</summary>
+    private List<SeleccionDeLinea> Seleccionar(IReadOnlyList<LineaParaElInventario> lineas, Guid? salvoElPedido)
     {
-        var disponible = _stock.ContainsKey(linea.EdicionId) ? Vendible(linea.EdicionId, salvoElPedido) : 0;
-        var (fuente, traslado, plazo) = _fuentes.GetValueOrDefault(linea.EdicionId, ("sede-central", false, (int?)null));
-        return new SeleccionDeLinea(linea.LineaId, linea.EdicionId, disponible >= linea.Cantidad, disponible >= linea.Cantidad ? fuente : null, traslado, plazo, disponible);
+        var apartado = new Dictionary<(Guid, string), int>();
+        var selecciones = new List<SeleccionDeLinea>(lineas.Count);
+        foreach (var linea in lineas)
+        {
+            var fijada = _fuentes.GetValueOrDefault(linea.EdicionId, ("sede-central", false, (int?)null));
+            var sucursal = linea.CodigoDeSucursal ?? fijada.Item1;
+            var (traslado, plazo) = linea.CodigoDeSucursal is null ? (fijada.Item2, fijada.Item3) : (false, (int?)null);
+            var disponible = Vendible(linea.EdicionId, linea.CodigoDeSucursal is null ? "sede-central" : sucursal, salvoElPedido);
+            var yaApartado = apartado.GetValueOrDefault((linea.EdicionId, sucursal));
+            var alcanza = yaApartado + linea.Cantidad <= disponible;
+            if (alcanza)
+            {
+                apartado[(linea.EdicionId, sucursal)] = yaApartado + linea.Cantidad;
+            }
+
+            var enLaRed = _stock.ContainsKey(linea.EdicionId) ? StockDe(linea.EdicionId, salvoElPedido).VendibleEnLaRed : 0;
+            selecciones.Add(new SeleccionDeLinea(linea.LineaId, linea.EdicionId, alcanza, alcanza ? sucursal : null, traslado, plazo, enLaRed, linea.CodigoDeSucursal is null ? null : disponible));
+        }
+
+        return selecciones;
     }
 
     private enum EstadoSimulado

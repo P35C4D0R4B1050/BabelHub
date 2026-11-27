@@ -69,6 +69,8 @@ public sealed class BajaDeEdicionConElCarritoRealTests(PostgresDelEcommerceCompl
         {
             servicios.RemoveAll<IInventarioDelCarrito>();
             servicios.AddSingleton<IInventarioDelCarrito>(inventario);
+            servicios.RemoveAll<BabelHub.Ecommerce.Application.Web.IPreferenciaDeSucursal>();
+            servicios.AddSingleton(BabelHub.IntegrationTests.Carrito.SucursalesDelCarrito.Preferencia());
         });
     }
 
@@ -89,7 +91,7 @@ public sealed class BajaDeEdicionConElCarritoRealTests(PostgresDelEcommerceCompl
         var (clienteA, clienteB, titular) = (await SembrarCuenta(), await SembrarCuenta(), await SembrarCuenta());
         foreach (var cuenta in new[] { clienteA, clienteB })
         {
-            var agregado = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICarritoDelCliente>().AgregarLinea(new AgregarLineaEntrada(edicion, 1)));
+            var agregado = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICarritoDelCliente>().AgregarLinea(new AgregarLineaEntrada(edicion, 1, CodigoDeSucursal: "sede-central")));
             Assert.True(agregado.EsExito, agregado.Error?.Clave);
         }
 

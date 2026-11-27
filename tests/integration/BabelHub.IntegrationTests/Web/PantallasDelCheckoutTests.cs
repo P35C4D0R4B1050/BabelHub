@@ -32,7 +32,7 @@ public sealed class PantallasDelCheckoutTests
     }
 
     private static LineaDeRevision Linea(string titulo, FormatoDeEdicion formato, int cantidad, decimal precio, DisponibilidadDeLineaDeCheckout disponibilidad, int? plazo = null, bool aConfirmar = false, bool retirada = false) =>
-        new(Guid.NewGuid(), Guid.NewGuid(), titulo, formato, cantidad, precio, precio * cantidad, disponibilidad, plazo, aConfirmar, retirada);
+        new(Guid.NewGuid(), Guid.NewGuid(), titulo, formato, cantidad, precio, precio * cantidad, disponibilidad, plazo, aConfirmar, retirada, formato == FormatoDeEdicion.Digital ? null : "AYA", formato == FormatoDeEdicion.Digital ? null : "Ayacucho");
 
     private static VistaDelCheckout Vista(
         IReadOnlyList<LineaDeRevision> lineas,
@@ -124,7 +124,7 @@ public sealed class PantallasDelCheckoutTests
 
         var (html, _) = await Pedir(anfitrion);
 
-        Assert.Contains("En tu sucursal", html, StringComparison.Ordinal);
+        Assert.Contains("Disponible en su sucursal", html, StringComparison.Ordinal);
         Assert.Contains("Se trae de otra sucursal", html, StringComparison.Ordinal);
         Assert.Contains("Plazo estimado: 3 días", html, StringComparison.Ordinal);
         Assert.Contains("Plazo estimado: 1 día", html, StringComparison.Ordinal);
@@ -203,7 +203,7 @@ public sealed class PantallasDelCheckoutTests
 
     [Fact]
     [Trait("Criterio", "AC-CAR-07")]
-    public async Task La_entrega_ofrece_un_formulario_de_recojo_con_las_sucursales_y_otro_de_domicilio_con_sus_campos_etiquetados()
+    public async Task La_entrega_ofrece_el_recojo_en_la_sucursal_de_cada_libro_sin_elegir_otra_y_el_domicilio_con_sus_campos_etiquetados()
     {
         await using var anfitrion = await Iniciar(Con(Vista(Mixto)));
 
@@ -212,8 +212,10 @@ public sealed class PantallasDelCheckoutTests
         Assert.Equal(2, Regex.Matches(html, "action=\"/checkout/entrega\"").Count);
         Assert.Contains("name=\"tipoDeEntrega\" value=\"recojo\"", html, StringComparison.Ordinal);
         Assert.Contains("name=\"tipoDeEntrega\" value=\"domicilio\"", html, StringComparison.Ordinal);
-        Assert.Contains("<option value=\"AYA\"", html, StringComparison.Ordinal);
-        Assert.Contains("<option value=\"LIM\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("name=\"codigoDeSucursal\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<option value=\"AYA\"", html, StringComparison.Ordinal);
+        Assert.Contains("cada libro se recoge en la sucursal que lo atiende", html, StringComparison.Ordinal);
+        Assert.Contains("2 × Estructuras de datos — <strong>Ayacucho</strong>", html, StringComparison.Ordinal);
         foreach (var campo in new[] { "nombre", "telefono", "direccion", "region" })
         {
             Assert.Contains($"id=\"entrega-{campo}\"", html, StringComparison.Ordinal);

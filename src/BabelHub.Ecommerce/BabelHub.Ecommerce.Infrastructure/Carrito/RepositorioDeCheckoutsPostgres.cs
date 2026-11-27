@@ -320,7 +320,7 @@ public sealed class RepositorioDeCheckoutsPostgres(AccesoAlEsquemaDelCarrito acc
     {
         var lineas = new List<LineaDelCheckout>();
         await using var comando = new NpgsqlCommand(
-            "SELECT linea_id, edicion_id, es_digital, titulo, isbn, cantidad, precio_unitario, codigo_de_fuente_informado, requiere_traslado_informado, plazo_informado_dias, consultado_en FROM carrito.lineas_del_checkout WHERE checkout_id = @checkout ORDER BY posicion",
+            "SELECT linea_id, edicion_id, es_digital, titulo, isbn, cantidad, precio_unitario, codigo_de_fuente_informado, requiere_traslado_informado, plazo_informado_dias, consultado_en, linea_de_carrito_id, codigo_de_sucursal FROM carrito.lineas_del_checkout WHERE checkout_id = @checkout ORDER BY posicion",
             conexion,
             transaccion);
         comando.Parameters.AddWithValue("checkout", checkoutId);
@@ -338,7 +338,9 @@ public sealed class RepositorioDeCheckoutsPostgres(AccesoAlEsquemaDelCarrito acc
                 AccesoAlEsquemaDelCarrito.LeerTexto(filas, 7),
                 AccesoAlEsquemaDelCarrito.LeerNulable<bool>(filas, 8),
                 AccesoAlEsquemaDelCarrito.LeerNulable<int>(filas, 9),
-                AccesoAlEsquemaDelCarrito.LeerInstante(filas, 10)));
+                AccesoAlEsquemaDelCarrito.LeerInstante(filas, 10),
+                AccesoAlEsquemaDelCarrito.LeerNulable<Guid>(filas, 11),
+                AccesoAlEsquemaDelCarrito.LeerTexto(filas, 12)));
         }
 
         return lineas;
@@ -350,14 +352,16 @@ public sealed class RepositorioDeCheckoutsPostgres(AccesoAlEsquemaDelCarrito acc
         foreach (var linea in checkout.Lineas)
         {
             await using var comando = new NpgsqlCommand(
-                "INSERT INTO carrito.lineas_del_checkout (checkout_id, edicion_id, posicion, linea_id, es_digital, titulo, isbn, cantidad, precio_unitario, codigo_de_fuente_informado, requiere_traslado_informado, plazo_informado_dias, consultado_en) "
-                + "VALUES (@checkout, @edicion, @posicion, @linea, @digital, @titulo, @isbn, @cantidad, @precio, @fuente, @traslado, @plazo, @consultado)",
+                "INSERT INTO carrito.lineas_del_checkout (checkout_id, edicion_id, posicion, linea_id, linea_de_carrito_id, codigo_de_sucursal, es_digital, titulo, isbn, cantidad, precio_unitario, codigo_de_fuente_informado, requiere_traslado_informado, plazo_informado_dias, consultado_en) "
+                + "VALUES (@checkout, @edicion, @posicion, @linea, @lineaDeCarrito, @sucursal, @digital, @titulo, @isbn, @cantidad, @precio, @fuente, @traslado, @plazo, @consultado)",
                 conexion,
                 transaccion);
             comando.Parameters.AddWithValue("checkout", checkout.Id);
             comando.Parameters.AddWithValue("edicion", linea.EdicionId);
             comando.Parameters.AddWithValue("posicion", posicion++);
             comando.Parameters.AddWithValue("linea", linea.LineaId);
+            comando.Parameters.AddWithValue("lineaDeCarrito", NpgsqlDbType.Uuid, AccesoAlEsquemaDelCarrito.ONulo(linea.LineaDeCarritoId));
+            comando.Parameters.AddWithValue("sucursal", NpgsqlDbType.Text, AccesoAlEsquemaDelCarrito.ONulo(linea.CodigoDeSucursal));
             comando.Parameters.AddWithValue("digital", linea.EsDigital);
             comando.Parameters.AddWithValue("titulo", linea.Titulo);
             comando.Parameters.AddWithValue("isbn", linea.Isbn);

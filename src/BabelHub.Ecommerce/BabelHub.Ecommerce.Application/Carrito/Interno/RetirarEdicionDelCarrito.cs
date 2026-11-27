@@ -59,15 +59,17 @@ internal sealed class RetirarEdicionDelCarrito(ServiciosDelCarrito servicios) : 
             var cambio = false;
             foreach (var edicion in buscadas)
             {
+                // El retiro afecta a todas las líneas de la edición (una por sucursal o lote); el aviso, uno por edición.
+                var lineas = carrito.Lineas.Count(l => l.EdicionId == edicion);
                 switch (carrito.RetirarEdicion(edicion, diferir, ahora))
                 {
                     case ResultadoDeRetiro.Quitada:
-                        quitadas++;
+                        quitadas += lineas;
                         cambio = true;
                         avisos.Add(Aviso(edicion, titulos, ahora));
                         break;
                     case ResultadoDeRetiro.Anotada:
-                        anotadas++;
+                        anotadas += lineas;
                         cambio = true;
                         break;
                 }

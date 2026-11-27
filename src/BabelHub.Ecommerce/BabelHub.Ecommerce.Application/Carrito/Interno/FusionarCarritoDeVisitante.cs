@@ -105,7 +105,7 @@ internal sealed class FusionarCarritoDeVisitante(ServiciosDelCarrito servicios) 
 
     private async Task<(ErrorDeAplicacion? Error, Terreno? Valor)> ObtenerTerreno(CarritoDeDominio visitante, Guid cuenta, CancellationToken cancelacion)
     {
-        var ids = visitante.Lineas.Select(l => l.EdicionId).ToList();
+        var ids = visitante.Lineas.Select(l => l.EdicionId).Distinct().ToList();
         if (ids.Count == 0)
         {
             return (null, new Terreno(new Dictionary<Guid, EdicionConsultada>(), new Dictionary<Guid, EdicionParaFusion>(), new HashSet<Guid>()));
@@ -119,7 +119,7 @@ internal sealed class FusionarCarritoDeVisitante(ServiciosDelCarrito servicios) 
 
         var ediciones = consulta.Valor.ToDictionary(e => e.EdicionId);
         var impresas = ids.Where(id => ediciones.TryGetValue(id, out var e) && e.Formato == FormatoDeEdicion.Impresa).ToList();
-        var maximos = new Dictionary<Guid, int?>();
+        var vendibles = new Dictionary<Guid, IReadOnlyDictionary<string, int>?>();
         if (impresas.Count > 0)
         {
             var disponibilidad = await servicios.Disponibilidad.Consultar(impresas, cancelacion).ConfigureAwait(false);
@@ -127,7 +127,7 @@ internal sealed class FusionarCarritoDeVisitante(ServiciosDelCarrito servicios) 
             {
                 foreach (var dato in disponibilidad.Valor)
                 {
-                    maximos[dato.EdicionId] = ServiciosDelCarrito.MaximoConocido(dato);
+                    vendibles[dato.EdicionId] = ServiciosDelCarrito.VendiblePorSucursal(dato);
                 }
             }
         }
@@ -149,7 +149,7 @@ internal sealed class FusionarCarritoDeVisitante(ServiciosDelCarrito servicios) 
             if (ediciones.TryGetValue(id, out var edicion))
             {
                 var esVendible = edicion.Estado == EstadoDeEdicionConsultado.Activa && edicion.MotivoDeNoDisponible is null;
-                paraLaFusion[id] = new EdicionParaFusion(id, edicion.Formato == FormatoDeEdicion.Digital, esVendible, maximos.GetValueOrDefault(id));
+                paraLaFusion[id] = new EdicionParaFusion(id, edicion.Formato == FormatoDeEdicion.Digital, esVendible, vendibles.GetValueOrDefault(id));
             }
         }
 

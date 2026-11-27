@@ -18,7 +18,11 @@ public sealed record LineaDeRevisionPintada(
     string ImporteTexto,
     DisponibilidadVista Disponibilidad,
     string? Plazo,
-    bool Retirada);
+    bool Retirada,
+    string? Sucursal);
+
+/// <summary>El envío a domicilio de una sucursal, listo para pintar.</summary>
+public sealed record EnvioPintado(string Sucursal, string ImporteTexto);
 
 /// <summary>Un paso de la barra de progreso: nunca depende solo del color (el actual lleva <c>aria-current</c> y el hecho su texto).</summary>
 public sealed record PasoPintado(string Nombre, bool Actual, bool Hecho);
@@ -42,6 +46,9 @@ public sealed class CheckoutVista : ModeloBaseDePagina
 
     public string EnvioTexto { get; set; } = string.Empty;
 
+    /// <summary>El desglose del envío por sucursal, cuando se puede mostrar (CAR-09).</summary>
+    public IReadOnlyList<EnvioPintado> Envios { get; set; } = [];
+
     public string TotalTexto { get; set; } = string.Empty;
 
     /// <summary>El total que la persona ve, con punto decimal: lo que viaja oculto para compararlo al pagar (D17).</summary>
@@ -58,9 +65,6 @@ public sealed class CheckoutVista : ModeloBaseDePagina
 
     /// <summary>Alguna línea impide pagar (retirada o agotada): se dice y se ofrece volver al carrito.</summary>
     public bool HayProblema { get; set; }
-
-    /// <summary>Las sucursales de recojo que se pueden elegir (código y nombre), de la lista de sucursales.</summary>
-    public IReadOnlyList<SucursalElegible> SucursalesDeRecojo { get; set; } = [];
 
     public IReadOnlyList<TextoParaAceptar> Textos { get; set; } = [];
 
@@ -93,7 +97,8 @@ public static class ConstructorDeLaVistaDelCheckout
         modelo.RequiereEntrega = modelo.HayImpresos;
         modelo.Lineas = [.. vista.Lineas.Select(ALaLinea)];
         modelo.StockNoValidable = vista.Lineas.Any(l => l.Disponibilidad == DisponibilidadDeLineaDeCheckout.NoSePuedeValidar);
-        modelo.HayProblema = vista.Lineas.Any(l => l.Retirada || l.Disponibilidad == DisponibilidadDeLineaDeCheckout.Agotada);
+        modelo.HayProblema = vista.TieneLineasSinSucursal || vista.Lineas.Any(l => l.Retirada || l.Disponibilidad == DisponibilidadDeLineaDeCheckout.Agotada);
+        modelo.Envios = [.. (vista.DesgloseDelEnvio ?? []).Select(e => new EnvioPintado(e.NombreDeSucursal ?? e.CodigoDeSucursal, FormatoPeruano.Soles(e.Importe)))];
         modelo.SubtotalTexto = FormatoPeruano.Soles(vista.Subtotal);
         modelo.TotalTexto = FormatoPeruano.Soles(vista.Total);
         modelo.TotalVisto = vista.Total.ToString("0.00", CultureInfo.InvariantCulture);
@@ -120,16 +125,16 @@ public static class ConstructorDeLaVistaDelCheckout
         var digital = l.Formato == FormatoDeEdicion.Digital;
         var (disponibilidad, plazo) = l.Disponibilidad switch
         {
-            DisponibilidadDeLineaDeCheckout.EnSuSucursal => (new DisponibilidadVista(EstadoDeDisponibilidad.EnTuSucursal, "En tu sucursal", "exito", "badge-success"), null),
+            DisponibilidadDeLineaDeCheckout.EnSuSucursal => (new DisponibilidadVista(EstadoDeDisponibilidad.EnLaSucursal, "Disponible en su sucursal", "exito", "badge-success"), null),
             DisponibilidadDeLineaDeCheckout.PorTraslado => (
                 new DisponibilidadVista(EstadoDeDisponibilidad.EnOtrasSucursales, "Se trae de otra sucursal", "sucursal", "badge-info"),
                 l.PlazoAConfirmar ? "Plazo a confirmar" : l.PlazoInformadoDias is { } dias ? $"Plazo estimado: {dias} {(dias == 1 ? "día" : "días")}" : null),
             DisponibilidadDeLineaDeCheckout.Agotada => (DisponibilidadVista.Agotado(), null),
             DisponibilidadDeLineaDeCheckout.DisponibleAlInstante => (DisponibilidadVista.DisponibleAlInstante(), null),
             DisponibilidadDeLineaDeCheckout.NoSePuedeValidar => (new DisponibilidadVista(EstadoDeDisponibilidad.NoSePuedeConfirmar, "No se puede validar el stock ahora", "aviso", "badge-warning"), null),
-            _ => (new DisponibilidadVista(EstadoDeDisponibilidad.EnLaRed, "Hay stock; la fuente se confirma al elegir la entrega", "exito", "badge-success"), null),
+            _ => (new DisponibilidadVista(EstadoDeDisponibilidad.EnLaSucursal, "Con stock; se confirma al pagar", "exito", "badge-success"), null),
         };
-        return new LineaDeRevisionPintada(l.Titulo, digital ? "Libro digital" : "Libro impreso", l.Cantidad, FormatoPeruano.Soles(l.PrecioUnitario), FormatoPeruano.Soles(l.Importe), disponibilidad, plazo, l.Retirada);
+        return new LineaDeRevisionPintada(l.Titulo, digital ? "Libro digital" : "Libro impreso", l.Cantidad, FormatoPeruano.Soles(l.PrecioUnitario), FormatoPeruano.Soles(l.Importe), disponibilidad, plazo, l.Retirada, l.NombreDeSucursal);
     }
 }
 

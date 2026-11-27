@@ -66,6 +66,8 @@ public sealed class PagosYPedidosRealesTests(PostgresDelEcommerceCompletoFixture
         servicios.AddSingleton<IReloj>(_reloj);
         servicios.RemoveAll<IInventarioDelCarrito>();
         servicios.AddSingleton<IInventarioDelCarrito>(_inventarioDelCarrito);
+        servicios.RemoveAll<BabelHub.Ecommerce.Application.Web.IPreferenciaDeSucursal>();
+        servicios.AddSingleton(BabelHub.IntegrationTests.Carrito.SucursalesDelCarrito.Preferencia());
         servicios.RemoveAll<IReservasDelPago>();
         servicios.AddSingleton<IReservasDelPago>(new ReservasConRegistroDeLiberaciones(_reservasDelPago, _liberaciones));
         servicios.RemoveAll<IReservasDelPedido>();
@@ -101,9 +103,9 @@ public sealed class PagosYPedidosRealesTests(PostgresDelEcommerceCompletoFixture
     {
         var cuenta = await SembrarCuenta();
         var textos = await TextosVigentes(anfitrion);
-        Assert.True((await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICarritoDelCliente>().AgregarLinea(new AgregarLineaEntrada(EdicionImpresa, 1)))).EsExito);
+        Assert.True((await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICarritoDelCliente>().AgregarLinea(new AgregarLineaEntrada(EdicionImpresa, 1, CodigoDeSucursal: "sede-central")))).EsExito);
         Assert.True((await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().Iniciar(new IniciarCheckoutEntrada()))).EsExito);
-        var entrega = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().ElegirEntrega(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, null, new ContactoDeCompra(NombreDelContacto, "987654321", "Jr. Ficticio 123, Ayacucho", "ayacucho"))));
+        var entrega = await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().ElegirEntrega(new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, new ContactoDeCompra(NombreDelContacto, "987654321", "Jr. Ficticio 123, Ayacucho", "ayacucho"))));
         Assert.True(entrega.EsExito, entrega.Error?.Clave);
         Assert.True((await anfitrion.Como(DelCliente(cuenta), sp => sp.GetRequiredService<ICheckoutDelCliente>().RegistrarAceptaciones(new RegistrarAceptacionesEntrada(textos)))).EsExito);
         var total = entrega.Valor.Total;

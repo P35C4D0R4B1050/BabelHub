@@ -25,7 +25,7 @@ public enum TipoDeResultadoDelPaso
 }
 
 /// <summary>Lo que el Inventario informó de una línea al reservar, para guardarlo como lo nuevo informado cuando cambió el plazo o la fuente (CAR-27).</summary>
-public sealed record InformadoPorLaReserva(Guid EdicionId, string? CodigoDeFuente, bool RequiereTraslado, int? PlazoDias);
+public sealed record InformadoPorLaReserva(Guid LineaId, string? CodigoDeFuente, bool RequiereTraslado, int? PlazoDias);
 
 public sealed record ResultadoDelPasoDeReserva(
     TipoDeResultadoDelPaso Tipo,
@@ -56,7 +56,7 @@ internal sealed class ReservarImpresos(ServiciosDelCheckout servicios)
             case TipoDeResultadoDeReservar.Reservada:
                 return Revisar(respuesta.Reserva!, preparado, ahora);
             case TipoDeResultadoDeReservar.StockInsuficiente:
-                return Abortar("falta-de-stock", Rechazo([.. respuesta.SinStock!.SelectMany(l => new[] { new ErrorDeCampo("edicionId", l.EdicionId.ToString("D")), new ErrorDeCampo("maximo", l.DisponibleEnLaRed.ToString(CultureInfo.InvariantCulture)) })]));
+                return Abortar("falta-de-stock", Rechazo([.. respuesta.SinStock!.SelectMany(l => FaltaDeStock(l, preparado))]));
             case TipoDeResultadoDeReservar.EnCurso:
                 return new ResultadoDelPasoDeReserva(TipoDeResultadoDelPaso.NoAbortar, Error: new ErrorDeAplicacion(CategoriaDeError.Conflicto, ClavesDelCarrito.EnCurso));
             case TipoDeResultadoDeReservar.ConflictoDeIdempotencia:
@@ -101,6 +101,14 @@ internal sealed class ReservarImpresos(ServiciosDelCheckout servicios)
             return Abortar("reserva-expirada", Rechazo([new ErrorDeCampo("motivo", "reserva-expirada")]));
         }
 
+        // Una línea nunca se atiende desde otra sucursal que la elegida (CAR-41): una fuente distinta es una falla del Inventario y aborta.
+        var declaradas = preparado.LineasImpresas.ToDictionary(l => l.LineaId, l => l.CodigoDeSucursal);
+        var reasignadas = reserva.Lineas.Where(s => declaradas.TryGetValue(s.LineaId, out var sucursal) && sucursal is not null && s.CodigoDeFuente != sucursal).ToList();
+        if (reasignadas.Count > 0)
+        {
+            return Abortar("fuente-distinta", Rechazo([.. reasignadas.Select(s => new ErrorDeCampo("edicionId", s.EdicionId.ToString("D"))), new ErrorDeCampo("motivo", "fuente-distinta")]));
+        }
+
         var informadas = preparado.Vista.Lineas.Where(l => l.Formato == FormatoDeEdicion.Impresa).ToDictionary(l => l.LineaId);
         var cambios = new List<InformadoPorLaReserva>();
         var errores = new List<ErrorDeCampo>();
@@ -114,7 +122,7 @@ internal sealed class ReservarImpresos(ServiciosDelCheckout servicios)
             var informadoTraslado = informada.Disponibilidad == DisponibilidadDeLineaDeCheckout.PorTraslado;
             if (informadoTraslado != seleccion.RequiereTraslado || informada.PlazoInformadoDias != seleccion.PlazoEstimadoDias)
             {
-                cambios.Add(new InformadoPorLaReserva(seleccion.EdicionId, seleccion.CodigoDeFuente, seleccion.RequiereTraslado, seleccion.PlazoEstimadoDias));
+                cambios.Add(new InformadoPorLaReserva(seleccion.LineaId, seleccion.CodigoDeFuente, seleccion.RequiereTraslado, seleccion.PlazoEstimadoDias));
                 errores.Add(new ErrorDeCampo("edicionId", seleccion.EdicionId.ToString("D")));
                 errores.Add(new ErrorDeCampo("plazoDias", seleccion.PlazoEstimadoDias?.ToString(CultureInfo.InvariantCulture) ?? "a-confirmar"));
             }
@@ -124,6 +132,14 @@ internal sealed class ReservarImpresos(ServiciosDelCheckout servicios)
             ? Abortar("plazo-cambiado", Rechazo(errores), cambios)
             : new ResultadoDelPasoDeReserva(TipoDeResultadoDelPaso.Reservada, reserva.ExpiraEn);
     }
+
+    /// <summary>Lo que se informa de una línea sin stock (CAR-27): la edición, la sucursal elegida y lo disponible en ella.</summary>
+    private static IEnumerable<ErrorDeCampo> FaltaDeStock(LineaSinStock linea, PasoAlPagoPreparado preparado) =>
+    [
+        new("edicionId", linea.EdicionId.ToString("D")),
+        new("sucursal", preparado.LineasImpresas.FirstOrDefault(l => l.LineaId == linea.LineaId)?.CodigoDeSucursal ?? string.Empty),
+        new("maximo", (linea.DisponibleEnLaSucursal ?? linea.DisponibleEnLaRed).ToString(CultureInfo.InvariantCulture)),
+    ];
 
     private static ErrorDeAplicacion Rechazo(IReadOnlyList<ErrorDeCampo> errores) => new(CategoriaDeError.Conflicto, ClavesDelCarrito.ReservaRechazada, errores);
 
@@ -241,7 +257,7 @@ internal sealed class AbortarElPasoAlPago(ServiciosDelCheckout servicios)
         // Un cambio de plazo o de fuente: lo devuelto por Reservar es lo nuevo informado, y un segundo intento avanza (CAR-27).
         foreach (var nuevo in solicitud.NuevoInformado ?? [])
         {
-            checkout.RegistrarLoInformado(nuevo.EdicionId, nuevo.CodigoDeFuente, nuevo.RequiereTraslado, nuevo.PlazoDias, ahora);
+            checkout.RegistrarLoInformado(nuevo.LineaId, nuevo.CodigoDeFuente, nuevo.RequiereTraslado, nuevo.PlazoDias, ahora);
         }
 
         await carrito.Checkouts.Guardar(checkout, cancelacion).ConfigureAwait(false);

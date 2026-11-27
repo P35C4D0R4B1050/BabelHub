@@ -26,7 +26,8 @@ internal sealed class ObtenerCheckout(ServiciosDelCheckout servicios) : ICasoDeU
 
         var (cuenta, vivo, delCarrito) = entro.Valor;
         var oferta = await servicios.Consentimiento.Consultar(cuenta, cancelacion).ConfigureAwait(false);
-        return Resultado<VistaDelCheckout>.Exito(servicios.Vista(vivo, delCarrito, null) with { ConsentimientoDeWhatsApp = ServiciosDelCheckout.DeOferta(oferta) });
+        var vista = await servicios.VistaActual(vivo, delCarrito, null, cancelacion).ConfigureAwait(false);
+        return Resultado<VistaDelCheckout>.Exito(vista with { ConsentimientoDeWhatsApp = ServiciosDelCheckout.DeOferta(oferta) });
     }
 }
 
@@ -55,6 +56,12 @@ internal sealed class RegistrarAceptaciones(ServiciosDelCheckout servicios) : IC
         if (ValidarForma(entrada) is { } invalida)
         {
             return Resultado<VistaDelCheckout>.Fallo(invalida);
+        }
+
+        // Una compra anterior a la venta por sucursal no avanza; reservando o en pago, además se aborta y libera su reserva (CAR-45).
+        if (await servicios.ResolverCompraAnterior(cuenta, vivo, delCarrito, cancelacion).ConfigureAwait(false) is { } anterior)
+        {
+            return Resultado<VistaDelCheckout>.Fallo(anterior);
         }
 
         if (ServiciosDelCheckout.ErrorDeEstado(vivo.Estado) is { } estado)
@@ -128,7 +135,8 @@ internal sealed class RegistrarAceptaciones(ServiciosDelCheckout servicios) : IC
 
         // 7. El consentimiento de WhatsApp: fuera de la transacción, sin exigirlo y siempre después de las comprobaciones de la cuenta.
         var consentimiento = await ResolverConsentimiento(cuenta, entrada, cancelacion).ConfigureAwait(false);
-        return Resultado<VistaDelCheckout>.Exito(servicios.Vista(checkout, delCarritoFinal, null) with { ConsentimientoDeWhatsApp = consentimiento });
+        var final = await servicios.VistaActual(checkout, delCarritoFinal, null, cancelacion).ConfigureAwait(false);
+        return Resultado<VistaDelCheckout>.Exito(final with { ConsentimientoDeWhatsApp = consentimiento });
     }
 
     private async Task<(Resultado<Checkout> Resultado, CarritoDeDominio? Carrito)> EnLaTransaccion(

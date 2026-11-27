@@ -28,9 +28,9 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
 
     public const string RutaDelEstadoDelPago = "/checkout/pago/estado";
 
-    private static readonly string[] CamposDeIniciar = ["sucursalPreferida"];
+    private static readonly string[] CamposDeIniciar = [];
 
-    private static readonly string[] CamposDeEntrega = ["tipoDeEntrega", "sucursal", "direccion", "region", "nombre", "telefono", "pedidoId"];
+    private static readonly string[] CamposDeEntrega = ["tipoDeEntrega", "direccion", "region", "nombre", "telefono", "pedidoId"];
 
     private static readonly string[] CamposDeSalir = ["pedidoId"];
 
@@ -57,13 +57,7 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
             return await Falla(error!, cancelacion);
         }
 
-        var sucursal = campos.GetValueOrDefault("sucursalPreferida");
-        if (sucursal is not null && (sucursal.Length is 0 or > 40 || sucursal.Any(char.IsControl)))
-        {
-            return await Falla(EntradasHttpDelCarrito.Invalido("sucursalPreferida"), cancelacion);
-        }
-
-        return await Terminar(await checkout.Iniciar(new IniciarCheckoutEntrada(sucursal), cancelacion), "/checkout", cancelacion);
+        return await Terminar(await checkout.Iniciar(new IniciarCheckoutEntrada(), cancelacion), "/checkout", cancelacion);
     }
 
     [HttpGet("/checkout")]
@@ -152,15 +146,10 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
             return await Falla(EntradasHttpDelCarrito.Invalido(contactoEnviado[0]), cancelacion);
         }
 
-        if (tipo != TipoDeEntregaDeCompra.Recojo && campos.ContainsKey("sucursal"))
-        {
-            return await Falla(EntradasHttpDelCarrito.Invalido("sucursal"), cancelacion);
-        }
-
         var contacto = tipo == TipoDeEntregaDeCompra.Domicilio
             ? new ContactoDeCompra(campos.GetValueOrDefault("nombre"), campos.GetValueOrDefault("telefono"), campos.GetValueOrDefault("direccion"), campos.GetValueOrDefault("region"))
             : null;
-        var elegida = await checkout.ElegirEntrega(new ElegirEntregaEntrada(tipo.Value, campos.GetValueOrDefault("sucursal"), contacto, pedidoId), cancelacion);
+        var elegida = await checkout.ElegirEntrega(new ElegirEntregaEntrada(tipo.Value, contacto, pedidoId), cancelacion);
         return elegida.EsExito ? Redirigir("/checkout") : await FallaEnLaPagina(elegida.Error!, campos, cancelacion);
     }
 
@@ -353,7 +342,6 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
     {
         var modelo = await pagina.Completar(new CheckoutVista(), "Tu compra", cancelacion: cancelacion);
         ConstructorDeLaVistaDelCheckout.Armar(modelo, vista);
-        modelo.SucursalesDeRecojo = modelo.Sucursales;
         modelo.Textos = await TextosParaAceptar(vista, modelo.HayDigitales, cancelacion);
         return modelo;
     }
@@ -408,7 +396,7 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
         var problema = ProblemasDelCarrito.Crear(HttpContext, errores, error);
         await DenegacionesHttp.Registrar(HttpContext, error.Categoria, error.Clave, problema.Code);
         var modelo = await Armar(actual.Valor, cancelacion);
-        PantallasDelCarrito.AplicarElFallo(modelo, problema, error, campos);
+        PantallasDelCarrito.AplicarElFallo(modelo, problema, error, campos, DetalleDeLaFalta(error, actual.Valor));
         Response.StatusCode = Request.EsHtmx() ? StatusCodes.Status200OK : problema.Status;
         Response.Headers.CacheControl = "no-store";
         if (error.Categoria == CategoriaDeError.Limite)
@@ -420,11 +408,26 @@ public sealed partial class CheckoutController(ICheckoutDelCliente checkout, IEx
         return View("Index", modelo);
     }
 
+    /// <summary>El libro y la sucursal de un rechazo por falta de stock (CAR-27), tomados de las líneas de la compra.</summary>
+    private static DetalleDelStock? DetalleDeLaFalta(ErrorDeAplicacion error, VistaDelCheckout vista)
+    {
+        var sucursal = error.Errores.FirstOrDefault(e => e.Campo == "sucursal")?.Clave;
+        if (sucursal is null)
+        {
+            return null;
+        }
+
+        var edicion = Guid.TryParseExact(error.Errores.FirstOrDefault(e => e.Campo == "edicionId")?.Clave, "D", out var id) ? id : (Guid?)null;
+        var linea = vista.Lineas.FirstOrDefault(l => l.CodigoDeSucursal == sucursal && (edicion is null || l.EdicionId == edicion));
+        return linea is null ? null : new DetalleDelStock(linea.NombreDeSucursal, linea.Titulo);
+    }
+
     private async Task<IActionResult> Falla(ErrorDeAplicacion error, CancellationToken cancelacion)
     {
         if (PantallasDelCarrito.PrefiereHtml(Request))
         {
-            return await PantallasDelCarrito.Escribir(this, pagina, errores, error, "/checkout", cancelacion);
+            var vista = error.Errores.Any(e => e.Campo == "sucursal") ? await checkout.Obtener(cancelacion) : null;
+            return await PantallasDelCarrito.Escribir(this, pagina, errores, error, "/checkout", cancelacion, vista is { EsExito: true } ? DetalleDeLaFalta(error, vista.Valor) : null);
         }
 
         await ProblemasDelCarrito.Escribir(HttpContext, errores, error);

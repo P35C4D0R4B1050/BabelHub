@@ -74,7 +74,7 @@ public sealed class DisponibilidadDelCarrito : IDisponibilidadDeEdiciones
         IReadOnlyList<DisponibilidadDeEdicion> respuesta =
         [
             .. edicionIds.Select(id => _vendible.TryGetValue(id, out var v)
-                ? new DisponibilidadDeEdicion(id, v > 0 ? EstadoDeDisponibilidad.Disponible : EstadoDeDisponibilidad.Agotada, v, [], FrescuraDeLaDisponibilidad.Reciente, DateTimeOffset.UnixEpoch, null)
+                ? new DisponibilidadDeEdicion(id, v > 0 ? EstadoDeDisponibilidad.Disponible : EstadoDeDisponibilidad.Agotada, v, [new DisponibilidadPorFuente(AtajosDeCarrito.Sucursal, "Sede central", v)], FrescuraDeLaDisponibilidad.Reciente, DateTimeOffset.UnixEpoch, null)
                 : new DisponibilidadDeEdicion(id, EstadoDeDisponibilidad.DisponibleAlInstante, null, [], FrescuraDeLaDisponibilidad.Reciente, null, null)),
         ];
         return Task.FromResult(Resultado<IReadOnlyList<DisponibilidadDeEdicion>>.Exito(respuesta));
@@ -291,6 +291,7 @@ public sealed class EntornoDelCarritoConPostgres : IAsyncDisposable
         servicios.AddSingleton<ICreadorDeIntencionesDePago>(Pagos);
         servicios.AddSingleton<IInventarioDelCarrito>(InventarioDeLasPruebas);
         servicios.AddSingleton<ITextosLegales>(Textos);
+        servicios.AddSingleton(SucursalesDelCarrito.Preferencia());
         servicios.AddSingleton<IMarcaDeCancelacion>(Marca);
         servicios.AddSingleton<IAuditoriaDelCarrito>(Auditoria);
         servicios.AddSingleton<IAlertasDelCarrito>(Alertas);
@@ -409,7 +410,11 @@ public sealed class EntornoDelCarritoConPostgres : IAsyncDisposable
     }
 
     public Task<Resultado<ResultadoDeCarrito>> Agregar(Guid? cuenta, Guid edicion, int cantidad, string? cookie = null) =>
-        Como(cuenta, sp => sp.GetRequiredService<ICarritoDelCliente>().AgregarLinea(new AgregarLineaEntrada(edicion, cantidad, cuenta is null ? cookie : null)));
+        Como(cuenta, sp => sp.GetRequiredService<ICarritoDelCliente>().AgregarLinea(new AgregarLineaEntrada(edicion, cantidad, cuenta is null ? cookie : null, CodigoDeSucursal: "sede-central")));
+
+    /// <summary>El identificador de la única línea de una edición en el carrito de la cuenta.</summary>
+    public async Task<Guid> LineaDe(Guid cuenta, Guid edicion) =>
+        (await Como(cuenta, sp => sp.GetRequiredService<ICarritoDelCliente>().Obtener(new SolicitudSobreElCarrito()))).Valor.Carrito.Lineas.Single(l => l.EdicionId == edicion).LineaId;
 
     public static readonly TextoVistoDeCompra[] LosDosTextos = [new(TextoLegalDeCompra.Terminos, "t-1"), new(TextoLegalDeCompra.Privacidad, "p-1")];
 
@@ -419,12 +424,14 @@ public sealed class EntornoDelCarritoConPostgres : IAsyncDisposable
     public async Task<VistaDelCheckout> PrepararCheckout(Guid cuenta, bool domicilio = false, bool conDigitales = false)
     {
         var textos = conDigitales ? LosTresTextos : LosDosTextos;
-        await Como(cuenta, sp => sp.GetRequiredService<ICheckoutDelCliente>().Iniciar(new IniciarCheckoutEntrada()));
+        var inicio = await Como(cuenta, sp => sp.GetRequiredService<ICheckoutDelCliente>().Iniciar(new IniciarCheckoutEntrada()));
+        Assert.True(inicio.EsExito, $"Iniciar: {inicio.Error?.Clave}");
         var entrega = domicilio
-            ? new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, null, new ContactoDeCompra("Ana Pérez Quispe", "987654321", "Jr. Lima 123", "ayacucho"))
-            : new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, "sede-central", null);
+            ? new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Domicilio, new ContactoDeCompra("Ana Pérez Quispe", "987654321", "Jr. Lima 123", "ayacucho"))
+            : new ElegirEntregaEntrada(TipoDeEntregaDeCompra.Recojo, null);
         var vista = await Como(cuenta, sp => sp.GetRequiredService<ICheckoutDelCliente>().ElegirEntrega(entrega));
         await Como(cuenta, sp => sp.GetRequiredService<ICheckoutDelCliente>().RegistrarAceptaciones(new RegistrarAceptacionesEntrada(textos)));
+        Assert.True(vista.EsExito, $"ElegirEntrega: {vista.Error?.Clave}");
         return vista.Valor;
     }
 

@@ -17,7 +17,7 @@ public sealed class CorreccionesDeLaRevisionDeEco4aTests
 
     private static Guid Edicion(int n) => new(n, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1);
 
-    private static LineaParaCheckout Impreso(int n) => new(Edicion(n), false, $"Libro {n}", "9780000000019", 1, 50m);
+    private static LineaParaCheckout Impreso(int n) => new(Edicion(n), false, $"Libro {n}", "9780000000019", 1, 50m, Edicion(n), Sucursal.Principal);
 
     private static LineaParaCheckout Digital(int n) => new(Edicion(n), true, $"Digital {n}", "9780000000026", 1, 20m);
 
@@ -202,32 +202,28 @@ public sealed class CorreccionesDeLaRevisionDeEco4aTests
     // ---------------------------------------------------------------- texto de la entrega
 
     [Theory]
-    [InlineData("lima", "lima")]
-    [InlineData("  lima  ", "lima")]
-    public void El_codigo_de_la_sucursal_de_recojo_se_recorta_de_espacios(string texto, string esperado)
-    {
-        var checkout = ADomicilio();
-
-        checkout.ElegirRecojo(texto, Ahora.AddMinutes(1));
-
-        Assert.Equal(esperado, checkout.CodigoDeSucursalDeRecojo);
-    }
-
-    [Theory]
     [InlineData("li\nma")]
     [InlineData("lima\n")]
     [InlineData("li\tma")]
     [InlineData("   ")]
-    public void Un_codigo_de_sucursal_con_caracteres_de_control_o_vacio_se_rechaza(string texto) =>
-        Assert.Throws<ArgumentException>(() => ADomicilio().ElegirRecojo(texto, Ahora));
+    [InlineData("  lima  ")]
+    [Trait("Criterio", "AC-CAR-34")]
+    public void Un_codigo_de_sucursal_vacio_con_espacios_o_con_caracteres_de_control_no_entra_en_una_linea(string texto)
+    {
+        var carrito = Carrito();
+        var antes = carrito.Lineas.Count;
+
+        Assert.Equal(RechazoDeCarrito.SucursalRequerida, carrito.Agregar(Guid.NewGuid(), Edicion(9), esDigital: false, texto, 1, Ahora).Rechazo);
+        Assert.Equal(antes, carrito.Lineas.Count);
+    }
 
     [Fact]
     public void Un_codigo_de_sucursal_de_mas_de_40_caracteres_se_rechaza_y_uno_de_40_se_acepta()
     {
-        Assert.Throws<ArgumentException>(() => ADomicilio().ElegirRecojo(new string('s', 41), Ahora));
-        var checkout = ADomicilio();
-        checkout.ElegirRecojo(new string('s', 40), Ahora);
-        Assert.Equal(40, checkout.CodigoDeSucursalDeRecojo!.Length);
+        var carrito = Carrito();
+
+        Assert.Equal(RechazoDeCarrito.SucursalRequerida, carrito.Agregar(Guid.NewGuid(), Edicion(9), esDigital: false, new string('s', 41), 1, Ahora).Rechazo);
+        Assert.True(carrito.Agregar(Guid.NewGuid(), Edicion(9), esDigital: false, new string('s', 40), 1, Ahora).EsExito);
     }
 
     [Theory]

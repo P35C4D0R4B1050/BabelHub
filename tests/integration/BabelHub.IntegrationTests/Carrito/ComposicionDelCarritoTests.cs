@@ -40,6 +40,7 @@ public sealed class ComposicionDelCarritoTests
         servicios.AddSingleton(Doble<IReloj>());
         servicios.AddSingleton(Doble<IClienteDelInventario>());
         servicios.AddSingleton(Doble<ITextosLegales>());
+        servicios.AddSingleton(Doble<BabelHub.Ecommerce.Application.Web.IPreferenciaDeSucursal>());
         servicios.AddSingleton(Doble<ICalculadorDeHuella>());
         servicios.AddSingleton(Doble<IRegistroDeTrabajosDeFondo>());
         return servicios;

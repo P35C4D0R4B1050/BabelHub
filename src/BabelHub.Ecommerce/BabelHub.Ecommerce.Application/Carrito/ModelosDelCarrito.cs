@@ -57,8 +57,12 @@ public enum TipoDeAvisoDelCarrito
 /// <summary>Un aviso persistente del carrito que se muestra hasta que la persona lo marque como visto (sin datos personales).</summary>
 public sealed record AvisoDelCarrito(Guid Id, TipoDeAvisoDelCarrito Tipo, Guid EdicionId, string Titulo, MotivoDeAjusteDeAviso? Motivo, int? CantidadFinal, DateTimeOffset CreadoEn);
 
-/// <summary>Una línea del carrito tal como la ve la persona: precio vigente, importe y disponibilidad con su frescura (CAR-03, CAR-04). <see cref="Retirada"/> es una línea con retiro pendiente: ya cuenta como retirada.</summary>
+/// <summary>
+/// Una línea del carrito tal como la ve la persona: precio vigente, importe y disponibilidad con su frescura (CAR-03, CAR-04). <see cref="Retirada"/> es una línea con retiro pendiente: ya cuenta como retirada. Un impreso dice la sucursal
+/// que lo atiende (CAR-44), lo vendible en ella si se pudo confirmar y el máximo al que puede subir esta línea; <see cref="SinSucursal"/> es una línea anterior a la venta por sucursal, que se pide quitar y volver a agregar (CAR-45).
+/// </summary>
 public sealed record LineaDelCarritoVista(
+    Guid LineaId,
     Guid EdicionId,
     string Titulo,
     string? Isbn,
@@ -67,7 +71,12 @@ public sealed record LineaDelCarritoVista(
     decimal PrecioUnitario,
     decimal Importe,
     DisponibilidadDeEdicion? Disponibilidad,
-    bool Retirada);
+    bool Retirada,
+    string? CodigoDeSucursal = null,
+    string? NombreDeSucursal = null,
+    int? VendibleEnLaSucursal = null,
+    int? MaximoEditable = null,
+    bool SinSucursal = false);
 
 /// <summary>El carrito de la cuenta o del visitante: sus líneas, el subtotal (sin envío) y los avisos sin ver. <see cref="PreciosNoConfirmados"/> es verdadero cuando el Catálogo no respondió: los precios y el subtotal no se pueden mostrar y ninguna línea se marca como retirada por ese motivo. Una lectura no tiene efectos (CAR-25).</summary>
 public sealed record VistaDelCarrito(IReadOnlyList<LineaDelCarritoVista> Lineas, decimal Subtotal, IReadOnlyList<AvisoDelCarrito> Avisos, bool HayUnaCompraEnCurso, bool PreciosNoConfirmados = false);
@@ -85,7 +94,8 @@ public sealed record SolicitudSobreElCarrito(string? CookieDelVisitante = null)
     }
 }
 
-public sealed record AgregarLineaEntrada(Guid EdicionId, int Cantidad, string? CookieDelVisitante = null)
+/// <summary>Agregar al carrito: un impreso lleva la sucursal que lo atenderá (CAR-39); en una digital se ignora.</summary>
+public sealed record AgregarLineaEntrada(Guid EdicionId, int Cantidad, string? CookieDelVisitante = null, string? CodigoDeSucursal = null)
 {
     /// <summary>La cookie del visitante es una capacidad: no se imprime.</summary>
     private bool PrintMembers(System.Text.StringBuilder constructor)
@@ -95,20 +105,20 @@ public sealed record AgregarLineaEntrada(Guid EdicionId, int Cantidad, string? C
     }
 }
 
-public sealed record ModificarLineaEntrada(Guid EdicionId, int Cantidad, string? CookieDelVisitante = null)
+public sealed record ModificarLineaEntrada(Guid LineaId, int Cantidad, string? CookieDelVisitante = null)
 {
     private bool PrintMembers(System.Text.StringBuilder constructor)
     {
-        constructor.Append("EdicionId = ").Append(EdicionId).Append(", Cantidad = ").Append(Cantidad);
+        constructor.Append("LineaId = ").Append(LineaId).Append(", Cantidad = ").Append(Cantidad);
         return true;
     }
 }
 
-public sealed record EliminarLineaEntrada(Guid EdicionId, string? CookieDelVisitante = null)
+public sealed record EliminarLineaEntrada(Guid LineaId, string? CookieDelVisitante = null)
 {
     private bool PrintMembers(System.Text.StringBuilder constructor)
     {
-        constructor.Append("EdicionId = ").Append(EdicionId);
+        constructor.Append("LineaId = ").Append(LineaId);
         return true;
     }
 }
@@ -213,8 +223,8 @@ public sealed record InstantaneaDeCompra(
 
 // ---------- Checkout ----------
 
-/// <summary>Lo que pide quien entra a la revisión: la sucursal preferida (código, opcional) con la que se muestra cada línea «en su sucursal» o «por traslado» (AC-CAR-04).</summary>
-public sealed record IniciarCheckoutEntrada(string? CodigoDeSucursalPreferida = null);
+/// <summary>Lo que pide quien entra a la revisión: nada; cada línea ya dice la sucursal que la atiende (CAR-39).</summary>
+public sealed record IniciarCheckoutEntrada;
 
 public enum DisponibilidadDeLineaDeCheckout
 {
@@ -239,7 +249,12 @@ public sealed record LineaDeRevision(
     DisponibilidadDeLineaDeCheckout Disponibilidad,
     int? PlazoInformadoDias,
     bool PlazoAConfirmar,
-    bool Retirada);
+    bool Retirada,
+    string? CodigoDeSucursal = null,
+    string? NombreDeSucursal = null);
+
+/// <summary>El costo de envío a domicilio de una sucursal que atiende alguna línea (CAR-09, CAR-23).</summary>
+public sealed record EnvioDeSucursalDeCompra(string CodigoDeSucursal, string? NombreDeSucursal, decimal Importe);
 
 /// <summary>El checkout en curso tal como lo ve la persona. <see cref="PedidoId"/> solo viaja en <c>en_pago</c> y <c>pago_pendiente</c>, y en <c>en_pago</c> no cuando una línea tiene retiro pendiente (CAR-10, CAR-26).</summary>
 public sealed record VistaDelCheckout(
@@ -259,10 +274,12 @@ public sealed record VistaDelCheckout(
     DateTimeOffset? ReservaExpiraEn,
     Guid? PedidoId,
     bool CarritoCambio,
-    ConsentimientoDeWhatsAppDeCompra? ConsentimientoDeWhatsApp = null);
+    ConsentimientoDeWhatsAppDeCompra? ConsentimientoDeWhatsApp = null,
+    IReadOnlyList<EnvioDeSucursalDeCompra>? DesgloseDelEnvio = null,
+    bool TieneLineasSinSucursal = false);
 
-/// <summary>La entrega elegida: recojo con el código de una sucursal, domicilio con el contacto (dirección y región incluidas) o solo digital (CAR-07 a CAR-09, CAR-30).</summary>
-public sealed record ElegirEntregaEntrada(TipoDeEntregaDeCompra Tipo, string? CodigoDeSucursalDeRecojo, ContactoDeCompra? Contacto, Guid? PedidoId = null);
+/// <summary>La entrega elegida: recojo (cada línea en su sucursal), domicilio con el contacto (dirección y región incluidas) o solo digital (CAR-07 a CAR-09, CAR-30).</summary>
+public sealed record ElegirEntregaEntrada(TipoDeEntregaDeCompra Tipo, ContactoDeCompra? Contacto = null, Guid? PedidoId = null);
 
 /// <summary>Un texto con la versión que la persona vio al aceptarlo: se compara con la vigente de Identidad (CAR-28).</summary>
 public sealed record TextoVistoDeCompra(TextoLegalDeCompra Texto, string VersionVista);

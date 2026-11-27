@@ -59,20 +59,20 @@ public sealed record RespuestaDelInventarioDelCarrito<T>
     public static RespuestaDelInventarioDelCarrito<T> SinRespuesta { get; } = new(EstadoDeRespuestaDelInventarioDelCarrito.NoDisponible, default, null, null);
 }
 
-/// <summary>El stock vendible de una edición impresa según el Inventario, sin memoria (CAR-05).</summary>
-public sealed record StockDeEdicion(Guid EdicionId, int VendibleEnLaRed);
+/// <summary>El stock vendible de una edición impresa según el Inventario, sin memoria (CAR-05): en la red y en cada sucursal (la que no aparece no tiene unidades).</summary>
+public sealed record StockDeEdicion(Guid EdicionId, int VendibleEnLaRed, IReadOnlyDictionary<string, int> VendiblePorSucursal);
 
 /// <summary>La disponibilidad real de varias ediciones: las que el Inventario no conoce (<c>noRegistradas</c>) se tratan como agotadas (CAR-05).</summary>
 public sealed record StockDeVariasEdiciones(IReadOnlyList<StockDeEdicion> Ediciones, IReadOnlyList<Guid> NoRegistradas, DateTimeOffset ConsultadaEn);
 
-/// <summary>Una línea impresa que se consulta o se reserva: el <c>lineaId</c> estable que asigna Carrito (D04).</summary>
-public sealed record LineaParaElInventario(Guid LineaId, Guid EdicionId, int Cantidad);
+/// <summary>Una línea impresa que se consulta o se reserva: el <c>lineaId</c> estable que asigna Carrito (D04) y la sucursal que la persona eligió (CAR-39).</summary>
+public sealed record LineaParaElInventario(Guid LineaId, Guid EdicionId, int Cantidad, string? CodigoDeSucursal = null);
 
-/// <summary>La entrega con la que se consulta o se reserva: recojo con el código de sucursal, o domicilio con la región en minúsculas y con guiones (la misma de la fuente).</summary>
-public sealed record EntregaParaElInventario(TipoDeEntrega Tipo, string? CodigoDeSucursalDeRecojo, string? RegionDeEntrega);
+/// <summary>La entrega con la que se consulta o se reserva: recojo (cada línea en su sucursal) o domicilio con la región en minúsculas y con guiones.</summary>
+public sealed record EntregaParaElInventario(TipoDeEntrega Tipo, string? RegionDeEntrega);
 
 /// <summary>Lo que el Inventario seleccionaría o reservó para una línea (nunca se divide entre fuentes): fuente, si implica traslado y su plazo (<see langword="null"/> es «a confirmar», FUE-13).</summary>
-public sealed record SeleccionDeLinea(Guid LineaId, Guid EdicionId, bool HayStock, string? CodigoDeFuente, bool RequiereTraslado, int? PlazoEstimadoDias, int DisponibleEnLaRed);
+public sealed record SeleccionDeLinea(Guid LineaId, Guid EdicionId, bool HayStock, string? CodigoDeFuente, bool RequiereTraslado, int? PlazoEstimadoDias, int DisponibleEnLaRed, int? DisponibleEnLaSucursal = null);
 
 public sealed record ConsultaPreviaDelInventario(IReadOnlyList<SeleccionDeLinea> Lineas, DateTimeOffset ConsultadaEn);
 
@@ -109,7 +109,7 @@ public enum TipoDeResultadoDeReservar
     NoDisponible,
 }
 
-public sealed record LineaSinStock(Guid LineaId, Guid EdicionId, int Solicitada, int DisponibleEnLaRed);
+public sealed record LineaSinStock(Guid LineaId, Guid EdicionId, int Solicitada, int DisponibleEnLaRed, int? DisponibleEnLaSucursal = null);
 
 public sealed record ReservaObtenida(Guid PedidoId, DateTimeOffset ExpiraEn, IReadOnlyList<SeleccionDeLinea> Lineas, bool EsRepeticion);
 
@@ -349,11 +349,26 @@ public interface IAuditoriaDelCarrito
 /// </summary>
 public sealed class CarritoYaExisteException() : Exception("El carrito ya existe: otro dispositivo lo creó a la vez.");
 
+// ---------- Tarifas de envío ----------
+
+/// <summary>
+/// Los costos de envío propios de cada sucursal (<c>carrito.tarifas_de_envio</c>, CAR-46, CAR-47): una sucursal sin fila cobra el predeterminado. <see cref="Fijar"/> escribe el nuevo y devuelve el propio anterior <b>en la misma
+/// operación</b> y con la fila bloqueada, de modo que la auditoría registre el importe que de verdad reemplazó.
+/// </summary>
+public interface IRepositorioDeTarifasDeEnvio
+{
+    /// <summary>Las tarifas propias por código de sucursal, leídas de una sola vez (dentro de la transacción en curso, si la hay).</summary>
+    Task<IReadOnlyDictionary<string, CostoDeEnvio>> Leer(CancellationToken cancelacion = default);
+
+    /// <summary>Fija el costo propio de la sucursal y devuelve el anterior, o <see langword="null"/> si no tenía. Dentro de la transacción en curso.</summary>
+    Task<CostoDeEnvio?> Fijar(string codigoDeSucursal, CostoDeEnvio costo, DateTimeOffset ahora, CancellationToken cancelacion = default);
+}
+
 // ---------- Opciones ----------
 
 /// <summary>
-/// El costo de envío fijo configurado (<c>Carrito:CostoDeEnvio</c>, CAR-23): soles con dos decimales y no negativo, validado al arrancar. Se lee al elegir el domicilio y se <b>congela</b> al pasar al pago; uno por pedido a
-/// domicilio. No es un puerto de un tercero sino una opción tipada: la Infraestructura lee la configuración y la Aplicación solo ve este valor.
+/// El costo de envío <b>predeterminado</b> (<c>Carrito:CostoDeEnvio</c>, CAR-47): lo cobra toda sucursal sin uno propio. Soles con dos decimales y no negativo, validado al arrancar y modificable sin cambiar el código. Se lee al
+/// mostrar y al <b>congelar</b> el envío. No es un puerto de un tercero sino una opción tipada: la Infraestructura lee la configuración y la Aplicación solo ve este valor.
 /// </summary>
 public interface ICostoDeEnvioConfigurado
 {

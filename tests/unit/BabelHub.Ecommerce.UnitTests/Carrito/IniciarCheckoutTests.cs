@@ -22,14 +22,14 @@ public sealed class IniciarCheckoutTests
         var cuenta = e.Actor.Actual!.UsuarioId!.Value;
         foreach (var (edicion, cantidad) in lineas)
         {
-            await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(edicion(e), cantidad));
+            await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(edicion(e), cantidad, CodigoDeSucursal: Sucursal.Principal));
         }
 
         return (e, cuenta, e.Carritos.Todos.SingleOrDefault()!);
     }
 
-    private static Task<Resultado<VistaDelCheckout>> Iniciar(EntornoDelCarrito e, string? sucursal = null) =>
-        new IniciarCheckout(e.ServiciosDelCheckout()).Ejecutar(new IniciarCheckoutEntrada(sucursal));
+    private static Task<Resultado<VistaDelCheckout>> Iniciar(EntornoDelCarrito e) =>
+        new IniciarCheckout(e.ServiciosDelCheckout()).Ejecutar(new IniciarCheckoutEntrada());
 
     [Fact]
     [Trait("Criterio", "AC-CAR-04")]
@@ -45,7 +45,7 @@ public sealed class IniciarCheckoutTests
         Assert.Equal("Pedro Páramo", vista.Lineas.Single().Titulo);
         Assert.Equal(80m, vista.Subtotal);
         Assert.Equal(1, e.Inventario.ConsultasDeDisponibilidad);
-        Assert.Equal(0, e.Inventario.ConsultasPrevias);
+        Assert.Equal(1, e.Inventario.ConsultasPrevias);
         var checkout = Assert.Single(e.Checkouts.Todos);
         Assert.Equal(EstadoDelCheckout.EnEdicion, checkout.Estado);
         Assert.Equal(2, checkout.Lineas.Single().Cantidad.Valor);
@@ -53,25 +53,44 @@ public sealed class IniciarCheckoutTests
 
     [Fact]
     [Trait("Criterio", "AC-CAR-04")]
-    public async Task Con_la_sucursal_preferida_cada_linea_dice_si_esta_en_su_sucursal_o_viene_por_traslado_con_su_plazo()
+    public async Task Dos_lineas_del_mismo_libro_en_una_sucursal_se_suman_y_se_indica_que_alli_no_alcanza_aunque_otra_la_cubra()
     {
-        var aqui = Guid.Empty;
-        var lejos = Guid.Empty;
-        var sinRuta = Guid.Empty;
-        var (e, _, _) = await ConCarrito((x => aqui = x.Impreso(5), 1), (x => lejos = x.Impreso(5), 1), (x => sinRuta = x.Impreso(5), 1));
-        e.Inventario.FijarFuente(aqui, "sede-central", false, null);
-        e.Inventario.FijarFuente(lejos, "cusco", true, 3);
-        e.Inventario.FijarFuente(sinRuta, "cusco", true, null);
+        var e = EntornoDelCarrito.DeCliente();
+        var libro = e.Impreso(5, 40m, "Pedro Páramo");
+        e.Inventario.FijarStock(libro, 10, Sucursal.Cusco);
+        var carrito = CarritoDeDominio.Crear(Guid.NewGuid(), PropietarioDelCarrito.DeCuenta(e.Actor.Actual!.UsuarioId!.Value), Inicio);
+        carrito.Agregar(Guid.NewGuid(), libro, false, Sucursal.Principal, 20, Inicio);
+        carrito.Agregar(Guid.NewGuid(), libro, false, Sucursal.Cusco, 3, Inicio);
+        e.Carritos.Sembrar(carrito);
+        e.Inventario.FijarStock(libro, 20);
+        carrito.Agregar(Guid.NewGuid(), libro, false, Sucursal.Principal, 3, Inicio);
 
-        var vista = (await Iniciar(e, "sede-central")).Valor;
+        var resultado = await Iniciar(e);
 
-        var porEdicion = vista.Lineas.ToDictionary(l => l.EdicionId);
-        Assert.Equal(DisponibilidadDeLineaDeCheckout.EnSuSucursal, porEdicion[aqui].Disponibilidad);
-        Assert.Equal((DisponibilidadDeLineaDeCheckout.PorTraslado, 3, false), (porEdicion[lejos].Disponibilidad, porEdicion[lejos].PlazoInformadoDias, porEdicion[lejos].PlazoAConfirmar));
-        Assert.Equal((DisponibilidadDeLineaDeCheckout.PorTraslado, (int?)null, true), (porEdicion[sinRuta].Disponibilidad, porEdicion[sinRuta].PlazoInformadoDias, porEdicion[sinRuta].PlazoAConfirmar));
-        Assert.Equal(1, e.Inventario.ConsultasPrevias);
-        Assert.Equal(TipoDeEntrega.Recojo, e.Inventario.UltimaEntregaPrevia!.Tipo);
-        Assert.Equal("sede-central", e.Inventario.UltimaEntregaPrevia.CodigoDeSucursalDeRecojo);
+        Assert.Equal(ClavesDelCarrito.SinStock, resultado.Error!.Clave);
+        Assert.Equal(["20", Sucursal.Principal, libro.ToString("D")], resultado.Error.Errores.Select(x => x.Clave));
+        Assert.Empty(e.Checkouts.Todos);
+    }
+
+    [Fact]
+    [Trait("Criterio", "AC-CAR-04")]
+    public async Task La_consulta_previa_declara_la_sucursal_de_cada_linea_y_no_se_habla_de_traslados()
+    {
+        var e = EntornoDelCarrito.DeCliente();
+        var libro = e.Impreso(5, 40m, "Pedro Páramo");
+        e.Inventario.FijarStock(libro, 10, Sucursal.Cusco);
+        var carrito = CarritoDeDominio.Crear(Guid.NewGuid(), PropietarioDelCarrito.DeCuenta(e.Actor.Actual!.UsuarioId!.Value), Inicio);
+        carrito.Agregar(Guid.NewGuid(), libro, false, Sucursal.Principal, 5, Inicio);
+        carrito.Agregar(Guid.NewGuid(), libro, false, Sucursal.Cusco, 3, Inicio);
+        e.Carritos.Sembrar(carrito);
+
+        var vista = (await Iniciar(e)).Valor;
+
+        Assert.Equal([Sucursal.Principal, Sucursal.Cusco], e.Inventario.UltimasLineasPrevias.Select(l => l.CodigoDeSucursal));
+        Assert.Equal((TipoDeEntrega.Recojo, (string?)null), (e.Inventario.UltimaEntregaPrevia!.Tipo, e.Inventario.UltimaEntregaPrevia.RegionDeEntrega));
+        Assert.Equal(["Sede central", "Cusco"], vista.Lineas.Select(l => l.NombreDeSucursal));
+        Assert.All(vista.Lineas, l => Assert.Equal(DisponibilidadDeLineaDeCheckout.EnSuSucursal, l.Disponibilidad));
+        Assert.Equal(2, Assert.Single(e.Checkouts.Todos).Lineas.Count);
     }
 
     [Fact]
@@ -118,12 +137,12 @@ public sealed class IniciarCheckoutTests
     }
 
     [Fact]
-    public async Task Si_falla_la_consulta_previa_con_la_sucursal_preferida_tampoco_se_avanza()
+    public async Task Si_falla_la_consulta_previa_tampoco_se_avanza()
     {
         var (e, _, _) = await ConCarrito((x => x.Impreso(5), 1));
         e.Inventario.PreviaCaida = true;
 
-        var resultado = await Iniciar(e, "sede-central");
+        var resultado = await Iniciar(e);
 
         Assert.Equal(ClavesDelCarrito.StockNoValidable, resultado.Error!.Clave);
         Assert.Empty(e.Checkouts.Todos);
@@ -135,7 +154,7 @@ public sealed class IniciarCheckoutTests
     {
         var (e, _, _) = await ConCarrito((x => x.Digital(), 1), (x => x.Digital(), 1));
 
-        var resultado = await Iniciar(e, "sede-central");
+        var resultado = await Iniciar(e);
 
         Assert.True(resultado.EsExito);
         Assert.Equal(0, e.Inventario.ConsultasDeDisponibilidad);
@@ -163,7 +182,7 @@ public sealed class IniciarCheckoutTests
     {
         var sinCarrito = EntornoDelCarrito.DeCliente();
         var (vacio, _, carrito) = await ConCarrito((x => x.Impreso(5), 1));
-        await new EliminarLinea(vacio.Servicios()).Ejecutar(new EliminarLineaEntrada(carrito.Lineas.Single().EdicionId));
+        await new EliminarLinea(vacio.Servicios()).Ejecutar(new EliminarLineaEntrada(carrito.Lineas.Single().LineaId));
 
         var a = await Iniciar(sinCarrito);
         var b = await Iniciar(vacio);
@@ -220,7 +239,7 @@ public sealed class IniciarCheckoutTests
         var (e, _, _) = await ConCarrito((x => x.Impreso(5), 1));
         var primero = (await Iniciar(e)).Valor;
         var otra = e.Impreso(5, 10m, "Otra");
-        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(otra, 2));
+        await new AgregarLinea(e.Servicios()).Ejecutar(new AgregarLineaEntrada(otra, 2, CodigoDeSucursal: Sucursal.Principal));
 
         var segundo = (await Iniciar(e)).Valor;
 
@@ -238,10 +257,10 @@ public sealed class IniciarCheckoutTests
         var carrito = CarritoDeDominio.Crear(Guid.NewGuid(), PropietarioDelCarrito.DeCuenta(cuenta), Inicio);
         carrito.Agregar(libro, false, 1, Inicio);
         e.Carritos.Sembrar(carrito);
-        var checkout = Checkout.Iniciar(Guid.NewGuid(), cuenta, carrito.Id, [new LineaParaCheckout(libro, false, "Libro", "9780000000019", 1, 50m)], Guid.NewGuid, Inicio);
+        var checkout = Checkout.Iniciar(Guid.NewGuid(), cuenta, carrito.Id, [new LineaParaCheckout(libro, false, "Libro", "9780000000019", 1, 50m, libro, Sucursal.Principal)], Guid.NewGuid, Inicio);
         checkout.Aceptar(TextoLegal.Terminos, "t-1", Inicio);
         checkout.Aceptar(TextoLegal.Privacidad, "p-1", Inicio);
-        checkout.ElegirRecojo("sede-central", Inicio);
+        checkout.ElegirRecojo(Inicio);
         checkout.PrepararPasoAlPago(Guid.NewGuid(), CostoDeEnvio.Cero, s => s, s => s, carrito, Inicio);
         checkout.ConfirmarEnPago(checkout.PedidoId!.Value, checkout.GeneracionDeReserva, checkout.HuellaDeInstantanea!, Inicio.AddMinutes(15), carrito);
         e.Checkouts.Sembrar(checkout);
@@ -258,7 +277,7 @@ public sealed class IniciarCheckoutTests
     public async Task Si_dos_solicitudes_crean_el_checkout_a_la_vez_la_segunda_devuelve_el_que_existe()
     {
         var (e, cuenta, carrito) = await ConCarrito((x => x.Impreso(5), 1));
-        var rival = Checkout.Iniciar(Guid.NewGuid(), cuenta, carrito.Id, [new LineaParaCheckout(carrito.Lineas.Single().EdicionId, false, "Libro", "9780000000019", 1, 50m)], Guid.NewGuid, Inicio);
+        var rival = Checkout.Iniciar(Guid.NewGuid(), cuenta, carrito.Id, [new LineaParaCheckout(carrito.Lineas.Single().EdicionId, false, "Libro", "9780000000019", 1, 50m, carrito.Lineas.Single().EdicionId, Sucursal.Principal)], Guid.NewGuid, Inicio);
         e.Checkouts.AntesDeAgregar = () =>
         {
             e.Checkouts.Sembrar(rival);
@@ -325,21 +344,6 @@ public sealed class IniciarCheckoutTests
         Assert.Equal(0, e.Inventario.ConsultasDeDisponibilidad);
     }
 
-    [Theory]
-    [InlineData("")]
-    [InlineData("SEDE CENTRAL")]
-    [InlineData("sede/central")]
-    public async Task Una_sucursal_preferida_con_formato_invalido_es_una_validacion_que_no_repite_el_valor(string sucursal)
-    {
-        var (e, _, _) = await ConCarrito((x => x.Impreso(5), 1));
-
-        var resultado = await Iniciar(e, sucursal);
-
-        Assert.Equal(CategoriaDeError.Validacion, resultado.Error!.Categoria);
-        Assert.Equal("codigoDeSucursalPreferida", Assert.Single(resultado.Error.Errores).Campo);
-        Assert.DoesNotContain("sede", Assert.Single(resultado.Error.Errores).Clave, StringComparison.OrdinalIgnoreCase);
-    }
-
     [Fact]
     public async Task La_vista_usa_el_precio_vigente_del_catalogo_y_el_total_sin_envio_mientras_no_haya_entrega()
     {
@@ -354,20 +358,4 @@ public sealed class IniciarCheckoutTests
         Assert.Equal([TextoLegalDeCompra.Terminos, TextoLegalDeCompra.Privacidad], vista.TextosPorAceptar);
     }
 
-    [Fact]
-    public async Task Cambiar_de_sucursal_preferida_y_volver_a_iniciar_mantiene_el_carrito_intacto()
-    {
-        var edicion = Guid.Empty;
-        var (e, _, carrito) = await ConCarrito((x => edicion = x.Impreso(5), 2));
-        var antes = carrito.Lineas.Select(l => (l.EdicionId, l.Cantidad.Valor)).ToList();
-
-        var primero = await Iniciar(e, "sede-central");
-        var segundo = await Iniciar(e, "cusco");
-
-        // Caso límite de la sección 6 de la spec: elegir otra sucursal no toca el carrito (el carrito no guarda sucursal).
-        Assert.True(primero.EsExito);
-        Assert.True(segundo.EsExito);
-        Assert.Equal(antes, e.Carritos.Todos.Single().Lineas.Select(l => (l.EdicionId, l.Cantidad.Valor)).ToList());
-        Assert.Equal((edicion, 2), (antes.Single().EdicionId, antes.Single().Valor));
-    }
 }

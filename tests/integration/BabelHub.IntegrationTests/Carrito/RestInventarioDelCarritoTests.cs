@@ -219,7 +219,7 @@ public sealed class RestInventarioDelCarritoTests
 
     // ---------- T25b: consulta previa, reservar y liberar sobre el cliente real ----------
 
-    private static readonly EntregaParaElInventario Recojo = new(TipoDeEntrega.Recojo, "sede-central", null);
+    private static readonly EntregaParaElInventario Recojo = new(TipoDeEntrega.Recojo, null);
 
     private static LineaParaElInventario Pedida(int cantidad = 2) => new(Guid.NewGuid(), Guid.NewGuid(), cantidad);
 
@@ -240,7 +240,7 @@ public sealed class RestInventarioDelCarritoTests
 
         Assert.True(respuesta.Exitosa);
         var enviada = Assert.Single(cliente.Previas);
-        Assert.Equal((TipoDeEntregaDeLaReserva.Recojo, "sede-central", null), (enviada.Tipo, enviada.CodigoDeSucursalDeRecojo, enviada.RegionDeEntrega));
+        Assert.Equal((TipoDeEntregaDeLaReserva.Recojo, null, null), (enviada.Tipo, enviada.CodigoDeSucursalDeRecojo, enviada.RegionDeEntrega));
         Assert.Equal([uno.LineaId, dos.LineaId], enviada.Lineas.Select(l => l.LineaId));
         Assert.Equal((true, "lima", true, 3), (respuesta.Valor.Lineas[1].HayStock, respuesta.Valor.Lineas[1].CodigoDeFuente, respuesta.Valor.Lineas[1].RequiereTraslado, respuesta.Valor.Lineas[1].PlazoEstimadoDias));
         Assert.Equal(Inicio.AddSeconds(-2), respuesta.Valor.ConsultadaEn);
@@ -294,7 +294,7 @@ public sealed class RestInventarioDelCarritoTests
         Assert.Equal(TipoDeResultadoDeReservar.Reservada, resultado.Tipo);
         var (solicitud, clave) = Assert.Single(cliente.Reservas);
         Assert.Equal(ClaveDeReserva.Para(pedido, 3), clave);
-        Assert.Equal((pedido, TipoDeEntregaDeLaReserva.Recojo, "sede-central"), (solicitud.PedidoId, solicitud.Tipo, solicitud.CodigoDeSucursalDeRecojo));
+        Assert.Equal((pedido, TipoDeEntregaDeLaReserva.Recojo, null), (solicitud.PedidoId, solicitud.Tipo, solicitud.CodigoDeSucursalDeRecojo));
         Assert.Equal(Inicio.AddMinutes(15), resultado.Reserva!.ExpiraEn);
         Assert.Equal(lineas.Select(l => l.LineaId), resultado.Reserva.Lineas.Select(l => l.LineaId));
     }
@@ -373,7 +373,7 @@ public sealed class RestInventarioDelCarritoTests
         var lineas = new[] { Pedida() };
         cliente.Reserva = (s, _) => ResultadoDelInventario<ReservaDelInventario>.ConValor(ReservaPendiente(s.PedidoId, lineas));
 
-        await adaptador.Reservar(Guid.NewGuid(), 1, new EntregaParaElInventario(TipoDeEntrega.Domicilio, null, "ayacucho"), lineas);
+        await adaptador.Reservar(Guid.NewGuid(), 1, new EntregaParaElInventario(TipoDeEntrega.Domicilio, "ayacucho"), lineas);
 
         var (solicitud, _) = Assert.Single(cliente.Reservas);
         Assert.Equal((TipoDeEntregaDeLaReserva.Domicilio, null, "ayacucho"), (solicitud.Tipo, solicitud.CodigoDeSucursalDeRecojo, solicitud.RegionDeEntrega));
